@@ -37,17 +37,30 @@ desc="Use devmatch(8) to load kernel modules"
 
 start_cmd="${name}_start"
 stop_cmd=':'
+one_nomatch="$2"
 
 devmatch_start()
 {
 	local x
 
-	x=$(devmatch | sort -u)
+	if [ -n "$one_nomatch" ]; then
+		x=$(devmatch -p "${one_nomatch}")
+	else
+		x=$(devmatch)
+	fi
 
 	[ -n "$x" ] || return
 
-	echo "Autoloading modules: ${x}"
-	kldload ${x}
+	# While kldload can accept multiple modules
+	# on the line at once, we loop here in case
+	# there's some weird error with one of them.
+	# We also optimize against the false positives
+	# or drivers that have symbolic links that
+	# confuse devmatch by running it -n.
+	for m in ${x}; do
+		echo "Autoloading module: ${m}"
+		kldload -n ${m}
+	done
 }
 
 load_rc_config $name

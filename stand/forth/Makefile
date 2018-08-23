@@ -7,7 +7,6 @@ MAN+=	beastie.4th.8 \
 	check-password.4th.8 \
 	color.4th.8 \
 	delay.4th.8 \
-	loader.conf.5 \
 	loader.4th.8 \
 	menu.4th.8 \
 	menusets.4th.8 \
@@ -19,6 +18,7 @@ FILES+=	brand-fbsd.4th
 FILES+=	check-password.4th
 FILES+=	color.4th
 FILES+=	delay.4th
+FILES+=	efi.4th
 FILES+=	frames.4th
 FILES+=	loader.4th
 FILES+=	logo-beastie.4th
@@ -33,10 +33,9 @@ FILES+=	screen.4th
 FILES+=	shortcuts.4th
 FILES+=	support.4th
 FILES+=	version.4th
-FILESDIR_loader.conf=	/boot/defaults
 
 # Allow machine specific loader.rc to be installed.
-.for f in loader.rc menu.rc loader.conf
+.for f in loader.rc menu.rc
 .if exists(${BOOTSRC}/${MACHINE:C/amd64/i386/}/loader/${f})
 FILES+= ${BOOTSRC}/${MACHINE:C/amd64/i386/}/loader/${f}
 .else

@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause OR GPL-2.0
+ *
  * Copyright (c) 2004 Topspin Communications.  All rights reserved.
  * Copyright (c) 2005 Sun Microsystems, Inc. All rights reserved.
  *
@@ -29,6 +31,8 @@
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
+ *
+ * $FreeBSD$
  */
 
 #include <linux/errno.h>
@@ -151,7 +155,7 @@ static void ib_fmr_batch_release(struct ib_fmr_pool *pool)
 #ifdef DEBUG
 		if (fmr->ref_count !=0) {
 			pr_warn(PFX "Unmapping FMR %p with ref count %d\n",
-				fmr, (int)fmr->ref_count);
+				fmr, fmr->ref_count);
 		}
 #endif
 	}

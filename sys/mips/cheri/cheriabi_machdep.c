@@ -63,28 +63,6 @@
 #include <sys/ucontext.h>
 #include <sys/user.h>
 
-/* Required by cheriabi_fill_uap.h */
-#include <sys/capsicum.h>
-#include <sys/linker.h>
-#include <sys/ipc.h>
-#include <sys/msg.h>
-#include <sys/mqueue.h>
-#include <sys/poll.h>
-#include <sys/procctl.h>
-#include <sys/resource.h>
-#include <sys/sched.h>
-#include <sys/sem.h>
-#include <sys/shm.h>
-#include <sys/socket.h>
-#include <sys/stat.h>
-#include <sys/timeffc.h>
-#include <sys/timex.h>
-#include <sys/uuid.h>
-#ifdef CHERI_KERNEL
-#include <sys/elf.h>
-#endif
-#include <netinet/sctp.h>
-
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
@@ -102,11 +80,6 @@
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_sysargmap.h>
 #include <compat/cheriabi/cheriabi_util.h>
-
-#include <compat/cheriabi/cheriabi_signal.h>
-#include <compat/cheriabi/cheriabi_aio.h>
-#include <compat/cheriabi/cheriabi_fill_uap.h>
-#include <compat/cheriabi/cheriabi_dispatch_fill_uap.h>
 
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
@@ -211,108 +184,13 @@ cheriabi_elf_header_supported(struct image_params *imgp)
 	return FALSE;
 }
 
-__attribute__((always_inline))
-inline void
-cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *argp,
-    int argnum, int ptrmask)
-{
-	struct trapframe *locr0 = td->td_frame;	 /* aka td->td_pcb->pcv_regs */
-	struct sysentvec *se;
-	int i, intreg_offset, ptrreg_offset, is_ptr_arg;
-
-	se = td->td_proc->p_sysent;
-
-	KASSERT(argnum >= 0, ("Negative argument number %d\n", argnum));
-	KASSERT(argnum < 8, ("Argument number %d >= 8\n", argnum));
-
-	/*
-	 * For syscall() and __syscall(), the arguments are stored in a
-	 * var args block pointed to by c13.
-	 *
-	 * XXX: Integer arguments can be stored as either 32-bit integers
-	 * or 64-bit longs.  We don't have a way to know what size an
-	 * integer argument is.  For now we assume they are 32-bit
-	 * integers since those arguments are more common with system
-	 * calls than off_t or longs.
-	 */
-	if (td->td_sa.argoff > 1) {
-		/* An earlier argument failed to copyin. */
-		*argp = (void * __capability)(uintcap_t)0;
-		return;
-	} else if (td->td_sa.argoff == 1) {
-		int error, intval, offset;
-
-		offset = 0;
-		for (i = 0; i < argnum; i++) {
-			if (ptrmask & (1 << i)) {
-				offset = roundup2(offset, sizeof(uintcap_t));
-				offset += sizeof(uintcap_t);
-			} else
-				offset += sizeof(int);
-		}
-		if (ptrmask & (1 << argnum))
-			error = copyincap_c((char * __capability)locr0->c13 +
-			    offset, argp, sizeof(*argp));
-		else {
-			error = copyin_c((char * __capability)locr0->c13 +
-			    offset, &intval, sizeof(intval));
-			*argp = (void * __capability)(__intcap_t)intval;
-		}
-		if (error)
-			td->td_sa.argoff = error + 1;
-		return;
-	}
-
-	/* XXX: O(1) possible with more bit twiddling. */
-	intreg_offset = ptrreg_offset = -1;
-	for (i = 0; i <= argnum; i++) {
-		if (ptrmask & (1 << i)) {
-			is_ptr_arg = 1;
-			ptrreg_offset++;
-		} else {
-			is_ptr_arg = 0;
-			intreg_offset++;
-		}
-	}
-
-	if (is_ptr_arg) {
-		switch (ptrreg_offset) {
-		case 0:	*argp = *((void * __capability *)&locr0->c3);	break;
-		case 1:	*argp = *((void * __capability *)&locr0->c4);	break;
-		case 2:	*argp = *((void * __capability *)&locr0->c5);	break;
-		case 3:	*argp = *((void * __capability *)&locr0->c6);	break;
-		case 4:	*argp = *((void * __capability *)&locr0->c7);	break;
-		case 5:	*argp = *((void * __capability *)&locr0->c8);	break;
-		case 6:	*argp = *((void * __capability *)&locr0->c9);	break;
-		case 7:	*argp = *((void * __capability *)&locr0->c10);	break;
-		default:
-			panic("%s: pointer argument %d out of range",
-			    __func__, ptrreg_offset);
-		}
-	} else {
-		switch (intreg_offset) {
-		case 0:	*argp = (void * __capability)(__intcap_t)locr0->a0; break;
-		case 1:	*argp = (void * __capability)(__intcap_t)locr0->a1; break;
-		case 2:	*argp = (void * __capability)(__intcap_t)locr0->a2; break;
-		case 3:	*argp = (void * __capability)(__intcap_t)locr0->a3; break;
-		case 4:	*argp = (void * __capability)(__intcap_t)locr0->a4; break;
-		case 5:	*argp = (void * __capability)(__intcap_t)locr0->a5; break;
-		case 6:	*argp = (void * __capability)(__intcap_t)locr0->a6; break;
-		case 7:	*argp = (void * __capability)(__intcap_t)locr0->a7; break;
-		default:
-			panic("%s: integer argument %d out of range",
-			    __func__, intreg_offset);
-		}
-	}
-}
-
 static int
 cheriabi_fetch_syscall_args(struct thread *td)
 {
 	struct trapframe *locr0 = td->td_frame;	 /* aka td->td_pcb->pcv_regs */
 	struct sysentvec *se;
 	struct syscall_args *sa;
-	int error;
+	int error, i, ptrmask;
 
 	error = 0;
 
@@ -343,10 +221,56 @@ cheriabi_fetch_syscall_args(struct thread *td)
 
 	sa->narg = sa->callp->sy_narg;
 
-	error = cheriabi_dispatch_fill_uap(td, sa->code, sa->args);
+	if (sa->code >= nitems(cheriabi_sysargmask))
+		ptrmask = 0;
+	else
+		ptrmask = cheriabi_sysargmask[sa->code];
 
-	if (error == 0 && sa->argoff > 1)
-		error = sa->argoff - 1;
+	/*
+	 * For syscall() and __syscall(), the arguments are stored in a
+	 * var args block pointed to by c13.
+	 */
+	if (td->td_sa.argoff == 1) {
+		uint64_t intval;
+		int offset;
+
+		offset = 0;
+		for (i = 0; i < sa->narg; i++) {
+			if (ptrmask & (1 << i)) {
+				offset = roundup2(offset, sizeof(uintcap_t));
+				error = copyincap_c(
+				    (char * __capability)locr0->c13 + offset,
+				    &sa->args[i], sizeof(sa->args[i]));
+				offset += sizeof(uintcap_t);
+			} else {
+				error = copyin_c(
+				    (char * __capability)locr0->c13 + offset,
+				    &intval, sizeof(intval));
+				sa->args[i] = intval;
+				offset += sizeof(uint64_t);
+			}
+			if (error)
+				break;
+		}
+	} else {
+		int intreg_offset, ptrreg_offset;
+
+		intreg_offset = 0;
+		ptrreg_offset = 0;
+		for (i = 0; i < sa->narg; i++) {
+			if (ptrmask & (1 << i)) {
+				if (ptrreg_offset > 7)
+					panic(
+				    "%s: pointer argument %d out of range",
+					    __func__, ptrreg_offset);
+				sa->args[i] = (intcap_t)(&locr0->c3)[ptrreg_offset];
+				ptrreg_offset++;
+			} else {
+				sa->args[i] = (&locr0->a0)[intreg_offset];
+				intreg_offset++;
+			}
+		}
+	}
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = locr0->v1;

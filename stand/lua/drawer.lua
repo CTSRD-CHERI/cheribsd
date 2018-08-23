@@ -1,5 +1,8 @@
 --
+-- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+--
 -- Copyright (c) 2015 Pedro Souza <pedrosouza@freebsd.org>
+-- Copyright (c) 2018 Kyle Evans <kevans@FreeBSD.org>
 -- All rights reserved.
 --
 -- Redistribution and use in source and binary forms, with or without
@@ -26,301 +29,437 @@
 -- $FreeBSD$
 --
 
-local drawer = {};
+local color = require("color")
+local config = require("config")
+local core = require("core")
+local screen = require("screen")
 
-local color = require("color");
-local core = require("core");
-local screen = require("screen");
+local drawer = {}
 
-drawer.brand_position = {x = 2, y = 1};
-drawer.fbsd_logo = {
-	"  ______               ____   _____ _____  ",
-	" |  ____|             |  _ \\ / ____|  __ \\ ",
-	" | |___ _ __ ___  ___ | |_) | (___ | |  | |",
-	" |  ___| '__/ _ \\/ _ \\|  _ < \\___ \\| |  | |",
-	" | |   | | |  __/  __/| |_) |____) | |__| |",
-	" | |   | | |    |    ||     |      |      |",
-	" |_|   |_|  \\___|\\___||____/|_____/|_____/ "
-};
+local fbsd_logo
+local beastie_color
+local beastie
+local fbsd_logo_v
+local orb_color
+local orb
+local none
 
-drawer.logo_position = {x = 46, y = 1};
-drawer.beastie_color = {
-	"               \027[31m,        ,",
-	"              /(        )`",
-	"              \\ \\___   / |",
-	"              /- \027[37m_\027[31m  `-/  '",
-	"             (\027[37m/\\/ \\\027[31m \\   /\\",
-	"             \027[37m/ /   |\027[31m `    \\",
-	"             \027[34mO O   \027[37m) \027[31m/    |",
-	"             \027[37m`-^--'\027[31m`<     '",
-	"            (_.)  _  )   /",
-	"             `.___/`    /",
-	"               `-----' /",
-	"  \027[33m<----.\027[31m     __ / __   \\",
-	"  \027[33m<----|====\027[31mO)))\027[33m==\027[31m) \\) /\027[33m====|",
-	"  \027[33m<----'\027[31m    `--' `.__,' \\",
-	"               |        |",
-	"                \\       /       /\\",
-	"           \027[36m______\027[31m( (_  / \\______/",
-	"         \027[36m,'  ,-----'   |",
-	"         `--{__________)\027[37m"
-};
+local function menuEntryName(drawing_menu, entry)
+	local name_handler = drawer.menu_name_handlers[entry.entry_type]
 
-drawer.beastie = {
-	"               ,        ,",
-	"              /(        )`",
-	"              \\ \\___   / |",
-	"              /- _  `-/  '",
-	"             (/\\/ \\ \\   /\\",
-	"             / /   | `    \\",
-	"             O O   ) /    |",
-	"             `-^--'`<     '",
-	"            (_.)  _  )   /",
-	"             `.___/`    /",
-	"               `-----' /",
-	"  <----.     __ / __   \\",
-	"  <----|====O)))==) \\) /====|",
-	"  <----'    `--' `.__,' \\",
-	"               |        |",
-	"                \\       /       /\\",
-	"           ______( (_  / \\______/",
-	"         ,'  ,-----'   |",
-	"         `--{__________)"
-};
+	if name_handler ~= nil then
+		return name_handler(drawing_menu, entry)
+	end
+	if type(entry.name) == "function" then
+		return entry.name()
+	end
+	return entry.name
+end
 
-drawer.fbsd_logo_shift = {x = 5, y = 4};
-drawer.fbsd_logo_v = {
-	"  ______",
-	" |  ____| __ ___  ___ ",
-	" | |__ | '__/ _ \\/ _ \\",
-	" |  __|| | |  __/  __/",
-	" | |   | | |    |    |",
-	" |_|   |_|  \\___|\\___|",
-	"  ____   _____ _____",
-	" |  _ \\ / ____|  __ \\",
-	" | |_) | (___ | |  | |",
-	" |  _ < \\___ \\| |  | |",
-	" | |_) |____) | |__| |",
-	" |     |      |      |",
-	" |____/|_____/|_____/"
-};
+fbsd_logo = {
+"  ______               ____   _____ _____  ",
+" |  ____|             |  _ \\ / ____|  __ \\ ",
+" | |___ _ __ ___  ___ | |_) | (___ | |  | |",
+" |  ___| '__/ _ \\/ _ \\|  _ < \\___ \\| |  | |",
+" | |   | | |  __/  __/| |_) |____) | |__| |",
+" | |   | | |    |    ||     |      |      |",
+" |_|   |_|  \\___|\\___||____/|_____/|_____/ "
+}
 
-drawer.orb_shift = {x = 2, y = 4};
-drawer.orb_color = {
-	"  \027[31m```                        \027[31;1m`\027[31m",
-	" s` `.....---...\027[31;1m....--.```   -/\027[31m",
-	" +o   .--`         \027[31;1m/y:`      +.\027[31m",
-	"  yo`:.            \027[31;1m:o      `+-\027[31m",
-	"   y/               \027[31;1m-/`   -o/\027[31m",
-	"  .-                  \027[31;1m::/sy+:.\027[31m",
-	"  /                     \027[31;1m`--  /\027[31m",
-	" `:                          \027[31;1m:`\027[31m",
-	" `:                          \027[31;1m:`\027[31m",
-	"  /                          \027[31;1m/\027[31m",
-	"  .-                        \027[31;1m-.\027[31m",
-	"   --                      \027[31;1m-.\027[31m",
-	"    `:`                  \027[31;1m`:`",
-	"      \027[31;1m.--             `--.",
-	"         .---.....----.\027[37m"
-};
+beastie_color = {
+"               \027[31m,        ,",
+"              /(        )`",
+"              \\ \\___   / |",
+"              /- \027[37m_\027[31m  `-/  '",
+"             (\027[37m/\\/ \\\027[31m \\   /\\",
+"             \027[37m/ /   |\027[31m `    \\",
+"             \027[34mO O   \027[37m) \027[31m/    |",
+"             \027[37m`-^--'\027[31m`<     '",
+"            (_.)  _  )   /",
+"             `.___/`    /",
+"               `-----' /",
+"  \027[33m<----.\027[31m     __ / __   \\",
+"  \027[33m<----|====\027[31mO)))\027[33m==\027[31m) \\) /\027[33m====|",
+"  \027[33m<----'\027[31m    `--' `.__,' \\",
+"               |        |",
+"                \\       /       /\\",
+"           \027[36m______\027[31m( (_  / \\______/",
+"         \027[36m,'  ,-----'   |",
+"         `--{__________)\027[37m"
+}
 
-drawer.orb = {
-	"  ```                        `",
-	" s` `.....---.......--.```   -/",
-	" +o   .--`         /y:`      +.",
-	"  yo`:.            :o      `+-",
-	"   y/               -/`   -o/",
-	"  .-                  ::/sy+:.",
-	"  /                     `--  /",
-	" `:                          :`",
-	" `:                          :`",
-	"  /                          /",
-	"  .-                        -.",
-	"   --                      -.",
-	"    `:`                  `:`",
-	"      .--             `--.",
-	"         .---.....----."
-};
+beastie = {
+"               ,        ,",
+"              /(        )`",
+"              \\ \\___   / |",
+"              /- _  `-/  '",
+"             (/\\/ \\ \\   /\\",
+"             / /   | `    \\",
+"             O O   ) /    |",
+"             `-^--'`<     '",
+"            (_.)  _  )   /",
+"             `.___/`    /",
+"               `-----' /",
+"  <----.     __ / __   \\",
+"  <----|====O)))==) \\) /====|",
+"  <----'    `--' `.__,' \\",
+"               |        |",
+"                \\       /       /\\",
+"           ______( (_  / \\______/",
+"         ,'  ,-----'   |",
+"         `--{__________)"
+}
 
-drawer.none = {""};
+fbsd_logo_v = {
+"  ______",
+" |  ____| __ ___  ___ ",
+" | |__ | '__/ _ \\/ _ \\",
+" |  __|| | |  __/  __/",
+" | |   | | |    |    |",
+" |_|   |_|  \\___|\\___|",
+"  ____   _____ _____",
+" |  _ \\ / ____|  __ \\",
+" | |_) | (___ | |  | |",
+" |  _ < \\___ \\| |  | |",
+" | |_) |____) | |__| |",
+" |     |      |      |",
+" |____/|_____/|_____/"
+}
 
-drawer.none_shift = {x = 17, y = 0};
+orb_color = {
+"  \027[31m```                        \027[31;1m`\027[31m",
+" s` `.....---...\027[31;1m....--.```   -/\027[31m",
+" +o   .--`         \027[31;1m/y:`      +.\027[31m",
+"  yo`:.            \027[31;1m:o      `+-\027[31m",
+"   y/               \027[31;1m-/`   -o/\027[31m",
+"  .-                  \027[31;1m::/sy+:.\027[31m",
+"  /                     \027[31;1m`--  /\027[31m",
+" `:                          \027[31;1m:`\027[31m",
+" `:                          \027[31;1m:`\027[31m",
+"  /                          \027[31;1m/\027[31m",
+"  .-                        \027[31;1m-.\027[31m",
+"   --                      \027[31;1m-.\027[31m",
+"    `:`                  \027[31;1m`:`",
+"      \027[31;1m.--             `--.",
+"         .---.....----.\027[37m"
+}
 
-drawer.menu_position = {x = 6, y = 11};
+orb = {
+"  ```                        `",
+" s` `.....---.......--.```   -/",
+" +o   .--`         /y:`      +.",
+"  yo`:.            :o      `+-",
+"   y/               -/`   -o/",
+"  .-                  ::/sy+:.",
+"  /                     `--  /",
+" `:                          :`",
+" `:                          :`",
+"  /                          /",
+"  .-                        -.",
+"   --                      -.",
+"    `:`                  `:`",
+"      .--             `--.",
+"         .---.....----."
+}
 
-drawer.box_pos_dim = {x = 3, y = 10, w = 41, h = 11};
+none = {""}
+
+-- Module exports
+drawer.menu_name_handlers = {
+	-- Menu name handlers should take the menu being drawn and entry being
+	-- drawn as parameters, and return the name of the item.
+	-- This is designed so that everything, including menu separators, may
+	-- have their names derived differently. The default action for entry
+	-- types not specified here is to use entry.name directly.
+	[core.MENU_SEPARATOR] = function(_, entry)
+		if entry.name ~= nil then
+			if type(entry.name) == "function" then
+				return entry.name()
+			end
+			return entry.name
+		end
+		return ""
+	end,
+	[core.MENU_CAROUSEL_ENTRY] = function(_, entry)
+		local carid = entry.carousel_id
+		local caridx = config.getCarouselIndex(carid)
+		local choices = entry.items
+		if type(choices) == "function" then
+			choices = choices()
+		end
+		if #choices < caridx then
+			caridx = 1
+		end
+		return entry.name(caridx, choices[caridx], choices)
+	end,
+}
+
+drawer.brand_position = {x = 2, y = 1}
+drawer.logo_position = {x = 46, y = 4}
+drawer.menu_position = {x = 5, y = 10}
+drawer.frame_size = {w = 42, h = 13}
+drawer.default_shift = {x = 0, y = 0}
+drawer.shift = drawer.default_shift
+
+drawer.branddefs = {
+	-- Indexed by valid values for loader_brand in loader.conf(5). Valid
+	-- keys are: graphic (table depicting graphic)
+	["fbsd"] = {
+		graphic = fbsd_logo,
+	},
+	["none"] = {
+		graphic = none,
+	},
+}
+
+drawer.logodefs = {
+	-- Indexed by valid values for loader_logo in loader.conf(5). Valid keys
+	-- are: requires_color (boolean), graphic (table depicting graphic), and
+	-- shift (table containing x and y).
+	["beastie"] = {
+		requires_color = true,
+		graphic = beastie_color,
+	},
+	["beastiebw"] = {
+		graphic = beastie,
+	},
+	["fbsdbw"] = {
+		graphic = fbsd_logo_v,
+		shift = {x = 5, y = 4},
+	},
+	["orb"] = {
+		requires_color = true,
+		graphic = orb_color,
+		shift = {x = 2, y = 4},
+	},
+	["orbbw"] = {
+		graphic = orb,
+		shift = {x = 2, y = 4},
+	},
+	["tribute"] = {
+		graphic = fbsd_logo,
+	},
+	["tributebw"] = {
+		graphic = fbsd_logo,
+	},
+	["none"] = {
+		graphic = none,
+		shift = {x = 17, y = 0},
+	},
+}
+
+drawer.frame_styles = {
+	-- Indexed by valid values for loader_menu_frame in loader.conf(5).
+	-- All of the keys appearing below must be set for any menu frame style
+	-- added to drawer.frame_styles.
+	["ascii"] = {
+		horizontal	= "-",
+		vertical	= "|",
+		top_left	= "+",
+		bottom_left	= "+",
+		top_right	= "+",
+		bottom_right	= "+",
+	},
+	["single"] = {
+		horizontal	= "\xC4",
+		vertical	= "\xB3",
+		top_left	= "\xDA",
+		bottom_left	= "\xC0",
+		top_right	= "\xBF",
+		bottom_right	= "\xD9",
+	},
+	["double"] = {
+		horizontal	= "\xCD",
+		vertical	= "\xBA",
+		top_left	= "\xC9",
+		bottom_left	= "\xC8",
+		top_right	= "\xBB",
+		bottom_right	= "\xBC",
+	},
+}
 
 function drawer.drawscreen(menu_opts)
 	-- drawlogo() must go first.
 	-- it determines the positions of other elements
-	drawer.drawlogo();
-        drawer.drawbrand();
-        drawer.drawbox();
-	return drawer.drawmenu(menu_opts);
+	drawer.drawlogo()
+	drawer.drawbrand()
+	drawer.drawbox()
+	return drawer.drawmenu(menu_opts)
 end
 
-function drawer.drawmenu(m)
-	x = drawer.menu_position.x;
-	y = drawer.menu_position.y;
+function drawer.drawmenu(menudef)
+	local x = drawer.menu_position.x
+	local y = drawer.menu_position.y
+
+	x = x + drawer.shift.x
+	y = y + drawer.shift.y
 
 	-- print the menu and build the alias table
-	local alias_table = {};
-	local entry_num = 0;
-	for line_num, e in ipairs(m) do
-		if (e.entry_type ~= core.MENU_SEPARATOR) then
-			entry_num = entry_num + 1;
-			screen.setcursor(x, y + line_num);
-			local name = "";
+	local alias_table = {}
+	local entry_num = 0
+	local menu_entries = menudef.entries
+	local effective_line_num = 0
+	if type(menu_entries) == "function" then
+		menu_entries = menu_entries()
+	end
+	for _, e in ipairs(menu_entries) do
+		-- Allow menu items to be conditionally visible by specifying
+		-- a visible function.
+		if e.visible ~= nil and not e.visible() then
+			goto continue
+		end
+		effective_line_num = effective_line_num + 1
+		if e.entry_type ~= core.MENU_SEPARATOR then
+			entry_num = entry_num + 1
+			screen.setcursor(x, y + effective_line_num)
 
-			if (e.entry_type == core.MENU_CAROUSEL_ENTRY) then
-				local carid = e.carousel_id;
-				local caridx = menu.getCarouselIndex(carid);
-				local choices = e.items();
-
-				if (#choices < caridx) then
-					caridx = 1;
-				end;
-				name = e.name(caridx, choices[caridx], choices);
-			else
-				name = e.name();
-			end
-			print(entry_num .. ". "..name);
+			printc(entry_num .. ". " .. menuEntryName(menudef, e))
 
 			-- fill the alias table
-			alias_table[tostring(entry_num)] = e;
-			if (e.alias ~= nil) then
-				for n, a in ipairs(e.alias) do
-					alias_table[a] = e;
+			alias_table[tostring(entry_num)] = e
+			if e.alias ~= nil then
+				for _, a in ipairs(e.alias) do
+					alias_table[a] = e
 				end
 			end
 		else
-			screen.setcursor(x, y + line_num);
-			print(e.name());
+			screen.setcursor(x, y + effective_line_num)
+			printc(menuEntryName(menudef, e))
 		end
+		::continue::
 	end
-	return alias_table;
+	return alias_table
 end
 
-
 function drawer.drawbox()
-	x = drawer.box_pos_dim.x;
-	y = drawer.box_pos_dim.y;
-	w = drawer.box_pos_dim.w;
-	h = drawer.box_pos_dim.h;
+	local x = drawer.menu_position.x - 3
+	local y = drawer.menu_position.y - 1
+	local w = drawer.frame_size.w
+	local h = drawer.frame_size.h
 
-	local hl = string.char(0xCD);
-	local vl = string.char(0xBA);
-
-	local tl = string.char(0xC9);
-	local bl = string.char(0xC8);
-	local tr = string.char(0xBB);
-	local br = string.char(0xBC);
-
-	screen.setcursor(x, y); print(tl);
-	screen.setcursor(x, y+h); print(bl);
-	screen.setcursor(x+w, y); print(tr);
-	screen.setcursor(x+w, y+h); print(br);
-
-	for i = 1, w-1 do
-		screen.setcursor(x+i, y);
-		print(hl);
-		screen.setcursor(x+i, y+h);
-		print(hl);
+	local framestyle = loader.getenv("loader_menu_frame") or "double"
+	local framespec = drawer.frame_styles[framestyle]
+	-- If we don't have a framespec for the current frame style, just don't
+	-- draw a box.
+	if framespec == nil then
+		return
 	end
 
-	for i = 1, h-1 do
-		screen.setcursor(x, y+i);
-		print(vl);
-		screen.setcursor(x+w, y+i);
-		print(vl);
+	local hl = framespec.horizontal
+	local vl = framespec.vertical
+
+	local tl = framespec.top_left
+	local bl = framespec.bottom_left
+	local tr = framespec.top_right
+	local br = framespec.bottom_right
+
+	x = x + drawer.shift.x
+	y = y + drawer.shift.y
+
+	screen.setcursor(x, y); printc(tl)
+	screen.setcursor(x, y + h); printc(bl)
+	screen.setcursor(x + w, y); printc(tr)
+	screen.setcursor(x + w, y + h); printc(br)
+
+	screen.setcursor(x + 1, y)
+	for _ = 1, w - 1 do
+		printc(hl)
 	end
 
-	screen.setcursor(x+(w/2)-9, y);
-	print("Welcome to FreeBSD");
+	screen.setcursor(x + 1, y + h)
+	for _ = 1, w - 1 do
+		printc(hl)
+	end
+
+	for i = 1, h - 1 do
+		screen.setcursor(x, y + i)
+		printc(vl)
+		screen.setcursor(x + w, y + i)
+		printc(vl)
+	end
+
+	local menu_header = loader.getenv("loader_menu_title") or
+	    "Welcome to FreeBSD"
+	local menu_header_align = loader.getenv("loader_menu_title_align")
+	local menu_header_x
+
+	if menu_header_align ~= nil then
+		menu_header_align = menu_header_align:lower()
+		if menu_header_align == "left" then
+			-- Just inside the left border on top
+			menu_header_x = x + 1
+		elseif menu_header_align == "right" then
+			-- Just inside the right border on top
+			menu_header_x = x + w - #menu_header
+		end
+	end
+	if menu_header_x == nil then
+		menu_header_x = x + (w / 2) - (#menu_header / 2)
+	end
+	screen.setcursor(menu_header_x, y)
+	printc(menu_header)
 end
 
 function drawer.draw(x, y, logo)
 	for i = 1, #logo do
-		screen.setcursor(x, y + i);
-		print(logo[i]);
+		screen.setcursor(x, y + i - 1)
+		printc(logo[i])
 	end
 end
 
 function drawer.drawbrand()
-	local x = tonumber(loader.getenv("loader_brand_x"));
-	local y = tonumber(loader.getenv("loader_brand_y"));
+	local x = tonumber(loader.getenv("loader_brand_x")) or
+	    drawer.brand_position.x
+	local y = tonumber(loader.getenv("loader_brand_y")) or
+	    drawer.brand_position.y
 
-	if not x then
-		x = drawer.brand_position.x;
-	end
-	if not y then
-		y = drawer.brand_position.y;
+	local graphic = drawer.branddefs[loader.getenv("loader_brand")]
+	if graphic == nil then
+		graphic = fbsd_logo
 	end
 
-	local logo = load("return " .. tostring(loader.getenv("loader_brand")))();
-	if not logo then
-		logo = drawer.fbsd_logo;
-	end
-	drawer.draw(x, y, logo);
+	x = x + drawer.shift.x
+	y = y + drawer.shift.y
+	drawer.draw(x, y, graphic)
 end
 
 function drawer.drawlogo()
-	local x = tonumber(loader.getenv("loader_logo_x"));
-	local y = tonumber(loader.getenv("loader_logo_y"));
+	local x = tonumber(loader.getenv("loader_logo_x")) or
+	    drawer.logo_position.x
+	local y = tonumber(loader.getenv("loader_logo_y")) or
+	    drawer.logo_position.y
 
-	if not x then
-		x = drawer.logo_position.x;
-	end
-	if not y then
-		y = drawer.logo_position.y;
-	end
+	local logo = loader.getenv("loader_logo")
+	local colored = color.isEnabled()
 
-	local logo = loader.getenv("loader_logo");
-	local s = {x = 0, y = 0};
-	local colored = color.isEnabled();
+	-- Lookup
+	local logodef = drawer.logodefs[logo]
 
-	if logo == "beastie" then
+	if logodef == nil or logodef.graphic == nil or
+	    (not colored and logodef.requires_color) then
+		-- Choose a sensible default
 		if colored then
-			logo = drawer.beastie_color;
-		end
-	elseif logo == "beastiebw" then
-		logo = drawer.beastie;
-	elseif logo == "fbsdbw" then
-		logo = drawer.fbsd_logo_v;
-		s = drawer.fbsd_logo_shift;
-	elseif logo == "orb" then
-		if colored then
-			logo = drawer.orb_color;
-		end
-		s = drawer.orb_shift;
-	elseif logo == "orbbw" then
-		logo = drawer.orb;
-		s = drawer.orb_shift;
-	elseif logo == "tribute" then
-		logo = drawer.fbsd_logo;
-	elseif logo == "tributebw" then
-		logo = drawer.fbsd_logo;
-	elseif logo == "none" then
-		--centre brand and text if no logo
-		drawer.brand_position.x = drawer.brand_position.x + drawer.none_shift.x;
-		drawer.brand_position.y = drawer.brand_position.y + drawer.none_shift.y;
-		drawer.menu_position.x = drawer.menu_position.x + drawer.none_shift.x;
-		drawer.menu_position.y = drawer.menu_position.y + drawer.none_shift.y;
-		drawer.box_pos_dim.x = drawer.box_pos_dim.x + drawer.none_shift.x;
-		drawer.box_pos_dim.y = drawer.box_pos_dim.y + drawer.none_shift.y;
-		--prevent redraws from moving menu further
-		drawer.none_shift.x = 0;
-		drawer.none_shift.y = 0;
-		logo = drawer.none;
-	end
-	if not logo then
-		if colored then
-			logo = drawer.orb_color;
+			logodef = drawer.logodefs["orb"]
 		else
-			logo = drawer.orb;
+			logodef = drawer.logodefs["orbbw"]
 		end
 	end
-	drawer.draw(x + s.x, y + s.y, logo);
+
+	if logodef ~= nil and logodef.graphic == none then
+		drawer.shift = logodef.shift
+	else
+		drawer.shift = drawer.default_shift
+	end
+
+	x = x + drawer.shift.x
+	y = y + drawer.shift.y
+
+	if logodef ~= nil and logodef.shift ~= nil then
+		x = x + logodef.shift.x
+		y = y + logodef.shift.y
+	end
+
+	drawer.draw(x, y, logodef.graphic)
 end
 
 return drawer

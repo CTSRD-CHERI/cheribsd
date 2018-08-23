@@ -30,45 +30,45 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/capsicum.h>
-#include <sys/file.h>
 #include <sys/fcntl.h>
+#include <sys/file.h>
 #include <sys/imgact.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
 #include <sys/mutex.h>
-#include <sys/sx.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
 #include <sys/resource.h>
 #include <sys/resourcevar.h>
+#include <sys/sched.h>
 #include <sys/signalvar.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
+#include <sys/systm.h>
+#include <sys/sx.h>
 #include <sys/unistd.h>
 #include <sys/wait.h>
-#include <sys/sched.h>
 
 #include <machine/frame.h>
 #include <machine/psl.h>
 #include <machine/segments.h>
 #include <machine/sysarch.h>
 
-#include <vm/vm.h>
 #include <vm/pmap.h>
+#include <vm/vm.h>
 #include <vm/vm_map.h>
 
 #include <i386/linux/linux.h>
 #include <i386/linux/linux_proto.h>
+#include <compat/linux/linux_emul.h>
 #include <compat/linux/linux_ipc.h>
 #include <compat/linux/linux_misc.h>
 #include <compat/linux/linux_mmap.h>
 #include <compat/linux/linux_signal.h>
 #include <compat/linux/linux_util.h>
-#include <compat/linux/linux_emul.h>
 
 #include <i386/include/pcb.h>			/* needed for pcb definition in linux_set_thread_area */
 
@@ -650,20 +650,20 @@ linux_set_thread_area(struct thread *td, struct linux_set_thread_area_args *args
 
 	idx = info.entry_number;
 	/*
-	 * Semantics of linux version: every thread in the system has array of
+	 * Semantics of Linux version: every thread in the system has array of
 	 * 3 tls descriptors. 1st is GLIBC TLS, 2nd is WINE, 3rd unknown. This
 	 * syscall loads one of the selected tls decriptors with a value and
 	 * also loads GDT descriptors 6, 7 and 8 with the content of the
 	 * per-thread descriptors.
 	 *
-	 * Semantics of fbsd version: I think we can ignore that linux has 3
+	 * Semantics of FreeBSD version: I think we can ignore that Linux has 3
 	 * per-thread descriptors and use just the 1st one. The tls_array[]
 	 * is used only in set/get-thread_area() syscalls and for loading the
-	 * GDT descriptors. In fbsd we use just one GDT descriptor for TLS so
-	 * we will load just one.
+	 * GDT descriptors. In FreeBSD we use just one GDT descriptor for TLS
+	 * so we will load just one.
 	 *
 	 * XXX: this doesn't work when a user space process tries to use more
-	 * than 1 TLS segment. Comment in the linux sources says wine might do
+	 * than 1 TLS segment. Comment in the Linux sources says wine might do
 	 * this.
 	 */
 
@@ -775,7 +775,7 @@ int
 linux_mq_open(struct thread *td, struct linux_mq_open_args *args)
 {
 #ifdef P1003_1B_MQUEUE
-	return sys_kmq_open(td, (struct kmq_open_args *) args);
+	return (sys_kmq_open(td, (struct kmq_open_args *)args));
 #else
 	return (ENOSYS);
 #endif
@@ -785,7 +785,7 @@ int
 linux_mq_unlink(struct thread *td, struct linux_mq_unlink_args *args)
 {
 #ifdef P1003_1B_MQUEUE
-	return sys_kmq_unlink(td, (struct kmq_unlink_args *) args);
+	return (sys_kmq_unlink(td, (struct kmq_unlink_args *)args));
 #else
 	return (ENOSYS);
 #endif
@@ -795,7 +795,7 @@ int
 linux_mq_timedsend(struct thread *td, struct linux_mq_timedsend_args *args)
 {
 #ifdef P1003_1B_MQUEUE
-	return sys_kmq_timedsend(td, (struct kmq_timedsend_args *) args);
+	return (sys_kmq_timedsend(td, (struct kmq_timedsend_args *)args));
 #else
 	return (ENOSYS);
 #endif
@@ -805,7 +805,7 @@ int
 linux_mq_timedreceive(struct thread *td, struct linux_mq_timedreceive_args *args)
 {
 #ifdef P1003_1B_MQUEUE
-	return sys_kmq_timedreceive(td, (struct kmq_timedreceive_args *) args);
+	return (sys_kmq_timedreceive(td, (struct kmq_timedreceive_args *)args));
 #else
 	return (ENOSYS);
 #endif
@@ -815,7 +815,7 @@ int
 linux_mq_notify(struct thread *td, struct linux_mq_notify_args *args)
 {
 #ifdef P1003_1B_MQUEUE
-	return sys_kmq_notify(td, (struct kmq_notify_args *) args);
+	return (sys_kmq_notify(td, (struct kmq_notify_args *)args));
 #else
 	return (ENOSYS);
 #endif
@@ -825,7 +825,7 @@ int
 linux_mq_getsetattr(struct thread *td, struct linux_mq_getsetattr_args *args)
 {
 #ifdef P1003_1B_MQUEUE
-	return sys_kmq_setattr(td, (struct kmq_setattr_args *) args);
+	return (sys_kmq_setattr(td, (struct kmq_setattr_args *)args));
 #else
 	return (ENOSYS);
 #endif

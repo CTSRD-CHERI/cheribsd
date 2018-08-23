@@ -2,11 +2,13 @@
 
 .include <bsd.init.mk>
 
-BINDIR=	/boot/lua
-FILES=	color.lua \
+FILESDIR=	/boot/lua
+FILES=	cli.lua \
+	color.lua \
 	config.lua \
 	core.lua \
 	drawer.lua \
+	hook.lua \
 	loader.lua \
 	menu.lua \
 	password.lua \

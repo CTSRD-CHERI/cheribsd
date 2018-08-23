@@ -131,6 +131,7 @@ memcpy(void *dst, const void *src, int len)
 
 	s = src;
 	d = dst;
+
 	while (len--)
 		*d++ = *s++;
 }
@@ -251,11 +252,11 @@ main(void)
 
 	for (;;) {
 		if (!autoboot || !OPT_CHECK(RBX_QUIET))
-		printf("\nFreeBSD/x86 boot\n"
-			"Default: %u:%s(%u,%c)%s\n"
-			"boot: ",
-			dsk.drive & DRV_MASK, dev_nm[dsk.type], dsk.unit,
-			'a' + dsk.part, kname);
+			printf("\nFreeBSD/x86 boot\n"
+				 "Default: %u:%s(%u,%c)%s\n"
+				 "boot: ",
+			    dsk.drive & DRV_MASK, dev_nm[dsk.type], dsk.unit,
+			    'a' + dsk.part, kname);
 		if (DO_SIO)
 			sio_flush();
 		if (!autoboot || keyhit(3*SECOND))
@@ -314,8 +315,8 @@ load(void)
 		for (j = k = 0; k < hdr.eh.e_phnum && j < 2; k++) {
 			if (xfsread(ino, ep + j, sizeof(ep[0])))
 				return;
-		if (ep[j].p_type == PT_LOAD)
-			j++;
+			if (ep[j].p_type == PT_LOAD)
+				j++;
 		}
 		for (i = 0; i < 2; i++) {
 			p = PTOV(ep[i].p_paddr & 0xffffff);
@@ -356,8 +357,7 @@ load(void)
 static int
 parse()
 {
-	char *arg;
-	char *ep, *p, *q;
+	char *arg, *ep, *p, *q;
 	const char *cp;
 	unsigned int drv;
 	int c, i, j;
@@ -387,11 +387,8 @@ parse()
 #if SERIAL
 				} else if (c == 'S') {
 					j = 0;
-					while (*arg <= '9') {
-						i = (unsigned int)(*arg - '0');
+					while ((u_int)(i = *arg++ - '0') <= 9)
 						j = j * 10 + i;
-						arg++;
-					}
 					if (j > 0 && i == -'0') {
 						comspeed = j;
 						break;
@@ -408,8 +405,7 @@ parse()
 				opts ^= OPT_SET(flags[i]);
 			}
 #if SERIAL
-			ioctrl = OPT_CHECK(RBX_DUAL) ?
-			    (IO_SERIAL|IO_KEYBOARD) :
+			ioctrl = OPT_CHECK(RBX_DUAL) ? (IO_SERIAL|IO_KEYBOARD) :
 			    OPT_CHECK(RBX_SERIAL) ? IO_SERIAL : IO_KEYBOARD;
 			if (DO_SIO) {
 				if (sio_init(115200 / comspeed) != 0)
@@ -427,7 +423,7 @@ parse()
 					arg += 2;
 				}
 				if (q - arg != 2)
-					return -1;
+					return (-1);
 				for (i = 0; arg[0] != dev_nm[i][0] ||
 				    arg[1] != dev_nm[i][1]; i++)
 					if (i == NDEV - 1)
@@ -489,13 +485,13 @@ dskread(void *buf, unsigned lba, unsigned nblk)
 		sl = dsk.slice;
 		if (sl < BASE_SLICE) {
 			for (i = 0; i < NDOSPART; i++)
-			if (dp[i].dp_typ == DOSPTYP_386BSD &&
-			    (dp[i].dp_flag & 0x80 || sl < BASE_SLICE)) {
-				sl = BASE_SLICE + i;
-				if (dp[i].dp_flag & 0x80 ||
-				    dsk.slice == COMPATIBILITY_SLICE)
-					break;
-			}
+				if (dp[i].dp_typ == DOSPTYP_386BSD &&
+				    (dp[i].dp_flag & 0x80 || sl < BASE_SLICE)) {
+					sl = BASE_SLICE + i;
+					if (dp[i].dp_flag & 0x80 ||
+					    dsk.slice == COMPATIBILITY_SLICE)
+						break;
+				}
 			if (dsk.slice == WHOLE_DISK_SLICE)
 				dsk.slice = sl;
 		}
@@ -655,7 +651,6 @@ xgetc(int fn)
 
 	if (OPT_CHECK(RBX_NOINTR))
 		return (0);
-
 	for (;;) {
 		if (DO_KBD && getc(1))
 			return (fn ? 1 : getc(0));

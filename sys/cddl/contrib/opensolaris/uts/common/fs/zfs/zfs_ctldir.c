@@ -976,13 +976,6 @@ zfsctl_snapdir_lookup(ap)
 			break;
 
 		/*
-		 * The vnode must be referenced at least by this thread and
-		 * the mount point or the thread doing the mounting.
-		 * There can be more references from concurrent lookups.
-		 */
-		KASSERT(vrefcnt(*vpp) > 1, ("found unreferenced mountpoint"));
-
-		/*
 		 * Check if a snapshot is already mounted on top of the vnode.
 		 */
 		err = zfsctl_mounted_here(vpp, lkflags);
@@ -1078,6 +1071,7 @@ zfsctl_snapdir_readdir(ap)
 		return (error);
 	}
 
+	ZFS_ENTER(zfsvfs);
 	for (;;) {
 		uint64_t cookie;
 		uint64_t id;
@@ -1094,6 +1088,7 @@ zfsctl_snapdir_readdir(ap)
 					*eofp = 1;
 				error = 0;
 			}
+			ZFS_EXIT(zfsvfs);
 			return (error);
 		}
 
@@ -1106,6 +1101,7 @@ zfsctl_snapdir_readdir(ap)
 		if (error != 0) {
 			if (error == ENAMETOOLONG)
 				error = 0;
+			ZFS_EXIT(zfsvfs);
 			return (SET_ERROR(error));
 		}
 		uio->uio_offset = cookie + dots_offset;
@@ -1129,6 +1125,7 @@ zfsctl_snapdir_getattr(ap)
 	uint64_t snap_count;
 	int err;
 
+	ZFS_ENTER(zfsvfs);
 	zfsctl_common_getattr(vp, vap);
 	vap->va_ctime = dmu_objset_snap_cmtime(zfsvfs->z_os);
 	vap->va_mtime = vap->va_ctime;
@@ -1136,12 +1133,15 @@ zfsctl_snapdir_getattr(ap)
 	if (dsl_dataset_phys(ds)->ds_snapnames_zapobj != 0) {
 		err = zap_count(dmu_objset_pool(ds->ds_objset)->dp_meta_objset,
 		    dsl_dataset_phys(ds)->ds_snapnames_zapobj, &snap_count);
-		if (err != 0)
+		if (err != 0) {
+			ZFS_EXIT(zfsvfs);
 			return (err);
+		}
 		vap->va_nlink += snap_count;
 	}
 	vap->va_size = vap->va_nlink;
 
+	ZFS_EXIT(zfsvfs);
 	return (0);
 }
 

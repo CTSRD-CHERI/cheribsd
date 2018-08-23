@@ -84,7 +84,8 @@ __FBSDID("$FreeBSD$");
 #include "string.h"
 
 static int	ufs_open(const char *path, struct open_file *f);
-static int	ufs_write(struct open_file *f, void *buf, size_t size, size_t *resid);
+static int	ufs_write(struct open_file *f, const void *buf, size_t size,
+		size_t *resid);
 static int	ufs_close(struct open_file *f);
 static int	ufs_read(struct open_file *f, void *buf, size_t size, size_t *resid);
 static off_t	ufs_seek(struct open_file *f, off_t offset, int where);
@@ -131,7 +132,7 @@ struct file {
 static int	read_inode(ino_t, struct open_file *);
 static int	block_map(struct open_file *, ufs2_daddr_t, ufs2_daddr_t *);
 static int	buf_read_file(struct open_file *, char **, size_t *);
-static int	buf_write_file(struct open_file *, char *, size_t *);
+static int	buf_write_file(struct open_file *, const char *, size_t *);
 static int	search_directory(char *, struct open_file *, ino_t *);
 static int	ufs_use_sa_read(void *, off_t, void **, int);
 
@@ -306,7 +307,7 @@ block_map(f, file_block, disk_block_p)
 static int
 buf_write_file(f, buf_p, size_p)
 	struct open_file *f;
-	char *buf_p;
+	const char *buf_p;
 	size_t *size_p;		/* out */
 {
 	struct file *fp = (struct file *)f->f_fsdata;
@@ -517,7 +518,7 @@ ufs_open(upath, f)
 
 	/* read super block */
 	twiddle(1);
-	if ((rc = ffs_sbget(f, &fs, -1, 0, ufs_use_sa_read)) != 0)
+	if ((rc = ffs_sbget(f, &fs, -1, "stand", ufs_use_sa_read)) != 0)
 		goto out;
 	fp->f_fs = fs;
 	/*
@@ -687,7 +688,6 @@ ufs_use_sa_read(void *devfd, off_t loc, void **bufp, int size)
 	int error;
 
 	f = (struct open_file *)devfd;
-	free(*bufp);
 	if ((*bufp = malloc(size)) == NULL)
 		return (ENOSPC);
 	error = (f->f_dev->dv_strategy)(f->f_devdata, F_READ, loc / DEV_BSIZE,
@@ -770,14 +770,14 @@ ufs_read(f, start, size, resid)
 static int
 ufs_write(f, start, size, resid)
 	struct open_file *f;
-	void *start;
+	const void *start;
 	size_t size;
 	size_t *resid;	/* out */
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	size_t csize;
 	int rc = 0;
-	char *addr = start;
+	const char *addr = start;
 
 	csize = size;
 	while ((size != 0) && (csize != 0)) {

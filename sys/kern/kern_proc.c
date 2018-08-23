@@ -1461,6 +1461,32 @@ cheriabi_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc_c *ki_c)
 }
 #endif	/* COMPAT_CHERIABI */
 
+static ssize_t
+kern_proc_out_size(struct proc *p, int flags)
+{
+	ssize_t size = 0;
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	if ((flags & KERN_PROC_NOTHREADS) != 0) {
+#ifdef COMPAT_FREEBSD32
+		if ((flags & KERN_PROC_MASK32) != 0) {
+			size += sizeof(struct kinfo_proc32);
+		} else
+#endif
+			size += sizeof(struct kinfo_proc);
+	} else {
+#ifdef COMPAT_FREEBSD32
+		if ((flags & KERN_PROC_MASK32) != 0)
+			size += sizeof(struct kinfo_proc32) * p->p_numthreads;
+		else
+#endif
+			size += sizeof(struct kinfo_proc) * p->p_numthreads;
+	}
+	PROC_UNLOCK(p);
+	return (size);
+}
+
 int
 kern_proc_out(struct proc *p, struct sbuf *sb, int flags)
 {
@@ -1530,6 +1556,9 @@ sysctl_out_proc(struct proc *p, struct sysctl_req *req, int flags)
 	struct kinfo_proc ki;
 	int error, error2;
 
+	if (req->oldptr == NULL)
+		return (SYSCTL_OUT(req, 0, kern_proc_out_size(p, flags)));
+
 	sbuf_new_for_sysctl(&sb, (char *)&ki, sizeof(ki), req);
 	sbuf_clear_flags(&sb, SBUF_INCLUDENUL);
 	error = kern_proc_out(p, &sb, flags);
@@ -1596,16 +1625,22 @@ sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 		break;
 	}
 
-	if (!req->oldptr) {
+	if (req->oldptr == NULL) {
 		/* overestimate by 5 procs */
 		error = SYSCTL_OUT(req, 0, sizeof (struct kinfo_proc) * 5);
 		if (error)
 			return (error);
+	} else {
+		error = sysctl_wire_old_buffer(req, 0);
+		if (error != 0)
+			return (error);
+		/*
+		 * This lock is only needed to safely grab the parent of a
+		 * traced process. Only grab it if we are producing any
+		 * data to begin with.
+		 */
+		sx_slock(&proctree_lock);
 	}
-	error = sysctl_wire_old_buffer(req, 0);
-	if (error != 0)
-		return (error);
-	sx_slock(&proctree_lock);
 	sx_slock(&allproc_lock);
 	for (doingzomb=0 ; doingzomb < 2 ; doingzomb++) {
 		if (!doingzomb)
@@ -1706,16 +1741,15 @@ sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 			}
 
 			error = sysctl_out_proc(p, req, flags);
-			if (error) {
-				sx_sunlock(&allproc_lock);
-				sx_sunlock(&proctree_lock);
-				return (error);
-			}
+			if (error)
+				goto out;
 		}
 	}
+out:
 	sx_sunlock(&allproc_lock);
-	sx_sunlock(&proctree_lock);
-	return (0);
+	if (req->oldptr != NULL)
+		sx_sunlock(&proctree_lock);
+	return (error);
 }
 
 struct pargs *

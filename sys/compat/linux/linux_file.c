@@ -528,7 +528,7 @@ linux_access(struct thread *td, struct linux_access_args *args)
 	char *path;
 	int error;
 
-	/* linux convention */
+	/* Linux convention. */
 	if (args->amode & ~(F_OK | X_OK | W_OK | R_OK))
 		return (EINVAL);
 
@@ -551,7 +551,7 @@ linux_faccessat(struct thread *td, struct linux_faccessat_args *args)
 	char *path;
 	int error, dfd;
 
-	/* linux convention */
+	/* Linux convention. */
 	if (args->amode & ~(F_OK | X_OK | W_OK | R_OK))
 		return (EINVAL);
 
@@ -997,7 +997,7 @@ linux_pread(struct thread *td, struct linux_pread_args *uap)
 
 	error = kern_pread(td, uap->fd, uap->buf, uap->nbyte, uap->offset);
 	if (error == 0) {
-		/* This seems to violate POSIX but linux does it */
+		/* This seems to violate POSIX but Linux does it. */
 		error = fgetvp(td, uap->fd,
 		    cap_rights_init(&rights, CAP_PREAD), &vp);
 		if (error != 0)

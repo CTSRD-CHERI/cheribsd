@@ -33,18 +33,14 @@
 
 /*
  * ZFS fully-qualified device descriptor.
- * Note, this must match the 'struct devdesc' declaration in bootstrap.h.
  * Arch-specific device descriptors should be binary compatible with this
  * structure if they are to support ZFS.
  */
-struct zfs_devdesc
-{
-    struct devsw	*d_dev;
-    int			d_type;
-    int			d_unit;
-    void		*d_opendata;
-    uint64_t		pool_guid;
-    uint64_t		root_guid;
+/* Note: Must match the 'struct devdesc' in stand.h */
+struct zfs_devdesc {
+	struct devdesc  dd;
+	uint64_t	pool_guid;
+	uint64_t	root_guid;
 };
 
 #ifdef LOADER_GELI_SUPPORT
@@ -82,7 +78,7 @@ char	*zfs_fmtdev(void *vdev);
 int	zfs_probe_dev(const char *devname, uint64_t *pool_guid);
 int	zfs_list(const char *name);
 uint64_t ldi_get_size(void *);
-void	init_zfs_bootenv(char *currdev);
+void	init_zfs_bootenv(const char *currdev);
 int	zfs_bootenv(const char *name);
 int	zfs_belist_add(const char *name, uint64_t __unused);
 int	zfs_set_env(void);

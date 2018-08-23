@@ -61,9 +61,9 @@
 struct smbioc_ossn {
 	int		ioc_opt;
 	uint32_t	ioc_svlen;	/* size of ioc_server address */
-	struct sockaddr*ioc_server;
+	struct sockaddr * __kerncap ioc_server;
 	uint32_t	ioc_lolen;	/* size of ioc_local address */
-	struct sockaddr*ioc_local;
+	struct sockaddr * __kerncap ioc_local;
 	char		ioc_srvname[SMB_MAXSRVNAMELEN + 1];
 	int		ioc_timeout;
 	int		ioc_retrycount;	/* number of retries before giveup */
@@ -92,11 +92,11 @@ struct smbioc_oshare {
 struct smbioc_rq {
 	u_char		ioc_cmd;
 	u_char		ioc_twc;
-	void *		ioc_twords;
+	void * __kerncap ioc_twords;
 	u_short		ioc_tbc;
-	void *		ioc_tbytes;
+	void * __kerncap ioc_tbytes;
 	int		ioc_rpbufsz;
-	char *		ioc_rpbuf;
+	char * __kerncap ioc_rpbuf;
 	u_char		ioc_rwc;
 	u_short		ioc_rbc;
 	u_int8_t	ioc_errclass;
@@ -107,15 +107,15 @@ struct smbioc_rq {
 struct smbioc_t2rq {
 	u_int16_t	ioc_setup[3];
 	int		ioc_setupcnt;
-	char *		ioc_name;
+	char * __kerncap ioc_name;
 	u_short		ioc_tparamcnt;
-	void *		ioc_tparam;
+	void * __kerncap ioc_tparam;
 	u_short		ioc_tdatacnt;
-	void *		ioc_tdata;
+	void * __kerncap ioc_tdata;
 	u_short		ioc_rparamcnt;
-	void *		ioc_rparam;
+	void * __kerncap ioc_rparam;
 	u_short		ioc_rdatacnt;
-	void *		ioc_rdata;
+	void * __kerncap ioc_rdata;
 };
 
 struct smbioc_flags {
@@ -133,7 +133,7 @@ struct smbioc_lookup {
 
 struct smbioc_rw {
 	smbfh	ioc_fh;
-	char *	ioc_base;
+	char * __kerncap ioc_base;
 	off_t	ioc_offset;
 	int	ioc_cnt;
 };

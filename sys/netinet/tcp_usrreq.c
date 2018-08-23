@@ -85,16 +85,15 @@ __FBSDID("$FreeBSD$");
 #include <netinet6/ip6_var.h>
 #include <netinet6/scope6_var.h>
 #endif
-#ifdef TCP_RFC7413
-#include <netinet/tcp_fastopen.h>
-#endif
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcp_seq.h>
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
+#include <netinet/tcp_log_buf.h>
 #include <netinet/tcpip.h>
 #include <netinet/cc/cc.h>
+#include <netinet/tcp_fastopen.h>
 #ifdef TCPPCAP
 #include <netinet/tcp_pcap.h>
 #endif
@@ -200,15 +199,18 @@ tcp_detach(struct socket *so, struct inpcb *inp)
 		 * XXXRW: Would it be cleaner to free the tcptw here?
 		 *
 		 * Astute question indeed, from twtcp perspective there are
-		 * three cases to consider:
+		 * four cases to consider:
 		 *
 		 * #1 tcp_detach is called at tcptw creation time by
 		 *  tcp_twstart, then do not discard the newly created tcptw
 		 *  and leave inpcb present until timewait ends
-		 * #2 tcp_detach is called at timewait end (or reuse) by
+		 * #2 tcp_detach is called at tcptw creation time by
+		 *  tcp_twstart, but connection is local and tw will be
+		 *  discarded immediately
+		 * #3 tcp_detach is called at timewait end (or reuse) by
 		 *  tcp_twclose, then the tcptw has already been discarded
 		 *  (or reused) and inpcb is freed here
-		 * #3 tcp_detach is called() after timewait ends (or reuse)
+		 * #4 tcp_detach is called() after timewait ends (or reuse)
 		 *  (e.g. by soclose), then tcptw has already been discarded
 		 *  (or reused) and inpcb is freed here
 		 *
@@ -430,10 +432,9 @@ tcp_usr_listen(struct socket *so, int backlog, struct thread *td)
 	}
 	SOCK_UNLOCK(so);
 
-#ifdef TCP_RFC7413
 	if (IS_FASTOPEN(tp->t_flags))
 		tp->t_tfo_pending = tcp_fastopen_alloc_counter();
-#endif
+
 out:
 	TCPDEBUG2(PRU_LISTEN);
 	TCP_PROBE2(debug__user, tp, PRU_LISTEN);
@@ -480,10 +481,9 @@ tcp6_usr_listen(struct socket *so, int backlog, struct thread *td)
 	}
 	SOCK_UNLOCK(so);
 
-#ifdef TCP_RFC7413
 	if (IS_FASTOPEN(tp->t_flags))
 		tp->t_tfo_pending = tcp_fastopen_alloc_counter();
-#endif
+
 out:
 	TCPDEBUG2(PRU_LISTEN);
 	TCP_PROBE2(debug__user, tp, PRU_LISTEN);
@@ -848,7 +848,6 @@ tcp_usr_rcvd(struct socket *so, int flags)
 	}
 	tp = intotcpcb(inp);
 	TCPDEBUG1();
-#ifdef TCP_RFC7413
 	/*
 	 * For passively-created TFO connections, don't attempt a window
 	 * update while still in SYN_RECEIVED as this may trigger an early
@@ -859,7 +858,6 @@ tcp_usr_rcvd(struct socket *so, int flags)
 	if (IS_FASTOPEN(tp->t_flags) &&
 	    (tp->t_state == TCPS_SYN_RECEIVED))
 		goto out;
-#endif
 #ifdef TCP_OFFLOAD
 	if (tp->t_flags & TF_TOE)
 		tcp_offload_rcvd(tp);
@@ -950,8 +948,12 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 #endif
 			if (error)
 				goto out;
-			tp->snd_wnd = TTCP_CLIENT_SND_WND;
-			tcp_mss(tp, -1);
+			if (IS_FASTOPEN(tp->t_flags))
+				tcp_fastopen_connect(tp);
+			else {
+				tp->snd_wnd = TTCP_CLIENT_SND_WND;
+				tcp_mss(tp, -1);
+			}
 		}
 		if (flags & PRUS_EOF) {
 			/*
@@ -997,6 +999,12 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 			 * initialize window to default value, and
 			 * initialize maxseg using peer's cached MSS.
 			 */
+
+			/*
+			 * Not going to contemplate SYN|URG
+			 */
+			if (IS_FASTOPEN(tp->t_flags))
+				tp->t_flags &= ~TF_FASTOPEN;
 #ifdef INET6
 			if (isipv6)
 				error = tcp6_connect(tp, nam, td);
@@ -1019,6 +1027,11 @@ tcp_usr_send(struct socket *so, int flags, struct mbuf *m,
 			tp->t_flags &= ~TF_FORCEDATA;
 		}
 	}
+	TCP_LOG_EVENT(tp, NULL,
+	    &inp->inp_socket->so_rcv,
+	    &inp->inp_socket->so_snd,
+	    TCP_LOG_USERSEND, error,
+	    0, NULL, false);
 out:
 	TCPDEBUG2((flags & PRUS_OOB) ? PRU_SENDOOB :
 		  ((flags & PRUS_EOF) ? PRU_SEND_EOF : PRU_SEND));
@@ -1526,6 +1539,15 @@ tcp_ctloutput(struct socket *so, struct sockopt *sopt)
 	return (tp->t_fb->tfb_tcp_ctloutput(so, sopt, inp, tp));
 }
 
+/*
+ * If this assert becomes untrue, we need to change the size of the buf
+ * variable in tcp_default_ctloutput().
+ */
+#ifdef CTASSERT
+CTASSERT(TCP_CA_NAME_MAX <= TCP_LOG_ID_LEN);
+CTASSERT(TCP_LOG_REASON_LEN <= TCP_LOG_ID_LEN);
+#endif
+
 int
 tcp_default_ctloutput(struct socket *so, struct sockopt *sopt, struct inpcb *inp, struct tcpcb *tp)
 {
@@ -1533,7 +1555,7 @@ tcp_default_ctloutput(struct socket *so, struct sockopt *sopt, struct inpcb *inp
 	u_int	ui;
 	struct	tcp_info ti;
 	struct cc_algo *algo;
-	char	*pbuf, buf[TCP_CA_NAME_MAX];
+	char	*pbuf, buf[TCP_LOG_ID_LEN];
 	size_t	len;
 
 	/*
@@ -1768,28 +1790,101 @@ unlock_and_done:
 			goto unlock_and_done;
 #endif
 
-#ifdef TCP_RFC7413
-		case TCP_FASTOPEN:
+		case TCP_FASTOPEN: {
+			struct tcp_fastopen tfo_optval;
+
 			INP_WUNLOCK(inp);
-			if (!V_tcp_fastopen_enabled)
+			if (!V_tcp_fastopen_client_enable &&
+			    !V_tcp_fastopen_server_enable)
 				return (EPERM);
 
+			error = sooptcopyin(sopt, &tfo_optval,
+				    sizeof(tfo_optval), sizeof(int));
+			if (error)
+				return (error);
+
+			INP_WLOCK_RECHECK(inp);
+			if (tfo_optval.enable) {
+				if (tp->t_state == TCPS_LISTEN) {
+					if (!V_tcp_fastopen_server_enable) {
+						error = EPERM;
+						goto unlock_and_done;
+					}
+
+					tp->t_flags |= TF_FASTOPEN;
+					if (tp->t_tfo_pending == NULL)
+						tp->t_tfo_pending =
+						    tcp_fastopen_alloc_counter();
+				} else {
+					/*
+					 * If a pre-shared key was provided,
+					 * stash it in the client cookie
+					 * field of the tcpcb for use during
+					 * connect.
+					 */
+					if (sopt->sopt_valsize ==
+					    sizeof(tfo_optval)) {
+						memcpy(tp->t_tfo_cookie.client,
+						       tfo_optval.psk,
+						       TCP_FASTOPEN_PSK_LEN);
+						tp->t_tfo_client_cookie_len =
+						    TCP_FASTOPEN_PSK_LEN;
+					}
+					tp->t_flags |= TF_FASTOPEN;
+				}
+			} else
+				tp->t_flags &= ~TF_FASTOPEN;
+			goto unlock_and_done;
+		}
+
+		case TCP_LOG:
+			INP_WUNLOCK(inp);
 			error = sooptcopyin(sopt, &optval, sizeof optval,
 			    sizeof optval);
 			if (error)
 				return (error);
 
 			INP_WLOCK_RECHECK(inp);
-			if (optval) {
-				tp->t_flags |= TF_FASTOPEN;
-				if ((tp->t_state == TCPS_LISTEN) &&
-				    (tp->t_tfo_pending == NULL))
-					tp->t_tfo_pending =
-					    tcp_fastopen_alloc_counter();
-			} else
-				tp->t_flags &= ~TF_FASTOPEN;
+			error = tcp_log_state_change(tp, optval);
 			goto unlock_and_done;
-#endif
+
+		case TCP_LOGBUF:
+			INP_WUNLOCK(inp);
+			error = EINVAL;
+			break;
+
+		case TCP_LOGID:
+			INP_WUNLOCK(inp);
+			error = sooptcopyin(sopt, buf, TCP_LOG_ID_LEN - 1, 0);
+			if (error)
+				break;
+			buf[sopt->sopt_valsize] = '\0';
+			INP_WLOCK_RECHECK(inp);
+			error = tcp_log_set_id(tp, buf);
+			/* tcp_log_set_id() unlocks the INP. */
+			break;
+
+		case TCP_LOGDUMP:
+		case TCP_LOGDUMPID:
+			INP_WUNLOCK(inp);
+			error =
+			    sooptcopyin(sopt, buf, TCP_LOG_REASON_LEN - 1, 0);
+			if (error)
+				break;
+			buf[sopt->sopt_valsize] = '\0';
+			INP_WLOCK_RECHECK(inp);
+			if (sopt->sopt_name == TCP_LOGDUMP) {
+				error = tcp_log_dump_tp_logbuf(tp, buf,
+				    M_WAITOK, true);
+				INP_WUNLOCK(inp);
+			} else {
+				tcp_log_dump_tp_bucket_logbufs(tp, buf);
+				/*
+				 * tcp_log_dump_tp_bucket_logbufs() drops the
+				 * INP lock.
+				 */
+			}
+			break;
 
 		default:
 			INP_WUNLOCK(inp);
@@ -1871,14 +1966,30 @@ unlock_and_done:
 			error = sooptcopyout(sopt, &optval, sizeof optval);
 			break;
 #endif
-
-#ifdef TCP_RFC7413
 		case TCP_FASTOPEN:
 			optval = tp->t_flags & TF_FASTOPEN;
 			INP_WUNLOCK(inp);
 			error = sooptcopyout(sopt, &optval, sizeof optval);
 			break;
-#endif
+		case TCP_LOG:
+			optval = tp->t_logstate;
+			INP_WUNLOCK(inp);
+			error = sooptcopyout(sopt, &optval, sizeof(optval));
+			break;
+		case TCP_LOGBUF:
+			/* tcp_log_getlogbuf() does INP_WUNLOCK(inp) */
+			error = tcp_log_getlogbuf(sopt, tp);
+			break;
+		case TCP_LOGID:
+			len = tcp_log_get_id(tp, buf);
+			INP_WUNLOCK(inp);
+			error = sooptcopyout(sopt, buf, len + 1);
+			break;
+		case TCP_LOGDUMP:
+		case TCP_LOGDUMPID:
+			INP_WUNLOCK(inp);
+			error = EINVAL;
+			break;
 		default:
 			INP_WUNLOCK(inp);
 			error = ENOPROTOOPT;

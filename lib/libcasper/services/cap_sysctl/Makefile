@@ -6,7 +6,7 @@ SHLIBDIR?=	/lib/casper
 
 PACKAGE=libcasper
 
-SHLIB_MAJOR=	0
+SHLIB_MAJOR=	1
 INCSDIR?=	${INCLUDEDIR}/casper
 
 .if ${MK_CASPER} != "no"
@@ -23,5 +23,10 @@ CFLAGS+=-I${.CURDIR}
 
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
+
+MAN+=	cap_sysctl.3
+
+MLINKS+=cap_sysctl.3 libcap_sysctl.3
+MLINKS+=cap_sysctl.3 cap_sysctlbyname.3
 
 .include <bsd.lib.mk>

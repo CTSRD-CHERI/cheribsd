@@ -214,7 +214,7 @@ const char *syscallnames[] = {
 	"undelete",			/* 205 = undelete */
 	"futimes",			/* 206 = futimes */
 	"getpgid",			/* 207 = getpgid */
-	"#208",			/* 208 = newreboot */
+	"#208",			/* 208 = nosys */
 	"poll",			/* 209 = poll */
 	"lkmnosys",			/* 210 = lkmnosys */
 	"lkmnosys",			/* 211 = lkmnosys */
@@ -569,4 +569,5 @@ const char *syscallnames[] = {
 	"kevent",			/* 560 = kevent */
 	"cpuset_getdomain",			/* 561 = cpuset_getdomain */
 	"cpuset_setdomain",			/* 562 = cpuset_setdomain */
+	"getrandom",			/* 563 = getrandom */
 };

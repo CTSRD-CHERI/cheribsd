@@ -98,7 +98,7 @@
 .set cheri_sysregs_accessible	# Don't warn on access to c27-c30
 #endif
 
-#include "assym.s"
+#include "assym.inc"
 
 	.set	noreorder		# Noreorder is default style!
 

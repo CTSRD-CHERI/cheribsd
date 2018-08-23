@@ -403,7 +403,7 @@ retrylookup:
 		if (m != NULL)
 			break;
 		VM_OBJECT_WUNLOCK(ksobj);
-		VM_WAIT;
+		vm_wait(ksobj);
 		VM_OBJECT_WLOCK(ksobj);
 	}
 	end_m = m + atop(KSTACK_SIZE);

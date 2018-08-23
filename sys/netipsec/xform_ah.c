@@ -582,6 +582,16 @@ ah_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 		error = EACCES;
 		goto bad;
 	}
+	if (skip + authsize + rplen > m->m_pkthdr.len) {
+		DPRINTF(("%s: bad mbuf length %u (expecting %lu)"
+		    " for packet in SA %s/%08lx\n", __func__,
+		    m->m_pkthdr.len, (u_long) (skip + authsize + rplen),
+		    ipsec_address(&sav->sah->saidx.dst, buf, sizeof(buf)),
+		    (u_long) ntohl(sav->spi)));
+		AHSTAT_INC(ahs_badauthl);
+		error = EACCES;
+		goto bad;
+	}
 	AHSTAT_ADD(ahs_ibytes, m->m_pkthdr.len - skip - hl);
 
 	/* Get crypto descriptors. */
@@ -626,6 +636,9 @@ ah_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	/* Zeroize the authenticator on the packet. */
 	m_copyback(m, skip + rplen, authsize, ipseczeroes);
 
+	/* Save ah_nxt, since ah pointer can become invalid after "massage" */
+	hl = ah->ah_nxt;
+
 	/* "Massage" the packet headers for crypto processing. */
 	error = ah_massage_headers(&m, sav->sah->saidx.dst.sa.sa_family,
 	    skip, ahx->type, 0);
@@ -650,10 +663,11 @@ ah_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 
 	/* These are passed as-is to the callback. */
 	xd->sav = sav;
-	xd->nxt = ah->ah_nxt;
+	xd->nxt = hl;
 	xd->protoff = protoff;
 	xd->skip = skip;
 	xd->cryptoid = cryptoid;
+	xd->vnet = curvnet;
 	return (crypto_dispatch(crp));
 bad:
 	m_freem(m);
@@ -680,6 +694,7 @@ ah_input_cb(struct cryptop *crp)
 
 	m = (struct mbuf *) crp->crp_buf;
 	xd = (struct xform_data *) crp->crp_opaque;
+	CURVNET_SET(xd->vnet);
 	sav = xd->sav;
 	skip = xd->skip;
 	nxt = xd->nxt;
@@ -697,6 +712,7 @@ ah_input_cb(struct cryptop *crp)
 			if (ipsec_updateid(sav, &crp->crp_sid, &cryptoid) != 0)
 				crypto_freesession(cryptoid);
 			xd->cryptoid = crp->crp_sid;
+			CURVNET_RESTORE();
 			return (crypto_dispatch(crp));
 		}
 		AHSTAT_INC(ahs_noxform);
@@ -792,8 +808,10 @@ ah_input_cb(struct cryptop *crp)
 		panic("%s: Unexpected address family: %d saidx=%p", __func__,
 		    saidx->dst.sa.sa_family, saidx);
 	}
+	CURVNET_RESTORE();
 	return error;
 bad:
+	CURVNET_RESTORE();
 	if (sav)
 		key_freesav(&sav);
 	if (m != NULL)
@@ -1027,6 +1045,7 @@ ah_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	xd->skip = skip;
 	xd->idx = idx;
 	xd->cryptoid = cryptoid;
+	xd->vnet = curvnet;
 
 	return crypto_dispatch(crp);
 bad:
@@ -1054,6 +1073,7 @@ ah_output_cb(struct cryptop *crp)
 
 	m = (struct mbuf *) crp->crp_buf;
 	xd = (struct xform_data *) crp->crp_opaque;
+	CURVNET_SET(xd->vnet);
 	sp = xd->sp;
 	sav = xd->sav;
 	skip = xd->skip;
@@ -1068,6 +1088,7 @@ ah_output_cb(struct cryptop *crp)
 			if (ipsec_updateid(sav, &crp->crp_sid, &cryptoid) != 0)
 				crypto_freesession(cryptoid);
 			xd->cryptoid = crp->crp_sid;
+			CURVNET_RESTORE();
 			return (crypto_dispatch(crp));
 		}
 		AHSTAT_INC(ahs_noxform);
@@ -1109,8 +1130,10 @@ ah_output_cb(struct cryptop *crp)
 
 	/* NB: m is reclaimed by ipsec_process_done. */
 	error = ipsec_process_done(m, sp, sav, idx);
+	CURVNET_RESTORE();
 	return (error);
 bad:
+	CURVNET_RESTORE();
 	free(xd, M_XDATA);
 	crypto_freereq(crp);
 	key_freesav(&sav);

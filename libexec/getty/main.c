@@ -252,14 +252,15 @@ main(int argc, char *argv[])
 		}
 
 		if (AC) {
-			int i, rfds;
+			fd_set rfds;
 			struct timeval to;
+			int i;
 
-        		rfds = 1 << 0;	/* FD_SET */
+			FD_ZERO(&rfds);
+			FD_SET(0, &rfds);
         		to.tv_sec = RT;
         		to.tv_usec = 0;
-        		i = select(32, (fd_set*)&rfds, (fd_set*)NULL,
-        			       (fd_set*)NULL, RT ? &to : NULL);
+			i = select(32, &rfds, NULL, NULL, RT ? &to : NULL);
         		if (i < 0) {
 				syslog(LOG_ERR, "select %s: %m", ttyn);
 			} else if (i == 0) {
@@ -426,15 +427,17 @@ main(int argc, char *argv[])
 static int
 opentty(const char *tty, int flags)
 {
-	int i;
-	int failopenlogged = 0;
+	int failopenlogged = 0, i, saved_errno;
 
 	while ((i = open(tty, flags)) == -1)
 	{
+		saved_errno = errno;
 		if (!failopenlogged) {
 			syslog(LOG_ERR, "open %s: %m", tty);
 			failopenlogged = 1;
 		}
+		if (saved_errno == ENOENT)
+			return 0;
 		sleep(60);
 	}
 	if (login_tty(i) < 0) { 
@@ -708,7 +711,7 @@ prompt(void)
 static char *
 get_line(int fd)
 {
-	int i = 0;
+	size_t i = 0;
 	static char linebuf[512];
 
 	/*

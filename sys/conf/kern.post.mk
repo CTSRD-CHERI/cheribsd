@@ -160,7 +160,7 @@ ${FULLKERNEL}: ${SYSTEM_DEP} vers.o
 	sh ${S}/tools/embed_cheriabitest_list.sh ${FULLKERNEL}
 .endif
 
-OBJS_DEPEND_GUESS+=	assym.s vnode_if.h ${BEFORE_DEPEND:M*.h} \
+OBJS_DEPEND_GUESS+=	assym.inc vnode_if.h ${BEFORE_DEPEND:M*.h} \
 			${MFILES:T:S/.m$/.h/}
 
 .for mfile in ${MFILES}
@@ -189,7 +189,7 @@ hack.pico: Makefile
 	${CC} ${HACK_EXTRA_FLAGS} -nostdlib hack.c -o hack.pico
 	rm -f hack.c
 
-assym.s: $S/kern/genassym.sh genassym.o
+assym.inc: $S/kern/genassym.sh genassym.o
 	NM='${NM}' NMFLAGS='${NMFLAGS}' sh $S/kern/genassym.sh genassym.o > ${.TARGET}
 
 genassym.o: $S/$M/$M/genassym.c
@@ -205,7 +205,9 @@ _meta_filemon=	1
 # Also skip generating or including .depend.* files if in meta+filemon mode
 # since it will track dependencies itself.  OBJS_DEPEND_GUESS is still used
 # for _meta_filemon but not for _SKIP_DEPEND.
-.if !defined(NO_SKIP_DEPEND) && (make(*obj) || \
+.if !defined(NO_SKIP_DEPEND) && \
+    ((!empty(.MAKEFLAGS:M-V) && empty(.MAKEFLAGS:M*DEP*)) || \
+    ${.TARGETS:M*obj} == ${.TARGETS} || \
     ${.TARGETS:M*clean*} == ${.TARGETS} || \
     ${.TARGETS:M*install*} == ${.TARGETS})
 _SKIP_DEPEND=	1
@@ -215,7 +217,7 @@ _SKIP_DEPEND=	1
 .endif
 
 kernel-depend: .depend
-SRCS=	assym.s vnode_if.h ${BEFORE_DEPEND} ${CFILES} \
+SRCS=	assym.inc vnode_if.h ${BEFORE_DEPEND} ${CFILES} \
 	${SYSTEM_CFILES} ${GEN_CFILES} ${SFILES} \
 	${MFILES:T:S/.m$/.h/}
 DEPENDOBJS+=	${SYSTEM_OBJS} genassym.o

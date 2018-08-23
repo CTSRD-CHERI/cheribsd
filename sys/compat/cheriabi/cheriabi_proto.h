@@ -1389,6 +1389,11 @@ struct cheriabi_cpuset_setdomain_args {
 	char mask_l_[PADL_(domainset_t * __capability)]; domainset_t * __capability mask; char mask_r_[PADR_(domainset_t * __capability)];
 	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
 };
+struct cheriabi_getrandom_args {
+	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char buflen_l_[PADL_(size_t)]; size_t buflen; char buflen_r_[PADR_(size_t)];
+	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
+};
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
@@ -1671,6 +1676,7 @@ int	cheriabi_mknodat(struct thread *, struct cheriabi_mknodat_args *);
 int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 int	cheriabi_cpuset_getdomain(struct thread *, struct cheriabi_cpuset_getdomain_args *);
 int	cheriabi_cpuset_setdomain(struct thread *, struct cheriabi_cpuset_setdomain_args *);
+int	cheriabi_getrandom(struct thread *, struct cheriabi_getrandom_args *);
 
 #ifdef COMPAT_43
 
@@ -2004,6 +2010,7 @@ int	cheriabi_cpuset_setdomain(struct thread *, struct cheriabi_cpuset_setdomain_
 #define	CHERIABI_SYS_AUE_cheriabi_kevent	AUE_KEVENT
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset_getdomain	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset_setdomain	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_getrandom	AUE_NULL
 
 #undef PAD_
 #undef PADL_

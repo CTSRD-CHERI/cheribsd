@@ -128,6 +128,7 @@ _LIBRARIES=	\
 		hubbub \
 		hx509 \
 		ipsec \
+		ipt \
 		jail \
 		jpeg \
 		kadm5clnt \

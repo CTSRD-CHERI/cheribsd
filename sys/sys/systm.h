@@ -369,60 +369,62 @@ int	copyinstr(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len,
 	    size_t * __restrict lencopied);
 #if __has_feature(capabilities)
-int	copyinstr_c(const void * _Nonnull __restrict __capability udaddr,
+int	copyinstr_c(const void * __restrict __capability udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len,
 	    size_t * __restrict lencopied);
 #else
 #define	copyinstr_c	copyinstr
 #endif
-int	copyin(const void * _Nonnull __restrict udaddr,
+int	copyin(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
-int	copyin_implicit_cap(const void * _Nonnull __restrict udaddr,
+int	copyin_implicit_cap(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyin_c(const void * _Nonnull __restrict __capability udaddr,
+int	copyin_c(const void * __restrict __capability udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
-int	copyincap_c(const void * _Nonnull __restrict __capability udaddr,
+int	copyincap_c(const void * __restrict __capability udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #else
 #define	copyin_c	copyin
 #define	copyincap_c	copyin
 #endif
-int	copyin_nofault(const void * _Nonnull __restrict udaddr,
+int	copyin_nofault(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyin_nofault_c(const void * __capability _Nonnull __restrict udaddr,
+int	copyin_nofault_c(const void * __capability __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #else
 #define	copyin_nofault_c	copyin_nofault
 #endif
 int	copyout(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict udaddr, size_t len);
+	    void * __restrict udaddr, size_t len);
 int	copyout_implicit_cap(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict udaddr, size_t len);
+	    void * __restrict udaddr, size_t len);
 
 #if __has_feature(capabilities)
 int	copyout_c(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict __capability udaddr, size_t len);
+	    void * __restrict __capability udaddr, size_t len);
 int	copyoutcap_c(const void * _Nonnull __restrict kaddr,
-	    void * __capability _Nonnull __restrict udaddr, size_t len);
+	    void * __capability __restrict udaddr, size_t len);
 #else
 #define	copyout_c	copyout
 #define	copyoutcap	copyout
 #define	copyoutcap_c	copyout
 #endif
 int	copyout_nofault(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict udaddr, size_t len);
+	    void * __restrict udaddr, size_t len);
 #if __has_feature(capabilities)
 int	copyout_nofault_c(const void * _Nonnull __restrict kaddr,
-	    void * __capability _Nonnull __restrict udaddr, size_t len);
+	    void * __capability __restrict udaddr, size_t len);
 int	copyoutcap_nofault_c(
 	    const void * _Nonnull __restrict kaddr,
-	    void * __capability _Nonnull __restrict udaddr, size_t len);
+	    void * __capability __restrict udaddr, size_t len);
 #else
 #define	copyout_nofault_c	copyout_nofault
 #define	copyoutcap_nofault_c	copyout_nofault
 #endif
+int	copyout_nofault(const void * _Nonnull __restrict kaddr,
+	    void * __restrict udaddr, size_t len);
 
 int	fubyte(volatile const void *base);
 long	fuword(volatile const void *base);
@@ -591,6 +593,8 @@ int	pause_sbt(const char *wmesg, sbintime_t sbt, sbintime_t pr,
 	    int flags);
 #define	pause(wmesg, timo)						\
 	pause_sbt((wmesg), tick_sbt * (timo), 0, C_HARDCLOCK)
+#define	pause_sig(wmesg, timo)						\
+	pause_sbt((wmesg), tick_sbt * (timo), 0, C_HARDCLOCK | C_CATCH)
 #define	tsleep(chan, pri, wmesg, timo)					\
 	_sleep((chan), NULL, (pri), (wmesg), tick_sbt * (timo),		\
 	    0, C_HARDCLOCK)

@@ -62,6 +62,7 @@ SRCS+=	__getosreldate.c \
 	getcap.c \
 	getcwd.c \
 	getdomainname.c \
+	getentropy.c \
 	getgrent.c \
 	getgrouplist.c \
 	gethostname.c \
@@ -226,6 +227,7 @@ MAN+=	alarm.3 \
 	getcwd.3 \
 	getdiskbyname.3 \
 	getdomainname.3 \
+	getentropy.3 \
 	getfsent.3 \
 	getgrent.3 \
 	getgrouplist.3 \

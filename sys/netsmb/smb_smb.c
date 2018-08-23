@@ -400,7 +400,8 @@ again:
 		mb_put_uint32le(mbp, 0);
 		smb_rq_wend(rqp);
 		smb_rq_bstart(rqp);
-		mb_put_mem(mbp, pp, plen, MB_MSYSTEM);
+		mb_put_mem(mbp, (__cheri_tocap char * __capability)pp, plen,
+		    MB_MSYSTEM);
 		smb_put_dstring(mbp, vcp, up, SMB_CS_NONE);
 	} else {
 		mb_put_uint16le(mbp, uniplen);
@@ -408,8 +409,11 @@ again:
 		mb_put_uint32le(mbp, caps);
 		smb_rq_wend(rqp);
 		smb_rq_bstart(rqp);
-		mb_put_mem(mbp, pp, plen, MB_MSYSTEM);
-		mb_put_mem(mbp, (caddr_t)unipp, uniplen, MB_MSYSTEM);
+		mb_put_mem(mbp, (__cheri_tocap char * __capability)pp, plen,
+		    MB_MSYSTEM);
+		mb_put_mem(mbp,
+		    (__cheri_tocap char * __capability)(char *)unipp, uniplen,
+		    MB_MSYSTEM);
 		smb_put_dstring(mbp, vcp, up, SMB_CS_NONE);		/* AccountName */
 		smb_put_dstring(mbp, vcp, vcp->vc_domain, SMB_CS_NONE);	/* PrimaryDomain */
 		smb_put_dstring(mbp, vcp, "FreeBSD", SMB_CS_NONE);	/* Client's OS */
@@ -561,7 +565,8 @@ again:
 	mb_put_uint16le(mbp, plen);
 	smb_rq_wend(rqp);
 	smb_rq_bstart(rqp);
-	mb_put_mem(mbp, pp, plen, MB_MSYSTEM);
+	mb_put_mem(mbp, (__cheri_tocap char * __capability)(char *)pp, plen,
+	    MB_MSYSTEM);
 	smb_put_dmem(mbp, vcp, "\\\\", 2, caseopt);
 	pp = vcp->vc_srvname;
 	smb_put_dmem(mbp, vcp, pp, strlen(pp), caseopt);
@@ -642,7 +647,8 @@ smb_smb_readx(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 	mb_put_uint8(mbp, 0xff);	/* no secondary command */
 	mb_put_uint8(mbp, 0);		/* MBZ */
 	mb_put_uint16le(mbp, 0);	/* offset to secondary */
-	mb_put_mem(mbp, (caddr_t)&fid, sizeof(fid), MB_MSYSTEM);
+	mb_put_mem(mbp, (__cheri_tocap char * __capability)(char *)&fid,
+	    sizeof(fid), MB_MSYSTEM);
 	mb_put_uint32le(mbp, uio->uio_offset);
 	*len = min(SSTOVC(ssp)->vc_rxmax, *len);
 	mb_put_uint16le(mbp, *len);	/* MaxCount */
@@ -722,7 +728,8 @@ smb_smb_writex(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 	mb_put_uint8(mbp, 0xff);	/* no secondary command */
 	mb_put_uint8(mbp, 0);		/* MBZ */
 	mb_put_uint16le(mbp, 0);	/* offset to secondary */
-	mb_put_mem(mbp, (caddr_t)&fid, sizeof(fid), MB_MSYSTEM);
+	mb_put_mem(mbp, (__cheri_tocap char * __capability)(char *)&fid,
+	    sizeof(fid), MB_MSYSTEM);
 	mb_put_uint32le(mbp, uio->uio_offset);
 	mb_put_uint32le(mbp, 0);	/* MBZ (timeout) */
 	mb_put_uint16le(mbp, 0);	/* !write-thru */
@@ -783,7 +790,8 @@ smb_smb_read(struct smb_share *ssp, u_int16_t fid,
 
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (caddr_t)&fid, sizeof(fid), MB_MSYSTEM);
+	mb_put_mem(mbp, (__cheri_tocap char * __capability)(char *)&fid,
+	    sizeof(fid), MB_MSYSTEM);
 	mb_put_uint16le(mbp, rlen);
 	mb_put_uint32le(mbp, uio->uio_offset);
 	mb_put_uint16le(mbp, min(uio->uio_resid, 0xffff));
@@ -864,7 +872,8 @@ smb_smb_write(struct smb_share *ssp, u_int16_t fid, int *len, int *rresid,
 		return error;
 	smb_rq_getrequest(rqp, &mbp);
 	smb_rq_wstart(rqp);
-	mb_put_mem(mbp, (caddr_t)&fid, sizeof(fid), MB_MSYSTEM);
+	mb_put_mem(mbp, (__cheri_tocap char * __capability)(char *)&fid,
+	    sizeof(fid), MB_MSYSTEM);
 	mb_put_uint16le(mbp, resid);
 	mb_put_uint32le(mbp, uio->uio_offset);
 	mb_put_uint16le(mbp, min(uio->uio_resid, 0xffff));

@@ -42,7 +42,6 @@
   typedef __va_list       va_list;
 #endif
 
-#ifndef va_start
 #ifdef __GNUCLIKE_BUILTIN_STDARG
   #define	va_start(ap, last)	__builtin_va_start((ap), (last))
   #define	va_arg(ap, type)	__builtin_va_arg((ap), type)
@@ -51,20 +50,6 @@
     #define	va_copy(dest, src)	__va_copy(dest, src)
   #endif
   #define	va_end(ap)		__builtin_va_end(ap)
-#endif
-#endif
-
-#if defined(lint) && !defined(va_start)
-  /*
-   * Provide a fake implementation for lint's benefit
-   * This very much assumes that __va_list ends up being a pointer
-   */
-  #define va_start(ap, last) ((void)((ap) = (char *) (&(last)+1)))
-  #if __ISO_C_VISIBLE >= 1999
-    #define va_copy(dst, src) ((dst) = (src))
-  #endif
-  #define va_arg(ap, type) (*((type*)(((ap) += sizeof(type)) - sizeof(type))))
-  #define va_end(ap) ((void)0)
 #endif
 
 #endif /* ! _SYS__STDARG_H_ */

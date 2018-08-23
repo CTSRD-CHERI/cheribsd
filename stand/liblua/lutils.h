@@ -28,5 +28,5 @@
 
 #include <lua.h>
 
-void	lregister(lua_State *, const char *, const char *, int (*fptr)(lua_State *));
-void	register_utils(lua_State *);
+int	luaopen_loader(lua_State *);
+int	luaopen_io(lua_State *);

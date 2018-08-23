@@ -439,7 +439,21 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 #endif
 #if defined(KDTRACE_HOOKS) || defined(LOCK_PROFILING)
 	uintptr_t state;
-	int doing_lockprof;
+	int doing_lockprof = 0;
+#endif
+
+#ifdef KDTRACE_HOOKS
+	if (LOCKSTAT_PROFILE_ENABLED(rw__acquire)) {
+		if (__rw_rlock_try(rw, td, &v, false LOCK_FILE_LINE_ARG))
+			goto out_lockstat;
+		doing_lockprof = 1;
+		all_time -= lockstat_nsecs(&rw->lock_object);
+		state = v;
+	}
+#endif
+#ifdef LOCK_PROFILING
+	doing_lockprof = 1;
+	state = v;
 #endif
 
 	if (SCHEDULER_STOPPED())
@@ -456,17 +470,6 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 #endif
 	lock_profile_obtain_lock_failed(&rw->lock_object,
 	    &contested, &waittime);
-
-#ifdef LOCK_PROFILING
-	doing_lockprof = 1;
-	state = v;
-#elif defined(KDTRACE_HOOKS)
-	doing_lockprof = lockstat_enabled;
-	if (__predict_false(doing_lockprof)) {
-		all_time -= lockstat_nsecs(&rw->lock_object);
-		state = v;
-	}
-#endif
 
 	for (;;) {
 		if (__rw_rlock_try(rw, td, &v, false LOCK_FILE_LINE_ARG))
@@ -616,6 +619,7 @@ retry_ts:
 		LOCKSTAT_RECORD4(rw__spin, rw, all_time - sleep_time,
 		    LOCKSTAT_READER, ptr_get_flag(state, RW_LOCK_READ) == 0,
 		    ptr_get_flag(state, RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
+out_lockstat:
 #endif
 	/*
 	 * TODO: acquire "owner of record" here.  Here be turnstile dragons
@@ -646,9 +650,12 @@ __rw_rlock_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 	WITNESS_CHECKORDER(&rw->lock_object, LOP_NEWORDER, file, line, NULL);
 
 	v = RW_READ_VALUE(rw);
-	if (__predict_false(LOCKSTAT_OOL_PROFILE_ENABLED(rw__acquire) ||
+	if (__predict_false(LOCKSTAT_PROFILE_ENABLED(rw__acquire) ||
 	    !__rw_rlock_try(rw, td, &v, true LOCK_FILE_LINE_ARG)))
 		__rw_rlock_hard(rw, td, v LOCK_FILE_LINE_ARG);
+	else
+		lock_profile_obtain_lock_success(&rw->lock_object, 0, 0,
+		    file, line);
 
 	LOCK_LOG_LOCK("RLOCK", &rw->lock_object, 0, 0, file, line);
 	WITNESS_LOCK(&rw->lock_object, 0, file, line);
@@ -840,9 +847,11 @@ _rw_runlock_cookie_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 	td = curthread;
 	v = RW_READ_VALUE(rw);
 
-	if (__predict_false(LOCKSTAT_OOL_PROFILE_ENABLED(rw__release) ||
+	if (__predict_false(LOCKSTAT_PROFILE_ENABLED(rw__release) ||
 	    !__rw_runlock_try(rw, td, &v)))
 		__rw_runlock_hard(rw, td, v LOCK_FILE_LINE_ARG);
+	else
+		lock_profile_release_lock(&rw->lock_object);
 
 	TD_LOCKS_DEC(curthread);
 }
@@ -871,7 +880,7 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 #ifdef ADAPTIVE_RWLOCKS
 	int spintries = 0;
 	int i, n;
-	int sleep_reason = 0;
+	enum { READERS, WRITER } sleep_reason;
 #endif
 	uintptr_t x;
 #ifdef LOCK_PROFILING
@@ -888,10 +897,28 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 #endif
 #if defined(KDTRACE_HOOKS) || defined(LOCK_PROFILING)
 	uintptr_t state;
-	int doing_lockprof;
+	int doing_lockprof = 0;
 #endif
 
 	tid = (uintptr_t)curthread;
+	rw = rwlock2rw(c);
+
+#ifdef KDTRACE_HOOKS
+	if (LOCKSTAT_PROFILE_ENABLED(rw__acquire)) {
+		while (v == RW_UNLOCKED) {
+			if (_rw_write_lock_fetch(rw, &v, tid))
+				goto out_lockstat;
+		}
+		doing_lockprof = 1;
+		all_time -= lockstat_nsecs(&rw->lock_object);
+		state = v;
+	}
+#endif
+#ifdef LOCK_PROFILING
+	doing_lockprof = 1;
+	state = v;
+#endif
+
 	if (SCHEDULER_STOPPED())
 		return;
 
@@ -900,7 +927,6 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 #elif defined(KDTRACE_HOOKS)
 	lock_delay_arg_init(&lda, NULL);
 #endif
-	rw = rwlock2rw(c);
 	if (__predict_false(v == RW_UNLOCKED))
 		v = RW_READ_VALUE(rw);
 
@@ -925,17 +951,6 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 	lock_profile_obtain_lock_failed(&rw->lock_object,
 	    &contested, &waittime);
 
-#ifdef LOCK_PROFILING
-	doing_lockprof = 1;
-	state = v;
-#elif defined(KDTRACE_HOOKS)
-	doing_lockprof = lockstat_enabled;
-	if (__predict_false(doing_lockprof)) {
-		all_time -= lockstat_nsecs(&rw->lock_object);
-		state = v;
-	}
-#endif
-
 	for (;;) {
 		if (v == RW_UNLOCKED) {
 			if (_rw_write_lock_fetch(rw, &v, tid))
@@ -952,9 +967,11 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 		 * running on another CPU, spin until the owner stops
 		 * running or the state of the lock changes.
 		 */
-		sleep_reason = 1;
-		owner = lv_rw_wowner(v);
-		if (!(ptr_get_flag(v, RW_LOCK_READ) && TD_IS_RUNNING(owner)) {
+		if (!ptr_get_flag(v, RW_LOCK_READ)) {
+			sleep_reason = WRITER;
+			owner = lv_rw_wowner(v);
+			if (!TD_IS_RUNNING(owner))
+				goto ts;
 			if (LOCK_LOG_TEST(&rw->lock_object, 0))
 				CTR3(KTR_LOCK, "%s: spinning on %p held by %p",
 				    __func__, rw, owner);
@@ -969,9 +986,10 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 			KTR_STATE0(KTR_SCHED, "thread", sched_tdname(curthread),
 			    "running");
 			continue;
-		}
-		if ((ptr_get_flag(v, RW_LOCK_READ) && RW_READERS(v) &&
-		    spintries < rowner_retries) {
+		} else if (RW_READERS(v) > 0) {
+			sleep_reason = READERS;
+			if (spintries == rowner_retries)
+				goto ts;
 			if (!ptr_get_flag(v, RW_LOCK_WRITE_SPINNER)) {
 				if (!atomic_fcmpset_ptr(&rw->rw_lock, &v,
 				    ptr_set_flag(v, RW_LOCK_WRITE_SPINNER))) {
@@ -989,15 +1007,15 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 				if ((ptr_get_flag(v, RW_LOCK_WRITE_SPINNER)) == 0)
 					break;
 			}
+#ifdef KDTRACE_HOOKS
+			lda.spin_cnt += i;
+#endif
 			KTR_STATE0(KTR_SCHED, "thread", sched_tdname(curthread),
 			    "running");
-#ifdef KDTRACE_HOOKS
-			lda.spin_cnt += rowner_loops - i;
-#endif
 			if (i < rowner_loops)
 				continue;
-			sleep_reason = 2;
 		}
+ts:
 #endif
 		ts = turnstile_trywait(&rw->lock_object);
 		v = RW_READ_VALUE(rw);
@@ -1017,7 +1035,7 @@ retry_ts:
 				turnstile_cancel(ts);
 				continue;
 			}
-		} else if (RW_READERS(v) > 0 && sleep_reason == 1) {
+		} else if (RW_READERS(v) > 0 && sleep_reason == WRITER) {
 			turnstile_cancel(ts);
 			continue;
 		}
@@ -1095,6 +1113,7 @@ retry_ts:
 		LOCKSTAT_RECORD4(rw__spin, rw, all_time - sleep_time,
 		    LOCKSTAT_WRITER, ptr_get_flag(state, RW_LOCK_READ) == 0,
 		    ptr_get_flag(state, RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
+out_lockstat:
 #endif
 	LOCKSTAT_PROFILE_OBTAIN_RWLOCK_SUCCESS(rw__acquire, rw, contested,
 	    waittime, file, line, LOCKSTAT_WRITER);

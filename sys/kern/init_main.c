@@ -724,10 +724,6 @@ start_init(void *dummy)
 	struct thread *td;
 	struct proc *p;
 
-	mtx_lock(&Giant);
-
-	GIANT_REQUIRED;
-
 	TSENTER();	/* Here so we don't overlap with mi_startup. */
 
 	td = curthread;
@@ -799,7 +795,6 @@ start_init(void *dummy)
 		 */
 		error = kern_execve(td, &args, NULL);
 		if (error == EJUSTRETURN) {
-			mtx_unlock(&Giant);
 			free(free_init_path, M_TEMP);
 			TSEXIT();
 			return;

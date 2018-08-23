@@ -70,7 +70,7 @@
 .set cheri_sysregs_accessible
 #endif
 
-#include "assym.s"
+#include "assym.inc"
 
 	.set	noreorder			# Noreorder is default style!
 

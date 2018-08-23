@@ -49,7 +49,7 @@
 #include <linux/sched.h>
 #include <linux/types.h>
 #include <linux/jiffies.h>
-#include <linux/log2.h> 
+#include <linux/log2.h>
 #include <asm/byteorder.h>
 
 #include <machine/stdarg.h>
@@ -86,9 +86,11 @@
 #define	S64_C(x) x ## LL
 #define	U64_C(x) x ## ULL
 
+#define	BUILD_BUG()			do { CTASSERT(0); } while (0)
 #define	BUILD_BUG_ON(x)			CTASSERT(!(x))
 #define	BUILD_BUG_ON_MSG(x, msg)	BUILD_BUG_ON(x)
 #define	BUILD_BUG_ON_NOT_POWER_OF_2(x)	BUILD_BUG_ON(!powerof2(x))
+#define	BUILD_BUG_ON_INVALID(expr)	while (0) { (void)(expr); }
 
 #define	BUG()			panic("BUG at %s:%d", __FILE__, __LINE__)
 #define	BUG_ON(cond)		do {				\
@@ -168,12 +170,12 @@ scnprintf(char *buf, size_t size, const char *fmt, ...)
  */
 #ifdef DEBUG
 #define pr_debug(fmt, ...) \
-        log(LOG_DEBUG, fmt, ##__VA_ARGS__)
+	log(LOG_DEBUG, fmt, ##__VA_ARGS__)
 #define pr_devel(fmt, ...) \
 	log(LOG_DEBUG, pr_fmt(fmt), ##__VA_ARGS__)
 #else
 #define pr_debug(fmt, ...) \
-        ({ if (0) log(LOG_DEBUG, fmt, ##__VA_ARGS__); 0; })
+	({ if (0) log(LOG_DEBUG, fmt, ##__VA_ARGS__); 0; })
 #define pr_devel(fmt, ...) \
 	({ if (0) log(LOG_DEBUG, pr_fmt(fmt), ##__VA_ARGS__); 0; })
 #endif
@@ -236,19 +238,19 @@ scnprintf(char *buf, size_t size, const char *fmt, ...)
 
 #ifndef WARN
 #define	WARN(condition, ...) ({			\
-        bool __ret_warn_on = (condition);	\
-        if (unlikely(__ret_warn_on))		\
-                pr_warning(__VA_ARGS__);	\
-        unlikely(__ret_warn_on);		\
+	bool __ret_warn_on = (condition);	\
+	if (unlikely(__ret_warn_on))		\
+		pr_warning(__VA_ARGS__);	\
+	unlikely(__ret_warn_on);		\
 })
 #endif
 
 #ifndef WARN_ONCE
 #define	WARN_ONCE(condition, ...) ({		\
-        bool __ret_warn_on = (condition);	\
-        if (unlikely(__ret_warn_on))		\
-                pr_warn_once(__VA_ARGS__);	\
-        unlikely(__ret_warn_on);		\
+	bool __ret_warn_on = (condition);	\
+	if (unlikely(__ret_warn_on))		\
+		pr_warn_once(__VA_ARGS__);	\
+	unlikely(__ret_warn_on);		\
 })
 #endif
 
@@ -257,7 +259,7 @@ scnprintf(char *buf, size_t size, const char *fmt, ...)
 	const __typeof(((type *)0)->member) *__p = (ptr);	\
 	(type *)((uintptr_t)__p - offsetof(type, member));	\
 })
-  
+
 #define	ARRAY_SIZE(x)	(sizeof(x) / sizeof((x)[0]))
 
 #define	u64_to_user_ptr(val)	((void *)(uintptr_t)(val))
@@ -293,6 +295,9 @@ kstrtoul(const char *cp, unsigned int base, unsigned long *res)
 
 	*res = strtoul(cp, &end, base);
 
+	/* skip newline character, if any */
+	if (*end == '\n')
+		end++;
 	if (*cp == 0 || *end != 0)
 		return (-EINVAL);
 	return (0);
@@ -305,6 +310,9 @@ kstrtol(const char *cp, unsigned int base, long *res)
 
 	*res = strtol(cp, &end, base);
 
+	/* skip newline character, if any */
+	if (*end == '\n')
+		end++;
 	if (*cp == 0 || *end != 0)
 		return (-EINVAL);
 	return (0);
@@ -318,6 +326,9 @@ kstrtoint(const char *cp, unsigned int base, int *res)
 
 	*res = temp = strtol(cp, &end, base);
 
+	/* skip newline character, if any */
+	if (*end == '\n')
+		end++;
 	if (*cp == 0 || *end != 0)
 		return (-EINVAL);
 	if (temp != (int)temp)
@@ -333,6 +344,9 @@ kstrtouint(const char *cp, unsigned int base, unsigned int *res)
 
 	*res = temp = strtoul(cp, &end, base);
 
+	/* skip newline character, if any */
+	if (*end == '\n')
+		end++;
 	if (*cp == 0 || *end != 0)
 		return (-EINVAL);
 	if (temp != (unsigned int)temp)
@@ -348,6 +362,9 @@ kstrtou32(const char *cp, unsigned int base, u32 *res)
 
 	*res = temp = strtoul(cp, &end, base);
 
+	/* skip newline character, if any */
+	if (*end == '\n')
+		end++;
 	if (*cp == 0 || *end != 0)
 		return (-EINVAL);
 	if (temp != (u32)temp)
@@ -395,7 +412,7 @@ extern bool linux_cpu_has_clflush;
 #endif
 
 typedef struct pm_message {
-        int event;
+	int event;
 } pm_message_t;
 
 /* Swap values of a and b */

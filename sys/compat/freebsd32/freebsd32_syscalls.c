@@ -217,7 +217,7 @@ const char *freebsd32_syscallnames[] = {
 	"undelete",			/* 205 = undelete */
 	"freebsd32_futimes",			/* 206 = freebsd32_futimes */
 	"getpgid",			/* 207 = getpgid */
-	"#208",			/* 208 = newreboot */
+	"#208",			/* 208 = nosys */
 	"poll",			/* 209 = poll */
 	"lkmnosys",			/* 210 = lkmnosys */
 	"lkmnosys",			/* 211 = lkmnosys */
@@ -595,4 +595,5 @@ const char *freebsd32_syscallnames[] = {
 	"freebsd32_kevent",			/* 560 = freebsd32_kevent */
 	"freebsd32_cpuset_getdomain",			/* 561 = freebsd32_cpuset_getdomain */
 	"freebsd32_cpuset_setdomain",			/* 562 = freebsd32_cpuset_setdomain */
+	"getrandom",			/* 563 = getrandom */
 };

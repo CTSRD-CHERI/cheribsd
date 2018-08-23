@@ -127,7 +127,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_signal.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_sysargmap.h>
 
 #include <sys/cheriabi.h>
 
@@ -2034,6 +2033,16 @@ cheriabi_cap_fcntls_get(struct thread *td,
 	return (ENOSYS);
 }
 #endif /* !CAPABILITIES */
+
+/*
+ * sys_getrandom.c
+ */
+int
+cheriabi_getrandom(struct thread *td, struct cheriabi_getrandom_args *uap)
+{
+
+	return (kern_getrandom(td, uap->buf, uap->buflen, uap->flags));
+}
 
 /*
  * sys_pipe.c

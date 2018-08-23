@@ -35,13 +35,32 @@ FILE *
 fopen(const char *filename, const char *mode)
 {
 	struct stat	st;
-	int		fd;
+	int		fd, m, o;
 	FILE		*f;
 
-	if (mode == NULL || mode[0] != 'r')
+	if (mode == NULL)
 		return NULL;
 
-	fd = open(filename, O_RDONLY);
+	switch (*mode++) {
+	case 'r':	/* open for reading */
+		m = O_RDONLY;
+		o = 0;
+		break;
+
+	case 'w':	/* open for writing */
+		m = O_WRONLY;
+		/* These are not actually implemented yet */
+		o = O_CREAT | O_TRUNC;
+		break;
+
+	default:	/* illegal mode */
+		return (NULL);
+	}
+
+	if (*mode == '+')
+		m = O_RDWR;
+
+	fd = open(filename, m | o);
 	if (fd < 0)
 		return NULL;
 
@@ -85,6 +104,21 @@ fread(void *ptr, size_t size, size_t count, FILE *stream)
 	return (r);
 }
 
+size_t
+fwrite(const void *ptr, size_t size, size_t count, FILE *stream)
+{
+	ssize_t w;
+
+	if (stream == NULL || ptr == NULL)
+		return (0);
+	w = write(stream->fd, ptr, size * count);
+	if (w == -1)
+		return (0);
+
+	stream->offset += w;
+	return ((size_t)w);
+}
+
 int
 fclose(FILE *stream)
 {
@@ -125,6 +159,42 @@ getc(FILE *stream)
 	if (r == 1)
 		return ch;
 	return EOF;
+}
+
+DIR *
+opendir(const char *name)
+{
+	DIR *dp;
+	int fd;
+
+	fd = open(name, O_RDONLY);
+	if (fd < 0)
+		return NULL;
+	dp = fdopendir(fd);
+	if (dp == NULL)
+		close(fd);
+	return dp;
+}
+
+DIR *
+fdopendir(int fd)
+{
+	DIR *dp;
+
+	dp = malloc(sizeof(*dp));
+	if (dp == NULL)
+		return NULL;
+	dp->fd = fd;
+	return dp;
+}
+
+int
+closedir(DIR *dp)
+{
+	close(dp->fd);
+	dp->fd = -1;
+	free(dp);
+	return 0;
 }
 
 void

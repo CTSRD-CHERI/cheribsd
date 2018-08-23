@@ -68,12 +68,14 @@ SUBDIR=	\
 	${_bxe} \
 	${_bios} \
 	${_bktr} \
+	${_blake2} \
 	${_bm} \
 	bnxt \
 	bridgestp \
 	bwi \
 	bwn \
 	${_bytgpio} \
+	${_chvgpio} \
 	cam \
 	${_cardbus} \
 	${_carp} \
@@ -85,7 +87,6 @@ SUBDIR=	\
 	cd9660_iconv \
 	${_ce} \
 	${_cfi} \
-	chacha20 \
 	${_chromebook_platform} \
 	${_ciss} \
 	cloudabi \
@@ -360,7 +361,7 @@ SUBDIR=	\
 	snp \
 	sound \
 	${_speaker} \
-	spigen \
+	spi \
 	${_splash} \
 	${_sppp} \
 	ste \
@@ -644,7 +645,11 @@ _amdsmn=	amdsmn
 _amdtemp=	amdtemp
 _arcmsr=	arcmsr
 _asmc=		asmc
+.if ${MK_CRYPT} != "no" || defined(ALL_MODULES)
+_blake2=	blake2
+.endif
 _bytgpio=	bytgpio
+_chvgpio=	chvgpio
 _ciss=		ciss
 _chromebook_platform=	chromebook_platform
 _cmx=		cmx
@@ -820,10 +825,6 @@ _cloudabi64=	cloudabi64
 .if ${MACHINE_ARCH:Marmv[67]*} != "" || ${MACHINE_CPUARCH} == "aarch64"
 _bcm283x_clkman=  bcm283x_clkman
 _bcm283x_pwm=  bcm283x_pwm
-.endif
-
-.if ${MACHINE_ARCH:Marmv[67]*} != ""
-_ffec=		ffec
 .endif
 
 SUBDIR+=${MODULES_EXTRA}

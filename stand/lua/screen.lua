@@ -1,4 +1,6 @@
 --
+-- SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+--
 -- Copyright (c) 2015 Pedro Souza <pedrosouza@freebsd.org>
 -- All rights reserved.
 --
@@ -26,60 +28,53 @@
 -- $FreeBSD$
 --
 
-local screen = {};
+local color = require("color")
+local core = require("core")
 
-local color = require("color");
-local core = require("core");
+local screen = {}
 
--- XXX TODO: This should be fixed in the interpreter to not print decimals
-function intstring(num)
-	local str = tostring(num)
-	local decimal = string.find(str, "%.")
-
-	if decimal then
-		return string.sub(str, 1, decimal - 1)
-	end
-	return str
-end
+-- Module exports
+screen.default_x = 0
+screen.default_y = 25
 
 function screen.clear()
-	if core.bootserial() then
-		return;
+	if core.isSerialBoot() then
+		return
 	end
-	loader.printc("\027[H\027[J");
+	printc(core.KEYSTR_CSI .. "H" .. core.KEYSTR_CSI .. "J")
 end
 
 function screen.setcursor(x, y)
-	if core.bootserial() then
-		return;
+	if core.isSerialBoot() then
+		return
 	end
 
-	loader.printc("\027["..intstring(y)..";"..intstring(x).."H");
+	printc(core.KEYSTR_CSI .. y .. ";" .. x .. "H")
 end
 
-function screen.setforeground(c)
+function screen.setforeground(color_value)
 	if color.disabled then
-		return c;
+		return color_value
 	end
-	loader.printc("\027[3"..c.."m");
+	printc(color.escapefg(color_value))
 end
 
-function screen.setbackground(c)
+function screen.setbackground(color_value)
 	if color.disabled then
-		return c;
+		return color_value
 	end
-	loader.printc("\027[4"..c.."m");
+	printc(color.escapebg(color_value))
 end
 
 function screen.defcolor()
-	loader.printc(color.default());
+	printc(color.default())
 end
 
 function screen.defcursor()
-	if core.bootserial() then
-		return;
+	if core.isSerialBoot() then
+		return
 	end
-	loader.printc("\027[25;0H");
+	screen.setcursor(screen.default_x, screen.default_y)
 end
 
 return screen

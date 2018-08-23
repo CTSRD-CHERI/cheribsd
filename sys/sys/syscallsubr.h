@@ -219,6 +219,8 @@ int	kern_getloginclass(struct thread *td, char * __capability namebuf,
 int	kern_getppid(struct thread *);
 int	kern_getpeername(struct thread *td, int fd, struct sockaddr **sa,
 	    socklen_t *alen);
+int	kern_getrandom(struct thread *td, void * __capability user_buf,
+	    size_t buflen, unsigned int flags);
 int	kern_getresgid(struct thread *td, gid_t * __capability rgid,
 	    gid_t * __capability egid, gid_t * __capability sgid);
 int	kern_getresuid(struct thread *td, uid_t * __capability ruid,

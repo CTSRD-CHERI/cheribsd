@@ -117,6 +117,7 @@ struct aw_mmc_softc {
 	int32_t			aw_vdd;
 	regulator_t		aw_reg_vmmc;
 	regulator_t		aw_reg_vqmmc;
+	unsigned int		aw_clock;
 
 	/* Fields required for DMA access. */
 	bus_addr_t	  	aw_dma_desc_phys;
@@ -266,11 +267,17 @@ aw_mmc_attach(device_t dev)
 		bus_width = 4;
 
 	if (regulator_get_by_ofw_property(dev, 0, "vmmc-supply",
-	    &sc->aw_reg_vmmc) == 0 && bootverbose)
-		device_printf(dev, "vmmc-supply regulator found\n");
+	    &sc->aw_reg_vmmc) == 0) {
+		if (bootverbose)
+			device_printf(dev, "vmmc-supply regulator found\n");
+		regulator_enable(sc->aw_reg_vmmc);
+	}
 	if (regulator_get_by_ofw_property(dev, 0, "vqmmc-supply",
-	    &sc->aw_reg_vqmmc) == 0 && bootverbose)
-		device_printf(dev, "vqmmc-supply regulator found\n");
+	    &sc->aw_reg_vqmmc) == 0 && bootverbose) {
+		if (bootverbose)
+			device_printf(dev, "vqmmc-supply regulator found\n");
+		regulator_enable(sc->aw_reg_vqmmc);
+	}
 
 	sc->aw_host.f_min = 400000;
 	sc->aw_host.f_max = 52000000;
@@ -860,7 +867,7 @@ aw_mmc_set_power(struct aw_mmc_softc *sc, int32_t vdd)
 
 	sc->aw_vdd = vdd;
 
-	if (sc->aw_reg_vmmc == NULL && sc->aw_reg_vqmmc == NULL)
+	if (sc->aw_reg_vqmmc == NULL)
 		return;
 
 	switch (1 << vdd) {
@@ -877,13 +884,6 @@ aw_mmc_set_power(struct aw_mmc_softc *sc, int32_t vdd)
 		break;
 	}
 
-	if (sc->aw_reg_vmmc)
-		if (regulator_set_voltage(sc->aw_reg_vmmc,
-		    min_uvolt, max_uvolt) != 0)
-			device_printf(sc->aw_dev,
-			    "Cannot set vmmc to %d<->%d\n",
-			    min_uvolt,
-			    max_uvolt);
 	if (sc->aw_reg_vqmmc)
 		if (regulator_set_voltage(sc->aw_reg_vqmmc,
 		    min_uvolt, max_uvolt) != 0)
@@ -939,8 +939,8 @@ aw_mmc_update_ios(device_t bus, device_t child)
 		reg &= ~AW_MMC_CTRL_DDR_MOD_SEL;
 	AW_MMC_WRITE_4(sc, AW_MMC_GCTL, reg);
 
-	if (ios->clock) {
-		clock = ios->clock;
+	if (ios->clock && ios->clock != sc->aw_clock) {
+		sc->aw_clock = clock = ios->clock;
 
 		/* Disable clock */
 		error = aw_mmc_update_clock(sc, 0);
