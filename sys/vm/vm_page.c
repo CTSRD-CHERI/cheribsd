@@ -531,7 +531,7 @@ vm_page_startup(vm_ptr_t vaddr)
 	 * manually fetch the value.
 	 */
 	TUNABLE_INT_FETCH("vm.boot_pages", &boot_pages);
-	new_end = end - (boot_pages * UMA_SLAB_SIZE);
+	new_end = end - (boot_pages * PAGE_SIZE);
 	new_end = trunc_page(new_end);
 	mapped = pmap_map(&vaddr, new_end, end,
 	    VM_PROT_READ | VM_PROT_WRITE);
