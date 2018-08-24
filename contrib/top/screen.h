@@ -11,9 +11,6 @@
 
 /* declare return values for termcap functions */
 extern int tgetent(char *bp, const char *name);
-extern int tgetflag(char *id);
-extern int tgetnum(char *id);
-extern char *tgetstr(char *id, char **area);
 extern char *tgoto(const char *cap, int col, int row);
 extern int tputs(const char *str, int affcnt, int (*putc)(int));
 
