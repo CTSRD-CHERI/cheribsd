@@ -391,7 +391,7 @@ const Elf_Sym *find_symdef(unsigned long, const Obj_Entry *,
 void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
 void init_pltgot(Obj_Entry *);
 void lockdflt_init(void);
-void digest_notes(Obj_Entry *, caddr_t, caddr_t);
+void digest_notes(Obj_Entry *, const Elf_Note *, const Elf_Note *);
 Obj_Entry *globallist_curr(const Obj_Entry *obj);
 Obj_Entry *globallist_next(const Obj_Entry *obj);
 void obj_free(Obj_Entry *);

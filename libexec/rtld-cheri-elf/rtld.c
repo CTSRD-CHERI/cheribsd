@@ -1450,9 +1450,9 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocabase,
 	    break;
 
 	case PT_NOTE:
-	    note_start = (caddr_t)obj->relocbase + ph->p_vaddr;
+	    note_start = obj->relocbase + ph->p_vaddr;
 	    note_end = note_start + ph->p_filesz;
-	    digest_notes(obj, note_start, note_end);
+	    digest_notes(obj, (const Elf_Note *)note_start, (const Elf_Note *)note_end);
 	    break;
 	}
     }
@@ -1466,13 +1466,13 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocabase,
 }
 
 void
-digest_notes(Obj_Entry *obj, caddr_t note_start, caddr_t note_end)
+digest_notes(Obj_Entry *obj, const Elf_Note *note_start, const Elf_Note *note_end)
 {
 	const Elf_Note *note;
 	const char *note_name;
 	uintptr_t p;
 
-	for (note = (const Elf_Note *)note_start; (caddr_t)note < note_end;
+	for (note = note_start; note < note_end;
 	    note = (const Elf_Note *)((const char *)(note + 1) +
 	      roundup2(note->n_namesz, sizeof(Elf32_Addr)) +
 	      roundup2(note->n_descsz, sizeof(Elf32_Addr)))) {
