@@ -262,3 +262,19 @@ test_fault_read_epcc(const struct cheri_test *ctp __unused)
 	CHERI_CAP_PRINT(cheri_getepcc());
 }
 #endif	/* __mips__ */
+
+#if __has_builtin(__builtin_cheri_cap_load_tags) && defined(__mips__)
+void
+test_fault_cloadtags_misaligned(const struct cheri_test *ctp __unused)
+{
+	uint64_t tags = 0xDEADFEED;
+	void * __capability p[20] __attribute__((aligned(512))) = { 0 } ;
+	void * __capability c = &p[1];
+
+	tags = __builtin_cheri_cap_load_tags(c);
+
+	printf("cloadtags misaligned left tags=0x%" PRIx64 "\n", tags);
+
+	cheritest_success();
+}
+#endif

@@ -367,6 +367,9 @@ DECLARE_CHERI_TEST(test_fault_read_kr2c);
 DECLARE_CHERI_TEST(test_fault_read_kcc);
 DECLARE_CHERI_TEST(test_fault_read_kdc);
 DECLARE_CHERI_TEST(test_fault_read_epcc);
+#if __has_builtin(__builtin_cheri_cap_load_tags) && defined(__mips__)
+DECLARE_CHERI_TEST(test_fault_cloadtags_misaligned);
+#endif
 DECLARE_CHERI_TEST(test_nofault_ccheck_user_pass);
 
 /* cheritest_fd.c */
@@ -555,6 +558,10 @@ DECLARE_CHERI_TEST(cheritest_vm_tag_tmpfile_private);
 DECLARE_CHERI_TEST(cheritest_vm_tag_tmpfile_private_prefault);
 DECLARE_CHERI_TEST(cheritest_vm_cow_read);
 DECLARE_CHERI_TEST(cheritest_vm_cow_write);
+#if __has_builtin(__builtin_cheri_cap_load_tags)
+DECLARE_CHERI_TEST(test_cloadtags_mapped);
+DECLARE_CHERI_TEST(test_fault_cloadtags_unmapped);
+#endif
 const char	*xfail_need_writable_tmp(const char *name);
 
 #if 0
