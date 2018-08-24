@@ -295,6 +295,13 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_SYSTEM_REGS },
 
+	{ .ct_name = "test_fault_cloadtags_misaligned",
+	  .ct_desc = "CLoadTags on not-cacheline-aligned address",
+	  .ct_func = test_fault_cloadtags_misaligned,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE,
+	  .ct_signum = SIGBUS,
+	  .ct_mips_exccode = T_ADDR_ERR_LD, },
+
 	/*
 	 * Tests on the kernel-provided sealing capability (sealcap).
 	 */
@@ -1041,6 +1048,17 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "check tags are swapped out by swap pager",
 	  .ct_func = cheritest_vm_swap,
 	  .ct_check_xfail = xfail_swap_required},
+
+	{ .ct_name = "test_fault_cloadtags_mapped",
+	  .ct_desc = "CLoadTags on mapped address",
+	  .ct_func = test_cloadtags_mapped, },
+
+	{ .ct_name = "test_fault_cloadtags_unmapped",
+	  .ct_desc = "CLoadTags on unmapped address",
+	  .ct_func = test_fault_cloadtags_unmapped,
+	  .ct_flags = CT_FLAG_SIGNAL | CT_FLAG_MIPS_EXCCODE,
+	  .ct_signum = SIGSEGV,
+	  .ct_mips_exccode = T_TLB_LD_MISS, },
 
 #ifdef CHERI_LIBCHERI_TESTS
 #if 0

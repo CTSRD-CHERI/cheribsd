@@ -596,3 +596,45 @@ cheritest_vm_cow_write(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(close(fd));
 	cheritest_success();
 }
+
+/*
+ * Test a mapped and unmapped invocation of cloadtags
+ */
+
+void
+test_cloadtags_mapped(const struct cheri_test *ctp __unused)
+{
+	uint64_t tags = 0;
+	void * __capability * __capability c;
+	void * __capability * p;
+
+	p = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+						MAP_ANON, -1, 0));
+	c = (__cheri_tocap void * __capability * __capability) p;
+
+	CHERITEST_VERIFY2(cheri_gettag(c) != 0, "initial cap not constructed");
+
+	p[1] = c;
+	p[2] = c;
+
+	asm volatile ( "cloadtags %[tags], %[ptr]" : [tags]"+r"(tags) : [ptr]"r"(c) );
+
+	CHERITEST_VERIFY2(tags == 0x6, "incorrect result from cloadtags");
+
+	munmap(p, PAGE_SIZE);
+	cheritest_success();
+}
+
+void
+test_fault_cloadtags_unmapped(const struct cheri_test *ctp __unused)
+{
+	uint64_t tags = 0;
+	void * __capability c;
+	void * p;
+
+	p = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+						MAP_ANON, -1, 0));
+	munmap(p, PAGE_SIZE);
+	c = (__cheri_tocap void * __capability) p;
+	asm volatile ( "cloadtags %[tags], %[ptr]" : [tags]"+r"(tags) : [ptr]"r"(c) );
+}

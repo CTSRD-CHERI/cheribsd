@@ -332,6 +332,7 @@ DECLARE_CHERI_TEST(test_fault_read_kr2c);
 DECLARE_CHERI_TEST(test_fault_read_kcc);
 DECLARE_CHERI_TEST(test_fault_read_kdc);
 DECLARE_CHERI_TEST(test_fault_read_epcc);
+DECLARE_CHERI_TEST(test_fault_cloadtags_misaligned);
 DECLARE_CHERI_TEST(test_nofault_ccheck_user_pass);
 
 /* cheritest_fd.c */
@@ -493,6 +494,8 @@ DECLARE_CHERI_TEST(cheritest_vm_tag_tmpfile_private);
 DECLARE_CHERI_TEST(cheritest_vm_tag_tmpfile_private_prefault);
 DECLARE_CHERI_TEST(cheritest_vm_cow_read);
 DECLARE_CHERI_TEST(cheritest_vm_cow_write);
+DECLARE_CHERI_TEST(test_cloadtags_mapped);
+DECLARE_CHERI_TEST(test_fault_cloadtags_unmapped);
 const char	*xfail_need_writable_tmp(const char *name);
 const char	*xfail_need_writable_non_tmpfs_tmp(const char *name);
 
