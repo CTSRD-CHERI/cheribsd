@@ -137,14 +137,25 @@ typedef	__uid_t		uid_t;
 #define	SIGRTMIN	65
 #define	SIGRTMAX	126
 
+#ifdef _KERNEL
 #if !__has_feature(capabilities)
 #define	__intcap_t __intptr_t
 #endif
-#define	SIG_DFL		((__sighandler_t * __kerncap)(__intcap_t)0)
-#define	SIG_IGN		((__sighandler_t * __kerncap)(__intcap_t)1)
-#define	SIG_ERR		((__sighandler_t * __kerncap)(__intcap_t)-1)
-/* #define	SIG_CATCH	((__sighandler_t *)(__intcap_t)2) See signalvar.h */
-#define SIG_HOLD        ((__sighandler_t * __kerncap)(__intcap_t)3)
+/*
+ * In the kernel we need to cast to __intcap_t since we are assigning to a
+ * capability. If we did this in hybrid userspace we would generate a CToPtr
+ * which causes all of the SIG_* constants to evaluate to 0.
+ */
+#define __SIGHANDLER_CONSTANT(value)	\
+    ((__sighandler_t * __kerncap)(__intcap_t)value)
+#else
+#define __SIGHANDLER_CONSTANT(value) ((__sighandler_t *)(__intptr_t)0)
+#endif
+#define	SIG_DFL		__SIGHANDLER_CONSTANT(0)
+#define	SIG_IGN		__SIGHANDLER_CONSTANT(1)
+#define	SIG_ERR		__SIGHANDLER_CONSTANT(-1)
+/* #define	SIG_CATCH	__SIGHANDLER_CONSTANT(2) See signalvar.h */
+#define SIG_HOLD        __SIGHANDLER_CONSTANT(3)
 
 /*
  * Type of a signal handling function.
