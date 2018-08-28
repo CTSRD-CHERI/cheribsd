@@ -4667,11 +4667,11 @@ unref_dag(Obj_Entry *root)
 /*
  * Common code for MD __tls_get_addr().
  */
-static void *tls_get_addr_slow(Elf_Addr **, int, size_t) __noinline;
+static void *tls_get_addr_slow(uintptr_t **, int, size_t) __noinline;
 static void *
-tls_get_addr_slow(Elf_Addr **dtvp, int index, size_t offset)
+tls_get_addr_slow(uintptr_t **dtvp, int index, size_t offset)
 {
-    Elf_Addr *newdtv, *dtv;
+    uintptr_t *newdtv, *dtv;
     RtldLockState lockstate;
     int to_copy;
 
@@ -4703,9 +4703,9 @@ tls_get_addr_slow(Elf_Addr **dtvp, int index, size_t offset)
 }
 
 void *
-tls_get_addr_common(Elf_Addr **dtvp, int index, size_t offset)
+tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset)
 {
-	Elf_Addr *dtv;
+	intptr_t *dtv;
 
 	dtv = *dtvp;
 	/* Check dtv generation in case new modules have arrived */

@@ -975,7 +975,7 @@ _mips_get_tls(void)
 void *
 __tls_get_addr(tls_index* ti)
 {
-	intptr_t** tls;
+	uintptr_t** tls;
 	char *p;
 
 #ifdef TLS_USE_SYSARCH
