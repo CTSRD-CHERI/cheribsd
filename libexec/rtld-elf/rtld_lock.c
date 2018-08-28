@@ -44,6 +44,18 @@
  * from machine/atomic.h.
  */
 
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180828,
+ *   "changes": [
+ *     "pointer_alignment"
+ *   ],
+ *   "change_comment": "Use __builtin_align_up",
+ * }
+ * CHERI CHANGES END
+ */
+
 #include <sys/param.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -73,7 +85,6 @@ def_lock_create(void)
 {
     void *base;
     char *p;
-    uintptr_t r;
     Lock *l;
 
     /*
@@ -85,12 +96,10 @@ def_lock_create(void)
      */
     base = xmalloc(CACHE_LINE_SIZE);
     p = (char *)base;
-    if ((uintptr_t)p % CACHE_LINE_SIZE != 0) {
+    if (!__builtin_is_aligned(p, CACHE_LINE_SIZE)) {
 	free(base);
 	base = xmalloc(2 * CACHE_LINE_SIZE);
-	p = (char *)base;
-	if ((r = (uintptr_t)p % CACHE_LINE_SIZE) != 0)
-	    p += CACHE_LINE_SIZE - r;
+	p = __builtin_align_up(base, CACHE_LINE_SIZE);
     }
     l = (Lock *)p;
     l->base = base;
