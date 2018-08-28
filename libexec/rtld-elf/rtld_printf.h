@@ -44,5 +44,5 @@ void rtld_fdputchar(int fd, int c);
 #define	rtld_printf(...) rtld_fdprintf(STDOUT_FILENO, __VA_ARGS__)
 #define	rtld_putstr(str) rtld_fdputstr(STDOUT_FILENO, (str))
 #define	rtld_putchar(c) rtld_fdputchar(STDOUT_FILENO, (c))
-
+#define rtld_write(fd, s, n) write(fd, s, n)
 #endif
