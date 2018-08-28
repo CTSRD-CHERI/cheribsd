@@ -3429,12 +3429,13 @@ ifmr_update(const struct ifmediareq *ifmr, caddr_t data)
 int
 ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 {
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI)
 	caddr_t saved_data;
-	struct ifmediareq *ifmr;
+	struct ifmediareq ifmr;
+#endif
 	struct ifmediareq *ifmrp;
 	struct ifnet *ifp;
 	struct ifreq *ifr;
-	u_long saved_cmd;
 	int error;
 	int oif_flags;
 #ifdef VIMAGE
@@ -3479,22 +3480,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	}
 
 	ifmrp = NULL;
-#ifdef COMPAT_FREEBSD32
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI)
 	switch (cmd) {
-	case SIOCGIFMEDIA32:
-	case SIOCGIFXMEDIA32:
-		ifmrp = &ifmr;
-		ifmr_init(ifmrp, data);
-		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
-		saved_data = data;
-		data = (caddr_t)ifmrp;
-	}
-#endif
-
-	ifr = (struct ifreq *)data;
-	switch (cmd) {
-	case SIOCGIFMEDIA:
-	case SIOCGIFXMEDIA:
 #ifdef COMPAT_FREEBSD32
 	case SIOCGIFMEDIA32:
 	case SIOCGIFXMEDIA32:
@@ -3503,14 +3490,13 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCGIFMEDIA64:
 	case SIOCGIFXMEDIA64:
 #endif
-		ifmr = malloc(sizeof(struct ifmediareq), M_TEMP,
-		    M_WAITOK | M_ZERO);
-		ifmr_init(ifmr, data);
-		saved_cmd = cmd;
+		ifmrp = &ifmr;
+		ifmr_init(ifmrp, data);
 		cmd = _IOC_NEWTYPE(cmd, struct ifmediareq);
 		saved_data = data;
-		data = (caddr_t)ifmr;
+		data = (caddr_t)ifmrp;
 	}
+#endif	/* defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI) */
 
 	ifr = (struct ifreq *)data;
 	switch (cmd) {
@@ -3608,11 +3594,15 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 out_ref:
 	if_rele(ifp);
 out_noref:
-	if (cmd == SIOCGIFMEDIA || cmd == SIOCGIFXMEDIA) {
+#if defined(COMPAT_FREEBSD32) && defined(COMPAT_CHERIABI)
+	if (ifmrp != NULL) {
+		KASSERT((cmd == SIOCGIFMEDIA || cmd == SIOCGIFXMEDIA),
+		    ("ifmrp non-NULL, but cmd is not an ifmedia req 0x%lx",
+		     cmd));
 		data = saved_data;
-		ifmr_update(ifmr, data);
-		free(ifmr, M_TEMP);
+		ifmr_update(ifmrp, data);
 	}
+#endif
 	CURVNET_RESTORE();
 	return (error);
 }
