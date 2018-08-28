@@ -1,1 +1,0 @@
-../rtld-elf/map_object.c

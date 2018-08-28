@@ -15,9 +15,10 @@ MK_CHERI_SHARED_PROG:=yes
 # DEBUG=-DDEBUG
 
 PROG?=		ld-cheri-elf.so.1
-SRCS=		rtld_start.S \
-		reloc.c rtld.c rtld_lock.c map_object.c \
-		heap.c malloc.c xmalloc.c debug.c libmap.c
+SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c
+.PATH: ${.CURDIR}/../rtld-elf
+SRCS+=	rtld_lock.c map_object.c xmalloc.c debug.c libmap.c
+
 MAN=
 NEED_CHERI=	pure
 WANT_DUMP=yes
@@ -31,7 +32,7 @@ RTLD_ARCH=	${MACHINE_ARCH}
 .else
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
-CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR}
+CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR} -I${.CURDIR}/../rtld-elf
 LDFLAGS+=	-nostdlib -e rtld_start
 WARNS?=		2
 INSTALLFLAGS=	-C -b
