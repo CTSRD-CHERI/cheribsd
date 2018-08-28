@@ -27,6 +27,19 @@
  * $FreeBSD$
  */
 
+ /*
+  * CHERI CHANGES START
+  * {
+  *   "updated": 20180828,
+  *   "target_type": "prog",
+  *   "changes": [
+  *     "support"
+  *   ],
+  *   "change_comment": "CHERI relocation"
+  * }
+  * CHERI CHANGES END
+  */
+
 #ifndef RTLD_H /* { */
 #define RTLD_H 1
 
@@ -41,7 +54,6 @@
 #include <stddef.h>
 
 #include "rtld_lock.h"
-#include "rtld_machdep.h"
 
 #define NEW(type)	((type *) xmalloc(sizeof(type)))
 #define CNEW(type)	((type *) xcalloc(1, sizeof(type)))
@@ -186,6 +198,10 @@ typedef struct Struct_Obj_Entry {
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
 #ifdef __mips__
+#ifdef __CHERI_PURE_CAPABILITY__
+    caddr_t cap_relocs;		/* start of the __cap_relocs section */
+    size_t cap_relocs_size;	/* size of the __cap_relocs section */
+#endif
     Elf_Word local_gotno;	/* Number of local GOT entries */
     Elf_Word symtabno;		/* Number of dynamic symbols */
     Elf_Word gotsym;		/* First dynamic symbol in GOT */
@@ -226,11 +242,19 @@ typedef struct Struct_Obj_Entry {
     Ver_Entry *vertab;		/* Versions required /defined by this object */
     int vernum;			/* Number of entries in vertab */
 
+#ifdef __CHERI_PURE_CAPABILITY__
+    void* init_cap;		/* Initialization function to call */
+    void* fini_cap;		/* Termination function to call */
+    Elf_Addr* preinit_array_cap;	/* Pre-initialization array of functions */
+    Elf_Addr* init_array_cap;	/* Initialization array of functions */
+    Elf_Addr* fini_array_cap;	/* Termination array of functions */
+#else
     Elf_Addr init;		/* Initialization function to call */
     Elf_Addr fini;		/* Termination function to call */
     Elf_Addr preinit_array;	/* Pre-initialization array of functions */
     Elf_Addr init_array;	/* Initialization array of functions */
     Elf_Addr fini_array;	/* Termination array of functions */
+#endif
     int preinit_array_num;	/* Number of entries in preinit_array */
     int init_array_num; 	/* Number of entries in init_array */
     int fini_array_num; 	/* Number of entries in fini_array */
@@ -271,6 +295,19 @@ typedef struct Struct_Obj_Entry {
     bool marker : 1;		/* marker on the global obj list */
     bool unholdfree : 1;	/* unmap upon last unhold */
     bool doomed : 1;		/* Object cannot be referenced */
+#ifdef __CHERI_PURE_CAPABILITY__
+    bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
+    /*
+     * If restrict_pcc_basic is true we can restricted $pcc to the object's
+     * executable segment, if restrict_pcc_strict is true we can restrict it
+     * to just the functions bounds in dlsym()/dlfunc(). Otherwise we need to
+     * fall back to giving the full address space bounds in $pcc.
+     *
+     * TODO: remove these options once we have decided on the correct ABI
+     */
+    bool restrict_pcc_basic : 1;
+    bool restrict_pcc_strict : 1;
+#endif
 
     struct link_map linkmap;	/* For GDB and dlinfo() */
     Objlist dldags;		/* Object belongs to these dlopened DAGs (%) */
@@ -368,6 +405,10 @@ void dump_obj_relocations(Obj_Entry *);
 void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
+
+// rtld_machdep.h depends on struct Obj_Entry and _rtld_error()
+#include "rtld_machdep.h"
+
 /*
  * Function declarations.
  */
@@ -407,5 +448,9 @@ void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
 void pre_init(void);
 void init_pltgot(Obj_Entry *);
 void allocate_initial_tls(Obj_Entry *);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+void process___cap_relocs(Obj_Entry*);
+#endif
 
 #endif /* } */

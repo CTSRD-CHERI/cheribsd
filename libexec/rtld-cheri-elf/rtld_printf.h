@@ -1,3 +1,1 @@
-#pragma once
-
-#include <simple_printf.h>
+../rtld-elf/rtld_printf.h
