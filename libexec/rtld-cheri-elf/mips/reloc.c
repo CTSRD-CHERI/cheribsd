@@ -378,8 +378,10 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 	const Elf_Sym *sym, *def;
 	const Obj_Entry *defobj;
 	Elf_Word i;
+#ifndef __CHERI_CAPABILITY_TABLE__
 	char symbuf[64];
 	SymLook req, defreq;
+#endif
 #ifdef SUPPORT_OLD_BROKEN_LD
 	int broken;
 #endif
@@ -481,8 +483,11 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			/* TODO: add cache here */
 			def = find_symdef(i, obj, &defobj, flags, NULL,
 			    lockstate);
-
+#ifndef __CHERI_CAPABILITY_TABLE__
 			/*
+			 * XXXAR: keep this here for legacy binaries (which
+			 * need a legacy rtld to run)
+			 *
 			 * XXX-BD: Undefined variables currently end up with
 			 * defined, but zero, .size.<var> variables.  This is
 			 * a linker bug.  Work around it by finding the one in
@@ -517,6 +522,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 					}
 				}
 			}
+#endif /* __CHERI_CAPABILITY_TABLE__ */
 			if (def == NULL) {
 				dbg("Warning4, can't find symbole %d", i);
 				return -1;
