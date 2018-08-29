@@ -15,7 +15,7 @@ MK_CHERI_SHARED_PROG:=yes
 # DEBUG=-DDEBUG
 
 PROG?=		ld-cheri-elf.so.1
-SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c
+SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c cheri_reloc.c
 .PATH: ${.CURDIR}/../rtld-elf
 SRCS+=	rtld_lock.c map_object.c xmalloc.c debug.c libmap.c
 
@@ -70,7 +70,7 @@ SYMBOL_MAPS+=	${.CURDIR}/${RTLD_ARCH}/Symbol.map
 
 #.sinclude "${.CURDIR}/${RTLD_ARCH}/Makefile.inc"
 
-.PATH: ${.CURDIR}/${RTLD_ARCH}
+.PATH: ${.CURDIR}/${RTLD_ARCH} ${.CURDIR}/../rtld-elf/${RTLD_ARCH}
 
 .include <bsd.prog.mk>
 ${PROG_FULL}:	${VERSION_MAP}

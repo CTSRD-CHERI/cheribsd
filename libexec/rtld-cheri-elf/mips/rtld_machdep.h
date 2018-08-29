@@ -41,7 +41,7 @@ struct Struct_Obj_Entry;
 /* Return the address of the .dynamic section in the dynamic linker. */
 #define rtld_dynamic(obj) (&_DYNAMIC)
 
-Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
+static inline Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 		       const struct Struct_Obj_Entry *defobj,
 		       const struct Struct_Obj_Entry *obj,
 		       const Elf_Rel *rel);
@@ -130,5 +130,34 @@ extern void *__tls_get_addr(tls_index *ti);
 #define	RTLD_DEFAULT_STACK_EXEC		PROT_EXEC
 
 #define md_abi_variant_hook(x)
+
+
+/* Add function not used by CHERI as inlines here so that the compiler can
+ * omit the call */
+
+static inline void init_pltgot(Obj_Entry *obj __unused) { /* Do nothing */ }
+
+static inline  int
+reloc_iresolve(Obj_Entry *obj __unused, struct Struct_RtldLockState *lockstate __unused)
+{
+	_rtld_error("%s: not implemented!", __func__);
+	return (0);
+}
+
+static inline  int
+reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
+    struct Struct_RtldLockState *lockstate __unused)
+{
+	_rtld_error("%s: not implemented!", __func__);
+	return (0);
+}
+
+static inline Elf_Addr
+reloc_jmpslot(Elf_Addr *where __unused, Elf_Addr target, const Obj_Entry *defobj __unused,
+    const Obj_Entry *obj __unused, const Elf_Rel *rel __unused)
+{
+	_rtld_error("%s: not implemented!", __func__);
+	return (target);
+}
 
 #endif

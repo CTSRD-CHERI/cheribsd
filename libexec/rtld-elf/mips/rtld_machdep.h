@@ -31,6 +31,10 @@
 #ifndef RTLD_MACHDEP_H
 #define RTLD_MACHDEP_H	1
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#error "Should not be included by rtld-cheri-elf"
+#endif
+
 #include <sys/types.h>
 #include <machine/atomic.h>
 #include <machine/tls.h>

@@ -711,9 +711,12 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
       &obj_rtld, SYMLOOK_EARLY, NULL) == -1)
 	rtld_die();
 
+#ifndef __CHERI_PURE_CAPABILITY__
+    /* Copy relocations are not supported in the purecap ABI */
     dbg("doing copy relocations");
     if (do_copy_relocations(obj_main) == -1)
 	rtld_die();
+#endif
 
     dbg("enforcing main obj relro");
     if (obj_enforce_relro(obj_main) == -1)

@@ -119,6 +119,9 @@ LEAF(rtld_start)
 	nop
 END(rtld_start)
 
+/* TODO: implement lazy binding */
+#if 0
+
 #define	XCALLFRAME_CAPSIZ	(9*CHERICAP_SIZE)
 #define	XCALLFRAME_SIZ		(12*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_RA		(10*SZREG + XCALLFRAME_CAPSIZ)
@@ -215,3 +218,5 @@ _rtld_bind_start:
 	cjr	$c12
 	cincoffset $c11, $c11, sp
 END(_rtld_bind_start)
+
+#endif
