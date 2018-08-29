@@ -82,7 +82,8 @@ static void digest_dynamic1(Obj_Entry *, int, const Elf_Dyn **,
 static void digest_dynamic2(Obj_Entry *, const Elf_Dyn *, const Elf_Dyn *,
     const Elf_Dyn *);
 static void digest_dynamic(Obj_Entry *, int);
-static Obj_Entry *digest_phdr(const Elf_Phdr *, int, caddr_t, const char *);
+static Obj_Entry *digest_phdr(const Elf_Phdr *, int, caddr_t, caddr_t,
+    const char *);
 static Obj_Entry *dlcheck(void *);
 static int dlclose_locked(void *, RtldLockState *);
 static Obj_Entry *dlopen_object(const char *name, int fd, Obj_Entry *refobj,
@@ -486,7 +487,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     ld_bind_now = getenv(_LD("BIND_NOW"));
 
-    /* 
+    /*
      * If the process is tainted, then we un-set the dangerous environment
      * variables.  The process will be marked as tainted until setuid(2)
      * is called.  If any child process calls setuid(2) we do not want any
@@ -515,6 +516,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_loadfltr = getenv(_LD("LOADFLTR")) != NULL;
     library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
     ld_skip_init_funcs = getenv(_LD("SKIP_INIT_FUNCS")) != NULL;
+    library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
     if (library_path_rpath != NULL) {
 	    if (library_path_rpath[0] == 'y' ||
 		library_path_rpath[0] == 'Y' ||
@@ -554,6 +556,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    rtld_die();
 	max_stack_flags = obj_main->stack_flags;
     } else {				/* Main program already loaded. */
+	caddr_t relocbase;
+
 	dbg("processing main program's program header");
 	assert(aux_info[AT_PHDR] != NULL);
 	phdr = (const Elf_Phdr *) aux_info[AT_PHDR]->a_un.a_ptr;
@@ -563,8 +567,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (caddr_t) aux_info[AT_ENTRY]->a_un.a_ptr;
-	if ((obj_main = digest_phdr(phdr, phnum, imgentry, argv0)) == NULL)
-	    rtld_die();
+	relocbase = (caddr_t) aux_info[AT_BASE]->a_un.a_ptr;
+	if ((obj_main = digest_phdr(phdr, phnum, imgentry, relocbase, argv0)) ==
+	    NULL)
+		rtld_die();
     }
 
     if (aux_info[AT_EXECPATH] != NULL && fd == -1) {
@@ -811,7 +817,7 @@ _rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 
     dbg("\"%s\" in \"%s\" ==> %p in \"%s\"",
       defobj->strtab + def->st_name, basename(obj->path),
-      (void *)target, basename(defobj->path));
+      (void *)(uintptr_t)target, basename(defobj->path));
 
     /*
      * Write the new contents for the jmpslot. Note that depending on
@@ -1245,14 +1251,14 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		break;
 
 	case DT_MIPS_RLD_MAP:
-		*((Elf_Addr *)(dynp->d_un.d_ptr)) = (Elf_Addr) &r_debug;
+		*((Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr)) = (Elf_Addr) &r_debug;
 		break;
 
 	case DT_MIPS_PLTGOT:
 		obj->mips_pltgot = (Elf_Addr *) (obj->relocbase +
 		    dynp->d_un.d_ptr);
 		break;
-		
+
 #endif
 
 #ifdef __powerpc64__
@@ -1362,7 +1368,8 @@ digest_dynamic(Obj_Entry *obj, int early)
  * returns an Obj_Entry structure.
  */
 static Obj_Entry *
-digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, const char *path)
+digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
+    const char *path)
 {
     Obj_Entry *obj;
     const Elf_Phdr *phlimit = phdr + phnum;
@@ -2487,7 +2494,7 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
     if (obj->textrel)
 	dbg("  WARNING: %s has impure text", obj->path);
     LD_UTRACE(UTRACE_LOAD_OBJECT, obj, obj->mapbase, obj->mapsize, 0,
-	obj->path);    
+	obj->path);
 
     return obj;
 }
@@ -2575,8 +2582,8 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 		for (index = elm->obj->fini_array_num - 1; index >= 0;
 		  index--) {
 		    if (fini_addr[index] != 0 && fini_addr[index] != 1) {
-			dbg("calling fini function for %s at %p",
-			    elm->obj->path, (void *)fini_addr[index]);
+			dbg("calling fini_array function for %s at %lx",
+			    elm->obj->path, fini_addr[index]);
 			LD_UTRACE(UTRACE_FINI_CALL, elm->obj,
 			    (void *)fini_addr[index], 0, 0, elm->obj->path);
 			call_initfini_pointer(elm->obj, fini_addr[index]);
@@ -2666,7 +2673,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 		    dbg("calling init function for %s at %p", elm->obj->path,
 			(void *)init_addr[index]);
 		    LD_UTRACE(UTRACE_INIT_CALL, elm->obj,
-			(void *)init_addr[index], 0, 0, elm->obj->path);
+			(void *)(uintptr_t)init_addr[index], 0, 0, elm->obj->path);
 		    call_init_pointer(elm->obj, init_addr[index]);
 		}
 	    }
@@ -3512,16 +3519,22 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	 * of the symbol. this is simply the relocated value of the
 	 * symbol.
 	 */
-	if (ELF_ST_TYPE(def->st_info) == STT_FUNC)
+	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = make_function_pointer(def, defobj);
-	else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC)
+	    dbg("dlsym(%s) is function: %-#p", name, sym);
+	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
-	else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
+	    dbg("dlsym(%s) is ifunc. Resolved to: %-#p", name, sym);
+	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    ti.ti_module = defobj->tlsindex;
 	    ti.ti_offset = def->st_value;
 	    sym = __tls_get_addr(&ti);
-	} else
+	    dbg("dlsym(%s) is TLS. Resolved to: %-#p", name, sym);
+	} else {
 	    sym = defobj->relocbase + def->st_value;
+	    dbg("dlsym(%s) is type %d. Resolved to: %-#p",
+		name, ELF_ST_TYPE(def->st_info), sym);
+	}
 	LD_UTRACE(UTRACE_DLSYM_STOP, handle, sym, 0, 0, name);
 	return (sym);
     }
@@ -4684,7 +4697,7 @@ tls_get_addr_slow(uintptr_t **dtvp, int index, size_t offset)
 void *
 tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset)
 {
-	intptr_t *dtv;
+	uintptr_t *dtv;
 
 	dtv = *dtvp;
 	/* Check dtv generation in case new modules have arrived */
@@ -4736,8 +4749,8 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
     Obj_Entry *obj;
     char *tls_block;
-    Elf_Addr *dtv, **tcb;
-    Elf_Addr addr;
+    uintptr_t *dtv, **tcb;
+    char *addr;
     int i;
     size_t extra_size, maxalign, post_size, pre_size, tls_block_size;
     size_t tls_init_align;
@@ -4762,11 +4775,11 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 
     /* Allocate whole TLS block */
     tls_block = malloc_aligned(tls_block_size, maxalign);
-    tcb = (Elf_Addr **)(tls_block + pre_size + extra_size);
+    tcb = (uintptr_t **)(tls_block + pre_size + extra_size);
 
     if (oldtcb != NULL) {
 	memcpy(tls_block, get_tls_block_ptr(oldtcb, tcbsize),
-	    tls_static_space);
+	    tls_block_size);
 	free_aligned(get_tls_block_ptr(oldtcb, tcbsize));
 
 	/* Adjust the DTV. */
@@ -4774,25 +4787,25 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 	for (i = 0; i < dtv[1]; i++) {
 	    if (dtv[i+2] >= (Elf_Addr)oldtcb &&
 		dtv[i+2] < (Elf_Addr)oldtcb + tls_static_space) {
-		dtv[i+2] = dtv[i+2] - (Elf_Addr)oldtcb + (Elf_Addr)tcb;
+		dtv[i+2] = (uintptr_t)tcb + ((Elf_Addr)dtv[i+2] - (Elf_Addr)oldtcb);
 	    }
 	}
     } else {
-	dtv = xcalloc(tls_max_index + 2, sizeof(Elf_Addr));
+	dtv = xcalloc(tls_max_index + 2, sizeof(void *));
 	tcb[0] = dtv;
-	dtv[0] = tls_dtv_generation;
-	dtv[1] = tls_max_index;
+	dtv[0] = (uintptr_t)tls_dtv_generation;
+	dtv[1] = (uintptr_t)tls_max_index;
 
 	for (obj = globallist_curr(objs); obj != NULL;
 	  obj = globallist_next(obj)) {
 	    if (obj->tlsoffset > 0) {
-		addr = (Elf_Addr)tcb + obj->tlsoffset;
+		addr = (char *)tcb + obj->tlsoffset;
 		if (obj->tlsinitsize > 0)
-		    memcpy((void*) addr, obj->tlsinit, obj->tlsinitsize);
+		    memcpy(addr, obj->tlsinit, obj->tlsinitsize);
 		if (obj->tlssize > obj->tlsinitsize)
 		    memset((void*) (addr + obj->tlsinitsize), 0,
 			   obj->tlssize - obj->tlsinitsize);
-		dtv[obj->tlsindex + 1] = addr;
+		dtv[obj->tlsindex + 1] = (uintptr_t)addr;
 	    }
 	}
     }
@@ -4803,8 +4816,8 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 void
 free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
 {
-    Elf_Addr *dtv;
-    Elf_Addr tlsstart, tlsend;
+    char **dtv;
+    char *tlsstart, *tlsend;
     size_t post_size;
     size_t dtvsize, i, tls_init_align;
 
@@ -4818,11 +4831,11 @@ free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
     post_size = 0;
 #endif
 
-    tlsstart = (Elf_Addr)tcb + TLS_TCB_SIZE + post_size;
-    tlsend = (Elf_Addr)tcb + tls_static_space;
+    tlsstart = (char *)tcb + TLS_TCB_SIZE + post_size;
+    tlsend = (char *)tcb + tls_static_space;
 
-    dtv = *(Elf_Addr **)tcb;
-    dtvsize = dtv[1];
+    dtv = *(void **)tcb;
+    dtvsize = (size_t)dtv[1];
     for (i = 0; i < dtvsize; i++) {
 	if (dtv[i+2] && (dtv[i+2] < tlsstart || dtv[i+2] >= tlsend)) {
 	    free((void*)dtv[i+2]);
@@ -5322,9 +5335,12 @@ _rtld_is_dlopened(void *arg)
 int
 obj_enforce_relro(Obj_Entry *obj)
 {
+	if (obj->relro_size == 0)
+		return (0);
 
-	if (obj->relro_size > 0 && mprotect(obj->relro_page, obj->relro_size,
-	    PROT_READ) == -1) {
+	dbg("Enforcing RELRO for %s (%p -> %p)", obj->path, obj->relro_page,
+	    obj->relro_page + obj->relro_size);
+	if (mprotect(obj->relro_page, obj->relro_size, PROT_READ) == -1) {
 		_rtld_error("%s: Cannot enforce relro protection: %s",
 		    obj->path, rtld_strerror(errno));
 		return (-1);

@@ -69,7 +69,7 @@ __FBSDID("$FreeBSD$");
 #include "libmap.h"
 #include "paths.h"
 #include "rtld_tls.h"
-#include "simple_printf.h"
+#include "rtld_printf.h"
 #include "rtld_utrace.h"
 #include "notes.h"
 
@@ -539,6 +539,7 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
     ld_preload = getenv(_LD("PRELOAD"));
     ld_elf_hints_path = getenv(_LD("ELF_HINTS_PATH"));
     ld_loadfltr = getenv(_LD("LOADFLTR")) != NULL;
+    library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
     ld_skip_init_funcs = getenv(_LD("SKIP_INIT_FUNCS")) != NULL;
     library_path_rpath = getenv(_LD("LIBRARY_PATH_RPATH"));
     if (library_path_rpath != NULL) {
@@ -1389,7 +1390,7 @@ digest_dynamic(Obj_Entry *obj, int early)
  * returns an Obj_Entry structure.
  */
 static Obj_Entry *
-digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocabase,
+digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
     const char *path)
 {
     Obj_Entry *obj;
@@ -2088,8 +2089,6 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
      * The "path" member can't be initialized yet because string constants
      * cannot yet be accessed. Below we will set it correctly.
      */
-    // FIXME:calling memset will fault in cap-table abi, we need to do
-    // crt_init_globals before here.....
     memset(&objtmp, 0, sizeof(objtmp));
     objtmp.path = NULL;
     objtmp.rtld = true;
@@ -2623,7 +2622,7 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 		for (index = elm->obj->fini_array_num - 1; index >= 0;
 		  index--) {
 		    if (fini_addr[index] != 0 && fini_addr[index] != 1) {
-			dbg("calling fini function for %s at %lx",
+			dbg("calling fini_array function for %s at %lx",
 			    elm->obj->path, fini_addr[index]);
 			LD_UTRACE(UTRACE_FINI_CALL, elm->obj,
 			    (void *)(intptr_t)fini_addr[index], 0, 0, elm->obj->path);
@@ -2713,7 +2712,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	    for (index = 0; index < elm->obj->init_array_num; index++) {
 		if (init_addr[index] != 0 && init_addr[index] != 1) {
 		    dbg("calling init function for %s at %p", elm->obj->path,
-			(void *)(uintptr_t)init_addr[index]);
+			(void *)init_addr[index]);
 		    LD_UTRACE(UTRACE_INIT_CALL, elm->obj,
 			(void *)(uintptr_t)init_addr[index], 0, 0, elm->obj->path);
 		    call_init_array_pointer(elm->obj, init_addr[index]);
@@ -4805,7 +4804,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 {
     Obj_Entry *obj;
     char *tls_block;
-    intptr_t *dtv, **tcb;
+    uintptr_t *dtv, **tcb;
     char *addr;
     int i;
     size_t extra_size, maxalign, post_size, pre_size, tls_block_size;
@@ -4831,7 +4830,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 
     /* Allocate whole TLS block */
     tls_block = malloc_aligned(tls_block_size, maxalign);
-    tcb = (intptr_t **)(tls_block + pre_size + extra_size);
+    tcb = (uintptr_t **)(tls_block + pre_size + extra_size);
 
     if (oldtcb != NULL) {
 	memcpy(tls_block, get_tls_block_ptr(oldtcb, tcbsize),
@@ -4843,14 +4842,14 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 	for (i = 0; i < dtv[1]; i++) {
 	    if (dtv[i+2] >= (Elf_Addr)oldtcb &&
 		dtv[i+2] < (Elf_Addr)oldtcb + tls_static_space) {
-		dtv[i+2] = (intptr_t)tcb + ((Elf_Addr)dtv[i+2] - (Elf_Addr)oldtcb);
+		dtv[i+2] = (uintptr_t)tcb + ((Elf_Addr)dtv[i+2] - (Elf_Addr)oldtcb);
 	    }
 	}
     } else {
 	dtv = xcalloc(tls_max_index + 2, sizeof(void *));
 	tcb[0] = dtv;
-	dtv[0] = (intptr_t)tls_dtv_generation;
-	dtv[1] = (intptr_t)tls_max_index;
+	dtv[0] = (uintptr_t)tls_dtv_generation;
+	dtv[1] = (uintptr_t)tls_max_index;
 
 	for (obj = globallist_curr(objs); obj != NULL;
 	  obj = globallist_next(obj)) {
@@ -4861,7 +4860,7 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 		if (obj->tlssize > obj->tlsinitsize)
 		    memset((void*) (addr + obj->tlsinitsize), 0,
 			   obj->tlssize - obj->tlsinitsize);
-		dtv[obj->tlsindex + 1] = (intptr_t)addr;
+		dtv[obj->tlsindex + 1] = (uintptr_t)addr;
 	    }
 	}
     }
