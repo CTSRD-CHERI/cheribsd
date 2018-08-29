@@ -678,7 +678,7 @@ sigonstack(size_t sp)
 		(td->td_sigstk.ss_flags & SS_ONSTACK) :
 		((sp - (size_t)td->td_sigstk.ss_sp) < td->td_sigstk.ss_size))
 #else
-	    ((sp - (size_t)td->td_sigstk.ss_sp) < td->td_sigstk.ss_size)
+	    ((sp - (__cheri_addr size_t)td->td_sigstk.ss_sp) < td->td_sigstk.ss_size)
 #endif
 	    : 0);
 }
@@ -907,7 +907,7 @@ sys_sigaction(struct thread *td, struct sigaction_args *uap)
 	if (oactp && !error) {
 #if __has_feature(capabilities)
 		memset(&oact_n, 0, sizeof(oact_n));
-		oact_n.sa_handler = (void *)(vaddr_t)oactp->sa_handler;
+		oact_n.sa_handler = (void *)(__cheri_addr vaddr_t)oactp->sa_handler;
 		oact_n.sa_flags = oactp->sa_flags;
 		oact_n.sa_mask = oactp->sa_mask;
 #else

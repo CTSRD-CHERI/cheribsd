@@ -1070,7 +1070,7 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 			len -= tocopy;
 			m = m->m_next;
 		}
-		mp->msg_controllen = (vaddr_t)ctlbuf - (vaddr_t)mp->msg_control;
+		mp->msg_controllen = (__cheri_addr vaddr_t)ctlbuf - (__cheri_addr vaddr_t)mp->msg_control;
 	}
 out:
 	fdrop(fp, td);

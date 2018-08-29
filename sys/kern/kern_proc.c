@@ -1906,14 +1906,14 @@ get_proc_vector_cheriabi(struct thread *td, struct proc *p,
 		return (ENOMEM);
 	switch (type) {
 	case PROC_ARG:
-		vptr = (vm_offset_t)pss.ps_argvstr;
+		vptr = (__cheri_addr vm_offset_t)pss.ps_argvstr;
 		vsize = pss.ps_nargvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
 		size = vsize * sizeof(void * __capability);
 		break;
 	case PROC_ENV:
-		vptr = (vm_offset_t)pss.ps_envstr;
+		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr;
 		vsize = pss.ps_nenvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
@@ -1924,7 +1924,7 @@ get_proc_vector_cheriabi(struct thread *td, struct proc *p,
 		 * The aux array is just above env array on the stack. Check
 		 * that the address is naturally aligned.
 		 */
-		vptr = (vm_offset_t)pss.ps_envstr +
+		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr +
 			(pss.ps_nenvstr + 1) * sizeof(void * __capability);
 #if __ELF_WORD_SIZE == 64
 		if (vptr % sizeof(uint64_t) != 0)

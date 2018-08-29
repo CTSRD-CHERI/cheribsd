@@ -346,7 +346,7 @@ cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
 
 	tp = td->td_frame;
 	PROC_LOCK(curthread->td_proc);
-	mcp->mc_onstack = sigonstack((vaddr_t)tp->csp);
+	mcp->mc_onstack = sigonstack((__cheri_addr vaddr_t)tp->csp);
 	PROC_UNLOCK(curthread->td_proc);
 	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
 	    sizeof(mcp->mc_regs));
@@ -450,7 +450,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * pointer and bounds...?
 	 */
 	regs = td->td_frame;
-	oonstack = sigonstack((vaddr_t)regs->csp);
+	oonstack = sigonstack((__cheri_addr vaddr_t)regs->csp);
 
 	/*
 	 * CHERI affects signal delivery in the following ways:
@@ -580,10 +580,10 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		 * on the safe side.
 		 */
 		regs->c3 = cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)&sfp->sf_si,
+		    CHERI_CAP_USER_DATA_PERMS, (__cheri_addr vaddr_t)&sfp->sf_si,
 		    sizeof(sfp->sf_si), 0);
 		regs->c4 = cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)&sfp->sf_uc,
+		    CHERI_CAP_USER_DATA_PERMS, (__cheri_addr vaddr_t)&sfp->sf_uc,
 		    sizeof(sfp->sf_uc), 0);
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
@@ -646,7 +646,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (generally) be removed automatically on sigreturn().
 	 */
-	regs->pc = (register_t)(intptr_t)catcher;
+	regs->pc = (register_t)(__cheri_addr vaddr_t)catcher;
 	regs->pcc = catcher;
 	regs->csp = sfp;
 	regs->c12 = catcher;

@@ -1260,7 +1260,7 @@ aio_qphysio(struct proc *p, struct kaiocb *job)
 	}
 
 	ki = p->p_aioinfo;
-	poff = (vm_offset_t)cb->aio_buf & PAGE_MASK;
+	poff = (__cheri_addr vm_offset_t)cb->aio_buf & PAGE_MASK;
 	if ((dev->si_flags & SI_UNMAPPED) && unmapped_buf_allowed) {
 		if (cb->aio_nbytes > MAXPHYS) {
 			error = -1;
@@ -1289,7 +1289,7 @@ aio_qphysio(struct proc *p, struct kaiocb *job)
 	bp->bio_length = cb->aio_nbytes;
 	bp->bio_bcount = cb->aio_nbytes;
 	bp->bio_done = aio_physwakeup;
-	bp->bio_data = (void *)(uintptr_t)cb->aio_buf;
+	bp->bio_data = (void *)(__cheri_addr vaddr_t)cb->aio_buf;
 	bp->bio_offset = cb->aio_offset;
 	bp->bio_cmd = cb->aio_lio_opcode == LIO_WRITE ? BIO_WRITE : BIO_READ;
 	bp->bio_dev = dev;
@@ -1672,7 +1672,7 @@ aio_aqueue(struct thread *td, kaiocb_t * __capability ujob, void *ujobptrp,
 		goto aqueue_fail;
 	}
 	kqfd = job->uaiocb.aio_sigevent.sigev_notify_kqueue;
-	kev.ident = (uintptr_t)job->ujob;
+	kev.ident = (__cheri_addr vaddr_t)job->ujob;
 	kev.filter = EVFILT_AIO;
 	kev.flags = EV_ADD | EV_ENABLE | EV_FLAG1 | evflags;
 	kev.data = (intptr_t)job;
@@ -1913,7 +1913,7 @@ kern_aio_return(struct thread *td, void * __capability ujob,
 		return (EINVAL);
 	AIO_LOCK(ki);
 	TAILQ_FOREACH(job, &ki->kaio_done, plist) {
-		if ((vaddr_t)job->ujob == (vaddr_t)ujob)
+		if ((__cheri_addr vaddr_t)job->ujob == (__cheri_addr vaddr_t)ujob)
 			break;
 	}
 	if (job != NULL) {
@@ -2080,7 +2080,7 @@ kern_aio_cancel(struct thread *td, int fd, void * __capability ujob,
 	TAILQ_FOREACH_SAFE(job, &ki->kaio_jobqueue, plist, jobn) {
 		if ((fd == job->uaiocb.aio_fildes) &&
 		    ((ujob == NULL) ||
-		     ((vaddr_t)ujob == (vaddr_t)job->ujob))) {
+		     ((__cheri_addr vaddr_t)ujob == (__cheri_addr vaddr_t)job->ujob))) {
 			if (aio_cancel_job(p, ki, job)) {
 				cancelled++;
 			} else {
@@ -2151,7 +2151,7 @@ kern_aio_error(struct thread *td, kaiocb_t * __capability ujob,
 	}
 	AIO_LOCK(ki);
 	TAILQ_FOREACH(job, &ki->kaio_all, allist) {
-		if ((vaddr_t)job->ujob == (vaddr_t)ujob) {
+		if ((__cheri_addr vaddr_t)job->ujob == (__cheri_addr vaddr_t)ujob) {
 			if (job->jobflags & KAIOCB_FINISHED)
 				td->td_retval[0] =
 					job->uaiocb._aiocb_private.error;
@@ -3408,7 +3408,7 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 		return (error);
 	}
 
-	error = kern_lio_listio(td, uap->mode, (intcap_t)(vaddr_t)uap->acb_list,
+	error = kern_lio_listio(td, uap->mode, (intcap_t)(__cheri_addr vaddr_t)uap->acb_list,
 	    acb_list, nent, sigp, &aiocb_c_ops);
 	free(acb_list, M_LIO);
 	return (error);

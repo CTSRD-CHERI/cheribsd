@@ -382,7 +382,7 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 	AUDIT_ARG_SVIPC_ID(shmmap_s->shmid);
 	for (i = 0; i < shminfo.shmseg; i++, shmmap_s++) {
 		if (shmmap_s->shmid != -1 &&
-		    shmmap_s->va == (vm_offset_t)shmaddr) {
+		    shmmap_s->va == (__cheri_addr vm_offset_t)shmaddr) {
 			break;
 		}
 	}
@@ -483,26 +483,26 @@ kern_shmat_locked(struct thread *td, int shmid,
 #ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			if ((shmflg & SHM_RND) != 0)
-				attach_va = rounddown2((vm_offset_t)shmaddr,
+				attach_va = rounddown2((__cheri_addr vm_offset_t)shmaddr,
 				    CHERI_SHMLBA);
-			else if (((vm_offset_t)shmaddr & (SHMLBA-1)) == 0 &&
-			    ((vm_offset_t)shmaddr & CHERI_ALIGN_MASK(size))
+			else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0 &&
+			    ((__cheri_addr vm_offset_t)shmaddr & CHERI_ALIGN_MASK(size))
 			    == 0)
-				attach_va = (vm_offset_t)shmaddr;
+				attach_va = (__cheri_addr vm_offset_t)shmaddr;
 			else
 				return (EINVAL);
 		} else
 #endif
 		{
 			if ((shmflg & SHM_RND) != 0)
-				attach_va = rounddown2((vm_offset_t)shmaddr, SHMLBA);
-			else if (((vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
-				attach_va = (vm_offset_t)shmaddr;
+				attach_va = rounddown2((__cheri_addr vm_offset_t)shmaddr, SHMLBA);
+			else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
+				attach_va = (__cheri_addr vm_offset_t)shmaddr;
 			else
 				return (EINVAL);
 		}
 		shmaddr = (const char * __capability)shmaddr -
-		    ((vm_offset_t)shmaddr - attach_va);
+		    ((__cheri_addr vm_offset_t)shmaddr - attach_va);
 		/*
 		 * Check that shmaddr (as adjusted for SHM_RND) has
 		 * enough space for a mapping.  For CheriABI this means
