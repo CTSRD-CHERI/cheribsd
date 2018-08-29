@@ -196,16 +196,16 @@ union sigval {
 #else /* _KERNEL */
 union sigval_native {
 	int	sival_int;
-	void	*sival_ptr;
+#ifdef __LP64__
+	uint32_t sival_ptr32;
+#endif
+	void	*sival_ptr_native;
 };
 #if __has_feature(capabilities)
 union sigval_c {
 	int	sival_int;
 	void * __capability sival_ptr;
 };
-typedef union sigval_c		ksigval_union;
-#else
-typedef union sigval_native	ksigval_union;
 #endif
 #endif /* _KERNEL */
 
@@ -218,7 +218,20 @@ union sigval32 {
 	uint32_t sigval_ptr;
 };
 #endif
+
+#ifdef _KERNEL
+typedef union {
+	int		sival_int;
+	void		*sival_ptr_native;
+#if (defined(_KERNEL) && defined(__LP64__))
+	uint32_t	sival_ptr32;
 #endif
+#if __has_feature(capabilities)
+	void * __capability sival_ptr_c;
+#endif
+} ksigval_union;
+#endif
+#endif /* __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE >= 500 */
 
 #if __POSIX_VISIBLE >= 199309
 
@@ -245,7 +258,7 @@ struct sigevent {
 struct sigevent_native {
 	int	sigev_notify;		/* Notification type */
 	int	sigev_signo;		/* Signal number */
-	ksigval_union sigev_value;	/* Signal value */
+	union sigval_native sigev_value;	/* Signal value */
 	union {
 		__lwpid_t	_threadid;
 		struct {
@@ -405,10 +418,43 @@ struct siginfo_c {
 		} __spare__;
 	} _reason;
 };
-typedef	struct siginfo_c	_siginfo_t;
-#else
-typedef	struct siginfo_native	_siginfo_t;
 #endif
+
+typedef struct {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	/*
+	 * Cause of signal, one of the SI_ macros or signal-specific
+	 * values, i.e. one of the FPE_... values for SIGFPE.  This
+	 * value is equivalent to the second argument to an old-style
+	 * FreeBSD signal handler.
+	 */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void* __capability si_addr;	/* faulting instruction */
+	ksigval_union si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+} _siginfo_t;
 #endif /* _KERNEL */
 
 #define si_trapno	_reason._fault._trapno

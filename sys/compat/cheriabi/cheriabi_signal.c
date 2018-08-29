@@ -236,7 +236,7 @@ cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
 
 	value_union.sival_ptr = uap->value;
 	if (uap->pid == td->td_proc->p_pid) {
-		sv.sival_ptr = value_union.sival_ptr;
+		sv.sival_ptr_c = value_union.sival_ptr;
 	} else {
 		/*
 		 * Cowardly refuse to send capabilities to other

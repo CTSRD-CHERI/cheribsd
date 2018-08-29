@@ -301,7 +301,7 @@ siginfo_to_siginfo_native(const _siginfo_t *si,
 	si_n->si_uid = si->si_uid;
 	si_n->si_status = si->si_status;
 	si_n->si_addr = (void *)(uintptr_t)si->si_addr;
-	si_n->si_value.sival_ptr = (void *)(intcap_t)si->si_value.sival_ptr;
+	si_n->si_value.sival_ptr_native = si->si_value.sival_ptr_native;
 	memcpy(&si_n->_reason, &si->_reason, sizeof(si_n->_reason));
 #endif
 }
@@ -321,8 +321,7 @@ siginfo_native_to_siginfo(const struct siginfo_native *si_n,
 	si->si_uid = si_n->si_uid;
 	si->si_status = si_n->si_status;
 	si->si_addr = (__cheri_tocap void * __capability)si_n->si_addr;
-	si->si_value.sival_ptr =
-	    (__cheri_tocap void * __capability)si_n->si_value.sival_ptr;
+	si->si_value.sival_ptr_native = si_n->si_value.sival_ptr_native;
 	memcpy(&si->_reason, &si_n->_reason, sizeof(si_n->_reason));
 #endif
 }
@@ -1963,7 +1962,8 @@ sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 {
 	ksigval_union sv;
 
-	sv.sival_ptr = (void * __capability)(intcap_t)uap->value;
+	memset(&sv, 0, sizeof(sv));
+	sv.sival_ptr_native = uap->value;
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
 }
@@ -1996,7 +1996,18 @@ kern_sigqueue(struct thread *td, pid_t pid, int signum, ksigval_union *value,
 		ksi.ksi_code = SI_QUEUE;
 		ksi.ksi_pid = td->td_proc->p_pid;
 		ksi.ksi_uid = td->td_ucred->cr_ruid;
-		ksi.ksi_value = *value;
+		memset(&ksi.ksi_value, 0, sizeof(ksi.ksi_value));
+#ifdef COMPAT_FREEBSD32
+		if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+			ksi.ksi_value.sival_ptr32 = value->sival_ptr32;
+		else
+#endif
+#ifdef COMPAT_CHERIABI
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			ksi.ksi_value.sival_ptr_c = value->sival_ptr_c;
+		else
+#endif
+			ksi.ksi_value.sival_ptr_native = value->sival_ptr_native;
 		error = pksignal(p, ksi.ksi_signo, &ksi);
 	}
 	PROC_UNLOCK(p);

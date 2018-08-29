@@ -537,6 +537,7 @@ static void
 ptrace_lwpinfo_to32(const struct ptrace_lwpinfo *pl,
     struct ptrace_lwpinfo32 *pl32)
 {
+	_siginfo_t si_n;
 
 	bzero(pl32, sizeof(*pl32));
 	pl32->pl_lwpid = pl->pl_lwpid;
@@ -544,7 +545,18 @@ ptrace_lwpinfo_to32(const struct ptrace_lwpinfo *pl,
 	pl32->pl_flags = pl->pl_flags;
 	pl32->pl_sigmask = pl->pl_sigmask;
 	pl32->pl_siglist = pl->pl_siglist;
-	siginfo_to_siginfo32(&pl->pl_siginfo, &pl32->pl_siginfo);
+	/* XXXBD: ptrace should be using capability aware structs by default. */
+	si_n.si_signo = pl->pl_siginfo.si_signo;
+	si_n.si_errno = pl->pl_siginfo.si_errno;
+	si_n.si_code = pl->pl_siginfo.si_code;
+	si_n.si_pid = pl->pl_siginfo.si_pid;
+	si_n.si_uid = pl->pl_siginfo.si_uid;
+	si_n.si_status = pl->pl_siginfo.si_status;
+	si_n.si_addr = pl->pl_siginfo.si_addr;
+	si_n.si_value.sival_ptr_native =
+	    pl->pl_siginfo.si_value.sival_ptr_native;
+	memcpy(&si_n._reason, &pl->pl_siginfo._reason, sizeof(si_n._reason));
+	siginfo_to_siginfo32(&si_n, &pl32->pl_siginfo);
 	strcpy(pl32->pl_tdname, pl->pl_tdname);
 	pl32->pl_child_pid = pl->pl_child_pid;
 	pl32->pl_syscall_code = pl->pl_syscall_code;

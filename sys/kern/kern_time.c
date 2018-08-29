@@ -1189,15 +1189,15 @@ convert_sigevent(const struct sigevent_native *sig_n, ksigevent_t *sig)
 		/* FALLTHROUGH */
 	case SIGEV_SIGNAL:
 		sig->sigev_signo = sig_n->sigev_signo;
-		sig->sigev_value.sival_ptr =
-		    (void * __capability)(intcap_t)sig_n->sigev_value.sival_ptr;
+		sig->sigev_value.sival_ptr_native =
+		    sig_n->sigev_value.sival_ptr_native;
 		break;
 	case SIGEV_KEVENT:
 		sig->sigev_notify_kqueue = sig_n->sigev_notify_kqueue;
 		sig->sigev_notify_kevent_flags =
 		    sig_n->sigev_notify_kevent_flags;
-		sig->sigev_value.sival_ptr =
-		    (void * __capability)(intcap_t)sig_n->sigev_value.sival_ptr;
+		sig->sigev_value.sival_ptr_native =
+		    sig_n->sigev_value.sival_ptr_native;
 		break;
 	default:
 		return (EINVAL);
@@ -1325,6 +1325,8 @@ kern_ktimer_create(struct thread *td, clockid_t clock_id, ksigevent_t *evp,
 			it->it_sigev.sigev_signo = SIGPROF;
 			break;
 		}
+		memset(&it->it_sigev.sigev_value, 0,
+		    sizeof(it->it_sigev.sigev_value));
 		it->it_sigev.sigev_value.sival_int = id;
 	}
 
@@ -1332,7 +1334,9 @@ kern_ktimer_create(struct thread *td, clockid_t clock_id, ksigevent_t *evp,
 	    it->it_sigev.sigev_notify == SIGEV_THREAD_ID) {
 		it->it_ksi.ksi_signo = it->it_sigev.sigev_signo;
 		it->it_ksi.ksi_code = SI_TIMER;
-		it->it_ksi.ksi_value = it->it_sigev.sigev_value;
+		CTASSERT(sizeof(it->it_ksi.ksi_value) == sizeof(it->it_sigev.sigev_value));
+		memcpy(&it->it_ksi.ksi_value, &it->it_sigev.sigev_value,
+		    sizeof(it->it_ksi.ksi_value));
 		it->it_ksi.ksi_timerid = id;
 	}
 	PROC_UNLOCK(p);

@@ -1676,7 +1676,17 @@ aio_aqueue(struct thread *td, kaiocb_t * __capability ujob, void *ujobptrp,
 	kev.filter = EVFILT_AIO;
 	kev.flags = EV_ADD | EV_ENABLE | EV_FLAG1 | evflags;
 	kev.data = (intptr_t)job;
-	kev.udata = job->uaiocb.aio_sigevent.sigev_value.sival_ptr;
+#ifdef COMPAT_FREEBSD32
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+		kev.udata = __USER_CAP_UNBOUND((void *)(uintptr_t)job->uaiocb.aio_sigevent.sigev_value.sival_ptr32);
+	else
+#endif
+#ifdef COMPAT_CHERIABI
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		kev.udata = job->uaiocb.aio_sigevent.sigev_value.sival_ptr_c;
+	else
+#endif
+		kev.udata = __USER_CAP_UNBOUND(job->uaiocb.aio_sigevent.sigev_value.sival_ptr_native);
 	error = kqfd_register(kqfd, &kev, td, 1);
 	if (error)
 		goto aqueue_fail;
@@ -2278,7 +2288,17 @@ kern_lio_listio(struct thread *td, int mode, intcap_t uacb_list,
 			kev.ident = (uintptr_t)uacb_list; /* something unique */
 			kev.data = (intptr_t)lj;
 			/* pass user defined sigval data */
-			kev.udata = lj->lioj_signal.sigev_value.sival_ptr;
+#ifdef COMPAT_FREEBSD32
+			if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+				kev.udata = __USER_CAP_UNBOUND((void *)(uintptr_t)lj->lioj_signal.sigev_value.sival_ptr32);
+			else
+#endif
+#ifdef COMPAT_CHERIABI
+			if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+				kev.udata = lj->lioj_signal.sigev_value.sival_ptr_c;
+			else
+#endif
+				kev.udata = __USER_CAP_UNBOUND(lj->lioj_signal.sigev_value.sival_ptr_native);
 			error = kqfd_register(
 			    lj->lioj_signal.sigev_notify_kqueue, &kev, td, 1);
 			if (error) {

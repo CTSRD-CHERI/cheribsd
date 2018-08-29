@@ -183,7 +183,7 @@ cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 	} else
 		sip = NULL;
 	error = kern_wait6(td, uap->idtype, uap->id, &status, uap->options,
-	    wrup, sip);
+	    wrup, (_siginfo_t *)sip);
 	if (error != 0)
 		return (error);
 	if (uap->status != NULL)
@@ -2236,7 +2236,8 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		c.pl.pl_syscall_code = r.pl.pl_syscall_code;
 		c.pl.pl_syscall_narg = r.pl.pl_syscall_narg;
 		memcpy(c.pl.pl_tdname, r.pl.pl_tdname, sizeof(c.pl.pl_tdname));
-		siginfo_native_to_siginfo(&r.pl.pl_siginfo, &c.pl.pl_siginfo);
+		siginfo_native_to_siginfo(&r.pl.pl_siginfo,
+		    (_siginfo_t *)&c.pl.pl_siginfo);
 
 		error = copyout_c(&c.pl, uap->addr, uap->data);
 		break;

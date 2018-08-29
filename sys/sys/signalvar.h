@@ -39,6 +39,7 @@
 #include <sys/_lock.h>
 #include <sys/_mutex.h>
 #include <sys/signal.h>
+#include <sys/systm.h>
 
 #ifdef _KERNEL
 #ifdef COMPAT_CHERIABI
@@ -313,7 +314,12 @@ static __inline void
 ksiginfo_set_sigev(ksiginfo_t *dst, ksigevent_t *sigev)
 {
 	dst->ksi_signo = sigev->sigev_signo;
-	dst->ksi_value = sigev->sigev_value;
+	memset(&dst->ksi_value, 0, sizeof(dst->ksi_value));
+#if __has_feature(capability)
+	dst->ksi_value.sival_ptr_c = sigev->sigev_value.siavl_ptr_c;
+#else
+	dst->ksi_value.sival_ptr_native = sigev->sigev_value.sival_ptr_native;
+#endif
 }
 
 struct pgrp;

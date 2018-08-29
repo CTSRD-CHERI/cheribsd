@@ -3291,14 +3291,16 @@ convert_sigevent32(struct sigevent32 *sig32, ksigevent_t *sig)
 		/* FALLTHROUGH */
 	case SIGEV_SIGNAL:
 		CP(*sig32, *sig, sigev_signo);
-		sig->sigev_value.sival_ptr =
-		    (void * __capability)(intcap_t)sig32->sigev_value.sival_ptr;
+		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
+		sig->sigev_value.sival_ptr32 =
+		    sig32->sigev_value.sival_ptr;
 		break;
 	case SIGEV_KEVENT:
 		CP(*sig32, *sig, sigev_notify_kqueue);
 		CP(*sig32, *sig, sigev_notify_kevent_flags);
-		sig->sigev_value.sival_ptr =
-		    (void * __capability)(intcap_t)sig32->sigev_value.sival_ptr;
+		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
+		sig->sigev_value.sival_ptr32 =
+		    sig32->sigev_value.sival_ptr;
 		break;
 	default:
 		return (EINVAL);
