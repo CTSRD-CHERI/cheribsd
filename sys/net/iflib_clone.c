@@ -166,7 +166,7 @@ iflib_iflladdr(void *arg __unused, struct ifnet *ifp)
 }
 
 static int
-iflib_clone_create(struct if_clone *ifc, int unit, caddr_t params)
+iflib_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 {
 	const char *name = ifc_name(ifc);
 	struct iflib_cloneattach_ctx clctx;
@@ -301,3 +301,11 @@ iflib_clone_deregister(if_pseudo_t ip)
 	/* XXX free devclass */
 	free(ip, M_IFLIB);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180830,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

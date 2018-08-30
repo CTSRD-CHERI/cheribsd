@@ -52,7 +52,7 @@ MALLOC_DECLARE(M_IFLIB);
 
 struct iflib_cloneattach_ctx {
 	struct if_clone *cc_ifc;
-	caddr_t cc_params;
+	void * __capability cc_params;
 	const char *cc_name;
 	int cc_len;
 };
@@ -71,3 +71,11 @@ void iflib_set_detach(if_ctx_t ctx);
 void iflib_stop(if_ctx_t ctx);
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180830,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

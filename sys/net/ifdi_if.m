@@ -221,7 +221,7 @@ METHOD int cloneattach {
 	if_ctx_t _ctx;
 	struct if_clone *_ifc;
 	const char *_name;
-	caddr_t params;
+	void * __capability params;
 } DEFAULT null_cloneattach;
 
 METHOD int detach {
@@ -456,3 +456,11 @@ METHOD int sysctl_int_delay {
 METHOD void debug {
 	if_ctx_t _ctx;
 } DEFAULT null_void_op;
+// CHERI CHANGES START
+// {
+//   "updated": 20180830,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END
