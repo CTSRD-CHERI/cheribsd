@@ -90,7 +90,6 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 
 #define call_initfini_pointer(obj, target)				\
 	(((InitFunc)(target))())
-/*	(((InitFunc)(cheri_setoffset(cheri_getppcc(), (target))))()) */
 
 /*
  * XXXAR: FIXME: this should not be using cheri_getppc()/obj->relocbase, we want
