@@ -149,7 +149,7 @@ typedef	__uid_t		uid_t;
 #define __SIGHANDLER_CONSTANT(value)	\
     ((__sighandler_t * __kerncap)(__intcap_t)value)
 #else
-#define __SIGHANDLER_CONSTANT(value) ((__sighandler_t *)(__intptr_t)0)
+#define __SIGHANDLER_CONSTANT(value) ((__sighandler_t *)(__intptr_t)value)
 #endif
 #define	SIG_DFL		__SIGHANDLER_CONSTANT(0)
 #define	SIG_IGN		__SIGHANDLER_CONSTANT(1)
