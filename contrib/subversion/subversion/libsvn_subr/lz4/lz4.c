@@ -1439,7 +1439,7 @@ static void LZ4_init(LZ4_stream_t* lz4ds, BYTE* base)
 
 int LZ4_resetStreamState(void* state, char* inputBuffer)
 {
-    if ((((uptrval)state) & 3) != 0) return 1;   /* Error : pointer is not aligned on 4-bytes boundary */
+    if (!__builtin_is_aligned(state, 4)) return 1;   /* Error : pointer is not aligned on 4-bytes boundary */
     LZ4_init((LZ4_stream_t*)state, (BYTE*)inputBuffer);
     return 0;
 }
@@ -1479,3 +1479,11 @@ extern const apr_uint32_t svn__fake__lz4internal;
 const apr_uint32_t svn__fake__lz4internal = 0xdeadbeef;
 
 #endif /* SVN_INTERNAL_LZ4 */
+// CHERI CHANGES START
+// {
+//   "updated": 20180830
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

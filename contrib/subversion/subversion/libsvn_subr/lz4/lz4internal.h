@@ -379,7 +379,7 @@ typedef struct {
  *        and may change in a future version !
  */
 #define LZ4_STREAMSIZE_U64 ((1 << (LZ4_MEMORY_USAGE-3)) + 4)
-#define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(unsigned long long))
+#define LZ4_STREAMSIZE     (LZ4_STREAMSIZE_U64 * sizeof(uintptr_t))
 union LZ4_stream_u {
     unsigned long long table[LZ4_STREAMSIZE_U64];
     LZ4_stream_t_internal internal_donotuse;
@@ -464,3 +464,11 @@ LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") int LZ4_decompress
 
 #endif /* LZ4_H_2983827168210 */
 #endif /* SVN_INTERNAL_LZ4 */
+// CHERI CHANGES START
+// {
+//   "updated": 20180830,
+//   "changes": [
+//     "pointer_size"
+//   ]
+// }
+// CHERI CHANGES END
