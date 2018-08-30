@@ -903,9 +903,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    ELF_ST_BIND(def->st_info),
 				    ELF_ST_BIND(src_sym->st_info));
 				assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
-				assert(def->st_value == 0);
-				assert(def->st_size == 0);
 #endif
+				assert(def == &sym_zero && "Undef weak symbol is non-canonical!");
 				is_undef_weak = true;
 			}
 			else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
