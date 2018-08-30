@@ -654,7 +654,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     /* Initialize a fake symbol for resolving undefined weak references. */
     sym_zero.st_info = ELF_ST_INFO(STB_GLOBAL, STT_NOTYPE);
     sym_zero.st_shndx = SHN_UNDEF;
-    sym_zero.st_value = -(uintptr_t)obj_main->relocbase;
+    sym_zero.st_value = -(vaddr_t)obj_main->relocbase;
 
     if (!libmap_disable)
         libmap_disable = (bool)lm_init(libmap_override);
