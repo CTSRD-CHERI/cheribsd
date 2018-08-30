@@ -443,10 +443,9 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
 		if (!explicit_fd)
 		    fd = open_binary_fd(argv0, search_in_path);
 		if (fstat(fd, &st) == -1) {
-		    _rtld_error("failed to fstat FD %d (%s): %s", fd,
+		    rtld_fatal("failed to fstat FD %d (%s): %s", fd,
 		      explicit_fd ? "user-provided descriptor" : argv0,
 		      rtld_strerror(errno));
-		    rtld_die();
 		}
 
 		/*
@@ -525,8 +524,7 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    unsetenv(_LD("DEBUG")) || unsetenv(_LD("ELF_HINTS_PATH")) ||
 	    unsetenv(_LD("SKIP_INIT_FUNCS")) ||
 	    unsetenv(_LD("LOADFLTR")) || unsetenv(_LD("LIBRARY_PATH_RPATH"))) {
-		_rtld_error("environment corrupt; aborting");
-		rtld_die();
+		rtld_fatal("environment corrupt; aborting");
 	}
     }
     ld_debug = getenv(_LD("DEBUG"));
@@ -756,9 +754,31 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
       ld_bind_now != NULL && *ld_bind_now != '\0', SYMLOOK_EARLY,
       NULL) == -1)
 	rtld_die();
+#ifdef __CHERI_PURE_CAPABILITY__
+    /* old crt does not exist for CheriABI */
+    assert(obj_main->crt_no_init);
+#else
+    if (!obj_main->crt_no_init) {
+	/*
+	 * Make sure we don't call the main program's init and fini
+	 * functions for binaries linked with old crt1 which calls
+	 * _init itself.
+	 */
+	obj_main->init_ptr = obj_main->fini_ptr = NULL;
+	obj_main->preinit_array_ptr = obj_main->init_array_ptr =
+	    obj_main->fini_array_ptr = NULL;
+    }
+#endif /* #ifndef __CHERI_PURE_CAPABILITY__ */
+
+    /*
+     * Execute MD initializers required before we call the objects'
+     * init functions.
+     */
+    pre_init();
 
     wlock_acquire(rtld_bind_lock, &lockstate);
-    preinit_main();
+    if (obj_main->crt_no_init)
+	preinit_main();
     objlist_call_init(&initlist, &lockstate);
     _r_debug_postinit(&obj_main->linkmap);
     objlist_clear(&initlist);
@@ -782,18 +802,17 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
 void *
 rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	rtld_fatal("IFUNC is not implemented for CheriABI");
+#else
+
 	void *ptr;
 	Elf_Addr target;
 
 	ptr = (void *)make_function_pointer(def, obj);
 	target = call_ifunc_resolver(ptr);
-	// FIXME: this is probably wrong in most cases
-#if 0
-	return ((void *)cheri_setoffset(cheri_getdefault(), target));
+	return ((void *)target);
 #endif
-	_rtld_error("GNU IFUNC is broken for CheriABI");
-	rtld_die();
-	return NULL;
 }
 
 /*
@@ -1225,6 +1244,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    obj->fini_array_num = dynp->d_un.d_val / sizeof(Elf_Addr);
 	    break;
 
+#ifdef __CHERI_PURE_CAPABILITY__
 	case DT_CHERI___CAPRELOCS:
 	    obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
 	    break;
@@ -1232,7 +1252,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	case DT_CHERI___CAPRELOCSSZ:
 	    obj->cap_relocs_size = dynp->d_un.d_val;
 	    break;
-
+#endif
 
 	/*
 	 * Don't process DT_DEBUG on MIPS as the dynamic section
@@ -1505,8 +1525,10 @@ digest_notes(Obj_Entry *obj, const Elf_Note *note_start, const Elf_Note *note_en
 			break;
 		}
 	}
+#ifdef __CHERI_PURE_CAPABILITY__
 	/* We don't support old-style binaries that call init. */
 	assert(obj->crt_no_init == true);
+#endif
 }
 
 static Obj_Entry *
@@ -2104,8 +2126,10 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* MIPS has a bogus DT_TEXTREL. */
     assert(!objtmp.textrel);
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
     /* This was done in _rtld_do___caprelocs_self */
     objtmp.cap_relocs_processed = true;
+#endif
     /*
      * Temporarily put the dynamic linker entry into the object list, so
      * that symbols can be found.
@@ -2119,7 +2143,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* Initialize the object list. */
     TAILQ_INIT(&obj_list);
 
-#ifdef DEBUG_VERBOSE
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG_VERBOSE)
     if (objtmp.cap_relocs) {
 	size_t cap_relocs_size =
 	    ((caddr_t)&__stop___cap_relocs - (caddr_t)&__start___cap_relocs);
@@ -2184,8 +2208,7 @@ init_pagesizes(Elf_Auxinfo **aux_info)
 			}
 		}
 		if (sysctl(mib, len, psa, &size, NULL, 0) == -1) {
-			_rtld_error("sysctl for hw.pagesize(s) failed");
-			rtld_die();
+			rtld_fatal("sysctl for hw.pagesize(s) failed");
 		}
 psa_filled:
 		pagesizes = psa;
@@ -2704,6 +2727,10 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	        (void *)(uintptr_t)elm->obj->init_ptr);
 	    LD_UTRACE(UTRACE_INIT_CALL, elm->obj, (void *)(intptr_t)elm->obj->init_ptr,
 	        0, 0, elm->obj->path);
+	    /*
+	     * Note: GLibc passes argc, argv and envv to _init. Should we also
+	     * do this here for compatibility?
+	     */
 	    call_initfini_pointer(elm->obj, elm->obj->init_ptr);
 	}
 	/* TODO: we should do a CSetBounds after parsing .dynamic */
@@ -2888,10 +2915,11 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 	if (reloc_non_plt(obj, rtldobj, flags, lockstate))
 		return (-1);
 
+#ifdef __CHERI_PURE_CAPABILITY__
 	/* Process the __cap_relocs section to initialize global capabilities */
 	if (obj->cap_relocs_size)
 		process___cap_relocs(obj);
-
+#endif
 
 	/* Re-protected the text segment. */
 	if (obj->textrel && reloc_textrel_prot(obj, false) != 0)
@@ -3575,14 +3603,13 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    ti.ti_module = defobj->tlsindex;
 	    ti.ti_offset = def->st_value;
 	    sym = __tls_get_addr(&ti);
-	    // TODO: this is probably wrong, abort instead?
 	    dbg("dlsym(%s) is TLS. Resolved to: %-#p", name, sym);
 	} else {
 	    sym = make_data_pointer(def, defobj);
 	    dbg("dlsym(%s) is type %d. Resolved to: %-#p",
 		name, ELF_ST_TYPE(def->st_info), sym);
 	}
-#ifdef DEBUG
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG)
 	// FIXME: this warning breaks some tests that expect clean stdout/stderr
 	// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
 	if (cheri_getlen(sym) <= 0) {
@@ -5024,8 +5051,7 @@ allocate_module_tls(int index)
 	    break;
     }
     if (!obj) {
-	_rtld_error("Can't find module with TLS index %d", index);
-	rtld_die();
+	rtld_fatal("Can't find module with TLS index %d", index);
     }
 
     p = malloc_aligned(obj->tlssize, obj->tlsalign);
@@ -5165,9 +5191,8 @@ locate_dependency(const Obj_Entry *obj, const char *name)
 	    return (needed->obj);
 	}
     }
-    _rtld_error("%s: Unexpected inconsistency: dependency %s not found",
+    rtld_fatal("%s: Unexpected inconsistency: dependency %s not found",
 	obj->path, name);
-    rtld_die();
 }
 
 static int
@@ -5537,15 +5562,13 @@ parse_args(char* argv[], int argc, bool *use_pathp, int *fdp)
 			 */
 			if (j != arglen - 1) {
 				/* -f must be the last option in, e.g., -abcf */
-				_rtld_error("invalid options: %s", arg);
-				rtld_die();
+				rtld_fatal("invalid options: %s", arg);
 			}
 			i++;
 			fd = parse_integer(argv[i]);
 			if (fd == -1) {
-				_rtld_error("invalid file descriptor: '%s'",
+				rtld_fatal("invalid file descriptor: '%s'",
 				    argv[i]);
-				rtld_die();
 			}
 			*fdp = fd;
 			break;
@@ -5659,8 +5682,7 @@ void
 __stack_chk_fail(void)
 {
 
-	_rtld_error("stack overflow detected; terminated");
-	rtld_die();
+	rtld_fatal("stack overflow detected; terminated");
 }
 __weak_reference(__stack_chk_fail, __stack_chk_fail_local);
 
@@ -5668,8 +5690,7 @@ void
 __chk_fail(void)
 {
 
-	_rtld_error("buffer overflow detected; terminated");
-	rtld_die();
+	rtld_fatal("buffer overflow detected; terminated");
 }
 
 const char *

@@ -411,6 +411,10 @@ void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 #define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, target)
 #endif
 
+#ifndef __CHERI_PURE_CAPABILITY__
+/* For CHERI we also set bounds (see rtld_machdep in rtld-cheri-elf) */
+#define make_data_pointer(def, defobj)	(defobj->relocbase + def->st_value)
+#endif
 
 /*
  * Function declarations.

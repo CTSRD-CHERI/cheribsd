@@ -34,7 +34,7 @@
 #include <machine/atomic.h>
 #include <machine/tls.h>
 
-#include <assert.h>
+#include "debug.h"
 
 struct Struct_Obj_Entry;
 
@@ -94,6 +94,8 @@ get_codesegment(const struct Struct_Obj_Entry *obj) {
 	dbg_assert(cheri_getperm(obj->relocbase) & __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__);
 	return obj->relocbase;
 }
+
+#define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path);
 
 #define call_init_array_pointer(obj, target)				\
 	(((InitArrFunc)(cheri_setoffset(get_codesegment(obj), (target))))	\

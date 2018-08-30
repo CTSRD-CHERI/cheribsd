@@ -729,7 +729,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
       ld_bind_now != NULL && *ld_bind_now != '\0', SYMLOOK_EARLY,
       NULL) == -1)
 	rtld_die();
-
+#ifdef __CHERI_PURE_CAPABILITY__
+    /* old crt does not exist for CheriABI */
+    assert(obj_main->crt_no_init);
+#else
     if (!obj_main->crt_no_init) {
 	/*
 	 * Make sure we don't call the main program's init and fini
@@ -740,6 +743,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	obj_main->preinit_array_ptr = obj_main->init_array_ptr =
 	    obj_main->fini_array_ptr = NULL;
     }
+#endif /* #ifndef __CHERI_PURE_CAPABILITY__ */
 
     /*
      * Execute MD initializers required before we call the objects'
@@ -773,12 +777,17 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 void *
 rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 {
+#ifdef __CHERI_PURE_CAPABILITY__
+	rtld_fatal("IFUNC is not implemented for CheriABI");
+#else
+
 	void *ptr;
 	Elf_Addr target;
 
 	ptr = (void *)make_function_pointer(def, obj);
 	target = call_ifunc_resolver(ptr);
 	return ((void *)target);
+#endif
 }
 
 /*
@@ -1210,6 +1219,16 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    obj->fini_array_num = dynp->d_un.d_val / sizeof(Elf_Addr);
 	    break;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	case DT_CHERI___CAPRELOCS:
+	    obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_CHERI___CAPRELOCSSZ:
+	    obj->cap_relocs_size = dynp->d_un.d_val;
+	    break;
+#endif
+
 	/*
 	 * Don't process DT_DEBUG on MIPS as the dynamic section
 	 * is mapped read-only. DT_MIPS_RLD_MAP is used instead.
@@ -1481,6 +1500,10 @@ digest_notes(Obj_Entry *obj, const Elf_Note *note_start, const Elf_Note *note_en
 			break;
 		}
 	}
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* We don't support old-style binaries that call init. */
+	assert(obj->crt_no_init == true);
+#endif
 }
 
 static Obj_Entry *
@@ -2078,6 +2101,10 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* MIPS has a bogus DT_TEXTREL. */
     assert(!objtmp.textrel);
 #endif
+#ifdef __CHERI_PURE_CAPABILITY__
+    /* This was done in _rtld_do___caprelocs_self */
+    objtmp.cap_relocs_processed = true;
+#endif
     /*
      * Temporarily put the dynamic linker entry into the object list, so
      * that symbols can be found.
@@ -2090,6 +2117,19 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 
     /* Initialize the object list. */
     TAILQ_INIT(&obj_list);
+
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG_VERBOSE)
+    if (objtmp.cap_relocs) {
+	size_t cap_relocs_size =
+	    ((caddr_t)&__stop___cap_relocs - (caddr_t)&__start___cap_relocs);
+	rtld_printf("RTLD has DT_CHERI___CAPRELOCS = %#p, __start___cap_relocs"
+	    "= %#p\nDT_CHERI___CAPRELOCSSZ = %zd, difference = %zd",
+	    objtmp.cap_relocs, &__start___cap_relocs, cap_relocs_size,
+	    objtmp.cap_relocs_size);
+	assert((vaddr_t)objtmp.cap_relocs == (vaddr_t)&__start___cap_relocs);
+	assert(objtmp.cap_relocs_size == cap_relocs_size);
+    }
+#endif
 
     /* Now that non-local variables can be accesses, copy out obj_rtld. */
     memcpy(&obj_rtld, &objtmp, sizeof(obj_rtld));
@@ -2848,6 +2888,12 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 	if (reloc_non_plt(obj, rtldobj, flags, lockstate))
 		return (-1);
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Process the __cap_relocs section to initialize global capabilities */
+	if (obj->cap_relocs_size)
+		process___cap_relocs(obj);
+#endif
+
 	/* Re-protected the text segment. */
 	if (obj->textrel && reloc_textrel_prot(obj, false) != 0)
 		return (-1);
@@ -3532,10 +3578,18 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    sym = __tls_get_addr(&ti);
 	    dbg("dlsym(%s) is TLS. Resolved to: %-#p", name, sym);
 	} else {
-	    sym = defobj->relocbase + def->st_value;
+	    sym = make_data_pointer(def, defobj);
 	    dbg("dlsym(%s) is type %d. Resolved to: %-#p",
 		name, ELF_ST_TYPE(def->st_info), sym);
 	}
+#if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG)
+	// FIXME: this warning breaks some tests that expect clean stdout/stderr
+	// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
+	if (cheri_getlen(sym) <= 0) {
+		rtld_fdprintf(STDERR_FILENO, "Warning: created zero length "
+		    "capability for %s (in %s): %-#p\n", name, defobj->path, sym);
+	}
+#endif
 	LD_UTRACE(UTRACE_DLSYM_STOP, handle, sym, 0, 0, name);
 	return (sym);
     }
