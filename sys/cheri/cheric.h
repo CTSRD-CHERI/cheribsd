@@ -79,6 +79,9 @@
 
 #define	cheri_csetbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
 
+/* Create an untagged capability from an integer */
+#define cheri_fromint(x)	cheri_incoffset(NULL, x)
+
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
  * data capability.  The compiler's use of CFromPtr will be with respect to
