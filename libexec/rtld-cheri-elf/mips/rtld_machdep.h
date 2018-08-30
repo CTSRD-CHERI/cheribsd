@@ -95,13 +95,22 @@ get_codesegment(const struct Struct_Obj_Entry *obj) {
 	return obj->relocbase;
 }
 
+static inline const void*
+vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
+	const void* text = get_codesegment(obj);
+	dbg_assert(code_addr >= (vaddr_t)text);
+	dbg_assert(code_addr < (vaddr_t)text + cheri_getlen(text));
+	/* XXXAR: would be nice if we had a cheri_setaddress() */
+	return (const char*)text + (code_addr - cheri_getbase(text));
+}
+
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path);
 
-#define call_init_array_pointer(obj, target)				\
-	(((InitArrFunc)(cheri_setoffset(get_codesegment(obj), (target))))	\
+#define call_init_array_pointer(obj, target)			\
+	(((InitArrFunc)(vaddr_to_code_pointer(obj, (target))))	\
 	    (main_argc, main_argv, environ))
-#define call_fini_array_pointer(obj, target)				\
-	(((InitArrFunc)(cheri_setoffset(get_codesegment(obj), (target))))	\
+#define call_fini_array_pointer(obj, target)			\
+	(((InitArrFunc)(vaddr_to_code_pointer(obj, (target))))	\
 	    (main_argc, main_argv, environ))
 
 // Not implemented for CHERI:
