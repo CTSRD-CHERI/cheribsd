@@ -88,6 +88,12 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	return ret;
 }
 
+static inline const void*
+get_codesegment(const struct Struct_Obj_Entry *obj) {
+	/* TODO: we should have a separate member for .text/rodata */
+	dbg_assert(cheri_getperm(obj->relocbase) & __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__);
+	return obj->relocbase;
+}
 #define call_initfini_pointer(obj, target)				\
 	(((InitFunc)(target))())
 
