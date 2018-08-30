@@ -398,8 +398,18 @@ void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
 
-// rtld_machdep.h depends on struct Obj_Entry and _rtld_error()
+/* rtld_machdep.h depends on struct Obj_Entry and _rtld_error() */
 #include "rtld_machdep.h"
+
+/* Archictectures other than CHERI can just call the pointer */
+#ifndef call_init_array_pointer
+#define call_init_array_pointer(obj, target) call_init_pointer(obj, target)
+#endif
+
+#ifndef call_fini_array_pointer
+#define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, target)
+#endif
+
 
 /*
  * Function declarations.

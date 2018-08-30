@@ -2531,7 +2531,7 @@ preinit_main(void)
 		preinit_addr[index]);
 	    LD_UTRACE(UTRACE_INIT_CALL, obj_main,
 	      (void *)(intptr_t)preinit_addr[index], 0, 0, obj_main->path);
-	    call_init_pointer(obj_main, preinit_addr[index]);
+	    call_init_array_pointer(obj_main, preinit_addr[index]);
 	}
     }
 }
@@ -2586,7 +2586,7 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 			    elm->obj->path, fini_addr[index]);
 			LD_UTRACE(UTRACE_FINI_CALL, elm->obj,
 			    (void *)(intptr_t)fini_addr[index], 0, 0, elm->obj->path);
-			call_initfini_pointer(elm->obj, fini_addr[index]);
+			call_fini_array_pointer(elm->obj, fini_addr[index]);
 		    }
 		}
 	    }
@@ -2678,7 +2678,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 			(void *)init_addr[index]);
 		    LD_UTRACE(UTRACE_INIT_CALL, elm->obj,
 			(void *)(uintptr_t)init_addr[index], 0, 0, elm->obj->path);
-		    call_init_pointer(elm->obj, init_addr[index]);
+		    call_init_array_pointer(elm->obj, init_addr[index]);
 		}
 	    }
 	}
