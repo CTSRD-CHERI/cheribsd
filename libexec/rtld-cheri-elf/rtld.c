@@ -42,7 +42,6 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-#include <sys/cheriabi.h>
 #include <sys/mount.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -51,7 +50,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/utsname.h>
 #include <sys/ktrace.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <sys/cheriabi.h>
 #include <cheri/cheric.h>
+#endif
 
 #include <dlfcn.h>
 #include <err.h>
@@ -337,8 +339,17 @@ _LD(const char *var)
 #endif
 
 /*
- * Main entry point for dynamic linking.  The first argument is a
- * pointer to the ELF  "auxiliary vector".
+ * Main entry point for dynamic linking.
+ *
+ * For CHERI the first argument is a pointer to the ELF "auxiliary vector".
+ * For all other architectures the first argument is the stack pointer.
+ * The stack is expected to be laid out as described
+ * in the SVR4 ABI specification, Intel 386 Processor Supplement.
+ * Specifically, the stack pointer points to a word containing
+ * ARGC.  Following that in the stack is a null-terminated sequence
+ * of pointers to argument strings.  Then comes a null-terminated
+ * sequence of pointers to environment strings.  Finally, there is a
+ * sequence of "auxiliary vector" entries.
  *
  * The second argument points to a place to store the dynamic linker's
  * exit procedure pointer and the third to a place to store the main
@@ -347,9 +358,16 @@ _LD(const char *var)
  * The return value is the main program's entry point.
  */
 func_ptr_type
+#ifdef __CHERI_PURE_CAPABILITY__
 _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
+#else
+_rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
+#endif
 {
-    Elf_Auxinfo *aux_info[AT_COUNT];
+    Elf_Auxinfo *aux_info[AT_COUNT], *auxp;
+#ifndef __CHERI_PURE_CAPABILITY__
+    Elf_Auxinfo *aux, *auxpf;
+#endif
     Objlist_Entry *entry;
     Obj_Entry *last_interposer, *obj, *preload_tail;
     const Elf_Phdr *phdr;
@@ -358,6 +376,9 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
     struct stat st;
     Elf_Addr *argcp;
     char **argv, *argv0, **env, *kexecpath, *library_path_rpath;
+#ifndef __CHERI_PURE_CAPABILITY__
+    char **envp;
+#endif
     caddr_t imgentry;
     char buf[MAXPATHLEN];
     int argc, fd, i, mib[2], phnum, rtld_argc;
@@ -370,18 +391,32 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
      * init_rtld has returned.  It is OK to reference file-scope statics
      * and string constants, and to call static and global functions.
      */
+#ifndef __CHERI_PURE_CAPABILITY__
+    /* Find the auxiliary vector on the stack. */
+    argcp = sp;
+    argc = *sp++;
+    argv = (char **) sp;
+    sp += argc + 1;	/* Skip over arguments and NULL terminator */
+    env = (char **) sp;
+    while (*sp++ != 0)	/* Skip over environment, and NULL terminator */
+	;
+    aux = (Elf_Auxinfo *) sp;
+#endif
 
     /* Digest the auxiliary vector. */
     for (i = 0;  i < AT_COUNT;  i++)
 	aux_info[i] = NULL;
-    for (Elf_Auxinfo *auxp = aux;  auxp->a_type != AT_NULL;  auxp++) {
+    for (auxp = aux;  auxp->a_type != AT_NULL;  auxp++) {
 	if (auxp->a_type < AT_COUNT)
 	    aux_info[auxp->a_type] = auxp;
     }
+#ifdef __CHERI_PURE_CAPABILITY__
+    /* CHERI reads these values from auxv instead */
     argcp = &aux_info[AT_ARGC]->a_un.a_val;
     argc = *argcp;
     argv = (char **)aux_info[AT_ARGV]->a_un.a_ptr;
     env = (char **)aux_info[AT_ENVV]->a_un.a_ptr;
+#endif
 
     /* Initialize and relocate ourselves. */
     assert(aux_info[AT_BASE] != NULL);
@@ -394,7 +429,7 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
     main_argv = argv;
 
     /*
-     * XXX-BD: Do we really want stack canarys?  If we do, we probably
+     * XXX-BD: Do we really want stack canarys for CHERI?  If we do, we probably
      * want them to be unforgable capabilities, e.g. zero length sealed
      * capabilities with kernel address space base addresses.
      */
@@ -481,14 +516,13 @@ _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
 		 * places environment pointers and aux vectors right
 		 * after the terminating NULL, we must shift
 		 * environment and aux as well.
-		 *
-		 * (Not true for CHERI, keeping this here to reduce the diff)
 		 */
 		main_argc = argc - rtld_argc;
 		for (i = 0; i <= main_argc; i++)
 		    argv[i] = argv[i + rtld_argc];
 		*argcp -= rtld_argc;
-#if 0
+		/* auxv/envp is not on the stack in CHERI so we don't need this */
+#ifndef __CHERI_PURE_CAPABILITY__
 		environ = env = envp = argv + main_argc + 1;
 		do {
 		    *envp = *(envp + rtld_argc);
@@ -5662,13 +5696,15 @@ void (*__cleanup)(void);
 int __isthreaded = 0;
 int _thread_autoinit_dummy_decl = 1;
 
+#ifdef __CHERI_PURE_CAPABILITY__
 /* FIXME: abort() will crash inside sigprocmask, let's just use raise() here */
 void
 abort(void)
 {
 	raise(SIGABRT);
-	 __builtin_unreachable();
+	 __builtin_trap();
 }
+#endif
 
 /*
  * No unresolved symbols for rtld.

@@ -50,10 +50,16 @@ __FBSDID("$FreeBSD$");
 #include <sys/utsname.h>
 #include <sys/ktrace.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <sys/cheriabi.h>
+#include <cheri/cheric.h>
+#endif
+
 #include <dlfcn.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <signal.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -331,8 +337,11 @@ _LD(const char *var)
 #endif
 
 /*
- * Main entry point for dynamic linking.  The first argument is the
- * stack pointer.  The stack is expected to be laid out as described
+ * Main entry point for dynamic linking.
+ *
+ * For CHERI the first argument is a pointer to the ELF "auxiliary vector".
+ * For all other architectures the first argument is the stack pointer.
+ * The stack is expected to be laid out as described
  * in the SVR4 ABI specification, Intel 386 Processor Supplement.
  * Specifically, the stack pointer points to a word containing
  * ARGC.  Following that in the stack is a null-terminated sequence
@@ -347,9 +356,16 @@ _LD(const char *var)
  * The return value is the main program's entry point.
  */
 func_ptr_type
+#ifdef __CHERI_PURE_CAPABILITY__
+_rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp)
+#else
 _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
+#endif
 {
-    Elf_Auxinfo *aux, *auxp, *auxpf, *aux_info[AT_COUNT];
+    Elf_Auxinfo *aux_info[AT_COUNT], *auxp;
+#ifndef __CHERI_PURE_CAPABILITY__
+    Elf_Auxinfo *aux, *auxpf;
+#endif
     Objlist_Entry *entry;
     Obj_Entry *last_interposer, *obj, *preload_tail;
     const Elf_Phdr *phdr;
@@ -357,7 +373,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     RtldLockState lockstate;
     struct stat st;
     Elf_Addr *argcp;
-    char **argv, *argv0, **env, **envp, *kexecpath, *library_path_rpath;
+    char **argv, *argv0, **env, *kexecpath, *library_path_rpath;
+#ifndef __CHERI_PURE_CAPABILITY__
+    char **envp;
+#endif
     caddr_t imgentry;
     char buf[MAXPATHLEN];
     int argc, fd, i, phnum, rtld_argc;
@@ -369,7 +388,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
      * init_rtld has returned.  It is OK to reference file-scope statics
      * and string constants, and to call static and global functions.
      */
-
+#ifndef __CHERI_PURE_CAPABILITY__
     /* Find the auxiliary vector on the stack. */
     argcp = sp;
     argc = *sp++;
@@ -379,6 +398,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     while (*sp++ != 0)	/* Skip over environment, and NULL terminator */
 	;
     aux = (Elf_Auxinfo *) sp;
+#endif
 
     /* Digest the auxiliary vector. */
     for (i = 0;  i < AT_COUNT;  i++)
@@ -387,6 +407,13 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	if (auxp->a_type < AT_COUNT)
 	    aux_info[auxp->a_type] = auxp;
     }
+#ifdef __CHERI_PURE_CAPABILITY__
+    /* CHERI reads these values from auxv instead */
+    argcp = &aux_info[AT_ARGC]->a_un.a_val;
+    argc = *argcp;
+    argv = (char **)aux_info[AT_ARGV]->a_un.a_ptr;
+    env = (char **)aux_info[AT_ENVV]->a_un.a_ptr;
+#endif
 
     /* Initialize and relocate ourselves. */
     assert(aux_info[AT_BASE] != NULL);
@@ -465,6 +492,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		for (i = 0; i <= main_argc; i++)
 		    argv[i] = argv[i + rtld_argc];
 		*argcp -= rtld_argc;
+		/* auxv/envp is not on the stack in CHERI so we don't need this */
+#ifndef __CHERI_PURE_CAPABILITY__
 		environ = env = envp = argv + main_argc + 1;
 		do {
 		    *envp = *(envp + rtld_argc);
@@ -477,6 +506,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		    if (auxp->a_type == AT_NULL)
 			    break;
 		}
+#endif
 	    } else {
 		rtld_printf("no binary\n");
 		rtld_die();
@@ -2614,6 +2644,7 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 	     * It is legal to have both DT_FINI and DT_FINI_ARRAY defined.
 	     * When this happens, DT_FINI_ARRAY is processed first.
 	     */
+	    /* TODO: we should do a CSetBounds after parsing .dynamic */
 	    fini_addr = elm->obj->fini_array_ptr;
 	    if (fini_addr != NULL && elm->obj->fini_array_num > 0) {
 		for (index = elm->obj->fini_array_num - 1; index >= 0;
@@ -2707,6 +2738,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	     */
 	    call_initfini_pointer(elm->obj, elm->obj->init_ptr);
 	}
+	/* TODO: we should do a CSetBounds after parsing .dynamic */
 	init_addr = elm->obj->init_array_ptr;
 	if (init_addr != NULL) {
 	    for (index = 0; index < elm->obj->init_array_num; index++) {
@@ -5635,6 +5667,16 @@ void (*__cleanup)(void);
 int __isthreaded = 0;
 int _thread_autoinit_dummy_decl = 1;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/* FIXME: abort() will crash inside sigprocmask, let's just use raise() here */
+void
+abort(void)
+{
+	raise(SIGABRT);
+	 __builtin_trap();
+}
+#endif
+
 /*
  * No unresolved symbols for rtld.
  */
@@ -5651,3 +5693,12 @@ rtld_strerror(int errnum)
 		return ("Unknown error");
 	return (sys_errlist[errnum]);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Hack to avoid a relocation against __auxargs from libc/gen/auxv.c.
+ * This symbol is actually provided by crt1.c but we need a definition in
+ * rtld to avoid a R_MIPS_CHERI_CAPBILITY relocation in rtld
+ */
+__attribute__((visibility("hidden"))) Elf_Auxinfo *__auxargs = NULL;
+#endif
