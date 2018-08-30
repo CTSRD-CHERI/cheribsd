@@ -94,10 +94,20 @@ __FBSDID("$FreeBSD$");
  * need to work on that.
  */
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #endif
+
 #if __has_feature(capabilities)
-#define	SIG_DFL_N	(void *)0
-#define	SIG_IGN_N	(void *)1
+static inline bool
+is_magic_sighandler_constant(void* handler) {
+	/*
+	 * Instead of enumerating all the SIG_* constants, just check if
+	 * it is a small (positive or negative) integer so that this doesn't
+	 * break if someone adds a new SIG_* constant. The manual checks that
+	 * we were using before weren't handling SIG_HOLD.
+	 */
+	return (vaddr_t)handler < 64;
+}
 #endif
 
 #include <machine/cpu.h>
@@ -887,10 +897,8 @@ sys_sigaction(struct thread *td, struct sigaction_args *uap)
 		if (error)
 			return (error);
 #if __has_feature(capabilities)
-		if (act_n.sa_handler == SIG_DFL_N)
-			actp->sa_handler = SIG_DFL;
-		else if (act_n.sa_handler == SIG_IGN_N)
-			actp->sa_handler = SIG_IGN;
+		if (is_magic_sighandler_constant(act_n.sa_handler))
+			actp->sa_handler = cheri_fromint((vaddr_t)act_n.sa_handler);
 		else
 			actp->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
 		actp->sa_flags = act_n.sa_flags;
@@ -938,10 +946,8 @@ freebsd4_sigaction(struct thread *td, struct freebsd4_sigaction_args *uap)
 		if (error)
 			return (error);
 #if __has_feature(capabilities)
-		if (act_n.sa_handler == SIG_DFL_N)
-			actp->sa_handler = SIG_DFL;
-		else if (act_n.sa_handler == SIG_IGN_N)
-			actp->sa_handler = SIG_IGN;
+		if (is_magic_sighandler_constant(act_n.sa_handler))
+			actp->sa_handler = cheri_fromint((vaddr_t)act_n.sa_handler);
 		else
 			actp->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
 		actp->sa_flags = act_n.sa_flags;
@@ -992,12 +998,14 @@ osigaction(struct thread *td, struct osigaction_args *uap)
 		error = copyin(uap->nsa, &sa, sizeof(sa));
 		if (error)
 			return (error);
-		if (sa.sa_handler == SIG_DFL_N)
-			nsap->sa_handler = SIG_DFL;
-		else if (sa.sa_handler == SIG_IGN_N)
-			nsap->sa_handler = SIG_IGN;
+#if __has_feature(capabilities)
+		if (is_magic_sighandler_constant(sa.sa_handler))
+			nsap->sa_handler = cheri_fromint((vaddr_t)sa.sa_handler);
 		else
-			nsap->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
+			nsap->sa_handler = __USER_CODE_CAP(sa.sa_handler);
+#else
+		nsap.sa_handler = (void *)(uintptr_t)sa.sa_handler;
+#endif
 		nsap->sa_flags = sa.sa_flags;
 		OSIG2SIG(sa.sa_mask, nsap->sa_mask);
 	}
