@@ -422,10 +422,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		if (!explicit_fd)
 		    fd = open_binary_fd(argv0, search_in_path);
 		if (fstat(fd, &st) == -1) {
-		    _rtld_error("failed to fstat FD %d (%s): %s", fd,
+		    rtld_fatal("failed to fstat FD %d (%s): %s", fd,
 		      explicit_fd ? "user-provided descriptor" : argv0,
 		      rtld_strerror(errno));
-		    rtld_die();
 		}
 
 		/*
@@ -500,8 +499,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    unsetenv(_LD("DEBUG")) || unsetenv(_LD("ELF_HINTS_PATH")) ||
 	    unsetenv(_LD("SKIP_INIT_FUNCS")) ||
 	    unsetenv(_LD("LOADFLTR")) || unsetenv(_LD("LIBRARY_PATH_RPATH"))) {
-		_rtld_error("environment corrupt; aborting");
-		rtld_die();
+		rtld_fatal("environment corrupt; aborting");
 	}
     }
     ld_debug = getenv(_LD("DEBUG"));
@@ -2145,8 +2143,7 @@ init_pagesizes(Elf_Auxinfo **aux_info)
 			}
 		}
 		if (sysctl(mib, len, psa, &size, NULL, 0) == -1) {
-			_rtld_error("sysctl for hw.pagesize(s) failed");
-			rtld_die();
+			rtld_fatal("sysctl for hw.pagesize(s) failed");
 		}
 psa_filled:
 		pagesizes = psa;
@@ -4973,8 +4970,7 @@ allocate_module_tls(int index)
 	    break;
     }
     if (!obj) {
-	_rtld_error("Can't find module with TLS index %d", index);
-	rtld_die();
+	rtld_fatal("Can't find module with TLS index %d", index);
     }
 
     p = malloc_aligned(obj->tlssize, obj->tlsalign);
@@ -5114,9 +5110,8 @@ locate_dependency(const Obj_Entry *obj, const char *name)
 	    return (needed->obj);
 	}
     }
-    _rtld_error("%s: Unexpected inconsistency: dependency %s not found",
+    rtld_fatal("%s: Unexpected inconsistency: dependency %s not found",
 	obj->path, name);
-    rtld_die();
 }
 
 static int
@@ -5486,15 +5481,13 @@ parse_args(char* argv[], int argc, bool *use_pathp, int *fdp)
 			 */
 			if (j != arglen - 1) {
 				/* -f must be the last option in, e.g., -abcf */
-				_rtld_error("invalid options: %s", arg);
-				rtld_die();
+				rtld_fatal("invalid options: %s", arg);
 			}
 			i++;
 			fd = parse_integer(argv[i]);
 			if (fd == -1) {
-				_rtld_error("invalid file descriptor: '%s'",
+				rtld_fatal("invalid file descriptor: '%s'",
 				    argv[i]);
-				rtld_die();
 			}
 			*fdp = fd;
 			break;

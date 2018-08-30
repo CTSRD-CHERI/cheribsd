@@ -94,22 +94,17 @@ get_codesegment(const struct Struct_Obj_Entry *obj) {
 	dbg_assert(cheri_getperm(obj->relocbase) & __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__);
 	return obj->relocbase;
 }
-#define call_initfini_pointer(obj, target)				\
-	(((InitFunc)(target))())
 
-/*
- * XXXAR: FIXME: this should not be using cheri_getppc()/obj->relocbase, we want
- * a obj->text_segment_only or similar
- */
 #define call_init_array_pointer(obj, target)				\
-	(((InitArrFunc)(cheri_setoffset(cheri_getpcc(), (target))))	\
+	(((InitArrFunc)(cheri_setoffset(get_codesegment(obj), (target))))	\
 	    (main_argc, main_argv, environ))
 #define call_fini_array_pointer(obj, target)				\
-	(((InitArrFunc)(cheri_setoffset(cheri_getpcc(), (target))))	\
+	(((InitArrFunc)(cheri_setoffset(get_codesegment(obj), (target))))	\
 	    (main_argc, main_argv, environ))
 
-#define	call_ifunc_resolver(ptr) \
-	(((Elf_Addr (*)(void))ptr)())
+// Not implemented for CHERI:
+// #define	call_ifunc_resolver(ptr) \
+// 	(((Elf_Addr (*)(void))ptr)())
 
 typedef struct {
 	unsigned long ti_module;
