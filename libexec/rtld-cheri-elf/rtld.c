@@ -3582,7 +3582,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	    dbg("dlsym(%s) is type %d. Resolved to: %-#p",
 		name, ELF_ST_TYPE(def->st_info), sym);
 	}
-#if 0
+#ifdef DEBUG
 	// FIXME: this warning breaks some tests that expect clean stdout/stderr
 	// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
 	if (cheri_getlen(sym) <= 0) {
@@ -5639,21 +5639,6 @@ void (*__cleanup)(void);
 int __isthreaded = 0;
 int _thread_autoinit_dummy_decl = 1;
 
-void
-__assert(const char *func, const char *file, int line, const char *failedexpr)
-{
-	if (func == NULL)
-		rtld_fdprintf(STDERR_FILENO,
-		     "Assertion failed: (%s), file %s, line %d.\n", failedexpr,
-		     file, line);
-	else
-		rtld_fdprintf(STDERR_FILENO,
-		     "Assertion failed: (%s), function %s, file %s, line %d.\n",
-		     failedexpr, func, file, line);
-	abort();
-	/* NOTREACHED */
-}
-
 /* FIXME: abort() will crash inside sigprocmask, let's just use raise() here */
 void
 abort(void)
@@ -5695,6 +5680,3 @@ rtld_strerror(int errnum)
 		return ("Unknown error");
 	return (sys_errlist[errnum]);
 }
-
-/* Hack to avoid a relocation against __auxargs from libc/gen/auxv.c */
-Elf_Auxinfo *__auxargs = NULL;
