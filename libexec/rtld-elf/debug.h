@@ -35,10 +35,10 @@
 #define DEBUG_H 1
 
 #include <sys/cdefs.h>
-
+/* assert() is always enabled. For expensive checks use dbg_assert() instead. */
+#undef NDEBUG
+#include <assert.h>
 #include <string.h>
-#include <unistd.h>
-
 #include "rtld_printf.h"
 
 extern void debug_printf(const char *, ...) __printflike(1, 2);
@@ -61,10 +61,7 @@ extern int debug;
 #endif
 
 /* assert() is always enabled. For expensive checks use dbg_assert() instead. */
-#undef assert
-#define assert(cond)	((cond) ? (void) 0 :		\
-    (msg(_MYNAME ": assert failed: " __FILE__ ":"	\
-      __XSTRING(__LINE__) ":" #cond "\n"), abort()))
+
 #define msg(s)		rtld_write(STDERR_FILENO, s, strlen(s))
 #define trace()		msg(_MYNAME ": " __XSTRING(__LINE__) "\n")
 

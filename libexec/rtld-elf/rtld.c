@@ -5694,6 +5694,24 @@ rtld_strerror(int errnum)
 	return (sys_errlist[errnum]);
 }
 
+#if defined DEBUG || !defined(NDEBUG)
+/* Provide an implementation of __assert that does not pull in fprintf() */
+void
+__assert(const char *func, const char *file, int line, const char *failedexpr)
+{
+	if (func == NULL)
+		(void)rtld_fdprintf(STDERR_FILENO,
+		     "Assertion failed: (%s), file %s, line %d.\n", failedexpr,
+		     file, line);
+	else
+		(void)rtld_fdprintf(STDERR_FILENO,
+		     "Assertion failed: (%s), function %s, file %s, line %d.\n",
+		     failedexpr, func, file, line);
+	abort();
+	/* NOTREACHED */
+}
+#endif
+
 #ifdef __CHERI_PURE_CAPABILITY__
 /*
  * Hack to avoid a relocation against __auxargs from libc/gen/auxv.c.
