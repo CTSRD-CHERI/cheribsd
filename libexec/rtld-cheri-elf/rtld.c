@@ -5701,3 +5701,12 @@ rtld_strerror(int errnum)
 		return ("Unknown error");
 	return (sys_errlist[errnum]);
 }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * Hack to avoid a relocation against __auxargs from libc/gen/auxv.c.
+ * This symbol is actually provided by crt1.c but we need a definition in
+ * rtld to avoid a R_MIPS_CHERI_CAPBILITY relocation in rtld
+ */
+__attribute__((visibility("hidden"))) Elf_Auxinfo *__auxargs = NULL;
+#endif
