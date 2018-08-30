@@ -3597,7 +3597,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 out_ref:
 	if_rele(ifp);
 out_noref:
-#if defined(COMPAT_FREEBSD32) && defined(COMPAT_CHERIABI)
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI)
 	if (ifmrp != NULL) {
 		KASSERT((cmd == SIOCGIFMEDIA || cmd == SIOCGIFXMEDIA),
 		    ("ifmrp non-NULL, but cmd is not an ifmedia req 0x%lx",
