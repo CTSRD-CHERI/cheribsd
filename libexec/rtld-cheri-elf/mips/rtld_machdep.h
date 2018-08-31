@@ -34,7 +34,12 @@
 #include <machine/atomic.h>
 #include <machine/tls.h>
 
+#ifdef IN_RTLD
+/* Don't pull this in when building libthr */
 #include "debug.h"
+#else
+#define dbg_assert(cond) assert(cond)
+#endif
 
 struct Struct_Obj_Entry;
 
