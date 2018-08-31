@@ -914,7 +914,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				/* Remove execute permissions and set bounds */
 				symval = make_data_pointer(def, defobj);
 			}
-#if 0
+#ifdef DEBUG
 			// FIXME: this warning breaks some tests that expect clean stdout/stderr
 			// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
 			// TODO: or use this approach: https://github.com/CTSRD-CHERI/cheribsd/commit/c1920496c0086d9c5214fb0f491e4d6cdff3828e?

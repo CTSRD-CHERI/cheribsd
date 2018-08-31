@@ -2743,7 +2743,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	if (init_addr != NULL) {
 	    for (index = 0; index < elm->obj->init_array_num; index++) {
 		if (init_addr[index] != 0 && init_addr[index] != 1) {
-		    dbg("calling init function for %s at %p", elm->obj->path,
+		    dbg("calling init array function for %s at %p", elm->obj->path,
 			(void *)(uintptr_t)init_addr[index]);
 		    LD_UTRACE(UTRACE_INIT_CALL, elm->obj,
 			(void *)(uintptr_t)init_addr[index], 0, 0, elm->obj->path);
