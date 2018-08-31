@@ -1396,8 +1396,8 @@ int (*compares[])(const void *arg1, const void *arg2) = {
 	compare_iofault,
 	compare_vcsw,
 	compare_ivcsw,
-	(int(*)(void*,void*))compare_jid,
-	(int(*)(void*,void*))compare_swap,
+	compare_jid,
+	compare_swap,
 	NULL
 };
 
