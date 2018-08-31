@@ -1612,7 +1612,7 @@ muge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		rc = 0;
 		reinit = 0;
 
-		mask = ifr->ifr_reqcap ^ ifp->if_capenable;
+		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 
 		/* Modify the RX CSUM enable bits. */
 		if ((mask & IFCAP_RXCSUM) != 0 &&
