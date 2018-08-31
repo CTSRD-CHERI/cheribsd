@@ -335,7 +335,7 @@ kern_mmap(struct thread *td, uintptr_t addr0, uintptr_t max_addr0,
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif
-	    MAP_ALIGNMENT_MASK)) != 0))
+	    MAP_ALIGNMENT_MASK)) != 0)) {
 #ifdef KTRACE
 		if (KTRPOINT(td, KTR_SYSERRCAUSE))
 			ktrsyserrcause("%s: Invalid arguments with MAP_GUARD",
