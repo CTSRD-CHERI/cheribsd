@@ -1054,9 +1054,13 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	    CHERI_CAP_USER_CODE_LENGTH, CHERI_CAP_USER_CODE_PERMS);
 	/*
 	 * XXX-BD: grant code and data perms to allow textrel fixups.
+	 * XXXAR: This currently spans the full address space and is not correct
+	 * for the main binary since args->base seems to contain the rtld addr.
+	 * rtld-cheri-elf fixes this up to be only the main binary.
+	 *
 	 */
-	AUXARGS_ENTRY_CAP(pos, AT_BASE, args->base, 0,
-	    CHERI_CAP_USER_DATA_LENGTH - args->base,
+	AUXARGS_ENTRY_CAP(pos, AT_BASE, 0, args->base,
+	    CHERI_CAP_USER_DATA_LENGTH,
 	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 #ifdef AT_EHDRFLAGS
 	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);

@@ -596,9 +596,15 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (caddr_t) aux_info[AT_ENTRY]->a_un.a_ptr;
 	relocbase = (caddr_t) aux_info[AT_BASE]->a_un.a_ptr;
+	dbg("Values from kernel:\n\tAT_PHDR=%-#p\n\tAT_BASE=%-#p\n\tAT_ENTRY=%-#p\n",
+		phdr, relocbase, imgentry);
 	if ((obj_main = digest_phdr(phdr, phnum, imgentry, relocbase, argv0)) ==
 	    NULL)
 		rtld_die();
+	dbg("Parsed values:\n\tmapbase=%-#p\n\tmapsize=%#zx"
+	     "\n\ttextsize=%#zx\n\tvaddrbase=%#zx\n\trelocbase=%-#p\n",
+		obj_main->mapbase, obj_main->mapsize, obj_main->textsize, obj_main->vaddrbase, obj_main->relocbase);
+	rtld_require(obj_main->vaddrbase == 0, "non-zero vaddrbase not supported!");
     }
 
     if (aux_info[AT_EXECPATH] != NULL && fd == -1) {
@@ -1418,6 +1424,7 @@ static Obj_Entry *
 digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
     const char *path)
 {
+    dbg("%s(0, entry=%p, relocbase=%-#p, path=%s)\n", __func__, entry, relocbase, path);
     Obj_Entry *obj;
     const Elf_Phdr *phlimit = phdr + phnum;
     const Elf_Phdr *ph;
@@ -1489,6 +1496,20 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
 	_rtld_error("%s: too few PT_LOAD segments", path);
 	return NULL;
     }
+
+#ifdef __CHERI_PURE_CAPABILITY__
+   // FIXME: the kernel is passing a full addressspace AT_BASE value with
+   // the offset pointing to rtld. We should pass the main binary mapping instead!
+
+   // obj->relocbase was derived from Phdr, which is a data cap. We need a full
+   // permissions cap for obj->relocbase (for now)
+   dbg("Original obj_main->relocbase %-#p", obj->relocbase);
+   assert(cheri_getbase(relocbase) <= cheri_getbase(obj->relocbase));
+   obj->relocbase = cheri_setoffset(relocbase,
+       cheri_getaddress(obj->relocbase) - cheri_getbase(relocbase));
+   obj->relocbase = cheri_csetbounds(obj->relocbase, obj->mapsize);
+   dbg("Fixed obj_main->relocbase %-#p", obj->relocbase);
+#endif
 
     obj->entry = entry;
     return obj;
