@@ -40,7 +40,9 @@ SRCS+=	\
 
 SRCS+= getdents.c lstat.c mknod.c stat.c
 
+.ifndef LIBCHERI
 SRCS+= brk.c
+.endif
 SRCS+= pipe.c
 SRCS+= vadvise.c
 

@@ -4,7 +4,7 @@ PACKAGE=			tests
 
 .include <bsd.own.mk>
 
-.if ${MACHINE_CPUARCH} != "aarch64" && ${MACHINE_CPUARCH} != "riscv"
+.if ${MACHINE_CPUARCH} != "aarch64" && ${MACHINE_CPUARCH} != "riscv" && !defined(LIBCHERI)
 ATF_TESTS_C+=			brk_test
 .endif
 ATF_TESTS_C+=			queue_test
