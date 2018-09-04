@@ -578,8 +578,6 @@ devclass_t	device_get_devclass(device_t dev);
 driver_t	*device_get_driver(device_t dev);
 u_int32_t	device_get_flags(device_t dev);
 device_t	device_get_parent(device_t dev);
-device_t	device_get_intr_parent(device_t dev);
-void	device_set_intr_parent(device_t dev, device_t intr_parent);
 int	device_get_children(device_t dev, device_t **listp, int *countp);
 void	*device_get_ivars(device_t dev);
 void	device_set_ivars(device_t dev, void *ivars);

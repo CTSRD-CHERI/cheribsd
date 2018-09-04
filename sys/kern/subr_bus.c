@@ -122,7 +122,6 @@ struct device {
 	TAILQ_ENTRY(device)	link;	/**< list of devices in parent */
 	TAILQ_ENTRY(device)	devlink; /**< global device list membership */
 	device_t	parent;		/**< parent of this device  */
-	device_t	intr_parent;	/**< interrupt parent of this device */
 	device_list_t	children;	/**< list of child devices */
 
 	/*
@@ -2268,24 +2267,6 @@ device_t
 device_get_parent(device_t dev)
 {
 	return (dev->parent);
-}
-
-/**
- * @brief Return the interrupt parent of a device
- */
-device_t
-device_get_intr_parent(device_t dev)
-{
-	return (dev->intr_parent);
-}
-
-/**
- * @brief Set the interrupt parent of a device
- */
-void
-device_set_intr_parent(device_t dev, device_t intr_parent)
-{
-	dev->intr_parent = intr_parent;
 }
 
 /**
@@ -5760,13 +5741,3 @@ DB_SHOW_ALL_COMMAND(devices, db_show_all_devices)
 	}
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "kiovec_t",
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
