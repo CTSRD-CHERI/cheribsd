@@ -116,7 +116,20 @@ ccache-print-options: .PHONY
 .endif	# exists(${CCACHE_BIN})
 .endif	# ${MK_CCACHE_BUILD} == "yes"
 
-.for cc X_ in CC $${_empty_var_} XCC X_
+_cc_vars=CC $${_empty_var_}
+.if !empty(_COMPILER_MK_WANT_CROSS_VARS)
+# Only the toplevel makefile needs to compute the X_COMPILER_* variables.
+# Skipping the computation of the unused X_COMPILER_* in the subdirectory
+# makefiles can save a noticeable amount of time when walking the whole source
+# tree (e.g. during make includes, etc.).
+_cc_vars+=XCC X_
+# Also get version information from CHERI_CC (if it is set)
+.ifdef CHERI_CC
+_cc_vars+=CHERI_CC CHERI_
+.endif
+.endif
+
+.for cc X_ in ${_cc_vars}
 .if ${cc} == "CC" || !empty(XCC)
 # Try to import COMPILER_TYPE and COMPILER_VERSION from parent make.
 # The value is only used/exported for the same environment that impacts
@@ -148,6 +161,15 @@ ${X_}COMPILER_TYPE= none
 ${X_}COMPILER_VERSION= 0
 ${X_}COMPILER_FREEBSD_VERSION= 0
 .elif !defined(${X_}COMPILER_TYPE) || !defined(${X_}COMPILER_VERSION)
+# Ensure that all values are cached when running the buildworld stages. While
+# this only amounts to one executing ${CC}, echo and awk this adds to quite a
+# lot of unccessary fork()+exec() when building world
+# walking the entire object tree
+.if !empty(COMPILER_MK_VARS_SHOULD_BE_SET)
+.error "${.CURDIR}: Rerunning ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. This value should be cached!"
+.else
+.info "${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION"
+.endif
 _v!=	${${cc}} --version || echo 0.0.0
 
 .if !defined(${X_}COMPILER_TYPE)
@@ -171,6 +193,11 @@ ${X_}COMPILER_VERSION!=echo "${_v:M[1-9].[0-9]*}" | awk -F. '{print $$1 * 10000 
 .undef _v
 .endif
 .if !defined(${X_}COMPILER_FREEBSD_VERSION)
+.if !empty(COMPILER_MK_VARS_SHOULD_BE_SET)
+.error "${.CURDIR}: Recomputing ${X_}COMPILER_FREEBSD_VERSION. This value should be cached!"
+.else
+.info "${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION"
+.endif
 ${X_}COMPILER_FREEBSD_VERSION!=	{ echo "__FreeBSD_cc_version" | ${${cc}} -E - 2>/dev/null || echo __FreeBSD_cc_version; } | sed -n '$$p'
 # If we get a literal "__FreeBSD_cc_version" back then the compiler
 # is a non-FreeBSD build that doesn't support it or some other error
