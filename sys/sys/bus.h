@@ -68,8 +68,8 @@ typedef enum device_state {
  */
 #define BUS_USER_BUFFER		(3*1024)
 struct u_device {
-	uintptr_t	dv_handle;
-	uintptr_t	dv_parent;
+	uint64_t		dv_handle;
+	uint64_t		dv_parent;
 	uint32_t	dv_devflags;		/**< @brief API Flags for device */
 	uint16_t	dv_flags;		/**< @brief flags for dev state */
 	device_state_t	dv_state;		/**< @brief State of attachment */
@@ -941,10 +941,10 @@ static __inline void varp ## _set_ ## var(device_t dev, type t)		\
 #endif /* !_SYS_BUS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20180904,
 //   "target_type": "header",
 //   "changes": [
-//     "platform"
+//     "pointer_size"
 //   ]
 // }
 // CHERI CHANGES END
