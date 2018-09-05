@@ -67,7 +67,7 @@ ${var}=	${${var}.${${X_}_ld_hash}}
 .if !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
 .error "${.CURDIR}: Rerunning ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!"
 .else
-.info "${.CURDIR}: Running ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION"
+# .info "${.CURDIR}: Running ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION"
 .endif
 _ld_version!=	(${${ld}} --version || echo none) | sed -n 1p
 .if ${_ld_version} == "none"
