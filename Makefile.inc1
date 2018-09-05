@@ -119,7 +119,11 @@ _COMPILER_MK_WANT_CROSS_VARS=yes
 # Avoiding unncessary cc --version calls can noticeable speed up walking over
 # the source tree (e.g. in the make includes step)
 COMPILER_MK_VARS_SHOULD_BE_SET=yes
+.if ${.TARGETS:N*buildenv}
+# It is fine to recompute the variables in the buildenv environment but otherwise
+# they should be set for all submakes,
 .export COMPILER_MK_VARS_SHOULD_BE_SET
+.endif
 
 # Check if there is a local compiler that can satisfy as an external compiler.
 # Which compiler is expected to be used?
