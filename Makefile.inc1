@@ -1321,7 +1321,7 @@ buildenv: .PHONY
 
 .if ${MK_CHERI} != "no"
 libcheribuildenvvars:
-	@echo ${LIBCHERIWMAKEENV:Q}
+	@echo ${LIBCHERIWMAKEENV:Q} ${.MAKE.EXPORTED:@v@$v=\"${$v}\"@}
 
 .if ${.TARGETS:Mlibcheribuildenv}
 .if ${.MAKEFLAGS:M-j}
