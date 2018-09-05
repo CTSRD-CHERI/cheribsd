@@ -64,6 +64,7 @@ static struct syscall_helper_data gssd_syscalls[] = {
 
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32_util.h>
+#include <compat/freebsd32/freebsd32_syscall.h>
 
 static struct syscall_helper_data gssd32_syscalls[] = {
 	SYSCALL32_INIT_HELPER_COMPAT(gssd_syscall),
