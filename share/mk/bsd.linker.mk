@@ -47,7 +47,9 @@ ${X_}_ld_hash:=	${${X_}_ld_hash:hash}
 _can_export=	yes
 .for var in ${_exported_vars}
 .if defined(${var}) && (!defined(${var}.${${X_}_ld_hash}) || ${${var}.${${X_}_ld_hash}} != ${${var}})
-# .info "Cannot import ${X_}LINKER variables since ${var} is different: ${${var}.${${X_}_ld_hash}} != ${${var}}"
+.if defined(${var}.${${X_}_ld_hash})
+.info "Cannot import ${X_}LINKER variables since cached ${var} is different: ${${var}.${${X_}_ld_hash}} != ${${var}}"
+.endif
 _can_export=	no
 .endif
 .endfor

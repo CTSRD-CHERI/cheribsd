@@ -138,10 +138,13 @@ _exported_vars=	${X_}COMPILER_TYPE ${X_}COMPILER_VERSION \
 		${X_}COMPILER_FREEBSD_VERSION
 ${X_}_cc_hash=	${${cc}}${MACHINE}${PATH}
 ${X_}_cc_hash:=	${${X_}_cc_hash:hash}
-# Only import if none of the vars are set somehow else.
+# Only import if none of the vars are set differently somehow else.
 _can_export=	yes
 .for var in ${_exported_vars}
-.if defined(${var})
+.if defined(${var}) && (!defined(${var}.${${X_}_cc_hash}) || ${${var}.${${X_}_cc_hash}} != ${${var}})
+.if defined(${var}.${${X_}_ld_hash})
+.info "Cannot import ${X_}LINKER variables since cached ${var} is different: ${${var}.${${X_}_cc_hash}} != ${${var}}"
+.endif
 _can_export=	no
 .endif
 .endfor
@@ -168,7 +171,7 @@ ${X_}COMPILER_FREEBSD_VERSION= 0
 .if !empty(COMPILER_MK_VARS_SHOULD_BE_SET)
 .error "${.CURDIR}: Rerunning ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. This value should be cached!"
 .else
-.info "${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION"
+.info "${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. ${cc}=${${cc}}"
 .endif
 _v!=	${${cc}} --version || echo 0.0.0
 
@@ -196,7 +199,7 @@ ${X_}COMPILER_VERSION!=echo "${_v:M[1-9].[0-9]*}" | awk -F. '{print $$1 * 10000 
 .if !empty(COMPILER_MK_VARS_SHOULD_BE_SET)
 .error "${.CURDIR}: Recomputing ${X_}COMPILER_FREEBSD_VERSION. This value should be cached!"
 .else
-.info "${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION"
+.info "${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION. ${cc}=${${cc}}"
 .endif
 ${X_}COMPILER_FREEBSD_VERSION!=	{ echo "__FreeBSD_cc_version" | ${${cc}} -E - 2>/dev/null || echo __FreeBSD_cc_version; } | sed -n '$$p'
 # If we get a literal "__FreeBSD_cc_version" back then the compiler
