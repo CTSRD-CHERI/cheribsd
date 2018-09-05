@@ -841,9 +841,11 @@ LIBCHERIWMAKEENV= \
 		PATH=${TMPPATH} \
 		LIBDIR=/usr/libcheri \
 		SHLIBDIR=/usr/libcheri \
-		TESTSBASE=${LIBCHERI_TESTSBASE}
+		TESTSBASE=${LIBCHERI_TESTSBASE} \
+		CC="${CHERI_CC}" \
+		LD=${CHERI_LD:U${XLD}}
 
-.ifdef CHERI_CC
+.if 0
 # FIXME: in LIBCHERIWMAKEENV we try to recompute the values...
 LIBCHERIWMAKEENV+=COMPILER_TYPE="${CHERI_COMPILER_TYPE}" \
 		COMPILER_FEATURES=" ${CHERI_COMPILER_FEATURES}" \
@@ -917,7 +919,7 @@ IMAKE_MTREE=	MTREE_CMD="mtree ${MTREEFLAGS}"
 
 # kernel stage
 KMAKEENV=	${WMAKEENV:NSYSROOT=*}
-KMAKE=		${KMAKEENV} ${MAKE} ${.MAKEFLAGS} ${KERNEL_FLAGS} KERNEL=${INSTKERNNAME}
+KMAKE=		${KMAKEENV} ${MAKE} ${.MAKEFLAGS} ${KERNEL_FLAGS} KERNEL=${INSTKERNNAME} _TOOLCHAIN_VARS_SHOULD_BE_SET=
 
 #
 # buildworld
@@ -1228,17 +1230,24 @@ buildcheri:
 	    ${_t}
 .endfor
 .endfor
+# Add one extra recursive make call here to avoid computing the bsd.compiler.mk values
+	${_+_}cd ${.CURDIR}; ${LIBCHERIWMAKE} -f Makefile.inc1 _buildcheri_impl
+
+_buildcheri_impl:
+	@echo CHERI_CC=${CHERI_CC}, CC=${CC}
+	@echo CHERI_COMPILER_TYPE=${CHERI_COMPILER_TYPE} COMPILER_TYPE=${COMPILER_TYPE}
+	@echo CHERI_COMPILER_VERSION=${CHERI_COMPILER_VERSION} COMPILER_VERSION=${COMPILER_VERSION}
 .for _lib in ${_cheri_libs}
 	${_+_}@${ECHODIR} "===> ${_lib} (obj,all,install)"; \
 		cd ${.CURDIR}/${_lib} && \
-		    if [ -z "${NO_OBJ}" ]; then ${LIBCHERIWMAKE} DIRPRFX=${_lib}/ obj; fi && \
-		    ${LIBCHERIWMAKE} MK_TESTS=no DIRPRFX=${_lib}/ all && \
-		    ${LIBCHERIWMAKE} MK_TESTS=no DIRPRFX=${_lib}/ install
+		    if [ -z "${NO_OBJ}" ]; then ${MAKE} DIRPRFX=${_lib}/ obj; fi && \
+		    ${MAKE} MK_TESTS=no DIRPRFX=${_lib}/ all && \
+		    ${MAKE} MK_TESTS=no DIRPRFX=${_lib}/ install
 .endfor
 .if ${MK_TESTS} == "yes"
 .for _lib in ${_cheri_test_libs}
 		cd ${.CURDIR}/${_lib} && \
-		    ${LIBCHERIWMAKE} DIRPRFX=${_lib}/ all
+		    ${MAKE} DIRPRFX=${_lib}/ all
 .endfor
 .endif
 
