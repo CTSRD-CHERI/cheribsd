@@ -89,19 +89,19 @@ MK_GCC_BOOTSTRAP=	no
 .if make(installworld) || make(installsysroot) || make(install) || \
     make(distributeworld) || make(stageworld)
 .-include "${OBJTOP}/compiler-metadata.mk"
-COMPILER_MK_VARS_SHOULD_BE_SET=yes
+_TOOLCHAIN_VARS_SHOULD_BE_SET=yes
 .else
 # Computing the variables is fine in the toplevel makefile:
-COMPILER_MK_VARS_SHOULD_BE_SET=
+_TOOLCHAIN_VARS_SHOULD_BE_SET=
 .endif
 
 # Pull in COMPILER_TYPE and COMPILER_FREEBSD_VERSION early. Pull it from the
 # tree to be friendlier to foreign OS builds. It's safe to do so unconditionally
 # here since we will always have the right make, unlike in src/Makefile
-# Also set _COMPILER_MK_WANT_CROSS_VARS to tell bsd.compiler that it should
+# Also set _WANT_TOOLCHAIN_CROSS_VARS to tell bsd.compiler that it should
 # populate the X_COMPILER_* variables if possible.
-.if empty(COMPILER_MK_VARS_SHOULD_BE_SET)
-_COMPILER_MK_WANT_CROSS_VARS=yes
+.if empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+_WANT_TOOLCHAIN_CROSS_VARS=yes
 .endif
 .include "share/mk/bsd.compiler.mk"
 .include "share/mk/src.opts.mk"
@@ -118,11 +118,11 @@ _COMPILER_MK_WANT_CROSS_VARS=yes
 # variable we can cause an error if bsd.compiler.mk has to invoke ${CC} again.
 # Avoiding unncessary cc --version calls can noticeable speed up walking over
 # the source tree (e.g. in the make includes step)
-COMPILER_MK_VARS_SHOULD_BE_SET=yes
+_TOOLCHAIN_VARS_SHOULD_BE_SET=yes
 .if ${.TARGETS:N*buildenv}
 # It is fine to recompute the variables in the buildenv environment but otherwise
 # they should be set for all submakes,
-.export COMPILER_MK_VARS_SHOULD_BE_SET
+.export _TOOLCHAIN_VARS_SHOULD_BE_SET
 .endif
 
 # Check if there is a local compiler that can satisfy as an external compiler.

@@ -25,7 +25,7 @@
 __<bsd.linker.mk>__:
 
 _ld_vars=LD $${_empty_var_}
-.if !empty(_COMPILER_MK_WANT_CROSS_VARS)
+.if !empty(_WANT_TOOLCHAIN_CROSS_VARS)
 # Only the toplevel makefile needs to compute the X_LINKER_* variables.
 # This avoids unncessary fork+exec calls in every subdir (see bsd.compiler.mk)
 _ld_vars+=XLD X_
@@ -64,7 +64,7 @@ ${var}=	${${var}.${${X_}_ld_hash}}
 .if ${ld} == "LD" || (${ld} == "XLD" && ${XLD} != ${LD})
 .if !defined(${X_}LINKER_TYPE) || !defined(${X_}LINKER_VERSION)
 # See bsd.compiler.mk
-.if !empty(COMPILER_MK_VARS_SHOULD_BE_SET)
+.if !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
 .error "${.CURDIR}: Rerunning ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!"
 .else
 .info "${.CURDIR}: Running ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION"
@@ -85,11 +85,6 @@ ${X_}LINKER_TYPE=	bfd
 _v=	2.17.50
 .endif
 # See bsd.compiler.mk
-.if !empty(COMPILER_MK_VARS_SHOULD_BE_SET)
-.error "${.CURDIR}: Rerunning echo ${_v:M[1-9].[0-9]*}" | awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;} to compute ${X_}LINKER_VERSION. This value should be cached!"
-.else
-.info "${.CURDIR}: Running echo ${_v:M[1-9].[0-9]*}" | awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;} to compute ${X_}LINKER_VERSION"
-.endif
 ${X_}LINKER_VERSION!=	echo "${_v:M[1-9].[0-9]*}" | \
 			  awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;}'
 .undef _ld_version
