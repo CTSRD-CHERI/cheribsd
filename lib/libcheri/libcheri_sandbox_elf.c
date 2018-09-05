@@ -557,7 +557,7 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 		/* XXXBD: ideally read would not be required for code. */
 		if (flags & SANDBOX_LOADELF_CODE)
 			prot &= PROT_READ | PROT_WRITE | PROT_EXEC;
-		if (flags & SANDBOX_LOADELF_DATA)
+		else if (flags & SANDBOX_LOADELF_DATA)
 			prot &= PROT_READ | PROT_WRITE;
 
 		taddr = rounddown2((phdr_member(p_vaddr)), PAGE_SIZE);
