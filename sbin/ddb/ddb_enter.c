@@ -46,7 +46,7 @@ __FBSDID("$FreeBSD$");
 #define	SYSCTL_ENTER	"debug.kdb.enter"
 
 void
-ddb_enter(int argc, char *argv[])
+ddb_enter(int argc, char *argv[] __unused)
 {
 	int one;
 
