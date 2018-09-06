@@ -45,6 +45,8 @@
 #ifndef _SYS_MDIOCTL_H_
 #define _SYS_MDIOCTL_H_
 
+#include <sys/_uio.h>
+
 enum md_types {MD_MALLOC, MD_PRELOAD, MD_VNODE, MD_SWAP, MD_NULL};
 
 /*
