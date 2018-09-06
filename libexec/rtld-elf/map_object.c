@@ -307,6 +307,14 @@ map_object(int fd, const char *path, const struct stat *sb)
     obj->textsize = round_page(segs[0]->p_vaddr + segs[0]->p_memsz) -
       base_vaddr;
     obj->vaddrbase = base_vaddr;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+    if (obj->vaddrbase != 0) {
+	_rtld_error("%s: nonzero vaddrbase %zd not supported for CheriABI",
+	    path, obj->vaddrbase);
+	goto error1;
+    }
+#endif
     obj->relocbase = mapbase - base_vaddr;
     obj->dynamic = (const Elf_Dyn *) (obj->relocbase + phdyn->p_vaddr);
     if (hdr->e_entry != 0)
