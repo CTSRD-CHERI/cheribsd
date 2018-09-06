@@ -2,6 +2,7 @@
 
 CHERI_NO_SHARED=	faults during test runs
 
+CONFS=	crontab
 PROG=	cron
 MAN=	cron.8
 SRCS=	cron.c database.c do_command.c job.c user.c popen.c
