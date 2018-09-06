@@ -77,8 +77,11 @@ SYMBOL_MAPS+=	${.CURDIR}/${RTLD_ARCH}/Symbol.map
 
 .PATH: ${.CURDIR}/${RTLD_ARCH} ${.CURDIR}/../rtld-elf/${RTLD_ARCH}
 
+
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
+
 .include <bsd.prog.mk>
 ${PROG_FULL}:	${VERSION_MAP}
 .include <bsd.symver.mk>
-
 #CFLAGS:=	${CFLAGS} -O0
