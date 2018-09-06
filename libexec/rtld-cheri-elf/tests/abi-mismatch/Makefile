@@ -10,6 +10,6 @@ SUBDIR+=	basic_nocheri_lib basic_hybrid_lib basic_purecap_lib
 #CFLAGS.option-domain-search_test+=	-I${.CURDIR:H}
 #LIBADD.option-domain-search_test=	util
 
-TESTS_SUBDIRS+=	dlopen-hybrid
+TESTS_SUBDIRS+=	dlopen-hybrid dlopen-purecap
 
 .include <bsd.test.mk>

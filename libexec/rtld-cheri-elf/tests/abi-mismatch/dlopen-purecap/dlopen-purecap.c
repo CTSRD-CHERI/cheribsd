@@ -31,61 +31,67 @@
  */
 #include "../utils.h"
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#error "This should be a hybrid binary"
-#endif
-#if !__has_feature(capabilities)
-#error "This should be a hybrid binary"
+#ifndef __CHERI_PURE_CAPABILITY__
+#error "This should be a purecap binary"
 #endif
 
-ATF_TC(dlopen_purecap_fail);
-ATF_TC_HEAD(dlopen_purecap_fail, tc)
+
+ATF_TC(dlopen_purecap);
+ATF_TC_HEAD(dlopen_purecap, tc)
 {
 	atf_tc_set_md_var(tc, "descr",
-	    "Check that opening a purecap library from a hybrid binary fails");
+	    "Check that we can dlopen() a purecap library from a purecap binary");
 }
-ATF_TC_BODY(dlopen_purecap_fail, tc)
+ATF_TC_BODY(dlopen_purecap, tc)
+{
+	test_dlopen_success("libbasic_purecap.so.0", "purecap", true);
+}
+
+ATF_TC(dlopen_hybrid_fail);
+ATF_TC_HEAD(dlopen_hybrid_fail, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "Check that dlopen() of a hybrid library from a purecap binary fails");
+}
+ATF_TC_BODY(dlopen_hybrid_fail, tc)
 {
 	char error_msg[PATH_MAX];
 	const char* exedir = get_executable_dir();
 #ifdef __mips__
 	snprintf(error_msg, sizeof(error_msg),
-	    "%s/%s: cannot load %s/../%s since it is CheriABI",
-	    exedir, "dlopen-hybrid", exedir, "libbasic_purecap.so.0");
+	    "%s/%s: cannot load %s/../%s since it is not CheriABI (e_flags=0x30c10007)",
+	    exedir, "dlopen-purecap", exedir, "libbasic_hybrid.so.0");
 #else
 #error "Error message wrong for non-MIPS"
 #endif
-	test_dlopen_failure("libbasic_purecap.so.0", error_msg);
+	test_dlopen_failure("libbasic_hybrid.so.0", error_msg);
 }
 
-ATF_TC(dlopen_hybrid);
-ATF_TC_HEAD(dlopen_hybrid, tc)
+ATF_TC(dlopen_nocheri_fail);
+ATF_TC_HEAD(dlopen_nocheri_fail, tc)
 {
 	atf_tc_set_md_var(tc, "descr",
-	    "Check that we can dlopen() a hybrid library from a hybrid binary");
+	    "Check that dlopen() of a non-CHERI library from a purecap binary fails");
 }
-ATF_TC_BODY(dlopen_hybrid, tc)
+ATF_TC_BODY(dlopen_nocheri_fail, tc)
 {
-	// TODO: test that we can get a capability back
-	test_dlopen_success("libbasic_hybrid.so.0", "hybrid", true);
-}
+	char error_msg[PATH_MAX];
+	const char* exedir = get_executable_dir();
 
-ATF_TC(dlopen_nocheri);
-ATF_TC_HEAD(dlopen_nocheri, tc)
-{
-	atf_tc_set_md_var(tc, "descr",
-	    "Check that we can dlopen() a non-CHERI library from a hybrid binary");
+#ifdef __mips__
+	snprintf(error_msg, sizeof(error_msg),
+	    "%s/%s: cannot load %s/../%s since it is not CHERI-" __XSTRING(_MIPS_SZCAP)
+	    " (e_flags=0x30000007)", exedir, "dlopen-purecap", exedir, "libbasic_nocheri.so.0");
+#else
+#error "Error message wrong for non-MIPS"
+#endif
+	test_dlopen_failure("libbasic_nocheri.so.0", error_msg);
 }
-ATF_TC_BODY(dlopen_nocheri, tc)
-{
-	test_dlopen_success("libbasic_nocheri.so.0", "not CHERI", true);
-}
-
 
 ATF_TP_ADD_TCS(tp)
 {
-	ATF_TP_ADD_TC(tp, dlopen_purecap_fail);
-	ATF_TP_ADD_TC(tp, dlopen_hybrid);
-	ATF_TP_ADD_TC(tp, dlopen_nocheri);
+	ATF_TP_ADD_TC(tp, dlopen_purecap);
+	ATF_TP_ADD_TC(tp, dlopen_hybrid_fail);
+	ATF_TP_ADD_TC(tp, dlopen_nocheri_fail);
 	return atf_no_error();
 }

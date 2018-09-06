@@ -68,7 +68,7 @@ get_executable_dir(void)
 } while (0)
 #define CHECK_DLERROR_STREQ(msg)	do { \
 	const char* error = dlerror(); \
-	ATF_CHECK_STREQ_MSG(error, msg, "Unexpected dlerror() %s != %s", error, msg); \
+	ATF_CHECK_STREQ(error, msg); \
 } while (0)
 
 static void*
@@ -76,7 +76,7 @@ test_dlopen_success(const char* lib, const char* expected_value, bool do_close)
 {
 	const char* exedir = get_executable_dir();
 	char libpath[PATH_MAX];
-	snprintf(libpath, sizeof(libpath), "%s/%s", exedir, lib);
+	snprintf(libpath, sizeof(libpath), "%s/../%s", exedir, lib);
 	printf("Loading library %s\n", libpath);
 	ATF_REQUIRE_MSG(access(libpath, F_OK) == 0, "%s doesn't exist", libpath);
 
@@ -106,4 +106,24 @@ test_dlopen_success(const char* lib, const char* expected_value, bool do_close)
 		return NULL;
 	}
 	return handle;
+}
+
+static void
+test_dlopen_failure(const char* lib, const char* error_message)
+{
+	const char* exedir = get_executable_dir();
+	char libpath[PATH_MAX];
+	snprintf(libpath, sizeof(libpath), "%s/../%s", exedir, lib);
+	printf("libpath = %s\n", libpath);
+	ATF_REQUIRE_MSG(access(libpath, F_OK) == 0, "%s doesn't exist", libpath);
+
+	// Check that noload doesn't pull it in (and doesn't give an error)
+	void* handle = dlopen(libpath, RTLD_LAZY | RTLD_NOLOAD);
+	ATF_CHECK_MSG(handle == NULL, "RTLD_NOLOAD loaded %s", libpath);
+	CHECK_DLERROR_NULL();
+
+	// Now check that we get an error on dlopen()
+	handle = dlopen(libpath, RTLD_LAZY);
+	CHECK_DLERROR_STREQ(error_message);
+	ATF_REQUIRE_MSG(handle == NULL, "Should not be able to load wrong ABI lib");
 }
