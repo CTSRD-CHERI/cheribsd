@@ -590,7 +590,7 @@ mac_veriexec_init(struct mac_policy_conf *mpc __unused)
  * @return 0 on success, otherwise an error code.
  */
 static int
-mac_veriexec_syscall(struct thread *td, int call, void *arg)
+mac_veriexec_syscall(struct thread *td, int call, void * __capability arg)
 {
 	struct image_params img;
 	struct nameidata nd;
@@ -645,7 +645,7 @@ cleanup_file:
 		break;
 	case MAC_VERIEXEC_CHECK_PATH_SYSCALL:
 		/* Look up the path to get the vnode */
-		NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1,
+		NDINIT_C(&nd, LOOKUP, FOLLOW | LOCKLEAF | AUDITVNODE1,
 		    UIO_USERSPACE, arg, td);
 		error = namei(&nd);
 		if (error != 0)
@@ -801,3 +801,11 @@ mac_veriexec_proc_is_trusted(struct ucred *cred, struct proc *p)
 	/* Check that the trusted flag is set */
 	return ((flags & VERIEXEC_TRUSTED) == VERIEXEC_TRUSTED);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180906,
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END
