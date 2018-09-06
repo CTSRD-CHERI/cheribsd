@@ -3693,7 +3693,9 @@ coredump(struct thread *td)
 	 */
 	if (name[0] != '/') {
 		fullpath = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-		if (kern___getcwd(td, fullpath, UIO_SYSSPACE, MAXPATHLEN, MAXPATHLEN) != 0) {
+		if (kern___getcwd(td,
+		    (__cheri_tocap char * __capability)fullpath,
+		    UIO_SYSSPACE, MAXPATHLEN, MAXPATHLEN) != 0) {
 			free(fullpath, M_TEMP);
 			goto out2;
 		}
