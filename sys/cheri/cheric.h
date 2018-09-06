@@ -309,7 +309,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
  * See https://github.com/CTSRD-CHERI/clang/issues/189
  */
 #define cheri_get_low_ptr_bits(ptr, mask)                                      \
-  __cheri_get_low_ptr_bits(ptr, __static_assert_sensible_low_bits(mask))
+  __cheri_get_low_ptr_bits((uintptr_t)(ptr), __static_assert_sensible_low_bits(mask))
 
 /*
  * Set low bits in a uintptr_t
@@ -325,7 +325,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
  * compile-time constant.
  */
 #define cheri_set_low_ptr_bits(ptr, bits)                                      \
-  __cheri_set_low_ptr_bits(ptr, __runtime_assert_sensible_low_bits(bits))
+  __cheri_set_low_ptr_bits((uintptr_t)(ptr), __runtime_assert_sensible_low_bits(bits))
 
 /*
  * Clear the bits in @p mask from the capability/pointer @p ptr. Mask must be
@@ -346,7 +346,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
  *
  */
 #define cheri_clear_low_ptr_bits(ptr, mask)                                    \
-  __cheri_clear_low_ptr_bits(ptr, __static_assert_sensible_low_bits(mask))
+  __cheri_clear_low_ptr_bits((uintptr_t)(ptr), __static_assert_sensible_low_bits(mask))
 
 #include <machine/cheric.h>
 
