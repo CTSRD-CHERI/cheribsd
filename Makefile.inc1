@@ -87,15 +87,43 @@ MK_GCC_BOOTSTRAP=	no
 # Pull in compiler metadata from buildworld/toolchain if possible to avoid
 # running CC from bsd.compiler.mk.
 .if make(installworld) || make(installsysroot) || make(install) || \
-    make(distributeworld) || make(stageworld)
+    make(distributeworld) || make(stageworld) || make(distribution)
 .-include "${OBJTOP}/compiler-metadata.mk"
+_TOOLCHAIN_VARS_SHOULD_BE_SET=yes
+.else
+# Computing the variables is fine in the toplevel makefile:
+_TOOLCHAIN_VARS_SHOULD_BE_SET=
 .endif
 
 # Pull in COMPILER_TYPE and COMPILER_FREEBSD_VERSION early. Pull it from the
 # tree to be friendlier to foreign OS builds. It's safe to do so unconditionally
 # here since we will always have the right make, unlike in src/Makefile
+# Also set _WANT_TOOLCHAIN_CROSS_VARS to tell bsd.compiler that it should
+# populate the X_COMPILER_* variables if possible.
+.if empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+_WANT_TOOLCHAIN_CROSS_VARS=yes
+.endif
 .include "share/mk/bsd.compiler.mk"
 .include "share/mk/src.opts.mk"
+# .info CC=${CC} LD=${LD} COMPILER_VERSION=${COMPILER_VERSION} COMPILER_TYPE=${COMPILER_TYPE} \
+#		COMPILER_FEATURES="${COMPILER_FEATURES}" COMPILER_FREEBSD_VERSION=${COMPILER_FREEBSD_VERSION} \
+#		LINKER_VERSION="${LINKER_VERSION}" LINKER_TYPE="${LINKER_TYPE}" \
+#		LINKER_FEATURES="${LINKER_FEATURES}"
+#.info XCC=${XCC} XLD=${XLD} X_COMPILER_VERSION=${X_COMPILER_VERSION} X_COMPILER_TYPE=${X_COMPILER_TYPE} \
+#		X_COMPILER_FEATURES="${X_COMPILER_FEATURES}" X_COMPILER_FREEBSD_VERSION=${X_COMPILER_FREEBSD_VERSION} \
+#		X_LINKER_VERSION="${X_LINKER_VERSION}" X_LINKER_TYPE="${X_LINKER_TYPE}" \
+#		X_LINKER_FEATURES="${X_LINKER_FEATURES}"
+
+# All sub-makes should have valid COMPILER_* variables so by setting this
+# variable we can cause an error if bsd.compiler.mk has to invoke ${CC} again.
+# Avoiding unncessary cc --version calls can noticeable speed up walking over
+# the source tree (e.g. in the make includes step)
+_TOOLCHAIN_VARS_SHOULD_BE_SET=yes
+.if ${.TARGETS:N*buildenv:N*kernel*}
+# It is fine to recompute the variables in the kernel and buildenv environment
+# but otherwise they should be set for all submakes,
+.export _TOOLCHAIN_VARS_SHOULD_BE_SET
+.endif
 
 # Check if there is a local compiler that can satisfy as an external compiler.
 # Which compiler is expected to be used?
@@ -169,17 +197,23 @@ test-system-compiler: .PHONY
 # For installworld need to ensure that the looked-up compiler metadata is
 # passed along rather than trying to run cc from the restricted
 # STRICTTMPPATH.
-.if ${MK_CLANG_BOOTSTRAP} == "no" && ${MK_GCC_BOOTSTRAP} == "no"
+.if ${MK_CLANG_BOOTSTRAP} == "no" && ${MK_GCC_BOOTSTRAP} == "no" && 0
 .if !defined(X_COMPILER_TYPE)
 CROSSENV+=	COMPILER_VERSION=${COMPILER_VERSION} \
 		COMPILER_TYPE=${COMPILER_TYPE} \
 		COMPILER_FEATURES="${COMPILER_FEATURES}" \
-		COMPILER_FREEBSD_VERSION=${COMPILER_FREEBSD_VERSION}
+		COMPILER_FREEBSD_VERSION=${COMPILER_FREEBSD_VERSION} \
+		LINKER_VERSION="${LINKER_VERSION}" \
+		LINKER_TYPE="${LINKER_TYPE}" \
+		LINKER_FEATURES="${LINKER_FEATURES}"
 .else
 CROSSENV+=	COMPILER_VERSION=${X_COMPILER_VERSION} \
 		COMPILER_FEATURES="${X_COMPILER_FEATURES}" \
 		COMPILER_TYPE=${X_COMPILER_TYPE} \
-		COMPILER_FREEBSD_VERSION=${X_COMPILER_FREEBSD_VERSION}
+		COMPILER_FREEBSD_VERSION=${X_COMPILER_FREEBSD_VERSION} \
+		LINKER_VERSION="${X_LINKER_VERSION}" \
+		LINKER_TYPE="${X_LINKER_TYPE}" \
+		LINKER_FEATURES="${X_LINKER_FEATURES}"
 .endif
 .endif
 # Store some compiler metadata for use in installworld where we don't
@@ -579,6 +613,7 @@ BMAKEENV=	INSTALL="sh ${.CURDIR}/tools/install.sh" \
 		PATH=${BPATH}:${PATH} \
 		WORLDTMP=${WORLDTMP} \
 		MAKEFLAGS="-m ${.CURDIR}/tools/build/mk ${.MAKEFLAGS}"
+
 # need to keep this in sync with targets/pseudo/bootstrap-tools/Makefile
 BSARGS= 	DESTDIR= \
 		OBJTOP='${WORLDTMP}/obj-tools' \
@@ -625,7 +660,9 @@ XMAKE=		${BMAKE} \
 # kernel-tools stage
 KTMAKEENV=	INSTALL="sh ${.CURDIR}/tools/install.sh" \
 		PATH=${BPATH}:${PATH} \
-		WORLDTMP=${WORLDTMP}
+		WORLDTMP=${WORLDTMP} \
+		MAKEFLAGS="-m ${.CURDIR}/tools/build/mk ${.MAKEFLAGS}"
+
 KTMAKE=		TOOLS_PREFIX=${WORLDTMP} \
 		${KTMAKEENV} ${MAKE} ${WORLD_FLAGS} -f Makefile.inc1 \
 		DESTDIR= \
@@ -794,7 +831,6 @@ LIBCHERI_TESTSBASE=	${TESTSBASE}/cheri
 # Yes, the flags are redundant.
 LIBCHERIWMAKEENV= \
 		NEED_CHERI=pure \
-		COMPILER_TYPE=clang \
 		LIBCHERI=yes \
 		MK_PROFILE=no \
 		SYSROOT=${WORLDTMP} \
@@ -805,7 +841,10 @@ LIBCHERIWMAKEENV= \
 		PATH=${TMPPATH} \
 		LIBDIR=/usr/libcheri \
 		SHLIBDIR=/usr/libcheri \
-		TESTSBASE=${LIBCHERI_TESTSBASE}
+		TESTSBASE=${LIBCHERI_TESTSBASE} \
+		CC="${CHERI_CC}" \
+		LD=${CHERI_LD:U${XLD}}
+
 LIBCHERIWMAKEENV+=	MACHINE=mips MACHINE_ARCH=mips64
 LIBCHERIWMAKEFLAGS= \
 		DESTDIR=${WORLDTMP} \
@@ -1174,17 +1213,24 @@ buildcheri:
 	    ${_t}
 .endfor
 .endfor
+# Add one extra recursive make call here to avoid computing the bsd.compiler.mk values
+	${_+_}cd ${.CURDIR}; ${LIBCHERIWMAKE} -f Makefile.inc1 _buildcheri_impl
+
+_buildcheri_impl:
+	@echo CHERI_CC=${CHERI_CC}, CC=${CC}
+	@echo CHERI_COMPILER_TYPE=${CHERI_COMPILER_TYPE} COMPILER_TYPE=${COMPILER_TYPE}
+	@echo CHERI_COMPILER_VERSION=${CHERI_COMPILER_VERSION} COMPILER_VERSION=${COMPILER_VERSION}
 .for _lib in ${_cheri_libs}
 	${_+_}@${ECHODIR} "===> ${_lib} (obj,all,install)"; \
 		cd ${.CURDIR}/${_lib} && \
-		    if [ -z "${NO_OBJ}" ]; then ${LIBCHERIWMAKE} DIRPRFX=${_lib}/ obj; fi && \
-		    ${LIBCHERIWMAKE} MK_TESTS=no DIRPRFX=${_lib}/ all && \
-		    ${LIBCHERIWMAKE} MK_TESTS=no DIRPRFX=${_lib}/ install
+		    if [ -z "${NO_OBJ}" ]; then ${MAKE} DIRPRFX=${_lib}/ obj; fi && \
+		    ${MAKE} MK_TESTS=no DIRPRFX=${_lib}/ all && \
+		    ${MAKE} MK_TESTS=no DIRPRFX=${_lib}/ install
 .endfor
 .if ${MK_TESTS} == "yes"
 .for _lib in ${_cheri_test_libs}
 		cd ${.CURDIR}/${_lib} && \
-		    ${LIBCHERIWMAKE} DIRPRFX=${_lib}/ all
+		    ${MAKE} DIRPRFX=${_lib}/ all
 .endfor
 .endif
 
@@ -1267,7 +1313,7 @@ buildenv: .PHONY
 
 .if ${MK_CHERI} != "no"
 libcheribuildenvvars:
-	@echo ${LIBCHERIWMAKEENV:Q}
+	@echo ${LIBCHERIWMAKEENV:Q} ${.MAKE.EXPORTED:@v@$v=\"${$v}\"@}
 
 .if ${.TARGETS:Mlibcheribuildenv}
 .if ${.MAKEFLAGS:M-j}

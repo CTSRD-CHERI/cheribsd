@@ -24,7 +24,18 @@
 .if !target(__<bsd.linker.mk>__)
 __<bsd.linker.mk>__:
 
-.for ld X_ in LD $${_empty_var_} XLD X_
+_ld_vars=LD $${_empty_var_}
+.if !empty(_WANT_TOOLCHAIN_CROSS_VARS)
+# Only the toplevel makefile needs to compute the X_LINKER_* variables.
+# This avoids unncessary fork+exec calls in every subdir (see bsd.compiler.mk)
+_ld_vars+=XLD X_
+# Also get version information from CHERI_LD (if it is set)
+.ifdef CHERI_LD
+_ld_vars+=CHERI_LD CHERI_
+.endif
+.endif
+
+.for ld X_ in ${_ld_vars}
 .if ${ld} == "LD" || !empty(XLD)
 # Try to import LINKER_TYPE and LINKER_VERSION from parent make.
 # The value is only used/exported for the same environment that impacts
@@ -32,10 +43,13 @@ __<bsd.linker.mk>__:
 _exported_vars=	${X_}LINKER_TYPE ${X_}LINKER_VERSION ${X_}LINKER_FEATURES
 ${X_}_ld_hash=	${${ld}}${MACHINE}${PATH}
 ${X_}_ld_hash:=	${${X_}_ld_hash:hash}
-# Only import if none of the vars are set somehow else.
+# Only import if none of the vars are set differntly somehow else.
 _can_export=	yes
 .for var in ${_exported_vars}
-.if defined(${var})
+.if defined(${var}) && (!defined(${var}.${${X_}_ld_hash}) || ${${var}.${${X_}_ld_hash}} != ${${var}})
+.if defined(${var}.${${X_}_ld_hash})
+.info "Cannot import ${X_}LINKER variables since cached ${var} is different: ${${var}.${${X_}_ld_hash}} != ${${var}}"
+.endif
 _can_export=	no
 .endif
 .endfor
@@ -49,6 +63,12 @@ ${var}=	${${var}.${${X_}_ld_hash}}
 
 .if ${ld} == "LD" || (${ld} == "XLD" && ${XLD} != ${LD})
 .if !defined(${X_}LINKER_TYPE) || !defined(${X_}LINKER_VERSION)
+# See bsd.compiler.mk
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+.error "${.CURDIR}: Rerunning ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!"
+.else
+# .info "${.CURDIR}: Running ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION"
+.endif
 _ld_version!=	(${${ld}} --version || echo none) | sed -n 1p
 .if ${_ld_version} == "none"
 .warning Unable to determine linker type from ${ld}=${${ld}}
@@ -64,6 +84,7 @@ _v=	${_ld_version:[2]}
 ${X_}LINKER_TYPE=	bfd
 _v=	2.17.50
 .endif
+# See bsd.compiler.mk
 ${X_}LINKER_VERSION!=	echo "${_v:M[1-9].[0-9]*}" | \
 			  awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;}'
 .undef _ld_version
