@@ -109,7 +109,8 @@ vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
 	return (const char*)text + (code_addr - cheri_getbase(text));
 }
 
-#define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path);
+// ignore _init/_fini
+#define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
 
 #define call_init_array_pointer(obj, target)			\
 	(((InitArrFunc)(vaddr_to_code_pointer(obj, (target))))	\
@@ -175,5 +176,32 @@ reloc_jmpslot(Elf_Addr *where __unused, Elf_Addr target, const Obj_Entry *defobj
 	_rtld_error("%s: not implemented!", __func__);
 	return (target);
 }
+
+// Validating e_flags:
+#if _MIPS_SZCAP == 128
+#define _RTLD_EXPECTED_MIPS_MACH EF_MIPS_MACH_CHERI128
+#else
+static_assert(_MIPS_SZCAP == 256, "CHERI bits != 256?")
+#define _RTLD_EXPECTED_MIPS_MACH EF_MIPS_MACH_CHERI256
+#endif
+
+#define rtld_validate_target_eflags(path, hdr, main_path)	\
+	_rtld_validate_target_eflags(path, hdr, main_path)
+static inline bool
+_rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_path)
+{
+	if ((hdr->e_flags & EF_MIPS_MACH) != _RTLD_EXPECTED_MIPS_MACH) {
+		_rtld_error("%s: cannot load %s since it is not CHERI-" __XSTRING(_MIPS_SZCAP)
+		    " (e_flags=0x%zx)", main_path, path, (size_t)hdr->e_flags);
+		return false;
+	}
+	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI) {
+		_rtld_error("%s: cannot load %s since it is not CheriABI"
+		    " (e_flags=0x%zx)", main_path, path, (size_t)hdr->e_flags);
+		return false;
+	}
+	return true;
+}
+
 
 #endif

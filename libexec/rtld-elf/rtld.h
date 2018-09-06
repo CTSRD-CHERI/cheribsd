@@ -384,7 +384,7 @@ void rtld_die(void) __dead2;
 #define rtld_fatal(args...)	do { _rtld_error(args); rtld_die(); } while (0)
 #define rtld_require(cond, args...) if (!(cond)) { rtld_fatal(args); }
 const char *rtld_strerror(int);
-Obj_Entry *map_object(int, const char *, const struct stat *);
+Obj_Entry *map_object(int, const char *, const struct stat *, const char *);
 void *xcalloc(size_t, size_t);
 void *xmalloc(size_t);
 char *xstrdup(const char *);

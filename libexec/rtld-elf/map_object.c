@@ -52,7 +52,7 @@
 #include "debug.h"
 #include "rtld.h"
 
-static Elf_Ehdr *get_elf_header(int, const char *, const struct stat *);
+static Elf_Ehdr *get_elf_header(int, const char *, const struct stat *, const char*);
 static int convert_flags(int); /* Elf flags -> mmap flags */
 
 int __getosreldate(void);
@@ -66,7 +66,7 @@ int __getosreldate(void);
  * for the shared object.  Returns NULL on failure.
  */
 Obj_Entry *
-map_object(int fd, const char *path, const struct stat *sb)
+map_object(int fd, const char *path, const struct stat *sb, const char* main_path)
 {
     Obj_Entry *obj;
     Elf_Ehdr *hdr;
@@ -106,7 +106,7 @@ map_object(int fd, const char *path, const struct stat *sb)
     char *note_map;
     size_t note_map_len;
 
-    hdr = get_elf_header(fd, path, sb);
+    hdr = get_elf_header(fd, path, sb, main_path);
     if (hdr == NULL)
 	return (NULL);
 
@@ -362,7 +362,7 @@ error:
 }
 
 static Elf_Ehdr *
-get_elf_header(int fd, const char *path, const struct stat *sbp)
+get_elf_header(int fd, const char *path, const struct stat *sbp, const char* main_path)
 {
 	Elf_Ehdr *hdr;
 
@@ -403,17 +403,10 @@ get_elf_header(int fd, const char *path, const struct stat *sbp)
 		goto error;
 	}
 
-	/*
-	 * XXX: No checks are performed on e_flags.  This permits loading
-	 * "plain" MIPS shared libraries with CHERI binaries or mixing
-	 * 128-bit and 256-bit.  At some point, e_flags validation should
-	 * be added.
-	 */
 #ifndef rtld_validate_target_eflags
-#define rtld_validate_target_eflags(hdr) true
+#define rtld_validate_target_eflags(path, hdr, main_path) true
 #endif
-	if (!rtld_validate_target_eflags(hdr)) {
-		_rtld_error("%s: unsupported e_flags", path);
+	if (!rtld_validate_target_eflags(path, hdr, main_path)) {
 		goto error;
 	}
 
