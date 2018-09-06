@@ -181,7 +181,7 @@ reloc_jmpslot(Elf_Addr *where __unused, Elf_Addr target, const Obj_Entry *defobj
 #if _MIPS_SZCAP == 128
 #define _RTLD_EXPECTED_MIPS_MACH EF_MIPS_MACH_CHERI128
 #else
-static_assert(_MIPS_SZCAP == 256, "CHERI bits != 256?")
+static_assert(_MIPS_SZCAP == 256, "CHERI bits != 256?");
 #define _RTLD_EXPECTED_MIPS_MACH EF_MIPS_MACH_CHERI256
 #endif
 
