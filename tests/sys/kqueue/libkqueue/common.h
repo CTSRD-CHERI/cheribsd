@@ -57,7 +57,7 @@ kevent_add(int kqfd, struct kevent *kev,
         short     filter,
         u_short   flags,
         u_int     fflags,
-        intptr_t  data,
+        int64_t   data,
         void      *udata);
 
 /* DEPRECATED: */
