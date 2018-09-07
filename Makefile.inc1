@@ -1260,6 +1260,9 @@ _cheri_libs+=lib/libsqlite3
 .if ${MK_KERBEROS} != "no"
 _cheri_libs+=kerberos5/lib/libhdb
 .endif
+.if ${MK_OFED} != "no"
+_cheri_libs+=lib/ofed/libibverbs lib/ofed/libibumad lib/ofed/libibmad lib/ofed/complib lib/ofed/libmlx5
+.endif
 _cheri_libs+=usr.bin/lex/lib lib/libcxxrt lib/libc++ lib ${LOCAL_LIB_DIRS}
 .if ${MK_CDDL} != "no"
 _cheri_libs+=cddl/lib
