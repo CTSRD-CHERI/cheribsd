@@ -142,8 +142,9 @@ int sys_read_uint(const char *dir_name, const char *file_name, unsigned *u)
 }
 
 #define	DIRECTSIZ(namlen)						\
-	(((uintptr_t)&((struct dirent *)0)->d_name +			\
-	((namlen)+1)*sizeof(((struct dirent *)0)->d_name[0]) + 3) & ~3)
+	__builtin_align_up(						\
+	((uintptr_t)&((struct dirent *)0)->d_name +			\
+	((namlen)+1)*sizeof(((struct dirent *)0)->d_name[0])), 4)
 
 int
 sys_scandir(const char *dirname, struct dirent ***namelist,
@@ -264,3 +265,11 @@ errout:
 	free(names);
 	return (-err);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180907,
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END
