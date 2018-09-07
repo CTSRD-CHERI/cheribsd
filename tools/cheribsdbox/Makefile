@@ -298,6 +298,7 @@ CRUNCH_ALIAS_less= more
 CRUNCH_SRCDIRS+= usr.sbin
 CRUNCH_PROGS_usr.sbin+= \
 		chown \
+		devctl \
 		devinfo \
 		diskinfo \
 		iostat \
@@ -318,6 +319,9 @@ CRUNCH_PROGS_usr.sbin+= \
 # Also build mount_smb for QEMU user-mode smb shares:
 CRUNCH_PROGS_usr.sbin+=	mount_smbfs
 CRUNCH_LIBS+=	-lsmb
+
+# required for devctl
+CRUNCH_LIBS+=	-ldevctl
 
 # Build mtree as well:
 CRUNCH_PROGS_usr.sbin+=	nmtree
