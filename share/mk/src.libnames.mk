@@ -542,19 +542,6 @@ LIBUUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libuutil
 LIBZFSDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs
 LIBZFS_COREDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs_core
 LIBZPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libzpool
-LIBCXGB4DIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libcxgb4
-LIBIBCMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibcm
-LIBIBCOMMONDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibcommon
-LIBIBMADDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibmad
-LIBIBUMADDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibumad
-LIBIBVERBSDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibverbs
-LIBMLX4DIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libmlx4
-LIBMTHCADIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libmthca
-LIBOPENSMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libopensm
-LIBOSMCOMPDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libosmcomp
-LIBOSMVENDORDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libosmvendor
-LIBRDMACMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/librdmacm
-LIBIBSDPDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libsdp
 
 # OFED support
 LIBCXGB4DIR=	${_LIB_OBJTOP}/lib/ofed/libcxgb4
