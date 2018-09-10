@@ -129,7 +129,11 @@ _start(void *auxv,
 	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
 	 * first place, but we currently rely on it for crt_init_globals.
 	 */
+#ifdef __CHERI_CAPABILITY_TABLE__
 	__asm__ __volatile__ ("csetdefault %0" : : "C" (NULL));
+#else
+#pragma message("Not clearing $ddc since it is required for the legacy ABI")
+#endif
 
 	__auxargs = auxv;
 	/* Digest the auxiliary vector. */
