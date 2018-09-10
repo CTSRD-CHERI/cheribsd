@@ -826,8 +826,15 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 */
 	/* XXXAR: is there a better way to check for dynamic binaries? */
 	is_dynamic_binary = imgp->reloc_base != 0;
-	data_length = is_dynamic_binary ?
-	    CHERI_CAP_USER_DATA_LENGTH - imgp->reloc_base : text_end;
+	/*
+	 * XXXAR: data_length needs to be the full address space to allow
+	 * legacy TLS to work since the TLS region will be beyond the end of
+	 * the text section. This does not matter for new binaries since they
+	 * will all clear $ddc as one of the first user instructions anyway.
+	 * TODO: add a kernel config option to start with NULL $ddc once
+	 * crt_init_globals is fixed.
+	 */
+	data_length = CHERI_CAP_USER_DATA_LENGTH - imgp->reloc_base;
 	code_length = is_dynamic_binary ?
 	    CHERI_CAP_USER_CODE_LENGTH - imgp->reloc_base : text_end;
 	frame = &td->td_pcb->pcb_regs;
