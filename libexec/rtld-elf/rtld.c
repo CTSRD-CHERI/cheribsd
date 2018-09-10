@@ -604,9 +604,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	dbg("Parsed values:\n\tmapbase=%-#p\n\tmapsize=%#zx"
 	     "\n\ttextsize=%#zx\n\tvaddrbase=%#zx\n\trelocbase=%-#p\n",
 		obj_main->mapbase, obj_main->mapsize, obj_main->textsize, obj_main->vaddrbase, obj_main->relocbase);
-#ifdef __CHERI_PURE_CAPABILITY__
-	rtld_require(obj_main->vaddrbase == 0, "non-zero vaddrbase not supported!");
-#endif
     }
 
     if (aux_info[AT_EXECPATH] != NULL && fd == -1) {
