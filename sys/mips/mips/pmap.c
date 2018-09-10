@@ -1022,7 +1022,7 @@ _pmap_unwire_ptp(pmap_t pmap, vm_offset_t va, vm_page_t m)
 	 * If the page is finally unwired, simply free it.
 	 */
 	vm_page_free_zero(m);
-	atomic_subtract_int(&vm_cnt.v_wire_count, 1);
+	vm_wire_sub(1);
 }
 
 /*
@@ -1063,11 +1063,11 @@ pmap_grow_direct_page(int req)
 {
 
 #ifdef __mips_n64
-	VM_WAIT;
+	vm_wait(NULL);
 #else
 	if (!vm_page_reclaim_contig(req, 1, 0, MIPS_KSEG0_LARGEST_PHYS,
 	    PAGE_SIZE, 0))
-		VM_WAIT;
+		vm_wait(NULL);
 #endif
 }
 
@@ -1172,8 +1172,7 @@ _pmap_allocpte(pmap_t pmap, unsigned ptepindex, u_int flags)
 			if (_pmap_allocpte(pmap, NUPDE + segindex,
 			    flags) == NULL) {
 				/* alloc failed, release current */
-				--m->wire_count;
-				atomic_subtract_int(&vm_cnt.v_wire_count, 1);
+				vm_page_unwire_noq(m);
 				vm_page_free_zero(m);
 				return (NULL);
 			}
@@ -1251,8 +1250,7 @@ pmap_release(pmap_t pmap)
 	ptdva = (vm_offset_t)pmap->pm_segtab;
 	ptdpg = PHYS_TO_VM_PAGE(MIPS_DIRECT_TO_PHYS(ptdva));
 
-	ptdpg->wire_count--;
-	atomic_subtract_int(&vm_cnt.v_wire_count, 1);
+	vm_page_unwire_noq(ptdpg);
 	vm_page_free_zero(ptdpg);
 }
 
@@ -2058,6 +2056,8 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
 		newpte |= PTE_SC;
 #endif
+	if ((m->oflags & VPO_UNMANAGED) == 0)
+		newpte |= PTE_MANAGED;
 
 	mpte = NULL;
 
@@ -2087,8 +2087,11 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		panic("pmap_enter: invalid page directory, pdir=%p, va=%p",
 		    (void *)pmap->pm_segtab, (void *)va);
 	}
-	om = NULL;
+
 	origpte = *pte;
+	KASSERT(!pte_test(&origpte, PTE_D | PTE_RO | PTE_VALID),
+	    ("pmap_enter: modified page not writable: va: %p, pte: %#jx",
+	    (void *)va, (uintmax_t)origpte));
 	opa = TLBLO_PTE_TO_PA(origpte);
 
 	/*
@@ -2107,10 +2110,6 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 		    PTE_W))
 			pmap->pm_stats.wired_count--;
 
-		KASSERT(!pte_test(&origpte, PTE_D | PTE_RO),
-		    ("%s: modified page not writable: va: %p, pte: %#jx",
-		    __func__, (void *)va, (uintmax_t)origpte));
-
 		/*
 		 * Remove extra pte reference
 		 */
@@ -2119,8 +2118,6 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 
 		if (pte_test(&origpte, PTE_MANAGED)) {
 			m->md.pv_flags |= PV_TABLE_REF;
-			om = m;
-			newpte |= PTE_MANAGED;
 			if (!pte_test(&newpte, PTE_RO))
 				vm_page_aflag_set(m, PGA_WRITEABLE);
 		}
@@ -2134,13 +2131,29 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	 * handle validating new mapping.
 	 */
 	if (opa) {
+		if (is_kernel_pmap(pmap))
+			*pte = PTE_G;
+		else
+			*pte = 0;
 		if (pte_test(&origpte, PTE_W))
 			pmap->pm_stats.wired_count--;
-
 		if (pte_test(&origpte, PTE_MANAGED)) {
 			om = PHYS_TO_VM_PAGE(opa);
+			if (pte_test(&origpte, PTE_D))
+				vm_page_dirty(om);
+			if ((om->md.pv_flags & PV_TABLE_REF) != 0) {
+				om->md.pv_flags &= ~PV_TABLE_REF;
+				vm_page_aflag_set(om, PGA_REFERENCED);
+			}
 			pv = pmap_pvh_remove(&om->md, pmap, va);
+			if (!pte_test(&newpte, PTE_MANAGED))
+				free_pv_entry(pmap, pv);
+			if ((om->aflags & PGA_WRITEABLE) != 0 &&
+			    TAILQ_EMPTY(&om->md.pv_list))
+				vm_page_aflag_clear(om, PGA_WRITEABLE);
 		}
+		pmap_invalidate_page(pmap, va);
+		origpte = 0;
 		if (mpte != NULL) {
 			mpte->wire_count--;
 			KASSERT(mpte->wire_count > 0,
@@ -2153,17 +2166,16 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	/*
 	 * Enter on the PV list if part of our managed memory.
 	 */
-	if ((m->oflags & VPO_UNMANAGED) == 0) {
+	if (pte_test(&newpte, PTE_MANAGED)) {
 		m->md.pv_flags |= PV_TABLE_REF;
-		if (pv == NULL)
+		if (pv == NULL) {
 			pv = get_pv_entry(pmap, FALSE);
-		pv->pv_va = va;
+			pv->pv_va = va;
+		}
 		TAILQ_INSERT_TAIL(&m->md.pv_list, pv, pv_next);
-		newpte |= PTE_MANAGED;
 		if (!pte_test(&newpte, PTE_RO))
 			vm_page_aflag_set(m, PGA_WRITEABLE);
-	} else if (pv != NULL)
-		free_pv_entry(pmap, pv);
+	}
 
 	/*
 	 * Increment counters
@@ -2184,21 +2196,16 @@ validate:
 	if (origpte != newpte) {
 		*pte = newpte;
 		if (pte_test(&origpte, PTE_VALID)) {
+			KASSERT(opa == pa, ("pmap_enter: invalid update"));
 			if (pte_test(&origpte, PTE_MANAGED) && opa != pa) {
 				if (om->md.pv_flags & PV_TABLE_REF)
 					vm_page_aflag_set(om, PGA_REFERENCED);
 				om->md.pv_flags &= ~PV_TABLE_REF;
 			}
 			if (pte_test(&origpte, PTE_D)) {
-				KASSERT(!pte_test(&origpte, PTE_RO),
-				    ("pmap_enter: modified page not writable:"
-				    " va: %p, pte: %#jx", (void *)va, (uintmax_t)origpte));
 				if (pte_test(&origpte, PTE_MANAGED))
-					vm_page_dirty(om);
+					vm_page_dirty(m);
 			}
-			if (pte_test(&origpte, PTE_MANAGED) &&
-			    TAILQ_EMPTY(&om->md.pv_list))
-				vm_page_aflag_clear(om, PGA_WRITEABLE);
 			pmap_update_page(pmap, va, newpte);
 		}
 	}

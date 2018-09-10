@@ -72,6 +72,11 @@
 #include <cheri/cheri.h>
 #endif
 
+typedef union {
+	uint32_t inst;
+	register_t pad; /* Ensure this is aligned the same way as other fields */
+} badinstr_t;
+
 /* Note: This must also match regnum.h and regdef.h */
 
 struct trapframe {
@@ -131,9 +136,16 @@ struct trapframe {
 	 * 
 	 * Also, be sure this matches what is defined in regnum.h
 	 */
+/* XXXAR: These two seem unused so I repurposed them for BadInstr + BadInstrP */
+#if 0
 	register_t	ic;	/* RM7k and RM9k specific */
 	register_t	dummy;	/* Alignment for 32-bit case */
-
+#else
+	/* Trap instruction or 0 if CP0_BadInstr not supported by current CPU */
+	badinstr_t	badinstr;
+	/* Branch instruction if trap happened in delay slot (CP0_BadInstrP) */
+	badinstr_t	badinstr_p;
+#endif
 	/*
 	 * CHERI registers are saved for both user and kernel processes -- but
 	 * are defined only on supporting CPUs.  This need not be binary

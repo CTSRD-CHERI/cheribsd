@@ -81,7 +81,7 @@ bcm2835_late_init(platform_t plat)
 	int len;
 
 	system = OF_finddevice("/system");
-	if (system != 0) {
+	if (system != -1) {
 		len = OF_getencprop(system, "linux,serial", cells,
 		    sizeof(cells));
 		if (len > 0)
@@ -154,4 +154,5 @@ static platform_method_t bcm2836_methods[] = {
 };
 FDT_PLATFORM_DEF2(bcm2836, bcm2836_legacy, "bcm2836 (legacy)", 0, "brcm,bcm2709", 100);
 FDT_PLATFORM_DEF2(bcm2836, bcm2836, "bcm2836", 0, "brcm,bcm2836", 100);
+FDT_PLATFORM_DEF2(bcm2836, bcm2837, "bcm2837", 0, "brcm,bcm2837", 100);
 #endif

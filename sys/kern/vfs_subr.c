@@ -43,7 +43,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 #include "opt_watchdog.h"
 
@@ -366,7 +365,6 @@ static int
 vnode_init(void *mem, int size, int flags)
 {
 	struct vnode *vp;
-	struct bufobj *bo;
 
 	vp = mem;
 	bzero(vp, size);
@@ -383,11 +381,7 @@ vnode_init(void *mem, int size, int flags)
 	/*
 	 * Initialize bufobj.
 	 */
-	bo = &vp->v_bufobj;
-	rw_init(BO_LOCKPTR(bo), "bufobj interlock");
-	bo->bo_private = vp;
-	TAILQ_INIT(&bo->bo_clean.bv_hd);
-	TAILQ_INIT(&bo->bo_dirty.bv_hd);
+	bufobj_init(&vp->v_bufobj, vp);
 	/*
 	 * Initialize namecache.
 	 */
@@ -693,19 +687,21 @@ vfs_suser(struct mount *mp, struct thread *td)
 {
 	int error;
 
-	/*
-	 * If the thread is jailed, but this is not a jail-friendly file
-	 * system, deny immediately.
-	 */
-	if (!(mp->mnt_vfc->vfc_flags & VFCF_JAIL) && jailed(td->td_ucred))
-		return (EPERM);
+	if (jailed(td->td_ucred)) {
+		/*
+		 * If the jail of the calling thread lacks permission for
+		 * this type of file system, deny immediately.
+		 */
+		if (!prison_allow(td->td_ucred, mp->mnt_vfc->vfc_prison_flag))
+			return (EPERM);
 
-	/*
-	 * If the file system was mounted outside the jail of the calling
-	 * thread, deny immediately.
-	 */
-	if (prison_check(td->td_ucred, mp->mnt_cred) != 0)
-		return (EPERM);
+		/*
+		 * If the file system was mounted outside the jail of the
+		 * calling thread, deny immediately.
+		 */
+		if (prison_check(td->td_ucred, mp->mnt_cred) != 0)
+			return (EPERM);
+	}
 
 	/*
 	 * If file system supports delegated administration, we don't check
@@ -1413,7 +1409,7 @@ getnewvnode(const char *tag, struct mount *mp, struct vop_vector *vops,
 	struct thread *td;
 	struct lock_object *lo;
 	static int cyclecount;
-	int error;
+	int error __unused;
 
 	CTR3(KTR_VFS, "%s: mp %p with tag %s", __func__, mp, tag);
 	vp = NULL;
@@ -2464,37 +2460,6 @@ reassignbuf(struct buf *bp)
 	BO_UNLOCK(bo);
 }
 
-/*
- * A temporary hack until refcount_* APIs are sorted out.
- */
-static __inline int
-vfs_refcount_acquire_if_not_zero(volatile u_int *count)
-{
-	u_int old;
-
-	old = *count;
-	for (;;) {
-		if (old == 0)
-			return (0);
-		if (atomic_fcmpset_int(count, &old, old + 1))
-			return (1);
-	}
-}
-
-static __inline int
-vfs_refcount_release_if_not_last(volatile u_int *count)
-{
-	u_int old;
-
-	old = *count;
-	for (;;) {
-		if (old == 1)
-			return (0);
-		if (atomic_fcmpset_int(count, &old, old - 1))
-			return (1);
-	}
-}
-
 static void
 v_init_counters(struct vnode *vp)
 {
@@ -2533,7 +2498,7 @@ v_incr_usecount(struct vnode *vp)
 	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
 
 	if (vp->v_type != VCHR &&
-	    vfs_refcount_acquire_if_not_zero(&vp->v_usecount)) {
+	    refcount_acquire_if_not_zero(&vp->v_usecount)) {
 		VNASSERT((vp->v_iflag & VI_OWEINACT) == 0, vp,
 		    ("vnode with usecount and VI_OWEINACT set"));
 	} else {
@@ -2625,7 +2590,7 @@ vget(struct vnode *vp, int flags, struct thread *td)
 	 * Upgrade our holdcnt to a usecount.
 	 */
 	if (vp->v_type == VCHR ||
-	    !vfs_refcount_acquire_if_not_zero(&vp->v_usecount)) {
+	    !refcount_acquire_if_not_zero(&vp->v_usecount)) {
 		VI_LOCK(vp);
 		if ((vp->v_iflag & VI_OWEINACT) == 0) {
 			oweinact = 0;
@@ -2729,7 +2694,7 @@ vputx(struct vnode *vp, int func)
 	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
 
 	if (vp->v_type != VCHR &&
-	    vfs_refcount_release_if_not_last(&vp->v_usecount)) {
+	    refcount_release_if_not_last(&vp->v_usecount)) {
 		if (func == VPUTX_VPUT)
 			VOP_UNLOCK(vp, 0);
 		vdrop(vp);
@@ -2845,7 +2810,7 @@ _vhold(struct vnode *vp, bool locked)
 		ASSERT_VI_UNLOCKED(vp, __func__);
 	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
 	if (!locked) {
-		if (vfs_refcount_acquire_if_not_zero(&vp->v_holdcnt)) {
+		if (refcount_acquire_if_not_zero(&vp->v_holdcnt)) {
 			VNASSERT((vp->v_iflag & VI_FREE) == 0, vp,
 			    ("_vhold: vnode with holdcnt is free"));
 			return;
@@ -2916,7 +2881,7 @@ _vdrop(struct vnode *vp, bool locked)
 	if ((int)vp->v_holdcnt <= 0)
 		panic("vdrop: holdcnt %d", vp->v_holdcnt);
 	if (!locked) {
-		if (vfs_refcount_release_if_not_last(&vp->v_holdcnt))
+		if (refcount_release_if_not_last(&vp->v_holdcnt))
 			return;
 		VI_LOCK(vp);
 	}
@@ -3471,8 +3436,25 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 	va_end(ap);
 	printf("%p: ", (void *)vp);
 	printf("tag %s, type %s\n", vp->v_tag, typename[vp->v_type]);
-	printf("    usecount %d, writecount %d, refcount %d mountedhere %p\n",
-	    vp->v_usecount, vp->v_writecount, vp->v_holdcnt, vp->v_mountedhere);
+	printf("    usecount %d, writecount %d, refcount %d",
+	    vp->v_usecount, vp->v_writecount, vp->v_holdcnt);
+	switch (vp->v_type) {
+	case VDIR:
+		printf(" mountedhere %p\n", vp->v_mountedhere);
+		break;
+	case VCHR:
+		printf(" rdev %p\n", vp->v_rdev);
+		break;
+	case VSOCK:
+		printf(" socket %p\n", vp->v_unpcb);
+		break;
+	case VFIFO:
+		printf(" fifoinfo %p\n", vp->v_fifoinfo);
+		break;
+	default:
+		printf("\n");
+		break;
+	}
 	buf[0] = '\0';
 	buf[1] = '\0';
 	if (vp->v_vflag & VV_ROOT)
@@ -5465,12 +5447,12 @@ mnt_vnode_next_active_relock(struct vnode *mvp, struct mount *mp,
 	 * acquired with vhold(), but that might try to acquire the vnode
 	 * interlock, which would be a LOR with the mount vnode list lock.
 	 */
-	held = vfs_refcount_acquire_if_not_zero(&vp->v_holdcnt);
+	held = refcount_acquire_if_not_zero(&vp->v_holdcnt);
 	mtx_unlock(&mp->mnt_listmtx);
 	if (!held)
 		goto abort;
 	VI_LOCK(vp);
-	if (!vfs_refcount_release_if_not_last(&vp->v_holdcnt)) {
+	if (!refcount_release_if_not_last(&vp->v_holdcnt)) {
 		vdropl(vp);
 		goto abort;
 	}

@@ -353,7 +353,7 @@ sgregister(struct cam_periph *periph, void *arg)
 	 * instance for it.  We'll release this reference once the devfs
 	 * instance has been freed.
 	 */
-	if (cam_periph_acquire(periph) != CAM_REQ_CMP) {
+	if (cam_periph_acquire(periph) != 0) {
 		xpt_print(periph->path, "%s: lost periph during "
 			  "registration!\n", __func__);
 		cam_periph_lock(periph);
@@ -439,7 +439,7 @@ sgopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 	int error = 0;
 
 	periph = (struct cam_periph *)dev->si_drv1;
-	if (cam_periph_acquire(periph) != CAM_REQ_CMP)
+	if (cam_periph_acquire(periph) != 0)
 		return (ENXIO);
 
 	/*
@@ -580,7 +580,7 @@ sgioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 
 		cam_fill_csio(csio,
 			      /*retries*/1,
-			      sgdone,
+			      /*cbfcnp*/NULL,
 			      dir|CAM_DEV_QFRZDIS,
 			      MSG_SIMPLE_Q_TAG,
 			      req->dxferp,

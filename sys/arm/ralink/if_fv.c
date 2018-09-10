@@ -227,7 +227,7 @@ fv_setfilt(struct fv_softc *sc)
 
 	i = 0;
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		ma = LLADDR((struct sockaddr_dl *)ifma->ifma_addr);
@@ -981,7 +981,7 @@ fv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			csr;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		FV_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1009,8 +1009,8 @@ fv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		FV_UNLOCK(sc);
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 #if 0
 		FV_LOCK(sc);
 		fv_set_filter(sc);
@@ -1019,7 +1019,7 @@ fv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 #ifdef MII
 		mii = device_get_softc(sc->fv_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
@@ -1027,7 +1027,7 @@ fv_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		error = ifmedia_ioctl(ifp, ifr, &sc->fv_ifmedia, command);
 #endif
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		error = 0;
 #if 0
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;

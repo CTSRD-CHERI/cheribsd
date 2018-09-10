@@ -67,6 +67,7 @@ struct if_clone {
 	char ifc_name[IFCLOSIZ];	/* (c) Name of device, e.g. `gif' */
 	struct unrhdr *ifc_unrhdr;	/* (c) alloc_unr(9) header */
 	int ifc_maxunit;		/* (c) maximum unit number */
+	int ifc_flags;
 	long ifc_refcnt;		/* (i) Reference count. */
 	LIST_HEAD(, ifnet) ifc_iflist;	/* (i) List of cloned interfaces */
 	struct mtx ifc_mtx;		/* Mutex to protect members. */
@@ -234,7 +235,8 @@ if_clone_createif(struct if_clone *ifc, char *name, size_t len,
 		if (ifp == NULL)
 			panic("%s: lookup failed for %s", __func__, name);
 
-		if_addgroup(ifp, ifc->ifc_name);
+		if ((ifc->ifc_flags & IFC_NOGROUP) == 0)
+			if_addgroup(ifp, ifc->ifc_name);
 
 		IF_CLONE_LOCK(ifc);
 		IFC_IFLIST_INSERT(ifc, ifp);
@@ -321,8 +323,8 @@ if_clone_destroyif(struct if_clone *ifc, struct ifnet *ifp)
 		CURVNET_RESTORE();
 		return (ENXIO);		/* ifp is not on the list. */
 	}
-
-	if_delgroup(ifp, ifc->ifc_name);
+	if ((ifc->ifc_flags & IFC_NOGROUP) == 0)
+		if_delgroup(ifp, ifc->ifc_name);
 
 	if (ifc->ifc_type == SIMPLE)
 		err = ifc_simple_destroy(ifc, ifp);
@@ -330,7 +332,8 @@ if_clone_destroyif(struct if_clone *ifc, struct ifnet *ifp)
 		err = (*ifc->ifc_destroy)(ifc, ifp);
 
 	if (err != 0) {
-		if_addgroup(ifp, ifc->ifc_name);
+		if ((ifc->ifc_flags & IFC_NOGROUP) == 0)
+			if_addgroup(ifp, ifc->ifc_name);
 
 		IF_CLONE_LOCK(ifc);
 		IFC_IFLIST_INSERT(ifc, ifp);
@@ -415,7 +418,7 @@ if_clone_simple(const char *name, ifcs_create_t create, ifcs_destroy_t destroy,
 
 	for (unit = 0; unit < minifs; unit++) {
 		char name[IFNAMSIZ];
-		int error;
+		int error __unused;
 
 		snprintf(name, IFNAMSIZ, "%s%d", ifc->ifc_name, unit);
 		error = if_clone_createif(ifc, name, IFNAMSIZ, NULL);
@@ -555,9 +558,10 @@ if_clone_findifc(struct ifnet *ifp)
 void
 if_clone_addgroup(struct ifnet *ifp, struct if_clone *ifc)
 {
-
-	if_addgroup(ifp, ifc->ifc_name);
-	IF_CLONE_REMREF(ifc);
+	if ((ifc->ifc_flags & IFC_NOGROUP) == 0) {
+		if_addgroup(ifp, ifc->ifc_name);
+		IF_CLONE_REMREF(ifc);
+	}
 }
 
 /*
@@ -735,9 +739,27 @@ ifc_simple_destroy(struct if_clone *ifc, struct ifnet *ifp)
 
 	return (0);
 }
+
+const char *
+ifc_name(struct if_clone *ifc)
+{
+	return (ifc->ifc_name);
+}
+
+void
+ifc_flags_set(struct if_clone *ifc, int flags)
+{
+	ifc->ifc_flags = flags;
+}
+
+int
+ifc_flags_get(struct if_clone *ifc)
+{
+	return (ifc->ifc_flags);
+}
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20180830,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -103,7 +103,7 @@ struct xen_intr_pcpu_data {
  * Start the scan at port 0 by initializing the last scanned
  * location as the highest numbered event channel port.
  */
-static DPCPU_DEFINE(struct xen_intr_pcpu_data, xen_intr_pcpu) = {
+DPCPU_DEFINE_STATIC(struct xen_intr_pcpu_data, xen_intr_pcpu) = {
 	.last_processed_l1i = LONG_BIT - 1,
 	.last_processed_l2i = LONG_BIT - 1
 };
@@ -430,7 +430,7 @@ xen_intr_bind_isrc(struct xenisrc **isrcp, evtchn_port_t local_port,
 		 * unless specified otherwise, so shuffle them to balance
 		 * the interrupt load.
 		 */
-		xen_intr_assign_cpu(&isrc->xi_intsrc, intr_next_cpu());
+		xen_intr_assign_cpu(&isrc->xi_intsrc, intr_next_cpu(0));
 	}
 #endif
 
@@ -1562,7 +1562,7 @@ xen_intr_add_handler(const char *name, driver_filter_t filter,
 		return (EINVAL);
 
 	error = intr_add_handler(name, isrc->xi_vector,filter, handler, arg,
-	    flags|INTR_EXCL, &isrc->xi_cookie);
+	    flags|INTR_EXCL, &isrc->xi_cookie, 0);
 	if (error != 0) {
 		printf(
 		    "%s: xen_intr_add_handler: intr_add_handler failed: %d\n",

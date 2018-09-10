@@ -744,8 +744,7 @@ kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
 		/* Construct a full pathname for jailed callers. */
 		pr_pathlen = strcmp(pr_path, "/") == 0 ? 0
 		    : strlcpy(path, pr_path, MAXPATHLEN);
-		error = copyinstr_c(userpath,
-		    (__cheri_tocap char * __capability)path + pr_pathlen,
+		error = copyinstr_c(userpath, path + pr_pathlen,
 		    MAXPATHLEN - pr_pathlen, NULL);
 #ifdef KTRACE
 		if (error == 0 && KTRPOINT(curthread, KTR_NAMEI))
@@ -864,8 +863,7 @@ kern_shm_unlink(struct thread *td, const char * __capability userpath)
 	pr_path = td->td_ucred->cr_prison->pr_path;
 	pr_pathlen = strcmp(pr_path, "/") == 0 ? 0
 	    : strlcpy(path, pr_path, MAXPATHLEN);
-	error = copyinstr_c(userpath,
-	    (__cheri_tocap char * __capability)path + pr_pathlen,
+	error = copyinstr_c(userpath, path + pr_pathlen,
 	    MAXPATHLEN - pr_pathlen, NULL);
 	if (error) {
 		free(path, M_TEMP);

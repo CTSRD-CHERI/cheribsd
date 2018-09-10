@@ -26,7 +26,7 @@
 	 * Also for U-Boot there must be a pre-existing /memory node.
 	 */
 	chosen {};
-	memory { device_type = "memory"; reg = <0 0>; };
+	memory { device_type = "memory"; };
 
 	aliases {
 		ethernet0 = &fec;
@@ -113,6 +113,7 @@
 			reg = <0>;
 			clocks = <&clks IMX5_CLK_USB_PHY_GATE>;
 			clock-names = "main_clk";
+			#phy-cells = <0>;
 		};
 	};
 
@@ -148,14 +149,14 @@
 			ipu_di0: port@2 {
 				reg = <2>;
 
-				ipu_di0_disp0: endpoint {
+				ipu_di0_disp1: endpoint {
 				};
 			};
 
 			ipu_di1: port@3 {
 				reg = <3>;
 
-				ipu_di1_disp1: endpoint {
+				ipu_di1_disp2: endpoint {
 				};
 			};
 		};

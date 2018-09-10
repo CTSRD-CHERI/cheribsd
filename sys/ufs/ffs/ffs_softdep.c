@@ -688,6 +688,7 @@ static MALLOC_DEFINE(M_MOUNTDATA, "softdep", "Softdep per-mount data");
  * MUST match the defines above, such that memtype[D_XXX] == M_XXX
  */
 static struct malloc_type *memtype[] = {
+	NULL,
 	M_PAGEDEP,
 	M_INODEDEP,
 	M_BMSAFEMAP,
@@ -724,7 +725,8 @@ static struct malloc_type *memtype[] = {
  * Names of malloc types.
  */
 #define TYPENAME(type)  \
-	((unsigned)(type) <= D_LAST ? memtype[type]->ks_shortdesc : "???")
+	((unsigned)(type) <= D_LAST && (unsigned)(type) >= D_FIRST ? \
+	memtype[type]->ks_shortdesc : "???")
 /*
  * End system adaptation definitions.
  */
@@ -2501,7 +2503,7 @@ softdep_mount(devvp, mp, fs, cred)
 	ump->bmsafemap_hashtbl = hashinit(1024, M_BMSAFEMAP,
 	    &ump->bmsafemap_hash_size);
 	i = 1 << (ffs(desiredvnodes / 10) - 1);
-	ump->indir_hashtbl = mallocarray(i, sizeof(struct indir_hashhead),
+	ump->indir_hashtbl = malloc(i * sizeof(struct indir_hashhead),
 	    M_FREEWORK, M_WAITOK);
 	ump->indir_hash_size = i - 1;
 	for (i = 0; i <= ump->indir_hash_size; i++)
@@ -2628,8 +2630,8 @@ jblocks_create(void)
 	jblocks = malloc(sizeof(*jblocks), M_JBLOCKS, M_WAITOK | M_ZERO);
 	TAILQ_INIT(&jblocks->jb_segs);
 	jblocks->jb_avail = 10;
-	jblocks->jb_extent = mallocarray(jblocks->jb_avail,
-	    sizeof(struct jextent), M_JBLOCKS, M_WAITOK | M_ZERO);
+	jblocks->jb_extent = malloc(sizeof(struct jextent) * jblocks->jb_avail,
+	    M_JBLOCKS, M_WAITOK | M_ZERO);
 
 	return (jblocks);
 }
@@ -2714,7 +2716,7 @@ jblocks_add(jblocks, daddr, blocks)
 	/* Adding a new extent. */
 	if (++jblocks->jb_used == jblocks->jb_avail) {
 		jblocks->jb_avail *= 2;
-		jext = mallocarray(jblocks->jb_avail, sizeof(struct jextent),
+		jext = malloc(sizeof(struct jextent) * jblocks->jb_avail,
 		    M_JBLOCKS, M_WAITOK | M_ZERO);
 		memcpy(jext, jblocks->jb_extent,
 		    sizeof(struct jextent) * jblocks->jb_used);
@@ -6291,7 +6293,9 @@ setup_trunc_indir(freeblks, ip, lbn, lastlbn, blkno)
 	 * live on this newblk.
 	 */
 	if ((indirdep->ir_state & DEPCOMPLETE) == 0) {
-		newblk_lookup(mp, dbtofsb(ump->um_fs, bp->b_blkno), 0, &newblk);
+		if (newblk_lookup(mp, dbtofsb(ump->um_fs, bp->b_blkno), 0,
+		    &newblk) == 0)
+			panic("setup_trunc_indir: lost block");
 		LIST_FOREACH(indirn, &newblk->nb_indirdeps, ir_next)
 			trunc_indirdep(indirn, freeblks, bp, off);
 	} else
@@ -10984,6 +10988,8 @@ softdep_disk_write_complete(bp)
 	if (ump == NULL)
 		return;
 
+	sbp = NULL;
+
 	/*
 	 * If an error occurred while doing the write, then the data
 	 * has not hit the disk and the dependencies cannot be processed.
@@ -11026,7 +11032,6 @@ softdep_disk_write_complete(bp)
 	/*
 	 * Ump SU lock must not be released anywhere in this code segment.
 	 */
-	sbp = NULL;
 	owk = NULL;
 	while ((wk = LIST_FIRST(&bp->b_dep)) != NULL) {
 		WORKLIST_REMOVE(wk);
@@ -12959,7 +12964,7 @@ flush_newblk_dep(vp, mp, lbn)
 			break;
 		}
 		if (newblk->nb_list.wk_type != D_ALLOCDIRECT)
-			panic("flush_newblk_deps: Bad newblk %p", newblk);
+			panic("flush_newblk_dep: Bad newblk %p", newblk);
 		/*
 		 * Flush the journal.
 		 */

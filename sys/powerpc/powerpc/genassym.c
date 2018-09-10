@@ -66,11 +66,11 @@ ASSYM(PC_DBSAVE, offsetof(struct pcpu, pc_dbsave));
 ASSYM(PC_RESTORE, offsetof(struct pcpu, pc_restore));
 
 #if defined(BOOKE)
-ASSYM(PC_BOOKE_CRITSAVE, offsetof(struct pcpu, pc_booke_critsave));
-ASSYM(PC_BOOKE_MCHKSAVE, offsetof(struct pcpu, pc_booke_mchksave));
-ASSYM(PC_BOOKE_TLBSAVE, offsetof(struct pcpu, pc_booke_tlbsave));
-ASSYM(PC_BOOKE_TLB_LEVEL, offsetof(struct pcpu, pc_booke_tlb_level));
-ASSYM(PC_BOOKE_TLB_LOCK, offsetof(struct pcpu, pc_booke_tlb_lock));
+ASSYM(PC_BOOKE_CRITSAVE, offsetof(struct pcpu, pc_booke.critsave));
+ASSYM(PC_BOOKE_MCHKSAVE, offsetof(struct pcpu, pc_booke.mchksave));
+ASSYM(PC_BOOKE_TLBSAVE, offsetof(struct pcpu, pc_booke.tlbsave));
+ASSYM(PC_BOOKE_TLB_LEVEL, offsetof(struct pcpu, pc_booke.tlb_level));
+ASSYM(PC_BOOKE_TLB_LOCK, offsetof(struct pcpu, pc_booke.tlb_lock));
 #endif
 
 ASSYM(CPUSAVE_R27, CPUSAVE_R27*sizeof(register_t));
@@ -109,10 +109,10 @@ ASSYM(MTX_LOCK, offsetof(struct mtx, mtx_lock));
 #if defined(AIM)
 ASSYM(USER_ADDR, USER_ADDR);
 #ifdef __powerpc64__
-ASSYM(PC_KERNSLB, offsetof(struct pcpu, pc_slb));
-ASSYM(PC_USERSLB, offsetof(struct pcpu, pc_userslb));
-ASSYM(PC_SLBSAVE, offsetof(struct pcpu, pc_slbsave));
-ASSYM(PC_SLBSTACK, offsetof(struct pcpu, pc_slbstack));
+ASSYM(PC_KERNSLB, offsetof(struct pcpu, pc_aim.slb));
+ASSYM(PC_USERSLB, offsetof(struct pcpu, pc_aim.userslb));
+ASSYM(PC_SLBSAVE, offsetof(struct pcpu, pc_aim.slbsave));
+ASSYM(PC_SLBSTACK, offsetof(struct pcpu, pc_aim.slbstack));
 ASSYM(USER_SLB_SLOT, USER_SLB_SLOT);
 ASSYM(USER_SLB_SLBE, USER_SLB_SLBE);
 ASSYM(SEGMENT_MASK, SEGMENT_MASK);
@@ -195,6 +195,7 @@ ASSYM(CF_SIZE, sizeof(struct callframe));
 
 ASSYM(PCB_CONTEXT, offsetof(struct pcb, pcb_context));
 ASSYM(PCB_CR, offsetof(struct pcb, pcb_cr));
+ASSYM(PCB_DSCR, offsetof(struct pcb, pcb_dscr));
 ASSYM(PCB_SP, offsetof(struct pcb, pcb_sp));
 ASSYM(PCB_TOC, offsetof(struct pcb, pcb_toc));
 ASSYM(PCB_LR, offsetof(struct pcb, pcb_lr));
@@ -202,6 +203,7 @@ ASSYM(PCB_ONFAULT, offsetof(struct pcb, pcb_onfault));
 ASSYM(PCB_FLAGS, offsetof(struct pcb, pcb_flags));
 ASSYM(PCB_FPU, PCB_FPU);
 ASSYM(PCB_VEC, PCB_VEC);
+ASSYM(PCB_CDSCR, PCB_CDSCR);
 
 ASSYM(PCB_AIM_USR_VSID, offsetof(struct pcb, pcb_cpu.aim.usr_vsid));
 ASSYM(PCB_BOOKE_DBCR0, offsetof(struct pcb, pcb_cpu.booke.dbcr0));
@@ -222,6 +224,7 @@ ASSYM(TDF_NEEDRESCHED, TDF_NEEDRESCHED);
 ASSYM(SF_UC, offsetof(struct sigframe, sf_uc));
 
 ASSYM(KERNBASE, KERNBASE);
+ASSYM(DMAP_BASE_ADDRESS, DMAP_BASE_ADDRESS);
 ASSYM(MAXCOMLEN, MAXCOMLEN);
 
 #ifdef __powerpc64__
@@ -235,10 +238,6 @@ ASSYM(PSL_CE, PSL_CE);
 ASSYM(PSL_UCLE, PSL_UCLE);
 ASSYM(PSL_WE, PSL_WE);
 ASSYM(PSL_UBLE, PSL_UBLE);
-
-#if defined(BOOKE_E500)
-ASSYM(PSL_KERNSET_INIT, PSL_KERNSET_INIT);
-#endif
 
 #if defined(AIM) && defined(__powerpc64__)
 ASSYM(PSL_SF, PSL_SF);
@@ -268,7 +267,4 @@ ASSYM(PSL_FP, PSL_FP);
 ASSYM(PSL_ME, PSL_ME);
 ASSYM(PSL_PR, PSL_PR);
 ASSYM(PSL_PMM, PSL_PMM);
-ASSYM(PSL_KERNSET, PSL_KERNSET);
-ASSYM(PSL_USERSET, PSL_USERSET);
-ASSYM(PSL_USERSTATIC, PSL_USERSTATIC);
 

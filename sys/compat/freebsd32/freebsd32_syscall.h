@@ -77,7 +77,7 @@
 #define	FREEBSD32_SYS_sbrk	69
 #define	FREEBSD32_SYS_sstk	70
 				/* 71 is old mmap */
-#define	FREEBSD32_SYS_vadvise	72
+#define	FREEBSD32_SYS_freebsd11_vadvise	72
 #define	FREEBSD32_SYS_munmap	73
 #define	FREEBSD32_SYS_freebsd32_mprotect	74
 #define	FREEBSD32_SYS_madvise	75
@@ -227,9 +227,9 @@
 #define	FREEBSD32_SYS_kbounce	258
 #define	FREEBSD32_SYS_freebsd11_freebsd32_getdents	272
 #define	FREEBSD32_SYS_lchmod	274
-#define	FREEBSD32_SYS_netbsd_lchown	275
+				/* 275 is obsolete netbsd_lchown */
 #define	FREEBSD32_SYS_freebsd32_lutimes	276
-#define	FREEBSD32_SYS_netbsd_msync	277
+				/* 277 is obsolete netbsd_msync */
 #define	FREEBSD32_SYS_freebsd11_nstat	278
 #define	FREEBSD32_SYS_freebsd11_nfstat	279
 #define	FREEBSD32_SYS_freebsd11_nlstat	280
@@ -411,6 +411,7 @@
 #define	FREEBSD32_SYS_symlinkat	502
 #define	FREEBSD32_SYS_unlinkat	503
 #define	FREEBSD32_SYS_posix_openpt	504
+#define	FREEBSD32_SYS_gssd_syscall	505
 #define	FREEBSD32_SYS_freebsd32_jail_get	506
 #define	FREEBSD32_SYS_freebsd32_jail_set	507
 #define	FREEBSD32_SYS_jail_remove	508
@@ -460,7 +461,7 @@
 #define	FREEBSD32_SYS_freebsd32_fstat	551
 #define	FREEBSD32_SYS_freebsd32_fstatat	552
 #define	FREEBSD32_SYS_freebsd32_fhstat	553
-#define	FREEBSD32_SYS_freebsd32_getdirentries	554
+#define	FREEBSD32_SYS_getdirentries	554
 #define	FREEBSD32_SYS_statfs	555
 #define	FREEBSD32_SYS_fstatfs	556
 #define	FREEBSD32_SYS_getfsstat	557
@@ -469,4 +470,5 @@
 #define	FREEBSD32_SYS_freebsd32_kevent	560
 #define	FREEBSD32_SYS_freebsd32_cpuset_getdomain	561
 #define	FREEBSD32_SYS_freebsd32_cpuset_setdomain	562
-#define	FREEBSD32_SYS_MAXSYSCALL	563
+#define	FREEBSD32_SYS_getrandom	563
+#define	FREEBSD32_SYS_MAXSYSCALL	564

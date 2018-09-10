@@ -101,7 +101,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			v = uio->uio_offset;
 
 			off = uio->uio_offset & PAGE_MASK;
-			cnt = PAGE_SIZE - ((vm_offset_t)iov->iov_base &
+			cnt = PAGE_SIZE - ((__cheri_addr vm_offset_t)iov->iov_base &
 			    PAGE_MASK);
 			cnt = min(cnt, PAGE_SIZE - off);
 			cnt = min(cnt, iov->iov_len);

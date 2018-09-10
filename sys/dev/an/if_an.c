@@ -1903,7 +1903,7 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	}
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		AN_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -1924,18 +1924,17 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		AN_UNLOCK(sc);
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->an_ifmedia, command);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* The Aironet has no multicast filter. */
 		error = 0;
 		break;
 	case SIOCGAIRONET:
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct an_req * __capability)&sc->areq,
+		error = copyin_c(ifr_data_get_ptr(ifr), &sc->areq,
 		    sizeof(sc->areq));
 		if (error != 0)
 			break;
@@ -1965,27 +1964,24 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			break;
 		}
 		AN_UNLOCK(sc);
-		error = copyout_c(
-		    (__cheri_tocap struct an_req * __capability)&sc->areq,
-		    ifr_data_get_ptr(ifr), sizeof(sc->areq));
+		error = copyout_c(&sc->areq, ifr_data_get_ptr(ifr),
+		    sizeof(sc->areq));
 		break;
 	case SIOCSAIRONET:
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
 		AN_LOCK(sc);
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct an_req * __capability)&sc->areq,
+		error = copyin_c(ifr_data_get_ptr(ifr), &sc->areq,
 		    sizeof(sc->areq));
 		if (error != 0)
 			break;
 		an_setdef(sc, &sc->areq);
 		AN_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCGPRIVATE_0):	/* used by Cisco client utility */
+	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):	/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct aironet_ioctl * __capability)&l_ioctl,
+		error = copyin_c(ifr_data_get_ptr(ifr), &l_ioctl,
 		    sizeof(l_ioctl));
 		if (error)
 			goto out;
@@ -2004,17 +2000,14 @@ an_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		AN_UNLOCK(sc);
 		if (!error) {
 			/* copy out the updated command info */
-			error = copyout_c(
-			    (__cheri_tocap struct aironet_ioctl * __capability)
-			    &l_ioctl, ifr_data_get_ptr(ifr),
+			error = copyout_c(&l_ioctl, ifr_data_get_ptr(ifr),
 			    sizeof(l_ioctl));
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCGPRIVATE_1):	/* used by Cisco client utility */
+	case CASE_IOC_IFREQ(SIOCGPRIVATE_1):	/* used by Cisco client utility */
 		if ((error = priv_check(td, PRIV_DRIVER)))
 			goto out;
-		error = copyin_c(ifr_data_get_ptr(ifr),
-		    (__cheri_tocap struct aironet_ioctl * __capability)&l_ioctl,
+		error = copyin_c(ifr_data_get_ptr(ifr), &l_ioctl,
 		    sizeof(l_ioctl));
 		if (error)
 			goto out;

@@ -27,7 +27,7 @@
         aout
         ..
         clang
-            6.0.0
+            6.0.1
                 include
                     sanitizer
                     ..
@@ -123,6 +123,8 @@
             ..
         ..
         bsdinstall
+        ..
+        dwatch
         ..
         hyperv
         ..
@@ -240,6 +242,8 @@
             dma
             ..
             drivers
+            ..
+            dwatch
             ..
             etc
                 defaults
@@ -816,6 +820,8 @@
             man3
             ..
             man4
+                aarch64
+                ..
                 amd64
                 ..
                 arm

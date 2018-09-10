@@ -179,8 +179,6 @@ FBSD_1.0 {
 	munlockall;
 	munmap;
 	nanosleep;
-	netbsd_lchown;
-	netbsd_msync;
 	nfssvc;
 	nmount;
 	ntp_adjtime;
@@ -393,6 +391,7 @@ FBSD_1.5 {
 	getdents;
 	getdirentries;
 	getfsstat;
+	getrandom;
 	kbounce;
 	kevent;
 	lstat;
@@ -778,10 +777,6 @@ FBSDprivate_1.0 {
 	__sys_munmap;
 	_nanosleep;
 	__sys_nanosleep;
-	_netbsd_lchown;
-	__sys_netbsd_lchown;
-	_netbsd_msync;
-	__sys_netbsd_msync;
 	_nfssvc;
 	__sys_nfssvc;
 	_nmount;
@@ -1011,8 +1006,6 @@ FBSDprivate_1.0 {
 	__sys_utrace;
 	_uuidgen;
 	__sys_uuidgen;
-	_vadvise;
-	__sys_vadvise;
 	_wait4;
 	__sys_wait4;
 	_wait6;
@@ -1030,4 +1023,5 @@ FBSDprivate_1.0 {
 	__sys_cpuset_getdomain;
 	_cpuset_setdomain;
 	__sys_cpuset_setdomain;
+	__sys_break;
 };

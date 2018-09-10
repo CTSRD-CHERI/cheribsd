@@ -56,9 +56,6 @@ extern char		**boot2_envv;
 extern struct bootinfo	 boot2_bootinfo;
 
 /* metadata.c */
-int	md_load64(char *args, vm_offset_t *modulep);
-
-/* vers.c */
-extern char		bootprog_info[];
+int	md_load64(char *args, vm_offset_t *modulep, vm_offset_t *dtbp);
 
 #endif /* !_BOOT_LOADER_H_ */

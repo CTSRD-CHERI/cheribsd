@@ -442,12 +442,12 @@ main(int argc, char *argv[])
 		}
 	}
 	if (resolv == 0 || (cappwd != NULL && capgrp != NULL)) {
-		if (cap_enter() < 0 && errno != ENOSYS)
+		if (caph_enter() < 0)
 			err(1, "unable to enter capability mode");
 	}
 #else
 	if (resolv == 0) {
-		if (cap_enter() < 0 && errno != ENOSYS)
+		if (caph_enter() < 0)
 			err(1, "unable to enter capability mode");
 	}
 #endif
@@ -623,6 +623,16 @@ abidump(struct ktr_header *kth)
 	if (abiflag == 0)
 		return (flags);
 
+	if (flags & SV_CHERI) {
+		/* XXX: Can't determine capability size from sv_flags */
+#if MIPS_SZCAP == 32
+		printf("C256 ");
+#else
+		printf("C128 ");
+#endif
+		return (flags);
+	}
+
 	switch (flags & SV_ABI_MASK) {
 	case SV_ABI_LINUX:
 		abi = "L";
@@ -785,18 +795,14 @@ syscallabi(u_int sv_flags)
 	switch (sv_flags & SV_ABI_MASK) {
 	case SV_ABI_FREEBSD:
 		return (SYSDECODE_ABI_FREEBSD);
-#if defined(__amd64__) || defined(__i386__)
 	case SV_ABI_LINUX:
-#ifdef __amd64__
+#ifdef __LP64__
 		if (sv_flags & SV_ILP32)
 			return (SYSDECODE_ABI_LINUX32);
 #endif
 		return (SYSDECODE_ABI_LINUX);
-#endif
-#if defined(__aarch64__) || defined(__amd64__)
 	case SV_ABI_CLOUDABI:
 		return (SYSDECODE_ABI_CLOUDABI64);
-#endif
 	default:
 		return (SYSDECODE_ABI_UNKNOWN);
 	}

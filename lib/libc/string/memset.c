@@ -106,7 +106,7 @@ __CAPSUFFIX(memset)(void * __CAP dst0, int c0, size_t length)
 	}
 #endif
 	/* Align destination by filling in bytes. */
-	if ((t = (long)dst & wmask) != 0) {
+	if ((t = (__cheri_addr long)dst & wmask) != 0) {
 		t = wsize - t;
 		length -= t;
 		do {

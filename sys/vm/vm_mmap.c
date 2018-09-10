@@ -50,7 +50,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_hwpmc_hooks.h"
 #include "opt_ktrace.h"
 #include "opt_vm.h"
@@ -291,7 +290,7 @@ kern_mmap(struct thread *td, uintptr_t addr0, uintptr_t max_addr0,
 	    (flags & ~(MAP_SHARED | MAP_PRIVATE | MAP_FIXED | MAP_HASSEMAPHORE |
 	    MAP_STACK | MAP_NOSYNC | MAP_ANON | MAP_EXCL | MAP_NOCORE |
 	    MAP_PREFAULT_READ | MAP_GUARD |
-	    MAP_CHERI_DDC | MAP_CHERI_NOSETBOUNDS |
+	    MAP_CHERI_NOSETBOUNDS |
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif
@@ -332,8 +331,11 @@ kern_mmap(struct thread *td, uintptr_t addr0, uintptr_t max_addr0,
 		return (EINVAL);
 	}
 	if ((flags & MAP_GUARD) != 0 && (prot != PROT_NONE || fd != -1 ||
-	    pos != 0 || (flags & (MAP_SHARED | MAP_PRIVATE | MAP_PREFAULT |
-	    MAP_PREFAULT_READ | MAP_ANON | MAP_STACK)) != 0)) {
+	    pos != 0 || (flags & ~(MAP_FIXED | MAP_GUARD | MAP_EXCL |
+#ifdef MAP_32BIT
+	    MAP_32BIT |
+#endif
+	    MAP_ALIGNMENT_MASK)) != 0)) {
 #ifdef KTRACE
 		if (KTRPOINT(td, KTR_SYSERRCAUSE))
 			ktrsyserrcause("%s: Invalid arguments with MAP_GUARD",
@@ -771,8 +773,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 		 */
 		pkm.pm_address = (uintptr_t) NULL;
 		if (vm_map_lookup_entry(map, addr, &entry)) {
-			for (;
-			    entry != &map->header && entry->start < addr + size;
+			for (; entry->start < addr + size;
 			    entry = entry->next) {
 				if (vm_map_check_protection(map, entry->start,
 					entry->end, VM_PROT_EXECUTE) == TRUE) {
@@ -917,11 +918,6 @@ kern_madvise(struct thread *td, uintptr_t addr0, size_t len, int behav)
 	}
 
 	/*
-	 * Check for illegal behavior
-	 */
-	if (behav < 0 || behav > MADV_CORE)
-		return (EINVAL);
-	/*
 	 * Check for illegal addresses.  Watch out for address wrap... Note
 	 * that VM_*_ADDRESS are not constants due to casts (argh).
 	 */
@@ -939,9 +935,10 @@ kern_madvise(struct thread *td, uintptr_t addr0, size_t len, int behav)
 	start = trunc_page(addr);
 	end = round_page(addr + len);
 
-	if (vm_map_madvise(map, start, end, behav))
-		return (EINVAL);
-	return (0);
+	/*
+	 * vm_map_madvise() checks for illegal values of behav.
+	 */
+	return (vm_map_madvise(map, start, end, behav));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -1007,16 +1004,12 @@ RestartScan:
 	 * up the pages elsewhere.
 	 */
 	lastvecindex = -1;
-	for (current = entry;
-	    (current != &map->header) && (current->start < end);
-	    current = current->next) {
+	for (current = entry; current->start < end; current = current->next) {
 
 		/*
 		 * check for contiguity
 		 */
-		if (current->end < end &&
-		    (entry->next == &map->header ||
-		     current->next->start > current->end)) {
+		if (current->end < end && current->next->start > current->end) {
 			vm_map_unlock_read(map);
 			return (ENOMEM);
 		}
@@ -1244,7 +1237,7 @@ kern_mlock(struct proc *proc, struct ucred *cred, uintptr_t addr0, size_t len)
 		return (ENOMEM);
 	}
 	PROC_UNLOCK(proc);
-	if (npages + vm_cnt.v_wire_count > vm_page_max_wired)
+	if (npages + vm_wire_count() > vm_page_max_wired)
 		return (EAGAIN);
 #ifdef RACCT
 	if (racct_enable) {

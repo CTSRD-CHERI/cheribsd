@@ -77,7 +77,7 @@
 #define	SYS_sbrk	69
 #define	SYS_sstk	70
 				/* 71 is old mmap */
-#define	SYS_vadvise	72
+#define	SYS_freebsd11_vadvise	72
 #define	SYS_munmap	73
 #define	SYS_mprotect	74
 #define	SYS_madvise	75
@@ -232,9 +232,9 @@
 #define	SYS_kbounce	258
 #define	SYS_freebsd11_getdents	272
 #define	SYS_lchmod	274
-#define	SYS_netbsd_lchown	275
+				/* 275 is obsolete netbsd_lchown */
 #define	SYS_lutimes	276
-#define	SYS_netbsd_msync	277
+				/* 277 is obsolete netbsd_msync */
 #define	SYS_freebsd11_nstat	278
 #define	SYS_freebsd11_nfstat	279
 #define	SYS_freebsd11_nlstat	280
@@ -479,5 +479,6 @@
 #define	SYS_kevent	560
 #define	SYS_cpuset_getdomain	561
 #define	SYS_cpuset_setdomain	562
-#define	SYS_coexecve	563
-#define	SYS_MAXSYSCALL	564
+#define	SYS_getrandom	563
+#define	SYS_coexecve	564
+#define	SYS_MAXSYSCALL	565

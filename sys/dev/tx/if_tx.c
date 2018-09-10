@@ -528,7 +528,7 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int error = 0;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifp->if_mtu == ifr_mtu_get(ifr))
 			break;
 
@@ -548,7 +548,7 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		EPIC_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If it is marked down and running, then stop it.
@@ -576,15 +576,15 @@ epic_ifioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		EPIC_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		EPIC_LOCK(sc);
 		epic_set_mc_table(sc);
 		EPIC_UNLOCK(sc);
 		error = 0;
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
@@ -1399,7 +1399,7 @@ epic_set_mc_table(epic_softc_t *sc)
 	filter[3] = 0;
 
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		h = ether_crc32_be(LLADDR((struct sockaddr_dl *)

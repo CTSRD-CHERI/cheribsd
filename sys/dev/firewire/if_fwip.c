@@ -383,7 +383,7 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int s, error;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		s = splimp();
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING))
@@ -394,10 +394,10 @@ fwip_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		splx(s);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 #ifdef DEVICE_POLLING
 	    {
 		struct ifreq *ifr = (struct ifreq *) data;

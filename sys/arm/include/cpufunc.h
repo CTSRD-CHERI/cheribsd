@@ -54,7 +54,7 @@
 static __inline void
 breakpoint(void)
 {
-	__asm(".word      0xe7ffffff");
+	__asm("udf        0xffff");
 }
 
 struct cpu_functions {
@@ -275,14 +275,9 @@ void	sheeva_l2cache_wb_range		(vm_offset_t, vm_size_t);
 void	sheeva_l2cache_wbinv_all	(void);
 #endif
 
-#if defined(CPU_MV_PJ4B)
-void	armv6_idcache_wbinv_all		(void);
-#endif
 #if defined(CPU_CORTEXA) || defined(CPU_MV_PJ4B) || defined(CPU_KRAIT)
-void	armv7_idcache_wbinv_all		(void);
 void	armv7_cpu_sleep			(int);
 void	armv7_setup			(void);
-void	armv7_drain_writebuf		(void);
 
 void 	cortexa_setup			(void);
 #endif
@@ -292,8 +287,6 @@ void	pj4bv7_setup			(void);
 #endif
 
 #if defined(CPU_ARM1176)
-void	arm11_drain_writebuf	(void);
-
 void    arm11x6_setup                   (void);
 void    arm11x6_sleep                   (int);  /* no ref. for errata */
 #endif
@@ -314,8 +307,7 @@ void	armv5_ec_idcache_wbinv_range(vm_offset_t, vm_size_t);
 
 #if defined(CPU_ARM9) || defined(CPU_ARM9E) ||				\
   defined(CPU_FA526) ||							\
-  defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_IXP425) ||		\
-  defined(CPU_XSCALE_81342)
+  defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_81342)
 
 void	armv4_tlb_flushID	(void);
 void	armv4_tlb_flushD	(void);
@@ -325,8 +317,7 @@ void	armv4_drain_writebuf	(void);
 void	armv4_idcache_inv_all	(void);
 #endif
 
-#if defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_IXP425) ||		\
-  defined(CPU_XSCALE_81342)
+#if defined(CPU_XSCALE_PXA2X0) || defined(CPU_XSCALE_81342)
 void	xscale_cpwait		(void);
 
 void	xscale_cpu_sleep	(int mode);
@@ -364,7 +355,7 @@ void	xscale_cache_flushD_rng	(vm_offset_t start, vm_size_t end);
 void	xscale_context_switch	(void);
 
 void	xscale_setup		(void);
-#endif	/* CPU_XSCALE_PXA2X0 || CPU_XSCALE_IXP425 */
+#endif	/* CPU_XSCALE_PXA2X0 */
 
 #ifdef	CPU_XSCALE_81342
 
@@ -461,12 +452,6 @@ void set_stackptr	(u_int mode, u_int address);
 u_int get_stackptr	(u_int mode);
 
 /*
- * Miscellany
- */
-
-int get_pc_str_offset	(void);
-
-/*
  * CPU functions from locore.S
  */
 
@@ -494,6 +479,19 @@ extern int	arm_dcache_align_mask;
 extern u_int	arm_cache_level;
 extern u_int	arm_cache_loc;
 extern u_int	arm_cache_type[14];
+
+#else	/* !_KERNEL */
+
+static __inline void
+breakpoint(void)
+{
+
+	/*
+	 * This matches the instruction used by GDB for software
+	 * breakpoints.
+	 */
+	__asm("udf        0xfdee");
+}
 
 #endif	/* _KERNEL */
 #endif	/* _MACHINE_CPUFUNC_H_ */

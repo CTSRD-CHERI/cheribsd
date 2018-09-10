@@ -172,7 +172,7 @@ SYSCTL_PROC(_net_inet_tcp, OID_AUTO, maxtcptw, CTLTYPE_INT|CTLFLAG_RW,
     &maxtcptw, 0, sysctl_maxtcptw, "IU",
     "Maximum number of compressed TCP TIME_WAIT entries");
 
-VNET_DEFINE(int, nolocaltimewait) = 0;
+static VNET_DEFINE(int, nolocaltimewait) = 0;
 #define	V_nolocaltimewait	VNET(nolocaltimewait)
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, nolocaltimewait, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(nolocaltimewait), 0,
@@ -206,11 +206,12 @@ void
 tcp_tw_destroy(void)
 {
 	struct tcptw *tw;
+	struct epoch_tracker et;
 
-	INP_INFO_RLOCK(&V_tcbinfo);
+	INP_INFO_RLOCK_ET(&V_tcbinfo, et);
 	while ((tw = TAILQ_FIRST(&V_twq_2msl)) != NULL)
 		tcp_twclose(tw, 0);
-	INP_INFO_RUNLOCK(&V_tcbinfo);
+	INP_INFO_RUNLOCK_ET(&V_tcbinfo, et);
 
 	TW_LOCK_DESTROY(V_tw_lock);
 	uma_zdestroy(V_tcptw_zone);
@@ -225,12 +226,12 @@ tcp_tw_destroy(void)
 void
 tcp_twstart(struct tcpcb *tp)
 {
-	struct tcptw *tw;
+	struct tcptw twlocal, *tw;
 	struct inpcb *inp = tp->t_inpcb;
-	int acknow;
 	struct socket *so;
+	bool acknow, local;
 #ifdef INET6
-	int isipv6 = inp->inp_inc.inc_flags & INC_ISIPV6;
+	bool isipv6 = inp->inp_inc.inc_flags & INC_ISIPV6;
 #endif
 
 	INP_INFO_RLOCK_ASSERT(&V_tcbinfo);
@@ -241,25 +242,18 @@ tcp_twstart(struct tcpcb *tp)
 	    "(inp->inp_flags & INP_DROPPED) != 0"));
 
 	if (V_nolocaltimewait) {
-		int error = 0;
 #ifdef INET6
 		if (isipv6)
-			error = in6_localaddr(&inp->in6p_faddr);
-#endif
-#if defined(INET6) && defined(INET)
+			local = in6_localaddr(&inp->in6p_faddr);
 		else
 #endif
 #ifdef INET
-			error = in_localip(inp->inp_faddr);
+			local = in_localip(inp->inp_faddr);
+#else
+			local = false;
 #endif
-		if (error) {
-			tp = tcp_close(tp);
-			if (tp != NULL)
-				INP_WUNLOCK(inp);
-			return;
-		}
-	}
-
+	} else
+		local = false;
 
 	/*
 	 * For use only by DTrace.  We do not reference the state
@@ -267,7 +261,10 @@ tcp_twstart(struct tcpcb *tp)
 	 */
 	tcp_state_change(tp, TCPS_TIME_WAIT);
 
-	tw = uma_zalloc(V_tcptw_zone, M_NOWAIT);
+	if (local)
+		tw = &twlocal;
+	else
+		tw = uma_zalloc(V_tcptw_zone, M_NOWAIT);
 	if (tw == NULL) {
 		/*
 		 * Reached limit on total number of TIMEWAIT connections
@@ -286,11 +283,10 @@ tcp_twstart(struct tcpcb *tp)
 		}
 	}
 	/*
-	 * The tcptw will hold a reference on its inpcb until tcp_twclose
-	 * is called
+	 * For !local case the tcptw will hold a reference on its inpcb
+	 * until tcp_twclose is called.
 	 */
 	tw->tw_inpcb = inp;
-	in_pcbref(inp);	/* Reference from tw */
 
 	/*
 	 * Recover last window size sent.
@@ -337,16 +333,19 @@ tcp_twstart(struct tcpcb *tp)
 	tcp_discardcb(tp);
 	so = inp->inp_socket;
 	soisdisconnected(so);
-	tw->tw_cred = crhold(so->so_cred);
-	SOCK_LOCK(so);
 	tw->tw_so_options = so->so_options;
-	SOCK_UNLOCK(so);
+	inp->inp_flags |= INP_TIMEWAIT;
 	if (acknow)
 		tcp_twrespond(tw, TH_ACK);
-	inp->inp_ppcb = tw;
-	inp->inp_flags |= INP_TIMEWAIT;
-	TCPSTATES_INC(TCPS_TIME_WAIT);
-	tcp_tw_2msl_reset(tw, 0);
+	if (local)
+		in_pcbdrop(inp);
+	else {
+		in_pcbref(inp);	/* Reference from tw */
+		tw->tw_cred = crhold(so->so_cred);
+		inp->inp_ppcb = tw;
+		TCPSTATES_INC(TCPS_TIME_WAIT);
+		tcp_tw_2msl_reset(tw, 0);
+	}
 
 	/*
 	 * If the inpcb owns the sole reference to the socket, then we can
@@ -647,7 +646,7 @@ tcp_tw_2msl_stop(struct tcptw *tw, int reuse)
 {
 	struct ucred *cred;
 	struct inpcb *inp;
-	int released;
+	int released __unused;
 
 	INP_INFO_RLOCK_ASSERT(&V_tcbinfo);
 
@@ -676,6 +675,7 @@ tcp_tw_2msl_scan(int reuse)
 {
 	struct tcptw *tw;
 	struct inpcb *inp;
+	struct epoch_tracker et;
 
 #ifdef INVARIANTS
 	if (reuse) {
@@ -709,54 +709,46 @@ tcp_tw_2msl_scan(int reuse)
 		in_pcbref(inp);
 		TW_RUNLOCK(V_tw_lock);
 
-		if (INP_INFO_TRY_RLOCK(&V_tcbinfo)) {
-
-			INP_WLOCK(inp);
-			tw = intotw(inp);
-			if (in_pcbrele_wlocked(inp)) {
-				if (__predict_true(tw == NULL)) {
-					INP_INFO_RUNLOCK(&V_tcbinfo);
-					continue;
-				} else {
-					/* This should not happen as in TIMEWAIT
-					 * state the inp should not be destroyed
-					 * before its tcptw. If INVARIANTS is
-					 * defined panic.
-					 */
-#ifdef INVARIANTS
-					panic("%s: Panic before an infinite "
-					    "loop: INP_TIMEWAIT && (INP_FREED "
-					    "|| inp last reference) && tw != "
-					    "NULL", __func__);
-#else
-					log(LOG_ERR, "%s: Avoid an infinite "
-					    "loop: INP_TIMEWAIT && (INP_FREED "
-					    "|| inp last reference) && tw != "
-					    "NULL", __func__);
-#endif
-					INP_INFO_RUNLOCK(&V_tcbinfo);
-					break;
-				}
-			}
-
-			if (tw == NULL) {
-				/* tcp_twclose() has already been called */
-				INP_WUNLOCK(inp);
-				INP_INFO_RUNLOCK(&V_tcbinfo);
+		INP_INFO_RLOCK_ET(&V_tcbinfo, et);
+		INP_WLOCK(inp);
+		tw = intotw(inp);
+		if (in_pcbrele_wlocked(inp)) {
+			if (__predict_true(tw == NULL)) {
+				INP_INFO_RUNLOCK_ET(&V_tcbinfo, et);
 				continue;
+			} else {
+				/* This should not happen as in TIMEWAIT
+				 * state the inp should not be destroyed
+				 * before its tcptw. If INVARIANTS is
+				 * defined panic.
+				 */
+#ifdef INVARIANTS
+				panic("%s: Panic before an infinite "
+					  "loop: INP_TIMEWAIT && (INP_FREED "
+					  "|| inp last reference) && tw != "
+					  "NULL", __func__);
+#else
+				log(LOG_ERR, "%s: Avoid an infinite "
+					"loop: INP_TIMEWAIT && (INP_FREED "
+					"|| inp last reference) && tw != "
+					"NULL", __func__);
+#endif
+				INP_INFO_RUNLOCK_ET(&V_tcbinfo, et);
+				break;
 			}
-
-			tcp_twclose(tw, reuse);
-			INP_INFO_RUNLOCK(&V_tcbinfo);
-			if (reuse)
-			    return tw;
-		} else {
-			/* INP_INFO lock is busy, continue later. */
-			INP_WLOCK(inp);
-			if (!in_pcbrele_wlocked(inp))
-				INP_WUNLOCK(inp);
-			break;
 		}
+
+		if (tw == NULL) {
+			/* tcp_twclose() has already been called */
+			INP_WUNLOCK(inp);
+			INP_INFO_RUNLOCK_ET(&V_tcbinfo, et);
+			continue;
+		}
+
+		tcp_twclose(tw, reuse);
+		INP_INFO_RUNLOCK_ET(&V_tcbinfo, et);
+		if (reuse)
+			return tw;
 	}
 
 	return NULL;

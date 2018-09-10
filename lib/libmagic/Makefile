@@ -8,12 +8,14 @@ CONTRDIR=	${SRCTOP}/contrib/file
 
 LIB=	magic
 SHLIB_MAJOR=	4
+.if !make(build-tools)
 LIBADD=	z
+.endif
 MAN=	libmagic.3 magic.5
 
-SRCS=	apprentice.c apptype.c ascmagic.c cdf.c cdf_time.c compress.c \
-	der.c encoding.c fsmagic.c funcs.c \
-	is_tar.c magic.c print.c readcdf.c readelf.c softmagic.c
+SRCS=	apprentice.c apptype.c ascmagic.c buffer.c cdf.c cdf_time.c \
+	compress.c der.c encoding.c fsmagic.c funcs.c \
+	is_tar.c magic.c print.c readcdf.c readelf.c seccomp.c softmagic.c
 INCS=	magic.h
 
 MAGICPATH?=	/usr/share/misc

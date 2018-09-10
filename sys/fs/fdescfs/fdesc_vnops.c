@@ -286,7 +286,6 @@ fdesc_lookup(struct vop_lookup_args *ap)
 	struct thread *td = cnp->cn_thread;
 	struct file *fp;
 	struct fdesc_get_ino_args arg;
-	cap_rights_t rights;
 	int nlen = cnp->cn_namelen;
 	u_int fd, fd1;
 	int error;
@@ -331,7 +330,7 @@ fdesc_lookup(struct vop_lookup_args *ap)
 	/*
 	 * No rights to check since 'fp' isn't actually used.
 	 */
-	if ((error = fget(td, fd, cap_rights_init(&rights), &fp)) != 0)
+	if ((error = fget(td, fd, &cap_no_rights, &fp)) != 0)
 		goto bad;
 
 	/* Check if we're looking up ourselves. */
@@ -415,6 +414,8 @@ fdesc_pathconf(struct vop_pathconf_args *ap)
 			*ap->a_retval = 1;
 		return (0);
 	default:
+		if (VTOFDESC(vp)->fd_type == Froot)
+			return (vop_stdpathconf(ap));
 		vref(vp);
 		VOP_UNLOCK(vp, 0);
 		error = kern_fpathconf(curthread, VTOFDESC(vp)->fd_fd,
@@ -611,7 +612,6 @@ static int
 fdesc_readlink(struct vop_readlink_args *va)
 {
 	struct vnode *vp, *vn;
-	cap_rights_t rights;
 	struct thread *td;
 	struct uio *uio;
 	struct file *fp;
@@ -629,7 +629,7 @@ fdesc_readlink(struct vop_readlink_args *va)
 	VOP_UNLOCK(vn, 0);
 
 	td = curthread;
-	error = fget_cap(td, fd_fd, cap_rights_init(&rights), &fp, NULL);
+	error = fget_cap(td, fd_fd, &cap_no_rights, &fp, NULL);
 	if (error != 0)
 		goto out;
 

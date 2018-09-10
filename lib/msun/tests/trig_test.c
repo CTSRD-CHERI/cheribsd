@@ -90,6 +90,9 @@ ATF_TC_HEAD(special, tc)
 }
 ATF_TC_BODY(special, tc)
 {
+#ifndef	_FLOAT_IEEE754
+atf_tc_skip("Test not applicable on this architecture.");
+#else
 
 	/* Values at 0 should be exact. */
 	testall(tan, 0.0, 0.0, ALL_STD_EXCEPT, 0);
@@ -111,6 +114,7 @@ ATF_TC_BODY(special, tc)
 	testall(tan, NAN, NAN, ALL_STD_EXCEPT, 0);
 	testall(sin, NAN, NAN, ALL_STD_EXCEPT, 0);
 	testall(cos, NAN, NAN, ALL_STD_EXCEPT, 0);
+#endif /* _FLOAT_IEEE754 */
 }
 
 #ifndef __i386__

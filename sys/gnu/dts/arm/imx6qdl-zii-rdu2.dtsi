@@ -49,6 +49,7 @@
 
 	aliases {
 		mdio-gpio0 = &mdio1;
+		rtc0 = &ds1341;
 	};
 
 	mdio1: mdio {
@@ -304,6 +305,15 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart4>;
 	status = "okay";
+
+	rave-sp {
+		compatible = "zii,rave-sp-rdu2";
+		current-speed = <1000000>;
+
+		watchdog {
+			compatible = "zii,rave-sp-watchdog";
+		};
+	};
 };
 
 &ecspi1 {
@@ -390,7 +400,7 @@
 	clock-frequency = <100000>;
 	status = "okay";
 
-	pmic@08 {
+	pmic@8 {
 		compatible = "fsl,pfuze100";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_pfuze100_irq>;
@@ -497,11 +507,11 @@
 	};
 
 	eeprom@54 {
-		compatible = "at,24c128";
+		compatible = "atmel,24c128";
 		reg = <0x54>;
 	};
 
-	rtc@68 {
+	ds1341: rtc@68 {
 		compatible = "dallas,ds1341";
 		reg = <0x68>;
 	};
@@ -543,7 +553,7 @@
 
 		rmi4-f01@1 {
 			reg = <0x1>;
-			syna,nosleep-mode = <1>;
+			syna,nosleep-mode = <2>;
 		};
 
 		rmi4-f11@11 {
@@ -580,6 +590,17 @@
 	pinctrl-0 = <&pinctrl_pcie>;
 	reset-gpio = <&gpio7 12 GPIO_ACTIVE_LOW>;
 	status = "okay";
+
+	host@0 {
+		reg = <0 0 0 0 0>;
+
+		#address-cells = <3>;
+		#size-cells = <2>;
+
+		i210: i210@0 {
+			reg = <0 0 0 0 0>;
+		};
+	};
 };
 
 &usdhc2 {
@@ -590,6 +611,8 @@
 	wp-gpios = <&gpio2 3 GPIO_ACTIVE_HIGH>;
 	vmmc-supply = <&reg_3p3v_sd>;
 	vqmmc-supply = <&reg_3p3v>;
+	no-1-8-v;
+	no-sdio;
 	status = "okay";
 };
 
@@ -601,6 +624,8 @@
 	wp-gpios = <&gpio2 1 GPIO_ACTIVE_HIGH>;
 	vmmc-supply = <&reg_3p3v_sd>;
 	vqmmc-supply = <&reg_3p3v>;
+	no-1-8-v;
+	no-sdio;
 	status = "okay";
 };
 
@@ -610,7 +635,10 @@
 	bus-width = <8>;
 	vmmc-supply = <&reg_3p3v>;
 	vqmmc-supply = <&reg_3p3v>;
+	no-1-8-v;
 	non-removable;
+	no-sdio;
+	no-sd;
 	status = "okay";
 };
 
@@ -728,6 +756,7 @@
 
 &usbh1 {
 	vbus-supply = <&reg_5p0v_main>;
+	disable-over-current;
 	status = "okay";
 };
 
@@ -790,6 +819,10 @@
 			IMX_AUDMUX_V2_PDCR_RXDSEL(1)
 		>;
 	};
+};
+
+&wdog1 {
+	status = "disabled";
 };
 
 &iomuxc {

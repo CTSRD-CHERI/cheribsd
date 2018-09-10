@@ -189,9 +189,10 @@
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
 /*
- * _DATA includes _VMMAP to support MAP_CHERI_DDC.  This should be removed
- * when all consumers are migrated.  Current consumers:
- *  - TLS mini-allocator
+ * _DATA includes _VMMAP so that we can derive the MMAP cap from it.
+ *
+ * XXX: Should it include "unallocated" user permissions so
+ * userspace can use them?
  */
 #define	CHERI_PERMS_USERSPACE_DATA					\
 				(CHERI_PERMS_USERSPACE |		\
@@ -209,7 +210,7 @@
 	(CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)	\
 
 #define	CHERI_PERMS_KERNEL_CODE						\
-	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE)
+	(CHERI_PERMS_KERNEL | CHERI_PERM_EXECUTE | CHERI_PERM_SYSTEM_REGS)
 
 #define	CHERI_PERMS_KERNEL_DATA						\
 	(CHERI_PERMS_KERNEL | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |	\
@@ -277,7 +278,7 @@
 /* Start at 256MB to avoid low PC values in sandboxes */
 #define	CHERI_CAP_USER_MMAP_BASE	(VM_MINUSER_ADDRESS + 0x10000000)
 #define	CHERI_CAP_USER_MMAP_LENGTH					\
-    (VM_MAXUSER_ADDRESS + CHERI_CAP_USER_MMAP_BASE)
+    (VM_MAXUSER_ADDRESS - CHERI_CAP_USER_MMAP_BASE)
 #define	CHERI_CAP_USER_MMAP_OFFSET	0x0
 
 /*

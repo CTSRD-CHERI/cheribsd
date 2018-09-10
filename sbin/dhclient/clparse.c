@@ -49,10 +49,9 @@ __FBSDID("$FreeBSD$");
 #include "dhctoken.h"
 
 struct client_config top_level_config;
-struct interface_info *dummy_interfaces;
-extern struct interface_info *ifi;
+static struct interface_info *dummy_interfaces;
 
-char client_script_name[] = "/sbin/dhclient-script";
+static char client_script_name[] = "/sbin/dhclient-script";
 
 /*
  * client-conf-file :== client-declarations EOF
@@ -687,7 +686,7 @@ parse_option_decl(FILE *cfile, struct option_data *options)
 	u_int8_t	 hunkbuf[1024];
 	unsigned	 hunkix = 0;
 	char		*vendor;
-	char		*fmt;
+	const char	*fmt;
 	struct universe	*universe;
 	struct option	*option;
 	struct iaddr	 ip_addr;

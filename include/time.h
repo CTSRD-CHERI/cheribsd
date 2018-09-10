@@ -146,7 +146,9 @@ __BEGIN_DECLS
 char *asctime(const struct tm *);
 clock_t clock(void);
 char *ctime(const time_t *);
+#ifndef _STANDALONE
 double difftime(time_t, time_t);
+#endif
 /* XXX missing: getdate() */
 struct tm *gmtime(const time_t *);
 struct tm *localtime(const time_t *);
@@ -197,6 +199,8 @@ void tzsetwall(void);
 time_t timelocal(struct tm * const);
 time_t timegm(struct tm * const);
 int timer_oshandle_np(timer_t timerid);
+time_t time2posix(time_t t);
+time_t posix2time(time_t t);
 #endif /* __BSD_VISIBLE */
 
 #if __POSIX_VISIBLE >= 200809 || defined(_XLOCALE_H_)

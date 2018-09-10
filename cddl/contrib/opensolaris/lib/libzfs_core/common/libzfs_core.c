@@ -94,7 +94,7 @@
 extern int zfs_ioctl_version;
 #endif
 
-static int g_fd;
+static int g_fd = -1;
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static int g_refcount;
 
@@ -120,9 +120,14 @@ libzfs_core_fini(void)
 {
 	(void) pthread_mutex_lock(&g_lock);
 	ASSERT3S(g_refcount, >, 0);
-	g_refcount--;
-	if (g_refcount == 0)
+
+	if (g_refcount > 0)
+		g_refcount--;
+
+	if (g_refcount == 0 && g_fd != -1) {
 		(void) close(g_fd);
+		g_fd = -1;
+	}
 	(void) pthread_mutex_unlock(&g_lock);
 }
 
@@ -139,6 +144,7 @@ lzc_ioctl(zfs_ioc_t ioc, const char *name,
 	size_t size;
 
 	ASSERT3S(g_refcount, >, 0);
+	VERIFY3S(g_fd, !=, -1);
 
 	(void) strlcpy(zc.zc_name, name, sizeof (zc.zc_name));
 
@@ -280,6 +286,16 @@ lzc_promote(const char *fsname, char *snapnamebuf, int snapnamelen)
 	return (0);
 }
 
+int
+lzc_remap(const char *fsname)
+{
+	int error;
+	nvlist_t *args = fnvlist_alloc();
+	error = lzc_ioctl(ZFS_IOC_REMAP, fsname, args, NULL);
+	nvlist_free(args);
+	return (error);
+}
+
 /*
  * Creates snapshots.
  *
@@ -410,6 +426,9 @@ lzc_exists(const char *dataset)
 	 * own zfs_cmd_t rather than using lzc_ioctl().
 	 */
 	zfs_cmd_t zc = { 0 };
+
+	ASSERT3S(g_refcount, >, 0);
+	VERIFY3S(g_fd, !=, -1);
 
 	(void) strlcpy(zc.zc_name, dataset, sizeof (zc.zc_name));
 	return (ioctl(g_fd, ZFS_IOC_OBJSET_STATS, &zc) == 0);
@@ -656,6 +675,7 @@ recv_impl(const char *snapname, nvlist_t *props, const char *origin,
 	int error;
 
 	ASSERT3S(g_refcount, >, 0);
+	VERIFY3S(g_fd, !=, -1);
 
 	/* zc_name is name of containing filesystem */
 	(void) strlcpy(zc.zc_name, snapname, sizeof (zc.zc_name));
@@ -918,6 +938,25 @@ lzc_destroy_bookmarks(nvlist_t *bmarks, nvlist_t **errlist)
 	return (error);
 }
 
+static int
+lzc_channel_program_impl(const char *pool, const char *program, boolean_t sync,
+    uint64_t instrlimit, uint64_t memlimit, nvlist_t *argnvl, nvlist_t **outnvl)
+{
+	int error;
+	nvlist_t *args;
+
+	args = fnvlist_alloc();
+	fnvlist_add_string(args, ZCP_ARG_PROGRAM, program);
+	fnvlist_add_nvlist(args, ZCP_ARG_ARGLIST, argnvl);
+	fnvlist_add_boolean_value(args, ZCP_ARG_SYNC, sync);
+	fnvlist_add_uint64(args, ZCP_ARG_INSTRLIMIT, instrlimit);
+	fnvlist_add_uint64(args, ZCP_ARG_MEMLIMIT, memlimit);
+	error = lzc_ioctl(ZFS_IOC_CHANNEL_PROGRAM, pool, args, outnvl);
+	fnvlist_free(args);
+
+	return (error);
+}
+
 /*
  * Executes a channel program.
  *
@@ -955,16 +994,94 @@ int
 lzc_channel_program(const char *pool, const char *program, uint64_t instrlimit,
     uint64_t memlimit, nvlist_t *argnvl, nvlist_t **outnvl)
 {
-	int error;
-	nvlist_t *args;
+	return (lzc_channel_program_impl(pool, program, B_TRUE, instrlimit,
+	    memlimit, argnvl, outnvl));
+}
 
-	args = fnvlist_alloc();
-	fnvlist_add_string(args, ZCP_ARG_PROGRAM, program);
-	fnvlist_add_nvlist(args, ZCP_ARG_ARGLIST, argnvl);
-	fnvlist_add_uint64(args, ZCP_ARG_INSTRLIMIT, instrlimit);
-	fnvlist_add_uint64(args, ZCP_ARG_MEMLIMIT, memlimit);
-	error = lzc_ioctl(ZFS_IOC_CHANNEL_PROGRAM, pool, args, outnvl);
+/*
+ * Creates a checkpoint for the specified pool.
+ *
+ * If this function returns 0 the pool was successfully checkpointed.
+ *
+ * This method may also return:
+ *
+ * ZFS_ERR_CHECKPOINT_EXISTS
+ *	The pool already has a checkpoint. A pools can only have one
+ *	checkpoint at most, at any given time.
+ *
+ * ZFS_ERR_DISCARDING_CHECKPOINT
+ * 	ZFS is in the middle of discarding a checkpoint for this pool.
+ * 	The pool can be checkpointed again once the discard is done.
+ *
+ * ZFS_DEVRM_IN_PROGRESS
+ * 	A vdev is currently being removed. The pool cannot be
+ * 	checkpointed until the device removal is done.
+ *
+ * ZFS_VDEV_TOO_BIG
+ * 	One or more top-level vdevs exceed the maximum vdev size
+ * 	supported for this feature.
+ */
+int
+lzc_pool_checkpoint(const char *pool)
+{
+	int error;
+
+	nvlist_t *result = NULL;
+	nvlist_t *args = fnvlist_alloc();
+
+	error = lzc_ioctl(ZFS_IOC_POOL_CHECKPOINT, pool, args, &result);
+
 	fnvlist_free(args);
+	fnvlist_free(result);
 
 	return (error);
+}
+
+/*
+ * Discard the checkpoint from the specified pool.
+ *
+ * If this function returns 0 the checkpoint was successfully discarded.
+ *
+ * This method may also return:
+ *
+ * ZFS_ERR_NO_CHECKPOINT
+ * 	The pool does not have a checkpoint.
+ *
+ * ZFS_ERR_DISCARDING_CHECKPOINT
+ * 	ZFS is already in the middle of discarding the checkpoint.
+ */
+int
+lzc_pool_checkpoint_discard(const char *pool)
+{
+	int error;
+
+	nvlist_t *result = NULL;
+	nvlist_t *args = fnvlist_alloc();
+
+	error = lzc_ioctl(ZFS_IOC_POOL_DISCARD_CHECKPOINT, pool, args, &result);
+
+	fnvlist_free(args);
+	fnvlist_free(result);
+
+	return (error);
+}
+
+/*
+ * Executes a read-only channel program.
+ *
+ * A read-only channel program works programmatically the same way as a
+ * normal channel program executed with lzc_channel_program(). The only
+ * difference is it runs exclusively in open-context and therefore can
+ * return faster. The downside to that, is that the program cannot change
+ * on-disk state by calling functions from the zfs.sync submodule.
+ *
+ * The return values of this function (and their meaning) are exactly the
+ * same as the ones described in lzc_channel_program().
+ */
+int
+lzc_channel_program_nosync(const char *pool, const char *program,
+    uint64_t timeout, uint64_t memlimit, nvlist_t *argnvl, nvlist_t **outnvl)
+{
+	return (lzc_channel_program_impl(pool, program, B_FALSE, timeout,
+	    memlimit, argnvl, outnvl));
 }

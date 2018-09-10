@@ -66,6 +66,8 @@
 #ifndef _NETINET6_IP6_VAR_H_
 #define _NETINET6_IP6_VAR_H_
 
+#include <sys/epoch.h>
+
 /*
  * IP6 reassembly queue structure.  Each fragment
  * being reassembled is attached to one of these structures.
@@ -121,6 +123,7 @@ struct ip6_moptions {
 	u_short	im6o_max_memberships;	/* max memberships this socket */
 	struct	in6_multi **im6o_membership;	/* group memberships */
 	struct	in6_mfilter *im6o_mfilters;	/* source filters */
+	struct	epoch_context imo6_epoch_ctx;
 };
 
 /*
@@ -364,7 +367,7 @@ void	ip6_direct_input(struct mbuf *);
 void	ip6_freepcbopts(struct ip6_pktopts *);
 
 int	ip6_unknown_opt(u_int8_t *, struct mbuf *, int);
-char *	ip6_get_prevhdr(const struct mbuf *, int);
+int	ip6_get_prevhdr(const struct mbuf *, int);
 int	ip6_nexthdr(const struct mbuf *, int, int, int *);
 int	ip6_lasthdr(const struct mbuf *, int, int, int *);
 

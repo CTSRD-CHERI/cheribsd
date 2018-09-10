@@ -53,7 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #ifdef LOADER_ZFS_SUPPORT
 #include <sys/vtoc.h>
-#include "../zfs/libzfs.h"
+#include "libzfs.h"
 #endif
 
 #include <vm/vm.h>
@@ -74,8 +74,6 @@ __FBSDID("$FreeBSD$");
 #include "bootstrap.h"
 #include "libofw.h"
 #include "dev_net.h"
-
-extern char bootprog_info[];
 
 enum {
 	HEAPVA		= 0x800000,
@@ -117,7 +115,7 @@ uint32_t cpu_get_mid_sun4u(void);
 static void tlb_init_sun4u(void);
 
 #ifdef LOADER_DEBUG
-typedef u_int64_t tte_t;
+typedef uint64_t tte_t;
 
 static void pmap_print_tlb_sun4u(void);
 static void pmap_print_tte_sun4u(tte_t, tte_t);
@@ -339,7 +337,7 @@ static int
 __elfN(exec)(struct preloaded_file *fp)
 {
 	struct file_metadata *fmp;
-	vm_offset_t mdp, dtbp;
+	vm_offset_t mdp;
 	Elf_Addr entry;
 	Elf_Ehdr *e;
 	int error;
@@ -348,7 +346,7 @@ __elfN(exec)(struct preloaded_file *fp)
 		return (EFTYPE);
 	e = (Elf_Ehdr *)&fmp->md_data;
 
-	if ((error = md_load(fp->f_args, &mdp, &dtbp)) != 0)
+	if ((error = md_load64(fp->f_args, &mdp, NULL)) != 0)
 		return (error);
 
 	printf("jumping to kernel entry at %#lx.\n", e->e_entry);
@@ -735,15 +733,6 @@ tlb_init_sun4u(void)
 
 #ifdef LOADER_ZFS_SUPPORT
 
-/* Set by sparc64_zfs_probe to provide partition size. */
-static size_t part_size;
-
-uint64_t
-ldi_get_size(void *priv __unused)
-{
-	return ((uint64_t)part_size);
-}
-
 static void
 sparc64_zfs_probe(void)
 {
@@ -799,7 +788,6 @@ sparc64_zfs_probe(void)
 			if (part == 2 || vtoc.part[part].tag !=
 			    VTOC_TAG_FREEBSD_ZFS)
 				continue;
-			part_size = vtoc.map[part].nblks;
 			(void)sprintf(devname, "%s:%c", alias, part + 'a');
 			/* Get the GUID of the ZFS pool on the boot device. */
 			if (strcmp(devname, bootpath) == 0)
@@ -816,8 +804,7 @@ sparc64_zfs_probe(void)
 	if (guid != 0) {
 		zfs_currdev.pool_guid = guid;
 		zfs_currdev.root_guid = 0;
-		zfs_currdev.d_dev = &zfs_dev;
-		zfs_currdev.d_type = zfs_currdev.d_dev->dv_type;
+		zfs_currdev.dd.d_dev = &zfs_dev;
 	}
 }
 #endif /* LOADER_ZFS_SUPPORT */

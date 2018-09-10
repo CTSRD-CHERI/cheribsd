@@ -44,6 +44,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/ctype.h>
 #include <sys/limits.h>
+/*
+ * Note that stdarg.h and the ANSI style va_start macro is used for both
+ * ANSI and traditional C compilers.
+ */
+#include <machine/stdarg.h>
 #else
 #include <sys/types.h>
 
@@ -53,12 +58,6 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <string.h>
 #endif
-
-/*
- * Note that stdarg.h and the ANSI style va_start macro is used for both
- * ANSI and traditional C compilers.
- */
-#include <machine/stdarg.h>
 
 #define	BUF		32 	/* Maximum length of numeric string. */
 

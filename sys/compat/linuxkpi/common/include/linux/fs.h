@@ -42,6 +42,7 @@
 #include <linux/wait.h>
 #include <linux/semaphore.h>
 #include <linux/spinlock.h>
+#include <linux/dcache.h>
 
 struct module;
 struct kiocb;
@@ -64,11 +65,6 @@ struct pfs_node;
 
 typedef struct files_struct *fl_owner_t;
 
-struct dentry {
-	struct inode	*d_inode;
-	struct pfs_node	*d_pfs_node;
-};
-
 struct file_operations;
 
 struct linux_file_wait_queue {
@@ -85,7 +81,7 @@ struct linux_file_wait_queue {
 struct linux_file {
 	struct file	*_file;
 	const struct file_operations	*f_op;
-	void 		*private_data;
+	void		*private_data;
 	int		f_flags;
 	int		f_mode;	/* Just starting mode. */
 	struct dentry	*f_dentry;
@@ -143,7 +139,7 @@ struct file_operations {
 	int (*fasync)(int, struct file *, int);
 
 /* Although not supported in FreeBSD, to align with Linux code
- * we are adding llseek() only when it is mapped to no_llseek which returns 
+ * we are adding llseek() only when it is mapped to no_llseek which returns
  * an illegal seek error
  */
 	loff_t (*llseek)(struct file *, loff_t, int);
@@ -273,7 +269,7 @@ iput(struct inode *inode)
 	vrele(inode);
 }
 
-static inline loff_t 
+static inline loff_t
 no_llseek(struct file *file, loff_t offset, int whence)
 {
 
@@ -285,6 +281,20 @@ noop_llseek(struct linux_file *file, loff_t offset, int whence)
 {
 
 	return (file->_file->f_offset);
+}
+
+static inline struct vnode *
+file_inode(const struct linux_file *file)
+{
+
+	return (file->f_vnode);
+}
+
+static inline int
+call_mmap(struct linux_file *file, struct vm_area_struct *vma)
+{
+
+	return (file->f_op->mmap(file, vma));
 }
 
 /* Shared memory support */

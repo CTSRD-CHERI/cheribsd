@@ -115,9 +115,7 @@ cheri_test_init(void)
 	 * Valid capability to cheri_test_int -- which should be read-write.
 	 * Most other test caps are derived from this one.
 	 */
-	cheri_capability_set(&cheri_test_finecap,
-	    CHERI_PERM_LOAD | CHERI_PERM_STORE, (vaddr_t)&cheri_test_int,
-	    sizeof(cheri_test_int), 0);
+	cheri_test_finecap = &cheri_test_int;
 
 	/* Valid capability to cheri_test_int -- but tag stripped. */
 	cheri_test_untaggedcap = cheri_cleartag(cheri_test_finecap);

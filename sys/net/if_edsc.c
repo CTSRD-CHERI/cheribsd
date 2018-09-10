@@ -208,7 +208,7 @@ edsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	struct ifreq		*ifr = (struct ifreq *)data;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 #if 1
 		/*
 		 * Just turn on any capabilities requested.

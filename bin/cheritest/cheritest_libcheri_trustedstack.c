@@ -252,7 +252,11 @@ test_sandbox_trustedstack_underflow(const struct cheri_test *ctp __unused)
 	returncap = libcheri_make_sealed_return_object();
 	codecap = returncap.co_codecap;
 	datacap = returncap.co_datacap;
-	__asm__ __volatile__ ("ccall $c1, $c2, 1;" "nop" : : "C"(codecap),
+	/*
+	 * TODO: the branch delay slot has been removed. We can remove the nop
+	 * once we no longer expect to run on older bitfiles
+	 */
+	__asm__ __volatile__ ("ccall %0, %1, 1\n\tnop" : : "C"(codecap),
 	    "C"(datacap));
 	cheritest_failure_errx("continued after attempted CReturn");
 }

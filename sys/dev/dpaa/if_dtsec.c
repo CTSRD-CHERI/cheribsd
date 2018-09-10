@@ -404,7 +404,7 @@ dtsec_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	/* Basic functionality to achieve media status reports */
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		DTSEC_LOCK(sc);
 		if (dtsec_set_mtu(sc, ifr_mtu_get(ifr)))
 			ifp->if_mtu = ifr_mtu_get(ifr);
@@ -412,7 +412,7 @@ dtsec_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = EINVAL;
 		DTSEC_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		DTSEC_LOCK(sc);
 
 		if (sc->sc_ifnet->if_flags & IFF_UP)
@@ -424,7 +424,7 @@ dtsec_if_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_mii->mii_media,
 		    command);
 		break;

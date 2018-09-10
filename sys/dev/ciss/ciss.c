@@ -222,11 +222,6 @@ static driver_t ciss_pci_driver = {
     sizeof(struct ciss_softc)
 };
 
-static devclass_t	ciss_devclass;
-DRIVER_MODULE(ciss, pci, ciss_pci_driver, ciss_devclass, 0, 0);
-MODULE_DEPEND(ciss, cam, 1, 1, 1);
-MODULE_DEPEND(ciss, pci, 1, 1, 1);
-
 /*
  * Control device interface.
  */
@@ -270,6 +265,7 @@ TUNABLE_INT("hw.ciss.force_transport", &ciss_force_transport);
  */
 static int ciss_force_interrupt = 0;
 TUNABLE_INT("hw.ciss.force_interrupt", &ciss_force_interrupt);
+
 
 /************************************************************************
  * CISS adapters amazingly don't have a defined programming interface
@@ -360,11 +356,18 @@ static struct
     { 0x103C, 0x21C8, CISS_BOARD_SA5,   "HP Smart Array H241" },
     { 0x103C, 0x21CA, CISS_BOARD_SA5,   "HP Smart Array P246br" },
     { 0x103C, 0x21CB, CISS_BOARD_SA5,   "HP Smart Array P840" },
-    { 0x103C, 0x21CC, CISS_BOARD_SA5,   "HP Smart Array TBD" },
+    { 0x103C, 0x21CC, CISS_BOARD_SA5,   "HP Smart Array P542d" },
     { 0x103C, 0x21CD, CISS_BOARD_SA5,   "HP Smart Array P240nr" },
     { 0x103C, 0x21CE, CISS_BOARD_SA5,   "HP Smart Array H240nr" },
     { 0, 0, 0, NULL }
 };
+
+static devclass_t	ciss_devclass;
+DRIVER_MODULE(ciss, pci, ciss_pci_driver, ciss_devclass, 0, 0);
+MODULE_PNP_INFO("U16:vendor;U16:device;", pci, ciss, ciss_vendor_data,
+    sizeof(ciss_vendor_data[0]), nitems(ciss_vendor_data) - 1);
+MODULE_DEPEND(ciss, cam, 1, 1, 1);
+MODULE_DEPEND(ciss, pci, 1, 1, 1);
 
 /************************************************************************
  * Find a match for the device in our list of known adapters.
@@ -1427,7 +1430,7 @@ ciss_init_logical(struct ciss_softc *sc)
     }
 
     sc->ciss_logical =
-	mallocarray(sc->ciss_max_logical_bus, sizeof(struct ciss_ldrive *),
+	malloc(sc->ciss_max_logical_bus * sizeof(struct ciss_ldrive *),
 	       CISS_MALLOC_CLASS, M_NOWAIT | M_ZERO);
     if (sc->ciss_logical == NULL) {
 	error = ENXIO;
@@ -1436,7 +1439,7 @@ ciss_init_logical(struct ciss_softc *sc)
 
     for (i = 0; i < sc->ciss_max_logical_bus; i++) {
 	sc->ciss_logical[i] =
-	    mallocarray(sc->ciss_cfg->max_logical_supported,
+	    malloc(sc->ciss_cfg->max_logical_supported *
 		   sizeof(struct ciss_ldrive),
 		   CISS_MALLOC_CLASS, M_NOWAIT | M_ZERO);
 	if (sc->ciss_logical[i] == NULL) {
@@ -1549,7 +1552,7 @@ ciss_init_physical(struct ciss_softc *sc)
     }
 
     sc->ciss_controllers =
-	mallocarray(sc->ciss_max_logical_bus, sizeof(union ciss_device_address),
+	malloc(sc->ciss_max_logical_bus * sizeof (union ciss_device_address),
 	       CISS_MALLOC_CLASS, M_NOWAIT | M_ZERO);
 
     if (sc->ciss_controllers == NULL) {
@@ -1566,7 +1569,7 @@ ciss_init_physical(struct ciss_softc *sc)
     }
 
     sc->ciss_physical =
-	mallocarray(sc->ciss_max_physical_bus, sizeof(struct ciss_pdrive *),
+	malloc(sc->ciss_max_physical_bus * sizeof(struct ciss_pdrive *),
 	       CISS_MALLOC_CLASS, M_NOWAIT | M_ZERO);
     if (sc->ciss_physical == NULL) {
 	ciss_printf(sc, "Could not allocate memory for physical device map\n");
@@ -2873,7 +2876,7 @@ ciss_cam_init(struct ciss_softc *sc)
      */
     maxbus = max(sc->ciss_max_logical_bus, sc->ciss_max_physical_bus +
 		 CISS_PHYSICAL_BASE);
-    sc->ciss_cam_sim = mallocarray(maxbus, sizeof(struct cam_sim*),
+    sc->ciss_cam_sim = malloc(maxbus * sizeof(struct cam_sim*),
 			      CISS_MALLOC_CLASS, M_NOWAIT | M_ZERO);
     if (sc->ciss_cam_sim == NULL) {
 	ciss_printf(sc, "can't allocate memory for controller SIM\n");

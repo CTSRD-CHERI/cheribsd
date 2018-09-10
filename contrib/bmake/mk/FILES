@@ -17,6 +17,7 @@ inc.mk
 init.mk
 install-mk
 java.mk
+ldorder.mk
 lib.mk
 libnames.mk
 libs.mk
@@ -58,6 +59,7 @@ warnings.mk
 whats.mk
 yacc.mk
 dirdeps.mk
+dirdeps-options.mk
 gendirdeps.mk
 install-new.mk
 meta2deps.py

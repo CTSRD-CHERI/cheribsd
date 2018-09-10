@@ -173,7 +173,7 @@ static int
 vmmdev_rw(struct cdev *cdev, struct uio *uio, int flags)
 {
 	int error, off, c, prot;
-	vm_paddr_t gpa;
+	vm_paddr_t gpa, maxaddr;
 	void *hpa, *cookie;
 	struct vmmdev_softc *sc;
 
@@ -189,6 +189,7 @@ vmmdev_rw(struct cdev *cdev, struct uio *uio, int flags)
 		return (error);
 
 	prot = (uio->uio_rw == UIO_WRITE ? VM_PROT_WRITE : VM_PROT_READ);
+	maxaddr = vmm_sysmem_maxaddr(sc->vm);
 	while (uio->uio_resid > 0 && error == 0) {
 		gpa = uio->uio_offset;
 		off = gpa & PAGE_MASK;
@@ -204,7 +205,7 @@ vmmdev_rw(struct cdev *cdev, struct uio *uio, int flags)
 		 */
 		hpa = vm_gpa_hold(sc->vm, VM_MAXCPU - 1, gpa, c, prot, &cookie);
 		if (hpa == NULL) {
-			if (uio->uio_rw == UIO_READ)
+			if (uio->uio_rw == UIO_READ && gpa < maxaddr)
 				error = uiomove(__DECONST(void *, zero_region),
 				    c, uio);
 			else
@@ -282,6 +283,36 @@ done:
 }
 
 static int
+vm_get_register_set(struct vm *vm, int vcpu, unsigned int count, int *regnum,
+    uint64_t *regval)
+{
+	int error, i;
+
+	error = 0;
+	for (i = 0; i < count; i++) {
+		error = vm_get_register(vm, vcpu, regnum[i], &regval[i]);
+		if (error)
+			break;
+	}
+	return (error);
+}
+
+static int
+vm_set_register_set(struct vm *vm, int vcpu, unsigned int count, int *regnum,
+    uint64_t *regval)
+{
+	int error, i;
+
+	error = 0;
+	for (i = 0; i < count; i++) {
+		error = vm_set_register(vm, vcpu, regnum[i], regval[i]);
+		if (error)
+			break;
+	}
+	return (error);
+}
+
+static int
 vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	     struct thread *td)
 {
@@ -290,6 +321,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vmmdev_softc *sc;
 	struct vm_register *vmreg;
 	struct vm_seg_desc *vmsegdesc;
+	struct vm_register_set *vmregset;
 	struct vm_run *vmrun;
 	struct vm_exception *vmexc;
 	struct vm_lapic_irq *vmirq;
@@ -315,6 +347,9 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	struct vm_rtc_time *rtctime;
 	struct vm_rtc_data *rtcdata;
 	struct vm_memmap *mm;
+	struct vm_cpu_topology *topology;
+	uint64_t *regvals;
+	int *regnums;
 
 	sc = vmmdev_lookup2(cdev);
 	if (sc == NULL)
@@ -333,6 +368,8 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	case VM_SET_REGISTER:
 	case VM_GET_SEGMENT_DESCRIPTOR:
 	case VM_SET_SEGMENT_DESCRIPTOR:
+	case VM_GET_REGISTER_SET:
+	case VM_SET_REGISTER_SET:
 	case VM_INJECT_EXCEPTION:
 	case VM_GET_CAPABILITY:
 	case VM_SET_CAPABILITY:
@@ -340,6 +377,7 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 	case VM_PPTDEV_MSIX:
 	case VM_SET_X2APIC_STATE:
 	case VM_GLA2GPA:
+	case VM_GLA2GPA_NOFAULT:
 	case VM_ACTIVATE_CPU:
 	case VM_SET_INTINFO:
 	case VM_GET_INTINFO:
@@ -546,6 +584,48 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 					vmsegdesc->regnum,
 					&vmsegdesc->desc);
 		break;
+	case VM_GET_REGISTER_SET:
+		vmregset = (struct vm_register_set *)data;
+		if (vmregset->count > VM_REG_LAST) {
+			error = EINVAL;
+			break;
+		}
+		regvals = malloc(sizeof(regvals[0]) * vmregset->count, M_VMMDEV,
+		    M_WAITOK);
+		regnums = malloc(sizeof(regnums[0]) * vmregset->count, M_VMMDEV,
+		    M_WAITOK);
+		error = copyin(vmregset->regnums, regnums, sizeof(regnums[0]) *
+		    vmregset->count);
+		if (error == 0)
+			error = vm_get_register_set(sc->vm, vmregset->cpuid,
+			    vmregset->count, regnums, regvals);
+		if (error == 0)
+			error = copyout(regvals, vmregset->regvals,
+			    sizeof(regvals[0]) * vmregset->count);
+		free(regvals, M_VMMDEV);
+		free(regnums, M_VMMDEV);
+		break;
+	case VM_SET_REGISTER_SET:
+		vmregset = (struct vm_register_set *)data;
+		if (vmregset->count > VM_REG_LAST) {
+			error = EINVAL;
+			break;
+		}
+		regvals = malloc(sizeof(regvals[0]) * vmregset->count, M_VMMDEV,
+		    M_WAITOK);
+		regnums = malloc(sizeof(regnums[0]) * vmregset->count, M_VMMDEV,
+		    M_WAITOK);
+		error = copyin(vmregset->regnums, regnums, sizeof(regnums[0]) *
+		    vmregset->count);
+		if (error == 0)
+			error = copyin(vmregset->regvals, regvals,
+			    sizeof(regvals[0]) * vmregset->count);
+		if (error == 0)
+			error = vm_set_register_set(sc->vm, vmregset->cpuid,
+			    vmregset->count, regnums, regvals);
+		free(regvals, M_VMMDEV);
+		free(regnums, M_VMMDEV);
+		break;
 	case VM_GET_CAPABILITY:
 		vmcap = (struct vm_capability *)data;
 		error = vm_get_capability(sc->vm, vmcap->cpuid,
@@ -588,6 +668,13 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		    ("%s: vm_gla2gpa unknown error %d", __func__, error));
 		break;
 	}
+	case VM_GLA2GPA_NOFAULT:
+		gg = (struct vm_gla2gpa *)data;
+		error = vm_gla2gpa_nofault(sc->vm, gg->vcpuid, &gg->paging,
+		    gg->gla, gg->prot, &gg->gpa, &gg->fault);
+		KASSERT(error == 0 || error == EFAULT,
+		    ("%s: vm_gla2gpa unknown error %d", __func__, error));
+		break;
 	case VM_ACTIVATE_CPU:
 		vac = (struct vm_activate_cpu *)data;
 		error = vm_activate_cpu(sc->vm, vac->vcpuid);
@@ -605,11 +692,21 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 			*cpuset = vm_active_cpus(sc->vm);
 		else if (vm_cpuset->which == VM_SUSPENDED_CPUS)
 			*cpuset = vm_suspended_cpus(sc->vm);
+		else if (vm_cpuset->which == VM_DEBUG_CPUS)
+			*cpuset = vm_debug_cpus(sc->vm);
 		else
 			error = EINVAL;
 		if (error == 0)
 			error = copyout(cpuset, vm_cpuset->cpus, size);
 		free(cpuset, M_TEMP);
+		break;
+	case VM_SUSPEND_CPU:
+		vac = (struct vm_activate_cpu *)data;
+		error = vm_suspend_cpu(sc->vm, vac->vcpuid);
+		break;
+	case VM_RESUME_CPU:
+		vac = (struct vm_activate_cpu *)data;
+		error = vm_resume_cpu(sc->vm, vac->vcpuid);
 		break;
 	case VM_SET_INTINFO:
 		vmii = (struct vm_intinfo *)data;
@@ -641,6 +738,17 @@ vmmdev_ioctl(struct cdev *cdev, u_long cmd, caddr_t data, int fflag,
 		break;
 	case VM_RESTART_INSTRUCTION:
 		error = vm_restart_instruction(sc->vm, vcpu);
+		break;
+	case VM_SET_TOPOLOGY:
+		topology = (struct vm_cpu_topology *)data;
+		error = vm_set_topology(sc->vm, topology->sockets,
+		    topology->cores, topology->threads, topology->maxcpus);
+		break;
+	case VM_GET_TOPOLOGY:
+		topology = (struct vm_cpu_topology *)data;
+		vm_get_topology(sc->vm, &topology->sockets, &topology->cores,
+		    &topology->threads, &topology->maxcpus);
+		error = 0;
 		break;
 	default:
 		error = ENOTTY;

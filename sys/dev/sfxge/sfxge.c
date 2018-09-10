@@ -399,7 +399,7 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	error = 0;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SFXGE_ADAPTER_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -415,7 +415,7 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		SFXGE_ADAPTER_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) == ifp->if_mtu) {
 			/* Nothing to do */
 			error = 0;
@@ -438,12 +438,12 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 			}
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			sfxge_mac_filter_set(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 	{
 		int reqcap = ifr_reqcap_get(ifr);
 		int capchg_mask;
@@ -520,12 +520,12 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		SFXGE_ADAPTER_UNLOCK(sc);
 		break;
 	}
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->media, command);
 		break;
 #ifdef SIOCGI2C
-	CASE_IOC_IFREQ(SIOCGI2C):
+	case CASE_IOC_IFREQ(SIOCGI2C):
 	{
 		struct ifi2creq i2c;
 
@@ -549,7 +549,7 @@ sfxge_if_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 		break;
 	}
 #endif
-	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
+	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		error = priv_check(curthread, PRIV_DRIVER);
 		if (error != 0)
 			break;

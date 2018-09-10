@@ -54,8 +54,6 @@ static EFI_GUID BlockIoProtocolGUID = BLOCK_IO_PROTOCOL;
 static EFI_GUID DevicePathGUID = DEVICE_PATH_PROTOCOL;
 static EFI_GUID LoadedImageGUID = LOADED_IMAGE_PROTOCOL;
 static EFI_GUID ConsoleControlGUID = EFI_CONSOLE_CONTROL_PROTOCOL_GUID;
-static EFI_GUID FreeBSDBootVarGUID = FREEBSD_BOOT_VAR_GUID;
-static EFI_GUID GlobalBootVarGUID = UEFI_BOOT_VAR_GUID;
 
 /*
  * Provide Malloc / Free backed by EFIs AllocatePool / FreePool which ensures
@@ -78,42 +76,6 @@ Free(void *buf, const char *file __unused, int line __unused)
 {
 	if (buf != NULL)
 		(void)BS->FreePool(buf);
-}
-
-static EFI_STATUS
-efi_getenv(EFI_GUID *g, const char *v, void *data, size_t *len)
-{
-	size_t ul;
-	CHAR16 *uv;
-	UINT32 attr;
-	UINTN dl;
-	EFI_STATUS rv;
-
-	uv = NULL;
-	if (utf8_to_ucs2(v, &uv, &ul) != 0)
-		return (EFI_OUT_OF_RESOURCES);
-	dl = *len;
-	rv = RS->GetVariable(uv, g, &attr, &dl, data);
-	if (rv == EFI_SUCCESS)
-		*len = dl;
-	free(uv);
-	return (rv);
-}
-
-static EFI_STATUS
-efi_setenv_freebsd_wcs(const char *varname, CHAR16 *valstr)
-{
-	CHAR16 *var = NULL;
-	size_t len;
-	EFI_STATUS rv;
-
-	if (utf8_to_ucs2(varname, &var, &len) != 0)
-		return (EFI_OUT_OF_RESOURCES);
-	rv = RS->SetVariable(var, &FreeBSDBootVarGUID,
-	    EFI_VARIABLE_BOOTSERVICE_ACCESS | EFI_VARIABLE_RUNTIME_ACCESS,
-	    (ucs2len(valstr) + 1) * sizeof(efi_char), valstr);
-	free(var);
-	return (rv);
 }
 
 /*
@@ -429,7 +391,7 @@ efi_main(EFI_HANDLE Ximage, EFI_SYSTEM_TABLE *Xsystab)
 	EFI_STATUS status;
 	EFI_CONSOLE_CONTROL_PROTOCOL *ConsoleControl = NULL;
 	SIMPLE_TEXT_OUTPUT_INTERFACE *conout = NULL;
-	UINTN i, max_dim, best_mode, cols, rows, hsize, nhandles;
+	UINTN i, hsize, nhandles;
 	CHAR16 *text;
 	UINT16 boot_current;
 	size_t sz;
@@ -448,22 +410,13 @@ efi_main(EFI_HANDLE Ximage, EFI_SYSTEM_TABLE *Xsystab)
 		(void)ConsoleControl->SetMode(ConsoleControl,
 		    EfiConsoleControlScreenText);
 	/*
-	 * Reset the console and find the best text mode.
+	 * Reset the console enable the cursor. Later we'll choose a better
+	 * console size through GOP/UGA.
 	 */
 	conout = ST->ConOut;
 	conout->Reset(conout, TRUE);
-	max_dim = best_mode = 0;
-	for (i = 0; i < conout->Mode->MaxMode; i++) {
-		status = conout->QueryMode(conout, i, &cols, &rows);
-		if (EFI_ERROR(status))
-			continue;
-		if (cols * rows > max_dim) {
-			max_dim = cols * rows;
-			best_mode = i;
-		}
-	}
-	if (max_dim > 0)
-		conout->SetMode(conout, best_mode);
+	/* Explicitly set conout to mode 0, 80x25 */
+	conout->SetMode(conout, 0);
 	conout->EnableCursor(conout, TRUE);
 	conout->ClearScreen(conout);
 
@@ -505,15 +458,18 @@ efi_main(EFI_HANDLE Ximage, EFI_SYSTEM_TABLE *Xsystab)
 
 	boot_current = 0;
 	sz = sizeof(boot_current);
-	efi_getenv(&GlobalBootVarGUID, "BootCurrent", &boot_current, &sz);
-	printf("   BootCurrent: %04x\n", boot_current);
+	if (efi_global_getenv("BootCurrent", &boot_current, &sz) == EFI_SUCCESS) {
+		printf("   BootCurrent: %04x\n", boot_current);
 
-	sz = sizeof(boot_order);
-	efi_getenv(&GlobalBootVarGUID, "BootOrder", &boot_order, &sz);
-	printf("   BootOrder:");
-	for (i = 0; i < sz / sizeof(boot_order[0]); i++)
-		printf(" %04x", boot_order[i]);
-	printf("\n");
+		sz = sizeof(boot_order);
+		if (efi_global_getenv("BootOrder", &boot_order, &sz) == EFI_SUCCESS) {
+			printf("   BootOrder:");
+			for (i = 0; i < sz / sizeof(boot_order[0]); i++)
+				printf(" %04x%s", boot_order[i],
+				    boot_order[i] == boot_current ? "[*]" : "");
+			printf("\n");
+		}
+	}
 
 #ifdef TEST_FAILURE
 	/*

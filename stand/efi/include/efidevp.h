@@ -31,6 +31,8 @@ Revision History
 // Device Path structures - Section C
 //
 
+#pragma pack(1)
+
 typedef struct _EFI_DEVICE_PATH {
         UINT8                           Type;
         UINT8                           SubType;
@@ -138,6 +140,9 @@ typedef struct _ACPI_EXTENDED_HID_DEVICE_PATH {
   UINT32                          UID;
   UINT32                          CID;
 } ACPI_EXTENDED_HID_DEVICE_PATH;
+
+#define ACPI_ADR_DP                         0x03
+/* ACPI_ADR_DEVICE_PATH not defined */
 
 //
 // EISA ID Macro
@@ -450,5 +455,7 @@ typedef struct _EFI_DEVICE_PATH_TO_TEXT_PROTOCOL {
 	EFI_DEVICE_PATH_TO_TEXT_NODE ConvertDeviceNodeToText;
 	EFI_DEVICE_PATH_TO_TEXT_PATH ConvertDevicePathToText;
 } EFI_DEVICE_PATH_TO_TEXT_PROTOCOL;
+
+#pragma pack()
 
 #endif

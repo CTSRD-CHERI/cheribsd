@@ -67,13 +67,12 @@
 #include <sys/ucontext.h>
 #include <sys/ucred.h>
 #include <sys/types.h>
-#include <sys/domainset.h>
+#include <sys/_domainset.h>
 
 #include <machine/proc.h>		/* Machine-dependent proc substruct. */
 #ifdef _KERNEL
 #include <machine/cpu.h>
 #endif
-
 
 /*
  * One structure allocated per session.
@@ -242,7 +241,8 @@ struct thread {
 	u_char		td_lend_user_pri; /* (t) Lend user pri. */
 
 /* Cleared during fork1() */
-#define	td_startzero td_flags
+#define	td_startzero td_epochnest
+	u_char		td_epochnest;	/* (k) Epoch nest counter. */
 	int		td_flags;	/* (t) TDF_* flags. */
 	int		td_inhibitors;	/* (t) Why can not run. */
 	int		td_pflags;	/* (k) Private thread (TDP_*) flags. */
@@ -254,6 +254,7 @@ struct thread {
 	u_char		td_tsqueue;	/* (t) Turnstile queue blocked on. */
 	short		td_locks;	/* (k) Debug: count of non-spin locks */
 	short		td_rw_rlocks;	/* (k) Count of rwlock read locks. */
+	short		td_sx_slocks;	/* (k) Count of sx shared locks. */
 	short		td_lk_slocks;	/* (k) Count of lockmgr shared locks. */
 	short		td_stopsched;	/* (k) Scheduler stopped. */
 	struct turnstile *td_blocked;	/* (t) Lock thread is blocked on. */
@@ -301,6 +302,7 @@ struct thread {
 	void		*td_su;		/* (k) FFS SU private */
 	sbintime_t	td_sleeptimo;	/* (t) Sleep timeout. */
 	int		td_rtcgen;	/* (s) rtc_generation of abs. sleep */
+	size_t		td_vslock_sz;	/* (k) amount of vslock-ed space */
 #define	td_endzero td_sigmask
 
 /* Copied during fork1() or create_thread(). */
@@ -312,6 +314,7 @@ struct thread {
 	u_char		td_pri_class;	/* (t) Scheduling class. */
 	u_char		td_user_pri;	/* (t) User pri from estcpu and nice. */
 	u_char		td_base_user_pri; /* (t) Base user pri */
+	u_char		td_pre_epoch_prio; /* (k) User pri on entry to epoch */
 	uintcap_t	td_rb_list;	/* (k) Robust list head. */
 	uintcap_t	td_rbp_list;	/* (k) Robust priv list head. */
 	uintcap_t	td_rb_inact;	/* (k) Current in-action mutex loc. */
@@ -341,6 +344,7 @@ struct thread {
 #define td_retval	td_uretoff.tdu_retval
 #define td_retcap	td_uretoff.tdu_retcap
 	u_int		td_cowgen;	/* (k) Generation of COW pointers. */
+	/* LP64 hole */
 	struct callout	td_slpcallout;	/* (h) Callout for sleep. */
 	struct trapframe *td_frame;	/* (k) */
 	struct vm_object *td_kstack_obj;/* (a) Kstack object. */
@@ -352,16 +356,19 @@ struct thread {
 	struct lpohead	td_lprof[2];	/* (a) lock profiling objects. */
 	struct kdtrace_thread	*td_dtrace; /* (*) DTrace-specific data. */
 	int		td_errno;	/* Error returned by last syscall. */
+	/* LP64 hole */
 	struct vnet	*td_vnet;	/* (k) Effective vnet. */
 	const char	*td_vnet_lpush;	/* (k) Debugging vnet push / pop. */
 	struct trapframe *td_intr_frame;/* (k) Frame of the current irq */
 	struct proc	*td_rfppwait_p;	/* (k) The vforked child */
 	struct vm_page	**td_ma;	/* (k) uio pages held */
 	int		td_ma_cnt;	/* (k) size of *td_ma */
+	/* LP64 hole */
 	void		*td_emuldata;	/* Emulator state data */
 	int		td_lastcpu;	/* (t) Last cpu we were on. */
 	int		td_oncpu;	/* (t) Which cpu we are on. */
 	void		*td_lkpi_task;	/* LinuxKPI task struct pointer */
+	int		td_pmcpend;
 };
 
 struct thread0_storage {
@@ -388,7 +395,11 @@ do {									\
 } while (0)
 
 #define	TD_LOCKS_INC(td)	((td)->td_locks++)
-#define	TD_LOCKS_DEC(td)	((td)->td_locks--)
+#define	TD_LOCKS_DEC(td) do {						\
+	KASSERT(SCHEDULER_STOPPED_TD(td) || (td)->td_locks > 0,		\
+	    ("thread %p owns no locks", (td)));				\
+	(td)->td_locks--;						\
+} while (0)
 #else
 #define	THREAD_LOCKPTR_ASSERT(td, lock)
 
@@ -448,6 +459,7 @@ do {									\
 #define	TDB_EXIT	0x00000400 /* Exiting LWP indicator for ptrace() */
 #define	TDB_VFORK	0x00000800 /* vfork indicator for ptrace() */
 #define	TDB_FSTP	0x00001000 /* The thread is PT_ATTACH leader */
+#define	TDB_STEP	0x00002000 /* (x86) PSL_T set for PT_STEP */
 
 /*
  * "Private" flags kept in td_pflags:
@@ -614,7 +626,7 @@ struct proc {
 	u_int		p_stype;	/* (c) Stop event type. */
 	char		p_step;		/* (c) Process is stopped. */
 	u_char		p_pfsflags;	/* (c) Procfs flags. */
-	u_int		p_ptevents;	/* (c) ptrace() event mask. */
+	u_int		p_ptevents;	/* (c + e) ptrace() event mask. */
 	struct nlminfo	*p_nlminfo;	/* (?) Only used by/for lockd. */
 	struct kaioinfo	*p_aioinfo;	/* (y) ASYNC I/O info. */
 	struct thread	*p_singlethread;/* (c + j) If single threading this is it */
@@ -627,6 +639,7 @@ struct proc {
 	u_int		p_treeflag;	/* (e) P_TREE flags */
 	int		p_pendingexits; /* (c) Count of pending thread exits. */
 	struct filemon	*p_filemon;	/* (c) filemon-specific data. */
+	int		p_pdeathsig;	/* (c) Signal from parent on exit. */
 /* End area that is zeroed on creation. */
 #define	p_endzero	p_magic
 
@@ -667,13 +680,11 @@ struct proc {
 	LIST_HEAD(, mqueue_notifier)	p_mqnotifier; /* (c) mqueue notifiers.*/
 	struct kdtrace_proc	*p_dtrace; /* (*) DTrace-specific data. */
 	struct cv	p_pwait;	/* (*) wait cv for exit/exec. */
-	struct cv	p_dbgwait;	/* (*) wait cv for debugger attach
-					   after fork. */
 	uint64_t	p_prev_runtime;	/* (c) Resource usage accounting. */
 	struct racct	*p_racct;	/* (b) Resource accounting. */
 	int		p_throttled;	/* (c) Flag for racct pcpu throttling */
 	/*
-	 * An orphan is the child that has beed re-parented to the
+	 * An orphan is the child that has been re-parented to the
 	 * debugger as a result of attaching to it.  Need to keep
 	 * track of them for parent to be able to collect the exit
 	 * status of what used to be children.

@@ -84,20 +84,21 @@ static int	openfirmware(void *args);
 __inline void
 ofw_save_trap_vec(char *save_trap_vec)
 {
-	if (!ofw_real_mode)
+	if (!ofw_real_mode || !hw_direct_map)
                 return;
 
-	bcopy((void *)EXC_RST, save_trap_vec, EXC_LAST - EXC_RST);
+	bcopy((void *)PHYS_TO_DMAP(EXC_RST), save_trap_vec, EXC_LAST - EXC_RST);
 }
 
 static __inline void
 ofw_restore_trap_vec(char *restore_trap_vec)
 {
-	if (!ofw_real_mode)
+	if (!ofw_real_mode || !hw_direct_map)
                 return;
 
-	bcopy(restore_trap_vec, (void *)EXC_RST, EXC_LAST - EXC_RST);
-	__syncicache(EXC_RSVD, EXC_LAST - EXC_RSVD);
+	bcopy(restore_trap_vec, (void *)PHYS_TO_DMAP(EXC_RST),
+	    EXC_LAST - EXC_RST);
+	__syncicache((void *)PHYS_TO_DMAP(EXC_RSVD), EXC_LAST - EXC_RSVD);
 }
 
 /*
@@ -222,42 +223,21 @@ parse_ofw_memory(phandle_t node, const char *prop, struct mem_region *output)
 	return (sz);
 }
 
+#ifdef FDT
 static int
-excise_fdt_reserved(struct mem_region *avail, int asz)
+excise_reserved_regions(struct mem_region *avail, int asz,
+			struct mem_region *exclude, int esz)
 {
-	struct {
-		uint64_t address;
-		uint64_t size;
-	} fdtmap[16];
-	ssize_t fdtmapsize;
-	phandle_t chosen;
 	int i, j, k;
 
-	chosen = OF_finddevice("/chosen");
-	fdtmapsize = OF_getprop(chosen, "fdtmemreserv", fdtmap, sizeof(fdtmap));
-
-	for (j = 0; j < fdtmapsize/sizeof(fdtmap[0]); j++) {
-		fdtmap[j].address = be64toh(fdtmap[j].address) & ~PAGE_MASK;
-		fdtmap[j].size = round_page(be64toh(fdtmap[j].size));
-	}
-
-	KASSERT(j*sizeof(fdtmap[0]) < sizeof(fdtmap),
-	    ("Exceeded number of FDT reservations"));
-	/* Add a virtual entry for the FDT itself */
-	if (fdt != NULL) {
-		fdtmap[j].address = (vm_offset_t)fdt & ~PAGE_MASK;
-		fdtmap[j].size = round_page(fdt_totalsize(fdt));
-		fdtmapsize += sizeof(fdtmap[0]);
-	}
-
 	for (i = 0; i < asz; i++) {
-		for (j = 0; j < fdtmapsize/sizeof(fdtmap[0]); j++) {
+		for (j = 0; j < esz; j++) {
 			/*
 			 * Case 1: Exclusion region encloses complete
 			 * available entry. Drop it and move on.
 			 */
-			if (fdtmap[j].address <= avail[i].mr_start &&
-			    fdtmap[j].address + fdtmap[j].size >=
+			if (exclude[j].mr_start <= avail[i].mr_start &&
+			    exclude[j].mr_start + exclude[j].mr_size >=
 			    avail[i].mr_start + avail[i].mr_size) {
 				for (k = i+1; k < asz; k++)
 					avail[k-1] = avail[k];
@@ -272,20 +252,20 @@ excise_fdt_reserved(struct mem_region *avail, int asz)
 			 * a new available entry with the region after
 			 * the excluded region, if any.
 			 */
-			if (fdtmap[j].address >= avail[i].mr_start &&
-			    fdtmap[j].address < avail[i].mr_start +
+			if (exclude[j].mr_start >= avail[i].mr_start &&
+			    exclude[j].mr_start < avail[i].mr_start +
 			    avail[i].mr_size) {
-				if (fdtmap[j].address + fdtmap[j].size < 
+				if (exclude[j].mr_start + exclude[j].mr_size <
 				    avail[i].mr_start + avail[i].mr_size) {
 					avail[asz].mr_start =
-					    fdtmap[j].address + fdtmap[j].size;
+					    exclude[j].mr_start + exclude[j].mr_size;
 					avail[asz].mr_size = avail[i].mr_start +
 					     avail[i].mr_size -
 					     avail[asz].mr_start;
 					asz++;
 				}
 
-				avail[i].mr_size = fdtmap[j].address -
+				avail[i].mr_size = exclude[j].mr_start -
 				    avail[i].mr_start;
 			}
 
@@ -295,13 +275,13 @@ excise_fdt_reserved(struct mem_region *avail, int asz)
 			 * The case of a contained exclusion zone has already
 			 * been caught in case 2.
 			 */
-			if (fdtmap[j].address + fdtmap[j].size >=
-			    avail[i].mr_start && fdtmap[j].address +
-			    fdtmap[j].size < avail[i].mr_start +
+			if (exclude[j].mr_start + exclude[j].mr_size >=
+			    avail[i].mr_start && exclude[j].mr_start +
+			    exclude[j].mr_size < avail[i].mr_start +
 			    avail[i].mr_size) {
 				avail[i].mr_size += avail[i].mr_start;
 				avail[i].mr_start =
-				    fdtmap[j].address + fdtmap[j].size;
+				    exclude[j].mr_start + exclude[j].mr_size;
 				avail[i].mr_size -= avail[i].mr_start;
 			}
 		}
@@ -309,6 +289,86 @@ excise_fdt_reserved(struct mem_region *avail, int asz)
 
 	return (asz);
 }
+
+static int
+excise_initrd_region(struct mem_region *avail, int asz)
+{
+	phandle_t chosen;
+	uint64_t start, end;
+	ssize_t size;
+	struct mem_region initrdmap[1];
+	pcell_t cell[2];
+
+	chosen = OF_finddevice("/chosen");
+
+	size = OF_getencprop(chosen, "linux,initrd-start", cell, sizeof(cell));
+	if (size < 0)
+		return (asz);
+	else if (size == 4)
+		start = cell[0];
+	else if (size == 8)
+		start = (uint64_t)cell[0] << 32 | cell[1];
+	else {
+		/* Invalid value length */
+		printf("WARNING: linux,initrd-start must be either 4 or 8 bytes long\n");
+		return (asz);
+	}
+
+	size = OF_getencprop(chosen, "linux,initrd-end", cell, sizeof(cell));
+	if (size < 0)
+		return (asz);
+	else if (size == 4)
+		end = cell[0];
+	else if (size == 8)
+		end = (uint64_t)cell[0] << 32 | cell[1];
+	else {
+		/* Invalid value length */
+		printf("WARNING: linux,initrd-end must be either 4 or 8 bytes long\n");
+		return (asz);
+	}
+
+	if (end <= start)
+		return (asz);
+
+	initrdmap[0].mr_start = start;
+	initrdmap[0].mr_size = end - start;
+
+	asz = excise_reserved_regions(avail, asz, initrdmap, 1);
+
+	return (asz);
+}
+
+static int
+excise_fdt_reserved(struct mem_region *avail, int asz)
+{
+	struct mem_region fdtmap[32];
+	ssize_t fdtmapsize;
+	phandle_t chosen;
+	int j, fdtentries;
+
+	chosen = OF_finddevice("/chosen");
+	fdtmapsize = OF_getprop(chosen, "fdtmemreserv", fdtmap, sizeof(fdtmap));
+
+	for (j = 0; j < fdtmapsize/sizeof(fdtmap[0]); j++) {
+		fdtmap[j].mr_start = be64toh(fdtmap[j].mr_start) & ~PAGE_MASK;
+		fdtmap[j].mr_size = round_page(be64toh(fdtmap[j].mr_size));
+	}
+
+	KASSERT(j*sizeof(fdtmap[0]) < sizeof(fdtmap),
+	    ("Exceeded number of FDT reservations"));
+	/* Add a virtual entry for the FDT itself */
+	if (fdt != NULL) {
+		fdtmap[j].mr_start = (vm_offset_t)fdt & ~PAGE_MASK;
+		fdtmap[j].mr_size = round_page(fdt_totalsize(fdt));
+		fdtmapsize += sizeof(fdtmap[0]);
+	}
+
+	fdtentries = fdtmapsize/sizeof(fdtmap[0]);
+	asz = excise_reserved_regions(avail, asz, fdtmap, fdtentries);
+
+	return (asz);
+}
+#endif
 
 /*
  * This is called during powerpc_init, before the system is really initialized.
@@ -339,7 +399,17 @@ ofw_mem_regions(struct mem_region *memp, int *memsz,
 
 		res = parse_ofw_memory(phandle, "reg", &memp[msz]);
 		msz += res/sizeof(struct mem_region);
-		if (OF_getproplen(phandle, "available") >= 0)
+
+		/*
+		 * On POWER9 Systems we might have both linux,usable-memory and
+		 * reg properties.  'reg' denotes all available memory, but we
+		 * must use 'linux,usable-memory', a subset, as some memory
+		 * regions are reserved for NVLink.
+		 */
+		if (OF_getproplen(phandle, "linux,usable-memory") >= 0)
+			res = parse_ofw_memory(phandle, "linux,usable-memory",
+			    &availp[asz]);
+		else if (OF_getproplen(phandle, "available") >= 0)
 			res = parse_ofw_memory(phandle, "available",
 			    &availp[asz]);
 		else
@@ -347,9 +417,18 @@ ofw_mem_regions(struct mem_region *memp, int *memsz,
 		asz += res/sizeof(struct mem_region);
 	}
 
+#ifdef FDT
 	phandle = OF_finddevice("/chosen");
 	if (OF_hasprop(phandle, "fdtmemreserv"))
 		asz = excise_fdt_reserved(availp, asz);
+
+	/* If the kernel is being loaded through kexec, initrd region is listed
+	 * in /chosen but the region is not marked as reserved, so, we might exclude
+	 * it here.
+	 */
+	if (OF_hasprop(phandle, "linux,initrd-start"))
+		asz = excise_initrd_region(availp, asz);
+#endif
 
 	*memsz = msz;
 	*availsz = asz;
@@ -381,12 +460,6 @@ OF_initial_setup(void *fdt_ptr, void *junk, int (*openfirm)(void *))
 #endif
 
 	fdt = fdt_ptr;
-
-	#ifdef FDT_DTB_STATIC
-	/* Check for a statically included blob */
-	if (fdt == NULL)
-		fdt = &fdt_static_dtb;
-	#endif
 }
 
 boolean_t
@@ -414,13 +487,59 @@ OF_bootstrap()
 	} else
 #endif
 	if (fdt != NULL) {
-		status = OF_install(OFW_FDT, 0);
+#ifdef FDT
+#ifdef AIM
+		bus_space_tag_t fdt_bt;
+		vm_offset_t tmp_fdt_ptr;
+		vm_size_t fdt_size;
+		uintptr_t fdt_va;
+#endif
 
+		status = OF_install(OFW_FDT, 0);
 		if (status != TRUE)
 			return status;
 
+#ifdef AIM /* AIM-only for now -- Book-E does this remapping in early init */
+		/* Get the FDT size for mapping if we can */
+		tmp_fdt_ptr = pmap_early_io_map((vm_paddr_t)fdt, PAGE_SIZE);
+		if (fdt_check_header((void *)tmp_fdt_ptr) != 0) {
+			pmap_early_io_unmap(tmp_fdt_ptr, PAGE_SIZE);
+			return FALSE;
+		}
+		fdt_size = fdt_totalsize((void *)tmp_fdt_ptr);
+		pmap_early_io_unmap(tmp_fdt_ptr, PAGE_SIZE);
+
+		/*
+		 * Map this for real. Use bus_space_map() to take advantage
+		 * of its auto-remapping function once the kernel is loaded.
+		 * This is a dirty hack, but what we have.
+		 */
+#ifdef _LITTLE_ENDIAN
+		fdt_bt = &bs_le_tag;
+#else
+		fdt_bt = &bs_be_tag;
+#endif
+		bus_space_map(fdt_bt, (vm_paddr_t)fdt, fdt_size, 0, &fdt_va);
+		 
+		err = OF_init((void *)fdt_va);
+#else
 		err = OF_init(fdt);
+#endif
+#endif
 	} 
+
+	#ifdef FDT_DTB_STATIC
+	/*
+	 * Check for a statically included blob already in the kernel and
+	 * needing no mapping.
+	 */
+	else {
+		status = OF_install(OFW_FDT, 0);
+		if (status != TRUE)
+			return status;
+		err = OF_init(&fdt_static_dtb);
+	}
+	#endif
 
 	if (err != 0) {
 		OF_install(NULL, 0);

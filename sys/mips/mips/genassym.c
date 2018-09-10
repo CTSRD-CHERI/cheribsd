@@ -99,6 +99,7 @@ ASSYM(PC_TLB_MOD_CNT, offsetof(struct pcpu, pc_tlb_mod_cnt));
 
 ASSYM(VM_MAX_KERNEL_ADDRESS, VM_MAX_KERNEL_ADDRESS);
 ASSYM(VM_MAXUSER_ADDRESS, VM_MAXUSER_ADDRESS);
+ASSYM(VM_MINUSER_ADDRESS, VM_MINUSER_ADDRESS);
 ASSYM(SIGF_UC, offsetof(struct sigframe, sf_uc));
 #ifdef COMPAT_FREEBSD32
 ASSYM(SIGF32_UC, offsetof(struct sigframe32, sf_uc));

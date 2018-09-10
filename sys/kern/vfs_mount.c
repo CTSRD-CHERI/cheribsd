@@ -81,6 +81,10 @@ static int	usermount = 0;
 SYSCTL_INT(_vfs, OID_AUTO, usermount, CTLFLAG_RW, &usermount, 0,
     "Unprivileged users may mount and unmount file systems");
 
+static bool	default_autoro = false;
+SYSCTL_BOOL(_vfs, OID_AUTO, default_autoro, CTLFLAG_RW, &default_autoro, 0,
+    "Retry failed r/w mount as r/o if no explicit ro/rw option is specified");
+
 MALLOC_DEFINE(M_MOUNT, "mount", "vfs mount structure");
 MALLOC_DEFINE(M_STATFS, "statfs", "statfs structure");
 static uma_zone_t mount_zone;
@@ -310,8 +314,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 			bcopy((__cheri_fromcap void *)auio->uio_iov[i].iov_base,
 			    opt->name, namelen);
 		} else {
-			error = copyin_c(auio->uio_iov[i].iov_base,
-			    (__cheri_tocap char * __capability)opt->name,
+			error = copyin_c(auio->uio_iov[i].iov_base, opt->name,
 			    namelen);
 			if (error)
 				goto bad;
@@ -330,7 +333,6 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 				    optlen);
 			} else {
 				error = copyin_c(auio->uio_iov[i + 1].iov_base,
-				    (__cheri_tocap void * __capability)
 				    opt->value, optlen);
 				if (error)
 					goto bad;
@@ -550,6 +552,31 @@ vfs_mount_destroy(struct mount *mp)
 	uma_zfree(mount_zone, mp);
 }
 
+static bool
+vfs_should_downgrade_to_ro_mount(uint64_t fsflags, int error)
+{
+	/* This is an upgrade of an exisiting mount. */
+	if ((fsflags & MNT_UPDATE) != 0)
+		return (false);
+	/* This is already an R/O mount. */
+	if ((fsflags & MNT_RDONLY) != 0)
+		return (false);
+
+	switch (error) {
+	case ENODEV:	/* generic, geom, ... */
+	case EACCES:	/* cam/scsi, ... */
+	case EROFS:	/* md, mmcsd, ... */
+		/*
+		 * These errors can be returned by the storage layer to signal
+		 * that the media is read-only.  No harm in the R/O mount
+		 * attempt if the error was returned for some other reason.
+		 */
+		return (true);
+	default:
+		return (false);
+	}
+}
+
 int
 vfs_donmount(struct thread *td, uint64_t fsflags, struct uio *fsoptions)
 {
@@ -557,10 +584,12 @@ vfs_donmount(struct thread *td, uint64_t fsflags, struct uio *fsoptions)
 	struct vfsopt *opt, *tmp_opt;
 	char *fstype, *fspath, *errmsg;
 	int error, fstypelen, fspathlen, errmsg_len, errmsg_pos;
+	bool autoro;
 
 	errmsg = fspath = NULL;
 	errmsg_len = fspathlen = 0;
 	errmsg_pos = -1;
+	autoro = default_autoro;
 
 	error = vfs_buildopts(fsoptions, &optlist);
 	if (error)
@@ -652,16 +681,27 @@ vfs_donmount(struct thread *td, uint64_t fsflags, struct uio *fsoptions)
 			free(opt->name, M_MOUNT);
 			opt->name = strdup("nonosymfollow", M_MOUNT);
 		}
-		else if (strcmp(opt->name, "noro") == 0)
+		else if (strcmp(opt->name, "noro") == 0) {
 			fsflags &= ~MNT_RDONLY;
-		else if (strcmp(opt->name, "rw") == 0)
+			autoro = false;
+		}
+		else if (strcmp(opt->name, "rw") == 0) {
 			fsflags &= ~MNT_RDONLY;
-		else if (strcmp(opt->name, "ro") == 0)
+			autoro = false;
+		}
+		else if (strcmp(opt->name, "ro") == 0) {
 			fsflags |= MNT_RDONLY;
+			autoro = false;
+		}
 		else if (strcmp(opt->name, "rdonly") == 0) {
 			free(opt->name, M_MOUNT);
 			opt->name = strdup("ro", M_MOUNT);
 			fsflags |= MNT_RDONLY;
+			autoro = false;
+		}
+		else if (strcmp(opt->name, "autoro") == 0) {
+			vfs_freeopt(optlist, opt);
+			autoro = true;
 		}
 		else if (strcmp(opt->name, "suiddir") == 0)
 			fsflags |= MNT_SUIDDIR;
@@ -686,6 +726,19 @@ vfs_donmount(struct thread *td, uint64_t fsflags, struct uio *fsoptions)
 	}
 
 	error = vfs_domount(td, fstype, fspath, fsflags, &optlist);
+
+	/*
+	 * See if we can mount in the read-only mode if the error code suggests
+	 * that it could be possible and the mount options allow for that.
+	 * Never try it if "[no]{ro|rw}" has been explicitly requested and not
+	 * overridden by "autoro".
+	 */
+	if (autoro && vfs_should_downgrade_to_ro_mount(fsflags, error)) {
+		printf("%s: R/W mount failed, possibly R/O media,"
+		    " trying R/O mount\n", __func__);
+		fsflags |= MNT_RDONLY;
+		error = vfs_domount(td, fstype, fspath, fsflags, &optlist);
+	}
 bail:
 	/* copyout the errmsg */
 	if (errmsg_pos != -1 && ((2 * errmsg_pos + 1) < fsoptions->uio_iovcnt)
@@ -696,7 +749,7 @@ bail:
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		} else {
-			copyout_c((__cheri_tocap char * __capability)errmsg,
+			copyout_c(errmsg,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		}
@@ -791,6 +844,16 @@ vfs_domount_first(
 
 	ASSERT_VOP_ELOCKED(vp, __func__);
 	KASSERT((fsflags & MNT_UPDATE) == 0, ("MNT_UPDATE shouldn't be here"));
+
+	/*
+	 * If the jail of the calling thread lacks permission for this type of
+	 * file system, deny immediately.
+	 */
+	if (jailed(td->td_ucred) && !prison_allow(td->td_ucred,
+	    vfsp->vfc_prison_flag)) {
+		vput(vp);
+		return (EPERM);
+	}
 
 	/*
 	 * If the user is not root, ensure that they own the directory
@@ -1099,8 +1162,6 @@ vfs_domount(
 			vfsp = vfs_byname_kld(fstype, td, &error);
 		if (vfsp == NULL)
 			return (ENODEV);
-		if (jailed(td->td_ucred) && !(vfsp->vfc_flags & VFCF_JAIL))
-			return (EPERM);
 	}
 
 	/*
@@ -1165,8 +1226,7 @@ kern_unmount(struct thread *td, const char * __capability path, int flags)
 	}
 
 	pathbuf = malloc(MNAMELEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(path, (__cheri_tocap char * __capability)pathbuf,
-	    MNAMELEN, NULL);
+	error = copyinstr_c(path, pathbuf, MNAMELEN, NULL);
 	if (error) {
 		free(pathbuf, M_TEMP);
 		return (error);

@@ -384,7 +384,7 @@ void
 sleepq_set_timeout_sbt(void *wchan, sbintime_t sbt, sbintime_t pr,
     int flags)
 {
-	struct sleepqueue_chain *sc;
+	struct sleepqueue_chain *sc __unused;
 	struct thread *td;
 	sbintime_t pr1;
 
@@ -780,7 +780,7 @@ sleepq_type(void *wchan)
 static int
 sleepq_resume_thread(struct sleepqueue *sq, struct thread *td, int pri)
 {
-	struct sleepqueue_chain *sc;
+	struct sleepqueue_chain *sc __unused;
 
 	MPASS(td != NULL);
 	MPASS(sq->sq_wchan != NULL);
@@ -974,7 +974,7 @@ sleepq_remove_matching(struct sleepqueue *sq, int queue,
 static void
 sleepq_timeout(void *arg)
 {
-	struct sleepqueue_chain *sc;
+	struct sleepqueue_chain *sc __unused;
 	struct sleepqueue *sq;
 	struct thread *td;
 	void *wchan;
@@ -1103,7 +1103,7 @@ void
 sleepq_chains_remove_matching(bool (*matches)(struct thread *))
 {
 	struct sleepqueue_chain *sc;
-	struct sleepqueue *sq;
+	struct sleepqueue *sq, *sq1;
 	int i, wakeup_swapper;
 
 	wakeup_swapper = 0;
@@ -1112,7 +1112,7 @@ sleepq_chains_remove_matching(bool (*matches)(struct thread *))
 			continue;
 		}
 		mtx_lock_spin(&sc->sc_lock);
-		LIST_FOREACH(sq, &sc->sc_queues, sq_hash) {
+		LIST_FOREACH_SAFE(sq, &sc->sc_queues, sq_hash, sq1) {
 			for (i = 0; i < NR_SLEEPQS; ++i) {
 				wakeup_swapper |= sleepq_remove_matching(sq, i,
 				    matches, 0);

@@ -125,6 +125,11 @@ _start(void *auxv,
 	/* Must be called before accessing any globals */
 	crt_init_globals();
 #endif
+	/*
+	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
+	 * first place, but we currently rely on it for crt_init_globals.
+	 */
+	__asm__ __volatile__ ("csetdefault %0" : : "C" (NULL));
 
 	__auxargs = auxv;
 	/* Digest the auxiliary vector. */

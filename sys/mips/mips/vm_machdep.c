@@ -43,7 +43,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 
 #include <sys/param.h>
@@ -61,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/vmem.h>
 
+#include <machine/abi.h>
 #include <machine/cache.h>
 #include <machine/clock.h>
 #include <machine/cpu.h>
@@ -88,18 +88,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/user.h>
 #include <sys/mbuf.h>
-
-/* Duplicated from asm.h */
-#if defined(__mips_o32)
-#define	SZREG	4
-#else
-#define	SZREG	8
-#endif
-#if defined(__mips_o32) || defined(__mips_o64)
-#define	CALLFRAME_SIZ	(SZREG * (4 + 2))
-#elif defined(__mips_n32) || defined(__mips_n64)
-#define	CALLFRAME_SIZ	(SZREG * 4)
-#endif
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -515,13 +503,7 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	struct trapframe *tf;
 	register_t sp;
 
-	/*
-	 * At the point where a function is called, sp must be 8
-	 * byte aligned[for compatibility with 64-bit CPUs]
-	 * in ``See MIPS Run'' by D. Sweetman, p. 269
-	 * align stack
-	 */
-	sp = (((intptr_t)stack->ss_sp + stack->ss_size) & ~0x7) -
+	sp = (((__cheri_addr vaddr_t)stack->ss_sp + stack->ss_size) & ~(STACK_ALIGN - 1)) -
 	    CALLFRAME_SIZ;
 
 	/*

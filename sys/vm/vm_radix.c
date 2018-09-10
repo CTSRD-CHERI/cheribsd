@@ -112,7 +112,7 @@ vm_radix_node_get(vm_pindex_t owner, uint16_t count, uint16_t clevel)
 {
 	struct vm_radix_node *rnode;
 
-	rnode = uma_zalloc(vm_radix_node_zone, M_NOWAIT | M_ZERO);
+	rnode = uma_zalloc(vm_radix_node_zone, M_NOWAIT);
 	if (rnode == NULL)
 		return (NULL);
 	rnode->rn_owner = owner;
@@ -283,7 +283,18 @@ vm_radix_node_zone_dtor(void *mem, int size __unused, void *arg __unused)
 }
 #endif
 
+static int
+vm_radix_node_zone_init(void *mem, int size __unused, int flags __unused)
+{
+	struct vm_radix_node *rnode;
+
+	rnode = mem;
+	bzero(rnode, sizeof(*rnode));
+	return (0);
+}
+
 #ifndef UMA_MD_SMALL_ALLOC
+void vm_radix_reserve_kva(void);
 /*
  * Reserve the KVA necessary to satisfy the node allocation.
  * This is mandatory in architectures not supporting direct
@@ -291,8 +302,8 @@ vm_radix_node_zone_dtor(void *mem, int size __unused, void *arg __unused)
  * every node allocation, resulting into deadlocks for consumers already
  * working with kernel maps.
  */
-static void
-vm_radix_reserve_kva(void *arg __unused)
+void
+vm_radix_reserve_kva(void)
 {
 
 	/*
@@ -304,8 +315,6 @@ vm_radix_reserve_kva(void *arg __unused)
 	    sizeof(struct vm_radix_node))))
 		panic("%s: unable to reserve KVA", __func__);
 }
-SYSINIT(vm_radix_reserve_kva, SI_SUB_KMEM, SI_ORDER_THIRD,
-    vm_radix_reserve_kva, NULL);
 #endif
 
 /*
@@ -322,7 +331,7 @@ vm_radix_zinit(void)
 #else
 	    NULL,
 #endif
-	    NULL, NULL, VM_RADIX_PAD, UMA_ZONE_VM);
+	    vm_radix_node_zone_init, NULL, VM_RADIX_PAD, UMA_ZONE_VM);
 }
 
 /*

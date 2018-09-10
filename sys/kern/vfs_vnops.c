@@ -172,10 +172,7 @@ static int vn_io_fault1(struct vnode *vp, struct uio *uio,
     struct vn_io_fault_args *args, struct thread *td);
 
 int
-vn_open(ndp, flagp, cmode, fp)
-	struct nameidata *ndp;
-	int *flagp, cmode;
-	struct file *fp;
+vn_open(struct nameidata *ndp, int *flagp, int cmode, struct file *fp)
 {
 	struct thread *td = ndp->ni_cnd.cn_thread;
 
@@ -621,19 +618,9 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
  * core'ing the same binary, or unrelated processes scanning the directory).
  */
 int
-vn_rdwr_inchunks(rw, vp, base, len, offset, segflg, ioflg, active_cred,
-    file_cred, aresid, td)
-	enum uio_rw rw;
-	struct vnode *vp;
-	void *base;
-	size_t len;
-	off_t offset;
-	enum uio_seg segflg;
-	int ioflg;
-	struct ucred *active_cred;
-	struct ucred *file_cred;
-	size_t *aresid;
-	struct thread *td;
+vn_rdwr_inchunks(enum uio_rw rw, struct vnode *vp, void *base, size_t len,
+    off_t offset, enum uio_seg segflg, int ioflg, struct ucred *active_cred,
+    struct ucred *file_cred, size_t *aresid, struct thread *td)
 {
 	int error = 0;
 	ssize_t iaresid;
@@ -777,12 +764,8 @@ get_advice(struct file *fp, struct uio *uio)
  * File table vnode read routine.
  */
 static int
-vn_read(fp, uio, active_cred, flags, td)
-	struct file *fp;
-	struct uio *uio;
-	struct ucred *active_cred;
-	int flags;
-	struct thread *td;
+vn_read(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
+    struct thread *td)
 {
 	struct vnode *vp;
 	off_t orig_offset;
@@ -836,12 +819,8 @@ vn_read(fp, uio, active_cred, flags, td)
  * File table vnode write routine.
  */
 static int
-vn_write(fp, uio, active_cred, flags, td)
-	struct file *fp;
-	struct uio *uio;
-	struct ucred *active_cred;
-	int flags;
-	struct thread *td;
+vn_write(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
+    struct thread *td)
 {
 	struct vnode *vp;
 	struct mount *mp;
@@ -955,23 +934,30 @@ static int
 vn_io_fault_doio(struct vn_io_fault_args *args, struct uio *uio,
     struct thread *td)
 {
+	int error, save;
 
+	error = 0;
+	save = vm_fault_disable_pagefaults();
 	switch (args->kind) {
 	case VN_IO_FAULT_FOP:
-		return ((args->args.fop_args.doio)(args->args.fop_args.fp,
-		    uio, args->cred, args->flags, td));
+		error = (args->args.fop_args.doio)(args->args.fop_args.fp,
+		    uio, args->cred, args->flags, td);
+		break;
 	case VN_IO_FAULT_VOP:
 		if (uio->uio_rw == UIO_READ) {
-			return (VOP_READ(args->args.vop_args.vp, uio,
-			    args->flags, args->cred));
+			error = VOP_READ(args->args.vop_args.vp, uio,
+			    args->flags, args->cred);
 		} else if (uio->uio_rw == UIO_WRITE) {
-			return (VOP_WRITE(args->args.vop_args.vp, uio,
-			    args->flags, args->cred));
+			error = VOP_WRITE(args->args.vop_args.vp, uio,
+			    args->flags, args->cred);
 		}
 		break;
+	default:
+		panic("vn_io_fault_doio: unknown kind of io %d %d",
+		    args->kind, uio->uio_rw);
 	}
-	panic("vn_io_fault_doio: unknown kind of io %d %d", args->kind,
-	    uio->uio_rw);
+	vm_fault_enable_pagefaults(save);
+	return (error);
 }
 
 static int
@@ -1047,7 +1033,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 	vm_offset_t addr, end;
 	size_t len, resid;
 	ssize_t adv;
-	int error, cnt, save, saveheld, prev_td_ma_cnt;
+	int error, cnt, saveheld, prev_td_ma_cnt;
 
 	if (vn_io_fault_prefault) {
 		error = vn_io_fault_prefault_user(uio);
@@ -1073,7 +1059,6 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 	short_uio.uio_rw = uio->uio_rw;
 	short_uio.uio_td = uio->uio_td;
 
-	save = vm_fault_disable_pagefaults();
 	error = vn_io_fault_doio(args, uio, td);
 	if (error != EFAULT)
 		goto out;
@@ -1098,7 +1083,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 		}
 		if (len > io_hold_cnt * PAGE_SIZE)
 			len = io_hold_cnt * PAGE_SIZE;
-		addr = (vaddr_t)uio_clone->uio_iov->iov_base;
+		addr = (__cheri_addr vaddr_t)uio_clone->uio_iov->iov_base;
 		end = round_page(addr + len);
 		if (end < addr) {
 			error = EFAULT;
@@ -1143,7 +1128,6 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 	td->td_ma_cnt = prev_td_ma_cnt;
 	curthread_pflags_restore(saveheld);
 out:
-	vm_fault_enable_pagefaults(save);
 	free(uio_clone, M_IOV);
 	return (error);
 }
@@ -1346,11 +1330,8 @@ out1:
  * File table vnode stat routine.
  */
 static int
-vn_statfile(fp, sb, active_cred, td)
-	struct file *fp;
-	struct stat *sb;
-	struct ucred *active_cred;
-	struct thread *td;
+vn_statfile(struct file *fp, struct stat *sb, struct ucred *active_cred,
+    struct thread *td)
 {
 	struct vnode *vp = fp->f_vnode;
 	int error;
@@ -2485,7 +2466,7 @@ vn_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 		if ((prot & VM_PROT_EXECUTE) != 0 && error == 0) {
 			pkm.pm_file = vp;
 			pkm.pm_address = (uintptr_t) *addr;
-			PMC_CALL_HOOK(td, PMC_FN_MMAP, (void *) &pkm);
+			PMC_CALL_HOOK_UNLOCKED(td, PMC_FN_MMAP, (void *) &pkm);
 		}
 	}
 #endif

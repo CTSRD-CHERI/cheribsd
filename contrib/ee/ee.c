@@ -2468,8 +2468,7 @@ int noverify;
 }
 
 void 
-edit_abort(arg)
-int arg;
+edit_abort(int arg)
 {
 	wrefresh(com_win);
 	resetty();

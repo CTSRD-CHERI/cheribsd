@@ -62,12 +62,8 @@ int sys_read_string(const char *dir_name, const char *file_name, char *str, int 
 
 	snprintf(path, sizeof(path), "%s/%s", dir_name, file_name);
 
-	for (s = &path[0]; *s != '\0'; s++)
-		if (*s == '/')
-			*s = '.';
-
 	len = max_len;
-	if (sysctlbyname(&path[1], str, &len, NULL, 0) == -1)
+	if (sysctlbyname(PATH_TO_SYS(path), str, &len, NULL, 0) == -1)
 		return ret_code();
 
 	str[(len < max_len) ? len : max_len - 1] = 0;
@@ -146,8 +142,9 @@ int sys_read_uint(const char *dir_name, const char *file_name, unsigned *u)
 }
 
 #define	DIRECTSIZ(namlen)						\
-	(((uintptr_t)&((struct dirent *)0)->d_name +			\
-	((namlen)+1)*sizeof(((struct dirent *)0)->d_name[0]) + 3) & ~3)
+	__builtin_align_up(						\
+	((uintptr_t)&((struct dirent *)0)->d_name +			\
+	((namlen)+1)*sizeof(((struct dirent *)0)->d_name[0])), 4)
 
 int
 sys_scandir(const char *dirname, struct dirent ***namelist,
@@ -170,11 +167,8 @@ sys_scandir(const char *dirname, struct dirent ***namelist,
 	int i;
 
 	*namelist = NULL;
-	/* Skip the leading / */
-	strncpy(name, &dirname[1], sizeof(name));
-	for (s = &name[0]; *s != '\0'; s++)
-		if (*s == '/')
-			*s = '.';
+	if (strlcpy(name, PATH_TO_SYS(dirname), sizeof(name)) >= sizeof(name))
+		return (-EINVAL);
 	/*
 	 * Resolve the path.
 	 */
@@ -259,7 +253,7 @@ out:
 	if (cnt && compar)
 		qsort(names, cnt, sizeof(struct dirent *),
 		    (int (*)(const void *, const void *))compar);
-		
+
 	*namelist = names;
 
 	return (cnt);
@@ -271,3 +265,11 @@ errout:
 	free(names);
 	return (-err);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180907,
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

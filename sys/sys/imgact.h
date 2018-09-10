@@ -34,7 +34,7 @@
 #ifndef _SYS_IMGACT_H_
 #define	_SYS_IMGACT_H_
 
-#include <sys/uio.h>
+#include <sys/_uio.h>
 
 #include <vm/vm.h>
 
@@ -68,6 +68,7 @@ struct image_params {
 	struct proc *cop;	/* process we're coexecing into */
 	const char *image_header; /* head of file to exec */
 	unsigned long entry_addr; /* entry address of target executable */
+	unsigned long start_addr; /* start of mapped image (including bss) */
 	unsigned long end_addr;   /* end of mapped image (including bss) */
 	unsigned long reloc_base; /* load address of image */
 	char vmspace_destroyed;	/* flag - we've blown away original vm space */
@@ -79,7 +80,6 @@ struct image_params {
 	void *auxargs;		/* ELF Auxinfo structure pointer */
 	struct sf_buf *firstpage;	/* first page that we mapped */
 	unsigned long ps_strings; /* PS_STRINGS for BSD/OS binaries */
-	size_t auxarg_size;
 	struct image_args *args;	/* system call arguments */
 	const struct sysentvec *sysent;	/* system entry vector */
 	char *execpath;

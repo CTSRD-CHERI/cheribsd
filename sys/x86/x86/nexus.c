@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_apic.h"
 #endif
 #include "opt_isa.h"
+#include "opt_pci.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -131,7 +132,7 @@ static	int nexus_get_resource(device_t, device_t, int, int,
 static void nexus_delete_resource(device_t, device_t, int, int);
 static	int nexus_get_cpus(device_t, device_t, enum cpu_sets, size_t,
 			   cpuset_t *);
-#ifdef DEV_APIC
+#if defined(DEV_APIC) && defined(DEV_PCI)
 static	int nexus_alloc_msi(device_t pcib, device_t dev, int count, int maxcount, int *irqs);
 static	int nexus_release_msi(device_t pcib, device_t dev, int count, int *irqs);
 static	int nexus_alloc_msix(device_t pcib, device_t dev, int *irq);
@@ -172,7 +173,7 @@ static device_method_t nexus_methods[] = {
 	DEVMETHOD(bus_get_cpus,		nexus_get_cpus),
 
 	/* pcib interface */
-#ifdef DEV_APIC
+#if defined(DEV_APIC) && defined(DEV_PCI)
 	DEVMETHOD(pcib_alloc_msi,	nexus_alloc_msi),
 	DEVMETHOD(pcib_release_msi,	nexus_release_msi),
 	DEVMETHOD(pcib_alloc_msix,	nexus_alloc_msix),
@@ -573,7 +574,7 @@ nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 		 int flags, driver_filter_t filter, void (*ihand)(void *),
 		 void *arg, void **cookiep)
 {
-	int		error;
+	int		error, domain;
 
 	/* somebody tried to setup an irq that failed to allocate! */
 	if (irq == NULL)
@@ -589,9 +590,11 @@ nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 	error = rman_activate_resource(irq);
 	if (error)
 		return (error);
+	if (bus_get_domain(child, &domain) != 0)
+		domain = 0;
 
 	error = intr_add_handler(device_get_nameunit(child),
-	    rman_get_start(irq), filter, ihand, arg, flags, cookiep);
+	    rman_get_start(irq), filter, ihand, arg, flags, cookiep, domain);
 
 	return (error);
 }
@@ -699,7 +702,7 @@ nexus_add_irq(u_long irq)
 		panic("%s: failed", __func__);
 }
 
-#ifdef DEV_APIC
+#if defined(DEV_APIC) && defined(DEV_PCI)
 static int
 nexus_alloc_msix(device_t pcib, device_t dev, int *irq)
 {
@@ -734,7 +737,7 @@ nexus_map_msi(device_t pcib, device_t dev, int irq, uint64_t *addr, uint32_t *da
 
 	return (msi_map(irq, addr, data));
 }
-#endif
+#endif /* DEV_APIC && DEV_PCI */
 
 /* Placeholder for system RAM. */
 static void
@@ -901,4 +904,5 @@ static driver_t sysresource_driver = {
 static devclass_t sysresource_devclass;
 
 DRIVER_MODULE(sysresource, isa, sysresource_driver, sysresource_devclass, 0, 0);
+ISA_PNP_INFO(sysresource_ids);
 #endif /* DEV_ISA */

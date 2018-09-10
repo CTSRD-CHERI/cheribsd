@@ -29,7 +29,7 @@
  *
  */
 
-#include "assym.s"
+#include "assym.inc"
 #include "opt_kstack_pages.h"
 #include "opt_sched.h"
 
@@ -165,10 +165,9 @@ ENTRY(cpu_switch)
 	mov	x0, x19
 
 	/*
-	 * Release the old thread. This doesn't need to be a store-release
-	 * as the above dsb instruction will provide release semantics.
+	 * Release the old thread.
 	 */
-	str	x2, [x0, #TD_LOCK]
+	stlr	x2, [x0, #TD_LOCK]
 #if defined(SCHED_ULE) && defined(SMP)
 	/* Spin if TD_LOCK points to a blocked_lock */
 	ldr	x2, =_C_LABEL(blocked_lock)

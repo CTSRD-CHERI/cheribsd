@@ -46,7 +46,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -67,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/jail.h>
 #include <sys/pioctl.h>
 #include <sys/racct.h>
+#include <sys/rctl.h>
 #include <sys/resourcevar.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -321,8 +321,7 @@ kern_getgroups(struct thread *td, u_int gidsetsize, gid_t * __capability gidset)
 	if (gidsetsize < ngrp)
 		return (EINVAL);
 
-	error = copyout_c((__cheri_tocap gid_t * __capability)cred->cr_groups,
-	    gidset, ngrp * sizeof(gid_t));
+	error = copyout_c(cred->cr_groups, gidset, ngrp * sizeof(gid_t));
 out:
 	td->td_retval[0] = ngrp;
 	return (error);
@@ -585,9 +584,14 @@ sys_setuid(struct thread *td, struct setuid_args *uap)
 		setsugid(p);
 	}
 	proc_set_cred(p, newcred);
-	PROC_UNLOCK(p);
 #ifdef RACCT
 	racct_proc_ucred_changed(p, oldcred, newcred);
+	crhold(newcred);
+#endif
+	PROC_UNLOCK(p);
+#ifdef RCTL
+	rctl_proc_ucred_changed(p, newcred);
+	crfree(newcred);
 #endif
 	uifree(uip);
 	crfree(oldcred);
@@ -933,9 +937,14 @@ sys_setreuid(struct thread *td, struct setreuid_args *uap)
 		setsugid(p);
 	}
 	proc_set_cred(p, newcred);
-	PROC_UNLOCK(p);
 #ifdef RACCT
 	racct_proc_ucred_changed(p, oldcred, newcred);
+	crhold(newcred);
+#endif
+	PROC_UNLOCK(p);
+#ifdef RCTL
+	rctl_proc_ucred_changed(p, newcred);
+	crfree(newcred);
 #endif
 	uifree(ruip);
 	uifree(euip);
@@ -1074,9 +1083,14 @@ sys_setresuid(struct thread *td, struct setresuid_args *uap)
 		setsugid(p);
 	}
 	proc_set_cred(p, newcred);
-	PROC_UNLOCK(p);
 #ifdef RACCT
 	racct_proc_ucred_changed(p, oldcred, newcred);
+	crhold(newcred);
+#endif
+	PROC_UNLOCK(p);
+#ifdef RCTL
+	rctl_proc_ucred_changed(p, newcred);
+	crfree(newcred);
 #endif
 	uifree(ruip);
 	uifree(euip);
@@ -1188,17 +1202,12 @@ kern_getresuid(struct thread *td, uid_t * __capability ruid,
 
 	cred = td->td_ucred;
 	if (ruid)
-		error1 = copyout_c(
-		    (__cheri_tocap uid_t * __capability)&cred->cr_ruid,
-		    ruid, sizeof(cred->cr_ruid));
+		error1 = copyout_c(&cred->cr_ruid, ruid, sizeof(cred->cr_ruid));
 	if (euid)
-		error2 = copyout_c(
-		    (__cheri_tocap uid_t * __capability)&cred->cr_uid,
-		    euid, sizeof(cred->cr_uid));
+		error2 = copyout_c(&cred->cr_uid, euid, sizeof(cred->cr_uid));
 	if (suid)
-		error3 = copyout_c(
-		    (__cheri_tocap uid_t * __capability)&cred->cr_svuid,
-		    suid, sizeof(cred->cr_svuid));
+		error3 = copyout_c(&cred->cr_svuid, suid,
+		    sizeof(cred->cr_svuid));
 	return (error1 ? error1 : error2 ? error2 : error3);
 }
 
@@ -1227,17 +1236,13 @@ kern_getresgid(struct thread *td, gid_t * __capability rgid,
 
 	cred = td->td_ucred;
 	if (rgid)
-		error1 = copyout_c(
-		    (__cheri_tocap gid_t * __capability)&cred->cr_rgid,
-		    rgid, sizeof(cred->cr_rgid));
+		error1 = copyout_c(&cred->cr_rgid, rgid, sizeof(cred->cr_rgid));
 	if (egid)
-		error2 = copyout_c(
-		    (__cheri_tocap gid_t * __capability)&cred->cr_groups[0],
-		    egid, sizeof(cred->cr_groups[0]));
+		error2 = copyout_c( &cred->cr_groups[0], egid,
+		    sizeof(cred->cr_groups[0]));
 	if (sgid)
-		error3 = copyout_c(
-		    (__cheri_tocap gid_t * __capability)&cred->cr_svgid,
-		    sgid, sizeof(cred->cr_svgid));
+		error3 = copyout_c(&cred->cr_svgid, sgid,
+		    sizeof(cred->cr_svgid));
 	return (error1 ? error1 : error2 ? error2 : error3);
 }
 
@@ -2179,7 +2184,7 @@ kern_setlogin(struct thread *td, const char * __capability namebuf)
 	error = priv_check(td, PRIV_PROC_SETLOGIN);
 	if (error)
 		return (error);
-	error = copyinstr_c(namebuf, &logintmp[0], sizeof(logintmp), NULL);
+	error = copyinstr_c(namebuf, logintmp, sizeof(logintmp), NULL);
 	if (error != 0) {
 		if (error == ENAMETOOLONG)
 			error = EINVAL;

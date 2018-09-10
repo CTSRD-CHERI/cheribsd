@@ -10,6 +10,8 @@
         ..
         engines
         ..
+        geom
+        ..
         i18n
         ..
     ..

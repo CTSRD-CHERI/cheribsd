@@ -471,7 +471,7 @@ glc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int err = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
                 mtx_lock(&sc->sc_mtx);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -486,14 +486,14 @@ glc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->sc_ifpflags = ifp->if_flags;
 		mtx_unlock(&sc->sc_mtx);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
                 mtx_lock(&sc->sc_mtx);
 		glc_set_multicast(sc);
                 mtx_unlock(&sc->sc_mtx);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		err = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
 	default:
@@ -524,7 +524,7 @@ glc_set_multicast(struct glc_softc *sc)
 	} else {
 		if_maddr_rlock(ifp);
 		naddrs = 1; /* Include broadcast */
-		TAILQ_FOREACH(inm, &ifp->if_multiaddrs, ifma_link) {
+		CK_STAILQ_FOREACH(inm, &ifp->if_multiaddrs, ifma_link) {
 			if (inm->ifma_addr->sa_family != AF_LINK)
 				continue;
 			addr = 0;
@@ -832,7 +832,8 @@ glc_txintr(struct glc_softc *sc)
 		/* Speculatively (or necessarily) start the TX queue again */
 		error = lv1_net_start_tx_dma(sc->sc_bus, sc->sc_dev,
 		    sc->sc_txdmadesc_phys +
-		    txs->txs_firstdesc*sizeof(struct glc_dmadesc), 0);
+		    ((txs == NULL) ? 0 : txs->txs_firstdesc)*
+		     sizeof(struct glc_dmadesc), 0);
 		if (error != 0)
 			device_printf(sc->sc_self,
 			    "lv1_net_start_tx_dma error: %d\n", error);

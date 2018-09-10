@@ -271,7 +271,7 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	struct cryptop *crp;
 	struct newesp *esp;
 	uint8_t *ivp;
-	uint64_t cryptoid;
+	crypto_session_t cryptoid;
 	int alen, error, hlen, plen;
 
 	IPSEC_ASSERT(sav != NULL, ("null SA"));
@@ -389,7 +389,7 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 		crp->crp_flags |= CRYPTO_F_ASYNC | CRYPTO_F_ASYNC_KEEPORDER;
 	crp->crp_buf = (caddr_t) m;
 	crp->crp_callback = esp_input_cb;
-	crp->crp_sid = cryptoid;
+	crp->crp_session = cryptoid;
 	crp->crp_opaque = (caddr_t) xd;
 
 	/* These are passed as-is to the callback */
@@ -397,6 +397,7 @@ esp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	xd->protoff = protoff;
 	xd->skip = skip;
 	xd->cryptoid = cryptoid;
+	xd->vnet = curvnet;
 
 	/* Decryption descriptor */
 	IPSEC_ASSERT(crde != NULL, ("null esp crypto descriptor"));
@@ -447,7 +448,7 @@ esp_input_cb(struct cryptop *crp)
 	struct secasvar *sav;
 	struct secasindex *saidx;
 	caddr_t ptr;
-	uint64_t cryptoid;
+	crypto_session_t cryptoid;
 	int hlen, skip, protoff, error, alen;
 
 	crd = crp->crp_desc;
@@ -455,6 +456,7 @@ esp_input_cb(struct cryptop *crp)
 
 	m = (struct mbuf *) crp->crp_buf;
 	xd = (struct xform_data *) crp->crp_opaque;
+	CURVNET_SET(xd->vnet);
 	sav = xd->sav;
 	skip = xd->skip;
 	protoff = xd->protoff;
@@ -466,9 +468,10 @@ esp_input_cb(struct cryptop *crp)
 	if (crp->crp_etype) {
 		if (crp->crp_etype == EAGAIN) {
 			/* Reset the session ID */
-			if (ipsec_updateid(sav, &crp->crp_sid, &cryptoid) != 0)
+			if (ipsec_updateid(sav, &crp->crp_session, &cryptoid) != 0)
 				crypto_freesession(cryptoid);
-			xd->cryptoid = crp->crp_sid;
+			xd->cryptoid = crp->crp_session;
+			CURVNET_RESTORE();
 			return (crypto_dispatch(crp));
 		}
 		ESPSTAT_INC(esps_noxform);
@@ -603,8 +606,10 @@ esp_input_cb(struct cryptop *crp)
 		panic("%s: Unexpected address family: %d saidx=%p", __func__,
 		    saidx->dst.sa.sa_family, saidx);
 	}
+	CURVNET_RESTORE();
 	return error;
 bad:
+	CURVNET_RESTORE();
 	if (sav != NULL)
 		key_freesav(&sav);
 	if (m != NULL)
@@ -632,7 +637,8 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	struct secasindex *saidx;
 	unsigned char *pad;
 	uint8_t *ivp;
-	uint64_t cntr, cryptoid;
+	uint64_t cntr;
+	crypto_session_t cryptoid;
 	int hlen, rlen, padding, blks, alen, i, roff;
 	int error, maxpacketsize;
 	uint8_t prot;
@@ -837,6 +843,7 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	xd->sav = sav;
 	xd->idx = idx;
 	xd->cryptoid = cryptoid;
+	xd->vnet = curvnet;
 
 	/* Crypto operation descriptor. */
 	crp->crp_ilen = m->m_pkthdr.len; /* Total input length. */
@@ -846,7 +853,7 @@ esp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	crp->crp_buf = (caddr_t) m;
 	crp->crp_callback = esp_output_cb;
 	crp->crp_opaque = (caddr_t) xd;
-	crp->crp_sid = cryptoid;
+	crp->crp_session = cryptoid;
 
 	if (esph) {
 		/* Authentication descriptor. */
@@ -877,11 +884,12 @@ esp_output_cb(struct cryptop *crp)
 	struct secpolicy *sp;
 	struct secasvar *sav;
 	struct mbuf *m;
-	uint64_t cryptoid;
+	crypto_session_t cryptoid;
 	u_int idx;
 	int error;
 
 	xd = (struct xform_data *) crp->crp_opaque;
+	CURVNET_SET(xd->vnet);
 	m = (struct mbuf *) crp->crp_buf;
 	sp = xd->sp;
 	sav = xd->sav;
@@ -892,9 +900,10 @@ esp_output_cb(struct cryptop *crp)
 	if (crp->crp_etype) {
 		if (crp->crp_etype == EAGAIN) {
 			/* Reset the session ID */
-			if (ipsec_updateid(sav, &crp->crp_sid, &cryptoid) != 0)
+			if (ipsec_updateid(sav, &crp->crp_session, &cryptoid) != 0)
 				crypto_freesession(cryptoid);
-			xd->cryptoid = crp->crp_sid;
+			xd->cryptoid = crp->crp_session;
+			CURVNET_RESTORE();
 			return (crypto_dispatch(crp));
 		}
 		ESPSTAT_INC(esps_noxform);
@@ -940,8 +949,10 @@ esp_output_cb(struct cryptop *crp)
 
 	/* NB: m is reclaimed by ipsec_process_done. */
 	error = ipsec_process_done(m, sp, sav, idx);
+	CURVNET_RESTORE();
 	return (error);
 bad:
+	CURVNET_RESTORE();
 	free(xd, M_XDATA);
 	crypto_freereq(crp);
 	key_freesav(&sav);

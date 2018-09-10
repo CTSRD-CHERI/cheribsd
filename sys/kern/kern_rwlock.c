@@ -95,8 +95,8 @@ struct lock_class lock_class_rw = {
 };
 
 #ifdef ADAPTIVE_RWLOCKS
-static int __read_frequently rowner_retries = 10;
-static int __read_frequently rowner_loops = 10000;
+static int __read_frequently rowner_retries;
+static int __read_frequently rowner_loops;
 static SYSCTL_NODE(_debug, OID_AUTO, rwlock, CTLFLAG_RD, NULL,
     "rwlock debugging");
 SYSCTL_INT(_debug_rwlock, OID_AUTO, retry, CTLFLAG_RW, &rowner_retries, 0, "");
@@ -109,7 +109,15 @@ SYSCTL_INT(_debug_rwlock, OID_AUTO, delay_base, CTLFLAG_RW, &rw_delay.base,
 SYSCTL_INT(_debug_rwlock, OID_AUTO, delay_max, CTLFLAG_RW, &rw_delay.max,
     0, "");
 
-LOCK_DELAY_SYSINIT_DEFAULT(rw_delay);
+static void
+rw_lock_delay_init(void *arg __unused)
+{
+
+	lock_delay_default_init(&rw_delay);
+	rowner_retries = 10;
+	rowner_loops = max(10000, rw_delay.max);
+}
+LOCK_DELAY_SYSINIT(rw_lock_delay_init);
 #endif
 
 /*
@@ -438,7 +446,21 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 #endif
 #if defined(KDTRACE_HOOKS) || defined(LOCK_PROFILING)
 	uintptr_t state;
-	int doing_lockprof;
+	int doing_lockprof = 0;
+#endif
+
+#ifdef KDTRACE_HOOKS
+	if (LOCKSTAT_PROFILE_ENABLED(rw__acquire)) {
+		if (__rw_rlock_try(rw, td, &v, false LOCK_FILE_LINE_ARG))
+			goto out_lockstat;
+		doing_lockprof = 1;
+		all_time -= lockstat_nsecs(&rw->lock_object);
+		state = v;
+	}
+#endif
+#ifdef LOCK_PROFILING
+	doing_lockprof = 1;
+	state = v;
 #endif
 
 	if (SCHEDULER_STOPPED())
@@ -455,17 +477,6 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 #endif
 	lock_profile_obtain_lock_failed(&rw->lock_object,
 	    &contested, &waittime);
-
-#ifdef LOCK_PROFILING
-	doing_lockprof = 1;
-	state = v;
-#elif defined(KDTRACE_HOOKS)
-	doing_lockprof = lockstat_enabled;
-	if (__predict_false(doing_lockprof)) {
-		all_time -= lockstat_nsecs(&rw->lock_object);
-		state = v;
-	}
-#endif
 
 	for (;;) {
 		if (__rw_rlock_try(rw, td, &v, false LOCK_FILE_LINE_ARG))
@@ -499,25 +510,38 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 				    sched_tdname(curthread), "running");
 				continue;
 			}
-		} else if (spintries < rowner_retries) {
-			spintries++;
-			KTR_STATE1(KTR_SCHED, "thread", sched_tdname(curthread),
-			    "spinning", "lockname:\"%s\"",
-			    rw->lock_object.lo_name);
-			for (i = 0; i < rowner_loops; i += n) {
-				n = RW_READERS(v);
-				lock_delay_spin(n);
+		} else {
+			if ((v & RW_LOCK_WRITE_SPINNER) && RW_READERS(v) == 0) {
+				MPASS(!__rw_can_read(td, v, false));
+				lock_delay_spin(2);
 				v = RW_READ_VALUE(rw);
-				if ((v & RW_LOCK_READ) == 0 || __rw_can_read(td, v, false))
-					break;
-			}
-#ifdef KDTRACE_HOOKS
-			lda.spin_cnt += rowner_loops - i;
-#endif
-			KTR_STATE0(KTR_SCHED, "thread", sched_tdname(curthread),
-			    "running");
-			if (i < rowner_loops)
 				continue;
+			}
+			if (spintries < rowner_retries) {
+				spintries++;
+				KTR_STATE1(KTR_SCHED, "thread", sched_tdname(curthread),
+				    "spinning", "lockname:\"%s\"",
+				    rw->lock_object.lo_name);
+				n = RW_READERS(v);
+				for (i = 0; i < rowner_loops; i += n) {
+					lock_delay_spin(n);
+					v = RW_READ_VALUE(rw);
+					if (!(v & RW_LOCK_READ))
+						break;
+					n = RW_READERS(v);
+					if (n == 0)
+						break;
+					if (__rw_can_read(td, v, false))
+						break;
+				}
+#ifdef KDTRACE_HOOKS
+				lda.spin_cnt += rowner_loops - i;
+#endif
+				KTR_STATE0(KTR_SCHED, "thread", sched_tdname(curthread),
+				    "running");
+				if (i < rowner_loops)
+					continue;
+			}
 		}
 #endif
 
@@ -535,7 +559,8 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 		 */
 		v = RW_READ_VALUE(rw);
 retry_ts:
-		if (__rw_can_read(td, v, false)) {
+		if (((v & RW_LOCK_WRITE_SPINNER) && RW_READERS(v) == 0) ||
+		    __rw_can_read(td, v, false)) {
 			turnstile_cancel(ts);
 			continue;
 		}
@@ -615,6 +640,7 @@ retry_ts:
 		LOCKSTAT_RECORD4(rw__spin, rw, all_time - sleep_time,
 		    LOCKSTAT_READER, (state & RW_LOCK_READ) == 0,
 		    (state & RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
+out_lockstat:
 #endif
 	/*
 	 * TODO: acquire "owner of record" here.  Here be turnstile dragons
@@ -645,9 +671,12 @@ __rw_rlock_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 	WITNESS_CHECKORDER(&rw->lock_object, LOP_NEWORDER, file, line, NULL);
 
 	v = RW_READ_VALUE(rw);
-	if (__predict_false(LOCKSTAT_OOL_PROFILE_ENABLED(rw__acquire) ||
+	if (__predict_false(LOCKSTAT_PROFILE_ENABLED(rw__acquire) ||
 	    !__rw_rlock_try(rw, td, &v, true LOCK_FILE_LINE_ARG)))
 		__rw_rlock_hard(rw, td, v LOCK_FILE_LINE_ARG);
+	else
+		lock_profile_obtain_lock_success(&rw->lock_object, 0, 0,
+		    file, line);
 
 	LOCK_LOG_LOCK("RLOCK", &rw->lock_object, 0, 0, file, line);
 	WITNESS_LOCK(&rw->lock_object, 0, file, line);
@@ -711,11 +740,7 @@ __rw_runlock_try(struct rwlock *rw, struct thread *td, uintptr_t *vp)
 {
 
 	for (;;) {
-		/*
-		 * See if there is more than one read lock held.  If so,
-		 * just drop one and return.
-		 */
-		if (RW_READERS(*vp) > 1) {
+		if (RW_READERS(*vp) > 1 || !(*vp & RW_LOCK_WAITERS)) {
 			if (atomic_fcmpset_rel_ptr(&rw->rw_lock, vp,
 			    *vp - RW_ONE_READER)) {
 				if (LOCK_LOG_TEST(&rw->lock_object, 0))
@@ -723,23 +748,6 @@ __rw_runlock_try(struct rwlock *rw, struct thread *td, uintptr_t *vp)
 					    "%s: %p succeeded %p -> %p",
 					    __func__, rw, (void *)*vp,
 					    (void *)(*vp - RW_ONE_READER));
-				td->td_rw_rlocks--;
-				return (true);
-			}
-			continue;
-		}
-		/*
-		 * If there aren't any waiters for a write lock, then try
-		 * to drop it quickly.
-		 */
-		if (!(*vp & RW_LOCK_WAITERS)) {
-			MPASS((*vp & ~RW_LOCK_WRITE_SPINNER) ==
-			    RW_READERS_LOCK(1));
-			if (atomic_fcmpset_rel_ptr(&rw->rw_lock, vp,
-			    RW_UNLOCKED)) {
-				if (LOCK_LOG_TEST(&rw->lock_object, 0))
-					CTR2(KTR_LOCK, "%s: %p last succeeded",
-					    __func__, rw);
 				td->td_rw_rlocks--;
 				return (true);
 			}
@@ -760,23 +768,19 @@ __rw_runlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 	if (SCHEDULER_STOPPED())
 		return;
 
+	if (__rw_runlock_try(rw, td, &v))
+		goto out_lockstat;
+
+	/*
+	 * Ok, we know we have waiters and we think we are the
+	 * last reader, so grab the turnstile lock.
+	 */
+	turnstile_chain_lock(&rw->lock_object);
+	v = RW_READ_VALUE(rw);
 	for (;;) {
 		if (__rw_runlock_try(rw, td, &v))
 			break;
 
-		/*
-		 * Ok, we know we have waiters and we think we are the
-		 * last reader, so grab the turnstile lock.
-		 */
-		turnstile_chain_lock(&rw->lock_object);
-		v = RW_READ_VALUE(rw);
-retry_ts:
-		if (__rw_runlock_try(rw, td, &v)) {
-			turnstile_chain_unlock(&rw->lock_object);
-			break;
-		}
-
-		v &= (RW_LOCK_WAITERS | RW_LOCK_WRITE_SPINNER);
 		MPASS(v & RW_LOCK_WAITERS);
 
 		/*
@@ -801,9 +805,9 @@ retry_ts:
 			queue = TS_EXCLUSIVE_QUEUE;
 			setv |= (v & RW_LOCK_READ_WAITERS);
 		}
-		v |= RW_READERS_LOCK(1);
+		setv |= (v & RW_LOCK_WRITE_SPINNER);
 		if (!atomic_fcmpset_rel_ptr(&rw->rw_lock, &v, setv))
-			goto retry_ts;
+			continue;
 		if (LOCK_LOG_TEST(&rw->lock_object, 0))
 			CTR2(KTR_LOCK, "%s: %p last succeeded with waiters",
 			    __func__, rw);
@@ -818,11 +822,12 @@ retry_ts:
 		ts = turnstile_lookup(&rw->lock_object);
 		MPASS(ts != NULL);
 		turnstile_broadcast(ts, queue);
-		turnstile_unpend(ts, TS_SHARED_LOCK);
-		turnstile_chain_unlock(&rw->lock_object);
+		turnstile_unpend(ts);
 		td->td_rw_rlocks--;
 		break;
 	}
+	turnstile_chain_unlock(&rw->lock_object);
+out_lockstat:
 	LOCKSTAT_PROFILE_RELEASE_RWLOCK(rw__release, rw, LOCKSTAT_READER);
 }
 
@@ -841,9 +846,11 @@ _rw_runlock_cookie_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 	td = curthread;
 	v = RW_READ_VALUE(rw);
 
-	if (__predict_false(LOCKSTAT_OOL_PROFILE_ENABLED(rw__release) ||
+	if (__predict_false(LOCKSTAT_PROFILE_ENABLED(rw__release) ||
 	    !__rw_runlock_try(rw, td, &v)))
 		__rw_runlock_hard(rw, td, v LOCK_FILE_LINE_ARG);
+	else
+		lock_profile_release_lock(&rw->lock_object);
 
 	TD_LOCKS_DEC(curthread);
 }
@@ -856,6 +863,23 @@ _rw_runlock_cookie(volatile uintptr_t *c, const char *file, int line)
 	rw = rwlock2rw(c);
 	_rw_runlock_cookie_int(rw LOCK_FILE_LINE_ARG);
 }
+
+#ifdef ADAPTIVE_RWLOCKS
+static inline void
+rw_drop_critical(uintptr_t v, bool *in_critical, int *extra_work)
+{
+
+	if (v & RW_LOCK_WRITE_SPINNER)
+		return;
+	if (*in_critical) {
+		critical_exit();
+		*in_critical = false;
+		(*extra_work)--;
+	}
+}
+#else
+#define rw_drop_critical(v, in_critical, extra_work) do { } while (0)
+#endif
 
 /*
  * This function is called when we are unable to obtain a write lock on the
@@ -872,9 +896,10 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 #ifdef ADAPTIVE_RWLOCKS
 	int spintries = 0;
 	int i, n;
-	int sleep_reason = 0;
+	enum { READERS, WRITER } sleep_reason = READERS;
+	bool in_critical = false;
 #endif
-	uintptr_t x;
+	uintptr_t setv;
 #ifdef LOCK_PROFILING
 	uint64_t waittime = 0;
 	int contested = 0;
@@ -889,10 +914,31 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 #endif
 #if defined(KDTRACE_HOOKS) || defined(LOCK_PROFILING)
 	uintptr_t state;
-	int doing_lockprof;
+	int doing_lockprof = 0;
 #endif
+	int extra_work = 0;
 
 	tid = (uintptr_t)curthread;
+	rw = rwlock2rw(c);
+
+#ifdef KDTRACE_HOOKS
+	if (LOCKSTAT_PROFILE_ENABLED(rw__acquire)) {
+		while (v == RW_UNLOCKED) {
+			if (_rw_write_lock_fetch(rw, &v, tid))
+				goto out_lockstat;
+		}
+		extra_work = 1;
+		doing_lockprof = 1;
+		all_time -= lockstat_nsecs(&rw->lock_object);
+		state = v;
+	}
+#endif
+#ifdef LOCK_PROFILING
+	extra_work = 1;
+	doing_lockprof = 1;
+	state = v;
+#endif
+
 	if (SCHEDULER_STOPPED())
 		return;
 
@@ -901,7 +947,6 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 #elif defined(KDTRACE_HOOKS)
 	lock_delay_arg_init(&lda, NULL);
 #endif
-	rw = rwlock2rw(c);
 	if (__predict_false(v == RW_UNLOCKED))
 		v = RW_READ_VALUE(rw);
 
@@ -926,17 +971,6 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 	lock_profile_obtain_lock_failed(&rw->lock_object,
 	    &contested, &waittime);
 
-#ifdef LOCK_PROFILING
-	doing_lockprof = 1;
-	state = v;
-#elif defined(KDTRACE_HOOKS)
-	doing_lockprof = lockstat_enabled;
-	if (__predict_false(doing_lockprof)) {
-		all_time -= lockstat_nsecs(&rw->lock_object);
-		state = v;
-	}
-#endif
-
 	for (;;) {
 		if (v == RW_UNLOCKED) {
 			if (_rw_write_lock_fetch(rw, &v, tid))
@@ -948,14 +982,23 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 #endif
 
 #ifdef ADAPTIVE_RWLOCKS
+		if (v == (RW_LOCK_READ | RW_LOCK_WRITE_SPINNER)) {
+			if (atomic_fcmpset_acq_ptr(&rw->rw_lock, &v, tid))
+				break;
+			continue;
+		}
+
 		/*
 		 * If the lock is write locked and the owner is
 		 * running on another CPU, spin until the owner stops
 		 * running or the state of the lock changes.
 		 */
-		sleep_reason = 1;
-		owner = lv_rw_wowner(v);
-		if (!(v & RW_LOCK_READ) && TD_IS_RUNNING(owner)) {
+		if (!(v & RW_LOCK_READ)) {
+			rw_drop_critical(v, &in_critical, &extra_work);
+			sleep_reason = WRITER;
+			owner = lv_rw_wowner(v);
+			if (!TD_IS_RUNNING(owner))
+				goto ts;
 			if (LOCK_LOG_TEST(&rw->lock_object, 0))
 				CTR3(KTR_LOCK, "%s: spinning on %p held by %p",
 				    __func__, rw, owner);
@@ -970,12 +1013,21 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 			KTR_STATE0(KTR_SCHED, "thread", sched_tdname(curthread),
 			    "running");
 			continue;
-		}
-		if ((v & RW_LOCK_READ) && RW_READERS(v) &&
-		    spintries < rowner_retries) {
+		} else if (RW_READERS(v) > 0) {
+			sleep_reason = READERS;
+			if (spintries == rowner_retries)
+				goto ts;
 			if (!(v & RW_LOCK_WRITE_SPINNER)) {
+				if (!in_critical) {
+					critical_enter();
+					in_critical = true;
+					extra_work++;
+				}
 				if (!atomic_fcmpset_ptr(&rw->rw_lock, &v,
 				    v | RW_LOCK_WRITE_SPINNER)) {
+					critical_exit();
+					in_critical = false;
+					extra_work--;
 					continue;
 				}
 			}
@@ -983,22 +1035,27 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 			KTR_STATE1(KTR_SCHED, "thread", sched_tdname(curthread),
 			    "spinning", "lockname:\"%s\"",
 			    rw->lock_object.lo_name);
+			n = RW_READERS(v);
 			for (i = 0; i < rowner_loops; i += n) {
-				n = RW_READERS(v);
 				lock_delay_spin(n);
 				v = RW_READ_VALUE(rw);
-				if ((v & RW_LOCK_WRITE_SPINNER) == 0)
+				if (!(v & RW_LOCK_WRITE_SPINNER))
+					break;
+				if (!(v & RW_LOCK_READ))
+					break;
+				n = RW_READERS(v);
+				if (n == 0)
 					break;
 			}
+#ifdef KDTRACE_HOOKS
+			lda.spin_cnt += i;
+#endif
 			KTR_STATE0(KTR_SCHED, "thread", sched_tdname(curthread),
 			    "running");
-#ifdef KDTRACE_HOOKS
-			lda.spin_cnt += rowner_loops - i;
-#endif
 			if (i < rowner_loops)
 				continue;
-			sleep_reason = 2;
 		}
+ts:
 #endif
 		ts = turnstile_trywait(&rw->lock_object);
 		v = RW_READ_VALUE(rw);
@@ -1016,10 +1073,12 @@ retry_ts:
 		if (owner != NULL) {
 			if (TD_IS_RUNNING(owner)) {
 				turnstile_cancel(ts);
+				rw_drop_critical(v, &in_critical, &extra_work);
 				continue;
 			}
-		} else if (RW_READERS(v) > 0 && sleep_reason == 1) {
+		} else if (RW_READERS(v) > 0 && sleep_reason == WRITER) {
 			turnstile_cancel(ts);
+			rw_drop_critical(v, &in_critical, &extra_work);
 			continue;
 		}
 #endif
@@ -1030,11 +1089,11 @@ retry_ts:
 		 * If a pending waiters queue is present, claim the lock
 		 * ownership and maintain the pending queue.
 		 */
-		x = v & (RW_LOCK_WAITERS | RW_LOCK_WRITE_SPINNER);
-		if ((v & ~x) == RW_UNLOCKED) {
-			x &= ~RW_LOCK_WRITE_SPINNER;
-			if (atomic_fcmpset_acq_ptr(&rw->rw_lock, &v, tid | x)) {
-				if (x)
+		setv = v & (RW_LOCK_WAITERS | RW_LOCK_WRITE_SPINNER);
+		if ((v & ~setv) == RW_UNLOCKED) {
+			setv &= ~RW_LOCK_WRITE_SPINNER;
+			if (atomic_fcmpset_acq_ptr(&rw->rw_lock, &v, tid | setv)) {
+				if (setv)
 					turnstile_claim(ts);
 				else
 					turnstile_cancel(ts);
@@ -1042,19 +1101,37 @@ retry_ts:
 			}
 			goto retry_ts;
 		}
-		/*
-		 * If the RW_LOCK_WRITE_WAITERS flag isn't set, then try to
-		 * set it.  If we fail to set it, then loop back and try
-		 * again.
-		 */
-		if (!(v & RW_LOCK_WRITE_WAITERS)) {
-			if (!atomic_fcmpset_ptr(&rw->rw_lock, &v,
-			    v | RW_LOCK_WRITE_WAITERS))
-				goto retry_ts;
-			if (LOCK_LOG_TEST(&rw->lock_object, 0))
-				CTR2(KTR_LOCK, "%s: %p set write waiters flag",
-				    __func__, rw);
+
+#ifdef ADAPTIVE_RWLOCKS
+		if (in_critical) {
+			if ((v & RW_LOCK_WRITE_SPINNER) ||
+			    !((v & RW_LOCK_WRITE_WAITERS))) {
+				setv = v & ~RW_LOCK_WRITE_SPINNER;
+				setv |= RW_LOCK_WRITE_WAITERS;
+				if (!atomic_fcmpset_ptr(&rw->rw_lock, &v, setv))
+					goto retry_ts;
+			}
+			critical_exit();
+			in_critical = false;
+			extra_work--;
+		} else {
+#endif
+			/*
+			 * If the RW_LOCK_WRITE_WAITERS flag isn't set, then try to
+			 * set it.  If we fail to set it, then loop back and try
+			 * again.
+			 */
+			if (!(v & RW_LOCK_WRITE_WAITERS)) {
+				if (!atomic_fcmpset_ptr(&rw->rw_lock, &v,
+				    v | RW_LOCK_WRITE_WAITERS))
+					goto retry_ts;
+				if (LOCK_LOG_TEST(&rw->lock_object, 0))
+					CTR2(KTR_LOCK, "%s: %p set write waiters flag",
+					    __func__, rw);
+			}
+#ifdef ADAPTIVE_RWLOCKS
 		}
+#endif
 		/*
 		 * We were unable to acquire the lock and the write waiters
 		 * flag is set, so we must block on the turnstile.
@@ -1079,6 +1156,12 @@ retry_ts:
 #endif
 		v = RW_READ_VALUE(rw);
 	}
+	if (__predict_true(!extra_work))
+		return;
+#ifdef ADAPTIVE_RWLOCKS
+	if (in_critical)
+		critical_exit();
+#endif
 #if defined(KDTRACE_HOOKS) || defined(LOCK_PROFILING)
 	if (__predict_true(!doing_lockprof))
 		return;
@@ -1095,6 +1178,7 @@ retry_ts:
 		LOCKSTAT_RECORD4(rw__spin, rw, all_time - sleep_time,
 		    LOCKSTAT_WRITER, (state & RW_LOCK_READ) == 0,
 		    (state & RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
+out_lockstat:
 #endif
 	LOCKSTAT_PROFILE_OBTAIN_RWLOCK_SUCCESS(rw__acquire, rw, contested,
 	    waittime, file, line, LOCKSTAT_WRITER);
@@ -1175,7 +1259,7 @@ __rw_wunlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 	ts = turnstile_lookup(&rw->lock_object);
 	MPASS(ts != NULL);
 	turnstile_broadcast(ts, queue);
-	turnstile_unpend(ts, TS_EXCLUSIVE_LOCK);
+	turnstile_unpend(ts);
 	turnstile_chain_unlock(&rw->lock_object);
 }
 
@@ -1187,7 +1271,7 @@ __rw_wunlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 int
 __rw_try_upgrade_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 {
-	uintptr_t v, x, tid;
+	uintptr_t v, setv, tid;
 	struct turnstile *ts;
 	int success;
 
@@ -1207,12 +1291,12 @@ __rw_try_upgrade_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 	 */
 	tid = (uintptr_t)curthread;
 	success = 0;
+	v = RW_READ_VALUE(rw);
 	for (;;) {
-		v = rw->rw_lock;
 		if (RW_READERS(v) > 1)
 			break;
 		if (!(v & RW_LOCK_WAITERS)) {
-			success = atomic_cmpset_acq_ptr(&rw->rw_lock, v, tid);
+			success = atomic_fcmpset_acq_ptr(&rw->rw_lock, &v, tid);
 			if (!success)
 				continue;
 			break;
@@ -1222,7 +1306,8 @@ __rw_try_upgrade_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 		 * Ok, we think we have waiters, so lock the turnstile.
 		 */
 		ts = turnstile_trywait(&rw->lock_object);
-		v = rw->rw_lock;
+		v = RW_READ_VALUE(rw);
+retry_ts:
 		if (RW_READERS(v) > 1) {
 			turnstile_cancel(ts);
 			break;
@@ -1233,16 +1318,16 @@ __rw_try_upgrade_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 		 * If we obtain the lock with the flags set, then claim
 		 * ownership of the turnstile.
 		 */
-		x = rw->rw_lock & RW_LOCK_WAITERS;
-		success = atomic_cmpset_ptr(&rw->rw_lock, v, tid | x);
+		setv = tid | (v & RW_LOCK_WAITERS);
+		success = atomic_fcmpset_ptr(&rw->rw_lock, &v, setv);
 		if (success) {
-			if (x)
+			if (v & RW_LOCK_WAITERS)
 				turnstile_claim(ts);
 			else
 				turnstile_cancel(ts);
 			break;
 		}
-		turnstile_cancel(ts);
+		goto retry_ts;
 	}
 	LOCK_LOG_TRY("WUPGRADE", &rw->lock_object, 0, success, file, line);
 	if (success) {
@@ -1320,7 +1405,7 @@ __rw_downgrade_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 	 */
 	if (rwait && !wwait) {
 		turnstile_broadcast(ts, TS_SHARED_QUEUE);
-		turnstile_unpend(ts, TS_EXCLUSIVE_LOCK);
+		turnstile_unpend(ts);
 	} else
 		turnstile_disown(ts);
 	turnstile_chain_unlock(&rw->lock_object);

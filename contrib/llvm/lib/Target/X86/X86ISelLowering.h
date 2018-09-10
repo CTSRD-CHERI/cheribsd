@@ -982,6 +982,9 @@ namespace llvm {
     bool isVectorClearMaskLegal(const SmallVectorImpl<int> &Mask,
                                 EVT VT) const override;
 
+    /// Returns true if lowering to a jump table is allowed.
+    bool areJTsAllowed(const Function *Fn) const override;
+
     /// If true, then instruction selection should
     /// seek to shrink the FP constant of the specified type to a smaller type
     /// in order to save space and / or reduce runtime.
@@ -1095,9 +1098,6 @@ namespace llvm {
     /// instructions/intrinsics.
     bool lowerInterleavedStore(StoreInst *SI, ShuffleVectorInst *SVI,
                                unsigned Factor) const override;
-
-
-    void finalizeLowering(MachineFunction &MF) const override;
 
   protected:
     std::pair<const TargetRegisterClass *, uint8_t>
@@ -1293,6 +1293,9 @@ namespace llvm {
 
     MachineBasicBlock *EmitLoweredTLSCall(MachineInstr &MI,
                                           MachineBasicBlock *BB) const;
+
+    MachineBasicBlock *EmitLoweredRetpoline(MachineInstr &MI,
+                                            MachineBasicBlock *BB) const;
 
     MachineBasicBlock *emitEHSjLjSetJmp(MachineInstr &MI,
                                         MachineBasicBlock *MBB) const;

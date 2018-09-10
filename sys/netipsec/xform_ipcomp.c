@@ -118,7 +118,7 @@ ipcomp_encapcheck(union sockaddr_union *src, union sockaddr_union *dst)
 }
 
 static int
-ipcomp_nonexp_input(struct mbuf **mp, int *offp, int proto)
+ipcomp_nonexp_input(struct mbuf *m, int off, int proto, void *arg __unused)
 {
 	int isr;
 
@@ -135,13 +135,13 @@ ipcomp_nonexp_input(struct mbuf **mp, int *offp, int proto)
 #endif
 	default:
 		IPCOMPSTAT_INC(ipcomps_nopf);
-		m_freem(*mp);
+		m_freem(m);
 		return (IPPROTO_DONE);
 	}
-	m_adj(*mp, *offp);
-	IPCOMPSTAT_ADD(ipcomps_ibytes, (*mp)->m_pkthdr.len);
+	m_adj(m, off);
+	IPCOMPSTAT_ADD(ipcomps_ibytes, m->m_pkthdr.len);
 	IPCOMPSTAT_INC(ipcomps_input);
-	netisr_dispatch(isr, *mp);
+	netisr_dispatch(isr, m);
 	return (IPPROTO_DONE);
 }
 
@@ -178,11 +178,10 @@ ipcomp_init(struct secasvar *sav, struct xformsw *xsp)
 static int
 ipcomp_zeroize(struct secasvar *sav)
 {
-	int err;
 
-	err = crypto_freesession(sav->tdb_cryptoid);
-	sav->tdb_cryptoid = 0;
-	return err;
+	crypto_freesession(sav->tdb_cryptoid);
+	sav->tdb_cryptoid = NULL;
+	return 0;
 }
 
 /*
@@ -255,9 +254,10 @@ ipcomp_input(struct mbuf *m, struct secasvar *sav, int skip, int protoff)
 	xd->sav = sav;
 	xd->protoff = protoff;
 	xd->skip = skip;
+	xd->vnet = curvnet;
 
 	SECASVAR_LOCK(sav);
-	crp->crp_sid = xd->cryptoid = sav->tdb_cryptoid;
+	crp->crp_session = xd->cryptoid = sav->tdb_cryptoid;
 	SECASVAR_UNLOCK(sav);
 
 	return crypto_dispatch(crp);
@@ -279,13 +279,14 @@ ipcomp_input_cb(struct cryptop *crp)
 	struct secasvar *sav;
 	struct secasindex *saidx;
 	caddr_t addr;
-	uint64_t cryptoid;
+	crypto_session_t cryptoid;
 	int hlen = IPCOMP_HLENGTH, error, clen;
 	int skip, protoff;
 	uint8_t nproto;
 
 	m = (struct mbuf *) crp->crp_buf;
 	xd = (struct xform_data *) crp->crp_opaque;
+	CURVNET_SET(xd->vnet);
 	sav = xd->sav;
 	skip = xd->skip;
 	protoff = xd->protoff;
@@ -299,9 +300,10 @@ ipcomp_input_cb(struct cryptop *crp)
 	if (crp->crp_etype) {
 		if (crp->crp_etype == EAGAIN) {
 			/* Reset the session ID */
-			if (ipsec_updateid(sav, &crp->crp_sid, &cryptoid) != 0)
+			if (ipsec_updateid(sav, &crp->crp_session, &cryptoid) != 0)
 				crypto_freesession(cryptoid);
-			xd->cryptoid = crp->crp_sid;
+			xd->cryptoid = crp->crp_session;
+			CURVNET_RESTORE();
 			return (crypto_dispatch(crp));
 		}
 		IPCOMPSTAT_INC(ipcomps_noxform);
@@ -366,8 +368,10 @@ ipcomp_input_cb(struct cryptop *crp)
 		panic("%s: Unexpected address family: %d saidx=%p", __func__,
 		    saidx->dst.sa.sa_family, saidx);
 	}
+	CURVNET_RESTORE();
 	return error;
 bad:
+	CURVNET_RESTORE();
 	if (sav != NULL)
 		key_freesav(&sav);
 	if (m != NULL)
@@ -493,6 +497,7 @@ ipcomp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	xd->idx = idx;
 	xd->skip = skip;
 	xd->protoff = protoff;
+	xd->vnet = curvnet;
 
 	/* Crypto operation descriptor */
 	crp->crp_ilen = m->m_pkthdr.len;	/* Total input length */
@@ -502,7 +507,7 @@ ipcomp_output(struct mbuf *m, struct secpolicy *sp, struct secasvar *sav,
 	crp->crp_opaque = (caddr_t) xd;
 
 	SECASVAR_LOCK(sav);
-	crp->crp_sid = xd->cryptoid = sav->tdb_cryptoid;
+	crp->crp_session = xd->cryptoid = sav->tdb_cryptoid;
 	SECASVAR_UNLOCK(sav);
 
 	return crypto_dispatch(crp);
@@ -525,12 +530,13 @@ ipcomp_output_cb(struct cryptop *crp)
 	struct secpolicy *sp;
 	struct secasvar *sav;
 	struct mbuf *m;
-	uint64_t cryptoid;
+	crypto_session_t cryptoid;
 	u_int idx;
 	int error, skip, protoff;
 
 	m = (struct mbuf *) crp->crp_buf;
 	xd = (struct xform_data *) crp->crp_opaque;
+	CURVNET_SET(xd->vnet);
 	idx = xd->idx;
 	sp = xd->sp;
 	sav = xd->sav;
@@ -542,9 +548,10 @@ ipcomp_output_cb(struct cryptop *crp)
 	if (crp->crp_etype) {
 		if (crp->crp_etype == EAGAIN) {
 			/* Reset the session ID */
-			if (ipsec_updateid(sav, &crp->crp_sid, &cryptoid) != 0)
+			if (ipsec_updateid(sav, &crp->crp_session, &cryptoid) != 0)
 				crypto_freesession(cryptoid);
-			xd->cryptoid = crp->crp_sid;
+			xd->cryptoid = crp->crp_session;
+			CURVNET_RESTORE();
 			return (crypto_dispatch(crp));
 		}
 		IPCOMPSTAT_INC(ipcomps_noxform);
@@ -640,10 +647,12 @@ ipcomp_output_cb(struct cryptop *crp)
 
 	/* NB: m is reclaimed by ipsec_process_done. */
 	error = ipsec_process_done(m, sp, sav, idx);
+	CURVNET_RESTORE();
 	return (error);
 bad:
 	if (m)
 		m_freem(m);
+	CURVNET_RESTORE();
 	free(xd, M_XDATA);
 	crypto_freereq(crp);
 	key_freesav(&sav);
@@ -652,19 +661,6 @@ bad:
 }
 
 #ifdef INET
-static const struct encaptab *ipe4_cookie = NULL;
-extern struct domain inetdomain;
-static struct protosw ipcomp4_protosw = {
-	.pr_type =	SOCK_RAW,
-	.pr_domain =	&inetdomain,
-	.pr_protocol =	0 /* IPPROTO_IPV[46] */,
-	.pr_flags =	PR_ATOMIC | PR_ADDR | PR_LASTHDR,
-	.pr_input =	ipcomp_nonexp_input,
-	.pr_output =	rip_output,
-	.pr_ctloutput =	rip_ctloutput,
-	.pr_usrreqs =	&rip_usrreqs
-};
-
 static int
 ipcomp4_nonexp_encapcheck(const struct mbuf *m, int off, int proto,
     void *arg __unused)
@@ -685,21 +681,17 @@ ipcomp4_nonexp_encapcheck(const struct mbuf *m, int off, int proto,
 	dst.sin.sin_addr = ip->ip_dst;
 	return (ipcomp_encapcheck(&src, &dst));
 }
+
+static const struct encaptab *ipe4_cookie = NULL;
+static const struct encap_config ipv4_encap_cfg = {
+	.proto = -1,
+	.min_length = sizeof(struct ip),
+	.exact_match = sizeof(in_addr_t) << 4,
+	.check = ipcomp4_nonexp_encapcheck,
+	.input = ipcomp_nonexp_input
+};
 #endif
 #ifdef INET6
-static const struct encaptab *ipe6_cookie = NULL;
-extern struct domain inet6domain;
-static struct protosw ipcomp6_protosw = {
-	.pr_type =	SOCK_RAW,
-	.pr_domain =	&inet6domain,
-	.pr_protocol =	0 /* IPPROTO_IPV[46] */,
-	.pr_flags =	PR_ATOMIC | PR_ADDR | PR_LASTHDR,
-	.pr_input =	ipcomp_nonexp_input,
-	.pr_output =	rip6_output,
-	.pr_ctloutput =	rip6_ctloutput,
-	.pr_usrreqs =	&rip6_usrreqs
-};
-
 static int
 ipcomp6_nonexp_encapcheck(const struct mbuf *m, int off, int proto,
     void *arg __unused)
@@ -732,6 +724,15 @@ ipcomp6_nonexp_encapcheck(const struct mbuf *m, int off, int proto,
 	}
 	return (ipcomp_encapcheck(&src, &dst));
 }
+
+static const struct encaptab *ipe6_cookie = NULL;
+static const struct encap_config ipv6_encap_cfg = {
+	.proto = -1,
+	.min_length = sizeof(struct ip6_hdr),
+	.exact_match = sizeof(struct in6_addr) << 4,
+	.check = ipcomp6_nonexp_encapcheck,
+	.input = ipcomp_nonexp_input
+};
 #endif
 
 static struct xformsw ipcomp_xformsw = {
@@ -748,12 +749,10 @@ ipcomp_attach(void)
 {
 
 #ifdef INET
-	ipe4_cookie = encap_attach_func(AF_INET, -1,
-	    ipcomp4_nonexp_encapcheck, &ipcomp4_protosw, NULL);
+	ipe4_cookie = ip_encap_attach(&ipv4_encap_cfg, NULL, M_WAITOK);
 #endif
 #ifdef INET6
-	ipe6_cookie = encap_attach_func(AF_INET6, -1,
-	    ipcomp6_nonexp_encapcheck, &ipcomp6_protosw, NULL);
+	ipe6_cookie = ip6_encap_attach(&ipv6_encap_cfg, NULL, M_WAITOK);
 #endif
 	xform_attach(&ipcomp_xformsw);
 }
@@ -763,10 +762,10 @@ ipcomp_detach(void)
 {
 
 #ifdef INET
-	encap_detach(ipe4_cookie);
+	ip_encap_detach(ipe4_cookie);
 #endif
 #ifdef INET6
-	encap_detach(ipe6_cookie);
+	ip6_encap_detach(ipe6_cookie);
 #endif
 	xform_detach(&ipcomp_xformsw);
 }

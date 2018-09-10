@@ -885,7 +885,7 @@ rsu_set_multi(struct rsu_softc *sc)
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 			ifp = vap->iv_ifp;
 			if_maddr_rlock(ifp);
-			TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+			CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 				caddr_t dl;
 				uint8_t pos;
 
@@ -2982,7 +2982,7 @@ rsu_ioctl_net(struct ieee80211com *ic, u_long cmd, void *data)
 
 	error = 0;
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 	{
 		struct ieee80211vap *vap;
 		int rxmask;

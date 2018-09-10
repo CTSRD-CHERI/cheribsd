@@ -1978,7 +1978,7 @@ ti_setmulti(struct ti_softc *sc)
 
 	/* Now program new ones. */
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		mc = malloc(sizeof(struct ti_mc_entry), M_DEVBUF, M_NOWAIT);
@@ -3517,7 +3517,7 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int mask, error = 0;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		TI_LOCK(sc);
 		if (ifr_mtu_get(ifr) < ETHERMIN ||
 		    ifr_mtu_get(ifr) > TI_JUMBO_MTU)
@@ -3531,7 +3531,7 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		TI_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		TI_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			/*
@@ -3562,18 +3562,18 @@ ti_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->ti_if_flags = ifp->if_flags;
 		TI_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		TI_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
 			ti_setmulti(sc);
 		TI_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		TI_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&

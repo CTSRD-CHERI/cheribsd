@@ -40,8 +40,6 @@ __FBSDID("$FreeBSD$");
  * rp.c - for RocketPort FreeBSD
  */
 
-#include "opt_compat.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/endian.h>
@@ -732,8 +730,7 @@ rp_attachcommon(CONTROLLER_T *ctlp, int num_aiops, int num_ports)
 
 	ctlp->num_ports = num_ports;
 	ctlp->rp = rp = (struct rp_port *)
-		mallocarray(num_ports, sizeof(struct rp_port), M_DEVBUF,
-		    M_NOWAIT | M_ZERO);
+		malloc(sizeof(struct rp_port) * num_ports, M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (rp == NULL) {
 		device_printf(ctlp->dev, "rp_attachcommon: Could not malloc rp_ports structures.\n");
 		retval = ENOMEM;

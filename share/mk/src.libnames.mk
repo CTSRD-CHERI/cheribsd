@@ -35,6 +35,7 @@ _INTERNALLIBS=	\
 		bfd \
 		binutils \
 		bsnmptools \
+		c_nossp_pic \
 		cron \
 		elftc \
 		fifolog \
@@ -51,7 +52,6 @@ _INTERNALLIBS=	\
 		parse \
 		pe \
 		pmcstat \
-		readline \
 		sl \
 		sm \
 		smdb \
@@ -129,6 +129,7 @@ _LIBRARIES=	\
 		hubbub \
 		hx509 \
 		ipsec \
+		ipt \
 		jail \
 		jpeg \
 		kadm5clnt \
@@ -157,6 +158,7 @@ _LIBRARIES=	\
 		nsgif \
 		nv \
 		nvpair \
+		opencsd \
 		opie \
 		pam \
 		panel \
@@ -171,7 +173,7 @@ _LIBRARIES=	\
 		procstat \
 		pthread \
 		radius \
-		readline \
+		regex \
 		roken \
 		rosprite \
 		rpcsec_gss \
@@ -267,6 +269,9 @@ _DP_cap_pwd=	nv
 _DP_cap_random=	nv
 _DP_cap_sysctl=	nv
 _DP_cap_syslog=	nv
+.if ${MK_OFED} != "no"
+_DP_pcap=	ibverbs mlx5
+.endif
 _DP_pjdlog=	util
 _DP_png=	z
 _DP_opie=	md
@@ -318,7 +323,6 @@ _DP_pam+=	ssh
 .if ${MK_NIS} != "no"
 _DP_pam+=	ypclnt
 .endif
-_DP_readline=	ncursesw
 _DP_roken=	crypt
 _DP_kadm5clnt=	com_err krb5 roken
 _DP_kadm5srv=	com_err hdb krb5 roken
@@ -337,6 +341,7 @@ _DP_gssapi_krb5+=	gssapi krb5 crypto roken asn1 com_err
 _DP_lzma=	pthread
 _DP_ucl=	m
 _DP_vmmapi=	util
+_DP_opencsd=	cxxrt
 _DP_ctf=	z
 _DP_dtrace=	ctf elf proc pthread rtld_db
 _DP_xo=		util
@@ -450,9 +455,6 @@ LIBELFTC?=	${LIBELFTCDIR}/libelftc.a
 LIBPEDIR=	${_LIB_OBJTOP}/lib/libpe
 LIBPE?=		${LIBPEDIR}/libpe.a
 
-LIBREADLINEDIR=	${_LIB_OBJTOP}/gnu/lib/libreadline/readline
-LIBREADLINE?=	${LIBREADLINEDIR}/libreadline.a
-
 LIBOPENBSDDIR=	${_LIB_OBJTOP}/lib/libopenbsd
 LIBOPENBSD?=	${LIBOPENBSDDIR}/libopenbsd.a
 
@@ -510,6 +512,9 @@ LIBAMU?=	${LIBAMUDIR}/libamu.a
 LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
 LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat.a
 
+LIBC_NOSSP_PICDIR=	${OBJTOP}/lib/libc
+LIBC_NOSSP_PIC?=	${LIBC_NOSSP_PICDIR}/libc_nossp_pic.a
+
 LIBBFDDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbfd
 LIBBFD?=	${LIBBFDDIR}/libbfd.a
 
@@ -537,33 +542,20 @@ LIBUUTILDIR=	${_LIB_OBJTOP}/cddl/lib/libuutil
 LIBZFSDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs
 LIBZFS_COREDIR=	${_LIB_OBJTOP}/cddl/lib/libzfs_core
 LIBZPOOLDIR=	${_LIB_OBJTOP}/cddl/lib/libzpool
-LIBCXGB4DIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libcxgb4
-LIBIBCMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibcm
-LIBIBCOMMONDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibcommon
-LIBIBMADDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibmad
-LIBIBUMADDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibumad
-LIBIBVERBSDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libibverbs
-LIBMLX4DIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libmlx4
-LIBMTHCADIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libmthca
-LIBOPENSMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libopensm
-LIBOSMCOMPDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libosmcomp
-LIBOSMVENDORDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libosmvendor
-LIBRDMACMDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/librdmacm
-LIBIBSDPDIR=	${_LIB_OBJTOP}/contrib/ofed/usr.lib/libsdp
 
 # OFED support
-LIBCXGB4DIR=	${_LIB_OBJTOP}/contrib/ofed/libcxgb4
-LIBIBCMDIR=	${_LIB_OBJTOP}/contrib/ofed/libibcm
-LIBIBMADDIR=	${_LIB_OBJTOP}/contrib/ofed/libibmad
-LIBIBNETDISCDIR=${_LIB_OBJTOP}/contrib/ofed/libibnetdisc
-LIBIBUMADDIR=	${_LIB_OBJTOP}/contrib/ofed/libibumad
-LIBIBVERBSDIR=	${_LIB_OBJTOP}/contrib/ofed/libibverbs
-LIBMLX4DIR=	${_LIB_OBJTOP}/contrib/ofed/libmlx4
-LIBMLX5DIR=	${_LIB_OBJTOP}/contrib/ofed/libmlx5
-LIBRDMACMDIR=	${_LIB_OBJTOP}/contrib/ofed/librdmacm
-LIBOSMCOMPDIR=	${_LIB_OBJTOP}/contrib/ofed/opensm/complib
-LIBOPENSMDIR=	${_LIB_OBJTOP}/contrib/ofed/opensm/libopensm
-LIBOSMVENDORDIR=${_LIB_OBJTOP}/contrib/ofed/opensm/libvendor
+LIBCXGB4DIR=	${_LIB_OBJTOP}/lib/ofed/libcxgb4
+LIBIBCMDIR=	${_LIB_OBJTOP}/lib/ofed/libibcm
+LIBIBMADDIR=	${_LIB_OBJTOP}/lib/ofed/libibmad
+LIBIBNETDISCDIR=${_LIB_OBJTOP}/lib/ofed/libibnetdisc
+LIBIBUMADDIR=	${_LIB_OBJTOP}/lib/ofed/libibumad
+LIBIBVERBSDIR=	${_LIB_OBJTOP}/lib/ofed/libibverbs
+LIBMLX4DIR=	${_LIB_OBJTOP}/lib/ofed/libmlx4
+LIBMLX5DIR=	${_LIB_OBJTOP}/lib/ofed/libmlx5
+LIBRDMACMDIR=	${_LIB_OBJTOP}/lib/ofed/librdmacm
+LIBOSMCOMPDIR=	${_LIB_OBJTOP}/lib/ofed/complib
+LIBOPENSMDIR=	${_LIB_OBJTOP}/lib/ofed/libopensm
+LIBOSMVENDORDIR=${_LIB_OBJTOP}/lib/ofed/libvendor
 
 LIBDIALOGDIR=	${_LIB_OBJTOP}/gnu/lib/libdialog
 LIBGCOVDIR=	${_LIB_OBJTOP}/gnu/lib/libgcov

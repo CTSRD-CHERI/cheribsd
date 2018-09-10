@@ -34,13 +34,15 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/_rwlock.h>
 #include <netinet/in.h>
+#include <sys/epoch.h>
+#include <sys/ck.h>
 
 struct ifnet;
 struct sysctl_req;
 struct rt_msghdr;
 struct rt_addrinfo;
 struct llentry;
-LIST_HEAD(llentries, llentry);
+CK_LIST_HEAD(llentries, llentry);
 
 #define	LLE_MAX_LINKHDR		24	/* Full IB header */
 /*
@@ -48,7 +50,7 @@ LIST_HEAD(llentries, llentry);
  * a shared lock
  */
 struct llentry {
-	LIST_ENTRY(llentry)	 lle_next;
+	CK_LIST_ENTRY(llentry)	 lle_next;
 	union {
 		struct in_addr	addr4;
 		struct in6_addr	addr6;
@@ -76,10 +78,11 @@ struct llentry {
 	int			 lle_refcnt;
 	char			*ll_addr;	/* link-layer address */
 
-	LIST_ENTRY(llentry)	lle_chain;	/* chain of deleted items */
+	CK_LIST_ENTRY(llentry)	lle_chain;	/* chain of deleted items */
 	struct callout		lle_timer;
 	struct rwlock		 lle_lock;
 	struct mtx		req_mtx;
+	struct epoch_context lle_epoch_ctx;
 };
 
 #define	LLE_WLOCK(lle)		rw_wlock(&(lle)->lle_lock)
@@ -149,6 +152,7 @@ typedef void (llt_fill_sa_entry_t)(const struct llentry *, struct sockaddr *);
 typedef void (llt_free_tbl_t)(struct lltable *);
 typedef void (llt_link_entry_t)(struct lltable *, struct llentry *);
 typedef void (llt_unlink_entry_t)(struct llentry *);
+typedef void (llt_mark_used_t)(struct llentry *);
 
 typedef int (llt_foreach_cb_t)(struct lltable *, struct llentry *, void *);
 typedef int (llt_foreach_entry_t)(struct lltable *, llt_foreach_cb_t *, void *);
@@ -173,6 +177,7 @@ struct lltable {
 	llt_unlink_entry_t	*llt_unlink_entry;
 	llt_fill_sa_entry_t	*llt_fill_sa_entry;
 	llt_free_tbl_t		*llt_free_tbl;
+	llt_mark_used_t		*llt_mark_used;
 };
 
 MALLOC_DECLARE(M_LLTABLE);
@@ -245,6 +250,19 @@ lla_lookup(struct lltable *llt, u_int flags, const struct sockaddr *l3addr)
 {
 
 	return (llt->llt_lookup(llt, flags, l3addr));
+}
+
+/*
+ * Notify the LLE code that the entry was used by datapath.
+ */
+static __inline void
+llentry_mark_used(struct llentry *lle)
+{
+
+	if (lle->r_skip_req == 0)
+		return;
+	if ((lle->r_flags & RLLE_VALID) != 0)
+		lle->lle_tbl->llt_mark_used(lle);
 }
 
 int		lla_rt_output(struct rt_msghdr *, struct rt_addrinfo *);

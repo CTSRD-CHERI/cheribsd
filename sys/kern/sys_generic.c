@@ -40,7 +40,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
-#include "opt_compat.h"
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
@@ -111,15 +110,13 @@ MALLOC_DEFINE(M_IOCTLOPS, "ioctlops", "ioctl data buffer");
 static MALLOC_DEFINE(M_SELECT, "select", "select() buffer");
 MALLOC_DEFINE(M_IOV, "iov", "large iov's");
 
-static int	pollout(struct thread *, struct pollfd * __capability,
+static int	pollout(struct thread *, struct pollfd *,
 		    struct pollfd * __capability, u_int);
-static int	pollscan(struct thread *, struct pollfd * __capability , u_int);
+static int	pollscan(struct thread *, struct pollfd *, u_int);
 static int	pollrescan(struct thread *);
-static int	selscan(struct thread *, fd_mask * __capability *,
-		    fd_mask * __capability *, int);
-static int	selrescan(struct thread *, fd_mask * __capability *,
-		    fd_mask * __capability *);
-static void	selfdalloc(struct thread *, void * __capability);
+static int	selscan(struct thread *, fd_mask **, fd_mask **, int);
+static int	selrescan(struct thread *, fd_mask **, fd_mask **);
+static void	selfdalloc(struct thread *, void *);
 static void	selfdfree(struct seltd *, struct selfd *);
 static int	dofileread(struct thread *, int, struct file *, struct uio *,
 		    off_t, int);
@@ -158,7 +155,7 @@ struct selfd {
 	struct selinfo		*sf_si;		/* (f) selinfo when linked. */
 	struct mtx		*sf_mtx;	/* Pointer to selinfo mtx. */
 	struct seltd		*sf_td;		/* (k) owning seltd. */
-	void * __capability	sf_cookie;	/* (k) fd or pollfd. */
+	void *			sf_cookie;	/* (k) fd or pollfd. */
 	u_int			sf_refs;
 };
 
@@ -191,9 +188,7 @@ struct read_args {
 };
 #endif
 int
-sys_read(td, uap)
-	struct thread *td;
-	struct read_args *uap;
+sys_read(struct thread *td, struct read_args *uap)
 {
 	struct uio auio;
 	kiovec_t aiov;
@@ -207,7 +202,7 @@ sys_read(td, uap)
 	auio.uio_resid = uap->nbyte;
 	auio.uio_segflg = UIO_USERSPACE;
 	error = kern_readv(td, uap->fd, &auio);
-	return(error);
+	return (error);
 }
 
 /*
@@ -284,10 +279,9 @@ int
 kern_readv(struct thread *td, int fd, struct uio *auio)
 {
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
-	error = fget_read(td, fd, cap_rights_init(&rights, CAP_READ), &fp);
+	error = fget_read(td, fd, &cap_read_rights, &fp);
 	if (error)
 		return (error);
 	error = dofileread(td, fd, fp, auio, (off_t)-1, 0);
@@ -321,17 +315,12 @@ sys_preadv(struct thread *td, struct preadv_args *uap)
 }
 
 int
-kern_preadv(td, fd, auio, offset)
-	struct thread *td;
-	int fd;
-	struct uio *auio;
-	off_t offset;
+kern_preadv(struct thread *td, int fd, struct uio *auio, off_t offset)
 {
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
-	error = fget_read(td, fd, cap_rights_init(&rights, CAP_PREAD), &fp);
+	error = fget_read(td, fd, &cap_pread_rights, &fp);
 	if (error)
 		return (error);
 	if (!(fp->f_ops->fo_flags & DFLAG_SEEKABLE))
@@ -350,13 +339,8 @@ kern_preadv(td, fd, auio, offset)
  * from a file using the passed in uio, offset, and flags.
  */
 static int
-dofileread(td, fd, fp, auio, offset, flags)
-	struct thread *td;
-	int fd;
-	struct file *fp;
-	struct uio *auio;
-	off_t offset;
-	int flags;
+dofileread(struct thread *td, int fd, struct file *fp, struct uio *auio,
+    off_t offset, int flags)
 {
 	ssize_t cnt;
 	int error;
@@ -369,7 +353,7 @@ dofileread(td, fd, fp, auio, offset, flags)
 	/* Finish zero length reads right here */
 	if (auio->uio_resid == 0) {
 		td->td_retval[0] = 0;
-		return(0);
+		return (0);
 	}
 	auio->uio_rw = UIO_READ;
 	auio->uio_offset = offset;
@@ -403,9 +387,7 @@ struct write_args {
 };
 #endif
 int
-sys_write(td, uap)
-	struct thread *td;
-	struct write_args *uap;
+sys_write(struct thread *td, struct write_args *uap)
 {
 	struct uio auio;
 	kiovec_t aiov;
@@ -419,7 +401,7 @@ sys_write(td, uap)
 	auio.uio_resid = uap->nbyte;
 	auio.uio_segflg = UIO_USERSPACE;
 	error = kern_writev(td, uap->fd, &auio);
-	return(error);
+	return (error);
 }
 
 /*
@@ -457,7 +439,7 @@ kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
 	auio.uio_resid = nbyte;
 	auio.uio_segflg = UIO_USERSPACE;
 	error = kern_pwritev(td, fd, &auio, offset);
-	return(error);
+	return (error);
 }
 
 #if defined(COMPAT_FREEBSD6)
@@ -497,10 +479,9 @@ int
 kern_writev(struct thread *td, int fd, struct uio *auio)
 {
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
-	error = fget_write(td, fd, cap_rights_init(&rights, CAP_WRITE), &fp);
+	error = fget_write(td, fd, &cap_write_rights, &fp);
 	if (error)
 		return (error);
 	error = dofilewrite(td, fd, fp, auio, (off_t)-1, 0);
@@ -534,17 +515,12 @@ sys_pwritev(struct thread *td, struct pwritev_args *uap)
 }
 
 int
-kern_pwritev(td, fd, auio, offset)
-	struct thread *td;
-	struct uio *auio;
-	int fd;
-	off_t offset;
+kern_pwritev(struct thread *td, int fd, struct uio *auio, off_t offset)
 {
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
-	error = fget_write(td, fd, cap_rights_init(&rights, CAP_PWRITE), &fp);
+	error = fget_write(td, fd, &cap_pwrite_rights, &fp);
 	if (error)
 		return (error);
 	if (!(fp->f_ops->fo_flags & DFLAG_SEEKABLE))
@@ -563,13 +539,8 @@ kern_pwritev(td, fd, auio, offset)
  * a file using the passed in uio, offset, and flags.
  */
 static int
-dofilewrite(td, fd, fp, auio, offset, flags)
-	struct thread *td;
-	int fd;
-	struct file *fp;
-	struct uio *auio;
-	off_t offset;
-	int flags;
+dofilewrite(struct thread *td, int fd, struct file *fp, struct uio *auio,
+    off_t offset, int flags)
 {
 	ssize_t cnt;
 	int error;
@@ -618,19 +589,15 @@ dofilewrite(td, fd, fp, auio, offset, flags)
  * descriptor isn't writable.
  */
 int
-kern_ftruncate(td, fd, length)
-	struct thread *td;
-	int fd;
-	off_t length;
+kern_ftruncate(struct thread *td, int fd, off_t length)
 {
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(fd);
 	if (length < 0)
 		return (EINVAL);
-	error = fget(td, fd, cap_rights_init(&rights, CAP_FTRUNCATE), &fp);
+	error = fget(td, fd, &cap_ftruncate_rights, &fp);
 	if (error)
 		return (error);
 	AUDIT_ARG_FILE(td->td_proc, fp);
@@ -651,9 +618,7 @@ struct ftruncate_args {
 };
 #endif
 int
-sys_ftruncate(td, uap)
-	struct thread *td;
-	struct ftruncate_args *uap;
+sys_ftruncate(struct thread *td, struct ftruncate_args *uap)
 {
 
 	return (kern_ftruncate(td, uap->fd, uap->length));
@@ -667,9 +632,7 @@ struct oftruncate_args {
 };
 #endif
 int
-oftruncate(td, uap)
-	struct thread *td;
-	struct oftruncate_args *uap;
+oftruncate(struct thread *td, struct oftruncate_args *uap)
 {
 
 	return (kern_ftruncate(td, uap->fd, uap->length));
@@ -758,9 +721,6 @@ kern_ioctl(struct thread *td, int fd, u_long com, caddr_t data)
 {
 	struct file *fp;
 	struct filedesc *fdp;
-#ifndef CAPABILITIES
-	cap_rights_t rights;
-#endif
 	int error, tmp, locked;
 
 	AUDIT_ARG_FD(fd);
@@ -799,7 +759,7 @@ kern_ioctl(struct thread *td, int fd, u_long com, caddr_t data)
 		locked = LA_UNLOCKED;
 	}
 #else
-	error = fget(td, fd, cap_rights_init(&rights, CAP_IOCTL), &fp);
+	error = fget(td, fd, &cap_ioctl_rights, &fp);
 	if (error != 0) {
 		fp = NULL;
 		goto out;
@@ -1011,10 +971,10 @@ kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	 * of 256.
 	 */
 	fd_mask s_selbits[howmany(2048, NFDBITS)];
-	fd_mask * __capability ibits[3];
-	fd_mask * __capability obits[3];
-	fd_mask * __capability selbits;
-	fd_mask * __capability sbp;
+	fd_mask * ibits[3];
+	fd_mask * obits[3];
+	fd_mask * selbits;
+	fd_mask * sbp;
 	struct timeval rtv;
 	sbintime_t asbt, precision, rsbt;
 	u_int nbufbytes, ncpbytes, ncpubytes, nfdbits;
@@ -1055,7 +1015,7 @@ kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	if (nbufbytes <= sizeof s_selbits)
 		selbits = &s_selbits[0];
 	else
-		selbits = malloc_c(nbufbytes, M_SELECT, M_WAITOK);
+		selbits = malloc(nbufbytes, M_SELECT, M_WAITOK);
 
 	/*
 	 * Assign pointers into the bit buffers and fetch the input bits.
@@ -1075,8 +1035,7 @@ kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 			error = copyin_c(name, ibits[x], ncpubytes);	\
 			if (error != 0)					\
 				goto done;				\
-			bzero((__cheri_fromcap char *)			\
-			    (char * __capability) ibits[x] + ncpubytes,	\
+			bzero((char *) ibits[x] + ncpubytes,		\
 			    ncpbytes - ncpubytes);			\
 		}							\
 	} while (0)
@@ -1107,7 +1066,7 @@ kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	swizzle_fdset(ibits[2]);
 	
 	if (nbufbytes != 0)
-		bzero((__cheri_fromcap void *)selbits, nbufbytes / 2);
+		bzero(selbits, nbufbytes / 2);
 
 	precision = 0;
 	if (tvp != NULL) {
@@ -1172,8 +1131,8 @@ done:
 		putbits(fd_ex, 2);
 #undef putbits
 	}
-	if (selbits != (__cheri_tocap fd_mask * __capability)&s_selbits[0])
-		free_c(selbits, M_SELECT);
+	if (selbits != &s_selbits[0])
+		free(selbits, M_SELECT);
 
 	return (error);
 }
@@ -1194,7 +1153,7 @@ static int select_flags[3] = {
  * bit position in the fd_mask array.
  */
 static __inline int
-selflags(fd_mask * __capability *ibits, int idx, fd_mask bit)
+selflags(fd_mask **ibits, int idx, fd_mask bit)
 {
 	int flags;
 	int msk;
@@ -1215,8 +1174,7 @@ selflags(fd_mask * __capability *ibits, int idx, fd_mask bit)
  * input bits originally requested.
  */
 static __inline int
-selsetbits(fd_mask * __capability *ibits, fd_mask * __capability *obits,
-    int idx, fd_mask bit, int events)
+selsetbits(fd_mask **ibits, fd_mask **obits, int idx, fd_mask bit, int events)
 {
 	int msk;
 	int n;
@@ -1247,11 +1205,8 @@ selsetbits(fd_mask * __capability *ibits, fd_mask * __capability *obits,
 static __inline int
 getselfd_cap(struct filedesc *fdp, int fd, struct file **fpp)
 {
-	cap_rights_t rights;
 
-	cap_rights_init(&rights, CAP_EVENT);
-
-	return (fget_unlocked(fdp, fd, &rights, fpp, NULL));
+	return (fget_unlocked(fdp, fd, &cap_event_rights, fpp, NULL));
 }
 
 /*
@@ -1259,8 +1214,7 @@ getselfd_cap(struct filedesc *fdp, int fd, struct file **fpp)
  * completion.
  */
 static int
-selrescan(struct thread *td, fd_mask * __capability *ibits,
-    fd_mask * __capability *obits)
+selrescan(struct thread *td, fd_mask **ibits, fd_mask **obits)
 {
 	struct filedesc *fdp;
 	struct selinfo *si;
@@ -1276,7 +1230,7 @@ selrescan(struct thread *td, fd_mask * __capability *ibits,
 	stp = td->td_sel;
 	n = 0;
 	STAILQ_FOREACH_SAFE(sfp, &stp->st_selq, sf_link, sfn) {
-		fd = (int)(uintcap_t)sfp->sf_cookie;
+		fd = (int)(uintptr_t)sfp->sf_cookie;
 		si = sfp->sf_si;
 		selfdfree(stp, sfp);
 		/* If the selinfo wasn't cleared the event didn't fire. */
@@ -1302,8 +1256,7 @@ selrescan(struct thread *td, fd_mask * __capability *ibits,
  * each selinfo.
  */
 static int
-selscan(struct thread *td, fd_mask * __capability *ibits,
-    fd_mask * __capability *obits, int nfd)
+selscan(struct thread *td, fd_mask **ibits, fd_mask **obits, int nfd)
 {
 	struct filedesc *fdp;
 	struct file *fp;
@@ -1324,7 +1277,7 @@ selscan(struct thread *td, fd_mask * __capability *ibits,
 			error = getselfd_cap(fdp, fd, &fp);
 			if (error)
 				return (error);
-			selfdalloc(td, (void * __capability)(uintcap_t)fd);
+			selfdalloc(td, (void *)(uintptr_t)fd);
 			ev = fo_poll(fp, flags, td->td_ucred, td);
 			fdrop(fp, td);
 			if (ev != 0)
@@ -1358,7 +1311,7 @@ int
 kern_poll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
     struct timespec *tsp, sigset_t *uset)
 {
-	struct pollfd * __capability bits;
+	struct pollfd * bits;
 	struct pollfd smallbits[32];
 	sbintime_t sbt, precision, tmp;
 	time_t over;
@@ -1395,7 +1348,7 @@ kern_poll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
 		return (EINVAL);
 	ni = nfds * sizeof(struct pollfd);
 	if (ni > sizeof(smallbits))
-		bits = malloc_c(ni, M_TEMP, M_WAITOK);
+		bits = malloc(ni, M_TEMP, M_WAITOK);
 	else
 		bits = &smallbits[0];
 	error = copyin_c(fds, bits, ni);
@@ -1446,7 +1399,7 @@ done:
 	}
 out:
 	if (ni > sizeof(smallbits))
-		free_c(bits, M_TEMP);
+		free(bits, M_TEMP);
 	return (error);
 }
 
@@ -1489,10 +1442,7 @@ pollrescan(struct thread *td)
 	struct selinfo *si;
 	struct filedesc *fdp;
 	struct file *fp;
-	struct pollfd * __capability fd;
-#ifdef CAPABILITIES
-	cap_rights_t rights;
-#endif
+	struct pollfd *fd;
 	int n;
 
 	n = 0;
@@ -1509,8 +1459,7 @@ pollrescan(struct thread *td)
 		fp = fdp->fd_ofiles[fd->fd].fde_file;
 #ifdef CAPABILITIES
 		if (fp == NULL ||
-		    cap_check(cap_rights(fdp, fd->fd),
-		    cap_rights_init(&rights, CAP_EVENT)) != 0)
+		    cap_check(cap_rights(fdp, fd->fd), &cap_event_rights) != 0)
 #else
 		if (fp == NULL)
 #endif
@@ -1536,7 +1485,7 @@ pollrescan(struct thread *td)
 
 
 static int
-pollout(struct thread *td, struct pollfd * __capability fds,
+pollout(struct thread *td, struct pollfd *fds,
     struct pollfd * __capability ufds, u_int nfd)
 {
 	int error = 0;
@@ -1544,7 +1493,6 @@ pollout(struct thread *td, struct pollfd * __capability fds,
 	u_int n = 0;
 
 	for (i = 0; i < nfd; i++) {
-		/* XXX-BD: CTSRD-CHERI/clang#180 */
 		error = copyout_c(&fds->revents, &ufds->revents,
 		    sizeof(ufds->revents));
 		if (error)
@@ -1559,13 +1507,10 @@ pollout(struct thread *td, struct pollfd * __capability fds,
 }
 
 static int
-pollscan(struct thread *td, struct pollfd * __capability fds, u_int nfd)
+pollscan(struct thread *td, struct pollfd *fds, u_int nfd)
 {
 	struct filedesc *fdp = td->td_proc->p_fd;
 	struct file *fp;
-#ifdef CAPABILITIES
-	cap_rights_t rights;
-#endif
 	int i, n = 0;
 
 	FILEDESC_SLOCK(fdp);
@@ -1579,8 +1524,7 @@ pollscan(struct thread *td, struct pollfd * __capability fds, u_int nfd)
 			fp = fdp->fd_ofiles[fds->fd].fde_file;
 #ifdef CAPABILITIES
 			if (fp == NULL ||
-			    cap_check(cap_rights(fdp, fds->fd),
-			    cap_rights_init(&rights, CAP_EVENT)) != 0)
+			    cap_check(cap_rights(fdp, fds->fd), &cap_event_rights) != 0)
 #else
 			if (fp == NULL)
 #endif
@@ -1673,7 +1617,7 @@ selsocket(struct socket *so, int events, struct timeval *tvp, struct thread *td)
  * have two select sets, one for read and another for write.
  */
 static void
-selfdalloc(struct thread *td, void * __capability cookie)
+selfdalloc(struct thread *td, void * cookie)
 {
 	struct seltd *stp;
 
@@ -1706,8 +1650,7 @@ selfdfree(struct seltd *stp, struct selfd *sfp)
 
 /* Drain the waiters tied to all the selfd belonging the specified selinfo. */
 void
-seldrain(sip)
-        struct selinfo *sip;
+seldrain(struct selinfo *sip)
 {
 
 	/*
@@ -1725,9 +1668,7 @@ seldrain(sip)
  * Record a select request.
  */
 void
-selrecord(selector, sip)
-	struct thread *selector;
-	struct selinfo *sip;
+selrecord(struct thread *selector, struct selinfo *sip)
 {
 	struct selfd *sfp;
 	struct seltd *stp;
@@ -1776,17 +1717,14 @@ selrecord(selector, sip)
 
 /* Wake up a selecting thread. */
 void
-selwakeup(sip)
-	struct selinfo *sip;
+selwakeup(struct selinfo *sip)
 {
 	doselwakeup(sip, -1);
 }
 
 /* Wake up a selecting thread, and set its priority. */
 void
-selwakeuppri(sip, pri)
-	struct selinfo *sip;
-	int pri;
+selwakeuppri(struct selinfo *sip, int pri)
 {
 	doselwakeup(sip, pri);
 }
@@ -1795,9 +1733,7 @@ selwakeuppri(sip, pri)
  * Do a wakeup when a selectable event occurs.
  */
 static void
-doselwakeup(sip, pri)
-	struct selinfo *sip;
-	int pri;
+doselwakeup(struct selinfo *sip, int pri)
 {
 	struct selfd *sfp;
 	struct selfd *sfn;

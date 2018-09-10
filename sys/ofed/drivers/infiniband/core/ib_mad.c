@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause OR GPL-2.0
+ *
  * Copyright (c) 2004-2007 Voltaire, Inc. All rights reserved.
  * Copyright (c) 2005 Intel Corporation.  All rights reserved.
  * Copyright (c) 2005 Mellanox Technologies Ltd.  All rights reserved.
@@ -32,8 +34,10 @@
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
- *
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #define	LINUXKPI_PARAM_PREFIX ibcore_
 #define	KBUILD_MODNAME "ibcore"
@@ -569,7 +573,7 @@ static void unregister_mad_agent(struct ib_mad_agent_private *mad_agent_priv)
 	 */
 	cancel_mads(mad_agent_priv);
 	port_priv = mad_agent_priv->qp_info->port_priv;
-	cancel_delayed_work(&mad_agent_priv->timed_work);
+	cancel_delayed_work_sync(&mad_agent_priv->timed_work);
 
 	spin_lock_irqsave(&port_priv->reg_lock, flags);
 	remove_mad_reg_req(mad_agent_priv);

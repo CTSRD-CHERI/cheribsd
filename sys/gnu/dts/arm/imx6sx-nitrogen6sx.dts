@@ -52,7 +52,7 @@
 		t_lcd = &t_lcd;
 	};
 
-	memory {
+	memory@80000000 {
 		reg = <0x80000000 0x40000000>;
 	};
 
@@ -231,7 +231,7 @@
 	pinctrl-0 = <&pinctrl_i2c1>;
 	status = "okay";
 
-	codec: sgtl5000@0a {
+	codec: sgtl5000@a {
 		compatible = "fsl,sgtl5000";
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_sgtl5000>;

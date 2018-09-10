@@ -215,16 +215,21 @@ vslock(void * __capability addr, size_t len)
 	 * Also, the sysctl code, which is the only present user
 	 * of vslock(), does a hard loop on EAGAIN.
 	 */
-	if (npages + vm_cnt.v_wire_count > vm_page_max_wired)
+	if (npages + vm_wire_count() > vm_page_max_wired)
 		return (EAGAIN);
 #endif
 	error = vm_map_wire(&curproc->p_vmspace->vm_map, start, end,
 	    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);
+	if (error == KERN_SUCCESS) {
+		curthread->td_vslock_sz += len;
+		return (0);
+	}
+
 	/*
 	 * Return EFAULT on error to match copy{in,out}() behaviour
 	 * rather than returning ENOMEM like mlock() would.
 	 */
-	return (error == KERN_SUCCESS ? 0 : EFAULT);
+	return (EFAULT);
 }
 
 void
@@ -234,6 +239,8 @@ vsunlock(void * __capability addr, size_t len)
 
 	/* Rely on the parameter sanity checks performed by vslock(). */
 	vaddr = (__cheri_addr vm_offset_t)addr;
+	MPASS(curthread->td_vslock_sz >= len);
+	curthread->td_vslock_sz -= len;
 	(void)vm_map_unwire(&curproc->p_vmspace->vm_map,
 	    trunc_page(vaddr), round_page(vaddr + len),
 	    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);
@@ -403,7 +410,7 @@ retrylookup:
 		if (m != NULL)
 			break;
 		VM_OBJECT_WUNLOCK(ksobj);
-		VM_WAIT;
+		vm_wait(ksobj);
 		VM_OBJECT_WLOCK(ksobj);
 	}
 	end_m = m + atop(KSTACK_PAGE_SIZE);
@@ -730,7 +737,7 @@ vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
 	}
 
 	while (vm_page_count_severe()) {
-		VM_WAIT;
+		vm_wait_severe();
 	}
 
 	if ((flags & RFMEM) == 0) {

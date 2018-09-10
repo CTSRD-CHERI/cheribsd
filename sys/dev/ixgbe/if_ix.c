@@ -47,7 +47,7 @@
 /************************************************************************
  * Driver version
  ************************************************************************/
-char ixgbe_driver_version[] = "4.0.0-k";
+char ixgbe_driver_version[] = "4.0.1-k";
 
 
 /************************************************************************
@@ -92,6 +92,7 @@ static pci_vendor_info_t ixgbe_vendor_info_array[] =
   PVID(IXGBE_INTEL_VENDOR_ID, IXGBE_DEV_ID_X550EM_X_KR,  "Intel(R) PRO/10GbE PCI-Express Network Driver"),
   PVID(IXGBE_INTEL_VENDOR_ID, IXGBE_DEV_ID_X550EM_X_KX4,  "Intel(R) PRO/10GbE PCI-Express Network Driver"),
   PVID(IXGBE_INTEL_VENDOR_ID, IXGBE_DEV_ID_X550EM_X_10G_T,  "Intel(R) PRO/10GbE PCI-Express Network Driver"),
+  PVID(IXGBE_INTEL_VENDOR_ID, IXGBE_DEV_ID_X550EM_X_1G_T,  "Intel(R) PRO/10GbE PCI-Express Network Driver"),
   PVID(IXGBE_INTEL_VENDOR_ID, IXGBE_DEV_ID_X550EM_X_SFP, "Intel(R) PRO/10GbE PCI-Express Network Driver"),
   PVID(IXGBE_INTEL_VENDOR_ID, IXGBE_DEV_ID_X550EM_A_KR, "Intel(R) PRO/10GbE PCI-Express Network Driver"),
   PVID(IXGBE_INTEL_VENDOR_ID, IXGBE_DEV_ID_X550EM_A_KR_L, "Intel(R) PRO/10GbE PCI-Express Network Driver"),
@@ -136,7 +137,7 @@ static void ixgbe_if_timer(if_ctx_t ctx, uint16_t);
 static void ixgbe_if_update_admin_status(if_ctx_t ctx);
 static void ixgbe_if_vlan_register(if_ctx_t ctx, u16 vtag);
 static void ixgbe_if_vlan_unregister(if_ctx_t ctx, u16 vtag);
-
+static int  ixgbe_if_i2c_req(if_ctx_t ctx, struct ifi2creq *req);
 int ixgbe_intr(void *arg);
 
 /************************************************************************
@@ -236,6 +237,8 @@ static driver_t ix_driver = {
 
 devclass_t ix_devclass;
 DRIVER_MODULE(ix, pci, ix_driver, ix_devclass, 0, 0);
+MODULE_PNP_INFO("U16:vendor;U16:device", pci, ix, ixgbe_vendor_info_array,
+    sizeof(ixgbe_vendor_info_array[0]), nitems(ixgbe_vendor_info_array) - 1);
 
 MODULE_DEPEND(ix, pci, 1, 1, 1);
 MODULE_DEPEND(ix, ether, 1, 1, 1);
@@ -269,6 +272,7 @@ static device_method_t ixgbe_if_methods[] = {
 	DEVMETHOD(ifdi_vlan_register, ixgbe_if_vlan_register),
 	DEVMETHOD(ifdi_vlan_unregister, ixgbe_if_vlan_unregister),
 	DEVMETHOD(ifdi_get_counter, ixgbe_if_get_counter),
+	DEVMETHOD(ifdi_i2c_req, ixgbe_if_i2c_req),
 #ifdef PCI_IOV
 	DEVMETHOD(ifdi_iov_init, ixgbe_if_iov_init),
 	DEVMETHOD(ifdi_iov_uninit, ixgbe_if_iov_uninit),
@@ -360,10 +364,10 @@ extern struct if_txrx ixgbe_txrx;
 static struct if_shared_ctx ixgbe_sctx_init = {
 	.isc_magic = IFLIB_MAGIC,
 	.isc_q_align = PAGE_SIZE,/* max(DBA_ALIGN, PAGE_SIZE) */
-	.isc_tx_maxsize = IXGBE_TSO_SIZE,
-
+	.isc_tx_maxsize = IXGBE_TSO_SIZE + sizeof(struct ether_vlan_header),
 	.isc_tx_maxsegsize = PAGE_SIZE,
-
+	.isc_tso_maxsize = IXGBE_TSO_SIZE + sizeof(struct ether_vlan_header),
+	.isc_tso_maxsegsize = PAGE_SIZE,
 	.isc_rx_maxsize = PAGE_SIZE*4,
 	.isc_rx_nsegments = 1,
 	.isc_rx_maxsegsize = PAGE_SIZE*4,
@@ -1030,7 +1034,7 @@ ixgbe_if_attach_pre(if_ctx_t ctx)
 
 	scctx->isc_txrx = &ixgbe_txrx;
 
-	scctx->isc_capenable = IXGBE_CAPS;
+	scctx->isc_capabilities = scctx->isc_capenable = IXGBE_CAPS;
 
 	return (0);
 
@@ -1171,20 +1175,10 @@ ixgbe_setup_interface(if_ctx_t ctx)
 
 	INIT_DEBUGOUT("ixgbe_setup_interface: begin");
 
-	if_setifheaderlen(ifp, sizeof(struct ether_vlan_header));
 	if_setbaudrate(ifp, IF_Gbps(10));
 
 	adapter->max_frame_size = ifp->if_mtu + ETHER_HDR_LEN + ETHER_CRC_LEN;
 
-	/*
-	 * Don't turn this on by default, if vlans are
-	 * created on another pseudo device (eg. lagg)
-	 * then vlan events are not passed thru, breaking
-	 * operation, but with HW FILTER off it works. If
-	 * using vlans directly on the ixgbe driver you can
-	 * enable this and get full hardware tag filtering.
-	 */
-	if_setcapenablebit(ifp, 0, IFCAP_VLAN_HWFILTER);
 	adapter->phy_layer = ixgbe_get_supported_physical_layer(&adapter->hw);
 
 	ixgbe_add_media_types(ctx);
@@ -1229,6 +1223,25 @@ ixgbe_if_get_counter(if_ctx_t ctx, ift_counter cnt)
 		return (if_get_counter_default(ifp, cnt));
 	}
 } /* ixgbe_if_get_counter */
+
+/************************************************************************
+ * ixgbe_if_i2c_req
+ ************************************************************************/
+static int
+ixgbe_if_i2c_req(if_ctx_t ctx, struct ifi2creq *req)
+{
+	struct adapter		*adapter = iflib_get_softc(ctx);
+	struct ixgbe_hw 	*hw = &adapter->hw;
+	int 			i;
+
+
+	if (hw->phy.ops.read_i2c_byte == NULL)
+		return (ENXIO);
+	for (i = 0; i < req->len; i++)
+		hw->phy.ops.read_i2c_byte(hw, req->offset + i,
+		    req->dev_addr, &req->data[i]);
+	return (0);
+} /* ixgbe_if_i2c_req */
 
 /************************************************************************
  * ixgbe_add_media_types
@@ -4546,4 +4559,3 @@ ixgbe_check_fan_failure(struct adapter *adapter, u32 reg, bool in_interrupt)
 	if (reg & mask)
 		device_printf(adapter->dev, "\nCRITICAL: FAN FAILURE!! REPLACE IMMEDIATELY!!\n");
 } /* ixgbe_check_fan_failure */
-

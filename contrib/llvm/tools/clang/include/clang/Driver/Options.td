@@ -1031,6 +1031,8 @@ def finline_functions : Flag<["-"], "finline-functions">, Group<f_clang_Group>, 
 def finline_hint_functions: Flag<["-"], "finline-hint-functions">, Group<f_clang_Group>, Flags<[CC1Option]>,
   HelpText<"Inline functions which are (explicitly or implicitly) marked inline">;
 def finline : Flag<["-"], "finline">, Group<clang_ignored_f_Group>;
+def fexperimental_isel : Flag<["-"], "fexperimental-isel">, Group<f_clang_Group>,
+  HelpText<"Enables the experimental global instruction selector">;
 def fexperimental_new_pass_manager : Flag<["-"], "fexperimental-new-pass-manager">,
   Group<f_clang_Group>, Flags<[CC1Option]>,
   HelpText<"Enables an experimental new pass manager in LLVM.">;
@@ -1098,7 +1100,8 @@ def fthinlto_index_EQ : Joined<["-"], "fthinlto-index=">,
   HelpText<"Perform ThinLTO importing using provided function summary index">;
 def fmacro_backtrace_limit_EQ : Joined<["-"], "fmacro-backtrace-limit=">,
                                 Group<f_Group>, Flags<[DriverOption, CoreOption]>;
-def fmerge_all_constants : Flag<["-"], "fmerge-all-constants">, Group<f_Group>;
+def fmerge_all_constants : Flag<["-"], "fmerge-all-constants">, Group<f_Group>,
+  Flags<[CC1Option]>, HelpText<"Allow merging of constants">;
 def fmessage_length_EQ : Joined<["-"], "fmessage-length=">, Group<f_Group>;
 def fms_extensions : Flag<["-"], "fms-extensions">, Group<f_Group>, Flags<[CC1Option, CoreOption]>,
   HelpText<"Accept some non-standard constructs supported by the Microsoft compiler">;
@@ -1237,6 +1240,8 @@ def fno_exceptions : Flag<["-"], "fno-exceptions">, Group<f_Group>;
 def fno_gnu_keywords : Flag<["-"], "fno-gnu-keywords">, Group<f_Group>, Flags<[CC1Option]>;
 def fno_inline_functions : Flag<["-"], "fno-inline-functions">, Group<f_clang_Group>, Flags<[CC1Option]>;
 def fno_inline : Flag<["-"], "fno-inline">, Group<f_clang_Group>, Flags<[CC1Option]>;
+def fno_experimental_isel : Flag<["-"], "fno-experimental-isel">, Group<f_clang_Group>,
+  HelpText<"Disables the experimental global instruction selector">;
 def fno_experimental_new_pass_manager : Flag<["-"], "fno-experimental-new-pass-manager">,
   Group<f_clang_Group>, Flags<[CC1Option]>,
   HelpText<"Disables an experimental new pass manager in LLVM.">;
@@ -1245,7 +1250,7 @@ def fveclib : Joined<["-"], "fveclib=">, Group<f_Group>, Flags<[CC1Option]>,
 def fno_lax_vector_conversions : Flag<["-"], "fno-lax-vector-conversions">, Group<f_Group>,
   HelpText<"Disallow implicit conversions between vectors with a different number of elements or different element types">, Flags<[CC1Option]>;
 def fno_merge_all_constants : Flag<["-"], "fno-merge-all-constants">, Group<f_Group>,
-    Flags<[CC1Option]>, HelpText<"Disallow merging of constants">;
+  HelpText<"Disallow merging of constants">;
 def fno_modules : Flag <["-"], "fno-modules">, Group<f_Group>,
   Flags<[DriverOption]>;
 def fno_implicit_module_maps : Flag <["-"], "fno-implicit-module-maps">, Group<f_Group>,
@@ -1988,6 +1993,9 @@ def mbranch_likely : Flag<["-"], "mbranch-likely">, Group<m_Group>,
   IgnoredGCCCompat;
 def mno_branch_likely : Flag<["-"], "mno-branch-likely">, Group<m_Group>,
   IgnoredGCCCompat;
+def mindirect_jump_EQ : Joined<["-"], "mindirect-jump=">,
+  Group<m_Group>,
+  HelpText<"Change indirect jump instructions to inhibit speculation">;
 def mdsp : Flag<["-"], "mdsp">, Group<m_Group>;
 def mno_dsp : Flag<["-"], "mno-dsp">, Group<m_Group>;
 def mdspr2 : Flag<["-"], "mdspr2">, Group<m_Group>;
@@ -2555,6 +2563,8 @@ def mrtm : Flag<["-"], "mrtm">, Group<m_x86_Features_Group>;
 def mno_rtm : Flag<["-"], "mno-rtm">, Group<m_x86_Features_Group>;
 def mrdseed : Flag<["-"], "mrdseed">, Group<m_x86_Features_Group>;
 def mno_rdseed : Flag<["-"], "mno-rdseed">, Group<m_x86_Features_Group>;
+def msahf : Flag<["-"], "msahf">, Group<m_x86_Features_Group>;
+def mno_sahf : Flag<["-"], "mno-sahf">, Group<m_x86_Features_Group>;
 def msgx : Flag<["-"], "msgx">, Group<m_x86_Features_Group>;
 def mno_sgx : Flag<["-"], "mno-sgx">, Group<m_x86_Features_Group>;
 def msha : Flag<["-"], "msha">, Group<m_x86_Features_Group>;
@@ -2579,6 +2589,10 @@ def mshstk : Flag<["-"], "mshstk">, Group<m_x86_Features_Group>;
 def mno_shstk : Flag<["-"], "mno-shstk">, Group<m_x86_Features_Group>;
 def mibt : Flag<["-"], "mibt">, Group<m_x86_Features_Group>;
 def mno_ibt : Flag<["-"], "mno-ibt">, Group<m_x86_Features_Group>;
+def mretpoline : Flag<["-"], "mretpoline">, Group<m_x86_Features_Group>;
+def mno_retpoline : Flag<["-"], "mno-retpoline">, Group<m_x86_Features_Group>;
+def mretpoline_external_thunk : Flag<["-"], "mretpoline-external-thunk">, Group<m_x86_Features_Group>;
+def mno_retpoline_external_thunk : Flag<["-"], "mno-retpoline-external-thunk">, Group<m_x86_Features_Group>;
 
 // These are legacy user-facing driver-level option spellings. They are always
 // aliases for options that are spelled using the more common Unix / GNU flag

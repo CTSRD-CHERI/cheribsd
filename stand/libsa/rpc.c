@@ -63,7 +63,7 @@ __FBSDID("$FreeBSD$");
 
 struct auth_info {
 	int32_t 	authtype;	/* auth type */
-	u_int32_t	authlen;	/* auth length */
+	uint32_t	authlen;	/* auth length */
 };
 
 struct auth_unix {
@@ -75,29 +75,29 @@ struct auth_unix {
 };
 
 struct rpc_call {
-	u_int32_t	rp_xid;		/* request transaction id */
+	uint32_t	rp_xid;		/* request transaction id */
 	int32_t 	rp_direction;	/* call direction (0) */
-	u_int32_t	rp_rpcvers;	/* rpc version (2) */
-	u_int32_t	rp_prog;	/* program */
-	u_int32_t	rp_vers;	/* version */
-	u_int32_t	rp_proc;	/* procedure */
+	uint32_t	rp_rpcvers;	/* rpc version (2) */
+	uint32_t	rp_prog;	/* program */
+	uint32_t	rp_vers;	/* version */
+	uint32_t	rp_proc;	/* procedure */
 };
 
 struct rpc_reply {
-	u_int32_t	rp_xid;		/* request transaction id */
+	uint32_t	rp_xid;		/* request transaction id */
 	int32_t 	rp_direction;	/* call direction (1) */
 	int32_t 	rp_astatus;	/* accept status (0: accepted) */
 	union {
-		u_int32_t	rpu_errno;
+		uint32_t	rpu_errno;
 		struct {
 			struct auth_info rok_auth;
-			u_int32_t	rok_status;
+			uint32_t	rok_status;
 		} rpu_rok;
 	} rp_u;
 };
 
 /* Local forwards */
-static	ssize_t recvrpc(struct iodesc *, void **, void **, time_t);
+static	ssize_t recvrpc(struct iodesc *, void **, void **, time_t, void *);
 static	int rpc_getport(struct iodesc *, n_long, n_long);
 
 int rpc_xid;
@@ -167,7 +167,7 @@ rpc_call(struct iodesc *d, n_long prog, n_long vers, n_long proc,
 	ptr = NULL;
 	cc = sendrecv(d,
 	    sendudp, send_head, send_tail - send_head,
-	    recvrpc, &ptr, (void **)&reply);
+	    recvrpc, &ptr, (void **)&reply, NULL);
 
 #ifdef RPC_DEBUG
 	if (debug)
@@ -217,7 +217,7 @@ rpc_call(struct iodesc *d, n_long prog, n_long vers, n_long proc,
  * Remaining checks are done by callrpc
  */
 static ssize_t
-recvrpc(struct iodesc *d, void **pkt, void **payload, time_t tleft)
+recvrpc(struct iodesc *d, void **pkt, void **payload, time_t tleft, void *extra)
 {
 	void *ptr;
 	struct rpc_reply *reply;
@@ -283,10 +283,10 @@ rpc_fromaddr(void *pkt, struct in_addr *addr, u_short *port)
 		n_long ip_src;
 		n_long ip_dst;
 		/* UDP header: */
-		u_int16_t uh_sport;		/* source port */
-		u_int16_t uh_dport;		/* destination port */
+		uint16_t uh_sport;		/* source port */
+		uint16_t uh_dport;		/* destination port */
 		int16_t	  uh_ulen;		/* udp length */
-		u_int16_t uh_sum;		/* udp checksum */
+		uint16_t uh_sum;		/* udp checksum */
 		/* RPC reply header: */
 		struct rpc_reply rpc;
 	} *hhdr;

@@ -1295,7 +1295,7 @@ pmap_pinit(pmap_t pmap)
 	 */
 	while ((ptdpg = vm_page_alloc(NULL, NUSERPGTBLS, VM_ALLOC_NORMAL |
 	    VM_ALLOC_NOOBJ | VM_ALLOC_WIRED | VM_ALLOC_ZERO)) == NULL)
-		VM_WAIT;
+		vm_wait(NULL);
 	if ((ptdpg->flags & PG_ZERO) == 0)
 		pmap_zero_page(ptdpg);
 
@@ -1332,7 +1332,7 @@ _pmap_allocpte(pmap_t pmap, unsigned ptepindex, struct rwlock **lockp)
 			RELEASE_PV_LIST_LOCK(lockp);
 			PMAP_UNLOCK(pmap);
 			rw_runlock(&pvh_global_lock);
-			VM_WAIT;
+			vm_wait(NULL);
 			rw_rlock(&pvh_global_lock);
 			PMAP_LOCK(pmap);
 		}

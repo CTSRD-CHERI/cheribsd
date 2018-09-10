@@ -45,7 +45,7 @@
 /************************************************************************
  * Driver version
  ************************************************************************/
-char ixv_driver_version[] = "2.0.0-k";
+char ixv_driver_version[] = "2.0.1-k";
 
 /************************************************************************
  * PCI Device ID Table
@@ -143,6 +143,8 @@ static driver_t ixv_driver = {
 
 devclass_t ixv_devclass;
 DRIVER_MODULE(ixv, pci, ixv_driver, ixv_devclass, 0, 0);
+MODULE_PNP_INFO("U16:vendor;U16:device", pci, ixv, ixv_vendor_info_array,
+    sizeof(ixv_vendor_info_array[0]), nitems(ixv_vendor_info_array) - 1);
 MODULE_DEPEND(ixv, pci, 1, 1, 1);
 MODULE_DEPEND(ixv, ether, 1, 1, 1);
 #ifdef DEV_NETMAP
@@ -207,10 +209,10 @@ extern struct if_txrx ixgbe_txrx;
 static struct if_shared_ctx ixv_sctx_init = {
 	.isc_magic = IFLIB_MAGIC,
 	.isc_q_align = PAGE_SIZE,/* max(DBA_ALIGN, PAGE_SIZE) */
-	.isc_tx_maxsize = IXGBE_TSO_SIZE,
-
+	.isc_tx_maxsize = IXGBE_TSO_SIZE + sizeof(struct ether_vlan_header),
 	.isc_tx_maxsegsize = PAGE_SIZE,
-
+	.isc_tso_maxsize = IXGBE_TSO_SIZE + sizeof(struct ether_vlan_header),
+	.isc_tso_maxsegsize = PAGE_SIZE,
 	.isc_rx_maxsize = MJUM16BYTES,
 	.isc_rx_nsegments = 1,
 	.isc_rx_maxsegsize = MJUM16BYTES,
@@ -505,11 +507,11 @@ ixv_if_attach_pre(if_ctx_t ctx)
 	/*
 	 * Tell the upper layer(s) we support everything the PF
 	 * driver does except...
-	 *   hardware stats
 	 *   Wake-on-LAN
 	 */
-	scctx->isc_capenable = IXGBE_CAPS;
-	scctx->isc_capenable ^= IFCAP_HWSTATS | IFCAP_WOL;
+	scctx->isc_capabilities = IXGBE_CAPS;
+	scctx->isc_capabilities ^= IFCAP_WOL;
+	scctx->isc_capenable = scctx->isc_capabilities;
 
 	INIT_DEBUGOUT("ixv_if_attach_pre: end");
 
@@ -616,6 +618,7 @@ ixv_if_init(if_ctx_t ctx)
 
 	/* Reset VF and renegotiate mailbox API version */
 	hw->mac.ops.reset_hw(hw);
+	hw->mac.ops.start_hw(hw);
 	error = ixv_negotiate_api(adapter);
 	if (error) {
 		device_printf(dev,
@@ -661,10 +664,6 @@ ixv_if_init(if_ctx_t ctx)
 
 	/* And now turn on interrupts */
 	ixv_if_enable_intr(ctx);
-
-	/* Now inform the stack we're ready */
-	ifp->if_drv_flags |= IFF_DRV_RUNNING;
-	ifp->if_drv_flags &= ~IFF_DRV_OACTIVE;
 
 	return;
 } /* ixv_if_init */
@@ -849,7 +848,7 @@ ixv_if_multi_set(if_ctx_t ctx)
 
 	IOCTL_DEBUGOUT("ixv_if_multi_set: begin");
 
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
@@ -913,10 +912,18 @@ ixv_if_update_admin_status(if_ctx_t ctx)
 {
 	struct adapter *adapter = iflib_get_softc(ctx);
 	device_t       dev = iflib_get_dev(ctx);
+	s32            status;
 
 	adapter->hw.mac.get_link_status = TRUE;
-	ixgbe_check_link(&adapter->hw, &adapter->link_speed, &adapter->link_up,
-	    FALSE);
+
+	status = ixgbe_check_link(&adapter->hw, &adapter->link_speed,
+	    &adapter->link_up, FALSE);
+
+	if (status != IXGBE_SUCCESS && adapter->hw.adapter_stopped == FALSE) {
+		/* Mailbox's Clear To Send status is lost or timeout occurred.
+		 * We need reinitialization. */
+		iflib_get_ifp(ctx)->if_init(ctx);
+	}
 
 	if (adapter->link_up) {
 		if (adapter->link_active == FALSE) {
@@ -1156,7 +1163,6 @@ ixv_setup_interface(if_ctx_t ctx)
 
 	INIT_DEBUGOUT("ixv_setup_interface: begin");
 
-	if_setifheaderlen(ifp, sizeof(struct ether_vlan_header));
 	if_setbaudrate(ifp, IF_Gbps(10));
 	ifp->if_snd.ifq_maxlen = scctx->isc_ntxd[0] - 2;
 
@@ -1445,7 +1451,7 @@ ixv_initialize_receive_units(if_ctx_t ctx)
 		 */
 		if (ifp->if_capenable & IFCAP_NETMAP) {
 			struct netmap_adapter *na = NA(ifp);
-			struct netmap_kring *kring = &na->rx_rings[j];
+			struct netmap_kring *kring = na->rx_rings[j];
 			int t = na->num_rx_desc - 1 - nm_kr_rxspace(kring);
 
 			IXGBE_WRITE_REG(hw, IXGBE_VFRDT(rxr->me), t);

@@ -1179,12 +1179,12 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 	case SIOCAIFADDR:
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		/* set the interface "up" when assigning an IP address */
 		ifp->if_flags |= IFF_UP;
 		/* FALLTHROUGH */
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		going_up = ifp->if_flags & IFF_UP &&
 			(ifp->if_drv_flags & IFF_DRV_RUNNING) == 0;
 		going_down = (ifp->if_flags & IFF_UP) == 0 &&
@@ -1241,7 +1241,7 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 #ifndef ifr_mtu
 #define ifr_mtu ifr_metric
 #endif
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < 128 || ifr_mtu_get(ifr) > sp->lcp.their_mru)
 			return (EINVAL);
 		ifp->if_mtu = ifr_mtu_get(ifr);
@@ -1255,7 +1255,7 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 		break;
 #endif
 #ifdef SIOCGIFMTU
-	CASE_IOC_IFREQ(SIOCGIFMTU):
+	case CASE_IOC_IFREQ(SIOCGIFMTU):
 		ifr_mtu_set(ifr, ifp->if_mtu);
 		break;
 #endif
@@ -1264,12 +1264,12 @@ sppp_ioctl(struct ifnet *ifp, IOCTL_CMD_T cmd, void *data)
 		*(short*)data = ifp->if_mtu;
 		break;
 #endif
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFGENERIC):
-	CASE_IOC_IFREQ(SIOCSIFGENERIC):
+	case CASE_IOC_IFREQ(SIOCGIFGENERIC):
+	case CASE_IOC_IFREQ(SIOCSIFGENERIC):
 		rv = sppp_params(sp, cmd, data);
 		break;
 
@@ -4837,7 +4837,7 @@ sppp_get_ip_addrs(struct sppp *sp, u_long *src, u_long *dst, u_long *srcmask)
 	 */
 	si = NULL;
 	if_addr_rlock(ifp);
-	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			si = (struct sockaddr_in *)ifa->ifa_addr;
 			sm = (struct sockaddr_in *)ifa->ifa_netmask;
@@ -4879,7 +4879,7 @@ sppp_set_ip_addr(struct sppp *sp, u_long src)
 	 */
 	si = NULL;
 	if_addr_rlock(ifp);
-	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			si = (struct sockaddr_in *)ifa->ifa_addr;
 			if (si != NULL) {
@@ -4941,7 +4941,7 @@ sppp_get_ip6_addrs(struct sppp *sp, struct in6_addr *src, struct in6_addr *dst,
 	 */
 	si = NULL;
 	if_addr_rlock(ifp);
-	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
 		if (ifa->ifa_addr->sa_family == AF_INET6) {
 			si = (struct sockaddr_in6 *)ifa->ifa_addr;
 			sm = (struct sockaddr_in6 *)ifa->ifa_netmask;
@@ -4996,7 +4996,7 @@ sppp_set_ip6_addr(struct sppp *sp, const struct in6_addr *src)
 
 	sin6 = NULL;
 	if_addr_rlock(ifp);
-	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family == AF_INET6) {
 			sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 			if (sin6 && IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
@@ -5068,9 +5068,7 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		goto quit;
 	}
 
-	if (copyin_c(ifr_data_get_ptr(ifr),
-	    (__cheri_tocap struct spppreq * __capability)spr,
-	    sizeof(struct spppreq)) != 0) {
+	if (copyin_c(ifr_data_get_ptr(ifr), spr, sizeof(struct spppreq)) != 0) {
 		rv = EFAULT;
 		goto quit;
 	}
@@ -5078,7 +5076,7 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 	switch (subcmd) {
 	case (u_long)SPPPIOGDEFS:
 		switch (cmd) {
-		CASE_IOC_IFREQ(SIOCGIFGENERIC):
+		case CASE_IOC_IFREQ(SIOCGIFGENERIC):
 			break;
 		default:
 			rv = EINVAL;
@@ -5110,14 +5108,13 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		 * setting it.
 		 */
 		spr->defs.lcp.timeout = sp->lcp.timeout * 1000 / hz;
-		rv = copyout_c(
-		    (__cheri_tocap struct spppreq * __capability)spr,
-		    ifr_data_get_ptr(ifr), sizeof(struct spppreq));
+		rv = copyout_c(spr, ifr_data_get_ptr(ifr),
+		    sizeof(struct spppreq));
 		break;
 
 	case (u_long)SPPPIOSDEFS:
 		switch (cmd) {
-		CASE_IOC_IFREQ(SIOCGIFGENERIC):
+		case CASE_IOC_IFREQ(SIOCGIFGENERIC):
 			break;
 		default:
 			rv = EINVAL;

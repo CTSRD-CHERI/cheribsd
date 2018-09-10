@@ -44,7 +44,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/time.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
-#include <sys/interrupt.h>
 #include <sys/proc.h>
 #include <sys/sbuf.h>
 #include <sys/smp.h>
@@ -5011,6 +5010,8 @@ xpt_release_device(struct cam_ed *device)
 	free(device->physpath, M_CAMXPT);
 	free(device->rcap_buf, M_CAMXPT);
 	free(device->serial_num, M_CAMXPT);
+	free(device->nvme_data, M_CAMXPT);
+	free(device->nvme_cdata, M_CAMXPT);
 	taskqueue_enqueue(xsoftc.xpt_taskq, &device->device_destroy_task);
 }
 
@@ -5374,8 +5375,8 @@ xpt_path_mtx(struct cam_path *path)
 static void
 xpt_done_process(struct ccb_hdr *ccb_h)
 {
-	struct cam_sim *sim;
-	struct cam_devq *devq;
+	struct cam_sim *sim = NULL;
+	struct cam_devq *devq = NULL;
 	struct mtx *mtx = NULL;
 
 #if defined(BUF_TRACKING) || defined(FULL_BUF_TRACKING)
@@ -5418,9 +5419,15 @@ xpt_done_process(struct ccb_hdr *ccb_h)
 			mtx_unlock(&xsoftc.xpt_highpower_lock);
 	}
 
-	sim = ccb_h->path->bus->sim;
+	/*
+	 * Insulate against a race where the periph is destroyed
+	 * but CCBs are still not all processed.
+	 */
+	if (ccb_h->path->bus)
+		sim = ccb_h->path->bus->sim;
 
 	if (ccb_h->status & CAM_RELEASE_SIMQ) {
+		KASSERT(sim, ("sim missing for CAM_RELEASE_SIMQ request"));
 		xpt_release_simq(sim, /*run_queue*/FALSE);
 		ccb_h->status &= ~CAM_RELEASE_SIMQ;
 	}
@@ -5431,9 +5438,12 @@ xpt_done_process(struct ccb_hdr *ccb_h)
 		ccb_h->status &= ~CAM_DEV_QFRZN;
 	}
 
-	devq = sim->devq;
 	if ((ccb_h->func_code & XPT_FC_USER_CCB) == 0) {
 		struct cam_ed *dev = ccb_h->path->device;
+
+		if (sim)
+			devq = sim->devq;
+		KASSERT(devq, ("sim missing for XPT_FC_USER_CCB request"));
 
 		mtx_lock(&devq->send_mtx);
 		devq->send_active--;

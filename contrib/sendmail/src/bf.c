@@ -95,11 +95,7 @@ struct bf_info
 */
 
 static int
-sm_bfopen(fp, info, flags, rpool)
-	SM_FILE_T *fp;
-	const void *info;
-	int flags;
-	const void *rpool;
+sm_bfopen(SM_FILE_T *fp, const void *info, int flags, const void *rpool)
 {
 	char *filename;
 	MODE_T fmode;

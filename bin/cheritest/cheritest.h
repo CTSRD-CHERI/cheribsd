@@ -302,7 +302,6 @@ DECLARE_CHERI_TEST(test_fault_ccall_data_execute);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_nospace);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_perms);
 DECLARE_CHERI_TEST(test_cheriabi_mmap_unrepresentable);
-DECLARE_CHERI_TEST(test_cheriabi_mmap_ddc);
 
 /* cheritest_cheriabi_open.c */
 DECLARE_CHERI_TEST(test_cheriabi_open_ordinary);
@@ -450,6 +449,9 @@ DECLARE_CHERI_TEST(test_string_memmove_c);
 
 /* cheritest_syscall.c */
 DECLARE_CHERI_TEST(test_sandbox_syscall);
+DECLARE_CHERI_TEST(test_sig_dfl_neq_ign);
+DECLARE_CHERI_TEST(test_sig_dfl_ign);
+DECLARE_CHERI_TEST(test_ptrace_basic);
 
 /* cheritest_registers.c */
 DECLARE_CHERI_TEST(test_initregs_default);
@@ -466,10 +468,15 @@ DECLARE_CHERI_TEST(test_tls_align_4k);
 DECLARE_CHERI_TEST(test_tls_align_cap);
 DECLARE_CHERI_TEST(test_tls_align_ptr);
 
+/* cheritest_tls_threads.c */
+DECLARE_CHERI_TEST(test_tls_threads);
+
 /* cheritest_vm.c */
 DECLARE_CHERI_TEST(cheritest_vm_tag_mmap_anon);;
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_private);
+DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared2x);
+DECLARE_CHERI_TEST(cheritest_vm_shm_open_anon_unix_surprise);
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_private);
 DECLARE_CHERI_TEST(cheritest_vm_notag_tmpfile_shared);

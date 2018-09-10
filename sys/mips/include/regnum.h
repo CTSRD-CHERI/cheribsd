@@ -128,12 +128,21 @@
 #define	BADVADDR 35
 #define	CAUSE	36
 #define	PC	37
+
+/* XXXAR: These two seem unused so I repurposed them for BadInstr + BadInstrP */
+#if 0
 /*
  * IC is valid only on RM7K and RM9K processors. Access to this is
  * controlled by IC_INT_REG which defined in kernel config
  */
 #define	IC	38
 #define	DUMMY	39	/* for 8 byte alignment */
+#else
+#define	BADINSTR	38
+#define	BADINSTR_P	39
+#endif
+
+
 #define	NUMSAVEREGS 40
 
 /*

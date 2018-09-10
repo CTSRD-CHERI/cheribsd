@@ -99,7 +99,7 @@ struct chown_args {
 	char uid_l_[PADL_(int)]; int uid; char uid_r_[PADR_(int)];
 	char gid_l_[PADL_(int)]; int gid; char gid_r_[PADR_(int)];
 };
-struct obreak_args {
+struct break_args {
 	char nsize_l_[PADL_(char *)]; char * nsize; char nsize_r_[PADR_(char *)];
 };
 struct getpid_args {
@@ -273,9 +273,6 @@ struct sbrk_args {
 };
 struct sstk_args {
 	char incr_l_[PADL_(int)]; int incr; char incr_r_[PADR_(int)];
-};
-struct ovadvise_args {
-	char anom_l_[PADL_(int)]; int anom; char anom_r_[PADR_(int)];
 };
 struct munmap_args {
 	char addr_l_[PADL_(void *)]; void * addr; char addr_r_[PADR_(void *)];
@@ -1784,6 +1781,11 @@ struct cpuset_setdomain_args {
 	char mask_l_[PADL_(domainset_t *)]; domainset_t * mask; char mask_r_[PADR_(domainset_t *)];
 	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
 };
+struct getrandom_args {
+	char buf_l_[PADL_(void *)]; void * buf; char buf_r_[PADR_(void *)];
+	char buflen_l_[PADL_(size_t)]; size_t buflen; char buflen_r_[PADR_(size_t)];
+	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
+};
 struct coexecve_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char fname_l_[PADL_(char *)]; char * fname; char fname_r_[PADR_(char *)];
@@ -1804,7 +1806,7 @@ int	sys_chdir(struct thread *, struct chdir_args *);
 int	sys_fchdir(struct thread *, struct fchdir_args *);
 int	sys_chmod(struct thread *, struct chmod_args *);
 int	sys_chown(struct thread *, struct chown_args *);
-int	sys_obreak(struct thread *, struct obreak_args *);
+int	sys_break(struct thread *, struct break_args *);
 int	sys_getpid(struct thread *, struct getpid_args *);
 int	sys_mount(struct thread *, struct mount_args *);
 int	sys_unmount(struct thread *, struct unmount_args *);
@@ -1845,7 +1847,6 @@ int	sys_msync(struct thread *, struct msync_args *);
 int	sys_vfork(struct thread *, struct vfork_args *);
 int	sys_sbrk(struct thread *, struct sbrk_args *);
 int	sys_sstk(struct thread *, struct sstk_args *);
-int	sys_ovadvise(struct thread *, struct ovadvise_args *);
 int	sys_munmap(struct thread *, struct munmap_args *);
 int	sys_mprotect(struct thread *, struct mprotect_args *);
 int	sys_madvise(struct thread *, struct madvise_args *);
@@ -2171,6 +2172,7 @@ int	sys_mknodat(struct thread *, struct mknodat_args *);
 int	sys_kevent(struct thread *, struct kevent_args *);
 int	sys_cpuset_getdomain(struct thread *, struct cpuset_getdomain_args *);
 int	sys_cpuset_setdomain(struct thread *, struct cpuset_setdomain_args *);
+int	sys_getrandom(struct thread *, struct getrandom_args *);
 int	sys_coexecve(struct thread *, struct coexecve_args *);
 
 #ifdef COMPAT_43
@@ -2511,6 +2513,9 @@ struct freebsd11_mknod_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
 	char dev_l_[PADL_(int)]; int dev; char dev_r_[PADR_(int)];
 };
+struct freebsd11_vadvise_args {
+	char anom_l_[PADL_(int)]; int anom; char anom_r_[PADR_(int)];
+};
 struct freebsd11_stat_args {
 	char path_l_[PADL_(char *)]; char * path; char path_r_[PADR_(char *)];
 	char ub_l_[PADL_(struct freebsd11_stat *)]; struct freebsd11_stat * ub; char ub_r_[PADR_(struct freebsd11_stat *)];
@@ -2588,6 +2593,7 @@ struct freebsd11_mknodat_args {
 	char dev_l_[PADL_(uint32_t)]; uint32_t dev; char dev_r_[PADR_(uint32_t)];
 };
 int	freebsd11_mknod(struct thread *, struct freebsd11_mknod_args *);
+int	freebsd11_vadvise(struct thread *, struct freebsd11_vadvise_args *);
 int	freebsd11_stat(struct thread *, struct freebsd11_stat_args *);
 int	freebsd11_fstat(struct thread *, struct freebsd11_fstat_args *);
 int	freebsd11_lstat(struct thread *, struct freebsd11_lstat_args *);
@@ -2676,7 +2682,7 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_sbrk	AUE_SBRK
 #define	SYS_AUE_sstk	AUE_SSTK
 #define	SYS_AUE_ommap	AUE_MMAP
-#define	SYS_AUE_vadvise	AUE_O_VADVISE
+#define	SYS_AUE_freebsd11_vadvise	AUE_O_VADVISE
 #define	SYS_AUE_munmap	AUE_MUNMAP
 #define	SYS_AUE_mprotect	AUE_MPROTECT
 #define	SYS_AUE_madvise	AUE_MADVISE
@@ -3065,6 +3071,7 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_kevent	AUE_KEVENT
 #define	SYS_AUE_cpuset_getdomain	AUE_NULL
 #define	SYS_AUE_cpuset_setdomain	AUE_NULL
+#define	SYS_AUE_getrandom	AUE_NULL
 #define	SYS_AUE_coexecve	AUE_NULL
 
 #undef PAD_

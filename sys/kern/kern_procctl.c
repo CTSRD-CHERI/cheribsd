@@ -27,8 +27,6 @@
  * SUCH DAMAGE.
  */
 
-#include "opt_compat.h"
-
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -208,7 +206,7 @@ static int
 reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids_c *rp)
 {
 	struct proc *reap, *p2;
-	struct procctl_reaper_pidinfo * __capability pi;
+	struct procctl_reaper_pidinfo *pi;
 	u_int i, n;
 	int error;
 
@@ -222,7 +220,7 @@ reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids_c *rp
 	sx_unlock(&proctree_lock);
 	if (rp->rp_count < n)
 		n = rp->rp_count;
-	pi = malloc_c(n * sizeof(*pi), M_TEMP, M_WAITOK | M_ZERO);
+	pi = malloc(n * sizeof(*pi), M_TEMP, M_WAITOK | M_ZERO);
 	sx_slock(&proctree_lock);
 	LIST_FOREACH(p2, &reap->p_reaplist, p_reapsibling) {
 		if (i == n)
@@ -238,7 +236,7 @@ reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids_c *rp
 	}
 	sx_sunlock(&proctree_lock);
 	error = copyout_c(pi, rp->rp_pids, i * sizeof(*pi));
-	free_c(pi, M_TEMP);
+	free(pi, M_TEMP);
 	sx_slock(&proctree_lock);
 	PROC_LOCK(p);
 	return (error);
@@ -457,7 +455,7 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		struct procctl_reaper_pids32 rp32;
 #endif
 	} xpids;
-	int error, error1, flags;
+	int error, error1, flags, signum;
 
 	switch (com) {
 	case PROC_SPROTECT:
@@ -479,9 +477,11 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		break;
 	case PROC_REAP_GETPIDS:
 		/* XXX: fix for cheriabi and freebsd32 */
-#ifdef COMPAT_CHERI
+#ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
-			copyincap_c(udata, &x.rp, sizeof(x.rp));
+			error = copyincap_c(udata, &x.rp, sizeof(x.rp));
+			if (error != 0)
+				return (error);
 		} else
 #endif
 #ifdef COMPAT_FREEBSD32
@@ -516,6 +516,15 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 	case PROC_TRAPCAP_STATUS:
 		data = &flags;
 		break;
+	case PROC_PDEATHSIG_CTL:
+		error = copyin_c(udata, &signum, sizeof(signum));
+		if (error != 0)
+			return (error);
+		data = &signum;
+		break;
+	case PROC_PDEATHSIG_STATUS:
+		data = &signum;
+		break;
 	default:
 		return (EINVAL);
 	}
@@ -534,6 +543,10 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 	case PROC_TRAPCAP_STATUS:
 		if (error == 0)
 			error = copyout_c(&flags, udata, sizeof(flags));
+		break;
+	case PROC_PDEATHSIG_STATUS:
+		if (error == 0)
+			error = copyout_c(&signum, udata, sizeof(signum));
 		break;
 	}
 	return (error);
@@ -576,6 +589,7 @@ kern_procctl(struct thread *td, idtype_t idtype, id_t id, int com, void *data)
 	struct pgrp *pg;
 	struct proc *p;
 	int error, first_error, ok;
+	int signum;
 	bool tree_locked;
 
 	switch (com) {
@@ -586,8 +600,31 @@ kern_procctl(struct thread *td, idtype_t idtype, id_t id, int com, void *data)
 	case PROC_REAP_KILL:
 	case PROC_TRACE_STATUS:
 	case PROC_TRAPCAP_STATUS:
+	case PROC_PDEATHSIG_CTL:
+	case PROC_PDEATHSIG_STATUS:
 		if (idtype != P_PID)
 			return (EINVAL);
+	}
+
+	switch (com) {
+	case PROC_PDEATHSIG_CTL:
+		signum = *(int *)data;
+		p = td->td_proc;
+		if ((id != 0 && id != p->p_pid) ||
+		    (signum != 0 && !_SIG_VALID(signum)))
+			return (EINVAL);
+		PROC_LOCK(p);
+		p->p_pdeathsig = signum;
+		PROC_UNLOCK(p);
+		return (0);
+	case PROC_PDEATHSIG_STATUS:
+		p = td->td_proc;
+		if (id != 0 && id != p->p_pid)
+			return (EINVAL);
+		PROC_LOCK(p);
+		*(int *)data = p->p_pdeathsig;
+		PROC_UNLOCK(p);
+		return (0);
 	}
 
 	switch (com) {

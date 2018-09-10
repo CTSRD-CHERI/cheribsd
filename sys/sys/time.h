@@ -173,7 +173,7 @@ static __inline sbintime_t
 nstosbt(int64_t _ns)
 {
 
-	return ((_ns * (((uint64_t)1 << 63) / 500000000) >> 32));
+	return ((_ns * (((uint64_t)1 << 63) / 500000000)) >> 32);
 }
 
 static __inline int64_t
@@ -187,7 +187,7 @@ static __inline sbintime_t
 ustosbt(int64_t _us)
 {
 
-	return ((_us * (((uint64_t)1 << 63) / 500000) >> 32));
+	return ((_us * (((uint64_t)1 << 63) / 500000)) >> 32);
 }
 
 static __inline int64_t
@@ -201,7 +201,7 @@ static __inline sbintime_t
 mstosbt(int64_t _ms)
 {
 
-	return ((_ms * (((uint64_t)1 << 63) / 500) >> 32));
+	return ((_ms * (((uint64_t)1 << 63) / 500)) >> 32);
 }
 
 /*-
@@ -289,6 +289,22 @@ tvtosbt(struct timeval _tv)
 #endif /* __BSD_VISIBLE */
 
 #ifdef _KERNEL
+/*
+ * Simple macros to convert ticks to milliseconds
+ * or microseconds and vice-versa. The answer
+ * will always be at least 1. Note the return
+ * value is a uint32_t however we step up the
+ * operations to 64 bit to avoid any overflow/underflow
+ * problems.
+ */
+#define TICKS_2_MSEC(t) max(1, (uint32_t)(hz == 1000) ? \
+	  (t) : (((uint64_t)(t) * (uint64_t)1000)/(uint64_t)hz))
+#define TICKS_2_USEC(t) max(1, (uint32_t)(hz == 1000) ? \
+	  ((t) * 1000) : (((uint64_t)(t) * (uint64_t)1000000)/(uint64_t)hz))
+#define MSEC_2_TICKS(m) max(1, (uint32_t)((hz == 1000) ? \
+	  (m) : ((uint64_t)(m) * (uint64_t)hz)/(uint64_t)1000))
+#define USEC_2_TICKS(u) max(1, (uint32_t)((hz == 1000) ? \
+	 ((u) / 1000) : ((uint64_t)(u) * (uint64_t)hz)/(uint64_t)1000000))
 
 /* Operations on timespecs */
 #define	timespecclear(tvp)	((tvp)->tv_sec = (tvp)->tv_nsec = 0)

@@ -208,7 +208,7 @@ ipfw_alloc_rule(struct ip_fw_chain *chain, size_t rulesize)
 	struct ip_fw *rule;
 
 	rule = malloc(rulesize, M_IPFW, M_WAITOK | M_ZERO);
-	rule->cntr = uma_zalloc(V_ipfw_cntr_zone, M_WAITOK | M_ZERO);
+	rule->cntr = uma_zalloc_pcpu(V_ipfw_cntr_zone, M_WAITOK | M_ZERO);
 
 	return (rule);
 }
@@ -217,7 +217,7 @@ static void
 free_rule(struct ip_fw *rule)
 {
 
-	uma_zfree(V_ipfw_cntr_zone, rule->cntr);
+	uma_zfree_pcpu(V_ipfw_cntr_zone, rule->cntr);
 	free(rule, M_IPFW);
 }
 
@@ -301,10 +301,8 @@ ipfw_init_skipto_cache(struct ip_fw_chain *chain)
 {
 	int *idxmap, *idxmap_back;
 
-	idxmap = malloc(65536 * sizeof(uint32_t *), M_IPFW,
-	    M_WAITOK | M_ZERO);
-	idxmap_back = malloc(65536 * sizeof(uint32_t *), M_IPFW,
-	    M_WAITOK | M_ZERO);
+	idxmap = malloc(65536 * sizeof(int), M_IPFW, M_WAITOK | M_ZERO);
+	idxmap_back = malloc(65536 * sizeof(int), M_IPFW, M_WAITOK);
 
 	/*
 	 * Note we may be called at any time after initialization,
@@ -355,7 +353,7 @@ get_map(struct ip_fw_chain *chain, int extra, int locked)
 
 	for (;;) {
 		struct ip_fw **map;
-		int i, mflags;
+		u_int i, mflags;
 
 		mflags = M_ZERO | ((locked != 0) ? M_NOWAIT : M_WAITOK);
 
@@ -1062,7 +1060,7 @@ delete_range(struct ip_fw_chain *chain, ipfw_range_tlv *rt, int *ndel)
 	map = swap_map(chain, map, chain->n_rules - n);
 	/* 6. Remove all dynamic states originated by deleted rules */
 	if (ndyn > 0)
-		ipfw_expire_dyn_rules(chain, rt);
+		ipfw_expire_dyn_states(chain, rt);
 	/* 7. now remove the rules deleted from the old map */
 	for (i = start; i < end; i++) {
 		rule = map[i];
@@ -1750,6 +1748,7 @@ check_ipfw_rule_body(ipfw_insn *cmd, int cmd_len, struct rule_check_info *ci)
 #endif
 		case O_IP4:
 		case O_TAG:
+		case O_SKIP_ACTION:
 			if (cmdlen != F_INSN_SIZE(ipfw_insn))
 				goto bad_size;
 			break;
@@ -3536,8 +3535,7 @@ ipfw_flush_sopt_data(struct sockopt_data *sd)
 	sopt = sd->sopt;
 
 	if (sopt->sopt_dir == SOPT_GET) {
-		error = copyout_c((__cheri_tocap void * __capability)sd->kbuf,
-		    sopt->sopt_val, sz);
+		error = copyout_c(sd->kbuf, sopt->sopt_val, sz);
 		if (error != 0)
 			return (error);
 	}

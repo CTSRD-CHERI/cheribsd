@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause OR GPL-2.0
+ *
  * Copyright (c) 2005 Topspin Communications.  All rights reserved.
  * Copyright (c) 2005, 2006, 2007 Cisco Systems.  All rights reserved.
  * Copyright (c) 2005 PathScale, Inc.  All rights reserved.
@@ -32,6 +34,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #define	LINUXKPI_PARAM_PREFIX ibcore_
 
@@ -1790,6 +1795,7 @@ static int create_qp(struct ib_uverbs_file *file,
 
 	init_uobj(&obj->uevent.uobject, cmd->user_handle, file->ucontext,
 		  &qp_lock_class);
+	mutex_init(&obj->mcast_lock);
 	down_write(&obj->uevent.uobject.mutex);
 	if (cmd_sz >= offsetof(typeof(*cmd), rwq_ind_tbl_handle) +
 		      sizeof(cmd->rwq_ind_tbl_handle) &&
@@ -1938,6 +1944,9 @@ static int create_qp(struct ib_uverbs_file *file,
 			atomic_inc(&attr.srq->usecnt);
 		if (ind_tbl)
 			atomic_inc(&ind_tbl->usecnt);
+	} else {
+		/* It is done in _ib_create_qp for other QP types */
+		qp->uobject = &obj->uevent.uobject;
 	}
 	qp->uobject = &obj->uevent.uobject;
 
@@ -2358,6 +2367,25 @@ ssize_t ib_uverbs_modify_qp(struct ib_uverbs_file *file,
 		goto out;
 	}
 
+	if ((cmd.attr_mask & IB_QP_PORT) &&
+	    !rdma_is_port_valid(qp->device, cmd.port_num)) {
+		ret = -EINVAL;
+		goto release_qp;
+	}
+
+	if ((cmd.attr_mask & IB_QP_AV) &&
+	    !rdma_is_port_valid(qp->device, cmd.dest.port_num)) {
+		ret = -EINVAL;
+		goto release_qp;
+	}
+
+	if ((cmd.attr_mask & IB_QP_ALT_PATH) &&
+	    (!rdma_is_port_valid(qp->device, cmd.alt_port_num) ||
+	    !rdma_is_port_valid(qp->device, cmd.alt_dest.port_num))) {
+		ret = -EINVAL;
+		goto release_qp;
+	}
+
 	attr->qp_state 		  = cmd.qp_state;
 	attr->cur_qp_state 	  = cmd.cur_qp_state;
 	attr->path_mtu 		  = cmd.path_mtu;
@@ -2405,9 +2433,11 @@ ssize_t ib_uverbs_modify_qp(struct ib_uverbs_file *file,
 	attr->alt_ah_attr.port_num 	    = cmd.alt_dest.port_num;
 
 	if (qp->real_qp == qp) {
-		ret = ib_resolve_eth_dmac(qp, attr, &cmd.attr_mask);
-		if (ret)
-			goto release_qp;
+		if (cmd.attr_mask & IB_QP_AV) {
+			ret = ib_resolve_eth_dmac(qp->device, &attr->ah_attr);
+			if (ret)
+				goto release_qp;
+		}
 		ret = qp->device->modify_qp(qp, attr,
 			modify_qp_mask(qp->qp_type, cmd.attr_mask), &udata);
 	} else {
@@ -2878,12 +2908,20 @@ ssize_t ib_uverbs_create_ah(struct ib_uverbs_file *file,
 	struct ib_ah			*ah;
 	struct ib_ah_attr		attr;
 	int ret;
+	struct ib_udata                   udata;
 
 	if (out_len < sizeof resp)
 		return -ENOSPC;
 
 	if (copy_from_user(&cmd, buf, sizeof cmd))
 		return -EFAULT;
+
+	if (!rdma_is_port_valid(ib_dev, cmd.attr.port_num))
+		return -EINVAL;
+
+	INIT_UDATA(&udata, buf + sizeof(cmd),
+		   (unsigned long)cmd.response + sizeof(resp),
+		   in_len - sizeof(cmd), out_len - sizeof(resp));
 
 	uobj = kmalloc(sizeof *uobj, GFP_KERNEL);
 	if (!uobj)
@@ -2911,12 +2949,16 @@ ssize_t ib_uverbs_create_ah(struct ib_uverbs_file *file,
 	memset(&attr.dmac, 0, sizeof(attr.dmac));
 	memcpy(attr.grh.dgid.raw, cmd.attr.grh.dgid, 16);
 
-	ah = ib_create_ah(pd, &attr);
+	ah = pd->device->create_ah(pd, &attr, &udata);
+
 	if (IS_ERR(ah)) {
 		ret = PTR_ERR(ah);
 		goto err_put;
 	}
 
+	ah->device  = pd->device;
+	ah->pd      = pd;
+	atomic_inc(&pd->usecnt);
 	ah->uobject  = uobj;
 	uobj->object = ah;
 
@@ -3015,6 +3057,7 @@ ssize_t ib_uverbs_attach_mcast(struct ib_uverbs_file *file,
 
 	obj = container_of(qp->uobject, struct ib_uqp_object, uevent.uobject);
 
+	mutex_lock(&obj->mcast_lock);
 	list_for_each_entry(mcast, &obj->mcast_list, list)
 		if (cmd.mlid == mcast->lid &&
 		    !memcmp(cmd.gid, mcast->gid.raw, sizeof mcast->gid.raw)) {
@@ -3038,6 +3081,7 @@ ssize_t ib_uverbs_attach_mcast(struct ib_uverbs_file *file,
 		kfree(mcast);
 
 out_put:
+	mutex_unlock(&obj->mcast_lock);
 	put_qp_write(qp);
 
 	return ret ? ret : in_len;
@@ -3053,6 +3097,7 @@ ssize_t ib_uverbs_detach_mcast(struct ib_uverbs_file *file,
 	struct ib_qp                 *qp;
 	struct ib_uverbs_mcast_entry *mcast;
 	int                           ret = -EINVAL;
+	bool                          found = false;
 
 	if (copy_from_user(&cmd, buf, sizeof cmd))
 		return -EFAULT;
@@ -3061,21 +3106,27 @@ ssize_t ib_uverbs_detach_mcast(struct ib_uverbs_file *file,
 	if (!qp)
 		return -EINVAL;
 
-	ret = ib_detach_mcast(qp, (union ib_gid *) cmd.gid, cmd.mlid);
-	if (ret)
-		goto out_put;
-
 	obj = container_of(qp->uobject, struct ib_uqp_object, uevent.uobject);
+	mutex_lock(&obj->mcast_lock);
 
 	list_for_each_entry(mcast, &obj->mcast_list, list)
 		if (cmd.mlid == mcast->lid &&
 		    !memcmp(cmd.gid, mcast->gid.raw, sizeof mcast->gid.raw)) {
 			list_del(&mcast->list);
 			kfree(mcast);
+			found = true;
 			break;
 		}
 
+	if (!found) {
+		ret = -EINVAL;
+		goto out_put;
+	}
+
+	ret = ib_detach_mcast(qp, (union ib_gid *)cmd.gid, cmd.mlid);
+
 out_put:
+	mutex_unlock(&obj->mcast_lock);
 	put_qp_write(qp);
 
 	return ret ? ret : in_len;

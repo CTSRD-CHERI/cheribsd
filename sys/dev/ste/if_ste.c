@@ -434,7 +434,7 @@ ste_rxfilter(struct ste_softc *sc)
 	rxcfg |= STE_RXMODE_MULTIHASH;
 	/* Now program new ones. */
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		h = ether_crc32_be(LLADDR((struct sockaddr_dl *)
@@ -1749,7 +1749,7 @@ ste_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		STE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -1763,19 +1763,19 @@ ste_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->ste_if_flags = ifp->if_flags;
 		STE_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		STE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			ste_rxfilter(sc);
 		STE_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->ste_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		STE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING

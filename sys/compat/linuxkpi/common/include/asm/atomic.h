@@ -159,47 +159,98 @@ atomic_cmpxchg(atomic_t *v, int old, int new)
 	return (ret);
 }
 
-#define	cmpxchg(ptr, old, new) ({				\
-	__typeof(*(ptr)) __ret;					\
-								\
-	CTASSERT(sizeof(__ret) == 1 || sizeof(__ret) == 2 ||	\
-	    sizeof(__ret) == 4 || sizeof(__ret) == 8);		\
-								\
-	__ret = (old);						\
-	switch (sizeof(__ret)) {				\
-	case 1:							\
-		while (!atomic_fcmpset_8((volatile int8_t *)(ptr), \
-		    (int8_t *)&__ret, (new)) && __ret == (old))	\
-			;					\
-		break;						\
-	case 2:							\
-		while (!atomic_fcmpset_16((volatile int16_t *)(ptr), \
-		    (int16_t *)&__ret, (new)) && __ret == (old)) \
-			;					\
-		break;						\
-	case 4:							\
-		while (!atomic_fcmpset_32((volatile int32_t *)(ptr), \
-		    (int32_t *)&__ret, (new)) && __ret == (old)) \
-			;					\
-		break;						\
-	case 8:							\
-		while (!atomic_fcmpset_64((volatile int64_t *)(ptr), \
-		    (int64_t *)&__ret, (new)) && __ret == (old)) \
-			;					\
-		break;						\
-	}							\
-	__ret;							\
+#define	cmpxchg(ptr, old, new) ({					\
+	union {								\
+		__typeof(*(ptr)) val;					\
+		u8 u8[0];						\
+		u16 u16[0];						\
+		u32 u32[0];						\
+		u64 u64[0];						\
+	} __ret = { .val = (old) }, __new = { .val = (new) };		\
+									\
+	CTASSERT(sizeof(__ret.val) == 1 || sizeof(__ret.val) == 2 ||	\
+	    sizeof(__ret.val) == 4 || sizeof(__ret.val) == 8);		\
+									\
+	switch (sizeof(__ret.val)) {					\
+	case 1:								\
+		while (!atomic_fcmpset_8((volatile u8 *)(ptr),		\
+		    __ret.u8, __new.u8[0]) && __ret.val == (old))	\
+			;						\
+		break;							\
+	case 2:								\
+		while (!atomic_fcmpset_16((volatile u16 *)(ptr),	\
+		    __ret.u16, __new.u16[0]) && __ret.val == (old))	\
+			;						\
+		break;							\
+	case 4:								\
+		while (!atomic_fcmpset_32((volatile u32 *)(ptr),	\
+		    __ret.u32, __new.u32[0]) && __ret.val == (old))	\
+			;						\
+		break;							\
+	case 8:								\
+		while (!atomic_fcmpset_64((volatile u64 *)(ptr),	\
+		    __ret.u64, __new.u64[0]) && __ret.val == (old))	\
+			;						\
+		break;							\
+	}								\
+	__ret.val;							\
 })
 
 #define	cmpxchg_relaxed(...)	cmpxchg(__VA_ARGS__)
 
-#define	xchg(ptr, v) ({						\
-	__typeof(*(ptr)) __ret;					\
-								\
-	__ret = *(ptr);						\
-	*(ptr) = v;						\
-	__ret;							\
+#define	xchg(ptr, new) ({						\
+	union {								\
+		__typeof(*(ptr)) val;					\
+		u8 u8[0];						\
+		u16 u16[0];						\
+		u32 u32[0];						\
+		u64 u64[0];						\
+	} __ret, __new = { .val = (new) };				\
+									\
+	CTASSERT(sizeof(__ret.val) == 1 || sizeof(__ret.val) == 2 ||	\
+	    sizeof(__ret.val) == 4 || sizeof(__ret.val) == 8);		\
+									\
+	switch (sizeof(__ret.val)) {					\
+	case 1:								\
+		__ret.val = READ_ONCE(*ptr);				\
+		while (!atomic_fcmpset_8((volatile u8 *)(ptr),		\
+	            __ret.u8, __new.u8[0]))				\
+			;						\
+		break;							\
+	case 2:								\
+		__ret.val = READ_ONCE(*ptr);				\
+		while (!atomic_fcmpset_16((volatile u16 *)(ptr),	\
+	            __ret.u16, __new.u16[0]))				\
+			;						\
+		break;							\
+	case 4:								\
+		__ret.u32[0] = atomic_swap_32((volatile u32 *)(ptr),	\
+		    __new.u32[0]);					\
+		break;							\
+	case 8:								\
+		__ret.u64[0] = atomic_swap_64((volatile u64 *)(ptr),	\
+		    __new.u64[0]);					\
+		break;							\
+	}								\
+	__ret.val;							\
 })
+
+static inline int
+atomic_dec_if_positive(atomic_t *v)
+{
+	int retval;
+	int old;
+
+	old = atomic_read(v);
+	for (;;) {
+		retval = old - 1;
+		if (unlikely(retval < 0))
+			break;
+		if (likely(atomic_fcmpset_int(&v->counter, &old, retval)))
+			break;
+	}
+	return (retval);
+}
 
 #define	LINUX_ATOMIC_OP(op, c_op)				\
 static inline void atomic_##op(int i, atomic_t *v)		\

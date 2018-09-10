@@ -79,7 +79,7 @@ __FBSDID("$FreeBSD$");
 
 /* Defined in FS&K */
 #define	RANDOM_FORTUNA_NPOOLS 32		/* The number of accumulation pools */
-#define	RANDOM_FORTUNA_DEFPOOLSIZE 64		/* The default pool size/length for a (re)seed */
+#define	RANDOM_FORTUNA_DEFPOOLSIZE 1		/* The default pool size/length for a (re)seed */
 #define	RANDOM_FORTUNA_MAX_READ (1 << 20)	/* Max bytes in a single read */
 
 /*
@@ -87,7 +87,7 @@ __FBSDID("$FreeBSD$");
  * Making RANDOM_FORTUNA_DEFPOOLSIZE too large will mean a long time between reseeds,
  * and too small may compromise initial security but get faster reseeds.
  */
-#define	RANDOM_FORTUNA_MINPOOLSIZE 16
+#define	RANDOM_FORTUNA_MINPOOLSIZE 1
 #define	RANDOM_FORTUNA_MAXPOOLSIZE INT_MAX 
 CTASSERT(RANDOM_FORTUNA_MINPOOLSIZE <= RANDOM_FORTUNA_DEFPOOLSIZE);
 CTASSERT(RANDOM_FORTUNA_DEFPOOLSIZE <= RANDOM_FORTUNA_MAXPOOLSIZE);

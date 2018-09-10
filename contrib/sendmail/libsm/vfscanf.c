@@ -96,8 +96,7 @@ static jmp_buf		ScanTimeOut;
 
 /* ARGSUSED0 */
 static void
-scanalrm(sig)
-	int sig;
+scanalrm(int sig)
 {
 	longjmp(ScanTimeOut, 1);
 }
@@ -251,13 +250,13 @@ literal:
 			/* FALLTHROUGH */
 		  case 'd':
 			c = CT_INT;
-			ccfn = (ULONGLONG_T (*)())sm_strtoll;
+			ccfn = (ULONGLONG_T (*)(const char *, char **, int))sm_strtoll;
 			base = 10;
 			break;
 
 		  case 'i':
 			c = CT_INT;
-			ccfn = (ULONGLONG_T (*)())sm_strtoll;
+			ccfn = (ULONGLONG_T (*)(const char *, char **, int))sm_strtoll;
 			base = 0;
 			break;
 
@@ -335,7 +334,7 @@ literal:
 			if (isupper(c))
 				flags |= LONG;
 			c = CT_INT;
-			ccfn = (ULONGLONG_T (*)()) sm_strtoll;
+			ccfn = (ULONGLONG_T (*)(const char *, char **, int)) sm_strtoll;
 			base = 10;
 			break;
 		}

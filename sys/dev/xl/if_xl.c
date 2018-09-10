@@ -334,6 +334,8 @@ static devclass_t xl_devclass;
 DRIVER_MODULE_ORDERED(xl, pci, xl_driver, xl_devclass, NULL, NULL,
     SI_ORDER_ANY);
 DRIVER_MODULE(miibus, xl, miibus_driver, miibus_devclass, NULL, NULL);
+MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, xl, xl_devs, sizeof(xl_devs[0]),
+    nitems(xl_devs) - 1);
 
 static void
 xl_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nseg, int error)
@@ -634,7 +636,7 @@ xl_rxfilter_90x(struct xl_softc *sc)
 			rxfilt |= XL_RXFILTER_ALLMULTI;
 	} else {
 		if_maddr_rlock(ifp);
-		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+		CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 			if (ifma->ifma_addr->sa_family != AF_LINK)
 				continue;
 			rxfilt |= XL_RXFILTER_ALLMULTI;
@@ -689,7 +691,7 @@ xl_rxfilter_90xB(struct xl_softc *sc)
 		/* Now program new ones. */
 		mcnt = 0;
 		if_maddr_rlock(ifp);
-		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+		CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 			if (ifma->ifma_addr->sa_family != AF_LINK)
 				continue;
 			/*
@@ -3006,7 +3008,7 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	struct mii_data		*mii = NULL;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		XL_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -3022,8 +3024,8 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->xl_if_flags = ifp->if_flags;
 		XL_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* XXX Downcall from if_addmulti() possibly with locks held. */
 		XL_LOCK(sc);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING)
@@ -3031,7 +3033,7 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		XL_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		if (sc->xl_miibus != NULL)
 			mii = device_get_softc(sc->xl_miibus);
 		if (mii == NULL)
@@ -3041,7 +3043,7 @@ xl_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr,
 			    &mii->mii_media, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0 &&

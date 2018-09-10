@@ -81,3 +81,8 @@ u_int	security_cheri_debugger_on_sigprot;
 SYSCTL_UINT(_security_cheri, OID_AUTO, debugger_on_sigprot, CTLFLAG_RW,
     &security_cheri_debugger_on_sigprot, 0,
     "Enter KDB when SIGPROT is delivered to an unsandboxed thread");
+
+u_int	security_cheri_bound_legacy_capabilities;
+SYSCTL_INT(_security_cheri, OID_AUTO, bound_legacy_capabilities,
+    CTLFLAG_RWTUN, &security_cheri_bound_legacy_capabilities, 0,
+    "Set bounds on userspace capabilities created by legacy ABIs.");

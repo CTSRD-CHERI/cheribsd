@@ -39,7 +39,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/time.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
-#include <sys/interrupt.h>
 #include <sys/sbuf.h>
 
 #include <sys/eventhandler.h>
@@ -280,7 +279,6 @@ static cam_status
 proberegister(struct cam_periph *periph, void *arg)
 {
 	union ccb *request_ccb;	/* CCB representing the probe request */
-	cam_status status;
 	probe_softc *softc;
 
 	request_ccb = (union ccb *)arg;
@@ -304,10 +302,9 @@ proberegister(struct cam_periph *periph, void *arg)
 	periph->softc = softc;
 	softc->periph = periph;
 	softc->action = PROBE_INVALID;
-	status = cam_periph_acquire(periph);
-	if (status != CAM_REQ_CMP) {
-		return (status);
-	}
+	if (cam_periph_acquire(periph) != 0)
+		return (CAM_REQ_CMP_ERR);
+
 	CAM_DEBUG(periph->path, CAM_DEBUG_PROBE, ("Probe started\n"));
 	ata_device_transport(periph->path);
 	probeschedule(periph);

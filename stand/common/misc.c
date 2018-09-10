@@ -138,6 +138,7 @@ kern_pread(int fd, vm_offset_t dest, size_t len, off_t off)
  * Read the specified part of a file to a malloced buffer.  The file
  * pointer is advanced to the end of the read data.
  */
+/* coverity[ -tainted_data_return ] */
 void *
 alloc_pread(int fd, off_t off, size_t len)
 {
@@ -184,7 +185,7 @@ hexdump(caddr_t region, size_t len)
 	
 	for (x = 0; x < 16; x++) {
 	    if ((line + x) < (region + len)) {
-		emit("%02x ", *(u_int8_t *)(line + x));
+		emit("%02x ", *(uint8_t *)(line + x));
 	    } else {
 		emit("-- ");
 	    }
@@ -194,7 +195,7 @@ hexdump(caddr_t region, size_t len)
 	emit(" |");
 	for (x = 0; x < 16; x++) {
 	    if ((line + x) < (region + len)) {
-		c = *(u_int8_t *)(line + x);
+		c = *(uint8_t *)(line + x);
 		if ((c < ' ') || (c > '~'))	/* !isprint(c) */
 		    c = '.';
 		emit("%c", c);

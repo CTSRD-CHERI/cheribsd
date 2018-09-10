@@ -48,6 +48,13 @@
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
 #include <machine/pcb.h>
+#if __has_feature(capabilities)
+#include <machine/vmparam.h>
+#endif
+
+#if __has_feature(capabilities)
+#include <cheri/cheri.h>
+#endif
 
 __NULLABILITY_PRAGMA_PUSH
 
@@ -109,6 +116,12 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 #define	CTASSERT(x)	_Static_assert(x, "compile-time assertion failed")
 #endif
 
+#if defined(_KERNEL)
+#include <sys/param.h>		/* MAXCPU */
+#include <sys/pcpu.h>		/* curthread */
+#include <sys/kpilite.h>
+#endif
+
 /*
  * Assert that a pointer can be loaded from memory atomically.
  *
@@ -145,22 +158,37 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * the current PCB.
  */
 #if __has_feature(capabilities)
-#define	__USER_CAP_UNBOUND(ptr)						\
+/*
+ * Derive out-of-bounds and small values from NULL.  This allows common
+ * sentinel values to work.
+ */
+#define ___USER_CFROMPTR(ptr, cap)					\
     ((ptr) == NULL ? NULL :						\
-	__builtin_cheri_offset_set(curthread->td_pcb->pcb_regs.ddc,	\
-	(vaddr_t)(ptr)))
+     ((vm_offset_t)(ptr) < 4096 ||					\
+      (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
+	__builtin_cheri_offset_set(NULL, (vaddr_t)(ptr)) :		\
+	__builtin_cheri_offset_set((cap), (vaddr_t)(ptr)))
+
+#define	__USER_CAP_UNBOUND(ptr)						\
+    ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.ddc)
 
 #define	__USER_CODE_CAP(ptr)						\
-    ((ptr) == NULL ? NULL :						\
-	__builtin_cheri_offset_set(curthread->td_pcb->pcb_regs.pcc,	\
-	(vaddr_t)(ptr)))
+     ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.pcc)
+
+#define	__USER_CAP(ptr, len)						\
+({									\
+	void * __capability unbound = __USER_CAP_UNBOUND(ptr);		\
+	(security_cheri_bound_legacy_capabilities &&			\
+	    __builtin_cheri_tag_get(unbound) ?				\
+	    __builtin_cheri_bounds_set(unbound, (len)) : unbound);	\
+})
 
 #else /* !has_feature(capabilities) */
 #define	__USER_CAP_UNBOUND(ptr)	(ptr)
 #define	__USER_CODE_CAP(ptr)	(ptr)
+#define	__USER_CAP(ptr, len)	(ptr)
 #endif /* !has_feature(capabilities) */
 
-#define	__USER_CAP(ptr, len)	__USER_CAP_UNBOUND(ptr)
 #define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)
 #define	__USER_CAP_ARRAY(objp, cnt) \
      __USER_CAP((objp), sizeof(*(objp)) * (cnt))
@@ -186,11 +214,10 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * XXX most of these variables should be const.
  */
 extern int osreldate;
-extern int envmode;
-extern int hintmode;		/* 0 = off. 1 = config, 2 = fallback */
-extern int dynamic_kenv;
+extern bool dynamic_kenv;
 extern struct mtx kenv_lock;
 extern char *kern_envp;
+extern char *md_envp;
 extern char static_env[];
 extern char static_hints[];	/* by config for now */
 
@@ -250,12 +277,46 @@ void	vpanic(const char *, __va_list) __dead2 __printflike(1, 0);
 void	cpu_boot(int);
 void	cpu_flush_dcache(void *, size_t);
 void	cpu_rootconf(void);
-void	critical_enter(void);
-void	critical_exit(void);
+void	critical_enter_KBI(void);
+void	critical_exit_KBI(void);
+void	critical_exit_preempt(void);
 void	init_param1(void);
 void	init_param2(long physpages);
 void	init_static_kenv(char *, size_t);
 void	tablefull(const char *);
+
+#if defined(KLD_MODULE) || defined(KTR_CRITICAL) || !defined(_KERNEL) || defined(GENOFFSET)
+#define critical_enter() critical_enter_KBI()
+#define critical_exit() critical_exit_KBI()
+#else
+static __inline void
+critical_enter(void)
+{
+	struct thread_lite *td;
+
+	td = (struct thread_lite *)curthread;
+	td->td_critnest++;
+	__compiler_membar();
+}
+
+static __inline void
+critical_exit(void)
+{
+	struct thread_lite *td;
+
+	td = (struct thread_lite *)curthread;
+	KASSERT(td->td_critnest != 0,
+	    ("critical_exit: td_critnest == 0"));
+	__compiler_membar();
+	td->td_critnest--;
+	__compiler_membar();
+	if (__predict_false(td->td_owepreempt))
+		critical_exit_preempt();
+
+}
+#endif
+
+
 #ifdef  EARLY_PRINTF
 typedef void early_putc_t(int ch);
 extern early_putc_t *early_putc;
@@ -295,6 +356,7 @@ void	hexdump(const void *ptr, int length, const char *hdr, int flags);
 
 #define ovbcopy(f, t, l) bcopy((f), (t), (l))
 void	bcopy(const void * _Nonnull from, void * _Nonnull to, size_t len);
+#define bcopy(from, to, len) __builtin_memmove((to), (from), (len))
 #if __has_feature(capabilities)
 void	bcopy_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
@@ -307,15 +369,18 @@ void	cheri_bcopy(const void *src, void *dst, size_t len);
 #define	cheri_bcopy	bcopy
 #endif
 void	bzero(void * _Nonnull buf, size_t len);
-#define bzero(buf, len) ({				\
-	if (__builtin_constant_p(len) && (len) <= 64)	\
-		__builtin_memset((buf), 0, (len));	\
-	else						\
-		bzero((buf), (len));			\
-})
+#define bzero(buf, len) __builtin_memset((buf), 0, (len))
 void	explicit_bzero(void * _Nonnull, size_t);
+int	bcmp(const void *b1, const void *b2, size_t len);
+#define bcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 
+void	*memset(void * _Nonnull buf, int c, size_t len);
+#define memset(buf, c, len) __builtin_memset((buf), (c), (len))
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
+#if !__has_feature(capabilities)
+/* Causes a compiler crash. */
+#define memcpy(to, from, len) __builtin_memcpy(to, from, len)
+#endif
 #if __has_feature(capabilities)
 void	*memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
@@ -326,6 +391,7 @@ void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #define	cheri_memcpy	memcpy
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
+#define memmove(dest, src, n) __builtin_memmove((dest), (src), (n))
 #if __has_feature(capabilities)
 void	*memmove_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
@@ -338,75 +404,72 @@ struct copy_map {
 	size_t	uoffset;
 	size_t	koffset;
 };
+int	memcmp(const void *b1, const void *b2, size_t len);
+#define memcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 
 int	copystr(const void * _Nonnull __restrict kfaddr,
 	    void * _Nonnull __restrict kdaddr, size_t len,
 	    size_t * __restrict lencopied);
-#if __has_feature(capabilities)
-int	copystr_c(const void * __capability _Nonnull __restrict kfaddr,
-	    void * __capability _Nonnull __restrict kdaddr, size_t len,
-	    size_t * __capability __restrict lencopied);
-#else
-#define	copystr_c	copystr
-#endif
 int	copyinstr(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len,
 	    size_t * __restrict lencopied);
 #if __has_feature(capabilities)
-int	copyinstr_c(const void * _Nonnull __restrict __CAPABILITY udaddr,
-	    void * _Nonnull __restrict __CAPABILITY kaddr, size_t len,
-	    size_t * __restrict __CAPABILITY lencopied);
+int	copyinstr_c(const void * __restrict __capability udaddr,
+	    void * _Nonnull __restrict kaddr, size_t len,
+	    size_t * __restrict lencopied);
 #else
 #define	copyinstr_c	copyinstr
 #endif
-int	copyin(const void * _Nonnull __restrict udaddr,
+int	copyin(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
-int	copyin_implicit_cap(const void * _Nonnull __restrict udaddr,
+int	copyin_implicit_cap(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyin_c(const void * _Nonnull __restrict __capability udaddr,
-	    void * _Nonnull __restrict __capability kaddr, size_t len);
-int	copyincap_c(const void * _Nonnull __restrict __capability udaddr,
-	    void * _Nonnull __restrict __capability kaddr, size_t len);
+int	copyin_c(const void * __restrict __capability udaddr,
+	    void * _Nonnull __restrict kaddr, size_t len);
+int	copyincap_c(const void * __restrict __capability udaddr,
+	    void * _Nonnull __restrict kaddr, size_t len);
 #else
 #define	copyin_c	copyin
 #define	copyincap_c	copyin
 #endif
-int	copyin_nofault(const void * _Nonnull __restrict udaddr,
+int	copyin_nofault(const void * __restrict udaddr,
 	    void * _Nonnull __restrict kaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyin_nofault_c(const void * __capability _Nonnull __restrict udaddr,
-	    void * __capability _Nonnull __restrict kaddr, size_t len);
+int	copyin_nofault_c(const void * __capability __restrict udaddr,
+	    void * _Nonnull __restrict kaddr, size_t len);
 #else
 #define	copyin_nofault_c	copyin_nofault
 #endif
 int	copyout(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict udaddr, size_t len);
+	    void * __restrict udaddr, size_t len);
 int	copyout_implicit_cap(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict udaddr, size_t len);
+	    void * __restrict udaddr, size_t len);
 
 #if __has_feature(capabilities)
-int	copyout_c(const void * _Nonnull __restrict __capability kaddr,
-	    void * _Nonnull __restrict __capability udaddr, size_t len);
-int	copyoutcap_c(const void * __capability _Nonnull __restrict kaddr,
-	    void * __capability _Nonnull __restrict udaddr, size_t len);
+int	copyout_c(const void * _Nonnull __restrict kaddr,
+	    void * __restrict __capability udaddr, size_t len);
+int	copyoutcap_c(const void * _Nonnull __restrict kaddr,
+	    void * __capability __restrict udaddr, size_t len);
 #else
 #define	copyout_c	copyout
 #define	copyoutcap	copyout
 #define	copyoutcap_c	copyout
 #endif
 int	copyout_nofault(const void * _Nonnull __restrict kaddr,
-	    void * _Nonnull __restrict udaddr, size_t len);
+	    void * __restrict udaddr, size_t len);
 #if __has_feature(capabilities)
-int	copyout_nofault_c(const void * __capability _Nonnull __restrict kaddr,
-	    void * __capability _Nonnull __restrict udaddr, size_t len);
+int	copyout_nofault_c(const void * _Nonnull __restrict kaddr,
+	    void * __capability __restrict udaddr, size_t len);
 int	copyoutcap_nofault_c(
-	    const void * __capability _Nonnull __restrict kaddr,
-	    void * __capability _Nonnull __restrict udaddr, size_t len);
+	    const void * _Nonnull __restrict kaddr,
+	    void * __capability __restrict udaddr, size_t len);
 #else
 #define	copyout_nofault_c	copyout_nofault
 #define	copyoutcap_nofault_c	copyout_nofault
 #endif
+int	copyout_nofault(const void * _Nonnull __restrict kaddr,
+	    void * __restrict udaddr, size_t len);
 
 int	fubyte(volatile const void *base);
 long	fuword(volatile const void *base);
@@ -490,6 +553,8 @@ void	startprofclock(struct proc *);
 void	stopprofclock(struct proc *);
 void	cpu_startprofclock(void);
 void	cpu_stopprofclock(void);
+void	suspendclock(void);
+void	resumeclock(void);
 sbintime_t 	cpu_idleclock(void);
 void	cpu_activeclock(void);
 void	cpu_new_callout(int cpu, sbintime_t bt, sbintime_t bt_opt);
@@ -510,6 +575,11 @@ int	getenv_quad(const char *name, quad_t *data);
 int	kern_setenv(const char *name, const char *value);
 int	kern_unsetenv(const char *name);
 int	testenv(const char *name);
+
+int	getenv_array(const char *name, void *data, int size, int *psize,
+    int type_size, bool allow_signed);
+#define	GETENV_UNSIGNED	false	/* negative numbers not allowed */
+#define	GETENV_SIGNED	true	/* negative numbers allowed */
 
 typedef uint64_t (cpu_tick_f)(void);
 void set_cputicker(cpu_tick_f *func, uint64_t freq, unsigned var);
@@ -575,6 +645,8 @@ int	pause_sbt(const char *wmesg, sbintime_t sbt, sbintime_t pr,
 	    int flags);
 #define	pause(wmesg, timo)						\
 	pause_sbt((wmesg), tick_sbt * (timo), 0, C_HARDCLOCK)
+#define	pause_sig(wmesg, timo)						\
+	pause_sbt((wmesg), tick_sbt * (timo), 0, C_HARDCLOCK | C_CATCH)
 #define	tsleep(chan, pri, wmesg, timo)					\
 	_sleep((chan), NULL, (pri), (wmesg), tick_sbt * (timo),		\
 	    0, C_HARDCLOCK)
@@ -627,6 +699,22 @@ void free_unr(struct unrhdr *uh, u_int item);
 void	intr_prof_stack_use(struct thread *td, struct trapframe *frame);
 
 void counted_warning(unsigned *counter, const char *msg);
+
+/*
+ * APIs to manage deprecation and obsolescence.
+ */
+struct device;
+void _gone_in(int major, const char *msg);
+void _gone_in_dev(struct device *dev, int major, const char *msg);
+#ifdef NO_OBSOLETE_CODE
+#define __gone_ok(m, msg)					 \
+	_Static_assert(m < P_OSREL_MAJOR(__FreeBSD_version)),	 \
+	    "Obsolete code" msg);
+#else
+#define	__gone_ok(m, msg)
+#endif
+#define gone_in(major, msg)		__gone_ok(major, msg) _gone_in(major, msg)
+#define gone_in_dev(dev, major, msg)	__gone_ok(major, msg) _gone_in_dev(dev, major, msg)
 
 __NULLABILITY_PRAGMA_POP
 

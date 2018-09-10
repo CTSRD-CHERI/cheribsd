@@ -27,6 +27,18 @@
  * $FreeBSD$
  */
 
+ /*
+  * CHERI CHANGES START
+  * {
+  *   "updated": 20180828,
+  *   "changes": [
+  *     "pointer_alignment"
+  *   ],
+  *   "change_comment": "Use __builtin_align_up",
+  * }
+  * CHERI CHANGES END
+  */
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -79,7 +91,7 @@ malloc_aligned(size_t size, size_t align)
 		align = sizeof(void *);
 
 	mem = xmalloc(size + sizeof(void *) + align - 1);
-	res = (void *)round((uintptr_t)mem + sizeof(void *), align);
+	res = __builtin_align_up((char *)mem + sizeof(void *), align);
 	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
 	return (res);
 }

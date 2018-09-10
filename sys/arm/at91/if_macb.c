@@ -1137,7 +1137,7 @@ set_filter(struct macb_softc *sc)
 	multicast_filter[0] = 0;
 	multicast_filter[1] = 0;
 
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		count++;
@@ -1163,7 +1163,7 @@ macbioctl(struct ifnet * ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		MACB_LOCK(sc);
 
 		if ((ifp->if_flags & IFF_UP) != 0) {
@@ -1180,15 +1180,15 @@ macbioctl(struct ifnet * ifp, u_long cmd, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		MACB_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		MACB_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			set_filter(sc);
 
 		MACB_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);

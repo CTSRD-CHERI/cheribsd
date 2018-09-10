@@ -107,9 +107,6 @@ void * __capability	cheri_capability_build_user_data(uint32_t perms,
 void * __capability	cheri_capability_build_user_rwx(uint32_t perms,
 			    vaddr_t basep, size_t length, off_t off);
 
-void	cheri_capability_set(void * __capability *capp, uint32_t uperms,
-	    vaddr_t basep, size_t length, off_t off);
-
 /*
  * CHERI context management functions.
  */
@@ -127,8 +124,12 @@ int	cheri_syscall_authorize(struct thread *td, u_int code,
 int	cheri_signal_sandboxed(struct thread *td);
 void	cheri_trapframe_from_cheriframe(struct trapframe *frame,
 	    struct cheri_frame *cfp);
-void	cheri_trapframe_to_cheriframe(struct trapframe *frame,
-	    struct cheri_frame *cfp);
+void	_cheri_trapframe_to_cheriframe(struct trapframe *frame,
+	    struct cheri_frame *cfp, bool strip_tags);
+#define	cheri_trapframe_to_cheriframe(tf, cf)			\
+	_cheri_trapframe_to_cheriframe((tf), (cf), false)
+#define	cheri_trapframe_to_cheriframe_strip(tf, cf)		\
+	_cheri_trapframe_to_cheriframe((tf), (cf), true)
 void	hybridabi_sendsig(struct thread *td);
 
 /*
@@ -160,6 +161,7 @@ extern u_int	security_cheri_debugger_on_sandbox_unwind;
 extern u_int	security_cheri_debugger_on_sigprot;
 extern u_int	security_cheri_sandboxed_signals;
 extern u_int	security_cheri_syscall_violations;
+extern u_int	security_cheri_bound_legacy_capabilities;
 
 /*
  * Functions exposed to machine-independent code that must interact with

@@ -39,8 +39,14 @@ __FBSDID("$FreeBSD$");
 #include <libelf.h>
 #include <libproc.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	LD_ELF	"ld-cheri-elf"
+#else
+#define	LD_ELF	"ld-elf"
+#endif
+
 static const char *aout_object = "a.out";
-static const char *ldelf_object = "ld-elf.so.1";
+static const char *ldelf_object = LD_ELF".so.1";
 static const char *target_prog_file = "target_prog";
 
 /*
@@ -204,10 +210,10 @@ ATF_TC_BODY(map_prefix_name2map, tc)
 	(void)proc_rdagent(phdl);
 
 	/* Make sure that "ld-elf" and "ld-elf.so" return the same map. */
-	map1 = proc_name2map(phdl, "ld-elf");
-	ATF_REQUIRE_MSG(map1 != NULL, "failed to look up map for 'ld-elf'");
-	map2 = proc_name2map(phdl, "ld-elf.so");
-	ATF_REQUIRE_MSG(map2 != NULL, "failed to look up map for 'ld-elf.so'");
+	map1 = proc_name2map(phdl, LD_ELF);
+	ATF_REQUIRE_MSG(map1 != NULL, "failed to look up map for '"LD_ELF"'");
+	map2 = proc_name2map(phdl, LD_ELF ".so");
+	ATF_REQUIRE_MSG(map2 != NULL, "failed to look up map for '"LD_ELF".so'");
 	ATF_CHECK_EQ(strcmp(map1->pr_mapname, map2->pr_mapname), 0);
 
 	ATF_CHECK_EQ_MSG(proc_continue(phdl), 0, "failed to resume execution");

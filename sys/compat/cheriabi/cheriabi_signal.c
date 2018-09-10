@@ -32,7 +32,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ktrace.h"
@@ -93,9 +92,7 @@ cheriabi_sigprocmask(struct thread *td, struct cheriabi_sigprocmask_args *uap)
 		osetp = NULL;
 	error = kern_sigprocmask(td, uap->how, setp, osetp, 0);
 	if (osetp && error == 0)
-		error = copyout_c(
-		    (__cheri_tocap sigset_t * __capability)osetp, uap->oset,
-		    sizeof(oset));
+		error = copyout_c(osetp, uap->oset, sizeof(oset));
 	return (error);
 }
 
@@ -239,7 +236,7 @@ cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
 
 	value_union.sival_ptr = uap->value;
 	if (uap->pid == td->td_proc->p_pid) {
-		sv.sival_ptr = value_union.sival_ptr;
+		sv.sival_ptr_c = value_union.sival_ptr;
 	} else {
 		/*
 		 * Cowardly refuse to send capabilities to other

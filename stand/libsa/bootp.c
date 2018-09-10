@@ -73,7 +73,7 @@ static	char vm_cmu[4] = VM_CMU;
 
 /* Local forwards */
 static	ssize_t bootpsend(struct iodesc *, void *, size_t);
-static	ssize_t bootprecv(struct iodesc *, void **, void **, time_t);
+static	ssize_t bootprecv(struct iodesc *, void **, void **, time_t, void *);
 static	int vend_rfc1048(u_char *, u_int);
 #ifdef BOOTP_VEND_CMU
 static	void vend_cmu(u_char *);
@@ -183,14 +183,14 @@ bootp(int sock)
 
 	if(sendrecv(d,
 		    bootpsend, bp, sizeof(*bp),
-		    bootprecv, &pkt, (void **)&rbootp) == -1) {
+		    bootprecv, &pkt, (void **)&rbootp, NULL) == -1) {
 	    printf("bootp: no reply\n");
 	    return;
 	}
 
 #ifdef SUPPORT_DHCP
 	if(dhcp_ok) {
-		u_int32_t leasetime;
+		uint32_t leasetime;
 		bp->bp_vend[6] = DHCPREQUEST;
 		bp->bp_vend[7] = TAG_REQ_ADDR;
 		bp->bp_vend[8] = 4;
@@ -209,7 +209,7 @@ bootp(int sock)
 		free(pkt);
 		if(sendrecv(d,
 			    bootpsend, bp, sizeof(*bp),
-			    bootprecv, &pkt, (void **)&rbootp) == -1) {
+			    bootprecv, &pkt, (void **)&rbootp, NULL) == -1) {
 			printf("DHCPREQUEST failed\n");
 			return;
 		}
@@ -286,7 +286,8 @@ bootpsend(struct iodesc *d, void *pkt, size_t len)
 }
 
 static ssize_t
-bootprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft)
+bootprecv(struct iodesc *d, void **pkt, void **payload, time_t tleft,
+    void *extra)
 {
 	ssize_t n;
 	struct bootp *bp;

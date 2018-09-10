@@ -51,7 +51,7 @@ struct cmd cmdtab[] = {
 	{ "election",	testinghelp,	testing,	1 },
 	{ "help",	helphelp,	help,		0 },
 	{ "msite",	msitehelp,	msite,		0 },
-	{ "quit",	quithelp,	quit,		0 },
+	{ "quit",	quithelp,	(handler_func)quit,		0 },
 	{ "trace",	tracinghelp,	tracing,	1 },
 	{ "?",		helphelp,	help,		0 },
 };

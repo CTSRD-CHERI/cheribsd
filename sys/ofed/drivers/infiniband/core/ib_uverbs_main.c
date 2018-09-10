@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause OR GPL-2.0
+ *
  * Copyright (c) 2005 Topspin Communications.  All rights reserved.
  * Copyright (c) 2005, 2006 Cisco Systems.  All rights reserved.
  * Copyright (c) 2005 Mellanox Technologies. All rights reserved.
@@ -33,6 +35,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include <linux/module.h>
 #include <linux/device.h>
@@ -1270,7 +1275,6 @@ static void ib_uverbs_free_hw_resources(struct ib_uverbs_device *uverbs_dev,
 		kref_get(&file->ref);
 		mutex_unlock(&uverbs_dev->lists_mutex);
 
-		ib_uverbs_event_handler(&file->event_handler, &event);
 
 		mutex_lock(&file->cleanup_mutex);
 		ucontext = file->ucontext;
@@ -1287,6 +1291,7 @@ static void ib_uverbs_free_hw_resources(struct ib_uverbs_device *uverbs_dev,
 			 * for example due to freeing the resources
 			 * (e.g mmput).
 			 */
+			ib_uverbs_event_handler(&file->event_handler, &event);
 			ib_dev->disassociate_ucontext(ucontext);
 			ib_uverbs_cleanup_ucontext(file, ucontext);
 		}

@@ -3107,6 +3107,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 6;
 		break;
 	}
+	/* cheriabi_getrandom */
+	case 563: {
+		struct cheriabi_getrandom_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->buf; /* void * __capability */
+		uarg[1] = p->buflen; /* size_t */
+		uarg[2] = p->flags; /* unsigned int */
+		*n_args = 3;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8291,6 +8300,22 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* cheriabi_getrandom */
+	case 563:
+		switch(ndx) {
+		case 0:
+			p = "userland void * __capability";
+			break;
+		case 1:
+			p = "size_t";
+			break;
+		case 2:
+			p = "unsigned int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10076,6 +10101,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_cpuset_setdomain */
 	case 562:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_getrandom */
+	case 563:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

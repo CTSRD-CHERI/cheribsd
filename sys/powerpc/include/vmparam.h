@@ -83,11 +83,7 @@
 #if !defined(LOCORE)
 #ifdef __powerpc64__
 #define	VM_MIN_ADDRESS		(0x0000000000000000UL)
-#ifdef AIM
-#define	VM_MAXUSER_ADDRESS	(0xfffffffffffff000UL)
-#else
-#define	VM_MAXUSER_ADDRESS	(0x7ffffffffffff000UL)
-#endif
+#define	VM_MAXUSER_ADDRESS	(0x3ffffffffffff000UL)
 #define	VM_MAX_ADDRESS		(0xffffffffffffffffUL)
 #else
 #define	VM_MIN_ADDRESS		((vm_offset_t)0)
@@ -99,7 +95,7 @@
 #ifdef BOOKE
 #define	VM_MIN_ADDRESS		0
 #ifdef __powerpc64__
-#define	VM_MAXUSER_ADDRESS	0x7ffffffffffff000
+#define	VM_MAXUSER_ADDRESS	0x3ffffffffffff000
 #else
 #define	VM_MAXUSER_ADDRESS	0x7ffff000
 #endif
@@ -110,8 +106,8 @@
 #define	FREEBSD32_USRSTACK	FREEBSD32_SHAREDPAGE
 
 #ifdef __powerpc64__
-#define	VM_MIN_KERNEL_ADDRESS		0xc000000000000000UL
-#define	VM_MAX_KERNEL_ADDRESS		0xc0000001c7ffffffUL
+#define	VM_MIN_KERNEL_ADDRESS		0xe000000000000000UL
+#define	VM_MAX_KERNEL_ADDRESS		0xe0000007ffffffffUL
 #define	VM_MAX_SAFE_KERNEL_ADDRESS	VM_MAX_KERNEL_ADDRESS
 #endif
 
@@ -134,9 +130,9 @@
 
 #ifdef __powerpc64__
 #ifndef LOCORE
-#define	KERNBASE	0xc000000000000000UL	/* start of kernel virtual */
+#define	KERNBASE	0xe000000000000100UL	/* start of kernel virtual */
 #else
-#define	KERNBASE	0xc000000000000000	/* start of kernel virtual */
+#define	KERNBASE	0xe000000000000100	/* start of kernel virtual */
 #endif
 #else
 #define	KERNBASE		0xc0000000	/* start of kernel virtual */
@@ -243,14 +239,17 @@ struct pmap_physseg {
 
 /*
  * We (usually) have a direct map of all physical memory, so provide
- * a macro to use to get the kernel VA address for a given PA. Returns
- * 0 if the direct map is unavailable. The location of the direct map
- * may not be 1:1 in future, so use of the macro is recommended.
+ * a macro to use to get the kernel VA address for a given PA. Check the
+ * value of PMAP_HAS_PMAP before using.
  */
+#ifndef LOCORE
 #ifdef __powerpc64__
-#define	DMAP_BASE_ADDRESS	0x0000000000000000UL
+#define	DMAP_BASE_ADDRESS	0xc000000000000000UL
+#define	DMAP_MAX_ADDRESS	0xcfffffffffffffffUL
 #else
 #define	DMAP_BASE_ADDRESS	0x00000000UL
+#define	DMAP_MAX_ADDRESS	0xbfffffffUL
+#endif
 #endif
 
 #define	PMAP_HAS_DMAP	(hw_direct_map)

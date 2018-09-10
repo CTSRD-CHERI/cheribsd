@@ -40,7 +40,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_bpf.h"
-#include "opt_compat.h"
 #include "opt_ddb.h"
 #include "opt_netgraph.h"
 
@@ -63,6 +62,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/ttycom.h>
 #include <sys/uio.h>
+#include <sys/sysent.h>
 
 #include <sys/event.h>
 #include <sys/file.h>
@@ -99,6 +99,10 @@ __FBSDID("$FreeBSD$");
 
 MALLOC_DEFINE(M_BPF, "BPF", "BPF data");
 
+static struct bpf_if_ext dead_bpf_if = {
+	.bif_dlist = LIST_HEAD_INITIALIZER()
+};
+
 struct bpf_if {
 #define	bif_next	bif_ext.bif_next
 #define	bif_dlist	bif_ext.bif_dlist
@@ -113,6 +117,11 @@ struct bpf_if {
 };
 
 CTASSERT(offsetof(struct bpf_if, bif_ext) == 0);
+
+#define BPFIF_RLOCK(bif)	rw_rlock(&(bif)->bif_lock)
+#define BPFIF_RUNLOCK(bif)	rw_runlock(&(bif)->bif_lock)
+#define BPFIF_WLOCK(bif)	rw_wlock(&(bif)->bif_lock)
+#define BPFIF_WUNLOCK(bif)	rw_wunlock(&(bif)->bif_lock)
 
 #if defined(DEV_BPF) || defined(NETGRAPH_BPF)
 
@@ -133,9 +142,9 @@ struct bpf_dltlist_c {
 };
 
 #define	_CASE_IOC_BPF_DLTLIST_C(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_dltlist_c):
+    _IOC_NEWTYPE((cmd), struct bpf_dltlist_c): case
 #define	_CASE_IOC_BPF_PROGRAM_C(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_program_c):
+    _IOC_NEWTYPE((cmd), struct bpf_program_c): case
 #else /* !COMPAT_CHERIABI */
 #define	_CASE_IOC_BPF_DLTLIST_C(cmd)
 #define	_CASE_IOC_BPF_PROGRAM_C(cmd)
@@ -174,9 +183,9 @@ struct bpf_dltlist32 {
 #define	BIOCGRTIMEOUT32	_IOR('B', 110, struct timeval32)
 
 #define	_CASE_IOC_BPF_DLTLIST32(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_dltlist32):
+    _IOC_NEWTYPE((cmd), struct bpf_dltlist32): case
 #define	_CASE_IOC_BPF_PROGRAM32(cmd)				\
-    case _IOC_NEWTYPE((cmd), struct bpf_program32):
+    _IOC_NEWTYPE((cmd), struct bpf_program32): case
 #else /* !COMPAT_FREEBSD32 */
 #define	_CASE_IOC_BPF_DLTLIST32(cmd)
 #define	_CASE_IOC_BPF_PROGRAM32(cmd)
@@ -185,12 +194,15 @@ struct bpf_dltlist32 {
 #define	CASE_IOC_BPF_DLTLIST(cmd)				\
     _CASE_IOC_BPF_DLTLIST_C(cmd)				\
     _CASE_IOC_BPF_DLTLIST32(cmd)				\
-    case (cmd)
+    (cmd)
 #define	CASE_IOC_BPF_PROGRAM(cmd)				\
     _CASE_IOC_BPF_PROGRAM_C(cmd)				\
     _CASE_IOC_BPF_PROGRAM32(cmd)				\
-    case (cmd)
+    (cmd)
 
+#define BPF_LOCK()	   sx_xlock(&bpf_sx)
+#define BPF_UNLOCK()		sx_xunlock(&bpf_sx)
+#define BPF_LOCK_ASSERT()	sx_assert(&bpf_sx, SA_XLOCKED)
 /*
  * bpf_iflist is a list of BPF interface structures, each corresponding to a
  * specific DLT.  The same network interface might have several BPF interface
@@ -198,7 +210,7 @@ struct bpf_dltlist32 {
  * frames, ethernet frames, etc).
  */
 static LIST_HEAD(, bpf_if)	bpf_iflist, bpf_freelist;
-static struct mtx	bpf_mtx;		/* bpf global lock */
+static struct sx	bpf_sx;		/* bpf global lock */
 static int		bpf_bpfd_cnt;
 
 static void	bpf_attachd(struct bpf_d *, struct bpf_if *);
@@ -311,7 +323,7 @@ bpf_append_bytes(struct bpf_d *d, caddr_t buf, u_int offset, void *src,
 		return (bpf_buffer_append_bytes(d, buf, offset, src, len));
 
 	case BPF_BUFMODE_ZBUF:
-		d->bd_zcopy++;
+		counter_u64_add(d->bd_zcopy, 1);
 		return (bpf_zerocopy_append_bytes(d, buf, offset, src, len));
 
 	default:
@@ -331,7 +343,7 @@ bpf_append_mbuf(struct bpf_d *d, caddr_t buf, u_int offset, void *src,
 		return (bpf_buffer_append_mbuf(d, buf, offset, src, len));
 
 	case BPF_BUFMODE_ZBUF:
-		d->bd_zcopy++;
+		counter_u64_add(d->bd_zcopy, 1);
 		return (bpf_zerocopy_append_mbuf(d, buf, offset, src, len));
 
 	default:
@@ -917,6 +929,15 @@ bpfopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 		return (error);
 	}
 
+	/* Setup counters */
+	d->bd_rcount = counter_u64_alloc(M_WAITOK);
+	d->bd_dcount = counter_u64_alloc(M_WAITOK);
+	d->bd_fcount = counter_u64_alloc(M_WAITOK);
+	d->bd_wcount = counter_u64_alloc(M_WAITOK);
+	d->bd_wfcount = counter_u64_alloc(M_WAITOK);
+	d->bd_wdcount = counter_u64_alloc(M_WAITOK);
+	d->bd_zcopy = counter_u64_alloc(M_WAITOK);
+
 	/*
 	 * For historical reasons, perform a one-time initialization call to
 	 * the buffer routines, even though we're not yet committed to a
@@ -1142,22 +1163,22 @@ bpfwrite(struct cdev *dev, struct uio *uio, int ioflag)
 		return (error);
 
 	BPF_PID_REFRESH_CUR(d);
-	d->bd_wcount++;
+	counter_u64_add(d->bd_wcount, 1);
 	/* XXX: locking required */
 	if (d->bd_bif == NULL) {
-		d->bd_wdcount++;
+		counter_u64_add(d->bd_wdcount, 1);
 		return (ENXIO);
 	}
 
 	ifp = d->bd_bif->bif_ifp;
 
 	if ((ifp->if_flags & IFF_UP) == 0) {
-		d->bd_wdcount++;
+		counter_u64_add(d->bd_wdcount, 1);
 		return (ENETDOWN);
 	}
 
 	if (uio->uio_resid == 0) {
-		d->bd_wdcount++;
+		counter_u64_add(d->bd_wdcount, 1);
 		return (0);
 	}
 
@@ -1168,10 +1189,10 @@ bpfwrite(struct cdev *dev, struct uio *uio, int ioflag)
 	error = bpf_movein(uio, (int)d->bd_bif->bif_dlt, ifp,
 	    &m, &dst, &hlen, d);
 	if (error) {
-		d->bd_wdcount++;
+		counter_u64_add(d->bd_wdcount, 1);
 		return (error);
 	}
-	d->bd_wfcount++;
+	counter_u64_add(d->bd_wfcount, 1);
 	if (d->bd_hdrcmplt)
 		dst.sa_family = pseudo_AF_HDRCMPLT;
 
@@ -1207,7 +1228,7 @@ bpfwrite(struct cdev *dev, struct uio *uio, int ioflag)
 
 	error = (*ifp->if_output)(ifp, m, &dst, &ro);
 	if (error)
-		d->bd_wdcount++;
+		counter_u64_add(d->bd_wdcount, 1);
 
 	if (mc != NULL) {
 		if (error == 0)
@@ -1246,13 +1267,13 @@ reset_d(struct bpf_d *d)
 	}
 	if (bpf_canwritebuf(d))
 		d->bd_slen = 0;
-	d->bd_rcount = 0;
-	d->bd_dcount = 0;
-	d->bd_fcount = 0;
-	d->bd_wcount = 0;
-	d->bd_wfcount = 0;
-	d->bd_wdcount = 0;
-	d->bd_zcopy = 0;
+	counter_u64_zero(d->bd_rcount);
+	counter_u64_zero(d->bd_dcount);
+	counter_u64_zero(d->bd_fcount);
+	counter_u64_zero(d->bd_wcount);
+	counter_u64_zero(d->bd_wfcount);
+	counter_u64_zero(d->bd_wdcount);
+	counter_u64_zero(d->bd_zcopy);
 }
 
 /*
@@ -1312,8 +1333,8 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		case BIOCGBLEN:
 		case BIOCFLUSH:
 		case BIOCGDLT:
-		CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
-		CASE_IOC_IFREQ(BIOCGETIF):
+		case CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
+		case CASE_IOC_IFREQ(BIOCGETIF):
 		case BIOCGRTIMEOUT:
 #if defined(COMPAT_FREEBSD32) && defined(__amd64__)
 		case BIOCGRTIMEOUT32:
@@ -1343,7 +1364,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	 * If we're called from a 32-bit process, mark the stream as 32-bit
 	 * so that it will get 32-bit packet headers.
 	 */
-	if (SV_CURPROC_FLAG(SV_ILP32)) {
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
 		BPFD_LOCK(d);
 		d->bd_compat32 = 1;
 		BPFD_UNLOCK(d);
@@ -1396,9 +1417,9 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Set link layer read filter.
 	 */
-	CASE_IOC_BPF_PROGRAM(BIOCSETF):
-	CASE_IOC_BPF_PROGRAM(BIOCSETFNR):
-	CASE_IOC_BPF_PROGRAM(BIOCSETWF):
+	case CASE_IOC_BPF_PROGRAM(BIOCSETF):
+	case CASE_IOC_BPF_PROGRAM(BIOCSETFNR):
+	case CASE_IOC_BPF_PROGRAM(BIOCSETWF):
 		error = bpf_setf(d, (struct bpf_program *)addr, cmd);
 		break;
 
@@ -1444,7 +1465,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Get a list of supported data link types.
 	 */
-	CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
+	case CASE_IOC_BPF_DLTLIST(BIOCGDLTLIST):
 		BPF_LOCK();
 		if (d->bd_bif == NULL)
 			error = EINVAL;
@@ -1468,7 +1489,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Get interface name.
 	 */
-	CASE_IOC_IFREQ(BIOCGETIF):
+	case CASE_IOC_IFREQ(BIOCGETIF):
 		BPF_LOCK();
 		if (d->bd_bif == NULL)
 			error = EINVAL;
@@ -1485,7 +1506,7 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	/*
 	 * Set interface.
 	 */
-	CASE_IOC_IFREQ(BIOCSETIF):
+	case CASE_IOC_IFREQ(BIOCSETIF):
 		{
 			int alloc_buf, size;
 
@@ -1585,8 +1606,8 @@ bpfioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			struct bpf_stat *bs = (struct bpf_stat *)addr;
 
 			/* XXXCSJP overflow */
-			bs->bs_recv = d->bd_rcount;
-			bs->bs_drop = d->bd_dcount;
+			bs->bs_recv = (u_int)counter_u64_fetch(d->bd_rcount);
+			bs->bs_drop = (u_int)counter_u64_fetch(d->bd_dcount);
 			break;
 		}
 
@@ -1824,10 +1845,10 @@ bf_insns_get_ptr(void *fpp)
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP(
 		    (struct bpf_insn *)(uintptr_t)fpup->fp32.bf_insns,
-		    fpup->fp32.bf_len * sizeof(bpf_insn)));
+		    fpup->fp32.bf_len * sizeof(struct bpf_insn)));
 #endif
 	return (__USER_CAP(fpup->fp.bf_insns,
-	    fpup->fp.bf_len * sizeof(bpf_insn)));
+	    fpup->fp.bf_len * sizeof(struct bpf_insn)));
 }
 
 /*
@@ -1875,15 +1896,19 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	if (size > 0) {
 		/* We're setting up new filter.  Copy and check actual data. */
 		fcode = malloc(size, M_BPF, M_WAITOK);
-		if (copyin_c(bf_insns_get_ptr(fp),
-		    (__cheri_tocap struct bpf_insn * __capability)fcode, size) != 0 ||
+		if (copyin_c(bf_insns_get_ptr(fp), fcode, size) != 0 ||
 		    !bpf_validate(fcode, flen)) {
 			free(fcode, M_BPF);
 			return (EINVAL);
 		}
 #ifdef BPF_JITTER
-		/* Filter is copied inside fcode and is perfectly valid. */
-		jfunc = bpf_jitter(fcode, flen);
+		if (cmd != BIOCSETWF) {
+			/*
+			 * Filter is copied inside fcode and is
+			 * perfectly valid.
+			 */
+			jfunc = bpf_jitter(fcode, flen);
+		}
 #endif
 	}
 
@@ -2148,8 +2173,7 @@ bpf_tap(struct bpf_if *bp, u_char *pkt, u_int pktlen)
 		 * write lock, too
 		 */
 
-		/* XXX: Do not protect counter for the sake of performance. */
-		++d->bd_rcount;
+		counter_u64_add(d->bd_rcount, 1);
 		/*
 		 * NB: We dont call BPF_CHECK_DIRECTION() here since there is no
 		 * way for the caller to indiciate to us whether this packet
@@ -2169,7 +2193,7 @@ bpf_tap(struct bpf_if *bp, u_char *pkt, u_int pktlen)
 			 */
 			BPFD_LOCK(d);
 
-			d->bd_fcount++;
+			counter_u64_add(d->bd_fcount, 1);
 			if (gottime < bpf_ts_quality(d->bd_tstamp))
 				gottime = bpf_gettime(&bt, d->bd_tstamp, NULL);
 #ifdef MAC
@@ -2216,7 +2240,7 @@ bpf_mtap(struct bpf_if *bp, struct mbuf *m)
 	LIST_FOREACH(d, &bp->bif_dlist, bd_next) {
 		if (BPF_CHECK_DIRECTION(d, m->m_pkthdr.rcvif, bp->bif_ifp))
 			continue;
-		++d->bd_rcount;
+		counter_u64_add(d->bd_rcount, 1);
 #ifdef BPF_JITTER
 		bf = bpf_jitter_enable != 0 ? d->bd_bfilter : NULL;
 		/* XXX We cannot handle multiple mbufs. */
@@ -2228,7 +2252,7 @@ bpf_mtap(struct bpf_if *bp, struct mbuf *m)
 		if (slen != 0) {
 			BPFD_LOCK(d);
 
-			d->bd_fcount++;
+			counter_u64_add(d->bd_fcount, 1);
 			if (gottime < bpf_ts_quality(d->bd_tstamp))
 				gottime = bpf_gettime(&bt, d->bd_tstamp, m);
 #ifdef MAC
@@ -2279,12 +2303,12 @@ bpf_mtap2(struct bpf_if *bp, void *data, u_int dlen, struct mbuf *m)
 	LIST_FOREACH(d, &bp->bif_dlist, bd_next) {
 		if (BPF_CHECK_DIRECTION(d, m->m_pkthdr.rcvif, bp->bif_ifp))
 			continue;
-		++d->bd_rcount;
+		counter_u64_add(d->bd_rcount, 1);
 		slen = bpf_filter(d->bd_rfilter, (u_char *)&mb, pktlen, 0);
 		if (slen != 0) {
 			BPFD_LOCK(d);
 
-			d->bd_fcount++;
+			counter_u64_add(d->bd_fcount, 1);
 			if (gottime < bpf_ts_quality(d->bd_tstamp))
 				gottime = bpf_gettime(&bt, d->bd_tstamp, m);
 #ifdef MAC
@@ -2433,7 +2457,7 @@ catchpacket(struct bpf_d *d, u_char *pkt, u_int pktlen, u_int snaplen,
 			 * buffer model.
 			 */
 			bpf_buffull(d);
-			++d->bd_dcount;
+			counter_u64_add(d->bd_dcount, 1);
 			return;
 		}
 		KASSERT(!d->bd_hbuf_in_use, ("hold buffer is in use"));
@@ -2529,6 +2553,15 @@ bpf_freed(struct bpf_d *d)
 	if (d->bd_wfilter != NULL)
 		free((caddr_t)d->bd_wfilter, M_BPF);
 	mtx_destroy(&d->bd_lock);
+
+	counter_u64_free(d->bd_rcount);
+	counter_u64_free(d->bd_dcount);
+	counter_u64_free(d->bd_fcount);
+	counter_u64_free(d->bd_wcount);
+	counter_u64_free(d->bd_wfcount);
+	counter_u64_free(d->bd_wdcount);
+	counter_u64_free(d->bd_zcopy);
+
 }
 
 /*
@@ -2634,7 +2667,7 @@ bpfdetach(struct ifnet *ifp)
 		 */
 		BPFIF_WLOCK(bp);
 		bp->bif_flags |= BPFIF_FLAG_DYING;
-		*bp->bif_bpf = NULL;
+		*bp->bif_bpf = (struct bpf_if *)&dead_bpf_if;
 		BPFIF_WUNLOCK(bp);
 
 		CTR4(KTR_NET, "%s: sheduling free for encap %d (%p) for if %p",
@@ -2774,9 +2807,7 @@ again:
 		n++;
 	}
 	BPF_UNLOCK();
-	error = copyout_c(
-	    (__cheri_tocap u_int * __capability)lst, bfl_list_get_ptr(bfl),
-	    sizeof(u_int) * n);
+	error = copyout_c(lst, bfl_list_get_ptr(bfl), sizeof(u_int) * n);
 	free(lst, M_TEMP);
 	BPF_LOCK();
 	bfl->bfl_len = n;
@@ -2828,7 +2859,7 @@ bpf_drvinit(void *unused)
 {
 	struct cdev *dev;
 
-	mtx_init(&bpf_mtx, "bpf global lock", NULL, MTX_DEF);
+	sx_init(&bpf_sx, "bpf global lock");
 	LIST_INIT(&bpf_iflist);
 	LIST_INIT(&bpf_freelist);
 
@@ -2858,12 +2889,12 @@ bpf_zero_counters(void)
 		BPFIF_RLOCK(bp);
 		LIST_FOREACH(bd, &bp->bif_dlist, bd_next) {
 			BPFD_LOCK(bd);
-			bd->bd_rcount = 0;
-			bd->bd_dcount = 0;
-			bd->bd_fcount = 0;
-			bd->bd_wcount = 0;
-			bd->bd_wfcount = 0;
-			bd->bd_zcopy = 0;
+			counter_u64_zero(bd->bd_rcount);
+			counter_u64_zero(bd->bd_dcount);
+			counter_u64_zero(bd->bd_fcount);
+			counter_u64_zero(bd->bd_wcount);
+			counter_u64_zero(bd->bd_wfcount);
+			counter_u64_zero(bd->bd_zcopy);
 			BPFD_UNLOCK(bd);
 		}
 		BPFIF_RUNLOCK(bp);
@@ -2888,9 +2919,9 @@ bpfstats_fill_xbpf(struct xbpf_d *d, struct bpf_d *bd)
 	d->bd_direction = bd->bd_direction;
 	d->bd_feedback = bd->bd_feedback;
 	d->bd_async = bd->bd_async;
-	d->bd_rcount = bd->bd_rcount;
-	d->bd_dcount = bd->bd_dcount;
-	d->bd_fcount = bd->bd_fcount;
+	d->bd_rcount = counter_u64_fetch(bd->bd_rcount);
+	d->bd_dcount = counter_u64_fetch(bd->bd_dcount);
+	d->bd_fcount = counter_u64_fetch(bd->bd_fcount);
 	d->bd_sig = bd->bd_sig;
 	d->bd_slen = bd->bd_slen;
 	d->bd_hlen = bd->bd_hlen;
@@ -2899,10 +2930,10 @@ bpfstats_fill_xbpf(struct xbpf_d *d, struct bpf_d *bd)
 	strlcpy(d->bd_ifname,
 	    bd->bd_bif->bif_ifp->if_xname, IFNAMSIZ);
 	d->bd_locked = bd->bd_locked;
-	d->bd_wcount = bd->bd_wcount;
-	d->bd_wdcount = bd->bd_wdcount;
-	d->bd_wfcount = bd->bd_wfcount;
-	d->bd_zcopy = bd->bd_zcopy;
+	d->bd_wcount = counter_u64_fetch(bd->bd_wcount);
+	d->bd_wdcount = counter_u64_fetch(bd->bd_wdcount);
+	d->bd_wfcount = counter_u64_fetch(bd->bd_wfcount);
+	d->bd_zcopy = counter_u64_fetch(bd->bd_zcopy);
 	d->bd_bufmode = bd->bd_bufmode;
 }
 
@@ -2982,13 +3013,13 @@ bpf_stats_sysctl(SYSCTL_HANDLER_ARGS)
 SYSINIT(bpfdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE,bpf_drvinit,NULL);
 
 #else /* !DEV_BPF && !NETGRAPH_BPF */
+
 /*
  * NOP stubs to allow bpf-using drivers to load and function.
  *
  * A 'better' implementation would allow the core bpf functionality
  * to be loaded at runtime.
  */
-static struct bpf_if bp_null;
 
 void
 bpf_tap(struct bpf_if *bp, u_char *pkt, u_int pktlen)
@@ -3016,7 +3047,7 @@ void
 bpfattach2(struct ifnet *ifp, u_int dlt, u_int hdrlen, struct bpf_if **driverp)
 {
 
-	*driverp = &bp_null;
+	*driverp = (struct bpf_if *)&dead_bpf_if;
 }
 
 void

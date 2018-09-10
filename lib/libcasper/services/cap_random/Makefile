@@ -6,7 +6,7 @@ SHLIBDIR?=	/lib/casper
 
 PACKAGE=libcasper
 
-SHLIB_MAJOR=	0
+SHLIB_MAJOR=	1
 INCSDIR?=	${INCLUDEDIR}/casper
 
 .if ${MK_CASPER} != "no"
@@ -20,5 +20,10 @@ INCS=	cap_random.h
 LIBADD=	nv
 
 CFLAGS+=-I${.CURDIR}
+
+MAN+=	cap_random.3
+
+MLINKS+=cap_random.3 libcap_random.3
+MLINKS+=cap_random.3 cap_random_buf.3
 
 .include <bsd.lib.mk>

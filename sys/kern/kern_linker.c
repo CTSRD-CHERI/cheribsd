@@ -163,7 +163,7 @@ linker_init(void *arg)
 	TAILQ_INIT(&linker_files);
 }
 
-SYSINIT(linker, SI_SUB_KLD, SI_ORDER_FIRST, linker_init, 0);
+SYSINIT(linker, SI_SUB_KLD, SI_ORDER_FIRST, linker_init, NULL);
 
 static void
 linker_stop_class_add(void *arg)
@@ -411,7 +411,7 @@ linker_init_kernel_modules(void)
 }
 
 SYSINIT(linker_kernel, SI_SUB_KLD, SI_ORDER_ANY, linker_init_kernel_modules,
-    0);
+    NULL);
 
 static int
 linker_load_file(const char *filename, linker_file_t *result)
@@ -1182,9 +1182,7 @@ kern_kldfind(struct thread *td, const char * __capability file)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	if ((error = copyinstr_c(file,
-	    (__cheri_tocap char * __capability)pathname, MAXPATHLEN,
-	    NULL)) != 0)
+	if ((error = copyinstr_c(file, pathname, MAXPATHLEN, NULL)) != 0)
 		goto out;
 
 	filename = linker_basename(pathname);
@@ -1709,7 +1707,7 @@ fail:
 	/* woohoo! we made it! */
 }
 
-SYSINIT(preload, SI_SUB_KLD, SI_ORDER_MIDDLE, linker_preload, 0);
+SYSINIT(preload, SI_SUB_KLD, SI_ORDER_MIDDLE, linker_preload, NULL);
 
 /*
  * Handle preload files that failed to load any modules.
@@ -1744,7 +1742,7 @@ linker_preload_finish(void *arg)
  * becomes runnable in SI_SUB_KTHREAD_INIT, so go slightly before that.
  */
 SYSINIT(preload_finish, SI_SUB_KTHREAD_INIT - 100, SI_ORDER_MIDDLE,
-    linker_preload_finish, 0);
+    linker_preload_finish, NULL);
 
 /*
  * Search for a not-loaded module by name.

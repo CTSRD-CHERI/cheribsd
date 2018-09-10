@@ -81,12 +81,8 @@
 #ifndef	_DISK_H
 #define	_DISK_H
 
-struct disk_devdesc
-{
-	struct devsw	*d_dev;
-	int		d_type;
-	int		d_unit;
-	void		*d_opendata;
+struct disk_devdesc {
+	struct devdesc	dd;		/* Must be first. */
 	int		d_slice;
 	int		d_partition;
 	uint64_t	d_offset;

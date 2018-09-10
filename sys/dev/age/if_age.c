@@ -183,6 +183,8 @@ static driver_t age_driver = {
 static devclass_t age_devclass;
 
 DRIVER_MODULE(age, pci, age_driver, age_devclass, 0, 0);
+MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, age, age_devs,
+    sizeof(age_devs[0]), nitems(age_devs));
 DRIVER_MODULE(miibus, age, miibus_driver, miibus_devclass, 0, 0);
 
 static struct resource_spec age_res_spec_mem[] = {
@@ -1826,7 +1828,7 @@ age_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < ETHERMIN || ifr_mtu_get(ifr) > AGE_JUMBO_MTU)
 			error = EINVAL;
 		else if (ifp->if_mtu != ifr_mtu_get(ifr)) {
@@ -1839,7 +1841,7 @@ age_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			AGE_UNLOCK(sc);
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		AGE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -1857,19 +1859,19 @@ age_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->age_if_flags = ifp->if_flags;
 		AGE_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		AGE_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			age_rxfilter(sc);
 		AGE_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->age_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		AGE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
@@ -3170,7 +3172,7 @@ age_rxfilter(struct age_softc *sc)
 	bzero(mchash, sizeof(mchash));
 
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &sc->age_ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &sc->age_ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		crc = ether_crc32_be(LLADDR((struct sockaddr_dl *)

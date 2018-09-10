@@ -1931,13 +1931,8 @@ void X86_32TargetCodeGenInfo::setTargetAttributes(
     return;
   if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
     if (FD->hasAttr<X86ForceAlignArgPointerAttr>()) {
-      // Get the LLVM function.
       llvm::Function *Fn = cast<llvm::Function>(GV);
-
-      // Now add the 'alignstack' attribute with a value of 16.
-      llvm::AttrBuilder B;
-      B.addStackAlignmentAttr(16);
-      Fn->addAttributes(llvm::AttributeList::FunctionIndex, B);
+      Fn->addFnAttr("stackrealign");
     }
     if (FD->hasAttr<AnyX86InterruptAttr>()) {
       llvm::Function *Fn = cast<llvm::Function>(GV);
@@ -2292,13 +2287,8 @@ public:
       return;
     if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
       if (FD->hasAttr<X86ForceAlignArgPointerAttr>()) {
-        // Get the LLVM function.
-        auto *Fn = cast<llvm::Function>(GV);
-
-        // Now add the 'alignstack' attribute with a value of 16.
-        llvm::AttrBuilder B;
-        B.addStackAlignmentAttr(16);
-        Fn->addAttributes(llvm::AttributeList::FunctionIndex, B);
+        llvm::Function *Fn = cast<llvm::Function>(GV);
+        Fn->addFnAttr("stackrealign");
       }
       if (FD->hasAttr<AnyX86InterruptAttr>()) {
         llvm::Function *Fn = cast<llvm::Function>(GV);
@@ -2429,13 +2419,8 @@ void WinX86_64TargetCodeGenInfo::setTargetAttributes(
     return;
   if (const FunctionDecl *FD = dyn_cast_or_null<FunctionDecl>(D)) {
     if (FD->hasAttr<X86ForceAlignArgPointerAttr>()) {
-      // Get the LLVM function.
-      auto *Fn = cast<llvm::Function>(GV);
-
-      // Now add the 'alignstack' attribute with a value of 16.
-      llvm::AttrBuilder B;
-      B.addStackAlignmentAttr(16);
-      Fn->addAttributes(llvm::AttributeList::FunctionIndex, B);
+      llvm::Function *Fn = cast<llvm::Function>(GV);
+      Fn->addFnAttr("stackrealign");
     }
     if (FD->hasAttr<AnyX86InterruptAttr>()) {
       llvm::Function *Fn = cast<llvm::Function>(GV);
@@ -3543,7 +3528,17 @@ ABIArgInfo X86_64ABIInfo::classifyRegCallStructType(QualType Ty,
 
 void X86_64ABIInfo::computeInfo(CGFunctionInfo &FI) const {
 
-  bool IsRegCall = FI.getCallingConvention() == llvm::CallingConv::X86_RegCall;
+  const unsigned CallingConv = FI.getCallingConvention();
+  // It is possible to force Win64 calling convention on any x86_64 target by
+  // using __attribute__((ms_abi)). In such case to correctly emit Win64
+  // compatible code delegate this call to WinX86_64ABIInfo::computeInfo.
+  if (CallingConv == llvm::CallingConv::Win64) {
+    WinX86_64ABIInfo Win64ABIInfo(CGT);
+    Win64ABIInfo.computeInfo(FI);
+    return;
+  }
+
+  bool IsRegCall = CallingConv == llvm::CallingConv::X86_RegCall;
 
   // Keep track of the number of assigned registers.
   unsigned FreeIntRegs = IsRegCall ? 11 : 6;

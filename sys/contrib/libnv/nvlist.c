@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2009-2013 The FreeBSD Foundation
  * Copyright (c) 2013-2015 Mariusz Zaborski <oshogbo@FreeBSD.org>
  * All rights reserved.
@@ -1604,6 +1606,37 @@ NVLIST_ADD_ARRAY(const int *, descriptor)
 #endif
 
 #undef	NVLIST_ADD_ARRAY
+
+#define	NVLIST_APPEND_ARRAY(vtype, type, TYPE)				\
+void									\
+nvlist_append_##type##_array(nvlist_t *nvl, const char *name, vtype value)\
+{									\
+	nvpair_t *nvp;							\
+									\
+	if (nvlist_error(nvl) != 0) {					\
+		ERRNO_SET(nvlist_error(nvl));				\
+		return;							\
+	}								\
+	nvp = nvlist_find(nvl, NV_TYPE_##TYPE##_ARRAY, name);		\
+	if (nvp == NULL) {						\
+		nvlist_add_##type##_array(nvl, name, &value, 1);	\
+		return;							\
+	}								\
+	if (nvpair_append_##type##_array(nvp, value) == -1) {		\
+		nvl->nvl_error = ERRNO_OR_DEFAULT(ENOMEM);		\
+		ERRNO_SET(nvl->nvl_error);				\
+	}								\
+}
+
+NVLIST_APPEND_ARRAY(const bool, bool, BOOL)
+NVLIST_APPEND_ARRAY(const uint64_t, number, NUMBER)
+NVLIST_APPEND_ARRAY(const char *, string, STRING)
+NVLIST_APPEND_ARRAY(const nvlist_t *, nvlist, NVLIST)
+#ifndef _KERNEL
+NVLIST_APPEND_ARRAY(const int, descriptor, DESCRIPTOR)
+#endif
+
+#undef	NVLIST_APPEND_ARRAY
 
 bool
 nvlist_move_nvpair(nvlist_t *nvl, nvpair_t *nvp)

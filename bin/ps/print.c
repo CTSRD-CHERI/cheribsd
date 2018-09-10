@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 
 #include <err.h>
 #include <grp.h>
+#include <jail.h>
 #include <langinfo.h>
 #include <locale.h>
 #include <math.h>
@@ -661,7 +662,7 @@ getpmem(KINFO *k)
 		return (0.0);
 	/* XXX want pmap ptpages, segtab, etc. (per architecture) */
 	/* XXX don't have info about shared */
-	fracmem = ((float)k->ki_p->ki_rssize) / mempages;
+	fracmem = ((double)k->ki_p->ki_rssize) / mempages;
 	return (100.0 * fracmem);
 }
 
@@ -770,8 +771,6 @@ printval(void *bp, VAR *v)
 	case PGTOK:
 		(void)asprintf(&str, ofmt, ps_pgtok(*(u_long *)bp));
 		break;
-	default:
-		xo_errx(1, "unknown type %d", v->type);
 	}
 
 	return (str);
@@ -839,4 +838,17 @@ loginclass(KINFO *k, VARENT *ve __unused)
 		return (strdup("-"));
 	}
 	return (strdup(k->ki_p->ki_loginclass));
+}
+
+char *
+jailname(KINFO *k, VARENT *ve __unused)
+{
+	char *name;
+
+	if (k->ki_p->ki_jid == 0)
+		return (strdup("-"));
+	name = jail_getname(k->ki_p->ki_jid);
+	if (name == NULL)
+		return (strdup("-"));
+	return (name);
 }

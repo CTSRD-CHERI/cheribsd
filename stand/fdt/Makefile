@@ -5,7 +5,6 @@
 .PATH:		${SYSDIR}/contrib/libfdt/
 
 LIB=		fdt
-INTERNALLIB=
 
 # Vendor sources of libfdt.
 SRCS+=		fdt.c fdt_ro.c fdt_wip.c fdt_sw.c fdt_rw.c fdt_strerror.c \
@@ -18,5 +17,4 @@ CFLAGS+=	-I${SYSDIR}/contrib/libfdt/ -I${LDRSRC}
 
 CFLAGS+=	-Wformat -Wall
 
-.include <bsd.stand.mk>
 .include <bsd.lib.mk>

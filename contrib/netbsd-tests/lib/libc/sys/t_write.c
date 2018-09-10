@@ -25,6 +25,18 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180719,
+ *   "target_type": "test",
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "Missing mode to open with O_CREAT"
+ * }
+ * CHERI CHANGES END
+ */
 
 #include <sys/cdefs.h>
 __COPYRIGHT("@(#) Copyright (c) 2008\
@@ -69,7 +81,7 @@ ATF_TC_BODY(write_err, tc)
 	errno = 0;
 	ATF_REQUIRE_ERRNO(EBADF, write(-1, wbuf, sizeof(wbuf)) == -1);
 
-	fd = open(path, O_RDWR | O_CREAT);
+	fd = open(path, O_RDWR | O_CREAT, 0600);
 
 	if (fd >= 0) {
 
@@ -149,7 +161,7 @@ ATF_TC_BODY(write_pos, tc)
 	size_t i;
 	int fd;
 
-	fd = open(path, O_RDWR | O_CREAT);
+	fd = open(path, O_RDWR | O_CREAT, 0600);
 	ATF_REQUIRE(fd >= 0);
 
 	for (i = 0; i < n; i++) {
@@ -179,7 +191,7 @@ ATF_TC_BODY(write_ret, tc)
 	size_t i, j;
 	int fd;
 
-	fd = open(path, O_WRONLY | O_CREAT);
+	fd = open(path, O_WRONLY | O_CREAT, 0600);
 	ATF_REQUIRE(fd >= 0);
 
 	(void)memset(buf, 'x', sizeof(buf));

@@ -28,6 +28,18 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180719,
+ *   "target_type": "test",
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "Missing mode to open with O_CREAT"
+ * }
+ * CHERI CHANGES END
+ */
 #include <sys/cdefs.h>
 __RCSID("$NetBSD: t_fopen.c,v 1.3 2011/09/14 14:34:37 martin Exp $");
 
@@ -58,7 +70,7 @@ ATF_TC_BODY(fdopen_close, tc)
 	 * used to fdopen(3) a stream is
 	 * closed once the stream is closed.
 	 */
-	fd = open(path, O_RDWR | O_CREAT);
+	fd = open(path, O_RDWR | O_CREAT, 0600);
 
 	ATF_REQUIRE(fd >= 0);
 
@@ -85,7 +97,7 @@ ATF_TC_BODY(fdopen_err, tc)
 {
 	int fd;
 
-	fd = open(path, O_RDONLY | O_CREAT);
+	fd = open(path, O_RDONLY | O_CREAT, 0600);
 	ATF_REQUIRE(fd >= 0);
 
 	errno = 0;
@@ -126,7 +138,7 @@ ATF_TC_BODY(fdopen_seek, tc)
 	 * with the stream corresponds with the offset
 	 * set earlier for the file descriptor.
 	 */
-	fd = open(path, O_RDWR | O_CREAT);
+	fd = open(path, O_RDWR | O_CREAT, 0600);
 
 	ATF_REQUIRE(fd >= 0);
 	ATF_REQUIRE(write(fd, "garbage", 7) == 7);

@@ -71,8 +71,7 @@ struct ktr_header {
  * is the public interface.
  */
 #define	KTRCHECK(td, type)	((td)->td_proc->p_traceflag & (1 << type))
-#define KTRPOINT(td, type)						\
-	(KTRCHECK((td), (type)) && !((td)->td_pflags & TDP_INKTRACE))
+#define KTRPOINT(td, type)  (__predict_false(KTRCHECK((td), (type))))
 #define	KTRCHECKDRAIN(td)	(!(STAILQ_EMPTY(&(td)->td_proc->p_ktr)))
 #define	KTRUSERRET(td) do {						\
 	if (KTRCHECKDRAIN(td))						\
@@ -116,10 +115,6 @@ struct ktr_sysret {
 /*
  * KTR_GENIO - trace generic process i/o
  */
-#ifndef _UIO_RW_DECLARED
-enum	uio_rw { UIO_READ, UIO_WRITE };
-#define	_UIO_RW_DECLARED
-#endif
 #define KTR_GENIO	4
 struct ktr_genio {
 	int	ktr_fd;

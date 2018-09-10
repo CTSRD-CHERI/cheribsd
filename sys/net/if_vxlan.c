@@ -588,7 +588,7 @@ vxlan_ftable_update_locked(struct vxlan_softc *sc,
     struct rm_priotracker *tracker)
 {
 	struct vxlan_ftable_entry *fe;
-	int error;
+	int error __unused;
 
 	VXLAN_LOCK_ASSERT(sc);
 
@@ -863,8 +863,9 @@ static void
 vxlan_socket_destroy(struct vxlan_socket *vso)
 {
 	struct socket *so;
-	struct vxlan_socket_mc_info *mc;
+#ifdef INVARIANTS
 	int i;
+	struct vxlan_socket_mc_info *mc;
 
 	for (i = 0; i < VXLAN_SO_MC_MAX_GROUPS; i++) {
 		mc = &vso->vxlso_mc[i];
@@ -878,7 +879,7 @@ vxlan_socket_destroy(struct vxlan_socket *vso)
 		    ("%s: socket %p vni_hash[%d] not empty",
 		     __func__, vso, i));
 	}
-
+#endif
 	so = vso->vxlso_sock;
 	if (so != NULL) {
 		vso->vxlso_sock = NULL;
@@ -2248,8 +2249,8 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifd = (struct ifdrv *) data;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		error = 0;
 		break;
 
@@ -2258,7 +2259,7 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = vxlan_ioctl_drvspec(sc, ifd, cmd == SIOCGDRVSPEC);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		error = vxlan_ioctl_ifflags(sc);
 		break;
 
@@ -2505,7 +2506,7 @@ vxlan_rcv_udp_packet(struct mbuf *m, int offset, struct inpcb *inpcb,
 	struct vxlan_socket *vso;
 	struct vxlan_header *vxh, vxlanhdr;
 	uint32_t vni;
-	int error;
+	int error __unused;
 
 	M_ASSERTPKTHDR(m);
 	vso = xvso;

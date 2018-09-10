@@ -32,7 +32,7 @@
  * each supported architecture.
  */
 #undef JEMALLOC_TLS_MODEL
-#undef STATIC_PAGE_SHIFT
+#undef LG_PAGE
 #undef LG_VADDR
 #undef LG_SIZEOF_PTR
 #undef LG_SIZEOF_SIZE_T
@@ -92,7 +92,7 @@
 #  define JEMALLOC_TLS_MODEL	/* Default. */
 #endif
 
-#define	STATIC_PAGE_SHIFT	PAGE_SHIFT
+#define	LG_PAGE			PAGE_SHIFT
 #define	LG_SIZEOF_INT		2
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	LG_SIZEOF_LONG		LG_SIZEOF_PTR

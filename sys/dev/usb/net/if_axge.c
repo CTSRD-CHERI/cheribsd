@@ -587,6 +587,10 @@ axge_detach(device_t dev)
 	sc = device_get_softc(dev);
 	ue = &sc->sc_ue;
 	if (device_is_attached(dev)) {
+
+		/* wait for any post attach or other command to complete */
+		usb_proc_drain(&ue->ue_tq);
+
 		AXGE_LOCK(sc);
 		/*
 		 * XXX
@@ -782,7 +786,7 @@ axge_rxfilter(struct usb_ether *ue)
 
 	rxmode |= RCR_ACPT_MCAST;
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		h = ether_crc32_be(LLADDR((struct sockaddr_dl *)
@@ -878,7 +882,8 @@ axge_stop(struct usb_ether *ue)
 	val &= ~MSR_RE;
 	axge_write_cmd_2(sc, AXGE_ACCESS_MAC, 2, AXGE_MSR, val);
 
-	ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
+	if (ifp != NULL)
+		ifp->if_drv_flags &= ~(IFF_DRV_RUNNING | IFF_DRV_OACTIVE);
 	sc->sc_flags &= ~AXGE_FLAG_LINK;
 
 	/*
@@ -902,7 +907,7 @@ axge_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 	reinit = 0;
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		AXGE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&

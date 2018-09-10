@@ -32,6 +32,7 @@
 #include <string.h>
 #include <zlib.h>
 #include <libgen.h>
+#include <sys/assfail.h>
 #include <sys/spa.h>
 #include <sys/stat.h>
 #include <sys/processor.h>
@@ -72,7 +73,7 @@ struct proc p0;
  */
 /*ARGSUSED*/
 kthread_t *
-zk_thread_create(void (*func)(), void *arg)
+zk_thread_create(void (*func)(void*), void *arg)
 {
 	thread_t tid;
 
@@ -1005,6 +1006,16 @@ kernel_fini(void)
 
 	random_fd = -1;
 	urandom_fd = -1;
+}
+
+/* ARGSUSED */
+uint32_t
+zone_get_hostid(void *zonep)
+{
+	/*
+	 * We're emulating the system's hostid in userland.
+	 */
+	return (strtoul(hw_serial, NULL, 10));
 }
 
 int

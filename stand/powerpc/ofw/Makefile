@@ -11,15 +11,13 @@ LOADER_GZIP_SUPPORT?=	yes
 LOADER_BZIP2_SUPPORT?=	no
 
 .include <bsd.init.mk>
-MK_SSP=		no
-MAN=
 
 PROG=		loader
 NEWVERSWHAT=	"Open Firmware loader" ${MACHINE_ARCH}
 INSTALLFLAGS=	-b
 
 # Architecture-specific loader code
-SRCS=		conf.c metadata.c vers.c start.c
+SRCS=		conf.c vers.c main.c elf_freebsd.c ppc64_elf_freebsd.c start.c
 SRCS+=		ucmpdi2.c
 
 .include	"${BOOTSRC}/fdt.mk"
@@ -40,15 +38,11 @@ CFLAGS+=	-DRELOC=${RELOC}
 
 LDFLAGS=	-nostdlib -static -T ${.CURDIR}/ldscript.powerpc
 
-# Pull in common loader code
-.PATH:		${BOOTSRC}/ofw/common
-.include	"${BOOTSRC}/ofw/common/Makefile.inc"
-
 # Open Firmware standalone support library
 LIBOFW=		${BOOTOBJ}/ofw/libofw/libofw.a
 CFLAGS+=	-I${BOOTSRC}/ofw/libofw
 
-DPADD=		${LIBFICL} ${LIBOFW} ${LIBFDT} ${LIBSA}
-LDADD=		${LIBFICL} ${LIBOFW} ${LIBFDT} ${LIBSA}
+DPADD=		${LDR_INTERP} ${LIBOFW} ${LIBFDT} ${LIBSA}
+LDADD=		${LDR_INTERP} ${LIBOFW} ${LIBFDT} ${LIBSA}
 
 .include <bsd.prog.mk>

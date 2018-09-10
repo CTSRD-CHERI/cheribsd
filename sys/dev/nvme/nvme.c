@@ -222,23 +222,38 @@ nvme_modevent(module_t mod, int type, void *arg)
 void
 nvme_dump_command(struct nvme_command *cmd)
 {
+	uint8_t opc, fuse;
+
+	opc = (cmd->opc_fuse >> NVME_CMD_OPC_SHIFT) & NVME_CMD_OPC_MASK;
+	fuse = (cmd->opc_fuse >> NVME_CMD_FUSE_SHIFT) & NVME_CMD_FUSE_MASK;
+
 	printf(
-"opc:%x f:%x r1:%x cid:%x nsid:%x r2:%x r3:%x mptr:%jx prp1:%jx prp2:%jx cdw:%x %x %x %x %x %x\n",
-	    cmd->opc, cmd->fuse, cmd->rsvd1, cmd->cid, cmd->nsid,
+"opc:%x f:%x cid:%x nsid:%x r2:%x r3:%x mptr:%jx prp1:%jx prp2:%jx cdw:%x %x %x %x %x %x\n",
+	    opc, fuse, cmd->cid, le32toh(cmd->nsid),
 	    cmd->rsvd2, cmd->rsvd3,
-	    (uintmax_t)cmd->mptr, (uintmax_t)cmd->prp1, (uintmax_t)cmd->prp2,
-	    cmd->cdw10, cmd->cdw11, cmd->cdw12, cmd->cdw13, cmd->cdw14,
-	    cmd->cdw15);
+	    (uintmax_t)le64toh(cmd->mptr), (uintmax_t)le64toh(cmd->prp1), (uintmax_t)le64toh(cmd->prp2),
+	    le32toh(cmd->cdw10), le32toh(cmd->cdw11), le32toh(cmd->cdw12),
+	    le32toh(cmd->cdw13), le32toh(cmd->cdw14), le32toh(cmd->cdw15));
 }
 
 void
 nvme_dump_completion(struct nvme_completion *cpl)
 {
+	uint8_t p, sc, sct, m, dnr;
+	uint16_t status;
+
+	status = le16toh(cpl->status);
+
+	p = NVME_STATUS_GET_P(status);
+	sc = NVME_STATUS_GET_SC(status);
+	sct = NVME_STATUS_GET_SCT(status);
+	m = NVME_STATUS_GET_M(status);
+	dnr = NVME_STATUS_GET_DNR(status);
+
 	printf("cdw0:%08x sqhd:%04x sqid:%04x "
 	    "cid:%04x p:%x sc:%02x sct:%x m:%x dnr:%x\n",
-	    cpl->cdw0, cpl->sqhd, cpl->sqid,
-	    cpl->cid, cpl->status.p, cpl->status.sc, cpl->status.sct,
-	    cpl->status.m, cpl->status.dnr);
+	    le32toh(cpl->cdw0), le16toh(cpl->sqhd), le16toh(cpl->sqid),
+	    cpl->cid, p, sc, sct, m, dnr);
 }
 
 static int
@@ -424,6 +439,24 @@ nvme_notify_fail_consumers(struct nvme_controller *ctrlr)
 	}
 }
 
+void
+nvme_notify_ns(struct nvme_controller *ctrlr, int nsid)
+{
+	struct nvme_consumer	*cons;
+	struct nvme_namespace	*ns = &ctrlr->ns[nsid - 1];
+	uint32_t		i;
+
+	if (!ctrlr->is_initialized)
+		return;
+
+	for (i = 0; i < NVME_MAX_CONSUMERS; i++) {
+		cons = &nvme_consumer[i];
+		if (cons->id != INVALID_CONSUMER_ID && cons->ns_fn != NULL)
+			ns->cons_cookie[cons->id] =
+			    (*cons->ns_fn)(ns, ctrlr->cons_cookie[cons->id]);
+	}
+}
+
 struct nvme_consumer *
 nvme_register_consumer(nvme_cons_ns_fn_t ns_fn, nvme_cons_ctrlr_fn_t ctrlr_fn,
 		       nvme_cons_async_fn_t async_fn,
@@ -469,6 +502,5 @@ nvme_completion_poll_cb(void *arg, const struct nvme_completion *cpl)
 	 *  the request passed or failed.
 	 */
 	memcpy(&status->cpl, cpl, sizeof(*cpl));
-	wmb();
-	status->done = TRUE;
+	atomic_store_rel_int(&status->done, 1);
 }

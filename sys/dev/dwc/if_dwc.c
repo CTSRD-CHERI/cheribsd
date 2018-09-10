@@ -607,7 +607,7 @@ dwc_setup_rxfilter(struct dwc_softc *sc)
 		for (i = 0; i < nhash; i++)
 			hash[i] = 0;
 		if_maddr_rlock(ifp);
-		TAILQ_FOREACH(ifma, &sc->ifp->if_multiaddrs, ifma_link) {
+		CK_STAILQ_FOREACH(ifma, &sc->ifp->if_multiaddrs, ifma_link) {
 			if (ifma->ifma_addr->sa_family != AF_LINK)
 				continue;
 			crc = ether_crc32_le(LLADDR((struct sockaddr_dl *)
@@ -662,7 +662,7 @@ dwc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		DWC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -680,20 +680,20 @@ dwc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		DWC_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			DWC_LOCK(sc);
 			dwc_setup_rxfilter(sc);
 			DWC_UNLOCK(sc);
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = sc->mii_softc;
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_VLAN_MTU) {
 			/* No work to do except acknowledge the change took */

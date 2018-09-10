@@ -36,7 +36,7 @@
 /* Commands and return values; nonzero return sets command_errmsg != NULL */
 typedef int	(bootblk_cmd_t)(int argc, char *argv[]);
 #define	COMMAND_ERRBUFSZ	(256)
-extern char	*command_errmsg;	
+extern const char *command_errmsg;
 extern char	command_errbuf[COMMAND_ERRBUFSZ];
 #define CMD_OK		0
 #define CMD_WARN	1
@@ -46,7 +46,13 @@ extern char	command_errbuf[COMMAND_ERRBUFSZ];
 
 /* interp.c */
 void	interact(void);
-int	include(const char *filename);
+void	interp_emit_prompt(void);
+int	interp_builtin_cmd(int argc, char *argv[]);
+
+/* Called by interp.c for interp_*.c embedded interpreters */
+int	interp_include(const char *filename);	/* Execute commands from filename */
+void	interp_init(void);			/* Initialize interpreater */
+int	interp_run(const char *line);		/* Run a single command */
 
 /* interp_backslash.c */
 char	*backslash(const char *str);
@@ -54,12 +60,7 @@ char	*backslash(const char *str);
 /* interp_parse.c */
 int	parse(int *argc, char ***argv, const char *str);
 
-/* interp_forth.c */
-void	bf_init(void);
-int	bf_run(char *line);
-
 /* boot.c */
-int	autoboot(int timeout, char *prompt);
 void	autoboot_maybe(void);
 int	getrootmount(char *rootdev);
 
@@ -148,7 +149,7 @@ void			pnp_addident(struct pnpinfo *pi, char *ident);
 struct pnpinfo		*pnp_allocinfo(void);
 void			pnp_freeinfo(struct pnpinfo *pi);
 void			pnp_addinfo(struct pnpinfo *pi);
-char			*pnp_eisaformat(u_int8_t *data);
+char			*pnp_eisaformat(uint8_t *data);
 
 /*
  *  < 0	- No ISA in system
@@ -156,6 +157,11 @@ char			*pnp_eisaformat(u_int8_t *data);
  *  > 0	- ISA in system, value is read data port address
  */
 extern int			isapnp_readport;
+
+/*
+ * Version information
+ */
+extern char bootprog_info[];
 
 /*
  * Preloaded file metadata header.
@@ -166,7 +172,7 @@ extern int			isapnp_readport;
 struct file_metadata 
 {
     size_t			md_size;
-    u_int16_t			md_type;
+    uint16_t			md_type;
     struct file_metadata	*md_next;
     char			md_data[1];	/* data are immediately appended */
 };
@@ -208,7 +214,7 @@ struct preloaded_file
 struct file_format
 {
     /* Load function must return EFTYPE if it can't handle the module supplied */
-    int		(* l_load)(char *filename, u_int64_t dest, struct preloaded_file **result);
+    int		(* l_load)(char *filename, uint64_t dest, struct preloaded_file **result);
     /* Only a loader that will load a kernel (first module) should have an exec handler */
     int		(* l_exec)(struct preloaded_file *mp);
 };
@@ -237,20 +243,20 @@ void file_removemetadata(struct preloaded_file *fp);
 #define ELF_RELOC_RELA	2
 
 /* Relocation offset for some architectures */
-extern u_int64_t __elfN(relocation_offset);
+extern uint64_t __elfN(relocation_offset);
 
 struct elf_file;
 typedef Elf_Addr (symaddr_fn)(struct elf_file *ef, Elf_Size symidx);
 
-int	__elfN(loadfile)(char *filename, u_int64_t dest, struct preloaded_file **result);
-int	__elfN(obj_loadfile)(char *filename, u_int64_t dest,
+int	__elfN(loadfile)(char *filename, uint64_t dest, struct preloaded_file **result);
+int	__elfN(obj_loadfile)(char *filename, uint64_t dest,
 	    struct preloaded_file **result);
 int	__elfN(reloc)(struct elf_file *ef, symaddr_fn *symaddr,
 	    const void *reldata, int reltype, Elf_Addr relbase,
 	    Elf_Addr dataaddr, void *data, size_t len);
-int __elfN(loadfile_raw)(char *filename, u_int64_t dest,
+int __elfN(loadfile_raw)(char *filename, uint64_t dest,
 	    struct preloaded_file **result, int multiboot);
-int __elfN(load_modmetadata)(struct preloaded_file *fp, u_int64_t dest);
+int __elfN(load_modmetadata)(struct preloaded_file *fp, uint64_t dest);
 #endif
 
 /*
@@ -315,6 +321,9 @@ struct arch_switch
 
     /* Probe ZFS pool(s), if needed. */
     void	(*arch_zfs_probe)(void);
+
+    /* For kexec-type loaders, get ksegment structure */
+    void	(*arch_kexec_kseg_get)(int *nseg, void **kseg);
 };
 extern struct arch_switch archsw;
 
@@ -325,10 +334,8 @@ void	dev_cleanup(void);
 
 time_t	time(time_t *tloc);
 
-#ifndef CTASSERT                /* Allow lint to override */
-#define CTASSERT(x)             _CTASSERT(x, __LINE__)
-#define _CTASSERT(x, y)         __CTASSERT(x, y)
-#define __CTASSERT(x, y)        typedef char __assert ## y[(x) ? 1 : -1]
+#ifndef CTASSERT
+#define	CTASSERT(x)	_Static_assert(x, "compile-time assertion failed")
 #endif
 
 #endif /* !_BOOTSTRAP_H_ */

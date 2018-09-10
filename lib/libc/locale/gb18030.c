@@ -112,7 +112,19 @@ _GB18030_mbrtowc(wchar_t * __restrict pwc, const char * __restrict s,
 		pwc = NULL;
 	}
 
-	ncopy = MIN(MIN(n, MB_CUR_MAX), sizeof(gs->bytes) - gs->count);
+	/*
+	 * CHERI CHANGES START
+	 * {
+	 *   "updated": 20180723,
+	 *   "target_type": "lib",
+	 *   "changes": [
+	 *     "buffer_overrun"
+	 *   ],
+	 *   "change_comment": "fixes mbtowc_test:mbtowc"
+	 * }
+	 * CHERI CHANGES END
+	 */
+	ncopy = MIN(MIN(MIN(n, MB_CUR_MAX), sizeof(gs->bytes) - gs->count), strlen(s));
 	memcpy(gs->bytes + gs->count, s, ncopy);
 	ocount = gs->count;
 	gs->count += ncopy;

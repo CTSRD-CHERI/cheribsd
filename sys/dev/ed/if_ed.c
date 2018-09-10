@@ -1225,7 +1225,7 @@ ed_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int     error = 0;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		/*
 		 * If the interface is marked up and stopped, then start it.
 		 * If we're up and already running, then it may be a mediachg.
@@ -1252,8 +1252,8 @@ ed_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		ED_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * Multicast list has changed; set the hardware filter
 		 * accordingly.
@@ -1265,7 +1265,7 @@ ed_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		if (sc->sc_media_ioctl == NULL) {
 			error = EINVAL;
 			break;
@@ -1701,7 +1701,7 @@ ed_ds_getmcaf(struct ed_softc *sc, uint32_t *mcaf)
 	mcaf[1] = 0;
 
 	if_maddr_rlock(sc->ifp);
-	TAILQ_FOREACH(ifma, &sc->ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &sc->ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		index = ether_crc32_be(LLADDR((struct sockaddr_dl *)

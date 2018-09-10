@@ -128,7 +128,7 @@ extern int32_t		nvme_retry_count;
 struct nvme_completion_poll_status {
 
 	struct nvme_completion	cpl;
-	boolean_t		done;
+	int			done;
 };
 
 #define NVME_REQUEST_VADDR	1
@@ -312,8 +312,8 @@ struct nvme_controller {
 
 	struct cdev			*cdev;
 
-	/** bit mask of warning types currently enabled for async events */
-	union nvme_critical_warning_state	async_event_config;
+	/** bit mask of event types currently enabled for async events */
+	uint32_t			async_event_config;
 
 	uint32_t			num_aers;
 	struct nvme_async_event_request	aer[NVME_MAX_ASYNC_EVENTS];
@@ -339,13 +339,13 @@ struct nvme_controller {
 	bus_space_write_4((sc)->bus_tag, (sc)->bus_handle,		       \
 	    nvme_mmio_offsetof(reg), val)
 
-#define nvme_mmio_write_8(sc, reg, val) \
+#define nvme_mmio_write_8(sc, reg, val)					       \
 	do {								       \
 		bus_space_write_4((sc)->bus_tag, (sc)->bus_handle,	       \
 		    nvme_mmio_offsetof(reg), val & 0xFFFFFFFF); 	       \
 		bus_space_write_4((sc)->bus_tag, (sc)->bus_handle,	       \
 		    nvme_mmio_offsetof(reg)+4,				       \
-		    (val & 0xFFFFFFFF00000000UL) >> 32);		       \
+		    (val & 0xFFFFFFFF00000000ULL) >> 32);		       \
 	} while (0);
 
 #if __FreeBSD_version < 800054
@@ -399,7 +399,7 @@ void	nvme_ctrlr_cmd_set_num_queues(struct nvme_controller *ctrlr,
 				      uint32_t num_queues, nvme_cb_fn_t cb_fn,
 				      void *cb_arg);
 void	nvme_ctrlr_cmd_set_async_event_config(struct nvme_controller *ctrlr,
-					      union nvme_critical_warning_state state,
+					      uint32_t state,
 					      nvme_cb_fn_t cb_fn, void *cb_arg);
 void	nvme_ctrlr_cmd_abort(struct nvme_controller *ctrlr, uint16_t cid,
 			     uint16_t sqid, nvme_cb_fn_t cb_fn, void *cb_arg);
@@ -426,7 +426,7 @@ int	nvme_qpair_construct(struct nvme_qpair *qpair, uint32_t id,
 			     struct nvme_controller *ctrlr);
 void	nvme_qpair_submit_tracker(struct nvme_qpair *qpair,
 				  struct nvme_tracker *tr);
-void	nvme_qpair_process_completions(struct nvme_qpair *qpair);
+bool	nvme_qpair_process_completions(struct nvme_qpair *qpair);
 void	nvme_qpair_submit_request(struct nvme_qpair *qpair,
 				  struct nvme_request *req);
 void	nvme_qpair_reset(struct nvme_qpair *qpair);
@@ -544,6 +544,7 @@ void	nvme_notify_async_consumers(struct nvme_controller *ctrlr,
 				    uint32_t log_page_size);
 void	nvme_notify_fail_consumers(struct nvme_controller *ctrlr);
 void	nvme_notify_new_controller(struct nvme_controller *ctrlr);
+void	nvme_notify_ns(struct nvme_controller *ctrlr, int nsid);
 
 void	nvme_ctrlr_intx_handler(void *arg);
 void	nvme_ctrlr_poll(struct nvme_controller *ctrlr);

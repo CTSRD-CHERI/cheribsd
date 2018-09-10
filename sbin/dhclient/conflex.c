@@ -53,9 +53,9 @@ __FBSDID("$FreeBSD$");
 int lexline;
 int lexchar;
 char *token_line;
-char *prev_line;
-char *cur_line;
-char *tlname;
+static char *prev_line;
+static char *cur_line;
+const char *tlname;
 int eol_token;
 
 static char line1[81];
@@ -78,7 +78,7 @@ static int read_num_or_name(int, FILE *);
 static int intern(char *, int);
 
 void
-new_parse(char *name)
+new_parse(const char *name)
 {
 	tlname = name;
 	lpos = line = 1;
@@ -264,7 +264,7 @@ read_string(FILE *cfile)
 static int
 read_number(int c, FILE *cfile)
 {
-	int	seenx = 0, token = NUMBER;
+	int	seenx = 0, _token = NUMBER;
 	unsigned i = 0;
 
 	tokbuf[i++] = c;
@@ -286,7 +286,7 @@ read_number(int c, FILE *cfile)
 	tokbuf[i] = 0;
 	tval = tokbuf;
 
-	return (token);
+	return (_token);
 }
 
 static int
@@ -347,6 +347,7 @@ intern(char *atom, int dfv)
 			return (BOOTING);
 		if (!strcasecmp(atom + 1, "oot-unknown-clients"))
 			return (BOOT_UNKNOWN_CLIENTS);
+		break;
 	case 'c':
 		if (!strcasecmp(atom + 1, "lass"))
 			return (CLASS);

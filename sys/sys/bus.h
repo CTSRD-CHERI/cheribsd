@@ -46,7 +46,7 @@
  */
 struct u_businfo {
 	int	ub_version;		/**< @brief interface version */
-#define BUS_USER_VERSION	1
+#define BUS_USER_VERSION	2
 	int	ub_generation;		/**< @brief generation count */
 };
 
@@ -63,50 +63,23 @@ typedef enum device_state {
 
 /**
  * @brief Device information exported to userspace.
- *
- * New fields must be appended to the structure.  Each new field or set of
- * fields should be paired with a bit in dv_fields_present.  When libdevinfo
- * reads a structure from hw.bus.devices that is larger than sizeof(ou_device)
- * it will use these bits to determine which fields the current kernel
- * provides.  This allows never versions of libdevinfo to operate with older
- * kernels.
+ * The strings are placed one after the other, separated by NUL characters.
+ * Fields should be added after the last one and order maintained for compatibility
  */
+#define BUS_USER_BUFFER		(3*1024)
 struct u_device {
-	uintptr_t	dv_handle;
-	uintptr_t	dv_parent;
-
-	char		dv_name[32];		/**< @brief Name of device in tree. */
-	char		dv_desc[32];		/**< @brief Driver description */
-	char		dv_drivername[32];	/**< @brief Driver name */
-	char		dv_pnpinfo[128];	/**< @brief Plug and play info */
-	char		dv_location[128];	/**< @brief Where is the device? */
+	uint64_t		dv_handle;
+	uint64_t		dv_parent;
 	uint32_t	dv_devflags;		/**< @brief API Flags for device */
 	uint16_t	dv_flags;		/**< @brief flags for dev state */
 	device_state_t	dv_state;		/**< @brief State of attachment */
-	uint64_t	dv_fields;		/**< @brief Further fields */
-#define	DV_FIELD_INTR_PARENT	0x1
-#define	DV_FIELDS		(DV_FIELD_INTR_PARENT)
-	uintptr_t	dv_intr_parent;		/**< @brief Interrupt-parent */
-};
-
-/**
- * @brief Old, static set of device information exported to userspace.
- *
- * This definition exists to portably provide size information to
- * consumers of hw.bus.devices.
- */
-struct ou_device {
-	uintptr_t	dv_handle;
-	uintptr_t	dv_parent;
-
-	char		dv_name[32];		/**< @brief Name of device in tree. */
-	char		dv_desc[32];		/**< @brief Driver description */
-	char		dv_drivername[32];	/**< @brief Driver name */
-	char		dv_pnpinfo[128];	/**< @brief Plug and play info */
-	char		dv_location[128];	/**< @brief Where is the device? */
-	uint32_t	dv_devflags;		/**< @brief API Flags for device */
-	uint16_t	dv_flags;		/**< @brief flags for dev date */
-	device_state_t	dv_state;		/**< @brief State of attachment */
+	char		dv_fields[BUS_USER_BUFFER]; /**< @brief NUL terminated fields */
+	/* name (name of the device in tree) */
+	/* desc (driver description) */
+	/* drivername (Name of driver without unit number) */
+	/* pnpinfo (Plug and play information from bus) */
+	/* location (Location of device on parent */
+	/* NUL */
 };
 
 /* Flags exported via dv_flags. */
@@ -119,6 +92,7 @@ struct ou_device {
 #define	DF_EXTERNALSOFTC 0x40		/* softc not allocated by us */
 #define	DF_REBID	0x80		/* Can rebid after attach */
 #define	DF_SUSPENDED	0x100		/* Device is suspended. */
+#define DF_QUIET_CHILDREN 0x200		/* Default to quiet for all my children */
 
 /**
  * @brief Device request structure used for ioctl's.
@@ -182,7 +156,8 @@ void devctl_notify(const char *__system, const char *__subsystem,
     const char *__type, const char *__data);
 void devctl_queue_data_f(char *__data, int __flags);
 void devctl_queue_data(char *__data);
-void devctl_safe_quote(char *__dst, const char *__src, size_t len);
+struct sbuf;
+void devctl_safe_quote_sb(struct sbuf *__sb, const char *__src);
 
 /**
  * Device name parsers.  Hook to allow device enumerators to map
@@ -604,8 +579,6 @@ devclass_t	device_get_devclass(device_t dev);
 driver_t	*device_get_driver(device_t dev);
 u_int32_t	device_get_flags(device_t dev);
 device_t	device_get_parent(device_t dev);
-device_t	device_get_intr_parent(device_t dev);
-void	device_set_intr_parent(device_t dev, device_t intr_parent);
 int	device_get_children(device_t dev, device_t **listp, int *countp);
 void	*device_get_ivars(device_t dev);
 void	device_set_ivars(device_t dev, void *ivars);
@@ -616,6 +589,7 @@ device_state_t	device_get_state(device_t dev);
 int	device_get_unit(device_t dev);
 struct sysctl_ctx_list *device_get_sysctl_ctx(device_t dev);
 struct sysctl_oid *device_get_sysctl_tree(device_t dev);
+int	device_has_quiet_children(device_t dev);
 int	device_is_alive(device_t dev);	/* did probe succeed? */
 int	device_is_attached(device_t dev);	/* did attach succeed? */
 int	device_is_enabled(device_t dev);
@@ -629,6 +603,7 @@ int	device_probe_and_attach(device_t dev);
 int	device_probe_child(device_t bus, device_t dev);
 int	device_quiesce(device_t dev);
 void	device_quiet(device_t dev);
+void	device_quiet_children(device_t dev);
 void	device_set_desc(device_t dev, const char* desc);
 void	device_set_desc_copy(device_t dev, const char* desc);
 int	device_set_devclass(device_t dev, const char *classname);
@@ -734,6 +709,7 @@ void	bus_data_generation_update(void);
 #define	BUS_PASS_INTERRUPT	40	/* Interrupt controllers. */
 #define	BUS_PASS_TIMER		50	/* Timers and clocks. */
 #define	BUS_PASS_SCHEDULER	60	/* Start scheduler. */
+#define	BUS_PASS_SUPPORTDEV	100000	/* Drivers which support DEFAULT drivers. */
 #define	BUS_PASS_DEFAULT	__INT_MAX /* Everything else. */
 
 #define	BUS_PASS_ORDER_FIRST	0
@@ -966,10 +942,10 @@ static __inline void varp ## _set_ ## var(device_t dev, type t)		\
 #endif /* !_SYS_BUS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20180904,
 //   "target_type": "header",
 //   "changes": [
-//     "platform"
+//     "pointer_size"
 //   ]
 // }
 // CHERI CHANGES END

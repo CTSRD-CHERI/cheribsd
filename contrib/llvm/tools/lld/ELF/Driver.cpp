@@ -668,12 +668,14 @@ void LinkerDriver::readConfigs(opt::InputArgList &Args) {
   Config->WarnCommon = Args.hasArg(OPT_warn_common);
   Config->ZCombreloc = !hasZOption(Args, "nocombreloc");
   Config->ZExecstack = hasZOption(Args, "execstack");
+  Config->ZHazardplt = hasZOption(Args, "hazardplt");
   Config->ZNocopyreloc = hasZOption(Args, "nocopyreloc");
   Config->ZNodelete = hasZOption(Args, "nodelete");
   Config->ZNodlopen = hasZOption(Args, "nodlopen");
   Config->ZNow = hasZOption(Args, "now");
   Config->ZOrigin = hasZOption(Args, "origin");
   Config->ZRelro = !hasZOption(Args, "norelro");
+  Config->ZRetpolineplt = hasZOption(Args, "retpolineplt");
   Config->ZRodynamic = hasZOption(Args, "rodynamic");
   Config->ZStackSize = args::getZOptionValue(Args, OPT_z, "stack-size", 0);
   Config->ZText = !hasZOption(Args, "notext");
@@ -1060,7 +1062,12 @@ template <class ELFT> void LinkerDriver::link(opt::InputArgList &Args) {
     addReservedSymbols();
 
   // Apply version scripts.
-  Symtab->scanVersionScript();
+  //
+  // For a relocatable output, version scripts don't make sense, and
+  // parsing a symbol version string (e.g. dropping "@ver1" from a symbol
+  // name "foo@ver1") rather do harm, so we don't call this if -r is given.
+  if (!Config->Relocatable)
+    Symtab->scanVersionScript();
 
   // Create wrapped symbols for -wrap option.
   for (auto *Arg : Args.filtered(OPT_wrap))

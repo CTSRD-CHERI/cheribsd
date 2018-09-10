@@ -146,7 +146,9 @@ static struct g_part_scheme g_part_gpt_scheme = {
 	.gps_bootcodesz = MBRSIZE,
 };
 G_PART_SCHEME_DECLARE(g_part_gpt);
+MODULE_VERSION(geom_part_gpt, 0);
 
+static struct uuid gpt_uuid_apple_apfs = GPT_ENT_TYPE_APPLE_APFS;
 static struct uuid gpt_uuid_apple_boot = GPT_ENT_TYPE_APPLE_BOOT;
 static struct uuid gpt_uuid_apple_core_storage =
     GPT_ENT_TYPE_APPLE_CORE_STORAGE;
@@ -208,6 +210,7 @@ static struct g_part_uuid_alias {
 	int alias;
 	int mbrtype;
 } gpt_uuid_alias_match[] = {
+	{ &gpt_uuid_apple_apfs,		G_PART_ALIAS_APPLE_APFS,	 0 },
 	{ &gpt_uuid_apple_boot,		G_PART_ALIAS_APPLE_BOOT,	 0xab },
 	{ &gpt_uuid_apple_core_storage,	G_PART_ALIAS_APPLE_CORE_STORAGE, 0 },
 	{ &gpt_uuid_apple_hfs,		G_PART_ALIAS_APPLE_HFS,		 0xaf },
@@ -921,6 +924,14 @@ g_part_gpt_read(struct g_part_table *basetable, struct g_consumer *cp)
 		    pp->name);
 		printf("GEOM: %s: GPT rejected -- may not be recoverable.\n",
 		    pp->name);
+		if (prihdr != NULL)
+			g_free(prihdr);
+		if (pritbl != NULL)
+			g_free(pritbl);
+		if (sechdr != NULL)
+			g_free(sechdr);
+		if (sectbl != NULL)
+			g_free(sectbl);
 		return (EINVAL);
 	}
 

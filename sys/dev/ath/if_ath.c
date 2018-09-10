@@ -1624,7 +1624,7 @@ ath_vap_create(struct ieee80211com *ic, const char name[IFNAMSIZ], int unit,
 	}
 
 	/* STA, AHDEMO? */
-	if (opmode == IEEE80211_M_HOSTAP || opmode == IEEE80211_M_MBSS) {
+	if (opmode == IEEE80211_M_HOSTAP || opmode == IEEE80211_M_MBSS || opmode == IEEE80211_M_STA) {
 		assign_address(sc, mac, flags & IEEE80211_CLONE_BSSID);
 		ath_hal_setbssidmask(sc->sc_ah, sc->sc_hwbssidmask);
 	}
@@ -1858,6 +1858,7 @@ ath_vap_delete(struct ieee80211vap *vap)
 		if (sc->sc_nstavaps == 0 && sc->sc_swbmiss)
 			sc->sc_swbmiss = 0;
 	} else if (vap->iv_opmode == IEEE80211_M_HOSTAP ||
+	    vap->iv_opmode == IEEE80211_M_STA ||
 	    vap->iv_opmode == IEEE80211_M_MBSS) {
 		reclaim_address(sc, vap->iv_myaddr);
 		ath_hal_setbssidmask(ah, sc->sc_hwbssidmask);
@@ -2150,7 +2151,7 @@ ath_intr(void *arg)
 	if (ah->ah_syncstate != 0) {
 		int i;
 		for (i = 0; i < 32; i++)
-			if (ah->ah_syncstate & (i << i))
+			if (ah->ah_syncstate & (1 << i))
 				sc->sc_intr_stats.sync_intr[i]++;
 	}
 
@@ -3614,7 +3615,7 @@ ath_update_mcast_hw(struct ath_softc *sc)
 		TAILQ_FOREACH(vap, &ic->ic_vaps, iv_next) {
 			ifp = vap->iv_ifp;
 			if_maddr_rlock(ifp);
-			TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+			CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 				caddr_t dl;
 				uint32_t val;
 				uint8_t pos;

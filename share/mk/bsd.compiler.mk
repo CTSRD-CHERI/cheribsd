@@ -19,7 +19,9 @@
 # COMPILER_FEATURES will contain one or more of the following, based on
 # compiler support for that feature:
 #
-# - c++11 : supports full (or nearly full) C++11 programming environment.
+# - c++11:     supports full (or nearly full) C++11 programming environment.
+# - retpoline: supports the retpoline speculative execution vulnerability
+#              mitigation.
 #
 # These variables with an X_ prefix will also be provided if XCC is set.
 #
@@ -37,7 +39,7 @@ CCACHE_BUILD_TYPE?=	command
 # Handle ccache after CC is determined, but not if CC/CXX are already
 # overridden with a manual setup.
 .if ${MK_CCACHE_BUILD:Uno} == "yes" && \
-    !make(showconfig) && \
+    !make(test-system-*) && !make(print-dir) && !make(showconfig) && \
     (${CC:M*ccache/world/*} == "" || ${CXX:M*ccache/world/*} == "")
 # CC is always prepended with the ccache wrapper rather than modifying
 # PATH since it is more clear that ccache is used and avoids wasting time
@@ -114,7 +116,20 @@ ccache-print-options: .PHONY
 .endif	# exists(${CCACHE_BIN})
 .endif	# ${MK_CCACHE_BUILD} == "yes"
 
-.for cc X_ in CC $${_empty_var_} XCC X_
+_cc_vars=CC $${_empty_var_}
+.if !empty(_WANT_TOOLCHAIN_CROSS_VARS)
+# Only the toplevel makefile needs to compute the X_COMPILER_* variables.
+# Skipping the computation of the unused X_COMPILER_* in the subdirectory
+# makefiles can save a noticeable amount of time when walking the whole source
+# tree (e.g. during make includes, etc.).
+_cc_vars+=XCC X_
+# Also get version information from CHERI_CC (if it is set)
+.ifdef CHERI_CC
+_cc_vars+=CHERI_CC CHERI_
+.endif
+.endif
+
+.for cc X_ in ${_cc_vars}
 .if ${cc} == "CC" || !empty(XCC)
 # Try to import COMPILER_TYPE and COMPILER_VERSION from parent make.
 # The value is only used/exported for the same environment that impacts
@@ -123,10 +138,13 @@ _exported_vars=	${X_}COMPILER_TYPE ${X_}COMPILER_VERSION \
 		${X_}COMPILER_FREEBSD_VERSION
 ${X_}_cc_hash=	${${cc}}${MACHINE}${PATH}
 ${X_}_cc_hash:=	${${X_}_cc_hash:hash}
-# Only import if none of the vars are set somehow else.
+# Only import if none of the vars are set differently somehow else.
 _can_export=	yes
 .for var in ${_exported_vars}
-.if defined(${var})
+.if defined(${var}) && (!defined(${var}.${${X_}_cc_hash}) || ${${var}.${${X_}_cc_hash}} != ${${var}})
+.if defined(${var}.${${X_}_ld_hash})
+.info "Cannot import ${X_}COMPILER variables since cached ${var} is different: ${${var}.${${X_}_cc_hash}} != ${${var}}"
+.endif
 _can_export=	no
 .endif
 .endfor
@@ -146,7 +164,16 @@ ${X_}COMPILER_TYPE= none
 ${X_}COMPILER_VERSION= 0
 ${X_}COMPILER_FREEBSD_VERSION= 0
 .elif !defined(${X_}COMPILER_TYPE) || !defined(${X_}COMPILER_VERSION)
-_v!=	${${cc}} --version || echo 0.0.0
+# Ensure that all values are cached when running the buildworld stages. While
+# this only amounts to one executing ${CC}, echo and awk this adds to quite a
+# lot of unccessary fork()+exec() when building world
+# walking the entire object tree
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+.error "${.CURDIR}: Rerunning ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. This value should be cached!"
+.else
+# .info "${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. ${cc}=${${cc}}"
+.endif
+_v!=	${${cc}:N${CCACHE_BIN}} --version || echo 0.0.0
 
 .if !defined(${X_}COMPILER_TYPE)
 . if ${${cc}:T:M*gcc*}
@@ -155,7 +182,7 @@ ${X_}COMPILER_TYPE:=	gcc
 ${X_}COMPILER_TYPE:=	clang
 . elif ${_v:Mgcc}
 ${X_}COMPILER_TYPE:=	gcc
-. elif ${_v:M\(GCC\)}
+. elif ${_v:M\(GCC\)} || ${_v:M*GNU}
 ${X_}COMPILER_TYPE:=	gcc
 . elif ${_v:Mclang} || ${_v:M(clang-*.*.*)}
 ${X_}COMPILER_TYPE:=	clang
@@ -169,7 +196,12 @@ ${X_}COMPILER_VERSION!=echo "${_v:M[1-9].[0-9]*}" | awk -F. '{print $$1 * 10000 
 .undef _v
 .endif
 .if !defined(${X_}COMPILER_FREEBSD_VERSION)
-${X_}COMPILER_FREEBSD_VERSION!=	{ echo "__FreeBSD_cc_version" | ${${cc}} -E - 2>/dev/null || echo __FreeBSD_cc_version; } | sed -n '$$p'
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+.error "${.CURDIR}: Recomputing ${X_}COMPILER_FREEBSD_VERSION. This value should be cached!"
+.else
+# .info "${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION. ${cc}=${${cc}}"
+.endif
+${X_}COMPILER_FREEBSD_VERSION!=	{ echo "__FreeBSD_cc_version" | ${${cc}:N${CCACHE_BIN}} -E - 2>/dev/null || echo __FreeBSD_cc_version; } | sed -n '$$p'
 # If we get a literal "__FreeBSD_cc_version" back then the compiler
 # is a non-FreeBSD build that doesn't support it or some other error
 # occurred.
@@ -178,11 +210,13 @@ ${X_}COMPILER_FREEBSD_VERSION=	unknown
 .endif
 .endif
 
+${X_}COMPILER_FEATURES=
 .if ${${X_}COMPILER_TYPE} == "clang" || \
 	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 40800)
-${X_}COMPILER_FEATURES=	c++11
-.else
-${X_}COMPILER_FEATURES=
+${X_}COMPILER_FEATURES+=	c++11
+.endif
+.if ${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 60000
+${X_}COMPILER_FEATURES+=	retpoline
 .endif
 
 .else
@@ -204,5 +238,7 @@ ${var}.${${X_}_cc_hash}:=	${${var}}
 .endif	# ${cc} == "CC" || !empty(XCC)
 .endfor	# .for cc in CC XCC
 
+.if !defined(_NO_INCLUDE_LINKERMK)
 .include <bsd.linker.mk>
+.endif
 .endif	# !target(__<bsd.compiler.mk>__)

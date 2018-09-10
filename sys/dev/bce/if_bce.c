@@ -529,7 +529,8 @@ MODULE_DEPEND(bce, miibus, 1, 1, 1);
 
 DRIVER_MODULE(bce, pci, bce_driver, bce_devclass, NULL, NULL);
 DRIVER_MODULE(miibus, bce, miibus_driver, miibus_devclass, NULL, NULL);
-
+MODULE_PNP_INFO("U16:vendor;U16:device;U16:#;U16:#;D:#", pci, bce,
+    bce_devs, sizeof(bce_devs[0]), nitems(bce_devs) - 1);
 
 /****************************************************************************/
 /* Tunable device values                                                    */
@@ -7692,7 +7693,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	switch(command) {
 
 	/* Set the interface MTU. */
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		/* Check that the MTU setting is supported. */
 		if ((ifr_mtu_get(ifr) < BCE_MIN_MTU) ||
 			(ifr_mtu_get(ifr) > BCE_MAX_JUMBO_MTU)) {
@@ -7714,7 +7715,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set interface flags. */
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		DBPRINT(sc, BCE_VERBOSE_SPECIAL, "Received SIOCSIFFLAGS\n");
 
 		BCE_LOCK(sc);
@@ -7746,8 +7747,8 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Add/Delete multicast address */
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		DBPRINT(sc, BCE_VERBOSE_MISC,
 		    "Received SIOCADDMULTI/SIOCDELMULTI\n");
 
@@ -7759,7 +7760,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set/Get Interface media */
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		DBPRINT(sc, BCE_VERBOSE_MISC,
 		    "Received SIOCSIFMEDIA/SIOCGIFMEDIA\n");
@@ -7774,7 +7775,7 @@ bce_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		break;
 
 	/* Set interface capability */
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		DBPRINT(sc, BCE_INFO_MISC,
 		    "Received SIOCSIFCAP = 0x%08X\n", (u32) mask);
@@ -8116,7 +8117,7 @@ bce_set_rx_mode(struct bce_softc *sc)
 		DBPRINT(sc, BCE_INFO_MISC, "Enabling selective multicast mode.\n");
 
 		if_maddr_rlock(ifp);
-		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+		CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 			if (ifma->ifma_addr->sa_family != AF_LINK)
 				continue;
 			h = ether_crc32_le(LLADDR((struct sockaddr_dl *)

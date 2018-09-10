@@ -473,7 +473,7 @@ let Defs = [EAX, ECX, EDX, FP0, FP1, FP2, FP3, FP4, FP5, FP6, FP7,
             ST0, ST1, ST2, ST3, ST4, ST5, ST6, ST7,
             MM0, MM1, MM2, MM3, MM4, MM5, MM6, MM7,
             XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6, XMM7,
-            XMM8, XMM9, XMM10, XMM11, XMM12, XMM13, XMM14, XMM15, EFLAGS],
+            XMM8, XMM9, XMM10, XMM11, XMM12, XMM13, XMM14, XMM15, EFLAGS, DF],
     usesCustomInserter = 1, Uses = [ESP, SSP] in {
 def TLS_addr32 : I<0, Pseudo, (outs), (ins i32mem:$sym),
                   "# TLS_addr32",
@@ -493,7 +493,7 @@ let Defs = [RAX, RCX, RDX, RSI, RDI, R8, R9, R10, R11,
             ST0, ST1, ST2, ST3, ST4, ST5, ST6, ST7,
             MM0, MM1, MM2, MM3, MM4, MM5, MM6, MM7,
             XMM0, XMM1, XMM2, XMM3, XMM4, XMM5, XMM6, XMM7,
-            XMM8, XMM9, XMM10, XMM11, XMM12, XMM13, XMM14, XMM15, EFLAGS],
+            XMM8, XMM9, XMM10, XMM11, XMM12, XMM13, XMM14, XMM15, EFLAGS, DF],
     usesCustomInserter = 1, Uses = [RSP, SSP] in {
 def TLS_addr64 : I<0, Pseudo, (outs), (ins i64mem:$sym),
                    "# TLS_addr64",
@@ -509,7 +509,7 @@ def TLS_base_addr64 : I<0, Pseudo, (outs), (ins i64mem:$sym),
 // For i386, the address of the thunk is passed on the stack, on return the
 // address of the variable is in %eax.  %ecx is trashed during the function
 // call.  All other registers are preserved.
-let Defs = [EAX, ECX, EFLAGS],
+let Defs = [EAX, ECX, EFLAGS, DF],
     Uses = [ESP, SSP],
     usesCustomInserter = 1 in
 def TLSCall_32 : I<0, Pseudo, (outs), (ins i32mem:$sym),
@@ -522,7 +522,7 @@ def TLSCall_32 : I<0, Pseudo, (outs), (ins i32mem:$sym),
 // %rdi. The lowering will do the right thing with RDI.
 // On return the address of the variable is in %rax.  All other
 // registers are preserved.
-let Defs = [RAX, EFLAGS],
+let Defs = [RAX, EFLAGS, DF],
     Uses = [RSP, SSP],
     usesCustomInserter = 1 in
 def TLSCall_64 : I<0, Pseudo, (outs), (ins i64mem:$sym),
@@ -1146,14 +1146,14 @@ def X86tcret_6regs : PatFrag<(ops node:$ptr, node:$off),
 
 def : Pat<(X86tcret ptr_rc_tailcall:$dst, imm:$off),
           (TCRETURNri ptr_rc_tailcall:$dst, imm:$off)>,
-          Requires<[Not64BitMode]>;
+          Requires<[Not64BitMode, NotUseRetpoline]>;
 
 // FIXME: This is disabled for 32-bit PIC mode because the global base
 // register which is part of the address mode may be assigned a
 // callee-saved register.
 def : Pat<(X86tcret (load addr:$dst), imm:$off),
           (TCRETURNmi addr:$dst, imm:$off)>,
-          Requires<[Not64BitMode, IsNotPIC]>;
+          Requires<[Not64BitMode, IsNotPIC, NotUseRetpoline]>;
 
 def : Pat<(X86tcret (i32 tglobaladdr:$dst), imm:$off),
           (TCRETURNdi tglobaladdr:$dst, imm:$off)>,
@@ -1165,13 +1165,21 @@ def : Pat<(X86tcret (i32 texternalsym:$dst), imm:$off),
 
 def : Pat<(X86tcret ptr_rc_tailcall:$dst, imm:$off),
           (TCRETURNri64 ptr_rc_tailcall:$dst, imm:$off)>,
-          Requires<[In64BitMode]>;
+          Requires<[In64BitMode, NotUseRetpoline]>;
 
 // Don't fold loads into X86tcret requiring more than 6 regs.
 // There wouldn't be enough scratch registers for base+index.
 def : Pat<(X86tcret_6regs (load addr:$dst), imm:$off),
           (TCRETURNmi64 addr:$dst, imm:$off)>,
-          Requires<[In64BitMode]>;
+          Requires<[In64BitMode, NotUseRetpoline]>;
+
+def : Pat<(X86tcret ptr_rc_tailcall:$dst, imm:$off),
+          (RETPOLINE_TCRETURN64 ptr_rc_tailcall:$dst, imm:$off)>,
+          Requires<[In64BitMode, UseRetpoline]>;
+
+def : Pat<(X86tcret ptr_rc_tailcall:$dst, imm:$off),
+          (RETPOLINE_TCRETURN32 ptr_rc_tailcall:$dst, imm:$off)>,
+          Requires<[Not64BitMode, UseRetpoline]>;
 
 def : Pat<(X86tcret (i64 tglobaladdr:$dst), imm:$off),
           (TCRETURNdi64 tglobaladdr:$dst, imm:$off)>,

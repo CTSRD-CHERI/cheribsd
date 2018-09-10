@@ -25,6 +25,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180719,
+ *   "target_type": "test",
+ *   "changes": [
+ *     "function_abi"
+ *   ],
+ *   "change_comment": "Missing mode to open with O_CREAT"
+ * }
+ * CHERI CHANGES END
+ */
 
 /*
  * Test cases for operations on DIR objects:
@@ -73,7 +85,7 @@ ATF_TC_BODY(telldir_after_seekdir, tc)
 		char filename[16];
 
 		snprintf(filename, sizeof(filename), "%d", i);
-		fd = openat(dirfd, filename, O_WRONLY | O_CREAT);
+		fd = openat(dirfd, filename, O_WRONLY | O_CREAT, 0600);
 		ATF_REQUIRE(fd > 0);
 		close(fd);
 	}
@@ -150,7 +162,7 @@ ATF_TC_BODY(telldir_at_end_of_block, tc)
 		char filename[16];
 
 		snprintf(filename, sizeof(filename), "%d", i);
-		fd = openat(dirfd, filename, O_WRONLY | O_CREAT);
+		fd = openat(dirfd, filename, O_WRONLY | O_CREAT, 0600);
 		ATF_REQUIRE(fd > 0);
 		close(fd);
 	}

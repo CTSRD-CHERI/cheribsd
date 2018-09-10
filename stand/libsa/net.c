@@ -58,6 +58,20 @@ __FBSDID("$FreeBSD$");
 #include "net.h"
 
 /*
+ * Maximum wait time for sending and receiving before we give up and timeout.
+ * If set to 0, operations will eventually timeout completely, but send/recv
+ * timeouts must progress exponentially from MINTMO to MAXTMO before final
+ * timeout is hit.
+ */
+#ifndef MAXWAIT
+#define MAXWAIT 0	/* seconds */
+#endif
+
+#if MAXWAIT < 0
+#error MAXWAIT must not be a negative number
+#endif
+
+/*
  * Send a packet and wait for a reply, with exponential backoff.
  *
  * The send routine must return the actual number of bytes written,
@@ -72,11 +86,12 @@ ssize_t
 sendrecv(struct iodesc *d,
     ssize_t (*sproc)(struct iodesc *, void *, size_t),
     void *sbuf, size_t ssize,
-    ssize_t (*rproc)(struct iodesc *, void **, void **, time_t),
-    void **pkt, void **payload)
+    ssize_t (*rproc)(struct iodesc *, void **, void **, time_t, void *),
+    void **pkt, void **payload, void *recv_extra)
 {
 	ssize_t cc;
 	time_t t, tmo, tlast;
+	time_t tref;
 	long tleft;
 
 #ifdef NET_DEBUG
@@ -87,8 +102,13 @@ sendrecv(struct iodesc *d,
 	tmo = MINTMO;
 	tlast = 0;
 	tleft = 0;
+	tref = getsecs();
 	t = getsecs();
 	for (;;) {
+		if (MAXWAIT > 0 && (getsecs() - tref) >= MAXWAIT) {
+			errno = ETIMEDOUT;
+			return -1;
+		}
 		if (tleft <= 0) {
 			if (tmo >= MAXTMO) {
 				errno = ETIMEDOUT;
@@ -116,9 +136,9 @@ sendrecv(struct iodesc *d,
 		}
 
 		/* Try to get a packet and process it. */
-		cc = (*rproc)(d, pkt, payload, tleft);
+		cc = (*rproc)(d, pkt, payload, tleft, recv_extra);
 		/* Return on data, EOF or real error. */
-		if (cc != -1 || errno != 0)
+		if (cc != -1 || (errno != 0 && errno != ETIMEDOUT))
 			return (cc);
 
 		/* Timed out or didn't get the packet we're waiting for */

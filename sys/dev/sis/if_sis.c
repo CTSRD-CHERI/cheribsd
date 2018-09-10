@@ -744,7 +744,7 @@ sis_rxfilter_ns(struct sis_softc *sc)
 		}
 
 		if_maddr_rlock(ifp);
-		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+		CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 			if (ifma->ifma_addr->sa_family != AF_LINK)
 				continue;
 			h = sis_mchash(sc,
@@ -802,7 +802,7 @@ sis_rxfilter_sis(struct sis_softc *sc)
 			hashes[i] = 0;
 		i = 0;
 		if_maddr_rlock(ifp);
-		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+		CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 			if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 			h = sis_mchash(sc,
@@ -2123,7 +2123,7 @@ sis_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error = 0, mask;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SIS_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -2137,19 +2137,19 @@ sis_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->sis_if_flags = ifp->if_flags;
 		SIS_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		SIS_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			sis_rxfilter(sc);
 		SIS_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->sis_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		SIS_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING

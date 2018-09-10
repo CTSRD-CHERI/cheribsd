@@ -285,6 +285,8 @@ enum ipfw_opcodes {		/* arguments (4 byte each)	*/
 	O_EXTERNAL_INSTANCE,	/* arg1=id of eaction handler instance */
 	O_EXTERNAL_DATA,	/* variable length data */
 
+	O_SKIP_ACTION,		/* none				*/
+
 	O_LAST_OPCODE		/* not an opcode!		*/
 };
 
@@ -671,7 +673,7 @@ struct ipfw_flow_id {
 	uint32_t	src_ip;
 	uint16_t	dst_port;
 	uint16_t	src_port;
-	uint8_t		fib;
+	uint8_t		fib;	/* XXX: must be uint16_t */
 	uint8_t		proto;
 	uint8_t		_flags;	/* protocol-specific flags */
 	uint8_t		addr_type; /* 4=ip4, 6=ip6, 1=ether ? */
@@ -682,6 +684,7 @@ struct ipfw_flow_id {
 };
 #endif
 
+#define	IS_IP4_FLOW_ID(id)	((id)->addr_type == 4)
 #define IS_IP6_FLOW_ID(id)	((id)->addr_type == 6)
 
 /*

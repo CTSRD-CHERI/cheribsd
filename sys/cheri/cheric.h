@@ -40,12 +40,12 @@
 
 /*
  * Programmer-friendly macros for CHERI-aware C code -- requires use of
- * CHERI-aware Clang/LLVM, and full capability context switching, so not yet
- * usable in the kernel.
+ * CHERI-aware Clang/LLVM, and full capability context switching.
  */
 #define	cheri_getlen(x)		__builtin_cheri_length_get((x))
 #define	cheri_getbase(x)	__builtin_cheri_base_get((x))
 #define	cheri_getoffset(x)	__builtin_cheri_offset_get((x))
+#define	cheri_getaddress(x)	__builtin_cheri_address_get((x))
 #define	cheri_getperm(x)	__builtin_cheri_perms_get((x))
 #define	cheri_getsealed(x)	__builtin_cheri_sealed_get((x))
 #define	cheri_gettag(x)		__builtin_cheri_tag_get((x))
@@ -78,6 +78,9 @@
 #define	cheri_local(c)		cheri_andperm((c), ~CHERI_PERM_GLOBAL)
 
 #define	cheri_csetbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
+
+/* Create an untagged capability from an integer */
+#define cheri_fromint(x)	cheri_incoffset(NULL, x)
 
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
@@ -203,9 +206,15 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
-
 #define CHERI_PRINT_PTR(ptr)						\
 	printf("%s: " #ptr " v:%lu b:%016jx l:%016zx o:%jx\n", __func__, \
+	   cheri_gettag((const void * __capability)(ptr)),	        \
+	   cheri_getbase((const void * __capability)(ptr)),		\
+	   cheri_getlen((const void * __capability)(ptr)),		\
+	   cheri_getoffset((const void * __capability)(ptr)))
+
+#define CHERI_FPRINT_PTR(f, ptr)					\
+	fprintf(f, "%s: " #ptr " v:%lu b:%016jx l:%016zx o:%jx\n", __func__, \
 	   cheri_gettag((const void * __capability)(ptr)),	        \
 	   cheri_getbase((const void * __capability)(ptr)),		\
 	   cheri_getlen((const void * __capability)(ptr)),		\
@@ -300,7 +309,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
  * See https://github.com/CTSRD-CHERI/clang/issues/189
  */
 #define cheri_get_low_ptr_bits(ptr, mask)                                      \
-  __cheri_get_low_ptr_bits(ptr, __static_assert_sensible_low_bits(mask))
+  __cheri_get_low_ptr_bits((uintptr_t)(ptr), __static_assert_sensible_low_bits(mask))
 
 /*
  * Set low bits in a uintptr_t
@@ -316,7 +325,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
  * compile-time constant.
  */
 #define cheri_set_low_ptr_bits(ptr, bits)                                      \
-  __cheri_set_low_ptr_bits(ptr, __runtime_assert_sensible_low_bits(bits))
+  __cheri_set_low_ptr_bits((uintptr_t)(ptr), __runtime_assert_sensible_low_bits(bits))
 
 /*
  * Clear the bits in @p mask from the capability/pointer @p ptr. Mask must be
@@ -337,7 +346,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
  *
  */
 #define cheri_clear_low_ptr_bits(ptr, mask)                                    \
-  __cheri_clear_low_ptr_bits(ptr, __static_assert_sensible_low_bits(mask))
+  __cheri_clear_low_ptr_bits((uintptr_t)(ptr), __static_assert_sensible_low_bits(mask))
 
 #include <machine/cheric.h>
 

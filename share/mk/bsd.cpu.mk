@@ -199,14 +199,16 @@ MACHINE_CPU = 3dnow mmx k6 k5 i586
 MACHINE_CPU = mmx k6 k5 i586
 .  elif ${CPUTYPE} == "k5"
 MACHINE_CPU = k5 i586
-.  elif ${CPUTYPE} == "skylake" || ${CPUTYPE} == "knl"
+.  elif ${CPUTYPE} == "cannonlake" || ${CPUTYPE} == "knm" || \
+    ${CPUTYPE} == "skylake-avx512" || ${CPUTYPE} == "knl"
 MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
-.  elif ${CPUTYPE} == "broadwell" || ${CPUTYPE} == "haswell"
+.  elif ${CPUTYPE} == "skylake" || ${CPUTYPE} == "broadwell" || \
+    ${CPUTYPE} == "haswell"
 MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
 .  elif ${CPUTYPE} == "ivybridge" || ${CPUTYPE} == "sandybridge"
 MACHINE_CPU = avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
-.  elif ${CPUTYPE} == "westmere" || ${CPUTYPE} == "nehalem" || \
-    ${CPUTYPE} == "silvermont"
+.  elif ${CPUTYPE} == "goldmont" || ${CPUTYPE} == "westmere" || \
+    ${CPUTYPE} == "nehalem" || ${CPUTYPE} == "silvermont"
 MACHINE_CPU = sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
 .  elif ${CPUTYPE} == "penryn"
 MACHINE_CPU = sse41 ssse3 sse3 sse2 sse i686 mmx i586
@@ -260,14 +262,16 @@ MACHINE_CPU = k8 3dnow sse3
 .  elif ${CPUTYPE} == "opteron" || ${CPUTYPE} == "athlon64" || \
     ${CPUTYPE} == "athlon-fx" || ${CPUTYPE} == "k8"
 MACHINE_CPU = k8 3dnow
-.  elif ${CPUTYPE} == "skylake" || ${CPUTYPE} == "knl"
+.  elif ${CPUTYPE} == "cannonlake" || ${CPUTYPE} == "knm" || \
+    ${CPUTYPE} == "skylake-avx512" || ${CPUTYPE} == "knl"
 MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse3
-.  elif ${CPUTYPE} == "broadwell" || ${CPUTYPE} == "haswell"
+.  elif ${CPUTYPE} == "skylake" || ${CPUTYPE} == "broadwell" || \
+    ${CPUTYPE} == "haswell"
 MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse3
 .  elif ${CPUTYPE} == "ivybridge" || ${CPUTYPE} == "sandybridge"
 MACHINE_CPU = avx sse42 sse41 ssse3 sse3
-.  elif ${CPUTYPE} == "westmere" || ${CPUTYPE} == "nehalem" || \
-    ${CPUTYPE} == "silvermont"
+.  elif ${CPUTYPE} == "goldmont" || ${CPUTYPE} == "westmere" || \
+    ${CPUTYPE} == "nehalem" || ${CPUTYPE} == "silvermont"
 MACHINE_CPU = sse42 sse41 ssse3 sse3
 .  elif ${CPUTYPE} == "penryn"
 MACHINE_CPU = sse41 ssse3 sse3
@@ -339,7 +343,7 @@ MACHINE_CPU += armv7
 . endif
 # armv6 and armv7 are a hybrid. It can use the softfp ABI, but doesn't emulate
 # floating point in the general case, so don't define softfp for it at this
-# time. arm and armeb are pure softfp, so define it for them.
+# time. arm is pure softfp, so define it for them.
 . if ${MACHINE_ARCH:Marmv[67]*} == ""
 MACHINE_CPU += softfp
 . endif
@@ -359,12 +363,10 @@ CFLAGS += -mcpu=8540 -Wa,-me500 -mspe=yes -mabi=spe -mfloat-gprs=double
 .endif
 
 .if ${MACHINE_CPUARCH} == "riscv"
-.if ${TARGET_ARCH:Mriscv*sf}
+.if ${MACHINE_ARCH:Mriscv*sf}
 CFLAGS += -march=rv64imac -mabi=lp64
-ACFLAGS += -march=rv64imac -mabi=lp64
 .else
-CFLAGS += -march=rv64imafdc -mabi=lp64
-ACFLAGS += -march=rv64imafdc -mabi=lp64
+CFLAGS += -march=rv64imafdc -mabi=lp64d
 .endif
 .endif
 

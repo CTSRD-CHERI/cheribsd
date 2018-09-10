@@ -572,4 +572,5 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_kevent",			/* 560 = cheriabi_kevent */
 	"cheriabi_cpuset_getdomain",			/* 561 = cheriabi_cpuset_getdomain */
 	"cheriabi_cpuset_setdomain",			/* 562 = cheriabi_cpuset_setdomain */
+	"cheriabi_getrandom",			/* 563 = cheriabi_getrandom */
 };

@@ -32,8 +32,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
-
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/cdio.h>
@@ -50,6 +48,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/systm.h>
+#include <sys/uio.h>
 
 #include <compat/freebsd32/freebsd32.h>
 #include <compat/freebsd32/freebsd32_ioctl.h>

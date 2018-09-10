@@ -29,11 +29,9 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
 #if 0
 static char sccsid[] = "@(#)ls.c	8.1 (Berkeley) 6/6/93";
 #endif
-#endif /* not lint */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -91,8 +89,10 @@ printtime(time_t ftime)
 	const char *format;
 	static int d_first = -1;
 
+#ifdef D_MD_ORDER
 	if (d_first < 0)
 		d_first = (*nl_langinfo(D_MD_ORDER) == 'd');
+#endif
 	if (lnow == 0)
 		lnow = time(NULL);
 
@@ -110,7 +110,7 @@ printtime(time_t ftime)
 static void
 printlink(char *name)
 {
-	int lnklen;
+	ssize_t lnklen;
 	char path[MAXPATHLEN];
 
 	if ((lnklen = readlink(name, path, MAXPATHLEN - 1)) == -1) {

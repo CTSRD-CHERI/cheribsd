@@ -199,10 +199,10 @@ g_eli_crypto_rerun(struct cryptop *crp)
 			break;
 	}
 	KASSERT(wr != NULL, ("Invalid worker (%u).", bp->bio_pflags));
-	G_ELI_DEBUG(1, "Rerunning crypto %s request (sid: %ju -> %ju).",
-	    bp->bio_cmd == BIO_READ ? "READ" : "WRITE", (uintmax_t)wr->w_sid,
-	    (uintmax_t)crp->crp_sid);
-	wr->w_sid = crp->crp_sid;
+	G_ELI_DEBUG(1, "Rerunning crypto %s request (sid: %p -> %p).",
+	    bp->bio_cmd == BIO_READ ? "READ" : "WRITE", wr->w_sid,
+	    crp->crp_session);
+	wr->w_sid = crp->crp_session;
 	crp->crp_etype = 0;
 	error = crypto_dispatch(crp);
 	if (error == 0)
@@ -210,6 +210,16 @@ g_eli_crypto_rerun(struct cryptop *crp)
 	G_ELI_DEBUG(1, "%s: crypto_dispatch() returned %d.", __func__, error);
 	crp->crp_etype = error;
 	return (error);
+}
+
+static void
+g_eli_getattr_done(struct bio *bp)
+{
+	if (bp->bio_error == 0 && 
+	    !strcmp(bp->bio_attribute, "GEOM::physpath")) {
+		strlcat(bp->bio_data, "/eli", bp->bio_length);
+	}
+	g_std_done(bp);
 }
 
 /*
@@ -244,7 +254,8 @@ g_eli_read_done(struct bio *bp)
 			pbp->bio_driver2 = NULL;
 		}
 		g_io_deliver(pbp, pbp->bio_error);
-		atomic_subtract_int(&sc->sc_inflight, 1);
+		if (sc != NULL)
+			atomic_subtract_int(&sc->sc_inflight, 1);
 		return;
 	}
 	mtx_lock(&sc->sc_queue_mtx);
@@ -289,7 +300,8 @@ g_eli_write_done(struct bio *bp)
 	 */
 	sc = pbp->bio_to->geom->softc;
 	g_io_deliver(pbp, pbp->bio_error);
-	atomic_subtract_int(&sc->sc_inflight, 1);
+	if (sc != NULL)
+		atomic_subtract_int(&sc->sc_inflight, 1);
 }
 
 /*
@@ -380,7 +392,10 @@ g_eli_start(struct bio *bp)
 	case BIO_FLUSH:
 	case BIO_DELETE:
 	case BIO_ZONE:
-		cbp->bio_done = g_std_done;
+		if (bp->bio_cmd == BIO_GETATTR)
+			cbp->bio_done = g_eli_getattr_done;
+		else
+			cbp->bio_done = g_std_done;
 		cp = LIST_FIRST(&sc->sc_geom->consumer);
 		cbp->bio_to = cp->provider;
 		G_ELI_LOGREQ(2, cbp, "Sending request.");
@@ -1073,7 +1088,7 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
                                  memcpy(key, keybuf->kb_ents[i].ke_data,
                                      sizeof(key));
 
-                                 if (g_eli_mkey_decrypt(&md, key,
+                                 if (g_eli_mkey_decrypt_any(&md, key,
                                      mkey, &nkey) == 0 ) {
                                          explicit_bzero(key, sizeof(key));
                                          goto have_key;
@@ -1148,7 +1163,7 @@ g_eli_taste(struct g_class *mp, struct g_provider *pp, int flags __unused)
                 /*
                  * Decrypt Master-Key.
                  */
-                error = g_eli_mkey_decrypt(&md, key, mkey, &nkey);
+                error = g_eli_mkey_decrypt_any(&md, key, mkey, &nkey);
                 bzero(key, sizeof(key));
                 if (error == -1) {
                         if (i == tries) {
@@ -1320,3 +1335,4 @@ g_eli_fini(struct g_class *mp)
 
 DECLARE_GEOM_CLASS(g_eli_class, g_eli);
 MODULE_DEPEND(g_eli, crypto, 1, 1, 1);
+MODULE_VERSION(geom_eli, 0);

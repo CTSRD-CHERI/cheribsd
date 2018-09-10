@@ -419,7 +419,7 @@ chregister(struct cam_periph *periph, void *arg)
 	 * instance for it.  We'll release this reference once the devfs
 	 * instance has been freed.
 	 */
-	if (cam_periph_acquire(periph) != CAM_REQ_CMP) {
+	if (cam_periph_acquire(periph) != 0) {
 		xpt_print(periph->path, "%s: lost periph during "
 			  "registration!\n", __func__);
 		cam_periph_lock(periph);
@@ -467,7 +467,7 @@ chopen(struct cdev *dev, int flags, int fmt, struct thread *td)
 	int error;
 
 	periph = (struct cam_periph *)dev->si_drv1;
-	if (cam_periph_acquire(periph) != CAM_REQ_CMP)
+	if (cam_periph_acquire(periph) != 0)
 		return (ENXIO);
 
 	softc = (struct ch_softc *)periph->softc;
@@ -1198,13 +1198,14 @@ chgetelemstatus(struct cam_periph *periph, int scsi_version, u_long cmd,
 	struct read_element_status_descriptor *desc;
 	caddr_t data = NULL;
 	size_t size, desclen;
-	int avail, i, error = 0;
+	u_int avail, i;
 	int curdata, dvcid, sense_flags;
 	int try_no_dvcid = 0;
 	struct changer_element_status *user_data = NULL;
 	struct ch_softc *softc;
 	union ccb *ccb;
 	int chet = cesr->cesr_element_type;
+	int error = 0;
 	int want_voltags = (cesr->cesr_flags & CESR_VOLTAGS) ? 1 : 0;
 
 	softc = (struct ch_softc *)periph->softc;

@@ -71,13 +71,11 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 		    0, MIPS_KSEG0_LARGEST_PHYS, PAGE_SIZE, 0))
 			continue;
 #endif
-		if (m == NULL) {
-			if (wait & M_NOWAIT)
-				return (NULL);
-			else
-				VM_WAIT;
-		} else
+		if (m != NULL)
 			break;
+		if ((wait & M_NOWAIT) != 0)
+			return (NULL);
+		vm_wait(NULL);
 	}
 
 	pa = VM_PAGE_TO_PHYS(m);
@@ -98,9 +96,8 @@ uma_small_free(void *mem, vm_size_t size, u_int8_t flags)
 	pa = MIPS_DIRECT_TO_PHYS((vm_offset_t)mem);
 	dump_drop_page(pa);
 	m = PHYS_TO_VM_PAGE(pa);
-	m->wire_count--;
+	vm_page_unwire_noq(m);
 	vm_page_free(m);
-	atomic_subtract_int(&vm_cnt.v_wire_count, 1);
 }
 // CHERI CHANGES START
 // {

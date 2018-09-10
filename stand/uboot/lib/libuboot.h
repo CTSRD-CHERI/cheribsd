@@ -27,12 +27,8 @@
  * $FreeBSD$
  */
 
-struct uboot_devdesc
-{
-	struct devsw	*d_dev;
-	int		d_type;
-	int		d_unit;
-	void		*d_opendata;
+struct uboot_devdesc {
+	struct devdesc		dd;	/* Must be first. */
 	union {
 		struct {
 			int	slice;

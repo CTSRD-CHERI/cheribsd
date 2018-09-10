@@ -47,7 +47,6 @@ __FBSDID("$FreeBSD$");
 #include <cheri_private.h>
 #include "xlocale_private.h"
 
-
 /*
  * Convert a string to a long integer.
  *
@@ -163,10 +162,3 @@ __CAPSUFFIX(strtol)(__CAP const char * __restrict nptr,
 {
 	return __CAPSUFFIX(strtol_l)(nptr, endptr, base, __get_locale());
 }
-#ifndef CAPABILITY_VERSION
-long double
-strtold(const char * __restrict nptr, char ** __restrict endptr)
-{
-	return strtold_l(nptr, endptr, __get_locale());
-}
-#endif

@@ -92,12 +92,22 @@ typedef int malloc_cpuid_t;
 #  ifdef __hppa__
 #    define LG_QUANTUM		4
 #  endif
-#  ifdef __mips__
-#    ifndef __CHERI_PURE_CAPABILITY__
+#  ifdef __m68k__
 #    define LG_QUANTUM		3
+#  endif
+#  ifdef __mips__
+#    if defined(__CHERI_PURE_CAPABILITY__) && _MIPS_SZCAP == 256
+#      define LG_QUANTUM	5
+#    elif defined(__CHERI_PURE_CAPABILITY__) && _MIPS_SZCAP == 128
+#      define LG_QUANTUM	4
+#    elif defined(__mips_n32) || defined(__mips_n64)
+#      define LG_QUANTUM	4
 #    else
-#      define LG_QUANTUM		5
+#      define LG_QUANTUM	3
 #    endif
+#  endif
+#  ifdef __nios2__
+#    define LG_QUANTUM		3
 #  endif
 #  ifdef __or1k__
 #    define LG_QUANTUM		3
@@ -105,13 +115,14 @@ typedef int malloc_cpuid_t;
 #  ifdef __powerpc__
 #    define LG_QUANTUM		4
 #  endif
-#  ifdef __riscv
+#  if defined(__riscv) || defined(__riscv__)
 #    define LG_QUANTUM		4
 #  endif
 #  ifdef __s390__
 #    define LG_QUANTUM		4
 #  endif
-#  ifdef __SH4__
+#  if (defined (__SH3E__) || defined(__SH4_SINGLE__) || defined(__SH4__) || \
+	defined(__SH4_SINGLE_ONLY__))
 #    define LG_QUANTUM		4
 #  endif
 #  ifdef __tile__

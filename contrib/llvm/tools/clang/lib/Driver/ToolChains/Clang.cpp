@@ -3288,9 +3288,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
 
   Args.AddLastArg(CmdArgs, options::OPT_fveclib);
 
-  if (!Args.hasFlag(options::OPT_fmerge_all_constants,
-                    options::OPT_fno_merge_all_constants))
-    CmdArgs.push_back("-fno-merge-all-constants");
+  if (Args.hasFlag(options::OPT_fmerge_all_constants,
+                   options::OPT_fno_merge_all_constants, false))
+    CmdArgs.push_back("-fmerge-all-constants");
 
   // LLVM Code Generator Options.
 
@@ -4637,6 +4637,37 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
           << "-fwhole-program-vtables"
           << "-flto";
     CmdArgs.push_back("-fwhole-program-vtables");
+  }
+
+  if (Arg *A = Args.getLastArg(options::OPT_fexperimental_isel,
+                               options::OPT_fno_experimental_isel)) {
+    CmdArgs.push_back("-mllvm");
+    if (A->getOption().matches(options::OPT_fexperimental_isel)) {
+      CmdArgs.push_back("-global-isel=1");
+
+      // GISel is on by default on AArch64 -O0, so don't bother adding
+      // the fallback remarks for it. Other combinations will add a warning of
+      // some kind.
+      bool IsArchSupported = Triple.getArch() == llvm::Triple::aarch64;
+      bool IsOptLevelSupported = false;
+
+      Arg *A = Args.getLastArg(options::OPT_O_Group);
+      if (Triple.getArch() == llvm::Triple::aarch64) {
+        if (!A || A->getOption().matches(options::OPT_O0))
+          IsOptLevelSupported = true;
+      }
+      if (!IsArchSupported || !IsOptLevelSupported) {
+        CmdArgs.push_back("-mllvm");
+        CmdArgs.push_back("-global-isel-abort=2");
+
+        if (!IsArchSupported)
+          D.Diag(diag::warn_drv_experimental_isel_incomplete) << Triple.getArchName();
+        else
+          D.Diag(diag::warn_drv_experimental_isel_incomplete_opt);
+      }
+    } else {
+      CmdArgs.push_back("-global-isel=0");
+    }
   }
 
   // Finally add the compile command to the compilation.

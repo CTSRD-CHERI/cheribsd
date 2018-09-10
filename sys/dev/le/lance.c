@@ -506,7 +506,7 @@ lance_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		LE_LOCK(sc);
 		if (ifp->if_flags & IFF_PROMISC) {
 			if (!(sc->sc_flags & LE_PROMISC)) {
@@ -552,8 +552,8 @@ lance_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		LE_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * Multicast list has changed; set the hardware filter
 		 * accordingly.
@@ -565,7 +565,7 @@ lance_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
 
@@ -602,7 +602,7 @@ lance_setladrf(struct lance_softc *sc, uint16_t *af)
 
 	af[0] = af[1] = af[2] = af[3] = 0x0000;
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 

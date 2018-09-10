@@ -35,7 +35,7 @@ __FBSDID("$FreeBSD$");
 #include "libuserboot.h"
 
 #if defined(USERBOOT_ZFS_SUPPORT)
-#include "../zfs/libzfs.h"
+#include "libzfs.h"
 #endif
 
 static int	userboot_parsedev(struct disk_devdesc **dev, const char *devspec, const char **path);
@@ -139,7 +139,7 @@ userboot_parsedev(struct disk_devdesc **dev, const char *devspec, const char **p
 	    goto fail;
 	}
 
-	idev->d_unit = unit;
+	idev->dd.d_unit = unit;
 	if (path != NULL)
 	    *path = (*cp == 0) ? cp : cp + 1;
 	break;
@@ -158,8 +158,7 @@ userboot_parsedev(struct disk_devdesc **dev, const char *devspec, const char **p
 	err = EINVAL;
 	goto fail;
     }
-    idev->d_dev = dv;
-    idev->d_type = dv->dv_type;
+    idev->dd.d_dev = dv;
     if (dev == NULL) {
 	free(idev);
     } else {
@@ -176,10 +175,10 @@ userboot_parsedev(struct disk_devdesc **dev, const char *devspec, const char **p
 char *
 userboot_fmtdev(void *vdev)
 {
-    struct disk_devdesc	*dev = (struct disk_devdesc *)vdev;
+    struct devdesc	*dev = (struct devdesc *)vdev;
     static char		buf[128];	/* XXX device length constant? */
 
-    switch(dev->d_type) {
+    switch(dev->d_dev->dv_type) {
     case DEVT_NONE:
 	strcpy(buf, "(no device)");
 	break;

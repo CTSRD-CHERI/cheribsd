@@ -54,15 +54,19 @@
 #include <machine/frame.h>
 #include <machine/trap.h>
 
+#ifdef CHERI_LIBCHERI_TESTS
 #include <cheri/libcheri_fd.h>
 #include <cheri/libcheri_stack.h>
 #include <cheri/libcheri_sandbox.h>
+#endif
 
 #include <machine/sysarch.h>
 #endif
 
 #include <assert.h>
+#ifdef CHERI_LIBCHERI_TESTS
 #include <cheritest-helper.h>
+#endif
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -968,6 +972,16 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "check tags are stored for SHM_ANON MAP_PRIVATE pages",
 	  .ct_func = cheritest_vm_tag_shm_open_anon_private, },
 
+	{ .ct_name = "cheritest_vm_tag_shm_open_anon_shared2x",
+	  .ct_desc = "test multiply-mapped SHM_ANON objects",
+	  .ct_func = cheritest_vm_tag_shm_open_anon_shared2x, },
+
+	{ .ct_name = "cheritest_vm_shm_open_anon_unix_surprise",
+	  .ct_desc = "test SHM_ANON vs SCM_RIGHTS",
+	  .ct_func = cheritest_vm_shm_open_anon_unix_surprise,
+	  .ct_xfail_reason =
+	    "Tags currently survive cross-AS aliasing of SHM_ANON objects", },
+
 	{ .ct_name = "cheritest_vm_tag_dev_zero_shared",
 	  .ct_desc = "check tags are stored for /dev/zero MAP_SHARED pages",
 	  .ct_func = cheritest_vm_tag_dev_zero_shared, },
@@ -1011,6 +1025,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = cheritest_vm_swap,
 	  .ct_check_xfail = xfail_swap_required},
 
+#ifdef CHERI_LIBCHERI_TESTS
 #if 0
 	/*
 	 * Simple CCall/CReturn tests that sometimes generate signals.
@@ -1111,6 +1126,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_mips_exccode = T_C2E,
 	  .ct_cp2_exccode = CHERI_EXCCODE_PERM_EXECUTE },
 #endif
+#endif
 
 	/*
 	 * Test copyin/out(_c) via kbounce(2) syscall.
@@ -1119,6 +1135,19 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Exercise copyin/out via kbounce(2) syscall",
 	  .ct_func = test_kbounce, },
 
+	{ .ct_name = "test_sig_dfl_neq_ign",
+	  .ct_desc = "Test SIG_DFL != SIG_IGN",
+	  .ct_func = test_sig_dfl_neq_ign, },
+
+	{ .ct_name = "test_sig_dfl_ign",
+	  .ct_desc = "Test proper handling of SIG_DFL and SIG_IGN",
+	  .ct_func = test_sig_dfl_ign, },
+
+	{ .ct_name = "test_ptrace_basic",
+	  .ct_desc = "Test basic handling of ptrace functionality",
+	  .ct_func = test_ptrace_basic, },
+
+#ifdef CHERI_LIBCHERI_TESTS
 	/*
 	 * Test libcheri sandboxing -- and kernel sandbox unwind.
 	 */
@@ -1543,6 +1572,7 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_flags = CT_FLAG_STDOUT_STRING | CT_FLAG_SANDBOX,
 	  .ct_stdout_string = "hello world\n" },
 #endif
+#endif
 
 	/*
 	 * Tests relating to setjmp(3) and longjmp(3).
@@ -1594,6 +1624,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test alignment of TLS 4K array",
 	  .ct_func = test_tls_align_4k, },
 
+#ifdef CHERITHREAD_TESTS
+	{ .ct_name = "test_tls_threads",
+	  .ct_desc = "Test TLS across threads",
+	  .ct_func = test_tls_threads, },
+#endif
+
 	/*
 	 * zlib tests.
 	 */
@@ -1605,10 +1641,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Inflate a compressed buffer of zeroes",
 	  .ct_func = test_inflate_zeroes },
 
+#ifdef CHERI_LIBCHERI_TESTS
 	{ .ct_name = "test_sandbox_inflate_zeroes",
 	  .ct_desc = "Inflate a compressed buffer of zeroes -- in a sandbox",
 	  .ct_func = test_sandbox_inflate_zeroes,
 	  .ct_flags = CT_FLAG_SANDBOX, },
+#endif
 
 	/*
 	 * CheriABI specific tests.
@@ -1625,10 +1663,6 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_cheriabi_mmap_unrepresentable",
 	  .ct_desc = "Test CheriABI mmap() with unrepresentable lengths",
 	  .ct_func = test_cheriabi_mmap_unrepresentable },
-
-	{ .ct_name = "test_cheriabi_mmap_ddc",
-	  .ct_desc = "Test CheriABI MAP_CHERI_DDC flag",
-	  .ct_func = test_cheriabi_mmap_ddc },
 
 	/*
 	 * Tests for pathname handling in open(2).
@@ -1778,8 +1812,10 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 {
 	struct cheri_frame *cfp;
 	ucontext_t *uap;
+#ifdef CHERI_LIBCHERI_TESTS
 	u_int numframes;
 	int ret;
+#endif
 
 	uap = (ucontext_t *)vuap;
 	if (uap->uc_mcontext.mc_regs[0] != /* UCONTEXT_MAGIC */ 0xACEDBADE) {
@@ -1803,6 +1839,7 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 	ccsp->ccs_mips_cause = uap->uc_mcontext.cause;
 	ccsp->ccs_cp2_cause = cfp->cf_capcause;
 
+#ifdef CHERI_LIBCHERI_TESTS
 	/*
 	 * The cheritest signal handler must decide between two courses of
 	 * action: if we're executing in a sandbox, perform an unwind and
@@ -1833,14 +1870,14 @@ signal_handler(int signum, siginfo_t *info, void *vuap)
 		}
 		ccsp->ccs_unwound = 1;
 		return;
-	} else {
-		/*
-		 * Signal delivered outside of a sandbox; catch but terminate
-		 * test.  Use EX_SOFTWARE as the parent handler will recognise
-		 * this as an appropriate exit code when a signal is handled.
-		 */
-		_exit(EX_SOFTWARE);
 	}
+#endif
+	/*
+	 * Signal delivered outside of a sandbox; catch but terminate
+	 * test.  Use EX_SOFTWARE as the parent handler will recognise
+	 * this as an appropriate exit code when a signal is handled.
+	 */
+	_exit(EX_SOFTWARE);
 }
 
 void
@@ -2339,12 +2376,15 @@ main(int argc, char *argv[])
 	/*
 	 * Initialise the libcheri sandboxing library.
 	 */
+#ifdef CHERI_LIBCHERI_TESTS
 	if (!unsandboxed_tests_only)
 		libcheri_init();
+#endif
 
 	cheri_failed_tests = sl_init();
 	cheri_xfailed_tests = sl_init();
 	/* Run the actual tests. */
+#ifdef CHERI_LIBCHERI_TESTS
 #if 0
 	cheritest_ccall_setup();
 #endif
@@ -2352,6 +2392,7 @@ main(int argc, char *argv[])
 		if (cheritest_libcheri_setup() < 0)
 			err(EX_SOFTWARE, "cheritest_libcheri_setup");
 	}
+#endif
 	xo_open_container("testsuite");
 	xo_open_list("test");
 	if (run_all) {
@@ -2429,8 +2470,10 @@ main(int argc, char *argv[])
 			    expected_failures - tests_xfailed);
 	}
 
+#ifdef CHERI_LIBCHERI_TESTS
 	if (!unsandboxed_tests_only)
 		cheritest_libcheri_destroy();
+#endif
 	if (tests_failed > tests_xfailed)
 		exit(-1);
 	exit(EX_OK);

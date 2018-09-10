@@ -129,6 +129,9 @@ public:
 
   void ChangeSection(MCSection *Section, const MCExpr *Subsection) override;
 
+  void emitELFSymverDirective(StringRef AliasName,
+                              const MCSymbol *Aliasee) override;
+
   void EmitLOHDirective(MCLOHType Kind, const MCLOHArgs &Args) override;
   void EmitLabel(MCSymbol *Symbol, SMLoc Loc = SMLoc()) override;
 
@@ -191,9 +194,6 @@ public:
   void EmitGPRel64Value(const MCExpr *Value) override;
 
   void EmitGPRel32Value(const MCExpr *Value) override;
-
-
-  void emitFill(uint64_t NumBytes, uint8_t FillValue) override;
 
   void emitFill(const MCExpr &NumBytes, uint64_t FillValue,
                 SMLoc Loc = SMLoc()) override;
@@ -412,6 +412,14 @@ void MCAsmStreamer::ChangeSection(MCSection *Section,
         *MAI, getContext().getObjectFileInfo()->getTargetTriple(), OS,
         Subsection);
   }
+}
+
+void MCAsmStreamer::emitELFSymverDirective(StringRef AliasName,
+                                           const MCSymbol *Aliasee) {
+  OS << ".symver ";
+  Aliasee->print(OS, MAI);
+  OS << ", " << AliasName;
+  EmitEOL();
 }
 
 void MCAsmStreamer::EmitLabel(MCSymbol *Symbol, SMLoc Loc) {
@@ -965,17 +973,12 @@ void MCAsmStreamer::EmitGPRel32Value(const MCExpr *Value) {
   EmitEOL();
 }
 
-/// emitFill - Emit NumBytes bytes worth of the value specified by
-/// FillValue.  This implements directives such as '.space'.
-void MCAsmStreamer::emitFill(uint64_t NumBytes, uint8_t FillValue) {
-  if (NumBytes == 0) return;
-
-  const MCExpr *E = MCConstantExpr::create(NumBytes, getContext());
-  emitFill(*E, FillValue);
-}
-
 void MCAsmStreamer::emitFill(const MCExpr &NumBytes, uint64_t FillValue,
                              SMLoc Loc) {
+  int64_t IntNumBytes;
+  if (NumBytes.evaluateAsAbsolute(IntNumBytes) && IntNumBytes == 0)
+    return;
+
   if (const char *ZeroDirective = MAI->getZeroDirective()) {
     // FIXME: Emit location directives
     OS << ZeroDirective;

@@ -74,8 +74,7 @@ efi_destroy_1t1_map(void)
 		VM_OBJECT_RLOCK(obj_1t1_pt);
 		TAILQ_FOREACH(m, &obj_1t1_pt->memq, listq)
 			m->wire_count = 0;
-		atomic_subtract_int(&vm_cnt.v_wire_count,
-		    obj_1t1_pt->resident_page_count);
+		vm_wire_sub(obj_1t1_pt->resident_page_count);
 		VM_OBJECT_RUNLOCK(obj_1t1_pt);
 		vm_object_deallocate(obj_1t1_pt);
 	}
@@ -166,7 +165,7 @@ efi_create_1t1_map(struct efi_md *map, int ndesc, int descsz)
 	    descsz)) {
 		if ((p->md_attr & EFI_MD_ATTR_RT) == 0)
 			continue;
-		if (p->md_virt != NULL) {
+		if (p->md_virt != NULL && (uint64_t)p->md_virt != p->md_phys) {
 			if (bootverbose)
 				printf("EFI Runtime entry %d is mapped\n", i);
 			goto fail;

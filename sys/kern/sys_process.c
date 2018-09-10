@@ -34,8 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
@@ -351,7 +349,6 @@ proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 	kiovec_t iov;
 	struct uio uio;
 	ssize_t slen;
-	int error;
 
 	MPASS(len < SSIZE_MAX);
 	slen = (ssize_t)len;
@@ -364,7 +361,7 @@ proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_rw = rw;
 	uio.uio_td = td;
-	error = proc_rwmem(p, &uio);
+	proc_rwmem(p, &uio);
 	if (uio.uio_resid == slen)
 		return (-1);
 	return (slen - uio.uio_resid);
@@ -387,7 +384,8 @@ proc_writemem(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 }
 
 static int
-ptrace_vm_entry(struct thread *td, struct proc *p, struct ptrace_vm_entry *pve)
+ptrace_vm_entry(struct thread *td, struct proc *p,
+		kptrace_vm_entry_t * __capability pve)
 {
 	struct vattr vattr;
 	vm_map_t map;
@@ -483,8 +481,14 @@ ptrace_vm_entry(struct thread *td, struct proc *p, struct ptrace_vm_entry *pve)
 			if (fullpath != NULL) {
 				pve->pve_pathlen = strlen(fullpath) + 1;
 				if (pve->pve_pathlen <= pathlen) {
+#if __has_feature(capabilities)
+					error = copyout_c(fullpath,
+						pve->pve_path,
+						pve->pve_pathlen);
+#else
 					error = copyout(fullpath, pve->pve_path,
 					    pve->pve_pathlen);
+#endif
 				} else
 					error = ENAMETOOLONG;
 			}
@@ -503,7 +507,7 @@ ptrace_vm_entry(struct thread *td, struct proc *p, struct ptrace_vm_entry *pve)
 #ifdef COMPAT_FREEBSD32
 static int
 ptrace_vm_entry32(struct thread *td, struct proc *p,
-    struct ptrace_vm_entry32 *pve32)
+    struct ptrace_vm_entry32 * __capability pve32)
 {
 	struct ptrace_vm_entry pve;
 	int error;
@@ -532,6 +536,7 @@ static void
 ptrace_lwpinfo_to32(const struct ptrace_lwpinfo *pl,
     struct ptrace_lwpinfo32 *pl32)
 {
+	_siginfo_t si_n;
 
 	bzero(pl32, sizeof(*pl32));
 	pl32->pl_lwpid = pl->pl_lwpid;
@@ -539,7 +544,18 @@ ptrace_lwpinfo_to32(const struct ptrace_lwpinfo *pl,
 	pl32->pl_flags = pl->pl_flags;
 	pl32->pl_sigmask = pl->pl_sigmask;
 	pl32->pl_siglist = pl->pl_siglist;
-	siginfo_to_siginfo32(&pl->pl_siginfo, &pl32->pl_siginfo);
+	/* XXXBD: ptrace should be using capability aware structs by default. */
+	si_n.si_signo = pl->pl_siginfo.si_signo;
+	si_n.si_errno = pl->pl_siginfo.si_errno;
+	si_n.si_code = pl->pl_siginfo.si_code;
+	si_n.si_pid = pl->pl_siginfo.si_pid;
+	si_n.si_uid = pl->pl_siginfo.si_uid;
+	si_n.si_status = pl->pl_siginfo.si_status;
+	si_n.si_addr = pl->pl_siginfo.si_addr;
+	si_n.si_value.sival_ptr_native =
+	    pl->pl_siginfo.si_value.sival_ptr_native;
+	memcpy(&si_n._reason, &pl->pl_siginfo._reason, sizeof(si_n._reason));
+	siginfo_to_siginfo32(&si_n, &pl32->pl_siginfo);
 	strcpy(pl32->pl_tdname, pl->pl_tdname);
 	pl32->pl_child_pid = pl->pl_child_pid;
 	pl32->pl_syscall_code = pl->pl_syscall_code;
@@ -590,7 +606,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	union {
 		struct ptrace_io_desc piod;
 		struct ptrace_lwpinfo pl;
-		struct ptrace_vm_entry pve;
+		kptrace_vm_entry_t pve;
 #ifdef CPU_CHERI
 		struct capreg capreg;
 #endif
@@ -608,7 +624,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		char args[nitems(td->td_sa.args) * sizeof(register_t)];
 		int ptevents;
 	} r;
-	void *addr;
+	void * __capability addr;
 	int error = 0;
 #ifdef COMPAT_FREEBSD32
 	int wrap32 = 0;
@@ -655,10 +671,30 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		error = COPYIN(uap->addr, &r.piod, sizeof r.piod);
 		break;
 	case PT_VM_ENTRY:
+#if __has_feature(capabilities)
+	{
+		struct ptrace_vm_entry pve;
+		error = COPYIN(uap->addr, &pve, sizeof pve);
+		if (error)
+			break;
+
+		r.pve.pve_entry     = pve.pve_entry;
+		r.pve.pve_timestamp = pve.pve_timestamp;
+		r.pve.pve_start     = pve.pve_start;
+		r.pve.pve_end       = pve.pve_end;
+		r.pve.pve_offset    = pve.pve_offset;
+		r.pve.pve_prot      = pve.pve_prot;
+		r.pve.pve_pathlen   = pve.pve_pathlen;
+		r.pve.pve_fileid    = pve.pve_fileid;
+		r.pve.pve_fsid      = pve.pve_fsid;
+		r.pve.pve_path      = (void * __capability)(intcap_t)pve.pve_path;
+	}
+#else
 		error = COPYIN(uap->addr, &r.pve, sizeof r.pve);
+#endif
 		break;
 	default:
-		addr = uap->addr;
+		addr = (__cheri_tocap void * __capability)uap->addr;
 		break;
 	}
 	if (error)
@@ -734,6 +770,7 @@ void
 proc_set_traced(struct proc *p, bool stop)
 {
 
+	sx_assert(&proctree_lock, SX_XLOCKED);
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	p->p_flag |= P_TRACED;
 	if (stop)
@@ -743,14 +780,14 @@ proc_set_traced(struct proc *p, bool stop)
 }
 
 int
-kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
+kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int data)
 {
 	kiovec_t iov;
 	struct uio uio;
 	struct proc *curp, *p, *pp;
 	struct thread *td2 = NULL, *td3;
-	struct ptrace_io_desc *piod = NULL;
-	struct ptrace_lwpinfo *pl;
+	struct ptrace_io_desc * __capability piod = NULL;
+	struct ptrace_lwpinfo * __capability pl;
 	int error, num, tmp;
 	int proctree_locked = 0;
 	lwpid_t tid = 0, *buf;
@@ -1041,7 +1078,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		}
 		CTR2(KTR_PTRACE, "PT_GET_EVENT_MASK: pid %d mask %#x", p->p_pid,
 		    p->p_ptevents);
-		*(int *)addr = p->p_ptevents;
+		*(int * __capability)addr = p->p_ptevents;
 		break;
 
 	case PT_SET_EVENT_MASK:
@@ -1049,7 +1086,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			error = EINVAL;
 			break;
 		}
-		tmp = *(int *)addr;
+		tmp = *(int * __capability)addr;
 		if ((tmp & ~(PTRACE_EXEC | PTRACE_SCE | PTRACE_SCX |
 		    PTRACE_FORK | PTRACE_LWP | PTRACE_VFORK)) != 0) {
 			error = EINVAL;
@@ -1070,7 +1107,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			error = EINVAL;
 			break;
 		}
-		bzero(addr, sizeof(td2->td_sa.args));
+		bzero((__cheri_fromcap void *)addr, sizeof(td2->td_sa.args));
 #ifdef COMPAT_FREEBSD32
 		if (wrap32)
 			for (num = 0; num < nitems(td2->td_sa.args); num++)
@@ -1078,8 +1115,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 				    td2->td_sa.args[num];
 		else
 #endif
-			bcopy(td2->td_sa.args, addr, td2->td_sa.narg *
-			    sizeof(register_t));
+			bcopy_c((__cheri_tocap void * __capability)td2->td_sa.args,
+				addr, td2->td_sa.narg * sizeof(register_t));
 		break;
 		
 	case PT_STEP:
@@ -1106,9 +1143,9 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		case PT_TO_SCE:
 		case PT_TO_SCX:
 		case PT_SYSCALL:
-			if (addr != (void *)1) {
+			if ((__cheri_addr uintptr_t)addr != 1) {
 				error = ptrace_set_pc(td2,
-				    (u_long)(uintfptr_t)addr);
+				    (u_long)(__cheri_addr uintfptr_t)addr);
 				if (error)
 					goto out;
 			}
@@ -1118,26 +1155,31 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCE: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(uintfptr_t)addr, data);
+				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    data);
 				break;
 			case PT_TO_SCX:
 				p->p_ptevents |= PTRACE_SCX;
 				CTR4(KTR_PTRACE,
 		    "PT_TO_SCX: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(uintfptr_t)addr, data);
+				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    data);
 				break;
 			case PT_SYSCALL:
 				p->p_ptevents |= PTRACE_SYSCALL;
 				CTR4(KTR_PTRACE,
 		    "PT_SYSCALL: pid %d, events = %#x, PC = %#lx, sig = %d",
 				    p->p_pid, p->p_ptevents,
-				    (u_long)(uintfptr_t)addr, data);
+				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    data);
 				break;
 			case PT_CONTINUE:
 				CTR3(KTR_PTRACE,
 				    "PT_CONTINUE: pid %d, PC = %#lx, sig = %d",
-				    p->p_pid, (u_long)(uintfptr_t)addr, data);
+				    p->p_pid,
+				    (u_long)(__cheri_addr uintfptr_t)addr,
+				    data);
 				break;
 			}
 			break;
@@ -1233,8 +1275,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		td2->td_dbgflags |= TDB_USERWR;
 		PROC_UNLOCK(p);
 		error = 0;
-		if (proc_writemem(td, p, (off_t)(uintptr_t)addr, &data,
-		    sizeof(int)) != sizeof(int))
+		if (proc_writemem(td, p, (off_t)(__cheri_addr uintptr_t)addr,
+		    &data, sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_WRITE: pid %d: %p <= %#x",
@@ -1246,8 +1288,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 	case PT_READ_D:
 		PROC_UNLOCK(p);
 		error = tmp = 0;
-		if (proc_readmem(td, p, (off_t)(uintptr_t)addr, &tmp,
-		    sizeof(int)) != sizeof(int))
+		if (proc_readmem(td, p, (off_t)(__cheri_addr uintptr_t)addr,
+		    &tmp, sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_READ: pid %d: %p >= %#x",
@@ -1319,39 +1361,39 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		CTR2(KTR_PTRACE, "PT_SETREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_USERWR;
-		error = PROC_WRITE(regs, td2, addr);
+		error = PROC_WRITE(regs, td2, (__cheri_fromcap void *)addr);
 		break;
 
 	case PT_GETREGS:
 		CTR2(KTR_PTRACE, "PT_GETREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
-		error = PROC_READ(regs, td2, addr);
+		error = PROC_READ(regs, td2, (__cheri_fromcap void *)addr);
 		break;
 
 	case PT_SETFPREGS:
 		CTR2(KTR_PTRACE, "PT_SETFPREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_USERWR;
-		error = PROC_WRITE(fpregs, td2, addr);
+		error = PROC_WRITE(fpregs, td2, (__cheri_fromcap void *)addr);
 		break;
 
 	case PT_GETFPREGS:
 		CTR2(KTR_PTRACE, "PT_GETFPREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
-		error = PROC_READ(fpregs, td2, addr);
+		error = PROC_READ(fpregs, td2, (__cheri_fromcap void *)addr);
 		break;
 
 	case PT_SETDBREGS:
 		CTR2(KTR_PTRACE, "PT_SETDBREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_USERWR;
-		error = PROC_WRITE(dbregs, td2, addr);
+		error = PROC_WRITE(dbregs, td2, (__cheri_fromcap void *)addr);
 		break;
 
 	case PT_GETDBREGS:
 		CTR2(KTR_PTRACE, "PT_GETDBREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
-		error = PROC_READ(dbregs, td2, addr);
+		error = PROC_READ(dbregs, td2, (__cheri_fromcap void *)addr);
 		break;
 
 #ifdef CPU_CHERI
@@ -1359,13 +1401,13 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		CTR2(KTR_PTRACE, "PT_SETCAPREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
 		td2->td_dbgflags |= TDB_USERWR;
-		error = PROC_WRITE(capregs, td2, addr);
+		error = PROC_WRITE(capregs, td2, (__cheri_fromcap void *)addr);
 		break;
 
 	case PT_GETCAPREGS:
 		CTR2(KTR_PTRACE, "PT_GETCAPREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);
-		error = PROC_READ(capregs, td2, addr);
+		error = PROC_READ(capregs, td2, (__cheri_fromcap void *)addr);
 		break;
 #endif
 
@@ -1387,7 +1429,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 		} else
 #endif
 		pl = addr;
-		bzero(pl, sizeof(*pl));
+		bzero((__cheri_fromcap void *)pl, sizeof(*pl));
 		pl->pl_lwpid = td2->td_tid;
 		pl->pl_event = PL_EVENT_NONE;
 		pl->pl_flags = 0;
@@ -1406,7 +1448,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			){
 				pl->pl_flags |= PL_FLAG_SI;
 				siginfo_to_siginfo_native(&td2->td_si,
-				    &pl->pl_siginfo);
+				    (__cheri_fromcap struct siginfo_native *)&pl->pl_siginfo);
 			}
 		}
 		if (td2->td_dbgflags & TDB_SCE)
@@ -1473,7 +1515,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 			buf[tmp++] = td2->td_tid;
 		}
 		PROC_UNLOCK(p);
-		error = copyout(buf, addr, tmp * sizeof(lwpid_t));
+		error = copyout_c(buf, addr, tmp * sizeof(lwpid_t));
 		free(buf, M_TEMP);
 		if (!error)
 			td->td_retval[0] = tmp;
@@ -1501,7 +1543,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void *addr, int data)
 #ifdef __HAVE_PTRACE_MACHDEP
 		if (req >= PT_FIRSTMACH) {
 			PROC_UNLOCK(p);
-			error = cpu_ptrace(td2, req, addr, data);
+			error = cpu_ptrace(td2, req,
+					(__cheri_fromcap void *)addr, data);
 			PROC_LOCK(p);
 		} else
 #endif

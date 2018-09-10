@@ -107,6 +107,14 @@ struct ptrace_io_desc {
 	size_t	piod_len;	/* request length */
 };
 
+struct ptrace_io_desc_c {
+	int	piod_op;	/* I/O operation */
+	vm_offset_t piod_offs;	/* child offset; not capability! */
+	void	* __capability piod_addr;	/* parent offset */
+	size_t	piod_len;	/* request length */
+};
+
+
 /*
  * Operations in piod_op.
  */
@@ -147,6 +155,21 @@ struct ptrace_lwpinfo {
 	u_int		pl_syscall_narg;
 };
 
+#if defined(_KERNEL) && __has_feature(capabilities)
+struct ptrace_lwpinfo_c {
+	lwpid_t	pl_lwpid;	/* LWP described. */
+	int	pl_event;	/* Event that stopped the LWP. */
+	int	pl_flags;	/* LWP flags. */
+	sigset_t	pl_sigmask;	/* LWP signal mask */
+	sigset_t	pl_siglist;	/* LWP pending signal */
+	struct siginfo_c	pl_siginfo;	/* siginfo for signal */
+	char		pl_tdname[MAXCOMLEN + 1]; /* LWP name */
+	pid_t		pl_child_pid;	/* New child pid */
+	u_int		pl_syscall_code;
+	u_int		pl_syscall_narg;
+};
+#endif
+
 #if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
 struct ptrace_lwpinfo32 {
 	lwpid_t	pl_lwpid;	/* LWP described. */
@@ -175,6 +198,23 @@ struct ptrace_vm_entry {
 	uint32_t	pve_fsid;	/* File system ID. */
 	char		*pve_path;	/* Path name of object. */
 };
+#if __has_feature(capabilities)
+struct ptrace_vm_entry_c {
+	int		pve_entry;	/* Entry number used for iteration. */
+	int		pve_timestamp;	/* Generation number of VM map. */
+	u_long		pve_start;	/* Start VA of range. */
+	u_long		pve_end;	/* End VA of range (incl). */
+	u_long		pve_offset;	/* Offset in backing object. */
+	u_int		pve_prot;	/* Protection of memory range. */
+	u_int		pve_pathlen;	/* Size of path. */
+	long		pve_fileid;	/* File ID. */
+	uint32_t	pve_fsid;	/* File system ID. */
+	char * __capability pve_path;	/* Path name of object. */
+};
+typedef struct ptrace_vm_entry_c	kptrace_vm_entry_t;
+#else
+typedef struct ptrace_vm_entry		kptrace_vm_entry_t;
+#endif
 
 #ifdef _KERNEL
 

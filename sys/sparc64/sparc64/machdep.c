@@ -40,7 +40,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 #include "opt_kstack_pages.h"
 
@@ -190,8 +189,8 @@ cpu_startup(void *arg)
 	EVENTHANDLER_REGISTER(shutdown_final, sparc64_shutdown_final, NULL,
 	    SHUTDOWN_PRI_LAST);
 
-	printf("avail memory = %lu (%lu MB)\n", vm_cnt.v_free_count * PAGE_SIZE,
-	    vm_cnt.v_free_count / ((1024 * 1024) / PAGE_SIZE));
+	printf("avail memory = %lu (%lu MB)\n", vm_free_count() * PAGE_SIZE,
+	    vm_free_count() / ((1024 * 1024) / PAGE_SIZE));
 
 	if (bootverbose)
 		printf("machine: %s\n", sparc64_model);

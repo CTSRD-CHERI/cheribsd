@@ -137,7 +137,7 @@ lo_clone_create(struct if_clone *ifc, int unit,
 	ifp->if_output = looutput;
 	ifp->if_snd.ifq_maxlen = ifqmaxlen;
 	ifp->if_capabilities = ifp->if_capenable =
-	    IFCAP_HWCSUM | IFCAP_HWCSUM_IPV6;
+	    IFCAP_HWCSUM | IFCAP_HWCSUM_IPV6 | IFCAP_LINKSTATE;
 	ifp->if_hwassist = LO_CSUM_FEATURES | LO_CSUM_FEATURES6;
 	if_attach(ifp);
 	bpfattach(ifp, DLT_NULL, sizeof(u_int32_t));
@@ -378,16 +378,17 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0, mask;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 		ifp->if_drv_flags |= IFF_DRV_RUNNING;
+		if_link_state_change(ifp, LINK_STATE_UP);
 		/*
 		 * Everything else is done at a higher level.
 		 */
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifr == NULL) {
 			error = EAFNOSUPPORT;		/* XXX */
 			break;
@@ -409,14 +410,16 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
+		if_link_state_change(ifp, (ifp->if_flags & IFF_UP) ?
+		    LINK_STATE_UP: LINK_STATE_DOWN);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if ((mask & IFCAP_RXCSUM) != 0)
 			ifp->if_capenable ^= IFCAP_RXCSUM;

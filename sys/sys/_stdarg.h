@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-3-Clause
  *
  * Copyright (c) 2002 David E. O'Brien.  All rights reserved.
- * Copyright (c) 2017 Poul-Henning Kamp. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -43,26 +42,13 @@
 #endif
 
 #ifdef __GNUCLIKE_BUILTIN_STDARG
-  #define va_start(ap, last) __builtin_va_start((ap), (last))
-  #define va_arg(ap, type) __builtin_va_arg((ap), type)
-  #define __va_copy(dest, src) __builtin_va_copy((dest), (src))
+  #define	va_start(ap, last)	__builtin_va_start((ap), (last))
+  #define	va_arg(ap, type)	__builtin_va_arg((ap), type)
+  #define	__va_copy(dest, src)	__builtin_va_copy((dest), (src))
   #if __ISO_C_VISIBLE >= 1999
-    #define va_copy(dest, src) __va_copy(dest, src)
+    #define	va_copy(dest, src)	__va_copy(dest, src)
   #endif
-#define va_end(ap) __builtin_va_end(ap)
-#endif
-
-#if defined(lint) && !defined(va_start)
-  /*
-   * Provide a fake implementation for lint's benefit
-   * This very much assumes that __va_list ends up being a pointer
-   */
-  #define va_start(ap, last) ((void)((ap) = (char *) (&(last)+1)))
-  #if __ISO_C_VISIBLE >= 1999
-    #define va_copy(dst, src) ((dst) = (src))
-  #endif
-  #define va_arg(ap, type) (*((type*)(((ap) += sizeof(type)) - sizeof(type))))
-  #define va_end(ap) ((void)0)
+  #define	va_end(ap)		__builtin_va_end(ap)
 #endif
 
 #endif /* ! _SYS__STDARG_H_ */

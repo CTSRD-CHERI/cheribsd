@@ -108,6 +108,12 @@ mips_wbflush(void)
 #endif
 }
 
+static __inline void
+breakpoint(void)
+{
+	__asm __volatile ("break");
+}
+
 #ifdef _KERNEL
 /*
  * XXX
@@ -258,6 +264,9 @@ MIPS_RW32_COP0_SEL(config6, MIPS_COP_0_CONFIG, 6);
     defined(CPU_MIPS24K)
 MIPS_RW32_COP0_SEL(config7, MIPS_COP_0_CONFIG, 7);
 #endif
+
+MIPS_RW32_COP0_SEL(badinstr, MIPS_COP_0_BAD_VADDR, 1);
+MIPS_RW32_COP0_SEL(badinstr_p, MIPS_COP_0_BAD_VADDR, 2);
 MIPS_RW32_COP0(count, MIPS_COP_0_COUNT);
 MIPS_RW32_COP0(index, MIPS_COP_0_TLB_INDEX);
 MIPS_RW32_COP0(wired, MIPS_COP_0_TLB_WIRED);
@@ -366,12 +375,6 @@ get_intr_mask(void)
 {
 
 	return (mips_rd_status() & MIPS_SR_INT_MASK);
-}
-
-static __inline void
-breakpoint(void)
-{
-	__asm __volatile ("break");
 }
 
 #if defined(__GNUC__) && !defined(__mips_o32)

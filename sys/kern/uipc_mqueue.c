@@ -54,7 +54,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
-#include "opt_compat.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -1360,14 +1359,12 @@ mqfs_read(struct vop_read_args *ap)
 	char buf[80];
 	struct vnode *vp = ap->a_vp;
 	struct uio *uio = ap->a_uio;
-	struct mqfs_node *pn;
 	struct mqueue *mq;
 	int len, error;
 
 	if (vp->v_type != VREG)
 		return (EINVAL);
 
-	pn = VTON(vp);
 	mq = VTOMQ(vp);
 	snprintf(buf, sizeof(buf),
 		"QSIZE:%-10ld MAXMSG:%-10ld CURMSG:%-10ld MSGSIZE:%-10ld\n",
@@ -1666,9 +1663,8 @@ mqueue_loadmsg(const char * __capability msg_ptr, size_t msg_size, int msg_prio)
 
 	len = sizeof(struct mqueue_msg) + msg_size;
 	msg = malloc(len, M_MQUEUEDATA, M_WAITOK);
-	error = copyin_c(msg_ptr,
-	    ((__cheri_tocap char * __capability)(char *)msg) +
-	    sizeof(struct mqueue_msg), msg_size);
+	error = copyin_c(msg_ptr, (char *)msg + sizeof(struct mqueue_msg),
+	    msg_size);
 	if (error) {
 		free(msg, M_MQUEUEDATA);
 		msg = NULL;
@@ -1688,13 +1684,10 @@ mqueue_savemsg(struct mqueue_msg *msg, char * __capability msg_ptr,
 {
 	int error;
 
-	error = copyout_c(
-	    ((__cheri_tocap char * __capability)(char *)msg) + sizeof(*msg),
-	    msg_ptr, msg->msg_size);
+	error = copyout_c((char *)msg + sizeof(*msg), msg_ptr, msg->msg_size);
 	if (error == 0 && msg_prio != NULL)
-		error = copyout_c(
-		    (__cheri_tocap unsigned int * __capability)&msg->msg_prio,
-		    msg_prio, sizeof(unsigned int));
+		error = copyout_c(&msg->msg_prio, msg_prio,
+		    sizeof(unsigned int));
 	return (error);
 }
 
@@ -2056,7 +2049,7 @@ kern_kmq_open(struct thread *td, const char * __capability upath, int flags,
 			return (EINVAL);
 	}
 
-	error = copyinstr_c(upath, &path[0], MQFS_NAMELEN + 1, NULL);
+	error = copyinstr_c(upath, path, MQFS_NAMELEN + 1, NULL);
         if (error)
 		return (error);
 
@@ -2177,7 +2170,7 @@ kern_kmq_unlink(struct thread *td, const char * __capability upath)
 	struct mqfs_node *pn;
 	int error, len;
 
-	error = copyinstr_c(upath, &path[0], MQFS_NAMELEN + 1, NULL);
+	error = copyinstr_c(upath, path, MQFS_NAMELEN + 1, NULL);
         if (error)
 		return (error);
 
@@ -2227,9 +2220,8 @@ static __inline int
 getmq(struct thread *td, int fd, struct file **fpp, struct mqfs_node **ppn,
 	struct mqueue **pmq)
 {
-	cap_rights_t rights;
 
-	return _getmq(td, fd, cap_rights_init(&rights, CAP_EVENT), fget,
+	return _getmq(td, fd, &cap_event_rights, fget,
 	    fpp, ppn, pmq);
 }
 
@@ -2237,9 +2229,8 @@ static __inline int
 getmq_read(struct thread *td, int fd, struct file **fpp,
 	 struct mqfs_node **ppn, struct mqueue **pmq)
 {
-	cap_rights_t rights;
 
-	return _getmq(td, fd, cap_rights_init(&rights, CAP_READ), fget_read,
+	return _getmq(td, fd, &cap_read_rights, fget_read,
 	    fpp, ppn, pmq);
 }
 
@@ -2247,9 +2238,8 @@ static __inline int
 getmq_write(struct thread *td, int fd, struct file **fpp,
 	struct mqfs_node **ppn, struct mqueue **pmq)
 {
-	cap_rights_t rights;
 
-	return _getmq(td, fd, cap_rights_init(&rights, CAP_WRITE), fget_write,
+	return _getmq(td, fd, &cap_write_rights, fget_write,
 	    fpp, ppn, pmq);
 }
 
@@ -2392,9 +2382,6 @@ kern_kmq_timedsend(struct thread *td, int mqd,
 static int
 kern_kmq_notify(struct thread *td, int mqd, ksigevent_t *sigev)
 {
-#ifdef CAPABILITIES
-	cap_rights_t rights;
-#endif
 	struct filedesc *fdp;
 	struct proc *p;
 	struct mqueue *mq;
@@ -2427,8 +2414,7 @@ again:
 		goto out;
 	}
 #ifdef CAPABILITIES
-	error = cap_check(cap_rights(fdp, mqd),
-	    cap_rights_init(&rights, CAP_EVENT));
+	error = cap_check(cap_rights(fdp, mqd), &cap_event_rights);
 	if (error) {
 		FILEDESC_SUNLOCK(fdp);
 		goto out;
@@ -2518,11 +2504,13 @@ sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 static void
 mqueue_fdclose(struct thread *td, int fd, struct file *fp)
 {
-	struct filedesc *fdp;
 	struct mqueue *mq;
+#ifdef INVARIANTS
+	struct filedesc *fdp;
  
 	fdp = td->td_proc->p_fd;
 	FILEDESC_LOCK_ASSERT(fdp);
+#endif
 
 	if (fp->f_ops == &mqueueops) {
 		mq = FPTOMQ(fp);
@@ -2923,7 +2911,7 @@ freebsd32_kmq_timedreceive(struct thread *td,
 int
 freebsd32_kmq_notify(struct thread *td, struct freebsd32_kmq_notify_args *uap)
 {
-	struct sigevent ev, *evp;
+	ksigevent_t ev, *evp;
 	struct sigevent32 ev32;
 	int error;
 

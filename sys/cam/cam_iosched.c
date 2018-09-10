@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2015 Netflix, Inc.
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -223,6 +222,7 @@ struct iop_stats {
 	int		total;		/* Total for all time -- wraps */
 	int		in;		/* number queued all time -- wraps */
 	int		out;		/* number completed all time -- wraps */
+	int		errs;		/* Number of I/Os completed with error --  wraps */
 
 	/*
 	 * Statistics on different bits of the process.
@@ -717,22 +717,22 @@ cam_iosched_io_metric_update(struct cam_iosched_softc *isc,
     sbintime_t sim_latency, int cmd, size_t size);
 #endif
 
-static inline int
+static inline bool
 cam_iosched_has_flagged_work(struct cam_iosched_softc *isc)
 {
 	return !!(isc->flags & CAM_IOSCHED_FLAG_WORK_FLAGS);
 }
 
-static inline int
+static inline bool
 cam_iosched_has_io(struct cam_iosched_softc *isc)
 {
 #ifdef CAM_IOSCHED_DYNAMIC
 	if (do_dynamic_iosched) {
 		struct bio *rbp = bioq_first(&isc->bio_queue);
 		struct bio *wbp = bioq_first(&isc->write_queue);
-		int can_write = wbp != NULL &&
+		bool can_write = wbp != NULL &&
 		    cam_iosched_limiter_caniop(&isc->write_stats, wbp) == 0;
-		int can_read = rbp != NULL &&
+		bool can_read = rbp != NULL &&
 		    cam_iosched_limiter_caniop(&isc->read_stats, rbp) == 0;
 		if (iosched_debug > 2) {
 			printf("can write %d: pending_writes %d max_writes %d\n", can_write, isc->write_stats.pending, isc->write_stats.max);
@@ -745,7 +745,7 @@ cam_iosched_has_io(struct cam_iosched_softc *isc)
 	return bioq_first(&isc->bio_queue) != NULL;
 }
 
-static inline int
+static inline bool
 cam_iosched_has_more_trim(struct cam_iosched_softc *isc)
 {
 	return !(isc->flags & CAM_IOSCHED_FLAG_TRIM_ACTIVE) &&
@@ -756,7 +756,7 @@ cam_iosched_has_more_trim(struct cam_iosched_softc *isc)
     (isc)->sort_io_queue : cam_sort_io_queues)
 
 
-static inline int
+static inline bool
 cam_iosched_has_work(struct cam_iosched_softc *isc)
 {
 #ifdef CAM_IOSCHED_DYNAMIC
@@ -781,6 +781,7 @@ cam_iosched_iop_stats_init(struct cam_iosched_softc *isc, struct iop_stats *ios)
 	ios->max = ios->current = 300000;
 	ios->min = 1;
 	ios->out = 0;
+	ios->errs = 0;
 	ios->pending = 0;
 	ios->queued = 0;
 	ios->total = 0;
@@ -971,7 +972,11 @@ cam_iosched_iop_stats_sysctl_init(struct cam_iosched_softc *isc, struct iop_stat
 	SYSCTL_ADD_INT(ctx, n,
 	    OID_AUTO, "out", CTLFLAG_RD,
 	    &ios->out, 0,
-	    "# of transactions completed");
+	    "# of transactions completed (including with error)");
+	SYSCTL_ADD_INT(ctx, n,
+	    OID_AUTO, "errs", CTLFLAG_RD,
+	    &ios->errs, 0,
+	    "# of transactions completed with an error");
 
 	SYSCTL_ADD_PROC(ctx, n,
 	    OID_AUTO, "limiter", CTLTYPE_STRING | CTLFLAG_RW,
@@ -1213,7 +1218,11 @@ cam_iosched_get_write(struct cam_iosched_softc *isc)
 	 */
 	if (bioq_first(&isc->bio_queue) && isc->current_read_bias) {
 		if (iosched_debug)
-			printf("Reads present and current_read_bias is %d queued writes %d queued reads %d\n", isc->current_read_bias, isc->write_stats.queued, isc->read_stats.queued);
+			printf(
+			    "Reads present and current_read_bias is %d queued "
+			    "writes %d queued reads %d\n",
+			    isc->current_read_bias, isc->write_stats.queued,
+    			    isc->read_stats.queued);
 		isc->current_read_bias--;
 		/* We're not limiting writes, per se, just doing reads first */
 		return NULL;
@@ -1386,7 +1395,7 @@ cam_iosched_queue_work(struct cam_iosched_softc *isc, struct bio *bp)
 	 * the work on the bio queue.
 	 */
 	if (bp->bio_cmd == BIO_DELETE) {
-		bioq_disksort(&isc->trim_queue, bp);
+		bioq_insert_tail(&isc->trim_queue, bp);
 #ifdef CAM_IOSCHED_DYNAMIC
 		isc->trim_stats.in++;
 		isc->trim_stats.queued++;
@@ -1463,13 +1472,19 @@ cam_iosched_bio_complete(struct cam_iosched_softc *isc, struct bio *bp,
 		printf("done: %p %#x\n", bp, bp->bio_cmd);
 	if (bp->bio_cmd == BIO_WRITE) {
 		retval = cam_iosched_limiter_iodone(&isc->write_stats, bp);
+		if ((bp->bio_flags & BIO_ERROR) != 0)
+			isc->write_stats.errs++;
 		isc->write_stats.out++;
 		isc->write_stats.pending--;
 	} else if (bp->bio_cmd == BIO_READ) {
 		retval = cam_iosched_limiter_iodone(&isc->read_stats, bp);
+		if ((bp->bio_flags & BIO_ERROR) != 0)
+			isc->read_stats.errs++;
 		isc->read_stats.out++;
 		isc->read_stats.pending--;
 	} else if (bp->bio_cmd == BIO_DELETE) {
+		if ((bp->bio_flags & BIO_ERROR) != 0)
+			isc->trim_stats.errs++;
 		isc->trim_stats.out++;
 		isc->trim_stats.pending--;
 	} else if (bp->bio_cmd != BIO_FLUSH) {
@@ -1477,7 +1492,7 @@ cam_iosched_bio_complete(struct cam_iosched_softc *isc, struct bio *bp,
 			printf("Completing command with bio_cmd == %#x\n", bp->bio_cmd);
 	}
 
-	if (!(bp->bio_flags & BIO_ERROR))
+	if (!(bp->bio_flags & BIO_ERROR) && done_ccb != NULL)
 		cam_iosched_io_metric_update(isc,
 		    cam_iosched_sbintime_t(done_ccb->ccb_h.qos.periph_data),
 		    bp->bio_cmd, bp->bio_bcount);

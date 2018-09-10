@@ -12,7 +12,11 @@
 # LINKER_FEATURES may contain one or more of the following, based on
 # linker support for that feature:
 #
-# - build-id : support for generating a Build-ID note
+# - build-id:  support for generating a Build-ID note
+# - retpoline: support for generating PLT with retpoline speculative
+#              execution vulnerability mitigation
+#
+# LINKER_FREEBSD_VERSION is the linker's internal source version.
 #
 # These variables with an X_ prefix will also be provided if XLD is set.
 #
@@ -22,18 +26,33 @@
 .if !target(__<bsd.linker.mk>__)
 __<bsd.linker.mk>__:
 
-.for ld X_ in LD $${_empty_var_} XLD X_
+_ld_vars=LD $${_empty_var_}
+.if !empty(_WANT_TOOLCHAIN_CROSS_VARS)
+# Only the toplevel makefile needs to compute the X_LINKER_* variables.
+# This avoids unncessary fork+exec calls in every subdir (see bsd.compiler.mk)
+_ld_vars+=XLD X_
+# Also get version information from CHERI_LD (if it is set)
+.ifdef CHERI_LD
+_ld_vars+=CHERI_LD CHERI_
+.endif
+.endif
+
+.for ld X_ in ${_ld_vars}
 .if ${ld} == "LD" || !empty(XLD)
 # Try to import LINKER_TYPE and LINKER_VERSION from parent make.
 # The value is only used/exported for the same environment that impacts
 # LD and LINKER_* settings here.
-_exported_vars=	${X_}LINKER_TYPE ${X_}LINKER_VERSION ${X_}LINKER_FEATURES
+_exported_vars=	${X_}LINKER_TYPE ${X_}LINKER_VERSION ${X_}LINKER_FEATURES \
+		${X_}LINKER_FREEBSD_VERSION
 ${X_}_ld_hash=	${${ld}}${MACHINE}${PATH}
 ${X_}_ld_hash:=	${${X_}_ld_hash:hash}
-# Only import if none of the vars are set somehow else.
+# Only import if none of the vars are set differntly somehow else.
 _can_export=	yes
 .for var in ${_exported_vars}
-.if defined(${var})
+.if defined(${var}) && (!defined(${var}.${${X_}_ld_hash}) || ${${var}.${${X_}_ld_hash}} != ${${var}})
+.if defined(${var}.${${X_}_ld_hash})
+.info "Cannot import ${X_}LINKER variables since cached ${var} is different: ${${var}.${${X_}_ld_hash}} != ${${var}}"
+.endif
 _can_export=	no
 .endif
 .endfor
@@ -47,21 +66,32 @@ ${var}=	${${var}.${${X_}_ld_hash}}
 
 .if ${ld} == "LD" || (${ld} == "XLD" && ${XLD} != ${LD})
 .if !defined(${X_}LINKER_TYPE) || !defined(${X_}LINKER_VERSION)
-_ld_version!=	(${${ld}} --version || echo none) | head -n 1
+# See bsd.compiler.mk
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+.error "${.CURDIR}: Rerunning ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!"
+.else
+# .info "${.CURDIR}: Running ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION"
+.endif
+_ld_version!=	(${${ld}} --version || echo none) | sed -n 1p
 .if ${_ld_version} == "none"
 .warning Unable to determine linker type from ${ld}=${${ld}}
 .endif
 .if ${_ld_version:[1..2]} == "GNU ld"
 ${X_}LINKER_TYPE=	bfd
+${X_}LINKER_FREEBSD_VERSION=	0
 _v=	${_ld_version:M[1-9].[0-9]*:[1]}
 .elif ${_ld_version:[1]} == "LLD"
 ${X_}LINKER_TYPE=	lld
 _v=	${_ld_version:[2]}
+${X_}LINKER_FREEBSD_VERSION!= \
+	${${ld}} --version | \
+	awk '$$3 ~ /FreeBSD/ {print substr($$4, 1, length($$4)-1)}'
 .else
 .warning Unknown linker from ${ld}=${${ld}}: ${_ld_version}, defaulting to bfd
 ${X_}LINKER_TYPE=	bfd
 _v=	2.17.50
 .endif
+# See bsd.compiler.mk
 ${X_}LINKER_VERSION!=	echo "${_v:M[1-9].[0-9]*}" | \
 			  awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;}'
 .undef _ld_version
@@ -69,9 +99,13 @@ ${X_}LINKER_VERSION!=	echo "${_v:M[1-9].[0-9]*}" | \
 ${X_}LINKER_FEATURES=
 .if ${${X_}LINKER_TYPE} != "bfd" || ${${X_}LINKER_VERSION} > 21750
 ${X_}LINKER_FEATURES+=	build-id
+${X_}LINKER_FEATURES+=	ifunc
 .endif
 .if ${${X_}LINKER_TYPE} != "lld" || ${${X_}LINKER_VERSION} >= 50000
 ${X_}LINKER_FEATURES+=	filter
+.endif
+.if ${${X_}LINKER_TYPE} == "lld" && ${${X_}LINKER_VERSION} >= 60000
+${X_}LINKER_FEATURES+=	retpoline
 .endif
 .endif
 .else
@@ -79,6 +113,7 @@ ${X_}LINKER_FEATURES+=	filter
 X_LINKER_TYPE=		${LINKER_TYPE}
 X_LINKER_VERSION=	${LINKER_VERSION}
 X_LINKER_FEATURES=	${LINKER_FEATURES}
+X_LINKER_FREEBSD_VERSION= ${LINKER_FREEBSD_VERSION}
 .endif	# ${ld} == "LD" || (${ld} == "XLD" && ${XLD} != ${LD})
 
 # Export the values so sub-makes don't have to look them up again, using the

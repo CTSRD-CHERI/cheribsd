@@ -14,7 +14,7 @@ MK_INSTALL_AS_USER= yes
 .endif
 
 # from src/Makefile (for universe)
-TARGET_ARCHES_arm?=     arm armeb armv6 armv7
+TARGET_ARCHES_arm?=     arm armv6 armv7
 TARGET_ARCHES_arm64?=   aarch64
 TARGET_ARCHES_mips?=    mipsel mips mips64el mips64 mipsn32 mipsn32el
 TARGET_ARCHES_powerpc?= powerpc powerpc64 powerpcspe
@@ -212,7 +212,7 @@ BTOOLSPATH= ${HOST_OBJTOP}/tools${.CURDIR}
 
 # Don't use the bootstrap tools logic on itself.
 .if ${.TARGETS:Mbootstrap-tools} == "" && \
-    !make(showconfig) && \
+    !make(test-system-*) && !make(showconfig) && !make(print-dir) && \
     !defined(BOOTSTRAPPING_TOOLS) && !empty(TOOLSDIR) && ${.MAKE.LEVEL} == 0
 .for dir in /sbin /bin /usr/sbin /usr/bin
 PATH:= ${TOOLSDIR}${dir}:${PATH}

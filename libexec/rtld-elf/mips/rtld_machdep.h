@@ -31,6 +31,10 @@
 #ifndef RTLD_MACHDEP_H
 #define RTLD_MACHDEP_H	1
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#error "Should not be included by rtld-cheri-elf"
+#endif
+
 #include <sys/types.h>
 #include <machine/atomic.h>
 #include <machine/tls.h>
@@ -64,7 +68,7 @@ typedef struct {
 #define round(size, align) \
     (((size) + (align) - 1) & ~((align) - 1))
 #define calculate_first_tls_offset(size, align) \
-    round(TLS_TCB_SIZE, align)
+    TLS_TCB_SIZE
 #define calculate_tls_offset(prev_offset, prev_size, size, align) \
     round(prev_offset + prev_size, align)
 #define calculate_tls_end(off, size)    ((off) + (size))
@@ -75,5 +79,34 @@ extern void *__tls_get_addr(tls_index *ti);
 #define	RTLD_DEFAULT_STACK_EXEC		PROT_EXEC
 
 #define md_abi_variant_hook(x)
+
+// Validating e_flags:
+#define rtld_validate_target_eflags(path, hdr, main_path)	\
+	_rtld_validate_target_eflags(path, hdr, main_path)
+static inline bool
+_rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_path)
+{
+	static size_t first_cheri_obj = 0;
+	size_t machine = (hdr->e_flags & EF_MIPS_MACH);
+	bool is_cheri = machine == EF_MIPS_MACH_CHERI128 || machine == EF_MIPS_MACH_CHERI128;
+	/* rtld is built with the MIPS compiler, so just save the first encountered CHERI bits */
+	/* TODO: ask the kernel instead */
+	if (is_cheri) {
+		if (!first_cheri_obj) {
+			first_cheri_obj = machine;
+		} else if (machine != first_cheri_obj) {
+			_rtld_error("%s: cannot load %s since EF_MIPS_MACH_CHERI"
+			    " != 0x%zx (e_flags=0x%zx)", main_path, path,
+			    first_cheri_obj, (size_t)hdr->e_flags);
+			return false;
+		}
+	}
+	if ((hdr->e_flags & EF_MIPS_ABI) == EF_MIPS_ABI_CHERIABI) {
+		_rtld_error("%s: cannot load %s since it is CheriABI",
+		    main_path, path);
+		return false;
+	}
+	return true;
+}
 
 #endif

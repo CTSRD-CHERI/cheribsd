@@ -41,7 +41,7 @@
 // format. Struct kernel_stat is defined as 'struct stat' in asm/stat.h. To
 // access stat from asm/stat.h, without conflicting with definition in
 // sys/stat.h, we use this trick.
-#if defined(__mips64)
+#if defined(__mips64) && SANITIZER_LINUX
 #include <asm/unistd.h>
 #include <sys/types.h>
 #define stat kernel_stat
@@ -249,7 +249,7 @@ static void stat64_to_stat(struct stat64 *in, struct stat *out) {
 }
 #endif
 
-#if defined(__mips64)
+#if defined(__mips64) && SANITIZER_LINUX
 // Undefine compatibility macros from <sys/stat.h>
 // so that they would not clash with the kernel_stat
 // st_[a|m|c]time fields
@@ -351,7 +351,7 @@ uptr internal_lstat(const char *path, void *buf) {
 
 uptr internal_fstat(fd_t fd, void *buf) {
 #if SANITIZER_FREEBSD || SANITIZER_NETBSD || SANITIZER_LINUX_USES_64BIT_SYSCALLS
-# if SANITIZER_MIPS64 && !SANITIZER_NETBSD
+# if SANITIZER_MIPS64 && SANITIZER_LINUX_USES_64BIT_SYSCALLS
   // For mips64, fstat syscall fills buffer in the format of kernel_stat
   struct kernel_stat kbuf;
   int res = internal_syscall(SYSCALL(fstat), fd, &kbuf);
@@ -1200,7 +1200,7 @@ uptr internal_clone(int (*fn)(void *), void *child_stack, int flags, void *arg,
                        : "rsp", "memory", "r11", "rcx");
   return res;
 }
-#elif defined(__mips__)
+#elif defined(__mips__) && SANITIZER_LINUX
 uptr internal_clone(int (*fn)(void *), void *child_stack, int flags, void *arg,
                     int *parent_tidptr, void *newtls, int *child_tidptr) {
   long long res;
@@ -1819,10 +1819,17 @@ static void GetPcSpBp(void *context, uptr *pc, uptr *sp, uptr *bp) {
   *bp = stk_ptr[15];
 # endif
 #elif defined(__mips__)
+# if SANITIZER_FREEBSD
+  ucontext_t *ucontext = (ucontext_t*)context;
+  *pc = ucontext->uc_mcontext.mc_pc;
+  *bp = ucontext->uc_mcontext.mc_regs[30];
+  *sp = ucontext->uc_mcontext.mc_regs[29];
+# else
   ucontext_t *ucontext = (ucontext_t*)context;
   *pc = ucontext->uc_mcontext.pc;
   *bp = ucontext->uc_mcontext.gregs[30];
   *sp = ucontext->uc_mcontext.gregs[29];
+# endif
 #elif defined(__s390__)
   ucontext_t *ucontext = (ucontext_t*)context;
 # if defined(__s390x__)

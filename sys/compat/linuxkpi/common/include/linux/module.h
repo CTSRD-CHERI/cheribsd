@@ -42,6 +42,7 @@
 #include <linux/sysfs.h>
 #include <linux/moduleparam.h>
 #include <linux/slab.h>
+#include <linux/export.h>
 
 #define MODULE_AUTHOR(name)
 #define MODULE_DESCRIPTION(name)
@@ -51,8 +52,7 @@
 
 #define	THIS_MODULE	((struct module *)0)
 
-#define	EXPORT_SYMBOL(name)
-#define	EXPORT_SYMBOL_GPL(name)
+#define	__MODULE_STRING(x) __stringify(x)
 
 /* OFED pre-module initialization */
 #define	SI_SUB_OFED_PREINIT	(SI_SUB_ROOT_CONF - 2)
@@ -77,9 +77,7 @@ _module_run(void *arg)
 		printf("Running %s (%p)\n", name, pc);
 #endif
 	fn = arg;
-	DROP_GIANT();
 	fn();
-	PICKUP_GIANT();
 }
 
 #define	module_init(fn)							\

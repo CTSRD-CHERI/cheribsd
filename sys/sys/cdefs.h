@@ -230,8 +230,10 @@
 #endif
 #if __GNUC_PREREQ__(4, 3) || __has_attribute(__alloc_size__)
 #define	__alloc_size(x)	__attribute__((__alloc_size__(x)))
+#define	__alloc_size2(n, x)	__attribute__((__alloc_size__(n, x)))
 #else
 #define	__alloc_size(x)
+#define	__alloc_size2(n, x)
 #endif
 #if __GNUC_PREREQ__(4, 9) || __has_attribute(__alloc_align__)
 #define	__alloc_align(x)	__attribute__((__alloc_align__(x)))
@@ -589,7 +591,7 @@
  *	__FBSDID("$FreeBSD$");
  */
 #ifndef	__FBSDID
-#if !defined(lint) && !defined(STRIP_FBSDID)
+#if !defined(STRIP_FBSDID)
 #define	__FBSDID(s)	__IDSTRING(__CONCAT(__rcsid_,__LINE__),s)
 #else
 #define	__FBSDID(s)	struct __hack
@@ -949,10 +951,31 @@
 #define __cheri_addr
 #endif
 
-/* allow __builtin_is_aligned unconditionally */
+#define __static_assert_if_constant(val, expr, message) \
+	_Static_assert(__builtin_choose_expr(__builtin_constant_p(val), \
+	    expr, 1), message)
+#define __static_assert_power_of_two(val) \
+	__static_assert_if_constant(val, (val & (val-1)) == 0, \
+	     "Alignment must be a power-of-two")
+
+/* Allow use of __builtin_is_aligned/align_up/align_down unconditionally */
 #if !__has_builtin(__builtin_is_aligned)
 #define __builtin_is_aligned(addr, align) \
-	(((vaddr_t)addr & ((vaddr_t)(align) - 1)) == 0)
+	({ __static_assert_power_of_two(align);			\
+	(((vaddr_t)addr & ((vaddr_t)(align) - 1)) == 0); })
+#endif
+#if !__has_builtin(__builtin_align_up)
+#define __builtin_align_up(addr, align) \
+	({ __static_assert_power_of_two(align);					\
+	vaddr_t unaligned_bits = (vaddr_t)addr & (align - 1);			\
+	unaligned_bits == 0 ? addr :						\
+	    (__typeof__(addr))((uintptr_t)addr + (align - unaligned_bits)); })
+#endif
+#if !__has_builtin(__builtin_align_down)
+#define __builtin_align_down(addr, align) ({					\
+	__static_assert_power_of_two(align);					\
+	vaddr_t unaligned_bits = (vaddr_t)addr & (align - 1);			\
+	(__typeof__(addr))((uintptr_t)addr - unaligned_bits); })
 #endif
 
 #endif /* !_SYS_CDEFS_H_ */

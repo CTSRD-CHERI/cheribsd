@@ -402,14 +402,12 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	struct filedesc_to_leader *fdtol;
 	struct sigacts *newsigacts;
 
-	sx_assert(&proctree_lock, SX_SLOCKED);
+	sx_assert(&proctree_lock, SX_LOCKED);
 	sx_assert(&allproc_lock, SX_XLOCKED);
 
 	p1 = td->td_proc;
 
 	trypid = fork_findpid(fr->fr_flags);
-
-	sx_sunlock(&proctree_lock);
 
 	p2->p_state = PRS_NEW;		/* protect against others */
 	p2->p_pid = trypid;
@@ -417,11 +415,11 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	LIST_INSERT_HEAD(&allproc, p2, p_list);
 	allproc_gen++;
 	LIST_INSERT_HEAD(PIDHASH(p2->p_pid), p2, p_hash);
-	tidhash_add(td2);
 	PROC_LOCK(p2);
 	PROC_LOCK(p1);
 
 	sx_xunlock(&allproc_lock);
+	sx_xunlock(&proctree_lock);
 
 	bcopy(&p1->p_startcopy, &p2->p_startcopy,
 	    __rangeof(struct proc, p_startcopy, p_endcopy));
@@ -436,6 +434,8 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	prison_proc_hold(p2->p_ucred->cr_prison);
 
 	PROC_UNLOCK(p2);
+
+	tidhash_add(td2);
 
 	/*
 	 * Malloc things while we don't hold any locks.
@@ -729,18 +729,6 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	 * but before we wait for the debugger.
 	 */
 	_PHOLD(p2);
-	if (p1->p_ptevents & PTRACE_FORK) {
-		/*
-		 * Arrange for debugger to receive the fork event.
-		 *
-		 * We can report PL_FLAG_FORKED regardless of
-		 * P_FOLLOWFORK settings, but it does not make a sense
-		 * for runaway child.
-		 */
-		td->td_dbgflags |= TDB_FORK;
-		td->td_dbg_forked = p2->p_pid;
-		td2->td_dbgflags |= TDB_STOPATFORK;
-	}
 	if (fr->fr_flags & RFPPWAIT) {
 		td->td_pflags |= TDP_RFPPWAIT;
 		td->td_rfppwait_p = p2;
@@ -764,7 +752,42 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 		procdesc_finit(p2->p_procdesc, fp_procdesc);
 		fdrop(fp_procdesc, td);
 	}
-
+	
+	/*
+	 * Speculative check for PTRACE_FORK. PTRACE_FORK is not
+	 * synced with forks in progress so it is OK if we miss it
+	 * if being set atm.
+	 */
+	if ((p1->p_ptevents & PTRACE_FORK) != 0) {
+		sx_xlock(&proctree_lock);
+		PROC_LOCK(p2);
+		
+		/*
+		 * p1->p_ptevents & p1->p_pptr are protected by both
+		 * process and proctree locks for modifications,
+		 * so owning proctree_lock allows the race-free read.
+		 */
+		if ((p1->p_ptevents & PTRACE_FORK) != 0) {
+			/*
+			 * Arrange for debugger to receive the fork event.
+			 *
+			 * We can report PL_FLAG_FORKED regardless of
+			 * P_FOLLOWFORK settings, but it does not make a sense
+			 * for runaway child.
+			 */
+			td->td_dbgflags |= TDB_FORK;
+			td->td_dbg_forked = p2->p_pid;
+			td2->td_dbgflags |= TDB_STOPATFORK;
+			proc_set_traced(p2, true);
+			CTR2(KTR_PTRACE,
+			    "do_fork: attaching to new child pid %d: oppid %d",
+			    p2->p_pid, p2->p_oppid);
+			proc_reparent(p2, p1->p_pptr);
+		}
+		PROC_UNLOCK(p2);
+		sx_xunlock(&proctree_lock);
+	}
+	
 	if ((fr->fr_flags & RFSTOPPED) == 0) {
 		/*
 		 * If RFSTOPPED not requested, make child runnable and
@@ -781,11 +804,6 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	}
 
 	PROC_LOCK(p2);
-	/*
-	 * Wait until debugger is attached to child.
-	 */
-	while (td2->td_proc == p2 && (td2->td_dbgflags & TDB_STOPATFORK) != 0)
-		cv_wait(&p2->p_dbgwait, &p2->p_mtx);
 	_PRELE(p2);
 	racct_proc_fork_done(p2);
 	PROC_UNLOCK(p2);
@@ -963,7 +981,7 @@ fork1(struct thread *td, struct fork_req *fr)
 	STAILQ_INIT(&newproc->p_ktr);
 
 	/* We have to lock the process tree while we look for a pid. */
-	sx_slock(&proctree_lock);
+	sx_xlock(&proctree_lock);
 	sx_xlock(&allproc_lock);
 
 	/*
@@ -985,8 +1003,8 @@ fork1(struct thread *td, struct fork_req *fr)
 	}
 
 	error = EAGAIN;
-	sx_sunlock(&proctree_lock);
 	sx_xunlock(&allproc_lock);
+	sx_xunlock(&proctree_lock);
 #ifdef MAC
 	mac_proc_destroy(newproc);
 #endif
@@ -1071,24 +1089,15 @@ fork_exit(void (*callout)(void *, struct trapframe *), void *arg,
 void
 fork_return(struct thread *td, struct trapframe *frame)
 {
-	struct proc *p, *dbg;
+	struct proc *p;
 
 	p = td->td_proc;
 	if (td->td_dbgflags & TDB_STOPATFORK) {
-		sx_xlock(&proctree_lock);
 		PROC_LOCK(p);
-		if (p->p_pptr->p_ptevents & PTRACE_FORK) {
+		if ((p->p_flag & P_TRACED) != 0) {
 			/*
-			 * If debugger still wants auto-attach for the
-			 * parent's children, do it now.
+			 * Inform the debugger if one is still present.
 			 */
-			dbg = p->p_pptr->p_pptr;
-			proc_set_traced(p, true);
-			CTR2(KTR_PTRACE,
-		    "fork_return: attaching to new child pid %d: oppid %d",
-			    p->p_pid, p->p_oppid);
-			proc_reparent(p, dbg);
-			sx_xunlock(&proctree_lock);
 			td->td_dbgflags |= TDB_CHILD | TDB_SCX | TDB_FSTP;
 			ptracestop(td, SIGSTOP, NULL);
 			td->td_dbgflags &= ~(TDB_CHILD | TDB_SCX);
@@ -1096,9 +1105,7 @@ fork_return(struct thread *td, struct trapframe *frame)
 			/*
 			 * ... otherwise clear the request.
 			 */
-			sx_xunlock(&proctree_lock);
 			td->td_dbgflags &= ~TDB_STOPATFORK;
-			cv_broadcast(&p->p_dbgwait);
 		}
 		PROC_UNLOCK(p);
 	} else if (p->p_flag & P_TRACED || td->td_dbgflags & TDB_BORN) {

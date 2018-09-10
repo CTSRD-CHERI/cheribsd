@@ -94,8 +94,8 @@ kern_extattrctl(struct thread *td, const char * __capability path, int cmd,
 	 * invoke the VFS call so as to pass in NULL there if needed.
 	 */
 	if (uattrname != NULL) {
-		error = copyinstr_c(uattrname, &attrname[0],
-		    EXTATTR_MAXNAMELEN, NULL);
+		error = copyinstr_c(uattrname, attrname, EXTATTR_MAXNAMELEN,
+		    NULL);
 		if (error)
 			return (error);
 	}
@@ -249,7 +249,7 @@ kern_extattr_set_fd(struct thread *td, int fd, int attrnamespace,
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr_c(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
@@ -315,7 +315,7 @@ kern_extattr_set_path(struct thread *td,
 	int error;
 
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr_c(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
@@ -432,7 +432,7 @@ kern_extattr_get_fd(struct thread *td, int fd, int attrnamespace,
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr_c(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
@@ -493,7 +493,7 @@ kern_extattr_get_path(struct thread *td, const char * __capability path,
 	int error;
 
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr_c(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
@@ -579,7 +579,7 @@ kern_extattr_delete_fd(struct thread *td, int fd, int attrnamespace,
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr_c(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return (error);
 	AUDIT_ARG_TEXT(attrname);
@@ -634,7 +634,7 @@ kern_extattr_delete_path(struct thread *td, const char * __capability path,
 	int error;
 
 	AUDIT_ARG_VALUE(attrnamespace);
-	error = copyinstr_c(uattrname, &attrname[0], EXTATTR_MAXNAMELEN, NULL);
+	error = copyinstr_c(uattrname, attrname, EXTATTR_MAXNAMELEN, NULL);
 	if (error)
 		return(error);
 	AUDIT_ARG_TEXT(attrname);

@@ -80,6 +80,10 @@ __FBSDID("$FreeBSD$");
 #include <netinet/in_var.h>
 #include <netinet/ip_var.h>
 #include <netinet/ip_options.h>
+
+#include <netinet/udp.h>
+#include <netinet/udp_var.h>
+
 #ifdef SCTP
 #include <netinet/sctp.h>
 #include <netinet/sctp_crc32.h>
@@ -117,7 +121,7 @@ ip_output_pfil(struct mbuf **mp, struct ifnet *ifp, struct inpcb *inp,
 
 	/* Run through list of hooks for output packets. */
 	odst.s_addr = ip->ip_dst.s_addr;
-	*error = pfil_run_hooks(&V_inet_pfil_hook, mp, ifp, PFIL_OUT, inp);
+	*error = pfil_run_hooks(&V_inet_pfil_hook, mp, ifp, PFIL_OUT, 0, inp);
 	m = *mp;
 	if ((*error) != 0 || m == NULL)
 		return 1; /* Finished */
@@ -225,7 +229,6 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
 	struct route iproute;
 	struct rtentry *rte;	/* cache for ro->ro_rt */
 	uint32_t fibnum;
-	int have_ia_ref;
 #if defined(IPSEC) || defined(IPSEC_SUPPORT)
 	int no_route_but_check_spd = 0;
 #endif
@@ -281,6 +284,7 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
 		dst->sin_len = sizeof(*dst);
 		dst->sin_addr = ip->ip_dst;
 	}
+	NET_EPOCH_ENTER();
 again:
 	/*
 	 * Validate route against routing table additions;
@@ -302,14 +306,10 @@ again:
 		    !RT_LINK_IS_UP(rte->rt_ifp) ||
 			  dst->sin_family != AF_INET ||
 			  dst->sin_addr.s_addr != ip->ip_dst.s_addr)) {
-		RTFREE(rte);
-		rte = ro->ro_rt = (struct rtentry *)NULL;
-		if (ro->ro_lle)
-			LLE_FREE(ro->ro_lle);	/* zeros ro_lle */
-		ro->ro_lle = (struct llentry *)NULL;
+		RO_INVALIDATE_CACHE(ro);
+		rte = NULL;
 	}
 	ia = NULL;
-	have_ia_ref = 0;
 	/*
 	 * If routing to interface only, short circuit routing lookup.
 	 * The use of an all-ones broadcast address implies this; an
@@ -325,7 +325,6 @@ again:
 			error = ENETUNREACH;
 			goto bad;
 		}
-		have_ia_ref = 1;
 		ip->ip_dst.s_addr = INADDR_BROADCAST;
 		dst->sin_addr = ip->ip_dst;
 		ifp = ia->ia_ifp;
@@ -340,7 +339,6 @@ again:
 			error = ENETUNREACH;
 			goto bad;
 		}
-		have_ia_ref = 1;
 		ifp = ia->ia_ifp;
 		ip->ip_ttl = 1;
 		isbroadcast = ifp->if_flags & IFF_BROADCAST ?
@@ -353,8 +351,6 @@ again:
 		 */
 		ifp = imo->imo_multicast_ifp;
 		IFP_TO_IA(ifp, ia, &in_ifa_tracker);
-		if (ia)
-			have_ia_ref = 1;
 		isbroadcast = 0;	/* fool gcc */
 	} else {
 		/*
@@ -582,8 +578,6 @@ sendit:
 		case -1: /* Need to try again */
 			/* Reset everything for a new round */
 			RO_RTFREE(ro);
-			if (have_ia_ref)
-				ifa_free(&ia->ia_ifa);
 			ro->ro_prepend = NULL;
 			rte = NULL;
 			gw = dst;
@@ -738,10 +732,9 @@ done:
 		 * calling RTFREE on it again.
 		 */
 		ro->ro_rt = NULL;
-	if (have_ia_ref)
-		ifa_free(&ia->ia_ifa);
+	NET_EPOCH_EXIT();
 	return (error);
-bad:
+ bad:
 	m_freem(m);
 	goto done;
 }
@@ -931,24 +924,34 @@ void
 in_delayed_cksum(struct mbuf *m)
 {
 	struct ip *ip;
-	uint16_t csum, offset, ip_len;
+	struct udphdr *uh;
+	uint16_t cklen, csum, offset;
 
 	ip = mtod(m, struct ip *);
 	offset = ip->ip_hl << 2 ;
-	ip_len = ntohs(ip->ip_len);
-	csum = in_cksum_skip(m, ip_len, offset);
-	if (m->m_pkthdr.csum_flags & CSUM_UDP && csum == 0)
-		csum = 0xffff;
+
+	if (m->m_pkthdr.csum_flags & CSUM_UDP) {
+		/* if udp header is not in the first mbuf copy udplen */
+		if (offset + sizeof(struct udphdr) > m->m_len)
+			m_copydata(m, offset + offsetof(struct udphdr,
+			    uh_ulen), sizeof(cklen), (caddr_t)&cklen);
+		else {
+			uh = (struct udphdr *)mtodo(m, offset);
+			cklen = ntohs(uh->uh_ulen);
+		}
+		csum = in_cksum_skip(m, cklen + offset, offset);
+		if (csum == 0)
+			csum = 0xffff;
+	} else {
+		cklen = ntohs(ip->ip_len);
+		csum = in_cksum_skip(m, cklen, offset);
+	}
 	offset += m->m_pkthdr.csum_data;	/* checksum offset */
 
-	/* find the mbuf in the chain where the checksum starts*/
-	while ((m != NULL) && (offset >= m->m_len)) {
-		offset -= m->m_len;
-		m = m->m_next;
-	}
-	KASSERT(m != NULL, ("in_delayed_cksum: checksum outside mbuf chain."));
-	KASSERT(offset + sizeof(u_short) <= m->m_len, ("in_delayed_cksum: checksum split between mbufs."));
-	*(u_short *)(m->m_data + offset) = csum;
+	if (offset + sizeof(csum) > m->m_len)
+		m_copyback(m, offset, sizeof(csum), (caddr_t)&csum);
+	else
+		*(u_short *)mtodo(m, offset) = csum;
 }
 
 /*
@@ -986,6 +989,15 @@ ip_ctloutput(struct socket *so, struct sockopt *sopt)
 					inp->inp_flags2 |= INP_REUSEPORT;
 				else
 					inp->inp_flags2 &= ~INP_REUSEPORT;
+				INP_WUNLOCK(inp);
+				error = 0;
+				break;
+			case SO_REUSEPORT_LB:
+				INP_WLOCK(inp);
+				if ((so->so_options & SO_REUSEPORT_LB) != 0)
+					inp->inp_flags2 |= INP_REUSEPORT_LB;
+				else
+					inp->inp_flags2 &= ~INP_REUSEPORT_LB;
 				INP_WUNLOCK(inp);
 				error = 0;
 				break;

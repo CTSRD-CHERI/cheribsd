@@ -39,7 +39,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
@@ -95,10 +94,20 @@ __FBSDID("$FreeBSD$");
  * need to work on that.
  */
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #endif
+
 #if __has_feature(capabilities)
-#define	SIG_DFL_N	(void *)0
-#define	SIG_IGN_N	(void *)1
+static inline bool
+is_magic_sighandler_constant(void* handler) {
+	/*
+	 * Instead of enumerating all the SIG_* constants, just check if
+	 * it is a small (positive or negative) integer so that this doesn't
+	 * break if someone adds a new SIG_* constant. The manual checks that
+	 * we were using before weren't handling SIG_HOLD.
+	 */
+	return (vaddr_t)handler < 64;
+}
 #endif
 
 #include <machine/cpu.h>
@@ -302,8 +311,28 @@ siginfo_to_siginfo_native(const _siginfo_t *si,
 	si_n->si_uid = si->si_uid;
 	si_n->si_status = si->si_status;
 	si_n->si_addr = (void *)(uintptr_t)si->si_addr;
-	si_n->si_value.sival_ptr = (void *)(intcap_t)si->si_value.sival_ptr;
+	si_n->si_value.sival_ptr_native = si->si_value.sival_ptr_native;
 	memcpy(&si_n->_reason, &si->_reason, sizeof(si_n->_reason));
+#endif
+}
+
+void
+siginfo_native_to_siginfo(const struct siginfo_native *si_n,
+    _siginfo_t *si)
+{
+
+#if !__has_feature(capabilities)
+	memcpy(si, si_n, sizeof(*si_n));
+#else
+	si->si_signo = si_n->si_signo;
+	si->si_errno = si_n->si_errno;
+	si->si_code = si_n->si_code;
+	si->si_pid = si_n->si_pid;
+	si->si_uid = si_n->si_uid;
+	si->si_status = si_n->si_status;
+	si->si_addr = (__cheri_tocap void * __capability)si_n->si_addr;
+	si->si_value.sival_ptr_native = si_n->si_value.sival_ptr_native;
+	memcpy(&si->_reason, &si_n->_reason, sizeof(si_n->_reason));
 #endif
 }
 
@@ -634,11 +663,8 @@ cursig(struct thread *td)
 void
 signotify(struct thread *td)
 {
-	struct proc *p;
 
-	p = td->td_proc;
-
-	PROC_LOCK_ASSERT(p, MA_OWNED);
+	PROC_LOCK_ASSERT(td->td_proc, MA_OWNED);
 
 	if (SIGPENDING(td)) {
 		thread_lock(td);
@@ -658,7 +684,7 @@ sigonstack(size_t sp)
 		(td->td_sigstk.ss_flags & SS_ONSTACK) :
 		((sp - (size_t)td->td_sigstk.ss_sp) < td->td_sigstk.ss_size))
 #else
-	    ((sp - (size_t)td->td_sigstk.ss_sp) < td->td_sigstk.ss_size)
+	    ((sp - (__cheri_addr size_t)td->td_sigstk.ss_sp) < td->td_sigstk.ss_size)
 #endif
 	    : 0);
 }
@@ -722,8 +748,8 @@ kern_sigaction(struct thread *td, int sig, const ksigaction_t *act,
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
 	if (oact) {
+		memset(oact, 0, sizeof(*oact));
 		oact->sa_mask = ps->ps_catchmask[_SIG_IDX(sig)];
-		oact->sa_flags = 0;
 		if (SIGISMEMBER(ps->ps_sigonstack, sig))
 			oact->sa_flags |= SA_ONSTACK;
 		if (!SIGISMEMBER(ps->ps_sigintr, sig))
@@ -871,10 +897,8 @@ sys_sigaction(struct thread *td, struct sigaction_args *uap)
 		if (error)
 			return (error);
 #if __has_feature(capabilities)
-		if (act_n.sa_handler == SIG_DFL_N)
-			actp->sa_handler = SIG_DFL;
-		else if (act_n.sa_handler == SIG_IGN_N)
-			actp->sa_handler = SIG_IGN;
+		if (is_magic_sighandler_constant(act_n.sa_handler))
+			actp->sa_handler = cheri_fromint((vaddr_t)act_n.sa_handler);
 		else
 			actp->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
 		actp->sa_flags = act_n.sa_flags;
@@ -887,7 +911,7 @@ sys_sigaction(struct thread *td, struct sigaction_args *uap)
 	if (oactp && !error) {
 #if __has_feature(capabilities)
 		memset(&oact_n, 0, sizeof(oact_n));
-		oact_n.sa_handler = (void *)(vaddr_t)oactp->sa_handler;
+		oact_n.sa_handler = (void *)(__cheri_addr vaddr_t)oactp->sa_handler;
 		oact_n.sa_flags = oactp->sa_flags;
 		oact_n.sa_mask = oactp->sa_mask;
 #else
@@ -922,10 +946,8 @@ freebsd4_sigaction(struct thread *td, struct freebsd4_sigaction_args *uap)
 		if (error)
 			return (error);
 #if __has_feature(capabilities)
-		if (act_n.sa_handler == SIG_DFL_N)
-			actp->sa_handler = SIG_DFL;
-		else if (act_n.sa_handler == SIG_IGN_N)
-			actp->sa_handler = SIG_IGN;
+		if (is_magic_sighandler_constant(act_n.sa_handler))
+			actp->sa_handler = cheri_fromint((vaddr_t)act_n.sa_handler);
 		else
 			actp->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
 		actp->sa_flags = act_n.sa_flags;
@@ -976,12 +998,14 @@ osigaction(struct thread *td, struct osigaction_args *uap)
 		error = copyin(uap->nsa, &sa, sizeof(sa));
 		if (error)
 			return (error);
-		if (sa.sa_handler == SIG_DFL_N)
-			nsap->sa_handler = SIG_DFL;
-		else if (sa.sa_handler == SIG_IGN_N)
-			nsap->sa_handler = SIG_IGN;
+#if __has_feature(capabilities)
+		if (is_magic_sighandler_constant(sa.sa_handler))
+			nsap->sa_handler = cheri_fromint((vaddr_t)sa.sa_handler);
 		else
-			nsap->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
+			nsap->sa_handler = __USER_CODE_CAP(sa.sa_handler);
+#else
+		nsap.sa_handler = (void *)(uintptr_t)sa.sa_handler;
+#endif
 		nsap->sa_flags = sa.sa_flags;
 		OSIG2SIG(sa.sa_mask, nsap->sa_mask);
 	}
@@ -1771,12 +1795,11 @@ killpg1(struct thread *td, int sig, int pgid, int all, ksiginfo_t *ksi)
 		 */
 		sx_slock(&allproc_lock);
 		FOREACH_PROC_IN_SYSTEM(p) {
-			PROC_LOCK(p);
 			if (p->p_pid <= 1 || p->p_flag & P_SYSTEM ||
 			    p == td->td_proc || p->p_state == PRS_NEW) {
-				PROC_UNLOCK(p);
 				continue;
 			}
+			PROC_LOCK(p);
 			err = p_cansignal(td, p, sig);
 			if (err == 0) {
 				if (sig)
@@ -1885,7 +1908,6 @@ int
 sys_pdkill(struct thread *td, struct pdkill_args *uap)
 {
 	struct proc *p;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_SIGNUM(uap->signum);
@@ -1893,8 +1915,7 @@ sys_pdkill(struct thread *td, struct pdkill_args *uap)
 	if ((u_int)uap->signum > _SIG_MAXSIG)
 		return (EINVAL);
 
-	error = procdesc_find(td, uap->fd,
-	    cap_rights_init(&rights, CAP_PDKILL), &p);
+	error = procdesc_find(td, uap->fd, &cap_pdkill_rights, &p);
 	if (error)
 		return (error);
 	AUDIT_ARG_PROCESS(p);
@@ -1944,7 +1965,8 @@ sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 {
 	ksigval_union sv;
 
-	sv.sival_ptr = (void * __capability)(intcap_t)uap->value;
+	memset(&sv, 0, sizeof(sv));
+	sv.sival_ptr_native = uap->value;
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
 }
@@ -1977,7 +1999,18 @@ kern_sigqueue(struct thread *td, pid_t pid, int signum, ksigval_union *value,
 		ksi.ksi_code = SI_QUEUE;
 		ksi.ksi_pid = td->td_proc->p_pid;
 		ksi.ksi_uid = td->td_ucred->cr_ruid;
-		ksi.ksi_value = *value;
+		memset(&ksi.ksi_value, 0, sizeof(ksi.ksi_value));
+#ifdef COMPAT_FREEBSD32
+		if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+			ksi.ksi_value.sival_ptr32 = value->sival_ptr32;
+		else
+#endif
+#ifdef COMPAT_CHERIABI
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			ksi.ksi_value.sival_ptr_c = value->sival_ptr_c;
+		else
+#endif
+			ksi.ksi_value.sival_ptr_native = value->sival_ptr_native;
 		error = pksignal(p, ksi.ksi_signo, &ksi);
 	}
 	PROC_UNLOCK(p);
@@ -2684,7 +2717,6 @@ ptracestop(struct thread *td, int sig, ksiginfo_t *si)
 			}
 			if ((td->td_dbgflags & TDB_STOPATFORK) != 0) {
 				td->td_dbgflags &= ~TDB_STOPATFORK;
-				cv_broadcast(&p->p_dbgwait);
 			}
 stopme:
 			thread_suspend_switch(td, p);
@@ -3317,11 +3349,7 @@ childproc_exited(struct proc *p)
 	sigparent(p, reason, status);
 }
 
-/*
- * We only have 1 character for the core count in the format
- * string, so the range will be 0-9
- */
-#define	MAX_NUM_CORE_FILES 10
+#define	MAX_NUM_CORE_FILES 100000
 #ifndef NUM_CORE_FILES
 #define	NUM_CORE_FILES 5
 #endif
@@ -3346,9 +3374,11 @@ sysctl_debug_num_cores_check (SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 SYSCTL_PROC(_debug, OID_AUTO, ncores, CTLTYPE_INT|CTLFLAG_RW,
-	    0, sizeof(int), sysctl_debug_num_cores_check, "I", "");
+	    0, sizeof(int), sysctl_debug_num_cores_check, "I",
+	    "Maximum number of generated process corefiles while using index format");
 
-#define	GZ_SUFFIX	".gz"
+#define	GZIP_SUFFIX	".gz"
+#define	ZSTD_SUFFIX	".zst"
 
 int compress_user_cores = 0;
 
@@ -3368,7 +3398,9 @@ sysctl_compress_user_cores(SYSCTL_HANDLER_ARGS)
 }
 SYSCTL_PROC(_kern, OID_AUTO, compress_user_cores, CTLTYPE_INT | CTLFLAG_RWTUN,
     0, sizeof(int), sysctl_compress_user_cores, "I",
-    "Enable compression of user corefiles (" __XSTRING(COMPRESS_GZIP) " = gzip)");
+    "Enable compression of user corefiles ("
+    __XSTRING(COMPRESS_GZIP) " = gzip, "
+    __XSTRING(COMPRESS_ZSTD) " = zstd)");
 
 int compress_user_cores_level = 6;
 SYSCTL_INT(_kern, OID_AUTO, compress_user_cores_level, CTLFLAG_RWTUN,
@@ -3399,6 +3431,93 @@ SYSCTL_PROC(_kern, OID_AUTO, corefile, CTLTYPE_STRING | CTLFLAG_RW |
     CTLFLAG_MPSAFE, 0, 0, sysctl_kern_corefile, "A",
     "Process corefile name format string");
 
+static void
+vnode_close_locked(struct thread *td, struct vnode *vp)
+{
+
+	VOP_UNLOCK(vp, 0);
+	vn_close(vp, FWRITE, td->td_ucred, td);
+}
+
+/*
+ * If the core format has a %I in it, then we need to check
+ * for existing corefiles before defining a name.
+ * To do this we iterate over 0..ncores to find a
+ * non-existing core file name to use. If all core files are
+ * already used we choose the oldest one.
+ */
+static int
+corefile_open_last(struct thread *td, char *name, int indexpos,
+    int indexlen, int ncores, struct vnode **vpp)
+{
+	struct vnode *oldvp, *nextvp, *vp;
+	struct vattr vattr;
+	struct nameidata nd;
+	int error, i, flags, oflags, cmode;
+	char ch;
+	struct timespec lasttime;
+
+	nextvp = oldvp = NULL;
+	cmode = S_IRUSR | S_IWUSR;
+	oflags = VN_OPEN_NOAUDIT | VN_OPEN_NAMECACHE |
+	    (capmode_coredump ? VN_OPEN_NOCAPCHECK : 0);
+
+	for (i = 0; i < ncores; i++) {
+		flags = O_CREAT | FWRITE | O_NOFOLLOW;
+
+		ch = name[indexpos + indexlen];
+		(void)snprintf(name + indexpos, indexlen + 1, "%.*u", indexlen,
+		    i);
+		name[indexpos + indexlen] = ch;
+
+		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, name, td);
+		error = vn_open_cred(&nd, &flags, cmode, oflags, td->td_ucred,
+		    NULL);
+		if (error != 0)
+			break;
+
+		vp = nd.ni_vp;
+		NDFREE(&nd, NDF_ONLY_PNBUF);
+		if ((flags & O_CREAT) == O_CREAT) {
+			nextvp = vp;
+			break;
+		}
+
+		error = VOP_GETATTR(vp, &vattr, td->td_ucred);
+		if (error != 0) {
+			vnode_close_locked(td, vp);
+			break;
+		}
+
+		if (oldvp == NULL ||
+		    lasttime.tv_sec > vattr.va_mtime.tv_sec ||
+		    (lasttime.tv_sec == vattr.va_mtime.tv_sec &&
+		    lasttime.tv_nsec >= vattr.va_mtime.tv_nsec)) {
+			if (oldvp != NULL)
+				vnode_close_locked(td, oldvp);
+			oldvp = vp;
+			lasttime = vattr.va_mtime;
+		} else {
+			vnode_close_locked(td, vp);
+		}
+	}
+
+	if (oldvp != NULL) {
+		if (nextvp == NULL)
+			nextvp = oldvp;
+		else
+			vnode_close_locked(td, oldvp);
+	}
+	if (error != 0) {
+		if (nextvp != NULL)
+			vnode_close_locked(td, oldvp);
+	} else {
+		*vpp = nextvp;
+	}
+
+	return (error);
+}
+
 /*
  * corefile_open(comm, uid, pid, td, compress, vpp, namep)
  * Expand the name described in corefilename, using name, uid, and pid
@@ -3415,16 +3534,21 @@ static int
 corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
     int compress, struct vnode **vpp, char **namep)
 {
-	struct nameidata nd;
 	struct sbuf sb;
+	struct nameidata nd;
 	const char *format;
 	char *hostname, *name;
-	int indexpos, i, error, cmode, flags, oflags;
+	int cmode, error, flags, i, indexpos, indexlen, oflags, ncores;
+
+	static struct timeval lastfail;
+	static int curfail;
 
 	hostname = NULL;
 	format = corefilename;
 	name = malloc(MAXPATHLEN, M_TEMP, M_WAITOK | M_ZERO);
+	indexlen = 0;
 	indexpos = -1;
+	ncores = num_cores;
 	(void)sbuf_new(&sb, name, MAXPATHLEN, SBUF_FIXEDLEN);
 	sx_slock(&corefilename_lock);
 	for (i = 0; format[i] != '\0'; i++) {
@@ -3445,8 +3569,14 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 				sbuf_printf(&sb, "%s", hostname);
 				break;
 			case 'I':	/* autoincrementing index */
-				sbuf_printf(&sb, "0");
-				indexpos = sbuf_len(&sb) - 1;
+				if (indexpos != -1) {
+					sbuf_printf(&sb, "%%I");
+					break;
+				}
+
+				indexpos = sbuf_len(&sb);
+				sbuf_printf(&sb, "%u", ncores - 1);
+				indexlen = sbuf_len(&sb) - indexpos;
 				break;
 			case 'N':	/* process name */
 				sbuf_printf(&sb, "%s", comm);
@@ -3472,7 +3602,9 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 	sx_sunlock(&corefilename_lock);
 	free(hostname, M_TEMP);
 	if (compress == COMPRESS_GZIP)
-		sbuf_printf(&sb, GZ_SUFFIX);
+		sbuf_printf(&sb, GZIP_SUFFIX);
+	else if (compress == COMPRESS_ZSTD)
+		sbuf_printf(&sb, ZSTD_SUFFIX);
 	if (sbuf_error(&sb) != 0) {
 		log(LOG_ERR, "pid %ld (%s), uid (%lu): corename is too "
 		    "long\n", (long)pid, comm, (u_long)uid);
@@ -3483,68 +3615,44 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 	sbuf_finish(&sb);
 	sbuf_delete(&sb);
 
-	cmode = coredump_fs_mode;
-	oflags = VN_OPEN_NOAUDIT | VN_OPEN_NAMECACHE |
-	    (capmode_coredump ? VN_OPEN_NOCAPCHECK : 0);
-
-	/*
-	 * If the core format has a %I in it, then we need to check
-	 * for existing corefiles before returning a name.
-	 * To do this we iterate over 0..num_cores to find a
-	 * non-existing core file name to use.
-	 */
 	if (indexpos != -1) {
-		for (i = 0; i < num_cores; i++) {
-			flags = O_CREAT | O_EXCL | FWRITE | O_NOFOLLOW;
-			name[indexpos] = '0' + i;
-			NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, name, td);
-			error = vn_open_cred(&nd, &flags, cmode, oflags,
-			    td->td_ucred, NULL);
-			if (error) {
-				if (error == EEXIST)
-					continue;
-				log(LOG_ERR,
-				    "pid %d (%s), uid (%u):  Path `%s' failed "
-				    "on initial open test, error = %d\n",
-				    pid, comm, uid, name, error);
-			}
-			goto out;
+		error = corefile_open_last(td, name, indexpos, indexlen, ncores,
+		    vpp);
+		if (error != 0) {
+			log(LOG_ERR,
+			    "pid %d (%s), uid (%u):  Path `%s' failed "
+			    "on initial open test, error = %d\n",
+			    pid, comm, uid, name, error);
+		}
+	} else {
+		cmode = coredump_fs_mode;
+		oflags = VN_OPEN_NOAUDIT | VN_OPEN_NAMECACHE |
+		    (capmode_coredump ? VN_OPEN_NOCAPCHECK : 0);
+		flags = O_CREAT | FWRITE | O_NOFOLLOW;
+
+		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, name, td);
+		error = vn_open_cred(&nd, &flags, cmode, oflags, td->td_ucred,
+		    NULL);
+		if (error == 0) {
+			*vpp = nd.ni_vp;
+			NDFREE(&nd, NDF_ONLY_PNBUF);
 		}
 	}
 
-	flags = O_CREAT | FWRITE | O_NOFOLLOW;
-	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, name, td);
-	error = vn_open_cred(&nd, &flags, cmode, oflags, td->td_ucred, NULL);
-out:
-	if (error) {
+	if (error != 0) {
+		if (ppsratecheck(&lastfail, &curfail, 1)) {
+			log(LOG_ERR, "pid %d (%s), uid (%u): Failed to open "
+			    "coredump file '%s', error=%d\n", pid, comm, uid,
+			    name, error);
+		}
 #ifdef AUDIT
 		audit_proc_coredump(td, name, error);
 #endif
 		free(name, M_TEMP);
 		return (error);
 	}
-	NDFREE(&nd, NDF_ONLY_PNBUF);
-	*vpp = nd.ni_vp;
 	*namep = name;
 	return (0);
-}
-
-static int
-coredump_sanitise_path(const char *path)
-{
-	size_t i;
-
-	/*
-	 * Only send a subset of ASCII to devd(8) because it
-	 * might pass these strings to sh -c.
-	 */
-	for (i = 0; path[i]; i++)
-		if (!(isalpha(path[i]) || isdigit(path[i])) &&
-		    path[i] != '/' && path[i] != '.' &&
-		    path[i] != '-')
-			return (0);
-
-	return (1);
 }
 
 /*
@@ -3567,11 +3675,8 @@ coredump(struct thread *td)
 	char *name;			/* name of corefile */
 	void *rl_cookie;
 	off_t limit;
-	char *data = NULL;
 	char *fullpath, *freepath = NULL;
-	size_t len;
-	static const char comm_name[] = "comm=";
-	static const char core_name[] = "core=";
+	struct sbuf *sb;
 
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	MPASS((p->p_flag & P_HADTHREADS) == 0 || p->p_singlethread == td);
@@ -3654,23 +3759,37 @@ coredump(struct thread *td)
 	 */
 	if (error != 0 || coredump_devctl == 0)
 		goto out;
-	len = MAXPATHLEN * 2 + sizeof(comm_name) - 1 +
-	    sizeof(' ') + sizeof(core_name) - 1;
-	data = malloc(len, M_TEMP, M_WAITOK);
+	sb = sbuf_new_auto();
 	if (vn_fullpath_global(td, p->p_textvp, &fullpath, &freepath) != 0)
-		goto out;
-	if (!coredump_sanitise_path(fullpath))
-		goto out;
-	snprintf(data, len, "%s%s ", comm_name, fullpath);
+		goto out2;
+	sbuf_printf(sb, "comm=\"");
+	devctl_safe_quote_sb(sb, fullpath);
 	free(freepath, M_TEMP);
-	freepath = NULL;
-	if (vn_fullpath_global(td, vp, &fullpath, &freepath) != 0)
-		goto out;
-	if (!coredump_sanitise_path(fullpath))
-		goto out;
-	strlcat(data, core_name, len);
-	strlcat(data, fullpath, len);
-	devctl_notify("kernel", "signal", "coredump", data);
+	sbuf_printf(sb, "\" core=\"");
+
+	/*
+	 * We can't lookup core file vp directly. When we're replacing a core, and
+	 * other random times, we flush the name cache, so it will fail. Instead,
+	 * if the path of the core is relative, add the current dir in front if it.
+	 */
+	if (name[0] != '/') {
+		fullpath = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+		if (kern___getcwd(td,
+		    (__cheri_tocap char * __capability)fullpath,
+		    UIO_SYSSPACE, MAXPATHLEN, MAXPATHLEN) != 0) {
+			free(fullpath, M_TEMP);
+			goto out2;
+		}
+		devctl_safe_quote_sb(sb, fullpath);
+		free(fullpath, M_TEMP);
+		sbuf_putc(sb, '/');
+	}
+	devctl_safe_quote_sb(sb, name);
+	sbuf_printf(sb, "\"");
+	if (sbuf_finish(sb) == 0)
+		devctl_notify("kernel", "signal", "coredump", sbuf_data(sb));
+out2:
+	sbuf_delete(sb);
 out:
 	error1 = vn_close(vp, FWRITE, cred, td);
 	if (error == 0)
@@ -3678,8 +3797,6 @@ out:
 #ifdef AUDIT
 	audit_proc_coredump(td, name, error);
 #endif
-	free(freepath, M_TEMP);
-	free(data, M_TEMP);
 	free(name, M_TEMP);
 	return (error);
 }

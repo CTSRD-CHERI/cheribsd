@@ -31,7 +31,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ktrace.h"
 #include "opt_kqueue.h"
 
@@ -754,7 +753,7 @@ static void
 filt_timerdetach(struct knote *kn)
 {
 	struct kq_timer_cb_data *kc;
-	unsigned int old;
+	unsigned int old __unused;
 
 	kc = kn->kn_ptr.p_v;
 	callout_drain(&kc->c);
@@ -1005,7 +1004,7 @@ kevent_copyout(void *arg, kkevent_t *kevp, int count)
 		ks_n[i].flags = kevp[i].flags;
 		ks_n[i].fflags = kevp[i].fflags;
 		ks_n[i].data = kevp[i].data;
-		ks_n[i].udata = (void *)(uintptr_t)kevp[i].udata;
+		ks_n[i].udata = (void *)(__cheri_addr vaddr_t)kevp[i].udata;
 		memcpy(&ks_n[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
 	}
 	error = copyout(ks_n, uap->eventlist, count * sizeof(*ks_n));
@@ -1070,7 +1069,7 @@ kevent11_copyout(void *arg, kkevent_t *kevp, int count)
 		kev11.flags = kevp->flags;
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
-		kev11.udata = (void *)(uintptr_t)kevp->udata;
+		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
 		error = copyout(&kev11, uap->eventlist, sizeof(kev11));
 		if (error != 0)
 			break;
@@ -1327,7 +1326,6 @@ kqueue_register(struct kqueue *kq, kkevent_t *kev, struct thread *td, int waitok
 	struct file *fp;
 	struct knote *kn, *tkn;
 	struct knlist *knl;
-	cap_rights_t rights;
 	int error, filt, event;
 	int haskqglobal, filedesc_unlock;
 
@@ -1363,8 +1361,7 @@ findkn:
 		if (kev->ident > INT_MAX)
 			error = EBADF;
 		else
-			error = fget(td, kev->ident,
-			    cap_rights_init(&rights, CAP_EVENT), &fp);
+			error = fget(td, kev->ident, &cap_event_rights, &fp);
 		if (error)
 			goto done;
 

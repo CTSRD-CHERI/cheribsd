@@ -344,10 +344,28 @@ typedef struct {
 #define	EF_MIPS_UCODE		0x00000010
 #define	EF_MIPS_ABI2		0x00000020	/* N32 */
 #define	EF_MIPS_OPTIONS_FIRST	0x00000080
+#define	EF_MIPS_ABI		0x0000F000
+#define	EF_MIPS_ABI_O32		0x00001000
+#define	EF_MIPS_ABI_O64		0x00002000
+#define	EF_MIPS_ABI_EABI32	0x00003000
+#define	EF_MIPS_ABI_EABI64	0x00004000
+#define	EF_MIPS_ABI_CHERIABI	0x0000C000
+#define	EF_MIPS_MACH_CHERI128	0x00C10000	/* 128 bit CHERI */
+#define	EF_MIPS_MACH_CHERI256	0x00C20000	/* 256 bit CHERI */
+#define	EF_MIPS_MACH		0x00FF0000	/* Machine mask */
 #define	EF_MIPS_ARCH_ASE	0x0F000000	/* Architectural extensions */
 #define	EF_MIPS_ARCH_ASE_MDMX	0x08000000	/* MDMX multimedia extension */
 #define	EF_MIPS_ARCH_ASE_M16	0x04000000	/* MIPS-16 ISA extensions */
 #define	EF_MIPS_ARCH		0xF0000000	/* Architecture field */
+#define	EF_MIPS_ARCH_1		0x00000000	/* -mips1 code */
+#define	EF_MIPS_ARCH_2		0x10000000	/* -mips2 code */
+#define	EF_MIPS_ARCH_3		0x20000000	/* -mips3 code */
+#define	EF_MIPS_ARCH_4		0x30000000	/* -mips4 code */
+#define	EF_MIPS_ARCH_5		0x40000000	/* -mips5 code */
+#define	EF_MIPS_ARCH_32		0x50000000	/* -mips32 code */
+#define	EF_MIPS_ARCH_64		0x60000000	/* -mips64 code */
+#define	EF_MIPS_ARCH_32R2	0x70000000	/* -mips32r2 code */
+#define	EF_MIPS_ARCH_64R2	0x80000000	/* -mips64r2 code */
 
 #define	EF_PPC_EMB		0x80000000
 #define	EF_PPC_RELOCATABLE	0x00010000
@@ -584,6 +602,7 @@ typedef struct {
 #define	DT_SUNW_RTLDINF		0x6000000e	/* ld.so.1 info (private) */
 #define	DT_SUNW_FILTER		0x6000000f	/* symbol filter name */
 #define	DT_SUNW_CAP		0x60000010	/* hardware/software */
+#define	DT_SUNW_ASLR		0x60000023	/* ASLR control */
 #define	DT_HIOS		0x6ffff000	/* Last OS-specific */
 
 /*
@@ -763,6 +782,7 @@ typedef struct {
 #define	NT_PTLWPINFO		17	/* Thread ptrace miscellaneous info. */
 #define	NT_CAPREGS		20	/* Capability registers. */
 #define	NT_PPC_VMX	0x100	/* PowerPC Altivec/VMX registers */
+#define	NT_PPC_VSX	0x102	/* PowerPC VSX registers */
 #define	NT_X86_XSTATE	0x202	/* x86 XSAVE extended state. */
 #define	NT_ARM_VFP	0x400	/* ARM VFP registers */
 
@@ -1353,7 +1373,7 @@ typedef struct {
 #endif /* !_SYS_ELF_COMMON_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20180823,
 //   "target_type": "header",
 //   "changes": [
 //     "support"
