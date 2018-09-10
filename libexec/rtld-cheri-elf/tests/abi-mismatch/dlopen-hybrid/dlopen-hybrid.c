@@ -58,6 +58,27 @@ ATF_TC_BODY(dlopen_purecap_fail, tc)
 	test_dlopen_failure("libbasic_purecap.so.0", error_msg);
 }
 
+ATF_TC(dlopen_wrong_bits_hybrid_fail);
+ATF_TC_HEAD(dlopen_wrong_bits_hybrid_fail, tc)
+{
+	atf_tc_set_md_var(tc, "descr",
+	    "Check that opening a hybrid library with different CHERI size fails");
+}
+ATF_TC_BODY(dlopen_wrong_bits_hybrid_fail, tc)
+{
+	char error_msg[PATH_MAX];
+	const char* exedir = get_executable_dir();
+#ifdef __mips__
+	snprintf(error_msg, sizeof(error_msg),
+	    "%s/%s: cannot load %s/../%s since EF_MIPS_MACH_CHERI != 0x%x0000"
+	    " (e_flags=0x30%x0007)", exedir, "dlopen-hybrid", exedir,
+	    "libwrong_size_hybrid.so.0", GOOD_CHERI_MACH, BAD_CHERI_MACH);
+#else
+#error "Error message wrong for non-MIPS"
+#endif
+	test_dlopen_failure("libwrong_size_hybrid.so.0", error_msg);
+}
+
 ATF_TC(dlopen_hybrid);
 ATF_TC_HEAD(dlopen_hybrid, tc)
 {
@@ -85,6 +106,7 @@ ATF_TC_BODY(dlopen_nocheri, tc)
 ATF_TP_ADD_TCS(tp)
 {
 	ATF_TP_ADD_TC(tp, dlopen_purecap_fail);
+	ATF_TP_ADD_TC(tp, dlopen_wrong_bits_hybrid_fail);
 	ATF_TP_ADD_TC(tp, dlopen_hybrid);
 	ATF_TP_ADD_TC(tp, dlopen_nocheri);
 	return atf_no_error();
