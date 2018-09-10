@@ -1429,3 +1429,7 @@
 				    int policy); }
 563	AUE_NULL	STD	{ int cheriabi_getrandom(void *buf, \
 				    size_t buflen, unsigned int flags); }
+564	AUE_NULL	STD	{ int cheriabi_coexecve(pid_t pid, \
+				    _In_z_ const char *fname, \
+				    _In_ void * __capability *argv, \
+				    _In_ void * __capability *envv); }

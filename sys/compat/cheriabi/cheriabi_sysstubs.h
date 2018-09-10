@@ -3560,3 +3560,13 @@ SYS_STUB(563, int, getrandom,
     /* _localcheck */ {if (!(cheri_getperm(buf) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(564, int, coexecve,
+    /* _protoargs */ (pid_t pid, const char *  fname, void *  __capability * __capability argv, void *  __capability * __capability envv),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, pid_t pid, const char * __capability   fname, void * __capability   __capability * __capability  __capability argv, void * __capability   __capability * __capability  __capability envv),
+    /* _protoargs_err */ (__capability int *stub_errno, pid_t pid, const char * __capability   fname, void * __capability   __capability * __capability  __capability argv, void * __capability   __capability * __capability  __capability envv),
+    /* _callargs */ (pid, (__cheri_fromcap const char * )fname, (__cheri_fromcap void *  __capability * __capability)argv, (__cheri_fromcap void *  __capability * __capability)envv),
+    /* _callargs_chk */ (&ret, stub_errno, pid, fname, argv, envv),
+    /* _callargs_err */ (&errno, pid, (const char * )fname, (void *  __capability * __capability)argv, (void *  __capability * __capability)envv),
+    /* _localcheck */ {if (!(cheri_getperm(fname) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(argv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(envv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+

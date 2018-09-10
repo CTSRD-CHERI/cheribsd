@@ -585,4 +585,5 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_cpuset_getdomain_args), (sy_call_t *)cheriabi_cpuset_getdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 561 = cheriabi_cpuset_getdomain */
 	{ AS(cheriabi_cpuset_setdomain_args), (sy_call_t *)cheriabi_cpuset_setdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = cheriabi_cpuset_setdomain */
 	{ AS(cheriabi_getrandom_args), (sy_call_t *)cheriabi_getrandom, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 563 = cheriabi_getrandom */
+	{ AS(cheriabi_coexecve_args), (sy_call_t *)cheriabi_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = cheriabi_coexecve */
 };

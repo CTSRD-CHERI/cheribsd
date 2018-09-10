@@ -354,6 +354,7 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_cpuset_getdomain] = (0x0 | 0x10 | 0x20),
  [CHERIABI_SYS_cheriabi_cpuset_setdomain] = (0x0 | 0x10),
  [CHERIABI_SYS_cheriabi_getrandom] = (0x0 | 0x1),
+ [CHERIABI_SYS_cheriabi_coexecve] = (0x0 | 0x2 | 0x4 | 0x8),
 };
 
 #endif /* !_CHERIABI_SYSARGMAP_H_ */
