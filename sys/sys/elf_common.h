@@ -710,8 +710,20 @@ typedef struct {
 #define	DT_MIPS_RLD_OBJ_UPDATE		0x70000033
 #define	DT_MIPS_RWPLT			0x70000034
 
-#define	DT_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
-#define	DT_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
+#define	DT_MIPS_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
+#define	DT_MIPS_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
+#define	DT_MIPS_CHERI_FLAGS		0x7000c002 /* various CHERI flags (e.g. ABI) */
+#define	DT_MIPS_CHERI_CAPTABLE		0x7000c003 /* various CHERI flags (e.g. ABI) */
+#define	DT_MIPS_CHERI_CAPTABLESZ	0x7000c004 /* various CHERI flags (e.g. ABI) */
+
+enum MipsCheriFlags {
+	DF_MIPS_CHERI_NONE		= 0x00000000,
+	DF_MIPS_CHERI_ABI_MASK		= 0x00000007,
+	DF_MIPS_CHERI_ABI_LEGACY	= 0x00000000,
+	DF_MIPS_CHERI_ABI_PCREL		= 0x00000001,
+	DF_MIPS_CHERI_ABI_PLT		= 0x00000002,
+	DF_MIPS_CHERI_ABI_FNDESC	= 0x00000003
+};
 
 #define	DT_PPC_GOT			0x70000000
 #define	DT_PPC_TLSOPT			0x70000001
