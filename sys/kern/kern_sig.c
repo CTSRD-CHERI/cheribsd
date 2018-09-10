@@ -3029,7 +3029,16 @@ issignal(struct thread *td)
 				printf("Process (pid %lu) got signal %d\n",
 					(u_long)p->p_pid, sig);
 #endif
-				goto ignore;		/* == ignore */
+				/*
+				 * Deliver signals that would cause a sandbox
+				 * unwind (fatal signals) to init to avoid an
+				 * inifinite loop on boot if we miscompile init.
+				 */
+				if (p->p_pid == 1 && (prop & SIGPROP_SBUNWIND) != 0)
+					printf("Delivering fatal signal %d to "
+					   "system process %s\n", sig, p->p_comm);
+				else
+					goto ignore;		/* == ignore */
 			}
 			/*
 			 * If there is a pending stop signal to process with
