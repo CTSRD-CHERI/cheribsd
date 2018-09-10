@@ -1457,6 +1457,11 @@ atse_detach(device_t dev)
 
 	mtx_destroy(&sc->atse_mtx);
 
+	xdma_channel_free(sc->xchan_tx);
+	xdma_channel_free(sc->xchan_rx);
+	xdma_put(sc->xdma_tx);
+	xdma_put(sc->xdma_rx);
+
 	return (0);
 }
 
