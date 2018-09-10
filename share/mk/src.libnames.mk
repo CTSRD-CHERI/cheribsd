@@ -381,8 +381,8 @@ _DP_mlx4=	ibverbs pthread
 _DP_mlx5=	ibverbs pthread
 _DP_rdmacm=	ibverbs
 _DP_osmcomp=	pthread
-_DP_opensm=	pthread
-_DP_osmvendor=	ibumad pthread
+_DP_opensm=	pthread osmcomp
+_DP_osmvendor=	ibumad pthread osmcomp
 .endif
 
 _DP_helloworld=	cheri
