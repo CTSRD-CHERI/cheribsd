@@ -36,6 +36,7 @@
 #endif
 
 #include <sys/types.h>
+#include <sys/sysctl.h>
 #include <machine/atomic.h>
 #include <machine/tls.h>
 
@@ -86,18 +87,29 @@ extern void *__tls_get_addr(tls_index *ti);
 static inline bool
 _rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_path)
 {
-	static size_t first_cheri_obj = 0;
+	static size_t cheri_flag = 0;
 	size_t machine = (hdr->e_flags & EF_MIPS_MACH);
-	bool is_cheri = machine == EF_MIPS_MACH_CHERI128 || machine == EF_MIPS_MACH_CHERI128;
-	/* rtld is built with the MIPS compiler, so just save the first encountered CHERI bits */
-	/* TODO: ask the kernel instead */
+	bool is_cheri = machine == EF_MIPS_MACH_CHERI256 || machine == EF_MIPS_MACH_CHERI128;
+	/* RTLD is built with the MIPS compiler, so ask the kernel for size */
 	if (is_cheri) {
-		if (!first_cheri_obj) {
-			first_cheri_obj = machine;
-		} else if (machine != first_cheri_obj) {
+		if (!cheri_flag) {
+			uint32_t cap_size;
+			size_t len = sizeof(cap_size);
+			if (sysctlbyname("security.cheri.capability_size",
+			    &cap_size, &len, NULL, 0) == -1) {
+				rtld_fatal("Found CHERI DSO but couldn't get "
+				    "expected CHERI size from kernel!");
+			}
+			if (cap_size == 32)
+				cheri_flag = EF_MIPS_MACH_CHERI256;
+			else if (cap_size == 16)
+				cheri_flag = EF_MIPS_MACH_CHERI128;
+			else
+				rtld_fatal("Invalid cheri size");
+		} else if (machine != cheri_flag) {
 			_rtld_error("%s: cannot load %s since EF_MIPS_MACH_CHERI"
 			    " != 0x%zx (e_flags=0x%zx)", main_path, path,
-			    first_cheri_obj, (size_t)hdr->e_flags);
+			    cheri_flag, (size_t)hdr->e_flags);
 			return false;
 		}
 	}
