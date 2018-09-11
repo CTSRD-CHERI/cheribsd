@@ -1450,9 +1450,9 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end,
 		    obj->captable, obj->captable - obj->text_rodata_cap);
 		if (obj->captable) {
-			vaddr_t start = MIN(obj->text_rodata_start,
+			vaddr_t start = rtld_min(obj->text_rodata_start,
 			    obj->captable - obj->text_rodata_cap);
-			vaddr_t end = MAX(obj->text_rodata_end,
+			vaddr_t end = rtld_max(obj->text_rodata_end,
 			    obj->captable + cheri_getlen(obj->captable) - obj->text_rodata_cap);
 			obj->text_rodata_cap += start;
 			obj->text_rodata_cap = cheri_csetbounds_sametype(
@@ -1549,13 +1549,13 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
 	    }
 	    nsegs++;
 	    if ((ph->p_flags & PF_X) == PF_X) {
-		obj->textsize = MAX(obj->textsize,
+		obj->textsize = rtld_max(obj->textsize,
 		    round_page(ph->p_vaddr + ph->p_memsz) - obj->vaddrbase);
 	    }
 	    if (!(ph->p_flags & PF_W)) {
 		Elf_Addr start_addr = ph->p_vaddr;
-		obj->text_rodata_start = MIN(start_addr, obj->text_rodata_start);
-		obj->text_rodata_end = MAX(start_addr + ph->p_memsz, obj->text_rodata_end);
+		obj->text_rodata_start = rtld_min(start_addr, obj->text_rodata_start);
+		obj->text_rodata_end = rtld_max(start_addr + ph->p_memsz, obj->text_rodata_end);
 		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
 		    " = %zx text/rodata end = %zx", path, nsegs,
 		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end);
@@ -2271,8 +2271,8 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	    continue;
 	if (!(ph->p_flags & PF_W)) {
 	    Elf_Addr start_addr = ph->p_vaddr;
-	    objtmp.text_rodata_start = MIN(start_addr, objtmp.text_rodata_start);
-	    objtmp.text_rodata_end = MAX(start_addr + ph->p_memsz, objtmp.text_rodata_end);
+	    objtmp.text_rodata_start = rtld_min(start_addr, objtmp.text_rodata_start);
+	    objtmp.text_rodata_end = rtld_max(start_addr + ph->p_memsz, objtmp.text_rodata_end);
 #if defined(DEBUG_VERBOSE)
 	    /* debug is not initialized yet so dbg() is a no-op */
 	    rtld_fdprintf(STDERR_FILENO, "rtld: processing PT_LOAD phdr[%d], "
@@ -4959,7 +4959,7 @@ get_tls_block_ptr(void *tcb, size_t tcbsize)
     size_t extra_size, post_size, pre_size, tls_block_size;
     size_t tls_init_align;
 
-    tls_init_align = MAX(obj_main->tlsalign, 1);
+    tls_init_align = rtld_max(obj_main->tlsalign, 1);
 
     /* Compute fragments sizes. */
     extra_size = tcbsize - TLS_TCB_SIZE;
@@ -4999,8 +4999,8 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 	return (oldtcb);
 
     assert(tcbsize >= TLS_TCB_SIZE);
-    maxalign = MAX(tcbalign, tls_static_max_align);
-    tls_init_align = MAX(obj_main->tlsalign, 1);
+    maxalign = rtld_max(tcbalign, tls_static_max_align);
+    tls_init_align = rtld_max(obj_main->tlsalign, 1);
 
     /* Compute fragmets sizes. */
     extra_size = tcbsize - TLS_TCB_SIZE;
@@ -5062,7 +5062,7 @@ free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
     size_t dtvsize, i, tls_init_align;
 
     assert(tcbsize >= TLS_TCB_SIZE);
-    tls_init_align = MAX(obj_main->tlsalign, 1);
+    tls_init_align = rtld_max(obj_main->tlsalign, 1);
 
     /* Compute fragments sizes. */
 #if defined(__aarch64__) || defined(__arm__)

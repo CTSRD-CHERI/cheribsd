@@ -148,8 +148,8 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    }
 	    if (!(segs[nsegs]->p_flags & PF_W)) {
 		Elf_Addr start_addr = segs[nsegs]->p_vaddr;
-		text_rodata_start = MIN(start_addr, text_rodata_start);
-		text_rodata_end = MAX(start_addr + segs[nsegs]->p_memsz, text_rodata_end);
+		text_rodata_start = rtld_min(start_addr, text_rodata_start);
+		text_rodata_end = rtld_max(start_addr + segs[nsegs]->p_memsz, text_rodata_end);
 		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
 		    " = %zx text/rodata end = %zx", path, nsegs,
 		    (size_t)text_rodata_start, (size_t)text_rodata_end);
