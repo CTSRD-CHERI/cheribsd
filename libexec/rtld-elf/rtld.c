@@ -1552,6 +1552,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
 		obj->textsize = rtld_max(obj->textsize,
 		    round_page(ph->p_vaddr + ph->p_memsz) - obj->vaddrbase);
 	    }
+#ifdef __CHERI_PURE_CAPABILITY__
 	    if (!(ph->p_flags & PF_W)) {
 		Elf_Addr start_addr = ph->p_vaddr;
 		obj->text_rodata_start = rtld_min(start_addr, obj->text_rodata_start);
@@ -1560,6 +1561,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
 		    " = %zx text/rodata end = %zx", path, nsegs,
 		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end);
 	    }
+#endif
 	    break;
 
 	case PT_DYNAMIC:

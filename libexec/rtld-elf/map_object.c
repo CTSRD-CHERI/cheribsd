@@ -105,9 +105,10 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     caddr_t note_end;
     char *note_map;
     size_t note_map_len;
-
+#ifdef __CHERI_PURE_CAPABILITY__
     Elf_Addr text_rodata_start = 0;
     Elf_Addr text_rodata_end = 0;
+#endif
 
 
     hdr = get_elf_header(fd, path, sb, main_path);
@@ -146,6 +147,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 		    path, nsegs);
 		goto error;
 	    }
+#ifdef __CHERI_PURE_CAPABILITY__
 	    if (!(segs[nsegs]->p_flags & PF_W)) {
 		Elf_Addr start_addr = segs[nsegs]->p_vaddr;
 		text_rodata_start = rtld_min(start_addr, text_rodata_start);
@@ -154,6 +156,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 		    " = %zx text/rodata end = %zx", path, nsegs,
 		    (size_t)text_rodata_start, (size_t)text_rodata_end);
 	    }
+#endif
 	    break;
 
 	case PT_PHDR:
