@@ -1262,6 +1262,29 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	case DT_MIPS_CHERI___CAPRELOCSSZ:
 	    obj->cap_relocs_size = dynp->d_un.d_val;
 	    break;
+
+	case DT_MIPS_CHERI_FLAGS: {
+	    size_t flags = dynp->d_un.d_val;
+	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
+	    if (abi == DF_MIPS_CHERI_ABI_PCREL)
+		obj->restrict_pcc_basic = 1;
+	    else if (abi == DF_MIPS_CHERI_ABI_PLT || abi == DF_MIPS_CHERI_ABI_FNDESC)
+		obj->restrict_pcc_strict = 1;
+	    /* Can't restrict $pcc in legacy mode */
+	    obj->cheri_captable_abi = abi;
+	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
+	    if (flags)
+		dbg("Unknown DT_MIPS_CHERI_FLAGS: %zx", (size_t)flags);
+	    break;
+	}
+
+	case DT_MIPS_CHERI_CAPTABLE:
+	    obj->captable = (obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_MIPS_CHERI_CAPTABLESZ:
+	    obj->captable_size = dynp->d_un.d_val;
+	    break;
 #endif
 
 	/*

@@ -211,7 +211,9 @@ typedef struct Struct_Obj_Entry {
 #ifdef __mips__
 #ifdef __CHERI_PURE_CAPABILITY__
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
+    caddr_t captable;		/* start of the .cap_table section */
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
+    size_t captable_size;	/* size of the .cap_table section */
 #endif
     Elf_Word local_gotno;	/* Number of local GOT entries */
     Elf_Word symtabno;		/* Number of dynamic symbols */
@@ -310,6 +312,7 @@ typedef struct Struct_Obj_Entry {
      */
     bool restrict_pcc_basic : 1;
     bool restrict_pcc_strict : 1;
+    unsigned cheri_captable_abi : 3;
 #endif
 
     struct link_map linkmap;	/* For GDB and dlinfo() */
