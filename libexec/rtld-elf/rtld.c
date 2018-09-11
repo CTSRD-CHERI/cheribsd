@@ -1423,6 +1423,72 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	}
 	if (dyn_soname != NULL)
 		object_add_name(obj, obj->strtab + dyn_soname->d_un.d_val);
+#ifdef __CHERI_PURE_CAPABILITY__
+	// Set tight bounds on the individual members now (for the ones that
+	// we iterate over) instead of inheriting the relocbase bounds to avoid
+	// any overflows at runtime.
+	set_bounds_if_nonnull(obj->rel, obj->relsize);
+	set_bounds_if_nonnull(obj->rela, obj->relasize);
+	set_bounds_if_nonnull(obj->pltrel, obj->pltrelsize);
+	set_bounds_if_nonnull(obj->pltrela, obj->pltrelasize);
+	set_bounds_if_nonnull(obj->strtab, obj->strsize);
+	set_bounds_if_nonnull(obj->phdr, obj->phsize);
+
+	set_bounds_if_nonnull(obj->preinit_array_ptr, obj->preinit_array_num * sizeof(Elf_Addr));
+	set_bounds_if_nonnull(obj->init_array_ptr, obj->init_array_num * sizeof(Elf_Addr));
+	set_bounds_if_nonnull(obj->fini_array_ptr, obj->fini_array_num * sizeof(Elf_Addr));
+
+	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
+	set_bounds_if_nonnull(obj->captable, obj->captable_size);
+
+	// Now reduce the bounds on text_rodata_cap:  I, and for PLT/FNDESC we can set tight bounds
+	// so we only need .text
+	if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL) {
+		// For pcrel ABI we need to include captable as well
+		dbg("%s: text/rodata start = %#zx, text/rodata end = %#zx, "
+		    "captable = %-#p (relative to start %#zx)", obj->path,
+		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end,
+		    obj->captable, obj->captable - obj->text_rodata_cap);
+		if (obj->captable) {
+			vaddr_t start = MIN(obj->text_rodata_start,
+			    obj->captable - obj->text_rodata_cap);
+			vaddr_t end = MAX(obj->text_rodata_end,
+			    obj->captable + cheri_getlen(obj->captable) - obj->text_rodata_cap);
+			obj->text_rodata_cap += start;
+			obj->text_rodata_cap = cheri_csetbounds_sametype(
+			    obj->text_rodata_cap, end - start);
+		} else {
+			dbg("%s: missing DT_CHERI_CAPTABLE so can't set "
+			    "sensible bounds on text/rodata -> using full DSO"
+			    ": %-#p", obj->path, obj->text_rodata_cap);
+		}
+	} else if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_LEGACY) {
+#ifdef __CHERI_CAPABILITY_TABLE__
+		rtld_fatal("Cannot load legacy object %s with captable RTLD "
+		    "because it needs an unbounded $pcc. If the program is "
+		    "actually cap-table please update your toolchain so that "
+		    "the output binaries have the correct DT_MIPS_CHERI_FLAGS",
+		    obj->path);
+#endif
+		// In the legacy ABI we don't shrink the bounds at all since
+		// we use cgetsetoffset to call into other libraries ...
+		dbg("Increasing bounds text_rodata_cap in legacy ABI:");
+		dbg("\tbefore: %-#p", obj->text_rodata_cap);
+		obj->text_rodata_cap = cheri_copyaddress(cheri_getpcc(),
+		    obj->text_rodata_cap);
+		dbg("\tafter: %-#p", obj->text_rodata_cap);
+	} else {
+		// tight bounds on text_rodata possible since $cgp is live-in
+		obj->text_rodata_cap += obj->text_rodata_start;
+		// TODO: data-only .so files? Possibly used by icu4c? For now
+		// I'll keep this assertion until we hit an error
+		rtld_require(obj->text_rodata_end != 0, "No text segment in %s?", obj->path);
+		obj->text_rodata_cap = cheri_csetbounds_sametype(
+		   obj->text_rodata_cap, obj->text_rodata_end - obj->text_rodata_start);
+	}
+	dbg("%s: tightened bounds of text/rodata cap: %-#p", obj->path,
+	    obj->text_rodata_cap);
+#endif
 }
 
 static void
