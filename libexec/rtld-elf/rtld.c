@@ -1461,6 +1461,14 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
 		  obj->vaddrbase;
 	    }
 	    nsegs++;
+	    if (!(ph->p_flags & PF_W)) {
+		Elf_Addr start_addr = ph->p_vaddr;
+		obj->text_rodata_start = MIN(start_addr, obj->text_rodata_start);
+		obj->text_rodata_end = MAX(start_addr + ph->p_memsz, obj->text_rodata_end);
+		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
+		    " = %zx text/rodata end = %zx", path, nsegs,
+		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end);
+	    }
 	    break;
 
 	case PT_DYNAMIC:
@@ -1508,6 +1516,13 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
        cheri_getaddress(obj->relocbase) - cheri_getbase(relocbase));
    obj->relocbase = cheri_csetbounds(obj->relocbase, obj->mapsize);
    dbg("Fixed obj_main->relocbase %-#p", obj->relocbase);
+
+    /*
+     * Note: no csetbounds yet since we also need to include .cap_table (which
+     * is part of the r/w section). Bounds are set after .dynamic is read.
+     */
+    obj->text_rodata_cap = obj->relocbase;
+    fix_obj_mapping_cap_permissions(obj, path);
 #endif
 
     obj->entry = entry;
@@ -2151,19 +2166,43 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* MIPS has a bogus DT_TEXTREL. */
     assert(!objtmp.textrel);
 #endif
+    ehdr = (Elf_Ehdr *)mapbase;
+    objtmp.phdr = (Elf_Phdr *)((char *)mapbase + ehdr->e_phoff);
+    objtmp.phsize = ehdr->e_phnum * sizeof(objtmp.phdr[0]);
 #ifdef __CHERI_PURE_CAPABILITY__
     /* This was done in _rtld_do___caprelocs_self */
     objtmp.cap_relocs_processed = true;
+    /* find the end of rodata/text: */
+
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+	const Elf_Phdr *ph = &objtmp.phdr[i];
+	if (ph->p_type != PT_LOAD)
+	    continue;
+	if (!(ph->p_flags & PF_W)) {
+	    Elf_Addr start_addr = ph->p_vaddr;
+	    objtmp.text_rodata_start = MIN(start_addr, objtmp.text_rodata_start);
+	    objtmp.text_rodata_end = MAX(start_addr + ph->p_memsz, objtmp.text_rodata_end);
+#if defined(DEBUG_VERBOSE)
+	    /* debug is not initialized yet so dbg() is a no-op */
+	    rtld_fdprintf(STDERR_FILENO, "rtld: processing PT_LOAD phdr[%d], "
+		"new text/rodata start  = %zx text/rodata end = %zx\n", i + 1,
+		(size_t)objtmp.text_rodata_start, (size_t)objtmp.text_rodata_end);
 #endif
+	}
+    }
+    /*
+     * Note: no csetbounds yet since we also need to include .cap_table (which
+     * is part of the r/w section). Bounds are set after .dynamic is read.
+     */
+    objtmp.text_rodata_cap = objtmp.relocbase;
+    fix_obj_mapping_cap_permissions(&objtmp, "RTLD");
+#endif
+
     /*
      * Temporarily put the dynamic linker entry into the object list, so
      * that symbols can be found.
      */
     relocate_objects(&objtmp, true, &objtmp, 0, NULL);
-
-    ehdr = (Elf_Ehdr *)mapbase;
-    objtmp.phdr = (Elf_Phdr *)((char *)mapbase + ehdr->e_phoff);
-    objtmp.phsize = ehdr->e_phnum * sizeof(objtmp.phdr[0]);
 
     /* Initialize the object list. */
     TAILQ_INIT(&obj_list);
@@ -3622,7 +3661,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	 * symbol.
 	 */
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
-	    sym = make_function_pointer(def, defobj);
+	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 	    dbg("dlsym(%s) is function: %-#p", name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);

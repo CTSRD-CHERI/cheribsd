@@ -106,6 +106,10 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     char *note_map;
     size_t note_map_len;
 
+    Elf_Addr text_rodata_start = 0;
+    Elf_Addr text_rodata_end = 0;
+
+
     hdr = get_elf_header(fd, path, sb, main_path);
     if (hdr == NULL)
 	return (NULL);
@@ -141,6 +145,14 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 		_rtld_error("%s: PT_LOAD segment %d not page-aligned",
 		    path, nsegs);
 		goto error;
+	    }
+	    if (!(segs[nsegs]->p_flags & PF_W)) {
+		Elf_Addr start_addr = segs[nsegs]->p_vaddr;
+		text_rodata_start = MIN(start_addr, text_rodata_start);
+		text_rodata_end = MAX(start_addr + segs[nsegs]->p_memsz, text_rodata_end);
+		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
+		    " = %zx text/rodata end = %zx", path, nsegs,
+		    (size_t)text_rodata_start, (size_t)text_rodata_end);
 	    }
 	    break;
 
@@ -308,14 +320,21 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
       base_vaddr;
     obj->vaddrbase = base_vaddr;
 
+    obj->relocbase = mapbase - base_vaddr;
 #ifdef __CHERI_PURE_CAPABILITY__
     if (obj->vaddrbase != 0) {
-	_rtld_error("%s: nonzero vaddrbase %zd not supported for CheriABI",
-	    path, obj->vaddrbase);
-	goto error1;
+	rtld_fdprintf(STDERR_FILENO, "%s: nonzero vaddrbase %zd may be broken "
+	    "for CheriABI", path, obj->vaddrbase);
     }
+    obj->text_rodata_start = text_rodata_start;
+    obj->text_rodata_end = text_rodata_end;
+    /*
+     * Note: no csetbounds yet since we also need to include .cap_table (which
+     * is part of the r/w section). Bounds are set after .dynamic is read.
+     */
+    obj->text_rodata_cap = obj->relocbase;
+    fix_obj_mapping_cap_permissions(obj, path);
 #endif
-    obj->relocbase = mapbase - base_vaddr;
     obj->dynamic = (const Elf_Dyn *) (obj->relocbase + phdyn->p_vaddr);
     if (hdr->e_entry != 0)
 	obj->entry = (caddr_t) (obj->relocbase + hdr->e_entry);

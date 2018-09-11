@@ -165,6 +165,17 @@ typedef struct Struct_Obj_Entry {
     size_t mapsize;		/* Size of mapped region in bytes */
     size_t textsize;		/* Size of text segment in bytes */
     Elf_Addr vaddrbase;		/* Base address in shared object file */
+#ifdef __CHERI_PURE_CAPABILITY__
+    /*
+     * For CHERI we need a capability for the executable + rodata segments so
+     * that we can derive code capabilities from it.
+     * By having these additional members we can remove execute permissions from
+     * relocbase and mapbase.
+     */
+    Elf_Addr text_rodata_start;
+    Elf_Addr text_rodata_end;
+    caddr_t text_rodata_cap;	/* Capability for the executable mapping */
+#endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */
     caddr_t entry;		/* Entry point */

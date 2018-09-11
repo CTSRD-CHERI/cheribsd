@@ -890,7 +890,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
 			    "IFUNC not implemented!");
 
-			void* symval = NULL;
+			const void* symval = NULL;
 			bool is_undef_weak = false;
 			if (def->st_shndx == SHN_UNDEF) {
 				/* Verify that we are resolving a weak symbol */
@@ -940,7 +940,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    symname(obj, r_symndx), symval);
 				return -1;
 			}
-			*((void**)where) = symval;
+			*((const void**)where) = symval;
 #if defined(DEBUG_VERBOSE)
 			dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s",
 			    where, rel->r_offset, symname(obj, r_symndx),
