@@ -1045,23 +1045,23 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	} else {
 		rtld_base = 0;
 		rtld_len = CHERI_CAP_USER_CODE_LENGTH;
+	}
+
 	if (args->execfd != -1)
 		AUXARGS_ENTRY_NOCAP(pos, AT_EXECFD, args->execfd);
 	CTASSERT(CHERI_CAP_USER_CODE_BASE == 0);
-	AUXARGS_ENTRY_CAP(pos, AT_PHDR, prog_base,
-	    args->phdr - prog_base, prog_len,
-	    CHERI_CAP_USER_DATA_PERMS);
+	/*
+	 * AT_ENTRY gives an executable cap for the whole program and
+	 * AT_PHDR a writable one. RTLD is reposible for seting bounds.
+	 */
+	AUXARGS_ENTRY_CAP(pos, AT_PHDR, prog_base, args->phdr - prog_base,
+	    prog_len, CHERI_CAP_USER_DATA_PERMS);
 	AUXARGS_ENTRY_NOCAP(pos, AT_PHENT, args->phent);
 	AUXARGS_ENTRY_NOCAP(pos, AT_PHNUM, args->phnum);
 	AUXARGS_ENTRY_NOCAP(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY_NOCAP(pos, AT_FLAGS, args->flags);
-	/*
-	 * XXX-BD: the should be bounded to the mapping, but for now
-	 * they aren't as struct image_params doesn't contain the
-	 * mapping and we're not ensuring a representable capability.
-	 */
-	AUXARGS_ENTRY_CAP(pos, AT_ENTRY, CHERI_CAP_USER_CODE_BASE, args->entry,
-	    CHERI_CAP_USER_CODE_LENGTH, CHERI_CAP_USER_CODE_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_ENTRY, prog_base, args->entry - prog_base,
+	    prog_len, CHERI_CAP_USER_CODE_PERMS);
 	/*
 	 * XXX-BD: grant code and data perms to allow textrel fixups.
 	 */
