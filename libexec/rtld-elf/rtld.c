@@ -1255,11 +1255,11 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	case DT_CHERI___CAPRELOCS:
+	case DT_MIPS_CHERI___CAPRELOCS:
 	    obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
-	case DT_CHERI___CAPRELOCSSZ:
+	case DT_MIPS_CHERI___CAPRELOCSSZ:
 	    obj->cap_relocs_size = dynp->d_un.d_val;
 	    break;
 #endif
