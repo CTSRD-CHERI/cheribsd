@@ -1029,12 +1029,22 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 	unsigned long prog_base, prog_len;
+	unsigned long rtld_base, rtld_len;
 
 	prog_base = rounddown2(imgp->start_addr,
 	    1ULL << CHERI_ALIGN_SHIFT(imgp->start_addr));
 	prog_len = roundup2(imgp->end_addr - prog_base,
 	    1ULL << CHERI_ALIGN_SHIFT(imgp->end_addr - prog_base));
 
+
+	if (imgp->interp_end) {
+		rtld_base = rounddown2(args->base,
+		    1ULL << CHERI_ALIGN_SHIFT(args->base));
+		rtld_len = roundup2(imgp->interp_end - rtld_base,
+		    1ULL << CHERI_ALIGN_SHIFT(imgp->interp_end - rtld_base));
+	} else {
+		rtld_base = 0;
+		rtld_len = CHERI_CAP_USER_CODE_LENGTH;
 	if (args->execfd != -1)
 		AUXARGS_ENTRY_NOCAP(pos, AT_EXECFD, args->execfd);
 	CTASSERT(CHERI_CAP_USER_CODE_BASE == 0);
@@ -1054,14 +1064,9 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	    CHERI_CAP_USER_CODE_LENGTH, CHERI_CAP_USER_CODE_PERMS);
 	/*
 	 * XXX-BD: grant code and data perms to allow textrel fixups.
-	 * XXXAR: This currently spans the full address space and is not correct
-	 * for the main binary since args->base seems to contain the rtld addr.
-	 * rtld-cheri-elf fixes this up to be only the main binary.
-	 *
 	 */
-	AUXARGS_ENTRY_CAP(pos, AT_BASE, 0, args->base,
-	    CHERI_CAP_USER_DATA_LENGTH,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, args->base - rtld_base,
+	    rtld_len, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 #ifdef AT_EHDRFLAGS
 	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);
 #endif

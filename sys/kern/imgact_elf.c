@@ -99,7 +99,7 @@ static int __elfN(check_header)(const Elf_Ehdr *hdr);
 static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
     const char *interp, int interp_name_len, int32_t *osrel);
 static int __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
-    u_long *entry, size_t pagesize);
+    u_long *end_addr, u_long *entry, size_t pagesize);
 static int __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
     caddr_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot,
     size_t pagesize);
@@ -650,12 +650,16 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
  * an executable, this value is ignored.  On exit, "addr" specifies
  * where the file was actually loaded.
  *
+ * The "end_addr" reference parameter is out only.  On exit, it specifies
+ * the end address of the loaded file.
+ *
  * The "entry" reference parameter is out only.  On exit, it specifies
  * the entry point for the loaded file.
+ *
  */
 static int
 __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
-	u_long *entry, size_t pagesize)
+	u_long *end_addr, u_long *entry, size_t pagesize)
 {
 	struct {
 		struct nameidata nd;
@@ -670,6 +674,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	vm_prot_t prot;
 	u_long rbase;
 	u_long base_addr = 0;
+	u_long max_addr = 0;
 	int error, i, numsegs;
 
 #ifdef CAPABILITY_MODE
@@ -766,10 +771,13 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 			if (numsegs == 0)
   				base_addr = trunc_page(phdr[i].p_vaddr +
 				    rbase);
+
+			max_addr = MAX(max_addr, phdr[i].p_vaddr + phdr[i].p_memsz);
 			numsegs++;
 		}
 	}
 	*addr = base_addr;
+	*end_addr = base_addr + max_addr;
 	*entry = (unsigned long)hdr->e_entry + rbase;
 
 fail:
@@ -1053,6 +1061,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	PROC_UNLOCK(imgp->proc);
 
 	imgp->entry_addr = entry;
+	imgp->interp_end = 0;
 
 	if (interp != NULL) {
 		have_interp = FALSE;
@@ -1063,7 +1072,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			snprintf(path, MAXPATHLEN, "%s%s",
 			    brand_info->emul_path, interp);
 			error = __elfN(load_file)(imgp->proc, path, &addr,
-			    &imgp->entry_addr, sv->sv_pagesize);
+			    &imgp->interp_end, &imgp->entry_addr, sv->sv_pagesize);
 			free(path, M_TEMP);
 			if (error == 0)
 				have_interp = TRUE;
@@ -1072,13 +1081,13 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		    (brand_info->interp_path == NULL ||
 		    strcmp(interp, brand_info->interp_path) == 0)) {
 			error = __elfN(load_file)(imgp->proc, newinterp, &addr,
-			    &imgp->entry_addr, sv->sv_pagesize);
+			    &imgp->interp_end, &imgp->entry_addr, sv->sv_pagesize);
 			if (error == 0)
 				have_interp = TRUE;
 		}
 		if (!have_interp) {
 			error = __elfN(load_file)(imgp->proc, interp, &addr,
-			    &imgp->entry_addr, sv->sv_pagesize);
+			    &imgp->interp_end, &imgp->entry_addr, sv->sv_pagesize);
 		}
 		vn_lock(imgp->vp, LK_EXCLUSIVE | LK_RETRY);
 		if (error != 0) {
