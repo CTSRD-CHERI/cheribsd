@@ -762,7 +762,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	rtld_die();
 #ifdef __CHERI_PURE_CAPABILITY__
     /* old crt does not exist for CheriABI */
-    assert(obj_main->crt_no_init);
+    obj_main->crt_no_init = true;
 #else
     if (!obj_main->crt_no_init) {
 	/*
@@ -1646,10 +1646,6 @@ digest_notes(Obj_Entry *obj, const Elf_Note *note_start, const Elf_Note *note_en
 			break;
 		}
 	}
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* We don't support old-style binaries that call init. */
-	assert(obj->crt_no_init == true);
-#endif
 }
 
 static Obj_Entry *
