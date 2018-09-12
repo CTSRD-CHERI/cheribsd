@@ -946,8 +946,15 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (error != 0)
 		goto ret;
 
+	/*
+	 * XXX: For some reason imgp->start_addr is changed from ~0UL to 0 so due
+	 * to computing the minimum we were always getting a start_addr of 0.
+	 */
+	/* KASSERT(imgp->start_addr != 0,
+	 *   ("Should be ULONG_MAX and not 0x%lx", imgp->start_addr)); */
+	imgp->start_addr = ~0UL;
 	for (i = 0; i < hdr->e_phnum; i++) {
-		unsigned long start_addr, end_addr;
+		unsigned long end_addr;
 		switch (phdr[i].p_type) {
 		case PT_LOAD:	/* Loadable segment */
 			if (phdr[i].p_memsz == 0)
@@ -959,13 +966,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			    sv->sv_pagesize);
 			if (error != 0)
 				goto ret;
-
-			start_addr = phdr[i].p_vaddr + et_dyn_addr;
-			end_addr = start_addr + phdr[i].p_memsz;
-			if (imgp->start_addr > start_addr)
-				imgp->start_addr = start_addr;
-			if (imgp->end_addr < end_addr)
-				imgp->end_addr = end_addr;
 
 			/*
 			 * If this segment contains the program headers,
@@ -983,6 +983,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			seg_size = round_page(phdr[i].p_memsz +
 			    phdr[i].p_vaddr + et_dyn_addr - seg_addr);
 
+			imgp->start_addr = MIN(imgp->start_addr, seg_addr);
+			end_addr = seg_addr + seg_size;
+			imgp->end_addr = MAX(imgp->end_addr, end_addr);
 			/*
 			 * Make the largest executable segment the official
 			 * text segment and all others data.

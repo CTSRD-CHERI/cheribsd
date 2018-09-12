@@ -1031,6 +1031,8 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	unsigned long prog_base, prog_len;
 	unsigned long rtld_base, rtld_len;
 
+	/* printf("%s: start=%#lx, end=%#lx, base=%#lx, interp_end=%#lx\n", __func__,
+		imgp->start_addr, imgp->end_addr, args->base, imgp->interp_end); */
 	prog_base = rounddown2(imgp->start_addr,
 	    1ULL << CHERI_ALIGN_SHIFT(imgp->start_addr));
 	prog_len = roundup2(imgp->end_addr - prog_base,
