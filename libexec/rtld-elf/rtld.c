@@ -88,8 +88,7 @@ static void digest_dynamic1(Obj_Entry *, int, const Elf_Dyn **,
 static void digest_dynamic2(Obj_Entry *, const Elf_Dyn *, const Elf_Dyn *,
     const Elf_Dyn *);
 static void digest_dynamic(Obj_Entry *, int);
-static Obj_Entry *digest_phdr(const Elf_Phdr *, int, caddr_t, caddr_t,
-    const char *);
+static Obj_Entry *digest_phdr(const Elf_Phdr *, int, caddr_t, const char *);
 static Obj_Entry *dlcheck(void *);
 static int dlclose_locked(void *, RtldLockState *);
 static Obj_Entry *dlopen_object(const char *name, int fd, Obj_Entry *refobj,
@@ -564,10 +563,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     if (ld_debug != NULL && *ld_debug != '\0')
 	debug = 1;
-    dbg("%s is initialized, base address = %p", __progname,
+    dbg("%s is initialized, base address = %-#p", __progname,
 	(caddr_t) aux_info[AT_BASE]->a_un.a_ptr);
-    dbg("RTLD dynamic = %p", obj_rtld.dynamic);
-    dbg("RTLD pltgot  = %p", obj_rtld.pltgot);
+    dbg("RTLD dynamic = %-#p", obj_rtld.dynamic);
+    dbg("RTLD pltgot  = %-#p", obj_rtld.pltgot);
 
     dbg("initializing thread locks");
     lockdflt_init();
@@ -584,8 +583,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    rtld_die();
 	max_stack_flags = obj_main->stack_flags;
     } else {				/* Main program already loaded. */
-	caddr_t relocbase;
-
 	dbg("processing main program's program header");
 	assert(aux_info[AT_PHDR] != NULL);
 	phdr = (const Elf_Phdr *) aux_info[AT_PHDR]->a_un.a_ptr;
@@ -595,10 +592,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (caddr_t) aux_info[AT_ENTRY]->a_un.a_ptr;
-	relocbase = (caddr_t) aux_info[AT_BASE]->a_un.a_ptr;
 	dbg("Values from kernel:\n\tAT_PHDR=%-#p\n\tAT_BASE=%-#p\n\tAT_ENTRY=%-#p\n",
-		phdr, relocbase, imgentry);
-	if ((obj_main = digest_phdr(phdr, phnum, imgentry, relocbase, argv0)) ==
+		phdr, aux_info[AT_BASE]->a_un.a_ptr, imgentry);
+	if ((obj_main = digest_phdr(phdr, phnum, imgentry, argv0)) ==
 	    NULL)
 		rtld_die();
 	dbg("Parsed values:\n\tmapbase=%-#p\n\tmapsize=%#zx"
@@ -1509,10 +1505,9 @@ digest_dynamic(Obj_Entry *obj, int early)
  * returns an Obj_Entry structure.
  */
 static Obj_Entry *
-digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
-    const char *path)
+digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, const char *path)
 {
-    dbg("%s(0, entry=%p, relocbase=%-#p, path=%s)\n", __func__, entry, relocbase, path);
+    dbg("%s(0, entry=%-#p, phdr=%-#p, path=%s)\n", __func__, entry, phdr, path);
     Obj_Entry *obj;
     const Elf_Phdr *phlimit = phdr + phnum;
     const Elf_Phdr *ph;
@@ -1524,8 +1519,12 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
 	if (ph->p_type != PT_PHDR)
 	    continue;
 
-	obj->phdr = phdr;
 	obj->phsize = ph->p_memsz;
+#ifdef __CHERI_PURE_CAPABILITY__
+	obj->phdr = cheri_csetbounds(phdr, ph->p_memsz);
+#else
+	obj->phdr = phdr;
+#endif
 	obj->relocbase = (caddr_t)phdr - ph->p_vaddr;
 	break;
     }
@@ -1598,23 +1597,12 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
     }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-   // FIXME: the kernel is passing a full addressspace AT_BASE value with
-   // the offset pointing to rtld. We should pass the main binary mapping instead!
-
-   // obj->relocbase was derived from Phdr, which is a data cap. We need a full
-   // permissions cap for obj->relocbase (for now)
-   dbg("Original obj_main->relocbase %-#p", obj->relocbase);
-   assert(cheri_getbase(relocbase) <= cheri_getbase(obj->relocbase));
-   obj->relocbase = cheri_setoffset(relocbase,
-       cheri_getaddress(obj->relocbase) - cheri_getbase(relocbase));
    obj->relocbase = cheri_csetbounds(obj->relocbase, obj->mapsize);
-   dbg("Fixed obj_main->relocbase %-#p", obj->relocbase);
-
     /*
-     * Note: no csetbounds yet since we also need to include .cap_table (which
-     * is part of the r/w section). Bounds are set after .dynamic is read.
+     * Derive text_rodata cap from AT_ENTRY (but set the address to the beginning
+     * of the object). Note: csetbounds is done after parsing .dynamic
      */
-    obj->text_rodata_cap = obj->relocbase;
+    obj->text_rodata_cap = cheri_copyaddress(entry, obj->relocbase);
     fix_obj_mapping_cap_permissions(obj, path);
 #endif
 
