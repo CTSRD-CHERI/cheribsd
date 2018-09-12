@@ -867,7 +867,7 @@ ext2_add_first_entry(struct vnode *dvp, struct ext2fs_direct_2 *entry,
     struct componentname *cnp)
 {
 	struct inode *dp;
-	struct iovec aiov;
+	kiovec_t aiov;
 	struct uio auio;
 	char* buf = NULL;
 	int dirblksize, error;
@@ -892,14 +892,12 @@ ext2_add_first_entry(struct vnode *dvp, struct ext2fs_direct_2 *entry,
 
 		auio.uio_offset = dp->i_offset;
 		auio.uio_resid = dirblksize;
-		aiov.iov_len = auio.uio_resid;
-		aiov.iov_base = (caddr_t)buf;
+		IOVEC_INIT(&aiov, buf, auio.uio_resid);
 	} else {
 		entry->e2d_reclen = dirblksize;
 		auio.uio_offset = dp->i_offset;
 		auio.uio_resid = EXT2_DIR_REC_LEN(entry->e2d_namlen);
-		aiov.iov_len = auio.uio_resid;
-		aiov.iov_base = (caddr_t)entry;
+		IOVEC_INIT(&aiov, entry, auio.uio_resid);
 	}
 
 	auio.uio_iov = &aiov;
