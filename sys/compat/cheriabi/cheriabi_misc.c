@@ -863,7 +863,11 @@ cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd)
 	do {								\
 		void * __capability _tmpcap;				\
 		_tmpcap = cheri_capability_build_user_rwx((perms),	\
-		    (base), (length), (offset));		\
+		    (base), (length), (offset));			\
+		KASSERT(cheri_gettag(_tmpcap), ("Created invalid cap"	\
+		    "from base=%zx, offset=%#zx, length=%#zx, "		\
+		    "perms=%#zx", (size_t)(base), (size_t)(offset),	\
+		    (size_t)(length), (size_t)(perms)));		\
 		copyoutcap_c(&_tmpcap, uaddr, sizeof(_tmpcap));		\
 	} while(0)
 
