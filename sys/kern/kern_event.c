@@ -164,7 +164,7 @@ static void	filt_timerexpire(void *knx);
 static int	filt_timerattach(struct knote *kn);
 static void	filt_timerdetach(struct knote *kn);
 static void	filt_timerstart(struct knote *kn, sbintime_t to);
-static void	filt_timertouch(struct knote *kn, struct kevent *kev,
+static void	filt_timertouch(struct knote *kn, kkevent_t *kev,
 		    u_long type);
 static int	filt_timervalidate(struct knote *kn, sbintime_t *to);
 static int	filt_timer(struct knote *kn, long hint);
@@ -793,7 +793,7 @@ filt_timerdetach(struct knote *kn)
 }
 
 static void
-filt_timertouch(struct knote *kn, struct kevent *kev, u_long type)
+filt_timertouch(struct knote *kn, kkevent_t *kev, u_long type)
 {
 	struct kq_timer_cb_data *kc;	
 	struct kqueue *kq;
