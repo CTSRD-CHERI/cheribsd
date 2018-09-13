@@ -185,7 +185,7 @@ typedef struct Struct_Obj_Entry {
      */
     Elf_Addr text_rodata_start;
     Elf_Addr text_rodata_end;
-    caddr_t text_rodata_cap;	/* Capability for the executable mapping */
+    const char* text_rodata_cap;	/* Capability for the executable mapping */
 #endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */
