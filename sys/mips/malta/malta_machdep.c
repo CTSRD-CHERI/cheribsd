@@ -356,30 +356,42 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	cninit();
 	printf("entry: platform_start()\n");
 
-	bootverbose = 1;
-
 	/* 
+	 * Parse kernel cmdline.
 	 * YAMON uses 32bit pointers to strings so
 	 * convert them to proper type manually
 	 */
-
-	if (bootverbose) {
-		printf("cmd line: ");
-		for (i = 0; i < argc; i++) {
-			char *arg;
+	printf("cmd line: ");
+	for (i = 0; i < argc; i++) {
+		char *arg;
 #ifdef CHERI_KERNEL
-			/* trust that YAMON initialized the strings correctly and
-			 * do not try to get the precise string length.
-			 */
-			arg = cheri_ptrpermoff((caddr_t)cheri_getkdc() +
-			    (vm_offset_t)(argv[i]), 4096, CHERI_PERM_LOAD, 0);
+		/* trust that YAMON initialized the strings correctly and
+		 * do not try to get the precise string length.
+		 */
+		arg = cheri_ptrpermoff((caddr_t)cheri_getkdc() +
+		    (vm_offset_t)(argv[i]), 4096, CHERI_PERM_LOAD, 0);
 #else
-			arg = (char*)(intptr_t)argv[i];
+		arg = (char*)(intptr_t)argv[i];
 #endif
-			printf("%s ", arg);
+		printf("%s ", arg);
+		while (*arg != '\0') {
+			if (*arg++ != '-')
+				continue;
+			switch (*arg) {
+			case 'a':
+				boothowto |= RB_ASKNAME;
+				break;
+			case 'v':
+				bootverbose = 1;
+				boothowto |= RB_VERBOSE;
+				break;
+			case 'C':
+				boothowto |= RB_CDROM;
+				break;
+			}
 		}
-		printf("\n");
 	}
+	printf("\n");
 
 	if (bootverbose)
 		printf("envp:\n");
