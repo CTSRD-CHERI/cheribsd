@@ -1090,6 +1090,9 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 	vm_ptr_t buf_cl, buf_clend;
 	vm_size_t size_cl, size_clend;
 	int cache_linesize_mask = mips_dcache_max_linesize - 1;
+#ifdef CHERI_KERNEL
+	vm_offset_t tmp_va;
+#endif
 
 	/*
 	 * dcache invalidation operates on cache line aligned addresses
@@ -1108,16 +1111,37 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 	 * unrelated adjacent data (and a rule of mbuf handling is that the cpu
 	 * is not allowed to touch the mbuf while dma is in progress, including
 	 * header fields).
+	 *
+	 * XXX-AM: This is very bad for CHERI, the buffer pointer does not give
+	 * access to the whole cache line so there is no way we can cleanly
+	 * preserve the non-aligned data without using a global kernel
+	 * capability.
 	 */
 	if (aligned) {
 		size_cl = 0;
 		size_clend = 0;
 	} else {
-		buf_cl = rounddown2(buf, mips_dcache_max_linesize);
+#ifdef CHERI_KERNEL
+		tmp_va = ptr_to_va(buf) & ~cache_linesize_mask;
 		size_cl = ptr_to_va(buf) & cache_linesize_mask;
+		if (size_cl)
+			buf_cl = (vm_ptr_t)cheri_bound(
+			    cheri_setoffset(cheri_kall_capability, tmp_va),
+			    size_cl);
+		tmp_va = ptr_to_va(buf + len);
+		size_clend = (mips_dcache_max_linesize -
+		    (tmp_va & cache_linesize_mask)) & cache_linesize_mask;
+		if (size_clend)
+			buf_clend = (vm_ptr_t)cheri_bound(
+			    cheri_setoffset(cheri_kall_capability, tmp_va),
+			    size_clend);
+#else
+		buf_cl = buf & ~cache_linesize_mask;
+		size_cl = buf & cache_linesize_mask;
 		buf_clend = buf + len;
 		size_clend = (mips_dcache_max_linesize -
-		    (ptr_to_va(buf_clend) & cache_linesize_mask)) & cache_linesize_mask;
+		    (buf_clend & cache_linesize_mask)) & cache_linesize_mask;
+#endif
 	}
 
 	switch (op) {
