@@ -803,6 +803,17 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     /* Return the exit procedure and the program entry point. */
     *exit_proc = rtld_exit;
     *objp = obj_main;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+    // ensure that we setup a valid $cgp if the binary is built with -nostartfiles
+    // Note: This value should still remain valid after the return since clang
+    // won't clobber it. This should ensure that on return from here to
+    // rtld_start.S $cgp will be set up correctly. We could also pass another
+    // reference argument and store obj_main->captable there but this is easier
+    // and should have the same effect.
+    __asm__ volatile("cmove $cgp, %0" :: "C"(obj_main->captable));
+#endif
+
     return (func_ptr_type) obj_main->entry;
 }
 
@@ -4145,6 +4156,7 @@ rtld_dirname_abs(const char *path, char *base)
 static void
 linkmap_add(Obj_Entry *obj)
 {
+    dbg("Adding %s to linkmap", printable_path(obj->path));
     struct link_map *l = &obj->linkmap;
     struct link_map *prev;
 
