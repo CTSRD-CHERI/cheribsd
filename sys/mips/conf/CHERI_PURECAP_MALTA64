@@ -27,6 +27,7 @@ nooptions	DDB
 nooptions	MSDOSFS
 nooptions	NFSD, NFSCL
 nooptions	FFS
+options		CD9660
 # disable raid, we don't need it
 nooptions	GEOM_RAID
 
