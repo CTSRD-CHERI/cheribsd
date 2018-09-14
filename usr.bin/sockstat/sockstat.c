@@ -427,8 +427,7 @@ gather_sctp(void)
 				    (!opt_L || !local_all_loopback) &&
 				    ((xinpcb->flags & SCTP_PCB_FLAGS_UDPTYPE) ||
 				     (xstcb->last == 1))) {
-					hash = (int)((uintptr_t)sock->socket %
-					    HASHSIZE);
+					hash = (int)(sock->socket % HASHSIZE);
 					sock->next = sockhash[hash];
 					sockhash[hash] = sock;
 				} else {
@@ -555,8 +554,7 @@ gather_sctp(void)
 				    (!opt_L ||
 				     !(local_all_loopback ||
 				     foreign_all_loopback))) {
-					hash = (int)((uintptr_t)sock->socket %
-					    HASHSIZE);
+					hash = (int)(sock->socket % HASHSIZE);
 					sock->next = sockhash[hash];
 					sockhash[hash] = sock;
 				} else {
@@ -718,7 +716,7 @@ gather_inet(int proto)
 			    TCP_FUNCTION_NAME_LEN_MAX);
 		}
 		sock->protoname = protoname;
-		hash = (int)((uintptr_t)sock->socket % HASHSIZE);
+		hash = (int)(sock->socket % HASHSIZE);
 		sock->next = sockhash[hash];
 		sockhash[hash] = sock;
 	}
@@ -813,7 +811,7 @@ gather_unix(int proto)
 		faddr->next = NULL;
 		sock->laddr = laddr;
 		sock->faddr = faddr;
-		hash = (int)((uintptr_t)sock->socket % HASHSIZE);
+		hash = (int)(sock->socket % HASHSIZE);
 		sock->next = sockhash[hash];
 		sockhash[hash] = sock;
 	}
@@ -1179,7 +1177,7 @@ display(void)
 			continue;
 		if (opt_j >= 0 && opt_j != getprocjid(xf->xf_pid))
 			continue;
-		hash = (int)((uintptr_t)xf->xf_data % HASHSIZE);
+		hash = (int)(xf->xf_data % HASHSIZE);
 		for (s = sockhash[hash]; s != NULL; s = s->next) {
 			if (s->socket != xf->xf_data)
 				continue;
