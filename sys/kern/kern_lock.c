@@ -113,8 +113,9 @@ CTASSERT(LK_UNLOCKED == (LK_UNLOCKED &
 } while (0)
 
 #define	LK_CAN_SHARE(x, flags)						\
-	(((x) & LK_SHARE) &&						\
-	(((x) & (LK_EXCLUSIVE_WAITERS | LK_EXCLUSIVE_SPINNERS)) == 0 ||	\
+	(ptr_get_flag(x, LK_SHARE) &&					\
+	(ptr_get_flag(x,						\
+	    LK_EXCLUSIVE_WAITERS | LK_EXCLUSIVE_SPINNERS) == 0 || 	\
 	(curthread->td_lk_slocks != 0 && !(flags & LK_NODDLKTREAT)) ||	\
 	(curthread->td_pflags & TDP_DEADLKTREAT)))
 #define	LK_TRYOP(x)							\
@@ -130,10 +131,12 @@ CTASSERT(LK_UNLOCKED == (LK_UNLOCKED &
 	((f) & LK_SLEEPFAIL) == 0)
 
 #define	lockmgr_disowned(lk)						\
-	(((lk)->lk_lock & ~(LK_FLAGMASK & ~LK_SHARE)) == LK_KERNPROC)
+	(ptr_clear_flag((lk)->lk_lock, (LK_FLAGMASK & ~LK_SHARE)) ==	\
+	    LK_KERNPROC)
 
 #define	lockmgr_xlocked(lk)						\
-	(((lk)->lk_lock & ~(LK_FLAGMASK & ~LK_SHARE)) == (uintptr_t)curthread)
+	(ptr_clear_flag((lk)->lk_lock, (LK_FLAGMASK & ~LK_SHARE)) ==	\
+	    (uintptr_t)curthread)
 
 static void	assert_lockmgr(const struct lock_object *lock, int how);
 #ifdef DDB
@@ -240,7 +243,8 @@ lockmgr_xholder(const struct lock *lk)
 	uintptr_t x;
 
 	x = lk->lk_lock;
-	return ((x & LK_SHARE) ? NULL : (struct thread *)LK_HOLDER(x));
+	return ((ptr_get_flag(x, LK_SHARE)) ?
+	    NULL : (struct thread *)LK_HOLDER(x));
 }
 
 /*
@@ -313,7 +317,7 @@ wakeupshlk(struct lock *lk, const char *file, int line)
 		sleepq_lock(&lk->lock_object);
 		orig_x = lk->lk_lock;
 retry_sleepq:
-		x = orig_x & (LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
+		x = ptr_get_flag(orig_x, LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
 		v = LK_UNLOCKED;
 
 		/*
@@ -331,11 +335,11 @@ retry_sleepq:
 		 */
 		realexslp = sleepq_sleepcnt(&lk->lock_object,
 		    SQ_EXCLUSIVE_QUEUE);
-		if ((x & LK_EXCLUSIVE_WAITERS) != 0 && realexslp != 0) {
+		if (ptr_get_flag(x, LK_EXCLUSIVE_WAITERS) != 0 && realexslp != 0) {
 			if (lk->lk_exslpfail < realexslp) {
 				lk->lk_exslpfail = 0;
 				queue = SQ_EXCLUSIVE_QUEUE;
-				v |= (x & LK_SHARED_WAITERS);
+				v |= ptr_get_flag(x, LK_SHARED_WAITERS);
 			} else {
 				lk->lk_exslpfail = 0;
 				LOCK_LOG2(lk,
@@ -367,7 +371,7 @@ retry_sleepq:
 			break;
 		}
 
-		x |= LK_SHARERS_LOCK(1);
+		x = ptr_set_flag(x, LK_SHARERS_LOCK(1));
 		if (!atomic_fcmpset_rel_ptr(&lk->lk_lock, &x, v)) {
 			orig_x = x;
 			goto retry_sleepq;
@@ -536,8 +540,8 @@ lockmgr_sunlock_try(struct lock *lk, uintptr_t *xp)
 		 * If there are not waiters on the exclusive queue, drop the
 		 * lock quickly.
 		 */
-		if ((*xp & LK_ALL_WAITERS) == 0) {
-			MPASS((*xp & ~LK_EXCLUSIVE_SPINNERS) ==
+		if (ptr_get_flag(*xp, LK_ALL_WAITERS) == 0) {
+			MPASS(ptr_get_flag(*xp, ~LK_EXCLUSIVE_SPINNERS) ==
 			    LK_SHARERS_LOCK(1));
 			if (atomic_fcmpset_rel_ptr(&lk->lk_lock, xp,
 			    LK_UNLOCKED))
@@ -624,9 +628,9 @@ retry_sleepq:
 		 * Try to set the LK_SHARED_WAITERS flag.  If we fail,
 		 * loop back and retry.
 		 */
-		if ((x & LK_SHARED_WAITERS) == 0) {
+		if (ptr_get_flag(x, LK_SHARED_WAITERS) == 0) {
 			if (!atomic_fcmpset_acq_ptr(&lk->lk_lock, &x,
-			    x | LK_SHARED_WAITERS)) {
+			    ptr_set_flag(x, LK_SHARED_WAITERS))) {
 				goto retry_sleepq;
 			}
 			LOCK_LOG2(lk, "%s: %p set shared waiters flag",
@@ -782,11 +786,11 @@ retry_sleepq:
 		 * claim lock ownership and return, preserving waiters
 		 * flags.
 		 */
-		v = x & (LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
-		if ((x & ~v) == LK_UNLOCKED) {
-			v &= ~LK_EXCLUSIVE_SPINNERS;
+		v = ptr_get_flag(x, LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
+		if (ptr_clear_flag(x, v) == LK_UNLOCKED) {
+			v = ptr_clear_flag(v, LK_EXCLUSIVE_SPINNERS);
 			if (atomic_fcmpset_acq_ptr(&lk->lk_lock, &x,
-			    tid | v)) {
+			    ptr_set_flag(tid, v))) {
 				sleepq_release(&lk->lock_object);
 				LOCK_LOG2(lk,
 				    "%s: %p claimed by a new writer",
@@ -800,9 +804,9 @@ retry_sleepq:
 		 * Try to set the LK_EXCLUSIVE_WAITERS flag.  If we
 		 * fail, loop back and retry.
 		 */
-		if ((x & LK_EXCLUSIVE_WAITERS) == 0) {
+		if (ptr_get_flag(x, LK_EXCLUSIVE_WAITERS) == 0) {
 			if (!atomic_fcmpset_ptr(&lk->lk_lock, &x,
-			    x | LK_EXCLUSIVE_WAITERS)) {
+			    ptr_set_flag(x, LK_EXCLUSIVE_WAITERS))) {
 				goto retry_sleepq;
 			}
 			LOCK_LOG2(lk, "%s: %p set excl waiters flag",
@@ -867,15 +871,15 @@ lockmgr_upgrade(struct lock *lk, u_int flags, struct lock_object *ilk,
 
 	_lockmgr_assert(lk, KA_SLOCKED, file, line);
 	v = lk->lk_lock;
-	x = v & LK_ALL_WAITERS;
-	v &= LK_EXCLUSIVE_SPINNERS;
+	x = ptr_get_flag(v, LK_ALL_WAITERS);
+	v = ptr_get_flag(v, LK_EXCLUSIVE_SPINNERS);
 
 	/*
 	 * Try to switch from one shared lock to an exclusive one.
 	 * We need to preserve waiters flags during the operation.
 	 */
-	if (atomic_cmpset_ptr(&lk->lk_lock, LK_SHARERS_LOCK(1) | x | v,
-	    tid | x)) {
+	if (atomic_cmpset_ptr(&lk->lk_lock, x | v | LK_SHARERS_LOCK(1),
+	    ptr_set_flag(tid, x))) {
 		LOCK_LOG_LOCK("XUPGRADE", &lk->lock_object, 0, 0, file,
 		    line);
 		WITNESS_UPGRADE(&lk->lock_object, LOP_EXCLUSIVE |
@@ -1048,13 +1052,13 @@ lockmgr_xunlock_hard(struct lock *lk, uintptr_t x, u_int flags, struct lock_obje
 	 * lk_exslpfail might be considered an 'upper limit'
 	 * bound, including the edge cases.
 	 */
-	MPASS((x & LK_EXCLUSIVE_SPINNERS) == 0);
+	MPASS(ptr_get_flag(x, LK_EXCLUSIVE_SPINNERS) == 0);
 	realexslp = sleepq_sleepcnt(&lk->lock_object, SQ_EXCLUSIVE_QUEUE);
-	if ((x & LK_EXCLUSIVE_WAITERS) != 0 && realexslp != 0) {
+	if (ptr_get_flag(x, LK_EXCLUSIVE_WAITERS) != 0 && realexslp != 0) {
 		if (lk->lk_exslpfail < realexslp) {
 			lk->lk_exslpfail = 0;
 			queue = SQ_EXCLUSIVE_QUEUE;
-			v |= (x & LK_SHARED_WAITERS);
+			v |= ptr_get_flag(x, LK_SHARED_WAITERS);
 		} else {
 			lk->lk_exslpfail = 0;
 			LOCK_LOG2(lk,
@@ -1106,7 +1110,7 @@ lockmgr_unlock_fast_path(struct lock *lk, u_int flags, struct lock_object *ilk)
 	_lockmgr_assert(lk, KA_LOCKED, file, line);
 	unlocked = false;
 	x = lk->lk_lock;
-	if (__predict_true(x & LK_SHARE) != 0) {
+	if (__predict_true(ptr_get_flag(x, LK_SHARE)) != 0) {
 		if (lockmgr_sunlock_try(lk, &x)) {
 			lockmgr_note_shared_release(lk, file, line);
 			unlocked = true;
@@ -1227,10 +1231,10 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 		 */
 		for (;;) {
 			x = lk->lk_lock;
-			MPASS((x & LK_EXCLUSIVE_SPINNERS) == 0);
-			x &= LK_ALL_WAITERS;
-			if (atomic_cmpset_rel_ptr(&lk->lk_lock, tid | x,
-			    LK_SHARERS_LOCK(1) | x))
+			MPASS(ptr_get_flag(x, LK_EXCLUSIVE_SPINNERS) == 0);
+			x = ptr_get_flag(x, LK_ALL_WAITERS);
+			if (atomic_cmpset_rel_ptr(&lk->lk_lock, ptr_set_flag(tid, x),
+			    ptr_set_flag(LK_SHARERS_LOCK(1), x)))
 				break;
 			cpu_spinwait();
 		}
@@ -1239,7 +1243,7 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 		_lockmgr_assert(lk, KA_LOCKED, file, line);
 		x = lk->lk_lock;
 
-		if (__predict_true(x & LK_SHARE) != 0) {
+		if (__predict_true(ptr_get_flag(x, LK_SHARE)) != 0) {
 			return (lockmgr_sunlock_hard(lk, x, flags, ilk, file, line));
 		} else {
 			return (lockmgr_xunlock_hard(lk, x, flags, ilk, file, line));
@@ -1300,9 +1304,9 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 				continue;
 			}
 
-			v = x & (LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
-			if ((x & ~v) == LK_UNLOCKED) {
-				v = (x & ~LK_EXCLUSIVE_SPINNERS);
+			v = ptr_get_flag(x, LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS);
+			if (ptr_clear_flag(x, v) == LK_UNLOCKED) {
+				v = ptr_clear_flag(x, LK_EXCLUSIVE_SPINNERS);
 
 				/*
 				 * If interruptible sleeps left the exclusive
@@ -1318,9 +1322,9 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 				 * an 'upper limit' bound, including the edge
 				 * cases.
 				 */
-				if (v & LK_EXCLUSIVE_WAITERS) {
+				if (ptr_get_flag(v, LK_EXCLUSIVE_WAITERS)) {
 					queue = SQ_EXCLUSIVE_QUEUE;
-					v &= ~LK_EXCLUSIVE_WAITERS;
+					v = ptr_clear_flag(v, LK_EXCLUSIVE_WAITERS);
 				} else {
 
 					/*
@@ -1330,10 +1334,10 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 					 * have left spourious lk_exslpfail
 					 * counts on, so clean it up anyway.
 					 */
-					MPASS(v & LK_SHARED_WAITERS);
+					MPASS(ptr_get_flag(v, LK_SHARED_WAITERS));
 					lk->lk_exslpfail = 0;
 					queue = SQ_SHARED_QUEUE;
-					v &= ~LK_SHARED_WAITERS;
+					v = ptr_clear_flag(v, LK_SHARED_WAITERS);
 				}
 				if (queue == SQ_EXCLUSIVE_QUEUE) {
 					realexslp =
@@ -1342,7 +1346,7 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 					if (lk->lk_exslpfail >= realexslp) {
 						lk->lk_exslpfail = 0;
 						queue = SQ_SHARED_QUEUE;
-						v &= ~LK_SHARED_WAITERS;
+						v = ptr_clear_flag(v, LK_SHARED_WAITERS);
 						if (realexslp != 0) {
 							LOCK_LOG2(lk,
 					"%s: %p has only LK_SLEEPFAIL sleepers",
@@ -1378,7 +1382,8 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 				 */
 				if (queue == SQ_SHARED_QUEUE) {
 					for (v = lk->lk_lock;
-					    (v & LK_SHARE) && !LK_SHARERS(v);
+					    ptr_get_flag(v, LK_SHARE) &&
+					        !LK_SHARERS(v);
 					    v = lk->lk_lock)
 						cpu_spinwait();
 				}
@@ -1388,9 +1393,9 @@ __lockmgr_args(struct lock *lk, u_int flags, struct lock_object *ilk,
 			 * Try to set the LK_EXCLUSIVE_WAITERS flag.  If we
 			 * fail, loop back and retry.
 			 */
-			if ((x & LK_EXCLUSIVE_WAITERS) == 0) {
+			if (ptr_get_flag(x, LK_EXCLUSIVE_WAITERS) == 0) {
 				if (!atomic_cmpset_ptr(&lk->lk_lock, x,
-				    x | LK_EXCLUSIVE_WAITERS)) {
+				    ptr_set_flag(x, LK_EXCLUSIVE_WAITERS))) {
 					sleepq_release(&lk->lock_object);
 					continue;
 				}
@@ -1475,10 +1480,11 @@ _lockmgr_disown(struct lock *lk, const char *file, int line)
 	 */
 	for (;;) {
 		x = lk->lk_lock;
-		MPASS((x & LK_EXCLUSIVE_SPINNERS) == 0);
-		x &= LK_ALL_WAITERS;
-		if (atomic_cmpset_rel_ptr(&lk->lk_lock, tid | x,
-		    LK_KERNPROC | x))
+		MPASS(ptr_get_flag(x, LK_EXCLUSIVE_SPINNERS) == 0);
+		x = ptr_get_flag(x, LK_ALL_WAITERS);
+		if (atomic_cmpset_rel_ptr(&lk->lk_lock,
+		    ptr_set_flag(tid, x),
+		    ptr_set_flag(LK_KERNPROC, x)))
 			return;
 		cpu_spinwait();
 	}
@@ -1492,7 +1498,7 @@ lockmgr_printinfo(const struct lock *lk)
 
 	if (lk->lk_lock == LK_UNLOCKED)
 		printf("lock type %s: UNLOCKED\n", lk->lock_object.lo_name);
-	else if (lk->lk_lock & LK_SHARE)
+	else if (ptr_get_flag(lk->lk_lock, LK_SHARE))
 		printf("lock type %s: SHARED (count %ju)\n",
 		    lk->lock_object.lo_name,
 		    (uintmax_t)LK_SHARERS(lk->lk_lock));
@@ -1509,11 +1515,11 @@ lockmgr_printinfo(const struct lock *lk)
 	}
 
 	x = lk->lk_lock;
-	if (x & LK_EXCLUSIVE_WAITERS)
+	if (ptr_get_flag(x, LK_EXCLUSIVE_WAITERS))
 		printf(" with exclusive waiters pending\n");
-	if (x & LK_SHARED_WAITERS)
+	if (ptr_get_flag(x, LK_SHARED_WAITERS))
 		printf(" with shared waiters pending\n");
-	if (x & LK_EXCLUSIVE_SPINNERS)
+	if (ptr_get_flag(x, LK_EXCLUSIVE_SPINNERS))
 		printf(" with exclusive spinners pending\n");
 
 	STACK_PRINT(lk);
@@ -1529,7 +1535,7 @@ lockstatus(const struct lock *lk)
 	x = lk->lk_lock;
 	v = LK_HOLDER(x);
 
-	if ((x & LK_SHARE) == 0) {
+	if (ptr_get_flag(x, LK_SHARE) == 0) {
 		if (v == (uintptr_t)curthread || v == LK_KERNPROC)
 			ret = LK_EXCLUSIVE;
 		else
@@ -1572,19 +1578,19 @@ _lockmgr_assert(const struct lock *lk, int what, const char *file, int line)
 		 * Workaround this skipping the check if the lock is held in
 		 * exclusive mode even for the KA_LOCKED case.
 		 */
-		if (slocked || (lk->lk_lock & LK_SHARE)) {
+		if (slocked || ptr_get_flag(lk->lk_lock, LK_SHARE)) {
 			witness_assert(&lk->lock_object, what, file, line);
 			break;
 		}
 #endif
 		if (lk->lk_lock == LK_UNLOCKED ||
-		    ((lk->lk_lock & LK_SHARE) == 0 && (slocked ||
+		    (ptr_get_flag(lk->lk_lock, LK_SHARE) == 0 && (slocked ||
 		    (!lockmgr_xlocked(lk) && !lockmgr_disowned(lk)))))
 			panic("Lock %s not %slocked @ %s:%d\n",
 			    lk->lock_object.lo_name, slocked ? "share" : "",
 			    file, line);
 
-		if ((lk->lk_lock & LK_SHARE) == 0) {
+		if (ptr_get_flag(lk->lk_lock, LK_SHARE) == 0) {
 			if (lockmgr_recursed(lk)) {
 				if (what & KA_NOTRECURSED)
 					panic("Lock %s recursed @ %s:%d\n",
@@ -1632,7 +1638,7 @@ lockmgr_chain(struct thread *td, struct thread **ownerp)
 	if (LOCK_CLASS(&lk->lock_object) != &lock_class_lockmgr)
 		return (0);
 	db_printf("blocked on lockmgr %s", lk->lock_object.lo_name);
-	if (lk->lk_lock & LK_SHARE)
+	if (ptr_get_flag(lk->lk_lock, LK_SHARE))
 		db_printf("SHARED (count %ju)\n",
 		    (uintmax_t)LK_SHARERS(lk->lk_lock));
 	else
@@ -1653,7 +1659,7 @@ db_show_lockmgr(const struct lock_object *lock)
 	db_printf(" state: ");
 	if (lk->lk_lock == LK_UNLOCKED)
 		db_printf("UNLOCKED\n");
-	else if (lk->lk_lock & LK_SHARE)
+	else if (ptr_get_flag(lk->lk_lock, LK_SHARE))
 		db_printf("SLOCK: %ju\n", (uintmax_t)LK_SHARERS(lk->lk_lock));
 	else {
 		td = lockmgr_xholder(lk);
@@ -1667,7 +1673,7 @@ db_show_lockmgr(const struct lock_object *lock)
 			db_printf(" recursed: %d\n", lk->lk_recurse);
 	}
 	db_printf(" waiters: ");
-	switch (lk->lk_lock & LK_ALL_WAITERS) {
+	switch (ptr_get_flag(lk->lk_lock, LK_ALL_WAITERS)) {
 	case LK_SHARED_WAITERS:
 		db_printf("shared\n");
 		break;
@@ -1681,7 +1687,7 @@ db_show_lockmgr(const struct lock_object *lock)
 		db_printf("none\n");
 	}
 	db_printf(" spinners: ");
-	if (lk->lk_lock & LK_EXCLUSIVE_SPINNERS)
+	if (ptr_get_flag(lk->lk_lock, LK_EXCLUSIVE_SPINNERS))
 		db_printf("exclusive\n");
 	else
 		db_printf("none\n");

@@ -37,6 +37,7 @@
 #include <sys/_lockmgr.h>
 #include <sys/_mutex.h>
 #include <sys/_rwlock.h>
+#include <sys/ptrbits.h>
 
 #define	LK_SHARE			0x01
 #define	LK_SHARED_WAITERS		0x02
@@ -47,13 +48,13 @@
 #define	LK_FLAGMASK							\
 	(LK_SHARE | LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS)
 
-#define	LK_HOLDER(x)			((x) & ~LK_FLAGMASK)
-#define	LK_SHARERS_SHIFT		4
-#define	LK_SHARERS(x)			(LK_HOLDER(x) >> LK_SHARERS_SHIFT)
-#define	LK_SHARERS_LOCK(x)		((x) << LK_SHARERS_SHIFT | LK_SHARE)
-#define	LK_ONE_SHARER			(1 << LK_SHARERS_SHIFT)
-#define	LK_UNLOCKED			LK_SHARERS_LOCK(0)
-#define	LK_KERNPROC			((uintptr_t)(-1) & ~LK_FLAGMASK)
+#define	LK_HOLDER(x)		(ptr_clear_flag(x, LK_FLAGMASK))
+#define	LK_SHARERS_SHIFT	4
+#define	LK_SHARERS(x)		(ptr_to_va(LK_HOLDER(x)) >> LK_SHARERS_SHIFT)
+#define	LK_SHARERS_LOCK(x)	((x) << LK_SHARERS_SHIFT | LK_SHARE)
+#define	LK_ONE_SHARER		(1 << LK_SHARERS_SHIFT)
+#define	LK_UNLOCKED		LK_SHARERS_LOCK(0)
+#define	LK_KERNPROC		(ptr_clear_flag((uintptr_t)(-1), LK_FLAGMASK))
 
 #ifdef _KERNEL
 
