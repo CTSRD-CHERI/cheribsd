@@ -1510,7 +1510,7 @@ alloc:
 	 * E.g., nullfs uses vfs_hash_index() on the lower vnode for
 	 * its own hashing.
 	 */
-	vp->v_hash = (uintptr_t)vp >> vnsz2log;
+	vp->v_hash = ptr_to_va(vp) >> vnsz2log;
 
 	*vpp = vp;
 	return (0);
