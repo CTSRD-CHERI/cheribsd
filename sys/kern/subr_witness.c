@@ -3051,7 +3051,7 @@ witness_debugger(int cond, const char *msg)
 
 	if (!cond)
 		return;
-
+#ifdef KDB
 	if (witness_trace) {
 		sbuf_new(&sb, buf, sizeof(buf), SBUF_FIXEDLEN);
 		sbuf_set_drain(&sb, witness_output_drain, NULL);
@@ -3064,7 +3064,6 @@ witness_debugger(int cond, const char *msg)
 		sbuf_finish(&sb);
 	}
 
-#ifdef KDB
 	if (witness_kdb)
 		kdb_enter(KDB_WHY_WITNESS, msg);
 #endif
