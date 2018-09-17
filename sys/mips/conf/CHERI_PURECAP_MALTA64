@@ -37,6 +37,9 @@ options		VERBOSE_SYSINIT
 options		BUS_DEBUG
 options		CAMDEBUG
 options		CAM_DEBUG_FLAGS=3
+options		STACK # needed for witness
+options		WITNESS
+options		DEBUG_VFS_LOCKS
 # options		KTR
 # options		KTR_VERBOSE=2
 # nooptions	KTR_ALQ
