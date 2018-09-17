@@ -179,14 +179,15 @@ SUBDIR.${MK_LDNS}+=	libldns
 # built for certain architectures.
 # XXXAR: This is not actually true, it makes sense to build them even if we
 # aren't building a native clang since we might be cross-compiling with clang
-.if (${COMPILER_TYPE} == "clang") && \
-    (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-    ${MACHINE_CPUARCH} == "arm" ||  ${MACHINE_CPUARCH} == "i386" || \
+.if ${COMPILER_TYPE} == "clang"
+.if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
+    ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
     ${MACHINE_ARCH:Mmips64} != "") && !defined(LIBCHERI)
 _libclang_rt=	libclang_rt
 .elif !defined(LIBCHERI)
 .error "NOT BUILDING libclang_rt"
 .endif
+.endif # ${COMPILER_TYPE} == "clang"
 
 .if ${MK_LIBCPLUSPLUS} != "no"
 _libcxxrt=	libcxxrt
