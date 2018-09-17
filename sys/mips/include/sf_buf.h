@@ -45,8 +45,8 @@ sf_buf_kva(struct sf_buf *sf)
 
 	m = (vm_page_t)sf;
 #ifdef CHERI_KERNEL
-	return cheri_csetbounds(MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)),
-				PAGE_SIZE);
+	return ((vm_ptr_t)cheri_csetbounds(
+	    MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)), PAGE_SIZE));
 #else
 	return ((vm_ptr_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m)));
 #endif
