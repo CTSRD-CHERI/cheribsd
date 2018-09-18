@@ -1282,12 +1282,8 @@ sys_mlockall(struct thread *td, struct mlockall_args *uap)
 	 * a hard resource limit, return ENOMEM.
 	 */
 	if (!old_mlock && uap->how & MCL_CURRENT) {
-		PROC_LOCK(td->td_proc);
-		if (map->size > lim_cur(td, RLIMIT_MEMLOCK)) {
-			PROC_UNLOCK(td->td_proc);
+		if (map->size > lim_cur(td, RLIMIT_MEMLOCK))
 			return (ENOMEM);
-		}
-		PROC_UNLOCK(td->td_proc);
 	}
 #ifdef RACCT
 	if (racct_enable) {
@@ -1672,21 +1668,21 @@ vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
 
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {
-		PROC_LOCK(td->td_proc);
-		if (map->size + size > lim_cur_proc(td->td_proc, RLIMIT_VMEM)) {
-			PROC_UNLOCK(td->td_proc);
+		RACCT_PROC_LOCK(td->td_proc);
+		if (map->size + size > lim_cur(td, RLIMIT_VMEM)) {
+			RACCT_PROC_UNLOCK(td->td_proc);
 			return (ENOMEM);
 		}
 		if (racct_set(td->td_proc, RACCT_VMEM, map->size + size)) {
-			PROC_UNLOCK(td->td_proc);
+			RACCT_PROC_UNLOCK(td->td_proc);
 			return (ENOMEM);
 		}
 		if (!old_mlock && map->flags & MAP_WIREFUTURE) {
 			if (ptoa(pmap_wired_count(map->pmap)) + size >
-			    lim_cur_proc(td->td_proc, RLIMIT_MEMLOCK)) {
+			    lim_cur(td, RLIMIT_MEMLOCK)) {
 				racct_set_force(td->td_proc, RACCT_VMEM,
 				    map->size);
-				PROC_UNLOCK(td->td_proc);
+				RACCT_PROC_UNLOCK(td->td_proc);
 				return (ENOMEM);
 			}
 			error = racct_set(td->td_proc, RACCT_MEMLOCK,
@@ -1694,11 +1690,11 @@ vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
 			if (error != 0) {
 				racct_set_force(td->td_proc, RACCT_VMEM,
 				    map->size);
-				PROC_UNLOCK(td->td_proc);
+				RACCT_PROC_UNLOCK(td->td_proc);
 				return (error);
 			}
 		}
-		PROC_UNLOCK(td->td_proc);
+		RACCT_PROC_UNLOCK(td->td_proc);
 	}
 
 	/*
