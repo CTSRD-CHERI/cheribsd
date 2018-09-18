@@ -10,8 +10,6 @@ SHLIB_MAJOR= 0
 
 .PATH: ${SRCTOP}/sys/contrib/libnv ${SRCTOP}/sys/sys
 CFLAGS+=-I${.CURDIR}
-#XXXBD: workaround for jenkins build systems
-CFLAGS+=-D'__nonnull(x)='
 
 SRCS=	cnvlist.c
 SRCS+=	dnvlist.c
