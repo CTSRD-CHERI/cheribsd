@@ -111,7 +111,6 @@ __DEFAULT_YES_OPTIONS = \
     GPIO \
     HAST \
     HTML \
-    HYPERV \
     ICONV \
     INET \
     INET6 \
@@ -396,6 +395,13 @@ __DEFAULT_NO_OPTIONS+=MLX5TOOL
 __DEFAULT_YES_OPTIONS+=PIE
 .else
 __DEFAULT_NO_OPTIONS+=PIE
+.endif
+
+# HyperV is currently x86-only
+.if ${__T} == "amd64" || ${__T} == "i386"
+__DEFAULT_YES_OPTIONS+=HYPERV
+.else
+__DEFAULT_NO_OPTIONS+=HYPERV
 .endif
 
 # NVME is only x86 and powerpc64
