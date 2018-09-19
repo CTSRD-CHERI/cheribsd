@@ -199,7 +199,8 @@ kern_quotactl(struct thread *td, const char * __CAPABILITY path, int cmd,
 	 * Require that Q_QUOTAON handles the vfs_busy() reference on
 	 * its own, always returning with ubusied mount point.
 	 */
-	if ((cmd >> SUBCMDSHIFT) != Q_QUOTAON)
+	if ((cmd >> SUBCMDSHIFT) != Q_QUOTAON &&
+	    (cmd >> SUBCMDSHIFT) != Q_QUOTAOFF)
 		vfs_unbusy(mp);
 	return (error);
 }
