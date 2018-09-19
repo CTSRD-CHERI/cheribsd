@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/pctrie.h>
+#include <sys/ptrbits.h>
 
 #ifdef DDB
 #include <ddb/ddb.h>
@@ -170,7 +171,7 @@ static __inline boolean_t
 pctrie_isleaf(struct pctrie_node *node)
 {
 
-	return (((uintptr_t)node & PCTRIE_ISLEAF) != 0);
+	return (ptr_get_flag(node, PCTRIE_ISLEAF) != 0);
 }
 
 /*
@@ -180,7 +181,7 @@ static __inline uint64_t *
 pctrie_toval(struct pctrie_node *node)
 {
 
-	return ((uint64_t *)((uintptr_t)node & ~PCTRIE_FLAGS));
+	return ((uint64_t *)ptr_clear_flag(node, PCTRIE_FLAGS));
 }
 
 /*
@@ -193,7 +194,7 @@ pctrie_addval(struct pctrie_node *node, uint64_t index, uint16_t clev,
 	int slot;
 
 	slot = pctrie_slot(index, clev);
-	node->pn_child[slot] = (void *)((uintptr_t)val | PCTRIE_ISLEAF);
+	node->pn_child[slot] = (void *)(ptr_set_flag(val, PCTRIE_ISLEAF));
 }
 
 /*
@@ -295,7 +296,7 @@ pctrie_insert(struct pctrie *ptree, uint64_t *val, pctrie_alloc_t allocfn)
 	 */
 	node = pctrie_getroot(ptree);
 	if (node == NULL) {
-		ptree->pt_root = (uintptr_t)val | PCTRIE_ISLEAF;
+		ptree->pt_root = (uintptr_t)(ptr_set_flag(val, PCTRIE_ISLEAF));
 		return (0);
 	}
 	parentp = (void **)&ptree->pt_root;
