@@ -1365,10 +1365,30 @@ vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 		bt_freetrim(vm, BT_MAXFREE);
 		(*vm->vm_releasefn)(vm->vm_arg, spanaddr, spansize);
 	} else {
+#ifdef CHERI_KERNEL
+		/*
+		 * Find the SPAN btag and use the capability to generate
+		 * the new bt_start for the coalesced region
+		 */
+		vm_offset_t spanoffset;
+		TAILQ_FOREACH_REVERSE_FROM(t, &vm->vm_seglist, vmem_seglist,
+		    bt_seglist)
+			if (BT_ISSPAN_P(t))
+				break;
+		MPASS(cheri_is_subset((void *)t->bt_start, (void *)bt->bt_start));
+		MPASS(cheri_getlen((void *)t->bt_start) >= bt->bt_size);
+		spanoffset = ptr_to_va(bt->bt_start) -
+		    cheri_getbase((void *)t->bt_start);
+		bt->bt_start = (vmem_addr_t)cheri_csetbounds(
+		    (void *)(t->bt_start + spanoffset), bt->bt_size);
+#endif
 		bt_insfree(vm, bt);
 		VMEM_CONDVAR_BROADCAST(vm);
 		bt_freetrim(vm, BT_MAXFREE);
 	}
+#ifdef CHERI_KERNEL
+	MPASS(cheri_getlen((void *)bt->bt_start) == bt->bt_size);
+#endif
 }
 
 /*
