@@ -1321,7 +1321,7 @@ err_exit:
 }
 
 struct exec_args_kva {
-	vm_offset_t addr;
+	vm_ptr_t addr;
 	u_int gen;
 	SLIST_ENTRY(exec_args_kva) next;
 };
@@ -1349,7 +1349,7 @@ exec_prealloc_args_kva(void *arg __unused)
 }
 SYSINIT(exec_args_kva, SI_SUB_EXEC, SI_ORDER_ANY, exec_prealloc_args_kva, NULL);
 
-static vm_offset_t
+static vm_ptr_t
 exec_alloc_args_kva(void **cookie)
 {
 	struct exec_args_kva *argkva;
