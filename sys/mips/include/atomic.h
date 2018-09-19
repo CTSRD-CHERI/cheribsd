@@ -1425,7 +1425,7 @@ atomic_readandclear_cap(__volatile uintptr_t *p)
 	__asm __volatile (
 		"1:\n\t"
 		"cllc		%0, %1\n\t"	/* load old value */
-		"cfromptr	%2, $c0, $zero\n\t" /* clear c1 */
+		"cgetnull	%2\n\t"		/* clear c1 */
 		"cscc		$t0, %2, %1\n\t" /* attempt to store */
 		"beqz		$t0, 1b\n\t"	/* spin if failed */
 		"nop\n\t"			/* delay slot */
