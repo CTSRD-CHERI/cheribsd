@@ -1149,8 +1149,8 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	cld		k0, zero, 0(CHERI_REG_KR1C)	# k0=this PTE
 
 	/* Validate page table entry.  */
-	andi		k0, PTE_VR
-	beqz		k0, 3f
+	andi		k1, k0, PTE_VR
+	beqz		k1, 3f
 	nop
 
 	/* Check whether this is an even or odd entry.  */
