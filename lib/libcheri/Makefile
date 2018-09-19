@@ -46,7 +46,7 @@ INCS=	libcheri_ccall.h		\
 	libcheri_sandboxasm.h
 
 CFLAGS+=	-I${.CURDIR}
-CFLAGS+=	-I${.CURDIR}/${MACHINE_ARCH}
+CFLAGS+=	-I${.CURDIR}/${MACHINE}
 CFLAGS.libcheri_invoke_hybrid.S+= -fno-pic -mabicalls
 CFLAGS+=  -mllvm -mxmxgot
 CFLAGS+=	-DHAVE_WORKING_TLS
@@ -76,7 +76,7 @@ CLEANFILES+=	libcheri_invoke_hybrid.o	\
 
 NO_WERROR=
 
-.PATH: ${.CURDIR}/${MACHINE_ARCH}
+.PATH: ${.CURDIR}/${MACHINE}
 .PATH: ${.CURDIR}/../libc/string
 .PATH: ${.CURDIR}/../libc/${MACHINE}/string
 

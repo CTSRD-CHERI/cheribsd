@@ -287,7 +287,7 @@ CFLAGS+=	-I${LIBC_DIR}/include			\
 
 .PATH: ${.CURDIR}/${MACHINE_ARCH}
 .PATH: ${LIBCHERI_DIR}
-.PATH: ${LIBCHERI_DIR}/${MACHINE_ARCH}
+.PATH: ${LIBCHERI_DIR}/${MACHINE}
 
 .PATH: ${.CURDIR}/../libmalloc_simple
 
