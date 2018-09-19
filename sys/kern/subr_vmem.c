@@ -1302,6 +1302,7 @@ vmem_free(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 {
 	qcache_t *qc;
 	MPASS(size > 0);
+	CHERI_VM_ASSERT_VALID(addr);
 
 	if (size <= vm->vm_qcache_max) {
 		qc = &vm->vm_qcache[(size - 1) >> vm->vm_quantum_shift];
