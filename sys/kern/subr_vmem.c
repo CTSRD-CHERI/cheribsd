@@ -214,12 +214,13 @@ static uma_zone_t vmem_zone;
 #define	VMEM_ALIGNUP(addr, align)	(-(-(addr) & -(align)))
 
 #define	VMEM_CROSS_P(addr1, addr2, boundary) \
-	((((addr1) ^ (addr2)) & -(boundary)) != 0)
+    ((((addr1) ^ (addr2)) & -(boundary)) != 0)
 #else /* CHERI_KERNEL */
 #define	VMEM_ALIGNUP(addr, align)	__builtin_align_up(addr, align)
 
-#define	VMEM_CROSS_P(addr1, addr2, boundary)			\
-	(((ptr_to_va(addr1) ^ ptr_to_va(addr2)) & -(boundary)) != 0)
+#define	VMEM_CROSS_P(addr1, addr2, boundary)				\
+    (((ptr_to_va((uintptr_t)addr1) ^ ptr_to_va((uintptr_t)addr2)) &	\
+    -(boundary)) != 0)
 #endif
 
 #define	ORDER2SIZE(order)	((order) < VMEM_OPTVALUE ? ((order) + 1) : \
