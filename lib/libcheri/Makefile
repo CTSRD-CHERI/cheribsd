@@ -20,7 +20,7 @@ SRCS=	libcheri_ccall.c		\
 	libcheri_sandbox_loader.c	\
 	libcheri_sandbox_methods.c
 
-.if defined(LIBCHERI)
+.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
 SRCS+=	libcheri_invoke_cabi.S		\
 	libcheri_classes_cabi.S
 .else
@@ -66,7 +66,7 @@ NEED_CHERI=	hybrid
 .endif
 
 CLEANFILES=	libcheri_ccall_trampoline.o
-.if defined(LIBCHERI)
+.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
 CLEANFILES+=	libcheri_invoke_cabi.o		\
 		libcheri_classes_cabi.o
 .else

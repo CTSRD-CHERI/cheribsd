@@ -10,7 +10,7 @@ PACKAGE=	ssh
 
 WARNS?=	5
 CFLAGS+= -I${SSHDIR} -include ssh_namespace.h
-.ifdef LIBCHERI
+.if ${MACHINE_ARCH:Mmips64c128} || ${MACHINE_ARCH:Mmips64c256}
 # This library often causes `relocation R_MIPS_GOT_PAGE out of range` errors
 CFLAGS+=-mllvm -mxmxgot
 .endif

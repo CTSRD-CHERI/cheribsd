@@ -182,9 +182,10 @@ SUBDIR.${MK_LDNS}+=	libldns
 .if ${COMPILER_TYPE} == "clang"
 .if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
-    ${MACHINE_ARCH:Mmips64} != "") && !defined(LIBCHERI)
+    ${MACHINE_ARCH:Mmips64*}) && \
+    ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
 _libclang_rt=	libclang_rt
-.elif !defined(LIBCHERI)
+.elif ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
 .error "NOT BUILDING libclang_rt"
 .endif
 .endif # ${COMPILER_TYPE} == "clang"
@@ -216,7 +217,7 @@ SUBDIR.${MK_PMC}+=	libipt
 SUBDIR.${MK_BHYVE}+=	libvmmapi
 .endif
 
-.if ${MACHINE_ARCH} == "mips64"
+.if ${MACHINE_ARCH:Mmips64*}
 _libstatcounters=	libstatcounters
 .endif
 
@@ -253,7 +254,7 @@ SUBDIR_PARALLEL=
 SUBDIR:=	${SUBDIR:Nlibc++experimental}
 .endif
 
-.if defined(LIBCHERI)
+.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
 SUBDIR+=	libmalloc_simple
 SUBDIR+=	libcheri_syscalls
 SUBDIR+=	libcheri_support

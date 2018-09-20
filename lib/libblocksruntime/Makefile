@@ -11,7 +11,7 @@ WARNS?=	2
 INCS=	Block.h Block_private.h
 SRCS=	data.c runtime.c
 
-.ifdef LIBCHERI
+.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
 CFLAGS+=	-Wno-error-mips-cheri-bugs
 .endif
 

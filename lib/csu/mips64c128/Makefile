@@ -1,10 +1,6 @@
 #
 # $FreeBSD$
 #
-SRCS=	crtbeginC.c				\
-	crtendC.c
-FILES=	crtbeginC.o				\
-	crtendC.o
 FILESOWN=       ${LIBOWN}
 FILESGRP=       ${LIBGRP}
 FILESMODE=      ${LIBMODE}
@@ -16,11 +12,7 @@ CFLAGS+=-mxgot -mllvm -mxmxgot
 
 NEED_CHERI=	pure
 
-# Currently needed for libcheri sandboxes
-SRCS+=	crt_init_globals.c
-FILES+=	crt_init_globals.o
-
-.if defined(LIBCHERI)
+.PATH: ${.CURDIR}/../common
 CFLAGS+=	-I${.CURDIR}/../common		\
 		-I${.CURDIR}/../../libc/include
 FILES+=	crt1.o					\
@@ -56,7 +48,5 @@ crtend.o:	crtendC.c
 # Used as the first object file for PIE (other executables use crt1.c)
 Scrt1.o:	crt1.c
 	${CC} ${CFLAGS} ${PICFLAG} -c -o ${.TARGET} ${.ALLSRC}
-
-.endif
 
 .include <bsd.lib.mk>

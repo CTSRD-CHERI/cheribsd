@@ -15,7 +15,7 @@ SHLIB_MAJOR= 7
 
 CFLAGS+=	-DPLATFORM_CONFIG_H=\"${.CURDIR}/config_freebsd.h\"
 CFLAGS+=	-I${.OBJDIR}
-.ifdef LIBCHERI
+.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
 CFLAGS+=	-Wno-cheri-bitwise-operations
 .endif
 
@@ -418,7 +418,7 @@ MLINKS+=	archive_write_set_options.3 archive_write_set_format_option.3
 MLINKS+=	archive_write_set_options.3 archive_write_set_option.3
 MLINKS+=	libarchive.3 archive.3
 
-.if ${MACHINE_ARCH} != "mips64"
+.if ! ${MACHINE_ARCH:Mmips64*}
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 .endif

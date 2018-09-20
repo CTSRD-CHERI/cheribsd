@@ -203,7 +203,7 @@ CFLAGS+=	-DEMIT_SYNC_ATOMICS
 SRCF+=		stdatomic
 .endif
 
-.ifdef LIBCHERI
+.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
 # -Wcapabilities warning while trying to decode a string to a pointer.
 # Easy to suppress, but the result is unlikely to work so leave the symbol
 # unimplemented for now.
