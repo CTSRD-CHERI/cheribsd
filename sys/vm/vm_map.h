@@ -249,7 +249,7 @@ struct vmspace {
 	segsz_t vm_ssize;	/* stack size (pages) */
 	caddr_t vm_taddr;	/* (c) user virtual address of text */
 	caddr_t vm_daddr;	/* (c) user virtual address of data */
-	caddr_t vm_maxsaddr;	/* user VA at max stack growth */
+	vm_offset_t vm_maxsaddr;	/* user VA at max stack growth */
 	volatile int vm_refcnt;	/* number of references */
 	/*
 	 * Keep the PMAP last, so that CPU-specific variations of that
