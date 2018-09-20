@@ -15,9 +15,3 @@ SRCS+=	_setjmp_c.S setjmp_c.S cheriabi_pic_wrappers.c
 .else
 SRCS+=	_setjmp.S setjmp.S
 .endif
-
-.if ${MK_CHERI} == "yes"
-# XXX-BD: clang currently miscompiles these.  See CHERI-LLVM bug #125.
-#CC.setjmp.S=      ${_CHERI_CC}
-#CC._setjmp.S=      ${_CHERI_CC}
-.endif
