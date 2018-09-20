@@ -2961,8 +2961,11 @@ fgetvp_write(struct thread *td, int fd, cap_rights_t *rightsp,
 
 /*
  * Handle the last reference to a file being closed.
+ *
+ * Without the noinline attribute clang keeps inlining the func thorough this
+ * file when fdrop is used.
  */
-int
+int __noinline
 _fdrop(struct file *fp, struct thread *td)
 {
 	int error;
