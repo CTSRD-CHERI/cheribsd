@@ -186,7 +186,7 @@ SUBDIR.${MK_LDNS}+=	libldns
     ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
 _libclang_rt=	libclang_rt
 .elif ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
-.error "NOT BUILDING libclang_rt"
+.error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
 .endif
 .endif # ${COMPILER_TYPE} == "clang"
 
