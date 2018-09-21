@@ -306,6 +306,8 @@ MACHINE_CPU = v9 ultrasparc ultrasparc3
 
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS += -G0
+# Hack for CheriBSD because clang targets a much newer CPU
+CFLAGS += -mcpu=mips4
 . if ${MACHINE_ARCH:Mmips*el*} != ""
 AFLAGS += -EL
 CFLAGS += -EL
@@ -318,13 +320,62 @@ LDFLAGS += -EB
 AFLAGS+= -mabi=${MIPS_ABI}
 CFLAGS+= -mabi=${MIPS_ABI}
 LDFLAGS+= -mabi=${MIPS_ABI}
-. if ${MACHINE_ARCH:Mmips64*} != ""
+. if ${MACHINE_ARCH:Mmips*c*}
+MIPS_ABI?=	purecap
+. elif ${MACHINE_ARCH:Mmips64*} != ""
 MIPS_ABI?=	64
 . elif ${MACHINE_ARCH:Mmipsn32*} != ""
 MIPS_ABI?=	n32
 . else
 MIPS_ABI?=	32
 . endif
+.if ${MACHINE_ARCH:Mmips*c*}
+CFLAGS+=	-integrated-as
+CFLAGS+=	-fpic
+CFLAGS+=	-cheri-cap-table-abi=pcrel
+.ifdef CHERI_USE_CAP_TLS
+CFLAGS+=	-cheri-cap-tls-abi=${CHERI_USE_CAP_TLS}
+.else
+CFLAGS+=	-ftls-model=local-exec
+.endif
+.ifdef NO_WERROR
+# Implicit function declarations should always be an error in purecap
+# mode as we will probably generate wrong code for calling them.
+# XXXBD: move to WARNS?
+CFLAGS+=	-Werror=implicit-function-declaration
+.endif
+# Turn off deprecated warnings
+# XXXBD: is this still needed?
+CFLAGS+=	-Wno-deprecated-declarations
+. if ${MK_CHERI_EXACT_EQUALS} == "yes"
+CFLAGS+=	-mllvm -cheri-exact-equals
+. endif
+# XXXBD: is -mstack-alignment needed here?
+. if ${MACHINE_ARCH:Mmips*c128}
+CFLAGS+=	-cheri=128
+CFLAGS+=	-mstack-alignment=16
+. elif ${MACHINE_ARCH:Mmips*c256}
+CFLAGS+=	-cheri=256
+CFLAGS+=	-mstack-alignment=32
+. endif
+# Clang no longer defines __LP64__ for Cheri purecap ABI but there are a
+# lot of files that use it to check for not 32-bit
+# XXXAR: Remove this once we have checked all the #ifdef __LP64__ uses
+CFLAGS+=	-D__LP64__=1
+LDFLAGS+=	-fuse-ld=lld
+# XXXBD: still needed?
+LDFLAGS+=	-Wl,-melf64btsmip_cheri_fbsd
+LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
+# Work around cheri-unknown-freebsd-ld.lld: error: section: .init_array
+# is not contiguous with other relro sections
+# TODO: remove this once I've debugged the root cause
+LDFLAGS+=	-Wl,-z,norelro
+CFLAGS+=	-Qunused-arguments
+CFLAGS+=	-Werror=cheri-bitwise-operations
+# Don't remove CHERI symbols from the symbol table
+STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
+		--keep-symbol=__cheri_method.\*
+.endif
 . if ${MACHINE_ARCH:Mmips*hf}
 CFLAGS += -mhard-float
 . else

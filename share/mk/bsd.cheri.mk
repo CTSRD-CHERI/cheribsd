@@ -28,6 +28,7 @@
 # SUCH DAMAGE.
 #
 
+.if ! ${MACHINE_ARCH:Mmips*c*} || defined(LIBCHERI)
 .if !${.TARGETS:Mbuild-tools} && !defined(BOOTSTRAPPING)
 .if defined(NEED_CHERI)
 .if ${MK_CHERI} == "no"
@@ -178,6 +179,7 @@ CXXFLAGS+=	-stdlib=libc++
 # Don't remove CHERI symbols from the symbol table
 STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
 		--keep-symbol=__cheri_method.\*
+.endif
 .endif
 .endif
 .endif

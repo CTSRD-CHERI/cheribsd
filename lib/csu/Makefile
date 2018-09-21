@@ -8,6 +8,8 @@ SUBDIR+= ${MACHINE_ARCH}
 SUBDIR+= ${MACHINE_CPUARCH}
 .endif
 
-SUBDIR.${MK_CHERI}=	libcheri
+.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} == "yes"
+SUBDIR+=	libcheri
+.endif
 
 .include <bsd.subdir.mk>

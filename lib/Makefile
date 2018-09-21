@@ -150,7 +150,7 @@ SUBDIR.${MK_CHERI}+=	libz-cheri
 SUBDIR.${MK_CHERI}+=	libjpeg
 SUBDIR.${MK_CHERI}+=	libpng_sb
 
-.if ${MK_CHERI} != "no"
+.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
 _libc_cheri=	libc_cheri
 _libcheri=	libcheri
 .endif

@@ -288,12 +288,28 @@ __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF
 # Clang is enabled, and will be installed as the default /usr/bin/cc.
 __DEFAULT_YES_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
 __DEFAULT_NO_OPTIONS+=GCC GCC_BOOTSTRAP GNUCXX GPL_DTC
-.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mriscv*} == "" && ${__T} != "sparc64"
+.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mriscv*} == "" && ${__T} != "sparc64" && ! ${__T:Mmips*c*}
 # If an external compiler that supports C++11 is used as ${CC} and Clang
 # supports the target, then Clang is enabled but GCC is installed as the
 # default /usr/bin/cc.
 __DEFAULT_YES_OPTIONS+=CLANG GCC GCC_BOOTSTRAP GNUCXX GPL_DTC LLD
 __DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
+.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mmips*c*}
+# CHERI pure-capability targets alwasy use libc++
+# Don't build CLANG for now
+__DEFAULT_NO_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC
+__DEFAULT_NO_OPTIONS+=GCC GCC_BOOTSTRAP GNUCXX
+__DEFAULT_NO_OPTIONS+=GPL_DTC
+__DEFAULT_NO_OPTIONS+=LLD
+# stand/libsa required -fno-pic which can't work with CHERI
+# XXXBD: we should build mips*c* as mips here, but punt for now
+BROKEN_OPTIONS+=BOOT
+# rescue doesn't link
+BROKEN_OPTIONS+=RESCUE
+# ofed needs work
+BROKEN_OPTIONS+=OFED
+# lib32 could probalby be made to work, but makes little sense
+BROKEN_OPTIONS+=LIB32
 .else
 # Everything else disables Clang, and uses GCC instead.
 __DEFAULT_YES_OPTIONS+=GCC GCC_BOOTSTRAP GNUCXX GPL_DTC
