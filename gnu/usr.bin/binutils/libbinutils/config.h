@@ -2,11 +2,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20180924,
  *   "target_type": "lib",
  *   "changes": [
  *     "unsupported"
- *   ]
+ *   ],
+ *   "is_upstream": true
  * }
  * CHERI CHANGES END
  */
@@ -115,6 +116,7 @@
 #define HAVE_MKSTEMP 1
 
 /* Define to 1 if you have the `sbrk' function. */
+/* #undef HAVE_SBRK */
 
 /* Define to 1 if you have the `setmode' function. */
 #define HAVE_SETMODE 1
