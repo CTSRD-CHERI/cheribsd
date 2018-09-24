@@ -49,6 +49,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_vlan.h"
 #include "opt_ratelimit.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
@@ -1028,7 +1030,7 @@ vlan_clone_create(struct if_clone *ifc, char *name, size_t len,
 	 * called for.
 	 */
 	if (params) {
-		error = copyin_c(params, &vlr, sizeof(vlr));
+		error = copyin(params, &vlr, sizeof(vlr));
 		if (error)
 			return error;
 		p = ifunit_ref(vlr.vlr_parent);
@@ -1822,7 +1824,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 				ifmr = (struct ifmediareq *)data;
 				if (ifmr->ifm_count >= 1 && ifmr->ifm_ulist) {
 					ifmr->ifm_count = 1;
-					error = copyout_c(&ifmr->ifm_current,
+					error = copyout(&ifmr->ifm_current,
 						ifmr->ifm_ulist,
 						sizeof(int));
 				}
@@ -1873,7 +1875,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 #endif
-		error = copyin_c(ifr_data_get_ptr(ifr), &vlr, sizeof(vlr));
+		error = copyin(ifr_data_get_ptr(ifr), &vlr, sizeof(vlr));
 		if (error)
 			break;
 		if (vlr.vlr_parent[0] == '\0') {
@@ -1905,7 +1907,7 @@ vlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			vlr.vlr_tag = ifv->ifv_vid;
 		}
 		VLAN_SUNLOCK();
-		error = copyout_c(&vlr, ifr_data_get_ptr(ifr), sizeof(vlr));
+		error = copyout(&vlr, ifr_data_get_ptr(ifr), sizeof(vlr));
 		break;
 		
 	case CASE_IOC_IFREQ(SIOCSIFFLAGS):

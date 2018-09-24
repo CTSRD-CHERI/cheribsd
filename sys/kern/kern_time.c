@@ -36,6 +36,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/limits.h>
@@ -185,7 +187,8 @@ sys_clock_getcpuclockid2(struct thread *td, struct clock_getcpuclockid2_args *ua
 
 	error = kern_clock_getcpuclockid2(td, uap->id, uap->which, &clk_id);
 	if (error == 0)
-		error = copyout(&clk_id, uap->clock_id, sizeof(clockid_t));
+		error = copyout(&clk_id, __USER_CAP_OBJ(uap->clock_id),
+		    sizeof(clockid_t));
 	return (error);
 }
 
@@ -235,7 +238,7 @@ sys_clock_gettime(struct thread *td, struct clock_gettime_args *uap)
 
 	error = kern_clock_gettime(td, uap->clock_id, &ats);
 	if (error == 0)
-		error = copyout(&ats, uap->tp, sizeof(ats));
+		error = copyout(&ats, __USER_CAP_OBJ(uap->tp), sizeof(ats));
 
 	return (error);
 }
@@ -386,7 +389,7 @@ sys_clock_settime(struct thread *td, struct clock_settime_args *uap)
 	struct timespec ats;
 	int error;
 
-	if ((error = copyin(uap->tp, &ats, sizeof(ats))) != 0)
+	if ((error = copyin(__USER_CAP_OBJ(uap->tp), &ats, sizeof(ats))) != 0)
 		return (error);
 	return (kern_clock_settime(td, uap->clock_id, &ats));
 }
@@ -434,7 +437,7 @@ sys_clock_getres(struct thread *td, struct clock_getres_args *uap)
 
 	error = kern_clock_getres(td, uap->clock_id, &ts);
 	if (error == 0)
-		error = copyout(&ts, uap->tp, sizeof(ts));
+		error = copyout(&ts, __USER_CAP_OBJ(uap->tp), sizeof(ts));
 	return (error);
 }
 
@@ -622,7 +625,7 @@ user_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
 	struct timespec rmt, rqt;
 	int error;
 
-	error = copyin_c(ua_rqtp, &rqt, sizeof(rqt));
+	error = copyin(ua_rqtp, &rqt, sizeof(rqt));
 	if (error)
 		return (error);
 	if (ua_rmtp != NULL && (flags & TIMER_ABSTIME) == 0 &&
@@ -632,7 +635,7 @@ user_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
 	if (error == EINTR && ua_rmtp != NULL && (flags & TIMER_ABSTIME) == 0) {
 		int error2;
 
-		error2 = copyout_c(&rmt, ua_rmtp, sizeof(rmt));
+		error2 = copyout(&rmt, ua_rmtp, sizeof(rmt));
 		if (error2)
 			error = error2;
 	}
@@ -664,12 +667,12 @@ kern_gettimeofday(struct thread *td, struct timeval * __capability tp,
 
 	if (tp) {
 		microtime(&atv);
-		error = copyout_c(&atv, tp, sizeof (atv));
+		error = copyout(&atv, tp, sizeof (atv));
 	}
 	if (error == 0 && tzp != NULL) {
 		rtz.tz_minuteswest = tz_minuteswest;
 		rtz.tz_dsttime = tz_dsttime;
-		error = copyout_c(&rtz, tzp, sizeof (rtz));
+		error = copyout(&rtz, tzp, sizeof (rtz));
 	}
 	return (error);
 }
@@ -698,14 +701,14 @@ user_settimeofday(struct thread *td, const struct timeval * __capability tv,
 	int error;
 
 	if (tv) {
-		error = copyin_c(tv, &atv, sizeof(atv));
+		error = copyin(tv, &atv, sizeof(atv));
 		if (error)
 			return (error);
 		tvp = &atv;
 	} else
 		tvp = NULL;
 	if (tz) {
-		error = copyin_c(tz, &atz, sizeof(atz));
+		error = copyin(tz, &atz, sizeof(atz));
 		if (error)
 			return (error);
 		tzp = &atz;
@@ -772,7 +775,8 @@ sys_getitimer(struct thread *td, struct getitimer_args *uap)
 	error = kern_getitimer(td, uap->which, &aitv);
 	if (error != 0)
 		return (error);
-	return (copyout(&aitv, uap->itv, sizeof (struct itimerval)));
+	return (copyout(&aitv, __USER_CAP_OBJ(uap->itv),
+	    sizeof (struct itimerval)));
 }
 
 int
@@ -830,12 +834,14 @@ sys_setitimer(struct thread *td, struct setitimer_args *uap)
 		return (sys_getitimer(td, (struct getitimer_args *)uap));
 	}
 
-	if ((error = copyin(uap->itv, &aitv, sizeof(struct itimerval))))
+	if ((error = copyin(__USER_CAP_OBJ(uap->itv), &aitv,
+	    sizeof(struct itimerval))))
 		return (error);
 	error = kern_setitimer(td, uap->which, &aitv, &oitv);
 	if (error != 0 || uap->oitv == NULL)
 		return (error);
-	return (copyout(&oitv, uap->oitv, sizeof(struct itimerval)));
+	return (copyout(&oitv, __USER_CAP_OBJ(uap->oitv),
+	    sizeof(struct itimerval)));
 }
 
 int
@@ -1225,7 +1231,7 @@ sys_ktimer_create(struct thread *td, struct ktimer_create_args *uap)
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->evp, &ev_n, sizeof(ev_n));
+		error = copyin(__USER_CAP_OBJ(uap->evp), &ev_n, sizeof(ev_n));
 		if (error != 0)
 			return (error);
 		convert_sigevent(&ev_n, &ev);
@@ -1233,7 +1239,7 @@ sys_ktimer_create(struct thread *td, struct ktimer_create_args *uap)
 	}
 	error = kern_ktimer_create(td, uap->clock_id, evp, &id, -1);
 	if (error == 0) {
-		error = copyout(&id, uap->timerid, sizeof(int));
+		error = copyout(&id, __USER_CAP_OBJ(uap->timerid), sizeof(int));
 		if (error != 0)
 			kern_ktimer_delete(td, id);
 	}
@@ -1430,13 +1436,14 @@ sys_ktimer_settime(struct thread *td, struct ktimer_settime_args *uap)
 	struct itimerspec val, oval, *ovalp;
 	int error;
 
-	error = copyin(uap->value, &val, sizeof(val));
+	error = copyin(__USER_CAP_OBJ(uap->value), &val, sizeof(val));
 	if (error != 0)
 		return (error);
 	ovalp = uap->ovalue != NULL ? &oval : NULL;
 	error = kern_ktimer_settime(td, uap->timerid, uap->flags, &val, ovalp);
 	if (error == 0 && uap->ovalue != NULL)
-		error = copyout(ovalp, uap->ovalue, sizeof(*ovalp));
+		error = copyout(ovalp, __USER_CAP_OBJ(uap->ovalue),
+		    sizeof(*ovalp));
 	return (error);
 }
 
@@ -1478,7 +1485,7 @@ sys_ktimer_gettime(struct thread *td, struct ktimer_gettime_args *uap)
 
 	error = kern_ktimer_gettime(td, uap->timerid, &val);
 	if (error == 0)
-		error = copyout(&val, uap->value, sizeof(val));
+		error = copyout(&val, __USER_CAP_OBJ(uap->value), sizeof(val));
 	return (error);
 }
 

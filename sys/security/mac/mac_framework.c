@@ -607,7 +607,7 @@ copyin_mac(void * __capability mac_p, kmac_t *mac)
 #endif
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		error = copyincap_c(mac_p, mac, sizeof(*mac))
+		error = copyincap(mac_p, mac, sizeof(*mac))
 	} else
 #endif
 	{

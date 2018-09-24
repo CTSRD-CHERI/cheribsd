@@ -26,6 +26,8 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -5062,13 +5064,13 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 	 * Check the cmd word first before attempting to fetch all the
 	 * data.
 	 */
-	rv = fueword_c(ifr_data_get_ptr(ifr), &subcmd);
+	rv = fueword(ifr_data_get_ptr(ifr), &subcmd);
 	if (rv == -1) {
 		rv = EFAULT;
 		goto quit;
 	}
 
-	if (copyin_c(ifr_data_get_ptr(ifr), spr, sizeof(struct spppreq)) != 0) {
+	if (copyin(ifr_data_get_ptr(ifr), spr, sizeof(struct spppreq)) != 0) {
 		rv = EFAULT;
 		goto quit;
 	}
@@ -5108,7 +5110,7 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		 * setting it.
 		 */
 		spr->defs.lcp.timeout = sp->lcp.timeout * 1000 / hz;
-		rv = copyout_c(spr, ifr_data_get_ptr(ifr),
+		rv = copyout(spr, ifr_data_get_ptr(ifr),
 		    sizeof(struct spppreq));
 		break;
 

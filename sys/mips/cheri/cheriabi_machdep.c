@@ -47,6 +47,8 @@
 
 #include "opt_ddb.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -237,12 +239,12 @@ cheriabi_fetch_syscall_args(struct thread *td)
 		for (i = 0; i < sa->narg; i++) {
 			if (ptrmask & (1 << i)) {
 				offset = roundup2(offset, sizeof(uintcap_t));
-				error = copyincap_c(
+				error = copyincap(
 				    (char * __capability)locr0->c13 + offset,
 				    &sa->args[i], sizeof(sa->args[i]));
 				offset += sizeof(uintcap_t);
 			} else {
-				error = copyin_c(
+				error = copyin(
 				    (char * __capability)locr0->c13 + offset,
 				    &intval, sizeof(intval));
 				sa->args[i] = intval;
@@ -621,7 +623,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/*
 	 * Copy the sigframe out to the user's stack.
 	 */
-	if (copyoutcap_c(&sf, sfp, sizeof(sf)) != 0) {
+	if (copyoutcap(&sf, sfp, sizeof(sf)) != 0) {
 		/*
 		 * Something is wrong with the stack pointer.
 		 * ...Kill the process.
@@ -1043,7 +1045,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		return (cheriabi_set_user_tls(td, uap->parms));
 
 	case MIPS_GET_TLS:
-		error = copyoutcap_c(&td->td_md.md_tls, uap->parms,
+		error = copyoutcap(&td->td_md.md_tls, uap->parms,
 		    sizeof(void * __capability));
 		return (error);
 
@@ -1054,11 +1056,11 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 #ifdef CPU_QEMU_MALTA
 	case QEMU_GET_QTRACE:
 		intval = (td->td_md.md_flags & MDTD_QTRACE) ? 1 : 0;
-		error = copyout_c(&intval, uap->parms, sizeof(intval));
+		error = copyout(&intval, uap->parms, sizeof(intval));
 		return (error);
 
 	case QEMU_SET_QTRACE:
-		error = copyin_c(uap->parms, &intval, sizeof(intval));
+		error = copyin(uap->parms, &intval, sizeof(intval));
 		if (error)
 			return (error);
 		if (intval)
@@ -1078,7 +1080,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		size_t base;
 
 		base = cheri_getbase(td->td_md.md_cheri_mmap_cap);
-		if (suword_c(uap->parms, base) != 0)
+		if (suword(uap->parms, base) != 0)
 			return (EFAULT);
 		return (0);
 	}
@@ -1087,7 +1089,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		size_t len;
 
 		len = cheri_getlen(td->td_md.md_cheri_mmap_cap);
-		if (suword_c(uap->parms, len) != 0)
+		if (suword(uap->parms, len) != 0)
 			return (EFAULT);
 		return (0);
 	}
@@ -1096,7 +1098,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		ssize_t offset;
 
 		offset = cheri_getoffset(td->td_md.md_cheri_mmap_cap);
-		if (suword_c(uap->parms, offset) != 0)
+		if (suword(uap->parms, offset) != 0)
 			return (EFAULT);
 		return (0);
 	}
@@ -1105,21 +1107,21 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		uint64_t perms;
 
 		perms = cheri_getperm(td->td_md.md_cheri_mmap_cap);
-		if (suword64_c(uap->parms, perms) != 0)
+		if (suword64(uap->parms, perms) != 0)
 			return (EFAULT);
 		return (0);
 	}
 
 	case CHERI_MMAP_ANDPERM: {
 		uint64_t perms;
-		perms = fuword64_c(uap->parms);
+		perms = fuword64(uap->parms);
 
 		if (perms == -1)
 			return (EINVAL);
 		td->td_md.md_cheri_mmap_cap =
 		    cheri_andperm(td->td_md.md_cheri_mmap_cap, perms);
 		perms = cheri_getperm(td->td_md.md_cheri_mmap_cap);
-		if (suword64_c(uap->parms, perms) != 0)
+		if (suword64(uap->parms, perms) != 0)
 			return (EFAULT);
 		return (0);
 	}
@@ -1128,7 +1130,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		size_t len;
 		ssize_t offset;
 
-		offset = fuword_c(uap->parms);
+		offset = fuword(uap->parms);
 		/* Reject errors and misaligned offsets */
 		if (offset == -1 || (offset & PAGE_MASK) != 0)
 			return (EINVAL);
@@ -1147,7 +1149,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		size_t len, olen;
 		ssize_t offset;
 
-		len = fuword_c(uap->parms);
+		len = fuword(uap->parms);
 		/* Reject errors or misaligned lengths */
 		if (len == (size_t)-1 || (len & PAGE_MASK) != 0)
 			return (EINVAL);

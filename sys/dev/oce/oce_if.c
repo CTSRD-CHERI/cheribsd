@@ -43,6 +43,8 @@
 #include "opt_inet6.h"
 #include "opt_inet.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include "oce_if.h"
 #include "oce_user.h"
 
@@ -2283,14 +2285,14 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 	OCE_DMA_MEM dma_mem;
 	struct mbx_common_get_cntl_attr *fw_cmd;
 
-	if (copyin_c(priv_data, cookie, strlen(IOCTL_COOKIE)))
+	if (copyin(priv_data, cookie, strlen(IOCTL_COOKIE)))
 		return EFAULT;
 
 	if (memcmp(cookie, IOCTL_COOKIE, strlen(IOCTL_COOKIE)))
 		return EINVAL;
 
 	ioctl_ptr = (char * __capability)priv_data + strlen(IOCTL_COOKIE);
-	if (copyin_c(ioctl_ptr, &req, sizeof(struct mbx_hdr)))
+	if (copyin(ioctl_ptr, &req, sizeof(struct mbx_hdr)))
 		return EFAULT;
 
 	req_size = le32toh(req.u0.req.request_length);
@@ -2302,7 +2304,7 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 	if (rc)
 		return ENOMEM;
 
-	if (copyin_c(ioctl_ptr, OCE_DMAPTR(&dma_mem,char), req_size)) {
+	if (copyin(ioctl_ptr, OCE_DMAPTR(&dma_mem,char), req_size)) {
 		rc = EFAULT;
 		goto dma_free;
 	}
@@ -2313,7 +2315,7 @@ oce_handle_passthrough(struct ifnet *ifp, caddr_t data)
 		goto dma_free;
 	}
 
-	if (copyout_c(OCE_DMAPTR(&dma_mem,char), ioctl_ptr, req_size))
+	if (copyout(OCE_DMAPTR(&dma_mem,char), ioctl_ptr, req_size))
 		rc =  EFAULT;
 
 	/* 

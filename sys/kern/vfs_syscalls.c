@@ -42,6 +42,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
@@ -307,7 +309,7 @@ user_statfs(struct thread *td, const char * __capability path,
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_statfs(td, path, UIO_USERSPACE, sfp);
 	if (error == 0)
-		error = copyout_c(sfp, buf, sizeof(struct statfs));
+		error = copyout(sfp, buf, sizeof(struct statfs));
 	free(sfp, M_STATFS);
 	return (error);
 }
@@ -357,7 +359,7 @@ user_fstatfs(struct thread *td, int fd, struct statfs * __capability buf)
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fstatfs(td, fd, sfp);
 	if (error == 0)
-		error = copyout_c(sfp, buf, sizeof(struct statfs));
+		error = copyout(sfp, buf, sizeof(struct statfs));
 	free(sfp, M_STATFS);
 	return (error);
 }
@@ -534,7 +536,7 @@ restart:
 				    sizeof(*sp));
 				free(sptmp, M_STATFS);
 			} else /* if (bufseg == UIO_USERSPACE) */ {
-				error = copyout_c(sp, sfsp, sizeof(*sp));
+				error = copyout(sp, sfsp, sizeof(*sp));
 				free(sptmp, M_STATFS);
 				if (error != 0) {
 					vfs_unbusy(mp);
@@ -734,7 +736,7 @@ freebsd11_statfs(struct thread *td, struct freebsd11_statfs_args *uap)
 	error = kern_statfs(td, __USER_CAP_STR(uap->path), UIO_USERSPACE, sfp);
 	if (error == 0) {
 		freebsd11_cvtstatfs(sfp, &osb);
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	}
 	free(sfp, M_STATFS);
 	return (error);
@@ -754,7 +756,7 @@ freebsd11_fstatfs(struct thread *td, struct freebsd11_fstatfs_args *uap)
 	error = kern_fstatfs(td, uap->fd, sfp);
 	if (error == 0) {
 		freebsd11_cvtstatfs(sfp, &osb);
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	}
 	free(sfp, M_STATFS);
 	return (error);
@@ -782,7 +784,8 @@ freebsd11_getfsstat(struct thread *td, struct freebsd11_getfsstat_args *uap)
 		sp = (__cheri_fromcap struct statfs *)buf;
 		while (count > 0 && error == 0) {
 			freebsd11_cvtstatfs(sp, &osb);
-			error = copyout(&osb, uap->buf, sizeof(osb));
+			error = copyout(&osb, __USER_CAP_OBJ(uap->buf),
+			    sizeof(osb));
 			sp++;
 			uap->buf++;
 			count--;
@@ -803,14 +806,14 @@ freebsd11_fhstatfs(struct thread *td, struct freebsd11_fhstatfs_args *uap)
 	fhandle_t fh;
 	int error;
 
-	error = copyin(uap->u_fhp, &fh, sizeof(fhandle_t));
+	error = copyin(__USER_CAP_OBJ(uap->u_fhp), &fh, sizeof(fhandle_t));
 	if (error)
 		return (error);
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fhstatfs(td, fh, sfp);
 	if (error == 0) {
 		freebsd11_cvtstatfs(sfp, &osb);
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	}
 	free(sfp, M_STATFS);
 	return (error);
@@ -1667,7 +1670,7 @@ kern_symlinkat(struct thread *td, const char * __capability path1, int fd,
 		syspath = (__cheri_fromcap const char *)path1;
 	} else {
 		tmppath = uma_zalloc(namei_zone, M_WAITOK);
-		if ((error = copyinstr_c(path1, tmppath, MAXPATHLEN,
+		if ((error = copyinstr(path1, tmppath, MAXPATHLEN,
 		    NULL)) != 0)
 			goto out;
 		syspath = tmppath;
@@ -2237,7 +2240,7 @@ freebsd11_stat(struct thread *td, struct freebsd11_stat_args* uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, uap->ub, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->ub), sizeof(osb));
 	return (error);
 }
 
@@ -2254,7 +2257,7 @@ freebsd11_lstat(struct thread *td, struct freebsd11_lstat_args* uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, uap->ub, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->ub), sizeof(osb));
 	return (error);
 }
 
@@ -2266,7 +2269,7 @@ freebsd11_fhstat(struct thread *td, struct freebsd11_fhstat_args* uap)
 	struct freebsd11_stat osb;
 	int error;
 
-	error = copyin(uap->u_fhp, &fh, sizeof(fhandle_t));
+	error = copyin(__USER_CAP_OBJ(uap->u_fhp), &fh, sizeof(fhandle_t));
 	if (error != 0)
 		return (error);
 	error = kern_fhstat(td, fh, &sb);
@@ -2274,7 +2277,7 @@ freebsd11_fhstat(struct thread *td, struct freebsd11_fhstat_args* uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, uap->sb, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->sb), sizeof(osb));
 	return (error);
 }
 
@@ -2291,7 +2294,7 @@ freebsd11_fstatat(struct thread *td, struct freebsd11_fstatat_args* uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	return (error);
 }
 #endif	/* COMPAT_FREEBSD11 */
@@ -2325,7 +2328,7 @@ user_fstatat(struct thread *td, int fd, const char * __capability path,
 	error = kern_statat(td, flag, fd, path, UIO_USERSPACE,
 	    &sb, NULL);
 	if (error == 0)
-		error = copyout_c(&sb, buf, sizeof (sb));
+		error = copyout(&sb, buf, sizeof (sb));
 	return (error);
 }
 
@@ -2418,7 +2421,7 @@ freebsd11_nstat(struct thread *td, struct freebsd11_nstat_args *uap)
 	if (error != 0)
 		return (error);
 	freebsd11_cvtnstat(&sb, &nsb);
-	return (copyout(&nsb, uap->ub, sizeof (nsb)));
+	return (copyout(&nsb, __USER_CAP_OBJ(uap->ub), sizeof (nsb)));
 }
 
 /*
@@ -2442,7 +2445,7 @@ freebsd11_nlstat(struct thread *td, struct freebsd11_nlstat_args *uap)
 	if (error != 0)
 		return (error);
 	freebsd11_cvtnstat(&sb, &nsb);
-	return (copyout(&nsb, uap->ub, sizeof (nsb)));
+	return (copyout(&nsb, __USER_CAP_OBJ(uap->ub), sizeof (nsb)));
 }
 #endif /* COMPAT_FREEBSD11 */
 
@@ -3015,7 +3018,7 @@ getutimes(const struct timeval * __capability usrtvp, enum uio_seg tvpseg,
 			tvp = usrtvp;
 		} else {
 			tmptvp = &tv[0];
-			if ((error = copyin_c(usrtvp, tmptvp, sizeof(tv))) != 0)
+			if ((error = copyin(usrtvp, tmptvp, sizeof(tv))) != 0)
 				return (error);
 			tvp = (__cheri_tocap struct timeval * __capability)
 			    tmptvp;
@@ -3053,7 +3056,7 @@ getutimens(const struct timespec * __capability usrtsp, enum uio_seg tspseg,
 	if (tspseg == UIO_SYSSPACE) {
 		tsp[0] = usrtsp[0];
 		tsp[1] = usrtsp[1];
-	} else if ((error = copyin_c(usrtsp, tsp, sizeof(*tsp) * 2)) != 0)
+	} else if ((error = copyin(usrtsp, tsp, sizeof(*tsp) * 2)) != 0)
 		return (error);
 	if (tsp[0].tv_nsec == UTIME_OMIT && tsp[1].tv_nsec == UTIME_OMIT)
 		*retflags |= UTIMENS_EXIT;
@@ -3827,7 +3830,8 @@ out:
 
 #if defined(COMPAT_43) || defined(COMPAT_FREEBSD11)
 int
-freebsd11_kern_getdirentries(struct thread *td, int fd, char *ubuf, u_int count,
+freebsd11_kern_getdirentries(struct thread *td, int fd,
+    char * __capability ubuf, u_int count,
     long *basep, void (*func)(struct freebsd11_dirent *))
 {
 	struct freebsd11_dirent dstdp;
@@ -3980,11 +3984,12 @@ freebsd11_getdirentries(struct thread *td,
 	long base;
 	int error;
 
-	error = freebsd11_kern_getdirentries(td, uap->fd, uap->buf, uap->count,
-	    &base, NULL);
+	error = freebsd11_kern_getdirentries(td, uap->fd,
+	    __USER_CAP(uap->buf, uap->count), uap->count, &base, NULL);
 
 	if (error == 0 && uap->basep != NULL)
-		error = copyout(&base, uap->basep, sizeof(long));
+		error = copyout(&base, __USER_CAP(uap->basep, sizeof(long)),
+		    sizeof(long));
 	return (error);
 }
 
@@ -4025,7 +4030,7 @@ user_getdirentries(struct thread *td, int fd, char * __capability buf,
 	if (error != 0)
 		return (error);
 	if (basep != NULL)
-		error = copyout_c(&base, basep, sizeof(off_t));
+		error = copyout(&base, basep, sizeof(off_t));
 	return (error);
 }
 
@@ -4271,7 +4276,7 @@ kern_getfh(struct thread *td, const char * __capability fname,
 	error = VOP_VPTOFH(vp, &fh.fh_fid);
 	vput(vp);
 	if (error == 0)
-		error = copyout_c(&fh, fhp, sizeof (fh));
+		error = copyout(&fh, fhp, sizeof (fh));
 	return (error);
 }
 
@@ -4314,7 +4319,7 @@ kern_fhopen(struct thread *td, const struct fhandle * __capability u_fhp,
 	/* why not allow a non-read/write open for our lockd? */
 	if (((fmode & (FREAD | FWRITE)) == 0) || (fmode & O_CREAT))
 		return (EINVAL);
-	error = copyin_c(u_fhp, &fhp, sizeof(fhp));
+	error = copyin(u_fhp, &fhp, sizeof(fhp));
 	if (error != 0)
 		return(error);
 	/* find the mount point */
@@ -4396,12 +4401,12 @@ user_fhstat(struct thread *td, const struct fhandle * __capability u_fhp,
 	struct fhandle fh;
 	int error;
 
-	error = copyin_c(u_fhp, &fh, sizeof(fh));
+	error = copyin(u_fhp, &fh, sizeof(fh));
 	if (error != 0)
 		return (error);
 	error = kern_fhstat(td, fh, &sb);
 	if (error == 0)
-		error = copyout_c(&sb, usb, sizeof(sb));
+		error = copyout(&sb, usb, sizeof(sb));
 	return (error);
 }
 
@@ -4451,13 +4456,13 @@ user_fhstatfs(struct thread *td, const struct fhandle * __capability u_fhp,
 	fhandle_t fh;
 	int error;
 
-	error = copyin_c(u_fhp, &fh, sizeof(fhandle_t));
+	error = copyin(u_fhp, &fh, sizeof(fhandle_t));
 	if (error != 0)
 		return (error);
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fhstatfs(td, fh, sfp);
 	if (error == 0)
-		error = copyout_c(sfp, buf, sizeof(*sfp));
+		error = copyout(sfp, buf, sizeof(*sfp));
 	free(sfp, M_STATFS);
 	return (error);
 }

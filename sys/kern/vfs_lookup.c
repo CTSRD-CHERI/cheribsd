@@ -42,6 +42,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -330,7 +332,7 @@ namei(struct nameidata *ndp)
 		error = copystr((__cheri_fromcap const char *)ndp->ni_dirp,
 		    cnp->cn_pnbuf, MAXPATHLEN, &ndp->ni_pathlen);
 	else
-		error = copyinstr_c(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
+		error = copyinstr(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
 		    &ndp->ni_pathlen);
 
 	/*
@@ -1346,8 +1348,9 @@ NDFREE(struct nameidata *ndp, const u_int flags)
  * the M_TEMP bucket if one is returned.
  */
 int
-kern_alternate_path(struct thread *td, const char *prefix, const char *path,
-    enum uio_seg pathseg, char **pathbuf, int create, int dirfd)
+kern_alternate_path(struct thread *td, const char *prefix,
+    const char * __capability path, enum uio_seg pathseg, char **pathbuf,
+    int create, int dirfd)
 {
 	struct nameidata nd, ndroot;
 	char *ptr, *buf, *cp;
@@ -1369,7 +1372,8 @@ kern_alternate_path(struct thread *td, const char *prefix, const char *path,
 
 	/* Append the filename to the prefix. */
 	if (pathseg == UIO_SYSSPACE)
-		error = copystr(path, ptr, sz, &len);
+		error = copystr((__cheri_fromcap const char *)path, ptr, sz,
+		    &len);
 	else
 		error = copyinstr(path, ptr, sz, &len);
 

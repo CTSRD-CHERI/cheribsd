@@ -30,6 +30,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/capsicum.h>
@@ -235,7 +237,7 @@ reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids_c *rp
 		i++;
 	}
 	sx_sunlock(&proctree_lock);
-	error = copyout_c(pi, rp->rp_pids, i * sizeof(*pi));
+	error = copyout(pi, rp->rp_pids, i * sizeof(*pi));
 	free(pi, M_TEMP);
 	sx_slock(&proctree_lock);
 	PROC_LOCK(p);
@@ -461,7 +463,7 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 	case PROC_SPROTECT:
 	case PROC_TRACE_CTL:
 	case PROC_TRAPCAP_CTL:
-		error = copyin_c(udata, &flags, sizeof(flags));
+		error = copyin(udata, &flags, sizeof(flags));
 		if (error != 0)
 			return (error);
 		data = &flags;
@@ -479,14 +481,14 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		/* XXX: fix for cheriabi and freebsd32 */
 #ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
-			error = copyincap_c(udata, &x.rp, sizeof(x.rp));
+			error = copyincap(udata, &x.rp, sizeof(x.rp));
 			if (error != 0)
 				return (error);
 		} else
 #endif
 #ifdef COMPAT_FREEBSD32
 		if (SV_CURPROC_FLAG(SV_ILP32)) {
-			error = copyin_c(udata, &xpids.rp32,
+			error = copyin(udata, &xpids.rp32,
 			    sizeof(xpids.rp32));
 			if (error != 0)
 				return (error);
@@ -497,7 +499,7 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		} else
 #endif
 		{
-			error = copyin_c(udata, &xpids.rp, sizeof(xpids.rp));
+			error = copyin(udata, &xpids.rp, sizeof(xpids.rp));
 			if (error != 0)
 				return (error);
 			x.rp.rp_count = xpids.rp.rp_count;
@@ -507,7 +509,7 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		data = &x.rp;
 		break;
 	case PROC_REAP_KILL:
-		error = copyin_c(udata, &x.rk, sizeof(x.rk));
+		error = copyin(udata, &x.rk, sizeof(x.rk));
 		if (error != 0)
 			return (error);
 		data = &x.rk;
@@ -517,7 +519,7 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		data = &flags;
 		break;
 	case PROC_PDEATHSIG_CTL:
-		error = copyin_c(udata, &signum, sizeof(signum));
+		error = copyin(udata, &signum, sizeof(signum));
 		if (error != 0)
 			return (error);
 		data = &signum;
@@ -532,21 +534,21 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 	switch (com) {
 	case PROC_REAP_STATUS:
 		if (error == 0)
-			error = copyout_c(&x.rs, udata, sizeof(x.rs));
+			error = copyout(&x.rs, udata, sizeof(x.rs));
 		break;
 	case PROC_REAP_KILL:
-		error1 = copyout_c(&x.rk, udata, sizeof(x.rk));
+		error1 = copyout(&x.rk, udata, sizeof(x.rk));
 		if (error == 0)
 			error = error1;
 		break;
 	case PROC_TRACE_STATUS:
 	case PROC_TRAPCAP_STATUS:
 		if (error == 0)
-			error = copyout_c(&flags, udata, sizeof(flags));
+			error = copyout(&flags, udata, sizeof(flags));
 		break;
 	case PROC_PDEATHSIG_STATUS:
 		if (error == 0)
-			error = copyout_c(&signum, udata, sizeof(signum));
+			error = copyout(&signum, udata, sizeof(signum));
 		break;
 	}
 	return (error);

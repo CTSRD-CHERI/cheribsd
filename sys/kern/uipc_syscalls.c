@@ -39,6 +39,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/capsicum.h>
@@ -285,7 +287,7 @@ user_accept(struct thread *td, int s, struct sockaddr * __capability uname,
 	if (uname == NULL)
 		return (kern_accept4(td, s, NULL, NULL, flags, NULL));
 
-	error = copyin_c(anamelen, &namelen, sizeof(namelen));
+	error = copyin(anamelen, &namelen, sizeof(namelen));
 	if (error != 0)
 		return (error);
 
@@ -300,10 +302,10 @@ user_accept(struct thread *td, int s, struct sockaddr * __capability uname,
 			((struct osockaddr *)name)->sa_family =
 			    name->sa_family;
 #endif
-		error = copyout_c(name, uname, namelen);
+		error = copyout(name, uname, namelen);
 	}
 	if (error == 0)
-		error = copyout_c(&namelen, anamelen, sizeof(namelen));
+		error = copyout(&namelen, anamelen, sizeof(namelen));
 	if (error != 0)
 		fdclose(td, fp, td->td_retval[0]);
 	fdrop(fp, td);
@@ -669,7 +671,7 @@ user_socketpair(struct thread *td, int domain, int type, int protocol,
 	error = kern_socketpair(td, domain, type, protocol, sv);
 	if (error != 0)
 		return (error);
-	error = copyout_c(&sv[0], rsv, 2 * sizeof(int));
+	error = copyout(&sv[0], rsv, 2 * sizeof(int));
 	if (error != 0) {
 		(void)kern_close(td, sv[0]);
 		(void)kern_close(td, sv[1]);
@@ -913,7 +915,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	kiovec_t *iov;
 	int error;
 
-	error = copyin(uap->msg, &umsg, sizeof(umsg));
+	error = copyin(__USER_CAP_OBJ(uap->msg), &umsg, sizeof(umsg));
 	if (error != 0)
 		return (error);
 	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
@@ -1023,7 +1025,7 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 				    fromsa->sa_family;
 #endif
 			if (fromseg == UIO_USERSPACE) {
-				error = copyout_c(fromsa, mp->msg_name,
+				error = copyout(fromsa, mp->msg_name,
 				    (unsigned)len);
 				if (error != 0)
 					goto out;
@@ -1059,7 +1061,7 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 		len = mp->msg_controllen;
 		mp->msg_controllen = 0;
 		for (m = control; m != NULL && len >= m->m_len; m = m->m_next) {
-			if ((error = copyout_c(mtod(m, caddr_t), ctlbuf,
+			if ((error = copyout(mtod(m, caddr_t), ctlbuf,
 			    m->m_len)) != 0)
 				goto out;
 
@@ -1101,7 +1103,7 @@ recvit(struct thread *td, int s, kmsghdr_t *mp,
 	if (error != 0)
 		return (error);
 	if (namelenp != NULL) {
-		error = copyout_c(&mp->msg_namelen, namelenp,
+		error = copyout(&mp->msg_namelen, namelenp,
 		    sizeof (socklen_t));
 #ifdef COMPAT_OLDSOCK
 		if (mp->msg_flags & MSG_COMPAT)
@@ -1130,7 +1132,7 @@ kern_recvfrom(struct thread *td, int s, void * __capability buf, size_t len,
 	int error;
 
 	if (fromlenaddr != NULL) {
-		error = copyin_c(fromlenaddr, &msg.msg_namelen,
+		error = copyin(fromlenaddr, &msg.msg_namelen,
 		    sizeof (msg.msg_namelen));
 		if (error != 0)
 			goto done2;
@@ -1218,7 +1220,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	kiovec_t *iov;
 	int error;
 
-	error = copyin(uap->msg, &umsg, sizeof(umsg));
+	error = copyin(__USER_CAP_OBJ(uap->msg), &umsg, sizeof(umsg));
 	if (error != 0)
 		return (error);
 	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
@@ -1245,7 +1247,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 		umsg.msg_namelen = msg.msg_namelen;
 		umsg.msg_iovlen = msg.msg_iovlen;
 		umsg.msg_controllen = msg.msg_controllen;
-		error = copyout(&umsg, uap->msg, sizeof(umsg));
+		error = copyout(&umsg, __USER_CAP_OBJ(uap->msg), sizeof(umsg));
 	}
 	free(iov, M_IOV);
 	return (error);
@@ -1350,7 +1352,7 @@ user_getsockopt(struct thread *td, int s, int level, int name,
 	int error;
 
 	if (val != NULL) {
-		error = copyin_c(avalsize, &valsize, sizeof (valsize));
+		error = copyin(avalsize, &valsize, sizeof (valsize));
 		if (error != 0)
 			return (error);
 	}
@@ -1359,7 +1361,7 @@ user_getsockopt(struct thread *td, int s, int level, int name,
 	    &valsize);
 
 	if (error == 0)
-		error = copyout_c(&valsize, avalsize, sizeof (valsize));
+		error = copyout(&valsize, avalsize, sizeof (valsize));
 	return (error);
 }
 
@@ -1418,7 +1420,7 @@ user_getsockname(struct thread *td, int fdes,
 	socklen_t len;
 	int error;
 
-	error = copyin_c(alen, &len, sizeof(len));
+	error = copyin(alen, &len, sizeof(len));
 	if (error != 0)
 		return (error);
 
@@ -1431,11 +1433,11 @@ user_getsockname(struct thread *td, int fdes,
 		if (compat)
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
-		error = copyout_c(sa, asa, len);
+		error = copyout(sa, asa, len);
 	}
 	free(sa, M_SONAME);
 	if (error == 0)
-		error = copyout_c(&len, alen, sizeof(len));
+		error = copyout(&len, alen, sizeof(len));
 	return (error);
 }
 
@@ -1505,7 +1507,7 @@ user_getpeername(struct thread *td, int fdes,
 	socklen_t len;
 	int error;
 
-	error = copyin_c(alen, &len, sizeof (len));
+	error = copyin(alen, &len, sizeof (len));
 	if (error != 0)
 		return (error);
 
@@ -1518,11 +1520,11 @@ user_getpeername(struct thread *td, int fdes,
 		if (compat)
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
-		error = copyout_c(sa, asa, len);
+		error = copyout(sa, asa, len);
 	}
 	free(sa, M_SONAME);
 	if (error == 0)
-		error = copyout_c(&len, alen, sizeof(len));
+		error = copyout(&len, alen, sizeof(len));
 	return (error);
 }
 
@@ -1606,7 +1608,7 @@ sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen, int type)
 	}
 	m = m_get2(buflen, M_WAITOK, type, 0);
 	m->m_len = buflen;
-	error = copyin_c(buf, mtod(m, void *), buflen);
+	error = copyin(buf, mtod(m, void *), buflen);
 	if (error != 0)
 		(void) m_free(m);
 	else {
@@ -1636,7 +1638,7 @@ getsockaddr(struct sockaddr **namp, const struct sockaddr * __capability uaddr,
 	if (len < offsetof(struct sockaddr, sa_data[0]))
 		return (EINVAL);
 	sa = malloc(len, M_SONAME, M_WAITOK);
-	error = copyin_c(uaddr, sa, len);
+	error = copyin(uaddr, sa, len);
 	if (error != 0) {
 		free(sa, M_SONAME);
 	} else {

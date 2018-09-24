@@ -42,6 +42,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -141,14 +143,14 @@ acl_copyin(const void * __capability user_acl, struct acl *kernel_acl,
 	switch (type) {
 	case ACL_TYPE_ACCESS_OLD:
 	case ACL_TYPE_DEFAULT_OLD:
-		error = copyin_c(user_acl, &old, sizeof(old));
+		error = copyin(user_acl, &old, sizeof(old));
 		if (error != 0)
 			break;
 		acl_copy_oldacl_into_acl(&old, kernel_acl);
 		break;
 
 	default:
-		error = copyin_c(user_acl, kernel_acl, sizeof(*kernel_acl));
+		error = copyin(user_acl, kernel_acl, sizeof(*kernel_acl));
 		if (kernel_acl->acl_maxcnt != ACL_MAX_ENTRIES)
 			return (EINVAL);
 	}
@@ -171,18 +173,18 @@ acl_copyout(const struct acl *kernel_acl, void * __capability user_acl,
 		if (error != 0)
 			break;
 
-		error = copyout_c(&old, user_acl, sizeof(old));
+		error = copyout(&old, user_acl, sizeof(old));
 		break;
 
 	default:
-		error = fueword32_c((char * __capability)user_acl +
+		error = fueword32((char * __capability)user_acl +
 		    offsetof(struct acl, acl_maxcnt), &am);
 		if (error == -1)
 			return (EFAULT);
 		if (am != ACL_MAX_ENTRIES)
 			return (EINVAL);
 
-		error = copyout_c(kernel_acl, user_acl, sizeof(*kernel_acl));
+		error = copyout(kernel_acl, user_acl, sizeof(*kernel_acl));
 	}
 
 	return (error);

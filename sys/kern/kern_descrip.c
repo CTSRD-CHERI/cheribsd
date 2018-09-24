@@ -43,6 +43,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 
@@ -447,7 +449,7 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg)
 		/*
 		 * Convert old flock structure to new.
 		 */
-		error = copyin_c((void * __capability)arg, &ofl, sizeof(ofl));
+		error = copyin((void * __capability)arg, &ofl, sizeof(ofl));
 		fl.l_start = ofl.l_start;
 		fl.l_len = ofl.l_len;
 		fl.l_pid = ofl.l_pid;
@@ -472,7 +474,7 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg)
 	case F_SETLK:
 	case F_SETLKW:
 	case F_SETLK_REMOTE:
-		error = copyin_c((void * __capability)arg, &fl, sizeof(fl));
+		error = copyin((void * __capability)arg, &fl, sizeof(fl));
 		arg1 = (intptr_t)&fl;
 		break;
 	default:
@@ -490,9 +492,9 @@ kern_fcntl_freebsd(struct thread *td, int fd, int cmd, intcap_t arg)
 		ofl.l_pid = fl.l_pid;
 		ofl.l_type = fl.l_type;
 		ofl.l_whence = fl.l_whence;
-		error = copyout_c(&ofl, (void * __capability)arg, sizeof(ofl));
+		error = copyout(&ofl, (void * __capability)arg, sizeof(ofl));
 	} else if (cmd == F_GETLK) {
-		error = copyout_c(&fl, (void * __capability)arg, sizeof(fl));
+		error = copyout(&fl, (void * __capability)arg, sizeof(fl));
 	}
 	return (error);
 }
@@ -1320,7 +1322,7 @@ ofstat(struct thread *td, struct ofstat_args *uap)
 	error = kern_fstat(td, uap->fd, &ub);
 	if (error == 0) {
 		cvtstat(&ub, &oub);
-		error = copyout(&oub, uap->sb, sizeof(oub));
+		error = copyout(&oub, __USER_CAP_OBJ(uap->sb), sizeof(oub));
 	}
 	return (error);
 }
@@ -1339,7 +1341,7 @@ freebsd11_fstat(struct thread *td, struct freebsd11_fstat_args *uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, uap->sb, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->sb), sizeof(osb));
 	return (error);
 }
 #endif	/* COMPAT_FREEBSD11 */
@@ -1369,7 +1371,7 @@ user_fstat(struct thread *td, int fd, struct stat * __capability sb)
 
 	error = kern_fstat(td, fd, &ub);
 	if (error == 0)
-		error = copyout_c(&ub, sb, sizeof(ub));
+		error = copyout(&ub, sb, sizeof(ub));
 	return (error);
 }
 
@@ -1425,7 +1427,7 @@ freebsd11_nfstat(struct thread *td, struct freebsd11_nfstat_args *uap)
 	error = kern_fstat(td, uap->fd, &ub);
 	if (error == 0) {
 		freebsd11_cvtnstat(&ub, &nub);
-		error = copyout(&nub, uap->sb, sizeof(nub));
+		error = copyout(&nub, __USER_CAP_OBJ(uap->sb), sizeof(nub));
 	}
 	return (error);
 }

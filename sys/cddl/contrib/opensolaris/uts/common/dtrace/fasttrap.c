@@ -32,6 +32,8 @@
  * Copyright (c) 2015, Joyent, Inc. All rights reserved.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/atomic.h>
 #include <sys/errno.h>
 #include <sys/stat.h>
@@ -2280,7 +2282,7 @@ fasttrap_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int fflag,
 #endif
 			uprobe = __USER_CAP(*(void **)arg,
 			    sizeof(fasttrap_probe_spec_t));
-		if (copyin_c(&uprobe->ftps_noffs, &noffs,
+		if (copyin(&uprobe->ftps_noffs, &noffs,
 		    sizeof (uprobe->ftps_noffs)))
 			return (EFAULT);
 
@@ -2298,7 +2300,7 @@ fasttrap_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int fflag,
 
 		probe = kmem_alloc(size, KM_SLEEP);
 
-		if (copyin_c(uprobe, probe, size) != 0 ||
+		if (copyin(uprobe, probe, size) != 0 ||
 		    probe->ftps_noffs != noffs) {
 			kmem_free(probe, size);
 			return (EFAULT);

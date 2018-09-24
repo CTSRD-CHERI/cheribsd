@@ -29,6 +29,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -479,7 +481,7 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 	}
 	if (du.din.ia_datalen) {
 		csp->cp_data = malloc(du.din.ia_datalen, M_ICONVDATA, M_WAITOK);
-		error = copyin_c(ia_data, csp->cp_data, du.din.ia_datalen);
+		error = copyin(ia_data, csp->cp_data, du.din.ia_datalen);
 		if (error)
 			goto bad;
 	}

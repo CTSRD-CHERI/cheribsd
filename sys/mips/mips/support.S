@@ -284,12 +284,12 @@ END(copyin_c)
 /*
  * Copy specified amount of data from user space into the kernel via
  * capabilities
- *	copyincap_c(from, to, len)
+ *	copyincap(from, to, len)
  *		void * __capability from;	c3 (user source capability)
  *		void * to;			a0 (kernel destination address)
  *		unsigned len;			a1
  */
-NESTED(copyincap_c, CALLFRAME_SIZ, ra)
+NESTED(copyincap, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA	v0, copyerr
@@ -312,7 +312,7 @@ NESTED(copyincap_c, CALLFRAME_SIZ, ra)
 	PTR_ADDU	sp, sp, CALLFRAME_SIZ
 	j	ra
 	move	v0, zero
-END(copyincap_c)
+END(copyincap)
 #endif
 
 #ifdef CHERI_IMPLICIT_USER_DDC
@@ -382,12 +382,12 @@ END(copyout_c)
 /*
  * Copy specified amount of data from the kernel to user space via
  * capabilities, preserving capabilities.
- *	copyoutcap_c(from, to, len)
- *		void * __capability from;	(user source address)
- *		void * __capability to;		(kernel destination address)
+ *	copyoutcap(from, to, len)
+ *		void *from;			(kernel source address)
+ *		void * __capability to;		(user destination capability)
  *		unsigned len;
  */
-NESTED(copyoutcap_c, CALLFRAME_SIZ, ra)
+NESTED(copyoutcap, CALLFRAME_SIZ, ra)
 	PTR_SUBU	sp, sp, CALLFRAME_SIZ
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 	PTR_LA	v0, copyerr
@@ -411,7 +411,7 @@ NESTED(copyoutcap_c, CALLFRAME_SIZ, ra)
 	PTR_ADDU	sp, sp, CALLFRAME_SIZ
 	j	ra
 	move	v0, zero
-END(copyoutcap_c)
+END(copyoutcap)
 #endif
 
 LEAF(copyerr)
@@ -683,7 +683,7 @@ LEAF(fubyte_c)
 	PTR_S	zero, U_PCB_ONFAULT(v1)
 END(fubyte_c)
 
-LEAF(fuecap_c)
+LEAF(fuecap)
 	PTR_LA	v0, fswberr
 	cgetbase	t0, $c3
 	blt	t0, zero, fswberr	# make sure address is in user space
@@ -695,7 +695,7 @@ LEAF(fuecap_c)
 	csc	$c3, a0, 0($ddc)	# store capability
 	j	ra
 	li	v0, 0
-END(fuecap_c)
+END(fuecap)
 
 LEAF(suword32_c)
 	PTR_LA	v0, fswberr

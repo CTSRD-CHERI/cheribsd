@@ -31,6 +31,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -687,12 +689,12 @@ ipsec_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case CASE_IOC_IFREQ(IPSECGREQID):
 		reqid = sc->reqid;
-		error = copyout_c(&reqid, ifr_data_get_ptr(ifr), sizeof(reqid));
+		error = copyout(&reqid, ifr_data_get_ptr(ifr), sizeof(reqid));
 		break;
 	case CASE_IOC_IFREQ(IPSECSREQID):
 		if ((error = priv_check(curthread, PRIV_NET_SETIFCAP)) != 0)
 			break;
-		error = copyin_c(ifr_data_get_ptr(ifr), &reqid, sizeof(reqid));
+		error = copyin(ifr_data_get_ptr(ifr), &reqid, sizeof(reqid));
 		if (error != 0)
 			break;
 		error = ipsec_set_reqid(ifp, reqid);

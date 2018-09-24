@@ -95,8 +95,9 @@ int	kern_accessat(struct thread *td, int fd, const char * __capability path,
 int	kern_acct(struct thread *td, const char * __capability path);
 int	kern_adjtime(struct thread *td, struct timeval *delta,
 	    struct timeval *olddelta);
-int	kern_alternate_path(struct thread *td, const char *prefix, const char *path,
-	    enum uio_seg pathseg, char **pathbuf, int create, int dirfd);
+int	kern_alternate_path(struct thread *td, const char *prefix,
+	    const char * __capability path, enum uio_seg pathseg,
+	    char **pathbuf, int create, int dirfd);
 int	kern_audit(struct thread *td, const void * __capability record,
 	    u_int length);
 int	kern_auditctl(struct thread *td, const char * __capability path);
@@ -563,8 +564,9 @@ int	user_statfs(struct thread *td, const char * __capability path,
 
 struct freebsd11_dirent;
 
-int	freebsd11_kern_getdirentries(struct thread *td, int fd, char *ubuf, u_int
-	    count, long *basep, void (*func)(struct freebsd11_dirent *));
+int	freebsd11_kern_getdirentries(struct thread *td, int fd,
+	    char * __capability ubuf, u_int count, long *basep,
+	    void (*func)(struct freebsd11_dirent *));
 
 #endif /* !_SYS_SYSCALLSUBR_H_ */
 // CHERI CHANGES START

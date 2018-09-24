@@ -66,6 +66,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_pf.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/endian.h>
@@ -1322,7 +1324,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		pfsyncr.pfsyncr_defer = (PFSYNCF_DEFER ==
 		    (sc->sc_flags & PFSYNCF_DEFER));
 		PFSYNC_UNLOCK(sc);
-		return (copyout_c(&pfsyncr, ifr_data_get_ptr(ifr),
+		return (copyout(&pfsyncr, ifr_data_get_ptr(ifr),
 		    sizeof(pfsyncr)));
 
 	case CASE_IOC_IFREQ(SIOCSETPFSYNC):
@@ -1334,7 +1336,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		if ((error = priv_check(curthread, PRIV_NETINET_PF)) != 0)
 			return (error);
-		if ((error = copyin_c(ifr_data_get_ptr(ifr), &pfsyncr,
+		if ((error = copyin(ifr_data_get_ptr(ifr), &pfsyncr,
 		    sizeof(pfsyncr))))
 			return (error);
 

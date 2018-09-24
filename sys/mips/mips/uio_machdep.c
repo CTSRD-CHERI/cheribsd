@@ -40,6 +40,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -115,9 +117,9 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		case UIO_USERSPACE:
 			maybe_yield();
 			if (uio->uio_rw == UIO_READ)
-				error = copyout_c(cp, iov->iov_base, cnt);
+				error = copyout(cp, iov->iov_base, cnt);
 			else
-				error = copyin_c(iov->iov_base, cp, cnt);
+				error = copyin(iov->iov_base, cp, cnt);
 			if (error) {
 				if (sf != NULL)
 					sf_buf_free(sf);

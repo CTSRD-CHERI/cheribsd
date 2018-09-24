@@ -39,6 +39,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ffs.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/endian.h>
@@ -932,7 +934,7 @@ getquota32(struct thread *td, struct mount *mp, u_long id, int type,
 	if (error)
 		return (error);
 	dqb64_dqb32(&dqb64, &dqb32);
-	error = copyout_c(&dqb32, addr, sizeof(dqb32));
+	error = copyout(&dqb32, addr, sizeof(dqb32));
 	return (error);
 }
 
@@ -944,7 +946,7 @@ setquota32(struct thread *td, struct mount *mp, u_long id, int type,
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin_c(addr, &dqb32, sizeof(dqb32));
+	error = copyin(addr, &dqb32, sizeof(dqb32));
 	if (error)
 		return (error);
 	dqb32_dqb64(&dqb32, &dqb64);
@@ -960,7 +962,7 @@ setuse32(struct thread *td, struct mount *mp, u_long id, int type,
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin_c(addr, &dqb32, sizeof(dqb32));
+	error = copyin(addr, &dqb32, sizeof(dqb32));
 	if (error)
 		return (error);
 	dqb32_dqb64(&dqb32, &dqb64);
@@ -978,7 +980,7 @@ getquota(struct thread *td, struct mount *mp, u_long id, int type,
 	error = _getquota(td, mp, id, type, &dqb64);
 	if (error)
 		return (error);
-	error = copyout_c(&dqb64, addr, sizeof(dqb64));
+	error = copyout(&dqb64, addr, sizeof(dqb64));
 	return (error);
 }
 
@@ -989,7 +991,7 @@ setquota(struct thread *td, struct mount *mp, u_long id, int type,
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin_c(addr, &dqb64, sizeof(dqb64));
+	error = copyin(addr, &dqb64, sizeof(dqb64));
 	if (error)
 		return (error);
 	error = _setquota(td, mp, id, type, &dqb64);
@@ -1003,7 +1005,7 @@ setuse(struct thread *td, struct mount *mp, u_long id, int type,
 	struct dqblk64 dqb64;
 	int error;
 
-	error = copyin_c(addr, &dqb64, sizeof(dqb64));
+	error = copyin(addr, &dqb64, sizeof(dqb64));
 	if (error)
 		return (error);
 	error = _setuse(td, mp, id, type, &dqb64);
@@ -1031,7 +1033,7 @@ getquotasize(struct thread *td, struct mount *mp, u_long id, int type,
 	else
 		bitsize = 32;
 	UFS_UNLOCK(ump);
-	return (copyout_c(&bitsize, sizep, sizeof(int)));
+	return (copyout(&bitsize, sizep, sizeof(int)));
 }
 
 /*

@@ -43,6 +43,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_ddb.h"
 #include "opt_netgraph.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/lock.h>
@@ -1896,7 +1898,7 @@ bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 	if (size > 0) {
 		/* We're setting up new filter.  Copy and check actual data. */
 		fcode = malloc(size, M_BPF, M_WAITOK);
-		if (copyin_c(bf_insns_get_ptr(fp), fcode, size) != 0 ||
+		if (copyin(bf_insns_get_ptr(fp), fcode, size) != 0 ||
 		    !bpf_validate(fcode, flen)) {
 			free(fcode, M_BPF);
 			return (EINVAL);
@@ -2807,7 +2809,7 @@ again:
 		n++;
 	}
 	BPF_UNLOCK();
-	error = copyout_c(lst, bfl_list_get_ptr(bfl), sizeof(u_int) * n);
+	error = copyout(lst, bfl_list_get_ptr(bfl), sizeof(u_int) * n);
 	free(lst, M_TEMP);
 	BPF_LOCK();
 	bfl->bfl_len = n;

@@ -29,6 +29,8 @@
 
 #include "opt_evdev.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
@@ -614,14 +616,22 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 		return (0);
 	}
 
-	case UI_SET_BSDUNIQ:
+	case UI_SET_BSDUNIQ: {
+		void * __capability cap;
 		if (state->ucs_state == UINPUT_RUNNING)
 			return (EINVAL);
-		ret = copyinstr(*(void **)data, buf, sizeof(buf), NULL);
+#ifdef COMPAT_CHERIABI
+		if (SV_CURPROC_FLAG(SV_CHERI))
+			cap = *(void * __capability *)data;
+		else
+#endif
+			cap = __USER_CAP_STR(*(void **)data);
+		ret = copyinstr(cap, buf, sizeof(buf), NULL);
 		if (ret != 0)
 			return (ret);
 		evdev_set_serial(state->ucs_evdev, buf);
 		return (0);
+	}
 
 	case UI_SET_SWBIT:
 		if (state->ucs_state == UINPUT_RUNNING ||

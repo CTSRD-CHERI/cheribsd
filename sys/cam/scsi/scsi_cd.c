@@ -52,6 +52,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_cd.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -1599,7 +1601,8 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 				sizeof(struct cd_sub_channel_header)));
 			cam_periph_unlock(periph);
 			if (nocopyout == 0) {
-				if (copyout(data, args->data, len) != 0) {
+				if (copyout(data,
+				    __USER_CAP_UNBOUND(args->data), len) != 0) {
 					error = EFAULT;
 				}
 			} else {
@@ -1773,7 +1776,7 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 			}
 
 			cam_periph_unlock(periph);
-			error = copyout_c(data->entries, te_data_get_ptr(te),
+			error = copyout(data->entries, te_data_get_ptr(te),
 			    len);
 			free(data, M_SCSICD);
 			free(lead, M_SCSICD);

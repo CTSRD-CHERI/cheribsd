@@ -34,6 +34,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 #include "opt_kqueue.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #ifdef COMPAT_FREEBSD11
 #define	_WANT_FREEBSD11_KEVENT
 #endif
@@ -1010,11 +1012,11 @@ kern_kqueue(struct thread *td, int flags, struct filecaps *fcaps)
 
 struct g_kevent_args {
 	int	fd;
-	void	*changelist;
+	void	* __capability changelist;
 	int	nchanges;
-	void	*eventlist;
+	void	* __capability eventlist;
 	int	nevents;
-	const struct timespec *timeout;
+	const struct timespec * __capability timeout;
 };
 
 int
@@ -1028,11 +1030,11 @@ sys_kevent(struct thread *td, struct kevent_args *uap)
 	};
 	struct g_kevent_args gk_args = {
 		.fd = uap->fd,
-		.changelist = uap->changelist,
+		.changelist = __USER_CAP_UNBOUND(uap->changelist),
 		.nchanges = uap->nchanges,
-		.eventlist = uap->eventlist,
+		.eventlist = __USER_CAP_UNBOUND(uap->eventlist),
 		.nevents = uap->nevents,
-		.timeout = uap->timeout,
+		.timeout = __USER_CAP_OBJ(uap->timeout),
 	};
 
 	return (kern_kevent_generic(td, &gk_args, &k_ops, "kevent"));
@@ -1043,9 +1045,6 @@ kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
     struct kevent_copyops *k_ops, const char *struct_name)
 {
 	struct timespec ts, *tsp;
-#ifdef KTRACE
-	struct kevent *eventlist = uap->eventlist;
-#endif
 	int error;
 
 	if (uap->timeout != NULL) {
@@ -1067,7 +1066,7 @@ kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
 
 #ifdef KTRACE
 	if (error == 0 && KTRPOINT(td, KTR_STRUCT_ARRAY))
-		ktrstructarray(struct_name, UIO_USERSPACE, eventlist,
+		ktrstructarray(struct_name, UIO_USERSPACE, uap->eventlist,
 		    td->td_retval[0], k_ops->kevent_size);
 #endif
 
@@ -1103,7 +1102,8 @@ kevent_copyout(void *arg, kkevent_t *kevp, int count)
 		ks_n[i].udata = (void *)(__cheri_addr vaddr_t)kevp[i].udata;
 		memcpy(&ks_n[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
 	}
-	error = copyout(ks_n, uap->eventlist, count * sizeof(*ks_n));
+	error = copyout(ks_n, __USER_CAP_UNBOUND(uap->eventlist),
+	    count * sizeof(*ks_n));
 #endif
 	if (error == 0)
 		uap->eventlist += count;
@@ -1129,7 +1129,8 @@ kevent_copyin(void *arg, kkevent_t *kevp, int count)
 #if !__has_feature(capabilities)
 	error = copyin(uap->changelist, kevp, count * sizeof *kevp);
 #else
-	error = copyin(uap->changelist, ks_n, count * sizeof(*ks_n));
+	error = copyin(__USER_CAP_UNBOUND(uap->changelist), ks_n,
+	    count * sizeof(*ks_n));
 	if (error != 0)
 		return (error);
 	for (i = 0; i < count; i++) {
@@ -1166,7 +1167,8 @@ kevent11_copyout(void *arg, kkevent_t *kevp, int count)
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
 		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
-		error = copyout(&kev11, uap->eventlist, sizeof(kev11));
+		error = copyout(&kev11, __USER_CAP_OBJ(uap->eventlist),
+		    sizeof(kev11));
 		if (error != 0)
 			break;
 		uap->eventlist++;
@@ -1189,7 +1191,8 @@ kevent11_copyin(void *arg, kkevent_t *kevp, int count)
 	uap = (struct freebsd11_kevent_args *)arg;
 
 	for (i = 0; i < count; i++) {
-		error = copyin(uap->changelist, &kev11, sizeof(kev11));
+		error = copyin(__USER_CAP_OBJ(uap->changelist), &kev11,
+		    sizeof(kev11));
 		if (error != 0)
 			break;
 		kevp->ident = kev11.ident;
@@ -1216,11 +1219,11 @@ freebsd11_kevent(struct thread *td, struct freebsd11_kevent_args *uap)
 	};
 	struct g_kevent_args gk_args = {
 		.fd = uap->fd,
-		.changelist = uap->changelist,
+		.changelist = __USER_CAP_UNBOUND(uap->changelist),
 		.nchanges = uap->nchanges,
-		.eventlist = uap->eventlist,
+		.eventlist = __USER_CAP_UNBOUND(uap->eventlist),
 		.nevents = uap->nevents,
-		.timeout = uap->timeout,
+		.timeout = __USER_CAP_OBJ(uap->timeout),
 	};
 
 	return (kern_kevent_generic(td, &gk_args, &k_ops, "kevent_freebsd11"));

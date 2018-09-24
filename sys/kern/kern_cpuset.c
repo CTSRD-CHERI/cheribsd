@@ -35,6 +35,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ddb.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysctl.h>
@@ -1527,7 +1529,7 @@ kern_cpuset(struct thread *td, cpusetid_t * __capability setid)
 	cpuset_rel(root);
 	if (error)
 		return (error);
-	error = copyout_c(&set->cs_id, setid, sizeof(set->cs_id));
+	error = copyout(&set->cs_id, setid, sizeof(set->cs_id));
 	if (error == 0)
 		error = cpuset_setproc(-1, set, NULL, NULL);
 	cpuset_rel(set);
@@ -1629,7 +1631,7 @@ kern_cpuset_getid(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	tmpid = set->cs_id;
 	cpuset_rel(set);
 	if (error == 0)
-		error = copyout_c(&tmpid, setid, sizeof(tmpid));
+		error = copyout(&tmpid, setid, sizeof(tmpid));
 
 	return (error);
 }
@@ -1746,7 +1748,7 @@ kern_cpuset_getaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	if (p)
 		PROC_UNLOCK(p);
 	if (error == 0)
-		error = copyout_c(mask, maskp, size);
+		error = copyout(mask, maskp, size);
 out:
 	free(mask, M_TEMP);
 	return (error);
@@ -1792,7 +1794,7 @@ kern_cpuset_setaffinity(struct thread *td, cpulevel_t level, cpuwhich_t which,
 			return (ECAPMODE);
 	}
 	mask = malloc(cpusetsize, M_TEMP, M_WAITOK | M_ZERO);
-	error = copyin_c(maskp, mask, cpusetsize);
+	error = copyin(maskp, mask, cpusetsize);
 	if (error)
 		goto out;
 	/*
@@ -2006,9 +2008,9 @@ kern_cpuset_getdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	}
 	DOMAINSET_COPY(&outset.ds_mask, mask);
 	if (error == 0)
-		error = copyout_c(mask, maskp, domainsetsize);
+		error = copyout(mask, maskp, domainsetsize);
 	if (error == 0)
-		if (suword32_c(policyp, outset.ds_policy) != 0)
+		if (suword32(policyp, outset.ds_policy) != 0)
 			error = EFAULT;
 out:
 	free(mask, M_TEMP);
@@ -2064,7 +2066,7 @@ kern_cpuset_setdomain(struct thread *td, cpulevel_t level, cpuwhich_t which,
 	}
 	memset(&domain, 0, sizeof(domain));
 	mask = malloc(domainsetsize, M_TEMP, M_WAITOK | M_ZERO);
-	error = copyin_c(maskp, mask, domainsetsize);
+	error = copyin(maskp, mask, domainsetsize);
 	if (error)
 		goto out;
 	/*

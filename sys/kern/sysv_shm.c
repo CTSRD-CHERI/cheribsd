@@ -73,6 +73,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_sysvipc.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -790,7 +792,7 @@ user_shmctl(struct thread *td, int shmid, int cmd,
 
 	/* IPC_SET needs to copyin the buffer before calling kern_shmctl */
 	if (cmd == IPC_SET) {
-		if ((error = copyin_c(ubuf, &buf, sizeof(struct shmid_ds))))
+		if ((error = copyin(ubuf, &buf, sizeof(struct shmid_ds))))
 			goto done;
 	}
 
@@ -801,7 +803,7 @@ user_shmctl(struct thread *td, int shmid, int cmd,
 	/* Cases in which we need to copyout */
 	switch (cmd) {
 	case IPC_STAT:
-		error = copyout_c(&buf, ubuf, bufsz);
+		error = copyout(&buf, ubuf, bufsz);
 		break;
 	}
 

@@ -39,6 +39,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -303,7 +305,7 @@ kern_rtprio_thread(struct thread *td, int function, lwpid_t lwpid,
 
 	/* Perform copyin before acquiring locks if needed. */
 	if (function == RTP_SET)
-		cierror = copyin_c(urtp, &rtp, sizeof(struct rtprio));
+		cierror = copyin(urtp, &rtp, sizeof(struct rtprio));
 	else
 		cierror = 0;
 
@@ -325,7 +327,7 @@ kern_rtprio_thread(struct thread *td, int function, lwpid_t lwpid,
 			break;
 		pri_to_rtp(td1, &rtp);
 		PROC_UNLOCK(p);
-		return (copyout_c(&rtp, urtp, sizeof(struct rtprio)));
+		return (copyout(&rtp, urtp, sizeof(struct rtprio)));
 	case RTP_SET:
 		if ((error = p_cansched(td, p)) || (error = cierror))
 			break;
@@ -394,7 +396,7 @@ kern_rtprio(struct thread *td, int function, pid_t pid,
 
 	/* Perform copyin before acquiring locks if needed. */
 	if (function == RTP_SET)
-		cierror = copyin_c(urtp, &rtp, sizeof(struct rtprio));
+		cierror = copyin(urtp, &rtp, sizeof(struct rtprio));
 	else
 		cierror = 0;
 
@@ -437,7 +439,7 @@ kern_rtprio(struct thread *td, int function, pid_t pid,
 			}
 		}
 		PROC_UNLOCK(p);
-		return (copyout_c(&rtp, urtp, sizeof(struct rtprio)));
+		return (copyout(&rtp, urtp, sizeof(struct rtprio)));
 	case RTP_SET:
 		if ((error = p_cansched(td, p)) || (error = cierror))
 			break;
@@ -610,7 +612,7 @@ sys_setrlimit(struct thread *td, struct __setrlimit_args *uap)
 	struct rlimit alim;
 	int error;
 
-	if ((error = copyin(uap->rlp, &alim, sizeof(struct rlimit))))
+	if ((error = copyin(__USER_CAP_OBJ(uap->rlp), &alim, sizeof(struct rlimit))))
 		return (error);
 	error = kern_setrlimit(td, uap->which, &alim);
 	return (error);
@@ -801,7 +803,7 @@ sys_getrlimit(struct thread *td, struct __getrlimit_args *uap)
 	if (uap->which >= RLIM_NLIMITS)
 		return (EINVAL);
 	lim_rlimit(td, uap->which, &rlim);
-	error = copyout(&rlim, uap->rlp, sizeof(struct rlimit));
+	error = copyout(&rlim, __USER_CAP_OBJ(uap->rlp), sizeof(struct rlimit));
 	return (error);
 }
 
@@ -970,7 +972,8 @@ sys_getrusage(struct thread *td, struct getrusage_args *uap)
 
 	error = kern_getrusage(td, uap->who, &ru);
 	if (error == 0)
-		error = copyout(&ru, uap->rusage, sizeof(struct rusage));
+		error = copyout(&ru, __USER_CAP_OBJ(uap->rusage),
+		    sizeof(struct rusage));
 	return (error);
 }
 

@@ -109,6 +109,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_sctp.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/fcntl.h>
@@ -2704,9 +2706,9 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (sopt->sopt_td != NULL) {
 		if (sopt->sopt_dir == SOPT_SETCAP ||
 		    sopt->sopt_dir == SOPT_GETCAP)
-			return (copyincap_c(sopt->sopt_val, buf, valsize));
+			return (copyincap(sopt->sopt_val, buf, valsize));
 		else
-			return (copyin_c(sopt->sopt_val, buf, valsize));
+			return (copyin(sopt->sopt_val, buf, valsize));
 	}
 
 	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
@@ -2978,7 +2980,7 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 			KASSERT(sopt->sopt_dir != SOPT_GETCAP &&
 			   sopt->sopt_dir != SOPT_SETCAP,
 			   ("exporting capabilities not supproted"));
-			error = copyout_c(buf, sopt->sopt_val, valsize);
+			error = copyout(buf, sopt->sopt_val, valsize);
 		} else
 			bcopy(buf, (__cheri_fromcap void *)sopt->sopt_val,
 			    valsize);
@@ -3257,7 +3259,7 @@ soopt_mcopyin(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyin_c(sopt->sopt_val, mtod(m, char *),
+			error = copyin(sopt->sopt_val, mtod(m, char *),
 			    m->m_len);
 			if (error != 0) {
 				m_freem(m0);
@@ -3287,7 +3289,7 @@ soopt_mcopyout(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyout_c(mtod(m, char *), sopt->sopt_val,
+			error = copyout(mtod(m, char *), sopt->sopt_val,
 			    m->m_len);
 			if (error != 0) {
 				m_freem(m0);

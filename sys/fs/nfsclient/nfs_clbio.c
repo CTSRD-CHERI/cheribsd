@@ -37,6 +37,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bio.h>
@@ -804,7 +806,7 @@ do_sync:
 			    uiop->uio_segflg == UIO_SYSSPACE,
 			    ("nfs_directio_write: Bad uio_segflg"));
 			if (uiop->uio_segflg == UIO_USERSPACE) {
-				error = copyin_c(uiop->uio_iov->iov_base,
+				error = copyin(uiop->uio_iov->iov_base,
 				    (__cheri_fromcap void *)t_iov->iov_base,
 				    size);
 				if (error != 0)

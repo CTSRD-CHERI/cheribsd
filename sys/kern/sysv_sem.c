@@ -49,6 +49,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_sysvipc.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -661,7 +663,7 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 	case GETALL:
 	case SETVAL:
 	case SETALL:
-		error = copyin(uap->arg, &arg, sizeof(arg));
+		error = copyin(__USER_CAP_OBJ(uap->arg), &arg, sizeof(arg));
 		if (error)
 			return (error);
 		break;
@@ -673,7 +675,7 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin(arg.buf, &dsbuf, sizeof(dsbuf));
+		error = copyin(__USER_CAP_OBJ(arg.buf), &dsbuf, sizeof(dsbuf));
 		if (error)
 			return (error);
 		semun.buf = &dsbuf;
@@ -699,7 +701,7 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 	switch (uap->cmd) {
 	case SEM_STAT:
 	case IPC_STAT:
-		error = copyout(&dsbuf, arg.buf, sizeof(dsbuf));
+		error = copyout(&dsbuf, __USER_CAP_OBJ(arg.buf), sizeof(dsbuf));
 		break;
 	}
 
@@ -726,7 +728,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 	case GETALL:
 	case SETVAL:
 	case SETALL:
-		error = copyincap_c(uap->arg, &arg, sizeof(arg));
+		error = copyincap(uap->arg, &arg, sizeof(arg));
 		if (error)
 			return (error);
 		break;
@@ -738,7 +740,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin_c(arg.buf, &dsbuf_c, sizeof(dsbuf_c));
+		error = copyin(arg.buf, &dsbuf_c, sizeof(dsbuf_c));
 		if (error)
 			return (error);
 		memset(&dsbuf, 0, sizeof(dsbuf));
@@ -769,7 +771,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 		CP(dsbuf, dsbuf_c, sem_nsems);
 		CP(dsbuf, dsbuf_c, sem_otime);
 		CP(dsbuf, dsbuf_c, sem_ctime);
-		error = copyout_c(&dsbuf_c, arg.buf, sizeof(dsbuf_c));
+		error = copyout(&dsbuf_c, arg.buf, sizeof(dsbuf_c));
 		break;
 	}
 
@@ -966,7 +968,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 		for (i = 0; i < semakptr->u.sem_nsems; i++)
 			array[i] = semakptr->u.__sem_base[i].semval;
 		mtx_unlock(sema_mtxp);
-		error = copyout_c(array, arg->array, count * sizeof(*array));
+		error = copyout(array, arg->array, count * sizeof(*array));
 		mtx_lock(sema_mtxp);
 		break;
 
@@ -1010,7 +1012,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 		count = semakptr->u.sem_nsems;
 		mtx_unlock(sema_mtxp);		    
 		array = malloc(sizeof(*array) * count, M_TEMP, M_WAITOK);
-		error = copyin_c(arg->array, array, count * sizeof(*array));
+		error = copyin(arg->array, array, count * sizeof(*array));
 		mtx_lock(sema_mtxp);
 		if (error)
 			break;
@@ -1250,7 +1252,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 
 		sops = malloc(nsops * sizeof(*sops), M_TEMP, M_WAITOK);
 	}
-	if ((error = copyin_c(usops, sops, nsops * sizeof(sops[0]))) != 0) {
+	if ((error = copyin(usops, sops, nsops * sizeof(sops[0]))) != 0) {
 		DPRINTF(("error = %d from copyin(%p, %p, %d)\n", error,
 		    (__cheri_fromcap struct sembuf *)usops, sops,
 		    nsops * sizeof(sops[0])));

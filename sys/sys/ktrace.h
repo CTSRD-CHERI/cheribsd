@@ -325,7 +325,8 @@ void	ktrprocexit(struct thread *);
 void	ktrprocfork(struct proc *, struct proc *);
 void	ktruserret(struct thread *);
 void	ktrstruct(const char *, const void *, size_t);
-void	ktrstructarray(const char *, enum uio_seg, const void *, int, size_t);
+void	ktrstructarray(const char *, enum uio_seg, const void * __capability,
+	    int, size_t);
 void	ktrcapfail(enum ktr_cap_fail_type, const cap_rights_t *,
 	    const cap_rights_t *);
 #define ktrcaprights(s) \

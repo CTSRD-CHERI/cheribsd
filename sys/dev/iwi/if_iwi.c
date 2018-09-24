@@ -37,6 +37,8 @@ __FBSDID("$FreeBSD$");
  * http://www.intel.com/network/connectivity/products/wireless/prowireless_mobile.htm
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/sockio.h>
@@ -2059,7 +2061,7 @@ iwi_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	switch (cmd) {
 	case CASE_IOC_IFREQ(SIOCGIWISTATS):
 		/* XXX validate permissions/memory/etc? */
-		error = copyout_c(&sc->sc_linkqual, ifr_data_get_ptr(ifr),
+		error = copyout(&sc->sc_linkqual, ifr_data_get_ptr(ifr),
 		    sizeof(struct iwi_notif_link_quality));
 		break;
 	case CASE_IOC_IFREQ(SIOCZIWISTATS):

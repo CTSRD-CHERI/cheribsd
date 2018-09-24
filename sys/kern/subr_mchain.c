@@ -32,6 +32,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysctl.h>
@@ -245,7 +247,7 @@ mb_put_mem(struct mbchain *mbp, const char * __capability source, int size,
 			bcopy((__cheri_fromcap const char *)source, dst, cplen);
 			break;
 		    case MB_MUSER:
-			error = copyin_c(source, dst, cplen);
+			error = copyin(source, dst, cplen);
 			if (error)
 				return (error);
 			break;
@@ -509,7 +511,7 @@ md_get_mem(struct mdchain *mdp, char * __capability target, int size, int type)
 			continue;
 		switch (type) {
 		    case MB_MUSER:
-			error = copyout_c(s, target, count);
+			error = copyout(s, target, count);
 			if (error)
 				return error;
 			break;

@@ -37,6 +37,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_sctp.h"
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/capsicum.h>
@@ -286,7 +288,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 	int error = 0, len;
 
 	if (usinfo != NULL) {
-		error = copyin_c(usinfo, &sinfo, sizeof(sinfo));
+		error = copyin(usinfo, &sinfo, sizeof(sinfo));
 		if (error != 0)
 			return (error);
 		sinfop = &sinfo;
@@ -424,7 +426,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 	int error, i;
 
 	if (usinfo != NULL) {
-		error = copyin_c(usinfo, &sinfo, sizeof(sinfo));
+		error = copyin(usinfo, &sinfo, sizeof(sinfo));
 		if (error != 0)
 			return (error);
 		sinfop = &sinfo;
@@ -617,14 +619,14 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov,
 #endif /* MAC */
 
 	if (fromlenaddr != NULL) {
-		error = copyin_c(fromlenaddr, &fromlen, sizeof(fromlen));
+		error = copyin(fromlenaddr, &fromlen, sizeof(fromlen));
 		if (error != 0)
 			goto out;
 	} else {
 		fromlen = 0;
 	}
 	if (umsg_flags) {
-		error = copyin_c(umsg_flags, &msg_flags, sizeof(int));
+		error = copyin(umsg_flags, &msg_flags, sizeof(int));
 		if (error != 0)
 			goto out;
 	} else {
@@ -663,7 +665,7 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov,
 			error = 0;
 	} else {
 		if (usinfo)
-			error = copyout_c(&sinfo, usinfo, sizeof(sinfo));
+			error = copyout(&sinfo, usinfo, sizeof(sinfo));
 	}
 #ifdef KTRACE
 	if (ktruio != NULL) {
@@ -681,11 +683,11 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov,
 			len = 0;
 		else {
 			len = MIN(len, fromsa->sa_len);
-			error = copyout_c(fromsa, from, (size_t)len);
+			error = copyout(fromsa, from, (size_t)len);
 			if (error != 0)
 				goto out;
 		}
-		error = copyout_c(&len, fromlenaddr, sizeof (socklen_t));
+		error = copyout(&len, fromlenaddr, sizeof (socklen_t));
 		if (error != 0)
 			goto out;
 	}
@@ -694,7 +696,7 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov,
 		ktrsockaddr(fromsa);
 #endif
 	if (umsg_flags) {
-		error = copyout_c(&msg_flags, umsg_flags, sizeof (int));
+		error = copyout(&msg_flags, umsg_flags, sizeof (int));
 		if (error != 0)
 			goto out;
 	}

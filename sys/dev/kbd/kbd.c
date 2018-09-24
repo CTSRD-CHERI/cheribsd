@@ -32,6 +32,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_kbd.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -880,7 +882,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			else
 #endif
 				data = __USER_CAP_UNBOUND(*(void **)arg);
-		error = copyout_c(kbd->kb_keymap, data, sizeof(keymap_t));
+		error = copyout(kbd->kb_keymap, data, sizeof(keymap_t));
 		splx(s);
 		return (error);
 	case OGIO_KEYMAP:	/* get keyboard translation table (compat) */
@@ -916,7 +918,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			else
 #endif
 				data = __USER_CAP_UNBOUND(*(void **)arg);
-			error = copyin_c(data, mapp, sizeof *mapp);
+			error = copyin(data, mapp, sizeof *mapp);
 			if (error != 0) {
 				splx(s);
 				free(mapp, M_TEMP);

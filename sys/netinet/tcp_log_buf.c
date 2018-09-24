@@ -30,6 +30,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -1639,7 +1641,7 @@ tcp_log_copyout(struct sockopt *sopt, void *src, void * __capability dst,
 {
 
 	if (sopt->sopt_td != NULL)
-		return (copyout_c(src, dst, len));
+		return (copyout(src, dst, len));
 	bcopy(src, (__cheri_fromcap void *)dst, len);
 	return (0);
 }

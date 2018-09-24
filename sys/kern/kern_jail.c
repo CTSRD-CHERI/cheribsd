@@ -35,6 +35,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/kernel.h>
@@ -229,8 +231,9 @@ sys_jail(struct thread *td, struct jail_args *uap)
 {
 	uint32_t version;
 	int error;
+	void * __capability jail = __USER_CAP_UNBOUND(uap->jail);
 
-	error = copyin(uap->jail, &version, sizeof(version));
+	error = copyin(jail, &version, sizeof(version));
 	if (error)
 		return (error);
 
@@ -240,7 +243,7 @@ sys_jail(struct thread *td, struct jail_args *uap)
 		struct in_addr ip4;
 
 		/* FreeBSD single IPv4 jails. */
-		error = copyin(uap->jail, &j0, sizeof(struct jail_v0));
+		error = copyin(jail, &j0, sizeof(struct jail_v0));
 		if (error)
 			return (error);
 		/* jail_v0 is host order */
@@ -259,7 +262,7 @@ sys_jail(struct thread *td, struct jail_args *uap)
 	case 2:	{ /* JAIL_API_VERSION */
 		struct jail j;
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
-		error = copyin(uap->jail, &j, sizeof(struct jail));
+		error = copyin(jail, &j, sizeof(struct jail));
 		if (error)
 			return (error);
 		return (kern_jail(td, __USER_CAP_STR(j.path),
@@ -364,7 +367,7 @@ kern_jail(struct thread *td, const char * __capability path,
 	optstr = "path";
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	error = copyinstr_c(path, u_path, MAXPATHLEN, NULL);
+	error = copyinstr(path, u_path, MAXPATHLEN, NULL);
 	if (error)
 		goto done;
 	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_path, tmplen);
@@ -373,7 +376,7 @@ kern_jail(struct thread *td, const char * __capability path,
 	optstr = "host.hostname";
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	error = copyinstr_c(hostname, u_hostname, MAXHOSTNAMELEN, NULL);
+	error = copyinstr(hostname, u_hostname, MAXHOSTNAMELEN, NULL);
 	if (error)
 		goto done;
 	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_hostname, tmplen);
@@ -383,7 +386,7 @@ kern_jail(struct thread *td, const char * __capability path,
 		optstr = "name";
 		IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 		opt.uio_iovcnt++;
-		error = copyinstr_c(jailname, u_name, MAXHOSTNAMELEN, NULL);
+		error = copyinstr(jailname, u_name, MAXHOSTNAMELEN, NULL);
 		if (error)
 			goto done;
 		IOVEC_INIT(&optiov[opt.uio_iovcnt], u_name, tmplen);
@@ -395,7 +398,7 @@ kern_jail(struct thread *td, const char * __capability path,
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	if (ipseg == UIO_USERSPACE) {
-		error = copyin_c(ip4, u_ip4, ip4s * sizeof(struct in_addr));
+		error = copyin(ip4, u_ip4, ip4s * sizeof(struct in_addr));
 		if (error != 0)
 			goto done;
 	} else
@@ -410,7 +413,7 @@ kern_jail(struct thread *td, const char * __capability path,
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
 	if (ipseg == UIO_USERSPACE) {
-		error = copyin_c(ip6, u_ip6, ip6s * sizeof(struct in6_addr));
+		error = copyin(ip6, u_ip6, ip6s * sizeof(struct in6_addr));
 		if (error != 0)
 			goto done;
 	} else
@@ -1865,7 +1868,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 			else
-				copyout_c(errmsg,
+				copyout(errmsg,
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 		}
@@ -2159,7 +2162,7 @@ kern_jail_get(struct thread *td, struct uio *optuio, int flags)
 					    optuio->uio_iov[pos].iov_base,
 					    opt->len);
 				} else {
-					error = copyout_c(opt->value,
+					error = copyout(opt->value,
 					    optuio->uio_iov[pos].iov_base,
 					    opt->len);
 					if (error)
@@ -2186,7 +2189,7 @@ kern_jail_get(struct thread *td, struct uio *optuio, int flags)
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 			else
-				copyout_c(errmsg,
+				copyout(errmsg,
 				    optuio->uio_iov[errmsg_pos].iov_base,
 				    errmsg_len);
 		}

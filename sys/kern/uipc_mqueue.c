@@ -55,6 +55,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -1663,7 +1665,7 @@ mqueue_loadmsg(const char * __capability msg_ptr, size_t msg_size, int msg_prio)
 
 	len = sizeof(struct mqueue_msg) + msg_size;
 	msg = malloc(len, M_MQUEUEDATA, M_WAITOK);
-	error = copyin_c(msg_ptr, (char *)msg + sizeof(struct mqueue_msg),
+	error = copyin(msg_ptr, (char *)msg + sizeof(struct mqueue_msg),
 	    msg_size);
 	if (error) {
 		free(msg, M_MQUEUEDATA);
@@ -1684,9 +1686,9 @@ mqueue_savemsg(struct mqueue_msg *msg, char * __capability msg_ptr,
 {
 	int error;
 
-	error = copyout_c((char *)msg + sizeof(*msg), msg_ptr, msg->msg_size);
+	error = copyout((char *)msg + sizeof(*msg), msg_ptr, msg->msg_size);
 	if (error == 0 && msg_prio != NULL)
-		error = copyout_c(&msg->msg_prio, msg_prio,
+		error = copyout(&msg->msg_prio, msg_prio,
 		    sizeof(unsigned int));
 	return (error);
 }
@@ -2047,7 +2049,7 @@ kern_kmq_open(struct thread *td, const char * __capability upath, int flags,
 			return (EINVAL);
 	}
 
-	error = copyinstr_c(upath, path, MQFS_NAMELEN + 1, NULL);
+	error = copyinstr(upath, path, MQFS_NAMELEN + 1, NULL);
         if (error)
 		return (error);
 
@@ -2143,7 +2145,7 @@ user_kmq_open(struct thread *td, const char * __capability path,
 		return (EINVAL);
 	flags = FFLAGS(flags);
 	if ((flags & O_CREAT) != 0 && uattr != NULL) {
-		error = copyin_c(uattr, &attr, sizeof(attr));
+		error = copyin(uattr, &attr, sizeof(attr));
 		if (error)
 			return (error);
 	}
@@ -2168,7 +2170,7 @@ kern_kmq_unlink(struct thread *td, const char * __capability upath)
 	struct mqfs_node *pn;
 	int error, len;
 
-	error = copyinstr_c(upath, path, MQFS_NAMELEN + 1, NULL);
+	error = copyinstr(upath, path, MQFS_NAMELEN + 1, NULL);
         if (error)
 		return (error);
 
@@ -2289,7 +2291,7 @@ user_kmq_setattr(struct thread *td, int mqd,
 	int error;
 
 	if (uattr != NULL) {
-		error = copyin_c(uattr, &attr, sizeof(attr));
+		error = copyin(uattr, &attr, sizeof(attr));
 		if (error != 0)
 			return (error);
 	}
@@ -2297,7 +2299,7 @@ user_kmq_setattr(struct thread *td, int mqd,
 	    &oattr);
 	if (error == 0 && uoattr != NULL) {
 		bzero(oattr.__reserved, sizeof(oattr.__reserved));
-		error = copyout_c(&oattr, uoattr, sizeof(oattr));
+		error = copyout(&oattr, uoattr, sizeof(oattr));
 	}
 	return (error);
 }
@@ -2327,7 +2329,7 @@ kern_timedreceive(struct thread *td, int mqd, char * __capability msg_ptr,
 	if (error)
 		return (error);
 	if (user_abs_timeout != NULL) {
-		error = copyin_c(user_abs_timeout, &ets, sizeof(ets));
+		error = copyin(user_abs_timeout, &ets, sizeof(ets));
 		if (error != 0)
 			return (error);
 		abs_timeout = &ets;
@@ -2364,7 +2366,7 @@ kern_kmq_timedsend(struct thread *td, int mqd,
 	if (error)
 		return (error);
 	if (user_abs_timeout != NULL) {
-		error = copyin_c(user_abs_timeout, &ets, sizeof(ets));
+		error = copyin(user_abs_timeout, &ets, sizeof(ets));
 		if (error != 0)
 			return (error);
 		abs_timeout = &ets;
@@ -2490,7 +2492,7 @@ sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->sigev, &ev_n, sizeof(ev));
+		error = copyin(__USER_CAP_OBJ(uap->sigev), &ev_n, sizeof(ev));
 		if (error != 0)
 			return (error);
 		convert_sigevent(&ev_n, &ev);
@@ -2993,7 +2995,7 @@ cheriabi_kmq_notify(struct thread *td, struct cheriabi_kmq_notify_args *uap)
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin_c(uap->sigev, &ev, sizeof(ev));
+		error = copyin(uap->sigev, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
 		evp = &ev;

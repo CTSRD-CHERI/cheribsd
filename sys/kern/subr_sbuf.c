@@ -31,6 +31,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 
 #ifdef _KERNEL
@@ -459,7 +461,7 @@ sbuf_bcat(struct sbuf *s, const void *buf, size_t len)
  * Copy a byte string from userland into an sbuf.
  */
 int
-sbuf_bcopyin(struct sbuf *s, const void *uaddr, size_t len)
+sbuf_bcopyin(struct sbuf *s, const void * __capability uaddr, size_t len)
 {
 
 	assert_sbuf_integrity(s);
@@ -537,7 +539,7 @@ sbuf_copyin(struct sbuf *s, const void * __capability uaddr, size_t len)
 		if (SBUF_FREESPACE(s) < len)
 			len = SBUF_FREESPACE(s);
 	}
-	switch (copyinstr_c(uaddr, s->s_buf + s->s_len, len + 1, &done)) {
+	switch (copyinstr(uaddr, s->s_buf + s->s_len, len + 1, &done)) {
 	case ENAMETOOLONG:
 		s->s_error = ENOMEM;
 		/* fall through */

@@ -38,6 +38,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -629,13 +631,13 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case CASE_IOC_IFREQ(GIFGOPTS):
 		options = sc->gif_options;
-		error = copyout_c(&options, ifr_data_get_ptr(ifr),
+		error = copyout(&options, ifr_data_get_ptr(ifr),
 		    sizeof(options));
 		break;
 	case CASE_IOC_IFREQ(GIFSOPTS):
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
-		error = copyin_c(ifr_data_get_ptr(ifr), &options,
+		error = copyin(ifr_data_get_ptr(ifr), &options,
 		    sizeof(options));
 		if (error)
 			break;

@@ -39,6 +39,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
@@ -694,7 +696,8 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 	} else
 		data = (void *)&uap->data;
 	if (com & IOC_IN) {
-		error = copyin(uap->data, data, (u_int)size);
+		error = copyin(__USER_CAP_UNBOUND(uap->data), data,
+		    (u_int)size);
 		if (error != 0)
 			goto out;
 	} else if (com & IOC_OUT) {
@@ -708,7 +711,8 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 	error = kern_ioctl(td, uap->fd, com, data);
 
 	if (error == 0 && (com & IOC_OUT))
-		error = copyout(data, uap->data, (u_int)size);
+		error = copyout(data, __USER_CAP_UNBOUND(uap->data),
+		    (u_int)size);
 
 out:
 	if (size > SYS_IOCTL_SMALL_SIZE)
@@ -838,7 +842,7 @@ sys_pselect(struct thread *td, struct pselect_args *uap)
 	int error;
 
 	if (uap->ts != NULL) {
-		error = copyin(uap->ts, &ts, sizeof(ts));
+		error = copyin(__USER_CAP_OBJ(uap->ts), &ts, sizeof(ts));
 		if (error != 0)
 		    return (error);
 		TIMESPEC_TO_TIMEVAL(&tv, &ts);
@@ -846,7 +850,7 @@ sys_pselect(struct thread *td, struct pselect_args *uap)
 	} else
 		tvp = NULL;
 	if (uap->sm != NULL) {
-		error = copyin(uap->sm, &set, sizeof(set));
+		error = copyin(__USER_CAP_OBJ(uap->sm), &set, sizeof(set));
 		if (error != 0)
 			return (error);
 		uset = &set;
@@ -897,7 +901,7 @@ sys_select(struct thread *td, struct select_args *uap)
 	int error;
 
 	if (uap->tv != NULL) {
-		error = copyin(uap->tv, &tv, sizeof(tv));
+		error = copyin(__USER_CAP_OBJ(uap->tv), &tv, sizeof(tv));
 		if (error)
 			return (error);
 		tvp = &tv;
@@ -946,7 +950,7 @@ select_check_badfd(fd_set * __capability fd_in, int nd, int ndu,
 		}
 #endif
 		if (addr != oaddr) {
-			res = fubyte_c(addr);
+			res = fubyte(addr);
 			if (res == -1)
 				return (EFAULT);
 			oaddr = addr;
@@ -1032,7 +1036,7 @@ kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 			ibits[x] = sbp + nbufbytes / 2 / sizeof *sbp;	\
 			obits[x] = sbp;					\
 			sbp += ncpbytes / sizeof *sbp;			\
-			error = copyin_c(name, ibits[x], ncpubytes);	\
+			error = copyin(name, ibits[x], ncpubytes);	\
 			if (error != 0)					\
 				goto done;				\
 			bzero((char *) ibits[x] + ncpubytes,		\
@@ -1121,7 +1125,7 @@ done:
 #undef swizzle_fdset
 
 #define	putbits(name, x) \
-	if (name && (error2 = copyout_c(obits[x], name, ncpubytes))) \
+	if (name && (error2 = copyout(obits[x], name, ncpubytes))) \
 		error = error2;
 	if (error == 0) {
 		int error2;
@@ -1351,7 +1355,7 @@ kern_poll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
 		bits = malloc(ni, M_TEMP, M_WAITOK);
 	else
 		bits = &smallbits[0];
-	error = copyin_c(fds, bits, ni);
+	error = copyin(fds, bits, ni);
 	if (error)
 		goto done;
 
@@ -1411,14 +1415,14 @@ sys_ppoll(struct thread *td, struct ppoll_args *uap)
 	int error;
 
 	if (uap->ts != NULL) {
-		error = copyin(uap->ts, &ts, sizeof(ts));
+		error = copyin(__USER_CAP_OBJ(uap->ts), &ts, sizeof(ts));
 		if (error)
 			return (error);
 		tsp = &ts;
 	} else
 		tsp = NULL;
 	if (uap->set != NULL) {
-		error = copyin(uap->set, &set, sizeof(set));
+		error = copyin(__USER_CAP_OBJ(uap->set), &set, sizeof(set));
 		if (error)
 			return (error);
 		ssp = &set;
@@ -1493,7 +1497,7 @@ pollout(struct thread *td, struct pollfd *fds,
 	u_int n = 0;
 
 	for (i = 0; i < nfd; i++) {
-		error = copyout_c(&fds->revents, &ufds->revents,
+		error = copyout(&fds->revents, &ufds->revents,
 		    sizeof(ufds->revents));
 		if (error)
 			return (error);
