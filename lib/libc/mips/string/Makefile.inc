@@ -4,7 +4,7 @@ MDSRCS+= \
 	ffs.S \
 	strlen.S
 
-.if ! ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
+.if ! ${MACHINE_ARCH:Mmips*c*}
 MDSRCS+= \
 	bcmp.S \
 	bzero.S \
