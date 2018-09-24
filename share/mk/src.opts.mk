@@ -297,7 +297,10 @@ __DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
 .elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mmips*c*}
 # CHERI pure-capability targets alwasy use libc++
 # Don't build CLANG for now
-__DEFAULT_NO_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC
+__DEFAULT_NO_OPTIONS+=CLANG CLANG_IS_CC
+# Don't bootstrap clang, it isn't the version we want
+__DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP
+# Don't build the ancient GCC
 __DEFAULT_NO_OPTIONS+=GCC GCC_BOOTSTRAP GNUCXX
 __DEFAULT_NO_OPTIONS+=GPL_DTC
 __DEFAULT_NO_OPTIONS+=LLD
