@@ -321,7 +321,6 @@ SUBDIR=	\
 	ral \
 	${_ralfw} \
 	${_random_fortuna} \
-	${_random_yarrow} \
 	${_random_other} \
 	rc4 \
 	${_rdma} \
@@ -440,7 +439,6 @@ SUBDIR+=	opensolaris
 _crypto=	crypto
 _cryptodev=	cryptodev
 _random_fortuna=random_fortuna
-_random_yarrow=	random_yarrow
 _random_other=	random_other
 .endif
 .endif
@@ -594,8 +592,12 @@ _cpuctl=	cpuctl
 _cpufreq=	cpufreq
 _cs=		cs
 _dpms=		dpms
+.if ${MK_MODULE_DRM} != "no"
 _drm=		drm
+.endif
+.if ${MK_MODULE_DRM2} != "no"
 _drm2=		drm2
+.endif
 _ed=		ed
 _em=		em
 _ena=		ena
@@ -792,7 +794,9 @@ _cardbus=	cardbus
 _cbb=		cbb
 _cfi=		cfi
 _cpufreq=	cpufreq
+.if ${MK_MODULE_DRM} != "no"
 _drm=		drm
+.endif
 _exca=		exca
 _ffec=		ffec
 _nvd=		nvd
@@ -802,7 +806,10 @@ _wi=		wi
 .endif
 
 .if ${MACHINE_ARCH} == "powerpc64"
+.if ${MK_MODULE_DRM2} != "no"
 _drm2=		drm2
+.endif
+_ipmi=		ipmi
 .endif
 .if ${MACHINE_ARCH} == "powerpc64" || ${MACHINE_ARCH} == "powerpc"
 # Don't build powermac_nvram for powerpcspe, it's never supported.

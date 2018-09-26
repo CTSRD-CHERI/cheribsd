@@ -44,6 +44,8 @@ __FBSDID("$FreeBSD$");
 #endif /* INET */
 #include "opt_inet6.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/malloc.h>
@@ -183,7 +185,7 @@ static size_t ctl3_rsize;
  * static variables followed by global ones
  */
 
-static VNET_DEFINE(uma_zone_t, ipfw_cntr_zone);
+VNET_DEFINE_STATIC(uma_zone_t, ipfw_cntr_zone);
 #define	V_ipfw_cntr_zone		VNET(ipfw_cntr_zone)
 
 void
@@ -3535,7 +3537,7 @@ ipfw_flush_sopt_data(struct sockopt_data *sd)
 	sopt = sd->sopt;
 
 	if (sopt->sopt_dir == SOPT_GET) {
-		error = copyout_c(sd->kbuf, sopt->sopt_val, sz);
+		error = copyout(sd->kbuf, sopt->sopt_val, sz);
 		if (error != 0)
 			return (error);
 	}

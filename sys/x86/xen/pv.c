@@ -204,6 +204,7 @@ hammer_time_xen_legacy(start_info_t *si, uint64_t xenstack)
 	uint64_t *PT3 = (u_int64_t *)(xenstack + PAGE_SIZE);
 	uint64_t *PT2 = (u_int64_t *)(xenstack + 2 * PAGE_SIZE);
 	int i;
+	char *kenv;
 
 	xen_domain_type = XEN_PV_DOMAIN;
 	vm_guest = VM_GUEST_XEN;
@@ -251,6 +252,15 @@ hammer_time_xen_legacy(start_info_t *si, uint64_t xenstack)
 		PT2[i] |= PG_V | PG_RW | PG_PS | PG_U;
 	}
 	load_cr3(((uint64_t)&PT4[0]) - KERNBASE);
+
+	/*
+	 * Init an empty static kenv using a free page. The contents will be
+	 * filled from the parse_preload_data hook.
+	 */
+	kenv = (void *)(physfree + KERNBASE);
+	physfree += PAGE_SIZE;
+	bzero(kenv, PAGE_SIZE);
+	init_static_kenv(kenv, PAGE_SIZE);
 
 	/* Set the hooks for early functions that diverge from bare metal */
 	init_ops = xen_legacy_init_ops;
@@ -350,18 +360,12 @@ start_xen_ap(int cpu)
 	const size_t stacksize = kstack_pages * PAGE_SIZE;
 
 	/* allocate and set up an idle stack data page */
-	bootstacks[cpu] =
-	    (void *)kmem_malloc(kernel_arena, stacksize, M_WAITOK | M_ZERO);
-	doublefault_stack =
-	    (char *)kmem_malloc(kernel_arena, PAGE_SIZE, M_WAITOK | M_ZERO);
-	mce_stack =
-	    (char *)kmem_malloc(kernel_arena, PAGE_SIZE, M_WAITOK | M_ZERO);
-	nmi_stack =
-	    (char *)kmem_malloc(kernel_arena, PAGE_SIZE, M_WAITOK | M_ZERO);
-	dbg_stack =
-	    (void *)kmem_malloc(kernel_arena, PAGE_SIZE, M_WAITOK | M_ZERO);
-	dpcpu =
-	    (void *)kmem_malloc(kernel_arena, DPCPU_SIZE, M_WAITOK | M_ZERO);
+	bootstacks[cpu] = (void *)kmem_malloc(stacksize, M_WAITOK | M_ZERO);
+	doublefault_stack = (char *)kmem_malloc(PAGE_SIZE, M_WAITOK | M_ZERO);
+	mce_stack = (char *)kmem_malloc(PAGE_SIZE, M_WAITOK | M_ZERO);
+	nmi_stack = (char *)kmem_malloc(PAGE_SIZE, M_WAITOK | M_ZERO);
+	dbg_stack = (void *)kmem_malloc(PAGE_SIZE, M_WAITOK | M_ZERO);
+	dpcpu = (void *)kmem_malloc(DPCPU_SIZE, M_WAITOK | M_ZERO);
 
 	bootSTK = (char *)bootstacks[cpu] + kstack_pages * PAGE_SIZE - 8;
 	bootAP = cpu;

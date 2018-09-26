@@ -83,9 +83,9 @@ colocation_fetch_context(struct thread *td, struct switcher_context *scp)
 		return (false);
 	}
 
-	error = copyincap_c(__USER_CAP((const void *)addr, sizeof(*scp)),
+	error = copyincap(__USER_CAP((const void *)addr, sizeof(*scp)),
 	    &(*scp), sizeof(*scp));
-	KASSERT(error == 0, ("%s: copyincap_c from %p failed with error %d\n",
+	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
 	    __func__, (void *)td->td_md.md_switcher_context, error));
 
 	if (scp->sc_borrower_td == NULL) {
@@ -135,9 +135,9 @@ colocation_thread_exit(struct thread *td)
 	sc.sc_td = NULL;
 	sc.sc_borrower_td = NULL;
 
-	error = copyoutcap_c(&sc, __USER_CAP((void *)addr, sizeof(sc)), sizeof(sc));
+	error = copyoutcap(&sc, __USER_CAP((void *)addr, sizeof(sc)), sizeof(sc));
 	if (error != 0) {
-		printf("%s: copyoutcap_c to %p failed with error %d\n",
+		printf("%s: copyoutcap to %p failed with error %d\n",
 		    __func__, (void *)addr, error);
 		return;
 	}
@@ -145,9 +145,9 @@ colocation_thread_exit(struct thread *td)
 	if (peersc == NULL)
 		return;
 
-	error = copyincap_c(__USER_CAP((void *)peersc, sizeof(sc)), &sc, sizeof(sc));
+	error = copyincap(__USER_CAP((void *)peersc, sizeof(sc)), &sc, sizeof(sc));
 	if (error != 0) {
-		printf("%s: peer copyincap_c from %p failed with error %d\n",
+		printf("%s: peer copyincap from %p failed with error %d\n",
 		    __func__, (void *)peersc, error);
 		return;
 	}
@@ -155,9 +155,9 @@ colocation_thread_exit(struct thread *td)
 	sc.sc_peer_context = NULL;
 	sc.sc_borrower_td = NULL;
 
-	error = copyoutcap_c(&sc, __USER_CAP((void *)peersc, sizeof(sc)), sizeof(sc));
+	error = copyoutcap(&sc, __USER_CAP((void *)peersc, sizeof(sc)), sizeof(sc));
 	if (error != 0) {
-		printf("%s: peer copyoutcap_c to %p failed with error %d\n",
+		printf("%s: peer copyoutcap to %p failed with error %d\n",
 		    __func__, (void *)peersc, error);
 		return;
 	}
@@ -272,7 +272,7 @@ cosetup(struct thread *td)
 	sc.sc_borrower_td = NULL;
 	sc.sc_peer_context = NULL;
 
-	error = copyoutcap_c(&sc, __USER_CAP((void *)addr, sizeof(sc)), sizeof(sc));
+	error = copyoutcap(&sc, __USER_CAP((void *)addr, sizeof(sc)), sizeof(sc));
 	KASSERT(error == 0, ("%s: copyout failed with error %d\n", __func__, error));
 
 	return (0);
@@ -300,26 +300,26 @@ sys_cosetup(struct thread *td, struct cosetup_args *uap)
 		    td->td_proc->p_sysent->sv_cocall_base,
 		    td->td_proc->p_sysent->sv_cocall_len, 0);
 		codecap = cheri_seal(codecap, switcher_sealcap);
-		error = copyoutcap_c(&codecap, __USER_CAP(uap->code, sizeof(codecap)), sizeof(codecap));
+		error = copyoutcap(&codecap, __USER_CAP(uap->code, sizeof(codecap)), sizeof(codecap));
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_capability_build_user_rwx( CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
-		error = copyoutcap_c(&datacap, __USER_CAP(uap->data, sizeof(datacap)), sizeof(datacap));
+		error = copyoutcap(&datacap, __USER_CAP(uap->data, sizeof(datacap)), sizeof(datacap));
 		return (0);
 
 	case COSETUP_COACCEPT:
 		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_coaccept_base, td->td_proc->p_sysent->sv_coaccept_len, 0);
 		codecap = cheri_seal(codecap, switcher_sealcap);
-		error = copyoutcap_c(&codecap, __USER_CAP(uap->code, sizeof(codecap)), sizeof(codecap));
+		error = copyoutcap(&codecap, __USER_CAP(uap->code, sizeof(codecap)), sizeof(codecap));
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
-		error = copyoutcap_c(&datacap, __USER_CAP(uap->data, sizeof(datacap)), sizeof(datacap));
+		error = copyoutcap(&datacap, __USER_CAP(uap->data, sizeof(datacap)), sizeof(datacap));
 		return (0);
 
 	default:
@@ -369,7 +369,7 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 	cap = cheri_seal(cap, switcher_sealcap2);
 
 	if (uap->cap != NULL) {
-		error = copyoutcap_c(&cap, __USER_CAP(uap->cap, sizeof(cap)), sizeof(cap));
+		error = copyoutcap(&cap, __USER_CAP(uap->cap, sizeof(cap)), sizeof(cap));
 		if (error != 0) {
 			vm_map_unlock(&vmspace->vm_map);
 			return (error);
@@ -410,7 +410,7 @@ sys_colookup(struct thread *td, struct colookup_args *uap)
 		return (ESRCH);
 	}
 
-	error = copyoutcap_c(&con->c_value, __USER_CAP(uap->cap, sizeof(con->c_value)), sizeof(con->c_value));
+	error = copyoutcap(&con->c_value, __USER_CAP(uap->cap, sizeof(con->c_value)), sizeof(con->c_value));
 	vm_map_unlock(&vmspace->vm_map);
 	return (error);
 }

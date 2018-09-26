@@ -139,7 +139,6 @@ SUBDIR=	alias \
 	script \
 	sdiff \
 	sed \
-	send-pr \
 	seq \
 	shar \
 	showmount \

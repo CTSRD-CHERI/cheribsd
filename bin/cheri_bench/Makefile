@@ -15,7 +15,7 @@ NO_WERROR=	YES
 
 LIBADD+= pthread
 
-.if ${MK_CHERI} != "no"
+.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
 LIBADD+=  cheri
 .ifdef CLANG_CLEARREGS
 CFLAGS+= -mllvm -cheri-use-clearregs

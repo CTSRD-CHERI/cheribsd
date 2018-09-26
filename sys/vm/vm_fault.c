@@ -271,8 +271,8 @@ vm_fault_soft_fast(struct faultstate *fs, vm_offset_t vaddr, vm_prot_t prot,
     int fault_type, int fault_flags, boolean_t wired, vm_page_t *m_hold)
 {
 	vm_page_t m, m_map;
-#if (defined(__amd64__) || defined(__i386__) || defined(__aarch64__)) && \
-    VM_NRESERVLEVEL > 0
+#if (defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
+    __ARM_ARCH >= 6) || defined(__i386__)) && VM_NRESERVLEVEL > 0
 	vm_page_t m_super;
 	int flags;
 #endif
@@ -286,8 +286,8 @@ vm_fault_soft_fast(struct faultstate *fs, vm_offset_t vaddr, vm_prot_t prot,
 		return (KERN_FAILURE);
 	m_map = m;
 	psind = 0;
-#if (defined(__amd64__) || defined(__i386__) || defined(__aarch64__)) && \
-    VM_NRESERVLEVEL > 0
+#if (defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
+    __ARM_ARCH >= 6) || defined(__i386__)) && VM_NRESERVLEVEL > 0
 	if ((m->flags & PG_FICTITIOUS) == 0 &&
 	    (m_super = vm_reserv_to_superpage(m)) != NULL &&
 	    rounddown2(vaddr, pagesizes[m_super->psind]) >= fs->entry->start &&
@@ -469,7 +469,8 @@ vm_fault_populate(struct faultstate *fs, vm_prot_t prot, int fault_type,
 	    pidx <= pager_last;
 	    pidx += npages, m = vm_page_next(&m[npages - 1])) {
 		vaddr = fs->entry->start + IDX_TO_OFF(pidx) - fs->entry->offset;
-#if defined(__amd64__) || defined(__i386__) || defined(__aarch64__)
+#if defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
+    __ARM_ARCH >= 6) || defined(__i386__)
 		psind = m->psind;
 		if (psind > 0 && ((vaddr & (pagesizes[psind] - 1)) != 0 ||
 		    pidx + OFF_TO_IDX(pagesizes[psind]) - 1 > pager_last ||
@@ -555,6 +556,7 @@ vm_fault_hold(vm_map_t map, vm_offset_t vaddr, vm_prot_t fault_type,
 	u_int flags;
 	struct faultstate fs;
 	struct vnode *vp;
+	struct domainset *dset;
 	vm_object_t next_object, retry_object;
 	vm_offset_t e_end, e_start;
 	vm_pindex_t retry_pindex;
@@ -799,7 +801,11 @@ RetryFault:;
 			 * there, and allocation can fail, causing
 			 * restart and new reading of the p_flag.
 			 */
-			if (!vm_page_count_severe() || P_KILLED(curproc)) {
+			dset = fs.object->domain.dr_policy;
+			if (dset == NULL)
+				dset = curthread->td_domain.dr_policy;
+			if (!vm_page_count_severe_set(&dset->ds_mask) ||
+			    P_KILLED(curproc)) {
 #if VM_NRESERVLEVEL > 0
 				vm_object_color(fs.object, atop(vaddr) -
 				    fs.pindex);
@@ -814,7 +820,7 @@ RetryFault:;
 			}
 			if (fs.m == NULL) {
 				unlock_and_deallocate(&fs);
-				vm_waitpfault();
+				vm_waitpfault(dset);
 				goto RetryFault;
 			}
 		}
@@ -1135,7 +1141,7 @@ readrest:
 				 */
 			    fs.object == fs.first_object->backing_object) {
 				vm_page_lock(fs.m);
-				vm_page_remque(fs.m);
+				vm_page_dequeue(fs.m);
 				vm_page_remove(fs.m);
 				vm_page_unlock(fs.m);
 				vm_page_lock(fs.first_m);

@@ -203,6 +203,7 @@ MAN=	aac.4 \
 	icmp6.4 \
 	ida.4 \
 	if_ipsec.4 \
+	iflib.4 \
 	ifmib.4 \
 	ig4.4 \
 	igmp.4 \
@@ -242,7 +243,6 @@ MAN=	aac.4 \
 	ixl.4 \
 	ixlv.4 \
 	jedec_dimm.4 \
-	jedec_ts.4 \
 	jme.4 \
 	joy.4 \
 	kbdmux.4 \
@@ -900,7 +900,14 @@ _dtrace_provs=	dtrace_io.4 \
 		dtrace_sched.4 \
 		dtrace_sctp.4 \
 		dtrace_tcp.4 \
-		dtrace_udp.4
+		dtrace_udp.4 \
+		dtrace_udplite.4
+.endif
+
+.if ${MK_EFI} != "no"
+MAN+=		efidev.4
+
+MLINKS+=	efidev.4 efirtc.4
 .endif
 
 .if ${MK_ISCSI} != "no"

@@ -92,6 +92,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
+#include <vm/vm_domainset.h>
 #include <vm/vm_map.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
@@ -126,7 +127,7 @@ kernacc(void *addr, int len, int rw)
 	KASSERT((rw & ~VM_PROT_ALL) == 0,
 	    ("illegal ``rw'' argument to kernacc (%x)\n", rw));
 
-	if ((vm_offset_t)addr + len > kernel_map->max_offset ||
+	if ((vm_offset_t)addr + len > vm_map_max(kernel_map) ||
 	    (vm_offset_t)addr + len < (vm_offset_t)addr)
 		return (FALSE);
 
@@ -504,7 +505,7 @@ vm_thread_new(struct thread *td, int pages)
 	else if (pages > KSTACK_MAX_PAGES)
 		pages = KSTACK_MAX_PAGES;
 
-	if (pages == kstack_pages) {
+	if (pages == kstack_pages && kstack_cache != NULL) {
 		mtx_lock(&kstack_cache_mtx);
 		if (kstack_cache != NULL) {
 			ks_ce = kstack_cache;
@@ -701,6 +702,7 @@ vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
 	vm_map_t map2;
 	vm_map_entry_t entry;
 	struct proc *p1 = td->td_proc;
+	struct domainset *dset;
 	int error;
 
 	if ((flags & RFMEM) == 0 && (flags & RFPROC) != 0) {
@@ -735,9 +737,9 @@ vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
 		p2->p_vmspace = p1->p_vmspace;
 		atomic_add_int(&p1->p_vmspace->vm_refcnt, 1);
 	}
-
-	while (vm_page_count_severe()) {
-		vm_wait_severe();
+	dset = td2->td_domain.dr_policy;
+	while (vm_page_count_severe_set(&dset->ds_mask)) {
+		vm_wait_doms(&dset->ds_mask);
 	}
 
 	if ((flags & RFMEM) == 0) {

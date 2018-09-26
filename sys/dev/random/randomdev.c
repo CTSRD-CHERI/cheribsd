@@ -156,6 +156,10 @@ READ_RANDOM_UIO(struct uio *uio, bool nonblock)
 		error = tsleep(&random_alg_context, PCATCH, "randseed", hz/10);
 		if (error == ERESTART || error == EINTR)
 			break;
+		/* Squash tsleep timeout condition */
+		if (error == EWOULDBLOCK)
+			error = 0;
+		KASSERT(error == 0, ("unexpected tsleep error %d", error));
 	}
 	if (error == 0) {
 		read_rate_increment((uio->uio_resid + sizeof(uint32_t))/sizeof(uint32_t));
@@ -166,7 +170,7 @@ READ_RANDOM_UIO(struct uio *uio, bool nonblock)
 			 * Belt-and-braces.
 			 * Round up the read length to a crypto block size multiple,
 			 * which is what the underlying generator is expecting.
-			 * See the random_buf size requirements in the Yarrow/Fortuna code.
+			 * See the random_buf size requirements in the Fortuna code.
 			 */
 			read_len = roundup(read_len, RANDOM_BLOCKSIZE);
 			/* Work in chunks page-sized or less */
@@ -184,9 +188,13 @@ READ_RANDOM_UIO(struct uio *uio, bool nonblock)
 			 * uninterruptible syscalls.
 			 */
 			if (error == 0 && uio->uio_resid != 0 &&
-			    total_read % sigchk_period == 0)
+			    total_read % sigchk_period == 0) {
 				error = tsleep_sbt(&random_alg_context, PCATCH,
 				    "randrd", SBT_1NS, 0, C_HARDCLOCK);
+				/* Squash tsleep timeout condition */
+				if (error == EWOULDBLOCK)
+					error = 0;
+			}
 		}
 		if (error == ERESTART || error == EINTR)
 			error = 0;
@@ -250,7 +258,6 @@ randomdev_accumulate(uint8_t *buf, u_int count)
 	for (i = 0; i < RANDOM_KEYSIZE_WORDS; i += sizeof(event.he_entropy)/sizeof(event.he_entropy[0])) {
 		event.he_somecounter = (uint32_t)get_cyclecount();
 		event.he_size = sizeof(event.he_entropy);
-		event.he_bits = event.he_size/8;
 		event.he_source = RANDOM_CACHED;
 		event.he_destination = destination++; /* Harmless cheating */
 		memcpy(event.he_entropy, entropy_data + i, sizeof(event.he_entropy));

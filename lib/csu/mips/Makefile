@@ -24,12 +24,6 @@ FILESDIR=	${LIBDIR}
 CLEANFILES=	${OBJS} crt1_c.o crt1_s.o gcrt1_c.o Scrt1_c.o
 CLEANFILES+=	crt1_c.s gcrt1_c.s Scrt1_c.s
 
-.if defined(LIBCHERI)
-# We don't support .init and .fini on CheriABI so don't build the files.
-FILES:=	${FILES:Ncrti.o:Ncrtn.o}
-STRIP_EXCEPTIONS=	objcopy -R .eh_frame ${.TARGET}
-.endif
-
 # crt1 is split into an assembly part (crt1_s.s) and a C part (crt1_c.c) so
 # that raw assembly can be used to re-align the stack to be 32-byte aligned.
 # This is necessary for CHERI because capabilities must be 32-byte aligned.
@@ -84,7 +78,3 @@ Scrt1.o: Scrt1_c.o crt1_s.o
 	${LD} ${_LDFLAGS} -o Scrt1.o -r crt1_s.o Scrt1_c.o
 
 .include <bsd.lib.mk>
-
-.if defined(LIBCHERI)
-CC:=	${CC:N-g}
-.endif

@@ -11,7 +11,7 @@ CFLAGS+=	-I${.CURDIR} \
 SRCS=	libpng_sb.c
 WARNS?=	6
 
-.ifdef LIBCHERI
+.if ${MACHINE_ARCH:Mmips64c128} || ${MACHINE_ARCH:Mmips64c256}
 NEED_CHERI=	pure
 .else
 NEED_CHERI=	hybrid

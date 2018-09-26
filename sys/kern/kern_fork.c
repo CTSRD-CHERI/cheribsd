@@ -42,6 +42,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_ktrace.h"
 #include "opt_kstack_pages.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -147,7 +149,7 @@ kern_pdfork(struct thread *td, int * __capability fdp, int flags)
 	if (error == 0) {
 		td->td_retval[0] = pid;
 		td->td_retval[1] = 0;
-		error = copyout_c(&fd, fdp, sizeof(fd));
+		error = copyout(&fd, fdp, sizeof(fd));
 	}
 	return (error);
 }

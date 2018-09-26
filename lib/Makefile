@@ -75,6 +75,8 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpcap \
 	libpjdlog \
 	libpng \
+	libpmc \
+	libpmcstat \
 	${_libproc} \
 	libprocstat \
 	libregex \
@@ -148,7 +150,7 @@ SUBDIR.${MK_CHERI}+=	libz-cheri
 SUBDIR.${MK_CHERI}+=	libjpeg
 SUBDIR.${MK_CHERI}+=	libpng_sb
 
-.if ${MK_CHERI} != "no"
+.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
 _libc_cheri=	libc_cheri
 _libcheri=	libcheri
 .endif
@@ -177,14 +179,16 @@ SUBDIR.${MK_LDNS}+=	libldns
 # built for certain architectures.
 # XXXAR: This is not actually true, it makes sense to build them even if we
 # aren't building a native clang since we might be cross-compiling with clang
-.if (${COMPILER_TYPE} == "clang") && \
-    (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-    ${MACHINE_CPUARCH} == "arm" ||  ${MACHINE_CPUARCH} == "i386" || \
-    ${MACHINE_ARCH:Mmips64} != "") && !defined(LIBCHERI)
+.if ${COMPILER_TYPE} == "clang"
+.if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
+    ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
+    ${MACHINE_ARCH:Mmips64*}) && \
+    ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
 _libclang_rt=	libclang_rt
-.elif !defined(LIBCHERI)
-.error "NOT BUILDING libclang_rt"
+.elif ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
+.error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
 .endif
+.endif # ${COMPILER_TYPE} == "clang"
 
 .if ${MK_LIBCPLUSPLUS} != "no"
 _libcxxrt=	libcxxrt
@@ -213,7 +217,7 @@ SUBDIR.${MK_PMC}+=	libipt
 SUBDIR.${MK_BHYVE}+=	libvmmapi
 .endif
 
-.if ${MACHINE_ARCH} == "mips64"
+.if ${MACHINE_ARCH:Mmips64*}
 _libstatcounters=	libstatcounters
 .endif
 
@@ -227,9 +231,6 @@ _libdl=		libdl
 .endif
 
 SUBDIR.${MK_OPENSSL}+=	libmp
-.if (${COMPILER_TYPE} == "clang" || (${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 60100 && ${MACHINE_CPUARCH} != "riscv"))
-SUBDIR.${MK_PMC}+=	libpmc libpmcstat
-.endif
 SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
@@ -242,6 +243,7 @@ SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_UNBOUND}+=	libunbound
 SUBDIR.${MK_USB}+=	libusbhid libusb
 SUBDIR.${MK_OFED}+=	ofed
+SUBDIR.${MK_ZFS}+=	libbe
 
 .if !make(install)
 SUBDIR_PARALLEL=
@@ -252,7 +254,7 @@ SUBDIR_PARALLEL=
 SUBDIR:=	${SUBDIR:Nlibc++experimental}
 .endif
 
-.if defined(LIBCHERI)
+.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
 SUBDIR+=	libmalloc_simple
 SUBDIR+=	libcheri_syscalls
 SUBDIR+=	libcheri_support

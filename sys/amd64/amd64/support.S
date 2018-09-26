@@ -41,7 +41,7 @@
 	.text
 
 /* Address: %rdi */
-ENTRY(pagezero)
+ENTRY(pagezero_std)
 	PUSH_FRAME_POINTER
 	movq	$PAGE_SIZE/8,%rcx
 	xorl	%eax,%eax
@@ -49,7 +49,17 @@ ENTRY(pagezero)
 	stosq
 	POP_FRAME_POINTER
 	ret
-END(pagezero)
+END(pagezero_std)
+
+ENTRY(pagezero_erms)
+	PUSH_FRAME_POINTER
+	movq	$PAGE_SIZE,%rcx
+	xorl	%eax,%eax
+	rep
+	stosb
+	POP_FRAME_POINTER
+	ret
+END(pagezero_erms)
 
 /*
  * pagecopy(%rdi=from, %rsi=to)
@@ -96,64 +106,18 @@ END(sse2_pagezero)
  * Adapted from bcopy written by:
  *  ws@tools.de     (Wolfgang Solfrank, TooLs GmbH) +49-228-985800
  */
-ENTRY(memmove)
-	PUSH_FRAME_POINTER
-	movq	%rdi,%r9
-	movq	%rdx,%rcx
-
-	movq	%rdi,%rax
-	subq	%rsi,%rax
-	cmpq	%rcx,%rax			/* overlapping && src < dst? */
-	jb	1f
-
-	shrq	$3,%rcx				/* copy by 64-bit words */
-	rep
-	movsq
-	movq	%rdx,%rcx
-	andq	$7,%rcx				/* any bytes left? */
-	jne	2f
-	movq	%r9,%rax
-	POP_FRAME_POINTER
-	ret
-2:
-	rep
-	movsb
-	movq	%r9,%rax
-	POP_FRAME_POINTER
-	ret
-
-	/* ALIGN_TEXT */
-1:
-	addq	%rcx,%rdi			/* copy backwards */
-	addq	%rcx,%rsi
-	decq	%rdi
-	decq	%rsi
-	andq	$7,%rcx				/* any fractional bytes? */
-	std
-	rep
-	movsb
-	movq	%rdx,%rcx			/* copy remainder by 32-bit words */
-	shrq	$3,%rcx
-	subq	$7,%rsi
-	subq	$7,%rdi
-	rep
-	movsq
-	cld
-	movq	%r9,%rax
-	POP_FRAME_POINTER
-	ret
-END(memmove)
-
-/*
- * memcpy(dst, src, len)
- *        rdi, rsi, rdx
- *
- * Note: memcpy does not support overlapping copies
- */
-ENTRY(memcpy)
+ENTRY(memmove_std)
 	PUSH_FRAME_POINTER
 	movq	%rdi,%rax
 	movq	%rdx,%rcx
+
+	movq	%rdi,%r8
+	subq	%rsi,%r8
+	cmpq	%rcx,%r8			/* overlapping && src < dst? */
+	jb	2f
+
+	cmpq	$15,%rcx
+	jbe	1f
 	shrq	$3,%rcx				/* copy by 64-bit words */
 	rep
 	movsq
@@ -162,24 +126,115 @@ ENTRY(memcpy)
 	jne	1f
 	POP_FRAME_POINTER
 	ret
+	ALIGN_TEXT
 1:
 	rep
 	movsb
 	POP_FRAME_POINTER
 	ret
-END(memcpy)
+
+	/* ALIGN_TEXT */
+2:
+	addq	%rcx,%rdi			/* copy backwards */
+	addq	%rcx,%rsi
+	decq	%rdi
+	decq	%rsi
+	std
+	andq	$7,%rcx				/* any fractional bytes? */
+	je	3f
+	rep
+	movsb
+3:
+	movq	%rdx,%rcx			/* copy remainder by 32-bit words */
+	shrq	$3,%rcx
+	subq	$7,%rsi
+	subq	$7,%rdi
+	rep
+	movsq
+	cld
+	POP_FRAME_POINTER
+	ret
+END(memmove_std)
+
+ENTRY(memmove_erms)
+	PUSH_FRAME_POINTER
+	movq	%rdi,%rax
+	movq	%rdx,%rcx
+
+	movq	%rdi,%r8
+	subq	%rsi,%r8
+	cmpq	%rcx,%r8			/* overlapping && src < dst? */
+	jb	1f
+
+	rep
+	movsb
+	POP_FRAME_POINTER
+	ret
+
+1:
+	addq	%rcx,%rdi			/* copy backwards */
+	addq	%rcx,%rsi
+	decq	%rdi
+	decq	%rsi
+	std
+	rep
+	movsb
+	cld
+	POP_FRAME_POINTER
+	ret
+END(memmove_erms)
+
+/*
+ * memcpy(dst, src, len)
+ *        rdi, rsi, rdx
+ *
+ * Note: memcpy does not support overlapping copies
+ */
+ENTRY(memcpy_std)
+	PUSH_FRAME_POINTER
+	movq	%rdi,%rax
+	movq	%rdx,%rcx
+	cmpq	$15,%rcx
+	jbe	1f
+	shrq	$3,%rcx				/* copy by 64-bit words */
+	rep
+	movsq
+	movq	%rdx,%rcx
+	andq	$7,%rcx				/* any bytes left? */
+	jne	1f
+	POP_FRAME_POINTER
+	ret
+	ALIGN_TEXT
+1:
+	rep
+	movsb
+	POP_FRAME_POINTER
+	ret
+END(memcpy_std)
+
+ENTRY(memcpy_erms)
+	PUSH_FRAME_POINTER
+	movq	%rdi,%rax
+	movq	%rdx,%rcx
+	rep
+	movsb
+	POP_FRAME_POINTER
+	ret
+END(memcpy_erms)
 
 /*
  * memset(dst, c,   len)
  *        rdi, rsi, rdx
  */
-ENTRY(memset)
+ENTRY(memset_std)
 	PUSH_FRAME_POINTER
 	movq	%rdi,%r9
 	movq	%rdx,%rcx
 	movzbq	%sil,%r8
 	movabs	$0x0101010101010101,%rax
 	imulq	%r8,%rax
+	cmpq	$15,%rcx
+	jbe	1f
 	shrq	$3,%rcx
 	rep
 	stosq
@@ -189,13 +244,26 @@ ENTRY(memset)
 	movq	%r9,%rax
 	POP_FRAME_POINTER
 	ret
+	ALIGN_TEXT
 1:
 	rep
 	stosb
 	movq	%r9,%rax
 	POP_FRAME_POINTER
 	ret
-END(memset)
+END(memset_std)
+
+ENTRY(memset_erms)
+	PUSH_FRAME_POINTER
+	movq	%rdi,%r9
+	movq	%rdx,%rcx
+	movb	%sil,%al
+	rep
+	stosb
+	movq	%r9,%rax
+	POP_FRAME_POINTER
+	ret
+END(memset_erms)
 
 /* fillw(pat, base, cnt) */
 /*       %rdi,%rsi, %rdx */
@@ -222,29 +290,44 @@ END(fillw)
  * returns to *curpcb->pcb_onfault instead of the function.
  */
 
+.macro SMAP_DISABLE smap
+.if	\smap
+	stac
+.endif
+.endm
+
+
+.macro SMAP_ENABLE smap
+.if	\smap
+	clac
+.endif
+.endm
+
 /*
  * copyout(from_kernel, to_user, len)
  *         %rdi,        %rsi,    %rdx
  */
-ENTRY(copyout)
+.macro	COPYOUT smap erms
 	PUSH_FRAME_POINTER
-	movq	PCPU(CURPCB),%rax
-	movq	$copyout_fault,PCB_ONFAULT(%rax)
+	movq	PCPU(CURPCB),%r9
+	/* Trap entry clears PSL.AC */
+	movq	$copy_fault,PCB_ONFAULT(%r9)
 	testq	%rdx,%rdx			/* anything to do? */
-	jz	done_copyout
+	jz	2f
 
 	/*
-	 * Check explicitly for non-user addresses.  This check is essential
-	 * because it prevents usermode from writing into the kernel.  We do
-	 * not verify anywhere else that the user did not specify a rogue
-	 * address.
+	 * Check explicitly for non-user addresses.  If 486 write protection
+	 * is being used, this check is essential because we are in kernel
+	 * mode so the h/w does not provide any protection against writing
+	 * kernel addresses.
 	 */
+
 	/*
 	 * First, prevent address wrapping.
 	 */
 	movq	%rsi,%rax
 	addq	%rdx,%rax
-	jc	copyout_fault
+	jc	copy_fault
 /*
  * XXX STOP USING VM_MAXUSER_ADDRESS.
  * It is an end address, not a max, so every time it is used correctly it
@@ -253,92 +336,138 @@ ENTRY(copyout)
  */
 	movq	$VM_MAXUSER_ADDRESS,%rcx
 	cmpq	%rcx,%rax
-	ja	copyout_fault
+	ja	copy_fault
 
 	xchgq	%rdi,%rsi
 	/* bcopy(%rsi, %rdi, %rdx) */
 	movq	%rdx,%rcx
 
+	SMAP_DISABLE \smap
+.if	\erms == 0
+	cmpq	$15,%rcx
+	jbe	1f
 	shrq	$3,%rcx
 	rep
 	movsq
 	movb	%dl,%cl
 	andb	$7,%cl
-	je	done_copyout
+	jne	1f
+	SMAP_ENABLE \smap
+	xorl	%eax,%eax
+	movq	%rax,PCB_ONFAULT(%r9)
+	POP_FRAME_POINTER
+	ret
+.endif
+1:
 	rep
 	movsb
-
-done_copyout:
+	SMAP_ENABLE \smap
+2:
 	xorl	%eax,%eax
-	movq	PCPU(CURPCB),%rdx
-	movq	%rax,PCB_ONFAULT(%rdx)
+	movq	%rax,PCB_ONFAULT(%r9)
 	POP_FRAME_POINTER
 	ret
+.endm
 
-	ALIGN_TEXT
-copyout_fault:
-	movq	PCPU(CURPCB),%rdx
-	movq	$0,PCB_ONFAULT(%rdx)
-	movq	$EFAULT,%rax
-	POP_FRAME_POINTER
-	ret
-END(copyout)
+ENTRY(copyout_nosmap_std)
+	COPYOUT smap=0 erms=0
+END(copyout_nosmap_std)
+
+ENTRY(copyout_smap_std)
+	COPYOUT smap=1 erms=0
+END(copyout_smap_std)
+
+ENTRY(copyout_nosmap_erms)
+	COPYOUT smap=0 erms=1
+END(copyout_nosmap_erms)
+
+ENTRY(copyout_smap_erms)
+	COPYOUT smap=1 erms=1
+END(copyout_smap_erms)
 
 /*
  * copyin(from_user, to_kernel, len)
  *        %rdi,      %rsi,      %rdx
  */
-ENTRY(copyin)
+.macro	COPYIN smap erms
 	PUSH_FRAME_POINTER
-	movq	PCPU(CURPCB),%rax
-	movq	$copyin_fault,PCB_ONFAULT(%rax)
+	movq	PCPU(CURPCB),%r9
+	movq	$copy_fault,PCB_ONFAULT(%r9)
 	testq	%rdx,%rdx			/* anything to do? */
-	jz	done_copyin
+	jz	2f
 
 	/*
 	 * make sure address is valid
 	 */
 	movq	%rdi,%rax
 	addq	%rdx,%rax
-	jc	copyin_fault
+	jc	copy_fault
 	movq	$VM_MAXUSER_ADDRESS,%rcx
 	cmpq	%rcx,%rax
-	ja	copyin_fault
+	ja	copy_fault
 
 	xchgq	%rdi,%rsi
 	movq	%rdx,%rcx
 	movb	%cl,%al
+
+	SMAP_DISABLE \smap
+.if \erms == 0
+	cmpq	$15,%rcx
+	jbe	1f
 	shrq	$3,%rcx				/* copy longword-wise */
 	rep
 	movsq
 	movb	%al,%cl
 	andb	$7,%cl				/* copy remaining bytes */
-	je	done_copyin
+	jne	1f
+	SMAP_ENABLE \smap
+	xorl	%eax,%eax
+	movq	%rax,PCB_ONFAULT(%r9)
+	POP_FRAME_POINTER
+	ret
+.endif
+1:
 	rep
 	movsb
 
-done_copyin:
+	SMAP_ENABLE \smap
+2:
 	xorl	%eax,%eax
-	movq	PCPU(CURPCB),%rdx
-	movq	%rax,PCB_ONFAULT(%rdx)
+	movq	%rax,PCB_ONFAULT(%r9)
 	POP_FRAME_POINTER
 	ret
+.endm
+
+ENTRY(copyin_nosmap_std)
+	COPYIN smap=0 erms=0
+END(copyin_nosmap_std)
+
+ENTRY(copyin_smap_std)
+	COPYIN smap=1 erms=0
+END(copyin_smap_std)
+
+ENTRY(copyin_nosmap_erms)
+	COPYIN smap=0 erms=1
+END(copyin_nosmap_erms)
+
+ENTRY(copyin_smap_erms)
+	COPYIN smap=1 erms=1
+END(copyin_smap_erms)
 
 	ALIGN_TEXT
-copyin_fault:
+copy_fault:
 	movq	PCPU(CURPCB),%rdx
 	movq	$0,PCB_ONFAULT(%rdx)
-	movq	$EFAULT,%rax
+	movl	$EFAULT,%eax
 	POP_FRAME_POINTER
 	ret
-END(copyin)
 
 /*
  * casueword32.  Compare and set user integer.  Returns -1 on fault,
  *        0 if access was successful.  Old value is written to *oldp.
  *        dst = %rdi, old = %esi, oldp = %rdx, new = %ecx
  */
-ENTRY(casueword32)
+ENTRY(casueword32_nosmap)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%r8
 	movq	$fusufault,PCB_ONFAULT(%r8)
@@ -370,14 +499,50 @@ ENTRY(casueword32)
 	movl	%esi,(%rdx)			/* oldp = %rdx */
 	POP_FRAME_POINTER
 	ret
-END(casueword32)
+END(casueword32_nosmap)
+
+ENTRY(casueword32_smap)
+	PUSH_FRAME_POINTER
+	movq	PCPU(CURPCB),%r8
+	movq	$fusufault,PCB_ONFAULT(%r8)
+
+	movq	$VM_MAXUSER_ADDRESS-4,%rax
+	cmpq	%rax,%rdi			/* verify address is valid */
+	ja	fusufault
+
+	movl	%esi,%eax			/* old */
+	stac
+#ifdef SMP
+	lock
+#endif
+	cmpxchgl %ecx,(%rdi)			/* new = %ecx */
+	clac
+
+	/*
+	 * The old value is in %eax.  If the store succeeded it will be the
+	 * value we expected (old) from before the store, otherwise it will
+	 * be the current value.  Save %eax into %esi to prepare the return
+	 * value.
+	 */
+	movl	%eax,%esi
+	xorl	%eax,%eax
+	movq	%rax,PCB_ONFAULT(%r8)
+
+	/*
+	 * Access the oldp after the pcb_onfault is cleared, to correctly
+	 * catch corrupted pointer.
+	 */
+	movl	%esi,(%rdx)			/* oldp = %rdx */
+	POP_FRAME_POINTER
+	ret
+END(casueword32_smap)
 
 /*
  * casueword.  Compare and set user long.  Returns -1 on fault,
  *        0 if access was successful.  Old value is written to *oldp.
  *        dst = %rdi, old = %rsi, oldp = %rdx, new = %rcx
  */
-ENTRY(casueword)
+ENTRY(casueword_nosmap)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%r8
 	movq	$fusufault,PCB_ONFAULT(%r8)
@@ -403,7 +568,37 @@ ENTRY(casueword)
 	movq	%rsi,(%rdx)
 	POP_FRAME_POINTER
 	ret
-END(casueword)
+END(casueword_nosmap)
+
+ENTRY(casueword_smap)
+	PUSH_FRAME_POINTER
+	movq	PCPU(CURPCB),%r8
+	movq	$fusufault,PCB_ONFAULT(%r8)
+
+	movq	$VM_MAXUSER_ADDRESS-4,%rax
+	cmpq	%rax,%rdi			/* verify address is valid */
+	ja	fusufault
+
+	movq	%rsi,%rax			/* old */
+	stac
+#ifdef SMP
+	lock
+#endif
+	cmpxchgq %rcx,(%rdi)			/* new = %rcx */
+	clac
+
+	/*
+	 * The old value is in %rax.  If the store succeeded it will be the
+	 * value we expected (old) from before the store, otherwise it will
+	 * be the current value.
+	 */
+	movq	%rax,%rsi
+	xorl	%eax,%eax
+	movq	%rax,PCB_ONFAULT(%r8)
+	movq	%rsi,(%rdx)
+	POP_FRAME_POINTER
+	ret
+END(casueword_smap)
 
 /*
  * Fetch (load) a 64-bit word, a 32-bit word, a 16-bit word, or an 8-bit
@@ -411,8 +606,7 @@ END(casueword)
  * addr = %rdi, valp = %rsi
  */
 
-ALTENTRY(fueword64)
-ENTRY(fueword)
+ENTRY(fueword_nosmap)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -427,10 +621,28 @@ ENTRY(fueword)
 	movq	%r11,(%rsi)
 	POP_FRAME_POINTER
 	ret
-END(fueword64)
-END(fueword)
+END(fueword_nosmap)
 
-ENTRY(fueword32)
+ENTRY(fueword_smap)
+	PUSH_FRAME_POINTER
+	movq	PCPU(CURPCB),%rcx
+	movq	$fusufault,PCB_ONFAULT(%rcx)
+
+	movq	$VM_MAXUSER_ADDRESS-8,%rax
+	cmpq	%rax,%rdi			/* verify address is valid */
+	ja	fusufault
+
+	xorl	%eax,%eax
+	stac
+	movq	(%rdi),%r11
+	clac
+	movq	%rax,PCB_ONFAULT(%rcx)
+	movq	%r11,(%rsi)
+	POP_FRAME_POINTER
+	ret
+END(fueword_smap)
+
+ENTRY(fueword32_nosmap)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -445,9 +657,28 @@ ENTRY(fueword32)
 	movl	%r11d,(%rsi)
 	POP_FRAME_POINTER
 	ret
-END(fueword32)
+END(fueword32_nosmap)
 
-ENTRY(fuword16)
+ENTRY(fueword32_smap)
+	PUSH_FRAME_POINTER
+	movq	PCPU(CURPCB),%rcx
+	movq	$fusufault,PCB_ONFAULT(%rcx)
+
+	movq	$VM_MAXUSER_ADDRESS-4,%rax
+	cmpq	%rax,%rdi			/* verify address is valid */
+	ja	fusufault
+
+	xorl	%eax,%eax
+	stac
+	movl	(%rdi),%r11d
+	clac
+	movq	%rax,PCB_ONFAULT(%rcx)
+	movl	%r11d,(%rsi)
+	POP_FRAME_POINTER
+	ret
+END(fueword32_smap)
+
+ENTRY(fuword16_nosmap)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -460,9 +691,26 @@ ENTRY(fuword16)
 	movq	$0,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret
-END(fuword16)
+END(fuword16_nosmap)
 
-ENTRY(fubyte)
+ENTRY(fuword16_smap)
+	PUSH_FRAME_POINTER
+	movq	PCPU(CURPCB),%rcx
+	movq	$fusufault,PCB_ONFAULT(%rcx)
+
+	movq	$VM_MAXUSER_ADDRESS-2,%rax
+	cmpq	%rax,%rdi
+	ja	fusufault
+
+	stac
+	movzwl	(%rdi),%eax
+	clac
+	movq	$0,PCB_ONFAULT(%rcx)
+	POP_FRAME_POINTER
+	ret
+END(fuword16_smap)
+
+ENTRY(fubyte_nosmap)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -475,24 +723,31 @@ ENTRY(fubyte)
 	movq	$0,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret
-END(fubyte)
+END(fubyte_nosmap)
 
-	ALIGN_TEXT
-fusufault:
+ENTRY(fubyte_smap)
+	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%rcx
-	xorl	%eax,%eax
-	movq	%rax,PCB_ONFAULT(%rcx)
-	decq	%rax
+	movq	$fusufault,PCB_ONFAULT(%rcx)
+
+	movq	$VM_MAXUSER_ADDRESS-1,%rax
+	cmpq	%rax,%rdi
+	ja	fusufault
+
+	stac
+	movzbl	(%rdi),%eax
+	clac
+	movq	$0,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret
+END(fubyte_smap)
 
 /*
  * Store a 64-bit word, a 32-bit word, a 16-bit word, or an 8-bit byte to
  * user memory.
  * addr = %rdi, value = %rsi
  */
-ALTENTRY(suword64)
-ENTRY(suword)
+ENTRY(suword_nosmap)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -507,10 +762,28 @@ ENTRY(suword)
 	movq	%rax,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret
-END(suword64)
-END(suword)
+END(suword_nosmap)
 
-ENTRY(suword32)
+ENTRY(suword_smap)
+	PUSH_FRAME_POINTER
+	movq	PCPU(CURPCB),%rcx
+	movq	$fusufault,PCB_ONFAULT(%rcx)
+
+	movq	$VM_MAXUSER_ADDRESS-8,%rax
+	cmpq	%rax,%rdi			/* verify address validity */
+	ja	fusufault
+
+	stac
+	movq	%rsi,(%rdi)
+	clac
+	xorl	%eax,%eax
+	movq	PCPU(CURPCB),%rcx
+	movq	%rax,PCB_ONFAULT(%rcx)
+	POP_FRAME_POINTER
+	ret
+END(suword_smap)
+
+ENTRY(suword32_nosmap)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -525,9 +798,28 @@ ENTRY(suword32)
 	movq	%rax,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret
-END(suword32)
+END(suword32_nosmap)
 
-ENTRY(suword16)
+ENTRY(suword32_smap)
+	PUSH_FRAME_POINTER
+	movq	PCPU(CURPCB),%rcx
+	movq	$fusufault,PCB_ONFAULT(%rcx)
+
+	movq	$VM_MAXUSER_ADDRESS-4,%rax
+	cmpq	%rax,%rdi			/* verify address validity */
+	ja	fusufault
+
+	stac
+	movl	%esi,(%rdi)
+	clac
+	xorl	%eax,%eax
+	movq	PCPU(CURPCB),%rcx
+	movq	%rax,PCB_ONFAULT(%rcx)
+	POP_FRAME_POINTER
+	ret
+END(suword32_smap)
+
+ENTRY(suword16_nosmap)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -542,9 +834,28 @@ ENTRY(suword16)
 	movq	%rax,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret
-END(suword16)
+END(suword16_nosmap)
 
-ENTRY(subyte)
+ENTRY(suword16_smap)
+	PUSH_FRAME_POINTER
+	movq	PCPU(CURPCB),%rcx
+	movq	$fusufault,PCB_ONFAULT(%rcx)
+
+	movq	$VM_MAXUSER_ADDRESS-2,%rax
+	cmpq	%rax,%rdi			/* verify address validity */
+	ja	fusufault
+
+	stac
+	movw	%si,(%rdi)
+	clac
+	xorl	%eax,%eax
+	movq	PCPU(CURPCB),%rcx		/* restore trashed register */
+	movq	%rax,PCB_ONFAULT(%rcx)
+	POP_FRAME_POINTER
+	ret
+END(suword16_smap)
+
+ENTRY(subyte_nosmap)
 	PUSH_FRAME_POINTER
 	movq	PCPU(CURPCB),%rcx
 	movq	$fusufault,PCB_ONFAULT(%rcx)
@@ -560,7 +871,37 @@ ENTRY(subyte)
 	movq	%rax,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret
-END(subyte)
+END(subyte_nosmap)
+
+ENTRY(subyte_smap)
+	PUSH_FRAME_POINTER
+	movq	PCPU(CURPCB),%rcx
+	movq	$fusufault,PCB_ONFAULT(%rcx)
+
+	movq	$VM_MAXUSER_ADDRESS-1,%rax
+	cmpq	%rax,%rdi			/* verify address validity */
+	ja	fusufault
+
+	movl	%esi,%eax
+	stac
+	movb	%al,(%rdi)
+	clac
+	xorl	%eax,%eax
+	movq	PCPU(CURPCB),%rcx		/* restore trashed register */
+	movq	%rax,PCB_ONFAULT(%rcx)
+	POP_FRAME_POINTER
+	ret
+END(subyte_smap)
+
+	ALIGN_TEXT
+	/* Fault entry clears PSL.AC */
+fusufault:
+	movq	PCPU(CURPCB),%rcx
+	xorl	%eax,%eax
+	movq	%rax,PCB_ONFAULT(%rcx)
+	decq	%rax
+	POP_FRAME_POINTER
+	ret
 
 /*
  * copyinstr(from, to, maxlen, int *lencopied)
@@ -571,7 +912,7 @@ END(subyte)
  *	EFAULT on protection violations. If lencopied is non-zero,
  *	return the actual length in *lencopied.
  */
-ENTRY(copyinstr)
+ENTRY(copyinstr_nosmap)
 	PUSH_FRAME_POINTER
 	movq	%rdx,%r8			/* %r8 = maxlen */
 	movq	%rcx,%r9			/* %r9 = *len */
@@ -595,28 +936,55 @@ ENTRY(copyinstr)
 
 2:
 	decq	%rdx
-	jz	3f
+	jz	copyinstr_toolong
 
 	lodsb
 	stosb
 	orb	%al,%al
 	jnz	2b
 
+	jmp	copyinstr_succ
+END(copyinstr_nosmap)
+
+ENTRY(copyinstr_smap)
+	PUSH_FRAME_POINTER
+	movq	%rdx,%r8			/* %r8 = maxlen */
+	movq	%rcx,%r9			/* %r9 = *len */
+	xchgq	%rdi,%rsi			/* %rdi = from, %rsi = to */
+	movq	PCPU(CURPCB),%rcx
+	movq	$cpystrflt,PCB_ONFAULT(%rcx)
+
+	movq	$VM_MAXUSER_ADDRESS,%rax
+
+	/* make sure 'from' is within bounds */
+	subq	%rsi,%rax
+	jbe	cpystrflt
+
+	stac
+
+	/* restrict maxlen to <= VM_MAXUSER_ADDRESS-from */
+	cmpq	%rdx,%rax
+	jae	1f
+	movq	%rax,%rdx
+	movq	%rax,%r8
+1:
+	incq	%rdx
+
+2:
+	decq	%rdx
+	jz	copyinstr_toolong_smap
+
+	lodsb
+	stosb
+	orb	%al,%al
+	jnz	2b
+
+	clac
+
+copyinstr_succ:
 	/* Success -- 0 byte reached */
 	decq	%rdx
 	xorl	%eax,%eax
-	jmp	cpystrflt_x
-3:
-	/* rdx is zero - return ENAMETOOLONG or EFAULT */
-	movq	$VM_MAXUSER_ADDRESS,%rax
-	cmpq	%rax,%rsi
-	jae	cpystrflt
-4:
-	movq	$ENAMETOOLONG,%rax
-	jmp	cpystrflt_x
-
-cpystrflt:
-	movq	$EFAULT,%rax
 
 cpystrflt_x:
 	/* set *lencopied and return %eax */
@@ -630,7 +998,22 @@ cpystrflt_x:
 1:
 	POP_FRAME_POINTER
 	ret
-END(copyinstr)
+	/* Fault entry clears PSL.AC */
+cpystrflt:
+	movq	$EFAULT,%rax
+	jmp	cpystrflt_x
+
+copyinstr_toolong_smap:
+	clac
+copyinstr_toolong:
+	/* rdx is zero - return ENAMETOOLONG or EFAULT */
+	movq	$VM_MAXUSER_ADDRESS,%rax
+	cmpq	%rax,%rsi
+	jae	cpystrflt
+	movq	$ENAMETOOLONG,%rax
+	jmp	cpystrflt_x
+
+END(copyinstr_smap)
 
 /*
  * copystr(from, to, maxlen, int *lencopied)
@@ -895,3 +1278,36 @@ ENTRY(handle_ibrs_exit_rs)
 END(handle_ibrs_exit_rs)
 
 	.noaltmacro
+
+/*
+ * Flush L1D cache.  Load enough of the data from the kernel text
+ * to flush existing L1D content.
+ *
+ * N.B. The function does not follow ABI calling conventions, it corrupts %rbx.
+ * The vmm.ko caller expects that only %rax, %rdx, %rbx, %rcx, %r9, and %rflags
+ * registers are clobbered.  The NMI handler caller only needs %r13 preserved.
+ */
+ENTRY(flush_l1d_sw)
+#define	L1D_FLUSH_SIZE	(64 * 1024)
+	movq	$KERNBASE, %r9
+	movq	$-L1D_FLUSH_SIZE, %rcx
+	/*
+	 * pass 1: Preload TLB.
+	 * Kernel text is mapped using superpages.  TLB preload is
+	 * done for the benefit of older CPUs which split 2M page
+	 * into 4k TLB entries.
+	 */
+1:	movb	L1D_FLUSH_SIZE(%r9, %rcx), %al
+	addq	$PAGE_SIZE, %rcx
+	jne	1b
+	xorl	%eax, %eax
+	cpuid
+	movq	$-L1D_FLUSH_SIZE, %rcx
+	/* pass 2: Read each cache line. */
+2:	movb	L1D_FLUSH_SIZE(%r9, %rcx), %al
+	addq	$64, %rcx
+	jne	2b
+	lfence
+	ret
+#undef	L1D_FLUSH_SIZE
+END(flush_l1d_sw)

@@ -138,19 +138,22 @@ settime_task_func(void *arg, int pending)
 {
 	struct timespec ts;
 	struct rtc_instance *rtc;
+	int error;
 
 	rtc = arg;
 	if (!(rtc->flags & CLOCKF_SETTIME_NO_TS)) {
 		getnanotime(&ts);
 		if (!(rtc->flags & CLOCKF_SETTIME_NO_ADJ)) {
 			ts.tv_sec -= utc_offset();
-			timespecadd(&ts, &rtc->resadj);
+			timespecadd(&ts, &rtc->resadj, &ts);
 		}
 	} else {
 		ts.tv_sec  = 0;
 		ts.tv_nsec = 0;
 	}
-	CLOCK_SETTIME(rtc->clockdev, &ts);
+	error = CLOCK_SETTIME(rtc->clockdev, &ts);
+	if (error != 0 && bootverbose)
+		device_printf(rtc->clockdev, "CLOCK_SETTIME error %d\n", error);
 }
 
 static void
@@ -301,7 +304,7 @@ read_clocks(struct timespec *ts, bool debug_read)
 			continue;
 		}
 		if (!(rtc->flags & CLOCKF_GETTIME_NO_ADJ)) {
-			timespecadd(ts, &rtc->resadj);
+			timespecadd(ts, &rtc->resadj, ts);
 			ts->tv_sec += utc_offset();
 		}
 		if (!debug_read) {

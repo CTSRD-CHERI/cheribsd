@@ -13,6 +13,7 @@ WANT_CHERI=none
 PACKAGE=	clibs
 MK_SSP=		no
 
+CONFS=		libmap.conf
 PROG?=		ld-elf.so.1
 .if (${PROG:M*ld-elf32*} != "")
 TAGS+=		lib32

@@ -40,6 +40,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -94,7 +96,7 @@ SX_SYSINIT(gre_ioctl_sx, &gre_ioctl_sx, "gre_ioctl");
 
 static int	gre_clone_create(struct if_clone *, int, void * __capability);
 static void	gre_clone_destroy(struct ifnet *);
-static VNET_DEFINE(struct if_clone *, gre_cloner);
+VNET_DEFINE_STATIC(struct if_clone *, gre_cloner);
 #define	V_gre_cloner	VNET(gre_cloner)
 
 static void	gre_qflush(struct ifnet *);
@@ -119,7 +121,7 @@ static SYSCTL_NODE(_net_link, IFT_TUNNEL, gre, CTLFLAG_RW, 0,
 #define MAX_GRE_NEST 1
 #endif
 
-static VNET_DEFINE(int, max_gre_nesting) = MAX_GRE_NEST;
+VNET_DEFINE_STATIC(int, max_gre_nesting) = MAX_GRE_NEST;
 #define	V_max_gre_nesting	VNET(max_gre_nesting)
 SYSCTL_INT(_net_link_gre, OID_AUTO, max_nesting, CTLFLAG_RW | CTLFLAG_VNET,
     &VNET_NAME(max_gre_nesting), 0, "Max nested tunnels");
@@ -263,7 +265,7 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case GRESOPTS:
 		if ((error = priv_check(curthread, PRIV_NET_GRE)) != 0)
 			break;
-		if ((error = copyin_c(ifr_data_get_ptr(ifr), &opt,
+		if ((error = copyin(ifr_data_get_ptr(ifr), &opt,
 		    sizeof(opt))) != 0)
 			break;
 		if (cmd == GRESKEY) {
@@ -301,11 +303,11 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		 */
 		break;
 	case CASE_IOC_IFREQ(GREGKEY):
-		error = copyout_c(&sc->gre_key, ifr_data_get_ptr(ifr),
+		error = copyout(&sc->gre_key, ifr_data_get_ptr(ifr),
 		    sizeof(sc->gre_key));
 		break;
 	case CASE_IOC_IFREQ(GREGOPTS):
-		error = copyout_c(&sc->gre_options, ifr_data_get_ptr(ifr),
+		error = copyout(&sc->gre_options, ifr_data_get_ptr(ifr),
 		    sizeof(sc->gre_options));
 		break;
 	default:
@@ -564,6 +566,8 @@ gre_transmit(struct ifnet *ifp, struct mbuf *m)
 		goto drop;
 	}
 	af = m->m_pkthdr.csum_data;
+	BPF_MTAP2(ifp, &af, sizeof(af), m);
+	m->m_flags &= ~(M_BCAST|M_MCAST);
 	M_SETFIB(m, sc->gre_fibnum);
 	M_PREPEND(m, sc->gre_hlen, M_NOWAIT);
 	if (m == NULL) {

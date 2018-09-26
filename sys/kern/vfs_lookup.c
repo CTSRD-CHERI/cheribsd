@@ -42,6 +42,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -163,10 +165,6 @@ nameiinit(void *dummy __unused)
 	getnewvnode("crossmp", NULL, &crossmp_vnodeops, &vp_crossmp);
 }
 SYSINIT(vfs, SI_SUB_VFS, SI_ORDER_SECOND, nameiinit, NULL);
-
-static int lookup_shared = 1;
-SYSCTL_INT(_vfs, OID_AUTO, lookup_shared, CTLFLAG_RWTUN, &lookup_shared, 0,
-    "enables shared locks for path name translation");
 
 static int lookup_cap_dotdot = 1;
 SYSCTL_INT(_vfs, OID_AUTO, lookup_cap_dotdot, CTLFLAG_RWTUN,
@@ -311,8 +309,6 @@ namei(struct nameidata *ndp)
 	    ("namei: flags contaminated with nameiops"));
 	MPASS(ndp->ni_startdir == NULL || ndp->ni_startdir->v_type == VDIR ||
 	    ndp->ni_startdir->v_type == VBAD);
-	if (!lookup_shared)
-		cnp->cn_flags &= ~LOCKSHARED;
 	fdp = p->p_fd;
 	TAILQ_INIT(&ndp->ni_cap_tracker);
 	ndp->ni_lcf = 0;
@@ -330,7 +326,7 @@ namei(struct nameidata *ndp)
 		error = copystr((__cheri_fromcap const char *)ndp->ni_dirp,
 		    cnp->cn_pnbuf, MAXPATHLEN, &ndp->ni_pathlen);
 	else
-		error = copyinstr_c(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
+		error = copyinstr(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
 		    &ndp->ni_pathlen);
 
 	/*
@@ -663,10 +659,7 @@ lookup(struct nameidata *ndp)
 	 * We use shared locks until we hit the parent of the last cn then
 	 * we adjust based on the requesting flags.
 	 */
-	if (lookup_shared)
-		cnp->cn_lkflags = LK_SHARED;
-	else
-		cnp->cn_lkflags = LK_EXCLUSIVE;
+	cnp->cn_lkflags = LK_SHARED;
 	dp = ndp->ni_startdir;
 	ndp->ni_startdir = NULLVP;
 	vn_lock(dp,
@@ -1090,7 +1083,7 @@ nextname:
 		VOP_UNLOCK(dp, 0);
 success:
 	/*
-	 * Because of lookup_shared we may have the vnode shared locked, but
+	 * Because of shared lookup we may have the vnode shared locked, but
 	 * the caller may want it to be exclusively locked.
 	 */
 	if (needs_exclusive_leaf(dp->v_mount, cnp->cn_flags) &&
@@ -1346,8 +1339,9 @@ NDFREE(struct nameidata *ndp, const u_int flags)
  * the M_TEMP bucket if one is returned.
  */
 int
-kern_alternate_path(struct thread *td, const char *prefix, const char *path,
-    enum uio_seg pathseg, char **pathbuf, int create, int dirfd)
+kern_alternate_path(struct thread *td, const char *prefix,
+    const char * __capability path, enum uio_seg pathseg, char **pathbuf,
+    int create, int dirfd)
 {
 	struct nameidata nd, ndroot;
 	char *ptr, *buf, *cp;
@@ -1369,7 +1363,8 @@ kern_alternate_path(struct thread *td, const char *prefix, const char *path,
 
 	/* Append the filename to the prefix. */
 	if (pathseg == UIO_SYSSPACE)
-		error = copystr(path, ptr, sz, &len);
+		error = copystr((__cheri_fromcap const char *)path, ptr, sz,
+		    &len);
 	else
 		error = copyinstr(path, ptr, sz, &len);
 

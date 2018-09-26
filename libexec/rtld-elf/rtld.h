@@ -55,6 +55,17 @@
 
 #include "rtld_lock.h"
 
+/* The macros in sys/param.h evaluate their arguments again ... */
+/* XXXAR: I wish I could just use C++ and std::min() */
+#define rtld_min(X, Y)			\
+	({ typeof (X) x_ = (X);		\
+	    typeof (Y) y_ = (Y);	\
+	    (x_ < y_) ? x_ : y_; })
+#define rtld_max(X, Y)			\
+	({ typeof (X) x_ = (X);		\
+	    typeof (Y) y_ = (Y);	\
+	    (x_ > y_) ? x_ : y_; })
+
 #define NEW(type)	((type *) xmalloc(sizeof(type)))
 #define CNEW(type)	((type *) xcalloc(1, sizeof(type)))
 
@@ -165,6 +176,17 @@ typedef struct Struct_Obj_Entry {
     size_t mapsize;		/* Size of mapped region in bytes */
     size_t textsize;		/* Size of text segment in bytes */
     Elf_Addr vaddrbase;		/* Base address in shared object file */
+#ifdef __CHERI_PURE_CAPABILITY__
+    /*
+     * For CHERI we need a capability for the executable + rodata segments so
+     * that we can derive code capabilities from it.
+     * By having these additional members we can remove execute permissions from
+     * relocbase and mapbase.
+     */
+    Elf_Addr text_rodata_start;
+    Elf_Addr text_rodata_end;
+    caddr_t text_rodata_cap;	/* Capability for the executable mapping */
+#endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */
     caddr_t entry;		/* Entry point */
@@ -200,7 +222,9 @@ typedef struct Struct_Obj_Entry {
 #ifdef __mips__
 #ifdef __CHERI_PURE_CAPABILITY__
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
+    caddr_t captable;		/* start of the .cap_table section */
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
+    size_t captable_size;	/* size of the .cap_table section */
 #endif
     Elf_Word local_gotno;	/* Number of local GOT entries */
     Elf_Word symtabno;		/* Number of dynamic symbols */
@@ -299,6 +323,7 @@ typedef struct Struct_Obj_Entry {
      */
     bool restrict_pcc_basic : 1;
     bool restrict_pcc_strict : 1;
+    unsigned cheri_captable_abi : 3;
 #endif
 
     struct link_map linkmap;	/* For GDB and dlinfo() */

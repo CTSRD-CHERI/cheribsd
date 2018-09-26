@@ -86,16 +86,6 @@ static volatile int trace;
 #endif
 static volatile int alarm_fired;
 
-#define timespecsub(vvp, uvp)						\
-	do {								\
-		(vvp)->tv_sec -= (uvp)->tv_sec;				\
-		(vvp)->tv_nsec -= (uvp)->tv_nsec;			\
-		if ((vvp)->tv_nsec < 0) {				\
-			(vvp)->tv_sec--;				\
-			(vvp)->tv_nsec += 1000000000;			\
-		}							\
-	} while (0)
-
 static void
 alarm_handler(int signum __unused)
 {
@@ -171,7 +161,7 @@ benchmark_iteration(int i)
 	 * 0 is a special case, it's always the time.
 	 */
 	ts_diff = ts_now;
-	timespecsub(&ts_diff, &ts_prev);
+	timespecsub(&ts_diff, &ts_prev, &ts_diff);
 	assert(ts_diff.tv_sec == 0);
 	RAW_NUMBER(i, 0) = ts_diff.tv_nsec;
 	ts_prev = ts_now;
@@ -1324,7 +1314,7 @@ main(int argc, char *argv[])
 		for (k = 0; k < loops; k++) {
 			calls = the_test->t_func(iterations, the_test->t_int,
 			    path);
-			timespecsub(&ts_end, &ts_start);
+			timespecsub(&ts_end, &ts_start, &ts_end);
 			printf("%s\t%ju\t", the_test->t_name, k);
 			printf("%ju.%09ju\t%ju\t", (uintmax_t)ts_end.tv_sec,
 			    (uintmax_t)ts_end.tv_nsec, calls);

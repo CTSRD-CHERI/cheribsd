@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2008, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
  * Copyright 2016 Gary Mills
  * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
  * Copyright 2017 Joyent, Inc.
@@ -1491,9 +1491,11 @@ dsl_scan_prefetch_cb(zio_t *zio, const zbookmark_phys_t *zb, const blkptr_t *bp,
 		int i;
 		int epb = BP_GET_LSIZE(bp) >> DNODE_SHIFT;
 
-		for (i = 0, cdnp = buf->b_data; i < epb; i++, cdnp++) {
+		for (i = 0, cdnp = buf->b_data; i < epb;
+		    i += cdnp->dn_extra_slots + 1,
+		    cdnp += cdnp->dn_extra_slots + 1) {
 			dsl_scan_prefetch_dnode(scn, cdnp,
-						zb->zb_objset, zb->zb_blkid * epb + i);
+			    zb->zb_objset, zb->zb_blkid * epb + i);
 		}
 	} else if (BP_GET_TYPE(bp) == DMU_OT_OBJSET) {
 		objset_phys_t *osp = buf->b_data;
@@ -1671,7 +1673,9 @@ dsl_scan_recurse(dsl_scan_t *scn, dsl_dataset_t *ds, dmu_objset_type_t ostype,
 			scn->scn_phys.scn_errors++;
 			return (err);
 		}
-		for (i = 0, cdnp = buf->b_data; i < epb; i++, cdnp++) {
+		for (i = 0, cdnp = buf->b_data; i < epb;
+		    i += cdnp->dn_extra_slots + 1,
+		    cdnp += cdnp->dn_extra_slots + 1) {
 			dsl_scan_visitdnode(scn, ds, ostype,
 			    cdnp, zb->zb_blkid * epb + i, tx);
 		}
@@ -1734,7 +1738,7 @@ dsl_scan_visitdnode(dsl_scan_t *scn, dsl_dataset_t *ds,
 		zbookmark_phys_t czb;
 		SET_BOOKMARK(&czb, ds ? ds->ds_object : 0, object,
 		    0, DMU_SPILL_BLKID);
-		dsl_scan_visitbp(&dnp->dn_spill,
+		dsl_scan_visitbp(DN_SPILL_BLKPTR(dnp),
 		    &czb, dnp, ds, scn, ostype, tx);
 	}
 }
@@ -2164,7 +2168,8 @@ dsl_scan_visitds(dsl_scan_t *scn, uint64_t dsobj, dmu_tx_t *tx)
 	 * block-sharing rules don't apply to it.
 	 */
 	if (DSL_SCAN_IS_SCRUB_RESILVER(scn) && !dsl_dataset_is_snapshot(ds) &&
-	    ds->ds_dir != dp->dp_origin_snap->ds_dir) {
+	    (dp->dp_origin_snap == NULL ||
+	    ds->ds_dir != dp->dp_origin_snap->ds_dir)) {
 		objset_t *os;
 		if (dmu_objset_from_ds(ds, &os) != 0) {
 			goto out;
@@ -2959,6 +2964,16 @@ dsl_scan_need_resilver(spa_t *spa, const dva_t *dva, size_t psize,
 {
 	vdev_t *vd;
 
+	if (vd->vdev_ops == &vdev_indirect_ops) {
+		/*
+		 * The indirect vdev can point to multiple
+		 * vdevs.  For simplicity, always create
+		 * the resilver zio_t. zio_vdev_io_start()
+		 * will bypass the child resilver i/o's if
+		 * they are on vdevs that don't have DTL's.
+		 */
+		return (B_TRUE);
+	}
 	if (DVA_GET_GANG(dva)) {
 		/*
 		 * Gang members may be spread across multiple
@@ -3540,15 +3555,15 @@ dsl_scan_scrub_cb(dsl_pool_t *dp,
 	boolean_t needs_io;
 	int zio_flags = ZIO_FLAG_SCAN_THREAD | ZIO_FLAG_RAW | ZIO_FLAG_CANFAIL;
 	int d;
-	
-	if (phys_birth <= scn->scn_phys.scn_min_txg ||
-	    phys_birth >= scn->scn_phys.scn_max_txg)
-		return (0);
 
-	if (BP_IS_EMBEDDED(bp)) {
+	if (phys_birth <= scn->scn_phys.scn_min_txg ||
+	    phys_birth >= scn->scn_phys.scn_max_txg) {
 		count_block(scn, dp->dp_blkstats, bp);
 		return (0);
 	}
+
+	/* Embedded BP's have phys_birth==0, so we reject them above. */
+	ASSERT(!BP_IS_EMBEDDED(bp));
 
 	ASSERT(DSL_SCAN_IS_SCRUB_RESILVER(scn));
 	if (scn->scn_phys.scn_func == POOL_SCAN_SCRUB) {

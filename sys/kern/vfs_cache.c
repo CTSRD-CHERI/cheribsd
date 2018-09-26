@@ -40,6 +40,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/counter.h>
@@ -2158,10 +2160,9 @@ kern___getcwd(struct thread *td, char * __capability buf, enum uio_seg bufseg,
 
 	if (!error) {
 		if (bufseg == UIO_SYSSPACE)
-			bcopy_c((__cheri_tocap char * __capability)bp,
-			    buf, strlen(bp) + 1);
+			bcopy(bp, (__cheri_fromcap char *)buf, strlen(bp) + 1);
 		else
-			error = copyout_c(bp, buf, strlen(bp) + 1);
+			error = copyout(bp, buf, strlen(bp) + 1);
 #ifdef KTRACE
 	if (KTRPOINT(curthread, KTR_NAMEI))
 		ktrnamei(bp);

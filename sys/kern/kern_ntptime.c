@@ -35,6 +35,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ntp.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -299,7 +301,7 @@ kern_ntp_gettime(struct thread *td, struct ntptimeval * __capability ntvp)
 	NTP_UNLOCK();
 
 	td->td_retval[0] = ntv.time_state;
-	return (copyout_c(&ntv, ntvp, sizeof(ntv)));
+	return (copyout(&ntv, ntvp, sizeof(ntv)));
 }
 
 static int
@@ -354,13 +356,13 @@ sys_ntp_adjtime(struct thread *td, struct ntp_adjtime_args *uap)
 	struct timex ntv;
 	int error, retval;
 
-	error = copyin(uap->tp, &ntv, sizeof(ntv));
+	error = copyin(__USER_CAP_OBJ(uap->tp), &ntv, sizeof(ntv));
 	if (error)
 		return (error);
 	error = kern_ntp_adjtime(td, &ntv, &retval);
 	if (error)
 		return (error);
-	error = copyout((caddr_t)&ntv, (caddr_t)uap->tp, sizeof(ntv));
+	error = copyout(&ntv, __USER_CAP_OBJ(uap->tp), sizeof(ntv));
 	if (error == 0)
 		td->td_retval[0] = retval;
 	return (error);
@@ -983,7 +985,8 @@ sys_adjtime(struct thread *td, struct adjtime_args *uap)
 	int error;
 
 	if (uap->delta) {
-		error = copyin(uap->delta, &delta, sizeof(delta));
+		error = copyin(__USER_CAP_OBJ(uap->delta), &delta,
+		    sizeof(delta));
 		if (error)
 			return (error);
 		deltap = &delta;
@@ -991,7 +994,8 @@ sys_adjtime(struct thread *td, struct adjtime_args *uap)
 		deltap = NULL;
 	error = kern_adjtime(td, deltap, &olddelta);
 	if (uap->olddelta && error == 0)
-		error = copyout(&olddelta, uap->olddelta, sizeof(olddelta));
+		error = copyout(&olddelta, __USER_CAP_OBJ(uap->olddelta),
+		    sizeof(olddelta));
 	return (error);
 }
 

@@ -34,6 +34,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -522,9 +524,9 @@ addupc_task(struct thread *td, uintfptr_t pc, u_int ticks)
 	addr = prof->pr_base + i;
 	PROC_PROFUNLOCK(p);
 	PROC_UNLOCK(p);
-	if (copyin_c(addr, &v, sizeof(v)) == 0) {
+	if (copyin(addr, &v, sizeof(v)) == 0) {
 		v += ticks;
-		if (copyout_c(&v, addr, sizeof(v)) == 0) {
+		if (copyout(&v, addr, sizeof(v)) == 0) {
 			PROC_LOCK(p);
 			goto out;
 		}

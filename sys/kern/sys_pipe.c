@@ -94,6 +94,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/conf.h>
@@ -484,7 +486,7 @@ kern_pipe2(struct thread *td, int * __capability ufildes, int flags)
 	error = kern_pipe(td, fildes, flags, NULL, NULL);
 	if (error)
 		return (error);
-	error = copyout_c(&fildes[0], ufildes, 2 * sizeof(int));
+	error = copyout(&fildes[0], ufildes, 2 * sizeof(int));
 	if (error) {
 		(void)kern_close(td, fildes[0]);
 		(void)kern_close(td, fildes[1]);

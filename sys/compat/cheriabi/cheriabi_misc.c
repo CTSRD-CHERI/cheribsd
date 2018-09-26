@@ -39,6 +39,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_posix.h"
 #include "opt_capsicum.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/capsicum.h>
@@ -187,11 +189,11 @@ cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 	if (error != 0)
 		return (error);
 	if (uap->status != NULL)
-		error = copyout_c(&status, uap->status, sizeof(status));
+		error = copyout(&status, uap->status, sizeof(status));
 	if (uap->wrusage != NULL && error == 0)
-		error = copyout_c(&wru, uap->wrusage, sizeof(wru));
+		error = copyout(&wru, uap->wrusage, sizeof(wru));
 	if (uap->info != NULL && error == 0) {
-		error = copyout_c(&si, uap->info, sizeof(si));
+		error = copyout(&si, uap->info, sizeof(si));
 	}
 	return (error);
 }
@@ -232,7 +234,7 @@ cheriabi_exec_copyin_args(struct image_args *args,
 			error = copystr((__cheri_fromcap const char *)fname,
 			    args->fname, PATH_MAX, &length);
 		} else {
-			error = copyinstr_c(fname, args->fname, PATH_MAX,
+			error = copyinstr(fname, args->fname, PATH_MAX,
 			    &length);
 		}
 		if (error != 0)
@@ -249,12 +251,12 @@ cheriabi_exec_copyin_args(struct image_args *args,
 	 */
 	pcap = argv;
 	for (;;) {
-		error = copyincap_c(pcap++, &argcap, sizeof(argcap));
+		error = copyincap(pcap++, &argcap, sizeof(argcap));
 		if (error)
 			goto err_exit;
 		if (argcap == NULL)
 			break;
-		error = copyinstr_c(argcap, args->endp, args->stringspace,
+		error = copyinstr(argcap, args->endp, args->stringspace,
 		    &length);
 		if (error != 0) {
 			if (error == ENAMETOOLONG)
@@ -274,12 +276,12 @@ cheriabi_exec_copyin_args(struct image_args *args,
 	if (envv) {
 		pcap = envv;
 		for (;;) {
-			error = copyincap_c(pcap++, &argcap, sizeof(argcap));
+			error = copyincap(pcap++, &argcap, sizeof(argcap));
 			if (error != 0)
 				goto err_exit;
 			if (argcap == NULL)
 				break;
-			error = copyinstr_c(argcap, args->endp,
+			error = copyinstr(argcap, args->endp,
 			    args->stringspace, &length);
 			if (error != 0) {
 				if (error == ENAMETOOLONG)
@@ -376,7 +378,7 @@ cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count)
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	error = copyoutcap_c(kevp, uap->eventlist, count * sizeof(*kevp));
+	error = copyoutcap(kevp, uap->eventlist, count * sizeof(*kevp));
 	if (error == 0)
 		uap->eventlist += count;
 	return (error);
@@ -394,7 +396,7 @@ cheriabi_kevent_copyin(void *arg, kkevent_t *kevp, int count)
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct cheriabi_kevent_args *)arg;
 
-	error = copyincap_c(uap->changelist, kevp, count * sizeof(*kevp));
+	error = copyincap(uap->changelist, kevp, count * sizeof(*kevp));
 	if (error == 0)
 		uap->changelist += count;
 	return (error);
@@ -411,7 +413,7 @@ cheriabi_kevent(struct thread *td, struct cheriabi_kevent_args *uap)
 
 
 	if (uap->timeout) {
-		error = copyin_c(uap->timeout, &ts, sizeof(ts));
+		error = copyin(uap->timeout, &ts, sizeof(ts));
 		if (error)
 			return (error);
 		tsp = &ts;
@@ -437,7 +439,7 @@ cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
 	iovlen = iovcnt * sizeof(kiovec_t);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
 	iov = (kiovec_t *)(uio + 1);
-	error = copyincap_c(iovp, iov, iovlen);
+	error = copyincap(iovp, iov, iovlen);
 	if (error) {
 		free(uio, M_IOV);
 		return (error);
@@ -526,7 +528,7 @@ cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
 		return (error);
 	iovlen = iovcnt * sizeof(kiovec_t);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
-	error = copyincap_c(iovp_c, iov, iovlen);
+	error = copyincap(iovp_c, iov, iovlen);
 	if (error) {
 		free(iov, M_IOV);
 		return (error);
@@ -552,7 +554,7 @@ cheriabi_sendfile(struct thread *td, struct cheriabi_sendfile_args *uap)
 	hdr_uio = trl_uio = NULL;
 
 	if (uap->hdtr != NULL) {
-		error = copyincap_c(uap->hdtr, &hdtr_c, sizeof(hdtr_c));
+		error = copyincap(uap->hdtr, &hdtr_c, sizeof(hdtr_c));
 		if (error)
 			goto out;
 
@@ -581,7 +583,7 @@ cheriabi_sendfile(struct thread *td, struct cheriabi_sendfile_args *uap)
 	fdrop(fp, td);
 
 	if (uap->sbytes != NULL)
-		copyout_c(&sbytes, uap->sbytes, sizeof(off_t));
+		copyout(&sbytes, uap->sbytes, sizeof(off_t));
 
 out:
 	if (hdr_uio)
@@ -597,7 +599,7 @@ cheriabi_jail(struct thread *td, struct cheriabi_jail_args *uap)
 	unsigned int version;
 	int error;
 
-	error = copyin_c(&uap->jailp->version, &version, sizeof(version));
+	error = copyin(&uap->jailp->version, &version, sizeof(version));
 	if (error)
 		return (error);
 
@@ -612,7 +614,7 @@ cheriabi_jail(struct thread *td, struct cheriabi_jail_args *uap)
 		struct jail_c j;
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
 
-		error = copyincap_c(uap->jailp, &j, sizeof(j));
+		error = copyincap(uap->jailp, &j, sizeof(j));
 		if (error != 0)
 			return (error);
 		return (kern_jail(td, j.path, j.hostname, j.jailname,
@@ -649,7 +651,7 @@ cheriabi_updateiov(const struct uio * uiop, struct iovec_c * __capability iovp)
 	int i, error;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
-		error = copyout_c( &uiop->uio_iov[i].iov_len, &iovp[i].iov_len,
+		error = copyout( &uiop->uio_iov[i].iov_len, &iovp[i].iov_len,
 		    sizeof(uiop->uio_iov[i].iov_len));
 		if (error != 0)
 			return (error);
@@ -683,7 +685,7 @@ cheriabi_sigreturn(struct thread *td, struct cheriabi_sigreturn_args *uap)
 	ucontext_c_t uc;
 	int error;
 
-	error = copyincap_c(uap->sigcntxp, &uc, sizeof(uc));
+	error = copyincap(uap->sigcntxp, &uc, sizeof(uc));
 	if (error != 0)
 		return (error);
 
@@ -712,7 +714,7 @@ cheriabi_getcontext(struct thread *td, struct cheriabi_getcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	return (copyoutcap_c(&uc, uap->ucp, UCC_COPY_SIZE));
+	return (copyoutcap(&uc, uap->ucp, UCC_COPY_SIZE));
 }
 
 int
@@ -723,7 +725,7 @@ cheriabi_setcontext(struct thread *td, struct cheriabi_setcontext_args *uap)
 
 	if (uap->ucp == NULL)
 		return (EINVAL);
-	if ((ret = copyincap_c(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyincap(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = cheriabi_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -747,9 +749,9 @@ cheriabi_swapcontext(struct thread *td, struct cheriabi_swapcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	if ((ret = copyoutcap_c(&uc, uap->oucp, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyoutcap(&uc, uap->oucp, UCC_COPY_SIZE)) != 0)
 		return (ret);
-	if ((ret = copyincap_c(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyincap(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = cheriabi_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -890,8 +892,12 @@ cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd)
 	do {								\
 		void * __capability _tmpcap;				\
 		_tmpcap = cheri_capability_build_user_rwx((perms),	\
-		    (base), (length), (offset));		\
-		copyoutcap_c(&_tmpcap, uaddr, sizeof(_tmpcap));		\
+		    (base), (length), (offset));			\
+		KASSERT(cheri_gettag(_tmpcap), ("Created invalid cap"	\
+		    "from base=%zx, offset=%#zx, length=%#zx, "		\
+		    "perms=%#zx", (size_t)(base), (size_t)(offset),	\
+		    (size_t)(length), (size_t)(perms)));		\
+		copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));		\
 	} while(0)
 
 register_t *
@@ -943,7 +949,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 		destp -= szsigcode;
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
-		copyout_c(imgp->proc->p_sysent->sv_sigcode, destp, szsigcode);
+		copyout(imgp->proc->p_sysent->sv_sigcode, destp, szsigcode);
 	}
 
 	/*
@@ -952,7 +958,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	if (execpath_len != 0) {
 		destp -= execpath_len;
 		imgp->execpathp = (__cheri_addr unsigned long)destp;
-		copyout_c(imgp->execpath, destp, execpath_len);
+		copyout(imgp->execpath, destp, execpath_len);
 	}
 
 	/*
@@ -961,7 +967,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 	imgp->canary = (__cheri_addr unsigned long)destp;
-	copyout_c(canary, destp, sizeof(canary));
+	copyout(canary, destp, sizeof(canary));
 	imgp->canarylen = sizeof(canary);
 
 	/*
@@ -970,7 +976,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	destp -= szps;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
 	imgp->pagesizes = (__cheri_addr unsigned long)destp;
-	copyout_c(pagesizes, destp, szps);
+	copyout(pagesizes, destp, szps);
 	imgp->pagesizeslen = szps;
 
 	destp -= ARG_MAX - imgp->args->stringspace;
@@ -1000,14 +1006,14 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	copyout_c(stringp, destp, ARG_MAX - imgp->args->stringspace);
+	copyout(stringp, destp, ARG_MAX - imgp->args->stringspace);
 
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	sucap(&arginfo->ps_argvstr, cheri_getaddress(vectp), 0,
 	    argc * sizeof(void * __capability), CHERI_CAP_USER_DATA_PERMS);
-	suword32_c(&arginfo->ps_nargvstr, argc);
+	suword32(&arginfo->ps_nargvstr, argc);
 
 	/*
 	 * Fill in argument portion of vector table.
@@ -1023,12 +1029,12 @@ cheriabi_copyout_strings(struct image_params *imgp)
 
 	/* a null vector table pointer separates the argp's from the envp's */
 	/* XXX: suword clears the tag */
-	suword_c(vectp++, 0);
+	suword(vectp++, 0);
 
 	sucap(&arginfo->ps_envstr, cheri_getaddress(vectp), 0,
 	    arginfo->ps_nenvstr * sizeof(void * __capability),
 	    CHERI_CAP_USER_DATA_PERMS);
-	suword32_c(&arginfo->ps_nenvstr, envc);
+	suword32(&arginfo->ps_nenvstr, envc);
 
 	/*
 	 * Fill in environment portion of vector table.
@@ -1044,15 +1050,15 @@ cheriabi_copyout_strings(struct image_params *imgp)
 
 	/* end of vector table is a null pointer */
 	/* XXX: suword clears the tag */
-	suword_c(vectp++, 0);
+	suword(vectp++, 0);
 
 	return ((register_t *)stack_base);
 }
 
 #define	AUXARGS_ENTRY_NOCAP(pos, id, val)				\
-	{suword_c(pos++, id); suword_c(pos++, val);}
+	{suword(pos++, id); suword(pos++, val);}
 #define	AUXARGS_ENTRY_CAP(pos, id, base, offset, len, perm) do {	\
-		suword_c(pos++, id);					\
+		suword(pos++, id);					\
 		sucap(pos++, base, offset, len, perm);			\
 	} while(0)
 
@@ -1062,39 +1068,46 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 	unsigned long prog_base, prog_len;
+	unsigned long rtld_base, rtld_len;
 
+	/* printf("%s: start=%#lx, end=%#lx, base=%#lx, interp_end=%#lx\n", __func__,
+		imgp->start_addr, imgp->end_addr, args->base, imgp->interp_end); */
 	prog_base = rounddown2(imgp->start_addr,
 	    1ULL << CHERI_ALIGN_SHIFT(imgp->start_addr));
 	prog_len = roundup2(imgp->end_addr - prog_base,
 	    1ULL << CHERI_ALIGN_SHIFT(imgp->end_addr - prog_base));
 
+
+	if (imgp->interp_end) {
+		rtld_base = rounddown2(args->base,
+		    1ULL << CHERI_ALIGN_SHIFT(args->base));
+		rtld_len = roundup2(imgp->interp_end - rtld_base,
+		    1ULL << CHERI_ALIGN_SHIFT(imgp->interp_end - rtld_base));
+	} else {
+		rtld_base = 0;
+		rtld_len = CHERI_CAP_USER_CODE_LENGTH;
+	}
+
 	if (args->execfd != -1)
 		AUXARGS_ENTRY_NOCAP(pos, AT_EXECFD, args->execfd);
 	CTASSERT(CHERI_CAP_USER_CODE_BASE == 0);
-	AUXARGS_ENTRY_CAP(pos, AT_PHDR, prog_base,
-	    args->phdr - prog_base, prog_len,
-	    CHERI_CAP_USER_DATA_PERMS);
+	/*
+	 * AT_ENTRY gives an executable cap for the whole program and
+	 * AT_PHDR a writable one. RTLD is reposible for seting bounds.
+	 */
+	AUXARGS_ENTRY_CAP(pos, AT_PHDR, prog_base, args->phdr - prog_base,
+	    prog_len, CHERI_CAP_USER_DATA_PERMS);
 	AUXARGS_ENTRY_NOCAP(pos, AT_PHENT, args->phent);
 	AUXARGS_ENTRY_NOCAP(pos, AT_PHNUM, args->phnum);
 	AUXARGS_ENTRY_NOCAP(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY_NOCAP(pos, AT_FLAGS, args->flags);
-	/*
-	 * XXX-BD: the should be bounded to the mapping, but for now
-	 * they aren't as struct image_params doesn't contain the
-	 * mapping and we're not ensuring a representable capability.
-	 */
-	AUXARGS_ENTRY_CAP(pos, AT_ENTRY, CHERI_CAP_USER_CODE_BASE, args->entry,
-	    CHERI_CAP_USER_CODE_LENGTH, CHERI_CAP_USER_CODE_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_ENTRY, prog_base, args->entry - prog_base,
+	    prog_len, CHERI_CAP_USER_CODE_PERMS);
 	/*
 	 * XXX-BD: grant code and data perms to allow textrel fixups.
-	 * XXXAR: This currently spans the full address space and is not correct
-	 * for the main binary since args->base seems to contain the rtld addr.
-	 * rtld-cheri-elf fixes this up to be only the main binary.
-	 *
 	 */
-	AUXARGS_ENTRY_CAP(pos, AT_BASE, 0, args->base,
-	    CHERI_CAP_USER_DATA_LENGTH,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, args->base - rtld_base,
+	    rtld_len, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 #ifdef AT_EHDRFLAGS
 	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);
 #endif
@@ -1195,14 +1208,14 @@ cheriabi_kbounce(struct thread *td, struct cheriabi_kbounce_args *uap)
 		return (EINVAL);
 
 	bounce = malloc(len, M_TEMP, M_WAITOK | M_ZERO);
-	error = copyin_c(src, bounce, len);
+	error = copyin(src, bounce, len);
 	if (error != 0) {
-		printf("%s: error in copyin_c %d\n", __func__, error);
+		printf("%s: error in copyin %d\n", __func__, error);
 		goto error;
 	}
-	error = copyout_c(bounce, dst, len);
+	error = copyout(bounce, dst, len);
 	if (error != 0)
-		printf("%s: error in copyout_c %d\n", __func__, error);
+		printf("%s: error in copyout %d\n", __func__, error);
 error:
 	free(bounce, M_TEMP);
 	return (error);
@@ -1437,7 +1450,7 @@ cheriabi_kldload(struct thread *td, struct cheriabi_kldload_args *uap)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(uap->file, pathname, MAXPATHLEN, NULL);
+	error = copyinstr(uap->file, pathname, MAXPATHLEN, NULL);
 	if (error != 0)
 		goto error;
 	error = kern_kldload(td, pathname, &fileid);
@@ -1462,7 +1475,7 @@ cheriabi_kldstat(struct thread *td, struct cheriabi_kldstat_args *uap)
         struct kld_file_stat_c stat_c;
         int error, version;
 
-        error = copyin_c(&uap->stat->version, &version, sizeof(version));
+        error = copyin(&uap->stat->version, &version, sizeof(version));
 	if (error != 0)
                 return (error);
         if (version != sizeof(struct kld_file_stat_c))
@@ -1478,7 +1491,7 @@ cheriabi_kldstat(struct thread *td, struct cheriabi_kldstat_args *uap)
 	stat_c.address = (void * __capability)(intcap_t)stat.address;
         CP(stat, stat_c, size);
         bcopy(&stat.pathname[0], &stat_c.pathname[0], sizeof(stat.pathname));
-        return (copyout_c(&stat_c, uap->stat, version));
+        return (copyout(&stat_c, uap->stat, version));
 }
 
 int
@@ -1488,21 +1501,21 @@ cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
 	char *symstr;
 	int error;
 
-	error = copyincap_c(uap->data, &lookup, sizeof(lookup));
+	error = copyincap(uap->data, &lookup, sizeof(lookup));
 	if (error != 0)
 		return (error);
 	if (lookup.version != sizeof(lookup) ||
 	    uap->cmd != KLDSYM_LOOKUP)
 		return (EINVAL);
 	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(lookup.symname, symstr, MAXPATHLEN, NULL);
+	error = copyinstr(lookup.symname, symstr, MAXPATHLEN, NULL);
 	if (error != 0)
 		goto done;
 	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,
 	    &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
 		goto done;
-	error = copyoutcap_c(&lookup, uap->data, sizeof(lookup));
+	error = copyoutcap(&lookup, uap->data, sizeof(lookup));
 
 done:
 	free(symstr, M_TEMP);
@@ -1547,7 +1560,7 @@ cheriabi_uuidgen(struct thread *td, struct cheriabi_uuidgen_args *uap)
 	count = uap->count;
 	store = malloc(count * sizeof(struct uuid), M_TEMP, M_WAITOK);
 	kern_uuidgen(store, count);
-	error = copyout_c(store, uap->store, count * sizeof(struct uuid));
+	error = copyout(store, uap->store, count * sizeof(struct uuid));
 	free(store, M_TEMP);
 	return (error);
 }
@@ -1597,7 +1610,7 @@ cheriabi_setgroups(struct thread *td, struct cheriabi_setgroups_args *uap)
 		/* XXX: CTSRD-CHERI/clang#179 */
 		groups = &smallgroups[0];
 
-	error = copyin_c(uap->gidset, groups, gidsetsize * sizeof(gid_t));
+	error = copyin(uap->gidset, groups, gidsetsize * sizeof(gid_t));
 	if (error == 0)
 		error = kern_setgroups(td, gidsetsize, groups);
 
@@ -1727,7 +1740,7 @@ cheriabi_setrlimit(struct thread *td, struct cheriabi_setrlimit_args *uap)
 	struct rlimit alim;
 	int error;
 
-	error = copyin_c(uap->rlp, &alim, sizeof(struct rlimit));
+	error = copyin(uap->rlp, &alim, sizeof(struct rlimit));
 	if (error != 0)
 		return (error);
 	return (kern_setrlimit(td, uap->which, &alim));
@@ -1742,7 +1755,7 @@ cheriabi_getrlimit(struct thread *td, struct cheriabi_getrlimit_args *uap)
 	if (uap->which >= RLIM_NLIMITS)
 		return (EINVAL);
 	lim_rlimit(td, uap->which, &rlim);
-	error = copyout_c(&rlim, uap->rlp, sizeof(struct rlimit));
+	error = copyout(&rlim, uap->rlp, sizeof(struct rlimit));
 	return (error);
 }
 
@@ -1754,7 +1767,7 @@ cheriabi_getrusage(struct thread *td, struct cheriabi_getrusage_args *uap)
 
 	error = kern_getrusage(td, uap->who, &ru);
 	if (error == 0)
-		error = copyout_c(&ru, uap->rusage, sizeof(struct rusage));
+		error = copyout(&ru, uap->rusage, sizeof(struct rusage));
 	return (error);
 }
 
@@ -1785,7 +1798,7 @@ cheriabi_thr_create_initthr(struct thread *td, void *thunk)
 	struct thr_create_initthr_args_c *args;
 
 	args = thunk;
-	if (args->tid != NULL && suword_c(args->tid, td->td_tid) != 0)
+	if (args->tid != NULL && suword(args->tid, td->td_tid) != 0)
 		return (EFAULT);
 
 	return (cheriabi_set_mcontext(td, &args->ctx.uc_mcontext));
@@ -1797,7 +1810,7 @@ cheriabi_thr_create(struct thread *td, struct cheriabi_thr_create_args *uap)
 	struct thr_create_initthr_args_c args;
 	int error;
 
-	if ((error = copyincap_c(uap->ctx, &args.ctx, sizeof(args.ctx))))
+	if ((error = copyincap(uap->ctx, &args.ctx, sizeof(args.ctx))))
 		return (error);
 	args.tid = uap->id;
 	return (thread_create(td, NULL, cheriabi_thr_create_initthr, &args));
@@ -1809,9 +1822,9 @@ cheriabi_thr_new_initthr(struct thread *td, void *thunk)
 	struct thr_param_c *param = thunk;
 
 	if ((param->child_tid != NULL &&
-	    suword_c(param->child_tid, td->td_tid)) ||
+	    suword(param->child_tid, td->td_tid)) ||
 	    (param->parent_tid != NULL &&
-	    suword_c(param->parent_tid, td->td_tid)))
+	    suword(param->parent_tid, td->td_tid)))
 		return (EFAULT);
 	cheriabi_set_threadregs(td, param);
 	return (cheriabi_set_user_tls(td, param->tls_base));
@@ -1822,7 +1835,7 @@ cheriabi_thr_self(struct thread *td, struct cheriabi_thr_self_args *uap)
 {
 	int error;
 
-	error = suword_c(uap->id, td->td_tid);
+	error = suword(uap->id, td->td_tid);
 	if (error == -1)
 		return (EFAULT);
 	return (0);
@@ -1836,7 +1849,7 @@ cheriabi_thr_exit(struct thread *td, struct cheriabi_thr_exit_args *uap)
 
 	/* Signal userland that it can free the stack. */
 	if (uap->state != NULL) {
-		suword_c(uap->state, 1);
+		suword(uap->state, 1);
 		kern_umtx_wake(td, uap->state, INT_MAX, 0);
 	}
 
@@ -1877,7 +1890,7 @@ cheriabi_thr_new(struct thread *td, struct cheriabi_thr_new_args *uap)
 	if (uap->param_size != sizeof(struct thr_param_c))
 		return (EINVAL);
 
-	error = copyincap_c(uap->param, &param_c, uap->param_size);
+	error = copyincap(uap->param, &param_c, uap->param_size);
 	if (error != 0)
 		return (error);
 
@@ -1889,7 +1902,7 @@ cheriabi_thr_new(struct thread *td, struct cheriabi_thr_new_args *uap)
 	 */
 	cheriabi_thr_new_md(td, &param_c);
 	if (param_c.rtp != NULL) {
-		error = copyin_c(param_c.rtp, &rtp, sizeof(struct rtprio));
+		error = copyin(param_c.rtp, &rtp, sizeof(struct rtprio));
 		if (error)
 			return (error);
 		rtpp = &rtp;
@@ -2188,23 +2201,23 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 
 	/* Several set operations just move data through the kernel */
 	case PT_SETREGS:
-		error = copyin_c(uap->addr, &r.reg, sizeof r.reg);
+		error = copyin(uap->addr, &r.reg, sizeof r.reg);
 		break;
 	case PT_SETFPREGS:
-		error = copyin_c(uap->addr, &r.fpreg, sizeof r.fpreg);
+		error = copyin(uap->addr, &r.fpreg, sizeof r.fpreg);
 		break;
 	case PT_SETDBREGS:
-		error = copyin_c(uap->addr, &r.dbreg, sizeof r.dbreg);
+		error = copyin(uap->addr, &r.dbreg, sizeof r.dbreg);
 		break;
 	case PT_SET_EVENT_MASK:
 		if (uap->data != sizeof(r.ptevents))
 			error = EINVAL;
 		else
-			error = copyin_c(uap->addr, &r.ptevents, uap->data);
+			error = copyin(uap->addr, &r.ptevents, uap->data);
 		break;
 
 	case PT_VM_ENTRY:
-		error = copyincap_c(uap->addr, (char *)&r.pve, sizeof r.pve);
+		error = copyincap(uap->addr, (char *)&r.pve, sizeof r.pve);
 		if (error)
 			break;
 
@@ -2260,7 +2273,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 #endif
 	case PT_GET_EVENT_MASK:
 		/* NB: The size in uap->data is validated in kern_ptrace(). */
-		error = copyout_c(&r.ptevents, uap->addr, uap->data);
+		error = copyout(&r.ptevents, uap->addr, uap->data);
 		break;
 	case PT_LWPINFO:
 		memset(&c.pl, 0, sizeof(c.pl));
@@ -2276,7 +2289,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		siginfo_native_to_siginfo(&r.pl.pl_siginfo,
 		    (_siginfo_t *)&c.pl.pl_siginfo);
 
-		error = copyout_c(&c.pl, uap->addr, uap->data);
+		error = copyout(&c.pl, uap->addr, uap->data);
 		break;
 #if 0
 	case PT_GET_SC_ARGS:

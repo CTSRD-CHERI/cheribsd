@@ -266,7 +266,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #ifdef CPU_CHERI
 	cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
 	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs, cfp);
-	if (copyoutcap_c(cfp,
+	if (copyoutcap(cfp,
 	    __USER_CAP((void *)(uintptr_t)sf.sf_uc.uc_mcontext.mc_cp2state,
 	    cp2_len), cp2_len) != 0) {
 		free(cfp, M_TEMP);
@@ -527,7 +527,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 			return (EINVAL);
 		}
 		cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
-		error = copyincap_c(__USER_CAP((void *)mcp->mc_cp2state,
+		error = copyincap(__USER_CAP((void *)mcp->mc_cp2state,
 		    mcp->mc_cp2state_len), cfp, sizeof(*cfp));
 		if (error) {
 			free(cfp, M_TEMP);

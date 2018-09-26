@@ -34,6 +34,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <err.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -421,10 +422,8 @@ i_cpustates(int *states)
     int value;
     const char * const *names;
     const char *thisname;
+    int *hstates = states;
     int cpu;
-
-    /* copy over values into "last" array */
-    memcpy(lcpustates, states, num_cpustates * sizeof(int) * num_cpus);
 
 for (cpu = 0; cpu < num_cpus; cpu++) {
     names = cpustate_names;
@@ -456,6 +455,9 @@ for (cpu = 0; cpu < num_cpus; cpu++) {
     }
 }
 
+    /* copy over values into "last" array */
+    states = hstates;
+    memcpy(lcpustates, states, num_cpustates * sizeof(int) * num_cpus);
 }
 
 void
@@ -464,6 +466,7 @@ u_cpustates(int *states)
     int value;
     const char * const *names;
     const char *thisname;
+    int *hstates = states;
     int *lp;
     int *colp;
     int cpu;
@@ -506,6 +509,8 @@ for (cpu = 0; cpu < num_cpus; cpu++) {
 	colp++;
     }
 }
+
+    states = hstates;
 }
 
 void
@@ -1348,9 +1353,7 @@ setup_buffer(char *buffer, int addlen)
 	}
 
 	if (NULL == b) {
-		fprintf(stderr, "%s: can't allocate sufficient memory\n",
-				myname);
-		exit(4);
+		errx(4, "can't allocate sufficient memory");
 	}
 
 	return b;

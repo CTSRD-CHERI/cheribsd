@@ -56,12 +56,16 @@
  *      c4      relocabase capability
  */
 LEAF(rtld_start)
+#ifdef __CHERI_CAPABILITY_TABLE__
 	/*
 	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
 	 * first place.
 	 */
 	cgetnull	$c5
 	csetdefault	$c5
+#else
+#pragma message("Not clearing $ddc since it is required for the legacy ABI")
+#endif
 	/*
 	 * XXX: Assume the kernel aligned the stack correctly.
 	 */

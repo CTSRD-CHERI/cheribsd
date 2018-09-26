@@ -43,6 +43,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/systm.h>
@@ -807,8 +809,8 @@ ktrstruct(const char *name, const void *data, size_t datalen)
 }
 
 void
-ktrstructarray(const char *name, enum uio_seg seg, const void *data,
-    int num_items, size_t struct_size)
+ktrstructarray(const char *name, enum uio_seg seg,
+    const void * __capability data, int num_items, size_t struct_size)
 {
 	struct ktr_request *req;
 	struct ktr_struct_array *ksa;
@@ -837,7 +839,8 @@ ktrstructarray(const char *name, enum uio_seg seg, const void *data,
 	buf = malloc(buflen, M_KTRACE, M_WAITOK);
 	strcpy(buf, name);
 	if (seg == UIO_SYSSPACE)
-		bcopy(data, buf + namelen, datalen);
+		bcopy((__cheri_fromcap const void *)data, buf + namelen,
+		    datalen);
 	else {
 		if (copyin(data, buf + namelen, datalen) != 0) {
 			free(buf, M_KTRACE);
@@ -1191,7 +1194,7 @@ kern_utrace(struct thread *td, const void * __capability addr, size_t len)
 	if (len > KTR_USER_MAXLEN)
 		return (EINVAL);
 	cp = malloc(len, M_KTRACE, M_WAITOK);
-	error = copyin_c(addr, cp, len);
+	error = copyin(addr, cp, len);
 	if (error) {
 		free(cp, M_KTRACE);
 		return (error);

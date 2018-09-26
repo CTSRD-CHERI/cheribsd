@@ -1374,8 +1374,7 @@ kern_sigtimedwait(struct thread *td, sigset_t waitset, ksiginfo_t *ksi,
 		if (timeout->tv_nsec >= 0 && timeout->tv_nsec < 1000000000) {
 			timevalid = 1;
 			getnanouptime(&rts);
-			ets = rts;
-			timespecadd(&ets, timeout);
+			timespecadd(&rts, timeout, &ets);
 		}
 	}
 	ksiginfo_init(ksi);
@@ -1415,8 +1414,7 @@ kern_sigtimedwait(struct thread *td, sigset_t waitset, ksiginfo_t *ksi,
 				error = EAGAIN;
 				break;
 			}
-			ts = ets;
-			timespecsub(&ts, &rts);
+			timespecsub(&ets, &rts, &ts);
 			TIMESPEC_TO_TIMEVAL(&tv, &ts);
 			timo = tvtohz(&tv);
 		} else {
@@ -3045,7 +3043,16 @@ issignal(struct thread *td)
 				printf("Process (pid %lu) got signal %d\n",
 					(u_long)p->p_pid, sig);
 #endif
-				goto ignore;		/* == ignore */
+				/*
+				 * Deliver signals that would cause a sandbox
+				 * unwind (fatal signals) to init to avoid an
+				 * inifinite loop on boot if we miscompile init.
+				 */
+				if (p->p_pid == 1 && (prop & SIGPROP_SBUNWIND) != 0)
+					printf("Delivering fatal signal %d to "
+					   "system process %s\n", sig, p->p_comm);
+				else
+					goto ignore;		/* == ignore */
 			}
 			/*
 			 * If there is a pending stop signal to process with
@@ -3217,6 +3224,23 @@ postsig(int sig)
 	return (1);
 }
 
+void
+proc_wkilled(struct proc *p)
+{
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	if ((p->p_flag & P_WKILLED) == 0) {
+		p->p_flag |= P_WKILLED;
+		/*
+		 * Notify swapper that there is a process to swap in.
+		 * The notification is racy, at worst it would take 10
+		 * seconds for the swapper process to notice.
+		 */
+		if ((p->p_flag & (P_INMEM | P_SWAPPINGIN)) == 0)
+			wakeup(&proc0);
+	}
+}
+
 /*
  * Kill the current process for stated reason.
  */
@@ -3229,7 +3253,7 @@ killproc(struct proc *p, char *why)
 	    p->p_comm);
 	log(LOG_ERR, "pid %d (%s), uid %d, was killed: %s\n", p->p_pid,
 	    p->p_comm, p->p_ucred ? p->p_ucred->cr_uid : -1, why);
-	p->p_flag |= P_WKILLED;
+	proc_wkilled(p);
 	kern_psignal(p, SIGKILL);
 }
 

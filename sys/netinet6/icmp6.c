@@ -124,8 +124,8 @@ VNET_PCPUSTAT_SYSUNINIT(icmp6stat);
 VNET_DECLARE(struct inpcbinfo, ripcbinfo);
 VNET_DECLARE(struct inpcbhead, ripcb);
 VNET_DECLARE(int, icmp6errppslim);
-static VNET_DEFINE(int, icmp6errpps_count) = 0;
-static VNET_DEFINE(struct timeval, icmp6errppslim_last);
+VNET_DEFINE_STATIC(int, icmp6errpps_count) = 0;
+VNET_DEFINE_STATIC(struct timeval, icmp6errppslim_last);
 VNET_DECLARE(int, icmp6_nodeinfo);
 
 #define	V_ripcbinfo			VNET(ripcbinfo)
@@ -1936,6 +1936,10 @@ icmp6_rip6_input(struct mbuf **mp, int off)
 		   !IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &ip6->ip6_src))
 			continue;
 		INP_RLOCK(in6p);
+		if (__predict_false(in6p->inp_flags2 & INP_FREED)) {
+			INP_RUNLOCK(in6p);
+			continue;
+		}
 		if (ICMP6_FILTER_WILLBLOCK(icmp6->icmp6_type,
 		    in6p->in6p_icmp6filt)) {
 			INP_RUNLOCK(in6p);

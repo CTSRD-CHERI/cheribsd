@@ -47,7 +47,7 @@ _blacklistd-helper+=	blacklistd-helper
 SUBDIR+=	bootpd
 .endif
 
-.if ${MK_CHERI} != "no"
+.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
 _cheri_bench_helper=	cheri_bench-helper
 _cheritest_helper=	cheritest-helper
 _libpng_sb_helper=	libpng_sb-helper
@@ -84,7 +84,7 @@ _pppoed=	pppoed
 _tftp-proxy=	tftp-proxy
 .endif
 
-.if !defined(NO_PIC) && !defined(NO_RTLD)
+.if !defined(NO_PIC) && !defined(NO_RTLD) && !${MACHINE_ARCH:Mmips*c*}
 _rtld-elf=	rtld-elf
 .endif
 
