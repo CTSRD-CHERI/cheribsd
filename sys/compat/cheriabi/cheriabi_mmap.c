@@ -134,6 +134,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 	void * __capability addr_cap;
 	register_t perms, reqperms;
 	vm_offset_t reqaddr;
+	struct mmap_req mr;
 
 	if (flags & MAP_32BIT) {
 		SYSERRCAUSE("MAP_32BIT not supported in CheriABI");
@@ -278,8 +279,16 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 
 	}
 
-	return (kern_mmap(td, reqaddr, cap_base + cap_len, uap->len,
-	    uap->prot, flags, uap->fd, uap->pos));
+	memset(&mr, 0, sizeof(mr));
+	mr.mr_hint = reqaddr;
+	mr.mr_max_addr = cap_base + cap_len;
+	mr.mr_size = uap->len;
+	mr.mr_prot = uap->prot;
+	mr.mr_flags = flags;
+	mr.mr_fd = uap->fd;
+	mr.mr_pos = uap->pos;
+
+	return (kern_mmap_req(td, &mr));
 }
 
 int

@@ -198,25 +198,48 @@ int
 sys_mmap(struct thread *td, struct mmap_args *uap)
 {
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, 0, uap->len,
-	    uap->prot, uap->flags, uap->fd, uap->pos));
+	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len, uap->prot,
+	    uap->flags, uap->fd, uap->pos));
 }
 
 int
-kern_mmap(struct thread *td, uintptr_t addr0, uintptr_t max_addr0,
-    size_t size, int prot, int flags, int fd, off_t pos)
+kern_mmap(struct thread *td, uintptr_t addr0, size_t size, int prot,
+    int flags, int fd, off_t pos)
+{
+	struct mmap_req	mr = {
+		.mr_hint = addr0,
+		.mr_size = size,
+		.mr_prot = prot,
+		.mr_flags = flags,
+		.mr_fd = fd,
+		.mr_pos = pos
+	};
+
+	return (kern_mmap_req(td, &mr));
+}
+
+int
+kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 {
 	struct vmspace *vms;
 	struct file *fp;
+	off_t pos;
 	vm_offset_t addr_mask = PAGE_MASK;
-	vm_size_t pageoff;
+	vm_size_t pageoff, size;
 	vm_offset_t addr, max_addr;
 	vm_prot_t cap_maxprot;
-	int align, error, max_prot;
+	int align, error, fd, flags, max_prot, prot;
 	cap_rights_t rights;
 
-	max_prot = EXTRACT_PROT_MAX(prot);
-	prot = EXTRACT_PROT(prot);
+	addr = mrp->mr_hint;
+	max_addr = mrp->mr_max_addr;
+	size = mrp->mr_size;
+	max_prot = EXTRACT_PROT_MAX(mrp->mr_prot);
+	prot = EXTRACT_PROT(mrp->mr_prot);
+	flags = mrp->mr_flags;
+	fd = mrp->mr_fd;
+	pos = mrp->mr_pos;
+
 	if ((prot & max_prot) != prot) {
 #ifdef KTRACE
 		if (KTRPOINT(td, KTR_SYSERRCAUSE))
@@ -232,8 +255,6 @@ kern_mmap(struct thread *td, uintptr_t addr0, uintptr_t max_addr0,
 	vms = td->td_proc->p_vmspace;
 	fp = NULL;
 	AUDIT_ARG_FD(fd);
-	addr = addr0;
-	max_addr = max_addr0;
 
 	/*
 	 * Ignore old flags that used to be defined but did not do anything.
