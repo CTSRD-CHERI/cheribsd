@@ -38,8 +38,10 @@ __FBSDID("$FreeBSD$");
 LEAF(cocall)
 	PIC_PROLOGUE(cocall)
 
-	ccall	$c3, $c4, 1
 	cgetpcc $c11
+	cincoffset $c11, $c11, 12
+	ccall	$c3, $c4, 1
+	nop
 	bnez	v0, 1f
 	nop
 	PIC_RETURN()
