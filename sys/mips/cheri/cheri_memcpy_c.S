@@ -46,7 +46,7 @@
 
 /*
  * Implement CHERI memcpy() and bcopy() variants in assembly; C works fine in
- * the kernel most of the time, but copyincap_c() and copyoutcap_c() require
+ * the kernel most of the time, but copyincap() and copyoutcap() require
  * that no callee-save registers be trampled over due to fault-based error
  * handling.
  *

@@ -239,11 +239,15 @@ static int mlx5_enable_msix(struct mlx5_core_dev *dev)
 	struct mlx5_priv *priv = &dev->priv;
 	struct mlx5_eq_table *table = &priv->eq_table;
 	int num_eqs = 1 << MLX5_CAP_GEN(dev, log_max_eq);
-	int nvec;
+	int limit = dev->msix_eqvec;
+	int nvec = MLX5_EQ_VEC_COMP_BASE;
 	int i;
 
-	nvec = MLX5_CAP_GEN(dev, num_ports) * num_online_cpus() +
-	       MLX5_EQ_VEC_COMP_BASE;
+	if (limit > 0)
+		nvec += limit;
+	else
+		nvec += MLX5_CAP_GEN(dev, num_ports) * num_online_cpus();
+
 	nvec = min_t(int, nvec, num_eqs);
 	if (nvec <= MLX5_EQ_VEC_COMP_BASE)
 		return -ENOMEM;
@@ -846,10 +850,7 @@ static int mlx5_pci_init(struct mlx5_core_dev *dev, struct mlx5_priv *priv)
 		goto err_clr_master;
 	}
 
-	if (mlx5_vsc_find_cap(dev))
-		dev_err(&pdev->dev, "Unable to find vendor specific capabilities\n");
-
-        return 0;
+	return 0;
 
 err_clr_master:
 	pci_clear_master(dev->pdev);
@@ -873,7 +874,9 @@ static int mlx5_init_once(struct mlx5_core_dev *dev, struct mlx5_priv *priv)
 	struct pci_dev *pdev = dev->pdev;
 	int err;
 
-	mlx5_vsec_init(dev);
+	err = mlx5_vsc_find_cap(dev);
+	if (err)
+		dev_err(&pdev->dev, "Unable to find vendor specific capabilities\n");
 
 	err = mlx5_query_hca_caps(dev);
 	if (err) {
@@ -905,7 +908,22 @@ static int mlx5_init_once(struct mlx5_core_dev *dev, struct mlx5_priv *priv)
 	mlx5_init_srq_table(dev);
 	mlx5_init_mr_table(dev);
 
+#ifdef RATELIMIT
+	err = mlx5_init_rl_table(dev);
+	if (err) {
+		dev_err(&pdev->dev, "Failed to init rate limiting\n");
+		goto err_tables_cleanup;
+	}
+#endif
 	return 0;
+
+#ifdef RATELIMIT
+err_tables_cleanup:
+	mlx5_cleanup_mr_table(dev);
+	mlx5_cleanup_srq_table(dev);
+	mlx5_cleanup_qp_table(dev);
+	mlx5_cleanup_cq_table(dev);
+#endif
 
 err_eq_cleanup:
 	mlx5_eq_cleanup(dev);
@@ -916,6 +934,9 @@ out:
 
 static void mlx5_cleanup_once(struct mlx5_core_dev *dev)
 {
+#ifdef RATELIMIT
+	mlx5_cleanup_rl_table(dev);
+#endif
 	mlx5_cleanup_mr_table(dev);
 	mlx5_cleanup_srq_table(dev);
 	mlx5_cleanup_qp_table(dev);
@@ -1056,8 +1077,6 @@ static int mlx5_load_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 		goto err_fs;
 	}
 
-	mlx5_fwdump_prep(dev);
-
 	clear_bit(MLX5_INTERFACE_STATE_DOWN, &dev->intf_state);
 	set_bit(MLX5_INTERFACE_STATE_UP, &dev->intf_state);
 
@@ -1127,7 +1146,6 @@ static int mlx5_unload_one(struct mlx5_core_dev *dev, struct mlx5_priv *priv,
 		goto out;
 	}
 
-	mlx5_fwdump_clean(dev);
 	mlx5_unregister_device(dev);
 
 	mlx5_cleanup_fs(dev);
@@ -1179,12 +1197,12 @@ struct mlx5_core_event_handler {
 		      void *data);
 };
 
-
 static int init_one(struct pci_dev *pdev,
 		    const struct pci_device_id *id)
 {
 	struct mlx5_core_dev *dev;
 	struct mlx5_priv *priv;
+	device_t bsddev = pdev->dev.bsddev;
 	int err;
 
 	dev = kzalloc(sizeof(*dev), GFP_KERNEL);
@@ -1199,6 +1217,12 @@ static int init_one(struct pci_dev *pdev,
 	dev->profile = &profiles[prof_sel];
 	dev->pdev = pdev;
 	dev->event = mlx5_core_event;
+
+	sysctl_ctx_init(&dev->sysctl_ctx);
+	SYSCTL_ADD_INT(&dev->sysctl_ctx,
+	    SYSCTL_CHILDREN(device_get_sysctl_tree(bsddev)),
+	    OID_AUTO, "msix_eqvec", CTLFLAG_RDTUN, &dev->msix_eqvec, 0,
+	    "Maximum number of MSIX event queue vectors, if set");
 
 	INIT_LIST_HEAD(&priv->ctx_list);
 	spin_lock_init(&priv->ctx_lock);
@@ -1224,6 +1248,8 @@ static int init_one(struct pci_dev *pdev,
 		goto clean_health;
 	}
 
+	mlx5_fwdump_prep(dev);
+
 	pci_save_state(pdev->dev.bsddev);
 	return 0;
 
@@ -1233,6 +1259,7 @@ clean_health:
 close_pci:
         mlx5_pci_close(dev, priv);
 clean_dev:
+	sysctl_ctx_free(&dev->sysctl_ctx);
 	kfree(dev);
 	return err;
 }
@@ -1248,10 +1275,12 @@ static void remove_one(struct pci_dev *pdev)
 		return;
 	}
 
+	mlx5_fwdump_clean(dev);
 	mlx5_pagealloc_cleanup(dev);
 	mlx5_health_cleanup(dev);
 	mlx5_pci_close(dev, priv);
 	pci_set_drvdata(pdev, NULL);
+	sysctl_ctx_free(&dev->sysctl_ctx);
 	kfree(dev);
 }
 
@@ -1264,6 +1293,7 @@ static pci_ers_result_t mlx5_pci_err_detected(struct pci_dev *pdev,
 	dev_info(&pdev->dev, "%s was called\n", __func__);
 	mlx5_enter_error_state(dev, false);
 	mlx5_unload_one(dev, priv, false);
+
 	if (state) {
 		mlx5_drain_health_wq(dev);
 		mlx5_pci_disable_device(dev);

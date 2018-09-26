@@ -56,12 +56,16 @@
  *      c4      relocabase capability
  */
 LEAF(rtld_start)
+#ifdef __CHERI_CAPABILITY_TABLE__
 	/*
 	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
 	 * first place.
 	 */
 	cgetnull	$c5
 	csetdefault	$c5
+#else
+#pragma message("Not clearing $ddc since it is required for the legacy ABI")
+#endif
 	/*
 	 * XXX: Assume the kernel aligned the stack correctly.
 	 */
@@ -118,6 +122,9 @@ LEAF(rtld_start)
 	cjr		$c12
 	nop
 END(rtld_start)
+
+/* TODO: implement lazy binding */
+#if 0
 
 #define	XCALLFRAME_CAPSIZ	(9*CHERICAP_SIZE)
 #define	XCALLFRAME_SIZ		(12*SZREG + XCALLFRAME_CAPSIZ)
@@ -215,3 +222,5 @@ _rtld_bind_start:
 	cjr	$c12
 	cincoffset $c11, $c11, sp
 END(_rtld_bind_start)
+
+#endif

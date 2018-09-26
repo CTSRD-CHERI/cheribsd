@@ -163,6 +163,7 @@ $PROBE /this->fi_mount != 0/ /* probe ID $(( $ID + $MAX_DEPTH + 4 )) */
 	this->path = strjoin(this->path, strjoin(this->name =
 		(this->d_name != 0 ? this->d_name : ""),
 		this->name != "" ? "/" : ""));
+}
 EOF
 ACTIONS=$( cat <&9 )
 ID=$(( $ID + $MAX_DEPTH + 5 ))
@@ -173,6 +174,7 @@ EVENT_TEST="this->fi_mount != 0"
 
 ############################################################ EVENT DETAILS
 
+if [ ! "$CUSTOM_DETAILS" ]; then
 exec 9<<EOF
 	/*
 	 * Print full path
@@ -180,6 +182,7 @@ exec 9<<EOF
 	printf("%s", this->path);
 EOF
 EVENT_DETAILS=$( cat <&9 )
+fi
 
 ################################################################################
 # END

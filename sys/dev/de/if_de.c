@@ -3053,7 +3053,7 @@ tulip_addr_filter(tulip_softc_t * const sc)
     else
 	bcopy(sc->tulip_enaddr, eaddr, ETHER_ADDR_LEN);
 
-    TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+    CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 
 	    if (ifma->ifma_addr->sa_family == AF_LINK)
 		multicnt++;
@@ -3080,7 +3080,7 @@ tulip_addr_filter(tulip_softc_t * const sc)
 	 */
 	bzero(sc->tulip_setupdata, sizeof(sc->tulip_setupdata));
 
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
@@ -3112,7 +3112,7 @@ tulip_addr_filter(tulip_softc_t * const sc)
 	    /*
 	     * Else can get perfect filtering for 16 addresses.
 	     */
-	    TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	    CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		    if (ifma->ifma_addr->sa_family != AF_LINK)
 			    continue;
 		    addrp = LLADDR((struct sockaddr_dl *)ifma->ifma_addr);
@@ -4266,19 +4266,6 @@ tulip_ifioctl(struct ifnet * ifp, u_long cmd, caddr_t data)
 	    break;
 	}
 
-#ifdef SIOCGADDRROM
-	case CASE_IOC_IFREQ(SIOCGADDRROM): {
-	    error = copyout(sc->tulip_rombuf, ifr_data_get_ptr(ifr),
-		sizeof(sc->tulip_rombuf));
-	    break;
-	}
-#endif
-#ifdef SIOCGCHIPID
-	case CASE_IOC_IFREQ(SIOCGCHIPID): {
-	    ifr->ifr_metric = (int) sc->tulip_chipid;
-	    break;
-	}
-#endif
 	default: {
 	    error = ether_ioctl(ifp, cmd, data);
 	    break;

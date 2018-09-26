@@ -51,6 +51,11 @@
 		stdout-path = &uart1;
 	};
 
+	/* Will be filled by the bootloader */
+	memory@90000000 {
+		reg = <0x90000000 0>;
+	};
+
 	aliases {
 		mdio-gpio0 = &mdio_gpio;
 		rtc0 = &ds1341;
@@ -202,8 +207,6 @@
 
 		switch@0 {
 			compatible = "marvell,mv88e6085";
-			#address-cells = <1>;
-			#size-cells = <0>;
 			reg = <0>;
 			dsa,member = <0 0>;
 
@@ -242,7 +245,7 @@
 
 	sound {
 		compatible = "simple-audio-card";
-		simple-audio-card,name = "RDU1 audio";
+		simple-audio-card,name = "Front";
 		simple-audio-card,format = "i2s";
 		simple-audio-card,bitclock-master = <&sound_codec>;
 		simple-audio-card,frame-master = <&sound_codec>;
@@ -251,7 +254,7 @@
 		simple-audio-card,routing =
 			"Headphone Jack", "HPLEFT",
 			"Headphone Jack", "HPRIGHT";
-		simple-audio-card,aux-devs = <&tpa6130a2>;
+		simple-audio-card,aux-devs = <&hpa1>;
 
 		sound_cpu: simple-audio-card,cpu {
 			sound-dai = <&ssi2>;
@@ -271,6 +274,7 @@
 		clock-names = "main_clk";
 		reset-gpios = <&gpio4 8 GPIO_ACTIVE_LOW>;
 		vcc-supply = <&vusb_reg>;
+		#phy-cells = <0>;
 	};
 
 	usbh2phy: usbphy2 {
@@ -281,6 +285,7 @@
 		clock-names = "main_clk";
 		reset-gpios = <&gpio4 7 GPIO_ACTIVE_LOW>;
 		vcc-supply = <&vusb_reg>;
+		#phy-cells = <0>;
 	};
 };
 
@@ -428,13 +433,13 @@
 			#size-cells = <0>;
 			led-control = <0x0 0x0 0x3f83f8 0x0>;
 
-			sysled0 {
+			sysled0@3 {
 				reg = <3>;
 				label = "system:green:status";
 				linux,default-trigger = "default-on";
 			};
 
-			sysled1 {
+			sysled1@4 {
 				reg = <4>;
 				label = "system:green:act";
 				linux,default-trigger = "heartbeat";
@@ -455,7 +460,10 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_esdhc1>;
 	bus-width = <4>;
+	no-1-8-v;
 	non-removable;
+	no-sdio;
+	no-sd;
 	status = "okay";
 };
 
@@ -479,7 +487,7 @@
 		reg = <0x50>;
 	};
 
-	tpa6130a2: amp@60 {
+	hpa1: amp@60 {
 		compatible = "ti,tpa6130a2";
 		reg = <0x60>;
 		pinctrl-names = "default";
@@ -516,7 +524,7 @@
 	};
 
 	touchscreen@20 {
-		compatible = "syna,rmi4_i2c";
+		compatible = "syna,rmi4-i2c";
 		reg = <0x20>;
 		pinctrl-names = "default";
 		pinctrl-0 = <&pinctrl_ts>;
@@ -534,8 +542,8 @@
 
 		rmi4-f11@11 {
 			reg = <0x11>;
-			touch-inverted-y;
-			touch-swapped-x-y;
+			touchscreen-inverted-y;
+			touchscreen-swapped-x-y;
 			syna,sensor-type = <1>;
 		};
 	};
@@ -566,6 +574,15 @@
 	pinctrl-names = "default";
 	pinctrl-0 = <&pinctrl_uart3>;
 	status = "okay";
+
+	rave-sp {
+		compatible = "zii,rave-sp-rdu1";
+		current-speed = <38400>;
+
+		watchdog {
+			compatible = "zii,rave-sp-watchdog";
+		};
+	};
 };
 
 &usbh1 {
@@ -575,6 +592,7 @@
 	phy_type = "ulpi";
 	fsl,usbphy = <&usbh1phy>;
 	disable-over-current;
+	maximum-speed = "full-speed";
 	vbus-supply = <&reg_5p0v_main>;
 	status = "okay";
 };
@@ -752,7 +770,7 @@
 
 	pinctrl_ts: tsgrp {
 		fsl,pins = <
-			MX51_PAD_CSI1_D8__GPIO3_12		0x85
+			MX51_PAD_CSI1_D8__GPIO3_12		0x04
 			MX51_PAD_CSI1_D9__GPIO3_13		0x85
 		>;
 	};

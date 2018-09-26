@@ -34,8 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
@@ -351,7 +349,6 @@ proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 	kiovec_t iov;
 	struct uio uio;
 	ssize_t slen;
-	int error;
 
 	MPASS(len < SSIZE_MAX);
 	slen = (ssize_t)len;
@@ -364,7 +361,7 @@ proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
 	uio.uio_segflg = UIO_SYSSPACE;
 	uio.uio_rw = rw;
 	uio.uio_td = td;
-	error = proc_rwmem(p, &uio);
+	proc_rwmem(p, &uio);
 	if (uio.uio_resid == slen)
 		return (-1);
 	return (slen - uio.uio_resid);
@@ -539,6 +536,7 @@ static void
 ptrace_lwpinfo_to32(const struct ptrace_lwpinfo *pl,
     struct ptrace_lwpinfo32 *pl32)
 {
+	_siginfo_t si_n;
 
 	bzero(pl32, sizeof(*pl32));
 	pl32->pl_lwpid = pl->pl_lwpid;
@@ -546,7 +544,18 @@ ptrace_lwpinfo_to32(const struct ptrace_lwpinfo *pl,
 	pl32->pl_flags = pl->pl_flags;
 	pl32->pl_sigmask = pl->pl_sigmask;
 	pl32->pl_siglist = pl->pl_siglist;
-	siginfo_to_siginfo32(&pl->pl_siginfo, &pl32->pl_siginfo);
+	/* XXXBD: ptrace should be using capability aware structs by default. */
+	si_n.si_signo = pl->pl_siginfo.si_signo;
+	si_n.si_errno = pl->pl_siginfo.si_errno;
+	si_n.si_code = pl->pl_siginfo.si_code;
+	si_n.si_pid = pl->pl_siginfo.si_pid;
+	si_n.si_uid = pl->pl_siginfo.si_uid;
+	si_n.si_status = pl->pl_siginfo.si_status;
+	si_n.si_addr = pl->pl_siginfo.si_addr;
+	si_n.si_value.sival_ptr_native =
+	    pl->pl_siginfo.si_value.sival_ptr_native;
+	memcpy(&si_n._reason, &pl->pl_siginfo._reason, sizeof(si_n._reason));
+	siginfo_to_siginfo32(&si_n, &pl32->pl_siginfo);
 	strcpy(pl32->pl_tdname, pl->pl_tdname);
 	pl32->pl_child_pid = pl->pl_child_pid;
 	pl32->pl_syscall_code = pl->pl_syscall_code;
@@ -761,6 +770,7 @@ void
 proc_set_traced(struct proc *p, bool stop)
 {
 
+	sx_assert(&proctree_lock, SX_XLOCKED);
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	p->p_flag |= P_TRACED;
 	if (stop)
@@ -1247,7 +1257,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		 * queue cannot accommodate any new signals.
 		 */
 		if (data == SIGKILL)
-			p->p_flag |= P_WKILLED;
+			proc_wkilled(p);
 
 		/*
 		 * Unsuspend all threads.  To leave a thread
@@ -1265,8 +1275,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		td2->td_dbgflags |= TDB_USERWR;
 		PROC_UNLOCK(p);
 		error = 0;
-		if (proc_writemem(td, p, (off_t)(uintptr_t)addr, &data,
-		    sizeof(int)) != sizeof(int))
+		if (proc_writemem(td, p, (off_t)(__cheri_addr uintptr_t)addr,
+		    &data, sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_WRITE: pid %d: %p <= %#x",
@@ -1278,8 +1288,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	case PT_READ_D:
 		PROC_UNLOCK(p);
 		error = tmp = 0;
-		if (proc_readmem(td, p, (off_t)(uintptr_t)addr, &tmp,
-		    sizeof(int)) != sizeof(int))
+		if (proc_readmem(td, p, (off_t)(__cheri_addr uintptr_t)addr,
+		    &tmp, sizeof(int)) != sizeof(int))
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_READ: pid %d: %p >= %#x",

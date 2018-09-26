@@ -39,7 +39,6 @@ __FBSDID("$FreeBSD$");
  * HID spec: http://www.usb.org/developers/devclass_docs/HID1_11.pdf
  */
 
-#include "opt_compat.h"
 #include "opt_kbd.h"
 #include "opt_ukbd.h"
 #include "opt_evdev.h"
@@ -366,8 +365,10 @@ static device_detach_t ukbd_detach;
 static device_resume_t ukbd_resume;
 
 #ifdef EVDEV_SUPPORT
+static evdev_event_t ukbd_ev_event;
+
 static const struct evdev_methods ukbd_evdev_methods = {
-	.ev_event = evdev_ev_kbd_event,
+	.ev_event = ukbd_ev_event,
 };
 #endif
 
@@ -386,10 +387,22 @@ ukbd_any_key_pressed(struct ukbd_softc *sc)
 static void
 ukbd_start_timer(struct ukbd_softc *sc)
 {
-	sbintime_t delay, prec;
+	sbintime_t delay, now, prec;
 
+	now = sbinuptime();
+
+	/* check if initial delay passed and fallback to key repeat delay */
+	if (sc->sc_delay == 0)
+		sc->sc_delay = sc->sc_kbd.kb_delay2;
+
+	/* compute timeout */
 	delay = SBT_1MS * sc->sc_delay;
 	sc->sc_co_basetime += delay;
+
+	/* check if we are running behind */
+	if (sc->sc_co_basetime < now)
+		sc->sc_co_basetime = now;
+
 	/* This is rarely called, so prefer precision to efficiency. */
 	prec = qmin(delay >> 7, SBT_1MS * 10);
 	usb_callout_reset_sbt(&sc->sc_callout, sc->sc_co_basetime, prec,
@@ -510,7 +523,6 @@ ukbd_get_key(struct ukbd_softc *sc, uint8_t wait)
 static void
 ukbd_interrupt(struct ukbd_softc *sc)
 {
-	struct timeval ctv;
 	uint32_t n_mod;
 	uint32_t o_mod;
 	uint32_t now = sc->sc_time_ms;
@@ -580,14 +592,11 @@ rfound:	;
 				break;
 			}
 		}
-		if (j < UKBD_NKEYCODE) {
-			/* Old key repeating. */
-			sc->sc_delay = sc->sc_kbd.kb_delay2;
-		} else {
-			/* New key. */
-			microuptime(&ctv);
-			sc->sc_co_basetime = tvtosbt(ctv);
+		if (j == UKBD_NKEYCODE) {
+			/* New key - set initial delay and [re]start timer */
+			sc->sc_co_basetime = sbinuptime();
 			sc->sc_delay = sc->sc_kbd.kb_delay1;
+			ukbd_start_timer(sc);
 		}
 		ukbd_put_key(sc, key | KEY_PRESS);
 
@@ -837,10 +846,6 @@ ukbd_intr_callback(struct usb_xfer *xfer, usb_error_t error)
 		}
 
 		ukbd_interrupt(sc);
-
-		if (ukbd_any_key_pressed(sc) != 0) {
-			ukbd_start_timer(sc);
-		}
 
 	case USB_ST_SETUP:
 tr_setup:
@@ -1468,6 +1473,22 @@ ukbd_resume(device_t dev)
 
 	return (0);
 }
+
+#ifdef EVDEV_SUPPORT
+static void
+ukbd_ev_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
+    int32_t value)
+{
+	keyboard_t *kbd = evdev_get_softc(evdev);
+
+	if (evdev_rcpt_mask & EVDEV_RCPT_HW_KBD &&
+	    (type == EV_LED || type == EV_REP)) {
+		mtx_lock(&Giant);
+		kbd_ev_event(kbd, type, code, value);
+		mtx_unlock(&Giant);
+	}
+}
+#endif
 
 /* early keyboard probe, not supported */
 static int

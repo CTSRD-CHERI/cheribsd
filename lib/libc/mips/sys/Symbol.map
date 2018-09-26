@@ -21,11 +21,6 @@ FBSDprivate_1.0 {
 	__sys_getlogin;
 	_getlogin;
 	__sys_exit;
-	__sys_vfork;
-	_vfork;
-	_brk;
-	_sbrk;
-	_end;
 
 	/*
 	 * XXX-BD: Export .size.<var> symbols for <var>'s that are undefined

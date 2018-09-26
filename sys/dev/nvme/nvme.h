@@ -110,12 +110,8 @@
 
 /* Command field definitions */
 
-#define NVME_CMD_OPC_SHIFT				(0)
-#define NVME_CMD_OPC_MASK				(0xFF)
 #define NVME_CMD_FUSE_SHIFT				(8)
 #define NVME_CMD_FUSE_MASK				(0x3)
-
-#define NVME_CMD_SET_OPC(opc)				(htole16(((opc) & NVME_CMD_OPC_MASK) << NVME_CMD_OPC_SHIFT))
 
 #define NVME_STATUS_P_SHIFT				(0)
 #define NVME_STATUS_P_MASK				(0x1)
@@ -428,7 +424,8 @@ _Static_assert(sizeof(struct nvme_registers) == 0x1008, "bad size for nvme_regis
 struct nvme_command
 {
 	/* dword 0 */
-	uint16_t opc_fuse;	/* opcode, fused operation */
+	uint8_t opc;		/* opcode */
+	uint8_t fuse;		/* fused operation */
 	uint16_t cid;		/* command identifier */
 
 	/* dword 1 */
@@ -1091,6 +1088,12 @@ struct nvme_firmware_page {
 
 _Static_assert(sizeof(struct nvme_firmware_page) == 512, "bad size for nvme_firmware_page");
 
+struct nvme_ns_list {
+	uint32_t		ns[1024];
+} __packed __aligned(4);
+
+_Static_assert(sizeof(struct nvme_ns_list) == 4096, "bad size for nvme_ns_list");
+
 struct intel_log_temp_stats
 {
 	uint64_t	current;
@@ -1282,7 +1285,7 @@ static inline
 void	nvme_ns_flush_cmd(struct nvme_command *cmd, uint32_t nsid)
 {
 
-	cmd->opc_fuse = NVME_CMD_SET_OPC(NVME_OPC_FLUSH);
+	cmd->opc = NVME_OPC_FLUSH;
 	cmd->nsid = htole32(nsid);
 }
 
@@ -1290,7 +1293,7 @@ static inline
 void	nvme_ns_rw_cmd(struct nvme_command *cmd, uint32_t rwcmd, uint32_t nsid,
     uint64_t lba, uint32_t count)
 {
-	cmd->opc_fuse = NVME_CMD_SET_OPC(rwcmd);
+	cmd->opc = rwcmd;
 	cmd->nsid = htole32(nsid);
 	cmd->cdw10 = htole32(lba & 0xffffffffu);
 	cmd->cdw11 = htole32(lba >> 32);
@@ -1315,7 +1318,7 @@ static inline
 void	nvme_ns_trim_cmd(struct nvme_command *cmd, uint32_t nsid,
     uint32_t num_ranges)
 {
-	cmd->opc_fuse = NVME_CMD_SET_OPC(NVME_OPC_DATASET_MANAGEMENT);
+	cmd->opc = NVME_OPC_DATASET_MANAGEMENT;
 	cmd->nsid = htole32(nsid);
 	cmd->cdw10 = htole32(num_ranges - 1);
 	cmd->cdw11 = htole32(NVME_DSM_ATTR_DEALLOCATE);
@@ -1467,6 +1470,15 @@ void	nvme_firmware_page_swapbytes(struct nvme_firmware_page *s)
 
 	for (i = 0; i < 7; i++)
 		s->revision[i] = le64toh(s->revision[i]);
+}
+
+static inline
+void	nvme_ns_list_swapbytes(struct nvme_ns_list *s)
+{
+	int i;
+
+	for (i = 0; i < 1024; i++)
+		s->ns[i] = le32toh(s->ns[i]);
 }
 
 static inline

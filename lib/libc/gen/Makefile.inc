@@ -4,10 +4,12 @@
 # machine-independent gen sources
 .PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/gen ${LIBC_SRCTOP}/gen
 
-.ifdef LIBCHERI
+.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
 CFLAGS+=	-DNO_COMPAT7
 CFLAGS.getpwent.c=	-mxgot
 .endif
+
+CONFS=	shells
 
 SRCS+=	__getosreldate.c \
 	__pthread_mutex_init_calloc_cb_stub.c \
@@ -19,6 +21,8 @@ SRCS+=	__getosreldate.c \
 	_thread_init.c \
 	alarm.c \
 	arc4random.c \
+	arc4random-compat.c \
+	arc4random_uniform.c \
 	assert.c \
 	auxv.c \
 	basename.c \
@@ -46,6 +50,7 @@ SRCS+=	__getosreldate.c \
 	errlst.c \
 	errno.c \
 	exec.c \
+	exect.c \
 	fdevname.c \
 	feature_present.c \
 	fmtcheck.c \
@@ -137,6 +142,7 @@ SRCS+=	__getosreldate.c \
 	termios.c \
 	time.c \
 	times.c \
+	timespec_get.c \
 	timezone.c \
 	tls.c \
 	tls_malloc.c \
@@ -154,7 +160,8 @@ SRCS+=	__getosreldate.c \
 	waitpid.c \
 	waitid.c \
 	wordexp.c
-.if ${MK_SYMVER} == yes && !defined(LIBCHERI)
+.if ${MK_SYMVER} == yes && \
+    ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
 SRCS+=	devname-compat11.c \
 	fts-compat.c \
 	fts-compat11.c \
@@ -166,6 +173,8 @@ SRCS+=	devname-compat11.c \
 	scandir-compat11.c \
 	unvis-compat.c
 .endif
+
+CFLAGS.arc4random.c= -I${SRCTOP}/sys -I${SRCTOP}/sys/crypto/chacha20
 
 .PATH: ${SRCTOP}/contrib/libc-pwcache
 SRCS+=	pwcache.c pwcache.h
@@ -302,6 +311,7 @@ MAN+=	alarm.3 \
 	tcsetsid.3 \
 	time.3 \
 	times.3 \
+	timespec_get.3 \
 	timezone.3 \
 	ttyname.3 \
 	tzset.3 \
@@ -316,9 +326,7 @@ MAN+=	alarm.3 \
 	vis.3 \
 	wordexp.3
 
-MLINKS+=arc4random.3 arc4random_addrandom.3 \
-	arc4random.3 arc4random_stir.3 \
-	arc4random.3 arc4random_buf.3 \
+MLINKS+=arc4random.3 arc4random_buf.3 \
 	arc4random.3 arc4random_uniform.3
 MLINKS+=ctermid.3 ctermid_r.3
 MLINKS+=devname.3 devname_r.3

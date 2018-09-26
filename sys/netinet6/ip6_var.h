@@ -66,6 +66,8 @@
 #ifndef _NETINET6_IP6_VAR_H_
 #define _NETINET6_IP6_VAR_H_
 
+#include <sys/epoch.h>
+
 /*
  * IP6 reassembly queue structure.  Each fragment
  * being reassembled is attached to one of these structures.
@@ -121,6 +123,7 @@ struct ip6_moptions {
 	u_short	im6o_max_memberships;	/* max memberships this socket */
 	struct	in6_multi **im6o_membership;	/* group memberships */
 	struct	in6_mfilter *im6o_mfilters;	/* source filters */
+	struct	epoch_context imo6_epoch_ctx;
 };
 
 /*
@@ -298,8 +301,10 @@ VNET_DECLARE(struct socket *, ip6_mrouter);	/* multicast routing daemon */
 VNET_DECLARE(int, ip6_sendredirects);	/* send IP redirects when forwarding? */
 VNET_DECLARE(int, ip6_maxfragpackets);	/* Maximum packets in reassembly
 					 * queue */
-VNET_DECLARE(int, ip6_maxfrags);	/* Maximum fragments in reassembly
+extern int ip6_maxfrags;		/* Maximum fragments in reassembly
 					 * queue */
+VNET_DECLARE(int, ip6_maxfragbucketsize); /* Maximum reassembly queues per bucket */
+VNET_DECLARE(int, ip6_maxfragsperpacket); /* Maximum fragments per packet */
 VNET_DECLARE(int, ip6_accept_rtadv);	/* Acts as a host not a router */
 VNET_DECLARE(int, ip6_no_radr);		/* No defroute from RA */
 VNET_DECLARE(int, ip6_norbit_raif);	/* Disable R-bit in NA on RA
@@ -314,7 +319,8 @@ VNET_DECLARE(int, ip6_dad_count);	/* DupAddrDetectionTransmits */
 #define	V_ip6_mrouter			VNET(ip6_mrouter)
 #define	V_ip6_sendredirects		VNET(ip6_sendredirects)
 #define	V_ip6_maxfragpackets		VNET(ip6_maxfragpackets)
-#define	V_ip6_maxfrags			VNET(ip6_maxfrags)
+#define	V_ip6_maxfragbucketsize		VNET(ip6_maxfragbucketsize)
+#define	V_ip6_maxfragsperpacket		VNET(ip6_maxfragsperpacket)
 #define	V_ip6_accept_rtadv		VNET(ip6_accept_rtadv)
 #define	V_ip6_no_radr			VNET(ip6_no_radr)
 #define	V_ip6_norbit_raif		VNET(ip6_norbit_raif)
@@ -401,6 +407,7 @@ int	ip6_fragment(struct ifnet *, struct mbuf *, int, u_char, int,
 
 int	route6_input(struct mbuf **, int *, int);
 
+void	frag6_set_bucketsize(void);
 void	frag6_init(void);
 int	frag6_input(struct mbuf **, int *, int);
 void	frag6_slowtimo(void);

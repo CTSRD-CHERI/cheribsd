@@ -626,11 +626,17 @@ enum {
 	DDP_BUF1_INVALIDATED
 };
 
-void
-handle_ddp_tcb_rpl(struct toepcb *toep, const struct cpl_set_tcb_rpl *cpl)
+CTASSERT(DDP_BUF0_INVALIDATED == CPL_COOKIE_DDP0);
+
+static int
+do_ddp_tcb_rpl(struct sge_iq *iq, const struct rss_header *rss, struct mbuf *m)
 {
+	struct adapter *sc = iq->adapter;
+	const struct cpl_set_tcb_rpl *cpl = (const void *)(rss + 1);
+	unsigned int tid = GET_TID(cpl);
 	unsigned int db_idx;
-	struct inpcb *inp = toep->inp;
+	struct toepcb *toep;
+	struct inpcb *inp;
 	struct ddp_buffer *db;
 	struct kaiocb *job;
 	long copied;
@@ -638,6 +644,8 @@ handle_ddp_tcb_rpl(struct toepcb *toep, const struct cpl_set_tcb_rpl *cpl)
 	if (cpl->status != CPL_ERR_NONE)
 		panic("XXX: tcp_rpl failed: %d", cpl->status);
 
+	toep = lookup_tid(sc, tid);
+	inp = toep->inp;
 	switch (cpl->cookie) {
 	case V_WORD(W_TCB_RX_DDP_FLAGS) | V_COOKIE(DDP_BUF0_INVALIDATED):
 	case V_WORD(W_TCB_RX_DDP_FLAGS) | V_COOKIE(DDP_BUF1_INVALIDATED):
@@ -645,6 +653,7 @@ handle_ddp_tcb_rpl(struct toepcb *toep, const struct cpl_set_tcb_rpl *cpl)
 		 * XXX: This duplicates a lot of code with handle_ddp_data().
 		 */
 		db_idx = G_COOKIE(cpl->cookie) - DDP_BUF0_INVALIDATED;
+		MPASS(db_idx < nitems(toep->ddp.db));
 		INP_WLOCK(inp);
 		DDP_LOCK(toep);
 		db = &toep->ddp.db[db_idx];
@@ -689,6 +698,8 @@ handle_ddp_tcb_rpl(struct toepcb *toep, const struct cpl_set_tcb_rpl *cpl)
 		panic("XXX: unknown tcb_rpl offset %#x, cookie %#x",
 		    G_WORD(cpl->cookie), G_COOKIE(cpl->cookie));
 	}
+
+	return (0);
 }
 
 void
@@ -811,14 +822,13 @@ enable_ddp(struct adapter *sc, struct toepcb *toep)
 
 	DDP_ASSERT_LOCKED(toep);
 	toep->ddp.flags |= DDP_SC_REQ;
-	t4_set_tcb_field(sc, toep->ctrlq, toep->tid, W_TCB_RX_DDP_FLAGS,
+	t4_set_tcb_field(sc, toep->ctrlq, toep, W_TCB_RX_DDP_FLAGS,
 	    V_TF_DDP_OFF(1) | V_TF_DDP_INDICATE_OUT(1) |
 	    V_TF_DDP_BUF0_INDICATE(1) | V_TF_DDP_BUF1_INDICATE(1) |
 	    V_TF_DDP_BUF0_VALID(1) | V_TF_DDP_BUF1_VALID(1),
-	    V_TF_DDP_BUF0_INDICATE(1) | V_TF_DDP_BUF1_INDICATE(1), 0, 0,
-	    toep->ofld_rxq->iq.abs_id);
-	t4_set_tcb_field(sc, toep->ctrlq, toep->tid, W_TCB_T_FLAGS,
-	    V_TF_RCV_COALESCE_ENABLE(1), 0, 0, 0, toep->ofld_rxq->iq.abs_id);
+	    V_TF_DDP_BUF0_INDICATE(1) | V_TF_DDP_BUF1_INDICATE(1), 0, 0);
+	t4_set_tcb_field(sc, toep->ctrlq, toep, W_TCB_T_FLAGS,
+	    V_TF_RCV_COALESCE_ENABLE(1), 0, 0, 0);
 }
 
 static int
@@ -1867,10 +1877,9 @@ t4_aio_cancel_active(struct kaiocb *job)
 			 */
 			valid_flag = i == 0 ? V_TF_DDP_BUF0_VALID(1) :
 			    V_TF_DDP_BUF1_VALID(1);
-			t4_set_tcb_field(sc, toep->ctrlq, toep->tid,
+			t4_set_tcb_field(sc, toep->ctrlq, toep,
 			    W_TCB_RX_DDP_FLAGS, valid_flag, 0, 1,
-			    i + DDP_BUF0_INVALIDATED,
-			    toep->ofld_rxq->iq.abs_id);
+			    i + DDP_BUF0_INVALIDATED);
 			toep->ddp.db[i].cancel_pending = 1;
 			CTR2(KTR_CXGBE, "%s: request %p marked pending",
 			    __func__, job);
@@ -1942,6 +1951,10 @@ void
 t4_ddp_mod_load(void)
 {
 
+	t4_register_shared_cpl_handler(CPL_SET_TCB_RPL, do_ddp_tcb_rpl,
+	    CPL_COOKIE_DDP0);
+	t4_register_shared_cpl_handler(CPL_SET_TCB_RPL, do_ddp_tcb_rpl,
+	    CPL_COOKIE_DDP1);
 	t4_register_cpl_handler(CPL_RX_DATA_DDP, do_rx_data_ddp);
 	t4_register_cpl_handler(CPL_RX_DDP_COMPLETE, do_rx_ddp_complete);
 	TAILQ_INIT(&ddp_orphan_pagesets);
@@ -1956,6 +1969,8 @@ t4_ddp_mod_unload(void)
 	taskqueue_drain(taskqueue_thread, &ddp_orphan_task);
 	MPASS(TAILQ_EMPTY(&ddp_orphan_pagesets));
 	mtx_destroy(&ddp_orphan_pagesets_lock);
+	t4_register_shared_cpl_handler(CPL_SET_TCB_RPL, NULL, CPL_COOKIE_DDP0);
+	t4_register_shared_cpl_handler(CPL_SET_TCB_RPL, NULL, CPL_COOKIE_DDP1);
 	t4_register_cpl_handler(CPL_RX_DATA_DDP, NULL);
 	t4_register_cpl_handler(CPL_RX_DDP_COMPLETE, NULL);
 }

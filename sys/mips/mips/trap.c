@@ -44,7 +44,6 @@
 __FBSDID("$FreeBSD$");
 #define TRAP_DEBUG 1
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 
@@ -322,7 +321,7 @@ struct trapdebug trapdebug[TRAPSIZE], *trp = trapdebug;
 #endif
 
 #define	KERNLAND(x)	((vm_offset_t)(x) >= VM_MIN_KERNEL_ADDRESS && (vm_offset_t)(x) < VM_MAX_KERNEL_ADDRESS)
-#define	DELAYBRANCH(x)	((int)(x) < 0)
+#define	DELAYBRANCH(x)	((x) & MIPS_CR_BR_DELAY)
 
 /*
  * MIPS load/store access type
@@ -453,7 +452,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    "faulting instruction from %p\n",  __func__, p->p_pid,
 		    (long)td->td_tid, p->p_comm,
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
-		    (void*)(vaddr_t)(bad_inst_ptr));
+		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
 	}
 	/* Should this be a kerncap instead instead of being indirected by $pcc? */
 	vaddr = frame->pc + offset_from_pc;
@@ -692,11 +691,16 @@ trap(struct trapframe *trapframe)
 	char *msg = NULL;
 	intptr_t addr = 0;
 	register_t pc;
-	int cop;
+	int cop, error;
 	register_t *frame_regs;
 
 	trapdebug_enter(trapframe, 0);
-	
+#ifdef KDB
+	if (kdb_active) {
+		kdb_reenter();
+		return (0);
+	}
+#endif
 	type = (trapframe->cause & MIPS_CR_EXC_CODE) >> MIPS_CR_EXC_CODE_SHIFT;
 	if (TRAPF_USERMODE(trapframe)) {
 		type |= T_USER;
@@ -1052,25 +1056,37 @@ dofault:
 
 	case T_BREAK + T_USER:
 		{
-			/* get address of break instruction and fetch it */
-			addr = fetch_bad_instr(trapframe);
-#if 0
-			printf("trap: %s (%d) breakpoint %x at %x: (adr %x ins %x)\n",
-			    p->p_comm, p->p_pid, instr, trapframe->pc,
-			    p->p_md.md_ss_addr, p->p_md.md_ss_instr);	/* XXX */
-#endif
-			if (td->td_md.md_ss_addr != addr ||
-			    trapframe->badinstr.inst != MIPS_BREAK_SSTEP) {
-				i = SIGTRAP;
-				break;
-			}
-			/*
-			 * The restoration of the original instruction and
-			 * the clearing of the breakpoint will be done later
-			 * by the call to ptrace_clear_single_step() in
-			 * issignal() when SIGTRAP is processed.
-			 */
+			intptr_t va;
+			uint32_t instr;
+
 			i = SIGTRAP;
+			ucode = TRAP_BRKPT;
+			addr = trapframe->pc;
+
+			/* compute address of break instruction */
+			va = trapframe->pc;
+			if (DELAYBRANCH(trapframe->cause))
+				va += sizeof(int);
+
+			if (td->td_md.md_ss_addr != va)
+				break;
+
+			/* read break instruction */
+			instr = fuword32_c(__USER_CODE_CAP((void *)va));
+
+			if (instr != MIPS_BREAK_SSTEP)
+				break;
+
+			CTR3(KTR_PTRACE,
+			    "trap: tid %d, single step at %#lx: %#08x",
+			    td->td_tid, va, instr);
+			PROC_LOCK(p);
+			_PHOLD(p);
+			error = ptrace_clear_single_step(td);
+			_PRELE(p);
+			PROC_UNLOCK(p);
+			if (error == 0)
+				ucode = TRAP_TRACE;
 			break;
 		}
 
@@ -1085,6 +1101,7 @@ dofault:
 				va += sizeof(int);
 			printf("watch exception @ %p\n", (void *)va);
 			i = SIGTRAP;
+			ucode = TRAP_BRKPT;
 			addr = va;
 			break;
 		}
@@ -1093,7 +1110,6 @@ dofault:
 		{
 			struct trapframe *locr0 = td->td_frame;
 
-			/* get address of trap instruction and fetch it */
 			addr = fetch_bad_instr(trapframe);
 
 			if (DELAYBRANCH(trapframe->cause)) {	/* Check BD bit */
@@ -1369,8 +1385,10 @@ err:
 #endif
 
 #ifdef KDB
-		if (debugger_on_panic || kdb_active) {
+		if (debugger_on_panic) {
+			kdb_why = KDB_WHY_TRAP;
 			kdb_trap(type, 0, trapframe);
+			kdb_why = KDB_WHY_UNSET;
 		}
 #endif
 		panic("trap");

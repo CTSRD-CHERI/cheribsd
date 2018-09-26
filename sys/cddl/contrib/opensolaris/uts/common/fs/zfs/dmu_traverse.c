@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2012, 2016 by Delphix. All rights reserved.
+ * Copyright (c) 2012, 2018 by Delphix. All rights reserved.
  * Copyright (c) 2015 Chunwei Chen. All rights reserved.
  */
 
@@ -32,6 +32,7 @@
 #include <sys/dsl_pool.h>
 #include <sys/dnode.h>
 #include <sys/spa.h>
+#include <sys/spa_impl.h>
 #include <sys/zio.h>
 #include <sys/dmu_impl.h>
 #include <sys/sa.h>
@@ -87,8 +88,8 @@ traverse_zil_block(zilog_t *zilog, blkptr_t *bp, void *arg, uint64_t claim_txg)
 	if (BP_IS_HOLE(bp))
 		return (0);
 
-	if (claim_txg == 0 && bp->blk_birth >= spa_first_txg(td->td_spa))
-		return (0);
+	if (claim_txg == 0 && bp->blk_birth >= spa_min_claim_txg(td->td_spa))
+		return (-1);
 
 	SET_BOOKMARK(&zb, td->td_objset, ZB_ZIL_OBJECT, ZB_ZIL_LEVEL,
 	    bp->blk_cksum.zc_word[ZIL_ZC_SEQ]);
@@ -127,20 +128,17 @@ static void
 traverse_zil(traverse_data_t *td, zil_header_t *zh)
 {
 	uint64_t claim_txg = zh->zh_claim_txg;
-	zilog_t *zilog;
 
 	/*
 	 * We only want to visit blocks that have been claimed but not yet
-	 * replayed; plus, in read-only mode, blocks that are already stable.
+	 * replayed; plus blocks that are already stable in read-only mode.
 	 */
 	if (claim_txg == 0 && spa_writeable(td->td_spa))
 		return;
 
-	zilog = zil_alloc(spa_get_dsl(td->td_spa)->dp_meta_objset, zh);
-
+	zilog_t *zilog = zil_alloc(spa_get_dsl(td->td_spa)->dp_meta_objset, zh);
 	(void) zil_parse(zilog, traverse_zil_block, traverse_zil_record, td,
 	    claim_txg);
-
 	zil_free(zilog);
 }
 
@@ -336,13 +334,13 @@ traverse_visitbp(traverse_data_t *td, const dnode_phys_t *dnp,
 			goto post;
 		dnode_phys_t *child_dnp = buf->b_data;
 
-		for (i = 0; i < epb; i++) {
+		for (i = 0; i < epb; i += child_dnp[i].dn_extra_slots + 1) {
 			prefetch_dnode_metadata(td, &child_dnp[i],
 			    zb->zb_objset, zb->zb_blkid * epb + i);
 		}
 
 		/* recursively visitbp() blocks below this */
-		for (i = 0; i < epb; i++) {
+		for (i = 0; i < epb; i += child_dnp[i].dn_extra_slots + 1) {
 			err = traverse_dnode(td, &child_dnp[i],
 			    zb->zb_objset, zb->zb_blkid * epb + i);
 			if (err != 0)
@@ -444,7 +442,7 @@ prefetch_dnode_metadata(traverse_data_t *td, const dnode_phys_t *dnp,
 
 	if (dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR) {
 		SET_BOOKMARK(&czb, objset, object, 0, DMU_SPILL_BLKID);
-		traverse_prefetch_metadata(td, &dnp->dn_spill, &czb);
+		traverse_prefetch_metadata(td, DN_SPILL_BLKPTR(dnp), &czb);
 	}
 }
 
@@ -479,7 +477,7 @@ traverse_dnode(traverse_data_t *td, const dnode_phys_t *dnp,
 
 	if (err == 0 && (dnp->dn_flags & DNODE_FLAG_SPILL_BLKPTR)) {
 		SET_BOOKMARK(&czb, objset, object, 0, DMU_SPILL_BLKID);
-		err = traverse_visitbp(td, dnp, &dnp->dn_spill, &czb);
+		err = traverse_visitbp(td, dnp, DN_SPILL_BLKPTR(dnp), &czb);
 	}
 
 	if (err == 0 && (td->td_flags & TRAVERSE_POST)) {
@@ -501,8 +499,9 @@ traverse_prefetcher(spa_t *spa, zilog_t *zilog, const blkptr_t *bp,
     const zbookmark_phys_t *zb, const dnode_phys_t *dnp, void *arg)
 {
 	prefetch_data_t *pfd = arg;
-	arc_flags_t aflags = ARC_FLAG_NOWAIT | ARC_FLAG_PREFETCH;
-
+	arc_flags_t aflags = ARC_FLAG_NOWAIT | ARC_FLAG_PREFETCH |
+	    ARC_FLAG_PRESCIENT_PREFETCH;
+	
 	ASSERT(pfd->pd_bytes_fetched >= 0);
 	if (bp == NULL)
 		return (0);

@@ -71,8 +71,9 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_sysvipc.h"
+
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -383,7 +384,7 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 	AUDIT_ARG_SVIPC_ID(shmmap_s->shmid);
 	for (i = 0; i < shminfo.shmseg; i++, shmmap_s++) {
 		if (shmmap_s->shmid != -1 &&
-		    shmmap_s->va == (vm_offset_t)shmaddr) {
+		    shmmap_s->va == (__cheri_addr vm_offset_t)shmaddr) {
 			break;
 		}
 	}
@@ -484,26 +485,26 @@ kern_shmat_locked(struct thread *td, int shmid,
 #ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			if ((shmflg & SHM_RND) != 0)
-				attach_va = rounddown2((vm_offset_t)shmaddr,
+				attach_va = rounddown2((__cheri_addr vm_offset_t)shmaddr,
 				    CHERI_SHMLBA);
-			else if (((vm_offset_t)shmaddr & (SHMLBA-1)) == 0 &&
-			    ((vm_offset_t)shmaddr & CHERI_ALIGN_MASK(size))
+			else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0 &&
+			    ((__cheri_addr vm_offset_t)shmaddr & CHERI_ALIGN_MASK(size))
 			    == 0)
-				attach_va = (vm_offset_t)shmaddr;
+				attach_va = (__cheri_addr vm_offset_t)shmaddr;
 			else
 				return (EINVAL);
 		} else
 #endif
 		{
 			if ((shmflg & SHM_RND) != 0)
-				attach_va = rounddown2((vm_offset_t)shmaddr, SHMLBA);
-			else if (((vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
-				attach_va = (vm_offset_t)shmaddr;
+				attach_va = rounddown2((__cheri_addr vm_offset_t)shmaddr, SHMLBA);
+			else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
+				attach_va = (__cheri_addr vm_offset_t)shmaddr;
 			else
 				return (EINVAL);
 		}
 		shmaddr = (const char * __capability)shmaddr -
-		    ((vm_offset_t)shmaddr - attach_va);
+		    ((__cheri_addr vm_offset_t)shmaddr - attach_va);
 		/*
 		 * Check that shmaddr (as adjusted for SHM_RND) has
 		 * enough space for a mapping.  For CheriABI this means
@@ -791,7 +792,7 @@ user_shmctl(struct thread *td, int shmid, int cmd,
 
 	/* IPC_SET needs to copyin the buffer before calling kern_shmctl */
 	if (cmd == IPC_SET) {
-		if ((error = copyin_c(ubuf, &buf, sizeof(struct shmid_ds))))
+		if ((error = copyin(ubuf, &buf, sizeof(struct shmid_ds))))
 			goto done;
 	}
 
@@ -802,7 +803,7 @@ user_shmctl(struct thread *td, int shmid, int cmd,
 	/* Cases in which we need to copyout */
 	switch (cmd) {
 	case IPC_STAT:
-		error = copyout_c(&buf, ubuf, bufsz);
+		error = copyout(&buf, ubuf, bufsz);
 		break;
 	}
 
@@ -1672,6 +1673,7 @@ freebsd7_freebsd32_shmctl(struct thread *td,
 		break;
 	case SHM_STAT:
 	case IPC_STAT:
+		memset(&u32.shmid_ds32, 0, sizeof(u32.shmid_ds32));
 		freebsd32_ipcperm_old_out(&u.shmid_ds.shm_perm,
 		    &u32.shmid_ds32.shm_perm);
 		if (u.shmid_ds.shm_segsz > INT32_MAX)
@@ -1835,6 +1837,7 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 	/* Cases in which we need to copyout */
 	switch (uap->cmd) {
 	case IPC_STAT:
+		memset(&old, 0, sizeof(old));
 		ipcperm_new2old(&buf.shm_perm, &old.shm_perm);
 		if (buf.shm_segsz > INT_MAX)
 			old.shm_segsz = INT_MAX;

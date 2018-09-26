@@ -34,14 +34,20 @@
 #include <machine/atomic.h>
 #include <machine/tls.h>
 
-#include <assert.h>
+#ifdef IN_RTLD
+/* Don't pull this in when building libthr */
+#include "debug.h"
+#else
+#define dbg_assert(cond) assert(cond)
+#define dbg(...)
+#endif
 
 struct Struct_Obj_Entry;
 
 /* Return the address of the .dynamic section in the dynamic linker. */
 #define rtld_dynamic(obj) (&_DYNAMIC)
 
-Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
+static inline Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 		       const struct Struct_Obj_Entry *defobj,
 		       const struct Struct_Obj_Entry *obj,
 		       const Elf_Rel *rel);
@@ -54,10 +60,18 @@ Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 #define DATA_PTR_REMOVE_PERMS	(__CHERI_CAP_PERMISSION_PERMIT_SEAL__ |	\
 	__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__)
 
-static inline void*
+static inline const char*
+get_codesegment(const struct Struct_Obj_Entry *obj) {
+	/* TODO: we should have a separate member for .text/rodata */
+	dbg_assert(cheri_getperm(obj->text_rodata_cap) & __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__);
+	dbg_assert(!(cheri_getperm(obj->text_rodata_cap) & __CHERI_CAP_PERMISSION_PERMIT_STORE__));
+	return obj->text_rodata_cap;
+}
+
+static inline const void*
 make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 {
-	void* ret = defobj->relocbase + def->st_value;
+	const void* ret = get_codesegment(defobj) + def->st_value;
 
 	/* Remove store and seal permissions */
 	cheri_andperm(ret, ~FUNC_PTR_REMOVE_PERMS);
@@ -88,23 +102,30 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	return ret;
 }
 
-#define call_initfini_pointer(obj, target)				\
-	(((InitFunc)(target))())
-/*	(((InitFunc)(cheri_setoffset(cheri_getppcc(), (target))))()) */
+static inline const void*
+vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
+	const void* text = get_codesegment(obj);
+	dbg_assert(code_addr >= (vaddr_t)text);
+	dbg_assert(code_addr < (vaddr_t)text + cheri_getlen(text));
+	return cheri_copyaddress(text, cheri_fromint(code_addr));
+}
 
-/*
- * XXXAR: FIXME: this should not be using cheri_getppc()/obj->relocbase, we want
- * a obj->text_segment_only or similar
- */
-#define call_init_array_pointer(obj, target)				\
-	(((InitArrFunc)(cheri_setoffset(cheri_getpcc(), (target))))	\
+#define set_bounds_if_nonnull(ptr, size)	\
+	do { if (ptr) { ptr = cheri_csetbounds_sametype(ptr, size); } } while(0)
+
+// ignore _init/_fini
+#define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
+
+#define call_init_array_pointer(obj, target)			\
+	(((InitArrFunc)(vaddr_to_code_pointer(obj, (target))))	\
 	    (main_argc, main_argv, environ))
-#define call_fini_array_pointer(obj, target)				\
-	(((InitArrFunc)(cheri_setoffset(cheri_getpcc(), (target))))	\
+#define call_fini_array_pointer(obj, target)			\
+	(((InitArrFunc)(vaddr_to_code_pointer(obj, (target))))	\
 	    (main_argc, main_argv, environ))
 
-#define	call_ifunc_resolver(ptr) \
-	(((Elf_Addr (*)(void))ptr)())
+// Not implemented for CHERI:
+// #define	call_ifunc_resolver(ptr) \
+// 	(((Elf_Addr (*)(void))ptr)())
 
 typedef struct {
 	unsigned long ti_module;
@@ -118,6 +139,7 @@ typedef struct {
 #define calculate_tls_offset(prev_offset, prev_size, size, align) \
     round(prev_offset + prev_size, align)
 #define calculate_tls_end(off, size)    ((off) + (size))
+#define	calculate_tls_post_size(align)	0
 
 /*
  * Lazy binding entry point, called via PLT.
@@ -130,5 +152,70 @@ extern void *__tls_get_addr(tls_index *ti);
 #define	RTLD_DEFAULT_STACK_EXEC		PROT_EXEC
 
 #define md_abi_variant_hook(x)
+
+
+/* Add function not used by CHERI as inlines here so that the compiler can
+ * omit the call */
+
+static inline void init_pltgot(Obj_Entry *obj __unused) { /* Do nothing */ }
+
+static inline  int
+reloc_iresolve(Obj_Entry *obj __unused, struct Struct_RtldLockState *lockstate __unused)
+{
+	_rtld_error("%s: not implemented!", __func__);
+	return (0);
+}
+
+static inline  int
+reloc_gnu_ifunc(Obj_Entry *obj __unused, int flags __unused,
+    struct Struct_RtldLockState *lockstate __unused)
+{
+	_rtld_error("%s: not implemented!", __func__);
+	return (0);
+}
+
+static inline Elf_Addr
+reloc_jmpslot(Elf_Addr *where __unused, Elf_Addr target, const Obj_Entry *defobj __unused,
+    const Obj_Entry *obj __unused, const Elf_Rel *rel __unused)
+{
+	_rtld_error("%s: not implemented!", __func__);
+	return (target);
+}
+
+// Validating e_flags:
+#if _MIPS_SZCAP == 128
+#define _RTLD_EXPECTED_MIPS_MACH EF_MIPS_MACH_CHERI128
+#else
+static_assert(_MIPS_SZCAP == 256, "CHERI bits != 256?");
+#define _RTLD_EXPECTED_MIPS_MACH EF_MIPS_MACH_CHERI256
+#endif
+
+#define rtld_validate_target_eflags(path, hdr, main_path)	\
+	_rtld_validate_target_eflags(path, hdr, main_path)
+static inline bool
+_rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_path)
+{
+	if ((hdr->e_flags & EF_MIPS_MACH) != _RTLD_EXPECTED_MIPS_MACH) {
+		_rtld_error("%s: cannot load %s since it is not CHERI-" __XSTRING(_MIPS_SZCAP)
+		    " (e_flags=0x%zx)", main_path, path, (size_t)hdr->e_flags);
+		return false;
+	}
+	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI) {
+		_rtld_error("%s: cannot load %s since it is not CheriABI"
+		    " (e_flags=0x%zx)", main_path, path, (size_t)hdr->e_flags);
+		return false;
+	}
+	return true;
+}
+
+static inline void
+fix_obj_mapping_cap_permissions(Obj_Entry *obj, const char* path __unused)
+{
+	obj->text_rodata_cap = cheri_andperm(obj->text_rodata_cap, ~FUNC_PTR_REMOVE_PERMS);
+	obj->relocbase = cheri_andperm(obj->relocbase, ~DATA_PTR_REMOVE_PERMS);
+	obj->mapbase = cheri_andperm(obj->mapbase, ~DATA_PTR_REMOVE_PERMS);
+	dbg("%s:\n\tmapbase=%-#p\n\trelocbase=%-#p\n\ttext_rodata=%-#p", path,
+	    obj->mapbase, obj->relocbase, obj->text_rodata_cap);
+}
 
 #endif

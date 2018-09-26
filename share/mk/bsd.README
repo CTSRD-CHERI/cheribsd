@@ -22,6 +22,7 @@ bsd.confs.mk		- install of configuration files
 bsd.cpu.mk		- sets CPU/arch-related variables (included from sys.mk)
 bsd.crunchgen.mk	- building crunched binaries using crunchgen(1)
 bsd.dep.mk		- handle Makefile dependencies
+bsd.dirs.mk		- handle directory creation
 bsd.doc.mk		- building troff system documents
 bsd.endian.mk		- TARGET_ENDIAN=1234(little) or 4321 (big) for target
 bsd.files.mk		- install of general purpose files
@@ -115,6 +116,8 @@ the tree where the file gets installed.
 The profiled libraries are no longer built in a different directory than
 the regular libraries.  A new suffix, ".po", is used to denote a profiled
 object, and ".pico" denotes a position-independent relocatable object.
+".nossppico" denotes a position-independent relocatable object without
+stack smashing protection.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 
@@ -290,6 +293,18 @@ CLEANDIRS	Additional files (CLEANFILES) and directories (CLEANDIRS) to
 CLEANFILES	remove during clean and cleandir targets.  "rm -rf" and
 		"rm -f" are used, respectively.
 
+DIRS		A list of variables referring to directories.  For example:
+
+			DIRS+=	FOO
+			FOO=	/usr/share/foo
+
+		Owner, Group, Mode and Flags are handled by FOO_OWN,
+		FOO_GRP, FOO_MODE and FOO_FLAGS, respectively.
+
+		This allows FILESDIR to be set to FOO, and the directory
+		will be created before the files are installed and the
+		dependencies will be set correctly.
+
 DPADD		Additional dependencies for the program.  Usually used for
 		libraries.  For example, to depend on the compatibility and
 		utility libraries use:
@@ -341,6 +356,7 @@ LINKOWN		Owner of links created with LINKS [${BINOWN}].
 LINKGRP		Group of links created with LINKS [${BINGRP}].
 
 LINKMODE	Mode of links created with LINKS [${BINMODE}].
+
 
 MAN		Manual pages.  If no MAN variable is defined,
 		"MAN=${PROG}.1" is assumed. See bsd.man.mk for more details.
@@ -563,6 +579,8 @@ LINKOWN		Owner of links created with LINKS [${LIBOWN}].
 LINKGRP		Group of links created with LINKS [${LIBGRP}].
 
 LINKMODE	Mode of links created with LINKS [${LIBMODE}].
+
+LINTLIBDIR	Target directory for lint libraries.
 
 MAN		The manual pages to be installed. See bsd.man.mk for more
 		details.

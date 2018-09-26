@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2018 Kyle Evans <kevans@FreeBSD.org>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -50,6 +49,7 @@ __FBSDID("$FreeBSD$");
 
 static struct ofw_compat_data compat_data[] = {
 	{"allwinner,sun50i-a64-system-controller", 1},
+	{"allwinner,sun50i-a64-system-control", 1},
 	{"allwinner,sun8i-a83t-system-controller", 1},
 	{"allwinner,sun8i-h3-system-controller", 1},
 	{NULL,             0}

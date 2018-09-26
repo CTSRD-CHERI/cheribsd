@@ -38,6 +38,7 @@
 
 #include "opt_atpic.h"
 #include "opt_ddb.h"
+#include "opt_smp.h"
 
 #include <sys/param.h>
 #include <sys/bus.h>
@@ -45,6 +46,7 @@
 #include <sys/ktr.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
+#include <sys/malloc.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
@@ -71,15 +73,16 @@
 #include <isa/isareg.h>
 #endif
 
+#include <vm/vm.h>
+
 #define	MAX_STRAY_LOG	5
 
 typedef void (*mask_fn)(void *);
 
 static int intrcnt_index;
-static struct intsrc *interrupt_sources[NUM_IO_INTS];
+static struct intsrc **interrupt_sources;
 #ifdef SMP
-static struct intsrc *interrupt_sorted[NUM_IO_INTS];
-CTASSERT(sizeof(interrupt_sources) == sizeof(interrupt_sorted));
+static struct intsrc **interrupt_sorted;
 static int intrbalance;
 SYSCTL_INT(_hw, OID_AUTO, intrbalance, CTLFLAG_RW, &intrbalance, 0,
     "Interrupt auto-balance interval (seconds).  Zero disables.");
@@ -89,15 +92,19 @@ static struct sx intrsrc_lock;
 static struct mtx intrpic_lock;
 static struct mtx intrcnt_lock;
 static TAILQ_HEAD(pics_head, pic) pics;
+u_int num_io_irqs;
 
 #if defined(SMP) && !defined(EARLY_AP_STARTUP)
 static int assign_cpu;
 #endif
 
-u_long intrcnt[INTRCNT_COUNT];
-char intrnames[INTRCNT_COUNT * (MAXCOMLEN + 1)];
+u_long *intrcnt;
+char *intrnames;
 size_t sintrcnt = sizeof(intrcnt);
 size_t sintrnames = sizeof(intrnames);
+int nintrcnt;
+
+static MALLOC_DEFINE(M_INTR, "intr", "Interrupt Sources");
 
 static int	intr_assign_cpu(void *arg, int cpu);
 static void	intr_disable_src(void *arg);
@@ -106,6 +113,18 @@ static int	intr_pic_registered(struct pic *pic);
 static void	intrcnt_setname(const char *name, int index);
 static void	intrcnt_updatename(struct intsrc *is);
 static void	intrcnt_register(struct intsrc *is);
+
+/*
+ * SYSINIT levels for SI_SUB_INTR:
+ *
+ * SI_ORDER_FIRST: Initialize locks and pics TAILQ, xen_hvm_cpu_init
+ * SI_ORDER_SECOND: Xen PICs
+ * SI_ORDER_THIRD: Add I/O APIC PICs, alloc MSI and Xen IRQ ranges
+ * SI_ORDER_FOURTH: Add 8259A PICs
+ * SI_ORDER_FOURTH + 1: Finalize interrupt count and add interrupt sources
+ * SI_ORDER_MIDDLE: SMP interrupt counters
+ * SI_ORDER_ANY: Enable interrupts on BSP
+ */
 
 static int
 intr_pic_registered(struct pic *pic)
@@ -142,6 +161,60 @@ intr_register_pic(struct pic *pic)
 }
 
 /*
+ * Allocate interrupt source arrays and register interrupt sources
+ * once the number of interrupts is known.
+ */
+static void
+intr_init_sources(void *arg)
+{
+	struct pic *pic;
+
+	MPASS(num_io_irqs > 0);
+
+	interrupt_sources = mallocarray(num_io_irqs, sizeof(*interrupt_sources),
+	    M_INTR, M_WAITOK | M_ZERO);
+#ifdef SMP
+	interrupt_sorted = mallocarray(num_io_irqs, sizeof(*interrupt_sorted),
+	    M_INTR, M_WAITOK | M_ZERO);
+#endif
+
+	/*
+	 * - 1 ??? dummy counter.
+	 * - 2 counters for each I/O interrupt.
+	 * - 1 counter for each CPU for lapic timer.
+	 * - 1 counter for each CPU for the Hyper-V vmbus driver.
+	 * - 8 counters for each CPU for IPI counters for SMP.
+	 */
+	nintrcnt = 1 + num_io_irqs * 2 + mp_ncpus * 2;
+#ifdef COUNT_IPIS
+	if (mp_ncpus > 1)
+		nintrcnt += 8 * mp_ncpus;
+#endif
+	intrcnt = mallocarray(nintrcnt, sizeof(u_long), M_INTR, M_WAITOK |
+	    M_ZERO);
+	intrnames = mallocarray(nintrcnt, MAXCOMLEN + 1, M_INTR, M_WAITOK |
+	    M_ZERO);
+	sintrcnt = nintrcnt * sizeof(u_long);
+	sintrnames = nintrcnt * (MAXCOMLEN + 1);
+
+	intrcnt_setname("???", 0);
+	intrcnt_index = 1;
+
+	/*
+	 * NB: intrpic_lock is not held here to avoid LORs due to
+	 * malloc() in intr_register_source().  However, we are still
+	 * single-threaded at this point in startup so the list of
+	 * PICs shouldn't change.
+	 */
+	TAILQ_FOREACH(pic, &pics, pics) {
+		if (pic->pic_register_sources != NULL)
+			pic->pic_register_sources(pic);
+	}
+}
+SYSINIT(intr_init_sources, SI_SUB_INTR, SI_ORDER_FOURTH + 1, intr_init_sources,
+    NULL);
+
+/*
  * Register a new interrupt source with the global interrupt system.
  * The global interrupts need to be disabled when this function is
  * called.
@@ -153,6 +226,8 @@ intr_register_source(struct intsrc *isrc)
 
 	KASSERT(intr_pic_registered(isrc->is_pic), ("unregistered PIC"));
 	vector = isrc->is_pic->pic_vector(isrc);
+	KASSERT(vector < num_io_irqs, ("IRQ %d too large (%u irqs)", vector,
+	    num_io_irqs));
 	if (interrupt_sources[vector] != NULL)
 		return (EEXIST);
 	error = intr_event_create(&isrc->is_event, isrc, 0, vector,
@@ -178,14 +253,15 @@ struct intsrc *
 intr_lookup_source(int vector)
 {
 
-	if (vector < 0 || vector >= nitems(interrupt_sources))
+	if (vector < 0 || vector >= num_io_irqs)
 		return (NULL);
 	return (interrupt_sources[vector]);
 }
 
 int
 intr_add_handler(const char *name, int vector, driver_filter_t filter,
-    driver_intr_t handler, void *arg, enum intr_type flags, void **cookiep)
+    driver_intr_t handler, void *arg, enum intr_type flags, void **cookiep,
+    int domain)
 {
 	struct intsrc *isrc;
 	int error;
@@ -200,6 +276,7 @@ intr_add_handler(const char *name, int vector, driver_filter_t filter,
 		intrcnt_updatename(isrc);
 		isrc->is_handlers++;
 		if (isrc->is_handlers == 1) {
+			isrc->is_domain = domain;
 			isrc->is_pic->pic_enable_intr(isrc);
 			isrc->is_pic->pic_enable_source(isrc);
 		}
@@ -374,6 +451,7 @@ intrcnt_register(struct intsrc *is)
 
 	KASSERT(is->is_event != NULL, ("%s: isrc with no event", __func__));
 	mtx_lock_spin(&intrcnt_lock);
+	MPASS(intrcnt_index + 2 <= nintrcnt);
 	is->is_index = intrcnt_index;
 	intrcnt_index += 2;
 	snprintf(straystr, MAXCOMLEN + 1, "stray irq%d",
@@ -390,6 +468,7 @@ intrcnt_add(const char *name, u_long **countp)
 {
 
 	mtx_lock_spin(&intrcnt_lock);
+	MPASS(intrcnt_index < nintrcnt);
 	*countp = &intrcnt[intrcnt_index];
 	intrcnt_setname(name, intrcnt_index);
 	intrcnt_index++;
@@ -400,8 +479,6 @@ static void
 intr_init(void *dummy __unused)
 {
 
-	intrcnt_setname("???", 0);
-	intrcnt_index = 1;
 	TAILQ_INIT(&pics);
 	mtx_init(&intrpic_lock, "intrpic", NULL, MTX_DEF);
 	sx_init(&intrsrc_lock, "intrsrc");
@@ -467,10 +544,10 @@ void
 intr_reprogram(void)
 {
 	struct intsrc *is;
-	int v;
+	u_int v;
 
 	sx_xlock(&intrsrc_lock);
-	for (v = 0; v < NUM_IO_INTS; v++) {
+	for (v = 0; v < num_io_irqs; v++) {
 		is = interrupt_sources[v];
 		if (is == NULL)
 			continue;
@@ -487,14 +564,15 @@ intr_reprogram(void)
 DB_SHOW_COMMAND(irqs, db_show_irqs)
 {
 	struct intsrc **isrc;
-	int i, verbose;
+	u_int i;
+	int verbose;
 
 	if (strcmp(modif, "v") == 0)
 		verbose = 1;
 	else
 		verbose = 0;
 	isrc = interrupt_sources;
-	for (i = 0; i < NUM_IO_INTS && !db_pager_quit; i++, isrc++)
+	for (i = 0; i < num_io_irqs && !db_pager_quit; i++, isrc++)
 		if (*isrc != NULL)
 			db_dump_intr_event((*isrc)->is_event, verbose);
 }
@@ -507,14 +585,27 @@ DB_SHOW_COMMAND(irqs, db_show_irqs)
  */
 
 cpuset_t intr_cpus = CPUSET_T_INITIALIZER(0x1);
-static int current_cpu;
+static int current_cpu[MAXMEMDOM];
+
+static void
+intr_init_cpus(void)
+{
+	int i;
+
+	for (i = 0; i < vm_ndomains; i++) {
+		current_cpu[i] = 0;
+		if (!CPU_ISSET(current_cpu[i], &intr_cpus) ||
+		    !CPU_ISSET(current_cpu[i], &cpuset_domain[i]))
+			intr_next_cpu(i);
+	}
+}
 
 /*
  * Return the CPU that the next interrupt source should use.  For now
  * this just returns the next local APIC according to round-robin.
  */
 u_int
-intr_next_cpu(void)
+intr_next_cpu(int domain)
 {
 	u_int apic_id;
 
@@ -529,12 +620,13 @@ intr_next_cpu(void)
 #endif
 
 	mtx_lock_spin(&icu_lock);
-	apic_id = cpu_apic_ids[current_cpu];
+	apic_id = cpu_apic_ids[current_cpu[domain]];
 	do {
-		current_cpu++;
-		if (current_cpu > mp_maxid)
-			current_cpu = 0;
-	} while (!CPU_ISSET(current_cpu, &intr_cpus));
+		current_cpu[domain]++;
+		if (current_cpu[domain] > mp_maxid)
+			current_cpu[domain] = 0;
+	} while (!CPU_ISSET(current_cpu[domain], &intr_cpus) ||
+	    !CPU_ISSET(current_cpu[domain], &cpuset_domain[domain]));
 	mtx_unlock_spin(&icu_lock);
 	return (apic_id);
 }
@@ -568,7 +660,18 @@ intr_add_cpu(u_int cpu)
 	CPU_SET(cpu, &intr_cpus);
 }
 
-#ifndef EARLY_AP_STARTUP
+#ifdef EARLY_AP_STARTUP
+static void
+intr_smp_startup(void *arg __unused)
+{
+
+	intr_init_cpus();
+	return;
+}
+SYSINIT(intr_smp_startup, SI_SUB_SMP, SI_ORDER_SECOND, intr_smp_startup,
+    NULL);
+
+#else
 /*
  * Distribute all the interrupt sources among the available CPUs once the
  * AP's have been launched.
@@ -577,9 +680,9 @@ static void
 intr_shuffle_irqs(void *arg __unused)
 {
 	struct intsrc *isrc;
-	u_int cpu;
-	int i;
+	u_int cpu, i;
 
+	intr_init_cpus();
 	/* Don't bother on UP. */
 	if (mp_ncpus == 1)
 		return;
@@ -587,7 +690,7 @@ intr_shuffle_irqs(void *arg __unused)
 	/* Round-robin assign a CPU to each enabled source. */
 	sx_xlock(&intrsrc_lock);
 	assign_cpu = 1;
-	for (i = 0; i < NUM_IO_INTS; i++) {
+	for (i = 0; i < num_io_irqs; i++) {
 		isrc = interrupt_sources[i];
 		if (isrc != NULL && isrc->is_handlers > 0) {
 			/*
@@ -599,12 +702,12 @@ intr_shuffle_irqs(void *arg __unused)
 			 */
 			cpu = isrc->is_event->ie_cpu;
 			if (cpu == NOCPU)
-				cpu = current_cpu;
+				cpu = current_cpu[isrc->is_domain];
 			if (isrc->is_pic->pic_assign_cpu(isrc,
 			    cpu_apic_ids[cpu]) == 0) {
 				isrc->is_cpu = cpu;
 				if (isrc->is_event->ie_cpu == NOCPU)
-					intr_next_cpu();
+					intr_next_cpu(isrc->is_domain);
 			}
 		}
 	}
@@ -622,8 +725,8 @@ sysctl_hw_intrs(SYSCTL_HANDLER_ARGS)
 {
 	struct sbuf sbuf;
 	struct intsrc *isrc;
+	u_int i;
 	int error;
-	int i;
 
 	error = sysctl_wire_old_buffer(req, 0);
 	if (error != 0)
@@ -631,14 +734,15 @@ sysctl_hw_intrs(SYSCTL_HANDLER_ARGS)
 
 	sbuf_new_for_sysctl(&sbuf, NULL, 128, req);
 	sx_slock(&intrsrc_lock);
-	for (i = 0; i < NUM_IO_INTS; i++) {
+	for (i = 0; i < num_io_irqs; i++) {
 		isrc = interrupt_sources[i];
 		if (isrc == NULL)
 			continue;
-		sbuf_printf(&sbuf, "%s:%d @%d: %ld\n",
+		sbuf_printf(&sbuf, "%s:%d @cpu%d(domain%d): %ld\n",
 		    isrc->is_event->ie_fullname,
 		    isrc->is_index,
 		    isrc->is_cpu,
+		    isrc->is_domain,
 		    *isrc->is_count);
 	}
 
@@ -689,25 +793,26 @@ intr_balance(void *dummy __unused, int pending __unused)
 	 * Sort interrupts according to count.
 	 */
 	sx_xlock(&intrsrc_lock);
-	memcpy(interrupt_sorted, interrupt_sources, sizeof(interrupt_sorted));
-	qsort(interrupt_sorted, NUM_IO_INTS, sizeof(interrupt_sorted[0]),
+	memcpy(interrupt_sorted, interrupt_sources, num_io_irqs *
+	    sizeof(interrupt_sorted[0]));
+	qsort(interrupt_sorted, num_io_irqs, sizeof(interrupt_sorted[0]),
 	    intrcmp);
 
 	/*
 	 * Restart the scan from the same location to avoid moving in the
 	 * common case.
 	 */
-	current_cpu = 0;
+	intr_init_cpus();
 
 	/*
 	 * Assign round-robin from most loaded to least.
 	 */
-	for (i = NUM_IO_INTS - 1; i >= 0; i--) {
+	for (i = num_io_irqs - 1; i >= 0; i--) {
 		isrc = interrupt_sorted[i];
 		if (isrc == NULL  || isrc->is_event->ie_cpu != NOCPU)
 			continue;
-		cpu = current_cpu;
-		intr_next_cpu();
+		cpu = current_cpu[isrc->is_domain];
+		intr_next_cpu(isrc->is_domain);
 		if (isrc->is_cpu != cpu &&
 		    isrc->is_pic->pic_assign_cpu(isrc,
 		    cpu_apic_ids[cpu]) == 0)
@@ -735,7 +840,7 @@ SYSINIT(intr_balance_init, SI_SUB_SMP, SI_ORDER_ANY, intr_balance_init, NULL);
  * Always route interrupts to the current processor in the UP case.
  */
 u_int
-intr_next_cpu(void)
+intr_next_cpu(int domain)
 {
 
 	return (PCPU_GET(apic_id));

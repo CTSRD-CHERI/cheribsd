@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  *
  * Copyright (c) 2017 Dell EMC
- * Copyright (c) 2000 David O'Brien
+ * Copyright (c) 2000-2001, 2003 David O'Brien
  * Copyright (c) 1995-1996 Søren Schmidt
  * Copyright (c) 1996 Peter Wemm
  * All rights reserved.
@@ -35,7 +35,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
-#include "opt_compat.h"
 
 #include <sys/param.h>
 #include <sys/capsicum.h>
@@ -100,7 +99,7 @@ static int __elfN(check_header)(const Elf_Ehdr *hdr);
 static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
     const char *interp, int interp_name_len, int32_t *osrel);
 static int __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
-    u_long *entry, size_t pagesize);
+    u_long *end_addr, u_long *entry, size_t pagesize);
 static int __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
     caddr_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot,
     size_t pagesize);
@@ -651,12 +650,16 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
  * an executable, this value is ignored.  On exit, "addr" specifies
  * where the file was actually loaded.
  *
+ * The "end_addr" reference parameter is out only.  On exit, it specifies
+ * the end address of the loaded file.
+ *
  * The "entry" reference parameter is out only.  On exit, it specifies
  * the entry point for the loaded file.
+ *
  */
 static int
 __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
-	u_long *entry, size_t pagesize)
+	u_long *end_addr, u_long *entry, size_t pagesize)
 {
 	struct {
 		struct nameidata nd;
@@ -671,6 +674,7 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	vm_prot_t prot;
 	u_long rbase;
 	u_long base_addr = 0;
+	u_long max_addr = 0;
 	int error, i, numsegs;
 
 #ifdef CAPABILITY_MODE
@@ -767,10 +771,13 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 			if (numsegs == 0)
   				base_addr = trunc_page(phdr[i].p_vaddr +
 				    rbase);
+
+			max_addr = MAX(max_addr, phdr[i].p_vaddr + phdr[i].p_memsz);
 			numsegs++;
 		}
 	}
 	*addr = base_addr;
+	*end_addr = base_addr + max_addr;
 	*entry = (unsigned long)hdr->e_entry + rbase;
 
 fail:
@@ -851,7 +858,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			break;
 		case PT_INTERP:
 			/* Path to interpreter */
-			if (phdr[i].p_filesz > MAXPATHLEN) {
+			if (phdr[i].p_filesz < 2 ||
+			    phdr[i].p_filesz > MAXPATHLEN) {
 				uprintf("Invalid PT_INTERP\n");
 				error = ENOEXEC;
 				goto ret;
@@ -873,7 +881,8 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 				    UIO_SYSSPACE, IO_NODELOCKED, td->td_ucred,
 				    NOCRED, NULL, td);
 				if (error != 0) {
-					uprintf("i/o error PT_INTERP\n");
+					uprintf("i/o error PT_INTERP %d\n",
+					    error);
 					goto ret;
 				}
 				interp_buf[interp_name_len] = '\0';
@@ -881,6 +890,11 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			} else {
 				interp = __DECONST(char *, imgp->image_header) +
 				    phdr[i].p_offset;
+				if (interp[interp_name_len - 1] != '\0') {
+					uprintf("Invalid PT_INTERP\n");
+					error = ENOEXEC;
+					goto ret;
+				}
 			}
 			break;
 		case PT_GNU_STACK:
@@ -938,8 +952,15 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (error != 0)
 		goto ret;
 
+	/*
+	 * XXX: For some reason imgp->start_addr is changed from ~0UL to 0 so due
+	 * to computing the minimum we were always getting a start_addr of 0.
+	 */
+	/* KASSERT(imgp->start_addr != 0,
+	 *   ("Should be ULONG_MAX and not 0x%lx", imgp->start_addr)); */
+	imgp->start_addr = ~0UL;
 	for (i = 0; i < hdr->e_phnum; i++) {
-		unsigned long start_addr, end_addr;
+		unsigned long end_addr;
 		switch (phdr[i].p_type) {
 		case PT_LOAD:	/* Loadable segment */
 			if (phdr[i].p_memsz == 0)
@@ -951,13 +972,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			    sv->sv_pagesize);
 			if (error != 0)
 				goto ret;
-
-			start_addr = phdr[i].p_vaddr + et_dyn_addr;
-			end_addr = start_addr + phdr[i].p_memsz;
-			if (imgp->start_addr > start_addr)
-				imgp->start_addr = start_addr;
-			if (imgp->end_addr < end_addr)
-				imgp->end_addr = end_addr;
 
 			/*
 			 * If this segment contains the program headers,
@@ -975,6 +989,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			seg_size = round_page(phdr[i].p_memsz +
 			    phdr[i].p_vaddr + et_dyn_addr - seg_addr);
 
+			imgp->start_addr = MIN(imgp->start_addr, seg_addr);
+			end_addr = seg_addr + seg_size;
+			imgp->end_addr = MAX(imgp->end_addr, end_addr);
 			/*
 			 * Make the largest executable segment the official
 			 * text segment and all others data.
@@ -1053,6 +1070,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	PROC_UNLOCK(imgp->proc);
 
 	imgp->entry_addr = entry;
+	imgp->interp_end = 0;
 
 	if (interp != NULL) {
 		have_interp = FALSE;
@@ -1063,7 +1081,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			snprintf(path, MAXPATHLEN, "%s%s",
 			    brand_info->emul_path, interp);
 			error = __elfN(load_file)(imgp->proc, path, &addr,
-			    &imgp->entry_addr, sv->sv_pagesize);
+			    &imgp->interp_end, &imgp->entry_addr, sv->sv_pagesize);
 			free(path, M_TEMP);
 			if (error == 0)
 				have_interp = TRUE;
@@ -1072,13 +1090,13 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		    (brand_info->interp_path == NULL ||
 		    strcmp(interp, brand_info->interp_path) == 0)) {
 			error = __elfN(load_file)(imgp->proc, newinterp, &addr,
-			    &imgp->entry_addr, sv->sv_pagesize);
+			    &imgp->interp_end, &imgp->entry_addr, sv->sv_pagesize);
 			if (error == 0)
 				have_interp = TRUE;
 		}
 		if (!have_interp) {
 			error = __elfN(load_file)(imgp->proc, interp, &addr,
-			    &imgp->entry_addr, sv->sv_pagesize);
+			    &imgp->interp_end, &imgp->entry_addr, sv->sv_pagesize);
 		}
 		vn_lock(imgp->vp, LK_EXCLUSIVE | LK_RETRY);
 		if (error != 0) {
@@ -1117,10 +1135,18 @@ ret:
 
 #define	suword __CONCAT(suword, __ELF_WORD_SIZE)
 
-void
-__elfN(set_auxargs)(Elf_Addr *pos, struct image_params *imgp)
+int
+__elfN(freebsd_fixup)(register_t **stack_base, struct image_params *imgp)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
+	Elf_Auxinfo *argarray, *pos;
+	Elf_Addr *base, *auxbase;
+	int error;
+
+	base = (Elf_Addr *)*stack_base;
+	auxbase = base + imgp->args->argc + 1 + imgp->args->envc + 1;
+	argarray = pos = malloc(AT_COUNT * sizeof(*pos), M_TEMP,
+	    M_WAITOK | M_ZERO);
 
 	if (args->execfd != -1)
 		AUXARGS_ENTRY(pos, AT_EXECFD, args->execfd);
@@ -1160,21 +1186,16 @@ __elfN(set_auxargs)(Elf_Addr *pos, struct image_params *imgp)
 
 	free(imgp->auxargs, M_TEMP);
 	imgp->auxargs = NULL;
-}
+	KASSERT(pos - argarray <= AT_COUNT, ("Too many auxargs"));
 
-int
-__elfN(freebsd_fixup)(register_t **stack_base, struct image_params *imgp)
-{
-	Elf_Addr *base;
-	Elf_Addr *pos;
-
-	base = (Elf_Addr *)*stack_base;
-	pos = base + (imgp->args->argc + imgp->args->envc + 2);
-
-	__elfN(set_auxargs)(pos, imgp);
+	error = copyout(argarray, auxbase, sizeof(*argarray) * AT_COUNT);
+	free(argarray, M_TEMP);
+	if (error != 0)
+		return (error);
 
 	base--;
-	suword(base, (long)imgp->args->argc);
+	if (suword(base, imgp->args->argc) == -1)
+		return (EFAULT);
 	*stack_base = (register_t *)base;
 	return (0);
 }

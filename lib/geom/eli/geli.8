@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd September 17, 2017
+.Dd July 24, 2018
 .Dt GELI 8
 .Os
 .Sh NAME
@@ -61,16 +61,17 @@ utility:
 .Op Fl l Ar keylen
 .Op Fl s Ar sectorsize
 .Op Fl V Ar version
-.Ar prov
+.Ar prov ...
 .Nm
 .Cm label - an alias for
 .Cm init
 .Nm
 .Cm attach
-.Op Fl dprv
+.Op Fl Cdprv
+.Op Fl n Ar keyno
 .Op Fl j Ar passfile
 .Op Fl k Ar keyfile
-.Ar prov
+.Ar prov ...
 .Nm
 .Cm detach
 .Op Fl fl
@@ -191,8 +192,7 @@ entered via prompt or read from one or more passfiles; a keyfile read from
 one or more files.
 .It
 Allows encryption of the root partition.
-The user will be asked for the
-passphrase before the root file system is mounted.
+The user is asked for the passphrase before the root filesystem is mounted.
 .It
 Strengthens the passphrase component of the User Key with:
 .Rs
@@ -216,12 +216,12 @@ so that if a user has to quickly destroy key material,
 it is possible to get the data back by restoring keys from
 backup.
 .It
-Providers can be configured to automatically detach on last close
-(so users do not have to remember to detach providers after unmounting
-the file systems).
+Providers can be configured to automatically detach on last close,
+so users do not have to remember to detach providers after unmounting
+the filesystems.
 .It
-Allows attaching a provider with a random, one-time Master Key -
-useful for swap partitions and temporary file systems.
+Allows attaching a provider with a random, one-time Master Key,
+which is useful for swap partitions and temporary filesystems.
 .It
 Allows verification of data integrity (data authentication).
 .It
@@ -233,10 +233,14 @@ The first argument to
 indicates an action to be performed:
 .Bl -tag -width ".Cm configure"
 .It Cm init
-Initialize the provider which needs to be encrypted.
+Initialize providers which need to be encrypted.
+If multiple providers are listed as arguments, they will all be initialized
+with the same passphrase and/or User Key.
+A unique salt will be randomly generated for each provider to ensure the
+Master Key for each is unique.
 Here you can set up the cryptographic algorithm to use, Data Key length,
 etc.
-The last sector of the provider is used to store metadata.
+The last sector of the providers is used to store metadata.
 The
 .Cm init
 subcommand also automatically writes metadata backups to
@@ -279,6 +283,16 @@ To inhibit backups, you can use
 .Pa none
 as the
 .Ar backupfile .
+If multiple providers were initialized in the one command, you can use
+.Pa PROV
+(all upper-case) in the file name, and it will be replaced with the provider
+name.
+If
+.Pa PROV
+is not found in the file name and multiple providers were initialized in the
+one command,
+.Pa -<prov>
+will be appended to the end of the file name specified.
 .It Fl d
 When entering the passphrase to boot from this encrypted root filesystem, echo
 .Ql *
@@ -379,31 +393,43 @@ This option is helpful when creating a provider that may be used by older
 versions.
 Consult the
 .Sx HISTORY
-section to find which metadata version is supported by which FreeBSD version.
+section to find which metadata version is supported by which
+.Fx
+version.
 Note that using an older version of metadata may limit the number of
 features available.
 .El
 .It Cm attach
-Attach the given provider.
-The encrypted Master Key will be loaded from the metadata and decrypted
-using the given passphrase/keyfile and a new GEOM provider will be created
-using the given provider's name with an
+Attach the given providers.
+The encrypted Master Keys are loaded from the metadata and decrypted
+using the given passphrase/keyfile and new GEOM providers are created
+using the specified provider names.
+A
 .Qq .eli
-suffix.
+suffix is added to the user specified provider names.
+Multiple providers can only be attached with a single
+.Cm attach
+command if they all have the same passphrase and keyfiles.
 .Pp
 Additional options include:
 .Bl -tag -width ".Fl j Ar passfile"
+.It Fl C
+Do a dry-run decryption.
+This is useful to verify passphrase and keyfile without decrypting the device.
 .It Fl d
-If specified, a decrypted provider will be detached automatically on last close.
-This can help with scarce memory so the user does not have to remember to detach the
-provider after unmounting the file system.
-It only works when the provider was opened for writing, so it will not work if
-the file system on the provider is mounted read-only.
+If specified, the decrypted providers are detached automatically on last close,
+so the user does not have to remember to detach
+providers after unmounting the filesystems.
+This only works when providers were opened for writing, and will not work if
+the filesystems on the providers were mounted read-only.
 Probably a better choice is the
 .Fl l
 option for the
 .Cm detach
 subcommand.
+.It Fl n Ar keyno
+Specifies the index number of the Master Key copy to use (could be 0 or 1).
+If the index number is not provided all keys will be tested.
 .It Fl j Ar passfile
 Specifies a file which contains the passphrase component of the User Key
 (or part of it).
@@ -412,6 +438,7 @@ For more information see the description of the
 option for the
 .Cm init
 subcommand.
+The same passfiles are used for all listed providers.
 .It Fl k Ar keyfile
 Specifies a file which contains the keyfile component of the User Key
 (or part of it).
@@ -420,14 +447,15 @@ For more information see the description of the
 option for the
 .Cm init
 subcommand.
+The same keyfiles are used for all listed providers.
 .It Fl p
-Do not use a passphrase as a component of the User Key.
+Do not use a passphrase as a component of the User Keys.
 Cannot be combined with the
 .Fl j
 option.
 .It Fl r
-Attach read-only provider.
-It will not be opened for writing.
+Attach read-only providers.
+They are not opened for writing.
 .El
 .It Cm detach
 Detach the given providers, which means remove the devfs entry
@@ -438,14 +466,15 @@ Additional options include:
 .It Fl f
 Force detach - detach even if the provider is open.
 .It Fl l
-Mark provider to detach on last close.
+Mark provider to detach on last close, after the last filesystem has been
+unmounted.
 If this option is specified, the provider will not be detached
 while it is open, but will be automatically detached when it is closed for the
 last time even if it was only opened for reading.
 .El
 .It Cm onetime
 Attach the given providers with a random, one-time (ephemeral) Master Key.
-The command can be used to encrypt swap partitions or temporary file systems.
+The command can be used to encrypt swap partitions or temporary filesystems.
 .Pp
 Additional options include:
 .Bl -tag -width ".Fl a Ar sectorsize"
@@ -460,10 +489,10 @@ For more information, see the description of the
 .Cm init
 subcommand.
 .It Fl d
-Detach on last close.
-Note: this option is not usable for temporary file systems as the provider will
-be detached after creating the file system on it.
-It still can (and should be) used for swap partitions.
+Detach on last close, after the last filesystem has been unmounted.
+Note: this option is not usable for temporary filesystems as the provider is
+detached after the filesystem has been created.
+It still can, and should, be used for swap partitions.
 For more information, see the description of the
 .Cm attach
 subcommand.
@@ -636,17 +665,17 @@ and
 .El
 .It Cm suspend
 Suspend device by waiting for all inflight requests to finish, clearing all
-sensitive information (like the Master Key and Data Keys) from kernel memory,
+sensitive information such as the Master Key and Data Keys from kernel memory,
 and blocking all further I/O requests until the
 .Cm resume
 subcommand is executed.
-This functionality is useful for laptops: when one wants to suspend a
-laptop, one does not want to leave an encrypted device attached.
-Instead of closing all files and directories opened from a file system located
-on an encrypted device, unmounting the file system, and detaching the device,
-the
+This functionality is useful for laptops.
+Suspending a laptop should not leave an encrypted device attached.
+The
 .Cm suspend
-subcommand can be used.
+subcommand can be used rather than closing all files and directories from
+filesystems on the encrypted device, unmounting the filesystem, and
+detaching the device.
 Any access to the encrypted device will be blocked until the Master Key is
 reloaded through the
 .Cm resume
@@ -657,8 +686,8 @@ The
 subcommand does not work with devices created with the
 .Cm onetime
 subcommand.
-Please note that sensitive data might still be present in memory after
-suspending an encrypted device due to the file system cache, etc.
+Please note that sensitive data might still be present in memory locations
+such as the filesystem cache after suspending an encrypted device.
 .Pp
 Additional options include:
 .Bl -tag -width ".Fl a"
@@ -671,23 +700,23 @@ devices.
 Resume previously suspended device.
 The caller must ensure that executing this subcommand does not access the
 suspended device, leading to a deadlock.
-For example suspending a device which contains the file system where the
+For example, suspending a device which contains the filesystem where the
 .Nm
-utility is stored is bad idea.
+utility is stored is a bad idea.
 .Pp
 Additional options include:
 .Bl -tag -width ".Fl j Ar passfile"
 .It Fl j Ar passfile
-Specifies a file which contains the passphrase component of the User Key
-(or part of it).
+Specifies a file which contains the passphrase component of the User Key,
+or part of it.
 For more information see the description of the
 .Fl J
 option for the
 .Cm init
 subcommand.
 .It Fl k Ar keyfile
-Specifies a file which contains the keyfile component of the User Key
-(or part of it).
+Specifies a file which contains the keyfile component of the User Key,
+or part of it.
 For more information see the description of the
 .Fl K
 option for the
@@ -803,18 +832,17 @@ If set to 3, the
 maximum amount of debug information is printed.
 .It Va kern.geom.eli.tries : No 3
 Number of times a user is asked for the passphrase.
-This is only used for providers which are attached on boot
-(before the root file system is mounted).
+This is only used for providers which are attached on boot,
+before the root filesystem is mounted.
 If set to 0, attaching providers on boot will be disabled.
 This variable should be set in
 .Pa /boot/loader.conf .
 .It Va kern.geom.eli.overwrites : No 5
-Specifies how many times the Master Key will be overwritten
+Specifies how many times the Master Key is overwritten
 with random values when it is destroyed.
 After this operation it is filled with zeros.
 .It Va kern.geom.eli.visible_passphrase : No 0
-If set to 1, the passphrase entered on boot (before the root
-file system is mounted) will be visible.
+If set to 1, the passphrase entered on boot will be visible.
 This alternative should be used with caution as the entered
 passphrase can be logged and exposed via
 .Xr dmesg 8 .
@@ -853,7 +881,7 @@ Exit status is 0 on success, and 1 if the command fails.
 Initialize a provider which is going to be encrypted with a
 passphrase and random data from a file on the user's pen drive.
 Use 4kB sector size.
-Attach the provider, create a file system, and mount it.
+Attach the provider, create a filesystem, and mount it.
 Do the work.
 Unmount the provider and detach it:
 .Bd -literal -offset indent
@@ -908,7 +936,7 @@ Encrypted swap partition setup:
 .Ed
 .Pp
 The example below shows how to configure two providers which will be attached
-on boot (before the root file system is mounted).
+on boot, before the root filesystem is mounted.
 One of them is using passphrase and three keyfile parts and the other is
 using only a keyfile in one part:
 .Bd -literal -offset indent
@@ -986,7 +1014,7 @@ geli: Cannot read metadata from /dev/da0: Invalid argument.
 Enter passphrase:
 .Ed
 .Pp
-If an encrypted file system is extended, it is necessary to relocate and
+If an encrypted filesystem is extended, it is necessary to relocate and
 update the metadata:
 .Bd -literal -offset indent
 # gpart create -s GPT ada0

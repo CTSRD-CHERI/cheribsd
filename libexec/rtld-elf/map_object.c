@@ -52,7 +52,7 @@
 #include "debug.h"
 #include "rtld.h"
 
-static Elf_Ehdr *get_elf_header(int, const char *, const struct stat *);
+static Elf_Ehdr *get_elf_header(int, const char *, const struct stat *, const char*);
 static int convert_flags(int); /* Elf flags -> mmap flags */
 
 int __getosreldate(void);
@@ -66,7 +66,7 @@ int __getosreldate(void);
  * for the shared object.  Returns NULL on failure.
  */
 Obj_Entry *
-map_object(int fd, const char *path, const struct stat *sb)
+map_object(int fd, const char *path, const struct stat *sb, const char* main_path)
 {
     Obj_Entry *obj;
     Elf_Ehdr *hdr;
@@ -101,12 +101,17 @@ map_object(int fd, const char *path, const struct stat *sb)
     Elf_Word stack_flags;
     Elf_Addr relro_page;
     size_t relro_size;
-    Elf_Addr note_start;
-    Elf_Addr note_end;
+    caddr_t note_start;
+    caddr_t note_end;
     char *note_map;
     size_t note_map_len;
+#ifdef __CHERI_PURE_CAPABILITY__
+    Elf_Addr text_rodata_start = 0;
+    Elf_Addr text_rodata_end = 0;
+#endif
 
-    hdr = get_elf_header(fd, path, sb);
+
+    hdr = get_elf_header(fd, path, sb, main_path);
     if (hdr == NULL)
 	return (NULL);
 
@@ -142,6 +147,16 @@ map_object(int fd, const char *path, const struct stat *sb)
 		    path, nsegs);
 		goto error;
 	    }
+#ifdef __CHERI_PURE_CAPABILITY__
+	    if (!(segs[nsegs]->p_flags & PF_W)) {
+		Elf_Addr start_addr = segs[nsegs]->p_vaddr;
+		text_rodata_start = rtld_min(start_addr, text_rodata_start);
+		text_rodata_end = rtld_max(start_addr + segs[nsegs]->p_memsz, text_rodata_end);
+		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
+		    " = %zx text/rodata end = %zx", path, nsegs,
+		    (size_t)text_rodata_start, (size_t)text_rodata_end);
+	    }
+#endif
 	    break;
 
 	case PT_PHDR:
@@ -177,10 +192,10 @@ map_object(int fd, const char *path, const struct stat *sb)
 		    _rtld_error("%s: error mapping PT_NOTE (%d)", path, errno);
 		    goto error;
 		}
-		note_start = (Elf_Addr)(note_map + phdr->p_offset -
+		note_start = (note_map + phdr->p_offset -
 		  trunc_page(phdr->p_offset));
 	    } else {
-		note_start = (Elf_Addr)(char *)hdr + phdr->p_offset;
+		note_start = (char *)hdr + phdr->p_offset;
 	    }
 	    note_end = note_start + phdr->p_filesz;
 	    break;
@@ -205,23 +220,32 @@ map_object(int fd, const char *path, const struct stat *sb)
     base_vaddr = trunc_page(segs[0]->p_vaddr);
     base_vlimit = round_page(segs[nsegs]->p_vaddr + segs[nsegs]->p_memsz);
     mapsize = base_vlimit - base_vaddr;
-    base_addr = (caddr_t) base_vaddr;
+    base_addr = (caddr_t)(uintptr_t)base_vaddr;
     base_flags = __getosreldate() >= P_OSREL_MAP_GUARD ? MAP_GUARD :
 	MAP_PRIVATE | MAP_ANON | MAP_NOCORE;
     if (npagesizes > 1 && round_page(segs[0]->p_filesz) >= pagesizes[1])
 	base_flags |= MAP_ALIGNED_SUPER;
-    if (base_vaddr != 0)
+    if (base_vaddr != 0) {
+#ifdef __CHERI_PURE_CAPABILITY__
+        _rtld_error("%s: Cannot map object at fixed address 0x%lx in CheriABI",
+	  path, base_vaddr);
+	goto error;
+#else
 	base_flags |= MAP_FIXED | MAP_EXCL;
+#endif
+    }
 
+    dbg("Allocating entire object: mmap(%#p, 0x%lx, 0x%x, 0x%x, -1, 0)",
+	    base_addr, mapsize, PROT_NONE | PROT_MAX(PROT_ALL), base_flags);
     mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(PROT_ALL),
 	base_flags, -1, 0);
-    if (mapbase == (caddr_t) -1) {
+    if (mapbase == MAP_FAILED) {
 	_rtld_error("%s: mmap of entire address space failed: %s",
 	  path, rtld_strerror(errno));
 	goto error;
     }
-    if (base_addr != NULL && mapbase != base_addr) {
-	_rtld_error("%s: mmap returned wrong address: wanted %p, got %p",
+    if (base_addr != NULL && (vaddr_t)mapbase != (vaddr_t)base_addr) {
+	_rtld_error("%s: mmap returned wrong address: wanted %#p, got %#p",
 	  path, base_addr, mapbase);
 	goto error1;
     }
@@ -234,6 +258,8 @@ map_object(int fd, const char *path, const struct stat *sb)
 	data_addr = mapbase + (data_vaddr - base_vaddr);
 	data_prot = convert_prot(segs[i]->p_flags);
 	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED;
+	dbg("Mapping %s PT_LOAD(%d) with flags 0x%x at %p", path, i,
+	    segs[i]->p_flags, data_addr, data_vlimit);
 	if (mmap(data_addr, data_vlimit - data_vaddr, data_prot,
 	  data_flags | MAP_PREFAULT_READ, fd, data_offset) == (caddr_t) -1) {
 	    _rtld_error("%s: mmap of data failed: %s", path,
@@ -296,7 +322,22 @@ map_object(int fd, const char *path, const struct stat *sb)
     obj->textsize = round_page(segs[0]->p_vaddr + segs[0]->p_memsz) -
       base_vaddr;
     obj->vaddrbase = base_vaddr;
+
     obj->relocbase = mapbase - base_vaddr;
+#ifdef __CHERI_PURE_CAPABILITY__
+    if (obj->vaddrbase != 0) {
+	rtld_fdprintf(STDERR_FILENO, "%s: nonzero vaddrbase %zd may be broken "
+	    "for CheriABI", path, obj->vaddrbase);
+    }
+    obj->text_rodata_start = text_rodata_start;
+    obj->text_rodata_end = text_rodata_end;
+    /*
+     * Note: no csetbounds yet since we also need to include .cap_table (which
+     * is part of the r/w section). Bounds are set after .dynamic is read.
+     */
+    obj->text_rodata_cap = obj->relocbase;
+    fix_obj_mapping_cap_permissions(obj, path);
+#endif
     obj->dynamic = (const Elf_Dyn *) (obj->relocbase + phdyn->p_vaddr);
     if (hdr->e_entry != 0)
 	obj->entry = (caddr_t) (obj->relocbase + hdr->e_entry);
@@ -327,7 +368,7 @@ map_object(int fd, const char *path, const struct stat *sb)
     obj->relro_page = obj->relocbase + trunc_page(relro_page);
     obj->relro_size = round_page(relro_size);
     if (note_start < note_end)
-	digest_notes(obj, note_start, note_end);
+	digest_notes(obj, (const Elf_Note *)note_start, (const Elf_Note *)note_end);
     if (note_map != NULL)
 	munmap(note_map, note_map_len);
     munmap(hdr, PAGE_SIZE);
@@ -343,7 +384,7 @@ error:
 }
 
 static Elf_Ehdr *
-get_elf_header(int fd, const char *path, const struct stat *sbp)
+get_elf_header(int fd, const char *path, const struct stat *sbp, const char* main_path)
 {
 	Elf_Ehdr *hdr;
 
@@ -381,6 +422,13 @@ get_elf_header(int fd, const char *path, const struct stat *sbp)
 	}
 	if (hdr->e_machine != ELF_TARG_MACH) {
 		_rtld_error("%s: unsupported machine", path);
+		goto error;
+	}
+
+#ifndef rtld_validate_target_eflags
+#define rtld_validate_target_eflags(path, hdr, main_path) true
+#endif
+	if (!rtld_validate_target_eflags(path, hdr, main_path)) {
 		goto error;
 	}
 

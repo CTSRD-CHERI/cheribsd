@@ -122,12 +122,12 @@ copyout_nofault_c(const void *kaddr, void * __capability udaddr,
 }
 
 int
-copyoutcap_nofault_c(const void *kaddr, void * __capability udaddr, size_t len)
+copyoutcap_nofault(const void *kaddr, void * __capability udaddr, size_t len)
 {
 	int error, save;
 
 	save = vm_fault_disable_pagefaults();
-	error = copyoutcap_c(kaddr, udaddr, len);
+	error = copyoutcap(kaddr, udaddr, len);
 	vm_fault_enable_pagefaults(save);
 	return (error);
 }
@@ -250,7 +250,7 @@ uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 	size_t cnt;
 	int error, newflags, save;
 
-	error = 0;
+	save = error = 0;
 
 	KASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE,
 	    ("uiomove: mode"));
@@ -315,7 +315,7 @@ uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 		n -= cnt;
 	}
 out:
-	if (uio->uio_segflg == UIO_USERSPACE) 
+	if (save)
 		curthread_pflags_restore(save);
 	return (error);
 }

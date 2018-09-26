@@ -33,6 +33,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ffclock.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/timeffc.h>
 #include <sys/proc.h>
@@ -55,7 +57,7 @@ cheriabi_ffclock_getcounter(struct thread *td,
 	ffclock_read_counter(&ffcount);
 	if (ffcount == 0)
 		return (EAGAIN);
-	return (copyout_c(&ffcount, uap->ffcount, sizeof(ffcounter)));
+	return (copyout(&ffcount, uap->ffcount, sizeof(ffcounter)));
 #else
 	return (ENOSYS);
 #endif
@@ -101,13 +103,13 @@ cheriabi_ntp_adjtime(struct thread *td, struct cheriabi_ntp_adjtime_args *uap)
 	struct timex ntv;
 	int error, retval;
 
-	error = copyin_c(uap->tp, &ntv, sizeof(ntv));
+	error = copyin(uap->tp, &ntv, sizeof(ntv));
 	if (error != 0)
 		return (error);
 	error = kern_ntp_adjtime(td, &ntv, &retval);
 	if (error != 0)
 		return (error);
-	error = copyout_c(&ntv, uap->tp, sizeof(ntv));
+	error = copyout(&ntv, uap->tp, sizeof(ntv));
 	if (error == 0)
 		td->td_retval[0] = retval;
 	return (error);
@@ -120,7 +122,7 @@ cheriabi_adjtime(struct thread *td, struct cheriabi_adjtime_args *uap)
 	int error;
 
 	if (uap->delta) {
-		error = copyin_c(uap->delta, &delta, sizeof(delta));
+		error = copyin(uap->delta, &delta, sizeof(delta));
 		if (error != 0)
 			return (error);
 		deltap = &delta;
@@ -128,7 +130,7 @@ cheriabi_adjtime(struct thread *td, struct cheriabi_adjtime_args *uap)
 		deltap = NULL;
 	error = kern_adjtime(td, deltap, &olddelta);
 	if (uap->olddelta && error == 0)
-		error = copyout_c(&olddelta, uap->olddelta, sizeof(olddelta));
+		error = copyout(&olddelta, uap->olddelta, sizeof(olddelta));
 	return (error);
 }
 
@@ -145,7 +147,7 @@ cheriabi_clock_getcpuclockid2(struct thread *td,
 
 	error = kern_clock_getcpuclockid2(td, uap->id, uap->which, &clk_id);
 	if (error == 0)
-		error = copyout_c(&clk_id, uap->clock_id, sizeof(clockid_t));
+		error = copyout(&clk_id, uap->clock_id, sizeof(clockid_t));
 
 	return (error);
 }
@@ -159,7 +161,7 @@ cheriabi_clock_gettime(struct thread *td,
 
 	error = kern_clock_gettime(td, uap->clock_id, &ats);
 	if (error == 0)
-		error = copyout_c(&ats, uap->tp, sizeof(ats));
+		error = copyout(&ats, uap->tp, sizeof(ats));
 
 	return (error);
 }
@@ -171,7 +173,7 @@ cheriabi_clock_settime(struct thread *td,
 	struct timespec ats;
 	int error;
 
-	error = copyin_c(uap->tp, &ats, sizeof(ats));
+	error = copyin(uap->tp, &ats, sizeof(ats));
 	if (error != 0)
 		return (error);
 
@@ -190,7 +192,7 @@ cheriabi_clock_getres(struct thread *td,
 
 	error = kern_clock_getres(td, uap->clock_id, &ats);
 	if (error == 0)
-		error = copyout_c(&ats, uap->tp, sizeof(ats));
+		error = copyout(&ats, uap->tp, sizeof(ats));
 	
 	return (error);
 }
@@ -238,7 +240,7 @@ cheriabi_getitimer(struct thread *td, struct cheriabi_getitimer_args *uap)
 	error = kern_getitimer(td, uap->which, &aitv);
 	if (error != 0)
 		return (error);
-	return (copyout_c(&aitv, uap->itv, sizeof (struct itimerval)));
+	return (copyout(&aitv, uap->itv, sizeof (struct itimerval)));
 }
 
 int
@@ -251,16 +253,16 @@ cheriabi_setitimer(struct thread *td, struct cheriabi_setitimer_args *uap)
 		error = kern_getitimer(td, uap->which, &aitv);
 		if (error != 0)
 			return (error);
-		return (copyout_c(&aitv, uap->oitv, sizeof (struct itimerval)));
+		return (copyout(&aitv, uap->oitv, sizeof (struct itimerval)));
 	}
 
-	error = copyin_c(uap->itv, &aitv, sizeof(struct itimerval));
+	error = copyin(uap->itv, &aitv, sizeof(struct itimerval));
 	if (error != 0)
 		return (error);
 	error = kern_setitimer(td, uap->which, &aitv, &oitv);
 	if (error != 0 || uap->oitv == NULL)
 		return (error);
-	return (copyout_c(&oitv, uap->oitv, sizeof(struct itimerval)));
+	return (copyout(&oitv, uap->oitv, sizeof(struct itimerval)));
 }
 
 int
@@ -273,7 +275,7 @@ cheriabi_ktimer_create(struct thread *td,
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
-		error = copyincap_c(uap->evp, &ev, sizeof(ev));
+		error = copyincap(uap->evp, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
 		evp = &ev;
@@ -281,7 +283,7 @@ cheriabi_ktimer_create(struct thread *td,
 	error = kern_ktimer_create(td, uap->clock_id, evp, &id, -1);
 	if (error != 0)
 		return (error);
-	error = copyout_c(&id, uap->timerid, sizeof(int));
+	error = copyout(&id, uap->timerid, sizeof(int));
 	if (error != 0)
 		kern_ktimer_delete(td, id);
 	return (error);
@@ -294,13 +296,13 @@ cheriabi_ktimer_settime(struct thread *td,
 	struct itimerspec val, oval, *ovalp;
 	int error;
 
-	error = copyin_c(uap->value, &val, sizeof(val));
+	error = copyin(uap->value, &val, sizeof(val));
 	if (error != 0)
 		return (error);
 	ovalp = uap->ovalue != NULL ? &oval : NULL;
 	error = kern_ktimer_settime(td, uap->timerid, uap->flags, &val, ovalp);
 	if (error == 0 && uap->ovalue != NULL)
-		error = copyout_c(ovalp, uap->ovalue, sizeof(*ovalp));
+		error = copyout(ovalp, uap->ovalue, sizeof(*ovalp));
 	return (error);
 }
 
@@ -313,6 +315,6 @@ cheriabi_ktimer_gettime(struct thread *td,
 
 	error = kern_ktimer_gettime(td, uap->timerid, &val);
 	if (error == 0)
-		error = copyout_c(&val, uap->value, sizeof(val));
+		error = copyout(&val, uap->value, sizeof(val));
 	return (error);
 }

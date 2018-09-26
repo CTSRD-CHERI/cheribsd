@@ -27,6 +27,19 @@
  * $FreeBSD$
  */
 
+ /*
+  * CHERI CHANGES START
+  * {
+  *   "updated": 20180828,
+  *   "target_type": "prog",
+  *   "changes": [
+  *     "support"
+  *   ],
+  *   "change_comment": "CHERI relocation"
+  * }
+  * CHERI CHANGES END
+  */
+
 #ifndef RTLD_H /* { */
 #define RTLD_H 1
 
@@ -41,7 +54,17 @@
 #include <stddef.h>
 
 #include "rtld_lock.h"
-#include "rtld_machdep.h"
+
+/* The macros in sys/param.h evaluate their arguments again ... */
+/* XXXAR: I wish I could just use C++ and std::min() */
+#define rtld_min(X, Y)			\
+	({ typeof (X) x_ = (X);		\
+	    typeof (Y) y_ = (Y);	\
+	    (x_ < y_) ? x_ : y_; })
+#define rtld_max(X, Y)			\
+	({ typeof (X) x_ = (X);		\
+	    typeof (Y) y_ = (Y);	\
+	    (x_ > y_) ? x_ : y_; })
 
 #define NEW(type)	((type *) xmalloc(sizeof(type)))
 #define CNEW(type)	((type *) xcalloc(1, sizeof(type)))
@@ -153,6 +176,17 @@ typedef struct Struct_Obj_Entry {
     size_t mapsize;		/* Size of mapped region in bytes */
     size_t textsize;		/* Size of text segment in bytes */
     Elf_Addr vaddrbase;		/* Base address in shared object file */
+#ifdef __CHERI_PURE_CAPABILITY__
+    /*
+     * For CHERI we need a capability for the executable + rodata segments so
+     * that we can derive code capabilities from it.
+     * By having these additional members we can remove execute permissions from
+     * relocbase and mapbase.
+     */
+    Elf_Addr text_rodata_start;
+    Elf_Addr text_rodata_end;
+    caddr_t text_rodata_cap;	/* Capability for the executable mapping */
+#endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */
     caddr_t entry;		/* Entry point */
@@ -186,6 +220,12 @@ typedef struct Struct_Obj_Entry {
     const char *strtab;		/* String table */
     unsigned long strsize;	/* Size in bytes of string table */
 #ifdef __mips__
+#ifdef __CHERI_PURE_CAPABILITY__
+    caddr_t cap_relocs;		/* start of the __cap_relocs section */
+    caddr_t captable;		/* start of the .cap_table section */
+    size_t cap_relocs_size;	/* size of the __cap_relocs section */
+    size_t captable_size;	/* size of the .cap_table section */
+#endif
     Elf_Word local_gotno;	/* Number of local GOT entries */
     Elf_Word symtabno;		/* Number of dynamic symbols */
     Elf_Word gotsym;		/* First dynamic symbol in GOT */
@@ -226,11 +266,11 @@ typedef struct Struct_Obj_Entry {
     Ver_Entry *vertab;		/* Versions required /defined by this object */
     int vernum;			/* Number of entries in vertab */
 
-    Elf_Addr init;		/* Initialization function to call */
-    Elf_Addr fini;		/* Termination function to call */
-    Elf_Addr preinit_array;	/* Pre-initialization array of functions */
-    Elf_Addr init_array;	/* Initialization array of functions */
-    Elf_Addr fini_array;	/* Termination array of functions */
+    void* init_ptr;		/* Initialization function to call */
+    void* fini_ptr;		/* Termination function to call */
+    Elf_Addr* preinit_array_ptr;	/* Pre-initialization array of functions */
+    Elf_Addr* init_array_ptr;	/* Initialization array of functions */
+    Elf_Addr* fini_array_ptr;	/* Termination array of functions */
     int preinit_array_num;	/* Number of entries in preinit_array */
     int init_array_num; 	/* Number of entries in init_array */
     int fini_array_num; 	/* Number of entries in fini_array */
@@ -271,6 +311,20 @@ typedef struct Struct_Obj_Entry {
     bool marker : 1;		/* marker on the global obj list */
     bool unholdfree : 1;	/* unmap upon last unhold */
     bool doomed : 1;		/* Object cannot be referenced */
+#ifdef __CHERI_PURE_CAPABILITY__
+    bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
+    /*
+     * If restrict_pcc_basic is true we can restricted $pcc to the object's
+     * executable segment, if restrict_pcc_strict is true we can restrict it
+     * to just the functions bounds in dlsym()/dlfunc(). Otherwise we need to
+     * fall back to giving the full address space bounds in $pcc.
+     *
+     * TODO: remove these options once we have decided on the correct ABI
+     */
+    bool restrict_pcc_basic : 1;
+    bool restrict_pcc_strict : 1;
+    unsigned cheri_captable_abi : 3;
+#endif
 
     struct link_map linkmap;	/* For GDB and dlinfo() */
     Objlist dldags;		/* Object belongs to these dlopened DAGs (%) */
@@ -352,8 +406,10 @@ typedef struct Struct_SymLook {
 
 void _rtld_error(const char *, ...) __printflike(1, 2) __exported;
 void rtld_die(void) __dead2;
+#define rtld_fatal(args...)	do { _rtld_error(args); rtld_die(); } while (0)
+#define rtld_require(cond, args...) if (!(cond)) { rtld_fatal(args); }
 const char *rtld_strerror(int);
-Obj_Entry *map_object(int, const char *, const struct stat *);
+Obj_Entry *map_object(int, const char *, const struct stat *, const char *);
 void *xcalloc(size_t, size_t);
 void *xmalloc(size_t);
 char *xstrdup(const char *);
@@ -368,6 +424,24 @@ void dump_obj_relocations(Obj_Entry *);
 void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
+
+/* rtld_machdep.h depends on struct Obj_Entry and _rtld_error() */
+#include "rtld_machdep.h"
+
+/* Archictectures other than CHERI can just call the pointer */
+#ifndef call_init_array_pointer
+#define call_init_array_pointer(obj, target) call_init_pointer(obj, target)
+#endif
+
+#ifndef call_fini_array_pointer
+#define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, target)
+#endif
+
+#ifndef __CHERI_PURE_CAPABILITY__
+/* For CHERI we also set bounds (see rtld_machdep in rtld-cheri-elf) */
+#define make_data_pointer(def, defobj)	(defobj->relocbase + def->st_value)
+#endif
+
 /*
  * Function declarations.
  */
@@ -375,7 +449,7 @@ unsigned long elf_hash(const char *);
 const Elf_Sym *find_symdef(unsigned long, const Obj_Entry *,
   const Obj_Entry **, int, SymCache *, struct Struct_RtldLockState *);
 void lockdflt_init(void);
-void digest_notes(Obj_Entry *, Elf_Addr, Elf_Addr);
+void digest_notes(Obj_Entry *, const Elf_Note *, const Elf_Note *);
 Obj_Entry *globallist_curr(const Obj_Entry *obj);
 Obj_Entry *globallist_next(const Obj_Entry *obj);
 void obj_free(Obj_Entry *);
@@ -384,7 +458,7 @@ void _rtld_bind_start(void);
 void *rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def);
 void symlook_init(SymLook *, const char *);
 int symlook_obj(SymLook *, const Obj_Entry *);
-void *tls_get_addr_common(Elf_Addr** dtvp, int index, size_t offset);
+void *tls_get_addr_common(uintptr_t** dtvp, int index, size_t offset);
 void *allocate_tls(Obj_Entry *, void *, size_t, size_t);
 void free_tls(void *, size_t, size_t);
 void *allocate_module_tls(int index);
@@ -407,5 +481,9 @@ void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
 void pre_init(void);
 void init_pltgot(Obj_Entry *);
 void allocate_initial_tls(Obj_Entry *);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+void process___cap_relocs(Obj_Entry*);
+#endif
 
 #endif /* } */

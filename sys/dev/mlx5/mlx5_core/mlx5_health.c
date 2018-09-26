@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2015, Mellanox Technologies, Ltd.  All rights reserved.
+ * Copyright (c) 2013-2017, Mellanox Technologies, Ltd.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -48,8 +48,6 @@ enum {
 enum {
 	MLX5_DROP_NEW_HEALTH_WORK,
 	MLX5_DROP_NEW_RECOVERY_WORK,
-	MLX5_SKIP_SW_RESET,
-	MLX5_SW_RESET_SEM_LOCKED,
 };
 
 enum  {
@@ -61,19 +59,19 @@ enum  {
 	MLX5_SENSOR_FW_SYND_RFR		= 5,
 };
 
-static int lock_sem_sw_reset(struct mlx5_core_dev *dev, int state)
+static int lock_sem_sw_reset(struct mlx5_core_dev *dev)
 {
-	int ret, err;
+	int ret;
 
 	/* Lock GW access */
-	ret = mlx5_pciconf_cap9_sem(dev, LOCK);
+	ret = -mlx5_vsc_lock(dev);
 	if (ret) {
-		mlx5_core_warn(dev, "Timed out locking gateway %d, %d\n", state, ret);
+		mlx5_core_warn(dev, "Timed out locking gateway %d\n", ret);
 		return ret;
 	}
 
-	ret = mlx5_pciconf_set_sem_addr_space(dev, MLX5_SEMAPHORE_SW_RESET, state);
-	if (ret && state == LOCK) {
+	ret = -mlx5_vsc_lock_addr_space(dev, MLX5_SEMAPHORE_SW_RESET);
+	if (ret) {
 		if (ret == -EBUSY)
 			mlx5_core_dbg(dev, "SW reset FW semaphore already locked, another function will handle the reset\n");
 		else
@@ -81,9 +79,26 @@ static int lock_sem_sw_reset(struct mlx5_core_dev *dev, int state)
 	}
 
 	/* Unlock GW access */
-	err = mlx5_pciconf_cap9_sem(dev, UNLOCK);
-	if (err)
-		mlx5_core_warn(dev, "Timed out unlocking gateway: state %d, err %d\n", state, err);
+	mlx5_vsc_unlock(dev);
+
+	return ret;
+}
+
+static int unlock_sem_sw_reset(struct mlx5_core_dev *dev)
+{
+	int ret;
+
+	/* Lock GW access */
+	ret = -mlx5_vsc_lock(dev);
+	if (ret) {
+		mlx5_core_warn(dev, "Timed out locking gateway %d\n", ret);
+		return ret;
+	}
+
+	ret = -mlx5_vsc_unlock_addr_space(dev, MLX5_SEMAPHORE_SW_RESET);
+
+	/* Unlock GW access */
+	mlx5_vsc_unlock(dev);
 
 	return ret;
 }
@@ -167,7 +182,6 @@ static void reset_fw_if_needed(struct mlx5_core_dev *dev)
 {
 	bool supported = (ioread32be(&dev->iseg->initializing) >>
 			  MLX5_FW_RESET_SUPPORTED_OFFSET) & 1;
-	struct mlx5_core_health *health = &dev->priv.health;
 	u32 cmdq_addr, fatal_error;
 
 	if (!supported)
@@ -181,9 +195,8 @@ static void reset_fw_if_needed(struct mlx5_core_dev *dev)
 	fatal_error = check_fatal_sensors(dev);
 	if (fatal_error == MLX5_SENSOR_PCI_COMM_ERR ||
 	    fatal_error == MLX5_SENSOR_NIC_DISABLED ||
-	    fatal_error == MLX5_SENSOR_NIC_SW_RESET ||
-	    test_bit(MLX5_SKIP_SW_RESET, &health->flags)) {
-		mlx5_core_warn(dev, "Not issuing FW reset. Either it's already done or won't help.");
+	    fatal_error == MLX5_SENSOR_NIC_SW_RESET) {
+		mlx5_core_warn(dev, "Not issuing FW reset. Either it's already done or won't help.\n");
 		return;
 	}
 
@@ -197,27 +210,66 @@ static void reset_fw_if_needed(struct mlx5_core_dev *dev)
 		    &dev->iseg->cmdq_addr_l_sz);
 }
 
+#define MLX5_CRDUMP_WAIT_MS	60000
+#define MLX5_FW_RESET_WAIT_MS	1000
+#define MLX5_NIC_STATE_POLL_MS	5
 void mlx5_enter_error_state(struct mlx5_core_dev *dev, bool force)
 {
-	mutex_lock(&dev->intf_state_mutex);
-	if (dev->state == MLX5_DEVICE_STATE_INTERNAL_ERROR) {
-		goto unlock;
-		return;
-	}
+	unsigned long end, delay_ms = MLX5_CRDUMP_WAIT_MS;
+	u32 fatal_error;
+	int lock = -EBUSY;
 
-	if (!force)
-		mlx5_core_err(dev, "internal state error detected\n");
-	if (check_fatal_sensors(dev) || force) {
-		reset_fw_if_needed(dev);
-		dev->state = MLX5_DEVICE_STATE_INTERNAL_ERROR;
+	fatal_error = check_fatal_sensors(dev);
+
+	if (fatal_error || force) {
+		if (xchg(&dev->state, MLX5_DEVICE_STATE_INTERNAL_ERROR) ==
+		    MLX5_DEVICE_STATE_INTERNAL_ERROR)
+			return;
+		if (!force)
+			mlx5_core_err(dev, "internal state error detected\n");
 		mlx5_trigger_cmd_completions(dev);
 	}
 
-	mlx5_core_event(dev, MLX5_DEV_EVENT_SYS_ERROR, 0);
-	if (!force)
-		mlx5_core_err(dev, "system error event triggered\n");
+	mutex_lock(&dev->intf_state_mutex);
 
-unlock:
+	if (force)
+		goto err_state_done;
+
+	if (fatal_error == MLX5_SENSOR_FW_SYND_RFR) {
+		/* Get cr-dump and reset FW semaphore */
+		if (mlx5_core_is_pf(dev))
+			lock = lock_sem_sw_reset(dev);
+
+		/* Execute cr-dump and SW reset */
+		if (lock != -EBUSY) {
+			mlx5_fwdump(dev);
+			reset_fw_if_needed(dev);
+			delay_ms = MLX5_FW_RESET_WAIT_MS;
+		}
+	}
+
+	/* Recover from SW reset */
+	end = jiffies + msecs_to_jiffies(delay_ms);
+	do {
+		if (sensor_nic_disabled(dev))
+			break;
+
+		msleep(MLX5_NIC_STATE_POLL_MS);
+	} while (!time_after(jiffies, end));
+
+	if (!sensor_nic_disabled(dev)) {
+		dev_err(&dev->pdev->dev, "NIC IFC still %d after %lums.\n",
+			get_nic_mode(dev), delay_ms);
+	}
+
+	/* Release FW semaphore if you are the lock owner */
+	if (!lock)
+		unlock_sem_sw_reset(dev);
+
+	mlx5_core_err(dev, "system error event triggered\n");
+
+err_state_done:
+	mlx5_core_event(dev, MLX5_DEV_EVENT_SYS_ERROR, 0);
 	mutex_unlock(&dev->intf_state_mutex);
 }
 
@@ -262,10 +314,11 @@ static void health_recover(struct work_struct *work)
 	priv = container_of(health, struct mlx5_priv, health);
 	dev = container_of(priv, struct mlx5_core_dev, priv);
 
+	mtx_lock(&Giant);	/* XXX newbus needs this */
+
 	if (sensor_pci_no_comm(dev)) {
 		dev_err(&dev->pdev->dev, "health recovery flow aborted, PCI reads still not working\n");
 		recover = false;
-		goto clear_sem;
 	}
 
 	nic_mode = get_nic_mode(dev);
@@ -281,18 +334,12 @@ static void health_recover(struct work_struct *work)
 		recover = false;
 	}
 
-clear_sem:
-	if (test_and_clear_bit(MLX5_SW_RESET_SEM_LOCKED, &health->flags)) {
-		mlx5_core_dbg(dev, "Unlocking FW reset semaphore\n");
-		lock_sem_sw_reset(dev, UNLOCK);
-	}
-
-	test_and_clear_bit(MLX5_SKIP_SW_RESET, &health->flags);
-
 	if (recover) {
 		dev_err(&dev->pdev->dev, "starting health recovery flow\n");
 		mlx5_recover_device(dev);
 	}
+
+	mtx_unlock(&Giant);
 }
 
 /* How much time to wait until health resetting the driver (in msecs) */
@@ -312,28 +359,10 @@ static void health_care(struct work_struct *work)
 	struct mlx5_core_dev *dev;
 	struct mlx5_priv *priv;
 	unsigned long flags;
-	int ret;
 
 	health = container_of(work, struct mlx5_core_health, work);
 	priv = container_of(health, struct mlx5_priv, health);
 	dev = container_of(priv, struct mlx5_core_dev, priv);
-
-	if (mlx5_core_is_pf(dev)) {
-		ret = lock_sem_sw_reset(dev, LOCK);
-		if (!ret) {
-			mlx5_core_warn(dev, "Locked FW reset semaphore\n");
-			set_bit(MLX5_SW_RESET_SEM_LOCKED, &health->flags);
-		}
-		else if (ret == -EBUSY) {
-			/* sw reset will be skipped only in case we detect the
-			 * semaphore was already taken. In case of an error
-			 * while taking the semaphore we prefer to issue a
-			 * reset since longer cr-dump time and multiple resets
-			 * are better than a stuck fw.
-			 */
-			set_bit(MLX5_SKIP_SW_RESET, &health->flags);
-		}
-	}
 
 	mlx5_core_warn(dev, "handling bad device here\n");
 	mlx5_handle_bad_state(dev);

@@ -30,6 +30,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -72,8 +74,8 @@ static STAILQ_HEAD(, tcp_log_id_node) tcp_log_expireq_head =
     STAILQ_HEAD_INITIALIZER(tcp_log_expireq_head);
 static struct mtx tcp_log_expireq_mtx;
 static struct callout tcp_log_expireq_callout;
-static uint64_t tcp_log_auto_ratio = 0;
-static uint64_t tcp_log_auto_ratio_cur = 0;
+static u_long tcp_log_auto_ratio = 0;
+static volatile u_long tcp_log_auto_ratio_cur = 0;
 static uint32_t tcp_log_auto_mode = TCP_LOG_STATE_TAIL;
 static bool tcp_log_auto_all = false;
 
@@ -109,7 +111,7 @@ SYSCTL_UMA_CUR(_net_inet_tcp_bb, OID_AUTO, log_id_tcpcb_entries, CTLFLAG_RD,
 SYSCTL_U32(_net_inet_tcp_bb, OID_AUTO, log_version, CTLFLAG_RD, &tcp_log_version,
     0, "Version of log formats exported");
 
-SYSCTL_U64(_net_inet_tcp_bb, OID_AUTO, log_auto_ratio, CTLFLAG_RW,
+SYSCTL_ULONG(_net_inet_tcp_bb, OID_AUTO, log_auto_ratio, CTLFLAG_RW,
     &tcp_log_auto_ratio, 0, "Do auto capturing for 1 out of N sessions");
 
 SYSCTL_U32(_net_inet_tcp_bb, OID_AUTO, log_auto_mode, CTLFLAG_RW,
@@ -283,7 +285,7 @@ tcp_log_selectauto(void)
 	 * this session.
 	 */
 	if (tcp_log_auto_ratio &&
-	    (atomic_fetchadd_64(&tcp_log_auto_ratio_cur, 1) %
+	    (atomic_fetchadd_long(&tcp_log_auto_ratio_cur, 1) %
 	    tcp_log_auto_ratio) == 0)
 		return (true);
 	return (false);
@@ -1639,7 +1641,7 @@ tcp_log_copyout(struct sockopt *sopt, void *src, void * __capability dst,
 {
 
 	if (sopt->sopt_td != NULL)
-		return (copyout_c(src, dst, len));
+		return (copyout(src, dst, len));
 	bcopy(src, (__cheri_fromcap void *)dst, len);
 	return (0);
 }
@@ -1668,52 +1670,7 @@ tcp_log_logs_to_buf(struct sockopt *sopt, struct tcp_log_stailq *log_tailqp,
 #ifdef TCPLOG_DEBUG_COUNTERS
 		counter_u64_add(tcp_log_que_copyout, 1);
 #endif
-#if 0
-		struct tcp_log_buffer *lb = &log_entry->tlm_buf;
-		int i;
 
-		printf("lb = %p:\n", lb);
-#define	PRINT(f)	printf(#f " = %u\n", (unsigned int)lb->f)
-		printf("tlb_tv = {%lu, %lu}\n", lb->tlb_tv.tv_sec, lb->tlb_tv.tv_usec);
-		PRINT(tlb_ticks);
-		PRINT(tlb_sn);
-		PRINT(tlb_stackid);
-		PRINT(tlb_eventid);
-		PRINT(tlb_eventflags);
-		PRINT(tlb_errno);
-		PRINT(tlb_rxbuf.tls_sb_acc);
-		PRINT(tlb_rxbuf.tls_sb_ccc);
-		PRINT(tlb_rxbuf.tls_sb_spare);
-		PRINT(tlb_txbuf.tls_sb_acc);
-		PRINT(tlb_txbuf.tls_sb_ccc);
-		PRINT(tlb_txbuf.tls_sb_spare);
-		PRINT(tlb_state);
-		PRINT(tlb_flags);
-		PRINT(tlb_snd_una);
-		PRINT(tlb_snd_max);
-		PRINT(tlb_snd_cwnd);
-		PRINT(tlb_snd_nxt);
-		PRINT(tlb_snd_recover);
-		PRINT(tlb_snd_wnd);
-		PRINT(tlb_snd_ssthresh);
-		PRINT(tlb_srtt);
-		PRINT(tlb_rttvar);
-		PRINT(tlb_rcv_up);
-		PRINT(tlb_rcv_adv);
-		PRINT(tlb_rcv_nxt);
-		PRINT(tlb_sack_newdata);
-		PRINT(tlb_rcv_wnd);
-		PRINT(tlb_dupacks);
-		PRINT(tlb_segqlen);
-		PRINT(tlb_snd_numholes);
-		PRINT(tlb_snd_scale);
-		PRINT(tlb_rcv_scale);
-		PRINT(tlb_len);
-		printf("hex dump: ");
-		for (i = 0; i < sizeof(struct tcp_log_buffer); i++)
-			printf("%02x", *(((uint8_t *)lb) + i));
-#undef PRINT
-#endif
 		/*
 		 * Skip copying out the header if it isn't present.
 		 * Instead, copy out zeros (to ensure we don't leak info).

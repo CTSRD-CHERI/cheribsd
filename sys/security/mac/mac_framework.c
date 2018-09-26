@@ -586,7 +586,9 @@ int
 mac_check_structmac_consistent(const kmac_t *mac)
 {
 
-	if (mac->m_buflen > MAC_MAX_LABEL_BUF_LEN)
+	/* Require that labels have a non-zero length. */
+	if (mac->m_buflen > MAC_MAX_LABEL_BUF_LEN ||
+	    mac->m_buflen <= sizeof(""))
 		return (EINVAL);
 
 	return (0);
@@ -605,7 +607,7 @@ copyin_mac(void * __capability mac_p, kmac_t *mac)
 #endif
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		error = copyincap_c(mac_p, mac, sizeof(*mac))
+		error = copyincap(mac_p, mac, sizeof(*mac))
 	} else
 #endif
 	{

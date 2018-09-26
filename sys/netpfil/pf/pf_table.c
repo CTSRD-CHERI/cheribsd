@@ -44,7 +44,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/mbuf.h>
 #include <sys/mutex.h>
 #include <sys/refcount.h>
-#include <sys/rwlock.h>
 #include <sys/socket.h>
 #include <vm/uma.h>
 
@@ -123,9 +122,9 @@ struct pfr_walktree {
 #define	senderr(e)	do { rv = (e); goto _bad; } while (0)
 
 static MALLOC_DEFINE(M_PFTABLE, "pf_table", "pf(4) tables structures");
-static VNET_DEFINE(uma_zone_t, pfr_kentry_z);
+VNET_DEFINE_STATIC(uma_zone_t, pfr_kentry_z);
 #define	V_pfr_kentry_z		VNET(pfr_kentry_z)
-static VNET_DEFINE(uma_zone_t, pfr_kcounters_z);
+VNET_DEFINE_STATIC(uma_zone_t, pfr_kcounters_z);
 #define	V_pfr_kcounters_z	VNET(pfr_kcounters_z)
 
 static struct pf_addr	 pfr_ffaddr = {
@@ -177,7 +176,6 @@ static struct pfr_ktable
 			*pfr_lookup_table(struct pfr_table *);
 static void		 pfr_clean_node_mask(struct pfr_ktable *,
 			    struct pfr_kentryworkq *);
-static int		 pfr_table_count(struct pfr_table *, int);
 static int		 pfr_skip_table(struct pfr_table *,
 			    struct pfr_ktable *, int);
 static struct pfr_kentry
@@ -186,13 +184,13 @@ static struct pfr_kentry
 static RB_PROTOTYPE(pfr_ktablehead, pfr_ktable, pfrkt_tree, pfr_ktable_compare);
 static RB_GENERATE(pfr_ktablehead, pfr_ktable, pfrkt_tree, pfr_ktable_compare);
 
-static VNET_DEFINE(struct pfr_ktablehead, pfr_ktables);
+VNET_DEFINE_STATIC(struct pfr_ktablehead, pfr_ktables);
 #define	V_pfr_ktables	VNET(pfr_ktables)
 
-static VNET_DEFINE(struct pfr_table, pfr_nulltable);
+VNET_DEFINE_STATIC(struct pfr_table, pfr_nulltable);
 #define	V_pfr_nulltable	VNET(pfr_nulltable)
 
-static VNET_DEFINE(int, pfr_ktable_cnt);
+VNET_DEFINE_STATIC(int, pfr_ktable_cnt);
 #define V_pfr_ktable_cnt	VNET(pfr_ktable_cnt)
 
 void
@@ -1688,7 +1686,7 @@ pfr_fix_anchor(char *anchor)
 	return (0);
 }
 
-static int
+int
 pfr_table_count(struct pfr_table *filter, int flags)
 {
 	struct pf_ruleset *rs;

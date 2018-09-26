@@ -47,7 +47,7 @@
 #
 #
 # KMODDIR	Base path for loadable kernel modules
-#		(see kld(4)). [/boot/module]
+#		(see kld(4)). [/boot/modules]
 #
 # KMODOWN	Kernel and KLD owner. [${BINOWN}]
 #
@@ -73,6 +73,13 @@
 # CONFGRP	Configuration file group. [wheel]
 #
 # CONFMODE	Configuration file mode. [644]
+#
+#
+# DIROWN	Directory owner. [root]
+#
+# DIRGRP	Directory group. [wheel]
+#
+# DIRMODE	Directory mode. [755]
 #
 #
 # DOCDIR	Base path for system documentation (e.g. PSD, USD,
@@ -158,6 +165,7 @@ KMODOWN?=	${BINOWN}
 KMODGRP?=	${BINGRP}
 KMODMODE?=	${BINMODE}
 DTBDIR?=	/boot/dtb
+DTBODIR?=	/boot/dtb/overlays
 DTBOWN?=	root
 DTBGRP?=	wheel
 DTBMODE?=	444
@@ -196,6 +204,10 @@ MANDIR?=	${SHAREDIR}/man/man
 MANOWN?=	${SHAREOWN}
 MANGRP?=	${SHAREGRP}
 MANMODE?=	${NOBINMODE}
+
+DIROWN?=	root
+DIRGRP?=	wheel
+DIRMODE?=	755
 
 DOCDIR?=	${SHAREDIR}/doc
 DOCOWN?=	${SHAREOWN}
@@ -255,7 +267,7 @@ XZ_CMD?=	xz
 PKG_CMD?=	pkg
 
 # Pointer to the top directory into which tests are installed.  Should not be
-# overriden by Makefiles, but the user may choose to set this in src.conf(5).
+# overridden by Makefiles, but the user may choose to set this in src.conf(5).
 TESTSBASE?= /usr/tests
 
 DEPENDFILE?=	.depend

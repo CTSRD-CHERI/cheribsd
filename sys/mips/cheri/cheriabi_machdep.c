@@ -45,8 +45,9 @@
  * SUCH DAMAGE.
  */
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
+
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -238,12 +239,12 @@ cheriabi_fetch_syscall_args(struct thread *td)
 		for (i = 0; i < sa->narg; i++) {
 			if (ptrmask & (1 << i)) {
 				offset = roundup2(offset, sizeof(uintcap_t));
-				error = copyincap_c(
+				error = copyincap(
 				    (char * __capability)locr0->c13 + offset,
 				    &sa->args[i], sizeof(sa->args[i]));
 				offset += sizeof(uintcap_t);
 			} else {
-				error = copyin_c(
+				error = copyin(
 				    (char * __capability)locr0->c13 + offset,
 				    &intval, sizeof(intval));
 				sa->args[i] = intval;
@@ -347,7 +348,7 @@ cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
 
 	tp = td->td_frame;
 	PROC_LOCK(curthread->td_proc);
-	mcp->mc_onstack = sigonstack((vaddr_t)tp->csp);
+	mcp->mc_onstack = sigonstack((__cheri_addr vaddr_t)tp->csp);
 	PROC_UNLOCK(curthread->td_proc);
 	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
 	    sizeof(mcp->mc_regs));
@@ -451,7 +452,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * pointer and bounds...?
 	 */
 	regs = td->td_frame;
-	oonstack = sigonstack((vaddr_t)regs->csp);
+	oonstack = sigonstack((__cheri_addr vaddr_t)regs->csp);
 
 	/*
 	 * CHERI affects signal delivery in the following ways:
@@ -581,10 +582,10 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		 * on the safe side.
 		 */
 		regs->c3 = cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)&sfp->sf_si,
+		    CHERI_CAP_USER_DATA_PERMS, (__cheri_addr vaddr_t)&sfp->sf_si,
 		    sizeof(sfp->sf_si), 0);
 		regs->c4 = cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)&sfp->sf_uc,
+		    CHERI_CAP_USER_DATA_PERMS, (__cheri_addr vaddr_t)&sfp->sf_uc,
 		    sizeof(sfp->sf_uc), 0);
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
@@ -622,7 +623,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/*
 	 * Copy the sigframe out to the user's stack.
 	 */
-	if (copyoutcap_c(&sf, sfp, sizeof(sf)) != 0) {
+	if (copyoutcap(&sf, sfp, sizeof(sf)) != 0) {
 		/*
 		 * Something is wrong with the stack pointer.
 		 * ...Kill the process.
@@ -647,7 +648,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (generally) be removed automatically on sigreturn().
 	 */
-	regs->pc = (register_t)(intptr_t)catcher;
+	regs->pc = (register_t)(__cheri_addr vaddr_t)catcher;
 	regs->pcc = catcher;
 	regs->csp = sfp;
 	regs->c12 = catcher;
@@ -827,8 +828,15 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 */
 	/* XXXAR: is there a better way to check for dynamic binaries? */
 	is_dynamic_binary = imgp->reloc_base != 0;
-	data_length = is_dynamic_binary ?
-	    CHERI_CAP_USER_DATA_LENGTH - imgp->reloc_base : text_end;
+	/*
+	 * XXXAR: data_length needs to be the full address space to allow
+	 * legacy TLS to work since the TLS region will be beyond the end of
+	 * the text section. This does not matter for new binaries since they
+	 * will all clear $ddc as one of the first user instructions anyway.
+	 * TODO: add a kernel config option to start with NULL $ddc once
+	 * crt_init_globals is fixed.
+	 */
+	data_length = CHERI_CAP_USER_DATA_LENGTH - imgp->reloc_base;
 	code_length = is_dynamic_binary ?
 	    CHERI_CAP_USER_CODE_LENGTH - imgp->reloc_base : text_end;
 	frame = &td->td_pcb->pcb_regs;
@@ -1037,7 +1045,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		return (cheriabi_set_user_tls(td, uap->parms));
 
 	case MIPS_GET_TLS:
-		error = copyoutcap_c(&td->td_md.md_tls, uap->parms,
+		error = copyoutcap(&td->td_md.md_tls, uap->parms,
 		    sizeof(void * __capability));
 		return (error);
 
@@ -1048,11 +1056,11 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 #ifdef CPU_QEMU_MALTA
 	case QEMU_GET_QTRACE:
 		intval = (td->td_md.md_flags & MDTD_QTRACE) ? 1 : 0;
-		error = copyout_c(&intval, uap->parms, sizeof(intval));
+		error = copyout(&intval, uap->parms, sizeof(intval));
 		return (error);
 
 	case QEMU_SET_QTRACE:
-		error = copyin_c(uap->parms, &intval, sizeof(intval));
+		error = copyin(uap->parms, &intval, sizeof(intval));
 		if (error)
 			return (error);
 		if (intval)
@@ -1072,7 +1080,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		size_t base;
 
 		base = cheri_getbase(td->td_md.md_cheri_mmap_cap);
-		if (suword_c(uap->parms, base) != 0)
+		if (suword(uap->parms, base) != 0)
 			return (EFAULT);
 		return (0);
 	}
@@ -1081,7 +1089,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		size_t len;
 
 		len = cheri_getlen(td->td_md.md_cheri_mmap_cap);
-		if (suword_c(uap->parms, len) != 0)
+		if (suword(uap->parms, len) != 0)
 			return (EFAULT);
 		return (0);
 	}
@@ -1090,7 +1098,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		ssize_t offset;
 
 		offset = cheri_getoffset(td->td_md.md_cheri_mmap_cap);
-		if (suword_c(uap->parms, offset) != 0)
+		if (suword(uap->parms, offset) != 0)
 			return (EFAULT);
 		return (0);
 	}
@@ -1099,21 +1107,21 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		uint64_t perms;
 
 		perms = cheri_getperm(td->td_md.md_cheri_mmap_cap);
-		if (suword64_c(uap->parms, perms) != 0)
+		if (suword64(uap->parms, perms) != 0)
 			return (EFAULT);
 		return (0);
 	}
 
 	case CHERI_MMAP_ANDPERM: {
 		uint64_t perms;
-		perms = fuword64_c(uap->parms);
+		perms = fuword64(uap->parms);
 
 		if (perms == -1)
 			return (EINVAL);
 		td->td_md.md_cheri_mmap_cap =
 		    cheri_andperm(td->td_md.md_cheri_mmap_cap, perms);
 		perms = cheri_getperm(td->td_md.md_cheri_mmap_cap);
-		if (suword64_c(uap->parms, perms) != 0)
+		if (suword64(uap->parms, perms) != 0)
 			return (EFAULT);
 		return (0);
 	}
@@ -1122,7 +1130,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		size_t len;
 		ssize_t offset;
 
-		offset = fuword_c(uap->parms);
+		offset = fuword(uap->parms);
 		/* Reject errors and misaligned offsets */
 		if (offset == -1 || (offset & PAGE_MASK) != 0)
 			return (EINVAL);
@@ -1141,7 +1149,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		size_t len, olen;
 		ssize_t offset;
 
-		len = fuword_c(uap->parms);
+		len = fuword(uap->parms);
 		/* Reject errors or misaligned lengths */
 		if (len == (size_t)-1 || (len & PAGE_MASK) != 0)
 			return (EINVAL);

@@ -78,6 +78,7 @@ void _rtld_powerpc_pltcall(void);
 #define calculate_tls_offset(prev_offset, prev_size, size, align) \
     round(prev_offset + prev_size, align)
 #define calculate_tls_end(off, size)    ((off) + (size))
+#define calculate_tls_post_size(align)  0
  
 typedef struct {
 	unsigned long ti_module;

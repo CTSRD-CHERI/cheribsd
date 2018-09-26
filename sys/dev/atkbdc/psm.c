@@ -2023,9 +2023,9 @@ psmdetach(device_t dev)
 
 #ifdef EVDEV_SUPPORT
 static int
-psm_ev_open_r(struct evdev_dev *evdev, void *ev_softc)
+psm_ev_open_r(struct evdev_dev *evdev)
 {
-	struct psm_softc *sc = (struct psm_softc *)ev_softc;
+	struct psm_softc *sc = evdev_get_softc(evdev);
 	int err = 0;
 
 	/* Get device data */
@@ -2043,24 +2043,27 @@ psm_ev_open_r(struct evdev_dev *evdev, void *ev_softc)
 	return (err);
 }
 
-static void
-psm_ev_close_r(struct evdev_dev *evdev, void *ev_softc)
+static int
+psm_ev_close_r(struct evdev_dev *evdev)
 {
-	struct psm_softc *sc = (struct psm_softc *)ev_softc;
+	struct psm_softc *sc = evdev_get_softc(evdev);
+	int err = 0;
 
 	sc->state &= ~PSM_EV_OPEN_R;
 
 	if (sc->state & (PSM_OPEN | PSM_EV_OPEN_A))
-		return;
+		return (0);
 
 	if (sc->state & PSM_VALID)
-		psmclose(sc);
+		err = psmclose(sc);
+
+	return (err);
 }
 
 static int
-psm_ev_open_a(struct evdev_dev *evdev, void *ev_softc)
+psm_ev_open_a(struct evdev_dev *evdev)
 {
-	struct psm_softc *sc = (struct psm_softc *)ev_softc;
+	struct psm_softc *sc = evdev_get_softc(evdev);
 	int err = 0;
 
 	/* Get device data */
@@ -2078,18 +2081,21 @@ psm_ev_open_a(struct evdev_dev *evdev, void *ev_softc)
 	return (err);
 }
 
-static void
-psm_ev_close_a(struct evdev_dev *evdev, void *ev_softc)
+static int
+psm_ev_close_a(struct evdev_dev *evdev)
 {
-	struct psm_softc *sc = (struct psm_softc *)ev_softc;
+	struct psm_softc *sc = evdev_get_softc(evdev);
+	int err = 0;
 
 	sc->state &= ~PSM_EV_OPEN_A;
 
 	if (sc->state & (PSM_OPEN | PSM_EV_OPEN_R))
-		return;
+		return (0);
 
 	if (sc->state & PSM_VALID)
-		psmclose(sc);
+		err = psmclose(sc);
+
+	return (err);
 }
 #endif
 
@@ -2560,9 +2566,6 @@ psmioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 	struct psm_softc *sc = dev->si_drv1;
 	mousemode_t mode;
 	mousestatus_t status;
-#if (defined(MOUSE_GETVARS))
-	mousevar_t *var;
-#endif
 	mousedata_t *data;
 	int stat[3];
 	int command_byte;
@@ -2758,21 +2761,6 @@ psmioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag,
 		splx(s);
 		*(mousestatus_t *)addr = status;
 		break;
-
-#if (defined(MOUSE_GETVARS))
-	case MOUSE_GETVARS:
-		var = (mousevar_t *)addr;
-		bzero(var, sizeof(*var));
-		s = spltty();
-		var->var[0] = MOUSE_VARS_PS2_SIG;
-		var->var[1] = sc->config;
-		var->var[2] = sc->flags;
-		splx(s);
-		break;
-
-	case MOUSE_SETVARS:
-		return (ENODEV);
-#endif /* MOUSE_GETVARS */
 
 	case MOUSE_READSTATE:
 	case MOUSE_READDATA:
@@ -4966,8 +4954,8 @@ psmsoftintr(void *arg)
 	if (evdev_rcpt_mask & EVDEV_RCPT_HW_MOUSE &&
 	    sc->hw.model != MOUSE_MODEL_ELANTECH &&
 	    sc->hw.model != MOUSE_MODEL_SYNAPTICS) {
-		evdev_push_rel(sc->evdev_r, EV_REL, x);
-		evdev_push_rel(sc->evdev_r, EV_REL, -y);
+		evdev_push_rel(sc->evdev_r, REL_X, x);
+		evdev_push_rel(sc->evdev_r, REL_Y, -y);
 
 		switch (sc->hw.model) {
 		case MOUSE_MODEL_EXPLORER:

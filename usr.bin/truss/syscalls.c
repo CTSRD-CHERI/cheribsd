@@ -50,6 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/socket.h>
 #define _WANT_FREEBSD11_STAT
 #include <sys/stat.h>
+#include <sys/time.h>
 #include <sys/un.h>
 #include <sys/wait.h>
 #include <netinet/in.h>
@@ -580,7 +581,7 @@ static struct syscall decoded_syscalls[] = {
 	  .args = { { Int, 0 }, { CloudABIFDStat | OUT, 1 } } },
 	{ .name = "cloudabi_sys_fd_stat_put", .ret_type = 1, .nargs = 3,
 	  .args = { { Int, 0 }, { CloudABIFDStat | IN, 1 },
-	            { ClouduABIFDSFlags, 2 } } },
+	            { CloudABIFDSFlags, 2 } } },
 	{ .name = "cloudabi_sys_fd_sync", .ret_type = 1, .nargs = 1,
 	  .args = { { Int, 0 } } },
 	{ .name = "cloudabi_sys_file_advise", .ret_type = 1, .nargs = 4,
@@ -2513,7 +2514,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 	case CloudABIClockID:
 		fputs(xlookup(cloudabi_clockid, args[sc->offset]), fp);
 		break;
-	case ClouduABIFDSFlags:
+	case CloudABIFDSFlags:
 		fputs(xlookup_bits(cloudabi_fdsflags, args[sc->offset]), fp);
 		break;
 	case CloudABIFDStat: {
@@ -2633,7 +2634,7 @@ print_syscall_ret(struct trussinfo *trussinfo, int errorp, long *retval)
 	t = trussinfo->curthread;
 	sc = t->cs.sc;
 	if (trussinfo->flags & COUNTONLY) {
-		timespecsubt(&t->after, &t->before, &timediff);
+		timespecsub(&t->after, &t->before, &timediff);
 		timespecadd(&sc->time, &timediff, &sc->time);
 		sc->ncalls++;
 		if (errorp)

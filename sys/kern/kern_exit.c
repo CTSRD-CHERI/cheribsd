@@ -39,8 +39,9 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ktrace.h"
+
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -481,6 +482,12 @@ exit1(struct thread *td, int rval, int signo)
 				PROC_LOCK(q->p_reaper);
 				pksignal(q->p_reaper, SIGCHLD, ksi1);
 				PROC_UNLOCK(q->p_reaper);
+			} else if (q->p_pdeathsig > 0) {
+				/*
+				 * The child asked to received a signal
+				 * when we exit.
+				 */
+				kern_psignal(q, q->p_pdeathsig);
 			}
 		} else {
 			/*
@@ -521,6 +528,13 @@ exit1(struct thread *td, int rval, int signo)
 	 */
 	while ((q = LIST_FIRST(&p->p_orphans)) != NULL) {
 		PROC_LOCK(q);
+		/*
+		 * If we are the real parent of this process
+		 * but it has been reparented to a debugger, then
+		 * check if it asked for a signal when we exit.
+		 */
+		if (q->p_pdeathsig > 0)
+			kern_psignal(q, q->p_pdeathsig);
 		CTR2(KTR_PTRACE, "exit: pid %d, clearing orphan %d", p->p_pid,
 		    q->p_pid);
 		clear_orphan(q);
@@ -689,7 +703,8 @@ sys_abort2(struct thread *td, struct abort2_args *uap)
 	if (uap->nargs > 0) {
 		if (uap->args == NULL)
 			goto out;
-		error = copyin(uap->args, uargs, uap->nargs * sizeof(void *));
+		error = copyin(__USER_CAP_UNBOUND(uap->args), uargs,
+		    uap->nargs * sizeof(void *));
 		if (error != 0)
 			goto out;
 	}
@@ -770,9 +785,9 @@ kern_wait4(struct thread *td, int pid, int * __capability statusp, int options,
 		rup = NULL;
 	error = kern_wait(td, pid, &status, options, rup);
 	if (statusp != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout_c(&status, statusp, sizeof(status));
+		error = copyout(&status, statusp, sizeof(status));
 	if (rusage != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout_c(&ru, rusage, sizeof(struct rusage));
+		error = copyout(&ru, rusage, sizeof(struct rusage));
 	return (error);
 }
 
@@ -807,12 +822,14 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 	error = kern_wait6(td, idtype, id, &status, uap->options, wrup, sip);
 
 	if (uap->status != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout(&status, uap->status, sizeof(status));
+		error = copyout(&status, __USER_CAP_OBJ(uap->status),
+		    sizeof(status));
 	if (uap->wrusage != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout(&wru, uap->wrusage, sizeof(wru));
+		error = copyout(&wru, __USER_CAP_OBJ(uap->wrusage),
+		    sizeof(wru));
 	if (uap->info != NULL && error == 0) {
 		siginfo_to_siginfo_native(&si, &si_n);
-		error = copyout(&si_n, uap->info, sizeof(si_n));
+		error = copyout(&si_n, __USER_CAP_OBJ(uap->info), sizeof(si_n));
 	}
 	return (error);
 }

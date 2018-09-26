@@ -13,11 +13,16 @@ MK_CHERI_SHARED_PROG:=yes
 # TODO: disable this once we believe RTLD works reliably
 # Disable DEBUG to get a fair performance comparison to rtld-elf
 # DEBUG=-DDEBUG
+.ifdef BUILD_RTLD_DEBUG
+CFLAGS+=-DDEBUG
+.endif
+
 
 PROG?=		ld-cheri-elf.so.1
-SRCS=		rtld_start.S \
-		reloc.c rtld.c rtld_lock.c map_object.c \
-		heap.c malloc.c xmalloc.c debug.c libmap.c
+SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c cheri_reloc.c
+.PATH: ${.CURDIR}/../rtld-elf
+SRCS+=	rtld_lock.c map_object.c xmalloc.c debug.c libmap.c
+
 MAN=
 NEED_CHERI=	pure
 WANT_DUMP=yes
@@ -31,8 +36,9 @@ RTLD_ARCH=	${MACHINE_ARCH}
 .else
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
-CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR}
+CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR} -I${.CURDIR}/../rtld-elf
 LDFLAGS+=	-nostdlib -e rtld_start
+# TODO: increase this to 6
 WARNS?=		2
 INSTALLFLAGS=	-C -b
 PRECIOUSPROG=
@@ -69,10 +75,13 @@ SYMBOL_MAPS+=	${.CURDIR}/${RTLD_ARCH}/Symbol.map
 
 #.sinclude "${.CURDIR}/${RTLD_ARCH}/Makefile.inc"
 
-.PATH: ${.CURDIR}/${RTLD_ARCH}
+.PATH: ${.CURDIR}/${RTLD_ARCH} ${.CURDIR}/../rtld-elf/${RTLD_ARCH}
+
+
+HAS_TESTS=
+SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>
 ${PROG_FULL}:	${VERSION_MAP}
 .include <bsd.symver.mk>
-
 #CFLAGS:=	${CFLAGS} -O0

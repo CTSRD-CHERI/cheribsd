@@ -54,7 +54,8 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
-#include "opt_compat.h"
+
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -1360,14 +1361,12 @@ mqfs_read(struct vop_read_args *ap)
 	char buf[80];
 	struct vnode *vp = ap->a_vp;
 	struct uio *uio = ap->a_uio;
-	struct mqfs_node *pn;
 	struct mqueue *mq;
 	int len, error;
 
 	if (vp->v_type != VREG)
 		return (EINVAL);
 
-	pn = VTON(vp);
 	mq = VTOMQ(vp);
 	snprintf(buf, sizeof(buf),
 		"QSIZE:%-10ld MAXMSG:%-10ld CURMSG:%-10ld MSGSIZE:%-10ld\n",
@@ -1666,7 +1665,7 @@ mqueue_loadmsg(const char * __capability msg_ptr, size_t msg_size, int msg_prio)
 
 	len = sizeof(struct mqueue_msg) + msg_size;
 	msg = malloc(len, M_MQUEUEDATA, M_WAITOK);
-	error = copyin_c(msg_ptr, (char *)msg + sizeof(struct mqueue_msg),
+	error = copyin(msg_ptr, (char *)msg + sizeof(struct mqueue_msg),
 	    msg_size);
 	if (error) {
 		free(msg, M_MQUEUEDATA);
@@ -1687,9 +1686,9 @@ mqueue_savemsg(struct mqueue_msg *msg, char * __capability msg_ptr,
 {
 	int error;
 
-	error = copyout_c((char *)msg + sizeof(*msg), msg_ptr, msg->msg_size);
+	error = copyout((char *)msg + sizeof(*msg), msg_ptr, msg->msg_size);
 	if (error == 0 && msg_prio != NULL)
-		error = copyout_c(&msg->msg_prio, msg_prio,
+		error = copyout(&msg->msg_prio, msg_prio,
 		    sizeof(unsigned int));
 	return (error);
 }
@@ -1755,9 +1754,8 @@ mqueue_send(struct mqueue *mq, const char * __capability msg_ptr,
 		goto bad;
 	}
 	for (;;) {
-		ts2 = *abs_timeout;
 		getnanotime(&ts);
-		timespecsub(&ts2, &ts);
+		timespecsub(abs_timeout, &ts, &ts2);
 		if (ts2.tv_sec < 0 || (ts2.tv_sec == 0 && ts2.tv_nsec <= 0)) {
 			error = ETIMEDOUT;
 			break;
@@ -1907,9 +1905,8 @@ mqueue_receive(struct mqueue *mq, char * __capability msg_ptr,
 	}
 
 	for (;;) {
-		ts2 = *abs_timeout;
 		getnanotime(&ts);
-		timespecsub(&ts2, &ts);
+		timespecsub(abs_timeout, &ts, &ts2);
 		if (ts2.tv_sec < 0 || (ts2.tv_sec == 0 && ts2.tv_nsec <= 0)) {
 			error = ETIMEDOUT;
 			return (error);
@@ -2052,7 +2049,7 @@ kern_kmq_open(struct thread *td, const char * __capability upath, int flags,
 			return (EINVAL);
 	}
 
-	error = copyinstr_c(upath, path, MQFS_NAMELEN + 1, NULL);
+	error = copyinstr(upath, path, MQFS_NAMELEN + 1, NULL);
         if (error)
 		return (error);
 
@@ -2148,7 +2145,7 @@ user_kmq_open(struct thread *td, const char * __capability path,
 		return (EINVAL);
 	flags = FFLAGS(flags);
 	if ((flags & O_CREAT) != 0 && uattr != NULL) {
-		error = copyin_c(uattr, &attr, sizeof(attr));
+		error = copyin(uattr, &attr, sizeof(attr));
 		if (error)
 			return (error);
 	}
@@ -2173,7 +2170,7 @@ kern_kmq_unlink(struct thread *td, const char * __capability upath)
 	struct mqfs_node *pn;
 	int error, len;
 
-	error = copyinstr_c(upath, path, MQFS_NAMELEN + 1, NULL);
+	error = copyinstr(upath, path, MQFS_NAMELEN + 1, NULL);
         if (error)
 		return (error);
 
@@ -2223,9 +2220,8 @@ static __inline int
 getmq(struct thread *td, int fd, struct file **fpp, struct mqfs_node **ppn,
 	struct mqueue **pmq)
 {
-	cap_rights_t rights;
 
-	return _getmq(td, fd, cap_rights_init(&rights, CAP_EVENT), fget,
+	return _getmq(td, fd, &cap_event_rights, fget,
 	    fpp, ppn, pmq);
 }
 
@@ -2233,9 +2229,8 @@ static __inline int
 getmq_read(struct thread *td, int fd, struct file **fpp,
 	 struct mqfs_node **ppn, struct mqueue **pmq)
 {
-	cap_rights_t rights;
 
-	return _getmq(td, fd, cap_rights_init(&rights, CAP_READ), fget_read,
+	return _getmq(td, fd, &cap_read_rights, fget_read,
 	    fpp, ppn, pmq);
 }
 
@@ -2243,9 +2238,8 @@ static __inline int
 getmq_write(struct thread *td, int fd, struct file **fpp,
 	struct mqfs_node **ppn, struct mqueue **pmq)
 {
-	cap_rights_t rights;
 
-	return _getmq(td, fd, cap_rights_init(&rights, CAP_WRITE), fget_write,
+	return _getmq(td, fd, &cap_write_rights, fget_write,
 	    fpp, ppn, pmq);
 }
 
@@ -2297,7 +2291,7 @@ user_kmq_setattr(struct thread *td, int mqd,
 	int error;
 
 	if (uattr != NULL) {
-		error = copyin_c(uattr, &attr, sizeof(attr));
+		error = copyin(uattr, &attr, sizeof(attr));
 		if (error != 0)
 			return (error);
 	}
@@ -2305,7 +2299,7 @@ user_kmq_setattr(struct thread *td, int mqd,
 	    &oattr);
 	if (error == 0 && uoattr != NULL) {
 		bzero(oattr.__reserved, sizeof(oattr.__reserved));
-		error = copyout_c(&oattr, uoattr, sizeof(oattr));
+		error = copyout(&oattr, uoattr, sizeof(oattr));
 	}
 	return (error);
 }
@@ -2335,7 +2329,7 @@ kern_timedreceive(struct thread *td, int mqd, char * __capability msg_ptr,
 	if (error)
 		return (error);
 	if (user_abs_timeout != NULL) {
-		error = copyin_c(user_abs_timeout, &ets, sizeof(ets));
+		error = copyin(user_abs_timeout, &ets, sizeof(ets));
 		if (error != 0)
 			return (error);
 		abs_timeout = &ets;
@@ -2372,7 +2366,7 @@ kern_kmq_timedsend(struct thread *td, int mqd,
 	if (error)
 		return (error);
 	if (user_abs_timeout != NULL) {
-		error = copyin_c(user_abs_timeout, &ets, sizeof(ets));
+		error = copyin(user_abs_timeout, &ets, sizeof(ets));
 		if (error != 0)
 			return (error);
 		abs_timeout = &ets;
@@ -2388,9 +2382,6 @@ kern_kmq_timedsend(struct thread *td, int mqd,
 static int
 kern_kmq_notify(struct thread *td, int mqd, ksigevent_t *sigev)
 {
-#ifdef CAPABILITIES
-	cap_rights_t rights;
-#endif
 	struct filedesc *fdp;
 	struct proc *p;
 	struct mqueue *mq;
@@ -2423,8 +2414,7 @@ again:
 		goto out;
 	}
 #ifdef CAPABILITIES
-	error = cap_check(cap_rights(fdp, mqd),
-	    cap_rights_init(&rights, CAP_EVENT));
+	error = cap_check(cap_rights(fdp, mqd), &cap_event_rights);
 	if (error) {
 		FILEDESC_SUNLOCK(fdp);
 		goto out;
@@ -2502,7 +2492,7 @@ sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->sigev, &ev_n, sizeof(ev));
+		error = copyin(__USER_CAP_OBJ(uap->sigev), &ev_n, sizeof(ev));
 		if (error != 0)
 			return (error);
 		convert_sigevent(&ev_n, &ev);
@@ -2514,11 +2504,13 @@ sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 static void
 mqueue_fdclose(struct thread *td, int fd, struct file *fp)
 {
-	struct filedesc *fdp;
 	struct mqueue *mq;
+#ifdef INVARIANTS
+	struct filedesc *fdp;
  
 	fdp = td->td_proc->p_fd;
 	FILEDESC_LOCK_ASSERT(fdp);
+#endif
 
 	if (fp->f_ops == &mqueueops) {
 		mq = FPTOMQ(fp);
@@ -2919,7 +2911,7 @@ freebsd32_kmq_timedreceive(struct thread *td,
 int
 freebsd32_kmq_notify(struct thread *td, struct freebsd32_kmq_notify_args *uap)
 {
-	struct sigevent ev, *evp;
+	ksigevent_t ev, *evp;
 	struct sigevent32 ev32;
 	int error;
 
@@ -3003,7 +2995,7 @@ cheriabi_kmq_notify(struct thread *td, struct cheriabi_kmq_notify_args *uap)
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin_c(uap->sigev, &ev, sizeof(ev));
+		error = copyin(uap->sigev, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
 		evp = &ev;

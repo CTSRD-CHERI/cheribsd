@@ -40,6 +40,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_posix.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -126,7 +128,7 @@ user_sched_setparam(struct thread *td, pid_t pid,
 	int e;
 	struct sched_param sched_param;
 
-	e = copyin_c(param, &sched_param, sizeof(sched_param));
+	e = copyin(param, &sched_param, sizeof(sched_param));
 	if (e)
 		return (e);
 
@@ -194,7 +196,7 @@ user_sched_getparam(struct thread *td, pid_t pid,
 	e = kern_sched_getparam(td, targettd, &sched_param);
 	PROC_UNLOCK(targetp);
 	if (e == 0)
-		e = copyout_c(&sched_param, param, sizeof(sched_param));
+		e = copyout(&sched_param, param, sizeof(sched_param));
 	return (e);
 }
 
@@ -231,7 +233,7 @@ user_sched_setscheduler(struct thread *td, pid_t pid, int policy,
 	struct thread *targettd;
 	struct proc *targetp;
 
-	e = copyin_c(param, &sched_param, sizeof(sched_param));
+	e = copyin(param, &sched_param, sizeof(sched_param));
 	if (e)
 		return (e);
 
@@ -363,7 +365,7 @@ user_sched_rr_get_interval(struct thread *td, pid_t pid,
 
 	error = kern_sched_rr_get_interval(td, pid, &timespec);
 	if (error == 0)
-		error = copyout_c(&timespec, interval, sizeof(timespec));
+		error = copyout(&timespec, interval, sizeof(timespec));
 	return (error);
 }
 

@@ -58,8 +58,9 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_sysvipc.h"
+
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -418,8 +419,7 @@ DECLARE_MODULE(sysvmsg, sysvmsg_mod, SI_SUB_SYSV_MSG, SI_ORDER_FIRST);
 MODULE_VERSION(sysvmsg, 1);
 
 static void
-msg_freehdr(msghdr)
-	struct msg *msghdr;
+msg_freehdr(struct msg *msghdr)
 {
 	while (msghdr->msg_ts > 0) {
 		short next;
@@ -519,23 +519,20 @@ sys_msgctl(struct thread *td, struct msgctl_args *uap)
 	int cmd = uap->cmd;
 	struct msqid_ds msqbuf;
 	int error;
+	struct msqid_ds * __capability buf = __USER_CAP_OBJ(uap->buf);
 
 	DPRINTF(("call to msgctl(%d, %d, %p)\n", msqid, cmd, uap->buf));
 	if (cmd == IPC_SET &&
-	    (error = copyin(uap->buf, &msqbuf, sizeof(msqbuf))) != 0)
+	    (error = copyin(buf, &msqbuf, sizeof(msqbuf))) != 0)
 		return (error);
 	error = kern_msgctl(td, msqid, cmd, &msqbuf);
 	if (cmd == IPC_STAT && error == 0)
-		error = copyout(&msqbuf, uap->buf, sizeof(struct msqid_ds));
+		error = copyout(&msqbuf, buf, sizeof(struct msqid_ds));
 	return (error);
 }
 
 int
-kern_msgctl(td, msqid, cmd, msqbuf)
-	struct thread *td;
-	int msqid;
-	int cmd;
-	struct msqid_ds *msqbuf;
+kern_msgctl(struct thread *td, int msqid, int cmd, struct msqid_ds *msqbuf)
 {
 	int rval, error, msqix;
 	struct msqid_kernel *msqkptr;
@@ -800,7 +797,7 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 	struct prison *rpr;
 	short next;
 #ifdef RACCT
-	size_t saved_msgsz;
+	size_t saved_msgsz = 0;
 #endif
 
 	rpr = msg_find_prison(td->td_ucred);
@@ -1044,7 +1041,7 @@ kern_msgsnd(struct thread *td, int msqid, const void * __capability msgp,
 		if (next >= msginfo.msgseg)
 			panic("next out of range #2");
 		mtx_unlock(&msq_mtx);
-		if ((error = copyin_c(msgp, &msgpool[next * msginfo.msgssz],
+		if ((error = copyin(msgp, &msgpool[next * msginfo.msgssz],
 		    tlen)) != 0) {
 			mtx_lock(&msq_mtx);
 			DPRINTF(("error %d copying in message segment\n",
@@ -1145,17 +1142,17 @@ sys_msgsnd(struct thread *td, struct msgsnd_args *uap)
 {
 	int error;
 	long mtype;
+	const char * __capability msgp = __USER_CAP(uap->msgp, uap->msgsz);
 
 	DPRINTF(("call to msgsnd(%d, %p, %zu, %d)\n", uap->msqid, uap->msgp,
 	    uap->msgsz, uap->msgflg));
 
-	if ((error = copyin(uap->msgp, &mtype, sizeof(mtype))) != 0) {
+	if ((error = copyin(msgp, &mtype, sizeof(mtype))) != 0) {
 		DPRINTF(("error %d copying the message type\n", error));
 		return (error);
 	}
-	return (kern_msgsnd(td, uap->msqid,
-	    (const char * __capability)__USER_CAP(uap->msgp, uap->msgsz) +
-	    sizeof(mtype), uap->msgsz, uap->msgflg, mtype));
+	return (kern_msgsnd(td, uap->msqid, msgp + sizeof(mtype), uap->msgsz,
+	    uap->msgflg, mtype));
 }
 
 /* XXX msgp is actually mtext. */
@@ -1394,7 +1391,7 @@ kern_msgrcv(struct thread *td, int msqid, void * __capability msgp,
 		if (next >= msginfo.msgseg)
 			panic("next out of range #3");
 		mtx_unlock(&msq_mtx);
-		error = copyout_c(&msgpool[next * msginfo.msgssz], msgp, tlen);
+		error = copyout(&msgpool[next * msginfo.msgssz], msgp, tlen);
 		mtx_lock(&msq_mtx);
 		if (error != 0) {
 			DPRINTF(("error (%d) copying out message segment\n",
@@ -1433,15 +1430,15 @@ sys_msgrcv(struct thread *td, struct msgrcv_args *uap)
 {
 	int error;
 	long mtype;
+	char * __capability msgp = __USER_CAP(uap->msgp, uap->msgsz);
 
 	DPRINTF(("call to msgrcv(%d, %p, %zu, %ld, %d)\n", uap->msqid,
 	    uap->msgp, uap->msgsz, uap->msgtyp, uap->msgflg));
 
-	if ((error = kern_msgrcv(td, uap->msqid,
-	    (char * __capability)__USER_CAP(uap->msgp, uap->msgsz) +
-	    sizeof(mtype), uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
+	if ((error = kern_msgrcv(td, uap->msqid, msgp + sizeof(mtype),
+	    uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
-	if ((error = copyout(&mtype, uap->msgp, sizeof(mtype))) != 0)
+	if ((error = copyout(&mtype, msgp, sizeof(mtype))) != 0)
 		DPRINTF(("error %d copying the message type\n", error));
 	return (error);
 }
@@ -1886,7 +1883,7 @@ cheriabi_msgctl(struct thread *td, struct cheriabi_msgctl_args *uap)
 	int error;
 
 	if (uap->cmd == IPC_SET) {
-		error = copyin_c(uap->buf, &msqbuf_c, sizeof(msqbuf_c));
+		error = copyin(uap->buf, &msqbuf_c, sizeof(msqbuf_c));
 		if (error)
 			return (error);
 		CP(msqbuf_c, msqbuf, msg_perm);
@@ -1916,7 +1913,7 @@ cheriabi_msgctl(struct thread *td, struct cheriabi_msgctl_args *uap)
 		CP(msqbuf, msqbuf_c, msg_stime);
 		CP(msqbuf, msqbuf_c, msg_rtime);
 		CP(msqbuf, msqbuf_c, msg_ctime);
-		error = copyout_c(&msqbuf_c, uap->buf,
+		error = copyout(&msqbuf_c, uap->buf,
 		    sizeof(struct msqid_ds_c));
 	}
 	return (error);
@@ -1935,7 +1932,7 @@ cheriabi_msgrcv(struct thread *td, struct cheriabi_msgrcv_args *uap)
 	    (char * __capability)uap->msgp + sizeof(mtype),
 	    uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
-	if ((error = copyout_c(&mtype, uap->msgp, sizeof(mtype))) != 0)
+	if ((error = copyout(&mtype, uap->msgp, sizeof(mtype))) != 0)
 		DPRINTF(("error %d copying the message type\n", error));
 	return (error);
 }
@@ -1949,7 +1946,7 @@ cheriabi_msgsnd(struct thread *td, struct cheriabi_msgsnd_args *uap)
 	DPRINTF(("call to msgsnd(%d, %p, %zu, %d)\n", uap->msqid, uap->msgp,
 	    uap->msgsz, uap->msgflg));
 
-	if ((error = copyin_c(uap->msgp, &mtype, sizeof(mtype))) != 0) {
+	if ((error = copyin(uap->msgp, &mtype, sizeof(mtype))) != 0) {
 		DPRINTF(("error %d copying the message type\n", error));
 		return (error);
 	}

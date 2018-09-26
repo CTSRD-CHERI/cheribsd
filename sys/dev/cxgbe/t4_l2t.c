@@ -182,7 +182,7 @@ t4_l2t_set_switching(struct adapter *sc, struct l2t_entry *e, uint16_t vlan,
 
 	e->vlan = vlan;
 	e->lport = port;
-	e->wrq = &sc->sge.mgmtq;
+	e->wrq = &sc->sge.ctrlq[0];
 	e->iqid = sc->sge.fwq.abs_id;
 	memcpy(e->dmac, eth_addr, ETHER_ADDR_LEN);
 	mtx_lock(&e->lock);
@@ -257,7 +257,6 @@ do_l2t_write_rpl(struct sge_iq *iq, const struct rss_header *rss,
 	return (0);
 }
 
-#ifdef SBUF_DRAIN
 static inline unsigned int
 vlan_prio(const struct l2t_entry *e)
 {
@@ -335,4 +334,3 @@ skip:
 
 	return (rc);
 }
-#endif

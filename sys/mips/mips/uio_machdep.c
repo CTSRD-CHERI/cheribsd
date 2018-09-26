@@ -40,6 +40,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -56,7 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cache.h>
 
 #ifdef CPU_CHERI
-#define	CAP_ALIGNED(x)	((vaddr_t)(x) % CHERICAP_SIZE == 0)
+#define	CAP_ALIGNED(x)	((x) % CHERICAP_SIZE == 0)
 #endif
 
 /*
@@ -115,9 +117,9 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 		case UIO_USERSPACE:
 			maybe_yield();
 			if (uio->uio_rw == UIO_READ)
-				error = copyout_c(cp, iov->iov_base, cnt);
+				error = copyout(cp, iov->iov_base, cnt);
 			else
-				error = copyin_c(iov->iov_base, cp, cnt);
+				error = copyin(iov->iov_base, cp, cnt);
 			if (error) {
 				if (sf != NULL)
 					sf_buf_free(sf);
@@ -126,8 +128,8 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			break;
 		case UIO_SYSSPACE:
 #ifdef CPU_CHERI
-			if (CAP_ALIGNED(cp) &&
-			    CAP_ALIGNED(iov->iov_base) &&
+			if (CAP_ALIGNED((vaddr_t)cp) &&
+			    CAP_ALIGNED((__cheri_addr vaddr_t)iov->iov_base) &&
 			    CAP_ALIGNED(cnt)) {
 				if (uio->uio_rw == UIO_READ)
 					cheri_bcopy(cp,

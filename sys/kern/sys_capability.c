@@ -63,6 +63,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/file.h>
@@ -85,8 +87,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/vm.h>
 
-int trap_enotcap;
-SYSCTL_INT(_kern, OID_AUTO, trap_enotcap, CTLFLAG_RW, &trap_enotcap, 0,
+bool __read_frequently trap_enotcap;
+SYSCTL_BOOL(_kern, OID_AUTO, trap_enotcap, CTLFLAG_RW, &trap_enotcap, 0,
     "Deliver SIGTRAP on ENOTCAPABLE");
 
 #ifdef CAPABILITY_MODE
@@ -134,7 +136,7 @@ kern_cap_getmode(struct thread *td, u_int * __capability modep)
 	u_int i;
 
 	i = IN_CAPABILITY_MODE(td) ? 1 : 0;
-	return (copyout_c(&i, modep, sizeof(i)));
+	return (copyout(&i, modep, sizeof(i)));
 }
 
 #else /* !CAPABILITY_MODE */
@@ -190,7 +192,7 @@ cap_check(const cap_rights_t *havep, const cap_rights_t *needp)
  * Convert capability rights into VM access flags.
  */
 u_char
-cap_rights_to_vmprot(cap_rights_t *havep)
+cap_rights_to_vmprot(const cap_rights_t *havep)
 {
 	u_char maxprot;
 
@@ -211,14 +213,14 @@ cap_rights_to_vmprot(cap_rights_t *havep)
  * this one file.
  */
 
-cap_rights_t *
-cap_rights_fde(struct filedescent *fdep)
+const cap_rights_t *
+cap_rights_fde(const struct filedescent *fdep)
 {
 
 	return (&fdep->fde_rights);
 }
 
-cap_rights_t *
+const cap_rights_t *
 cap_rights(struct filedesc *fdp, int fd)
 {
 
@@ -274,14 +276,14 @@ user_cap_rights_limit(struct thread *td, int fd,
 
 	cap_rights_init(&rights);
 
-	error = copyin_c(rightsp, &rights, sizeof(rights.cr_rights[0]));
+	error = copyin(rightsp, &rights, sizeof(rights.cr_rights[0]));
 	if (error != 0)
 		return (error);
 	version = CAPVER(&rights);
 	if (version != CAP_RIGHTS_VERSION_00)
 		return (EINVAL);
 
-	error = copyin_c(rightsp, &rights,
+	error = copyin(rightsp, &rights,
 	    sizeof(rights.cr_rights[0]) * CAPARSIZE(&rights));
 	if (error != 0)
 		return (error);
@@ -350,7 +352,7 @@ kern_cap_rights_get(struct thread *td, int version, int fd,
 				return (EINVAL);
 		}
 	}
-	error = copyout_c(&rights, rightsp, sizeof(rights.cr_rights[0]) * n);
+	error = copyout(&rights, rightsp, sizeof(rights.cr_rights[0]) * n);
 #ifdef KTRACE
 	if (error == 0 && KTRPOINT(td, KTR_STRUCT))
 		ktrcaprights(&rights);
@@ -485,7 +487,7 @@ user_cap_ioctls_limit(struct thread *td, int fd,
 		cmds = NULL;
 	} else {
 		cmds = malloc(sizeof(cmds[0]) * ncmds, M_FILECAPS, M_WAITOK);
-		error = copyin_c(ucmds, cmds, sizeof(cmds[0]) * ncmds);
+		error = copyin(ucmds, cmds, sizeof(cmds[0]) * ncmds);
 		if (error != 0) {
 			free(cmds, M_FILECAPS);
 			return (error);
@@ -545,7 +547,7 @@ kern_cap_ioctls_get(struct thread *td, int fd, u_long * __capability dstcmds,
 	 */
 	if (count != -1) {
 		if (cmdsp != NULL) {
-			error = copyout_c(cmdsp, dstcmds,
+			error = copyout(cmdsp, dstcmds,
 			    sizeof(cmdsp[0]) * ncmds);
 			if (error != 0)
 				goto out;
@@ -654,7 +656,7 @@ kern_cap_fcntls_get(struct thread *td, int fd,
 	rights = fdep->fde_fcntls;
 	FILEDESC_SUNLOCK(fdp);
 
-	return (copyout_c(&rights, fcntlrightsp, sizeof(rights)));
+	return (copyout(&rights, fcntlrightsp, sizeof(rights)));
 }
 
 #else /* !CAPABILITIES */

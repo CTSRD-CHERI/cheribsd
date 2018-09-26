@@ -41,7 +41,7 @@
  *	mkdir: want it ?
  */
 
-#include "opt_compat.h"
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -852,7 +852,7 @@ devfs_ioctl(struct vop_ioctl_args *ap)
 		if (i > fgn->len)
 			error = EINVAL;
 		else
-			error = copyout_c(p, fiodgname_buf_get_ptr(fgn), i);
+			error = copyout(p, fiodgname_buf_get_ptr(fgn), i);
 		break;
 	default:
 		error = dsw->d_ioctl(dev, com, ap->a_data, ap->a_fflag, td);

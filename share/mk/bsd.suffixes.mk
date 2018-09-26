@@ -5,8 +5,8 @@
 	chmod a+x ${.TARGET}
 
 .c:
-	${CC.${.IMPSRC:T}:U${CC}} ${CFLAGS} ${LDFLAGS} ${.IMPSRC} ${LDLIBS} \
-	    -o ${.TARGET}
+	${CC.${.IMPSRC:T}:U${CC}:N${CCACHE_BIN}} ${CFLAGS} ${LDFLAGS} \
+	    ${.IMPSRC} ${LDLIBS} -o ${.TARGET}
 	${CTFCONVERT_CMD}
 
 .c.o:

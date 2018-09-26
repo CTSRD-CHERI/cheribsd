@@ -154,6 +154,59 @@ END(fpe_state_save)
 #endif /* FPE */
 
 /*
+ * void
+ * fpe_state_clear(void)
+ */
+ENTRY(fpe_state_clear)
+	/*
+	 * Enable FPE usage in supervisor mode,
+	 * so we can access registers.
+	 */
+	li	t0, SSTATUS_FS_INITIAL
+	csrs	sstatus, t0
+
+	fscsr	zero
+	fcvt.d.l f0, zero
+	fcvt.d.l f1, zero
+	fcvt.d.l f2, zero
+	fcvt.d.l f3, zero
+	fcvt.d.l f4, zero
+	fcvt.d.l f5, zero
+	fcvt.d.l f6, zero
+	fcvt.d.l f7, zero
+	fcvt.d.l f8, zero
+	fcvt.d.l f9, zero
+	fcvt.d.l f10, zero
+	fcvt.d.l f11, zero
+	fcvt.d.l f12, zero
+	fcvt.d.l f13, zero
+	fcvt.d.l f14, zero
+	fcvt.d.l f15, zero
+	fcvt.d.l f16, zero
+	fcvt.d.l f17, zero
+	fcvt.d.l f18, zero
+	fcvt.d.l f19, zero
+	fcvt.d.l f20, zero
+	fcvt.d.l f21, zero
+	fcvt.d.l f22, zero
+	fcvt.d.l f23, zero
+	fcvt.d.l f24, zero
+	fcvt.d.l f25, zero
+	fcvt.d.l f26, zero
+	fcvt.d.l f27, zero
+	fcvt.d.l f28, zero
+	fcvt.d.l f29, zero
+	fcvt.d.l f30, zero
+	fcvt.d.l f31, zero
+
+	/* Disable FPE usage in supervisor mode. */
+	li	t0, SSTATUS_FS_MASK
+	csrc	sstatus, t0
+
+	ret
+END(fpe_state_clear)
+	
+/*
  * void cpu_throw(struct thread *old, struct thread *new)
  */
 ENTRY(cpu_throw)
@@ -179,6 +232,7 @@ ENTRY(cpu_throw)
 	/* Load registers */
 	ld	ra, (PCB_RA)(x13)
 	ld	sp, (PCB_SP)(x13)
+	ld	tp, (PCB_TP)(x13)
 
 	/* s[0-11] */
 	ld	s0, (PCB_S + 0 * 8)(x13)
@@ -208,8 +262,6 @@ ENTRY(cpu_throw)
 #endif
 
 	ret
-.Lcpu_throw_panic_str:
-	.asciz "cpu_throw: %p\0"
 END(cpu_throw)
 
 /*
@@ -233,6 +285,7 @@ ENTRY(cpu_switch)
 	/* Store ra, sp and the callee-saved registers */
 	sd	ra, (PCB_RA)(x13)
 	sd	sp, (PCB_SP)(x13)
+	sd	tp, (PCB_TP)(x13)
 
 	/* s[0-11] */
 	sd	s0, (PCB_S + 0 * 8)(x13)
@@ -305,6 +358,7 @@ ENTRY(cpu_switch)
 #endif
 
 	/* Restore the registers */
+	ld	tp, (PCB_TP)(x13)
 	ld	ra, (PCB_RA)(x13)
 	ld	sp, (PCB_SP)(x13)
 
@@ -394,7 +448,6 @@ ENTRY(fork_trampoline)
 	ld	a7, (TF_A + 7 * 8)(sp)
 
 	/* Load user ra and sp */
-	ld	tp, (TF_TP)(sp)
 	ld	ra, (TF_RA)(sp)
 
 	/*
@@ -418,6 +471,7 @@ ENTRY(savectx)
 	/* Store ra, sp and the callee-saved registers */
 	sd	ra, (PCB_RA)(a0)
 	sd	sp, (PCB_SP)(a0)
+	sd	tp, (PCB_TP)(a0)
 
 	/* s[0-11] */
 	sd	s0, (PCB_S + 0 * 8)(a0)

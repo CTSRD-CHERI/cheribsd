@@ -40,8 +40,9 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
-#include "opt_compat.h"
 #include "opt_ktrace.h"
+
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -198,7 +199,8 @@ kern_quotactl(struct thread *td, const char * __CAPABILITY path, int cmd,
 	 * Require that Q_QUOTAON handles the vfs_busy() reference on
 	 * its own, always returning with ubusied mount point.
 	 */
-	if ((cmd >> SUBCMDSHIFT) != Q_QUOTAON)
+	if ((cmd >> SUBCMDSHIFT) != Q_QUOTAON &&
+	    (cmd >> SUBCMDSHIFT) != Q_QUOTAOFF)
 		vfs_unbusy(mp);
 	return (error);
 }
@@ -308,7 +310,7 @@ user_statfs(struct thread *td, const char * __capability path,
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_statfs(td, path, UIO_USERSPACE, sfp);
 	if (error == 0)
-		error = copyout_c(sfp, buf, sizeof(struct statfs));
+		error = copyout(sfp, buf, sizeof(struct statfs));
 	free(sfp, M_STATFS);
 	return (error);
 }
@@ -358,7 +360,7 @@ user_fstatfs(struct thread *td, int fd, struct statfs * __capability buf)
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fstatfs(td, fd, sfp);
 	if (error == 0)
-		error = copyout_c(sfp, buf, sizeof(struct statfs));
+		error = copyout(sfp, buf, sizeof(struct statfs));
 	free(sfp, M_STATFS);
 	return (error);
 }
@@ -369,11 +371,10 @@ kern_fstatfs(struct thread *td, int fd, struct statfs *buf)
 	struct file *fp;
 	struct mount *mp;
 	struct vnode *vp;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(fd);
-	error = getvnode(td, fd, cap_rights_init(&rights, CAP_FSTATFS), &fp);
+	error = getvnode(td, fd, &cap_fstatfs_rights, &fp);
 	if (error != 0)
 		return (error);
 	vp = fp->f_vnode;
@@ -536,7 +537,7 @@ restart:
 				    sizeof(*sp));
 				free(sptmp, M_STATFS);
 			} else /* if (bufseg == UIO_USERSPACE) */ {
-				error = copyout_c(sp, sfsp, sizeof(*sp));
+				error = copyout(sp, sfsp, sizeof(*sp));
 				free(sptmp, M_STATFS);
 				if (error != 0) {
 					vfs_unbusy(mp);
@@ -736,7 +737,7 @@ freebsd11_statfs(struct thread *td, struct freebsd11_statfs_args *uap)
 	error = kern_statfs(td, __USER_CAP_STR(uap->path), UIO_USERSPACE, sfp);
 	if (error == 0) {
 		freebsd11_cvtstatfs(sfp, &osb);
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	}
 	free(sfp, M_STATFS);
 	return (error);
@@ -756,7 +757,7 @@ freebsd11_fstatfs(struct thread *td, struct freebsd11_fstatfs_args *uap)
 	error = kern_fstatfs(td, uap->fd, sfp);
 	if (error == 0) {
 		freebsd11_cvtstatfs(sfp, &osb);
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	}
 	free(sfp, M_STATFS);
 	return (error);
@@ -784,7 +785,8 @@ freebsd11_getfsstat(struct thread *td, struct freebsd11_getfsstat_args *uap)
 		sp = (__cheri_fromcap struct statfs *)buf;
 		while (count > 0 && error == 0) {
 			freebsd11_cvtstatfs(sp, &osb);
-			error = copyout(&osb, uap->buf, sizeof(osb));
+			error = copyout(&osb, __USER_CAP_OBJ(uap->buf),
+			    sizeof(osb));
 			sp++;
 			uap->buf++;
 			count--;
@@ -805,14 +807,14 @@ freebsd11_fhstatfs(struct thread *td, struct freebsd11_fhstatfs_args *uap)
 	fhandle_t fh;
 	int error;
 
-	error = copyin(uap->u_fhp, &fh, sizeof(fhandle_t));
+	error = copyin(__USER_CAP_OBJ(uap->u_fhp), &fh, sizeof(fhandle_t));
 	if (error)
 		return (error);
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fhstatfs(td, fh, sfp);
 	if (error == 0) {
 		freebsd11_cvtstatfs(sfp, &osb);
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	}
 	free(sfp, M_STATFS);
 	return (error);
@@ -866,11 +868,10 @@ sys_fchdir(struct thread *td, struct fchdir_args *uap)
 	struct vnode *vp, *tdp;
 	struct mount *mp;
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(uap->fd);
-	error = getvnode(td, uap->fd, cap_rights_init(&rights, CAP_FCHDIR),
+	error = getvnode(td, uap->fd, &cap_fchdir_rights,
 	    &fp);
 	if (error != 0)
 		return (error);
@@ -1283,7 +1284,6 @@ kern_mknodat(struct thread *td, int fd, const char * __capability path,
 	struct mount *mp;
 	struct vattr vattr;
 	struct nameidata nd;
-	cap_rights_t rights;
 	int error, whiteout = 0;
 
 	AUDIT_ARG_MODE(mode);
@@ -1311,7 +1311,7 @@ kern_mknodat(struct thread *td, int fd, const char * __capability path,
 restart:
 	bwillwrite();
 	NDINIT_ATRIGHTS_C(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
-	    NOCACHE, pathseg, path, fd, cap_rights_init(&rights, CAP_MKNODAT),
+	    NOCACHE, pathseg, path, fd, &cap_mknodat_rights,
 	    td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -1412,14 +1412,13 @@ kern_mkfifoat(struct thread *td, int fd, const char * __capability path,
 	struct mount *mp;
 	struct vattr vattr;
 	struct nameidata nd;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_MODE(mode);
 restart:
 	bwillwrite();
 	NDINIT_ATRIGHTS_C(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
-	    NOCACHE, pathseg, path, fd, cap_rights_init(&rights, CAP_MKFIFOAT),
+	    NOCACHE, pathseg, path, fd, &cap_mkfifoat_rights,
 	    td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -1547,13 +1546,12 @@ kern_linkat(struct thread *td, int fd1, int fd2,
 	struct vnode *vp;
 	struct mount *mp;
 	struct nameidata nd;
-	cap_rights_t rights;
 	int error;
 
 again:
 	bwillwrite();
 	NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, segflg, path1, fd1,
-	    cap_rights_init(&rights, CAP_LINKAT_SOURCE), td);
+	    &cap_linkat_source_rights, td);
 
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -1565,7 +1563,7 @@ again:
 	}
 	NDINIT_ATRIGHTS_C(&nd, CREATE,
 	    LOCKPARENT | SAVENAME | AUDITVNODE2 | NOCACHE, segflg, path2, fd2,
-	    cap_rights_init(&rights, CAP_LINKAT_TARGET), td);
+	    &cap_linkat_target_rights, td);
 	if ((error = namei(&nd)) == 0) {
 		if (nd.ni_vp != NULL) {
 			NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -1668,13 +1666,12 @@ kern_symlinkat(struct thread *td, const char * __capability path1, int fd,
 	char *tmppath;
 	struct nameidata nd;
 	int error;
-	cap_rights_t rights;
 
 	if (segflg == UIO_SYSSPACE) {
 		syspath = (__cheri_fromcap const char *)path1;
 	} else {
 		tmppath = uma_zalloc(namei_zone, M_WAITOK);
-		if ((error = copyinstr_c(path1, tmppath, MAXPATHLEN,
+		if ((error = copyinstr(path1, tmppath, MAXPATHLEN,
 		    NULL)) != 0)
 			goto out;
 		syspath = tmppath;
@@ -1683,7 +1680,7 @@ kern_symlinkat(struct thread *td, const char * __capability path1, int fd,
 restart:
 	bwillwrite();
 	NDINIT_ATRIGHTS_C(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
-	    NOCACHE, segflg, path2, fd, cap_rights_init(&rights, CAP_SYMLINKAT),
+	    NOCACHE, segflg, path2, fd, &cap_symlinkat_rights,
 	    td);
 	if ((error = namei(&nd)) != 0)
 		goto out;
@@ -1829,13 +1826,12 @@ kern_unlinkat(struct thread *td, int fd, const char * __capability path,
 	struct vnode *vp;
 	struct nameidata nd;
 	struct stat sb;
-	cap_rights_t rights;
 	int error;
 
 restart:
 	bwillwrite();
 	NDINIT_ATRIGHTS_C(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1,
-	    pathseg, path, fd, cap_rights_init(&rights, CAP_UNLINKAT), td);
+	    pathseg, path, fd, &cap_unlinkat_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error == EINVAL ? EPERM : error);
 	vp = nd.ni_vp;
@@ -1911,11 +1907,10 @@ int
 kern_lseek(struct thread *td, int fd, off_t offset, int whence)
 {
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(fd);
-	error = fget(td, fd, cap_rights_init(&rights, CAP_SEEK), &fp);
+	error = fget(td, fd, &cap_seek_rights, &fp);
 	if (error != 0)
 		return (error);
 	error = (fp->f_ops->fo_flags & DFLAG_SEEKABLE) != 0 ?
@@ -2024,7 +2019,6 @@ kern_accessat(struct thread *td, int fd, const char * __capability path,
 	struct ucred *cred, *usecred;
 	struct vnode *vp;
 	struct nameidata nd;
-	cap_rights_t rights;
 	int error;
 
 	if (flag & ~AT_EACCESS)
@@ -2048,8 +2042,7 @@ kern_accessat(struct thread *td, int fd, const char * __capability path,
 		usecred = cred;
 	AUDIT_ARG_VALUE(amode);
 	NDINIT_ATRIGHTS_C(&nd, LOOKUP, FOLLOW | LOCKSHARED | LOCKLEAF |
-	    AUDITVNODE1, pathseg, path, fd, cap_rights_init(&rights, CAP_FSTAT),
-	    td);
+	    AUDITVNODE1, pathseg, path, fd, &cap_fstat_rights, td);
 	if ((error = namei(&nd)) != 0)
 		goto out;
 	vp = nd.ni_vp;
@@ -2133,6 +2126,7 @@ olstat(struct thread *td, struct olstat_args *uap)
 
 /*
  * Convert from an old to a new stat structure.
+ * XXX: many values are blindly truncated.
  */
 void
 cvtstat(struct stat *st, struct ostat *ost)
@@ -2146,10 +2140,7 @@ cvtstat(struct stat *st, struct ostat *ost)
 	ost->st_uid = st->st_uid;
 	ost->st_gid = st->st_gid;
 	ost->st_rdev = st->st_rdev;
-	if (st->st_size < (quad_t)1 << 32)
-		ost->st_size = st->st_size;
-	else
-		ost->st_size = -2;
+	ost->st_size = MIN(st->st_size, INT32_MAX);
 	ost->st_atim = st->st_atim;
 	ost->st_mtim = st->st_mtim;
 	ost->st_ctim = st->st_ctim;
@@ -2164,12 +2155,25 @@ cvtstat(struct stat *st, struct ostat *ost)
 int ino64_trunc_error;
 SYSCTL_INT(_vfs, OID_AUTO, ino64_trunc_error, CTLFLAG_RW,
     &ino64_trunc_error, 0,
-    "Error on truncation of inode number, device id or link count");
+    "Error on truncation of device, file or inode number, or link count");
+
 int
 freebsd11_cvtstat(struct stat *st, struct freebsd11_stat *ost)
 {
 
 	ost->st_dev = st->st_dev;
+	if (ost->st_dev != st->st_dev) {
+		switch (ino64_trunc_error) {
+		default:
+			/*
+			 * Since dev_t is almost raw, don't clamp to the
+			 * maximum for case 2, but ignore the error.
+			 */
+			break;
+		case 1:
+			return (EOVERFLOW);
+		}
+	}
 	ost->st_ino = st->st_ino;
 	if (ost->st_ino != st->st_ino) {
 		switch (ino64_trunc_error) {
@@ -2200,6 +2204,14 @@ freebsd11_cvtstat(struct stat *st, struct freebsd11_stat *ost)
 	ost->st_uid = st->st_uid;
 	ost->st_gid = st->st_gid;
 	ost->st_rdev = st->st_rdev;
+	if (ost->st_rdev != st->st_rdev) {
+		switch (ino64_trunc_error) {
+		default:
+			break;
+		case 1:
+			return (EOVERFLOW);
+		}
+	}
 	ost->st_atim = st->st_atim;
 	ost->st_mtim = st->st_mtim;
 	ost->st_ctim = st->st_ctim;
@@ -2229,7 +2241,7 @@ freebsd11_stat(struct thread *td, struct freebsd11_stat_args* uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, uap->ub, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->ub), sizeof(osb));
 	return (error);
 }
 
@@ -2246,7 +2258,7 @@ freebsd11_lstat(struct thread *td, struct freebsd11_lstat_args* uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, uap->ub, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->ub), sizeof(osb));
 	return (error);
 }
 
@@ -2258,7 +2270,7 @@ freebsd11_fhstat(struct thread *td, struct freebsd11_fhstat_args* uap)
 	struct freebsd11_stat osb;
 	int error;
 
-	error = copyin(uap->u_fhp, &fh, sizeof(fhandle_t));
+	error = copyin(__USER_CAP_OBJ(uap->u_fhp), &fh, sizeof(fhandle_t));
 	if (error != 0)
 		return (error);
 	error = kern_fhstat(td, fh, &sb);
@@ -2266,7 +2278,7 @@ freebsd11_fhstat(struct thread *td, struct freebsd11_fhstat_args* uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, uap->sb, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->sb), sizeof(osb));
 	return (error);
 }
 
@@ -2283,7 +2295,7 @@ freebsd11_fstatat(struct thread *td, struct freebsd11_fstatat_args* uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	return (error);
 }
 #endif	/* COMPAT_FREEBSD11 */
@@ -2317,7 +2329,7 @@ user_fstatat(struct thread *td, int fd, const char * __capability path,
 	error = kern_statat(td, flag, fd, path, UIO_USERSPACE,
 	    &sb, NULL);
 	if (error == 0)
-		error = copyout_c(&sb, buf, sizeof (sb));
+		error = copyout(&sb, buf, sizeof (sb));
 	return (error);
 }
 
@@ -2328,7 +2340,6 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 {
 	struct nameidata nd;
 	struct stat sb;
-	cap_rights_t rights;
 	int error;
 
 	if (flag & ~AT_SYMLINK_NOFOLLOW)
@@ -2336,7 +2347,7 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 
 	NDINIT_ATRIGHTS_C(&nd, LOOKUP, ((flag & AT_SYMLINK_NOFOLLOW) ?
 	    NOFOLLOW : FOLLOW) | LOCKSHARED | LOCKLEAF | AUDITVNODE1,
-	    pathseg, path, fd, cap_rights_init(&rights, CAP_FSTAT), td);
+	    pathseg, path, fd, &cap_fstat_rights, td);
 
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -2411,7 +2422,7 @@ freebsd11_nstat(struct thread *td, struct freebsd11_nstat_args *uap)
 	if (error != 0)
 		return (error);
 	freebsd11_cvtnstat(&sb, &nsb);
-	return (copyout(&nsb, uap->ub, sizeof (nsb)));
+	return (copyout(&nsb, __USER_CAP_OBJ(uap->ub), sizeof (nsb)));
 }
 
 /*
@@ -2435,7 +2446,7 @@ freebsd11_nlstat(struct thread *td, struct freebsd11_nlstat_args *uap)
 	if (error != 0)
 		return (error);
 	freebsd11_cvtnstat(&sb, &nsb);
-	return (copyout(&nsb, uap->ub, sizeof (nsb)));
+	return (copyout(&nsb, __USER_CAP_OBJ(uap->ub), sizeof (nsb)));
 }
 #endif /* COMPAT_FREEBSD11 */
 
@@ -2684,13 +2695,12 @@ kern_chflagsat(struct thread *td, int fd, const char * __capability path,
     enum uio_seg pathseg, u_long flags, int atflag)
 {
 	struct nameidata nd;
-	cap_rights_t rights;
 	int error, follow;
 
 	AUDIT_ARG_FFLAGS(flags);
 	follow = (atflag & AT_SYMLINK_NOFOLLOW) ? NOFOLLOW : FOLLOW;
 	NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path, fd,
-	    cap_rights_init(&rights, CAP_FCHFLAGS), td);
+	    &cap_fchflags_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -2712,12 +2722,11 @@ int
 sys_fchflags(struct thread *td, struct fchflags_args *uap)
 {
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(uap->fd);
 	AUDIT_ARG_FFLAGS(uap->flags);
-	error = getvnode(td, uap->fd, cap_rights_init(&rights, CAP_FCHFLAGS),
+	error = getvnode(td, uap->fd, &cap_fchflags_rights,
 	    &fp);
 	if (error != 0)
 		return (error);
@@ -2818,13 +2827,12 @@ kern_fchmodat(struct thread *td, int fd, const char * __capability path,
     enum uio_seg pathseg, mode_t mode, int flag)
 {
 	struct nameidata nd;
-	cap_rights_t rights;
 	int error, follow;
 
 	AUDIT_ARG_MODE(mode);
 	follow = (flag & AT_SYMLINK_NOFOLLOW) ? NOFOLLOW : FOLLOW;
 	NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path, fd,
-	    cap_rights_init(&rights, CAP_FCHMOD), td);
+	    &cap_fchmod_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
@@ -2846,13 +2854,12 @@ int
 sys_fchmod(struct thread *td, struct fchmod_args *uap)
 {
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(uap->fd);
 	AUDIT_ARG_MODE(uap->mode);
 
-	error = fget(td, uap->fd, cap_rights_init(&rights, CAP_FCHMOD), &fp);
+	error = fget(td, uap->fd, &cap_fchmod_rights, &fp);
 	if (error != 0)
 		return (error);
 	error = fo_chmod(fp, uap->mode, td->td_ucred, td);
@@ -2933,13 +2940,12 @@ kern_fchownat(struct thread *td, int fd, const char * __capability path,
     enum uio_seg pathseg, int uid, int gid, int flag)
 {
 	struct nameidata nd;
-	cap_rights_t rights;
 	int error, follow;
 
 	AUDIT_ARG_OWNER(uid, gid);
 	follow = (flag & AT_SYMLINK_NOFOLLOW) ? NOFOLLOW : FOLLOW;
 	NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, pathseg, path, fd,
-	    cap_rights_init(&rights, CAP_FCHOWN), td);
+	    &cap_fchown_rights, td);
 
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -2981,12 +2987,11 @@ int
 sys_fchown(struct thread *td, struct fchown_args *uap)
 {
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(uap->fd);
 	AUDIT_ARG_OWNER(uap->uid, uap->gid);
-	error = fget(td, uap->fd, cap_rights_init(&rights, CAP_FCHOWN), &fp);
+	error = fget(td, uap->fd, &cap_fchown_rights, &fp);
 	if (error != 0)
 		return (error);
 	error = fo_chown(fp, uap->uid, uap->gid, td->td_ucred, td);
@@ -3014,7 +3019,7 @@ getutimes(const struct timeval * __capability usrtvp, enum uio_seg tvpseg,
 			tvp = usrtvp;
 		} else {
 			tmptvp = &tv[0];
-			if ((error = copyin_c(usrtvp, tmptvp, sizeof(tv))) != 0)
+			if ((error = copyin(usrtvp, tmptvp, sizeof(tv))) != 0)
 				return (error);
 			tvp = (__cheri_tocap struct timeval * __capability)
 			    tmptvp;
@@ -3052,7 +3057,7 @@ getutimens(const struct timespec * __capability usrtsp, enum uio_seg tspseg,
 	if (tspseg == UIO_SYSSPACE) {
 		tsp[0] = usrtsp[0];
 		tsp[1] = usrtsp[1];
-	} else if ((error = copyin_c(usrtsp, tsp, sizeof(*tsp) * 2)) != 0)
+	} else if ((error = copyin(usrtsp, tsp, sizeof(*tsp) * 2)) != 0)
 		return (error);
 	if (tsp[0].tv_nsec == UTIME_OMIT && tsp[1].tv_nsec == UTIME_OMIT)
 		*retflags |= UTIMENS_EXIT;
@@ -3153,13 +3158,12 @@ kern_utimesat(struct thread *td, int fd,
 {
 	struct nameidata nd;
 	struct timespec ts[2];
-	cap_rights_t rights;
 	int error;
 
 	if ((error = getutimes(tptr, tptrseg, ts)) != 0)
 		return (error);
 	NDINIT_ATRIGHTS_C(&nd, LOOKUP, FOLLOW | AUDITVNODE1, pathseg, path, fd,
-	    cap_rights_init(&rights, CAP_FUTIMES), td);
+	    &cap_futimes_rights, td);
 
 	if ((error = namei(&nd)) != 0)
 		return (error);
@@ -3229,14 +3233,13 @@ kern_futimes(struct thread *td, int fd,
 {
 	struct timespec ts[2];
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(fd);
 	error = getutimes(tptr, tptrseg, ts);
 	if (error != 0)
 		return (error);
-	error = getvnode(td, fd, cap_rights_init(&rights, CAP_FUTIMES), &fp);
+	error = getvnode(td, fd, &cap_futimes_rights, &fp);
 	if (error != 0)
 		return (error);
 #ifdef AUDIT
@@ -3263,7 +3266,6 @@ kern_futimens(struct thread *td, int fd,
 {
 	struct timespec ts[2];
 	struct file *fp;
-	cap_rights_t rights;
 	int error, flags;
 
 	AUDIT_ARG_FD(fd);
@@ -3272,7 +3274,7 @@ kern_futimens(struct thread *td, int fd,
 		return (error);
 	if (flags & UTIMENS_EXIT)
 		return (0);
-	error = getvnode(td, fd, cap_rights_init(&rights, CAP_FUTIMES), &fp);
+	error = getvnode(td, fd, &cap_futimes_rights, &fp);
 	if (error != 0)
 		return (error);
 #ifdef AUDIT
@@ -3301,7 +3303,6 @@ kern_utimensat(struct thread *td, int fd,
 {
 	struct nameidata nd;
 	struct timespec ts[2];
-	cap_rights_t rights;
 	int error, flags;
 
 	if (flag & ~AT_SYMLINK_NOFOLLOW)
@@ -3311,7 +3312,7 @@ kern_utimensat(struct thread *td, int fd,
 		return (error);
 	NDINIT_ATRIGHTS_C(&nd, LOOKUP,
 	    ((flag & AT_SYMLINK_NOFOLLOW) ? NOFOLLOW : FOLLOW) | AUDITVNODE1,
-	    pathseg, path, fd, cap_rights_init(&rights, CAP_FUTIMES), td);
+	    pathseg, path, fd, &cap_futimes_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	/*
@@ -3430,11 +3431,10 @@ kern_fsync(struct thread *td, int fd, bool fullsync)
 	struct vnode *vp;
 	struct mount *mp;
 	struct file *fp;
-	cap_rights_t rights;
 	int error, lock_flags;
 
 	AUDIT_ARG_FD(fd);
-	error = getvnode(td, fd, cap_rights_init(&rights, CAP_FSYNC), &fp);
+	error = getvnode(td, fd, &cap_fsync_rights, &fp);
 	if (error != 0)
 		return (error);
 	vp = fp->f_vnode;
@@ -3531,7 +3531,6 @@ kern_renameat(struct thread *td, int oldfd, const char * __capability old,
 	struct mount *mp = NULL;
 	struct vnode *tvp, *fvp, *tdvp;
 	struct nameidata fromnd, tond;
-	cap_rights_t rights;
 	int error;
 
 again:
@@ -3539,11 +3538,11 @@ again:
 #ifdef MAC
 	NDINIT_ATRIGHTS_C(&fromnd, DELETE, LOCKPARENT | LOCKLEAF | SAVESTART |
 	    AUDITVNODE1, pathseg, old, oldfd,
-	    cap_rights_init(&rights, CAP_RENAMEAT_SOURCE), td);
+	    &cap_renameat_source_rights, td);
 #else
 	NDINIT_ATRIGHTS_C(&fromnd, DELETE, WANTPARENT | SAVESTART | AUDITVNODE1,
 	    pathseg, old, oldfd,
-	    cap_rights_init(&rights, CAP_RENAMEAT_SOURCE), td);
+	    &cap_renameat_source_rights, td);
 #endif
 
 	if ((error = namei(&fromnd)) != 0)
@@ -3558,7 +3557,7 @@ again:
 	fvp = fromnd.ni_vp;
 	NDINIT_ATRIGHTS_C(&tond, RENAME, LOCKPARENT | LOCKLEAF | NOCACHE |
 	    SAVESTART | AUDITVNODE2, pathseg, new, newfd,
-	    cap_rights_init(&rights, CAP_RENAMEAT_TARGET), td);
+	    &cap_renameat_target_rights, td);
 	if (fromnd.ni_vp->v_type == VDIR)
 		tond.ni_cnd.cn_flags |= WILLBEDIR;
 	if ((error = namei(&tond)) != 0) {
@@ -3607,7 +3606,7 @@ again:
 			 * from 'newfd'.
 			 */
 			error = cap_check(&tond.ni_filecaps.fc_rights,
-			    cap_rights_init(&rights, CAP_UNLINKAT));
+			    &cap_unlinkat_rights);
 			if (error != 0)
 				goto out;
 		}
@@ -3696,14 +3695,13 @@ kern_mkdirat(struct thread *td, int fd, const char * __capability path,
 	struct vnode *vp;
 	struct vattr vattr;
 	struct nameidata nd;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_MODE(mode);
 restart:
 	bwillwrite();
 	NDINIT_ATRIGHTS_C(&nd, CREATE, LOCKPARENT | SAVENAME | AUDITVNODE1 |
-	    NOCACHE, segflg, path, fd, cap_rights_init(&rights, CAP_MKDIRAT),
+	    NOCACHE, segflg, path, fd, &cap_mkdirat_rights,
 	    td);
 	nd.ni_cnd.cn_flags |= WILLBEDIR;
 	if ((error = namei(&nd)) != 0)
@@ -3774,13 +3772,12 @@ kern_rmdirat(struct thread *td, int fd, const char * __capability path,
 	struct mount *mp;
 	struct vnode *vp;
 	struct nameidata nd;
-	cap_rights_t rights;
 	int error;
 
 restart:
 	bwillwrite();
 	NDINIT_ATRIGHTS_C(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1,
-	    pathseg, path, fd, cap_rights_init(&rights, CAP_UNLINKAT), td);
+	    pathseg, path, fd, &cap_unlinkat_rights, td);
 	if ((error = namei(&nd)) != 0)
 		return (error);
 	vp = nd.ni_vp;
@@ -3834,7 +3831,8 @@ out:
 
 #if defined(COMPAT_43) || defined(COMPAT_FREEBSD11)
 int
-freebsd11_kern_getdirentries(struct thread *td, int fd, char *ubuf, u_int count,
+freebsd11_kern_getdirentries(struct thread *td, int fd,
+    char * __capability ubuf, u_int count,
     long *basep, void (*func)(struct freebsd11_dirent *))
 {
 	struct freebsd11_dirent dstdp;
@@ -3987,11 +3985,12 @@ freebsd11_getdirentries(struct thread *td,
 	long base;
 	int error;
 
-	error = freebsd11_kern_getdirentries(td, uap->fd, uap->buf, uap->count,
-	    &base, NULL);
+	error = freebsd11_kern_getdirentries(td, uap->fd,
+	    __USER_CAP(uap->buf, uap->count), uap->count, &base, NULL);
 
 	if (error == 0 && uap->basep != NULL)
-		error = copyout(&base, uap->basep, sizeof(long));
+		error = copyout(&base, __USER_CAP(uap->basep, sizeof(long)),
+		    sizeof(long));
 	return (error);
 }
 
@@ -4032,7 +4031,7 @@ user_getdirentries(struct thread *td, int fd, char * __capability buf,
 	if (error != 0)
 		return (error);
 	if (basep != NULL)
-		error = copyout_c(&base, basep, sizeof(off_t));
+		error = copyout(&base, basep, sizeof(off_t));
 	return (error);
 }
 
@@ -4044,7 +4043,6 @@ kern_getdirentries(struct thread *td, int fd, char * __capability buf,
 	struct file *fp;
 	struct uio auio;
 	kiovec_t aiov;
-	cap_rights_t rights;
 	off_t loff;
 	int error, eofflag;
 	off_t foffset;
@@ -4053,7 +4051,7 @@ kern_getdirentries(struct thread *td, int fd, char * __capability buf,
 	if (count > IOSIZE_MAX)
 		return (EINVAL);
 	auio.uio_resid = count;
-	error = getvnode(td, fd, cap_rights_init(&rights, CAP_READ), &fp);
+	error = getvnode(td, fd, &cap_read_rights, &fp);
 	if (error != 0)
 		return (error);
 	if ((fp->f_flag & FREAD) == 0) {
@@ -4279,7 +4277,7 @@ kern_getfh(struct thread *td, const char * __capability fname,
 	error = VOP_VPTOFH(vp, &fh.fh_fid);
 	vput(vp);
 	if (error == 0)
-		error = copyout_c(&fh, fhp, sizeof (fh));
+		error = copyout(&fh, fhp, sizeof (fh));
 	return (error);
 }
 
@@ -4322,7 +4320,7 @@ kern_fhopen(struct thread *td, const struct fhandle * __capability u_fhp,
 	/* why not allow a non-read/write open for our lockd? */
 	if (((fmode & (FREAD | FWRITE)) == 0) || (fmode & O_CREAT))
 		return (EINVAL);
-	error = copyin_c(u_fhp, &fhp, sizeof(fhp));
+	error = copyin(u_fhp, &fhp, sizeof(fhp));
 	if (error != 0)
 		return(error);
 	/* find the mount point */
@@ -4404,12 +4402,12 @@ user_fhstat(struct thread *td, const struct fhandle * __capability u_fhp,
 	struct fhandle fh;
 	int error;
 
-	error = copyin_c(u_fhp, &fh, sizeof(fh));
+	error = copyin(u_fhp, &fh, sizeof(fh));
 	if (error != 0)
 		return (error);
 	error = kern_fhstat(td, fh, &sb);
 	if (error == 0)
-		error = copyout_c(&sb, usb, sizeof(sb));
+		error = copyout(&sb, usb, sizeof(sb));
 	return (error);
 }
 
@@ -4459,13 +4457,13 @@ user_fhstatfs(struct thread *td, const struct fhandle * __capability u_fhp,
 	fhandle_t fh;
 	int error;
 
-	error = copyin_c(u_fhp, &fh, sizeof(fhandle_t));
+	error = copyin(u_fhp, &fh, sizeof(fhandle_t));
 	if (error != 0)
 		return (error);
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fhstatfs(td, fh, sfp);
 	if (error == 0)
-		error = copyout_c(sfp, buf, sizeof(*sfp));
+		error = copyout(sfp, buf, sizeof(*sfp));
 	free(sfp, M_STATFS);
 	return (error);
 }
@@ -4518,7 +4516,6 @@ kern_posix_fallocate(struct thread *td, int fd, off_t offset, off_t len)
 	struct file *fp;
 	struct mount *mp;
 	struct vnode *vp;
-	cap_rights_t rights;
 	off_t olen, ooffset;
 	int error;
 #ifdef AUDIT
@@ -4532,7 +4529,7 @@ kern_posix_fallocate(struct thread *td, int fd, off_t offset, off_t len)
 	if (offset > OFF_MAX - len)
 		return (EFBIG);
 	AUDIT_ARG_FD(fd);
-	error = fget(td, fd, cap_rights_init(&rights, CAP_PWRITE), &fp);
+	error = fget(td, fd, &cap_pwrite_rights, &fp);
 	if (error != 0)
 		return (error);
 	AUDIT_ARG_FILE(td->td_proc, fp);
@@ -4619,7 +4616,6 @@ kern_posix_fadvise(struct thread *td, int fd, off_t offset, off_t len,
 	struct fadvise_info *fa, *new;
 	struct file *fp;
 	struct vnode *vp;
-	cap_rights_t rights;
 	off_t end;
 	int error;
 
@@ -4642,7 +4638,7 @@ kern_posix_fadvise(struct thread *td, int fd, off_t offset, off_t len,
 	}
 	/* XXX: CAP_POSIX_FADVISE? */
 	AUDIT_ARG_FD(fd);
-	error = fget(td, fd, cap_rights_init(&rights), &fp);
+	error = fget(td, fd, &cap_no_rights, &fp);
 	if (error != 0)
 		goto out;
 	AUDIT_ARG_FILE(td->td_proc, fp);

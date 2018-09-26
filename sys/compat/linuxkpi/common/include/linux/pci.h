@@ -98,6 +98,7 @@ struct pci_device_id {
 #define PCI_DEVFN(slot, func)   ((((slot) & 0x1f) << 3) | ((func) & 0x07))
 #define PCI_SLOT(devfn)		(((devfn) >> 3) & 0x1f)
 #define PCI_FUNC(devfn)		((devfn) & 0x07)
+#define	PCI_BUS_NUM(devfn)	(((devfn) >> 8) & 0xff)
 
 #define PCI_VDEVICE(_vendor, _device)					\
 	    .vendor = PCI_VENDOR_ID_##_vendor, .device = (_device),	\
@@ -538,7 +539,9 @@ struct msix_entry {
  * NB: define added to prevent this definition of pci_enable_msix from
  * clashing with the native FreeBSD version.
  */
-#define	pci_enable_msix		linux_pci_enable_msix
+#define	pci_enable_msix(...) \
+  linux_pci_enable_msix(__VA_ARGS__)
+
 static inline int
 pci_enable_msix(struct pci_dev *pdev, struct msix_entry *entries, int nreq)
 {
@@ -572,7 +575,9 @@ pci_enable_msix(struct pci_dev *pdev, struct msix_entry *entries, int nreq)
 	return (0);
 }
 
-#define	pci_enable_msix_range	linux_pci_enable_msix_range
+#define	pci_enable_msix_range(...) \
+  linux_pci_enable_msix_range(__VA_ARGS__)
+
 static inline int
 pci_enable_msix_range(struct pci_dev *dev, struct msix_entry *entries,
     int minvec, int maxvec)

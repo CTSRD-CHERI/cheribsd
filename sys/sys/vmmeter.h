@@ -73,11 +73,8 @@ struct vmtotal {
 /*
  * System wide statistics counters.
  * Locking:
- *      a - locked by atomic operations
  *      c - constant after initialization
- *      f - locked by vm_page_queue_free_mtx
  *      p - uses counter(9)
- *      q - changes are synchronized by the corresponding vm_pagequeue lock
  */
 struct vmmeter {
 	/*
@@ -188,6 +185,13 @@ vm_page_count_severe(void)
 {
 
 	return (!DOMAINSET_EMPTY(&vm_severe_domains));
+}
+
+static inline int
+vm_page_count_severe_set(domainset_t *mask)
+{
+
+	return (DOMAINSET_SUBSET(&vm_severe_domains, mask));
 }
 
 /*

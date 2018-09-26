@@ -39,7 +39,7 @@
 
 #include "elfcopy.h"
 
-ELFTC_VCSID("$Id: main.c 3520 2017-04-17 01:47:52Z kaiwang27 $");
+ELFTC_VCSID("$Id: main.c 3577 2017-09-14 02:19:42Z emaste $");
 
 enum options
 {
@@ -372,6 +372,14 @@ create_elf(struct elfcopy *ecp)
 		create_symtab(ecp);
 
 	/*
+	 * Write the underlying ehdr. Note that it should be called
+	 * before elf_setshstrndx() since it will overwrite e->e_shstrndx.
+	 */
+	if (gelf_update_ehdr(ecp->eout, &oeh) == 0)
+		errx(EXIT_FAILURE, "gelf_update_ehdr() failed: %s",
+		    elf_errmsg(-1));
+
+	/*
 	 * First processing of output sections: at this stage we copy the
 	 * content of each section from input to output object.  Section
 	 * content will be modified and printed (mcs) if need. Also content of
@@ -379,14 +387,6 @@ create_elf(struct elfcopy *ecp)
 	 * to symbol table changes.
 	 */
 	copy_content(ecp);
-
-	/*
-	 * Write the underlying ehdr. Note that it should be called
-	 * before elf_setshstrndx() since it will overwrite e->e_shstrndx.
-	 */
-	if (gelf_update_ehdr(ecp->eout, &oeh) == 0)
-		errx(EXIT_FAILURE, "gelf_update_ehdr() failed: %s",
-		    elf_errmsg(-1));
 
 	/* Generate section name string table (.shstrtab). */
 	set_shstrtab(ecp);

@@ -20,7 +20,7 @@
  */
 /*
  * Copyright (c) 2005, 2010, Oracle and/or its affiliates. All rights reserved.
- * Copyright (c) 2011, 2017 by Delphix. All rights reserved.
+ * Copyright (c) 2011, 2018 by Delphix. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  */
 
@@ -28,6 +28,7 @@
 
 #include <sys/zfs_context.h>
 #include <sys/spa.h>
+#include <sys/spa_impl.h>
 #include <sys/dmu.h>
 #include <sys/zap.h>
 #include <sys/arc.h>
@@ -130,17 +131,11 @@ zil_bp_compare(const void *x1, const void *x2)
 	const dva_t *dva1 = &((zil_bp_node_t *)x1)->zn_dva;
 	const dva_t *dva2 = &((zil_bp_node_t *)x2)->zn_dva;
 
-	if (DVA_GET_VDEV(dva1) < DVA_GET_VDEV(dva2))
-		return (-1);
-	if (DVA_GET_VDEV(dva1) > DVA_GET_VDEV(dva2))
-		return (1);
+	int cmp = AVL_CMP(DVA_GET_VDEV(dva1), DVA_GET_VDEV(dva2));
+	if (likely(cmp))
+		return (cmp);
 
-	if (DVA_GET_OFFSET(dva1) < DVA_GET_OFFSET(dva2))
-		return (-1);
-	if (DVA_GET_OFFSET(dva1) > DVA_GET_OFFSET(dva2))
-		return (1);
-
-	return (0);
+	return (AVL_CMP(DVA_GET_OFFSET(dva1), DVA_GET_OFFSET(dva2)));
 }
 
 static void
@@ -402,6 +397,35 @@ done:
 	return (error);
 }
 
+/* ARGSUSED */
+static int
+zil_clear_log_block(zilog_t *zilog, blkptr_t *bp, void *tx, uint64_t first_txg)
+{
+	ASSERT(!BP_IS_HOLE(bp));
+
+	/*
+	 * As we call this function from the context of a rewind to a
+	 * checkpoint, each ZIL block whose txg is later than the txg
+	 * that we rewind to is invalid. Thus, we return -1 so
+	 * zil_parse() doesn't attempt to read it.
+	 */
+	if (bp->blk_birth >= first_txg)
+		return (-1);
+
+	if (zil_bp_tree_add(zilog, bp) != 0)
+		return (0);
+
+	zio_free(zilog->zl_spa, first_txg, bp);
+	return (0);
+}
+
+/* ARGSUSED */
+static int
+zil_noop_log_record(zilog_t *zilog, lr_t *lrc, void *tx, uint64_t first_txg)
+{
+	return (0);
+}
+
 static int
 zil_claim_log_block(zilog_t *zilog, blkptr_t *bp, void *tx, uint64_t first_txg)
 {
@@ -445,7 +469,7 @@ zil_claim_log_record(zilog_t *zilog, lr_t *lrc, void *tx, uint64_t first_txg)
 static int
 zil_free_log_block(zilog_t *zilog, blkptr_t *bp, void *tx, uint64_t claim_txg)
 {
-	zio_free_zil(zilog->zl_spa, dmu_tx_get_txg(tx), bp);
+	zio_free(zilog->zl_spa, dmu_tx_get_txg(tx), bp);
 
 	return (0);
 }
@@ -473,12 +497,7 @@ zil_lwb_vdev_compare(const void *x1, const void *x2)
 	const uint64_t v1 = ((zil_vdev_node_t *)x1)->zv_vdev;
 	const uint64_t v2 = ((zil_vdev_node_t *)x2)->zv_vdev;
 
-	if (v1 < v2)
-		return (-1);
-	if (v1 > v2)
-		return (1);
-
-	return (0);
+	return (AVL_CMP(v1, v2));
 }
 
 static lwb_t *
@@ -631,11 +650,12 @@ zil_create(zilog_t *zilog)
 		txg = dmu_tx_get_txg(tx);
 
 		if (!BP_IS_HOLE(&blk)) {
-			zio_free_zil(zilog->zl_spa, txg, &blk);
+			zio_free(zilog->zl_spa, txg, &blk);
 			BP_ZERO(&blk);
 		}
 
-		error = zio_alloc_zil(zilog->zl_spa, txg, &blk, NULL,
+		error = zio_alloc_zil(zilog->zl_spa,
+		    zilog->zl_os->os_dsl_dataset->ds_object, txg, &blk, NULL,
 		    ZIL_MIN_BLKSZ, &slog);
 
 		if (error == 0)
@@ -731,8 +751,8 @@ int
 zil_claim(dsl_pool_t *dp, dsl_dataset_t *ds, void *txarg)
 {
 	dmu_tx_t *tx = txarg;
-	uint64_t first_txg = dmu_tx_get_txg(tx);
 	zilog_t *zilog;
+	uint64_t first_txg;
 	zil_header_t *zh;
 	objset_t *os;
 	int error;
@@ -753,15 +773,54 @@ zil_claim(dsl_pool_t *dp, dsl_dataset_t *ds, void *txarg)
 
 	zilog = dmu_objset_zil(os);
 	zh = zil_header_in_syncing_context(zilog);
+	ASSERT3U(tx->tx_txg, ==, spa_first_txg(zilog->zl_spa));
+	first_txg = spa_min_claim_txg(zilog->zl_spa);
 
-	if (spa_get_log_state(zilog->zl_spa) == SPA_LOG_CLEAR) {
-		if (!BP_IS_HOLE(&zh->zh_log))
-			zio_free_zil(zilog->zl_spa, first_txg, &zh->zh_log);
+	/*
+	 * If the spa_log_state is not set to be cleared, check whether
+	 * the current uberblock is a checkpoint one and if the current
+	 * header has been claimed before moving on.
+	 *
+	 * If the current uberblock is a checkpointed uberblock then
+	 * one of the following scenarios took place:
+	 *
+	 * 1] We are currently rewinding to the checkpoint of the pool.
+	 * 2] We crashed in the middle of a checkpoint rewind but we
+	 *    did manage to write the checkpointed uberblock to the
+	 *    vdev labels, so when we tried to import the pool again
+	 *    the checkpointed uberblock was selected from the import
+	 *    procedure.
+	 *
+	 * In both cases we want to zero out all the ZIL blocks, except
+	 * the ones that have been claimed at the time of the checkpoint
+	 * (their zh_claim_txg != 0). The reason is that these blocks
+	 * may be corrupted since we may have reused their locations on
+	 * disk after we took the checkpoint.
+	 *
+	 * We could try to set spa_log_state to SPA_LOG_CLEAR earlier
+	 * when we first figure out whether the current uberblock is
+	 * checkpointed or not. Unfortunately, that would discard all
+	 * the logs, including the ones that are claimed, and we would
+	 * leak space.
+	 */
+	if (spa_get_log_state(zilog->zl_spa) == SPA_LOG_CLEAR ||
+	    (zilog->zl_spa->spa_uberblock.ub_checkpoint_txg != 0 &&
+	    zh->zh_claim_txg == 0)) {
+		if (!BP_IS_HOLE(&zh->zh_log)) {
+			(void) zil_parse(zilog, zil_clear_log_block,
+			    zil_noop_log_record, tx, first_txg);
+		}
 		BP_ZERO(&zh->zh_log);
 		dsl_dataset_dirty(dmu_objset_ds(os), tx);
 		dmu_objset_disown(os, FTAG);
 		return (0);
 	}
+
+	/*
+	 * If we are not rewinding and opening the pool normally, then
+	 * the min_claim_txg should be equal to the first txg of the pool.
+	 */
+	ASSERT3U(first_txg, ==, spa_first_txg(zilog->zl_spa));
 
 	/*
 	 * Claim all log blocks if we haven't already done so, and remember
@@ -814,16 +873,17 @@ zil_check_log_chain(dsl_pool_t *dp, dsl_dataset_t *ds, void *tx)
 	zilog = dmu_objset_zil(os);
 	bp = (blkptr_t *)&zilog->zl_header->zh_log;
 
-	/*
-	 * Check the first block and determine if it's on a log device
-	 * which may have been removed or faulted prior to loading this
-	 * pool.  If so, there's no point in checking the rest of the log
-	 * as its content should have already been synced to the pool.
-	 */
 	if (!BP_IS_HOLE(bp)) {
 		vdev_t *vd;
 		boolean_t valid = B_TRUE;
 
+		/*
+		 * Check the first block and determine if it's on a log device
+		 * which may have been removed or faulted prior to loading this
+		 * pool.  If so, there's no point in checking the rest of the
+		 * log as its content should have already been synced to the
+		 * pool.
+		 */
 		spa_config_enter(os->os_spa, SCL_STATE, FTAG, RW_READER);
 		vd = vdev_lookup_top(os->os_spa, DVA_GET_VDEV(&bp->blk_dva[0]));
 		if (vd->vdev_islog && vdev_is_dead(vd))
@@ -831,6 +891,18 @@ zil_check_log_chain(dsl_pool_t *dp, dsl_dataset_t *ds, void *tx)
 		spa_config_exit(os->os_spa, SCL_STATE, FTAG);
 
 		if (!valid)
+			return (0);
+
+		/*
+		 * Check whether the current uberblock is checkpointed (e.g.
+		 * we are rewinding) and whether the current header has been
+		 * claimed or not. If it hasn't then skip verifying it. We
+		 * do this because its ZIL blocks may be part of the pool's
+		 * state before the rewind, which is no longer valid.
+		 */
+		zil_header_t *zh = zil_header_in_syncing_context(zilog);
+		if (zilog->zl_spa->spa_uberblock.ub_checkpoint_txg != 0 &&
+		    zh->zh_claim_txg == 0)
 			return (0);
 	}
 
@@ -842,7 +914,8 @@ zil_check_log_chain(dsl_pool_t *dp, dsl_dataset_t *ds, void *tx)
 	 * which will update spa_max_claim_txg.  See spa_load() for details.
 	 */
 	error = zil_parse(zilog, zil_claim_log_block, zil_claim_log_record, tx,
-	    zilog->zl_header->zh_claim_txg ? -1ULL : spa_first_txg(os->os_spa));
+	    zilog->zl_header->zh_claim_txg ? -1ULL :
+	    spa_min_claim_txg(os->os_spa));
 
 	return ((error == ECKSUM || error == ENOENT) ? 0 : error);
 }
@@ -1259,7 +1332,8 @@ zil_lwb_write_issue(zilog_t *zilog, lwb_t *lwb)
 	BP_ZERO(bp);
 
 	/* pass the old blkptr in order to spread log blocks across devs */
-	error = zio_alloc_zil(spa, txg, bp, &lwb->lwb_blk, zil_blksz, &slog);
+	error = zio_alloc_zil(spa, zilog->zl_os->os_dsl_dataset->ds_object,
+	    txg, bp, &lwb->lwb_blk, zil_blksz, &slog);
 	if (error == 0) {
 		ASSERT3U(bp->blk_birth, ==, txg);
 		bp->blk_cksum = lwb->lwb_blk.blk_cksum;
@@ -1541,12 +1615,7 @@ zil_aitx_compare(const void *x1, const void *x2)
 	const uint64_t o1 = ((itx_async_node_t *)x1)->ia_foid;
 	const uint64_t o2 = ((itx_async_node_t *)x2)->ia_foid;
 
-	if (o1 < o2)
-		return (-1);
-	if (o1 > o2)
-		return (1);
-
-	return (0);
+	return (AVL_CMP(o1, o2));
 }
 
 /*
@@ -1652,7 +1721,8 @@ zil_itx_assign(zilog_t *zilog, itx_t *itx, dmu_tx_t *tx)
 		list_insert_tail(&itxs->i_sync_list, itx);
 	} else {
 		avl_tree_t *t = &itxs->i_async_tree;
-		uint64_t foid = ((lr_ooo_t *)&itx->itx_lr)->lr_foid;
+		uint64_t foid =
+		    LR_FOID_GET_OBJ(((lr_ooo_t *)&itx->itx_lr)->lr_foid);
 		itx_async_node_t *ian;
 		avl_index_t where;
 
@@ -2214,7 +2284,7 @@ zil_commit_waiter_timeout(zilog_t *zilog, zil_commit_waiter_t *zcw)
 	 */
 	lwb_t *nlwb = zil_lwb_write_issue(zilog, lwb);
 
-	ASSERT3S(lwb->lwb_state, !=, LWB_STATE_OPENED);
+	IMPLY(nlwb != NULL, lwb->lwb_state != LWB_STATE_OPENED);
 
 	/*
 	 * Since the lwb's zio hadn't been issued by the time this thread
@@ -2901,12 +2971,11 @@ zil_close(zilog_t *zilog)
 	 * ZIL to be clean, and to wait for all pending lwbs to be
 	 * written out.
 	 */
-	if (txg != 0)
+	if (txg)
 		txg_wait_synced(zilog->zl_dmu_pool, txg);
 
-	if (zilog_is_dirty(zilog))
-		zfs_dbgmsg("zil (%p) is dirty, txg %llu", zilog, txg);
-	VERIFY(!zilog_is_dirty(zilog));
+	if (txg < spa_freeze_txg(zilog->zl_spa))
+		ASSERT(!zilog_is_dirty(zilog));
 
 	zilog->zl_get_data = NULL;
 
@@ -3121,7 +3190,7 @@ zil_replay_log_record(zilog_t *zilog, lr_t *lr, void *zra, uint64_t claim_txg)
 	 */
 	if (TX_OOO(txtype)) {
 		error = dmu_object_info(zilog->zl_os,
-		    ((lr_ooo_t *)lr)->lr_foid, NULL);
+		    LR_FOID_GET_OBJ(((lr_ooo_t *)lr)->lr_foid), NULL);
 		if (error == ENOENT || error == EEXIST)
 			return (0);
 	}

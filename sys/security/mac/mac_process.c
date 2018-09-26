@@ -47,6 +47,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_mac.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/condvar.h>
 #include <sys/imgact.h>
@@ -150,7 +152,7 @@ mac_execve_enter(struct image_params *imgp, kmac_t *mac)
 		return (error);
 
 	buffer = malloc(mac->m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr_c(mac->m_string, buffer, mac->m_buflen, NULL);
+	error = copyinstr(mac->m_string, buffer, mac->m_buflen, NULL);
 	if (error) {
 		free(buffer, M_MACTEMP);
 		return (error);

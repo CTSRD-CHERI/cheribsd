@@ -72,7 +72,7 @@ INCSDIR_atf-c++.hpp= ${INCLUDEDIR}
 MAN=		atf-c++.3
 MLINKS+=	atf-c++.3 atf-c-api++.3  # Backwards compatibility.
 
-.if ${MACHINE_ARCH} != "mips64"
+.if ! ${MACHINE_ARCH:Mmips64*}
 # CheriABI C++ support broke this
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests

@@ -1641,9 +1641,6 @@ m_unshare(struct mbuf *m0, int how)
 				mprev->m_len += m->m_len;
 				mprev->m_next = m->m_next;	/* unlink from chain */
 				m_free(m);			/* reclaim mbuf */
-#if 0
-				newipsecstat.ips_mbcoalesced++;
-#endif
 			} else {
 				mprev = m;
 			}
@@ -1673,9 +1670,6 @@ m_unshare(struct mbuf *m0, int how)
 			mprev->m_len += m->m_len;
 			mprev->m_next = m->m_next;	/* unlink from chain */
 			m_free(m);			/* reclaim mbuf */
-#if 0
-			newipsecstat.ips_clcoalesced++;
-#endif
 			continue;
 		}
 

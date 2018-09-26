@@ -94,7 +94,7 @@ struct tcp_log_bbr {
 	uint16_t flex7;
 	uint8_t bbr_state;
 	uint8_t bbr_substate;
-	uint8_t inpacer;
+	uint8_t inhpts;
 	uint8_t ininput;
 	uint8_t use_lt_bw;
 	uint8_t flex8;
@@ -217,7 +217,9 @@ enum tcp_log_events {
 	BBR_LOG_REDUCE,		/* old bbr log reduce for 4.1 and earlier 46*/
 	TCP_LOG_RTT,		/* A rtt (in useconds) is being sampled and applied to the srtt algo 47 */
 	BBR_LOG_SETTINGS_CHG,   /* Settings changed for loss response 48 */
-	TCP_LOG_END		/* End (keep at end)	            49 */
+	BBR_LOG_SRTT_GAIN_EVENT, /* SRTT gaining 49 */
+	TCP_LOG_REASS,		/* Reassembly buffer logging 50 */
+	TCP_LOG_END		/* End (keep at end)	            51 */
 };
 
 enum tcp_log_states {
@@ -331,6 +333,7 @@ struct tcp_log_dev_log_queue {
 	} while (0)
 
 
+#ifdef TCP_BLACKBOX
 extern bool tcp_log_verbose;
 void tcp_log_drain(struct tcpcb *tp);
 int tcp_log_dump_tp_logbuf(struct tcpcb *tp, char *reason, int how, bool force);
@@ -348,6 +351,20 @@ int tcp_log_state_change(struct tcpcb *tp, int state);
 void tcp_log_tcpcbinit(struct tcpcb *tp);
 void tcp_log_tcpcbfini(struct tcpcb *tp);
 void tcp_log_flowend(struct tcpcb *tp);
+#else /* !TCP_BLACKBOX */
+#define tcp_log_verbose	(false)
+
+static inline struct tcp_log_buffer *
+tcp_log_event_(struct tcpcb *tp, struct tcphdr *th, struct sockbuf *rxbuf,
+    struct sockbuf *txbuf, uint8_t eventid, int errornum, uint32_t len,
+    union tcp_log_stackspecific *stackinfo, int th_hostorder,
+    const char *output_caller, const char *func, int line,
+    const struct timeval *tv)
+{
+
+	return (NULL);
+}
+#endif /* TCP_BLACKBOX */
 
 #endif	/* _KERNEL */
 #endif	/* __tcp_log_buf_h__ */

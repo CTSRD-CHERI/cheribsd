@@ -31,9 +31,10 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ktrace.h"
 #include "opt_kqueue.h"
+
+#define	EXPLICIT_USER_ACCESS
 
 #ifdef COMPAT_FREEBSD11
 #define	_WANT_FREEBSD11_KEVENT
@@ -164,6 +165,10 @@ static int	filt_fileattach(struct knote *kn);
 static void	filt_timerexpire(void *knx);
 static int	filt_timerattach(struct knote *kn);
 static void	filt_timerdetach(struct knote *kn);
+static void	filt_timerstart(struct knote *kn, sbintime_t to);
+static void	filt_timertouch(struct knote *kn, kkevent_t *kev,
+		    u_long type);
+static int	filt_timervalidate(struct knote *kn, sbintime_t *to);
 static int	filt_timer(struct knote *kn, long hint);
 static int	filt_userattach(struct knote *kn);
 static void	filt_userdetach(struct knote *kn);
@@ -192,6 +197,7 @@ static struct filterops timer_filtops = {
 	.f_attach = filt_timerattach,
 	.f_detach = filt_timerdetach,
 	.f_event = filt_timer,
+	.f_touch = filt_timertouch,
 };
 static struct filterops user_filtops = {
 	.f_attach = filt_userattach,
@@ -702,29 +708,44 @@ filt_timerexpire(void *knx)
  * data contains amount of time to sleep
  */
 static int
-filt_timerattach(struct knote *kn)
+filt_timervalidate(struct knote *kn, sbintime_t *to)
 {
-	struct kq_timer_cb_data *kc;
 	struct bintime bt;
-	sbintime_t to, sbt;
-	unsigned int ncallouts;
+	sbintime_t sbt;
 
 	if (kn->kn_sdata < 0)
 		return (EINVAL);
 	if (kn->kn_sdata == 0 && (kn->kn_flags & EV_ONESHOT) == 0)
 		kn->kn_sdata = 1;
-	/* Only precision unit are supported in flags so far */
+	/*
+	 * The only fflags values supported are the timer unit
+	 * (precision) and the absolute time indicator.
+	 */
 	if ((kn->kn_sfflags & ~(NOTE_TIMER_PRECMASK | NOTE_ABSTIME)) != 0)
 		return (EINVAL);
 
-	to = timer2sbintime(kn->kn_sdata, kn->kn_sfflags);
+	*to = timer2sbintime(kn->kn_sdata, kn->kn_sfflags);
 	if ((kn->kn_sfflags & NOTE_ABSTIME) != 0) {
 		getboottimebin(&bt);
 		sbt = bttosbt(bt);
-		to -= sbt;
+		*to -= sbt;
 	}
-	if (to < 0)
+	if (*to < 0)
 		return (EINVAL);
+	return (0);
+}
+
+static int
+filt_timerattach(struct knote *kn)
+{
+	struct kq_timer_cb_data *kc;
+	sbintime_t to;
+	unsigned int ncallouts;
+	int error;
+
+	error = filt_timervalidate(kn, &to);
+	if (error != 0)
+		return (error);
 
 	do {
 		ncallouts = kq_ncallouts;
@@ -737,6 +758,17 @@ filt_timerattach(struct knote *kn)
 	kn->kn_status &= ~KN_DETACHED;		/* knlist_add clears it */
 	kn->kn_ptr.p_v = kc = malloc(sizeof(*kc), M_KQUEUE, M_WAITOK);
 	callout_init(&kc->c, 1);
+	filt_timerstart(kn, to);
+
+	return (0);
+}
+
+static void
+filt_timerstart(struct knote *kn, sbintime_t to)
+{
+	struct kq_timer_cb_data *kc;
+
+	kc = kn->kn_ptr.p_v;
 	if ((kn->kn_sfflags & NOTE_ABSTIME) != 0) {
 		kc->next = to;
 		kc->to = 0;
@@ -746,15 +778,13 @@ filt_timerattach(struct knote *kn)
 	}
 	callout_reset_sbt_on(&kc->c, kc->next, 0, filt_timerexpire, kn,
 	    PCPU_GET(cpuid), C_ABSOLUTE);
-
-	return (0);
 }
 
 static void
 filt_timerdetach(struct knote *kn)
 {
 	struct kq_timer_cb_data *kc;
-	unsigned int old;
+	unsigned int old __unused;
 
 	kc = kn->kn_ptr.p_v;
 	callout_drain(&kc->c);
@@ -762,6 +792,73 @@ filt_timerdetach(struct knote *kn)
 	old = atomic_fetchadd_int(&kq_ncallouts, -1);
 	KASSERT(old > 0, ("Number of callouts cannot become negative"));
 	kn->kn_status |= KN_DETACHED;	/* knlist_remove sets it */
+}
+
+static void
+filt_timertouch(struct knote *kn, kkevent_t *kev, u_long type)
+{
+	struct kq_timer_cb_data *kc;	
+	struct kqueue *kq;
+	sbintime_t to;
+	int error;
+
+	switch (type) {
+	case EVENT_REGISTER:
+		/* Handle re-added timers that update data/fflags */
+		if (kev->flags & EV_ADD) {
+			kc = kn->kn_ptr.p_v;
+
+			/* Drain any existing callout. */
+			callout_drain(&kc->c);
+
+			/* Throw away any existing undelivered record
+			 * of the timer expiration. This is done under
+			 * the presumption that if a process is
+			 * re-adding this timer with new parameters,
+			 * it is no longer interested in what may have
+			 * happened under the old parameters. If it is
+			 * interested, it can wait for the expiration,
+			 * delete the old timer definition, and then
+			 * add the new one.
+			 *
+			 * This has to be done while the kq is locked:
+			 *   - if enqueued, dequeue
+			 *   - make it no longer active
+			 *   - clear the count of expiration events
+			 */
+			kq = kn->kn_kq;
+			KQ_LOCK(kq);
+			if (kn->kn_status & KN_QUEUED)
+				knote_dequeue(kn);
+
+			kn->kn_status &= ~KN_ACTIVE;
+			kn->kn_data = 0;
+			KQ_UNLOCK(kq);
+			
+			/* Reschedule timer based on new data/fflags */
+			kn->kn_sfflags = kev->fflags;
+			kn->kn_sdata = kev->data;
+			error = filt_timervalidate(kn, &to);
+			if (error != 0) {
+			  	kn->kn_flags |= EV_ERROR;
+				kn->kn_data = error;
+			} else
+			  	filt_timerstart(kn, to);
+		}
+		break;
+
+        case EVENT_PROCESS:
+		*kev = kn->kn_kevent;
+		if (kn->kn_flags & EV_CLEAR) {
+			kn->kn_data = 0;
+			kn->kn_fflags = 0;
+		}
+		break;
+
+	default:
+		panic("filt_timertouch() - invalid type (%ld)", type);
+		break;
+	}
 }
 
 static int
@@ -915,11 +1012,11 @@ kern_kqueue(struct thread *td, int flags, struct filecaps *fcaps)
 
 struct g_kevent_args {
 	int	fd;
-	void	*changelist;
+	void	* __capability changelist;
 	int	nchanges;
-	void	*eventlist;
+	void	* __capability eventlist;
 	int	nevents;
-	const struct timespec *timeout;
+	const struct timespec * __capability timeout;
 };
 
 int
@@ -933,11 +1030,11 @@ sys_kevent(struct thread *td, struct kevent_args *uap)
 	};
 	struct g_kevent_args gk_args = {
 		.fd = uap->fd,
-		.changelist = uap->changelist,
+		.changelist = __USER_CAP_UNBOUND(uap->changelist),
 		.nchanges = uap->nchanges,
-		.eventlist = uap->eventlist,
+		.eventlist = __USER_CAP_UNBOUND(uap->eventlist),
 		.nevents = uap->nevents,
-		.timeout = uap->timeout,
+		.timeout = __USER_CAP_OBJ(uap->timeout),
 	};
 
 	return (kern_kevent_generic(td, &gk_args, &k_ops, "kevent"));
@@ -948,9 +1045,6 @@ kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
     struct kevent_copyops *k_ops, const char *struct_name)
 {
 	struct timespec ts, *tsp;
-#ifdef KTRACE
-	struct kevent *eventlist = uap->eventlist;
-#endif
 	int error;
 
 	if (uap->timeout != NULL) {
@@ -972,7 +1066,7 @@ kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
 
 #ifdef KTRACE
 	if (error == 0 && KTRPOINT(td, KTR_STRUCT_ARRAY))
-		ktrstructarray(struct_name, UIO_USERSPACE, eventlist,
+		ktrstructarray(struct_name, UIO_USERSPACE, uap->eventlist,
 		    td->td_retval[0], k_ops->kevent_size);
 #endif
 
@@ -1005,10 +1099,11 @@ kevent_copyout(void *arg, kkevent_t *kevp, int count)
 		ks_n[i].flags = kevp[i].flags;
 		ks_n[i].fflags = kevp[i].fflags;
 		ks_n[i].data = kevp[i].data;
-		ks_n[i].udata = (void *)(uintptr_t)kevp[i].udata;
+		ks_n[i].udata = (void *)(__cheri_addr vaddr_t)kevp[i].udata;
 		memcpy(&ks_n[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
 	}
-	error = copyout(ks_n, uap->eventlist, count * sizeof(*ks_n));
+	error = copyout(ks_n, __USER_CAP_UNBOUND(uap->eventlist),
+	    count * sizeof(*ks_n));
 #endif
 	if (error == 0)
 		uap->eventlist += count;
@@ -1034,7 +1129,8 @@ kevent_copyin(void *arg, kkevent_t *kevp, int count)
 #if !__has_feature(capabilities)
 	error = copyin(uap->changelist, kevp, count * sizeof *kevp);
 #else
-	error = copyin(uap->changelist, ks_n, count * sizeof(*ks_n));
+	error = copyin(__USER_CAP_UNBOUND(uap->changelist), ks_n,
+	    count * sizeof(*ks_n));
 	if (error != 0)
 		return (error);
 	for (i = 0; i < count; i++) {
@@ -1070,8 +1166,9 @@ kevent11_copyout(void *arg, kkevent_t *kevp, int count)
 		kev11.flags = kevp->flags;
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
-		kev11.udata = (void *)(uintptr_t)kevp->udata;
-		error = copyout(&kev11, uap->eventlist, sizeof(kev11));
+		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
+		error = copyout(&kev11, __USER_CAP_OBJ(uap->eventlist),
+		    sizeof(kev11));
 		if (error != 0)
 			break;
 		uap->eventlist++;
@@ -1094,7 +1191,8 @@ kevent11_copyin(void *arg, kkevent_t *kevp, int count)
 	uap = (struct freebsd11_kevent_args *)arg;
 
 	for (i = 0; i < count; i++) {
-		error = copyin(uap->changelist, &kev11, sizeof(kev11));
+		error = copyin(__USER_CAP_OBJ(uap->changelist), &kev11,
+		    sizeof(kev11));
 		if (error != 0)
 			break;
 		kevp->ident = kev11.ident;
@@ -1121,11 +1219,11 @@ freebsd11_kevent(struct thread *td, struct freebsd11_kevent_args *uap)
 	};
 	struct g_kevent_args gk_args = {
 		.fd = uap->fd,
-		.changelist = uap->changelist,
+		.changelist = __USER_CAP_UNBOUND(uap->changelist),
 		.nchanges = uap->nchanges,
-		.eventlist = uap->eventlist,
+		.eventlist = __USER_CAP_UNBOUND(uap->eventlist),
 		.nevents = uap->nevents,
-		.timeout = uap->timeout,
+		.timeout = __USER_CAP_OBJ(uap->timeout),
 	};
 
 	return (kern_kevent_generic(td, &gk_args, &k_ops, "kevent_freebsd11"));
@@ -1327,7 +1425,6 @@ kqueue_register(struct kqueue *kq, kkevent_t *kev, struct thread *td, int waitok
 	struct file *fp;
 	struct knote *kn, *tkn;
 	struct knlist *knl;
-	cap_rights_t rights;
 	int error, filt, event;
 	int haskqglobal, filedesc_unlock;
 
@@ -1363,8 +1460,7 @@ findkn:
 		if (kev->ident > INT_MAX)
 			error = EBADF;
 		else
-			error = fget(td, kev->ident,
-			    cap_rights_init(&rights, CAP_EVENT), &fp);
+			error = fget(td, kev->ident, &cap_event_rights, &fp);
 		if (error)
 			goto done;
 

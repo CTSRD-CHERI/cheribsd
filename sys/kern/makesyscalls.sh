@@ -472,11 +472,12 @@ sed -e '
 			}
 			if (argtype[argc] == "")
 				parserr($f, "argument definition")
+
 			# The parser adds space around parens.
 			# Remove it from annotations.
 			gsub(/ \( /, "(", argtype[argc]);
 			gsub(/ \)/, ")", argtype[argc]);
-			# Strip SAL annotations
+			#remove annotations
 			gsub(/_In[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Out[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Pagerange[^ ]*[_)] /, "", argtype[argc]);
@@ -907,9 +908,6 @@ sed -e '
 	}
 	END {
 		printf "\n#define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))\n" > sysinc
-
-		if (ncompat != 0 || ncompat4 != 0 || ncompat6 != 0 || ncompat7 != 0 || ncompat10 != 0 || ncompat11 != 0)
-			printf "#include \"opt_compat.h\"\n\n" > syssw
 
 		if (ncompat != 0) {
 			printf "\n#ifdef %s\n", compat > sysinc

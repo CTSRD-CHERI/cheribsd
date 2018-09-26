@@ -222,7 +222,7 @@ ip6_init(void)
 	TUNABLE_INT_FETCH("net.inet6.ip6.accept_rtadv", &V_ip6_accept_rtadv);
 	TUNABLE_INT_FETCH("net.inet6.ip6.no_radr", &V_ip6_no_radr);
 
-	TAILQ_INIT(&V_in6_ifaddrhead);
+	CK_STAILQ_INIT(&V_in6_ifaddrhead);
 	V_in6_ifaddrhashtbl = hashinit(IN6ADDR_NHASH, M_IFADDR,
 	    &V_in6_ifaddrhmask);
 
@@ -377,10 +377,10 @@ ip6_destroy(void *unused __unused)
 
 	/* Cleanup addresses. */
 	IFNET_RLOCK();
-	TAILQ_FOREACH(ifp, &V_ifnet, if_link) {
+	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
 		/* Cannot lock here - lock recursion. */
 		/* IF_ADDR_LOCK(ifp); */
-		TAILQ_FOREACH_SAFE(ifa, &ifp->if_addrhead, ifa_link, nifa) {
+		CK_STAILQ_FOREACH_SAFE(ifa, &ifp->if_addrhead, ifa_link, nifa) {
 
 			if (ifa->ifa_addr->sa_family != AF_INET6)
 				continue;
@@ -720,13 +720,15 @@ ip6_input(struct mbuf *m)
 #endif
 	/*
 	 * Try to forward the packet, but if we fail continue.
+	 * ip6_tryforward() does not generate redirects, so fall
+	 * through to normal processing if redirects are required.
 	 * ip6_tryforward() does inbound and outbound packet firewall
 	 * processing. If firewall has decided that destination becomes
 	 * our local address, it sets M_FASTFWD_OURS flag. In this
 	 * case skip another inbound firewall processing and update
 	 * ip6 pointer.
 	 */
-	if (V_ip6_forwarding != 0
+	if (V_ip6_forwarding != 0 && V_ip6_sendredirects == 0
 #if defined(IPSEC) || defined(IPSEC_SUPPORT)
 	    && (!IPSEC_ENABLED(ipv6) ||
 	    IPSEC_CAPS(ipv6, m, IPSEC_CAP_OPERABLE) == 0)
@@ -1267,7 +1269,7 @@ ip6_savecontrol_v4(struct inpcb *inp, struct mbuf *m, struct mbuf **mp,
 				mbuf_tstmp2timespec(m, &t.ts);
 				getboottimebin(&boottimebin);
 				bintime2timespec(&boottimebin, &ts1);
-				timespecadd(&t.ts, &ts1);
+				timespecadd(&t.ts, &ts1, &t.ts);
 			} else {
 				nanotime(&t.ts);
 			}

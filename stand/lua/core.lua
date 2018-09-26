@@ -41,6 +41,26 @@ local function composeLoaderCmd(cmd_name, argstr)
 	return cmd_name
 end
 
+-- Globals
+-- try_include will return the loaded module on success, or nil on failure.
+-- A message will also be printed on failure, with one exception: non-verbose
+-- loading will suppress 'module not found' errors.
+function try_include(module)
+	local status, ret = pcall(require, module)
+	-- ret is the module if we succeeded.
+	if status then
+		return ret
+	end
+	-- Otherwise, ret is just a message; filter out ENOENT unless we're
+	-- doing a verbose load. As a consequence, try_include prior to loading
+	-- configuration will not display 'module not found'. All other errors
+	-- in loading will be printed.
+	if config.verbose or ret:match("^module .+ not found") == nil then
+		error(ret, 2)
+	end
+	return nil
+end
+
 -- Module exports
 -- Commonly appearing constants
 core.KEY_BACKSPACE	= 8
@@ -165,7 +185,7 @@ function core.kernelList()
 	end
 
 	if v ~= nil then
-		for n in v:gmatch("([^; ]+)[; ]?") do
+		for n in v:gmatch("([^;, ]+)[;, ]?") do
 			if unique[n] == nil then
 				i = i + 1
 				kernels[i] = n
@@ -290,14 +310,6 @@ function core.isZFSBoot()
 end
 
 function core.isSerialBoot()
-	local c = loader.getenv("console")
-
-	if c ~= nil then
-		if c:find("comconsole") ~= nil then
-			return true
-		end
-	end
-
 	local s = loader.getenv("boot_serial")
 	if s ~= nil then
 		return true
@@ -316,16 +328,7 @@ end
 
 -- Is the menu skipped in the environment in which we've booted?
 function core.isMenuSkipped()
-	if core.isSerialBoot() then
-		return true
-	end
-	local c = string.lower(loader.getenv("console") or "")
-	if c:match("^efi[ ;]") ~= nil or c:match("[ ;]efi[ ;]") ~= nil then
-		return true
-	end
-
-	c = string.lower(loader.getenv("beastie_disable") or "")
-	return c == "yes"
+	return string.lower(loader.getenv("beastie_disable") or "") == "yes"
 end
 
 -- This may be a better candidate for a 'utility' module.

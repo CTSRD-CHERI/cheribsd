@@ -34,7 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 #include "opt_kstack_pages.h"
@@ -277,7 +276,6 @@ proc_init(void *mem, int size, int flags)
 	mtx_init(&p->p_itimmtx, "pitiml", NULL, MTX_SPIN | MTX_NEW);
 	mtx_init(&p->p_profmtx, "pprofl", NULL, MTX_SPIN | MTX_NEW);
 	cv_init(&p->p_pwait, "ppwait");
-	cv_init(&p->p_dbgwait, "dbgwait");
 	TAILQ_INIT(&p->p_threads);	     /* all threads in proc */
 	EVENTHANDLER_DIRECT_INVOKE(process_init, p);
 	p->p_stats = pstats_alloc();
@@ -1907,14 +1905,14 @@ get_proc_vector_cheriabi(struct thread *td, struct proc *p,
 		return (ENOMEM);
 	switch (type) {
 	case PROC_ARG:
-		vptr = (vm_offset_t)pss.ps_argvstr;
+		vptr = (__cheri_addr vm_offset_t)pss.ps_argvstr;
 		vsize = pss.ps_nargvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
 		size = vsize * sizeof(void * __capability);
 		break;
 	case PROC_ENV:
-		vptr = (vm_offset_t)pss.ps_envstr;
+		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr;
 		vsize = pss.ps_nenvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
@@ -1925,7 +1923,7 @@ get_proc_vector_cheriabi(struct thread *td, struct proc *p,
 		 * The aux array is just above env array on the stack. Check
 		 * that the address is naturally aligned.
 		 */
-		vptr = (vm_offset_t)pss.ps_envstr +
+		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr +
 			(pss.ps_nenvstr + 1) * sizeof(void * __capability);
 #if __ELF_WORD_SIZE == 64
 		if (vptr % sizeof(uint64_t) != 0)
@@ -2220,11 +2218,20 @@ sysctl_kern_proc_args(SYSCTL_HANDLER_ARGS)
 
 	if (req->newlen > ps_arg_cache_limit - sizeof(struct pargs))
 		return (ENOMEM);
-	newpa = pargs_alloc(req->newlen);
-	error = SYSCTL_IN(req, newpa->ar_args, req->newlen);
-	if (error != 0) {
-		pargs_free(newpa);
-		return (error);
+
+	if (req->newlen == 0) {
+		/*
+		 * Clear the argument pointer, so that we'll fetch arguments
+		 * with proc_getargv() until further notice.
+		 */
+		newpa = NULL;
+	} else {
+		newpa = pargs_alloc(req->newlen);
+		error = SYSCTL_IN(req, newpa->ar_args, req->newlen);
+		if (error != 0) {
+			pargs_free(newpa);
+			return (error);
+		}
 	}
 	PROC_LOCK(p);
 	pa = p->p_args;
@@ -3656,7 +3663,7 @@ again:
 		}
 	}
 	/*  Did the loop above missed any stopped process ? */
-	LIST_FOREACH(p, &allproc, p_list) {
+	FOREACH_PROC_IN_SYSTEM(p) {
 		/* No need for proc lock. */
 		if ((p->p_flag & P_TOTAL_STOP) != 0)
 			goto again;

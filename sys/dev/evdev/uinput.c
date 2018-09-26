@@ -29,6 +29,8 @@
 
 #include "opt_evdev.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
@@ -39,6 +41,7 @@
 #include <sys/poll.h>
 #include <sys/proc.h>
 #include <sys/selinfo.h>
+#include <sys/sysent.h>
 #include <sys/systm.h>
 #include <sys/sx.h>
 #include <sys/uio.h>
@@ -159,10 +162,10 @@ uinput_knl_assert_unlocked(void *arg)
 }
 
 static void
-uinput_ev_event(struct evdev_dev *evdev, void *softc, uint16_t type,
-    uint16_t code, int32_t value)
+uinput_ev_event(struct evdev_dev *evdev, uint16_t type, uint16_t code,
+    int32_t value)
 {
-	struct uinput_cdev_state *state = softc;
+	struct uinput_cdev_state *state = evdev_get_softc(evdev);
 
 	if (type == EV_LED)
 		evdev_push_event(evdev, type, code, value);
@@ -596,7 +599,7 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 		void * __capability cap;
 
 #ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		if (SV_CURPROC_FLAG(SV_CHERI))
 			cap = *(void * __capability *)data;
 		else
 #endif
@@ -610,6 +613,23 @@ uinput_ioctl_sub(struct uinput_cdev_state *state, u_long cmd, caddr_t data)
 		if (ret != 0)
 			return (ret);
 		evdev_set_phys(state->ucs_evdev, buf);
+		return (0);
+	}
+
+	case UI_SET_BSDUNIQ: {
+		void * __capability cap;
+		if (state->ucs_state == UINPUT_RUNNING)
+			return (EINVAL);
+#ifdef COMPAT_CHERIABI
+		if (SV_CURPROC_FLAG(SV_CHERI))
+			cap = *(void * __capability *)data;
+		else
+#endif
+			cap = __USER_CAP_STR(*(void **)data);
+		ret = copyinstr(cap, buf, sizeof(buf), NULL);
+		if (ret != 0)
+			return (ret);
+		evdev_set_serial(state->ucs_evdev, buf);
 		return (0);
 	}
 

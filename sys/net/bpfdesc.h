@@ -118,9 +118,6 @@ struct bpf_d {
 #define BPF_PID_REFRESH(bd, td)	(bd)->bd_pid = (td)->td_proc->p_pid
 #define BPF_PID_REFRESH_CUR(bd)	(bd)->bd_pid = curthread->td_proc->p_pid
 
-#define BPF_LOCK()		mtx_lock(&bpf_mtx)
-#define BPF_UNLOCK()		mtx_unlock(&bpf_mtx)
-#define BPF_LOCK_ASSERT()	mtx_assert(&bpf_mtx, MA_OWNED)
 /*
  * External representation of the bpf descriptor
  */
@@ -154,11 +151,6 @@ struct xbpf_d {
 	 */
 	u_int64_t	bd_spare[4];
 };
-
-#define BPFIF_RLOCK(bif)	rw_rlock(&(bif)->bif_lock)
-#define BPFIF_RUNLOCK(bif)	rw_runlock(&(bif)->bif_lock)
-#define BPFIF_WLOCK(bif)	rw_wlock(&(bif)->bif_lock)
-#define BPFIF_WUNLOCK(bif)	rw_wunlock(&(bif)->bif_lock)
 
 #define BPFIF_FLAG_DYING	1	/* Reject new bpf consumers */
 

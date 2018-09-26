@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2015-2018 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -61,9 +61,6 @@ _start:
 	sub	s9, t2, t1	/* s9 = physmem base */
 	mv	s10, a0		/* s10 = hart id */
 	mv	s11, a1		/* s11 = dtbp */
-
-	li	t0, SSTATUS_SUM
-	csrs	sstatus, t0
 
 	/* Direct secondary cores to mpentry */
 	bnez	s10, mpentry
@@ -156,6 +153,8 @@ _start:
 	or	s2, s2, t0
 	sfence.vma
 	csrw	sptbr, s2
+
+	.align 2
 va:
 
 	/* Setup supervisor trap vector */
@@ -261,6 +260,21 @@ END(mpentry)
  * Called by a core when it is being brought online.
  */
 ENTRY(mpentry)
+	/*
+	 * Calculate the offset to __riscv_boot_ap
+	 * for the current core, cpuid is in a0.
+	 */
+	li	t1, 4
+	mulw	t1, t1, a0
+	/* Get the pointer */
+	la	t0, __riscv_boot_ap
+	add	t0, t0, t1
+
+1:
+	/* Wait the kernel to be ready */
+	lw	t1, 0(t0)
+	beqz	t1, 1b
+
 	/* Setup stack pointer */
 	la	t0, secondary_stacks
 	li	t1, (PAGE_SIZE * KSTACK_PAGES)
@@ -284,6 +298,8 @@ ENTRY(mpentry)
 	or	s2, s2, t0
 	sfence.vma
 	csrw	sptbr, s2
+
+	.align 2
 mpva:
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
@@ -292,20 +308,6 @@ mpva:
 	/* Ensure sscratch is zero */
 	li	t0, 0
 	csrw	sscratch, t0
-	/*
-	 * Calculate the offset to __riscv_boot_ap
-	 * for current core, cpuid in a0.
-	 */
-	li	t1, 4
-	mulw	t1, t1, a0
-	/* Get pointer */
-	la	t0, __riscv_boot_ap
-	add	t0, t0, t1
-
-1:
-	/* Wait the kernel to be ready */
-	lw	t1, 0(t0)
-	beqz	t1, 1b
 
 	call	init_secondary
 END(mpentry)

@@ -145,7 +145,7 @@ int ibv_fork_init(void)
 
 	if (huge_page_enabled) {
 		size = get_page_size(tmp);
-		tmp_aligned = (void *) ((uintptr_t) tmp & ~(size - 1));
+		tmp_aligned = __builtin_align_down(tmp, size);
 	} else {
 		size = page_size;
 		tmp_aligned = tmp;
@@ -604,9 +604,9 @@ static int ibv_madvise_range(void *base, size_t size, int advice)
 	else
 		range_page_size = page_size;
 
-	start = (uintptr_t) base & ~(range_page_size - 1);
-	end   = ((uintptr_t) (base + size + range_page_size - 1) &
-		 ~(range_page_size - 1)) - 1;
+	start = __builtin_align_down((uintptr_t)base, range_page_size);
+	end   = __builtin_align_down((uintptr_t)base + size + range_page_size,
+	    range_page_size) - 1;
 
 	pthread_mutex_lock(&mm_mutex);
 again:
@@ -702,3 +702,11 @@ int ibv_dofork_range(void *base, size_t size)
 		return 0;
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180907,
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

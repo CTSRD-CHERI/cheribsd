@@ -62,14 +62,14 @@ extern void ixgbe_if_enable_intr(if_ctx_t ctx);
 static int ixgbe_determine_rsstype(u16 pkt_info);
 
 struct if_txrx ixgbe_txrx  = {
-	ixgbe_isc_txd_encap,
-	ixgbe_isc_txd_flush,
-	ixgbe_isc_txd_credits_update,
-	ixgbe_isc_rxd_available,
-	ixgbe_isc_rxd_pkt_get,
-	ixgbe_isc_rxd_refill,
-	ixgbe_isc_rxd_flush,
-	NULL
+	.ift_txd_encap = ixgbe_isc_txd_encap,
+	.ift_txd_flush = ixgbe_isc_txd_flush,
+	.ift_txd_credits_update = ixgbe_isc_txd_credits_update,
+	.ift_rxd_available = ixgbe_isc_rxd_available,
+	.ift_rxd_pkt_get = ixgbe_isc_rxd_pkt_get,
+	.ift_rxd_refill = ixgbe_isc_rxd_refill,
+	.ift_rxd_flush = ixgbe_isc_rxd_flush,
+	.ift_legacy_intr = NULL
 };
 
 extern if_shared_ctx_t ixgbe_sctx;
@@ -217,6 +217,7 @@ ixgbe_isc_txd_encap(void *arg, if_pkt_info_t pi)
 	}
 
 	olinfo_status |= IXGBE_ADVTXD_CC;
+	pidx_last = 0;
 	for (j = 0; j < nsegs; j++) {
 		bus_size_t seglen;
 
@@ -429,7 +430,8 @@ ixgbe_isc_rxd_pkt_get(void *arg, if_rxd_info_t ri)
 
 		rxd->wb.upper.status_error = 0;
 		eop = ((staterr & IXGBE_RXD_STAT_EOP) != 0);
-		if (staterr & IXGBE_RXD_STAT_VP) {
+
+		if ( (rxr->vtag_strip) && (staterr & IXGBE_RXD_STAT_VP) ) {
 			vtag = le16toh(rxd->wb.upper.vlan);
 		} else {
 			vtag = 0;

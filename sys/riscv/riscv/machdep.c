@@ -204,13 +204,14 @@ fill_fpregs(struct thread *td, struct fpreg *regs)
 		 * If we have just been running FPE instructions we will
 		 * need to save the state to memcpy it below.
 		 */
-		fpe_state_save(td);
+		if (td == curthread)
+			fpe_state_save(td);
 
 		memcpy(regs->fp_x, pcb->pcb_x, sizeof(regs->fp_x));
 		regs->fp_fcsr = pcb->pcb_fcsr;
 	} else
 #endif
-		memset(regs->fp_x, 0, sizeof(regs->fp_x));
+		memset(regs, 0, sizeof(*regs));
 
 	return (0);
 }
@@ -219,12 +220,17 @@ int
 set_fpregs(struct thread *td, struct fpreg *regs)
 {
 #ifdef FPE
+	struct trapframe *frame;
 	struct pcb *pcb;
 
+	frame = td->td_frame;
 	pcb = td->td_pcb;
 
 	memcpy(pcb->pcb_x, regs->fp_x, sizeof(regs->fp_x));
 	pcb->pcb_fcsr = regs->fp_fcsr;
+	pcb->pcb_fpflags |= PCB_FP_STARTED;
+	frame->tf_sstatus &= ~SSTATUS_FS_MASK;
+	frame->tf_sstatus |= SSTATUS_FS_CLEAN;
 #endif
 
 	return (0);
@@ -342,7 +348,6 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	tf->tf_ra = mcp->mc_gpregs.gp_ra;
 	tf->tf_sp = mcp->mc_gpregs.gp_sp;
 	tf->tf_gp = mcp->mc_gpregs.gp_gp;
-	tf->tf_tp = mcp->mc_gpregs.gp_tp;
 	tf->tf_sepc = mcp->mc_gpregs.gp_sepc;
 	tf->tf_sstatus = mcp->mc_gpregs.gp_sstatus;
 
@@ -548,7 +553,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct proc *p;
 	int onstack;
-	int code;
 	int sig;
 
 	td = curthread;
@@ -556,7 +560,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 
 	sig = ksi->ksi_signo;
-	code = ksi->ksi_code;
 	psp = p->p_sigacts;
 	mtx_assert(&psp->ps_mtx, MA_OWNED);
 
@@ -737,12 +740,14 @@ cache_setup(void)
 vm_offset_t
 fake_preload_metadata(struct riscv_bootparams *rvbp __unused)
 {
+	static uint32_t fake_preload[35];
 #ifdef DDB
 	vm_offset_t zstart = 0, zend = 0;
 #endif
 	vm_offset_t lastaddr;
-	int i = 0;
-	static uint32_t fake_preload[35];
+	int i;
+
+	i = 0;
 
 	fake_preload[i++] = MODINFO_NAME;
 	fake_preload[i++] = strlen("kernel") + 1;
@@ -754,12 +759,13 @@ fake_preload_metadata(struct riscv_bootparams *rvbp __unused)
 	i += 3;
 	fake_preload[i++] = MODINFO_ADDR;
 	fake_preload[i++] = sizeof(vm_offset_t);
-	fake_preload[i++] = (uint64_t)(KERNBASE + KERNENTRY);
+	*(vm_offset_t *)&fake_preload[i++] =
+	    (vm_offset_t)(KERNBASE + KERNENTRY);
 	i += 1;
 	fake_preload[i++] = MODINFO_SIZE;
-	fake_preload[i++] = sizeof(uint64_t);
-	printf("end is 0x%016lx\n", (uint64_t)&end);
-	fake_preload[i++] = (uint64_t)&end - (uint64_t)(KERNBASE + KERNENTRY);
+	fake_preload[i++] = sizeof(vm_offset_t);
+	fake_preload[i++] = (vm_offset_t)&end -
+	    (vm_offset_t)(KERNBASE + KERNENTRY);
 	i += 1;
 #ifdef DDB
 #if 0
@@ -871,8 +877,6 @@ initriscv(struct riscv_bootparams *rvbp)
 	mutex_init();
 	init_param2(physmem);
 	kdb_init();
-
-	riscv_init_interrupts();
 
 	early_boot = 0;
 }

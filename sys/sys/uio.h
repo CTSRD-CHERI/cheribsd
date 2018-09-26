@@ -38,6 +38,7 @@
 #include <sys/cdefs.h>
 #include <sys/_types.h>
 #include <sys/_iovec.h>
+#include <sys/_uio.h>
 
 #ifndef _SSIZE_T_DECLARED
 typedef	__ssize_t	ssize_t;
@@ -47,20 +48,6 @@ typedef	__ssize_t	ssize_t;
 #ifndef _OFF_T_DECLARED
 typedef	__off_t	off_t;
 #define	_OFF_T_DECLARED
-#endif
-
-#if __BSD_VISIBLE
-#ifndef _UIO_RW_DECLARED
-enum	uio_rw { UIO_READ, UIO_WRITE };
-#define	_UIO_RW_DECLARED
-#endif
-
-/* Segment flag values. */
-enum uio_seg {
-	UIO_USERSPACE,		/* from user data space */
-	UIO_SYSSPACE,		/* from system space */
-	UIO_NOCOPY		/* don't copy, already in object */
-};
 #endif
 
 #ifdef _KERNEL

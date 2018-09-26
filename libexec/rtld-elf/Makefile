@@ -3,7 +3,9 @@
 # Use the following command to build local debug version of dynamic
 # linker:
 # make DEBUG_FLAGS=-g DEBUG=-DDEBUG WITHOUT_TESTS=yes all
-
+.ifdef BUILD_RTLD_DEBUG
+CFLAGS+=-DDEBUG
+.endif
 # Not adapted for CHERI
 WANT_CHERI=none
 
@@ -11,6 +13,7 @@ WANT_CHERI=none
 PACKAGE=	clibs
 MK_SSP=		no
 
+CONFS=		libmap.conf
 PROG?=		ld-elf.so.1
 .if (${PROG:M*ld-elf32*} != "")
 TAGS+=		lib32
@@ -59,7 +62,7 @@ CFLAGS+=	-fvisibility=hidden
 CFLAGS.reloc.c+=-fno-jump-tables
 .endif
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
-LIBADD=		c_pic
+LIBADD=		c_nossp_pic
 .if ${MK_TOOLCHAIN} == "no"
 LDFLAGS+=	-L${LIBCDIR}
 .endif

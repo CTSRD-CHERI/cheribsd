@@ -173,19 +173,26 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
  *	A map is a set of map entries.  These map entries are
  *	organized both as a binary search tree and as a doubly-linked
  *	list.  Both structures are ordered based upon the start and
- *	end addresses contained within each map entry.  The list
- *	header has max start value and min end value to act as
- *	sentinels for sequential search of the doubly-linked list.
+ *	end addresses contained within each map entry.
+ *
+ *	Counterintuitively, the map's min offset value is stored in
+ *	map->header.end, and its max offset value is stored in
+ *	map->header.start.
+ *
+ *	The list header has max start value and min end value to act
+ *	as sentinels for sequential search of the doubly-linked list.
  *	Sleator and Tarjan's top-down splay algorithm is employed to
  *	control height imbalance in the binary search tree.
  *
- * List of locks
+ *	List of locks
  *	(c)	const until freed
  */
 struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
-#define	min_offset	header.end	/* (c) */
-#define	max_offset	header.start	/* (c) */
+/*
+	map min_offset	header.end	(c)
+	map max_offset	header.start	(c)
+*/
 	struct sx lock;			/* Lock for map data */
 	struct mtx system_mtx;
 	int nentries;			/* Number of entries */
@@ -209,16 +216,23 @@ struct vm_map {
 #define	MAP_BUSY_WAKEUP		0x02
 
 #ifdef	_KERNEL
+#if defined(KLD_MODULE) && !defined(KLD_TIED)
+#define	vm_map_max(map)		vm_map_max_KBI((map))
+#define	vm_map_min(map)		vm_map_min_KBI((map))
+#define	vm_map_pmap(map)	vm_map_pmap_KBI((map))
+#else
 static __inline vm_offset_t
 vm_map_max(const struct vm_map *map)
 {
-	return (map->max_offset);
+
+	return (map->header.start);
 }
 
 static __inline vm_offset_t
 vm_map_min(const struct vm_map *map)
 {
-	return (map->min_offset);
+
+	return (map->header.end);
 }
 
 static __inline pmap_t
@@ -232,6 +246,7 @@ vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
 {
 	map->flags = (map->flags | set) & ~clear;
 }
+#endif	/* KLD_MODULE */
 #endif	/* _KERNEL */
 
 /*
@@ -292,6 +307,9 @@ void vm_map_wakeup(vm_map_t map);
 void vm_map_busy(vm_map_t map);
 void vm_map_unbusy(vm_map_t map);
 void vm_map_wait_busy(vm_map_t map);
+vm_offset_t vm_map_max_KBI(const struct vm_map *map);
+vm_offset_t vm_map_min_KBI(const struct vm_map *map);
+pmap_t vm_map_pmap_KBI(vm_map_t map);
 
 #define	vm_map_lock(map)	_vm_map_lock(map, LOCK_FILE, LOCK_LINE)
 #define	vm_map_unlock(map)	_vm_map_unlock(map, LOCK_FILE, LOCK_LINE)

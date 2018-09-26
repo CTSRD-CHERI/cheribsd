@@ -122,7 +122,9 @@ MK_LLVM_LIBUNWIND:=	yes
 MK_GROFF:=	no
 # Build cheribsdbox by default so that we have a emergency MIPS tool if the
 # CHERI world is broken
+.if !defined(WITHOUT_CHERIBSDBOX)
 MK_CHERIBSDBOX:=	yes
+.endif
 .else
 MK_CHERI:=	no
 .endif

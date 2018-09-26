@@ -410,8 +410,8 @@ vmspace_dofree(struct vmspace *vm)
 	 * Delete all of the mappings and pages they hold, then call
 	 * the pmap module to reclaim anything left.
 	 */
-	(void)vm_map_remove(&vm->vm_map, vm->vm_map.min_offset,
-	    vm->vm_map.max_offset);
+	(void)vm_map_remove(&vm->vm_map, vm_map_min(&vm->vm_map),
+	    vm_map_max(&vm->vm_map));
 
 	pmap_release(vmspace_pmap(vm));
 	vm->vm_map.pmap = NULL;
@@ -872,8 +872,8 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 	map->needs_wakeup = FALSE;
 	map->system_map = 0;
 	map->pmap = pmap;
-	map->min_offset = ptr_to_va(min);
-	map->max_offset = ptr_to_va(max);
+	map->header.end = ptr_to_va(min);
+	map->header.start = ptr_to_va(max);
 	map->flags = 0;
 	map->root = NULL;
 	map->timestamp = 0;
@@ -1275,7 +1275,8 @@ vm_map_insert(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	/*
 	 * Check that the start and end points are not bogus.
 	 */
-	if (start < map->min_offset || end > map->max_offset || start >= end)
+	if (start < vm_map_min(map) || end > vm_map_max(map) ||
+	    start >= end)
 		return (KERN_INVALID_ADDRESS);
 
 	/*
@@ -1354,10 +1355,9 @@ charged:
 			vm_object_clear_flag(object, OBJ_ONEMAPPING);
 		VM_OBJECT_WUNLOCK(object);
 	} else if (prev_entry != &map->header &&
-	    prev_entry->eflags == protoeflags &&
+	    (prev_entry->eflags & ~MAP_ENTRY_USER_WIRED) == protoeflags &&
 	    (cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 &&
-	    prev_entry->end == start && prev_entry->wired_count == 0 &&
-	    (prev_entry->cred == cred ||
+	    prev_entry->end == start && (prev_entry->cred == cred ||
 	    (prev_entry->object.vm_object != NULL &&
 	    prev_entry->object.vm_object->cred == cred)) &&
 	    vm_object_coalesce(prev_entry->object.vm_object,
@@ -1372,7 +1372,11 @@ charged:
 		 */
 		if (prev_entry->inheritance == inheritance &&
 		    prev_entry->protection == prot &&
-		    prev_entry->max_protection == max) {
+		    prev_entry->max_protection == max &&
+		    prev_entry->wired_count == 0) {
+			KASSERT((prev_entry->eflags & MAP_ENTRY_USER_WIRED) ==
+			    0, ("prev_entry %p has incoherent wiring",
+			    prev_entry));
 			if ((prev_entry->eflags & MAP_ENTRY_GUARD) == 0)
 				map->size += end - prev_entry->end;
 			prev_entry->end = end;
@@ -1478,9 +1482,8 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length,
 	 * Request must fit within min/max VM address and must avoid
 	 * address wrap.
 	 */
-	if (start < map->min_offset)
-		start = map->min_offset;
-	if (start + length > map->max_offset || start + length < start)
+	start = MAX(start, vm_map_min(map));
+	if (start + length > vm_map_max(map) || start + length < start)
 		return (1);
 
 	/* Empty tree means wide open address space. */
@@ -2315,7 +2318,7 @@ vm_map_madvise(
 	int behav)
 {
 	vm_map_entry_t current, entry;
-	int modify_map = 0;
+	bool modify_map;
 
 	/*
 	 * Some madvise calls directly modify the vm_map_entry, in which case
@@ -2332,19 +2335,20 @@ vm_map_madvise(
 	case MADV_NOCORE:
 	case MADV_CORE:
 		if (start == end)
-			return (KERN_SUCCESS);
-		modify_map = 1;
+			return (0);
+		modify_map = true;
 		vm_map_lock(map);
 		break;
 	case MADV_WILLNEED:
 	case MADV_DONTNEED:
 	case MADV_FREE:
 		if (start == end)
-			return (KERN_SUCCESS);
+			return (0);
+		modify_map = false;
 		vm_map_lock_read(map);
 		break;
 	default:
-		return (KERN_INVALID_ARGUMENT);
+		return (EINVAL);
 	}
 
 	/*
@@ -3359,11 +3363,17 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end)
 		 * Unwire before removing addresses from the pmap; otherwise,
 		 * unwiring will put the entries back in the pmap.
 		 */
-		if (entry->wired_count != 0) {
+		if (entry->wired_count != 0)
 			vm_map_entry_unwire(map, entry);
-		}
 
-		pmap_remove(map->pmap, entry->start, entry->end);
+		/*
+		 * Remove mappings for the pages, but only if the
+		 * mappings could exist.  For instance, it does not
+		 * make sense to call pmap_remove() for guard entries.
+		 */
+		if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0 ||
+		    entry->object.vm_object != NULL)
+			pmap_remove(map->pmap, entry->start, entry->end);
 
 		/*
 		 * Delete the entry only after removing all pmap
@@ -3626,10 +3636,10 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	old_map = &vm1->vm_map;
 	/* Copy immutable fields of vm1 to vm2. */
 #ifndef CHERI_KERNEL
-	vm2 = vmspace_alloc(old_map->min_offset, old_map->max_offset, NULL);
+	vm2 = vmspace_alloc(vm_map_min(old_map), vm_map_max(old_map), NULL);
 #else
 	vm2 = vmspace_alloc(old_map->map_capability,
-	    old_map->map_capability + old_map->max_offset, NULL);
+	    old_map->map_capability + vm_map_max(old_map), NULL);
 #endif
 	if (vm2 == NULL)
 		return (NULL);
@@ -4524,6 +4534,27 @@ vm_map_lookup_done(vm_map_t map, vm_map_entry_t entry)
 	 * Unlock the main-level map
 	 */
 	vm_map_unlock_read(map);
+}
+
+vm_offset_t
+vm_map_max_KBI(const struct vm_map *map)
+{
+
+	return (vm_map_max(map));
+}
+
+vm_offset_t
+vm_map_min_KBI(const struct vm_map *map)
+{
+
+	return (vm_map_min(map));
+}
+
+pmap_t
+vm_map_pmap_KBI(vm_map_t map)
+{
+
+	return (map->pmap);
 }
 
 #include "opt_ddb.h"

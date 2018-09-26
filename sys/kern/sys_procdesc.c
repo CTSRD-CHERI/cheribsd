@@ -68,6 +68,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/capsicum.h>
 #include <sys/fcntl.h>
@@ -217,15 +219,13 @@ sys_pdgetpid(struct thread *td, struct pdgetpid_args *uap)
 int
 user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp)
 {
-	cap_rights_t rights;
 	pid_t pid;
 	int error;
 
 	AUDIT_ARG_FD(fd);
-	error = kern_pdgetpid(td, fd,
-	    cap_rights_init(&rights, CAP_PDGETPID), &pid);
+	error = kern_pdgetpid(td, fd, &cap_pdgetpid_rights, &pid);
 	if (error == 0)
-		error = copyout_c(&pid, pidp, sizeof(pid));
+		error = copyout(&pid, pidp, sizeof(pid));
 	return (error);
 }
 

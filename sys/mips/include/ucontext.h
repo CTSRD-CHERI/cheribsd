@@ -41,10 +41,6 @@
 
 #ifndef _LOCORE
 
-#if defined(_KERNEL) && !defined(KLD_MODULE) && !defined(_STANDALONE)
-#include "opt_compat.h"
-#endif
-
 #if defined(COMPAT_CHERIABI) || defined(__CHERI_PURE_CAPABILITY__)
 #include <cheri/cheri.h>
 #endif

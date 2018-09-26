@@ -466,7 +466,7 @@ tunclose(struct cdev *dev, int foo, int bar, struct thread *td)
 
 		ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 		mtx_unlock(&tp->tun_mtx);
-		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+		CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 			/* deal w/IPv4 PtP destination; unlocked read */
 			if (ifa->ifa_addr->sa_family == AF_INET) {
 				rtinit(ifa, (int)RTM_DELETE,
@@ -508,7 +508,7 @@ tuninit(struct ifnet *ifp)
 
 #ifdef INET
 	if_addr_rlock(ifp);
-	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			struct sockaddr_in *si;
 
@@ -910,7 +910,7 @@ tunwrite(struct cdev *dev, struct uio *uio, int flag)
 		m_freem(m);
 		return (EAFNOSUPPORT);
 	}
-	random_harvest_queue(m, sizeof(*m), 2, RANDOM_NET_TUN);
+	random_harvest_queue(m, sizeof(*m), RANDOM_NET_TUN);
 	if_inc_counter(ifp, IFCOUNTER_IBYTES, m->m_pkthdr.len);
 	if_inc_counter(ifp, IFCOUNTER_IPACKETS, 1);
 	CURVNET_SET(ifp->if_vnet);

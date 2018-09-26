@@ -33,6 +33,7 @@
 
 .include <src.opts.mk>
 
+CONFS=	dhclient.conf
 PACKAGE=runtime
 SRCS=	dhclient.c clparse.c alloc.c dispatch.c hash.c bpf.c options.c \
 	tree.c conflex.c errwarn.c inet.c packet.c convert.c tables.c \
@@ -44,13 +45,14 @@ MAN=	dhclient.8 dhclient.conf.5 dhclient.leases.5 dhcp-options.5 \
 	dhclient-script.8
 LIBADD=	util
 
-.if ${MK_CASPER} != "no" && !defined(RESCUE)
+.if ${MK_DYNAMICROOT} == "no"
+.warning ${PROG} built without libcasper support
+.elif ${MK_CASPER} != "no" && !defined(RESCUE)
 LIBADD+=        casper
 LIBADD+=        cap_syslog
 CFLAGS+=-DWITH_CASPER
 .endif
 
-WARNS?=	4
 NO_WCAST_ALIGN=	yes
 
 HAS_TESTS=

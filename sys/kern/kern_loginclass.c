@@ -47,6 +47,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
@@ -58,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/queue.h>
 #include <sys/racct.h>
+#include <sys/rctl.h>
 #include <sys/refcount.h>
 #include <sys/rwlock.h>
 #include <sys/syscallsubr.h>
@@ -203,7 +206,7 @@ kern_getloginclass(struct thread *td, char * __capability namebuf,
 	lcnamelen = strlen(lc->lc_name) + 1;
 	if (lcnamelen > namelen)
 		return (ERANGE);
-	return (copyout_c(&lc->lc_name[0], namebuf, lcnamelen));
+	return (copyout(&lc->lc_name[0], namebuf, lcnamelen));
 }
 
 /*
@@ -234,7 +237,7 @@ kern_setloginclass(struct thread *td, const char * __capability namebuf)
 	error = priv_check(td, PRIV_PROC_SETLOGINCLASS);
 	if (error != 0)
 		return (error);
-	error = copyinstr_c(namebuf, lcname, sizeof(lcname),
+	error = copyinstr(namebuf, lcname, sizeof(lcname),
 	    NULL);
 	if (error != 0)
 		return (error);
@@ -248,9 +251,14 @@ kern_setloginclass(struct thread *td, const char * __capability namebuf)
 	oldcred = crcopysafe(p, newcred);
 	newcred->cr_loginclass = newlc;
 	proc_set_cred(p, newcred);
-	PROC_UNLOCK(p);
 #ifdef RACCT
 	racct_proc_ucred_changed(p, oldcred, newcred);
+	crhold(newcred);
+#endif
+	PROC_UNLOCK(p);
+#ifdef RCTL
+	rctl_proc_ucred_changed(p, newcred);
+	crfree(newcred);
 #endif
 	loginclass_free(oldcred->cr_loginclass);
 	crfree(oldcred);

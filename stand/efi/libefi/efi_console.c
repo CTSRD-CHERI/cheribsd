@@ -147,20 +147,20 @@ efi_cons_rawputchar(int c)
 		switch (c) {
 		case '\r':
 			curx = 0;
-			curs_move(&curx, &cury, curx, cury);
+			efi_cons_efiputchar('\r');
 			return;
 		case '\n':
+			efi_cons_efiputchar('\n');
+			efi_cons_efiputchar('\r');
 			cury++;
-			if (cury >= y) {
-				efi_cons_efiputchar('\n');
+			if (cury >= y)
 				cury--;
-			} else
-				curs_move(&curx, &cury, curx, cury);
+			curx = 0;
 			return;
 		case '\b':
 			if (curx > 0) {
+				efi_cons_efiputchar('\b');
 				curx--;
-				curs_move(&curx, &cury, curx, cury);
 			}
 			return;
 		default:
@@ -175,7 +175,6 @@ efi_cons_rawputchar(int c)
 				cury--;
 			}
 		}
-		curs_move(&curx, &cury, curx, cury);
 #endif
 	}
 }
@@ -385,6 +384,10 @@ efi_term_emu(int c)
 					break;
 				case 22:	/* normal intensity */
 					fg_c &= ~0x8;
+					break;
+				case 24:	/* not underline */
+				case 25:	/* not blinking */
+					bg_c &= ~0x8;
 					break;
 				case 30: case 31: case 32: case 33:
 				case 34: case 35: case 36: case 37:

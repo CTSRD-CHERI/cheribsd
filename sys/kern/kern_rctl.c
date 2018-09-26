@@ -34,6 +34,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
@@ -1543,7 +1545,7 @@ rctl_read_inbuf(char **inputstr, const char * __capability inbufp,
 		return (E2BIG);
 
 	str = malloc(inbuflen + 1, M_RCTL, M_WAITOK);
-	error = copyinstr_c(inbufp, str, inbuflen, NULL);
+	error = copyinstr(inbufp, str, inbuflen, NULL);
 	if (error != 0) {
 		free(str, M_RCTL);
 		return (error);
@@ -1573,7 +1575,7 @@ rctl_write_outbuf(struct sbuf *outputsbuf, char * __capability outbufp,
 		sbuf_delete(outputsbuf);
 		return (ERANGE);
 	}
-	error = copyout_c(sbuf_data(outputsbuf), outbufp,
+	error = copyout(sbuf_data(outputsbuf), outbufp,
 	    sbuf_len(outputsbuf) + 1);
 	sbuf_delete(outputsbuf);
 	return (error);
@@ -2009,12 +2011,15 @@ rctl_proc_ucred_changed(struct proc *p, struct ucred *newcred)
 	struct prison_racct *newprr;
 	int rulecnt, i;
 
-	ASSERT_RACCT_ENABLED();
+	if (!racct_enable)
+		return;
+
+	PROC_LOCK_ASSERT(p, MA_NOTOWNED);
 
 	newuip = newcred->cr_ruidinfo;
 	newlc = newcred->cr_loginclass;
 	newprr = newcred->cr_prison->pr_prison_racct;
-	
+
 	LIST_INIT(&newrules);
 
 again:

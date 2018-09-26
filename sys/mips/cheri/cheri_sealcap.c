@@ -67,6 +67,6 @@ int
 cheri_sysarch_getsealcap(struct thread *td, void * __capability ucap)
 {
 
-	return (copyoutcap_c(&td->td_proc->p_md.md_cheri_sealcap, ucap,
+	return (copyoutcap(&td->td_proc->p_md.md_cheri_sealcap, ucap,
 	    sizeof(td->td_proc->p_md.md_cheri_sealcap)));
 }

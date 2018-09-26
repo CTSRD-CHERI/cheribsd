@@ -29,6 +29,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/sbuf.h>
@@ -64,7 +66,7 @@ cheriabi_abort2(struct thread *td, struct cheriabi_abort2_args *uap)
 	if (uap->nargs > 0) {
 		if (uap->args == NULL)
 			goto out;
-		error = copyin_c(uap->args, &uargs[0],
+		error = copyin(uap->args, &uargs[0],
 		    uap->nargs * sizeof(void *));
 		if (error != 0)
 			goto out;

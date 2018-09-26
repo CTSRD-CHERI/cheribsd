@@ -45,7 +45,7 @@ LDIRS=	bsm cam cheri geom net net80211 netgraph netinet netinet6 \
 LSUBDIRS=	cam/ata cam/mmc cam/nvme cam/scsi \
 	dev/acpica dev/agp dev/an dev/bktr dev/ciss dev/filemon dev/firewire \
 	dev/hwpmc dev/hyperv \
-	dev/ic dev/iicbus dev/io dev/lmc dev/mfi dev/mmc dev/nvme \
+	dev/ic dev/iicbus dev/io dev/mfi dev/mmc dev/nvme \
 	dev/ofw dev/pbio dev/pci ${_dev_powermac_nvram} dev/ppbus dev/smbus \
 	dev/speaker dev/tcp_log dev/vkbd dev/wi \
 	fs/devfs fs/fdescfs fs/msdosfs fs/nandfs fs/nfs fs/nullfs \
@@ -56,6 +56,7 @@ LSUBDIRS=	cam/ata cam/mmc cam/nvme cam/scsi \
 	net/altq \
 	netgraph/atm netgraph/netflow \
 	netinet/cc \
+	netinet/netdump \
 	security/audit \
 	security/mac_biba security/mac_bsdextended security/mac_lomac \
 	security/mac_mls security/mac_partition \
@@ -68,7 +69,7 @@ LSUBSUBDIRS=	dev/mpt/mpilib
 LSUBSUBDIRS+=	netgraph/bluetooth/include
 .endif
 
-.if ${MK_CHERI} != "no"
+.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
 LSUBDIRS+=	compat/cheriabi
 .endif
 
@@ -146,7 +147,7 @@ compat:
 		rm -f ${SDESTDIR}${INCLUDEDIR}/$i; \
 	fi
 .endfor
-	mtree -deU ${MTREE_FOLLOWS_SYMLINKS} \
+	mtree -deU ${NO_ROOT:D-W} ${MTREE_FOLLOWS_SYMLINKS} \
 	    -f ${SRCTOP}/etc/mtree/BSD.include.dist \
 	    -p ${SDESTDIR}${INCLUDEDIR} > /dev/null
 
@@ -249,12 +250,6 @@ copies: .PHONY .META
 	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 teken.h \
 	    ${SDESTDIR}${INCLUDEDIR}/teken
 .if ${MK_CDDL} != "no"
-	cd ${SRCTOP}/cddl/contrib/opensolaris/lib/libzfs_core/common; \
-	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 libzfs_core.h \
-	    ${SDESTDIR}${INCLUDEDIR}
-	cd ${SRCTOP}/cddl/contrib/opensolaris/lib/libnvpair; \
-	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 libnvpair.h \
-	    ${SDESTDIR}${INCLUDEDIR}
 	cd ${SRCTOP}/sys/cddl/contrib/opensolaris/uts/common/sys; \
 	${INSTALL} -C ${TAG_ARGS} -o ${BINOWN} -g ${BINGRP} -m 444 nvpair.h \
 	    ${SDESTDIR}${INCLUDEDIR}/sys
@@ -393,6 +388,11 @@ symlinks: .PHONY .META
 		${INSTALL_SYMLINK} ${TAG_ARGS} ../../../sys/rpc/$$h \
 		    ${SDESTDIR}${INCLUDEDIR}/rpc; \
 	done
+.if ${MK_CDDL} != "no"
+	${INSTALL_SYMLINK} ${TAG_ARGS} \
+	    ../../../sys/cddl/contrib/opensolaris/uts/common/sys/nvpair.h \
+	    ${SDESTDIR}${INCLUDEDIR}/sys
+.endif
 .if ${MK_MLX5TOOL} != "no"
 	${INSTALL_SYMLINK} ${TAG_ARGS} ../../../../sys/dev/mlx5/mlx5io.h \
 	    ${SDESTDIR}${INCLUDEDIR}/dev/mlx5

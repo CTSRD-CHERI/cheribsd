@@ -40,7 +40,6 @@ __FBSDID("$FreeBSD$");
 /*
  * includes
  */
-#include "opt_compat.h"
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #include "opt_sctp.h"
@@ -446,7 +445,7 @@ sctp_get_mbuf_for_msg(unsigned int space_needed,
 /*
  * SCTP AUTH
  */
-#define SCTP_READ_RANDOM(buf, len)	read_random(buf, len)
+#define SCTP_READ_RANDOM(buf, len)	arc4rand(buf, len, 0)
 
 /* map standard crypto API names */
 #define SCTP_SHA1_CTX		SHA1_CTX

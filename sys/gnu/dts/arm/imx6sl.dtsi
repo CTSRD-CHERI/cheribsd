@@ -1,11 +1,6 @@
-/*
- * Copyright 2013 Freescale Semiconductor, Inc.
- *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2 as
- * published by the Free Software Foundation.
- *
- */
+// SPDX-License-Identifier: GPL-2.0
+//
+// Copyright 2013 Freescale Semiconductor, Inc.
 
 #include <dt-bindings/interrupt-controller/irq.h>
 #include "imx6sl-pinfunc.h"
@@ -21,7 +16,7 @@
 	 * Also for U-Boot there must be a pre-existing /memory node.
 	 */
 	chosen {};
-	memory { device_type = "memory"; reg = <0 0>; };
+	memory { device_type = "memory"; };
 
 	aliases {
 		ethernet0 = &fec;
@@ -86,9 +81,6 @@
 	};
 
 	clocks {
-		#address-cells = <1>;
-		#size-cells = <0>;
-
 		ckil {
 			compatible = "fixed-clock";
 			#clock-cells = <0>;
@@ -100,6 +92,21 @@
 			#clock-cells = <0>;
 			clock-frequency = <24000000>;
 		};
+	};
+
+	tempmon: tempmon {
+		compatible = "fsl,imx6q-tempmon";
+		interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
+		interrupt-parent = <&gpc>;
+		fsl,tempmon = <&anatop>;
+		fsl,tempmon-data = <&ocotp>;
+		clocks = <&clks IMX6SL_CLK_PLL3_USB_OTG>;
+	};
+
+	pmu {
+		compatible = "arm,cortex-a9-pmu";
+		interrupt-parent = <&gpc>;
+		interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
 	};
 
 	soc {
@@ -123,11 +130,6 @@
 			cache-level = <2>;
 			arm,tag-latency = <4 2 3>;
 			arm,data-latency = <4 2 3>;
-		};
-
-		pmu {
-			compatible = "arm,cortex-a9-pmu";
-			interrupts = <0 94 IRQ_TYPE_LEVEL_HIGH>;
 		};
 
 		aips1: aips-bus@2000000 {
@@ -613,14 +615,6 @@
 					anatop-min-voltage = <725000>;
 					anatop-max-voltage = <1450000>;
 				};
-			};
-
-			tempmon: tempmon {
-				compatible = "fsl,imx6q-tempmon";
-				interrupts = <0 49 IRQ_TYPE_LEVEL_HIGH>;
-				fsl,tempmon = <&anatop>;
-				fsl,tempmon-data = <&ocotp>;
-				clocks = <&clks IMX6SL_CLK_PLL3_USB_OTG>;
 			};
 
 			usbphy1: usbphy@20c9000 {

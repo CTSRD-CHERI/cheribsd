@@ -129,8 +129,8 @@
 					wakeup-source;
 				};
 
-				atmel_mxt_ts@4c {
-					compatible = "atmel,atmel_mxt_ts";
+				touchscreen@4c {
+					compatible = "atmel,maxtouch";
 					reg = <0x4c>;
 					interrupt-parent = <&pioE>;
 					interrupts = <24 0x0>;
@@ -172,6 +172,18 @@
 
 			usart4: serial@fc010000 {
 				status = "okay";
+			};
+
+			tcb2: timer@fc024000 {
+				timer@0 {
+					compatible = "atmel,tcb-timer";
+					reg = <0>;
+				};
+
+				timer@1 {
+					compatible = "atmel,tcb-timer";
+					reg = <1>;
+				};
 			};
 
 			watchdog@fc068640 {

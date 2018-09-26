@@ -5,8 +5,6 @@
  * $FreeBSD$
  */
 
-#include "opt_compat.h"
-
 #include <sys/param.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
@@ -75,7 +73,7 @@ struct sysent freebsd32_sysent[] = {
 	{ compat11(AS(freebsd11_freebsd32_mknod_args),freebsd32_mknod), AUE_MKNOD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 14 = freebsd11 freebsd32_mknod */
 	{ AS(chmod_args), (sy_call_t *)sys_chmod, AUE_CHMOD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 15 = chmod */
 	{ AS(chown_args), (sy_call_t *)sys_chown, AUE_CHOWN, NULL, 0, 0, 0, SY_THR_STATIC },	/* 16 = chown */
-	{ AS(obreak_args), (sy_call_t *)sys_obreak, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 17 = break */
+	{ AS(break_args), (sy_call_t *)sys_break, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 17 = break */
 	{ compat4(AS(freebsd4_freebsd32_getfsstat_args),freebsd32_getfsstat), AUE_GETFSSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 18 = freebsd4 freebsd32_getfsstat */
 	{ compat(AS(ofreebsd32_lseek_args),freebsd32_lseek), AUE_LSEEK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 19 = old freebsd32_lseek */
 	{ 0, (sy_call_t *)sys_getpid, AUE_GETPID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 20 = getpid */
@@ -130,7 +128,7 @@ struct sysent freebsd32_sysent[] = {
 	{ AS(sbrk_args), (sy_call_t *)sys_sbrk, AUE_SBRK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 69 = sbrk */
 	{ AS(sstk_args), (sy_call_t *)sys_sstk, AUE_SSTK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 70 = sstk */
 	{ compat(AS(ommap_args),mmap), AUE_MMAP, NULL, 0, 0, 0, SY_THR_STATIC },	/* 71 = old mmap */
-	{ AS(ovadvise_args), (sy_call_t *)sys_ovadvise, AUE_O_VADVISE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 72 = vadvise */
+	{ compat11(AS(freebsd11_vadvise_args),vadvise), AUE_O_VADVISE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 72 = freebsd11 vadvise */
 	{ AS(munmap_args), (sy_call_t *)sys_munmap, AUE_MUNMAP, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 73 = munmap */
 	{ AS(freebsd32_mprotect_args), (sy_call_t *)freebsd32_mprotect, AUE_MPROTECT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 74 = freebsd32_mprotect */
 	{ AS(madvise_args), (sy_call_t *)sys_madvise, AUE_MADVISE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 75 = madvise */
@@ -259,7 +257,7 @@ struct sysent freebsd32_sysent[] = {
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },		/* 198 = __syscall */
 	{ compat6(AS(freebsd6_freebsd32_lseek_args),freebsd32_lseek), AUE_LSEEK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 199 = freebsd6 freebsd32_lseek */
 	{ compat6(AS(freebsd6_freebsd32_truncate_args),freebsd32_truncate), AUE_TRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 200 = freebsd6 freebsd32_truncate */
-	{ compat6(AS(freebsd6_freebsd32_ftruncate_args),freebsd32_ftruncate), AUE_FTRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 201 = freebsd6 freebsd32_ftruncate */
+	{ compat6(AS(freebsd6_freebsd32_ftruncate_args),freebsd32_ftruncate), AUE_FTRUNCATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 201 = freebsd6 freebsd32_ftruncate */
 	{ AS(freebsd32_sysctl_args), (sy_call_t *)freebsd32_sysctl, AUE_SYSCTL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 202 = freebsd32_sysctl */
 	{ AS(mlock_args), (sy_call_t *)sys_mlock, AUE_MLOCK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 203 = mlock */
 	{ AS(munlock_args), (sy_call_t *)sys_munlock, AUE_MUNLOCK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 204 = munlock */
@@ -333,9 +331,9 @@ struct sysent freebsd32_sysent[] = {
 	{ compat11(AS(freebsd11_freebsd32_getdents_args),freebsd32_getdents), AUE_O_GETDENTS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 272 = freebsd11 freebsd32_getdents */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 273 = nosys */
 	{ AS(lchmod_args), (sy_call_t *)sys_lchmod, AUE_LCHMOD, NULL, 0, 0, 0, SY_THR_STATIC },	/* 274 = lchmod */
-	{ AS(lchown_args), (sy_call_t *)sys_lchown, AUE_LCHOWN, NULL, 0, 0, 0, SY_THR_STATIC },	/* 275 = netbsd_lchown */
+	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 275 = obsolete netbsd_lchown */
 	{ AS(freebsd32_lutimes_args), (sy_call_t *)freebsd32_lutimes, AUE_LUTIMES, NULL, 0, 0, 0, SY_THR_STATIC },	/* 276 = freebsd32_lutimes */
-	{ AS(msync_args), (sy_call_t *)sys_msync, AUE_MSYNC, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 277 = netbsd_msync */
+	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 277 = obsolete netbsd_msync */
 	{ compat11(AS(freebsd11_nstat_args),nstat), AUE_STAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 278 = freebsd11 nstat */
 	{ compat11(AS(freebsd11_nfstat_args),nfstat), AUE_FSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 279 = freebsd11 nfstat */
 	{ compat11(AS(freebsd11_nlstat_args),nlstat), AUE_LSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 280 = freebsd11 nlstat */
@@ -392,7 +390,7 @@ struct sysent freebsd32_sysent[] = {
 	{ 0, (sy_call_t *)sys_sched_yield, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 331 = sched_yield */
 	{ AS(sched_get_priority_max_args), (sy_call_t *)sys_sched_get_priority_max, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 332 = sched_get_priority_max */
 	{ AS(sched_get_priority_min_args), (sy_call_t *)sys_sched_get_priority_min, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 333 = sched_get_priority_min */
-	{ AS(sched_rr_get_interval_args), (sy_call_t *)sys_sched_rr_get_interval, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 334 = sched_rr_get_interval */
+	{ AS(freebsd32_sched_rr_get_interval_args), (sy_call_t *)freebsd32_sched_rr_get_interval, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 334 = freebsd32_sched_rr_get_interval */
 	{ AS(utrace_args), (sy_call_t *)sys_utrace, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 335 = utrace */
 	{ compat4(AS(freebsd4_freebsd32_sendfile_args),freebsd32_sendfile), AUE_SENDFILE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 336 = freebsd4 freebsd32_sendfile */
 	{ AS(kldsym_args), (sy_call_t *)sys_kldsym, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 337 = kldsym */
@@ -539,14 +537,14 @@ struct sysent freebsd32_sysent[] = {
 	{ AS(freebsd32_mmap_args), (sy_call_t *)freebsd32_mmap, AUE_MMAP, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 477 = freebsd32_mmap */
 	{ AS(freebsd32_lseek_args), (sy_call_t *)freebsd32_lseek, AUE_LSEEK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 478 = freebsd32_lseek */
 	{ AS(freebsd32_truncate_args), (sy_call_t *)freebsd32_truncate, AUE_TRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 479 = freebsd32_truncate */
-	{ AS(freebsd32_ftruncate_args), (sy_call_t *)freebsd32_ftruncate, AUE_FTRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 480 = freebsd32_ftruncate */
+	{ AS(freebsd32_ftruncate_args), (sy_call_t *)freebsd32_ftruncate, AUE_FTRUNCATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 480 = freebsd32_ftruncate */
 #else
 	{ AS(freebsd32_pread_args), (sy_call_t *)freebsd32_pread, AUE_PREAD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 475 = freebsd32_pread */
 	{ AS(freebsd32_pwrite_args), (sy_call_t *)freebsd32_pwrite, AUE_PWRITE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 476 = freebsd32_pwrite */
 	{ AS(freebsd32_mmap_args), (sy_call_t *)freebsd32_mmap, AUE_MMAP, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 477 = freebsd32_mmap */
 	{ AS(freebsd32_lseek_args), (sy_call_t *)freebsd32_lseek, AUE_LSEEK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 478 = freebsd32_lseek */
 	{ AS(freebsd32_truncate_args), (sy_call_t *)freebsd32_truncate, AUE_TRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 479 = freebsd32_truncate */
-	{ AS(freebsd32_ftruncate_args), (sy_call_t *)freebsd32_ftruncate, AUE_FTRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 480 = freebsd32_ftruncate */
+	{ AS(freebsd32_ftruncate_args), (sy_call_t *)freebsd32_ftruncate, AUE_FTRUNCATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 480 = freebsd32_ftruncate */
 #endif
 	{ AS(thr_kill2_args), (sy_call_t *)sys_thr_kill2, AUE_THR_KILL2, NULL, 0, 0, 0, SY_THR_STATIC },	/* 481 = thr_kill2 */
 	{ AS(shm_open_args), (sy_call_t *)sys_shm_open, AUE_SHMOPEN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 482 = shm_open */
@@ -576,7 +574,7 @@ struct sysent freebsd32_sysent[] = {
 	{ AS(symlinkat_args), (sy_call_t *)sys_symlinkat, AUE_SYMLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 502 = symlinkat */
 	{ AS(unlinkat_args), (sy_call_t *)sys_unlinkat, AUE_UNLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 503 = unlinkat */
 	{ AS(posix_openpt_args), (sy_call_t *)sys_posix_openpt, AUE_POSIX_OPENPT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 504 = posix_openpt */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 505 = gssd_syscall */
+	{ AS(gssd_syscall_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 505 = gssd_syscall */
 	{ AS(freebsd32_jail_get_args), (sy_call_t *)freebsd32_jail_get, AUE_JAIL_GET, NULL, 0, 0, 0, SY_THR_STATIC },	/* 506 = freebsd32_jail_get */
 	{ AS(freebsd32_jail_set_args), (sy_call_t *)freebsd32_jail_set, AUE_JAIL_SET, NULL, 0, 0, 0, SY_THR_STATIC },	/* 507 = freebsd32_jail_set */
 	{ AS(jail_remove_args), (sy_call_t *)sys_jail_remove, AUE_JAIL_REMOVE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 508 = jail_remove */
@@ -635,7 +633,7 @@ struct sysent freebsd32_sysent[] = {
 	{ AS(freebsd32_fstat_args), (sy_call_t *)freebsd32_fstat, AUE_FSTAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 551 = freebsd32_fstat */
 	{ AS(freebsd32_fstatat_args), (sy_call_t *)freebsd32_fstatat, AUE_FSTATAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 552 = freebsd32_fstatat */
 	{ AS(freebsd32_fhstat_args), (sy_call_t *)freebsd32_fhstat, AUE_FHSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 553 = freebsd32_fhstat */
-	{ AS(getdirentries_args), (sy_call_t *)sys_getdirentries, AUE_GETDIRENTRIES, NULL, 0, 0, 0, SY_THR_STATIC },	/* 554 = getdirentries */
+	{ AS(getdirentries_args), (sy_call_t *)sys_getdirentries, AUE_GETDIRENTRIES, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 554 = getdirentries */
 	{ AS(statfs_args), (sy_call_t *)sys_statfs, AUE_STATFS, NULL, 0, 0, 0, SY_THR_STATIC },	/* 555 = statfs */
 	{ AS(fstatfs_args), (sy_call_t *)sys_fstatfs, AUE_FSTATFS, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 556 = fstatfs */
 	{ AS(getfsstat_args), (sy_call_t *)sys_getfsstat, AUE_GETFSSTAT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 557 = getfsstat */
@@ -644,5 +642,5 @@ struct sysent freebsd32_sysent[] = {
 	{ AS(freebsd32_kevent_args), (sy_call_t *)freebsd32_kevent, AUE_KEVENT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 560 = freebsd32_kevent */
 	{ AS(freebsd32_cpuset_getdomain_args), (sy_call_t *)freebsd32_cpuset_getdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 561 = freebsd32_cpuset_getdomain */
 	{ AS(freebsd32_cpuset_setdomain_args), (sy_call_t *)freebsd32_cpuset_setdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = freebsd32_cpuset_setdomain */
-	{ AS(getrandom_args), (sy_call_t *)sys_getrandom, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 563 = getrandom */
+	{ AS(getrandom_args), (sy_call_t *)sys_getrandom, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 563 = getrandom */
 };

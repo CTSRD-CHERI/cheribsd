@@ -41,8 +41,9 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
-#include "opt_compat.h"
 #include "opt_ktrace.h"
+
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/fail.h>
@@ -195,13 +196,8 @@ sysctl_load_tunable_by_oid_locked(struct sysctl_oid *oidp)
 	char path[96];
 	ssize_t rem = sizeof(path);
 	ssize_t len;
-	uint8_t val_8;
-	uint16_t val_16;
-	uint32_t val_32;
-	int val_int;
-	long val_long;
-	int64_t val_64;
-	quad_t val_quad;
+	uint8_t data[512] __aligned(sizeof(uint64_t));
+	int size;
 	int error;
 
 	path[--rem] = 0;
@@ -229,85 +225,88 @@ sysctl_load_tunable_by_oid_locked(struct sysctl_oid *oidp)
 
 	switch (oidp->oid_kind & CTLTYPE) {
 	case CTLTYPE_INT:
-		if (getenv_int(path + rem, &val_int) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(int), GETENV_SIGNED) == 0)
 			return;
-		req.newlen = sizeof(val_int);
-		req.newptr = &val_int;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_UINT:
-		if (getenv_uint(path + rem, (unsigned int *)&val_int) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(int), GETENV_UNSIGNED) == 0)
 			return;
-		req.newlen = sizeof(val_int);
-		req.newptr = &val_int;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_LONG:
-		if (getenv_long(path + rem, &val_long) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(long), GETENV_SIGNED) == 0)
 			return;
-		req.newlen = sizeof(val_long);
-		req.newptr = &val_long;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_ULONG:
-		if (getenv_ulong(path + rem, (unsigned long *)&val_long) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(long), GETENV_UNSIGNED) == 0)
 			return;
-		req.newlen = sizeof(val_long);
-		req.newptr = &val_long;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_S8:
-		if (getenv_int(path + rem, &val_int) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(int8_t), GETENV_SIGNED) == 0)
 			return;
-		val_8 = val_int;
-		req.newlen = sizeof(val_8);
-		req.newptr = &val_8;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_S16:
-		if (getenv_int(path + rem, &val_int) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(int16_t), GETENV_SIGNED) == 0)
 			return;
-		val_16 = val_int;
-		req.newlen = sizeof(val_16);
-		req.newptr = &val_16;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_S32:
-		if (getenv_long(path + rem, &val_long) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(int32_t), GETENV_SIGNED) == 0)
 			return;
-		val_32 = val_long;
-		req.newlen = sizeof(val_32);
-		req.newptr = &val_32;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_S64:
-		if (getenv_quad(path + rem, &val_quad) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(int64_t), GETENV_SIGNED) == 0)
 			return;
-		val_64 = val_quad;
-		req.newlen = sizeof(val_64);
-		req.newptr = &val_64;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_U8:
-		if (getenv_uint(path + rem, (unsigned int *)&val_int) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(uint8_t), GETENV_UNSIGNED) == 0)
 			return;
-		val_8 = val_int;
-		req.newlen = sizeof(val_8);
-		req.newptr = &val_8;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_U16:
-		if (getenv_uint(path + rem, (unsigned int *)&val_int) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(uint16_t), GETENV_UNSIGNED) == 0)
 			return;
-		val_16 = val_int;
-		req.newlen = sizeof(val_16);
-		req.newptr = &val_16;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_U32:
-		if (getenv_ulong(path + rem, (unsigned long *)&val_long) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(uint32_t), GETENV_UNSIGNED) == 0)
 			return;
-		val_32 = val_long;
-		req.newlen = sizeof(val_32);
-		req.newptr = &val_32;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_U64:
-		/* XXX there is no getenv_uquad() */
-		if (getenv_quad(path + rem, &val_quad) == 0)
+		if (getenv_array(path + rem, data, sizeof(data), &size,
+		    sizeof(uint64_t), GETENV_UNSIGNED) == 0)
 			return;
-		val_64 = val_quad;
-		req.newlen = sizeof(val_64);
-		req.newptr = &val_64;
+		req.newlen = size;
+		req.newptr = data;
 		break;
 	case CTLTYPE_STRING:
 		penv = kern_getenv(path + rem);
@@ -924,7 +923,7 @@ sysctl_register_all(void *arg)
 		sysctl_register_oid(*oidp);
 	SYSCTL_WUNLOCK();
 }
-SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_FIRST, sysctl_register_all, 0);
+SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_FIRST, sysctl_register_all, NULL);
 
 /*
  * "Staff-functions"
@@ -1848,20 +1847,20 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_nofault_c(p,
+				error = copyoutcap_nofault(p,
 				    (char * __capability)req->oldptr +
 				    origidx, i);
 			else
-				error = copyout_nofault_c(p,
+				error = copyout_nofault(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		} else
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_c(p,
+				error = copyoutcap(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 			else
-				error = copyout_c(p,
+				error = copyout(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		if (error != 0)
@@ -1884,10 +1883,10 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "sysctl_new_user()");
 	if (req->flags & SCTL_PTRIN)
-		error = copyincap_c((char * __capability)req->newptr +
+		error = copyincap((char * __capability)req->newptr +
 		    req->newidx, p, l);
 	else
-		error = copyin_c((char * __capability)req->newptr + req->newidx,
+		error = copyin((char * __capability)req->newptr + req->newidx,
 		    p, l);
 	req->newidx += l;
 	return (error);
@@ -2110,7 +2109,7 @@ kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
 	if (namelen > CTL_MAXNAME || namelen < 2)
 		return (EINVAL);
 
-	error = copyin_c(uname, &name[0], namelen * sizeof(int));
+	error = copyin(uname, &name[0], namelen * sizeof(int));
 	if (error)
 		return (error);
 
@@ -2119,7 +2118,7 @@ kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
 	if (error && error != ENOMEM)
 		return (error);
 	if (oldlenp) {
-		i = copyout_c(&j, oldlenp, sizeof(j));
+		i = copyout(&j, oldlenp, sizeof(j));
 		if (i)
 			return (i);
 	}
@@ -2147,7 +2146,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen,
 		if (inkernel) {
 			req.oldlen = *oldlenp;
 		} else {
-			error = copyin_c(oldlenp, &req.oldlen,
+			error = copyin(oldlenp, &req.oldlen,
 			    sizeof(*oldlenp));
 			if (error)
 				return (error);

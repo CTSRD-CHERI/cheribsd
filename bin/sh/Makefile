@@ -3,6 +3,9 @@
 
 .include <src.opts.mk>
 
+CONFS=	dot.profile profile
+CONFSDIR_dot.profile=	/root
+CONFSNAME_dot.profile=	.profile
 PACKAGE=runtime
 PROG=	sh
 INSTALLFLAGS= -S
@@ -32,8 +35,7 @@ WFORMAT=0
 	${.CURDIR:H}/test \
 	${SRCTOP}/usr.bin/printf
 
-CLEANFILES+= mknodes mknodes.o \
-	mksyntax mksyntax.o
+CLEANFILES+= mknodes mksyntax
 CLEANFILES+= ${GENSRCS} ${GENHDRS}
 
 build-tools: mknodes mksyntax
@@ -66,6 +68,10 @@ token.h: mktokens
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
 
-WANT_DUMP=	yes
+beforeinstallconfig:
+	rm -f ${DESTDIR}/.profile
+
+afterinstallconfig:
+	${INSTALL_LINK} ${TAG_ARGS} ${DESTDIR}/root/.profile ${DESTDIR}/.profile
 
 .include <bsd.prog.mk>

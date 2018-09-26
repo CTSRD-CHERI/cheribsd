@@ -60,10 +60,11 @@
  * From: src/sys/dev/vn/vn.c,v 1.122 2000/12/16 16:06:03
  */
 
-#include "opt_compat.h"
 #include "opt_rootdevname.h"
 #include "opt_geom.h"
 #include "opt_md.h"
+
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -91,6 +92,7 @@
 #include <sys/sched.h>
 #include <sys/sf_buf.h>
 #include <sys/sysctl.h>
+#include <sys/uio.h>
 #include <sys/vnode.h>
 #include <sys/disk.h>
 
@@ -189,6 +191,10 @@ SYSCTL_INT(_vm, OID_AUTO, md_malloc_wait, CTLFLAG_RW, &md_malloc_wait, 0,
  */
 u_char mfs_root[MD_ROOT_SIZE*1024] __attribute__ ((section ("oldmfs")));
 const int mfs_root_size = sizeof(mfs_root);
+#elif defined(MD_ROOT_MEM)
+/* MD region already mapped in the memory */
+u_char *mfs_root;
+int mfs_root_size;
 #else
 extern volatile u_char __weak_symbol mfs_root;
 extern volatile u_char __weak_symbol mfs_root_end;
@@ -1421,7 +1427,7 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 
 	fname = mdr->md_file;
 	if (mdr->md_file_seg == UIO_USERSPACE)
-		error = copyinstr_c(fname, sc->file, sizeof(sc->file), NULL);
+		error = copyinstr(fname, sc->file, sizeof(sc->file), NULL);
 	else if (mdr->md_file_seg == UIO_SYSSPACE)
 		error = copystr((__cheri_fromcap char *)fname, sc->file,
 		    sizeof(sc->file), NULL);
@@ -1684,7 +1690,7 @@ kern_mdattach_locked(struct thread *td, struct md_req *mdr)
 	if (sc == NULL)
 		return (error);
 	if (mdr->md_label != NULL)
-		error = copyinstr_c(mdr->md_label, sc->label,
+		error = copyinstr(mdr->md_label, sc->label,
 		    sizeof(sc->label), NULL);
 	if (error != 0)
 		goto err_after_new;
@@ -1825,14 +1831,14 @@ kern_mdquery_locked(struct md_req *mdr)
 	mdr->md_sectorsize = sc->sectorsize;
 	error = 0;
 	if (mdr->md_label != NULL) {
-		error = copyout_c(sc->label, mdr->md_label,
+		error = copyout(sc->label, mdr->md_label,
 		    strlen(sc->label) + 1);
 		if (error != 0)
 			return (error);
 	}
 	if (sc->type == MD_VNODE ||
 	    (sc->type == MD_PRELOAD && mdr->md_file != NULL))
-		error = copyout_c(sc->file, mdr->md_file,
+		error = copyout(sc->file, mdr->md_file,
 		    strlen(sc->file) + 1);
 	return (error);
 }
@@ -2119,8 +2125,12 @@ g_md_init(struct g_class *mp __unused)
 #ifdef MD_ROOT
 	if (mfs_root_size != 0) {
 		sx_xlock(&md_sx);
+#ifdef MD_ROOT_MEM
+		md_preloaded(mfs_root, mfs_root_size, NULL);
+#else
 		md_preloaded(__DEVOLATILE(u_char *, &mfs_root), mfs_root_size,
 		    NULL);
+#endif
 		sx_xunlock(&md_sx);
 	}
 #endif

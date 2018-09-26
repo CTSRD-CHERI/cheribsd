@@ -34,6 +34,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ffclock.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
@@ -432,7 +434,7 @@ kern_ffclock_setestimate(struct thread *td,
 	if ((error = priv_check(td, PRIV_CLOCK_SETTIME)) != 0)
 		return (error);
 
-	if ((error = copyin_c(ucest, &cest,
+	if ((error = copyin(ucest, &cest,
 	    sizeof(struct ffclock_estimate))) != 0)
 		return (error);
 
@@ -471,7 +473,7 @@ kern_ffclock_getestimate(struct thread *td,
 	mtx_lock(&ffclock_mtx);
 	memcpy(&cest, &ffclock_estimate, sizeof(struct ffclock_estimate));
 	mtx_unlock(&ffclock_mtx);
-	error = copyout_c(&cest, ucest, sizeof(struct ffclock_estimate));
+	error = copyout(&cest, ucest, sizeof(struct ffclock_estimate));
 	return (error);
 }
 

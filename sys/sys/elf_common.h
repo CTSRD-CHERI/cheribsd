@@ -334,8 +334,10 @@ typedef struct {
 #define	EF_ARM_ALIGN8		0x00000040
 #define	EF_ARM_NEW_ABI		0x00000080
 #define	EF_ARM_OLD_ABI		0x00000100
-#define	EF_ARM_SOFT_FLOAT	0x00000200
-#define	EF_ARM_VFP_FLOAT	0x00000400
+#define	EF_ARM_ABI_FLOAT_SOFT	0x00000200
+#define	EF_ARM_SOFT_FLOAT	EF_ARM_ABI_FLOAT_SOFT /* Pre-V5 ABI name */
+#define	EF_ARM_ABI_FLOAT_HARD	0x00000400
+#define	EF_ARM_VFP_FLOAT	EF_ARM_ABI_FLOAT_HARD /* Pre-V5 ABI name */
 #define	EF_ARM_MAVERICK_FLOAT	0x00000800
 
 #define	EF_MIPS_NOREORDER	0x00000001
@@ -602,6 +604,7 @@ typedef struct {
 #define	DT_SUNW_RTLDINF		0x6000000e	/* ld.so.1 info (private) */
 #define	DT_SUNW_FILTER		0x6000000f	/* symbol filter name */
 #define	DT_SUNW_CAP		0x60000010	/* hardware/software */
+#define	DT_SUNW_ASLR		0x60000023	/* ASLR control */
 #define	DT_HIOS		0x6ffff000	/* Last OS-specific */
 
 /*
@@ -709,8 +712,20 @@ typedef struct {
 #define	DT_MIPS_RLD_OBJ_UPDATE		0x70000033
 #define	DT_MIPS_RWPLT			0x70000034
 
-#define	DT_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
-#define	DT_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
+#define	DT_MIPS_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
+#define	DT_MIPS_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
+#define	DT_MIPS_CHERI_FLAGS		0x7000c002 /* various CHERI flags (e.g. ABI) */
+#define	DT_MIPS_CHERI_CAPTABLE		0x7000c003 /* various CHERI flags (e.g. ABI) */
+#define	DT_MIPS_CHERI_CAPTABLESZ	0x7000c004 /* various CHERI flags (e.g. ABI) */
+
+enum MipsCheriFlags {
+	DF_MIPS_CHERI_NONE		= 0x00000000,
+	DF_MIPS_CHERI_ABI_MASK		= 0x00000007,
+	DF_MIPS_CHERI_ABI_LEGACY	= 0x00000000,
+	DF_MIPS_CHERI_ABI_PCREL		= 0x00000001,
+	DF_MIPS_CHERI_ABI_PLT		= 0x00000002,
+	DF_MIPS_CHERI_ABI_FNDESC	= 0x00000003
+};
 
 #define	DT_PPC_GOT			0x70000000
 #define	DT_PPC_TLSOPT			0x70000001
@@ -781,6 +796,7 @@ typedef struct {
 #define	NT_PTLWPINFO		17	/* Thread ptrace miscellaneous info. */
 #define	NT_CAPREGS		20	/* Capability registers. */
 #define	NT_PPC_VMX	0x100	/* PowerPC Altivec/VMX registers */
+#define	NT_PPC_VSX	0x102	/* PowerPC VSX registers */
 #define	NT_X86_XSTATE	0x202	/* x86 XSAVE extended state. */
 #define	NT_ARM_VFP	0x400	/* ARM VFP registers */
 

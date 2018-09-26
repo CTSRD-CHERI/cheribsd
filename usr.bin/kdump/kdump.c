@@ -99,10 +99,10 @@ __FBSDID("$FreeBSD$");
 #include <casper/cap_pwd.h>
 #endif
 
-u_int abidump(struct ktr_header *);
 int fetchprocinfo(struct ktr_header *, u_int *);
+u_int findabi(struct ktr_header *);
 int fread_tail(void *, int, int);
-void dumpheader(struct ktr_header *);
+void dumpheader(struct ktr_header *, u_int);
 void ktrsyscall(struct ktr_syscall *, u_int);
 void ktrsysret(struct ktr_sysret *, u_int);
 void ktrnamei(char *, int);
@@ -133,8 +133,9 @@ void usage(void);
 #define	TIMESTAMP_ELAPSED	0x2
 #define	TIMESTAMP_RELATIVE	0x4
 
-static int timestamp, decimal, fancy = 1, suppressdata, tail, threads, maxdata,
-    resolv = 0, abiflag = 0, syscallno = 0;
+static bool abiflag, decimal, fancy = true, resolv, suppressdata, syscallno,
+    tail, threads;
+static int timestamp, maxdata;
 static const char *tracefile = DEF_TRACEFILE;
 static struct ktr_header ktr_header;
 
@@ -371,40 +372,40 @@ main(int argc, char *argv[])
 	while ((ch = getopt(argc,argv,"f:dElm:np:AHRrSsTt:")) != -1)
 		switch (ch) {
 		case 'A':
-			abiflag = 1;
+			abiflag = true;
 			break;
 		case 'f':
 			tracefile = optarg;
 			break;
 		case 'd':
-			decimal = 1;
+			decimal = true;
 			break;
 		case 'l':
-			tail = 1;
+			tail = true;
 			break;
 		case 'm':
 			maxdata = atoi(optarg);
 			break;
 		case 'n':
-			fancy = 0;
+			fancy = false;
 			break;
 		case 'p':
 			pid = atoi(optarg);
 			break;
 		case 'r':
-			resolv = 1;
+			resolv = true;
 			break;
 		case 'S':
-			syscallno = 1;
+			syscallno = true;
 			break;
 		case 's':
-			suppressdata = 1;
+			suppressdata = true;
 			break;
 		case 'E':
 			timestamp |= TIMESTAMP_ELAPSED;
 			break;
 		case 'H':
-			threads = 1;
+			threads = true;
 			break;
 		case 'R':
 			timestamp |= TIMESTAMP_RELATIVE;
@@ -435,19 +436,19 @@ main(int argc, char *argv[])
 	caph_cache_tzdata();
 
 #ifdef WITH_CASPER
-	if (resolv != 0) {
+	if (resolv) {
 		if (cappwdgrp_setup(&cappwd, &capgrp) < 0) {
 			cappwd = NULL;
 			capgrp = NULL;
 		}
 	}
-	if (resolv == 0 || (cappwd != NULL && capgrp != NULL)) {
-		if (cap_enter() < 0 && errno != ENOSYS)
+	if (!resolv || (cappwd != NULL && capgrp != NULL)) {
+		if (caph_enter() < 0)
 			err(1, "unable to enter capability mode");
 	}
 #else
-	if (resolv == 0) {
-		if (cap_enter() < 0 && errno != ENOSYS)
+	if (!resolv) {
+		if (caph_enter() < 0)
 			err(1, "unable to enter capability mode");
 	}
 #endif
@@ -474,10 +475,6 @@ main(int argc, char *argv[])
 				drop_logged = 1;
 			}
 		}
-		if (trpoints & (1<<ktr_header.ktr_type))
-			if (pid == 0 || ktr_header.ktr_pid == pid ||
-			    ktr_header.ktr_tid == pid)
-				dumpheader(&ktr_header);
 		if ((ktrlen = ktr_header.ktr_len) < 0)
 			errx(1, "bogus length 0x%x", ktrlen);
 		if (ktrlen > size) {
@@ -490,12 +487,13 @@ main(int argc, char *argv[])
 			errx(1, "data too short");
 		if (fetchprocinfo(&ktr_header, (u_int *)m) != 0)
 			continue;
-		sv_flags = abidump(&ktr_header);
 		if (pid && ktr_header.ktr_pid != pid &&
 		    ktr_header.ktr_tid != pid)
 			continue;
 		if ((trpoints & (1<<ktr_header.ktr_type)) == 0)
 			continue;
+		sv_flags = findabi(&ktr_header);
+		dumpheader(&ktr_header, sv_flags);
 		drop_logged = 0;
 		switch (ktr_header.ktr_type) {
 		case KTR_SYSCALL:
@@ -606,66 +604,28 @@ fetchprocinfo(struct ktr_header *kth, u_int *flags)
 }
 
 u_int
-abidump(struct ktr_header *kth)
+findabi(struct ktr_header *kth)
 {
 	struct proc_info *pi;
-	const char *abi;
-	const char *arch;
-	u_int flags = 0;
 
 	TAILQ_FOREACH(pi, &trace_procs, info) {
 		if (pi->pid == kth->ktr_pid) {
-			flags = pi->sv_flags;
-			break;
+			return (pi->sv_flags);
 		}
 	}
 
-	if (abiflag == 0)
-		return (flags);
-
-	if (flags & SV_CHERI) {
-		/* XXX: Can't determine capability size from sv_flags */
-#if MIPS_SZCAP == 32
-		printf("C256 ");
-#else
-		printf("C128 ");
-#endif
-		return (flags);
-	}
-
-	switch (flags & SV_ABI_MASK) {
-	case SV_ABI_LINUX:
-		abi = "L";
-		break;
-	case SV_ABI_FREEBSD:
-		abi = "F";
-		break;
-	case SV_ABI_CLOUDABI:
-		abi = "C";
-		break;
-	default:
-		abi = "U";
-		break;
-	}
-
-	if (flags & SV_LP64)
-		arch = "64";
-	else if (flags & SV_ILP32)
-		arch = "32";
-	else
-		arch = "00";
-
-	printf("%s%s  ", abi, arch);
-
-	return (flags);
+	return (0);
 }
 
 void
-dumpheader(struct ktr_header *kth)
+dumpheader(struct ktr_header *kth, u_int sv_flags)
 {
 	static char unknown[64];
 	static struct timeval prevtime, prevtime_e;
 	struct timeval temp;
+	const char *abi;
+	const char *arch;
+	const char *cap;
 	const char *type;
 	const char *sign;
 
@@ -698,10 +658,6 @@ dumpheader(struct ktr_header *kth)
 	case KTR_SYSCTL:
 		type = "SCTL";
 		break;
-	case KTR_PROCCTOR:
-		/* FALLTHROUGH */
-	case KTR_PROCDTOR:
-		return;
 	case KTR_CAPFAIL:
 		type = "CAP ";
 		break;
@@ -768,6 +724,42 @@ dumpheader(struct ktr_header *kth)
 		}
 	}
 	printf("%s  ", type);
+	if (abiflag != 0) {
+		switch (sv_flags & SV_ABI_MASK) {
+		case SV_ABI_LINUX:
+			abi = "L";
+			break;
+		case SV_ABI_FREEBSD:
+			abi = "F";
+			break;
+		case SV_ABI_CLOUDABI:
+			abi = "C";
+			break;
+		default:
+			abi = "U";
+			break;
+		}
+
+		if ((sv_flags & SV_LP64) != 0)
+			arch = "64";
+		else if ((sv_flags & SV_ILP32) != 0)
+			arch = "32";
+		else
+			arch = "00";
+
+		if (sv_flags & SV_CHERI) {
+			/* XXX: Can't determine capability size from sv_flags */
+#if MIPS_SZCAP == 32
+			cap = "C256";
+#else
+			cap = "C128";
+#endif
+		}
+			else
+				cap = "";
+
+		printf("%s%s%s  ", abi, arch, cap);
+	}
 }
 
 #include <sys/syscall.h>
@@ -795,18 +787,14 @@ syscallabi(u_int sv_flags)
 	switch (sv_flags & SV_ABI_MASK) {
 	case SV_ABI_FREEBSD:
 		return (SYSDECODE_ABI_FREEBSD);
-#if defined(__amd64__) || defined(__i386__)
 	case SV_ABI_LINUX:
-#ifdef __amd64__
+#ifdef __LP64__
 		if (sv_flags & SV_ILP32)
 			return (SYSDECODE_ABI_LINUX32);
 #endif
 		return (SYSDECODE_ABI_LINUX);
-#endif
-#if defined(__aarch64__) || defined(__amd64__)
 	case SV_ABI_CLOUDABI:
 		return (SYSDECODE_ABI_CLOUDABI64);
-#endif
 	default:
 		return (SYSDECODE_ABI_UNKNOWN);
 	}
@@ -1888,14 +1876,14 @@ ktrstat(struct stat *statp)
 	printf("struct stat {");
 	printf("dev=%ju, ino=%ju, ",
 		(uintmax_t)statp->st_dev, (uintmax_t)statp->st_ino);
-	if (resolv == 0)
+	if (!resolv)
 		printf("mode=0%jo, ", (uintmax_t)statp->st_mode);
 	else {
 		strmode(statp->st_mode, mode);
 		printf("mode=%s, ", mode);
 	}
 	printf("nlink=%ju, ", (uintmax_t)statp->st_nlink);
-	if (resolv == 0) {
+	if (!resolv) {
 		pwd = NULL;
 	} else {
 #ifdef WITH_CASPER
@@ -1909,7 +1897,7 @@ ktrstat(struct stat *statp)
 		printf("uid=%ju, ", (uintmax_t)statp->st_uid);
 	else
 		printf("uid=\"%s\", ", pwd->pw_name);
-	if (resolv == 0) {
+	if (!resolv) {
 		grp = NULL;
 	} else {
 #ifdef WITH_CASPER
@@ -1925,7 +1913,7 @@ ktrstat(struct stat *statp)
 		printf("gid=\"%s\", ", grp->gr_name);
 	printf("rdev=%ju, ", (uintmax_t)statp->st_rdev);
 	printf("atime=");
-	if (resolv == 0)
+	if (!resolv)
 		printf("%jd", (intmax_t)statp->st_atim.tv_sec);
 	else {
 		tm = localtime(&statp->st_atim.tv_sec);
@@ -1937,7 +1925,7 @@ ktrstat(struct stat *statp)
 	else
 		printf(", ");
 	printf("mtime=");
-	if (resolv == 0)
+	if (!resolv)
 		printf("%jd", (intmax_t)statp->st_mtim.tv_sec);
 	else {
 		tm = localtime(&statp->st_mtim.tv_sec);
@@ -1949,7 +1937,7 @@ ktrstat(struct stat *statp)
 	else
 		printf(", ");
 	printf("ctime=");
-	if (resolv == 0)
+	if (!resolv)
 		printf("%jd", (intmax_t)statp->st_ctim.tv_sec);
 	else {
 		tm = localtime(&statp->st_ctim.tv_sec);
@@ -1961,7 +1949,7 @@ ktrstat(struct stat *statp)
 	else
 		printf(", ");
 	printf("birthtime=");
-	if (resolv == 0)
+	if (!resolv)
 		printf("%jd", (intmax_t)statp->st_birthtim.tv_sec);
 	else {
 		tm = localtime(&statp->st_birthtim.tv_sec);

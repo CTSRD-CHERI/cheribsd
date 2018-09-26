@@ -33,13 +33,14 @@
 #include <sys/acl.h>
 #include <sys/signal.h>
 #include <sys/sem.h>
-#include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/mac.h>
 #include <sys/mount.h>
 #include <sys/_cpuset.h>
 #include <sys/_domainset.h>
+#include <sys/_uio.h>
 
+struct __wrusage;
 struct ffclock_estimate;
 struct file;
 struct filecaps;
@@ -60,12 +61,13 @@ struct ogetdirentries_args;
 struct rlimit;
 struct rusage;
 struct rtprio;
+struct sched_param;
 struct sockaddr;
 struct stat;
 struct thr_param;
 struct timex;
-struct sched_param;
-struct __wrusage;
+struct uio;
+
 
 int	kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
 	    const struct acl * __capability aclp);
@@ -93,14 +95,16 @@ int	kern_accessat(struct thread *td, int fd, const char * __capability path,
 int	kern_acct(struct thread *td, const char * __capability path);
 int	kern_adjtime(struct thread *td, struct timeval *delta,
 	    struct timeval *olddelta);
-int	kern_alternate_path(struct thread *td, const char *prefix, const char *path,
-	    enum uio_seg pathseg, char **pathbuf, int create, int dirfd);
+int	kern_alternate_path(struct thread *td, const char *prefix,
+	    const char * __capability path, enum uio_seg pathseg,
+	    char **pathbuf, int create, int dirfd);
 int	kern_audit(struct thread *td, const void * __capability record,
 	    u_int length);
 int	kern_auditctl(struct thread *td, const char * __capability path);
 int	kern_auditon(struct thread *td, int cmd, void * __capability data,
 	    u_int length);
 int	kern_bindat(struct thread *td, int dirfd, int fd, struct sockaddr *sa);
+int	kern_break(struct thread *td, uintptr_t *addr);
 int	kern_cap_getmode(struct thread *td, u_int * __capability modep);
 int	kern_cap_fcntls_get(struct thread *td, int fd,
 	    uint32_t * __capability fcntlrightsp);
@@ -560,8 +564,9 @@ int	user_statfs(struct thread *td, const char * __capability path,
 
 struct freebsd11_dirent;
 
-int	freebsd11_kern_getdirentries(struct thread *td, int fd, char *ubuf, u_int
-	    count, long *basep, void (*func)(struct freebsd11_dirent *));
+int	freebsd11_kern_getdirentries(struct thread *td, int fd,
+	    char * __capability ubuf, u_int count, long *basep,
+	    void (*func)(struct freebsd11_dirent *));
 
 #endif /* !_SYS_SYSCALLSUBR_H_ */
 // CHERI CHANGES START

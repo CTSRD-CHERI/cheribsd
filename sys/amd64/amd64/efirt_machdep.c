@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/vmparam.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#include <vm/vm_extern.h>
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
@@ -82,6 +83,19 @@ efi_destroy_1t1_map(void)
 	obj_1t1_pt = NULL;
 	efi_pml4 = NULL;
 	efi_pml4_page = NULL;
+}
+
+/*
+ * Map a physical address from EFI runtime space into KVA space.  Returns 0 to
+ * indicate a failed mapping so that the caller may handle error.
+ */
+vm_offset_t
+efi_phys_to_kva(vm_paddr_t paddr)
+{
+
+	if (paddr >= dmaplimit)
+		return (0);
+	return (PHYS_TO_DMAP(paddr));
 }
 
 static vm_page_t
@@ -253,6 +267,7 @@ efi_arch_enter(void)
 
 	curpmap = PCPU_GET(curpmap);
 	PMAP_LOCK_ASSERT(curpmap, MA_OWNED);
+	curthread->td_md.md_efirt_dis_pf = vm_fault_disable_pagefaults();
 
 	/*
 	 * IPI TLB shootdown handler invltlb_pcid_handler() reloads
@@ -287,6 +302,7 @@ efi_arch_leave(void)
 	    curpmap->pm_pcids[PCPU_GET(cpuid)].pm_pcid : 0));
 	if (!pmap_pcid_enabled)
 		invltlb();
+	vm_fault_enable_pagefaults(curthread->td_md.md_efirt_dis_pf);
 }
 
 /* XXX debug stuff */

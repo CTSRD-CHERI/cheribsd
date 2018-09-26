@@ -122,6 +122,18 @@ int	bootverbose = BOOTVERBOSE;
 SYSCTL_INT(_debug, OID_AUTO, bootverbose, CTLFLAG_RW, &bootverbose, 0,
 	"Control the output of verbose kernel messages");
 
+#ifdef VERBOSE_SYSINIT
+/*
+ * We'll use the defined value of VERBOSE_SYSINIT from the kernel config to
+ * dictate the default VERBOSE_SYSINIT behavior.  Significant values for this
+ * option and associated tunable are:
+ * - 0, 'compiled in but silent by default'
+ * - 1, 'compiled in but verbose by default' (default)
+ */
+int	verbose_sysinit = VERBOSE_SYSINIT;
+TUNABLE_INT("debug.verbose_sysinit", &verbose_sysinit);
+#endif
+
 #ifdef INVARIANTS
 FEATURE(invariants, "Kernel compiled with INVARIANTS, may affect performance");
 #endif
@@ -271,7 +283,7 @@ restart:
 			continue;
 
 #if defined(VERBOSE_SYSINIT)
-		if ((*sipp)->subsystem > last) {
+		if ((*sipp)->subsystem > last && verbose_sysinit != 0) {
 			verbose = 1;
 			last = (*sipp)->subsystem;
 			printf("subsystem %x\n", last);
@@ -505,6 +517,7 @@ proc0_init(void *dummy __unused)
 	p->p_peers = 0;
 	p->p_leader = p;
 	p->p_reaper = p;
+	p->p_treeflag |= P_TREE_REAPER;
 	LIST_INIT(&p->p_reaplist);
 
 	strncpy(p->p_comm, "kernel", sizeof (p->p_comm));
@@ -638,17 +651,23 @@ proc0_post(void *dummy __unused)
 	 */
 	sx_slock(&allproc_lock);
 	FOREACH_PROC_IN_SYSTEM(p) {
+		PROC_LOCK(p);
+		if (p->p_state == PRS_NEW) {
+			PROC_UNLOCK(p);
+			continue;
+		}
 		microuptime(&p->p_stats->p_start);
 		PROC_STATLOCK(p);
 		rufetch(p, &ru);	/* Clears thread stats */
-		PROC_STATUNLOCK(p);
 		p->p_rux.rux_runtime = 0;
 		p->p_rux.rux_uticks = 0;
 		p->p_rux.rux_sticks = 0;
 		p->p_rux.rux_iticks = 0;
+		PROC_STATUNLOCK(p);
 		FOREACH_THREAD_IN_PROC(p, td) {
 			td->td_runtime = 0;
 		}
+		PROC_UNLOCK(p);
 	}
 	sx_sunlock(&allproc_lock);
 	PCPU_SET(switchtime, cpu_ticks());
@@ -738,9 +757,7 @@ start_init(void *dummy)
 		strlcpy(init_path, var, sizeof(init_path));
 		freeenv(var);
 	}
-	pathlen = strlen(init_path) + 1;
-	free_init_path = tmp_init_path = malloc(pathlen, M_TEMP, M_WAITOK);
-	strlcpy(tmp_init_path, init_path, pathlen);
+	free_init_path = tmp_init_path = strdup(init_path, M_TEMP);
 	
 	while ((path = strsep(&tmp_init_path, ":")) != NULL) {
 		pathlen = strlen(path) + 1;
@@ -835,7 +852,6 @@ create_init(const void *udata __unused)
 	PROC_LOCK(initproc);
 	initproc->p_flag |= P_SYSTEM | P_INMEM;
 	initproc->p_treeflag |= P_TREE_REAPER;
-	LIST_INSERT_HEAD(&initproc->p_reaplist, &proc0, p_reapsibling);
 	oldcred = initproc->p_ucred;
 	crcopy(newcred, oldcred);
 #ifdef MAC

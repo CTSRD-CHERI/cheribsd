@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/psl.h>
 #include <machine/cpufunc.h>
 #include <machine/md_var.h>
+#include <machine/reg.h>
 #include <machine/segments.h>
 #include <machine/smp.h>
 #include <machine/specialreg.h>
@@ -186,6 +187,91 @@ static struct unrhdr *vpid_unr;
 static u_int vpid_alloc_failed;
 SYSCTL_UINT(_hw_vmm_vmx, OID_AUTO, vpid_alloc_failed, CTLFLAG_RD,
 	    &vpid_alloc_failed, 0, NULL);
+
+static int guest_l1d_flush;
+SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush, CTLFLAG_RD,
+    &guest_l1d_flush, 0, NULL);
+static int guest_l1d_flush_sw;
+SYSCTL_INT(_hw_vmm_vmx, OID_AUTO, l1d_flush_sw, CTLFLAG_RD,
+    &guest_l1d_flush_sw, 0, NULL);
+
+static struct msr_entry msr_load_list[1] __aligned(16);
+
+/*
+ * The definitions of SDT probes for VMX.
+ */
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, entry,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE4(vmm, vmx, exit, taskswitch,
+    "struct vmx *", "int", "struct vm_exit *", "struct vm_task_switch *");
+
+SDT_PROBE_DEFINE4(vmm, vmx, exit, craccess,
+    "struct vmx *", "int", "struct vm_exit *", "uint64_t");
+
+SDT_PROBE_DEFINE4(vmm, vmx, exit, rdmsr,
+    "struct vmx *", "int", "struct vm_exit *", "uint32_t");
+
+SDT_PROBE_DEFINE5(vmm, vmx, exit, wrmsr,
+    "struct vmx *", "int", "struct vm_exit *", "uint32_t", "uint64_t");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, halt,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, mtrap,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, pause,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, intrwindow,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE4(vmm, vmx, exit, interrupt,
+    "struct vmx *", "int", "struct vm_exit *", "uint32_t");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, nmiwindow,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, inout,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, cpuid,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE5(vmm, vmx, exit, exception,
+    "struct vmx *", "int", "struct vm_exit *", "uint32_t", "int");
+
+SDT_PROBE_DEFINE5(vmm, vmx, exit, nestedfault,
+    "struct vmx *", "int", "struct vm_exit *", "uint64_t", "uint64_t");
+
+SDT_PROBE_DEFINE4(vmm, vmx, exit, mmiofault,
+    "struct vmx *", "int", "struct vm_exit *", "uint64_t");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, eoi,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, apicaccess,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE4(vmm, vmx, exit, apicwrite,
+    "struct vmx *", "int", "struct vm_exit *", "struct vlapic *");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, xsetbv,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, monitor,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE3(vmm, vmx, exit, mwait,
+    "struct vmx *", "int", "struct vm_exit *");
+
+SDT_PROBE_DEFINE4(vmm, vmx, exit, unknown,
+    "struct vmx *", "int", "struct vm_exit *", "uint32_t");
+
+SDT_PROBE_DEFINE4(vmm, vmx, exit, return,
+    "struct vmx *", "int", "struct vm_exit *", "int");
 
 /*
  * Use the last page below 4GB as the APIC access address. This address is
@@ -496,6 +582,9 @@ vmx_cleanup(void)
 		vpid_unr = NULL;
 	}
 
+	if (nmi_flush_l1d_sw == 1)
+		nmi_flush_l1d_sw = 0;
+
 	smp_rendezvous(NULL, vmx_disable, NULL, NULL);
 
 	return (0);
@@ -722,6 +811,31 @@ vmx_init(int ipinum)
 		return (error);
 	}
 
+	guest_l1d_flush = (cpu_ia32_arch_caps & IA32_ARCH_CAP_RDCL_NO) == 0;
+	TUNABLE_INT_FETCH("hw.vmm.l1d_flush", &guest_l1d_flush);
+
+	/*
+	 * L1D cache flush is enabled.  Use IA32_FLUSH_CMD MSR when
+	 * available.  Otherwise fall back to the software flush
+	 * method which loads enough data from the kernel text to
+	 * flush existing L1D content, both on VMX entry and on NMI
+	 * return.
+	 */
+	if (guest_l1d_flush) {
+		if ((cpu_stdext_feature3 & CPUID_STDEXT3_L1D_FLUSH) == 0) {
+			guest_l1d_flush_sw = 1;
+			TUNABLE_INT_FETCH("hw.vmm.l1d_flush_sw",
+			    &guest_l1d_flush_sw);
+		}
+		if (guest_l1d_flush_sw) {
+			if (nmi_flush_l1d_sw <= 1)
+				nmi_flush_l1d_sw = 1;
+		} else {
+			msr_load_list[0].index = MSR_IA32_FLUSH_CMD;
+			msr_load_list[0].val = IA32_FLUSH_CMD_L1D;
+		}
+	}
+
 	/*
 	 * Stash the cr0 and cr4 bits that must be fixed to 0 or 1
 	 */
@@ -911,6 +1025,15 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 		error += vmwrite(VMCS_MSR_BITMAP, vtophys(vmx->msr_bitmap));
 		error += vmwrite(VMCS_VPID, vpid[i]);
 
+		if (guest_l1d_flush && !guest_l1d_flush_sw) {
+			vmcs_write(VMCS_ENTRY_MSR_LOAD, pmap_kextract(
+			    (vm_offset_t)&msr_load_list[0]));
+			vmcs_write(VMCS_ENTRY_MSR_LOAD_COUNT,
+			    nitems(msr_load_list));
+			vmcs_write(VMCS_EXIT_MSR_STORE, 0);
+			vmcs_write(VMCS_EXIT_MSR_STORE_COUNT, 0);
+		}
+
 		/* exception bitmap */
 		if (vcpu_trace_exceptions(vm, i))
 			exc_bitmap = 0xffffffff;
@@ -918,8 +1041,8 @@ vmx_vminit(struct vm *vm, pmap_t pmap)
 			exc_bitmap = 1 << IDT_MC;
 		error += vmwrite(VMCS_EXCEPTION_BITMAP, exc_bitmap);
 
-		vmx->ctx[i].guest_dr6 = 0xffff0ff0;
-		error += vmwrite(VMCS_GUEST_DR7, 0x400);
+		vmx->ctx[i].guest_dr6 = DBREG_DR6_RESERVED1;
+		error += vmwrite(VMCS_GUEST_DR7, DBREG_DR7_RESERVED1);
 
 		if (virtual_interrupt_delivery) {
 			error += vmwrite(VMCS_APIC_ACCESS, APIC_ACCESS_ADDRESS);
@@ -2118,6 +2241,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	vmexit->exitcode = VM_EXITCODE_BOGUS;
 
 	vmm_stat_incr(vmx->vm, vcpu, VMEXIT_COUNT, 1);
+	SDT_PROBE3(vmm, vmx, exit, entry, vmx, vcpu, vmexit);
 
 	/*
 	 * VM-entry failures during or after loading guest state.
@@ -2220,6 +2344,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 			}
 		}
 		vmexit->exitcode = VM_EXITCODE_TASK_SWITCH;
+		SDT_PROBE4(vmm, vmx, exit, taskswitch, vmx, vcpu, vmexit, ts);
 		VCPU_CTR4(vmx->vm, vcpu, "task switch reason %d, tss 0x%04x, "
 		    "%s errcode 0x%016lx", ts->reason, ts->tsssel,
 		    ts->ext ? "external" : "internal",
@@ -2227,6 +2352,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		break;
 	case EXIT_REASON_CR_ACCESS:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_CR_ACCESS, 1);
+		SDT_PROBE4(vmm, vmx, exit, craccess, vmx, vcpu, vmexit, qual);
 		switch (qual & 0xf) {
 		case 0:
 			handled = vmx_emulate_cr0_access(vmx, vcpu, qual);
@@ -2244,6 +2370,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		retu = false;
 		ecx = vmxctx->guest_rcx;
 		VCPU_CTR1(vmx->vm, vcpu, "rdmsr 0x%08x", ecx);
+		SDT_PROBE4(vmm, vmx, exit, rdmsr, vmx, vcpu, vmexit, ecx);
 		error = emulate_rdmsr(vmx, vcpu, ecx, &retu);
 		if (error) {
 			vmexit->exitcode = VM_EXITCODE_RDMSR;
@@ -2264,6 +2391,8 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		edx = vmxctx->guest_rdx;
 		VCPU_CTR2(vmx->vm, vcpu, "wrmsr 0x%08x value 0x%016lx",
 		    ecx, (uint64_t)edx << 32 | eax);
+		SDT_PROBE5(vmm, vmx, exit, wrmsr, vmx, vmexit, vcpu, ecx,
+		    (uint64_t)edx << 32 | eax);
 		error = emulate_wrmsr(vmx, vcpu, ecx,
 		    (uint64_t)edx << 32 | eax, &retu);
 		if (error) {
@@ -2280,6 +2409,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		break;
 	case EXIT_REASON_HLT:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_HLT, 1);
+		SDT_PROBE3(vmm, vmx, exit, halt, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_HLT;
 		vmexit->u.hlt.rflags = vmcs_read(VMCS_GUEST_RFLAGS);
 		if (virtual_interrupt_delivery)
@@ -2290,15 +2420,18 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		break;
 	case EXIT_REASON_MTF:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_MTRAP, 1);
+		SDT_PROBE3(vmm, vmx, exit, mtrap, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_MTRAP;
 		vmexit->inst_length = 0;
 		break;
 	case EXIT_REASON_PAUSE:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_PAUSE, 1);
+		SDT_PROBE3(vmm, vmx, exit, pause, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_PAUSE;
 		break;
 	case EXIT_REASON_INTR_WINDOW:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_INTR_WINDOW, 1);
+		SDT_PROBE3(vmm, vmx, exit, intrwindow, vmx, vcpu, vmexit);
 		vmx_clear_int_window_exiting(vmx, vcpu);
 		return (1);
 	case EXIT_REASON_EXT_INTR:
@@ -2312,6 +2445,8 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		 * this virtual interrupt during the subsequent VM enter.
 		 */
 		intr_info = vmcs_read(VMCS_EXIT_INTR_INFO);
+		SDT_PROBE4(vmm, vmx, exit, interrupt,
+		    vmx, vcpu, vmexit, intr_info);
 
 		/*
 		 * XXX: Ignore this exit if VMCS_INTR_VALID is not set.
@@ -2331,6 +2466,7 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_EXTINT, 1);
 		return (1);
 	case EXIT_REASON_NMI_WINDOW:
+		SDT_PROBE3(vmm, vmx, exit, nmiwindow, vmx, vcpu, vmexit);
 		/* Exit to allow the pending virtual NMI to be injected */
 		if (vm_nmi_pending(vmx->vm, vcpu))
 			vmx_inject_nmi(vmx, vcpu);
@@ -2358,9 +2494,11 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 			vis->addrsize = inout_str_addrsize(inst_info);
 			inout_str_seginfo(vmx, vcpu, inst_info, in, vis);
 		}
+		SDT_PROBE3(vmm, vmx, exit, inout, vmx, vcpu, vmexit);
 		break;
 	case EXIT_REASON_CPUID:
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_CPUID, 1);
+		SDT_PROBE3(vmm, vmx, exit, cpuid, vmx, vcpu, vmexit);
 		handled = vmx_handle_cpuid(vmx->vm, vcpu, vmxctx);
 		break;
 	case EXIT_REASON_EXCEPTION:
@@ -2425,6 +2563,8 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		}
 		VCPU_CTR2(vmx->vm, vcpu, "Reflecting exception %d/%#x into "
 		    "the guest", intr_vec, errcode);
+		SDT_PROBE5(vmm, vmx, exit, exception,
+		    vmx, vcpu, vmexit, intr_vec, errcode);
 		error = vm_inject_exception(vmx->vm, vcpu, intr_vec,
 		    errcode_valid, errcode, 0);
 		KASSERT(error == 0, ("%s: vm_inject_exception error %d",
@@ -2445,9 +2585,13 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 			vmexit->u.paging.gpa = gpa;
 			vmexit->u.paging.fault_type = ept_fault_type(qual);
 			vmm_stat_incr(vmx->vm, vcpu, VMEXIT_NESTED_FAULT, 1);
+			SDT_PROBE5(vmm, vmx, exit, nestedfault,
+			    vmx, vcpu, vmexit, gpa, qual);
 		} else if (ept_emulation_fault(qual)) {
 			vmexit_inst_emul(vmexit, gpa, vmcs_gla());
 			vmm_stat_incr(vmx->vm, vcpu, VMEXIT_INST_EMUL, 1);
+			SDT_PROBE4(vmm, vmx, exit, mmiofault,
+			    vmx, vcpu, vmexit, gpa);
 		}
 		/*
 		 * If Virtual NMIs control is 1 and the VM-exit is due to an
@@ -2464,9 +2608,11 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 	case EXIT_REASON_VIRTUALIZED_EOI:
 		vmexit->exitcode = VM_EXITCODE_IOAPIC_EOI;
 		vmexit->u.ioapic_eoi.vector = qual & 0xFF;
+		SDT_PROBE3(vmm, vmx, exit, eoi, vmx, vcpu, vmexit);
 		vmexit->inst_length = 0;	/* trap-like */
 		break;
 	case EXIT_REASON_APIC_ACCESS:
+		SDT_PROBE3(vmm, vmx, exit, apicaccess, vmx, vcpu, vmexit);
 		handled = vmx_handle_apic_access(vmx, vcpu, vmexit);
 		break;
 	case EXIT_REASON_APIC_WRITE:
@@ -2476,18 +2622,25 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 		 */
 		vmexit->inst_length = 0;
 		vlapic = vm_lapic(vmx->vm, vcpu);
+		SDT_PROBE4(vmm, vmx, exit, apicwrite,
+		    vmx, vcpu, vmexit, vlapic);
 		handled = vmx_handle_apic_write(vmx, vcpu, vlapic, qual);
 		break;
 	case EXIT_REASON_XSETBV:
+		SDT_PROBE3(vmm, vmx, exit, xsetbv, vmx, vcpu, vmexit);
 		handled = vmx_emulate_xsetbv(vmx, vcpu, vmexit);
 		break;
 	case EXIT_REASON_MONITOR:
+		SDT_PROBE3(vmm, vmx, exit, monitor, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_MONITOR;
 		break;
 	case EXIT_REASON_MWAIT:
+		SDT_PROBE3(vmm, vmx, exit, mwait, vmx, vcpu, vmexit);
 		vmexit->exitcode = VM_EXITCODE_MWAIT;
 		break;
 	default:
+		SDT_PROBE4(vmm, vmx, exit, unknown,
+		    vmx, vcpu, vmexit, reason);
 		vmm_stat_incr(vmx->vm, vcpu, VMEXIT_UNKNOWN, 1);
 		break;
 	}
@@ -2523,6 +2676,9 @@ vmx_exit_process(struct vmx *vmx, int vcpu, struct vm_exit *vmexit)
 			 */
 		}
 	}
+
+	SDT_PROBE4(vmm, vmx, exit, return,
+	    vmx, vcpu, vmexit, handled);
 	return (handled);
 }
 
@@ -2743,6 +2899,12 @@ vmx_run(void *arg, int vcpu, register_t rip, pmap_t pmap,
 			vm_exit_astpending(vmx->vm, vcpu, rip);
 			vmx_astpending_trace(vmx, vcpu, rip);
 			handled = HANDLED;
+			break;
+		}
+
+		if (vcpu_debugged(vm, vcpu)) {
+			enable_intr();
+			vm_exit_debug(vmx->vm, vcpu, rip);
 			break;
 		}
 

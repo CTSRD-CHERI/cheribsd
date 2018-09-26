@@ -296,7 +296,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			goto handle_nosign;
 		case 'p':
 			ptr = va_arg(ap, void *);
-#ifdef __CHERI__
+#ifdef __CHERI_PURE_CAPABILITY__
 			if (sharpflag) {
 				_Bool sealed = cheri_getsealed(ptr);
 				uintmax_t perms = cheri_getperm(ptr);

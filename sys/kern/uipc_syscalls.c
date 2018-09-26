@@ -37,8 +37,9 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_inet.h"
 #include "opt_inet6.h"
-#include "opt_compat.h"
 #include "opt_ktrace.h"
+
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,6 +59,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/syscallsubr.h>
+#include <sys/uio.h>
+#include <sys/un.h>
+#include <sys/unpcb.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
@@ -186,12 +190,16 @@ kern_bindat(struct thread *td, int dirfd, int fd, struct sockaddr *sa)
 {
 	struct socket *so;
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
+
+#ifdef CAPABILITY_MODE
+	if (IN_CAPABILITY_MODE(td) && (dirfd == AT_FDCWD))
+		return (ECAPMODE);
+#endif
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_SOCKADDR(td, dirfd, sa);
-	error = getsock_cap(td, fd, cap_rights_init(&rights, CAP_BIND),
+	error = getsock_cap(td, fd, &cap_bind_rights,
 	    &fp, NULL, NULL);
 	if (error != 0)
 		return (error);
@@ -250,11 +258,10 @@ kern_listen(struct thread *td, int s, int backlog)
 {
 	struct socket *so;
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(s);
-	error = getsock_cap(td, s, cap_rights_init(&rights, CAP_LISTEN),
+	error = getsock_cap(td, s, &cap_listen_rights,
 	    &fp, NULL, NULL);
 	if (error == 0) {
 		so = fp->f_data;
@@ -280,7 +287,7 @@ user_accept(struct thread *td, int s, struct sockaddr * __capability uname,
 	if (uname == NULL)
 		return (kern_accept4(td, s, NULL, NULL, flags, NULL));
 
-	error = copyin_c(anamelen, &namelen, sizeof(namelen));
+	error = copyin(anamelen, &namelen, sizeof(namelen));
 	if (error != 0)
 		return (error);
 
@@ -295,10 +302,10 @@ user_accept(struct thread *td, int s, struct sockaddr * __capability uname,
 			((struct osockaddr *)name)->sa_family =
 			    name->sa_family;
 #endif
-		error = copyout_c(name, uname, namelen);
+		error = copyout(name, uname, namelen);
 	}
 	if (error == 0)
-		error = copyout_c(&namelen, anamelen, sizeof(namelen));
+		error = copyout(&namelen, anamelen, sizeof(namelen));
 	if (error != 0)
 		fdclose(td, fp, td->td_retval[0]);
 	fdrop(fp, td);
@@ -321,7 +328,6 @@ kern_accept4(struct thread *td, int s, struct sockaddr **name,
 	struct sockaddr *sa = NULL;
 	struct socket *head, *so;
 	struct filecaps fcaps;
-	cap_rights_t rights;
 	u_int fflag;
 	pid_t pgid;
 	int error, fd, tmp;
@@ -330,7 +336,7 @@ kern_accept4(struct thread *td, int s, struct sockaddr **name,
 		*name = NULL;
 
 	AUDIT_ARG_FD(s);
-	error = getsock_cap(td, s, cap_rights_init(&rights, CAP_ACCEPT),
+	error = getsock_cap(td, s, &cap_accept_rights,
 	    &headfp, &fflag, &fcaps);
 	if (error != 0)
 		return (error);
@@ -488,12 +494,16 @@ kern_connectat(struct thread *td, int dirfd, int fd, struct sockaddr *sa)
 {
 	struct socket *so;
 	struct file *fp;
-	cap_rights_t rights;
 	int error, interrupted = 0;
+
+#ifdef CAPABILITY_MODE
+	if (IN_CAPABILITY_MODE(td) && (dirfd == AT_FDCWD))
+		return (ECAPMODE);
+#endif
 
 	AUDIT_ARG_FD(fd);
 	AUDIT_ARG_SOCKADDR(td, dirfd, sa);
-	error = getsock_cap(td, fd, cap_rights_init(&rights, CAP_CONNECT),
+	error = getsock_cap(td, fd, &cap_connect_rights,
 	    &fp, NULL, NULL);
 	if (error != 0)
 		return (error);
@@ -608,6 +618,15 @@ kern_socketpair(struct thread *td, int domain, int type, int protocol,
 		 error = soconnect2(so2, so1);
 		 if (error != 0)
 			goto free4;
+	} else if (so1->so_proto->pr_flags & PR_CONNREQUIRED) {
+		struct unpcb *unp, *unp2;
+		unp = sotounpcb(so1);
+		unp2 = sotounpcb(so2);
+		/* 
+		 * No need to lock the unps, because the sockets are brand-new.
+		 * No other threads can be using them yet
+		 */
+		unp_copy_peercred(td, unp, unp2, unp);
 	}
 	finit(fp1, FREAD | FWRITE | fflag, DTYPE_SOCKET, fp1->f_data,
 	    &socketops);
@@ -652,7 +671,7 @@ user_socketpair(struct thread *td, int domain, int type, int protocol,
 	error = kern_socketpair(td, domain, type, protocol, sv);
 	if (error != 0)
 		return (error);
-	error = copyout_c(&sv[0], rsv, 2 * sizeof(int));
+	error = copyout(&sv[0], rsv, 2 * sizeof(int));
 	if (error != 0) {
 		(void)kern_close(td, sv[0]);
 		(void)kern_close(td, sv[1]);
@@ -726,7 +745,7 @@ kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 	struct uio auio;
 	kiovec_t * __capability iov;
 	struct socket *so;
-	cap_rights_t rights;
+	cap_rights_t *rights;
 #ifdef KTRACE
 	struct uio *ktruio = NULL;
 #endif
@@ -734,14 +753,15 @@ kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 	int i, error;
 
 	AUDIT_ARG_FD(s);
-	cap_rights_init(&rights, CAP_SEND);
+	rights = &cap_send_rights;
 	if (mp->msg_name != NULL) {
 		AUDIT_ARG_SOCKADDR(td, AT_FDCWD,
 		    (__cheri_fromcap struct sockaddr *)
 		    mp->msg_name);
-		cap_rights_set(&rights, CAP_CONNECT);
+		AUDIT_ARG_SOCKADDR(td, AT_FDCWD, mp->msg_name);
+		rights = &cap_send_connect_rights;
 	}
-	error = getsock_cap(td, s, &rights, &fp, NULL, NULL);
+	error = getsock_cap(td, s, rights, &fp, NULL, NULL);
 	if (error != 0) {
 		m_freem(control);
 		return (error);
@@ -895,7 +915,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	kiovec_t *iov;
 	int error;
 
-	error = copyin(uap->msg, &umsg, sizeof(umsg));
+	error = copyin(__USER_CAP_OBJ(uap->msg), &umsg, sizeof(umsg));
 	if (error != 0)
 		return (error);
 	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
@@ -924,12 +944,11 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 {
 	struct uio auio;
 	kiovec_t * __capability iov;
-	struct mbuf *m, *control = NULL;
+	struct mbuf *control, *m;
 	char * __capability ctlbuf;
 	struct file *fp;
 	struct socket *so;
 	struct sockaddr *fromsa = NULL;
-	cap_rights_t rights;
 #ifdef KTRACE
 	struct uio *ktruio = NULL;
 #endif
@@ -940,7 +959,7 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 		*controlp = NULL;
 
 	AUDIT_ARG_FD(s);
-	error = getsock_cap(td, s, cap_rights_init(&rights, CAP_RECV),
+	error = getsock_cap(td, s, &cap_recv_rights,
 	    &fp, NULL, NULL);
 	if (error != 0)
 		return (error);
@@ -972,6 +991,7 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 	if (KTRPOINT(td, KTR_GENIO))
 		ktruio = cloneuio(&auio);
 #endif
+	control = NULL;
 	len = auio.uio_resid;
 	error = soreceive(so, &fromsa, &auio, NULL,
 	    (mp->msg_control || controlp) ? &control : NULL,
@@ -1005,7 +1025,7 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 				    fromsa->sa_family;
 #endif
 			if (fromseg == UIO_USERSPACE) {
-				error = copyout_c(fromsa, mp->msg_name,
+				error = copyout(fromsa, mp->msg_name,
 				    (unsigned)len);
 				if (error != 0)
 					goto out;
@@ -1037,30 +1057,22 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 			control->m_data += sizeof (struct cmsghdr);
 		}
 #endif
-		len = mp->msg_controllen;
-		m = control;
-		mp->msg_controllen = 0;
 		ctlbuf = mp->msg_control;
-
-		while (m && len > 0) {
-			unsigned int tocopy;
-
-			if (len >= m->m_len)
-				tocopy = m->m_len;
-			else {
-				mp->msg_flags |= MSG_CTRUNC;
-				tocopy = len;
-			}
-
-			if ((error = copyout_c(mtod(m, caddr_t), ctlbuf,
-			    tocopy)) != 0)
+		len = mp->msg_controllen;
+		mp->msg_controllen = 0;
+		for (m = control; m != NULL && len >= m->m_len; m = m->m_next) {
+			if ((error = copyout(mtod(m, caddr_t), ctlbuf,
+			    m->m_len)) != 0)
 				goto out;
 
-			ctlbuf += tocopy;
-			len -= tocopy;
-			m = m->m_next;
+			ctlbuf += m->m_len;
+			len -= m->m_len;
+			mp->msg_controllen += m->m_len;
 		}
-		mp->msg_controllen = (vaddr_t)ctlbuf - (vaddr_t)mp->msg_control;
+		if (m != NULL) {
+			mp->msg_flags |= MSG_CTRUNC;
+			m_dispose_extcontrolm(m);
+		}
 	}
 out:
 	fdrop(fp, td);
@@ -1072,8 +1084,11 @@ out:
 
 	if (error == 0 && controlp != NULL)
 		*controlp = control;
-	else  if (control)
+	else if (control != NULL) {
+		if (error != 0)
+			m_dispose_extcontrolm(control);
 		m_freem(control);
+	}
 
 	return (error);
 }
@@ -1088,7 +1103,7 @@ recvit(struct thread *td, int s, kmsghdr_t *mp,
 	if (error != 0)
 		return (error);
 	if (namelenp != NULL) {
-		error = copyout_c(&mp->msg_namelen, namelenp,
+		error = copyout(&mp->msg_namelen, namelenp,
 		    sizeof (socklen_t));
 #ifdef COMPAT_OLDSOCK
 		if (mp->msg_flags & MSG_COMPAT)
@@ -1117,7 +1132,7 @@ kern_recvfrom(struct thread *td, int s, void * __capability buf, size_t len,
 	int error;
 
 	if (fromlenaddr != NULL) {
-		error = copyin_c(fromlenaddr, &msg.msg_namelen,
+		error = copyin(fromlenaddr, &msg.msg_namelen,
 		    sizeof (msg.msg_namelen));
 		if (error != 0)
 			goto done2;
@@ -1205,7 +1220,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	kiovec_t *iov;
 	int error;
 
-	error = copyin(uap->msg, &umsg, sizeof(umsg));
+	error = copyin(__USER_CAP_OBJ(uap->msg), &umsg, sizeof(umsg));
 	if (error != 0)
 		return (error);
 	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
@@ -1232,7 +1247,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 		umsg.msg_namelen = msg.msg_namelen;
 		umsg.msg_iovlen = msg.msg_iovlen;
 		umsg.msg_controllen = msg.msg_controllen;
-		error = copyout(&umsg, uap->msg, sizeof(umsg));
+		error = copyout(&umsg, __USER_CAP_OBJ(uap->msg), sizeof(umsg));
 	}
 	free(iov, M_IOV);
 	return (error);
@@ -1250,11 +1265,10 @@ kern_shutdown(struct thread *td, int s, int how)
 {
 	struct socket *so;
 	struct file *fp;
-	cap_rights_t rights;
 	int error;
 
 	AUDIT_ARG_FD(s);
-	error = getsock_cap(td, s, cap_rights_init(&rights, CAP_SHUTDOWN),
+	error = getsock_cap(td, s, &cap_shutdown_rights,
 	    &fp, NULL, NULL);
 	if (error == 0) {
 		so = fp->f_data;
@@ -1288,7 +1302,6 @@ kern_setsockopt(struct thread *td, int s, int level, int name,
 	struct socket *so;
 	struct file *fp;
 	struct sockopt sopt;
-	cap_rights_t rights;
 	int error;
 
 	if (val == NULL && valsize != 0)
@@ -1313,7 +1326,7 @@ kern_setsockopt(struct thread *td, int s, int level, int name,
 	}
 
 	AUDIT_ARG_FD(s);
-	error = getsock_cap(td, s, cap_rights_init(&rights, CAP_SETSOCKOPT),
+	error = getsock_cap(td, s, &cap_setsockopt_rights,
 	    &fp, NULL, NULL);
 	if (error == 0) {
 		so = fp->f_data;
@@ -1339,7 +1352,7 @@ user_getsockopt(struct thread *td, int s, int level, int name,
 	int error;
 
 	if (val != NULL) {
-		error = copyin_c(avalsize, &valsize, sizeof (valsize));
+		error = copyin(avalsize, &valsize, sizeof (valsize));
 		if (error != 0)
 			return (error);
 	}
@@ -1348,7 +1361,7 @@ user_getsockopt(struct thread *td, int s, int level, int name,
 	    &valsize);
 
 	if (error == 0)
-		error = copyout_c(&valsize, avalsize, sizeof (valsize));
+		error = copyout(&valsize, avalsize, sizeof (valsize));
 	return (error);
 }
 
@@ -1363,7 +1376,6 @@ kern_getsockopt(struct thread *td, int s, int level, int name,
 	struct socket *so;
 	struct file *fp;
 	struct sockopt sopt;
-	cap_rights_t rights;
 	int error;
 
 	if (val == NULL)
@@ -1388,7 +1400,7 @@ kern_getsockopt(struct thread *td, int s, int level, int name,
 	}
 
 	AUDIT_ARG_FD(s);
-	error = getsock_cap(td, s, cap_rights_init(&rights, CAP_GETSOCKOPT),
+	error = getsock_cap(td, s, &cap_getsockopt_rights,
 	    &fp, NULL, NULL);
 	if (error == 0) {
 		so = fp->f_data;
@@ -1408,7 +1420,7 @@ user_getsockname(struct thread *td, int fdes,
 	socklen_t len;
 	int error;
 
-	error = copyin_c(alen, &len, sizeof(len));
+	error = copyin(alen, &len, sizeof(len));
 	if (error != 0)
 		return (error);
 
@@ -1421,11 +1433,11 @@ user_getsockname(struct thread *td, int fdes,
 		if (compat)
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
-		error = copyout_c(sa, asa, len);
+		error = copyout(sa, asa, len);
 	}
 	free(sa, M_SONAME);
 	if (error == 0)
-		error = copyout_c(&len, alen, sizeof(len));
+		error = copyout(&len, alen, sizeof(len));
 	return (error);
 }
 
@@ -1435,12 +1447,11 @@ kern_getsockname(struct thread *td, int fd, struct sockaddr **sa,
 {
 	struct socket *so;
 	struct file *fp;
-	cap_rights_t rights;
 	socklen_t len;
 	int error;
 
 	AUDIT_ARG_FD(fd);
-	error = getsock_cap(td, fd, cap_rights_init(&rights, CAP_GETSOCKNAME),
+	error = getsock_cap(td, fd, &cap_getsockname_rights,
 	    &fp, NULL, NULL);
 	if (error != 0)
 		return (error);
@@ -1496,7 +1507,7 @@ user_getpeername(struct thread *td, int fdes,
 	socklen_t len;
 	int error;
 
-	error = copyin_c(alen, &len, sizeof (len));
+	error = copyin(alen, &len, sizeof (len));
 	if (error != 0)
 		return (error);
 
@@ -1509,11 +1520,11 @@ user_getpeername(struct thread *td, int fdes,
 		if (compat)
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
-		error = copyout_c(sa, asa, len);
+		error = copyout(sa, asa, len);
 	}
 	free(sa, M_SONAME);
 	if (error == 0)
-		error = copyout_c(&len, alen, sizeof(len));
+		error = copyout(&len, alen, sizeof(len));
 	return (error);
 }
 
@@ -1523,12 +1534,11 @@ kern_getpeername(struct thread *td, int fd, struct sockaddr **sa,
 {
 	struct socket *so;
 	struct file *fp;
-	cap_rights_t rights;
 	socklen_t len;
 	int error;
 
 	AUDIT_ARG_FD(fd);
-	error = getsock_cap(td, fd, cap_rights_init(&rights, CAP_GETPEERNAME),
+	error = getsock_cap(td, fd, &cap_getpeername_rights,
 	    &fp, NULL, NULL);
 	if (error != 0)
 		return (error);
@@ -1598,7 +1608,7 @@ sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen, int type)
 	}
 	m = m_get2(buflen, M_WAITOK, type, 0);
 	m->m_len = buflen;
-	error = copyin_c(buf, mtod(m, void *), buflen);
+	error = copyin(buf, mtod(m, void *), buflen);
 	if (error != 0)
 		(void) m_free(m);
 	else {
@@ -1628,7 +1638,7 @@ getsockaddr(struct sockaddr **namp, const struct sockaddr * __capability uaddr,
 	if (len < offsetof(struct sockaddr, sa_data[0]))
 		return (EINVAL);
 	sa = malloc(len, M_SONAME, M_WAITOK);
-	error = copyin_c(uaddr, sa, len);
+	error = copyin(uaddr, sa, len);
 	if (error != 0) {
 		free(sa, M_SONAME);
 	} else {
@@ -1640,6 +1650,54 @@ getsockaddr(struct sockaddr **namp, const struct sockaddr * __capability uaddr,
 		*namp = sa;
 	}
 	return (error);
+}
+
+/*
+ * Dispose of externalized rights from an SCM_RIGHTS message.  This function
+ * should be used in error or truncation cases to avoid leaking file descriptors
+ * into the recipient's (the current thread's) table.
+ */
+void
+m_dispose_extcontrolm(struct mbuf *m)
+{
+	struct cmsghdr *cm;
+	struct file *fp;
+	struct thread *td;
+	socklen_t clen, datalen;
+	int error, fd, *fds, nfd;
+
+	td = curthread;
+	for (; m != NULL; m = m->m_next) {
+		if (m->m_type != MT_EXTCONTROL)
+			continue;
+		cm = mtod(m, struct cmsghdr *);
+		clen = m->m_len;
+		while (clen > 0) {
+			if (clen < sizeof(*cm))
+				panic("%s: truncated mbuf %p", __func__, m);
+			datalen = CMSG_SPACE(cm->cmsg_len - CMSG_SPACE(0));
+			if (clen < datalen)
+				panic("%s: truncated mbuf %p", __func__, m);
+
+			if (cm->cmsg_level == SOL_SOCKET &&
+			    cm->cmsg_type == SCM_RIGHTS) {
+				fds = (int *)CMSG_DATA(cm);
+				nfd = (cm->cmsg_len - CMSG_SPACE(0)) /
+				    sizeof(int);
+
+				while (nfd-- > 0) {
+					fd = *fds++;
+					error = fget(td, fd, &cap_no_rights,
+					    &fp);
+					if (error == 0)
+						fdclose(td, fp, fd);
+				}
+			}
+			clen -= datalen;
+			cm = (struct cmsghdr *)((uint8_t *)cm + datalen);
+		}
+		m_chtype(m, MT_CONTROL);
+	}
 }
 // CHERI CHANGES START
 // {

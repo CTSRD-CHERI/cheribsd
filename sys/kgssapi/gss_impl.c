@@ -30,7 +30,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
+#define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -66,6 +66,7 @@ static struct syscall_helper_data gssd_syscalls[] = {
 
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32_util.h>
+#include <compat/freebsd32/freebsd32_syscall.h>
 
 static struct syscall_helper_data gssd32_syscalls[] = {
 	SYSCALL32_INIT_HELPER_COMPAT(gssd_syscall),
@@ -159,7 +160,7 @@ kern_gssd_syscall(struct thread *td, const char * __capability upath)
 	if (error)
 		return (error);
 
-	error = copyinstr_c(upath, path, sizeof(path), NULL);
+	error = copyinstr(upath, path, sizeof(path), NULL);
 	if (error)
 		return (error);
 	if (strlen(path) + 1 > sizeof(sun.sun_path))

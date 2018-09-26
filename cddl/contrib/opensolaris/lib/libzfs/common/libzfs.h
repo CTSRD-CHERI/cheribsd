@@ -132,6 +132,14 @@ typedef enum zfs_error {
 	EZFS_POOLREADONLY,	/* pool is in read-only mode */
 	EZFS_SCRUB_PAUSED,	/* scrub currently paused */
 	EZFS_NO_PENDING,	/* cannot cancel, no operation is pending */
+	EZFS_CHECKPOINT_EXISTS,	/* checkpoint exists */
+	EZFS_DISCARDING_CHECKPOINT,	/* currently discarding a checkpoint */
+	EZFS_NO_CHECKPOINT,	/* pool has no checkpoint */
+	EZFS_DEVRM_IN_PROGRESS,	/* a device is currently being removed */
+	EZFS_VDEV_TOO_BIG,	/* a device is too big to be used */
+	EZFS_TOOMANY,		/* argument list too long */
+	EZFS_INITIALIZING,	/* currently initializing */
+	EZFS_NO_INITIALIZE,	/* no active initialize */
 	EZFS_UNKNOWN
 } zfs_error_t;
 
@@ -257,6 +265,8 @@ typedef struct splitflags {
  * Functions to manipulate pool and vdev state
  */
 extern int zpool_scan(zpool_handle_t *, pool_scan_func_t, pool_scrub_cmd_t);
+extern int zpool_initialize(zpool_handle_t *, pool_initialize_func_t,
+    nvlist_t *);
 extern int zpool_clear(zpool_handle_t *, const char *, nvlist_t *);
 extern int zpool_reguid(zpool_handle_t *);
 extern int zpool_reopen(zpool_handle_t *);
@@ -391,7 +401,7 @@ typedef struct importargs {
 	int can_be_active : 1;	/* can the pool be active?		*/
 	int unique : 1;		/* does 'poolname' already exist?	*/
 	int exists : 1;		/* set on return if pool already exists	*/
-	nvlist_t *policy;	/* rewind policy (rewind txg, etc.)	*/
+	nvlist_t *policy;	/* load policy (max txg, rewind, etc.)	*/
 } importargs_t;
 
 extern nvlist_t *zpool_search_import(libzfs_handle_t *, importargs_t *);
@@ -420,6 +430,8 @@ extern int zfs_ioctl(libzfs_handle_t *, int request, struct zfs_cmd *);
 extern int zpool_get_physpath(zpool_handle_t *, char *, size_t);
 extern void zpool_explain_recover(libzfs_handle_t *, const char *, int,
     nvlist_t *);
+extern int zpool_checkpoint(zpool_handle_t *);
+extern int zpool_discard_checkpoint(zpool_handle_t *);
 
 /*
  * Basic handle manipulations.  These functions do not create or destroy the
@@ -831,6 +843,17 @@ extern int zmount(const char *, const char *, int, char *, char *, int, char *,
 #endif
 extern int zfs_remap_indirects(libzfs_handle_t *hdl, const char *);
 
+/* Allow consumers to initialize libshare externally for optimal performance */
+extern int zfs_init_libshare_arg(libzfs_handle_t *, int, void *);
+/*
+ * For most consumers, zfs_init_libshare_arg is sufficient on its own, and
+ * zfs_uninit_libshare is unnecessary. zfs_uninit_libshare should only be called
+ * if the caller has already initialized libshare for one set of zfs handles,
+ * and wishes to share or unshare filesystems outside of that set. In that case,
+ * the caller should uninitialize libshare, and then re-initialize it with the
+ * new handles being shared or unshared.
+ */
+extern void zfs_uninit_libshare(libzfs_handle_t *);
 #ifdef	__cplusplus
 }
 #endif

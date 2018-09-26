@@ -199,18 +199,10 @@ in6_delayed_cksum(struct mbuf *m, uint32_t plen, u_short offset)
 		csum = 0xffff;
 	offset += m->m_pkthdr.csum_data;	/* checksum offset */
 
-	if (offset + sizeof(u_short) > m->m_len) {
-		printf("%s: delayed m_pullup, m->len: %d plen %u off %u "
-		    "csum_flags=%b\n", __func__, m->m_len, plen, offset,
-		    (int)m->m_pkthdr.csum_flags, CSUM_BITS);
-		/*
-		 * XXX this should not happen, but if it does, the correct
-		 * behavior may be to insert the checksum in the appropriate
-		 * next mbuf in the chain.
-		 */
-		return;
-	}
-	*(u_short *)(m->m_data + offset) = csum;
+	if (offset + sizeof(csum) > m->m_len)
+		m_copyback(m, offset, sizeof(csum), (caddr_t)&csum);
+	else
+		*(u_short *)mtodo(m, offset) = csum;
 }
 
 int
@@ -812,22 +804,16 @@ again:
 			error = netisr_queue(NETISR_IPV6, m);
 			goto done;
 		} else {
-			RO_RTFREE(ro);
+			RO_INVALIDATE_CACHE(ro);
 			needfiblookup = 1; /* Redo the routing table lookup. */
-			if (ro->ro_lle)
-				LLE_FREE(ro->ro_lle);	/* zeros ro_lle */
-			ro->ro_lle = NULL;
 		}
 	}
 	/* See if fib was changed by packet filter. */
 	if (fibnum != M_GETFIB(m)) {
 		m->m_flags |= M_SKIP_FIREWALL;
 		fibnum = M_GETFIB(m);
-		RO_RTFREE(ro);
+		RO_INVALIDATE_CACHE(ro);
 		needfiblookup = 1;
-		if (ro->ro_lle)
-			LLE_FREE(ro->ro_lle);	/* zeros ro_lle */
-		ro->ro_lle = NULL;
 	}
 	if (needfiblookup)
 		goto again;
@@ -1048,7 +1034,7 @@ sendorfree:
 	m = m0->m_nextpkt;
 	m0->m_nextpkt = 0;
 	m_freem(m0);
-	for (m0 = m; m; m = m0) {
+	for (; m; m = m0) {
 		m0 = m->m_nextpkt;
 		m->m_nextpkt = 0;
 		if (error == 0) {
@@ -1454,6 +1440,15 @@ ip6_ctloutput(struct socket *so, struct sockopt *sopt)
 				INP_WUNLOCK(in6p);
 				error = 0;
 				break;
+			case SO_REUSEPORT_LB:
+				INP_WLOCK(in6p);
+				if ((so->so_options & SO_REUSEPORT_LB) != 0)
+					in6p->inp_flags2 |= INP_REUSEPORT_LB;
+				else
+					in6p->inp_flags2 &= ~INP_REUSEPORT_LB;
+				INP_WUNLOCK(in6p);
+				error = 0;
+				break;
 			case SO_SETFIB:
 				INP_WLOCK(in6p);
 				in6p->inp_inc.inc_fibnum = so->so_fibnum;
@@ -1635,11 +1630,17 @@ do {									\
 						error = EINVAL;
 						break;
 					}
+					INP_WLOCK(in6p);
+					if (in6p->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {
+						INP_WUNLOCK(in6p);
+						return (ECONNRESET);
+					}
 					optp = &in6p->in6p_outputopts;
 					error = ip6_pcbopt(IPV6_HOPLIMIT,
 					    (u_char *)&optval, sizeof(optval),
 					    optp, (td != NULL) ? td->td_ucred :
 					    NULL, uproto);
+					INP_WUNLOCK(in6p);
 					break;
 				}
 
@@ -1749,11 +1750,17 @@ do {									\
 					break;
 				{
 					struct ip6_pktopts **optp;
+					INP_WLOCK(in6p);
+					if (in6p->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {
+						INP_WUNLOCK(in6p);
+						return (ECONNRESET);
+					}
 					optp = &in6p->in6p_outputopts;
 					error = ip6_pcbopt(optname,
 					    (u_char *)&optval, sizeof(optval),
 					    optp, (td != NULL) ? td->td_ucred :
 					    NULL, uproto);
+					INP_WUNLOCK(in6p);
 					break;
 				}
 
@@ -1835,10 +1842,16 @@ do {									\
 					break;
 				optlen = sopt->sopt_valsize;
 				optbuf = optbuf_storage;
+				INP_WLOCK(in6p);
+				if (in6p->inp_flags & (INP_TIMEWAIT | INP_DROPPED)) {
+					INP_WUNLOCK(in6p);
+					return (ECONNRESET);
+				}
 				optp = &in6p->in6p_outputopts;
 				error = ip6_pcbopt(optname, optbuf, optlen,
 				    optp, (td != NULL) ? td->td_ucred : NULL,
 				    uproto);
+				INP_WUNLOCK(in6p);
 				break;
 			}
 #undef OPTSET
@@ -2285,7 +2298,9 @@ ip6_pcbopt(int optname, u_char *buf, int len, struct ip6_pktopts **pktopt,
 
 	if (*pktopt == NULL) {
 		*pktopt = malloc(sizeof(struct ip6_pktopts), M_IP6OPT,
-		    M_WAITOK);
+		    M_NOWAIT);
+		if (*pktopt == NULL)
+			return (ENOBUFS);
 		ip6_initpktopts(*pktopt);
 	}
 	opt = *pktopt;

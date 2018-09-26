@@ -1060,40 +1060,6 @@ sctp_hmac_m(uint16_t hmac_algo, uint8_t *key, uint32_t keylen,
 	return (digestlen);
 }
 
-/*-
- * verify the HMAC digest using the desired hash key, text, and HMAC
- * algorithm.
- * Returns -1 on error, 0 on success.
- */
-int
-sctp_verify_hmac(uint16_t hmac_algo, uint8_t *key, uint32_t keylen,
-    uint8_t *text, uint32_t textlen,
-    uint8_t *digest, uint32_t digestlen)
-{
-	uint32_t len;
-	uint8_t temp[SCTP_AUTH_DIGEST_LEN_MAX];
-
-	/* sanity check the material and length */
-	if ((key == NULL) || (keylen == 0) ||
-	    (text == NULL) || (textlen == 0) || (digest == NULL)) {
-		/* can't do HMAC with empty key or text or digest */
-		return (-1);
-	}
-	len = sctp_get_hmac_digest_len(hmac_algo);
-	if ((len == 0) || (digestlen != len))
-		return (-1);
-
-	/* compute the expected hash */
-	if (sctp_hmac(hmac_algo, key, keylen, text, textlen, temp) != len)
-		return (-1);
-
-	if (memcmp(digest, temp, digestlen) != 0)
-		return (-1);
-	else
-		return (0);
-}
-
-
 /*
  * computes the requested HMAC using a key struct (which may be modified if
  * the keylen exceeds the HMAC block len).
@@ -1309,6 +1275,7 @@ sctp_auth_setactivekey(struct sctp_tcb *stcb, uint16_t keyid)
 		/* can't reactivate a deactivated key with other refcounts */
 		return (-1);
 	}
+
 	/* set the (new) active key */
 	stcb->asoc.authinfo.active_keyid = keyid;
 	/* reset the deactivated flag */
@@ -1363,6 +1330,7 @@ sctp_deact_sharedkey(struct sctp_tcb *stcb, uint16_t keyid)
 		sctp_ulp_notify(SCTP_NOTIFY_AUTH_FREE_KEY, stcb, keyid, 0,
 		    SCTP_SO_LOCKED);
 	}
+
 	/* mark the key as deactivated */
 	skey->deactivated = 1;
 
@@ -1504,6 +1472,8 @@ sctp_auth_get_cookie_params(struct sctp_tcb *stcb, struct mbuf *m,
 		if (p_random != NULL) {
 			keylen = sizeof(*p_random) + random_len;
 			memcpy(new_key->key, p_random, keylen);
+		} else {
+			keylen = 0;
 		}
 		/* append in the AUTH chunks */
 		if (chunks != NULL) {
@@ -1580,6 +1550,7 @@ sctp_fill_hmac_digest_m(struct mbuf *m, uint32_t auth_offset,
 			    "Assoc Key");
 #endif
 	}
+
 	/* set in the active key id */
 	auth->shared_key_id = htons(keyid);
 
@@ -1767,6 +1738,7 @@ sctp_notify_authentication(struct sctp_tcb *stcb, uint32_t indication,
 		/* If the socket is gone we are out of here */
 		return;
 	}
+
 	if (sctp_stcb_is_feature_off(stcb->sctp_ep, stcb, SCTP_PCB_FLAGS_AUTHEVNT))
 		/* event not enabled */
 		return;
@@ -1927,6 +1899,7 @@ sctp_validate_init_auth_params(struct mbuf *m, int offset, int limit)
 			if (num_chunks)
 				got_chklist = 1;
 		}
+
 		offset += SCTP_SIZE32(plen);
 		if (offset >= limit) {
 			break;
@@ -2021,6 +1994,7 @@ sctp_initialize_auth_params(struct sctp_inpcb *inp, struct sctp_tcb *stcb)
 					new_key->key[keylen++] = i;
 			}
 		}
+
 		/* append in the HMACs */
 		ph = (struct sctp_paramhdr *)(new_key->key + keylen);
 		ph->param_type = htons(SCTP_HMAC_LIST);

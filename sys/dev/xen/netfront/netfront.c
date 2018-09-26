@@ -944,7 +944,7 @@ netfront_send_fake_arp(device_t dev, struct netfront_info *info)
 	struct ifaddr *ifa;
 
 	ifp = info->xn_ifp;
-	TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family == AF_INET) {
 			arp_ifinit(ifp, ifa);
 		}
@@ -961,6 +961,8 @@ netfront_backend_changed(device_t dev, XenbusState newstate)
 	struct netfront_info *sc = device_get_softc(dev);
 
 	DPRINTK("newstate=%d\n", newstate);
+
+	CURVNET_SET(sc->xn_ifp->if_vnet);
 
 	switch (newstate) {
 	case XenbusStateInitialising:
@@ -994,6 +996,8 @@ netfront_backend_changed(device_t dev, XenbusState newstate)
 #endif
 		break;
 	}
+
+	CURVNET_RESTORE();
 }
 
 /**

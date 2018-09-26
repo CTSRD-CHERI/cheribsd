@@ -1,10 +1,14 @@
 #
 # $FreeBSD$
 #
-SRCS=	crt_invoke.S				\
-	crt_rtld.S
-FILES=	crt_invoke.o				\
-	crt_rtld.o
+.PATH: ${.CURDIR}/../common
+SRCS=	crt_init_globals.c			\
+	crt_invoke.S				\
+	crt_rtld.S				\
+	crtbeginC.c				\
+	crtendC.c
+FILES=	${SRCS:C/.[cS]$/.o/}
+
 FILESOWN=       ${LIBOWN}
 FILESGRP=       ${LIBGRP}
 FILESMODE=      ${LIBMODE}

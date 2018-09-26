@@ -34,7 +34,7 @@
 #ifndef _SYS_IMGACT_H_
 #define	_SYS_IMGACT_H_
 
-#include <sys/uio.h>
+#include <sys/_uio.h>
 
 #include <vm/vm.h>
 
@@ -70,6 +70,7 @@ struct image_params {
 	unsigned long start_addr; /* start of mapped image (including bss) */
 	unsigned long end_addr;   /* end of mapped image (including bss) */
 	unsigned long reloc_base; /* load address of image */
+	unsigned long interp_end; /* end address of RTLD mapping (or zero) */
 	char vmspace_destroyed;	/* flag - we've blown away original vm space */
 #define IMGACT_SHELL	0x1
 #define IMGACT_BINMISC	0x2
@@ -79,7 +80,6 @@ struct image_params {
 	void *auxargs;		/* ELF Auxinfo structure pointer */
 	struct sf_buf *firstpage;	/* first page that we mapped */
 	unsigned long ps_strings; /* PS_STRINGS for BSD/OS binaries */
-	size_t auxarg_size;
 	struct image_args *args;	/* system call arguments */
 	struct sysentvec *sysent;	/* system entry vector */
 	char *execpath;

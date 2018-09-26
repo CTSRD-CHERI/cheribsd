@@ -73,22 +73,8 @@ struct	vlanreq {
 #define	O_SIOCSETVLAN	SIOCSIFGENERIC
 #define	O_SIOCGETVLAN	SIOCGIFGENERIC
 
-#define	SIOCGVLANPCP	_IOWR('i', 152, struct ifreq)	/* Get VLAN PCP */
-#define	SIOCSVLANPCP	 _IOW('i', 153, struct ifreq)	/* Set VLAN PCP */
-
-/*
- * Names for 802.1q priorities ("802.1p").  Notice that in this scheme,
- * (0 < 1), allowing default 0-tagged traffic to take priority over background
- * tagged traffic.
- */
-#define	IEEE8021Q_PCP_BK	1	/* Background (lowest) */
-#define	IEEE8021Q_PCP_BE	0	/* Best effort (default) */
-#define	IEEE8021Q_PCP_EE	2	/* Excellent effort */
-#define	IEEE8021Q_PCP_CA	3	/* Critical applications */
-#define	IEEE8021Q_PCP_VI	4	/* Video, < 100ms latency */
-#define	IEEE8021Q_PCP_VO	5	/* Video, < 10ms latency */
-#define	IEEE8021Q_PCP_IC	6	/* Internetwork control */
-#define	IEEE8021Q_PCP_NC	7	/* Network control (highest) */
+#define	SIOCGVLANPCP	SIOCGLANPCP	/* Get VLAN PCP */
+#define	SIOCSVLANPCP	SIOCSLANPCP	/* Set VLAN PCP */
 
 #ifdef _KERNEL
 /*
@@ -146,6 +132,8 @@ struct	vlanreq {
 	((_ifp)->if_type == IFT_L2VLAN ? (*vlan_trunkdev_p)((_ifp)) : NULL)
 #define	VLAN_TAG(_ifp, _vid)					\
 	((_ifp)->if_type == IFT_L2VLAN ? (*vlan_tag_p)((_ifp), (_vid)) : EINVAL)
+#define	VLAN_PCP(_ifp, _pcp)					\
+	((_ifp)->if_type == IFT_L2VLAN ? (*vlan_pcp_p)((_ifp), (_pcp)) : EINVAL)
 #define	VLAN_COOKIE(_ifp)					\
 	((_ifp)->if_type == IFT_L2VLAN ? (*vlan_cookie_p)((_ifp)) : NULL)
 #define	VLAN_SETCOOKIE(_ifp, _cookie)				\
@@ -158,6 +146,7 @@ extern	void (*vlan_trunk_cap_p)(struct ifnet *);
 extern	struct ifnet *(*vlan_trunkdev_p)(struct ifnet *);
 extern	struct ifnet *(*vlan_devat_p)(struct ifnet *, uint16_t);
 extern	int (*vlan_tag_p)(struct ifnet *, uint16_t *);
+extern	int (*vlan_pcp_p)(struct ifnet *, uint16_t *);
 extern	int (*vlan_setcookie_p)(struct ifnet *, void *);
 extern	void *(*vlan_cookie_p)(struct ifnet *);
 
