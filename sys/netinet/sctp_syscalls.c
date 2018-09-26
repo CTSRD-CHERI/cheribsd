@@ -35,7 +35,6 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_sctp.h"
-#include "opt_compat.h"
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
@@ -132,7 +131,7 @@ static int	kern_sctp_generic_recvmsg(struct thread *td, int sd,
 static void
 sctp_syscalls_init(void *unused __unused)
 {
-	int error;
+	int error __unused;
 
 	error = syscall_helper_register(sctp_syscalls, SY_THR_STATIC);
 	KASSERT((error == 0),
@@ -664,7 +663,7 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov,
 			error = 0;
 	} else {
 		if (usinfo)
-			error = copyout_c( &sinfo, usinfo, sizeof(sinfo));
+			error = copyout_c(&sinfo, usinfo, sizeof(sinfo));
 	}
 #ifdef KTRACE
 	if (ktruio != NULL) {
@@ -682,9 +681,7 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov,
 			len = 0;
 		else {
 			len = MIN(len, fromsa->sa_len);
-			error = copyout_c(
-			    (__cheri_tocap struct sockaddr * __capability)
-			    fromsa, from, (size_t)len);
+			error = copyout_c(fromsa, from, (size_t)len);
 			if (error != 0)
 				goto out;
 		}

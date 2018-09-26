@@ -183,6 +183,16 @@ trapname(u_int vector)
 	return ("unknown");
 }
 
+static inline bool
+frame_is_trap_inst(struct trapframe *frame)
+{
+#ifdef AIM
+	return (frame->exc == EXC_PGM && frame->srr1 & EXC_PGM_TRAP);
+#else
+	return ((frame->cpu.booke.esr & ESR_PTR) != 0);
+#endif
+}
+
 void
 trap(struct trapframe *frame)
 {
@@ -194,8 +204,16 @@ trap(struct trapframe *frame)
 	int		sig, type, user;
 	u_int		ucode;
 	ksiginfo_t	ksi;
+	register_t 	fscr;
 
 	VM_CNT_INC(v_trap);
+
+#ifdef KDB
+	if (kdb_active) {
+		kdb_reenter();
+		return;
+	}
+#endif
 
 	td = curthread;
 	p = td->td_proc;
@@ -284,6 +302,14 @@ trap(struct trapframe *frame)
 			break;
 
 		case EXC_FAC:
+			fscr = mfspr(SPR_FSCR);
+			if ((fscr & FSCR_IC_MASK) == FSCR_IC_HTM) {
+				CTR0(KTR_TRAP, "Hardware Transactional Memory subsystem disabled");
+			}
+			sig = SIGILL;
+			ucode =	ILL_ILLOPC;
+			break;
+		case EXC_HEA:
 			sig = SIGILL;
 			ucode =	ILL_ILLOPC;
 			break;
@@ -323,11 +349,7 @@ trap(struct trapframe *frame)
 
 		case EXC_PGM:
 			/* Identify the trap reason */
-#ifdef AIM
-			if (frame->srr1 & EXC_PGM_TRAP) {
-#else
-			if (frame->cpu.booke.esr & ESR_PTR) {
-#endif
+			if (frame_is_trap_inst(frame)) {
 #ifdef KDTRACE_HOOKS
 				inst = fuword32((const void *)frame->srr0);
 				if (inst == 0x0FFFDDDD &&
@@ -371,11 +393,7 @@ trap(struct trapframe *frame)
 		switch (type) {
 		case EXC_PGM:
 #ifdef KDTRACE_HOOKS
-#ifdef AIM
-			if (frame->srr1 & EXC_PGM_TRAP) {
-#else
-			if (frame->cpu.booke.esr & ESR_PTR) {
-#endif
+			if (frame_is_trap_inst(frame)) {
 				if (*(uint32_t *)frame->srr0 == EXC_DTRACE) {
 					if (dtrace_invop_jump_addr != NULL) {
 						dtrace_invop_jump_addr(frame);
@@ -391,7 +409,8 @@ trap(struct trapframe *frame)
 			break;
 #if defined(__powerpc64__) && defined(AIM)
 		case EXC_DSE:
-			if ((frame->dar & SEGMENT_MASK) == USER_ADDR) {
+			if (td->td_pcb->pcb_cpu.aim.usr_vsid != 0 &&
+			    (frame->dar & SEGMENT_MASK) == USER_ADDR) {
 				__asm __volatile ("slbmte %0, %1" ::
 					"r"(td->td_pcb->pcb_cpu.aim.usr_vsid),
 					"r"(USER_SLB_SLBE));
@@ -430,23 +449,62 @@ trap(struct trapframe *frame)
 static void
 trap_fatal(struct trapframe *frame)
 {
+#ifdef KDB
+	bool handled;
+#endif
 
 	printtrap(frame->exc, frame, 1, (frame->srr1 & PSL_PR));
 #ifdef KDB
-	if ((debugger_on_panic || kdb_active) &&
-	    kdb_trap(frame->exc, 0, frame))
-		return;
+	if (debugger_on_panic) {
+		kdb_why = KDB_WHY_TRAP;
+		handled = kdb_trap(frame->exc, 0, frame);
+		kdb_why = KDB_WHY_UNSET;
+		if (handled)
+			return;
+	}
 #endif
 	panic("%s trap", trapname(frame->exc));
 }
 
 static void
+cpu_printtrap(u_int vector, struct trapframe *frame, int isfatal, int user)
+{
+#ifdef AIM
+	uint16_t ver;
+
+	switch (vector) {
+	case EXC_DSE:
+	case EXC_DSI:
+	case EXC_DTMISS:
+		printf("   dsisr           = 0x%lx\n",
+		    (u_long)frame->cpu.aim.dsisr);
+		break;
+	case EXC_MCHK:
+		ver = mfpvr() >> 16;
+		if (MPC745X_P(ver))
+			printf("    msssr0         = 0x%b\n",
+			    (int)mfspr(SPR_MSSSR0), MSSSR_BITMASK);
+		break;
+	}
+#elif defined(BOOKE)
+	vm_paddr_t pa;
+
+	switch (vector) {
+	case EXC_MCHK:
+		pa = mfspr(SPR_MCARU);
+		pa = (pa << 32) | (u_register_t)mfspr(SPR_MCAR);
+		printf("   mcsr            = 0x%b\n",
+		    (int)mfspr(SPR_MCSR), MCSR_BITMASK);
+		printf("   mcar            = 0x%jx\n", (uintmax_t)pa);
+	}
+	printf("   esr             = 0x%b\n",
+	    (int)frame->cpu.booke.esr, ESR_BITMASK);
+#endif
+}
+
+static void
 printtrap(u_int vector, struct trapframe *frame, int isfatal, int user)
 {
-	uint16_t ver;
-#ifdef BOOKE
-	vm_paddr_t pa;
-#endif
 
 	printf("\n");
 	printf("%s %s trap:\n", isfatal ? "fatal" : "handled",
@@ -458,10 +516,6 @@ printtrap(u_int vector, struct trapframe *frame, int isfatal, int user)
 	case EXC_DSI:
 	case EXC_DTMISS:
 		printf("   virtual address = 0x%" PRIxPTR "\n", frame->dar);
-#ifdef AIM
-		printf("   dsisr           = 0x%lx\n",
-		    (u_long)frame->cpu.aim.dsisr);
-#endif
 		break;
 	case EXC_ISE:
 	case EXC_ISI:
@@ -469,27 +523,13 @@ printtrap(u_int vector, struct trapframe *frame, int isfatal, int user)
 		printf("   virtual address = 0x%" PRIxPTR "\n", frame->srr0);
 		break;
 	case EXC_MCHK:
-		ver = mfpvr() >> 16;
-#if defined(AIM)
-		if (MPC745X_P(ver))
-			printf("    msssr0         = 0x%b\n",
-			    (int)mfspr(SPR_MSSSR0), MSSSR_BITMASK);
-#elif defined(BOOKE)
-		pa = mfspr(SPR_MCARU);
-		pa = (pa << 32) | (u_register_t)mfspr(SPR_MCAR);
-		printf("   mcsr            = 0x%b\n",
-		    (int)mfspr(SPR_MCSR), MCSR_BITMASK);
-		printf("   mcar            = 0x%jx\n", (uintmax_t)pa);
-#endif
 		break;
 	}
-#ifdef BOOKE
-	printf("   esr             = 0x%b\n",
-	    (int)frame->cpu.booke.esr, ESR_BITMASK);
-#endif
+	cpu_printtrap(vector, frame, isfatal, user);
 	printf("   srr0            = 0x%" PRIxPTR " (0x%" PRIxPTR ")\n",
 	    frame->srr0, frame->srr0 - (register_t)(__startkernel - KERNBASE));
 	printf("   srr1            = 0x%lx\n", (u_long)frame->srr1);
+	printf("   current msr     = 0x%" PRIxPTR "\n", mfmsr());
 	printf("   lr              = 0x%" PRIxPTR " (0x%" PRIxPTR ")\n",
 	    frame->lr, frame->lr - (register_t)(__startkernel - KERNBASE));
 	printf("   curthread       = %p\n", curthread);
@@ -629,8 +669,9 @@ syscall(struct trapframe *frame)
 	 * Speculatively restore last user SLB segment, which we know is
 	 * invalid already, since we are likely to do copyin()/copyout().
 	 */
-	__asm __volatile ("slbmte %0, %1; isync" ::
-            "r"(td->td_pcb->pcb_cpu.aim.usr_vsid), "r"(USER_SLB_SLBE));
+	if (td->td_pcb->pcb_cpu.aim.usr_vsid != 0)
+		__asm __volatile ("slbmte %0, %1; isync" ::
+		    "r"(td->td_pcb->pcb_cpu.aim.usr_vsid), "r"(USER_SLB_SLBE));
 #endif
 
 	error = syscallenter(td);
@@ -648,7 +689,7 @@ handle_kernel_slb_spill(int type, register_t dar, register_t srr0)
 	int i;
 
 	addr = (type == EXC_ISE) ? srr0 : dar;
-	slbcache = PCPU_GET(slb);
+	slbcache = PCPU_GET(aim.slb);
 	esid = (uintptr_t)addr >> ADDR_SR_SHFT;
 	slbe = (esid << SLBE_ESID_SHIFT) | SLBE_VALID;
 	
@@ -691,6 +732,9 @@ handle_user_slb_spill(pmap_t pm, vm_offset_t addr)
 	uint64_t esid;
 	int i;
 
+	if (pm->pm_slb == NULL)
+		return (-1);
+
 	esid = (uintptr_t)addr >> ADDR_SR_SHFT;
 
 	PMAP_LOCK(pm);
@@ -725,10 +769,7 @@ trap_pfault(struct trapframe *frame, int user)
 	struct		proc *p;
 	vm_map_t	map;
 	vm_prot_t	ftype;
-	int		rv;
-#ifdef AIM
-	register_t	user_sr;
-#endif
+	int		rv, is_user;
 
 	td = curthread;
 	p = td->td_proc;
@@ -753,21 +794,14 @@ trap_pfault(struct trapframe *frame, int user)
 		KASSERT(p->p_vmspace != NULL, ("trap_pfault: vmspace  NULL"));
 		map = &p->p_vmspace->vm_map;
 	} else {
-#ifdef BOOKE
-		if (eva < VM_MAXUSER_ADDRESS) {
-#else
-		if ((eva >> ADDR_SR_SHFT) == (USER_ADDR >> ADDR_SR_SHFT)) {
-#endif
-			map = &p->p_vmspace->vm_map;
+		rv = pmap_decode_kernel_ptr(eva, &is_user, &eva);
+		if (rv != 0)
+			return (SIGSEGV);
 
-#ifdef AIM
-			user_sr = td->td_pcb->pcb_cpu.aim.usr_segm;
-			eva &= ADDR_PIDX | ADDR_POFF;
-			eva |= user_sr << ADDR_SR_SHFT;
-#endif
-		} else {
+		if (is_user)
+			map = &p->p_vmspace->vm_map;
+		else
 			map = kernel_map;
-		}
 	}
 	va = trunc_page(eva);
 
@@ -882,26 +916,16 @@ db_trap_glue(struct trapframe *frame)
 
 	if (!(frame->srr1 & PSL_PR)
 	    && (frame->exc == EXC_TRC || frame->exc == EXC_RUNMODETRC
-#ifdef AIM
-		|| (frame->exc == EXC_PGM
-		    && (frame->srr1 & EXC_PGM_TRAP))
-#else
-		|| (frame->exc == EXC_DEBUG)
-		|| (frame->cpu.booke.esr & ESR_PTR)
-#endif
+	    	|| frame_is_trap_inst(frame)
 		|| frame->exc == EXC_BPT
+		|| frame->exc == EXC_DEBUG
 		|| frame->exc == EXC_DSI)) {
 		int type = frame->exc;
 
 		/* Ignore DTrace traps. */
 		if (*(uint32_t *)frame->srr0 == EXC_DTRACE)
 			return (0);
-#ifdef AIM
-		if (type == EXC_PGM && (frame->srr1 & EXC_PGM_TRAP)) {
-#else
-		if (type == EXC_DEBUG ||
-		    (frame->cpu.booke.esr & ESR_PTR)) {
-#endif
+		if (frame_is_trap_inst(frame)) {
 			type = T_BREAKPOINT;
 		}
 		return (kdb_trap(type, 0, frame));

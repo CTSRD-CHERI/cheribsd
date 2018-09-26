@@ -80,18 +80,19 @@ BOOTVERBOSE	opt_global.h
 CALLOUT_PROFILING
 CAPABILITIES	opt_capsicum.h
 CAPABILITY_MODE	opt_capsicum.h
-COMPAT_43	opt_compat.h
-COMPAT_43TTY	opt_compat.h
-COMPAT_FREEBSD4	opt_compat.h
-COMPAT_FREEBSD5	opt_compat.h
-COMPAT_FREEBSD6	opt_compat.h
-COMPAT_FREEBSD7	opt_compat.h
-COMPAT_FREEBSD9	opt_compat.h
-COMPAT_FREEBSD10	opt_compat.h
-COMPAT_FREEBSD11	opt_compat.h
+COMPAT_43	opt_global.h
+COMPAT_43TTY	opt_global.h
+COMPAT_FREEBSD4	opt_global.h
+COMPAT_FREEBSD5	opt_global.h
+COMPAT_FREEBSD6	opt_global.h
+COMPAT_FREEBSD7	opt_global.h
+COMPAT_FREEBSD9	opt_global.h
+COMPAT_FREEBSD10	opt_global.h
+COMPAT_FREEBSD11	opt_global.h
 COMPAT_CLOUDABI32	opt_dontuse.h
 COMPAT_CLOUDABI64	opt_dontuse.h
-COMPAT_LINUXKPI	opt_compat.h
+COMPAT_LINUXKPI	opt_dontuse.h
+_COMPAT_LINUX32	opt_compat.h	# XXX: make sure opt_compat.h exists
 COMPILING_LINT	opt_global.h
 CY_PCI_FASTINTR
 DEADLKRES	opt_watchdog.h
@@ -103,7 +104,6 @@ FULL_PREEMPTION	opt_sched.h
 GZIO		opt_gzio.h
 IMAGACT_BINMISC		opt_dontuse.h
 IPI_PREEMPTION	opt_sched.h
-GEOM_AES	opt_geom.h
 GEOM_BDE	opt_geom.h
 GEOM_BSD	opt_geom.h
 GEOM_CACHE	opt_geom.h
@@ -158,16 +158,23 @@ MAC_IFOFF	opt_dontuse.h
 MAC_LOMAC	opt_dontuse.h
 MAC_MLS		opt_dontuse.h
 MAC_NONE	opt_dontuse.h
+MAC_NTPD	opt_dontuse.h
 MAC_PARTITION	opt_dontuse.h
 MAC_PORTACL	opt_dontuse.h
 MAC_SEEOTHERUIDS	opt_dontuse.h
 MAC_STATIC	opt_mac.h
 MAC_STUB	opt_dontuse.h
 MAC_TEST	opt_dontuse.h
+MAC_VERIEXEC	opt_dontuse.h
+MAC_VERIEXEC_SHA1	opt_dontuse.h
+MAC_VERIEXEC_SHA256	opt_dontuse.h
+MAC_VERIEXEC_SHA384	opt_dontuse.h
+MAC_VERIEXEC_SHA512	opt_dontuse.h
 MD_ROOT		opt_md.h
 MD_ROOT_FSTYPE	opt_md.h
 MD_ROOT_READONLY	opt_md.h
 MD_ROOT_SIZE	opt_md.h
+MD_ROOT_MEM	opt_md.h
 MFI_DEBUG	opt_mfi.h
 MFI_DECODE_LOG	opt_mfi.h
 MPROF_BUFFERS	opt_mprof.h
@@ -177,6 +184,7 @@ NO_ADAPTIVE_MUTEXES	opt_adaptive_mutexes.h
 NO_ADAPTIVE_RWLOCKS
 NO_ADAPTIVE_SX
 NO_EVENTTIMERS		opt_timer.h
+NO_OBSOLETE_CODE	opt_global.h
 NO_SYSCTL_DESCR	opt_global.h
 NSWBUF_MIN	opt_swap.h
 MBUF_PACKET_ZONE_DISABLE	opt_global.h
@@ -217,10 +225,12 @@ SYSVMSG		opt_sysvipc.h
 SYSVSEM		opt_sysvipc.h
 SYSVSHM		opt_sysvipc.h
 SW_WATCHDOG	opt_watchdog.h
+TCPHPTS         opt_inet.h
 TURNSTILE_PROFILING
 UMTX_PROFILING
 UMTX_CHAINS	opt_global.h
 VERBOSE_SYSINIT
+ZSTDIO		opt_zstdio.h
 
 # POSIX kernel options
 P1003_1B_MQUEUE			opt_posix.h
@@ -313,6 +323,9 @@ NFS_ROOT_TCP	opt_nfsroot.h
 # SMB/CIFS requester
 NETSMB		opt_netsmb.h
 
+# Enable netdump(4) client support.
+NETDUMP 	opt_global.h
+
 # Options used only in subr_param.c.
 HZ		opt_param.h
 MAXFILES	opt_param.h
@@ -336,17 +349,20 @@ CAM_DEBUG_LUN		opt_cam.h
 CAM_DEBUG_FLAGS		opt_cam.h
 CAM_BOOT_DELAY		opt_cam.h
 CAM_IOSCHED_DYNAMIC	opt_cam.h
+CAM_TEST_FAILURE	opt_cam.h
 SCSI_DELAY		opt_scsi.h
 SCSI_NO_SENSE_STRINGS	opt_scsi.h
 SCSI_NO_OP_STRINGS	opt_scsi.h
 
 # Options used only in cam/ata/ata_da.c
-ADA_TEST_FAILURE	opt_ada.h
 ATA_STATIC_ID		opt_ada.h
 
 # Options used only in cam/scsi/scsi_cd.c
 CHANGER_MIN_BUSY_SECONDS	opt_cd.h
 CHANGER_MAX_BUSY_SECONDS	opt_cd.h
+
+# Options used only in cam/scsi/scsi_da.c
+DA_TRACK_REFS		opt_da.h
 
 # Options used only in cam/scsi/scsi_sa.c.
 SA_IO_TIMEOUT		opt_sa.h
@@ -414,6 +430,7 @@ BOOTP_WIRED_TO		opt_bootp.h
 DEVICE_POLLING
 DUMMYNET		opt_ipdn.h
 RATELIMIT		opt_ratelimit.h
+RATELIMIT_DEBUG		opt_ratelimit.h
 INET			opt_inet.h
 INET6			opt_inet6.h
 IPDIVERT
@@ -450,10 +467,12 @@ SLIP_IFF_OPTS		opt_slip.h
 TCPDEBUG
 TCPPCAP		opt_global.h
 SIFTR
+TCP_BLACKBOX		opt_global.h
 TCP_HHOOK		opt_inet.h
 TCP_OFFLOAD		opt_inet.h # Enable code to dispatch TCP offloading
 TCP_RFC7413		opt_inet.h
 TCP_RFC7413_MAX_KEYS	opt_inet.h
+TCP_RFC7413_MAX_PSKS	opt_inet.h
 TCP_SIGNATURE		opt_ipsec.h
 VLAN_ARRAY		opt_vlan.h
 XBONEHACK
@@ -765,6 +784,7 @@ SC_DISABLE_KDBKEY	opt_syscons.h
 SC_DISABLE_REBOOT	opt_syscons.h
 SC_HISTORY_SIZE		opt_syscons.h
 SC_KERNEL_CONS_ATTR	opt_syscons.h
+SC_KERNEL_CONS_ATTRS	opt_syscons.h
 SC_KERNEL_CONS_REV_ATTR	opt_syscons.h
 SC_MOUSE_CHAR		opt_syscons.h
 SC_NO_CUTPASTE		opt_syscons.h
@@ -896,9 +916,6 @@ HWPMC_DEBUG		opt_global.h
 HWPMC_HOOKS
 HWPMC_MIPS_BACKTRACE 	opt_hwpmc_hooks.h
 
-# Interrupt filtering
-INTR_FILTER
-
 # 802.11 support layer
 IEEE80211_DEBUG		opt_wlan.h
 IEEE80211_DEBUG_REFCNT	opt_wlan.h
@@ -976,12 +993,16 @@ RANDOM_LOADABLE	opt_global.h
 # This turns on high-rate and potentially expensive harvesting in
 # the uma slab allocator.
 RANDOM_ENABLE_UMA	opt_global.h
+RANDOM_ENABLE_ETHER	opt_global.h
 
 # BHND(4) driver
 BHND_LOGLEVEL	opt_global.h
 
 # GPIO and child devices
 GPIO_SPI_DEBUG	opt_gpio.h
+
+# SPI devices
+SPIGEN_LEGACY_CDEVNAME	opt_spi.h
 
 # etherswitch(4) driver
 RTL8366_SOFT_RESET opt_etherswitch.h
@@ -1001,3 +1022,6 @@ EKCD		opt_ekcd.h
 
 # NVME options
 NVME_USE_NVD	opt_nvme.h
+
+# amdsbwd options
+AMDSBWD_DEBUG	opt_amdsbwd.h

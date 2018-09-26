@@ -56,7 +56,6 @@
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 #include "opt_kstack_pages.h"
 
@@ -74,7 +73,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/utrap.h>
 #include <machine/wstate.h>
 
-#include "assym.s"
+#include "assym.inc"
 
 #define	TSB_ASI			0x0
 #define	TSB_KERNEL		0x0

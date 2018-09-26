@@ -51,31 +51,18 @@
 /*
  * Capability used to seal capability pairs returned by cosetup(2).
  */
-void * __capability	switcher_sealcap;
+void * __capability	switcher_sealcap = (void * __capability)-1;
 
 /*
  * Capability used to seal capabilities returned by coregister(2)/colookup(2).
  */
-void * __capability	switcher_sealcap2;
+void * __capability	switcher_sealcap2 = (void * __capability)-1;
 
 struct mtx		switcher_lock;
 
-/*
- * For now, all we do is declare what we support, as most initialisation took
- * place in the MIPS machine-dependent assembly.  CHERI doesn't need a lot of
- * actual boot-time initialisation.
- */
 static void
 colocation_startup(void)
 {
-
-	cheri_capability_set(&switcher_sealcap, CHERI_SEALCAP_SWITCHER_PERMS,
-	    CHERI_SEALCAP_SWITCHER_BASE, CHERI_SEALCAP_SWITCHER_LENGTH,
-	    CHERI_SEALCAP_SWITCHER_OFFSET);
-
-	cheri_capability_set(&switcher_sealcap2, CHERI_SEALCAP_SWITCHER2_PERMS,
-	    CHERI_SEALCAP_SWITCHER2_BASE, CHERI_SEALCAP_SWITCHER2_LENGTH,
-	    CHERI_SEALCAP_SWITCHER2_OFFSET);
 
 	mtx_init(&switcher_lock, "switcher lock", NULL, MTX_DEF);
 }
@@ -144,7 +131,7 @@ colocation_thread_exit(struct thread *td)
 	 * Set sc_peer_context to a special "null" capability, so that cocall(2)
 	 * can see the callee thread is dead.
 	 */
-	cheri_capability_set((void * __capability *)&sc.sc_peer_context, 0, 0, 0, 0);
+	sc.sc_peer_context = cheri_capability_build_user_rwx(0, 0, 0, 0);
 	sc.sc_td = NULL;
 	sc.sc_borrower_td = NULL;
 
@@ -309,7 +296,7 @@ sys_cosetup(struct thread *td, struct cosetup_args *uap)
 
 	switch (uap->what) {
 	case COSETUP_COCALL:
-		cheri_capability_set(&codecap, CHERI_CAP_USER_CODE_PERMS,
+		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_cocall_base,
 		    td->td_proc->p_sysent->sv_cocall_len, 0);
 		codecap = cheri_seal(codecap, switcher_sealcap);
@@ -317,23 +304,20 @@ sys_cosetup(struct thread *td, struct cosetup_args *uap)
 		if (error != 0)
 			return (error);
 
-		cheri_capability_set(&datacap,
-		    CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+		datacap = cheri_capability_build_user_rwx( CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
 		error = copyoutcap_c(&datacap, __USER_CAP(uap->data, sizeof(datacap)), sizeof(datacap));
 		return (0);
 
 	case COSETUP_COACCEPT:
-		cheri_capability_set(&codecap, CHERI_CAP_USER_CODE_PERMS,
-		    td->td_proc->p_sysent->sv_coaccept_base,
-		    td->td_proc->p_sysent->sv_coaccept_len, 0);
+		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
+		    td->td_proc->p_sysent->sv_coaccept_base, td->td_proc->p_sysent->sv_coaccept_len, 0);
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = copyoutcap_c(&codecap, __USER_CAP(uap->code, sizeof(codecap)), sizeof(codecap));
 		if (error != 0)
 			return (error);
 
-		cheri_capability_set(&datacap,
-		    CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+		datacap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
 		error = copyoutcap_c(&datacap, __USER_CAP(uap->data, sizeof(datacap)), sizeof(datacap));
 		return (0);
@@ -381,7 +365,7 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 		}
 	}
 
-	cheri_capability_set(&cap, CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+	cap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
 	cap = cheri_seal(cap, switcher_sealcap2);
 
 	if (uap->cap != NULL) {

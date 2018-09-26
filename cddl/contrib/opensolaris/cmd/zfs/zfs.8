@@ -31,7 +31,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd September 16, 2016
+.Dd December 6, 2017
 .Dt ZFS 8
 .Os
 .Sh NAME
@@ -115,6 +115,9 @@
 .Oo Fl s Ar property Oc Ns ...
 .Oo Fl S Ar property Oc Ns ...
 .Ar filesystem Ns | Ns Ar volume Ns | Ns Ar snapshot | Ns Ar bookmark Ns ...
+.Nm
+.Cm remap
+.Ar filesystem Ns | Ns Ar volume
 .Nm
 .Cm set
 .Ar property Ns = Ns Ar value Oo Ar property Ns = Ns Ar value Oc Ns ...
@@ -287,6 +290,7 @@
 .Op Ar snapshot Ns | Ns Ar filesystem
 .Nm
 .Cm program
+.Op Fl n
 .Op Fl t Ar timeout
 .Op Fl m Ar memory_limit
 .Ar pool script
@@ -973,6 +977,10 @@ Please see
 for more information on these algorithms.
 .Pp
 Changing this property affects only newly-written data.
+.Pp
+Salted checksum algorithms
+.Pq Cm edonr , skein
+are currently not supported for any filesystem on the boot pools.
 .It Sy compression Ns = Ns Cm on | off | lzjb | gzip | gzip- Ns Ar N | Cm zle | Cm lz4
 Controls the compression algorithm used for this dataset.
 Setting compression to
@@ -2263,6 +2271,17 @@ option was not specified.
 .El
 .It Xo
 .Nm
+.Cm remap
+.Ar filesystem Ns | Ns Ar volume
+.Xc
+.Pp
+Remap the indirect blocks in the given fileystem or volume so that they no
+longer reference blocks on previously removed vdevs and we can eventually
+shrink the size of the indirect mapping objects for the previously removed
+vdevs. Note that remapping all blocks might not be possible and that
+references from snapshots will still exist and cannot be remapped.
+.It Xo
+.Nm
 .Cm upgrade
 .Op Fl v
 .Xc
@@ -2655,7 +2674,9 @@ feature.
 .It Fl c, -compressed
 Generate a more compact stream by using compressed WRITE records for blocks
 which are compressed on disk and in memory (see the
-.Sy compression property for details).  If the
+.Sy compression
+property for details).
+If the
 .Sy lz4_compress
 feature is active on the sending system, then the receiving system must have that
 feature enabled as well. If the
@@ -3294,6 +3315,7 @@ Display the path's inode change time as the first column of output.
 .It Xo
 .Nm
 .Cm program
+.Op Fl n
 .Op Fl t Ar timeout
 .Op Fl m Ar memory_limit
 .Ar pool script
@@ -3316,6 +3338,14 @@ For full documentation of the ZFS channel program interface, see the manual
 page for
 .Xr zfs-program 8 .
 .Bl -tag -width indent
+.It Fl n
+Executes a read-only channel program, which runs faster.
+The program cannot change on-disk state by calling functions from
+the zfs.sync submodule.
+The program can be used to gather information such as properties and
+determining if changes would succeed (zfs.check.*).
+Without this flag, all pending changes must be synced to disk before
+a channel program can complete.
 .It Fl t Ar timeout
 Execution time limit, in milliseconds.
 If a channel program executes for longer than the provided timeout, it will

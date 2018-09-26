@@ -363,6 +363,7 @@ MIASM =  \
 	cheriabi_kevent.o \
 	cheriabi_cpuset_getdomain.o \
 	cheriabi_cpuset_setdomain.o \
+	cheriabi_getrandom.o \
 	cheriabi_coexecve.o \
 	cosetup.o \
 	coregister.o \

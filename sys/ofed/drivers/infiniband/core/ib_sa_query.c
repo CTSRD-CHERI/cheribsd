@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause OR GPL-2.0
+ *
  * Copyright (c) 2004 Topspin Communications.  All rights reserved.
  * Copyright (c) 2005 Voltaire, Inc.  All rights reserved.
  * Copyright (c) 2006 Intel Corporation.  All rights reserved.
@@ -31,6 +33,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include <linux/module.h>
 #include <linux/err.h>
@@ -692,10 +697,9 @@ int ib_init_ah_from_path(struct ib_device *device, u8 port_num,
 
 		resolved_dev = dev_get_by_index(dev_addr.net,
 						dev_addr.bound_dev_if);
-		if (resolved_dev->if_flags & IFF_LOOPBACK) {
-			dev_put(resolved_dev);
-			resolved_dev = idev;
-			dev_hold(resolved_dev);
+		if (!resolved_dev) {
+			dev_put(idev);
+			return -ENODEV;
 		}
 		ndev = ib_get_ndev_from_path(rec);
 		rcu_read_lock();

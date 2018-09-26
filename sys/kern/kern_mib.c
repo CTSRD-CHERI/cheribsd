@@ -40,7 +40,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_posix.h"
 #include "opt_config.h"
 
@@ -89,11 +88,6 @@ SYSCTL_ROOT_NODE(OID_AUTO, security, CTLFLAG_RW, 0,
 #ifdef REGRESSION
 SYSCTL_ROOT_NODE(OID_AUTO, regression, CTLFLAG_RW, 0,
      "Regression test MIB");
-#endif
-
-#ifdef EXT_RESOURCES
-SYSCTL_ROOT_NODE(OID_AUTO, clock, CTLFLAG_RW, 0,
-	"Clocks");
 #endif
 
 SYSCTL_STRING(_kern, OID_AUTO, ident, CTLFLAG_RD|CTLFLAG_MPSAFE,
@@ -161,8 +155,10 @@ SYSCTL_INT(_hw, HW_PAGESIZE, pagesize, CTLFLAG_RD|CTLFLAG_CAPRD,
 static int
 sysctl_kern_arnd(SYSCTL_HANDLER_ARGS)
 {
+	static struct timeval lastfail;
 	char buf[256];
 	size_t len;
+	static int curfail;
 
 	/*-
 	 * This is one of the very few legitimate uses of read_random(9).
@@ -172,7 +168,14 @@ sysctl_kern_arnd(SYSCTL_HANDLER_ARGS)
 	 * If random(4) is not seeded, then this returns 0, so the
 	 * sysctl will return a zero-length buffer.
 	 */
-	len = read_random(buf, MIN(req->oldlen, sizeof(buf)));
+	size_t reqsize = MIN(req->oldlen, sizeof(buf));
+	len = read_random(buf, reqsize);
+	/* XXXAR: spammy debug message should be rate limited */
+	if (reqsize != len && ppsratecheck(&lastfail, &curfail, 3)) {
+		printf("%s: %s (pid %d) requested %zu bytes of random data but "
+		    "only got %zu\n", __func__, curproc->p_comm, curproc->p_pid,
+		    reqsize, len);
+	}
 	return (SYSCTL_OUT(req, buf, len));
 }
 
@@ -206,7 +209,7 @@ sysctl_hw_usermem(SYSCTL_HANDLER_ARGS)
 {
 	u_long val;
 
-	val = ctob(physmem - vm_cnt.v_wire_count);
+	val = ctob(physmem - vm_wire_count());
 	return (sysctl_handle_long(oidp, &val, 0, req));
 }
 

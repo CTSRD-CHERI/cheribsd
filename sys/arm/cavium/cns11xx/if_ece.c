@@ -1839,7 +1839,7 @@ set_filter(struct ece_softc *sc)
 		return;
 	}
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		add_mac_entry(sc,
@@ -1857,7 +1857,7 @@ eceioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int mask, error = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ECE_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1872,19 +1872,19 @@ eceioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ECE_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		ECE_LOCK(sc);
 		set_filter(sc);
 		ECE_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (mask & IFCAP_VLAN_MTU) {
 			ECE_LOCK(sc);

@@ -162,6 +162,9 @@ struct if_data {
 #define	IFF_STATICARP	0x80000		/* (n) static ARP */
 #define	IFF_DYING	0x200000	/* (n) interface is winding down */
 #define	IFF_RENAMING	0x400000	/* (n) interface is being renamed */
+#define	IFF_NOGROUP	0x800000	/* (n) interface is not part of any groups */
+
+
 /*
  * Old names for driver flags so that user space tools can continue to use
  * the old (portable) names.
@@ -399,11 +402,14 @@ struct	ifreq {
 		u_int	ifru_fib;
 		u_char	ifru_vlan_pcp;
 	} ifr_ifru;
+};
 #ifndef _KERNEL
 #define	ifr_addr	ifr_ifru.ifru_addr	/* address */
 #define	ifr_dstaddr	ifr_ifru.ifru_dstaddr	/* other end of p-to-p link */
 #define	ifr_broadaddr	ifr_ifru.ifru_broadaddr	/* broadcast address */
+#ifndef _KERNEL
 #define	ifr_buffer	ifr_ifru.ifru_buffer	/* user supplied buffer with its length */
+#endif
 #define	ifr_flags	ifr_ifru.ifru_flags[0]	/* flags (low 16 bits) */
 #define	ifr_flagshigh	ifr_ifru.ifru_flags[1]	/* flags (high 16 bits) */
 #define	ifr_jid		ifr_ifru.ifru_jid	/* jail/vnet */
@@ -411,14 +417,16 @@ struct	ifreq {
 #define	ifr_mtu		ifr_ifru.ifru_mtu	/* mtu */
 #define ifr_phys	ifr_ifru.ifru_phys	/* physical wire */
 #define ifr_media	ifr_ifru.ifru_media	/* physical media */
+#ifndef _KERNEL
 #define	ifr_data	ifr_ifru.ifru_data	/* for use by interface */
+#endif
 #define	ifr_reqcap	ifr_ifru.ifru_cap[0]	/* requested capabilities */
 #define	ifr_curcap	ifr_ifru.ifru_cap[1]	/* current capabilities */
 #define	ifr_index	ifr_ifru.ifru_index	/* interface index */
 #define	ifr_fib		ifr_ifru.ifru_fib	/* interface fib */
 #define	ifr_vlan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
-#endif
-};
+#define	ifr_lan_pcp	ifr_ifru.ifru_vlan_pcp	/* VLAN priority */
+#endif /* !defined(_KERNEL) */
 
 #if defined(_KERNEL) && __has_feature(capabilities)
 struct ifreq_buffer_c {
@@ -596,6 +604,8 @@ struct ifrsshash {
 	uint16_t	ifrh_spare1;
 	uint32_t	ifrh_types;		/* RSS_TYPE_ */
 };
+
+#define	IFNET_PCP_NONE	0xff	/* PCP disabled */
 
 #endif /* __BSD_VISIBLE */
 

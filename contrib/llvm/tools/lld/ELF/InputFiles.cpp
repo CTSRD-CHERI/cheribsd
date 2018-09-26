@@ -281,6 +281,10 @@ template <class ELFT> ArrayRef<Symbol *> ObjFile<ELFT>::getLocalSymbols() {
   return makeArrayRef(this->Symbols).slice(1, this->FirstNonLocal - 1);
 }
 
+template <class ELFT> ArrayRef<Symbol *> ObjFile<ELFT>::getGlobalSymbols() {
+  return makeArrayRef(this->Symbols).slice(this->FirstNonLocal);
+}
+
 template <class ELFT>
 void ObjFile<ELFT>::parse(DenseSet<CachedHashStringRef> &ComdatGroups) {
   // Read section and symbol tables.
@@ -854,6 +858,14 @@ template <class ELFT> void SharedFile<ELFT>::parseRest() {
       warn("found local symbol '" + Name +
            "' in global part of symbol table in file " + toString(this));
       continue;
+    }
+
+    if (Config->EMachine == EM_MIPS) {
+      // FIXME: MIPS BFD linker puts _gp_disp symbol into DSO files
+      // and incorrectly assigns VER_NDX_LOCAL to this section global
+      // symbol. Here is a workaround for this bug.
+      if (Versym && VersymIndex == VER_NDX_LOCAL && Name == "_gp_disp")
+        continue;
     }
 
     const Elf_Verdef *Ver = nullptr;

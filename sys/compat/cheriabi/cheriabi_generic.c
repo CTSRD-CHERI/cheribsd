@@ -32,13 +32,13 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
 #include <sys/poll.h>
 #include <sys/syscallsubr.h>
 #include <sys/systm.h>
+#include <sys/uio.h>
 
 #include <compat/cheriabi/cheriabi_proto.h>
 

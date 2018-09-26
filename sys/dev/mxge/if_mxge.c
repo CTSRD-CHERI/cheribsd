@@ -688,7 +688,7 @@ z_alloc(void *nil, u_int items, u_int size)
 {
 	void *ptr;
 
-	ptr = mallocarray(items, size, M_TEMP, M_NOWAIT);
+	ptr = malloc(items * size, M_TEMP, M_NOWAIT);
 	return ptr;
 }
 
@@ -1146,7 +1146,7 @@ mxge_set_multicast_list(mxge_softc_t *sc)
 	/* Walk the multicast list, and add each address */
 
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
@@ -4154,19 +4154,59 @@ mxge_media_status(struct ifnet *ifp, struct ifmediareq *ifmr)
 }
 
 static int
+mxge_fetch_i2c(mxge_softc_t *sc, struct ifi2creq *i2c)
+{
+	mxge_cmd_t cmd;
+	uint32_t i2c_args;
+	int i, ms, err;
+
+
+	if (i2c->dev_addr != 0xA0 &&
+	    i2c->dev_addr != 0xA2)
+		return (EINVAL);
+	if (i2c->len > sizeof(i2c->data))
+		return (EINVAL);
+
+	for (i = 0; i < i2c->len; i++) {
+		i2c_args = i2c->dev_addr << 0x8;
+		i2c_args |= i2c->offset + i;
+		cmd.data0 = 0;	 /* just fetch 1 byte, not all 256 */
+		cmd.data1 = i2c_args;
+		err = mxge_send_cmd(sc, MXGEFW_CMD_I2C_READ, &cmd);
+
+		if (err != MXGEFW_CMD_OK)
+			return (EIO);
+		/* now we wait for the data to be cached */
+		cmd.data0 = i2c_args & 0xff;
+		err = mxge_send_cmd(sc, MXGEFW_CMD_I2C_BYTE, &cmd);
+		for (ms = 0; (err == EBUSY) && (ms < 50); ms++) {
+			cmd.data0 = i2c_args & 0xff;
+			err = mxge_send_cmd(sc, MXGEFW_CMD_I2C_BYTE, &cmd);
+			if (err == EBUSY)
+				DELAY(1000);
+		}
+		if (err != MXGEFW_CMD_OK)
+			return (EIO);
+		i2c->data[i] = cmd.data0;
+	}
+	return (0);
+}
+
+static int
 mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 {
 	mxge_softc_t *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *)data;
+	struct ifi2creq i2c;
 	int err, mask;
 
 	err = 0;
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		err = mxge_change_mtu(sc, ifr_mtu_get(ifr));
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		mtx_lock(&sc->driver_mtx);
 		if (sc->dying) {
 			mtx_unlock(&sc->driver_mtx);
@@ -4190,14 +4230,18 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		mtx_unlock(&sc->driver_mtx);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		mtx_lock(&sc->driver_mtx);
+		if (sc->dying) {
+			mtx_unlock(&sc->driver_mtx);
+			return (EINVAL);
+		}
 		mxge_set_multicast_list(sc);
 		mtx_unlock(&sc->driver_mtx);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mtx_lock(&sc->driver_mtx);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if (mask & IFCAP_TXCSUM) {
@@ -4278,12 +4322,36 @@ mxge_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 
 	case SIOCGIFMEDIA:
 		mtx_lock(&sc->driver_mtx);
+		if (sc->dying) {
+			mtx_unlock(&sc->driver_mtx);
+			return (EINVAL);
+		}
 		mxge_media_probe(sc);
 		mtx_unlock(&sc->driver_mtx);
 		err = ifmedia_ioctl(ifp, (struct ifreq *)data,
 				    &sc->media, command);
 		break;
 
+	case SIOCGI2C:
+		if (sc->connector != MXGE_XFP &&
+		    sc->connector != MXGE_SFP) {
+			err = ENXIO;
+			break;
+		}
+		err = copyin_c(ifr_data_get_ptr(ifr), &i2c, sizeof(i2c));
+		if (err != 0)
+			break;
+		mtx_lock(&sc->driver_mtx);
+		if (sc->dying) {
+			mtx_unlock(&sc->driver_mtx);
+			return (EINVAL);
+		}
+		err = mxge_fetch_i2c(sc, &i2c);
+		mtx_unlock(&sc->driver_mtx);
+		if (err == 0)
+			err = copyout(&i2c, ifr->ifr_ifru.ifru_data,
+			    sizeof(i2c));
+		break;
 	default:
 		err = ether_ioctl(ifp, command, data);
 		break;
@@ -4386,8 +4454,8 @@ mxge_alloc_slices(mxge_softc_t *sc)
 	sc->rx_ring_size = cmd.data0;
 	max_intr_slots = 2 * (sc->rx_ring_size / sizeof (mcp_dma_addr_t));
 	
-	sc->ss = mallocarray(sc->num_slices, sizeof(*sc->ss), M_DEVBUF,
-	    M_NOWAIT | M_ZERO);
+	bytes = sizeof (*sc->ss) * sc->num_slices;
+	sc->ss = malloc(bytes, M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (sc->ss == NULL)
 		return (ENOMEM);
 	for (i = 0; i < sc->num_slices; i++) {
@@ -4531,6 +4599,7 @@ abort_with_fw:
 static int
 mxge_add_msix_irqs(mxge_softc_t *sc)
 {
+	size_t bytes;
 	int count, err, i, rid;
 
 	rid = PCIR_BAR(2);
@@ -4558,8 +4627,8 @@ mxge_add_msix_irqs(mxge_softc_t *sc)
 		err = ENOSPC;
 		goto abort_with_msix;
 	}
-	sc->msix_irq_res = mallocarray(sc->num_slices,
-	    sizeof(*sc->msix_irq_res), M_DEVBUF, M_NOWAIT|M_ZERO);
+	bytes = sizeof (*sc->msix_irq_res) * sc->num_slices;
+	sc->msix_irq_res = malloc(bytes, M_DEVBUF, M_NOWAIT|M_ZERO);
 	if (sc->msix_irq_res == NULL) {
 		err = ENOMEM;
 		goto abort_with_msix;
@@ -4578,8 +4647,8 @@ mxge_add_msix_irqs(mxge_softc_t *sc)
 		}
 	}
 
-	sc->msix_ih =  mallocarray(sc->num_slices, sizeof(*sc->msix_ih),
-	    M_DEVBUF, M_NOWAIT|M_ZERO);
+	bytes = sizeof (*sc->msix_ih) * sc->num_slices;
+	sc->msix_ih =  malloc(bytes, M_DEVBUF, M_NOWAIT|M_ZERO);
 
 	for (i = 0; i < sc->num_slices; i++) {
 		err = bus_setup_intr(sc->dev, sc->msix_irq_res[i],
@@ -4915,6 +4984,9 @@ mxge_attach(device_t dev)
 	ifp->if_ioctl = mxge_ioctl;
 	ifp->if_start = mxge_start;
 	ifp->if_get_counter = mxge_get_counter;
+	ifp->if_hw_tsomax = IP_MAXPACKET - (ETHER_HDR_LEN + ETHER_VLAN_ENCAP_LEN);
+	ifp->if_hw_tsomaxsegcount = sc->ss[0].tx.max_desc;
+	ifp->if_hw_tsomaxsegsize = IP_MAXPACKET;
 	/* Initialise the ifmedia structure */
 	ifmedia_init(&sc->media, 0, mxge_media_change,
 		     mxge_media_status);

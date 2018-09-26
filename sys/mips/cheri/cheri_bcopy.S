@@ -29,6 +29,8 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/errno.h>
+
 /* XXXRW: Can I drop some of these? */
 #include <machine/asm.h>
 #include <machine/cpu.h>
@@ -41,7 +43,7 @@
 #include <machine/cherireg.h>
 #endif
 
-#include "assym.s"
+#include "assym.inc"
 
 .set noat
 .set noreorder
@@ -73,10 +75,9 @@ XLEAF(cheri_bcopy)
 	li	v1, -CHERICAP_SIZE	/* Handle under-aligned lengths by... */
 	and	a2, a2, v1	/* .. truncating the length to capsize bytes. */
 	daddu	a2, a1, a2	/* Branch delay: put end pointer in a2. */
-	cgetkdc	$c3
 loop:
-	clc	CHERI_REG_CTEMP0, a0, 0($c3)
-	csc	CHERI_REG_CTEMP0, a1, 0($c3)
+	clc	CHERI_REG_CTEMP0, a0, 0($ddc)
+	csc	CHERI_REG_CTEMP0, a1, 0($ddc)
 	daddiu	a1, a1, CHERICAP_SIZE	/* Increment destination pointer. */
 	bne	a1, a2, loop	/* Are we there yet?  If not, loop. */
 	daddiu	a0, a0, CHERICAP_SIZE	/* Branch delay: increment src ptr. */

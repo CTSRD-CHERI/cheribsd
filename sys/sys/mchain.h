@@ -77,7 +77,8 @@ int  mb_put_uint32be(struct mbchain *mbp, u_int32_t x);
 int  mb_put_uint32le(struct mbchain *mbp, u_int32_t x);
 int  mb_put_int64be(struct mbchain *mbp, int64_t x);
 int  mb_put_int64le(struct mbchain *mbp, int64_t x);
-int  mb_put_mem(struct mbchain *mbp, c_caddr_t source, int size, int type);
+int  mb_put_mem(struct mbchain *mbp, const char * __capability source, int size,
+	int type);
 int  mb_put_mbuf(struct mbchain *mbp, struct mbuf *m);
 int  mb_put_uio(struct mbchain *mbp, struct uio *uiop, int size);
 
@@ -96,7 +97,8 @@ int  md_get_uint32le(struct mdchain *mdp, u_int32_t *x);
 int  md_get_int64(struct mdchain *mdp, int64_t *x);
 int  md_get_int64be(struct mdchain *mdp, int64_t *x);
 int  md_get_int64le(struct mdchain *mdp, int64_t *x);
-int  md_get_mem(struct mdchain *mdp, caddr_t target, int size, int type);
+int  md_get_mem(struct mdchain *mdp, char * __capability target, int size,
+	int type);
 int  md_get_mbuf(struct mdchain *mdp, int size, struct mbuf **m);
 int  md_get_uio(struct mdchain *mdp, struct uio *uiop, int size);
 

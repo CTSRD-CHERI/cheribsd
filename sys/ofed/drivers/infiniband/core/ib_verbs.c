@@ -1,4 +1,6 @@
-/*
+/*-
+ * SPDX-License-Identifier: BSD-2-Clause OR GPL-2.0
+ *
  * Copyright (c) 2004 Mellanox Technologies Ltd.  All rights reserved.
  * Copyright (c) 2004 Infinicon Corporation.  All rights reserved.
  * Copyright (c) 2004 Intel Corporation.  All rights reserved.
@@ -35,6 +37,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  */
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
 #include <linux/errno.h>
 #include <linux/err.h>
@@ -317,7 +322,7 @@ struct ib_ah *ib_create_ah(struct ib_pd *pd, struct ib_ah_attr *ah_attr)
 {
 	struct ib_ah *ah;
 
-	ah = pd->device->create_ah(pd, ah_attr);
+	ah = pd->device->create_ah(pd, ah_attr, NULL);
 
 	if (!IS_ERR(ah)) {
 		ah->device  = pd->device;
@@ -398,12 +403,8 @@ static bool find_gid_index(const union ib_gid *gid,
 
 	if (ctx->gid_type != gid_attr->gid_type)
 		return false;
-
-	if ((!!(ctx->vlan_id != 0xffff) == !is_vlan_dev(gid_attr->ndev)) ||
-	    (is_vlan_dev(gid_attr->ndev) &&
-	     vlan_dev_vlan_id(gid_attr->ndev) != ctx->vlan_id))
+	if (rdma_vlan_dev_vlan_id(gid_attr->ndev) != ctx->vlan_id)
 		return false;
-
 	return true;
 }
 
@@ -479,50 +480,29 @@ int ib_init_ah_from_wc(struct ib_device *device, u8 port_num,
 		return ret;
 
 	if (rdma_protocol_roce(device, port_num)) {
-		int if_index = 0;
-		u16 vlan_id = wc->wc_flags & IB_WC_WITH_VLAN ?
+		struct ib_gid_attr dgid_attr;
+		const u16 vlan_id = (wc->wc_flags & IB_WC_WITH_VLAN) ?
 				wc->vlan_id : 0xffff;
-		struct net_device *idev;
-		struct net_device *resolved_dev;
 
 		if (!(wc->wc_flags & IB_WC_GRH))
 			return -EPROTOTYPE;
 
-		if (!device->get_netdev)
-			return -EOPNOTSUPP;
-
-		idev = device->get_netdev(device, port_num);
-		if (!idev)
-			return -ENODEV;
-
-		ret = rdma_addr_find_l2_eth_by_grh(&dgid, &sgid,
-						   ah_attr->dmac,
-						   wc->wc_flags & IB_WC_WITH_VLAN ?
-						   NULL : &vlan_id,
-						   &if_index, &hoplimit);
-		if (ret) {
-			dev_put(idev);
-			return ret;
-		}
-
-		resolved_dev = dev_get_by_index(&init_net, if_index);
-		if (resolved_dev->if_flags & IFF_LOOPBACK) {
-			dev_put(resolved_dev);
-			resolved_dev = idev;
-			dev_hold(resolved_dev);
-		}
-		rcu_read_lock();
-		if (resolved_dev != idev && !rdma_is_upper_dev_rcu(idev,
-								   resolved_dev))
-			ret = -EHOSTUNREACH;
-		rcu_read_unlock();
-		dev_put(idev);
-		dev_put(resolved_dev);
+		ret = get_sgid_index_from_eth(device, port_num, vlan_id,
+					      &dgid, gid_type, &gid_index);
 		if (ret)
 			return ret;
 
-		ret = get_sgid_index_from_eth(device, port_num, vlan_id,
-					      &dgid, gid_type, &gid_index);
+		ret = ib_get_cached_gid(device, port_num, gid_index, &dgid, &dgid_attr);
+		if (ret)
+			return ret;
+
+		if (dgid_attr.ndev == NULL)
+			return -ENODEV;
+
+		ret = rdma_addr_find_l2_eth_by_grh(&dgid, &sgid, ah_attr->dmac,
+		    dgid_attr.ndev, &hoplimit);
+
+		dev_put(dgid_attr.ndev);
 		if (ret)
 			return ret;
 	}
@@ -1178,52 +1158,50 @@ int ib_modify_qp_is_ok(enum ib_qp_state cur_state, enum ib_qp_state next_state,
 }
 EXPORT_SYMBOL(ib_modify_qp_is_ok);
 
-int ib_resolve_eth_dmac(struct ib_qp *qp,
-			struct ib_qp_attr *qp_attr, int *qp_attr_mask)
+int ib_resolve_eth_dmac(struct ib_device *device,
+			struct ib_ah_attr *ah_attr)
 {
-	int           ret = 0;
+	struct ib_gid_attr sgid_attr;
+	union ib_gid sgid;
+	int hop_limit;
+	int ret;
 
-	if (*qp_attr_mask & IB_QP_AV) {
-		if (qp_attr->ah_attr.port_num < rdma_start_port(qp->device) ||
-		    qp_attr->ah_attr.port_num > rdma_end_port(qp->device))
-			return -EINVAL;
+	if (ah_attr->port_num < rdma_start_port(device) ||
+	    ah_attr->port_num > rdma_end_port(device))
+		return -EINVAL;
 
-		if (!rdma_cap_eth_ah(qp->device, qp_attr->ah_attr.port_num))
-			return 0;
+	if (!rdma_cap_eth_ah(device, ah_attr->port_num))
+		return 0;
 
-		if (rdma_link_local_addr((struct in6_addr *)qp_attr->ah_attr.grh.dgid.raw)) {
-			rdma_get_ll_mac((struct in6_addr *)qp_attr->ah_attr.grh.dgid.raw,
-					qp_attr->ah_attr.dmac);
+	if (rdma_is_multicast_addr((struct in6_addr *)ah_attr->grh.dgid.raw)) {
+		if (ipv6_addr_v4mapped((struct in6_addr *)ah_attr->grh.dgid.raw)) {
+			__be32 addr = 0;
+
+			memcpy(&addr, ah_attr->grh.dgid.raw + 12, 4);
+			ip_eth_mc_map(addr, (char *)ah_attr->dmac);
 		} else {
-			union ib_gid		sgid;
-			struct ib_gid_attr	sgid_attr;
-			int			ifindex;
-			int			hop_limit;
-
-			ret = ib_query_gid(qp->device,
-					   qp_attr->ah_attr.port_num,
-					   qp_attr->ah_attr.grh.sgid_index,
-					   &sgid, &sgid_attr);
-
-			if (ret || !sgid_attr.ndev) {
-				if (!ret)
-					ret = -ENXIO;
-				goto out;
-			}
-
-			ifindex = sgid_attr.ndev->if_index;
-
-			ret = rdma_addr_find_l2_eth_by_grh(&sgid,
-							   &qp_attr->ah_attr.grh.dgid,
-							   qp_attr->ah_attr.dmac,
-							   NULL, &ifindex, &hop_limit);
-
-			dev_put(sgid_attr.ndev);
-
-			qp_attr->ah_attr.grh.hop_limit = hop_limit;
+			ipv6_eth_mc_map((struct in6_addr *)ah_attr->grh.dgid.raw,
+					(char *)ah_attr->dmac);
 		}
+		return 0;
 	}
-out:
+
+	ret = ib_query_gid(device,
+			   ah_attr->port_num,
+			   ah_attr->grh.sgid_index,
+			   &sgid, &sgid_attr);
+	if (ret != 0)
+		return (ret);
+	if (!sgid_attr.ndev)
+		return -ENXIO;
+
+	ret = rdma_addr_find_l2_eth_by_grh(&sgid,
+					   &ah_attr->grh.dgid,
+					   ah_attr->dmac,
+					   sgid_attr.ndev, &hop_limit);
+	dev_put(sgid_attr.ndev);
+
+	ah_attr->grh.hop_limit = hop_limit;
 	return ret;
 }
 EXPORT_SYMBOL(ib_resolve_eth_dmac);
@@ -1233,11 +1211,13 @@ int ib_modify_qp(struct ib_qp *qp,
 		 struct ib_qp_attr *qp_attr,
 		 int qp_attr_mask)
 {
-	int ret;
+	if (qp_attr_mask & IB_QP_AV) {
+		int ret;
 
-	ret = ib_resolve_eth_dmac(qp, qp_attr, &qp_attr_mask);
-	if (ret)
-		return ret;
+		ret = ib_resolve_eth_dmac(qp->device, &qp_attr->ah_attr);
+		if (ret)
+			return ret;
+	}
 
 	return qp->device->modify_qp(qp->real_qp, qp_attr, qp_attr_mask, NULL);
 }
@@ -1487,13 +1467,53 @@ EXPORT_SYMBOL(ib_dealloc_fmr);
 
 /* Multicast groups */
 
+static bool is_valid_mcast_lid(struct ib_qp *qp, u16 lid)
+{
+	struct ib_qp_init_attr init_attr = {};
+	struct ib_qp_attr attr = {};
+	int num_eth_ports = 0;
+	int port;
+
+	/* If QP state >= init, it is assigned to a port and we can check this
+	 * port only.
+	 */
+	if (!ib_query_qp(qp, &attr, IB_QP_STATE | IB_QP_PORT, &init_attr)) {
+		if (attr.qp_state >= IB_QPS_INIT) {
+			if (rdma_port_get_link_layer(qp->device, attr.port_num) !=
+			    IB_LINK_LAYER_INFINIBAND)
+				return true;
+			goto lid_check;
+		}
+	}
+
+	/* Can't get a quick answer, iterate over all ports */
+	for (port = 0; port < qp->device->phys_port_cnt; port++)
+		if (rdma_port_get_link_layer(qp->device, port) !=
+		    IB_LINK_LAYER_INFINIBAND)
+			num_eth_ports++;
+
+	/* If we have at lease one Ethernet port, RoCE annex declares that
+	 * multicast LID should be ignored. We can't tell at this step if the
+	 * QP belongs to an IB or Ethernet port.
+	 */
+	if (num_eth_ports)
+		return true;
+
+	/* If all the ports are IB, we can check according to IB spec. */
+lid_check:
+	return !(lid < be16_to_cpu(IB_MULTICAST_LID_BASE) ||
+		 lid == be16_to_cpu(IB_LID_PERMISSIVE));
+}
+
 int ib_attach_mcast(struct ib_qp *qp, union ib_gid *gid, u16 lid)
 {
 	int ret;
 
 	if (!qp->device->attach_mcast)
 		return -ENOSYS;
-	if (gid->raw[0] != 0xff || qp->qp_type != IB_QPT_UD)
+
+	if (!rdma_is_multicast_addr((struct in6_addr *)gid->raw) ||
+	    qp->qp_type != IB_QPT_UD || !is_valid_mcast_lid(qp, lid))
 		return -EINVAL;
 
 	ret = qp->device->attach_mcast(qp, gid, lid);
@@ -1509,7 +1529,9 @@ int ib_detach_mcast(struct ib_qp *qp, union ib_gid *gid, u16 lid)
 
 	if (!qp->device->detach_mcast)
 		return -ENOSYS;
-	if (gid->raw[0] != 0xff || qp->qp_type != IB_QPT_UD)
+
+	if (!rdma_is_multicast_addr((struct in6_addr *)gid->raw) ||
+	    qp->qp_type != IB_QPT_UD || !is_valid_mcast_lid(qp, lid))
 		return -EINVAL;
 
 	ret = qp->device->detach_mcast(qp, gid, lid);
@@ -1922,7 +1944,13 @@ static void __ib_drain_sq(struct ib_qp *qp)
 {
 	struct ib_qp_attr attr = { .qp_state = IB_QPS_ERR };
 	struct ib_drain_cqe sdrain;
-	struct ib_send_wr swr = {}, *bad_swr;
+	struct ib_send_wr *bad_swr;
+	struct ib_rdma_wr swr = {
+		.wr = {
+			.opcode	= IB_WR_RDMA_WRITE,
+			.wr_cqe	= &sdrain.cqe,
+		},
+	};
 	int ret;
 
 	if (qp->send_cq->poll_ctx == IB_POLL_DIRECT) {
@@ -1931,7 +1959,6 @@ static void __ib_drain_sq(struct ib_qp *qp)
 		return;
 	}
 
-	swr.wr_cqe = &sdrain.cqe;
 	sdrain.cqe.done = ib_drain_qp_done;
 	init_completion(&sdrain.done);
 
@@ -1941,7 +1968,7 @@ static void __ib_drain_sq(struct ib_qp *qp)
 		return;
 	}
 
-	ret = ib_post_send(qp, &swr, &bad_swr);
+	ret = ib_post_send(qp, &swr.wr, &bad_swr);
 	if (ret) {
 		WARN_ONCE(ret, "failed to drain send queue: %d\n", ret);
 		return;

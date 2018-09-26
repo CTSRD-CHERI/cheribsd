@@ -130,7 +130,10 @@ template <class ELFT> void SymbolTable::addCombinedLTOObject() {
 
   for (InputFile *File : LTO->compile()) {
     DenseSet<CachedHashStringRef> DummyGroups;
-    cast<ObjFile<ELFT>>(File)->parse(DummyGroups);
+    auto *Obj = cast<ObjFile<ELFT>>(File);
+    Obj->parse(DummyGroups);
+    for (Symbol *Sym : Obj->getGlobalSymbols())
+      Sym->parseSymbolVersion();
     ObjectFiles.push_back(File);
   }
 }
@@ -491,12 +494,13 @@ void SymbolTable::addShared(StringRef Name, SharedFile<ELFT> &File,
   if (WasInserted || ((S->isUndefined() || S->isLazy()) &&
                       S->getVisibility() == STV_DEFAULT)) {
     uint8_t Binding = S->Binding;
+    bool WasUndefined = S->isUndefined();
     replaceSymbol<SharedSymbol>(S, File, Name, Sym.getBinding(), Sym.st_other,
                                 Sym.getType(), Sym.st_value, Sym.st_size,
                                 Alignment, VerdefIndex);
     if (!WasInserted) {
       S->Binding = Binding;
-      if (!S->isWeak() && !Config->GcSections)
+      if (!S->isWeak() && !Config->GcSections && WasUndefined)
         File.IsNeeded = true;
     }
   }

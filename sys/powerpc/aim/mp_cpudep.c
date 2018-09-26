@@ -64,9 +64,6 @@ cpudep_ap_early_bootstrap(void)
 	register_t reg;
 #endif
 
-	__asm __volatile("mtsprg 0, %0" :: "r"(ap_pcpu));
-	powerpc_sync();
-
 	switch (mfpvr() >> 16) {
 	case IBM970:
 	case IBM970FX:
@@ -86,7 +83,28 @@ cpudep_ap_early_bootstrap(void)
 #endif
 		powerpc_sync();
 		break;
+	case IBMPOWER8:
+	case IBMPOWER8E:
+	case IBMPOWER9:
+#ifdef __powerpc64__
+		if (mfmsr() & PSL_HV) {
+			isync();
+			/*
+			 * Direct interrupts to SRR instead of HSRR and
+			 * reset LPCR otherwise
+			 */
+			mtspr(SPR_LPID, 0);
+			isync();
+
+			mtspr(SPR_LPCR, lpcr);
+			isync();
+		}
+#endif
+		break;
 	}
+
+	__asm __volatile("mtsprg 0, %0" :: "r"(ap_pcpu));
+	powerpc_sync();
 }
 
 uintptr_t
@@ -94,7 +112,7 @@ cpudep_ap_bootstrap(void)
 {
 	register_t msr, sp;
 
-	msr = PSL_KERNSET & ~PSL_EE;
+	msr = psl_kernset & ~PSL_EE;
 	mtmsr(msr);
 
 	pcpup->pc_curthread = pcpup->pc_idlethread;
@@ -380,9 +398,13 @@ cpudep_ap_setup()
 	case IBMPOWER7PLUS:
 	case IBMPOWER8:
 	case IBMPOWER8E:
+	case IBMPOWER9:
 #ifdef __powerpc64__
-		if (mfmsr() & PSL_HV)
-			mtspr(SPR_LPCR, mfspr(SPR_LPCR) | LPCR_LPES);
+		if (mfmsr() & PSL_HV) {
+			mtspr(SPR_LPCR, mfspr(SPR_LPCR) | lpcr |
+			    LPCR_PECE_WAKESET);
+			isync();
+		}
 #endif
 		break;
 	default:

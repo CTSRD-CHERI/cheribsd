@@ -123,6 +123,7 @@ SRCS+=		atoi.c			\
 # libc/string
 CFLAGS.strerror.c=	-Wno-incompatible-pointer-types-discards-qualifiers
 SRCS+=		bcopy.S			\
+		explicit_bzero.c	\
 		ffs.c			\
 		memchr.c		\
 		memchr_c.c		\
@@ -308,6 +309,7 @@ CFLAGS+=	-I${LIBC_DIR}/include			\
 .PATH: ${.CURDIR}/../../contrib/gdtoa
 .PATH: ${.CURDIR}/../../sys/kern
 .PATH: ${.CURDIR}/../../contrib/tzcode/stdtime
+.PATH: ${SRCTOP}/sys/libkern
 
 CFLAGS+=	-Wno-cast-align -DFORCE_C_LOCALE -DFORCE_UTC_TZ
 

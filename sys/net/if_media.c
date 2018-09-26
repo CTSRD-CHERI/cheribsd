@@ -236,7 +236,7 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 	/*
 	 * Set the current media.
 	 */
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	{
 		struct ifmedia_entry *oldentry;
 		int oldmedia;
@@ -321,9 +321,7 @@ ifmedia_ioctl(ifp, ifr, ifm, cmd)
 		i = 0;
 		LIST_FOREACH(ep, &ifm->ifm_list, ifm_list)
 			if (i++ < ifmr->ifm_count) {
-				error = copyout_c(
-				    (__cheri_tocap int * __capability)
-				    &ep->ifm_media,
+				error = copyout_c(&ep->ifm_media,
 				    ifmr->ifm_ulist + i - 1, sizeof(int));
 				if (error)
 					break;
@@ -402,18 +400,6 @@ struct ifmedia_description ifm_subtype_ethernet_descriptions[] =
 struct ifmedia_description ifm_subtype_ethernet_option_descriptions[] =
     IFM_SUBTYPE_ETHERNET_OPTION_DESCRIPTIONS;
 
-struct ifmedia_description ifm_subtype_tokenring_descriptions[] =
-    IFM_SUBTYPE_TOKENRING_DESCRIPTIONS;
-
-struct ifmedia_description ifm_subtype_tokenring_option_descriptions[] =
-    IFM_SUBTYPE_TOKENRING_OPTION_DESCRIPTIONS;
-
-struct ifmedia_description ifm_subtype_fddi_descriptions[] =
-    IFM_SUBTYPE_FDDI_DESCRIPTIONS;
-
-struct ifmedia_description ifm_subtype_fddi_option_descriptions[] =
-    IFM_SUBTYPE_FDDI_OPTION_DESCRIPTIONS;
-
 struct ifmedia_description ifm_subtype_ieee80211_descriptions[] =
     IFM_SUBTYPE_IEEE80211_DESCRIPTIONS;
 
@@ -446,16 +432,6 @@ struct ifmedia_type_to_subtype ifmedia_types_to_subtypes[] = {
 	{
 	  &ifm_subtype_ethernet_descriptions[0],
 	  &ifm_subtype_ethernet_option_descriptions[0],
-	  NULL,
-	},
-	{
-	  &ifm_subtype_tokenring_descriptions[0],
-	  &ifm_subtype_tokenring_option_descriptions[0],
-	  NULL,
-	},
-	{
-	  &ifm_subtype_fddi_descriptions[0],
-	  &ifm_subtype_fddi_option_descriptions[0],
 	  NULL,
 	},
 	{

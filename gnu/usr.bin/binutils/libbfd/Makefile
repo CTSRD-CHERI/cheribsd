@@ -107,3 +107,7 @@ elf64-target.h: elfxx-target.h
 GENDIRDEPS_FILTER+= N*/nm
 
 .include <bsd.lib.mk>
+.if ${MK_CHERI} != "no"
+# This code is completely broken
+CFLAGS+=	-Wno-error=mips-cheri-prototypes
+.endif

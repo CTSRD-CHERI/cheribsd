@@ -1170,7 +1170,7 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 	int error = 0, mask;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		CGEM_LOCK(sc);
 		if ((if_getflags(ifp) & IFF_UP) != 0) {
 			if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
@@ -1189,8 +1189,8 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		CGEM_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* Set up multi-cast filters. */
 		if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) != 0) {
 			CGEM_LOCK(sc);
@@ -1199,13 +1199,13 @@ cgem_ioctl(if_t ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		CGEM_LOCK(sc);
 		mask = if_getcapenable(ifp) ^ ifr_reqcap_get(ifr);
 

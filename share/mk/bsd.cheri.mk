@@ -86,7 +86,7 @@ CHERI_CXX=${CHERI_CC:H}/${CHERI_CC:T:S/clang/clang++/}
 .error CHERI_CXX is defined to ${CHERI_CXX} which does not exist
 .endif
 
-_CHERI_COMMON_FLAGS=	-g -integrated-as --target=cheri-unknown-freebsd \
+_CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
 			-msoft-float
 _CHERI_CC=		${CHERI_CC} ${_CHERI_COMMON_FLAGS}
 _CHERI_CXX=		${CHERI_CXX} ${_CHERI_COMMON_FLAGS}
@@ -113,9 +113,13 @@ LIBDIR_BASE:=	/usr/libcheri
 .info "Not overriding LIBDIR for CHERI since ${.CURDIR} is a test library"
 .endif
 ROOTOBJDIR=	${OBJTOP}/obj-libcheri
-CFLAGS+=	-ftls-model=local-exec
 .ifdef CHERI_USE_CAP_TABLE
 CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
+.endif
+.ifdef CHERI_USE_CAP_TLS
+CFLAGS+=	-cheri-cap-tls-abi=${CHERI_USE_CAP_TLS}
+.else
+CFLAGS+=	-ftls-model=local-exec
 .endif
 
 .ifdef NO_WERROR

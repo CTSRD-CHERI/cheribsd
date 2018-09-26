@@ -110,13 +110,13 @@ smb_strdup(const char *s)
  * duplicate string from a user space.
  */
 char *
-smb_strdupin(char *s, size_t maxlen)
+smb_strdupin(char * __capability s, size_t maxlen)
 {
 	char *p;
 	int error;
 
 	p = malloc(maxlen + 1, M_SMBSTR, M_WAITOK);
-	error = copyinstr(s, p, maxlen + 1, NULL);
+	error = copyinstr_c(s, p, maxlen + 1, NULL);
 	if (error) {
 		free(p, M_SMBSTR);
 		return (NULL);
@@ -128,14 +128,14 @@ smb_strdupin(char *s, size_t maxlen)
  * duplicate memory block from a user space.
  */
 void *
-smb_memdupin(void *umem, size_t len)
+smb_memdupin(void * __capability umem, size_t len)
 {
 	char *p;
 
 	if (len > 8 * 1024)
 		return NULL;
 	p = malloc(len, M_SMBSTR, M_WAITOK);
-	if (copyin(umem, p, len) == 0)
+	if (copyin_c(umem, p, len) == 0)
 		return p;
 	free(p, M_SMBSTR);
 	return NULL;
@@ -337,13 +337,16 @@ smb_put_dmem(struct mbchain *mbp, struct smb_vc *vcp, const char *src,
 	if (size == 0)
 		return 0;
 	if (dp == NULL) {
-		return mb_put_mem(mbp, src, size, MB_MSYSTEM);
+		return mb_put_mem(mbp,
+		    (__cheri_tocap const char * __capability)src, size,
+		    MB_MSYSTEM);
 	}
 	mbp->mb_copy = smb_copy_iconv;
 	mbp->mb_udata = dp;
 	if (SMB_UNICODE_STRINGS(vcp))
 		mb_put_padbyte(mbp);
-	return mb_put_mem(mbp, src, size, MB_MCUSTOM);
+	return mb_put_mem(mbp, (__cheri_tocap const char * __capability)src,
+	    size, MB_MCUSTOM);
 }
 
 int

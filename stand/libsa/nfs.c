@@ -126,7 +126,6 @@ struct nfs_iodesc {
 int		nfs_open(const char *path, struct open_file *f);
 static int	nfs_close(struct open_file *f);
 static int	nfs_read(struct open_file *f, void *buf, size_t size, size_t *resid);
-static int	nfs_write(struct open_file *f, void *buf, size_t size, size_t *resid);
 static off_t	nfs_seek(struct open_file *f, off_t offset, int where);
 static int	nfs_stat(struct open_file *f, struct stat *sb);
 static int	nfs_readdir(struct open_file *f, struct dirent *d);
@@ -138,7 +137,7 @@ struct fs_ops nfs_fsops = {
 	nfs_open,
 	nfs_close,
 	nfs_read,
-	nfs_write,
+	null_write,
 	nfs_seek,
 	nfs_stat,
 	nfs_readdir
@@ -250,7 +249,7 @@ int
 nfs_lookupfh(struct nfs_iodesc *d, const char *name, struct nfs_iodesc *newfd)
 {
 	void *pkt = NULL;
-	int len, rlen, pos;
+	int len, pos;
 	struct args {
 		uint32_t fhsize;
 		uint32_t fhplusname[1 +
@@ -466,14 +465,13 @@ int
 nfs_open(const char *upath, struct open_file *f)
 {
 	struct iodesc *desc;
-	struct nfs_iodesc *currfd;
+	struct nfs_iodesc *currfd = NULL;
 	char buf[2 * NFS_V3MAXFHSIZE + 3];
 	u_char *fh;
 	char *cp;
 	int i;
 #ifndef NFS_NOSYMLINK
-	struct nfs_iodesc *newfd;
-	struct nfsv3_fattrs *fa;
+	struct nfs_iodesc *newfd = NULL;
 	char *ncp;
 	int c;
 	char namebuf[NFS_MAXPATHLEN + 1];
@@ -481,7 +479,7 @@ nfs_open(const char *upath, struct open_file *f)
 	int nlinks = 0;
 #endif
 	int error;
-	char *path;
+	char *path = NULL;
 
 	if (netproto != NET_NFS)
 		return (EINVAL);
@@ -713,15 +711,6 @@ ret:
 		*resid = size;
 
 	return (0);
-}
-
-/*
- * Not implemented.
- */
-int
-nfs_write(struct open_file *f, void *buf, size_t size, size_t *resid)
-{
-	return (EROFS);
 }
 
 off_t

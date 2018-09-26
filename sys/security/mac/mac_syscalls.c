@@ -114,8 +114,7 @@ kern_mac_get_pid(struct thread *td, pid_t pid, void * __capability mac_p)
 		return (error);
 
 	elements = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr_c(mac.m_string,
-	    (__cheri_tocap char * __capability)elements, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string, elements, mac.m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		crfree(tcred);
@@ -126,8 +125,7 @@ kern_mac_get_pid(struct thread *td, pid_t pid, void * __capability mac_p)
 	error = mac_cred_externalize_label(tcred->cr_label, elements,
 	    buffer, mac.m_buflen);
 	if (error == 0)
-		error = copyout_c((__cheri_tocap char * __capability)buffer,
-		    mac.m_string, strlen(buffer)+1);
+		error = copyout_c(buffer, mac.m_string, strlen(buffer)+1);
 
 	free(buffer, M_MACTEMP);
 	free(elements, M_MACTEMP);
@@ -158,8 +156,7 @@ kern_mac_get_proc(struct thread *td, void * __capability mac_p)
 		return (error);
 
 	elements = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr_c(mac.m_string,
-	   (__cheri_tocap char * __capability)elements, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string, elements, mac.m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		return (error);
@@ -169,8 +166,7 @@ kern_mac_get_proc(struct thread *td, void * __capability mac_p)
 	error = mac_cred_externalize_label(td->td_ucred->cr_label,
 	    elements, buffer, mac.m_buflen);
 	if (error == 0)
-		error = copyout_c((__cheri_tocap char * __capability)buffer,
-		    mac.m_string, strlen(buffer)+1);
+		error = copyout_c(buffer, mac.m_string, strlen(buffer)+1);
 
 	free(buffer, M_MACTEMP);
 	free(elements, M_MACTEMP);
@@ -206,8 +202,7 @@ kern_mac_set_proc(struct thread *td, void * __capability mac_p)
 		return (error);
 
 	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr_c(mac.m_string,
-	    (__cheri_tocap char * __capability)buffer, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string, buffer, mac.m_buflen, NULL);
 	if (error) {
 		free(buffer, M_MACTEMP);
 		return (error);
@@ -275,8 +270,7 @@ kern_mac_get_fd(struct thread *td, int fd, void * __capability mac_p)
 		return (error);
 
 	elements = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr_c(mac.m_string,
-	    (__cheri_tocap char * __capability)elements, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string, elements, mac.m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		return (error);
@@ -338,8 +332,7 @@ kern_mac_get_fd(struct thread *td, int fd, void * __capability mac_p)
 		error = EINVAL;
 	}
 	if (error == 0)
-		error = copyout_c((__cheri_tocap char * __capability)buffer,
-		    mac.m_string, strlen(buffer)+1);
+		error = copyout_c(buffer, mac.m_string, strlen(buffer)+1);
 out_fdrop:
 	fdrop(fp, td);
 out:
@@ -386,8 +379,7 @@ kern_mac_get_path(struct thread *td, const char * __capability path_p,
 		return (error);
 
 	elements = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr_c(mac.m_string,
-	    (__cheri_tocap char * __capability)elements, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string, elements, mac.m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		return (error);
@@ -407,8 +399,7 @@ kern_mac_get_path(struct thread *td, const char * __capability path_p,
 	mac_vnode_label_free(intlabel);
 
 	if (error == 0)
-		error = copyout_c( (__cheri_tocap char * __capability)buffer,
-		    mac.m_string, strlen(buffer)+1);
+		error = copyout_c(buffer, mac.m_string, strlen(buffer)+1);
 
 out:
 	free(buffer, M_MACTEMP);
@@ -447,8 +438,7 @@ kern_mac_set_fd(struct thread *td, int fd, void * __capability mac_p)
 		return (error);
 
 	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr_c(mac.m_string,
-	    (__cheri_tocap char * __capability)buffer, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string, buffer, mac.m_buflen, NULL);
 	if (error) {
 		free(buffer, M_MACTEMP);
 		return (error);
@@ -565,8 +555,7 @@ kern_mac_set_path(struct thread *td, const char * __capability path_p,
 		return (error);
 
 	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr_c(mac.m_string,
-	    (__cheri_tocap char * __capability)buffer, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string, buffer, mac.m_buflen, NULL);
 	if (error) {
 		free(buffer, M_MACTEMP);
 		return (error);
@@ -611,7 +600,7 @@ kern_mac_syscall(struct thread *td, const char * __capability policy, int call,
 	char target[MAC_MAX_POLICY_NAME];
 	int error;
 
-	error = copyinstr_c(policy, &target[0], sizeof(target), NULL);
+	error = copyinstr_c(policy, target, sizeof(target), NULL);
 	if (error)
 		return (error);
 

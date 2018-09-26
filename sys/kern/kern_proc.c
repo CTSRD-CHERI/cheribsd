@@ -34,7 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 #include "opt_ktrace.h"
 #include "opt_kstack_pages.h"
@@ -277,7 +276,6 @@ proc_init(void *mem, int size, int flags)
 	mtx_init(&p->p_itimmtx, "pitiml", NULL, MTX_SPIN | MTX_NEW);
 	mtx_init(&p->p_profmtx, "pprofl", NULL, MTX_SPIN | MTX_NEW);
 	cv_init(&p->p_pwait, "ppwait");
-	cv_init(&p->p_dbgwait, "dbgwait");
 	TAILQ_INIT(&p->p_threads);	     /* all threads in proc */
 	EVENTHANDLER_DIRECT_INVOKE(process_init, p);
 	p->p_stats = pstats_alloc();
@@ -1461,6 +1459,32 @@ cheriabi_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc_c *ki_c)
 }
 #endif	/* COMPAT_CHERIABI */
 
+static ssize_t
+kern_proc_out_size(struct proc *p, int flags)
+{
+	ssize_t size = 0;
+
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	if ((flags & KERN_PROC_NOTHREADS) != 0) {
+#ifdef COMPAT_FREEBSD32
+		if ((flags & KERN_PROC_MASK32) != 0) {
+			size += sizeof(struct kinfo_proc32);
+		} else
+#endif
+			size += sizeof(struct kinfo_proc);
+	} else {
+#ifdef COMPAT_FREEBSD32
+		if ((flags & KERN_PROC_MASK32) != 0)
+			size += sizeof(struct kinfo_proc32) * p->p_numthreads;
+		else
+#endif
+			size += sizeof(struct kinfo_proc) * p->p_numthreads;
+	}
+	PROC_UNLOCK(p);
+	return (size);
+}
+
 int
 kern_proc_out(struct proc *p, struct sbuf *sb, int flags)
 {
@@ -1530,6 +1554,9 @@ sysctl_out_proc(struct proc *p, struct sysctl_req *req, int flags)
 	struct kinfo_proc ki;
 	int error, error2;
 
+	if (req->oldptr == NULL)
+		return (SYSCTL_OUT(req, 0, kern_proc_out_size(p, flags)));
+
 	sbuf_new_for_sysctl(&sb, (char *)&ki, sizeof(ki), req);
 	sbuf_clear_flags(&sb, SBUF_INCLUDENUL);
 	error = kern_proc_out(p, &sb, flags);
@@ -1596,16 +1623,22 @@ sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 		break;
 	}
 
-	if (!req->oldptr) {
+	if (req->oldptr == NULL) {
 		/* overestimate by 5 procs */
 		error = SYSCTL_OUT(req, 0, sizeof (struct kinfo_proc) * 5);
 		if (error)
 			return (error);
+	} else {
+		error = sysctl_wire_old_buffer(req, 0);
+		if (error != 0)
+			return (error);
+		/*
+		 * This lock is only needed to safely grab the parent of a
+		 * traced process. Only grab it if we are producing any
+		 * data to begin with.
+		 */
+		sx_slock(&proctree_lock);
 	}
-	error = sysctl_wire_old_buffer(req, 0);
-	if (error != 0)
-		return (error);
-	sx_slock(&proctree_lock);
 	sx_slock(&allproc_lock);
 	for (doingzomb=0 ; doingzomb < 2 ; doingzomb++) {
 		if (!doingzomb)
@@ -1706,16 +1739,15 @@ sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 			}
 
 			error = sysctl_out_proc(p, req, flags);
-			if (error) {
-				sx_sunlock(&allproc_lock);
-				sx_sunlock(&proctree_lock);
-				return (error);
-			}
+			if (error)
+				goto out;
 		}
 	}
+out:
 	sx_sunlock(&allproc_lock);
-	sx_sunlock(&proctree_lock);
-	return (0);
+	if (req->oldptr != NULL)
+		sx_sunlock(&proctree_lock);
+	return (error);
 }
 
 struct pargs *
@@ -1873,14 +1905,14 @@ get_proc_vector_cheriabi(struct thread *td, struct proc *p,
 		return (ENOMEM);
 	switch (type) {
 	case PROC_ARG:
-		vptr = (vm_offset_t)pss.ps_argvstr;
+		vptr = (__cheri_addr vm_offset_t)pss.ps_argvstr;
 		vsize = pss.ps_nargvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
 		size = vsize * sizeof(void * __capability);
 		break;
 	case PROC_ENV:
-		vptr = (vm_offset_t)pss.ps_envstr;
+		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr;
 		vsize = pss.ps_nenvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
@@ -1891,7 +1923,7 @@ get_proc_vector_cheriabi(struct thread *td, struct proc *p,
 		 * The aux array is just above env array on the stack. Check
 		 * that the address is naturally aligned.
 		 */
-		vptr = (vm_offset_t)pss.ps_envstr +
+		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr +
 			(pss.ps_nenvstr + 1) * sizeof(void * __capability);
 #if __ELF_WORD_SIZE == 64
 		if (vptr % sizeof(uint64_t) != 0)
@@ -2186,11 +2218,20 @@ sysctl_kern_proc_args(SYSCTL_HANDLER_ARGS)
 
 	if (req->newlen > ps_arg_cache_limit - sizeof(struct pargs))
 		return (ENOMEM);
-	newpa = pargs_alloc(req->newlen);
-	error = SYSCTL_IN(req, newpa->ar_args, req->newlen);
-	if (error != 0) {
-		pargs_free(newpa);
-		return (error);
+
+	if (req->newlen == 0) {
+		/*
+		 * Clear the argument pointer, so that we'll fetch arguments
+		 * with proc_getargv() until further notice.
+		 */
+		newpa = NULL;
+	} else {
+		newpa = pargs_alloc(req->newlen);
+		error = SYSCTL_IN(req, newpa->ar_args, req->newlen);
+		if (error != 0) {
+			pargs_free(newpa);
+			return (error);
+		}
 	}
 	PROC_LOCK(p);
 	pa = p->p_args;
@@ -3623,7 +3664,7 @@ again:
 		}
 	}
 	/*  Did the loop above missed any stopped process ? */
-	LIST_FOREACH(p, &allproc, p_list) {
+	FOREACH_PROC_IN_SYSTEM(p) {
 		/* No need for proc lock. */
 		if ((p->p_flag & P_TOTAL_STOP) != 0)
 			goto again;

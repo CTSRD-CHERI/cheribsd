@@ -213,12 +213,12 @@ typedef TAILQ_HEAD(pnp_head, pnp_elt) pnp_list;
  *	type	Output		Meaning
  *	I	uint32_t	Integer equality comparison
  *	J	uint32_t	Pair of uint16_t fields converted to native
-				byte order. The two fields both must match.
+ *				byte order. The two fields both must match.
  *	G	uint32_t	Greater than or equal to
  *	L	uint32_t	Less than or equal to
  *	M	uint32_t	Mask of which fields to test. Fields that
-				take up space increment the count. This
-				field must be first, and resets the count.
+ *				take up space increment the count. This
+ *				field must be first, and resets the count.
  *	D	string		Description of the device this pnp info is for
  *	Z	string		pnp string must match this
  *	T	nothing		T fields set pnp values that must be true for
@@ -420,7 +420,7 @@ parse_entry(struct mod_metadata *md, const char *cval,
 		break;
 	case MDT_PNP_INFO:
 		check(EF_SEG_READ_REL(ef, data, sizeof(pnp), &pnp));
-		check(EF_SEG_READ(ef, (Elf_Off)pnp.descr, sizeof(descr), descr));
+		check(EF_SEG_READ_STRING(ef, (Elf_Off)pnp.descr, sizeof(descr), descr));
 		descr[sizeof(descr) - 1] = '\0';
 		if (dflag) {
 			printf("  pnp info for bus %s format %s %d entries of %d bytes\n",
@@ -510,7 +510,7 @@ parse_entry(struct mod_metadata *md, const char *cval,
 							ptr = *(char **)(walker + elt->pe_offset);
 							buffer[0] = '\0';
 							if (ptr != NULL) {
-								EF_SEG_READ(ef, (Elf_Off)ptr,
+								EF_SEG_READ_STRING(ef, (Elf_Off)ptr,
 								    sizeof(buffer), buffer);
 								buffer[sizeof(buffer) - 1] = '\0';
 							}

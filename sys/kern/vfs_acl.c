@@ -68,6 +68,7 @@ CTASSERT(ACL_MAX_ENTRIES >= OLDACL_MAX_ENTRIES);
 
 MALLOC_DEFINE(M_ACL, "acl", "Access Control Lists");
 
+
 static int	vacl_set_acl(struct thread *td, struct vnode *vp,
 		    acl_type_t type, const struct acl * __capability aclp);
 static int	vacl_get_acl(struct thread *td, struct vnode *vp,
@@ -147,9 +148,7 @@ acl_copyin(const void * __capability user_acl, struct acl *kernel_acl,
 		break;
 
 	default:
-		error = copyin_c(user_acl,
-		    (__cheri_tocap struct acl * __capability)kernel_acl,
-		    sizeof(*kernel_acl));
+		error = copyin_c(user_acl, kernel_acl, sizeof(*kernel_acl));
 		if (kernel_acl->acl_maxcnt != ACL_MAX_ENTRIES)
 			return (EINVAL);
 	}
@@ -172,7 +171,7 @@ acl_copyout(const struct acl *kernel_acl, void * __capability user_acl,
 		if (error != 0)
 			break;
 
-		error = copyout_c( &old, user_acl, sizeof(old));
+		error = copyout_c(&old, user_acl, sizeof(old));
 		break;
 
 	default:
@@ -183,9 +182,7 @@ acl_copyout(const struct acl *kernel_acl, void * __capability user_acl,
 		if (am != ACL_MAX_ENTRIES)
 			return (EINVAL);
 
-		error = copyout_c(
-		    (__cheri_tocap const struct acl * __capability)kernel_acl,
-		    user_acl, sizeof(*kernel_acl));
+		error = copyout_c(kernel_acl, user_acl, sizeof(*kernel_acl));
 	}
 
 	return (error);
@@ -556,6 +553,7 @@ sys___acl_aclcheck_file(struct thread *td, struct __acl_aclcheck_file_args *uap)
 int
 sys___acl_aclcheck_link(struct thread *td, struct __acl_aclcheck_link_args *uap)
 {
+
 	return (kern___acl_aclcheck_path(td, __USER_CAP_STR(uap->path),
 	    uap->type, __USER_CAP_OBJ(uap->aclp), NOFOLLOW));
 }

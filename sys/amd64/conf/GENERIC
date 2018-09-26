@@ -32,7 +32,9 @@ options 	INET6			# IPv6 communications protocols
 options 	IPSEC			# IP (v4/v6) security
 options 	IPSEC_SUPPORT		# Allow kldload of ipsec and tcpmd5
 options 	TCP_OFFLOAD		# TCP offload
+options 	TCP_BLACKBOX		# Enhanced TCP event logging
 options 	TCP_HHOOK		# hhook(9) framework for TCP
+options		TCP_RFC7413		# TCP Fast Open
 options 	SCTP			# Stream Control Transmission Protocol
 options 	FFS			# Berkeley Fast Filesystem
 options 	SOFTUPDATES		# Enable FFS soft updates support
@@ -97,6 +99,12 @@ options 	WITNESS			# Enable checks to detect deadlocks and cycles
 options 	WITNESS_SKIPSPIN	# Don't run witness on spinlocks for speed
 options 	MALLOC_DEBUG_MAXZONES=8	# Separate malloc(9) zones
 
+# Kernel dump features.
+options 	EKCD			# Support for encrypted kernel dumps
+options 	GZIO			# gzip-compressed kernel and user dumps
+options 	ZSTDIO			# zstd-compressed kernel and user dumps
+options 	NETDUMP			# netdump(4) client support
+
 # Make an SMP-capable kernel by default
 options 	SMP			# Symmetric MultiProcessor Kernel
 options 	EARLY_AP_STARTUP
@@ -139,6 +147,7 @@ device		adw			# Advansys wide SCSI adapters
 device		aic			# Adaptec 15[012]x SCSI adapters, AIC-6[23]60.
 device		bt			# Buslogic/Mylex MultiMaster SCSI adapters
 device		isci			# Intel C600 SAS controller
+device		ocs_fc			# Emulex FC adapters
 
 # ATA/SCSI peripherals
 device		scbus			# SCSI bus (required for ATA/SCSI)
@@ -163,6 +172,7 @@ device		iir			# Intel Integrated RAID
 device		ips			# IBM (Adaptec) ServeRAID
 device		mly			# Mylex AcceleRAID/eXtremeRAID
 device		twa			# 3ware 9000 series PATA/SATA RAID
+device		smartpqi		# Microsemi smartpqi driver
 device		tws			# LSI 3ware 9750 SATA+SAS 6Gb/s RAID controller
 
 # RAID controllers
@@ -230,8 +240,8 @@ device		em			# Intel PRO/1000 Gigabit Ethernet Family
 device		ix			# Intel PRO/10GbE PCIE PF Ethernet
 device		ixv			# Intel PRO/10GbE PCIE VF Ethernet
 device		ixl			# Intel XL710 40Gbe PCIE Ethernet
-options		IXL_IW			# Enable iWARP Client Interface in ixl(4)
-device		ixlv			# Intel XL710 40Gbe VF PCIE Ethernet
+#options		IXL_IW			# Enable iWARP Client Interface in ixl(4)
+#device		ixlv			# Intel XL710 40Gbe VF PCIE Ethernet
 device		le			# AMD Am7900 LANCE and Am79C9xx PCnet
 device		ti			# Alteon Networks Tigon I/II gigabit Ethernet
 device		txp			# 3Com 3cR990 (``Typhoon'')

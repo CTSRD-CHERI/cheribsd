@@ -34,7 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
@@ -278,6 +277,8 @@ get_process_cputime(struct proc *targetp, struct timespec *ats)
 	PROC_STATLOCK(targetp);
 	rufetch(targetp, &ru);
 	runtime = targetp->p_rux.rux_runtime;
+	if (curthread->td_proc == targetp)
+		runtime += cpu_ticks() - PCPU_GET(switchtime);
 	PROC_STATUNLOCK(targetp);
 	cputick2timespec(runtime, ats);
 }
@@ -561,7 +562,8 @@ kern_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
 	} while (error == 0 && is_abs_real && td->td_rtcgen == 0);
 	td->td_rtcgen = 0;
 	if (error != EWOULDBLOCK) {
-		TIMESEL(&sbtt, tmp);
+		if (TIMESEL(&sbtt, tmp))
+			sbtt += tc_tick_sbt;
 		if (sbtt >= sbt)
 			return (0);
 		if (error == ERESTART)
@@ -1189,15 +1191,15 @@ convert_sigevent(const struct sigevent_native *sig_n, ksigevent_t *sig)
 		/* FALLTHROUGH */
 	case SIGEV_SIGNAL:
 		sig->sigev_signo = sig_n->sigev_signo;
-		sig->sigev_value.sival_ptr =
-		    (void * __capability)(intcap_t)sig_n->sigev_value.sival_ptr;
+		sig->sigev_value.sival_ptr_native =
+		    sig_n->sigev_value.sival_ptr_native;
 		break;
 	case SIGEV_KEVENT:
 		sig->sigev_notify_kqueue = sig_n->sigev_notify_kqueue;
 		sig->sigev_notify_kevent_flags =
 		    sig_n->sigev_notify_kevent_flags;
-		sig->sigev_value.sival_ptr =
-		    (void * __capability)(intcap_t)sig_n->sigev_value.sival_ptr;
+		sig->sigev_value.sival_ptr_native =
+		    sig_n->sigev_value.sival_ptr_native;
 		break;
 	default:
 		return (EINVAL);
@@ -1325,6 +1327,8 @@ kern_ktimer_create(struct thread *td, clockid_t clock_id, ksigevent_t *evp,
 			it->it_sigev.sigev_signo = SIGPROF;
 			break;
 		}
+		memset(&it->it_sigev.sigev_value, 0,
+		    sizeof(it->it_sigev.sigev_value));
 		it->it_sigev.sigev_value.sival_int = id;
 	}
 
@@ -1332,7 +1336,9 @@ kern_ktimer_create(struct thread *td, clockid_t clock_id, ksigevent_t *evp,
 	    it->it_sigev.sigev_notify == SIGEV_THREAD_ID) {
 		it->it_ksi.ksi_signo = it->it_sigev.sigev_signo;
 		it->it_ksi.ksi_code = SI_TIMER;
-		it->it_ksi.ksi_value = it->it_sigev.sigev_value;
+		CTASSERT(sizeof(it->it_ksi.ksi_value) == sizeof(it->it_sigev.sigev_value));
+		memcpy(&it->it_ksi.ksi_value, &it->it_sigev.sigev_value,
+		    sizeof(it->it_ksi.ksi_value));
 		it->it_ksi.ksi_timerid = id;
 	}
 	PROC_UNLOCK(p);

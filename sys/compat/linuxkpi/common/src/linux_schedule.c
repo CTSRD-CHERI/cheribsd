@@ -33,6 +33,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/signalvar.h>
 #include <sys/sleepqueue.h>
 
+#include <linux/delay.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include <linux/list.h>
@@ -41,11 +42,12 @@ __FBSDID("$FreeBSD$");
 #include <linux/wait.h>
 
 static int
-linux_add_to_sleepqueue(void *wchan, const char *wmesg, int timeout, int state)
+linux_add_to_sleepqueue(void *wchan, struct task_struct *task,
+    const char *wmesg, int timeout, int state)
 {
 	int flags, ret;
 
-	MPASS((state & ~TASK_NORMAL) == 0);
+	MPASS((state & ~(TASK_PARKED | TASK_NORMAL)) == 0);
 
 	flags = SLEEPQ_SLEEP | ((state & TASK_INTERRUPTIBLE) != 0 ?
 	    SLEEPQ_INTERRUPTIBLE : 0);
@@ -53,6 +55,8 @@ linux_add_to_sleepqueue(void *wchan, const char *wmesg, int timeout, int state)
 	sleepq_add(wchan, NULL, wmesg, flags, 0);
 	if (timeout != 0)
 		sleepq_set_timeout(wchan, timeout);
+
+	DROP_GIANT();
 	if ((state & TASK_INTERRUPTIBLE) != 0) {
 		if (timeout == 0)
 			ret = -sleepq_wait_sig(wchan, 0);
@@ -65,10 +69,33 @@ linux_add_to_sleepqueue(void *wchan, const char *wmesg, int timeout, int state)
 		} else
 			ret = -sleepq_timedwait(wchan, 0);
 	}
+	PICKUP_GIANT();
+
 	/* filter return value */
-	if (ret != 0 && ret != -EWOULDBLOCK)
+	if (ret != 0 && ret != -EWOULDBLOCK) {
+		linux_schedule_save_interrupt_value(task, ret);
 		ret = -ERESTARTSYS;
+	}
 	return (ret);
+}
+
+unsigned int
+linux_msleep_interruptible(unsigned int ms)
+{
+	int ret;
+
+	/* guard against invalid values */
+	if (ms == 0)
+		ms = 1;
+	ret = -pause_sbt("lnxsleep", mstosbt(ms), 0, C_HARDCLOCK | C_CATCH);
+
+	switch (ret) {
+	case -EWOULDBLOCK:
+		return (0);
+	default:
+		linux_schedule_save_interrupt_value(current, ret);
+		return (ms);
+	}
 }
 
 static int
@@ -153,6 +180,24 @@ autoremove_wake_function(wait_queue_t *wq, unsigned int state, int flags,
 	return (ret);
 }
 
+int
+default_wake_function(wait_queue_t *wq, unsigned int state, int flags,
+    void *key __unused)
+{
+	return (wake_up_task(wq->private, state));
+}
+
+void
+linux_init_wait_entry(wait_queue_t *wq, int flags)
+{
+
+	memset(wq, 0, sizeof(*wq));
+	wq->flags = flags;
+	wq->private = current;
+	wq->func = autoremove_wake_function;
+	INIT_LIST_HEAD(&wq->task_list);
+}
+
 void
 linux_wake_up(wait_queue_head_t *wqh, unsigned int state, int nr, bool locked)
 {
@@ -218,8 +263,6 @@ linux_wait_event_common(wait_queue_head_t *wqh, wait_queue_t *wq, int timeout,
 	if (lock != NULL)
 		spin_unlock_irq(lock);
 
-	DROP_GIANT();
-
 	/* range check timeout */
 	if (timeout < 1)
 		timeout = 1;
@@ -235,14 +278,13 @@ linux_wait_event_common(wait_queue_head_t *wqh, wait_queue_t *wq, int timeout,
 	PHOLD(task->task_thread->td_proc);
 	sleepq_lock(task);
 	if (atomic_read(&task->state) != TASK_WAKING) {
-		ret = linux_add_to_sleepqueue(task, "wevent", timeout, state);
+		ret = linux_add_to_sleepqueue(task, task, "wevent", timeout,
+		    state);
 	} else {
 		sleepq_release(task);
-		ret = linux_signal_pending_state(state, task) ? -ERESTARTSYS : 0;
+		ret = 0;
 	}
 	PRELE(task->task_thread->td_proc);
-
-	PICKUP_GIANT();
 
 	if (lock != NULL)
 		spin_lock_irq(lock);
@@ -253,6 +295,7 @@ int
 linux_schedule_timeout(int timeout)
 {
 	struct task_struct *task;
+	int ret;
 	int state;
 	int remainder;
 
@@ -266,24 +309,27 @@ linux_schedule_timeout(int timeout)
 
 	remainder = ticks + timeout;
 
-	DROP_GIANT();
-
 	sleepq_lock(task);
 	state = atomic_read(&task->state);
-	if (state != TASK_WAKING)
-		(void)linux_add_to_sleepqueue(task, "sched", timeout, state);
-	else
+	if (state != TASK_WAKING) {
+		ret = linux_add_to_sleepqueue(task, task, "sched", timeout,
+		    state);
+	} else {
 		sleepq_release(task);
+		ret = 0;
+	}
 	set_task_state(task, TASK_RUNNING);
-
-	PICKUP_GIANT();
 
 	if (timeout == 0)
 		return (MAX_SCHEDULE_TIMEOUT);
 
 	/* range check return value */
 	remainder -= ticks;
-	if (remainder < 0)
+
+	/* range check return value */
+	if (ret == -ERESTARTSYS && remainder < 1)
+		remainder = 1;
+	else if (remainder < 0)
 		remainder = 0;
 	else if (remainder > timeout)
 		remainder = timeout;
@@ -319,8 +365,6 @@ linux_wait_on_bit_timeout(unsigned long *word, int bit, unsigned int state,
 	void *wchan;
 	int ret;
 
-	DROP_GIANT();
-
 	/* range check timeout */
 	if (timeout < 1)
 		timeout = 1;
@@ -337,13 +381,12 @@ linux_wait_on_bit_timeout(unsigned long *word, int bit, unsigned int state,
 			break;
 		}
 		set_task_state(task, state);
-		ret = linux_add_to_sleepqueue(wchan, "wbit", timeout, state);
+		ret = linux_add_to_sleepqueue(wchan, task, "wbit", timeout,
+		    state);
 		if (ret != 0)
 			break;
 	}
 	set_task_state(task, TASK_RUNNING);
-
-	PICKUP_GIANT();
 
 	return (ret);
 }
@@ -362,8 +405,6 @@ linux_wait_on_atomic_t(atomic_t *a, unsigned int state)
 	void *wchan;
 	int ret;
 
-	DROP_GIANT();
-
 	task = current;
 	wchan = a;
 	for (;;) {
@@ -374,13 +415,11 @@ linux_wait_on_atomic_t(atomic_t *a, unsigned int state)
 			break;
 		}
 		set_task_state(task, state);
-		ret = linux_add_to_sleepqueue(wchan, "watomic", 0, state);
+		ret = linux_add_to_sleepqueue(wchan, task, "watomic", 0, state);
 		if (ret != 0)
 			break;
 	}
 	set_task_state(task, TASK_RUNNING);
-
-	PICKUP_GIANT();
 
 	return (ret);
 }

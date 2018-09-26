@@ -242,7 +242,7 @@ a10_ehci_attach(device_t self)
 
 	/* Enable USB PHY */
 	if (phy_get_by_ofw_name(self, 0, "usb", &aw_sc->phy) == 0) {
-		err = phy_enable(self, aw_sc->phy);
+		err = phy_enable(aw_sc->phy);
 		if (err != 0) {
 			device_printf(self, "Could not enable phy\n");
 			goto error;
@@ -365,5 +365,5 @@ static driver_t ehci_driver = {
 
 static devclass_t ehci_devclass;
 
-DRIVER_MODULE(ehci, simplebus, ehci_driver, ehci_devclass, 0, 0);
-MODULE_DEPEND(ehci, usb, 1, 1, 1);
+DRIVER_MODULE(a10_ehci, simplebus, ehci_driver, ehci_devclass, 0, 0);
+MODULE_DEPEND(a10_ehci, usb, 1, 1, 1);

@@ -52,7 +52,6 @@ struct mem_affinity {
 extern struct mem_affinity *mem_affinity;
 extern int *mem_locality;
 #endif
-extern int vm_ndomains;
 
 struct vm_freelist {
 	struct pglist pl;
@@ -78,6 +77,7 @@ vm_page_t vm_phys_alloc_contig(int domain, u_long npages, vm_paddr_t low,
     vm_paddr_t high, u_long alignment, vm_paddr_t boundary);
 vm_page_t vm_phys_alloc_freelist_pages(int domain, int freelist, int pool,
     int order);
+int vm_phys_alloc_npages(int domain, int pool, int npages, vm_page_t ma[]);
 vm_page_t vm_phys_alloc_pages(int domain, int pool, int order);
 int vm_phys_domain_match(int prefer, vm_paddr_t low, vm_paddr_t high);
 int vm_phys_fictitious_reg_range(vm_paddr_t start, vm_paddr_t end,
@@ -96,12 +96,12 @@ int vm_phys_mem_affinity(int f, int t);
 
 /*
  *
- *	vm_phys_domidx:
+ *	vm_phys_domain:
  *
  *	Return the index of the domain the page belongs to.
  */
 static inline int
-vm_phys_domidx(vm_page_t m)
+vm_phys_domain(vm_page_t m)
 {
 #ifdef NUMA
 	int domn, segind;
@@ -115,27 +115,6 @@ vm_phys_domidx(vm_page_t m)
 #else
 	return (0);
 #endif
-}
-
-/*
- *	vm_phys_domain:
- *
- * 	Return the memory domain the page belongs to.
- */
-static inline struct vm_domain *
-vm_phys_domain(vm_page_t m)
-{
-
-	return (&vm_dom[vm_phys_domidx(m)]);
-}
-
-static inline u_int
-vm_phys_freecnt_adj(vm_page_t m, int adj)
-{
-
-	mtx_assert(&vm_page_queue_free_mtx, MA_OWNED);
-	vm_phys_domain(m)->vmd_free_count += adj;
-	return (vm_cnt.v_free_count += adj);
 }
 
 #endif	/* _KERNEL */

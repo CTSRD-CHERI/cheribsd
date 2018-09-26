@@ -81,7 +81,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 #include "opt_hwpmc_hooks.h"
 #include "opt_kstack_pages.h"
@@ -209,6 +208,16 @@ booke_cpu_init(void)
 {
 
 	cpu_features |= PPC_FEATURE_BOOKE;
+
+	psl_kernset = PSL_CE | PSL_ME | PSL_EE;
+#ifdef __powerpc64__
+	psl_kernset |= PSL_CM;
+#endif
+	psl_userset = psl_kernset | PSL_PR;
+#ifdef __powerpc64__
+	psl_userset32 = psl_userset & ~PSL_CM;
+#endif
+	psl_userstatic = ~(PSL_VEC | PSL_FP | PSL_FE0 | PSL_FE1);
 
 	pmap_mmu_install(MMU_TYPE_BOOKE, BUS_PROBE_GENERIC);
 }
@@ -362,7 +371,7 @@ booke_init(u_long arg1, u_long arg2)
 	return (ret);
 }
 
-#define RES_GRANULE 32
+#define RES_GRANULE cacheline_size
 extern uintptr_t tlb0_miss_locks[];
 
 /* Initialise a struct pcpu. */
@@ -370,14 +379,14 @@ void
 cpu_pcpu_init(struct pcpu *pcpu, int cpuid, size_t sz)
 {
 
-	pcpu->pc_tid_next = TID_MIN;
+	pcpu->pc_booke.tid_next = TID_MIN;
 
 #ifdef SMP
 	uintptr_t *ptr;
 	int words_per_gran = RES_GRANULE / sizeof(uintptr_t);
 
 	ptr = &tlb0_miss_locks[cpuid * words_per_gran];
-	pcpu->pc_booke_tlb_lock = ptr;
+	pcpu->pc_booke.tlb_lock = ptr;
 	*ptr = TLB_UNLOCKED;
 	*(ptr + 1) = 0;		/* recurse counter */
 #endif

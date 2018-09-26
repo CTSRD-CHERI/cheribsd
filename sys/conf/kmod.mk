@@ -81,13 +81,18 @@ OBJCOPY?=	objcopy
 .include "config.mk"
 
 # Search for kernel source tree in standard places.
-.for _dir in ${.CURDIR}/../.. ${.CURDIR}/../../.. /sys /usr/src/sys
+.if empty(KERNBUILDDIR)
+.if !defined(SYSDIR)
+.for _dir in ${SRCTOP:D${SRCTOP}/sys} \
+    ${.CURDIR}/../.. ${.CURDIR}/../../.. /sys /usr/src/sys
 .if !defined(SYSDIR) && exists(${_dir}/kern/)
 SYSDIR=	${_dir:tA}
 .endif
 .endfor
+.endif
 .if !defined(SYSDIR) || !exists(${SYSDIR}/kern/)
 .error "can't find kernel source tree"
+.endif
 .endif
 
 .SUFFIXES: .out .o .c .cc .cxx .C .y .l .s .S .m
@@ -106,6 +111,9 @@ WERROR?=	-Werror
 CFLAGS+=	${WERROR}
 CFLAGS+=	-D_KERNEL
 CFLAGS+=	-DKLD_MODULE
+.if defined(MODULE_TIED)
+CFLAGS+=	-DKLD_TIED
+.endif
 
 # Don't use any standard or source-relative include directories.
 NOSTDINC=	-nostdinc
@@ -117,7 +125,7 @@ CFLAGS+=	-DHAVE_KERNEL_OPTION_HEADERS -include ${KERNBUILDDIR}/opt_global.h
 # Add -I paths for system headers.  Individual module makefiles don't
 # need any -I paths for this.  Similar defaults for .PATH can't be
 # set because there are no standard paths for non-headers.
-CFLAGS+=	-I. -I${SYSDIR}
+CFLAGS+=	-I. -I${SYSDIR} -I${SYSDIR}/contrib/ck/include
 
 CFLAGS.gcc+=	-finline-limit=${INLINE_LIMIT}
 CFLAGS.gcc+=	-fms-extensions
@@ -244,14 +252,14 @@ ${FULLPROG}: ${OBJS}
 .if ${EXPORT_SYMS} == NO
 	:> export_syms
 .elif !exists(${.CURDIR}/${EXPORT_SYMS})
-	echo ${EXPORT_SYMS} > export_syms
+	echo -n "${EXPORT_SYMS:@s@$s${.newline}@}" > export_syms
 .else
 	grep -v '^#' < ${EXPORT_SYMS} > export_syms
 .endif
 	${AWK} -f ${SYSDIR}/conf/kmod_syms.awk ${.TARGET} \
 	    export_syms | xargs -J% ${OBJCOPY} % ${.TARGET}
 .endif
-.endif
+.endif # defined(EXPORT_SYMS)
 .if defined(PREFIX_SYMS)
 	${AWK} -v prefix=${PREFIX_SYMS} -f ${SYSDIR}/conf/kmod_syms_prefix.awk \
 	    ${.TARGET} /dev/null | xargs -J% ${OBJCOPY} % ${.TARGET}
@@ -455,24 +463,32 @@ acpi_quirks.h: ${SYSDIR}/tools/acpi_quirks2h.awk ${SYSDIR}/dev/acpica/acpi_quirk
 	${AWK} -f ${SYSDIR}/tools/acpi_quirks2h.awk ${SYSDIR}/dev/acpica/acpi_quirks
 .endif
 
-.if !empty(SRCS:Massym.s) || !empty(DPSRCS:Massym.s)
-CLEANFILES+=	assym.s genassym.o
+.if !empty(SRCS:Massym.inc) || !empty(DPSRCS:Massym.inc)
+CLEANFILES+=	assym.inc
 DEPENDOBJS+=	genassym.o
-assym.s: genassym.o
-.if defined(KERNBUILDDIR)
-genassym.o: opt_global.h
+DPSRCS+=	offset.inc
 .endif
-assym.s: ${SYSDIR}/kern/genassym.sh
+.if defined(MODULE_TIED)
+DPSRCS+=	offset.inc
+.endif
+.if !empty(SRCS:Moffset.inc) || !empty(DPSRCS:Moffset.inc)
+CLEANFILES+=	offset.inc genoffset.o
+DEPENDOBJS+=	genoffset.o
+.endif
+assym.inc: genassym.o
+offset.inc: genoffset.o
+assym.inc: ${SYSDIR}/kern/genassym.sh
 	sh ${SYSDIR}/kern/genassym.sh genassym.o > ${.TARGET}
-genassym.o: ${SYSDIR}/${MACHINE}/${MACHINE}/genassym.c
+genassym.o: ${SYSDIR}/${MACHINE}/${MACHINE}/genassym.c offset.inc
 genassym.o: ${SRCS:Mopt_*.h}
 	${CC} -c ${CFLAGS:N-flto:N-fno-common} \
 	    ${SYSDIR}/${MACHINE}/${MACHINE}/genassym.c
-.endif
-
-.if defined(KERNBUILDDIR)
-${OBJS}: opt_global.h
-.endif
+offset.inc: ${SYSDIR}/kern/genoffset.sh genoffset.o
+	sh ${SYSDIR}/kern/genoffset.sh genoffset.o > ${.TARGET}
+genoffset.o: ${SYSDIR}/kern/genoffset.c
+genoffset.o: ${SRCS:Mopt_*.h}
+	${CC} -c ${CFLAGS:N-flto:N-fno-common} \
+	    ${SYSDIR}/kern/genoffset.c
 
 CLEANDEPENDFILES+=	${_ILINKS}
 # .depend needs include links so we remove them only together.
@@ -480,6 +496,9 @@ cleanilinks:
 	rm -f ${_ILINKS}
 
 OBJS_DEPEND_GUESS+= ${SRCS:M*.h}
+.if defined(KERNBUILDDIR)
+OBJS_DEPEND_GUESS+= opt_global.h
+.endif
 
 .include <bsd.dep.mk>
 .include <bsd.clang-analyze.mk>

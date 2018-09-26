@@ -1,4 +1,6 @@
 /*-
+ * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ *
  * Copyright (c) 2013, Anish Gupta (akgupt3@gmail.com)
  * All rights reserved.
  *
@@ -42,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpufunc.h>
 #include <machine/psl.h>
 #include <machine/md_var.h>
+#include <machine/reg.h>
 #include <machine/specialreg.h>
 #include <machine/smp.h>
 #include <machine/vmm.h>
@@ -507,8 +510,8 @@ vmcb_init(struct svm_softc *sc, int vcpu, uint64_t iopm_base_pa,
 	    PAT_VALUE(7, PAT_UNCACHEABLE);
 
 	/* Set up DR6/7 to power-on state */
-	state->dr6 = 0xffff0ff0;
-	state->dr7 = 0x400;
+	state->dr6 = DBREG_DR6_RESERVED1;
+	state->dr7 = DBREG_DR7_RESERVED1;
 }
 
 /*
@@ -933,7 +936,6 @@ svm_update_virqinfo(struct svm_softc *sc, int vcpu)
 	struct vm *vm;
 	struct vlapic *vlapic;
 	struct vmcb_ctrl *ctrl;
-	int pending;
 
 	vm = sc->vm;
 	vlapic = vm_lapic(vm, vcpu);
@@ -942,20 +944,9 @@ svm_update_virqinfo(struct svm_softc *sc, int vcpu)
 	/* Update %cr8 in the emulated vlapic */
 	vlapic_set_cr8(vlapic, ctrl->v_tpr);
 
-	/*
-	 * If V_IRQ indicates that the interrupt injection attempted on then
-	 * last VMRUN was successful then update the vlapic accordingly.
-	 */
-	if (ctrl->v_intr_vector != 0) {
-		pending = ctrl->v_irq;
-		KASSERT(ctrl->v_intr_vector >= 16, ("%s: invalid "
-		    "v_intr_vector %d", __func__, ctrl->v_intr_vector));
-		KASSERT(!ctrl->v_ign_tpr, ("%s: invalid v_ign_tpr", __func__));
-		VCPU_CTR2(vm, vcpu, "v_intr_vector %d %s", ctrl->v_intr_vector,
-		    pending ? "pending" : "accepted");
-		if (!pending)
-			vlapic_intr_accepted(vlapic, ctrl->v_intr_vector);
-	}
+	/* Virtual interrupt injection is not used. */
+	KASSERT(ctrl->v_intr_vector == 0, ("%s: invalid "
+	    "v_intr_vector %d", __func__, ctrl->v_intr_vector));
 }
 
 static void
@@ -981,6 +972,7 @@ svm_save_intinfo(struct svm_softc *svm_sc, int vcpu)
 	vm_exit_intinfo(svm_sc->vm, vcpu, intinfo);
 }
 
+#ifdef INVARIANTS
 static __inline int
 vintr_intercept_enabled(struct svm_softc *sc, int vcpu)
 {
@@ -988,6 +980,7 @@ vintr_intercept_enabled(struct svm_softc *sc, int vcpu)
 	return (svm_get_intercept(sc, vcpu, VMCB_CTRL1_INTCPT,
 	    VMCB_INTCPT_VINTR));
 }
+#endif
 
 static __inline void
 enable_intr_window_exiting(struct svm_softc *sc, int vcpu)
@@ -1024,12 +1017,7 @@ disable_intr_window_exiting(struct svm_softc *sc, int vcpu)
 		return;
 	}
 
-#ifdef KTR
-	if (ctrl->v_intr_vector == 0)
-		VCPU_CTR0(sc->vm, vcpu, "Disable intr window exiting");
-	else
-		VCPU_CTR0(sc->vm, vcpu, "Clearing V_IRQ interrupt injection");
-#endif
+	VCPU_CTR0(sc->vm, vcpu, "Disable intr window exiting");
 	ctrl->v_irq = 0;
 	ctrl->v_intr_vector = 0;
 	svm_set_dirty(sc, vcpu, VMCB_CACHE_TPR);
@@ -1574,14 +1562,14 @@ svm_inj_interrupts(struct svm_softc *sc, int vcpu, struct vlapic *vlapic)
 	struct vmcb_state *state;
 	struct svm_vcpu *vcpustate;
 	uint8_t v_tpr;
-	int vector, need_intr_window, pending_apic_vector;
+	int vector, need_intr_window;
+	int extint_pending;
 
 	state = svm_get_vmcb_state(sc, vcpu);
 	ctrl  = svm_get_vmcb_ctrl(sc, vcpu);
 	vcpustate = svm_get_vcpu(sc, vcpu);
 
 	need_intr_window = 0;
-	pending_apic_vector = 0;
 
 	if (vcpustate->nextrip != state->rip) {
 		ctrl->intr_shadow = 0;
@@ -1651,39 +1639,18 @@ svm_inj_interrupts(struct svm_softc *sc, int vcpu, struct vlapic *vlapic)
 		}
 	}
 
-	if (!vm_extint_pending(sc->vm, vcpu)) {
-		/*
-		 * APIC interrupts are delivered using the V_IRQ offload.
-		 *
-		 * The primary benefit is that the hypervisor doesn't need to
-		 * deal with the various conditions that inhibit interrupts.
-		 * It also means that TPR changes via CR8 will be handled
-		 * without any hypervisor involvement.
-		 *
-		 * Note that the APIC vector must remain pending in the vIRR
-		 * until it is confirmed that it was delivered to the guest.
-		 * This can be confirmed based on the value of V_IRQ at the
-		 * next #VMEXIT (1 = pending, 0 = delivered).
-		 *
-		 * Also note that it is possible that another higher priority
-		 * vector can become pending before this vector is delivered
-		 * to the guest. This is alright because vcpu_notify_event()
-		 * will send an IPI and force the vcpu to trap back into the
-		 * hypervisor. The higher priority vector will be injected on
-		 * the next VMRUN.
-		 */
-		if (vlapic_pending_intr(vlapic, &vector)) {
-			KASSERT(vector >= 16 && vector <= 255,
-			    ("invalid vector %d from local APIC", vector));
-			pending_apic_vector = vector;
-		}
-		goto done;
+	extint_pending = vm_extint_pending(sc->vm, vcpu);
+	if (!extint_pending) {
+		if (!vlapic_pending_intr(vlapic, &vector))
+			goto done;
+		KASSERT(vector >= 16 && vector <= 255,
+		    ("invalid vector %d from local APIC", vector));
+	} else {
+		/* Ask the legacy pic for a vector to inject */
+		vatpic_pending_intr(sc->vm, &vector);
+		KASSERT(vector >= 0 && vector <= 255,
+		    ("invalid vector %d from INTR", vector));
 	}
-
-	/* Ask the legacy pic for a vector to inject */
-	vatpic_pending_intr(sc->vm, &vector);
-	KASSERT(vector >= 0 && vector <= 255, ("invalid vector %d from INTR",
-	    vector));
 
 	/*
 	 * If the guest has disabled interrupts or is in an interrupt shadow
@@ -1710,14 +1677,14 @@ svm_inj_interrupts(struct svm_softc *sc, int vcpu, struct vlapic *vlapic)
 		goto done;
 	}
 
-	/*
-	 * Legacy PIC interrupts are delivered via the event injection
-	 * mechanism.
-	 */
 	svm_eventinject(sc, vcpu, VMCB_EVENTINJ_TYPE_INTR, vector, 0, false);
 
-	vm_extint_clear(sc->vm, vcpu);
-	vatpic_intr_accepted(sc->vm, vector);
+	if (!extint_pending) {
+		vlapic_intr_accepted(vlapic, vector);
+	} else {
+		vm_extint_clear(sc->vm, vcpu);
+		vatpic_intr_accepted(sc->vm, vector);
+	}
 
 	/*
 	 * Force a VM-exit as soon as the vcpu is ready to accept another
@@ -1747,21 +1714,7 @@ done:
 		svm_set_dirty(sc, vcpu, VMCB_CACHE_TPR);
 	}
 
-	if (pending_apic_vector) {
-		/*
-		 * If an APIC vector is being injected then interrupt window
-		 * exiting is not possible on this VMRUN.
-		 */
-		KASSERT(!need_intr_window, ("intr_window exiting impossible"));
-		VCPU_CTR1(sc->vm, vcpu, "Injecting vector %d using V_IRQ",
-		    pending_apic_vector);
-
-		ctrl->v_irq = 1;
-		ctrl->v_ign_tpr = 0;
-		ctrl->v_intr_vector = pending_apic_vector;
-		ctrl->v_intr_prio = pending_apic_vector >> 4;
-		svm_set_dirty(sc, vcpu, VMCB_CACHE_TPR);
-	} else if (need_intr_window) {
+	if (need_intr_window) {
 		/*
 		 * We use V_IRQ in conjunction with the VINTR intercept to
 		 * trap into the hypervisor as soon as a virtual interrupt
@@ -2062,6 +2015,12 @@ svm_vmrun(void *arg, int vcpu, register_t rip, pmap_t pmap,
 		if (vcpu_should_yield(vm, vcpu)) {
 			enable_gintr();
 			vm_exit_astpending(vm, vcpu, state->rip);
+			break;
+		}
+
+		if (vcpu_debugged(vm, vcpu)) {
+			enable_gintr();
+			vm_exit_debug(vm, vcpu, state->rip);
 			break;
 		}
 

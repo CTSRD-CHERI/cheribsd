@@ -18,6 +18,16 @@
    License along with the GNU C Library; see the file COPYING.LIB.  If not,
    write to the Free Software Foundation, Inc., 59 Temple Place - Suite 330,
    Boston, MA 02111-1307, USA.  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180807,
+ *   "target_type": "prog",
+ *   "changes": [],
+ *   "change_comment": "work around compiler bug"
+ * }
+ * CHERI CHANGES END
+ */
 
 #ifdef HAVE_CONFIG_H
 #include <config.h>
@@ -59,8 +69,15 @@
 
 /* Determine default alignment.  */
 struct fooalign {char x; double d;};
+/* XXX: Should be constant folded rather than CGetNull/CFromPtr/CSub, which
+ *      gets broken by having a NULL DDC. */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define DEFAULT_ALIGNMENT  \
+  ((PTR_INT_TYPE) __builtin_offsetof(struct fooalign, d))
+#else
 #define DEFAULT_ALIGNMENT  \
   ((PTR_INT_TYPE) ((char *) &((struct fooalign *) 0)->d - (char *) 0))
+#endif
 /* If malloc were really smart, it would round addresses to DEFAULT_ALIGNMENT.
    But in fact it might be less smart and round addresses to as much as
    DEFAULT_ROUNDING.  So we prepare for it to do that.  */

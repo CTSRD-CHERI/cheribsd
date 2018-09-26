@@ -3,7 +3,9 @@
 # Use the following command to build local debug version of dynamic
 # linker:
 # make DEBUG_FLAGS=-g DEBUG=-DDEBUG WITHOUT_TESTS=yes all
-
+.ifdef BUILD_RTLD_DEBUG
+CFLAGS+=-DDEBUG
+.endif
 # Not adapted for CHERI
 WANT_CHERI=none
 
@@ -60,7 +62,7 @@ CFLAGS.reloc.c+=-fno-jump-tables
 CFLAGS+=	-DTLS_USE_SYSARCH=1
 .endif
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
-LIBADD=		c_pic
+LIBADD=		c_nossp_pic
 .if ${MK_TOOLCHAIN} == "no"
 LDFLAGS+=	-L${LIBCDIR}
 .endif

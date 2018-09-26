@@ -54,7 +54,6 @@ MAN=	aac.4 \
 	${_aout.4} \
 	${_apic.4} \
 	arcmsr.4 \
-	${_armv8crypto.4} \
 	${_asmc.4} \
 	ata.4 \
 	ath.4 \
@@ -70,11 +69,6 @@ MAN=	aac.4 \
 	audit.4 \
 	auditpipe.4 \
 	aue.4 \
-	${_aw_gpio.4} \
-	${_aw_mmc.4} \
-	${_aw_rtc.4} \
-	${_aw_sid.4} \
-	${_aw_syscon.4} \
 	axe.4 \
 	axge.4 \
 	bce.4 \
@@ -97,6 +91,7 @@ MAN=	aac.4 \
 	bwi.4 \
 	bwn.4 \
 	${_bytgpio.4} \
+	${_chvgpio.4} \
 	capsicum.4 \
 	cardbus.4 \
 	carp.4 \
@@ -119,7 +114,6 @@ MAN=	aac.4 \
 	chromebook_platform.4 \
 	ciss.4 \
 	cloudabi.4 \
-	cm.4 \
 	cmx.4 \
 	${_coretemp.4} \
 	${_cpuctl.4} \
@@ -164,11 +158,11 @@ MAN=	aac.4 \
 	fd.4 \
 	fdc.4 \
 	fdt.4 \
+	fdt_pinctrl.4 \
 	fdtbus.4 \
 	ffclock.4 \
 	filemon.4 \
 	firewire.4 \
-	fpa.4 \
 	full.4 \
 	fwe.4 \
 	fwip.4 \
@@ -217,6 +211,7 @@ MAN=	aac.4 \
 	iicbus.4 \
 	iicsmb.4 \
 	iir.4 \
+	${_imcsmb.4} \
 	inet.4 \
 	inet6.4 \
 	intpm.4 \
@@ -243,10 +238,10 @@ MAN=	aac.4 \
 	iwmfw.4 \
 	iwn.4 \
 	iwnfw.4 \
-	ixgb.4 \
 	ixgbe.4 \
 	ixl.4 \
 	ixlv.4 \
+	jedec_dimm.4 \
 	jedec_ts.4 \
 	jme.4 \
 	joy.4 \
@@ -264,7 +259,6 @@ MAN=	aac.4 \
 	${_linux.4} \
 	liquidio.4 \
 	lm75.4 \
-	lmc.4 \
 	lo.4 \
 	lp.4 \
 	lpbb.4 \
@@ -308,6 +302,7 @@ MAN=	aac.4 \
 	msk.4 \
 	mtio.4 \
 	multicast.4 \
+	muge.4 \
 	mvs.4 \
 	mwl.4 \
 	mwlfw.4 \
@@ -319,6 +314,7 @@ MAN=	aac.4 \
 	ncv.4 \
 	${_ndis.4} \
 	net80211.4 \
+	netdump.4 \
 	netfpga10g_nf10bmac.4 \
 	netgraph.4 \
 	netintro.4 \
@@ -396,8 +392,8 @@ MAN=	aac.4 \
 	${_nvme.4} \
 	${_nvram.4} \
 	${_nvram2env.4} \
-	${_nxge.4} \
 	oce.4 \
+	ocs_fc.4\
 	ohci.4 \
 	orm.4 \
 	ow.4 \
@@ -473,6 +469,7 @@ MAN=	aac.4 \
 	sio.4 \
 	sis.4 \
 	sk.4 \
+	${_smartpqi.4} \
 	smb.4 \
 	smbus.4 \
 	smp.4 \
@@ -509,6 +506,7 @@ MAN=	aac.4 \
 	snd_via82c686.4 \
 	snd_vibes.4 \
 	snp.4 \
+	spigen.4 \
 	${_spkr.4} \
 	splash.4 \
 	sppp.4 \
@@ -565,7 +563,6 @@ MAN=	aac.4 \
 	vt.4 \
 	vte.4 \
 	${_vtnet.4} \
-	${_vxge.4} \
 	watchdog.4 \
 	wb.4 \
 	${_wbwd.4} \
@@ -670,7 +667,6 @@ MLINKS+=ipw.4 if_ipw.4
 MLINKS+=iwi.4 if_iwi.4
 MLINKS+=iwm.4 if_iwm.4
 MLINKS+=iwn.4 if_iwn.4
-MLINKS+=ixgb.4 if_ixgb.4
 MLINKS+=ixgbe.4 ix.4
 MLINKS+=ixgbe.4 if_ix.4
 MLINKS+=ixgbe.4 if_ixgbe.4
@@ -682,7 +678,6 @@ MLINKS+=lagg.4 trunk.4
 MLINKS+=lagg.4 if_lagg.4
 MLINKS+=le.4 if_le.4
 MLINKS+=lge.4 if_lge.4
-MLINKS+=lmc.4 if_lmc.4
 MLINKS+=lo.4 loop.4
 MLINKS+=lp.4 plip.4
 MLINKS+=malo.4 if_malo.4
@@ -703,7 +698,6 @@ MLINKS+=netintro.4 net.4 \
 	netintro.4 networking.4
 MLINKS+=${_nfe.4} ${_if_nfe.4}
 MLINKS+=nge.4 if_nge.4
-MLINKS+=${_nxge.4} ${_if_nxge.4}
 MLINKS+=ow.4 onewire.4
 MLINKS+=pccbb.4 cbb.4
 MLINKS+=pcm.4 snd.4 \
@@ -753,25 +747,12 @@ MLINKS+=vpo.4 imm.4
 MLINKS+=vr.4 if_vr.4
 MLINKS+=vte.4 if_vte.4
 MLINKS+=${_vtnet.4} ${_if_vtnet.4}
-MLINKS+=${_vxge.4} ${_if_vxge.4}
 MLINKS+=watchdog.4 SW_WATCHDOG.4
 MLINKS+=wb.4 if_wb.4
 MLINKS+=wi.4 if_wi.4
 MLINKS+=${_wpi.4} ${_if_wpi.4}
 MLINKS+=xe.4 if_xe.4
 MLINKS+=xl.4 if_xl.4
-
-.if ${MACHINE_CPUARCH} == "aarch64"
-_armv8crypto.4=	armv8crypto.4
-.endif
-
-.if ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "aarch64"
-_aw_gpio.4=	aw_gpio.4
-_aw_mmc.4=	aw_mmc.4
-_aw_rtc.4=	aw_rtc.4
-_aw_sid.4=	aw_sid.4
-_aw_syscon.4=	aw_syscon.4
-.endif
 
 .if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 _acpi_asus.4=	acpi_asus.4
@@ -798,6 +779,7 @@ _amdtemp.4=	amdtemp.4
 _asmc.4=	asmc.4
 _bxe.4=		bxe.4
 _bytgpio.4=	bytgpio.4
+_chvgpio.4=	chvgpio.4
 _coretemp.4=	coretemp.4
 _cpuctl.4=	cpuctl.4
 _dpms.4=	dpms.4
@@ -817,12 +799,11 @@ _ichwd.4=	ichwd.4
 _if_bxe.4=	if_bxe.4
 _if_ndis.4=	if_ndis.4
 _if_nfe.4=	if_nfe.4
-_if_nxge.4=	if_nxge.4
 _if_urtw.4=	if_urtw.4
 _if_vmx.4=	if_vmx.4
 _if_vtnet.4=	if_vtnet.4
-_if_vxge.4=	if_vxge.4
 _if_wpi.4=	if_wpi.4
+_imcsmb.4=	imcsmb.4
 _ipmi.4=	ipmi.4
 _io.4=		io.4
 _linux.4=	linux.4
@@ -833,7 +814,6 @@ _nfsmb.4=	nfsmb.4
 _nvd.4=		nvd.4
 _nvme.4=	nvme.4
 _nvram.4=	nvram.4
-_nxge.4=	nxge.4
 _virtio.4=	virtio.4
 _virtio_balloon.4=virtio_balloon.4
 _virtio_blk.4=	virtio_blk.4
@@ -842,7 +822,6 @@ _virtio_random.4= virtio_random.4
 _virtio_scsi.4= virtio_scsi.4
 _vmx.4=		vmx.4
 _vtnet.4=	vtnet.4
-_vxge.4=	vxge.4
 _padlock.4=	padlock.4
 _rr232x.4=	rr232x.4
 _speaker.4=	speaker.4
@@ -869,6 +848,7 @@ _qlxgb.4=	qlxgb.4
 _qlxgbe.4=	qlxgbe.4
 _qlnxe.4=	qlnxe.4
 _sfxge.4=	sfxge.4
+_smartpqi.4=	smartpqi.4
 
 MLINKS+=qlxge.4 if_qlxge.4
 MLINKS+=qlxgb.4 if_qlxgb.4
@@ -886,9 +866,23 @@ _vmm.4=		vmm.4
 _nvram2env.4=	nvram2env.4
 .endif
 
-.if exists(${.CURDIR}/man4.${MACHINE_CPUARCH})
-SUBDIR=	man4.${MACHINE_CPUARCH}
+.if ${MACHINE_CPUARCH} == "powerpc"
+_nvd.4= 	nvd.4
+_nvme.4=	nvme.4
 .endif
+
+.if empty(MAN_ARCH)
+__arches=	${MACHINE} ${MACHINE_ARCH} ${MACHINE_CPUARCH}
+.elif ${MAN_ARCH} == "all"
+__arches=	${:!/bin/sh -c "/bin/ls -d ${.CURDIR}/man4.*"!:E}
+.else
+__arches=	${MAN_ARCH}
+.endif
+.for __arch in ${__arches:O:u}
+.if exists(${.CURDIR}/man4.${__arch})
+SUBDIR+=	man4.${__arch}
+.endif
+.endfor
 
 .if ${MK_BLUETOOTH} != "no"
 MAN+=		ng_bluetooth.4
@@ -904,6 +898,7 @@ _dtrace_provs=	dtrace_io.4 \
 		dtrace_lockstat.4 \
 		dtrace_proc.4 \
 		dtrace_sched.4 \
+		dtrace_sctp.4 \
 		dtrace_tcp.4 \
 		dtrace_udp.4
 .endif
@@ -918,6 +913,10 @@ MAN+=		iser.4
 .if ${MK_OFED} != "no"
 MAN+=		mlx4ib.4
 MAN+=		mlx5ib.4
+.endif
+
+.if ${MK_MLX5TOOL} != "no"
+MAN+=		mlx5io.4
 .endif
 
 .if ${MK_TESTS} != "no"

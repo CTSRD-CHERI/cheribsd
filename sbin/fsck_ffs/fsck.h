@@ -308,13 +308,14 @@ extern u_int	real_dev_bsize;		/* actual disk sector size, not overridden */
 extern char	nflag;			/* assume a no response */
 extern char	yflag;			/* assume a yes response */
 extern int	bkgrdflag;		/* use a snapshot to run on an active system */
-extern ufs2_daddr_t bflag;		/* location of alternate super block */
+extern off_t	bflag;			/* location of alternate super block */
 extern int	debug;			/* output debugging info */
 extern int	Eflag;			/* delete empty data blocks */
 extern int	Zflag;			/* zero empty data blocks */
 extern int	inoopt;			/* trim out unused inodes */
 extern char	ckclean;		/* only do work if not cleanly unmounted */
 extern int	cvtlevel;		/* convert to newer file system format */
+extern int	ckhashadd;		/* check hashes to be added */
 extern int	bkgrdcheck;		/* determine if background check is possible */
 extern int	bkgrdsumadj;		/* whether the kernel have ability to adjust superblock summary */
 extern char	usedsoftdep;		/* just fix soft dependency inconsistencies */
@@ -327,6 +328,7 @@ extern char	skipclean;		/* skip clean file systems if preening */
 extern int	fsmodified;		/* 1 => write done to file system */
 extern int	fsreadfd;		/* file descriptor for reading file system */
 extern int	fswritefd;		/* file descriptor for writing file system */
+extern struct	uufsd disk;		/* libufs user-ufs disk structure */
 extern int	surrender;		/* Give up if reads fail */
 extern int	wantrestart;		/* Restart fsck on early termination */
 

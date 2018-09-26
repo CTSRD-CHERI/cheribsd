@@ -435,8 +435,8 @@ yp_push(char *server, char *map, unsigned long tid)
  * is our private yp_all() routine.
  */
 static int
-yppush_foreach(int status, char *key, int keylen, char *val, int vallen,
-    char *data)
+yppush_foreach(u_long status, char *key, int keylen, char *val, int vallen,
+    void *data)
 {
 	char server[YPMAXRECORD + 2];
 

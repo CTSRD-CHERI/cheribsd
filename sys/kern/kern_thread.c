@@ -81,9 +81,9 @@ _Static_assert(offsetof(struct thread, td_flags) == 0xfc,
     "struct thread KBI td_flags");
 _Static_assert(offsetof(struct thread, td_pflags) == 0x104,
     "struct thread KBI td_pflags");
-_Static_assert(offsetof(struct thread, td_frame) == 0x468,
+_Static_assert(offsetof(struct thread, td_frame) == 0x470,
     "struct thread KBI td_frame");
-_Static_assert(offsetof(struct thread, td_emuldata) == 0x510,
+_Static_assert(offsetof(struct thread, td_emuldata) == 0x518,
     "struct thread KBI td_emuldata");
 _Static_assert(offsetof(struct proc, p_flag) == 0xb0,
     "struct proc KBI p_flag");
@@ -91,7 +91,7 @@ _Static_assert(offsetof(struct proc, p_pid) == 0xbc,
     "struct proc KBI p_pid");
 _Static_assert(offsetof(struct proc, p_filemon) == 0x3d0,
     "struct proc KBI p_filemon");
-_Static_assert(offsetof(struct proc, p_comm) == 0x3e0,
+_Static_assert(offsetof(struct proc, p_comm) == 0x3e4,
     "struct proc KBI p_comm");
 _Static_assert(offsetof(struct proc, p_emuldata) == 0x4b8,
     "struct proc KBI p_emuldata");
@@ -101,9 +101,9 @@ _Static_assert(offsetof(struct thread, td_flags) == 0x98,
     "struct thread KBI td_flags");
 _Static_assert(offsetof(struct thread, td_pflags) == 0xa0,
     "struct thread KBI td_pflags");
-_Static_assert(offsetof(struct thread, td_frame) == 0x2e4,
+_Static_assert(offsetof(struct thread, td_frame) == 0x2e8,
     "struct thread KBI td_frame");
-_Static_assert(offsetof(struct thread, td_emuldata) == 0x330,
+_Static_assert(offsetof(struct thread, td_emuldata) == 0x334,
     "struct thread KBI td_emuldata");
 _Static_assert(offsetof(struct proc, p_flag) == 0x68,
     "struct proc KBI p_flag");
@@ -111,9 +111,9 @@ _Static_assert(offsetof(struct proc, p_pid) == 0x74,
     "struct proc KBI p_pid");
 _Static_assert(offsetof(struct proc, p_filemon) == 0x27c,
     "struct proc KBI p_filemon");
-_Static_assert(offsetof(struct proc, p_comm) == 0x288,
+_Static_assert(offsetof(struct proc, p_comm) == 0x28c,
     "struct proc KBI p_comm");
-_Static_assert(offsetof(struct proc, p_emuldata) == 0x314,
+_Static_assert(offsetof(struct proc, p_emuldata) == 0x318,
     "struct proc KBI p_emuldata");
 #endif
 
@@ -532,9 +532,6 @@ thread_exit(void)
 	SDT_PROBE0(proc, , , lwp__exit);
 	KASSERT(TAILQ_EMPTY(&td->td_sigqueue.sq_list), ("signal pending"));
 
-#ifdef AUDIT
-	AUDIT_SYSCALL_EXIT(0, td);
-#endif
 	/*
 	 * drop FPU & debug register state storage, or any other
 	 * architecture specific resources that
@@ -586,8 +583,11 @@ thread_exit(void)
 	 * If this thread is part of a process that is being tracked by hwpmc(4),
 	 * inform the module of the thread's impending exit.
 	 */
-	if (PMC_PROC_IS_USING_PMCS(td->td_proc))
+	if (PMC_PROC_IS_USING_PMCS(td->td_proc)) {
 		PMC_SWITCH_CONTEXT(td, PMC_FN_CSW_OUT);
+		PMC_CALL_HOOK_UNLOCKED(td, PMC_FN_THR_EXIT, NULL);
+	} else if (PMC_SYSTEM_SAMPLING_ACTIVE())
+		PMC_CALL_HOOK_UNLOCKED(td, PMC_FN_THR_EXIT_LOG, NULL);
 #endif
 	PROC_UNLOCK(p);
 	PROC_STATLOCK(p);

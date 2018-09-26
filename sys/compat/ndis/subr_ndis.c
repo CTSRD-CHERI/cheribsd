@@ -1287,7 +1287,7 @@ NdisMRegisterIoPortRange(offset, adapter, port, numports)
 	if (rman_get_size(sc->ndis_res_io) < numports)
 		return (NDIS_STATUS_INVALID_LENGTH);
 
-	*offset = (void *)rman_get_start(sc->ndis_res_io);
+	*offset = (void *)(uintptr_t)rman_get_start(sc->ndis_res_io);
 
 	return (NDIS_STATUS_SUCCESS);
 }
@@ -1351,7 +1351,7 @@ NdisMAllocateMapRegisters(ndis_handle adapter, uint32_t dmachannel,
 	block = (ndis_miniport_block *)adapter;
 	sc = device_get_softc(block->nmb_physdeviceobj->do_devext);
 
-	sc->ndis_mmaps = mallocarray(physmapneeded, sizeof(bus_dmamap_t),
+	sc->ndis_mmaps = malloc(sizeof(bus_dmamap_t) * physmapneeded,
 	    M_DEVBUF, M_NOWAIT|M_ZERO);
 
 	if (sc->ndis_mmaps == NULL)

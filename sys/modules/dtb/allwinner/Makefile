@@ -8,14 +8,19 @@ DTS=	\
 	sun5i-r8-chip.dts \
 	sun7i-a20-bananapi.dts \
 	sun7i-a20-cubieboard2.dts \
+	sun7i-a20-lamobo-r1.dts \
 	sun7i-a20-olimex-som-evb.dts \
 	sun7i-a20-pcduino3.dts \
 	sun8i-a83t-bananapi-m3.dts \
 	sun8i-h2-plus-orangepi-zero.dts \
 	sun8i-h3-nanopi-m1.dts \
+	sun8i-h3-nanopi-m1-plus.dts \
 	sun8i-h3-nanopi-neo.dts \
 	sun8i-h3-orangepi-one.dts \
 	sun8i-h3-orangepi-plus2e.dts
+
+DTSO=	sun8i-a83t-sid.dtso \
+	sun8i-h3-sid.dtso
 
 LINKS= \
 	${DTBDIR}/sun4i-a10-cubieboard.dtb ${DTBDIR}/cubieboard.dtb \

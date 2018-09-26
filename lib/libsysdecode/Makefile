@@ -113,15 +113,16 @@ CLEANFILES= ioctl.c tables.h
 CPP+=	-m32
 .endif
 
+.if ${MK_CHERI} != "no" && !defined(NEED_CHERI)
+NEED_CHERI=	hybrid
+.endif
+
 .if ${MK_PF} != "no"
 CFLAGS+=-DPF
 .endif
 
 # Workaround duplicate declarations in <netinet/ip_compat.h>
 CFLAGS.gcc.ioctl.c+= -Wno-redundant-decls
-
-# Workaround warning for unused ssi_cables[] in <dev/lmc/if_lmc.h>
-CFLAGS.gcc.ioctl.c+= -Wno-unused
 
 CFLAGS.gcc+=	${CFLAGS.gcc.${.IMPSRC}}
 

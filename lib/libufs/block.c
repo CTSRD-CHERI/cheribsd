@@ -30,10 +30,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20180711,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_bit_flags"
+ *     "pointer_alignment"
  *   ]
  * }
  * CHERI CHANGES END

@@ -178,13 +178,6 @@ distribute:
 	${_+_}cd ${.CURDIR} ; ${MAKE} distribution DESTDIR=${DISTDIR}/${DISTRIBUTION}
 
 .include <bsd.endian.mk>
-.if ${TARGET_ENDIANNESS} == "1234"
-CAP_MKDB_ENDIAN?= -l
-.elif ${TARGET_ENDIANNESS} == "4321"
-CAP_MKDB_ENDIAN?= -b
-.else
-CAP_MKDB_ENDIAN?=
-.endif
 
 .if defined(NO_ROOT)
 METALOG.add?=	cat -l >> ${METALOG}
@@ -199,12 +192,17 @@ distribution:
 	    ${INSTALL} -o ${BINOWN} -g ${BINGRP} -m 644 \
 		${BIN1} ${DESTDIR}/etc; \
 	    cap_mkdb ${CAP_MKDB_ENDIAN} ${DESTDIR}/etc/login.conf; \
-	    services_mkdb ${CAP_MKDB_ENDIAN} -q -o ${DESTDIR}/var/db/services.db \
-		${DESTDIR}/etc/services; \
 	    ${INSTALL} -o ${BINOWN} -g ${BINGRP} -m 755 \
 		${BIN2} ${DESTDIR}/etc; \
 	    ${INSTALL} -o ${BINOWN} -g ${BINGRP} -m 600 \
 		master.passwd nsmb.conf opieaccess ${DESTDIR}/etc;
+
+.if ${MK_SERVICESDB} != "no"
+	cd ${.CURDIR}; \
+	    services_mkdb ${CAP_MKDB_ENDIAN} -q -o ${DESTDIR}/var/db/services.db \
+		${DESTDIR}/etc/services;
+.endif
+
 .if ${MK_BSNMP} != "no"
 	cd ${.CURDIR}; \
 	    ${INSTALL} -o ${BINOWN} -g ${BINGRP} -m 600 \
@@ -388,14 +386,13 @@ distrib-dirs: ${MTREES:N/*} distrib-cleanup .PHONY
 		d=${DISTBASE}$$d; \
 		shift; \
 		test -d ${DESTDIR}/$$d || mkdir -p ${DESTDIR}/$$d; \
-		${ECHO} "${MTREE_CMD:N-W} -C -f $$m -K uname,gname | " \
+		${ECHO} "${MTREE_CMD:N-W} -C -f $$m -K all | " \
 		    "sed s#^\.#.$$d# | ${METALOG.add}" ; \
 		${MTREE_FILTER} $$m | \
-		${MTREE_CMD:N-W} -C -K uname,gname | sed s#^\.#.$$d# | \
+		${MTREE_CMD:N-W} -C -K all | sed s#^\.#.$$d# | \
 		    ${METALOG.add} ; \
 	done; true
 .endif
-	${INSTALL_SYMLINK} usr/src/sys ${DESTDIR}/sys
 .if ${MK_NLS} != "no"
 	set - `grep "^[a-zA-Z]" ${.CURDIR}/nls.alias`; \
 	while [ $$# -gt 0 ] ; do \

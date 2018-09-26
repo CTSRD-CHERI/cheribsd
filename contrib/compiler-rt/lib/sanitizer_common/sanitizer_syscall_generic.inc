@@ -42,7 +42,7 @@
 # else
 #  define internal_syscall_ptr  syscall
 # endif
-#elif defined(__x86_64__) && (SANITIZER_FREEBSD || SANITIZER_MAC)
+#elif SANITIZER_FREEBSD || (defined(__x86_64__) && SANITIZER_MAC)
 # define internal_syscall __syscall
 # define internal_syscall64 __syscall
 # define internal_syscall_ptr __syscall

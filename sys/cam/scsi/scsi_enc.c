@@ -29,8 +29,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
-
 #include <sys/param.h>
 
 #include <sys/conf.h>
@@ -271,7 +269,7 @@ enc_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 	int error = 0;
 
 	periph = (struct cam_periph *)dev->si_drv1;
-	if (cam_periph_acquire(periph) != CAM_REQ_CMP)
+	if (cam_periph_acquire(periph) != 0)
 		return (ENXIO);
 
 	cam_periph_lock(periph);
@@ -360,11 +358,11 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 
 #ifdef	COMPAT_CHERIABI
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		return(ENOTTY);
+		return (ENOTTY);
 #endif
 #ifdef	COMPAT_FREEBSD32
 	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
-		return(ENOTTY);
+		return (ENOTTY);
 #endif
 
 	if (arg_addr)
@@ -871,7 +869,7 @@ enc_kproc_init(enc_softc_t *enc)
 
 	callout_init_mtx(&enc->status_updater, cam_periph_mtx(enc->periph), 0);
 
-	if (cam_periph_acquire(enc->periph) != CAM_REQ_CMP)
+	if (cam_periph_acquire(enc->periph) != 0)
 		return (ENXIO);
 
 	result = kproc_create(enc_daemon, enc, &enc->enc_daemon, /*flags*/0,
@@ -987,7 +985,7 @@ enc_ctor(struct cam_periph *periph, void *arg)
 	 * instance for it.  We'll release this reference once the devfs
 	 * instance has been freed.
 	 */
-	if (cam_periph_acquire(periph) != CAM_REQ_CMP) {
+	if (cam_periph_acquire(periph) != 0) {
 		xpt_print(periph->path, "%s: lost periph during "
 			  "registration!\n", __func__);
 		cam_periph_lock(periph);

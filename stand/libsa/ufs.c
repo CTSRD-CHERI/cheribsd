@@ -84,7 +84,8 @@ __FBSDID("$FreeBSD$");
 #include "string.h"
 
 static int	ufs_open(const char *path, struct open_file *f);
-static int	ufs_write(struct open_file *f, void *buf, size_t size, size_t *resid);
+static int	ufs_write(struct open_file *f, const void *buf, size_t size,
+		size_t *resid);
 static int	ufs_close(struct open_file *f);
 static int	ufs_read(struct open_file *f, void *buf, size_t size, size_t *resid);
 static off_t	ufs_seek(struct open_file *f, off_t offset, int where);
@@ -123,6 +124,7 @@ struct file {
 	ufs2_daddr_t	f_buf_blkno;	/* block number of data block */
 	char		*f_buf;		/* buffer for data block */
 	size_t		f_buf_size;	/* size of data block */
+	int		f_inumber;	/* inumber */
 };
 #define DIP(fp, field) \
 	((fp)->f_fs->fs_magic == FS_UFS1_MAGIC ? \
@@ -131,8 +133,13 @@ struct file {
 static int	read_inode(ino_t, struct open_file *);
 static int	block_map(struct open_file *, ufs2_daddr_t, ufs2_daddr_t *);
 static int	buf_read_file(struct open_file *, char **, size_t *);
-static int	buf_write_file(struct open_file *, char *, size_t *);
+static int	buf_write_file(struct open_file *, const char *, size_t *);
 static int	search_directory(char *, struct open_file *, ino_t *);
+static int	ufs_use_sa_read(void *, off_t, void **, int);
+
+/* from ffs_subr.c */
+int	ffs_sbget(void *, struct fs **, off_t, char *,
+	    int (*)(void *, off_t, void **, int));
 
 /*
  * Read a new inode into a file structure.
@@ -184,6 +191,7 @@ read_inode(inumber, f)
 		fp->f_buf_blkno = -1;
 	}
 	fp->f_seekp = 0;
+	fp->f_inumber = inumber;
 out:
 	free(buf);
 	return (rc);	 
@@ -301,7 +309,7 @@ block_map(f, file_block, disk_block_p)
 static int
 buf_write_file(f, buf_p, size_p)
 	struct open_file *f;
-	char *buf_p;
+	const char *buf_p;
 	size_t *size_p;		/* out */
 {
 	struct file *fp = (struct file *)f->f_fsdata;
@@ -485,8 +493,6 @@ search_directory(name, f, inumber_p)
 	return (ENOENT);
 }
 
-static int sblock_try[] = SBLOCKSEARCH;
-
 /*
  * Open a file.
  */
@@ -500,8 +506,7 @@ ufs_open(upath, f)
 	ino_t inumber, parent_inumber;
 	struct file *fp;
 	struct fs *fs;
-	int i, rc;
-	size_t buf_size;
+	int rc;
 	int nlinks = 0;
 	char namebuf[MAXPATHLEN+1];
 	char *buf = NULL;
@@ -512,31 +517,11 @@ ufs_open(upath, f)
 	bzero(fp, sizeof(struct file));
 	f->f_fsdata = (void *)fp;
 
-	/* allocate space and read super block */
-	fs = malloc(SBLOCKSIZE);
-	fp->f_fs = fs;
+	/* read super block */
 	twiddle(1);
-	/*
-	 * Try reading the superblock in each of its possible locations.
-	 */
-	for (i = 0; sblock_try[i] != -1; i++) {
-		rc = (f->f_dev->dv_strategy)(f->f_devdata, F_READ,
-		    sblock_try[i] / DEV_BSIZE, SBLOCKSIZE,
-		    (char *)fs, &buf_size);
-		if (rc)
-			goto out;
-		if ((fs->fs_magic == FS_UFS1_MAGIC ||
-		     (fs->fs_magic == FS_UFS2_MAGIC &&
-		      fs->fs_sblockloc == sblock_try[i])) &&
-		    buf_size == SBLOCKSIZE &&
-		    fs->fs_bsize <= MAXBSIZE &&
-		    fs->fs_bsize >= sizeof(struct fs))
-			break;
-	}
-	if (sblock_try[i] == -1) {
-		rc = EINVAL;
+	if ((rc = ffs_sbget(f, &fs, -1, "stand", ufs_use_sa_read)) != 0)
 		goto out;
-	}
+	fp->f_fs = fs;
 	/*
 	 * Calculate indirect block levels.
 	 */
@@ -693,6 +678,28 @@ out:
 	return (rc);
 }
 
+/*
+ * A read function for use by standalone-layer routines.
+ */
+static int
+ufs_use_sa_read(void *devfd, off_t loc, void **bufp, int size)
+{
+	struct open_file *f;
+	size_t buf_size;
+	int error;
+
+	f = (struct open_file *)devfd;
+	if ((*bufp = malloc(size)) == NULL)
+		return (ENOSPC);
+	error = (f->f_dev->dv_strategy)(f->f_devdata, F_READ, loc / DEV_BSIZE,
+	    size, *bufp, &buf_size);
+	if (error != 0)
+		return (error);
+	if (buf_size != size)
+		return (EIO);
+	return (0);
+}
+
 static int
 ufs_close(f)
 	struct open_file *f;
@@ -764,14 +771,14 @@ ufs_read(f, start, size, resid)
 static int
 ufs_write(f, start, size, resid)
 	struct open_file *f;
-	void *start;
+	const void *start;
 	size_t size;
 	size_t *resid;	/* out */
 {
 	struct file *fp = (struct file *)f->f_fsdata;
 	size_t csize;
 	int rc = 0;
-	char *addr = start;
+	const char *addr = start;
 
 	csize = size;
 	while ((size != 0) && (csize != 0)) {
@@ -830,6 +837,20 @@ ufs_stat(f, sb)
 	sb->st_uid = DIP(fp, di_uid);
 	sb->st_gid = DIP(fp, di_gid);
 	sb->st_size = DIP(fp, di_size);
+	sb->st_mtime = DIP(fp, di_mtime);
+	/*
+	 * The items below are ufs specific!
+	 * Other fs types will need their own solution
+	 * if these fields are needed.
+	 */
+	sb->st_ino = fp->f_inumber;
+	/*
+	 * We need something to differentiate devs.
+	 * fs_id is unique but 64bit, we xor the two
+	 * halves to squeeze it into 32bits.
+	 */
+	sb->st_dev = (dev_t)(fp->f_fs->fs_id[0] ^ fp->f_fs->fs_id[1]);
+
 	return (0);
 }
 

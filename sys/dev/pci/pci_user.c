@@ -30,7 +30,6 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_bus.h"	/* XXX trim includes */
-#include "opt_compat.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1064,8 +1063,7 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 			 */
 			pattern_buf = malloc(cio->pat_buf_len, M_TEMP,
 			    M_WAITOK);
-			error = copyin_c(cio->patterns,
-			    (__cheri_tocap void * __capability)pattern_buf,
+			error = copyin_c(cio->patterns, pattern_buf,
 			    cio->pat_buf_len);
 			if (error != 0) {
 				error = EINVAL;
@@ -1120,8 +1118,10 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 				 * tell the user that there are more matches
 				 * left.
 				 */
-				if (cio->num_matches >= ionum)
+				if (cio->num_matches >= ionum) {
+					error = 0;
 					break;
+				}
 
 				pci_conf_for_copyout(&dinfo->conf, &pcu, cmd);
 				error = copyout_c(&pcu,

@@ -313,7 +313,12 @@ static __inline void
 ksiginfo_set_sigev(ksiginfo_t *dst, ksigevent_t *sigev)
 {
 	dst->ksi_signo = sigev->sigev_signo;
-	dst->ksi_value = sigev->sigev_value;
+	__builtin_memset(&dst->ksi_value, 0, sizeof(dst->ksi_value));
+#if __has_feature(capability)
+	dst->ksi_value.sival_ptr_c = sigev->sigev_value.siavl_ptr_c;
+#else
+	dst->ksi_value.sival_ptr_native = sigev->sigev_value.sival_ptr_native;
+#endif
 }
 
 struct pgrp;
@@ -405,6 +410,8 @@ int	sigev_findtd(struct proc *p, ksigevent_t *sigev, struct thread **);
 int	sig_ffs(sigset_t *set);
 void	siginfo_to_siginfo_native(const _siginfo_t *si,
 	    struct siginfo_native *si_n);
+void	siginfo_native_to_siginfo(const struct siginfo_native *si_n,
+	    _siginfo_t *si);
 void	siginit(struct proc *p);
 void	signotify(struct thread *td);
 int	sigprop(int sig);

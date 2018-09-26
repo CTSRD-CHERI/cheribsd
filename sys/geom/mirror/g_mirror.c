@@ -207,7 +207,6 @@ g_mirror_event_send(void *arg, int state, int flags)
 	mtx_unlock(&sc->sc_queue_mtx);
 	if ((flags & G_MIRROR_EVENT_DONTWAIT) != 0)
 		return (0);
-	sx_assert(&sc->sc_lock, SX_XLOCKED);
 	G_MIRROR_DEBUG(4, "%s: Sleeping %p.", __func__, ep);
 	sx_xunlock(&sc->sc_lock);
 	while ((ep->e_flags & G_MIRROR_EVENT_DONE) == 0) {
@@ -276,8 +275,6 @@ g_mirror_ndisks(struct g_mirror_softc *sc, int state)
 {
 	struct g_mirror_disk *disk;
 	u_int n = 0;
-
-	sx_assert(&sc->sc_lock, SX_LOCKED);
 
 	LIST_FOREACH(disk, &sc->sc_disks, d_next) {
 		if (state == -1 || disk->d_state == state)
@@ -495,7 +492,9 @@ g_mirror_destroy_disk(struct g_mirror_disk *disk)
 	sc = disk->d_softc;
 	sx_assert(&sc->sc_lock, SX_XLOCKED);
 
+	g_topology_lock();
 	LIST_REMOVE(disk, d_next);
+	g_topology_unlock();
 	g_mirror_event_cancel(disk);
 	if (sc->sc_hint == disk)
 		sc->sc_hint = NULL;
@@ -521,6 +520,8 @@ g_mirror_destroy_disk(struct g_mirror_disk *disk)
 static void
 g_mirror_free_device(struct g_mirror_softc *sc)
 {
+
+	g_topology_assert();
 
 	mtx_destroy(&sc->sc_queue_mtx);
 	mtx_destroy(&sc->sc_events_mtx);
@@ -1336,9 +1337,7 @@ g_mirror_sync_request(struct g_mirror_softc *sc, struct bio *bp)
 	 */
 	switch (bp->bio_cmd) {
 	case BIO_READ: {
-		struct g_mirror_disk *d;
 		struct g_consumer *cp;
-		int readable;
 
 		KFAIL_POINT_ERROR(DEBUG_FP, g_mirror_sync_request_read,
 		    bp->bio_error);
@@ -1349,31 +1348,17 @@ g_mirror_sync_request(struct g_mirror_softc *sc, struct bio *bp)
 			    bp->bio_error);
 
 			/*
-			 * If there's at least one other disk from which we can
-			 * read the block, retry the request.
-			 */
-			readable = 0;
-			LIST_FOREACH(d, &sc->sc_disks, d_next)
-				if (d->d_state == G_MIRROR_DISK_STATE_ACTIVE &&
-				    !(d->d_flags & G_MIRROR_DISK_FLAG_BROKEN))
-					readable++;
-
-			/*
 			 * The read error will trigger a syncid bump, so there's
 			 * no need to do that here.
 			 *
-			 * If we can retry the read from another disk, do so.
-			 * Otherwise, all we can do is kick out the new disk.
+			 * The read error handling for regular requests will
+			 * retry the read from all active mirrors before passing
+			 * the error back up, so there's no need to retry here.
 			 */
-			if (readable == 0) {
-				g_mirror_sync_request_free(disk, bp);
-				g_mirror_event_send(disk,
-				    G_MIRROR_DISK_STATE_DISCONNECTED,
-				    G_MIRROR_EVENT_DONTWAIT);
-			} else {
-				g_mirror_sync_reinit(disk, bp, bp->bio_offset);
-				goto retry_read;
-			}
+			g_mirror_sync_request_free(disk, bp);
+			g_mirror_event_send(disk,
+			    G_MIRROR_DISK_STATE_DISCONNECTED,
+			    G_MIRROR_EVENT_DONTWAIT);
 			return;
 		}
 		G_MIRROR_LOGREQ(3, bp,
@@ -1429,7 +1414,6 @@ g_mirror_sync_request(struct g_mirror_softc *sc, struct bio *bp)
 		g_mirror_sync_reinit(disk, bp, sync->ds_offset);
 		sync->ds_offset += bp->bio_length;
 
-retry_read:
 		G_MIRROR_LOGREQ(3, bp, "Sending synchronization request.");
 		sync->ds_consumer->index++;
 
@@ -2643,6 +2627,7 @@ again:
 		DISK_STATE_CHANGED();
 
 		disk->d_state = state;
+		g_topology_lock();
 		if (LIST_EMPTY(&sc->sc_disks))
 			LIST_INSERT_HEAD(&sc->sc_disks, disk, d_next);
 		else {
@@ -2660,6 +2645,7 @@ again:
 			if (dp != NULL)
 				LIST_INSERT_AFTER(dp, disk, d_next);
 		}
+		g_topology_unlock();
 		G_MIRROR_DEBUG(1, "Device %s: provider %s detected.",
 		    sc->sc_name, g_mirror_get_diskname(disk));
 		if (sc->sc_state == G_MIRROR_DEVICE_STATE_STARTING)
@@ -3345,24 +3331,20 @@ g_mirror_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp,
 		disk = cp->private;
 		if (disk == NULL)
 			return;
-		g_topology_unlock();
-		sx_xlock(&sc->sc_lock);
 		sbuf_printf(sb, "%s<ID>%u</ID>\n", indent, (u_int)disk->d_id);
 		if (disk->d_state == G_MIRROR_DISK_STATE_SYNCHRONIZING) {
 			sbuf_printf(sb, "%s<Synchronized>", indent);
 			if (disk->d_sync.ds_offset == 0)
 				sbuf_printf(sb, "0%%");
-			else {
+			else
 				sbuf_printf(sb, "%u%%",
 				    (u_int)((disk->d_sync.ds_offset * 100) /
-				    sc->sc_provider->mediasize));
-			}
+				    sc->sc_mediasize));
 			sbuf_printf(sb, "</Synchronized>\n");
-			if (disk->d_sync.ds_offset > 0) {
+			if (disk->d_sync.ds_offset > 0)
 				sbuf_printf(sb, "%s<BytesSynced>%jd"
 				    "</BytesSynced>\n", indent,
 				    (intmax_t)disk->d_sync.ds_offset);
-			}
 		}
 		sbuf_printf(sb, "%s<SyncID>%u</SyncID>\n", indent,
 		    disk->d_sync.ds_syncid);
@@ -3397,11 +3379,7 @@ g_mirror_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp,
 		    disk->d_priority);
 		sbuf_printf(sb, "%s<State>%s</State>\n", indent,
 		    g_mirror_disk_state2str(disk->d_state));
-		sx_xunlock(&sc->sc_lock);
-		g_topology_lock();
 	} else {
-		g_topology_unlock();
-		sx_xlock(&sc->sc_lock);
 		sbuf_printf(sb, "%s<Type>", indent);
 		switch (sc->sc_type) {
 		case G_MIRROR_TYPE_AUTOMATIC:
@@ -3453,8 +3431,6 @@ g_mirror_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp,
 		else
 			sbuf_printf(sb, "%s", "DEGRADED");
 		sbuf_printf(sb, "</State>\n");
-		sx_xunlock(&sc->sc_lock);
-		g_topology_lock();
 	}
 }
 
@@ -3509,3 +3485,4 @@ g_mirror_fini(struct g_class *mp)
 }
 
 DECLARE_GEOM_CLASS(g_mirror_class, g_mirror);
+MODULE_VERSION(geom_mirror, 0);

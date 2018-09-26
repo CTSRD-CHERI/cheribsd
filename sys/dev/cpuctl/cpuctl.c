@@ -367,8 +367,10 @@ update_intel(int cpu, cpuctl_update_args_t *args, struct thread *td)
 	rdmsr_safe(MSR_BIOS_SIGN, &rev0); /* Get current microcode revision. */
 
 	/*
-	 * Perform update.
+	 * Perform update.  Flush caches first to work around seemingly
+	 * undocumented errata applying to some Broadwell CPUs.
 	 */
+	wbinvd();
 	wrmsr_safe(MSR_BIOS_UPDT_TRIG, (uintptr_t)(ptr));
 	wrmsr_safe(MSR_BIOS_SIGN, 0);
 
@@ -527,7 +529,9 @@ cpuctl_do_eval_cpu_features(int cpu, struct thread *td)
 	set_cpu(cpu, td);
 	identify_cpu1();
 	identify_cpu2();
+	hw_ibrs_recalculate();
 	restore_cpu(oldcpu, is_bound, td);
+	hw_ssb_recalculate(true);
 	printcpuinfo();
 	return (0);
 }

@@ -414,13 +414,13 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	switch (cmd) {
 	case SIOCAIFADDR:
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		if (ifa->ifa_addr->sa_family != AF_INET)
 			return (EAFNOSUPPORT);
 
 		ifp->if_flags |= IFF_UP;
 		/* FALLTHROUGH */
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		error = 0;
 		ppb_lock(ppbus);
 		if ((!(ifp->if_flags & IFF_UP)) &&
@@ -432,7 +432,7 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ppb_unlock(ppbus);
 		return (error);
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		ppb_lock(ppbus);
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			ptr = malloc(ifr_mtu_get(ifr) + MLPIPHDRLEN, M_DEVBUF,
@@ -449,12 +449,12 @@ lpioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ppb_unlock(ppbus);
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFMTU):
+	case CASE_IOC_IFREQ(SIOCGIFMTU):
 		ifr_mtu_set(ifr, sc->sc_ifp->if_mtu);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifr == NULL) {
 			return (EAFNOSUPPORT);		/* XXX */
 		}

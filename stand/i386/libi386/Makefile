@@ -1,11 +1,8 @@
 # $FreeBSD$
 
-HAVE_GELI=		yes
-
 .include <bsd.init.mk>
 
 LIB=			i386
-INTERNALLIB=
 
 SRCS=	biosacpi.c bioscd.c biosdisk.c biosmem.c biospnp.c \
 	biospci.c biossmap.c bootinfo.c bootinfo32.c bootinfo64.c \
@@ -15,6 +12,7 @@ SRCS=	biosacpi.c bioscd.c biosdisk.c biosmem.c biospnp.c \
 	smbios.c time.c vidconsole.c amd64_tramp.S spinconsole.c
 .PATH:	${ZFSSRC}
 SRCS+=  devicename_stubs.c
+CFLAGS+= -I${ZFSSRC}
 
 BOOT_COMCONSOLE_PORT?= 0x3f8
 CFLAGS+=	-DCOMPORT=${BOOT_COMCONSOLE_PORT}

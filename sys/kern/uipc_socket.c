@@ -107,7 +107,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
-#include "opt_compat.h"
 #include "opt_sctp.h"
 
 #include <sys/param.h>
@@ -1103,6 +1102,8 @@ soclose(struct socket *so)
 drop:
 	if (so->so_proto->pr_usrreqs->pru_close != NULL)
 		(*so->so_proto->pr_usrreqs->pru_close)(so);
+	if (so->so_dtor != NULL)
+		so->so_dtor(so);
 
 	SOCK_LOCK(so);
 	if ((listening = (so->so_options & SO_ACCEPTCONN))) {
@@ -2162,7 +2163,6 @@ release:
 
 /*
  * Optimized version of soreceive() for stream (TCP) sockets.
- * XXXAO: (MSG_WAITALL | MSG_PEEK) isn't properly handled.
  */
 int
 soreceive_stream(struct socket *so, struct sockaddr **psa, struct uio *uio,
@@ -2177,12 +2177,12 @@ soreceive_stream(struct socket *so, struct sockaddr **psa, struct uio *uio,
 		return (EINVAL);
 	if (psa != NULL)
 		*psa = NULL;
-	if (controlp != NULL)
-		return (EINVAL);
 	if (flagsp != NULL)
 		flags = *flagsp &~ MSG_EOR;
 	else
 		flags = 0;
+	if (controlp != NULL)
+		*controlp = NULL;
 	if (flags & MSG_OOB)
 		return (soreceive_rcvoob(so, uio, flags));
 	if (mp0 != NULL)
@@ -2704,11 +2704,9 @@ sooptcopyin(struct sockopt *sopt, void *buf, size_t len, size_t minlen)
 	if (sopt->sopt_td != NULL) {
 		if (sopt->sopt_dir == SOPT_SETCAP ||
 		    sopt->sopt_dir == SOPT_GETCAP)
-			return (copyincap_c(sopt->sopt_val,
-			   (__cheri_tocap void * __capability)buf, valsize));
+			return (copyincap_c(sopt->sopt_val, buf, valsize));
 		else
-			return (copyin_c(sopt->sopt_val,
-			   (__cheri_tocap void * __capability)buf, valsize));
+			return (copyin_c(sopt->sopt_val, buf, valsize));
 	}
 
 	bcopy((__cheri_fromcap void *)sopt->sopt_val, buf, valsize);
@@ -2785,6 +2783,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 		case SO_BROADCAST:
 		case SO_REUSEADDR:
 		case SO_REUSEPORT:
+		case SO_REUSEPORT_LB:
 		case SO_OOBINLINE:
 		case SO_TIMESTAMP:
 		case SO_BINTIME:
@@ -2979,9 +2978,7 @@ sooptcopyout(struct sockopt *sopt, const void *buf, size_t len)
 			KASSERT(sopt->sopt_dir != SOPT_GETCAP &&
 			   sopt->sopt_dir != SOPT_SETCAP,
 			   ("exporting capabilities not supproted"));
-			error = copyout_c(
-			    (__cheri_tocap const void * __capability)buf,
-			    sopt->sopt_val, valsize);
+			error = copyout_c(buf, sopt->sopt_val, valsize);
 		} else
 			bcopy(buf, (__cheri_fromcap void *)sopt->sopt_val,
 			    valsize);
@@ -3028,6 +3025,7 @@ sogetopt(struct socket *so, struct sockopt *sopt)
 		case SO_KEEPALIVE:
 		case SO_REUSEADDR:
 		case SO_REUSEPORT:
+		case SO_REUSEPORT_LB:
 		case SO_BROADCAST:
 		case SO_OOBINLINE:
 		case SO_ACCEPTCONN:
@@ -3255,8 +3253,7 @@ soopt_mcopyin(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyin_c(sopt->sopt_val,
-			    (__cheri_tocap void * __capability)mtod(m, char *),
+			error = copyin_c(sopt->sopt_val, mtod(m, char *),
 			    m->m_len);
 			if (error != 0) {
 				m_freem(m0);
@@ -3286,9 +3283,8 @@ soopt_mcopyout(struct sockopt *sopt, struct mbuf *m)
 		if (sopt->sopt_td != NULL) {
 			int error;
 
-			error = copyout_c(
-			    (__cheri_tocap void * __capability)mtod(m, char *),
-			    sopt->sopt_val, m->m_len);
+			error = copyout_c(mtod(m, char *), sopt->sopt_val,
+			    m->m_len);
 			if (error != 0) {
 				m_freem(m0);
 				return(error);
@@ -3887,6 +3883,17 @@ sodupsockaddr(const struct sockaddr *sa, int mflags)
 }
 
 /*
+ * Register per-socket destructor.
+ */
+void
+sodtor_set(struct socket *so, so_dtor_t *func)
+{
+
+	SOCK_LOCK_ASSERT(so);
+	so->so_dtor = func;
+}
+
+/*
  * Register per-socket buffer upcalls.
  */
 void
@@ -4047,12 +4054,12 @@ sotoxsocket(struct socket *so, struct xsocket *xso)
 {
 
 	xso->xso_len = sizeof *xso;
-	xso->xso_so = so;
+	xso->xso_so = (uintptr_t)so;
 	xso->so_type = so->so_type;
 	xso->so_options = so->so_options;
 	xso->so_linger = so->so_linger;
 	xso->so_state = so->so_state;
-	xso->so_pcb = so->so_pcb;
+	xso->so_pcb = (uintptr_t)so->so_pcb;
 	xso->xso_protocol = so->so_proto->pr_protocol;
 	xso->xso_family = so->so_proto->pr_domain->dom_family;
 	xso->so_timeo = so->so_timeo;

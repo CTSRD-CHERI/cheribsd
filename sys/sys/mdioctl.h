@@ -45,6 +45,8 @@
 #ifndef _SYS_MDIOCTL_H_
 #define _SYS_MDIOCTL_H_
 
+#include <sys/_uio.h>
+
 enum md_types {MD_MALLOC, MD_PRELOAD, MD_VNODE, MD_SWAP, MD_NULL};
 
 /*
@@ -64,7 +66,7 @@ struct md_ioctl {
 	int		md_fwheads;	/* firmware heads */
 	int		md_fwsectors;	/* firmware sectors */
 	char		*md_label;	/* label of the device */
-	int		md_pad[MDNPAD];	/* padding for future ideas */
+	int		md_pad[MDNPAD];	/* storage for MDIOCLIST */
 };
 
 #define MD_NAME		"md"

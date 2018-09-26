@@ -27,13 +27,11 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD$
  */
 
-#if defined(LIBC_SCCS) && !defined(lint)
-static char sccsid[] = "@(#)rexec.c	8.1 (Berkeley) 6/4/93";
-#endif /* LIBC_SCCS and not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
+__SCCSID("@(#)rexec.c	8.1 (Berkeley) 6/4/93");
 
 #include <sys/types.h>
 #include <sys/uio.h>
@@ -356,7 +354,7 @@ retry:
 			goto bad;
 		}
 		port = ntohs((u_short)sin2.sin_port);
-		(void) sprintf(num, "%u", port);
+		(void) sprintf(num, "%hu", port);
 		(void) write(s, num, strlen(num)+1);
 		{ int len = sizeof (from);
 		  s3 = accept(s2, (struct sockaddr *)&from, &len);

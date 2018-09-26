@@ -502,7 +502,7 @@ axe_setmulti(struct usb_ether *ue)
 	rxmode &= ~AXE_RXCMD_ALLMULTI;
 
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
 	{
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
@@ -1477,7 +1477,7 @@ axe_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	error = 0;
 	reinit = 0;
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		AXE_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&

@@ -74,6 +74,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
+#include <netinet/netdump/netdump.h>
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -190,6 +191,8 @@ static struct cdevsw cxgb_cdevsw = {
 static devclass_t	cxgb_port_devclass;
 DRIVER_MODULE(cxgb, cxgbc, cxgb_port_driver, cxgb_port_devclass, 0, 0);
 MODULE_VERSION(cxgb, 1);
+
+NETDUMP_DEFINE(cxgb);
 
 static struct mtx t3_list_lock;
 static SLIST_HEAD(, adapter) t3_list;
@@ -1045,6 +1048,9 @@ cxgb_port_attach(device_t dev)
 
 	ether_ifattach(ifp, p->hw_addr);
 
+	/* Attach driver netdump methods. */
+	NETDUMP_SET(ifp, cxgb);
+
 #ifdef DEFAULT_JUMBO
 	if (sc->params.nports <= 2)
 		ifp->if_mtu = ETHERMTU_JUMBO;
@@ -1874,7 +1880,7 @@ cxgb_ioctl(struct ifnet *ifp, unsigned long command, caddr_t data)
 	uint32_t mask;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error) {
@@ -1894,7 +1900,7 @@ fail:
 		}
 		ADAPTER_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ADAPTER_LOCK(sc);
 		if (IS_DOOMED(p)) {
 			error = ENXIO;
@@ -1924,8 +1930,8 @@ fail:
 
 		ADAPTER_LOCK_ASSERT_NOTOWNED(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error)
@@ -1939,7 +1945,7 @@ fail:
 		ADAPTER_UNLOCK(sc);
 
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		ADAPTER_LOCK(sc);
 		error = IS_DOOMED(p) ? ENXIO : (IS_BUSY(sc) ? EBUSY : 0);
 		if (error)
@@ -2038,7 +2044,7 @@ fail:
 #endif
 		ADAPTER_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &p->media, command);
 		break;
@@ -2958,8 +2964,14 @@ cxgb_extension_ioctl(struct cdev *dev, unsigned long cmd, caddr_t data,
 	case CHELSIO_GET_EEPROM: {
 		int i;
 		struct ch_eeprom *e = (struct ch_eeprom *)data;
-		uint8_t *buf = malloc(EEPROMSIZE, M_DEVBUF, M_NOWAIT);
+		uint8_t *buf;
 
+		if (e->offset & 3 || e->offset >= EEPROMSIZE ||
+		    e->len > EEPROMSIZE || e->offset + e->len > EEPROMSIZE) {
+			return (EINVAL);
+		}
+
+		buf = malloc(EEPROMSIZE, M_DEVBUF, M_NOWAIT);
 		if (buf == NULL) {
 			return (ENOMEM);
 		}
@@ -3572,6 +3584,75 @@ cxgbc_mod_event(module_t mod, int cmd, void *arg)
 
 	return (rc);
 }
+
+#ifdef NETDUMP
+static void
+cxgb_netdump_init(struct ifnet *ifp, int *nrxr, int *ncl, int *clsize)
+{
+	struct port_info *pi;
+	adapter_t *adap;
+
+	pi = if_getsoftc(ifp);
+	adap = pi->adapter;
+	ADAPTER_LOCK(adap);
+	*nrxr = SGE_QSETS;
+	*ncl = adap->sge.qs[0].fl[1].size;
+	*clsize = adap->sge.qs[0].fl[1].buf_size;
+	ADAPTER_UNLOCK(adap);
+}
+
+static void
+cxgb_netdump_event(struct ifnet *ifp, enum netdump_ev event)
+{
+	struct port_info *pi;
+	struct sge_qset *qs;
+	int i;
+
+	pi = if_getsoftc(ifp);
+	if (event == NETDUMP_START)
+		for (i = 0; i < SGE_QSETS; i++) {
+			qs = &pi->adapter->sge.qs[i];
+
+			/* Need to reinit after netdump_mbuf_dump(). */
+			qs->fl[0].zone = zone_pack;
+			qs->fl[1].zone = zone_clust;
+			qs->lro.enabled = 0;
+		}
+}
+
+static int
+cxgb_netdump_transmit(struct ifnet *ifp, struct mbuf *m)
+{
+	struct port_info *pi;
+	struct sge_qset *qs;
+
+	pi = if_getsoftc(ifp);
+	if ((if_getdrvflags(ifp) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
+	    IFF_DRV_RUNNING)
+		return (ENOENT);
+
+	qs = &pi->adapter->sge.qs[pi->first_qset];
+	return (cxgb_netdump_encap(qs, &m));
+}
+
+static int
+cxgb_netdump_poll(struct ifnet *ifp, int count)
+{
+	struct port_info *pi;
+	adapter_t *adap;
+	int i;
+
+	pi = if_getsoftc(ifp);
+	if ((if_getdrvflags(ifp) & IFF_DRV_RUNNING) == 0)
+		return (ENOENT);
+
+	adap = pi->adapter;
+	for (i = 0; i < SGE_QSETS; i++)
+		(void)cxgb_netdump_poll_rx(adap, &adap->sge.qs[i]);
+	(void)cxgb_netdump_poll_tx(&adap->sge.qs[pi->first_qset]);
+	return (0);
+}
+#endif /* NETDUMP */
 // CHERI CHANGES START
 // {
 //   "updated": 20180629,

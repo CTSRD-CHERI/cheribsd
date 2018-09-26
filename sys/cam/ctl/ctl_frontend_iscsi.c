@@ -56,6 +56,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/uio.h>
 #include <sys/unistd.h>
+#include <sys/nv.h>
+#include <sys/dnv.h>
 #include <vm/uma.h>
 
 #include <cam/scsi/scsi_all.h>
@@ -1164,11 +1166,11 @@ cfiscsi_maintenance_thread(void *arg)
 
 	for (;;) {
 		CFISCSI_SESSION_LOCK(cs);
-		if (cs->cs_terminating == false)
+		if (cs->cs_terminating == false || cs->cs_handoff_in_progress)
 			cv_wait(&cs->cs_maintenance_cv, &cs->cs_lock);
 		CFISCSI_SESSION_UNLOCK(cs);
 
-		if (cs->cs_terminating) {
+		if (cs->cs_terminating && cs->cs_handoff_in_progress == false) {
 
 			/*
 			 * We used to wait up to 30 seconds to deliver queued
@@ -1196,8 +1198,6 @@ static void
 cfiscsi_session_terminate(struct cfiscsi_session *cs)
 {
 
-	if (cs->cs_terminating)
-		return;
 	cs->cs_terminating = true;
 	cv_signal(&cs->cs_maintenance_cv);
 #ifdef ICL_KERNEL_PROXY
@@ -1267,6 +1267,13 @@ cfiscsi_session_new(struct cfiscsi_softc *softc, const char *offload)
 #ifdef ICL_KERNEL_PROXY
 	cv_init(&cs->cs_login_cv, "cfiscsi_login");
 #endif
+
+	/*
+	 * The purpose of this is to avoid racing with session shutdown.
+	 * Otherwise we could have the maintenance thread call icl_conn_close()
+	 * before we call icl_conn_handoff().
+	 */
+	cs->cs_handoff_in_progress = true;
 
 	cs->cs_conn = icl_new_conn(offload, false, "cfiscsi", &cs->cs_lock);
 	if (cs->cs_conn == NULL) {
@@ -1378,8 +1385,18 @@ cfiscsi_accept(struct socket *so, struct sockaddr *sa, int portal_id)
 	icl_conn_handoff_sock(cs->cs_conn, so);
 	cs->cs_initiator_sa = sa;
 	cs->cs_portal_id = portal_id;
+	cs->cs_handoff_in_progress = false;
 	cs->cs_waiting_for_ctld = true;
 	cv_signal(&cfiscsi_softc.accept_cv);
+
+	CFISCSI_SESSION_LOCK(cs);
+	/*
+	 * Wake up the maintenance thread if we got scheduled for termination
+	 * somewhere between cfiscsi_session_new() and icl_conn_handoff_sock().
+	 */
+	if (cs->cs_terminating)
+		cfiscsi_session_terminate(cs);
+	CFISCSI_SESSION_UNLOCK(cs);
 }
 #endif
 
@@ -1559,6 +1576,7 @@ cfiscsi_ioctl_handoff(struct ctl_iscsi *ci)
 	mtx_lock(&softc->lock);
 	if (ct->ct_online == 0) {
 		mtx_unlock(&softc->lock);
+		cs->cs_handoff_in_progress = false;
 		cfiscsi_session_terminate(cs);
 		cfiscsi_target_release(ct);
 		ci->status = CTL_ISCSI_ERROR;
@@ -1569,7 +1587,6 @@ cfiscsi_ioctl_handoff(struct ctl_iscsi *ci)
 	cs->cs_target = ct;
 	mtx_unlock(&softc->lock);
 
-	refcount_acquire(&cs->cs_outstanding_ctl_pdus);
 restart:
 	if (!cs->cs_terminating) {
 		mtx_lock(&softc->lock);
@@ -1606,8 +1623,8 @@ restart:
 #endif
 		error = icl_conn_handoff(cs->cs_conn, cihp->socket);
 		if (error != 0) {
+			cs->cs_handoff_in_progress = false;
 			cfiscsi_session_terminate(cs);
-			refcount_release(&cs->cs_outstanding_ctl_pdus);
 			ci->status = CTL_ISCSI_ERROR;
 			snprintf(ci->error_str, sizeof(ci->error_str),
 			    "%s: icl_conn_handoff failed with error %d",
@@ -1632,7 +1649,16 @@ restart:
 	}
 #endif
 
-	refcount_release(&cs->cs_outstanding_ctl_pdus);
+	CFISCSI_SESSION_LOCK(cs);
+	cs->cs_handoff_in_progress = false;
+
+	/*
+	 * Wake up the maintenance thread if we got scheduled for termination.
+	 */
+	if (cs->cs_terminating)
+		cfiscsi_session_terminate(cs);
+	CFISCSI_SESSION_UNLOCK(cs);
+
 	ci->status = CTL_ISCSI_OK;
 }
 
@@ -2082,30 +2108,30 @@ cfiscsi_ioctl_port_create(struct ctl_req *req)
 {
 	struct cfiscsi_target *ct;
 	struct ctl_port *port;
-	const char *target, *alias, *tags;
+	const char *target, *alias, *val;
 	struct scsi_vpd_id_descriptor *desc;
-	ctl_options_t opts;
 	int retval, len, idlen;
 	uint16_t tag;
 
-	ctl_init_opts(&opts, req->num_args, req->kern_args);
-	target = ctl_get_opt(&opts, "cfiscsi_target");
-	alias = ctl_get_opt(&opts, "cfiscsi_target_alias");
-	tags = ctl_get_opt(&opts, "cfiscsi_portal_group_tag");
-	if (target == NULL || tags == NULL) {
+	target = dnvlist_get_string(req->args_nvl, "cfiscsi_target", NULL);
+	alias = dnvlist_get_string(req->args_nvl, "cfiscsi_target_alias", NULL);
+	val = dnvlist_get_string(req->args_nvl, "cfiscsi_portal_group_tag",
+	    NULL);
+
+
+	if (target == NULL || val == NULL) {
 		req->status = CTL_LUN_ERROR;
 		snprintf(req->error_str, sizeof(req->error_str),
 		    "Missing required argument");
-		ctl_free_opts(&opts);
 		return;
 	}
-	tag = strtol(tags, (char **)NULL, 10);
+
+	tag = strtoul(val, NULL, 0);
 	ct = cfiscsi_target_find_or_create(&cfiscsi_softc, target, alias, tag);
 	if (ct == NULL) {
 		req->status = CTL_LUN_ERROR;
 		snprintf(req->error_str, sizeof(req->error_str),
 		    "failed to create target \"%s\"", target);
-		ctl_free_opts(&opts);
 		return;
 	}
 	if (ct->ct_state == CFISCSI_TARGET_STATE_ACTIVE) {
@@ -2114,7 +2140,6 @@ cfiscsi_ioctl_port_create(struct ctl_req *req)
 		    "target \"%s\" for portal group tag %u already exists",
 		    target, tag);
 		cfiscsi_target_release(ct);
-		ctl_free_opts(&opts);
 		return;
 	}
 	port = &ct->ct_port;
@@ -2127,7 +2152,7 @@ cfiscsi_ioctl_port_create(struct ctl_req *req)
 	/* XXX KDM what should the real number be here? */
 	port->num_requested_ctl_io = 4096;
 	port->port_name = "iscsi";
-	port->physical_port = tag;
+	port->physical_port = (int)tag;
 	port->virtual_port = ct->ct_target_id;
 	port->port_online = cfiscsi_online;
 	port->port_offline = cfiscsi_offline;
@@ -2136,9 +2161,7 @@ cfiscsi_ioctl_port_create(struct ctl_req *req)
 	port->fe_datamove = cfiscsi_datamove;
 	port->fe_done = cfiscsi_done;
 	port->targ_port = -1;
-
-	port->options = opts;
-	STAILQ_INIT(&opts);
+	port->options = nvlist_clone(req->args_nvl);
 
 	/* Generate Port ID. */
 	idlen = strlen(target) + strlen(",t,0x0001") + 1;
@@ -2170,7 +2193,6 @@ cfiscsi_ioctl_port_create(struct ctl_req *req)
 
 	retval = ctl_port_register(port);
 	if (retval != 0) {
-		ctl_free_opts(&port->options);
 		free(port->port_devid, M_CFISCSI);
 		free(port->target_devid, M_CFISCSI);
 		cfiscsi_target_release(ct);
@@ -2182,45 +2204,42 @@ cfiscsi_ioctl_port_create(struct ctl_req *req)
 done:
 	ct->ct_state = CFISCSI_TARGET_STATE_ACTIVE;
 	req->status = CTL_LUN_OK;
-	memcpy(req->kern_args[0].kvalue, &port->targ_port,
-	    sizeof(port->targ_port)); //XXX
+	req->result_nvl = nvlist_create(0);
+	nvlist_add_number(req->result_nvl, "port_id", port->targ_port);
 }
 
 static void
 cfiscsi_ioctl_port_remove(struct ctl_req *req)
 {
 	struct cfiscsi_target *ct;
-	const char *target, *tags;
-	ctl_options_t opts;
+	const char *target, *val;
 	uint16_t tag;
 
-	ctl_init_opts(&opts, req->num_args, req->kern_args);
-	target = ctl_get_opt(&opts, "cfiscsi_target");
-	tags = ctl_get_opt(&opts, "cfiscsi_portal_group_tag");
-	if (target == NULL || tags == NULL) {
-		ctl_free_opts(&opts);
+	target = dnvlist_get_string(req->args_nvl, "cfiscsi_target", NULL);
+	val = dnvlist_get_string(req->args_nvl, "cfiscsi_portal_group_tag",
+	    NULL);
+
+	if (target == NULL || val == NULL) {
 		req->status = CTL_LUN_ERROR;
 		snprintf(req->error_str, sizeof(req->error_str),
 		    "Missing required argument");
 		return;
 	}
-	tag = strtol(tags, (char **)NULL, 10);
+
+	tag = strtoul(val, NULL, 0);
 	ct = cfiscsi_target_find(&cfiscsi_softc, target, tag);
 	if (ct == NULL) {
-		ctl_free_opts(&opts);
 		req->status = CTL_LUN_ERROR;
 		snprintf(req->error_str, sizeof(req->error_str),
 		    "can't find target \"%s\"", target);
 		return;
 	}
 	if (ct->ct_state != CFISCSI_TARGET_STATE_ACTIVE) {
-		ctl_free_opts(&opts);
 		req->status = CTL_LUN_ERROR;
 		snprintf(req->error_str, sizeof(req->error_str),
 		    "target \"%s\" is already dying", target);
 		return;
 	}
-	ctl_free_opts(&opts);
 
 	ct->ct_state = CFISCSI_TARGET_STATE_DYING;
 	ctl_port_offline(&ct->ct_port);

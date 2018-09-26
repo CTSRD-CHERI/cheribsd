@@ -33,32 +33,12 @@
 #include "opt_ddb.h"
 
 #include <machine/asmacros.h>
+#include <machine/specialreg.h>
 #include <machine/pmap.h>
 
-#include "assym.s"
+#include "assym.inc"
 
 	.text
-
-/*
- * bcopy family
- * void bzero(void *buf, u_int len)
- */
-
-/* done */
-ENTRY(bzero)
-	PUSH_FRAME_POINTER
-	movq	%rsi,%rcx
-	xorl	%eax,%eax
-	shrq	$3,%rcx
-	rep
-	stosq
-	movq	%rsi,%rcx
-	andq	$7,%rcx
-	rep
-	stosb
-	POP_FRAME_POINTER
-	ret
-END(bzero)
 
 /* Address: %rdi */
 ENTRY(pagezero)
@@ -70,6 +50,21 @@ ENTRY(pagezero)
 	POP_FRAME_POINTER
 	ret
 END(pagezero)
+
+/*
+ * pagecopy(%rdi=from, %rsi=to)
+ */
+ENTRY(pagecopy)
+	PUSH_FRAME_POINTER
+	movq	$PAGE_SIZE/8,%rcx
+	movq	%rdi,%r9
+	movq	%rsi,%rdi
+	movq	%r9,%rsi
+	rep
+	movsq
+	POP_FRAME_POINTER
+	ret
+END(pagecopy)
 
 /* Address: %rdi */
 ENTRY(sse2_pagezero)
@@ -95,33 +90,15 @@ ENTRY(sse2_pagezero)
 	ret
 END(sse2_pagezero)
 
-ENTRY(bcmp)
-	PUSH_FRAME_POINTER
-	movq	%rdx,%rcx
-	shrq	$3,%rcx
-	repe
-	cmpsq
-	jne	1f
-
-	movq	%rdx,%rcx
-	andq	$7,%rcx
-	repe
-	cmpsb
-1:
-	setne	%al
-	movsbl	%al,%eax
-	POP_FRAME_POINTER
-	ret
-END(bcmp)
-
 /*
- * bcopy(src, dst, cnt)
- *       rdi, rsi, rdx
+ * memmove(dst, src, cnt)
+ *         rdi, rsi, rdx
+ * Adapted from bcopy written by:
  *  ws@tools.de     (Wolfgang Solfrank, TooLs GmbH) +49-228-985800
  */
-ENTRY(bcopy)
+ENTRY(memmove)
 	PUSH_FRAME_POINTER
-	xchgq	%rsi,%rdi
+	movq	%rdi,%r9
 	movq	%rdx,%rcx
 
 	movq	%rdi,%rax
@@ -134,8 +111,14 @@ ENTRY(bcopy)
 	movsq
 	movq	%rdx,%rcx
 	andq	$7,%rcx				/* any bytes left? */
+	jne	2f
+	movq	%r9,%rax
+	POP_FRAME_POINTER
+	ret
+2:
 	rep
 	movsb
+	movq	%r9,%rax
 	POP_FRAME_POINTER
 	ret
 
@@ -156,11 +139,15 @@ ENTRY(bcopy)
 	rep
 	movsq
 	cld
+	movq	%r9,%rax
 	POP_FRAME_POINTER
 	ret
-END(bcopy)
+END(memmove)
 
 /*
+ * memcpy(dst, src, len)
+ *        rdi, rsi, rdx
+ *
  * Note: memcpy does not support overlapping copies
  */
 ENTRY(memcpy)
@@ -172,6 +159,10 @@ ENTRY(memcpy)
 	movsq
 	movq	%rdx,%rcx
 	andq	$7,%rcx				/* any bytes left? */
+	jne	1f
+	POP_FRAME_POINTER
+	ret
+1:
 	rep
 	movsb
 	POP_FRAME_POINTER
@@ -179,33 +170,32 @@ ENTRY(memcpy)
 END(memcpy)
 
 /*
- * pagecopy(%rdi=from, %rsi=to)
+ * memset(dst, c,   len)
+ *        rdi, rsi, rdx
  */
-ENTRY(pagecopy)
+ENTRY(memset)
 	PUSH_FRAME_POINTER
-	movq	$-PAGE_SIZE,%rax
-	movq	%rax,%rdx
-	subq	%rax,%rdi
-	subq	%rax,%rsi
-1:
-	prefetchnta (%rdi,%rax)
-	addq	$64,%rax
-	jne	1b
-2:
-	movq	(%rdi,%rdx),%rax
-	movnti	%rax,(%rsi,%rdx)
-	movq	8(%rdi,%rdx),%rax
-	movnti	%rax,8(%rsi,%rdx)
-	movq	16(%rdi,%rdx),%rax
-	movnti	%rax,16(%rsi,%rdx)
-	movq	24(%rdi,%rdx),%rax
-	movnti	%rax,24(%rsi,%rdx)
-	addq	$32,%rdx
-	jne	2b
-	sfence
+	movq	%rdi,%r9
+	movq	%rdx,%rcx
+	movzbq	%sil,%r8
+	movabs	$0x0101010101010101,%rax
+	imulq	%r8,%rax
+	shrq	$3,%rcx
+	rep
+	stosq
+	movq	%rdx,%rcx
+	andq	$7,%rcx
+	jne	1f
+	movq	%r9,%rax
 	POP_FRAME_POINTER
 	ret
-END(pagecopy)
+1:
+	rep
+	stosb
+	movq	%r9,%rax
+	POP_FRAME_POINTER
+	ret
+END(memset)
 
 /* fillw(pat, base, cnt) */
 /*       %rdi,%rsi, %rdx */
@@ -274,6 +264,7 @@ ENTRY(copyout)
 	movsq
 	movb	%dl,%cl
 	andb	$7,%cl
+	je	done_copyout
 	rep
 	movsb
 
@@ -322,6 +313,7 @@ ENTRY(copyin)
 	movsq
 	movb	%al,%cl
 	andb	$7,%cl				/* copy remaining bytes */
+	je	done_copyin
 	rep
 	movsb
 
@@ -788,3 +780,118 @@ msr_onfault:
 	movl	$EFAULT,%eax
 	POP_FRAME_POINTER
 	ret
+
+/*
+ * void pmap_pti_pcid_invalidate(uint64_t ucr3, uint64_t kcr3);
+ * Invalidates address space addressed by ucr3, then returns to kcr3.
+ * Done in assembler to ensure no other memory accesses happen while
+ * on ucr3.
+ */
+	ALIGN_TEXT
+ENTRY(pmap_pti_pcid_invalidate)
+	pushfq
+	cli
+	movq	%rdi,%cr3	/* to user page table */
+	movq	%rsi,%cr3	/* back to kernel */
+	popfq
+	retq
+
+/*
+ * void pmap_pti_pcid_invlpg(uint64_t ucr3, uint64_t kcr3, vm_offset_t va);
+ * Invalidates virtual address va in address space ucr3, then returns to kcr3.
+ */
+	ALIGN_TEXT
+ENTRY(pmap_pti_pcid_invlpg)
+	pushfq
+	cli
+	movq	%rdi,%cr3	/* to user page table */
+	invlpg	(%rdx)
+	movq	%rsi,%cr3	/* back to kernel */
+	popfq
+	retq
+
+/*
+ * void pmap_pti_pcid_invlrng(uint64_t ucr3, uint64_t kcr3, vm_offset_t sva,
+ *     vm_offset_t eva);
+ * Invalidates virtual addresses between sva and eva in address space ucr3,
+ * then returns to kcr3.
+ */
+	ALIGN_TEXT
+ENTRY(pmap_pti_pcid_invlrng)
+	pushfq
+	cli
+	movq	%rdi,%cr3	/* to user page table */
+1:	invlpg	(%rdx)
+	addq	$PAGE_SIZE,%rdx
+	cmpq	%rdx,%rcx
+	ja	1b
+	movq	%rsi,%cr3	/* back to kernel */
+	popfq
+	retq
+
+	.altmacro
+	.macro	ibrs_seq_label l
+handle_ibrs_\l:
+	.endm
+	.macro	ibrs_call_label l
+	call	handle_ibrs_\l
+	.endm
+	.macro	ibrs_seq count
+	ll=1
+	.rept	\count
+	ibrs_call_label	%(ll)
+	nop
+	ibrs_seq_label %(ll)
+	addq	$8,%rsp
+	ll=ll+1
+	.endr
+	.endm
+
+/* all callers already saved %rax, %rdx, and %rcx */
+ENTRY(handle_ibrs_entry)
+	cmpb	$0,hw_ibrs_active(%rip)
+	je	1f
+	movl	$MSR_IA32_SPEC_CTRL,%ecx
+	rdmsr
+	orl	$(IA32_SPEC_CTRL_IBRS|IA32_SPEC_CTRL_STIBP),%eax
+	orl	$(IA32_SPEC_CTRL_IBRS|IA32_SPEC_CTRL_STIBP)>>32,%edx
+	wrmsr
+	movb	$1,PCPU(IBPB_SET)
+	testl	$CPUID_STDEXT_SMEP,cpu_stdext_feature(%rip)
+	jne	1f
+	ibrs_seq 32
+1:	ret
+END(handle_ibrs_entry)
+
+ENTRY(handle_ibrs_exit)
+	cmpb	$0,PCPU(IBPB_SET)
+	je	1f
+	movl	$MSR_IA32_SPEC_CTRL,%ecx
+	rdmsr
+	andl	$~(IA32_SPEC_CTRL_IBRS|IA32_SPEC_CTRL_STIBP),%eax
+	andl	$~((IA32_SPEC_CTRL_IBRS|IA32_SPEC_CTRL_STIBP)>>32),%edx
+	wrmsr
+	movb	$0,PCPU(IBPB_SET)
+1:	ret
+END(handle_ibrs_exit)
+
+/* registers-neutral version, but needs stack */
+ENTRY(handle_ibrs_exit_rs)
+	cmpb	$0,PCPU(IBPB_SET)
+	je	1f
+	pushq	%rax
+	pushq	%rdx
+	pushq	%rcx
+	movl	$MSR_IA32_SPEC_CTRL,%ecx
+	rdmsr
+	andl	$~(IA32_SPEC_CTRL_IBRS|IA32_SPEC_CTRL_STIBP),%eax
+	andl	$~((IA32_SPEC_CTRL_IBRS|IA32_SPEC_CTRL_STIBP)>>32),%edx
+	wrmsr
+	popq	%rcx
+	popq	%rdx
+	popq	%rax
+	movb	$0,PCPU(IBPB_SET)
+1:	ret
+END(handle_ibrs_exit_rs)
+
+	.noaltmacro

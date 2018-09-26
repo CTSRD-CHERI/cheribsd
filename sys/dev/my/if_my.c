@@ -336,7 +336,7 @@ my_setmulti(struct my_softc * sc)
 
 	/* now program new ones */
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		h = ~ether_crc32_be(LLADDR((struct sockaddr_dl *)
@@ -1661,7 +1661,7 @@ my_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 	int             error;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		MY_LOCK(sc);
 		if (ifp->if_flags & IFF_UP)
 			my_init_locked(sc);
@@ -1670,15 +1670,15 @@ my_ioctl(struct ifnet * ifp, u_long command, caddr_t data)
 		MY_UNLOCK(sc);
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		MY_LOCK(sc);
 		my_setmulti(sc);
 		MY_UNLOCK(sc);
 		error = 0;
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);
 		break;
 	default:

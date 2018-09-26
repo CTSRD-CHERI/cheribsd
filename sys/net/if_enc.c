@@ -194,7 +194,7 @@ enc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		break;
 	default:
 		return (EINVAL);
@@ -305,7 +305,7 @@ enc_hhook(int32_t hhook_type, int32_t hhook_id, void *udata, void *ctx_data,
 	/* Make a packet looks like it was received on enc(4) */
 	rcvif = (*ctx->mp)->m_pkthdr.rcvif;
 	(*ctx->mp)->m_pkthdr.rcvif = ifp;
-	if (pfil_run_hooks(ph, ctx->mp, ifp, pdir, ctx->inp) != 0 ||
+	if (pfil_run_hooks(ph, ctx->mp, ifp, pdir, 0, ctx->inp) != 0 ||
 	    *ctx->mp == NULL) {
 		*ctx->mp = NULL; /* consumed by filter */
 		return (EACCES);

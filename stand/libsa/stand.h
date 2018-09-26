@@ -68,6 +68,7 @@
 
 /* this header intentionally exports NULL from <string.h> */
 #include <string.h>
+#define strcoll(a, b)	strcmp((a), (b))
 
 #define CHK(fmt, args...)	printf("%s(%d): " fmt "\n", __func__, __LINE__ , ##args)
 #define PCHK(fmt, args...)	{printf("%s(%d): " fmt "\n", __func__, __LINE__ , ##args); getchar();}
@@ -104,7 +105,7 @@ struct fs_ops {
     int		(*fo_close)(struct open_file *f);
     int		(*fo_read)(struct open_file *f, void *buf,
 			   size_t size, size_t *resid);
-    int		(*fo_write)(struct open_file *f, void *buf,
+    int		(*fo_write)(struct open_file *f, const void *buf,
 			    size_t size, size_t *resid);
     off_t	(*fo_seek)(struct open_file *f, off_t offset, int where);
     int		(*fo_stat)(struct open_file *f, struct stat *sb);
@@ -137,6 +138,12 @@ extern struct fs_ops pkgfs_fsops;
 struct devsw {
     const char	dv_name[8];
     int		dv_type;		/* opaque type constant, arch-dependant */
+#define DEVT_NONE	0
+#define DEVT_DISK	1
+#define DEVT_NET	2
+#define DEVT_CD		3
+#define DEVT_ZFS	4
+#define DEVT_FD		5
     int		(*dv_init)(void);	/* early probe call */
     int		(*dv_strategy)(void *devdata, int rw, daddr_t blk,
 			size_t size, char *buf, size_t *rsize);
@@ -159,16 +166,8 @@ extern int errno;
  * versions may be larger, but should be allowed to
  * overlap.
  */
-struct devdesc
-{
+struct devdesc {
     struct devsw	*d_dev;
-    int			d_type;
-#define DEVT_NONE	0
-#define DEVT_DISK	1
-#define DEVT_NET	2
-#define DEVT_CD		3
-#define DEVT_ZFS	4
-#define DEVT_FD		5
     int			d_unit;
     void		*d_opendata;
 };
@@ -269,10 +268,11 @@ extern void	*reallocf(void *ptr, size_t size);
 extern void	mallocstats(void);
 
 extern int	printf(const char *fmt, ...) __printflike(1, 2);
-extern void	vprintf(const char *fmt, __va_list);
 extern int	sprintf(char *buf, const char *cfmt, ...) __printflike(2, 3);
 extern int	snprintf(char *buf, size_t size, const char *cfmt, ...) __printflike(3, 4);
-extern void	vsprintf(char *buf, const char *cfmt, __va_list);
+extern int	vprintf(const char *fmt, __va_list);
+extern int	vsprintf(char *buf, const char *cfmt, __va_list);
+extern int	vsnprintf(char *buf, size_t size, const char *cfmt, __va_list);
 
 extern void	twiddle(u_int callerdiv);
 extern void	twiddle_divisor(u_int globaldiv);
@@ -285,18 +285,19 @@ extern int	open(const char *, int);
 #define	O_RDONLY	0x0
 #define O_WRONLY	0x1
 #define O_RDWR		0x2
+/* NOT IMPLEMENTED */
+#define	O_CREAT		0x0200		/* create if nonexistent */
+#define	O_TRUNC		0x0400		/* truncate to zero length */
 extern int	close(int);
 extern void	closeall(void);
 extern ssize_t	read(int, void *, size_t);
-extern ssize_t	write(int, void *, size_t);
+extern ssize_t	write(int, const void *, size_t);
 extern struct	dirent *readdirfd(int);
 
 extern void	srandom(unsigned int);
 extern long	random(void);
     
 /* imports from stdlib, locally modified */
-extern long	strtol(const char *, char **, int);
-extern unsigned long	strtoul(const char *, char **, int);
 extern char	*optarg;			/* getopt(3) external variables */
 extern int	optind, opterr, optopt, optreset;
 extern int	getopt(int, char * const [], const char *);
@@ -346,6 +347,14 @@ extern int		unsetenv(const char *name);
 extern ev_sethook_t	env_noset;		/* refuse set operation */
 extern ev_unsethook_t	env_nounset;		/* refuse unset operation */
 
+/* stdlib.h routines */
+extern int		abs(int a);
+extern void		abort(void) __dead2;
+extern long		strtol(const char * __restrict, char ** __restrict, int);
+extern long long	strtoll(const char * __restrict, char ** __restrict, int);
+extern unsigned long	strtoul(const char * __restrict, char ** __restrict, int);
+extern unsigned long long strtoull(const char * __restrict, char ** __restrict, int);
+
 /* BCD conversions (undocumented) */
 extern u_char const	bcd2bin_data[];
 extern u_char const	bin2bcd_data[];
@@ -368,7 +377,6 @@ static __inline quad_t qmin(quad_t a, quad_t b) { return (a < b ? a : b); }
 static __inline u_long ulmax(u_long a, u_long b) { return (a > b ? a : b); }
 static __inline u_long ulmin(u_long a, u_long b) { return (a < b ? a : b); }
 
-
 /* null functions for device/filesystem switches (undocumented) */
 extern int	nodev(void);
 extern int	noioctl(struct open_file *, u_long, void *);
@@ -377,7 +385,7 @@ extern void	nullsys(void);
 extern int	null_open(const char *path, struct open_file *f);
 extern int	null_close(struct open_file *f);
 extern int	null_read(struct open_file *f, void *buf, size_t size, size_t *resid);
-extern int	null_write(struct open_file *f, void *buf, size_t size, size_t *resid);
+extern int	null_write(struct open_file *f, const void *buf, size_t size, size_t *resid);
 extern off_t	null_seek(struct open_file *f, off_t offset, int where);
 extern int	null_stat(struct open_file *f, struct stat *sb);
 extern int	null_readdir(struct open_file *f, struct dirent *d);
@@ -387,13 +395,14 @@ extern int	null_readdir(struct open_file *f, struct dirent *d);
  * Machine dependent functions and data, must be provided or stubbed by 
  * the consumer 
  */
-extern void		exit(int);
+extern void		exit(int) __dead2;
 extern int		getchar(void);
 extern int		ischar(void);
 extern void		putchar(int);
 extern int		devopen(struct open_file *, const char *, const char **);
 extern int		devclose(struct open_file *f);
 extern void		panic(const char *, ...) __dead2 __printflike(1, 2);
+extern void		panic_action(void) __weak_symbol __dead2;
 extern time_t		getsecs(void);
 extern struct fs_ops	*file_system[];
 extern struct fs_ops	*exclusive_file_system;

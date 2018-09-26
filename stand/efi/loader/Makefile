@@ -1,7 +1,5 @@
 # $FreeBSD$
 
-MAN=
-
 LOADER_NET_SUPPORT?=	yes
 LOADER_MSDOS_SUPPORT?=	yes
 LOADER_UFS_SUPPORT?=	yes
@@ -9,8 +7,6 @@ LOADER_CD9660_SUPPORT?=	no
 LOADER_EXT2FS_SUPPORT?=	no
 
 .include <bsd.init.mk>
-
-MK_SSP=		no
 
 PROG=		loader.sym
 INTERNALPROG=
@@ -29,9 +25,9 @@ SRCS=	autoload.c \
 	vers.c
 
 .if ${MK_ZFS} != "no"
-LIBZFSBOOT=	${BOOTOBJ}/zfs/libzfsboot.a
 CFLAGS+=	-I${ZFSSRC}
 CFLAGS+=	-DEFI_ZFS_BOOT
+HAVE_ZFS=	yes
 .endif
 
 .if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} > 40201
@@ -95,20 +91,6 @@ CLEANFILES+=	loader.efi
 
 NEWVERSWHAT=	"EFI loader" ${MACHINE}
 
-NM?=		nm
-OBJCOPY?=	objcopy
-
-.if ${MACHINE_CPUARCH} == "amd64"
-EFI_TARGET=	efi-app-x86_64
-.elif ${MACHINE_CPUARCH} == "i386"
-EFI_TARGET=	efi-app-ia32
-.else
-EFI_TARGET=	binary
-.endif
-
-# Arbitrarily set the PE/COFF header timestamps to 1 Jan 2016 00:00:00
-# for build reproducibility.
-SOURCE_DATE_EPOCH?=1451606400
 loader.efi: ${PROG}
 	if ${NM} ${.ALLSRC} | grep ' U '; then \
 		echo "Undefined symbols in ${.ALLSRC}"; \
@@ -123,8 +105,7 @@ loader.efi: ${PROG}
 
 LIBEFI=		${BOOTOBJ}/efi/libefi/libefi.a
 
-DPADD=		${LIBFICL} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} ${LIBZFSBOOT} ${LIBSA} \
-		${LDSCRIPT}
-LDADD=		${LIBFICL} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} ${LIBZFSBOOT} ${LIBSA}
+DPADD=		${LDR_INTERP} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} ${LIBSA} ${LDSCRIPT}
+LDADD=		${LDR_INTERP} ${LIBEFI} ${LIBFDT} ${LIBEFI_FDT} ${LIBSA}
 
 .include <bsd.prog.mk>

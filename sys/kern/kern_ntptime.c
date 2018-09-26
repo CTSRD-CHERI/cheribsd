@@ -292,6 +292,8 @@ kern_ntp_gettime(struct thread *td, struct ntptimeval * __capability ntvp)
 {
 	struct ntptimeval ntv;
 
+	memset(&ntv, 0, sizeof(ntv));
+
 	NTP_LOCK();
 	ntp_gettime1(&ntv);
 	NTP_UNLOCK();

@@ -4,6 +4,8 @@
 
 FILEGROUPS=	FILES
 
+FILES+=	devmatch.conf
+
 .if ${MACHINE} == "powerpc"
 FILES+=	apple.conf
 .endif
@@ -18,7 +20,7 @@ FILES+=	hyperv.conf
 .endif
 
 .if ${MK_USB} != "no"
-FILES+=	uath.conf ulpt.conf usb.conf
+FILES+=	uath.conf ulpt.conf
 .endif
 
 .if ${MK_ZFS} != "no"

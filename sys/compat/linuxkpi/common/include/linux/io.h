@@ -71,28 +71,35 @@ __raw_writeq(uint64_t b, volatile void *addr)
 static inline void
 writel(uint32_t b, void *addr)
 {
-        *(volatile uint32_t *)addr = b;
+	*(volatile uint32_t *)addr = b;
+}
+
+#undef writel_relaxed
+static inline void
+writel_relaxed(uint32_t b, void *addr)
+{
+	*(volatile uint32_t *)addr = b;
 }
 
 #undef writeq
 static inline void
 writeq(uint64_t b, void *addr)
 {
-        *(volatile uint64_t *)addr = b;
+	*(volatile uint64_t *)addr = b;
 }
 
 #undef writeb
 static inline void
 writeb(uint8_t b, void *addr)
 {
-        *(volatile uint8_t *)addr = b;
+	*(volatile uint8_t *)addr = b;
 }
 
 #undef writew
 static inline void
 writew(uint16_t b, void *addr)
 {
-        *(volatile uint16_t *)addr = b;
+	*(volatile uint16_t *)addr = b;
 }
 
 #undef ioread8

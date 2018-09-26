@@ -5,7 +5,7 @@
 PROG=	syscall_timing
 MAN=
 
-LIBADD=	pthread
+#LIBADD=	pthread
 
 WARNS=	6
 

@@ -1841,7 +1841,7 @@ uhso_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	sc = ifp->if_softc;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if (ifp->if_flags & IFF_UP) {
 			if (!(ifp->if_drv_flags & IFF_DRV_RUNNING)) {
 				uhso_if_init(sc);
@@ -1855,9 +1855,9 @@ uhso_if_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFADDR):
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		break;
 	default:
 		return (EINVAL);

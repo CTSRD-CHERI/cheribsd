@@ -7,10 +7,19 @@
  * Free Software Foundation;  either version 2 of the  License, or (at your
  * option) any later version.
  */
-#include "skeleton.dtsi"
 #include <dt-bindings/interrupt-controller/irq.h>
 
 / {
+	#address-cells = <1>;
+	#size-cells = <1>;
+	chosen { };
+	aliases { };
+
+	memory@c0000000 {
+		device_type = "memory";
+		reg = <0xc0000000 0x0>;
+	};
+
 	arm {
 		#address-cells = <1>;
 		#size-cells = <1>;
@@ -23,6 +32,18 @@
 			reg = <0xfffee000 0x2000>;
 		};
 	};
+	dsp: dsp@11800000 {
+		compatible = "ti,da850-dsp";
+		reg = <0x11800000 0x40000>,
+		      <0x11e00000 0x8000>,
+		      <0x11f00000 0x8000>,
+		      <0x01c14044 0x4>,
+		      <0x01c14174 0x8>;
+		reg-names = "l2sram", "l1pram", "l1dram", "host1cfg", "chipsig";
+		interrupt-parent = <&intc>;
+		interrupts = <28>;
+		status = "disabled";
+	};
 	soc@1c00000 {
 		compatible = "simple-bus";
 		model = "da850";
@@ -34,8 +55,6 @@
 		pmx_core: pinmux@14120 {
 			compatible = "pinctrl-single";
 			reg = <0x14120 0x50>;
-			#address-cells = <1>;
-			#size-cells = <0>;
 			#pinctrl-cells = <2>;
 			pinctrl-single,bit-per-mux;
 			pinctrl-single,register-width = <32>;

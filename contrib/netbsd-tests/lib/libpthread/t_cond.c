@@ -308,7 +308,7 @@ pthread_cond_timedwait_func(void *arg)
 
 	for (;;) {
 
-		if (i++ >= 10000)
+		if (i++ >= 1000)
 			pthread_exit(NULL);
 
 		(void)memset(&ts, 0, sizeof(struct timespec));

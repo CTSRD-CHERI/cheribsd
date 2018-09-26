@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/bus.h>
 #include <sys/random.h>
 #include <sys/rman.h>
+#include <sys/sbuf.h>
 #include <sys/selinfo.h>
 #include <sys/signalvar.h>
 #include <sys/smp.h>
@@ -58,7 +59,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/uio.h>
 #include <sys/bus.h>
-#include <sys/interrupt.h>
 #include <sys/cpuset.h>
 
 #include <net/vnet.h>
@@ -122,7 +122,6 @@ struct device {
 	TAILQ_ENTRY(device)	link;	/**< list of devices in parent */
 	TAILQ_ENTRY(device)	devlink; /**< global device list membership */
 	device_t	parent;		/**< parent of this device  */
-	device_t	intr_parent;	/**< interrupt parent of this device */
 	device_list_t	children;	/**< list of child devices */
 
 	/*
@@ -860,27 +859,18 @@ sysctl_devctl_queue(SYSCTL_HANDLER_ARGS)
  * Strings are always terminated with a NUL, but may be truncated if longer
  * than @p len bytes after quotes.
  *
- * @param dst	Buffer to hold the string. Must be at least @p len bytes long
+ * @param sb	sbuf to place the characters into
  * @param src	Original buffer.
- * @param len	Length of buffer pointed to by @dst, including trailing NUL
  */
 void
-devctl_safe_quote(char *dst, const char *src, size_t len)
+devctl_safe_quote_sb(struct sbuf *sb, const char *src)
 {
-	char *walker = dst, *ep = dst + len - 1;
 
-	if (len == 0)
-		return;
-	while (src != NULL && walker < ep)
-	{
-		if (*src == '"' || *src == '\\') {
-			if (ep - walker < 2)
-				break;
-			*walker++ = '\\';
-		}
-		*walker++ = *src++;
+	while (*src != '\0') {
+		if (*src == '"' || *src == '\\')
+			sbuf_putc(sb, '\\');
+		sbuf_putc(sb, *src++);
 	}
-	*walker = '\0';
 }
 
 /* End of /dev/devctl code */
@@ -1465,7 +1455,7 @@ devclass_get_devices(devclass_t dc, device_t **devlistp, int *devcountp)
 	device_t *list;
 
 	count = devclass_get_count(dc);
-	list = mallocarray(count, sizeof(device_t), M_TEMP, M_NOWAIT|M_ZERO);
+	list = malloc(count * sizeof(device_t), M_TEMP, M_NOWAIT|M_ZERO);
 	if (!list)
 		return (ENOMEM);
 
@@ -1681,7 +1671,7 @@ devclass_alloc_unit(devclass_t dc, device_t dev, int *unitp)
 
 		oldlist = dc->devices;
 		newsize = roundup((unit + 1), MINALLOCSIZE / sizeof(device_t));
-		newlist = mallocarray(newsize, sizeof(device_t), M_BUS, M_NOWAIT);
+		newlist = malloc(sizeof(device_t) * newsize, M_BUS, M_NOWAIT);
 		if (!newlist)
 			return (ENOMEM);
 		if (oldlist != NULL)
@@ -1829,6 +1819,8 @@ make_device(device_t parent, const char *name, int unit)
 			return (NULL);
 		}
 	}
+	if (parent != NULL && device_has_quiet_children(parent))
+		dev->flags |= DF_QUIET | DF_QUIET_CHILDREN;
 	dev->ivars = NULL;
 	dev->softc = NULL;
 
@@ -2269,24 +2261,6 @@ device_get_parent(device_t dev)
 }
 
 /**
- * @brief Return the interrupt parent of a device
- */
-device_t
-device_get_intr_parent(device_t dev)
-{
-	return (dev->intr_parent);
-}
-
-/**
- * @brief Set the interrupt parent of a device
- */
-void
-device_set_intr_parent(device_t dev, device_t intr_parent)
-{
-	dev->intr_parent = intr_parent;
-}
-
-/**
  * @brief Get a list of children of a device
  *
  * An array containing a list of all the children of the given device
@@ -2319,7 +2293,7 @@ device_get_children(device_t dev, device_t **devlistp, int *devcountp)
 		return (0);
 	}
 
-	list = mallocarray(count, sizeof(device_t), M_TEMP, M_NOWAIT|M_ZERO);
+	list = malloc(count * sizeof(device_t), M_TEMP, M_NOWAIT|M_ZERO);
 	if (!list)
 		return (ENOMEM);
 
@@ -2668,12 +2642,30 @@ device_quiet(device_t dev)
 }
 
 /**
+ * @brief Set the DF_QUIET_CHILDREN flag for the device
+ */
+void
+device_quiet_children(device_t dev)
+{
+	dev->flags |= DF_QUIET_CHILDREN;
+}
+
+/**
  * @brief Clear the DF_QUIET flag for the device
  */
 void
 device_verbose(device_t dev)
 {
 	dev->flags &= ~DF_QUIET;
+}
+
+/**
+ * @brief Return non-zero if the DF_QUIET_CHIDLREN flag is set on the device
+ */
+int
+device_has_quiet_children(device_t dev)
+{
+	return ((dev->flags & DF_QUIET_CHILDREN) != 0);
 }
 
 /**
@@ -3727,7 +3719,11 @@ bus_generic_detach(device_t dev)
 	if (dev->state != DS_ATTACHED)
 		return (EBUSY);
 
-	TAILQ_FOREACH(child, &dev->children, link) {
+	/*
+	 * Detach children in the reverse order.
+	 * See bus_generic_suspend for details.
+	 */
+	TAILQ_FOREACH_REVERSE(child, &dev->children, device_list, link) {
 		if ((error = device_detach(child)) != 0)
 			return (error);
 	}
@@ -3747,7 +3743,11 @@ bus_generic_shutdown(device_t dev)
 {
 	device_t child;
 
-	TAILQ_FOREACH(child, &dev->children, link) {
+	/*
+	 * Shut down children in the reverse order.
+	 * See bus_generic_suspend for details.
+	 */
+	TAILQ_FOREACH_REVERSE(child, &dev->children, device_list, link) {
 		device_shutdown(child);
 	}
 
@@ -3800,15 +3800,23 @@ int
 bus_generic_suspend(device_t dev)
 {
 	int		error;
-	device_t	child, child2;
+	device_t	child;
 
-	TAILQ_FOREACH(child, &dev->children, link) {
+	/*
+	 * Suspend children in the reverse order.
+	 * For most buses all children are equal, so the order does not matter.
+	 * Other buses, such as acpi, carefully order their child devices to
+	 * express implicit dependencies between them.  For such buses it is
+	 * safer to bring down devices in the reverse order.
+	 */
+	TAILQ_FOREACH_REVERSE(child, &dev->children, device_list, link) {
 		error = BUS_SUSPEND_CHILD(dev, child);
-		if (error) {
-			for (child2 = TAILQ_FIRST(&dev->children);
-			     child2 && child2 != child;
-			     child2 = TAILQ_NEXT(child2, link))
-				BUS_RESUME_CHILD(dev, child2);
+		if (error != 0) {
+			child = TAILQ_NEXT(child, link);
+			if (child != NULL) {
+				TAILQ_FOREACH_FROM(child, &dev->children, link)
+					BUS_RESUME_CHILD(dev, child);
+			}
 			return (error);
 		}
 	}
@@ -5070,7 +5078,7 @@ print_device_short(device_t dev, int indent)
 	if (!dev)
 		return;
 
-	indentprintf(("device %d: <%s> %sparent,%schildren,%s%s%s%s%s,%sivars,%ssoftc,busy=%d\n",
+	indentprintf(("device %d: <%s> %sparent,%schildren,%s%s%s%s%s%s,%sivars,%ssoftc,busy=%d\n",
 	    dev->unit, dev->desc,
 	    (dev->parent? "":"no "),
 	    (TAILQ_EMPTY(&dev->children)? "no ":""),
@@ -5079,6 +5087,7 @@ print_device_short(device_t dev, int indent)
 	    (dev->flags&DF_WILDCARD? "wildcard,":""),
 	    (dev->flags&DF_DESCMALLOCED? "descmalloced,":""),
 	    (dev->flags&DF_REBID? "rebiddable,":""),
+	    (dev->flags&DF_SUSPENDED? "suspended,":""),
 	    (dev->ivars? "":"no "),
 	    (dev->softc? "":"no "),
 	    dev->busy));
@@ -5246,8 +5255,9 @@ sysctl_devices(SYSCTL_HANDLER_ARGS)
 	u_int			namelen = arg2;
 	int			index;
 	device_t		dev;
-	struct u_device		udev;	/* XXX this is a bit big */
+	struct u_device		*udev;
 	int			error;
+	char			*walker, *ep;
 
 	if (namelen != 2)
 		return (EINVAL);
@@ -5268,26 +5278,45 @@ sysctl_devices(SYSCTL_HANDLER_ARGS)
 		return (ENOENT);
 
 	/*
-	 * Populate the return array.
+	 * Populate the return item, careful not to overflow the buffer.
 	 */
-	bzero(&udev, sizeof(udev));
-	udev.dv_handle = (uintptr_t)dev;
-	udev.dv_parent = (uintptr_t)dev->parent;
-	if (dev->nameunit != NULL)
-		strlcpy(udev.dv_name, dev->nameunit, sizeof(udev.dv_name));
-	if (dev->desc != NULL)
-		strlcpy(udev.dv_desc, dev->desc, sizeof(udev.dv_desc));
-	if (dev->driver != NULL && dev->driver->name != NULL)
-		strlcpy(udev.dv_drivername, dev->driver->name,
-		    sizeof(udev.dv_drivername));
-	bus_child_pnpinfo_str(dev, udev.dv_pnpinfo, sizeof(udev.dv_pnpinfo));
-	bus_child_location_str(dev, udev.dv_location, sizeof(udev.dv_location));
-	udev.dv_devflags = dev->devflags;
-	udev.dv_flags = dev->flags;
-	udev.dv_state = dev->state;
-	udev.dv_fields = DV_FIELDS;
-	udev.dv_intr_parent = (uintptr_t)dev->intr_parent;
-	error = SYSCTL_OUT(req, &udev, MIN(req->oldlen, sizeof(udev)));
+	udev = malloc(sizeof(*udev), M_BUS, M_WAITOK | M_ZERO);
+	if (udev == NULL)
+		return (ENOMEM);
+	udev->dv_handle = (uintptr_t)dev;
+	udev->dv_parent = (uintptr_t)dev->parent;
+	udev->dv_devflags = dev->devflags;
+	udev->dv_flags = dev->flags;
+	udev->dv_state = dev->state;
+	walker = udev->dv_fields;
+	ep = walker + sizeof(udev->dv_fields);
+#define CP(src)						\
+	if ((src) == NULL)				\
+		*walker++ = '\0';			\
+	else {						\
+		strlcpy(walker, (src), ep - walker);	\
+		walker += strlen(walker) + 1;		\
+	}						\
+	if (walker >= ep)				\
+		break;
+
+	do {
+		CP(dev->nameunit);
+		CP(dev->desc);
+		CP(dev->driver != NULL ? dev->driver->name : NULL);
+		bus_child_pnpinfo_str(dev, walker, ep - walker);
+		walker += strlen(walker) + 1;
+		if (walker >= ep)
+			break;
+		bus_child_location_str(dev, walker, ep - walker);
+		walker += strlen(walker) + 1;
+		if (walker >= ep)
+			break;
+		*walker++ = '\0';
+	} while (0);
+#undef CP
+	error = SYSCTL_OUT(req, udev, sizeof(*udev));
+	free(udev, M_BUS);
 	return (error);
 }
 
@@ -5625,6 +5654,56 @@ devctl2_init(void)
 	    UID_ROOT, GID_WHEEL, 0600, "devctl2");
 }
 
+/*
+ * APIs to manage deprecation and obsolescence.
+ */
+static int obsolete_panic = 0;
+SYSCTL_INT(_debug, OID_AUTO, obsolete_panic, CTLFLAG_RWTUN, &obsolete_panic, 0,
+    "Bus debug level");
+/* 0 - don't panic, 1 - panic if already obsolete, 2 - panic if deprecated */
+static void
+gone_panic(int major, int running, const char *msg)
+{
+
+	switch (obsolete_panic)
+	{
+	case 0:
+		return;
+	case 1:
+		if (running < major)
+			return;
+		/* FALLTHROUGH */
+	default:
+		panic("%s", msg);
+	}
+}
+
+void
+_gone_in(int major, const char *msg)
+{
+
+	gone_panic(major, P_OSREL_MAJOR(__FreeBSD_version), msg);
+	if (P_OSREL_MAJOR(__FreeBSD_version) >= major)
+		printf("Obsolete code will removed soon: %s\n", msg);
+	else if (P_OSREL_MAJOR(__FreeBSD_version) + 1 == major)
+		printf("Deprecated code (to be removed in FreeBSD %d): %s\n",
+		    major, msg);
+}
+
+void
+_gone_in_dev(device_t dev, int major, const char *msg)
+{
+
+	gone_panic(major, P_OSREL_MAJOR(__FreeBSD_version), msg);
+	if (P_OSREL_MAJOR(__FreeBSD_version) >= major)
+		device_printf(dev,
+		    "Obsolete code will removed soon: %s\n", msg);
+	else if (P_OSREL_MAJOR(__FreeBSD_version) + 1 == major)
+		device_printf(dev,
+		    "Deprecated code (to be removed in FreeBSD %d): %s\n",
+		    major, msg);
+}
+
 #ifdef DDB
 DB_SHOW_COMMAND(device, db_show_device)
 {
@@ -5653,13 +5732,3 @@ DB_SHOW_ALL_COMMAND(devices, db_show_all_devices)
 	}
 }
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "kiovec_t",
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

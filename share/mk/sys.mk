@@ -118,7 +118,8 @@ NO_META_IGNORE_HOST_HEADERS=	1
 # This needs to be done early - before .PATH is computed
 # Don't do this for 'make showconfig' as it enables all options where meta mode
 # is not expected.
-.if !make(showconfig) && !make(print-dir) && empty(.MAKEFLAGS:M-[nN])
+.if !make(showconfig) && !make(print-dir) && !make(test-system-*) && \
+    empty(.MAKEFLAGS:M-[nN])
 .sinclude <auto.obj.mk>
 .endif
 .endif	# ${MK_AUTO_OBJ} == "yes"
@@ -320,7 +321,8 @@ SHELL=	${__MAKE_SHELL}
 .MAKE.EXPAND_VARIABLES= yes
 
 # Tell bmake the makefile preference
-.MAKE.MAKEFILE_PREFERENCE= BSDmakefile makefile Makefile
+MAKEFILE_PREFERENCE?= BSDmakefile makefile Makefile
+.MAKE.MAKEFILE_PREFERENCE= ${MAKEFILE_PREFERENCE}
 
 # Tell bmake to always pass job tokens, regardless of target depending on
 # .MAKE or looking like ${MAKE}/${.MAKE}/$(MAKE)/$(.MAKE)/make.

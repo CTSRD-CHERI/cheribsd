@@ -899,7 +899,7 @@ vx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		VX_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) == 0 &&
 		    (ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -928,7 +928,7 @@ vx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VX_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		/*
 	         * Set the interface MTU.
 	         */
@@ -941,8 +941,8 @@ vx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		VX_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * Multicast list has changed; set the hardware filter
 		 * accordingly.

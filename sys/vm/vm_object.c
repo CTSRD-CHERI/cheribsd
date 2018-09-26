@@ -96,6 +96,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_pager.h>
+#include <vm/vm_phys.h>
+#include <vm/vm_pagequeue.h>
 #include <vm/swap_pager.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_extern.h>
@@ -730,14 +732,11 @@ static void
 vm_object_terminate_pages(vm_object_t object)
 {
 	vm_page_t p, p_next;
-	struct mtx *mtx, *mtx1;
-	struct vm_pagequeue *pq, *pq1;
-	int dequeued;
+	struct mtx *mtx;
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
 
 	mtx = NULL;
-	pq = NULL;
 
 	/*
 	 * Free any remaining pageable pages.  This also removes them from the
@@ -747,59 +746,20 @@ vm_object_terminate_pages(vm_object_t object)
 	 */
 	TAILQ_FOREACH_SAFE(p, &object->memq, listq, p_next) {
 		vm_page_assert_unbusied(p);
-		if ((object->flags & OBJ_UNMANAGED) == 0) {
+		if ((object->flags & OBJ_UNMANAGED) == 0)
 			/*
 			 * vm_page_free_prep() only needs the page
 			 * lock for managed pages.
 			 */
-			mtx1 = vm_page_lockptr(p);
-			if (mtx1 != mtx) {
-				if (mtx != NULL)
-					mtx_unlock(mtx);
-				if (pq != NULL) {
-					vm_pagequeue_cnt_add(pq, dequeued);
-					vm_pagequeue_unlock(pq);
-					pq = NULL;
-				}
-				mtx = mtx1;
-				mtx_lock(mtx);
-			}
-		}
+			vm_page_change_lock(p, &mtx);
 		p->object = NULL;
 		if (p->wire_count != 0)
-			goto unlist;
-		VM_CNT_INC(v_pfree);
-		p->flags &= ~PG_ZERO;
-		if (p->queue != PQ_NONE) {
-			KASSERT(p->queue < PQ_COUNT, ("vm_object_terminate: "
-			    "page %p is not queued", p));
-			pq1 = vm_page_pagequeue(p);
-			if (pq != pq1) {
-				if (pq != NULL) {
-					vm_pagequeue_cnt_add(pq, dequeued);
-					vm_pagequeue_unlock(pq);
-				}
-				pq = pq1;
-				vm_pagequeue_lock(pq);
-				dequeued = 0;
-			}
-			p->queue = PQ_NONE;
-			TAILQ_REMOVE(&pq->pq_pl, p, plinks.q);
-			dequeued--;
-		}
-		if (vm_page_free_prep(p, true))
 			continue;
-unlist:
-		TAILQ_REMOVE(&object->memq, p, listq);
-	}
-	if (pq != NULL) {
-		vm_pagequeue_cnt_add(pq, dequeued);
-		vm_pagequeue_unlock(pq);
+		VM_CNT_INC(v_pfree);
+		vm_page_free(p);
 	}
 	if (mtx != NULL)
 		mtx_unlock(mtx);
-
-	vm_page_free_phys_pglist(&object->memq);
 
 	/*
 	 * If the object contained any pages, then reset it to an empty state.
@@ -1285,7 +1245,7 @@ next_page:
 		if (tm->valid != VM_PAGE_BITS_ALL)
 			goto next_pindex;
 		vm_page_lock(tm);
-		if (tm->hold_count != 0 || tm->wire_count != 0) {
+		if (vm_page_held(tm)) {
 			vm_page_unlock(tm);
 			goto next_pindex;
 		}
@@ -1983,7 +1943,6 @@ vm_object_page_remove(vm_object_t object, vm_pindex_t start, vm_pindex_t end,
 {
 	vm_page_t p, next;
 	struct mtx *mtx;
-	struct pglist pgl;
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
 	KASSERT((object->flags & OBJ_UNMANAGED) == 0 ||
@@ -1992,7 +1951,6 @@ vm_object_page_remove(vm_object_t object, vm_pindex_t start, vm_pindex_t end,
 	if (object->resident_page_count == 0)
 		return;
 	vm_object_pip_add(object, 1);
-	TAILQ_INIT(&pgl);
 again:
 	p = vm_page_find_least(object, start);
 	mtx = NULL;
@@ -2046,13 +2004,10 @@ again:
 		}
 		if ((options & OBJPR_NOTMAPPED) == 0 && object->ref_count != 0)
 			pmap_remove_all(p);
-		p->flags &= ~PG_ZERO;
-		if (vm_page_free_prep(p, false))
-			TAILQ_INSERT_TAIL(&pgl, p, listq);
+		vm_page_free(p);
 	}
 	if (mtx != NULL)
 		mtx_unlock(mtx);
-	vm_page_free_phys_pglist(&pgl);
 	vm_object_pip_wakeup(object);
 }
 
@@ -2290,7 +2245,7 @@ void
 vm_object_unwire(vm_object_t object, vm_ooffset_t offset, vm_size_t length,
     uint8_t queue)
 {
-	vm_object_t tobject;
+	vm_object_t tobject, t1object;
 	vm_page_t m, tm;
 	vm_pindex_t end_pindex, pindex, tpindex;
 	int depth, locked_depth;
@@ -2304,6 +2259,7 @@ vm_object_unwire(vm_object_t object, vm_ooffset_t offset, vm_size_t length,
 		return;
 	pindex = OFF_TO_IDX(offset);
 	end_pindex = pindex + atop(length);
+again:
 	locked_depth = 1;
 	VM_OBJECT_RLOCK(object);
 	m = vm_page_find_least(object, pindex);
@@ -2337,16 +2293,26 @@ vm_object_unwire(vm_object_t object, vm_ooffset_t offset, vm_size_t length,
 			m = TAILQ_NEXT(m, listq);
 		}
 		vm_page_lock(tm);
+		if (vm_page_xbusied(tm)) {
+			for (tobject = object; locked_depth >= 1;
+			    locked_depth--) {
+				t1object = tobject->backing_object;
+				VM_OBJECT_RUNLOCK(tobject);
+				tobject = t1object;
+			}
+			vm_page_busy_sleep(tm, "unwbo", true);
+			goto again;
+		}
 		vm_page_unwire(tm, queue);
 		vm_page_unlock(tm);
 next_page:
 		pindex++;
 	}
 	/* Release the accumulated object locks. */
-	for (depth = 0; depth < locked_depth; depth++) {
-		tobject = object->backing_object;
-		VM_OBJECT_RUNLOCK(object);
-		object = tobject;
+	for (tobject = object; locked_depth >= 1; locked_depth--) {
+		t1object = tobject->backing_object;
+		VM_OBJECT_RUNLOCK(tobject);
+		tobject = t1object;
 	}
 }
 
@@ -2425,9 +2391,9 @@ sysctl_vm_object_list(SYSCTL_HANDLER_ARGS)
 			 * sysctl is only meant to give an
 			 * approximation of the system anyway.
 			 */
-			if (vm_page_active(m))
+			if (m->queue == PQ_ACTIVE)
 				kvo->kvo_active++;
-			else if (vm_page_inactive(m))
+			else if (m->queue == PQ_INACTIVE)
 				kvo->kvo_inactive++;
 		}
 

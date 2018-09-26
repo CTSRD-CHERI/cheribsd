@@ -57,7 +57,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include "opt_compat.h"
 #include "opt_ddb.h"
 #include "opt_kstack_pages.h"
 #include "opt_platform.h"
@@ -160,6 +159,14 @@ uintptr_t	powerpc_init(vm_offset_t, vm_offset_t, vm_offset_t, void *,
 long		Maxmem = 0;
 long		realmem = 0;
 
+/* Default MSR values set in the AIM/Book-E early startup code */
+register_t	psl_kernset;
+register_t	psl_userset;
+register_t	psl_userstatic;
+#ifdef __powerpc64__
+register_t	psl_userset32;
+#endif
+
 struct kva_md_info kmi;
 
 static void
@@ -213,8 +220,8 @@ cpu_startup(void *dummy)
 	vm_ksubmap_init(&kmi);
 
 	printf("avail memory = %ju (%ju MB)\n",
-	    ptoa((uintmax_t)vm_cnt.v_free_count),
-	    ptoa((uintmax_t)vm_cnt.v_free_count) / 1048576);
+	    ptoa((uintmax_t)vm_free_count()),
+	    ptoa((uintmax_t)vm_free_count()) / 1048576);
 
 	/*
 	 * Set up buffers, so they can be used to read disk labels.
@@ -229,6 +236,8 @@ extern unsigned char	__sbss_start[];
 extern unsigned char	__sbss_end[];
 extern unsigned char	_end[];
 
+void aim_early_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry,
+    void *mdp, uint32_t mdp_cookie);
 void aim_cpu_init(vm_offset_t toc);
 void booke_cpu_init(void);
 
@@ -239,15 +248,12 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp,
 	struct		pcpu *pc;
 	struct cpuref	bsp;
 	vm_offset_t	startkernel, endkernel;
-	void		*kmdp;
 	char		*env;
         bool		ofw_bootargs = false;
 #ifdef DDB
 	vm_offset_t ksym_start;
 	vm_offset_t ksym_end;
 #endif
-
-	kmdp = NULL;
 
 	/* First guess at start/end kernel positions */
 	startkernel = __startkernel;
@@ -269,16 +275,10 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp,
 	bzero(__bss_start, _end - __bss_start);
 #endif
 
+	cpu_feature_setup();
+
 #ifdef AIM
-	/*
-	 * If running from an FDT, make sure we are in real mode to avoid
-	 * tromping on firmware page tables. Everything in the kernel assumes
-	 * 1:1 mappings out of firmware, so this won't break anything not
-	 * already broken. This doesn't work if there is live OF, since OF
-	 * may internally use non-1:1 mappings.
-	 */
-	if (ofentry == 0)
-		mtmsr(mfmsr() & ~(PSL_IR | PSL_DR));
+	aim_early_init(fdt, toc, ofentry, mdp, mdp_cookie);
 #endif
 
 	/*
@@ -287,14 +287,33 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp,
 	 * boothowto.
 	 */
 	if (mdp != NULL) {
+		void *kmdp = NULL;
+		char *envp = NULL;
+		uintptr_t md_offset = 0;
+		vm_paddr_t kernelendphys;
+
+#ifdef AIM
+		if ((uintptr_t)&powerpc_init > DMAP_BASE_ADDRESS)
+			md_offset = DMAP_BASE_ADDRESS;
+#endif
+
 		preload_metadata = mdp;
+		if (md_offset > 0) {
+			preload_metadata += md_offset;
+			preload_bootstrap_relocate(md_offset);
+		}
 		kmdp = preload_search_by_type("elf kernel");
 		if (kmdp != NULL) {
 			boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
-			init_static_kenv(MD_FETCH(kmdp, MODINFOMD_ENVP, char *),
-			    0);
-			endkernel = ulmax(endkernel, MD_FETCH(kmdp,
-			    MODINFOMD_KERNEND, vm_offset_t));
+			envp = MD_FETCH(kmdp, MODINFOMD_ENVP, char *);
+			if (envp != NULL)
+				envp += md_offset;
+			init_static_kenv(envp, 0);
+			kernelendphys = MD_FETCH(kmdp, MODINFOMD_KERNEND,
+			    vm_offset_t);
+			if (kernelendphys != 0)
+				kernelendphys += md_offset;
+			endkernel = ulmax(endkernel, kernelendphys);
 #ifdef DDB
 			ksym_start = MD_FETCH(kmdp, MODINFOMD_SSYM, uintptr_t);
 			ksym_end = MD_FETCH(kmdp, MODINFOMD_ESYM, uintptr_t);
@@ -380,7 +399,7 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp,
 	 * Bring up MMU
 	 */
 	pmap_bootstrap(startkernel, endkernel);
-	mtmsr(PSL_KERNSET & ~PSL_EE);
+	mtmsr(psl_kernset & ~PSL_EE);
 
 	/*
 	 * Initialize params/tunables that are derived from memsize

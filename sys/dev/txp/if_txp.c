@@ -1710,7 +1710,7 @@ txp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int capenable, error = 0, mask;
 
 	switch(command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		TXP_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -1728,8 +1728,8 @@ txp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->sc_if_flags = ifp->if_flags;
 		TXP_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/*
 		 * Multicast list has changed; set the hardware
 		 * filter accordingly.
@@ -1739,7 +1739,7 @@ txp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			txp_set_filter(sc);
 		TXP_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		TXP_LOCK(sc);
 		capenable = ifp->if_capenable;
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
@@ -1773,7 +1773,7 @@ txp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		VLAN_CAPABILITIES(ifp);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_ifmedia, command);
 		break;
 	default:
@@ -2742,7 +2742,7 @@ txp_set_filter(struct txp_softc *sc)
 	mchash[0] = mchash[1] = 0;
 	mcnt = 0;
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		crc = ether_crc32_be(LLADDR((struct sockaddr_dl *)

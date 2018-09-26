@@ -151,6 +151,7 @@ struct Configuration {
   bool WarnMissingEntry;
   bool ZCombreloc;
   bool ZExecstack;
+  bool ZHazardplt;
   bool ZNocopyreloc;
   bool ZNodelete;
   bool ZNodlopen;
@@ -159,6 +160,7 @@ struct Configuration {
   bool ZRelro;
   bool ZRodynamic;
   bool ZText;
+  bool ZRetpolineplt;
   bool ExitEarly;
   bool ZWxneeded;
   DiscardPolicy Discard;

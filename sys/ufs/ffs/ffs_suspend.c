@@ -78,7 +78,7 @@ ffs_susp_suspended(struct mount *mp)
 	sx_assert(&ffs_susp_lock, SA_LOCKED);
 
 	ump = VFSTOUFS(mp);
-	if (ump->um_writesuspended)
+	if ((ump->um_flags & UM_WRITESUSPENDED) != 0)
 		return (1);
 	return (0);
 }
@@ -144,9 +144,7 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 			if (error != 0)
 				goto out;
 			if (uio->uio_rw == UIO_WRITE) {
-				error = copyin_c(base,
-				    (__cheri_tocap char * __capability)
-				    bp->b_data, len);
+				error = copyin_c(base, bp->b_data, len);
 				if (error != 0) {
 					bp->b_flags |= B_INVAL | B_NOCACHE;
 					brelse(bp);
@@ -156,9 +154,7 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 				if (error != 0)
 					goto out;
 			} else {
-				error = copyout_c(
-				    (__cheri_tocap char * __capability)
-				    bp->b_data, base, len);
+				error = copyout_c(bp->b_data, base, len);
 				brelse(bp);
 				if (error != 0)
 					goto out;
@@ -212,7 +208,9 @@ ffs_susp_suspend(struct mount *mp)
 	if ((error = vfs_write_suspend(mp, VS_SKIP_UNMOUNT)) != 0)
 		return (error);
 
-	ump->um_writesuspended = 1;
+	UFS_LOCK(ump);
+	ump->um_flags |= UM_WRITESUSPENDED;
+	UFS_UNLOCK(ump);
 
 	return (0);
 }
@@ -257,7 +255,9 @@ ffs_susp_dtor(void *data)
 
 	vfs_write_resume(mp, 0);
 	vfs_unbusy(mp);
-	ump->um_writesuspended = 0;
+	UFS_LOCK(ump);
+	ump->um_flags &= ~UM_WRITESUSPENDED;
+	UFS_UNLOCK(ump);
 
 	sx_xunlock(&ffs_susp_lock);
 }

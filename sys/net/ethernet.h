@@ -344,6 +344,7 @@ struct ether_vlan_header {
 #define	ETHERTYPE_PPPOE		0x8864	/* PPP Over Ethernet Session Stage */
 #define	ETHERTYPE_LANPROBE	0x8888	/* HP LanProbe test? */
 #define	ETHERTYPE_PAE		0x888e	/* EAPOL PAE/802.1x */
+#define	ETHERTYPE_QINQ		0x88A8	/* 802.1ad VLAN stacking */
 #define	ETHERTYPE_LOOPBACK	0x9000	/* Loopback: used to test interfaces */
 #define	ETHERTYPE_LBACK		ETHERTYPE_LOOPBACK	/* DEC MOP loopback */
 #define	ETHERTYPE_XNSSM		0x9001	/* 3Com (Formerly Bridge Communications), XNS Systems Management */
@@ -384,6 +385,20 @@ struct ether_vlan_header {
 	}								\
 } while (0)
 
+/*
+ * Names for 802.1q priorities ("802.1p").  Notice that in this scheme,
+ * (0 < 1), allowing default 0-tagged traffic to take priority over background
+ * tagged traffic.
+ */
+#define	IEEE8021Q_PCP_BK	1	/* Background (lowest) */
+#define	IEEE8021Q_PCP_BE	0	/* Best effort (default) */
+#define	IEEE8021Q_PCP_EE	2	/* Excellent effort */
+#define	IEEE8021Q_PCP_CA	3	/* Critical applications */
+#define	IEEE8021Q_PCP_VI	4	/* Video, < 100ms latency */
+#define	IEEE8021Q_PCP_VO	5	/* Video, < 10ms latency */
+#define	IEEE8021Q_PCP_IC	6	/* Internetwork control */
+#define	IEEE8021Q_PCP_NC	7	/* Network control (highest) */
+
 #ifdef _KERNEL
 
 struct ifnet;
@@ -405,6 +420,8 @@ extern	char *ether_sprintf(const u_int8_t *);
 void	ether_vlan_mtap(struct bpf_if *, struct mbuf *,
 	    void *, u_int);
 struct mbuf  *ether_vlanencap(struct mbuf *, uint16_t);
+bool	ether_8021q_frame(struct mbuf **mp, struct ifnet *ife, struct ifnet *p,
+	    uint16_t vid, uint8_t pcp);
 
 #ifdef _SYS_EVENTHANDLER_H_
 /* new ethernet interface attached event */

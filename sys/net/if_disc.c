@@ -209,15 +209,15 @@ discioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifp->if_flags |= IFF_UP;
 
 		/*
 		 * Everything else is done at a higher level.
 		 */
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifr == NULL) {
 			error = EAFNOSUPPORT;		/* XXX */
 			break;
@@ -236,7 +236,7 @@ discioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
 	default:

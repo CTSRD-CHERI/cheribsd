@@ -3,12 +3,12 @@
 # Compile netmap as a module, useful if you want a netmap bridge
 # or loadable drivers.
 
-.include <bsd.own.mk> # FreeBSD 10 and earlier
-# .include "${SYSDIR}/conf/kern.opts.mk"
+SYSDIR?=${SRCTOP}/sys
+.include "${SYSDIR}/conf/kern.opts.mk"
 
-.PATH: ${SRCTOP}/sys/dev/netmap
-.PATH.h: ${SRCTOP}/sys/net
-CFLAGS += -I${SRCTOP}/sys/ -D INET
+.PATH: ${SYSDIR}/dev/netmap
+.PATH.h: ${SYSDIR}/net
+CFLAGS += -I${SYSDIR}/ -D INET
 KMOD	= netmap
 SRCS	= device_if.h bus_if.h pci_if.h opt_netmap.h
 SRCS	+= netmap.c netmap.h netmap_kern.h
@@ -21,6 +21,7 @@ SRCS	+= netmap_offloadings.c
 SRCS	+= netmap_pipe.c
 SRCS	+= netmap_monitor.c
 SRCS	+= netmap_pt.c
+SRCS	+= netmap_legacy.c
 SRCS	+= if_ptnet.c
 SRCS	+= opt_inet.h opt_inet6.h
 

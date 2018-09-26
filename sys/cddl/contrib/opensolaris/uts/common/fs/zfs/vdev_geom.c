@@ -239,7 +239,7 @@ vdev_geom_attach(struct g_provider *pp, vdev_t *vd, boolean_t sanity)
 		}
 		error = g_access(cp, 1, 0, 1);
 		if (error != 0) {
-			ZFS_LOG(1, "%s(%d): g_access failed: %d", __func__,
+			ZFS_LOG(1, "%s(%d): g_access failed: %d\n", __func__,
 			       __LINE__, error);
 			vdev_geom_detach(cp, B_FALSE);
 			return (NULL);
@@ -905,6 +905,8 @@ vdev_geom_open(vdev_t *vd, uint64_t *psize, uint64_t *max_psize,
 	PICKUP_GIANT();
 	if (cp == NULL) {
 		vd->vdev_stat.vs_aux = VDEV_AUX_OPEN_FAILED;
+		vdev_dbgmsg(vd, "vdev_geom_open: failed to open [error=%d]",
+		    error);
 		return (error);
 	}
 skip_open:
@@ -1145,8 +1147,10 @@ vdev_ops_t vdev_geom_ops = {
 	vdev_geom_io_start,
 	vdev_geom_io_done,
 	NULL,
+	NULL,
 	vdev_geom_hold,
 	vdev_geom_rele,
+	NULL,
 	VDEV_TYPE_DISK,		/* name of this vdev type */
 	B_TRUE			/* leaf vdev */
 };

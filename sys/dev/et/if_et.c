@@ -188,6 +188,8 @@ static driver_t et_driver = {
 static devclass_t et_devclass;
 
 DRIVER_MODULE(et, pci, et_driver, et_devclass, 0, 0);
+MODULE_PNP_INFO("U16:vendor;U16:device;D:#", pci, et, et_devices,
+    sizeof(et_devices[0]), nitems(et_devices) - 1);
 DRIVER_MODULE(miibus, et, miibus_driver, miibus_devclass, 0, 0);
 
 static int	et_rx_intr_npkts = 32;
@@ -1295,7 +1297,7 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 /* XXX LOCKSUSED */
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ET_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1313,14 +1315,14 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ET_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->sc_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
 			ET_LOCK(sc);
 			et_setmulti(sc);
@@ -1328,7 +1330,7 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		ET_LOCK(sc);
 #if 0
 		if (sc->sc_flags & ET_FLAG_JUMBO)
@@ -1353,7 +1355,7 @@ et_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ET_UNLOCK(sc);
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		ET_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
@@ -1581,7 +1583,7 @@ et_setmulti(struct et_softc *sc)
 
 	count = 0;
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		uint32_t *hp, h;
 
 		if (ifma->ifma_addr->sa_family != AF_LINK)

@@ -125,7 +125,7 @@ void mlx4_free_db(struct mlx4_context *context, enum mlx4_db_type type, uint32_t
 	pthread_mutex_lock(&context->db_list_mutex);
 
 	for (page = context->db_list[type]; page; page = page->next)
-		if (((uintptr_t) db & ~(ps - 1)) == (uintptr_t) page->buf.buf)
+		if (__builtin_align_down(db, ps) == page->buf.buf)
 			break;
 
 	if (!page)
@@ -149,3 +149,11 @@ void mlx4_free_db(struct mlx4_context *context, enum mlx4_db_type type, uint32_t
 out:
 	pthread_mutex_unlock(&context->db_list_mutex);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180907,
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

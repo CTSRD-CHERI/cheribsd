@@ -96,9 +96,9 @@ static int
 crossmp_vop_lock1(struct vop_lock1_args *ap)
 {
 	struct vnode *vp;
-	struct lock *lk;
-	const char *file;
-	int flags, line;
+	struct lock *lk __unused;
+	const char *file __unused;
+	int flags, line __unused;
 
 	vp = ap->a_vp;
 	lk = vp->v_vnlock;
@@ -122,7 +122,7 @@ static int
 crossmp_vop_unlock(struct vop_unlock_args *ap)
 {
 	struct vnode *vp;
-	struct lock *lk;
+	struct lock *lk __unused;
 	int flags;
 
 	vp = ap->a_vp;
@@ -327,15 +327,11 @@ namei(struct nameidata *ndp)
 	if ((cnp->cn_flags & HASBUF) == 0)
 		cnp->cn_pnbuf = uma_zalloc(namei_zone, M_WAITOK);
 	if (ndp->ni_segflg == UIO_SYSSPACE)
-		error = copystr_c(ndp->ni_dirp,
-		    (__cheri_tocap char * __capability)cnp->cn_pnbuf,
-		    MAXPATHLEN,
-		    (__cheri_tocap size_t * __capability)&ndp->ni_pathlen);
+		error = copystr((__cheri_fromcap const char *)ndp->ni_dirp,
+		    cnp->cn_pnbuf, MAXPATHLEN, &ndp->ni_pathlen);
 	else
-		error = copyinstr_c(ndp->ni_dirp,
-		    (__cheri_tocap char * __capability)cnp->cn_pnbuf,
-		    MAXPATHLEN,
-		    (__cheri_tocap size_t * __capability)&ndp->ni_pathlen);
+		error = copyinstr_c(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
+		    &ndp->ni_pathlen);
 
 	/*
 	 * Don't allow empty pathnames.

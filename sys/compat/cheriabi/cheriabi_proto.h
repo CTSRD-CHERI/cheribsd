@@ -1389,6 +1389,11 @@ struct cheriabi_cpuset_setdomain_args {
 	char mask_l_[PADL_(domainset_t * __capability)]; domainset_t * __capability mask; char mask_r_[PADR_(domainset_t * __capability)];
 	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
 };
+struct cheriabi_getrandom_args {
+	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
+	char buflen_l_[PADL_(size_t)]; size_t buflen; char buflen_r_[PADR_(size_t)];
+	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
+};
 struct cheriabi_coexecve_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
@@ -1677,6 +1682,7 @@ int	cheriabi_mknodat(struct thread *, struct cheriabi_mknodat_args *);
 int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 int	cheriabi_cpuset_getdomain(struct thread *, struct cheriabi_cpuset_getdomain_args *);
 int	cheriabi_cpuset_setdomain(struct thread *, struct cheriabi_cpuset_setdomain_args *);
+int	cheriabi_getrandom(struct thread *, struct cheriabi_getrandom_args *);
 int	cheriabi_coexecve(struct thread *, struct cheriabi_coexecve_args *);
 
 #ifdef COMPAT_43
@@ -2011,6 +2017,7 @@ int	cheriabi_coexecve(struct thread *, struct cheriabi_coexecve_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_kevent	AUE_KEVENT
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset_getdomain	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset_setdomain	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_getrandom	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_coexecve	AUE_NULL
 
 #undef PAD_

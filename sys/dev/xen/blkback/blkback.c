@@ -251,7 +251,7 @@ struct xbb_xen_reqlist {
 	uint8_t			*kva;
 
 	/**
-	 * Base, psuedo-physical address, corresponding to the start
+	 * Base, pseudo-physical address, corresponding to the start
 	 * of this request's kva region.
 	 */
 	uint64_t	 	 gnt_base;
@@ -590,7 +590,7 @@ struct xbb_softc {
 	 */
 	vm_offset_t		  kva;
 
-	/** Psuedo-physical address corresponding to kva. */
+	/** Pseudo-physical address corresponding to kva. */
 	uint64_t		  gnt_base_addr;
 
 	/** The size of the global kva pool. */
@@ -806,6 +806,9 @@ struct xbb_softc {
 
 	/** Watch to wait for hotplug script execution */
 	struct xs_watch		  hotplug_watch;
+
+	/** Got the needed data from hotplug scripts? */
+	bool			  hotplug_done;
 };
 
 /*---------------------------- Request Processing ----------------------------*/
@@ -936,7 +939,7 @@ xbb_reqlist_ioaddr(struct xbb_xen_reqlist *reqlist, int pagenr, int sector)
 
 /**
  * Given a page index and 512b sector offset within that page, calculate
- * an offset into the local psuedo-physical address space used to map a
+ * an offset into the local pseudo-physical address space used to map a
  * front-end's request data into a request.
  *
  * \param reqlist The request list structure whose pseudo-physical region
@@ -2800,9 +2803,8 @@ xbb_disconnect(struct xbb_softc *xbb)
 	if ((xbb->flags & XBBF_RING_CONNECTED) == 0)
 		return (0);
 
-	xen_intr_unbind(&xbb->xen_intr_handle);
-
 	mtx_unlock(&xbb->lock);
+	xen_intr_unbind(&xbb->xen_intr_handle);
 	taskqueue_drain(xbb->io_taskqueue, &xbb->io_task); 
 	mtx_lock(&xbb->lock);
 
@@ -3166,7 +3168,7 @@ xbb_alloc_requests(struct xbb_softc *xbb)
 	/*
 	 * Allocate request book keeping datastructures.
 	 */
-	xbb->requests = mallocarray(xbb->max_requests, sizeof(*xbb->requests),
+	xbb->requests = malloc(xbb->max_requests * sizeof(*xbb->requests),
 			       M_XENBLOCKBACK, M_NOWAIT|M_ZERO);
 	if (xbb->requests == NULL) {
 		xenbus_dev_fatal(xbb->dev, ENOMEM, 
@@ -3194,7 +3196,7 @@ xbb_alloc_request_lists(struct xbb_softc *xbb)
 	 * If no requests can be merged, we need 1 request list per
 	 * in flight request.
 	 */
-	xbb->request_lists = mallocarray(xbb->max_requests,
+	xbb->request_lists = malloc(xbb->max_requests *
 		sizeof(*xbb->request_lists), M_XENBLOCKBACK, M_NOWAIT|M_ZERO);
 	if (xbb->request_lists == NULL) {
 		xenbus_dev_fatal(xbb->dev, ENOMEM, 
@@ -3222,7 +3224,7 @@ xbb_alloc_request_lists(struct xbb_softc *xbb)
 		}
 #endif /* XBB_USE_BOUNCE_BUFFERS */
 
-		reqlist->gnt_handles = mallocarray(xbb->max_reqlist_segments,
+		reqlist->gnt_handles = malloc(xbb->max_reqlist_segments *
 					      sizeof(*reqlist->gnt_handles),
 					      M_XENBLOCKBACK, M_NOWAIT|M_ZERO);
 		if (reqlist->gnt_handles == NULL) {
@@ -3310,10 +3312,9 @@ xbb_connect(struct xbb_softc *xbb)
 {
 	int error;
 
-	if (xenbus_get_state(xbb->dev) != XenbusStateInitialised)
-		return;
-
-	if (xbb_collect_frontend_info(xbb) != 0)
+	if (!xbb->hotplug_done ||
+	    (xenbus_get_state(xbb->dev) != XenbusStateInitWait) ||
+	    (xbb_collect_frontend_info(xbb) != 0))
 		return;
 
 	xbb->flags &= ~XBBF_SHUTDOWN;
@@ -3412,6 +3413,7 @@ xbb_shutdown(struct xbb_softc *xbb)
 		free(xbb->hotplug_watch.node, M_XENBLOCKBACK);
 		xbb->hotplug_watch.node = NULL;
 	}
+	xbb->hotplug_done = false;
 
 	if (xenbus_get_state(xbb->dev) < XenbusStateClosing)
 		xenbus_set_state(xbb->dev, XenbusStateClosing);
@@ -3692,8 +3694,11 @@ xbb_attach_disk(struct xs_watch *watch, const char **vec, unsigned int len)
 		return;
 	}
 
-	/* Tell the front end that we are ready to connect. */
-	xenbus_set_state(dev, XenbusStateInitialised);
+	xbb->hotplug_done = true;
+
+	/* The front end might be waiting for the backend, attach if so. */
+	if (xenbus_get_otherend_state(xbb->dev) == XenbusStateInitialised)
+		xbb_connect(xbb);
 }
 
 /**
@@ -3757,6 +3762,7 @@ xbb_attach(device_t dev)
 	 * We need to wait for hotplug script execution before
 	 * moving forward.
 	 */
+	KASSERT(!xbb->hotplug_done, ("Hotplug scripts already executed"));
 	watch_path = xs_join(xenbus_get_node(xbb->dev), "physical-device-path");
 	xbb->hotplug_watch.callback_data = (uintptr_t)dev;
 	xbb->hotplug_watch.callback = xbb_attach_disk;

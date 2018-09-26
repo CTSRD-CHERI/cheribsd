@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright (c) 2016 Matthew Macy <mmacy@mattmacy.io>
+ * Copyright (c) 2016 Nicole Graziano <nicole@nextbsd.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -410,7 +410,6 @@ static driver_t em_if_driver = {
 
 #define EM_TICKS_TO_USECS(ticks)	((1024 * (ticks) + 500) / 1000)
 #define EM_USECS_TO_TICKS(usecs)	((1000 * (usecs) + 512) / 1024)
-#define M_TSO_LEN			66
 
 #define MAX_INTS_PER_SEC	8000
 #define DEFAULT_ITR		(1000000000/(MAX_INTS_PER_SEC * 256))
@@ -419,8 +418,6 @@ static driver_t em_if_driver = {
 #ifndef CSUM_TSO
 #define CSUM_TSO	0
 #endif
-
-#define TSO_WORKAROUND	4
 
 static SYSCTL_NODE(_hw, OID_AUTO, em, CTLFLAG_RD, 0, "EM driver parameters");
 
@@ -484,8 +481,10 @@ extern struct if_txrx lem_txrx;
 static struct if_shared_ctx em_sctx_init = {
 	.isc_magic = IFLIB_MAGIC,
 	.isc_q_align = PAGE_SIZE,
-	.isc_tx_maxsize = EM_TSO_SIZE,
+	.isc_tx_maxsize = EM_TSO_SIZE + sizeof(struct ether_vlan_header),
 	.isc_tx_maxsegsize = PAGE_SIZE,
+	.isc_tso_maxsize = EM_TSO_SIZE + sizeof(struct ether_vlan_header),
+	.isc_tso_maxsegsize = EM_TSO_SEG_SIZE,
 	.isc_rx_maxsize = MJUM9BYTES,
 	.isc_rx_nsegments = 1,
 	.isc_rx_maxsegsize = MJUM9BYTES,
@@ -508,12 +507,13 @@ static struct if_shared_ctx em_sctx_init = {
 
 if_shared_ctx_t em_sctx = &em_sctx_init;
 
-
 static struct if_shared_ctx igb_sctx_init = {
 	.isc_magic = IFLIB_MAGIC,
 	.isc_q_align = PAGE_SIZE,
-	.isc_tx_maxsize = EM_TSO_SIZE,
+	.isc_tx_maxsize = EM_TSO_SIZE + sizeof(struct ether_vlan_header),
 	.isc_tx_maxsegsize = PAGE_SIZE,
+	.isc_tso_maxsize = EM_TSO_SIZE + sizeof(struct ether_vlan_header),
+	.isc_tso_maxsegsize = EM_TSO_SEG_SIZE,
 	.isc_rx_maxsize = MJUM9BYTES,
 	.isc_rx_nsegments = 1,
 	.isc_rx_maxsegsize = MJUM9BYTES,
@@ -697,16 +697,19 @@ em_set_num_queues(if_ctx_t ctx)
 	return (maxqueues);
 }
 
+#define	LEM_CAPS							\
+    IFCAP_HWCSUM | IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING |		\
+    IFCAP_VLAN_HWCSUM | IFCAP_WOL | IFCAP_VLAN_HWFILTER
 
-#define EM_CAPS \
-	IFCAP_TSO4 | IFCAP_TXCSUM | IFCAP_LRO | IFCAP_RXCSUM | IFCAP_VLAN_HWFILTER | IFCAP_WOL_MAGIC | \
-	IFCAP_WOL_MCAST | IFCAP_WOL | IFCAP_VLAN_HWTSO | IFCAP_HWCSUM | IFCAP_VLAN_HWTAGGING | \
-	IFCAP_VLAN_HWCSUM | IFCAP_VLAN_HWTSO | IFCAP_VLAN_MTU;
+#define	EM_CAPS								\
+    IFCAP_HWCSUM | IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING |		\
+    IFCAP_VLAN_HWCSUM | IFCAP_WOL | IFCAP_VLAN_HWFILTER | IFCAP_TSO4 |	\
+    IFCAP_LRO | IFCAP_VLAN_HWTSO
 
-#define IGB_CAPS \
-	IFCAP_TSO4 | IFCAP_TXCSUM | IFCAP_LRO | IFCAP_RXCSUM | IFCAP_VLAN_HWFILTER | IFCAP_WOL_MAGIC | \
-	IFCAP_WOL_MCAST | IFCAP_WOL | IFCAP_VLAN_HWTSO | IFCAP_HWCSUM | IFCAP_VLAN_HWTAGGING | IFCAP_VLAN_HWCSUM | \
-	IFCAP_VLAN_HWTSO | IFCAP_VLAN_MTU | IFCAP_TXCSUM_IPV6 | IFCAP_HWCSUM_IPV6 | IFCAP_JUMBO_MTU;
+#define	IGB_CAPS							\
+    IFCAP_HWCSUM | IFCAP_VLAN_MTU | IFCAP_VLAN_HWTAGGING |		\
+    IFCAP_VLAN_HWCSUM | IFCAP_WOL | IFCAP_VLAN_HWFILTER | IFCAP_TSO4 |	\
+    IFCAP_LRO | IFCAP_VLAN_HWTSO | IFCAP_JUMBO_MTU | IFCAP_HWCSUM_IPV6;
 
 /*********************************************************************
  *  Device initialization routine
@@ -736,7 +739,7 @@ em_if_attach_pre(if_ctx_t ctx)
 		return (ENXIO);
 	}
 
-	adapter->ctx = ctx;
+	adapter->ctx = adapter->osdep.ctx = ctx;
 	adapter->dev = adapter->osdep.dev = dev;
 	scctx = adapter->shared = iflib_get_softc_ctx(ctx);
 	adapter->media = iflib_get_media(ctx);
@@ -773,17 +776,10 @@ em_if_attach_pre(if_ctx_t ctx)
 	/* Determine hardware and mac info */
 	em_identify_hardware(ctx);
 
-	/* Set isc_msix_bar */
 	scctx->isc_msix_bar = PCIR_BAR(EM_MSIX_BAR);
 	scctx->isc_tx_nsegments = EM_MAX_SCATTER;
-	scctx->isc_tx_tso_segments_max = scctx->isc_tx_nsegments;
-	scctx->isc_tx_tso_size_max = EM_TSO_SIZE;
-	scctx->isc_tx_tso_segsize_max = EM_TSO_SEG_SIZE;
 	scctx->isc_nrxqsets_max = scctx->isc_ntxqsets_max = em_set_num_queues(ctx);
 	device_printf(dev, "attach_pre capping queues at %d\n", scctx->isc_ntxqsets_max);
-
-	scctx->isc_tx_csum_flags = CSUM_TCP | CSUM_UDP | CSUM_IP_TSO;
-
 
 	if (adapter->hw.mac.type >= igb_mac_min) {
 		int try_second_bar;
@@ -793,7 +789,10 @@ em_if_attach_pre(if_ctx_t ctx)
 		scctx->isc_txd_size[0] = sizeof(union e1000_adv_tx_desc);
 		scctx->isc_rxd_size[0] = sizeof(union e1000_adv_rx_desc);
 		scctx->isc_txrx = &igb_txrx;
-		scctx->isc_capenable = IGB_CAPS;
+		scctx->isc_tx_tso_segments_max = EM_MAX_SCATTER;
+		scctx->isc_tx_tso_size_max = EM_TSO_SIZE;
+		scctx->isc_tx_tso_segsize_max = EM_TSO_SEG_SIZE;
+		scctx->isc_capabilities = scctx->isc_capenable = IGB_CAPS;
 		scctx->isc_tx_csum_flags = CSUM_TCP | CSUM_UDP | CSUM_TSO | CSUM_IP6_TCP \
 			| CSUM_IP6_UDP | CSUM_IP6_TCP;
 		if (adapter->hw.mac.type != e1000_82575)
@@ -807,26 +806,44 @@ em_if_attach_pre(if_ctx_t ctx)
 		try_second_bar = pci_read_config(dev, scctx->isc_msix_bar, 4);
 		if (try_second_bar == 0)
 			scctx->isc_msix_bar += 4;
-
 	} else if (adapter->hw.mac.type >= em_mac_min) {
 		scctx->isc_txqsizes[0] = roundup2(scctx->isc_ntxd[0]* sizeof(struct e1000_tx_desc), EM_DBA_ALIGN);
 		scctx->isc_rxqsizes[0] = roundup2(scctx->isc_nrxd[0] * sizeof(union e1000_rx_desc_extended), EM_DBA_ALIGN);
 		scctx->isc_txd_size[0] = sizeof(struct e1000_tx_desc);
 		scctx->isc_rxd_size[0] = sizeof(union e1000_rx_desc_extended);
 		scctx->isc_txrx = &em_txrx;
-		scctx->isc_capenable = EM_CAPS;
+		scctx->isc_tx_tso_segments_max = EM_MAX_SCATTER;
+		scctx->isc_tx_tso_size_max = EM_TSO_SIZE;
+		scctx->isc_tx_tso_segsize_max = EM_TSO_SEG_SIZE;
+		scctx->isc_capabilities = scctx->isc_capenable = EM_CAPS;
+		/*
+		 * For EM-class devices, don't enable IFCAP_{TSO4,VLAN_HWTSO}
+		 * by default as we don't have workarounds for all associated
+		 * silicon errata.  E. g., with several MACs such as 82573E,
+		 * TSO only works at Gigabit speed and otherwise can cause the
+		 * hardware to hang (which also would be next to impossible to
+		 * work around given that already queued TSO-using descriptors
+		 * would need to be flushed and vlan(4) reconfigured at runtime
+		 * in case of a link speed change).  Moreover, MACs like 82579
+		 * still can hang at Gigabit even with all publicly documented
+		 * TSO workarounds implemented.  Generally, the penality of
+		 * these workarounds is rather high and may involve copying
+		 * mbuf data around so advantages of TSO lapse.  Still, TSO may
+		 * work for a few MACs of this class - at least when sticking
+		 * with Gigabit - in which case users may enable TSO manually.
+		 */
+		scctx->isc_capenable &= ~(IFCAP_TSO4 | IFCAP_VLAN_HWTSO);
 		scctx->isc_tx_csum_flags = CSUM_TCP | CSUM_UDP | CSUM_IP_TSO;
 	} else {
 		scctx->isc_txqsizes[0] = roundup2((scctx->isc_ntxd[0] + 1) * sizeof(struct e1000_tx_desc), EM_DBA_ALIGN);
 		scctx->isc_rxqsizes[0] = roundup2((scctx->isc_nrxd[0] + 1) * sizeof(struct e1000_rx_desc), EM_DBA_ALIGN);
 		scctx->isc_txd_size[0] = sizeof(struct e1000_tx_desc);
 		scctx->isc_rxd_size[0] = sizeof(struct e1000_rx_desc);
-		scctx->isc_tx_csum_flags = CSUM_TCP | CSUM_UDP | CSUM_IP_TSO;
+		scctx->isc_tx_csum_flags = CSUM_TCP | CSUM_UDP;
 		scctx->isc_txrx = &lem_txrx;
-		scctx->isc_capenable = EM_CAPS;
+		scctx->isc_capabilities = scctx->isc_capenable = LEM_CAPS;
 		if (adapter->hw.mac.type < e1000_82543)
 			scctx->isc_capenable &= ~(IFCAP_HWCSUM|IFCAP_VLAN_HWCSUM);
-		scctx->isc_tx_csum_flags = CSUM_TCP | CSUM_UDP | CSUM_IP_TSO;
 		scctx->isc_msix_bar = 0;
 	}
 
@@ -1006,6 +1023,11 @@ em_if_attach_pre(if_ctx_t ctx)
 	 * Get Wake-on-Lan and Management info for later use
 	 */
 	em_get_wakeup(ctx);
+
+	/* Enable only WOL MAGIC by default */
+	scctx->isc_capenable &= ~IFCAP_WOL;
+	if (adapter->wol != 0)
+		scctx->isc_capenable |= IFCAP_WOL_MAGIC;
 
 	iflib_set_mac(ctx, hw->mac.addr);
 
@@ -1684,13 +1706,6 @@ em_if_timer(if_ctx_t ctx, uint16_t qid)
 		return;
 
 	iflib_admin_intr_deferred(ctx);
-	/* Reset LAA into RAR[0] on 82571 */
-	if ((adapter->hw.mac.type == e1000_82571) &&
-	    e1000_get_laa_state_82571(&adapter->hw))
-		e1000_rar_set(&adapter->hw, adapter->hw.mac.addr, 0);
-
-	if (adapter->hw.mac.type < em_mac_min)
-		lem_smartspeed(adapter);
 
 	/* Mask to use in the irq trigger */
 	if (adapter->intr_type == IFLIB_INTR_MSIX) {
@@ -1800,6 +1815,14 @@ em_if_update_admin_status(if_ctx_t ctx)
 		printf("link state changed to down\n");
 	}
 	em_update_stats_counters(adapter);
+
+	/* Reset LAA into RAR[0] on 82571 */
+	if ((adapter->hw.mac.type == e1000_82571) &&
+	    e1000_get_laa_state_82571(&adapter->hw))
+		e1000_rar_set(&adapter->hw, adapter->hw.mac.addr, 0);
+
+	if (adapter->hw.mac.type < em_mac_min)
+		lem_smartspeed(adapter);
 
 	E1000_WRITE_REG(&adapter->hw, E1000_IMS, EM_MSIX_LINK | E1000_IMS_LSC);
 }
@@ -2749,49 +2772,13 @@ em_setup_interface(if_ctx_t ctx)
 	struct ifnet *ifp = iflib_get_ifp(ctx);
 	struct adapter *adapter = iflib_get_softc(ctx);
 	if_softc_ctx_t scctx = adapter->shared;
-	uint64_t cap = 0;
 
 	INIT_DEBUGOUT("em_setup_interface: begin");
-
-	/* TSO parameters */
-	if_sethwtsomax(ifp, IP_MAXPACKET);
-	/* Take m_pullup(9)'s in em_xmit() w/ TSO into acount. */
-	if_sethwtsomaxsegcount(ifp, EM_MAX_SCATTER - 5);
-	if_sethwtsomaxsegsize(ifp, EM_TSO_SEG_SIZE);
 
 	/* Single Queue */
 	if (adapter->tx_num_queues == 1) {
 		if_setsendqlen(ifp, scctx->isc_ntxd[0] - 1);
 		if_setsendqready(ifp);
-	}
-
-	cap = IFCAP_HWCSUM | IFCAP_VLAN_HWCSUM | IFCAP_TSO4;
-	cap |= IFCAP_VLAN_HWTAGGING | IFCAP_VLAN_HWTSO | IFCAP_VLAN_MTU;
-
-	/*
-	 * Tell the upper layer(s) we
-	 * support full VLAN capability
-	 */
-	if_setifheaderlen(ifp, sizeof(struct ether_vlan_header));
-	if_setcapabilitiesbit(ifp, cap, 0);
-
-	/*
-	 * Don't turn this on by default, if vlans are
-	 * created on another pseudo device (eg. lagg)
-	 * then vlan events are not passed thru, breaking
-	 * operation, but with HW FILTER off it works. If
-	 * using vlans directly on the em driver you can
-	 * enable this and get full hardware tag filtering.
-	 */
-	if_setcapabilitiesbit(ifp, IFCAP_VLAN_HWFILTER,0);
-
-	/* Enable only WOL MAGIC by default */
-	if (adapter->wol) {
-		if_setcapenablebit(ifp, IFCAP_WOL_MAGIC,
-			    IFCAP_WOL_MCAST| IFCAP_WOL_UCAST);
-	} else {
-		if_setcapenablebit(ifp, 0, IFCAP_WOL_MAGIC |
-			     IFCAP_WOL_MCAST| IFCAP_WOL_UCAST);
 	}
 
 	/*
@@ -2835,9 +2822,9 @@ em_if_tx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs, uint64_t *paddrs, int ntxqs
 
 	/* First allocate the top level queue structs */
 	if (!(adapter->tx_queues =
-	    (struct em_tx_queue *) mallocarray(adapter->tx_num_queues,
-		sizeof(struct em_tx_queue), M_DEVBUF, M_NOWAIT | M_ZERO))) {
-		    device_printf(iflib_get_dev(ctx), "Unable to allocate queue memory\n");
+	    (struct em_tx_queue *) malloc(sizeof(struct em_tx_queue) *
+	    adapter->tx_num_queues, M_DEVBUF, M_NOWAIT | M_ZERO))) {
+		device_printf(iflib_get_dev(ctx), "Unable to allocate queue memory\n");
 		return(ENOMEM);
 	}
 
@@ -2849,8 +2836,7 @@ em_if_tx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs, uint64_t *paddrs, int ntxqs
 		que->me = txr->me =  i;
 
 		/* Allocate report status array */
-		if (!(txr->tx_rsq = (qidx_t *) mallocarray(scctx->isc_ntxd[0],
-		    sizeof(qidx_t), M_DEVBUF, M_NOWAIT | M_ZERO))) {
+		if (!(txr->tx_rsq = (qidx_t *) malloc(sizeof(qidx_t) * scctx->isc_ntxd[0], M_DEVBUF, M_NOWAIT | M_ZERO))) {
 			device_printf(iflib_get_dev(ctx), "failed to allocate rs_idxs memory\n");
 			error = ENOMEM;
 			goto fail;
@@ -2882,8 +2868,8 @@ em_if_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs, uint64_t *paddrs, int nrxqs
 
 	/* First allocate the top level queue structs */
 	if (!(adapter->rx_queues =
-	    (struct em_rx_queue *) mallocarray(adapter->rx_num_queues,
-	        sizeof(struct em_rx_queue), M_DEVBUF, M_NOWAIT | M_ZERO))) {
+	    (struct em_rx_queue *) malloc(sizeof(struct em_rx_queue) *
+	    adapter->rx_num_queues, M_DEVBUF, M_NOWAIT | M_ZERO))) {
 		device_printf(iflib_get_dev(ctx), "Unable to allocate queue memory\n");
 		error = ENOMEM;
 		goto fail;

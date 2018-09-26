@@ -31,6 +31,8 @@
  * ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
+ *
+ * $FreeBSD$
  */
 
 #if !defined(IB_ADDR_H)
@@ -93,10 +95,10 @@ struct rdma_dev_addr {
  * rdma_translate_ip - Translate a local IP address to an RDMA hardware
  *   address.
  *
- * The dev_addr->net field must be initialized.
+ * The dev_addr->net and dev_addr->bound_dev_if fields must be initialized.
  */
 int rdma_translate_ip(const struct sockaddr *addr,
-		      struct rdma_dev_addr *dev_addr, u16 *vlan_id);
+		      struct rdma_dev_addr *dev_addr);
 
 /**
  * rdma_resolve_ip - Resolve source and destination IP addresses to
@@ -131,11 +133,12 @@ int rdma_copy_addr(struct rdma_dev_addr *dev_addr, struct net_device *dev,
 	      const unsigned char *dst_dev_addr);
 
 int rdma_addr_size(struct sockaddr *addr);
+int rdma_addr_size_in6(struct sockaddr_in6 *addr);
+int rdma_addr_size_kss(struct sockaddr_storage *addr);
 
-int rdma_addr_find_smac_by_sgid(union ib_gid *sgid, u8 *smac, u16 *vlan_id);
 int rdma_addr_find_l2_eth_by_grh(const union ib_gid *sgid,
 				 const union ib_gid *dgid,
-				 u8 *smac, u16 *vlan_id, int *if_index,
+				 u8 *smac, struct net_device *dev,
 				 int *hoplimit);
 
 static inline u16 ib_addr_get_pkey(struct rdma_dev_addr *dev_addr)
@@ -164,6 +167,8 @@ static inline u16 rdma_vlan_dev_vlan_id(const struct net_device *dev)
 {
 	uint16_t tag;
 
+	if (dev->if_pcp != IFNET_PCP_NONE)
+		return 0x0000;	/* prio-tagged traffic */
 	if (VLAN_TAG(__DECONST(struct ifnet *, dev), &tag) != 0)
 		return 0xffff;
 	return tag;
@@ -218,7 +223,7 @@ static inline void iboe_addr_get_sgid(struct rdma_dev_addr *dev_addr,
 
 	dev = dev_get_by_index(&init_net, dev_addr->bound_dev_if);
 	if (dev) {
-		TAILQ_FOREACH(ifa, &dev->if_addrhead, ifa_link) {
+		CK_STAILQ_FOREACH(ifa, &dev->if_addrhead, ifa_link) {
 			if (ifa->ifa_addr == NULL ||
 			    ifa->ifa_addr->sa_family != AF_INET)
 				continue;
@@ -316,7 +321,13 @@ static inline void rdma_get_ll_mac(struct in6_addr *addr, u8 *mac)
 
 static inline int rdma_is_multicast_addr(struct in6_addr *addr)
 {
-	return addr->s6_addr[0] == 0xff;
+	__be32 ipv4_addr;
+
+	if (addr->s6_addr[0] == 0xff)
+		return 1;
+
+	ipv4_addr = addr->s6_addr32[3];
+	return (ipv6_addr_v4mapped(addr) && ipv4_is_multicast(ipv4_addr));
 }
 
 static inline void rdma_get_mcast_mac(struct in6_addr *addr, u8 *mac)
@@ -337,8 +348,10 @@ static inline u16 rdma_get_vlan_id(union ib_gid *dgid)
 	return vid < 0x1000 ? vid : 0xffff;
 }
 
-static inline struct net_device *rdma_vlan_dev_real_dev(const struct net_device *dev)
+static inline struct net_device *rdma_vlan_dev_real_dev(struct net_device *dev)
 {
+	if (dev->if_pcp != IFNET_PCP_NONE)
+		return dev; /* prio-tagged traffic */
 	return VLAN_TRUNKDEV(__DECONST(struct ifnet *, dev));
 }
 

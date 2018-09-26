@@ -300,10 +300,12 @@ static struct if_shared_ctx bnxt_sctx_init = {
 	.isc_nfl = 2,				// Number of Free Lists
 	.isc_flags = IFLIB_HAS_RXCQ | IFLIB_HAS_TXCQ | IFLIB_NEED_ETHER_PAD,
 	.isc_q_align = PAGE_SIZE,
-	.isc_tx_maxsize = BNXT_TSO_SIZE,
-	.isc_tx_maxsegsize = BNXT_TSO_SIZE,
-	.isc_rx_maxsize = BNXT_TSO_SIZE,
-	.isc_rx_maxsegsize = BNXT_TSO_SIZE,
+	.isc_tx_maxsize = BNXT_TSO_SIZE + sizeof(struct ether_vlan_header),
+	.isc_tx_maxsegsize = BNXT_TSO_SIZE + sizeof(struct ether_vlan_header),
+	.isc_tso_maxsize = BNXT_TSO_SIZE + sizeof(struct ether_vlan_header),
+	.isc_tso_maxsegsize = BNXT_TSO_SIZE + sizeof(struct ether_vlan_header),
+	.isc_rx_maxsize = BNXT_TSO_SIZE + sizeof(struct ether_vlan_header),
+	.isc_rx_maxsegsize = BNXT_TSO_SIZE + sizeof(struct ether_vlan_header),
 
 	// Only use a single segment to avoid page size constraints
 	.isc_rx_nsegments = 1,
@@ -351,7 +353,7 @@ bnxt_tx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 
 	softc = iflib_get_softc(ctx);
 
-	softc->tx_cp_rings = mallocarray(ntxqsets, sizeof(struct bnxt_cp_ring),
+	softc->tx_cp_rings = malloc(sizeof(struct bnxt_cp_ring) * ntxqsets,
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->tx_cp_rings) {
 		device_printf(iflib_get_dev(ctx),
@@ -359,7 +361,7 @@ bnxt_tx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 		rc = ENOMEM;
 		goto cp_alloc_fail;
 	}
-	softc->tx_rings = mallocarray(ntxqsets, sizeof(struct bnxt_ring),
+	softc->tx_rings = malloc(sizeof(struct bnxt_ring) * ntxqsets,
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->tx_rings) {
 		device_printf(iflib_get_dev(ctx),
@@ -446,7 +448,7 @@ bnxt_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 
 	softc = iflib_get_softc(ctx);
 
-	softc->rx_cp_rings = mallocarray(nrxqsets, sizeof(struct bnxt_cp_ring),
+	softc->rx_cp_rings = malloc(sizeof(struct bnxt_cp_ring) * nrxqsets,
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->rx_cp_rings) {
 		device_printf(iflib_get_dev(ctx),
@@ -454,7 +456,7 @@ bnxt_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 		rc = ENOMEM;
 		goto cp_alloc_fail;
 	}
-	softc->rx_rings = mallocarray(nrxqsets, sizeof(struct bnxt_ring),
+	softc->rx_rings = malloc(sizeof(struct bnxt_ring) * nrxqsets,
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->rx_rings) {
 		device_printf(iflib_get_dev(ctx),
@@ -462,7 +464,7 @@ bnxt_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 		rc = ENOMEM;
 		goto ring_alloc_fail;
 	}
-	softc->ag_rings = mallocarray(nrxqsets, sizeof(struct bnxt_ring),
+	softc->ag_rings = malloc(sizeof(struct bnxt_ring) * nrxqsets,
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->ag_rings) {
 		device_printf(iflib_get_dev(ctx),
@@ -470,7 +472,7 @@ bnxt_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 		rc = ENOMEM;
 		goto ag_alloc_fail;
 	}
-	softc->grp_info = mallocarray(nrxqsets, sizeof(struct bnxt_grp_info),
+	softc->grp_info = malloc(sizeof(struct bnxt_grp_info) * nrxqsets,
 	    M_DEVBUF, M_NOWAIT | M_ZERO);
 	if (!softc->grp_info) {
 		device_printf(iflib_get_dev(ctx),
@@ -540,10 +542,9 @@ bnxt_rx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs,
 		softc->rx_rings[i].paddr = paddrs[i * nrxqs + 1];
 
 		/* Allocate the TPA start buffer */
-		softc->rx_rings[i].tpa_start = mallocarray(
-		    RX_TPA_START_CMPL_AGG_ID_MASK >> RX_TPA_START_CMPL_AGG_ID_SFT,
-		    sizeof(struct bnxt_full_tpa_start),	M_DEVBUF,
-		    M_NOWAIT | M_ZERO);
+		softc->rx_rings[i].tpa_start = malloc(sizeof(struct bnxt_full_tpa_start) *
+	    		(RX_TPA_START_CMPL_AGG_ID_MASK >> RX_TPA_START_CMPL_AGG_ID_SFT),
+	    		M_DEVBUF, M_NOWAIT | M_ZERO);
 		if (softc->rx_rings[i].tpa_start == NULL) {
 			rc = -ENOMEM;
 			device_printf(softc->dev,
@@ -785,7 +786,7 @@ bnxt_attach_pre(if_ctx_t ctx)
 	scctx->isc_txrx = &bnxt_txrx;
 	scctx->isc_tx_csum_flags = (CSUM_IP | CSUM_TCP | CSUM_UDP |
 	    CSUM_TCP_IPV6 | CSUM_UDP_IPV6 | CSUM_TSO);
-	scctx->isc_capenable =
+	scctx->isc_capabilities = scctx->isc_capenable =
 	    /* These are translated to hwassit bits */
 	    IFCAP_TXCSUM | IFCAP_TXCSUM_IPV6 | IFCAP_TSO4 | IFCAP_TSO6 |
 	    /* These are checked by iflib */
@@ -1644,7 +1645,7 @@ bnxt_priv_ioctl(if_ctx_t ctx, u_long command, caddr_t data)
 	struct bnxt_ioctl_data *iod = NULL;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCGPRIVATE_0):
+	case CASE_IOC_IFREQ(SIOCGPRIVATE_0):
 		if ((rc = priv_check(curthread, PRIV_DRIVER)) != 0)
 			goto exit;
 

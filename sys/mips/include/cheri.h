@@ -315,11 +315,11 @@ struct cheri_kframe {
 		    : : "i" (cd), "i" (cb), "i" (ct));			\
 } while (0)
 
-#define	CHERI_CCALL(cs, cb) do {					\
+#define	CHERI_CCALL_TRAP(cs, cb) do {					\
 	__asm__ __volatile__ (						\
 	    ".set push\n"						\
 	    _INLINE_CHERI_ASM_OPTIONS					\
-	    "ccall $c%0, $c%1\n"					\
+	    "CCallTrap $c%0, $c%1\n" /* no branch delay slot */		\
 	    ".set pop\n"						\
 	    : :	"i" (cs), "i" (cb) : "memory");				\
 } while (0)

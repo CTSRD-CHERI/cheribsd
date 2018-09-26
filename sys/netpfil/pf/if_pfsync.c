@@ -588,6 +588,8 @@ pfsync_input(struct mbuf **mp, int *offp __unused, int proto __unused)
 	int rv;
 	uint16_t count;
 
+	PF_RULES_RLOCK_TRACKER;
+
 	*mp = NULL;
 	V_pfsyncstats.pfsyncs_ipackets++;
 
@@ -868,7 +870,7 @@ pfsync_in_upd(struct pfsync_pkt *pkt, struct mbuf *m, int offset, int count)
 		st = pf_find_state_byid(sp->id, sp->creatorid);
 		if (st == NULL) {
 			/* insert the update */
-			if (pfsync_state_import(sp, 0))
+			if (pfsync_state_import(sp, pkt->flags))
 				V_pfsyncstats.pfsyncs_badstate++;
 			continue;
 		}
@@ -1283,7 +1285,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error;
 
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		PFSYNC_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			ifp->if_drv_flags |= IFF_DRV_RUNNING;
@@ -1295,7 +1297,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			pfsync_pointers_uninit();
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (!sc->sc_sync_if ||
 		    ifr_mtu_get(ifr) <= PFSYNC_MINPKT ||
 		    ifr_mtu_get(ifr) > sc->sc_sync_if->if_mtu)
@@ -1308,7 +1310,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		ifp->if_mtu = ifr_mtu_get(ifr);
 		break;
-	CASE_IOC_IFREQ(SIOCGETPFSYNC):
+	case CASE_IOC_IFREQ(SIOCGETPFSYNC):
 		bzero(&pfsyncr, sizeof(pfsyncr));
 		PFSYNC_LOCK(sc);
 		if (sc->sc_sync_if) {
@@ -1323,7 +1325,7 @@ pfsyncioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		return (copyout_c(&pfsyncr, ifr_data_get_ptr(ifr),
 		    sizeof(pfsyncr)));
 
-	CASE_IOC_IFREQ(SIOCSETPFSYNC):
+	case CASE_IOC_IFREQ(SIOCSETPFSYNC):
 	    {
 		struct ip_moptions *imo = &sc->sc_imo;
 		struct ifnet *sifp;

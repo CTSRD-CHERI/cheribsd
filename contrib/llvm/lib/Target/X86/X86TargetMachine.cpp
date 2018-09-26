@@ -62,6 +62,7 @@ void initializeX86CallFrameOptimizationPass(PassRegistry &);
 void initializeX86CmovConverterPassPass(PassRegistry &);
 void initializeX86ExecutionDepsFixPass(PassRegistry &);
 void initializeX86DomainReassignmentPass(PassRegistry &);
+void initializeX86FlagsCopyLoweringPassPass(PassRegistry &);
 
 } // end namespace llvm
 
@@ -80,6 +81,7 @@ extern "C" void LLVMInitializeX86Target() {
   initializeX86CmovConverterPassPass(PR);
   initializeX86ExecutionDepsFixPass(PR);
   initializeX86DomainReassignmentPass(PR);
+  initializeX86FlagsCopyLoweringPassPass(PR);
 }
 
 static std::unique_ptr<TargetLoweringObjectFile> createTLOF(const Triple &TT) {
@@ -321,6 +323,7 @@ public:
   void addPreRegAlloc() override;
   void addPostRegAlloc() override;
   void addPreEmitPass() override;
+  void addPreEmitPass2() override;
   void addPreSched2() override;
 };
 
@@ -350,6 +353,11 @@ void X86PassConfig::addIRPasses() {
 
   if (TM->getOptLevel() != CodeGenOpt::None)
     addPass(createInterleavedAccessPass());
+
+  // Add passes that handle indirect branch removal and insertion of a retpoline
+  // thunk. These will be a no-op unless a function subtarget has the retpoline
+  // feature enabled.
+  addPass(createIndirectBrExpandPass());
 }
 
 bool X86PassConfig::addInstSelector() {
@@ -409,6 +417,7 @@ void X86PassConfig::addPreRegAlloc() {
     addPass(createX86CallFrameOptimization());
   }
 
+  addPass(createX86FlagsCopyLoweringPass());
   addPass(createX86WinAllocaExpander());
 }
 void X86PassConfig::addMachineSSAOptimization() {
@@ -435,4 +444,8 @@ void X86PassConfig::addPreEmitPass() {
     addPass(createX86FixupLEAs());
     addPass(createX86EvexToVexInsts());
   }
+}
+
+void X86PassConfig::addPreEmitPass2() {
+  addPass(createX86RetpolineThunksPass());
 }

@@ -49,12 +49,20 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/ioctl.h>
 
+#include <assert.h>
 #include <net/if_media.h>
 #include <ifaddrs.h>
 #include <poll.h>
 
-struct protocol *protocols;
-struct timeout *timeouts;
+/* Assert that pointer p is aligned to at least align bytes */
+#if __has_builtin(__builtin_is_aligned)
+#define assert_aligned(p, align) assert(__builtin_is_aligned((p), (align)))
+#else
+#define assert_aligned(p, align) assert((((uintptr_t)p) & ((align) - 1)) == 0)
+#endif
+
+static struct protocol *protocols;
+static struct timeout *timeouts;
 static struct timeout *free_timeouts;
 static int interfaces_invalidated;
 void (*bootp_packet_handler)(struct interface_info *,
@@ -73,7 +81,6 @@ void
 discover_interfaces(struct interface_info *iface)
 {
 	struct ifaddrs *ifap, *ifa;
-	struct sockaddr_in foo;
 	struct ifreq *tif;
 
 	if (getifaddrs(&ifap) != 0)
@@ -93,8 +100,22 @@ discover_interfaces(struct interface_info *iface)
 		 * and record it in a linked list.
 		 */
 		if (ifa->ifa_addr->sa_family == AF_LINK) {
-			struct sockaddr_dl *foo =
-			    (struct sockaddr_dl *)ifa->ifa_addr;
+			struct sockaddr_dl *foo;
+
+			/* 
+			 * The implementation of getifaddrs should guarantee
+			 * this alignment
+			 */
+			assert_aligned(ifa->ifa_addr,
+				       _Alignof(struct sockaddr_dl));
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-align"
+#endif
+			foo = (struct sockaddr_dl *)ifa->ifa_addr;
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
 
 			iface->index = foo->sdl_index;
 			iface->hw_address.hlen = foo->sdl_alen;
@@ -102,6 +123,7 @@ discover_interfaces(struct interface_info *iface)
 			memcpy(iface->hw_address.haddr,
 			    LLADDR(foo), foo->sdl_alen);
 		} else if (ifa->ifa_addr->sa_family == AF_INET) {
+			struct sockaddr_in foo;
 			struct iaddr addr;
 
 			memcpy(&foo, ifa->ifa_addr, sizeof(foo));
@@ -437,7 +459,7 @@ cancel_timeout(void (*where)(void *), void *what)
 
 /* Add a protocol to the list of protocols... */
 void
-add_protocol(char *name, int fd, void (*handler)(struct protocol *),
+add_protocol(const char *name, int fd, void (*handler)(struct protocol *),
     void *local)
 {
 	struct protocol *p;
@@ -529,17 +551,37 @@ interface_set_mtu_priv(char *ifname, u_int16_t mtu)
 {
 	struct ifreq ifr;
 	int sock;
+	u_int16_t old_mtu;
 
 	if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
 		error("Can't create socket");
 
 	memset(&ifr, 0, sizeof(ifr));
+	old_mtu = 0;
 
 	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	ifr.ifr_mtu = mtu;
 
-	if (ioctl(sock, SIOCSIFMTU, &ifr) == -1)
-		warning("SIOCSIFMTU failed (%d): %s", mtu,
+	if (ioctl(sock, SIOCGIFMTU, (caddr_t)&ifr) == -1)
+		warning("SIOCGIFMTU failed (%s): %s", ifname,
 			strerror(errno));
+	else
+		old_mtu = ifr.ifr_mtu;
+
+	if (mtu != old_mtu) {
+		ifr.ifr_mtu = mtu;
+
+		if (ioctl(sock, SIOCSIFMTU, &ifr) == -1)
+			warning("SIOCSIFMTU failed (%d): %s", mtu,
+				strerror(errno));
+	}
+
 	close(sock);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180817,
+//   "changes": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

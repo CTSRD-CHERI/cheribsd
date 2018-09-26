@@ -170,6 +170,14 @@ vfp_save_state(struct thread *td, struct pcb *pcb)
 	KASSERT(pcb != NULL, ("NULL vfp pcb"));
 	KASSERT(td == NULL || td->td_pcb == pcb, ("Invalid vfp pcb"));
 
+	/* 
+	 * savectx() will be called on panic with dumppcb as an argument,
+	 * dumppcb doesn't have pcb_fpusaved set, so set it to save
+	 * the VFP registers.
+	 */
+	if (pcb->pcb_fpusaved == NULL)
+		pcb->pcb_fpusaved = &pcb->pcb_fpustate;
+
 	if (td == NULL)
 		td = curthread;
 
@@ -256,7 +264,7 @@ fpu_kern_free_ctx(struct fpu_kern_ctx *ctx)
 	free(ctx, M_FPUKERN_CTX);
 }
 
-int
+void
 fpu_kern_enter(struct thread *td, struct fpu_kern_ctx *ctx, u_int flags)
 {
 	struct pcb *pcb;
@@ -279,12 +287,12 @@ fpu_kern_enter(struct thread *td, struct fpu_kern_ctx *ctx, u_int flags)
 		vfp_enable();
 		pcb->pcb_fpflags |= PCB_FP_KERN | PCB_FP_NOSAVE |
 		    PCB_FP_STARTED;
-		return (0);
+		return;
 	}
 
 	if ((flags & FPU_KERN_KTHR) != 0 && is_fpu_kern_thread(0)) {
 		ctx->flags = FPU_KERN_CTX_DUMMY | FPU_KERN_CTX_INUSE;
-		return (0);
+		return;
 	}
 	/*
 	 * Check either we are already using the VFP in the kernel, or
@@ -300,7 +308,7 @@ fpu_kern_enter(struct thread *td, struct fpu_kern_ctx *ctx, u_int flags)
 	pcb->pcb_fpflags |= PCB_FP_KERN;
 	pcb->pcb_fpflags &= ~PCB_FP_STARTED;
 
-	return (0);
+	return;
 }
 
 int

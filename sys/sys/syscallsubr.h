@@ -33,13 +33,14 @@
 #include <sys/acl.h>
 #include <sys/signal.h>
 #include <sys/sem.h>
-#include <sys/uio.h>
 #include <sys/socket.h>
 #include <sys/mac.h>
 #include <sys/mount.h>
 #include <sys/_cpuset.h>
 #include <sys/_domainset.h>
+#include <sys/_uio.h>
 
+struct __wrusage;
 struct ffclock_estimate;
 struct file;
 struct filecaps;
@@ -60,12 +61,13 @@ struct ogetdirentries_args;
 struct rlimit;
 struct rusage;
 struct rtprio;
+struct sched_param;
 struct sockaddr;
 struct stat;
 struct thr_param;
 struct timex;
-struct sched_param;
-struct __wrusage;
+struct uio;
+
 
 int	kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
 	    const struct acl * __capability aclp);
@@ -101,6 +103,7 @@ int	kern_auditctl(struct thread *td, const char * __capability path);
 int	kern_auditon(struct thread *td, int cmd, void * __capability data,
 	    u_int length);
 int	kern_bindat(struct thread *td, int dirfd, int fd, struct sockaddr *sa);
+int	kern_break(struct thread *td, uintptr_t *addr);
 int	kern_cap_getmode(struct thread *td, u_int * __capability modep);
 int	kern_cap_fcntls_get(struct thread *td, int fd,
 	    uint32_t * __capability fcntlrightsp);
@@ -221,6 +224,8 @@ int	kern_getloginclass(struct thread *td, char * __capability namebuf,
 int	kern_getppid(struct thread *);
 int	kern_getpeername(struct thread *td, int fd, struct sockaddr **sa,
 	    socklen_t *alen);
+int	kern_getrandom(struct thread *td, void * __capability user_buf,
+	    size_t buflen, unsigned int flags);
 int	kern_getresgid(struct thread *td, gid_t * __capability rgid,
 	    gid_t * __capability egid, gid_t * __capability sgid);
 int	kern_getresuid(struct thread *td, uid_t * __capability ruid,
@@ -339,7 +344,7 @@ int	kern_preadv(struct thread *td, int fd, struct uio *auio, off_t offset);
 int	kern_pselect(struct thread *td, int nd, fd_set * __capability in,
 	    fd_set * __capability ou, fd_set * __capability ex,
 	    struct timeval *tvp, sigset_t *uset, int abi_nfdbits);
-int	kern_ptrace(struct thread *td, int req, pid_t pid, void *addr,
+int	kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr,
 	    int data);
 int	kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
 	    off_t offset);

@@ -411,7 +411,7 @@ in6_setscope(struct in6_addr *in6, struct ifnet *ifp, u_int32_t *ret_id)
 		if (scope == IPV6_ADDR_SCOPE_INTFACELOCAL ||
 		    scope == IPV6_ADDR_SCOPE_LINKLOCAL) {
 			/*
-			 * Currently we use interface indeces as the
+			 * Currently we use interface indices as the
 			 * zone IDs for interface-local and link-local
 			 * scopes.
 			 */
@@ -453,7 +453,7 @@ in6_clearscope(struct in6_addr *in6)
  * Return the scope identifier or zero.
  */
 uint16_t
-in6_getscope(struct in6_addr *in6)
+in6_getscope(const struct in6_addr *in6)
 {
 
 	if (IN6_IS_SCOPE_LINKLOCAL(in6) || IN6_IS_ADDR_MC_INTFACELOCAL(in6))

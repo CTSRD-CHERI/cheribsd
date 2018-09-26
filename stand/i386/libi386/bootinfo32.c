@@ -39,9 +39,6 @@ __FBSDID("$FreeBSD$");
 
 #ifdef LOADER_GELI_SUPPORT
 #include "geliboot.h"
-
-static const size_t keybuf_size = sizeof(struct keybuf) +
-    (GELI_MAX_KEYS * sizeof(struct keybuf_ent));
 #endif
 
 static struct bootinfo  bi;
@@ -63,7 +60,7 @@ static struct bootinfo  bi;
  * MOD_METADATA	(variable)		type-specific metadata
  */
 #define COPY32(v, a, c) {			\
-    u_int32_t	x = (v);			\
+    uint32_t	x = (v);			\
     if (c)					\
 	i386_copyin(&x, a, sizeof(x));		\
     a += sizeof(x);				\
@@ -154,10 +151,6 @@ bi_load32(char *args, int *howtop, int *bootdevp, vm_offset_t *bip, vm_offset_t 
     int				bootdevnr, i, howto;
     char			*kernelname;
     const char			*kernelpath;
-#ifdef LOADER_GELI_SUPPORT
-    char                        buf[keybuf_size];
-    struct keybuf               *keybuf = (struct keybuf *)buf;
-#endif
 
     howto = bi_getboothowto(args);
 
@@ -181,16 +174,16 @@ bi_load32(char *args, int *howtop, int *bootdevp, vm_offset_t *bip, vm_offset_t 
     /* XXX - use a default bootdev of 0.  Is this ok??? */
     bootdevnr = 0;
 
-    switch(rootdev->d_type) {
+    switch(rootdev->dd.d_dev->dv_type) {
     case DEVT_CD:
 	    /* Pass in BIOS device number. */
-	    bi.bi_bios_dev = bc_unit2bios(rootdev->d_unit);
+	    bi.bi_bios_dev = bc_unit2bios(rootdev->dd.d_unit);
 	    bootdevnr = bc_getdev(rootdev);
 	    break;
 
     case DEVT_DISK:
 	/* pass in the BIOS device number of the current disk */
-	bi.bi_bios_dev = bd_unit2bios(rootdev->d_unit);
+	bi.bi_bios_dev = bd_unit2bios(rootdev->dd.d_unit);
 	bootdevnr = bd_getdev(rootdev);
 	break;
 
@@ -199,7 +192,8 @@ bi_load32(char *args, int *howtop, int *bootdevp, vm_offset_t *bip, vm_offset_t 
 	    break;
 
     default:
-	printf("WARNING - don't know how to boot from device type %d\n", rootdev->d_type);
+	printf("WARNING - don't know how to boot from device type %d\n",
+	    rootdev->dd.d_dev->dv_type);
     }
     if (bootdevnr == -1) {
 	printf("root device %s invalid\n", i386_fmtdev(rootdev));
@@ -234,9 +228,7 @@ bi_load32(char *args, int *howtop, int *bootdevp, vm_offset_t *bip, vm_offset_t 
     file_addmetadata(kfp, MODINFOMD_KERNEND, sizeof kernend, &kernend);
     bios_addsmapdata(kfp);
 #ifdef LOADER_GELI_SUPPORT
-    geli_fill_keybuf(keybuf);
-    file_addmetadata(kfp, MODINFOMD_KEYBUF, keybuf_size, buf);
-    bzero(buf, sizeof(buf));
+    geli_export_key_metadata(kfp);
 #endif
 
     /* Figure out the size and location of the metadata */

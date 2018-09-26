@@ -462,11 +462,11 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 		return EINVAL;
 	if (du.din.ia_datalen > ICONV_CSMAXDATALEN)
 		return EINVAL;
-	if (strlen(du.din.ia_from) >= ICONV_CSNMAXLEN)
+	if (strnlen(du.din.ia_from, sizeof(du.din.ia_from)) >= ICONV_CSNMAXLEN)
 		return EINVAL;
-	if (strlen(du.din.ia_to) >= ICONV_CSNMAXLEN)
+	if (strnlen(du.din.ia_to, sizeof(du.din.ia_to)) >= ICONV_CSNMAXLEN)
 		return EINVAL;
-	if (strlen(du.din.ia_converter) >= ICONV_CNVNMAXLEN)
+	if (strnlen(du.din.ia_converter, sizeof(du.din.ia_converter)) >= ICONV_CNVNMAXLEN)
 		return EINVAL;
 	if (iconv_lookupconv(du.din.ia_converter, &dcp) != 0)
 		return EINVAL;
@@ -479,9 +479,7 @@ iconv_sysctl_add(SYSCTL_HANDLER_ARGS)
 	}
 	if (du.din.ia_datalen) {
 		csp->cp_data = malloc(du.din.ia_datalen, M_ICONVDATA, M_WAITOK);
-		error = copyin_c(ia_data,
-		    (__cheri_tocap void * __capability)csp->cp_data,
-		    du.din.ia_datalen);
+		error = copyin_c(ia_data, csp->cp_data, du.din.ia_datalen);
 		if (error)
 			goto bad;
 	}

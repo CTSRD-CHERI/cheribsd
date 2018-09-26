@@ -484,8 +484,9 @@ sf_rxfilter(struct sf_softc *sc)
 
 	/* Now program new ones. */
 	i = 1;
+	/* XXX how do we maintain reverse semantics without impl */
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH_REVERSE(ifma, &ifp->if_multiaddrs, ifmultihead,
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs,
 	    ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
@@ -576,7 +577,7 @@ sf_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	error = 0;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		SF_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
@@ -594,19 +595,19 @@ sf_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->sf_if_flags = ifp->if_flags;
 		SF_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		SF_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			sf_rxfilter(sc);
 		SF_UNLOCK(sc);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		mii = device_get_softc(sc->sf_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 #ifdef DEVICE_POLLING
 		if ((mask & IFCAP_POLLING) != 0) {

@@ -145,6 +145,12 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 			    prefix, "AT_EGID", (long)auxv[i].a_un.a_val);
 			break;
 #endif
+#ifdef AT_EHDRFLAGS
+		case AT_EHDRFLAGS:
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_EHDRFLAGS/%#lx}\n",
+			    prefix, "AT_EHDRFLAGS", (long)auxv[i].a_un.a_val);
+			break;
+#endif
 		case AT_EXECPATH:
 			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_EXECPATH/%p}\n",
 			    prefix, "AT_EXECPATH", auxv[i].a_un.a_ptr);

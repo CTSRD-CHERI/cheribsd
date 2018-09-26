@@ -342,7 +342,8 @@ acpi_parse_resource(ACPI_RESOURCE *res, void *context)
 	}
 	if (length <= 0)
 	    break;
-	if (res->Data.Address.ProducerConsumer != ACPI_CONSUMER) {
+	if (res->Type == ACPI_RESOURCE_TYPE_EXTENDED_ADDRESS64 &&
+	    res->Data.Address.ProducerConsumer != ACPI_CONSUMER) {
 	    ACPI_DEBUG_PRINT((ACPI_DB_RESOURCES,
 		"ignored %s %s producer\n", name,
 		acpi_address_range_name(res->Data.Address.ResourceType)));
@@ -529,6 +530,24 @@ acpi_res_set_iorange(device_t dev, void *context, uint64_t low,
 
     if (cp == NULL)
 	return;
+
+    /*
+     * XXX: Some BIOSes contain buggy _CRS entries where fixed I/O
+     * ranges have the maximum base address (_MAX) to the end of the
+     * I/O range instead of the start.  These are then treated as a
+     * relocatable I/O range rather than a fixed I/O resource.  As a
+     * workaround, treat I/O resources encoded this way as fixed I/O
+     * ports.
+     */
+    if (high == (low + length)) {
+	if (bootverbose)
+	    device_printf(dev,
+		"_CRS has fixed I/O port range defined as relocatable\n");
+
+	bus_set_resource(dev, SYS_RES_IOPORT, cp->ar_nio++, low, length);
+	return;
+    }
+
     device_printf(dev, "I/O range not supported\n");
 }
 
@@ -540,6 +559,9 @@ acpi_res_set_memory(device_t dev, void *context, uint64_t base,
 
     if (cp == NULL)
 	return;
+
+    while (bus_get_resource_start(dev, SYS_RES_MEMORY, cp->ar_nmem))
+	cp->ar_nmem++;
 
     bus_set_resource(dev, SYS_RES_MEMORY, cp->ar_nmem++, base, length);
 }

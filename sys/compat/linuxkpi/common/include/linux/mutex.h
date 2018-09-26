@@ -63,7 +63,7 @@ typedef struct mutex {
 
 #define	mutex_lock_interruptible(_m) ({		\
 	MUTEX_SKIP() ? 0 :			\
-	(sx_xlock_sig(&(_m)->sx) ? -EINTR : 0);	\
+	linux_mutex_lock_interruptible(_m);	\
 })
 
 #define	mutex_unlock(_m) do {			\
@@ -76,6 +76,21 @@ typedef struct mutex {
 	MUTEX_SKIP() ? 1 :			\
 	!!sx_try_xlock(&(_m)->sx);		\
 })
+
+enum mutex_trylock_recursive_enum {
+	MUTEX_TRYLOCK_FAILED = 0,
+	MUTEX_TRYLOCK_SUCCESS = 1,
+	MUTEX_TRYLOCK_RECURSIVE = 2,
+};
+
+static inline __must_check enum mutex_trylock_recursive_enum
+mutex_trylock_recursive(struct mutex *lock)
+{
+	if (unlikely(sx_xholder(&lock->sx) == curthread))
+		return (MUTEX_TRYLOCK_RECURSIVE);
+
+	return (mutex_trylock(lock));
+}
 
 #define	mutex_init(_m) \
 	linux_mutex_init(_m, mutex_name(#_m), SX_NOWITNESS)
@@ -101,7 +116,7 @@ mutex_is_owned(mutex_t *m)
 #ifdef WITNESS_ALL
 /* NOTE: the maximum WITNESS name is 64 chars */
 #define	__mutex_name(name, file, line)		\
-	(((const char *){file ":" #line "-" name}) + 	\
+	(((const char *){file ":" #line "-" name}) +	\
 	(sizeof(file) > 16 ? sizeof(file) - 16 : 0))
 #else
 #define	__mutex_name(name, file, line)	name
@@ -127,5 +142,7 @@ linux_mutex_destroy(mutex_t *m)
 		mutex_unlock(m);
 	sx_destroy(&m->sx);
 }
+
+extern int linux_mutex_lock_interruptible(mutex_t *m);
 
 #endif					/* _LINUX_MUTEX_H_ */

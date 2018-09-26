@@ -640,7 +640,7 @@ iwi_alloc_tx_ring(struct iwi_softc *sc, struct iwi_tx_ring *ring, int count,
 		goto fail;
 	}
 
-	ring->data = mallocarray(count, sizeof(struct iwi_tx_data), M_DEVBUF,
+	ring->data = malloc(count * sizeof (struct iwi_tx_data), M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (ring->data == NULL) {
 		device_printf(sc->sc_dev, "could not allocate soft data\n");
@@ -748,7 +748,7 @@ iwi_alloc_rx_ring(struct iwi_softc *sc, struct iwi_rx_ring *ring, int count)
 	ring->count = count;
 	ring->cur = 0;
 
-	ring->data = mallocarray(count, sizeof(struct iwi_rx_data), M_DEVBUF,
+	ring->data = malloc(count * sizeof (struct iwi_rx_data), M_DEVBUF,
 	    M_NOWAIT | M_ZERO);
 	if (ring->data == NULL) {
 		device_printf(sc->sc_dev, "could not allocate soft data\n");
@@ -2057,14 +2057,12 @@ iwi_ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 
 	IWI_LOCK(sc);
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCGIWISTATS):
+	case CASE_IOC_IFREQ(SIOCGIWISTATS):
 		/* XXX validate permissions/memory/etc? */
-		error = copyout_c(
-		    (__cheri_tocap struct iwi_notif_link_quality * __capability)
-		    &sc->sc_linkqual, ifr_data_get_ptr(ifr),
+		error = copyout_c(&sc->sc_linkqual, ifr_data_get_ptr(ifr),
 		    sizeof(struct iwi_notif_link_quality));
 		break;
-	CASE_IOC_IFREQ(SIOCZIWISTATS):
+	case CASE_IOC_IFREQ(SIOCZIWISTATS):
 		memset(&sc->sc_linkqual, 0,
 		    sizeof(struct iwi_notif_link_quality));
 		error = 0;
@@ -2552,11 +2550,35 @@ iwi_setwepkeys(struct iwi_softc *sc, struct ieee80211vap *vap)
 }
 
 static int
+iwi_set_rateset(struct iwi_softc *sc, const struct ieee80211_rateset *net_rs,
+    int mode, int type)
+{
+	struct iwi_rateset rs;
+
+	memset(&rs, 0, sizeof(rs));
+	rs.mode = mode;
+	rs.type = type;
+	rs.nrates = net_rs->rs_nrates;
+	if (rs.nrates > nitems(rs.rates)) {
+		DPRINTF(("Truncating negotiated rate set from %u\n",
+		    rs.nrates));
+		rs.nrates = nitems(rs.rates);
+	}
+	memcpy(rs.rates, net_rs->rs_rates, rs.nrates);
+	DPRINTF(("Setting .11%c%s %s rates (%u)\n",
+	    mode == IWI_MODE_11A ? 'a' : 'b',
+	    mode == IWI_MODE_11G ? "g" : "",
+	    type == IWI_RATESET_TYPE_SUPPORTED ? "supported" : "negotiated",
+	    rs.nrates));
+
+	return (iwi_cmd(sc, IWI_CMD_SET_RATES, &rs, sizeof(rs)));
+}
+
+static int
 iwi_config(struct iwi_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct iwi_configuration config;
-	struct iwi_rateset rs;
 	struct iwi_txpower power;
 	uint32_t data;
 	int error, i;
@@ -2605,25 +2627,13 @@ iwi_config(struct iwi_softc *sc)
 			return error;
 	}
 
-	memset(&rs, 0, sizeof rs);
-	rs.mode = IWI_MODE_11G;
-	rs.type = IWI_RATESET_TYPE_SUPPORTED;
-	rs.nrates = ic->ic_sup_rates[IEEE80211_MODE_11G].rs_nrates;
-	memcpy(rs.rates, ic->ic_sup_rates[IEEE80211_MODE_11G].rs_rates,
-	    rs.nrates);
-	DPRINTF(("Setting .11bg supported rates (%u)\n", rs.nrates));
-	error = iwi_cmd(sc, IWI_CMD_SET_RATES, &rs, sizeof rs);
+	error = iwi_set_rateset(sc, &ic->ic_sup_rates[IEEE80211_MODE_11G],
+	    IWI_MODE_11G, IWI_RATESET_TYPE_SUPPORTED);
 	if (error != 0)
 		return error;
 
-	memset(&rs, 0, sizeof rs);
-	rs.mode = IWI_MODE_11A;
-	rs.type = IWI_RATESET_TYPE_SUPPORTED;
-	rs.nrates = ic->ic_sup_rates[IEEE80211_MODE_11A].rs_nrates;
-	memcpy(rs.rates, ic->ic_sup_rates[IEEE80211_MODE_11A].rs_rates,
-	    rs.nrates);
-	DPRINTF(("Setting .11a supported rates (%u)\n", rs.nrates));
-	error = iwi_cmd(sc, IWI_CMD_SET_RATES, &rs, sizeof rs);
+	error = iwi_set_rateset(sc, &ic->ic_sup_rates[IEEE80211_MODE_11A],
+	    IWI_MODE_11A, IWI_RATESET_TYPE_SUPPORTED);
 	if (error != 0)
 		return error;
 
@@ -2817,7 +2827,6 @@ iwi_auth_and_assoc(struct iwi_softc *sc, struct ieee80211vap *vap)
 	struct ieee80211_node *ni;
 	struct iwi_configuration config;
 	struct iwi_associate *assoc = &sc->assoc;
-	struct iwi_rateset rs;
 	uint16_t capinfo;
 	uint32_t data;
 	int error, mode;
@@ -2887,18 +2896,8 @@ iwi_auth_and_assoc(struct iwi_softc *sc, struct ieee80211vap *vap)
 		goto done;
 
 	/* the rate set has already been "negotiated" */
-	memset(&rs, 0, sizeof rs);
-	rs.mode = mode;
-	rs.type = IWI_RATESET_TYPE_NEGOTIATED;
-	rs.nrates = ni->ni_rates.rs_nrates;
-	if (rs.nrates > IWI_RATESET_SIZE) {
-		DPRINTF(("Truncating negotiated rate set from %u\n",
-		    rs.nrates));
-		rs.nrates = IWI_RATESET_SIZE;
-	}
-	memcpy(rs.rates, ni->ni_rates.rs_rates, rs.nrates);
-	DPRINTF(("Setting negotiated rates (%u)\n", rs.nrates));
-	error = iwi_cmd(sc, IWI_CMD_SET_RATES, &rs, sizeof rs);
+	error = iwi_set_rateset(sc, &ni->ni_rates, mode,
+	    IWI_RATESET_TYPE_NEGOTIATED);
 	if (error != 0)
 		goto done;
 

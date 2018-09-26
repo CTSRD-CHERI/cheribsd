@@ -519,9 +519,10 @@ public:
   ///
   /// This corresponds to an assembler statement such as:
   ///  .symver _start, foo@@SOME_VERSION
-  /// \param Alias - The versioned alias (i.e. "foo@@SOME_VERSION")
+  /// \param AliasName - The versioned alias (i.e. "foo@@SOME_VERSION")
   /// \param Aliasee - The aliased symbol (i.e. "_start")
-  virtual void emitELFSymverDirective(MCSymbol *Alias, const MCSymbol *Aliasee);
+  virtual void emitELFSymverDirective(StringRef AliasName,
+                                      const MCSymbol *Aliasee);
 
   /// \brief Emit a Linker Optimization Hint (LOH) directive.
   /// \param Args - Arguments of the LOH.
@@ -662,7 +663,7 @@ public:
 
   /// \brief Emit NumBytes bytes worth of the value specified by FillValue.
   /// This implements directives such as '.space'.
-  virtual void emitFill(uint64_t NumBytes, uint8_t FillValue);
+  void emitFill(uint64_t NumBytes, uint8_t FillValue);
 
   /// \brief Emit \p Size bytes worth of the value specified by \p FillValue.
   ///

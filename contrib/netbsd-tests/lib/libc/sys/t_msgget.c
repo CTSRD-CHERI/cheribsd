@@ -28,6 +28,18 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180719,
+ *   "target_type": "test",
+ *   "changes": [
+ *     "other"
+ *   ],
+ *   "change_comment": "Fix a buffer overflow by removing an extra i++"
+ * }
+ * CHERI CHANGES END
+ */
 #include <sys/cdefs.h>
 __RCSID("$NetBSD: t_msgget.c,v 1.2 2014/02/27 00:59:50 joerg Exp $");
 
@@ -239,7 +251,6 @@ ATF_TC_BODY(msgget_limit, tc)
 		}
 	}
 
-	i++;
 	errno = 0;
 
 	buf[i] = msgget(MSG_KEY + i, IPC_CREAT | IPC_EXCL | 0600);

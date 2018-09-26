@@ -81,11 +81,20 @@ machdep_ap_bootstrap(void)
 		__asm __volatile("or 27,27,27");
 	__asm __volatile("or 6,6,6");
 
-	/* Give platform code a chance to do anything necessary */
+	/*
+	 * Set timebase as soon as possible to meet an implicit rendezvous
+	 * from cpu_mp_unleash(), which sets ap_letgo and then immediately
+	 * sets timebase.
+	 *
+	 * Note that this is instrinsically racy and is only relevant on
+	 * platforms that do not support better mechanisms.
+	 */
+	platform_smp_timebase_sync(ap_timebase, 1);
+
+	/* Give platform code a chance to do anything else necessary */
 	platform_smp_ap_init();
 
-	/* Initialize DEC and TB, sync with the BSP values */
-	platform_smp_timebase_sync(ap_timebase, 1);
+	/* Initialize decrementer */
 	decr_ap_init();
 
 	/* Serialize console output and AP count increment */
@@ -93,6 +102,9 @@ machdep_ap_bootstrap(void)
 	ap_awake++;
 	printf("SMP: AP CPU #%d launched\n", PCPU_GET(cpuid));
 	mtx_unlock_spin(&ap_boot_mtx);
+
+	while(smp_started == 0)
+		;
 
 	/* Start per-CPU event timers. */
 	cpu_initclocks_ap();
@@ -197,6 +209,7 @@ cpu_mp_unleash(void *dummy)
 {
 	struct pcpu *pc;
 	int cpus, timeout;
+	int ret;
 
 	if (mp_ncpus <= 1)
 		return;
@@ -215,12 +228,12 @@ cpu_mp_unleash(void *dummy)
 				printf("Waking up CPU %d (dev=%x)\n",
 				    pc->pc_cpuid, (int)pc->pc_hwref);
 
-			platform_smp_start_cpu(pc);
-			
-			timeout = 2000;	/* wait 2sec for the AP */
-			while (!pc->pc_awake && --timeout > 0)
-				DELAY(1000);
-
+			ret = platform_smp_start_cpu(pc);
+			if (ret == 0) {
+				timeout = 2000;	/* wait 2sec for the AP */
+				while (!pc->pc_awake && --timeout > 0)
+					DELAY(1000);
+			}
 		} else {
 			pc->pc_awake = 1;
 		}
@@ -253,11 +266,12 @@ cpu_mp_unleash(void *dummy)
 		    mp_ncpus, cpus, smp_cpus);
 	}
 
+	if (smp_cpus > 1)
+		atomic_store_rel_int(&smp_started, 1);
+
 	/* Let the APs get into the scheduler */
 	DELAY(10000);
 
-	/* XXX Atomic set operation? */
-	smp_started = 1;
 }
 
 SYSINIT(start_aps, SI_SUB_SMP, SI_ORDER_FIRST, cpu_mp_unleash, NULL);

@@ -415,8 +415,7 @@ mac_ifnet_ioctl_get(struct ucred *cred, struct ifreq *ifr,
 		return (error);
 
 	elements = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr_c(mac.m_string,
-	    (__cheri_tocap char * __capability)elements, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string, elements, mac.m_buflen, NULL);
 	if (error) {
 		free(elements, M_MACTEMP);
 		return (error);
@@ -431,8 +430,7 @@ mac_ifnet_ioctl_get(struct ucred *cred, struct ifreq *ifr,
 	    mac.m_buflen);
 	mac_ifnet_label_free(intlabel);
 	if (error == 0)
-		error = copyout_c((__cheri_tocap char * __capability)buffer,
-		    mac.m_string, strlen(buffer)+1);
+		error = copyout_c(buffer, mac.m_string, strlen(buffer)+1);
 
 	free(buffer, M_MACTEMP);
 	free(elements, M_MACTEMP);
@@ -460,8 +458,7 @@ mac_ifnet_ioctl_set(struct ucred *cred, struct ifreq *ifr, struct ifnet *ifp)
 		return (error);
 
 	buffer = malloc(mac.m_buflen, M_MACTEMP, M_WAITOK);
-	error = copyinstr_c(mac.m_string,
-	    (__cheri_tocap char * __capability)buffer, mac.m_buflen, NULL);
+	error = copyinstr_c(mac.m_string, buffer, mac.m_buflen, NULL);
 	if (error) {
 		free(buffer, M_MACTEMP);
 		return (error);

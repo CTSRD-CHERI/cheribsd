@@ -110,7 +110,6 @@ VNET_PCPUSTAT_SYSINIT(ipsec4stat);
 VNET_PCPUSTAT_SYSUNINIT(ipsec4stat);
 #endif /* VIMAGE */
 
-VNET_DEFINE(int, ip4_ah_offsetmask) = 0;	/* maybe IP_DF? */
 /* DF bit on encap. 0: clear 1: set 2: copy */
 VNET_DEFINE(int, ip4_ipsec_dfbit) = 0;
 VNET_DEFINE(int, ip4_esp_trans_deflev) = IPSEC_LEVEL_USE;
@@ -119,7 +118,6 @@ VNET_DEFINE(int, ip4_ah_trans_deflev) = IPSEC_LEVEL_USE;
 VNET_DEFINE(int, ip4_ah_net_deflev) = IPSEC_LEVEL_USE;
 /* ECN ignore(-1)/forbidden(0)/allowed(1) */
 VNET_DEFINE(int, ip4_ipsec_ecn) = 0;
-VNET_DEFINE(int, ip4_esp_randpad) = -1;
 
 static VNET_DEFINE(int, ip4_filtertunnel) = 0;
 #define	V_ip4_filtertunnel VNET(ip4_filtertunnel)
@@ -194,9 +192,6 @@ SYSCTL_INT(_net_inet_ipsec, IPSECCTL_DEF_AH_NETLEV, ah_net_deflev,
 SYSCTL_INT(_net_inet_ipsec, IPSECCTL_AH_CLEARTOS, ah_cleartos,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ah_cleartos), 0,
 	"If set, clear type-of-service field when doing AH computation.");
-SYSCTL_INT(_net_inet_ipsec, IPSECCTL_AH_OFFSETMASK, ah_offsetmask,
-	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip4_ah_offsetmask), 0,
-	"If not set, clear offset field mask when doing AH computation.");
 SYSCTL_INT(_net_inet_ipsec, IPSECCTL_DFBIT, dfbit,
 	CTLFLAG_VNET | CTLFLAG_RW, &VNET_NAME(ip4_ipsec_dfbit), 0,
 	"Do not fragment bit on encap.");
@@ -1327,9 +1322,10 @@ ok:
 }
 
 int
-ipsec_updateid(struct secasvar *sav, uint64_t *new, uint64_t *old)
+ipsec_updateid(struct secasvar *sav, crypto_session_t *new,
+    crypto_session_t *old)
 {
-	uint64_t tmp;
+	crypto_session_t tmp;
 
 	/*
 	 * tdb_cryptoid is initialized by xform_init().
@@ -1355,8 +1351,8 @@ ipsec_updateid(struct secasvar *sav, uint64_t *new, uint64_t *old)
 	 * XXXAE: check this more carefully.
 	 */
 	KEYDBG(IPSEC_STAMP,
-	    printf("%s: SA(%p) moves cryptoid %jd -> %jd\n",
-		__func__, sav, (uintmax_t)(*old), (uintmax_t)(*new)));
+	    printf("%s: SA(%p) moves cryptoid %p -> %p\n",
+		__func__, sav, *old, *new));
 	KEYDBG(IPSEC_DATA, kdebug_secasv(sav));
 	SECASVAR_LOCK(sav);
 	if (sav->tdb_cryptoid != *old) {

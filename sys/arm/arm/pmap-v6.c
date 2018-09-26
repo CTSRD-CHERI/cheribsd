@@ -2478,7 +2478,7 @@ _pmap_allocpte2(pmap_t pmap, vm_offset_t va, u_int flags)
 			if ((flags & PMAP_ENTER_NOSLEEP) == 0) {
 				PMAP_UNLOCK(pmap);
 				rw_wunlock(&pvh_global_lock);
-				VM_WAIT;
+				vm_wait(NULL);
 				rw_wlock(&pvh_global_lock);
 				PMAP_LOCK(pmap);
 			}
@@ -2548,18 +2548,6 @@ retry:
 	}
 
 	return (m);
-}
-
-static __inline void
-pmap_free_zero_pages(struct spglist *free)
-{
-	vm_page_t m;
-
-	while ((m = SLIST_FIRST(free)) != NULL) {
-		SLIST_REMOVE_HEAD(free, plinks.s.ss);
-		/* Preserve the page's PG_ZERO setting. */
-		vm_page_free_toq(m);
-	}
 }
 
 /*
@@ -2634,11 +2622,12 @@ pmap_unwire_pt2pg(pmap_t pmap, vm_offset_t va, vm_page_t m)
 	pmap->pm_stats.resident_count--;
 
 	/*
-	 * This is a release store so that the ordinary store unmapping
+	 * This barrier is so that the ordinary store unmapping
 	 * the L2 page table page is globally performed before TLB shoot-
 	 * down is begun.
 	 */
-	atomic_subtract_rel_int(&vm_cnt.v_wire_count, 1);
+	wmb();
+	vm_wire_sub(1);
 }
 
 /*
@@ -2945,9 +2934,9 @@ out:
 		SLIST_REMOVE_HEAD(&free, plinks.s.ss);
 		/* Recycle a freed page table page. */
 		m_pc->wire_count = 1;
-		atomic_add_int(&vm_cnt.v_wire_count, 1);
+		vm_wire_add(1);
 	}
-	pmap_free_zero_pages(&free);
+	vm_page_free_pages_toq(&free, false);
 	return (m_pc);
 }
 
@@ -3710,7 +3699,7 @@ pmap_demote_pte1(pmap_t pmap, pt1_entry_t *pte1p, vm_offset_t va)
 		    VM_ALLOC_NORMAL | VM_ALLOC_WIRED)) == NULL) {
 			SLIST_INIT(&free);
 			pmap_remove_pte1(pmap, pte1p, pte1_trunc(va), &free);
-			pmap_free_zero_pages(&free);
+			vm_page_free_pages_toq(&free, false);
 			CTR3(KTR_PMAP, "%s: failure for va %#x in pmap %p",
 			    __func__, va, pmap);
 			return (FALSE);
@@ -4234,7 +4223,7 @@ out:
 	sched_unpin();
 	rw_wunlock(&pvh_global_lock);
 	PMAP_UNLOCK(pmap);
-	pmap_free_zero_pages(&free);
+	vm_page_free_pages_toq(&free, false);
 }
 
 /*
@@ -4308,7 +4297,7 @@ small_mappings:
 	vm_page_aflag_clear(m, PGA_WRITEABLE);
 	sched_unpin();
 	rw_wunlock(&pvh_global_lock);
-	pmap_free_zero_pages(&free);
+	vm_page_free_pages_toq(&free, false);
 }
 
 /*
@@ -4495,7 +4484,7 @@ pmap_remove_pages(pmap_t pmap)
 	sched_unpin();
 	rw_wunlock(&pvh_global_lock);
 	PMAP_UNLOCK(pmap);
-	pmap_free_zero_pages(&free);
+	vm_page_free_pages_toq(&free, false);
 }
 
 /*
@@ -4604,7 +4593,7 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 			SLIST_INIT(&free);
 			if (pmap_unwire_pt2(pmap, va, mpt2pg, &free)) {
 				pmap_tlb_flush(pmap, va);
-				pmap_free_zero_pages(&free);
+				vm_page_free_pages_toq(&free, false);
 			}
 
 			mpt2pg = NULL;
@@ -6078,7 +6067,8 @@ pmap_copy(pmap_t dst_pmap, pmap_t src_pmap, vm_offset_t dst_addr, vm_size_t len,
 					if (pmap_unwire_pt2(dst_pmap, addr,
 					    dst_mpt2pg, &free)) {
 						pmap_tlb_flush(dst_pmap, addr);
-						pmap_free_zero_pages(&free);
+						vm_page_free_pages_toq(&free,
+						    false);
 					}
 					goto out;
 				}

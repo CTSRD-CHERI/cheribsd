@@ -199,7 +199,10 @@ enum zio_flag {
 
 #define	ZIO_VDEV_CHILD_FLAGS(zio)				\
 	(((zio)->io_flags & ZIO_FLAG_VDEV_INHERIT) |		\
-	ZIO_FLAG_CANFAIL)
+	ZIO_FLAG_DONT_PROPAGATE | ZIO_FLAG_CANFAIL)
+
+#define	ZIO_CHILD_BIT(x)		(1 << (x))
+#define	ZIO_CHILD_BIT_IS_SET(val, x)	((val) & (1 << (x)))
 
 enum zio_child {
 	ZIO_CHILD_VDEV = 0,
@@ -208,6 +211,14 @@ enum zio_child {
 	ZIO_CHILD_LOGICAL,
 	ZIO_CHILD_TYPES
 };
+
+#define	ZIO_CHILD_VDEV_BIT		ZIO_CHILD_BIT(ZIO_CHILD_VDEV)
+#define	ZIO_CHILD_GANG_BIT		ZIO_CHILD_BIT(ZIO_CHILD_GANG)
+#define	ZIO_CHILD_DDT_BIT		ZIO_CHILD_BIT(ZIO_CHILD_DDT)
+#define	ZIO_CHILD_LOGICAL_BIT		ZIO_CHILD_BIT(ZIO_CHILD_LOGICAL)
+#define	ZIO_CHILD_ALL_BITS					\
+	(ZIO_CHILD_VDEV_BIT | ZIO_CHILD_GANG_BIT | 		\
+	ZIO_CHILD_DDT_BIT | ZIO_CHILD_LOGICAL_BIT)
 
 enum zio_wait_type {
 	ZIO_WAIT_READY = 0,
@@ -541,7 +552,6 @@ extern zio_t *zio_free_sync(zio_t *pio, spa_t *spa, uint64_t txg,
 
 extern int zio_alloc_zil(spa_t *spa, uint64_t txg, blkptr_t *new_bp,
     blkptr_t *old_bp, uint64_t size, boolean_t *slog);
-extern void zio_free_zil(spa_t *spa, uint64_t txg, blkptr_t *bp);
 extern void zio_flush(zio_t *zio, vdev_t *vd);
 extern zio_t *zio_trim(zio_t *zio, spa_t *spa, vdev_t *vd, uint64_t offset,
     uint64_t size);
@@ -583,6 +593,8 @@ extern void zio_vdev_io_bypass(zio_t *zio);
 extern void zio_vdev_io_reissue(zio_t *zio);
 extern void zio_vdev_io_redone(zio_t *zio);
 
+extern void zio_change_priority(zio_t *pio, zio_priority_t priority);
+
 extern void zio_checksum_verified(zio_t *zio);
 extern int zio_worst_error(int e1, int e2);
 
@@ -593,7 +605,6 @@ extern enum zio_checksum zio_checksum_dedup_select(spa_t *spa,
 extern enum zio_compress zio_compress_select(spa_t *spa,
     enum zio_compress child, enum zio_compress parent);
 
-extern void zio_cancel(zio_t *zio);
 extern void zio_suspend(spa_t *spa, zio_t *zio);
 extern int zio_resume(spa_t *spa);
 extern void zio_resume_wait(spa_t *spa);

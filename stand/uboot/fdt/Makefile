@@ -5,7 +5,6 @@
 .PATH: ${LDRSRC}
 
 LIB=		uboot_fdt
-INTERNALLIB=
 WARNS?=		2
 
 SRCS=		uboot_fdt.c
@@ -19,5 +18,4 @@ CFLAGS+=	-I${FDTSRC}
 # Pick up the bootstrap header for some interface items
 CFLAGS+=	-I${LDRSRC}
 
-.include <bsd.stand.mk>
 .include <bsd.lib.mk>

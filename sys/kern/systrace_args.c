@@ -118,9 +118,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* obreak */
+	/* break */
 	case 17: {
-		struct obreak_args *p = params;
+		struct break_args *p = params;
 		uarg[0] = (intptr_t) p->nsize; /* char * */
 		*n_args = 1;
 		break;
@@ -429,13 +429,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 70: {
 		struct sstk_args *p = params;
 		iarg[0] = p->incr; /* int */
-		*n_args = 1;
-		break;
-	}
-	/* ovadvise */
-	case 72: {
-		struct ovadvise_args *p = params;
-		iarg[0] = p->anom; /* int */
 		*n_args = 1;
 		break;
 	}
@@ -1345,30 +1338,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* lchown */
-	case 275: {
-		struct lchown_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
-		uarg[1] = p->uid; /* uid_t */
-		iarg[2] = p->gid; /* gid_t */
-		*n_args = 3;
-		break;
-	}
 	/* lutimes */
 	case 276: {
 		struct lutimes_args *p = params;
 		uarg[0] = (intptr_t) p->path; /* char * */
 		uarg[1] = (intptr_t) p->tptr; /* struct timeval * */
 		*n_args = 2;
-		break;
-	}
-	/* msync */
-	case 277: {
-		struct msync_args *p = params;
-		uarg[0] = (intptr_t) p->addr; /* void * */
-		uarg[1] = p->len; /* size_t */
-		iarg[2] = p->flags; /* int */
-		*n_args = 3;
 		break;
 	}
 	/* preadv */
@@ -3292,8 +3267,17 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 6;
 		break;
 	}
-	/* coexecve */
+	/* getrandom */
 	case 563: {
+		struct getrandom_args *p = params;
+		uarg[0] = (intptr_t) p->buf; /* void * */
+		uarg[1] = p->buflen; /* size_t */
+		uarg[2] = p->flags; /* unsigned int */
+		*n_args = 3;
+		break;
+	}
+	/* coexecve */
+	case 564: {
 		struct coexecve_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
 		uarg[1] = (intptr_t) p->fname; /* char * */
@@ -3303,7 +3287,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* cosetup */
-	case 564: {
+	case 565: {
 		struct cosetup_args *p = params;
 		iarg[0] = p->what; /* int */
 		uarg[1] = (intptr_t) p->code; /* void *__capability * */
@@ -3312,7 +3296,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* coregister */
-	case 565: {
+	case 566: {
 		struct coregister_args *p = params;
 		uarg[0] = (intptr_t) p->name; /* const char * */
 		uarg[1] = (intptr_t) p->cap; /* void *__capability * */
@@ -3320,7 +3304,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* colookup */
-	case 566: {
+	case 567: {
 		struct colookup_args *p = params;
 		uarg[0] = (intptr_t) p->name; /* const char * */
 		uarg[1] = (intptr_t) p->cap; /* void *__capability * */
@@ -3328,7 +3312,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* copark */
-	case 567: {
+	case 568: {
 		*n_args = 0;
 		break;
 	}
@@ -3507,7 +3491,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* obreak */
+	/* break */
 	case 17:
 		switch(ndx) {
 		case 0:
@@ -3982,16 +3966,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* sstk */
 	case 70:
-		switch(ndx) {
-		case 0:
-			p = "int";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* ovadvise */
-	case 72:
 		switch(ndx) {
 		case 0:
 			p = "int";
@@ -5460,22 +5434,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* lchown */
-	case 275:
-		switch(ndx) {
-		case 0:
-			p = "userland char *";
-			break;
-		case 1:
-			p = "uid_t";
-			break;
-		case 2:
-			p = "gid_t";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* lutimes */
 	case 276:
 		switch(ndx) {
@@ -5484,22 +5442,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 1:
 			p = "userland struct timeval *";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* msync */
-	case 277:
-		switch(ndx) {
-		case 0:
-			p = "userland void *";
-			break;
-		case 1:
-			p = "size_t";
-			break;
-		case 2:
-			p = "int";
 			break;
 		default:
 			break;
@@ -8821,8 +8763,24 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* coexecve */
+	/* getrandom */
 	case 563:
+		switch(ndx) {
+		case 0:
+			p = "userland void *";
+			break;
+		case 1:
+			p = "size_t";
+			break;
+		case 2:
+			p = "unsigned int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* coexecve */
+	case 564:
 		switch(ndx) {
 		case 0:
 			p = "pid_t";
@@ -8841,7 +8799,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* cosetup */
-	case 564:
+	case 565:
 		switch(ndx) {
 		case 0:
 			p = "int";
@@ -8857,19 +8815,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* coregister */
-	case 565:
-		switch(ndx) {
-		case 0:
-			p = "userland const char *";
-			break;
-		case 1:
-			p = "userland void *__capability *";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* colookup */
 	case 566:
 		switch(ndx) {
 		case 0:
@@ -8882,8 +8827,21 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* copark */
+	/* colookup */
 	case 567:
+		switch(ndx) {
+		case 0:
+			p = "userland const char *";
+			break;
+		case 1:
+			p = "userland void *__capability *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* copark */
+	case 568:
 		break;
 	default:
 		break;
@@ -8960,10 +8918,10 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* obreak */
+	/* break */
 	case 17:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "caddr_t";
 		break;
 	/* getpid */
 	case 20:
@@ -9138,11 +9096,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* sstk */
 	case 70:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* ovadvise */
-	case 72:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -9666,18 +9619,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* lchown */
-	case 275:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
 	/* lutimes */
 	case 276:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* msync */
-	case 277:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -10776,28 +10719,33 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* coexecve */
+	/* getrandom */
 	case 563:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cosetup */
+	/* coexecve */
 	case 564:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* coregister */
+	/* cosetup */
 	case 565:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* colookup */
+	/* coregister */
 	case 566:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* copark */
+	/* colookup */
 	case 567:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* copark */
+	case 568:
 	default:
 		break;
 	};

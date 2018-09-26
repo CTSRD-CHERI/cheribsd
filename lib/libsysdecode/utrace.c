@@ -48,6 +48,28 @@ struct utrace_rtld32 {
 	int refcnt;
 	char name[MAXPATHLEN];
 };
+
+#ifdef __CHERI_PURE_CAPABILITY__
+struct utrace_rtld64 {
+	char sig[4];
+	int event;
+	uint64_t handle;
+	uint64_t mapbase;
+	uint64_t mapsize;
+	int refcnt;
+	char name[MAXPATHLEN];
+};
+#else
+struct utrace_rtld_cheri {
+	char sig[4];
+	int event;
+	void * __capability handle;
+	void * __capability mapbase;
+	size_t mapsize;
+	int refcnt;
+	char name[MAXPATHLEN];
+};
+#endif
 #endif
 
 static int
@@ -146,6 +168,20 @@ struct utrace_malloc32 {
 	uint32_t s;
 	uint32_t r;
 };
+
+#ifdef __CHERI_PURE_CAPABILITY__
+struct utrace_malloc64 {
+	uint64_t p;
+	uint64_t s;
+	uint64_t r;
+};
+#else
+struct utrace_malloc_cheri {
+	void * __capability p;
+	size_t s;
+	void * __capability r;
+};
+#endif
 #endif
 
 static void
@@ -171,6 +207,13 @@ sysdecode_utrace(FILE *fp, void *p, size_t len)
 	struct utrace_rtld32 *pr;
 	struct utrace_malloc um;
 	struct utrace_malloc32 *pm;
+#ifdef __CHERI_PURE_CAPABILITY__
+	struct utrace_rtld64 *r64;
+	struct utrace_malloc64 *m64;
+#else
+	struct utrace_rtld_cheri *rc;
+	struct utrace_malloc_cheri *mc;
+#endif
 #endif
 	static const char rtld_utrace_sig[RTLD_UTRACE_SIG_SZ] = RTLD_UTRACE_SIG;
 
@@ -208,6 +251,56 @@ sysdecode_utrace(FILE *fp, void *p, size_t len)
 		print_utrace_malloc(fp, &um);
 		return (1);
 	}
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	if (len == sizeof(struct utrace_rtld64) && bcmp(p, rtld_utrace_sig,
+	    sizeof(rtld_utrace_sig)) == 0) {
+		r64 = p;
+		memset(&ur, 0, sizeof(ur));
+		memcpy(ur.sig, r64->sig, sizeof(ur.sig));
+		ur.event = r64->event;
+		ur.handle = (void *)(uintptr_t)r64->handle;
+		ur.mapbase = (void *)(uintptr_t)r64->mapbase;
+		ur.mapsize = r64->mapsize;
+		ur.refcnt = r64->refcnt;
+		memcpy(ur.name, r64->name, sizeof(ur.name));
+		return (print_utrace_rtld(fp, &ur));
+	}
+
+	if (len == sizeof(struct utrace_malloc64)) {
+		m64 = p;
+		memset(&um, 0, sizeof(um));
+		um.p = (void *)(uintptr_t)m64->p;
+		um.s = m64->s;
+		um.r = (void *)(uintptr_t)m64->r;
+		print_utrace_malloc(fp, &um);
+		return (1);
+	}
+#else
+	if (len == sizeof(struct utrace_rtld_cheri) && bcmp(p, rtld_utrace_sig,
+	    sizeof(rtld_utrace_sig)) == 0) {
+		rc = p;
+		memset(&ur, 0, sizeof(ur));
+		memcpy(ur.sig, rc->sig, sizeof(ur.sig));
+		ur.event = rc->event;
+		ur.handle = (void *)(__cheri_addr uintptr_t)rc->handle;
+		ur.mapbase = (void *)(__cheri_addr uintptr_t)rc->mapbase;
+		ur.mapsize = rc->mapsize;
+		ur.refcnt = rc->refcnt;
+		memcpy(ur.name, rc->name, sizeof(ur.name));
+		return (print_utrace_rtld(fp, &ur));
+	}
+
+	if (len == sizeof(struct utrace_malloc_cheri)) {
+		mc = p;
+		memset(&um, 0, sizeof(um));
+		um.p = (void *)(__cheri_addr uintptr_t)mc->p;
+		um.s = mc->s;
+		um.r = (void *)(__cheri_addr uintptr_t)mc->r;
+		print_utrace_malloc(fp, &um);
+		return (1);
+	}
+#endif
 #endif
 
 	return (0);

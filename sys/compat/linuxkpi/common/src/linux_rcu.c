@@ -1,5 +1,6 @@
 /*-
  * Copyright (c) 2016 Matthew Macy (mmacy@mattmacy.io)
+ * Copyright (c) 2017 Hans Petter Selasky (hselasky@freebsd.org)
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -91,7 +92,7 @@ CTASSERT(offsetof(struct linux_epoch_record, epoch_record) == 0);
 
 static ck_epoch_t linux_epoch;
 static struct linux_epoch_head linux_epoch_head;
-static DPCPU_DEFINE(struct linux_epoch_record, linux_epoch_record);
+DPCPU_DEFINE_STATIC(struct linux_epoch_record, linux_epoch_record);
 
 static void linux_rcu_cleaner_func(void *, int);
 
@@ -297,13 +298,13 @@ linux_synchronize_rcu(void)
 
 	td = curthread;
 
-	DROP_GIANT();
-
 	/*
 	 * Synchronizing RCU might change the CPU core this function
 	 * is running on. Save current values:
 	 */
 	thread_lock(td);
+
+	DROP_GIANT();
 
 	old_cpu = PCPU_GET(cpuid);
 	old_pinned = td->td_pinned;

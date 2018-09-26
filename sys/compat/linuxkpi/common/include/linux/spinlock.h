@@ -98,6 +98,9 @@ typedef struct {
 	__ret;					\
 })
 
+#define	spin_trylock_irq(_l)			\
+	spin_trylock(_l)
+
 #define	spin_lock_nested(_l, _n) do {		\
 	if (SPIN_SKIP())			\
 		break;				\
@@ -122,7 +125,7 @@ typedef struct {
 #ifdef WITNESS_ALL
 /* NOTE: the maximum WITNESS name is 64 chars */
 #define	__spin_lock_name(name, file, line)		\
-	(((const char *){file ":" #line "-" name}) + 	\
+	(((const char *){file ":" #line "-" name}) +	\
 	(sizeof(file) > 16 ? sizeof(file) - 16 : 0))
 #else
 #define	__spin_lock_name(name, file, line)	name

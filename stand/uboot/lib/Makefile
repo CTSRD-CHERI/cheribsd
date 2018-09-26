@@ -5,7 +5,6 @@
 .PATH: ${LDRSRC}
 
 LIB=		uboot
-INTERNALLIB=
 WARNS?=		2
 
 SRCS=	console.c copy.c devicename.c elf_freebsd.c glue.c
@@ -25,5 +24,4 @@ CFLAGS+=	-I${LDRSRC}
 CFLAGS+= -DDISK_DEBUG
 .endif
 
-.include <bsd.stand.mk>
 .include <bsd.lib.mk>

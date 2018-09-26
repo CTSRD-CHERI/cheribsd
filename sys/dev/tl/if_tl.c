@@ -880,7 +880,8 @@ tl_setmulti(sc)
 	} else {
 		i = 1;
 		if_maddr_rlock(ifp);
-		TAILQ_FOREACH_REVERSE(ifma, &ifp->if_multiaddrs, ifmultihead, ifma_link) {
+		/* XXX want to maintain reverse semantics - pop list and re-add? */
+		CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 			if (ifma->ifma_addr->sa_family != AF_LINK)
 				continue;
 			/*
@@ -2126,7 +2127,7 @@ tl_ioctl(ifp, command, data)
 	int			error = 0;
 
 	switch(command) {
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		TL_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING &&
@@ -2150,14 +2151,14 @@ tl_ioctl(ifp, command, data)
 		TL_UNLOCK(sc);
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		TL_LOCK(sc);
 		tl_setmulti(sc);
 		TL_UNLOCK(sc);
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		if (sc->tl_bitrate)
 			error = ifmedia_ioctl(ifp, ifr, &sc->ifmedia, command);

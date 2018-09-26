@@ -402,7 +402,7 @@ iface_match(struct ifnet *ifp, ipfw_insn_if *cmd, struct ip_fw_chain *chain,
 		struct ifaddr *ia;
 
 		if_addr_rlock(ifp);
-		TAILQ_FOREACH(ia, &ifp->if_addrhead, ifa_link) {
+		CK_STAILQ_FOREACH(ia, &ifp->if_addrhead, ifa_link) {
 			if (ia->ifa_addr->sa_family != AF_INET)
 				continue;
 			if (cmd->p.ip.s_addr == ((struct sockaddr_in *)
@@ -767,7 +767,7 @@ ipfw_localip6(struct in6_addr *in6)
 		return (in6_localip(in6));
 
 	IN6_IFADDR_RLOCK(&in6_ifa_tracker);
-	TAILQ_FOREACH(ia, &V_in6_ifaddrhead, ia_link) {
+	CK_STAILQ_FOREACH(ia, &V_in6_ifaddrhead, ia_link) {
 		if (!IN6_IS_ADDR_LINKLOCAL(&ia->ia_addr.sin6_addr))
 			continue;
 		if (IN6_ARE_MASKED_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
@@ -819,6 +819,32 @@ is_icmp6_query(int icmp6_type)
 		return (1);
 
 	return (0);
+}
+
+static int
+map_icmp_unreach(int code)
+{
+
+	/* RFC 7915 p4.2 */
+	switch (code) {
+	case ICMP_UNREACH_NET:
+	case ICMP_UNREACH_HOST:
+	case ICMP_UNREACH_SRCFAIL:
+	case ICMP_UNREACH_NET_UNKNOWN:
+	case ICMP_UNREACH_HOST_UNKNOWN:
+	case ICMP_UNREACH_TOSNET:
+	case ICMP_UNREACH_TOSHOST:
+		return (ICMP6_DST_UNREACH_NOROUTE);
+	case ICMP_UNREACH_PORT:
+		return (ICMP6_DST_UNREACH_NOPORT);
+	default:
+		/*
+		 * Map the rest of codes into admit prohibited.
+		 * XXX: unreach proto should be mapped into ICMPv6
+		 * parameter problem, but we use only unreach type.
+		 */
+		return (ICMP6_DST_UNREACH_ADMIN);
+	}
 }
 
 static void
@@ -1361,8 +1387,7 @@ ipfw_chk(struct ip_fw_args *args)
 	 * 	MATCH_NONE when checked and not matched (q = NULL),
 	 *	MATCH_FORWARD or MATCH_REVERSE otherwise (q != NULL)
 	 */
-	int dyn_dir = MATCH_UNKNOWN;
-	uint16_t dyn_name = 0;
+	struct ipfw_dyn_info dyn_info;
 	struct ip_fw *q = NULL;
 	struct ip_fw_chain *chain = &V_layer3_chain;
 
@@ -1394,6 +1419,7 @@ ipfw_chk(struct ip_fw_args *args)
 	proto = args->f_id.proto = 0;	/* mark f_id invalid */
 		/* XXX 0 is a valid proto: IP/IPv6 Hop-by-Hop Option */
 
+	DYN_INFO_INIT(&dyn_info);
 /*
  * PULLUP_TO(len, p, T) makes sure that len + sizeof(T) is contiguous,
  * then it sets p to point at the offset "len" in the mbuf. WARNING: the
@@ -2558,7 +2584,9 @@ do {								\
 			 *
 			 * O_LIMIT and O_KEEP_STATE: these opcodes are
 			 *   not real 'actions', and are stored right
-			 *   before the 'action' part of the rule.
+			 *   before the 'action' part of the rule (one
+			 *   exception is O_SKIP_ACTION which could be
+			 *   between these opcodes and 'action' one).
 			 *   These opcodes try to install an entry in the
 			 *   state tables; if successful, we continue with
 			 *   the next opcode (match=1; break;), otherwise
@@ -2575,11 +2603,22 @@ do {								\
 			 *   further instances of these opcodes become NOPs.
 			 *   The jump to the next rule is done by setting
 			 *   l=0, cmdlen=0.
+			 *
+			 * O_SKIP_ACTION: this opcode is not a real 'action'
+			 *  either, and is stored right before the 'action'
+			 *  part of the rule, right after the O_KEEP_STATE
+			 *  opcode. It causes match failure so the real
+			 *  'action' could be executed only if the rule
+			 *  is checked via dynamic rule from the state
+			 *  table, as in such case execution starts
+			 *  from the true 'action' opcode directly.
+			 *   
 			 */
 			case O_LIMIT:
 			case O_KEEP_STATE:
 				if (ipfw_dyn_install_state(chain, f,
-				    (ipfw_insn_limit *)cmd, args, tablearg)) {
+				    (ipfw_insn_limit *)cmd, args, ulp,
+				    pktlen, &dyn_info, tablearg)) {
 					/* error or limit violation */
 					retval = IP_FW_DENY;
 					l = 0;	/* exit inner loop */
@@ -2593,34 +2632,15 @@ do {								\
 				/*
 				 * dynamic rules are checked at the first
 				 * keep-state or check-state occurrence,
-				 * with the result being stored in dyn_dir
-				 * and dyn_name.
+				 * with the result being stored in dyn_info.
 				 * The compiler introduces a PROBE_STATE
 				 * instruction for us when we have a
 				 * KEEP_STATE (because PROBE_STATE needs
 				 * to be run first).
-				 *
-				 * (dyn_dir == MATCH_UNKNOWN) means this is
-				 * first lookup for such f_id. Do lookup.
-				 *
-				 * (dyn_dir != MATCH_UNKNOWN &&
-				 *  dyn_name != 0 && dyn_name != cmd->arg1)
-				 * means previous lookup didn't find dynamic
-				 * rule for specific state name and current
-				 * lookup will search rule with another state
-				 * name. Redo lookup.
-				 *
-				 * (dyn_dir != MATCH_UNKNOWN && dyn_name == 0)
-				 * means previous lookup was for `any' name
-				 * and it didn't find rule. No need to do
-				 * lookup again.
 				 */
-				if ((dyn_dir == MATCH_UNKNOWN ||
-				    (dyn_name != 0 &&
-				    dyn_name != cmd->arg1)) &&
-				    (q = ipfw_dyn_lookup_state(&args->f_id,
-				     ulp, pktlen, &dyn_dir,
-				     (dyn_name = cmd->arg1))) != NULL) {
+				if (DYN_LOOKUP_NEEDED(&dyn_info, cmd) &&
+				    (q = ipfw_dyn_lookup_state(args, ulp,
+				    pktlen, cmd, &dyn_info)) != NULL) {
 					/*
 					 * Found dynamic entry, jump to the
 					 * 'action' part of the parent rule
@@ -2628,13 +2648,7 @@ do {								\
 					 * cmdlen.
 					 */
 					f = q;
-					/* XXX we would like to have f_pos
-					 * readily accessible in the dynamic
-				         * rule, instead of having to
-					 * lookup q->rule.
-					 */
-					f_pos = ipfw_find_rule(chain,
-					    f->rulenum, f->id);
+					f_pos = dyn_info.f_pos;
 					cmd = ACTION_PTR(f);
 					l = f->cmd_len - f->act_ofs;
 					cmdlen = 0;
@@ -2649,6 +2663,11 @@ do {								\
 				if (cmd->opcode == O_CHECK_STATE)
 					l = 0;	/* exit inner loop */
 				match = 1;
+				break;
+
+			case O_SKIP_ACTION:
+				match = 0;	/* skip to the next rule */
+				l = 0;		/* exit inner loop */
 				break;
 
 			case O_ACCEPT:
@@ -2831,9 +2850,12 @@ do {								\
 				    (proto != IPPROTO_ICMPV6 ||
 				     (is_icmp6_query(icmp6_type) == 1)) &&
 				    !(m->m_flags & (M_BCAST|M_MCAST)) &&
-				    !IN6_IS_ADDR_MULTICAST(&args->f_id.dst_ip6)) {
-					send_reject6(
-					    args, cmd->arg1, hlen,
+				    !IN6_IS_ADDR_MULTICAST(
+					&args->f_id.dst_ip6)) {
+					send_reject6(args,
+					    cmd->opcode == O_REJECT ?
+					    map_icmp_unreach(cmd->arg1):
+					    cmd->arg1, hlen,
 					    (struct ip6_hdr *)ip);
 					m = args->m;
 				}
@@ -2848,7 +2870,8 @@ do {								\
 			case O_FORWARD_IP:
 				if (args->eh)	/* not valid on layer2 pkts */
 					break;
-				if (q != f || dyn_dir == MATCH_FORWARD) {
+				if (q != f ||
+				    dyn_info.direction == MATCH_FORWARD) {
 				    struct sockaddr_in *sa;
 
 				    sa = &(((ipfw_insn_sa *)cmd)->sa);
@@ -2908,7 +2931,8 @@ do {								\
 			case O_FORWARD_IP6:
 				if (args->eh)	/* not valid on layer2 pkts */
 					break;
-				if (q != f || dyn_dir == MATCH_FORWARD) {
+				if (q != f ||
+				    dyn_info.direction == MATCH_FORWARD) {
 					struct sockaddr_in6 *sin6;
 
 					sin6 = &(((ipfw_insn_sa6 *)cmd)->sa);
@@ -3011,8 +3035,10 @@ do {								\
 			case O_REASS: {
 				int ip_off;
 
-				IPFW_INC_RULE_COUNTER(f, pktlen);
 				l = 0;	/* in any case exit inner loop */
+				if (is_ipv6) /* IPv6 is not supported yet */
+					break;
+				IPFW_INC_RULE_COUNTER(f, pktlen);
 				ip_off = ntohs(ip->ip_off);
 
 				/* if not fragmented, go to next rule */
@@ -3060,7 +3086,7 @@ do {								\
 					 * @args content, and it may be
 					 * used for new state lookup later.
 					 */
-					dyn_dir = MATCH_UNKNOWN;
+					DYN_INFO_INIT(&dyn_info);
 				}
 				break;
 

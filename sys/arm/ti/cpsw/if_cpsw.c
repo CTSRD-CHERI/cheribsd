@@ -746,7 +746,7 @@ cpsw_get_fdt_data(struct cpsw_softc *sc, int port)
 	phy = -1;
 	vlan = -1;
 	for (child = OF_child(sc->node); child != 0; child = OF_peer(child)) {
-		if (OF_getprop_alloc(child, "name", 1, (void **)&name) < 0)
+		if (OF_getprop_alloc(child, "name", (void **)&name) < 0)
 			continue;
 		if (sscanf(name, "slave@%lx", &mdio_child_addr) != 1) {
 			OF_prop_free(name);
@@ -1385,7 +1385,7 @@ cpswp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	ifr = (struct ifreq *)data;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		changed = ifp->if_capenable ^ ifr_reqcap_get(ifr);
 		if (changed & IFCAP_HWCSUM) {
 			if ((ifr_reqcap_get(ifr) & changed) & IFCAP_HWCSUM)
@@ -1395,7 +1395,7 @@ cpswp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		error = 0;
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		CPSW_PORT_LOCK(sc);
 		if (ifp->if_flags & IFF_UP) {
 			if (ifp->if_drv_flags & IFF_DRV_RUNNING) {
@@ -1422,17 +1422,17 @@ cpswp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		sc->if_flags = ifp->if_flags;
 		CPSW_PORT_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
 		cpswp_ale_update_addresses(sc, 0);
 		break;
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		/* Ugh.  DELMULTI doesn't provide the specific address
 		   being removed, so the best we can do is remove
 		   everything and rebuild it all. */
 		cpswp_ale_update_addresses(sc, 1);
 		break;
 	case SIOCGIFMEDIA:
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		error = ifmedia_ioctl(ifp, ifr, &sc->mii->mii_media, command);
 		break;
 	default:
@@ -2465,7 +2465,7 @@ cpswp_ale_update_addresses(struct cpswp_softc *sc, int purge)
 
         /* Set other multicast addrs desired. */
         if_maddr_rlock(sc->ifp);
-        TAILQ_FOREACH(ifma, &sc->ifp->if_multiaddrs, ifma_link) {
+        CK_STAILQ_FOREACH(ifma, &sc->ifp->if_multiaddrs, ifma_link) {
                 if (ifma->ifma_addr->sa_family != AF_LINK)
                         continue;
 		cpsw_ale_mc_entry_set(sc->swsc, portmask, sc->vlan,

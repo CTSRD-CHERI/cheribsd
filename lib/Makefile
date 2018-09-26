@@ -27,6 +27,7 @@ SUBDIR_BOOTSTRAP= \
 
 SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	.WAIT \
+	geom \
 	libalias \
 	libarchive \
 	libauditd \
@@ -76,6 +77,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpng \
 	${_libproc} \
 	libprocstat \
+	libregex \
 	librpcsvc \
 	librss \
 	librt \
@@ -104,6 +106,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 # Inter-library dependencies.  When the makefile for a library contains LDADD
 # libraries, those libraries should be listed as build order dependencies here.
 
+SUBDIR_DEPEND_geom=	libufs
 SUBDIR_DEPEND_libarchive= libz libbz2 libexpat liblzma libmd
 SUBDIR_DEPEND_libauditdm= libbsm
 SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
@@ -128,6 +131,9 @@ SUBDIR_DEPEND_libtacplus= libmd
 SUBDIR_DEPEND_libulog= libmd
 SUBDIR_DEPEND_libunbound= ${_libldns}
 SUBDIR_DEPEND_liblzma= ${_libthr}
+.if ${MK_OFED} != "no"
+SUBDIR_DEPEND_libpcap= ofed
+.endif
 
 # NB: keep these sorted by MK_* knobs
 
@@ -169,11 +175,15 @@ SUBDIR.${MK_LDNS}+=	libldns
 # The libraries under libclang_rt can only be built by clang, and only make
 # sense to build when clang is enabled at all.  Furthermore, they can only be
 # built for certain architectures.
-.if ${MK_CLANG} != "no" && ${COMPILER_TYPE} == "clang" && \
+# XXXAR: This is not actually true, it makes sense to build them even if we
+# aren't building a native clang since we might be cross-compiling with clang
+.if (${COMPILER_TYPE} == "clang") && \
     (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
-    (${MACHINE_CPUARCH} == "arm" && ${MACHINE_ARCH} != "armeb") || \
-    (${MACHINE_CPUARCH} == "i386"))
+    ${MACHINE_CPUARCH} == "arm" ||  ${MACHINE_CPUARCH} == "i386" || \
+    ${MACHINE_ARCH:Mmips64} != "") && !defined(LIBCHERI)
 _libclang_rt=	libclang_rt
+.elif !defined(LIBCHERI)
+.error "NOT BUILDING libclang_rt"
 .endif
 
 .if ${MK_LIBCPLUSPLUS} != "no"
@@ -194,7 +204,12 @@ SUBDIR.${MK_NIS}+=	libypclnt
 _libvgl=	libvgl
 .endif
 
+.if ${MACHINE_CPUARCH} == "aarch64"
+SUBDIR.${MK_PMC}+=	libopencsd
+.endif
+
 .if ${MACHINE_CPUARCH} == "amd64"
+SUBDIR.${MK_PMC}+=	libipt
 SUBDIR.${MK_BHYVE}+=	libvmmapi
 .endif
 
@@ -212,7 +227,9 @@ _libdl=		libdl
 .endif
 
 SUBDIR.${MK_OPENSSL}+=	libmp
+.if (${COMPILER_TYPE} == "clang" || (${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 60100 && ${MACHINE_CPUARCH} != "riscv"))
 SUBDIR.${MK_PMC}+=	libpmc libpmcstat
+.endif
 SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet
@@ -224,6 +241,7 @@ SUBDIR+=		atf
 SUBDIR.${MK_TESTS}+=	tests
 SUBDIR.${MK_UNBOUND}+=	libunbound
 SUBDIR.${MK_USB}+=	libusbhid libusb
+SUBDIR.${MK_OFED}+=	ofed
 
 .if !make(install)
 SUBDIR_PARALLEL=

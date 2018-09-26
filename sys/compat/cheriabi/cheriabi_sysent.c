@@ -584,9 +584,10 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_kevent_args), (sy_call_t *)cheriabi_kevent, AUE_KEVENT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 560 = cheriabi_kevent */
 	{ AS(cheriabi_cpuset_getdomain_args), (sy_call_t *)cheriabi_cpuset_getdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 561 = cheriabi_cpuset_getdomain */
 	{ AS(cheriabi_cpuset_setdomain_args), (sy_call_t *)cheriabi_cpuset_setdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = cheriabi_cpuset_setdomain */
-	{ AS(cheriabi_coexecve_args), (sy_call_t *)cheriabi_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 563 = cheriabi_coexecve */
-	{ AS(cosetup_args), (sy_call_t *)sys_cosetup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = cosetup */
-	{ AS(coregister_args), (sy_call_t *)sys_coregister, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = coregister */
-	{ AS(colookup_args), (sy_call_t *)sys_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = colookup */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 567 = { */
+	{ AS(cheriabi_getrandom_args), (sy_call_t *)cheriabi_getrandom, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 563 = cheriabi_getrandom */
+	{ AS(cheriabi_coexecve_args), (sy_call_t *)cheriabi_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = cheriabi_coexecve */
+	{ AS(cosetup_args), (sy_call_t *)sys_cosetup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = cosetup */
+	{ AS(coregister_args), (sy_call_t *)sys_coregister, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = coregister */
+	{ AS(colookup_args), (sy_call_t *)sys_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = colookup */
+	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 568 = { */
 };

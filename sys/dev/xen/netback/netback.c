@@ -491,7 +491,7 @@ struct xnb_softc {
 	 */
 	vm_offset_t		kva;
 
-	/** Psuedo-physical address corresponding to kva. */
+	/** Pseudo-physical address corresponding to kva. */
 	uint64_t		gnt_base_addr;
 
 	/** Various configuration and state bit flags. */
@@ -662,6 +662,7 @@ xnb_disconnect(struct xnb_softc *xnb)
 	mtx_lock(&xnb->rx_lock);
 	mtx_unlock(&xnb->rx_lock);
 
+	mtx_lock(&xnb->sc_lock);
 	/* Free malloc'd softc member variables */
 	if (xnb->bridge != NULL) {
 		free(xnb->bridge, M_XENSTORE);
@@ -689,6 +690,8 @@ xnb_disconnect(struct xnb_softc *xnb)
 	    sizeof(struct xnb_ring_config));
 
 	xnb->flags &= ~XNBF_RING_CONNECTED;
+	mtx_unlock(&xnb->sc_lock);
+
 	return (0);
 }
 
@@ -1066,17 +1069,14 @@ xnb_shutdown(struct xnb_softc *xnb)
 		if_free(xnb->xnb_ifp);
 		xnb->xnb_ifp = NULL;
 	}
-	mtx_lock(&xnb->sc_lock);
 
 	xnb_disconnect(xnb);
 
-	mtx_unlock(&xnb->sc_lock);
 	if (xenbus_get_state(xnb->dev) < XenbusStateClosing)
 		xenbus_set_state(xnb->dev, XenbusStateClosing);
 	mtx_lock(&xnb->sc_lock);
 
 	xnb->flags &= ~XNBF_IN_SHUTDOWN;
-
 
 	/* Indicate to xnb_detach() that is it safe to proceed. */
 	wakeup(xnb);
@@ -2217,7 +2217,7 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	int error = 0;
 
 	switch (cmd) {
-		CASE_IOC_IFREQ(SIOCSIFFLAGS):
+		case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 			mtx_lock(&xnb->sc_lock);
 			if (ifp->if_flags & IFF_UP) {
 				xnb_ifinit_locked(xnb);
@@ -2232,7 +2232,7 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			 */
 			mtx_unlock(&xnb->sc_lock);
 			break;
-		CASE_IOC_IFREQ(SIOCSIFADDR):
+		case CASE_IOC_IFREQ(SIOCSIFADDR):
 #ifdef INET
 			mtx_lock(&xnb->sc_lock);
 			if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -2257,7 +2257,7 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			}
 #endif
 			break;
-		CASE_IOC_IFREQ(SIOCSIFCAP):
+		case CASE_IOC_IFREQ(SIOCSIFCAP):
 			mtx_lock(&xnb->sc_lock);
 			if (ifr_reqcap_get(ifr) & IFCAP_TXCSUM) {
 				ifp->if_capenable |= IFCAP_TXCSUM;
@@ -2298,14 +2298,14 @@ xnb_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 #endif
 			mtx_unlock(&xnb->sc_lock);
 			break;
-		CASE_IOC_IFREQ(SIOCSIFMTU):
+		case CASE_IOC_IFREQ(SIOCSIFMTU):
 			ifp->if_mtu = ifr_mtu_get(ifr);
 			ifp->if_drv_flags &= ~IFF_DRV_RUNNING;
 			xnb_ifinit(xnb);
 			break;
-		CASE_IOC_IFREQ(SIOCADDMULTI):
-		CASE_IOC_IFREQ(SIOCDELMULTI):
-		CASE_IOC_IFREQ(SIOCSIFMEDIA):
+		case CASE_IOC_IFREQ(SIOCADDMULTI):
+		case CASE_IOC_IFREQ(SIOCDELMULTI):
+		case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 		case SIOCGIFMEDIA:
 			error = ifmedia_ioctl(ifp, ifr, &xnb->sc_media, cmd);
 			break;

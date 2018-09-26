@@ -35,29 +35,34 @@
 #define DEBUG_H 1
 
 #include <sys/cdefs.h>
-
+/* assert() is always enabled. For expensive checks use dbg_assert() instead. */
+#undef NDEBUG
+#include <assert.h>
 #include <string.h>
-#include <unistd.h>
+#include "rtld_printf.h"
 
 extern void debug_printf(const char *, ...) __printflike(1, 2);
 extern int debug;
 
 #ifdef DEBUG
 #define dbg(...)	debug_printf(__VA_ARGS__)
+#define dbg_assert(cond)	assert(cond)
 #else
 #define dbg(...)	((void) 0)
+#define dbg_assert(cond)	((void) 0)
 #endif
 
-#ifndef COMPAT_32BIT
+#ifdef __CHERI_PURE_CAPABILITY__
+#define _MYNAME	"ld-cheri-elf.so.1"
+#elif !defined(COMPAT_32BIT)
 #define _MYNAME	"ld-elf.so.1"
 #else
 #define _MYNAME	"ld-elf32.so.1"
 #endif
 
-#define assert(cond)	((cond) ? (void) 0 :		\
-    (msg(_MYNAME ": assert failed: " __FILE__ ":"	\
-      __XSTRING(__LINE__) "\n"), abort()))
-#define msg(s)		write(STDOUT_FILENO, s, strlen(s))
+/* assert() is always enabled. For expensive checks use dbg_assert() instead. */
+
+#define msg(s)		rtld_write(STDERR_FILENO, s, strlen(s))
 #define trace()		msg(_MYNAME ": " __XSTRING(__LINE__) "\n")
 
 

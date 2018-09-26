@@ -64,6 +64,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
+#include <netinet/netdump/netdump.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -199,6 +200,7 @@ static int	alc_shutdown(device_t);
 static void	alc_start(struct ifnet *);
 static void	alc_start_locked(struct ifnet *);
 static void	alc_start_queue(struct alc_softc *);
+static void	alc_start_tx(struct alc_softc *);
 static void	alc_stats_clear(struct alc_softc *);
 static void	alc_stats_update(struct alc_softc *);
 static void	alc_stop(struct alc_softc *);
@@ -212,6 +214,8 @@ static void	alc_watchdog(struct alc_softc *);
 static int	sysctl_int_range(SYSCTL_HANDLER_ARGS, int, int);
 static int	sysctl_hw_alc_proc_limit(SYSCTL_HANDLER_ARGS);
 static int	sysctl_hw_alc_int_mod(SYSCTL_HANDLER_ARGS);
+
+NETDUMP_DEFINE(alc);
 
 static device_method_t alc_methods[] = {
 	/* Device interface. */
@@ -227,7 +231,7 @@ static device_method_t alc_methods[] = {
 	DEVMETHOD(miibus_writereg,	alc_miibus_writereg),
 	DEVMETHOD(miibus_statchg,	alc_miibus_statchg),
 
-	{ NULL, NULL }
+	DEVMETHOD_END
 };
 
 static driver_t alc_driver = {
@@ -239,6 +243,8 @@ static driver_t alc_driver = {
 static devclass_t alc_devclass;
 
 DRIVER_MODULE(alc, pci, alc_driver, alc_devclass, 0, 0);
+MODULE_PNP_INFO("U16:vendor;U16:device", pci, alc, alc_ident_table,
+    sizeof(alc_ident_table[0]), nitems(alc_ident_table) - 1);
 DRIVER_MODULE(miibus, alc, miibus_driver, miibus_devclass, 0, 0);
 
 static struct resource_spec alc_res_spec_mem[] = {
@@ -1651,6 +1657,9 @@ alc_attach(device_t dev)
 		goto fail;
 	}
 
+	/* Attach driver netdump methods. */
+	NETDUMP_SET(ifp, alc);
+
 fail:
 	if (error != 0)
 		alc_detach(dev);
@@ -2974,22 +2983,28 @@ alc_start_locked(struct ifnet *ifp)
 		ETHER_BPF_MTAP(ifp, m_head);
 	}
 
-	if (enq > 0) {
-		/* Sync descriptors. */
-		bus_dmamap_sync(sc->alc_cdata.alc_tx_ring_tag,
-		    sc->alc_cdata.alc_tx_ring_map, BUS_DMASYNC_PREWRITE);
-		/* Kick. Assume we're using normal Tx priority queue. */
-		if ((sc->alc_flags & ALC_FLAG_AR816X_FAMILY) != 0)
-			CSR_WRITE_2(sc, ALC_MBOX_TD_PRI0_PROD_IDX,
-			    (uint16_t)sc->alc_cdata.alc_tx_prod);
-		else
-			CSR_WRITE_4(sc, ALC_MBOX_TD_PROD_IDX,
-			    (sc->alc_cdata.alc_tx_prod <<
-			    MBOX_TD_PROD_LO_IDX_SHIFT) &
-			    MBOX_TD_PROD_LO_IDX_MASK);
-		/* Set a timeout in case the chip goes out to lunch. */
-		sc->alc_watchdog_timer = ALC_TX_TIMEOUT;
-	}
+	if (enq > 0)
+		alc_start_tx(sc);
+}
+
+static void
+alc_start_tx(struct alc_softc *sc)
+{
+
+	/* Sync descriptors. */
+	bus_dmamap_sync(sc->alc_cdata.alc_tx_ring_tag,
+	    sc->alc_cdata.alc_tx_ring_map, BUS_DMASYNC_PREWRITE);
+	/* Kick. Assume we're using normal Tx priority queue. */
+	if ((sc->alc_flags & ALC_FLAG_AR816X_FAMILY) != 0)
+		CSR_WRITE_2(sc, ALC_MBOX_TD_PRI0_PROD_IDX,
+		    (uint16_t)sc->alc_cdata.alc_tx_prod);
+	else
+		CSR_WRITE_4(sc, ALC_MBOX_TD_PROD_IDX,
+		    (sc->alc_cdata.alc_tx_prod <<
+		    MBOX_TD_PROD_LO_IDX_SHIFT) &
+		    MBOX_TD_PROD_LO_IDX_MASK);
+	/* Set a timeout in case the chip goes out to lunch. */
+	sc->alc_watchdog_timer = ALC_TX_TIMEOUT;
 }
 
 static void
@@ -3030,7 +3045,7 @@ alc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	ifr = (struct ifreq *)data;
 	error = 0;
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		if (ifr_mtu_get(ifr) < ETHERMIN ||
 		    ifr_mtu_get(ifr) > (sc->alc_ident->max_framelen -
 		    sizeof(struct ether_vlan_header) - ETHER_CRC_LEN) ||
@@ -3050,7 +3065,7 @@ alc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			ALC_UNLOCK(sc);
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		ALC_LOCK(sc);
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0 &&
@@ -3064,19 +3079,19 @@ alc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		sc->alc_if_flags = ifp->if_flags;
 		ALC_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		ALC_LOCK(sc);
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0)
 			alc_rxfilter(sc);
 		ALC_UNLOCK(sc);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		mii = device_get_softc(sc->alc_miibus);
 		error = ifmedia_ioctl(ifp, ifr, &mii->mii_media, cmd);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 		ALC_LOCK(sc);
 		mask = ifr_reqcap_get(ifr) ^ ifp->if_capenable;
 		if ((mask & IFCAP_TXCSUM) != 0 &&
@@ -4595,7 +4610,7 @@ alc_rxfilter(struct alc_softc *sc)
 	}
 
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &sc->alc_ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &sc->alc_ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		crc = ether_crc32_be(LLADDR((struct sockaddr_dl *)
@@ -4642,6 +4657,57 @@ sysctl_hw_alc_int_mod(SYSCTL_HANDLER_ARGS)
 	return (sysctl_int_range(oidp, arg1, arg2, req,
 	    ALC_IM_TIMER_MIN, ALC_IM_TIMER_MAX));
 }
+
+#ifdef NETDUMP
+static void
+alc_netdump_init(struct ifnet *ifp, int *nrxr, int *ncl, int *clsize)
+{
+	struct alc_softc *sc;
+
+	sc = if_getsoftc(ifp);
+	KASSERT(sc->alc_buf_size <= MCLBYTES, ("incorrect cluster size"));
+
+	*nrxr = ALC_RX_RING_CNT;
+	*ncl = NETDUMP_MAX_IN_FLIGHT;
+	*clsize = MCLBYTES;
+}
+
+static void
+alc_netdump_event(struct ifnet *ifp __unused, enum netdump_ev event __unused)
+{
+}
+
+static int
+alc_netdump_transmit(struct ifnet *ifp, struct mbuf *m)
+{
+	struct alc_softc *sc;
+	int error;
+
+	sc = if_getsoftc(ifp);
+	if ((if_getdrvflags(ifp) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
+	    IFF_DRV_RUNNING)
+		return (EBUSY);
+
+	error = alc_encap(sc, &m);
+	if (error == 0)
+		alc_start_tx(sc);
+	return (error);
+}
+
+static int
+alc_netdump_poll(struct ifnet *ifp, int count)
+{
+	struct alc_softc *sc;
+
+	sc = if_getsoftc(ifp);
+	if ((if_getdrvflags(ifp) & (IFF_DRV_RUNNING | IFF_DRV_OACTIVE)) !=
+	    IFF_DRV_RUNNING)
+		return (EBUSY);
+
+	alc_txeof(sc);
+	return (alc_rxintr(sc, count));
+}
+#endif /* NETDUMP */
 // CHERI CHANGES START
 // {
 //   "updated": 20180629,

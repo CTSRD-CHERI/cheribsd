@@ -572,9 +572,10 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_kevent",			/* 560 = cheriabi_kevent */
 	"cheriabi_cpuset_getdomain",			/* 561 = cheriabi_cpuset_getdomain */
 	"cheriabi_cpuset_setdomain",			/* 562 = cheriabi_cpuset_setdomain */
-	"cheriabi_coexecve",			/* 563 = cheriabi_coexecve */
-	"cosetup",			/* 564 = cosetup */
-	"coregister",			/* 565 = coregister */
-	"colookup",			/* 566 = colookup */
-	"#567",			/* 567 = { */
+	"cheriabi_getrandom",			/* 563 = cheriabi_getrandom */
+	"cheriabi_coexecve",			/* 564 = cheriabi_coexecve */
+	"cosetup",			/* 565 = cosetup */
+	"coregister",			/* 566 = coregister */
+	"colookup",			/* 567 = colookup */
+	"#568",			/* 568 = { */
 };

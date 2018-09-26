@@ -85,7 +85,6 @@
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/module.h>
-#include <sys/protosw.h>
 #include <sys/proc.h>
 #include <sys/queue.h>
 #include <sys/rmlock.h>
@@ -151,19 +150,7 @@ static const char stfname[] = "stf";
 static MALLOC_DEFINE(M_STF, stfname, "6to4 Tunnel Interface");
 static const int ip_stf_ttl = 40;
 
-extern  struct domain inetdomain;
-static int in_stf_input(struct mbuf **, int *, int);
-static struct protosw in_stf_protosw = {
-	.pr_type =		SOCK_RAW,
-	.pr_domain =		&inetdomain,
-	.pr_protocol =		IPPROTO_IPV6,
-	.pr_flags =		PR_ATOMIC|PR_ADDR,
-	.pr_input =		in_stf_input,
-	.pr_output =		rip_output,
-	.pr_ctloutput =		rip_ctloutput,
-	.pr_usrreqs =		&rip_usrreqs
-};
-
+static int in_stf_input(struct mbuf *, int, int, void *);
 static char *stfnames[] = {"stf0", "stf", "6to4", NULL};
 
 static int stfmodevent(module_t, int, void *);
@@ -183,6 +170,14 @@ static int stf_clone_create(struct if_clone *, char *, size_t,
     void * __capability);
 static int stf_clone_destroy(struct if_clone *, struct ifnet *);
 static struct if_clone *stf_cloner;
+
+static const struct encap_config ipv4_encap_cfg = {
+	.proto = IPPROTO_IPV6,
+	.min_length = sizeof(struct ip),
+	.exact_match = (sizeof(in_addr_t) << 3) + 8,
+	.check = stf_encapcheck,
+	.input = in_stf_input
+};
 
 static int
 stf_clone_match(struct if_clone *ifc, const char *name)
@@ -252,8 +247,7 @@ stf_clone_create(struct if_clone *ifc, char *name, size_t len,
 	ifp->if_dname = stfname;
 	ifp->if_dunit = IF_DUNIT_NONE;
 
-	sc->encap_cookie = encap_attach_func(AF_INET, IPPROTO_IPV6,
-	    stf_encapcheck, &in_stf_protosw, sc);
+	sc->encap_cookie = ip_encap_attach(&ipv4_encap_cfg, sc, M_WAITOK);
 	if (sc->encap_cookie == NULL) {
 		if_printf(ifp, "attach failed\n");
 		free(sc, M_STF);
@@ -274,9 +268,9 @@ static int
 stf_clone_destroy(struct if_clone *ifc, struct ifnet *ifp)
 {
 	struct stf_softc *sc = ifp->if_softc;
-	int err;
+	int err __unused;
 
-	err = encap_detach(sc->encap_cookie);
+	err = ip_encap_detach(sc->encap_cookie);
 	KASSERT(err == 0, ("Unexpected error detaching encap_cookie"));
 	bpfdetach(ifp);
 	if_detach(ifp);
@@ -382,7 +376,7 @@ stf_getsrcifa6(struct ifnet *ifp, struct in6_addr *addr, struct in6_addr *mask)
 	struct in_addr in;
 
 	if_addr_rlock(ifp);
-	TAILQ_FOREACH(ia, &ifp->if_addrhead, ifa_link) {
+	CK_STAILQ_FOREACH(ia, &ifp->if_addrhead, ifa_link) {
 		if (ia->ifa_addr->sa_family != AF_INET6)
 			continue;
 		sin6 = (struct sockaddr_in6 *)ia->ifa_addr;
@@ -559,7 +553,7 @@ stf_checkaddr4(struct stf_softc *sc, struct in_addr *in, struct ifnet *inifp)
 	 * reject packets with broadcast
 	 */
 	IN_IFADDR_RLOCK(&in_ifa_tracker);
-	TAILQ_FOREACH(ia4, &V_in_ifaddrhead, ia_link) {
+	CK_STAILQ_FOREACH(ia4, &V_in_ifaddrhead, ia_link) {
 		if ((ia4->ia_ifa.ifa_ifp->if_flags & IFF_BROADCAST) == 0)
 			continue;
 		if (in->s_addr == ia4->ia_broadaddr.sin_addr.s_addr) {
@@ -610,18 +604,13 @@ stf_checkaddr6(struct stf_softc *sc, struct in6_addr *in6, struct ifnet *inifp)
 }
 
 static int
-in_stf_input(struct mbuf **mp, int *offp, int proto)
+in_stf_input(struct mbuf *m, int off, int proto, void *arg)
 {
-	struct stf_softc *sc;
+	struct stf_softc *sc = arg;
 	struct ip *ip;
 	struct ip6_hdr *ip6;
-	struct mbuf *m;
 	u_int8_t otos, itos;
 	struct ifnet *ifp;
-	int off;
-
-	m = *mp;
-	off = *offp;
 
 	if (proto != IPPROTO_IPV6) {
 		m_freem(m);
@@ -629,9 +618,6 @@ in_stf_input(struct mbuf **mp, int *offp, int proto)
 	}
 
 	ip = mtod(m, struct ip *);
-
-	sc = (struct stf_softc *)encap_getarg(m);
-
 	if (sc == NULL || (STF2IFP(sc)->if_flags & IFF_UP) == 0) {
 		m_freem(m);
 		return (IPPROTO_DONE);
@@ -682,7 +668,7 @@ in_stf_input(struct mbuf **mp, int *offp, int proto)
 	ip6->ip6_flow |= htonl((u_int32_t)itos << 20);
 
 	m->m_pkthdr.rcvif = ifp;
-	
+
 	if (bpf_peers_present(ifp->if_bpf)) {
 		/*
 		 * We need to prepend the address family as
@@ -719,7 +705,7 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	error = 0;
 	switch (cmd) {
-	CASE_IOC_IFREQ(SIOCSIFADDR):
+	case CASE_IOC_IFREQ(SIOCSIFADDR):
 		ifa = (struct ifaddr *)data;
 		if (ifa == NULL || ifa->ifa_addr->sa_family != AF_INET6) {
 			error = EAFNOSUPPORT;
@@ -739,17 +725,17 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		ifp->if_flags |= IFF_UP;
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		ifr = (struct ifreq *)data;
 		if (ifr == NULL || ifr_addr_get_family(ifr) != AF_INET6)
 			error = EAFNOSUPPORT;
 		break;
 
-	CASE_IOC_IFREQ(SIOCGIFMTU):
+	case CASE_IOC_IFREQ(SIOCGIFMTU):
 		break;
 
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 		ifr = (struct ifreq *)data;
 		mtu = ifr_mtu_get(ifr);
 		/* RFC 4213 3.2 ideal world MTU */

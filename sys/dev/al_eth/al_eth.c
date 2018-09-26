@@ -2891,7 +2891,7 @@ al_eth_set_rx_mode(struct al_eth_adapter *adapter)
 	unsigned char *mac;
 
 	if_maddr_rlock(ifp);
-	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
+	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 		if (mc == MAX_NUM_MULTICAST_ADDRESSES)
@@ -2905,7 +2905,7 @@ al_eth_set_rx_mode(struct al_eth_adapter *adapter)
 	if_maddr_runlock(ifp);
 
 	if_addr_rlock(ifp);
-	TAILQ_FOREACH(ifua, &ifp->if_addrhead, ifa_link) {
+	CK_STAILQ_FOREACH(ifua, &ifp->if_addrhead, ifa_link) {
 		if (ifua->ifa_addr->sa_family != AF_LINK)
 			continue;
 		if (uc == MAX_NUM_ADDRESSES)
@@ -2951,7 +2951,7 @@ al_eth_set_rx_mode(struct al_eth_adapter *adapter)
 			/* set new addresses */
 			i = AL_ETH_MAC_TABLE_UNICAST_IDX_BASE + 1;
 			if_addr_rlock(ifp);
-			TAILQ_FOREACH(ifua, &ifp->if_addrhead, ifa_link) {
+			CK_STAILQ_FOREACH(ifua, &ifp->if_addrhead, ifa_link) {
 				if (ifua->ifa_addr->sa_family != AF_LINK) {
 					continue;
 				}
@@ -3316,7 +3316,7 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	int			error = 0;
 
 	switch (command) {
-	CASE_IOC_IFREQ(SIOCSIFMTU):
+	case CASE_IOC_IFREQ(SIOCSIFMTU):
 	{
 		error = al_eth_check_mtu(adapter, ifr_mtu_get(ifr));
 		if (error != 0) {
@@ -3330,7 +3330,7 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		al_init(adapter);
 		break;
 	}
-	CASE_IOC_IFREQ(SIOCSIFFLAGS):
+	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
 		if ((ifp->if_flags & IFF_UP) != 0) {
 			if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 				if (((ifp->if_flags ^ adapter->if_flags) &
@@ -3354,8 +3354,8 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		adapter->if_flags = ifp->if_flags;
 		break;
 
-	CASE_IOC_IFREQ(SIOCADDMULTI):
-	CASE_IOC_IFREQ(SIOCDELMULTI):
+	case CASE_IOC_IFREQ(SIOCADDMULTI):
+	case CASE_IOC_IFREQ(SIOCDELMULTI):
 		if ((ifp->if_drv_flags & IFF_DRV_RUNNING) != 0) {
 			device_printf_dbg(adapter->dev,
 			    "ioctl add/del multi before\n");
@@ -3365,7 +3365,7 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 #endif
 		}
 		break;
-	CASE_IOC_IFREQ(SIOCSIFMEDIA):
+	case CASE_IOC_IFREQ(SIOCSIFMEDIA):
 	case SIOCGIFMEDIA:
 		if (adapter->mii != NULL)
 			error = ifmedia_ioctl(ifp, ifr,
@@ -3374,7 +3374,7 @@ al_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			error = ifmedia_ioctl(ifp, ifr,
 			    &adapter->media, command);
 		break;
-	CASE_IOC_IFREQ(SIOCSIFCAP):
+	case CASE_IOC_IFREQ(SIOCSIFCAP):
 	    {
 		int mask, reinit;
 

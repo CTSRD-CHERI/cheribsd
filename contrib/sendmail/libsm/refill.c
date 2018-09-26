@@ -115,9 +115,7 @@ static int sm_lflush __P((SM_FILE_T *, int *));
 */
 
 static int
-sm_lflush(fp, timeout)
-	SM_FILE_T *fp;
-	int *timeout;
+sm_lflush(SM_FILE_T *fp, int *timeout)
 {
 
 	if ((fp->f_flags & (SMLBF|SMWR)) == (SMLBF|SMWR))

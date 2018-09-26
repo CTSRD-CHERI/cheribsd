@@ -29,7 +29,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd September 18, 2016
+.Dd June 19, 2018
 .Dt RC.SUBR 8
 .Os
 .Sh NAME
@@ -551,9 +551,16 @@ is mounted.
 A list of environment variables to run
 .Va command
 with.
-This will be passed as arguments to
+This will be passed as arguments to the
 .Xr env 1
 utility.
+.It Va ${name}_env_file
+A file to source for environmental variables to run
+.Va command
+with.
+Note that all the variables which are being assigned in this file are going
+to be exported into the environment of
+.Va command .
 .It Va ${name}_fib
 FIB
 .Pa Routing Table
@@ -583,15 +590,28 @@ as.
 Only supported after
 .Pa /usr
 is mounted.
+.It Va ${name}_limits
+Resource limits to apply to
+.Va command .
+This will be passed as arguments to the
+.Xr limits 1
+utility.
+By default, the resource limits are based on the login class defined in
+.Va ${name}_login_class .
+.It Va ${name}_login_class
+Login class to use with
+.Va ${name}_limits .
+Defaults to
+.Dq Li daemon .
 .It Va ${name}_oomprotect
 .Xr protect 1
 .Va command
 from being killed when swap space is exhausted.
 If
-.Em YES
+.Dq Li YES
 is used, no child processes are protected.
 If
-.Em ALL ,
+.Dq Li ALL ,
 protect all child processes.
 .It Va ${name}_program
 Full path to the command.

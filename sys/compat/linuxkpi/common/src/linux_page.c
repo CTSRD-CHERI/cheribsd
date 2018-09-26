@@ -69,7 +69,8 @@ linux_page_address(struct page *page)
 
 	if (page->object != kmem_object && page->object != kernel_object) {
 		return (PMAP_HAS_DMAP ?
-		    ((void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page))) : NULL);
+		    ((void *)(uintptr_t)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page))) :
+		    NULL);
 	}
 	return ((void *)(uintptr_t)(VM_MIN_KERNEL_ADDRESS +
 	    IDX_TO_OFF(page->pindex)));
@@ -100,7 +101,7 @@ linux_alloc_pages(gfp_t flags, unsigned int order)
 				if (flags & M_WAITOK) {
 					if (!vm_page_reclaim_contig(req,
 					    npages, 0, pmax, PAGE_SIZE, 0)) {
-						VM_WAIT;
+						vm_wait(NULL);
 					}
 					flags &= ~M_WAITOK;
 					goto retry;

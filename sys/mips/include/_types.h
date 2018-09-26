@@ -75,8 +75,10 @@ typedef	unsigned long long	__uint64_t;
  * Standard type definitions.
  */
 typedef	__int32_t	__clock_t;		/* clock()... */
+#ifndef _STANDALONE
 typedef	double		__double_t;
 typedef	float		__float_t;
+#endif
 #ifdef __mips_n64
 #ifndef __CHERI_PURE_CAPABILITY__
 typedef	__int64_t	__critical_t;
@@ -160,20 +162,6 @@ typedef	int		___wchar_t;
 
 #define	__WCHAR_MIN	__INT_MIN	/* min value for a wchar_t */
 #define	__WCHAR_MAX	__INT_MAX	/* max value for a wchar_t */
-
-/*
- * Unusual type definitions.
- */
-#ifdef __GNUCLIKE_BUILTIN_VARARGS
-typedef __builtin_va_list	__va_list;	/* internally known to gcc */
-#else
-typedef	char *			__va_list;
-#endif /* __GNUCLIKE_BUILTIN_VARARGS */
-#if defined(__GNUC_VA_LIST_COMPATIBILITY) && !defined(__GNUC_VA_LIST) \
-    && !defined(__NO_GNUC_VA_LIST)
-#define	__GNUC_VA_LIST
-typedef __va_list		__gnuc_va_list;	/* compatibility w/GNU headers*/
-#endif
 
 #endif /* !_MACHINE__TYPES_H_ */
 // CHERI CHANGES START

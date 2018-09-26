@@ -126,7 +126,7 @@ _sglist_append_buf(struct sglist *sg, void * __capability buf, size_t len,
 		return (0);
 
 	/* Do the first page.  It may have an offset. */
-	vaddr = (vm_offset_t)buf;
+	vaddr = (__cheri_addr vm_offset_t)buf;
 	offset = vaddr & PAGE_MASK;
 	if (pmap != NULL)
 		paddr = pmap_extract(pmap, vaddr);

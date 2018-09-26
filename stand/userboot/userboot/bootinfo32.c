@@ -36,6 +36,10 @@ __FBSDID("$FreeBSD$");
 #include "bootstrap.h"
 #include "libuserboot.h"
 
+#ifdef LOADER_GELI_SUPPORT
+#include "geliboot.h"
+#endif
+
 static struct bootinfo  bi;
 
 /*
@@ -55,7 +59,7 @@ static struct bootinfo  bi;
  * MOD_METADATA	(variable)		type-specific metadata
  */
 #define COPY32(v, a, c) {			\
-    u_int32_t	x = (v);			\
+    uint32_t	x = (v);			\
     if (c)					\
         CALLBACK(copyin, &x, a, sizeof(x));	\
     a += sizeof(x);				\
@@ -200,6 +204,9 @@ bi_load32(char *args, int *howtop, int *bootdevp, vm_offset_t *bip, vm_offset_t 
     file_addmetadata(kfp, MODINFOMD_ENVP, sizeof envp, &envp);
     file_addmetadata(kfp, MODINFOMD_KERNEND, sizeof kernend, &kernend);
     bios_addsmapdata(kfp);
+#ifdef LOADER_GELI_SUPPORT
+    geli_export_key_metadata(kfp);
+#endif
 
     /* Figure out the size and location of the metadata */
     *modulep = addr;

@@ -57,9 +57,11 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#ifdef CHERI_LIBCHERI_TESTS
 #include <cheri/libcheri_sandbox.h>
 #include <cheritest-helper.h>
 #include <cheritest-helper-internal.h>
+#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -185,6 +187,7 @@ test_inflate_zeroes(const struct cheri_test *ctp __unused)
 }
 
 
+#ifdef CHERI_LIBCHERI_TESTS
 void
 test_sandbox_inflate_zeroes(const struct cheri_test *ctp __unused)
 {
@@ -223,3 +226,4 @@ test_sandbox_inflate_zeroes(const struct cheri_test *ctp __unused)
 	free(outbuf);
 	cheritest_success();
 }
+#endif

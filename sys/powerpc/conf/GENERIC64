@@ -95,6 +95,12 @@ options 	WITNESS			#Enable checks to detect deadlocks and cycles
 options 	WITNESS_SKIPSPIN	#Don't run witness on spinlocks for speed
 options 	MALLOC_DEBUG_MAXZONES=8	# Separate malloc(9) zones
 
+# Kernel dump features.
+options 	EKCD			# Support for encrypted kernel dumps
+options 	GZIO			# gzip-compressed kernel and user dumps
+options 	ZSTDIO			# zstd-compressed kernel and user dumps
+options 	NETDUMP			# netdump(4) client support
+
 # Make an SMP-capable kernel by default
 options 	SMP			# Symmetric MultiProcessor Kernel
 
@@ -111,6 +117,10 @@ device		ahci		# AHCI-compatible SATA controllers
 device		ata		# Legacy ATA/SATA controllers
 device		mvs		# Marvell 88SX50XX/88SX60XX/88SX70XX/SoC SATA
 device		siis		# SiliconImage SiI3124/SiI3132/SiI3531 SATA
+
+# NVM Express (NVMe) support
+device		nvme		# base NVMe driver
+device		nvd		# expose NVMe namespaces as disks, depends on nvme
 
 # SCSI Controllers
 device		ahc		# AHA2940 and onboard AIC7xxx devices
@@ -202,6 +212,7 @@ device		fwe		# Ethernet over FireWire (non-standard!)
 
 # Misc
 device		iicbus		# I2C bus code
+device		iic
 device		kiic		# Keywest I2C
 device		ad7417		# PowerMac7,2 temperature sensor
 device		ds1631		# PowerMac11,2 temperature sensor
