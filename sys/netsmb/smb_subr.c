@@ -29,6 +29,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/endian.h>
@@ -116,7 +118,7 @@ smb_strdupin(char * __capability s, size_t maxlen)
 	int error;
 
 	p = malloc(maxlen + 1, M_SMBSTR, M_WAITOK);
-	error = copyinstr_c(s, p, maxlen + 1, NULL);
+	error = copyinstr(s, p, maxlen + 1, NULL);
 	if (error) {
 		free(p, M_SMBSTR);
 		return (NULL);
@@ -135,7 +137,7 @@ smb_memdupin(void * __capability umem, size_t len)
 	if (len > 8 * 1024)
 		return NULL;
 	p = malloc(len, M_SMBSTR, M_WAITOK);
-	if (copyin_c(umem, p, len) == 0)
+	if (copyin(umem, p, len) == 0)
 		return p;
 	free(p, M_SMBSTR);
 	return NULL;

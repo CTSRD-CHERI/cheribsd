@@ -38,6 +38,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -110,7 +112,7 @@ static int	gif_transmit(struct ifnet *, struct mbuf *);
 static void	gif_qflush(struct ifnet *);
 static int	gif_clone_create(struct if_clone *, int, void * __capability);
 static void	gif_clone_destroy(struct ifnet *);
-static VNET_DEFINE(struct if_clone *, gif_cloner);
+VNET_DEFINE_STATIC(struct if_clone *, gif_cloner);
 #define	V_gif_cloner	VNET(gif_cloner)
 
 SYSCTL_DECL(_net_link);
@@ -127,7 +129,7 @@ static SYSCTL_NODE(_net_link, IFT_GIF, gif, CTLFLAG_RW, 0,
  */
 #define MAX_GIF_NEST 1
 #endif
-static VNET_DEFINE(int, max_gif_nesting) = MAX_GIF_NEST;
+VNET_DEFINE_STATIC(int, max_gif_nesting) = MAX_GIF_NEST;
 #define	V_max_gif_nesting	VNET(max_gif_nesting)
 SYSCTL_INT(_net_link_gif, OID_AUTO, max_nesting, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(max_gif_nesting), 0, "Max nested tunnels");
@@ -629,13 +631,13 @@ gif_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case CASE_IOC_IFREQ(GIFGOPTS):
 		options = sc->gif_options;
-		error = copyout_c(&options, ifr_data_get_ptr(ifr),
+		error = copyout(&options, ifr_data_get_ptr(ifr),
 		    sizeof(options));
 		break;
 	case CASE_IOC_IFREQ(GIFSOPTS):
 		if ((error = priv_check(curthread, PRIV_NET_GIF)) != 0)
 			break;
-		error = copyin_c(ifr_data_get_ptr(ifr), &options,
+		error = copyin(ifr_data_get_ptr(ifr), &options,
 		    sizeof(options));
 		if (error)
 			break;

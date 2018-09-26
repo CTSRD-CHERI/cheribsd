@@ -38,6 +38,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/mount.h>
 #include <sys/namei.h>
@@ -120,7 +122,7 @@ kern_audit(struct thread *td, const void * __capability record, u_int length)
 
 	rec = malloc(length, M_AUDITDATA, M_WAITOK);
 
-	error = copyin_c(record, rec, length);
+	error = copyin(record, rec, length);
 	if (error)
 		goto free_out;
 
@@ -230,7 +232,7 @@ kern_auditon(struct thread *td, int cmd, void * __capability data,
 	case A_GETPINFO:
 	case A_GETPINFO_ADDR:
 	case A_SENDTRIGGER:
-		error = copyin_c(data, &udata, length);
+		error = copyin(data, &udata, length);
 		if (error)
 			return (error);
 		AUDIT_ARG_AUDITON(&udata);
@@ -594,7 +596,7 @@ kern_auditon(struct thread *td, int cmd, void * __capability data,
 	case A_GETFSIZE:
 	case A_GETPINFO_ADDR:
 	case A_GETKAUDIT:
-		error = copyout_c(&udata, data, length);
+		error = copyout(&udata, data, length);
 		if (error)
 			return (error);
 		break;
@@ -624,7 +626,7 @@ kern_getauid(struct thread *td, uid_t * __capability auid)
 	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
-	return (copyout_c(&td->td_ucred->cr_audit.ai_auid, auid,
+	return (copyout(&td->td_ucred->cr_audit.ai_auid, auid,
 	    sizeof(td->td_ucred->cr_audit.ai_auid)));
 }
 
@@ -645,7 +647,7 @@ kern_setauid(struct thread *td, uid_t * __capability auid)
 
 	if (jailed(td->td_ucred))
 		return (ENOSYS);
-	error = copyin_c(auid, &id, sizeof(id));
+	error = copyin(auid, &id, sizeof(id));
 	if (error)
 		return (error);
 	audit_arg_auid(id);
@@ -704,7 +706,7 @@ kern_getaudit(struct thread *td, struct auditinfo * __capability auditinfo)
 	ai.ai_asid = cred->cr_audit.ai_asid;
 	ai.ai_termid.machine = cred->cr_audit.ai_termid.at_addr[0];
 	ai.ai_termid.port = cred->cr_audit.ai_termid.at_port;
-	return (copyout_c(&ai, auditinfo, sizeof(ai)));
+	return (copyout(&ai, auditinfo, sizeof(ai)));
 }
 
 /* ARGSUSED */
@@ -724,7 +726,7 @@ kern_setaudit(struct thread *td, struct auditinfo * __capability auditinfo)
 
 	if (jailed(td->td_ucred))
 		return (ENOSYS);
-	error = copyin_c(auditinfo, &ai, sizeof(ai));
+	error = copyin(auditinfo, &ai, sizeof(ai));
 	if (error)
 		return (error);
 	audit_arg_auditinfo(&ai);
@@ -779,7 +781,7 @@ kern_getaudit_addr(struct thread *td,
 	error = priv_check(td, PRIV_AUDIT_GETAUDIT);
 	if (error)
 		return (error);
-	return (copyout_c(&td->td_ucred->cr_audit, auditinfo_addr,
+	return (copyout(&td->td_ucred->cr_audit, auditinfo_addr,
 	    sizeof(*auditinfo_addr)));
 }
 
@@ -802,7 +804,7 @@ kern_setaudit_addr(struct thread *td,
 
 	if (jailed(td->td_ucred))
 		return (ENOSYS);
-	error = copyin_c(auditinfo_addr, &aia, sizeof(aia));
+	error = copyin(auditinfo_addr, &aia, sizeof(aia));
 	if (error)
 		return (error);
 	audit_arg_auditinfo_addr(&aia);

@@ -198,6 +198,8 @@ zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
 			break;
 		default:
 			error = EINVAL;
+			if (cmd == Q_QUOTAON || cmd == Q_QUOTAOFF)
+				vfs_unbusy(vfsp);
 			goto done;
 		}
 	}
@@ -255,9 +257,11 @@ zfs_quotactl(vfs_t *vfsp, int cmds, uid_t id, void *arg)
 	case Q_QUOTAON:
 		// As far as I can tell, you can't turn quotas on or off on zfs
 		error = 0;
+		vfs_unbusy(vfsp);
 		break;
 	case Q_QUOTAOFF:
 		error = ENOTSUP;
+		vfs_unbusy(vfsp);
 		break;
 	case Q_SETQUOTA:
 		error = copyin(&dqblk, arg, sizeof(dqblk));
@@ -1130,6 +1134,8 @@ zfsvfs_init(zfsvfs_t *zfsvfs, objset_t *os)
 }
 
 #if defined(__FreeBSD__)
+taskq_t *zfsvfs_taskq;
+
 static void
 zfsvfs_task_unlinked_drain(void *context, int pending __unused)
 {
@@ -2185,9 +2191,9 @@ zfs_umount(vfs_t *vfsp, int fflag)
 	}
 #endif
 
-	while (taskqueue_cancel(system_taskq->tq_queue,
+	while (taskqueue_cancel(zfsvfs_taskq->tq_queue,
 	    &zfsvfs->z_unlinked_drain_task, NULL) != 0)
-		taskqueue_drain(system_taskq->tq_queue,
+		taskqueue_drain(zfsvfs_taskq->tq_queue,
 		    &zfsvfs->z_unlinked_drain_task);
 
 	VERIFY(zfsvfs_teardown(zfsvfs, B_TRUE) == 0);
@@ -2554,11 +2560,17 @@ zfs_init(void)
 	zfs_vnodes_adjust();
 
 	dmu_objset_register_type(DMU_OST_ZFS, zfs_space_delta_cb);
+#if defined(__FreeBSD__)
+	zfsvfs_taskq = taskq_create("zfsvfs", 1, minclsyspri, 0, 0, 0);
+#endif
 }
 
 void
 zfs_fini(void)
 {
+#if defined(__FreeBSD__)
+	taskq_destroy(zfsvfs_taskq);
+#endif
 	zfsctl_fini();
 	zfs_znode_fini();
 	zfs_vnodes_adjust_back();
@@ -2630,6 +2642,7 @@ zfs_set_version(zfsvfs_t *zfsvfs, uint64_t newvers)
 	dmu_tx_commit(tx);
 
 	zfsvfs->z_version = newvers;
+	os->os_version = newvers;
 
 	zfs_set_fuid_feature(zfsvfs);
 
@@ -2642,17 +2655,47 @@ zfs_set_version(zfsvfs_t *zfsvfs, uint64_t newvers)
 int
 zfs_get_zplprop(objset_t *os, zfs_prop_t prop, uint64_t *value)
 {
-	const char *pname;
-	int error = ENOENT;
+	uint64_t *cached_copy = NULL;
 
 	/*
-	 * Look up the file system's value for the property.  For the
-	 * version property, we look up a slightly different string.
+	 * Figure out where in the objset_t the cached copy would live, if it
+	 * is available for the requested property.
 	 */
-	if (prop == ZFS_PROP_VERSION)
+	if (os != NULL) {
+		switch (prop) {
+		case ZFS_PROP_VERSION:
+			cached_copy = &os->os_version;
+			break;
+		case ZFS_PROP_NORMALIZE:
+			cached_copy = &os->os_normalization;
+			break;
+		case ZFS_PROP_UTF8ONLY:
+			cached_copy = &os->os_utf8only;
+			break;
+		case ZFS_PROP_CASE:
+			cached_copy = &os->os_casesensitivity;
+			break;
+		default:
+			break;
+		}
+	}
+	if (cached_copy != NULL && *cached_copy != OBJSET_PROP_UNINITIALIZED) {
+		*value = *cached_copy;
+		return (0);
+	}
+
+	/*
+	 * If the property wasn't cached, look up the file system's value for
+	 * the property. For the version property, we look up a slightly
+	 * different string.
+	 */
+	const char *pname;
+	int error = ENOENT;
+	if (prop == ZFS_PROP_VERSION) {
 		pname = ZPL_VERSION_STR;
-	else
+	} else {
 		pname = zfs_prop_to_name(prop);
+	}
 
 	if (os != NULL) {
 		ASSERT3U(os->os_phys->os_type, ==, DMU_OST_ZFS);
@@ -2677,6 +2720,15 @@ zfs_get_zplprop(objset_t *os, zfs_prop_t prop, uint64_t *value)
 		}
 		error = 0;
 	}
+
+	/*
+	 * If one of the methods for getting the property value above worked,
+	 * copy it into the objset_t's cache.
+	 */
+	if (error == 0 && cached_copy != NULL) {
+		*cached_copy = *value;
+	}
+
 	return (error);
 }
 

@@ -380,6 +380,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			store_ptr(where, val, rlen);
 			break;
 		}
+		case R_TYPE(CHERI_CAPABILITY_CALL):
 		case R_TYPE(CHERI_CAPABILITY): {
 			sym = symtab + r_symndx;
 			/* This is a hack for the undef weak __auxargs */
@@ -876,6 +877,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 		}
 
+		case R_TYPE(CHERI_CAPABILITY_CALL): /* TODO: lazy binding */
 		case R_TYPE(CHERI_CAPABILITY):
 		{
 			def = find_symdef(r_symndx, obj, &defobj, flags, NULL,
@@ -888,7 +890,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
 			    "IFUNC not implemented!");
 
-			void* symval = NULL;
+			const void* symval = NULL;
 			bool is_undef_weak = false;
 			if (def->st_shndx == SHN_UNDEF) {
 				/* Verify that we are resolving a weak symbol */
@@ -938,7 +940,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				    symname(obj, r_symndx), symval);
 				return -1;
 			}
-			*((void**)where) = symval;
+			*((const void**)where) = symval;
 #if defined(DEBUG_VERBOSE)
 			dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s",
 			    where, rel->r_offset, symname(obj, r_symndx),

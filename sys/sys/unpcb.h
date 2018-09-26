@@ -166,6 +166,15 @@ struct xunpgen {
 } __aligned(sizeof(void *));	/* Followed by struct xunpcb */
 #endif /* _SYS_SOCKETVAR_H_ */
 
+#if defined(_KERNEL)
+struct thread;
+
+/* In uipc_userreq.c */
+void
+unp_copy_peercred(struct thread *td, struct unpcb *client_unp,
+    struct unpcb *server_unp, struct unpcb *listen_unp);
+#endif
+
 #endif /* _SYS_UNPCB_H_ */
 // CHERI CHANGES START
 // {

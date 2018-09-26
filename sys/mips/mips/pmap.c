@@ -1268,8 +1268,8 @@ pmap_growkernel(vm_offset_t addr)
 	mtx_assert(&kernel_map->system_mtx, MA_OWNED);
 	req_class = VM_ALLOC_INTERRUPT;
 	addr = roundup2(addr, NBSEG);
-	if (addr - 1 >= kernel_map->max_offset)
-		addr = kernel_map->max_offset;
+	if (addr - 1 >= vm_map_max(kernel_map))
+		addr = vm_map_max(kernel_map);
 	while (kernel_vm_end < addr) {
 		pdpe = pmap_segmap(kernel_pmap, kernel_vm_end);
 #ifdef __mips_n64
@@ -1285,8 +1285,8 @@ pmap_growkernel(vm_offset_t addr)
 		pde = pmap_pdpe_to_pde(pdpe, kernel_vm_end);
 		if (*pde != 0) {
 			kernel_vm_end = (kernel_vm_end + NBPDR) & ~PDRMASK;
-			if (kernel_vm_end - 1 >= kernel_map->max_offset) {
-				kernel_vm_end = kernel_map->max_offset;
+			if (kernel_vm_end - 1 >= vm_map_max(kernel_map)) {
+				kernel_vm_end = vm_map_max(kernel_map);
 				break;
 			}
 			continue;
@@ -1318,8 +1318,8 @@ pmap_growkernel(vm_offset_t addr)
 			pte[i] = PTE_G;
 
 		kernel_vm_end = (kernel_vm_end + NBPDR) & ~PDRMASK;
-		if (kernel_vm_end - 1 >= kernel_map->max_offset) {
-			kernel_vm_end = kernel_map->max_offset;
+		if (kernel_vm_end - 1 >= vm_map_max(kernel_map)) {
+			kernel_vm_end = vm_map_max(kernel_map);
 			break;
 		}
 	}
@@ -3753,6 +3753,22 @@ pmap_change_attr(vm_offset_t sva, vm_size_t size, vm_memattr_t ma)
 	/* Flush caches to be in the safe side */
 	mips_dcache_wbinv_range(ova, size);
 	return 0;
+}
+
+boolean_t
+pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
+{
+
+	switch (mode) {
+	case VM_MEMATTR_UNCACHEABLE:
+	case VM_MEMATTR_WRITE_BACK:
+#ifdef MIPS_CCA_WC
+	case VM_MEMATTR_WRITE_COMBINING:
+#endif
+		return (TRUE);
+	default:
+		return (FALSE);
+	}
 }
 // CHERI CHANGES START
 // {

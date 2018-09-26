@@ -242,9 +242,10 @@ vm_offset_t kernel_vm_end = 0;
 
 /*
  * Data for the pv entry allocation mechanism.
- * Updates to pv_invl_gen are protected by the pv_list_locks[]
- * elements, but reads are not.
  */
+static TAILQ_HEAD(pch, pv_chunk) pv_chunks = TAILQ_HEAD_INITIALIZER(pv_chunks);
+static struct mtx pv_chunks_mutex;
+static struct rwlock pv_list_locks[NPV_LIST_LOCKS];
 static struct md_page *pv_table;
 static struct md_page pv_dummy;
 
@@ -269,13 +270,6 @@ static int superpages_enabled = 1;
 SYSCTL_INT(_vm_pmap, OID_AUTO, superpages_enabled,
     CTLFLAG_RDTUN | CTLFLAG_NOFETCH, &superpages_enabled, 0,
     "Are large page mappings enabled?");
-
-/*
- * Data for the pv entry allocation mechanism
- */
-static TAILQ_HEAD(pch, pv_chunk) pv_chunks = TAILQ_HEAD_INITIALIZER(pv_chunks);
-static struct mtx pv_chunks_mutex;
-static struct rwlock pv_list_locks[NPV_LIST_LOCKS];
 
 /*
  * Internal flags for pmap_enter()'s helper functions.
@@ -929,8 +923,7 @@ pmap_init(void)
 	 */
 	s = (vm_size_t)(pv_npg * sizeof(struct md_page));
 	s = round_page(s);
-	pv_table = (struct md_page *)kmem_malloc(kernel_arena, s,
-	    M_WAITOK | M_ZERO);
+	pv_table = (struct md_page *)kmem_malloc(s, M_WAITOK | M_ZERO);
 	for (i = 0; i < pv_npg; i++)
 		TAILQ_INIT(&pv_table[i].pv_list);
 	TAILQ_INIT(&pv_dummy.pv_list);
@@ -1751,8 +1744,8 @@ pmap_growkernel(vm_offset_t addr)
 	mtx_assert(&kernel_map->system_mtx, MA_OWNED);
 
 	addr = roundup2(addr, L2_SIZE);
-	if (addr - 1 >= kernel_map->max_offset)
-		addr = kernel_map->max_offset;
+	if (addr - 1 >= vm_map_max(kernel_map))
+		addr = vm_map_max(kernel_map);
 	while (kernel_vm_end < addr) {
 		l0 = pmap_l0(kernel_pmap, kernel_vm_end);
 		KASSERT(pmap_load(l0) != 0,
@@ -1775,8 +1768,8 @@ pmap_growkernel(vm_offset_t addr)
 		l2 = pmap_l1_to_l2(l1, kernel_vm_end);
 		if ((pmap_load(l2) & ATTR_AF) != 0) {
 			kernel_vm_end = (kernel_vm_end + L2_SIZE) & ~L2_OFFSET;
-			if (kernel_vm_end - 1 >= kernel_map->max_offset) {
-				kernel_vm_end = kernel_map->max_offset;
+			if (kernel_vm_end - 1 >= vm_map_max(kernel_map)) {
+				kernel_vm_end = vm_map_max(kernel_map);
 				break;
 			}
 			continue;
@@ -1794,8 +1787,8 @@ pmap_growkernel(vm_offset_t addr)
 		pmap_invalidate_page(kernel_pmap, kernel_vm_end);
 
 		kernel_vm_end = (kernel_vm_end + L2_SIZE) & ~L2_OFFSET;
-		if (kernel_vm_end - 1 >= kernel_map->max_offset) {
-			kernel_vm_end = kernel_map->max_offset;
+		if (kernel_vm_end - 1 >= vm_map_max(kernel_map)) {
+			kernel_vm_end = vm_map_max(kernel_map);
 			break;
 		}
 	}
@@ -4819,7 +4812,7 @@ pmap_change_attr_locked(vm_offset_t va, vm_size_t size, int mode)
 		return (EINVAL);
 
 	for (tmpva = base; tmpva < base + size; ) {
-		pte = pmap_pte(kernel_pmap, va, &lvl);
+		pte = pmap_pte(kernel_pmap, tmpva, &lvl);
 		if (pte == NULL)
 			return (EINVAL);
 
@@ -5080,76 +5073,45 @@ pmap_demote_l2(pmap_t pmap, pt_entry_t *l2, vm_offset_t va)
 int
 pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *locked_pa)
 {
-	pd_entry_t *l1p, l1;
-	pd_entry_t *l2p, l2;
-	pt_entry_t *l3p, l3;
-	vm_paddr_t pa;
+	pt_entry_t *pte, tpte;
+	vm_paddr_t mask, pa;
+	int lvl, val;
 	bool managed;
-	int val;
 
 	PMAP_LOCK(pmap);
 retry:
-	pa = 0;
 	val = 0;
-	managed = false;
+	pte = pmap_pte(pmap, addr, &lvl);
+	if (pte != NULL) {
+		tpte = pmap_load(pte);
 
-	l1p = pmap_l1(pmap, addr);
-	if (l1p == NULL) /* No l1 */
-		goto done;
+		switch (lvl) {
+		case 3:
+			mask = L3_OFFSET;
+			break;
+		case 2:
+			mask = L2_OFFSET;
+			break;
+		case 1:
+			mask = L1_OFFSET;
+			break;
+		default:
+			panic("pmap_mincore: invalid level %d", lvl);
+		}
 
-	l1 = pmap_load(l1p);
-	if ((l1 & ATTR_DESCR_MASK) == L1_INVAL)
-		goto done;
-
-	if ((l1 & ATTR_DESCR_MASK) == L1_BLOCK) {
-		pa = (l1 & ~ATTR_MASK) | (addr & L1_OFFSET);
-		managed = (l1 & ATTR_SW_MANAGED) == ATTR_SW_MANAGED;
-		val = MINCORE_SUPER | MINCORE_INCORE;
-		if (pmap_page_dirty(l1))
-			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
-		if ((l1 & ATTR_AF) == ATTR_AF)
-			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
-		goto done;
-	}
-
-	l2p = pmap_l1_to_l2(l1p, addr);
-	if (l2p == NULL) /* No l2 */
-		goto done;
-
-	l2 = pmap_load(l2p);
-	if ((l2 & ATTR_DESCR_MASK) == L2_INVAL)
-		goto done;
-
-	if ((l2 & ATTR_DESCR_MASK) == L2_BLOCK) {
-		pa = (l2 & ~ATTR_MASK) | (addr & L2_OFFSET);
-		managed = (l2 & ATTR_SW_MANAGED) == ATTR_SW_MANAGED;
-		val = MINCORE_SUPER | MINCORE_INCORE;
-		if (pmap_page_dirty(l2))
-			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
-		if ((l2 & ATTR_AF) == ATTR_AF)
-			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
-		goto done;
-	}
-
-	l3p = pmap_l2_to_l3(l2p, addr);
-	if (l3p == NULL) /* No l3 */
-		goto done;
-
-	l3 = pmap_load(l2p);
-	if ((l3 & ATTR_DESCR_MASK) == L3_INVAL)
-		goto done;
-
-	if ((l3 & ATTR_DESCR_MASK) == L3_PAGE) {
-		pa = (l3 & ~ATTR_MASK) | (addr & L3_OFFSET);
-		managed = (l3 & ATTR_SW_MANAGED) == ATTR_SW_MANAGED;
 		val = MINCORE_INCORE;
-		if (pmap_page_dirty(l3))
+		if (lvl != 3)
+			val |= MINCORE_SUPER;
+		if (pmap_page_dirty(tpte))
 			val |= MINCORE_MODIFIED | MINCORE_MODIFIED_OTHER;
-		if ((l3 & ATTR_AF) == ATTR_AF)
+		if ((tpte & ATTR_AF) == ATTR_AF)
 			val |= MINCORE_REFERENCED | MINCORE_REFERENCED_OTHER;
-	}
 
-done:
+		managed = (tpte & ATTR_SW_MANAGED) == ATTR_SW_MANAGED;
+		pa = (tpte & ~ATTR_MASK) | (addr & mask);
+	} else
+		managed = false;
+
 	if ((val & (MINCORE_MODIFIED_OTHER | MINCORE_REFERENCED_OTHER)) !=
 	    (MINCORE_MODIFIED_OTHER | MINCORE_REFERENCED_OTHER) && managed) {
 		/* Ensure that "PHYS_TO_VM_PAGE(pa)->object" doesn't change. */
@@ -5397,4 +5359,11 @@ pmap_unmap_io_transient(vm_page_t page[], vm_offset_t vaddr[], int count,
 			panic("ARM64TODO: pmap_unmap_io_transient: Unmap data");
 		}
 	}
+}
+
+boolean_t
+pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
+{
+
+	return (mode >= VM_MEMATTR_DEVICE && mode <= VM_MEMATTR_WRITE_THROUGH);
 }

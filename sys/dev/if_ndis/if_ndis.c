@@ -38,6 +38,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -2975,11 +2977,11 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	switch (cmd) {
 	case SIOCGDRVSPEC:
 	case SIOCSDRVSPEC:
-		error = copyin_c(ifr_data_get_ptr(ifr), &oid, sizeof(oid));
+		error = copyin(ifr_data_get_ptr(ifr), &oid, sizeof(oid));
 		if (error)
 			break;
 		oidbuf = malloc(oid.len, M_TEMP, M_WAITOK | M_ZERO);
-		error = copyin_c((char * __capability)ifr_data_get_ptr(ifr) +
+		error = copyin((char * __capability)ifr_data_get_ptr(ifr) +
 		    sizeof(oid), oidbuf, oid.len);
 	}
 
@@ -3002,7 +3004,7 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 			NDIS_UNLOCK(sc);
 			break;
 		}
-		error = copyin_c(ifr_data_get_ptr(ifr), &evt, sizeof(evt));
+		error = copyin(ifr_data_get_ptr(ifr), &evt, sizeof(evt));
 		if (error) {
 			NDIS_UNLOCK(sc);
 			break;
@@ -3012,14 +3014,14 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 			NDIS_UNLOCK(sc);
 			break;
 		}
-		error = copyout_c(&sc->ndis_evt[sc->ndis_evtcidx],
+		error = copyout(&sc->ndis_evt[sc->ndis_evtcidx],
 		    ifr_data_get_ptr(ifr), sizeof(uint32_t) * 2);
 		if (error) {
 			NDIS_UNLOCK(sc);
 			break;
 		}
 		if (sc->ndis_evt[sc->ndis_evtcidx].ne_len) {
-			error = copyout_c(sc->ndis_evt[sc->ndis_evtcidx].ne_buf,
+			error = copyout(sc->ndis_evt[sc->ndis_evtcidx].ne_buf,
 			    (char * __capability)ifr_data_get_ptr(ifr) +
 			    (sizeof(uint32_t) * 2),
 			    sc->ndis_evt[sc->ndis_evtcidx].ne_len);
@@ -3043,10 +3045,10 @@ ndis_80211ioctl(struct ieee80211com *ic, u_long cmd, void *data)
 	switch (cmd) {
 	case SIOCGDRVSPEC:
 	case SIOCSDRVSPEC:
-		error = copyout_c(&oid, ifr_data_get_ptr(ifr), sizeof(oid));
+		error = copyout(&oid, ifr_data_get_ptr(ifr), sizeof(oid));
 		if (error)
 			break;
-		error = copyout_c(oidbuf,
+		error = copyout(oidbuf,
 		    (char * __capability)ifr_data_get_ptr(ifr) + sizeof(oid),
 		    oid.len);
 	}

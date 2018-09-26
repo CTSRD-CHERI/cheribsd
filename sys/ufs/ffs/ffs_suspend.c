@@ -34,6 +34,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -144,7 +146,7 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 			if (error != 0)
 				goto out;
 			if (uio->uio_rw == UIO_WRITE) {
-				error = copyin_c(base, bp->b_data, len);
+				error = copyin(base, bp->b_data, len);
 				if (error != 0) {
 					bp->b_flags |= B_INVAL | B_NOCACHE;
 					brelse(bp);
@@ -154,7 +156,7 @@ ffs_susp_rdwr(struct cdev *dev, struct uio *uio, int ioflag)
 				if (error != 0)
 					goto out;
 			} else {
-				error = copyout_c(bp->b_data, base, len);
+				error = copyout(bp->b_data, base, len);
 				brelse(bp);
 				if (error != 0)
 					goto out;
@@ -216,6 +218,33 @@ ffs_susp_suspend(struct mount *mp)
 }
 
 static void
+ffs_susp_unsuspend(struct mount *mp)
+{
+	struct ufsmount *ump;
+
+	sx_assert(&ffs_susp_lock, SA_XLOCKED);
+
+	/*
+	 * XXX: The status is kept per-process; the vfs_write_resume() routine
+	 * 	asserts that the resuming thread is the same one that called
+	 * 	vfs_write_suspend().  The cdevpriv data, however, is attached
+	 * 	to the file descriptor, e.g. is inherited during fork.  Thus,
+	 * 	it's possible that the resuming process will be different from
+	 * 	the one that started the suspension.
+	 *
+	 * 	Work around by fooling the check in vfs_write_resume().
+	 */
+	mp->mnt_susp_owner = curthread;
+
+	vfs_write_resume(mp, 0);
+	ump = VFSTOUFS(mp);
+	UFS_LOCK(ump);
+	ump->um_flags &= ~UM_WRITESUSPENDED;
+	UFS_UNLOCK(ump);
+	vfs_unbusy(mp);
+}
+
+static void
 ffs_susp_dtor(void *data)
 {
 	struct fs *fs;
@@ -241,24 +270,7 @@ ffs_susp_dtor(void *data)
 	if (error != 0)
 		panic("failed to unsuspend writes on %s", fs->fs_fsmnt);
 
-	/*
-	 * XXX: The status is kept per-process; the vfs_write_resume() routine
-	 * 	asserts that the resuming thread is the same one that called
-	 * 	vfs_write_suspend().  The cdevpriv data, however, is attached
-	 * 	to the file descriptor, e.g. is inherited during fork.  Thus,
-	 * 	it's possible that the resuming process will be different from
-	 * 	the one that started the suspension.
-	 *
-	 * 	Work around by fooling the check in vfs_write_resume().
-	 */
-	mp->mnt_susp_owner = curthread;
-
-	vfs_write_resume(mp, 0);
-	vfs_unbusy(mp);
-	UFS_LOCK(ump);
-	ump->um_flags &= ~UM_WRITESUSPENDED;
-	UFS_UNLOCK(ump);
-
+	ffs_susp_unsuspend(mp);
 	sx_xunlock(&ffs_susp_lock);
 }
 
@@ -298,7 +310,8 @@ ffs_susp_ioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			break;
 		}
 		error = devfs_set_cdevpriv(mp, ffs_susp_dtor);
-		KASSERT(error == 0, ("devfs_set_cdevpriv failed"));
+		if (error != 0)
+			ffs_susp_unsuspend(mp);
 		break;
 	case UFSRESUME:
 		error = devfs_get_cdevpriv((void **)&mp);

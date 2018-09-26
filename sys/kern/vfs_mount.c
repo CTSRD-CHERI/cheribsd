@@ -39,6 +39,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/eventhandler.h>
@@ -314,7 +316,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 			bcopy((__cheri_fromcap void *)auio->uio_iov[i].iov_base,
 			    opt->name, namelen);
 		} else {
-			error = copyin_c(auio->uio_iov[i].iov_base, opt->name,
+			error = copyin(auio->uio_iov[i].iov_base, opt->name,
 			    namelen);
 			if (error)
 				goto bad;
@@ -332,7 +334,7 @@ vfs_buildopts(struct uio *auio, struct vfsoptlist **options)
 				    auio->uio_iov[i + 1].iov_base, opt->value,
 				    optlen);
 			} else {
-				error = copyin_c(auio->uio_iov[i + 1].iov_base,
+				error = copyin(auio->uio_iov[i + 1].iov_base,
 				    opt->value, optlen);
 				if (error)
 					goto bad;
@@ -749,7 +751,7 @@ bail:
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		} else {
-			copyout_c(errmsg,
+			copyout(errmsg,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_base,
 			    fsoptions->uio_iov[2 * errmsg_pos + 1].iov_len);
 		}
@@ -800,7 +802,7 @@ sys_mount(struct thread *td, struct mount_args *uap)
 	flags &= ~MNT_ROOTFS;
 
 	fstype = malloc(MFSNAMELEN, M_TEMP, M_WAITOK);
-	error = copyinstr(uap->type, fstype, MFSNAMELEN, NULL);
+	error = copyinstr(__USER_CAP_STR(uap->type), fstype, MFSNAMELEN, NULL);
 	if (error) {
 		free(fstype, M_TEMP);
 		return (error);
@@ -1226,7 +1228,7 @@ kern_unmount(struct thread *td, const char * __capability path, int flags)
 	}
 
 	pathbuf = malloc(MNAMELEN, M_TEMP, M_WAITOK);
-	error = copyinstr_c(path, pathbuf, MNAMELEN, NULL);
+	error = copyinstr(path, pathbuf, MNAMELEN, NULL);
 	if (error) {
 		free(pathbuf, M_TEMP);
 		return (error);
@@ -1948,7 +1950,7 @@ mount_argsu(struct mntarg *ma, const char *name, const void *val, int len)
 	maa = malloc(sizeof *maa + len, M_MOUNT, M_WAITOK | M_ZERO);
 	SLIST_INSERT_HEAD(&ma->list, maa, next);
 	tbuf = (void *)(maa + 1);
-	ma->error = copyinstr(val, tbuf, len, NULL);
+	ma->error = copyinstr(__USER_CAP_STR(val), tbuf, len, NULL);
 	return (mount_arg(ma, name, tbuf, -1));
 }
 

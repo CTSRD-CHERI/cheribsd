@@ -35,6 +35,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -187,31 +189,31 @@ static int proto_reg[] = {-1, -1};
  */
 
 /* Accept incoming CARP packets. */
-static VNET_DEFINE(int, carp_allow) = 1;
+VNET_DEFINE_STATIC(int, carp_allow) = 1;
 #define	V_carp_allow	VNET(carp_allow)
 
 /* Set DSCP in outgoing CARP packets. */
-static VNET_DEFINE(int, carp_dscp) = 56;
+VNET_DEFINE_STATIC(int, carp_dscp) = 56;
 #define	V_carp_dscp	VNET(carp_dscp)
 
 /* Preempt slower nodes. */
-static VNET_DEFINE(int, carp_preempt) = 0;
+VNET_DEFINE_STATIC(int, carp_preempt) = 0;
 #define	V_carp_preempt	VNET(carp_preempt)
 
 /* Log level. */
-static VNET_DEFINE(int, carp_log) = 1;
+VNET_DEFINE_STATIC(int, carp_log) = 1;
 #define	V_carp_log	VNET(carp_log)
 
 /* Global advskew demotion. */
-static VNET_DEFINE(int, carp_demotion) = 0;
+VNET_DEFINE_STATIC(int, carp_demotion) = 0;
 #define	V_carp_demotion	VNET(carp_demotion)
 
 /* Send error demotion factor. */
-static VNET_DEFINE(int, carp_senderr_adj) = CARP_MAXSKEW;
+VNET_DEFINE_STATIC(int, carp_senderr_adj) = CARP_MAXSKEW;
 #define	V_carp_senderr_adj	VNET(carp_senderr_adj)
 
 /* Iface down demotion factor. */
-static VNET_DEFINE(int, carp_ifdown_adj) = CARP_MAXSKEW;
+VNET_DEFINE_STATIC(int, carp_ifdown_adj) = CARP_MAXSKEW;
 #define	V_carp_ifdown_adj	VNET(carp_ifdown_adj)
 
 static int carp_allow_sysctl(SYSCTL_HANDLER_ARGS);
@@ -1423,6 +1425,7 @@ carp_multicast_setup(struct carp_if *cif, sa_family_t sa)
 			free(im6o->im6o_membership, M_CARP);
 			break;
 		}
+		in6m_acquire(in6m);
 		im6o->im6o_membership[0] = in6m;
 		im6o->im6o_num_memberships++;
 
@@ -1444,6 +1447,7 @@ carp_multicast_setup(struct carp_if *cif, sa_family_t sa)
 			free(im6o->im6o_membership, M_CARP);
 			break;
 		}
+		in6m_acquire(in6m);
 		im6o->im6o_membership[1] = in6m;
 		im6o->im6o_num_memberships++;
 		break;
@@ -1709,7 +1713,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 	struct carp_softc *sc = NULL;
 	int error = 0, locked = 0;
 
-	if ((error = copyin_c(ifr_data_get_ptr(ifr), &carpr, sizeof carpr)))
+	if ((error = copyin(ifr_data_get_ptr(ifr), &carpr, sizeof carpr)))
 		return (error);
 
 	ifp = ifunit_ref(ifr->ifr_name);
@@ -1824,7 +1828,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 				break;
 			}
 			carp_carprcp(&carpr, sc, priveleged);
-			error = copyout_c(&carpr, ifr_data_get_ptr(ifr),
+			error = copyout(&carpr, ifr_data_get_ptr(ifr),
 			    sizeof(carpr));
 		} else  {
 			int i, count;
@@ -1843,7 +1847,7 @@ carp_ioctl(struct ifreq *ifr, u_long cmd, struct thread *td)
 			IFNET_FOREACH_CARP(ifp, sc) {
 				carp_carprcp(&carpr, sc, priveleged);
 				carpr.carpr_count = count;
-				error = copyout_c(&carpr,
+				error = copyout(&carpr,
 				    (char * __capability)ifr_data_get_ptr(ifr) +
 				    (i * sizeof(carpr)), sizeof(carpr));
 				if (error) {

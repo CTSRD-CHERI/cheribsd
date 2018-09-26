@@ -1051,6 +1051,8 @@ findpcb:
 #ifdef INET6
 		if (isipv6) {
 			inc.inc_flags |= INC_ISIPV6;
+			if (inp->inp_inc.inc_flags & INC_IPV6MINMTU)
+				inc.inc_flags |= INC_IPV6MINMTU;
 			inc.inc6_faddr = ip6->ip6_src;
 			inc.inc6_laddr = ip6->ip6_dst;
 		} else
@@ -1145,6 +1147,7 @@ tfo_socket_result:
 			 * contains.  tcp_do_segment() consumes
 			 * the mbuf chain and unlocks the inpcb.
 			 */
+			TCP_PROBE5(receive, NULL, tp, m, tp, th);
 			tp->t_fb->tfb_tcp_do_segment(m, th, so, tp, drop_hdrlen, tlen,
 			    iptos);
 			if (ti_locked == TI_RLOCKED)
@@ -1733,7 +1736,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	    tp->snd_nxt == tp->snd_max &&
 	    tiwin && tiwin == tp->snd_wnd && 
 	    ((tp->t_flags & (TF_NEEDSYN|TF_NEEDFIN)) == 0) &&
-	    LIST_EMPTY(&tp->t_segq) &&
+	    SEGQ_EMPTY(tp) &&
 	    ((to.to_flags & TOF_TS) == 0 ||
 	     TSTMP_GEQ(to.to_tsval, tp->ts_recent)) ) {
 
@@ -2406,6 +2409,16 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		 *      SYN-RECEIVED* -> FIN-WAIT-1
 		 */
 		tp->t_starttime = ticks;
+		if (IS_FASTOPEN(tp->t_flags) && tp->t_tfo_pending) {
+			tcp_fastopen_decrement_counter(tp->t_tfo_pending);
+			tp->t_tfo_pending = NULL;
+
+			/*
+			 * Account for the ACK of our SYN prior to
+			 * regular ACK processing below.
+			 */ 
+			tp->snd_una++;
+		}
 		if (tp->t_flags & TF_NEEDFIN) {
 			tcp_state_change(tp, TCPS_FIN_WAIT_1);
 			tp->t_flags &= ~TF_NEEDFIN;
@@ -2413,16 +2426,6 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			tcp_state_change(tp, TCPS_ESTABLISHED);
 			TCP_PROBE5(accept__established, NULL, tp,
 			    m, tp, th);
-			if (IS_FASTOPEN(tp->t_flags) && tp->t_tfo_pending) {
-				tcp_fastopen_decrement_counter(tp->t_tfo_pending);
-				tp->t_tfo_pending = NULL;
-
-				/*
-				 * Account for the ACK of our SYN prior to
-				 * regular ACK processing below.
-				 */ 
-				tp->snd_una++;
-			}
 			/*
 			 * TFO connections call cc_conn_init() during SYN
 			 * processing.  Calling it again here for such
@@ -2439,7 +2442,7 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		 * later; if not, do so now to pass queued data to user.
 		 */
 		if (tlen == 0 && (thflags & TH_FIN) == 0)
-			(void) tcp_reass(tp, (struct tcphdr *)0, 0,
+			(void) tcp_reass(tp, (struct tcphdr *)0, NULL, 0,
 			    (struct mbuf *)0);
 		tp->snd_wl1 = th->th_seq - 1;
 		/* FALLTHROUGH */
@@ -3016,7 +3019,7 @@ dodata:							/* XXX */
 		 * fast retransmit can work).
 		 */
 		if (th->th_seq == tp->rcv_nxt &&
-		    LIST_EMPTY(&tp->t_segq) &&
+		    SEGQ_EMPTY(tp) &&
 		    (TCPS_HAVEESTABLISHED(tp->t_state) ||
 		     tfo_syn)) {
 			if (DELAY_ACK(tp, tlen) || tfo_syn)
@@ -3041,7 +3044,7 @@ dodata:							/* XXX */
 			 * m_adj() doesn't actually frees any mbufs
 			 * when trimming from the head.
 			 */
-			thflags = tcp_reass(tp, th, &tlen, m);
+			thflags = tcp_reass(tp, th, &save_start, &tlen, m);
 			tp->t_flags |= TF_ACKNOW;
 		}
 		if (tlen > 0 && (tp->t_flags & TF_SACK_PERMIT))

@@ -26,7 +26,7 @@ makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
 
 options 	SCHED_ULE		# ULE scheduler
 options 	PREEMPTION		# Enable kernel thread preemption
-#options 	VIMAGE			# Subsystem virtualization, e.g. VNET
+options 	VIMAGE			# Subsystem virtualization, e.g. VNET
 options 	INET			# InterNETworking
 options 	INET6			# IPv6 communications protocols
 options 	IPSEC			# IP (v4/v6) security
@@ -108,6 +108,9 @@ options 	SOC_BRCM_BCM2837
 options 	SOC_ROCKCHIP_RK3328
 options 	SOC_XILINX_ZYNQ
 
+# Timer drivers
+device		a10_timer
+
 # Annapurna Alpine drivers
 device		al_ccu			# Alpine Cache Coherency Unit
 device		al_nb_service		# Alpine North Bridge Service
@@ -159,6 +162,7 @@ device		pass		# Passthrough device (direct ATA/SCSI access)
 
 # MMC/SD/SDIO Card slot support
 device		sdhci
+device		sdhci_xenon		# Marvell Xenon SD/MMC controller
 device		aw_mmc			# Allwinner SD/MMC controller
 device		mmc			# mmc/sd bus
 device		mmcsd			# mmc/sd flash cards
@@ -187,6 +191,7 @@ device		ukbd			# Keyboard
 device		umass			# Disks/Mass storage - Requires scbus and da
 
 # USB ethernet support
+device		muge
 device		smcphy
 device		smsc
 
@@ -236,6 +241,7 @@ device		kbdmux
 device		vt_efifb
 
 # Pseudo devices.
+device		crypto		# core crypto support
 device		loop		# Network loopback
 device		random		# Entropy device
 device		ether		# Ethernet support
@@ -251,8 +257,10 @@ options 	EXT_RESOURCES
 device		clk
 device		phy
 device		hwreset
+device		nvmem
 device		regulator
 device		syscon
+device		aw_syscon
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!
@@ -265,5 +273,5 @@ options 	THUNDERX_PASS_1_1_ERRATA
 options 	FDT
 device		acpi
 
-# The crypto framework is required by IPSEC
-device		crypto			# Required by IPSEC
+# DTBs
+makeoptions	MODULES_EXTRA="dtb/allwinner"

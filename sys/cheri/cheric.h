@@ -78,9 +78,29 @@
 #define	cheri_local(c)		cheri_andperm((c), ~CHERI_PERM_GLOBAL)
 
 #define	cheri_csetbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
+/* XXXAR: shouldn't this be the default and we add cheri_csetbounds_untyped? */
+#define	cheri_csetbounds_changetype(type, x, y)	\
+	(type)cheri_csetbounds((x), (y)))
+#define	cheri_csetbounds_sametype(x, y)	\
+	((__typeof__(x))cheri_csetbounds((x), (y)))
 
 /* Create an untagged capability from an integer */
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
+
+/* Increment @p dst to have the address of @p src */
+static inline void * __capability
+cheri_copyaddress(const void * __capability dst, const void * __capability src)
+{
+	return (cheri_incoffset(dst,
+	    (const char* __capability)src - (const char* __capability)dst));
+}
+
+/* Same as above but using an absolute virtual address instead of another cap */
+static inline void * __capability
+cheri_setaddress(const void * __capability dst, vaddr_t addr)
+{
+	return (cheri_incoffset(dst, addr - cheri_getaddress(dst)));
+}
 
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or

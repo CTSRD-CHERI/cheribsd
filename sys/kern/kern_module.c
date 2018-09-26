@@ -29,6 +29,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
@@ -399,7 +401,7 @@ kern_modstat(struct thread *td, int modid,
 	/*
 	 * Check the version of the user's structure.
 	 */
-	if ((error = copyin_c(&stat->version, &version, sizeof(version))) != 0)
+	if ((error = copyin(&stat->version, &version, sizeof(version))) != 0)
 		return (error);
 	if (version != sizeof(struct module_stat_v1)
 	    && version != sizeof(struct module_stat))
@@ -407,19 +409,19 @@ kern_modstat(struct thread *td, int modid,
 	namelen = strlen(mod->name) + 1;
 	if (namelen > MAXMODNAME)
 		namelen = MAXMODNAME;
-	if ((error = copyout_c(name, &stat->name, namelen)) != 0)
+	if ((error = copyout(name, &stat->name, namelen)) != 0)
 		return (error);
 
-	if ((error = copyout_c(&refs, &stat->refs, sizeof(int))) != 0)
+	if ((error = copyout(&refs, &stat->refs, sizeof(int))) != 0)
 		return (error);
-	if ((error = copyout_c(&id, &stat->id, sizeof(int))) != 0)
+	if ((error = copyout(&id, &stat->id, sizeof(int))) != 0)
 		return (error);
 
 	/*
 	 * >v1 stat includes module data.
 	 */
 	if (version == sizeof(struct module_stat))
-		if ((error = copyout_c(&data, &stat->data, sizeof(data))) != 0)
+		if ((error = copyout(&data, &stat->data, sizeof(data))) != 0)
 			return (error);
 	td->td_retval[0] = 0;
 	return (error);
@@ -439,7 +441,7 @@ kern_modfind(struct thread *td, const char * __capability uname)
 	char name[MAXMODNAME];
 	module_t mod;
 
-	if ((error = copyinstr_c(uname, name, sizeof name, 0)) != 0)
+	if ((error = copyinstr(uname, name, sizeof name, 0)) != 0)
 		return (error);
 
 	MOD_SLOCK;
@@ -503,8 +505,8 @@ freebsd32_modstat(struct thread *td, struct freebsd32_modstat_args *uap)
 	MOD_SUNLOCK;
 	stat32 = uap->stat;
 
-	if ((error = copyin(&stat32->version, &version, sizeof(version))) != 0)
-		return (error);
+	if (fueword32(__USER_CAP_OBJ(&stat32->version), &version) != 0)
+		return (EFAULT);
 	if (version != sizeof(struct module_stat_v1)
 	    && version != sizeof(struct module_stat32))
 		return (EINVAL);

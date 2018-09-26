@@ -373,8 +373,9 @@ extern vm_offset_t virtual_end;
  * is called: pmap_kenter(), pmap_kextract(), pmap_kremove(), vtophys(), and
  * vtopte().
  */
+void	pmap_activate_boot(pmap_t pmap);
 void	pmap_bootstrap(vm_paddr_t);
-int	pmap_cache_bits(int mode, boolean_t is_pde);
+int	pmap_cache_bits(pmap_t, int mode, boolean_t is_pde);
 int	pmap_change_attr(vm_offset_t, vm_size_t, int);
 void	pmap_init_pat(void);
 void	pmap_kenter(vm_offset_t va, vm_paddr_t pa);
@@ -393,8 +394,8 @@ void	pmap_invalidate_range(pmap_t, vm_offset_t, vm_offset_t);
 void	pmap_invalidate_all(pmap_t);
 void	pmap_invalidate_cache(void);
 void	pmap_invalidate_cache_pages(vm_page_t *pages, int count);
-void	pmap_invalidate_cache_range(vm_offset_t sva, vm_offset_t eva,
-	    boolean_t force);
+void	pmap_invalidate_cache_range(vm_offset_t sva, vm_offset_t eva);
+void	pmap_force_invalidate_cache_range(vm_offset_t sva, vm_offset_t eva);
 void	*pmap_trm_alloc(size_t size, int flags);
 void	pmap_trm_free(void *addr, size_t size);
 

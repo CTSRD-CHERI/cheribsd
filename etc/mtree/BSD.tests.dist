@@ -34,6 +34,8 @@
         ..
         pwait
         ..
+        rm
+        ..
         rmdir
         ..
         sh
@@ -66,6 +68,8 @@
         ..
         usr.bin
             ctfconvert
+            ..
+            ztest
             ..
         ..
         usr.sbin
@@ -431,6 +435,8 @@
         aio
         ..
         audit
+        ..
+        auditpipe
         ..
         capsicum
         ..

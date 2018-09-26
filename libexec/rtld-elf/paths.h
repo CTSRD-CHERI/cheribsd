@@ -34,7 +34,7 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	_PATH_ELF_HINTS		"/var/run/ld-cheri-elf.so.hints"
 #define	_PATH_LIBMAP_CONF	"/etc/libmap-cheri.conf"
-#define	_PATH_RTLD		"/libexec/ld-cheri-elf.so.1"
+#define	_BASENAME_RTLD		"ld-cheri-elf.so.1"
 #define	STANDARD_LIBRARY_PATH	"/libcheri:/usr/libcheri"
 #define	LD_			"LD_CHERI_"
 #endif
@@ -42,7 +42,7 @@
 #ifdef COMPAT_32BIT
 #define	_PATH_ELF_HINTS		"/var/run/ld-elf32.so.hints"
 #define	_PATH_LIBMAP_CONF	"/etc/libmap32.conf"
-#define	_PATH_RTLD		"/libexec/ld-elf32.so.1"
+#define	_BASENAME_RTLD		"ld-elf32.so.1"
 #define	STANDARD_LIBRARY_PATH	"/lib32:/usr/lib32"
 #define	LD_			"LD_32_"
 #endif
@@ -55,8 +55,12 @@
 #define	_PATH_LIBMAP_CONF	"/etc/libmap.conf"
 #endif
 
+#ifndef _BASENAME_RTLD
+#define	_BASENAME_RTLD		"ld-elf.so.1"
+#endif
+
 #ifndef _PATH_RTLD
-#define	_PATH_RTLD		"/libexec/ld-elf.so.1"
+#define	_PATH_RTLD		"/libexec/" _BASENAME_RTLD
 #endif
 
 #ifndef STANDARD_LIBRARY_PATH

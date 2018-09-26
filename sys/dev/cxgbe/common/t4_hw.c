@@ -5770,7 +5770,7 @@ int t4_set_sched_ipg(struct adapter *adap, int sched, unsigned int ipg)
  */
 static u64 chan_rate(struct adapter *adap, unsigned int bytes256)
 {
-	u64 v = bytes256 * adap->params.vpd.cclk;
+	u64 v = (u64)bytes256 * adap->params.vpd.cclk;
 
 	return v * 62 + v / 2;
 }
@@ -9803,7 +9803,7 @@ int t4_sched_config(struct adapter *adapter, int type, int minmaxen,
 int t4_sched_params(struct adapter *adapter, int type, int level, int mode,
 		    int rateunit, int ratemode, int channel, int cl,
 		    int minrate, int maxrate, int weight, int pktsize,
-		    int sleep_ok)
+		    int burstsize, int sleep_ok)
 {
 	struct fw_sched_cmd cmd;
 
@@ -9825,6 +9825,7 @@ int t4_sched_params(struct adapter *adapter, int type, int level, int mode,
 	cmd.u.params.max = cpu_to_be32(maxrate);
 	cmd.u.params.weight = cpu_to_be16(weight);
 	cmd.u.params.pktsize = cpu_to_be16(pktsize);
+	cmd.u.params.burstsize = cpu_to_be16(burstsize);
 
 	return t4_wr_mbox_meat(adapter,adapter->mbox, &cmd, sizeof(cmd),
 			       NULL, sleep_ok);

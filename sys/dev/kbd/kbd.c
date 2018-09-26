@@ -32,6 +32,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_kbd.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -48,6 +50,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/kbio.h>
 
+#include <dev/evdev/input-event-codes.h>
 #include <dev/kbd/kbdreg.h>
 
 #define KBD_INDEX(dev)	dev2unit(dev)
@@ -879,7 +882,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			else
 #endif
 				data = __USER_CAP_UNBOUND(*(void **)arg);
-		error = copyout_c(kbd->kb_keymap, data, sizeof(keymap_t));
+		error = copyout(kbd->kb_keymap, data, sizeof(keymap_t));
 		splx(s);
 		return (error);
 	case OGIO_KEYMAP:	/* get keyboard translation table (compat) */
@@ -915,7 +918,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 			else
 #endif
 				data = __USER_CAP_UNBOUND(*(void **)arg);
-			error = copyin_c(data, mapp, sizeof *mapp);
+			error = copyin(data, mapp, sizeof *mapp);
 			if (error != 0) {
 				splx(s);
 				free(mapp, M_TEMP);
@@ -1487,6 +1490,44 @@ genkbd_keyaction(keyboard_t *kbd, int keycode, int up, int *shiftstate,
 		}
 	}
 	/* NOT REACHED */
+}
+
+void
+kbd_ev_event(keyboard_t *kbd, uint16_t type, uint16_t code, int32_t value)
+{
+	int delay[2], led = 0, leds, oleds;
+
+	if (type == EV_LED) {
+		leds = oleds = KBD_LED_VAL(kbd);
+		switch (code) {
+		case LED_CAPSL:
+			led = CLKED;
+			break;
+		case LED_NUML:
+			led = NLKED;
+			break;
+		case LED_SCROLLL:
+			led = SLKED;
+			break;
+		}
+
+		if (value)
+			leds |= led;
+		else
+			leds &= ~led;
+
+		if (leds != oleds)
+			kbdd_ioctl(kbd, KDSETLED, (caddr_t)&leds);
+
+	} else if (type == EV_REP && code == REP_DELAY) {
+		delay[0] = value;
+		delay[1] = kbd->kb_delay2;
+		kbdd_ioctl(kbd, KDSETREPEAT, (caddr_t)delay);
+	} else if (type == EV_REP && code == REP_PERIOD) {
+		delay[0] = kbd->kb_delay1;
+		delay[1] = value;
+		kbdd_ioctl(kbd, KDSETREPEAT, (caddr_t)delay);
+	}
 }
 // CHERI CHANGES START
 // {

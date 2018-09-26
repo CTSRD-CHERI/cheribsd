@@ -135,7 +135,7 @@ VNET_DEFINE(int,			 pf_tcp_iss_off);
 VNET_DECLARE(int,			 pf_vnet_active);
 #define	V_pf_vnet_active		 VNET(pf_vnet_active)
 
-static VNET_DEFINE(uint32_t, pf_purge_idx);
+VNET_DEFINE_STATIC(uint32_t, pf_purge_idx);
 #define V_pf_purge_idx	VNET(pf_purge_idx)
 
 /*
@@ -159,7 +159,7 @@ struct pf_send_entry {
 };
 
 STAILQ_HEAD(pf_send_head, pf_send_entry);
-static VNET_DEFINE(struct pf_send_head, pf_sendqueue);
+VNET_DEFINE_STATIC(struct pf_send_head, pf_sendqueue);
 #define	V_pf_sendqueue	VNET(pf_sendqueue)
 
 static struct mtx pf_sendqueue_mtx;
@@ -179,9 +179,9 @@ struct pf_overload_entry {
 };
 
 SLIST_HEAD(pf_overload_head, pf_overload_entry);
-static VNET_DEFINE(struct pf_overload_head, pf_overloadqueue);
+VNET_DEFINE_STATIC(struct pf_overload_head, pf_overloadqueue);
 #define V_pf_overloadqueue	VNET(pf_overloadqueue)
-static VNET_DEFINE(struct task, pf_overloadtask);
+VNET_DEFINE_STATIC(struct task, pf_overloadtask);
 #define	V_pf_overloadtask	VNET(pf_overloadtask)
 
 static struct mtx pf_overloadqueue_mtx;
@@ -195,7 +195,7 @@ struct mtx pf_unlnkdrules_mtx;
 MTX_SYSINIT(pf_unlnkdrules_mtx, &pf_unlnkdrules_mtx, "pf unlinked rules",
     MTX_DEF);
 
-static VNET_DEFINE(uma_zone_t,	pf_sources_z);
+VNET_DEFINE_STATIC(uma_zone_t,	pf_sources_z);
 #define	V_pf_sources_z	VNET(pf_sources_z)
 uma_zone_t		pf_mtag_z;
 VNET_DEFINE(uma_zone_t,	 pf_state_z);
@@ -1719,24 +1719,28 @@ pf_purge_expired_states(u_int i, int maxcheck)
 	while (maxcheck > 0) {
 
 		ih = &V_pf_idhash[i];
+
+		/* only take the lock if we expect to do work */
+		if (!LIST_EMPTY(&ih->states)) {
 relock:
-		PF_HASHROW_LOCK(ih);
-		LIST_FOREACH(s, &ih->states, entry) {
-			if (pf_state_expires(s) <= time_uptime) {
-				V_pf_status.states -=
-				    pf_unlink_state(s, PF_ENTER_LOCKED);
-				goto relock;
+			PF_HASHROW_LOCK(ih);
+			LIST_FOREACH(s, &ih->states, entry) {
+				if (pf_state_expires(s) <= time_uptime) {
+					V_pf_status.states -=
+					    pf_unlink_state(s, PF_ENTER_LOCKED);
+					goto relock;
+				}
+				s->rule.ptr->rule_flag |= PFRULE_REFS;
+				if (s->nat_rule.ptr != NULL)
+					s->nat_rule.ptr->rule_flag |= PFRULE_REFS;
+				if (s->anchor.ptr != NULL)
+					s->anchor.ptr->rule_flag |= PFRULE_REFS;
+				s->kif->pfik_flags |= PFI_IFLAG_REFS;
+				if (s->rt_kif)
+					s->rt_kif->pfik_flags |= PFI_IFLAG_REFS;
 			}
-			s->rule.ptr->rule_flag |= PFRULE_REFS;
-			if (s->nat_rule.ptr != NULL)
-				s->nat_rule.ptr->rule_flag |= PFRULE_REFS;
-			if (s->anchor.ptr != NULL)
-				s->anchor.ptr->rule_flag |= PFRULE_REFS;
-			s->kif->pfik_flags |= PFI_IFLAG_REFS;
-			if (s->rt_kif)
-				s->rt_kif->pfik_flags |= PFI_IFLAG_REFS;
+			PF_HASHROW_UNLOCK(ih);
 		}
-		PF_HASHROW_UNLOCK(ih);
 
 		/* Return when we hit end of hash. */
 		if (++i > pf_hashmask) {

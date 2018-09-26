@@ -41,6 +41,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysproto.h>
@@ -701,7 +703,8 @@ sys_abort2(struct thread *td, struct abort2_args *uap)
 	if (uap->nargs > 0) {
 		if (uap->args == NULL)
 			goto out;
-		error = copyin(uap->args, uargs, uap->nargs * sizeof(void *));
+		error = copyin(__USER_CAP_UNBOUND(uap->args), uargs,
+		    uap->nargs * sizeof(void *));
 		if (error != 0)
 			goto out;
 	}
@@ -782,9 +785,9 @@ kern_wait4(struct thread *td, int pid, int * __capability statusp, int options,
 		rup = NULL;
 	error = kern_wait(td, pid, &status, options, rup);
 	if (statusp != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout_c(&status, statusp, sizeof(status));
+		error = copyout(&status, statusp, sizeof(status));
 	if (rusage != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout_c(&ru, rusage, sizeof(struct rusage));
+		error = copyout(&ru, rusage, sizeof(struct rusage));
 	return (error);
 }
 
@@ -819,12 +822,14 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 	error = kern_wait6(td, idtype, id, &status, uap->options, wrup, sip);
 
 	if (uap->status != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout(&status, uap->status, sizeof(status));
+		error = copyout(&status, __USER_CAP_OBJ(uap->status),
+		    sizeof(status));
 	if (uap->wrusage != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout(&wru, uap->wrusage, sizeof(wru));
+		error = copyout(&wru, __USER_CAP_OBJ(uap->wrusage),
+		    sizeof(wru));
 	if (uap->info != NULL && error == 0) {
 		siginfo_to_siginfo_native(&si, &si_n);
-		error = copyout(&si_n, uap->info, sizeof(si_n));
+		error = copyout(&si_n, __USER_CAP_OBJ(uap->info), sizeof(si_n));
 	}
 	return (error);
 }

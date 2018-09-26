@@ -24,7 +24,7 @@ SUBDIR+= libstdc++ libsupc++
 SUBDIR_DEPENDS_libsupc++:= libstdc++
 .endif
 
-.if defined(LIBCHERI)
+.if ${MACHINE_ARCH:Mmips*c*}
 # Don't use csu for CheriABI
 SUBDIR:=	${SUBDIR:Ncsu}
 # We'll be using the libunwind based libgcc_eh and libgcc_eh when the time

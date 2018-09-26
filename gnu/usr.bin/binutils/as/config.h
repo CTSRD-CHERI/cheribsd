@@ -2,13 +2,13 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20180924,
  *   "target_type": "prog",
  *   "changes": [
  *     "unsupported"
  *   ],
  *   "change_comment": "sbrk",
- *   "hybrid_specific": false
+ *   "is_upstream": true
  * }
  * CHERI CHANGES END
  */
@@ -82,6 +82,7 @@
 /* #undef HAVE_REMOVE */
 
 /* Define to 1 if you have the `sbrk' function. */
+/* #undef HAVE_SBRK */
 
 /* Define to 1 if you have the <stdarg.h> header file. */
 #define HAVE_STDARG_H 1

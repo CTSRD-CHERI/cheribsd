@@ -960,13 +960,19 @@ main(int argc, char *argv[])
 			gdb_port = atoi(optarg);
 			break;
 		case 'l':
-			if (lpc_device_parse(optarg) != 0) {
+			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
+				lpc_print_supported_devices();
+				exit(0);
+			} else if (lpc_device_parse(optarg) != 0) {
 				errx(EX_USAGE, "invalid lpc device "
 				    "configuration '%s'", optarg);
 			}
 			break;
 		case 's':
-			if (pci_parse_slot(optarg) != 0)
+			if (strncmp(optarg, "help", strlen(optarg)) == 0) {
+				pci_print_supported_devices();
+				exit(0);
+			} else if (pci_parse_slot(optarg) != 0)
 				exit(4);
 			else
 				break;
@@ -1112,6 +1118,11 @@ main(int argc, char *argv[])
 	if (lpc_bootrom())
 		fwctl_init();
 
+	/*
+	 * Change the proc title to include the VM name.
+	 */
+	setproctitle("%s", vmname);
+
 #ifndef WITHOUT_CAPSICUM
 	caph_cache_catpages();
 
@@ -1122,11 +1133,6 @@ main(int argc, char *argv[])
 		errx(EX_OSERR, "cap_enter() failed");
 #endif
 
-	/*
-	 * Change the proc title to include the VM name.
-	 */
-	setproctitle("%s", vmname); 
-	
 	/*
 	 * Add CPU 0
 	 */

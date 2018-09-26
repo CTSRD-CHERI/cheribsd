@@ -36,6 +36,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 /*
  * These functions support the macros and help fiddle mbuf chains for
  * the nfs op functions. They do things like create the rpc header and
@@ -106,7 +108,7 @@ nfsm_uiombuf(struct nfsrv_descript *nd, struct uio *uiop, int siz)
 			    NFSBCOPY((__cheri_fromcap char *)uiocp,
 				NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			else
-			    copyin_c(CAST_USER_ADDR_T(uiocp),
+			    copyin(CAST_USER_ADDR_T(uiocp),
 				NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			mbuf_setlen(mp, mbuf_len(mp) + xfer);
 			left -= xfer;
@@ -181,7 +183,7 @@ nfsm_uiombuflist(struct uio *uiop, int siz, struct mbuf **mbp, char **cpp)
 				NFSBCOPY((__cheri_fromcap char *)uiocp,
 				    NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			else
-				copyin_c(uiocp,
+				copyin(uiocp,
 				    NFSMTOD(mp, caddr_t) + mbuf_len(mp), xfer);
 			mbuf_setlen(mp, mbuf_len(mp) + xfer);
 			left -= xfer;

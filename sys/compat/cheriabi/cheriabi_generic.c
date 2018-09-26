@@ -34,6 +34,8 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/poll.h>
 #include <sys/syscallsubr.h>
@@ -125,7 +127,7 @@ cheriabi_pselect(struct thread *td, struct cheriabi_pselect_args *uap)
 	int error;
 
 	if (uap->ts != NULL) {
-		error = copyin_c(uap->ts, &ts, sizeof(ts));
+		error = copyin(uap->ts, &ts, sizeof(ts));
 		if (error != 0)
 		    return (error);
 		TIMESPEC_TO_TIMEVAL(&tv, &ts);
@@ -133,7 +135,7 @@ cheriabi_pselect(struct thread *td, struct cheriabi_pselect_args *uap)
 	} else
 		tvp = NULL;
 	if (uap->sm != NULL) {
-		error = copyin_c(uap->sm, &set, sizeof(set));
+		error = copyin(uap->sm, &set, sizeof(set));
 		if (error != 0)
 			return (error);
 		uset = &set;
@@ -150,7 +152,7 @@ cheriabi_select(struct thread *td, struct cheriabi_select_args *uap)
 	int error;
 
 	if (uap->tv != NULL) {
-		error = copyin_c(uap->tv, &tv, sizeof(tv));
+		error = copyin(uap->tv, &tv, sizeof(tv));
 		if (error)
 			return (error);
 		tvp = &tv;
@@ -187,14 +189,14 @@ cheriabi_ppoll(struct thread *td, struct cheriabi_ppoll_args *uap)
 	int error;
 
 	if (uap->ts != NULL) {
-		error = copyin_c(uap->ts, &ts, sizeof(ts));
+		error = copyin(uap->ts, &ts, sizeof(ts));
 		if (error)
 			return (error);
 		tsp = &ts;
 	} else
 		tsp = NULL;
 	if (uap->set != NULL) {
-		error = copyin_c(uap->set, &set, sizeof(set));
+		error = copyin(uap->set, &set, sizeof(set));
 		if (error)
 			return (error);
 		ssp = &set;

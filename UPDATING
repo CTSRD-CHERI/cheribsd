@@ -1,4 +1,4 @@
-Updating Information for FreeBSD current users.
+ Updating Information for FreeBSD current users.
 
 This file is maintained and copyrighted by M. Warner Losh <imp@freebsd.org>.
 See end of file for further details.  For commonly done items, please see the
@@ -31,17 +31,91 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 12.x IS SLOW:
 	disable the most expensive debugging functionality run
 	"ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20180826:
+	The Yarrow CSPRNG has been removed from the kernel as it has not been
+	supported by its designers since at least 2003. Fortuna has been the
+	default since FreeBSD-11.
+
+20180822:
+	devctl freeze/thaw have gone into the tree, the rc scripts have been
+	updated to use them and devmatch has been changed.  You should update
+	kernel, userland and rc scripts all at the same time.
+
+20180818:
+	The default interpreter has been switched from 4th to Lua.
+	LOADER_DEFAULT_INTERP, documented in build(7), will override the default
+	interpreter.  If you have custom FORTH code you will need to set
+	LOADER_DEFAULT_INTERP=4th (valid values are 4th, lua or simp) in
+	src.conf for the build.  This will create default hard links between
+	loader and loader_4th instead of loader and loader_lua, the new default.
+	If you are using UEFI it will create the proper hard link to loader.efi.
+
+	bhyve uses userboot.so. It remains 4th-only until some issues are solved
+	regarding coexisting with multiple versions of FreeBSD are resolved.
+
+20180815:
+	ls(1) now respects the COLORTERM environment variable used in other
+	systems and software to indicate that a colored terminal is both
+	supported and desired.  If ls(1) is suddenly emitting colors, they may
+	be disabled again by either removing the unwanted COLORTERM from your
+	environment, or using `ls --color=never`.  The ls(1) specific CLICOLOR
+	may not be observed in a future release.
+
+20180808:
+	The default pager for most commands has been changed to "less".  To
+	restore the old behavior, set PAGER="more" and MANPAGER="more -s" in
+	your environment.
+
+20180731:
+	The jedec_ts(4) driver has been removed. A superset of its functionality
+	is available in the jedec_dimm(4) driver, and the manpage for that
+	driver includes migration instructions. If you have "device jedec_ts"
+	in your kernel configuration file, it must be removed.
+
+20180730:
+	amd64/GENERIC now has EFI runtime services, EFIRT, enabled by default.
+	This should have no effect if the kernel is booted via BIOS/legacy boot.
+	EFIRT may be disabled via a loader tunable, efi.rt.disabled, if a system
+	has a buggy firmware that prevents a successful boot due to use of
+	runtime services.
+
+20180727:
+	Atmel AT91RM9200 and AT91SAM9, Cavium CNS 11xx and XScale
+	support has been removed from the tree. These ports were
+	obsolete and/or known to be broken for many years.
+
+20180723:
+	loader.efi has been augmented to participate more fully in the
+	UEFI boot manager protocol. loader.efi will now look at the
+	BootXXXX environment variable to determine if a specific kernel
+	or root partition was specified. XXXX is derived from BootCurrent.
+	efibootmgr(8) manages these standard UEFI variables.
+
 20180720:
 	zfsloader's functionality has now been folded into loader.
-	zfsloader is no longer necesasary once you've updated your
-	boot blocks. For a transition period, there will be a symlink
-	in place from zfsloader to loader to allow a smooth transition
-	until the boot blocks can be updated.
+	zfsloader is no longer necessary once you've updated your
+	boot blocks. For a transition period, we will install a
+	hardlink for zfsloader to loader to allow a smooth transition
+	until the boot blocks can be updated (hard link because old
+	zfs boot blocks don't understand symlinks).
+
+20180719:
+	ARM64 now have efifb support, if you want to have serial console
+	on your arm64 board when an screen is connected and the bootloader
+	setup a frambuffer for us to use, just add :
+	boot_serial=YES
+	boot_multicons=YES
+	in /boot/loader.conf
+	For Raspberry Pi 3 (RPI) users, this is needed even if you don't have
+	an screen connected as the firmware will setup a framebuffer are that
+	u-boot will expose as an EFI framebuffer.
 
 20180719:
 	New uid:gid added, ntpd:ntpd (123:123).  Be sure to run mergemaster
 	or take steps to update /etc/passwd before doing installworld on
-	existing systems.  Also, rc.d/ntpd now starts ntpd(8) as user ntpd
+	existing systems.  Do not skip the "mergemaster -Fp" step before
+	installworld, as described in the update procedures near the bottom
+	of this document.  Also, rc.d/ntpd now starts ntpd(8) as user ntpd
 	if the new mac_ntpd(4) policy is available, unless ntpd_flags or
 	the ntp config file contain options that change file/dir locations.
 	When such options (e.g., "statsdir" or "crypto") are used, ntpd can
@@ -85,11 +159,6 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 12.x IS SLOW:
 	6.0.1.  Please see the 20141231 entry below for information about
 	prerequisites and upgrading, if you are not already using clang 3.5.0
 	or higher.
-
-20180628:
-	r335753 introduced a new quoting method. However, etc/devd/devmatch.conf
-	needed to be changed to work with it. This change was made with r335763
-	and requires a mergemaster / etcupdate / etc to update the installed file.
 
 20180628:
 	r335753 introduced a new quoting method. However, etc/devd/devmatch.conf
@@ -161,7 +230,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 12.x IS SLOW:
 	Support for FDDI networks has been removed.  If you have device
 	fddi or device fpa in your kernel config file they must be
 	removed.
-	
+
 20180406:
 	In addition to supporting RFC 3164 formatted messages, the
 	syslogd(8) service is now capable of parsing RFC 5424 formatted

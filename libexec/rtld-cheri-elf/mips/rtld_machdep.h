@@ -39,6 +39,7 @@
 #include "debug.h"
 #else
 #define dbg_assert(cond) assert(cond)
+#define dbg(...)
 #endif
 
 struct Struct_Obj_Entry;
@@ -59,10 +60,18 @@ static inline Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
 #define DATA_PTR_REMOVE_PERMS	(__CHERI_CAP_PERMISSION_PERMIT_SEAL__ |	\
 	__CHERI_CAP_PERMISSION_PERMIT_EXECUTE__)
 
-static inline void*
+static inline const char*
+get_codesegment(const struct Struct_Obj_Entry *obj) {
+	/* TODO: we should have a separate member for .text/rodata */
+	dbg_assert(cheri_getperm(obj->text_rodata_cap) & __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__);
+	dbg_assert(!(cheri_getperm(obj->text_rodata_cap) & __CHERI_CAP_PERMISSION_PERMIT_STORE__));
+	return obj->text_rodata_cap;
+}
+
+static inline const void*
 make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 {
-	void* ret = defobj->relocbase + def->st_value;
+	const void* ret = get_codesegment(defobj) + def->st_value;
 
 	/* Remove store and seal permissions */
 	cheri_andperm(ret, ~FUNC_PTR_REMOVE_PERMS);
@@ -94,20 +103,15 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 }
 
 static inline const void*
-get_codesegment(const struct Struct_Obj_Entry *obj) {
-	/* TODO: we should have a separate member for .text/rodata */
-	dbg_assert(cheri_getperm(obj->relocbase) & __CHERI_CAP_PERMISSION_PERMIT_EXECUTE__);
-	return obj->relocbase;
-}
-
-static inline const void*
 vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
 	const void* text = get_codesegment(obj);
 	dbg_assert(code_addr >= (vaddr_t)text);
 	dbg_assert(code_addr < (vaddr_t)text + cheri_getlen(text));
-	/* XXXAR: would be nice if we had a cheri_setaddress() */
-	return (const char*)text + (code_addr - cheri_getbase(text));
+	return cheri_copyaddress(text, cheri_fromint(code_addr));
 }
+
+#define set_bounds_if_nonnull(ptr, size)	\
+	do { if (ptr) { ptr = cheri_csetbounds_sametype(ptr, size); } } while(0)
 
 // ignore _init/_fini
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
@@ -135,6 +139,7 @@ typedef struct {
 #define calculate_tls_offset(prev_offset, prev_size, size, align) \
     round(prev_offset + prev_size, align)
 #define calculate_tls_end(off, size)    ((off) + (size))
+#define	calculate_tls_post_size(align)	0
 
 /*
  * Lazy binding entry point, called via PLT.
@@ -203,5 +208,14 @@ _rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_p
 	return true;
 }
 
+static inline void
+fix_obj_mapping_cap_permissions(Obj_Entry *obj, const char* path __unused)
+{
+	obj->text_rodata_cap = cheri_andperm(obj->text_rodata_cap, ~FUNC_PTR_REMOVE_PERMS);
+	obj->relocbase = cheri_andperm(obj->relocbase, ~DATA_PTR_REMOVE_PERMS);
+	obj->mapbase = cheri_andperm(obj->mapbase, ~DATA_PTR_REMOVE_PERMS);
+	dbg("%s:\n\tmapbase=%-#p\n\trelocbase=%-#p\n\ttext_rodata=%-#p", path,
+	    obj->mapbase, obj->relocbase, obj->text_rodata_cap);
+}
 
 #endif

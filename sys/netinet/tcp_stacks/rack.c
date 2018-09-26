@@ -2275,7 +2275,7 @@ rack_start_hpts_timer(struct tcp_rack *rack, struct tcpcb *tp, uint32_t cts, int
 	}
 	hpts_timeout = rack_timer_start(tp, rack, cts);
 	if (tp->t_flags & TF_DELACK) {
-		delayed_ack = tcp_delacktime;
+		delayed_ack = TICKS_2_MSEC(tcp_delacktime);
 		rack->r_ctl.rc_hpts_flags |= PACE_TMR_DELACK;
 	}
 	if (delayed_ack && ((hpts_timeout == 0) ||
@@ -4657,7 +4657,6 @@ rack_process_data(struct mbuf *m, struct tcphdr *th, struct socket *so,
 
 	rack = (struct tcp_rack *)tp->t_fb_ptr;
 	INP_WLOCK_ASSERT(tp->t_inpcb);
-
 	nsegs = max(1, m->m_pkthdr.lro_nsegs);
 	if ((thflags & TH_ACK) &&
 	    (SEQ_LT(tp->snd_wl1, th->th_seq) ||
@@ -4686,6 +4685,10 @@ rack_process_data(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		tp->snd_nxt = tp->snd_max;
 		/* Make sure we output to start the timer */
 		rack->r_wanted_output++;
+	}
+	if (tp->t_flags2 & TF2_DROP_AF_DATA) {
+		m_freem(m);
+		return (0);
 	}
 	/*
 	 * Process segments with URG.
@@ -4777,7 +4780,7 @@ dodata:				/* XXX */
 		 * segments are out of order (so fast retransmit can work).
 		 */
 		if (th->th_seq == tp->rcv_nxt &&
-		    LIST_EMPTY(&tp->t_segq) &&
+		    SEGQ_EMPTY(tp) &&
 		    (TCPS_HAVEESTABLISHED(tp->t_state) ||
 		    tfo_syn)) {
 			if (DELAY_ACK(tp, tlen) || tfo_syn) {
@@ -4805,7 +4808,7 @@ dodata:				/* XXX */
 			 * m_adj() doesn't actually frees any mbufs when
 			 * trimming from the head.
 			 */
-			thflags = tcp_reass(tp, th, &tlen, m);
+			thflags = tcp_reass(tp, th, &save_start, &tlen, m);
 			tp->t_flags |= TF_ACKNOW;
 		}
 		if (tlen > 0)
@@ -5398,14 +5401,6 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	if (thflags & TH_RST)
 		return (rack_process_rst(m, th, so, tp));
 	/*
-	 * RFC5961 Section 4.2 Send challenge ACK for any SYN in
-	 * synchronized state.
-	 */
-	if (thflags & TH_SYN) {
-		rack_challenge_ack(m, th, tp, &ret_val);
-		return (ret_val);
-	}
-	/*
 	 * RFC 1323 PAWS: If we have a timestamp reply on this segment and
 	 * it's less than ts_recent, drop it.
 	 */
@@ -5475,6 +5470,16 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 * FIN-WAIT-1
 	 */
 	tp->t_starttime = ticks;
+	if (IS_FASTOPEN(tp->t_flags) && tp->t_tfo_pending) {
+		tcp_fastopen_decrement_counter(tp->t_tfo_pending);
+		tp->t_tfo_pending = NULL;
+
+		/*
+		 * Account for the ACK of our SYN prior to
+		 * regular ACK processing below.
+		 */ 
+		tp->snd_una++;
+	}
 	if (tp->t_flags & TF_NEEDFIN) {
 		tcp_state_change(tp, TCPS_FIN_WAIT_1);
 		tp->t_flags &= ~TF_NEEDFIN;
@@ -5482,16 +5487,6 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		tcp_state_change(tp, TCPS_ESTABLISHED);
 		TCP_PROBE5(accept__established, NULL, tp,
 		    mtod(m, const char *), tp, th);
-		if (IS_FASTOPEN(tp->t_flags) && tp->t_tfo_pending) {
-			tcp_fastopen_decrement_counter(tp->t_tfo_pending);
-			tp->t_tfo_pending = NULL;
-
-			/*
-			 * Account for the ACK of our SYN prior to regular
-			 * ACK processing below.
-			 */
-			tp->snd_una++;
-		}
 		/*
 		 * TFO connections call cc_conn_init() during SYN
 		 * processing.  Calling it again here for such connections
@@ -5506,7 +5501,7 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 * not, do so now to pass queued data to user.
 	 */
 	if (tlen == 0 && (thflags & TH_FIN) == 0)
-		(void)tcp_reass(tp, (struct tcphdr *)0, 0,
+		(void) tcp_reass(tp, (struct tcphdr *)0, NULL, 0,
 		    (struct mbuf *)0);
 	tp->snd_wl1 = th->th_seq - 1;
 	if (rack_process_ack(m, th, so, tp, to, tiwin, tlen, &ourfinisacked, thflags, &ret_val)) {
@@ -5571,7 +5566,7 @@ rack_do_established(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 */
 	if (__predict_true(((to->to_flags & TOF_SACK) == 0)) &&
 	    __predict_true((thflags & (TH_SYN | TH_FIN | TH_RST | TH_URG | TH_ACK)) == TH_ACK) &&
-	    __predict_true(LIST_EMPTY(&tp->t_segq)) &&
+	    __predict_true(SEGQ_EMPTY(tp)) &&
 	    __predict_true(th->th_seq == tp->rcv_nxt)) {
 		struct tcp_rack *rack;
 
@@ -6921,16 +6916,6 @@ rack_output(struct tcpcb *tp)
 	if (tp->t_flags & TF_TOE)
 		return (tcp_offload_output(tp));
 #endif
-
-	/*
-	 * For TFO connections in SYN_RECEIVED, only allow the initial
-	 * SYN|ACK and those sent by the retransmit timer.
-	 */
-	if (IS_FASTOPEN(tp->t_flags) &&
-	    (tp->t_state == TCPS_SYN_RECEIVED) &&
-	    SEQ_GT(tp->snd_max, tp->snd_una) &&    /* initial SYN|ACK sent */
-	    (rack->r_ctl.rc_resend == NULL))         /* not a retransmit */
-		return (0);
 #ifdef INET6
 	if (rack->r_state) {
 		/* Use the cache line loaded if possible */
@@ -6972,6 +6957,17 @@ rack_output(struct tcpcb *tp)
 	}
 	rack->r_wanted_output = 0;
 	rack->r_timer_override = 0;
+	/*
+	 * For TFO connections in SYN_SENT or SYN_RECEIVED,
+	 * only allow the initial SYN or SYN|ACK and those sent
+	 * by the retransmit timer.
+	 */
+	if (IS_FASTOPEN(tp->t_flags) &&
+	    ((tp->t_state == TCPS_SYN_RECEIVED) ||
+	     (tp->t_state == TCPS_SYN_SENT)) &&
+	    SEQ_GT(tp->snd_max, tp->snd_una) && /* initial SYN or SYN|ACK sent */
+	    (tp->t_rxtshift == 0))              /* not a retransmit */
+		return (0);
 	/*
 	 * Determine length of data that should be transmitted, and flags
 	 * that will be used. If there is some data or critical controls
@@ -7350,8 +7346,10 @@ again:
 	    (((flags & TH_SYN) && (tp->t_rxtshift > 0)) ||
 	     ((tp->t_state == TCPS_SYN_SENT) &&
 	      (tp->t_tfo_client_cookie_len == 0)) ||
-	     (flags & TH_RST)))
+	     (flags & TH_RST))) {
+		sack_rxmit = 0;
 		len = 0;
+	}
 	/* Without fast-open there should never be data sent on a SYN */
 	if ((flags & TH_SYN) && (!IS_FASTOPEN(tp->t_flags)))
 		len = 0;
@@ -7600,13 +7598,10 @@ dontupdate:
 	 * If our state indicates that FIN should be sent and we have not
 	 * yet done so, then we need to send.
 	 */
-	if (flags & TH_FIN) {
-		if ((tp->t_flags & TF_SENTFIN) ||
-		    (((tp->t_flags & TF_SENTFIN) == 0) &&
-		     (tp->snd_nxt == tp->snd_una))) {
-			pass = 11;
-			goto send;
-		}
+	if ((flags & TH_FIN) &&
+	    (tp->snd_nxt == tp->snd_una)) {
+		pass = 11;
+		goto send;
 	}
 	/*
 	 * No reason to send a segment, just return.

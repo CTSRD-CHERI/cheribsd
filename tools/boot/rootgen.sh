@@ -792,14 +792,13 @@ DESTDIR=${OBJDIR}/boot-tree
 rm -rf ${DESTDIR}
 mkdir -p ${DESTDIR}/boot/defaults
 mkdir -p ${DESTDIR}/boot/kernel
-# XXX boot1 exists only on sparc64
-cp /boot/boot1 ${DESTDIR}/boot
 cp /boot/kernel/kernel ${DESTDIR}/boot/kernel
 echo -h -D -S115200 > ${DESTDIR}/boot.config
 cat > ${DESTDIR}/boot/loader.conf <<EOF
 console=comconsole
 comconsole_speed=115200
-boot_serial=-h
+boot_serial=yes
+boot_multicons=yes
 EOF
 # XXX
 cp /boot/device.hints ${DESTDIR}/boot/device.hints

@@ -88,8 +88,7 @@ static void digest_dynamic1(Obj_Entry *, int, const Elf_Dyn **,
 static void digest_dynamic2(Obj_Entry *, const Elf_Dyn *, const Elf_Dyn *,
     const Elf_Dyn *);
 static void digest_dynamic(Obj_Entry *, int);
-static Obj_Entry *digest_phdr(const Elf_Phdr *, int, caddr_t, caddr_t,
-    const char *);
+static Obj_Entry *digest_phdr(const Elf_Phdr *, int, caddr_t, const char *);
 static Obj_Entry *dlcheck(void *);
 static int dlclose_locked(void *, RtldLockState *);
 static Obj_Entry *dlopen_object(const char *name, int fd, Obj_Entry *refobj,
@@ -437,8 +436,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	phdr = (const Elf_Phdr *)aux_info[AT_PHDR]->a_un.a_ptr;
 	if (phdr == obj_rtld.phdr) {
 	    if (!trust) {
-		rtld_printf("Tainted process refusing to run binary %s\n",
-		  argv0);
+		_rtld_error("Tainted process refusing to run binary %s",
+		    argv0);
 		rtld_die();
 	    }
 	    dbg("opening main program in direct exec mode");
@@ -449,7 +448,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		if (!explicit_fd)
 		    fd = open_binary_fd(argv0, search_in_path);
 		if (fstat(fd, &st) == -1) {
-		    rtld_fatal("failed to fstat FD %d (%s): %s", fd,
+		    rtld_fatal("Failed to fstat FD %d (%s): %s", fd,
 		      explicit_fd ? "user-provided descriptor" : argv0,
 		      rtld_strerror(errno));
 		}
@@ -475,8 +474,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		    dir_enable = true;
 		}
 		if (!dir_enable) {
-		    rtld_printf("No execute permission for binary %s\n",
-		      argv0);
+		    _rtld_error("No execute permission for binary %s",
+		        argv0);
 		    rtld_die();
 		}
 
@@ -508,7 +507,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		}
 #endif
 	    } else {
-		rtld_printf("no binary\n");
+		_rtld_error("No binary");
 		rtld_die();
 	    }
 	}
@@ -564,10 +563,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     if (ld_debug != NULL && *ld_debug != '\0')
 	debug = 1;
-    dbg("%s is initialized, base address = %p", __progname,
+    dbg("%s is initialized, base address = %-#p", __progname,
 	(caddr_t) aux_info[AT_BASE]->a_un.a_ptr);
-    dbg("RTLD dynamic = %p", obj_rtld.dynamic);
-    dbg("RTLD pltgot  = %p", obj_rtld.pltgot);
+    dbg("RTLD dynamic = %-#p", obj_rtld.dynamic);
+    dbg("RTLD pltgot  = %-#p", obj_rtld.pltgot);
 
     dbg("initializing thread locks");
     lockdflt_init();
@@ -584,8 +583,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    rtld_die();
 	max_stack_flags = obj_main->stack_flags;
     } else {				/* Main program already loaded. */
-	caddr_t relocbase;
-
 	dbg("processing main program's program header");
 	assert(aux_info[AT_PHDR] != NULL);
 	phdr = (const Elf_Phdr *) aux_info[AT_PHDR]->a_un.a_ptr;
@@ -595,18 +592,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (caddr_t) aux_info[AT_ENTRY]->a_un.a_ptr;
-	relocbase = (caddr_t) aux_info[AT_BASE]->a_un.a_ptr;
 	dbg("Values from kernel:\n\tAT_PHDR=%-#p\n\tAT_BASE=%-#p\n\tAT_ENTRY=%-#p\n",
-		phdr, relocbase, imgentry);
-	if ((obj_main = digest_phdr(phdr, phnum, imgentry, relocbase, argv0)) ==
+		phdr, aux_info[AT_BASE]->a_un.a_ptr, imgentry);
+	if ((obj_main = digest_phdr(phdr, phnum, imgentry, argv0)) ==
 	    NULL)
 		rtld_die();
 	dbg("Parsed values:\n\tmapbase=%-#p\n\tmapsize=%#zx"
 	     "\n\ttextsize=%#zx\n\tvaddrbase=%#zx\n\trelocbase=%-#p\n",
 		obj_main->mapbase, obj_main->mapsize, obj_main->textsize, obj_main->vaddrbase, obj_main->relocbase);
-#ifdef __CHERI_PURE_CAPABILITY__
-	rtld_require(obj_main->vaddrbase == 0, "non-zero vaddrbase not supported!");
-#endif
     }
 
     if (aux_info[AT_EXECPATH] != NULL && fd == -1) {
@@ -769,7 +762,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	rtld_die();
 #ifdef __CHERI_PURE_CAPABILITY__
     /* old crt does not exist for CheriABI */
-    assert(obj_main->crt_no_init);
+    obj_main->crt_no_init = true;
 #else
     if (!obj_main->crt_no_init) {
 	/*
@@ -1019,6 +1012,7 @@ rtld_die(void)
 
     if (msg == NULL)
 	msg = "Fatal error";
+    rtld_fdputstr(STDERR_FILENO, _BASENAME_RTLD ": ");
     rtld_fdputstr(STDERR_FILENO, msg);
     rtld_fdputchar(STDERR_FILENO, '\n');
     _exit(1);
@@ -1258,12 +1252,35 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    break;
 
 #ifdef __CHERI_PURE_CAPABILITY__
-	case DT_CHERI___CAPRELOCS:
+	case DT_MIPS_CHERI___CAPRELOCS:
 	    obj->cap_relocs = (obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
-	case DT_CHERI___CAPRELOCSSZ:
+	case DT_MIPS_CHERI___CAPRELOCSSZ:
 	    obj->cap_relocs_size = dynp->d_un.d_val;
+	    break;
+
+	case DT_MIPS_CHERI_FLAGS: {
+	    size_t flags = dynp->d_un.d_val;
+	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
+	    if (abi == DF_MIPS_CHERI_ABI_PCREL)
+		obj->restrict_pcc_basic = 1;
+	    else if (abi == DF_MIPS_CHERI_ABI_PLT || abi == DF_MIPS_CHERI_ABI_FNDESC)
+		obj->restrict_pcc_strict = 1;
+	    /* Can't restrict $pcc in legacy mode */
+	    obj->cheri_captable_abi = abi;
+	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
+	    if (flags)
+		dbg("Unknown DT_MIPS_CHERI_FLAGS: %zx", (size_t)flags);
+	    break;
+	}
+
+	case DT_MIPS_CHERI_CAPTABLE:
+	    obj->captable = (obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_MIPS_CHERI_CAPTABLESZ:
+	    obj->captable_size = dynp->d_un.d_val;
 	    break;
 #endif
 
@@ -1403,6 +1420,72 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	}
 	if (dyn_soname != NULL)
 		object_add_name(obj, obj->strtab + dyn_soname->d_un.d_val);
+#ifdef __CHERI_PURE_CAPABILITY__
+	// Set tight bounds on the individual members now (for the ones that
+	// we iterate over) instead of inheriting the relocbase bounds to avoid
+	// any overflows at runtime.
+	set_bounds_if_nonnull(obj->rel, obj->relsize);
+	set_bounds_if_nonnull(obj->rela, obj->relasize);
+	set_bounds_if_nonnull(obj->pltrel, obj->pltrelsize);
+	set_bounds_if_nonnull(obj->pltrela, obj->pltrelasize);
+	set_bounds_if_nonnull(obj->strtab, obj->strsize);
+	set_bounds_if_nonnull(obj->phdr, obj->phsize);
+
+	set_bounds_if_nonnull(obj->preinit_array_ptr, obj->preinit_array_num * sizeof(Elf_Addr));
+	set_bounds_if_nonnull(obj->init_array_ptr, obj->init_array_num * sizeof(Elf_Addr));
+	set_bounds_if_nonnull(obj->fini_array_ptr, obj->fini_array_num * sizeof(Elf_Addr));
+
+	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
+	set_bounds_if_nonnull(obj->captable, obj->captable_size);
+
+	// Now reduce the bounds on text_rodata_cap:  I, and for PLT/FNDESC we can set tight bounds
+	// so we only need .text
+	if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL) {
+		// For pcrel ABI we need to include captable as well
+		dbg("%s: text/rodata start = %#zx, text/rodata end = %#zx, "
+		    "captable = %-#p (relative to start %#zx)", obj->path,
+		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end,
+		    obj->captable, obj->captable - obj->text_rodata_cap);
+		if (obj->captable) {
+			vaddr_t start = rtld_min(obj->text_rodata_start,
+			    obj->captable - obj->text_rodata_cap);
+			vaddr_t end = rtld_max(obj->text_rodata_end,
+			    obj->captable + cheri_getlen(obj->captable) - obj->text_rodata_cap);
+			obj->text_rodata_cap += start;
+			obj->text_rodata_cap = cheri_csetbounds_sametype(
+			    obj->text_rodata_cap, end - start);
+		} else {
+			dbg("%s: missing DT_CHERI_CAPTABLE so can't set "
+			    "sensible bounds on text/rodata -> using full DSO"
+			    ": %-#p", obj->path, obj->text_rodata_cap);
+		}
+	} else if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_LEGACY) {
+#ifdef __CHERI_CAPABILITY_TABLE__
+		rtld_fatal("Cannot load legacy object %s with captable RTLD "
+		    "because it needs an unbounded $pcc. If the program is "
+		    "actually cap-table please update your toolchain so that "
+		    "the output binaries have the correct DT_MIPS_CHERI_FLAGS",
+		    obj->path);
+#endif
+		// In the legacy ABI we don't shrink the bounds at all since
+		// we use cgetsetoffset to call into other libraries ...
+		dbg("Increasing bounds text_rodata_cap in legacy ABI:");
+		dbg("\tbefore: %-#p", obj->text_rodata_cap);
+		obj->text_rodata_cap = cheri_copyaddress(cheri_getpcc(),
+		    obj->text_rodata_cap);
+		dbg("\tafter: %-#p", obj->text_rodata_cap);
+	} else {
+		// tight bounds on text_rodata possible since $cgp is live-in
+		obj->text_rodata_cap += obj->text_rodata_start;
+		// TODO: data-only .so files? Possibly used by icu4c? For now
+		// I'll keep this assertion until we hit an error
+		rtld_require(obj->text_rodata_end != 0, "No text segment in %s?", obj->path);
+		obj->text_rodata_cap = cheri_csetbounds_sametype(
+		   obj->text_rodata_cap, obj->text_rodata_end - obj->text_rodata_start);
+	}
+	dbg("%s: tightened bounds of text/rodata cap: %-#p", obj->path,
+	    obj->text_rodata_cap);
+#endif
 }
 
 static void
@@ -1423,10 +1506,9 @@ digest_dynamic(Obj_Entry *obj, int early)
  * returns an Obj_Entry structure.
  */
 static Obj_Entry *
-digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
-    const char *path)
+digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, const char *path)
 {
-    dbg("%s(0, entry=%p, relocbase=%-#p, path=%s)\n", __func__, entry, relocbase, path);
+    dbg("%s(0, entry=%-#p, phdr=%-#p, path=%s)\n", __func__, entry, phdr, path);
     Obj_Entry *obj;
     const Elf_Phdr *phlimit = phdr + phnum;
     const Elf_Phdr *ph;
@@ -1438,8 +1520,12 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
 	if (ph->p_type != PT_PHDR)
 	    continue;
 
-	obj->phdr = phdr;
 	obj->phsize = ph->p_memsz;
+#ifdef __CHERI_PURE_CAPABILITY__
+	obj->phdr = cheri_csetbounds(phdr, ph->p_memsz);
+#else
+	obj->phdr = phdr;
+#endif
 	obj->relocbase = (caddr_t)phdr - ph->p_vaddr;
 	break;
     }
@@ -1457,13 +1543,25 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
 	    if (nsegs == 0) {	/* First load segment */
 		obj->vaddrbase = trunc_page(ph->p_vaddr);
 		obj->mapbase = obj->vaddrbase + obj->relocbase;
-		obj->textsize = round_page(ph->p_vaddr + ph->p_memsz) -
-		  obj->vaddrbase;
 	    } else {		/* Last load segment */
 		obj->mapsize = round_page(ph->p_vaddr + ph->p_memsz) -
 		  obj->vaddrbase;
 	    }
 	    nsegs++;
+	    if ((ph->p_flags & PF_X) == PF_X) {
+		obj->textsize = rtld_max(obj->textsize,
+		    round_page(ph->p_vaddr + ph->p_memsz) - obj->vaddrbase);
+	    }
+#ifdef __CHERI_PURE_CAPABILITY__
+	    if (!(ph->p_flags & PF_W)) {
+		Elf_Addr start_addr = ph->p_vaddr;
+		obj->text_rodata_start = rtld_min(start_addr, obj->text_rodata_start);
+		obj->text_rodata_end = rtld_max(start_addr + ph->p_memsz, obj->text_rodata_end);
+		dbg("%s: processing readonly PT_LOAD[%d], new text/rodata start "
+		    " = %zx text/rodata end = %zx", path, nsegs,
+		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end);
+	    }
+#endif
 	    break;
 
 	case PT_DYNAMIC:
@@ -1500,17 +1598,13 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, caddr_t relocbase,
     }
 
 #ifdef __CHERI_PURE_CAPABILITY__
-   // FIXME: the kernel is passing a full addressspace AT_BASE value with
-   // the offset pointing to rtld. We should pass the main binary mapping instead!
-
-   // obj->relocbase was derived from Phdr, which is a data cap. We need a full
-   // permissions cap for obj->relocbase (for now)
-   dbg("Original obj_main->relocbase %-#p", obj->relocbase);
-   assert(cheri_getbase(relocbase) <= cheri_getbase(obj->relocbase));
-   obj->relocbase = cheri_setoffset(relocbase,
-       cheri_getaddress(obj->relocbase) - cheri_getbase(relocbase));
    obj->relocbase = cheri_csetbounds(obj->relocbase, obj->mapsize);
-   dbg("Fixed obj_main->relocbase %-#p", obj->relocbase);
+    /*
+     * Derive text_rodata cap from AT_ENTRY (but set the address to the beginning
+     * of the object). Note: csetbounds is done after parsing .dynamic
+     */
+    obj->text_rodata_cap = cheri_copyaddress(entry, obj->relocbase);
+    fix_obj_mapping_cap_permissions(obj, path);
 #endif
 
     obj->entry = entry;
@@ -1553,10 +1647,6 @@ digest_notes(Obj_Entry *obj, const Elf_Note *note_start, const Elf_Note *note_en
 			break;
 		}
 	}
-#ifdef __CHERI_PURE_CAPABILITY__
-	/* We don't support old-style binaries that call init. */
-	assert(obj->crt_no_init == true);
-#endif
 }
 
 static Obj_Entry *
@@ -2154,19 +2244,43 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* MIPS has a bogus DT_TEXTREL. */
     assert(!objtmp.textrel);
 #endif
+    ehdr = (Elf_Ehdr *)mapbase;
+    objtmp.phdr = (Elf_Phdr *)((char *)mapbase + ehdr->e_phoff);
+    objtmp.phsize = ehdr->e_phnum * sizeof(objtmp.phdr[0]);
 #ifdef __CHERI_PURE_CAPABILITY__
     /* This was done in _rtld_do___caprelocs_self */
     objtmp.cap_relocs_processed = true;
+    /* find the end of rodata/text: */
+
+    for (int i = 0; i < ehdr->e_phnum; i++) {
+	const Elf_Phdr *ph = &objtmp.phdr[i];
+	if (ph->p_type != PT_LOAD)
+	    continue;
+	if (!(ph->p_flags & PF_W)) {
+	    Elf_Addr start_addr = ph->p_vaddr;
+	    objtmp.text_rodata_start = rtld_min(start_addr, objtmp.text_rodata_start);
+	    objtmp.text_rodata_end = rtld_max(start_addr + ph->p_memsz, objtmp.text_rodata_end);
+#if defined(DEBUG_VERBOSE)
+	    /* debug is not initialized yet so dbg() is a no-op */
+	    rtld_fdprintf(STDERR_FILENO, "rtld: processing PT_LOAD phdr[%d], "
+		"new text/rodata start  = %zx text/rodata end = %zx\n", i + 1,
+		(size_t)objtmp.text_rodata_start, (size_t)objtmp.text_rodata_end);
 #endif
+	}
+    }
+    /*
+     * Note: no csetbounds yet since we also need to include .cap_table (which
+     * is part of the r/w section). Bounds are set after .dynamic is read.
+     */
+    objtmp.text_rodata_cap = objtmp.relocbase;
+    fix_obj_mapping_cap_permissions(&objtmp, "RTLD");
+#endif
+
     /*
      * Temporarily put the dynamic linker entry into the object list, so
      * that symbols can be found.
      */
     relocate_objects(&objtmp, true, &objtmp, 0, NULL);
-
-    ehdr = (Elf_Ehdr *)mapbase;
-    objtmp.phdr = (Elf_Phdr *)((char *)mapbase + ehdr->e_phoff);
-    objtmp.phsize = ehdr->e_phnum * sizeof(objtmp.phdr[0]);
 
     /* Initialize the object list. */
     TAILQ_INIT(&obj_list);
@@ -2545,7 +2659,7 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
 	    return NULL;
 	}
 	if (fs.f_flags & MNT_NOEXEC) {
-	    _rtld_error("Cannot execute objects on %s\n", fs.f_mntonname);
+	    _rtld_error("Cannot execute objects on %s", fs.f_mntonname);
 	    return NULL;
 	}
     }
@@ -3625,7 +3739,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	 * symbol.
 	 */
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
-	    sym = make_function_pointer(def, defobj);
+	    sym = __DECONST(void*, make_function_pointer(def, defobj));
 	    dbg("dlsym(%s) is function: %-#p", name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
@@ -4832,15 +4946,11 @@ get_tls_block_ptr(void *tcb, size_t tcbsize)
     size_t extra_size, post_size, pre_size, tls_block_size;
     size_t tls_init_align;
 
-    tls_init_align = MAX(obj_main->tlsalign, 1);
+    tls_init_align = rtld_max(obj_main->tlsalign, 1);
 
     /* Compute fragments sizes. */
     extra_size = tcbsize - TLS_TCB_SIZE;
-#if defined(__aarch64__) || defined(__arm__)
-    post_size =  roundup2(TLS_TCB_SIZE, tls_init_align) - TLS_TCB_SIZE;
-#else
-    post_size = 0;
-#endif
+    post_size = calculate_tls_post_size(tls_init_align);
     tls_block_size = tcbsize + post_size;
     pre_size = roundup2(tls_block_size, tls_init_align) - tls_block_size;
 
@@ -4872,16 +4982,12 @@ allocate_tls(Obj_Entry *objs, void *oldtcb, size_t tcbsize, size_t tcbalign)
 	return (oldtcb);
 
     assert(tcbsize >= TLS_TCB_SIZE);
-    maxalign = MAX(tcbalign, tls_static_max_align);
-    tls_init_align = MAX(obj_main->tlsalign, 1);
+    maxalign = rtld_max(tcbalign, tls_static_max_align);
+    tls_init_align = rtld_max(obj_main->tlsalign, 1);
 
     /* Compute fragmets sizes. */
     extra_size = tcbsize - TLS_TCB_SIZE;
-#if defined(__aarch64__) || defined(__arm__)
-    post_size = roundup2(TLS_TCB_SIZE, tls_init_align) - TLS_TCB_SIZE;
-#else
-    post_size = 0;
-#endif
+    post_size = calculate_tls_post_size(tls_init_align);
     tls_block_size = tcbsize + post_size;
     pre_size = roundup2(tls_block_size, tls_init_align) - tls_block_size;
     tls_block_size += pre_size + tls_static_space - TLS_TCB_SIZE - post_size;
@@ -4935,14 +5041,10 @@ free_tls(void *tcb, size_t tcbsize, size_t tcbalign)
     size_t dtvsize, i, tls_init_align;
 
     assert(tcbsize >= TLS_TCB_SIZE);
-    tls_init_align = MAX(obj_main->tlsalign, 1);
+    tls_init_align = rtld_max(obj_main->tlsalign, 1);
 
     /* Compute fragments sizes. */
-#if defined(__aarch64__) || defined(__arm__)
-    post_size =  roundup2(TLS_TCB_SIZE, tls_init_align) - TLS_TCB_SIZE;
-#else
-    post_size = 0;
-#endif
+    post_size = calculate_tls_post_size(tls_init_align);
 
     tlsstart = (char *)tcb + TLS_TCB_SIZE + post_size;
     tlsend = (char *)tcb + tls_static_space;
@@ -5507,12 +5609,12 @@ open_binary_fd(const char *argv0, bool search_in_path)
 	if (search_in_path && strchr(argv0, '/') == NULL) {
 		pathenv = getenv("PATH");
 		if (pathenv == NULL) {
-			rtld_printf("-p and no PATH environment variable\n");
+			_rtld_error("-p and no PATH environment variable");
 			rtld_die();
 		}
 		pathenv = strdup(pathenv);
 		if (pathenv == NULL) {
-			rtld_printf("Cannot allocate memory\n");
+			_rtld_error("Cannot allocate memory");
 			rtld_die();
 		}
 		fd = -1;
@@ -5538,8 +5640,7 @@ open_binary_fd(const char *argv0, bool search_in_path)
 	}
 
 	if (fd == -1) {
-		rtld_printf("Opening %s: %s\n", argv0,
-		    rtld_strerror(errno));
+		_rtld_error("Cannot open %s: %s", argv0, rtld_strerror(errno));
 		rtld_die();
 	}
 	return (fd);
@@ -5583,7 +5684,7 @@ parse_args(char* argv[], int argc, bool *use_pathp, int *fdp)
 			opt = arg[j];
 			if (opt == 'h') {
 				print_usage(argv[0]);
-				rtld_die();
+				_exit(0);
 			} else if (opt == 'f') {
 			/*
 			 * -f XX can be used to specify a descriptor for the
@@ -5593,12 +5694,12 @@ parse_args(char* argv[], int argc, bool *use_pathp, int *fdp)
 			 */
 			if (j != arglen - 1) {
 				/* -f must be the last option in, e.g., -abcf */
-				rtld_fatal("invalid options: %s", arg);
+				rtld_fatal("Invalid options: %s", arg);
 			}
 			i++;
 			fd = parse_integer(argv[i]);
 			if (fd == -1) {
-				rtld_fatal("invalid file descriptor: '%s'",
+				rtld_fatal("Invalid file descriptor: '%s'",
 				    argv[i]);
 			}
 			*fdp = fd;
@@ -5606,7 +5707,7 @@ parse_args(char* argv[], int argc, bool *use_pathp, int *fdp)
 			} else if (opt == 'p') {
 				*use_pathp = true;
 			} else {
-				rtld_printf("invalid argument: '%s'\n", arg);
+				_rtld_error("Invalid argument: '%s'", arg);
 				print_usage(argv[0]);
 				rtld_die();
 			}

@@ -1169,7 +1169,7 @@ page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	void *p;	/* Returned page */
 
 	*pflag = UMA_SLAB_KERNEL;
-	p = (void *) kmem_malloc_domain(kernel_arena, domain, bytes, wait);
+	p = (void *) kmem_malloc_domain(domain, bytes, wait);
 
 	return (p);
 }
@@ -1300,14 +1300,11 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 static void
 page_free(void *mem, vm_size_t size, uint8_t flags)
 {
-	struct vmem *vmem;
 
-	if (flags & UMA_SLAB_KERNEL)
-		vmem = kernel_arena;
-	else
+	if ((flags & UMA_SLAB_KERNEL) == 0)
 		panic("UMA: page_free used with invalid flags %x", flags);
 
-	kmem_free(vmem, (vm_offset_t)mem, size);
+	kmem_free((vm_offset_t)mem, size);
 }
 
 /*
@@ -2366,7 +2363,7 @@ uma_zalloc_arg(uma_zone_t zone, void *udata, int flags)
 #endif
 
 	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
-	random_harvest_fast_uma(&zone, sizeof(zone), 1, RANDOM_UMA);
+	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
 
 	/* This is the fast path allocation */
 	CTR4(KTR_UMA, "uma_zalloc_arg thread %x zone %s(%p) flags %d",
@@ -2575,7 +2572,7 @@ uma_zalloc_domain(uma_zone_t zone, void *udata, int domain, int flags)
 {
 
 	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
-	random_harvest_fast_uma(&zone, sizeof(zone), 1, RANDOM_UMA);
+	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
 
 	/* This is the fast path allocation */
 	CTR5(KTR_UMA,
@@ -2701,10 +2698,8 @@ again:
 			LIST_INSERT_HEAD(&dom->ud_part_slab, slab, us_link);
 			return (slab);
 		}
-		if (rr) {
-			keg->uk_cursor = (keg->uk_cursor + 1) % vm_ndomains;
-			domain = keg->uk_cursor;
-		}
+		if (rr)
+			domain = (domain + 1) % vm_ndomains;
 	} while (domain != start);
 
 	/* Retry domain scan with blocking. */
@@ -3035,7 +3030,7 @@ uma_zfree_arg(uma_zone_t zone, void *item, void *udata)
 #endif
 
 	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
-	random_harvest_fast_uma(&zone, sizeof(zone), 1, RANDOM_UMA);
+	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
 
 	CTR2(KTR_UMA, "uma_zfree_arg thread %x zone %s", curthread,
 	    zone->uz_name);
@@ -3211,7 +3206,7 @@ uma_zfree_domain(uma_zone_t zone, void *item, void *udata)
 {
 
 	/* Enable entropy collection for RANDOM_ENABLE_UMA kernel option */
-	random_harvest_fast_uma(&zone, sizeof(zone), 1, RANDOM_UMA);
+	random_harvest_fast_uma(&zone, sizeof(zone), RANDOM_UMA);
 
 	CTR2(KTR_UMA, "uma_zfree_domain thread %x zone %s", curthread,
 	    zone->uz_name);
@@ -3680,34 +3675,20 @@ uma_zone_exhausted_nolock(uma_zone_t zone)
 void *
 uma_large_malloc_domain(vm_size_t size, int domain, int wait)
 {
-	struct vmem *arena;
 	vm_offset_t addr;
 	uma_slab_t slab;
-
-#if VM_NRESERVLEVEL > 0
-	if (__predict_true((wait & M_EXEC) == 0))
-		arena = kernel_arena;
-	else
-		arena = kernel_rwx_arena;
-#else
-	arena = kernel_arena;
-#endif
 
 	slab = zone_alloc_item(slabzone, NULL, domain, wait);
 	if (slab == NULL)
 		return (NULL);
 	if (domain == UMA_ANYDOMAIN)
-		addr = kmem_malloc(arena, size, wait);
+		addr = kmem_malloc(size, wait);
 	else
-		addr = kmem_malloc_domain(arena, domain, size, wait);
+		addr = kmem_malloc_domain(domain, size, wait);
 	if (addr != 0) {
 		vsetslab(addr, slab);
 		slab->us_data = (void *)addr;
 		slab->us_flags = UMA_SLAB_KERNEL | UMA_SLAB_MALLOC;
-#if VM_NRESERVLEVEL > 0
-		if (__predict_false(arena == kernel_rwx_arena))
-			slab->us_flags |= UMA_SLAB_KRWX;
-#endif
 		slab->us_size = size;
 		slab->us_domain = vm_phys_domain(PHYS_TO_VM_PAGE(
 		    pmap_kextract(addr)));
@@ -3729,19 +3710,10 @@ uma_large_malloc(vm_size_t size, int wait)
 void
 uma_large_free(uma_slab_t slab)
 {
-	struct vmem *arena;
 
 	KASSERT((slab->us_flags & UMA_SLAB_KERNEL) != 0,
 	    ("uma_large_free:  Memory not allocated with uma_large_malloc."));
-#if VM_NRESERVLEVEL > 0
-	if (__predict_true((slab->us_flags & UMA_SLAB_KRWX) == 0))
-		arena = kernel_arena;
-	else
-		arena = kernel_rwx_arena;
-#else
-	arena = kernel_arena;
-#endif
-	kmem_free(arena, (vm_offset_t)slab->us_data, slab->us_size);
+	kmem_free((vm_offset_t)slab->us_data, slab->us_size);
 	uma_total_dec(slab->us_size);
 	zone_free_item(slabzone, slab, NULL, SKIP_NONE);
 }

@@ -2,11 +2,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20180924,
  *   "target_type": "prog",
  *   "changes": [
  *     "unsupported"
- *   ]
+ *   ],
+ *   "is_upstream": true
  * }
  * CHERI CHANGES END
  */
@@ -76,6 +77,7 @@
 #define HAVE_REALPATH 1
 
 /* Define to 1 if you have the `sbrk' function. */
+/* #undef HAVE_SBRK */
 
 /* Define to 1 if you have the <stdint.h> header file. */
 #define HAVE_STDINT_H 1

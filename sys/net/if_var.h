@@ -411,6 +411,7 @@ struct ifnet {
 #define	NET_EPOCH_ENTER_ET(et) epoch_enter_preempt(net_epoch_preempt, &(et))
 #define	NET_EPOCH_EXIT() epoch_exit_preempt(net_epoch_preempt, &nep_et)
 #define	NET_EPOCH_EXIT_ET(et) epoch_exit_preempt(net_epoch_preempt, &(et))
+#define	NET_EPOCH_WAIT() epoch_wait_preempt(net_epoch_preempt)
 
 
 /*
@@ -548,12 +549,14 @@ void	ifa_ref(struct ifaddr *ifa);
  * Multicast address structure.  This is analogous to the ifaddr
  * structure except that it keeps track of multicast addresses.
  */
+#define IFMA_F_ENQUEUED		0x1
 struct ifmultiaddr {
 	CK_STAILQ_ENTRY(ifmultiaddr) ifma_link; /* queue macro glue */
 	struct	sockaddr *ifma_addr; 	/* address this membership is for */
 	struct	sockaddr *ifma_lladdr;	/* link-layer translation, if any */
 	struct	ifnet *ifma_ifp;	/* back-pointer to interface */
 	u_int	ifma_refcount;		/* reference count */
+	int	ifma_flags;
 	void	*ifma_protospec;	/* protocol-specific state, if any */
 	struct	ifmultiaddr *ifma_llifma; /* pointer to ifma for ifma_lladdr */
 	struct	epoch_context	ifma_epoch_ctx;

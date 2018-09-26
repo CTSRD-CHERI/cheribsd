@@ -43,6 +43,8 @@ __FBSDID("$FreeBSD$");
 #include "opt_capsicum.h"
 #include "opt_ktrace.h"
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/fail.h>
 #include <sys/systm.h>
@@ -1845,20 +1847,20 @@ sysctl_old_user(struct sysctl_req *req, const void *p, size_t l)
 			i = len - origidx;
 		if (req->lock == REQ_WIRED) {
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_nofault_c(p,
+				error = copyoutcap_nofault(p,
 				    (char * __capability)req->oldptr +
 				    origidx, i);
 			else
-				error = copyout_nofault_c(p,
+				error = copyout_nofault(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		} else
 			if (req->flags & SCTL_PTROUT)
-				error = copyoutcap_c(p,
+				error = copyoutcap(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 			else
-				error = copyout_c(p,
+				error = copyout(p,
 				    (char * __capability)req->oldptr + origidx,
 				    i);
 		if (error != 0)
@@ -1881,10 +1883,10 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "sysctl_new_user()");
 	if (req->flags & SCTL_PTRIN)
-		error = copyincap_c((char * __capability)req->newptr +
+		error = copyincap((char * __capability)req->newptr +
 		    req->newidx, p, l);
 	else
-		error = copyin_c((char * __capability)req->newptr + req->newidx,
+		error = copyin((char * __capability)req->newptr + req->newidx,
 		    p, l);
 	req->newidx += l;
 	return (error);
@@ -2107,7 +2109,7 @@ kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
 	if (namelen > CTL_MAXNAME || namelen < 2)
 		return (EINVAL);
 
-	error = copyin_c(uname, &name[0], namelen * sizeof(int));
+	error = copyin(uname, &name[0], namelen * sizeof(int));
 	if (error)
 		return (error);
 
@@ -2116,7 +2118,7 @@ kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
 	if (error && error != ENOMEM)
 		return (error);
 	if (oldlenp) {
-		i = copyout_c(&j, oldlenp, sizeof(j));
+		i = copyout(&j, oldlenp, sizeof(j));
 		if (i)
 			return (i);
 	}
@@ -2144,7 +2146,7 @@ userland_sysctl(struct thread *td, int *name, u_int namelen,
 		if (inkernel) {
 			req.oldlen = *oldlenp;
 		} else {
-			error = copyin_c(oldlenp, &req.oldlen,
+			error = copyin(oldlenp, &req.oldlen,
 			    sizeof(*oldlenp));
 			if (error)
 				return (error);

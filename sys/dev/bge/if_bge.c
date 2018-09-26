@@ -548,7 +548,7 @@ static devclass_t bge_devclass;
 
 DRIVER_MODULE(bge, pci, bge_driver, bge_devclass, 0, 0);
 MODULE_PNP_INFO("U16:vendor;U16:device", pci, bge, bge_devs,
-    sizeof(bge_devs), nitems(bge_devs) - 1);
+    sizeof(bge_devs[0]), nitems(bge_devs) - 1);
 DRIVER_MODULE(miibus, bge, miibus_driver, miibus_devclass, 0, 0);
 
 static int bge_allow_asf = 1;
@@ -6724,15 +6724,15 @@ bge_sysctl_mem_read(SYSCTL_HANDLER_ARGS)
 static int
 bge_get_eaddr_fw(struct bge_softc *sc, uint8_t ether_addr[])
 {
-
+#ifdef __sparc64__
 	if (sc->bge_flags & BGE_FLAG_EADDR)
 		return (1);
 
-#ifdef __sparc64__
 	OF_getetheraddr(sc->bge_dev, ether_addr);
 	return (0);
-#endif
+#else
 	return (1);
+#endif
 }
 
 static int

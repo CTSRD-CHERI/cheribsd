@@ -122,12 +122,12 @@ copyout_nofault_c(const void *kaddr, void * __capability udaddr,
 }
 
 int
-copyoutcap_nofault_c(const void *kaddr, void * __capability udaddr, size_t len)
+copyoutcap_nofault(const void *kaddr, void * __capability udaddr, size_t len)
 {
 	int error, save;
 
 	save = vm_fault_disable_pagefaults();
-	error = copyoutcap_c(kaddr, udaddr, len);
+	error = copyoutcap(kaddr, udaddr, len);
 	vm_fault_enable_pagefaults(save);
 	return (error);
 }

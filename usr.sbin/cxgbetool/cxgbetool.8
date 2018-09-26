@@ -31,7 +31,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 14, 2018
+.Dd Sep 21, 2018
 .Dt CXGBETOOL 8
 .Os
 .Sh NAME
@@ -60,7 +60,7 @@
 .It
 .Nm Ar nexus Cm filter Ar idx Ar filter-specification
 .It
-.Nm Ar nexus Cm filter Ar idx Cm delete
+.Nm Ar nexus Cm filter Ar idx Cm delete Op Cm prio Bro Cm 0 | 1 Brc
 .It
 .Nm Ar nexus Cm filter list
 .It
@@ -381,7 +381,7 @@ TCAM filters: The number of available filters is in
 dev.<nexus>.<instance>.nfilters.
 .Ar idx
 must be an unused index between 0 and nfilters - 1.
-IPv6 filters consume 4 consecutive entries on T4/T5 and and 2 on T6 and
+IPv6 filters consume 4 consecutive entries on T4/T5 and 2 on T6 and
 .Ar idx
 must be aligned to 4 or 2 in this case.
 .Pp
@@ -418,9 +418,12 @@ Filter has priority over active and server regions of TCAM: 0 (default) or 1.
 Operational parameters that can be used with filters with
 .Cm action pass Ns :
 .It Cm queue
-Rx queue index to which to deliver the packet.  By default, packets that hit a
-filter with action pass are delivered based on their RSS hash as usual.  Use
-this to steer them to a particular queue.
+Context id of an ingress queue to which to deliver the packet.
+The context id is available in
+.Va dev.cxgbe.%d.rxq.%d.cntxt_id .
+By default, packets that hit a filter with action pass are delivered based on
+their RSS hash as usual.
+Use this to steer them to a particular queue.
 .It Cm rpttid
 Report the filter tid instead of the RSS hash in the rx descriptor.
 0 (default) or 1.
@@ -447,11 +450,11 @@ eport.
 .It Cm vlan
 Insert, remove, or rewrite the VLAN tag before switching the packet out of
 eport.
-.Cm vlan=none
+.Cm none
 removes the tag,
-.Cm vlan= Ns Ar tag
+.Cm = Ns Ar tag
 replaces the existing tag with the one provided, and
-.Cm vlan=+ Ns Ar tag
+.Cm + Ns Ar tag
 inserts the given tag into the frame.
 .It Cm nat
 Specify the desired NAT mode. Valid NAT modes values are:

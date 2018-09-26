@@ -237,6 +237,7 @@ __ElfType(Auxinfo);
 #define	R_MIPS_CHERI_SIZE	71
 
 #define	R_MIPS_CHERI_CAPABILITY	90
+#define	R_MIPS_CHERI_CAPABILITY_CALL	91	/* Same as above but can be lazy */
 
 #define	R_TYPE(name)		__CONCAT(R_MIPS_,name)
 

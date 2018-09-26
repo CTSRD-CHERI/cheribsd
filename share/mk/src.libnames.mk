@@ -69,6 +69,7 @@ _LIBRARIES=	\
 		asn1 \
 		auditd \
 		avl \
+		be \
 		begemot \
 		bluetooth \
 		bsdxml \
@@ -368,6 +369,7 @@ _DP_zfs_core=	nvpair
 _DP_uutil=	nvpair
 _DP_avl=	nvpair
 _DP_zpool=	md pthread z nvpair avl umem
+_DP_be=		zfs nvpair
 
 # OFED support
 .if ${MK_OFED} != "no"
@@ -381,8 +383,8 @@ _DP_mlx4=	ibverbs pthread
 _DP_mlx5=	ibverbs pthread
 _DP_rdmacm=	ibverbs
 _DP_osmcomp=	pthread
-_DP_opensm=	pthread
-_DP_osmvendor=	ibumad pthread
+_DP_opensm=	pthread osmcomp
+_DP_osmvendor=	ibumad pthread osmcomp
 .endif
 
 _DP_helloworld=	cheri
@@ -508,6 +510,9 @@ LIBBSNMPTOOLS?=	${LIBBSNMPTOOLSDIR}/libbsnmptools.a
 
 LIBAMUDIR=	${_LIB_OBJTOP}/usr.sbin/amd/libamu
 LIBAMU?=	${LIBAMUDIR}/libamu.a
+
+LIBBEDIR=	${_LIB_OBJTOP}/lib/libbe
+LIBBE?=		${LIBBEDIR}/libbe.a
 
 LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
 LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat.a

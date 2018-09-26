@@ -21,7 +21,7 @@ CFLAGS+=-I${SRCTOP}/lib/libc/include -I${.CURDIR}/thread \
 CFLAGS+=-I${.CURDIR}/arch/${MACHINE_CPUARCH}/include
 CFLAGS+=-I${.CURDIR}/sys
 CFLAGS+=-I${SRCTOP}/libexec/rtld-elf
-.ifdef LIBCHERI
+.if ${MACHINE_ARCH:Mmips64c128} || ${MACHINE_ARCH:Mmips64c256}
 CFLAGS+=-I${SRCTOP}/libexec/rtld-cheri-elf/${MACHINE_CPUARCH}
 .else
 CFLAGS+=-I${SRCTOP}/libexec/rtld-elf/${MACHINE_CPUARCH}
