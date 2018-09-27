@@ -236,6 +236,9 @@ struct mmap_req {
 	int		mr_fd;
 	int		_int_pad;
 	off_t		mr_pos;
+#if __has_feature(capabilities)
+	void * __capability mr_source_cap;
+#endif
 	};
 #endif
 

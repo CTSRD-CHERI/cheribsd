@@ -287,6 +287,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 	mr.mr_flags = flags;
 	mr.mr_fd = uap->fd;
 	mr.mr_pos = uap->pos;
+	mr.mr_source_cap = addr_cap;
 
 	return (kern_mmap_req(td, &mr));
 }
@@ -375,96 +376,75 @@ cheriabi_mmap_prot2perms(int prot)
 	return (perms);
 }
 
-int
-cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
-   void * __capability *addrp, size_t len, int prot, int flags)
+void * __capability
+cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
+    const struct mmap_req *mrp)
 {
-	register_t ret;
-	size_t mmap_cap_base, mmap_cap_len;
-	vm_map_t map;
+	void * __capability newcap;
+	size_t cap_base, cap_len;
 	register_t perms;
-	size_t addr_base;
-	void * __capability addr;
-
-	ret = td->td_retval[0];
-	/* On failure, return a NULL capability with an offset of -1. */
-	if ((void *)ret == MAP_FAILED) {
-		/* XXX-BD: the return of -1 is in userspace, not here. */
-		*retcap = (void * __capability)-1;
-		return (0);
-	}
 
 	/*
-	 * In the strong case (cheriabi_mmap_setbounds), leave addr untouched
-	 * when MAP_CHERI_NOSETBOUNDS is set.
+	 * In the strong case (cheriabi_mmap_setbounds), return the original
+	 * capability when MAP_CHERI_NOSETBOUNDS is set.
 	 *
-	 * In the weak case (!cheriabi_mmap_setbounds), return addr untouched
-	 * for *all* fixed requests.
+	 * In the weak case (!cheriabi_mmap_setbounds), return the original
+	 * capability for *all* fixed requests.
 	 *
 	 * NB: This means no permission changes.
 	 * The assumption is that the larger capability has the correct
 	 * permissions and we're only intrested in adjusting page mappings.
 	 */
-	if (flags & MAP_CHERI_NOSETBOUNDS ||
-	    (!cheriabi_mmap_setbounds && flags & MAP_FIXED)) {
-		*retcap = *addrp;
-		return (0);
+	if (mrp->mr_flags & MAP_CHERI_NOSETBOUNDS ||
+	    (!cheriabi_mmap_setbounds && mrp->mr_flags & MAP_FIXED)) {
+		return (mrp->mr_source_cap);
 	}
 
-	if (flags & MAP_FIXED) {
-		addr = *addrp;
-	} else {
-		addr = td->td_md.md_cheri_mmap_cap;
-	}
-
+	newcap = mrp->mr_source_cap;
 	if (cheriabi_mmap_honor_prot) {
-		perms = cheri_getperm(addr);
+		perms = cheri_getperm(newcap);
 		/*
 		 * Set the permissions to PROT_MAX to allow a full
 		 * range of access subject to page permissions.
 		 */
-		addr = cheri_andperm(addr, ~PERM_RWX |
-		    cheriabi_mmap_prot2perms(EXTRACT_PROT_MAX(prot)));
+		newcap = cheri_andperm(newcap, ~PERM_RWX |
+		    cheriabi_mmap_prot2perms(EXTRACT_PROT_MAX(mrp->mr_prot)));
 	}
 
-	if (flags & MAP_FIXED) {
+	if (mrp->mr_flags & MAP_FIXED) {
 		KASSERT(cheriabi_mmap_setbounds,
 		    ("%s: trying to set bounds on fixed map when disabled",
 		    __func__));
 		/*
-		 * If addr was under aligned, we need to return a
+		 * If hint was under aligned, we need to return a
 		 * capability to the whole, properly aligned region
-		 * with the offset pointing to addr.
+		 * with the offset pointing to hint.
 		 */
-		addr_base = cheri_getbase(addr);
+		cap_base = cheri_getbase(newcap);
 		/* Set offset to vaddr of page */
-		addr = cheri_setoffset(addr,
-		    rounddown2(ret, PAGE_SIZE) - addr_base);
-		addr = cheri_csetbounds(addr,
-		    roundup2(len + (ret - rounddown2(ret, PAGE_SIZE)),
+		newcap = cheri_setoffset(newcap,
+		    rounddown2(addr, PAGE_SIZE) - cap_base);
+		newcap = cheri_csetbounds(newcap,
+		    roundup2(mrp->mr_size + (addr - rounddown2(addr, PAGE_SIZE)),
 		    PAGE_SIZE));
 		/* Shift offset up if required */
-		addr_base = cheri_getbase(addr);
-		addr = cheri_setoffset(addr, addr_base - ret);
+		cap_base = cheri_getbase(newcap);
+		newcap = cheri_setoffset(newcap, cap_base - addr);
 	} else {
-		mmap_cap_base = cheri_getbase(addr);
-		mmap_cap_len = cheri_getlen(addr);
-		if (ret < mmap_cap_base ||
-		    ret + len > mmap_cap_base + mmap_cap_len) {
-			map = &td->td_proc->p_vmspace->vm_map;
-			vm_map_lock(map);
-			vm_map_remove(map, ret, ret + len);
-			vm_map_unlock(map);
-
-			return (EPERM);
-		}
-		addr = cheri_setoffset(addr, ret - mmap_cap_base);
+		cap_base = cheri_getbase(newcap);
+		cap_len = cheri_getlen(newcap);
+		KASSERT(addr >= cap_base &&
+		    addr + mrp->mr_size <= cap_base + cap_len,
+		    ("Allocated range (%zx - %zx) is not within source "
+		    "capability (%zx - %zx)", addr, addr + mrp->mr_size,
+		    cap_base, cap_base + cap_len));
+		newcap = cheri_setoffset(newcap, addr - cap_base);
 		if (cheriabi_mmap_setbounds)
-			addr = cheri_csetbounds(addr, roundup2(len, PAGE_SIZE));
+			newcap = cheri_csetbounds(newcap,
+			    roundup2(mrp->mr_size, PAGE_SIZE));
 	}
-	*retcap = addr;
 
-	return (0);
+	return (newcap);
 }
 
 int

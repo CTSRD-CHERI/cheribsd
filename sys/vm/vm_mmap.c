@@ -107,6 +107,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/pmckern.h>
 #endif
 
+#ifdef COMPAT_CHERIABI
+#include <compat/cheriabi/cheriabi_util.h>
+#endif
+
 int old_mlock = 0;
 SYSCTL_INT(_vm, OID_AUTO, old_mlock, CTLFLAG_RWTUN, &old_mlock, 0,
     "Do not apply RLIMIT_MEMLOCK on mlockall");
@@ -532,8 +536,15 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		    prot, max_prot & cap_maxprot, flags, pos, td);
 	}
 
-	if (error == 0)
-		td->td_retval[0] = (register_t) (addr + pageoff);
+	if (error == 0) {
+#ifdef COMPAT_CHERIABI
+		if (SV_CURPROC_FLAG(SV_CHERI))
+			td->td_retcap = cheriabi_mmap_retcap(td,
+			    addr + pageoff,  mrp);
+		else
+#endif
+			td->td_retval[0] = (register_t) (addr + pageoff);
+	}
 done:
 	if (fp)
 		fdrop(fp, td);
