@@ -31,7 +31,8 @@
 #ifndef _SYS_CHERIC_H_
 #define	_SYS_CHERIC_H_
 
-#include <sys/systm.h>
+/* XXX-AM: causes circular dependency with pcpu.h through machine/pte.h */
+//#include <sys/systm.h>
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
@@ -162,7 +163,7 @@ cheri_ptr(const void *ptr, size_t len)
 {
 
 	/* Assume CFromPtr without base set, availability of CSetBounds. */
-	KASSERT(len > 0, ("cheri_ptr with 0 length"));
+	// KASSERT(len > 0, ("cheri_ptr with 0 length"));
 	return (cheri_csetbounds((__cheri_tocap const void * __capability)ptr, len));
 }
 
