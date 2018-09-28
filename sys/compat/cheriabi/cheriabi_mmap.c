@@ -129,11 +129,9 @@ int
 cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 {
 	int flags = uap->flags;
-	int usertag;
-	size_t cap_base, cap_len, cap_offset;
-	void * __capability addr_cap;
+	void * __capability source_cap;
 	register_t perms, reqperms;
-	vm_offset_t reqaddr;
+	vm_offset_t hint;
 	struct mmap_req mr;
 
 	if (flags & MAP_32BIT) {
@@ -141,44 +139,61 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		return (EINVAL);
 	}
 
-	addr_cap = uap->addr;
-	usertag = cheri_gettag(addr_cap);
-	if (!usertag) {
-		if (flags & MAP_FIXED) {
-			SYSERRCAUSE(
-			    "MAP_FIXED without a valid addr capability");
-			return (EINVAL);
-		}
+	/*
+	 * Allow existing mapping to be replaced using the MAP_FIXED
+	 * flag IFF the addr argument is a valid capability with the
+	 * VMMAP user permission.  In this case, the new capability is
+	 * derived from the passed capability.  In all other cases, the
+	 * new capability is derived from the per-thread mmap capability.
+	 *
+	 * If MAP_FIXED specified and addr does not meet the above
+	 * requirements, then MAP_EXCL is implied to prevent changing
+	 * page contents without permission.
+	 *
+	 * XXXBD: The fact that using valid a capability to a currently
+	 * unmapped region with and without the VMMAP permission will
+	 * yield different results (and even failure modes) is potentially
+	 * confusing and incompatible with non-CHERI code.  One could
+	 * potentially check if the region contains any mappings and
+	 * switch to using the per-thread mmap capability as the source
+	 * capability if this pattern proves common.
+	 */
+	hint = cheri_getaddress(uap->addr);
+	if (cheri_gettag(uap->addr) &&
+	    (cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) &&
+	    (flags & MAP_FIXED))
+		source_cap = uap->addr;
+	else {
+		if (flags & MAP_FIXED)
+			flags |= MAP_EXCL;
+
 		if (flags & MAP_CHERI_NOSETBOUNDS) {
-			SYSERRCAUSE("MAP_CHERI_NOSETBOUNDS without a valid"
+			SYSERRCAUSE("MAP_CHERI_NOSETBOUNDS without a valid "
 			    "addr capability");
 			return (EINVAL);
 		}
 
-		/* User didn't provide a capability so get one. */
-		/* Use the per-thread one */
-		addr_cap = td->td_md.md_cheri_mmap_cap;
-		KASSERT(cheri_gettag(addr_cap),
-		    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+		/* Allocate from the per-thread capability. */
+		source_cap = td->td_md.md_cheri_mmap_cap;
 	}
-	cap_base = cheri_getbase(addr_cap);
-	cap_len = cheri_getlen(addr_cap);
-	if (usertag) {
-		cap_offset = cheri_getoffset(addr_cap);
-	} else {
-		/*
-		 * Ignore offset of default cap, it's only used to set bounds.
-		 */
-		cap_offset = 0;
-	}
-	if (cap_offset >= cap_len) {
-		SYSERRCAUSE("capability has out of range offset");
+	KASSERT(cheri_gettag(source_cap),
+	    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+
+	/*
+	 * If MAP_FIXED is specified, make sure that that the reqested
+	 * address range fits within the source capability.
+	 */
+	if ((flags & MAP_FIXED) &&
+	    (rounddown2(hint, PAGE_SIZE) < cheri_getbase(source_cap) ||
+	    roundup2(hint + uap->len, PAGE_SIZE) >
+	    cheri_getaddress(source_cap) + cheri_getlen(source_cap))) {
+		SYSERRCAUSE("MAP_FIXED and too little space in "
+		    "capablity (0x%zx < 0x%zx)", cap_len - cap_offset,
+		    roundup2(uap->len, PAGE_SIZE));
 		return (EPROT);
 	}
-	reqaddr = cap_base + cap_offset;
-	if (reqaddr == 0)
-		reqaddr = PAGE_SIZE;
-	perms = cheri_getperm(addr_cap);
+
+	perms = cheri_getperm(source_cap);
 	reqperms = cheriabi_mmap_prot2perms(uap->prot);
 	if ((perms & reqperms) != reqperms) {
 		SYSERRCAUSE("capability has insufficient perms (0x%lx)"
@@ -250,44 +265,15 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 	 * set at this point.  A simple assert is not easy to contruct...
 	 */
 
-	if (flags & MAP_FIXED) {
-		if (cap_len - cap_offset <
-		    roundup2(uap->len, PAGE_SIZE)) {
-			SYSERRCAUSE("MAP_FIXED and too little space in "
-			    "capablity (0x%zx < 0x%zx)", cap_len - cap_offset,
-			    roundup2(uap->len, PAGE_SIZE));
-			return (EPROT);
-		}
-
-		/*
-		 * If our address is under aligned, make sure
-		 * we have room to shift it down to the page
-		 * boundary.
-		 */
-		if ((reqaddr & PAGE_MASK) > cap_offset) {
-			SYSERRCAUSE("insufficent space to shift addr (0x%lx) "
-			    "down in capability (offset 0x%zx)",
-			    reqaddr, cap_offset);
-			return (EPROT);
-		}
-
-		/*
-		 * NB: We defer alignment checks to kern_vm_mmap where we
-		 * can account for file mappings with odd alignment
-		 * that match the offset alignment.
-		 */
-
-	}
-
 	memset(&mr, 0, sizeof(mr));
-	mr.mr_hint = reqaddr;
-	mr.mr_max_addr = cap_base + cap_len;
+	mr.mr_hint = hint;
+	mr.mr_max_addr = cheri_getbase(source_cap) + cheri_getlen(source_cap);
 	mr.mr_size = uap->len;
 	mr.mr_prot = uap->prot;
 	mr.mr_flags = flags;
 	mr.mr_fd = uap->fd;
 	mr.mr_pos = uap->pos;
-	mr.mr_source_cap = addr_cap;
+	mr.mr_source_cap = source_cap;
 
 	return (kern_mmap_req(td, &mr));
 }

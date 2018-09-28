@@ -465,8 +465,6 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 			addr = 0;
 #endif
 	} else {
-		KASSERT(addr != 0 || !SV_CURPROC_FLAG(SV_CHERI),
-		    ("CheriABI process requesting an address of 0"));
 		/*
 		 * XXX for non-fixed mappings where no hint is provided or
 		 * the hint would fall in the potential heap space,
