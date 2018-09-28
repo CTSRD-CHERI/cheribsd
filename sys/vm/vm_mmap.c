@@ -541,9 +541,9 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		if (SV_CURPROC_FLAG(SV_CHERI))
 			td->td_retcap = cheriabi_mmap_retcap(td,
 			    addr + pageoff,  mrp);
-		else
+		/* Unconditionaly return the VA in td_retval[0] for ktrace */
 #endif
-			td->td_retval[0] = (register_t) (addr + pageoff);
+		td->td_retval[0] = (register_t) (addr + pageoff);
 	}
 done:
 	if (fp)
