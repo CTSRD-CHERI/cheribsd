@@ -785,6 +785,8 @@ void ifr_lan_pcp_set(void *ifrp, u_char pcp);
 u_char ifr_vlan_pcp_get(void *ifrp);
 void ifr_vlan_pcp_set(void *ifrp, u_char pcp);
 
+int ifhwioctl(u_long, struct ifnet *, caddr_t, struct thread *);
+
 #ifdef DEVICE_POLLING
 enum poll_cmd { POLL_ONLY, POLL_AND_CHECK_STATUS };
 
