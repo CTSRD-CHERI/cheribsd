@@ -103,7 +103,7 @@ NESTED_NOPROFILE(__cerror, CALLFRAME_SIZ, ra)
 	# return -1 in all return registers
 	li		v0, -1
 	li		v1, -1
-	csetoffset	$c3, $cnull, v0
+	cincoffset	$c3, $cnull, -1
 
 	cjr		$c17
 #endif
