@@ -1075,9 +1075,7 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	 */
 	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, args->base - rtld_base,
 	    rtld_len, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
-#ifdef AT_EHDRFLAGS
 	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);
-#endif
 	if (imgp->execpathp != 0)
 		AUXARGS_ENTRY_CAP(pos, AT_EXECPATH, imgp->execpathp, 0,
 		    strlen(imgp->execpath) + 1,
