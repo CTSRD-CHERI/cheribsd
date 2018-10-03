@@ -1113,6 +1113,8 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	AUXARGS_ENTRY_CAP(pos, AT_ENVV, (vaddr_t)imgp->args->envv, 0,
 	   sizeof(void * __capability) * (imgp->args->envc + 1),
 	   CHERI_CAP_USER_DATA_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_PS_STRINGS, imgp->sysent->sv_psstrings, 0,
+	    sizeof(struct cheriabi_ps_strings), CHERI_CAP_USER_DATA_PERMS);
 
 	AUXARGS_ENTRY_NOCAP(pos, AT_NULL, 0);
 
