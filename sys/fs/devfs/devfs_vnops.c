@@ -787,7 +787,7 @@ devfs_ioctl_f(struct file *fp, u_long com, void *data, struct ucred *cred, struc
 }
 
 static void * __capability
-fiodgname_buf_get_ptr(void *fgnp)
+fiodgname_buf_get_ptr(void *fgnp, u_long com)
 {
 	union {
 		struct fiodgname_arg	fgn;
@@ -800,16 +800,21 @@ fiodgname_buf_get_ptr(void *fgnp)
 	} *fgnup;
 
 	fgnup = fgnp;
+	switch (com) {
+	case FIODGNAME:
+		return (__USER_CAP(fgnup->fgn.buf, fgnup->fgn.len));
 #ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
+	case FIODGNAME_C:
 		return (fgnup->fgn_c.buf);
 #endif
 #ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
+	case FIODGNAME_32:
 		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn32.buf,
 		    fgnup->fgn32.len));
 #endif
-	return (__USER_CAP(fgnup->fgn.buf, fgnup->fgn.len));
+	default:
+		panic("Unhandled ioctl command %ld", com);
+	}
 }
 
 static int
@@ -852,7 +857,7 @@ devfs_ioctl(struct vop_ioctl_args *ap)
 		if (i > fgn->len)
 			error = EINVAL;
 		else
-			error = copyout(p, fiodgname_buf_get_ptr(fgn), i);
+			error = copyout(p, fiodgname_buf_get_ptr(fgn, com), i);
 		break;
 	default:
 		error = dsw->d_ioctl(dev, com, ap->a_data, ap->a_fflag, td);
