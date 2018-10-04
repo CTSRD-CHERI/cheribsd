@@ -40,6 +40,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/param.h>
+#include <sys/elf_common.h>
 #include "notes.h"
 
 #ifdef __CHERI__
@@ -177,7 +179,7 @@ static const struct {
     aligned(4))) __used = {
 	.namesz = sizeof(NOTE_FREEBSD_VENDOR),
 	.descsz = sizeof(uint32_t),
-	.type = CRT_NOINIT_NOTETYPE,
+	.type = NT_FREEBSD_NOINIT_TAG,
 	.name = NOTE_FREEBSD_VENDOR,
 	.desc = 0
 };
