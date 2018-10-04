@@ -598,6 +598,7 @@ int	casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 #define	fuword16_c	fuword16
 #define	fuword32_c	fuword32
 #define	fuword64_c	fuword64
+#define fuecap		fueword
 #define	fueword_c	fueword
 #define	fueword32_c	fueword32
 #define	subyte_c	subyte
