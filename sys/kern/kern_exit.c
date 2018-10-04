@@ -680,7 +680,7 @@ sys_abort2(struct thread *td, struct abort2_args *uap)
 {
 	struct proc *p = td->td_proc;
 	struct sbuf *sb;
-	void *uargs[16];
+	void * __capability uargs[16];
 	int error, i, sig;
 
 	/*
@@ -722,7 +722,8 @@ sys_abort2(struct thread *td, struct abort2_args *uap)
 	if (uap->nargs > 0) {
 		sbuf_printf(sb, "(");
 		for (i = 0;i < uap->nargs; i++)
-			sbuf_printf(sb, "%s%p", i == 0 ? "" : ", ", uargs[i]);
+			sbuf_printf(sb, "%s%p", i == 0 ? "" : ", ",
+			    (__cheri_fromcap void *)uargs[i]);
 		sbuf_printf(sb, ")");
 	}
 	/*
@@ -796,7 +797,10 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 {
 	struct __wrusage wru, *wrup;
 	_siginfo_t si, *sip;
+#ifdef COMPAT_FREEBSD64
+	/* XXX-AM: fix for freebsd64 */
 	struct siginfo_native si_n;
+#endif
 	idtype_t idtype;
 	id_t id;
 	int error, status;
@@ -828,8 +832,11 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 		error = copyout(&wru, __USER_CAP_OBJ(uap->wrusage),
 		    sizeof(wru));
 	if (uap->info != NULL && error == 0) {
+#ifdef COMPAT_FREEBSD64
+		/* XXX-AM: fix this should go in compat64 */
 		siginfo_to_siginfo_native(&si, &si_n);
-		error = copyout(&si_n, __USER_CAP_OBJ(uap->info), sizeof(si_n));
+#endif
+		error = copyout(&si, __USER_CAP_OBJ(uap->info), sizeof(si));
 	}
 	return (error);
 }
