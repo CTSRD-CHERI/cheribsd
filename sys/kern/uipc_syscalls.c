@@ -911,6 +911,29 @@ int
 sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 {
 	kmsghdr_t msg;
+	kiovec_t *iov;
+	int error;
+
+	error = copyincap(uap->msg, &msg, sizeof(msg));
+	if (error != 0)
+		return (error);
+	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
+	if (error != 0)
+		return (error);
+	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
+#ifdef COMPAT_OLDSOCK
+	msg.msg_flags = 0;
+#endif
+	error = sendit(td, uap->s, &msg, uap->flags);
+	free(iov, M_IOV);
+	return (error);
+}
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+int
+freebsd64_sendmsg(struct thread *td, struct freebsd64_sendmsg_args *uap)
+{
+	kmsghdr_t msg;
 	umsghdr_t umsg;
 	kiovec_t *iov;
 	int error;
@@ -937,6 +960,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	free(iov, M_IOV);
 	return (error);
 }
+#endif
 
 int
 kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
@@ -1216,6 +1240,39 @@ int
 sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 {
 	kmsghdr_t msg;
+	kiovec_t *iov;
+	int error;
+
+	error = copyincap(uap->msg, &msg, sizeof(msg));
+	if (error != 0)
+		return (error);
+	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
+	if (error != 0)
+		return (error);
+	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
+	msg.msg_flags = uap->flags;
+#ifdef COMPAT_OLDSOCK
+	msg.msg_flags &= ~MSG_COMPAT;
+#endif
+	error = recvit(td, uap->s, &msg, NULL);
+	if (error == 0) {
+		/*
+		 * The pointers should not have changed so don't touch them.
+		 * XXX: assert this?
+		 * XXX: what if anything else should have changed?
+		 */
+		error = copyout(&msg, uap->msg, sizeof(msg));
+	}
+	free(iov, M_IOV);
+	return (error);
+}
+
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+int
+freebsd64_recvmsg(struct thread *td, struct freebsd64_recvmsg_args *uap)
+{
+	kmsghdr_t msg;
 	umsghdr_t umsg;
 	kiovec_t *iov;
 	int error;
@@ -1252,6 +1309,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	free(iov, M_IOV);
 	return (error);
 }
+#endif
 
 int
 sys_shutdown(struct thread *td, struct shutdown_args *uap)

@@ -964,7 +964,7 @@ sendfile(struct thread *td, struct sendfile_args *uap, int compat)
 	hdr_uio = trl_uio = NULL;
 
 	if (uap->hdtr != NULL) {
-		error = copyin(uap->hdtr, &hdtr, sizeof(hdtr));
+		error = copyincap(uap->hdtr, &hdtr, sizeof(hdtr));
 		if (error != 0)
 			goto out;
 		if (hdtr.headers != NULL) {
@@ -1008,7 +1008,7 @@ sendfile(struct thread *td, struct sendfile_args *uap, int compat)
 	fdrop(fp, td);
 
 	if (uap->sbytes != NULL)
-		copyout(&sbytes, uap->sbytes, sizeof(off_t));
+		copyout_c(&sbytes, uap->sbytes, sizeof(off_t));
 
 out:
 	free(hdr_uio, M_IOV);
