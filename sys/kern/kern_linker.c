@@ -29,6 +29,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define EXPLICIT_USER_ACCESS
+
 #include "opt_ddb.h"
 #include "opt_kld.h"
 #include "opt_hwpmc_hooks.h"
@@ -1304,7 +1306,7 @@ kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat)
 	bcopy(lf->filename, &stat->name[0], namelen);
 	stat->refs = lf->refs;
 	stat->id = lf->id;
-	stat->address = lf->address;
+	stat->address = (void * __capability)(intcap_t)lf->address;
 	stat->size = lf->size;
 	/* Version 2 fields: */
 	namelen = strlen(lf->pathname) + 1;
@@ -1371,7 +1373,7 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	char *symstr;
 	int error;
 
-	error = copyin(uap->data, &lookup, sizeof(lookup));
+	error = copyincap(uap->data, &lookup, sizeof(lookup));
 	if (error != 0)
 		return (error);
 	if (lookup.version != sizeof(lookup) ||
@@ -1385,7 +1387,7 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	    &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
 		goto done;
-	error = copyout(&lookup, uap->data, sizeof(lookup));
+	error = copyoutcap(&lookup, uap->data, sizeof(lookup));
 done:
 	free(symstr, M_TEMP);
 	return (error);
