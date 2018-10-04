@@ -183,6 +183,8 @@ struct ktr_ccall;
 struct ktr_creturn;
 struct ktr_cexception;
 struct thr_param;
+int	cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
+	    void * __capability *addrp, size_t len, int prot, int flags);
 /* XXX-AM: should we move this in place of machine/cpu_set_upcall? */
 void	cheriabi_set_threadregs(struct thread *td, struct thr_param *param);
 void	cheriabi_thr_new_md(struct thread *parent_td, struct thr_param *param);

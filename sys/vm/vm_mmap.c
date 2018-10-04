@@ -103,12 +103,12 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_page.h>
 #include <vm/vnode_pager.h>
 
-#ifdef HWPMC_HOOKS
-#include <sys/pmckern.h>
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_util.h>
+#ifdef HWPMC_HOOKS
+#include <sys/pmckern.h>
 #endif
 
 int old_mlock = 0;
@@ -117,6 +117,24 @@ SYSCTL_INT(_vm, OID_AUTO, old_mlock, CTLFLAG_RWTUN, &old_mlock, 0,
 static int log_wxrequests = 0;
 SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
     "Log requests for PROT_WRITE and PROT_EXEC");
+
+#if __has_feature(capabilities)
+SYSCTL_NODE(_compat, OID_AUTO, cheriabi, CTLFLAG_RW, 0, "CheriABI mode");
+static SYSCTL_NODE(_compat_cheriabi, OID_AUTO, mmap, CTLFLAG_RW, 0, "mmap");
+
+static int	cheriabi_mmap_honor_prot = 1;
+SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, honor_prot,
+    CTLFLAG_RWTUN, &cheriabi_mmap_honor_prot, 0,
+    "Reduce returned permissions to those requested by the prot argument.");
+static int	cheriabi_mmap_setbounds = 1;
+SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, setbounds,
+    CTLFLAG_RWTUN, &cheriabi_mmap_setbounds, 0,
+    "Set bounds on returned capabilities.");
+int	cheriabi_mmap_precise_bounds = 1;
+SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
+    CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
+    "Require that bounds on returned capabilities be precise.");
+#endif /* __has_feature(capabilities) */
 
 #ifdef MAP_32BIT
 #define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
@@ -127,6 +145,144 @@ struct sbrk_args {
 	int incr;
 };
 #endif
+
+#if __has_feature(capabilities)
+
+#define	PERM_READ	(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+#define	PERM_WRITE	(CHERI_PERM_STORE | CHERI_PERM_STORE_CAP | \
+			    CHERI_PERM_STORE_LOCAL_CAP)
+#define	PERM_EXEC	CHERI_PERM_EXECUTE
+#define	PERM_RWX	(PERM_READ | PERM_WRITE | PERM_EXEC)
+/*
+ * Given a starting set of CHERI permissions (operms), set (not AND) the load,
+ * store, and execute permissions based on the mmap permissions (prot).
+ *
+ * This function is intended to be used when creating a capability to a
+ * new region or rederiving a capability when upgrading a sub-region.
+ */
+static register_t
+cheriabi_mmap_prot2perms(int prot)
+{
+	register_t perms = 0;
+
+	if (prot & PROT_READ)
+		perms |= CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP;
+	if (prot & PROT_WRITE)
+		perms |= CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		CHERI_PERM_STORE_LOCAL_CAP;
+	if (prot & PROT_EXEC)
+		perms |= CHERI_PERM_EXECUTE;
+
+	return (perms);
+}
+
+static int
+cap_covers_pages(const void * __capability cap, size_t size)
+{
+	const char * __capability addr;
+	size_t pageoff;
+
+	addr = cap;
+	pageoff = ((__cheri_addr vaddr_t)addr & PAGE_MASK);
+	addr -= pageoff;
+	size += pageoff;
+	size = (vm_size_t)round_page(size);
+
+	return (__CAP_CHECK(__DECONST_CAP(void * __capability, addr), size));
+}
+
+int
+cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
+   void * __capability *addrp, size_t len, int prot, int flags)
+{
+	register_t ret;
+	size_t mmap_cap_base, mmap_cap_len;
+	vm_map_t map;
+	register_t perms;
+	size_t addr_base;
+	void * __capability addr;
+
+	ret = td->td_retval[0];
+	/* On failure, return a NULL capability with an offset of -1. */
+	if ((void *)ret == MAP_FAILED) {
+		/* XXX-BD: the return of -1 is in userspace, not here. */
+		*retcap = (void * __capability)-1;
+		return (0);
+	}
+
+	/*
+	 * In the strong case (cheriabi_mmap_setbounds), leave addr untouched
+	 * when MAP_CHERI_NOSETBOUNDS is set.
+	 *
+	 * In the weak case (!cheriabi_mmap_setbounds), return addr untouched
+	 * for *all* fixed requests.
+	 *
+	 * NB: This means no permission changes.
+	 * The assumption is that the larger capability has the correct
+	 * permissions and we're only intrested in adjusting page mappings.
+	 */
+	if (flags & MAP_CHERI_NOSETBOUNDS ||
+	    (!cheriabi_mmap_setbounds && flags & MAP_FIXED)) {
+		*retcap = *addrp;
+		return (0);
+	}
+
+	if (flags & MAP_FIXED) {
+		addr = *addrp;
+	} else {
+		addr = td->td_md.md_cheri_mmap_cap;
+	}
+
+	if (cheriabi_mmap_honor_prot) {
+		perms = cheri_getperm(addr);
+		/*
+		 * Set the permissions to PROT_MAX to allow a full
+		 * range of access subject to page permissions.
+		 */
+		addr = cheri_andperm(addr, ~PERM_RWX |
+		    cheriabi_mmap_prot2perms(EXTRACT_PROT_MAX(prot)));
+	}
+
+	if (flags & MAP_FIXED) {
+		KASSERT(cheriabi_mmap_setbounds,
+		    ("%s: trying to set bounds on fixed map when disabled",
+		    __func__));
+		/*
+		 * If addr was under aligned, we need to return a
+		 * capability to the whole, properly aligned region
+		 * with the offset pointing to addr.
+		 */
+		addr_base = cheri_getbase(addr);
+		/* Set offset to vaddr of page */
+		addr = cheri_setoffset(addr,
+		    rounddown2(ret, PAGE_SIZE) - addr_base);
+		addr = cheri_csetbounds(addr,
+		    roundup2(len + (ret - rounddown2(ret, PAGE_SIZE)),
+		    PAGE_SIZE));
+		/* Shift offset up if required */
+		addr_base = cheri_getbase(addr);
+		addr = cheri_setoffset(addr, addr_base - ret);
+	} else {
+		mmap_cap_base = cheri_getbase(addr);
+		mmap_cap_len = cheri_getlen(addr);
+		if (ret < mmap_cap_base ||
+		    ret + len > mmap_cap_base + mmap_cap_len) {
+			map = &td->td_proc->p_vmspace->vm_map;
+			vm_map_lock(map);
+			vm_map_remove(map, ret, ret + len);
+			vm_map_unlock(map);
+
+			return (EPERM);
+		}
+		addr = cheri_setoffset(addr, ret - mmap_cap_base);
+		if (cheriabi_mmap_setbounds)
+			addr = cheri_csetbounds(addr, roundup2(len, PAGE_SIZE));
+	}
+	*retcap = addr;
+
+	return (0);
+}
+#endif /* __has_feature(capabilities) */
 
 int
 sys_sbrk(struct thread *td, struct sbrk_args *uap)
@@ -188,7 +344,7 @@ vm_wxcheck(struct proc *p, char *call)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct mmap_args {
-	void *addr;
+	void * __capability addr;
 	size_t len;
 	int prot;
 	int flags;
@@ -198,13 +354,167 @@ struct mmap_args {
 };
 #endif
 
+#if __has_feature(capabilities)
 int
 sys_mmap(struct thread *td, struct mmap_args *uap)
 {
+	int flags = uap->flags;
+	void * __capability source_cap;
+	register_t perms, reqperms;
+	vm_offset_t hint;
+	struct mmap_req mr;
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len, uap->prot,
-	    uap->flags, uap->fd, uap->pos));
+	if (flags & MAP_32BIT) {
+		SYSERRCAUSE("MAP_32BIT not supported in CheriABI");
+		return (EINVAL);
+	}
+
+	/*
+	 * Allow existing mapping to be replaced using the MAP_FIXED
+	 * flag IFF the addr argument is a valid capability with the
+	 * VMMAP user permission.  In this case, the new capability is
+	 * derived from the passed capability.  In all other cases, the
+	 * new capability is derived from the per-thread mmap capability.
+	 *
+	 * If MAP_FIXED specified and addr does not meet the above
+	 * requirements, then MAP_EXCL is implied to prevent changing
+	 * page contents without permission.
+	 *
+	 * XXXBD: The fact that using valid a capability to a currently
+	 * unmapped region with and without the VMMAP permission will
+	 * yield different results (and even failure modes) is potentially
+	 * confusing and incompatible with non-CHERI code.  One could
+	 * potentially check if the region contains any mappings and
+	 * switch to using the per-thread mmap capability as the source
+	 * capability if this pattern proves common.
+	 */
+	hint = cheri_getaddress(uap->addr);
+	if (cheri_gettag(uap->addr) &&
+	    (cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) &&
+	    (flags & MAP_FIXED))
+		source_cap = uap->addr;
+	else {
+		if (flags & MAP_FIXED)
+			flags |= MAP_EXCL;
+
+		if (flags & MAP_CHERI_NOSETBOUNDS) {
+			SYSERRCAUSE("MAP_CHERI_NOSETBOUNDS without a valid "
+			    "addr capability");
+			return (EINVAL);
+		}
+
+		/* Allocate from the per-thread capability. */
+		source_cap = td->td_md.md_cheri_mmap_cap;
+	}
+	KASSERT(cheri_gettag(source_cap),
+	    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+
+	/*
+	 * If MAP_FIXED is specified, make sure that that the reqested
+	 * address range fits within the source capability.
+	 */
+	if ((flags & MAP_FIXED) &&
+	    (rounddown2(hint, PAGE_SIZE) < cheri_getbase(source_cap) ||
+	    roundup2(hint + uap->len, PAGE_SIZE) >
+	    cheri_getaddress(source_cap) + cheri_getlen(source_cap))) {
+		SYSERRCAUSE("MAP_FIXED and too little space in "
+		    "capablity (0x%zx < 0x%zx)", cap_len - cap_offset,
+		    roundup2(uap->len, PAGE_SIZE));
+		return (EPROT);
+	}
+
+	perms = cheri_getperm(source_cap);
+	reqperms = cheriabi_mmap_prot2perms(uap->prot);
+	if ((perms & reqperms) != reqperms) {
+		SYSERRCAUSE("capability has insufficient perms (0x%lx)"
+		    "for request (0x%lx)", perms, reqperms);
+		return (EPROT);
+	}
+
+	/*
+	 * If alignment is specified, check that it is sufficent and
+	 * increase as required.  If not, assume data alignment.
+	 */
+	switch (flags & MAP_ALIGNMENT_MASK) {
+	case MAP_ALIGNED(0):
+		/*
+		 * Request CHERI data alignment when no other request
+		 * is made.
+		 */
+		flags &= ~MAP_ALIGNMENT_MASK;
+		flags |= MAP_ALIGNED_CHERI;
+		break;
+	case MAP_ALIGNED_CHERI:
+	case MAP_ALIGNED_CHERI_SEAL:
+		break;
+	case MAP_ALIGNED_SUPER:
+#ifdef __mips_n64
+		/*
+		 * pmap_align_superpage() is a no-op for allocations
+		 * less than a super page so request data alignment
+		 * in that case.
+		 *
+		 * In practice this is a no-op as super-pages are
+		 * precisely representable.
+		 */
+		if (uap->len < PDRSIZE &&
+		    CHERI_ALIGN_SHIFT(uap->len) > PAGE_SHIFT) {
+			flags &= ~MAP_ALIGNMENT_MASK;
+			flags |= MAP_ALIGNED_CHERI;
+		}
+#else
+#error	MAP_ALIGNED_SUPER handling unimplemented for this architecture
+#endif
+		break;
+	default:
+		/* Reject nonsensical sub-page alignment requests */
+		if ((flags >> MAP_ALIGNMENT_SHIFT) < PAGE_SHIFT) {
+			SYSERRCAUSE("subpage alignment request");
+			return (EINVAL);
+		}
+
+		/*
+		 * Honor the caller's alignment request, if any unless
+		 * it is too small.  If is, promote the request to
+		 * MAP_ALIGNED_CHERI.
+		 *
+		 * XXX: It seems likely a user passing too small an
+		 * alignment will have also passed an invalid length,
+		 * but upgrading the alignment is always safe and
+		 * we'll catch the length later.
+		 */
+		if ((flags >> MAP_ALIGNMENT_SHIFT) <
+		    CHERI_ALIGN_SHIFT(uap->len)) {
+			flags &= ~MAP_ALIGNMENT_MASK;
+			flags |= MAP_ALIGNED_CHERI;
+		}
+		break;
+	}
+	/*
+	 * NOTE: If this architecture requires an alignment constraint, it is
+	 * set at this point.  A simple assert is not easy to contruct...
+	 */
+
+	memset(&mr, 0, sizeof(mr));
+	mr.mr_hint = hint;
+	mr.mr_max_addr = cheri_getbase(source_cap) + cheri_getlen(source_cap);
+	mr.mr_size = uap->len;
+	mr.mr_prot = uap->prot;
+	mr.mr_flags = flags;
+	mr.mr_fd = uap->fd;
+	mr.mr_pos = uap->pos;
+	mr.mr_source_cap = source_cap;
+
+	return (kern_mmap_req(td, &mr));
 }
+#else /* ! __has_feature(capabilities) */
+int
+sys_mmap(struct thread *td, struct mmap_args *uap)
+{
+	return (kern_mmap(td, (uintptr_t)uap->addr, 0, uap->len,
+	    uap->prot, uap->flags, uap->fd, uap->pos));
+}
+#endif /* ! __has_feature(capabilities) */
 
 int
 kern_mmap(struct thread *td, uintptr_t addr0, size_t size, int prot,
@@ -535,7 +845,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	}
 
 	if (error == 0) {
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI))
 			td->td_retcap = cheriabi_mmap_retcap(td,
 			    addr + pageoff,  mrp);
@@ -618,7 +928,7 @@ ommap(struct thread *td, struct ommap_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct msync_args {
-	void *addr;
+	void * __capability addr;
 	size_t len;
 	int flags;
 };
@@ -626,8 +936,18 @@ struct msync_args {
 int
 sys_msync(struct thread *td, struct msync_args *uap)
 {
-
-	return (kern_msync(td, (uintptr_t)uap->addr, uap->len, uap->flags));
+#if __has_feature(capabilities)
+	/*
+	 * FreeBSD msync() has a non-standard behavior that a len of 0
+	 * effects the whole vm entry.  We allow this because it is used
+	 * and we currently think there is little attack value in
+	 * msync calls.
+	 */
+	if (uap->len != 0 && cap_covers_pages(uap->addr, uap->len) == 0)
+		return (EINVAL);
+#endif
+	return (kern_msync(td, (uintptr_t)(__cheri_fromcap void *)uap->addr,
+	    uap->len, uap->flags));
 }
 
 int
@@ -676,15 +996,21 @@ kern_msync(struct thread *td, uintptr_t addr0, size_t size, int flags)
 
 #ifndef _SYS_SYSPROTO_H_
 struct munmap_args {
-	void *addr;
+	void * __capability addr;
 	size_t len;
 };
 #endif
 int
 sys_munmap(struct thread *td, struct munmap_args *uap)
 {
-
-	return (kern_munmap(td, (uintptr_t)uap->addr, uap->len));
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX EPROT? */
+	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+		return (EPROT);
+#endif
+	return (kern_munmap(td, (uintptr_t)(__cheri_fromcap void *)uap->addr,
+	    uap->len));
 }
 
 int
@@ -758,7 +1084,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 
 #ifndef _SYS_SYSPROTO_H_
 struct mprotect_args {
-	const void *addr;
+	const void * __capability addr;
 	size_t len;
 	int prot;
 };
@@ -766,8 +1092,32 @@ struct mprotect_args {
 int
 sys_mprotect(struct thread *td, struct mprotect_args *uap)
 {
+#if __has_feature(capabilities)
+	register_t perms, reqperms;
 
-	return (kern_mprotect(td, (uintptr_t)uap->addr, uap->len, uap->prot));
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX EPROT? */
+	/*
+	 * XXX: should we require CHERI_PERM_CHERIABI_VMMAP?  On one
+	 * hand we don't change the contents, on the other hand, denied
+	 * access can turn into a fault...
+	 */
+
+	perms = cheri_getperm(uap->addr);
+	/*
+	 * Requested prot much be allowed by capability.
+	 *
+	 * XXX-BD: An argument could be made for allowing a union of the
+	 * current page permissions with the capability permissions (e.g.
+	 * allowing a writable cap to add write permissions to an RX
+	 * region as required to match up objects with textrel sections.
+	 */
+	reqperms = cheriabi_mmap_prot2perms(uap->prot);
+	if ((perms & reqperms) != reqperms)
+		return (EPROT);
+#endif
+	return (kern_mprotect(td, (uintptr_t)(__cheri_fromcap void *)uap->addr,
+	    uap->len, uap->prot));
 }
 
 int
@@ -810,7 +1160,7 @@ kern_mprotect(struct thread *td, uintptr_t addr0, size_t size, int prot)
 
 #ifndef _SYS_SYSPROTO_H_
 struct minherit_args {
-	void *addr;
+	void * __capability addr;
 	size_t len;
 	int inherit;
 };
@@ -818,8 +1168,12 @@ struct minherit_args {
 int
 sys_minherit(struct thread *td, struct minherit_args *uap)
 {
-
-	return (kern_minherit(td, (vm_offset_t)uap->addr, uap->len,
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX EPROT? */
+	/* XXX: require CHERI_PERM_CHERIABI_VMMAP? */
+#endif
+	return (kern_minherit(td, (__cheri_addr vm_offset_t)uap->addr, uap->len,
 	    uap->inherit));
 }
 
@@ -847,7 +1201,7 @@ kern_minherit(struct thread *td, vm_offset_t addr, vm_size_t size, int inherit)
 
 #ifndef _SYS_SYSPROTO_H_
 struct madvise_args {
-	void *addr;
+	void * __capability addr;
 	size_t len;
 	int behav;
 };
@@ -856,8 +1210,21 @@ struct madvise_args {
 int
 sys_madvise(struct thread *td, struct madvise_args *uap)
 {
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX EPROT? */
 
-	return (kern_madvise(td, (uintptr_t)uap->addr, uap->len, uap->behav));
+	/*
+	 * MADV_FREE may change the page contents so require
+	 * CHERI_PERM_CHERIABI_VMMAP.
+	 */
+	if (uap->behav == MADV_FREE) {
+		if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+			return (EPROT);
+	}
+#endif
+	return (kern_madvise(td, (uintptr_t)(__cheri_fromcap void *)uap->addr,
+	    uap->len, uap->behav));
 }
 
 int
@@ -903,18 +1270,21 @@ kern_madvise(struct thread *td, uintptr_t addr0, size_t len, int behav)
 
 #ifndef _SYS_SYSPROTO_H_
 struct mincore_args {
-	const void *addr;
+	const void * __capability addr;
 	size_t len;
-	char *vec;
+	char * __capability vec;
 };
 #endif
 
 int
 sys_mincore(struct thread *td, struct mincore_args *uap)
 {
-
-	return (kern_mincore(td, (uintptr_t)uap->addr, uap->len,
-	    __USER_CAP(uap->vec, uap->len)));
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX: EPROT? */
+#endif
+	return (kern_mincore(td, (uintptr_t)(__cheri_fromcap void *)uap->addr,
+	    uap->len, uap->vec));
 }
 
 int
@@ -1155,16 +1525,19 @@ done2:
 
 #ifndef _SYS_SYSPROTO_H_
 struct mlock_args {
-	const void *addr;
+	const void * __capability addr;
 	size_t len;
 };
 #endif
 int
 sys_mlock(struct thread *td, struct mlock_args *uap)
 {
-
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX: EPROT? */
+#endif
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    __DECONST(uintptr_t, uap->addr), uap->len));
+	    __DECONST(uintptr_t, (__cheri_fromcap void *)uap->addr), uap->len));
 }
 
 int
@@ -1327,15 +1700,19 @@ sys_munlockall(struct thread *td, struct munlockall_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct munlock_args {
-	const void *addr;
+	const void * __capability addr;
 	size_t len;
 };
 #endif
 int
 sys_munlock(struct thread *td, struct munlock_args *uap)
 {
-
-	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
+#if __has_feature(capabilities)
+	if (cap_covers_pages(uap->addr, uap->len) == 0)
+		return (ENOMEM);	/* XXX: EPROT? */
+#endif
+	return (kern_munlock(td, (uintptr_t)(__cheri_fromcap void *)uap->addr,
+	    uap->len));
 }
 
 int
