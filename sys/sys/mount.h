@@ -564,7 +564,7 @@ struct vfsidctl {
 	char		vc_fstypename[MFSNAMELEN];
 					/* type of fs 'nfs' or '*' */
 	fsctlop_t	vc_op;		/* operation VFS_CTL_* (below) */
-	void		*vc_ptr;	/* pointer to data structure */
+	void * __kerncap vc_ptr;	/* pointer to data structure */
 	size_t		vc_len;		/* sizeof said structure */
 	u_int32_t	vc_spare[12];	/* spare (must be zero) */
 };
