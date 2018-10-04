@@ -492,6 +492,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 #endif
 }
 
+#if !__has_feature(capabilities)
 /*
  * Set that machine state for performing an upcall that starts
  * the entry function with the given argument.
@@ -552,6 +553,7 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	 * that are needed.
 	 */
 }
+#endif /* !feature(capabilities) */
 
 /*
  * Implement the pre-zeroed page mechanism.
@@ -572,6 +574,8 @@ swi_vm(void *dummy)
 		busdma_swi();
 }
 
+#if !__has_feature(capabilities)
+/* XXX-AM: fix for freebsd64, we use cheriabi_set_user_tls by default now */
 int
 cpu_set_user_tls(struct thread *td, void *tls_base)
 {
@@ -599,6 +603,7 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 
 	return (0);
 }
+#endif
 
 #ifdef DDB
 #include <ddb/ddb.h>

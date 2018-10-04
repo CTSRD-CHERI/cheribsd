@@ -64,8 +64,16 @@ typedef struct	__mcontext {
 
 #if __has_feature(capabilities)
 	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	struct chericap	__spare__[8];
-#else /* !feature(capabilities) */
+	void * __capability	__spare__[8];
+#else /* ! __has_feature(capabilities ) */
+        /*
+         * Optional externally referenced storage for coprocessors.  Modeled
+         * on the approach taken for extended FPU state on x86, which leaves
+         * some ABI concerns but appears to work in practice.
+         */
+        __register_t    mc_cp2state;    /* Pointer to external state. */
+        __register_t    mc_cp2state_len;/* Length of external state. */
+
         /*
          * XXXRW: Unfortunately, reserved space in the MIPS sigcontext was
          * made an 'int' rather than '__register_t', so embedding new pointers
@@ -77,7 +85,7 @@ typedef struct	__mcontext {
 #else
         int             xxx[7];         /* XXX reserved */
 #endif
-#endif /* !feature(capabilities) */
+#endif /* ! __has_feature(capabilities) */
 } mcontext_t;
 
 #if (defined(__mips_n32) || defined(__mips_n64)) && defined(COMPAT_FREEBSD32)

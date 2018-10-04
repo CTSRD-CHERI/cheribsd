@@ -88,6 +88,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/pmckern.h>
 #endif
 
+#include <cheri/cheric.h>
 #include <machine/reg.h>
 
 #include <security/audit/audit.h>
@@ -1188,10 +1189,11 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
  * space into the temporary string buffer.
  */
 int
-exec_copyin_args(struct image_args *args, char *fname,
-    enum uio_seg segflg, char **argv, char **envv)
+exec_copyin_args(struct image_args *args, char * __capability fname,
+    enum uio_seg segflg, char * __capability * __capability argv,
+    char * __capability * __capability envv)
 {
-	u_long argp, envp;
+	void * __capability argp, * __capability envp;
 	int error;
 
 	bzero(args, sizeof(*args));
@@ -1217,15 +1219,14 @@ exec_copyin_args(struct image_args *args, char *fname,
 	 * extract arguments first
 	 */
 	for (;;) {
-		error = fueword(argv++, &argp);
+		error = copyincap(argv++, &argp, sizeof(envp));
 		if (error == -1) {
 			error = EFAULT;
 			goto err_exit;
 		}
 		if (argp == 0)
 			break;
-		error = exec_args_add_arg_str(args, (void *)argp,
-		    UIO_USERSPACE);
+		error = exec_args_add_arg_str(args, argp, UIO_USERSPACE);
 		if (error != 0)
 			goto err_exit;
 	}
@@ -1237,14 +1238,14 @@ exec_copyin_args(struct image_args *args, char *fname,
 	 */
 	if (envv) {
 		for (;;) {
-			error = fueword(envv++, &envp);
+			error = copyincap(envv++, &envp, sizeof(envp));
 			if (error == -1) {
 				error = EFAULT;
 				goto err_exit;
 			}
 			if (envp == 0)
 				break;
-			error = exec_args_add_env_str(args, (void *)envp,
+			error = exec_args_add_env_str(args, envp,
 			    UIO_USERSPACE);
 			if (error != 0)
 				goto err_exit;
@@ -1471,7 +1472,7 @@ exec_free_args(struct image_args *args)
  * exec_args_add_env_str() - append an env string
  */
 int
-exec_args_add_fname(struct image_args *args, char *fname,
+exec_args_add_fname(struct image_args *args, char * __capability fname,
     enum uio_seg segflg)
 {
 	int error;
@@ -1482,9 +1483,12 @@ exec_args_add_fname(struct image_args *args, char *fname,
 
 	if (fname != NULL) {
 		args->fname = args->buf;
-		error = (segflg == UIO_SYSSPACE) ?
-		    copystr(fname, args->fname, PATH_MAX, &length) :
-		    copyinstr(fname, args->fname, PATH_MAX, &length);
+		if (segflg == UIO_SYSSPACE)
+			error = copystr((__cheri_fromcap const char *)fname,
+			    args->fname, PATH_MAX, &length);
+		else
+			error = copyinstr_c(fname, args->fname, PATH_MAX,
+			    &length);
 		if (error != 0)
 			return (error == ENAMETOOLONG ? E2BIG : error);
 	} else
@@ -1501,7 +1505,8 @@ exec_args_add_fname(struct image_args *args, char *fname,
 }
 
 int
-exec_args_add_arg_str(struct image_args *args, char *argp, enum uio_seg segflg)
+exec_args_add_arg_str(struct image_args *args, char * __capability argp,
+   enum uio_seg segflg)
 {
 	int error;
 	size_t length;
@@ -1509,9 +1514,12 @@ exec_args_add_arg_str(struct image_args *args, char *argp, enum uio_seg segflg)
 	KASSERT(args->begin_argv != NULL, ("begin_argp not initialzed"));
 	KASSERT(args->begin_envv == args->endp, ("appending args after env"));
 
-	error = (segflg == UIO_SYSSPACE) ?
-	    copystr(argp, args->endp, args->stringspace, &length) :
-	    copyinstr(argp, args->endp, args->stringspace, &length);
+	if (segflg == UIO_SYSSPACE)
+		error = copystr((__cheri_fromcap const char *)argp,
+		    args->endp, args->stringspace, &length);
+	else
+		error = copyinstr_c(argp, args->endp, args->stringspace,
+		    &length);
 	if (error != 0)
 		return (error == ENAMETOOLONG ? E2BIG : error);
 	args->stringspace -= length;
@@ -1523,16 +1531,20 @@ exec_args_add_arg_str(struct image_args *args, char *argp, enum uio_seg segflg)
 }
 
 int
-exec_args_add_env_str(struct image_args *args, char *envp, enum uio_seg segflg)
+exec_args_add_env_str(struct image_args *args, char * __capability envp,
+    enum uio_seg segflg)
 {
 	int error;
 	size_t length;
 
 	KASSERT(args->begin_envv != NULL, ("begin_envv not initialzed"));
 
-	error = (segflg == UIO_SYSSPACE) ?
-	    copystr(envp, args->endp, args->stringspace, &length) :
-	    copyinstr(envp, args->endp, args->stringspace, &length);
+	if (segflg == UIO_SYSSPACE)
+		error = copystr((__cheri_fromcap const char *)envp,
+		    args->endp, args->stringspace, &length);
+	else
+		error = copyinstr_c(envp, args->endp, args->stringspace,
+		    &length);
 	if (error != 0)
 		return (error == ENAMETOOLONG ? E2BIG : error);
 	args->stringspace -= length;
@@ -1541,6 +1553,32 @@ exec_args_add_env_str(struct image_args *args, char *envp, enum uio_seg segflg)
 
 	return (0);
 }
+
+#if __has_feature(capabilities)
+#define exec_user_data(p)						\
+	cheri_capability_build_user_data(				\
+		CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,	\
+		CHERI_CAP_USER_DATA_LENGTH, (p))
+/*
+ * This macro uses cheri_capability_build_user_rwx() because it can
+ * create both types of capabilities (and currently creates W|X caps).
+ * Its use should be replaced.
+ */
+#define exec_sucap(uaddr, base, offset, length, perms)			\
+	do {								\
+		void * __capability _tmpcap;				\
+		_tmpcap = cheri_capability_build_user_rwx((perms),	\
+		    (base), (length), (offset));			\
+		KASSERT(cheri_gettag(_tmpcap), ("Created invalid cap"	\
+		    "from base=%zx, offset=%#zx, length=%#zx, "		\
+		    "perms=%#zx", (size_t)(base), (size_t)(offset),	\
+		    (size_t)(length), (size_t)(perms)));		\
+		copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));		\
+	} while(0)
+#else
+#define exec_user_data(p) (p)
+#define exec_sucap(uaddr, base, offset, length, perms) suword((uaddr), (base));
+#endif
 
 /*
  * Copy strings out to the new process address space, constructing new arg
@@ -1551,15 +1589,19 @@ register_t *
 exec_copyout_strings(struct image_params *imgp)
 {
 	int argc, envc;
-	char **vectp;
+	char * __capability * __capability vectp;
 	char *stringp;
-	uintptr_t destp;
-	register_t *stack_base;
-	struct ps_strings *arginfo;
+	char * __capability destp;
+	void * __capability *stack_base;
+	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len;
 	int szsigcode, szps;
 	char canary[sizeof(long) * 8];
+
+#if __has_feature(capabilities)
+	KASSERT(imgp->auxargs != NULL, ("CheriABI requires auxargs"));
+#endif
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -1572,20 +1614,22 @@ exec_copyout_strings(struct image_params *imgp)
 		execpath_len = 0;
 	p = imgp->proc;
 	szsigcode = 0;
-	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
+	/* XXX: should be derived from a capability to the strings region */
+	arginfo = (struct ps_strings * __capability)
+	    exec_user_data(p->p_sysent->sv_psstrings);
 	if (p->p_sysent->sv_sigcode_base == 0) {
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);
 	}
-	destp =	(uintptr_t)arginfo;
+	destp =	(char * __capability)arginfo;
 
 	/*
 	 * install sigcode
 	 */
 	if (szsigcode != 0) {
 		destp -= szsigcode;
-		destp = rounddown2(destp, sizeof(void *));
-		copyout(p->p_sysent->sv_sigcode, (void *)destp, szsigcode);
+		destp = rounddown2(destp, sizeof(void * __capability));
+		copyout_c(p->p_sysent->sv_sigcode, destp, szsigcode);
 	}
 
 	/*
@@ -1593,9 +1637,9 @@ exec_copyout_strings(struct image_params *imgp)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		destp = rounddown2(destp, sizeof(void *));
-		imgp->execpathp = destp;
-		copyout(imgp->execpath, (void *)destp, execpath_len);
+		destp = rounddown2(destp, sizeof(void * __capability));
+		imgp->execpathp = (__cheri_addr unsigned long)destp;
+		copyout_c(imgp->execpath, destp, execpath_len);
 	}
 
 	/*
@@ -1603,23 +1647,26 @@ exec_copyout_strings(struct image_params *imgp)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = destp;
-	copyout(canary, (void *)destp, sizeof(canary));
+	imgp->canary = (__cheri_addr unsigned long)destp;
+	copyout_c(canary, destp, sizeof(canary));
 	imgp->canarylen = sizeof(canary);
 
 	/*
 	 * Prepare the pagesizes array.
 	 */
 	destp -= szps;
-	destp = rounddown2(destp, sizeof(void *));
-	imgp->pagesizes = destp;
-	copyout(pagesizes, (void *)destp, szps);
+	destp = rounddown2(destp, sizeof(void * __capability));
+	imgp->pagesizes = (__cheri_addr unsigned long)destp;
+	copyout_c(pagesizes, destp, szps);
 	imgp->pagesizeslen = szps;
 
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(void *));
+	destp = rounddown2(destp, sizeof(void * __capability));
 
-	vectp = (char **)destp;
+	vectp = (char * __capability * __capability)destp;
+#if __has_feature(capabilities)
+	vectp -= AT_COUNT * 2;
+#else
 	if (imgp->auxargs) {
 		/*
 		 * Allocate room on the stack for the ELF auxargs
@@ -1628,6 +1675,7 @@ exec_copyout_strings(struct image_params *imgp)
 		vectp -= howmany(AT_COUNT * sizeof(Elf_Auxinfo),
 		    sizeof(*vectp));
 	}
+#endif
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -1638,7 +1686,7 @@ exec_copyout_strings(struct image_params *imgp)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	stack_base = (register_t *)vectp;
+	stack_base = (__cheri_fromcap void * __capability *)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -1647,44 +1695,52 @@ exec_copyout_strings(struct image_params *imgp)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	copyout(stringp, (void *)destp, ARG_MAX - imgp->args->stringspace);
+	copyout_c(stringp, destp, ARG_MAX - imgp->args->stringspace);
 
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
-	suword(&arginfo->ps_argvstr, (long)(intptr_t)vectp);
-	suword32(&arginfo->ps_nargvstr, argc);
+	exec_sucap(&arginfo->ps_argvstr, (__cheri_addr long)vectp, 0,
+	    argc * sizeof(void * __capability), CHERI_CAP_USER_DATA_PERMS);
+	suword32_c(&arginfo->ps_nargvstr, argc);
 
 	/*
 	 * Fill in argument portion of vector table.
 	 */
 	for (; argc > 0; --argc) {
-		suword(vectp++, (long)(intptr_t)destp);
+		exec_sucap(vectp++, (__cheri_addr long)destp, 0,
+		    strlen(stringp) + 1, CHERI_CAP_USER_DATA_PERMS);
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
-	suword(vectp++, 0);
+	/* XXX: suword clears the tag */
+	suword_c(vectp++, 0);
 
-	suword(&arginfo->ps_envstr, (long)(intptr_t)vectp);
-	suword32(&arginfo->ps_nenvstr, envc);
+	exec_sucap(&arginfo->ps_envstr, (__cheri_addr long)vectp, 0,
+	    arginfo->ps_nenvstr * sizeof(void * __capability),
+	    CHERI_CAP_USER_DATA_PERMS);
+	suword32_c(&arginfo->ps_nenvstr, envc);
 
 	/*
 	 * Fill in environment portion of vector table.
 	 */
+	imgp->args->envv = (__cheri_fromcap void *)vectp;
 	for (; envc > 0; --envc) {
-		suword(vectp++, (long)(intptr_t)destp);
+		exec_sucap(vectp++, (__cheri_addr long)destp, 0,
+		    strlen(stringp) + 1, CHERI_CAP_USER_DATA_PERMS);
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
 	}
 
 	/* end of vector table is a null pointer */
-	suword(vectp, 0);
+	/* XXX: suword clears the tag */
+	suword_c(vectp, 0);
 
-	return (stack_base);
+	return ((register_t *)stack_base);
 }
 
 /*

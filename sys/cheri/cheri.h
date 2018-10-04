@@ -182,9 +182,11 @@ extern u_int	security_cheri_bound_legacy_capabilities;
 struct ktr_ccall;
 struct ktr_creturn;
 struct ktr_cexception;
-struct thr_param_c;
-void	cheriabi_thr_new_md(struct thread *parent_td,
-	    struct thr_param_c *param);
+struct thr_param;
+/* XXX-AM: should we move this in place of machine/cpu_set_upcall? */
+void	cheriabi_set_threadregs(struct thread *td, struct thr_param *param);
+void	cheriabi_thr_new_md(struct thread *parent_td, struct thr_param *param);
+int	cheriabi_set_user_tls(struct thread *td, void * __capability tls_base);
 void	ktrccall_mdfill(struct pcb *pcb, struct ktr_ccall *kc);
 void	ktrcreturn_mdfill(struct pcb *pcb, struct ktr_creturn *kr);
 void	ktrcexception_mdfill(struct trapframe *frame,

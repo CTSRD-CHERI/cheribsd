@@ -100,7 +100,7 @@ __FBSDID("$FreeBSD$");
  * specified pc, psl.
  */
 void
-sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
+freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
 	struct proc *p;
 	struct thread *td;
@@ -320,6 +320,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
 }
+#endif /* ! feature(capabilities) */
 
 /*
  * System call to cleanup state after a signal
@@ -609,7 +610,7 @@ set_capregs(struct thread *td, struct capreg *capregs)
 }
 #endif
 
-
+#if !__has_feature(capabilities)
 /*
  * Clear registers on exec
  * $sp is set to the stack pointer passed in.  $pc is set to the entry
@@ -685,6 +686,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 
 	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
 }
+#endif /* !feature(capabilities) */
 
 int
 ptrace_clear_single_step(struct thread *td)

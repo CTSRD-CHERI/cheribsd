@@ -2101,7 +2101,7 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 	struct ptrace_lwpinfo32 pl;
 #else
-	struct ptrace_lwpinfo pl;
+	struct ptrace_lwpinfo_native pl;
 #endif
 
 	td = (struct thread *)arg;
@@ -2121,7 +2121,7 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 			siginfo_to_siginfo32(&td->td_si, &pl.pl_siginfo);
 #else
-			siginfo_to_siginfo_native(&td->td_si, &pl.pl_siginfo);
+			memcpy(&pl.pl_siginfo, &td->td_si, sizeof(pl.pl_siginfo));
 #endif
 		}
 		strcpy(pl.pl_tdname, td->td_name);

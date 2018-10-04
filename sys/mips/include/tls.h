@@ -46,16 +46,20 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 #define TLS_TCB_SIZE	(2 * CHERICAP_SIZE)
 #elif defined(__mips_n64)
+#if __has_feature(capabilities)
+#define	TLS_TCB_SIZE	(2*sizeof(struct chericap))
+#else /* ! feature(capabilities) */
 #define TLS_TCB_SIZE	16
+#endif /* ! feature(capabilities) */
 #ifdef COMPAT_FREEBSD32
 #define TLS_TCB_SIZE32	8
 #endif
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 #define	TLS_TCB_SIZE_C	(2*sizeof(struct chericap))
 #endif
-#else
+#else /* ! __mips_n64 */
 #define TLS_TCB_SIZE	8
-#endif
+#endif /* ! __mips_n64 */
 
 #endif	/* __MIPS_TLS_H__ */
 // CHERI CHANGES START

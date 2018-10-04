@@ -751,11 +751,13 @@ start_init(void *dummy)
 			panic("%s: Can't allocate space for init arguments %d",
 			    __func__, error);
 
-		error = exec_args_add_fname(&args, path, UIO_SYSSPACE);
+		error = exec_args_add_fname(&args,
+		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add fname %d", __func__, error);
 
-		error = exec_args_add_arg_str(&args, path, UIO_SYSSPACE);
+		error = exec_args_add_arg_str(&args,
+		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add argv[0] %d", __func__, error);
 
@@ -780,7 +782,8 @@ start_init(void *dummy)
 			*flagp++ = '-';
 		*flagp++ = 0;
 		KASSERT(flagp <= &flags[0] + sizeof(flags), ("Overran flags"));
-		error = exec_args_add_arg_str(&args, flags, UIO_SYSSPACE);
+		error = exec_args_add_arg_str(&args,
+		    (__cheri_tocap char * __capability)flags, UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add argv[0] %d", __func__, error);
 

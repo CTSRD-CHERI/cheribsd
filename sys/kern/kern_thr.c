@@ -29,6 +29,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define EXPLICIT_USER_ACCESS
+
 #include "opt_posix.h"
 #include "opt_hwpmc_hooks.h"
 #include <sys/param.h>
@@ -59,6 +61,8 @@ __FBSDID("$FreeBSD$");
 #ifdef	HWPMC_HOOKS
 #include <sys/pmckern.h>
 #endif
+
+#include <cheri/cheri.h>
 
 #include <machine/frame.h>
 
@@ -99,7 +103,7 @@ suword_lwpid(void *addr, lwpid_t lwpid)
 
 struct thr_create_initthr_args {
 	ucontext_t ctx;
-	long *tid;
+	long * __capability tid;
 };
 
 static int
@@ -122,7 +126,7 @@ sys_thr_create(struct thread *td, struct thr_create_args *uap)
 	struct thr_create_initthr_args args;
 	int error;
 
-	if ((error = copyin(uap->ctx, &args.ctx, sizeof(args.ctx))))
+	if ((error = copyincap(uap->ctx, &args.ctx, sizeof(args.ctx))))
 		return (error);
 	args.tid = uap->id;
 	return (thread_create(td, NULL, thr_create_initthr, &args));
@@ -138,15 +142,22 @@ sys_thr_new(struct thread *td, struct thr_new_args *uap)
 	if (uap->param_size < 0 || uap->param_size > sizeof(param))
 		return (EINVAL);
 	bzero(&param, sizeof(param));
-	if ((error = copyin(uap->param, &param, uap->param_size)))
+	if ((error = copyincap(uap->param, &param, uap->param_size)))
 		return (error);
+
+	/*
+	 * Opportunity for machine-dependent code to provide a DDC if the
+	 * caller didn't provide one.
+	 *
+	 * XXXRW: But should only do so if a suitable flag is set?
+	 */
+	cheriabi_thr_new_md(td, &param);
 	return (kern_thr_new(td, &param));
 }
 
 static int
 thr_new_initthr(struct thread *td, void *thunk)
 {
-	stack_t stack;
 	struct thr_param *param;
 
 	/*
@@ -322,10 +333,10 @@ sys_thr_exit(struct thread *td, struct thr_exit_args *uap)
 	umtx_thread_exit(td);
 
 	/* Signal userland that it can free the stack. */
-	if ((void *)uap->state != NULL) {
+	if (uap->state != NULL) {
 		suword_lwpid(uap->state, 1);
-		kern_umtx_wake(td,
-		    __USER_CAP(uap->state, sizeof(struct umutex)), INT_MAX, 0);
+		kern_umtx_wake(td, __USER_CAP(uap->state, sizeof(struct umutex)),
+		    INT_MAX, 0);
 	}
 
 	return (kern_thr_exit(td));

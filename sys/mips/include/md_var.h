@@ -48,7 +48,7 @@ extern	int	szsigcode;
 extern	char	sigcode32[];
 extern	int	szsigcode32;
 #endif
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 extern	char	cheri_sigcode[];
 extern	int	szcheri_sigcode;
 #endif

@@ -34,6 +34,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -47,10 +49,14 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpuregs.h>
 #include <machine/tls.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #ifndef _SYS_SYSPROTO_H_
 struct sysarch_args {
 	int op;
-	char *parms;
+	char * __capability parms;
 };
 #endif
 
@@ -61,12 +67,11 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 #ifdef CPU_QEMU_MALTA
 	int intval;
 #endif
-	void *tlsbase;
 
 	switch (uap->op) {
 	case MIPS_SET_TLS:
 #if __has_feature(capabilities)
-		return (cheriabi_set_user_tls(td, uap->parms));
+		return (cpu_set_user_tls(td, uap->parms));
 #else
 		td->td_md.md_tls = __USER_CAP_UNBOUND(uap->parms);
 
@@ -86,10 +91,11 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 			    td->td_md.md_tls_tcb_offset));
 		}
 		return (0);
+#endif
 
 	case MIPS_GET_TLS:
-		tlsbase = (__cheri_fromcap void *)td->td_md.md_tls;
-		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
+		error = copyoutcap(&td->td_md.md_tls, uap->parms,
+		    sizeof(void * __capability));
 		return (error);
 
 	case MIPS_GET_COUNT:
@@ -113,7 +119,7 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 		return (0);
 #endif
 
-#ifdef CPU_CHERI
+#if defined(CPU_CHERI)
 #if 0
 	case CHERI_GET_STACK:
 		return (cheri_sysarch_getstack(td, uap));
@@ -123,12 +129,8 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 #endif
 
 	case CHERI_GET_SEALCAP:
-#if __has_feature(capabilities)
-		return (cheri_sysarch_getsealcap(td, uap->parms));
-#else
 		return (cheri_sysarch_getsealcap(td,
 		    __USER_CAP(uap->parms, sizeof(void * __capability))));
-#endif
 
 #if __has_feature(capabilities)
 	/*
@@ -224,7 +226,6 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 	}
 #endif /* __has_feature(capabilities) */
 #endif /* CPU_CHERI */
-
 	default:
 		break;
 	}

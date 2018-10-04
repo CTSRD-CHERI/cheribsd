@@ -102,17 +102,20 @@
 
 struct ptrace_io_desc {
 	int	piod_op;	/* I/O operation */
-	void	*piod_offs;	/* child offset */
-	void	*piod_addr;	/* parent offset */
+	vm_offset_t piod_offs;	/* child offset */
+	void * __kerncap piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
 
-struct ptrace_io_desc_c {
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+struct ptrace_io_desc_native {
 	int	piod_op;	/* I/O operation */
 	vm_offset_t piod_offs;	/* child offset; not capability! */
 	void	* __capability piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
+#endif
 
 
 /*
@@ -144,25 +147,26 @@ struct ptrace_lwpinfo {
 #define	PL_FLAG_VFORK_DONE 0x800 /* vfork parent has resumed */
 	sigset_t	pl_sigmask;	/* LWP signal mask */
 	sigset_t	pl_siglist;	/* LWP pending signal */
-#ifdef _KERNEL
-	struct siginfo_native pl_siginfo;	/* siginfo for signal */
-#else
+/* #ifdef _KERNEL */
+/* 	struct siginfo_native pl_siginfo;	/\* siginfo for signal *\/ */
+/* #else */
 	siginfo_t	pl_siginfo;	/* siginfo for signal */
-#endif
+/* #endif */
 	char		pl_tdname[MAXCOMLEN + 1]; /* LWP name */
 	pid_t		pl_child_pid;	/* New child pid */
 	u_int		pl_syscall_code;
 	u_int		pl_syscall_narg;
 };
 
-#if defined(_KERNEL) && __has_feature(capabilities)
-struct ptrace_lwpinfo_c {
+#if defined(_KERNEL)
+/* XXX-AM: fix for freebsd64 */
+struct ptrace_lwpinfo_native {
 	lwpid_t	pl_lwpid;	/* LWP described. */
 	int	pl_event;	/* Event that stopped the LWP. */
 	int	pl_flags;	/* LWP flags. */
 	sigset_t	pl_sigmask;	/* LWP signal mask */
 	sigset_t	pl_siglist;	/* LWP pending signal */
-	struct siginfo_c	pl_siginfo;	/* siginfo for signal */
+	struct siginfo_native	pl_siginfo;	/* siginfo for signal */
 	char		pl_tdname[MAXCOMLEN + 1]; /* LWP name */
 	pid_t		pl_child_pid;	/* New child pid */
 	u_int		pl_syscall_code;
@@ -196,10 +200,11 @@ struct ptrace_vm_entry {
 	u_int		pve_pathlen;	/* Size of path. */
 	long		pve_fileid;	/* File ID. */
 	uint32_t	pve_fsid;	/* File system ID. */
-	char		*pve_path;	/* Path name of object. */
+	char * __kerncap pve_path;	/* Path name of object. */
 };
-#if __has_feature(capabilities)
-struct ptrace_vm_entry_c {
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+struct ptrace_vm_entry_native {
 	int		pve_entry;	/* Entry number used for iteration. */
 	int		pve_timestamp;	/* Generation number of VM map. */
 	u_long		pve_start;	/* Start VA of range. */
@@ -211,10 +216,10 @@ struct ptrace_vm_entry_c {
 	uint32_t	pve_fsid;	/* File system ID. */
 	char * __capability pve_path;	/* Path name of object. */
 };
-typedef struct ptrace_vm_entry_c	kptrace_vm_entry_t;
-#else
-typedef struct ptrace_vm_entry		kptrace_vm_entry_t;
 #endif
+/* XXX-AM: this can be removed */
+typedef struct ptrace_vm_entry		kptrace_vm_entry_t;
+
 
 #ifdef _KERNEL
 
