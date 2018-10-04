@@ -44,11 +44,7 @@ struct sigframe {
 	register_t	sf_ucontext;	/* points to sf_uc */
 	register_t	sf_addr;	/* undocumented 4th arg */
 	ucontext_t	sf_uc;		/* = *sf_ucontext */
-#ifdef _KERNEL
-	struct siginfo_native sf_si;	/* = *sf_siginfo (SA_SIGINFO case) */
-#else
 	siginfo_t	sf_si;		/* = *sf_siginfo (SA_SIGINFO case) */
-#endif
 	unsigned long	__spare__[2];
 };
 
@@ -66,16 +62,16 @@ struct sigframe32 {
 };
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_signal.h>
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
 
-struct sigframe_c {
+struct sigframe64 {
 	register_t	sf_signum;
 	register_t	sf_siginfo;	/* code or pointer to sf_si */
 	register_t	sf_ucontext;	/* points to sf_uc */
 	register_t	sf_addr;	/* undocumented 4th arg */
-	ucontext_c_t	sf_uc;		/* = *sf_ucontext */
-	struct siginfo_c	sf_si;	/* = *sf_siginfo (SA_SIGINFO case) */
+	ucontext64_t	sf_uc;		/* = *sf_ucontext */
+	struct siginfo64	sf_si;	/* = *sf_siginfo (SA_SIGINFO case) */
 	unsigned long	__spare__[2];
 };
 #endif

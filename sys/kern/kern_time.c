@@ -1216,8 +1216,8 @@ convert_sigevent(const struct sigevent_native *sig_n, ksigevent_t *sig)
 #ifndef _SYS_SYSPROTO_H_
 struct ktimer_create_args {
 	clockid_t clock_id;
-	struct sigevent_native * evp;
-	int * timerid;
+	struct sigevent * __capability evp;
+	int * __capability timerid;
 };
 #endif
 int

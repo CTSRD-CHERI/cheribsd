@@ -83,6 +83,12 @@ __FBSDID("$FreeBSD$");
 
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
+#if !__has_feature(capabilities)
+/* XXX-AM: fix for freebsd64
+ * Note that this is really not used when we do not define
+ * the elf64 sysentvec.
+ */
+
 /*
  * Send an interrupt to process.
  *
@@ -328,7 +334,7 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	ucontext_t uc;
 	int error;
 
-	error = copyin(uap->sigcntxp, &uc, sizeof(uc));
+	error = copyincap(uap->sigcntxp, &uc, sizeof(uc));
 	if (error != 0)
 	    return (error);
 
@@ -468,6 +474,8 @@ set_regs(struct thread *td, struct reg *regs)
 	return (0);
 }
 
+#if !__has_feature(capabilities)
+/* XXX-AM: fix for freebsd64 */
 int
 get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 {
@@ -561,6 +569,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 
 	return (0);
 }
+#endif /* __has_feature(capabilities) */
 
 int
 fill_fpregs(struct thread *td, struct fpreg *fpregs)

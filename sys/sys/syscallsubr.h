@@ -494,7 +494,7 @@ int	kern_wait(struct thread *td, pid_t pid, int *status, int options,
 int	kern_wait4(struct thread *td, int pid, int * __capability status,
 	    int options, struct rusage * __capability rusage);
 int	kern_wait6(struct thread *td, enum idtype idtype, id_t id, int *status,
-	    int options, struct __wrusage *wrup, siginfo_t *sip);
+	    int options, struct __wrusage *wrup, _siginfo_t *sip);
 int	kern_writev(struct thread *td, int fd, struct uio *auio);
 int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);

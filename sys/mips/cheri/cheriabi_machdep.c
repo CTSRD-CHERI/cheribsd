@@ -329,8 +329,9 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 	}
 }
 
+#if __has_feature(capabilities)
 int
-cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
+get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
 {
 	struct trapframe *tp;
 
@@ -364,7 +365,7 @@ cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
 }
 
 int
-cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
+set_mcontext(struct thread *td, mcontext_c_t *mcp)
 {
 	struct trapframe *tp;
 	int tag;
@@ -392,6 +393,7 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 
 	return (0);
 }
+#endif /* __has_feature(capabilities) */
 
 /*
  * The CheriABI version of sendsig(9) largely borrows from the MIPS version,
@@ -416,7 +418,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct trapframe *regs;
 	struct sigacts *psp;
-	struct sigframe_c sf, * __capability sfp;
+	struct sigframe sf, * __capability sfp;
 	struct cheri_signal *csigp;
 	char * __capability csp;
 	int cheri_is_sandboxed;
@@ -554,10 +556,10 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		}
 		csp = regs->csp;
 	}
-	csp -= sizeof(struct sigframe_c);
+	csp -= sizeof(struct sigframe);
 	/* For CHERI, keep the stack pointer capability aligned. */
 	csp = __builtin_align_down(csp, CHERICAP_SIZE);
-	sfp = (struct sigframe_c * __capability)csp;
+	sfp = (struct sigframe * __capability)csp;
 
 	/* Build the argument list for the signal handler. */
 	regs->a0 = sig;
