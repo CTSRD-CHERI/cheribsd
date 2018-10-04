@@ -1,4 +1,4 @@
-%$FreeBSD$
+ $FreeBSD$
 ;	from: @(#)syscalls.master	8.2 (Berkeley) 1/13/94
 ;
 ; System call name/number master file.
@@ -43,42 +43,17 @@
 ;		function prototype in sys/sysproto.h.  Does add a
 ;		definition to syscall.h besides adding a sysent.
 ;	NOTSTATIC syscall is loadable
-;	VARARG	last argument is passed with a variadic calling convention.
-;	VARARG#	last # args are passed with a variadic calling convention.
-
-; annotations:
-;	SAL 2.0 annotations are used to specify how system calls treat
-;	arguments that are passed using pointers. There are three basic
-;	annotations.
-;
-;	_In_    Object pointed to will be read and not modified.
-;	_Out_   Object pointed to will be written and not read.
-;	_Inout_ Object pointed to will be written and read.
-;
-;	These annotations are used alone when the pointer refers to a single
-;	object i.e. scalar types, structs, and pointers, and not NULL. Adding
-;	the _opt_ suffix, e.g. _In_opt_, implies that the pointer may also
-;	refer to NULL.
-;
-;	For pointers to arrays, additional suffixes are added:
-;
-;	_In_z_, _Out_z_, _Inout_z_:
-;	    for a NUL terminated array e.g. a string.
-;	_In_reads_z_(n),_Out_writes_z_(n), _Inout_updates_z_(n):
-;	    for a NUL terminated array e.g. a string, of known length n bytes.
-;	_In_reads_(n),_Out_writes_(n),_Inout_updates_(n):
-;	    for an array of n elements.
-;	_In_reads_bytes_(n), _Out_writes_bytes_(n), _Inout_updates_bytes(n):
-;	    for a buffer of n-bytes.
-
-; Please copy any additions and changes to the following compatability tables:
-; sys/compat/freebsd32/syscalls.master
 
 ; #ifdef's, etc. may be included, and are copied to the output files.
 
 #include <sys/param.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
+#include <sys/mount.h>
+#include <sys/socket.h>
+#include <sys/user.h>
+#include <compat/cheriabi/cheriabi.h>
+#include <compat/cheriabi/cheriabi_proto.h>
 
 ; Reserved/unimplemented system calls in the range 0-150 inclusive
 ; are reserved for use in future Berkeley releases.
@@ -113,9 +88,9 @@
 	}
 5	AUE_OPEN_RWTC	STD|VARARG	{
 		int open(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int flags,
-		    int mode
+		    mode_t mode
 		);
 	}
 6	AUE_CLOSE	STD	{
@@ -139,19 +114,19 @@
 	}
 9	AUE_LINK	STD	{
 		int link(
-		    _In_z_ char *path,
-		    _In_z_ char *to
+		    _In_z_ const char *path,
+		    _In_z_ const char *to
 		);
 	}
 10	AUE_UNLINK	STD	{
 		int unlink(
-		    _In_z_ char *path
+		    _In_z_ const char *path
 		);
 	}
 11	AUE_NULL	OBSOL	execv
 12	AUE_CHDIR	STD	{
 		int chdir(
-		    _In_z_ char *path
+		    _In_z_ const char *path
 		);
 	}
 13	AUE_FCHDIR	STD	{
@@ -168,13 +143,13 @@
 	}
 15	AUE_CHMOD	STD	{
 		int chmod(
-		    _In_z_ char *path,
-		    int mode
+		    _In_z_ const char *path,
+		    mode_t mode
 		);
 	}
 16	AUE_CHOWN	STD	{
 		int chown(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int uid,
 		    int gid
 		);
@@ -203,16 +178,15 @@
 	}
 21	AUE_MOUNT	STD	{
 		int mount(
-		    _In_z_ char *type,
-		    _In_z_ char *path,
+		    _In_z_ const char *type,
+		    _In_z_ const char *path,
 		    int flags,
-		    _In_opt_ caddr_t data
+		    _In_opt_ void *data
 		);
 	}
-; XXX `path' should have type `const char *' but we're not ready for that.
 22	AUE_UMOUNT	STD	{
 		int unmount(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int flags
 		);
 	}
@@ -231,28 +205,28 @@
 		int ptrace(
 		    int req,
 		    pid_t pid,
-		    _Inout_opt_ caddr_t addr,
+		    _Inout_opt_ char * addr,
 		    int data
 		);
 	}
 27	AUE_RECVMSG	STD	{
 		ssize_t recvmsg(
 		    int s,
-		    _Inout_ _Contains_ptr_ struct msghdr_native *msg,
+		    _Inout_ _Contains_ptr_ struct msghdr *msg,
 		    int flags
 		);
 	}
 28	AUE_SENDMSG	STD	{
 		ssize_t sendmsg(
 		    int s,
-		    _In_ _Contains_ptr_ struct msghdr_native *msg,
+		    _In_ _Contains_ptr_ const struct msghdr *msg,
 		    int flags
 		);
 	}
 29	AUE_RECVFROM	STD	{
 		ssize_t recvfrom(
 		    int s,
-		    _Out_writes_bytes_(len) caddr_t buf,
+		    _Out_writes_bytes_(len) void *buf,
 		    size_t len,
 		    int flags,
 		    _Out_writes_bytes_opt_(*fromlenaddr) struct sockaddr *from,
@@ -282,7 +256,7 @@
 	}
 33	AUE_ACCESS	STD	{
 		int access(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int amode
 		);
 	}
@@ -335,7 +309,7 @@
 	}
 44	AUE_PROFILE	STD	{
 		int profil(
-		    _Out_writes_bytes_(size) caddr_t samples,
+		    _Out_writes_bytes_(size) void *samples,
 		    size_t size,
 		    size_t offset,
 		    u_int scale
@@ -365,9 +339,6 @@
 		    osigset_t mask
 		);
 	}
-; XXX note nonstandard (bogus) calling convention - the libc stub passes
-; us the mask, not a pointer to it, and we return the old mask as the
-; (int) return value.
 49	AUE_GETLOGIN	STD	{
 		int getlogin(
 		    _Out_writes_z_(namelen) char *namebuf,
@@ -376,12 +347,12 @@
 	}
 50	AUE_SETLOGIN	STD	{
 		int setlogin(
-		    _In_z_ char *namebuf
+		    _In_z_ const char *namebuf
 		);
 	}
 51	AUE_ACCT	STD	{
 		int acct(
-		    _In_z_ char *path
+		    _In_z_ const char *path
 		);
 	}
 52	AUE_SIGPENDING	COMPAT	{
@@ -389,15 +360,15 @@
 	}
 53	AUE_SIGALTSTACK	STD	{
 		int sigaltstack(
-		    _In_opt_ _Contains_long_ptr_ const struct sigaltstack_native *ss,
-		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack_native *oss
+		    _In_opt_ _Contains_long_ptr_ const struct sigaltstack *ss,
+		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack *oss
 		);
 	}
-54	AUE_IOCTL	STD|VARARG	{
+54	AUE_NULL	STD|VARARG	{
 		int ioctl(
 		    int fd,
 		    u_long com,
-		    _Inout_opt_ caddr_t data
+		    _Inout_opt_ void *data
 		);
 	}
 55	AUE_REBOOT	STD	{
@@ -407,37 +378,37 @@
 	}
 56	AUE_REVOKE	STD	{
 		int revoke(
-		    _In_z_ char *path
+		    _In_z_ const char *path
 		);
 	}
 57	AUE_SYMLINK	STD	{
 		int symlink(
-		    _In_z_ char *path,
-		    _In_z_ char *link
+		    _In_z_ const char *path,
+		    _In_z_ const char *link
 		);
 	}
 58	AUE_READLINK	STD	{
 		ssize_t readlink(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_writes_z_(count) char *buf,
 		    size_t count
 		);
 	}
 59	AUE_EXECVE	STD	{
 		int execve(
-		    _In_z_ char *fname,
+		    _In_z_ const char *fname,
 		    _In_z_ char **argv,
 		    _In_z_ char **envv
 		);
 	}
 60	AUE_UMASK	STD	{
-		int umask(
-		    int newmask
+		mode_t umask(
+		    mode_t newmask
 		);
 	}
 61	AUE_CHROOT	STD	{
 		int chroot(
-		    _In_z_ char *path
+		    _In_z_ const char *path
 		);
 	}
 62	AUE_FSTAT	COMPAT	{
@@ -458,9 +429,10 @@
 64	AUE_NULL	COMPAT	{
 		int getpagesize(void);
 	} getpagesize getpagesize_args int
+; XXX-BD: msync may not need/want _Pagerange_ as it doesn't alter the map
 65	AUE_MSYNC	STD	{
 		int msync(
-		    _In_ void *addr,
+		    _Pagerange_(len) void *addr,
 		    size_t len,
 		    int flags
 		);
@@ -497,29 +469,33 @@
 	}
 73	AUE_MUNMAP	STD	{
 		int munmap(
-		    _In_ void *addr,
+		    _Pagerange_vmmap_(len) void *addr,
 		    size_t len
 		);
 	}
 74	AUE_MPROTECT	STD	{
 		int mprotect(
-		    _In_ void *addr,
+		    _Pagerange_(len) const void *addr,
 		    size_t len,
 		    int prot
 		);
 	}
+; XXX-BD: MADV_FREE does change the map.  MADV_NOCORE has adversarial value.
+; MADV_CORE is probably an error if not a page.  Others don't really need
+; _Pagerange_.
 75	AUE_MADVISE	STD	{
 		int madvise(
-		    _In_ void *addr,
+		    _Pagerange_(len) void *addr,
 		    size_t len,
 		    int behav
 		);
 	}
 76	AUE_NULL	OBSOL	vhangup
 77	AUE_NULL	OBSOL	vlimit
+; XXX-BD: missing round up of len for misaligned addr
 78	AUE_MINCORE	STD	{
 		int mincore(
-		    _In_ const void *addr,
+		    _Pagerange_opt_(len) const void *addr,
 		    size_t len,
 		    _Out_writes_bytes_(len/PAGE_SIZE) char *vec
 		);
@@ -533,7 +509,7 @@
 80	AUE_SETGROUPS	STD	{
 		int setgroups(
 		    u_int gidsetsize,
-		    _In_reads_(gidsetsize) gid_t *gidset
+		    _In_reads_(gidsetsize) const gid_t *gidset
 		);
 	}
 81	AUE_GETPGRP	STD	{
@@ -547,8 +523,8 @@
 	}
 83	AUE_SETITIMER	STD	{
 		int setitimer(
-		    u_int which,
-		    _In_ _Contains_timet_ struct itimerval *itv,
+		    int which,
+		    _In_ _Contains_timet_ const struct itimerval *itv,
 		    _Out_opt_ _Contains_timet_ struct itimerval *oitv
 		);
 	}
@@ -557,12 +533,12 @@
 	}
 85	AUE_SWAPON	STD	{
 		int swapon(
-		    _In_z_ char *name
+		    _In_z_ const char *name
 		);
 	}
 86	AUE_GETITIMER	STD	{
 		int getitimer(
-		    u_int which,
+		    int which,
 		    _Out_ _Contains_timet_ struct itimerval *itv
 		);
 	}
@@ -592,7 +568,7 @@
 		int fcntl(
 		    int fd,
 		    int cmd,
-		    intptr_t arg
+		    intcap_t arg
 		);
 	}
 93	AUE_SELECT	STD	{
@@ -628,7 +604,7 @@
 		int connect(
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr *name,
-		    int namelen
+		    __socklen_t namelen
 		);
 	}
 99	AUE_ACCEPT	COMPAT|NOARGS {
@@ -668,8 +644,8 @@
 104	AUE_BIND	STD	{
 		int bind(
 		    int s,
-		    _In_reads_bytes_(namelen) const struct sockaddr * name,
-		    int namelen
+		    _In_reads_bytes_(namelen) const struct sockaddr *name,
+		    __socklen_t namelen
 		);
 	}
 105	AUE_SETSOCKOPT	STD	{
@@ -677,8 +653,8 @@
 		    int s,
 		    int level,
 		    int name,
-		    _In_reads_bytes_opt_(valsize) caddr_t val,
-		    int valsize
+		    _In_reads_bytes_opt_(valsize) const void *val,
+		    __socklen_t valsize
 		);
 	}
 106	AUE_LISTEN	STD	{
@@ -750,29 +726,29 @@
 		    int s,
 		    int level,
 		    int name,
-		    _Out_writes_bytes_opt_(*avalsize) caddr_t val,
-		    _Inout_  int *avalsize
+		    _Out_writes_bytes_opt_(*avalsize) void *val,
+		    _Inout_ __socklen_t *avalsize
 		);
 	}
 119	AUE_NULL	UNIMPL	resuba (BSD/OS 2.x)
 120	AUE_READV	STD	{
 		int readv(
 		    int fd,
-		    _Inout_updates_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _Inout_updates_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt
 		);
 	}
 121	AUE_WRITEV	STD	{
 		int writev(
 		    int fd,
-		    _In_reads_opt_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_opt_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt
 		);
 	}
 122	AUE_SETTIMEOFDAY	STD	{
 		int settimeofday(
-		    _In_ _Contains_long_timet_ struct timeval *tv,
-		    _In_opt_ _Contains_long_timet_ struct timezone *tzp
+		    _In_ _Contains_long_timet_ const struct timeval *tv,
+		    _In_opt_ _Contains_timet_ const struct timezone *tzp
 		);
 	}
 123	AUE_FCHOWN	STD	{
@@ -785,7 +761,7 @@
 124	AUE_FCHMOD	STD	{
 		int fchmod(
 		    int fd,
-		    int mode
+		    mode_t mode
 		);
 	}
 125	AUE_RECVFROM	COMPAT|NOARGS {
@@ -812,8 +788,8 @@
 	}
 128	AUE_RENAME	STD	{
 		int rename(
-		    _In_z_ char *from,
-		    _In_z_ char *to
+		    _In_z_ const char *from,
+		    _In_z_ const char *to
 		);
 	}
 129	AUE_TRUNCATE	COMPAT	{
@@ -836,18 +812,18 @@
 	}
 132	AUE_MKFIFO	STD	{
 		int mkfifo(
-		    _In_z_ char *path,
-		    int mode
+		    _In_z_ const char *path,
+		    mode_t mode
 		);
 	}
 133	AUE_SENDTO	STD	{
 		ssize_t sendto(
 		    int s,
-		    _In_reads_bytes_(len) caddr_t buf,
+		    _In_reads_bytes_(len) const void *buf,
 		    size_t len,
 		    int flags,
 		    _In_reads_bytes_opt_(tolen) const struct sockaddr *to,
-		    int tolen
+		    __socklen_t tolen
 		);
 	}
 134	AUE_SHUTDOWN	STD	{
@@ -866,25 +842,25 @@
 	}
 136	AUE_MKDIR	STD	{
 		int mkdir(
-		    _In_z_ char *path,
-		    int mode
+		    _In_z_ const char *path,
+		    mode_t mode
 		);
 	}
 137	AUE_RMDIR	STD	{
 		int rmdir(
-		    _In_z_ char *path
+		    _In_z_ const char *path
 		);
 	}
 138	AUE_UTIMES	STD	{
 		int utimes(
-		    _In_z_ char *path,
-		    _In_ _Contains_long_timet_ struct timeval *tptr
+		    _In_z_ const char *path,
+		    _In_ _Contains_long_timet_ const struct timeval *tptr
 		);
 	}
 139	AUE_NULL	OBSOL	4.2 sigreturn
 140	AUE_ADJTIME	STD	{
 		int adjtime(
-		    _In_ _Contains_long_timet_ struct timeval *delta,
+		    _In_ _Contains_long_timet_ const struct timeval *delta,
 		    _Out_opt_ _Contains_long_timet_ struct timeval *olddelta
 		);
 	}
@@ -926,10 +902,10 @@
 	}
 148	AUE_QUOTACTL	STD	{
 		int quotactl(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int cmd,
 		    int uid,
-		    _In_ caddr_t arg
+		    _In_ void *arg
 		);
 	}
 149	AUE_O_QUOTA	COMPAT	{
@@ -963,7 +939,7 @@
 155	AUE_NFS_SVC	NOSTD	{
 		int nfssvc(
 		    int flag,
-		    _In_ caddr_t argp
+		    void *argp
 		);
 	}
 156	AUE_GETDIRENTRIES	COMPAT	{
@@ -989,13 +965,13 @@
 159	AUE_NULL	UNIMPL	nosys
 160	AUE_LGETFH	STD {
 		int lgetfh(
-		    _In_z_ char *fname,
+		    _In_z_ const char *fname,
 		    _Out_ struct fhandle *fhp
 		);
 	}
 161	AUE_NFS_GETFH	STD	{
 		int getfh(
-		    _In_z_ char *fname,
+		    _In_z_ const char *fname,
 		    _Out_ struct fhandle *fhp
 		);
 	}
@@ -1131,7 +1107,7 @@
 	}
 191	AUE_PATHCONF	STD	{
 		int pathconf(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int name
 		);
 	}
@@ -1207,28 +1183,31 @@
 		    _In_reads_bytes_opt_(newlen) void *new,
 		    size_t newlen
 		);
-	} __sysctl sysctl_args int
+	}
+; XXX-BD: unclear if these really require _Pagerange_.  It's mostly
+; harmless to lock memory you don't own, but unlocking could cause (e.g.)
+; keys to leak to swap so could be malicous.
 203	AUE_MLOCK	STD	{
 		int mlock(
-		    _In_ const void *addr,
+		    _Pagerange_(len) const void *addr,
 		    size_t len
 		);
 	}
 204	AUE_MUNLOCK	STD	{
 		int munlock(
-		    _In_ const void *addr,
+		    _Pagerange_(len) const void *addr,
 		    size_t len
 		);
 	}
 205	AUE_UNDELETE	STD	{
 		int undelete(
-		    _In_z_ char *path
+		    _In_z_ const char *path
 		);
 	}
 206	AUE_FUTIMES	STD	{
 		int futimes(
 		    int fd,
-		    _In_reads_(2) _Contains_long_timet_ struct timeval *tptr
+		    _In_reads_(2) _Contains_long_timet_ const struct timeval *tptr
 		);
 	}
 207	AUE_GETPGID	STD	{
@@ -1314,7 +1293,7 @@
 228	AUE_SHMAT	NOSTD	{
 		void *shmat(
 		    int shmid,
-		    _In_ const void *shmaddr,
+		    _Pagerange_vmmap_opt_(1) void *shmaddr,
 		    int shmflg
 		);
 	}
@@ -1327,7 +1306,7 @@
 	}
 230	AUE_SHMDT	NOSTD	{
 		int shmdt(
-		    _In_ const void *shmaddr
+		    _Pagerange_vmmap_(1) void *shmaddr
 		);
 	}
 231	AUE_SHMGET	NOSTD	{
@@ -1358,7 +1337,7 @@
 235	AUE_NULL	STD	{
 		int ktimer_create(
 		    clockid_t clock_id,
-		    _In_ _Contains_long_ptr_ struct sigevent_native *evp,
+		    _In_ _Contains_long_ptr_ struct sigevent *evp,
 		    _Out_ int *timerid
 		);
 	}
@@ -1432,7 +1411,7 @@
 ; syscall numbers initially used in OpenBSD
 250	AUE_MINHERIT	STD	{
 		int minherit(
-		    _In_ void *addr,
+		    _Pagerange_(len) void *addr,
 		    size_t len,
 		    int inherit
 		);
@@ -1448,27 +1427,27 @@
 	}
 254	AUE_LCHOWN	STD	{
 		int lchown(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int uid,
 		    int gid
 		);
 	}
 255	AUE_AIO_READ	STD	{
 		int aio_read(
-		    _Inout_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 256	AUE_AIO_WRITE	STD	{
 		int aio_write(
-		    _Inout_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 257	AUE_LIO_LISTIO	STD	{
 		int lio_listio(
 		    int mode,
-		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb_native * const *acb_list,
+		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb * const *acb_list,
 		    int nent,
-		    _In_opt_ _Contains_long_ptr_ struct sigevent_native *sig
+		    _In_opt_ _Contains_long_ptr_ struct sigevent *sig
 		);
 	}
 258	AUE_NULL	STD	{
@@ -1490,15 +1469,15 @@
 273	AUE_NULL	UNIMPL	nosys
 274	AUE_LCHMOD	STD	{
 		int lchmod(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
 275	AUE_NULL	OBSOL	netbsd_lchown
 276	AUE_LUTIMES	STD	{
 		int lutimes(
-		    _In_z_ char *path,
-		    _In_ _Contains_long_timet_ struct timeval *tptr
+		    _In_z_ const char *path,
+		    _In_ _Contains_long_timet_ const struct timeval *tptr
 		);
 	}
 277	AUE_NULL	OBSOL	netbsd_msync
@@ -1524,7 +1503,7 @@
 289	AUE_PREADV	STD	{
 		ssize_t preadv(
 		    int fd,
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt,
 		    off_t offset
 		);
@@ -1532,7 +1511,7 @@
 290	AUE_PWRITEV	STD	{
 		ssize_t pwritev(
 		    int fd,
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt,
 		    off_t offset
 		);
@@ -1630,12 +1609,12 @@
 313	AUE_NULL	OBSOL	signanosleep
 314	AUE_AIO_RETURN	STD	{
 		ssize_t aio_return(
-		    _Inout_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 315	AUE_AIO_SUSPEND	STD	{
 		int aio_suspend(
-		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb_native * const * aiocbp,
+		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb * const *aiocbp,
 		    int nent,
 		    _In_opt_ _Contains_long_timet_ const struct timespec *timeout
 		);
@@ -1643,12 +1622,12 @@
 316	AUE_AIO_CANCEL	STD	{
 		int aio_cancel(
 		    int fd,
-		    _In_opt_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_opt_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 317	AUE_AIO_ERROR	STD	{
 		int aio_error(
-		    _In_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 318	AUE_AIO_READ	COMPAT6	{
@@ -1674,6 +1653,7 @@
 	}
 322	AUE_NULL	OBSOL	thr_sleep
 323	AUE_NULL	OBSOL	thr_wakeup
+; XXX-BD: are mlockall and munlockall ok in CheriABI?
 324	AUE_MLOCKALL	STD	{
 		int mlockall(
 		    int how
@@ -1752,12 +1732,12 @@
 		int kldsym(
 		    int fileid,
 		    int cmd,
-		    _In_ _Contains_long_ptr_ void *data
+		    _In_ _Contains_long_ptr_ struct kld_sym_lookup *data
 		);
 	}
 338	AUE_JAIL	STD	{
 		int jail(
-		    _In_ _Contains_ptr_ struct jail *jail
+		    _In_ _Contains_ptr_ struct jail *jailp
 		);
 	}
 339	AUE_NULL	NOSTD|NOTSTATIC	{
@@ -1801,14 +1781,14 @@
 345	AUE_SIGWAIT	STD	{
 		int sigtimedwait(
 		    _In_ const sigset_t *set,
-		    _Out_opt_ _Contains_long_ptr_ struct siginfo_native *info,
+		    _Out_opt_ _Contains_long_ptr_ struct siginfo *info,
 		    _In_opt_ _Contains_long_timet_ const struct timespec *timeout
 		);
 	}
 346	AUE_NULL	STD	{
 		int sigwaitinfo(
 		    _In_ const sigset_t *set,
-		    _Out_opt_ _Contains_long_ptr_ struct siginfo_native *info
+		    _Out_opt_ _Contains_long_ptr_ struct siginfo *info
 		);
 	}
 347	AUE_ACL_GET_FILE	STD	{
@@ -1901,7 +1881,7 @@
 	}
 359	AUE_AIO_WAITCOMPLETE	STD	{
 		ssize_t aio_waitcomplete(
-		    _Outptr_result_maybenull_ _Contains_long_ptr_ struct aiocb_native **aiocbp,
+		    _Outptr_result_maybenull_ _Contains_long_ptr_ struct aiocb **aiocbp,
 		    _In_opt_ _Contains_long_timet_ struct timespec *timeout
 		);
 	}
@@ -1989,7 +1969,7 @@
 	}
 378	AUE_NMOUNT	STD	{
 		int nmount(
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    unsigned int iovcnt,
 		    int flags
 		);
@@ -2001,36 +1981,36 @@
 383	AUE_NULL	OBSOL	kse_release
 384	AUE_NULL	STD	{
 		int __mac_get_proc(
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 385	AUE_NULL	STD	{
 		int __mac_set_proc(
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 386	AUE_NULL	STD	{
 		int __mac_get_fd(
 		    int fd,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 387	AUE_NULL	STD	{
 		int __mac_get_file(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 388	AUE_NULL	STD	{
 		int __mac_set_fd(
 		    int fd,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 389	AUE_NULL	STD	{
 		int __mac_set_file(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 390	AUE_NULL	STD	{
@@ -2059,7 +2039,7 @@
 		    int s,
 		    off_t offset,
 		    size_t nbytes,
-		    _In_opt_ _Contains_ptr_ struct sf_hdtr_native *hdtr,
+		    _In_opt_ _Contains_ptr_ struct sf_hdtr *hdtr,
 		    _Out_opt_ off_t *sbytes,
 		    int flags
 		);
@@ -2151,19 +2131,19 @@
 409	AUE_NULL	STD	{
 		int __mac_get_pid(
 		    pid_t pid,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 410	AUE_NULL	STD	{
 		int __mac_get_link(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 411	AUE_NULL	STD	{
 		int __mac_set_link(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 412	AUE_EXTATTR_SET_LINK	STD	{
@@ -2196,19 +2176,19 @@
 		    _In_z_ char *fname,
 		    _In_ char **argv,
 		    _In_ char **envv,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 416	AUE_SIGACTION	STD	{
 		int sigaction(
 		    int sig,
-		    _In_opt_ _Contains_ptr_ const struct sigaction_native *act,
-		    _Out_opt_ _Contains_ptr_ struct sigaction_native *oact
+		    _In_opt_ _Contains_ptr_ struct sigaction *act,
+		    _Out_opt_ _Contains_ptr_ struct sigaction *oact
 		);
 	}
 417	AUE_SIGRETURN	STD	{
 		int sigreturn(
-		    _In_ _Contains_long_ptr_ const struct __ucontext *sigcntxp
+		    _In_ const ucontext_c_t *sigcntxp
 		);
 	}
 418	AUE_NULL	UNIMPL	__xstat
@@ -2216,18 +2196,18 @@
 420	AUE_NULL	UNIMPL	__xlstat
 421	AUE_NULL	STD	{
 		int getcontext(
-		    _Out_ _Contains_long_ptr_ struct __ucontext *ucp
+		    _Out_ ucontext_c_t *ucp
 		);
 	}
 422	AUE_NULL	STD	{
 		int setcontext(
-		    _In_ _Contains_long_ptr_ const struct __ucontext *ucp
+		    _In_ const ucontext_c_t *ucp
 		);
 	}
 423	AUE_NULL	STD	{
 		int swapcontext(
-		    _Out_ _Contains_long_ptr_ struct __ucontext *oucp,
-		    _In_ _Contains_long_ptr_ const struct __ucontext *ucp
+		    _Out_ ucontext_c_t *oucp,
+		    _In_ const ucontext_c_t *ucp
 		);
 	}
 424	AUE_SWAPOFF	STD	{
@@ -2270,7 +2250,7 @@
 	}
 430	AUE_THR_CREATE	STD	{
 		int thr_create(
-		    _In_ ucontext_t *ctx,
+		    _In_ ucontext_c_t *ctx,
 		    _Out_ long *id,
 		    int flags
 		);
@@ -2391,7 +2371,7 @@
 	}
 453	AUE_AUDITCTL	STD	{
 		int auditctl(
-		    _In_z_ char *path
+		    _In_z_ const char *path
 		);
 	}
 454	AUE_NULL	STD	{
@@ -2452,7 +2432,7 @@
 461	AUE_MQ_NOTIFY	NOSTD	{
 		int kmq_notify(
 		    int mqd,
-		    _In_opt_ _Contains_long_ptr_ const struct sigevent_native *sigev
+		    _In_opt_ _Contains_long_ptr_ const struct sigevent *sigev
 		);
 	}
 462	AUE_MQ_UNLINK	NOSTD	{
@@ -2476,7 +2456,7 @@
 465	AUE_AIO_FSYNC	STD	{
 		int aio_fsync(
 		    int op,
-		    _In_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 466	AUE_RTPRIO	STD	{
@@ -2498,7 +2478,7 @@
 472	AUE_SCTP_GENERIC_SENDMSG	NOSTD	{
 		int sctp_generic_sendmsg(
 		    int sd,
-		    _In_reads_bytes_(mlen) caddr_t msg,
+		    _In_reads_bytes_(mlen) void *msg,
 		    int mlen,
 		    _In_reads_bytes_(tolen) const struct sockaddr *to,
 		    __socklen_t tolen,
@@ -2509,7 +2489,7 @@
 473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD	{
 		int sctp_generic_sendmsg_iov(
 		    int sd,
-		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec_native *iov,
+		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec *iov,
 		    int iovlen,
 		    _In_reads_bytes_(tolen) const struct sockaddr *to,
 		    __socklen_t tolen,
@@ -2520,7 +2500,7 @@
 474	AUE_SCTP_GENERIC_RECVMSG	NOSTD	{
 		int sctp_generic_recvmsg(
 		    int sd,
-		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec_native *iov,
+		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec *iov,
 		    int iovlen,
 		    _Out_writes_bytes_(*fromlenaddr) struct sockaddr *from,
 		    _Out_ __socklen_t *fromlenaddr,
@@ -2544,9 +2524,9 @@
 		    off_t offset
 		);
 	}
-477	AUE_MMAP	STD	{
+477	AUE_MMAP	STD {
 		void *mmap(
-		    _In_ void *addr,
+		    _Pagerange_vmmap_opt_(len) void *addr,
 		    size_t len,
 		    int prot,
 		    int flags,
@@ -2563,7 +2543,7 @@
 	}
 479	AUE_TRUNCATE	STD	{
 		int truncate(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    off_t length
 		);
 	}
@@ -2633,7 +2613,7 @@
 489	AUE_FACCESSAT	STD	{
 		int faccessat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int amode,
 		    int flag
 		);
@@ -2641,7 +2621,7 @@
 490	AUE_FCHMODAT	STD	{
 		int fchmodat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode,
 		    int flag
 		);
@@ -2649,7 +2629,7 @@
 491	AUE_FCHOWNAT	STD	{
 		int fchownat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    uid_t uid,
 		    gid_t gid,
 		    int flag
@@ -2673,30 +2653,30 @@
 494	AUE_FUTIMESAT	STD	{
 		int futimesat(
 		    int fd,
-		    _In_z_ char *path,
-		    _In_reads_(2) _Contains_long_timet_ struct timeval *times
+		    _In_z_ const char *path,
+		    _In_reads_(2) _Contains_long_timet_ const struct timeval *times
 		);
 	}
 495	AUE_LINKAT	STD	{
 		int linkat(
 		    int fd1,
-		    _In_z_ char *path1,
+		    _In_z_ const char *path1,
 		    int fd2,
-		    _In_z_ char *path2,
+		    _In_z_ const char *path2,
 		    int flag
 		);
 	}
 496	AUE_MKDIRAT	STD	{
 		int mkdirat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
 497	AUE_MKFIFOAT	STD	{
 		int mkfifoat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
@@ -2711,7 +2691,7 @@
 499	AUE_OPENAT_RWTC	STD|VARARG	{
 		int openat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int flag,
 		    mode_t mode
 		);
@@ -2719,7 +2699,7 @@
 500	AUE_READLINKAT	STD	{
 		int readlinkat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_writes_bytes_(bufsize) char *buf,
 		    size_t bufsize
 		);
@@ -2727,22 +2707,22 @@
 501	AUE_RENAMEAT	STD	{
 		int renameat(
 		    int oldfd,
-		    _In_z_ char *old,
+		    _In_z_ const char *old,
 		    int newfd,
-		    _In_z_ char *new
+		    _In_z_ const char *new
 		);
 	}
 502	AUE_SYMLINKAT	STD	{
 		int symlinkat(
-		    _In_z_ char *path1,
+		    _In_z_ const char *path1,
 		    int fd,
-		    _In_z_ char *path2
+		    _In_z_ const char *path2
 		);
 	}
 503	AUE_UNLINKAT	STD	{
 		int unlinkat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int flag
 		);
 	}
@@ -2754,19 +2734,19 @@
 ; 505 is initialised by the kgssapi code, if present.
 505	AUE_NULL	NOSTD	{
 		int gssd_syscall(
-		    _In_z_ char *path
+		    _In_z_ const char *path
 		);
 	}
 506	AUE_JAIL_GET	STD	{
 		int jail_get(
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    unsigned int iovcnt,
 		    int flags
 		);
 	}
 507	AUE_JAIL_SET	STD	{
 		int jail_set(
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    unsigned int iovcnt,
 		    int flags
 		);
@@ -2786,7 +2766,7 @@
 		    int semid,
 		    int semnum,
 		    int cmd,
-		    _Inout_ _Contains_ptr_ union semun_native *arg
+		    _Inout_ _Contains_ptr_ union semun *arg
 		);
 	}
 511	AUE_MSGCTL	NOSTD	{
@@ -2805,7 +2785,7 @@
 	}
 513	AUE_LPATHCONF	STD	{
 		int lpathconf(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int name
 		);
 	}
@@ -2927,7 +2907,7 @@
 		    _Out_opt_ int *status,
 		    int options,
 		    _Out_opt_ _Contains_long_ struct __wrusage *wrusage,
-		    _Out_opt_ _Contains_long_ptr_ struct siginfo_native *info
+		    _Out_opt_ _Contains_long_ptr_ struct __siginfo *info
 		);
 	}
 533	AUE_CAP_RIGHTS_LIMIT	STD	{
@@ -2967,7 +2947,7 @@
 		    int fd,
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr *name,
-		    int namelen
+		    __socklen_t namelen
 		);
 	}
 539	AUE_CONNECTAT	STD	{
@@ -2975,7 +2955,7 @@
 		    int fd,
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr *name,
-		    int namelen
+		    __socklen_t namelen
 		);
 	}
 540	AUE_CHFLAGSAT	STD	{
@@ -3002,7 +2982,7 @@
 	}
 543	AUE_AIO_MLOCK	STD	{
 		int aio_mlock(
-		    _In_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 544	AUE_PROCCTL	STD	{
@@ -3024,14 +3004,14 @@
 546	AUE_FUTIMES	STD	{
 		int futimens(
 		    int fd,
-		    _In_reads_(2) _Contains_long_timet_ struct timespec *times
+		    _In_reads_(2) _Contains_long_timet_ const struct timespec *times
 		);
 	}
 547	AUE_FUTIMESAT	STD	{
 		int utimensat(
 		    int fd,
-		    _In_z_ char *path,
-		    _In_reads_(2) _Contains_long_timet_ struct timespec *times,
+		    _In_z_ const char *path,
+		    _In_reads_(2) _Contains_long_timet_ const struct timespec *times,
 		    int flag
 		);
 	}
@@ -3051,7 +3031,7 @@
 552	AUE_FSTATAT	STD	{
 		int fstatat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ _Contains_long_timet_ struct stat *buf,
 		    int flag
 		);
@@ -3098,7 +3078,7 @@
 559	AUE_MKNODAT	STD	{
 		int mknodat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode,
 		    dev_t dev
 		);
@@ -3106,9 +3086,9 @@
 560	AUE_KEVENT	STD	{
 		int kevent(
 		    int fd,
-		    _In_reads_opt_(nchanges) _Contains_ptr_ struct kevent_native *changelist,
+		    _In_reads_opt_(nchanges) _Contains_ptr_ const struct kevent *changelist,
 		    int nchanges,
-		    _Out_writes_opt_(nevents) _Contains_ptr_ struct kevent_native *eventlist,
+		    _Out_writes_opt_(nevents) _Contains_ptr_ struct kevent *eventlist,
 		    int nevents,
 		    _In_opt_ _Contains_long_timet_ const struct timespec *timeout
 		);
@@ -3140,7 +3120,3 @@
 		    unsigned int flags
 		);
 	}
-
-; Please copy any additions and changes to the following compatability tables:
-; sys/compat/freebsd32/syscalls.master
-; vim: syntax=off

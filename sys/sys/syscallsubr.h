@@ -339,7 +339,7 @@ int	kern_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void *data);
 int	kern_profil(struct thread *td, char * __capability samples, size_t size,
 	    size_t offset, u_int scale);
-int	kern_pread(struct thread *td, int fd, void *buf, size_t nbyte,
+int	kern_pread(struct thread *td, int fd, void * __capability buf, size_t nbyte,
 	    off_t offset);
 int	kern_preadv(struct thread *td, int fd, struct uio *auio, off_t offset);
 int	kern_pselect(struct thread *td, int nd, fd_set * __capability in,
@@ -347,8 +347,8 @@ int	kern_pselect(struct thread *td, int nd, fd_set * __capability in,
 	    struct timeval *tvp, sigset_t *uset, int abi_nfdbits);
 int	kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr,
 	    int data);
-int	kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
-	    off_t offset);
+int	kern_pwrite(struct thread *td, int fd, const void * __capability buf,
+	    size_t nbyte, off_t offset);
 int	kern_pwritev(struct thread *td, int fd, struct uio *auio, off_t offset);
 int	kern_quotactl(struct thread *td, const char * __capability path,
 	    int cmd, int uid, void * __capability arg);
@@ -494,7 +494,7 @@ int	kern_wait(struct thread *td, pid_t pid, int *status, int options,
 int	kern_wait4(struct thread *td, int pid, int * __capability status,
 	    int options, struct rusage * __capability rusage);
 int	kern_wait6(struct thread *td, enum idtype idtype, id_t id, int *status,
-	    int options, struct __wrusage *wrup, _siginfo_t *sip);
+	    int options, struct __wrusage *wrup, siginfo_t *sip);
 int	kern_writev(struct thread *td, int fd, struct uio *auio);
 int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);
