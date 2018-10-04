@@ -175,7 +175,7 @@ settime(struct thread *td, struct timeval *tv)
 struct clock_getcpuclockid2_args {
 	id_t id;
 	int which,
-	clockid_t *clock_id;
+	clockid_t * __capability clock_id;
 };
 #endif
 /* ARGSUSED */
@@ -226,7 +226,7 @@ kern_clock_getcpuclockid2(struct thread *td, id_t id, int which,
 #ifndef _SYS_SYSPROTO_H_
 struct clock_gettime_args {
 	clockid_t clock_id;
-	struct	timespec *tp;
+	struct	timespec * __capability tp;
 };
 #endif
 /* ARGSUSED */
@@ -379,7 +379,7 @@ kern_clock_gettime(struct thread *td, clockid_t clock_id, struct timespec *ats)
 #ifndef _SYS_SYSPROTO_H_
 struct clock_settime_args {
 	clockid_t clock_id;
-	const struct	timespec *tp;
+	const struct	timespec * __capability tp;
 };
 #endif
 /* ARGSUSED */
@@ -423,7 +423,7 @@ kern_clock_settime(struct thread *td, clockid_t clock_id, struct timespec *ats)
 #ifndef _SYS_SYSPROTO_H_
 struct clock_getres_args {
 	clockid_t clock_id;
-	struct	timespec *tp;
+	struct	timespec * __capability tp;
 };
 #endif
 int
@@ -585,8 +585,8 @@ kern_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
 
 #ifndef _SYS_SYSPROTO_H_
 struct nanosleep_args {
-	const struct	timespec *rqtp;
-	struct		timespec *rmtp;
+	const struct	timespec * __capability rqtp;
+	struct		timespec * __capability rmtp;
 };
 #endif
 /* ARGSUSED */
@@ -602,8 +602,8 @@ sys_nanosleep(struct thread *td, struct nanosleep_args *uap)
 struct clock_nanosleep_args {
 	clockid_t clock_id;
 	int 	  flags;
-	const struct	timespec *rqtp;
-	struct	timespec *rmtp;
+	const struct	timespec * __capability rqtp;
+	struct	timespec * __capability rmtp;
 };
 #endif
 /* ARGSUSED */
@@ -644,8 +644,8 @@ user_clock_nanosleep(struct thread *td, clockid_t clock_id, int flags,
 
 #ifndef _SYS_SYSPROTO_H_
 struct gettimeofday_args {
-	struct	timeval *tp;
-	struct	timezone *tzp;
+	struct	timeval * __capability tp;
+	struct	timezone * __capability tzp;
 };
 #endif
 /* ARGSUSED */
@@ -679,8 +679,8 @@ kern_gettimeofday(struct thread *td, struct timeval * __capability tp,
 
 #ifndef _SYS_SYSPROTO_H_
 struct settimeofday_args {
-	struct	timeval *tv;
-	struct	timezone *tzp;
+	struct	timeval * __capability tv;
+	struct	timezone * __capability tzp;
 };
 #endif
 /* ARGSUSED */
@@ -763,7 +763,7 @@ kern_settimeofday(struct thread *td, struct timeval *tv, struct timezone *tzp)
 #ifndef _SYS_SYSPROTO_H_
 struct getitimer_args {
 	u_int	which;
-	struct	itimerval *itv;
+	struct	itimerval * __capability itv;
 };
 #endif
 int
@@ -820,7 +820,7 @@ kern_getitimer(struct thread *td, u_int which, struct itimerval *aitv)
 #ifndef _SYS_SYSPROTO_H_
 struct setitimer_args {
 	u_int	which;
-	struct	itimerval *itv, *oitv;
+	struct	itimerval * __capability itv, * __capability oitv;
 };
 #endif
 int
@@ -1184,6 +1184,12 @@ itimer_leave(struct itimer *it)
 		wakeup(it);
 }
 
+#ifdef COMPAT_FREEBSD64
+/*
+ * XXX-AM: this is only used in compat64 so it should
+ * be moved to compat.
+ * XXX-AM: fix for freebsd64.
+ */
 int
 convert_sigevent(const struct sigevent_native *sig_n, ksigevent_t *sig)
 {
@@ -1212,6 +1218,7 @@ convert_sigevent(const struct sigevent_native *sig_n, ksigevent_t *sig)
 	}
 	return (0);
 }
+#endif
 
 #ifndef _SYS_SYSPROTO_H_
 struct ktimer_create_args {
@@ -1223,7 +1230,6 @@ struct ktimer_create_args {
 int
 sys_ktimer_create(struct thread *td, struct ktimer_create_args *uap)
 {
-	struct sigevent_native ev_n;
 	ksigevent_t *evp, ev;
 	int id;
 	int error;
@@ -1231,10 +1237,13 @@ sys_ktimer_create(struct thread *td, struct ktimer_create_args *uap)
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(__USER_CAP_OBJ(uap->evp), &ev_n, sizeof(ev_n));
+		error = copyincap(__USER_CAP_OBJ(uap->evp), &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
+#if 0
+		/* XXX-AM: this should go to compat64. */
 		convert_sigevent(&ev_n, &ev);
+#endif
 		evp = &ev;
 	}
 	error = kern_ktimer_create(td, uap->clock_id, evp, &id, -1);
@@ -1426,8 +1435,8 @@ kern_ktimer_delete(struct thread *td, int timerid)
 struct ktimer_settime_args {
 	int timerid;
 	int flags;
-	const struct itimerspec * value;
-	struct itimerspec * ovalue;
+	const struct itimerspec * __capability value;
+	struct itimerspec * __capability ovalue;
 };
 #endif
 int
@@ -1474,7 +1483,7 @@ kern_ktimer_settime(struct thread *td, int timer_id, int flags,
 #ifndef _SYS_SYSPROTO_H_
 struct ktimer_gettime_args {
 	int timerid;
-	struct itimerspec * value;
+	struct itimerspec * __capability value;
 };
 #endif
 int
