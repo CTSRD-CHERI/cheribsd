@@ -239,7 +239,12 @@ sys_jail(struct thread *td, struct jail_args *uap)
 		return (error);
 
 	switch (version) {
-	case 0: {
+	case 0:
+	{
+#if __has_feature(capabilities)
+		/* These were never supported for CHERI */
+		return (EINVAL);
+#else
 		struct jail_v0 j0;
 		struct in_addr ip4;
 
@@ -251,7 +256,9 @@ sys_jail(struct thread *td, struct jail_args *uap)
 		ip4.s_addr = htonl(j0.ip_number);
 		return (kern_jail(td, __USER_CAP_STR(j0.path),
 		    __USER_CAP_STR(j0.hostname), NULL, &ip4, 1, NULL, 0,
-		    UIO_SYSSPACE)); }
+		    UIO_SYSSPACE));
+#endif
+	}
 
 	case 1:
 		/*
@@ -263,7 +270,7 @@ sys_jail(struct thread *td, struct jail_args *uap)
 	case 2:	{ /* JAIL_API_VERSION */
 		struct jail j;
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
-		error = copyin(jail, &j, sizeof(struct jail));
+		error = copyincap(jail, &j, sizeof(struct jail));
 		if (error)
 			return (error);
 		return (kern_jail(td, __USER_CAP_STR(j.path),
