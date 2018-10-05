@@ -453,11 +453,6 @@ _mips_rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 }
 #endif /* #ifndef __CHERI_PURE_CAPABILITY__*/
 
-static inline const char*
-symname(Obj_Entry* obj, size_t r_symndx) {
-	return obj->strtab + obj->symtab[r_symndx].st_name;
-}
-
 #ifdef __CHERI_PURE_CAPABILITY__
 #include "cheri_reloc.h"
 #endif
