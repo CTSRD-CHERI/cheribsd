@@ -90,14 +90,6 @@ struct fiodgname_arg_c {
 #define FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
 #endif
 
-#ifdef COMPAT_FREEBSD32
-struct fiodgname_arg32 {
-	int		len;
-	uint32_t	buf;	/* (void *) */
-};
-#define FIODGNAME_32	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg32)
-#endif
-
 static MALLOC_DEFINE(M_CDEVPDATA, "DEVFSP", "Metainfo for cdev-fp data");
 
 struct mtx	devfs_de_interlock;
@@ -786,7 +778,7 @@ devfs_ioctl_f(struct file *fp, u_long com, void *data, struct ucred *cred, struc
 	return (error);
 }
 
-static void * __capability
+void * __capability
 fiodgname_buf_get_ptr(void *fgnp, u_long com)
 {
 	union {
