@@ -185,12 +185,16 @@ static struct sx swdev_syscall_lock;	/* serialize swap(on|off) */
 void * __capability swap_restore_cap;
 #endif
 
-static vm_ooffset_t swap_total;
-SYSCTL_QUAD(_vm, OID_AUTO, swap_total, CTLFLAG_RD, &swap_total, 0,
-    "Total amount of available swap storage.");
-static vm_ooffset_t swap_reserved;
-SYSCTL_QUAD(_vm, OID_AUTO, swap_reserved, CTLFLAG_RD, &swap_reserved, 0,
+static u_long swap_reserved;
+static u_long swap_total;
+static int sysctl_page_shift(SYSCTL_HANDLER_ARGS);
+SYSCTL_PROC(_vm, OID_AUTO, swap_reserved, CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_MPSAFE,
+    &swap_reserved, 0, sysctl_page_shift, "A", 
     "Amount of swap storage needed to back all allocated anonymous memory.");
+SYSCTL_PROC(_vm, OID_AUTO, swap_total, CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_MPSAFE,
+    &swap_total, 0, sysctl_page_shift, "A", 
+    "Total amount of available swap storage.");
+
 static int overcommit = 0;
 SYSCTL_INT(_vm, VM_OVERCOMMIT, overcommit, CTLFLAG_RW, &overcommit, 0,
     "Configure virtual memory overcommit behavior. See tuning(7) "
@@ -207,6 +211,16 @@ SYSCTL_ULONG(_vm, OID_AUTO, swap_maxpages, CTLFLAG_RD, &swap_maxpages, 0,
 #define	SWAP_RESERVE_RLIMIT_ON		(1 << 1)
 #define	SWAP_RESERVE_ALLOW_NONWIRED	(1 << 2)
 
+static int
+sysctl_page_shift(SYSCTL_HANDLER_ARGS)
+{
+	uint64_t newval;
+	u_long value = *(u_long *)arg1;
+
+	newval = ((uint64_t)value) << PAGE_SHIFT;
+	return (sysctl_handle_64(oidp, &newval, 0, req));
+}
+
 int
 swap_reserve(vm_ooffset_t incr)
 {
@@ -217,7 +231,7 @@ swap_reserve(vm_ooffset_t incr)
 int
 swap_reserve_by_cred(vm_ooffset_t incr, struct ucred *cred)
 {
-	vm_ooffset_t r, s;
+	u_long r, s, prev, pincr;
 	int res, error;
 	static int curfail;
 	static struct timeval lastfail;
@@ -225,8 +239,8 @@ swap_reserve_by_cred(vm_ooffset_t incr, struct ucred *cred)
 
 	uip = cred->cr_ruidinfo;
 
-	if (incr & PAGE_MASK)
-		panic("swap_reserve: & PAGE_MASK");
+	KASSERT((incr & PAGE_MASK) == 0, ("%s: incr: %ju & PAGE_MASK", __func__,
+	    (uintmax_t)incr));
 
 #ifdef RACCT
 	if (racct_enable) {
@@ -238,36 +252,33 @@ swap_reserve_by_cred(vm_ooffset_t incr, struct ucred *cred)
 	}
 #endif
 
+	pincr = atop(incr);
 	res = 0;
-	mtx_lock(&sw_dev_mtx);
-	r = swap_reserved + incr;
+	prev = atomic_fetchadd_long(&swap_reserved, pincr);
+	r = prev + pincr;
 	if (overcommit & SWAP_RESERVE_ALLOW_NONWIRED) {
 		s = vm_cnt.v_page_count - vm_cnt.v_free_reserved -
 		    vm_wire_count();
-		s *= PAGE_SIZE;
 	} else
 		s = 0;
 	s += swap_total;
 	if ((overcommit & SWAP_RESERVE_FORCE_ON) == 0 || r <= s ||
 	    (error = priv_check(curthread, PRIV_VM_SWAP_NOQUOTA)) == 0) {
 		res = 1;
-		swap_reserved = r;
+	} else {
+		prev = atomic_fetchadd_long(&swap_reserved, -pincr);
+		if (prev < pincr)
+			panic("swap_reserved < incr on overcommit fail");
 	}
-	mtx_unlock(&sw_dev_mtx);
-
 	if (res) {
-		UIDINFO_VMSIZE_LOCK(uip);
+		prev = atomic_fetchadd_long(&uip->ui_vmsize, pincr);
 		if ((overcommit & SWAP_RESERVE_RLIMIT_ON) != 0 &&
-		    uip->ui_vmsize + incr > lim_cur(curthread, RLIMIT_SWAP) &&
-		    priv_check(curthread, PRIV_VM_SWAP_NORLIMIT))
+		    prev + pincr > lim_cur(curthread, RLIMIT_SWAP) &&
+		    priv_check(curthread, PRIV_VM_SWAP_NORLIMIT)) {
 			res = 0;
-		else
-			uip->ui_vmsize += incr;
-		UIDINFO_VMSIZE_UNLOCK(uip);
-		if (!res) {
-			mtx_lock(&sw_dev_mtx);
-			swap_reserved -= incr;
-			mtx_unlock(&sw_dev_mtx);
+			prev = atomic_fetchadd_long(&uip->ui_vmsize, -pincr);
+			if (prev < pincr)
+				panic("uip->ui_vmsize < incr on overcommit fail");
 		}
 	}
 	if (!res && ppsratecheck(&lastfail, &curfail, 1)) {
@@ -276,7 +287,7 @@ swap_reserve_by_cred(vm_ooffset_t incr, struct ucred *cred)
 	}
 
 #ifdef RACCT
-	if (!res) {
+	if (racct_enable && !res) {
 		PROC_LOCK(curproc);
 		racct_sub(curproc, RACCT_SWAP, incr);
 		PROC_UNLOCK(curproc);
@@ -290,22 +301,20 @@ void
 swap_reserve_force(vm_ooffset_t incr)
 {
 	struct uidinfo *uip;
+	u_long pincr;
 
-	mtx_lock(&sw_dev_mtx);
-	swap_reserved += incr;
-	mtx_unlock(&sw_dev_mtx);
+	KASSERT((incr & PAGE_MASK) == 0, ("%s: incr: %ju & PAGE_MASK", __func__,
+	    (uintmax_t)incr));
 
+	PROC_LOCK(curproc);
 #ifdef RACCT
-	PROC_LOCK(curproc);
-	racct_add_force(curproc, RACCT_SWAP, incr);
-	PROC_UNLOCK(curproc);
+	if (racct_enable)
+		racct_add_force(curproc, RACCT_SWAP, incr);
 #endif
-
-	uip = curthread->td_ucred->cr_ruidinfo;
-	PROC_LOCK(curproc);
-	UIDINFO_VMSIZE_LOCK(uip);
-	uip->ui_vmsize += incr;
-	UIDINFO_VMSIZE_UNLOCK(uip);
+	pincr = atop(incr);
+	atomic_add_long(&swap_reserved, pincr);
+	uip = curproc->p_ucred->cr_ruidinfo;
+	atomic_add_long(&uip->ui_vmsize, pincr);
 	PROC_UNLOCK(curproc);
 }
 
@@ -315,7 +324,7 @@ swap_release(vm_ooffset_t decr)
 	struct ucred *cred;
 
 	PROC_LOCK(curproc);
-	cred = curthread->td_ucred;
+	cred = curproc->p_ucred;
 	swap_release_by_cred(decr, cred);
 	PROC_UNLOCK(curproc);
 }
@@ -323,26 +332,26 @@ swap_release(vm_ooffset_t decr)
 void
 swap_release_by_cred(vm_ooffset_t decr, struct ucred *cred)
 {
+	u_long prev, pdecr;
  	struct uidinfo *uip;
 
 	uip = cred->cr_ruidinfo;
 
-	if (decr & PAGE_MASK)
-		panic("swap_release: & PAGE_MASK");
+	KASSERT((decr & PAGE_MASK) == 0, ("%s: decr: %ju & PAGE_MASK", __func__,
+	    (uintmax_t)decr));
 
-	mtx_lock(&sw_dev_mtx);
-	if (swap_reserved < decr)
+	pdecr = atop(decr);
+	prev = atomic_fetchadd_long(&swap_reserved, -pdecr);
+	if (prev < pdecr)
 		panic("swap_reserved < decr");
-	swap_reserved -= decr;
-	mtx_unlock(&sw_dev_mtx);
 
-	UIDINFO_VMSIZE_LOCK(uip);
-	if (uip->ui_vmsize < decr)
+	prev = atomic_fetchadd_long(&uip->ui_vmsize, -pdecr);
+	if (prev < pdecr)
 		printf("negative vmsize for uid = %d\n", uip->ui_uid);
-	uip->ui_vmsize -= decr;
-	UIDINFO_VMSIZE_UNLOCK(uip);
-
-	racct_sub_cred(cred, RACCT_SWAP, decr);
+#ifdef RACCT
+	if (racct_enable)
+		racct_sub_cred(cred, RACCT_SWAP, decr);
+#endif
 }
 
 #define SWM_POP		0x01	/* pop out			*/
@@ -2340,7 +2349,7 @@ swapon_check_swzone(void)
 {
 	unsigned long maxpages, npages;
 
-	npages = swap_total / PAGE_SIZE;
+	npages = swap_total;
 	/* absolute maximum we can handle assuming 100% efficiency */
 	maxpages = uma_zone_get_max(swblk_zone) * SWAP_META_PAGES;
 
@@ -2418,7 +2427,7 @@ swaponsomething(struct vnode *vp, void *id, u_long nblks,
 	TAILQ_INSERT_TAIL(&swtailq, sp, sw_list);
 	nswapdev++;
 	swap_pager_avail += nblks - 2;
-	swap_total += (vm_ooffset_t)nblks * PAGE_SIZE;
+	swap_total += nblks;
 	swapon_check_swzone();
 	swp_sizecheck();
 	mtx_unlock(&sw_dev_mtx);
@@ -2521,7 +2530,7 @@ swapoff_one(struct swdevt *sp, struct ucred *cred)
 	mtx_lock(&sw_dev_mtx);
 	sp->sw_flags |= SW_CLOSING;
 	swap_pager_avail -= blist_fill(sp->sw_blist, 0, nblks);
-	swap_total -= (vm_ooffset_t)nblks * PAGE_SIZE;
+	swap_total -= nblks;
 	mtx_unlock(&sw_dev_mtx);
 
 	/*
