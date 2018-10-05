@@ -82,14 +82,6 @@ static struct fileops devfs_ops_f;
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
 
-#ifdef COMPAT_CHERIABI
-struct fiodgname_arg_c {
-	int		len;
-	void * __capability buf;
-};
-#define FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
-#endif
-
 static MALLOC_DEFINE(M_CDEVPDATA, "DEVFSP", "Metainfo for cdev-fp data");
 
 struct mtx	devfs_de_interlock;

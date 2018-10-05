@@ -284,6 +284,9 @@ ptsdev_ioctl(struct file *fp, u_long cmd, void *data,
 		tty_unlock(tp);
 		return (0);
 	case FIODGNAME:
+#ifdef COMPAT_CHERIABI
+	case FIODGNAME_C:
+#endif
 #ifdef COMPAT_FREEBSD32
 	case FIODGNAME_32:
 #endif

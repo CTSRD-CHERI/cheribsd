@@ -64,6 +64,14 @@ struct fiodgname_arg {
 #define	FIOSEEKHOLE	_IOWR('f', 98, off_t)	/* SEEK_HOLE */
 
 #ifdef _KERNEL
+#ifdef COMPAT_CHERIABI
+struct fiodgname_arg_c {
+	int		len;
+	void * __capability buf;
+};
+#define FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
+#endif
+
 #ifdef COMPAT_FREEBSD32
 struct fiodgname_arg32 {
 	int		len;
