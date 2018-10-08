@@ -229,7 +229,7 @@ struct sigaltstack_args {
 struct ioctl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char com_l_[PADL_(u_long)]; u_long com; char com_r_[PADR_(u_long)];
-	char data_l_[PADL_(caddr_t)]; caddr_t data; char data_r_[PADR_(caddr_t)];
+	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 };
 struct reboot_args {
 	char opt_l_[PADL_(int)]; int opt; char opt_r_[PADR_(int)];
