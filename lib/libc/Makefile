@@ -33,7 +33,7 @@ CFLAGS+=-DNO__SCCSID -DNO__RCSID
 
 LIB?=c
 SHLIB_MAJOR= 7
-.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
+.if ${MACHINE_ARCH:Mmips*c*}
 SHLIB_LDSCRIPT=libc-cheri.ldscript
 .else
 .if ${MK_SSP} != "no"

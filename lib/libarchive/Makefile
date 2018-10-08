@@ -15,7 +15,7 @@ SHLIB_MAJOR= 7
 
 CFLAGS+=	-DPLATFORM_CONFIG_H=\"${.CURDIR}/config_freebsd.h\"
 CFLAGS+=	-I${.OBJDIR}
-.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
+.if ${MACHINE_ARCH:Mmips*c*}
 CFLAGS+=	-Wno-cheri-bitwise-operations
 .endif
 
