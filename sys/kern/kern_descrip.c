@@ -403,9 +403,9 @@ sys_dup(struct thread *td, struct dup_args *uap)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct fcntl_args {
-	int	fd;
-	int	cmd;
-	long	arg;
+	int		fd;
+	int		cmd;
+	intcap_t	arg;
 };
 #endif
 /* ARGSUSED */
@@ -1352,7 +1352,7 @@ freebsd11_fstat(struct thread *td, struct freebsd11_fstat_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct fstat_args {
 	int	fd;
-	struct	stat *sb;
+	struct	stat * __capability sb;
 };
 #endif
 /* ARGSUSED */
