@@ -204,9 +204,9 @@ static const struct execsw **execsw;
 
 #ifndef _SYS_SYSPROTO_H_
 struct execve_args {
-	char    *fname; 
-	char    **argv;
-	char    **envv; 
+	char    * __capability fname;
+	char    * __capability * __capability argv;
+	char    * __capability * __capability envv;
 };
 #endif
 
@@ -231,8 +231,8 @@ sys_execve(struct thread *td, struct execve_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct fexecve_args {
 	int	fd;
-	char	**argv;
-	char	**envv;
+	char	* __capability * __capability argv;
+	char	* __capability * __capability envv;
 }
 #endif
 int
@@ -257,10 +257,10 @@ sys_fexecve(struct thread *td, struct fexecve_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct __mac_execve_args {
-	char	*fname;
-	char	**argv;
-	char	**envv;
-	struct mac_native	*mac_p;
+	char	* __capability fname;
+	char	* __capability * __capability argv;
+	char	* __capability * __capability envv;
+	struct mac * __capability mac_p;
 };
 #endif
 

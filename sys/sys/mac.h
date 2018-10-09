@@ -66,13 +66,15 @@
  * and ioctls between userspace and the kernel.
  */
 
-#ifndef _KERNEL
+
 struct mac {
 	size_t		 m_buflen;
-	char		*m_string;
+	char * __kerncap m_string;
 };
 
 typedef struct mac	*mac_t;
+
+#ifndef _KERNEL
 
 /*
  * Location of the userland MAC framework configuration file.  mac.conf
