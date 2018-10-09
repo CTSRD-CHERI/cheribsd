@@ -675,7 +675,7 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 		mtx_lock(&tp->tun_mtx);
 		if (TUN2IFP(tp)->if_mtu != tunp->mtu) {
 			strlcpy(ifr.ifr_name, if_name(TUN2IFP(tp)), IFNAMSIZ);
-			ifr.ifr_mtu = tunp->mtu;
+			ifr_mtu_set(&ifr, tunp->mtu);
 			CURVNET_SET(TUN2IFP(tp)->if_vnet);
 			error = ifhwioctl(SIOCSIFMTU, TUN2IFP(tp),
 			    (caddr_t)&ifr, td);
