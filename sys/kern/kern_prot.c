@@ -295,7 +295,7 @@ sys_getegid(struct thread *td, struct getegid_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct getgroups_args {
 	u_int	gidsetsize;
-	gid_t	*gidset;
+	gid_t * __capability gidset;
 };
 #endif
 int
@@ -809,7 +809,7 @@ fail:
 #ifndef _SYS_SYSPROTO_H_
 struct setgroups_args {
 	u_int	gidsetsize;
-	gid_t	*gidset;
+	gid_t * __capability gidset;
 };
 #endif
 /* ARGSUSED */
@@ -1182,9 +1182,9 @@ fail:
 
 #ifndef _SYS_SYSPROTO_H_
 struct getresuid_args {
-	uid_t	*ruid;
-	uid_t	*euid;
-	uid_t	*suid;
+	uid_t * __capability ruid;
+	uid_t * __capability euid;
+	uid_t * __capability suid;
 };
 #endif
 /* ARGSUSED */
@@ -1216,9 +1216,9 @@ kern_getresuid(struct thread *td, uid_t * __capability ruid,
 
 #ifndef _SYS_SYSPROTO_H_
 struct getresgid_args {
-	gid_t	*rgid;
-	gid_t	*egid;
-	gid_t	*sgid;
+	gid_t * __capability rgid;
+	gid_t * __capability egid;
+	gid_t * __capability sgid;
 };
 #endif
 /* ARGSUSED */
@@ -2126,7 +2126,7 @@ crsetgroups(struct ucred *cr, int ngrp, gid_t *groups)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct getlogin_args {
-	char	*namebuf;
+	char * __capability namebuf;
 	u_int	namelen;
 };
 #endif
@@ -2163,7 +2163,7 @@ kern_getlogin(struct thread *td, char * __capability namebuf, u_int namelen)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct setlogin_args {
-	char	*namebuf;
+	char * __capability namebuf;
 };
 #endif
 /* ARGSUSED */
