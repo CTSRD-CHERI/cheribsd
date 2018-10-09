@@ -80,51 +80,38 @@
 } while(0)
 #endif
 
-#ifndef _KERNEL
 struct kevent {
-	__uintptr_t	ident;		/* identifier for this event */
+	__kuintcap_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;		/* action flags for kqueue */
 	unsigned int	fflags;		/* filter flag value */
 	__int64_t	data;		/* filter data value */
-	void		*udata;		/* opaque user data identifier */
+	void * __kerncap udata;		/* opaque user data identifier */
 	__uint64_t	ext[4];		/* extensions */
 };
-#else /* _KERNEL */
-struct kevent_native {
-	__uintptr_t	ident;		/* identifier for this event */
-	short		filter;		/* filter for event */
-	unsigned short	flags;
-	unsigned int	fflags;
-	__int64_t	data;
-	void		*udata;		/* opaque user data identifier */
-	__uint64_t	ext[4];
-};
-#if __has_feature(capabilities)
-struct kevent_c {
-	__uintcap_t	ident;		/* identifier for this event */
-	short		filter;		/* filter for event */
-	unsigned short	flags;
-	unsigned int	fflags;
-	__int64_t	data;
-	void * __capability udata;	/* opaque user data identifier */
-	__uint64_t	ext[4];
-};
-typedef	struct kevent_c		kkevent_t;
-#else
-typedef	struct kevent_native	kkevent_t;
-#endif
-#endif /* _KERNEL */
+typedef	struct kevent		kkevent_t;
 
 #if defined(_WANT_FREEBSD11_KEVENT)
 /* Older structure used in FreeBSD 11.x and older. */
 struct kevent_freebsd11 {
-	__uintptr_t	ident;		/* identifier for this event */
+	__kuintcap_t	ident;		/* identifier for this event */
 	short		filter;		/* filter for event */
 	unsigned short	flags;
 	unsigned int	fflags;
-	__intptr_t	data;
-	void		*udata;		/* opaque user data identifier */
+	__kintcap_t	data;
+	void * __kerncap udata;		/* opaque user data identifier */
+};
+#endif
+
+#ifdef COMPAT_FREEBSD64
+struct kevent64 {
+	uint64_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	unsigned short	flags;
+	unsigned int	fflags;
+	__int64_t	data;
+	uint64_t	udata;		/* opaque user data identifier */
+	__uint64_t	ext[4];
 };
 #endif
 
