@@ -9,7 +9,7 @@ const char *cheriabi_syscallnames[] = {
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
-	"cheriabi_syscall",			/* 0 = cheriabi_syscall */
+	"syscall",			/* 0 = syscall */
 	"exit",			/* 1 = exit */
 	"fork",			/* 2 = fork */
 	"cheriabi_read",			/* 3 = cheriabi_read */

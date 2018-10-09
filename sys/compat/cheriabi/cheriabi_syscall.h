@@ -5,7 +5,7 @@
  * $FreeBSD$
  */
 
-#define	CHERIABI_SYS_cheriabi_syscall	0
+#define	CHERIABI_SYS_syscall	0
 #define	CHERIABI_SYS_exit	1
 #define	CHERIABI_SYS_fork	2
 #define	CHERIABI_SYS_cheriabi_read	3
