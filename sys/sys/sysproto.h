@@ -195,7 +195,7 @@ struct getegid_args {
 	register_t dummy;
 };
 struct profil_args {
-	char samples_l_[PADL_(caddr_t)]; caddr_t samples; char samples_r_[PADR_(caddr_t)];
+	char samples_l_[PADL_(void * __capability)]; void * __capability samples; char samples_r_[PADR_(void * __capability)];
 	char size_l_[PADL_(size_t)]; size_t size; char size_r_[PADR_(size_t)];
 	char offset_l_[PADL_(size_t)]; size_t offset; char offset_r_[PADR_(size_t)];
 	char scale_l_[PADL_(u_int)]; u_int scale; char scale_r_[PADR_(u_int)];
