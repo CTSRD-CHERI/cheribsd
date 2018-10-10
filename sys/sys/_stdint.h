@@ -102,6 +102,14 @@ typedef	__intmax_t		intmax_t;
 typedef	__uintmax_t		uintmax_t;
 #define	_UINTMAX_T_DECLARED
 #endif
+#ifndef _KINTCAP_T_DECLARED
+typedef __kintcap_t	kintcap_t;
+#define _KINTCAP_T_DECLARED
+#endif
+#ifndef _KUINTCAP_T_DECLARED
+typedef __kuintcap_t	kuintcap_t;
+#define _KUINTCAP_T_DECLARED
+#endif
 
 #ifndef _VADDR_T_DECLARED
 #ifndef __CHERI_PURE_CAPABILITY__
