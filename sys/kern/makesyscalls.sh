@@ -79,13 +79,34 @@ else
 fi
 
 sed -e '
-:join
+	# FreeBSD ID, includes, comments, and blank lines
+	/.*\$FreeBSD/b done_joining
+	/^[#;]/b done_joining
+	/^$/b done_joining
+
+	# Join lines ending in backslash
+:join_backslashes
 	/\\$/{a\
 
 	N
 	s/\\\n//
-	b join
+	b join_backslashes
 	}
+
+	# OBSOL, etc lines without function signatures
+	/^[0-9][^{]*$/b done_joining
+
+	# Join incomplete signatures.  The { must appear on the first line
+	# and the } must appear on the last line (modulo lines joined by
+	# backslashes).
+:join_syscalls
+	/^[^}]*$/{a\
+
+	N
+	s/\n//
+	b join_syscalls
+	}
+:done_joining
 2,${
 	/^#/!s/\([{}()*,]\)/ \1 /g
 }
