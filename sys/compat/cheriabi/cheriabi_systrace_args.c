@@ -909,6 +909,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* nosys */
+	case 198: {
+		*n_args = 0;
+		break;
+	}
 	/* cheriabi___sysctl */
 	case 202: {
 		struct cheriabi___sysctl_args *p = params;
@@ -4566,6 +4571,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		default:
 			break;
 		};
+		break;
+	/* nosys */
+	case 198:
 		break;
 	/* cheriabi___sysctl */
 	case 202:
@@ -8842,6 +8850,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* nosys */
+	case 198:
 	/* cheriabi___sysctl */
 	case 202:
 		if (ndx == 0 || ndx == 1)

@@ -114,6 +114,7 @@ MIASM =  \
 	fpathconf.o \
 	cheriabi_getrlimit.o \
 	cheriabi_setrlimit.o \
+	__syscall.o \
 	cheriabi___sysctl.o \
 	cheriabi_mlock.o \
 	cheriabi_munlock.o \
