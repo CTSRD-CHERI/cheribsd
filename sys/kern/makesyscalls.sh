@@ -29,6 +29,7 @@ ptrmaskname="sysargmask"
 systrace="systrace_args.c"
 ptr_intptr_t_cast="intptr_t"
 ptr_qualified="*"
+mincompat="0"
 
 # tmp files:
 sysaue="sysent.aue.$$"
@@ -155,6 +156,7 @@ sed -e '
 		namesname = \"$namesname\"
 		ptrmaskname = \"$ptrmaskname\"
 		infile = \"$1\"
+		mincompat = \"$mincompat\" + 0
 		capenabled_string = \"$capenabled\"
 		cap_prefix = \"$cap_prefix\"
 		ptr_intptr_t_cast = \"$ptr_intptr_t_cast\"
@@ -811,43 +813,62 @@ sed -e '
 	}
 	type("COMPAT") || type("COMPAT4") || type("COMPAT6") || \
 	    type("COMPAT7") || type("COMPAT10") || type("COMPAT11") {
+		is_obsol = 0
 		if (flag("COMPAT")) {
-			ncompat++
+			if (mincompat >= 4)
+				is_obsol = 1
+			else
+				ncompat++
 			out = syscompat
 			outdcl = syscompatdcl
 			wrap = "compat"
 			prefix = "o"
 			descr = "old"
 		} else if (flag("COMPAT4")) {
-			ncompat4++
+			if (mincompat > 4)
+				is_obsol = 1
+			else
+				ncompat4++
 			out = syscompat4
 			outdcl = syscompat4dcl
 			wrap = "compat4"
 			prefix = "freebsd4_"
 			descr = "freebsd4"
 		} else if (flag("COMPAT6")) {
-			ncompat6++
+			if (mincompat > 5)
+				is_obsol = 1
+			else
+				ncompat6++
 			out = syscompat6
 			outdcl = syscompat6dcl
 			wrap = "compat6"
 			prefix = "freebsd6_"
 			descr = "freebsd6"
 		} else if (flag("COMPAT7")) {
-			ncompat7++
+			if (mincompat > 7)
+				is_obsol = 1
+			else
+				ncompat7++
 			out = syscompat7
 			outdcl = syscompat7dcl
 			wrap = "compat7"
 			prefix = "freebsd7_"
 			descr = "freebsd7"
 		} else if (flag("COMPAT10")) {
-			ncompat10++
+			if (mincompat > 10)
+				is_obsol = 1
+			else
+				ncompat10++
 			out = syscompat10
 			outdcl = syscompat10dcl
 			wrap = "compat10"
 			prefix = "freebsd10_"
 			descr = "freebsd10"
 		} else if (flag("COMPAT11")) {
-			ncompat11++
+			if (mincompat > 11)
+				is_obsol = 1
+			else
+				ncompat11++
 			out = syscompat11
 			outdcl = syscompat11dcl
 			wrap = "compat11"
@@ -855,6 +876,20 @@ sed -e '
 			descr = "freebsd11"
 		}
 		parseline()
+
+		if (is_obsol) {
+			printf("\t{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },") > sysent
+			align_sysent_comment(34)
+			printf("/* %d = obsolete %s%s */\n", syscall,
+			    prefix, funcalias) > sysent
+			printf("\t\"obs_%s%s\",\t\t\t/* %d = obsolete %s%s */\n",
+			    prefix, funcalias, syscall, prefix, funcalias) > sysnames
+			printf("\t\t\t\t/* %d is obsolete %s%s */\n",
+			    syscall, prefix, funcalias) > syshdr
+			syscall++
+			next
+		}
+
 		if (argc != 0 && !flag("NOARGS") && !flag("NOPROTO") && \
 		    !flag("NODEF")) {
 			printf("struct %s {\n", argalias) > out
