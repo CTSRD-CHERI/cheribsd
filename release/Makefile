@@ -221,6 +221,7 @@ disc1: packagesystem
 	echo hostid_enable=\"NO\" >> ${.TARGET}/etc/rc.conf
 	echo debug.witness.trace=0 >> ${.TARGET}/etc/sysctl.conf
 	echo vfs.mountroot.timeout=\"10\" >> ${.TARGET}/boot/loader.conf
+	echo kernels_autodetect=\"NO\" >> ${.TARGET}/boot/loader.conf
 	cp ${.CURDIR}/rc.local ${.TARGET}/etc
 	touch ${.TARGET}
 
@@ -248,6 +249,7 @@ bootonly: packagesystem
 	echo hostid_enable=\"NO\" >> ${.TARGET}/etc/rc.conf
 	echo debug.witness.trace=0 >> ${.TARGET}/etc/sysctl.conf
 	echo vfs.mountroot.timeout=\"10\" >> ${.TARGET}/boot/loader.conf
+	echo kernels_autodetect=\"NO\" >> ${.TARGET}/boot/loader.conf
 	cp ${.CURDIR}/rc.local ${.TARGET}/etc
 
 dvd: packagesystem
@@ -272,6 +274,7 @@ dvd: packagesystem
 	echo hostid_enable=\"NO\" >> ${.TARGET}/etc/rc.conf
 	echo debug.witness.trace=0 >> ${.TARGET}/etc/sysctl.conf
 	echo vfs.mountroot.timeout=\"10\" >> ${.TARGET}/boot/loader.conf
+	echo kernels_autodetect=\"NO\" >> ${.TARGET}/boot/loader.conf
 	cp ${.CURDIR}/rc.local ${.TARGET}/etc
 	touch ${.TARGET}
 
