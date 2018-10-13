@@ -9,6 +9,7 @@ FILESDIR=       ${LIBDIR}
 .undef LIBRARIES_ONLY
 CLEANFILES=	${FILES}
 CFLAGS+=-mxgot -mllvm -mxmxgot
+CFLAGS+=	-DCRT_IRELOC_SUPPRESS
 
 NEED_CHERI=	pure
 
