@@ -159,8 +159,8 @@ sed -e '
 		infile = \"$1\"
 		mincompat = \"$mincompat\" + 0
 		abi_flags = \"$abi_flags\"
+		abi_func_prefix = \"$abi_func_prefix\"
 		capenabled_string = \"$capenabled\"
-		cap_prefix = \"$cap_prefix\"
 		ptr_intptr_t_cast = \"$ptr_intptr_t_cast\"
 		ptr_qualified = \"$ptr_qualified\"
 		"'
@@ -526,8 +526,8 @@ sed -e '
 		}
 
 		if (abi_changes("pointer_args") && ptrargs > 0) {
-			argprefix = argprefix cap_prefix
-			funcprefix = cap_prefix
+			argprefix = argprefix abi_func_prefix
+			funcprefix = abi_func_prefix
 		}
 		if (funcalias == "") {
 			noabi_funcalias = funcname;
