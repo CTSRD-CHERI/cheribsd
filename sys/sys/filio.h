@@ -54,7 +54,7 @@
 #define	FIOGETLBA	_IOR('f', 121, int)	/* get start blk # */
 struct fiodgname_arg {
 	int	len;
-	void	*buf;
+	void * __kerncap buf;
 };
 #define	FIODGNAME	_IOW('f', 120, struct fiodgname_arg) /* get dev. name */
 #define	FIONWRITE	_IOR('f', 119, int)	/* get # bytes (yet) to write */

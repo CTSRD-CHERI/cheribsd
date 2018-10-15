@@ -82,6 +82,23 @@ static struct fileops devfs_ops_f;
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
 
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+struct fiodgname_arg64 {
+	int		len;
+	void * __capability buf;
+};
+#define FIODGNAME_64	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg64)
+#endif
+
+#ifdef COMPAT_FREEBSD32
+struct fiodgname_arg32 {
+	int		len;
+	uint32_t	buf;	/* (void *) */
+};
+#define FIODGNAME_32	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg32)
+#endif
+
 static MALLOC_DEFINE(M_CDEVPDATA, "DEVFSP", "Metainfo for cdev-fp data");
 
 struct mtx	devfs_de_interlock;
@@ -775,8 +792,8 @@ fiodgname_buf_get_ptr(void *fgnp, u_long com)
 {
 	union {
 		struct fiodgname_arg	fgn;
-#ifdef COMPAT_CHERIABI
-		struct fiodgname_arg_c	fgn_c;
+#ifdef COMPAT_FREEBSD64
+		struct fiodgname_arg64	fgn64;
 #endif
 #ifdef COMPAT_FREEBSD32
 		struct fiodgname_arg32	fgn32;
@@ -786,15 +803,17 @@ fiodgname_buf_get_ptr(void *fgnp, u_long com)
 	fgnup = fgnp;
 	switch (com) {
 	case FIODGNAME:
-		return (__USER_CAP(fgnup->fgn.buf, fgnup->fgn.len));
-#ifdef COMPAT_CHERIABI
-	case FIODGNAME_C:
-		return (fgnup->fgn_c.buf);
-#endif
+		return (fgnup->fgn.buf);
 #ifdef COMPAT_FREEBSD32
 	case FIODGNAME_32:
 		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn32.buf,
 		    fgnup->fgn32.len));
+#endif
+#ifdef COMPAT_FREEBSD64
+	case FIODGNAME_64:
+		/* XXX-AM: fix for freebsd64 */
+		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn64.buf,
+		    fgnup->fgn.len));
 #endif
 	default:
 		panic("Unhandled ioctl command %ld", com);
