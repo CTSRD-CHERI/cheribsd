@@ -66,15 +66,15 @@
 ; redistributions should be placed in the reserved range at the end
 ; of the current calls.
 
-0	AUE_NULL	NOPROTO|NOSTUB	{
+0	AUE_NULL	STD|NOSTUB	{
 		int nosys(void);
 	} syscall nosys_args int
-1	AUE_EXIT	NOPROTO|NOSTUB	{
+1	AUE_EXIT	STD|NOSTUB	{
 		void sys_exit(
 		    int rval
 		);
 	} exit sys_exit_args void
-2	AUE_FORK	NOPROTO	{
+2	AUE_FORK	STD	{
 		int fork(void);
 	}
 3	AUE_READ	STD	{
@@ -98,7 +98,7 @@
 		    mode_t mode
 		);
 	}
-6	AUE_CLOSE	NOPROTO	{
+6	AUE_CLOSE	STD	{
 		int close(
 		    int fd
 		);
@@ -113,8 +113,8 @@
 	}
 8	AUE_CREAT	COMPAT	{
 		int creat(
-			_In_z_ char *path,
-			int mode
+		    _In_z_ char *path,
+		    int mode
 		);
 	}
 9	AUE_LINK	STD	{
@@ -134,7 +134,7 @@
 		    _In_z_ const char *path
 		);
 	}
-13	AUE_FCHDIR	NOPROTO	{
+13	AUE_FCHDIR	STD	{
 		int fchdir(
 		    int fd
 		);
@@ -174,7 +174,7 @@
 		    int whence
 		);
 	}
-20	AUE_GETPID	NOPROTO	{
+20	AUE_GETPID	STD	{
 		pid_t getpid(void);
 	}
 21	AUE_MOUNT	STD	{
@@ -191,15 +191,15 @@
 		    int flags
 		);
 	}
-23	AUE_SETUID	NOPROTO	{
+23	AUE_SETUID	STD	{
 		int setuid(
 		    uid_t uid
 		);
 	}
-24	AUE_GETUID	NOPROTO	{
+24	AUE_GETUID	STD	{
 		uid_t getuid(void);
 	}
-25	AUE_GETEUID	NOPROTO	{
+25	AUE_GETEUID	STD	{
 		uid_t geteuid(void);
 	}
 26	AUE_PTRACE	STD	{
@@ -267,16 +267,16 @@
 		    u_long flags
 		);
 	}
-35	AUE_FCHFLAGS	NOPROTO	{
+35	AUE_FCHFLAGS	STD	{
 		int fchflags(
 		    int fd,
 		    u_long flags
 		);
 	}
-36	AUE_SYNC	NOPROTO	{
+36	AUE_SYNC	STD	{
 		int sync(void);
 	}
-37	AUE_KILL	NOPROTO	{
+37	AUE_KILL	STD	{
 		int kill(
 		    int pid,
 		    int signum
@@ -288,7 +288,7 @@
 		    _Out_ struct ostat *ub
 		);
 	}
-39	AUE_GETPPID	NOPROTO	{
+39	AUE_GETPPID	STD	{
 		pid_t getppid(void);
 	}
 40	AUE_LSTAT	COMPAT	{
@@ -297,7 +297,7 @@
 		    _Out_ struct ostat *ub
 		);
 	}
-41	AUE_DUP		NOPROTO	{
+41	AUE_DUP		STD	{
 		int dup(
 		    u_int fd
 		);
@@ -305,7 +305,7 @@
 42	AUE_PIPE	COMPAT10	{
 		int pipe(void);
 	}
-43	AUE_GETEGID	NOPROTO	{
+43	AUE_GETEGID	STD	{
 		gid_t getegid(void);
 	}
 44	AUE_PROFILE	STD	{
@@ -331,7 +331,7 @@
 		    _Out_opt_ struct osigaction *osa
 		);
 	}
-47	AUE_GETGID	NOPROTO	{
+47	AUE_GETGID	STD	{
 		gid_t getgid(void);
 	}
 48	AUE_SIGPROCMASK	COMPAT	{
@@ -372,7 +372,7 @@
 		    _Inout_opt_ void *data
 		);
 	}
-55	AUE_REBOOT	NOPROTO	{
+55	AUE_REBOOT	STD	{
 		int reboot(
 		    int opt
 		);
@@ -402,7 +402,7 @@
 		    _In_z_ void **envv
 		);
 	}
-60	AUE_UMASK	NOPROTO	{
+60	AUE_UMASK	STD	{
 		mode_t umask(
 		    mode_t newmask
 		);
@@ -436,7 +436,7 @@
 		    int flags
 		);
 	}
-66	AUE_VFORK	NOPROTO	{
+66	AUE_VFORK	STD	{
 		int vfork(void);
 	}
 67	AUE_NULL	OBSOL	vread
@@ -503,10 +503,10 @@
 		    _In_reads_(gidsetsize) const gid_t *gidset
 		);
 	}
-81	AUE_GETPGRP	NOPROTO	{
+81	AUE_GETPGRP	STD	{
 		int getpgrp(void);
 	}
-82	AUE_SETPGRP	NOPROTO	{
+82	AUE_SETPGRP	STD	{
 		int setpgid(
 		    int pid,
 		    int pgid
@@ -545,10 +545,10 @@
 		    u_int len
 		);
 	}
-89	AUE_GETDTABLESIZE	NOPROTO	{
+89	AUE_GETDTABLESIZE	STD	{
 		int getdtablesize(void);
 	}
-90	AUE_DUP2	NOPROTO	{
+90	AUE_DUP2	STD	{
 		int dup2(
 		    u_int from,
 		    u_int to
@@ -572,19 +572,19 @@
 		);
 	}
 94	AUE_NULL	UNIMPL	setdopt
-95	AUE_FSYNC	NOPROTO	{
+95	AUE_FSYNC	STD	{
 		int fsync(
 		    int fd
 		);
 	}
-96	AUE_SETPRIORITY	NOPROTO	{
+96	AUE_SETPRIORITY	STD	{
 		int setpriority(
 		    int which,
 		    int who,
 		    int prio
 		);
 	}
-97	AUE_SOCKET	NOPROTO	{
+97	AUE_SOCKET	STD	{
 		int socket(
 		    int domain,
 		    int type,
@@ -605,7 +605,7 @@
 		    int *anamelen
 		);
 	} accept accept_args int
-100	AUE_GETPRIORITY	NOPROTO	{
+100	AUE_GETPRIORITY	STD	{
 		int getpriority(
 		    int which,
 		    int who
@@ -648,7 +648,7 @@
 		    __socklen_t valsize
 		);
 	}
-106	AUE_LISTEN	NOPROTO	{
+106	AUE_LISTEN	STD	{
 		int listen(
 		    int s,
 		    int backlog
@@ -742,14 +742,14 @@
 		    _In_opt_ const struct timezone *tzp
 		);
 	}
-123	AUE_FCHOWN	NOPROTO	{
+123	AUE_FCHOWN	STD	{
 		int fchown(
 		    int fd,
 		    int uid,
 		    int gid
 		);
 	}
-124	AUE_FCHMOD	NOPROTO	{
+124	AUE_FCHMOD	STD	{
 		int fchmod(
 		    int fd,
 		    mode_t mode
@@ -765,13 +765,13 @@
 		    _Inout_ int *fromlenaddr
 		);
 	} recvfrom recvfrom_args int
-126	AUE_SETREUID	NOPROTO	{
+126	AUE_SETREUID	STD	{
 		int setreuid(
 		    int ruid,
 		    int euid
 		);
 	}
-127	AUE_SETREGID	NOPROTO	{
+127	AUE_SETREGID	STD	{
 		int setregid(
 		    int rgid,
 		    int egid
@@ -795,7 +795,7 @@
 		    long length
 		);
 	}
-131	AUE_FLOCK	NOPROTO	{
+131	AUE_FLOCK	STD	{
 		int flock(
 		    int fd,
 		    int how
@@ -817,7 +817,7 @@
 		    __socklen_t tolen
 		);
 	}
-134	AUE_SHUTDOWN	NOPROTO	{
+134	AUE_SHUTDOWN	STD	{
 		int shutdown(
 		    int s,
 		    int how
@@ -888,7 +888,7 @@
 		    int signum
 		);
 	}
-147	AUE_SETSID	NOPROTO	{
+147	AUE_SETSID	STD	{
 		int setsid(void);
 	}
 148	AUE_QUOTACTL	STD	{
@@ -1002,7 +1002,7 @@
 172	AUE_NULL	UNIMPL	nosys
 173	AUE_PREAD	OBSOL	pread
 174	AUE_PWRITE	OBSOL	pwrite
-175	AUE_SETFIB	NOPROTO	{
+175	AUE_SETFIB	STD	{
 		int setfib(
 		    int fibnum
 		);
@@ -1018,17 +1018,17 @@
 180	AUE_NULL	UNIMPL	nosys
 
 ; Syscalls 181-199 are used by/reserved for BSD
-181	AUE_SETGID	NOPROTO	{
+181	AUE_SETGID	STD	{
 		int setgid(
 		    gid_t gid
 		);
 	}
-182	AUE_SETEGID	NOPROTO	{
+182	AUE_SETEGID	STD	{
 		int setegid(
 		    gid_t egid
 		);
 	}
-183	AUE_SETEUID	NOPROTO	{
+183	AUE_SETEUID	STD	{
 		int seteuid(
 		    uid_t euid
 		);
@@ -1061,7 +1061,7 @@
 		    int name
 		);
 	}
-192	AUE_FPATHCONF	NOPROTO	{
+192	AUE_FPATHCONF	STD	{
 		int fpathconf(
 		    int fd,
 		    int name
@@ -1099,7 +1099,7 @@
 		    off_t pos
 		);
 	}
-198	AUE_NULL	NOPROTO|NOSTUB	{
+198	AUE_NULL	STD|NOSTUB	{
 		int nosys(void);
 	} __syscall __syscall_args int
 199	AUE_LSEEK	COMPAT6	{
@@ -1160,7 +1160,7 @@
 		    _In_reads_(2) const struct timeval *tptr
 		);
 	}
-207	AUE_GETPGID	NOPROTO	{
+207	AUE_GETPGID	STD	{
 		int getpgid(
 		    pid_t pid
 		);
@@ -1196,7 +1196,7 @@
 		    union semun_old *arg
 		);
 	}
-221	AUE_SEMGET	NOSTD|NOPROTO	{
+221	AUE_SEMGET	NOSTD	{
 		int semget(
 		    key_t key,
 		    int nsems,
@@ -1218,7 +1218,7 @@
 		    struct msqid_ds_old *buf
 		);
 	}
-225	AUE_MSGGET	NOSTD|NOPROTO	{
+225	AUE_MSGGET	NOSTD	{
 		int msgget(
 		    key_t key,
 		    int msgflg
@@ -1260,7 +1260,7 @@
 		    _Pagerange_vmmap_(1) void *shmaddr
 		);
 	}
-231	AUE_SHMGET	NOSTD|NOPROTO	{
+231	AUE_SHMGET	NOSTD	{
 		int shmget(
 		    key_t key,
 		    int size,
@@ -1292,7 +1292,7 @@
 		    _Out_ int *timerid
 		);
 	}
-236	AUE_NULL	NOPROTO	{
+236	AUE_NULL	STD	{
 		int ktimer_delete(
 		    int timerid
 		);
@@ -1311,7 +1311,7 @@
 		    _Out_ struct itimerspec *value
 		);
 	}
-239	AUE_NULL	NOPROTO	{
+239	AUE_NULL	STD	{
 		int ktimer_getoverrun(
 		    int timerid
 		);
@@ -1367,13 +1367,13 @@
 		    int inherit
 		);
 	}
-251	AUE_RFORK	NOPROTO	{
+251	AUE_RFORK	STD	{
 		int rfork(
 		    int flags
 		);
 	}
 252	AUE_POLL	UNIMPL	openbsd_poll
-253	AUE_ISSETUGID	NOPROTO	{
+253	AUE_ISSETUGID	STD	{
 		int issetugid(void);
 	}
 254	AUE_LCHOWN	STD	{
@@ -1491,7 +1491,7 @@
 		    _Out_ struct freebsd11_stat *sb
 		);
 	}
-300	AUE_NULL	NOPROTO	{
+300	AUE_NULL	STD	{
 		int modnext(
 		    int modid
 		);
@@ -1502,7 +1502,7 @@
 		    _Out_ struct module_stat *stat
 		);
 	}
-302	AUE_NULL	NOPROTO	{
+302	AUE_NULL	STD	{
 		int modfnext(
 		    int modid
 		);
@@ -1517,7 +1517,7 @@
 		    _In_z_ const char *file
 		);
 	}
-305	AUE_MODUNLOAD	NOPROTO	{
+305	AUE_MODUNLOAD	STD	{
 		int kldunload(
 		    int fileid
 		);
@@ -1527,7 +1527,7 @@
 		    _In_z_ const char *file
 		);
 	}
-307	AUE_NULL	NOPROTO	{
+307	AUE_NULL	STD	{
 		int kldnext(
 		    int fileid
 		);
@@ -1538,24 +1538,24 @@
 		    _Out_ struct kld_file_stat_c *stat
 		);
 	}
-309	AUE_NULL	NOPROTO	{
+309	AUE_NULL	STD	{
 		int kldfirstmod(
 		    int fileid
 		);
 	}
-310	AUE_GETSID	NOPROTO	{
+310	AUE_GETSID	STD	{
 		int getsid(
 		    pid_t pid
 		);
 	}
-311	AUE_SETRESUID	NOPROTO	{
+311	AUE_SETRESUID	STD	{
 		int setresuid(
 		    uid_t ruid,
 		    uid_t euid,
 		    uid_t suid
 		);
 	}
-312	AUE_SETRESGID	NOPROTO	{
+312	AUE_SETRESGID	STD	{
 		int setresgid(
 		    gid_t rgid,
 		    gid_t egid,
@@ -1608,12 +1608,12 @@
 322	AUE_NULL	OBSOL	thr_sleep
 323	AUE_NULL	OBSOL	thr_wakeup
 ; XXX-BD: are mlockall and munlockall ok in CheriABI?
-324	AUE_MLOCKALL	NOPROTO	{
+324	AUE_MLOCKALL	STD	{
 		int mlockall(
 		    int how
 		);
 	}
-325	AUE_MUNLOCKALL	NOPROTO	{
+325	AUE_MUNLOCKALL	STD	{
 		int munlockall(void);
 	}
 326	AUE_GETCWD	STD	{
@@ -1639,19 +1639,19 @@
 		    _In_ const struct sched_param *param
 		);
 	}
-330	AUE_NULL	NOPROTO	{
+330	AUE_NULL	STD	{
 		int sched_getscheduler (pid_t pid
 		);
 	}
 
-331	AUE_NULL	NOPROTO	{
+331	AUE_NULL	STD	{
 		int sched_yield (void);
 	}
-332	AUE_NULL	NOPROTO	{
+332	AUE_NULL	STD	{
 		int sched_get_priority_max (int policy
 		);
 	}
-333	AUE_NULL	NOPROTO	{
+333	AUE_NULL	STD	{
 		int sched_get_priority_min (int policy
 		);
 	}
@@ -1766,7 +1766,7 @@
 		    acl_type_t type
 		);
 	}
-352	AUE_ACL_DELETE_FD	NOPROTO	{
+352	AUE_ACL_DELETE_FD	STD	{
 		int __acl_delete_fd(
 		    int filedes,
 		    acl_type_t type
@@ -1840,7 +1840,7 @@
 		    _Out_opt_ gid_t *sgid
 		);
 	}
-362	AUE_KQUEUE	NOPROTO	{
+362	AUE_KQUEUE	STD	{
 		int kqueue(void);
 	}
 363	AUE_KEVENT	COMPAT11 {
@@ -1885,7 +1885,7 @@
 		    _In_z_ const char *attrname
 		);
 	}
-374	AUE_SETUGID	NOPROTO	{
+374	AUE_SETUGID	STD	{
 		int __setugid(
 		    int flag
 		);
@@ -2154,7 +2154,7 @@
 		    _Out_ long *id
 		);
 	}
-433	AUE_THR_KILL	NOPROTO	{
+433	AUE_THR_KILL	STD	{
 		int thr_kill(
 		    long id,
 		    int sig
@@ -2162,7 +2162,7 @@
 	}
 434	AUE_NULL	UNIMPL	nosys
 435	AUE_NULL	UNIMPL	nosys
-436	AUE_JAIL_ATTACH	NOPROTO	{
+436	AUE_JAIL_ATTACH	STD	{
 		int jail_attach(
 		    int jid
 		);
@@ -2198,12 +2198,12 @@
 		    _In_opt_ const struct timespec *timeout
 		);
 	}
-443	AUE_NULL	NOPROTO	{
+443	AUE_NULL	STD	{
 		int thr_wake(
 		    long id
 		);
 	}
-444	AUE_MODUNLOAD	NOPROTO	{
+444	AUE_MODUNLOAD	STD	{
 		int kldunloadf(
 		    int fileid,
 		    int flags
@@ -2356,7 +2356,7 @@
 468	AUE_NULL	UNIMPL	nosys
 469	AUE_NULL	UNIMPL	__getpath_fromfd
 470	AUE_NULL	UNIMPL	__getpath_fromaddr
-471	AUE_SCTP_PEELOFF	NOPROTO|NOSTD	{
+471	AUE_SCTP_PEELOFF	NOSTD	{
 		int sctp_peeloff(
 		    int sd,
 		    uint32_t name
@@ -2421,7 +2421,7 @@
 		    off_t pos
 		);
 	}
-478	AUE_LSEEK	NOPROTO	{
+478	AUE_LSEEK	STD	{
 		off_t lseek(
 		    int fd,
 		    off_t offset,
@@ -2434,13 +2434,13 @@
 		    off_t length
 		);
 	}
-480	AUE_FTRUNCATE	NOPROTO	{
+480	AUE_FTRUNCATE	STD	{
 		int ftruncate(
 		    int fd,
 		    off_t length
 		);
 	}
-481	AUE_THR_KILL2	NOPROTO	{
+481	AUE_THR_KILL2	STD	{
 		int thr_kill2(pid_t pid,
 		    long id,
 		    int sig
@@ -2463,7 +2463,7 @@
 		    _Out_ cpusetid_t *setid
 		);
 	}
-485	AUE_NULL	NOPROTO	{
+485	AUE_NULL	STD	{
 		int cpuset_setid(
 		    cpuwhich_t which,
 		    id_t id,
@@ -2612,7 +2612,7 @@
 		    int flag
 		);
 	}
-504	AUE_POSIX_OPENPT	NOPROTO	{
+504	AUE_POSIX_OPENPT	STD	{
 		int posix_openpt(
 		    int flags
 		);
@@ -2637,12 +2637,12 @@
 		    int flags
 		);
 	}
-508	AUE_JAIL_REMOVE	NOPROTO	{
+508	AUE_JAIL_REMOVE	STD	{
 		int jail_remove(
 		    int jid
 		);
 	}
-509	AUE_CLOSEFROM	NOPROTO	{
+509	AUE_CLOSEFROM	STD	{
 		int closefrom(
 		    int lowfd
 		);
@@ -2683,7 +2683,7 @@
 		    _Out_ cap_rights_t *rightsp
 		);
 	}
-516	AUE_CAP_ENTER	NOPROTO	{
+516	AUE_CAP_ENTER	STD	{
 		int cap_enter(void);
 	}
 517	AUE_CAP_GETMODE	STD	{
@@ -2697,7 +2697,7 @@
 		    int flags
 		);
 	}
-519	AUE_PDKILL	NOPROTO	{
+519	AUE_PDKILL	STD	{
 		int pdkill(
 		    int fd,
 		    int signum
@@ -2771,14 +2771,14 @@
 		    size_t outbuflen
 		);
 	}
-530	AUE_POSIX_FALLOCATE	NOPROTO	{
+530	AUE_POSIX_FALLOCATE	STD	{
 		int posix_fallocate(
 		    int fd,
 		    off_t offset,
 		    off_t len
 		);
 	}
-531	AUE_POSIX_FADVISE	NOPROTO	{
+531	AUE_POSIX_FADVISE	STD	{
 		int posix_fadvise(
 		    int fd,
 		    off_t offset,
@@ -2815,7 +2815,7 @@
 		    size_t maxcmds
 		);
 	}
-536	AUE_CAP_FCNTLS_LIMIT	NOPROTO	{
+536	AUE_CAP_FCNTLS_LIMIT	STD	{
 		int cap_fcntls_limit(
 		    int fd,
 		    uint32_t fcntlrights
@@ -2901,7 +2901,7 @@
 	}
 548	AUE_NULL	UNIMPL	freebsd11_numa_getaffinity
 549	AUE_NULL	UNIMPL	freebsd11_numa_setaffinity
-550	AUE_FSYNC	NOPROTO	{
+550	AUE_FSYNC	STD	{
 		int fdatasync(
 		    int fd
 		);
