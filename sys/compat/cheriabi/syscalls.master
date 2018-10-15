@@ -244,7 +244,7 @@
 		int getpeername(
 		    int fdes,
 		    _Out_writes_bytes_(*alen) struct sockaddr *asa,
-		    _Inout_ __socklen_t *alen
+		    _Inout_opt_ __socklen_t *alen
 		);
 	}
 32	AUE_GETSOCKNAME	STD	{
