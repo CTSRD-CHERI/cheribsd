@@ -256,29 +256,29 @@
 		    _Out_writes_bytes_(len) caddr_t buf,
 		    size_t len,
 		    int flags,
-		    _Out_writes_bytes_opt_(*fromlenaddr) struct sockaddr * __restrict from,
-		    _Inout_opt_ __socklen_t * __restrict fromlenaddr
+		    _Out_writes_bytes_opt_(*fromlenaddr) struct sockaddr *from,
+		    _Inout_opt_ __socklen_t *fromlenaddr
 		);
 	}
 30	AUE_ACCEPT	STD	{
 		int accept(
 		    int s,
-		    _Out_writes_bytes_opt_(*anamelen) struct sockaddr * __restrict name,
-		    _Inout_opt_ __socklen_t * __restrict anamelen
+		    _Out_writes_bytes_opt_(*anamelen) struct sockaddr *name,
+		    _Inout_opt_ __socklen_t *anamelen
 		);
 	}
 31	AUE_GETPEERNAME	STD	{
 		int getpeername(
 		    int fdes,
-		    _Out_writes_bytes_(*alen) struct sockaddr * __restrict asa,
-		    _Inout_opt_ __socklen_t * __restrict alen
+		    _Out_writes_bytes_(*alen) struct sockaddr *asa,
+		    _Inout_opt_ __socklen_t *alen
 		);
 	}
 32	AUE_GETSOCKNAME	STD	{
 		int getsockname(
 		    int fdes,
-		    _Out_writes_bytes_(*alen) struct sockaddr * __restrict asa,
-		    _Inout_ __socklen_t * __restrict alen
+		    _Out_writes_bytes_(*alen) struct sockaddr *asa,
+		    _Inout_ __socklen_t *alen
 		);
 	}
 33	AUE_ACCESS	STD	{
@@ -2986,8 +2986,8 @@
 541	AUE_ACCEPT	STD	{
 		int accept4(
 		    int s,
-		    _Out_writes_bytes_opt_(*anamelen) struct sockaddr * __restrict name,
-		    _Inout_opt_ __socklen_t * __restrict anamelen,
+		    _Out_writes_bytes_opt_(*anamelen) struct sockaddr *name,
+		    _Inout_opt_ __socklen_t *anamelen,
 		    int flags
 		);
 	}
