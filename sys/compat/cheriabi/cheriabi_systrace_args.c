@@ -332,8 +332,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_sigaltstack */
 	case 53: {
 		struct cheriabi_sigaltstack_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->ss; /* const cheriabi_stack_t * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->oss; /* cheriabi_stack_t * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->ss; /* const struct sigaltstack_c * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->oss; /* struct sigaltstack_c * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -3621,10 +3621,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 53:
 		switch(ndx) {
 		case 0:
-			p = "userland const cheriabi_stack_t * __capability";
+			p = "userland const struct sigaltstack_c * __capability";
 			break;
 		case 1:
-			p = "userland cheriabi_stack_t * __capability";
+			p = "userland struct sigaltstack_c * __capability";
 			break;
 		default:
 			break;

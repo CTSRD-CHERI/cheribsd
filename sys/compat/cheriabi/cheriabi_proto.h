@@ -167,8 +167,8 @@ struct cheriabi_acct_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_sigaltstack_args {
-	char ss_l_[PADL_(const cheriabi_stack_t * __capability)]; const cheriabi_stack_t * __capability ss; char ss_r_[PADR_(const cheriabi_stack_t * __capability)];
-	char oss_l_[PADL_(cheriabi_stack_t * __capability)]; cheriabi_stack_t * __capability oss; char oss_r_[PADR_(cheriabi_stack_t * __capability)];
+	char ss_l_[PADL_(const struct sigaltstack_c * __capability)]; const struct sigaltstack_c * __capability ss; char ss_r_[PADR_(const struct sigaltstack_c * __capability)];
+	char oss_l_[PADL_(struct sigaltstack_c * __capability)]; struct sigaltstack_c * __capability oss; char oss_r_[PADR_(struct sigaltstack_c * __capability)];
 };
 struct cheriabi_ioctl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];

@@ -62,6 +62,7 @@ struct shmid_ds_old;
 struct shmid_ds;
 struct sigaction_native;
 struct sigaction;
+struct sigaltstack;
 struct sigevent;
 struct siginfo;
 struct sigstack;
@@ -470,13 +471,13 @@ SYS_STUB(51, int, acct,
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
-SYS_STUB(53, int, sigaltstack,
-    /* _protoargs */ (const cheriabi_stack_t *  ss, cheriabi_stack_t *  oss),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const cheriabi_stack_t * __capability   ss, cheriabi_stack_t * __capability   oss),
-    /* _protoargs_err */ (__capability int *stub_errno, const cheriabi_stack_t * __capability   ss, cheriabi_stack_t * __capability   oss),
-    /* _callargs */ ((__cheri_fromcap const cheriabi_stack_t * )ss, (__cheri_fromcap cheriabi_stack_t * )oss),
+SYS_STUB_ARGHASPTRS(53, int, sigaltstack,
+    /* _protoargs */ (const struct sigaltstack*  ss, struct sigaltstack*  oss),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const struct sigaltstack* __capability   ss, struct sigaltstack* __capability   oss),
+    /* _protoargs_err */ (__capability int *stub_errno, const struct sigaltstack* __capability   ss, struct sigaltstack* __capability   oss),
+    /* _callargs */ ((__cheri_fromcap const struct sigaltstack* )ss, (__cheri_fromcap struct sigaltstack* )oss),
     /* _callargs_chk */ (&ret, stub_errno, ss, oss),
-    /* _callargs_err */ (&errno, (const cheriabi_stack_t * )ss, (cheriabi_stack_t * )oss),
+    /* _callargs_err */ (&errno, (const struct sigaltstack* )ss, (struct sigaltstack* )oss),
     /* _localcheck */ {if (!(cheri_getperm(ss) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(oss) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 

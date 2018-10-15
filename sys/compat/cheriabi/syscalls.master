@@ -360,8 +360,8 @@
 	}
 53	AUE_SIGALTSTACK	STD	{
 		int sigaltstack(
-		    _In_opt_ const cheriabi_stack_t *ss,
-		    _Out_opt_ cheriabi_stack_t *oss
+		    _In_opt_ const struct sigaltstack_c *ss,
+		    _Out_opt_ struct sigaltstack_c *oss
 		);
 	}
 54	AUE_NULL	STD|VARARG|NOSTUB	{
