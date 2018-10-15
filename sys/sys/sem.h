@@ -75,14 +75,14 @@ union semun_old {
 	unsigned short	*array;		/* array for GETALL & SETALL */
 };
 #endif
-#if defined(_WANT_SEMUN) && !defined(_KERNEL)
+#if defined(_KERNEL) || defined(_WANT_SEMUN)
 /*
  * semctl's arg parameter structure
  */
 union semun {
-	int		val;		/* value for SETVAL */
-	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
-	unsigned short	*array;		/* array for GETALL & SETALL */
+	int		val;	/* value for SETVAL */
+	struct semid_ds * __kerncap buf;	/* buffer for IPC_STAT & IPC_SET */
+	unsigned short * __kerncap array;	/* array for GETALL & SETALL */
 };
 #endif
 #if defined(_KERNEL)
@@ -98,17 +98,22 @@ union semun_kernel {
 	unsigned short * __capability array;	/* array for GETALL & SETALL */
 };
 #endif
+
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
 union semun_native {
 	int		val;		/* value for SETVAL */
 	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
 	unsigned short	*array;		/* array for GETALL & SETALL */
 };
+#endif
+
 #if __has_feature(capabilities)
 typedef union semun_kernel	ksemun_t;
 #else
-typedef union semun_native	ksemun_t;
+typedef union semun	ksemun_t;
 #endif
-typedef union semun_native	usemun_t;
+typedef union semun	usemun_t;
 #endif /* defined(_KERNEL) */
 
 /*

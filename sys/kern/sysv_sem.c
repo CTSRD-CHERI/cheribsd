@@ -644,7 +644,7 @@ struct __semctl_args {
 	int	semid;
 	int	semnum;
 	int	cmd;
-	union	semun *arg;
+	union	semun * __capability arg;
 };
 #endif
 int
