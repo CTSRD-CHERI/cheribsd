@@ -598,6 +598,7 @@ int	coaccept(void * __capability, void * __capability, void * __capability * __c
 int	cosetup(int, void * __capability *, void * __capability *);
 int	coregister(const char *, void * __capability *);
 int	colookup(const char *, void * __capability *);
+int	cogetpid(pid_t *pidp);
 ssize_t	write_c(int, __capability const void *, size_t);
 #endif
 #endif /* __BSD_VISIBLE */

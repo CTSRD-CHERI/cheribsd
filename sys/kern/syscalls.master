@@ -1356,6 +1356,8 @@
 567	AUE_NULL	STD	{ int colookup(const char *name, \
 				    void * __capability *cap); }
 568	AUE_NULL	STD	{ int copark(void); }
+569	AUE_NULL	STD	{ int cogetpid( \
+				    _Out_ pid_t *pidp); }
 
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master

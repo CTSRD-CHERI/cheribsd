@@ -190,10 +190,11 @@ MAN+=	abort2.2 \
 	clock_gettime.2 \
 	close.2 \
 	closefrom.2 \
+	coaccept.2 \
 	cosetup.2 \
 	coregister.2 \
 	cocall.2 \
-	coaccept.2 \
+	cogetpid.2 \
 	connect.2 \
 	connectat.2 \
 	cpuset.2 \

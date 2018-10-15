@@ -60,7 +60,9 @@ arguments must point to a sealed capability pair obtained from
 .Xr cosetup 2 .
 The
 .Ar cookiep
-will be set to an opaque, capability-sized token that identifies the callee.
+will be set to an opaque, capability-sized token that identifies the callee;
+it can be passed to
+.Xr cogetpid 2 .
 Both the
 .Fa buf
 and the
@@ -107,15 +109,14 @@ Basic usage example:
 			err(1, "coaccept");
 	}
 .Ed
-.Sh EXAMPLES
-.Bd -literal
 .Sh SEE ALSO
 .Xr copong 1 ,
 .Xr cocall 2 ,
 .Xr coexec 2 ,
-.Xr cosetup 2 ,
+.Xr cogetpid 2 ,
+.Xr colookup 2 ,
 .Xr coregister 2 ,
-.Xr colookup 2
+.Xr cosetup 2
 .Sh HISTORY
 The
 .Fn coaccept

@@ -86,7 +86,7 @@ colocation_fetch_context(struct thread *td, struct switcher_context *scp)
 	error = copyincap(__USER_CAP((const void *)addr, sizeof(*scp)),
 	    &(*scp), sizeof(*scp));
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
-	    __func__, (void *)td->td_md.md_switcher_context, error));
+	    __func__, (void *)addr, error));
 
 	if (scp->sc_borrower_td == NULL) {
 		/*
@@ -94,6 +94,39 @@ colocation_fetch_context(struct thread *td, struct switcher_context *scp)
 		 */
 		return (false);
 	}
+
+	return (true);
+}
+
+static bool
+colocation_fetch_peer_context(struct thread *td, struct switcher_context *scp)
+{
+	vaddr_t addr;
+	int error;
+
+	addr = td->td_md.md_switcher_context;
+	if (addr == 0) {
+		/*
+		 * We've never called cosetup(2).
+		 */
+		return (false);
+	}
+
+	error = copyincap(__USER_CAP((const void *)addr, sizeof(*scp)),
+	    &(*scp), sizeof(*scp));
+	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
+	    __func__, (void *)addr, error));
+
+	if (scp->sc_peer_context == NULL) {
+		/*
+		 * Not in cocall.
+		 */
+		return (false);
+	}
+
+	error = copyincap(scp->sc_peer_context, &(*scp), sizeof(*scp));
+	KASSERT(error == 0, ("%s: copyincap from peer %p failed with error %d\n",
+	    __func__, (__cheri_fromcap void *)scp->sc_peer_context, error));
 
 	return (true);
 }
@@ -412,6 +445,24 @@ sys_colookup(struct thread *td, struct colookup_args *uap)
 
 	error = copyoutcap(&con->c_value, __USER_CAP(uap->cap, sizeof(con->c_value)), sizeof(con->c_value));
 	vm_map_unlock(&vmspace->vm_map);
+	return (error);
+}
+
+int
+sys_cogetpid(struct thread *td, struct cogetpid_args *uap)
+{
+	struct switcher_context sc;
+	bool is_callee;
+	pid_t pid;
+	int error;
+
+	is_callee = colocation_fetch_peer_context(td, &sc);
+	if (!is_callee)
+		return (ESRCH);
+
+	pid = sc.sc_td->td_proc->p_pid;
+	error = copyout(&pid, uap->pidp, sizeof(pid));
+
 	return (error);
 }
 

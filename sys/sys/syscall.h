@@ -485,4 +485,5 @@
 #define	SYS_coregister	566
 #define	SYS_colookup	567
 #define	SYS_copark	568
-#define	SYS_MAXSYSCALL	569
+#define	SYS_cogetpid	569
+#define	SYS_MAXSYSCALL	570

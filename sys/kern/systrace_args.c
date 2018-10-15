@@ -3316,6 +3316,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
+	/* cogetpid */
+	case 569: {
+		struct cogetpid_args *p = params;
+		uarg[0] = (intptr_t) p->pidp; /* pid_t * */
+		*n_args = 1;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8843,6 +8850,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* copark */
 	case 568:
 		break;
+	/* cogetpid */
+	case 569:
+		switch(ndx) {
+		case 0:
+			p = "userland pid_t *";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10746,6 +10763,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* copark */
 	case 568:
+	/* cogetpid */
+	case 569:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
 	default:
 		break;
 	};

@@ -30,63 +30,56 @@
 .\" $FreeBSD$
 .\"
 .Dd April 30, 2018
-.Dt COREGISTER 2
+.Dt COGETPID 2
 .Os
 .Sh NAME
-.Nm coregister ,
-.Nm colookup
-.Nd register and lookup a colocated call target
+.Nm COGETPID
+.Nd get calling proccess identification
 .Sh LIBRARY
 .Lb libc
 .Sh SYNOPSIS
 .In unistd.h
 .Ft int
-.Fn coregister "const char *name" "void * __capability *target"
-.Ft int
-.Fn colookup "const char *name" "void * __capability *target"
+.Fn cogetpid "void * __capability cookie" "pid_t *pidp"
 .Sh DESCRIPTION
 The
-.Fn coregister
-function registers an arbitrarily named target
-.Ar name ,
-and returns the public sealed capability.
-The
-.Fn colookup
-function returns a public sealed capability registered by another process in the colocated
-address space.
-The public sealed capability can be freely passed to to other processes.
+.Fn cogetpid
+writes PID of the calling process into the variable pointed at by
+.Ar pidp .
+It is intended to use at the callee side, identified by the
+.Ar cookie
+argument filled in by
+.Xr coaccept 2 .
 .Sh RETURN VALUES
-.Rv -std coregister
+.Rv -std cogetpid
 .Sh ERRORS
 The
-.Fn coregister
+.Fn cogetpid
 system call
 will fail if:
 .Bl -tag -width Er
-.It Bq Er EBUSY
+.It Bq Er EINVAL
 The
-.Fa name
-argument points to string that is already registered.
+.Fa cookie
+argument is invalid.
 .It Bq Er EFAULT
 The
-.Fa name
-or
-.Fa target
-arguments
-point outside the process's allocated address space.
+.Fa pidp
+argument
+points outside the process's allocated address space.
 .El
 .Sh SEE ALSO
-.Xr coaccept 2 ,
+.Xr copong 1 ,
 .Xr cocall 2 ,
 .Xr coexec 2 ,
-.Xr cogetpid 2 ,
-.Xr cosetup 2
+.Xr cosetup 2 ,
+.Xr coregister 2 ,
+.Xr colookup 2 ,
+.Xr coaccept 2
 .Sh HISTORY
 The
-.Fn coregister
-and
-.Fn colookup
-system calls first appeared in
+.Fn coaccept
+system call first appeared in
 .Tn CheriBSD .
 .Sh AUTHORS
 .An -nosplit
