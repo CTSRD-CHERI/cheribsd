@@ -30,6 +30,7 @@ systrace="systrace_args.c"
 ptr_intptr_t_cast="intptr_t"
 ptr_qualified="*"
 mincompat="0"
+abi_flags=""
 
 # tmp files:
 sysaue="sysent.aue.$$"
@@ -157,6 +158,7 @@ sed -e '
 		ptrmaskname = \"$ptrmaskname\"
 		infile = \"$1\"
 		mincompat = \"$mincompat\" + 0
+		abi_flags = \"$abi_flags\"
 		capenabled_string = \"$capenabled\"
 		cap_prefix = \"$cap_prefix\"
 		ptr_intptr_t_cast = \"$ptr_intptr_t_cast\"
@@ -349,6 +351,14 @@ sed -e '
 				return 1
 		return 0
 	}
+	# Returns true if the flag "name" is set in the abi_flags variable
+	function abi_changes(name, _tmparray, i, n) {
+		n = split(abi_flags, _tmparray, /\|/)
+		for (i = 1; i <= n; i++)
+			if (_tmparray[i] == name)
+				return 1
+		return 0
+	}
 	{
 		n = split($1, syscall_range, /-/)
 		if (n == 1) {
@@ -391,6 +401,7 @@ sed -e '
 		argc= 0;
 		argssize = "0"
 		thr_flag = "SY_THR_STATIC"
+		ptrargs = 0
 		if (flag("NOTSTATIC")) {
 			thr_flag = "SY_THR_ABSENT"
 		}
@@ -507,12 +518,17 @@ sed -e '
 			# Allow pointers to be qualified
 			gsub(/\*/, ptr_qualified, argtype[argc]);
 			sub(/ $/, "", argtype[argc]);
+
+			if (isptrtype(argtype[argc]))
+				ptrargs++
+
 			argname[argc]=$f;
 			f += 2;			# skip name, and any comma
 		}
 		if (argc != 0)
 			argssize = "AS(" argalias ")"
 	}
+
 	{	comment = $4
 		if (NF < 7)
 			for (i = 5; i <= NF; i++)
@@ -574,23 +590,24 @@ sed -e '
 		}
 		printf("\t\t*n_args = %d;\n\t\tbreak;\n\t}\n", argc) > systrace
 		printf("\t\tbreak;\n") > systracetmp
-		if (argc != 0 && !flag("NOARGS") && !flag("NOPROTO") && \
-		    !flag("NODEF")) {
-			printf("struct %s {\n", argalias) > sysarg
-			for (i = 1; i <= argc; i++) {
-				a_type = argtype[i]
-				gsub (/__restrict/, "", a_type)
-				printf("\tchar %s_l_[PADL_(%s)]; " \
-				    "%s %s; char %s_r_[PADR_(%s)];\n",
-				    argname[i], a_type,
-				    a_type, argname[i],
-				    argname[i], a_type) > sysarg
-			}
-			printf("};\n") > sysarg
+		if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF") && \
+		    !(abi_flags != "" && ptrargs == 0)) {
+			if (argc != 0) {
+				printf("struct %s {\n", argalias) > sysarg
+				for (i = 1; i <= argc; i++) {
+					a_type = argtype[i]
+					gsub (/__restrict/, "", a_type)
+					printf("\tchar %s_l_[PADL_(%s)]; " \
+					    "%s %s; char %s_r_[PADR_(%s)];\n",
+					    argname[i], a_type,
+					    a_type, argname[i],
+					    argname[i], a_type) > sysarg
+				}
+				printf("};\n") > sysarg
+			} else
+				printf("struct %s {\n\tregister_t dummy;\n};\n",
+				    argalias) > sysarg
 		}
-		else if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF"))
-			printf("struct %s {\n\tregister_t dummy;\n};\n",
-			    argalias) > sysarg
 
 		if (argc != 0 && !flag("NOARGS") && !flag("NODEF")) {
 			printf(" [%s%s] = (0x0", syscallprefix, funcalias) > sysargmap
@@ -765,7 +782,8 @@ sed -e '
 			printf (")\n\n") > sysstubstubs
 		}
 
-		if (!flag("NOPROTO") && !flag("NODEF")) {
+		if (!flag("NOPROTO") && !flag("NODEF") && \
+		    !(abi_flags != "" && ptrargs == 0)) {
 			if (funcname == "nosys" || funcname == "lkmnosys" ||
 			    funcname == "sysarch" ||
 			    funcname ~ /^cheriabi/ || funcname ~ /^freebsd/ ||
