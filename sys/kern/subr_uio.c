@@ -604,7 +604,7 @@ io_user_cap(volatile const void * uaddr, size_t len)
 	if (inexec)
 		return (cheri_capability_build_user_data(
 		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)uaddr, len, 0));
-	return (__USER_CAP(uaddr, len));
+	return (__HYBRID_USER_CAP(uaddr, len));
 }
 
 int

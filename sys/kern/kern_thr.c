@@ -163,6 +163,11 @@ thr_new_initthr(struct thread *td, void *thunk)
 	    suword_lwpid(param->parent_tid, td->td_tid)))
 		return (EFAULT);
 
+#if __has_feature(capabilities)
+	cheriabi_set_threadregs(td, param);
+	/* Setup user TLS address and TLS pointer register. */
+	return (cpu_set_user_tls(td, param->tls_base));
+#else
 	/* Set up our machine context. */
 	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
 	stack.ss_size = param->stack_size;
@@ -170,6 +175,7 @@ thr_new_initthr(struct thread *td, void *thunk)
 	cpu_set_upcall(td, param->start_func, param->arg, &stack);
 	/* Setup user TLS address and TLS pointer register. */
 	return (cpu_set_user_tls(td, param->tls_base));
+#endif
 }
 
 int

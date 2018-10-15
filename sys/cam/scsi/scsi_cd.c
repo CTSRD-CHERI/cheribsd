@@ -1607,7 +1607,7 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 			cam_periph_unlock(periph);
 			if (nocopyout == 0) {
 				if (copyout(data,
-				    __USER_CAP_UNBOUND(args->data), len) != 0) {
+				    __HYBRID_USER_CAP_UNBOUND(args->data), len) != 0) {
 					error = EFAULT;
 				}
 			} else {

@@ -1067,7 +1067,8 @@ dofault:
 				break;
 
 			/* read break instruction */
-			instr = fuword32_c(__USER_CODE_CAP((void *)va));
+			/* XXX-AM: can't we use pcc? */
+			instr = fuword32_c(__HYBRID_USER_CODE_CAP((void *)va));
 
 			if (instr != MIPS_BREAK_SSTEP)
 				break;
