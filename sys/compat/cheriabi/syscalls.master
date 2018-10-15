@@ -78,21 +78,21 @@
 		int fork(void);
 	}
 3	AUE_READ	STD	{
-		ssize_t cheriabi_read(
+		ssize_t read(
 		    int fd,
 		    _Out_writes_bytes_(nbyte) void *buf,
 		    size_t nbyte
 		);
 	}
 4	AUE_WRITE	STD	{
-		ssize_t cheriabi_write(
+		ssize_t write(
 		    int fd,
 		    _In_reads_bytes_(nbyte) const void *buf,
 		    size_t nbyte
 		);
 	}
 5	AUE_OPEN_RWTC	STD|VARARG	{
-		int cheriabi_open(
+		int open(
 		    _In_z_ const char *path,
 		    int flags,
 		    mode_t mode
@@ -104,7 +104,7 @@
 		);
 	}
 7	AUE_WAIT4	STD	{
-		int cheriabi_wait4(
+		int wait4(
 		    int pid,
 		    _Out_opt_ int *status,
 		    int options,
@@ -118,19 +118,19 @@
 		);
 	}
 9	AUE_LINK	STD	{
-		int cheriabi_link(
+		int link(
 		    _In_z_ const char *path,
 		    _In_z_ const char *to
 		);
 	}
 10	AUE_UNLINK	STD	{
-		int cheriabi_unlink(
+		int unlink(
 		    _In_z_ const char *path
 		);
 	}
 11	AUE_NULL	OBSOL	execv
 12	AUE_CHDIR	STD	{
-		int cheriabi_chdir(
+		int chdir(
 		    _In_z_ const char *path
 		);
 	}
@@ -147,13 +147,13 @@
 		);
 	}
 15	AUE_CHMOD	STD	{
-		int cheriabi_chmod(
+		int chmod(
 		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
 16	AUE_CHOWN	STD	{
-		int cheriabi_chown(
+		int chown(
 		    _In_z_ const char *path,
 		    int uid,
 		    int gid
@@ -178,7 +178,7 @@
 		pid_t getpid(void);
 	}
 21	AUE_MOUNT	STD	{
-		int cheriabi_mount(
+		int mount(
 		    _In_z_ const char *type,
 		    _In_z_ const char *path,
 		    int flags,
@@ -186,7 +186,7 @@
 		);
 	}
 22	AUE_UMOUNT	STD	{
-		int cheriabi_unmount(
+		int unmount(
 		    _In_z_ const char *path,
 		    int flags
 		);
@@ -203,7 +203,7 @@
 		uid_t geteuid(void);
 	}
 26	AUE_PTRACE	STD	{
-		int cheriabi_ptrace(
+		int ptrace(
 		    int req,
 		    pid_t pid,
 		    _Inout_opt_ char * addr,
@@ -211,21 +211,21 @@
 		);
 	}
 27	AUE_RECVMSG	STD	{
-		ssize_t cheriabi_recvmsg(
+		ssize_t recvmsg(
 		    int s,
 		    _Inout_ struct msghdr_c *msg,
 		    int flags
 		);
 	}
 28	AUE_SENDMSG	STD	{
-		ssize_t cheriabi_sendmsg(
+		ssize_t sendmsg(
 		    int s,
 		    _In_ const struct msghdr_c *msg,
 		    int flags
 		);
 	}
 29	AUE_RECVFROM	STD	{
-		ssize_t cheriabi_recvfrom(
+		ssize_t recvfrom(
 		    int s,
 		    _Out_writes_bytes_(len) void *buf,
 		    size_t len,
@@ -235,34 +235,34 @@
 		);
 	}
 30	AUE_ACCEPT	STD	{
-		int cheriabi_accept(
+		int accept(
 		    int s,
 		    _Out_writes_bytes_opt_(*anamelen) struct sockaddr * name,
 		    _Inout_opt_ __socklen_t *anamelen
 		);
 	}
 31	AUE_GETPEERNAME	STD	{
-		int cheriabi_getpeername(
+		int getpeername(
 		    int fdes,
 		    _Out_writes_bytes_(*alen) struct sockaddr * asa,
 		    _Inout_ __socklen_t *alen
 		);
 	}
 32	AUE_GETSOCKNAME	STD	{
-		int cheriabi_getsockname(
+		int getsockname(
 		    int fdes,
 		    _Out_writes_bytes_(*alen) struct sockaddr * asa,
 		    _Inout_ __socklen_t *alen
 		);
 	}
 33	AUE_ACCESS	STD	{
-		int cheriabi_access(
+		int access(
 		    _In_z_ const char *path,
 		    int amode
 		);
 	}
 34	AUE_CHFLAGS	STD	{
-		int cheriabi_chflags(
+		int chflags(
 		    _In_z_ const char *path,
 		    u_long flags
 		);
@@ -309,7 +309,7 @@
 		gid_t getegid(void);
 	}
 44	AUE_PROFILE	STD	{
-		int cheriabi_profil(
+		int profil(
 		    _Out_writes_bytes_(size) void *samples,
 		    size_t size,
 		    size_t offset,
@@ -317,7 +317,7 @@
 		);
 	}
 45	AUE_KTRACE	STD	{
-		int cheriabi_ktrace(
+		int ktrace(
 		    _In_z_ const char *fname,
 		    int ops,
 		    int facs,
@@ -341,18 +341,18 @@
 		);
 	}
 49	AUE_GETLOGIN	STD	{
-		int cheriabi_getlogin(
+		int getlogin(
 		    _Out_writes_z_(namelen) char *namebuf,
 		    u_int namelen
 		);
 	}
 50	AUE_SETLOGIN	STD	{
-		int cheriabi_setlogin(
+		int setlogin(
 		    _In_z_ const char *namebuf
 		);
 	}
 51	AUE_ACCT	STD	{
-		int cheriabi_acct(
+		int acct(
 		    _In_z_ const char *path
 		);
 	}
@@ -360,13 +360,13 @@
 		int sigpending(void);
 	}
 53	AUE_SIGALTSTACK	STD	{
-		int cheriabi_sigaltstack(
+		int sigaltstack(
 		    _In_opt_ const cheriabi_stack_t *ss,
 		    _Out_opt_ cheriabi_stack_t *oss
 		);
 	}
 54	AUE_NULL	STD|VARARG|NOSTUB	{
-		int cheriabi_ioctl(
+		int ioctl(
 		    int fd,
 		    u_long com,
 		    _Inout_opt_ void *data
@@ -378,25 +378,25 @@
 		);
 	}
 56	AUE_REVOKE	STD	{
-		int cheriabi_revoke(
+		int revoke(
 		    _In_z_ const char *path
 		);
 	}
 57	AUE_SYMLINK	STD	{
-		int cheriabi_symlink(
+		int symlink(
 		    _In_z_ const char *path,
 		    _In_z_ const char *link
 		);
 	}
 58	AUE_READLINK	STD	{
-		ssize_t cheriabi_readlink(
+		ssize_t readlink(
 		    _In_z_ const char *path,
 		    _Out_writes_z_(count) char *buf,
 		    size_t count
 		);
 	}
 59	AUE_EXECVE	STD|NOSTUB	{
-		int cheriabi_execve(
+		int execve(
 		    _In_z_ const char *fname,
 		    _In_z_ void **argv,
 		    _In_z_ void **envv
@@ -408,7 +408,7 @@
 		);
 	}
 61	AUE_CHROOT	STD	{
-		int cheriabi_chroot(
+		int chroot(
 		    _In_z_ const char *path
 		);
 	}
@@ -430,7 +430,7 @@
 	} getpagesize getpagesize_args int
 ; XXX-BD: msync may not need/want _Pagerange_ as it doesn't alter the map
 65	AUE_MSYNC	STD	{
-		int cheriabi_msync(
+		int msync(
 		    _Pagerange_(len) void *addr,
 		    size_t len,
 		    int flags
@@ -459,13 +459,13 @@
 		);
 	}
 73	AUE_MUNMAP	STD	{
-		int cheriabi_munmap(
+		int munmap(
 		    _Pagerange_vmmap_(len) void *addr,
 		    size_t len
 		);
 	}
 74	AUE_MPROTECT	STD	{
-		int cheriabi_mprotect(
+		int mprotect(
 		    _Pagerange_(len) const void *addr,
 		    size_t len,
 		    int prot
@@ -475,7 +475,7 @@
 ; MADV_CORE is probably an error if not a page.  Others don't really need
 ; _Pagerange_.
 75	AUE_MADVISE	STD	{
-		int cheriabi_madvise(
+		int madvise(
 		    _Pagerange_(len) void *addr,
 		    size_t len,
 		    int behav
@@ -485,20 +485,20 @@
 77	AUE_NULL	OBSOL	vlimit
 ; XXX-BD: missing round up of len for misaligned addr
 78	AUE_MINCORE	STD	{
-		int cheriabi_mincore(
+		int mincore(
 		    _Pagerange_opt_(len) const void *addr,
 		    size_t len,
 		    _Out_writes_bytes_(len/PAGE_SIZE) char *vec
 		);
 	}
 79	AUE_GETGROUPS	STD	{
-		int cheriabi_getgroups(
+		int getgroups(
 		    u_int gidsetsize,
 		    _Out_writes_opt_(gidsetsize) gid_t *gidset
 		);
 	}
 80	AUE_SETGROUPS	STD	{
-		int cheriabi_setgroups(
+		int setgroups(
 		    u_int gidsetsize,
 		    _In_reads_(gidsetsize) const gid_t *gidset
 		);
@@ -513,7 +513,7 @@
 		);
 	}
 83	AUE_SETITIMER	STD	{
-		int cheriabi_setitimer(
+		int setitimer(
 		    int which,
 		    _In_ const struct itimerval *itv,
 		    _Out_opt_ struct itimerval *oitv
@@ -523,12 +523,12 @@
 		int wait(void);
 	}
 85	AUE_SWAPON	STD	{
-		int cheriabi_swapon(
+		int swapon(
 		    _In_z_ const char *name
 		);
 	}
 86	AUE_GETITIMER	STD	{
-		int cheriabi_getitimer(
+		int getitimer(
 		    int which,
 		    _Out_ struct itimerval *itv
 		);
@@ -556,14 +556,14 @@
 	}
 91	AUE_NULL	UNIMPL	getdopt
 92	AUE_FCNTL	STD|VARARG|NOSTUB	{
-		int cheriabi_fcntl(
+		int fcntl(
 		    int fd,
 		    int cmd,
 		    intcap_t arg
 		);
 	}
 93	AUE_SELECT	STD	{
-		int cheriabi_select(
+		int select(
 		    int nd,
 		    _Inout_opt_ fd_set *in,
 		    _Inout_opt_ fd_set *ou,
@@ -592,7 +592,7 @@
 		);
 	}
 98	AUE_CONNECT	STD	{
-		int cheriabi_connect(
+		int connect(
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr *name,
 		    __socklen_t namelen
@@ -633,14 +633,14 @@
 		);
 	}
 104	AUE_BIND	STD	{
-		int cheriabi_bind(
+		int bind(
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr *name,
 		    __socklen_t namelen
 		);
 	}
 105	AUE_SETSOCKOPT	STD	{
-		int cheriabi_setsockopt(
+		int setsockopt(
 		    int s,
 		    int level,
 		    int name,
@@ -701,19 +701,19 @@
 	}
 115	AUE_NULL	OBSOL	vtrace
 116	AUE_GETTIMEOFDAY	STD	{
-		int cheriabi_gettimeofday(
+		int gettimeofday(
 		    _Out_ struct timeval *tp,
 		    _Out_opt_ struct timezone *tzp
 		);
 	}
 117	AUE_GETRUSAGE	STD	{
-		int cheriabi_getrusage(
+		int getrusage(
 		    int who,
 		    _Out_ struct rusage *rusage
 		);
 	}
 118	AUE_GETSOCKOPT	STD	{
-		int cheriabi_getsockopt(
+		int getsockopt(
 		    int s,
 		    int level,
 		    int name,
@@ -723,21 +723,21 @@
 	}
 119	AUE_NULL	UNIMPL	resuba (BSD/OS 2.x)
 120	AUE_READV	STD	{
-		int cheriabi_readv(
+		int readv(
 		    int fd,
 		    _Inout_updates_(iovcnt) struct iovec_c *iovp,
 		    u_int iovcnt
 		);
 	}
 121	AUE_WRITEV	STD	{
-		int cheriabi_writev(
+		int writev(
 		    int fd,
 		    _In_reads_opt_(iovcnt) struct iovec_c *iovp,
 		    u_int iovcnt
 		);
 	}
 122	AUE_SETTIMEOFDAY	STD	{
-		int cheriabi_settimeofday(
+		int settimeofday(
 		    _In_ const struct timeval *tv,
 		    _In_opt_ const struct timezone *tzp
 		);
@@ -778,7 +778,7 @@
 		);
 	}
 128	AUE_RENAME	STD	{
-		int cheriabi_rename(
+		int rename(
 		    _In_z_ const char *from,
 		    _In_z_ const char *to
 		);
@@ -802,13 +802,13 @@
 		);
 	}
 132	AUE_MKFIFO	STD	{
-		int cheriabi_mkfifo(
+		int mkfifo(
 		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
 133	AUE_SENDTO	STD	{
-		ssize_t cheriabi_sendto(
+		ssize_t sendto(
 		    int s,
 		    _In_reads_bytes_(len) const void *buf,
 		    size_t len,
@@ -824,7 +824,7 @@
 		);
 	}
 135	AUE_SOCKETPAIR	STD	{
-		int cheriabi_socketpair(
+		int socketpair(
 		    int domain,
 		    int type,
 		    int protocol,
@@ -832,25 +832,25 @@
 		);
 	}
 136	AUE_MKDIR	STD	{
-		int cheriabi_mkdir(
+		int mkdir(
 		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
 137	AUE_RMDIR	STD	{
-		int cheriabi_rmdir(
+		int rmdir(
 		    _In_z_ const char *path
 		);
 	}
 138	AUE_UTIMES	STD	{
-		int cheriabi_utimes(
+		int utimes(
 		    _In_z_ const char *path,
 		    _In_ const struct timeval *tptr
 		);
 	}
 139	AUE_NULL	OBSOL	4.2 sigreturn
 140	AUE_ADJTIME	STD	{
-		int cheriabi_adjtime(
+		int adjtime(
 		    _In_ const struct timeval *delta,
 		    _Out_opt_ struct timeval *olddelta
 		);
@@ -892,7 +892,7 @@
 		int setsid(void);
 	}
 148	AUE_QUOTACTL	STD	{
-		int cheriabi_quotactl(
+		int quotactl(
 		    _In_z_ const char *path,
 		    int cmd,
 		    int uid,
@@ -917,7 +917,7 @@
 153	AUE_NULL	UNIMPL	asyncdaemon (BSD/OS 2.x)
 ; 154 is initialised by the NLM code, if present.
 154	AUE_NULL	NOSTD|NOSTUB	{
-		int cheriabi_nlm_syscall(
+		int nlm_syscall(
 		    int debug_level,
 		    int grace_period ,
 		    int addr_count,
@@ -926,7 +926,7 @@
 	}
 ; 155 is initialized by the NFS code, if present.
 155	AUE_NFS_SVC	NOSTD	{
-		int cheriabi_nfssvc(
+		int nfssvc(
 		    int flag,
 		    void *argp
 		);
@@ -953,13 +953,13 @@
 	}
 159	AUE_NULL	UNIMPL	nosys
 160	AUE_LGETFH	STD	{
-		int cheriabi_lgetfh(
+		int lgetfh(
 		    _In_z_ const char *fname,
 		    _Out_ struct fhandle *fhp
 		);
 	}
 161	AUE_NFS_GETFH	STD	{
-		int cheriabi_getfh(
+		int getfh(
 		    _In_z_ const char *fname,
 		    _Out_ struct fhandle *fhp
 		);
@@ -982,13 +982,13 @@
 		);
 	}
 165	AUE_SYSARCH	STD	{
-		int cheriabi_sysarch(
+		int sysarch(
 		    int op,
 		    char *parms
 		);
 	}
 166	AUE_RTPRIO	STD	{
-		int cheriabi_rtprio(
+		int rtprio(
 		    int function,
 		    pid_t pid,
 		    _Inout_ struct rtprio *rtp
@@ -1008,7 +1008,7 @@
 		);
 	}
 176	AUE_NTP_ADJTIME	STD	{
-		int cheriabi_ntp_adjtime(
+		int ntp_adjtime(
 		    _Inout_ struct timex *tp
 		);
 	}
@@ -1056,7 +1056,7 @@
 		);
 	}
 191	AUE_PATHCONF	STD	{
-		int cheriabi_pathconf(
+		int pathconf(
 		    _In_z_ const char *path,
 		    int name
 		);
@@ -1069,13 +1069,13 @@
 	}
 193	AUE_NULL	UNIMPL	nosys
 194	AUE_GETRLIMIT	STD	{
-		int cheriabi_getrlimit(
+		int getrlimit(
 		    u_int which,
 		    _Out_ struct rlimit *rlp
 		);
 	}
 195	AUE_SETRLIMIT	STD	{
-		int cheriabi_setrlimit(
+		int setrlimit(
 		    u_int which,
 		    _In_ struct rlimit *rlp
 		);
@@ -1125,7 +1125,7 @@
 		);
 	}
 202	AUE_SYSCTL	STD	{
-		int cheriabi___sysctl(
+		int __sysctl(
 		    _In_reads_(namelen) int *name,
 		    u_int namelen,
 		    _Out_writes_bytes_opt_(*oldlenp) void *old,
@@ -1138,24 +1138,24 @@
 ; harmless to lock memory you don't own, but unlocking could cause (e.g.)
 ; keys to leak to swap so could be malicous.
 203	AUE_MLOCK	STD	{
-		int cheriabi_mlock(
+		int mlock(
 		    _Pagerange_(len) const void *addr,
 		    size_t len
 		);
 	}
 204	AUE_MUNLOCK	STD	{
-		int cheriabi_munlock(
+		int munlock(
 		    _Pagerange_(len) const void *addr,
 		    size_t len
 		);
 	}
 205	AUE_UNDELETE	STD	{
-		int cheriabi_undelete(
+		int undelete(
 		    _In_z_ const char *path
 		);
 	}
 206	AUE_FUTIMES	STD	{
-		int cheriabi_futimes(
+		int futimes(
 		    int fd,
 		    _In_reads_(2) const struct timeval *tptr
 		);
@@ -1167,7 +1167,7 @@
 	}
 208	AUE_NULL	UNIMPL	newreboot (NetBSD)
 209	AUE_POLL	STD	{
-		int cheriabi_poll(
+		int poll(
 		    _Inout_updates_(nfds) struct pollfd *fds,
 		    u_int nfds,
 		    int timeout
@@ -1204,7 +1204,7 @@
 		);
 	}
 222	AUE_SEMOP	NOSTD	{
-		int cheriabi_semop(
+		int semop(
 		    int semid,
 		    _In_reads_(nsops) struct sembuf *sops,
 		    u_int nsops
@@ -1225,7 +1225,7 @@
 		);
 	}
 226	AUE_MSGSND	NOSTD	{
-		int cheriabi_msgsnd(
+		int msgsnd(
 		    int msqid,
 		    _In_reads_bytes_(msgsz) void *msgp,
 		    size_t msgsz,
@@ -1233,7 +1233,7 @@
 		);
 	}
 227	AUE_MSGRCV	NOSTD	{
-		int cheriabi_msgrcv(
+		int msgrcv(
 		    int msqid,
 		    _Out_writes_bytes_(msgsz) void *msgp,
 		    size_t msgsz,
@@ -1242,7 +1242,7 @@
 		);
 	}
 228	AUE_SHMAT	NOSTD	{
-		void *cheriabi_shmat(
+		void *shmat(
 		    int shmid,
 		    _Pagerange_vmmap_opt_(1) void *shmaddr,
 		    int shmflg
@@ -1256,7 +1256,7 @@
 		);
 	}
 230	AUE_SHMDT	NOSTD	{
-		int cheriabi_shmdt(
+		int shmdt(
 		    _Pagerange_vmmap_(1) void *shmaddr
 		);
 	}
@@ -1268,25 +1268,25 @@
 		);
 	}
 232	AUE_NULL	STD	{
-		int cheriabi_clock_gettime(
+		int clock_gettime(
 		    clockid_t clock_id,
 		    _Out_ struct timespec *tp
 		);
 	}
 233	AUE_CLOCK_SETTIME	STD	{
-		int cheriabi_clock_settime(
+		int clock_settime(
 		    clockid_t clock_id,
 		    _In_ const struct timespec *tp
 		);
 	}
 234	AUE_NULL	STD	{
-		int cheriabi_clock_getres(
+		int clock_getres(
 		    clockid_t clock_id,
 		    _Out_ struct timespec *tp
 		);
 	}
 235	AUE_NULL	STD	{
-		int cheriabi_ktimer_create(
+		int ktimer_create(
 		    clockid_t clock_id,
 		    _In_ struct sigevent_c *evp,
 		    _Out_ int *timerid
@@ -1298,7 +1298,7 @@
 		);
 	}
 237	AUE_NULL	STD	{
-		int cheriabi_ktimer_settime(
+		int ktimer_settime(
 		    int timerid,
 		    int flags,
 		    _In_ const struct itimerspec *value,
@@ -1306,7 +1306,7 @@
 		);
 	}
 238	AUE_NULL	STD	{
-		int cheriabi_ktimer_gettime(
+		int ktimer_gettime(
 		    int timerid,
 		    _Out_ struct itimerspec *value
 		);
@@ -1317,28 +1317,28 @@
 		);
 	}
 240	AUE_NULL	STD	{
-		int cheriabi_nanosleep(
+		int nanosleep(
 		    _In_ const struct timespec *rqtp,
 		    _Out_opt_ struct timespec *rmtp
 		);
 	}
 241	AUE_NULL	STD	{
-		int cheriabi_ffclock_getcounter(
+		int ffclock_getcounter(
 		    _Out_ ffcounter *ffcount
 		);
 	}
 242	AUE_NULL	STD	{
-		int cheriabi_ffclock_setestimate(
+		int ffclock_setestimate(
 		    _In_ struct ffclock_estimate *cest
 		);
 	}
 243	AUE_NULL	STD	{
-		int cheriabi_ffclock_getestimate(
+		int ffclock_getestimate(
 		    _Out_ struct ffclock_estimate *cest
 		);
 	}
 244	AUE_NULL	STD	{
-		int cheriabi_clock_nanosleep(
+		int clock_nanosleep(
 		    clockid_t clock_id,
 		    int flags,
 		    _In_ const struct timespec *rqtp,
@@ -1348,20 +1348,20 @@
 245	AUE_NULL	UNIMPL	nosys
 246	AUE_NULL	UNIMPL	nosys
 247	AUE_NULL	STD	{
-		int cheriabi_clock_getcpuclockid2(id_t id,
+		int clock_getcpuclockid2(id_t id,
 		    int which,
 		    _Out_ clockid_t *clock_id
 		);
 	}
 248	AUE_NULL	STD	{
-		int cheriabi_ntp_gettime(
+		int ntp_gettime(
 		    _Out_ struct ntptimeval *ntvp
 		);
 	}
 249	AUE_NULL	UNIMPL	nosys
 ; syscall numbers initially used in OpenBSD
 250	AUE_MINHERIT	STD	{
-		int cheriabi_minherit(
+		int minherit(
 		    _Pagerange_(len) void *addr,
 		    size_t len,
 		    int inherit
@@ -1377,24 +1377,24 @@
 		int issetugid(void);
 	}
 254	AUE_LCHOWN	STD	{
-		int cheriabi_lchown(
+		int lchown(
 		    _In_z_ const char *path,
 		    int uid,
 		    int gid
 		);
 	}
 255	AUE_AIO_READ	STD	{
-		int cheriabi_aio_read(
+		int aio_read(
 		    _Inout_ struct aiocb_c *aiocbp
 		);
 	}
 256	AUE_AIO_WRITE	STD	{
-		int cheriabi_aio_write(
+		int aio_write(
 		    _Inout_ struct aiocb_c *aiocbp
 		);
 	}
 257	AUE_LIO_LISTIO	STD	{
-		int cheriabi_lio_listio(
+		int lio_listio(
 		    int mode,
 		    _Inout_updates_(nent) struct aiocb_c * const*acb_list,
 		    int nent,
@@ -1402,7 +1402,7 @@
 		);
 	}
 258	AUE_NULL	STD	{
-		int cheriabi_kbounce(
+		int kbounce(
 		    _In_reads_bytes_(len) const void *src,
 		    _Out_writes_bytes_(len) void *dst,
 		    size_t len,
@@ -1419,14 +1419,14 @@
 	}
 273	AUE_NULL	UNIMPL	nosys
 274	AUE_LCHMOD	STD	{
-		int cheriabi_lchmod(
+		int lchmod(
 		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
 275	AUE_LCHOWN	UNIMPL	netbsd_lchown
 276	AUE_LUTIMES	STD	{
-		int cheriabi_lutimes(
+		int lutimes(
 		    _In_z_ const char *path,
 		    _In_ const struct timeval *tptr
 		);
@@ -1452,7 +1452,7 @@
 	}
 281-288	AUE_NULL	UNIMPL	nosys
 289	AUE_PREADV	STD	{
-		ssize_t cheriabi_preadv(
+		ssize_t preadv(
 		    int fd,
 		    _In_reads_(iovcnt) struct iovec_c *iovp,
 		    u_int iovcnt,
@@ -1460,7 +1460,7 @@
 		);
 	}
 290	AUE_PWRITEV	STD	{
-		ssize_t cheriabi_pwritev(
+		ssize_t pwritev(
 		    int fd,
 		    _In_reads_(iovcnt) struct iovec_c *iovp,
 		    u_int iovcnt,
@@ -1480,7 +1480,7 @@
 		);
 	}
 298	AUE_FHOPEN	STD	{
-		int cheriabi_fhopen(
+		int fhopen(
 		    _In_ const struct fhandle *u_fhp,
 			 	    int flags
 		);
@@ -1497,7 +1497,7 @@
 		);
 	}
 301	AUE_NULL	STD	{
-		int cheriabi_modstat(
+		int modstat(
 		    int modid,
 		    _Out_ struct module_stat *stat
 		);
@@ -1508,12 +1508,12 @@
 		);
 	}
 303	AUE_NULL	STD	{
-		int cheriabi_modfind(
+		int modfind(
 		    _In_z_ const char *name
 		);
 	}
 304	AUE_MODLOAD	STD	{
-		int cheriabi_kldload(
+		int kldload(
 		    _In_z_ const char *file
 		);
 	}
@@ -1523,7 +1523,7 @@
 		);
 	}
 306	AUE_NULL	STD	{
-		int cheriabi_kldfind(
+		int kldfind(
 		    _In_z_ const char *file
 		);
 	}
@@ -1533,7 +1533,7 @@
 		);
 	}
 308	AUE_NULL	STD	{
-		int cheriabi_kldstat(
+		int kldstat(
 		    int fileid,
 		    _Out_ struct kld_file_stat_c *stat
 		);
@@ -1564,25 +1564,25 @@
 	}
 313	AUE_NULL	OBSOL	signanosleep
 314	AUE_AIO_RETURN	STD	{
-		int cheriabi_aio_return(
+		int aio_return(
 		    _Inout_ struct aiocb_c *aiocbp
 		);
 	}
 315	AUE_AIO_SUSPEND	STD	{
-		int cheriabi_aio_suspend(
+		int aio_suspend(
 		    _Inout_updates_(nent) struct aiocb_c * const*aiocbp,
 		    int nent,
 		    _In_opt_ const struct timespec *timeout
 		);
 	}
 316	AUE_AIO_CANCEL	STD	{
-		int cheriabi_aio_cancel(
+		int aio_cancel(
 		    int fd,
 		    _In_opt_ struct aiocb_c *aiocbp
 		);
 	}
 317	AUE_AIO_ERROR	STD	{
-		int cheriabi_aio_error(
+		int aio_error(
 		    _In_ struct aiocb_c *aiocbp
 		);
 	}
@@ -1617,24 +1617,24 @@
 		int munlockall(void);
 	}
 326	AUE_GETCWD	STD	{
-		int cheriabi___getcwd(
+		int __getcwd(
 		    _Out_writes_z_(buflen) char *buf,
 		    size_t buflen
 		);
 	}
 327	AUE_NULL	STD	{
-		int cheriabi_sched_setparam (pid_t pid,
+		int sched_setparam (pid_t pid,
 		    _In_ const struct sched_param *param
 		);
 	}
 328	AUE_NULL	STD	{
-		int cheriabi_sched_getparam (pid_t pid,
+		int sched_getparam (pid_t pid,
 		    _Out_ struct sched_param *param
 		);
 	}
 
 329	AUE_NULL	STD	{
-		int cheriabi_sched_setscheduler (pid_t pid,
+		int sched_setscheduler (pid_t pid,
 		    int policy,
 		    _In_ const struct sched_param *param
 		);
@@ -1656,12 +1656,12 @@
 		);
 	}
 334	AUE_NULL	STD	{
-		int cheriabi_sched_rr_get_interval (pid_t pid,
+		int sched_rr_get_interval (pid_t pid,
 		    _Out_ struct timespec *interval
 		);
 	}
 335	AUE_NULL	STD	{
-		int cheriabi_utrace(
+		int utrace(
 		    _In_reads_bytes_(len) const void *addr,
 		    size_t len
 		);
@@ -1678,27 +1678,27 @@
 		);
 	}
 337	AUE_NULL	STD	{
-		int cheriabi_kldsym(
+		int kldsym(
 		    int fileid,
 		    int cmd,
 		    _In_ struct kld_sym_lookup_c *data
 		);
 	}
 338	AUE_JAIL	STD	{
-		int cheriabi_jail(
+		int jail(
 		    _In_ struct jail_c *jailp
 		);
 	}
 339	AUE_NULL	UNIMPL	nnpfs_syscall
 340	AUE_SIGPROCMASK	STD	{
-		int cheriabi_sigprocmask(
+		int sigprocmask(
 		    int how,
 		    _In_opt_ const sigset_t *set,
 		    _Out_opt_ sigset_t *oset
 		);
 	}
 341	AUE_SIGSUSPEND	STD	{
-		int cheriabi_sigsuspend(
+		int sigsuspend(
 		    _In_ const sigset_t *sigmask
 		);
 	}
@@ -1710,7 +1710,7 @@
 		);
 	}
 343	AUE_SIGPENDING	STD	{
-		int cheriabi_sigpending(
+		int sigpending(
 		    _In_ sigset_t *set
 		);
 	}
@@ -1720,48 +1720,48 @@
 		);
 	}
 345	AUE_SIGWAIT	STD	{
-		int cheriabi_sigtimedwait(
+		int sigtimedwait(
 		    _In_ const sigset_t *set,
 		    _Out_opt_ struct siginfo_c *info,
 		    _In_opt_ const struct timespec *timeout
 		);
 	}
 346	AUE_NULL	STD	{
-		int cheriabi_sigwaitinfo(
+		int sigwaitinfo(
 		    _In_ const sigset_t *set,
 		    _Out_opt_ struct siginfo_c *info
 		);
 	}
 347	AUE_ACL_GET_FILE	STD	{
-		int cheriabi___acl_get_file(
+		int __acl_get_file(
 		    _In_z_ const char *path,
 		    acl_type_t type,
 		    _Out_ struct acl *aclp
 		);
 	}
 348	AUE_ACL_SET_FILE	STD	{
-		int cheriabi___acl_set_file(
+		int __acl_set_file(
 		    _In_z_ const char *path,
 		    acl_type_t type,
 		    _In_ struct acl *aclp
 		);
 	}
 349	AUE_ACL_GET_FD	STD	{
-		int cheriabi___acl_get_fd(
+		int __acl_get_fd(
 		    int filedes,
 		    acl_type_t type,
 		    _Out_ struct acl *aclp
 		);
 	}
 350	AUE_ACL_SET_FD	STD	{
-		int cheriabi___acl_set_fd(
+		int __acl_set_fd(
 		    int filedes,
 		    acl_type_t type,
 		    _In_ struct acl *aclp
 		);
 	}
 351	AUE_ACL_DELETE_FILE	STD	{
-		int cheriabi___acl_delete_file(
+		int __acl_delete_file(
 		    _In_z_ const char *path,
 		    acl_type_t type
 		);
@@ -1773,21 +1773,21 @@
 		);
 	}
 353	AUE_ACL_CHECK_FILE	STD	{
-		int cheriabi___acl_aclcheck_file(
+		int __acl_aclcheck_file(
 		    _In_z_ const char *path,
 		    acl_type_t type,
 		    _In_ struct acl *aclp
 		);
 	}
 354	AUE_ACL_CHECK_FD	STD	{
-		int cheriabi___acl_aclcheck_fd(
+		int __acl_aclcheck_fd(
 		    int filedes,
 		    acl_type_t type,
 		    _In_ struct acl *aclp
 		);
 	}
 355	AUE_EXTATTRCTL	STD	{
-		int cheriabi_extattrctl(
+		int extattrctl(
 		    _In_z_ const char *path,
 		    int cmd,
 		    _In_z_opt_ const char *filename,
@@ -1796,7 +1796,7 @@
 		);
 	}
 356	AUE_EXTATTR_SET_FILE	STD	{
-		ssize_t cheriabi_extattr_set_file(
+		ssize_t extattr_set_file(
 		    _In_z_ const char *path,
 		    int attrnamespace,
 		    _In_z_ const char *attrname,
@@ -1805,7 +1805,7 @@
 		);
 	}
 357	AUE_EXTATTR_GET_FILE	STD	{
-		ssize_t cheriabi_extattr_get_file(
+		ssize_t extattr_get_file(
 		    _In_z_ const char *path,
 		    int attrnamespace,
 		    _In_z_ const char *attrname,
@@ -1814,27 +1814,27 @@
 		);
 	}
 358	AUE_EXTATTR_DELETE_FILE	STD	{
-		int cheriabi_extattr_delete_file(
+		int extattr_delete_file(
 		    _In_z_ const char *path,
 		    int attrnamespace,
 		    _In_z_ const char *attrname
 		);
 	}
 359	AUE_AIO_WAITCOMPLETE	STD	{
-		int cheriabi_aio_waitcomplete(
+		int aio_waitcomplete(
 		    _Outptr_result_maybenull_ struct aiocb_c **aiocbp,
 		    _In_opt_ struct timespec *timeout
 		);
 	}
 360	AUE_GETRESUID	STD	{
-		int cheriabi_getresuid(
+		int getresuid(
 		    _Out_opt_ uid_t *ruid,
 		    _Out_opt_ uid_t *euid,
 		    _Out_opt_ uid_t *suid
 		);
 	}
 361	AUE_GETRESGID	STD	{
-		int cheriabi_getresgid(
+		int getresgid(
 		    _Out_opt_ gid_t *rgid,
 		    _Out_opt_ gid_t *egid,
 		    _Out_opt_ gid_t *sgid
@@ -1861,7 +1861,7 @@
 369	AUE_NULL	UNIMPL	__cap_set_file
 370	AUE_NULL	UNIMPL	nosys
 371	AUE_EXTATTR_SET_FD	STD	{
-		ssize_t cheriabi_extattr_set_fd(
+		ssize_t extattr_set_fd(
 		    int fd,
 		    int attrnamespace,
 		    _In_z_ const char *attrname,
@@ -1870,7 +1870,7 @@
 		);
 	}
 372	AUE_EXTATTR_GET_FD	STD	{
-		ssize_t cheriabi_extattr_get_fd(
+		ssize_t extattr_get_fd(
 		    int fd,
 		    int attrnamespace,
 		    _In_z_ const char *attrname,
@@ -1879,7 +1879,7 @@
 		);
 	}
 373	AUE_EXTATTR_DELETE_FD	STD	{
-		int cheriabi_extattr_delete_fd(
+		int extattr_delete_fd(
 		    int fd,
 		    int attrnamespace,
 		    _In_z_ const char *attrname
@@ -1892,14 +1892,14 @@
 	}
 375	AUE_NULL	UNIMPL	nfsclnt
 376	AUE_EACCESS	STD	{
-		int cheriabi_eaccess(
+		int eaccess(
 		    _In_z_ char *path,
 		    int amode
 		);
 	}
 377	AUE_NULL	UNIMPL	afs3_syscall
 378	AUE_NMOUNT	STD	{
-		int cheriabi_nmount(
+		int nmount(
 		    _In_reads_(iovcnt) struct iovec_c *iovp,
 		    unsigned int iovcnt,
 		    int flags
@@ -1911,41 +1911,41 @@
 382	AUE_NULL	OBSOL	kse_thr_interrupt
 383	AUE_NULL	OBSOL	kse_release
 384	AUE_NULL	STD	{
-		int cheriabi___mac_get_proc(
+		int __mac_get_proc(
 		    _In_ struct mac_c *mac_p
 		);
 	}
 385	AUE_NULL	STD	{
-		int cheriabi___mac_set_proc(
+		int __mac_set_proc(
 		    _In_ struct mac_c *mac_p
 		);
 	}
 386	AUE_NULL	STD	{
-		int cheriabi___mac_get_fd(
+		int __mac_get_fd(
 		    int fd,
 		    _In_ struct mac_c *mac_p
 		);
 	}
 387	AUE_NULL	STD	{
-		int cheriabi___mac_get_file(
+		int __mac_get_file(
 		    _In_z_ const char *path_p,
 		    _In_ struct mac_c *mac_p
 		);
 	}
 388	AUE_NULL	STD	{
-		int cheriabi___mac_set_fd(
+		int __mac_set_fd(
 		    int fd,
 		    _In_ struct mac_c *mac_p
 		);
 	}
 389	AUE_NULL	STD	{
-		int cheriabi___mac_set_file(
+		int __mac_set_file(
 		    _In_z_ const char *path_p,
 		    _In_ struct mac_c *mac_p
 		);
 	}
 390	AUE_NULL	STD	{
-		int cheriabi_kenv(
+		int kenv(
 		    int what,
 		    _In_z_opt_ const char *name,
 		    _Inout_updates_opt_(len) char *value,
@@ -1953,19 +1953,19 @@
 		);
 	}
 391	AUE_LCHFLAGS	STD	{
-		int cheriabi_lchflags(
+		int lchflags(
 		    _In_z_ const char *path,
 		    u_long flags
 		);
 	}
 392	AUE_NULL	STD	{
-		int cheriabi_uuidgen(
+		int uuidgen(
 		    _Out_writes_(count) struct uuid *store,
 		    int count
 		);
 	}
 393	AUE_SENDFILE	STD	{
-		int cheriabi_sendfile(
+		int sendfile(
 		    int fd,
 		    int s,
 		    off_t offset,
@@ -1976,7 +1976,7 @@
 		);
 	}
 394	AUE_NULL	STD	{
-		int cheriabi_mac_syscall(
+		int mac_syscall(
 		    _In_z_ const char *policy,
 		    int call,
 		    _In_opt_ void *arg
@@ -2018,25 +2018,25 @@
 407	AUE_SEMGETVALUE	OBSOL	ksem_getvalue
 408	AUE_SEMDESTROY	OBSOL	ksem_destroy
 409	AUE_NULL	STD	{
-		int cheriabi___mac_get_pid(
+		int __mac_get_pid(
 		    pid_t pid,
 		    _In_ struct mac_c *mac_p
 		);
 	}
 410	AUE_NULL	STD	{
-		int cheriabi___mac_get_link(
+		int __mac_get_link(
 		    _In_z_ const char *path_p,
 		    _In_ struct mac_c *mac_p
 		);
 	}
 411	AUE_NULL	STD	{
-		int cheriabi___mac_set_link(
+		int __mac_set_link(
 		    _In_z_ const char *path_p,
 		    _In_ struct mac_c *mac_p
 		);
 	}
 412	AUE_EXTATTR_SET_LINK	STD	{
-		ssize_t cheriabi_extattr_set_link(
+		ssize_t extattr_set_link(
 		    _In_z_ const char *path,
 		    int attrnamespace,
 		    _In_z_ const char *attrname,
@@ -2045,7 +2045,7 @@
 		);
 	}
 413	AUE_EXTATTR_GET_LINK	STD	{
-		ssize_t cheriabi_extattr_get_link(
+		ssize_t extattr_get_link(
 		    _In_z_ const char *path,
 		    int attrnamespace,
 		    _In_z_ const char *attrname,
@@ -2054,14 +2054,14 @@
 		);
 	}
 414	AUE_EXTATTR_DELETE_LINK	STD	{
-		int cheriabi_extattr_delete_link(
+		int extattr_delete_link(
 		    _In_z_ const char *path,
 		    int attrnamespace,
 		    _In_z_ const char *attrname
 		);
 	}
 415	AUE_NULL	STD|NOSTUB	{
-		int cheriabi___mac_execve(
+		int __mac_execve(
 		    _In_z_ char *fname,
 		    _In_ void **argv,
 		    _In_ void **envv,
@@ -2069,14 +2069,14 @@
 		);
 	}
 416	AUE_SIGACTION	STD	{
-		int cheriabi_sigaction(
+		int sigaction(
 		    int sig,
 		    _In_opt_ struct sigaction_c *act,
 		    _Out_opt_ struct sigaction_c *oact
 		);
 	}
 417	AUE_SIGRETURN	STD	{
-		int cheriabi_sigreturn(
+		int sigreturn(
 		    _In_ const ucontext_c_t *sigcntxp
 		);
 	}
@@ -2084,73 +2084,73 @@
 419	AUE_NULL	UNIMPL	__xfstat
 420	AUE_NULL	UNIMPL	__xlstat
 421	AUE_NULL	STD	{
-		int cheriabi_getcontext(
+		int getcontext(
 		    _Out_ ucontext_c_t *ucp
 		);
 	}
 422	AUE_NULL	STD	{
-		int cheriabi_setcontext(
+		int setcontext(
 		    _In_ const ucontext_c_t *ucp
 		);
 	}
 423	AUE_NULL	STD	{
-		int cheriabi_swapcontext(
+		int swapcontext(
 		    _Out_ ucontext_c_t *oucp,
 		    _In_ const ucontext_c_t *ucp
 		);
 	}
 424	AUE_SWAPOFF	STD	{
-		int cheriabi_swapoff(
+		int swapoff(
 		    _In_z_ const char *name
 		);
 	}
 425	AUE_ACL_GET_LINK	STD	{
-		int cheriabi___acl_get_link(
+		int __acl_get_link(
 		    _In_z_ const char *path,
 		    acl_type_t type,
 		    _Out_ struct acl *aclp
 		);
 	}
 426	AUE_ACL_SET_LINK	STD	{
-		int cheriabi___acl_set_link(
+		int __acl_set_link(
 		    _In_z_ const char *path,
 		    acl_type_t type,
 		    _In_ struct acl *aclp
 		);
 	}
 427	AUE_ACL_DELETE_LINK	STD	{
-		int cheriabi___acl_delete_link(
+		int __acl_delete_link(
 		    _In_z_ const char *path,
 		    acl_type_t type
 		);
 	}
 428	AUE_ACL_CHECK_LINK	STD	{
-		int cheriabi___acl_aclcheck_link(
+		int __acl_aclcheck_link(
 		    _In_z_ const char *path,
 		    acl_type_t type,
 		    _In_ struct acl *aclp
 		);
 	}
 429	AUE_SIGWAIT	STD	{
-		int cheriabi_sigwait(
+		int sigwait(
 		    _In_ const sigset_t *set,
 		    _Out_ int *sig
 		);
 	}
 430	AUE_THR_CREATE	STD	{
-		int cheriabi_thr_create(
+		int thr_create(
 		    _In_ ucontext_c_t *ctx,
 		    _Out_ long *id,
 		    int flags
 		);
 	}
 431	AUE_THR_EXIT	STD|NOSTUB	{
-		void cheriabi_thr_exit(
+		void thr_exit(
 		    _Out_opt_ long *state
 		);
 	}
 432	AUE_NULL	STD	{
-		int cheriabi_thr_self(
+		int thr_self(
 		    _Out_ long *id
 		);
 	}
@@ -2168,7 +2168,7 @@
 		);
 	}
 437	AUE_EXTATTR_LIST_FD	STD	{
-		ssize_t cheriabi_extattr_list_fd(
+		ssize_t extattr_list_fd(
 		    int fd,
 		    int attrnamespace,
 		    _Out_writes_bytes_opt_(nbytes) void *data,
@@ -2176,7 +2176,7 @@
 		);
 	}
 438	AUE_EXTATTR_LIST_FILE	STD	{
-		ssize_t cheriabi_extattr_list_file(
+		ssize_t extattr_list_file(
 		    _In_z_ const char *path,
 		    int attrnamespace,
 		    _Out_writes_bytes_opt_(nbytes) void *data,
@@ -2184,7 +2184,7 @@
 		);
 	}
 439	AUE_EXTATTR_LIST_LINK	STD	{
-		ssize_t cheriabi_extattr_list_link(
+		ssize_t extattr_list_link(
 		    _In_z_ const char *path,
 		    int attrnamespace,
 		    _Out_writes_bytes_opt_(nbytes) void *data,
@@ -2194,7 +2194,7 @@
 440	AUE_NULL	OBSOL	kse_switchin
 441	AUE_SEMWAIT	OBSOL	ksem_timedwait
 442	AUE_NULL	STD	{
-		int cheriabi_thr_suspend(
+		int thr_suspend(
 		    _In_opt_ const struct timespec *timeout
 		);
 	}
@@ -2210,57 +2210,57 @@
 		);
 	}
 445	AUE_AUDIT	STD	{
-		int cheriabi_audit(
+		int audit(
 		    _In_reads_bytes_(length) const void *record,
 		    u_int length
 		);
 	}
 446	AUE_AUDITON	STD	{
-		int cheriabi_auditon(
+		int auditon(
 		    int cmd,
 		    _In_opt_ void *data,
 		    u_int length
 		);
 	}
 447	AUE_GETAUID	STD	{
-		int cheriabi_getauid(
+		int getauid(
 		    _Out_ uid_t *auid
 		);
 	}
 448	AUE_SETAUID	STD	{
-		int cheriabi_setauid(
+		int setauid(
 		    _In_ uid_t *auid
 		);
 	}
 449	AUE_GETAUDIT	STD	{
-		int cheriabi_getaudit(
+		int getaudit(
 		    _Out_ struct auditinfo *auditinfo
 		);
 	}
 450	AUE_SETAUDIT	STD	{
-		int cheriabi_setaudit(
+		int setaudit(
 		    _In_ struct auditinfo *auditinfo
 		);
 	}
 451	AUE_GETAUDIT_ADDR	STD	{
-		int cheriabi_getaudit_addr(
+		int getaudit_addr(
 		    _Out_writes_bytes_(length) struct auditinfo_addr *auditinfo_addr,
 		    u_int length
 		);
 	}
 452	AUE_SETAUDIT_ADDR	STD	{
-		int cheriabi_setaudit_addr(
+		int setaudit_addr(
 		    _In_reads_bytes_(length) struct auditinfo_addr *auditinfo_addr,
 		    u_int length
 		);
 	}
 453	AUE_AUDITCTL	STD	{
-		int cheriabi_auditctl(
+		int auditctl(
 		    _In_z_ const char *path
 		);
 	}
 454	AUE_NULL	STD	{
-		int cheriabi__umtx_op(
+		int _umtx_op(
 		    void *obj,
 		    int op,
 		    u_long val,
@@ -2269,20 +2269,20 @@
 		);
 	}
 455	AUE_THR_NEW	STD	{
-		int cheriabi_thr_new(
+		int thr_new(
 		    _In_ struct thr_param_c *param,
 		    int param_size
 		);
 	}
 456	AUE_NULL	STD	{
-		int cheriabi_sigqueue(
+		int sigqueue(
 		    pid_t pid,
 		    int signum,
 		    void *value
 		);
 	}
 457	AUE_MQ_OPEN	NOSTD	{
-		int cheriabi_kmq_open(
+		int kmq_open(
 		    _In_z_ const char *path,
 		    int flags,
 		    mode_t mode,
@@ -2290,14 +2290,14 @@
 		);
 	}
 458	AUE_MQ_SETATTR	NOSTD	{
-		int cheriabi_kmq_setattr(
+		int kmq_setattr(
 		    int mqd,
 		    _In_opt_ const struct mq_attr *attr,
 		    _Out_opt_ struct mq_attr *oattr
 		);
 	}
 459	AUE_MQ_TIMEDRECEIVE	NOSTD	{
-		int cheriabi_kmq_timedreceive(
+		int kmq_timedreceive(
 		    int mqd,
 		    _Out_writes_bytes_(msg_len) char *msg_ptr,
 		    size_t msg_len,
@@ -2306,7 +2306,7 @@
 		);
 	}
 460	AUE_MQ_TIMEDSEND	NOSTD	{
-		int cheriabi_kmq_timedsend(
+		int kmq_timedsend(
 		    int mqd,
 		    _In_reads_bytes_(msg_len) const char *msg_ptr,
 		    size_t msg_len,
@@ -2315,38 +2315,38 @@
 		);
 	}
 461	AUE_MQ_NOTIFY	NOSTD	{
-		int cheriabi_kmq_notify(
+		int kmq_notify(
 		    int mqd,
 		    _In_opt_ const struct sigevent_c *sigev
 		);
 	}
 462	AUE_MQ_UNLINK	NOSTD	{
-		int cheriabi_kmq_unlink(
+		int kmq_unlink(
 		    _In_z_ const char *path
 		);
 	}
 463	AUE_NULL	STD|NOSTUB	{
-		void cheriabi_abort2(
+		void abort2(
 		    _In_z_ const char *why,
 		    int nargs,
 		    _In_reads_(nargs) void **args
 		);
 	}
 464	AUE_NULL 	STD	{
-		int cheriabi_thr_set_name(
+		int thr_set_name(
 		    long id,
 		    _In_z_ const char *name
 		);
 	}
 465	AUE_AIO_FSYNC	STD	{
-		int cheriabi_aio_fsync(
+		int aio_fsync(
 		    int op,
 		    _Inout_ struct aiocb_c *
 		    aiocbp
 		);
 	}
 466	AUE_RTPRIO	STD	{
-		int cheriabi_rtprio_thread(
+		int rtprio_thread(
 		    int function,
 		    lwpid_t lwpid,
 		    _Inout_ struct rtprio *rtp
@@ -2363,7 +2363,7 @@
 		);
 	}
 472	AUE_SCTP_GENERIC_SENDMSG	NOSTD|NOSTUB	{
-		int cheriabi_sctp_generic_sendmsg(
+		int sctp_generic_sendmsg(
 		    int sd,
 		    _In_reads_bytes_(mlen) void *msg,
 		    int mlen,
@@ -2374,7 +2374,7 @@
 		);
 	}
 473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD|NOSTUB	{
-		int cheriabi_sctp_generic_sendmsg_iov(
+		int sctp_generic_sendmsg_iov(
 		    int sd,
 		    _In_reads_(iovlen) struct iovec_c *iov,
 		    int iovlen,
@@ -2385,7 +2385,7 @@
 		);
 	}
 474	AUE_SCTP_GENERIC_RECVMSG	NOSTD|NOSTUB	{
-		int cheriabi_sctp_generic_recvmsg(
+		int sctp_generic_recvmsg(
 		    int sd,
 		    _In_reads_(iovlen) struct iovec_c *iov,
 		    int iovlen,
@@ -2396,7 +2396,7 @@
 		);
 	}
 475	AUE_PREAD	STD	{
-		ssize_t cheriabi_pread(
+		ssize_t pread(
 		    int fd,
 		    _Out_writes_bytes_(nbyte) void *buf,
 		    size_t nbyte,
@@ -2404,7 +2404,7 @@
 		);
 	}
 476	AUE_PWRITE	STD	{
-		ssize_t cheriabi_pwrite(
+		ssize_t pwrite(
 		    int fd,
 		    _Out_writes_bytes_(nbyte) const void *buf,
 		    size_t nbyte,
@@ -2412,7 +2412,7 @@
 		);
 	}
 477	AUE_MMAP	STD {
-		void *cheriabi_mmap(
+		void *mmap(
 		    _Pagerange_vmmap_opt_(len) void *addr,
 		    size_t len,
 		    int prot,
@@ -2429,7 +2429,7 @@
 		);
 	}
 479	AUE_TRUNCATE	STD	{
-		int cheriabi_truncate(
+		int truncate(
 		    _In_z_ const char *path,
 		    off_t length
 		);
@@ -2447,19 +2447,19 @@
 		);
 	}
 482	AUE_SHMOPEN	STD	{
-		int cheriabi_shm_open(
+		int shm_open(
 		    _In_z_ const char *path,
 		    int flags,
 		    mode_t mode
 		);
 	}
 483	AUE_SHMUNLINK	STD	{
-		int cheriabi_shm_unlink(
+		int shm_unlink(
 		    _In_z_ const char *path
 		);
 	}
 484	AUE_NULL	STD	{
-		int cheriabi_cpuset(
+		int cpuset(
 		    _Out_ cpusetid_t *setid
 		);
 	}
@@ -2471,7 +2471,7 @@
 		);
 	}
 486	AUE_NULL	STD	{
-		int cheriabi_cpuset_getid(
+		int cpuset_getid(
 		    cpulevel_t level,
 		    cpuwhich_t which,
 		    id_t id,
@@ -2479,7 +2479,7 @@
 		);
 	}
 487	AUE_NULL	STD	{
-		int cheriabi_cpuset_getaffinity(
+		int cpuset_getaffinity(
 		    cpulevel_t level,
 		    cpuwhich_t which,
 		    id_t id,
@@ -2488,7 +2488,7 @@
 		);
 	}
 488	AUE_NULL	STD	{
-		int cheriabi_cpuset_setaffinity(
+		int cpuset_setaffinity(
 		    cpulevel_t level,
 		    cpuwhich_t which,
 		    id_t id,
@@ -2497,7 +2497,7 @@
 		);
 	}
 489	AUE_FACCESSAT	STD	{
-		int cheriabi_faccessat(
+		int faccessat(
 		    int fd,
 		    _In_z_ const char *path,
 		    int amode,
@@ -2505,7 +2505,7 @@
 		);
 	}
 490	AUE_FCHMODAT	STD	{
-		int cheriabi_fchmodat(
+		int fchmodat(
 		    int fd,
 		    _In_z_ const char *path,
 		    mode_t mode,
@@ -2513,7 +2513,7 @@
 		);
 	}
 491	AUE_FCHOWNAT	STD	{
-		int cheriabi_fchownat(
+		int fchownat(
 		    int fd,
 		    _In_z_ const char *path,
 		    uid_t uid,
@@ -2522,7 +2522,7 @@
 		);
 	}
 492	AUE_FEXECVE	STD|NOSTUB	{
-		int cheriabi_fexecve(
+		int fexecve(
 		    int fd,
 		    _In_ void **argv,
 		    _In_ void **envv
@@ -2537,14 +2537,14 @@
 		);
 	}
 494	AUE_FUTIMESAT	STD	{
-		int cheriabi_futimesat(
+		int futimesat(
 		    int fd,
 		    _In_z_ const char *path,
 		    _In_reads_(2) const struct timeval *times
 		);
 	}
 495	AUE_LINKAT	STD	{
-		int cheriabi_linkat(
+		int linkat(
 		    int fd1,
 		    _In_z_ const char *path1,
 		    int fd2,
@@ -2553,14 +2553,14 @@
 		);
 	}
 496	AUE_MKDIRAT	STD	{
-		int cheriabi_mkdirat(
+		int mkdirat(
 		    int fd,
 		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
 497	AUE_MKFIFOAT	STD	{
-		int cheriabi_mkfifoat(
+		int mkfifoat(
 		    int fd,
 		    _In_z_ const char *path,
 		    mode_t mode
@@ -2575,7 +2575,7 @@
 		);
 	}
 499	AUE_OPENAT_RWTC	STD|VARARG	{
-		int cheriabi_openat(
+		int openat(
 		    int fd,
 		    _In_z_ const char *path,
 		    int flag,
@@ -2583,7 +2583,7 @@
 		);
 	}
 500	AUE_READLINKAT	STD	{
-		int cheriabi_readlinkat(
+		int readlinkat(
 		    int fd,
 		    _In_z_ const char *path,
 		    _Out_writes_bytes_(bufsize) char *buf,
@@ -2591,7 +2591,7 @@
 		);
 	}
 501	AUE_RENAMEAT	STD	{
-		int cheriabi_renameat(
+		int renameat(
 		    int oldfd,
 		    _In_z_ const char *old,
 		    int newfd,
@@ -2599,14 +2599,14 @@
 		);
 	}
 502	AUE_SYMLINKAT	STD	{
-		int cheriabi_symlinkat(
+		int symlinkat(
 		    _In_z_ const char *path1,
 		    int fd,
 		    _In_z_ const char *path2
 		);
 	}
 503	AUE_UNLINKAT	STD	{
-		int cheriabi_unlinkat(
+		int unlinkat(
 		    int fd,
 		    _In_z_ const char *path,
 		    int flag
@@ -2619,19 +2619,19 @@
 	}
 ; 505 is initialised by the kgssapi code, if present.
 505	AUE_NULL	NOSTD	{
-		int cheriabi_gssd_syscall(
+		int gssd_syscall(
 		    _In_z_ const char *path
 		);
 	}
 506	AUE_JAIL_GET	STD	{
-		int cheriabi_jail_get(
+		int jail_get(
 		    _In_reads_(iovcnt) struct iovec_c *iovp,
 		    unsigned int iovcnt,
 		    int flags
 		);
 	}
 507	AUE_JAIL_SET	STD	{
-		int cheriabi_jail_set(
+		int jail_set(
 		    _In_reads_(iovcnt) struct iovec_c *iovp,
 		    unsigned int iovcnt,
 		    int flags
@@ -2648,7 +2648,7 @@
 		);
 	}
 510	AUE_SEMCTL	NOSTD {
-		int cheriabi___semctl(
+		int __semctl(
 		    int semid,
 		    int semnum,
 		    int cmd,
@@ -2656,28 +2656,28 @@
 		);
 	}
 511	AUE_MSGCTL	NOSTD {
-		int cheriabi_msgctl(
+		int msgctl(
 		    int msqid,
 		    int cmd,
 		    _Inout_opt_ struct msqid_ds_c *buf
 		);
 	}
 512	AUE_SHMCTL	NOSTD	{
-		int cheriabi_shmctl(
+		int shmctl(
 		    int shmid,
 		    int cmd,
 		    _Inout_opt_ struct shmid_ds *buf
 		);
 	}
 513	AUE_LPATHCONF	STD	{
-		int cheriabi_lpathconf(
+		int lpathconf(
 		    _In_z_ const char *path,
 		    int name
 		);
 	}
 514	AUE_NULL	OBSOL	cap_new
 515	AUE_CAP_RIGHTS_GET	STD	{
-		int cheriabi___cap_rights_get(
+		int __cap_rights_get(
 		    int version,
 		    int fd,
 		    _Out_ cap_rights_t *rightsp
@@ -2687,12 +2687,12 @@
 		int cap_enter(void);
 	}
 517	AUE_CAP_GETMODE	STD	{
-		int cheriabi_cap_getmode(
+		int cap_getmode(
 		    _Out_ u_int *modep
 		);
 	}
 518	AUE_PDFORK	STD	{
-		int cheriabi_pdfork(
+		int pdfork(
 		    _Out_ int *fdp,
 		    int flags
 		);
@@ -2704,14 +2704,14 @@
 		);
 	}
 520	AUE_PDGETPID	STD	{
-		int cheriabi_pdgetpid(
+		int pdgetpid(
 		    int fd,
 		    _Out_ pid_t *pidp
 		);
 	}
 521	AUE_PDWAIT	UNIMPL	pdwait4
 522	AUE_SELECT	STD	{
-		int cheriabi_pselect(
+		int pselect(
 		    int nd,
 		    _Inout_opt_ fd_set *in,
 		    _Inout_opt_ fd_set *ou,
@@ -2721,18 +2721,18 @@
 		);
 	}
 523	AUE_GETLOGINCLASS	STD	{
-		int cheriabi_getloginclass(
+		int getloginclass(
 		    _Out_writes_z_(namelen) char *namebuf,
 		    size_t namelen
 		);
 	}
 524	AUE_SETLOGINCLASS	STD	{
-		int cheriabi_setloginclass(
+		int setloginclass(
 		    _In_z_ const char *namebuf
 		);
 	}
 525	AUE_NULL	STD	{
-		int cheriabi_rctl_get_racct(
+		int rctl_get_racct(
 		    _In_reads_bytes_(inbuflen) const void *inbufp,
 		    size_t inbuflen,
 		    _Out_writes_bytes_(outbuflen) void *outbufp,
@@ -2740,7 +2740,7 @@
 		);
 	}
 526	AUE_NULL	STD	{
-		int cheriabi_rctl_get_rules(
+		int rctl_get_rules(
 		    _In_reads_bytes_(inbuflen) const void *inbufp,
 		    size_t inbuflen,
 		    _Out_writes_bytes_(outbuflen) void *outbufp,
@@ -2748,7 +2748,7 @@
 		);
 	}
 527	AUE_NULL	STD	{
-		int cheriabi_rctl_get_limits(
+		int rctl_get_limits(
 		    _In_reads_bytes_(inbuflen) const void *inbufp,
 		    size_t inbuflen,
 		    _Out_writes_bytes_(outbuflen) void *outbufp,
@@ -2756,7 +2756,7 @@
 		);
 	}
 528	AUE_NULL	STD	{
-		int cheriabi_rctl_add_rule(
+		int rctl_add_rule(
 		    _In_reads_bytes_(inbuflen) const void *inbufp,
 		    size_t inbuflen,
 		    _Out_writes_bytes_(outbuflen) void *outbufp,
@@ -2764,7 +2764,7 @@
 		);
 	}
 529	AUE_NULL	STD	{
-		int cheriabi_rctl_remove_rule(
+		int rctl_remove_rule(
 		    _In_reads_bytes_(inbuflen) const void *inbufp,
 		    size_t inbuflen,
 		    _Out_writes_bytes_(outbuflen) void *outbufp,
@@ -2787,7 +2787,7 @@
 		);
 	}
 532	AUE_WAIT6	STD	{
-		int cheriabi_wait6(int idtype,
+		int wait6(int idtype,
 		    id_t id,
 		    _Out_opt_ int *status,
 		    int options,
@@ -2796,20 +2796,20 @@
 		);
 	}
 533	AUE_CAP_RIGHTS_LIMIT	STD	{
-		    int cheriabi_cap_rights_limit(
+		    int cap_rights_limit(
 		    int fd,
 		    _In_ cap_rights_t *rightsp
 		);
 	}
 534	AUE_CAP_IOCTLS_LIMIT	STD	{
-		    int cheriabi_cap_ioctls_limit(
+		    int cap_ioctls_limit(
 		    int fd,
 		    _In_reads_(ncmds) const u_long *cmds,
 		    size_t ncmds
 		);
 	}
 535	AUE_CAP_IOCTLS_GET	STD	{
-		    ssize_t cheriabi_cap_ioctls_get(
+		    ssize_t cap_ioctls_get(
 		    int fd,
 		    _Out_writes_(maxcmds) u_long *cmds,
 		    size_t maxcmds
@@ -2822,13 +2822,13 @@
 		);
 	}
 537	AUE_CAP_FCNTLS_GET	STD	{
-		int cheriabi_cap_fcntls_get(
+		int cap_fcntls_get(
 		    int fd,
 		    _Out_ uint32_t *fcntlrightsp
 		);
 	}
 538	AUE_BINDAT	STD	{
-		int cheriabi_bindat(
+		int bindat(
 		    int fd,
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr *name,
@@ -2836,7 +2836,7 @@
 		);
 	}
 539	AUE_CONNECTAT	STD	{
-		int cheriabi_connectat(
+		int connectat(
 		    int fd,
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr *name,
@@ -2844,7 +2844,7 @@
 		);
 	}
 540	AUE_CHFLAGSAT	STD	{
-		int cheriabi_chflagsat(
+		int chflagsat(
 		    int fd,
 		    _In_z_ const char *path,
 		    u_long flags,
@@ -2852,25 +2852,25 @@
 		);
 	}
 541	AUE_ACCEPT	STD	{
-		int cheriabi_accept4(int s,
+		int accept4(int s,
 		    _Out_writes_bytes_opt_(*anamelen) struct sockaddr * name,
 		    _Inout_opt_ __socklen_t * anamelen,
 		    int flags
 		);
 	}
 542	AUE_PIPE	STD	{
-		int cheriabi_pipe2(
+		int pipe2(
 		    _Out_writes_(2) int *fildes,
 		    int flags
 		);
 	}
 543	AUE_AIO_MLOCK	STD	{
-		int cheriabi_aio_mlock(
+		int aio_mlock(
 		    _Inout_ struct aiocb_c *aiocbp
 		);
 	}
 544	AUE_PROCCTL	STD	{
-		int cheriabi_procctl(
+		int procctl(
 		    int idtype,
 		    id_t id,
 		    int com,
@@ -2878,7 +2878,7 @@
 		);
 	}
 545	AUE_POLL	STD	{
-		int cheriabi_ppoll(
+		int ppoll(
 		    _Inout_updates_(nfds) struct pollfd *fds,
 		    u_int nfds,
 		    _In_opt_ const struct timespec *ts,
@@ -2886,13 +2886,13 @@
 		);
 	}
 546	AUE_FUTIMES	STD	{
-		int cheriabi_futimens(
+		int futimens(
 		    int fd,
 		    _In_reads_(2) const struct timespec *times
 		);
 	}
 547	AUE_FUTIMESAT	STD	{
-		int cheriabi_utimensat(
+		int utimensat(
 		    int fd,
 		    _In_z_ const char *path,
 		    _In_reads_(2) const struct timespec *times,
@@ -2907,13 +2907,13 @@
 		);
 	}
 551	AUE_FSTAT	STD	{
-		int cheriabi_fstat(
+		int fstat(
 		    int fd,
 		    _Out_ struct stat *sb
 		);
 	}
 552	AUE_FSTATAT	STD	{
-		int cheriabi_fstatat(
+		int fstatat(
 		    int fd,
 		    _In_z_ const char *path,
 		    _Out_ struct stat *buf,
@@ -2921,13 +2921,13 @@
 		);
 	}
 553	AUE_FHSTAT	STD	{
-		int cheriabi_fhstat(
+		int fhstat(
 		    _In_ const struct fhandle *u_fhp,
 		    _Out_ struct stat *sb
 		);
 	}
 554	AUE_GETDIRENTRIES STD {
-		ssize_t cheriabi_getdirentries(
+		ssize_t getdirentries(
 		    int fd,
 		    _Out_writes_bytes_(count) char *buf,
 		    size_t count,
@@ -2935,32 +2935,32 @@
 		);
 	}
 555	AUE_STATFS	STD	{
-		int cheriabi_statfs(
+		int statfs(
 		    _In_z_ char *path,
 		    _Out_ struct statfs *buf
 		);
 	}
 556	AUE_FSTATFS	STD	{
-		int cheriabi_fstatfs(
+		int fstatfs(
 		    int fd,
 		    _Out_ struct statfs *buf
 		);
 	}
 557	AUE_GETFSSTAT	STD	{
-		int cheriabi_getfsstat(
+		int getfsstat(
 		    _Out_writes_bytes_opt_(bufsize) struct statfs *buf,
 		    long bufsize,
 		    int mode
 		);
 	}
 558	AUE_FHSTATFS	STD	{
-		int cheriabi_fhstatfs(
+		int fhstatfs(
 		    _In_ const struct fhandle *u_fhp,
 		    _Out_ struct statfs *buf
 		);
 	}
 559	AUE_MKNODAT	STD	{
-		int cheriabi_mknodat(
+		int mknodat(
 		    int fd,
 		    _In_z_ const char *path,
 		    mode_t mode,
@@ -2968,7 +2968,7 @@
 		);
 	}
 560	AUE_KEVENT	STD	{
-		int cheriabi_kevent(
+		int kevent(
 		    int fd,
 		    _In_reads_opt_(nchanges) const struct kevent_c *changelist,
 		    int nchanges,
@@ -2978,7 +2978,7 @@
 		);
 	}
 561	AUE_NULL	STD	{
-		int cheriabi_cpuset_getdomain(
+		int cpuset_getdomain(
 		    cpulevel_t level,
 		    cpuwhich_t which,
 		    id_t id,
@@ -2988,7 +2988,7 @@
 		);
 	}
 562	AUE_NULL	STD	{
-		int cheriabi_cpuset_setdomain(
+		int cpuset_setdomain(
 		    cpulevel_t level,
 		    cpuwhich_t which,
 		    id_t id,
@@ -2998,7 +2998,7 @@
 		);
 	}
 563	AUE_NULL	STD	{
-		int cheriabi_getrandom(
+		int getrandom(
 		    void *buf,
 		    size_t buflen,
 		    unsigned int flags
