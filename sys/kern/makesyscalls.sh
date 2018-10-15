@@ -400,6 +400,8 @@ sed -e '
 		ret_inc = 0
 		argc= 0;
 		argssize = "0"
+		argprefix = ""
+		funcprefix = ""
 		thr_flag = "SY_THR_STATIC"
 		ptrargs = 0
 		if (flag("NOTSTATIC")) {
@@ -453,28 +455,26 @@ sed -e '
 		# from it.
 		#
 		for (cap in capenabled) {
-			if (funcname == capenabled[cap] || funcname == cap_prefix capenabled[cap] ) {
+			if (funcname == capenabled[cap]) {
 				flags = "SYF_CAPENABLED";
 				break;
 			}
 		}
 
-		if (funcalias == "")
-			funcalias = funcname
 		if (argalias == "") {
 			argalias = funcname "_args"
 			if (flag("COMPAT"))
-				argalias = "o" argalias
+				argprefix = "o"
 			if (flag("COMPAT4"))
-				argalias = "freebsd4_" argalias
+				argprefix = "freebsd4_"
 			if (flag("COMPAT6"))
-				argalias = "freebsd6_" argalias
+				argprefix = "freebsd6_"
 			if (flag("COMPAT7"))
-				argalias = "freebsd7_" argalias
+				argprefix = "freebsd7_"
 			if (flag("COMPAT10"))
-				argalias = "freebsd10_" argalias
+				argprefix = "freebsd10_"
 			if (flag("COMPAT11"))
-				argalias = "freebsd11_" argalias
+				argprefix = "freebsd11_"
 		}
 		f++
 
@@ -482,13 +482,12 @@ sed -e '
 			parserr($f, ")")
 		f++
 
-		if (f == end) {
-			if ($f != "void")
-				parserr($f, "argument definition")
-			return
-		}
-
 		while (f <= end) {
+			if (argc == 0 && f == end) {
+				if ($f != "void")
+					parserr($f, "argument definition")
+				break
+			}
 			argc++
 			argtype[argc]=""
 			oldf=""
@@ -525,6 +524,19 @@ sed -e '
 			argname[argc]=$f;
 			f += 2;			# skip name, and any comma
 		}
+
+		if (abi_changes("pointer_args") && ptrargs > 0) {
+			argprefix = argprefix cap_prefix
+			funcprefix = cap_prefix
+		}
+		if (funcalias == "") {
+			noabi_funcalias = funcname;
+			funcalias = funcprefix funcname
+		} else
+			noabi_funcalias = funcalias
+		funcname = funcprefix funcname
+
+		argalias = argprefix argalias
 		if (argc != 0)
 			argssize = "AS(" argalias ")"
 	}
@@ -899,11 +911,11 @@ sed -e '
 			printf("\t{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },") > sysent
 			align_sysent_comment(34)
 			printf("/* %d = obsolete %s%s */\n", syscall,
-			    prefix, funcalias) > sysent
+			    prefix, noabi_funcalias) > sysent
 			printf("\t\"obs_%s%s\",\t\t\t/* %d = obsolete %s%s */\n",
-			    prefix, funcalias, syscall, prefix, funcalias) > sysnames
+			    prefix, noabi_funcalias, syscall, prefix, noabi_funcalias) > sysnames
 			printf("\t\t\t\t/* %d is obsolete %s%s */\n",
-			    syscall, prefix, funcalias) > syshdr
+			    syscall, prefix, noabi_funcalias) > syshdr
 			syscall++
 			next
 		}
