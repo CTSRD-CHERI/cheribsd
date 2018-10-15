@@ -118,8 +118,9 @@
 #define MD_NSECT (10000 * 2)
 #endif
 
-#ifdef COMPAT_CHERIABI
-struct md_ioctl_c {
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+struct md_ioctl64 {
 	unsigned	md_version;	/* Structure layout version */
 	unsigned	md_unit;	/* unit number */
 	enum md_types	md_type;	/* type of disk */
@@ -134,12 +135,12 @@ struct md_ioctl_c {
 	int		md_pad[MDNPAD];	/* used by MDIOCLIST */
 };
 
-#define	MDIOCATTACH_C	_IOC_NEWTYPE(MDIOCATTACH, struct md_ioctl_c)
-#define	MDIOCDETACH_C	_IOC_NEWTYPE(MDIOCDETACH, struct md_ioctl_c)
-#define	MDIOCQUERY_C	_IOC_NEWTYPE(MDIOCQUERY, struct md_ioctl_c)
+#define	MDIOCATTACH_64	_IOC_NEWTYPE(MDIOCATTACH, struct md_ioctl64)
+#define	MDIOCDETACH_64	_IOC_NEWTYPE(MDIOCDETACH, struct md_ioctl64)
+#define	MDIOCQUERY_64	_IOC_NEWTYPE(MDIOCQUERY, struct md_ioctl64)
 /* MDIOCLIST is broken by design and not supported in CheriABI */
-#define	MDIOCRESIZE_C	_IOC_NEWTYPE(MDIOCRESIZE, struct md_ioctl_c)
-#endif /* COMPAT_CHERIABI */
+#define	MDIOCRESIZE_64	_IOC_NEWTYPE(MDIOCRESIZE, struct md_ioctl64)
+#endif /* COMPAT_FREEBSD64 */
 
 #ifdef COMPAT_FREEBSD32
 struct md_ioctl32 {
@@ -1936,9 +1937,23 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case MDIOCATTACH:
 	case MDIOCDETACH:
 	case MDIOCRESIZE:
-	case MDIOCQUERY:
-	case MDIOCLIST: {
+	case MDIOCQUERY: {
 		struct md_ioctl *mdio = (struct md_ioctl *)addr;
+		if (mdio->md_version != MDIOVERSION)
+			return (EINVAL);
+		MD_IOCTL2REQ(mdio, &mdr);
+		mdr.md_file = mdio->md_file;
+		mdr.md_file_seg = UIO_USERSPACE;
+		mdr.md_label = mdio->md_label;
+		break;
+	}
+#ifdef COMPAT_FREEBSD64
+	case MDIOCATTACH_64:
+	case MDIOCDETACH_64:
+	case MDIOCRESIZE_64:
+	case MDIOCQUERY_64:
+	case MDIOCLIST_64: {
+		struct md_ioctl64 *mdio = (struct md_ioctl64 *)addr;
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
@@ -1952,20 +1967,6 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			mdr.md_file_seg = UIO_USERSPACE;
 		}
 		mdr.md_label = __USER_CAP_STR(mdio->md_label);
-		break;
-	}
-#ifdef COMPAT_CHERIABI
-	case MDIOCATTACH_C:
-	case MDIOCDETACH_C:
-	case MDIOCRESIZE_C:
-	case MDIOCQUERY_C: {
-		struct md_ioctl_c *mdio = (struct md_ioctl_c *)addr;
-		if (mdio->md_version != MDIOVERSION)
-			return (EINVAL);
-		MD_IOCTL2REQ(mdio, &mdr);
-		mdr.md_file = mdio->md_file;
-		mdr.md_file_seg = UIO_USERSPACE;
-		mdr.md_label = mdio->md_label;
 		break;
 	}
 #endif
