@@ -869,31 +869,31 @@ END(memset)
 LEAF(bzero)
 XLEAF(blkclr)
 	.set	noreorder
-	blt	a1, 12, smallclr	# small amount to clear?
+	blt		a1, 3*SZREG, smallclr # small amount to clear?
 	PTR_SUBU	a3, zero, a0	# compute # bytes to word align address
-	and	a3, a3, (SZREG - 1)
-	beq	a3, zero, 1f		# skip if word aligned
+	and		a3, a3, SZREG-1
+	beq		a3, zero, 1f	# skip if word aligned
 	PTR_SUBU	a1, a1, a3	# subtract from remaining count
-	REG_SHI	zero, 0(a0)		# clear 1 - 7 bytes to align
+	REG_SHI		zero, 0(a0)	# clear 1-7 bytes to align
 	PTR_ADDU	a0, a0, a3
 1:
-	and	v0, a1, (SZREG - 1)	# compute number of words left
+	and		v0, a1, SZREG-1	# compute number of words left
 	PTR_SUBU	a3, a1, v0
-	move	a1, v0
+	move		a1, v0
 	PTR_ADDU	a3, a3, a0	# compute ending address
 2:
 	PTR_ADDU	a0, a0, SZREG	# clear words
-	bne	a0, a3, 2b		#  unrolling loop does not help
-	REG_S	zero, -SZREG(a0)	#  since we are limited by memory speed
+	bne		a0, a3, 2b	#  unrolling loop doesn't help
+	REG_S		zero, -SZREG(a0) # since we are limited by memory speed
 smallclr:
-	ble	a1, zero, 2f
+	ble		a1, zero, 2f
 	PTR_ADDU	a3, a1, a0	# compute ending address
 1:
 	PTR_ADDU	a0, a0, 1	# clear bytes
-	bne	a0, a3, 1b
-	sb	zero, -1(a0)
+	bne		a0, a3, 1b
+	sb		zero, -1(a0)
 2:
-	j	ra
+	j		ra
 	nop
 END(bzero)
 
