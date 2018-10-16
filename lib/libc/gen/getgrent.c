@@ -847,8 +847,9 @@ files_group(void *retval, void *mdata, va_list ap)
 	char			*buffer;
 	size_t			 bufsize, linesize;
 	off_t			 pos;
-	int			 rv, stayopen, *errnop;
+	int			 fresh, rv, stayopen, *errnop;
 
+	fresh = 0;
 	name = NULL;
 	gid = (gid_t)-1;
 	how = (enum nss_lookup_type)mdata;
@@ -871,19 +872,24 @@ files_group(void *retval, void *mdata, va_list ap)
 	*errnop = files_getstate(&st);
 	if (*errnop != 0)
 		return (NS_UNAVAIL);
-	if (st->fp == NULL &&
-	    ((st->fp = fopen(_PATH_GROUP, "re")) == NULL)) {
-		*errnop = errno;
-		return (NS_UNAVAIL);
+	if (st->fp == NULL) {
+		st->fp = fopen(_PATH_GROUP, "re");
+		if (st->fp == NULL) {
+			*errnop = errno;
+			return (NS_UNAVAIL);
+		}
+		fresh = 1;
 	}
 	if (how == nss_lt_all)
 		stayopen = 1;
 	else {
-		rewind(st->fp);
+		if (!fresh)
+			rewind(st->fp);
 		stayopen = st->stayopen;
 	}
 	rv = NS_NOTFOUND;
-	pos = ftello(st->fp);
+	if (stayopen)
+		pos = ftello(st->fp);
 	while ((line = fgetln(st->fp, &linesize)) != NULL) {
 		if (line[linesize-1] == '\n')
 			linesize--;
@@ -905,7 +911,8 @@ files_group(void *retval, void *mdata, va_list ap)
 		    &buffer[linesize + 1], bufsize - linesize - 1, errnop);
 		if (rv & NS_TERMINATE)
 			break;
-		pos = ftello(st->fp);
+		if (stayopen)
+			pos = ftello(st->fp);
 	}
 	if (st->fp != NULL && !stayopen) {
 		fclose(st->fp);
@@ -1315,7 +1322,7 @@ compat_group(void *retval, void *mdata, va_list ap)
 	void			*discard;
 	size_t			 bufsize, linesize;
 	off_t			 pos;
-	int			 rv, stayopen, *errnop;
+	int			 fresh, rv, stayopen, *errnop;
 
 #define set_lookup_type(x, y) do { 				\
 	int i;							\
@@ -1323,6 +1330,7 @@ compat_group(void *retval, void *mdata, va_list ap)
 		x[i].mdata = (void *)(intptr_t)y;		\
 } while (0)
 
+	fresh = 0;
 	name = NULL;
 	gid = (gid_t)-1;
 	how = (enum nss_lookup_type)mdata;
@@ -1345,16 +1353,20 @@ compat_group(void *retval, void *mdata, va_list ap)
 	*errnop = compat_getstate(&st);
 	if (*errnop != 0)
 		return (NS_UNAVAIL);
-	if (st->fp == NULL &&
-	    ((st->fp = fopen(_PATH_GROUP, "re")) == NULL)) {
-		*errnop = errno;
-		rv = NS_UNAVAIL;
-		goto fin;
+	if (st->fp == NULL) {
+		st->fp = fopen(_PATH_GROUP, "re");
+		if (st->fp == NULL) {
+			*errnop = errno;
+			rv = NS_UNAVAIL;
+			goto fin;
+		}
+		fresh = 1;
 	}
 	if (how == nss_lt_all)
 		stayopen = 1;
 	else {
-		rewind(st->fp);
+		if (!fresh)
+			rewind(st->fp);
 		stayopen = st->stayopen;
 	}
 docompat:
@@ -1417,7 +1429,8 @@ docompat:
 		break;
 	}
 	rv = NS_NOTFOUND;
-	pos = ftello(st->fp);
+	if (stayopen)
+		pos = ftello(st->fp);
 	while ((line = fgetln(st->fp, &linesize)) != NULL) {
 		if (line[linesize-1] == '\n')
 			linesize--;
@@ -1458,7 +1471,8 @@ docompat:
 		    &buffer[linesize + 1], bufsize - linesize - 1, errnop);
 		if (rv & NS_TERMINATE)
 			break;
-		pos = ftello(st->fp);
+		if (stayopen)
+			pos = ftello(st->fp);
 	}
 fin:
 	if (st->fp != NULL && !stayopen) {
