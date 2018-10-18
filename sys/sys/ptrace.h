@@ -102,7 +102,11 @@
 
 struct ptrace_io_desc {
 	int	piod_op;	/* I/O operation */
-	vm_offset_t piod_offs;	/* child offset */
+#if defined(__CHERI_PURE_CAPABILITY__) || defined(_KERNEL)
+	vm_offset_t piod_offs;	/* child offset; not capability! */
+#else
+	void *piod_offs;	/* child offset */
+#endif
 	void * __kerncap piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
