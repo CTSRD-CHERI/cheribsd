@@ -41,7 +41,7 @@
 
 #ifndef _LOCORE
 
-#if defined(COMPAT_CHERIABI) || defined(__CHERI_PURE_CAPABILITY__)
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #endif
 
@@ -62,7 +62,7 @@ typedef struct	__mcontext {
 	void * __kerncap mc_tls;	/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 
-#if __has_feature(capabilities)
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
 	struct cheri_frame	mc_cheriframe;	/* capability registers */
 	void * __capability	__spare__[8];
 #else /* ! __has_feature(capabilities ) */

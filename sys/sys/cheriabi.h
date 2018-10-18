@@ -31,8 +31,9 @@
 #ifndef _SYS_CHERIABI_H_
 #define _SYS_CHERIABI_H_
 
+#ifdef _KERNEL
 #include <sys/types.h>
-#include <sys/imgact_elf.h>
+#include <sys/imgact.h>
 #include <sys/proc.h>
 
 extern int	cheriabi_mmap_precise_bounds;
@@ -41,4 +42,5 @@ int cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp);
 int cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
         void * __capability *addrp, size_t len, int prot, int flags);
 
+#endif
 #endif /* _SYS_CHERIABI_H_ */
