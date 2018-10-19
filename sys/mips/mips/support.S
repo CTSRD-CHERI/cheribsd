@@ -880,6 +880,8 @@ memsetsmallclr:
 	.set reorder
 END(memset)
 
+
+#if 0
 /*
  * bzero(s1, n)
  */
@@ -914,6 +916,7 @@ smallclr:
 	nop
 END(bzero)
 
+#endif
 
 /*
  * bcmp(s1, s2, n)
