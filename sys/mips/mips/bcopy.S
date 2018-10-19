@@ -53,28 +53,29 @@ __FBSDID("$FreeBSD$");
 #endif
 
 /*
- *	bcopy(caddr_t src, caddr_t dst, unsigned int len)
+ *	memmove(caddr_t dst, caddr_t src, unsigned int len)
  *
- *	a0 	src address
- *	a1	dst address
+ *	a0 	dst address
+ *	a1	src address
  *	a2	length
  */
 
-#define	SRCREG	a0
-#define	DSTREG	a1
+#define	DSTREG	a0
+#define	SRCREG	a1
 #define	SIZEREG	a2
 
-LEAF(memcpy)
-XLEAF(memmove)
-	.set	noat
-	.set	noreorder
+.set	noreorder
 
+
+LEAF(bcopy)
+XLEAF(ovbcopy)
+	# swap argument registers:
 	move	v0, a0
 	move	a0, a1
 	move	a1, v0
-
-XLEAF(bcopy)
-XLEAF(ovbcopy)
+XLEAF(memcpy)
+XLEAF(memmove)
+	.set	noat
 	/*
 	 *	Make sure we can copy forwards.
 	 */
@@ -284,4 +285,6 @@ XLEAF(ovbcopy)
 
 	.set	reorder
 	.set	at
-END(memcpy)
+XEND(memmove)
+XEND(memcpy)
+END(bcopy)
