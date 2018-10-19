@@ -66,15 +66,31 @@ __FBSDID("$FreeBSD$");
 
 .set	noreorder
 
+.macro DO_MAGIC_NOP nop_code, return_label=.Lmemmove_return
+	PTR_LI	v0, 0
+	PTR_LI	v1, \nop_code	# selector for QEMU magic nop
+	ori	$0, $0, 0xC0DE	# call QEMU magic nop
+	/* If the magic nop changed $v1 to 0xdec0ded then we can return */
+	beq	v1, 0xdec0ded, \return_label
+	nop
+.endm
 
 LEAF(bcopy)
 XLEAF(ovbcopy)
+	DO_MAGIC_NOP 7
 	# swap argument registers:
 	move	v0, a0
 	move	a0, a1
 	move	a1, v0
+	b .Lmips_implementation
+	nop
 XLEAF(memcpy)
+	DO_MAGIC_NOP 3
+	b .Lmips_implementation
+	nop
 XLEAF(memmove)
+	DO_MAGIC_NOP 5
+.Lmips_implementation:
 	.set	noat
 	/*
 	 *	Make sure we can copy forwards.
@@ -257,6 +273,7 @@ XLEAF(memmove)
 	bgtz		SIZEREG,1b
 	PTR_SUBU	DSTREG,1
 
+.Lmemmove_return:
 4:	# copydone
 	j	ra
 	nop
