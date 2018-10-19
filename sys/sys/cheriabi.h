@@ -42,5 +42,7 @@ int cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp);
 int cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
         void * __capability *addrp, size_t len, int prot, int flags);
 
+#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
+
 #endif
 #endif /* _SYS_CHERIABI_H_ */
