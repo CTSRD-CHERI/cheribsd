@@ -72,6 +72,14 @@ struct mac {
 	char * __kerncap m_string;
 };
 
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+struct mac64 {
+	size_t		m_buflen;
+	uint64_t	m_string;
+};
+#endif
+
 typedef struct mac	*mac_t;
 
 #ifndef _KERNEL

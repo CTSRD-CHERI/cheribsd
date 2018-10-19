@@ -605,16 +605,17 @@ copyin_mac(void * __capability mac_p, kmac_t *mac)
 		error = EOPNOTSUPP;
 	else
 #endif
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		error = copyincap(mac_p, mac, sizeof(*mac))
-	} else
-#endif
-	{
-		struct mac_native tmpmac;
+#ifdef COMPAT_FREEBSD64
+	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
+		/* XXX-AM: fix for freebsd64 */
+		struct mac64 tmpmac;
 		error = copyin_c(mac_p, &tmpmac, sizeof(tmpmac));
 		mac->m_buflen = tmpmac.m_buflen;
 		mac->m_string = __USER_CAP(tmpmac.m_string, tmpmac.m_buflen);
+	} else
+#endif
+	{
+		error = copyincap(mac_p, mac, sizeof(*mac));
 	}
 	return (error);
 }
