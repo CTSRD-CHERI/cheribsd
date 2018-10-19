@@ -92,6 +92,8 @@ XLEAF(memmove)
 	DO_MAGIC_NOP 5
 .Lmips_implementation:
 	.set	noat
+	/* set up return value, while we still can */
+	move	v0,DSTREG
 	/*
 	 *	Make sure we can copy forwards.
 	 */
