@@ -826,6 +826,22 @@ END(subyte_c)
  */
 LEAF(memset)
 	.set noreorder
+#if 1 /* TODO: CPU_QEMU_CHERI. but keep it here to verify that it works even with the nop */
+	/* Use the QEMU magic memset nop to speed up emulation: */
+	PTR_LI	v0, 0
+	PTR_LI	v1, 1	# selector for QEMU magic memset nop
+	ori	$0, $0, 0xC0DE	# call QEMU magic memset
+	/* If the magic nop changed $v1 to 0xdec0ded then we can return */
+	beq	v1, 0xdec0ded, .Lmemset_return
+	nop
+.Lmemset_magic_fail:
+	beq	v1, 1, .Lmemset_mips_impl # if $v1 is unchanged then the magic memset is not supported
+	nop
+	/* Not 0xdecoded and not 0x1 -> we failed and the tlb miss handler did not continue at the magic nop! */
+	PANIC("QEMU magic memset failed (tlb miss handler error?)")
+.Lmemset_mips_impl:
+#endif
+
 	blt	a2, 12, memsetsmallclr	# small amount to clear?
 	move	v0, a0			# save s1 for result
 
@@ -858,7 +874,8 @@ memsetsmallclr:
 	bne	a0, t0, 1b
 	sb	a1, -1(a0)
 2:
-	j	ra
+.Lmemset_return:
+	jr	ra
 	nop
 	.set reorder
 END(memset)
