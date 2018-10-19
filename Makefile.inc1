@@ -1070,6 +1070,17 @@ _cleanobj_fast_depend_hack: .PHONY
 	fi
 .endfor
 
+.if ${TARGET:Mmips*}
+.for f in memset
+	set +x; if [ -e "${OBJTOP}/lib/libc/.depend.${f}.o" ] && \
+	    egrep -qw '${f}\.[c]' ${OBJTOP}/lib/libc/.depend.${f}.o; then \
+		echo "Removing stale dependencies for ${f} C implementation (now written in assembly)"; \
+		rm -f ${OBJTOP}/lib/libc/.depend.${f}.* \
+		   ${LIBCOMPAT:D${LIBCOMPAT_OBJTOP}/lib/libc/.depend.${f}.*}; \
+	fi
+.endfor
+.endif
+
 _worldtmp: .PHONY
 	@echo
 	@echo "--------------------------------------------------------------"
