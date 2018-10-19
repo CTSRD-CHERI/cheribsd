@@ -211,34 +211,33 @@ void
 test_fault_read_kr1c(const struct cheri_test *ctp __unused)
 {
 
-	CHERI_CAPREG_PRINT(27);
+	CHERI_CAP_PRINT(cheri_getkr1c());
 }
 
 void
 test_fault_read_kr2c(const struct cheri_test *ctp __unused)
 {
 
-	CHERI_CAPREG_PRINT(28);
+	CHERI_CAP_PRINT(cheri_getkr2c());
 }
 
 void
 test_fault_read_kcc(const struct cheri_test *ctp __unused)
 {
 
-	CHERI_CAPREG_PRINT(29);
+	CHERI_CAP_PRINT(cheri_getkcc());
 }
 
 void
 test_fault_read_kdc(const struct cheri_test *ctp __unused)
 {
 
-	CHERI_CAPREG_PRINT(30);
+	CHERI_CAP_PRINT(cheri_getkdc());
 }
 
 void
 test_fault_read_epcc(const struct cheri_test *ctp __unused)
 {
-	__capability void *epcc;
-	epcc = __builtin_mips_cheri_exception_program_counter_cap_get();
-	CHERI_CAP_PRINT(epcc);
+
+	CHERI_CAP_PRINT(cheri_getepcc());
 }
