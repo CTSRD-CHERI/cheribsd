@@ -250,6 +250,7 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 	/*
 	 * Parse the ELF and produce mappings for code and data.
 	 */
+#ifdef SPLIT_CODE_DATA
 	if ((sbcp->sbc_codemap = sandbox_parse_elf64(fd, path,
 	    SANDBOX_LOADELF_CODE)) == NULL) {
 		saved_errno = EINVAL;
@@ -264,6 +265,15 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 		    path);
 		goto error;
 	}
+#else
+	if ((sbcp->sbc_datamap = sandbox_parse_elf64(fd, path,
+	    SANDBOX_LOADELF_CODE | SANDBOX_LOADELF_DATA)) == NULL) {
+		saved_errno = EINVAL;
+		warnx("%s: sandbox_parse_elf64(DATA) failed for %s", __func__,
+		    path);
+		goto error;
+	}
+#endif
 
 	/*
 	 * Don't allow sandbox binaries to request over maxmaplen of
@@ -273,12 +283,14 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 	 * value, but programs can have astonishing amounts of BSS
 	 * relative to file size.
 	 */
+#ifdef SPLIT_CODE_DATA
 	if (maxmaplen > 0 &&
 	    sandbox_map_maxoffset(sbcp->sbc_codemap) > maxmaplen) {
 		saved_errno = EINVAL;
 		warnx("%s: %s code too large", __func__, path);
 		goto error;
 	}
+#endif
 	if (maxmaplen > 0 &&
 	    sandbox_map_maxoffset(sbcp->sbc_datamap) > maxmaplen) {
 		saved_errno = EINVAL;

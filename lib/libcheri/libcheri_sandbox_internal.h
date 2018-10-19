@@ -55,17 +55,21 @@ struct sandbox_class {
 	char			*sbc_path;
 	int			 sbc_fd;
 	struct stat		 sbc_stat;
+#ifdef SPLIT_CODE_DATA
 	size_t			 sbc_codelen;
 	void			*sbc_codemem;
 	struct sandbox_map	*sbc_codemap;
+#endif
 	struct sandbox_map	*sbc_datamap;
 
+#ifdef SPLIT_CODE_DATA
 	/*
 	 * The class's code capabilities, in various incarnations required for
 	 * class creation.  These will be used for all objects in the class.
 	 */
 	__capability void	*sbc_classcap_rtld;	/* Ctor/dtor */
 	__capability void	*sbc_classcap_invoke;	/* Object invoke */
+#endif
 
 	/*
 	 * Class CCall methods.
