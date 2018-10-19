@@ -1700,15 +1700,18 @@ exec_copyout_strings(struct image_params *imgp)
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
-	exec_sucap(&arginfo->ps_argvstr, (__cheri_addr long)vectp, 0,
+	exec_sucap(&arginfo->ps_argvstr, (__cheri_addr vm_offset_t)vectp, 0,
 	    argc * sizeof(void * __capability), CHERI_CAP_USER_DATA_PERMS);
 	suword32_c(&arginfo->ps_nargvstr, argc);
 
 	/*
 	 * Fill in argument portion of vector table.
 	 */
+#if __has_feature(capabilities)
+	imgp->args->argv = (__cheri_fromcap void *)vectp;
+#endif
 	for (; argc > 0; --argc) {
-		exec_sucap(vectp++, (__cheri_addr long)destp, 0,
+		exec_sucap(vectp++, (__cheri_addr vm_offset_t)destp, 0,
 		    strlen(stringp) + 1, CHERI_CAP_USER_DATA_PERMS);
 		while (*stringp++ != 0)
 			destp++;
@@ -1719,17 +1722,19 @@ exec_copyout_strings(struct image_params *imgp)
 	/* XXX: suword clears the tag */
 	suword_c(vectp++, 0);
 
-	exec_sucap(&arginfo->ps_envstr, (__cheri_addr long)vectp, 0,
-	    arginfo->ps_nenvstr * sizeof(void * __capability),
+	exec_sucap(&arginfo->ps_envstr, (__cheri_addr vm_offset_t)vectp, 0,
+	    envc * sizeof(void * __capability),
 	    CHERI_CAP_USER_DATA_PERMS);
 	suword32_c(&arginfo->ps_nenvstr, envc);
 
 	/*
 	 * Fill in environment portion of vector table.
 	 */
+#if __has_feature(capabilities)
 	imgp->args->envv = (__cheri_fromcap void *)vectp;
+#endif
 	for (; envc > 0; --envc) {
-		exec_sucap(vectp++, (__cheri_addr long)destp, 0,
+		exec_sucap(vectp++, (__cheri_addr vm_offset_t)destp, 0,
 		    strlen(stringp) + 1, CHERI_CAP_USER_DATA_PERMS);
 		while (*stringp++ != 0)
 			destp++;
