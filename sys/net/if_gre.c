@@ -323,7 +323,6 @@ gre_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		    cmd == SIOCSIFPHYADDR_IN6 ||
 #endif
 		    0) {
-			ifp->if_drv_flags |= IFF_DRV_RUNNING;
 			if_link_state_change(ifp, LINK_STATE_UP);
 		}
 	}
@@ -339,6 +338,7 @@ gre_delete_tunnel(struct gre_softc *sc)
 	sx_assert(&gre_ioctl_sx, SA_XLOCKED);
 	if (sc->gre_family != 0) {
 		CK_LIST_REMOVE(sc, chain);
+		CK_LIST_REMOVE(sc, srchash);
 		GRE_WAIT();
 		free(sc->gre_hdr, M_GRE);
 		sc->gre_family = 0;
@@ -540,6 +540,7 @@ gre_setseqn(struct grehdr *gh, uint32_t seq)
 static int
 gre_transmit(struct ifnet *ifp, struct mbuf *m)
 {
+	GRE_RLOCK_TRACKER;
 	struct gre_softc *sc;
 	struct grehdr *gh;
 	uint32_t af;
@@ -559,6 +560,7 @@ gre_transmit(struct ifnet *ifp, struct mbuf *m)
 	sc = ifp->if_softc;
 	if ((ifp->if_flags & IFF_MONITOR) != 0 ||
 	    (ifp->if_flags & IFF_UP) == 0 ||
+	    (ifp->if_drv_flags & IFF_DRV_RUNNING) == 0 ||
 	    sc->gre_family == 0 ||
 	    (error = if_tunnel_check_nesting(ifp, m, MTAG_GRE,
 		V_max_gre_nesting)) != 0) {
