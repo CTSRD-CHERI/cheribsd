@@ -1744,30 +1744,27 @@ vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry)
 		return;
 
 	prev = entry->prev;
-	if (prev != &map->header) {
-		if (vm_map_mergeable_neighbors(prev, entry)) {
-			vm_map_log("remove", prev);
-			vm_map_entry_unlink(map, prev);
-			entry->start = prev->start;
-			entry->offset = prev->offset;
-			if (entry->prev != &map->header)
-				vm_map_entry_resize_free(map, entry->prev);
-			vm_map_log("resize", entry);
-
-			vm_map_merged_neighbor_dispose(map, prev);
-		}
+	if (prev != &map->header &&
+	    vm_map_mergeable_neighbors(prev, entry)) {
+		vm_map_log("remove", prev);
+		vm_map_entry_unlink(map, prev);
+		entry->start = prev->start;
+		entry->offset = prev->offset;
+		if (entry->prev != &map->header)
+			vm_map_entry_resize_free(map, entry->prev);
+		vm_map_log("resize", entry);
+		vm_map_merged_neighbor_dispose(map, prev);
 	}
 
 	next = entry->next;
-	if (next != &map->header) {
-		if (vm_map_mergeable_neighbors(entry, next)) {
-			vm_map_log("remove", next);
-			vm_map_entry_unlink(map, next);
-			entry->end = next->end;
-			vm_map_entry_resize_free(map, entry);
-			vm_map_log("resize", entry);
-			vm_map_merged_neighbor_dispose(map, next);
-		}
+	if (next != &map->header &&
+	    vm_map_mergeable_neighbors(entry, next)) {
+		vm_map_log("remove", next);
+		vm_map_entry_unlink(map, next);
+		entry->end = next->end;
+		vm_map_entry_resize_free(map, entry);
+		vm_map_log("resize", entry);
+		vm_map_merged_neighbor_dispose(map, next);
 	}
 }
 /*
