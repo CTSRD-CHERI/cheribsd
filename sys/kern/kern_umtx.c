@@ -4957,7 +4957,7 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact)
 {
 	union {
 		struct umutex m;
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
 		struct umutex64 m64;
 #endif
 	} mu;
