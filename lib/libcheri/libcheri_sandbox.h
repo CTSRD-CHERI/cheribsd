@@ -106,10 +106,10 @@ register_t	sandbox_object_invoke(struct sandbox_object *sbop,
 		    register_t methodnum, register_t a1,
 		    register_t a2, register_t a3, register_t a4,
 		    register_t a5, register_t a6, register_t a7,
-		    __capability void *c3, __capability void *c4,
-		    __capability void *c5, __capability void *c6,
-		    __capability void *c7, __capability void *c8,
-		    __capability void *c9, __capability void *c10);
+		    void * __capability c3, void * __capability c4,
+		    void * __capability c5, void * __capability c6,
+		    void * __capability c7, void * __capability c8,
+		    void * __capability c9, void * __capability c10);
 void	sandbox_object_destroy(struct sandbox_object *sbop);
 
 /*

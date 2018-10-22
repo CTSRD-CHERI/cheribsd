@@ -100,23 +100,23 @@ register_t	libcheri_system_user_call_fn(register_t methodnum,
 		    register_t a0, register_t a1, register_t a2,
 		    register_t a3, register_t a4, register_t a5,
 		    register_t a6,
-		    __capability void *c3, __capability void *c4,
-		    __capability void *c5, __capability void *c6,
-		    __capability void *c7);
+		    void * __capability c3, void * __capability c4,
+		    void * __capability c5, void * __capability c6,
+		    void * __capability c7);
 
 /*
  * XXXRW: Probably should be library-private: the CHERI type of the system
  * library.
  */
-extern __capability void	*libcheri_system_type;
+extern void * __capability	libcheri_system_type;
 
-typedef int(*libcheri_syscall_check_t)(int *ret, __capability int *stub_errno);
+typedef int(*libcheri_syscall_check_t)(int *ret, int * __capability stub_errno);
 extern libcheri_syscall_check_t libcheri_syscall_checks[SYS_MAXSYSCALL];
 
 /*
  * Vtable for cheri_system methods.
  */
-extern __capability vm_offset_t	*libcheri_system_vtable;
+extern vm_offset_t * __capability	libcheri_system_vtable;
 
 #define SYS_STUB(_num, _ret, _sys,					\
     _protoargs, _protoargs_chk, _protoargs_err,				\
