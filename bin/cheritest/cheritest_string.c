@@ -52,7 +52,7 @@ void * __capability
 #endif
 
 /* XXXAR: extra cast to void* to work around CTSRD-CHERI/clang#178 */
-#define	CAP(x)	((__cheri_tocap __capability void*)(void*)(x))
+#define	CAP(x)	((__cheri_tocap void *__capability)(void*)(x))
 
 /*
  * Test structure which will be memcpy'd.  Contains data and a capability in

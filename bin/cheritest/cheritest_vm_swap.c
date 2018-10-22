@@ -223,7 +223,8 @@ static int
 dotest(int force_pageout)
 {
 	void * __capability *p;
-	void * __capability tmp, *sealer;
+	void * __capability tmp;
+	void * __capability sealer;
 	uint64_t hash, tags, found_tags;
 	size_t i, j, k, nsealed, ntagged, pagesz, sz;
 	int mismatches, rc, want_tag, want_seal;

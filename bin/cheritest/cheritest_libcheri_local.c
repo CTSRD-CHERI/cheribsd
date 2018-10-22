@@ -172,7 +172,8 @@ test_sandbox_store_local_capability_in_stack(
 void
 test_sandbox_return_global_capability(const struct cheri_test *ctp __unused)
 {
-	void * __capability carg, *cret = NULL;
+	void * __capability carg;
+	void * __capability cret = NULL;
 	register_t v;
 
 	carg = (void * __capability)&v;
@@ -189,7 +190,8 @@ test_sandbox_return_global_capability(const struct cheri_test *ctp __unused)
 void
 test_sandbox_return_local_capability(const struct cheri_test *ctp __unused)
 {
-	void * __capability carg, *cret = NULL;
+	void * __capability carg;
+	void * __capability cret = NULL;
 	register_t v;
 
 	carg = (void * __capability)&v;

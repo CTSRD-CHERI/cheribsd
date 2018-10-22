@@ -71,7 +71,7 @@ struct sandbox_object	*cheritest_objectp;
 struct cheri_object cheritest, cheritest2;
 
 static int	allow_syscall(int *retp __unused,
-		    __capability int *errno_val __unused);
+		    int * __capability errno_val __unused);
 
 void
 test_sandbox_abort(const struct cheri_test *ctp __unused)
@@ -98,14 +98,14 @@ test_sandbox_cs_calloc(const struct cheri_test *ctp __unused)
 }
 
 static int
-allow_syscall(int *retp __unused, __capability int *errno_val __unused)
+allow_syscall(int *retp __unused, int * __capability errno_val __unused)
 {
 
 	return (0);
 }
 
 static int
-deny_syscall(int *retp, __capability int *stub_errno)
+deny_syscall(int *retp, int * __capability stub_errno)
 {
 
 	*retp = -1;
@@ -232,7 +232,8 @@ static char string_md5[] = "5eb63bbbe01eeed093cb22bb8f5acdc3";
 void
 test_sandbox_md5_ccall(const struct cheri_test *ctp __unused, int class)
 {
-	void * __capability md5cap, *bufcap;
+	void * __capability md5cap;
+	void * __capability bufcap;
 	char buf[33];
 
 	md5cap = cheri_ptrperm(string_to_md5, sizeof(string_to_md5),

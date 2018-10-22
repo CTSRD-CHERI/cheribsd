@@ -203,7 +203,8 @@ test_sealcap_seal_unseal(const struct cheri_test *ctp __unused)
 {
 	void * __capability sealdatap;
 	void * __capability sealcap;
-	void * __capability sealed, *unsealed;
+	void * __capability sealed;
+	void * __capability unsealed;
 	register_t v;
 
 	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
