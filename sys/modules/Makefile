@@ -279,7 +279,6 @@ SUBDIR=	\
 	nfssvc \
 	nge \
 	nmdm \
-	${_nsp} \
 	nullfs \
 	${_ntb} \
 	${_nvd} \
@@ -765,7 +764,6 @@ _glxiic=	glxiic
 _glxsb=		glxsb
 #_ibcs2=		ibcs2
 _ncr=		ncr
-_nsp=		nsp
 _pcfclock=	pcfclock
 _pst=		pst
 _sbni=		sbni
