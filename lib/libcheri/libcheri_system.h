@@ -84,7 +84,7 @@ int	libcheri_system_new(struct sandbox_object *sbop,
 LIBCHERI_SYSTEM_CCALL
 int	libcheri_system_helloworld(void);
 LIBCHERI_SYSTEM_CCALL
-int	libcheri_system_puts(__capability const char *str);
+int	libcheri_system_puts(const char * __capability str);
 LIBCHERI_SYSTEM_CCALL
 int	libcheri_system_putchar(int c);
 LIBCHERI_SYSTEM_CCALL

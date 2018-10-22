@@ -259,7 +259,7 @@ libcheri_fd_read(__capability void *buf_c, size_t nbytes)
  * Forward write_c() on a libcheri_fd to the underlying file descriptor.
  */
 struct libcheri_fd_ret
-libcheri_fd_write(__capability const void *buf_c, size_t nbytes)
+libcheri_fd_write(const void * __capability buf_c, size_t nbytes)
 {
 	struct libcheri_fd_ret ret;
 	__capability struct libcheri_fd *lcfp;

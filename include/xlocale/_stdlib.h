@@ -60,6 +60,6 @@ int			 ___mb_cur_max_l(locale_t);
 #define MB_CUR_MAX_L(x) ((size_t)___mb_cur_max_l(x))
 
 #if __has_feature(capabilities)
-long			 strtol_l_c(__capability const char *,
+long			 strtol_l_c(const char * __capability,
 			    char * __capability * __capability, int, locale_t);
 #endif

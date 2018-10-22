@@ -137,39 +137,39 @@ void	 swab(const void * __restrict, void * __restrict, ssize_t);
 #endif /* _SWAB_DECLARED */
 
 #if __has_feature(capabilities)
-__capability const void *
-	 memchr_c_const(__capability const void *, int, size_t) __pure;
-__capability void
-	*memchr_c(__capability const void *, int, size_t) __pure;
-int	 memcmp_c(__capability const void *, __capability const void *, size_t)
+const void * __capability
+	 memchr_c_const(const void * __capability, int, size_t) __pure;
+void * __capability
+	 memchr_c(const void * __capability, int, size_t) __pure;
+int	 memcmp_c(const void * __capability, const void * __capability, size_t)
 	    __pure;
-__capability void
-	*memcpy_c(__capability void * __restrict,
-	    __capability const void * __restrict, size_t);
+void * __capability
+	 memcpy_c(void * __capability __restrict,
+	    const void * __capability __restrict, size_t);
 void	*memcpy_c_fromcap(void * __restrict,
-	    __capability const void * __restrict, size_t);
-__capability void
-	*memcpy_c_tocap(__capability void * __restrict,
+	    const void * __capability __restrict, size_t);
+void * __capability
+	 memcpy_c_tocap(void * __capability __restrict,
 	    const void * __restrict, size_t);
-__capability void
-	*memmove_c(__capability void * __restrict,
-	    __capability const void * __restrict, size_t);
-__capability void
-	*memset_c(__capability void *, int, size_t);
+void * __capability
+	 memmove_c(void * __capability __restrict,
+	    const void * __capability __restrict, size_t);
+void * __capability
+	 memset_c(void * __capability, int, size_t);
 
-__capability char
-	*strchr_c(__capability const char *, int) __pure;
-int 	 strcmp_c(__capability const char *,
-	    __capability const char *s2) __pure;
-__capability char
-	*strcpy_c(__capability char * __restrict,
-	    __capability const char * __restrict);
-int	 strncmp_c(__capability const char *, __capability const char *,
+char * __capability
+	 strchr_c(const char * __capability, int) __pure;
+int 	 strcmp_c(const char * __capability,
+	    const char * __capability s2) __pure;
+char * __capability
+	 strcpy_c(char * __capability __restrict,
+	    const char * __capability __restrict);
+int	 strncmp_c(const char * __capability, const char * __capability,
 	    size_t) __pure;
-__capability char
-*strncpy_c(__capability char * __restrict, __capability const char * __restrict,
+char * __capability
+	 strncpy_c(char * __capability __restrict, const char * __capability __restrict,
 	    size_t);
-size_t	 strnlen_c(__capability const char *, size_t) __pure;
+size_t	 strnlen_c(const char * __capability, size_t) __pure;
 #endif
 
 int	 timingsafe_bcmp(const void *, const void *, size_t);

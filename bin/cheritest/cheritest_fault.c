@@ -192,8 +192,8 @@ void
 test_nofault_cfromptr(const struct cheri_test *ctp __unused)
 {
 	char buf[256];
-	__capability void * cd; /* stored into here */
-	__capability void * cb; /* derived from here */
+	void * __capability cd; /* stored into here */
+	void * __capability cb; /* derived from here */
 	int rt;
 
 	/*

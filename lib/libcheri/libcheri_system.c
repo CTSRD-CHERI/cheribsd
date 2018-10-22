@@ -116,7 +116,7 @@ libcheri_system_helloworld(void)
  * capability being passed in.
  */
 int
-libcheri_system_puts(__capability const char *str)
+libcheri_system_puts(const char * __capability str)
 {
 
 	for (; *str != '\0'; str++) {

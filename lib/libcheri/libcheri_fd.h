@@ -85,7 +85,7 @@ LIBCHERI_FD_CCALL
 struct libcheri_fd_ret	libcheri_fd_read(__capability void *buf_c,
 			     size_t nbytes);
 LIBCHERI_FD_CCALL
-struct libcheri_fd_ret	libcheri_fd_write(__capability const void *buf_c,
+struct libcheri_fd_ret	libcheri_fd_write(const void * __capability buf_c,
 			     size_t nbytes);
 
 #endif /* !_LIBCHERI_FD_H_ */
