@@ -718,7 +718,7 @@ sed -e '
 			}
 
 			# _protoargs_err
-			printf ("),\n    /* _protoargs_err */ (__capability int *stub_errno") > sysstubstubs
+			printf ("),\n    /* _protoargs_err */ (int * __capability stub_errno") > sysstubstubs
 			for (i = 1; i <= argc; i++) {
 				a_type = argtype[i]
 				sub(/_c /, "", a_type)
