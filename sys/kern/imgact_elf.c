@@ -87,11 +87,6 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheri.h>
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi.h>
-#include <compat/cheriabi/cheriabi_util.h>
-#endif
-
 #define ELF_NOTE_ROUNDSIZE	4
 #define OLD_EI_BRAND	8
 
@@ -2394,11 +2389,11 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 		sbuf_delete(sb);
 		*sizep = size;
 	} else {
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 		if (SV_PROC_FLAG(p, SV_CHERI) != 0)
 			structsize = sizeof(ElfCheriABI_Auxinfo);
 		else
-#endif /* ! COMPAT_CHERIABI */
+#endif
 			structsize = sizeof(Elf_Auxinfo);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
 		PHOLD(p);
