@@ -255,14 +255,14 @@ out_func out;
 void FAR *out_desc;
 {
     struct inflate_state FAR *state;
-    __capability z_const unsigned char FAR *next;    /* next input */
-    __capability unsigned char FAR *put;     /* next output */
-    __capability unsigned char FAR *sput;     /* saved next output */
+    z_const unsigned char FAR * __capability next;    /* next input */
+    unsigned char FAR * __capability put;     /* next output */
+    unsigned char FAR * __capability sput;     /* saved next output */
     unsigned have, left;        /* available input and output */
     unsigned long hold;         /* bit buffer */
     unsigned bits;              /* bits in bit buffer */
     unsigned copy;              /* number of stored or match bytes to copy */
-    __capability unsigned char FAR *from; /* where to copy match bytes from */
+    unsigned char FAR * __capability from; /* where to copy match bytes from */
     code here;                  /* current decoding table entry */
     code last;                  /* parent table entry */
     unsigned len;               /* length to copy for repeats, bits to drop */

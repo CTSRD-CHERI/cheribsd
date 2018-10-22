@@ -8,4 +8,4 @@
    subject to change. Applications should only use zlib.h.
  */
 
-void ZLIB_INTERNAL inflate_fast OF((z_streamp strm, __capability unsigned char FAR *beg));
+void ZLIB_INTERNAL inflate_fast OF((z_streamp strm, unsigned char FAR * __capability beg));
