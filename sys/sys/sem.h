@@ -55,6 +55,15 @@ struct semid_ds {
     					/* Times measured in secs since */
     					/* 00:00:00 UTC, Jan. 1, 1970, without leap seconds */
 };
+#if __has_feature(capabilities)
+struct semid_ds_c {
+	struct ipc_perm	 		sem_perm;
+	struct sem * __capability	sem_base;
+	unsigned short			sem_nsems;
+	time_t				sem_otime;
+	time_t				sem_ctime;
+};
+#endif
 
 /*
  * semop's sops parameter structure
@@ -159,6 +168,16 @@ struct semid_kernel {
 	struct	label *label;	/* MAC framework label */
 	struct	ucred *cred;	/* creator's credentials */
 };
+#if __has_feature(capabilities)
+/* User-facing wrapper used by sysctl handler, this should not really be
+ * used since 
+ */
+struct semid_kernel_c {
+	struct	semid_ds_c u;
+	struct	label * __capability label;	/* MAC framework label */
+	struct	ucred * __capability cred;	/* creator's credentials */
+};
+#endif
 
 /* internal "mode" bits */
 #define	SEM_ALLOC	01000	/* semaphore is allocated */
