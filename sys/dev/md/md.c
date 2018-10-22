@@ -1995,8 +1995,8 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	error = 0;
 	switch (cmd) {
 	case MDIOCATTACH:
-#ifdef COMPAT_CHERIABI
-	case MDIOCATTACH_C:
+#ifdef COMPAT_FREEBSD64
+	case MDIOCATTACH_64:
 #endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCATTACH_32:
@@ -2004,8 +2004,8 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		error = kern_mdattach(td, &mdr);
 		break;
 	case MDIOCDETACH:
-#ifdef COMPAT_CHERIABI
-	case MDIOCDETACH_C:
+#ifdef COMPAT_FREEBSD64
+	case MDIOCDETACH_64:
 #endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCDETACH_32:
@@ -2013,8 +2013,8 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		error = kern_mddetach(td, &mdr);
 		break;
 	case MDIOCRESIZE:
-#ifdef COMPAT_CHERIABI
-	case MDIOCRESIZE_C:
+#ifdef COMPAT_FREEBSD64
+	case MDIOCRESIZE_64:
 #endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCRESIZE_32:
@@ -2022,8 +2022,8 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		error = kern_mdresize(&mdr);
 		break;
 	case MDIOCQUERY:
-#ifdef COMPAT_CHERIABI
-	case MDIOCQUERY_C:
+#ifdef COMPAT_FREEBSD64
+	case MDIOCQUERY_64:
 #endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCQUERY_32:
@@ -2047,9 +2047,9 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		MD_REQ2IOCTL(&mdr, mdio);
 		break;
 	}
-#ifdef COMPAT_CHERIABI
-	case MDIOCATTACH_C:
-	case MDIOCQUERY_C: {
+#ifdef COMPAT_FREEBSD64
+	case MDIOCATTACH_64:
+	case MDIOCQUERY_64: {
 		struct md_ioctl_c *mdio = (struct md_ioctl_c *)addr;
 		MD_REQ2IOCTL(&mdr, mdio);
 		break;
