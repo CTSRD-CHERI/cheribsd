@@ -81,7 +81,7 @@ static struct sandbox_required_methods	*main_required_methods;
  * libcheri_system_vtable is defined here and not in libcheri_system.h to avoid
  * running into https://github.com/CTSRD-CHERI/cheribsd/issues/180
  */
-__capability vm_offset_t	*libcheri_system_vtable;
+vm_offset_t * __capability	 libcheri_system_vtable;
 
 
 static int	sandbox_program_init(void);
@@ -548,7 +548,7 @@ sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
  */
 int
 sandbox_object_new_system_object(void * __capability private_data,
-    void * __capability invoke_pcc, __capability vm_offset_t *vtable,
+    void * __capability invoke_pcc, vm_offset_t * __capability vtable,
     struct sandbox_object **sbopp)
 {
 
@@ -582,7 +582,7 @@ sandbox_object_new_system_object(void * __capability private_data,
 	 */
         (*sbopp)->sbo_cheri_object_invoke =
             libcheri_sandbox_make_sealed_invoke_object(
-	    (__cheri_tocap __capability struct sandbox_object *)*sbopp);
+	    (__cheri_tocap struct sandbox_object * __capability)*sbopp);
 	return (0);
 }
 

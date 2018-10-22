@@ -74,7 +74,7 @@
 
 LIBCHERI_CLASS_DECL(libcheri_fd);
 
-__capability vm_offset_t	*libcheri_fd_vtable;
+vm_offset_t * __capability libcheri_fd_vtable;
 
 /*
  * Data segment for a libcheri_fd.
@@ -164,7 +164,7 @@ libcheri_fd_destroy(struct sandbox_object *sbop)
  * Forward fstat() on a libcheri_fd to the underlying file descriptor.
  */
 struct libcheri_fd_ret
-libcheri_fd_fstat(__capability struct stat *sb_c)
+libcheri_fd_fstat(struct stat * __capability sb_c)
 {
 	struct libcheri_fd_ret ret;
 	struct libcheri_fd * __capability lcfp;

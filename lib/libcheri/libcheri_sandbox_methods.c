@@ -697,11 +697,11 @@ sandbox_warn_unresolved_methods(
 	}
 }
 
-__capability vm_offset_t *
+vm_offset_t * __capability
 sandbox_make_vtable(void *dataptr, const char *class,
     struct sandbox_provided_classes *provided_classes)
 {
-	__capability vm_offset_t *vtable;
+	vm_offset_t * __capability vtable;
 	vm_offset_t *cheri_ccallee_base;
 	size_t i, index, length, m;
 	struct sandbox_provided_method *pm;
@@ -758,7 +758,7 @@ sandbox_set_required_method_variables(void * __capability datacap,
     struct sandbox_required_methods *required_methods)
 {
 	size_t i;
-	__capability vm_offset_t *method_var_p;
+	vm_offset_t * __capability method_var_p;
 	struct sandbox_required_method *rmethods;
 
 	assert(required_methods != NULL);

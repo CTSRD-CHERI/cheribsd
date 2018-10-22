@@ -136,7 +136,7 @@ libcheri_system_putchar(int c)
 
 int
 libcheri_system_clock_gettime(clockid_t clock_id,
-    __capability struct timespec *tp)
+    struct timespec * __capability tp)
 {
 	int ret;
 	struct timespec ts;
