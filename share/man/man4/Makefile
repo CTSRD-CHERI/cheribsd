@@ -133,7 +133,6 @@ MAN=	aac.4 \
 	disc.4 \
 	divert.4 \
 	${_dpms.4} \
-	dpt.4 \
 	ds1307.4 \
 	ds3231.4 \
 	${_dtrace_provs} \
