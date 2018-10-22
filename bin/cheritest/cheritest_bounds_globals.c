@@ -81,7 +81,7 @@
 	void								\
 	test_bounds_##test(const struct cheri_test *ctp __unused)	\
 	{								\
-		__capability void *allocation =				\
+		void * __capability allocation =				\
 		    (__cheri_tocap void * __capability )&test;		\
 		size_t allocation_offset = cheri_getoffset(allocation);	\
 		size_t allocation_len = cheri_getlen(allocation);	\
@@ -474,7 +474,7 @@ TEST_BOUNDS(extern_global_array65536);
 	void								\
 	test_bounds_##test(const struct cheri_test *ctp __unused)	\
 	{								\
-		__capability void *allocation =				\
+		void * __capability allocation =				\
 		    (__cheri_tocap void * __capability)&test;		\
 		size_t allocation_offset = cheri_getoffset(allocation);	\
 		size_t allocation_len = cheri_getlen(allocation);	\

@@ -73,8 +73,8 @@ static uint64_t pattern[NPATTERN + 1];
 #define	PRINTF(fmt, ...)	do {} while (0)
 #define	CNE(p1, p2)	cne2(p1, p2)
 #define	caps(p)		caps2(#p, (p))
-static const char	*caps2(const char *nam, __capability void *p);
-static int		 cne2(__capability void *p1, __capability void *p2);
+static const char	*caps2(const char *nam, void * __capability p);
+static int		 cne2(void * __capability p1, void * __capability p2);
 static int		 dotest(int force_pageout);
 static void		 init_patterns(void);
 static void		 mix_patterns(void);
@@ -88,7 +88,7 @@ cheritest_vm_swap(const struct cheri_test *ctp __unused)
 }
 
 static const char *
-caps2(const char *nam, __capability void *p)
+caps2(const char *nam, void * __capability p)
 {
 	static char s[512];
 
@@ -107,7 +107,7 @@ caps2(const char *nam, __capability void *p)
 }
 
 static int
-cne2(__capability void *p1, __capability void *p2)
+cne2(void * __capability p1, void * __capability p2)
 {
 
 	if (cheri_gettag(p1) != cheri_gettag(p2) ||
@@ -223,7 +223,7 @@ static int
 dotest(int force_pageout)
 {
 	void * __capability *p;
-	__capability void *tmp, *sealer;
+	void * __capability tmp, *sealer;
 	uint64_t hash, tags, found_tags;
 	size_t i, j, k, nsealed, ntagged, pagesz, sz;
 	int mismatches, rc, want_tag, want_seal;
@@ -280,7 +280,7 @@ dotest(int force_pageout)
 	k = NPATTERN;
 	nsealed = 0;
 	ntagged = 0;
-	for (i = 0; i < sz / sizeof(__capability void *); i++) {
+	for (i = 0; i < sz / sizeof(void * __capability); i++) {
 		LOOP_INNER;
 		p[i] = tmp;
 	}
@@ -320,7 +320,7 @@ dotest(int force_pageout)
 	found_tags = 0;
 	nsealed = 0;
 	ntagged = 0;
-	for (i = 0; i < sz / sizeof(__capability void *); i++) {
+	for (i = 0; i < sz / sizeof(void * __capability); i++) {
 		if (j == 8 * sizeof(*pattern)) {
 			if (found_tags != pattern[k])
 				warnx("found: 0x%llx expected: 0x%llx\n",

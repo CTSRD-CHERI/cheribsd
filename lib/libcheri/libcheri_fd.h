@@ -82,7 +82,7 @@ struct libcheri_fd_ret	libcheri_fd_fstat(__capability struct stat *sb_c);
 LIBCHERI_FD_CCALL
 struct libcheri_fd_ret	libcheri_fd_lseek(off_t offset, int whence);
 LIBCHERI_FD_CCALL
-struct libcheri_fd_ret	libcheri_fd_read(__capability void *buf_c,
+struct libcheri_fd_ret	libcheri_fd_read(void * __capability buf_c,
 			     size_t nbytes);
 LIBCHERI_FD_CCALL
 struct libcheri_fd_ret	libcheri_fd_write(const void * __capability buf_c,

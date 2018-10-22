@@ -98,9 +98,9 @@ void
 test_fault_perm_seal(const struct cheri_test *ctp __unused)
 {
 	int i;
-	__capability void *ip = &i;
-	__capability void *sealcap;
-	__capability void *sealed;
+	void * __capability ip = &i;
+	void * __capability sealcap;
+	void * __capability sealed;
 
 	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
 		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
@@ -132,10 +132,10 @@ void
 test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 {
 	int i;
-	__capability void *ip = &i;
-	__capability void *sealcap;
-	__capability void *sealed;
-	__capability void *unsealed;
+	void * __capability ip = &i;
+	void * __capability sealcap;
+	void * __capability sealed;
+	void * __capability unsealed;
 
 	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
 		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
@@ -161,7 +161,7 @@ test_fault_tag(const struct cheri_test *ctp __unused)
 void
 test_fault_ccheck_user_fail(const struct cheri_test *ctp __unused)
 {
-	__capability void *cp;
+	void * __capability cp;
 	char ch;
 
 	cp = cheri_ptrperm(&ch, sizeof(ch), 0);
@@ -171,7 +171,7 @@ test_fault_ccheck_user_fail(const struct cheri_test *ctp __unused)
 void
 test_nofault_ccheck_user_pass(const struct cheri_test *ctp __unused)
 {
-	__capability void *cp;
+	void * __capability cp;
 	char ch;
 
 	cp = cheri_ptrperm(&ch, sizeof(ch), CHERI_PERM_SW0);

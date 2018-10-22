@@ -754,7 +754,7 @@ sandbox_make_vtable(void *dataptr, const char *class,
 }
 
 int
-sandbox_set_required_method_variables(__capability void *datacap,
+sandbox_set_required_method_variables(void * __capability datacap,
     struct sandbox_required_methods *required_methods)
 {
 	size_t i;

@@ -51,8 +51,8 @@ register_t invoke(struct cheri_object co __unused, register_t v0 __unused,
     register_t methodnum,
     register_t a0, register_t a1,
     struct cheri_object system_object,
-    __capability void *c5 __unused, __capability void *c6 __unused,
-    __capability void *c7, __capability void *c8)
+    void * __capability c5 __unused, void * __capability c6 __unused,
+    void * __capability c7, void * __capability c8)
     __attribute__((cheri_ccall)); /* XXXRW: Will be ccheri_ccaller. */
 
 static png_structp g_png_ptr;
@@ -155,8 +155,8 @@ register_t
 invoke(struct cheri_object c __unused, register_t v0 __unused,
     register_t op, register_t a0, register_t a1,
     struct cheri_object system_object __unused,
-    __capability void *c5 __unused, __capability void *c6 __unused,
-    __capability void *c7, __capability void *c8)
+    void * __capability c5 __unused, void * __capability c6 __unused,
+    void * __capability c7, void * __capability c8)
 {
 	png_infop info_ptr;
 

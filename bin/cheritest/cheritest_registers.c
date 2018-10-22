@@ -125,7 +125,7 @@ test_listregs(const struct cheri_test *ctp __unused)
  * during process startup -- and also the new expected values.
  */
 static void
-check_initreg_code(__capability void *c)
+check_initreg_code(void * __capability c)
 {
 	uintmax_t v;
 
@@ -215,7 +215,7 @@ check_initreg_code(__capability void *c)
 }
 
 static void
-check_initreg_data(__capability void *c)
+check_initreg_data(void * __capability c)
 {
 	uintmax_t v;
 
@@ -324,7 +324,7 @@ test_initregs_default(const struct cheri_test *ctp __unused)
 void
 test_initregs_stack(const struct cheri_test *ctp __unused)
 {
-	__capability void *c = cheri_getstack();
+	void * __capability c = cheri_getstack();
 	register_t v;
 
 	/* Base. */
@@ -458,7 +458,7 @@ test_initregs_idc(const struct cheri_test *ctp __unused)
 void
 test_initregs_pcc(const struct cheri_test *ctp __unused)
 {
-	__capability void *c;
+	void * __capability c;
 
 	/* $pcc includes $pc, so clear that for the purposes of the check. */
 	c = cheri_getpcc();

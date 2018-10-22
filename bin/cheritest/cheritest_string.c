@@ -63,7 +63,7 @@ void * __capability
 struct Test
 {
 	char pad0[32];
-	__capability void *y;
+	void * __capability y;
 	char pad1[32];
 };
 
@@ -114,7 +114,7 @@ void
 test_string_memcpy_c(const struct cheri_test *ctp __unused)
 {
 	int i;
-	__capability void *cpy;
+	void * __capability cpy;
 	struct Test t1, t2;
 
 	invalidate(&t1);
@@ -277,7 +277,7 @@ void
 test_string_memmove_c(const struct cheri_test *ctp __unused)
 {
 	int i;
-	__capability void *cpy;
+	void * __capability cpy;
 	struct Test t1, t2;
 
 	invalidate(&t1);
@@ -442,7 +442,7 @@ void
 test_string_kern_memcpy_c(const struct cheri_test *ctp __unused)
 {
 	int i;
-	__capability void *cpy;
+	void * __capability cpy;
 	struct Test t1, t2;
 
 	invalidate(&t1);
@@ -531,7 +531,7 @@ void
 test_string_kern_memmove_c(const struct cheri_test *ctp __unused)
 {
 	int i;
-	__capability void *cpy;
+	void * __capability cpy;
 	struct Test t1, t2;
 
 	invalidate(&t1);

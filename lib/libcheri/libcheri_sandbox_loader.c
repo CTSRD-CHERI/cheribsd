@@ -73,7 +73,7 @@ int
 sandbox_class_load(struct sandbox_class *sbcp)
 {
 #ifdef SPLIT_CODE_DATA
-	__capability void *codecap;
+	void * __capability codecap;
 #endif
 	int saved_errno;
 	caddr_t base;
@@ -192,9 +192,9 @@ int
 sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 {
 #ifndef SPLIT_CODE_DATA
-	__capability void *codecap;
+	void * __capability codecap;
 #endif
-	__capability void *idc;
+	void * __capability idc;
 	struct sandbox_metadata *sbmp;
 	size_t length;
 	size_t heaplen;
@@ -521,7 +521,7 @@ sandbox_object_reload(struct sandbox_object *sbop)
 	caddr_t base;
 	size_t length;
 	struct sandbox_class *sbcp;
-	__capability void *datacap;
+	void * __capability datacap;
 
 	assert(sbop != NULL);
 	sbcp = sbop->sbo_sandbox_classp;

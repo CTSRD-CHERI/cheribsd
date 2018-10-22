@@ -89,12 +89,12 @@ LIBCHERI_SYSTEM_CCALL
 int	libcheri_system_putchar(int c);
 LIBCHERI_SYSTEM_CCALL
 int	libcheri_system_clock_gettime(clockid_t clock_id,
-	    __capability struct timespec *tp);
+	    struct timespec * __capability tp);
 LIBCHERI_SYSTEM_CCALL
 int	libcheri_system_calloc(size_t number, size_t size,
 	    void * __capability * __capability ptrp);
 LIBCHERI_SYSTEM_CCALL
-int	libcheri_system_free(__capability void *ptr);
+int	libcheri_system_free(void * __capability ptr);
 LIBCHERI_SYSTEM_CCALL
 register_t	libcheri_system_user_call_fn(register_t methodnum,
 		    register_t a0, register_t a1, register_t a2,

@@ -56,9 +56,9 @@ static __thread char tls_dummy_char1;
 static __thread void *tls_ptr1;
 
 static __thread char tls_dummy_char0;
-static __thread __capability void *tls_cap0;
+static __thread void * __capability tls_cap0;
 static __thread char tls_dummy_char1;
-static __thread __capability void *tls_cap1;
+static __thread void * __capability tls_cap1;
 
 static __thread char tls_array_4k[4096] __aligned(4096);
 

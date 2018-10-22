@@ -99,7 +99,7 @@ __capability void	*libcheri_creturn_data;
 void
 libcheri_ccall_init(void)
 {
-	__capability void *cap;
+	void * __capability cap;
 
 	/*
 	 * Initialise sealing capabilities for invocation, rtld, and creturn,

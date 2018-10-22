@@ -143,7 +143,7 @@ sandbox_object {
 	__capability void	*sbo_csp;	/* Capability offset 6. */
 	union {
 		int		 sbo_busy;	/* Capability offset 7. */
-		__capability void *_sbo_reserved; /* Pad to capability size. */
+		void * __capability _sbo_reserved; /* Pad to capability size. */
 	};
 
 	/*

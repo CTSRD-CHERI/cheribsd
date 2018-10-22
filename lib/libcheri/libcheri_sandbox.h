@@ -92,8 +92,8 @@ int	sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
 	    struct sandbox_object **sbopp);
 int	sandbox_object_new_flags(struct sandbox_class *sbcp, size_t heaplen,
 	    uint flags, struct sandbox_object **sbopp);
-int	sandbox_object_new_system_object(__capability void *private_data,
-	    __capability void *invoke_pcc, __capability vm_offset_t *vtable,
+int	sandbox_object_new_system_object(void * __capability private_data,
+	    void * __capability invoke_pcc, vm_offset_t * __capability vtable,
 	    struct sandbox_object **sbopp);
 
 /**
@@ -127,14 +127,14 @@ struct cheri_object	sandbox_object_getobject(struct sandbox_object *sbop);
 /**
  * Get the sandbox's global data capability.
  */
-__capability void *
+void * __capability
 sandbox_object_getsandboxdata(struct sandbox_object *sbop);
 
 /**
  * Get the sandbox's stack.  This is a temporary API and should go away once
  * libcheri is responsible for managing a pool of stacks and clearing them.
  */
-__capability void *
+void * __capability
 sandbox_object_getsandboxstack(struct sandbox_object *sbop);
 
 /*
@@ -146,8 +146,8 @@ struct cheri_object	sandbox_object_getsystemobject(
 /*
  * API to get private data for system-class implementations.
  */
-__capability void	*sandbox_object_private_get(
+void * __capability	 sandbox_object_private_get(
 			    struct sandbox_object *sbop);
-__capability void	*sandbox_object_private_get_idc(void);
+void * __capability	 sandbox_object_private_get_idc(void);
 
 #endif /* !_LIBCHERI_SANDBOX_H_ */

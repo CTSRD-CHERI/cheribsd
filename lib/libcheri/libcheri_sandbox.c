@@ -547,8 +547,8 @@ sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
  * sandbox_class instances?  That would be more consistent...
  */
 int
-sandbox_object_new_system_object(__capability void *private_data,
-    __capability void *invoke_pcc, __capability vm_offset_t *vtable,
+sandbox_object_new_system_object(void * __capability private_data,
+    void * __capability invoke_pcc, __capability vm_offset_t *vtable,
     struct sandbox_object **sbopp)
 {
 
@@ -642,9 +642,9 @@ register_t
 sandbox_object_invoke(struct sandbox_object *sbop, register_t methodnum,
     register_t a1, register_t a2, register_t a3,
     register_t a4, register_t a5, register_t a6, register_t a7,
-    __capability void *c3, __capability void *c4, __capability void *c5,
-    __capability void *c6, __capability void *c7, __capability void *c8,
-    __capability void *c9, __capability void *c10)
+    void * __capability c3, void * __capability c4, void * __capability c5,
+    void * __capability c6, void * __capability c7, void * __capability c8,
+    void * __capability c9, void * __capability c10)
 {
 	struct sandbox_class *sbcp;
 	uint64_t sample, start;
@@ -703,14 +703,14 @@ sandbox_object_getobject(struct sandbox_object *sbop)
 	return (sbop->sbo_cheri_object_invoke);
 }
 
-__capability void *
+void * __capability
 sandbox_object_getsandboxdata(struct sandbox_object *sbop)
 {
 
 	return (sbop->sbo_idc);
 }
 
-__capability void *
+void * __capability
 sandbox_object_getsandboxstack(struct sandbox_object *sbop)
 {
 
@@ -724,14 +724,14 @@ sandbox_object_getsystemobject(struct sandbox_object *sbop)
 	return (sbop->sbo_cheri_object_system);
 }
 
-__capability void *
+void * __capability
 sandbox_object_private_get(struct sandbox_object *sbop)
 {
 
 	return (sbop->sbo_private_data);
 }
 
-__capability void *
+void * __capability
 sandbox_object_private_get_idc(void)
 {
 	struct sandbox_object *sbop;
