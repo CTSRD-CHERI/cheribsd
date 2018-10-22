@@ -356,7 +356,8 @@ enc_ioctl(struct cdev *dev, u_long cmd, caddr_t arg_addr, int flag,
 	void *addr;
 	int error, i;
 
-#ifdef	COMPAT_CHERIABI
+#if __has_feature(capabilities)
+	/* XXX-AM: do we need to do something for freebsd64? */
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 		return (ENOTTY);
 #endif

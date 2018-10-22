@@ -214,10 +214,6 @@ static struct cd_quirk_entry cd_quirk_table[] =
 	}
 };
 
-#ifdef COMPAT_CHERIABI
-#define	COMPAT_FREEBSD64
-#endif
-
 #ifdef COMPAT_FREEBSD32
 struct ioc_read_toc_entry32 {
 	u_char	address_format;
@@ -230,6 +226,7 @@ struct ioc_read_toc_entry32 {
 #endif
 
 #ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
 struct ioc_read_toc_entry64 {
 	u_char	address_format;
 	u_char	starting_track;

@@ -1862,7 +1862,8 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 		union ccb **user_ccb, *ccb;
 		xpt_opcode fc;
 
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
+		/* XXX-AM: do we need to do something for freebsd64? */
 		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 			error = ENOTTY;
 			goto bailout;
@@ -2048,7 +2049,8 @@ camioqueue_error:
 		struct pass_io_req *io_req;
 		int old_error;
 
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
+		/* XXX-AM: do we need to do something for freebsd64? */
 		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 			error = ENOTTY;
 			goto bailout;
