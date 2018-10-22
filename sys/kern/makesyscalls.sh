@@ -88,12 +88,12 @@ sed -e '
 	/^$/b done_joining
 
 	# Join lines ending in backslash
-:join_backslashes
+:joining
 	/\\$/{a\
 
 	N
 	s/\\\n//
-	b join_backslashes
+	b joining
 	}
 
 	# OBSOL, etc lines without function signatures
@@ -102,12 +102,11 @@ sed -e '
 	# Join incomplete signatures.  The { must appear on the first line
 	# and the } must appear on the last line (modulo lines joined by
 	# backslashes).
-:join_syscalls
 	/^[^}]*$/{a\
 
 	N
 	s/\n//
-	b join_syscalls
+	b joining
 	}
 :done_joining
 2,${
