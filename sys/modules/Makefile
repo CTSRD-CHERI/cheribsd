@@ -266,7 +266,6 @@ SUBDIR=	\
 	my \
 	${_nandfs} \
 	${_nandsim} \
-	${_ncr} \
 	${_nctgpio} \
 	${_ndis} \
 	${_netgraph} \
@@ -760,7 +759,6 @@ _cp=		cp
 _glxiic=	glxiic
 _glxsb=		glxsb
 #_ibcs2=		ibcs2
-_ncr=		ncr
 _pcfclock=	pcfclock
 _pst=		pst
 _sbni=		sbni
