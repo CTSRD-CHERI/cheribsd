@@ -494,7 +494,7 @@ struct nlm_syscall_args {
 };
 struct nfssvc_args {
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
-	char argp_l_[PADL_(caddr_t)]; caddr_t argp; char argp_r_[PADR_(caddr_t)];
+	char argp_l_[PADL_(void * __capability)]; void * __capability argp; char argp_r_[PADR_(void * __capability)];
 };
 struct lgetfh_args {
 	char fname_l_[PADL_(char *)]; char * fname; char fname_r_[PADR_(char *)];
@@ -1334,7 +1334,7 @@ struct sctp_peeloff_args {
 };
 struct sctp_generic_sendmsg_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char msg_l_[PADL_(caddr_t)]; caddr_t msg; char msg_r_[PADR_(caddr_t)];
+	char msg_l_[PADL_(void * __capability)]; void * __capability msg; char msg_r_[PADR_(void * __capability)];
 	char mlen_l_[PADL_(int)]; int mlen; char mlen_r_[PADR_(int)];
 	char to_l_[PADL_(const struct sockaddr *)]; const struct sockaddr * to; char to_r_[PADR_(const struct sockaddr *)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];

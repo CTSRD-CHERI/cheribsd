@@ -36,6 +36,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define EXPLICIT_USER_ACCESS
+
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -1240,7 +1242,7 @@ nfssvc_nfscl(struct thread *td, struct nfssvc_args *uap)
 			error = EINVAL;
 		if (error == 0)
 			error = nfsrv_lookupfilename(&nd,
-			    dumpmntopts.ndmnt_fname, td);
+			    (__cheri_fromcap char *)dumpmntopts.ndmnt_fname, td);
 		if (error == 0 && strcmp(nd.ni_vp->v_mount->mnt_vfc->vfc_name,
 		    "nfs") != 0) {
 			vput(nd.ni_vp);
