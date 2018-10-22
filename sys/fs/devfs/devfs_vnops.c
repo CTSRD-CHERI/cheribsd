@@ -848,8 +848,8 @@ devfs_ioctl(struct vop_ioctl_args *ap)
 		error = 0;
 		break;
 	case FIODGNAME:
-#ifdef COMPAT_CHERIABI
-	case FIODGNAME_C:
+#ifdef COMPAT_FREEBSD64
+	case FIODGNAME_64:
 #endif
 #ifdef	COMPAT_FREEBSD32
 	case FIODGNAME_32:
