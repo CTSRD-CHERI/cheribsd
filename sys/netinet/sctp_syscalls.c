@@ -73,11 +73,6 @@ __FBSDID("$FreeBSD$");
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32_util.h>
 #endif
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_proto.h>
-#include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_util.h>
-#endif
 
 #include <net/vnet.h>
 
@@ -105,7 +100,8 @@ static struct syscall_helper_data sctp_syscalls32[] = {
 };
 #endif
 
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
 static struct syscall_helper_data sctp_syscalls_cheriabi[] = {
 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(sctp_peeloff),
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_sctp_generic_sendmsg),
@@ -144,7 +140,8 @@ sctp_syscalls_init(void *unused __unused)
 	    ("%s: syscall32_helper_register failed for sctp syscalls",
 	    __func__));
 #endif
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
+	/* XXX-AM: fix for freebsd64 */
 	error = cheriabi_syscall_helper_register(sctp_syscalls_cheriabi,
 	    SY_THR_STATIC);
 	KASSERT((error == 0),
@@ -162,8 +159,8 @@ SYSINIT(sctp_syscalls, SI_SUB_SYSCALLS, SI_ORDER_ANY, sctp_syscalls_init, NULL);
  */
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_peeloff_args {
-int	sd;
-	caddr_t	name;
+	int	sd;
+	uint32_t name;
 };
 #endif
 int
@@ -239,11 +236,11 @@ done2:
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_generic_sendmsg_args {
 	int sd;
-	caddr_t msg;
+	void * __capability msg;
 	int mlen;
-	struct sockaddr *to;
+	struct sockaddr * __capability to;
 	__socklen_t tolen;
-	struct sctp_sndrcvinfo *sinfo;
+	struct sctp_sndrcvinfo * __capability sinfo;
 	int flags;
 };
 #endif
@@ -258,7 +255,8 @@ sys_sctp_generic_sendmsg(struct thread *td,
 	__USER_CAP_OBJ(uap->sinfo), uap->flags));
 }
 
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
 int
 cheriabi_sctp_generic_sendmsg(struct thread *td,
     struct cheriabi_sctp_generic_sendmsg_args *uap)
@@ -376,11 +374,11 @@ sctp_bad2:
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_generic_sendmsg_iov_args {
 	int sd;
-	struct iovec_native *iov;
+	struct iovec * __capability iov;
 	int iovlen;
-	struct sockaddr *to;
+	struct sockaddr * __capability to;
 	__socklen_t tolen;
-	struct sctp_sndrcvinfo *sinfo;
+	struct sctp_sndrcvinfo * __capability sinfo;
 	int flags;
 };
 #endif
@@ -395,7 +393,8 @@ sys_sctp_generic_sendmsg_iov(struct thread *td,
 	    __USER_CAP_OBJ(uap->sinfo), uap->flags));
 }
 
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
 int
 cheriabi_sctp_generic_sendmsg_iov(struct thread *td,
     struct cheriabi_sctp_generic_sendmsg_iov_args *uap)
@@ -451,9 +450,10 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 		error = freebsd32_copyiniov(uiov, iovlen, &iov, EMSGSIZE);
 	else
 #endif
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		error = cheriabi_copyiniov(uiov, iovlen, &iov, EMSGSIZE);
+#if COMPAT_FREEBSD64		
+	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI))
+		/* XXX-AM: fix for freebsd64 */
+		error = freebsd64_copyiniov(uiov, iovlen, &iov, EMSGSIZE);
 	else
 #endif
 		error = copyiniov(uiov, iovlen, &iov, EMSGSIZE);
@@ -535,12 +535,12 @@ sctp_bad2:
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_generic_recvmsg_args {
 	int sd;
-	struct iovec_native *iov;
+	struct iovec * __capability iov;
 	int iovlen;
-	struct sockaddr *from;
-	__socklen_t *fromlenaddr;
-	struct sctp_sndrcvinfo *sinfo;
-	int *msg_flags;
+	struct sockaddr * __capability from;
+	__socklen_t * __capability fromlenaddr;
+	struct sctp_sndrcvinfo * __capability sinfo;
+	int * __capability msg_flags;
 };
 #endif
 int
@@ -555,7 +555,8 @@ sys_sctp_generic_recvmsg(struct thread *td,
 	   __USER_CAP_OBJ(uap->msg_flags)));
 }
 
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
 int
 cheriabi_sctp_generic_recvmsg(struct thread *td,
     struct cheriabi_sctp_generic_recvmsg_args *uap)
@@ -598,9 +599,10 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov,
 		error = freebsd32_copyiniov(uiov, iovlen, &iov, EMSGSIZE);
 	else
 #endif
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
-		error = cheriabi_copyiniov(uiov, iovlen, &iov, EMSGSIZE);
+#if COMPAT_FREEBSD64		
+	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI))
+		/* XXX-AM: fix for freebsd64 */
+		error = freebsd64_copyiniov(uiov, iovlen, &iov, EMSGSIZE);
 	else
 #endif
 		error = copyiniov(uiov, iovlen, &iov, EMSGSIZE);
