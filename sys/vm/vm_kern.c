@@ -502,11 +502,15 @@ kmem_back(vm_object_t object, vm_offset_t addr, vm_size_t size, int flags)
 		 */
 		if (vm_ndomains > 1) {
 			domain = (addr >> KVA_QUANTUM_SHIFT) % vm_ndomains;
+			while (VM_DOMAIN_EMPTY(domain))
+				domain++;
 			next = roundup2(addr + 1, KVA_QUANTUM);
 			if (next > end || next < start)
 				next = end;
-		} else
+		} else {
+			domain = 0;
 			next = end;
+		}
 		rv = kmem_back_domain(domain, object, addr, next - addr, flags);
 		if (rv != KERN_SUCCESS) {
 			kmem_unback(object, start, addr - start);

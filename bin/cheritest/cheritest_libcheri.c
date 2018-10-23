@@ -71,7 +71,7 @@ struct sandbox_object	*cheritest_objectp;
 struct cheri_object cheritest, cheritest2;
 
 static int	allow_syscall(int *retp __unused,
-		    __capability int *errno_val __unused);
+		    int * __capability errno_val __unused);
 
 void
 test_sandbox_abort(const struct cheri_test *ctp __unused)
@@ -98,14 +98,14 @@ test_sandbox_cs_calloc(const struct cheri_test *ctp __unused)
 }
 
 static int
-allow_syscall(int *retp __unused, __capability int *errno_val __unused)
+allow_syscall(int *retp __unused, int * __capability errno_val __unused)
 {
 
 	return (0);
 }
 
 static int
-deny_syscall(int *retp, __capability int *stub_errno)
+deny_syscall(int *retp, int * __capability stub_errno)
 {
 
 	*retp = -1;
@@ -232,7 +232,8 @@ static char string_md5[] = "5eb63bbbe01eeed093cb22bb8f5acdc3";
 void
 test_sandbox_md5_ccall(const struct cheri_test *ctp __unused, int class)
 {
-	__capability void *md5cap, *bufcap;
+	void * __capability md5cap;
+	void * __capability bufcap;
 	char buf[33];
 
 	md5cap = cheri_ptrperm(string_to_md5, sizeof(string_to_md5),
@@ -264,8 +265,8 @@ static register_t cheritest_libcheri_userfn_handler(
     register_t methodnum,
     register_t a0, register_t a1, register_t a2, register_t a3,
     register_t a4, register_t a5, register_t a6, register_t a7,
-    __capability void *c3, __capability void *c4, __capability void *c5,
-    __capability void *c6, __capability void *c7)
+    void * __capability c3, void * __capability c4, void * __capability c5,
+    void * __capability c6, void * __capability c7)
     __attribute__((cheri_ccall)); /* XXXRW: Will be ccheri_ccallee. */
 
 void
@@ -298,9 +299,9 @@ cheritest_libcheri_userfn_handler(struct cheri_object system_object __unused,
     register_t a1 __unused, register_t a2 __unused, register_t a3 __unused,
     register_t a4 __unused, register_t a5 __unused, register_t a6 __unused,
     register_t a7 __unused,
-    __capability void *c3 __unused, __capability void *c4 __unused,
-    __capability void *c5 __unused, __capability void *c6 __unused,
-    __capability void *c7 __unused)
+    void * __capability c3 __unused, void * __capability c4 __unused,
+    void * __capability c5 __unused, void * __capability c6 __unused,
+    void * __capability c7 __unused)
 {
 
 	switch (methodnum) {

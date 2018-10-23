@@ -30,18 +30,6 @@
  *
  * $FreeBSD$
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "lib",
- *   "changes": [
- *     "unsupported"
- *   ],
- *   "change_comment": "pointless hint to mmap"
- * }
- * CHERI CHANGES END
- */
 
 #include <sys/types.h>
 #include <sys/devicestat.h>
@@ -79,7 +67,7 @@ geom_stats_resync(void)
 	if (statsfd == -1)
 		return;
 	for (;;) {
-		p = mmap(NULL, (npages + 1) * pagesize,
+		p = mmap(statp, (npages + 1) * pagesize,
 		    PROT_READ, MAP_SHARED, statsfd, 0);
 		if (p == MAP_FAILED)
 			break;

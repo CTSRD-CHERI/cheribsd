@@ -61,18 +61,18 @@
  * (in which only the stack capability is used).
  */
 #ifdef __CHERI_PURE_CAPABILITY__
-extern __capability void	*__libcheri_enter_stack_csp; /* Pure cap. */
+extern void * __capability	 __libcheri_enter_stack_csp; /* Pure cap. */
 #else
-extern __capability void	*__libcheri_enter_stack_cap; /* Hybrid cap. */
+extern void * __capability	 __libcheri_enter_stack_cap; /* Hybrid cap. */
 extern register_t		 __libcheri_enter_stack_sp;  /* Hybrid cap. */
 #endif
 
 #define	LIBCHERI_ENTER_STACK_SIZE	(PAGE_SIZE * 16)
 static void		*__libcheri_enter_stack;	/* Stack itself. */
 #ifdef __CHERI_PURE_CAPABILITY__
-__capability void	*__libcheri_enter_stack_csp;	/* Pure cap. */
+void * __capability	 __libcheri_enter_stack_csp;	/* Pure cap. */
 #else
-__capability void	*__libcheri_enter_stack_cap;	/* Hybrid cap. */
+void * __capability	 __libcheri_enter_stack_cap;	/* Hybrid cap. */
 register_t		 __libcheri_enter_stack_sp;	/* Hybrid cap. */
 #endif
 

@@ -320,10 +320,10 @@ __uint64_t
 	 strtouq(const char *, char **, int);
 
 #if __has_feature(capabilities)
-long	 strtol_c(__capability const char * __restrict,
+long	 strtol_c(const char * __capability __restrict,
 	    char * __capability * __capability __restrict, int);
 long double
-	 strtold_c(__capability const char * __restrict,
+	 strtold_c(const char * __capability __restrict,
 	    char * __capability * __restrict);
 
 #if !defined(__CHERI_PURE_CAPABILITY__)

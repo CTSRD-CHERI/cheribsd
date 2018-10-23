@@ -690,9 +690,15 @@ cheri_capability_setoffset(struct chericap *cp, register_t offset)
  */
 #ifdef _KERNEL
 struct sysentvec;
+<<<<<<< HEAD
 void	cheri_capability_set_user_sealcap(void *__capability *);
 void	cheri_capability_set_user_sigcode(void *__capability *,
 	    const struct sysentvec *);
+=======
+void	cheri_capability_set_user_sealcap(void * __capability *);
+void	cheri_capability_set_user_sigcode(void * __capability *,
+	    struct sysentvec *);
+>>>>>>> master
 int	cheri_capcause_to_sicode(register_t capcause);
 
 void	hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr);

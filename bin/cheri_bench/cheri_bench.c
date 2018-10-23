@@ -173,8 +173,8 @@ static void invoke_memcpy(__capability char *dataout, __capability char *datain,
   int ret;
   ret = cheri_bench_memcpy_cap(
 			cheri_bench,
-		     (__capability void *) dataout,
-		     (__capability void *) datain,
+		     (void * __capability) dataout,
+		     (void * __capability) datain,
 		     len);
   if (ret != 0) err(1, "Invoke failed.");
 }

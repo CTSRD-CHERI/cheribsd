@@ -303,6 +303,9 @@ struct thread {
 	sbintime_t	td_sleeptimo;	/* (t) Sleep timeout. */
 	int		td_rtcgen;	/* (s) rtc_generation of abs. sleep */
 	size_t		td_vslock_sz;	/* (k) amount of vslock-ed space */
+#ifdef CPU_CHERI
+	void * __capability	td_retcap; /* (k) Syscall cap return . */
+#endif
 #define	td_endzero td_sigmask
 
 /* Copied during fork1() or create_thread(). */
@@ -337,12 +340,8 @@ struct thread {
 	union {
 		register_t	tdu_retval[2];
 		off_t		tdu_off;
-#ifdef CPU_CHERI
-		void * __capability	tdu_retcap;
-#endif
 	} td_uretoff;			/* (k) Syscall aux returns. */
 #define td_retval	td_uretoff.tdu_retval
-#define td_retcap	td_uretoff.tdu_retcap
 	u_int		td_cowgen;	/* (k) Generation of COW pointers. */
 	/* LP64 hole */
 	struct callout	td_slpcallout;	/* (h) Callout for sleep. */

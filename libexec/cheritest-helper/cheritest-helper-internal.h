@@ -33,9 +33,9 @@
 #define	_LIBEXEC_CHERITEST_CHERITEST_HELPER_INTERNAL_H_
 
 struct zstream_proxy {
-	__capability void *next_in;
+	void * __capability next_in;
 	size_t avail_in;
-	__capability void *next_out;
+	void * __capability next_out;
 	size_t avail_out;
 	size_t total_in;
 	size_t total_out;

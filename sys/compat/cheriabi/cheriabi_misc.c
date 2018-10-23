@@ -144,23 +144,6 @@ static int cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count);
 static int cheriabi_kevent_copyin(void *arg, kkevent_t *kevp, int count);
 
 int
-cheriabi_syscall(struct thread *td, struct cheriabi_syscall_args *uap)
-{
-
-	/*
-	 * With generated uap fill functions, we'd have to alter the pcb
-	 * to support syscalls with integer arguments.  In practice, it
-	 * looks like we only really need fork (for libthr).
-	 */
-	switch (uap->number) {
-	case CHERIABI_SYS_fork:
-		return (sys_fork(td, NULL));
-	default:
-		return (EINVAL);
-	}
-}
-
-int
 cheriabi_wait4(struct thread *td, struct cheriabi_wait4_args *uap)
 {
 
@@ -1108,9 +1091,7 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	 */
 	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, args->base - rtld_base,
 	    rtld_len, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
-#ifdef AT_EHDRFLAGS
 	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);
-#endif
 	if (imgp->execpathp != 0)
 		AUXARGS_ENTRY_CAP(pos, AT_EXECPATH, imgp->execpathp, 0,
 		    strlen(imgp->execpath) + 1,
@@ -1148,6 +1129,8 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	AUXARGS_ENTRY_CAP(pos, AT_ENVV, (vaddr_t)imgp->args->envv, 0,
 	   sizeof(void * __capability) * (imgp->args->envc + 1),
 	   CHERI_CAP_USER_DATA_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_PS_STRINGS, imgp->sysent->sv_psstrings, 0,
+	    sizeof(struct cheriabi_ps_strings), CHERI_CAP_USER_DATA_PERMS);
 
 	AUXARGS_ENTRY_NOCAP(pos, AT_NULL, 0);
 

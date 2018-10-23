@@ -120,7 +120,7 @@ cheritest_libcheri_userfn_getstack(void)
 void
 test_sandbox_getstack(const struct cheri_test *ctp __unused)
 {
-	__capability void *cclear;
+	void * __capability cclear;
 	register_t v;
 
 	cclear = cheri_zerocap();
@@ -203,7 +203,7 @@ cheritest_libcheri_userfn_setstack(register_t arg)
 void
 test_sandbox_setstack(const struct cheri_test *ctp __unused)
 {
-	__capability void *cclear;
+	void * __capability cclear;
 	register_t v;
 
 	/*
@@ -227,7 +227,7 @@ test_sandbox_setstack(const struct cheri_test *ctp __unused)
 void
 test_sandbox_setstack_nop(const struct cheri_test *ctp __unused)
 {
-	__capability void *cclear;
+	void * __capability cclear;
 	register_t v;
 
 	/* Request no stack rewrite by using an argument of 0. */
@@ -246,8 +246,8 @@ void
 test_sandbox_trustedstack_underflow(const struct cheri_test *ctp __unused)
 {
 	struct cheri_object returncap;
-	__capability void *codecap asm ("$c1");
-	__capability void *datacap asm ("$c2");
+	void * __capability codecap asm ("$c1");
+	void * __capability datacap asm ("$c2");
 
 	returncap = libcheri_make_sealed_return_object();
 	codecap = returncap.co_codecap;

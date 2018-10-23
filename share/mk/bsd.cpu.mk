@@ -332,7 +332,7 @@ MIPS_ABI?=	32
 .if ${MACHINE_ARCH:Mmips*c*}
 CFLAGS+=	-integrated-as
 CFLAGS+=	-fpic
-CFLAGS+=	-cheri-cap-table-abi=pcrel
+CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE:Upcrel}
 .ifdef CHERI_USE_CAP_TLS
 CFLAGS+=	-cheri-cap-tls-abi=${CHERI_USE_CAP_TLS}
 .else

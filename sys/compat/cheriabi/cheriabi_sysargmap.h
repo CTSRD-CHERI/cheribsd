@@ -9,7 +9,6 @@
 #define	_CHERIABI_SYSARGMAP_H_
 
 int cheriabi_sysargmask[] = {
- [CHERIABI_SYS_cheriabi_syscall] = (0x0),
  [CHERIABI_SYS_exit] = (0x0),
  [CHERIABI_SYS_cheriabi_read] = (0x0 | 0x2),
  [CHERIABI_SYS_cheriabi_write] = (0x0 | 0x2),

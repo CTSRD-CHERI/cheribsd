@@ -89,12 +89,12 @@ CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
  */
 #ifdef CPU_CHERI128
 CTASSERT(sizeof(void *) == 8);
-CTASSERT(sizeof(void *__capability) == 16);
+CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct chericap) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
 #else
 CTASSERT(sizeof(void *) == 8);
-CTASSERT(sizeof(void *__capability) == 32);
+CTASSERT(sizeof(void * __capability) == 32);
 CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
 #endif

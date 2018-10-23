@@ -56,8 +56,8 @@ struct chericap {
  */
 struct cheri_object {
 #if !defined(_KERNEL) && __has_feature(capabilities)
-	__capability void	*co_codecap;
-	__capability void	*co_datacap;
+	void * __capability	co_codecap;
+	void * __capability	co_datacap;
 #else
 	struct chericap		 co_codecap;
 	struct chericap		 co_datacap;

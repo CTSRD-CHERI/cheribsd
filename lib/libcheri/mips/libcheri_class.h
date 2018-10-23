@@ -50,9 +50,9 @@
  *				unused for loaded (confined) classes.
  */
 #define	LIBCHERI_SANDBOX_OBJECT_FIELDS					\
-	__capability void	*__sandbox_object_idc;			\
-	__capability void	*__sandbox_object_rtld_pcc;		\
-	__capability void	*__sandbox_object_invoke_pcc;		\
+	void * __capability	 __sandbox_object_idc;			\
+	void * __capability	 __sandbox_object_rtld_pcc;		\
+	void * __capability	 __sandbox_object_invoke_pcc;		\
 	__capability intptr_t	*__sandbox_vtable
 
 #define	LIBCHERI_SANDBOX_OBJECT_INIT(sbop, idc, rtld_pcc, invoke_pcc, vtable)\

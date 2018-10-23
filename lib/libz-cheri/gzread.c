@@ -26,7 +26,7 @@
 #endif
 
 /* Local functions */
-local int gz_load OF((gz_statep, __capability unsigned char *, unsigned, unsigned *));
+local int gz_load OF((gz_statep, unsigned char * __capability, unsigned, unsigned *));
 local int gz_avail OF((gz_statep));
 local int gz_look OF((gz_statep));
 local int gz_decomp OF((gz_statep));
@@ -39,7 +39,7 @@ local int gz_skip OF((gz_statep, z_off64_t));
    read the number of bytes requested, depending on the type of descriptor. */
 local int gz_load(state, buf, len, have)
     gz_statep state;
-    __capability unsigned char *buf;
+    unsigned char * __capability buf;
     unsigned len;
     unsigned *have;
 {
@@ -80,8 +80,8 @@ local int gz_avail(state)
         return -1;
     if (state->eof == 0) {
         if (strm->avail_in) {       /* copy what's there to the start */
-            __capability unsigned char *p = state->in;
-            __capability unsigned const char *q = strm->next_in;
+            unsigned char * __capability p = state->in;
+            unsigned const char * __capability q = strm->next_in;
             unsigned n = strm->avail_in;
             do {
                 *p++ = *q++;
@@ -196,7 +196,7 @@ local int gz_decomp(state)
 {
     int ret = Z_OK;
     unsigned had;
-    __capability unsigned char *snext;
+    unsigned char * __capability snext;
     z_streamp strm = cheri_ptr_to_bounded_cap(&(state->strm));
 
     /* fill output buffer up to end of deflate stream */
@@ -489,8 +489,8 @@ int ZEXPORT gzungetc(c, file)
 
     /* slide output data if needed and insert byte before existing data */
     if (state->x.next == state->out) {
-        __capability unsigned char *src = state->out + state->x.have;
-        __capability unsigned char *dest = state->out + (state->size << 1);
+        unsigned char * __capability src = state->out + state->x.have;
+        unsigned char * __capability dest = state->out + (state->size << 1);
         while (src > state->out)
             *--dest = *--src;
         state->x.next = dest;
@@ -511,7 +511,7 @@ char * ZEXPORT gzgets(file, buf, len)
 {
     unsigned left, n;
     char *str;
-    __capability const unsigned char *eol;
+    const unsigned char * __capability eol;
     gz_statep state;
 
     /* check parameters and get internal structure */

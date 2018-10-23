@@ -76,7 +76,7 @@ uLong ZEXPORT adler32(adler, buf, len)
 
 uLong ZEXPORT adler32_c(adler, buf, len)
     uLong adler;
-    __capability const Bytef *buf;
+    const Bytef * __capability buf;
     uInt len;
 {
     unsigned long sum2;

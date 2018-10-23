@@ -53,10 +53,10 @@ size_t	sandbox_get_unresolved_methods(
 	    struct sandbox_required_methods *required_methods);
 void	sandbox_warn_unresolved_methods(
 	    struct sandbox_required_methods *required_methods);
-__capability vm_offset_t *sandbox_make_vtable(void *datacap, const char *class,
+vm_offset_t * __capability	sandbox_make_vtable(void *datacap, const char *class,
 	    struct sandbox_provided_classes *provided_classes);
 
-int	sandbox_set_required_method_variables(__capability void *datacap,
+int	sandbox_set_required_method_variables(void * __capability datacap,
 	    struct sandbox_required_methods *required_methods);
 
 #endif /* __LIBCHERI_SANDBOX_METHODS_H__ */

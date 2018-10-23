@@ -72,7 +72,9 @@
 int
 sandbox_class_load(struct sandbox_class *sbcp)
 {
-	__capability void *codecap;
+#ifdef SPLIT_CODE_DATA
+	void * __capability codecap;
+#endif
 	int saved_errno;
 	caddr_t base;
 
@@ -84,6 +86,7 @@ sandbox_class_load(struct sandbox_class *sbcp)
 	 * particular, set up the code and data capabilities quite differently.
 	 */
 
+#ifdef SPLIT_CODE_DATA
 	/*
 	 * Ensure that we aren't going to map over NULL, guard pages, or
 	 * metadata.  This check can probably be relaxed somewhat for
@@ -111,6 +114,7 @@ sandbox_class_load(struct sandbox_class *sbcp)
 		warnx("%s: sandbox_map_load(sbc_codemap)\n", __func__);
 		goto error;
 	}
+#endif
 
 	/*
 	 * Parse the sandbox ELF binary for CCall methods provided and
@@ -124,6 +128,7 @@ sandbox_class_load(struct sandbox_class *sbcp)
 		goto error;
 	}
 
+#ifdef SPLIT_CODE_DATA
 	if (sandbox_map_protect(base, sbcp->sbc_codemap) == -1) {
 		saved_errno = EINVAL;
 		warnx("%s: sandbox_map_protect(sbc_codemap)\n", __func__);
@@ -161,12 +166,15 @@ sandbox_class_load(struct sandbox_class *sbcp)
 #endif
 	sbcp->sbc_classcap_invoke = cheri_setoffset(codecap,
 	    SANDBOX_INVOKE_VECTOR);
+#endif
 
 	return (0);
 
 error:
+#ifdef SPLIT_CODE_DATA
 	if (sbcp->sbc_codemem != NULL)
 		munmap(sbcp->sbc_codemem, sbcp->sbc_codelen);
+#endif
 	errno = saved_errno;
 	return (-1);
 }
@@ -175,13 +183,18 @@ void
 sandbox_class_unload(struct sandbox_class *sbcp)
 {
 
+#ifdef SPLIT_CODE_DATA
 	munmap(sbcp->sbc_codemem, sbcp->sbc_codelen);
+#endif
 }
 
 int
 sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 {
-	__capability void *idc;
+#ifndef SPLIT_CODE_DATA
+	void * __capability codecap;
+#endif
+	void * __capability idc;
 	struct sandbox_metadata *sbmp;
 	size_t length;
 	size_t heaplen;
@@ -331,6 +344,44 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	 */
 	assert(length == 0);
 
+#ifndef SPLIT_CODE_DATA
+	/*
+	 * Set bounds and mask permissions on code capabilities.
+	 *
+	 * XXXRW: In CheriABI, mmap(2) will return suitable bounds, so just
+	 * mask permissions.  This is not well captured here.
+	 *
+	 * For both the MIPS ABI and CheriABI, we need to set suitable
+	 * offsets.
+	 *
+	 * XXXRW: There are future questions to answer here about W^X and
+	 * mmap(2) in CheriABI.
+	 */
+#ifdef __CHERI_PURE_CAPABILITY__
+	codecap = cheri_andperm(sbop->sbo_datamem,
+	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
+	    CHERI_PERM_EXECUTE);
+#else
+	codecap = cheri_codeptrperm(sbop->sbo_datamem, sbop->sbo_datalen,
+	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
+	    CHERI_PERM_EXECUTE);
+#endif
+	sbop->sbo_rtld_pcc = cheri_setoffset(codecap,
+	    SANDBOX_RTLD_VECTOR);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	codecap = cheri_andperm(sbop->sbo_datamem,
+	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
+	    CHERI_PERM_EXECUTE);
+#else
+	codecap = cheri_codeptrperm(sbop->sbo_datamem, sbop->sbo_datalen,
+	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
+	    CHERI_PERM_EXECUTE);
+#endif
+	sbop->sbo_invoke_pcc = cheri_setoffset(codecap,
+	    SANDBOX_INVOKE_VECTOR);
+#endif /* !SPLIT_CODE_DATA */
+
 	/*
 	 * Now that addresses are known, write out metadata for in-sandbox
 	 * use.  The stack was configured by the higher-level object code, so
@@ -378,8 +429,10 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	 * XXXRW: Where it the corresponding FINI?
 	 */
 	sbop->sbo_idc = idc;
+#ifdef SPLIT_CODE_DATA
 	sbop->sbo_rtld_pcc = sbcp->sbc_classcap_rtld;
 	sbop->sbo_invoke_pcc = sbcp->sbc_classcap_invoke;
+#endif
 	sbop->sbo_vtable = NULL;
 	sbop->sbo_ddc = idc;
 
@@ -393,10 +446,10 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	 */
 	sbop->sbo_cheri_object_rtld =
 	    libcheri_sandbox_make_sealed_rtld_object(
-	    (__cheri_tocap __capability struct sandbox_object *)sbop);
+	    (__cheri_tocap struct sandbox_object * __capability)sbop);
 	sbop->sbo_cheri_object_invoke =
 	    libcheri_sandbox_make_sealed_invoke_object(
-	    (__cheri_tocap __capability struct sandbox_object *)sbop);
+	    (__cheri_tocap struct sandbox_object * __capability)sbop);
 
 	/*
 	 * Set up a CHERI system object to service the sandbox's requests to
@@ -416,7 +469,7 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	 */
 	sbmp->sbm_system_object = sbop->sbo_cheri_object_system =
 	    libcheri_sandbox_make_sealed_invoke_object(
-	    (__cheri_tocap __capability struct sandbox_object *)
+	    (__cheri_tocap struct sandbox_object * __capability)
 	    sbop->sbo_sandbox_system_objectp);
 
 	/*
@@ -468,7 +521,7 @@ sandbox_object_reload(struct sandbox_object *sbop)
 	caddr_t base;
 	size_t length;
 	struct sandbox_class *sbcp;
-	__capability void *datacap;
+	void * __capability datacap;
 
 	assert(sbop != NULL);
 	sbcp = sbop->sbo_sandbox_classp;

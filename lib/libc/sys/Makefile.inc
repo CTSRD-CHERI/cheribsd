@@ -6,7 +6,7 @@
 
 # Include the generated makefile containing the *complete* list
 # of syscall names in MIASM.
-.if ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
+.if ! ${MACHINE_ARCH:Mmips*c*}
 .include "${SRCTOP}/sys/sys/syscall.mk"
 .else
 .include "${SRCTOP}/sys/compat/cheriabi/cheriabi_syscall.mk"
@@ -40,7 +40,7 @@ SRCS+=	\
 
 SRCS+= getdents.c lstat.c mknod.c stat.c
 
-.if ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
+.if ! ${MACHINE_ARCH:Mmips*c*}
 SRCS+= brk.c
 .endif
 SRCS+= pipe.c
@@ -94,7 +94,7 @@ NOASM+=	sigaction.o
 INTERPOSED+= sigaction
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
+.if ${MACHINE_ARCH:Mmips*c*}
 NO_UNDERSCORE=	fcntl ioctl open
 .for _nu in ${NO_UNDERSCORE}
 INTERPOSED:=	${INTERPOSED:N${_nu}}

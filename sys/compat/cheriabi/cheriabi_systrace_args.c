@@ -14,11 +14,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
-	/* cheriabi_syscall */
+	/* nosys */
 	case 0: {
-		struct cheriabi_syscall_args *p = params;
-		iarg[0] = p->number; /* int */
-		*n_args = 1;
+		*n_args = 0;
 		break;
 	}
 	/* sys_exit */
@@ -334,8 +332,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_sigaltstack */
 	case 53: {
 		struct cheriabi_sigaltstack_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->ss; /* const cheriabi_stack_t * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->oss; /* cheriabi_stack_t * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->ss; /* const struct sigaltstack_c * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->oss; /* struct sigaltstack_c * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -909,6 +907,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[0] = p->which; /* u_int */
 		uarg[1] = (__cheri_addr intptr_t) p->rlp; /* struct rlimit * __capability */
 		*n_args = 2;
+		break;
+	}
+	/* nosys */
+	case 198: {
+		*n_args = 0;
 		break;
 	}
 	/* cheriabi___sysctl */
@@ -3121,8 +3124,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct cheriabi_coexecve_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
 		uarg[1] = (__cheri_addr intptr_t) p->fname; /* const char * __capability */
-		uarg[2] = (__cheri_addr intptr_t) p->argv; /* void * __capability __capability * __capability */
-		uarg[3] = (__cheri_addr intptr_t) p->envv; /* void * __capability __capability * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->argv; /* void * __capability * __capability */
+		uarg[3] = (__cheri_addr intptr_t) p->envv; /* void * __capability * __capability */
 		*n_args = 4;
 		break;
 	}
@@ -3139,15 +3142,8 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
-	/* cheriabi_syscall */
+	/* nosys */
 	case 0:
-		switch(ndx) {
-		case 0:
-			p = "int";
-			break;
-		default:
-			break;
-		};
 		break;
 	/* sys_exit */
 	case 1:
@@ -3635,10 +3631,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 53:
 		switch(ndx) {
 		case 0:
-			p = "userland const cheriabi_stack_t * __capability";
+			p = "userland const struct sigaltstack_c * __capability";
 			break;
 		case 1:
-			p = "userland cheriabi_stack_t * __capability";
+			p = "userland struct sigaltstack_c * __capability";
 			break;
 		default:
 			break;
@@ -4585,6 +4581,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		default:
 			break;
 		};
+		break;
+	/* nosys */
+	case 198:
 		break;
 	/* cheriabi___sysctl */
 	case 202:
@@ -8336,10 +8335,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char * __capability";
 			break;
 		case 2:
-			p = "userland void * __capability __capability * __capability";
+			p = "userland void * __capability * __capability";
 			break;
 		case 3:
-			p = "userland void * __capability __capability * __capability";
+			p = "userland void * __capability * __capability";
 			break;
 		default:
 			break;
@@ -8359,11 +8358,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
-	/* cheriabi_syscall */
+	/* nosys */
 	case 0:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
 	/* sys_exit */
 	case 1:
 		if (ndx == 0 || ndx == 1)
@@ -8883,6 +8879,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* nosys */
+	case 198:
 	/* cheriabi___sysctl */
 	case 202:
 		if (ndx == 0 || ndx == 1)

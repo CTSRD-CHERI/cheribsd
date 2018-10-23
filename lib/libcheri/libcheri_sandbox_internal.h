@@ -55,17 +55,21 @@ struct sandbox_class {
 	char			*sbc_path;
 	int			 sbc_fd;
 	struct stat		 sbc_stat;
+#ifdef SPLIT_CODE_DATA
 	size_t			 sbc_codelen;
 	void			*sbc_codemem;
 	struct sandbox_map	*sbc_codemap;
+#endif
 	struct sandbox_map	*sbc_datamap;
 
+#ifdef SPLIT_CODE_DATA
 	/*
 	 * The class's code capabilities, in various incarnations required for
 	 * class creation.  These will be used for all objects in the class.
 	 */
-	__capability void	*sbc_classcap_rtld;	/* Ctor/dtor */
-	__capability void	*sbc_classcap_invoke;	/* Object invoke */
+	void * __capability	 sbc_classcap_rtld;	/* Ctor/dtor */
+	void * __capability	 sbc_classcap_invoke;	/* Object invoke */
+#endif
 
 	/*
 	 * Class CCall methods.
@@ -130,16 +134,16 @@ sandbox_object {
 	 * shared headers, allowing compile-time asserts to be used to check
 	 * binary compatibility has not been broken.
 	 */
-	__capability void	*sbo_idc;	/* Capability offset 0. */
-	__capability void	*sbo_rtld_pcc;	/* Capability offset 1. */
-	__capability void	*sbo_invoke_pcc;/* Capability offset 2. */
-	__capability void	*sbo_vtable;	/* Capability offset 3. */
-	__capability void	*sbo_ddc;	/* Capability offset 4. */
-	__capability void	*sbo_libcheri_tls; /* Capability offset 5. */
-	__capability void	*sbo_csp;	/* Capability offset 6. */
+	void * __capability	 sbo_idc;	/* Capability offset 0. */
+	void * __capability	 sbo_rtld_pcc;	/* Capability offset 1. */
+	void * __capability	 sbo_invoke_pcc;/* Capability offset 2. */
+	void * __capability	 sbo_vtable;	/* Capability offset 3. */
+	void * __capability	 sbo_ddc;	/* Capability offset 4. */
+	void * __capability	 sbo_libcheri_tls; /* Capability offset 5. */
+	void * __capability	 sbo_csp;	/* Capability offset 6. */
 	union {
 		int		 sbo_busy;	/* Capability offset 7. */
-		__capability void *_sbo_reserved; /* Pad to capability size. */
+		void * __capability _sbo_reserved; /* Pad to capability size. */
 	};
 
 	/*
@@ -174,7 +178,7 @@ sandbox_object {
 	 * Stack capability that will also be installed in the object during
 	 * domain transition.
 	 */
-	__capability void	*sbo_stackcap;
+	void * __capability	 sbo_stackcap;
 
 	/*
 	 * Sandbox statistics.
@@ -185,7 +189,7 @@ sandbox_object {
 	 * Private data for system objects -- e.g., for cheri_fd, a pointer to
 	 * file-descriptor data.
 	 */
-	__capability void	*sbo_private_data;
+	void * __capability	 sbo_private_data;
 };
 
 /*

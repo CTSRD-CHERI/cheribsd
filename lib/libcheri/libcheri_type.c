@@ -47,7 +47,7 @@ __REQUIRE_CAPABILITIES
 #include "libcheri_type.h"
 
 /* The root sealing capability of the types provenance tree. */
-static __capability void *libcheri_sealing_root;
+static void * __capability libcheri_sealing_root;
 
 /* The number of bits in the type field of a capability. */
 static const int libcheri_cap_type_bits = 24;
@@ -87,10 +87,10 @@ libcheri_type_init(void)
  * integer representation of the type to allocate.  The `max` argument
  * specifies value that the returned type must be less than.
  */
-static inline __capability void *
+static inline void * __capability
 libcheri_alloc_type_capability(_Atomic(uint64_t) *source, uint64_t max)
 {
-	__capability void *new_type_cap;
+	void * __capability new_type_cap;
 	uint64_t next;
 
 	/*
@@ -121,7 +121,7 @@ libcheri_alloc_type_capability(_Atomic(uint64_t) *source, uint64_t max)
 /*
  * A [very] simple CHERI type allocator.
  */
-__capability void *
+void * __capability
 libcheri_type_alloc(void)
 {
 
@@ -129,7 +129,7 @@ libcheri_type_alloc(void)
 	    libcheri_type_max));
 }
 
-__capability void *
+void * __capability
 libcheri_system_type_alloc(void)
 {
 

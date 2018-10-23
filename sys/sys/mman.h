@@ -226,6 +226,22 @@ typedef	__size_t	size_t;
 #define	_SIZE_T_DECLARED
 #endif
 
+#ifdef _KERNEL
+struct mmap_req {
+	vm_offset_t	mr_hint;
+	vm_offset_t	mr_max_addr;
+	vm_size_t	mr_size;
+	int		mr_prot;
+	int		mr_flags;
+	int		mr_fd;
+	int		_int_pad;
+	off_t		mr_pos;
+#if __has_feature(capabilities)
+	void * __capability mr_source_cap;
+#endif
+	};
+#endif
+
 #if defined(_KERNEL) || defined(_WANT_FILE)
 #include <sys/lock.h>
 #include <sys/mutex.h>

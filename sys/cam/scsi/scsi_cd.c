@@ -1303,7 +1303,7 @@ cdgetpagesize(int page_num)
 }
 
 static struct cd_toc_entry * __capability
-te_data_get_ptr(void *irtep)
+te_data_get_ptr(void *irtep, u_long cmd)
 {
 	union {
 		struct ioc_read_toc_entry irte;
@@ -1316,17 +1316,22 @@ te_data_get_ptr(void *irtep)
 	} *irteup;
 
 	irteup = irtep;
+	switch (IOCPARM_LEN(cmd)) {
+	case sizeof(irteup->irte):
+		return (irteup->irte.data);
 #ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
+	case sizeof(irteup->irte32):
 		return (__USER_CAP((struct cd_toc_entry *)(uintptr_t)
 		    irteup->irte32.data, irteup->irte32.data_len));
 #endif
 #ifdef COMPAT_FREEBSD64
-	if (SV_CURPROC_FLAG(SV_LP64) || !SV_CURPROC_FLAG(SV_CHERI))
+	case sizeof(irteup->irte64):
 		return (__USER_CAP(irteup->irte64.data,
 		    irteup->irte64.data_len));
 #endif
-	return (irteup->irte.data);
+	default:
+		panic("Unhandled ioctl command %ld", cmd);
+	}
 }
 
 static int
@@ -1776,7 +1781,7 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 			}
 
 			cam_periph_unlock(periph);
-			error = copyout(data->entries, te_data_get_ptr(te),
+			error = copyout(data->entries, te_data_get_ptr(te, cmd),
 			    len);
 			free(data, M_SCSICD);
 			free(lead, M_SCSICD);

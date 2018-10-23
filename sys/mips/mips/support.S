@@ -826,6 +826,22 @@ END(subyte_c)
  */
 LEAF(memset)
 	.set noreorder
+#if 1 /* TODO: CPU_QEMU_CHERI. but keep it here to verify that it works even with the nop */
+	/* Use the QEMU magic memset nop to speed up emulation: */
+	PTR_LI	v0, 0
+	PTR_LI	v1, 1	# selector for QEMU magic memset nop
+	ori	$0, $0, 0xC0DE	# call QEMU magic memset
+	/* If the magic nop changed $v1 to 0xdec0ded then we can return */
+	beq	v1, 0xdec0ded, .Lmemset_return
+	nop
+.Lmemset_magic_fail:
+	beq	v1, 1, .Lmemset_mips_impl # if $v1 is unchanged then the magic memset is not supported
+	nop
+	/* Not 0xdecoded and not 0x1 -> we failed and the tlb miss handler did not continue at the magic nop! */
+	PANIC("QEMU magic memset failed (tlb miss handler error?)")
+.Lmemset_mips_impl:
+#endif
+
 	blt	a2, 12, memsetsmallclr	# small amount to clear?
 	move	v0, a0			# save s1 for result
 
@@ -858,45 +874,49 @@ memsetsmallclr:
 	bne	a0, t0, 1b
 	sb	a1, -1(a0)
 2:
-	j	ra
+.Lmemset_return:
+	jr	ra
 	nop
 	.set reorder
 END(memset)
 
+
+#if 0
 /*
  * bzero(s1, n)
  */
 LEAF(bzero)
 XLEAF(blkclr)
 	.set	noreorder
-	blt	a1, 12, smallclr	# small amount to clear?
+	blt		a1, 3*SZREG, smallclr # small amount to clear?
 	PTR_SUBU	a3, zero, a0	# compute # bytes to word align address
-	and	a3, a3, (SZREG - 1)
-	beq	a3, zero, 1f		# skip if word aligned
+	and		a3, a3, SZREG-1
+	beq		a3, zero, 1f	# skip if word aligned
 	PTR_SUBU	a1, a1, a3	# subtract from remaining count
-	REG_SHI	zero, 0(a0)		# clear 1 - 7 bytes to align
+	REG_SHI		zero, 0(a0)	# clear 1-7 bytes to align
 	PTR_ADDU	a0, a0, a3
 1:
-	and	v0, a1, (SZREG - 1)	# compute number of words left
+	and		v0, a1, SZREG-1	# compute number of words left
 	PTR_SUBU	a3, a1, v0
-	move	a1, v0
+	move		a1, v0
 	PTR_ADDU	a3, a3, a0	# compute ending address
 2:
 	PTR_ADDU	a0, a0, SZREG	# clear words
-	bne	a0, a3, 2b		#  unrolling loop does not help
-	REG_S	zero, -SZREG(a0)	#  since we are limited by memory speed
+	bne		a0, a3, 2b	#  unrolling loop doesn't help
+	REG_S		zero, -SZREG(a0) # since we are limited by memory speed
 smallclr:
-	ble	a1, zero, 2f
+	ble		a1, zero, 2f
 	PTR_ADDU	a3, a1, a0	# compute ending address
 1:
 	PTR_ADDU	a0, a0, 1	# clear bytes
-	bne	a0, a3, 1b
-	sb	zero, -1(a0)
+	bne		a0, a3, 1b
+	sb		zero, -1(a0)
 2:
-	j	ra
+	j		ra
 	nop
 END(bzero)
 
+#endif
 
 /*
  * bcmp(s1, s2, n)

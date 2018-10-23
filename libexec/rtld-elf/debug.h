@@ -41,8 +41,10 @@
 #include <string.h>
 #include "rtld_printf.h"
 
+__BEGIN_DECLS
 extern void debug_printf(const char *, ...) __printflike(1, 2);
 extern int debug;
+__END_DECLS
 
 #ifdef DEBUG
 #define dbg(...)	debug_printf(__VA_ARGS__)

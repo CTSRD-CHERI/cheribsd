@@ -73,22 +73,22 @@
  * default data capability, they have non-identical permissions.
  */
 
-static __capability void *sandbox_creturn_sealcap;
-static __capability void *sandbox_creturn_codecap;
-static __capability void *sandbox_creturn_datacap;
+static void * __capability sandbox_creturn_sealcap;
+static void * __capability sandbox_creturn_codecap;
+static void * __capability sandbox_creturn_datacap;
 
-static __capability void *sandbox_nop_creturn_sealcap;
-static __capability void *sandbox_nop_creturn_codecap;
-static __capability void *sandbox_nop_creturn_datacap;
+static void * __capability sandbox_nop_creturn_sealcap;
+static void * __capability sandbox_nop_creturn_codecap;
+static void * __capability sandbox_nop_creturn_datacap;
 
-static __capability void *sandbox_dli_creturn_sealcap;
-static __capability void *sandbox_dli_creturn_codecap;
-static __capability void *sandbox_dli_creturn_datacap;
+static void * __capability sandbox_dli_creturn_sealcap;
+static void * __capability sandbox_dli_creturn_codecap;
+static void * __capability sandbox_dli_creturn_datacap;
 
-static __capability void *
+static void * __capability
 codecap_create(void (*sandbox_base)(void), void *sandbox_end)
 {
-	__capability void *codecap;
+	void * __capability codecap;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	codecap = cheri_andperm(sandbox_base,
@@ -101,10 +101,10 @@ codecap_create(void (*sandbox_base)(void), void *sandbox_end)
 	return (codecap);
 }
 
-static __capability void *
+static void * __capability
 datacap_create(void *sandbox_base, void *sandbox_end)
 {
-	__capability void *datacap;
+	void * __capability datacap;
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	datacap = cheri_andperm(sandbox_base,

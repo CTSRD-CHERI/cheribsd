@@ -8,6 +8,7 @@ MDSRCS+= \
 MDSRCS+= \
 	bcmp.S \
 	bzero.S \
+	memset.S \
 	strchr.S \
 	strcmp.S \
 	strrchr.S

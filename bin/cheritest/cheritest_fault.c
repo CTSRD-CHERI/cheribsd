@@ -98,9 +98,9 @@ void
 test_fault_perm_seal(const struct cheri_test *ctp __unused)
 {
 	int i;
-	__capability void *ip = &i;
-	__capability void *sealcap;
-	__capability void *sealed;
+	void * __capability ip = &i;
+	void * __capability sealcap;
+	void * __capability sealed;
 
 	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
 		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
@@ -132,10 +132,10 @@ void
 test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 {
 	int i;
-	__capability void *ip = &i;
-	__capability void *sealcap;
-	__capability void *sealed;
-	__capability void *unsealed;
+	void * __capability ip = &i;
+	void * __capability sealcap;
+	void * __capability sealed;
+	void * __capability unsealed;
 
 	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
 		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
@@ -161,7 +161,7 @@ test_fault_tag(const struct cheri_test *ctp __unused)
 void
 test_fault_ccheck_user_fail(const struct cheri_test *ctp __unused)
 {
-	__capability void *cp;
+	void * __capability cp;
 	char ch;
 
 	cp = cheri_ptrperm(&ch, sizeof(ch), 0);
@@ -171,7 +171,7 @@ test_fault_ccheck_user_fail(const struct cheri_test *ctp __unused)
 void
 test_nofault_ccheck_user_pass(const struct cheri_test *ctp __unused)
 {
-	__capability void *cp;
+	void * __capability cp;
 	char ch;
 
 	cp = cheri_ptrperm(&ch, sizeof(ch), CHERI_PERM_SW0);
@@ -192,8 +192,8 @@ void
 test_nofault_cfromptr(const struct cheri_test *ctp __unused)
 {
 	char buf[256];
-	__capability void * cd; /* stored into here */
-	__capability void * cb; /* derived from here */
+	void * __capability cd; /* stored into here */
+	void * __capability cb; /* derived from here */
 	int rt;
 
 	/*
@@ -211,34 +211,33 @@ void
 test_fault_read_kr1c(const struct cheri_test *ctp __unused)
 {
 
-	CHERI_CAPREG_PRINT(27);
+	CHERI_CAP_PRINT(cheri_getkr1c());
 }
 
 void
 test_fault_read_kr2c(const struct cheri_test *ctp __unused)
 {
 
-	CHERI_CAPREG_PRINT(28);
+	CHERI_CAP_PRINT(cheri_getkr2c());
 }
 
 void
 test_fault_read_kcc(const struct cheri_test *ctp __unused)
 {
 
-	CHERI_CAPREG_PRINT(29);
+	CHERI_CAP_PRINT(cheri_getkcc());
 }
 
 void
 test_fault_read_kdc(const struct cheri_test *ctp __unused)
 {
 
-	CHERI_CAPREG_PRINT(30);
+	CHERI_CAP_PRINT(cheri_getkdc());
 }
 
 void
 test_fault_read_epcc(const struct cheri_test *ctp __unused)
 {
-	__capability void *epcc;
-	epcc = __builtin_mips_cheri_exception_program_counter_cap_get();
-	CHERI_CAP_PRINT(epcc);
+
+	CHERI_CAP_PRINT(cheri_getepcc());
 }
