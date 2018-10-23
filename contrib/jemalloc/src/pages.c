@@ -615,6 +615,11 @@ pages_boot(void) {
 
 	init_thp_state();
 
+#ifdef __FreeBSD__
+	/*
+	 * FreeBSD doesn't need the check; madvise(2) is known to work.
+	 */
+#else
 	/* Detect lazy purge runtime support. */
 	if (pages_can_purge_lazy) {
 		bool committed = false;
@@ -628,6 +633,7 @@ pages_boot(void) {
 		}
 		os_pages_unmap(madv_free_page, PAGE);
 	}
+#endif
 
 	return false;
 }
