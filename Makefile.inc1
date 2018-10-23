@@ -105,15 +105,13 @@ _TOOLCHAIN_VARS_SHOULD_BE_SET=
 # Pull in COMPILER_TYPE and COMPILER_FREEBSD_VERSION early. Pull it from the
 # tree to be friendlier to foreign OS builds. It's safe to do so unconditionally
 # here since we will always have the right make, unlike in src/Makefile
-# Also set _WANT_TOOLCHAIN_CROSS_VARS to tell bsd.compiler that it should
-# populate the X_COMPILER_* variables if possible.
-.if empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
-_WANT_TOOLCHAIN_CROSS_VARS=yes
-.endif
 #XXXXX# Don't include bsd.linker.mk yet until XBINUTILS is handled (after src.opts.mk)
 #XXXXX_NO_INCLUDE_LINKERMK=	t
+# We also want the X_COMPILER* variables if we are using an external toolchain.
+_WANT_TOOLCHAIN_CROSS_VARS=	t
 .include "share/mk/bsd.compiler.mk"
 #XXXXX.undef _NO_INCLUDE_LINKERMK
+.undef _WANT_TOOLCHAIN_CROSS_VARS
 # src.opts.mk depends on COMPILER_FEATURES
 .include "share/mk/src.opts.mk"
 # .info CC=${CC} LD=${LD} COMPILER_VERSION=${COMPILER_VERSION} COMPILER_TYPE=${COMPILER_TYPE} \
@@ -237,7 +235,10 @@ X${BINUTIL}?=	${${BINUTIL}}
 MK_LLD_BOOTSTRAP=	no
 .endif
 
+# We also want the X_LINKER* variables if we are using an external toolchain.
+_WANT_TOOLCHAIN_CROSS_VARS=	t
 .include "share/mk/bsd.linker.mk"
+.undef _WANT_TOOLCHAIN_CROSS_VARS
 
 # Begin WITH_SYSTEM_COMPILER / WITH_SYSTEM_LD
 
