@@ -394,7 +394,7 @@ MLINKS+=cpuset_getaffinity.2 cpuset_setaffinity.2
 MLINKS+=cpuset_getdomain.2 cpuset_setdomain.2
 MLINKS+=dup.2 dup2.2
 MLINKS+=execve.2 coexecve.2 \
-	execve.2 fexecve.2 \
+	execve.2 fexecve.2
 MLINKS+=extattr_get_file.2 extattr.2 \
 	extattr_get_file.2 extattr_delete_fd.2 \
 	extattr_get_file.2 extattr_delete_file.2 \
