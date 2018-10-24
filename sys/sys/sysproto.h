@@ -1792,6 +1792,22 @@ struct coexecve_args {
 	char argv_l_[PADL_(char **)]; char ** argv; char argv_r_[PADR_(char **)];
 	char envv_l_[PADL_(char **)]; char ** envv; char envv_r_[PADR_(char **)];
 };
+struct cosetup_args {
+	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
+	char code_l_[PADL_(void *__capability *)]; void *__capability * code; char code_r_[PADR_(void *__capability *)];
+	char data_l_[PADL_(void *__capability *)]; void *__capability * data; char data_r_[PADR_(void *__capability *)];
+};
+struct coregister_args {
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+	char cap_l_[PADL_(void *__capability *)]; void *__capability * cap; char cap_r_[PADR_(void *__capability *)];
+};
+struct colookup_args {
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+	char cap_l_[PADL_(void *__capability *)]; void *__capability * cap; char cap_r_[PADR_(void *__capability *)];
+};
+struct copark_args {
+	register_t dummy;
+};
 struct cogetpid_args {
 	char pidp_l_[PADL_(pid_t *)]; pid_t * pidp; char pidp_r_[PADR_(pid_t *)];
 };
@@ -2177,6 +2193,10 @@ int	sys_cpuset_getdomain(struct thread *, struct cpuset_getdomain_args *);
 int	sys_cpuset_setdomain(struct thread *, struct cpuset_setdomain_args *);
 int	sys_getrandom(struct thread *, struct getrandom_args *);
 int	sys_coexecve(struct thread *, struct coexecve_args *);
+int	sys_cosetup(struct thread *, struct cosetup_args *);
+int	sys_coregister(struct thread *, struct coregister_args *);
+int	sys_colookup(struct thread *, struct colookup_args *);
+int	sys_copark(struct thread *, struct copark_args *);
 int	sys_cogetpid(struct thread *, struct cogetpid_args *);
 
 #ifdef COMPAT_43
@@ -3077,6 +3097,10 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_cpuset_setdomain	AUE_NULL
 #define	SYS_AUE_getrandom	AUE_NULL
 #define	SYS_AUE_coexecve	AUE_NULL
+#define	SYS_AUE_cosetup	AUE_NULL
+#define	SYS_AUE_coregister	AUE_NULL
+#define	SYS_AUE_colookup	AUE_NULL
+#define	SYS_AUE_copark	AUE_NULL
 #define	SYS_AUE_cogetpid	AUE_NULL
 
 #undef PAD_

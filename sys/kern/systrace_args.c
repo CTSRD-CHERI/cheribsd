@@ -3311,6 +3311,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* copark */
+	case 568: {
+		*n_args = 0;
+		break;
+	}
 	/* cogetpid */
 	case 569: {
 		struct cogetpid_args *p = params;
@@ -8842,6 +8847,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* copark */
+	case 568:
+		break;
 	/* cogetpid */
 	case 569:
 		switch(ndx) {
@@ -10753,6 +10761,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* copark */
+	case 568:
 	/* cogetpid */
 	case 569:
 		if (ndx == 0 || ndx == 1)

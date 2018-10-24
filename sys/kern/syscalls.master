@@ -3144,26 +3144,26 @@
 		    char **envv
 		);
 	}
-565	AUE_NULL	NOPROTO	{
+565	AUE_NULL	STD	{
 		int cosetup(
 		    int what,
 		    _Out_ void * __capability *code,
 		    _Out_ void * __capability *data
 		);
 	}
-566	AUE_NULL	NOPROTO	{
+566	AUE_NULL	STD	{
 		int coregister(
 		_In_z_ const char *name,
 		_Out_opt_ void * __capability *cap
 		);
 	}
-567	AUE_NULL	NOPROTO	{
+567	AUE_NULL	STD	{
 		int colookup(
 		    _In_z_ const char *name,
 		    _Out_ void * __capability *cap
 		);
 	}
-568	AUE_NULL	UNIMPL	{
+568	AUE_NULL	STD	{
 		int copark(void);
 	}
 569	AUE_NULL        STD     {

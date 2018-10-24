@@ -2286,3 +2286,24 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 
 	return (error);
 }
+
+int
+cheriabi_colookup(struct thread *td, struct cheriabi_colookup_args *uap)
+{
+
+	return (EDOOFUS);
+}
+
+int
+cheriabi_coregister(struct thread *td, struct cheriabi_coregister_args *uap)
+{
+
+	return (EDOOFUS);
+}
+
+int
+cheriabi_cosetup(struct thread *td, struct cheriabi_cosetup_args *uap)
+{
+
+	return (EDOOFUS);
+}

@@ -3018,20 +3018,20 @@
 		    _In_ void * *envv
 		);
 	}
-565	AUE_NULL	NOPROTO	{
+565	AUE_NULL	STD	{
 		int cosetup(
 		    int what,
 		    _Out_ void **code,
 		    _Out_ void **data
 		);
 	}
-566	AUE_NULL	NOPROTO	{
+566	AUE_NULL	STD	{
 		int coregister(
 		_In_z_ const char *name,
 		_Out_opt_ void **cap
 		);
 	}
-567	AUE_NULL	NOPROTO	{
+567	AUE_NULL	STD	{
 		int colookup(
 		    _In_z_ const char *name,
 		    _Out_ void **cap

@@ -281,7 +281,7 @@ cosetup(struct thread *td)
 	/*
 	 * XXX: Race between this and setting the owner.
 	 */
-	error = kern_mmap(td, 0, 0, PAGE_SIZE, VM_PROT_READ | VM_PROT_WRITE, MAP_ANON, -1, 0);
+	error = kern_mmap(td, 0, PAGE_SIZE, VM_PROT_READ | VM_PROT_WRITE, MAP_ANON, -1, 0);
 	if (error != 0) {
 		printf("%s: kern_mmap() failed with error %d\n", __func__, error);
 		return (error);

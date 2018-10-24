@@ -574,6 +574,6 @@ const char *syscallnames[] = {
 	"cosetup",			/* 565 = cosetup */
 	"coregister",			/* 566 = coregister */
 	"colookup",			/* 567 = colookup */
-	"#568",			/* 568 = { */
+	"copark",			/* 568 = copark */
 	"cogetpid",			/* 569 = cogetpid */
 };

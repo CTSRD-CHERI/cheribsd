@@ -1397,6 +1397,19 @@ struct cheriabi_coexecve_args {
 	char argv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability argv; char argv_r_[PADR_(void * __capability * __capability)];
 	char envv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability envv; char envv_r_[PADR_(void * __capability * __capability)];
 };
+struct cheriabi_cosetup_args {
+	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
+	char code_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability code; char code_r_[PADR_(void * __capability * __capability)];
+	char data_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability data; char data_r_[PADR_(void * __capability * __capability)];
+};
+struct cheriabi_coregister_args {
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char cap_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability cap; char cap_r_[PADR_(void * __capability * __capability)];
+};
+struct cheriabi_colookup_args {
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char cap_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability cap; char cap_r_[PADR_(void * __capability * __capability)];
+};
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
@@ -1680,6 +1693,9 @@ int	cheriabi_cpuset_getdomain(struct thread *, struct cheriabi_cpuset_getdomain_
 int	cheriabi_cpuset_setdomain(struct thread *, struct cheriabi_cpuset_setdomain_args *);
 int	cheriabi_getrandom(struct thread *, struct cheriabi_getrandom_args *);
 int	cheriabi_coexecve(struct thread *, struct cheriabi_coexecve_args *);
+int	cheriabi_cosetup(struct thread *, struct cheriabi_cosetup_args *);
+int	cheriabi_coregister(struct thread *, struct cheriabi_coregister_args *);
+int	cheriabi_colookup(struct thread *, struct cheriabi_colookup_args *);
 
 #ifdef COMPAT_43
 
@@ -2014,6 +2030,9 @@ int	cheriabi_coexecve(struct thread *, struct cheriabi_coexecve_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset_setdomain	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_getrandom	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_coexecve	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_cosetup	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_coregister	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_colookup	AUE_NULL
 
 #undef PAD_
 #undef PADL_
