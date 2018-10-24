@@ -80,8 +80,8 @@ libpng_sb_userfn_handler(struct cheri_object system_object,
     register_t methodnum,
     register_t a0, register_t a1, register_t a2, register_t a3,
     register_t a4, register_t a5, register_t a6, register_t a7,
-    __capability void *void_cpsp, __capability void *c4,
-    __capability void *c5, __capability void *c6, __capability void *c7)
+    void * __capability void_cpsp, void * __capability c4,
+    void * __capability c5, void * __capability c6, void * __capability c7)
     __attribute__((cheri_ccall));
     /* XXXRW: Will be ccheri_ccallee. */
 
@@ -91,9 +91,9 @@ libpng_sb_userfn_handler(struct cheri_object system_object __unused,
     register_t a0, register_t a1,
     register_t a2 __unused, register_t a3 __unused, register_t a4 __unused,
     register_t a5 __unused, register_t a6 __unused, register_t a7 __unused,
-    __capability void *void_cpsp, __capability void *c4,
-    __capability void *c5 __unused, __capability void *c6 __unused,
-    __capability void *c7 __unused)
+    void * __capability void_cpsp, void * __capability c4,
+    void * __capability c5 __unused, void * __capability c6 __unused,
+    void * __capability c7 __unused)
 {
 	struct sb_png_struct *psp = cheri_cap_to_typed_ptr(void_cpsp,
 		    struct sb_png_struct);
@@ -210,8 +210,8 @@ static register_t
 sb_cinvoke(struct sandbox_object *objectp, register_t methodnum,
     register_t a1, register_t a2, register_t a3, register_t a4,
     register_t a5, register_t a6, register_t a7,
-    __capability void *c7, __capability void *c8,
-    __capability void *c9, __capability void *c10)
+    void * __capability c7, void * __capability c8,
+    void * __capability c9, void * __capability c10)
 {
 
 	return (sandbox_object_invoke(objectp,
@@ -222,7 +222,7 @@ sb_cinvoke(struct sandbox_object *objectp, register_t methodnum,
 	    cheri_zerocap(), cheri_zerocap(), c7, c8, c9, c10));
 }
 
-static inline __capability void *
+static inline void * __capability
 sb_info_ptr_to_cap(png_const_infop info_ptr)
 {
 	
@@ -460,7 +460,7 @@ png_read_image(png_structp png_ptr, png_bytepp image)
 	printf("%s: allocating %u rows of 0x%u bytes\n", __func__,
 	    height, rowbytes);
 
-	row_pointer = calloc(height, sizeof(__capability void *));
+	row_pointer = calloc(height, sizeof(void * __capability));
 	if (row_pointer == NULL) {
 		warnx("%s: failed to malloc space for %u rows",
 		    __func__, height);

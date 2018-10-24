@@ -51,7 +51,7 @@ int invoke (void) {
 }
 
 int
-cheri_bench_memcpy(__capability void *dataout,  __capability void *datain, register_t len)
+cheri_bench_memcpy(void * __capability dataout,  void * __capability datain, register_t len)
 {
   memcpy_c(dataout, datain, len);
   return 0;

@@ -68,7 +68,7 @@
  * static and dynamic allocation.
  */
 static void
-test_bounds_precise(__capability void *c, size_t expected_len)
+test_bounds_precise(void * __capability c, size_t expected_len)
 {
 	size_t len, offset;
 
@@ -88,7 +88,7 @@ test_bounds_precise(__capability void *c, size_t expected_len)
 static void
 test_bounds_stack_alloca(size_t len)
 {
-	__capability void *c = (__capability void *)alloca(len);
+	void * __capability c = (void * __capability)alloca(len);
 
 	test_bounds_precise(c, len);
 }
@@ -160,7 +160,7 @@ test_bounds_stack_dynamic_uint64(const struct cheri_test *ctp __unused)
 void
 test_bounds_stack_static_cap(const struct cheri_test *ctp __unused)
 {
-	__capability void *c;
+	void * __capability c;
 	void * __capability * __capability cp =
 	    (void * __capability * __capability)&c;
 
@@ -176,7 +176,7 @@ test_bounds_stack_dynamic_cap(const struct cheri_test *ctp __unused)
 	 * 256-bit CHERI, we can guarantee 32-byte alignment, not the (likely)
 	 * 16-byte alignment we would naturally get back on MIPS.
 	 */
-	test_bounds_stack_alloca(sizeof(__capability void *));
+	test_bounds_stack_alloca(sizeof(void * __capability));
 }
 
 void

@@ -66,21 +66,21 @@
  */
 void ZLIB_INTERNAL inflate_fast(strm, beg)
 z_streamp strm;
-__capability unsigned char FAR *beg;    /* inflate()'s initial strm->next_out */
+unsigned char FAR * __capability beg;    /* inflate()'s initial strm->next_out */
 {
     struct inflate_state FAR *state;
-    __capability z_const unsigned char FAR *in;      /* local strm->next_in */
-    __capability z_const unsigned char FAR *sin;     /* saved strm->next_in */
-    __capability z_const unsigned char FAR *last;    /* have enough input while in < last */
-    __capability unsigned char FAR *out;     /* local strm->next_out */
-    __capability unsigned char FAR *end;     /* while out < end, enough space available */
+    z_const unsigned char FAR * __capability in;      /* local strm->next_in */
+    z_const unsigned char FAR * __capability sin;     /* saved strm->next_in */
+    z_const unsigned char FAR * __capability last;    /* have enough input while in < last */
+    unsigned char FAR * __capability out;     /* local strm->next_out */
+    unsigned char FAR * __capability end;     /* while out < end, enough space available */
 #ifdef INFLATE_STRICT
     unsigned dmax;              /* maximum distance from zlib header */
 #endif
     unsigned wsize;             /* window size or zero if not using window */
     unsigned whave;             /* valid bytes in the window */
     unsigned wnext;             /* window write index */
-    __capability unsigned char FAR *window;  /* allocated sliding window, if wsize != 0 */
+    unsigned char FAR * __capability window;  /* allocated sliding window, if wsize != 0 */
     unsigned long hold;         /* local strm->hold */
     unsigned bits;              /* local strm->bits */
     code const FAR *lcode;      /* local strm->lencode */
@@ -92,7 +92,7 @@ __capability unsigned char FAR *beg;    /* inflate()'s initial strm->next_out */
                                 /*  window position, window bytes to copy */
     unsigned len;               /* match length, unused bytes */
     unsigned dist;              /* match distance */
-    __capability unsigned char FAR *from;    /* where to copy match from */
+    unsigned char FAR * __capability from;    /* where to copy match from */
 
     /* copy state to local variables */
     state = (struct inflate_state FAR *)strm->state;

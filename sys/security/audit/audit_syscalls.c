@@ -2,7 +2,7 @@
  * SPDX-License-Identifier: BSD-3-Clause
  *
  * Copyright (c) 1999-2009 Apple Inc.
- * Copyright (c) 2016 Robert N. M. Watson
+ * Copyright (c) 2016, 2018 Robert N. M. Watson
  * All rights reserved.
  *
  * Portions of this software were developed by BAE Systems, the University of
@@ -388,7 +388,7 @@ kern_auditon(struct thread *td, int cmd, void * __capability data,
 	case A_OLDGETCOND:
 	case A_GETCOND:
 		if (length == sizeof(udata.au_cond64)) {
-			if (audit_enabled && !audit_suspended)
+			if (audit_trail_enabled && !audit_trail_suspended)
 				udata.au_cond64 = AUC_AUDITING;
 			else
 				udata.au_cond64 = AUC_NOAUDIT;
@@ -396,7 +396,7 @@ kern_auditon(struct thread *td, int cmd, void * __capability data,
 		}
 		if (length != sizeof(udata.au_cond))
 			return (EINVAL);
-		if (audit_enabled && !audit_suspended)
+		if (audit_trail_enabled && !audit_trail_suspended)
 			udata.au_cond = AUC_AUDITING;
 		else
 			udata.au_cond = AUC_NOAUDIT;
@@ -406,25 +406,27 @@ kern_auditon(struct thread *td, int cmd, void * __capability data,
 	case A_SETCOND:
 		if (length == sizeof(udata.au_cond64)) {
 			if (udata.au_cond64 == AUC_NOAUDIT)
-				audit_suspended = 1;
+				audit_trail_suspended = 1;
 			if (udata.au_cond64 == AUC_AUDITING)
-				audit_suspended = 0;
+				audit_trail_suspended = 0;
 			if (udata.au_cond64 == AUC_DISABLED) {
-				audit_suspended = 1;
+				audit_trail_suspended = 1;
 				audit_shutdown(NULL, 0);
 			}
+			audit_syscalls_enabled_update();
 			break;
 		}
 		if (length != sizeof(udata.au_cond))
 			return (EINVAL);
 		if (udata.au_cond == AUC_NOAUDIT)
-			audit_suspended = 1;
+			audit_trail_suspended = 1;
 		if (udata.au_cond == AUC_AUDITING)
-			audit_suspended = 0;
+			audit_trail_suspended = 0;
 		if (udata.au_cond == AUC_DISABLED) {
-			audit_suspended = 1;
+			audit_trail_suspended = 1;
 			audit_shutdown(NULL, 0);
 		}
+		audit_syscalls_enabled_update();
 		break;
 
 	case A_GETCLASS:
@@ -899,10 +901,11 @@ kern_auditctl(struct thread *td, const char * __capability path)
 	crhold(cred);
 
 	/*
-	 * XXXAUDIT: Should audit_suspended actually be cleared by
+	 * XXXAUDIT: Should audit_trail_suspended actually be cleared by
 	 * audit_worker?
 	 */
-	audit_suspended = 0;
+	audit_trail_suspended = 0;
+	audit_syscalls_enabled_update();
 
 	audit_rotate_vnode(cred, vp);
 

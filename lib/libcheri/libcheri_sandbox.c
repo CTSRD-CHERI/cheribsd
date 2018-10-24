@@ -81,7 +81,7 @@ static struct sandbox_required_methods	*main_required_methods;
  * libcheri_system_vtable is defined here and not in libcheri_system.h to avoid
  * running into https://github.com/CTSRD-CHERI/cheribsd/issues/180
  */
-__capability vm_offset_t	*libcheri_system_vtable;
+vm_offset_t * __capability	 libcheri_system_vtable;
 
 
 static int	sandbox_program_init(void);
@@ -250,6 +250,7 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 	/*
 	 * Parse the ELF and produce mappings for code and data.
 	 */
+#ifdef SPLIT_CODE_DATA
 	if ((sbcp->sbc_codemap = sandbox_parse_elf64(fd, path,
 	    SANDBOX_LOADELF_CODE)) == NULL) {
 		saved_errno = EINVAL;
@@ -264,6 +265,15 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 		    path);
 		goto error;
 	}
+#else
+	if ((sbcp->sbc_datamap = sandbox_parse_elf64(fd, path,
+	    SANDBOX_LOADELF_CODE | SANDBOX_LOADELF_DATA)) == NULL) {
+		saved_errno = EINVAL;
+		warnx("%s: sandbox_parse_elf64(DATA) failed for %s", __func__,
+		    path);
+		goto error;
+	}
+#endif
 
 	/*
 	 * Don't allow sandbox binaries to request over maxmaplen of
@@ -273,12 +283,14 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 	 * value, but programs can have astonishing amounts of BSS
 	 * relative to file size.
 	 */
+#ifdef SPLIT_CODE_DATA
 	if (maxmaplen > 0 &&
 	    sandbox_map_maxoffset(sbcp->sbc_codemap) > maxmaplen) {
 		saved_errno = EINVAL;
 		warnx("%s: %s code too large", __func__, path);
 		goto error;
 	}
+#endif
 	if (maxmaplen > 0 &&
 	    sandbox_map_maxoffset(sbcp->sbc_datamap) > maxmaplen) {
 		saved_errno = EINVAL;
@@ -535,8 +547,8 @@ sandbox_object_new(struct sandbox_class *sbcp, size_t heaplen,
  * sandbox_class instances?  That would be more consistent...
  */
 int
-sandbox_object_new_system_object(__capability void *private_data,
-    __capability void *invoke_pcc, __capability vm_offset_t *vtable,
+sandbox_object_new_system_object(void * __capability private_data,
+    void * __capability invoke_pcc, vm_offset_t * __capability vtable,
     struct sandbox_object **sbopp)
 {
 
@@ -570,7 +582,7 @@ sandbox_object_new_system_object(__capability void *private_data,
 	 */
         (*sbopp)->sbo_cheri_object_invoke =
             libcheri_sandbox_make_sealed_invoke_object(
-	    (__cheri_tocap __capability struct sandbox_object *)*sbopp);
+	    (__cheri_tocap struct sandbox_object * __capability)*sbopp);
 	return (0);
 }
 
@@ -630,9 +642,9 @@ register_t
 sandbox_object_invoke(struct sandbox_object *sbop, register_t methodnum,
     register_t a1, register_t a2, register_t a3,
     register_t a4, register_t a5, register_t a6, register_t a7,
-    __capability void *c3, __capability void *c4, __capability void *c5,
-    __capability void *c6, __capability void *c7, __capability void *c8,
-    __capability void *c9, __capability void *c10)
+    void * __capability c3, void * __capability c4, void * __capability c5,
+    void * __capability c6, void * __capability c7, void * __capability c8,
+    void * __capability c9, void * __capability c10)
 {
 	struct sandbox_class *sbcp;
 	uint64_t sample, start;
@@ -691,14 +703,14 @@ sandbox_object_getobject(struct sandbox_object *sbop)
 	return (sbop->sbo_cheri_object_invoke);
 }
 
-__capability void *
+void * __capability
 sandbox_object_getsandboxdata(struct sandbox_object *sbop)
 {
 
 	return (sbop->sbo_idc);
 }
 
-__capability void *
+void * __capability
 sandbox_object_getsandboxstack(struct sandbox_object *sbop)
 {
 
@@ -712,14 +724,14 @@ sandbox_object_getsystemobject(struct sandbox_object *sbop)
 	return (sbop->sbo_cheri_object_system);
 }
 
-__capability void *
+void * __capability
 sandbox_object_private_get(struct sandbox_object *sbop)
 {
 
 	return (sbop->sbo_private_data);
 }
 
-__capability void *
+void * __capability
 sandbox_object_private_get_idc(void)
 {
 	struct sandbox_object *sbop;

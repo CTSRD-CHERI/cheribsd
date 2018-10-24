@@ -42,6 +42,8 @@
 #define dbg(...)
 #endif
 
+__BEGIN_DECLS
+
 struct Struct_Obj_Entry;
 
 /* Return the address of the .dynamic section in the dynamic linker. */
@@ -211,11 +213,14 @@ _rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_p
 static inline void
 fix_obj_mapping_cap_permissions(Obj_Entry *obj, const char* path __unused)
 {
-	obj->text_rodata_cap = cheri_andperm(obj->text_rodata_cap, ~FUNC_PTR_REMOVE_PERMS);
-	obj->relocbase = cheri_andperm(obj->relocbase, ~DATA_PTR_REMOVE_PERMS);
-	obj->mapbase = cheri_andperm(obj->mapbase, ~DATA_PTR_REMOVE_PERMS);
+	obj->text_rodata_cap = (const char*)cheri_andperm(obj->text_rodata_cap, ~FUNC_PTR_REMOVE_PERMS);
+	obj->relocbase = (char*)cheri_andperm(obj->relocbase, ~DATA_PTR_REMOVE_PERMS);
+	obj->mapbase = (char*)cheri_andperm(obj->mapbase, ~DATA_PTR_REMOVE_PERMS);
 	dbg("%s:\n\tmapbase=%-#p\n\trelocbase=%-#p\n\ttext_rodata=%-#p", path,
 	    obj->mapbase, obj->relocbase, obj->text_rodata_cap);
 }
+
+__END_DECLS
+
 
 #endif

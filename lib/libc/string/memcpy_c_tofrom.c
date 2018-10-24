@@ -33,8 +33,8 @@
 
 #include <cheri/cheric.h>
 
-__capability void *
-memcpy_c_tocap(__capability void *dst, const void *src, size_t len)
+void * __capability
+memcpy_c_tocap(void * __capability dst, const void *src, size_t len)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -45,7 +45,7 @@ memcpy_c_tocap(__capability void *dst, const void *src, size_t len)
 }
 
 void *
-memcpy_c_fromcap(void *dst, __capability const void *src, size_t len)
+memcpy_c_fromcap(void *dst, const void * __capability src, size_t len)
 {
 
 #ifdef __CHERI_PURE_CAPABILITY__

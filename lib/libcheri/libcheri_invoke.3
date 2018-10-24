@@ -42,8 +42,8 @@
 #if __has_feature(capabilities)
 .Ft register_t
 .Fo libcheri_invoke
-.Fa "__capability void *c1"
-.Fa "__capability void *c2"
+.Fa "void * __capability c1"
+.Fa "void * __capability c2"
 .Fa "register_t a0"
 .Fa "register_t a1"
 .Fa "register_t a2"
@@ -52,14 +52,14 @@
 .Fa "register_t a5"
 .Fa "register_t a6"
 .Fa "register_t a7"
-.Fa "__capability void *c3"
-.Fa "__capability void *c4"
-.Fa "__capability void *c5"
-.Fa "__capability void *c6"
-.Fa "__capability void *c7"
-.Fa "__capability void *c8"
-.Fa "__capability void *c9"
-.Fa "__capability void *c10"
+.Fa "void * __capability c3"
+.Fa "void * __capability c4"
+.Fa "void * __capability c5"
+.Fa "void * __capability c6"
+.Fa "void * __capability c7"
+.Fa "void * __capability c8"
+.Fa "void * __capability c9"
+.Fa "void * __capability c10"
 .Fc
 #else
 .Ft register_t

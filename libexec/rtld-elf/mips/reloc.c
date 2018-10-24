@@ -453,10 +453,9 @@ _mips_rtld_bind(Obj_Entry *obj, Elf_Size reloff)
 }
 #endif /* #ifndef __CHERI_PURE_CAPABILITY__*/
 
-static inline const char*
-symname(Obj_Entry* obj, size_t r_symndx) {
-	return obj->strtab + obj->symtab[r_symndx].st_name;
-}
+#ifdef __CHERI_PURE_CAPABILITY__
+#include "cheri_reloc.h"
+#endif
 
 int
 reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
@@ -880,72 +879,9 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_TYPE(CHERI_CAPABILITY_CALL): /* TODO: lazy binding */
 		case R_TYPE(CHERI_CAPABILITY):
 		{
-			def = find_symdef(r_symndx, obj, &defobj, flags, NULL,
-			    lockstate);
-			if (__predict_false(def == NULL)) {
-				_rtld_error("%s: Could not find symbol %s",
-				    obj->path, symname(obj, r_symndx));
-				return -1;
-			}
-			assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
-			    "IFUNC not implemented!");
-
-			const void* symval = NULL;
-			bool is_undef_weak = false;
-			if (def->st_shndx == SHN_UNDEF) {
-				/* Verify that we are resolving a weak symbol */
-#ifdef DEBUG
-				const Elf_Sym* src_sym = obj->symtab + r_symndx;
-				dbg("NOTE: found undefined R_CHERI_CAPABILITY "
-				    "for %s (in %s): value=%ld, size=%ld, "
-				    "type=%d, def bind=%d,sym bind=%d",
-				    symname(obj, r_symndx), obj->path,
-				    def->st_value, def->st_size,
-				    ELF_ST_TYPE(def->st_info),
-				    ELF_ST_BIND(def->st_info),
-				    ELF_ST_BIND(src_sym->st_info));
-				assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
-#endif
-				assert(def == &sym_zero && "Undef weak symbol is non-canonical!");
-				is_undef_weak = true;
-			}
-			else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
-				/* Remove write permissions and set bounds */
-				symval = make_function_pointer(def, defobj);
-			} else {
-				/* Remove execute permissions and set bounds */
-				symval = make_data_pointer(def, defobj);
-			}
-#ifdef DEBUG
-			// FIXME: this warning breaks some tests that expect clean stdout/stderr
-			// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
-			// TODO: or use this approach: https://github.com/CTSRD-CHERI/cheribsd/commit/c1920496c0086d9c5214fb0f491e4d6cdff3828e?
-			if (__predict_false(symval != NULL && cheri_getlen(symval) <= 0)) {
-				rtld_fdprintf(STDERR_FILENO, "Warning: created "
-				    "zero length capability for %s (in %s): %-#p\n",
-				    symname(obj, r_symndx), obj->path, symval);
-			}
-#endif
-			/*
-			 * The capability offset is the addend for the
-			 * relocation. Since we are using Elf_Rel this is the
-			 * first 8 bytes of the target location (which is the
-			 * virtual address for both 128 and 256-bit CHERI).
-			 */
-			uint64_t src_offset = load_ptr(where, sizeof(uint64_t));
-			symval += src_offset;
-			if (__predict_false(!cheri_gettag(symval) && !is_undef_weak)) {
-				_rtld_error("%s: constructed invalid capability"
-				   "for %s: %#p",  obj->path,
-				    symname(obj, r_symndx), symval);
-				return -1;
-			}
-			*((const void**)where) = symval;
-#if defined(DEBUG_VERBOSE)
-			dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s",
-			    where, rel->r_offset, symname(obj, r_symndx),
-			    obj->path, *((void**)where), defobj->path);
-#endif
+			if (process_r_cheri_capability(obj, r_symndx, lockstate,
+			    flags, where) != 0)
+				return (-1);
 			break;
 		}
 #endif /* __CHERI_PURE_CAPABILITY__ */

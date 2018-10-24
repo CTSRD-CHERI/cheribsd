@@ -35,7 +35,7 @@
 #error "This code requires a CHERI-aware compiler"
 #endif
 
-extern __capability vm_offset_t *libcheri_fd_vtable;
+extern vm_offset_t * __capability libcheri_fd_vtable;
 
 extern struct cheri_object	libcheri_fd;
 #ifdef LIBCHERI_FD_INTERNAL
@@ -78,14 +78,14 @@ struct libcheri_fd_ret {
  */
 struct stat;
 LIBCHERI_FD_CCALL
-struct libcheri_fd_ret	libcheri_fd_fstat(__capability struct stat *sb_c);
+struct libcheri_fd_ret	libcheri_fd_fstat(struct stat * __capability sb_c);
 LIBCHERI_FD_CCALL
 struct libcheri_fd_ret	libcheri_fd_lseek(off_t offset, int whence);
 LIBCHERI_FD_CCALL
-struct libcheri_fd_ret	libcheri_fd_read(__capability void *buf_c,
+struct libcheri_fd_ret	libcheri_fd_read(void * __capability buf_c,
 			     size_t nbytes);
 LIBCHERI_FD_CCALL
-struct libcheri_fd_ret	libcheri_fd_write(__capability const void *buf_c,
+struct libcheri_fd_ret	libcheri_fd_write(const void * __capability buf_c,
 			     size_t nbytes);
 
 #endif /* !_LIBCHERI_FD_H_ */

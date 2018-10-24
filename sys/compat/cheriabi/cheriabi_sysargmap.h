@@ -9,7 +9,6 @@
 #define	_CHERIABI_SYSARGMAP_H_
 
 int cheriabi_sysargmask[] = {
- [CHERIABI_SYS_cheriabi_syscall] = (0x0),
  [CHERIABI_SYS_exit] = (0x0),
  [CHERIABI_SYS_cheriabi_read] = (0x0 | 0x2),
  [CHERIABI_SYS_cheriabi_write] = (0x0 | 0x2),
@@ -355,9 +354,9 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_cpuset_setdomain] = (0x0 | 0x10),
  [CHERIABI_SYS_cheriabi_getrandom] = (0x0 | 0x1),
  [CHERIABI_SYS_cheriabi_coexecve] = (0x0 | 0x2 | 0x4 | 0x8),
- [CHERIABI_SYS_cosetup] = (0x0 | 0x2 | 0x4),
- [CHERIABI_SYS_coregister] = (0x0 | 0x1 | 0x2),
- [CHERIABI_SYS_colookup] = (0x0 | 0x1 | 0x2),
+ [CHERIABI_SYS_cheriabi_cosetup] = (0x0 | 0x2 | 0x4),
+ [CHERIABI_SYS_cheriabi_coregister] = (0x0 | 0x1 | 0x2),
+ [CHERIABI_SYS_cheriabi_colookup] = (0x0 | 0x1 | 0x2),
 };
 
 #endif /* !_CHERIABI_SYSARGMAP_H_ */

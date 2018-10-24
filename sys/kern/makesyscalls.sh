@@ -29,6 +29,8 @@ ptrmaskname="sysargmask"
 systrace="systrace_args.c"
 ptr_intptr_t_cast="intptr_t"
 ptr_qualified="*"
+mincompat="0"
+abi_flags=""
 
 # tmp files:
 sysaue="sysent.aue.$$"
@@ -79,13 +81,34 @@ else
 fi
 
 sed -e '
-:join
+	# FreeBSD ID, includes, comments, and blank lines
+	/.*\$FreeBSD/b done_joining
+	/^[#;]/b done_joining
+	/^$/b done_joining
+
+	# Join lines ending in backslash
+:join_backslashes
 	/\\$/{a\
 
 	N
 	s/\\\n//
-	b join
+	b join_backslashes
 	}
+
+	# OBSOL, etc lines without function signatures
+	/^[0-9][^{]*$/b done_joining
+
+	# Join incomplete signatures.  The { must appear on the first line
+	# and the } must appear on the last line (modulo lines joined by
+	# backslashes).
+:join_syscalls
+	/^[^}]*$/{a\
+
+	N
+	s/\n//
+	b join_syscalls
+	}
+:done_joining
 2,${
 	/^#/!s/\([{}()*,]\)/ \1 /g
 }
@@ -134,8 +157,10 @@ sed -e '
 		namesname = \"$namesname\"
 		ptrmaskname = \"$ptrmaskname\"
 		infile = \"$1\"
+		mincompat = \"$mincompat\" + 0
+		abi_flags = \"$abi_flags\"
+		abi_func_prefix = \"$abi_func_prefix\"
 		capenabled_string = \"$capenabled\"
-		cap_prefix = \"$cap_prefix\"
 		ptr_intptr_t_cast = \"$ptr_intptr_t_cast\"
 		ptr_qualified = \"$ptr_qualified\"
 		"'
@@ -326,6 +351,14 @@ sed -e '
 				return 1
 		return 0
 	}
+	# Returns true if the flag "name" is set in the abi_flags variable
+	function abi_changes(name, _tmparray, i, n) {
+		n = split(abi_flags, _tmparray, /\|/)
+		for (i = 1; i <= n; i++)
+			if (_tmparray[i] == name)
+				return 1
+		return 0
+	}
 	{
 		n = split($1, syscall_range, /-/)
 		if (n == 1) {
@@ -367,7 +400,10 @@ sed -e '
 		ret_inc = 0
 		argc= 0;
 		argssize = "0"
+		argprefix = ""
+		funcprefix = ""
 		thr_flag = "SY_THR_STATIC"
+		ptrargs = 0
 		if (flag("NOTSTATIC")) {
 			thr_flag = "SY_THR_ABSENT"
 		}
@@ -419,28 +455,26 @@ sed -e '
 		# from it.
 		#
 		for (cap in capenabled) {
-			if (funcname == capenabled[cap] || funcname == cap_prefix capenabled[cap] ) {
+			if (funcname == capenabled[cap]) {
 				flags = "SYF_CAPENABLED";
 				break;
 			}
 		}
 
-		if (funcalias == "")
-			funcalias = funcname
 		if (argalias == "") {
 			argalias = funcname "_args"
 			if (flag("COMPAT"))
-				argalias = "o" argalias
+				argprefix = "o"
 			if (flag("COMPAT4"))
-				argalias = "freebsd4_" argalias
+				argprefix = "freebsd4_"
 			if (flag("COMPAT6"))
-				argalias = "freebsd6_" argalias
+				argprefix = "freebsd6_"
 			if (flag("COMPAT7"))
-				argalias = "freebsd7_" argalias
+				argprefix = "freebsd7_"
 			if (flag("COMPAT10"))
-				argalias = "freebsd10_" argalias
+				argprefix = "freebsd10_"
 			if (flag("COMPAT11"))
-				argalias = "freebsd11_" argalias
+				argprefix = "freebsd11_"
 		}
 		f++
 
@@ -448,13 +482,12 @@ sed -e '
 			parserr($f, ")")
 		f++
 
-		if (f == end) {
-			if ($f != "void")
-				parserr($f, "argument definition")
-			return
-		}
-
 		while (f <= end) {
+			if (argc == 0 && f == end) {
+				if ($f != "void")
+					parserr($f, "argument definition")
+				break
+			}
 			argc++
 			argtype[argc]=""
 			oldf=""
@@ -484,12 +517,30 @@ sed -e '
 			# Allow pointers to be qualified
 			gsub(/\*/, ptr_qualified, argtype[argc]);
 			sub(/ $/, "", argtype[argc]);
+
+			if (isptrtype(argtype[argc]))
+				ptrargs++
+
 			argname[argc]=$f;
 			f += 2;			# skip name, and any comma
 		}
+
+		if (abi_changes("pointer_args") && ptrargs > 0) {
+			argprefix = argprefix abi_func_prefix
+			funcprefix = abi_func_prefix
+		}
+		if (funcalias == "") {
+			noabi_funcalias = funcname;
+			funcalias = funcprefix funcname
+		} else
+			noabi_funcalias = funcalias
+		funcname = funcprefix funcname
+
+		argalias = argprefix argalias
 		if (argc != 0)
 			argssize = "AS(" argalias ")"
 	}
+
 	{	comment = $4
 		if (NF < 7)
 			for (i = 5; i <= NF; i++)
@@ -551,23 +602,24 @@ sed -e '
 		}
 		printf("\t\t*n_args = %d;\n\t\tbreak;\n\t}\n", argc) > systrace
 		printf("\t\tbreak;\n") > systracetmp
-		if (argc != 0 && !flag("NOARGS") && !flag("NOPROTO") && \
-		    !flag("NODEF")) {
-			printf("struct %s {\n", argalias) > sysarg
-			for (i = 1; i <= argc; i++) {
-				a_type = argtype[i]
-				gsub (/__restrict/, "", a_type)
-				printf("\tchar %s_l_[PADL_(%s)]; " \
-				    "%s %s; char %s_r_[PADR_(%s)];\n",
-				    argname[i], a_type,
-				    a_type, argname[i],
-				    argname[i], a_type) > sysarg
-			}
-			printf("};\n") > sysarg
+		if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF") && \
+		    !(abi_flags != "" && ptrargs == 0)) {
+			if (argc != 0) {
+				printf("struct %s {\n", argalias) > sysarg
+				for (i = 1; i <= argc; i++) {
+					a_type = argtype[i]
+					gsub (/__restrict/, "", a_type)
+					printf("\tchar %s_l_[PADL_(%s)]; " \
+					    "%s %s; char %s_r_[PADR_(%s)];\n",
+					    argname[i], a_type,
+					    a_type, argname[i],
+					    argname[i], a_type) > sysarg
+				}
+				printf("};\n") > sysarg
+			} else
+				printf("struct %s {\n\tregister_t dummy;\n};\n",
+				    argalias) > sysarg
 		}
-		else if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF"))
-			printf("struct %s {\n\tregister_t dummy;\n};\n",
-			    argalias) > sysarg
 
 		if (argc != 0 && !flag("NOARGS") && !flag("NODEF")) {
 			printf(" [%s%s] = (0x0", syscallprefix, funcalias) > sysargmap
@@ -666,7 +718,7 @@ sed -e '
 			}
 
 			# _protoargs_err
-			printf ("),\n    /* _protoargs_err */ (__capability int *stub_errno") > sysstubstubs
+			printf ("),\n    /* _protoargs_err */ (int * __capability stub_errno") > sysstubstubs
 			for (i = 1; i <= argc; i++) {
 				a_type = argtype[i]
 				sub(/_c /, "", a_type)
@@ -742,7 +794,8 @@ sed -e '
 			printf (")\n\n") > sysstubstubs
 		}
 
-		if (!flag("NOPROTO") && !flag("NODEF")) {
+		if (!flag("NOPROTO") && !flag("NODEF") && \
+		    !(abi_flags != "" && ptrargs == 0)) {
 			if (funcname == "nosys" || funcname == "lkmnosys" ||
 			    funcname == "sysarch" ||
 			    funcname ~ /^cheriabi/ || funcname ~ /^freebsd/ ||
@@ -790,43 +843,62 @@ sed -e '
 	}
 	type("COMPAT") || type("COMPAT4") || type("COMPAT6") || \
 	    type("COMPAT7") || type("COMPAT10") || type("COMPAT11") {
+		is_obsol = 0
 		if (flag("COMPAT")) {
-			ncompat++
+			if (mincompat >= 4)
+				is_obsol = 1
+			else
+				ncompat++
 			out = syscompat
 			outdcl = syscompatdcl
 			wrap = "compat"
 			prefix = "o"
 			descr = "old"
 		} else if (flag("COMPAT4")) {
-			ncompat4++
+			if (mincompat > 4)
+				is_obsol = 1
+			else
+				ncompat4++
 			out = syscompat4
 			outdcl = syscompat4dcl
 			wrap = "compat4"
 			prefix = "freebsd4_"
 			descr = "freebsd4"
 		} else if (flag("COMPAT6")) {
-			ncompat6++
+			if (mincompat > 5)
+				is_obsol = 1
+			else
+				ncompat6++
 			out = syscompat6
 			outdcl = syscompat6dcl
 			wrap = "compat6"
 			prefix = "freebsd6_"
 			descr = "freebsd6"
 		} else if (flag("COMPAT7")) {
-			ncompat7++
+			if (mincompat > 7)
+				is_obsol = 1
+			else
+				ncompat7++
 			out = syscompat7
 			outdcl = syscompat7dcl
 			wrap = "compat7"
 			prefix = "freebsd7_"
 			descr = "freebsd7"
 		} else if (flag("COMPAT10")) {
-			ncompat10++
+			if (mincompat > 10)
+				is_obsol = 1
+			else
+				ncompat10++
 			out = syscompat10
 			outdcl = syscompat10dcl
 			wrap = "compat10"
 			prefix = "freebsd10_"
 			descr = "freebsd10"
 		} else if (flag("COMPAT11")) {
-			ncompat11++
+			if (mincompat > 11)
+				is_obsol = 1
+			else
+				ncompat11++
 			out = syscompat11
 			outdcl = syscompat11dcl
 			wrap = "compat11"
@@ -834,6 +906,20 @@ sed -e '
 			descr = "freebsd11"
 		}
 		parseline()
+
+		if (is_obsol) {
+			printf("\t{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },") > sysent
+			align_sysent_comment(34)
+			printf("/* %d = obsolete %s%s */\n", syscall,
+			    prefix, noabi_funcalias) > sysent
+			printf("\t\"obs_%s%s\",\t\t\t/* %d = obsolete %s%s */\n",
+			    prefix, noabi_funcalias, syscall, prefix, noabi_funcalias) > sysnames
+			printf("\t\t\t\t/* %d is obsolete %s%s */\n",
+			    syscall, prefix, noabi_funcalias) > syshdr
+			syscall++
+			next
+		}
+
 		if (argc != 0 && !flag("NOARGS") && !flag("NOPROTO") && \
 		    !flag("NODEF")) {
 			printf("struct %s {\n", argalias) > out

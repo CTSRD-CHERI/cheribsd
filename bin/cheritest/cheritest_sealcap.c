@@ -50,7 +50,7 @@
 void
 test_sealcap_sysarch(const struct cheri_test *ctp __unused)
 {
-	__capability void *sealcap;
+	void * __capability sealcap;
 	register_t v;
 
 	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
@@ -144,9 +144,9 @@ static uint8_t sealdata[4096] __attribute__ ((aligned(4096)));
 void
 test_sealcap_seal(const struct cheri_test *ctp __unused)
 {
-	__capability void *sealdatap;
-	__capability void *sealcap;
-	__capability void *sealed;
+	void * __capability sealdatap;
+	void * __capability sealcap;
+	void * __capability sealed;
 	register_t v;
 
 	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)
@@ -201,9 +201,10 @@ test_sealcap_seal(const struct cheri_test *ctp __unused)
 void
 test_sealcap_seal_unseal(const struct cheri_test *ctp __unused)
 {
-	__capability void *sealdatap;
-	__capability void *sealcap;
-	__capability void *sealed, *unsealed;
+	void * __capability sealdatap;
+	void * __capability sealcap;
+	void * __capability sealed;
+	void * __capability unsealed;
 	register_t v;
 
 	if (sysarch(CHERI_GET_SEALCAP, &sealcap) < 0)

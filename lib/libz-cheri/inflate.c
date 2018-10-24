@@ -95,12 +95,12 @@
 /* function prototypes */
 local void fixedtables OF((struct inflate_state FAR *state));
 local int updatewindow OF((z_streamp strm,
-			   __capability const unsigned char FAR *data,
+			   const unsigned char FAR * __capability data,
                            unsigned copy));
 #ifdef BUILDFIXED
    void makefixed OF((void));
 #endif
-local unsigned syncsearch OF((unsigned FAR *have, __capability const unsigned char FAR *buf,
+local unsigned syncsearch OF((unsigned FAR *have, const unsigned char FAR * __capability buf,
                               unsigned len));
 
 int ZEXPORT inflateResetKeep(strm)
@@ -380,7 +380,7 @@ void makefixed()
  */
 local int updatewindow(strm, data, copy)
 z_streamp strm;
-__capability const Bytef *data;
+const Bytef * __capability data;
 unsigned copy;
 {
     struct inflate_state FAR *state;
@@ -609,15 +609,15 @@ z_streamp strm;
 int flush;
 {
     struct inflate_state FAR *state;
-    __capability z_const unsigned char FAR *next;    /* next input */
-    __capability unsigned char FAR *put;     /* next output */
-    __capability unsigned char FAR *sput;     /* saved next output */
+    z_const unsigned char FAR * __capability next;    /* next input */
+    unsigned char FAR * __capability put;     /* next output */
+    unsigned char FAR * __capability sput;     /* saved next output */
     unsigned have, left;        /* available input and output */
     unsigned long hold;         /* bit buffer */
     unsigned bits;              /* bits in bit buffer */
     unsigned in, out;           /* save starting available input and output */
     unsigned copy;              /* number of stored or match bytes to copy */
-    __capability unsigned char FAR *from;    /* where to copy match bytes from */
+    unsigned char FAR * __capability from;    /* where to copy match bytes from */
     code here;                  /* current decoding table entry */
     code last;                  /* parent table entry */
     unsigned len;               /* length to copy for repeats, bits to drop */
@@ -1305,7 +1305,7 @@ uInt dictLength;
 
 int ZEXPORT inflateSetDictionary_c(strm, dictionary, dictLength)
 z_streamp strm;
-__capability const Bytef *dictionary;
+const Bytef * __capability dictionary;
 uInt dictLength;
 {
     struct inflate_state FAR *state;
@@ -1368,7 +1368,7 @@ gz_headerp head;
  */
 local unsigned syncsearch(have, buf, len)
 unsigned FAR *have;
-__capability const unsigned char FAR *buf;
+const unsigned char FAR * __capability buf;
 unsigned len;
 {
     unsigned got;
@@ -1456,7 +1456,7 @@ z_streamp source;
 {
     struct inflate_state FAR *state;
     struct inflate_state FAR *copy;
-    __capability unsigned char FAR *window;
+    unsigned char FAR * __capability window;
     unsigned wsize;
 
     /* check input */

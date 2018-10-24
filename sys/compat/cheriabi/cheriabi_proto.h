@@ -47,9 +47,6 @@ struct thread;
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
-struct cheriabi_syscall_args {
-	char number_l_[PADL_(int)]; int number; char number_r_[PADR_(int)];
-};
 struct cheriabi_read_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
@@ -170,8 +167,8 @@ struct cheriabi_acct_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct cheriabi_sigaltstack_args {
-	char ss_l_[PADL_(const cheriabi_stack_t * __capability)]; const cheriabi_stack_t * __capability ss; char ss_r_[PADR_(const cheriabi_stack_t * __capability)];
-	char oss_l_[PADL_(cheriabi_stack_t * __capability)]; cheriabi_stack_t * __capability oss; char oss_r_[PADR_(cheriabi_stack_t * __capability)];
+	char ss_l_[PADL_(const struct sigaltstack_c * __capability)]; const struct sigaltstack_c * __capability ss; char ss_r_[PADR_(const struct sigaltstack_c * __capability)];
+	char oss_l_[PADL_(struct sigaltstack_c * __capability)]; struct sigaltstack_c * __capability oss; char oss_r_[PADR_(struct sigaltstack_c * __capability)];
 };
 struct cheriabi_ioctl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1397,13 +1394,12 @@ struct cheriabi_getrandom_args {
 struct cheriabi_coexecve_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
-	char argv_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability argv; char argv_r_[PADR_(void * __capability __capability * __capability)];
-	char envv_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability envv; char envv_r_[PADR_(void * __capability __capability * __capability)];
+	char argv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability argv; char argv_r_[PADR_(void * __capability * __capability)];
+	char envv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability envv; char envv_r_[PADR_(void * __capability * __capability)];
 };
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
-int	cheriabi_syscall(struct thread *, struct cheriabi_syscall_args *);
 int	cheriabi_read(struct thread *, struct cheriabi_read_args *);
 int	cheriabi_write(struct thread *, struct cheriabi_write_args *);
 int	cheriabi_open(struct thread *, struct cheriabi_open_args *);
@@ -1738,7 +1734,6 @@ int	cheriabi_coexecve(struct thread *, struct cheriabi_coexecve_args *);
 
 #endif /* COMPAT_FREEBSD11 */
 
-#define	CHERIABI_SYS_AUE_cheriabi_syscall	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_read	AUE_READ
 #define	CHERIABI_SYS_AUE_cheriabi_write	AUE_WRITE
 #define	CHERIABI_SYS_AUE_cheriabi_open	AUE_OPEN_RWTC

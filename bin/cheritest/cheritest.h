@@ -44,7 +44,7 @@
 } while (0)
 
 #define	CHERI_CAPREG_PRINT(crn) do {					\
-	__capability void *cap;						\
+	void * __capability cap;						\
 	if (crn == 0)							\
 		cap = cheri_getdefault();				\
 	else								\
@@ -54,7 +54,7 @@
 } while (0)
 
 #define	CHERI_PCC_PRINT() do {						\
-	__capability void *cap;						\
+	void * __capability cap;						\
 	cap = cheri_getpcc();						\
 	printf("PCC ");							\
 	CHERI_CAP_PRINT(cap);						\

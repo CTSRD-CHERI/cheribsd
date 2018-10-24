@@ -70,9 +70,7 @@ struct old_ps_strings {
 static char *
 setproctitle_internal(const char *fmt, va_list ap)
 {
-#ifndef __CHERI_PURE_CAPABILITY__
 	static struct ps_strings *ps_strings;
-#endif
 	static char *buf = NULL;
 	static char *obuf = NULL;
 	static char **oargv, *kbuf;
@@ -80,9 +78,7 @@ setproctitle_internal(const char *fmt, va_list ap)
 	static char *nargv[2] = { NULL, NULL };
 	char **nargvp;
 	int nargc;
-#ifndef __CHERI_PURE_CAPABILITY__
 	int i;
-#endif
 	size_t len;
 #ifndef __CHERI_PURE_CAPABILITY__
 	unsigned long ul_ps_strings;
@@ -130,6 +126,12 @@ setproctitle_internal(const char *fmt, va_list ap)
 		/* Nothing to restore */
 		return (NULL);
 
+#ifdef AT_PS_STRINGS
+	if (ps_strings == NULL)
+		(void)_elf_aux_info(AT_PS_STRINGS, &ps_strings,
+		    sizeof(ps_strings));
+#endif
+
 #ifndef __CHERI_PURE_CAPABILITY__
 	if (ps_strings == NULL) {
 		len = sizeof(ul_ps_strings);
@@ -138,6 +140,10 @@ setproctitle_internal(const char *fmt, va_list ap)
 			return (NULL);
 		ps_strings = (struct ps_strings *)ul_ps_strings;
 	}
+#endif
+
+	if (ps_strings == NULL)
+		return (NULL);
 
 	/*
 	 * PS_STRINGS points to zeroed memory on a style #2 kernel.
@@ -173,7 +179,6 @@ setproctitle_internal(const char *fmt, va_list ap)
 	}
 	ps_strings->ps_nargvstr = nargc;
 	ps_strings->ps_argvstr = nargvp;
-#endif	/* !__CHERI_PURE_CAPABILITY__ */
 
 	return (nargvp[0]);
 }

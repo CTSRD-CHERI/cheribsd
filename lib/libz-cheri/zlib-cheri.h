@@ -83,11 +83,11 @@ typedef void   (*free_func)  OF((voidpf opaque, voidpf address));
 struct internal_state;
 
 typedef struct z_stream_s {
-    __capability z_const Bytef *next_in;     /* next input byte */
+    z_const Bytef * __capability next_in;     /* next input byte */
     uInt     avail_in;  /* number of bytes available at next_in */
     uLong    total_in;  /* total number of input bytes read so far */
 
-    __capability Bytef    *next_out; /* next output byte should be put there */
+    Bytef * __capability next_out; /* next output byte should be put there */
     uInt     avail_out; /* remaining free space at next_out */
     uLong    total_out; /* total number of bytes output so far */
 
@@ -103,7 +103,7 @@ typedef struct z_stream_s {
     uLong   reserved;   /* reserved for future use */
 } z_stream;
 
-typedef __capability z_stream FAR *z_streamp;
+typedef z_stream FAR * __capability z_streamp;
 
 /*
      gzip header information passed to and from zlib routines.  See RFC 1952
@@ -820,7 +820,7 @@ ZEXTERN int ZEXPORT inflateSetDictionary OF((z_streamp strm,
                                              const Bytef *dictionary,
                                              uInt  dictLength));
 ZEXTERN int ZEXPORT inflateSetDictionary_c OF((z_streamp strm,
-                                             __capability const Bytef *dictionary,
+                                             const Bytef * __capability dictionary,
                                              uInt  dictLength));
 /*
      Initializes the decompression dictionary from the given uncompressed byte
@@ -1027,7 +1027,7 @@ ZEXTERN int ZEXPORT inflateBackInit OF((z_streamp strm, int windowBits,
 
 typedef unsigned (*in_func) OF((void FAR *,
                                 z_const unsigned char FAR * __capability FAR *));
-typedef int (*out_func) OF((void FAR *, __capability unsigned char FAR *,
+typedef int (*out_func) OF((void FAR *, unsigned char FAR * __capability,
                             unsigned));
 
 ZEXTERN int ZEXPORT inflateBack OF((z_streamp strm,
@@ -1571,7 +1571,7 @@ ZEXTERN void ZEXPORT gzclearerr OF((gzFile file));
 */
 
 ZEXTERN uLong ZEXPORT adler32 OF((uLong adler, const Bytef *buf, uInt len));
-ZEXTERN uLong ZEXPORT adler32_c OF((uLong adler, __capability const Bytef *buf,
+ZEXTERN uLong ZEXPORT adler32_c OF((uLong adler, const Bytef * __capability buf,
                                     uInt len));
 /*
      Update a running Adler-32 checksum with the bytes buf[0..len-1] and
@@ -1605,7 +1605,7 @@ ZEXTERN uLong ZEXPORT adler32_combine OF((uLong adler1, uLong adler2,
 
 ZEXTERN uLong ZEXPORT crc32   OF((uLong crc, const Bytef *buf,
                                   uInt len));
-ZEXTERN uLong ZEXPORT crc32_c   OF((uLong crc, __capability const Bytef *buf,
+ZEXTERN uLong ZEXPORT crc32_c   OF((uLong crc, const Bytef * __capability buf,
                                   uInt len));
 /*
      Update a running CRC-32 with the bytes buf[0..len-1] and return the
@@ -1678,7 +1678,7 @@ ZEXTERN int ZEXPORT inflateBackInit_ OF((z_streamp strm, int windowBits,
  */
 struct gzFile_s {
     unsigned have;
-    __capability unsigned char *next;
+    unsigned char * __capability next;
     z_off64_t pos;
 };
 ZEXTERN int ZEXPORT gzgetc_ OF((gzFile file));  /* backward compatibility */

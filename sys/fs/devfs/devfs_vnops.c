@@ -82,22 +82,6 @@ static struct fileops devfs_ops_f;
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
 
-#ifdef COMPAT_CHERIABI
-struct fiodgname_arg_c {
-	int		len;
-	void * __capability buf;
-};
-#define FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
-#endif
-
-#ifdef COMPAT_FREEBSD32
-struct fiodgname_arg32 {
-	int		len;
-	uint32_t	buf;	/* (void *) */
-};
-#define FIODGNAME_32	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg32)
-#endif
-
 static MALLOC_DEFINE(M_CDEVPDATA, "DEVFSP", "Metainfo for cdev-fp data");
 
 struct mtx	devfs_de_interlock;
@@ -786,8 +770,8 @@ devfs_ioctl_f(struct file *fp, u_long com, void *data, struct ucred *cred, struc
 	return (error);
 }
 
-static void * __capability
-fiodgname_buf_get_ptr(void *fgnp)
+void * __capability
+fiodgname_buf_get_ptr(void *fgnp, u_long com)
 {
 	union {
 		struct fiodgname_arg	fgn;
@@ -800,16 +784,21 @@ fiodgname_buf_get_ptr(void *fgnp)
 	} *fgnup;
 
 	fgnup = fgnp;
+	switch (com) {
+	case FIODGNAME:
+		return (__USER_CAP(fgnup->fgn.buf, fgnup->fgn.len));
 #ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI))
+	case FIODGNAME_C:
 		return (fgnup->fgn_c.buf);
 #endif
 #ifdef COMPAT_FREEBSD32
-	if (SV_CURPROC_FLAG(SV_ILP32))
+	case FIODGNAME_32:
 		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn32.buf,
 		    fgnup->fgn32.len));
 #endif
-	return (__USER_CAP(fgnup->fgn.buf, fgnup->fgn.len));
+	default:
+		panic("Unhandled ioctl command %ld", com);
+	}
 }
 
 static int
@@ -852,7 +841,7 @@ devfs_ioctl(struct vop_ioctl_args *ap)
 		if (i > fgn->len)
 			error = EINVAL;
 		else
-			error = copyout(p, fiodgname_buf_get_ptr(fgn), i);
+			error = copyout(p, fiodgname_buf_get_ptr(fgn, com), i);
 		break;
 	default:
 		error = dsw->d_ioctl(dev, com, ap->a_data, ap->a_fflag, td);

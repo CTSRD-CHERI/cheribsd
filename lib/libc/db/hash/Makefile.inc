@@ -6,7 +6,7 @@
 SRCS+=	hash.c hash_bigkey.c hash_buf.c hash_func.c hash_log2.c \
 	hash_page.c ndbm.c
 
-.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
+.if ${MACHINE_ARCH:Mmips*c*}
 CFLAGS.hash.c+=		-Wno-cheri-bitwise-operations
 CFLAGS.hash_buf.c+=	-Wno-cheri-bitwise-operations
 .endif

@@ -41,6 +41,8 @@
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
 
+struct mmap_req;
+
 struct cheriabi_ps_strings {
 	void * __capability	ps_argvstr;
 	int		ps_nargvstr;
@@ -122,8 +124,8 @@ void	cheriabi_set_signal_stack_capability(struct thread *td,
 void	cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *arg,
 	    int argnum, int ptrmask);
 
-int	cheriabi_mmap_set_retcap(struct thread *td, void * __capability *retcap,
-	    void * __capability *addrp, size_t len, int prot, int flags);
+void * __capability	cheriabi_mmap_retcap(struct thread *td,
+	    vm_offset_t addr, const struct mmap_req *mrp);
 
 int	cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags);
 int	cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp);

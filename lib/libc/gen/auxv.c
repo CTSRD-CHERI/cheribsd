@@ -92,6 +92,9 @@ static pthread_once_t aux_once = PTHREAD_ONCE_INIT;
 static int pagesize, osreldate, canary_len, ncpus, pagesizes_len;
 static int hwcap_present, hwcap2_present;
 static char *canary, *pagesizes;
+#ifdef AT_PS_STRINGS
+static void *ps_strings;
+#endif
 static void *timekeep;
 static u_long hwcap, hwcap2;
 
@@ -143,6 +146,12 @@ init_aux(void)
 		case AT_TIMEKEEP:
 			timekeep = aux->a_un.a_ptr;
 			break;
+
+#ifdef AT_PS_STRINGS
+		case AT_PS_STRINGS:
+			ps_strings = aux->a_un.a_ptr;
+			break;
+#endif
 		}
 	}
 }
@@ -230,6 +239,18 @@ _elf_aux_info(int aux, void *buf, int buflen)
 		} else
 			res = EINVAL;
 		break;
+#ifdef AT_PS_STRINGS
+	case AT_PS_STRINGS:
+		if (buflen == sizeof(void *)) {
+			if (ps_strings != NULL) {
+				*(void **)buf = ps_strings;
+				res = 0;
+			} else
+				res = ENOENT;
+		} else
+			res = EINVAL;
+		break;
+#endif
 	default:
 		res = ENOENT;
 		break;

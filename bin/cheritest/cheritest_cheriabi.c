@@ -162,20 +162,49 @@ test_cheriabi_mmap_perms(const struct cheri_test *ctp __unused)
 		cheritest_failure_errx("mmap(PROT_NONE) returned unrequested "
 		    "permissions (0x%lx)", cheri_getperm(cap));
 
-	/* Remove VMMAP permission from cap */
+	if (munmap(cap, PAGE_SIZE) != 0)
+		cheritest_failure_err("munmap() failed");
+
+	/* Attempt to unmap without CHERI_PERM_CHERIABI_VMMAP */
+	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
+	    MAP_ANON, -1, 0)) == MAP_FAILED)
+		cheritest_failure_err("mmap() failed");
 	tmpcap = cheri_andperm(cap, ~CHERI_PERM_CHERIABI_VMMAP);
 	if (munmap(tmpcap, PAGE_SIZE) == 0)
 		cheritest_failure_errx(
 		    "munmap() unmapped without CHERI_PERM_CHERIABI_VMMAP");
 
-	if (munmap(cap, PAGE_SIZE) != 0)
-		cheritest_failure_err("munmap() failed");
+	/*
+	 * Try to map over the previous mapping to check that it is still
+	 * there.
+	 */
+	if ((tmpcap = mmap(cap, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
+	    MAP_ANON|MAP_FIXED|MAP_EXCL, -1, 0)) != MAP_FAILED)
+		cheritest_failure_err("mmap(%#p, MAP_FIXED|MAP_EXCL) "
+		    "succeeded when page should have been mapped", cap);
 
-	if ((cap = mmap(tmpcap, PAGE_SIZE, PROT_NONE, MAP_ANON|MAP_FIXED,
-	    -1, 0)) != MAP_FAILED)
+	if (munmap(cap, PAGE_SIZE) != 0)
+		cheritest_failure_err("munmap() failed after overlap check");
+
+	/*
+	 * Attempt to MAP_FIXED though a valid capability without
+	 * CHERI_PERM_CHERIABI_VMMAP.
+	 */
+	if ((cap = mmap(0, PAGE_SIZE, PROT_READ|PROT_WRITE|PROT_EXEC,
+	    MAP_ANON, -1, 0)) == MAP_FAILED)
+		cheritest_failure_err("mmap() failed");
+	tmpcap = cheri_andperm(cap, ~CHERI_PERM_CHERIABI_VMMAP);
+
+	if ((tmpcap = mmap(tmpcap, PAGE_SIZE, PROT_NONE, MAP_ANON|MAP_FIXED, -1, 0)) !=
+	    MAP_FAILED)
 		cheritest_failure_errx(
 		    "mmap(MAP_FIXED) succeeded through a cap without"
-		    " CHERI_PERM_CHERIABI_VMMAP");
+		    " CHERI_PERM_CHERIABI_VMMAP (original %#p, new %#p)",
+		    cap, tmpcap);
+
+	if (munmap(cap, PAGE_SIZE) != 0)
+		cheritest_failure_err("munmap() failed after MAP_FIXED "
+		    "without permission");
 
 	/* Disallow executable pages */
 	perms = ~PERM_EXEC;

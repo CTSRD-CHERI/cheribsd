@@ -84,7 +84,7 @@ static void
 mmap_and_check_tag_stored(int fd, int protflags, int mapflags)
 {
 	void * __capability volatile *cp;
-	__capability void *cp_value;
+	void * __capability cp_value;
 	int v;
 
 	cp = CHERITEST_CHECK_SYSCALL(mmap(NULL, getpagesize(), protflags,
@@ -299,7 +299,7 @@ void
 cheritest_vm_notag_tmpfile_shared(const struct cheri_test *ctp __unused)
 {
 	void * __capability volatile *cp;
-	__capability void *cp_value;
+	void * __capability cp_value;
 	int fd, v;
 
 	fd = create_tempfile();
@@ -381,7 +381,7 @@ cheritest_vm_cow_read(const struct cheri_test *ctp __unused)
 {
 	void * __capability volatile *cp_copy;
 	void * __capability volatile *cp_real;
-	__capability void *cp;
+	void * __capability cp;
 	int fd;
 
 	/*
@@ -430,7 +430,7 @@ cheritest_vm_cow_write(const struct cheri_test *ctp __unused)
 {
 	void * __capability volatile *cp_copy;
 	void * __capability volatile *cp_real;
-	__capability void *cp;
+	void * __capability cp;
 	int fd;
 
 	/*

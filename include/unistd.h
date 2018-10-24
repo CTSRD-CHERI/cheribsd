@@ -593,13 +593,13 @@ extern int optreset;			/* getopt(3) external variable */
 #endif
 
 #if __has_feature(capabilities)
-int	cocall(void * __capability, void * __capability, void * __capability, void __capability *, size_t);
-int	coaccept(void * __capability, void * __capability, void * __capability * __capability, void __capability *, size_t);
-int	cosetup(int, void * __capability *, void * __capability *);
-int	coregister(const char *, void * __capability *);
-int	colookup(const char *, void * __capability *);
-int	cogetpid(pid_t *pidp);
-ssize_t	write_c(int, __capability const void *, size_t);
+int	 cocall(void * __capability, void * __capability, void * __capability, void __capability *, size_t);
+int	 coaccept(void * __capability, void * __capability, void * __capability * __capability, void __capability *, size_t);
+int	 cosetup(int, void * __capability *, void * __capability *);
+int	 coregister(const char *, void * __capability *);
+int	 colookup(const char *, void * __capability *);
+int	 cogetpid(pid_t *pidp);
+ssize_t	 write_c(int, const void * __capability, size_t);
 #endif
 #endif /* __BSD_VISIBLE */
 __END_DECLS

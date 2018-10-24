@@ -117,7 +117,7 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,	/* XXXBD: or something bigger? */
 	.sv_pagesize	= PAGE_SIZE,
-	.sv_minuser	= VM_MIN_ADDRESS,
+	.sv_minuser	= PAGE_SIZE,	/* Disallow mapping at NULL */
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= CHERIABI_PS_STRINGS,
@@ -275,6 +275,7 @@ cheriabi_fetch_syscall_args(struct thread *td)
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = locr0->v1;
+	td->td_retcap = locr0->c3;
 
 	return (error);
 }
@@ -283,12 +284,11 @@ static void
 cheriabi_set_syscall_retval(struct thread *td, int error)
 {
 	struct trapframe *locr0 = td->td_frame;
-	register_t a0;
+#ifdef INVARIANTS
 	unsigned int code;
 	const struct sysentvec *se;
 
 	code = locr0->v0;
-	a0 = locr0->a0;
 
 	se = td->td_proc->p_sysent;
 	/*
@@ -298,46 +298,34 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 	 */
 	if (code > se->sv_size)
 		code = 0;
+#endif
 
 	switch (error) {
 	case 0:
+		KASSERT(error != 0 ||
+		    td->td_retcap == locr0->c3 || td->td_retcap == NULL ||
+		    code == CHERIABI_SYS_cheriabi_mmap ||
+		    code == CHERIABI_SYS_cheriabi_shmat,
+		    ("trying to return capability from integer returning "
+		    "syscall (%u)", code));
+
 		locr0->v0 = td->td_retval[0];
 		locr0->v1 = td->td_retval[1];
+		locr0->c3 = td->td_retcap;
 		locr0->a3 = 0;
-
-		switch (code) {
-		case CHERIABI_SYS_cheriabi_mmap:
-			error = cheriabi_mmap_set_retcap(td, &locr0->c3,
-			    &locr0->c3, locr0->a0, locr0->a1, locr0->a2);
-			if (error == 0) {
-				locr0->v0 = 0;
-				locr0->a3 = 0;
-			} else {
-				locr0->v0 = error;
-				locr0->a3 = 1;
-			}
-			break;
-
-		case CHERIABI_SYS_cheriabi_shmat:
-			locr0->c3 = td->td_retcap;
-			locr0->v0 = 0;
-			locr0->a3 = 0;
-			break;
-
-		default:
-			return;
-		}
 		break;
+
 	case ERESTART:
 		locr0->pc = td->td_pcb->pcb_tpc;
 		break;
 
 	case EJUSTRETURN:
-		break;	/* nothing to do */
+		break;  /* nothing to do */
 
 	default:
 		locr0->v0 = error;
 		locr0->a3 = 1;
+		break;
 	}
 }
 
@@ -750,6 +738,14 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct rlimit rlim_stack;
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
+	/*
+	 * Ensure we don't have an old retcap value laying around.  In
+	 * principle we won't ever return it wrongly, but better safe
+	 * then sorry.
+	 *
+	 * XXXBD: This doesn't feel like the right place to do this...
+	 */
+	td->td_retcap = NULL;
 
 	KASSERT(stack % sizeof(void * __capability) == 0,
 	    ("CheriABI stack pointer not properly aligned"));

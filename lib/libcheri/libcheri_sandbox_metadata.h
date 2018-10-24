@@ -58,8 +58,8 @@ struct sandbox_metadata {
 	uint64_t	_sbm_reserved0;			/* Offset: 16 */
 	uint64_t	_sbm_reserved1;			/* Offset: 24 */
 	struct cheri_object	sbm_system_object;	/* Offset: 32 */
-	__capability vm_offset_t	*sbm_vtable;	/* Cap-offset: 2 */
-	__capability void	*_sbm_reserved2;	/* Cap-offset: 3 */
+	vm_offset_t * __capability	sbm_vtable;	/* Cap-offset: 2 */
+	void * __capability	 _sbm_reserved2;	/* Cap-offset: 3 */
 	struct cheri_object	 sbm_creturn_object;	/* Cap-offset: 4, 5 */
 };
 
