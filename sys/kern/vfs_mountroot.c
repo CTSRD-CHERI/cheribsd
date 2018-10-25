@@ -579,7 +579,7 @@ parse_dir_md(char **conf)
 
 	if (root_mount_mddev != -1) {
 		mdr.md_unit = root_mount_mddev;
-		error = kern_mddetach_p(td, &mdr);
+		(void)kern_mddetach_p(td, &mdr);
 		/* Ignore errors. We don't care. */
 		root_mount_mddev = -1;
 	}
