@@ -666,7 +666,7 @@ cheriabi_capability_set_user_entry(void * __capability *cp,
 {
 
 	/*
-	 * Set the jump target regigster for the pure capability calling
+	 * Set the jump target register for the pure capability calling
 	 * convention.
 	 */
 	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
@@ -807,24 +807,24 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    (mips_rd_status() & MIPS_SR_INT_MASK) |
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
 
-	/*
-	 * XXXAR: For now, initialise $ddc and $idc to the full address space
-	 * for dynamically linked executables. In the future these will be
-	 * restricted (or not set at all).
-	 */
 	/* XXXAR: is there a better way to check for dynamic binaries? */
 	is_dynamic_binary = imgp->reloc_base != 0;
 	/*
 	 * XXXAR: data_length needs to be the full address space to allow
-	 * legacy TLS to work since the TLS region will be beyond the end of
-	 * the text section. This does not matter for new binaries since they
-	 * will all clear $ddc as one of the first user instructions anyway.
-	 * TODO: add a kernel config option to start with NULL $ddc once
-	 * crt_init_globals is fixed.
+	 * legacy ABI to work since the TLS region will be beyond the end of
+	 * the text section.
+	 *
+	 * TODO: Start with a NULL $ddc once we drop legacy ABI support.
+	 *
+	 * Having a full address space $ddc on startup does not matter for new
+	 * binaries since they will all clear $ddc as one of the first user
+	 * instructions anyway.
+	 *
+	 * TODO: for co-processes we should start with NULL $ddc
 	 */
-	data_length = CHERI_CAP_USER_DATA_LENGTH - imgp->reloc_base;
 	code_length = is_dynamic_binary ?
 	    CHERI_CAP_USER_CODE_LENGTH - imgp->reloc_base : text_end;
+	data_length = CHERI_CAP_USER_DATA_LENGTH; /* Always representable */
 	frame = &td->td_pcb->pcb_regs;
 	cheriabi_capability_set_user_ddc(&frame->ddc, data_length);
 
