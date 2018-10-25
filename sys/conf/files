@@ -458,6 +458,7 @@ contrib/dev/acpica/components/executer/exregion.c	optional acpi
 contrib/dev/acpica/components/executer/exresnte.c	optional acpi
 contrib/dev/acpica/components/executer/exresolv.c	optional acpi
 contrib/dev/acpica/components/executer/exresop.c	optional acpi
+contrib/dev/acpica/components/executer/exserial.c	optional acpi
 contrib/dev/acpica/components/executer/exstore.c	optional acpi
 contrib/dev/acpica/components/executer/exstoren.c	optional acpi
 contrib/dev/acpica/components/executer/exstorob.c	optional acpi
@@ -3896,6 +3897,7 @@ kern/subr_compressor.c		standard \
 kern/subr_counter.c		standard
 kern/subr_devstat.c		standard
 kern/subr_disk.c		standard
+kern/subr_early.c		standard
 kern/subr_epoch.c		standard
 kern/subr_eventhandler.c	standard
 kern/subr_fattime.c		standard

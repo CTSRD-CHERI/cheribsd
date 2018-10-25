@@ -16,8 +16,8 @@ from older versions of FreeBSD, try WITHOUT_CLANG and WITH_GCC to bootstrap to
 the tip of head, and then rebuild without this option. The bootstrap process
 from older version of current across the gcc/clang cutover is a bit fragile.
 
-NOTE TO PEOPLE WHO THINK THAT FreeBSD 12.x IS SLOW:
-	FreeBSD 12.x has many debugging features turned on, in both the kernel
+NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
+	FreeBSD 13.x has many debugging features turned on, in both the kernel
 	and userland.  These features attempt to detect incorrect use of
 	system primitives, and encourage loud failure through extra sanity
 	checking and fail stop semantics.  They also substantially impact
@@ -30,6 +30,19 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 12.x IS SLOW:
 	debugging, define MALLOC_PRODUCTION in /etc/make.conf, or to merely
 	disable the most expensive debugging functionality run
 	"ln -s 'abort:false,junk:false' /etc/malloc.conf".)
+
+20181009:
+	OpenSSL has been updated to version 1.1.1.  This update included
+	additional various API changes througout the base system.  It is
+	important to rebuild third-party software after upgrading.  The value
+	of __FreeBSD_version has been bumped accordingly.
+
+20181006:
+	The legacy DRM modules and drivers have now been added to the loader's
+	module blacklist, in favor of loading them with kld_list in rc.conf(5).
+	The module blacklist may be overridden with the loader.conf(5)
+	'module_blacklist' variable, but loading them via rc.conf(5) is strongly
+	encouraged.
 
 20181002:
 	The cam(4) based nda(4) driver will be used over nvd(4) by default on

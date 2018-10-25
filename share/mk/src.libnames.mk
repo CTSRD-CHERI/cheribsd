@@ -246,6 +246,7 @@ _DP_zstd=	pthread
 .if ${MK_BLACKLIST} != "no"
 _DP_blacklist+=	pthread
 .endif
+_DP_crypto=	pthread
 .if ${MK_OPENSSL} != "no"
 _DP_archive+=	crypto
 .else
@@ -302,7 +303,7 @@ _DP_mp=	crypto
 _DP_memstat=	kvm
 _DP_magic=	z
 _DP_mt=		sbuf bsdxml
-_DP_ldns=	crypto
+_DP_ldns=	ssl crypto
 .if ${MK_OPENSSL} != "no"
 _DP_fetch=	ssl crypto
 .else

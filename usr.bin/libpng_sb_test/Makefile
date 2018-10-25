@@ -2,6 +2,8 @@
 
 PROG=	libpng_sb_test
 
+LDFLAGS+=	-Wl,-z,notext
+
 MAN=
 
 WARNS=	6
