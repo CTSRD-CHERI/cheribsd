@@ -31,6 +31,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+// CHERI CHANGES START
+// {
+//   "updated": 20181024,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END
 
 #include <config.h>
 
@@ -395,7 +403,7 @@ static void defval_neg_flag(const char *name, struct assignment *defval)
 static void defval_string(const char *name, struct assignment *defval)
 {
     if(defval != NULL)
-	cprint(1, "opt.%s = (char *)(unsigned long)\"%s\";\n", name, defval->u.value);
+	cprint(1, "opt.%s = (char *)(__uintptr_t)\"%s\";\n", name, defval->u.value);
     else
 	cprint(1, "opt.%s = NULL;\n", name);
 }

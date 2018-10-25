@@ -59,15 +59,22 @@
 	CHERI_CGETBASE(c_base, (crn));					\
 	CHERI_CGETLEN(c_length, (crn));					\
 	CHERI_CGETOFFSET(c_offset, (crn));				\
-	db_printf("v:%u s:%u p:%08jx b:%016jx l:%016jx o:%jx t:%jx\n",	\
+	db_printf("v:%u s:%u p:%08jx b:%016jx l:%016jx o:%jx t:%ld\n",	\
 	    ctag, c_sealed, c_perms, c_base, c_length, c_offset,	\
-	    c_otype);							\
+	    (long)c_otype);						\
 } while (0)
 
 #define	DB_CHERI_REG_PRINT(crn, num) do {				\
 	db_printf("$c%02u: ", num);					\
 	DB_CHERI_CAP_PRINT(crn);					\
 } while (0)
+
+static inline void
+db_print_cap(const char* msg, void * __capability cap)
+{
+	db_printf("%s" _CHERI_PRINTF_CAP_FMT "\n", msg,
+	    _CHERI_PRINTF_CAP_ARG(cap));
+}
 
 /*
  * Variation that prints live register state from the capability coprocessor.
@@ -125,16 +132,20 @@ DB_SHOW_COMMAND(cp2, ddb_dump_cp2)
 	DB_CHERI_REG_PRINT(28, 28);
 	DB_CHERI_REG_PRINT(29, 29);
 	DB_CHERI_REG_PRINT(30, 30);
-	/* TODO: will be NULL reg soon: DB_CHERI_REG_PRINT(31, 31); */
+	DB_CHERI_REG_PRINT(31, 31);
 
-	/* Shift $ddc into $ctemp for printing. */
-	db_printf("$ddc: ");
-	CHERI_CGETDEFAULT(CHERI_CR_KR1C);
-	DB_CHERI_REG_PRINT(CHERI_CR_KR1C, 0);
-	/* Same again for $epcc */
-	db_printf("$epcc: ");
-	CHERI_CGETEPCC(CHERI_CR_KR1C);
-	DB_CHERI_CAP_PRINT(CHERI_CR_KR1C);
+	/*
+	 * The following are special hw registers so make sure that we have
+	 * printed all the GPRs first since we need to move them into a GPR
+	 * for printing.
+	 */
+	db_print_cap("$ddc: ",  cheri_getdefault());
+	db_print_cap("$pcc: ",  cheri_getpcc());
+	db_print_cap("$kcc: ",  cheri_getkcc());
+	db_print_cap("$kdc: ",  cheri_getkdc());
+	db_print_cap("$epcc: ",  cheri_getepcc());
+	db_print_cap("$kr1c: ",  cheri_getkr1c());
+	db_print_cap("$kr2c: ",  cheri_getkr2c());
 }
 
 static void
@@ -158,19 +169,13 @@ db_show_cheri_trapframe(struct trapframe *frame)
 		db_printf("RegNum: invalid (%d) ", regnum);
 	db_printf("(%s)\n", cheri_exccode_string(exccode));
 
-	cheri_capability_load(CHERI_CR_CTEMP0, (struct chericap *)&frame->ddc);
-	db_printf("$ddc ");
-	DB_CHERI_CAP_PRINT(CHERI_CR_CTEMP0);
-	cheri_capability_load(CHERI_CR_CTEMP0, (struct chericap *)&frame->pcc);
-	db_printf("$pcc ");
-	DB_CHERI_CAP_PRINT(CHERI_CR_CTEMP0);
-	db_printf("\n");
-
+	db_print_cap("$ddc: ", frame->ddc);
+	db_print_cap("$pcc: ", frame->pcc);
 	/* Laboriously load and print each trapframe capability. */
 	for (i = 1; i < 27; i++) {
-		cheri_capability_load(CHERI_CR_CTEMP0,
-		    (struct chericap *)&frame->ddc + i);
-		DB_CHERI_REG_PRINT(CHERI_CR_CTEMP0, i);
+		void * __capability cap = *(&frame->ddc + i);
+		db_printf("$c%02d: " _CHERI_PRINTF_CAP_FMT "\n", i,
+		    _CHERI_PRINTF_CAP_ARG(cap));
 	}
 
 }
