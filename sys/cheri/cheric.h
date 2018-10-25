@@ -226,17 +226,19 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_typed_ptr(cap, type)				\
 	(type *)cheri_cap_to_ptr(cap, sizeof(type))
 
-#define _CHERI_PRINT_PTR_FMT(ptr)					\
-	    "%s: " #ptr " "						\
-	    "v:%lu s:%lu p:%08lx b:%016jx l:%016zx o:%jx t:%ld\n",	\
-	    __func__,							\
-	    cheri_gettag((const void * __capability)(ptr)),	        \
-	    cheri_getsealed((const void * __capability)(ptr)),	        \
-	    cheri_getperm((const void * __capability)(ptr)),	        \
+#define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx b:%016jx l:%016zx o:%jx t:%ld"
+#define _CHERI_PRINTF_CAP_ARG(ptr)					\
+	    cheri_gettag((const void * __capability)(ptr)),		\
+	    cheri_getsealed((const void * __capability)(ptr)),		\
+	    cheri_getperm((const void * __capability)(ptr)),		\
 	    cheri_getbase((const void * __capability)(ptr)),		\
 	    cheri_getlen((const void * __capability)(ptr)),		\
 	    cheri_getoffset((const void * __capability)(ptr)),		\
-	    cheri_gettype((const void * __capability)(ptr))
+	    (long)cheri_gettype((const void * __capability)(ptr))
+
+#define _CHERI_PRINT_PTR_FMT(ptr)					\
+	    "%s: " #ptr " " _CHERI_PRINTF_CAP_FMT "\n", __func__,	\
+	    _CHERI_PRINTF_CAP_ARG(ptr)
 
 #define CHERI_PRINT_PTR(ptr)						\
 	printf(_CHERI_PRINT_PTR_FMT(ptr))
