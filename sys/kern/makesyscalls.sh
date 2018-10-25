@@ -511,6 +511,7 @@ sed -e '
 			gsub(/ \( /, "(", argtype[argc]);
 			gsub(/ \)/, ")", argtype[argc]);
 			#remove annotations
+			gsub(/_Contains[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_In[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Out[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Pagerange[^ ]*[_)] /, "", argtype[argc]);
