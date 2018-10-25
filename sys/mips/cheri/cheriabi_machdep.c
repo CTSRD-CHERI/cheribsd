@@ -822,8 +822,6 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 *
 	 * TODO: for co-processes we should start with NULL $ddc
 	 */
-	code_length = is_dynamic_binary ?
-	    CHERI_CAP_USER_CODE_LENGTH - imgp->reloc_base : text_end;
 	data_length = CHERI_CAP_USER_DATA_LENGTH; /* Always representable */
 	frame = &td->td_pcb->pcb_regs;
 	cheriabi_capability_set_user_ddc(&frame->ddc, data_length);
@@ -832,7 +830,14 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with
 	 * broad bounds, but in the future, limited as appropriate to the
 	 * run-time linker or statically linked binary?
+	 *
+	 * TODO: restrict $pcc to the mapped binary once we no longer support
+	 * the legacy ABI.
+	 *
+	 * TODO: add a kernel config option for legacy ABI so we can shrink
+	 * this by default!
 	 */
+	code_length = is_dynamic_binary ? CHERI_CAP_USER_CODE_LENGTH : text_end;
 	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
 	    code_length);
 	frame->c12 = frame->pcc;
