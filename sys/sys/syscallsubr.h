@@ -383,7 +383,7 @@ int	kern_renameat(struct thread *td, int oldfd,
 int	kern_revoke(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
 int	kern_rmdirat(struct thread *td, int fd, const char * __capability path,
-	    enum uio_seg pathseg);
+	    enum uio_seg pathseg, int flag);
 int	kern_rtprio(struct thread *td, int function, pid_t pid,
 	    struct rtprio * __capability urtp);
 int	kern_rtprio_thread(struct thread *td, int function, lwpid_t lwpid,
@@ -480,7 +480,7 @@ int	kern_unmount(struct thread *td, const char * __capability path,
 	    int flags);
 int	kern_unlinkat(struct thread *td, int fd,
 	    const char * __capability path, enum uio_seg pathseg,
-	    ino_t oldinum);
+	    int flag, ino_t oldinum);
 int	kern_utimesat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, const struct timeval * __capability tptr,
 	    enum uio_seg tptrseg);
