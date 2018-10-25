@@ -72,6 +72,11 @@ extern char edata[];
  * XXX gcc doesn't do this for functions with __noreturn__ attribute.
  */
 #define	MIPS_END_OF_FUNCTION(ins)	((ins) == 0x03e00008)
+/*
+ * LLD will insert invalid instruction traps between functions.
+ * Currently this is 0xefefefef but it may change in the future.
+ */
+#define	MIPS_LLD_PADDING_BETWEEN_FUNCTIONS(ins)	((ins) == 0xefefefef)
 
 #if defined(__mips_n64)
 #	define	MIPS_IS_VALID_KERNELADDR(reg)	((((reg) & 3) == 0) && \
@@ -188,6 +193,10 @@ loop:
 		va = pc - sizeof(int);
 		while (1) {
 			instr = kdbpeek((int *)va);
+
+			/* LLD fills padding between functions with 0xefefefef */
+			if (MIPS_LLD_PADDING_BETWEEN_FUNCTIONS(instr))
+				break;
 
 			if (MIPS_START_OF_FUNCTION(instr))
 				break;
