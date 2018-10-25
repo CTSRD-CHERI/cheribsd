@@ -177,7 +177,6 @@ db_show_cheri_trapframe(struct trapframe *frame)
 		db_printf("$c%02d: " _CHERI_PRINTF_CAP_FMT "\n", i,
 		    _CHERI_PRINTF_CAP_ARG(cap));
 	}
-
 }
 
 /*
