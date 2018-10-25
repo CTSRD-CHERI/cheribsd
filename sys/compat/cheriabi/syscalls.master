@@ -423,7 +423,9 @@
 		    _Out_writes_bytes_opt(
 		    *size) char *where,
 		    _Inout_opt_ size_t *size,
-		    int arg); } getkerninfo getkerninfo_args int
+		    int arg
+		);
+	} getkerninfo getkerninfo_args int
 64	AUE_NULL	COMPAT	{
 		int getpagesize(void);
 	} getpagesize getpagesize_args int
@@ -905,7 +907,9 @@
 		int getsockname(
 		    int fdec,
 		    _Out_writes_bytes_(*alen) caddr_t asa,
-		    _Inout_ int *alen); } getsockname getsockname_args int
+		    _Inout_ int *alen
+		);
+	} getsockname getsockname_args int
 
 ; Syscalls 151-180 inclusive are reserved for vendor-specific
 ; system calls.  (This includes various calls added for compatibity
@@ -1648,7 +1652,7 @@
 	}
 
 331	AUE_NULL	STD	{
-		int sched_yield (void);
+		int sched_yield(void);
 	}
 332	AUE_NULL	STD	{
 		int sched_get_priority_max(
