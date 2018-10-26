@@ -31,6 +31,7 @@ ptr_intptr_t_cast="intptr_t"
 ptr_qualified="*"
 mincompat="0"
 abi_flags=""
+abi_type_suffix=""
 
 # tmp files:
 sysaue="sysent.aue.$$"
@@ -160,6 +161,7 @@ sed -e '
 		mincompat = \"$mincompat\" + 0
 		abi_flags = \"$abi_flags\"
 		abi_func_prefix = \"$abi_func_prefix\"
+		abi_type_suffix = \"$abi_type_suffix\"
 		capenabled_string = \"$capenabled\"
 		ptr_intptr_t_cast = \"$ptr_intptr_t_cast\"
 		ptr_qualified = \"$ptr_qualified\"
@@ -491,6 +493,7 @@ sed -e '
 			argc++
 			argtype[argc]=""
 			oldf=""
+			needs_suffix=0
 			while (f < end && $(f+1) != ",") {
 				if (argtype[argc] != "" && oldf != "*")
 					argtype[argc] = argtype[argc]" ";
@@ -506,6 +509,17 @@ sed -e '
 			if (argtype[argc] == "")
 				parserr($f, "argument definition")
 
+			if (isptrtype(argtype[argc])) {
+				if ((abi_changes("long_size") &&
+				    argtype[argc] ~ /_Contains[a-z_]*_long_/) ||
+				    (abi_changes("pointer_size") &&
+				    argtype[argc] ~ /_Contains[a-z_]*_ptr_/) ||
+				    (abi_changes("time_t_size") &&
+				    argtype[argc] ~ /_Contains[a-z_]*_timet_/))
+					needs_suffix=1
+				ptrargs++
+			}
+
 			# The parser adds space around parens.
 			# Remove it from annotations.
 			gsub(/ \( /, "(", argtype[argc]);
@@ -515,12 +529,15 @@ sed -e '
 			gsub(/_In[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Out[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Pagerange[^ ]*[_)] /, "", argtype[argc]);
+
+			# Add suffix if required
+			# XXX-BD: should this happen in the loop above?
+			if (needs_suffix)
+				sub(/(struct|union) [^ ]*/, "&" abi_type_suffix, argtype[argc])
+
 			# Allow pointers to be qualified
 			gsub(/\*/, ptr_qualified, argtype[argc]);
 			sub(/ $/, "", argtype[argc]);
-
-			if (isptrtype(argtype[argc]))
-				ptrargs++
 
 			argname[argc]=$f;
 			f += 2;			# skip name, and any comma
