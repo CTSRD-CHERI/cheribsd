@@ -314,6 +314,16 @@ cosetup(struct thread *td)
 int
 sys_cosetup(struct thread *td, struct cosetup_args *uap)
 {
+
+	return (kern_cosetup(td, uap->what,
+	    __USER_CAP(uap->code, sizeof(void * __capability)),
+	    __USER_CAP(uap->data, sizeof(void * __capability))));
+}
+
+int
+kern_cosetup(struct thread *td, int what,
+    void * __capability * __capability codep, void * __capability * __capability datap)
+{
 	void * __capability codecap;
 	void * __capability datacap;
 	vaddr_t addr;
@@ -327,32 +337,32 @@ sys_cosetup(struct thread *td, struct cosetup_args *uap)
 
 	addr = td->td_md.md_switcher_context;
 
-	switch (uap->what) {
+	switch (what) {
 	case COSETUP_COCALL:
 		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_cocall_base,
 		    td->td_proc->p_sysent->sv_cocall_len, 0);
 		codecap = cheri_seal(codecap, switcher_sealcap);
-		error = copyoutcap(&codecap, __USER_CAP(uap->code, sizeof(codecap)), sizeof(codecap));
+		error = copyoutcap(&codecap, codep, sizeof(codecap));
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_capability_build_user_rwx( CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
-		error = copyoutcap(&datacap, __USER_CAP(uap->data, sizeof(datacap)), sizeof(datacap));
+		error = copyoutcap(&datacap, datap, sizeof(datacap));
 		return (0);
 
 	case COSETUP_COACCEPT:
 		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
 		    td->td_proc->p_sysent->sv_coaccept_base, td->td_proc->p_sysent->sv_coaccept_len, 0);
 		codecap = cheri_seal(codecap, switcher_sealcap);
-		error = copyoutcap(&codecap, __USER_CAP(uap->code, sizeof(codecap)), sizeof(codecap));
+		error = copyoutcap(&codecap, codep, sizeof(codecap));
 		if (error != 0)
 			return (error);
 
 		datacap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
-		error = copyoutcap(&datacap, __USER_CAP(uap->data, sizeof(datacap)), sizeof(datacap));
+		error = copyoutcap(&datacap, datap, sizeof(datacap));
 		return (0);
 
 	default:
@@ -363,6 +373,13 @@ sys_cosetup(struct thread *td, struct cosetup_args *uap)
 int
 sys_coregister(struct thread *td, struct coregister_args *uap)
 {
+
+	return (kern_coregister(td, uap->name, __USER_CAP(uap->cap, sizeof(void * __capability))));
+}
+
+int
+kern_coregister(struct thread *td, const char *namep, void * __capability * __capability capp)
+{
 	struct vmspace *vmspace;
 	struct coname *con;
 	char name[PATH_MAX];
@@ -372,7 +389,7 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 
 	vmspace = td->td_proc->p_vmspace;
 
-	error = copyinstr(uap->name, name, sizeof(name), NULL);
+	error = copyinstr(namep, name, sizeof(name), NULL);
 	if (error != 0)
 		return (error);
 
@@ -401,8 +418,8 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 	cap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
 	cap = cheri_seal(cap, switcher_sealcap2);
 
-	if (uap->cap != NULL) {
-		error = copyoutcap(&cap, __USER_CAP(uap->cap, sizeof(cap)), sizeof(cap));
+	if (capp != NULL) {
+		error = copyoutcap(&cap, capp, sizeof(cap));
 		if (error != 0) {
 			vm_map_unlock(&vmspace->vm_map);
 			return (error);
@@ -421,6 +438,13 @@ sys_coregister(struct thread *td, struct coregister_args *uap)
 int
 sys_colookup(struct thread *td, struct colookup_args *uap)
 {
+
+	return (kern_colookup(td, uap->name, __USER_CAP(uap->cap, sizeof(void * __capability))));
+}
+
+int
+kern_colookup(struct thread *td, const char *namep, void * __capability * __capability capp)
+{
 	struct vmspace *vmspace;
 	const struct coname *con;
 	char name[PATH_MAX];
@@ -428,7 +452,7 @@ sys_colookup(struct thread *td, struct colookup_args *uap)
 
 	vmspace = td->td_proc->p_vmspace;
 
-	error = copyinstr(uap->name, name, sizeof(name), NULL);
+	error = copyinstr(namep, name, sizeof(name), NULL);
 	if (error != 0)
 		return (error);
 
@@ -443,13 +467,20 @@ sys_colookup(struct thread *td, struct colookup_args *uap)
 		return (ESRCH);
 	}
 
-	error = copyoutcap(&con->c_value, __USER_CAP(uap->cap, sizeof(con->c_value)), sizeof(con->c_value));
+	error = copyoutcap(&con->c_value, capp, sizeof(con->c_value));
 	vm_map_unlock(&vmspace->vm_map);
 	return (error);
 }
 
 int
 sys_cogetpid(struct thread *td, struct cogetpid_args *uap)
+{
+
+	return (kern_cogetpid(td, uap->pidp));
+}
+
+int
+kern_cogetpid(struct thread *td, pid_t *pidp)
 {
 	struct switcher_context sc;
 	bool is_callee;
@@ -461,13 +492,20 @@ sys_cogetpid(struct thread *td, struct cogetpid_args *uap)
 		return (ESRCH);
 
 	pid = sc.sc_td->td_proc->p_pid;
-	error = copyout(&pid, uap->pidp, sizeof(pid));
+	error = copyout(&pid, pidp, sizeof(pid));
 
 	return (error);
 }
 
 int
 sys_copark(struct thread *td, struct copark_args *uap)
+{
+
+	return (kern_copark(td));
+}
+
+int
+kern_copark(struct thread *td)
 {
 	int error;
 
