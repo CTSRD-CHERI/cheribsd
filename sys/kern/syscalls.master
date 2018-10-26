@@ -1312,7 +1312,7 @@
 		);
 	}
 228	AUE_SHMAT	NOSTD	{
-		int shmat(
+		void *shmat(
 		    int shmid,
 		    _In_ const void *shmaddr,
 		    int shmflg
@@ -2545,8 +2545,8 @@
 		);
 	}
 477	AUE_MMAP	STD	{
-		caddr_t mmap(
-		    _In_ caddr_t addr,
+		void *mmap(
+		    _In_ void *addr,
 		    size_t len,
 		    int prot,
 		    int flags,
