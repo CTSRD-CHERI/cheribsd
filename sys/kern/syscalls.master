@@ -1473,8 +1473,8 @@
 	}
 258	AUE_NULL	STD	{
 		int kbounce(
-		    _In_reads_bytes_(len)void *src,
-		    _Out_writes_bytes_(len)void *dst,
+		    _In_reads_bytes_(len) const void *src,
+		    _Out_writes_bytes_(len) void *dst,
 		    size_t len,
 		    int flags
 		);

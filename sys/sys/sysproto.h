@@ -725,7 +725,7 @@ struct lio_listio_args {
 	char sig_l_[PADL_(struct sigevent_native *)]; struct sigevent_native * sig; char sig_r_[PADR_(struct sigevent_native *)];
 };
 struct kbounce_args {
-	char src_l_[PADL_(void *)]; void * src; char src_r_[PADR_(void *)];
+	char src_l_[PADL_(const void *)]; const void * src; char src_r_[PADR_(const void *)];
 	char dst_l_[PADL_(void *)]; void * dst; char dst_r_[PADR_(void *)];
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];

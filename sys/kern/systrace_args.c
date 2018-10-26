@@ -1323,7 +1323,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* kbounce */
 	case 258: {
 		struct kbounce_args *p = params;
-		uarg[0] = (intptr_t) p->src; /* void * */
+		uarg[0] = (intptr_t) p->src; /* const void * */
 		uarg[1] = (intptr_t) p->dst; /* void * */
 		uarg[2] = p->len; /* size_t */
 		iarg[3] = p->flags; /* int */
@@ -5366,7 +5366,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 258:
 		switch(ndx) {
 		case 0:
-			p = "userland void *";
+			p = "userland const void *";
 			break;
 		case 1:
 			p = "userland void *";
