@@ -590,4 +590,5 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_coregister_args), (sy_call_t *)cheriabi_coregister, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = cheriabi_coregister */
 	{ AS(cheriabi_colookup_args), (sy_call_t *)cheriabi_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = cheriabi_colookup */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 568 = { */
+	{ AS(cheriabi_cogetpid_args), (sy_call_t *)cheriabi_cogetpid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 569 = cheriabi_cogetpid */
 };

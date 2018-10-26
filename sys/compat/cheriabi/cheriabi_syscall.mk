@@ -368,4 +368,5 @@ MIASM =  \
 	cheriabi_coexecve.o \
 	cheriabi_cosetup.o \
 	cheriabi_coregister.o \
-	cheriabi_colookup.o
+	cheriabi_colookup.o \
+	cheriabi_cogetpid.o

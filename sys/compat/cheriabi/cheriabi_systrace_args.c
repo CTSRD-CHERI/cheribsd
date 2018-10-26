@@ -3154,6 +3154,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* cheriabi_cogetpid */
+	case 569: {
+		struct cheriabi_cogetpid_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->pidp; /* pid_t * __capability */
+		*n_args = 1;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8411,6 +8418,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* cheriabi_cogetpid */
+	case 569:
+		switch(ndx) {
+		case 0:
+			p = "userland pid_t * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10220,6 +10237,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_colookup */
 	case 567:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_cogetpid */
+	case 569:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

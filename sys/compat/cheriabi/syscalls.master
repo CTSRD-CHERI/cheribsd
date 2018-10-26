@@ -3040,3 +3040,8 @@
 568	AUE_NULL	UNIMPL	{
 		int copark(void);
 	}
+569	AUE_NULL        STD     {
+		int cogetpid(
+		    _Out_ pid_t *pidp
+		);
+	}

@@ -2307,3 +2307,10 @@ cheriabi_cosetup(struct thread *td, struct cheriabi_cosetup_args *uap)
 
 	return (EDOOFUS);
 }
+
+int
+cheriabi_cogetpid(struct thread *td, struct cheriabi_cogetpid_args *uap)
+{
+
+	return (EDOOFUS);
+}

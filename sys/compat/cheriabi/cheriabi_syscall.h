@@ -485,4 +485,5 @@
 #define	CHERIABI_SYS_cheriabi_cosetup	565
 #define	CHERIABI_SYS_cheriabi_coregister	566
 #define	CHERIABI_SYS_cheriabi_colookup	567
-#define	CHERIABI_SYS_MAXSYSCALL	569
+#define	CHERIABI_SYS_cheriabi_cogetpid	569
+#define	CHERIABI_SYS_MAXSYSCALL	570

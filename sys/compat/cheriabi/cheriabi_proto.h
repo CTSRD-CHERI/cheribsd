@@ -1410,6 +1410,9 @@ struct cheriabi_colookup_args {
 	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
 	char cap_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability cap; char cap_r_[PADR_(void * __capability * __capability)];
 };
+struct cheriabi_cogetpid_args {
+	char pidp_l_[PADL_(pid_t * __capability)]; pid_t * __capability pidp; char pidp_r_[PADR_(pid_t * __capability)];
+};
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED
 #endif
@@ -1696,6 +1699,7 @@ int	cheriabi_coexecve(struct thread *, struct cheriabi_coexecve_args *);
 int	cheriabi_cosetup(struct thread *, struct cheriabi_cosetup_args *);
 int	cheriabi_coregister(struct thread *, struct cheriabi_coregister_args *);
 int	cheriabi_colookup(struct thread *, struct cheriabi_colookup_args *);
+int	cheriabi_cogetpid(struct thread *, struct cheriabi_cogetpid_args *);
 
 #ifdef COMPAT_43
 
@@ -2033,6 +2037,7 @@ int	cheriabi_colookup(struct thread *, struct cheriabi_colookup_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_cosetup	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_coregister	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_colookup	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_cogetpid	AUE_NULL
 
 #undef PAD_
 #undef PADL_

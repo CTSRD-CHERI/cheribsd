@@ -578,4 +578,5 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_coregister",			/* 566 = cheriabi_coregister */
 	"cheriabi_colookup",			/* 567 = cheriabi_colookup */
 	"#568",			/* 568 = { */
+	"cheriabi_cogetpid",			/* 569 = cheriabi_cogetpid */
 };
