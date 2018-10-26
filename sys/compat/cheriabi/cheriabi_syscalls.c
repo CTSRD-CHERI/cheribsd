@@ -577,6 +577,6 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_cosetup",			/* 565 = cheriabi_cosetup */
 	"cheriabi_coregister",			/* 566 = cheriabi_coregister */
 	"cheriabi_colookup",			/* 567 = cheriabi_colookup */
-	"#568",			/* 568 = { */
+	"copark",			/* 568 = copark */
 	"cheriabi_cogetpid",			/* 569 = cheriabi_cogetpid */
 };

@@ -3027,8 +3027,8 @@
 	}
 566	AUE_NULL	STD	{
 		int coregister(
-		_In_z_ const char *name,
-		_Out_opt_ void **cap
+		    _In_z_ const char *name,
+		    _Out_opt_ void **cap
 		);
 	}
 567	AUE_NULL	STD	{
@@ -3037,7 +3037,7 @@
 		    _Out_ void **cap
 		);
 	}
-568	AUE_NULL	UNIMPL	{
+568	AUE_NULL	STD	{
 		int copark(void);
 	}
 569	AUE_NULL        STD     {

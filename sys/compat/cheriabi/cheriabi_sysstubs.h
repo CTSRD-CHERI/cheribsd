@@ -3612,6 +3612,16 @@ SYS_STUB(567, int, colookup,
     /* _localcheck */ {if (!(cheri_getperm(name) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(cap) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(568, int, copark,
+    /* _protoargs */ (void),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno),
+    /* _protoargs_err */ (int * __capability stub_errno),
+    /* _callargs */ (),
+    /* _callargs_chk */ (&ret, stub_errno),
+    /* _callargs_err */ (&errno),
+    /* _localcheck */ {}
+)
+
 SYS_STUB(569, int, cogetpid,
     /* _protoargs */ (pid_t *  pidp),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno, pid_t * __capability   pidp),
