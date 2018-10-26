@@ -162,6 +162,7 @@ sed -e '
 		abi_flags = \"$abi_flags\"
 		abi_func_prefix = \"$abi_func_prefix\"
 		abi_type_suffix = \"$abi_type_suffix\"
+		abi_obsolete_syscalls = \"$abi_obsolete_syscalls\"
 		capenabled_string = \"$capenabled\"
 		ptr_intptr_t_cast = \"$ptr_intptr_t_cast\"
 		ptr_qualified = \"$ptr_qualified\"
@@ -358,6 +359,14 @@ sed -e '
 		n = split(abi_flags, _tmparray, /\|/)
 		for (i = 1; i <= n; i++)
 			if (_tmparray[i] == name)
+				return 1
+		return 0
+	}
+	# Returns true is syscall is in abi_obsolete_syscalls
+	function obsolete_in_abi(sysnum, _tmparray, i, n) {
+		n = split(abi_obsolete_syscalls, _tmparray, / /)
+		for (i = 1; i <= n; i++)
+			if (_tmparray[i] == sysnum)
 				return 1
 		return 0
 	}
@@ -579,8 +588,8 @@ sed -e '
 		flags = "0";
 	}
 
-	type("STD") || type("NODEF") || type("NOARGS") || type("NOPROTO") \
-	    || type("NOSTD") {
+	(type("STD") || type("NODEF") || type("NOARGS") || type("NOPROTO") \
+	    || type("NOSTD")) && !obsolete_in_abi(syscall) {
 		parseline()
 		printf("\t/* %s */\n\tcase %d: {\n", funcname, syscall) > systrace
 		printf("\t/* %s */\n\tcase %d:\n", funcname, syscall) > systracetmp
@@ -982,6 +991,18 @@ sed -e '
 			    prefix, funcalias, syscall) > syshdr
 			printf(" \\\n\t%s%s.o", prefix, funcalias) > sysmk
 		}
+		syscall++
+		next
+	}
+	obsolete_in_abi(syscall) {
+		parseline()
+		printf("\t{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },") > sysent
+		align_sysent_comment(34)
+		printf("/* %d = obsolete %s */\n", syscall, noabi_funcalias) > sysent
+		printf("\t\"obs_%s\",\t\t\t/* %d = obsolete %s */\n",
+		    noabi_funcalias, syscall, noabi_funcalias) > sysnames
+		printf("\t\t\t\t/* %d is obsolete %s */\n",
+		    syscall, noabi_funcalias) > syshdr
 		syscall++
 		next
 	}

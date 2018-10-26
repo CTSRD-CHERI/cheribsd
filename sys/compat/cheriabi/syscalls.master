@@ -158,7 +158,11 @@
 		    int gid
 		);
 	}
-17	AUE_NULL	OBSOL	obreak
+17	AUE_NULL	STD	{
+		caddr_t break(
+		    _In_ char *nsize
+		);
+	}
 18	AUE_GETFSSTAT	COMPAT4	{
 		int getfsstat(
 		    _Out_writes_bytes_opt_(bufsize) _Contains_long_ struct ostatfs *buf,
@@ -442,8 +446,16 @@
 	}
 67	AUE_NULL	OBSOL	vread
 68	AUE_NULL	OBSOL	vwrite
-69	AUE_SBRK	OBSOL	sbrk
-70	AUE_SSTK	OBSOL	sstk
+69	AUE_SBRK	STD	{
+		int sbrk(
+		    int incr
+		);
+	}
+70	AUE_SSTK	STD	{
+		int sstk(
+		    int incr
+		);
+	}
 71	AUE_MMAP	COMPAT	{
 		int mmap(
 		    _In_ void *addr,
@@ -999,9 +1011,33 @@
 	}
 167	AUE_NULL	UNIMPL	nosys
 168	AUE_NULL	UNIMPL	nosys
-169	AUE_SEMSYS	OBSOL	semsys
-170	AUE_MSGSYS	OBSOL	msgsys
-171	AUE_SHMSYS	OBSOL	shmsys
+169	AUE_SEMSYS	NOSTD|VARARG4	{
+		int semsys(
+		    int which,
+		    int a2,
+		    int a3,
+		    int a4,
+		    int a5
+		);
+	}
+170	AUE_MSGSYS	NOSTD|VARARG5 {
+		int msgsys(
+		    int which,
+		    int a2,
+		    int a3,
+		    int a4,
+		    int a5,
+		    int a6
+		);
+	}
+171	AUE_SHMSYS	NOSTD|VARARG3	{
+		int shmsys(
+		    int which,
+		    int a2,
+		    int a3,
+		    int a4
+		);
+	}
 172	AUE_NULL	UNIMPL	nosys
 173	AUE_PREAD	OBSOL	pread
 174	AUE_PWRITE	OBSOL	pwrite

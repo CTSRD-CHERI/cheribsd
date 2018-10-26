@@ -22,7 +22,7 @@
 				/* 14 is obsolete freebsd11_mknod */
 #define	CHERIABI_SYS_cheriabi_chmod	15
 #define	CHERIABI_SYS_cheriabi_chown	16
-				/* 17 is obsolete obreak */
+				/* 17 is obsolete break */
 				/* 18 is obsolete freebsd4_getfsstat */
 				/* 19 is obsolete olseek */
 #define	CHERIABI_SYS_getpid	20
