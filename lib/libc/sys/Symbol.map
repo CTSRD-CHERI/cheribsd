@@ -384,6 +384,7 @@ FBSD_1.5 {
 	coexecve;
 	cogetpid;
 	colookup;
+	copark;
 	coregister;
 	cosetup;
 	fdatasync;
