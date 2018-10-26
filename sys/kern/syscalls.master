@@ -3129,7 +3129,7 @@
 		    cpuwhich_t which,
 		    id_t id,
 		    size_t domainsetsize,
-		    _In_ domainset_t *mask,
+		    _In_reads_bytes_(domainsetsize) domainset_t *mask,
 		    int policy
 		);
 	}
