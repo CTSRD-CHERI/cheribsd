@@ -18,9 +18,6 @@
 
 /* The casts are bogus but will do for now. */
 struct sysent cheriabi_sysent[] = {
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },		/* 0 = syscall */
 	{ AS(sys_exit_args), (sy_call_t *)sys_sys_exit, AUE_EXIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 1 = exit */
 	{ 0, (sy_call_t *)sys_fork, AUE_FORK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 2 = fork */

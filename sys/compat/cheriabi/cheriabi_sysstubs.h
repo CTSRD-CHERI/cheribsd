@@ -15,9 +15,6 @@
 #include <sys/wait.h>
 
 #include <compat/cheriabi/cheriabi_signal.h>
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 struct __siginfo;
 struct __wrusage;
 struct acl;

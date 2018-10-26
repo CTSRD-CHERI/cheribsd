@@ -44,9 +44,6 @@ struct thread;
 #define	PADR_(t)	CHERI_PADR_(t)
 #endif
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 struct cheriabi_read_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
@@ -1420,9 +1417,6 @@ struct cheriabi_getrandom_args {
 	char buflen_l_[PADL_(size_t)]; size_t buflen; char buflen_r_[PADR_(size_t)];
 	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
 };
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 int	cheriabi_read(struct thread *, struct cheriabi_read_args *);
 int	cheriabi_write(struct thread *, struct cheriabi_write_args *);
 int	cheriabi_open(struct thread *, struct cheriabi_open_args *);
@@ -1711,54 +1705,36 @@ int	cheriabi_getrandom(struct thread *, struct cheriabi_getrandom_args *);
 
 #ifdef COMPAT_43
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_43 */
 
 
 #ifdef COMPAT_FREEBSD4
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_FREEBSD4 */
 
 
 #ifdef COMPAT_FREEBSD6
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_FREEBSD6 */
 
 
 #ifdef COMPAT_FREEBSD7
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_FREEBSD7 */
 
 
 #ifdef COMPAT_FREEBSD10
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_FREEBSD10 */
 
 
 #ifdef COMPAT_FREEBSD11
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_FREEBSD11 */
 
