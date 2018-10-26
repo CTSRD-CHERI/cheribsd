@@ -43,6 +43,8 @@
 ;		function prototype in sys/sysproto.h.  Does add a
 ;		definition to syscall.h besides adding a sysent.
 ;	NOTSTATIC syscall is loadable
+;	VARARG	last argument is passed with a variadic calling convention.
+;	VARARG#	last # args are passed with a variadic calling convention.
 
 ; annotations:
 ;	SAL 2.0 annotations are used to specify how system calls treat
@@ -109,16 +111,13 @@
 		    size_t nbyte
 		);
 	}
-5	AUE_OPEN_RWTC	STD	{
+5	AUE_OPEN_RWTC	STD|VARARG	{
 		int open(
 		    _In_z_ char *path,
 		    int flags,
 		    int mode
 		);
 	}
-; XXX should be		{ int open(const char *path, int flags, ...); }
-; but we're not ready for `const' or varargs.
-; XXX man page says `mode_t mode'.
 6	AUE_CLOSE	STD	{
 		int close(
 		    int fd
@@ -394,7 +393,7 @@
 		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack_native *oss
 		);
 	}
-54	AUE_IOCTL	STD	{
+54	AUE_IOCTL	STD|VARARG	{
 		int ioctl(
 		    int fd,
 		    u_long com,
@@ -589,15 +588,13 @@
 		);
 	}
 91	AUE_NULL	UNIMPL	getdopt
-92	AUE_FCNTL	STD	{
+92	AUE_FCNTL	STD|VARARG	{
 		int fcntl(
 		    int fd,
 		    int cmd,
 		    long arg
 		);
 	}
-; XXX should be	{ int fcntl(int fd, int cmd, ...); }
-; but we're not ready for varargs.
 93	AUE_SELECT	STD	{
 		int select(
 		    int nd,
@@ -1033,7 +1030,7 @@
 		);
 	}
 167-168	AUE_NULL	UNIMPL	nosys
-169	AUE_SEMSYS	NOSTD	{
+169	AUE_SEMSYS	NOSTD|VARARG4	{
 		int semsys(
 		    int which,
 		    int a2,
@@ -1042,8 +1039,7 @@
 		    int a5
 		);
 	}
-; XXX should be	{ int semsys(int which, ...); }
-170	AUE_MSGSYS	NOSTD	{
+170	AUE_MSGSYS	NOSTD|VARARG5	{
 		int msgsys(
 		    int which,
 		    int a2,
@@ -1053,8 +1049,7 @@
 		    int a6
 		);
 	}
-; XXX should be	{ int msgsys(int which, ...); }
-171	AUE_SHMSYS	NOSTD	{
+171	AUE_SHMSYS	NOSTD|VARARG3	{
 		int shmsys(
 		    int which,
 		    int a2,
@@ -1062,7 +1057,6 @@
 		    int a4
 		);
 	}
-; XXX should be	{ int shmsys(int which, ...); }
 172	AUE_NULL	UNIMPL	nosys
 173	AUE_PREAD	COMPAT6	{
 		ssize_t pread(
@@ -2715,8 +2709,7 @@
 		    uint32_t dev
 		);
 	}
-; XXX: see the comment for open
-499	AUE_OPENAT_RWTC	STD	{
+499	AUE_OPENAT_RWTC	STD|VARARG	{
 		int openat(
 		    int fd,
 		    _In_z_ char *path,
