@@ -65,10 +65,10 @@
 ; redistributions should be placed in the reserved range at the end
 ; of the current calls.
 
-0	AUE_NULL	STD|NOSTUB	{
+0	AUE_NULL	STD	{
 		int nosys(void);
 	} syscall nosys_args int
-1	AUE_EXIT	STD|NOSTUB	{
+1	AUE_EXIT	STD	{
 		void sys_exit(
 		    int rval
 		);
@@ -368,7 +368,7 @@
 		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack *oss
 		);
 	}
-54	AUE_NULL	STD|VARARG|NOSTUB	{
+54	AUE_NULL	STD|VARARG	{
 		int ioctl(
 		    int fd,
 		    u_long com,
@@ -398,7 +398,7 @@
 		    size_t count
 		);
 	}
-59	AUE_EXECVE	STD|NOSTUB	{
+59	AUE_EXECVE	STD	{
 		int execve(
 		    _In_z_ const char *fname,
 		    _In_z_ char **argv,
@@ -568,7 +568,7 @@
 		);
 	}
 91	AUE_NULL	UNIMPL	getdopt
-92	AUE_FCNTL	STD|VARARG|NOSTUB	{
+92	AUE_FCNTL	STD|VARARG	{
 		int fcntl(
 		    int fd,
 		    int cmd,
@@ -931,7 +931,7 @@
 152	AUE_NULL	UNIMPL	sem_wakeup (BSD/OS 2.x)
 153	AUE_NULL	UNIMPL	asyncdaemon (BSD/OS 2.x)
 ; 154 is initialised by the NLM code, if present.
-154	AUE_NULL	NOSTD|NOSTUB	{
+154	AUE_NULL	NOSTD	{
 		int nlm_syscall(
 		    int debug_level,
 		    int grace_period,
@@ -1153,7 +1153,7 @@
 		    off_t pos
 		);
 	}
-198	AUE_NULL	NOPROTO|NOSTUB	{
+198	AUE_NULL	NOPROTO	{
 		int nosys(void);
 	} __syscall __syscall_args int
 199	AUE_LSEEK	COMPAT6	{
@@ -1652,7 +1652,7 @@
 		    _In_opt_ _Contains_ptr_ struct osigevent *sig
 		);
 	}
-321	AUE_NULL	STD|NOSTUB	{
+321	AUE_NULL	STD	{
 		int yield(void);
 	}
 322	AUE_NULL	OBSOL	thr_sleep
@@ -1744,7 +1744,7 @@
 		    _In_ _Contains_ptr_ struct jail *jailp
 		);
 	}
-339	AUE_NULL	NOSTD|NOTSTATIC|NOSTUB	{
+339	AUE_NULL	NOSTD|NOTSTATIC	{
 		int nnpfs_syscall(
 		    int operation,
 		    char *a_pathP,
@@ -1960,7 +1960,7 @@
 		    int amode
 		);
 	}
-377	AUE_NULL	NOSTD|NOTSTATIC|NOSTUB	{
+377	AUE_NULL	NOSTD|NOTSTATIC	{
 		int afs3_syscall(
 		    long syscall,
 		    long parm1,
@@ -2175,7 +2175,7 @@
 		    _In_z_ const char *attrname
 		);
 	}
-415	AUE_NULL	STD|NOSTUB	{
+415	AUE_NULL	STD	{
 		int __mac_execve(
 		    _In_z_ char *fname,
 		    _In_ char **argv,
@@ -2259,7 +2259,7 @@
 		    int flags
 		);
 	}
-431	AUE_THR_EXIT	STD|NOSTUB	{
+431	AUE_THR_EXIT	STD	{
 		void thr_exit(
 		    _Out_opt_ long *state
 		);
@@ -2444,7 +2444,7 @@
 		    _In_z_ const char *path
 		);
 	}
-463	AUE_NULL	STD|NOSTUB	{
+463	AUE_NULL	STD	{
 		void abort2(
 		    _In_z_ const char *why,
 		    int nargs,
@@ -2479,7 +2479,7 @@
 		    uint32_t name
 		);
 	}
-472	AUE_SCTP_GENERIC_SENDMSG	NOSTD|NOSTUB	{
+472	AUE_SCTP_GENERIC_SENDMSG	NOSTD	{
 		int sctp_generic_sendmsg(
 		    int sd,
 		    _In_reads_bytes_(mlen) void *msg,
@@ -2490,7 +2490,7 @@
 		    int flags
 		);
 	}
-473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD|NOSTUB	{
+473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD	{
 		int sctp_generic_sendmsg_iov(
 		    int sd,
 		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec *iov,
@@ -2501,7 +2501,7 @@
 		    int flags
 		);
 	}
-474	AUE_SCTP_GENERIC_RECVMSG	NOSTD|NOSTUB	{
+474	AUE_SCTP_GENERIC_RECVMSG	NOSTD	{
 		int sctp_generic_recvmsg(
 		    int sd,
 		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec *iov,
@@ -2639,7 +2639,7 @@
 		    int flag
 		);
 	}
-492	AUE_FEXECVE	STD|NOSTUB	{
+492	AUE_FEXECVE	STD	{
 		int fexecve(
 		    int fd,
 		    _In_ char **argv,

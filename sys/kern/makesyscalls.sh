@@ -163,6 +163,7 @@ sed -e '
 		abi_func_prefix = \"$abi_func_prefix\"
 		abi_type_suffix = \"$abi_type_suffix\"
 		abi_obsolete_syscalls = \"$abi_obsolete_syscalls\"
+		no_stub_syscalls = \"$no_stub_syscalls\"
 		capenabled_string = \"$capenabled\"
 		ptr_intptr_t_cast = \"$ptr_intptr_t_cast\"
 		ptr_qualified = \"$ptr_qualified\"
@@ -370,6 +371,14 @@ sed -e '
 			if (_tmparray[i] == sysnum)
 				return 1
 		return 0
+	}
+	# Returns true is syscall is not in no_stub_syscalls
+	function genstub(sysnum, _tmparray, i, n) {
+		n = split(no_stub_syscalls, _tmparray, / /)
+		for (i = 1; i <= n; i++)
+			if (_tmparray[i] == sysnum)
+				return 0
+		return 1
 	}
 	{
 		n = split($1, syscall_range, /-/)
@@ -659,7 +668,7 @@ sed -e '
 			printf "),\n" > sysargmap
 		}
 
-		if (!flag("NOSTUB") && !flag("NODEF")) {
+		if (!flag("NODEF") && genstub(syscall)) {
 			arghasptrs = 0
 			for (i = 1; i <= argc; i++) {
 				if (isptrtype(argtype[i]) &&
