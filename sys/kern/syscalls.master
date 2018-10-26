@@ -758,8 +758,8 @@
 120	AUE_READV	STD	{
 		int readv(
 		    int fd,
-		   _Inout_updates_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
-		   u_int iovcnt
+		    _Inout_updates_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    u_int iovcnt
 		);
 	}
 121	AUE_WRITEV	STD	{
@@ -1564,7 +1564,7 @@
 301	AUE_NULL	STD	{
 		int modstat(
 		    int modid,
-		    _Out_ _Contains_long_ struct module_stat* stat
+		    _Out_ _Contains_long_ struct module_stat *stat
 		);
 	}
 302	AUE_NULL	STD	{
@@ -1733,7 +1733,7 @@
 	}
 335	AUE_NULL	STD	{
 		int utrace(
-		   _In_reads_bytes_(len) const void *addr,
+		    _In_reads_bytes_(len) const void *addr,
 		    size_t len
 		);
 	}
@@ -2416,7 +2416,6 @@
 		    _In_ void *value
 		);
 	}
-
 457	AUE_MQ_OPEN	NOSTD	{
 		int kmq_open(
 		    _In_z_ const char *path,
@@ -3024,7 +3023,7 @@
 	}
 546	AUE_FUTIMES	STD	{
 		int futimens(
-		     int fd,
+		    int fd,
 		    _In_reads_(2) _Contains_long_timet_ struct timespec *times
 		);
 	}
