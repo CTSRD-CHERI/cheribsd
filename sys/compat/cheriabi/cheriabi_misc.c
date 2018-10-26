@@ -909,6 +909,16 @@ cheriabi_copyout_strings(struct image_params *imgp)
 		execpath_len = 0;
 
 	curproc->p_psstrings = curproc->p_sysent->sv_psstrings;
+	if (imgp->cop != NULL) {
+#if 0
+		printf("%s: adjusting p_psstrings from %#lx to %#lx; p_usrstack %#lx\n",
+		    __func__, curproc->p_psstrings,
+		    curproc->p_psstrings - curproc->p_sysent->sv_usrstack + curproc->p_usrstack,
+		    curproc->p_usrstack);
+#endif
+		curproc->p_psstrings -= curproc->p_sysent->sv_usrstack - curproc->p_usrstack;
+	}
+
 	/* XXX: should be derived from a capability to the strings region */
 	arginfo = cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
@@ -919,9 +929,6 @@ cheriabi_copyout_strings(struct image_params *imgp)
 		szsigcode = *(imgp->proc->p_sysent->sv_szsigcode);
 	else
 		szsigcode = 0;
-	if (imgp->cop != NULL) {
-		printf("%s: XXX: needs to adjust arginfo, like exec_copyout_strings() does\n", __func__);
-	}
 
 	destp =	(char * __capability)arginfo;
 

@@ -760,7 +760,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	PROC_UNLOCK(td->td_proc);
 	stackbase = td->td_proc->p_usrstack - rlim_stack.rlim_max;
 	KASSERT(stack > stackbase,
-	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
+	    ("top of stack 0x%lx is below stack base 0x%lx; p_usrstack 0x%lx",
+	     stack, stackbase, td->td_proc->p_usrstack));
 	stacklen = stack - stackbase;
 	/*
 	 * Round the stack down as required to make it representable.
@@ -876,9 +877,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * XXXBD: 8MB should be the process stack limit.
 	 */
 	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
-	stackbase = USRSTACK - (1024 * 1024 * 8);
+	stackbase = td->td_proc->p_usrstack - (1024 * 1024 * 8);
 	KASSERT(stack > stackbase,
-	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
+	    ("top of stack 0x%lx is below stack base 0x%lx; p_usrstack 0x%lx",
+	     stack, stackbase, td->td_proc->p_usrstack));
 	stacklen = stack - stackbase;
 	td->td_frame->csp = cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, stacklen);
