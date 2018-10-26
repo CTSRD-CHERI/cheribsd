@@ -188,10 +188,10 @@ cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 int
 cheriabi_exec_copyin_args(struct image_args *args,
     const char * __capability fname, enum uio_seg segflg,
-    void * __capability * __capability argv,
-    void * __capability * __capability envv)
+    char * __capability * __capability argv,
+    char * __capability * __capability envv)
 {
-	void * __capability * __capability pcap;
+	char * __capability * __capability pcap;
 	void * __capability argcap;
 	size_t length;
 	int error;
@@ -1686,7 +1686,7 @@ cheriabi_rtprio(struct thread *td, struct cheriabi_rtprio_args *uap)
 }
 
 int
-cheriabi_setrlimit(struct thread *td, struct cheriabi_setrlimit_args *uap)
+cheriabi_setrlimit(struct thread *td, struct cheriabi___setrlimit_args *uap)
 {
 	struct rlimit alim;
 	int error;
@@ -1698,7 +1698,7 @@ cheriabi_setrlimit(struct thread *td, struct cheriabi_setrlimit_args *uap)
 }
 
 int
-cheriabi_getrlimit(struct thread *td, struct cheriabi_getrlimit_args *uap)
+cheriabi_getrlimit(struct thread *td, struct cheriabi___getrlimit_args *uap)
 {
 	struct rlimit rlim;
 	int error;
