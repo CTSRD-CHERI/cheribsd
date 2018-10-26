@@ -236,14 +236,14 @@
 		);
 	}
 27	AUE_RECVMSG	STD	{
-		int recvmsg(
+		ssize_t recvmsg(
 		    int s,
 		    _Inout_ _Contains_ptr_ struct msghdr_native *msg,
 		    int flags
 		);
 	}
 28	AUE_SENDMSG	STD	{
-		int sendmsg(
+		ssize_t sendmsg(
 		    int s,
 		    _In_ _Contains_ptr_ struct msghdr_native *msg,
 		    int flags
@@ -841,7 +841,7 @@
 		);
 	}
 133	AUE_SENDTO	STD	{
-		int sendto(
+		ssize_t sendto(
 		    int s,
 		    _In_reads_bytes_(len) caddr_t buf,
 		    size_t len,
