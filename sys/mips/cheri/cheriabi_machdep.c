@@ -723,10 +723,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
 	u_long auxv, stackbase, stacklen;
-	size_t map_base, map_length, text_end, data_length, code_length;
+	size_t map_base, map_length, text_end, data_length, code_end;
 	struct rlimit rlim_stack;
-	/* XXXAR: is there a better way to check for dynamic binaries? */
-	bool is_dynamic_binary = imgp->interp_end != 0;
+	/* const bool is_dynamic_binary = imgp->interp_end != 0; */
+	/* const bool is_rtld_direct_exec = imgp->reloc_base == imgp->start_addr; */
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 	/*
@@ -842,13 +842,13 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * executing ld-cheri-elf.so.1 directly and can use text_end to find
 	 * the end of the rtld mapping.
 	 */
-	code_length = imgp->interp_end ? imgp->interp_end : text_end;
-	code_length = roundup2(code_length, 1ULL << CHERI_ALIGN_SHIFT(code_length));
+	code_end = imgp->interp_end ? imgp->interp_end : text_end;
+	code_end = roundup2(code_length, 1ULL << CHERI_ALIGN_SHIFT(code_end));
 #else
-	code_length = CHERI_CAP_USER_CODE_LENGTH;
+	code_end = CHERI_CAP_USER_CODE_LENGTH;
 #endif
 	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
-	    code_length);
+	    code_end);
 	frame->c12 = frame->pcc;
 
 	/*
