@@ -1541,6 +1541,23 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, const char *path)
 	obj->relocbase = (caddr_t)phdr - ph->p_vaddr;
 	break;
     }
+#ifdef __CHERI_PURE_CAPABILITY__
+    /*
+     * Position dependent binaries can cause relocbase to be unrepresentable.
+     * Furthermore, they cannot be used with co-processes. To ease the transition
+     * towards being able to run everything as co-processes we now reject
+     * loading any positition dependent CheriABI binaries.
+     */
+    if (cheri_getaddress(obj->relocbase) == 0) {
+	_rtld_error("%s: Cannot load position dependent CheriABI binary with "
+	     "zero relocation base", path);
+	return NULL;
+    } else if (!cheri_gettag(obj->relocbase)) {
+	_rtld_error("%s: Cannot load CheriABI binary with unrepresentable"
+	    "relocation base (%-#p)", path, obj->relocbase);
+	return NULL;
+    }
+#endif
 
     obj->stack_flags = PF_X | PF_R | PF_W;
 
