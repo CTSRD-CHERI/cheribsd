@@ -727,11 +727,6 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct rlimit rlim_stack;
 	/* XXXAR: is there a better way to check for dynamic binaries? */
 	bool is_dynamic_binary = imgp->interp_end != 0;
-	bool is_rtld_direct_exec = imgp->start_addr ==
-	    ((Elf_Auxargs *)imgp->auxargs)->base;
-	(void)is_rtld_direct_exec;
-	//printf("%s: %s is dynamic binary: %d, is_rtld: %d, reloc_base=0x%lx\n", __func__,
-	//    imgp->execpath, is_dynamic_binary, is_rtld_direct_exec, imgp->reloc_base);
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 	/*
@@ -841,8 +836,17 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * TODO: add a kernel config option for legacy ABI so we can shrink
 	 * this by default!
 	 */
-	code_length = is_dynamic_binary ? CHERI_CAP_USER_CODE_LENGTH : text_end;
-	// code_length = roundup2(code_length, 1ULL << CHERI_ALIGN_SHIFT(code_length));
+#ifdef NOTYET
+	/*
+	 * The end of rtld is interp_end if interp_end is set. Otherwise we are
+	 * executing ld-cheri-elf.so.1 directly and can use text_end to find
+	 * the end of the rtld mapping.
+	 */
+	code_length = imgp->interp_end ? imgp->interp_end : text_end;
+	code_length = roundup2(code_length, 1ULL << CHERI_ALIGN_SHIFT(code_length));
+#else
+	code_length = CHERI_CAP_USER_CODE_LENGTH;
+#endif
 	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
 	    code_length);
 	frame->c12 = frame->pcc;
@@ -867,10 +871,13 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 *
 	 * XXXAR: this should not be necessary since it should be the same as
 	 * auxv[AT_BASE] but trying to load that from $c3 crashes...
+	 *
+	 * TODO: load the AT_BASE value instead of using this global cap!
 	 */
 	if (imgp->reloc_base)
 		td->td_frame->c4 = cheri_capability_build_user_data(
-		   CHERI_CAP_USER_DATA_PERMS, imgp->reloc_base, data_length, 0);
+		    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
+		    CHERI_CAP_USER_DATA_LENGTH, imgp->reloc_base);
 	/*
 	 * Restrict the stack capability to the maximum region allowed for
 	 * this process and adjust sp accordingly.
