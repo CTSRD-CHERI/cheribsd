@@ -723,9 +723,15 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
 	u_long auxv, stackbase, stacklen;
-	bool is_dynamic_binary;
 	size_t map_base, map_length, text_end, data_length, code_length;
 	struct rlimit rlim_stack;
+	/* XXXAR: is there a better way to check for dynamic binaries? */
+	bool is_dynamic_binary = imgp->interp_end != 0;
+	bool is_rtld_direct_exec = imgp->start_addr ==
+	    ((Elf_Auxargs *)imgp->auxargs)->base;
+	(void)is_rtld_direct_exec;
+	//printf("%s: %s is dynamic binary: %d, is_rtld: %d, reloc_base=0x%lx\n", __func__,
+	//    imgp->execpath, is_dynamic_binary, is_rtld_direct_exec, imgp->reloc_base);
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 	/*
@@ -807,8 +813,6 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    (mips_rd_status() & MIPS_SR_INT_MASK) |
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
 
-	/* XXXAR: is there a better way to check for dynamic binaries? */
-	is_dynamic_binary = imgp->reloc_base != 0;
 	/*
 	 * XXXAR: data_length needs to be the full address space to allow
 	 * legacy ABI to work since the TLS region will be beyond the end of
@@ -838,6 +842,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * this by default!
 	 */
 	code_length = is_dynamic_binary ? CHERI_CAP_USER_CODE_LENGTH : text_end;
+	// code_length = roundup2(code_length, 1ULL << CHERI_ALIGN_SHIFT(code_length));
 	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
 	    code_length);
 	frame->c12 = frame->pcc;
@@ -857,8 +862,11 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    CHERI_CAP_USER_DATA_PERMS, auxv,
 	    AT_COUNT * 2 * sizeof(void * __capability), 0);
 	/*
-	 * Load relocbase into $c4 so that rtld has a capability with the
-	 * correct bounds available on startup
+	 * Load relocbase for RTLD into $c4 so that rtld has a capability with
+	 * the correct bounds available on startup
+	 *
+	 * XXXAR: this should not be necessary since it should be the same as
+	 * auxv[AT_BASE] but trying to load that from $c3 crashes...
 	 */
 	if (imgp->reloc_base)
 		td->td_frame->c4 = cheri_capability_build_user_data(
