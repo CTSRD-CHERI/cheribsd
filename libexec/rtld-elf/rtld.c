@@ -2327,6 +2327,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG_VERBOSE)
     if (objtmp.cap_relocs) {
+	extern char __start___cap_relocs, __stop___cap_relocs;
 	size_t cap_relocs_size =
 	    ((caddr_t)&__stop___cap_relocs - (caddr_t)&__start___cap_relocs);
 	rtld_printf("RTLD has DT_CHERI___CAPRELOCS = %#p, __start___cap_relocs"
