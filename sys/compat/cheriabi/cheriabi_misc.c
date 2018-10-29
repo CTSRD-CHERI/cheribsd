@@ -1057,8 +1057,8 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	/*
 	 * XXX-BD: grant code and data perms to allow textrel fixups.
 	 */
-	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, args->base - rtld_base,
-	    rtld_len, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, 0, rtld_len,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);
 	if (imgp->execpathp != 0)
 		AUXARGS_ENTRY_CAP(pos, AT_EXECPATH, imgp->execpathp, 0,
