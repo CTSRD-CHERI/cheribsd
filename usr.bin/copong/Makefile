@@ -6,8 +6,7 @@ PROG=		copong
 SRCS=		copong.c
 
 CFLAGS+=	-fPIE -pie -Wno-error=deprecated-declarations -fuse-ld=lld
-#NEED_CHERI=	hybrid
-NEED_CHERI=	pure
+NEED_CHERI=	hybrid
 MK_CHERI_SHARED_PROG:=yes
 
 WARNS?=	5
