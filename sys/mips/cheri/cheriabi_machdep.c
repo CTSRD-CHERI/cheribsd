@@ -838,9 +838,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 */
 #ifdef NOTYET
 	/*
-	 * The end of rtld is interp_end if interp_end is set. Otherwise we are
-	 * executing ld-cheri-elf.so.1 directly and can use text_end to find
-	 * the end of the rtld mapping.
+	 * If we are executing a static binary we use text_end as the end of
+	 * the text segment. If $pcc is the start of rtld we use interp_end.
+	 * If we are executing ld-cheri-elf.so.1 directly and can use text_end
+	 * to find the end of the rtld mapping.
 	 */
 	code_end = imgp->interp_end ? imgp->interp_end : text_end;
 	code_end = roundup2(code_length, 1ULL << CHERI_ALIGN_SHIFT(code_end));
@@ -872,12 +873,17 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * XXXAR: this should not be necessary since it should be the same as
 	 * auxv[AT_BASE] but trying to load that from $c3 crashes...
 	 *
-	 * TODO: load the AT_BASE value instead of using this global cap!
+	 * TODO: load the AT_BASE value instead of using duplicated code!
 	 */
-	if (imgp->reloc_base)
+	if (imgp->reloc_base) {
+		vaddr_t rtld_base = imgp->reloc_base;
+		rtld_base = rounddown2(rtld_base, 1ULL << CHERI_ALIGN_SHIFT(rtld_base));
+		vaddr_t rtld_end = imgp->interp_end ? imgp->interp_end : imgp->end_addr;
+		vaddr_t rtld_len = rtld_end - rtld_base;
+		rtld_len = roundup2(rtld_len, 1ULL << CHERI_ALIGN_SHIFT(rtld_len));
 		td->td_frame->c4 = cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
-		    CHERI_CAP_USER_DATA_LENGTH, imgp->reloc_base);
+		    CHERI_CAP_USER_DATA_PERMS, rtld_base, rtld_len, 0);
+	}
 	/*
 	 * Restrict the stack capability to the maximum region allowed for
 	 * this process and adjust sp accordingly.
