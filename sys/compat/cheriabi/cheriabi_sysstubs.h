@@ -12,6 +12,8 @@
 #include <sys/_semaphore.h>
 #include <sys/socket.h>
 #include <sys/ucontext.h>
+#include <sys/wait.h>
+
 #include <compat/cheriabi/cheriabi_signal.h>
 #if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
 #define PAD64_REQUIRED

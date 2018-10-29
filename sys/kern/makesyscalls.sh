@@ -257,6 +257,7 @@ sed -e '
 		printf "#include <sys/_semaphore.h>\n" > sysstubs
 		printf "#include <sys/socket.h>\n" > sysstubs
 		printf "#include <sys/ucontext.h>\n" > sysstubs
+		printf "#include <sys/wait.h>\n\n" > sysstubs
 		printf "#include <compat/cheriabi/cheriabi_signal.h>\n" > sysstubs
 
 		printf "/*\n * System call argument to DTrace register array converstion.\n *\n" > systrace
