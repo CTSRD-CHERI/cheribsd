@@ -272,41 +272,44 @@ cosetup(struct thread *td)
 	struct switcher_context sc;
 	vm_map_t map;
 	vm_map_entry_t entry;
-	vaddr_t addr;
+	vm_offset_t addr;
 	boolean_t found;
 	int error;
 
 	KASSERT(td->td_md.md_switcher_context == 0, ("%s: already initialized\n", __func__));
 
+	map = &td->td_proc->p_vmspace->vm_map;
+
 	/*
-	 * XXX: Race between this and setting the owner.
+	 * XXX: Race between this and setting the owner.  If we moved the lock earlier,
+	 * 	we'd die on:
+	 * 	panic: _sx_xlock_hard: recursed on non-recursive sx vm map (user) @ /usr/home/en322/cheri/cheribsd/sys/vm/vm_map.c:1746
+	 *
 	 */
-	error = kern_mmap(td, 0, PAGE_SIZE, VM_PROT_READ | VM_PROT_WRITE, MAP_ANON, -1, 0);
+	error = vm_mmap_object(map, &addr, 0, PAGE_SIZE, VM_PROT_READ | VM_PROT_WRITE,
+	    VM_PROT_ALL, MAP_PRIVATE | MAP_ANON, NULL, 0, FALSE, td);
 	if (error != 0) {
-		printf("%s: kern_mmap() failed with error %d\n", __func__, error);
+		printf("%s: vm_mmap_object() failed with error %d\n", __func__, error);
 		return (error);
 	}
-
-	addr = td->td_retval[0];
 	td->td_md.md_switcher_context = addr;
-	td->td_retval[0] = 0;
 
-	map = &td->td_proc->p_vmspace->vm_map;
 	vm_map_lock(map);
 	found = vm_map_lookup_entry(map, addr, &entry);
-	KASSERT(found == TRUE, ("%s: vm_map_lookup_entry returned false\n", __func__));
-
+	KASSERT(found == TRUE, ("%s: vm_map_lookup_entry() returned false\n", __func__));
 	entry->owner = 0;
 	vm_map_unlock(map);
 
-	//printf("%s: context at %p, td %p\n", __func__, (void *)addr, td);
+	printf("%s: context at %p, td %p\n", __func__, (void *)addr, td);
 	sc.sc_unsealcap = switcher_sealcap2;
 	sc.sc_td = td;
 	sc.sc_borrower_td = NULL;
 	sc.sc_peer_context = NULL;
 
+	printf("%s: 5\n", __func__);
 	error = copyoutcap(&sc, __USER_CAP((void *)addr, sizeof(sc)), sizeof(sc));
-	KASSERT(error == 0, ("%s: copyout failed with error %d\n", __func__, error));
+	KASSERT(error == 0, ("%s: copyoutcap() failed with error %d\n", __func__, error));
+	printf("%s: done\n", __func__);
 
 	return (0);
 }
