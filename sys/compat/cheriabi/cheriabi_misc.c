@@ -1035,8 +1035,8 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 		rtld_len = roundup2(imgp->interp_end - rtld_base,
 		    1ULL << CHERI_ALIGN_SHIFT(imgp->interp_end - rtld_base));
 	} else {
-		rtld_base = 0;
-		rtld_len = CHERI_CAP_USER_CODE_LENGTH;
+		rtld_base = prog_base;
+		rtld_len = prog_len;
 	}
 
 	if (args->execfd != -1)
