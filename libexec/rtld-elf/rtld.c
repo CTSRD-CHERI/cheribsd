@@ -477,7 +477,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		if (!dir_enable) {
 		    _rtld_error("No execute permission for binary %s",
 		        argv0);
-		    rtld_die();
+		    if (!ld_tracing)
+			rtld_die();
 		}
 
 		/*
