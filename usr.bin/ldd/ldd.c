@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 
 #include <arpa/inet.h>
 
+#include <assert.h>
 #include <dlfcn.h>
 #include <err.h>
 #include <errno.h>
@@ -46,14 +47,23 @@ __FBSDID("$FreeBSD$");
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sysexits.h>
 #include <unistd.h>
+#include <spawn.h>
 
 #include "extern.h"
+#include "paths.h"
 
 /* We don't support a.out executables on arm64 and riscv */
 #if !defined(__aarch64__) && !defined(__riscv)
 #include <a.out.h>
 #define	AOUT_SUPPORTED
+#endif
+
+#if defined(__mips)
+#define RTLD_DIRECT_EXEC_TRACE_SUPPORTED 1
+#else
+#define RTLD_DIRECT_EXEC_TRACE_SUPPORTED 0
 #endif
 
 /*
@@ -78,7 +88,7 @@ __FBSDID("$FreeBSD$");
 } while (0)
 
 static int	is_executable(const char *fname, int fd, int *is_shlib,
-		    int *type);
+		    int *type, const char** rtld);
 static void	usage(void);
 
 #define	TYPE_UNKNOWN	0
@@ -86,6 +96,38 @@ static void	usage(void);
 #define	TYPE_ELF	2	/* Architecture default */
 #if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
 #define	TYPE_ELF32	3	/* Explicit 32 bits on architectures >32 bits */
+#endif
+
+#if RTLD_DIRECT_EXEC_TRACE_SUPPORTED == 1
+
+extern char **environ;
+
+static int
+trace_rtld_direct_exec(pid_t * child, const char *rtld, const char *file)
+{
+	char *argv[4];
+	int rval;
+
+	argv[0] = strdup(rtld);
+	argv[1] = strdup("-t");
+	argv[2] = strdup(file);
+	argv[3] = NULL;
+
+	fprintf(stderr, "Running %s %s %s\n", argv[0], argv[1], argv[2]);
+
+	rval = posix_spawn(child, rtld, NULL, NULL, argv, environ);
+	if (rval != 0) {
+		warnc(rval, "posix_spawn(%s, %s)", rtld, file);
+		rval = 1;
+		assert(*child == -1);
+	}
+	for (size_t i = 0; i < sizeof(argv) / sizeof(argv[0]); i++)
+		free(argv[i]);
+	return (rval);
+
+}
+
+#elif __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
 
 #define	_PATH_LDD32	"/usr/bin/ldd32"
 
@@ -139,6 +181,7 @@ execldd32(char *file, char *fmt1, char *fmt2, int aflag, int vflag)
 }
 #endif
 
+
 int
 main(int argc, char *argv[])
 {
@@ -191,13 +234,14 @@ main(int argc, char *argv[])
 	rval = 0;
 	for (; argc > 0; argc--, argv++) {
 		int fd, status, is_shlib, rv, type;
+		const char* rtld = NULL;
 
 		if ((fd = open(*argv, O_RDONLY, 0)) < 0) {
 			warn("%s", *argv);
 			rval |= 1;
 			continue;
 		}
-		rv = is_executable(*argv, fd, &is_shlib, &type);
+		rv = is_executable(*argv, fd, &is_shlib, &type, &rtld);
 		close(fd);
 		if (rv == 0) {
 			rval |= 1;
@@ -210,8 +254,12 @@ main(int argc, char *argv[])
 			break;
 #if __ELF_WORD_SIZE > 32 && defined(ELF32_SUPPORTED)
 		case TYPE_ELF32:
+#if RTLD_DIRECT_EXEC_TRACE_SUPPORTED == 1
+			break;
+#else
 			rval |= execldd32(*argv, fmt1, fmt2, aflag, vflag);
 			continue;
+#endif
 #endif
 		case TYPE_UNKNOWN:
 		default:
@@ -237,13 +285,41 @@ main(int argc, char *argv[])
 			printf("%s:\n", *argv);
 		fflush(stdout);
 
-		switch (fork()) {
-		case -1:
-			err(1, "fork");
-			break;
-		default:
-			if (wait(&status) < 0) {
-				warn("wait");
+		pid_t child = -1;
+		if (is_shlib == 0) {
+			int error = posix_spawn(&child, *argv, NULL, NULL,
+			    argv, environ);
+			if (error != 0) {
+				warnc(error, "is_shlib==0, %s", *argv);
+				rval |= 1;
+				continue;
+			}
+		} else {
+#if RTLD_DIRECT_EXEC_TRACE_SUPPORTED == 1
+			if (trace_rtld_direct_exec(&child, rtld, *argv) == 0) {
+				goto wait_for_child;
+			}
+			warnx("Could not execute %s, will try dlopen()"
+				    "instead", *argv);
+#endif
+			child = fork();
+			switch(child) {
+			case -1:
+				err(1, "fork");
+				break;
+			case 0:
+				dlopen(*argv, RTLD_TRACE);
+				warnx("%s: %s", *argv, dlerror());
+				_exit(1);
+			default:
+				break;
+			}
+		}
+
+wait_for_child:
+		if (child != -1) {
+			if (waitpid(child, &status, 0) < 0) {
+				warn("waitpid(%d)", child);
 				rval |= 1;
 			} else if (WIFSIGNALED(status)) {
 				fprintf(stderr, "%s: signal %d\n", *argv,
@@ -255,16 +331,6 @@ main(int argc, char *argv[])
 				    WEXITSTATUS(status));
 				rval |= 1;
 			}
-			break;
-		case 0:
-			if (is_shlib == 0) {
-				execl(*argv, *argv, (char *)NULL);
-				warn("%s", *argv);
-			} else {
-				dlopen(*argv, RTLD_TRACE);
-				warnx("%s: %s", *argv, dlerror());
-			}
-			_exit(1);
 		}
 	}
 
@@ -280,7 +346,8 @@ usage(void)
 }
 
 static int
-is_executable(const char *fname, int fd, int *is_shlib, int *type)
+is_executable(const char *fname, int fd, int *is_shlib, int *type,
+    const char** rtld)
 {
 	union {
 #ifdef AOUT_SUPPORTED
@@ -295,6 +362,7 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type)
 
 	*is_shlib = 0;
 	*type = TYPE_UNKNOWN;
+	*rtld = NULL;
 
 	if ((n = read(fd, &hdr, sizeof(hdr))) == -1) {
 		warn("%s: can't read program header", fname);
@@ -326,6 +394,7 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type)
 
 		dynamic = 0;
 		*type = TYPE_ELF32;
+		*rtld = _COMPAT32_PATH_RTLD;
 
 		if (lseek(fd, hdr.elf32.e_phoff, SEEK_SET) == -1) {
 			warnx("%s: header too short", fname);
@@ -368,6 +437,7 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type)
 
 		dynamic = 0;
 		*type = TYPE_ELF;
+		*rtld = _DEFAULT_PATH_RTLD;
 
 		if (lseek(fd, hdr.elf.e_phoff, SEEK_SET) == -1) {
 			warnx("%s: header too short", fname);
@@ -393,6 +463,12 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type)
 			switch (hdr.elf.e_ident[EI_OSABI]) {
 			case ELFOSABI_FREEBSD:
 				*is_shlib = 1;
+#ifdef __mips
+				if ((hdr.elf.e_flags & EF_MIPS_ABI) ==
+				    EF_MIPS_ABI_CHERIABI)
+					*rtld = _CHERIABI_PATH_RTLD;
+
+#endif
 				return (1);
 #ifdef __ARM_EABI__
 			case ELFOSABI_NONE:
