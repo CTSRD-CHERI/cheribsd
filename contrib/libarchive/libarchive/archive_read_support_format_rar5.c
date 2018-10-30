@@ -22,6 +22,14 @@
 * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
+// CHERI CHANGES START
+// {
+//   "updated": 20181030,
+//   "changes": [
+//     "pointer_integrity"
+//   ]
+// }
+// CHERI CHANGES END
 
 #include "archive_platform.h"
 
@@ -350,7 +358,7 @@ static size_t cdeque_size(struct cdeque* d) {
  * doesn't perform any bounds checking. If you need bounds checking, use
  * `cdeque_front()` function instead. */
 static void cdeque_front_fast(struct cdeque* d, void** value) {
-    *value = (void*) d->arr[d->beg_pos];
+    *value = (void*)(intptr_t) d->arr[d->beg_pos];
 }
 
 /* Returns the first element of current circular deque. This function
@@ -382,7 +390,7 @@ static int cdeque_push_back(struct cdeque* d, void* item) {
 /* Pops a front element of this circular deque object and returns its value.
  * This function doesn't perform any bounds checking. */
 static void cdeque_pop_front_fast(struct cdeque* d, void** value) {
-    *value = (void*) d->arr[d->beg_pos];
+    *value = (void*)(intptr_t) d->arr[d->beg_pos];
     d->beg_pos = (d->beg_pos + 1) & d->cap_mask;
     d->size--;
 }
@@ -402,12 +410,12 @@ static int cdeque_pop_front(struct cdeque* d, void** value) {
 
 /* Convinience function to cast filter_info** to void **. */
 static void** cdeque_filter_p(struct filter_info** f) {
-    return (void**) (size_t) f;
+    return (void**) (intptr_t) f;
 }
 
 /* Convinience function to cast filter_info* to void *. */
 static void* cdeque_filter(struct filter_info* f) {
-    return (void**) (size_t) f;
+    return (void**) (intptr_t) f;
 }
 
 /* Destroys this circular deque object. Dellocates the memory of the collection
