@@ -2305,24 +2305,21 @@ int
 cheriabi_coregister(struct thread *td, struct cheriabi_coregister_args *uap)
 {
 
-	// XXX: this fromcap thing is probably wrong.
-	return (kern_coregister(td, (__cheri_fromcap const char *)uap->name, uap->cap));
+	return (kern_coregister(td, uap->name, uap->cap));
 }
 
 int
 cheriabi_colookup(struct thread *td, struct cheriabi_colookup_args *uap)
 {
 
-	// XXX: this fromcap thing is probably wrong.
-	return (kern_colookup(td, (__cheri_fromcap const char *)uap->name, uap->cap));
+	return (kern_colookup(td, uap->name, uap->cap));
 }
 
 int
 cheriabi_cogetpid(struct thread *td, struct cheriabi_cogetpid_args *uap)
 {
 
-	// XXX: this fromcap thing is probably wrong.
-	return (kern_cogetpid(td, (__cheri_fromcap pid_t *)uap->pidp));
+	return (kern_cogetpid(td, uap->pidp));
 }
 
 #if 0

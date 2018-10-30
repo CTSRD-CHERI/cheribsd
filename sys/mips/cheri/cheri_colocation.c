@@ -387,11 +387,11 @@ int
 sys_coregister(struct thread *td, struct coregister_args *uap)
 {
 
-	return (kern_coregister(td, uap->name, __USER_CAP(uap->cap, sizeof(void * __capability))));
+	return (kern_coregister(td, __USER_CAP_STR(uap->name), __USER_CAP(uap->cap, sizeof(void * __capability))));
 }
 
 int
-kern_coregister(struct thread *td, const char *namep, void * __capability * __capability capp)
+kern_coregister(struct thread *td, const char * __capability namep, void * __capability * __capability capp)
 {
 	struct vmspace *vmspace;
 	struct coname *con;
@@ -402,7 +402,7 @@ kern_coregister(struct thread *td, const char *namep, void * __capability * __ca
 
 	vmspace = td->td_proc->p_vmspace;
 
-	error = copyinstr(namep, name, sizeof(name), NULL);
+	error = copyinstr_c(namep, name, sizeof(name), NULL);
 	if (error != 0)
 		return (error);
 
@@ -452,11 +452,11 @@ int
 sys_colookup(struct thread *td, struct colookup_args *uap)
 {
 
-	return (kern_colookup(td, uap->name, __USER_CAP(uap->cap, sizeof(void * __capability))));
+	return (kern_colookup(td, __USER_CAP_STR(uap->name), __USER_CAP(uap->cap, sizeof(void * __capability))));
 }
 
 int
-kern_colookup(struct thread *td, const char *namep, void * __capability * __capability capp)
+kern_colookup(struct thread *td, const char * __capability namep, void * __capability * __capability capp)
 {
 	struct vmspace *vmspace;
 	const struct coname *con;
@@ -465,7 +465,7 @@ kern_colookup(struct thread *td, const char *namep, void * __capability * __capa
 
 	vmspace = td->td_proc->p_vmspace;
 
-	error = copyinstr(namep, name, sizeof(name), NULL);
+	error = copyinstr_c(namep, name, sizeof(name), NULL);
 	if (error != 0)
 		return (error);
 
@@ -489,11 +489,11 @@ int
 sys_cogetpid(struct thread *td, struct cogetpid_args *uap)
 {
 
-	return (kern_cogetpid(td, uap->pidp));
+	return (kern_cogetpid(td, __USER_CAP(uap->pidp, sizeof(pid_t))));
 }
 
 int
-kern_cogetpid(struct thread *td, pid_t *pidp)
+kern_cogetpid(struct thread *td, pid_t * __capability pidp)
 {
 	struct switcher_context sc;
 	bool is_callee;
@@ -505,7 +505,7 @@ kern_cogetpid(struct thread *td, pid_t *pidp)
 		return (ESRCH);
 
 	pid = sc.sc_td->td_proc->p_pid;
-	error = copyout(&pid, pidp, sizeof(pid));
+	error = copyoutcap(&pid, pidp, sizeof(pid));
 
 	return (error);
 }
