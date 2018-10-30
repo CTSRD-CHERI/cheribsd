@@ -113,8 +113,6 @@ trace_rtld_direct_exec(pid_t * child, const char *rtld, const char *file)
 	argv[2] = strdup(file);
 	argv[3] = NULL;
 
-	fprintf(stderr, "Running %s %s %s\n", argv[0], argv[1], argv[2]);
-
 	rval = posix_spawn(child, rtld, NULL, NULL, argv, environ);
 	if (rval != 0) {
 		warnc(rval, "posix_spawn(%s, %s)", rtld, file);
