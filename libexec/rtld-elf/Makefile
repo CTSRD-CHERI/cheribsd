@@ -63,6 +63,8 @@ CFLAGS+=	-fvisibility=hidden
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS.reloc.c+=-fno-jump-tables
 .endif
+# Since we pass -shared, we shouldn't also pass -pie
+MK_PIE:=	no
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
 LIBADD=		c_nossp_pic
 .if ${MK_TOOLCHAIN} == "no"

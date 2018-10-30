@@ -50,6 +50,10 @@ BINDIR=		/libexec
 CFLAGS+=	-fpic
 CFLAGS+=	-DPIC $(DEBUG)
 CFLAGS.reloc.c+=-fno-jump-tables
+
+# Since we pass -shared, we shouldn't also pass -pie
+# TODO: should we use -pie instead of -shared for rtld?
+MK_PIE:=	no
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
 # avoid accidentally depending on non-existent symbols
 LDFLAGS+=	-Wl,-no-undefined
