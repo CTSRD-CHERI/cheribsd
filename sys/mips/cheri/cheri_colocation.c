@@ -48,6 +48,8 @@
 #include <vm/vm_pageout.h>
 #include <vm/vm_map.h>
 
+extern void * __capability	userspace_cap;
+
 /*
  * Capability used to seal capability pairs returned by cosetup(2).
  */
@@ -83,10 +85,18 @@ colocation_fetch_context(struct thread *td, struct switcher_context *scp)
 		return (false);
 	}
 
-	error = copyincap(__USER_CAP((const void *)addr, sizeof(*scp)),
+	error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap),
 	    &(*scp), sizeof(*scp));
+#if 1
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
 	    __func__, (void *)addr, error));
+#else
+	if (error != 0) {
+		printf("%s: copyincap from %p failed with error %d\n",
+		    __func__, (void *)addr, error);
+		return (false);
+	}
+#endif
 
 	if (scp->sc_borrower_td == NULL) {
 		/*
@@ -112,7 +122,7 @@ colocation_fetch_peer_context(struct thread *td, struct switcher_context *scp)
 		return (false);
 	}
 
-	error = copyincap(__USER_CAP((const void *)addr, sizeof(*scp)),
+	error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap),
 	    &(*scp), sizeof(*scp));
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
 	    __func__, (void *)addr, error));
@@ -168,7 +178,7 @@ colocation_thread_exit(struct thread *td)
 	sc.sc_td = NULL;
 	sc.sc_borrower_td = NULL;
 
-	error = copyoutcap(&sc, __USER_CAP((void *)addr, sizeof(sc)), sizeof(sc));
+	error = copyoutcap(&sc, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(sc));
 	if (error != 0) {
 		printf("%s: copyoutcap to %p failed with error %d\n",
 		    __func__, (void *)addr, error);
@@ -178,7 +188,7 @@ colocation_thread_exit(struct thread *td)
 	if (peersc == NULL)
 		return;
 
-	error = copyincap(__USER_CAP((void *)peersc, sizeof(sc)), &sc, sizeof(sc));
+	error = copyincap(___USER_CFROMPTR((void *)peersc, userspace_cap), &sc, sizeof(sc));
 	if (error != 0) {
 		printf("%s: peer copyincap from %p failed with error %d\n",
 		    __func__, (void *)peersc, error);
@@ -188,7 +198,7 @@ colocation_thread_exit(struct thread *td)
 	sc.sc_peer_context = NULL;
 	sc.sc_borrower_td = NULL;
 
-	error = copyoutcap(&sc, __USER_CAP((void *)peersc, sizeof(sc)), sizeof(sc));
+	error = copyoutcap(&sc, ___USER_CFROMPTR((void *)peersc, userspace_cap), sizeof(sc));
 	if (error != 0) {
 		printf("%s: peer copyoutcap to %p failed with error %d\n",
 		    __func__, (void *)peersc, error);
@@ -307,8 +317,8 @@ cosetup(struct thread *td)
 	sc.sc_peer_context = NULL;
 
 	printf("%s: 5\n", __func__);
-	error = copyoutcap(&sc, __USER_CAP((void *)addr, sizeof(sc)), sizeof(sc));
-	KASSERT(error == 0, ("%s: copyoutcap() failed with error %d\n", __func__, error));
+	error = copyoutcap(&sc, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(sc));
+	//KASSERT(error == 0, ("%s: copyoutcap() failed with error %d\n", __func__, error));
 	printf("%s: done\n", __func__);
 
 	return (0);
@@ -334,8 +344,10 @@ kern_cosetup(struct thread *td, int what,
 
 	if (td->td_md.md_switcher_context == 0) {
 		error = cosetup(td);
-		if (error != 0)
+		if (error != 0) {
+			printf("%s: cosetup() failed with error %d\n", __func__, error);
 			return (error);
+		}
 	}
 
 	addr = td->td_md.md_switcher_context;
