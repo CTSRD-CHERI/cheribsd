@@ -9,7 +9,8 @@ MAN=
 #CFLAGS+=	-fPIE -pie -Wno-error=deprecated-declarations -fuse-ld=lld
 CFLAGS+=	-Wno-error=deprecated-declarations
 LIBADD=		pthread
-NEED_CHERI=	hybrid
+#NEED_CHERI=	hybrid
+NEED_CHERI=     pure
 
 WARNS?=	5
 
