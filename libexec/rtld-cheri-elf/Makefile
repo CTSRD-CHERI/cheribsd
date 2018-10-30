@@ -25,6 +25,12 @@ SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c cheri_reloc.c
 .PATH: ${.CURDIR}/../rtld-elf
 SRCS+=	rtld_lock.c map_object.c xmalloc.c debug.c libmap.c
 
+# Build the CHERI PLT stuff as C++
+SRCS+=	cheri_plt.cpp
+CXXFLAGS+= -std=c++11 -fno-rtti -fno-exceptions
+CFLAGS+=	-I${SRCTOP}/contrib/uthash/src
+
+
 MAN=
 NEED_CHERI=	pure
 WANT_DUMP=yes
