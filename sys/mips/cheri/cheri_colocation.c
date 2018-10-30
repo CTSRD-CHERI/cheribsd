@@ -310,16 +310,14 @@ cosetup(struct thread *td)
 	entry->owner = 0;
 	vm_map_unlock(map);
 
-	printf("%s: context at %p, td %p\n", __func__, (void *)addr, td);
+	//printf("%s: context at %p, td %p\n", __func__, (void *)addr, td);
 	sc.sc_unsealcap = switcher_sealcap2;
 	sc.sc_td = td;
 	sc.sc_borrower_td = NULL;
 	sc.sc_peer_context = NULL;
 
-	printf("%s: 5\n", __func__);
 	error = copyoutcap(&sc, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(sc));
-	//KASSERT(error == 0, ("%s: copyoutcap() failed with error %d\n", __func__, error));
-	printf("%s: done\n", __func__);
+	KASSERT(error == 0, ("%s: copyoutcap() failed with error %d\n", __func__, error));
 
 	return (0);
 }
