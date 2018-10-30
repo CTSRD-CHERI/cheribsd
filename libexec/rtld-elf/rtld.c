@@ -800,7 +800,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     }
     lock_release(rtld_bind_lock, &lockstate);
 
-    dbg("transferring control to program entry point = %p", obj_main->entry);
+    dbg("transferring control to program entry point = %-#p", obj_main->entry);
 
     /* Return the exit procedure and the program entry point. */
     *exit_proc = rtld_exit;
@@ -814,6 +814,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     // reference argument and store obj_main->captable there but this is easier
     // and should have the same effect.
     __asm__ volatile("cmove $cgp, %0" :: "C"(obj_main->captable));
+    assert(cheri_getperm(obj_main->entry) & CHERI_PERM_EXECUTE);
 #endif
 
     return (func_ptr_type) obj_main->entry;

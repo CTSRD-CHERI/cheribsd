@@ -339,8 +339,14 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     fix_obj_mapping_cap_permissions(obj, path);
 #endif
     obj->dynamic = (const Elf_Dyn *) (obj->relocbase + phdyn->p_vaddr);
-    if (hdr->e_entry != 0)
+    if (hdr->e_entry != 0) {
+#ifdef __CHERI_PURE_CAPABILITY__
+	obj->entry = (caddr_t) (obj->text_rodata_cap + hdr->e_entry);
+	dbg("\tentry for %s: %-#p", path, obj->entry);
+#else
 	obj->entry = (caddr_t) (obj->relocbase + hdr->e_entry);
+#endif
+    }
     if (phdr_vaddr != 0) {
 	obj->phdr = (const Elf_Phdr *) (obj->relocbase + phdr_vaddr);
     } else {
