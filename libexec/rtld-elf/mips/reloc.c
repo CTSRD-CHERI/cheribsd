@@ -711,7 +711,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 				if (def->st_value != 0) {
 					print_local_reloc_dbg = true;
 				}
-#if defined(DEBUG_VERBOSE)
+#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE > 2
 				print_local_reloc_dbg = true;
 #endif
 				if (print_local_reloc_dbg)

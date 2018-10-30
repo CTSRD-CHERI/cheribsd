@@ -13,7 +13,9 @@ MK_CHERI_SHARED_PROG:=yes
 # TODO: disable this once we believe RTLD works reliably
 # Disable DEBUG to get a fair performance comparison to rtld-elf
 # DEBUG=-DDEBUG
-.ifdef BUILD_RTLD_DEBUG
+.ifdef RTLD_DEBUG_VERBOSE
+CFLAGS+=-DDEBUG -DDEBUG_VERBOSE=${RTLD_DEBUG_VERBOSE}
+.elif defined(BUILD_RTLD_DEBUG)
 CFLAGS+=-DDEBUG
 .endif
 

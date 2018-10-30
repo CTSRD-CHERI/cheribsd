@@ -95,8 +95,8 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		return -1;
 	}
 	*((const void**)where) = symval;
-#if defined(DEBUG_VERBOSE)
-	dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s", where, rel->r_offset,
+#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 2
+	dbg("CAP(%p/0x%lx) %s in %s --> %-#p in %s", where, (const char*)where - (const char*)obj->relocbase,
 	    symname(obj, r_symndx), obj->path, *((void**)where), defobj->path);
 #endif
 	return 0;
