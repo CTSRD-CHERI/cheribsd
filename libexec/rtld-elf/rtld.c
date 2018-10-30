@@ -556,7 +556,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     dangerous_ld_env = libmap_disable || (libmap_override != NULL) ||
 	(ld_library_path != NULL) || (ld_preload != NULL) ||
 	(ld_elf_hints_path != NULL) || ld_loadfltr;
-    ld_tracing = getenv(_LD("TRACE_LOADED_OBJECTS"));
+    if (!ld_tracing)
+	ld_tracing = getenv(_LD("TRACE_LOADED_OBJECTS"));
     ld_utrace = getenv(_LD("UTRACE"));
 
     if ((ld_elf_hints_path == NULL) || strlen(ld_elf_hints_path) == 0)
@@ -5750,6 +5751,8 @@ parse_args(char* argv[], int argc, bool *use_pathp, int *fdp)
 			break;
 			} else if (opt == 'p') {
 				*use_pathp = true;
+			} else if (opt == 't') {
+				ld_tracing = "yes";
 			} else {
 				_rtld_error("Invalid argument: '%s'", arg);
 				print_usage(argv[0]);
@@ -5797,6 +5800,7 @@ print_usage(const char *argv0)
 		"Options:\n"
 		"  -h        Display this help message\n"
 		"  -p        Search in PATH for named binary\n"
+		"  -t        Trace loaded libraries instead of executing <binary>\n"
 		"  -f <FD>   Execute <FD> instead of searching for <binary>\n"
 		"  --        End of RTLD options\n"
 		"  <binary>  Name of process to execute\n"
