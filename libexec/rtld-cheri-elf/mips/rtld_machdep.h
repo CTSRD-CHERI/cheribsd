@@ -70,7 +70,7 @@ get_codesegment(const struct Struct_Obj_Entry *obj) {
 	return obj->text_rodata_cap;
 }
 
-static inline const void*
+static inline dlfunc_t
 make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 {
 	const void* ret = get_codesegment(defobj) + def->st_value;
@@ -104,7 +104,7 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	return ret;
 }
 
-static inline const void*
+static inline dlfunc_t
 vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
 	const void* text = get_codesegment(obj);
 	dbg_assert(code_addr >= (vaddr_t)text);
@@ -147,7 +147,7 @@ typedef struct {
  * Lazy binding entry point, called via PLT.
  */
 void _rtld_bind_start(void);
-
+void *_mips_get_tls(void);
 extern void *__tls_get_addr(tls_index *ti);
 
 #define	RTLD_DEFAULT_STACK_PF_EXEC	PF_X

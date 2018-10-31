@@ -96,7 +96,7 @@ static void digest_dynamic1(Obj_Entry *, int, const Elf_Dyn **,
 static void digest_dynamic2(Obj_Entry *, const Elf_Dyn *, const Elf_Dyn *,
     const Elf_Dyn *);
 static void digest_dynamic(Obj_Entry *, int);
-static Obj_Entry *digest_phdr(const Elf_Phdr *, int, caddr_t, const char *);
+static Obj_Entry *digest_phdr(const Elf_Phdr *, int, dlfunc_t, const char *);
 static Obj_Entry *dlcheck(void *);
 static int dlclose_locked(void *, RtldLockState *);
 static Obj_Entry *dlopen_object(const char *name, int fd, Obj_Entry *refobj,
@@ -398,7 +398,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 #ifndef __CHERI_PURE_CAPABILITY__
     char **envp;
 #endif
-    caddr_t imgentry;
+    dlfunc_t imgentry;
     char buf[MAXPATHLEN];
     int argc, fd, i, phnum, rtld_argc;
     bool dir_enable, explicit_fd, search_in_path;
@@ -615,9 +615,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_PHENT] != NULL);
 	assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 	assert(aux_info[AT_ENTRY] != NULL);
-	imgentry = (caddr_t) aux_info[AT_ENTRY]->a_un.a_ptr;
+	imgentry = (dlfunc_t) aux_info[AT_ENTRY]->a_un.a_ptr;
 	dbg("Values from kernel:\n\tAT_PHDR=%-#p\n\tAT_BASE=%-#p\n\tAT_ENTRY=%-#p\n",
-		phdr, aux_info[AT_BASE]->a_un.a_ptr, imgentry);
+		phdr, aux_info[AT_BASE]->a_un.a_ptr, (const void *)imgentry);
 	if ((obj_main = digest_phdr(phdr, phnum, imgentry, argv0)) ==
 	    NULL)
 		rtld_die();
@@ -845,6 +845,8 @@ void *
 rtld_resolve_ifunc(const Obj_Entry *obj, const Elf_Sym *def)
 {
 #ifdef __CHERI_PURE_CAPABILITY__
+	(void)obj;
+	(void)def;
 	rtld_fatal("IFUNC is not implemented for CheriABI");
 #else
 
@@ -1486,9 +1488,10 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		    obj->captable, obj->captable - obj->text_rodata_cap);
 		if (obj->captable) {
 			vaddr_t start = rtld_min(obj->text_rodata_start,
-			    obj->captable - obj->text_rodata_cap);
+			    (vaddr_t)(obj->captable - obj->text_rodata_cap));
 			vaddr_t end = rtld_max(obj->text_rodata_end,
-			    obj->captable + cheri_getlen(obj->captable) - obj->text_rodata_cap);
+			    (vaddr_t)((obj->captable + cheri_getlen(obj->captable)) -
+			    obj->text_rodata_cap));
 			obj->text_rodata_cap += start;
 			obj->text_rodata_cap = cheri_csetbounds_sametype(
 			    obj->text_rodata_cap, end - start);
@@ -1544,7 +1547,7 @@ digest_dynamic(Obj_Entry *obj, int early)
  * returns an Obj_Entry structure.
  */
 static Obj_Entry *
-digest_phdr(const Elf_Phdr *phdr, int phnum, caddr_t entry, const char *path)
+digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 {
     dbg("%s(0, entry=%-#p, phdr=%-#p, path=%s)\n", __func__, entry, phdr, path);
     Obj_Entry *obj;
@@ -5920,5 +5923,6 @@ __assert(const char *func, const char *file, int line, const char *failedexpr)
  * This symbol is actually provided by crt1.c but we need a definition in
  * rtld to avoid a R_MIPS_CHERI_CAPBILITY relocation in rtld
  */
+extern Elf_Auxinfo *__auxargs;
 __attribute__((visibility("hidden"))) Elf_Auxinfo *__auxargs = NULL;
 #endif

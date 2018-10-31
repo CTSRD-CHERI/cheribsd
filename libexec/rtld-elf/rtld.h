@@ -47,6 +47,7 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 
+#include <dlfcn.h>
 #include <elf-hints.h>
 #include <link.h>
 #include <stdarg.h>
@@ -190,7 +191,7 @@ typedef struct Struct_Obj_Entry {
 #endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */
-    caddr_t entry;		/* Entry point */
+    dlfunc_t entry;		/* Entry point */
     const Elf_Phdr *phdr;	/* Program header if it is mapped, else NULL */
     size_t phsize;		/* Size of program header in bytes */
     const char *interp;		/* Pathname of the interpreter, if any */

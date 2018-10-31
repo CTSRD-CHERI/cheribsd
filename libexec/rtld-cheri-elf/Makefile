@@ -40,8 +40,8 @@ RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
 CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR} -I${.CURDIR}/../rtld-elf
 LDFLAGS+=	-nostdlib -e rtld_start
-# TODO: increase this to 6
-WARNS?=		2
+NO_WCAST_ALIGN=	yes
+WARNS?=		6
 INSTALLFLAGS=	-C -b
 PRECIOUSPROG=
 BINDIR=		/libexec

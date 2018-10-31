@@ -102,7 +102,7 @@ static	int pagebucket;			/* page size bucket */
 #if defined(MALLOC_DEBUG) || defined(RCHECK) || defined(IN_RTLD)
 #define	ASSERT(p)   if (!(p)) botch("p")
 static void
-botch(char *s)
+botch(const char *s)
 {
 #ifdef IN_RTLD
 	rtld_fdprintf(STDERR_FILENO, "\r\nassertion botched: %s\r\n", s);

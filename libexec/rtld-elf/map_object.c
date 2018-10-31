@@ -342,10 +342,10 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     obj->dynamic = (const Elf_Dyn *)(obj->relocbase + phdyn->p_vaddr);
     if (hdr->e_entry != 0) {
 #ifdef __CHERI_PURE_CAPABILITY__
-	obj->entry = (caddr_t) (obj->text_rodata_cap + hdr->e_entry);
+	obj->entry = (const void*)(obj->text_rodata_cap + hdr->e_entry);
 	dbg("\tentry for %s: %-#p", path, obj->entry);
 #else
-	obj->entry = (caddr_t)(obj->relocbase + hdr->e_entry);
+	obj->entry = (const void*)(obj->relocbase + hdr->e_entry);
 #endif
     }
     if (phdr_vaddr != 0) {

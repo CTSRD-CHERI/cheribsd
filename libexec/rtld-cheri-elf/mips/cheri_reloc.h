@@ -88,7 +88,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	 * virtual address for both 128 and 256-bit CHERI).
 	 */
 	uint64_t src_offset = load_ptr(where, sizeof(uint64_t));
-	symval += src_offset;
+	symval = (const char *)symval + src_offset;
 	if (__predict_false(!cheri_gettag(symval) && !is_undef_weak)) {
 		_rtld_error("%s: constructed invalid capability for %s: %#p",
 		    obj->path, symname(obj, r_symndx), symval);
