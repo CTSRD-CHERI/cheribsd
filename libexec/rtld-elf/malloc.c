@@ -150,7 +150,6 @@ botch(char *s)
  * must contain at least one page size.  The page sizes must be stored in
  * increasing order.
  */
-extern size_t *pagesizes;
 
 void *
 malloc(size_t nbytes)
@@ -298,7 +297,7 @@ morecore(int bucket)
 }
 
 void
-free(void *cp)
+free(void * cp)
 {
 	int size;
 	union overhead *op;
@@ -336,7 +335,7 @@ free(void *cp)
  * is extern so the caller can modify it).  If that fails we just copy
  * however many bytes was given to realloc() and hope it's not huge.
  */
-int realloc_srchlen = 4;	/* 4 should be plenty, -1 =>'s whole list */
+static int realloc_srchlen = 4;	/* 4 should be plenty, -1 =>'s whole list */
 
 void *
 realloc(void *cp, size_t nbytes)
@@ -432,7 +431,7 @@ findbucket(union overhead *freep, int srchlen)
  * for each size category, the second showing the number of mallocs -
  * frees for each size category.
  */
-mstats(char *s)
+mstats(char * s)
 {
 	int i, j;
 	union overhead *p;
