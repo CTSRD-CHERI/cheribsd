@@ -60,16 +60,11 @@ static char *rcsid = "$FreeBSD$";
 #include "rtld_printf.h"
 #include "paths.h"
 
-union overhead;
-static void morecore(int);
-static int findbucket(union overhead *, int);
-
 /*
  * Pre-allocate mmap'ed pages
  */
 #define	NPOOLPAGES	(128*1024/pagesz)
 static caddr_t		pagepool_start, pagepool_end;
-static int		morepages(int n);
 
 /*
  * The overhead on a block is at least 4 bytes.  When free, this space
@@ -96,6 +91,11 @@ union	overhead {
 #define	ov_rmagic	ovu.ovu_rmagic
 #define	ov_size		ovu.ovu_size
 };
+
+static void morecore(int bucket);
+static int morepages(int n);
+static int findbucket(union overhead *freep, int srchlen);
+
 
 #define	MAGIC		0xef		/* magic # on accounting info */
 #define RMAGIC		0x5555		/* magic # on range info */
@@ -155,10 +155,10 @@ extern size_t *pagesizes;
 void *
 malloc(size_t nbytes)
 {
-  	register union overhead *op;
-  	register int bucket;
-	register long n;
-	register unsigned amt;
+	union overhead *op;
+	int bucket;
+	size_t n;
+	unsigned amt;
 
 	/*
 	 * First time malloc is called, setup page size and
@@ -257,8 +257,8 @@ calloc(size_t num, size_t size)
 static void
 morecore(int bucket)
 {
-  	register union overhead *op;
-	register int sz;		/* size of desired block */
+	union overhead *op;
+	int sz;		/* size of desired block */
   	int amt;			/* amount to allocate */
   	int nblks;			/* how many blocks we get */
 
@@ -300,8 +300,8 @@ morecore(int bucket)
 void
 free(void *cp)
 {
-  	register int size;
-	register union overhead *op;
+	int size;
+	union overhead *op;
 
   	if (cp == NULL)
   		return;
@@ -341,8 +341,8 @@ int realloc_srchlen = 4;	/* 4 should be plenty, -1 =>'s whole list */
 void *
 realloc(void *cp, size_t nbytes)
 {
-  	register u_int onb;
-	register int i;
+	u_int onb;
+	int i;
 	union overhead *op;
   	char *res;
 	int was_alloced = 0;
@@ -410,8 +410,8 @@ realloc(void *cp, size_t nbytes)
 static int
 findbucket(union overhead *freep, int srchlen)
 {
-	register union overhead *p;
-	register int i, j;
+	union overhead *p;
+	int i, j;
 
 	for (i = 0; i < NBUCKETS; i++) {
 		j = 0;
@@ -434,8 +434,8 @@ findbucket(union overhead *freep, int srchlen)
  */
 mstats(char *s)
 {
-  	register int i, j;
-  	register union overhead *p;
+	int i, j;
+	union overhead *p;
   	int totfree = 0,
   	totused = 0;
 
