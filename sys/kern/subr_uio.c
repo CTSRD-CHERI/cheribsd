@@ -438,7 +438,7 @@ copyiniov(const uiovec_t * __capability iovp, u_int iovcnt, kiovec_t **iov,
 	iovs = malloc(iovlen, M_IOV, M_WAITOK);
 	/* XXXBD: needlessly slow when uiovec_t and kiovec_t are the same */
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin_c(iovp + i, &useriov, sizeof(useriov));
+		error = copyincap(iovp + i, &useriov, sizeof(useriov));
 		if (error) {
 			free(iovs, M_IOV);
 			return (error);
