@@ -157,8 +157,8 @@ malloc(size_t nbytes)
 {
 	union overhead *op;
 	int bucket;
-	size_t n;
-	unsigned amt;
+	ssize_t n;
+	size_t amt;
 
 	/*
 	 * First time malloc is called, setup page size and

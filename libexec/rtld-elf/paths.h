@@ -91,10 +91,10 @@
 #define	LD_SOFT_		"LD_SOFT_"
 #endif
 
-extern char *ld_elf_hints_default;
-extern char *ld_path_libmap_conf;
-extern char *ld_path_rtld;
-extern char *ld_standard_library_path;
-extern char *ld_env_prefix;
+extern const char *ld_elf_hints_default;
+extern const char *ld_path_libmap_conf;
+extern const char *ld_path_rtld;
+extern const char *ld_standard_library_path;
+extern const char *ld_env_prefix;
 
 #endif /* PATHS_H */

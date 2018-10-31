@@ -120,7 +120,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
      *
      * We expect that the loadable segments are ordered by load address.
      */
-    phdr = (Elf_Phdr *) ((char *)hdr + hdr->e_phoff);
+    phdr = (Elf_Phdr *)((char *)hdr + hdr->e_phoff);
     phsize  = hdr->e_phnum * sizeof (phdr[0]);
     phlimit = phdr + hdr->e_phnum;
     nsegs = -1;
@@ -338,17 +338,17 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     obj->text_rodata_cap = obj->relocbase;
     fix_obj_mapping_cap_permissions(obj, path);
 #endif
-    obj->dynamic = (const Elf_Dyn *) (obj->relocbase + phdyn->p_vaddr);
+    obj->dynamic = (const Elf_Dyn *)(obj->relocbase + phdyn->p_vaddr);
     if (hdr->e_entry != 0) {
 #ifdef __CHERI_PURE_CAPABILITY__
 	obj->entry = (caddr_t) (obj->text_rodata_cap + hdr->e_entry);
 	dbg("\tentry for %s: %-#p", path, obj->entry);
 #else
-	obj->entry = (caddr_t) (obj->relocbase + hdr->e_entry);
+	obj->entry = (caddr_t)(obj->relocbase + hdr->e_entry);
 #endif
     }
     if (phdr_vaddr != 0) {
-	obj->phdr = (const Elf_Phdr *) (obj->relocbase + phdr_vaddr);
+	obj->phdr = (const Elf_Phdr *)(obj->relocbase + phdr_vaddr);
     } else {
 	obj->phdr = malloc(phsize);
 	if (obj->phdr == NULL) {
@@ -356,12 +356,12 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    _rtld_error("%s: cannot allocate program header", path);
 	    goto error1;
 	}
-	memcpy((char *)obj->phdr, (char *)hdr + hdr->e_phoff, phsize);
+	memcpy(__DECONST(char *, obj->phdr), (char *)hdr + hdr->e_phoff, phsize);
 	obj->phdr_alloc = true;
     }
     obj->phsize = phsize;
     if (phinterp != NULL)
-	obj->interp = (const char *) (obj->relocbase + phinterp->p_vaddr);
+	obj->interp = (const char *)(obj->relocbase + phinterp->p_vaddr);
     if (phtls != NULL) {
 	tls_dtv_generation++;
 	obj->tlsindex = ++tls_max_index;
@@ -492,13 +492,13 @@ obj_free(Obj_Entry *obj)
     if (obj->origin_path)
 	free(obj->origin_path);
     if (obj->z_origin)
-	free(obj->rpath);
+	free(__DECONST(void*, obj->rpath));
     if (obj->priv)
 	free(obj->priv);
     if (obj->path)
 	free(obj->path);
     if (obj->phdr_alloc)
-	free((void *)obj->phdr);
+	free(__DECONST(void *, obj->phdr));
     free(obj);
 }
 
