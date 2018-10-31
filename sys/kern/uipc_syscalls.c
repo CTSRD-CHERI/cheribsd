@@ -1242,10 +1242,16 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	kmsghdr_t msg;
 	kiovec_t *iov;
 	int error;
+#if __has_feature(capabilities)
+	uiovec_t * __capability uiov;
+#endif
 
 	error = copyincap(uap->msg, &msg, sizeof(msg));
 	if (error != 0)
 		return (error);
+#if __has_feature(capabilities)
+	uiov = msg.msg_iov;
+#endif
 	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
@@ -1256,12 +1262,18 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 #endif
 	error = recvit(td, uap->s, &msg, NULL);
 	if (error == 0) {
+#if __has_feature(capabilities)
+		msg.msg_iov = (kiovec_t * __capability)uiov;
+		error = copyoutcap(&msg, uap->msg, sizeof(msg));
+#else
+		/* XXX-AM: this should also be done in compat freebsd64 */
 		/*
 		 * The pointers should not have changed so don't touch them.
 		 * XXX: assert this?
 		 * XXX: what if anything else should have changed?
 		 */
 		error = copyout(&msg, uap->msg, sizeof(msg));
+#endif
 	}
 	free(iov, M_IOV);
 	return (error);
