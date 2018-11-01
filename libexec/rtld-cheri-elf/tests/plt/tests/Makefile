@@ -16,7 +16,7 @@ SRCS.load_global_int_fnptr_call=load_global_int_fnptr_call.c external_fnptr.c
 
 LDFLAGS+=	-L${.OBJDIR}/../libtest_rtld_plt
 CFLAGS+=	-I${.CURDIR}/../libtest_rtld_plt
-DPADD+=		${.OBJDIR}/../libwrite/libtest_rtld_plt.so.1
+DPADD+=		${.OBJDIR}/../libtest_rtld_plt/libtest_rtld_plt.so.0
 LDADD=		-ltest_rtld_plt
 
 .include <bsd.test.mk>
