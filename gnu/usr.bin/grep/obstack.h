@@ -483,11 +483,11 @@ __extension__								\
    obstack_finish (__h); })
 
 #if __has_builtin(__builtin_align_down)
-#define obstack_align_down_mask(ptr, align_mask) \
-	__builtin_align_down(ptr, align_mask + 1)
+#define obstack_align_down_mask(ptr_int, align_mask) \
+	__builtin_align_down(ptr_int, align_mask + 1)
 #else
-#define obstack_align_down_mask(ptr, align_mask) \
-	((__PTR_TO_INT (ptr)) & ~(PTR_INT_TYPE)(align_mask))
+#define obstack_align_down_mask(ptr_int, align_mask) \
+	((ptr_int) & ~(PTR_INT_TYPE)(align_mask))
 #endif
 
 /* The local variable is named __o1 to avoid a name conflict
