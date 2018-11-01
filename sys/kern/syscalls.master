@@ -115,7 +115,7 @@
 		int open(
 		    _In_z_ char *path,
 		    int flags,
-		    int mode
+		    mode_t mode
 		);
 	}
 6	AUE_CLOSE	STD {
@@ -169,7 +169,7 @@
 15	AUE_CHMOD	STD {
 		int chmod(
 		    _In_z_ char *path,
-		    int mode
+		    mode_t mode
 		);
 	}
 16	AUE_CHOWN	STD {
@@ -432,7 +432,7 @@
 	}
 60	AUE_UMASK	STD {
 		int umask(
-		    int newmask
+		    mode_t newmask
 		);
 	}
 61	AUE_CHROOT	STD {
@@ -785,7 +785,7 @@
 124	AUE_FCHMOD	STD {
 		int fchmod(
 		    int fd,
-		    int mode
+		    mode_t mode
 		);
 	}
 125	AUE_RECVFROM	COMPAT|NOARGS {
@@ -837,7 +837,7 @@
 132	AUE_MKFIFO	STD {
 		int mkfifo(
 		    _In_z_ char *path,
-		    int mode
+		    mode_t mode
 		);
 	}
 133	AUE_SENDTO	STD {
@@ -867,7 +867,7 @@
 136	AUE_MKDIR	STD {
 		int mkdir(
 		    _In_z_ char *path,
-		    int mode
+		    mode_t mode
 		);
 	}
 137	AUE_RMDIR	STD {
