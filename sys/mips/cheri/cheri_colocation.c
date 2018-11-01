@@ -135,7 +135,8 @@ colocation_fetch_peer_context(struct thread *td, struct switcher_context *scp)
 	}
 
 	error = copyincap(scp->sc_peer_context, &(*scp), sizeof(*scp));
-	KASSERT(error == 0, ("%s: copyincap from peer %p failed with error %d\n",
+	KASSERT(error == 0,
+	    ("%s: copyincap from peer %p failed with error %d\n",
 	    __func__, (__cheri_fromcap void *)scp->sc_peer_context, error));
 
 	return (true);
@@ -231,7 +232,8 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 		return;
 	}
 
-	KASSERT(peertd != td, ("%s: peertd %p == td %p\n", __func__, peertd, td));
+	KASSERT(peertd != td,
+	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
 #if 0
 	printf("%s: replacing current td %p, switcher_context %#lx, md_tls %p, md_tls_tcb_offset %zd, "
@@ -291,22 +293,25 @@ cosetup(struct thread *td)
 	map = &td->td_proc->p_vmspace->vm_map;
 
 	/*
-	 * XXX: Race between this and setting the owner.  If we moved the lock earlier,
-	 * 	we'd die on:
-	 * 	panic: _sx_xlock_hard: recursed on non-recursive sx vm map (user) @ /usr/home/en322/cheri/cheribsd/sys/vm/vm_map.c:1746
+	 * XXX: Race between this and setting the owner.  If we moved the lock
+	 * 	earlier, we'd die on:
 	 *
+	 * 	panic: _sx_xlock_hard: recursed on non-recursive sx vm map (user) @ /usr/home/en322/cheri/cheribsd/sys/vm/vm_map.c:1746
 	 */
-	error = vm_mmap_object(map, &addr, 0, PAGE_SIZE, VM_PROT_READ | VM_PROT_WRITE,
-	    VM_PROT_ALL, MAP_PRIVATE | MAP_ANON, NULL, 0, FALSE, td);
+	error = vm_mmap_object(map, &addr, 0, PAGE_SIZE,
+	    VM_PROT_READ | VM_PROT_WRITE, VM_PROT_ALL,
+	    MAP_PRIVATE | MAP_ANON, NULL, 0, FALSE, td);
 	if (error != 0) {
-		printf("%s: vm_mmap_object() failed with error %d\n", __func__, error);
+		printf("%s: vm_mmap_object() failed with error %d\n",
+		    __func__, error);
 		return (error);
 	}
 	td->td_md.md_switcher_context = addr;
 
 	vm_map_lock(map);
 	found = vm_map_lookup_entry(map, addr, &entry);
-	KASSERT(found == TRUE, ("%s: vm_map_lookup_entry() returned false\n", __func__));
+	KASSERT(found == TRUE,
+	    ("%s: vm_map_lookup_entry() returned false\n", __func__));
 	entry->owner = 0;
 	vm_map_unlock(map);
 
@@ -316,8 +321,10 @@ cosetup(struct thread *td)
 	sc.sc_borrower_td = NULL;
 	sc.sc_peer_context = NULL;
 
-	error = copyoutcap(&sc, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(sc));
-	KASSERT(error == 0, ("%s: copyoutcap() failed with error %d\n", __func__, error));
+	error = copyoutcap(&sc,
+	    ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(sc));
+	KASSERT(error == 0,
+	    ("%s: copyoutcap() failed with error %d\n", __func__, error));
 
 	return (0);
 }
@@ -333,7 +340,8 @@ sys_cosetup(struct thread *td, struct cosetup_args *uap)
 
 int
 kern_cosetup(struct thread *td, int what,
-    void * __capability * __capability codep, void * __capability * __capability datap)
+    void * __capability * __capability codep,
+    void * __capability * __capability datap)
 {
 	void * __capability codecap;
 	void * __capability datacap;
@@ -343,7 +351,8 @@ kern_cosetup(struct thread *td, int what,
 	if (td->td_md.md_switcher_context == 0) {
 		error = cosetup(td);
 		if (error != 0) {
-			printf("%s: cosetup() failed with error %d\n", __func__, error);
+			printf("%s: cosetup() failed with error %d\n",
+			    __func__, error);
 			return (error);
 		}
 	}
@@ -360,20 +369,23 @@ kern_cosetup(struct thread *td, int what,
 		if (error != 0)
 			return (error);
 
-		datacap = cheri_capability_build_user_rwx( CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+		datacap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+		    addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
 		error = copyoutcap(&datacap, datap, sizeof(datacap));
 		return (0);
 
 	case COSETUP_COACCEPT:
 		codecap = cheri_capability_build_user_rwx(CHERI_CAP_USER_CODE_PERMS,
-		    td->td_proc->p_sysent->sv_coaccept_base, td->td_proc->p_sysent->sv_coaccept_len, 0);
+		    td->td_proc->p_sysent->sv_coaccept_base,
+		    td->td_proc->p_sysent->sv_coaccept_len, 0);
 		codecap = cheri_seal(codecap, switcher_sealcap);
 		error = copyoutcap(&codecap, codep, sizeof(codecap));
 		if (error != 0)
 			return (error);
 
-		datacap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+		datacap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+		    addr, PAGE_SIZE, 0);
 		datacap = cheri_seal(datacap, switcher_sealcap);
 		error = copyoutcap(&datacap, datap, sizeof(datacap));
 		return (0);
@@ -387,11 +399,13 @@ int
 sys_coregister(struct thread *td, struct coregister_args *uap)
 {
 
-	return (kern_coregister(td, __USER_CAP_STR(uap->name), __USER_CAP(uap->cap, sizeof(void * __capability))));
+	return (kern_coregister(td, __USER_CAP_STR(uap->name),
+	    __USER_CAP(uap->cap, sizeof(void * __capability))));
 }
 
 int
-kern_coregister(struct thread *td, const char * __capability namep, void * __capability * __capability capp)
+kern_coregister(struct thread *td, const char * __capability namep,
+    void * __capability * __capability capp)
 {
 	struct vmspace *vmspace;
 	struct coname *con;
@@ -428,7 +442,8 @@ kern_coregister(struct thread *td, const char * __capability namep, void * __cap
 		}
 	}
 
-	cap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS, addr, PAGE_SIZE, 0);
+	cap = cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+	    addr, PAGE_SIZE, 0);
 	cap = cheri_seal(cap, switcher_sealcap2);
 
 	if (capp != NULL) {
@@ -452,11 +467,13 @@ int
 sys_colookup(struct thread *td, struct colookup_args *uap)
 {
 
-	return (kern_colookup(td, __USER_CAP_STR(uap->name), __USER_CAP(uap->cap, sizeof(void * __capability))));
+	return (kern_colookup(td, __USER_CAP_STR(uap->name),
+	    __USER_CAP(uap->cap, sizeof(void * __capability))));
 }
 
 int
-kern_colookup(struct thread *td, const char * __capability namep, void * __capability * __capability capp)
+kern_colookup(struct thread *td, const char * __capability namep,
+    void * __capability * __capability capp)
 {
 	struct vmspace *vmspace;
 	const struct coname *con;
