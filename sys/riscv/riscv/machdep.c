@@ -585,7 +585,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	bzero(&frame, sizeof(frame));
 	get_mcontext(td, &frame.sf_uc.uc_mcontext, 0);
 	get_fpcontext(td, &frame.sf_uc.uc_mcontext);
-	frame.sf_si = ksi->ksi_info;
+	siginfo_to_siginfo_native(&ksi->ksi_info, &frame.sf_si);
 	frame.sf_uc.uc_sigmask = *mask;
 	frame.sf_uc.uc_stack = td->td_sigstk;
 	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
