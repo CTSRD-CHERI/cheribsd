@@ -1348,6 +1348,13 @@ kern_poll(struct thread *td, struct pollfd * __capability ufds, u_int nfds,
 	} else
 		sbt = -1;
 
+	/*
+	 * This is kinda bogus.  We have fd limits, but that is not
+	 * really related to the size of the pollfd array.  Make sure
+	 * we let the process use at least FD_SETSIZE entries and at
+	 * least enough for the system-wide limits.  We want to be reasonably
+	 * safe, but not overly restrictive.
+	 */
 	if (nfds > maxfilesperproc && nfds > FD_SETSIZE) 
 		return (EINVAL);
 	if (nfds > nitems(stackfds))
