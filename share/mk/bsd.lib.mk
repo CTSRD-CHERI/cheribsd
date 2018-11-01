@@ -98,6 +98,24 @@ STATIC_CFLAGS+= -ftls-model=initial-exec
 STATIC_CXXFLAGS+= -ftls-model=initial-exec
 .endif
 
+.if defined(MK_PIE)
+# Ports will not have MK_PIE defined and the following logic requires
+# it be defined.
+
+.if ${LDFLAGS:M-static} || (defined(WANT_CHERI) && ${WANT_CHERI} == "sandbox") || (defined(LIBADD) && !empty(LIBADD:Mcheri))
+NOPIE=yes
+.endif
+
+.if !defined(NOPIE)
+.if ${MK_PIE} != "no"
+
+STATIC_CFLAGS+= -fPIC -fPIE
+STATIC_CXXFLAGS+= -fPIC -fPIE
+
+.endif # ${MK_PIE} != no
+.endif # !defined(NOPIE)
+.endif # defined(MK_PIE)
+
 .include <bsd.libnames.mk>
 
 # prefer .s to a .c, add .po, remove stuff not used in the BSD libraries
