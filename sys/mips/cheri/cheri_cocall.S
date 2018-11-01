@@ -63,9 +63,9 @@
 			 1 << 3  /* $c3, containing the sealed code capability */ | \
 			 1 << 4  /* $c4, containing the sealed data capability */ | \
 			 /* $c5-$c10 are preserved and passed to the callee */ \
-			 /* $c11 is loaded from the callee context */ \
+			 1 << 11 /* $c11 */ | \
 			 1 << 12 /* $c12 */ | \
-			 1 << 13 /* $c13 */ | \
+			 /* $c13 is loaded from the callee context */ \
 			 1 << 14 /* $c14 */ | \
 			 1 << 15 /* $c15 */)
 
@@ -134,7 +134,7 @@ _C_LABEL(switcher_cocall):
 	/*
 	 * Save the PCC, put there by cocall().
 	 */
-	csc	$c11, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c13, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
 	 * Unseal the callee's control block.
@@ -203,7 +203,7 @@ _C_LABEL(switcher_cocall):
 	clc	$c23, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 	clc	$c24, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 
-	clc	$c11, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c13, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 
 	/*
 	 * Do the data transfer.
@@ -239,7 +239,7 @@ _C_LABEL(switcher_cocall):
 	/*
 	 * "Return" to the callee.
 	 */
-	cjr	$c11
+	cjr	$c13
 	nop
 10:
 	/*
@@ -256,7 +256,7 @@ _C_LABEL(switcher_cocall):
 	/*
 	 * Nope - length zero means the callee is dead.
 	 */
-	cjr	$c11
+	cjr	$c13
 	li	v0, EPIPE
 
 .globl _C_LABEL(eswitcher_cocall)

@@ -75,9 +75,9 @@
 			 1 << 8  /* $c8 */ | \
 			 1 << 9  /* $c9 */ | \
 			 1 << 10 /* $c10 */ | \
-			 /* $c11 is loaded from the caller's context */ \
+			 1 << 11 /* $c11 */ | \
 			 1 << 12 /* $c12 */ | \
-			 1 << 13 /* $c13 */ | \
+			 /* $c13 is loaded from the caller's context */ \
 			 1 << 14 /* $c14 */ | \
 			 1 << 15 /* $c15 */)
 
@@ -148,7 +148,7 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Save the PCC, put there by coaccept().
 	 */
-	csc	$c11, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c13, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
 	 * Save the pointer to the cookie.
@@ -206,7 +206,7 @@ _C_LABEL(switcher_coaccept):
 	clc	$c23, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 	clc	$c24, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 
-	clc	$c11, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c13, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 
 	/*
 	 * Do the data transfer back to the caller.  The reason
@@ -251,7 +251,7 @@ _C_LABEL(switcher_coaccept):
 	/*
 	 * Bye!
 	 */
-	cjr	$c11
+	cjr	$c13
 	nop
 
 .globl _C_LABEL(eswitcher_coaccept)
