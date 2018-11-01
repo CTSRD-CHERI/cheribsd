@@ -75,7 +75,7 @@
 			 1 << 8  /* $c8 */ | \
 			 1 << 9  /* $c9 */ | \
 			 1 << 10 /* $c10 */ | \
-			 1 << 11 /* $c11 */ | \
+			 /* $c11 is loaded from the caller's context, despite being marked as caller-save */ \
 			 1 << 12 /* $c12 */ | \
 			 /* $c13 is loaded from the caller's context */ \
 			 1 << 14 /* $c14 */ | \
@@ -130,30 +130,31 @@ _C_LABEL(switcher_coaccept):
 	csd	ra, zero, 3*CHERICAP_SIZE+88($idc)
 	csd	$15, zero, 3*CHERICAP_SIZE+96($idc) // t7
 
-	csc	$c17, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c18, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c19, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c20, zero, 4*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c21, zero, 5*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c22, zero, 6*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c23, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
-	csc	$c24, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c11, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c17, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c18, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c19, zero, 4*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c20, zero, 5*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c21, zero, 6*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c22, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c23, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c24, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
 	 * Save the data transfer args.
 	 */
-	csc	$c6, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c6, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 	csd	a0, zero, 3*CHERICAP_SIZE+104($idc)
 
 	/*
 	 * Save the PCC, put there by coaccept().
 	 */
-	csc	$c13, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c13, zero, 11*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
 	 * Save the pointer to the cookie.
 	 */
-	csc	$c5, zero, 11*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
+	csc	$c5, zero, 12*CHERICAP_SIZE+3*CHERICAP_SIZE+256($idc)
 
 	/*
 	 * Load the capability to the caller's control block.
@@ -197,16 +198,17 @@ _C_LABEL(switcher_coaccept):
 	cld	ra, zero, 3*CHERICAP_SIZE+88($c25)
 	cld	$15, zero, 3*CHERICAP_SIZE+96($c25) // t7
 
-	clc	$c17, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c18, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c19, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c20, zero, 4*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c21, zero, 5*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c22, zero, 6*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c23, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
-	clc	$c24, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c11, zero, 1*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c17, zero, 2*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c18, zero, 3*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c19, zero, 4*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c20, zero, 5*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c21, zero, 6*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c22, zero, 7*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c23, zero, 8*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c24, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 
-	clc	$c13, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c13, zero, 11*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 
 	/*
 	 * Do the data transfer back to the caller.  The reason
@@ -214,7 +216,7 @@ _C_LABEL(switcher_coaccept):
 	 * is doing - it transfers the data there and back, both
 	 * sides.
 	 */
-	clc	$c7, zero, 9*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
+	clc	$c7, zero, 10*CHERICAP_SIZE+3*CHERICAP_SIZE+256($c25)
 	cld	t0, zero, 3*CHERICAP_SIZE+104($c25)
 
 	/*
