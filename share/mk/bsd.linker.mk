@@ -105,10 +105,10 @@ ${X_}LINKER_FEATURES+=	retpoline
 .endif
 .else
 # Use LD's values
-X_LINKER_TYPE=		${LINKER_TYPE}
-X_LINKER_VERSION=	${LINKER_VERSION}
-X_LINKER_FEATURES=	${LINKER_FEATURES}
-X_LINKER_FREEBSD_VERSION= ${LINKER_FREEBSD_VERSION}
+${X_}LINKER_TYPE=		${LINKER_TYPE}
+${X_}LINKER_VERSION=	${LINKER_VERSION}
+${X_}LINKER_FEATURES=	${LINKER_FEATURES}
+${X_}LINKER_FREEBSD_VERSION= ${LINKER_FREEBSD_VERSION}
 .endif	# ${ld} == "LD" || (${ld} == "XLD" && ${XLD} != ${LD})
 
 # Export the values so sub-makes don't have to look them up again, using the
