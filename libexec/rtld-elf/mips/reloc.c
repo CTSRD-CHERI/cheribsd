@@ -876,14 +876,20 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 		}
 
-		case R_TYPE(CHERI_CAPABILITY_CALL): /* TODO: lazy binding */
+		case R_TYPE(CHERI_CAPABILITY_CALL):
+			// TODO: make this an error in a few weeks
+			dbg("%s: deprecated: found CHERI_CAPABILITY_CALL call "
+			    "PLT relocation against %s in rel.dyn instead of "
+			    "rel.plt. Please update LLD and recompile world!",
+			    obj->path, symname(obj, r_symndx));
+			if (!add_cheri_plt_stub(obj, r_symndx, where))
+				return (-1);
+			break;
 		case R_TYPE(CHERI_CAPABILITY):
-		{
 			if (process_r_cheri_capability(obj, r_symndx, lockstate,
 			    flags, where) != 0)
 				return (-1);
 			break;
-		}
 #endif /* __CHERI_PURE_CAPABILITY__ */
 		default:
 			dbg("sym = %lu, type = %lu, offset = %p, "

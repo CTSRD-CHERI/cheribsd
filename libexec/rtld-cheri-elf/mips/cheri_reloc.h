@@ -32,6 +32,8 @@
 #include <dlfcn.h>
 
 extern dlfunc_t find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol);
+extern bool add_cheri_plt_stub(const Obj_Entry* obj, Elf_Word r_symndx,
+    void** where);
 
 static inline int
 process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,

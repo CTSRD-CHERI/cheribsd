@@ -90,6 +90,7 @@ extern char **environ;
 struct stat;
 struct Struct_Obj_Entry;
 struct CheriExports;
+struct CheriPlt;
 
 /* Lists of shared objects */
 typedef struct Struct_Objlist_Entry {
@@ -186,7 +187,8 @@ typedef struct Struct_Obj_Entry {
     Elf_Addr text_rodata_start;
     Elf_Addr text_rodata_end;
     const char* text_rodata_cap;	/* Capability for the executable mapping */
-    struct CheriExports *cheri_exports;	/* Thunks for external calls */
+    struct CheriExports *cheri_exports;	/* Unique thunks for function pointers */
+    struct CheriPlt *cheri_plt_stubs;	/* PLT stubs for external calls */
 #endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */

@@ -52,27 +52,6 @@ __unused static void cheri_init_globals(void);
 void _rtld_do___caprelocs_self(const struct capreloc *start_relocs,
     const struct capreloc* end_relocs, void *relocbase);
 
-/*
- * LD_BIND_NOW was set - force relocation for all jump slots
- */
-int
-reloc_jmpslots(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
-{
-	/* Do nothing. TODO: needed once we have lazy binding */
-	obj->jmpslots_done = true;
-	return (0);
-}
-
-/*
- *  Process the PLT relocations.
- */
-int
-reloc_plt(Obj_Entry *obj __unused)
-{
-	/* Do nothing. TODO: needed once we have lazy binding */
-	return (0);
-}
-
 /* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
 static __attribute__((always_inline))
 void _do___caprelocs(const struct capreloc *start_relocs,
