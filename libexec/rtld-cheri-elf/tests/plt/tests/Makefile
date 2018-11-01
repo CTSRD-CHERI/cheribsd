@@ -5,7 +5,8 @@
 PLAIN_TESTS_C=	test_write \
 	load_global_int_call \
 	load_global_int_fnptr_call \
-	load_global_int_data_ref
+	load_global_int_data_ref \
+	test_library_cgp
 
 
 SRCS.load_global_int_fnptr_call=load_global_int_fnptr_call.c external_fnptr.c

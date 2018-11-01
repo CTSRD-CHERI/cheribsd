@@ -31,10 +31,15 @@
  */
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#include <cheri/cheric.h>
+
+
+#define cheri_getcgp() cheri_getidc()
 
 /* functions/data exported from this lib: */
 extern int global_int;
 extern int load_global_int(void);
+const void *get_library_cgp_plus_global_int(void);
 
 /* System calls: */
 extern void exit(int code);

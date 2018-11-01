@@ -29,15 +29,28 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#include "testlib_exports.h"
+#include "plt_test.h"
 
-int load_global_int(void) {
-	// Defined in a separate file to ensure it is actually loaded via the cap-table
-	return global_int;
-}
 
-const void *get_library_cgp_plus_global_int(void) {
-	const char* cgp = cheri_getcgp();
-	int load_global = global_int;
-	return cgp + load_global;
+void __start(void) {
+	// Clear $cgp before calling the library function:
+	__asm__ volatile("cmove $cgp, $cnull");	// clear $cgp
+	const void* cleared_cgp = cheri_getcgp();
+	require(cheri_gettag(cleared_cgp) == 0);
+
+	const void* library_cgp = get_library_cgp_plus_global_int();
+	print("Got library $cgp!\n");
+	require(cheri_gettag(library_cgp)); // $cgp should have changed
+	// And should have a offset of 42 and nonzero base+length
+	require(cheri_getoffset(library_cgp) == 42);
+	require(cheri_getbase(library_cgp) != 0);
+	require(cheri_getlen(library_cgp) != 0);
+	// Check that we have permit_load and permit_load_capability on the library $cgp
+	require((cheri_getperm(library_cgp) & CHERI_PERM_EXECUTE) == 0);
+	require((cheri_getperm(library_cgp) & CHERI_PERM_STORE) == 0);
+	require((cheri_getperm(library_cgp) & CHERI_PERM_STORE_CAP) == 0);
+	require((cheri_getperm(library_cgp) & CHERI_PERM_EXECUTE) == 0);
+	require((cheri_getperm(library_cgp) & CHERI_PERM_LOAD) == CHERI_PERM_LOAD);
+	require((cheri_getperm(library_cgp) & CHERI_PERM_LOAD_CAP) == CHERI_PERM_LOAD);
+	exit(0);
 }
