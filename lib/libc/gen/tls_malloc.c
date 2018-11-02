@@ -137,9 +137,9 @@ __morepages(int n)
 		    max_pagepools * sizeof(char *), PROT_READ|PROT_WRITE,
 		    MAP_ANON, fd, 0)) == MAP_FAILED)
 			return (0);
-		memcpy(new_pagepool_list, pagepool_list,
-		    sizeof(char *) * n_pagepools);
 		if (pagepool_list != NULL) {
+			memcpy(new_pagepool_list, pagepool_list,
+			    sizeof(char *) * n_pagepools);
 			if (munmap(pagepool_list,
 			    max_pagepools * sizeof(char *) / 2) != 0) {
 				abort();
