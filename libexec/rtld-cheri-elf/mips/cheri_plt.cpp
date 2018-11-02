@@ -98,6 +98,10 @@ public:
 	CheriPlt(const Obj_Entry* obj) : obj(obj) {}
 };
 
+static constexpr uint8_t plt_code[] = {
+#include "plt_code.inc"
+};
+
 extern "C" bool
 add_cheri_plt_stub(const Obj_Entry* obj, Elf_Word r_symndx, void** where)
 {
