@@ -225,7 +225,7 @@ typedef struct Struct_Obj_Entry {
 #ifdef __mips__
 #ifdef __CHERI_PURE_CAPABILITY__
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
-    caddr_t captable;		/* start of the .cap_table section */
+    void** captable;		/* start of the .cap_table section */
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
     size_t captable_size;	/* size of the .cap_table section */
 #endif
@@ -487,7 +487,12 @@ int convert_prot(int elfflags);
 int do_copy_relocations(Obj_Entry *);
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,
     struct Struct_RtldLockState *);
+
+#ifdef __CHERI_PURE_CAPABILITY__
+int reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj);
+#else
 int reloc_plt(Obj_Entry *);
+#endif
 int reloc_jmpslots(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_gnu_ifunc(Obj_Entry *, int flags, struct Struct_RtldLockState *);

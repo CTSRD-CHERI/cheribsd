@@ -1318,7 +1318,7 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	}
 
 	case DT_MIPS_CHERI_CAPTABLE:
-	    obj->captable = (obj->relocbase + dynp->d_un.d_ptr);
+	    obj->captable = (void**)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
 	case DT_MIPS_CHERI_CAPTABLESZ:
@@ -1504,12 +1504,12 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		dbg("%s: text/rodata start = %#zx, text/rodata end = %#zx, "
 		    "captable = %-#p (relative to start %#zx)", obj->path,
 		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end,
-		    obj->captable, obj->captable - obj->text_rodata_cap);
+		    obj->captable, (char*)obj->captable - obj->text_rodata_cap);
 		if (obj->captable) {
 			vaddr_t start = rtld_min(obj->text_rodata_start,
-			    (vaddr_t)(obj->captable - obj->text_rodata_cap));
+			    (vaddr_t)((char*)obj->captable - obj->text_rodata_cap));
 			vaddr_t end = rtld_max(obj->text_rodata_end,
-			    (vaddr_t)((obj->captable + cheri_getlen(obj->captable)) -
+			    (vaddr_t)(((char*)obj->captable + cheri_getlen(obj->captable)) -
 			    obj->text_rodata_cap));
 			obj->text_rodata_cap += start;
 			obj->text_rodata_cap = cheri_csetbounds_sametype(
