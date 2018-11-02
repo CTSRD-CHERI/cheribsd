@@ -46,9 +46,25 @@
 // Note: currently this structure is used both for the stub that branches to
 // the rtld resolver as well as for the unique thunks used for function pointers
 struct CheriPltStub {
-    const void* cgp;
-    const void* target;
-    uint32_t thunk_code[4]; // Three instructions + delay slot nop
+	// TODO: this is not necessary, but makes it so much easier to implemented
+	// We should either place this at offset 0 of $pcc or make the bind
+	// stub fetch it.
+	const void* rtld_cgp; // FIXME: remove
+	const void* captable_entry; // FIXME: remove
+
+	// This will contain a pointer to the beginning of the struct prior
+	// to resolving. This could be made a lot more efficient and the first
+	// two capabilities could be removed from the struct but for now the
+	// goal is just to get something that works...
+	const void* cgp;
+	const void* target;
+	uint32_t plt_code[4]; // Three instructions + delay slot nop
+	// Code:
+	//
+	// clc $cgp, $zero, -(2* CAP_SIZE) ($c12)
+	// clc $c12, $zero, -CAP_SIZE($c12)
+	// cjr $c12
+	// nop
 };
 
 struct CheriPlt {
@@ -62,6 +78,7 @@ private:
 	// FIXME: this needs changes in LLD to emit DT_PLTRELSZ/DT_JMPREL
 	constexpr static size_t BLOCK_SIZE = 16 * 1024 * 1024;
 	size_t current_offset = 0;
+	size_t num_plt_stubs = 0;
 
 	uint8_t* allocate_new_block() {
 		int mmap_flags = MAP_PRIVATE | MAP_ANON | MAP_NOCORE;
@@ -91,28 +108,92 @@ public:
 			}
 		}
 		uint8_t *next = current_allocation + current_offset;
-		current_offset += sizeof(CheriPlt);
+		current_offset += sizeof(CheriPltStub);
+		num_plt_stubs++;
 		return reinterpret_cast<CheriPltStub*>(
 		    __builtin_assume_aligned(next, sizeof(void*)));
 	}
+
+	size_t count() const { return num_plt_stubs; }
+
 	CheriPlt(const Obj_Entry* obj) : obj(obj) {}
 };
+
+#if 0
+static void _lazy_binding_resolver(void);
+__asm__(
+".text\n"
+".hidden _lazy_binding_resolver\n"
+"_lazy_binding_resolver:\n"
+"cmove $c3, $cgp\n"
+"clc $cgp, $zero, 0($cgp)\n"
+// TODO:
+"b resolve_lazy_binding\n"
+"nop\n"
+)
+#endif
+
+static void
+_lazy_binding_resolver()
+{
+	// TODO: write all of this in assembly
+	CheriPltStub* plt_stub;
+	__asm__ volatile("cmove %0, $cgp" :"=C"(plt_stub));
+	const void* rtld_cgp = plt_stub->rtld_cgp;
+	__asm__ volatile("cmove $cgp, %0" : : "C"(rtld_cgp));
+	// Now that $cgp has been restored we can call functions again
+	dbg("%s: rtld $cgp=%p, stub=%#p", __func__, rtld_cgp, plt_stub);
+	__builtin_trap();
+}
 
 static constexpr uint8_t plt_code[] = {
 #include "plt_code.inc"
 };
 
+static_assert(sizeof(plt_code) == sizeof(((CheriPltStub*)0)->plt_code), "");
+
 extern "C" bool
-add_cheri_plt_stub(const Obj_Entry* obj, Elf_Word r_symndx, void** where)
+add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
+    Elf_Word r_symndx, void** where)
 {
 	(void)where;
+	if (!obj->cheri_plt_stubs) {
+		// TODO: remove this
+		dbg("%s: warning: called %s before reloc_plt()."
+		    " Please updated LLD and rebuild world!", obj->path, __func__);
+		const_cast<Obj_Entry*>(obj)->cheri_plt_stubs = new (NEW(struct CheriPlt)) CheriPlt(obj);
+	}
+
 	assert(obj->cheri_plt_stubs); // Should be setup be reloc_plt()
-	CheriPltStub* plt = obj->cheri_plt_stubs->get_next_free_slot();
-	if (!plt)
+
+	// TODO: cheri_setaddr + ctestsubset instead of this check?
+	if ((vaddr_t)where < (vaddr_t)obj->captable ||
+	    (vaddr_t)where >= ((vaddr_t)obj->captable + cheri_getlen(obj->captable))) {
+		_rtld_error("%s: plt stub target capability %p for %s not "
+		    "inside captable %#p", obj->path, where,
+		    symname(obj, r_symndx), obj->captable);
 		return false;
-	_rtld_error("%s: could not add plt stub for %s", obj->path,
-	    symname(obj, r_symndx));
-	return false;
+	}
+
+	CheriPltStub* plt = obj->cheri_plt_stubs->get_next_free_slot();
+	if (!plt) {
+		// _rtld_error("%s: could not add plt stub for %s", obj->path,
+		//      symname(obj, r_symndx));
+		return false;
+	}
+	dbg("%s: plt stub for %s: %#p", obj->path, symname(obj, r_symndx), plt);
+
+	plt->captable_entry = where;
+	plt->rtld_cgp = rtldobj->captable;
+	plt->target = (const void*)&_lazy_binding_resolver;
+	__builtin_memcpy(plt->plt_code, plt_code, sizeof(plt->plt_code));
+	void* target_cap = cheri_csetbounds(plt, sizeof(CheriPltStub));
+	plt->cgp = target_cap; // currently self-reference (to beginning of struct)
+	// but the actual target that is written to the PLT should point to the code:
+	target_cap = cheri_incoffset(target_cap, offsetof(CheriPltStub, plt_code));
+	dbg("where=%p <- plt_code=%#p", where, target_cap);
+	*where = target_cap;
+	return true;
 }
 
 
@@ -132,14 +213,16 @@ reloc_jmpslots(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __un
  *  Process the PLT relocations.
  */
 extern "C" int
-reloc_plt(Obj_Entry *obj)
+reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 {
 	// FIXME: this needs changes in LLD to emit DT_PLTRELSZ/DT_JMPREL
-	assert(!obj->cheri_plt_stubs);
-	// Note: this is done before reloc_non_plt so it is safe to initialize
-	// obj->cheri_plt_stubs here even while we still allow plt relocations
-	// as part of .rel.dyn
-	obj->cheri_plt_stubs = new (NEW(struct CheriPlt)) CheriPlt(obj);
+	// TODO: assert(!obj->cheri_plt_stubs)
+	if (!obj->cheri_plt_stubs) {
+		// Note: this is done before reloc_non_plt so it is safe to initialize
+		// obj->cheri_plt_stubs here even while we still allow plt relocations
+		// as part of .rel.dyn
+		obj->cheri_plt_stubs = new (NEW(struct CheriPlt)) CheriPlt(obj);
+	}
 	assert(obj->cheri_plt_stubs);
 
 	// .rel.plt should only ever contain CHERI_CAPABILITY_CALL relocs!
@@ -151,13 +234,18 @@ reloc_plt(Obj_Entry *obj)
 		Elf_Word r_type = ELF_R_TYPE(rel->r_info);
 
 		if ((r_type & 0xff) == R_TYPE(CHERI_CAPABILITY_CALL)) {
-			if (!add_cheri_plt_stub(obj, r_symndx, where))
+			if (!add_cheri_plt_stub(obj, rtldobj, r_symndx, where))
 				return (-1);
 		} else {
 			_rtld_error("Unknown relocation type %x in PLT",
 			    (unsigned int)r_type);
 			return (-1);
 		}
+	}
+	dbg("%s: done relocating %zd PLT entries: ", obj->path,
+	    obj->cheri_plt_stubs->count());
+	for (size_t i = 0; i < obj->captable_size / sizeof(void*); i++) {
+		dbg("%s->captable[%zd]:%p = %#p", obj->path, i, &obj->captable[i], obj->captable[i]);
 	}
 	return (0);
 }

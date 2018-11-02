@@ -882,7 +882,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			    "PLT relocation against %s in rel.dyn instead of "
 			    "rel.plt. Please update LLD and recompile world!",
 			    obj->path, symname(obj, r_symndx));
-			if (!add_cheri_plt_stub(obj, r_symndx, where))
+			if (!add_cheri_plt_stub(obj, obj_rtld, r_symndx, where))
 				return (-1);
 			break;
 		case R_TYPE(CHERI_CAPABILITY):
