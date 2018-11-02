@@ -101,11 +101,11 @@ struct thread;
 struct vmspace;
 
 int	exec_alloc_args(struct image_args *);
-int	exec_args_add_arg_str(struct image_args *args, char *argp,
+int	exec_args_add_arg_str(struct image_args *args, const char *argp,
 	    enum uio_seg segflg);
-int	exec_args_add_env_str(struct image_args *args, char *envp,
+int	exec_args_add_env_str(struct image_args *args, const char *envp,
 	    enum uio_seg segflg);
-int	exec_args_add_fname(struct image_args *args, char *fname,
+int	exec_args_add_fname(struct image_args *args, const char *fname,
 	    enum uio_seg segflg);
 int	exec_check_permissions(struct image_params *);
 register_t *exec_copyout_strings(struct image_params *);
@@ -113,7 +113,7 @@ void	exec_free_args(struct image_args *);
 int	exec_new_vmspace(struct image_params *, struct sysentvec *);
 void	exec_setregs(struct thread *, struct image_params *, u_long);
 int	exec_shell_imgact(struct image_params *);
-int	exec_copyin_args(struct image_args *, char *, enum uio_seg,
+int	exec_copyin_args(struct image_args *, const char *, enum uio_seg,
 	char **, char **);
 int	exec_copyin_data_fds(struct thread *, struct image_args *, const void *,
 	size_t, const int *, size_t);

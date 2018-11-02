@@ -1672,8 +1672,7 @@ kern_symlinkat(struct thread *td, const char * __capability path1, int fd,
 		syspath = (__cheri_fromcap const char *)path1;
 	} else {
 		tmppath = uma_zalloc(namei_zone, M_WAITOK);
-		if ((error = copyinstr(path1, tmppath, MAXPATHLEN,
-		    NULL)) != 0)
+		if ((error = copyinstr(path1, tmppath, MAXPATHLEN, NULL)) != 0)
 			goto out;
 		syspath = tmppath;
 	}
@@ -1807,7 +1806,7 @@ int
 sys_unlinkat(struct thread *td, struct unlinkat_args *uap)
 {
 	int fd, flag;
-	char * __capability path;
+	const char * __capability path;
 
 	flag = uap->flag;
 	fd = uap->fd;
