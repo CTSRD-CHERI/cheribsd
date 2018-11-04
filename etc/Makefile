@@ -173,7 +173,7 @@ distrib-dirs: ${MTREES:N/*} distrib-cleanup .PHONY
 	    ${MTREE_FOLLOWS_SYMLINKS} -f $$m -p $$d; \
 	${MTREE_FILTER} $$m | \
 	${MTREE_CMD} -deU ${MTREE_FSCHG} ${MTREE_FOLLOWS_SYMLINKS} \
-	    -p $$d; \
+	    -p $$d
 .endfor
 .if defined(NO_ROOT)
 .for _m _d in ${MTREES}
@@ -186,7 +186,7 @@ distrib-dirs: ${MTREES:N/*} distrib-cleanup .PHONY
 	    "sed s#^\.#.$$d# | ${METALOG.add}" ; \
 	${MTREE_FILTER} $$m | \
 	${MTREE_CMD:N-W} -C -K all | sed s#^\.#.$$d# | \
-	    ${METALOG.add} ; \
+	    ${METALOG.add}
 .endfor
 .endif
 .if ${MK_NLS} != "no"
