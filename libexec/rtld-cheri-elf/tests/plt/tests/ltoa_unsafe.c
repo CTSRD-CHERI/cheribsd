@@ -29,38 +29,40 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <stdbool.h>
 #include "plt_test.h"
 
-extern void* _call_library_function_from_asm(void);
 
-void __start(void) {
-	print("Starting test!\n");
-	// Clear $cgp before calling the library function:
-	const void* original_cgp = cheri_getcgp();
-	print("Caller $cgp: "); print_cap(original_cgp); print("\n");
-	// Call the library function from assembly and clear $cgp first
-	// const void* library_cgp = _call_library_function_from_asm();
-	const void* library_cgp = get_library_cgp_plus_global_int();
-	__compiler_membar();
-	print("Got library $cgp (back in C function)!\n");
-	exit(0);
-	print("Caller $cgp: "); print_cap(original_cgp); print("\n");
-	print("Callee $cgp: "); print_cap(library_cgp); print("\n");
-
-	require(cheri_gettag(library_cgp)); // $cgp should have a tag
-	// And should have a offset of 42 and nonzero base+length
-	require_eq(cheri_getoffset(library_cgp), 42);
-	require_not_eq(cheri_getbase(library_cgp), 0);
-	require_not_eq(cheri_getlen(library_cgp), 0);
-	// Check that we have permit_load and permit_load_capability on the library $cgp
-	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_EXECUTE), 0);
-	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_STORE), 0);
-	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_STORE_CAP), 0);
-	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_EXECUTE), 0);
-	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_LOAD), CHERI_PERM_LOAD);
-	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_LOAD_CAP), CHERI_PERM_LOAD);
-
-	// Check that the library $cgp is different from the current $cgp
-	require_not_eq(cheri_getbase(library_cgp), cheri_getbase(original_cgp));
-	exit(0);
+const char* ltoa_unsafe(long n, int base) {
+	if (base < 2 || base > 16) {
+		__builtin_trap();
+	}
+	static const char digits[] = "0123456789abcdef";
+	// worst case (binary): 8 chars per byte + null + sign + 2 bytes prefix
+	const int BUFFER_SIZE = sizeof(long) * 8 + 1 + 1 + 2;
+	static char buf[BUFFER_SIZE];
+	char *start = buf + BUFFER_SIZE - 1;
+	bool negative = n < 0;
+	if (negative)
+		n = -n;
+	*start = '\0';
+	do {
+		*--start = (char)(digits[n % 16]);
+		n /= 10;
+	} while (n);
+	// Add 0x/0o/0b prefix
+	if (base == 2) {
+		*--start = 'b';
+		*--start = '0';
+	} else if (base == 8) {
+		*--start = 'o';
+		*--start = '0';
+	} else if (base == 16) {
+		*--start = 'x';
+		*--start = '0';
+	}
+	if (negative) {
+		*--start = '-';
+	}
+	return start;
 }
