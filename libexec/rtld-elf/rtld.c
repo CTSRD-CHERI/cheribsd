@@ -1624,10 +1624,6 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 		  obj->vaddrbase;
 	    }
 	    nsegs++;
-	    if ((ph->p_flags & PF_X) == PF_X) {
-		obj->textsize = rtld_max(obj->textsize,
-		    round_page(ph->p_vaddr + ph->p_memsz) - obj->vaddrbase);
-	    }
 #ifdef __CHERI_PURE_CAPABILITY__
 	    if (!(ph->p_flags & PF_W)) {
 		Elf_Addr start_addr = ph->p_vaddr;

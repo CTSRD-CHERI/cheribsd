@@ -325,7 +325,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     }
     obj->mapbase = mapbase;
     obj->mapsize = mapsize;
-    obj->textsize = text_end - base_vaddr;
     obj->vaddrbase = base_vaddr;
 
     obj->relocbase = mapbase - base_vaddr;
