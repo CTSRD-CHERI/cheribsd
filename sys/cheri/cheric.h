@@ -36,7 +36,7 @@
 
 #include <machine/cherireg.h>	/* Permission definitions. */
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) || defined(__CHERI__)
 
 /*
  * Programmer-friendly macros for CHERI-aware C code -- requires use of

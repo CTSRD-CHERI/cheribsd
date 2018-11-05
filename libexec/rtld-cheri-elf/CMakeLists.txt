@@ -18,6 +18,7 @@ list(APPEND rtld_SRCS
 
 # For code completion:
 add_definitions(-D__CHERI_PURE_CAPABILITY__=2)
+add_definitions(-D__CHERI__=1)
 add_definitions(-DIN_RTLD=1)
 # add_compile_options(-v)
 add_compile_options(-mabi=purecap)

@@ -50,9 +50,9 @@ struct Struct_Obj_Entry;
 #define rtld_dynamic(obj) (&_DYNAMIC)
 
 static inline Elf_Addr reloc_jmpslot(Elf_Addr *where, Elf_Addr target,
-		       const struct Struct_Obj_Entry *defobj,
-		       const struct Struct_Obj_Entry *obj,
-		       const Elf_Rel *rel);
+    const struct Struct_Obj_Entry *defobj, const struct Struct_Obj_Entry *obj,
+    const Elf_Rel *rel);
+dlfunc_t _mips_rtld_bind(void* plt_stub);
 
 #define FUNC_PTR_REMOVE_PERMS	(__CHERI_CAP_PERMISSION_PERMIT_SEAL__ |	\
 	__CHERI_CAP_PERMISSION_PERMIT_STORE__ |				\

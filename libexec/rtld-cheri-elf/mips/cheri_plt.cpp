@@ -49,15 +49,13 @@ struct CheriPltStub {
 	// TODO: this is not necessary, but makes it so much easier to implemented
 	// We should either place this at offset 0 of $pcc or make the bind
 	// stub fetch it.
-	const void* rtld_cgp; // FIXME: remove
-	const void* captable_entry; // FIXME: remove
-
+	const void* rtld_cgp; // FIXME: remove (could use privileged TLS register
 	// This will contain a pointer to the beginning of the struct prior
 	// to resolving. This could be made a lot more efficient and the first
 	// two capabilities could be removed from the struct but for now the
 	// goal is just to get something that works...
 	const void* cgp;
-	const void* target;
+	dlfunc_t target;
 	uint32_t plt_code[4]; // Three instructions + delay slot nop
 	// Code:
 	//
@@ -65,6 +63,15 @@ struct CheriPltStub {
 	// clc $c12, $zero, -CAP_SIZE($c12)
 	// cjr $c12
 	// nop
+
+public:
+	// TODO: remove the members and derive these sensibly
+	Elf_Word r_symndx() const { return _r_symndx; }
+	const Obj_Entry *obj() const { return _obj; }
+public:
+	const Obj_Entry *_obj; // FIXME: remove (one trampoline function per object)
+	Elf_Word _r_symndx; // FIXME: remove
+
 };
 
 struct CheriPlt {
@@ -133,17 +140,34 @@ __asm__(
 )
 #endif
 
-static void
-_lazy_binding_resolver()
+dlfunc_t
+_mips_rtld_bind(void* _plt_stub)
 {
-	// TODO: write all of this in assembly
-	CheriPltStub* plt_stub;
-	__asm__ volatile("cmove %0, $cgp" :"=C"(plt_stub));
-	const void* rtld_cgp = plt_stub->rtld_cgp;
-	__asm__ volatile("cmove $cgp, %0" : : "C"(rtld_cgp));
-	// Now that $cgp has been restored we can call functions again
-	dbg("%s: rtld $cgp=%p, stub=%#p", __func__, rtld_cgp, plt_stub);
-	__builtin_trap();
+	CheriPltStub *plt_stub = static_cast<CheriPltStub*>(_plt_stub);
+	dbg("%s: rtld $cgp=%p, stub=%#p", __func__, cheri_getidc(), plt_stub);
+	RtldLockState lockstate;
+	const Elf_Word r_symndx = plt_stub->r_symndx();
+	const Obj_Entry *obj = plt_stub->obj();
+
+	rlock_acquire(rtld_bind_lock, &lockstate);
+	if (sigsetjmp(lockstate.env, 0) != 0)
+		lock_upgrade(rtld_bind_lock, &lockstate);
+
+	const Obj_Entry *defobj;
+	const Elf_Sym *def = find_symdef(r_symndx, obj, &defobj, SYMLOOK_IN_PLT, NULL, &lockstate);
+	if (def == NULL) {
+		rtld_fatal("Could not find symbol definition for PLT symbol %s"
+		    " in %s", symname(obj, r_symndx), obj->path);
+	}
+
+	dlfunc_t target = make_function_pointer(def, defobj);
+	dbg("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
+	    defobj->strtab + def->st_name, (intmax_t)r_symndx, obj->path,
+	    (void *)plt_stub->target, (void *)target);
+	if (!ld_bind_not)
+		plt_stub->target = target;
+	lock_release(rtld_bind_lock, &lockstate);
+	return target;
 }
 
 static constexpr uint8_t plt_code[] = {
@@ -183,9 +207,12 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	}
 	dbg("%s: plt stub for %s: %#p", obj->path, symname(obj, r_symndx), plt);
 
-	plt->captable_entry = where;
+	// TODO: if we decide to directly update captable entries for the pc-relative ABI:
+	// plt->captable_entry = where;
 	plt->rtld_cgp = rtldobj->captable;
-	plt->target = (const void*)&_lazy_binding_resolver;
+	plt->target = (dlfunc_t)&_rtld_bind_start;
+	plt->_obj = obj;	// FIXME: remove
+	plt->_r_symndx = r_symndx; // FIXME: remove
 	__builtin_memcpy(plt->plt_code, plt_code, sizeof(plt->plt_code));
 	void* target_cap = cheri_csetbounds(plt, sizeof(CheriPltStub));
 	plt->cgp = target_cap; // currently self-reference (to beginning of struct)

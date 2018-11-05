@@ -123,9 +123,6 @@ LEAF(rtld_start)
 	nop
 END(rtld_start)
 
-/* TODO: implement lazy binding */
-#if 0
-
 #define	XCALLFRAME_CAPSIZ	(9*CHERICAP_SIZE)
 #define	XCALLFRAME_SIZ		(12*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_RA		(10*SZREG + XCALLFRAME_CAPSIZ)
@@ -149,11 +146,8 @@ END(rtld_start)
 #define	XCALLFRAME_C10		(1*CHERICAP_SIZE)
 #define	XCALLFRAME_C17		(0*CHERICAP_SIZE)
 
-	.globl	_rtld_bind_start
-	.ent	_rtld_bind_start
-_rtld_bind_start:
-	.frame	sp, XCALLFRAME_SIZ, $15
-	move	v1, gp			/* save old GP */
+LEAF(_rtld_bind_start)
+	// move	v1, gp			/* save old GP */
 	dli	sp, -XCALLFRAME_SIZ
 	cincoffset $c11, $c11, sp	/* save arguments and sp value in stack */
 	//SETUP_GP64(XCALLFRAME_GP, _rtld_bind_start)
@@ -180,6 +174,7 @@ _rtld_bind_start:
 	csc	$c17, zero, XCALLFRAME_C17($c11)
 	cmove	$c24, $c11
 
+#if 0
 	move	a0, v1			/* old GP */
 	PTR_SUBU	a0, a0, 0x7ff0	/* The offset of $gp from the	*/
        					/* beginning of the .got section: */
@@ -192,9 +187,14 @@ _rtld_bind_start:
 	cgetdefault	$c3
 	csetoffset	$c3, $c3, a0
 	move	a0, t8			/* symbol index */
-
-	PIC_CALL(_mips_rtld_bind)
-	cgetpccsetoffset $c12, v0
+#endif
+	// Currently naive implementation:
+	cmove	$c3, $cgp
+	// TODO: load this from privileged $chwr instead
+	clc	$cgp, zero, 0($c3) #const void* rtld_cgp = plt_stub->rtld_cgp;
+	// Now that the rtld $cgp has been restored we can call functions again
+	PIC_CALL(_mips_rtld_bind)	# $c3 = _mips_rtld_bind(plt_stub)
+	cmove	$c12, $c3
 
 	cmove	$c11, $c24
 	clc	$c17, zero, XCALLFRAME_C17($c11)
@@ -222,5 +222,3 @@ _rtld_bind_start:
 	cjr	$c12
 	cincoffset $c11, $c11, sp
 END(_rtld_bind_start)
-
-#endif
