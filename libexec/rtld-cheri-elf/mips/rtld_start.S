@@ -39,6 +39,7 @@
 
 /* XXXAR: This code currently requires non-PIC DLA expansions */
 .option pic0
+.set noreorder
 
 
 /*
@@ -153,8 +154,7 @@ LEAF(_rtld_bind_start)
 	// FIXME: the .cfi annotations seem to be wrong since the backtrace is better without them...
 	// .cfi_startproc
 	// .cfi_def_cfa_register	$c11, 0
-	dli	sp, -XCALLFRAME_SIZ
-	cincoffset $c11, $c11, sp	/* save arguments and sp value in stack */
+	cincoffset $c11, $c11, -XCALLFRAME_SIZ	/* save arguments and sp value in stack */
 	// .cfi_def_cfa_offset XCALLFRAME_SIZ
 	//SETUP_GP64(XCALLFRAME_GP, _rtld_bind_start)
 	csd	gp,  zero, XCALLFRAME_GP($c11)
@@ -261,8 +261,7 @@ LEAF(_rtld_bind_start)
 	cld	gp, zero, XCALLFRAME_GP($c11)
 	// .cfi_restore gp
 	//RESTORE_GP64
-	dli	sp, XCALLFRAME_SIZ
 	cjr	$c12
-	cincoffset $c11, $c11, sp
+	cincoffset $c11, $c11, XCALLFRAME_SIZ
 	// .cfi_endproc
 END(_rtld_bind_start)
