@@ -164,9 +164,16 @@ _mips_rtld_bind(void* _plt_stub)
 	dbg("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
 	    defobj->strtab + def->st_name, (intmax_t)r_symndx, obj->path,
 	    (void *)plt_stub->target, (void *)target);
-	if (!ld_bind_not)
+
+	const void* target_cgp = obj->captable;
+	if (!ld_bind_not) {
 		plt_stub->target = target;
+		plt_stub->cgp = target_cgp;
+	}
 	lock_release(rtld_bind_lock, &lockstate);
+	// Setup the target $cgp so that we can actually call the function
+	// TODO: return two values instead (will a 2 cap struct use $c3/$c4?)
+	__asm__ volatile("cmove $cgp, %0"::"C"(target_cgp));
 	return target;
 }
 
