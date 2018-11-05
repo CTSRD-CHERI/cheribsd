@@ -56,6 +56,7 @@
  *      c4      relocabase capability
  */
 LEAF(rtld_start)
+	// .cfi_startproc
 #ifdef __CHERI_CAPABILITY_TABLE__
 	/*
 	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
@@ -121,6 +122,7 @@ LEAF(rtld_start)
 	cmove		$c17, $c12 /* return == PCC signals backtrace routine to stop */
 	cjr		$c12
 	nop
+	// .cfi_endproc
 END(rtld_start)
 
 #define	XCALLFRAME_CAPSIZ	(9*CHERICAP_SIZE)
@@ -148,30 +150,52 @@ END(rtld_start)
 
 LEAF(_rtld_bind_start)
 	// move	v1, gp			/* save old GP */
+	// FIXME: the .cfi annotations seem to be wrong since the backtrace is better without them...
+	// .cfi_startproc
+	// .cfi_def_cfa_register	$c11, 0
 	dli	sp, -XCALLFRAME_SIZ
 	cincoffset $c11, $c11, sp	/* save arguments and sp value in stack */
+	// .cfi_def_cfa_offset XCALLFRAME_SIZ
 	//SETUP_GP64(XCALLFRAME_GP, _rtld_bind_start)
 	csd	gp,  zero, XCALLFRAME_GP($c11)
+	// .cfi_rel_offset gp, XCALLFRAME_GP
 	csd	a0,  zero, XCALLFRAME_A0($c11)
+	// .cfi_rel_offset a0, XCALLFRAME_A0
 	csd	a1,  zero, XCALLFRAME_A1($c11)
+	// .cfi_rel_offset a1, XCALLFRAME_A1
 	csd	a2,  zero, XCALLFRAME_A2($c11)
+	// .cfi_rel_offset a2, XCALLFRAME_A2
 	csd	a3,  zero, XCALLFRAME_A3($c11)
+	// .cfi_rel_offset a3, XCALLFRAME_A3
 	csd	a4,  zero, XCALLFRAME_A4($c11)
+	// .cfi_rel_offset a4, XCALLFRAME_A4
 	csd	a5,  zero, XCALLFRAME_A5($c11)
+	// .cfi_rel_offset a5, XCALLFRAME_A5
 	csd	a6,  zero, XCALLFRAME_A6($c11)
+	// .cfi_rel_offset a6, XCALLFRAME_A6
 	csd	a7,  zero, XCALLFRAME_A7($c11)
-	csd	$15, zero, XCALLFRAME_RA($c11)	/* ra is in t7/t3 */
+	// .cfi_rel_offset a7, XCALLFRAME_A7
 	csd	s0,  zero, XCALLFRAME_S0($c11)
+	// .cfi_rel_offset s0, XCALLFRAME_S0
 	/* XXX-BD: What about ccall functions?  Do we need v0, c1, c2? */
 	csc	$c3, zero, XCALLFRAME_C3($c11)
+	// .cfi_rel_offset $c3, XCALLFRAME_C3
 	csc	$c4, zero, XCALLFRAME_C4($c11)
+	// .cfi_rel_offset $c4, XCALLFRAME_C4
 	csc	$c5, zero, XCALLFRAME_C5($c11)
+	// .cfi_rel_offset $c5, XCALLFRAME_C5
 	csc	$c6, zero, XCALLFRAME_C6($c11)
+	// .cfi_rel_offset $c6, XCALLFRAME_C6
 	csc	$c7, zero, XCALLFRAME_C7($c11)
+	// .cfi_rel_offset $c7, XCALLFRAME_C7
 	csc	$c8, zero, XCALLFRAME_C8($c11)
+	// .cfi_rel_offset $c8, XCALLFRAME_C8
 	csc	$c9, zero, XCALLFRAME_C9($c11)
+	// .cfi_rel_offset $c9, XCALLFRAME_C9
 	csc	$c10, zero, XCALLFRAME_C10($c11)
+	// .cfi_rel_offset $c10, XCALLFRAME_C10
 	csc	$c17, zero, XCALLFRAME_C17($c11)
+	// .cfi_rel_offset $c17, XCALLFRAME_C17
 	cmove	$c24, $c11
 
 #if 0
@@ -198,27 +222,47 @@ LEAF(_rtld_bind_start)
 
 	cmove	$c11, $c24
 	clc	$c17, zero, XCALLFRAME_C17($c11)
+	// FIMXE: using .cfi_restore with a capreg crashes
+	//.cfi_restore $c17
 	clc	$c10, zero, XCALLFRAME_C10($c11)
+	//.cfi_restore $c10
 	clc	$c9, zero, XCALLFRAME_C9($c11)
+	// .cfi_restore $c9
 	clc	$c8, zero, XCALLFRAME_C8($c11)
+	//.cfi_restore $c8
 	clc	$c7, zero, XCALLFRAME_C7($c11)
+	//.cfi_restore $c7
 	clc	$c6, zero, XCALLFRAME_C6($c11)
+	//.cfi_restore $c6
 	clc	$c5, zero, XCALLFRAME_C5($c11)
+	//.cfi_restore $c5
 	clc	$c4, zero, XCALLFRAME_C4($c11)
+	//.cfi_restore $c4
 	clc	$c3, zero, XCALLFRAME_C3($c11)
-	cld	ra, zero, XCALLFRAME_RA($c11)
+	// .cfi_restore $c3
 	cld	s0, zero, XCALLFRAME_S0($c11)
+	// .cfi_restore s0
 	cld	a0, zero, XCALLFRAME_A0($c11)
+	// .cfi_restore a0
 	cld	a1, zero, XCALLFRAME_A1($c11)
+	// .cfi_restore a1
 	cld	a2, zero, XCALLFRAME_A2($c11)
+	// .cfi_restore a2
 	cld	a3, zero, XCALLFRAME_A3($c11)
+	// .cfi_restore a3
 	cld	a4, zero, XCALLFRAME_A4($c11)
+	// .cfi_restore a4
 	cld	a5, zero, XCALLFRAME_A5($c11)
+	// .cfi_restore a5
 	cld	a6, zero, XCALLFRAME_A6($c11)
+	// .cfi_restore a6
 	cld	a7, zero, XCALLFRAME_A7($c11)
+	// .cfi_restore a7
 	cld	gp, zero, XCALLFRAME_GP($c11)
+	// .cfi_restore gp
 	//RESTORE_GP64
 	dli	sp, XCALLFRAME_SIZ
 	cjr	$c12
 	cincoffset $c11, $c11, sp
+	// .cfi_endproc
 END(_rtld_bind_start)
