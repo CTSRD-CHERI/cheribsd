@@ -66,7 +66,7 @@ ${var}=	${${var}.${${X_}_ld_hash}}
 .if !defined(${X_}LINKER_TYPE) || !defined(${X_}LINKER_VERSION)
 # See bsd.compiler.mk
 .if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
-.error "${.CURDIR}: Rerunning ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!"
+#XXXXX.error "${.CURDIR}: Rerunning ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!"
 .else
 # .info "${.CURDIR}: Running ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION"
 .endif
