@@ -162,6 +162,7 @@ _mips_rtld_bind(void* _plt_stub)
 
 	dlfunc_t target = make_function_pointer(def, defobj);
 	const void* target_cgp = defobj->target_cgp;
+	assert(cheri_gettag(target_cgp));
 	dbg("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
 	    defobj->strtab + def->st_name, (intmax_t)r_symndx, obj->path,
 	    (void *)plt_stub->target, (void *)target);

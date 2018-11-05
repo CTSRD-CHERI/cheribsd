@@ -52,6 +52,7 @@
 #define	cheri_gettype(x)	__builtin_cheri_type_get((x))
 
 #define	cheri_andperm(x, y)	__builtin_cheri_perms_and((x), (y))
+#define	cheri_clearperm(x, y)	__builtin_cheri_perms_and((x), ~(y))
 #define	cheri_cleartag(x)	__builtin_cheri_tag_clear((x))
 #define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
 #define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))

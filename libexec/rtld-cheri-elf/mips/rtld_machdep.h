@@ -81,7 +81,7 @@ make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	const void* ret = get_codesegment(defobj) + def->st_value;
 
 	/* Remove store and seal permissions */
-	ret = cheri_andperm(ret, ~FUNC_PTR_REMOVE_PERMS);
+	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
 	if (defobj->restrict_pcc_strict)
 		return (dlfunc_t)cheri_csetbounds(ret, def->st_size);
 	if (defobj->restrict_pcc_basic)
@@ -103,7 +103,7 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	void* ret = defobj->relocbase + def->st_value;
 
 	/* Remove execute and seal permissions */
-	ret = cheri_andperm(ret, ~DATA_PTR_REMOVE_PERMS);
+	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
 	/* TODO: can we always set bounds here or does it break compat? */
 	ret = cheri_csetbounds(ret, def->st_size);
 	return ret;
@@ -218,9 +218,9 @@ _rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_p
 static inline void
 fix_obj_mapping_cap_permissions(Obj_Entry *obj, const char* path __unused)
 {
-	obj->text_rodata_cap = (const char*)cheri_andperm(obj->text_rodata_cap, ~FUNC_PTR_REMOVE_PERMS);
-	obj->relocbase = (char*)cheri_andperm(obj->relocbase, ~DATA_PTR_REMOVE_PERMS);
-	obj->mapbase = (char*)cheri_andperm(obj->mapbase, ~DATA_PTR_REMOVE_PERMS);
+	obj->text_rodata_cap = (const char*)cheri_clearperm(obj->text_rodata_cap, FUNC_PTR_REMOVE_PERMS);
+	obj->relocbase = (char*)cheri_clearperm(obj->relocbase, DATA_PTR_REMOVE_PERMS);
+	obj->mapbase = (char*)cheri_clearperm(obj->mapbase, DATA_PTR_REMOVE_PERMS);
 	dbg("%s:\n\tmapbase=%-#p\n\trelocbase=%-#p\n\ttext_rodata=%-#p", path,
 	    obj->mapbase, obj->relocbase, obj->text_rodata_cap);
 }
