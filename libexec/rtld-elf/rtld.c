@@ -1499,7 +1499,7 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	set_bounds_if_nonnull(obj->writable_captable, obj->captable_size);
 	// Set the target cgp as a read-only version of the .cap_table section
 	if (obj->writable_captable)
-		obj->target_cgp = cheri_andperm(obj->writable_captable, TARGET_CGP_REMOVE_PERMS);
+		obj->target_cgp = cheri_clearperm(obj->writable_captable, TARGET_CGP_REMOVE_PERMS);
 
 	// Now reduce the bounds on text_rodata_cap:  I, and for PLT/FNDESC we can set tight bounds
 	// so we only need .text
