@@ -161,11 +161,11 @@ _mips_rtld_bind(void* _plt_stub)
 	}
 
 	dlfunc_t target = make_function_pointer(def, defobj);
+	const void* target_cgp = defobj->target_cgp;
 	dbg("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
 	    defobj->strtab + def->st_name, (intmax_t)r_symndx, obj->path,
 	    (void *)plt_stub->target, (void *)target);
 
-	const void* target_cgp = obj->captable;
 	if (!ld_bind_not) {
 		plt_stub->target = target;
 		plt_stub->cgp = target_cgp;
@@ -198,11 +198,11 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	assert(obj->cheri_plt_stubs); // Should be setup be reloc_plt()
 
 	// TODO: cheri_setaddr + ctestsubset instead of this check?
-	if ((vaddr_t)where < (vaddr_t)obj->captable ||
-	    (vaddr_t)where >= ((vaddr_t)obj->captable + cheri_getlen(obj->captable))) {
+	if ((vaddr_t)where < (vaddr_t)obj->writable_captable ||
+	    (vaddr_t)where >= ((vaddr_t)obj->writable_captable + cheri_getlen(obj->writable_captable))) {
 		_rtld_error("%s: plt stub target capability %p for %s not "
 		    "inside captable %#p", obj->path, where,
-		    symname(obj, r_symndx), obj->captable);
+		    symname(obj, r_symndx), obj->writable_captable);
 		return false;
 	}
 
@@ -216,7 +216,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 
 	// TODO: if we decide to directly update captable entries for the pc-relative ABI:
 	// plt->captable_entry = where;
-	plt->rtld_cgp = rtldobj->captable;
+	plt->rtld_cgp = rtldobj->target_cgp;
 	plt->target = (dlfunc_t)&_rtld_bind_start;
 	plt->_obj = obj;	// FIXME: remove
 	plt->_r_symndx = r_symndx; // FIXME: remove
@@ -279,7 +279,8 @@ reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 	dbg("%s: done relocating %zd PLT entries: ", obj->path,
 	    obj->cheri_plt_stubs->count());
 	for (size_t i = 0; i < obj->captable_size / sizeof(void*); i++) {
-		dbg("%s->captable[%zd]:%p = %#p", obj->path, i, &obj->captable[i], obj->captable[i]);
+		dbg("%s->captable[%zd]:%p = %#p", obj->path, i,
+		    &obj->writable_captable[i], obj->writable_captable[i].value);
 	}
 	return (0);
 }

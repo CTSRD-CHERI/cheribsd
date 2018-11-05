@@ -836,7 +836,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     // rtld_start.S $cgp will be set up correctly. We could also pass another
     // reference argument and store obj_main->captable there but this is easier
     // and should have the same effect.
-    __asm__ volatile("cmove $cgp, %0" :: "C"(obj_main->captable));
+    __asm__ volatile("cmove $cgp, %0" :: "C"(obj_main->target_cgp));
     assert(cheri_getperm(obj_main->entry) & CHERI_PERM_EXECUTE);
 #endif
 
@@ -1318,7 +1318,8 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	}
 
 	case DT_MIPS_CHERI_CAPTABLE:
-	    obj->captable = (void**)(obj->relocbase + dynp->d_un.d_ptr);
+	    obj->writable_captable =
+	        (struct CheriCapTableEntry*)(obj->relocbase + dynp->d_un.d_ptr);
 	    break;
 
 	case DT_MIPS_CHERI_CAPTABLESZ:
@@ -1495,7 +1496,10 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	set_bounds_if_nonnull(obj->fini_array_ptr, obj->fini_array_num * sizeof(Elf_Addr));
 
 	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
-	set_bounds_if_nonnull(obj->captable, obj->captable_size);
+	set_bounds_if_nonnull(obj->writable_captable, obj->captable_size);
+	// Set the target cgp as a read-only version of the .cap_table section
+	if (obj->writable_captable)
+		obj->target_cgp = cheri_andperm(obj->writable_captable, TARGET_CGP_REMOVE_PERMS);
 
 	// Now reduce the bounds on text_rodata_cap:  I, and for PLT/FNDESC we can set tight bounds
 	// so we only need .text
@@ -1504,13 +1508,13 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		dbg("%s: text/rodata start = %#zx, text/rodata end = %#zx, "
 		    "captable = %-#p (relative to start %#zx)", obj->path,
 		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end,
-		    obj->captable, (char*)obj->captable - obj->text_rodata_cap);
-		if (obj->captable) {
+		    obj->writable_captable, (char*)obj->writable_captable - obj->text_rodata_cap);
+		if (obj->writable_captable) {
 			vaddr_t start = rtld_min(obj->text_rodata_start,
-			    (vaddr_t)((char*)obj->captable - obj->text_rodata_cap));
+			    (vaddr_t)((char*)obj->writable_captable - obj->text_rodata_cap));
 			vaddr_t end = rtld_max(obj->text_rodata_end,
-			    (vaddr_t)(((char*)obj->captable + cheri_getlen(obj->captable)) -
-			    obj->text_rodata_cap));
+			    (vaddr_t)(((char*)obj->writable_captable +
+			    cheri_getlen(obj->writable_captable)) - obj->text_rodata_cap));
 			obj->text_rodata_cap += start;
 			obj->text_rodata_cap = cheri_csetbounds_sametype(
 			    obj->text_rodata_cap, end - start);

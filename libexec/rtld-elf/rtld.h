@@ -91,6 +91,10 @@ struct stat;
 struct Struct_Obj_Entry;
 struct CheriExports;
 struct CheriPlt;
+/* Instead of using void** to get warnings on casts */
+struct CheriCapTableEntry {
+	void *value;
+};
 
 /* Lists of shared objects */
 typedef struct Struct_Objlist_Entry {
@@ -225,7 +229,12 @@ typedef struct Struct_Obj_Entry {
 #ifdef __mips__
 #ifdef __CHERI_PURE_CAPABILITY__
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
-    void** captable;		/* start of the .cap_table section */
+    /*
+     * Two pointers to the start of the .cap_table section: one writable
+     * for use by RTLD and one read-only for use as the target $cgp in plt stubs.
+     */
+    struct CheriCapTableEntry* writable_captable;
+    const struct CheriCapTableEntry* target_cgp;
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
     size_t captable_size;	/* size of the .cap_table section */
 #endif
