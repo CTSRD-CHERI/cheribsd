@@ -36,9 +36,14 @@ int load_global_int(void) {
 	return global_int;
 }
 
-const void *get_library_cgp_plus_global_int(void) {
+const void *get_library_cgp(void) {
 	const char* cgp = cheri_getcgp();
-	int load_global = global_int;
-	write(1, __func__, __builtin_strlen(__func__));
-	return cgp + load_global;
+	// Call a function to ensure that we need $cgp
+	write(1, "get_library_cgp_plus_global_int\n",
+	    __builtin_strlen("get_library_cgp_plus_global_int\n"));
+	return cgp;
+}
+
+const void *get_library_cgp_plus_global_int(void) {
+	return (const char*)get_library_cgp() + global_int;
 }

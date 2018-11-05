@@ -33,25 +33,15 @@
 
 extern void* _call_library_function_from_asm(void);
 
-void __start(void) {
-	print("Starting test!\n");
-	// Clear $cgp before calling the library function:
-	const void* original_cgp = cheri_getcgp();
-	print("Caller $cgp: "); print_cap(original_cgp); print("\n");
-	// Call the library function from assembly and clear $cgp first
-	// const void* library_cgp = _call_library_function_from_asm();
-	const void* library_cgp = get_library_cgp_plus_global_int();
-	__compiler_membar();
-	print("Got library $cgp (back in C function)!\n");
-	exit(0);
-	print("Caller $cgp: "); print_cap(original_cgp); print("\n");
-	print("Callee $cgp: "); print_cap(library_cgp); print("\n");
-
+static inline void
+check_library_cgp(const void* library_cgp, const void* original_cgp)
+{
 	require(cheri_gettag(library_cgp)); // $cgp should have a tag
 	// And should have a offset of 42 and nonzero base+length
-	require_eq(cheri_getoffset(library_cgp), 42);
 	require_not_eq(cheri_getbase(library_cgp), 0);
 	require_not_eq(cheri_getlen(library_cgp), 0);
+	require_not_eq(cheri_getbase(original_cgp), 0);
+	require_not_eq(cheri_getlen(original_cgp), 0);
 	// Check that we have permit_load and permit_load_capability on the library $cgp
 	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_EXECUTE), 0);
 	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_STORE), 0);
@@ -62,5 +52,33 @@ void __start(void) {
 
 	// Check that the library $cgp is different from the current $cgp
 	require_not_eq(cheri_getbase(library_cgp), cheri_getbase(original_cgp));
+}
+
+void __start(void) {
+	print("Starting test!\n");
+	// Clear $cgp before calling the library function:
+	const void* original_cgp = cheri_getcgp();
+	print("Caller $cgp: "); print_cap(original_cgp); print("\n");
+	// Call the library function from assembly and clear $cgp first
+	// const void* library_cgp = _call_library_function_from_asm();
+	const void* library_cgp = get_library_cgp();
+	__compiler_membar();
+	print("Got library $cgp (back in C function)!\n");
+	print("Result: "); print_cap(library_cgp); print("\n");
+	check_library_cgp(library_cgp, original_cgp);
+
+	int expected_offset = load_global_int();
+	require_eq(expected_offset, 42);
+
+	// Now do the same with the library cgp + offset:
+	const void* library_cgp_plus_int = get_library_cgp_plus_global_int();
+	print("Got library $cgp plus int:!\n");
+	print("Result: "); print_cap(library_cgp_plus_int); print("\n");
+
+	// This should have offset 42:
+	require_eq(cheri_getoffset(library_cgp_plus_int), expected_offset);
+	// and also all the other properties:
+	check_library_cgp(library_cgp_plus_int, original_cgp);
+
 	exit(0);
 }
