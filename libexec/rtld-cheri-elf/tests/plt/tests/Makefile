@@ -22,7 +22,6 @@ SRCS.${_t}=${_t}.c
 SRCS.${_t}+=	local_syscalls.S \
 	ltoa_unsafe.c \
 	${SRCTOP}/lib/libc/string/strlen.c
-.info SRCS.${_t}="${SRCS.${_t}}"
 .endfor
 
 
