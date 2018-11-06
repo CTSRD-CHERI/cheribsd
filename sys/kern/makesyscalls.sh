@@ -32,6 +32,7 @@ ptr_qualified="*"
 mincompat="0"
 abi_flags=""
 abi_type_suffix=""
+abi_intptr_t="intptr_t"
 
 # tmp files:
 sysaue="sysent.aue.$$"
@@ -160,6 +161,7 @@ sed -e '
 		mincompat = \"$mincompat\" + 0
 		abi_flags = \"$abi_flags\"
 		abi_func_prefix = \"$abi_func_prefix\"
+		abi_intptr_t = \"$abi_intptr_t\"
 		abi_type_suffix = \"$abi_type_suffix\"
 		abi_obsolete_syscalls = \"$abi_obsolete_syscalls\"
 		no_stub_syscalls = \"$no_stub_syscalls\"
@@ -541,6 +543,10 @@ sed -e '
 					needs_suffix=1
 				ptrargs++
 			}
+
+			# Replace intptr_t arguments with an ABI
+			# appropriate value
+			gsub(/intptr_t/, abi_intptr_t, argtype[argc]);
 
 			# The parser adds space around parens.
 			# Remove it from annotations.
