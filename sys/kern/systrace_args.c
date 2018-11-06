@@ -9386,7 +9386,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* shmat */
 	case 228:
 		if (ndx == 0 || ndx == 1)
-			p = "*";
+			p = "void *";
 		break;
 	/* shmdt */
 	case 230:
@@ -10221,7 +10221,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* mmap */
 	case 477:
 		if (ndx == 0 || ndx == 1)
-			p = "*";
+			p = "void *";
 		break;
 	/* lseek */
 	case 478:
