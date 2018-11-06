@@ -939,7 +939,7 @@
 155	AUE_NFS_SVC	NOSTD {
 		int nfssvc(
 		    int flag,
-		    void *argp
+		    _In_ void *argp
 		);
 	}
 156	AUE_GETDIRENTRIES	COMPAT {
