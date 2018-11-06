@@ -1364,8 +1364,26 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 		break;
 
 	case DT_MIPS_RLD_MAP:
+		// We still need to add relocbase for CHERI non-PIE binaries
+		// since we need something to derive the pointer from.
+		assert((vaddr_t)obj->relocbase == 0);
+		// All CheriABI binaries should be PIE so this should be unused.
 		*((Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr)) = (Elf_Addr) &r_debug;
 		break;
+
+	case DT_MIPS_RLD_MAP_REL: {
+		char* tag_loc;
+		// The MIPS_RLD_MAP_REL tag stores the offset to the .rld_map
+		// section relative to the address of the tag itself.
+#ifdef __CHERI_PURE_CAPABILITY__
+		tag_loc = (char*)cheri_copyaddress(obj->relocbase, dynp);
+#else
+		tag_loc = __DECONST(char*, dynp);
+#endif
+		rtld_printf("DT_MIPS_RLD_MAP_REL=%p+%p=%p\n", tag_loc, (void*)(uintptr_t)dynp->d_un.d_val, tag_loc + dynp->d_un.d_val);
+		*((Elf_Addr *)(tag_loc + dynp->d_un.d_val)) = (Elf_Addr) &r_debug;
+		break;
+	}
 
 	case DT_MIPS_PLTGOT:
 		obj->mips_pltgot = (Elf_Addr *)(obj->relocbase +
