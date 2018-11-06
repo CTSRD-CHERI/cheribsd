@@ -463,9 +463,13 @@ sed -e '
 			parserr($end, ")")
 		end--
 
-		f += ret_inc
 		syscallret=$f
 		f++
+		while (ret_inc > 0) {
+			syscallret=syscallret " " $f
+			f++
+			ret_inc--
+		}
 
 		funcname=$f
 
