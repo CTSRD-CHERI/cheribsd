@@ -431,7 +431,7 @@
 		);
 	}
 60	AUE_UMASK	STD {
-		int umask(
+		mode_t umask(
 		    mode_t newmask
 		);
 	}
