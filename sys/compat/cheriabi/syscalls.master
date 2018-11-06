@@ -2180,7 +2180,7 @@
 	}
 417	AUE_SIGRETURN	STD {
 		int sigreturn(
-		    _In_ const ucontext_c_t *sigcntxp
+		    _In_ _Contains_long_ptr_ const struct __ucontext *sigcntxp
 		);
 	}
 418	AUE_NULL	UNIMPL	__xstat
@@ -2188,18 +2188,18 @@
 420	AUE_NULL	UNIMPL	__xlstat
 421	AUE_NULL	STD {
 		int getcontext(
-		    _Out_ ucontext_c_t *ucp
+		    _Out_ _Contains_long_ptr_ struct __ucontext *ucp
 		);
 	}
 422	AUE_NULL	STD {
 		int setcontext(
-		    _In_ const ucontext_c_t *ucp
+		    _In_ _Contains_long_ptr_ const struct __ucontext *ucp
 		);
 	}
 423	AUE_NULL	STD {
 		int swapcontext(
-		    _Out_ ucontext_c_t *oucp,
-		    _In_ const ucontext_c_t *ucp
+		    _Out_ _Contains_long_ptr_ struct __ucontext *oucp,
+		    _In_ _Contains_long_ptr_ const struct __ucontext *ucp
 		);
 	}
 424	AUE_SWAPOFF	STD {
@@ -2242,7 +2242,7 @@
 	}
 430	AUE_THR_CREATE	STD {
 		int thr_create(
-		    _In_ ucontext_c_t *ctx,
+		    _In_ _Contains_long_ptr_ struct __ucontext *ctx,
 		    _Out_ long *id,
 		    int flags
 		);
