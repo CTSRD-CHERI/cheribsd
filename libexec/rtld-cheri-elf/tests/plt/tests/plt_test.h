@@ -79,10 +79,14 @@ void _require_eq(register_t r1, register_t r2, const char* r1s, const char* r2s,
 		print(r1s);
 		print(" (");
 		print_long(r1, 10);
+		print("/");
+		print_long(r1, 16);
 		print(") != ");
 		print(r2s);
 		print(" (");
 		print_long(r2, 10);
+		print("/");
+		print_long(r2, 16);
 		print(")\n");
 		exit(1);
 	}
@@ -98,10 +102,14 @@ void _require_not_eq(register_t r1, register_t r2, const char* r1s, const char* 
 		print(r1s);
 		print(" (");
 		print_long(r1, 10);
+		print("/");
+		print_long(r1, 16);
 		print(") == ");
 		print(r2s);
 		print(" (");
 		print_long(r2, 10);
+		print("/");
+		print_long(r2, 16);
 		print(")\n");
 		exit(1);
 	}

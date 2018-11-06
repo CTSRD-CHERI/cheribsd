@@ -47,8 +47,8 @@ const char* ltoa_unsafe(long n, int base) {
 		n = -n;
 	*start = '\0';
 	do {
-		*--start = (char)(digits[n % 16]);
-		n /= 10;
+		*--start = (char)(digits[n % base]);
+		n /= base;
 	} while (n);
 	// Add 0x/0o/0b prefix
 	if (base == 2) {
