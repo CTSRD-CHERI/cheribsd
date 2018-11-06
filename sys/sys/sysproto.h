@@ -127,7 +127,7 @@ struct geteuid_args {
 struct ptrace_args {
 	char req_l_[PADL_(int)]; int req; char req_r_[PADR_(int)];
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char addr_l_[PADL_(caddr_t)]; caddr_t addr; char addr_r_[PADR_(caddr_t)];
+	char addr_l_[PADL_(char *)]; char * addr; char addr_r_[PADR_(char *)];
 	char data_l_[PADL_(int)]; int data; char data_r_[PADR_(int)];
 };
 struct recvmsg_args {

@@ -170,7 +170,7 @@ struct cheriabi_sigaltstack_args {
 struct cheriabi_ioctl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char com_l_[PADL_(u_long)]; u_long com; char com_r_[PADR_(u_long)];
-	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
+	char data_l_[PADL_(char * __capability)]; char * __capability data; char data_r_[PADR_(char * __capability)];
 };
 struct cheriabi_revoke_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -1764,7 +1764,7 @@ int	cheriabi_getrandom(struct thread *, struct cheriabi_getrandom_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_setlogin	AUE_SETLOGIN
 #define	CHERIABI_SYS_AUE_cheriabi_acct	AUE_ACCT
 #define	CHERIABI_SYS_AUE_cheriabi_sigaltstack	AUE_SIGALTSTACK
-#define	CHERIABI_SYS_AUE_cheriabi_ioctl	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_ioctl	AUE_IOCTL
 #define	CHERIABI_SYS_AUE_cheriabi_revoke	AUE_REVOKE
 #define	CHERIABI_SYS_AUE_cheriabi_symlink	AUE_SYMLINK
 #define	CHERIABI_SYS_AUE_cheriabi_readlink	AUE_READLINK

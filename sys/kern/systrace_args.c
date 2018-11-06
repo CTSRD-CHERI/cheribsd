@@ -170,7 +170,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct ptrace_args *p = params;
 		iarg[0] = p->req; /* int */
 		iarg[1] = p->pid; /* pid_t */
-		uarg[2] = (intptr_t) p->addr; /* caddr_t */
+		uarg[2] = (intptr_t) p->addr; /* char * */
 		iarg[3] = p->data; /* int */
 		*n_args = 4;
 		break;
@@ -3522,7 +3522,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 2:
-			p = "caddr_t";
+			p = "userland char *";
 			break;
 		case 3:
 			p = "int";

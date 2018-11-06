@@ -339,7 +339,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct cheriabi_ioctl_args *p = params;
 		iarg[0] = p->fd; /* int */
 		uarg[1] = p->com; /* u_long */
-		uarg[2] = (__cheri_addr intptr_t) p->data; /* void * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->data; /* char * __capability */
 		*n_args = 3;
 		break;
 	}
@@ -3740,7 +3740,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "u_long";
 			break;
 		case 2:
-			p = "userland void * __capability";
+			p = "userland char * __capability";
 			break;
 		default:
 			break;
