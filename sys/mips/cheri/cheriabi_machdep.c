@@ -305,8 +305,8 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 	case 0:
 		KASSERT(error != 0 ||
 		    td->td_retcap == locr0->c3 || td->td_retcap == NULL ||
-		    code == CHERIABI_SYS_cheriabi_mmap ||
-		    code == CHERIABI_SYS_cheriabi_shmat,
+		    code == SYS_mmap ||
+		    code == SYS_shmat,
 		    ("trying to return capability from integer returning "
 		    "syscall (%u)", code));
 
