@@ -5,8 +5,8 @@
  * $FreeBSD$
  */
 
-#ifndef _SYS_ARGMAP_H_
-#define	_SYS_ARGMAP_H_
+#ifndef _SYS_SYSARGMAP_H_
+#define	_SYS_SYSARGMAP_H_
 
 int sysargmask[] = {
  [SYS_exit] = (0x0),
@@ -373,4 +373,4 @@ int sysargmask[] = {
  [SYS_getrandom] = (0x0 | 0x1),
 };
 
-#endif /* !_SYS_ARGMAP_H_ */
+#endif /* !_SYS_SYSARGMAP_H_ */
