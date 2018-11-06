@@ -368,7 +368,7 @@
 		int ioctl(
 		    int fd,
 		    u_long com,
-		    _Inout_opt_ void *data
+		    _Inout_opt_ char *data
 		);
 	}
 55	AUE_REBOOT	STD {
