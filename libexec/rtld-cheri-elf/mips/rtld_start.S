@@ -120,7 +120,7 @@ LEAF(rtld_start)
 	clc		$c4, zero, SFRAME_CLEANUP($c11)
 	clc		$c5, zero, SFRAME_OBJP($c11)
 
-	cmove		$c17, $c12 /* return == PCC signals backtrace routine to stop */
+	cmove		$cra, $c12 /* return == PCC signals backtrace routine to stop */
 	cjr		$c12
 	nop
 	// .cfi_endproc
@@ -140,7 +140,8 @@ END(rtld_start)
 #define	XCALLFRAME_A6		(2*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_A5		(1*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_A4		(0*SZREG + XCALLFRAME_CAPSIZ)
-#define	XCALLFRAME_CAPSIZ	(9*CHERICAP_SIZE)
+#define	XCALLFRAME_CAPSIZ	(10*CHERICAP_SIZE)
+#define	XCALLFRAME_CFP		(9*CHERICAP_SIZE)
 #define	XCALLFRAME_C3		(8*CHERICAP_SIZE)
 #define	XCALLFRAME_C4		(7*CHERICAP_SIZE)
 #define	XCALLFRAME_C5		(6*CHERICAP_SIZE)
@@ -149,7 +150,7 @@ END(rtld_start)
 #define	XCALLFRAME_C8		(3*CHERICAP_SIZE)
 #define	XCALLFRAME_C9		(2*CHERICAP_SIZE)
 #define	XCALLFRAME_C10		(1*CHERICAP_SIZE)
-#define	XCALLFRAME_C17		(0*CHERICAP_SIZE)
+#define	XCALLFRAME_CRA		(0*CHERICAP_SIZE)
 
 #if (XCALLFRAME_SIZ % CHERICAP_SIZE) != 0
 #error BAD_XCALLFRAME_SIZE
@@ -207,9 +208,12 @@ LEAF(_rtld_bind_start)
 	// .cfi_rel_offset $c9, XCALLFRAME_C9
 	csc	$c10, zero, XCALLFRAME_C10($c11)
 	// .cfi_rel_offset $c10, XCALLFRAME_C10
-	csc	$c17, zero, XCALLFRAME_C17($c11)
-	// .cfi_rel_offset $c17, XCALLFRAME_C17
-	cmove	$c24, $c11
+	csc	$cra, zero, XCALLFRAME_CRA($c11)
+	// .cfi_rel_offset $cra, XCALLFRAME_CRA
+	// We also need to save the frame pointer since it is callee-save
+	csc	$cfp, zero, XCALLFRAME_CFP($c11)
+	// .cfi_rel_offset $cfp, XCALLFRAME_CFP
+	cmove	$cfp, $c11
 
 	// Current naive implementation contains rtld_cgp at offset 0
 	cmove	$c3, $cgp
@@ -219,10 +223,12 @@ LEAF(_rtld_bind_start)
 	PIC_CALL(_mips_rtld_bind)	# $c3 = _mips_rtld_bind(plt_stub)
 	cmove	$c12, $c3
 
-	cmove	$c11, $c24
-	clc	$c17, zero, XCALLFRAME_C17($c11)
+	cmove	$c11, $cfp
 	// FIMXE: using .cfi_restore with a capreg crashes
-	//.cfi_restore $c17
+	clc	$cfp, zero, XCALLFRAME_CFP($c11)
+	//.cfi_restore $cfp
+	clc	$cra, zero, XCALLFRAME_CRA($c11)
+	//.cfi_restore $cra
 	clc	$c10, zero, XCALLFRAME_C10($c11)
 	//.cfi_restore $c10
 	clc	$c9, zero, XCALLFRAME_C9($c11)
@@ -265,7 +271,7 @@ LEAF(_rtld_bind_start)
 	daddiu	t0, t0, XCALLFRAME_SIZ
 	andi	t0, t0, (CHERICAP_SIZE - 1)
 	tne	t0, zero
-	cgetaddr	t0, $c24
+	cgetaddr	t0, $cfp
 	andi	t0, t0, (CHERICAP_SIZE - 1)
 	tne	t0, zero
 #endif
