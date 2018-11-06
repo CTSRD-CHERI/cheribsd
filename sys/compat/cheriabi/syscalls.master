@@ -563,7 +563,7 @@
 		int fcntl(
 		    int fd,
 		    int cmd,
-		    intcap_t arg
+		    intptr_t arg
 		);
 	}
 93	AUE_SELECT	STD {
