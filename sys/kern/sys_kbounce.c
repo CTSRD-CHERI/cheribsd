@@ -41,7 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kbounce.h>
 
 static int
-kern_kbounce(struct thread *td, void * __capability src,
+kern_kbounce(struct thread *td, const void * __capability src,
     void * __capability dst, size_t len, int flags)
 {
 	void *bounce;
