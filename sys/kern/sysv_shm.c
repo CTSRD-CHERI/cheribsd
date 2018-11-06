@@ -745,7 +745,7 @@ sys_shmctl(struct thread *td, struct shmctl_args *uap)
 int
 cheriabi_shmat(struct thread *td, struct cheriabi_shmat_args *uap)
 {
-	void * __capability shmaddr = uap->shmaddr;
+	const void * __capability shmaddr = uap->shmaddr;
 
 	if (shmaddr != NULL &&
 	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
@@ -757,7 +757,7 @@ cheriabi_shmat(struct thread *td, struct cheriabi_shmat_args *uap)
 int
 cheriabi_shmdt(struct thread *td, struct cheriabi_shmdt_args *uap)
 {
-	void * __capability shmaddr = uap->shmaddr;
+	const void * __capability shmaddr = uap->shmaddr;
 
 	if (shmaddr != NULL &&
 	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)

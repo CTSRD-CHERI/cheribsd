@@ -108,7 +108,7 @@
 	}
 8	AUE_CREAT	COMPAT {
 		int creat(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int mode
 		);
 	}
@@ -136,7 +136,7 @@
 	}
 14	AUE_MKNOD	COMPAT11 {
 		int mknod(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int mode,
 		    int dev
 		);
@@ -283,7 +283,7 @@
 	}
 38	AUE_STAT	COMPAT {
 		int stat(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ _Contains_timet_ struct ostat *ub
 		);
 	}
@@ -292,7 +292,7 @@
 	}
 40	AUE_LSTAT	COMPAT {
 		int lstat(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ _Contains_timet_ struct ostat *ub
 		);
 	}
@@ -794,7 +794,7 @@
 	}
 129	AUE_TRUNCATE	COMPAT {
 		int truncate(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    long length
 		);
 	}
@@ -952,7 +952,7 @@
 	}
 157	AUE_STATFS	COMPAT4 {
 		int statfs(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ _Contains_long_ struct ostatfs *buf
 		);
 	}
@@ -1089,7 +1089,7 @@
 187	AUE_NULL	OBSOL	lfs_segwait
 188	AUE_STAT	COMPAT11 {
 		int stat(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ _Contains_timet_ struct freebsd11_stat *ub
 		);
 	}
@@ -1101,7 +1101,7 @@
 	}
 190	AUE_LSTAT	COMPAT11 {
 		int lstat(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ _Contains_timet_ struct freebsd11_stat *ub
 		);
 	}
@@ -1162,7 +1162,7 @@
 	}
 200	AUE_TRUNCATE	COMPAT6 {
 		int truncate(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int pad,
 		    off_t length
 		);
@@ -1293,7 +1293,7 @@
 228	AUE_SHMAT	NOSTD {
 		void *shmat(
 		    int shmid,
-		    _Pagerange_vmmap_opt_(1) void *shmaddr,
+		    _Pagerange_vmmap_opt_(1) const void *shmaddr,
 		    int shmflg
 		);
 	}
@@ -1306,7 +1306,7 @@
 	}
 230	AUE_SHMDT	NOSTD {
 		int shmdt(
-		    _Pagerange_vmmap_(1) void *shmaddr
+		    _Pagerange_vmmap_(1) const void *shmaddr
 		);
 	}
 231	AUE_SHMGET	NOSTD {
@@ -1483,7 +1483,7 @@
 277	AUE_NULL	OBSOL	netbsd_msync
 278	AUE_STAT	COMPAT11 {
 		int nstat(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ _Contains_long_timet_ struct nstat *ub
 		);
 	}
@@ -1495,7 +1495,7 @@
 	}
 280	AUE_LSTAT	COMPAT11 {
 		int nlstat(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ _Contains_long_timet_ struct nstat *ub
 		);
 	}
@@ -1952,7 +1952,7 @@
 375	AUE_NULL	OBSOL	nfsclnt
 376	AUE_EACCESS	STD {
 		int eaccess(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int amode
 		);
 	}
@@ -2060,7 +2060,7 @@
 	}
 396	AUE_STATFS	COMPAT11 {
 		int statfs(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ struct freebsd11_statfs *buf
 		);
 	}
@@ -2173,7 +2173,7 @@
 	}
 415	AUE_NULL	STD {
 		int __mac_execve(
-		    _In_z_ char *fname,
+		    _In_z_ const char *fname,
 		    _In_ char **argv,
 		    _In_ char **envv,
 		    _In_ _Contains_long_ptr_ struct mac *mac_p
@@ -2645,7 +2645,7 @@
 493	AUE_FSTATAT	COMPAT11 {
 		int fstatat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ _Contains_long_timet_ struct freebsd11_stat *buf,
 		    int flag
 		);
@@ -2683,7 +2683,7 @@
 498	AUE_MKNODAT	COMPAT11 {
 		int mknodat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode,
 		    uint32_t dev
 		);
@@ -3052,7 +3052,7 @@
 	}
 555	AUE_STATFS	STD {
 		int statfs(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ struct statfs *buf
 		);
 	}
