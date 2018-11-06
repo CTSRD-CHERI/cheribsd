@@ -245,7 +245,7 @@
 28	AUE_SENDMSG	STD {
 		ssize_t sendmsg(
 		    int s,
-		    _In_ _Contains_ptr_ struct msghdr_native *msg,
+		    _In_ _Contains_ptr_ const struct msghdr_native *msg,
 		    int flags
 		);
 	}
@@ -503,7 +503,7 @@
 	}
 74	AUE_MPROTECT	STD {
 		int mprotect(
-		    _In_ void *addr,
+		    _In_ const void *addr,
 		    size_t len,
 		    int prot
 		);
@@ -533,7 +533,7 @@
 80	AUE_SETGROUPS	STD {
 		int setgroups(
 		    u_int gidsetsize,
-		    _In_reads_(gidsetsize) gid_t *gidset
+		    _In_reads_(gidsetsize) const gid_t *gidset
 		);
 	}
 81	AUE_GETPGRP	STD {
@@ -547,8 +547,8 @@
 	}
 83	AUE_SETITIMER	STD {
 		int setitimer(
-		    u_int which,
-		    _In_ _Contains_timet_ struct itimerval *itv,
+		    int which,
+		    _In_ _Contains_timet_ const struct itimerval *itv,
 		    _Out_opt_ _Contains_timet_ struct itimerval *oitv
 		);
 	}
@@ -771,7 +771,7 @@
 	}
 122	AUE_SETTIMEOFDAY	STD {
 		int settimeofday(
-		    _In_ _Contains_long_timet_ struct timeval *tv,
+		    _In_ _Contains_long_timet_ const struct timeval *tv,
 		    _In_opt_ _Contains_long_timet_ struct timezone *tzp
 		);
 	}
@@ -878,13 +878,13 @@
 138	AUE_UTIMES	STD {
 		int utimes(
 		    _In_z_ const char *path,
-		    _In_ _Contains_long_timet_ struct timeval *tptr
+		    _In_ _Contains_long_timet_ const struct timeval *tptr
 		);
 	}
 139	AUE_NULL	OBSOL	4.2 sigreturn
 140	AUE_ADJTIME	STD {
 		int adjtime(
-		    _In_ _Contains_long_timet_ struct timeval *delta,
+		    _In_ _Contains_long_timet_ const struct timeval *delta,
 		    _Out_opt_ _Contains_long_timet_ struct timeval *olddelta
 		);
 	}
@@ -1228,7 +1228,7 @@
 206	AUE_FUTIMES	STD {
 		int futimes(
 		    int fd,
-		    _In_reads_(2) _Contains_long_timet_ struct timeval *tptr
+		    _In_reads_(2) _Contains_long_timet_ const struct timeval *tptr
 		);
 	}
 207	AUE_GETPGID	STD {
@@ -1498,7 +1498,7 @@
 276	AUE_LUTIMES	STD {
 		int lutimes(
 		    _In_z_ const char *path,
-		    _In_ _Contains_long_timet_ struct timeval *tptr
+		    _In_ _Contains_long_timet_ const struct timeval *tptr
 		);
 	}
 277	AUE_NULL	OBSOL	netbsd_msync
@@ -2674,7 +2674,7 @@
 		int futimesat(
 		    int fd,
 		    _In_z_ const char *path,
-		    _In_reads_(2) _Contains_long_timet_ struct timeval *times
+		    _In_reads_(2) _Contains_long_timet_ const struct timeval *times
 		);
 	}
 495	AUE_LINKAT	STD {
@@ -3024,14 +3024,14 @@
 546	AUE_FUTIMES	STD {
 		int futimens(
 		    int fd,
-		    _In_reads_(2) _Contains_long_timet_ struct timespec *times
+		    _In_reads_(2) _Contains_long_timet_ const struct timespec *times
 		);
 	}
 547	AUE_FUTIMESAT	STD {
 		int utimensat(
 		    int fd,
 		    _In_z_ const char *path,
-		    _In_reads_(2) _Contains_long_timet_ struct timespec *times,
+		    _In_reads_(2) _Contains_long_timet_ const struct timespec *times,
 		    int flag
 		);
 	}
@@ -3106,7 +3106,7 @@
 560	AUE_KEVENT	STD {
 		int kevent(
 		    int fd,
-		    _In_reads_opt_(nchanges) _Contains_ptr_ struct kevent_native *changelist,
+		    _In_reads_opt_(nchanges) _Contains_ptr_ const struct kevent_native *changelist,
 		    int nchanges,
 		    _Out_writes_opt_(nevents) _Contains_ptr_ struct kevent_native *eventlist,
 		    int nevents,
