@@ -1732,7 +1732,7 @@
 		int kldsym(
 		    int fileid,
 		    int cmd,
-		    _In_ _Contains_long_ptr_ struct kld_sym_lookup *data
+		    _In_ _Contains_long_ptr_ void *data
 		);
 	}
 338	AUE_JAIL	STD {
