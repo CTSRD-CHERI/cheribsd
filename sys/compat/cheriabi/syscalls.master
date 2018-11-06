@@ -309,7 +309,7 @@
 	}
 44	AUE_PROFILE	STD {
 		int profil(
-		    _Out_writes_bytes_(size) void *samples,
+		    _Out_writes_bytes_(size) char *samples,
 		    size_t size,
 		    size_t offset,
 		    u_int scale
