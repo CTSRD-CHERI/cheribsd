@@ -209,7 +209,6 @@
 		    _In_opt_ void *data
 		);
 	}
-; XXX `path' should have type `const char *' but we're not ready for that.
 22	AUE_UMOUNT	STD {
 		int unmount(
 		    _In_z_ const char *path,
