@@ -1756,7 +1756,7 @@
 	}
 338	AUE_JAIL	STD {
 		int jail(
-		    _In_ _Contains_ptr_ struct jail *jail
+		    _In_ _Contains_ptr_ struct jail *jailp
 		);
 	}
 339	AUE_NULL	NOSTD|NOTSTATIC {
