@@ -230,7 +230,7 @@
 		int ptrace(
 		    int req,
 		    pid_t pid,
-		    _Inout_opt_ caddr_t addr,
+		    _Inout_opt_ char *addr,
 		    int data
 		);
 	}
