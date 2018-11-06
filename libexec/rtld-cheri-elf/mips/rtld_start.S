@@ -126,8 +126,9 @@ LEAF(rtld_start)
 	// .cfi_endproc
 END(rtld_start)
 
-#define	XCALLFRAME_CAPSIZ	(9*CHERICAP_SIZE)
-#define	XCALLFRAME_SIZ		(12*SZREG + XCALLFRAME_CAPSIZ)
+#define	_XCALLFRAME_SIZ		(11*SZREG + XCALLFRAME_CAPSIZ)
+/* Ensure the callframe size is capability aligned: */
+#define	XCALLFRAME_SIZ		((_XCALLFRAME_SIZ) + (_XCALLFRAME_SIZ % CHERICAP_SIZE))
 #define	XCALLFRAME_RA		(10*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_GP		(9*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_S0		(8*SZREG + XCALLFRAME_CAPSIZ)
@@ -139,6 +140,7 @@ END(rtld_start)
 #define	XCALLFRAME_A6		(2*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_A5		(1*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_A4		(0*SZREG + XCALLFRAME_CAPSIZ)
+#define	XCALLFRAME_CAPSIZ	(9*CHERICAP_SIZE)
 #define	XCALLFRAME_C3		(8*CHERICAP_SIZE)
 #define	XCALLFRAME_C4		(7*CHERICAP_SIZE)
 #define	XCALLFRAME_C5		(6*CHERICAP_SIZE)
@@ -149,11 +151,22 @@ END(rtld_start)
 #define	XCALLFRAME_C10		(1*CHERICAP_SIZE)
 #define	XCALLFRAME_C17		(0*CHERICAP_SIZE)
 
+#if (XCALLFRAME_SIZ % CHERICAP_SIZE) != 0
+#error BAD_XCALLFRAME_SIZE
+#endif
+
 LEAF(_rtld_bind_start)
 	// move	v1, gp			/* save old GP */
 	// FIXME: the .cfi annotations seem to be wrong since the backtrace is better without them...
 	// .cfi_startproc
 	// .cfi_def_cfa_register	$c11, 0
+#ifdef DEBUG
+	// FIXME: can we assume capability alignment?
+	cgetaddr	t0, $c11
+	andi	t0, t0, (CHERICAP_SIZE - 1)
+	tne	t0, zero
+#endif
+
 	cincoffset $c11, $c11, -XCALLFRAME_SIZ	/* save arguments and sp value in stack */
 	// .cfi_def_cfa_offset XCALLFRAME_SIZ
 	//SETUP_GP64(XCALLFRAME_GP, _rtld_bind_start)
@@ -198,21 +211,7 @@ LEAF(_rtld_bind_start)
 	// .cfi_rel_offset $c17, XCALLFRAME_C17
 	cmove	$c24, $c11
 
-#if 0
-	move	a0, v1			/* old GP */
-	PTR_SUBU	a0, a0, 0x7ff0	/* The offset of $gp from the	*/
-       					/* beginning of the .got section: */
-					/* $gp = .got + 0x7ff0, so	*/
-					/* .got = $gp - 0x7ff0		*/
-					/* Simple math as you can see.	*/
-	ld	a0, 8(a0)	/* object = pltgot[1] */
-	dli	t9, 0x7fffffffffffffff;
-	and	a0, a0, t9
-	cgetdefault	$c3
-	csetoffset	$c3, $c3, a0
-	move	a0, t8			/* symbol index */
-#endif
-	// Currently naive implementation:
+	// Current naive implementation contains rtld_cgp at offset 0
 	cmove	$c3, $cgp
 	// TODO: load this from privileged $chwr instead
 	clc	$cgp, zero, 0($c3) #const void* rtld_cgp = plt_stub->rtld_cgp;
@@ -260,8 +259,17 @@ LEAF(_rtld_bind_start)
 	// .cfi_restore a7
 	cld	gp, zero, XCALLFRAME_GP($c11)
 	// .cfi_restore gp
-	//RESTORE_GP64
-	cjr	$c12
-	cincoffset $c11, $c11, XCALLFRAME_SIZ
+#ifdef DEBUG
+	# Check that the target resulting stack address is aligned
+	cgetaddr	t0, $c11
+	daddiu	t0, t0, XCALLFRAME_SIZ
+	andi	t0, t0, (CHERICAP_SIZE - 1)
+	tne	t0, zero
+	cgetaddr	t0, $c24
+	andi	t0, t0, (CHERICAP_SIZE - 1)
+	tne	t0, zero
+#endif
+	cjr	$c12	# call the resolved target
+	cincoffset $c11, $c11, XCALLFRAME_SIZ	# delay slot
 	// .cfi_endproc
 END(_rtld_bind_start)
