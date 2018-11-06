@@ -31,10 +31,15 @@
 
 #undef _PATH_ELF_HINTS
 
+#define	_DEFAULT_BASENAME_RTLD		"ld-elf.so.1"
+#define	_CHERIABI_BASENAME_RTLD		"ld-cheri-elf.so.1"
+#define	_COMPAT32_BASENAME_RTLD		"ld-elf32.so.1"
+
+
 #ifdef __CHERI_PURE_CAPABILITY__
 #define	_PATH_ELF_HINTS		"/var/run/ld-cheri-elf.so.hints"
 #define	_PATH_LIBMAP_CONF	"/etc/libmap-cheri.conf"
-#define	_BASENAME_RTLD		"ld-cheri-elf.so.1"
+#define	_BASENAME_RTLD		_CHERIABI_BASENAME_RTLD
 #define	STANDARD_LIBRARY_PATH	"/libcheri:/usr/libcheri"
 #define	LD_			"LD_CHERI_"
 #endif
@@ -42,7 +47,7 @@
 #ifdef COMPAT_32BIT
 #define	_PATH_ELF_HINTS		"/var/run/ld-elf32.so.hints"
 #define	_PATH_LIBMAP_CONF	"/etc/libmap32.conf"
-#define	_BASENAME_RTLD		"ld-elf32.so.1"
+#define	_BASENAME_RTLD		_COMPAT32_BASENAME_RTLD
 #define	STANDARD_LIBRARY_PATH	"/lib32:/usr/lib32"
 #define	LD_			"LD_32_"
 #endif
@@ -56,12 +61,17 @@
 #endif
 
 #ifndef _BASENAME_RTLD
-#define	_BASENAME_RTLD		"ld-elf.so.1"
+#define	_BASENAME_RTLD		_DEFAULT_BASENAME_RTLD
 #endif
 
 #ifndef _PATH_RTLD
 #define	_PATH_RTLD		"/libexec/" _BASENAME_RTLD
 #endif
+
+/* Provide these constants for /usr/bin/ldd32 */
+#define _DEFAULT_PATH_RTLD "/libexec/" _DEFAULT_BASENAME_RTLD
+#define _CHERIABI_PATH_RTLD "/libexec/" _CHERIABI_BASENAME_RTLD
+#define _COMPAT32_PATH_RTLD "/libexec/" _COMPAT32_BASENAME_RTLD
 
 #ifndef STANDARD_LIBRARY_PATH
 #define	STANDARD_LIBRARY_PATH	"/lib/casper:/lib:/usr/lib"
@@ -81,10 +91,10 @@
 #define	LD_SOFT_		"LD_SOFT_"
 #endif
 
-extern char *ld_elf_hints_default;
-extern char *ld_path_libmap_conf;
-extern char *ld_path_rtld;
-extern char *ld_standard_library_path;
-extern char *ld_env_prefix;
+extern const char *ld_elf_hints_default;
+extern const char *ld_path_libmap_conf;
+extern const char *ld_path_rtld;
+extern const char *ld_standard_library_path;
+extern const char *ld_env_prefix;
 
 #endif /* PATHS_H */

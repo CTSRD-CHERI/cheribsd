@@ -661,22 +661,12 @@ cheriabi_capability_set_user_ddc(void * __capability *cp, size_t length)
 }
 
 static void
-cheriabi_capability_set_user_idc(void * __capability *cp, size_t length)
-{
-
-	/*
-	 * The default invoked data capability is also identical to $ddc.
-	 */
-	cheriabi_capability_set_user_ddc(cp, length);
-}
-
-static void
 cheriabi_capability_set_user_entry(void * __capability *cp,
     unsigned long entry_addr, size_t length)
 {
 
 	/*
-	 * Set the jump target regigster for the pure capability calling
+	 * Set the jump target register for the pure capability calling
 	 * convention.
 	 */
 	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
@@ -733,9 +723,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
 	u_long auxv, stackbase, stacklen;
-	bool is_dynamic_binary;
-	size_t map_base, map_length, text_end, data_length, code_length;
+	size_t map_base, map_length, text_end, data_length, code_end;
 	struct rlimit rlim_stack;
+	/* const bool is_dynamic_binary = imgp->interp_end != 0; */
+	/* const bool is_rtld_direct_exec = imgp->reloc_base == imgp->start_addr; */
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 	/*
@@ -819,34 +810,47 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
 
 	/*
-	 * XXXAR: For now, initialise $ddc and $idc to the full address space
-	 * for dynamically linked executables. In the future these will be
-	 * restricted (or not set at all).
-	 */
-	/* XXXAR: is there a better way to check for dynamic binaries? */
-	is_dynamic_binary = imgp->reloc_base != 0;
-	/*
 	 * XXXAR: data_length needs to be the full address space to allow
-	 * legacy TLS to work since the TLS region will be beyond the end of
-	 * the text section. This does not matter for new binaries since they
-	 * will all clear $ddc as one of the first user instructions anyway.
-	 * TODO: add a kernel config option to start with NULL $ddc once
-	 * crt_init_globals is fixed.
+	 * legacy ABI to work since the TLS region will be beyond the end of
+	 * the text section.
+	 *
+	 * TODO: Start with a NULL $ddc once we drop legacy ABI support.
+	 *
+	 * Having a full address space $ddc on startup does not matter for new
+	 * binaries since they will all clear $ddc as one of the first user
+	 * instructions anyway.
+	 *
+	 * TODO: for co-processes we should start with NULL $ddc
 	 */
-	data_length = CHERI_CAP_USER_DATA_LENGTH - imgp->reloc_base;
-	code_length = is_dynamic_binary ?
-	    CHERI_CAP_USER_CODE_LENGTH - imgp->reloc_base : text_end;
+	data_length = CHERI_CAP_USER_DATA_LENGTH; /* Always representable */
 	frame = &td->td_pcb->pcb_regs;
 	cheriabi_capability_set_user_ddc(&frame->ddc, data_length);
-	cheriabi_capability_set_user_idc(&frame->idc, data_length);
 
 	/*
 	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with
 	 * broad bounds, but in the future, limited as appropriate to the
 	 * run-time linker or statically linked binary?
+	 *
+	 * TODO: restrict $pcc to the mapped binary once we no longer support
+	 * the legacy ABI.
+	 *
+	 * TODO: add a kernel config option for legacy ABI so we can shrink
+	 * this by default!
 	 */
+#ifdef NOTYET
+	/*
+	 * If we are executing a static binary we use text_end as the end of
+	 * the text segment. If $pcc is the start of rtld we use interp_end.
+	 * If we are executing ld-cheri-elf.so.1 directly and can use text_end
+	 * to find the end of the rtld mapping.
+	 */
+	code_end = imgp->interp_end ? imgp->interp_end : text_end;
+	code_end = roundup2(code_length, 1ULL << CHERI_ALIGN_SHIFT(code_end));
+#else
+	code_end = CHERI_CAP_USER_CODE_LENGTH;
+#endif
 	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
-	    code_length);
+	    code_end);
 	frame->c12 = frame->pcc;
 
 	/*
@@ -864,12 +868,23 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    CHERI_CAP_USER_DATA_PERMS, auxv,
 	    AT_COUNT * 2 * sizeof(void * __capability), 0);
 	/*
-	 * Load relocbase into $c4 so that rtld has a capability with the
-	 * correct bounds available on startup
+	 * Load relocbase for RTLD into $c4 so that rtld has a capability with
+	 * the correct bounds available on startup
+	 *
+	 * XXXAR: this should not be necessary since it should be the same as
+	 * auxv[AT_BASE] but trying to load that from $c3 crashes...
+	 *
+	 * TODO: load the AT_BASE value instead of using duplicated code!
 	 */
-	if (imgp->reloc_base)
+	if (imgp->reloc_base) {
+		vaddr_t rtld_base = imgp->reloc_base;
+		rtld_base = rounddown2(rtld_base, 1ULL << CHERI_ALIGN_SHIFT(rtld_base));
+		vaddr_t rtld_end = imgp->interp_end ? imgp->interp_end : imgp->end_addr;
+		vaddr_t rtld_len = rtld_end - rtld_base;
+		rtld_len = roundup2(rtld_len, 1ULL << CHERI_ALIGN_SHIFT(rtld_len));
 		td->td_frame->c4 = cheri_capability_build_user_data(
-		   CHERI_CAP_USER_DATA_PERMS, imgp->reloc_base, data_length, 0);
+		    CHERI_CAP_USER_DATA_PERMS, rtld_base, rtld_len, 0);
+	}
 	/*
 	 * Restrict the stack capability to the maximum region allowed for
 	 * this process and adjust sp accordingly.

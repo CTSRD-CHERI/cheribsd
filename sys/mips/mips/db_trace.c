@@ -66,12 +66,28 @@ extern char edata[];
 #define	MIPS_START_OF_FUNCTION(ins)	((((ins) & 0xffff8000) == 0x27bd8000) \
 	|| (((ins) & 0xffff8000) == 0x67bd8000))
 
+#if defined(__clang__)
+/* The j ra check may have worked for GCC 4.2 but clang emits j ra in the middle
+ * of functions too. Only check for functions start daddiu + lld padding if
+ * the kernel was compiled with clang.
+ * Using the MIPS_END_OF_FUNCTION with a clang compiled kernel will cause
+ * issues such as a assuming a zero stack size for kern_execve.
+ */
+#define	MIPS_END_OF_FUNCTION(ins)	(false)
+#else
 /*
  * MIPS ABI 3.0 requires that all functions return using the 'j ra' instruction
  *
  * XXX gcc doesn't do this for functions with __noreturn__ attribute.
  */
 #define	MIPS_END_OF_FUNCTION(ins)	((ins) == 0x03e00008)
+#endif
+
+/*
+ * LLD will insert invalid instruction traps between functions.
+ * Currently this is 0xefefefef but it may change in the future.
+ */
+#define	MIPS_LLD_PADDING_BETWEEN_FUNCTIONS(ins)	((ins) == 0xefefefef)
 
 #if defined(__mips_n64)
 #	define	MIPS_IS_VALID_KERNELADDR(reg)	((((reg) & 3) == 0) && \
@@ -79,6 +95,14 @@ extern char edata[];
 #else
 #	define	MIPS_IS_VALID_KERNELADDR(reg)	((((reg) & 3) == 0) && \
 					((vm_offset_t)(reg) >= MIPS_KSEG0_START))
+#endif
+
+
+#define DEBUG_STACKTRACE 0
+#if DEBUG_STACKTRACE > 0
+#define STACKTRACE_DBG(args...) printf(args)
+#else
+#define STACKTRACE_DBG(args...)
 #endif
 
 static void
@@ -179,6 +203,7 @@ loop:
 	if (trapframe)
 		goto done;
 
+	STACKTRACE_DBG("Finding subr before %jx\n", (intmax_t)pc);
 	/*
 	 * Find the beginning of the current subroutine by scanning
 	 * backwards from the current PC for the end of the previous
@@ -189,23 +214,41 @@ loop:
 		while (1) {
 			instr = kdbpeek((int *)va);
 
-			if (MIPS_START_OF_FUNCTION(instr))
+			/* LLD fills padding between functions with 0xefefefef */
+			if (MIPS_LLD_PADDING_BETWEEN_FUNCTIONS(instr)) {
+				STACKTRACE_DBG("Found trap padding at %jx, "
+				    "inst = %x\n", (intmax_t)va, instr);
 				break;
+			}
+
+			if (MIPS_START_OF_FUNCTION(instr)) {
+				STACKTRACE_DBG("Found start of function at "
+				    "%jx, inst = %x\n", (intmax_t)va, instr);
+				break;
+			}
 
 			if (MIPS_END_OF_FUNCTION(instr)) {
 				/* skip over branch-delay slot instruction */
 				va += 2 * sizeof(int);
+				STACKTRACE_DBG("Found end of function at %jx,"
+				   "inst = %x\n", (intmax_t)va, instr);
 				break;
 			}
 
  			va -= sizeof(int);
 		}
 
-		/* skip over nulls which might separate .o files */
-		while ((instr = kdbpeek((int *)va)) == 0)
+		/* skip over nulls/trap padding which might separate .o files */
+		instr = kdbpeek((int *)va);
+		while (instr == 0 || MIPS_LLD_PADDING_BETWEEN_FUNCTIONS(instr)) {
 			va += sizeof(int);
+			STACKTRACE_DBG("Skipped padding at %jx, inst = %x, "
+			    "va=%jx\n", (intmax_t)subr, instr, (intmax_t)va);
+			instr = kdbpeek((int *)va);
+		}
 		subr = va;
 	}
+	STACKTRACE_DBG("Final subr = %jx, first inst = %x\n", (intmax_t )subr, instr);
 	/* scan forwards to find stack size and any saved registers */
 	stksize = 0;
 	more = 3;
@@ -335,6 +378,8 @@ loop:
 			/* look for stack pointer adjustment */
 			if (i.IType.rs != 29 || i.IType.rt != 29)
 				break;
+			STACKTRACE_DBG("Found stack adjustment by %d\n",
+			    -((short)i.IType.imm));
 			stksize = -((short)i.IType.imm);
 		}
 	}

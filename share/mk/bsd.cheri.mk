@@ -100,9 +100,6 @@ _CHERI_COMMON_FLAGS+=	--sysroot=${SYSROOT}
 _CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 .endif
 
-# Turn off deprecated warnings
-_CHERI_COMMON_FLAGS+= -Wno-deprecated-declarations
-
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 OBJCOPY:=	objcopy
 MIPS_ABI:=	purecap

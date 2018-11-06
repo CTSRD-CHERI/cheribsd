@@ -3,7 +3,9 @@
 # Use the following command to build local debug version of dynamic
 # linker:
 # make DEBUG_FLAGS=-g DEBUG=-DDEBUG WITHOUT_TESTS=yes all
-.ifdef BUILD_RTLD_DEBUG
+.ifdef RTLD_DEBUG_VERBOSE
+CFLAGS+=-DDEBUG -DDEBUG_VERBOSE=${RTLD_DEBUG_VERBOSE}
+.elif defined(BUILD_RTLD_DEBUG)
 CFLAGS+=-DDEBUG
 .endif
 # Not adapted for CHERI
@@ -41,7 +43,9 @@ LDFLAGS+=	-nostdlib -e rtld_start
 .else
 LDFLAGS+=	-nostdlib -e .rtld_start
 .endif
-WARNS?=		2
+
+NO_WCAST_ALIGN=	yes
+WARNS?=		6
 INSTALLFLAGS=	-C -b
 PRECIOUSPROG=
 BINDIR=		/libexec
@@ -61,6 +65,8 @@ CFLAGS+=	-fvisibility=hidden
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS.reloc.c+=-fno-jump-tables
 .endif
+# Since we pass -shared, we shouldn't also pass -pie
+MK_PIE:=	no
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
 LIBADD=		c_nossp_pic
 .if ${MK_TOOLCHAIN} == "no"
@@ -105,3 +111,13 @@ SUBDIR.${MK_TESTS}+= tests
 .include <bsd.prog.mk>
 ${PROG_FULL}:	${VERSION_MAP}
 .include <bsd.symver.mk>
+
+.if ${COMPILER_TYPE} == "gcc"
+# GCC warns about redeclarations even though they have __exported
+# and are therefore not identical to the ones from the system headers.
+CFLAGS+=	-Wno-redundant-decls
+.if ${COMPILER_VERSION} < 40300
+# Silence -Wshadow false positives in ancient GCC
+CFLAGS+=	-Wno-shadow
+.endif
+.endif

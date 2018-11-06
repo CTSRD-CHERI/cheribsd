@@ -42,17 +42,21 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 #include <sys/types.h>
+/* The clang-provided header is not warning-clean: */
+__unused static void cheri_init_globals(void);
 #include <cheri_init_globals.h>
 
 #include "debug.h"
 #include "rtld.h"
 
+void _rtld_do___caprelocs_self(const struct capreloc *start_relocs,
+    const struct capreloc* end_relocs, void *relocbase);
 
 /*
  * LD_BIND_NOW was set - force relocation for all jump slots
  */
 int
-reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
+reloc_jmpslots(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
 {
 	/* Do nothing. TODO: needed once we have lazy binding */
 	obj->jmpslots_done = true;
@@ -63,7 +67,7 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
  *  Process the PLT relocations.
  */
 int
-reloc_plt(Obj_Entry *obj)
+reloc_plt(Obj_Entry *obj __unused)
 {
 	/* Do nothing. TODO: needed once we have lazy binding */
 	return (0);

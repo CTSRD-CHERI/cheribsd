@@ -31,6 +31,7 @@ ptr_intptr_t_cast="intptr_t"
 ptr_qualified="*"
 mincompat="0"
 abi_flags=""
+abi_type_suffix=""
 
 # tmp files:
 sysaue="sysent.aue.$$"
@@ -87,12 +88,12 @@ sed -e '
 	/^$/b done_joining
 
 	# Join lines ending in backslash
-:join_backslashes
+:joining
 	/\\$/{a\
 
 	N
 	s/\\\n//
-	b join_backslashes
+	b joining
 	}
 
 	# OBSOL, etc lines without function signatures
@@ -101,12 +102,11 @@ sed -e '
 	# Join incomplete signatures.  The { must appear on the first line
 	# and the } must appear on the last line (modulo lines joined by
 	# backslashes).
-:join_syscalls
 	/^[^}]*$/{a\
 
 	N
 	s/\n//
-	b join_syscalls
+	b joining
 	}
 :done_joining
 2,${
@@ -160,6 +160,9 @@ sed -e '
 		mincompat = \"$mincompat\" + 0
 		abi_flags = \"$abi_flags\"
 		abi_func_prefix = \"$abi_func_prefix\"
+		abi_type_suffix = \"$abi_type_suffix\"
+		abi_obsolete_syscalls = \"$abi_obsolete_syscalls\"
+		no_stub_syscalls = \"$no_stub_syscalls\"
 		capenabled_string = \"$capenabled\"
 		ptr_intptr_t_cast = \"$ptr_intptr_t_cast\"
 		ptr_qualified = \"$ptr_qualified\"
@@ -254,6 +257,7 @@ sed -e '
 		printf "#include <sys/_semaphore.h>\n" > sysstubs
 		printf "#include <sys/socket.h>\n" > sysstubs
 		printf "#include <sys/ucontext.h>\n" > sysstubs
+		printf "#include <sys/wait.h>\n\n" > sysstubs
 		printf "#include <compat/cheriabi/cheriabi_signal.h>\n" > sysstubs
 
 		printf "/*\n * System call argument to DTrace register array converstion.\n *\n" > systrace
@@ -358,6 +362,22 @@ sed -e '
 			if (_tmparray[i] == name)
 				return 1
 		return 0
+	}
+	# Returns true is syscall is in abi_obsolete_syscalls
+	function obsolete_in_abi(sysnum, _tmparray, i, n) {
+		n = split(abi_obsolete_syscalls, _tmparray, / /)
+		for (i = 1; i <= n; i++)
+			if (_tmparray[i] == sysnum)
+				return 1
+		return 0
+	}
+	# Returns true is syscall is not in no_stub_syscalls
+	function genstub(sysnum, _tmparray, i, n) {
+		n = split(no_stub_syscalls, _tmparray, / /)
+		for (i = 1; i <= n; i++)
+			if (_tmparray[i] == sysnum)
+				return 0
+		return 1
 	}
 	{
 		n = split($1, syscall_range, /-/)
@@ -491,6 +511,7 @@ sed -e '
 			argc++
 			argtype[argc]=""
 			oldf=""
+			needs_suffix=0
 			while (f < end && $(f+1) != ",") {
 				if (argtype[argc] != "" && oldf != "*")
 					argtype[argc] = argtype[argc]" ";
@@ -506,20 +527,35 @@ sed -e '
 			if (argtype[argc] == "")
 				parserr($f, "argument definition")
 
+			if (isptrtype(argtype[argc])) {
+				if ((abi_changes("long_size") &&
+				    argtype[argc] ~ /_Contains[a-z_]*_long_/) ||
+				    (abi_changes("pointer_size") &&
+				    argtype[argc] ~ /_Contains[a-z_]*_ptr_/) ||
+				    (abi_changes("time_t_size") &&
+				    argtype[argc] ~ /_Contains[a-z_]*_timet_/))
+					needs_suffix=1
+				ptrargs++
+			}
+
 			# The parser adds space around parens.
 			# Remove it from annotations.
 			gsub(/ \( /, "(", argtype[argc]);
 			gsub(/ \)/, ")", argtype[argc]);
 			#remove annotations
+			gsub(/_Contains[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_In[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Out[^ ]*[_)] /, "", argtype[argc]);
 			gsub(/_Pagerange[^ ]*[_)] /, "", argtype[argc]);
+
+			# Add suffix if required
+			# XXX-BD: should this happen in the loop above?
+			if (needs_suffix)
+				sub(/(struct|union) [^ ]*/, "&" abi_type_suffix, argtype[argc])
+
 			# Allow pointers to be qualified
 			gsub(/\*/, ptr_qualified, argtype[argc]);
 			sub(/ $/, "", argtype[argc]);
-
-			if (isptrtype(argtype[argc]))
-				ptrargs++
 
 			argname[argc]=$f;
 			f += 2;			# skip name, and any comma
@@ -561,8 +597,8 @@ sed -e '
 		flags = "0";
 	}
 
-	type("STD") || type("NODEF") || type("NOARGS") || type("NOPROTO") \
-	    || type("NOSTD") {
+	(type("STD") || type("NODEF") || type("NOARGS") || type("NOPROTO") \
+	    || type("NOSTD")) && !obsolete_in_abi(syscall) {
 		parseline()
 		printf("\t/* %s */\n\tcase %d: {\n", funcname, syscall) > systrace
 		printf("\t/* %s */\n\tcase %d:\n", funcname, syscall) > systracetmp
@@ -631,7 +667,7 @@ sed -e '
 			printf "),\n" > sysargmap
 		}
 
-		if (!flag("NOSTUB") && !flag("NODEF")) {
+		if (!flag("NODEF") && genstub(syscall)) {
 			arghasptrs = 0
 			for (i = 1; i <= argc; i++) {
 				if (isptrtype(argtype[i]) &&
@@ -964,6 +1000,18 @@ sed -e '
 			    prefix, funcalias, syscall) > syshdr
 			printf(" \\\n\t%s%s.o", prefix, funcalias) > sysmk
 		}
+		syscall++
+		next
+	}
+	obsolete_in_abi(syscall) {
+		parseline()
+		printf("\t{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },") > sysent
+		align_sysent_comment(34)
+		printf("/* %d = obsolete %s */\n", syscall, noabi_funcalias) > sysent
+		printf("\t\"obs_%s\",\t\t\t/* %d = obsolete %s */\n",
+		    noabi_funcalias, syscall, noabi_funcalias) > sysnames
+		printf("\t\t\t\t/* %d is obsolete %s */\n",
+		    syscall, noabi_funcalias) > syshdr
 		syscall++
 		next
 	}

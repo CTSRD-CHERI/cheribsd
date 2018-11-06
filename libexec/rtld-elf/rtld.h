@@ -47,6 +47,7 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 
+#include <dlfcn.h>
 #include <elf-hints.h>
 #include <link.h>
 #include <stdarg.h>
@@ -76,7 +77,7 @@ __BEGIN_DECLS
 extern size_t tls_last_offset;
 extern size_t tls_last_size;
 extern size_t tls_static_space;
-extern int tls_dtv_generation;
+extern Elf_Addr tls_dtv_generation;
 extern int tls_max_index;
 
 extern int npagesizes;
@@ -190,7 +191,7 @@ typedef struct Struct_Obj_Entry {
 #endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */
-    caddr_t entry;		/* Entry point */
+    dlfunc_t entry;		/* Entry point */
     const Elf_Phdr *phdr;	/* Program header if it is mapped, else NULL */
     size_t phsize;		/* Size of program header in bytes */
     const char *interp;		/* Pathname of the interpreter, if any */
@@ -252,12 +253,12 @@ typedef struct Struct_Obj_Entry {
     Elf32_Word maskwords_bm_gnu;  	/* Bloom filter words - 1 (bitmask) */
     Elf32_Word shift2_gnu;		/* Bloom filter shift count */
     Elf32_Word dynsymcount;		/* Total entries in dynsym table */
-    Elf_Addr *bloom_gnu;		/* Bloom filter used by GNU hash func */
+    const Elf_Addr *bloom_gnu;		/* Bloom filter used by GNU hash func */
     const Elf_Hashelt *buckets_gnu;	/* GNU hash table bucket array */
     const Elf_Hashelt *chain_zero_gnu;	/* GNU hash table value array (Zeroed) */
 
-    char *rpath;		/* Search path specified in object */
-    char *runpath;		/* Search path with different priority */
+    const char *rpath;		/* Search path specified in object */
+    const char *runpath;	/* Search path with different priority */
     Needed_Entry *needed;	/* Shared objects needed by this one (%) */
     Needed_Entry *needed_filtees;
     Needed_Entry *needed_aux_filtees;

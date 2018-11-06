@@ -70,17 +70,17 @@ get_codesegment(const struct Struct_Obj_Entry *obj) {
 	return obj->text_rodata_cap;
 }
 
-static inline const void*
+static inline dlfunc_t
 make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 {
 	const void* ret = get_codesegment(defobj) + def->st_value;
 
 	/* Remove store and seal permissions */
-	cheri_andperm(ret, ~FUNC_PTR_REMOVE_PERMS);
+	ret = cheri_andperm(ret, ~FUNC_PTR_REMOVE_PERMS);
 	if (defobj->restrict_pcc_strict)
-		return cheri_csetbounds(ret, def->st_size);
+		return (dlfunc_t)cheri_csetbounds(ret, def->st_size);
 	if (defobj->restrict_pcc_basic)
-		return ret;
+		return __DECONST(dlfunc_t, ret); /* Shouldn't a function pointer be const implicitly? */
 
 	/*
 	 * Otherwise we need to give it full address space range (including
@@ -89,7 +89,7 @@ make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	 * TODO: remove once we have decided on a sane(r) ABI
 	 */
 	assert(cheri_getbase(cheri_getpcc()) == 0);
-	return cheri_setoffset(cheri_getpcc(), (vaddr_t)ret);
+	return (dlfunc_t)cheri_setoffset(cheri_getpcc(), (vaddr_t)ret);
 }
 
 static inline void*
@@ -98,18 +98,18 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	void* ret = defobj->relocbase + def->st_value;
 
 	/* Remove execute and seal permissions */
-	cheri_andperm(ret, ~DATA_PTR_REMOVE_PERMS);
+	ret = cheri_andperm(ret, ~DATA_PTR_REMOVE_PERMS);
 	/* TODO: can we always set bounds here or does it break compat? */
 	ret = cheri_csetbounds(ret, def->st_size);
 	return ret;
 }
 
-static inline const void*
+static inline dlfunc_t
 vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
 	const void* text = get_codesegment(obj);
 	dbg_assert(code_addr >= (vaddr_t)text);
 	dbg_assert(code_addr < (vaddr_t)text + cheri_getlen(text));
-	return cheri_copyaddress(text, cheri_fromint(code_addr));
+	return (dlfunc_t)cheri_copyaddress(text, cheri_fromint(code_addr));
 }
 
 #define set_bounds_if_nonnull(ptr, size)	\
@@ -147,7 +147,7 @@ typedef struct {
  * Lazy binding entry point, called via PLT.
  */
 void _rtld_bind_start(void);
-
+void *_mips_get_tls(void);
 extern void *__tls_get_addr(tls_index *ti);
 
 #define	RTLD_DEFAULT_STACK_PF_EXEC	PF_X
