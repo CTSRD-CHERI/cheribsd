@@ -2058,29 +2058,29 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_sigreturn */
 	case 417: {
 		struct cheriabi_sigreturn_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->sigcntxp; /* const ucontext_c_t * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->sigcntxp; /* const struct __ucontext_c * __capability */
 		*n_args = 1;
 		break;
 	}
 	/* cheriabi_getcontext */
 	case 421: {
 		struct cheriabi_getcontext_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->ucp; /* ucontext_c_t * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->ucp; /* struct __ucontext_c * __capability */
 		*n_args = 1;
 		break;
 	}
 	/* cheriabi_setcontext */
 	case 422: {
 		struct cheriabi_setcontext_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->ucp; /* const ucontext_c_t * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->ucp; /* const struct __ucontext_c * __capability */
 		*n_args = 1;
 		break;
 	}
 	/* cheriabi_swapcontext */
 	case 423: {
 		struct cheriabi_swapcontext_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->oucp; /* ucontext_c_t * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->ucp; /* const ucontext_c_t * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->oucp; /* struct __ucontext_c * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->ucp; /* const struct __ucontext_c * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -2137,7 +2137,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_thr_create */
 	case 430: {
 		struct cheriabi_thr_create_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->ctx; /* ucontext_c_t * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->ctx; /* struct __ucontext_c * __capability */
 		uarg[1] = (__cheri_addr intptr_t) p->id; /* long * __capability */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -6534,7 +6534,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 417:
 		switch(ndx) {
 		case 0:
-			p = "userland const ucontext_c_t * __capability";
+			p = "userland const struct __ucontext_c * __capability";
 			break;
 		default:
 			break;
@@ -6544,7 +6544,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 421:
 		switch(ndx) {
 		case 0:
-			p = "userland ucontext_c_t * __capability";
+			p = "userland struct __ucontext_c * __capability";
 			break;
 		default:
 			break;
@@ -6554,7 +6554,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 422:
 		switch(ndx) {
 		case 0:
-			p = "userland const ucontext_c_t * __capability";
+			p = "userland const struct __ucontext_c * __capability";
 			break;
 		default:
 			break;
@@ -6564,10 +6564,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 423:
 		switch(ndx) {
 		case 0:
-			p = "userland ucontext_c_t * __capability";
+			p = "userland struct __ucontext_c * __capability";
 			break;
 		case 1:
-			p = "userland const ucontext_c_t * __capability";
+			p = "userland const struct __ucontext_c * __capability";
 			break;
 		default:
 			break;
@@ -6661,7 +6661,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 430:
 		switch(ndx) {
 		case 0:
-			p = "userland ucontext_c_t * __capability";
+			p = "userland struct __ucontext_c * __capability";
 			break;
 		case 1:
 			p = "userland long * __capability";

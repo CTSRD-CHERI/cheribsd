@@ -16,6 +16,7 @@
 
 #include <compat/cheriabi/cheriabi_signal.h>
 struct __siginfo;
+struct __ucontext;
 struct __wrusage;
 struct acl;
 struct aiocb;
@@ -25,6 +26,7 @@ struct ffclock_estimate;
 struct fhandle;
 struct freebsd11_stat;
 struct freebsd11_statfs;
+struct freebsd4_ucontext;
 struct iovec;
 struct itimerspec;
 struct itimerval;
@@ -74,7 +76,6 @@ struct timespec;
 struct timeval;
 struct timex;
 struct timezone;
-struct ucontext4;
 struct utsname;
 struct uuid;
 union semun_old;
@@ -2421,42 +2422,42 @@ SYS_STUB_ARGHASPTRS(416, int, sigaction,
 )
 
 SYS_STUB_ARGHASPTRS(417, int, sigreturn,
-    /* _protoargs */ (const ucontext_t *  sigcntxp),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const ucontext_t * __capability   sigcntxp),
-    /* _protoargs_err */ (int * __capability stub_errno, const ucontext_t * __capability   sigcntxp),
-    /* _callargs */ ((__cheri_fromcap const ucontext_t * )sigcntxp),
+    /* _protoargs */ (const struct __ucontext*  sigcntxp),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const struct __ucontext* __capability   sigcntxp),
+    /* _protoargs_err */ (int * __capability stub_errno, const struct __ucontext* __capability   sigcntxp),
+    /* _callargs */ ((__cheri_fromcap const struct __ucontext* )sigcntxp),
     /* _callargs_chk */ (&ret, stub_errno, sigcntxp),
-    /* _callargs_err */ (&errno, (const ucontext_t * )sigcntxp),
+    /* _callargs_err */ (&errno, (const struct __ucontext* )sigcntxp),
     /* _localcheck */ {if (!(cheri_getperm(sigcntxp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB_ARGHASPTRS(421, int, getcontext,
-    /* _protoargs */ (ucontext_t *  ucp),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, ucontext_t * __capability   ucp),
-    /* _protoargs_err */ (int * __capability stub_errno, ucontext_t * __capability   ucp),
-    /* _callargs */ ((__cheri_fromcap ucontext_t * )ucp),
+    /* _protoargs */ (struct __ucontext*  ucp),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, struct __ucontext* __capability   ucp),
+    /* _protoargs_err */ (int * __capability stub_errno, struct __ucontext* __capability   ucp),
+    /* _callargs */ ((__cheri_fromcap struct __ucontext* )ucp),
     /* _callargs_chk */ (&ret, stub_errno, ucp),
-    /* _callargs_err */ (&errno, (ucontext_t * )ucp),
+    /* _callargs_err */ (&errno, (struct __ucontext* )ucp),
     /* _localcheck */ {if (!(cheri_getperm(ucp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB_ARGHASPTRS(422, int, setcontext,
-    /* _protoargs */ (const ucontext_t *  ucp),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const ucontext_t * __capability   ucp),
-    /* _protoargs_err */ (int * __capability stub_errno, const ucontext_t * __capability   ucp),
-    /* _callargs */ ((__cheri_fromcap const ucontext_t * )ucp),
+    /* _protoargs */ (const struct __ucontext*  ucp),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const struct __ucontext* __capability   ucp),
+    /* _protoargs_err */ (int * __capability stub_errno, const struct __ucontext* __capability   ucp),
+    /* _callargs */ ((__cheri_fromcap const struct __ucontext* )ucp),
     /* _callargs_chk */ (&ret, stub_errno, ucp),
-    /* _callargs_err */ (&errno, (const ucontext_t * )ucp),
+    /* _callargs_err */ (&errno, (const struct __ucontext* )ucp),
     /* _localcheck */ {if (!(cheri_getperm(ucp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB_ARGHASPTRS(423, int, swapcontext,
-    /* _protoargs */ (ucontext_t *  oucp, const ucontext_t *  ucp),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, ucontext_t * __capability   oucp, const ucontext_t * __capability   ucp),
-    /* _protoargs_err */ (int * __capability stub_errno, ucontext_t * __capability   oucp, const ucontext_t * __capability   ucp),
-    /* _callargs */ ((__cheri_fromcap ucontext_t * )oucp, (__cheri_fromcap const ucontext_t * )ucp),
+    /* _protoargs */ (struct __ucontext*  oucp, const struct __ucontext*  ucp),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, struct __ucontext* __capability   oucp, const struct __ucontext* __capability   ucp),
+    /* _protoargs_err */ (int * __capability stub_errno, struct __ucontext* __capability   oucp, const struct __ucontext* __capability   ucp),
+    /* _callargs */ ((__cheri_fromcap struct __ucontext* )oucp, (__cheri_fromcap const struct __ucontext* )ucp),
     /* _callargs_chk */ (&ret, stub_errno, oucp, ucp),
-    /* _callargs_err */ (&errno, (ucontext_t * )oucp, (const ucontext_t * )ucp),
+    /* _callargs_err */ (&errno, (struct __ucontext* )oucp, (const struct __ucontext* )ucp),
     /* _localcheck */ {if (!(cheri_getperm(oucp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(ucp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
@@ -2521,12 +2522,12 @@ SYS_STUB(429, int, sigwait,
 )
 
 SYS_STUB_ARGHASPTRS(430, int, thr_create,
-    /* _protoargs */ (ucontext_t *  ctx, long *  id, int flags),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, ucontext_t * __capability   ctx, long * __capability   id, int flags),
-    /* _protoargs_err */ (int * __capability stub_errno, ucontext_t * __capability   ctx, long * __capability   id, int flags),
-    /* _callargs */ ((__cheri_fromcap ucontext_t * )ctx, (__cheri_fromcap long * )id, flags),
+    /* _protoargs */ (struct __ucontext*  ctx, long *  id, int flags),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, struct __ucontext* __capability   ctx, long * __capability   id, int flags),
+    /* _protoargs_err */ (int * __capability stub_errno, struct __ucontext* __capability   ctx, long * __capability   id, int flags),
+    /* _callargs */ ((__cheri_fromcap struct __ucontext* )ctx, (__cheri_fromcap long * )id, flags),
     /* _callargs_chk */ (&ret, stub_errno, ctx, id, flags),
-    /* _callargs_err */ (&errno, (ucontext_t * )ctx, (long * )id, flags),
+    /* _callargs_err */ (&errno, (struct __ucontext* )ctx, (long * )id, flags),
     /* _localcheck */ {if (!(cheri_getperm(ctx) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(id) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 

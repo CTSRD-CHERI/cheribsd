@@ -565,7 +565,7 @@ struct __setrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
 	char rlp_l_[PADL_(struct rlimit *)]; struct rlimit * rlp; char rlp_r_[PADR_(struct rlimit *)];
 };
-struct sysctl_args {
+struct __sysctl_args {
 	char name_l_[PADL_(int *)]; int * name; char name_r_[PADR_(int *)];
 	char namelen_l_[PADL_(u_int)]; u_int namelen; char namelen_r_[PADR_(u_int)];
 	char old_l_[PADL_(void *)]; void * old; char old_r_[PADR_(void *)];
@@ -866,7 +866,7 @@ struct kldsym_args {
 	char data_l_[PADL_(void *)]; void * data; char data_r_[PADR_(void *)];
 };
 struct jail_args {
-	char jail_l_[PADL_(struct jail *)]; struct jail * jail; char jail_r_[PADR_(struct jail *)];
+	char jailp_l_[PADL_(struct jail *)]; struct jail * jailp; char jailp_r_[PADR_(struct jail *)];
 };
 struct nnpfs_syscall_args {
 	char operation_l_[PADL_(int)]; int operation; char operation_r_[PADR_(int)];
@@ -1181,7 +1181,7 @@ struct sigwait_args {
 	char sig_l_[PADL_(int *)]; int * sig; char sig_r_[PADR_(int *)];
 };
 struct thr_create_args {
-	char ctx_l_[PADL_(ucontext_t *)]; ucontext_t * ctx; char ctx_r_[PADR_(ucontext_t *)];
+	char ctx_l_[PADL_(struct __ucontext *)]; struct __ucontext * ctx; char ctx_r_[PADR_(struct __ucontext *)];
 	char id_l_[PADL_(long *)]; long * id; char id_r_[PADR_(long *)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
@@ -1904,7 +1904,7 @@ int	sys_pathconf(struct thread *, struct pathconf_args *);
 int	sys_fpathconf(struct thread *, struct fpathconf_args *);
 int	sys_getrlimit(struct thread *, struct __getrlimit_args *);
 int	sys_setrlimit(struct thread *, struct __setrlimit_args *);
-int	sys___sysctl(struct thread *, struct sysctl_args *);
+int	sys___sysctl(struct thread *, struct __sysctl_args *);
 int	sys_mlock(struct thread *, struct mlock_args *);
 int	sys_munlock(struct thread *, struct munlock_args *);
 int	sys_undelete(struct thread *, struct undelete_args *);
@@ -2385,7 +2385,7 @@ struct freebsd4_sigaction_args {
 	char oact_l_[PADL_(struct sigaction_native *)]; struct sigaction_native * oact; char oact_r_[PADR_(struct sigaction_native *)];
 };
 struct freebsd4_sigreturn_args {
-	char sigcntxp_l_[PADL_(const struct ucontext4 *)]; const struct ucontext4 * sigcntxp; char sigcntxp_r_[PADR_(const struct ucontext4 *)];
+	char sigcntxp_l_[PADL_(const struct freebsd4_ucontext *)]; const struct freebsd4_ucontext * sigcntxp; char sigcntxp_r_[PADR_(const struct freebsd4_ucontext *)];
 };
 int	freebsd4_getfsstat(struct thread *, struct freebsd4_getfsstat_args *);
 int	freebsd4_statfs(struct thread *, struct freebsd4_statfs_args *);

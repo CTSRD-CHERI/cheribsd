@@ -967,7 +967,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	}
 	/* __sysctl */
 	case 202: {
-		struct sysctl_args *p = params;
+		struct __sysctl_args *p = params;
 		uarg[0] = (intptr_t) p->name; /* int * */
 		uarg[1] = p->namelen; /* u_int */
 		uarg[2] = (intptr_t) p->old; /* void * */
@@ -1606,7 +1606,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* jail */
 	case 338: {
 		struct jail_args *p = params;
-		uarg[0] = (intptr_t) p->jail; /* struct jail * */
+		uarg[0] = (intptr_t) p->jailp; /* struct jail * */
 		*n_args = 1;
 		break;
 	}
@@ -2191,7 +2191,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* thr_create */
 	case 430: {
 		struct thr_create_args *p = params;
-		uarg[0] = (intptr_t) p->ctx; /* ucontext_t * */
+		uarg[0] = (intptr_t) p->ctx; /* struct __ucontext * */
 		uarg[1] = (intptr_t) p->id; /* long * */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -6811,7 +6811,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 430:
 		switch(ndx) {
 		case 0:
-			p = "userland ucontext_t *";
+			p = "userland struct __ucontext *";
 			break;
 		case 1:
 			p = "userland long *";
