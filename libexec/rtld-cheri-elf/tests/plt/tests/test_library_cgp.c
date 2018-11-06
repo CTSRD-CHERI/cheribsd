@@ -48,7 +48,7 @@ check_library_cgp(const void* library_cgp, const void* original_cgp)
 	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_STORE_CAP), 0);
 	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_EXECUTE), 0);
 	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_LOAD), CHERI_PERM_LOAD);
-	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_LOAD_CAP), CHERI_PERM_LOAD);
+	require_eq((cheri_getperm(library_cgp) & CHERI_PERM_LOAD_CAP), CHERI_PERM_LOAD_CAP);
 
 	// Check that the library $cgp is different from the current $cgp
 	require_not_eq(cheri_getbase(library_cgp), cheri_getbase(original_cgp));

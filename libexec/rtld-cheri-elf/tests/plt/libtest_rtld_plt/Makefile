@@ -19,4 +19,4 @@ CHERI_USE_CAP_TABLE:=plt
 # CHERI_USE_CAP_TABLE on the make command line)
 CFLAGS:=	${CFLAGS:N-cheri-cap-table-abi=*} -cheri-cap-table-abi=plt
 
-.info "{TESTSDIR}=${TESTSDIR}"
+# .info "{TESTSDIR}=${TESTSDIR}"
