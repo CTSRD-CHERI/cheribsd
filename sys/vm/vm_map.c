@@ -942,6 +942,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min, vm_offset_t max)
 {
 
 	map->header.next = map->header.prev = &map->header;
+	map->header.eflags = MAP_ENTRY_HEADER;
 	map->needs_wakeup = FALSE;
 	map->system_map = 0;
 	map->pmap = pmap;
@@ -1423,8 +1424,8 @@ charged:
 		if (object->ref_count > 1 || object->shadow_count != 0)
 			vm_object_clear_flag(object, OBJ_ONEMAPPING);
 		VM_OBJECT_WUNLOCK(object);
-	} else if (prev_entry != &map->header &&
-	    (prev_entry->eflags & ~MAP_ENTRY_USER_WIRED) == protoeflags &&
+	} else if ((prev_entry->eflags & ~MAP_ENTRY_USER_WIRED) ==
+	    protoeflags &&
 	    (cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 &&
 	    prev_entry->end == start && (prev_entry->cred == cred ||
 	    (prev_entry->object.vm_object != NULL &&
@@ -1874,8 +1875,7 @@ vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry)
 		return;
 
 	prev = entry->prev;
-	if (prev != &map->header &&
-	    vm_map_mergeable_neighbors(prev, entry)) {
+	if (vm_map_mergeable_neighbors(prev, entry)) {
 		vm_map_log("remove", prev);
 		vm_map_entry_unlink(map, prev);
 		entry->start = prev->start;
@@ -1887,8 +1887,7 @@ vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry)
 	}
 
 	next = entry->next;
-	if (next != &map->header &&
-	    vm_map_mergeable_neighbors(entry, next)) {
+	if (vm_map_mergeable_neighbors(entry, next)) {
 		vm_map_log("remove", next);
 		vm_map_entry_unlink(map, next);
 		entry->end = next->end;

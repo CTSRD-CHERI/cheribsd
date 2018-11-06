@@ -210,7 +210,7 @@ CROSS_BINUTILS_PREFIX?=${CROSS_TOOLCHAIN_PREFIX}
 # support the target architecture), provide a default cross-binutils prefix.
 # This allows riscv64 builds, for example, to automatically use the
 # riscv64-binutils port or package.
-.if !make(showconfig)
+.if !make(showconfig) && !defined(_NO_INCLUDE_COMPILERMK)
 .if !empty(BROKEN_OPTIONS:MBINUTILS_BOOTSTRAP) && \
     ${MK_LLD_BOOTSTRAP} == "no" && \
     !defined(CROSS_BINUTILS_PREFIX)
@@ -1086,7 +1086,7 @@ _worldtmp: .PHONY
 .elif !defined(I_REALLY_MEAN_NO_CLEAN)
 	${_+_}@if [ -e "${WORLDTMP}" ]; then \
 		echo ">>> Deleting stale files in build tree..."; \
-		cd ${.CURDIR}; ${WMAKE} -DBATCH_DELETE_OLD_FILES \
+		cd ${.CURDIR}; ${WMAKE} -DBATCH_DELETE_OLD_FILES _NO_INCLUDE_COMPILERMK=t \
 		    delete-old delete-old-libs >/dev/null; \
 	fi
 	rm -rf ${WORLDTMP}/legacy/usr/include
@@ -1145,22 +1145,24 @@ _cleanobj:
 	@echo "--------------------------------------------------------------"
 	@echo ">>> stage 2.1: cleaning up the object tree"
 	@echo "--------------------------------------------------------------"
-	${_+_}cd ${.CURDIR}; ${WMAKE} ${CLEANDIR}
+	# Avoid including bsd.compiler.mk in clean and obj with _NO_INCLUDE_COMPILERMK
+	# since the restricted $PATH might not contain a valid cc binary
+	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t ${CLEANDIR}
 .if defined(LIBCOMPAT)
-	${_+_}cd ${.CURDIR}; ${LIBCOMPATWMAKE} -f Makefile.inc1 ${CLEANDIR}
+	${_+_}cd ${.CURDIR}; ${LIBCOMPATWMAKE} _NO_INCLUDE_COMPILERMK=t -f Makefile.inc1 ${CLEANDIR}
 .endif
 .if defined (CHERI)
 	${_+_}cd ${.CURDIR}; ${LIBCHERIWMAKE} -f Makefile.inc1 ${CLEANDIR}
 .endif
 .else
-	${_+_}cd ${.CURDIR}; ${WMAKE} _cleanobj_fast_depend_hack
+	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t _cleanobj_fast_depend_hack
 .endif	# !defined(NO_CLEAN)
 _obj:
 	@echo
 	@echo "--------------------------------------------------------------"
 	@echo ">>> stage 2.2: rebuilding the object tree"
 	@echo "--------------------------------------------------------------"
-	${_+_}cd ${.CURDIR}; ${WMAKE} obj
+	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t obj
 _build-tools:
 	@echo
 	@echo "--------------------------------------------------------------"
@@ -1238,7 +1240,11 @@ _cheri_libs=lib/csu lib/libgcc_eh lib/libcompiler_rt lib/libc \
 	    lib/liblzma lib/libexpat secure/lib/libcrypto lib/libsbuf \
 	    lib/libelf lib/libkvm lib/ncurses/ncurses lib/ncurses/ncursesw \
 	    secure/lib/libssl lib/libmd lib/libutil lib/libprocstat \
-	    lib/librtld_db cddl/lib/libctf lib/libkiconv lib/libpam/libpam \
+	    lib/librtld_db
+.if ${MK_CDDL} != "no"
+_cheri_libs+=cddl/lib/libctf
+.endif
+_cheri_libs+=lib/libkiconv lib/libpam/libpam \
 	    lib/libcom_err lib/libcrypt lib/libufs
 
 .if ${MK_KERBEROS} != "no"
@@ -1287,6 +1293,13 @@ _cheri_test_libs+=gnu/lib secure/lib
 _cheri_test_libs+=kerberos5/lib
 .endif
 
+_cheri_distrib_dirs=lib ${LOCAL_LIB_DIRS} gnu/lib secure/lib
+.if ${MK_CDDL} != "no"
+_cheri_distrib_dirs+=cddl/lib
+.endif
+.if ${MK_KERBEROS} != "no"
+_cheri_distrib_dirs+=kerberos5/lib
+.endif
 buildcheri:
 	@echo
 	@echo "--------------------------------------------------------------"
@@ -1323,7 +1336,7 @@ _buildcheri_impl:
 .endif
 
 distributecheri installcheri:
-.for _lib in lib ${LOCAL_LIB_DIRS} cddl/lib gnu/lib secure/lib kerberos5/lib
+.for _lib in ${_cheri_distrib_dirs}
 	cd ${.CURDIR}/${_lib}; ${LIBCHERIIMAKE} ${.TARGET:S/cheri$//}
 .endfor
 .endif
