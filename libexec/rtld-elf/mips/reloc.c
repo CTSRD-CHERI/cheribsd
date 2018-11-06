@@ -409,8 +409,8 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			    (void *)(uintptr_t)load_ptr(where, sizeof(Elf_Sword)),
 			    strtab + symtab[r_symndx].st_name);
 #endif
-			rtld_printf("%s: Unsupported relocation type %ld "
-			    "in non-PLT relocations\n",
+			rtld_fdprintf(STDERR_FILENO, "%s: Unsupported relocation"
+			    "type %ld in non-PLT relocations\n",
 			    __func__, (u_long) ELF_R_TYPE(rel->r_info));
 			/* Abort won't work yet since it needs global caps */
 			/* abort(); */
