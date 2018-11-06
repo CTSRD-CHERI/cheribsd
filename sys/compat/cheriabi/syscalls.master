@@ -748,7 +748,7 @@
 122	AUE_SETTIMEOFDAY	STD {
 		int settimeofday(
 		    _In_ _Contains_long_timet_ const struct timeval *tv,
-		    _In_opt_ _Contains_timet_ const struct timezone *tzp
+		    _In_opt_ const struct timezone *tzp
 		);
 	}
 123	AUE_FCHOWN	STD {
