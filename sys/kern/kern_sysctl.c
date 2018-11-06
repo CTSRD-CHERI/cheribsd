@@ -2126,7 +2126,7 @@ out:
 }
 
 #ifndef _SYS_SYSPROTO_H_
-struct sysctl_args {
+struct __sysctl_args {
 	int	*name;
 	u_int	namelen;
 	void	*old;
@@ -2136,7 +2136,7 @@ struct sysctl_args {
 };
 #endif
 int
-sys___sysctl(struct thread *td, struct sysctl_args *uap)
+sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 {
 
 	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
