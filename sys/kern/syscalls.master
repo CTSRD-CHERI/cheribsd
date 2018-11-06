@@ -668,7 +668,7 @@
 104	AUE_BIND	STD {
 		int bind(
 		    int s,
-		    _In_reads_bytes_(namelen) const struct sockaddr * name,
+		    _In_reads_bytes_(namelen) const struct sockaddr *name,
 		    int namelen
 		);
 	}
