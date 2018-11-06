@@ -69,11 +69,12 @@
 	.set pop
 .endm
 
-LEAF(_call_library_function_from_asm)
+LEAF(_get_library_cgp_with_null_caller_cgp)
 	.set	noreorder
 	.set	nomacro
 	.set	noat
 	# save important registers in callee-save registers:
+	# FIXME: this breaks everything, we need to actually save to the stack
 	cmove	$c18, $cra
 	cmove	$c19, $cgp
 	cmove	$c20, $cfp
@@ -82,13 +83,14 @@ LEAF(_call_library_function_from_asm)
 	PRINT "Hello from ASM\n"
 
 	# now call the library function:
-	clc $c12, zero, %capcall(get_library_cgp_plus_global_int)($cgp)
+	# clc $c12, zero, %capcall(get_library_cgp)($cgp)
+	clcbi $c12, %capcall20(get_library_cgp)($cgp)
 	cgettag t0, $c12
 	fail_if_not_eq t0, 1	# Check that we got a tag on $c12
 
 	cgetnull	$cgp	# clear $cgp (to ensure that the plt stub loads it)
 	cgetnull	$c3	# clear return register
-	cjalr	$c12, $c17	 # call get_library_cgp_plus_global_int
+	cjalr	$c12, $c17	 # call get_library_cgp
 	nop
 
 	# restore registers
@@ -98,10 +100,11 @@ LEAF(_call_library_function_from_asm)
 	cmove	$csp, $c21
 	cgetnull	$c12
 
+	cmove	$c4, $c3	# print clobbers $c3 -> use different caller-save reg
 	PRINT "Sucessfully called library function from ASM\n"
-
+	cmove	$c3, $c4	# restore again
 	# return
 	cjr $cra
 	nop
 	teq zero, zero
-END(_call_library_function_from_asm)
+END(_get_library_cgp_with_null_caller_cgp)
