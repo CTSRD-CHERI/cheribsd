@@ -758,7 +758,7 @@ int
 freebsd4_freebsd32_sigreturn(td, uap)
 	struct thread *td;
 	struct freebsd4_freebsd32_sigreturn_args /* {
-		const struct freebsd4_freebsd32_ucontext *sigcntxp;
+		const struct freebsd4_ucontext32 *sigcntxp;
 	} */ *uap;
 {
 	struct ia32_ucontext4 uc;

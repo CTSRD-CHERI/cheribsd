@@ -1767,7 +1767,7 @@
 	}
 344	AUE_SIGRETURN	COMPAT4 {
 		int sigreturn(
-		    _In_ _Contains_long_ptr_ const struct ucontext4 *sigcntxp
+		    _In_ _Contains_long_ptr_ const struct freebsd4_ucontext *sigcntxp
 		);
 	}
 345	AUE_SIGWAIT	STD {
