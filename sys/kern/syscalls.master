@@ -562,7 +562,7 @@
 	}
 86	AUE_GETITIMER	STD {
 		int getitimer(
-		    u_int which,
+		    int which,
 		    _Out_ _Contains_timet_ struct itimerval *itv
 		);
 	}
