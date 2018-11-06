@@ -33,17 +33,21 @@
 
 int load_global_int(void) {
 	// Defined in a separate file to ensure it is actually loaded via the cap-table
+	write(1, "load_global_int\n",
+	    __builtin_strlen("load_global_int\n"));
 	return global_int;
 }
 
 const void *get_library_cgp(void) {
 	const char* cgp = cheri_getcgp();
 	// Call a function to ensure that we need $cgp
-	write(1, "get_library_cgp_plus_global_int\n",
-	    __builtin_strlen("get_library_cgp_plus_global_int\n"));
+	write(1, "get_library_cgp\n",
+	    __builtin_strlen("get_library_cgp\n"));
 	return cgp;
 }
 
 const void *get_library_cgp_plus_global_int(void) {
+	write(1, "get_library_cgp_plus_global_int\n",
+	    __builtin_strlen("get_library_cgp_plus_global_int\n"));
 	return (const char*)get_library_cgp() + global_int;
 }
