@@ -364,7 +364,7 @@
 		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack *oss
 		);
 	}
-54	AUE_NULL	STD|VARARG {
+54	AUE_IOCTL	STD|VARARG {
 		int ioctl(
 		    int fd,
 		    u_long com,
