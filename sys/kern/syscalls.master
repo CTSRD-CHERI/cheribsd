@@ -2269,7 +2269,7 @@
 	}
 430	AUE_THR_CREATE	STD {
 		int thr_create(
-		    _In_ ucontext_t *ctx,
+		    _In_ _Contains_long_ptr_ struct __ucontext *ctx,
 		    _Out_ long *id,
 		    int flags
 		);
