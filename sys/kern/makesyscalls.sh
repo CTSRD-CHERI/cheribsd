@@ -517,15 +517,16 @@ sed -e '
 			argc++
 			argtype[argc]=""
 			oldf=""
+			struct_name=""
+			union_name=""
 			needs_suffix=0
 			while (f < end && $(f+1) != ",") {
 				if (argtype[argc] != "" && oldf != "*")
 					argtype[argc] = argtype[argc]" ";
-				if (oldf == "struct") {
-					arg_structs[$f]
-				}
+				if (oldf == "struct")
+					struct_name=$f
 				if (oldf == "union")
-					arg_unions[$f]
+					union_name=$f
 				argtype[argc] = argtype[argc]$f;
 				oldf = $f;
 				f++
@@ -560,8 +561,18 @@ sed -e '
 
 			# Add suffix if required
 			# XXX-BD: should this happen in the loop above?
-			if (needs_suffix)
+			if (needs_suffix) {
 				sub(/(struct|union) [^ ]*/, "&" abi_type_suffix, argtype[argc])
+				if (struct_name != "")
+					struct_name = struct_name abi_type_suffix
+				if (union_name != "")
+					union_name = union_name abi_type_suffix
+			}
+
+			if (struct_name != "")
+				arg_structs[struct_name]
+			if (union_name != "")
+				arg_unions[union_name]
 
 			# Allow pointers to be qualified
 			gsub(/\*/, ptr_qualified, argtype[argc]);
