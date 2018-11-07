@@ -606,7 +606,7 @@
 		int accept(
 		    int s,
 		    _Out_writes_bytes_opt_(*anamelen) struct sockaddr *name,
-		    __socklen_t *anamelen
+		    _Inout_opt_ __socklen_t *anamelen
 		);
 	} accept accept_args int
 100	AUE_GETPRIORITY	STD {
