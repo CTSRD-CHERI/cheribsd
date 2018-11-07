@@ -44,9 +44,6 @@ struct thread;
 #define	PADR_(t)	CHERI_PADR_(t)
 #endif
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 struct cheriabi_read_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char buf_l_[PADL_(void * __capability)]; void * __capability buf; char buf_r_[PADR_(void * __capability)];
@@ -189,8 +186,8 @@ struct cheriabi_readlink_args {
 };
 struct cheriabi_execve_args {
 	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
-	char argv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability argv; char argv_r_[PADR_(void * __capability * __capability)];
-	char envv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability envv; char envv_r_[PADR_(void * __capability * __capability)];
+	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
+	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
 };
 struct cheriabi_chroot_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -344,7 +341,7 @@ struct cheriabi_nlm_syscall_args {
 	char debug_level_l_[PADL_(int)]; int debug_level; char debug_level_r_[PADR_(int)];
 	char grace_period_l_[PADL_(int)]; int grace_period; char grace_period_r_[PADR_(int)];
 	char addr_count_l_[PADL_(int)]; int addr_count; char addr_count_r_[PADR_(int)];
-	char addrs_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability addrs; char addrs_r_[PADR_(void * __capability * __capability)];
+	char addrs_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability addrs; char addrs_r_[PADR_(char * __capability * __capability)];
 };
 struct cheriabi_nfssvc_args {
 	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
@@ -374,11 +371,11 @@ struct cheriabi_pathconf_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char name_l_[PADL_(int)]; int name; char name_r_[PADR_(int)];
 };
-struct cheriabi_getrlimit_args {
+struct cheriabi___getrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
 	char rlp_l_[PADL_(struct rlimit * __capability)]; struct rlimit * __capability rlp; char rlp_r_[PADR_(struct rlimit * __capability)];
 };
-struct cheriabi_setrlimit_args {
+struct cheriabi___setrlimit_args {
 	char which_l_[PADL_(u_int)]; u_int which; char which_r_[PADR_(u_int)];
 	char rlp_l_[PADL_(struct rlimit * __capability)]; struct rlimit * __capability rlp; char rlp_r_[PADR_(struct rlimit * __capability)];
 };
@@ -413,11 +410,11 @@ struct cheriabi_poll_args {
 struct cheriabi_semop_args {
 	char semid_l_[PADL_(int)]; int semid; char semid_r_[PADR_(int)];
 	char sops_l_[PADL_(struct sembuf * __capability)]; struct sembuf * __capability sops; char sops_r_[PADR_(struct sembuf * __capability)];
-	char nsops_l_[PADL_(u_int)]; u_int nsops; char nsops_r_[PADR_(u_int)];
+	char nsops_l_[PADL_(size_t)]; size_t nsops; char nsops_r_[PADR_(size_t)];
 };
 struct cheriabi_msgsnd_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
-	char msgp_l_[PADL_(void * __capability)]; void * __capability msgp; char msgp_r_[PADR_(void * __capability)];
+	char msgp_l_[PADL_(const void * __capability)]; const void * __capability msgp; char msgp_r_[PADR_(const void * __capability)];
 	char msgsz_l_[PADL_(size_t)]; size_t msgsz; char msgsz_r_[PADR_(size_t)];
 	char msgflg_l_[PADL_(int)]; int msgflg; char msgflg_r_[PADR_(int)];
 };
@@ -607,6 +604,13 @@ struct cheriabi_kldsym_args {
 struct cheriabi_jail_args {
 	char jailp_l_[PADL_(struct jail_c * __capability)]; struct jail_c * __capability jailp; char jailp_r_[PADR_(struct jail_c * __capability)];
 };
+struct cheriabi_nnpfs_syscall_args {
+	char operation_l_[PADL_(int)]; int operation; char operation_r_[PADR_(int)];
+	char a_pathP_l_[PADL_(char * __capability)]; char * __capability a_pathP; char a_pathP_r_[PADR_(char * __capability)];
+	char a_opcode_l_[PADL_(int)]; int a_opcode; char a_opcode_r_[PADR_(int)];
+	char a_paramsP_l_[PADL_(void * __capability)]; void * __capability a_paramsP; char a_paramsP_r_[PADR_(void * __capability)];
+	char a_followSymlinks_l_[PADL_(int)]; int a_followSymlinks; char a_followSymlinks_r_[PADR_(int)];
+};
 struct cheriabi_sigprocmask_args {
 	char how_l_[PADL_(int)]; int how; char how_r_[PADR_(int)];
 	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
@@ -779,6 +783,24 @@ struct cheriabi_mac_syscall_args {
 	char call_l_[PADL_(int)]; int call; char call_r_[PADR_(int)];
 	char arg_l_[PADL_(void * __capability)]; void * __capability arg; char arg_r_[PADR_(void * __capability)];
 };
+struct cheriabi_ksem_init_args {
+	char idp_l_[PADL_(semid_t * __capability)]; semid_t * __capability idp; char idp_r_[PADR_(semid_t * __capability)];
+	char value_l_[PADL_(unsigned int)]; unsigned int value; char value_r_[PADR_(unsigned int)];
+};
+struct cheriabi_ksem_open_args {
+	char idp_l_[PADL_(semid_t * __capability)]; semid_t * __capability idp; char idp_r_[PADR_(semid_t * __capability)];
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+	char oflag_l_[PADL_(int)]; int oflag; char oflag_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+	char value_l_[PADL_(unsigned int)]; unsigned int value; char value_r_[PADR_(unsigned int)];
+};
+struct cheriabi_ksem_unlink_args {
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+};
+struct cheriabi_ksem_getvalue_args {
+	char id_l_[PADL_(semid_t)]; semid_t id; char id_r_[PADR_(semid_t)];
+	char val_l_[PADL_(int * __capability)]; int * __capability val; char val_r_[PADR_(int * __capability)];
+};
 struct cheriabi___mac_get_pid_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
@@ -812,8 +834,8 @@ struct cheriabi_extattr_delete_link_args {
 };
 struct cheriabi___mac_execve_args {
 	char fname_l_[PADL_(char * __capability)]; char * __capability fname; char fname_r_[PADR_(char * __capability)];
-	char argv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability argv; char argv_r_[PADR_(void * __capability * __capability)];
-	char envv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability envv; char envv_r_[PADR_(void * __capability * __capability)];
+	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
+	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
 	char mac_p_l_[PADL_(struct mac_c * __capability)]; struct mac_c * __capability mac_p; char mac_p_r_[PADR_(struct mac_c * __capability)];
 };
 struct cheriabi_sigaction_args {
@@ -888,6 +910,10 @@ struct cheriabi_extattr_list_link_args {
 	char attrnamespace_l_[PADL_(int)]; int attrnamespace; char attrnamespace_r_[PADR_(int)];
 	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
 	char nbytes_l_[PADL_(size_t)]; size_t nbytes; char nbytes_r_[PADR_(size_t)];
+};
+struct cheriabi_ksem_timedwait_args {
+	char id_l_[PADL_(semid_t)]; semid_t id; char id_r_[PADR_(semid_t)];
+	char abstime_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability abstime; char abstime_r_[PADR_(const struct timespec * __capability)];
 };
 struct cheriabi_thr_suspend_args {
 	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
@@ -994,7 +1020,7 @@ struct cheriabi_sctp_generic_sendmsg_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
 	char msg_l_[PADL_(void * __capability)]; void * __capability msg; char msg_r_[PADR_(void * __capability)];
 	char mlen_l_[PADL_(int)]; int mlen; char mlen_r_[PADR_(int)];
-	char to_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability to; char to_r_[PADR_(struct sockaddr * __capability)];
+	char to_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability to; char to_r_[PADR_(const struct sockaddr * __capability)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
 	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __capability)]; struct sctp_sndrcvinfo * __capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -1003,7 +1029,7 @@ struct cheriabi_sctp_generic_sendmsg_iov_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
 	char iov_l_[PADL_(struct iovec_c * __capability)]; struct iovec_c * __capability iov; char iov_r_[PADR_(struct iovec_c * __capability)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
-	char to_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability to; char to_r_[PADR_(struct sockaddr * __capability)];
+	char to_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability to; char to_r_[PADR_(const struct sockaddr * __capability)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
 	char sinfo_l_[PADL_(struct sctp_sndrcvinfo * __capability)]; struct sctp_sndrcvinfo * __capability sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
@@ -1093,8 +1119,8 @@ struct cheriabi_fchownat_args {
 };
 struct cheriabi_fexecve_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char argv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability argv; char argv_r_[PADR_(void * __capability * __capability)];
-	char envv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability envv; char envv_r_[PADR_(void * __capability * __capability)];
+	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
+	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
 };
 struct cheriabi_futimesat_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1241,12 +1267,12 @@ struct cheriabi_rctl_remove_rule_args {
 	char outbuflen_l_[PADL_(size_t)]; size_t outbuflen; char outbuflen_r_[PADR_(size_t)];
 };
 struct cheriabi_wait6_args {
-	char idtype_l_[PADL_(int)]; int idtype; char idtype_r_[PADR_(int)];
+	char idtype_l_[PADL_(idtype_t)]; idtype_t idtype; char idtype_r_[PADR_(idtype_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char status_l_[PADL_(int * __capability)]; int * __capability status; char status_r_[PADR_(int * __capability)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
 	char wrusage_l_[PADL_(struct __wrusage * __capability)]; struct __wrusage * __capability wrusage; char wrusage_r_[PADR_(struct __wrusage * __capability)];
-	char info_l_[PADL_(struct siginfo_c * __capability)]; struct siginfo_c * __capability info; char info_r_[PADR_(struct siginfo_c * __capability)];
+	char info_l_[PADL_(struct __siginfo_c * __capability)]; struct __siginfo_c * __capability info; char info_r_[PADR_(struct __siginfo_c * __capability)];
 };
 struct cheriabi_cap_rights_limit_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1298,7 +1324,7 @@ struct cheriabi_aio_mlock_args {
 	char aiocbp_l_[PADL_(struct aiocb_c * __capability)]; struct aiocb_c * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_c * __capability)];
 };
 struct cheriabi_procctl_args {
-	char idtype_l_[PADL_(int)]; int idtype; char idtype_r_[PADR_(int)];
+	char idtype_l_[PADL_(idtype_t)]; idtype_t idtype; char idtype_r_[PADR_(idtype_t)];
 	char id_l_[PADL_(id_t)]; id_t id; char id_r_[PADR_(id_t)];
 	char com_l_[PADL_(int)]; int com; char com_r_[PADR_(int)];
 	char data_l_[PADL_(void * __capability)]; void * __capability data; char data_r_[PADR_(void * __capability)];
@@ -1394,8 +1420,8 @@ struct cheriabi_getrandom_args {
 struct cheriabi_coexecve_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
 	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
-	char argv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability argv; char argv_r_[PADR_(void * __capability * __capability)];
-	char envv_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability envv; char envv_r_[PADR_(void * __capability * __capability)];
+	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
+	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
 };
 struct cheriabi_cosetup_args {
 	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
@@ -1413,9 +1439,6 @@ struct cheriabi_colookup_args {
 struct cheriabi_cogetpid_args {
 	char pidp_l_[PADL_(pid_t * __capability)]; pid_t * __capability pidp; char pidp_r_[PADR_(pid_t * __capability)];
 };
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 int	cheriabi_read(struct thread *, struct cheriabi_read_args *);
 int	cheriabi_write(struct thread *, struct cheriabi_write_args *);
 int	cheriabi_open(struct thread *, struct cheriabi_open_args *);
@@ -1486,8 +1509,8 @@ int	cheriabi_sysarch(struct thread *, struct cheriabi_sysarch_args *);
 int	cheriabi_rtprio(struct thread *, struct cheriabi_rtprio_args *);
 int	cheriabi_ntp_adjtime(struct thread *, struct cheriabi_ntp_adjtime_args *);
 int	cheriabi_pathconf(struct thread *, struct cheriabi_pathconf_args *);
-int	cheriabi_getrlimit(struct thread *, struct cheriabi_getrlimit_args *);
-int	cheriabi_setrlimit(struct thread *, struct cheriabi_setrlimit_args *);
+int	cheriabi_getrlimit(struct thread *, struct cheriabi___getrlimit_args *);
+int	cheriabi_setrlimit(struct thread *, struct cheriabi___setrlimit_args *);
 int	cheriabi___sysctl(struct thread *, struct cheriabi___sysctl_args *);
 int	cheriabi_mlock(struct thread *, struct cheriabi_mlock_args *);
 int	cheriabi_munlock(struct thread *, struct cheriabi_munlock_args *);
@@ -1540,6 +1563,7 @@ int	cheriabi_sched_rr_get_interval(struct thread *, struct cheriabi_sched_rr_get
 int	cheriabi_utrace(struct thread *, struct cheriabi_utrace_args *);
 int	cheriabi_kldsym(struct thread *, struct cheriabi_kldsym_args *);
 int	cheriabi_jail(struct thread *, struct cheriabi_jail_args *);
+int	cheriabi_nnpfs_syscall(struct thread *, struct cheriabi_nnpfs_syscall_args *);
 int	cheriabi_sigprocmask(struct thread *, struct cheriabi_sigprocmask_args *);
 int	cheriabi_sigsuspend(struct thread *, struct cheriabi_sigsuspend_args *);
 int	cheriabi_sigpending(struct thread *, struct cheriabi_sigpending_args *);
@@ -1575,6 +1599,10 @@ int	cheriabi_lchflags(struct thread *, struct cheriabi_lchflags_args *);
 int	cheriabi_uuidgen(struct thread *, struct cheriabi_uuidgen_args *);
 int	cheriabi_sendfile(struct thread *, struct cheriabi_sendfile_args *);
 int	cheriabi_mac_syscall(struct thread *, struct cheriabi_mac_syscall_args *);
+int	cheriabi_ksem_init(struct thread *, struct cheriabi_ksem_init_args *);
+int	cheriabi_ksem_open(struct thread *, struct cheriabi_ksem_open_args *);
+int	cheriabi_ksem_unlink(struct thread *, struct cheriabi_ksem_unlink_args *);
+int	cheriabi_ksem_getvalue(struct thread *, struct cheriabi_ksem_getvalue_args *);
 int	cheriabi___mac_get_pid(struct thread *, struct cheriabi___mac_get_pid_args *);
 int	cheriabi___mac_get_link(struct thread *, struct cheriabi___mac_get_link_args *);
 int	cheriabi___mac_set_link(struct thread *, struct cheriabi___mac_set_link_args *);
@@ -1599,6 +1627,7 @@ int	cheriabi_thr_self(struct thread *, struct cheriabi_thr_self_args *);
 int	cheriabi_extattr_list_fd(struct thread *, struct cheriabi_extattr_list_fd_args *);
 int	cheriabi_extattr_list_file(struct thread *, struct cheriabi_extattr_list_file_args *);
 int	cheriabi_extattr_list_link(struct thread *, struct cheriabi_extattr_list_link_args *);
+int	cheriabi_ksem_timedwait(struct thread *, struct cheriabi_ksem_timedwait_args *);
 int	cheriabi_thr_suspend(struct thread *, struct cheriabi_thr_suspend_args *);
 int	cheriabi_audit(struct thread *, struct cheriabi_audit_args *);
 int	cheriabi_auditon(struct thread *, struct cheriabi_auditon_args *);
@@ -1703,54 +1732,36 @@ int	cheriabi_cogetpid(struct thread *, struct cheriabi_cogetpid_args *);
 
 #ifdef COMPAT_43
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_43 */
 
 
 #ifdef COMPAT_FREEBSD4
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_FREEBSD4 */
 
 
 #ifdef COMPAT_FREEBSD6
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_FREEBSD6 */
 
 
 #ifdef COMPAT_FREEBSD7
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_FREEBSD7 */
 
 
 #ifdef COMPAT_FREEBSD10
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_FREEBSD10 */
 
 
 #ifdef COMPAT_FREEBSD11
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
 
 #endif /* COMPAT_FREEBSD11 */
 
@@ -1824,8 +1835,8 @@ int	cheriabi_cogetpid(struct thread *, struct cheriabi_cogetpid_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_rtprio	AUE_RTPRIO
 #define	CHERIABI_SYS_AUE_cheriabi_ntp_adjtime	AUE_NTP_ADJTIME
 #define	CHERIABI_SYS_AUE_cheriabi_pathconf	AUE_PATHCONF
-#define	CHERIABI_SYS_AUE_cheriabi_getrlimit	AUE_GETRLIMIT
-#define	CHERIABI_SYS_AUE_cheriabi_setrlimit	AUE_SETRLIMIT
+#define	CHERIABI_SYS_AUE_getrlimit	AUE_GETRLIMIT
+#define	CHERIABI_SYS_AUE_setrlimit	AUE_SETRLIMIT
 #define	CHERIABI_SYS_AUE_cheriabi___sysctl	AUE_SYSCTL
 #define	CHERIABI_SYS_AUE_cheriabi_mlock	AUE_MLOCK
 #define	CHERIABI_SYS_AUE_cheriabi_munlock	AUE_MUNLOCK
@@ -1878,6 +1889,7 @@ int	cheriabi_cogetpid(struct thread *, struct cheriabi_cogetpid_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_utrace	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_kldsym	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_jail	AUE_JAIL
+#define	CHERIABI_SYS_AUE_cheriabi_nnpfs_syscall	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_sigprocmask	AUE_SIGPROCMASK
 #define	CHERIABI_SYS_AUE_cheriabi_sigsuspend	AUE_SIGSUSPEND
 #define	CHERIABI_SYS_AUE_cheriabi_sigpending	AUE_SIGPENDING
@@ -1913,6 +1925,10 @@ int	cheriabi_cogetpid(struct thread *, struct cheriabi_cogetpid_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_uuidgen	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_sendfile	AUE_SENDFILE
 #define	CHERIABI_SYS_AUE_cheriabi_mac_syscall	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_ksem_init	AUE_SEMINIT
+#define	CHERIABI_SYS_AUE_cheriabi_ksem_open	AUE_SEMOPEN
+#define	CHERIABI_SYS_AUE_cheriabi_ksem_unlink	AUE_SEMUNLINK
+#define	CHERIABI_SYS_AUE_cheriabi_ksem_getvalue	AUE_SEMGETVALUE
 #define	CHERIABI_SYS_AUE_cheriabi___mac_get_pid	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___mac_get_link	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___mac_set_link	AUE_NULL
@@ -1937,6 +1953,7 @@ int	cheriabi_cogetpid(struct thread *, struct cheriabi_cogetpid_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_list_fd	AUE_EXTATTR_LIST_FD
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_list_file	AUE_EXTATTR_LIST_FILE
 #define	CHERIABI_SYS_AUE_cheriabi_extattr_list_link	AUE_EXTATTR_LIST_LINK
+#define	CHERIABI_SYS_AUE_cheriabi_ksem_timedwait	AUE_SEMWAIT
 #define	CHERIABI_SYS_AUE_cheriabi_thr_suspend	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_audit	AUE_AUDIT
 #define	CHERIABI_SYS_AUE_cheriabi_auditon	AUE_AUDITON

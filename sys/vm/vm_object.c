@@ -286,6 +286,7 @@ _vm_object_allocate(objtype_t type, vm_pindex_t size, vm_object_t object)
 
 #endif
 	object->size = size;
+	object->domain.dr_policy = NULL;
 	object->generation = 1;
 	object->ref_count = 1;
 	object->memattr = VM_MEMATTR_DEFAULT;
@@ -2154,9 +2155,8 @@ vm_object_coalesce(vm_object_t prev_object, vm_ooffset_t prev_offset,
 	next_size >>= PAGE_SHIFT;
 	next_pindex = OFF_TO_IDX(prev_offset) + prev_size;
 
-	if (prev_object->ref_count > 1 &&
-	    prev_object->size != next_pindex &&
-	    (prev_object->flags & OBJ_ONEMAPPING) == 0) {
+	if ((prev_object->ref_count > 1) &&
+	    (prev_object->size != next_pindex)) {
 		VM_OBJECT_WUNLOCK(prev_object);
 		return (FALSE);
 	}

@@ -778,6 +778,7 @@ enum MipsCheriFlags {
 #define	NT_FREEBSD_ABI_TAG	1
 #define	NT_FREEBSD_NOINIT_TAG	2
 #define	NT_FREEBSD_ARCH_TAG	3
+#define	NT_FREEBSD_FEATURE_CTL	4
 
 /* Values for n_type.  Used in core files. */
 #define	NT_PRSTATUS	1	/* Process status. */
@@ -899,6 +900,55 @@ enum MipsCheriFlags {
 #define	ELFCOMPRESS_HIOS	0x6fffffff
 #define	ELFCOMPRESS_LOPROC	0x70000000	/* Processor-specific */
 #define	ELFCOMPRESS_HIPROC	0x7fffffff
+
+/* Values for a_type. */
+#define	AT_NULL		0	/* Terminates the vector. */
+#define	AT_IGNORE	1	/* Ignored entry. */
+#define	AT_EXECFD	2	/* File descriptor of program to load. */
+#define	AT_PHDR		3	/* Program header of program already loaded. */
+#define	AT_PHENT	4	/* Size of each program header entry. */
+#define	AT_PHNUM	5	/* Number of program header entries. */
+#define	AT_PAGESZ	6	/* Page size in bytes. */
+#define	AT_BASE		7	/* Interpreter's base address. */
+#define	AT_FLAGS	8	/* Flags. */
+#define	AT_ENTRY	9	/* Where interpreter should transfer control. */
+#define	AT_NOTELF	10	/* Program is not ELF ?? */
+#define	AT_UID		11	/* Real uid. */
+#define	AT_EUID		12	/* Effective uid. */
+#ifndef __powerpc__
+#define	AT_GID		13	/* Real gid. */
+#define	AT_EGID		14	/* Effective gid. */
+#define	AT_EXECPATH	15	/* Path to the executable. */
+#define	AT_CANARY	16	/* Canary for SSP. */
+#define	AT_CANARYLEN	17	/* Length of the canary. */
+#define	AT_OSRELDATE	18	/* OSRELDATE. */
+#define	AT_NCPUS	19	/* Number of CPUs. */
+#define	AT_PAGESIZES	20	/* Pagesizes. */
+#define	AT_PAGESIZESLEN	21	/* Number of pagesizes. */
+#else /* defined(__powerpc__) */
+#define	AT_EXECPATH	13
+#define	AT_CANARY	14
+#define	AT_CANARYLEN	15
+#define	AT_OSRELDATE	16
+#define	AT_NCPUS	17
+#define	AT_PAGESIZES	18
+#define	AT_PAGESIZESLEN	19
+#define	AT_STACKPROT	21
+#endif /* defined(__powerpc__) */
+#define	AT_TIMEKEEP	22	/* Pointer to timehands. */
+#ifndef __powerpc__
+#define	AT_STACKPROT	23	/* Initial stack protection. */
+#endif
+#define	AT_EHDRFLAGS	24	/* e_flags field from elf hdr */
+#define	AT_HWCAP	25	/* CPU feature flags. */
+#define	AT_HWCAP2	26	/* CPU feature flags 2. */
+#define	AT_ARGC		27	/* Argument count */
+#define	AT_ARGV		28	/* Argument vector */
+#define	AT_ENVC		29	/* Environment count */
+#define	AT_ENVV		30	/* Environment vector */
+#define	AT_PS_STRINGS	31	/* struct ps_strings */
+
+#define	AT_COUNT	32	/* Count of defined aux entry types. */
 
 /*
  * Relocation types.

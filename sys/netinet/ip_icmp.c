@@ -158,6 +158,12 @@ SYSCTL_INT(_net_inet_icmp, OID_AUTO, tstamprepl, CTLFLAG_RW,
 	&VNET_NAME(icmptstamprepl), 0,
 	"Respond to ICMP Timestamp packets");
 
+VNET_DEFINE_STATIC(int, error_keeptags) = 0;
+#define	V_error_keeptags		VNET(error_keeptags)
+SYSCTL_INT(_net_inet_icmp, OID_AUTO, error_keeptags, CTLFLAG_VNET | CTLFLAG_RW,
+	&VNET_NAME(error_keeptags), 0,
+	"ICMP error response keeps copy of mbuf_tags of original packet");
+
 #ifdef ICMPPRINTFS
 int	icmpprintfs = 0;
 #endif
@@ -258,6 +264,7 @@ icmp_error(struct mbuf *n, int type, int code, uint32_t dest, int mtu)
 		if (n->m_len < oiphlen + tcphlen &&
 		    (n = m_pullup(n, oiphlen + tcphlen)) == NULL)
 			goto freeit;
+		oip = mtod(n, struct ip *);
 		icmpelen = max(tcphlen, min(V_icmp_quotelen,
 		    ntohs(oip->ip_len) - oiphlen));
 	} else if (oip->ip_p == IPPROTO_SCTP) {
@@ -367,6 +374,10 @@ stdreply:	icmpelen = max(8, min(V_icmp_quotelen, ntohs(oip->ip_len) -
 	nip->ip_p = IPPROTO_ICMP;
 	nip->ip_tos = 0;
 	nip->ip_off = 0;
+
+	if (V_error_keeptags)
+		m_tag_copy_chain(m, n, M_NOWAIT);
+
 	icmp_reflect(m);
 
 freeit:

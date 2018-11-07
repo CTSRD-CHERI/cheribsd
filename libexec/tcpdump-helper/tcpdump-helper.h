@@ -32,7 +32,7 @@
 #define _LIBEXEC_TCPDUMP_HELPER_H_
 
 CHERI_TCPDUMP_CCALL
-int	cheri_tcpdump_sandbox_init(__capability netdissect_options *ndo,
+int	cheri_tcpdump_sandbox_init(netdissect_options * __capability ndo,
 	    bpf_u_int32 localnet, bpf_u_int32 netmask,
 	    uint32_t timezone_offset,
 	    struct cheri_object next_sandbox);
@@ -40,15 +40,15 @@ CHERI_TCPDUMP_CCALL
 int	cheri_sandbox_has_printer(int type);
 CHERI_TCPDUMP_CCALL
 int	cheri_sandbox_pretty_print_packet(
-	    __capability netdissect_options *ndo,
-	    __capability const struct pcap_pkthdr *h,
-	    __capability const u_char *sp);
+	    netdissect_options * __capability ndo,
+	    const struct pcap_pkthdr * __capability h,
+	    const u_char * __capability sp);
 
 CHERI_TCPDUMP_CCALL
 void	cheri_tcpdump_sandbox_set_if_printer(
-	    __capability netdissect_options *ndo, int type);
+	    netdissect_options * __capability ndo, int type);
 CHERI_TCPDUMP_CCALL
 void	cheri_tcpdump_sandbox_set_function_pointers(
-	    __capability netdissect_options *ndo);
+	    netdissect_options * __capability ndo);
 
 #endif /* _LIBEXEC_TCPDUMP_HELPER_H_ */

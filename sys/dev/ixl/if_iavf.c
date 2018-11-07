@@ -126,7 +126,6 @@ static int	iavf_sysctl_queue_interrupt_table(SYSCTL_HANDLER_ARGS);
 static int	iavf_sysctl_vf_reset(SYSCTL_HANDLER_ARGS);
 static int	iavf_sysctl_vflr_reset(SYSCTL_HANDLER_ARGS);
 
-char *iavf_vc_speed_to_string(enum virtchnl_link_speed link_speed);
 static void	iavf_save_tunables(struct iavf_sc *);
 static enum i40e_status_code
     iavf_process_adminq(struct iavf_sc *, u16 *);
@@ -1947,10 +1946,10 @@ iavf_config_rss_reg(struct iavf_sc *sc)
 		/*
 		 * Fetch the RSS bucket id for the given indirection entry.
 		 * Cap it at the number of configured buckets (which is
-		 * num_queues.)
+		 * num_rx_queues.)
 		 */
 		que_id = rss_get_indirection_to_bucket(i);
-		que_id = que_id % vsi->num_queues;
+		que_id = que_id % vsi->num_rx_queues;
 #else
 		que_id = j;
 #endif

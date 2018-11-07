@@ -2096,7 +2096,7 @@ ufs_symlink(ap)
 		struct vnode **a_vpp;
 		struct componentname *a_cnp;
 		struct vattr *a_vap;
-		char *a_target;
+		const char *a_target;
 	} */ *ap;
 {
 	struct vnode *vp, **vpp = ap->a_vpp;

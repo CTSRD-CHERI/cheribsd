@@ -188,10 +188,10 @@ cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 int
 cheriabi_exec_copyin_args(struct image_args *args,
     const char * __capability fname, enum uio_seg segflg,
-    void * __capability * __capability argv,
-    void * __capability * __capability envv)
+    char * __capability * __capability argv,
+    char * __capability * __capability envv)
 {
-	void * __capability * __capability pcap;
+	char * __capability * __capability pcap;
 	void * __capability argcap;
 	size_t length;
 	int error;
@@ -876,10 +876,11 @@ cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd)
 		void * __capability _tmpcap;				\
 		_tmpcap = cheri_capability_build_user_rwx((perms),	\
 		    (base), (length), (offset));			\
-		KASSERT(cheri_gettag(_tmpcap), ("Created invalid cap"	\
-		    "from base=%zx, offset=%#zx, length=%#zx, "		\
-		    "perms=%#zx", (size_t)(base), (size_t)(offset),	\
-		    (size_t)(length), (size_t)(perms)));		\
+		KASSERT(cheri_gettag(_tmpcap), ("%s:%d: Created "	\
+		     "invalid cap from base=%zx, offset=%#zx, "		\
+		     "length=%#zx, perms=%#zx", __func__, __LINE__,	\
+		     (size_t)(base), (size_t)(offset),			\
+		     (size_t)(length), (size_t)(perms)));		\
 		copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));		\
 	} while(0)
 
@@ -1074,8 +1075,8 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 		rtld_len = roundup2(imgp->interp_end - rtld_base,
 		    1ULL << CHERI_ALIGN_SHIFT(imgp->interp_end - rtld_base));
 	} else {
-		rtld_base = 0;
-		rtld_len = CHERI_CAP_USER_CODE_LENGTH;
+		rtld_base = prog_base;
+		rtld_len = prog_len;
 	}
 
 	if (args->execfd != -1)
@@ -1096,8 +1097,8 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	/*
 	 * XXX-BD: grant code and data perms to allow textrel fixups.
 	 */
-	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, args->base - rtld_base,
-	    rtld_len, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, 0, rtld_len,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);
 	if (imgp->execpathp != 0)
 		AUXARGS_ENTRY_CAP(pos, AT_EXECPATH, imgp->execpathp, 0,
@@ -1725,7 +1726,7 @@ cheriabi_rtprio(struct thread *td, struct cheriabi_rtprio_args *uap)
 }
 
 int
-cheriabi_setrlimit(struct thread *td, struct cheriabi_setrlimit_args *uap)
+cheriabi_setrlimit(struct thread *td, struct cheriabi___setrlimit_args *uap)
 {
 	struct rlimit alim;
 	int error;
@@ -1737,7 +1738,7 @@ cheriabi_setrlimit(struct thread *td, struct cheriabi_setrlimit_args *uap)
 }
 
 int
-cheriabi_getrlimit(struct thread *td, struct cheriabi_getrlimit_args *uap)
+cheriabi_getrlimit(struct thread *td, struct cheriabi___getrlimit_args *uap)
 {
 	struct rlimit rlim;
 	int error;

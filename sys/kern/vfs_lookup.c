@@ -248,7 +248,8 @@ namei_handle_root(struct nameidata *ndp, struct vnode **dpp)
 	struct componentname *cnp;
 
 	cnp = &ndp->ni_cnd;
-	if ((ndp->ni_lcf & NI_LCF_STRICTRELATIVE) != 0) {
+	if ((ndp->ni_lcf & NI_LCF_STRICTRELATIVE) != 0 ||
+	    (cnp->cn_flags & BENEATH) != 0) {
 #ifdef KTRACE
 		if (KTRPOINT(curthread, KTR_CAPFAIL))
 			ktrcapfail(CAPFAIL_LOOKUP, NULL, NULL);
@@ -440,8 +441,10 @@ namei(struct nameidata *ndp)
 			vrele(dp);
 		goto out;
 	}
-	if ((ndp->ni_lcf & NI_LCF_STRICTRELATIVE) != 0 &&
-	    lookup_cap_dotdot != 0)
+	if (((ndp->ni_lcf & NI_LCF_STRICTRELATIVE) != 0 &&
+	    lookup_cap_dotdot != 0) ||
+	    ((ndp->ni_lcf & NI_LCF_STRICTRELATIVE) == 0 &&
+	    (cnp->cn_flags & BENEATH) != 0))
 		ndp->ni_lcf |= NI_LCF_CAP_DOTDOT;
 	SDT_PROBE3(vfs, namei, lookup, entry, dp, cnp->cn_pnbuf,
 	    cnp->cn_flags);

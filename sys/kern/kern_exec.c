@@ -1,4 +1,4 @@
-/*-
+/*
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 1993, David Greenman
@@ -1288,7 +1288,7 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
  * space into the temporary string buffer.
  */
 int
-exec_copyin_args(struct image_args *args, char *fname,
+exec_copyin_args(struct image_args *args, const char *fname,
     enum uio_seg segflg, char **argv, char **envv)
 {
 	u_long argp, envp;
@@ -1571,7 +1571,7 @@ exec_free_args(struct image_args *args)
  * exec_args_add_env_str() - append an env string
  */
 int
-exec_args_add_fname(struct image_args *args, char *fname,
+exec_args_add_fname(struct image_args *args, const char *fname,
     enum uio_seg segflg)
 {
 	int error;
@@ -1601,7 +1601,8 @@ exec_args_add_fname(struct image_args *args, char *fname,
 }
 
 int
-exec_args_add_arg_str(struct image_args *args, char *argp, enum uio_seg segflg)
+exec_args_add_arg_str(struct image_args *args, const char *argp,
+    enum uio_seg segflg)
 {
 	int error;
 	size_t length;
@@ -1623,7 +1624,8 @@ exec_args_add_arg_str(struct image_args *args, char *argp, enum uio_seg segflg)
 }
 
 int
-exec_args_add_env_str(struct image_args *args, char *envp, enum uio_seg segflg)
+exec_args_add_env_str(struct image_args *args, const char *envp,
+    enum uio_seg segflg)
 {
 	int error;
 	size_t length;

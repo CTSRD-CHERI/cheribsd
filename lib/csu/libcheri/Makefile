@@ -1,7 +1,7 @@
 #
 # $FreeBSD$
 #
-.PATH: ${.CURDIR}/../common
+.PATH: ${.CURDIR}/../common-cheri
 SRCS=	crt_init_globals.c			\
 	crt_invoke.S				\
 	crt_rtld.S				\

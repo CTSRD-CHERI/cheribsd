@@ -38,6 +38,17 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20181030: malloc_domain(9) KPI change
+OLD_FILES+=share/man/man9/malloc_domain.9.gz
+# 20181026: joy(4) removal
+OLD_FILES+=usr/share/man/man4/joy.4.gz
+# 20181025: OpenSSL libraries version bump to avoid conflict with ports
+OLD_LIBS+=lib/libcrypto.so.9
+OLD_LIBS+=usr/lib/libssl.so.9
+OLD_LIBS+=usr/lib32/libcrypto.so.9
+OLD_LIBS+=usr/lib32/libssl.so.9
+# 20181021: mse(4) removal
+OLD_FILES+=usr/share/man/man4/mse.4.gz
 # 20181015: Stale libcasper(3) files following r329452
 OLD_LIBS+=lib/casper/libcap_sysctl.so.0
 OLD_LIBS+=lib/casper/libcap_grp.so.0

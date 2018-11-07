@@ -13,7 +13,9 @@ MK_CHERI_SHARED_PROG:=yes
 # TODO: disable this once we believe RTLD works reliably
 # Disable DEBUG to get a fair performance comparison to rtld-elf
 # DEBUG=-DDEBUG
-.ifdef BUILD_RTLD_DEBUG
+.ifdef RTLD_DEBUG_VERBOSE
+CFLAGS+=-DDEBUG -DDEBUG_VERBOSE=${RTLD_DEBUG_VERBOSE}
+.elif defined(BUILD_RTLD_DEBUG)
 CFLAGS+=-DDEBUG
 .endif
 
@@ -38,8 +40,8 @@ RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
 CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR} -I${.CURDIR}/../rtld-elf
 LDFLAGS+=	-nostdlib -e rtld_start
-# TODO: increase this to 6
-WARNS?=		2
+NO_WCAST_ALIGN=	yes
+WARNS?=		6
 INSTALLFLAGS=	-C -b
 PRECIOUSPROG=
 BINDIR=		/libexec
@@ -48,6 +50,10 @@ BINDIR=		/libexec
 CFLAGS+=	-fpic
 CFLAGS+=	-DPIC $(DEBUG)
 CFLAGS.reloc.c+=-fno-jump-tables
+
+# Since we pass -shared, we shouldn't also pass -pie
+# TODO: should we use -pie instead of -shared for rtld?
+MK_PIE:=	no
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
 # avoid accidentally depending on non-existent symbols
 LDFLAGS+=	-Wl,-no-undefined

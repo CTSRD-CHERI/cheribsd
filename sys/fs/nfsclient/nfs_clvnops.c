@@ -147,7 +147,8 @@ static vop_set_text_t nfs_set_text;
 /*
  * Global vfs data structures for nfs
  */
-struct vop_vector newnfs_vnodeops = {
+
+static struct vop_vector newnfs_vnodeops_nosig = {
 	.vop_default =		&default_vnodeops,
 	.vop_access =		nfs_access,
 	.vop_advlock =		nfs_advlock,
@@ -182,7 +183,19 @@ struct vop_vector newnfs_vnodeops = {
 	.vop_set_text =		nfs_set_text,
 };
 
-struct vop_vector newnfs_fifoops = {
+static int
+nfs_vnodeops_bypass(struct vop_generic_args *a)
+{
+
+	return (vop_sigdefer(&newnfs_vnodeops_nosig, a));
+}
+
+struct vop_vector newnfs_vnodeops = {
+	.vop_default =		&default_vnodeops,
+	.vop_bypass =		nfs_vnodeops_bypass,
+};
+
+static struct vop_vector newnfs_fifoops_nosig = {
 	.vop_default =		&fifo_specops,
 	.vop_access =		nfsspec_access,
 	.vop_close =		nfsfifo_close,
@@ -195,6 +208,18 @@ struct vop_vector newnfs_fifoops = {
 	.vop_reclaim =		ncl_reclaim,
 	.vop_setattr =		nfs_setattr,
 	.vop_write =		nfsfifo_write,
+};
+
+static int
+nfs_fifoops_bypass(struct vop_generic_args *a)
+{
+
+	return (vop_sigdefer(&newnfs_fifoops_nosig, a));
+}
+
+struct vop_vector newnfs_fifoops = {
+	.vop_default =		&default_vnodeops,
+	.vop_bypass =		nfs_fifoops_bypass,
 };
 
 static int nfs_mknodrpc(struct vnode *dvp, struct vnode **vpp,
@@ -3008,14 +3033,19 @@ nfs_advlock(struct vop_advlock_args *ap)
 	int ret, error = EOPNOTSUPP;
 	u_quad_t size;
 	
+	ret = NFSVOPLOCK(vp, LK_SHARED);
+	if (ret != 0)
+		return (EBADF);
 	if (NFS_ISV4(vp) && (ap->a_flags & (F_POSIX | F_FLOCK)) != 0) {
-		if (vp->v_type != VREG)
+		if (vp->v_type != VREG) {
+			NFSVOPUNLOCK(vp, 0);
 			return (EINVAL);
+		}
 		if ((ap->a_flags & F_POSIX) != 0)
 			cred = p->p_ucred;
 		else
 			cred = td->td_ucred;
-		NFSVOPLOCK(vp, LK_EXCLUSIVE | LK_RETRY);
+		NFSVOPLOCK(vp, LK_UPGRADE | LK_RETRY);
 		if (vp->v_iflag & VI_DOOMED) {
 			NFSVOPUNLOCK(vp, 0);
 			return (EBADF);
@@ -3094,9 +3124,6 @@ nfs_advlock(struct vop_advlock_args *ap)
 		NFSVOPUNLOCK(vp, 0);
 		return (0);
 	} else if (!NFS_ISV4(vp)) {
-		error = NFSVOPLOCK(vp, LK_SHARED);
-		if (error)
-			return (error);
 		if ((VFSTONFS(vp->v_mount)->nm_flag & NFSMNT_NOLOCKD) != 0) {
 			size = VTONFS(vp)->n_size;
 			NFSVOPUNLOCK(vp, 0);
@@ -3119,7 +3146,8 @@ nfs_advlock(struct vop_advlock_args *ap)
 				NFSVOPUNLOCK(vp, 0);
 			}
 		}
-	}
+	} else
+		NFSVOPUNLOCK(vp, 0);
 	return (error);
 }
 

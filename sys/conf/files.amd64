@@ -208,6 +208,7 @@ dev/acpi_support/acpi_wmi_if.m	standard
 dev/agp/agp_amd64.c		optional	agp
 dev/agp/agp_i810.c		optional	agp
 dev/agp/agp_via.c		optional	agp
+dev/amdgpio/amdgpio.c		optional	amdgpio
 dev/amdsbwd/amdsbwd.c		optional	amdsbwd
 dev/amdsmn/amdsmn.c		optional	amdsmn | amdtemp
 dev/amdtemp/amdtemp.c		optional	amdtemp
@@ -720,6 +721,7 @@ x86/isa/isa_dma.c		standard
 x86/isa/nmi.c			standard
 x86/isa/orm.c			optional	isa
 x86/pci/pci_bus.c		optional	pci
+x86/pci/pci_early_quirks.c	optional	pci
 x86/pci/qpi.c			optional	pci
 x86/x86/autoconf.c		standard
 x86/x86/bus_machdep.c		standard
