@@ -11,8 +11,8 @@ all:
 sysent:  cheriabi_sysent.c cheriabi_syscall.h cheriabi_proto.h cheriabi_systrace_args.c
 
 cheriabi_sysent.c cheriabi_syscalls.c cheriabi_syscall.h cheriabi_proto.h cheriabi_systrace_args.c : \
-	    ../../kern/makesyscalls.sh syscalls.master syscalls.conf
-	sh ../../kern/makesyscalls.sh syscalls.master syscalls.conf
+	    ../../kern/makesyscalls.sh ../../kern/syscalls.master syscalls.conf
+	sh ../../kern/makesyscalls.sh ../../kern/syscalls.master syscalls.conf
 
 clean:
 	rm -f cheriabi_sysent.c cheriabi_syscalls.c cheriabi_syscall.h cheriabi_proto.h
