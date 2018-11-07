@@ -2050,7 +2050,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 416: {
 		struct cheriabi_sigaction_args *p = params;
 		iarg[0] = p->sig; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->act; /* struct sigaction_c * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->act; /* const struct sigaction_c * __capability */
 		uarg[2] = (__cheri_addr intptr_t) p->oact; /* struct sigaction_c * __capability */
 		*n_args = 3;
 		break;
@@ -2952,7 +2952,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[2] = (__cheri_addr intptr_t) p->status; /* int * __capability */
 		iarg[3] = p->options; /* int */
 		uarg[4] = (__cheri_addr intptr_t) p->wrusage; /* struct __wrusage * __capability */
-		uarg[5] = (__cheri_addr intptr_t) p->info; /* struct __siginfo_c * __capability */
+		uarg[5] = (__cheri_addr intptr_t) p->info; /* struct siginfo_c * __capability */
 		*n_args = 6;
 		break;
 	}
@@ -6521,7 +6521,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct sigaction_c * __capability";
+			p = "userland const struct sigaction_c * __capability";
 			break;
 		case 2:
 			p = "userland struct sigaction_c * __capability";
@@ -8104,7 +8104,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland struct __wrusage * __capability";
 			break;
 		case 5:
-			p = "userland struct __siginfo_c * __capability";
+			p = "userland struct siginfo_c * __capability";
 			break;
 		default:
 			break;

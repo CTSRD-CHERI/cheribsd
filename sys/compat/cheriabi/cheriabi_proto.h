@@ -840,7 +840,7 @@ struct cheriabi___mac_execve_args {
 };
 struct cheriabi_sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(struct sigaction_c * __capability)]; struct sigaction_c * __capability act; char act_r_[PADR_(struct sigaction_c * __capability)];
+	char act_l_[PADL_(const struct sigaction_c * __capability)]; const struct sigaction_c * __capability act; char act_r_[PADR_(const struct sigaction_c * __capability)];
 	char oact_l_[PADL_(struct sigaction_c * __capability)]; struct sigaction_c * __capability oact; char oact_r_[PADR_(struct sigaction_c * __capability)];
 };
 struct cheriabi_sigreturn_args {
@@ -1272,7 +1272,7 @@ struct cheriabi_wait6_args {
 	char status_l_[PADL_(int * __capability)]; int * __capability status; char status_r_[PADR_(int * __capability)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
 	char wrusage_l_[PADL_(struct __wrusage * __capability)]; struct __wrusage * __capability wrusage; char wrusage_r_[PADR_(struct __wrusage * __capability)];
-	char info_l_[PADL_(struct __siginfo_c * __capability)]; struct __siginfo_c * __capability info; char info_r_[PADR_(struct __siginfo_c * __capability)];
+	char info_l_[PADL_(struct siginfo_c * __capability)]; struct siginfo_c * __capability info; char info_r_[PADR_(struct siginfo_c * __capability)];
 };
 struct cheriabi_cap_rights_limit_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];

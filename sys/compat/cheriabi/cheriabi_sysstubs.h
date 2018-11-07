@@ -15,7 +15,6 @@
 #include <sys/wait.h>
 
 #include <compat/cheriabi/cheriabi_signal.h>
-struct __siginfo;
 struct __ucontext;
 struct __wrusage;
 struct acl;
@@ -2412,12 +2411,12 @@ SYS_STUB(414, int, extattr_delete_link,
 )
 
 SYS_STUB_ARGHASPTRS(416, int, sigaction,
-    /* _protoargs */ (int sig, struct sigaction*  act, struct sigaction*  oact),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int sig, struct sigaction* __capability   act, struct sigaction* __capability   oact),
-    /* _protoargs_err */ (int * __capability stub_errno, int sig, struct sigaction* __capability   act, struct sigaction* __capability   oact),
-    /* _callargs */ (sig, (__cheri_fromcap struct sigaction* )act, (__cheri_fromcap struct sigaction* )oact),
+    /* _protoargs */ (int sig, const struct sigaction*  act, struct sigaction*  oact),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int sig, const struct sigaction* __capability   act, struct sigaction* __capability   oact),
+    /* _protoargs_err */ (int * __capability stub_errno, int sig, const struct sigaction* __capability   act, struct sigaction* __capability   oact),
+    /* _callargs */ (sig, (__cheri_fromcap const struct sigaction* )act, (__cheri_fromcap struct sigaction* )oact),
     /* _callargs_chk */ (&ret, stub_errno, sig, act, oact),
-    /* _callargs_err */ (&errno, sig, (struct sigaction* )act, (struct sigaction* )oact),
+    /* _callargs_err */ (&errno, sig, (const struct sigaction* )act, (struct sigaction* )oact),
     /* _localcheck */ {if (!(cheri_getperm(act) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(oact) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
@@ -3373,12 +3372,12 @@ SYS_STUB(531, int, posix_fadvise,
 )
 
 SYS_STUB_ARGHASPTRS(532, int, wait6,
-    /* _protoargs */ (idtype_t idtype, id_t id, int *  status, int options, struct __wrusage *  wrusage, struct __siginfo*  info),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, idtype_t idtype, id_t id, int * __capability   status, int options, struct __wrusage * __capability   wrusage, struct __siginfo* __capability   info),
-    /* _protoargs_err */ (int * __capability stub_errno, idtype_t idtype, id_t id, int * __capability   status, int options, struct __wrusage * __capability   wrusage, struct __siginfo* __capability   info),
-    /* _callargs */ (idtype, id, (__cheri_fromcap int * )status, options, (__cheri_fromcap struct __wrusage * )wrusage, (__cheri_fromcap struct __siginfo* )info),
+    /* _protoargs */ (idtype_t idtype, id_t id, int *  status, int options, struct __wrusage *  wrusage, struct siginfo*  info),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, idtype_t idtype, id_t id, int * __capability   status, int options, struct __wrusage * __capability   wrusage, struct siginfo* __capability   info),
+    /* _protoargs_err */ (int * __capability stub_errno, idtype_t idtype, id_t id, int * __capability   status, int options, struct __wrusage * __capability   wrusage, struct siginfo* __capability   info),
+    /* _callargs */ (idtype, id, (__cheri_fromcap int * )status, options, (__cheri_fromcap struct __wrusage * )wrusage, (__cheri_fromcap struct siginfo* )info),
     /* _callargs_chk */ (&ret, stub_errno, idtype, id, status, options, wrusage, info),
-    /* _callargs_err */ (&errno, idtype, id, (int * )status, options, (struct __wrusage * )wrusage, (struct __siginfo* )info),
+    /* _callargs_err */ (&errno, idtype, id, (int * )status, options, (struct __wrusage * )wrusage, (struct siginfo* )info),
     /* _localcheck */ {if (!(cheri_getperm(status) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(wrusage) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(info) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
