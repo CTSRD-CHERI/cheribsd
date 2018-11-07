@@ -8,10 +8,6 @@
 #include <sys/param.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
-#include <sys/mount.h>
-#include <sys/socket.h>
-#include <sys/user.h>
-#include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))

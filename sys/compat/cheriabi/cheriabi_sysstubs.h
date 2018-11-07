@@ -56,11 +56,9 @@ struct rusage;
 struct sched_param;
 struct sctp_sndrcvinfo;
 struct sembuf;
-struct sf_hdtr_native;
 struct sf_hdtr;
 struct shmid_ds_old;
 struct shmid_ds;
-struct sigaction_native;
 struct sigaction;
 struct sigaltstack;
 struct sigevent;
@@ -3369,16 +3367,6 @@ SYS_STUB(531, int, posix_fadvise,
     /* _callargs_chk */ (&ret, stub_errno, fd, offset, len, advice),
     /* _callargs_err */ (&errno, fd, offset, len, advice),
     /* _localcheck */ {}
-)
-
-SYS_STUB_ARGHASPTRS(532, int, wait6,
-    /* _protoargs */ (idtype_t idtype, id_t id, int *  status, int options, struct __wrusage *  wrusage, struct siginfo*  info),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, idtype_t idtype, id_t id, int * __capability   status, int options, struct __wrusage * __capability   wrusage, struct siginfo* __capability   info),
-    /* _protoargs_err */ (int * __capability stub_errno, idtype_t idtype, id_t id, int * __capability   status, int options, struct __wrusage * __capability   wrusage, struct siginfo* __capability   info),
-    /* _callargs */ (idtype, id, (__cheri_fromcap int * )status, options, (__cheri_fromcap struct __wrusage * )wrusage, (__cheri_fromcap struct siginfo* )info),
-    /* _callargs_chk */ (&ret, stub_errno, idtype, id, status, options, wrusage, info),
-    /* _callargs_err */ (&errno, idtype, id, (int * )status, options, (struct __wrusage * )wrusage, (struct siginfo* )info),
-    /* _localcheck */ {if (!(cheri_getperm(status) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(wrusage) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(info) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB(533, int, cap_rights_limit,
