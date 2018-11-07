@@ -87,6 +87,7 @@ sed -e '
 	/.*\$FreeBSD/b done_joining
 	/^[#;]/b done_joining
 	/^$/b done_joining
+	/^%%ABI_HEADERS%%/b done_joining
 
 	# Join lines ending in backslash
 :joining
@@ -161,6 +162,7 @@ sed -e '
 		mincompat = \"$mincompat\" + 0
 		abi_flags = \"$abi_flags\"
 		abi_func_prefix = \"$abi_func_prefix\"
+		abi_headers = \"$abi_headers\"
 		abi_intptr_t = \"$abi_intptr_t\"
 		abi_type_suffix = \"$abi_type_suffix\"
 		abi_obsolete_syscalls = \"$abi_obsolete_syscalls\"
@@ -284,6 +286,11 @@ sed -e '
 	}
 	$1 ~ /^#[ 	]*include/ {
 		print > sysinc
+		next
+	}
+	$1 ~ /^%%ABI_HEADERS%%/ {
+		if (abi_headers != "")
+			print abi_headers > sysinc
 		next
 	}
 	$1 ~ /^#[ 	]*if/ {
