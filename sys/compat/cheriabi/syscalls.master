@@ -2899,7 +2899,7 @@
 		    _Out_opt_ int *status,
 		    int options,
 		    _Out_opt_ _Contains_long_ struct __wrusage *wrusage,
-		    _Out_opt_ _Contains_long_ptr_ struct __siginfo *info
+		    _Out_opt_ _Contains_long_ptr_ struct siginfo *info
 		);
 	}
 533	AUE_CAP_RIGHTS_LIMIT	STD {
