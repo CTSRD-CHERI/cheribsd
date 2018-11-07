@@ -1715,7 +1715,7 @@
 		    int s,
 		    off_t offset,
 		    size_t nbytes,
-		    _In_opt_ _Contains_ptr_ struct sf_hdtr_native *hdtr,
+		    _In_opt_ _Contains_ptr_ struct sf_hdtr *hdtr,
 		    _Out_opt_ off_t *sbytes,
 		    int flags
 		);
@@ -1756,8 +1756,8 @@
 342	AUE_SIGACTION	COMPAT4 {
 		int sigaction(
 		    int sig,
-		    _In_opt_ _Contains_ptr_ const struct sigaction_native *act,
-		    _Out_opt_ _Contains_ptr_ struct sigaction_native *oact
+		    _In_opt_ _Contains_ptr_ const struct sigaction *act,
+		    _Out_opt_ _Contains_ptr_ struct sigaction *oact
 		);
 	}
 343	AUE_SIGPENDING	STD {
