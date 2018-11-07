@@ -562,11 +562,16 @@ sed -e '
 			# Add suffix if required
 			# XXX-BD: should this happen in the loop above?
 			if (needs_suffix) {
+				sub(/_native /, " ", argtype[argc])
 				sub(/(struct|union) [^ ]*/, "&" abi_type_suffix, argtype[argc])
-				if (struct_name != "")
+				if (struct_name != "") {
+					sub(/_native/, "", struct_name);
 					struct_name = struct_name abi_type_suffix
-				if (union_name != "")
+				}
+				if (union_name != "") {
+					sub(/_native/, "", union_name);
 					union_name = union_name abi_type_suffix
+				}
 			}
 
 			if (struct_name != "")
