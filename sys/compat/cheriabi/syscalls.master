@@ -606,7 +606,7 @@
 		int accept(
 		    int s,
 		    _Out_writes_bytes_opt_(*anamelen) struct sockaddr *name,
-		    int *anamelen
+		    __socklen_t *anamelen
 		);
 	} accept accept_args int
 100	AUE_GETPRIORITY	STD {
@@ -766,7 +766,7 @@
 		    size_t len,
 		    int flags,
 		    _Out_writes_bytes_(*fromlenaddr) struct sockaddr *from,
-		    _Inout_ int *fromlenaddr
+		    _Inout_ __socklen_t *fromlenaddr
 		);
 	} recvfrom recvfrom_args int
 126	AUE_SETREUID	STD {
@@ -863,7 +863,7 @@
 		int getpeername(
 		    int fdes,
 		    _Out_writes_bytes_(*alen) struct sockaddr *asa,
-		    _Inout_opt_ int *alen
+		    _Inout_opt_ __socklen_t *alen
 		);
 	}
 142	AUE_SYSCTL	COMPAT {
@@ -910,7 +910,7 @@
 		int getsockname(
 		    int fdec,
 		    _Out_writes_bytes_(*alen) struct sockaddr *asa,
-		    _Inout_ int *alen
+		    _Inout_ __socklen_t *alen
 		);
 	} getsockname getsockname_args int
 
