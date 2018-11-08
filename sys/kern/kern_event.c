@@ -1012,7 +1012,7 @@ kern_kqueue(struct thread *td, int flags, struct filecaps *fcaps)
 
 struct g_kevent_args {
 	int	fd;
-	void	* __capability changelist;
+	const void * __capability changelist;
 	int	nchanges;
 	void	* __capability eventlist;
 	int	nevents;
