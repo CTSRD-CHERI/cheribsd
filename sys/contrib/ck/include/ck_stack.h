@@ -39,7 +39,12 @@ typedef struct ck_stack_entry ck_stack_entry_t;
 
 struct ck_stack {
 	struct ck_stack_entry *head;
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Can not reduce alignment on pointers */
+	char *generation;
+#else
 	char *generation CK_CC_PACKED;
+#endif
 } CK_CC_ALIASED;
 typedef struct ck_stack ck_stack_t;
 

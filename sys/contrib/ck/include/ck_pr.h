@@ -34,6 +34,10 @@
 #include <ck_stdint.h>
 #include <ck_stdbool.h>
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#include <cheri/cheric.h>
+#endif
+
 #ifndef CK_USE_CC_BUILTINS
 #if defined(__x86_64__)
 #include "gcc/x86_64/ck_pr.h"
@@ -491,6 +495,33 @@ CK_PR_BIN_S(or, 8, uint8_t, |)
 		return ((previous >> offset) & 1);				   \
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+/*
+ * XXX-AM: assume offset interpretation for all these operations
+ */
+#define CK_CHERI_OFFSET_OP(T, S, O)			\
+	(cheri_setoffset(T, cheri_getoffset(T) O (S)))
+
+#define CK_PR_BTX_PTR(K, S, M, T, P, C, R)					\
+	CK_CC_INLINE static bool						\
+	ck_pr_##K##_ptr(M *target, unsigned int offset)				\
+	{									\
+		T previous;							\
+		C punt;								\
+		long mask = (R ((long)1 << offset));				\
+		punt = ck_pr_md_load_ptr(target);				\
+		previous = (T)punt;						\
+		while (ck_pr_cas_ptr_value(target, (C)previous,			\
+			CK_CHERI_OFFSET_OP((C)previous, mask, P),		\
+			&previous) == false)					\
+				ck_pr_stall();					\
+		return ((cheri_getoffset((C)previous) >> offset) & 1);		\
+	}
+#else /* ! __CHERI_PURE_CAPABILITY__ */
+#define CK_PR_BTX_PTR(K, S, M, T, P, C, R)	\
+	CK_PR_BTX(K, S, M, T, P, C, R)
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
+
 #define CK_PR_BTX_S(K, S, T, P, R) CK_PR_BTX(K, S, T, T, P, T, R)
 
 #if defined(CK_F_PR_LOAD_INT) && defined(CK_F_PR_CAS_INT_VALUE)
@@ -535,17 +566,17 @@ CK_PR_BTX_S(bts, uint, unsigned int, |,)
 
 #ifndef CK_F_PR_BTC_PTR
 #define CK_F_PR_BTC_PTR
-CK_PR_BTX(btc, ptr, void, uintptr_t, ^, void *,)
+CK_PR_BTX_PTR(btc, ptr, void, uintptr_t, ^, void *,)
 #endif /* CK_F_PR_BTC_PTR */
 
 #ifndef CK_F_PR_BTR_PTR
 #define CK_F_PR_BTR_PTR
-CK_PR_BTX(btr, ptr, void, uintptr_t, &, void *, ~)
+CK_PR_BTX_PTR(btr, ptr, void, uintptr_t, &, void *, ~)
 #endif /* CK_F_PR_BTR_PTR */
 
 #ifndef CK_F_PR_BTS_PTR
 #define CK_F_PR_BTS_PTR
-CK_PR_BTX(bts, ptr, void, uintptr_t, |, void *,)
+CK_PR_BTX_PTR(bts, ptr, void, uintptr_t, |, void *,)
 #endif /* CK_F_PR_BTS_PTR */
 
 #endif /* CK_F_PR_LOAD_PTR && CK_F_PR_CAS_PTR_VALUE */
