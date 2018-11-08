@@ -30,8 +30,6 @@ systrace="systrace_args.c"
 ptr_intptr_t_cast="intptr_t"
 ptr_qualified="*"
 mincompat="0"
-abi_flags=""
-abi_type_suffix=""
 abi_intptr_t="intptr_t"
 
 # tmp files:
