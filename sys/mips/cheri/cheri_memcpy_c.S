@@ -66,6 +66,7 @@
 LEAF(FUNC_PREFIX(memcpy))
 XLEAF(FUNC_PREFIX(memcpy_c))
 XLEAF(FUNC_PREFIX(cheri_memcpy))
+XLEAF(FUNC_PREFIX(memmove))	
 #else
 LEAF(FUNC_PREFIX(memcpy_c))
 #endif

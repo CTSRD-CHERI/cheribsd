@@ -420,7 +420,8 @@ END(copyin_c)
  * c4 - kernel destination pointer
  * a0 - length of the copy
  */
-NESTED(copyincap_c, CALLFRAME_SIZ, ra)
+NESTED(copyincap, CALLFRAME_SIZ, ra)
+XNESTED(copyincap_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	cgetbase t0, $c3	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -444,7 +445,7 @@ NESTED(copyincap_c, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 	cjr	$c17
 	move	v0, zero
-END(copyincap_c)
+END(copyincap)
 
 /*
  * Copy specified amount of data from kernel to the user space
