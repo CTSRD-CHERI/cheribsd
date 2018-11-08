@@ -98,12 +98,16 @@
 
 #include <security/mac/mac_framework.h>
 
+#if !defined(CPU_CHERI) || defined(CPU_CHERI128)
 /*
  * Consumers of struct ifreq such as tcpdump assume no pad between ifr_name
  * and ifr_ifru when it is used in SIOCGIFCONF.
+ *
+ * XXX-AM: Ignore the padding restriction for CHERI-256.
  */
 _Static_assert(sizeof(((struct ifreq *)0)->ifr_name) ==
     offsetof(struct ifreq, ifr_ifru), "gap between ifr_name and ifr_ifru");
+#endif
 
 __read_mostly epoch_t net_epoch_preempt;
 __read_mostly epoch_t net_epoch;
