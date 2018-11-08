@@ -1380,7 +1380,6 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 #else
 		tag_loc = __DECONST(char*, dynp);
 #endif
-		rtld_printf("DT_MIPS_RLD_MAP_REL=%p+%p=%p\n", tag_loc, (void*)(uintptr_t)dynp->d_un.d_val, tag_loc + dynp->d_un.d_val);
 		*((Elf_Addr *)(tag_loc + dynp->d_un.d_val)) = (Elf_Addr) &r_debug;
 		break;
 	}
