@@ -41,6 +41,30 @@
 
 #include "rtld.h"
 
+static constexpr uint8_t simple_plt_code[] = {
+#include "plt_code.inc"
+};
+
+// A simple external call trampoline that has the target function and data
+//embedded just before the code
+struct SimpleExternalCallTrampoline {
+	const void* cgp;
+	dlfunc_t target;
+	uint32_t code[4]; // Three instructions + delay slot nop
+	// Code:
+	//
+	// clc $cgp, $zero, -(2* CAP_SIZE) ($c12)
+	// clc $c12, $zero, -CAP_SIZE($c12)
+	// cjr $c12
+	// nop
+	void init(const void* target_cgp, dlfunc_t target_func) {
+		this->cgp = target_cgp;
+		this->target = target_func;
+		static_assert(sizeof(this->code) == sizeof(simple_plt_code), "");
+		__builtin_memcpy(code, simple_plt_code, sizeof(simple_plt_code));
+	}
+};
+
 // Simple PLT stub with data + code embedded. Currently this will be updated to
 // dispatch directly to the resulting function
 // Note: currently this structure is used both for the stub that branches to
@@ -54,15 +78,7 @@ struct CheriPltStub {
 	// to resolving. This could be made a lot more efficient and the first
 	// two capabilities could be removed from the struct but for now the
 	// goal is just to get something that works...
-	const void* cgp;
-	dlfunc_t target;
-	uint32_t plt_code[4]; // Three instructions + delay slot nop
-	// Code:
-	//
-	// clc $cgp, $zero, -(2* CAP_SIZE) ($c12)
-	// clc $c12, $zero, -CAP_SIZE($c12)
-	// cjr $c12
-	// nop
+	struct SimpleExternalCallTrampoline trampoline;
 
 public:
 	// TODO: remove the members and derive these sensibly
@@ -71,22 +87,16 @@ public:
 public:
 	const Obj_Entry *_obj; // FIXME: remove (one trampoline function per object)
 	Elf_Word _r_symndx; // FIXME: remove
-
 };
 
-struct CheriPlt {
+// We need lots of RWX memory mappings for these stubs. Use a non-freeing
+// allocator that just mmap()s RWX memory and does bump-the-pointer
+// FIXME: this is not thread safe!
+class RWXAllocator {
 private:
-	uint8_t* current_allocation = nullptr;
-	const Obj_Entry* obj; // for debugging and assertion
-
-	// TODO: ideally we would just get the maximum size from the
-	// library and do a single mmap but for now we just allocate
-	// 16k chunks each time
-	// FIXME: this needs changes in LLD to emit DT_PLTRELSZ/DT_JMPREL
 	constexpr static size_t BLOCK_SIZE = 16 * 1024 * 1024;
 	size_t current_offset = 0;
-	size_t num_plt_stubs = 0;
-
+	uint8_t* current_allocation = nullptr;
 	uint8_t* allocate_new_block() {
 		int mmap_flags = MAP_PRIVATE | MAP_ANON | MAP_NOCORE;
 		// For now just keep it always mapped as RWX since we will
@@ -95,7 +105,7 @@ private:
 		// writable capability to this region so this should be safe
 		void* result = mmap(nullptr, BLOCK_SIZE, PROT_ALL | PROT_MAX(PROT_ALL),
 		    mmap_flags, -1, 0);
-		dbg("Allocated PLT block for %s: %-#p", obj->path, result);
+		dbg("Allocated new RWX block: %-#p", result);
 		if (result == MAP_FAILED) {
 			dbg("mmap failed: %s", strerror(errno));
 			return nullptr;
@@ -103,22 +113,50 @@ private:
 		current_offset = 0;
 		return reinterpret_cast<uint8_t*>(result);
 	}
-public:
-	CheriPltStub* get_next_free_slot() {
+	void* allocate(size_t size) {
+		// Can only allocate multiples of sizeof(void*)
+		assert(__builtin_is_aligned(size, sizeof(void*)));
 		if (current_allocation == nullptr ||
-		    current_offset + sizeof(CheriPltStub) > BLOCK_SIZE) {
+		    current_offset + size > BLOCK_SIZE) {
 			current_allocation = allocate_new_block();
 			if (current_allocation == nullptr) {
-				_rtld_error("%s: failed to allocate new PLT"
-				    " block", obj->path);
+				_rtld_error("failed to allocate new RWX block");
 				return nullptr;
 			}
 		}
 		uint8_t *next = current_allocation + current_offset;
-		current_offset += sizeof(CheriPltStub);
+		assert(__builtin_is_aligned(next, sizeof(void*)));
+		current_offset += size;
+		assert(current_offset <= BLOCK_SIZE);
+		return cheri_csetbounds(next, size);
+	}
+public:
+	template<typename T> T* allocate() {
+		constexpr size_t allocation_size =
+		    __builtin_align_up(sizeof(T), sizeof(void*));
+		return static_cast<T*>(
+		    __builtin_assume_aligned(allocate(allocation_size), sizeof(void*)));
+	}
+};
+
+// TODO: should probably be per-object to allow freeing on unload?
+// This would also make it easier to share multiple data pointers between stubs
+// since currently we set tight bounds
+static RWXAllocator globalRwxAllocator;
+
+struct CheriPlt {
+private:
+	const Obj_Entry* obj __unused; // for debugging and assertion
+
+	// TODO: ideally we would just get the maximum size from the
+	// library and do a single mmap but for now we just use the bump allocator
+	//  RWXAllocator allocator;
+	size_t num_plt_stubs = 0;
+public:
+	CheriPltStub* get_next_free_slot() {
 		num_plt_stubs++;
-		return reinterpret_cast<CheriPltStub*>(
-		    __builtin_assume_aligned(next, sizeof(void*)));
+		// return allocator.allocate<CheriPltStub>();
+		return globalRwxAllocator.allocate<CheriPltStub>();
 	}
 
 	size_t count() const { return num_plt_stubs; }
@@ -165,11 +203,11 @@ _mips_rtld_bind(void* _plt_stub)
 	assert(cheri_gettag(target_cgp));
 	dbg("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
 	    defobj->strtab + def->st_name, (intmax_t)r_symndx, obj->path,
-	    (void *)plt_stub->target, (void *)target);
+	    (void *)plt_stub->trampoline.target, (void *)target);
 
 	if (!ld_bind_not) {
-		plt_stub->target = target;
-		plt_stub->cgp = target_cgp;
+		plt_stub->trampoline.target = target;
+		plt_stub->trampoline.cgp = target_cgp;
 	}
 	lock_release(rtld_bind_lock, &lockstate);
 	// Setup the target $cgp so that we can actually call the function
@@ -177,12 +215,6 @@ _mips_rtld_bind(void* _plt_stub)
 	__asm__ volatile("cmove $cgp, %0"::"C"(target_cgp));
 	return target;
 }
-
-static constexpr uint8_t plt_code[] = {
-#include "plt_code.inc"
-};
-
-static_assert(sizeof(plt_code) == sizeof(((CheriPltStub*)0)->plt_code), "");
 
 extern "C" bool
 add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
@@ -218,15 +250,21 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	// TODO: if we decide to directly update captable entries for the pc-relative ABI:
 	// plt->captable_entry = where;
 	plt->rtld_cgp = rtldobj->target_cgp;
-	plt->target = (dlfunc_t)&_rtld_bind_start;
 	plt->_obj = obj;	// FIXME: remove
 	plt->_r_symndx = r_symndx; // FIXME: remove
-	__builtin_memcpy(plt->plt_code, plt_code, sizeof(plt->plt_code));
-	void* target_cap = cheri_csetbounds(plt, sizeof(CheriPltStub));
-	plt->cgp = target_cap; // currently self-reference (to beginning of struct)
+	// The target cap will span the whole plt stub:
+
+	// void* target_cap = cheri_csetbounds(plt, sizeof(CheriPltStub));
+	void* target_cap = plt;
+	// currently use a self-reference (to beginning of struct) as data cap
+	plt->trampoline.init(target_cap, (dlfunc_t)&_rtld_bind_start);
 	// but the actual target that is written to the PLT should point to the code:
-	target_cap = cheri_incoffset(target_cap, offsetof(CheriPltStub, plt_code));
+	target_cap = cheri_incoffset(target_cap, offsetof(CheriPltStub, trampoline.code));
+	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
 	dbg("where=%p <- plt_code=%#p", where, target_cap);
+	assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
+	assert(cheri_getlen(target_cap) == sizeof(CheriPltStub) &&
+	    "stub should have tight bounds");
 	*where = target_cap;
 	return true;
 }
