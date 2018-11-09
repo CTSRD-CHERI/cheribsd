@@ -9,11 +9,13 @@ FILESDIR=       ${LIBDIR}
 .undef LIBRARIES_ONLY
 CLEANFILES=	${FILES}
 CFLAGS+=-mxgot -mllvm -mxmxgot
+CFLAGS+=	-DCRT_IRELOC_SUPPRESS
 
 NEED_CHERI=	pure
 
-.PATH: ${.CURDIR}/../common
+.PATH:	${.CURDIR}/../common-cheri
 CFLAGS+=	-I${.CURDIR}/../common		\
+		-I${.CURDIR}/../common-cheri	\
 		-I${.CURDIR}/../../libc/include
 FILES+=	crt1.o					\
 	Scrt1.o					\

@@ -37,7 +37,7 @@
 
 #if !defined(_KERNEL) && __has_feature(capabilities)
 #define	cheri_getreg(x) ({						\
-	__capability void *_cap;					\
+	void * __capability _cap;					\
 	__asm __volatile ("cmove %0, $c" #x : "=C" (_cap));		\
 	_cap;								\
 })

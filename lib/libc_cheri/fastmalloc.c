@@ -46,7 +46,7 @@ register_t  _sb_heapbase;
 size_t	 _sb_heaplen;
 void	*_sb_heapcap;
 
-#define	MALLOC_ALIGN	sizeof(__capability void *)
+#define	MALLOC_ALIGN	sizeof(void * __capability)
 
 void *
 malloc(size_t size)

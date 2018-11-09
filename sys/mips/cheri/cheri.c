@@ -90,12 +90,12 @@ CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
  * for the hybrid ABI.
  */
 #ifdef CPU_CHERI128
-#ifndef CHERI_KERNEL
+#ifndef CHERI_KERNEL /* XXX-AM: change to cheri pure capability check */
 CTASSERT(sizeof(void *) == 8);
 #else
 CTASSERT(sizeof(void *) == 16);
 #endif
-CTASSERT(sizeof(void *__capability) == 16);
+CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct chericap) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
 #else /* CHERI256 */
@@ -104,7 +104,7 @@ CTASSERT(sizeof(void *) == 8);
 #else
 CTASSERT(sizeof(void *) == 32);
 #endif
-CTASSERT(sizeof(void *__capability) == 32);
+CTASSERT(sizeof(void * __capability) == 32);
 CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
 #endif /* CHERI256 */
@@ -274,16 +274,16 @@ SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
  * but not write.
  */
 void * __capability
-cheri_capability_build_user_code(uint32_t perms, vaddr_t basep, size_t length,
-    off_t off)
+_cheri_capability_build_user_code(uint32_t perms, vaddr_t basep, size_t length,
+    off_t off, const char* func, int line)
 {
 
 	KASSERT((perms & ~CHERI_CAP_USER_CODE_PERMS) == 0,
-	    ("perms %x has permission not in CHERI_CAP_USER_CODE_PERMS %x",
-	    perms, CHERI_CAP_USER_CODE_PERMS));
+	    ("%s:%d: perms %x has permission not in CHERI_CAP_USER_CODE_PERMS %x",
+	    func, line, perms, CHERI_CAP_USER_CODE_PERMS));
 
-	return (cheri_capability_build_user_rwx(
-	    perms & CHERI_CAP_USER_CODE_PERMS, basep, length, off));
+	return (_cheri_capability_build_user_rwx(
+	    perms & CHERI_CAP_USER_CODE_PERMS, basep, length, off, func, line));
 }
 
 /*
@@ -292,16 +292,16 @@ cheri_capability_build_user_code(uint32_t perms, vaddr_t basep, size_t length,
  * not execute.
  */
 void * __capability
-cheri_capability_build_user_data(uint32_t perms, vaddr_t basep, size_t length,
-    off_t off)
+_cheri_capability_build_user_data(uint32_t perms, vaddr_t basep, size_t length,
+    off_t off, const char* func, int line)
 {
 
 	KASSERT((perms & ~CHERI_CAP_USER_DATA_PERMS) == 0,
-	    ("perms %x has permission not in CHERI_CAP_USER_DATA_PERMS %x",
-	    perms, CHERI_CAP_USER_DATA_PERMS));
+	    ("%s:%d: perms %x has permission not in CHERI_CAP_USER_DATA_PERMS %x",
+	    func, line, perms, CHERI_CAP_USER_DATA_PERMS));
 
-	return (cheri_capability_build_user_rwx(
-	    perms & CHERI_CAP_USER_DATA_PERMS, basep, length, off));
+	return (_cheri_capability_build_user_rwx(
+	    perms & CHERI_CAP_USER_DATA_PERMS, basep, length, off, func, line));
 }
 
 /*
@@ -312,8 +312,8 @@ cheri_capability_build_user_data(uint32_t perms, vaddr_t basep, size_t length,
  * use should be documented in a comment when it is used.
  */
 void * __capability
-cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
-    off_t off)
+_cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
+    off_t off, const char* func __unused, int line __unused)
 {
 	void * __capability tmpcap;
 
@@ -321,8 +321,8 @@ cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
 	    cheri_setoffset(userspace_cap, basep), length), perms), off);
 
 	KASSERT(cheri_getlen(tmpcap) == length,
-	    ("Constructed capability has wrong length 0x%zx != 0x%zx",
-	    cheri_getlen(tmpcap), length));
+	    ("%s:%d: Constructed capability has wrong length 0x%zx != 0x%zx",
+	    func, line, cheri_getlen(tmpcap), length));
 
 	return (tmpcap);
 }

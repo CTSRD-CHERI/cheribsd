@@ -211,7 +211,7 @@ linux_mmap_common(struct thread *td, uintptr_t addr, size_t len, int prot,
 	 */
 	if (addr != 0 && (bsd_flags & MAP_FIXED) == 0 &&
 	    (bsd_flags & MAP_EXCL) == 0) {
-		error = kern_mmap(td, addr, 0, len, PROT_MAX(PROT_ALL) | prot,
+		error = kern_mmap(td, addr, len, PROT_MAX(PROT_ALL) | prot,
 		    bsd_flags | MAP_FIXED | MAP_EXCL, fd, pos);
 		if (error == 0)
 			goto out;

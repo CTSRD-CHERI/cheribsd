@@ -193,7 +193,7 @@ thread_mask_clear(int mask)
 }
 
 #define	RTLD_LOCK_CNT	3
-struct rtld_lock {
+static struct rtld_lock {
 	void	*handle;
 	int	 mask;
 } rtld_locks[RTLD_LOCK_CNT];

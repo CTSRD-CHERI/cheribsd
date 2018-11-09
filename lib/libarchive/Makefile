@@ -15,7 +15,7 @@ SHLIB_MAJOR= 7
 
 CFLAGS+=	-DPLATFORM_CONFIG_H=\"${.CURDIR}/config_freebsd.h\"
 CFLAGS+=	-I${.OBJDIR}
-.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
+.if ${MACHINE_ARCH:Mmips*c*}
 CFLAGS+=	-Wno-cheri-bitwise-operations
 .endif
 
@@ -48,6 +48,8 @@ INCS=	archive.h archive_entry.h
 
 # Sources to be compiled.
 SRCS=	archive_acl.c					\
+	archive_blake2sp_ref.c				\
+	archive_blake2s_ref.c				\
 	archive_check_magic.c				\
 	archive_cmdline.c				\
 	archive_cryptor.c				\
@@ -109,6 +111,7 @@ SRCS=	archive_acl.c					\
 	archive_read_support_format_lha.c		\
 	archive_read_support_format_mtree.c		\
 	archive_read_support_format_rar.c		\
+	archive_read_support_format_rar5.c		\
 	archive_read_support_format_raw.c		\
 	archive_read_support_format_tar.c		\
 	archive_read_support_format_warc.c		\

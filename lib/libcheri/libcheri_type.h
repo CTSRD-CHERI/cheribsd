@@ -35,7 +35,7 @@
 #error "This code requires a CHERI-aware compiler"
 #endif
 
-__capability void	*libcheri_type_alloc(void);
-__capability void	*libcheri_system_type_alloc(void);
+void * __capability	 libcheri_type_alloc(void);
+void * __capability	 libcheri_system_type_alloc(void);
 
 #endif /* !_LIBCHERI_TYPE_H_ */

@@ -4,7 +4,7 @@
 # machine-independent gen sources
 .PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/gen ${LIBC_SRCTOP}/gen
 
-.if ${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256}
+.if ${MACHINE_ARCH:Mmips*c*}
 CFLAGS+=	-DNO_COMPAT7
 CFLAGS.getpwent.c=	-mxgot
 .endif
@@ -161,7 +161,7 @@ SRCS+=	__getosreldate.c \
 	waitid.c \
 	wordexp.c
 .if ${MK_SYMVER} == yes && \
-    ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
+    ! ${MACHINE_ARCH:Mmips*c*}
 SRCS+=	devname-compat11.c \
 	fts-compat.c \
 	fts-compat11.c \
@@ -496,6 +496,7 @@ MLINKS+=setjmp.3 _longjmp.3 \
 	setjmp.3 siglongjmp.3 \
 	setjmp.3 sigsetjmp.3
 MLINKS+=setmode.3 getmode.3
+MLINKS+=setproctitle.3 setproctitle_fast.3
 MLINKS+=sigsetops.3 sigaddset.3 \
 	sigsetops.3 sigdelset.3 \
 	sigsetops.3 sigemptyset.3 \

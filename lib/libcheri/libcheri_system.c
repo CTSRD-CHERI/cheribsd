@@ -66,7 +66,7 @@ int
 libcheri_system_new(struct sandbox_object *sbop,
     struct sandbox_object **sbopp)
 {
-	__capability void *invoke_pcc;
+	void * __capability invoke_pcc;
 
 	/*
 	 * Construct an object capability for the system-class instance that
@@ -116,7 +116,7 @@ libcheri_system_helloworld(void)
  * capability being passed in.
  */
 int
-libcheri_system_puts(__capability const char *str)
+libcheri_system_puts(const char * __capability str)
 {
 
 	for (; *str != '\0'; str++) {
@@ -136,7 +136,7 @@ libcheri_system_putchar(int c)
 
 int
 libcheri_system_clock_gettime(clockid_t clock_id,
-    __capability struct timespec *tp)
+    struct timespec * __capability tp)
 {
 	int ret;
 	struct timespec ts;
@@ -155,7 +155,7 @@ int
 libcheri_system_calloc(size_t count, size_t size,
     void * __capability * __capability ptrp)
 {
-	__capability void *ptr;
+	void * __capability ptr;
 
 	if ((ptr = calloc_c(count, size)) == NULL)
 		return (-1);
@@ -164,7 +164,7 @@ libcheri_system_calloc(size_t count, size_t size,
 }
 
 int
-libcheri_system_free(__capability void *ptr)
+libcheri_system_free(void * __capability ptr)
 {
 
 	free_c(ptr);
@@ -190,8 +190,8 @@ register_t
 libcheri_system_user_call_fn(register_t methodnum,
     register_t a0, register_t a1, register_t a2, register_t a3,
     register_t a4, register_t a5, register_t a6,
-    __capability void *c3, __capability void *c4, __capability void *c5,
-    __capability void *c6, __capability void *c7)
+    void * __capability c3, void * __capability c4, void * __capability c5,
+    void * __capability c6, void * __capability c7)
 {
 
 	if (methodnum >= CHERI_SYSTEM_USER_BASE &&

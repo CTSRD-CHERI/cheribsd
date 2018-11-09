@@ -760,10 +760,11 @@ cloudabi_sys_file_unlink(struct thread *td,
 
 	if (uap->flags & CLOUDABI_UNLINK_REMOVEDIR)
 		error = kern_rmdirat(td, uap->fd,
-		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE);
+		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, 0);
 	else
 		error = kern_unlinkat(td, uap->fd,
-		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, 0);
+		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, 0,
+		    0);
 	cloudabi_freestr(path);
 	return (error);
 }

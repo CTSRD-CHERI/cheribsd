@@ -21,7 +21,7 @@ TESTS_SUBDIRS+=	sys
 TESTS_SUBDIRS+=	termios
 TESTS_SUBDIRS+=	ttyio
 
-.if ! (${MACHINE_ARCH:Mmips*c128} || ${MACHINE_ARCH:Mmips*c256})
+.if ! ${MACHINE_ARCH:Mmips*c*}
 # Fails to link
 SUBDIR=		tls_dso
 TESTS_SUBDIRS+=	tls

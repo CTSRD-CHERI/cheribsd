@@ -42,6 +42,6 @@ __attribute__((cheri_ccall))
 __attribute__((cheri_method_suffix("_cap"))) /* XXX rmn30 should this attribute be required in the callee? */
 __attribute__((cheri_method_class(cheri_bench)))
 int
-cheri_bench_memcpy(__capability void *dataout,  __capability void *datain, register_t len);
+cheri_bench_memcpy(void * __capability dataout,  void * __capability datain, register_t len);
 
 #endif /* !_LIBEXEC_CHERI_BENCH_HELPER_H_ */

@@ -73,23 +73,23 @@ extern void	libcheri_creturn_vector;
  * Sealing capabilities used to seal invocation, rtld, and creturn
  * capabilities.
  */
-static __capability void	*libcheri_ccall_invoke_type;
-static __capability void	*libcheri_ccall_rtld_type;
-static __capability void	*libcheri_creturn_type;
+static void * __capability	 libcheri_ccall_invoke_type;
+static void * __capability	 libcheri_ccall_rtld_type;
+static void * __capability	 libcheri_creturn_type;
 
 /*
  * Sealed capabilities shared across all sandbox objects: code for invocation
  * and rtld; code and data for creturn.
  */
-static __capability void	*libcheri_ccall_invoke_sealed_code;
-static __capability void	*libcheri_ccall_rtld_sealed_code;
+static void * __capability	 libcheri_ccall_invoke_sealed_code;
+static void * __capability	 libcheri_ccall_rtld_sealed_code;
 static struct cheri_object	 libcheri_creturn_object;
 
 static
 #if _MIPS_SZCAP == 128
 __attribute__ ((aligned(4096)))
 #endif
-__capability void	*libcheri_creturn_data;
+void * __capability	 libcheri_creturn_data;
 
 /*
  * One-time initialisation of libcheri on startup: (1) Initialise sealing
@@ -99,7 +99,7 @@ __capability void	*libcheri_creturn_data;
 void
 libcheri_ccall_init(void)
 {
-	__capability void *cap;
+	void * __capability cap;
 
 	/*
 	 * Initialise sealing capabilities for invocation, rtld, and creturn,
@@ -148,7 +148,7 @@ libcheri_ccall_init(void)
  */
 struct cheri_object
 libcheri_sandbox_make_sealed_invoke_object(
-    __capability struct sandbox_object *sbop)
+    struct sandbox_object * __capability sbop)
 {
 	struct cheri_object co;
 
@@ -164,7 +164,7 @@ libcheri_sandbox_make_sealed_invoke_object(
 
 struct cheri_object
 libcheri_sandbox_make_sealed_rtld_object(
-    __capability struct sandbox_object *sbop)
+    struct sandbox_object * __capability sbop)
 {
 	struct cheri_object co;
 

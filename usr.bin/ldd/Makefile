@@ -6,4 +6,6 @@ SRCS=		ldd.c
 SRCS+=		sods.c
 .endif
 
+CFLAGS+=	-I${SRCTOP}/libexec/rtld-elf
+
 .include <bsd.prog.mk>

@@ -53,28 +53,47 @@ __FBSDID("$FreeBSD$");
 #endif
 
 /*
- *	bcopy(caddr_t src, caddr_t dst, unsigned int len)
+ *	memmove(caddr_t dst, caddr_t src, unsigned int len)
  *
- *	a0 	src address
- *	a1	dst address
+ *	a0 	dst address
+ *	a1	src address
  *	a2	length
  */
 
-#define	SRCREG	a0
-#define	DSTREG	a1
+#define	DSTREG	a0
+#define	SRCREG	a1
 #define	SIZEREG	a2
 
-LEAF(memcpy)
-XLEAF(memmove)
-	.set	noat
-	.set	noreorder
+.set	noreorder
 
+.macro DO_MAGIC_NOP nop_code, return_label=.Lmemmove_return
+	PTR_LI	v0, 0
+	PTR_LI	v1, \nop_code	# selector for QEMU magic nop
+	ori	$0, $0, 0xC0DE	# call QEMU magic nop
+	/* If the magic nop changed $v1 to 0xdec0ded then we can return */
+	beq	v1, 0xdec0ded, \return_label
+	nop
+.endm
+
+LEAF(bcopy)
+XLEAF(ovbcopy)
+	DO_MAGIC_NOP 7
+	# swap argument registers:
 	move	v0, a0
 	move	a0, a1
 	move	a1, v0
-
-XLEAF(bcopy)
-XLEAF(ovbcopy)
+	b .Lmips_implementation
+	nop
+XLEAF(memcpy)
+	DO_MAGIC_NOP 3
+	b .Lmips_implementation
+	nop
+XLEAF(memmove)
+	DO_MAGIC_NOP 5
+.Lmips_implementation:
+	.set	noat
+	/* set up return value, while we still can */
+	move	v0,DSTREG
 	/*
 	 *	Make sure we can copy forwards.
 	 */
@@ -256,6 +275,7 @@ XLEAF(ovbcopy)
 	bgtz		SIZEREG,1b
 	PTR_SUBU	DSTREG,1
 
+.Lmemmove_return:
 4:	# copydone
 	j	ra
 	nop
@@ -284,4 +304,6 @@ XLEAF(ovbcopy)
 
 	.set	reorder
 	.set	at
-END(memcpy)
+XEND(memmove)
+XEND(memcpy)
+END(bcopy)

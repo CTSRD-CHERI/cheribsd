@@ -71,7 +71,7 @@
 struct cheri_object cheri_tcpdump;
 
 typedef int(*sandbox_selector)(int dlt, size_t len,
-	    __capability const u_char *data, void *selector_dta);
+	    const u_char * __capability data, void *selector_dta);
 
 struct tcpdump_sandbox {
 	STAILQ_ENTRY(tcpdump_sandbox)	 tds_entry;
@@ -84,7 +84,7 @@ struct tcpdump_sandbox {
 
 	struct tcpdump_sandbox	**tds_proto_sandboxes;
 	int			 tds_num_proto_sandboxes;
-	__capability struct cheri_object *tds_proto_sandbox_objects;
+	struct cheri_object * __capability tds_proto_sandbox_objects;
 
 	/* Lifetime stats for sandboxs matching selector */
 	int		 tds_faults;	/* Number of times the sandbox has
@@ -233,7 +233,7 @@ tcpdump_sandbox_reset(struct tcpdump_sandbox *sb)
 
 static int
 tds_select_all(int dlt __unused, size_t len __unused,
-    __capability const u_char *data __unused, void *sd __unused)
+    const u_char * __capability data __unused, void *sd __unused)
 {
 
 	/* Accept all packets */
@@ -241,7 +241,7 @@ tds_select_all(int dlt __unused, size_t len __unused,
 }
 
 static int
-tds_select_ipv4(int dlt, size_t len, __capability const u_char *data,
+tds_select_ipv4(int dlt, size_t len, const u_char * __capability data,
     void *sd __unused)
 {
 	const struct ether_header *eh;
@@ -259,7 +259,7 @@ tds_select_ipv4(int dlt, size_t len, __capability const u_char *data,
 }
 
 static int
-tds_select_ipv4_fromlocal(int dlt, size_t len, __capability const u_char *data,
+tds_select_ipv4_fromlocal(int dlt, size_t len, const u_char * __capability data,
     void *sd __unused)
 {
 	const struct ip *iphdr;
@@ -277,7 +277,7 @@ tds_select_ipv4_fromlocal(int dlt, size_t len, __capability const u_char *data,
 
 
 static int
-tds_select_ipv4_hash(int dlt, size_t len, __capability const u_char *data,
+tds_select_ipv4_hash(int dlt, size_t len, const u_char * __capability data,
     void *sd)
 {
 	int mod;
@@ -415,7 +415,7 @@ tcpdump_sandboxes_reset_all(struct tcpdump_sandbox_list *list)
 
 static struct tcpdump_sandbox *
 tcpdump_sandbox_find(struct tcpdump_sandbox_list *list, int dlt, size_t len,
-    __capability const u_char *data)
+    const u_char * __capability data)
 {
 	struct tcpdump_sandbox *sb;
 	const u_char *ipaddr;
@@ -442,11 +442,11 @@ tcpdump_sandbox_find(struct tcpdump_sandbox_list *list, int dlt, size_t len,
 
 static int
 tcpdump_sandbox_invoke(struct tcpdump_sandbox *sb, netdissect_options *ndo,
-    const struct pcap_pkthdr *hdr, __capability const u_char *data)
+    const struct pcap_pkthdr *hdr, const u_char * __capability data)
 {
 	int i, ret;
 	struct timeval now;
-	__capability const u_char *save_packetp, *save_snapend;
+	const u_char * __capability save_packetp, * __capability save_snapend;
 
 	/* Reset the sandbox if time or packet count exceeded */
 	if (ctdc->ctdc_sb_max_packets > 0 &&
@@ -679,7 +679,7 @@ has_printer(int type)
 
 void
 pretty_print_packet(netdissect_options *ndo, const struct pcap_pkthdr *h,
-    __capability const u_char *sp, u_int packets_captured)
+    const u_char * __capability sp, u_int packets_captured)
 {
 	int ret;
 	struct tcpdump_sandbox *sb;

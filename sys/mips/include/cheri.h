@@ -704,8 +704,8 @@ void cheri_init_capabilities(void);
 #endif
 
 struct sysentvec;
-void	cheri_capability_set_user_sealcap(void *__capability *);
-void	cheri_capability_set_user_sigcode(void *__capability *,
+void	cheri_capability_set_user_sealcap(void * __capability *);
+void	cheri_capability_set_user_sigcode(void * __capability *,
 	    struct sysentvec *);
 int	cheri_capcause_to_sicode(register_t capcause);
 

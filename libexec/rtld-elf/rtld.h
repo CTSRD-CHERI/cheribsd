@@ -47,13 +47,18 @@
 #include <sys/types.h>
 #include <sys/queue.h>
 
+#include <dlfcn.h>
 #include <elf-hints.h>
 #include <link.h>
 #include <stdarg.h>
+/* We might as well do booleans like C++. */
+#include <stdbool.h>
 #include <setjmp.h>
 #include <stddef.h>
 
 #include "rtld_lock.h"
+
+__BEGIN_DECLS
 
 /* The macros in sys/param.h evaluate their arguments again ... */
 /* XXXAR: I wish I could just use C++ and std::min() */
@@ -69,15 +74,10 @@
 #define NEW(type)	((type *) xmalloc(sizeof(type)))
 #define CNEW(type)	((type *) xcalloc(1, sizeof(type)))
 
-/* We might as well do booleans like C++. */
-typedef unsigned char bool;
-#define false	0
-#define true	1
-
 extern size_t tls_last_offset;
 extern size_t tls_last_size;
 extern size_t tls_static_space;
-extern int tls_dtv_generation;
+extern Elf_Addr tls_dtv_generation;
 extern int tls_max_index;
 
 extern int npagesizes;
@@ -89,6 +89,7 @@ extern char **environ;
 
 struct stat;
 struct Struct_Obj_Entry;
+struct CheriExports;
 
 /* Lists of shared objects */
 typedef struct Struct_Objlist_Entry {
@@ -185,11 +186,12 @@ typedef struct Struct_Obj_Entry {
      */
     Elf_Addr text_rodata_start;
     Elf_Addr text_rodata_end;
-    caddr_t text_rodata_cap;	/* Capability for the executable mapping */
+    const char* text_rodata_cap;	/* Capability for the executable mapping */
+    struct CheriExports *cheri_exports;	/* Thunks for external calls */
 #endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */
-    caddr_t entry;		/* Entry point */
+    dlfunc_t entry;		/* Entry point */
     const Elf_Phdr *phdr;	/* Program header if it is mapped, else NULL */
     size_t phsize;		/* Size of program header in bytes */
     const char *interp;		/* Pathname of the interpreter, if any */
@@ -251,12 +253,12 @@ typedef struct Struct_Obj_Entry {
     Elf32_Word maskwords_bm_gnu;  	/* Bloom filter words - 1 (bitmask) */
     Elf32_Word shift2_gnu;		/* Bloom filter shift count */
     Elf32_Word dynsymcount;		/* Total entries in dynsym table */
-    Elf_Addr *bloom_gnu;		/* Bloom filter used by GNU hash func */
+    const Elf_Addr *bloom_gnu;		/* Bloom filter used by GNU hash func */
     const Elf_Hashelt *buckets_gnu;	/* GNU hash table bucket array */
     const Elf_Hashelt *chain_zero_gnu;	/* GNU hash table value array (Zeroed) */
 
-    char *rpath;		/* Search path specified in object */
-    char *runpath;		/* Search path with different priority */
+    const char *rpath;		/* Search path specified in object */
+    const char *runpath;	/* Search path with different priority */
     Needed_Entry *needed;	/* Shared objects needed by this one (%) */
     Needed_Entry *needed_filtees;
     Needed_Entry *needed_aux_filtees;
@@ -408,6 +410,14 @@ void _rtld_error(const char *, ...) __printflike(1, 2) __exported;
 void rtld_die(void) __dead2;
 #define rtld_fatal(args...)	do { _rtld_error(args); rtld_die(); } while (0)
 #define rtld_require(cond, args...) if (!(cond)) { rtld_fatal(args); }
+static inline const char*
+strtab_value(const Obj_Entry* obj, size_t offset) {
+	return obj->strtab + offset;
+}
+static inline const char*
+symname(const Obj_Entry* obj, size_t r_symndx) {
+	return strtab_value(obj, obj->symtab[r_symndx].st_name);
+}
 const char *rtld_strerror(int);
 Obj_Entry *map_object(int, const char *, const struct stat *, const char *);
 void *xcalloc(size_t, size_t);
@@ -424,6 +434,7 @@ void dump_obj_relocations(Obj_Entry *);
 void dump_Elf_Rel(Obj_Entry *, const Elf_Rel *, u_long);
 void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 
+__END_DECLS
 
 /* rtld_machdep.h depends on struct Obj_Entry and _rtld_error() */
 #include "rtld_machdep.h"
@@ -442,6 +453,8 @@ void dump_Elf_Rela(Obj_Entry *, const Elf_Rela *, u_long);
 #define make_data_pointer(def, defobj)	(defobj->relocbase + def->st_value)
 #endif
 
+
+__BEGIN_DECLS
 /*
  * Function declarations.
  */
@@ -485,5 +498,7 @@ void allocate_initial_tls(Obj_Entry *);
 #ifdef __CHERI_PURE_CAPABILITY__
 void process___cap_relocs(Obj_Entry*);
 #endif
+
+__END_DECLS
 
 #endif /* } */

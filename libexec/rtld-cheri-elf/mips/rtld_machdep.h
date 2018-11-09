@@ -42,6 +42,8 @@
 #define dbg(...)
 #endif
 
+__BEGIN_DECLS
+
 struct Struct_Obj_Entry;
 
 /* Return the address of the .dynamic section in the dynamic linker. */
@@ -68,17 +70,17 @@ get_codesegment(const struct Struct_Obj_Entry *obj) {
 	return obj->text_rodata_cap;
 }
 
-static inline const void*
+static inline dlfunc_t
 make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 {
 	const void* ret = get_codesegment(defobj) + def->st_value;
 
 	/* Remove store and seal permissions */
-	cheri_andperm(ret, ~FUNC_PTR_REMOVE_PERMS);
+	ret = cheri_andperm(ret, ~FUNC_PTR_REMOVE_PERMS);
 	if (defobj->restrict_pcc_strict)
-		return cheri_csetbounds(ret, def->st_size);
+		return (dlfunc_t)cheri_csetbounds(ret, def->st_size);
 	if (defobj->restrict_pcc_basic)
-		return ret;
+		return __DECONST(dlfunc_t, ret); /* Shouldn't a function pointer be const implicitly? */
 
 	/*
 	 * Otherwise we need to give it full address space range (including
@@ -87,7 +89,7 @@ make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	 * TODO: remove once we have decided on a sane(r) ABI
 	 */
 	assert(cheri_getbase(cheri_getpcc()) == 0);
-	return cheri_setoffset(cheri_getpcc(), (vaddr_t)ret);
+	return (dlfunc_t)cheri_setoffset(cheri_getpcc(), (vaddr_t)ret);
 }
 
 static inline void*
@@ -96,18 +98,18 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	void* ret = defobj->relocbase + def->st_value;
 
 	/* Remove execute and seal permissions */
-	cheri_andperm(ret, ~DATA_PTR_REMOVE_PERMS);
+	ret = cheri_andperm(ret, ~DATA_PTR_REMOVE_PERMS);
 	/* TODO: can we always set bounds here or does it break compat? */
 	ret = cheri_csetbounds(ret, def->st_size);
 	return ret;
 }
 
-static inline const void*
+static inline dlfunc_t
 vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
 	const void* text = get_codesegment(obj);
 	dbg_assert(code_addr >= (vaddr_t)text);
 	dbg_assert(code_addr < (vaddr_t)text + cheri_getlen(text));
-	return cheri_copyaddress(text, cheri_fromint(code_addr));
+	return (dlfunc_t)cheri_copyaddress(text, cheri_fromint(code_addr));
 }
 
 #define set_bounds_if_nonnull(ptr, size)	\
@@ -145,7 +147,7 @@ typedef struct {
  * Lazy binding entry point, called via PLT.
  */
 void _rtld_bind_start(void);
-
+void *_mips_get_tls(void);
 extern void *__tls_get_addr(tls_index *ti);
 
 #define	RTLD_DEFAULT_STACK_PF_EXEC	PF_X
@@ -211,11 +213,14 @@ _rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_p
 static inline void
 fix_obj_mapping_cap_permissions(Obj_Entry *obj, const char* path __unused)
 {
-	obj->text_rodata_cap = cheri_andperm(obj->text_rodata_cap, ~FUNC_PTR_REMOVE_PERMS);
-	obj->relocbase = cheri_andperm(obj->relocbase, ~DATA_PTR_REMOVE_PERMS);
-	obj->mapbase = cheri_andperm(obj->mapbase, ~DATA_PTR_REMOVE_PERMS);
+	obj->text_rodata_cap = (const char*)cheri_andperm(obj->text_rodata_cap, ~FUNC_PTR_REMOVE_PERMS);
+	obj->relocbase = (char*)cheri_andperm(obj->relocbase, ~DATA_PTR_REMOVE_PERMS);
+	obj->mapbase = (char*)cheri_andperm(obj->mapbase, ~DATA_PTR_REMOVE_PERMS);
 	dbg("%s:\n\tmapbase=%-#p\n\trelocbase=%-#p\n\ttext_rodata=%-#p", path,
 	    obj->mapbase, obj->relocbase, obj->text_rodata_cap);
 }
+
+__END_DECLS
+
 
 #endif

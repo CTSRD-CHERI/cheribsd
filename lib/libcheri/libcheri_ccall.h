@@ -41,9 +41,9 @@
  */
 struct sandbox_object;
 struct cheri_object	libcheri_sandbox_make_sealed_invoke_object(
-			    __capability struct sandbox_object *sbop);
+			    struct sandbox_object * __capability sbop);
 struct cheri_object	libcheri_sandbox_make_sealed_rtld_object(
-			    __capability struct sandbox_object *sbop);
+			    struct sandbox_object * __capability sbop);
 struct cheri_object	libcheri_make_sealed_return_object(void);
 
 #endif /* _LIBCHERI_CCALL_H_ */

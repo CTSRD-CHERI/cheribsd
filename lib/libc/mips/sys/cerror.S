@@ -100,10 +100,10 @@ NESTED_NOPROFILE(__cerror, CALLFRAME_SIZ, ra)
 	daddiu		t0, zero, CALLFRAME_SIZ
 	cincoffset	$csp, $csp, t0
 
+	# return -1 in all return registers
 	li		v0, -1
 	li		v1, -1
-	cfromptr	$c3, $c0, zero			# return integer v0
-	csetoffset	$c3, $c3, v0			# via first return cap
+	cincoffset	$c3, $cnull, -1
 
 	cjr		$c17
 #endif

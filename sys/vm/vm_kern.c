@@ -252,13 +252,13 @@ kmem_alloc_attr(vm_size_t size, int flags, vm_paddr_t low, vm_paddr_t high,
 	vm_ptr_t addr;
 	int domain;
 
-	vm_domainset_iter_malloc_init(&di, kernel_object, &domain, &flags);
+	vm_domainset_iter_policy_init(&di, DOMAINSET_RR(), &domain, &flags);
 	do {
 		addr = kmem_alloc_attr_domain(domain, size, flags, low, high,
 		    memattr);
 		if (addr != 0)
 			break;
-	} while (vm_domainset_iter_malloc(&di, &domain, &flags) == 0);
+	} while (vm_domainset_iter_policy(&di, &domain) == 0);
 
 	return (addr);
 }
@@ -338,13 +338,13 @@ kmem_alloc_contig(vm_size_t size, int flags, vm_paddr_t low, vm_paddr_t high,
 	vm_ptr_t addr;
 	int domain;
 
-	vm_domainset_iter_malloc_init(&di, kernel_object, &domain, &flags);
+	vm_domainset_iter_policy_init(&di, DOMAINSET_RR(), &domain, &flags);
 	do {
 		addr = kmem_alloc_contig_domain(domain, size, flags, low, high,
 		    alignment, boundary, memattr);
 		if (addr != 0)
 			break;
-	} while (vm_domainset_iter_malloc(&di, &domain, &flags) == 0);
+	} while (vm_domainset_iter_policy(&di, &domain) == 0);
 
 	return (addr);
 }
@@ -450,12 +450,12 @@ kmem_malloc(vm_size_t size, int flags)
 	vm_ptr_t addr;
 	int domain;
 
-	vm_domainset_iter_malloc_init(&di, kernel_object, &domain, &flags);
+	vm_domainset_iter_policy_init(&di, DOMAINSET_RR(), &domain, &flags);
 	do {
 		addr = kmem_malloc_domain(domain, size, flags);
 		if (addr != 0)
 			break;
-	} while (vm_domainset_iter_malloc(&di, &domain, &flags) == 0);
+	} while (vm_domainset_iter_policy(&di, &domain) == 0);
 
 	return (addr);
 }
@@ -551,11 +551,15 @@ kmem_back(vm_object_t object, vm_ptr_t addr, vm_size_t size, int flags)
 		 */
 		if (vm_ndomains > 1) {
 			domain = (addr >> KVA_QUANTUM_SHIFT) % vm_ndomains;
+			while (VM_DOMAIN_EMPTY(domain))
+				domain++;
 			next = roundup2(addr + 1, KVA_QUANTUM);
 			if (next > end || next < start)
 				next = end;
-		} else
+		} else {
+			domain = 0;
 			next = end;
+		}
 		rv = kmem_back_domain(domain, object, addr, next - addr, flags);
 		if (rv != KERN_SUCCESS) {
 			kmem_unback(object, start, addr - start);

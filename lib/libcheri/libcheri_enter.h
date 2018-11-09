@@ -40,9 +40,9 @@ typedef register_t (*libcheri_system_user_fn_t)(
 	    register_t methodnum,
 	    register_t a0, register_t a1, register_t a2, register_t a3,
 	    register_t a4, register_t a5, register_t a6, register_t a7,
-	    __capability void *c3, __capability void *c4,
-	    __capability void *c5, __capability void *c6,
-	    __capability void *c7)
+	    void * __capability c3, void * __capability c4,
+	    void * __capability c5, void * __capability c6,
+	    void * __capability c7)
 	    __attribute__((cheri_ccall)); /* XXXRW: Will be ccheri_ccallee. */
 
 void	libcheri_system_user_register_fn(libcheri_system_user_fn_t fn_ptr);

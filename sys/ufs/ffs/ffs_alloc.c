@@ -3400,7 +3400,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		mp = NULL;
 		error = kern_unlinkat(td, AT_FDCWD,
 		    __USER_CAP_STR((char *)(intptr_t)cmd.value),
-		    UIO_USERSPACE, (ino_t)cmd.size);
+		    UIO_USERSPACE, 0, (ino_t)cmd.size);
 		break;
 
 	case FFS_SET_INODE:

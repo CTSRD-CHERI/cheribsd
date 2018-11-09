@@ -11,14 +11,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 {
 	int64_t *iarg  = (int64_t *) uarg;
 	switch (sysnum) {
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
-	/* cheriabi_syscall */
+	/* nosys */
 	case 0: {
-		struct cheriabi_syscall_args *p = params;
-		iarg[0] = p->number; /* int */
-		*n_args = 1;
+		*n_args = 0;
 		break;
 	}
 	/* sys_exit */
@@ -334,8 +329,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_sigaltstack */
 	case 53: {
 		struct cheriabi_sigaltstack_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->ss; /* const cheriabi_stack_t * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->oss; /* cheriabi_stack_t * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->ss; /* const struct sigaltstack_c * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->oss; /* struct sigaltstack_c * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -383,8 +378,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 59: {
 		struct cheriabi_execve_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->fname; /* const char * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->argv; /* void * __capability * __capability */
-		uarg[2] = (__cheri_addr intptr_t) p->envv; /* void * __capability * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->argv; /* char * __capability * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->envv; /* char * __capability * __capability */
 		*n_args = 3;
 		break;
 	}
@@ -799,7 +794,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->debug_level; /* int */
 		iarg[1] = p->grace_period; /* int */
 		iarg[2] = p->addr_count; /* int */
-		uarg[3] = (__cheri_addr intptr_t) p->addrs; /* void * __capability * __capability */
+		uarg[3] = (__cheri_addr intptr_t) p->addrs; /* char * __capability * __capability */
 		*n_args = 4;
 		break;
 	}
@@ -897,7 +892,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	}
 	/* cheriabi_getrlimit */
 	case 194: {
-		struct cheriabi_getrlimit_args *p = params;
+		struct cheriabi___getrlimit_args *p = params;
 		uarg[0] = p->which; /* u_int */
 		uarg[1] = (__cheri_addr intptr_t) p->rlp; /* struct rlimit * __capability */
 		*n_args = 2;
@@ -905,10 +900,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	}
 	/* cheriabi_setrlimit */
 	case 195: {
-		struct cheriabi_setrlimit_args *p = params;
+		struct cheriabi___setrlimit_args *p = params;
 		uarg[0] = p->which; /* u_int */
 		uarg[1] = (__cheri_addr intptr_t) p->rlp; /* struct rlimit * __capability */
 		*n_args = 2;
+		break;
+	}
+	/* nosys */
+	case 198: {
+		*n_args = 0;
 		break;
 	}
 	/* cheriabi___sysctl */
@@ -1034,7 +1034,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct cheriabi_semop_args *p = params;
 		iarg[0] = p->semid; /* int */
 		uarg[1] = (__cheri_addr intptr_t) p->sops; /* struct sembuf * __capability */
-		uarg[2] = p->nsops; /* u_int */
+		uarg[2] = p->nsops; /* size_t */
 		*n_args = 3;
 		break;
 	}
@@ -1050,7 +1050,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 226: {
 		struct cheriabi_msgsnd_args *p = params;
 		iarg[0] = p->msqid; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->msgp; /* void * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->msgp; /* const void * __capability */
 		uarg[2] = p->msgsz; /* size_t */
 		iarg[3] = p->msgflg; /* int */
 		*n_args = 4;
@@ -1087,7 +1087,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 231: {
 		struct shmget_args *p = params;
 		iarg[0] = p->key; /* key_t */
-		iarg[1] = p->size; /* int */
+		uarg[1] = p->size; /* size_t */
 		iarg[2] = p->shmflg; /* int */
 		*n_args = 3;
 		break;
@@ -1448,6 +1448,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 1;
 		break;
 	}
+	/* yield */
+	case 321: {
+		*n_args = 0;
+		break;
+	}
 	/* mlockall */
 	case 324: {
 		struct mlockall_args *p = params;
@@ -1549,6 +1554,17 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct cheriabi_jail_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->jailp; /* struct jail_c * __capability */
 		*n_args = 1;
+		break;
+	}
+	/* cheriabi_nnpfs_syscall */
+	case 339: {
+		struct cheriabi_nnpfs_syscall_args *p = params;
+		iarg[0] = p->operation; /* int */
+		uarg[1] = (__cheri_addr intptr_t) p->a_pathP; /* char * __capability */
+		iarg[2] = p->a_opcode; /* int */
+		uarg[3] = (__cheri_addr intptr_t) p->a_paramsP; /* void * __capability */
+		iarg[4] = p->a_followSymlinks; /* int */
+		*n_args = 5;
 		break;
 	}
 	/* cheriabi_sigprocmask */
@@ -1780,6 +1796,19 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
+	/* afs3_syscall */
+	case 377: {
+		struct afs3_syscall_args *p = params;
+		iarg[0] = p->syscall; /* long */
+		iarg[1] = p->parm1; /* long */
+		iarg[2] = p->parm2; /* long */
+		iarg[3] = p->parm3; /* long */
+		iarg[4] = p->parm4; /* long */
+		iarg[5] = p->parm5; /* long */
+		iarg[6] = p->parm6; /* long */
+		*n_args = 7;
+		break;
+	}
 	/* cheriabi_nmount */
 	case 378: {
 		struct cheriabi_nmount_args *p = params;
@@ -1883,6 +1912,75 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* ksem_close */
+	case 400: {
+		struct ksem_close_args *p = params;
+		iarg[0] = p->id; /* semid_t */
+		*n_args = 1;
+		break;
+	}
+	/* ksem_post */
+	case 401: {
+		struct ksem_post_args *p = params;
+		iarg[0] = p->id; /* semid_t */
+		*n_args = 1;
+		break;
+	}
+	/* ksem_wait */
+	case 402: {
+		struct ksem_wait_args *p = params;
+		iarg[0] = p->id; /* semid_t */
+		*n_args = 1;
+		break;
+	}
+	/* ksem_trywait */
+	case 403: {
+		struct ksem_trywait_args *p = params;
+		iarg[0] = p->id; /* semid_t */
+		*n_args = 1;
+		break;
+	}
+	/* cheriabi_ksem_init */
+	case 404: {
+		struct cheriabi_ksem_init_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->idp; /* semid_t * __capability */
+		uarg[1] = p->value; /* unsigned int */
+		*n_args = 2;
+		break;
+	}
+	/* cheriabi_ksem_open */
+	case 405: {
+		struct cheriabi_ksem_open_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->idp; /* semid_t * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
+		iarg[2] = p->oflag; /* int */
+		iarg[3] = p->mode; /* mode_t */
+		uarg[4] = p->value; /* unsigned int */
+		*n_args = 5;
+		break;
+	}
+	/* cheriabi_ksem_unlink */
+	case 406: {
+		struct cheriabi_ksem_unlink_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
+		*n_args = 1;
+		break;
+	}
+	/* cheriabi_ksem_getvalue */
+	case 407: {
+		struct cheriabi_ksem_getvalue_args *p = params;
+		iarg[0] = p->id; /* semid_t */
+		uarg[1] = (__cheri_addr intptr_t) p->val; /* int * __capability */
+		*n_args = 2;
+		break;
+	}
+	/* ksem_destroy */
+	case 408: {
+		struct ksem_destroy_args *p = params;
+		iarg[0] = p->id; /* semid_t */
+		*n_args = 1;
+		break;
+	}
 	/* cheriabi___mac_get_pid */
 	case 409: {
 		struct cheriabi___mac_get_pid_args *p = params;
@@ -1942,8 +2040,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 415: {
 		struct cheriabi___mac_execve_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->fname; /* char * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->argv; /* void * __capability * __capability */
-		uarg[2] = (__cheri_addr intptr_t) p->envv; /* void * __capability * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->argv; /* char * __capability * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->envv; /* char * __capability * __capability */
 		uarg[3] = (__cheri_addr intptr_t) p->mac_p; /* struct mac_c * __capability */
 		*n_args = 4;
 		break;
@@ -2102,6 +2200,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[2] = (__cheri_addr intptr_t) p->data; /* void * __capability */
 		uarg[3] = p->nbytes; /* size_t */
 		*n_args = 4;
+		break;
+	}
+	/* cheriabi_ksem_timedwait */
+	case 441: {
+		struct cheriabi_ksem_timedwait_args *p = params;
+		iarg[0] = p->id; /* semid_t */
+		uarg[1] = (__cheri_addr intptr_t) p->abstime; /* const struct timespec * __capability */
+		*n_args = 2;
 		break;
 	}
 	/* cheriabi_thr_suspend */
@@ -2326,7 +2432,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->sd; /* int */
 		uarg[1] = (__cheri_addr intptr_t) p->msg; /* void * __capability */
 		iarg[2] = p->mlen; /* int */
-		uarg[3] = (__cheri_addr intptr_t) p->to; /* struct sockaddr * __capability */
+		uarg[3] = (__cheri_addr intptr_t) p->to; /* const struct sockaddr * __capability */
 		iarg[4] = p->tolen; /* __socklen_t */
 		uarg[5] = (__cheri_addr intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * __capability */
 		iarg[6] = p->flags; /* int */
@@ -2339,7 +2445,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->sd; /* int */
 		uarg[1] = (__cheri_addr intptr_t) p->iov; /* struct iovec_c * __capability */
 		iarg[2] = p->iovlen; /* int */
-		uarg[3] = (__cheri_addr intptr_t) p->to; /* struct sockaddr * __capability */
+		uarg[3] = (__cheri_addr intptr_t) p->to; /* const struct sockaddr * __capability */
 		iarg[4] = p->tolen; /* __socklen_t */
 		uarg[5] = (__cheri_addr intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * __capability */
 		iarg[6] = p->flags; /* int */
@@ -2524,8 +2630,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 492: {
 		struct cheriabi_fexecve_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->argv; /* void * __capability * __capability */
-		uarg[2] = (__cheri_addr intptr_t) p->envv; /* void * __capability * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->argv; /* char * __capability * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->envv; /* char * __capability * __capability */
 		*n_args = 3;
 		break;
 	}
@@ -2841,12 +2947,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_wait6 */
 	case 532: {
 		struct cheriabi_wait6_args *p = params;
-		iarg[0] = p->idtype; /* int */
+		iarg[0] = p->idtype; /* idtype_t */
 		iarg[1] = p->id; /* id_t */
 		uarg[2] = (__cheri_addr intptr_t) p->status; /* int * __capability */
 		iarg[3] = p->options; /* int */
 		uarg[4] = (__cheri_addr intptr_t) p->wrusage; /* struct __wrusage * __capability */
-		uarg[5] = (__cheri_addr intptr_t) p->info; /* struct siginfo_c * __capability */
+		uarg[5] = (__cheri_addr intptr_t) p->info; /* struct __siginfo_c * __capability */
 		*n_args = 6;
 		break;
 	}
@@ -2950,7 +3056,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* cheriabi_procctl */
 	case 544: {
 		struct cheriabi_procctl_args *p = params;
-		iarg[0] = p->idtype; /* int */
+		iarg[0] = p->idtype; /* idtype_t */
 		iarg[1] = p->id; /* id_t */
 		iarg[2] = p->com; /* int */
 		uarg[3] = (__cheri_addr intptr_t) p->data; /* void * __capability */
@@ -3126,18 +3232,8 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 {
 	const char *p = NULL;
 	switch (sysnum) {
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
-	/* cheriabi_syscall */
+	/* nosys */
 	case 0:
-		switch(ndx) {
-		case 0:
-			p = "int";
-			break;
-		default:
-			break;
-		};
 		break;
 	/* sys_exit */
 	case 1:
@@ -3625,10 +3721,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 53:
 		switch(ndx) {
 		case 0:
-			p = "userland const cheriabi_stack_t * __capability";
+			p = "userland const struct sigaltstack_c * __capability";
 			break;
 		case 1:
-			p = "userland cheriabi_stack_t * __capability";
+			p = "userland struct sigaltstack_c * __capability";
 			break;
 		default:
 			break;
@@ -3706,10 +3802,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "userland void * __capability * __capability";
+			p = "userland char * __capability * __capability";
 			break;
 		case 2:
-			p = "userland void * __capability * __capability";
+			p = "userland char * __capability * __capability";
 			break;
 		default:
 			break;
@@ -4400,7 +4496,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland void * __capability * __capability";
+			p = "userland char * __capability * __capability";
 			break;
 		default:
 			break;
@@ -4576,6 +4672,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* nosys */
+	case 198:
+		break;
 	/* cheriabi___sysctl */
 	case 202:
 		switch(ndx) {
@@ -4732,7 +4831,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland struct sembuf * __capability";
 			break;
 		case 2:
-			p = "u_int";
+			p = "size_t";
 			break;
 		default:
 			break;
@@ -4758,7 +4857,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __capability";
+			p = "userland const void * __capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -4825,7 +4924,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "key_t";
 			break;
 		case 1:
-			p = "int";
+			p = "size_t";
 			break;
 		case 2:
 			p = "int";
@@ -5406,6 +5505,9 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* yield */
+	case 321:
+		break;
 	/* mlockall */
 	case 324:
 		switch(ndx) {
@@ -5554,6 +5656,28 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		switch(ndx) {
 		case 0:
 			p = "userland struct jail_c * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_nnpfs_syscall */
+	case 339:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland char * __capability";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "userland void * __capability";
+			break;
+		case 4:
+			p = "int";
 			break;
 		default:
 			break;
@@ -5959,6 +6083,34 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* afs3_syscall */
+	case 377:
+		switch(ndx) {
+		case 0:
+			p = "long";
+			break;
+		case 1:
+			p = "long";
+			break;
+		case 2:
+			p = "long";
+			break;
+		case 3:
+			p = "long";
+			break;
+		case 4:
+			p = "long";
+			break;
+		case 5:
+			p = "long";
+			break;
+		case 6:
+			p = "long";
+			break;
+		default:
+			break;
+		};
+		break;
 	/* cheriabi_nmount */
 	case 378:
 		switch(ndx) {
@@ -6136,6 +6288,114 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* ksem_close */
+	case 400:
+		switch(ndx) {
+		case 0:
+			p = "semid_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* ksem_post */
+	case 401:
+		switch(ndx) {
+		case 0:
+			p = "semid_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* ksem_wait */
+	case 402:
+		switch(ndx) {
+		case 0:
+			p = "semid_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* ksem_trywait */
+	case 403:
+		switch(ndx) {
+		case 0:
+			p = "semid_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_ksem_init */
+	case 404:
+		switch(ndx) {
+		case 0:
+			p = "userland semid_t * __capability";
+			break;
+		case 1:
+			p = "unsigned int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_ksem_open */
+	case 405:
+		switch(ndx) {
+		case 0:
+			p = "userland semid_t * __capability";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "mode_t";
+			break;
+		case 4:
+			p = "unsigned int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_ksem_unlink */
+	case 406:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_ksem_getvalue */
+	case 407:
+		switch(ndx) {
+		case 0:
+			p = "semid_t";
+			break;
+		case 1:
+			p = "userland int * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* ksem_destroy */
+	case 408:
+		switch(ndx) {
+		case 0:
+			p = "semid_t";
+			break;
+		default:
+			break;
+		};
+		break;
 	/* cheriabi___mac_get_pid */
 	case 409:
 		switch(ndx) {
@@ -6242,10 +6502,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland char * __capability";
 			break;
 		case 1:
-			p = "userland void * __capability * __capability";
+			p = "userland char * __capability * __capability";
 			break;
 		case 2:
-			p = "userland void * __capability * __capability";
+			p = "userland char * __capability * __capability";
 			break;
 		case 3:
 			p = "userland struct mac_c * __capability";
@@ -6508,6 +6768,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_ksem_timedwait */
+	case 441:
+		switch(ndx) {
+		case 0:
+			p = "semid_t";
+			break;
+		case 1:
+			p = "userland const struct timespec * __capability";
 			break;
 		default:
 			break;
@@ -6888,7 +7161,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct sockaddr * __capability";
+			p = "userland const struct sockaddr * __capability";
 			break;
 		case 4:
 			p = "__socklen_t";
@@ -6916,7 +7189,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct sockaddr * __capability";
+			p = "userland const struct sockaddr * __capability";
 			break;
 		case 4:
 			p = "__socklen_t";
@@ -7262,10 +7535,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __capability * __capability";
+			p = "userland char * __capability * __capability";
 			break;
 		case 2:
-			p = "userland void * __capability * __capability";
+			p = "userland char * __capability * __capability";
 			break;
 		default:
 			break;
@@ -7816,7 +8089,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 532:
 		switch(ndx) {
 		case 0:
-			p = "int";
+			p = "idtype_t";
 			break;
 		case 1:
 			p = "id_t";
@@ -7831,7 +8104,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland struct __wrusage * __capability";
 			break;
 		case 5:
-			p = "userland struct siginfo_c * __capability";
+			p = "userland struct __siginfo_c * __capability";
 			break;
 		default:
 			break;
@@ -8011,7 +8284,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 544:
 		switch(ndx) {
 		case 0:
-			p = "int";
+			p = "idtype_t";
 			break;
 		case 1:
 			p = "id_t";
@@ -8327,14 +8600,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 {
 	const char *p = NULL;
 	switch (sysnum) {
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
-#define PAD64_REQUIRED
-#endif
-	/* cheriabi_syscall */
+	/* nosys */
 	case 0:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
 	/* sys_exit */
 	case 1:
 		if (ndx == 0 || ndx == 1)
@@ -8854,6 +9121,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* nosys */
+	case 198:
 	/* cheriabi___sysctl */
 	case 202:
 		if (ndx == 0 || ndx == 1)
@@ -8932,7 +9201,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* cheriabi_msgrcv */
 	case 227:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "ssize_t";
 		break;
 	/* cheriabi_shmat */
 	case 228:
@@ -9154,7 +9423,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* cheriabi_aio_return */
 	case 314:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "ssize_t";
 		break;
 	/* cheriabi_aio_suspend */
 	case 315:
@@ -9171,6 +9440,8 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+	/* yield */
+	case 321:
 	/* mlockall */
 	case 324:
 		if (ndx == 0 || ndx == 1)
@@ -9232,6 +9503,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_jail */
 	case 338:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_nnpfs_syscall */
+	case 339:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -9323,7 +9599,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* cheriabi_aio_waitcomplete */
 	case 359:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "ssize_t";
 		break;
 	/* cheriabi_getresuid */
 	case 360:
@@ -9359,6 +9635,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_eaccess */
 	case 376:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* afs3_syscall */
+	case 377:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -9419,6 +9700,51 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_mac_syscall */
 	case 394:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* ksem_close */
+	case 400:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* ksem_post */
+	case 401:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* ksem_wait */
+	case 402:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* ksem_trywait */
+	case 403:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_ksem_init */
+	case 404:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_ksem_open */
+	case 405:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_ksem_unlink */
+	case 406:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_ksem_getvalue */
+	case 407:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* ksem_destroy */
+	case 408:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -9551,6 +9877,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 439:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
+		break;
+	/* cheriabi_ksem_timedwait */
+	case 441:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
 		break;
 	/* cheriabi_thr_suspend */
 	case 442:

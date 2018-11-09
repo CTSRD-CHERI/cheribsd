@@ -1904,7 +1904,7 @@ static void defval_neg_flag(const char *name, struct assignment *defval)
 static void defval_string(const char *name, struct assignment *defval)
 {
     if(defval != NULL)
-	cprint(1, "opt.%s = (char *)(unsigned long)\"%s\";\n", name, defval->u.value);
+	cprint(1, "opt.%s = (char *)(__uintptr_t)\"%s\";\n", name, defval->u.value);
     else
 	cprint(1, "opt.%s = NULL;\n", name);
 }

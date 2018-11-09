@@ -791,6 +791,9 @@ kassert_panic(const char *fmt, ...)
 #endif /* KASSERT_PANIC_OPTIONAL */
 #endif
 
+extern void nonexistent_function_so_that_panic_saves_retaddr(void);
+#pragma weak nonexistent_function_so_that_panic_saves_retaddr
+
 /*
  * Panic is called on unresolvable fatal errors.  It prints "panic: mesg",
  * and then reboots.  If we are called twice, then we avoid trying to sync
@@ -799,6 +802,15 @@ kassert_panic(const char *fmt, ...)
 void
 panic(const char *fmt, ...)
 {
+	/*
+	 * Clang/GCC will not save $ra in a noreturn function if the definition
+	 * of all called functions is visible.
+	 * By adding the call to a weak function definition we can trick clang
+	 * to save the return address so that "bt" in ddb can unwind the stack
+	 * past panic().
+	 */
+	if (nonexistent_function_so_that_panic_saves_retaddr)
+		nonexistent_function_so_that_panic_saves_retaddr();
 	va_list ap;
 
 	va_start(ap, fmt);
