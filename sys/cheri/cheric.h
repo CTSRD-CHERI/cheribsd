@@ -104,12 +104,13 @@ cheri_setaddress(const void * __capability dst, vaddr_t addr)
 	return (cheri_incoffset(dst, addr - cheri_getaddress(dst)));
 }
 
+#ifdef _KERNEL
 /*
  * Test whether a capability is a subset of another.
  * This mimics the semantics of the experimental ctestsubset instruction.
  */
 static __inline bool
-cheri_is_subset(const void *parent, const void *ptr)
+cheri_is_subset(const void * __capability parent, const void * __capability ptr)
 {
 	if (cheri_gettag(parent) != cheri_gettag(ptr))
 		return false;
@@ -122,6 +123,7 @@ cheri_is_subset(const void *parent, const void *ptr)
 		return false;
 	return true;
 }
+#endif
 
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
