@@ -317,10 +317,12 @@ reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 	}
 	dbg("%s: done relocating %zd PLT entries: ", obj->path,
 	    obj->cheri_plt_stubs->count());
+#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 3
 	for (size_t i = 0; i < obj->captable_size / sizeof(void*); i++) {
 		dbg("%s->captable[%zd]:%p = %#p", obj->path, i,
 		    &obj->writable_captable[i], obj->writable_captable[i].value);
 	}
+#endif
 	return (0);
 }
 
@@ -330,7 +332,7 @@ struct ThunkHash {
 #ifdef DEBUG
 	const char* name;
 #endif
-	CheriPltStub* thunk;	// TODO: make this an index to save space
+	SimpleExternalCallTrampoline* thunk;
 	UT_hash_handle hh;		// makes this structure hashable
 };
 
@@ -347,14 +349,23 @@ private:
 extern "C" dlfunc_t
 find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 {
-	dbg("Looking for thunk for %s (obj %s)", strtab_value(obj, symbol->st_name), obj->path);
+	dbg("Looking for thunk for %s (found in obj %s)", strtab_value(obj, symbol->st_name), obj->path);
 	if (!obj->cheri_exports) {
 		// Use placement-new here to use rtld xmalloc() instead of malloc
 		// FIXME: const_cast should not be needed
 		const_cast<Obj_Entry*>(obj)->cheri_exports =
 			new (NEW(struct CheriExports)) CheriExports;
 	}
-	return nullptr;
+	ThunkHash* s = obj->cheri_exports->getOrAddThunk(obj, symbol);
+
+	void* target_cap = cheri_csetbounds(s->thunk, sizeof(SimpleExternalCallTrampoline));
+	target_cap = cheri_incoffset(target_cap, offsetof(SimpleExternalCallTrampoline, code));
+	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
+	dbg("External call thunk resolved to %-#p", target_cap);
+	assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
+	assert(cheri_getlen(target_cap) == sizeof(SimpleExternalCallTrampoline) &&
+	    "stub should have tight bounds");
+	return (dlfunc_t)target_cap;
 }
 
 ThunkHash*
@@ -367,6 +378,8 @@ CheriExports::addThunk(const Obj_Entry* obj, const Elf_Sym *sym)
 	s->name = strtab_value(obj, sym->st_name);
 	dbg("Adding thunk for %s (obj %s)", s->name, obj->path);
 #endif
+	s->thunk = globalRwxAllocator.allocate<SimpleExternalCallTrampoline>();
+	s->thunk->init(obj->target_cgp, make_function_pointer(sym, obj));
 	HASH_ADD_PTR(this->existing_thunks, id, s);  /* id: name of key field */
 	return s;
 };

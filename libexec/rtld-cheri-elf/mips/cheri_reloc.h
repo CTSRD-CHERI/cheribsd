@@ -76,9 +76,8 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 		/* Remove write permissions and set bounds */
 		symval = find_external_call_thunk(defobj, def);
-		symval = NULL;
-		// FIXME: remove
 		if (!symval) {
+			// TODO: make this a fatal error
 			rtld_fdprintf(STDERR_FILENO, "Warning: Could not create"
 			    " thunk for %s (in %s)\n",
 			    symname(obj, r_symndx), obj->path);
