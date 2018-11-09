@@ -33,12 +33,15 @@
 
 extern int global_int;
 
-void __start(void) {
+static void test(void) {
 	// Check that we can call an function in the other library that uses
 	// the cap-table to load globals
 	int loaded_global = 0;
 	loaded_global = global_int;
-	print("Loaded global via data ref!\n");
-	require(loaded_global == 42);
-	exit(0);
+	print("Loaded global via data reference: ");
+	print_long(loaded_global, 10);
+	print("\n");
+	require_eq(loaded_global, 42);
 }
+
+TEST_MAIN()

@@ -54,7 +54,7 @@ check_library_cgp(const void* library_cgp, const void* original_cgp)
 	require_not_eq(cheri_getbase(library_cgp), cheri_getbase(original_cgp));
 }
 
-void __start(void) {
+static void test(void) {
 	print("Starting test!\n");
 	// Clear $cgp before calling the library function:
 	const void* original_cgp = cheri_getcgp();
@@ -79,7 +79,6 @@ void __start(void) {
 	require_eq(cheri_getoffset(library_cgp_plus_int), expected_offset);
 	// and also all the other properties:
 	check_library_cgp(library_cgp_plus_int, original_cgp);
-
-	print("Success!\n");
-	exit(0);
 }
+
+TEST_MAIN()

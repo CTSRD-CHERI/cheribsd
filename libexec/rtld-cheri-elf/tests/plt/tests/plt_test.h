@@ -52,6 +52,13 @@ extern const char* ltoa_unsafe(long l, int base);
 	}						\
 } while(0)
 
+#define TEST_MAIN() \
+	void __start(void) { \
+		test(); \
+		print("Success!\n"); \
+		exit(0); \
+	}
+
 static inline void
 print_long(long l, int base)
 {
