@@ -1486,19 +1486,6 @@ buildsysroot: buildworld_prologue ${BUILDSYSROOT_TGTS} buildworld_epilogue .PHON
 .endif
 	@echo "Built sysroot for ${TARGET}. Run installsysroot to install it."
 
-_sysent_dirs=	sys/kern
-_sysent_dirs+=	sys/compat/cheriabi
-_sysent_dirs+=	sys/compat/freebsd32
-_sysent_dirs+=	sys/i386/ibcs2
-_sysent_dirs+=	sys/amd64/linux		\
-		sys/amd64/linux32	\
-		sys/arm64/linux		\
-		sys/i386/linux
-sysent: .PHONY
-.for _dir in ${_sysent_dirs}
-	${MAKE} -C ${.CURDIR}/${_dir} sysent
-.endfor
-
 #
 # installcheck
 #
