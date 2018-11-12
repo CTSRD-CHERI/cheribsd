@@ -129,6 +129,13 @@ INLINE_LIMIT?=	8000
 .if ${MACHINE_CPUARCH} == "riscv"
 CFLAGS.gcc+=	-mcmodel=medany -march=rv64imafdc -mabi=lp64
 INLINE_LIMIT?=	8000
+# LLD doesn't yet support relaxations. In theory the relaxations can be
+# ignored, but due to how GNU as processes .align, it relies upon the linker
+# being able to remove unnecessary NOPs, even if it would otherwise not relax
+# any other code.
+.if ${LINKER_TYPE} == "lld"
+CFLAGS+=	-mno-relax -Wa,-mno-relax
+.endif
 .endif
 
 #
