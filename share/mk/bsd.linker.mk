@@ -29,6 +29,7 @@ __<bsd.linker.mk>__:
 _ld_vars=LD $${_empty_var_}
 .if !empty(_WANT_TOOLCHAIN_CROSS_VARS)
 # Only the toplevel makefile needs to compute the X_LINKER_* variables.
+_ld_vars+=XLD X_
 # Also get version information from CHERI_LD (if it is set)
 .ifdef CHERI_LD
 _ld_vars+=CHERI_LD CHERI_
