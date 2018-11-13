@@ -1,15 +1,14 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181113,
  *   "target_type": "lib",
  *   "changes": [
  *     "unsupported",
  *     "virtual_address",
  *     "other"
  *   ],
- *   "change_comment": "No MAP_FIXED, LG_PAGE hack",
- *   "hybrid_specific": false
+ *   "change_comment": "No MAP_FIXED, LG_PAGE hack"
  * }
  * CHERI CHANGES END
  */

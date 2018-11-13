@@ -3,11 +3,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181113,
  *   "target_type": "lib",
  *   "changes": [
  *     "monotonicity",
  *     "pointer_alignment",
+ *     "support",
  *     "virtual_address"
  *   ],
  *   "change_comment": "unbound_ptr()"

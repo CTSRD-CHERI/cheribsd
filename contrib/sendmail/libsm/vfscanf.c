@@ -14,9 +14,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181113,
  *   "target_type": "lib",
  *   "changes": [
+ *     "function_abi",
  *     "pointer_as_integer"
  *   ]
  * }
