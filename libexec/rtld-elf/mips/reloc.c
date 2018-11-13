@@ -32,11 +32,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181113,
  *   "target_type": "prog",
  *   "changes": [
  *     "support",
- *     "pointer_alignment",
+ *     "pointer_alignment"
  *   ],
  *   "change_comment": "CHERI relocation"
  * }

@@ -29,10 +29,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180829,
+ *   "updated": 20181113,
  *   "target_type": "prog",
  *   "changes": [
- *     "support",
+ *     "support"
  *   ],
  *   "change_comment": "CHERI relocation"
  * }

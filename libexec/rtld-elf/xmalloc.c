@@ -34,7 +34,7 @@
   *   "changes": [
   *     "pointer_alignment"
   *   ],
-  *   "change_comment": "Use __builtin_align_up",
+  *   "change_comment": "Use __builtin_align_up"
   * }
   * CHERI CHANGES END
   */
