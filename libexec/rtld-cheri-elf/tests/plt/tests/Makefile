@@ -20,8 +20,11 @@ SRCS.load_global_int_fnptr_call=load_global_int_fnptr_call.c external_fnptr.c
 SRCS.${_t}=${_t}.c
 .endif
 SRCS.${_t}+=	local_syscalls.S \
-	ltoa_unsafe.c \
-	${SRCTOP}/lib/libc/string/strlen.c
+	ltoa_unsafe.c
+# Can't use an absolute path here otherwise the build will create a .o file
+# in the source tree...
+.PATH: ${SRCTOP}/lib/libc/string
+SRCS.${_t}+=	strlen.c
 .endfor
 
 
