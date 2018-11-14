@@ -6,14 +6,15 @@ PLAIN_TESTS_C=	test_write \
 	load_global_int_call \
 	load_global_int_fnptr_call \
 	load_global_int_data_ref \
-	test_library_cgp
+	test_library_cgp \
+	test_library_fnptr \
 
 SRCS.test_library_cgp= \
 	test_library_cgp_asm.S \
 	test_library_cgp.c
 
 SRCS.load_global_int_fnptr_call=load_global_int_fnptr_call.c external_fnptr.c
-
+SRCS.test_library_fnptr=test_library_fnptr.c external_fnptr.c
 
 .for _t in ${PLAIN_TESTS_C}
 .if empty(SRCS.${_t})
