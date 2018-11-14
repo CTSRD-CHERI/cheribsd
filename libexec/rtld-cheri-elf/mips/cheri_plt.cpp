@@ -352,6 +352,8 @@ public:
 		result->key = key;
 		return result;
 	}
+	size_t size() const { return vector.size(); }
+	size_t capacity() const { return vector.capacity(); }
 };
 
 struct ExportsTableEntry {
@@ -404,6 +406,11 @@ CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 {
 	dbg("Adding thunk for %s (obj %s)", strtab_value(obj, sym->st_name), obj->path);
 	assert(ELF_ST_TYPE(sym->st_info) == STT_FUNC);
+	if (exports_map.size() == exports_map.capacity()) {
+		rtld_fdprintf(STDERR_FILENO, "Will have to allocate more space"
+		    " for function pointer exports in %s (current capacity=%zd)\n",
+		    defobj->path, exports_map.capacity());
+	}
 	ExportsTableEntry *s = exports_map.add(sym);
 #ifdef DEBUG
 	s->name = strtab_value(obj, sym->st_name);
