@@ -1229,7 +1229,7 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
     int wait)
 {
 	struct pglist alloctail;
-	vm_offset_t addr, zkva;
+	vm_ptr_t addr, zkva;
 	int cpu, flags;
 	vm_page_t p, p_next;
 #ifdef NUMA
@@ -1259,11 +1259,16 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 			goto fail;
 		TAILQ_INSERT_TAIL(&alloctail, p, listq);
 	}
+#ifdef UMA_SUPERPAGE_SLAB
+	if ((addr = kva_alloc_aligned(bytes, UMA_SLAB_SIZE)) == 0)
+#else
 	if ((addr = kva_alloc(bytes)) == 0)
+#endif
 		goto fail;
+	CHERI_VM_ASSERT_BOUNDS(addr, bytes);
 	zkva = addr;
 	TAILQ_FOREACH(p, &alloctail, listq) {
-		pmap_qenter(zkva, &p, 1);
+		pmap_qenter(ptr_to_va(zkva), &p, 1);
 		zkva += PAGE_SIZE;
 	}
 	return ((void*)addr);
@@ -2520,6 +2525,7 @@ zalloc_start:
 #endif
 		if (flags & M_ZERO)
 			uma_zero_item(item, zone);
+
 		return (item);
 	}
 
@@ -2967,7 +2973,7 @@ zone_import(uma_zone_t zone, void **bucket, int max, int domain, int flags)
 #ifdef NUMA
 		stripe = howmany(max, vm_ndomains);
 #endif
-		while (slab->us_freecount && i < max) { 
+		while (slab->us_freecount && i < max) {
 			bucket[i++] = slab_alloc_item(keg, slab);
 			if (keg->uk_free <= keg->uk_reserve)
 				break;
@@ -3078,7 +3084,7 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 	if (zone->uz_import(zone->uz_arg, &item, 1, domain, flags) != 1)
 		goto fail;
 	atomic_add_long(&zone->uz_allocs, 1);
-
+	item = cheri_bound(item, zone->uz_size);
 #ifdef INVARIANTS
 	skipdbg = uma_dbg_zskip(zone, item);
 #endif
@@ -3103,7 +3109,7 @@ zone_alloc_item(uma_zone_t zone, void *udata, int domain, int flags)
 		zone_free_item(zone, item, udata, SKIP_DTOR);
 		goto fail;
 	}
-	item = cheri_bound(item, zone->uz_size);
+
 #ifdef INVARIANTS
 	if (!skipdbg)
 		uma_dbg_alloc(zone, NULL, item);
@@ -3348,8 +3354,12 @@ slab_free_item(uma_keg_t keg, uma_slab_t slab, void *item)
 		LIST_INSERT_HEAD(&dom->ud_part_slab, slab, us_link);
 	}
 
-	/* Slab management. */
-	freei = ((uintptr_t)item - (uintptr_t)slab->us_data) / keg->uk_rsize;
+	/*
+	 * Slab management.
+	 * XXX-AM: mark these as ptr_to_va since they would go away with
+	 * the address interpretation of uintptr_t.
+	 */
+	freei = (ptr_to_va(item) - ptr_to_va(slab->us_data)) / keg->uk_rsize;
 	BIT_SET(SLAB_SETSIZE, freei, &slab->us_free);
 	slab->us_freecount++;
 
@@ -4200,10 +4210,10 @@ uma_dbg_kskip(uma_keg_t keg, void *mem)
 	if (dbg_divisor == 1)
 		return (false);
 
-	idx = (uintptr_t)mem >> PAGE_SHIFT;
+	idx = ptr_to_va(mem) >> PAGE_SHIFT;
 	if (keg->uk_ipers > 1) {
 		idx *= keg->uk_ipers;
-		idx += ((uintptr_t)mem & PAGE_MASK) / keg->uk_rsize;
+		idx += (ptr_to_va(mem) & PAGE_MASK) / keg->uk_rsize;
 	}
 
 	if ((idx / dbg_divisor) * dbg_divisor != idx) {
