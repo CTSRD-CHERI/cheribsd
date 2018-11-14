@@ -211,7 +211,7 @@ kern_mmap(struct thread *td, uintptr_t addr0, size_t size, int prot,
     int flags, int fd, off_t pos)
 {
 	struct mmap_req	mr = {
-		.mr_hint = addr0,
+		.mr_hint = ptr_to_va(addr0),
 		.mr_size = size,
 		.mr_prot = prot,
 		.mr_flags = flags,
