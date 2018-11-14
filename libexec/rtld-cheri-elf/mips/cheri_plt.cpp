@@ -380,6 +380,7 @@ private:
 extern "C" dlfunc_t
 find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 {
+	// FIXME: none of this is thread safe -> we need locks!
 	dbg("Looking thunk %s thunk (found in obj %s): %-#p",
 	    strtab_value(obj, symbol->st_name), obj->path, symbol);
 	if (!obj->cheri_exports) {
