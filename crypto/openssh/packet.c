@@ -39,7 +39,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180830,
+ *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_integrity",
@@ -2274,7 +2274,6 @@ ssh_packet_get_state(struct ssh *ssh, struct sshbuf *m)
 static int
 newkeys_from_blob(struct sshbuf *m, struct ssh *ssh, int mode)
 {
-	char *cipher_name;
 	struct sshbuf *b = NULL;
 	struct sshcomp *comp;
 	struct sshenc *enc;

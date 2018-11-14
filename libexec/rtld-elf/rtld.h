@@ -30,7 +30,7 @@
  /*
   * CHERI CHANGES START
   * {
-  *   "updated": 20180828,
+  *   "updated": 20181114,
   *   "target_type": "prog",
   *   "changes": [
   *     "support"

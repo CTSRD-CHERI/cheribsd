@@ -579,7 +579,7 @@ interface_set_mtu_priv(char *ifname, u_int16_t mtu)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180817,
+//   "updated": 20181114,
 //   "changes": [
 //     "pointer_alignment"
 //   ]

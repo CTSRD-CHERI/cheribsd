@@ -40,7 +40,7 @@ __FBSDID("$FreeBSD$");
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180728,
+ *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
  *     "function_abi"

@@ -36,7 +36,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180830,
+ *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_integrity",

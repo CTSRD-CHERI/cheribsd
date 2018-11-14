@@ -791,7 +791,7 @@ grp_command(const char *cmd, const nvlist_t *limits, nvlist_t *nvlin,
 CREATE_SERVICE("system.grp", grp_limit, grp_command, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "lib",
 //   "changes": [
 //     "pointer_alignment"
