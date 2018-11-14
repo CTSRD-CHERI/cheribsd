@@ -334,9 +334,10 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 * by the linker script and have no size info.
 	 */
 	void *edata_start;
-	size_t edata_siz = (size_t)(&end) - (size_t)(&edata);
+	size_t edata_siz = (__cheri_addr size_t)(&end) -
+	    (__cheri_addr size_t)(&edata);
 	edata_start = cheri_ptrpermoff((caddr_t)cheri_getkdc() +
-	    (vm_offset_t)(&edata), edata_siz, CHERI_PERM_STORE, 0);
+	    (__cheri_addr vm_offset_t)(&edata), edata_siz, CHERI_PERM_STORE, 0);
 	memset(edata_start, 0, edata_siz);
 	/* early capability-related initialization */
 	cheri_init_capabilities();
