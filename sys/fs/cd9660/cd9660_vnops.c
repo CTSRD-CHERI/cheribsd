@@ -575,6 +575,8 @@ cd9660_readdir(ap)
 				entryoffsetinblock;
 
 		idp->curroff += reclen;
+		/* NOTE: d_off is the offset of *next* entry. */
+		idp->current.d_off = idp->curroff;
 
 		switch (imp->iso_ftype) {
 		case ISO_FTYPE_RRIP:
