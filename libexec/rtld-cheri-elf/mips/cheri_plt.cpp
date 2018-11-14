@@ -378,7 +378,7 @@ private:
 extern "C" dlfunc_t
 find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 {
-	dbg("Looking for thunk for %s (found in obj %s): %-#p",
+	dbg("Looking thunk %s thunk (found in obj %s): %-#p",
 	    strtab_value(obj, symbol->st_name), obj->path, symbol);
 	if (!obj->cheri_exports) {
 		// Use placement-new here to use rtld xmalloc() instead of malloc
