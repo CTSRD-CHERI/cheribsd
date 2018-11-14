@@ -282,7 +282,7 @@ WOULD_OVERFLOW(size_t nmemb, size_t size)
 #endif /* !_SYS_MALLOC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

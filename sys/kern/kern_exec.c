@@ -1817,7 +1817,7 @@ exec_unregister(const struct execsw *execsw_arg)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "pointer_integrity",

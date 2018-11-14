@@ -2432,12 +2432,3 @@ iavf_sysctl_vflr_reset(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 #undef CTX_ACTIVE
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

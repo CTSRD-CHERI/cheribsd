@@ -4743,7 +4743,7 @@ sys_posix_fadvise(struct thread *td, struct posix_fadvise_args *uap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

@@ -4048,7 +4048,7 @@ vtnet_netdump_poll(struct ifnet *ifp, int count)
 #endif /* NETDUMP */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

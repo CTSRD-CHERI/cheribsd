@@ -2062,7 +2062,7 @@ vfs_oexport_conv(const struct oexport_args *oexp, struct export_args *exp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

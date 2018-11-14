@@ -632,7 +632,7 @@ __END_DECLS
 #endif /* !_NET_IF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:net"

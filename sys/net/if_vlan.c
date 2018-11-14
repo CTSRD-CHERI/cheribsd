@@ -1952,7 +1952,7 @@ vlan_snd_tag_alloc(struct ifnet *ifp,
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

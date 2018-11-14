@@ -76,7 +76,7 @@ void iflib_stop(if_ctx_t ctx);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180830,
+//   "updated": 20181114,
 //   "changes": [
 //     "user_capabilities"
 //   ]

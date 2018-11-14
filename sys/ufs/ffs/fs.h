@@ -847,7 +847,7 @@ extern u_char *fragtbl[];
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180816,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_size"

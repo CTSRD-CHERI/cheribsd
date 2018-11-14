@@ -1823,7 +1823,7 @@ itimers_event_hook_exit(void *arg, struct proc *p)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",

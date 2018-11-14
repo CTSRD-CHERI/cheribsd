@@ -193,7 +193,7 @@ struct mfi_query_disk {
 #define MFI_LINUX_SET_AEN_2	0x400c4d04
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "kiovec_t",

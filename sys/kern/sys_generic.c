@@ -975,10 +975,7 @@ kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	 * of 256.
 	 */
 	fd_mask s_selbits[howmany(2048, NFDBITS)];
-	fd_mask * ibits[3];
-	fd_mask * obits[3];
-	fd_mask * selbits;
-	fd_mask * sbp;
+	fd_mask *ibits[3], *obits[3], *selbits, *sbp;
 	struct timeval rtv;
 	sbintime_t asbt, precision, rsbt;
 	u_int nbufbytes, ncpbytes, ncpubytes, nfdbits;
@@ -1884,7 +1881,7 @@ kern_posix_error(struct thread *td, int error)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

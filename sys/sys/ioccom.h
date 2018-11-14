@@ -66,15 +66,6 @@
     (((~(IOCPARM_MASK << 16)) & (ioc)) | (((len) & IOCPARM_MASK) << 16))
 #define	_IOC_NEWTYPE(ioc, type)	_IOC_NEWLEN((ioc), sizeof(type))
 
-/*
- * Replace the length in an ioctl definition.  This reduces the risk of
- * copy and paste errors vs a fresh definition.
- */
-#define	_IOC_NEWLEN(ioc, len) \
-    (((~(IOCPARM_MASK << 16)) & (ioc)) | (((len) & IOCPARM_MASK) << 16))
-#define _IOC_NEWTYPE(ioc, type)	_IOC_NEWLEN((ioc), sizeof(type))
-
-
 #ifdef _KERNEL
 
 #if defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD5) || \
@@ -93,12 +84,3 @@ __END_DECLS
 #endif
 
 #endif /* !_SYS_IOCCOM_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "header",
-//   "changes": [
-//     "ioctl:misc"
-//   ]
-// }
-// CHERI CHANGES END

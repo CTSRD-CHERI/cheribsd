@@ -323,8 +323,8 @@ MODULE_DEPEND(pflog, pf, PF_MODVER, PF_MODVER, PF_MODVER);
 //   "updated": 20180629,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "ioctl:net",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

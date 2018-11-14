@@ -508,7 +508,7 @@ elf32_dump_thread(struct thread *td __unused, void *dst __unused,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",

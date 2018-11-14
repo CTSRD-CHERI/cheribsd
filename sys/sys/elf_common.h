@@ -1438,7 +1438,7 @@ enum MipsCheriFlags {
 #endif /* !_SYS_ELF_COMMON_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180823,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

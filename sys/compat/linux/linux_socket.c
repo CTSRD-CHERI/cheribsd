@@ -1763,7 +1763,7 @@ linux_socketcall(struct thread *td, struct linux_socketcall_args *args)
 #endif /* __i386__ || (__amd64__ && COMPAT_LINUX32) */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

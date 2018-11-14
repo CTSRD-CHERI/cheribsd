@@ -1170,7 +1170,7 @@ td_softdep_cleanup(struct thread *td)
 #endif	/* !_SYS_PROC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",

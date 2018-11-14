@@ -183,7 +183,7 @@ __END_DECLS
 #endif /* !_SYS_SHM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_integrity"

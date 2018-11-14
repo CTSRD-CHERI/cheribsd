@@ -713,7 +713,7 @@ kern_procctl(struct thread *td, idtype_t idtype, id_t id, int com, void *data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

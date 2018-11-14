@@ -2326,7 +2326,7 @@ ptnet_poll(if_t ifp, enum poll_cmd cmd, int budget)
 #endif /* DEVICE_POLLING */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

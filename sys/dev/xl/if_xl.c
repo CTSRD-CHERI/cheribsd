@@ -3302,7 +3302,7 @@ xl_setwol(struct xl_softc *sc)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

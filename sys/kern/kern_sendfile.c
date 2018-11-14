@@ -1053,7 +1053,7 @@ freebsd4_sendfile(struct thread *td, struct freebsd4_sendfile_args *uap)
 #endif /* COMPAT_FREEBSD4 */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

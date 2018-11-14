@@ -409,7 +409,7 @@ kern_modstat(struct thread *td, int modid,
 	namelen = strlen(mod->name) + 1;
 	if (namelen > MAXMODNAME)
 		namelen = MAXMODNAME;
-	if ((error = copyout(name, &stat->name, namelen)) != 0)
+	if ((error = copyout(name, &stat->name[0], namelen)) != 0)
 		return (error);
 
 	if ((error = copyout(&refs, &stat->refs, sizeof(int))) != 0)
@@ -534,7 +534,7 @@ freebsd32_modstat(struct thread *td, struct freebsd32_modstat_args *uap)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

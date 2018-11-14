@@ -118,7 +118,7 @@ extern int (*kern_mddetach_p)(struct thread *td, struct md_req *mdr);
 #endif	/* _SYS_MDIOCTL_H_*/
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:misc"

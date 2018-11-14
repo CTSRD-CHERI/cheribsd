@@ -5046,7 +5046,7 @@ umtx_thread_cleanup(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

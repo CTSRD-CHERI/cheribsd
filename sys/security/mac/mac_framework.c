@@ -623,7 +623,7 @@ SYSINIT(mac, SI_SUB_MAC, SI_ORDER_FIRST, mac_init, NULL);
 SYSINIT(mac_late, SI_SUB_MAC_LATE, SI_ORDER_FIRST, mac_late_init, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

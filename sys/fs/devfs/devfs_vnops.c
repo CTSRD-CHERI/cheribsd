@@ -2007,10 +2007,11 @@ CTASSERT(O_NONBLOCK == IO_NDELAY);
 CTASSERT(O_FSYNC == IO_SYNC);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:misc"
+//     "ioctl:misc",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

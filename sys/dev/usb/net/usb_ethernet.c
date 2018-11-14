@@ -662,7 +662,7 @@ DECLARE_MODULE(uether, uether_mod, SI_SUB_DRIVERS, SI_ORDER_ANY);
 MODULE_VERSION(uether, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

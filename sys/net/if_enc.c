@@ -449,7 +449,7 @@ DECLARE_MODULE(if_enc, enc_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_enc, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

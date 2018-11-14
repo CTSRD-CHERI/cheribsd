@@ -808,7 +808,7 @@ kern_extattr_list_path(struct thread *td, const char * __capability path,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

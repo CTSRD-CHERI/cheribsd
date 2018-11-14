@@ -1568,7 +1568,7 @@ MODULE_DEPEND(siftr, alq, 1, 1, 1);
 MODULE_VERSION(siftr, MODVERSION);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "pointer_integrity"

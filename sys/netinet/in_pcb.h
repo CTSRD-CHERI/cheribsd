@@ -896,7 +896,7 @@ void	in_pcboutput_eagain(struct inpcb *);
 #endif /* !_NETINET_IN_PCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_integrity"

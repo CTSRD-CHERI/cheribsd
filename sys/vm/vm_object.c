@@ -2706,7 +2706,7 @@ DB_SHOW_COMMAND(vmopag, vm_object_print_pages)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

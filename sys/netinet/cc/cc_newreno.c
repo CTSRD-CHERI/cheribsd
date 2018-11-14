@@ -393,7 +393,7 @@ DECLARE_CC_MODULE(newreno, &newreno_cc_algo);
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180822,
+//   "updated": 20181114,
 //   "changes": [
 //     "pointer_integrity"
 //   ]

@@ -711,7 +711,7 @@ sys_cap_fcntls_get(struct thread *td, struct cap_fcntls_get_args *uap)
 #endif /* CAPABILITIES */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

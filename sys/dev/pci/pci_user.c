@@ -465,7 +465,7 @@ pci_conf_match_old(struct pci_match_conf_old *matches, int num_matches,
 
 		if (((matches[i].flags & PCI_GETCONF_MATCH_NAME_OLD) != 0)
 		 && (strncmp(matches[i].pd_name, match_buf->pd_name,
-     sizeof(match_buf->pd_name)) != 0))
+		 sizeof(match_buf->pd_name)) != 0))
 			continue;
 
 		return(0);
@@ -1396,7 +1396,7 @@ getconfexit:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

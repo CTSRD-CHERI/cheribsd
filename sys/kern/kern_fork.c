@@ -1134,7 +1134,7 @@ fork_return(struct thread *td, struct trapframe *frame)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

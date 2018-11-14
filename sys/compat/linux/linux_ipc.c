@@ -943,7 +943,7 @@ MODULE_DEPEND(linux, sysvsem, 1, 1, 1);
 MODULE_DEPEND(linux, sysvshm, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "pointer_integrity",

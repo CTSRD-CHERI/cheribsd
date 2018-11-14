@@ -2293,7 +2293,7 @@ sys_rctl_remove_rule(struct thread *td, struct rctl_remove_rule_args *uap)
 #endif /* !RCTL */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -226,7 +226,7 @@ extern struct nchstats nchstats;
 #endif /* !_SYS_NAMEI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
