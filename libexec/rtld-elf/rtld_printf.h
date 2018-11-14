@@ -38,6 +38,8 @@
 #include <stdarg.h>
 #include <unistd.h>
 
+__BEGIN_DECLS
+
 int rtld_snprintf(char *buf, size_t bufsize, const char *fmt, ...)
     __printflike(3, 4);
 int rtld_vsnprintf(char *buf, size_t bufsize, const char *fmt, va_list ap);
@@ -50,5 +52,8 @@ void rtld_fdputchar(int fd, int c);
 #define	rtld_putstr(str) rtld_fdputstr(STDOUT_FILENO, (str))
 #define	rtld_putchar(c) rtld_fdputchar(STDOUT_FILENO, (c))
 #define rtld_write(fd, s, n) write(fd, s, n)
+__END_DECLS
+
 #endif  /* !defined(__CHERI_PURE_CAPABILITY__) */
+
 #endif
