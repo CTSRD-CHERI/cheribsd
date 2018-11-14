@@ -814,7 +814,7 @@ XLEAF(memset_c)
 	cmove	$c1, $c3		# save c3 for result
 
 	sll	t1, a0, 8		# compute  c << 8 in t1
-	or	t1, t1, a1		# compute c << 8 | c in t1
+	or	t1, t1, a0		# compute c << 8 | c in t1
 	sll	t2, t1, 16		# shift that left 16
 	or	t1, t2, t1		# or together
 
