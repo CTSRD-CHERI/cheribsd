@@ -140,8 +140,13 @@ END(rtld_start)
 #define	XCALLFRAME_A6		(2*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_A5		(1*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_A4		(0*SZREG + XCALLFRAME_CAPSIZ)
-#define	XCALLFRAME_CAPSIZ	(10*CHERICAP_SIZE)
-#define	XCALLFRAME_CFP		(9*CHERICAP_SIZE)
+#define	XCALLFRAME_CAPSIZ	(11*CHERICAP_SIZE)
+#define	XCALLFRAME_CFP		(10*CHERICAP_SIZE)
+/*
+ * We need to save $c13 for varidics and on-stack arguments since the any calls
+ * calls with variadic args in rtld (e.g.g debug printfs) will clobber it
+ */
+#define	XCALLFRAME_C13		(9*CHERICAP_SIZE)
 #define	XCALLFRAME_C3		(8*CHERICAP_SIZE)
 #define	XCALLFRAME_C4		(7*CHERICAP_SIZE)
 #define	XCALLFRAME_C5		(6*CHERICAP_SIZE)
@@ -208,6 +213,9 @@ LEAF(_rtld_bind_start)
 	// .cfi_rel_offset $c9, XCALLFRAME_C9
 	csc	$c10, zero, XCALLFRAME_C10($c11)
 	// .cfi_rel_offset $c10, XCALLFRAME_C10
+	csc	$c13, zero, XCALLFRAME_C13($c11)
+	// .cfi_rel_offset $c13, XCALLFRAME_C13
+
 	csc	$cra, zero, XCALLFRAME_CRA($c11)
 	// .cfi_rel_offset $cra, XCALLFRAME_CRA
 	// We also need to save the frame pointer since it is callee-save
@@ -229,6 +237,8 @@ LEAF(_rtld_bind_start)
 	//.cfi_restore $cfp
 	clc	$cra, zero, XCALLFRAME_CRA($c11)
 	//.cfi_restore $cra
+	clc	$c13, zero, XCALLFRAME_C13($c11)
+	//.cfi_restore $c13
 	clc	$c10, zero, XCALLFRAME_C10($c11)
 	//.cfi_restore $c10
 	clc	$c9, zero, XCALLFRAME_C9($c11)
