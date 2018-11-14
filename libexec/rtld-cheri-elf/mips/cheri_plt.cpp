@@ -36,6 +36,8 @@
 #include <sys/mman.h>
 #include <dlfcn.h>
 #include <errno.h>
+#define HASH_DEBUG 1
+#include <stdio.h>
 #include <uthash.h>
 #include <new>
 
@@ -338,8 +340,11 @@ struct ThunkHash {
 
 // A list of exported functions to allow uniquifying function pointers
 struct CheriExports {
+private:
+	const Obj_Entry* obj;
 	struct ThunkHash *existing_thunks = NULL;
 public:
+	CheriExports(const Obj_Entry* obj) : obj(obj) {}
 	ThunkHash* getOrAddThunk(const Obj_Entry* obj, const Elf_Sym *sym);
 private:
 	ThunkHash* addThunk(const Obj_Entry* obj, const Elf_Sym *sym);
@@ -349,12 +354,13 @@ private:
 extern "C" dlfunc_t
 find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 {
-	dbg("Looking for thunk for %s (found in obj %s)", strtab_value(obj, symbol->st_name), obj->path);
+	dbg("Looking for thunk for %s (found in obj %s): %-#p",
+	    strtab_value(obj, symbol->st_name), obj->path, symbol);
 	if (!obj->cheri_exports) {
 		// Use placement-new here to use rtld xmalloc() instead of malloc
 		// FIXME: const_cast should not be needed
 		const_cast<Obj_Entry*>(obj)->cheri_exports =
-			new (NEW(struct CheriExports)) CheriExports;
+			new (NEW(struct CheriExports)) CheriExports(obj);
 	}
 	ThunkHash* s = obj->cheri_exports->getOrAddThunk(obj, symbol);
 
@@ -369,7 +375,7 @@ find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 }
 
 ThunkHash*
-CheriExports::addThunk(const Obj_Entry* obj, const Elf_Sym *sym)
+CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 {
 	assert(ELF_ST_TYPE(sym->st_info) == STT_FUNC);
 	struct ThunkHash *s = NEW(struct ThunkHash);
@@ -379,21 +385,24 @@ CheriExports::addThunk(const Obj_Entry* obj, const Elf_Sym *sym)
 	dbg("Adding thunk for %s (obj %s)", s->name, obj->path);
 #endif
 	s->thunk = globalRwxAllocator.allocate<SimpleExternalCallTrampoline>();
-	s->thunk->init(obj->target_cgp, make_function_pointer(sym, obj));
+	s->thunk->init(obj->target_cgp, make_function_pointer(sym, defobj));
 	HASH_ADD_PTR(this->existing_thunks, id, s);  /* id: name of key field */
 	return s;
 };
 
 ThunkHash*
-CheriExports::getOrAddThunk(const Obj_Entry* obj, const Elf_Sym *sym)
+CheriExports::getOrAddThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 {
 	struct ThunkHash *s = nullptr;
+	dbg("Looking for ptr in hashtable %#p", this->existing_thunks);
+	assert(this->obj == defobj);
 	HASH_FIND_PTR(this->existing_thunks, &sym, s);
-	if (!s)
+	if (!s) {
 		s = addThunk(obj, sym);
+	}
 #ifdef DEBUG
 	else {
-		dbg("Found thunk for %s in %s: %p", s->name, obj->path, s);
+		dbg("Found thunk for %s in %s: %p", s->name, defobj->path, s);
 	}
 	// A second find should return the same value
 	struct ThunkHash *s2 = nullptr;
