@@ -36,12 +36,11 @@
 #include <sys/mman.h>
 #include <dlfcn.h>
 #include <errno.h>
-#define HASH_DEBUG 1
 #include <stdio.h>
-#include <uthash.h>
 #include <new>
 
 #include "rtld.h"
+#include "rtld_small_vector.h"
 
 static constexpr uint8_t simple_plt_code[] = {
 #include "plt_code.inc"
@@ -328,26 +327,51 @@ reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 	return (0);
 }
 
-// Note: the use of uthash here is highly inefficient but for now it works.
-struct ThunkHash {
-	const Elf_Sym *id;		// key (TODO: use symbol table index)
+// A very simple map to check if we already have a created a stub for
+// the given Elf_Sym
+template<typename Key, typename Pair>
+class SimpleLookupTable {
+protected:
+	// Most libraries will not have many exported function pointers so
+	// initially just use a simple array to hold all elements
+	// TODO: is 16 a good size?
+	SimpleSmallVector<Pair, 16> vector;
+public:
+	const Pair* find(Key key) {
+		static_assert(std::is_same<Key, decltype(((Pair*)0)->key)>::value, "bad type");
+		for (const Pair& p : vector) {
+			if (p.key == key) {
+				return &p;
+			}
+		}
+		return nullptr;
+	}
+	Pair* add(Key key) {
+		dbg_assert(find(key) == nullptr);
+		Pair* result = vector.add();
+		result->key = key;
+		return result;
+	}
+};
+
+struct ExportsTableEntry {
+	const Elf_Sym *key;	// TODO: use symbol table index)
+	SimpleExternalCallTrampoline* thunk;
 #ifdef DEBUG
 	const char* name;
 #endif
-	SimpleExternalCallTrampoline* thunk;
-	UT_hash_handle hh;		// makes this structure hashable
 };
 
 // A list of exported functions to allow uniquifying function pointers
 struct CheriExports {
 private:
 	const Obj_Entry* obj;
-	struct ThunkHash *existing_thunks = NULL;
+	SimpleLookupTable<const Elf_Sym*, ExportsTableEntry> exports_map;
 public:
 	CheriExports(const Obj_Entry* obj) : obj(obj) {}
-	ThunkHash* getOrAddThunk(const Obj_Entry* obj, const Elf_Sym *sym);
+	const ExportsTableEntry* getOrAddThunk(const Obj_Entry* obj, const Elf_Sym *sym);
 private:
-	ThunkHash* addThunk(const Obj_Entry* obj, const Elf_Sym *sym);
+	const ExportsTableEntry* addThunk(const Obj_Entry* obj, const Elf_Sym *sym);
 
 };
 
@@ -362,8 +386,9 @@ find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 		const_cast<Obj_Entry*>(obj)->cheri_exports =
 			new (NEW(struct CheriExports)) CheriExports(obj);
 	}
-	ThunkHash* s = obj->cheri_exports->getOrAddThunk(obj, symbol);
+	const ExportsTableEntry* s = obj->cheri_exports->getOrAddThunk(obj, symbol);
 
+	// TODO: should we store this in the exports table entry?
 	void* target_cap = cheri_csetbounds(s->thunk, sizeof(SimpleExternalCallTrampoline));
 	target_cap = cheri_incoffset(target_cap, offsetof(SimpleExternalCallTrampoline, code));
 	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
@@ -374,29 +399,26 @@ find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 	return (dlfunc_t)target_cap;
 }
 
-ThunkHash*
+const ExportsTableEntry*
 CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 {
+	dbg("Adding thunk for %s (obj %s)", strtab_value(obj, sym->st_name), obj->path);
 	assert(ELF_ST_TYPE(sym->st_info) == STT_FUNC);
-	struct ThunkHash *s = NEW(struct ThunkHash);
-	s->id = sym;
+	ExportsTableEntry *s = exports_map.add(sym);
 #ifdef DEBUG
 	s->name = strtab_value(obj, sym->st_name);
-	dbg("Adding thunk for %s (obj %s)", s->name, obj->path);
 #endif
+	dbg_assert(s->key == sym);
 	s->thunk = globalRwxAllocator.allocate<SimpleExternalCallTrampoline>();
 	s->thunk->init(obj->target_cgp, make_function_pointer(sym, defobj));
-	HASH_ADD_PTR(this->existing_thunks, id, s);  /* id: name of key field */
 	return s;
 };
 
-ThunkHash*
+const ExportsTableEntry*
 CheriExports::getOrAddThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 {
-	struct ThunkHash *s = nullptr;
-	dbg("Looking for ptr in hashtable %#p", this->existing_thunks);
 	assert(this->obj == defobj);
-	HASH_FIND_PTR(this->existing_thunks, &sym, s);
+	const ExportsTableEntry *s = exports_map.find(sym);
 	if (!s) {
 		s = addThunk(obj, sym);
 	}
@@ -405,8 +427,7 @@ CheriExports::getOrAddThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 		dbg("Found thunk for %s in %s: %p", s->name, defobj->path, s);
 	}
 	// A second find should return the same value
-	struct ThunkHash *s2 = nullptr;
-	HASH_FIND_PTR(this->existing_thunks, &sym, s2);
+	const ExportsTableEntry *s2 = exports_map.find(sym);
 	assert(s2 != nullptr);
 	assert(s2 == s);
 #endif
