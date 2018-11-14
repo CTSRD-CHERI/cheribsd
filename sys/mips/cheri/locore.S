@@ -129,17 +129,6 @@ VECTOR(_locore, unknown)
 	mtc0	t0, MIPS_COP_0_CONFIG
 	COP0_SYNC
 
-	/*
-	 * On CHERI MIPS, preserve the kernel's data segment context for use
-	 * in exception handlers.
-	 *
-	 * XXXRW: Do we want to rely on default initialisation of all CP2
-	 * registers here?
-	 */
-	cgetdefault	$c1
-	csetkcc		$c1
-	csetkdc		$c1
-
 #if defined(CPU_BERI)
 	/*
 	 * Enable userspace cycle-count, cycle-count resolution, and CPU
@@ -174,6 +163,131 @@ VECTOR(_locore, unknown)
 #endif
 
 	/*
+	 * Grab the initial omnipotent capability
+	 */
+	cgetdefault	CHERI_REG_KR2C
+
+	/*
+	 * Create a reduced DDC.
+	 *
+	 * XXX-BD: Actually changing base/length requires changes in
+	 * linkage.
+	 */
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
+	REG_LI		t0, CHERI_CAP_KERN_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_CAP_KERN_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_PERMS_KERNEL_DATA
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+
+	/* Preserve a copy in KDC for exception handlers. */
+	csetkdc		CHERI_REG_KR1C
+
+	/* Install the new DDC. */
+	csetdefault	CHERI_REG_KR1C
+
+	/*
+	 * Create a reduced PCC.
+	 *
+	 * XXX-BD: Actually changing base/length requires changes in
+	 * linkage.
+	 */
+	cgetpcc		CHERI_REG_KR1C
+	REG_LI		t0, CHERI_CAP_KERN_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_CAP_KERN_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI		t0, CHERI_PERMS_KERNEL_CODE
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+
+	/* Preserve a copy in KCC for exception handlers.  */
+
+	csetkcc		CHERI_REG_KR1C
+
+	/* Install the new PCC. */
+	REG_LI		t0, CHERI_CAP_KERN_BASE
+	cgetpcc		CHERI_REG_C29
+	cgetoffset	t1, CHERI_REG_C29			# 1
+	PTR_SUBU	t1, t1, t0				# 2
+	PTR_ADDIU	t1, t1, (4 * 7)				# 3
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t1	# 4
+	cjr		CHERI_REG_KR1C				# 5
+	nop							# 6
+	# 7 (land here)
+#if 0
+	/* Restrict kernel KCC and KDC */
+	/*
+	 * XXX-AM: Currently disabled because I have to understand
+	 * how it plays out with relocations
+	 */
+	cgetpcc $c12
+	PTR_LA t1, MIPS_XKSEG_COMPAT32_START # Exception vector start
+	csetoffset $c12, $c12, t1
+	PTR_LA t0, _C_LABEL(etext)	# Kernel .text end
+	PTR_SUBU t0, t0, t1
+	csetbounds $c12, $c12, t0
+	PTR_LA t0, restrict_pcc
+	PTR_SUBU t0, t0, t1
+	csetoffset $c12, $c12, t0
+	cjr $c12
+	nop
+restrict_pcc:
+#endif
+
+	/*
+	 * Create the parent kernel sealing capablity.
+	 */
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
+	REG_LI	t0, CHERI_SEALCAP_KERNEL_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_SEALCAP_KERNEL_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_SEALCAP_KERNEL_PERMS
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	PTR_LA	t0, _C_LABEL(kernel_sealcap)
+	csc	CHERI_REG_KR1C, t0, 0($ddc)
+
+	/*
+	 * Create a capability covering all of userspace from which to
+	 * derive new capabilities in execve(), etc.
+	 *
+	 * XXX-BD: A hardline, no-exceptions W^X implementation would split
+	 * the userspace capability here.
+	 *
+	 * XXX-BD: This is actually an ABI property and should probably
+	 * per sysent.
+	 */
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
+	REG_LI	t0, CHERI_CAP_USER_DATA_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_CAP_USER_DATA_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	PTR_LA	t0, _C_LABEL(userspace_cap)
+	csc	CHERI_REG_KR1C, t0, 0($ddc)
+
+	/*
+	 * Create a capability for userspace to seal capabilities with.
+	 */
+	cmove		CHERI_REG_KR1C, CHERI_REG_KR2C
+	REG_LI	t0, CHERI_SEALCAP_USERSPACE_BASE
+	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_SEALCAP_USERSPACE_LENGTH
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	REG_LI	t0, CHERI_SEALCAP_USERSPACE_PERMS
+	candperm	CHERI_REG_KR1C, CHERI_REG_KR1C, t0
+	PTR_LA	t0, _C_LABEL(user_sealcap)
+	csc	CHERI_REG_KR1C, t0, 0($ddc)
+
+	/*
+	 * Store the omnipotent capability to allow swap to be restored.
+	 */
+	PTR_LA	t0, _C_LABEL(swap_restore_cap)
+	csc	CHERI_REG_KR2C, t0, 0($ddc)
+
+	/*
 	 * Initialize stack and call machine startup.
 	 */
 	cgetkdc		CHERI_REG_STC
@@ -206,25 +320,11 @@ VECTOR(_locore, unknown)
 	/* Clear all remaining capabilities */
 	cclearlo	0xf7fe 	# keep c0, c11 /* XXX-AM c0 will eventually be cleared */
 	cclearhi	0x9bff	# keep c26, c29, c30
-#if 0
-	/* Restrict kernel KCC and KDC */
-	/*
-	 * XXX-AM: Currently disabled because I have to understand
-	 * how it plays out with relocations
-	 */
-	cgetpcc $c12
-	PTR_LA t1, MIPS_XKSEG_COMPAT32_START # Exception vector start
-	csetoffset $c12, $c12, t1
-	PTR_LA t0, _C_LABEL(etext)	# Kernel .text end
-	PTR_SUBU t0, t0, t1
-	csetbounds $c12, $c12, t0
-	PTR_LA t0, restrict_pcc
-	PTR_SUBU t0, t0, t1
-	csetoffset $c12, $c12, t0
-	cjr $c12
-	nop
-restrict_pcc:
-#endif
+
+	/* Zero out our temporary registers. */
+	cmove CHERI_REG_KR1C, $cnull
+	cmove CHERI_REG_KR2C, $cnull
+
 	/* XXX-AM: zero out ra so we catch anything that returns improperly */
 	PTR_LA	ra, 0
 
