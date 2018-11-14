@@ -56,7 +56,6 @@ systraceret="systraceret.$$"
 sysstubfwd="sysstubfwd.$$"
 sysstubstubs="sysstubstubs.$$"
 
-# default input files:
 capabilities_conf="capabilities.conf"
 
 trap "rm $sysaue $sysdcl $syscompat $syscompatdcl $syscompat4 $syscompat4dcl $syscompat6 $syscompat6dcl $syscompat7 $syscompat7dcl $syscompat10 $syscompat10dcl $syscompat11 $syscompat11dcl $sysent $sysinc $sysarg $sysprotoend $systracetmp $systraceret $sysstubfwd $sysstubstubs" 0
@@ -74,7 +73,7 @@ if [ -n "$2" ]; then
 fi
 
 if [ -r $capabilities_conf ]; then
-	capenabled=`cat $capabilities_conf | grep -v "^#" | grep -v "^$"`
+	capenabled=`egrep -v '^#|^$' $capabilities_conf`
 	capenabled=`echo $capenabled | sed 's/ /,/g'`
 else
 	capenabled=""
@@ -486,7 +485,8 @@ sed -e '
 		# from it.
 		#
 		for (cap in capenabled) {
-			if (funcname == capenabled[cap]) {
+			if (funcname == capenabled[cap] ||
+			    funcname == abi_func_prefix capenabled[cap]) {
 				flags = "SYF_CAPENABLED";
 				break;
 			}
