@@ -37,6 +37,7 @@
 
 // A simple version of e.g. llvm::SmallVector
 // This does not support shrinking, only growing and only POD types
+// Note: not thread safe!
 template<typename T, size_t InlineSize>
 class SimpleSmallVector {
 protected:
@@ -45,13 +46,37 @@ protected:
 	unsigned alloc = InlineSize;
 	// TODO: use a union to save space?
 	T inline_array[InlineSize];
+
+	bool is_inline() const { return alloc == InlineSize; }
+
 	void grow() {
-		rtld_fatal("GROWING VECTOR NOT IMPLEMENTED!");
+#ifdef DEBUG
+		constexpr size_t grow_by = 1;
+#else
+		constexpr size_t grow_by = 16;
+#endif
+		size_t new_size = (alloc + grow_by) * sizeof(T);
+		T* old_buffer = buffer;
+		if (is_inline()) {
+			dbg("Performing initial grow()");
+			// Assume this gives enough alignment
+			buffer = static_cast<T*>(xmalloc(new_size));
+			__builtin_memcpy(buffer, old_buffer, count * sizeof(T));
+		} else {
+			buffer = static_cast<T*>(realloc(old_buffer, new_size));
+			dbg_assert(buffer != nullptr);
+		}
+		dbg("Old buffer: %#p, new buffer: %#p, end(): %#p", old_buffer,
+		    buffer, end());
+		alloc += grow_by;
 	}
 public:
 	SimpleSmallVector() {
 		static_assert(__is_trivially_copyable(T), "Only POD types allowed!");
 		buffer = &inline_array[0];
+	}
+	~SimpleSmallVector() {
+
 	}
 	size_t size() const { return count; }
 	size_t capacity() const { return alloc; }
@@ -61,9 +86,16 @@ public:
 
 
 	template <typename... ArgTypes> T* add(ArgTypes &&... Args) {
-		if (__predict_false(size() >= this->capacity()))
+		dbg("end before: %#p, sizeof(T)=%zd, remaining=%zd", end(), sizeof(T),
+		    (size_t)cheri_bytes_remaining(end()));
+		if (__predict_false(size() >= capacity())) {
 			grow();
-		T* result = ::new ((void *)this->end()) T(std::forward<ArgTypes>(Args)...);
+			dbg("end after grow: %#p, sizeof(T)=%zd, remaining=%zd",
+			     end(), sizeof(T), (size_t)cheri_bytes_remaining(end()));
+		}
+		dbg_assert(size() < capacity());
+		dbg_assert(cheri_bytes_remaining(end()) >= sizeof(T));
+		T* result = ::new ((void *)end()) T(std::forward<ArgTypes>(Args)...);
 		count++;
 		return result;
 	}
