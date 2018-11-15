@@ -50,11 +50,8 @@ protected:
 	bool is_inline() const { return alloc == InlineSize; }
 
 	void grow() {
-#ifdef DEBUG
-		constexpr size_t grow_by = 1;
-#else
+		// TODO: what is a sensible growth strategy here
 		constexpr size_t grow_by = 16;
-#endif
 		size_t new_size = (alloc + grow_by) * sizeof(T);
 		T* old_buffer = buffer;
 		if (is_inline()) {
