@@ -35,7 +35,7 @@ for file in $(cd $path; git grep -l "CHERI CHANGES"); do
 			;;
 		u)
 			echo "Updating $file"
-			sed -i.bak -e "s/\"updated\": $last_annotated,/\"updated\": $today,/" $file
+			sed -i "" -e "s/\"updated\": $last_annotated,/\"updated\": $today,/" $file
 			;;
 		x)
 			exit
