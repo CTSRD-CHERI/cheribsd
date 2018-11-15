@@ -191,6 +191,7 @@ _mips_rtld_bind(void* _plt_stub)
 	const Elf_Word r_symndx = plt_stub->r_symndx();
 	const Obj_Entry *obj = plt_stub->obj();
 
+	// XXXAR: locking copied from _mips_rtld_bind so hopefully correct.
 	rlock_acquire(rtld_bind_lock, &lockstate);
 	if (sigsetjmp(lockstate.env, 0) != 0)
 		lock_upgrade(rtld_bind_lock, &lockstate);
@@ -383,7 +384,9 @@ private:
 extern "C" dlfunc_t
 find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 {
-	// FIXME: none of this is thread safe -> we need locks!
+	// This should be called with a global RTLD lock held so there should
+	// not be any races.
+	// FIXME: verify that this assumption is correct
 	dbg_cheri_plt_verbose("Looking thunk %s thunk (found in obj %s): %-#p",
 	    strtab_value(obj, symbol->st_name), obj->path, symbol);
 	if (!obj->cheri_exports) {
