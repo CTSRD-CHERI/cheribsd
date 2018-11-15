@@ -29,6 +29,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/endian.h>
 #include <sys/kernel.h>
@@ -171,7 +173,7 @@ kern_uuidgen(struct uuid *store, size_t count)
 
 #ifndef _SYS_SYSPROTO_H_
 struct uuidgen_args {
-	struct uuid *store;
+	struct uuid * __capability store;
 	int	count;
 };
 #endif

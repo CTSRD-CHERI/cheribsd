@@ -90,7 +90,11 @@ __FBSDID("$FreeBSD$");
  * should currently be sufficient for all supported platforms.
  */
 #define	SYS_IOCTL_SMALL_SIZE	128	/* bytes */
+#if __has_feature(capabilities)
+#define	SYS_IOCTL_SMALL_ALIGN	sizeof(void * __capability)
+#else
 #define	SYS_IOCTL_SMALL_ALIGN	8	/* bytes */
+#endif
 
 #ifdef __LP64__
 static int iosize_max_clamp = 0;
@@ -213,7 +217,7 @@ sys_read(struct thread *td, struct read_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct pread_args {
 	int	fd;
-	void	*buf;
+	void * __capability buf;
 	size_t	nbyte;
 	int	pad;
 	off_t	offset;
@@ -227,7 +231,7 @@ sys_pread(struct thread *td, struct pread_args *uap)
 }
 
 int
-kern_pread(struct thread *td, int fd, void *buf, size_t nbyte, off_t offset)
+kern_pread(struct thread *td, int fd, void * __capability buf, size_t nbyte, off_t offset)
 {
 	struct uio auio;
 	kiovec_t aiov;
@@ -235,7 +239,7 @@ kern_pread(struct thread *td, int fd, void *buf, size_t nbyte, off_t offset)
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	IOVEC_INIT(&aiov, buf, nbyte);
+	IOVEC_INIT_C(&aiov, buf, nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;
@@ -259,7 +263,7 @@ freebsd6_pread(struct thread *td, struct freebsd6_pread_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct readv_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec * __capability iovp;
 	u_int	iovcnt;
 };
 #endif
@@ -297,7 +301,7 @@ kern_readv(struct thread *td, int fd, struct uio *auio)
 #ifndef _SYS_SYSPROTO_H_
 struct preadv_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec * __capability iovp;
 	u_int	iovcnt;
 	off_t	offset;
 };
@@ -384,7 +388,7 @@ dofileread(struct thread *td, int fd, struct file *fp, struct uio *auio,
 #ifndef _SYS_SYSPROTO_H_
 struct write_args {
 	int	fd;
-	const void *buf;
+	const void * __capability buf;
 	size_t	nbyte;
 };
 #endif
@@ -397,7 +401,8 @@ sys_write(struct thread *td, struct write_args *uap)
 
 	if (uap->nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	IOVEC_INIT(&aiov, __DECONST(void *, uap->buf), uap->nbyte);
+	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, uap->buf),
+	    uap->nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = uap->nbyte;
@@ -412,7 +417,7 @@ sys_write(struct thread *td, struct write_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct pwrite_args {
 	int	fd;
-	const void *buf;
+	const void * __capability buf;
 	size_t	nbyte;
 	int	pad;
 	off_t	offset;
@@ -426,7 +431,7 @@ sys_pwrite(struct thread *td, struct pwrite_args *uap)
 }
 
 int
-kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
+kern_pwrite(struct thread *td, int fd, const void * __capability buf, size_t nbyte,
     off_t offset)
 {
 	struct uio auio;
@@ -435,7 +440,7 @@ kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	IOVEC_INIT(&aiov, __DECONST(void *, buf), nbyte);
+	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;
@@ -459,7 +464,7 @@ freebsd6_pwrite(struct thread *td, struct freebsd6_pwrite_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct writev_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec * __capability iovp;
 	u_int	iovcnt;
 };
 #endif
@@ -497,7 +502,7 @@ kern_writev(struct thread *td, int fd, struct uio *auio)
 #ifndef _SYS_SYSPROTO_H_
 struct pwritev_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec * __capability iovp;
 	u_int	iovcnt;
 	off_t	offset;
 };
@@ -645,7 +650,7 @@ oftruncate(struct thread *td, struct oftruncate_args *uap)
 struct ioctl_args {
 	int	fd;
 	u_long	com;
-	caddr_t	data;
+	void * __capability data;
 };
 #endif
 /* ARGSUSED */
@@ -696,7 +701,7 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 	} else
 		data = (void *)&uap->data;
 	if (com & IOC_IN) {
-		error = copyin(__USER_CAP_UNBOUND(uap->data), data,
+		error = copyincap(__USER_CAP_UNBOUND(uap->data), data,
 		    (u_int)size);
 		if (error != 0)
 			goto out;
@@ -711,7 +716,7 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 	error = kern_ioctl(td, uap->fd, com, data);
 
 	if (error == 0 && (com & IOC_OUT))
-		error = copyout(data, __USER_CAP_UNBOUND(uap->data),
+		error = copyoutcap(data, __USER_CAP_UNBOUND(uap->data),
 		    (u_int)size);
 
 out:

@@ -339,7 +339,7 @@ int	kern_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void *data);
 int	kern_profil(struct thread *td, char * __capability samples, size_t size,
 	    size_t offset, u_int scale);
-int	kern_pread(struct thread *td, int fd, void *buf, size_t nbyte,
+int	kern_pread(struct thread *td, int fd, void * __capability buf, size_t nbyte,
 	    off_t offset);
 int	kern_preadv(struct thread *td, int fd, struct uio *auio, off_t offset);
 int	kern_pselect(struct thread *td, int nd, fd_set * __capability in,
@@ -347,8 +347,8 @@ int	kern_pselect(struct thread *td, int nd, fd_set * __capability in,
 	    struct timeval *tvp, sigset_t *uset, int abi_nfdbits);
 int	kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr,
 	    int data);
-int	kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
-	    off_t offset);
+int	kern_pwrite(struct thread *td, int fd, const void * __capability buf,
+	    size_t nbyte, off_t offset);
 int	kern_pwritev(struct thread *td, int fd, struct uio *auio, off_t offset);
 int	kern_quotactl(struct thread *td, const char * __capability path,
 	    int cmd, int uid, void * __capability arg);

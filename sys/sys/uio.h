@@ -86,7 +86,8 @@ int	copyiniov(const uiovec_t * __capability iovp, u_int iovcnt,
 	    kiovec_t **iov, int error);
 int	copyinstrfrom(const void * __restrict src, void * __restrict dst,
 	    size_t len, size_t * __restrict copied, int seg);
-int	copyinuio(const uiovec_t *iovp, u_int iovcnt, struct uio **uiop);
+int	copyinuio(const uiovec_t * __capability iovp, u_int iovcnt,
+	    struct uio **uiop);
 int	copyout_map(struct thread *td, vm_offset_t *addr, size_t sz);
 int	copyout_unmap(struct thread *td, vm_offset_t addr, size_t sz);
 int	physcopyin(void *src, vm_paddr_t dst, size_t len);
@@ -101,7 +102,7 @@ int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
 	    struct uio *uio);
 int	uiomove_nofault(void *cp, int n, struct uio *uio);
 int	uiomove_object(struct vm_object *obj, off_t obj_size, struct uio *uio);
-int	updateiov(const struct uio *uiop, uiovec_t *iovp);
+int	updateiov(const struct uio *uiop, uiovec_t * __capability iovp);
 
 #else /* !_KERNEL */
 

@@ -1015,7 +1015,7 @@ ktrsyserrcause(const char *format, ...)
 
 #ifndef _SYS_SYSPROTO_H_
 struct ktrace_args {
-	char	*fname;
+	char * __capability fname;
 	int	ops;
 	int	facs;
 	int	pid;

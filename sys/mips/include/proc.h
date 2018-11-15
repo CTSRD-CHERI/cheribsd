@@ -76,7 +76,7 @@ struct mdthread {
 	int		md_cop2owner;
 #endif
 #ifdef CPU_CHERI
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 	void * __capability	md_cheri_mmap_cap;
 #endif
 #endif

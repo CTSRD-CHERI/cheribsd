@@ -438,7 +438,7 @@ copyiniov(const uiovec_t * __capability iovp, u_int iovcnt, kiovec_t **iov,
 	iovs = malloc(iovlen, M_IOV, M_WAITOK);
 	/* XXXBD: needlessly slow when uiovec_t and kiovec_t are the same */
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin_c(iovp + i, &useriov, sizeof(useriov));
+		error = copyincap(iovp + i, &useriov, sizeof(useriov));
 		if (error) {
 			free(iovs, M_IOV);
 			return (error);
@@ -450,7 +450,8 @@ copyiniov(const uiovec_t * __capability iovp, u_int iovcnt, kiovec_t **iov,
 }
 
 int
-copyinuio(const uiovec_t *iovp, u_int iovcnt, struct uio **uiop)
+copyinuio(const uiovec_t * __capability iovp, u_int iovcnt,
+    struct uio **uiop)
 {
 	uiovec_t u_iov;
 	kiovec_t *iov;
@@ -464,8 +465,13 @@ copyinuio(const uiovec_t *iovp, u_int iovcnt, struct uio **uiop)
 	iovlen = iovcnt * sizeof (kiovec_t);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	iov = (kiovec_t *)(uio + 1);
+	error = copyincap(iovp, iov, iovlen);
+	if (error) {
+		free(uio, M_IOV);
+		return (error);
+	}
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin(&iovp[i], &u_iov, sizeof(u_iov));
+		error = copyincap(&iovp[i], &u_iov, sizeof(u_iov));
 		if (error) {
 			free(uio, M_IOV);
 			return (error);
@@ -494,12 +500,13 @@ copyinuio(const uiovec_t *iovp, u_int iovcnt, struct uio **uiop)
  * iovec.
  */
 int
-updateiov(const struct uio *uiop, uiovec_t *iovp)
+updateiov(const struct uio *uiop, uiovec_t * __capability iovp)
 {
 	int i, error;
 
 	for (i = 0; i < uiop->uio_iovcnt; i++) {
-		error = suword(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
+		error = copyout_c(&uiop->uio_iov[i].iov_len, &iovp[i].iov_len,
+		    sizeof(uiop->uio_iov[i].iov_len));
 		if (error != 0)
 			return (error);
 	}
@@ -604,7 +611,7 @@ io_user_cap(volatile const void * uaddr, size_t len)
 	if (inexec)
 		return (cheri_capability_build_user_data(
 		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)uaddr, len, 0));
-	return (__USER_CAP(uaddr, len));
+	return (__HYBRID_USER_CAP(uaddr, len));
 }
 
 int

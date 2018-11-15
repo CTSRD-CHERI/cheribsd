@@ -91,21 +91,13 @@ struct vop_setlabel_args;
 #include <sys/acl.h>			/* XXX acl_type_t */
 #include <sys/types.h>			/* accmode_t */
 
-#if __has_feature(capabilities)
-struct mac_c {
-	size_t			m_buflen;
-	char * __capability	m_string;
+#ifdef COMPAT_FREEBSD64
+struct mac64 {
+	size_t		m_buflen;
+	uint64_t	m_string;
 };
 #endif
-struct mac_native {
-	size_t		 m_buflen;
-	char		*m_string;
-};
-#if __has_feature(capabilities)
-typedef	struct mac_c		kmac_t;
-#else
-typedef	struct mac_native	kmac_t;
-#endif
+typedef	struct mac		kmac_t;
 
 int	copyin_mac(void * __capability mac_p, kmac_t *mac);
 

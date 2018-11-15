@@ -84,8 +84,26 @@ struct mfi_ioc_packet {
 		struct mfi_frame_header hdr;
 	} mfi_frame;
 
+	struct iovec mfi_sgl[MAX_IOCTL_SGE];
+} __packed __aligned(sizeof(void *__CAPABILITY));
+
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+struct mfi_ioc_packet64 {
+	uint16_t	mfi_adapter_no;
+	uint16_t	mfi_pad1;
+	uint32_t	mfi_sgl_off;
+	uint32_t	mfi_sge_count;
+	uint32_t	mfi_sense_off;
+	uint32_t	mfi_sense_len;
+	union {
+		uint8_t raw[128];
+		struct mfi_frame_header hdr;
+	} mfi_frame;
+
 	struct iovec_native mfi_sgl[MAX_IOCTL_SGE];
 } __packed __aligned(sizeof(void *__CAPABILITY));
+#endif
 
 #ifdef COMPAT_FREEBSD32
 struct mfi_ioc_packet32 {
@@ -134,9 +152,31 @@ struct mfi_linux_ioc_packet {
 #if defined(__amd64__) /* Assume amd64 wants 32 bit Linux */
 	struct iovec32 lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #else
-	struct iovec_native lioc_sgl[MAX_LINUX_IOCTL_SGE];
+	struct iovec lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #endif
 } __packed __aligned(sizeof(void *__CAPABILITY));
+
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+struct mfi_linux_ioc_packet {
+	uint16_t	lioc_adapter_no;
+	uint16_t	lioc_pad1;
+	uint32_t	lioc_sgl_off;
+	uint32_t	lioc_sge_count;
+	uint32_t	lioc_sense_off;
+	uint32_t	lioc_sense_len;
+	union {
+		uint8_t raw[128];
+		struct mfi_frame_header hdr;
+	} lioc_frame;
+
+#if defined(__amd64__) /* Assume amd64 wants 32 bit Linux */
+	struct iovec32 lioc_sgl[MAX_LINUX_IOCTL_SGE];
+#else
+	struct iovec64 lioc_sgl[MAX_LINUX_IOCTL_SGE];
+#endif
+} __packed __aligned(sizeof(void *__CAPABILITY));
+#endif /* COMPAT_FREEBSD64 */
 
 struct mfi_ioc_passthru {
 	struct mfi_dcmd_frame	ioc_frame;

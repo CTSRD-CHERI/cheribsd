@@ -400,7 +400,7 @@ static SYSCTL_NODE(_kern, KERN_PROF, prof, CTLFLAG_RW, sysctl_kern_prof, "");
  */
 #ifndef _SYS_SYSPROTO_H_
 struct profil_args {
-	caddr_t	samples;
+	void * __capability samples;
 	size_t	size;
 	size_t	offset;
 	u_int	scale;

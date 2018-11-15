@@ -41,7 +41,7 @@
 
 #ifndef _LOCORE
 
-#if defined(COMPAT_CHERIABI) || defined(__CHERI_PURE_CAPABILITY__)
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #endif
 
@@ -59,9 +59,17 @@ typedef struct	__mcontext {
 	int		mc_fpused;	/* fp has been used */
 	f_register_t	mc_fpregs[33];	/* fp regs 0 to 31 and csr */
 	__register_t	mc_fpc_eir;	/* fp exception instruction reg */
-	void		*mc_tls;	/* pointer to TLS area */
+	void * __kerncap mc_tls;	/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 
+	/*
+	 *  XXX-AM: should this be defined(_KERNEL) && __has_feature(capabilities) ||
+	 *  __CHERI_PURE_CAPABILITY__ ?
+	 */
+#if defined(_KERNEL) || defined(__CHERI_PURE_CAPABILITY__)
+	struct cheri_frame	mc_cheriframe;	/* capability registers */
+	void * __capability	__spare__[8];
+#else /* ! __CHERI_PURE_CAPABILITY__ */
         /*
          * Optional externally referenced storage for coprocessors.  Modeled
          * on the approach taken for extended FPU state on x86, which leaves
@@ -78,14 +86,12 @@ typedef struct	__mcontext {
          * differently.
          */
 #if (defined(__mips_n32) || defined(__mips_n64))
-        int             xxx[2];         /* XXX reserved */
+        int             xxx[6];         /* XXX reserved */
 #else
-        int             xxx[5];         /* XXX reserved */
+        int             xxx[7];         /* XXX reserved */
 #endif
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
-	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	struct chericap	__spare__[8];
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
+#endif /* ! (_KERNEL || __CHERI_PURE_CAPABILITY__) */
 } mcontext_t;
 
 #if (defined(__mips_n32) || defined(__mips_n64)) && defined(COMPAT_FREEBSD32)
@@ -118,10 +124,11 @@ typedef struct __ucontext32 {
 } ucontext32_t;
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_signal.h>
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+/* #include <compat/cheriabi/cheriabi_signal.h> */
 
-typedef struct	__mcontext_c {
+typedef struct	__mcontext64 {
 	int		mc_onstack;	/* sigstack state to restore */
 	register_t	mc_pc;		/* pc at time of signal */
 	register_t	mc_regs[32];	/* processor regs 0 to 31 */
@@ -130,22 +137,39 @@ typedef struct	__mcontext_c {
 	int		mc_fpused;	/* fp has been used */
 	f_register_t	mc_fpregs[33];	/* fp regs 0 to 31 and csr */
 	register_t	mc_fpc_eir;	/* fp exception instruction reg */
-	void * __capability	mc_tls;		/* pointer to TLS area */
+	void		mc_tls;		/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
-	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	void * __capability	__spare__[8];
-} mcontext_c_t;
+        /*
+         * Optional externally referenced storage for coprocessors.  Modeled
+         * on the approach taken for extended FPU state on x86, which leaves
+         * some ABI concerns but appears to work in practice.
+         */
+        __register_t    mc_cp2state;    /* Pointer to external state. */
+        __register_t    mc_cp2state_len;/* Length of external state. */
 
-typedef struct __ucontext_c {
+        /*
+         * XXXRW: Unfortunately, reserved space in the MIPS sigcontext was
+         * made an 'int' rather than '__register_t', so embedding new pointers
+         * changes the 32-bit vs. 64-bit versions of this structure
+         * differently.
+         */
+#if (defined(__mips_n32) || defined(__mips_n64))
+        int             xxx[2];         /* XXX reserved */
+#else
+        int             xxx[5];         /* XXX reserved */
+#endif	
+} mcontext64_t;
+
+typedef struct __ucontext64 {
 	sigset_t		uc_sigmask;
-	mcontext_c_t		uc_mcontext;
+	mcontext64_t		uc_mcontext;
 	void * __capability	uc_link;
 	cheriabi_stack_t	uc_stack;
 	int			uc_flags;
 	int			__spare__[4];
-} ucontext_c_t;
+} ucontext64_t;
 #endif
-#endif
+#endif /* _LOCORE */
 
 #ifndef SZREG
 #if defined(__mips_o32)

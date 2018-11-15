@@ -382,7 +382,7 @@ vfs_mergeopts(struct vfsoptlist *toopts, struct vfsoptlist *oldopts)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct nmount_args {
-	struct iovec_native *iovp;
+	struct iovec * __capability iovp;
 	unsigned int iovcnt;
 	int flags;
 };
@@ -767,16 +767,19 @@ bail:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct mount_args {
-	char	*type;
-	char	*path;
+	char	* __capability type;
+	char	* __capability path;
 	int	flags;
-	caddr_t	data;
+	void	* __capability data;
 };
 #endif
 /* ARGSUSED */
 int
 sys_mount(struct thread *td, struct mount_args *uap)
 {
+#if __has_feature(capabilities)
+	return (ENOSYS);
+#else
 	char *fstype;
 	struct vfsconf *vfsp = NULL;
 	struct mntarg *ma = NULL;
@@ -828,6 +831,7 @@ sys_mount(struct thread *td, struct mount_args *uap)
 	if ((vfsp->vfc_flags & VFCF_SBDRY) != 0)
 		return (vfsp->vfc_vfsops_sd->vfs_cmount(ma, uap->data, flags));
 	return (vfsp->vfc_vfsops->vfs_cmount(ma, uap->data, flags));
+#endif
 }
 
 /*
@@ -1204,7 +1208,7 @@ vfs_domount(
  */
 #ifndef _SYS_SYSPROTO_H_
 struct unmount_args {
-	char	*path;
+	char	* __capability path;
 	int	flags;
 };
 #endif
@@ -1953,7 +1957,7 @@ mount_argsu(struct mntarg *ma, const char *name, const void *val, int len)
 	maa = malloc(sizeof *maa + len, M_MOUNT, M_WAITOK | M_ZERO);
 	SLIST_INSERT_HEAD(&ma->list, maa, next);
 	tbuf = (void *)(maa + 1);
-	ma->error = copyinstr(__USER_CAP_STR(val), tbuf, len, NULL);
+	ma->error = copyinstr(__HYBRID_USER_CAP_STR(val), tbuf, len, NULL);
 	return (mount_arg(ma, name, tbuf, -1));
 }
 

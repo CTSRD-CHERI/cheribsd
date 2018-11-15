@@ -2080,22 +2080,25 @@ out:
 
 #ifndef _SYS_SYSPROTO_H_
 struct sysctl_args {
-	int	*name;
+	int * __capability name;
 	u_int	namelen;
-	void	*old;
-	size_t	*oldlenp;
-	void	*new;
+	void * __capability old;
+	size_t * __capability oldlenp;
+	void * __capability new;
 	size_t	newlen;
 };
 #endif
 int
 sys___sysctl(struct thread *td, struct sysctl_args *uap)
 {
-
+	int flags = 0;
+#if __has_feature(capabilities)
+	flags = SCTL_CHERIABI;
+#endif
 	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
 	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
 	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
-	    uap->newlen, 0));
+	    uap->newlen, flags));
 }
 
 int

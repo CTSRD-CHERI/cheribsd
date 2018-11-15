@@ -283,7 +283,7 @@ SYSCTL_INT(_security_bsd, OID_AUTO, unprivileged_idprio, CTLFLAG_RW,
 struct rtprio_thread_args {
 	int		function;
 	lwpid_t		lwpid;
-	struct rtprio	*rtp;
+	struct rtprio * __capability rtp;
 };
 #endif
 int
@@ -374,7 +374,7 @@ kern_rtprio_thread(struct thread *td, int function, lwpid_t lwpid,
 struct rtprio_args {
 	int		function;
 	pid_t		pid;
-	struct rtprio	*rtp;
+	struct rtprio * __capability rtp;
 };
 #endif
 int
@@ -603,7 +603,7 @@ ogetrlimit(struct thread *td, struct ogetrlimit_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct __setrlimit_args {
 	u_int	which;
-	struct	rlimit *rlp;
+	struct	rlimit * __capability rlp;
 };
 #endif
 int
@@ -790,7 +790,7 @@ kern_proc_setrlimit(struct thread *td, struct proc *p, u_int which,
 #ifndef _SYS_SYSPROTO_H_
 struct __getrlimit_args {
 	u_int	which;
-	struct	rlimit *rlp;
+	struct	rlimit * __capability rlp;
 };
 #endif
 /* ARGSUSED */
@@ -961,7 +961,7 @@ calcru1(struct proc *p, struct rusage_ext *ruxp, struct timeval *up,
 #ifndef _SYS_SYSPROTO_H_
 struct getrusage_args {
 	int	who;
-	struct	rusage *rusage;
+	struct	rusage * __capability rusage;
 };
 #endif
 int

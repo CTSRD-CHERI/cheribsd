@@ -29,6 +29,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -50,14 +52,14 @@ __FBSDID("$FreeBSD$");
 
 #ifndef _SYS_SYSPROTO_H_
 struct getcontext_args {
-	struct __ucontext *ucp;
+	struct __ucontext * __capability ucp;
 }
 struct setcontext_args {
-	const struct __ucontext_t *ucp;
+	const struct __ucontext_t * __capability ucp;
 }
 struct swapcontext_args {
-	struct __ucontext *oucp;
-	const struct __ucontext_t *ucp;
+	struct __ucontext * __capability oucp;
+	const struct __ucontext_t * __capability ucp;
 }
 #endif
 
@@ -76,7 +78,7 @@ sys_getcontext(struct thread *td, struct getcontext_args *uap)
 		uc.uc_sigmask = td->td_sigmask;
 		PROC_UNLOCK(td->td_proc);
 		bzero(uc.__spare__, sizeof(uc.__spare__));
-		ret = copyout(&uc, uap->ucp, UC_COPY_SIZE);
+		ret = copyoutcap(&uc, uap->ucp, UC_COPY_SIZE);
 	}
 	return (ret);
 }
@@ -90,7 +92,7 @@ sys_setcontext(struct thread *td, struct setcontext_args *uap)
 	if (uap->ucp == NULL)
 		ret = EINVAL;
 	else {
-		ret = copyin(uap->ucp, &uc, UC_COPY_SIZE);
+		ret = copyincap(uap->ucp, &uc, UC_COPY_SIZE);
 		if (ret == 0) {
 			ret = set_mcontext(td, &uc.uc_mcontext);
 			if (ret == 0) {
@@ -117,9 +119,9 @@ sys_swapcontext(struct thread *td, struct swapcontext_args *uap)
 		PROC_LOCK(td->td_proc);
 		uc.uc_sigmask = td->td_sigmask;
 		PROC_UNLOCK(td->td_proc);
-		ret = copyout(&uc, uap->oucp, UC_COPY_SIZE);
+		ret = copyoutcap(&uc, uap->oucp, UC_COPY_SIZE);
 		if (ret == 0) {
-			ret = copyin(uap->ucp, &uc, UC_COPY_SIZE);
+			ret = copyincap(uap->ucp, &uc, UC_COPY_SIZE);
 			if (ret == 0) {
 				ret = set_mcontext(td, &uc.uc_mcontext);
 				if (ret == 0) {

@@ -92,9 +92,8 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd32/freebsd32_util.h>
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi.h>
-#include <compat/cheriabi/cheriabi_util.h>
+#if __has_feature(capabilities)
+#include <sys/cheriabi.h>
 #endif
 
 SDT_PROVIDER_DEFINE(proc);
@@ -180,9 +179,10 @@ CTASSERT(sizeof(struct kinfo_proc) == KINFO_PROC_SIZE);
 #ifdef COMPAT_FREEBSD32
 CTASSERT(sizeof(struct kinfo_proc32) == KINFO_PROC32_SIZE);
 #endif
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
 #ifdef NOTYET
-CTASSERT(sizeof(struct kinfo_proc_c) == KINFO_PROC_C_SIZE);
+CTASSERT(sizeof(struct kinfo_proc64) == KINFO_PROC64_SIZE);
 #endif
 #endif
 
@@ -1355,7 +1355,7 @@ freebsd32_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc32 *ki32)
 }
 #endif	/* COMPAT_FREEBSD32 */
 
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 /*
  * Convert pointers to NULL capabilities with the offset of the
  * virtual address to avoid leaking kernel capbilities.  One
@@ -1457,7 +1457,7 @@ cheriabi_kinfo_proc_out(const struct kinfo_proc *ki, struct kinfo_proc_c *ki_c)
 	CP(*ki, *ki_c, ki_sflag);
 	CP(*ki, *ki_c, ki_tdflags);
 }
-#endif	/* COMPAT_CHERIABI */
+#endif	/* __has_feature(capabilities) */
 
 static ssize_t
 kern_proc_out_size(struct proc *p, int flags)
@@ -1493,7 +1493,7 @@ kern_proc_out(struct proc *p, struct sbuf *sb, int flags)
 #ifdef COMPAT_FREEBSD32
 	struct kinfo_proc32 ki32;
 #endif
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 	struct kinfo_proc_c ki_c;
 #endif
 	int error;
@@ -1511,7 +1511,7 @@ kern_proc_out(struct proc *p, struct sbuf *sb, int flags)
 				error = ENOMEM;
 		} else
 #endif
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 		if ((flags & KERN_PROC_CHERIABI) != 0) {
 			cheriabi_kinfo_proc_out(&ki, &ki_c);
 			if (sbuf_bcat(sb, &ki_c, sizeof(ki_c)) != 0)
@@ -1530,7 +1530,7 @@ kern_proc_out(struct proc *p, struct sbuf *sb, int flags)
 					error = ENOMEM;
 			} else
 #endif
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 			if ((flags & KERN_PROC_CHERIABI) != 0) {
 				cheriabi_kinfo_proc_out(&ki, &ki_c);
 				if (sbuf_bcat(sb, &ki_c, sizeof(ki_c)) != 0)
@@ -1590,7 +1590,7 @@ sysctl_kern_proc(SYSCTL_HANDLER_ARGS)
 	if (req->flags & SCTL_MASK32)
 		flags |= KERN_PROC_MASK32;
 #endif
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 	if (req->flags & SCTL_CHERIABI)
 		flags |= KERN_PROC_CHERIABI;
 #endif
@@ -1888,12 +1888,12 @@ done:
 }
 #endif
 
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 static int
 get_proc_vector_cheriabi(struct thread *td, struct proc *p,
     char ***proc_vectorp, size_t *vsizep, enum proc_vector_type type)
 {
-	struct cheriabi_ps_strings pss;
+	struct ps_strings pss;
 	ElfCheriABI_Auxinfo aux;
 	vm_offset_t vptr, ptr;
 	char **proc_vector;
@@ -1971,7 +1971,7 @@ get_proc_vector_cheriabi(struct thread *td, struct proc *p,
 
 	return (0);
 }
-#endif /* COMPACT_CHERIABI */
+#endif /* __has_feature(capabilities) */
 
 static int
 get_proc_vector(struct thread *td, struct proc *p, char ***proc_vectorp,
@@ -1988,7 +1988,7 @@ get_proc_vector(struct thread *td, struct proc *p, char ***proc_vectorp,
 	if (SV_PROC_FLAG(p, SV_ILP32) != 0)
 		return (get_proc_vector32(td, p, proc_vectorp, vsizep, type));
 #endif
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 	if (SV_PROC_FLAG(p, SV_CHERI) != 0)
 		return (get_proc_vector_cheriabi(td, p, proc_vectorp, vsizep,
 			type));
@@ -2143,7 +2143,7 @@ proc_getauxv(struct thread *td, struct proc *p, struct sbuf *sb)
 			size = vsize * sizeof(Elf32_Auxinfo);
 		else
 #endif
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 		if (SV_PROC_FLAG(p, SV_CHERI) != 0)
 			size = vsize * sizeof(ElfCheriABI_Auxinfo);
 		else

@@ -2485,17 +2485,15 @@ out:
 int
 sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 {
-	struct sigevent_native ev_n;
-	ksigevent_t ev, *evp;
+	struct sigevent ev, *evp;
 	int error;
 
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(__USER_CAP_OBJ(uap->sigev), &ev_n, sizeof(ev));
+		error = copyin(uap->sigev, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
-		convert_sigevent(&ev_n, &ev);
 		evp = &ev;
 	}
 	return (kern_kmq_notify(td, uap->mqd, evp));
@@ -2940,7 +2938,8 @@ static struct syscall_helper_data mq32_syscalls[] = {
 };
 #endif
 
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_util.h>
@@ -3003,6 +3002,25 @@ cheriabi_kmq_notify(struct thread *td, struct cheriabi_kmq_notify_args *uap)
 	return (kern_kmq_notify(td, uap->mqd, evp));
 }
 
+int
+freebsd64_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
+{
+	struct sigevent64 ev_n;
+	ksigevent_t ev, *evp;
+	int error;
+
+	if (uap->sigev == NULL) {
+		evp = NULL;
+	} else {
+		error = copyin(__USER_CAP_OBJ(uap->sigev), &ev_n, sizeof(ev));
+		if (error != 0)
+			return (error);
+		convert_sigevent(&ev_n, &ev);
+		evp = &ev;
+	}
+	return (kern_kmq_notify(td, uap->mqd, evp));
+}
+
 static struct syscall_helper_data cheriabi_mq_syscalls[] = {
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_kmq_open),
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_kmq_unlink),
@@ -3012,7 +3030,7 @@ static struct syscall_helper_data cheriabi_mq_syscalls[] = {
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_kmq_notify),
 	SYSCALL_INIT_LAST
 };
-#endif
+#endif /* COMPAT_FREEBSD64 */
 
 static int
 mqinit(void)
@@ -3027,7 +3045,8 @@ mqinit(void)
 	if (error != 0)
 		return (error);
 #endif
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
+	/* XXX-AM: fix for freebsd64 */
 	error = cheriabi_syscall_helper_register(cheriabi_mq_syscalls,
 	    SY_THR_STATIC_KLD);
 	if (error != 0)
@@ -3040,7 +3059,8 @@ static int
 mqunload(void)
 {
 
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
+	/* XXX-AM: fix for freebsd64 */
 	cheriabi_syscall_helper_unregister(cheriabi_mq_syscalls);
 #endif
 #ifdef COMPAT_FREEBSD32

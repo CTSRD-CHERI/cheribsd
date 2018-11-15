@@ -39,6 +39,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define EXPLICIT_USER_ACCESS
+
 #include "opt_ktrace.h"
 
 #include <sys/param.h>
@@ -98,6 +100,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #if __has_feature(capabilities)
+/* XXX-AM: this is to be moved to compat64 */
 static inline bool
 is_magic_sighandler_constant(void* handler) {
 	/*
@@ -311,7 +314,7 @@ siginfo_to_siginfo_native(const _siginfo_t *si,
 	si_n->si_uid = si->si_uid;
 	si_n->si_status = si->si_status;
 	si_n->si_addr = (void *)(uintptr_t)si->si_addr;
-	si_n->si_value.sival_ptr_native = si->si_value.sival_ptr_native;
+	si_n->si_value.sival_ptr64 = si->si_value.sival_ptr_native;
 	memcpy(&si_n->_reason, &si->_reason, sizeof(si_n->_reason));
 #endif
 }
@@ -331,7 +334,7 @@ siginfo_native_to_siginfo(const struct siginfo_native *si_n,
 	si->si_uid = si_n->si_uid;
 	si->si_status = si_n->si_status;
 	si->si_addr = (__cheri_tocap void * __capability)si_n->si_addr;
-	si->si_value.sival_ptr_native = si_n->si_value.sival_ptr_native;
+	si->si_value.sival_ptr_native = si_n->si_value.sival_ptr64;
 	memcpy(&si->_reason, &si_n->_reason, sizeof(si_n->_reason));
 #endif
 }
@@ -878,47 +881,27 @@ kern_sigaction(struct thread *td, int sig, const ksigaction_t *act,
 #ifndef _SYS_SYSPROTO_H_
 struct sigaction_args {
 	int	sig;
-	struct	sigaction *act;
-	struct	sigaction *oact;
+	struct	sigaction * __capability act;
+	struct	sigaction * __capability oact;
 };
 #endif
 int
 sys_sigaction(struct thread *td, struct sigaction_args *uap)
 {
 	ksigaction_t act, oact;
-	struct sigaction_native act_n, oact_n;
 	ksigaction_t *actp, *oactp;
 	int error;
 
 	actp = (uap->act != NULL) ? &act : NULL;
 	oactp = (uap->oact != NULL) ? &oact : NULL;
 	if (actp) {
-		error = copyin(uap->act, &act_n, sizeof(act));
+		error = copyincap(uap->act, &act, sizeof(act));
 		if (error)
 			return (error);
-#if __has_feature(capabilities)
-		if (is_magic_sighandler_constant(act_n.sa_handler))
-			actp->sa_handler = cheri_fromint((vaddr_t)act_n.sa_handler);
-		else
-			actp->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
-		actp->sa_flags = act_n.sa_flags;
-		actp->sa_mask = act_n.sa_mask;
-#else
-		*actp = act_n;
-#endif
 	}
 	error = kern_sigaction(td, uap->sig, actp, oactp, 0);
-	if (oactp && !error) {
-#if __has_feature(capabilities)
-		memset(&oact_n, 0, sizeof(oact_n));
-		oact_n.sa_handler = (void *)(__cheri_addr vaddr_t)oactp->sa_handler;
-		oact_n.sa_flags = oactp->sa_flags;
-		oact_n.sa_mask = oactp->sa_mask;
-#else
-		oact_n = *oactp;
-#endif
-		error = copyout(&oact_n, uap->oact, sizeof(oact_n));
-	}
+	if (oactp && !error)
+		error = copyoutcap(&oact, uap->oact, sizeof(oact));
 	return (error);
 }
 
@@ -1205,8 +1188,8 @@ out:
 #ifndef _SYS_SYSPROTO_H_
 struct sigprocmask_args {
 	int	how;
-	const sigset_t *set;
-	sigset_t *oset;
+	const sigset_t * __capability set;
+	sigset_t * __capability oset;
 };
 #endif
 int
@@ -1283,7 +1266,6 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 {
 	struct timespec ts;
 	struct timespec *timeout;
-	struct siginfo_native si_n;
 	sigset_t set;
 	ksiginfo_t ksi;
 	int error;
@@ -1306,8 +1288,7 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 		return (error);
 
 	if (uap->info) {
-		siginfo_to_siginfo_native(&ksi.ksi_info, &si_n);
-		error = copyout(&si_n, uap->info, sizeof(si_n));
+		error = copyout(&ksi.ksi_info, uap->info, sizeof(ksi.ksi_info));
 	}
 
 	if (error == 0)
@@ -1319,7 +1300,6 @@ int
 sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 {
 	ksiginfo_t ksi;
-	struct siginfo_native si_n;
 	sigset_t set;
 	int error;
 
@@ -1332,8 +1312,7 @@ sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 		return (error);
 
 	if (uap->info) {
-		siginfo_to_siginfo_native(&ksi.ksi_info, &si_n);
-		error = copyout(&si_n, uap->info, sizeof(si_n));
+		error = copyout(&ksi.ksi_info, uap->info, sizeof(ksi.ksi_info));
 	}
 
 	if (error == 0)
@@ -1471,7 +1450,7 @@ kern_sigtimedwait(struct thread *td, sigset_t waitset, ksiginfo_t *ksi,
 
 #ifndef _SYS_SYSPROTO_H_
 struct sigpending_args {
-	sigset_t	*set;
+	sigset_t * __capability set;
 };
 #endif
 int
@@ -1592,7 +1571,7 @@ osigsetmask(struct thread *td, struct osigsetmask_args *uap)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct sigsuspend_args {
-	const sigset_t *sigmask;
+	const sigset_t * __capability sigmask;
 };
 #endif
 /* ARGSUSED */
@@ -1708,8 +1687,8 @@ osigstack(struct thread *td, struct osigstack_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct sigaltstack_args {
-	struct sigaltstack_native	*ss;
-	struct sigaltstack_native	*oss;
+	struct sigaltstack_native * __capability ss;
+	struct sigaltstack_native * __capability oss;
 };
 #endif
 /* ARGSUSED */
@@ -1717,27 +1696,19 @@ int
 sys_sigaltstack(struct thread *td, struct sigaltstack_args *uap)
 {
 	stack_t ss, oss;
-	struct sigaltstack_native ss_n;
 	int error;
 
 	if (uap->ss != NULL) {
-		error = copyin(uap->ss, &ss_n, sizeof(ss_n));
+		error = copyincap(uap->ss, &ss, sizeof(ss));
 		if (error)
 			return (error);
-		ss.ss_sp = __USER_CAP_UNBOUND(ss_n.ss_sp);
-		ss.ss_size = ss_n.ss_size;
-		ss.ss_flags = ss_n.ss_flags;
 	}
 	error = kern_sigaltstack(td, (uap->ss != NULL) ? &ss : NULL,
 	    (uap->oss != NULL) ? &oss : NULL);
 	if (error)
 		return (error);
 	if (uap->oss != NULL) {
-		memset(&ss_n, 0, sizeof(ss_n));
-		ss_n.ss_sp = (__cheri_fromcap void *)oss.ss_sp;
-		ss_n.ss_size = oss.ss_size;
-		ss_n.ss_flags = oss.ss_flags;
-		error = copyout(&ss_n, uap->oss, sizeof(ss_n));
+		error = copyoutcap(&oss, uap->oss, sizeof(oss));
 	}
 	return (error);
 }
@@ -1955,18 +1926,36 @@ okillpg(struct thread *td, struct okillpg_args *uap)
 struct sigqueue_args {
 	pid_t pid;
 	int signum;
-	/* union sigval */ void *value;
+	/* union sigval */ void * __capability value;
 };
 #endif
 int
 sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 {
-	ksigval_union sv;
+	ksigval_union	sv;
+	int		flags = 0;
 
-	memset(&sv, 0, sizeof(sv));
-	sv.sival_ptr_native = uap->value;
+	memset(&sv, 0, sizeof(sv));	
+	sv.sival_ptr_c = uap->value;
+#if __has_feature(capabilities)
+	int tag;
 
-	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
+	if (uap->pid != td->td_proc->p_pid) {
+		/*
+		 * Cowardly refuse to send capabilities to other
+		 * processes.
+		 *
+		 * XXX-BD: allow untagged capablities between
+		 * CheriABI processess? (Would have to happen in
+		 * delivery code to avoid a race).
+		 */
+		tag = cheri_gettag(sv.sival_ptr_c);
+		if (tag)
+			return (EPROT);
+	}
+#endif
+
+	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, flags));
 }
 
 int
@@ -2003,12 +1992,14 @@ kern_sigqueue(struct thread *td, pid_t pid, int signum, ksigval_union *value,
 			ksi.ksi_value.sival_ptr32 = value->sival_ptr32;
 		else
 #endif
-#ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			ksi.ksi_value.sival_ptr_c = value->sival_ptr_c;
+#ifdef COMPAT_FREEBSD64
+		if (SV_PROC_FLAG(td->td_proc, SV_LP64) &&
+		    !SV_PROC_FLAG(td->td_proc, SV_CHERI))
+			/* XXX-AM: fix for freebsd64 */
+			ksi.ksi_value.sival_ptr_native = value->sival_ptr_native;
 		else
 #endif
-			ksi.ksi_value.sival_ptr_native = value->sival_ptr_native;
+			ksi.ksi_value.sival_ptr_c = value->sival_ptr_c;
 		error = pksignal(p, ksi.ksi_signo, &ksi);
 	}
 	PROC_UNLOCK(p);

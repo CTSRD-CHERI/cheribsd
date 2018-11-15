@@ -3399,7 +3399,7 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		vn_finished_write(mp);
 		mp = NULL;
 		error = kern_unlinkat(td, AT_FDCWD,
-		    __USER_CAP_STR((char *)(intptr_t)cmd.value),
+		    __HYBRID_USER_CAP_STR((char *)(intptr_t)cmd.value),
 		    UIO_USERSPACE, 0, (ino_t)cmd.size);
 		break;
 

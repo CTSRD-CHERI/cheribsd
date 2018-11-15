@@ -1564,7 +1564,7 @@ cpuset_setproc_update_set(struct proc *p, struct cpuset *set)
 
 #ifndef _SYS_SYSPROTO_H_
 struct cpuset_args {
-	cpusetid_t	*setid;
+	cpusetid_t	* __capability setid;
 };
 #endif
 int
@@ -1634,7 +1634,7 @@ struct cpuset_getid_args {
 	cpulevel_t	level;
 	cpuwhich_t	which;
 	id_t		id;
-	cpusetid_t	*setid;
+	cpusetid_t * __capability setid;
 };
 #endif
 int
@@ -1701,7 +1701,7 @@ struct cpuset_getaffinity_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		cpusetsize;
-	cpuset_t	*mask;
+	cpuset_t * __capability mask;
 };
 #endif
 int
@@ -1819,7 +1819,7 @@ struct cpuset_setaffinity_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		cpusetsize;
-	const cpuset_t	*mask;
+	const cpuset_t * __capability mask;
 };
 #endif
 int
@@ -1946,8 +1946,8 @@ struct cpuset_getdomain_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		domainsetsize;
-	domainset_t	*mask;
-	int 		*policy;
+	domainset_t * __capability mask;
+	int * __capability policy;
 };
 #endif
 int
@@ -2082,7 +2082,7 @@ struct cpuset_setdomain_args {
 	cpuwhich_t	which;
 	id_t		id;
 	size_t		domainsetsize;
-	domainset_t	*mask;
+	domainset_t * __capability mask;
 	int 		policy;
 };
 #endif

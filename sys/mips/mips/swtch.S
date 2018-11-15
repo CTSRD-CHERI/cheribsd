@@ -814,10 +814,10 @@ szsigcode32:
 	.text
 #endif
 
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 	.globl	_C_LABEL(cheri_sigcode)
 _C_LABEL(cheri_sigcode):
-	dli		t0, SIGF_C_UC
+	dli		t0, SIGF_UC
 	cincoffset	$c3, $c11, t0		# In the hybrid ABI named $c11,
 	li		v0, SYS_sigreturn	# but we really mean $csp.
 # sigreturn (ucp)

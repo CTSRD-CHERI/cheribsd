@@ -83,6 +83,12 @@ __FBSDID("$FreeBSD$");
 
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
+#if !__has_feature(capabilities)
+/* XXX-AM: fix for freebsd64
+ * Note that this is really not used when we do not define
+ * the elf64 sysentvec.
+ */
+
 /*
  * Send an interrupt to process.
  *
@@ -94,7 +100,7 @@ __FBSDID("$FreeBSD$");
  * specified pc, psl.
  */
 void
-sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
+freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
 	struct proc *p;
 	struct thread *td;
@@ -314,6 +320,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
 }
+#endif /* ! feature(capabilities) */
 
 /*
  * System call to cleanup state after a signal
@@ -328,7 +335,7 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	ucontext_t uc;
 	int error;
 
-	error = copyin(uap->sigcntxp, &uc, sizeof(uc));
+	error = copyincap(uap->sigcntxp, &uc, sizeof(uc));
 	if (error != 0)
 	    return (error);
 
@@ -468,6 +475,8 @@ set_regs(struct thread *td, struct reg *regs)
 	return (0);
 }
 
+#if !__has_feature(capabilities)
+/* XXX-AM: fix for freebsd64 */
 int
 get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 {
@@ -561,6 +570,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 
 	return (0);
 }
+#endif /* __has_feature(capabilities) */
 
 int
 fill_fpregs(struct thread *td, struct fpreg *fpregs)
@@ -600,7 +610,7 @@ set_capregs(struct thread *td, struct capreg *capregs)
 }
 #endif
 
-
+#if !__has_feature(capabilities)
 /*
  * Clear registers on exec
  * $sp is set to the stack pointer passed in.  $pc is set to the entry
@@ -676,6 +686,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 
 	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
 }
+#endif /* !feature(capabilities) */
 
 int
 ptrace_clear_single_step(struct thread *td)

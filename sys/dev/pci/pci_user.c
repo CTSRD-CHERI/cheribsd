@@ -66,8 +66,9 @@ __FBSDID("$FreeBSD$");
 #include "pcib_if.h"
 #include "pci_if.h"
 
-#if __has_feature(capabilities)
-struct pci_conf_io_c {
+#ifdef COMPAT_FREEBSD64
+/* XXX-AM: fix for freebsd64 */
+struct pci_conf_io64 {
 	u_int32_t		pat_buf_len;
 	u_int32_t		num_patterns;
 	struct pci_match_conf * __capability patterns;
@@ -78,14 +79,12 @@ struct pci_conf_io_c {
 	u_int32_t		generation;
 	u_int32_t		status;
 };
-typedef	struct pci_conf_io_c	kpci_conf_io_t;
-#else
-typedef	struct pci_conf_io	kpci_conf_io_t;
-#endif
+#define	PCIOCGETCONF_64	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf64)
+#endif /* COMPAT_FREEBSD64 */
 
-#ifdef COMPAT_CHERIABI
-#define	PCIOCGETCONF_C	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf_io_c)
-#endif
+/* XXX-AM: this can be removed */
+typedef	struct pci_conf_io	kpci_conf_io_t;
+
 
 #ifdef COMPAT_FREEBSD32
 struct pci_conf32 {
@@ -540,10 +539,10 @@ pci_conf_match_old32(struct pci_match_conf_old32 *matches, int num_matches,
 #endif	/* COMPAT_FREEBSD32 */
 #endif	/* !PRE7_COMPAT */
 
-#ifdef COMPAT_CHERIABI
-#define	_CASE_PCIOCGETCONF_C	case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+#define	_CASE_PCIOCGETCONF_64	case PCIOCGETCONF_64:
 #else
-#define	_CASE_PCIOCGETCONF_C
+#define	_CASE_PCIOCGETCONF_64
 #endif
 
 #ifdef COMPAT_FREEBSD32
@@ -565,7 +564,7 @@ pci_conf_match_old32(struct pci_match_conf_old32 *matches, int num_matches,
 #endif
 
 #define CASE_PCIOCGETCONF					\
-    _CASE_PCIOCGETCONF_C					\
+    _CASE_PCIOCGETCONF_64					\
     _CASE_PCIOCGETCONF32					\
     _CASE_PCIOCGETCONF_OLD					\
     _CASE_PCIOCGETCONF_OLD32					\
@@ -591,8 +590,8 @@ pci_conf_match(u_long cmd, struct pci_match_conf *matches, int num_matches,
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF_64:
 #endif
 		return (pci_conf_match_native(
 		    (struct pci_match_conf *)matches, num_matches, match_buf));
@@ -716,8 +715,8 @@ pci_match_conf_size(u_long cmd)
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF_64:
 #endif
 		return (sizeof(struct pci_match_conf));
 #ifdef COMPAT_FREEBSD32
@@ -744,8 +743,8 @@ pci_conf_size(u_long cmd)
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF_64:
 #endif
 		return (sizeof(struct pci_conf));
 #ifdef COMPAT_FREEBSD32
@@ -769,17 +768,25 @@ pci_conf_size(u_long cmd)
 static void
 pci_conf_io_init(kpci_conf_io_t *cio, caddr_t data, u_long cmd)
 {
-	struct pci_conf_io *cio_native;
+#ifdef COMPAT_FREEBSD64
+	struct pci_conf_io64 *cio_native;
+#endif
 #ifdef COMPAT_FREEBSD32
 	struct pci_conf_io32 *cio32;
 #endif
 
 	switch (cmd) {
 	case PCIOCGETCONF:
+		*cio = *(struct pci_conf_io *)data;
+		return;
+
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF_64:
 #ifdef PRE7_COMPAT
 	case PCIOCGETCONF_OLD:
 #endif
-		cio_native = (struct pci_conf_io *)data;
+		/* XXX-AM: fix for freebsd64 */
+		cio_native = (struct pci_conf_io64 *)data;
 		cio->pat_buf_len = cio_native->pat_buf_len;
 		cio->num_patterns = cio_native->num_patterns;
 		cio->patterns = __USER_CAP(cio_native->patterns,
@@ -792,12 +799,7 @@ pci_conf_io_init(kpci_conf_io_t *cio, caddr_t data, u_long cmd)
 		cio->generation = cio_native->generation;
 		cio->status = cio_native->status;
 		return;
-
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
-		*cio = *(struct pci_conf_io_c *)data;
-		return;
-#endif
+#endif /* COMPAT_FREEBSD64 */
 
 #ifdef COMPAT_FREEBSD32
 	case PCIOCGETCONF32:
@@ -830,8 +832,8 @@ pci_conf_io_update_data(const kpci_conf_io_t *cio, caddr_t data,
     u_long cmd)
 {
 	struct pci_conf_io *d_cio;
-#ifdef COMPAT_CHERIABI
-	struct pci_conf_io_c *cio_c;
+#ifdef COMPAT_FREEBSD64
+	struct pci_conf_io64 *cio64;
 #endif
 #ifdef COMPAT_FREEBSD32
 	struct pci_conf_io32 *cio32;
@@ -849,9 +851,10 @@ pci_conf_io_update_data(const kpci_conf_io_t *cio, caddr_t data,
 		d_cio->num_matches = cio->num_matches;
 		return;
 
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
-		cio_c = (struct pci_conf_io_c *)data;
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF_64:
+		/* XXX-AM: fix for freebsd64 */
+		cio_c = (struct pci_conf_io64 *)data;
 		cio_c->status = cio->status;
 		cio_c->generation = cio->generation;
 		cio_c->offset = cio->offset;
@@ -888,8 +891,9 @@ pci_conf_for_copyout(const struct pci_conf *pcp, union pci_conf_union *pcup,
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF_64:
+		/* XXX-AM: fix for freebsd64 */
 #endif
 		pcup->pc = *pcp;
 		return;

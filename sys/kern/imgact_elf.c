@@ -87,11 +87,6 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheri.h>
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi.h>
-#include <compat/cheriabi/cheriabi_util.h>
-#endif
-
 #define ELF_NOTE_ROUNDSIZE	4
 #define OLD_EI_BRAND	8
 
@@ -2101,7 +2096,7 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 	struct ptrace_lwpinfo32 pl;
 #else
-	struct ptrace_lwpinfo pl;
+	struct ptrace_lwpinfo_native pl;
 #endif
 
 	td = (struct thread *)arg;
@@ -2121,7 +2116,7 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 			siginfo_to_siginfo32(&td->td_si, &pl.pl_siginfo);
 #else
-			siginfo_to_siginfo_native(&td->td_si, &pl.pl_siginfo);
+			memcpy(&pl.pl_siginfo, &td->td_si, sizeof(pl.pl_siginfo));
 #endif
 		}
 		strcpy(pl.pl_tdname, td->td_name);
@@ -2394,11 +2389,11 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 		sbuf_delete(sb);
 		*sizep = size;
 	} else {
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 		if (SV_PROC_FLAG(p, SV_CHERI) != 0)
 			structsize = sizeof(ElfCheriABI_Auxinfo);
 		else
-#endif /* ! COMPAT_CHERIABI */
+#endif
 			structsize = sizeof(Elf_Auxinfo);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
 		PHOLD(p);

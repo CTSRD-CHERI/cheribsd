@@ -536,6 +536,9 @@ sed -e '
 				    argtype[argc] ~ /_Contains[a-z_]*_timet_/))
 					needs_suffix=1
 				ptrargs++
+				if ((abi_changes("cheriabi")) &&
+				    argtype[argc] ~ /caddr_t/)
+					sub(/caddr_t/, "char *", argtype[argc]);
 			}
 
 			# The parser adds space around parens.
@@ -639,7 +642,7 @@ sed -e '
 		printf("\t\t*n_args = %d;\n\t\tbreak;\n\t}\n", argc) > systrace
 		printf("\t\tbreak;\n") > systracetmp
 		if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF") && \
-		    !(abi_flags != "" && ptrargs == 0)) {
+		    !(!abi_changes("defaultabi") && ptrargs == 0)) {
 			if (argc != 0) {
 				printf("struct %s {\n", argalias) > sysarg
 				for (i = 1; i <= argc; i++) {
@@ -831,7 +834,7 @@ sed -e '
 		}
 
 		if (!flag("NOPROTO") && !flag("NODEF") && \
-		    !(abi_flags != "" && ptrargs == 0)) {
+		    !(!abi_changes("defaultabi") && ptrargs == 0)) {
 			if (funcname == "nosys" || funcname == "lkmnosys" ||
 			    funcname == "sysarch" ||
 			    funcname ~ /^cheriabi/ || funcname ~ /^freebsd/ ||
