@@ -46,6 +46,9 @@ static constexpr uint8_t simple_plt_code[] = {
 #include "plt_code.inc"
 };
 
+#undef dbg
+#define dbg(...) _Pragma("GCC error \"should not be used\"")
+
 // A simple external call trampoline that has the target function and data
 //embedded just before the code
 struct SimpleExternalCallTrampoline {
@@ -106,9 +109,9 @@ private:
 		// writable capability to this region so this should be safe
 		void* result = mmap(nullptr, BLOCK_SIZE, PROT_ALL | PROT_MAX(PROT_ALL),
 		    mmap_flags, -1, 0);
-		dbg("Allocated new RWX block: %-#p", result);
+		dbg_cheri("Allocated new RWX block: %-#p", result);
 		if (result == MAP_FAILED) {
-			dbg("mmap failed: %s", strerror(errno));
+			dbg_cheri("mmap failed: %s", strerror(errno));
 			return nullptr;
 		}
 		current_offset = 0;
@@ -183,7 +186,7 @@ dlfunc_t
 _mips_rtld_bind(void* _plt_stub)
 {
 	CheriPltStub *plt_stub = static_cast<CheriPltStub*>(_plt_stub);
-	dbg("%s: rtld $cgp=%p, stub=%#p", __func__, cheri_getidc(), plt_stub);
+	dbg_cheri_plt_verbose("%s: rtld $cgp=%p, stub=%#p", __func__, cheri_getidc(), plt_stub);
 	RtldLockState lockstate;
 	const Elf_Word r_symndx = plt_stub->r_symndx();
 	const Obj_Entry *obj = plt_stub->obj();
@@ -202,7 +205,7 @@ _mips_rtld_bind(void* _plt_stub)
 	dlfunc_t target = make_function_pointer(def, defobj);
 	const void* target_cgp = defobj->target_cgp;
 	assert(cheri_gettag(target_cgp));
-	dbg("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
+	dbg_cheri_plt_verbose("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
 	    defobj->strtab + def->st_name, (intmax_t)r_symndx, obj->path,
 	    (void *)plt_stub->trampoline.target, (void *)target);
 
@@ -224,7 +227,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	(void)where;
 	if (!obj->cheri_plt_stubs) {
 		// TODO: remove this
-		dbg("%s: warning: called %s before reloc_plt()."
+		dbg_cheri_plt("%s: warning: called %s before reloc_plt()."
 		    " Please updated LLD and rebuild world!", obj->path, __func__);
 		const_cast<Obj_Entry*>(obj)->cheri_plt_stubs = new (NEW(struct CheriPlt)) CheriPlt(obj);
 	}
@@ -246,7 +249,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 		//      symname(obj, r_symndx));
 		return false;
 	}
-	dbg("%s: plt stub for %s: %#p", obj->path, symname(obj, r_symndx), plt);
+	dbg_cheri_plt("%s: plt stub for %s: %#p", obj->path, symname(obj, r_symndx), plt);
 
 	// TODO: if we decide to directly update captable entries for the pc-relative ABI:
 	// plt->captable_entry = where;
@@ -262,7 +265,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	// but the actual target that is written to the PLT should point to the code:
 	target_cap = cheri_incoffset(target_cap, offsetof(CheriPltStub, trampoline.code));
 	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
-	dbg("where=%p <- plt_code=%#p", where, target_cap);
+	dbg_cheri_plt_verbose("where=%p <- plt_code=%#p", where, target_cap);
 	assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
 	assert(cheri_getlen(target_cap) == sizeof(CheriPltStub) &&
 	    "stub should have tight bounds");
@@ -316,7 +319,7 @@ reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 			return (-1);
 		}
 	}
-	dbg("%s: done relocating %zd PLT entries: ", obj->path,
+	dbg_cheri_plt("%s: done relocating %zd PLT entries: ", obj->path,
 	    obj->cheri_plt_stubs->count());
 #if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 3
 	for (size_t i = 0; i < obj->captable_size / sizeof(void*); i++) {
@@ -381,7 +384,7 @@ extern "C" dlfunc_t
 find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 {
 	// FIXME: none of this is thread safe -> we need locks!
-	dbg("Looking thunk %s thunk (found in obj %s): %-#p",
+	dbg_cheri_plt_verbose("Looking thunk %s thunk (found in obj %s): %-#p",
 	    strtab_value(obj, symbol->st_name), obj->path, symbol);
 	if (!obj->cheri_exports) {
 		// Use placement-new here to use rtld xmalloc() instead of malloc
@@ -395,22 +398,87 @@ find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 	void* target_cap = cheri_csetbounds(s->thunk, sizeof(SimpleExternalCallTrampoline));
 	target_cap = cheri_incoffset(target_cap, offsetof(SimpleExternalCallTrampoline, code));
 	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
-	dbg("External call thunk resolved to %-#p", target_cap);
+	dbg_cheri_plt_verbose("External call thunk resolved to %-#p", target_cap);
 	assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
 	assert(cheri_getlen(target_cap) == sizeof(SimpleExternalCallTrampoline) &&
 	    "stub should have tight bounds");
 	return (dlfunc_t)target_cap;
 }
 
+#define STRING_CASE(val) case val: return #val;
+
+static inline const char* visibility_str(unsigned char vis) {
+	static char buffer[128];
+	switch (vis) {
+	STRING_CASE(STV_DEFAULT)
+	STRING_CASE(STV_EXPORTED)
+	STRING_CASE(STV_HIDDEN)
+	STRING_CASE(STV_INTERNAL)
+	STRING_CASE(STV_PROTECTED)
+	STRING_CASE(STV_SINGLETON)
+	default:
+		rtld_snprintf(buffer, sizeof(buffer), "<unknown STV: %d>", vis);
+		return buffer;
+	}
+}
+
+static inline const char* binding_str(unsigned char binding) {
+	static char buffer[128];
+	switch (binding) {
+	STRING_CASE(STB_LOCAL)
+	STRING_CASE(STB_GLOBAL)
+	STRING_CASE(STB_WEAK)
+	// STRING_CASE(STB_LOOS)
+	STRING_CASE(STB_GNU_UNIQUE)
+	STRING_CASE(STB_HIOS)
+	STRING_CASE(STB_LOPROC)
+	STRING_CASE(STB_HIPROC)
+	default:
+		rtld_snprintf(buffer, sizeof(buffer), "<unknown STB: %d>", binding);
+		return buffer;
+	}
+}
+
+static inline const char* type_str(unsigned char vis) {
+	static char buffer[128];
+	switch (vis) {
+	STRING_CASE(STT_NOTYPE)
+	STRING_CASE(STT_OBJECT)
+	STRING_CASE(STT_FUNC)
+	STRING_CASE(STT_SECTION)
+	STRING_CASE(STT_FILE)
+	STRING_CASE(STT_COMMON)
+	STRING_CASE(STT_TLS)
+	STRING_CASE(STT_NUM)
+	// STRING_CASE(STT_LOOS)
+	STRING_CASE(STT_GNU_IFUNC)
+	STRING_CASE(STT_HIOS)
+	STRING_CASE(STT_LOPROC)
+	// STRING_CASE(STT_SPARC_REGISTER)
+	STRING_CASE(STT_HIPROC)
+	default:
+		rtld_snprintf(buffer, sizeof(buffer), "<unknown STT: %d>", vis);
+		return buffer;
+	}
+}
+
+
 const ExportsTableEntry*
 CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 {
-	dbg("Adding thunk for %s (obj %s)", strtab_value(obj, sym->st_name), obj->path);
+	dbg_cheri_plt_verbose("Adding export thunk for %s (obj %s)",
+	    strtab_value(obj, sym->st_name), obj->path);
+	auto sym_vis = ELF_ST_VISIBILITY(sym->st_other);
+	auto sym_bind = ELF_ST_BIND(sym->st_info);
+	auto sym_type = ELF_ST_TYPE(sym->st_info);
+	dbg_cheri_plt_verbose("symbol info for %s: %s, %s, %s", strtab_value(obj, sym->st_name),
+	    binding_str(sym_bind), visibility_str(sym_vis), type_str(sym_type));
+
 	assert(ELF_ST_TYPE(sym->st_info) == STT_FUNC);
 #ifdef DEBUG_VERBOSE
 	if (exports_map.size() == exports_map.capacity()) {
-		rtld_fdprintf(STDERR_FILENO, "Will have to allocate more space"
-		    " for function pointer exports in %s (current capacity=%zd)\n",
+		dbg_cheri_plt("Will have to allocate more space for function "
+		    "pointer exports in %s (current capacity=%zd)\n",
 		    defobj->path, exports_map.capacity());
 	}
 #endif
@@ -434,7 +502,7 @@ CheriExports::getOrAddThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 	}
 #ifdef DEBUG
 	else {
-		dbg("Found thunk for %s in %s: %p", s->name, defobj->path, s);
+		dbg_cheri_plt_verbose("Found thunk for %s in %s: %p", s->name, defobj->path, s);
 	}
 	// A second find should return the same value
 	const ExportsTableEntry *s2 = exports_map.find(sym);

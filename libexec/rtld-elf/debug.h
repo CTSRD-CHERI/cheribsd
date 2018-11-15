@@ -62,13 +62,17 @@ __END_DECLS
 
 #ifdef DEBUG
 #define dbg(...)	debug_printf(RTLD_DBG_NO_CATEGORY, __VA_ARGS__)
-#define dbg_cat(category, ...)	debug_printf(RTLD_DBG_ ## category, )
+#define dbg_cat(category, ...)	debug_printf(RTLD_DBG_ ## category, __VA_ARGS__)
 #define dbg_assert(cond)	assert(cond)
 #else
 #define dbg(...)	((void) 0)
 #define dbg_cat(category, ...)	((void) 0)
 #define dbg_assert(cond)	((void) 0)
 #endif
+#define dbg_cheri(...)			dbg_cat(CHERI, __VA_ARGS__)
+#define dbg_cheri_plt(...)		dbg_cat(CHERI_PLT, __VA_ARGS__)
+#define dbg_cheri_plt_verbose(...)	dbg_cat(CHERI_PLT_VERBOSE, __VA_ARGS__)
+
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define _MYNAME	"ld-cheri-elf.so.1"
