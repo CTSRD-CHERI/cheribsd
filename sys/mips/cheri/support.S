@@ -606,6 +606,25 @@ LEAF(fubyte_c)
 	nop
 END(fubyte_c)
 
+LEAF(fuecap)
+	cgetaddr	t0, $c3
+	CAPTABLE_LOAD($c2, fswberr)
+	blt	t0, zero, 1f	# make sure address is in user space
+	nop
+	GET_CPU_PCPU($c1, t0)
+	clc	$c1, zero, PC_CURPCB($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	clc	$c3, zero, 0($c3)	# fetch capability
+	csc	$c3, zero, 0($c4)	# store capability
+	CHERI_NULL($c2)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	cjr	$c17
+	li	v0, 0
+1:
+	cjr	$c2	# fswberr
+	nop
+END(fuecap)
+
 LEAF(suword64_c)
 XLEAF(suword_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
