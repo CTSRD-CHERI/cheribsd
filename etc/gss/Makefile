@@ -3,7 +3,6 @@
 .include <src.opts.mk>
 
 FILES=	mech qop
-NO_OBJ=
 FILESDIR= /etc/gss
 
 .if ${MK_CHERI_PURE} == "yes"
