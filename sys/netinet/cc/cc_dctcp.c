@@ -474,7 +474,7 @@ DECLARE_CC_MODULE(dctcp, &dctcp_cc_algo);
 //   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

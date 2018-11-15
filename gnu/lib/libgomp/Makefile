@@ -4,7 +4,7 @@
 #   "updated": 20180629,
 #   "target_type": "lib",
 #   "changes": [
-#     "pointer_size"
+#     "pointer_shape"
 #   ],
 #   "change_comment": "size and alignment of locks set by defines"
 # }

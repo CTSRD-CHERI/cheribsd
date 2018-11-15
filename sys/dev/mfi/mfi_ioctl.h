@@ -197,7 +197,7 @@ struct mfi_query_disk {
 //   "target_type": "header",
 //   "changes": [
 //     "kiovec_t",
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

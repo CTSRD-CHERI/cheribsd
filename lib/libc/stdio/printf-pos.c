@@ -37,7 +37,7 @@
  *   "updated": 20180629,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_size",
+ *     "pointer_shape",
  *     "support"
  *   ],
  *   "change_comment": "PRIiPTR"

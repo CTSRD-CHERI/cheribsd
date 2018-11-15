@@ -468,7 +468,7 @@ LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") int LZ4_decompress
 // {
 //   "updated": 20180830,
 //   "changes": [
-//     "pointer_size"
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

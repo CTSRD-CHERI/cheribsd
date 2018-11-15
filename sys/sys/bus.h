@@ -949,7 +949,7 @@ static __inline void varp ## _set_ ## var(device_t dev, type t)		\
 //   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_size"
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

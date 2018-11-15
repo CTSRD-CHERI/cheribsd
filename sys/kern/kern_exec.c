@@ -1820,7 +1820,7 @@ exec_unregister(const struct execsw *execsw_arg)
 //   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
-//     "pointer_integrity",
+//     "integer_provenance",
 //     "user_capabilities"
 //   ]
 // }

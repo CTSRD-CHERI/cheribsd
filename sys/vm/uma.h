@@ -719,7 +719,7 @@ long uma_avail(void);
 //   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

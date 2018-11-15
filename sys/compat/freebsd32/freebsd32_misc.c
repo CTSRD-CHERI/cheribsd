@@ -3484,7 +3484,7 @@ freebsd32_sched_rr_get_interval(struct thread *td,
 //     "iovec-macros",
 //     "kiovec_t",
 //     "kernel_sig_types",
-//     "pointer_integrity",
+//     "integer_provenance",
 //     "user_capabilities",
 //     "other"
 //   ]

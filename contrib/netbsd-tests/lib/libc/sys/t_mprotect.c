@@ -34,7 +34,7 @@
  *   "updated": 20181113,
  *   "target_type": "test",
  *   "changes": [
- *     "function_abi",
+ *     "calling_convention",
  *     "other"
  *   ],
  *   "change_comment": "EPROT, Missing mode to open with O_CREAT"

@@ -7,7 +7,7 @@
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_alignment",
- *     "pointer_size",
+ *     "pointer_shape",
  *     "virtual_address"
  *   ]
  * }

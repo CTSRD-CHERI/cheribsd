@@ -35,7 +35,7 @@
  *   "updated": 20180629,
  *   "target_type": "prog",
  *   "changes": [
- *     "pointer_size"
+ *     "pointer_shape"
  *   ]
  * }
  * CHERI CHANGES END

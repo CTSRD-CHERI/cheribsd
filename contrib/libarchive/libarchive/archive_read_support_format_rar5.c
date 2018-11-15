@@ -26,7 +26,7 @@
 // {
 //   "updated": 20181030,
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

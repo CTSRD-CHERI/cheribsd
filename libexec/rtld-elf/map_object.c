@@ -33,7 +33,7 @@
  *   "target_type": "prog",
  *   "changes": [
  *     "monotonicity",
- *     "pointer_integrity"
+ *     "integer_provenance"
  *   ],
  *   "change_comment": "request sufficent mmap permissions"
  * }

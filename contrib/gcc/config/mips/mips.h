@@ -28,7 +28,7 @@ Boston, MA 02110-1301, USA.  */
  *   "updated": 20180629,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_size"
+ *     "pointer_shape"
  *   ],
  *   "change_comment": "align stack for capabilities",
  *   "hybrid_specific": true

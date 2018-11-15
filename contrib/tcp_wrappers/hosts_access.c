@@ -24,7 +24,7 @@
  *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
- *     "function_abi"
+ *     "calling_convention"
  *   ],
  *   "comment": "Added function prototypes, and also added parameters to function pointer types"
  * }

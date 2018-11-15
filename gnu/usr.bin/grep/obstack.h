@@ -25,7 +25,7 @@
  *   "target_type": "prog",
  *   "changes": [
  *     "pointer_alignment",
- *     "pointer_integrity"
+ *     "integer_provenance"
  *   ]
  * }
  * CHERI CHANGES END

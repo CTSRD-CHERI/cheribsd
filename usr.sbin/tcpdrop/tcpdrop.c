@@ -388,7 +388,7 @@ usage(void)
 // {
 //   "updated": 20180907,
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

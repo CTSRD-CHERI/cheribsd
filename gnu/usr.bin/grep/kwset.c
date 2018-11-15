@@ -27,7 +27,7 @@
  *   "updated": 20180629,
  *   "target_type": "prog",
  *   "changes": [
- *     "function_abi"
+ *     "calling_convention"
  *   ]
  * }
  * CHERI CHANGES END

@@ -37,7 +37,7 @@
  *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_integrity"
+ *     "integer_provenance"
  *   ],
  *   "hybrid_specific": true
  * }

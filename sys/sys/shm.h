@@ -186,7 +186,7 @@ __END_DECLS
 //   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ],
 //   "change_comment": "compression of large shared memory allocations"
 // }

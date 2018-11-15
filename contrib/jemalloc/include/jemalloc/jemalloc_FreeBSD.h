@@ -7,7 +7,7 @@
  *   "updated": 20181113,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_size",
+ *     "pointer_shape",
  *     "unsupported"
  *   ]
  * }

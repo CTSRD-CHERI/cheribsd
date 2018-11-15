@@ -118,7 +118,7 @@ typedef	__uint64_t		vaddr_t;
 //   "updated": 20180629,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_integrity",
+//     "integer_provenance",
 //     "virtual_address"
 //   ]
 // }

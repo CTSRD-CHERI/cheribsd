@@ -75,7 +75,7 @@ static const char rcsid[] =
  *   "updated": 20181115,
  *   "target_type": "lib",
  *   "changes": [
- *     "function_abi"
+ *     "calling_convention"
  *   ],
  *   "comment": "Using a function pointer without prototypes"
  * }

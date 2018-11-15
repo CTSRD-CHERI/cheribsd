@@ -33,7 +33,7 @@
  *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_size"
+ *     "pointer_shape"
  *   ],
  *   "change_comment": "TLS alignment"
  * }

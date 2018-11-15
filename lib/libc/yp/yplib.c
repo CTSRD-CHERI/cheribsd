@@ -104,7 +104,7 @@ extern bool_t xdr_ypresp_master();
  *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
- *     "function_abi"
+ *     "calling_convention"
  *   ],
  *   "comment": "Fixed using a function pointer without prototypes"
  * }

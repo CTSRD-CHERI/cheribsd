@@ -26,7 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *   "updated": 20180629,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_integrity"
+ *     "integer_provenance"
  *   ]
  * }
  * CHERI CHANGES END

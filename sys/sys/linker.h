@@ -370,7 +370,7 @@ __END_DECLS
 //   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_size"
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

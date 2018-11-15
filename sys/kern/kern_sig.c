@@ -3989,7 +3989,7 @@ sigacts_shared(struct sigacts *ps)
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",
-//     "pointer_integrity",
+//     "integer_provenance",
 //     "user_capabilities"
 //   ]
 // }

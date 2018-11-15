@@ -31,7 +31,7 @@
  *   "updated": 20181114,
  *   "target_type": "prog",
  *   "changes": [
- *     "pointer_size"
+ *     "pointer_shape"
  *   ],
  *   "change_comment": "pointer size is not equivalent to address size"
  * }

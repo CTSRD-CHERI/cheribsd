@@ -31,7 +31,7 @@
  *   "updated": 20180719,
  *   "target_type": "test",
  *   "changes": [
- *     "function_abi"
+ *     "calling_convention"
  *   ],
  *   "change_comment": "Missing mode to open with O_CREAT"
  * }

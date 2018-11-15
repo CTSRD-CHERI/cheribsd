@@ -174,7 +174,7 @@ out:
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t",
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

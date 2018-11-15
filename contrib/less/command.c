@@ -13,7 +13,7 @@
  *   "updated": 20181113,
  *   "target_type": "prog",
  *   "changes": [
- *     "function_abi"
+ *     "calling_convention"
  *   ]
  * }
  * CHERI CHANGES END

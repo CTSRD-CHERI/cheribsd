@@ -502,7 +502,7 @@ MODULE_DEPEND(chd, ertt, 1, 1, 1);
 //   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

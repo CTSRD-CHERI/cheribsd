@@ -36,7 +36,7 @@
  *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
- *     "function_abi",
+ *     "calling_convention",
  *     "unsupported"
  *   ],
  *   "change_comment": "stack pointer"

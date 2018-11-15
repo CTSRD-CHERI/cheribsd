@@ -51,7 +51,7 @@
  *   "updated": 20180629,
  *   "target_type": "header",
  *   "changes": [
- *     "pointer_size"
+ *     "pointer_shape"
  *   ]
  * }
  * CHERI CHANGES END

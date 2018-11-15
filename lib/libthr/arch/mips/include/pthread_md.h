@@ -34,7 +34,7 @@
  *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_size",
+ *     "pointer_shape",
  *     "support"
  *   ],
  *   "change_comment": "TLS alignment, capability based TLS interface"

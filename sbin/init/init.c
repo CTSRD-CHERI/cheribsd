@@ -37,7 +37,7 @@
  *   "updated": 20181114,
  *   "target_type": "prog",
  *   "changes": [
- *     "pointer_integrity"
+ *     "integer_provenance"
  *   ],
  *   "change_comments": "BDB hashes don't preserve pointers"
  * }

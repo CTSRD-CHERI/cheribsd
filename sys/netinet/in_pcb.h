@@ -899,7 +899,7 @@ void	in_pcboutput_eagain(struct inpcb *);
 //   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

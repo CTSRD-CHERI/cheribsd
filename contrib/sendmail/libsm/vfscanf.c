@@ -17,7 +17,7 @@
  *   "updated": 20181113,
  *   "target_type": "lib",
  *   "changes": [
- *     "function_abi",
+ *     "calling_convention",
  *     "pointer_as_integer"
  *   ]
  * }

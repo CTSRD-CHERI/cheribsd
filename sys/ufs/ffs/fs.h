@@ -850,7 +850,7 @@ extern u_char *fragtbl[];
 //   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_size"
+//     "pointer_shape"
 //   ],
 //   "change_comment": "embedded pointer storage in superblock"
 // }
