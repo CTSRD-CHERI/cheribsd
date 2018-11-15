@@ -540,7 +540,10 @@ END(MipsFPID)
  * (see sendsig() and sigreturn()). We have to compute the address
  * of the sigcontext struct for the sigreturn call.
 */
-/* XXX-AM: TODO merge cheriabi and normal sigcode for purecap kernel. */	
+/*
+ * XXX-AM: TODO merge cheriabi and normal sigcode for purecap kernel.
+ * Now this distinction is useless since cheriABI is the default ABI.
+ */
 	.globl	_C_LABEL(sigcode)
 _C_LABEL(sigcode):
 	PTR_ADDU	a0, sp, SIGF_UC		# address of ucontext
@@ -557,10 +560,9 @@ szsigcode:
 	.long	esigcode-sigcode
 	.text
 
-#ifdef COMPAT_CHERIABI
 	.globl	_C_LABEL(cheri_sigcode)
 _C_LABEL(cheri_sigcode):
-	dli		t0, SIGF_C_UC
+	dli		t0, SIGF_UC
 	cincoffset	$c3, CHERI_REG_STC, t0	# In the hybrid ABI named $c11,
 	li		v0, SYS_sigreturn	# but we really mean $csp.
 # sigreturn (ucp)
@@ -574,4 +576,3 @@ _C_LABEL(echeri_sigcode):
 szcheri_sigcode:
 	.long	echeri_sigcode-cheri_sigcode
 	.text
-#endif
