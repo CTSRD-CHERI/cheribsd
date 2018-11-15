@@ -642,8 +642,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	    NULL)
 		rtld_die();
 	dbg("Parsed values:\n\tmapbase=%-#p\n\tmapsize=%#zx"
-	    "\n\ttext_rodata=%#p\n\tvaddrbase=%#zx\n\trelocbase=%-#p\n",
-	    obj_main->mapbase, obj_main->mapsize, obj_main->text_rodata_cap,
+#ifdef __CHERI_PURE_CAPABILITY__
+	    "\n\ttext_rodata=%#p"
+#endif
+	    "\n\tvaddrbase=%#zx\n\trelocbase=%-#p\n",
+	    obj_main->mapbase, obj_main->mapsize,
+#ifdef __CHERI_PURE_CAPABILITY__
+	    obj_main->text_rodata_cap,
+#endif
 	    obj_main->vaddrbase, obj_main->relocbase);
     }
 
