@@ -600,6 +600,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	debug = RTLD_DBG_NO_CATEGORY;
     if (is_env_var_set(_LD("DEBUG_VERBOSE")))
 	debug = RTLD_DBG_ALL;
+    if (is_env_var_set(_LD("DEBUG_CHERI")))
+	debug |= RTLD_DBG_CHERI_PLT | RTLD_DBG_CHERI | RTLD_DBG_CHERI_PLT_VERBOSE;
+    if (is_env_var_set(_LD("DEBUG_STATS")))
+	debug |= RTLD_DBG_RELOC_STATS;
     if (getenv(_LD("DEBUG_CATEGORIES")))
 	debug |= parse_integer(getenv(_LD("DEBUG_CATEGORIES")));
 #endif
