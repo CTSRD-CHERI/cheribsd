@@ -205,7 +205,6 @@ static bool dangerous_ld_env;	/* True if environment variables have been
 				   used to affect the libraries loaded */
 bool ld_bind_not;		/* Disable PLT update */
 static char *ld_bind_now;	/* Environment variable for immediate binding */
-static char *ld_debug;		/* Environment variable for debugging */
 static char *ld_library_path;	/* Environment variable for search path */
 static char *ld_library_dirs;	/* Environment variable for library descriptors */
 static char *ld_preload;	/* Environment variable for libraries to
@@ -355,6 +354,18 @@ _LD(const char *var)
 #else
 #define _LD(x)	LD_ x
 #endif
+
+static inline
+bool is_env_var_set(const char* varname)
+{
+	char *env_var;
+
+	env_var = getenv(varname);
+
+	/* return true if the variable is nonnull and not equal to "0" */
+	return (env_var != NULL && *env_var != '\0' &&
+	    __builtin_strcmp(env_var, "0") != 0);
+}
 
 /*
  * Main entry point for dynamic linking.
@@ -554,7 +565,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		rtld_fatal("environment corrupt; aborting");
 	}
     }
-    ld_debug = getenv(_LD("DEBUG"));
     if (ld_bind_now == NULL)
 	    ld_bind_not = getenv(_LD("BIND_NOT")) != NULL;
     libmap_disable = getenv(_LD("LIBMAP_DISABLE")) != NULL;
@@ -585,8 +595,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if ((ld_elf_hints_path == NULL) || strlen(ld_elf_hints_path) == 0)
 	ld_elf_hints_path = ld_elf_hints_default;
 
-    if (ld_debug != NULL && *ld_debug != '\0')
-	debug = 1;
+#ifdef DEBUG
+    if (is_env_var_set(_LD("DEBUG")))
+	debug = RTLD_DBG_NO_CATEGORY;
+    if (is_env_var_set(_LD("DEBUG_VERBOSE")))
+	debug = RTLD_DBG_ALL;
+    if (getenv(_LD("DEBUG_CATEGORIES")))
+	debug |= parse_integer(getenv(_LD("DEBUG_CATEGORIES")));
+#endif
     dbg("%s is initialized, base address = %-#p", __progname,
 	(caddr_t) aux_info[AT_BASE]->a_un.a_ptr);
     dbg("RTLD dynamic = %-#p", obj_rtld.dynamic);
