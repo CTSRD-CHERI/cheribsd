@@ -72,7 +72,7 @@ static const char rcsid[] =
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180728,
+ *   "updated": 20181115,
  *   "target_type": "lib",
  *   "changes": [
  *     "function_abi"
