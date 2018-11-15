@@ -186,7 +186,7 @@ dlfunc_t
 _mips_rtld_bind(void* _plt_stub)
 {
 	CheriPltStub *plt_stub = static_cast<CheriPltStub*>(_plt_stub);
-	dbg_cheri_plt_verbose("%s: rtld $cgp=%p, stub=%#p", __func__, cheri_getidc(), plt_stub);
+	// dbg_cheri_plt_verbose("%s: rtld $cgp=%p, stub=%#p", __func__, cheri_getidc(), plt_stub);
 	RtldLockState lockstate;
 	const Elf_Word r_symndx = plt_stub->r_symndx();
 	const Obj_Entry *obj = plt_stub->obj();
@@ -250,7 +250,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 		//      symname(obj, r_symndx));
 		return false;
 	}
-	dbg_cheri_plt("%s: plt stub for %s: %#p", obj->path, symname(obj, r_symndx), plt);
+	dbg_cheri_plt_verbose("%s: plt stub for %s: %#p", obj->path, symname(obj, r_symndx), plt);
 
 	// TODO: if we decide to directly update captable entries for the pc-relative ABI:
 	// plt->captable_entry = where;
@@ -471,12 +471,13 @@ CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 {
 	dbg_cheri_plt_verbose("Adding export thunk for %s (obj %s)",
 	    strtab_value(obj, sym->st_name), obj->path);
+#ifdef DEBUG
 	auto sym_vis = ELF_ST_VISIBILITY(sym->st_other);
 	auto sym_bind = ELF_ST_BIND(sym->st_info);
 	auto sym_type = ELF_ST_TYPE(sym->st_info);
 	dbg_cheri_plt_verbose("symbol info for %s: %s, %s, %s", strtab_value(obj, sym->st_name),
 	    binding_str(sym_bind), visibility_str(sym_vis), type_str(sym_type));
-
+#endif
 	assert(ELF_ST_TYPE(sym->st_info) == STT_FUNC);
 #ifdef DEBUG_VERBOSE
 	if (exports_map.size() == exports_map.capacity()) {

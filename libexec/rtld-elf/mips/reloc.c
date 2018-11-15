@@ -878,9 +878,11 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 
 		case R_TYPE(CHERI_CAPABILITY_CALL):
 			// TODO: make this an error in a few weeks
-			dbg("%s: deprecated: found CHERI_CAPABILITY_CALL call "
+
+			rtld_fdprintf(STDERR_FILENO,
+			    "%s: deprecated: found CHERI_CAPABILITY_CALL call "
 			    "PLT relocation against %s in rel.dyn instead of "
-			    "rel.plt. Please update LLD and recompile world!",
+			    "rel.plt. Please update LLD and recompile world!\n",
 			    obj->path, symname(obj, r_symndx));
 			if (!add_cheri_plt_stub(obj, obj_rtld, r_symndx, where))
 				return (-1);
