@@ -113,9 +113,9 @@
 	}
 5	AUE_OPEN_RWTC	STD|VARARG	{
 		int open(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int flags,
-		    int mode
+		    mode_t mode
 		);
 	}
 6	AUE_CLOSE	STD	{
@@ -168,8 +168,8 @@
 	}
 15	AUE_CHMOD	STD	{
 		int chmod(
-		    _In_z_ char *path,
-		    int mode
+		    _In_z_ const char *path,
+		    mode_t mode
 		);
 	}
 16	AUE_CHOWN	STD	{
@@ -245,14 +245,14 @@
 28	AUE_SENDMSG	STD	{
 		ssize_t sendmsg(
 		    int s,
-		    _In_ _Contains_ptr_ struct msghdr *msg,
+		    _In_ _Contains_ptr_ const struct msghdr *msg,
 		    int flags
 		);
 	}
 29	AUE_RECVFROM	STD	{
 		ssize_t recvfrom(
 		    int s,
-		    _Out_writes_bytes_(len) caddr_t buf,
+		    _Out_writes_bytes_(len) void *buf,
 		    size_t len,
 		    int flags,
 		    _Out_writes_bytes_opt_(*fromlenaddr) struct sockaddr *from,
@@ -431,8 +431,8 @@
 		);
 	}
 60	AUE_UMASK	STD	{
-		int umask(
-		    int newmask
+		mode_t umask(
+		    mode_t newmask
 		);
 	}
 61	AUE_CHROOT	STD	{
@@ -548,7 +548,7 @@
 83	AUE_SETITIMER	STD	{
 		int setitimer(
 		    u_int which,
-		    _In_ _Contains_timet_ struct itimerval *itv,
+		    _In_ _Contains_timet_ const struct itimerval *itv,
 		    _Out_opt_ _Contains_timet_ struct itimerval *oitv
 		);
 	}
@@ -628,7 +628,7 @@
 		int connect(
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr *name,
-		    int namelen
+		    __socklen_t namelen
 		);
 	}
 99	AUE_ACCEPT	COMPAT|NOARGS {
@@ -669,7 +669,7 @@
 		int bind(
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr * name,
-		    int namelen
+		    __socklen_t namelen
 		);
 	}
 105	AUE_SETSOCKOPT	STD	{
@@ -677,8 +677,8 @@
 		    int s,
 		    int level,
 		    int name,
-		    _In_reads_bytes_opt_(valsize) caddr_t val,
-		    int valsize
+		    _In_reads_bytes_opt_(valsize) const void *val,
+		    __socklen_t valsize
 		);
 	}
 106	AUE_LISTEN	STD	{
@@ -750,8 +750,8 @@
 		    int s,
 		    int level,
 		    int name,
-		    _Out_writes_bytes_opt_(*avalsize) caddr_t val,
-		    _Inout_  int *avalsize
+		    _Out_writes_bytes_opt_(*avalsize) void *val,
+		    _Inout_  __socklen_t *avalsize
 		);
 	}
 119	AUE_NULL	UNIMPL	resuba (BSD/OS 2.x)
@@ -771,8 +771,8 @@
 	}
 122	AUE_SETTIMEOFDAY	STD	{
 		int settimeofday(
-		    _In_ _Contains_long_timet_ struct timeval *tv,
-		    _In_opt_ _Contains_long_timet_ struct timezone *tzp
+		    _In_ _Contains_long_timet_ const struct timeval *tv,
+		    _In_opt_ _Contains_long_timet_ const struct timezone *tzp
 		);
 	}
 123	AUE_FCHOWN	STD	{
@@ -785,7 +785,7 @@
 124	AUE_FCHMOD	STD	{
 		int fchmod(
 		    int fd,
-		    int mode
+		    mode_t mode
 		);
 	}
 125	AUE_RECVFROM	COMPAT|NOARGS {
@@ -812,13 +812,13 @@
 	}
 128	AUE_RENAME	STD	{
 		int rename(
-		    _In_z_ char *from,
-		    _In_z_ char *to
+		    _In_z_ const char *from,
+		    _In_z_ const char *to
 		);
 	}
 129	AUE_TRUNCATE	COMPAT	{
 		int truncate(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    long length
 		);
 	}
@@ -836,18 +836,18 @@
 	}
 132	AUE_MKFIFO	STD	{
 		int mkfifo(
-		    _In_z_ char *path,
-		    int mode
+		    _In_z_ const char *path,
+		    mode_t mode
 		);
 	}
 133	AUE_SENDTO	STD	{
 		ssize_t sendto(
 		    int s,
-		    _In_reads_bytes_(len) caddr_t buf,
+		    _In_reads_bytes_(len) const void *buf,
 		    size_t len,
 		    int flags,
 		    _In_reads_bytes_opt_(tolen) const struct sockaddr *to,
-		    int tolen
+		    __socklen_t tolen
 		);
 	}
 134	AUE_SHUTDOWN	STD	{
@@ -866,8 +866,8 @@
 	}
 136	AUE_MKDIR	STD	{
 		int mkdir(
-		    _In_z_ char *path,
-		    int mode
+		    _In_z_ const char *path,
+		    mode_t mode
 		);
 	}
 137	AUE_RMDIR	STD	{
@@ -877,14 +877,14 @@
 	}
 138	AUE_UTIMES	STD	{
 		int utimes(
-		    _In_z_ char *path,
-		    _In_ _Contains_long_timet_ struct timeval *tptr
+		    _In_z_ const char *path,
+		    _In_ _Contains_long_timet_ const struct timeval *tptr
 		);
 	}
 139	AUE_NULL	OBSOL	4.2 sigreturn
 140	AUE_ADJTIME	STD	{
 		int adjtime(
-		    _In_ _Contains_long_timet_ struct timeval *delta,
+		    _In_ _Contains_long_timet_ const struct timeval *delta,
 		    _Out_opt_ _Contains_long_timet_ struct timeval *olddelta
 		);
 	}
@@ -1186,7 +1186,7 @@
 	}
 200	AUE_TRUNCATE	COMPAT6	{
 		int truncate(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int pad,
 		    off_t length
 		);
@@ -1228,7 +1228,7 @@
 206	AUE_FUTIMES	STD	{
 		int futimes(
 		    int fd,
-		    _In_reads_(2) _Contains_long_timet_ struct timeval *tptr
+		    _In_reads_(2) _Contains_long_timet_ const struct timeval *tptr
 		);
 	}
 207	AUE_GETPGID	STD	{
@@ -1490,15 +1490,15 @@
 273	AUE_NULL	UNIMPL	nosys
 274	AUE_LCHMOD	STD	{
 		int lchmod(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
 275	AUE_NULL	OBSOL	netbsd_lchown
 276	AUE_LUTIMES	STD	{
 		int lutimes(
-		    _In_z_ char *path,
-		    _In_ _Contains_long_timet_ struct timeval *tptr
+		    _In_z_ const char *path,
+		    _In_ _Contains_long_timet_ const struct timeval *tptr
 		);
 	}
 277	AUE_NULL	OBSOL	netbsd_msync
@@ -1757,7 +1757,7 @@
 	}
 338	AUE_JAIL	STD	{
 		int jail(
-		    _In_ _Contains_ptr_ struct jail *jail
+		    _In_ _Contains_ptr_ struct jail *jailp
 		);
 	}
 339	AUE_NULL	NOSTD|NOTSTATIC	{
@@ -2563,7 +2563,7 @@
 	}
 479	AUE_TRUNCATE	STD	{
 		int truncate(
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    off_t length
 		);
 	}
@@ -2641,7 +2641,7 @@
 490	AUE_FCHMODAT	STD	{
 		int fchmodat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode,
 		    int flag
 		);
@@ -2673,37 +2673,37 @@
 494	AUE_FUTIMESAT	STD	{
 		int futimesat(
 		    int fd,
-		    _In_z_ char *path,
-		    _In_reads_(2) _Contains_long_timet_ struct timeval *times
+		    _In_z_ const char *path,
+		    _In_reads_(2) _Contains_long_timet_ const struct timeval *times
 		);
 	}
 495	AUE_LINKAT	STD	{
 		int linkat(
 		    int fd1,
-		    _In_z_ char *path1,
+		    _In_z_ const char *path1,
 		    int fd2,
-		    _In_z_ char *path2,
+		    _In_z_ const char *path2,
 		    int flag
 		);
 	}
 496	AUE_MKDIRAT	STD	{
 		int mkdirat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
 497	AUE_MKFIFOAT	STD	{
 		int mkfifoat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode
 		);
 	}
 498	AUE_MKNODAT	COMPAT11 {
 		int mknodat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode,
 		    uint32_t dev
 		);
@@ -2711,7 +2711,7 @@
 499	AUE_OPENAT_RWTC	STD|VARARG	{
 		int openat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    int flag,
 		    mode_t mode
 		);
@@ -2719,7 +2719,7 @@
 500	AUE_READLINKAT	STD	{
 		int readlinkat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_writes_bytes_(bufsize) char *buf,
 		    size_t bufsize
 		);
@@ -2727,9 +2727,9 @@
 501	AUE_RENAMEAT	STD	{
 		int renameat(
 		    int oldfd,
-		    _In_z_ char *old,
+		    _In_z_ const char *old,
 		    int newfd,
-		    _In_z_ char *new
+		    _In_z_ const char *new
 		);
 	}
 502	AUE_SYMLINKAT	STD	{
@@ -2927,7 +2927,7 @@
 		    _Out_opt_ int *status,
 		    int options,
 		    _Out_opt_ _Contains_long_ struct __wrusage *wrusage,
-		    _Out_opt_ _Contains_long_ptr_ struct siginfo *info
+		    _Out_opt_ _Contains_long_ptr_ struct __siginfo *info
 		);
 	}
 533	AUE_CAP_RIGHTS_LIMIT	STD	{
@@ -2967,7 +2967,7 @@
 		    int fd,
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr *name,
-		    int namelen
+		    __socklen_t namelen
 		);
 	}
 539	AUE_CONNECTAT	STD	{
@@ -2975,7 +2975,7 @@
 		    int fd,
 		    int s,
 		    _In_reads_bytes_(namelen) const struct sockaddr *name,
-		    int namelen
+		    __socklen_t namelen
 		);
 	}
 540	AUE_CHFLAGSAT	STD	{
@@ -3024,14 +3024,14 @@
 546	AUE_FUTIMES	STD	{
 		int futimens(
 		    int fd,
-		    _In_reads_(2) _Contains_long_timet_ struct timespec *times
+		    _In_reads_(2) _Contains_long_timet_ const struct timespec *times
 		);
 	}
 547	AUE_FUTIMESAT	STD	{
 		int utimensat(
 		    int fd,
-		    _In_z_ char *path,
-		    _In_reads_(2) _Contains_long_timet_ struct timespec *times,
+		    _In_z_ const char *path,
+		    _In_reads_(2) _Contains_long_timet_ const struct timespec *times,
 		    int flag
 		);
 	}
@@ -3051,7 +3051,7 @@
 552	AUE_FSTATAT	STD	{
 		int fstatat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    _Out_ _Contains_long_timet_ struct stat *buf,
 		    int flag
 		);
@@ -3098,7 +3098,7 @@
 559	AUE_MKNODAT	STD	{
 		int mknodat(
 		    int fd,
-		    _In_z_ char *path,
+		    _In_z_ const char *path,
 		    mode_t mode,
 		    dev_t dev
 		);
