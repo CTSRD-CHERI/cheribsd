@@ -49,9 +49,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* open */
 	case 5: {
 		struct open_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
 		iarg[1] = p->flags; /* int */
-		iarg[2] = p->mode; /* int */
+		iarg[2] = p->mode; /* mode_t */
 		*n_args = 3;
 		break;
 	}
@@ -104,8 +104,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* chmod */
 	case 15: {
 		struct chmod_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* char * __capability */
-		iarg[1] = p->mode; /* int */
+		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
 	}
@@ -116,13 +116,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[1] = p->uid; /* int */
 		iarg[2] = p->gid; /* int */
 		*n_args = 3;
-		break;
-	}
-	/* break */
-	case 17: {
-		struct break_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->nsize; /* char * __capability */
-		*n_args = 1;
 		break;
 	}
 	/* getpid */
@@ -188,7 +181,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 28: {
 		struct sendmsg_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->msg; /* struct msghdr * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->msg; /* const struct msghdr * __capability */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -197,7 +190,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 29: {
 		struct recvfrom_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->buf; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->buf; /* void * __capability */
 		uarg[2] = p->len; /* size_t */
 		iarg[3] = p->flags; /* int */
 		uarg[4] = (__cheri_addr intptr_t) p->from; /* struct sockaddr * __capability */
@@ -393,7 +386,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* umask */
 	case 60: {
 		struct umask_args *p = params;
-		iarg[0] = p->newmask; /* int */
+		iarg[0] = p->newmask; /* mode_t */
 		*n_args = 1;
 		break;
 	}
@@ -416,20 +409,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* vfork */
 	case 66: {
 		*n_args = 0;
-		break;
-	}
-	/* sbrk */
-	case 69: {
-		struct sbrk_args *p = params;
-		iarg[0] = p->incr; /* int */
-		*n_args = 1;
-		break;
-	}
-	/* sstk */
-	case 70: {
-		struct sstk_args *p = params;
-		iarg[0] = p->incr; /* int */
-		*n_args = 1;
 		break;
 	}
 	/* munmap */
@@ -500,7 +479,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 83: {
 		struct setitimer_args *p = params;
 		uarg[0] = p->which; /* u_int */
-		uarg[1] = (__cheri_addr intptr_t) p->itv; /* struct itimerval * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->itv; /* const struct itimerval * __capability */
 		uarg[2] = (__cheri_addr intptr_t) p->oitv; /* struct itimerval * __capability */
 		*n_args = 3;
 		break;
@@ -583,7 +562,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct connect_args *p = params;
 		iarg[0] = p->s; /* int */
 		uarg[1] = (__cheri_addr intptr_t) p->name; /* const struct sockaddr * __capability */
-		iarg[2] = p->namelen; /* int */
+		iarg[2] = p->namelen; /* __socklen_t */
 		*n_args = 3;
 		break;
 	}
@@ -600,7 +579,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct bind_args *p = params;
 		iarg[0] = p->s; /* int */
 		uarg[1] = (__cheri_addr intptr_t) p->name; /* const struct sockaddr * __capability */
-		iarg[2] = p->namelen; /* int */
+		iarg[2] = p->namelen; /* __socklen_t */
 		*n_args = 3;
 		break;
 	}
@@ -610,8 +589,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->s; /* int */
 		iarg[1] = p->level; /* int */
 		iarg[2] = p->name; /* int */
-		uarg[3] = (__cheri_addr intptr_t) p->val; /* char * __capability */
-		iarg[4] = p->valsize; /* int */
+		uarg[3] = (__cheri_addr intptr_t) p->val; /* const void * __capability */
+		iarg[4] = p->valsize; /* __socklen_t */
 		*n_args = 5;
 		break;
 	}
@@ -645,8 +624,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->s; /* int */
 		iarg[1] = p->level; /* int */
 		iarg[2] = p->name; /* int */
-		uarg[3] = (__cheri_addr intptr_t) p->val; /* char * __capability */
-		uarg[4] = (__cheri_addr intptr_t) p->avalsize; /* int * __capability */
+		uarg[3] = (__cheri_addr intptr_t) p->val; /* void * __capability */
+		uarg[4] = (__cheri_addr intptr_t) p->avalsize; /* __socklen_t * __capability */
 		*n_args = 5;
 		break;
 	}
@@ -671,8 +650,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* settimeofday */
 	case 122: {
 		struct settimeofday_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->tv; /* struct timeval * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->tzp; /* struct timezone * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->tv; /* const struct timeval * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->tzp; /* const struct timezone * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -689,7 +668,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 124: {
 		struct fchmod_args *p = params;
 		iarg[0] = p->fd; /* int */
-		iarg[1] = p->mode; /* int */
+		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
 	}
@@ -712,8 +691,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* rename */
 	case 128: {
 		struct rename_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->from; /* char * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->to; /* char * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->from; /* const char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->to; /* const char * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -728,8 +707,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* mkfifo */
 	case 132: {
 		struct mkfifo_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* char * __capability */
-		iarg[1] = p->mode; /* int */
+		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
 	}
@@ -737,11 +716,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 133: {
 		struct sendto_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->buf; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->buf; /* const void * __capability */
 		uarg[2] = p->len; /* size_t */
 		iarg[3] = p->flags; /* int */
 		uarg[4] = (__cheri_addr intptr_t) p->to; /* const struct sockaddr * __capability */
-		iarg[5] = p->tolen; /* int */
+		iarg[5] = p->tolen; /* __socklen_t */
 		*n_args = 6;
 		break;
 	}
@@ -766,8 +745,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* mkdir */
 	case 136: {
 		struct mkdir_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* char * __capability */
-		iarg[1] = p->mode; /* int */
+		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
 	}
@@ -781,15 +760,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* utimes */
 	case 138: {
 		struct utimes_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* char * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->tptr; /* struct timeval * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->tptr; /* const struct timeval * __capability */
 		*n_args = 2;
 		break;
 	}
 	/* adjtime */
 	case 140: {
 		struct adjtime_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->delta; /* struct timeval * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->delta; /* const struct timeval * __capability */
 		uarg[1] = (__cheri_addr intptr_t) p->olddelta; /* struct timeval * __capability */
 		*n_args = 2;
 		break;
@@ -858,39 +837,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[1] = p->pid; /* pid_t */
 		uarg[2] = (__cheri_addr intptr_t) p->rtp; /* struct rtprio * __capability */
 		*n_args = 3;
-		break;
-	}
-	/* semsys */
-	case 169: {
-		struct semsys_args *p = params;
-		iarg[0] = p->which; /* int */
-		iarg[1] = p->a2; /* int */
-		iarg[2] = p->a3; /* int */
-		iarg[3] = p->a4; /* int */
-		iarg[4] = p->a5; /* int */
-		*n_args = 5;
-		break;
-	}
-	/* msgsys */
-	case 170: {
-		struct msgsys_args *p = params;
-		iarg[0] = p->which; /* int */
-		iarg[1] = p->a2; /* int */
-		iarg[2] = p->a3; /* int */
-		iarg[3] = p->a4; /* int */
-		iarg[4] = p->a5; /* int */
-		iarg[5] = p->a6; /* int */
-		*n_args = 6;
-		break;
-	}
-	/* shmsys */
-	case 171: {
-		struct shmsys_args *p = params;
-		iarg[0] = p->which; /* int */
-		iarg[1] = p->a2; /* int */
-		iarg[2] = p->a3; /* int */
-		iarg[3] = p->a4; /* int */
-		*n_args = 4;
 		break;
 	}
 	/* setfib */
@@ -1004,7 +950,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 206: {
 		struct futimes_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->tptr; /* struct timeval * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->tptr; /* const struct timeval * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -1333,7 +1279,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* lchmod */
 	case 274: {
 		struct lchmod_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
 		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
@@ -1341,8 +1287,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* lutimes */
 	case 276: {
 		struct lutimes_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* char * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->tptr; /* struct timeval * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->tptr; /* const struct timeval * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -1606,7 +1552,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* jail */
 	case 338: {
 		struct jail_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->jail; /* struct jail * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->jailp; /* struct jail * __capability */
 		*n_args = 1;
 		break;
 	}
@@ -2563,7 +2509,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* truncate */
 	case 479: {
 		struct truncate_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
 		iarg[1] = p->length; /* off_t */
 		*n_args = 2;
 		break;
@@ -2663,7 +2609,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 490: {
 		struct fchmodat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
 		iarg[2] = p->mode; /* mode_t */
 		iarg[3] = p->flag; /* int */
 		*n_args = 4;
@@ -2693,8 +2639,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 494: {
 		struct futimesat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
-		uarg[2] = (__cheri_addr intptr_t) p->times; /* struct timeval * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->times; /* const struct timeval * __capability */
 		*n_args = 3;
 		break;
 	}
@@ -2702,9 +2648,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 495: {
 		struct linkat_args *p = params;
 		iarg[0] = p->fd1; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->path1; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path1; /* const char * __capability */
 		iarg[2] = p->fd2; /* int */
-		uarg[3] = (__cheri_addr intptr_t) p->path2; /* char * __capability */
+		uarg[3] = (__cheri_addr intptr_t) p->path2; /* const char * __capability */
 		iarg[4] = p->flag; /* int */
 		*n_args = 5;
 		break;
@@ -2713,7 +2659,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 496: {
 		struct mkdirat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
 		iarg[2] = p->mode; /* mode_t */
 		*n_args = 3;
 		break;
@@ -2722,7 +2668,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 497: {
 		struct mkfifoat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
 		iarg[2] = p->mode; /* mode_t */
 		*n_args = 3;
 		break;
@@ -2731,7 +2677,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 499: {
 		struct openat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
 		iarg[2] = p->flag; /* int */
 		iarg[3] = p->mode; /* mode_t */
 		*n_args = 4;
@@ -2741,7 +2687,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 500: {
 		struct readlinkat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
 		uarg[2] = (__cheri_addr intptr_t) p->buf; /* char * __capability */
 		uarg[3] = p->bufsize; /* size_t */
 		*n_args = 4;
@@ -2751,9 +2697,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 501: {
 		struct renameat_args *p = params;
 		iarg[0] = p->oldfd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->old; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->old; /* const char * __capability */
 		iarg[2] = p->newfd; /* int */
-		uarg[3] = (__cheri_addr intptr_t) p->new; /* char * __capability */
+		uarg[3] = (__cheri_addr intptr_t) p->new; /* const char * __capability */
 		*n_args = 4;
 		break;
 	}
@@ -3006,7 +2952,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[2] = (__cheri_addr intptr_t) p->status; /* int * __capability */
 		iarg[3] = p->options; /* int */
 		uarg[4] = (__cheri_addr intptr_t) p->wrusage; /* struct __wrusage * __capability */
-		uarg[5] = (__cheri_addr intptr_t) p->info; /* struct siginfo * __capability */
+		uarg[5] = (__cheri_addr intptr_t) p->info; /* struct __siginfo * __capability */
 		*n_args = 6;
 		break;
 	}
@@ -3058,7 +3004,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
 		uarg[2] = (__cheri_addr intptr_t) p->name; /* const struct sockaddr * __capability */
-		iarg[3] = p->namelen; /* int */
+		iarg[3] = p->namelen; /* __socklen_t */
 		*n_args = 4;
 		break;
 	}
@@ -3068,7 +3014,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
 		uarg[2] = (__cheri_addr intptr_t) p->name; /* const struct sockaddr * __capability */
-		iarg[3] = p->namelen; /* int */
+		iarg[3] = p->namelen; /* __socklen_t */
 		*n_args = 4;
 		break;
 	}
@@ -3131,7 +3077,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 546: {
 		struct futimens_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->times; /* struct timespec * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->times; /* const struct timespec * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -3139,8 +3085,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 547: {
 		struct utimensat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
-		uarg[2] = (__cheri_addr intptr_t) p->times; /* struct timespec * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->times; /* const struct timespec * __capability */
 		iarg[3] = p->flag; /* int */
 		*n_args = 4;
 		break;
@@ -3164,7 +3110,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 552: {
 		struct fstatat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
 		uarg[2] = (__cheri_addr intptr_t) p->buf; /* struct stat * __capability */
 		iarg[3] = p->flag; /* int */
 		*n_args = 4;
@@ -3225,7 +3171,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 559: {
 		struct mknodat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
 		iarg[2] = p->mode; /* mode_t */
 		iarg[3] = p->dev; /* dev_t */
 		*n_args = 4;
@@ -3338,13 +3284,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 5:
 		switch(ndx) {
 		case 0:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -3426,10 +3372,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 15:
 		switch(ndx) {
 		case 0:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -3446,16 +3392,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 2:
 			p = "int";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* break */
-	case 17:
-		switch(ndx) {
-		case 0:
-			p = "userland char * __capability";
 			break;
 		default:
 			break;
@@ -3554,7 +3490,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct msghdr * __capability";
+			p = "userland const struct msghdr * __capability";
 			break;
 		case 2:
 			p = "int";
@@ -3570,7 +3506,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland void * __capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -3879,7 +3815,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 60:
 		switch(ndx) {
 		case 0:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -3913,26 +3849,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* vfork */
 	case 66:
-		break;
-	/* sbrk */
-	case 69:
-		switch(ndx) {
-		case 0:
-			p = "int";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* sstk */
-	case 70:
-		switch(ndx) {
-		case 0:
-			p = "int";
-			break;
-		default:
-			break;
-		};
 		break;
 	/* munmap */
 	case 73:
@@ -4044,7 +3960,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "u_int";
 			break;
 		case 1:
-			p = "userland struct itimerval * __capability";
+			p = "userland const struct itimerval * __capability";
 			break;
 		case 2:
 			p = "userland struct itimerval * __capability";
@@ -4182,7 +4098,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const struct sockaddr * __capability";
 			break;
 		case 2:
-			p = "int";
+			p = "__socklen_t";
 			break;
 		default:
 			break;
@@ -4211,7 +4127,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const struct sockaddr * __capability";
 			break;
 		case 2:
-			p = "int";
+			p = "__socklen_t";
 			break;
 		default:
 			break;
@@ -4230,10 +4146,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland char * __capability";
+			p = "userland const void * __capability";
 			break;
 		case 4:
-			p = "int";
+			p = "__socklen_t";
 			break;
 		default:
 			break;
@@ -4291,10 +4207,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland char * __capability";
+			p = "userland void * __capability";
 			break;
 		case 4:
-			p = "userland int * __capability";
+			p = "userland __socklen_t * __capability";
 			break;
 		default:
 			break;
@@ -4336,10 +4252,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 122:
 		switch(ndx) {
 		case 0:
-			p = "userland struct timeval * __capability";
+			p = "userland const struct timeval * __capability";
 			break;
 		case 1:
-			p = "userland struct timezone * __capability";
+			p = "userland const struct timezone * __capability";
 			break;
 		default:
 			break;
@@ -4368,7 +4284,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -4404,10 +4320,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 128:
 		switch(ndx) {
 		case 0:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		default:
 			break;
@@ -4430,10 +4346,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 132:
 		switch(ndx) {
 		case 0:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -4446,7 +4362,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const void * __capability";
 			break;
 		case 2:
 			p = "size_t";
@@ -4458,7 +4374,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const struct sockaddr * __capability";
 			break;
 		case 5:
-			p = "int";
+			p = "__socklen_t";
 			break;
 		default:
 			break;
@@ -4500,10 +4416,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 136:
 		switch(ndx) {
 		case 0:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -4523,10 +4439,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 138:
 		switch(ndx) {
 		case 0:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "userland struct timeval * __capability";
+			p = "userland const struct timeval * __capability";
 			break;
 		default:
 			break;
@@ -4536,7 +4452,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 140:
 		switch(ndx) {
 		case 0:
-			p = "userland struct timeval * __capability";
+			p = "userland const struct timeval * __capability";
 			break;
 		case 1:
 			p = "userland struct timeval * __capability";
@@ -4649,72 +4565,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 2:
 			p = "userland struct rtprio * __capability";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* semsys */
-	case 169:
-		switch(ndx) {
-		case 0:
-			p = "int";
-			break;
-		case 1:
-			p = "int";
-			break;
-		case 2:
-			p = "int";
-			break;
-		case 3:
-			p = "int";
-			break;
-		case 4:
-			p = "int";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* msgsys */
-	case 170:
-		switch(ndx) {
-		case 0:
-			p = "int";
-			break;
-		case 1:
-			p = "int";
-			break;
-		case 2:
-			p = "int";
-			break;
-		case 3:
-			p = "int";
-			break;
-		case 4:
-			p = "int";
-			break;
-		case 5:
-			p = "int";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* shmsys */
-	case 171:
-		switch(ndx) {
-		case 0:
-			p = "int";
-			break;
-		case 1:
-			p = "int";
-			break;
-		case 2:
-			p = "int";
-			break;
-		case 3:
-			p = "int";
 			break;
 		default:
 			break;
@@ -4893,7 +4743,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct timeval * __capability";
+			p = "userland const struct timeval * __capability";
 			break;
 		default:
 			break;
@@ -5385,7 +5235,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 274:
 		switch(ndx) {
 		case 0:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 1:
 			p = "mode_t";
@@ -5398,10 +5248,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 276:
 		switch(ndx) {
 		case 0:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "userland struct timeval * __capability";
+			p = "userland const struct timeval * __capability";
 			break;
 		default:
 			break;
@@ -7465,7 +7315,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 479:
 		switch(ndx) {
 		case 0:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 1:
 			p = "off_t";
@@ -7644,7 +7494,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
 			p = "mode_t";
@@ -7701,10 +7551,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
-			p = "userland struct timeval * __capability";
+			p = "userland const struct timeval * __capability";
 			break;
 		default:
 			break;
@@ -7717,13 +7567,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 4:
 			p = "int";
@@ -7739,7 +7589,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
 			p = "mode_t";
@@ -7755,7 +7605,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
 			p = "mode_t";
@@ -7771,7 +7621,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
 			p = "int";
@@ -7790,7 +7640,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
 			p = "userland char * __capability";
@@ -7809,13 +7659,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		default:
 			break;
@@ -8254,7 +8104,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland struct __wrusage * __capability";
 			break;
 		case 5:
-			p = "userland struct siginfo * __capability";
+			p = "userland struct __siginfo * __capability";
 			break;
 		default:
 			break;
@@ -8344,7 +8194,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const struct sockaddr * __capability";
 			break;
 		case 3:
-			p = "int";
+			p = "__socklen_t";
 			break;
 		default:
 			break;
@@ -8363,7 +8213,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const struct sockaddr * __capability";
 			break;
 		case 3:
-			p = "int";
+			p = "__socklen_t";
 			break;
 		default:
 			break;
@@ -8475,7 +8325,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct timespec * __capability";
+			p = "userland const struct timespec * __capability";
 			break;
 		default:
 			break;
@@ -8488,10 +8338,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
-			p = "userland struct timespec * __capability";
+			p = "userland const struct timespec * __capability";
 			break;
 		case 3:
 			p = "int";
@@ -8530,7 +8380,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
 			p = "userland struct stat * __capability";
@@ -8636,7 +8486,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
 			p = "mode_t";
@@ -8814,11 +8664,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* break */
-	case 17:
-		if (ndx == 0 || ndx == 1)
-			p = "caddr_t";
-		break;
 	/* getpid */
 	case 20:
 	/* mount */
@@ -8971,7 +8816,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* umask */
 	case 60:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "mode_t";
 		break;
 	/* chroot */
 	case 61:
@@ -8985,16 +8830,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* vfork */
 	case 66:
-	/* sbrk */
-	case 69:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* sstk */
-	case 70:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
 	/* munmap */
 	case 73:
 		if (ndx == 0 || ndx == 1)
@@ -9238,21 +9073,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* rtprio */
 	case 166:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* semsys */
-	case 169:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* msgsys */
-	case 170:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* shmsys */
-	case 171:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

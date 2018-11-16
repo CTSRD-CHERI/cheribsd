@@ -232,7 +232,7 @@ sys_jail(struct thread *td, struct jail_args *uap)
 {
 	uint32_t version;
 	int error;
-	void * __capability jail = __USER_CAP_UNBOUND(uap->jail);
+	void * __capability jail = __USER_CAP_UNBOUND(uap->jailp);
 
 	error = copyin(jail, &version, sizeof(version));
 	if (error)
