@@ -1345,13 +1345,17 @@ buildcheri:
 	@echo "--------------------------------------------------------------"
 	@echo ">>> stage 4.2.1: building CHERI libraries"
 	@echo "--------------------------------------------------------------"
-.for _dir in lib/ncurses/ncurses lib/ncurses/ncursesw lib/libmagic
+.for _dir in lib/ncurses/ncurses lib/ncurses/ncursesw ${_libmagic} ${_jevents}
 .for _t in ${_obj} build-tools
-	cd ${.CURDIR}/${_dir}; \
+	${_+_}cd ${.CURDIR}/${_dir}; \
 	    WORLDTMP=${WORLDTMP} \
 	    MAKEFLAGS="-m ${.CURDIR}/tools/build/mk ${.MAKEFLAGS}" \
-	    MAKEOBJDIRPREFIX=${LIBCHERI_OBJTOP} ${MAKE} SSP_CFLAGS= DESTDIR= \
-	    DIRPRFX=${_dir}/ -DNO_LINT -DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
+	    ${MAKE} SSP_CFLAGS= DESTDIR= \
+	    OBJTOP=${LIBCHERI_OBJTOP} \
+	    OBJROOT='$${OBJTOP}/' \
+	    MAKEOBJDIRPREFIX= \
+	    DIRPRFX=${_dir}/ -DNO_LINT -DNO_CPU_CFLAGS \
+	    MK_CTF=no MK_RETPOLINE=no MK_WARNS=no \
 	    ${_t}
 .endfor
 .endfor
