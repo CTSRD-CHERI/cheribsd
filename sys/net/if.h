@@ -516,8 +516,8 @@ struct ifstat {
 struct	ifconf {
 	int	ifc_len;		/* size of associated buffer */
 	union {
-		caddr_t	ifcu_buf;
-		struct	ifreq *ifcu_req;
+		char * __kerncap		ifcu_buf;
+		struct ifreq * __kerncap	ifcu_req;
 	} ifc_ifcu;
 #define	ifc_buf	ifc_ifcu.ifcu_buf	/* buffer address */
 #define	ifc_req	ifc_ifcu.ifcu_req	/* array of structures returned */

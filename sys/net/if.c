@@ -292,7 +292,7 @@ struct mbuf *(*tbr_dequeue_ptr)(struct ifaltq *, int) = NULL;
  */
 static void	if_attachdomain(void *);
 static void	if_attachdomain1(struct ifnet *);
-static int	ifconf(u_long, caddr_t);
+static int	ifconf(u_long, struct ifconf *);
 static void	*if_grow(void);
 static void	if_input_default(struct ifnet *, struct mbuf *);
 static int	if_requestencap_default(struct ifnet *, struct if_encap_req *);
@@ -3377,6 +3377,22 @@ struct ifconf32 {
 };
 #define	SIOCGIFCONF32	_IOWR('i', 36, struct ifconf32)
 #endif
+#ifdef COMPAT_CHERIABI
+#define COMPAT_FREEBSD64
+#endif
+#ifdef COMPAT_FREEBSD64
+_Pragma("pointer_interpretation push")
+_Pragma("pointer_interpretation integer")
+struct ifconf64 {
+	int	ifc_len;
+	union {
+		char		*ifcu_buf;
+		struct ifreq	*ifcu_req;
+	} ifc_ifcu;
+};
+_Pragma("pointer_interpretation pop")
+#define	SIOCGIFCONF64	_IOC_NEWTYPE(SIOCGIFCONF, struct ifconf64)
+#endif
 
 static void
 ifmr_init(struct ifmediareq *ifmr, caddr_t data)
@@ -3464,6 +3480,13 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	caddr_t saved_data = NULL;
 	struct ifmediareq ifmr;
 	struct ifmediareq *ifmrp;
+#ifdef COMPAT_FREEBSD32
+	struct ifconf32 *ifc32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct ifconf64 *ifc64;
+#endif
+	struct ifconf ifc;
 #endif
 	struct ifnet *ifp;
 	struct ifreq *ifr;
@@ -3487,26 +3510,34 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 
 	switch (cmd) {
 	case SIOCGIFCONF:
-		error = ifconf(cmd, data);
+		error = ifconf(cmd, (struct ifconf *)data);
 		CURVNET_RESTORE();
 		return (error);
 
 #ifdef COMPAT_FREEBSD32
 	case SIOCGIFCONF32:
-		{
-			struct ifconf32 *ifc32;
-			struct ifconf ifc;
+		ifc32 = (struct ifconf32 *)data;
+		ifc.ifc_len = ifc32->ifc_len;
+		ifc.ifc_buf = __USER_CAP(PTRIN(ifc32->ifc_buf), ifc32->ifc_len);
 
-			ifc32 = (struct ifconf32 *)data;
-			ifc.ifc_len = ifc32->ifc_len;
-			ifc.ifc_buf = PTRIN(ifc32->ifc_buf);
+		error = ifconf(SIOCGIFCONF, (void *)&ifc);
+		CURVNET_RESTORE();
+		if (error == 0)
+			ifc32->ifc_len = ifc.ifc_len;
+		return (error);
+#endif
 
-			error = ifconf(SIOCGIFCONF, (void *)&ifc);
-			CURVNET_RESTORE();
-			if (error == 0)
-				ifc32->ifc_len = ifc.ifc_len;
-			return (error);
-		}
+#ifdef COMPAT_FREEBSD64
+	case SIOCGIFCONF64:
+		ifc64 = (struct ifconf64 *)data;
+		ifc.ifc_len = ifc64->ifc_len;
+		ifc.ifc_buf = __USER_CAP(ifc64->ifc_buf, ifc64->ifc_len);
+
+		error = ifconf(SIOCGIFCONF, (void *)&ifc);
+		CURVNET_RESTORE();
+		if (error == 0)
+			ifc64->ifc_len = ifc.ifc_len;
+		return (error);
 #endif
 	}
 
@@ -3741,9 +3772,8 @@ ifpromisc(struct ifnet *ifp, int pswitch)
  */
 /*ARGSUSED*/
 static int
-ifconf(u_long cmd, caddr_t data)
+ifconf(u_long cmd, struct ifconf *ifc)
 {
-	struct ifconf *ifc = (struct ifconf *)data;
 	struct ifnet *ifp;
 	struct ifaddr *ifa;
 	struct ifreq ifr;
@@ -3835,7 +3865,7 @@ again:
 
 	ifc->ifc_len = valid_len;
 	sbuf_finish(sb);
-	error = copyout(sbuf_data(sb), ifc->ifc_req, ifc->ifc_len);
+	error = copyout_c(sbuf_data(sb), ifc->ifc_req, ifc->ifc_len);
 	sbuf_delete(sb);
 	return (error);
 }
