@@ -149,10 +149,10 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 	bool borrowing;
 
 	borrowing = colocation_fetch_context(td, &sc);
-	if (!borrowing)
+	if (borrowing)
+		*peertdp = sc.sc_borrower_td;
+	else
 		*peertdp = NULL;
-
-	*peertdp = sc.sc_borrower_td;
 }
 
 void
