@@ -307,7 +307,7 @@ DECLARE_CC_MODULE(vegas, &vegas_cc_algo);
 MODULE_DEPEND(vegas, ertt, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20181121,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance"

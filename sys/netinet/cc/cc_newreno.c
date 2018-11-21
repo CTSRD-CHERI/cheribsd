@@ -393,7 +393,7 @@ DECLARE_CC_MODULE(newreno, &newreno_cc_algo);
 
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20181121,
 //   "changes": [
 //     "integer_provenance"
 //   ]

@@ -31,7 +31,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180719,
+ *   "updated": 20181121,
  *   "target_type": "test",
  *   "changes": [
  *     "calling_convention"
