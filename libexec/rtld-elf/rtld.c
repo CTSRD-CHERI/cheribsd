@@ -355,6 +355,7 @@ _LD(const char *var)
 #define _LD(x)	LD_ x
 #endif
 
+#ifdef DEBUG
 static inline
 bool is_env_var_set(const char* varname)
 {
@@ -366,6 +367,7 @@ bool is_env_var_set(const char* varname)
 	return (env_var != NULL && *env_var != '\0' &&
 	    __builtin_strcmp(env_var, "0") != 0);
 }
+#endif
 
 /*
  * Main entry point for dynamic linking.

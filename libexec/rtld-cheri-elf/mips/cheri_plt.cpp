@@ -410,6 +410,7 @@ find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 
 #define STRING_CASE(val) case val: return #val;
 
+#ifdef DEBUG
 static inline const char* visibility_str(unsigned char vis) {
 	static char buffer[128];
 	switch (vis) {
@@ -464,7 +465,7 @@ static inline const char* type_str(unsigned char vis) {
 		return buffer;
 	}
 }
-
+#endif
 
 const ExportsTableEntry*
 CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
