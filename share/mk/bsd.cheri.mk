@@ -88,7 +88,7 @@ CHERI_CXX=${CHERI_CC:H}/${CHERI_CC:T:S/clang/clang++/}
 .endif
 
 _CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
-			-msoft-float
+			-msoft-float -cheri-uintcap=offset
 _CHERI_CC=		${CHERI_CC} ${_CHERI_COMMON_FLAGS}
 _CHERI_CXX=		${CHERI_CXX} ${_CHERI_COMMON_FLAGS}
 _CHERI_CPP=		${CHERI_CPP} ${_CHERI_COMMON_FLAGS}
