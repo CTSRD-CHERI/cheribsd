@@ -374,7 +374,7 @@ void	knlist_cleardel(struct knlist *knl, struct thread *td,
 	knlist_cleardel((knl), (td), (islocked), 1)
 void	knote_fdclose(struct thread *p, int fd);
 int 	kqfd_register(int fd, kkevent_t *kev, struct thread *p,
-	    int waitok);
+	    int mflag);
 int	kqueue_add_filteropts(int filt, struct filterops *filtops);
 int	kqueue_del_filteropts(int filt);
 
@@ -395,7 +395,7 @@ __END_DECLS
 #endif /* !_SYS_EVENT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20181203,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
