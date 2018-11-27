@@ -126,6 +126,7 @@
 #include <machine/cpuregs.h>
 #include <machine/pte.h>
 #include <machine/pcb.h>
+#include <machine/trap.h>
 
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
@@ -367,15 +368,71 @@ SlowFault:
 	dsrl	reg, reg, CHERICAP_SHIFT ;				\
 	dsll	reg, reg, CHERICAP_SHIFT ;				\
 	csetoffset CHERI_REG_STC, CHERI_REG_STC, reg
+
+/*
+ * If the current exception is a coprocessor 2 exception,
+ * and it is a length violation or tag violation on STC
+ * then the kernel stack overflowed and we should panic.
+ *
+ * Note that we move to a valid stack before we call panic.
+ * We use the boot stack for this purpose.
+ * The boot stack has to be rederived, this code is shared with locore
+ * and the TLB exception kernel stack overflow handling and should
+ * be merged.
+ */
+#define CHERI_CHECK_STC_OVERFLOW(tmp)					\
+	mfc0	tmp, MIPS_COP_0_CAUSE ;					\
+	and	tmp, tmp, MIPS_CR_EXC_CODE ;				\
+	srl	tmp, tmp, 2 ;						\
+	xori	tmp, tmp, T_C2E ;					\
+	bnez	tmp, 99f ;						\
+	cgetcause tmp ;							\
+	and	tmp, tmp, (CHERI_CAPCAUSE_EXCCODE_MASK | CHERI_CAPCAUSE_REGNUM_MASK) ;\
+	xori	tmp, tmp, ((CHERI_EXCCODE_LENGTH << CHERI_CAPCAUSE_EXCCODE_SHIFT) | CHERI_CR_STC) ;\
+	beqz	tmp, 98f ;						\
+	cgetcause tmp ;							\
+	and	tmp, tmp, (CHERI_CAPCAUSE_EXCCODE_MASK | CHERI_CAPCAUSE_REGNUM_MASK) ;\
+	xori	tmp, tmp, ((CHERI_EXCCODE_TAG << CHERI_CAPCAUSE_EXCCODE_SHIFT) | CHERI_CR_STC) ;\
+	bnez tmp, 99f ;							\
+	nop ;								\
+98:									\
+	GET_CPU_PCPU(CHERI_REG_KR1C, k1) ;				\
+	clw	k1, zero, PC_CPUID(CHERI_REG_KR1C) ;			\
+	sll	k1, k1, PAGE_SHIFT + 1 /* curcpu pcpu offset */;	\
+	PTR_LA	k0, _C_LABEL(pcpu_space) ;				\
+	cgetkdc	CHERI_REG_KR1C ;					\
+	csetoffset CHERI_REG_KR1C, CHERI_REG_KR1C, k0 /* pcpu_space*/ ;	\
+	REG_LI		k0, MAXCPU * PAGE_SIZE * 2 ;			\
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, k0 /* set pcpu space bounds */ ;\
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1 /* go to beginning of curcpu pcpu space */ ;\
+	REG_LI		k1, PCPU_SIZE ;					\
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1 /* skip pcpu data */ ;\
+	REG_LI		k1, (PAGE_SIZE * 2) - PCPU_SIZE ;		\
+	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, k1 /* boot kstack bounds */ ;\
+	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1 /* go to the top of kstack */ ;\
+	cmove	CHERI_REG_KR2C, CHERI_REG_STC /* SAVE_CPU will save KR2C as STC */ ;\
+	cmove	CHERI_REG_STC, CHERI_REG_KR1C	/* XXX may want to save context before for the debugger */;\	
+	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE /* stop the ddb backtrace here */ ;\
+	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0 ;		\
+	cmove	CHERI_REG_KR2C, $c17 /* Assume the stack is capability aligned */ ;\
+	CHERI_NULL($c17) ;						\
+	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC) ;		\
+	csc	$c17, zero, CALLFRAME_SP(CHERI_REG_STC) ;		\
+	cmove	$c17, CHERI_REG_KR2C ;					\
+	SAVE_CPU ;							\
+	PANIC("Kernel stack overflow") ;				\
+99:
+
+
 /*
  * Save CHERI registers on the stack to construct the kernel trap frame.
  * Suitable alignment should already have been arranged by the caller.
  */
-#define	SAVE_CREG(creg, offs)						\
+#define	SAVE_CREG(creg, offs)					\
 	csc	creg, zero, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_STC)
 
-#define	SAVE_CAPCAUSE(reg, treg, offs) 					\
-	REG_LI	treg, (CALLFRAME_SIZ + (SZREG * offs)); 		\
+#define	SAVE_CAPCAUSE(reg, treg, offs)				\
+	REG_LI	treg, (CALLFRAME_SIZ + (SZREG * offs));		\
 	csd	reg, treg, 0(CHERI_REG_STC)
 
 /*
@@ -609,8 +666,11 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	cmove	CHERI_REG_KR1C, CHERI_REG_STC
 	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0
+	/* Adjust stack alignment if needed */
 	CHERI_ADJUST_STC(k0)
-	/* No stack alignment adjustment needed */
+	/* Check for kernel stack overflow before using the stack */
+	CHERI_CHECK_STC_OVERFLOW(k0)
+
 	/* XXX-AM: Can we use .mask/.frame in cheriabi? */
 	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
 	/*
@@ -898,7 +958,7 @@ END(MipsKernIntr)
  * XXX-AM: I am not sure why we can not use SAVE_REGS_TO_PCB()
  * since it does exactly the same things except mfc0 instructions
  * change position.
- * 
+ *
  * Leaves:
  * a3: exception PC
  */
@@ -1220,6 +1280,7 @@ tlb_insert_random:
 
 	/*
 	 * Check for kernel stack overflow.
+	 * This can happen if we are using guard pages for our kernel stack.
 	 */
 	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
 	clc	CHERI_REG_KR1C, zero, PC_CURTHREAD(CHERI_REG_KR1C)
@@ -1414,7 +1475,7 @@ END(MipsTLBMissException)
  *----------------------------------------------------------------------------
  */
 #if defined(CPU_HAVEFPU)
-#error "Floating point traps not supported in purecap kernel!"	
+#error "Floating point traps not supported in purecap kernel!"
 #endif /* CPU_HAVEFPU */
 
 /*

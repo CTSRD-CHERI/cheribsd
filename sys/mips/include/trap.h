@@ -73,6 +73,7 @@
 
 #define	T_USER			0x20	/* user-mode flag or'ed with type */
 
+#ifndef _LOCORE
 #if !defined(SMP) && (defined(DDB) || defined(DEBUG))
 
 struct trapdebug {		/* trap history buffer for debugging */
@@ -123,5 +124,7 @@ void MipsUserGenException(void);
 void MipsUserIntr(void);
 
 register_t trap(struct trapframe *);
+
+#endif /* ! _LOCORE */
 
 #endif /* !_MACHINE_TRAP_H_ */

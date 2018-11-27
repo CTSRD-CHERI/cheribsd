@@ -265,12 +265,26 @@ _C_LABEL(x):
 /*
  * Macros to panic and printf from assembly language.
  */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PANIC(msg)			\
+	PTR_LA	a0, 9f;			\
+	cgetkdc $c3;			\
+	csetoffset $c3, $c3, a0;	\
+	PTR_LA	t9, _C_LABEL(panic);	\
+	cgetpccsetoffset $c12, t9;	\
+	cjalr $c12, $c17;		\
+	nop;				\
+	.data;				\
+9:	.asciiz msg;			\
+	.text
+#else
 #define	PANIC(msg)			\
 	PTR_LA	a0, 9f;			\
 	PTR_LA	t9, _C_LABEL(panic);	\
 	jalr	t9;			\
 	nop;				\
 	MSG(msg)
+#endif
 
 #define	PANIC_KSEG0(msg, reg)	PANIC(msg)
 
