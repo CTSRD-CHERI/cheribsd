@@ -62,10 +62,10 @@
 #error "purecap kernel context switching compiled for non-CHERI target!"
 #endif
 #ifndef CHERI_KERNEL
-#error "purecap kernel context switching compiled for non-purecap kernel!"	
+#error "purecap kernel context switching compiled for non-purecap kernel!"
 #endif
 
-	
+
 #include "opt_compat.h"
 #include <sys/syscall.h>
 #include <machine/asm.h>
@@ -216,8 +216,8 @@ NESTED(cpu_throw, CALLFRAME_SIZ, ra)
 	and     a3, t0, ~(MIPS_SR_INT_IE)
 	mtc0	a3, MIPS_COP_0_STATUS		# Disable all interrupts
 	ITLBNOPFIX
-	j	mips_sw1			# We're not interested in old 
-						# thread's context, so jump 
+	j	mips_sw1			# We're not interested in old
+						# thread's context, so jump
 						# right to action
 	nop					# BDSLOT
 END(cpu_throw)
@@ -372,28 +372,41 @@ blocked_loop:
 
 #ifdef KSTACK_LARGE_PAGE
 /*
- * With a KSTACK_PAGE_SIZE of 16K and PAGE_SIZE of 4K it is possible that
- * a second TLB entry is currently mapping the kernel thread stack as a
- * regular 4K sized page(s). Check for this case and, if so, invalidate
+ * With a KSTACK large page size it is possible that a second TLB
+ * entry is currently mapping the kernel thread stack as a regular
+ * 4K sized page(s). Check for this case and, if so, invalidate
  * that TLB entry as well.
+ * This can happen only with the following combinations:
+ * CHERI-256 KSTACK_PAGE_SIZE == 64K
+ * CHERI-128 KSTACK_PAGE_SIZE == 16K
+ * non-cheri KSTACK_PAGE_SIZE == 16K
+ * all with PAGE_SIZE == 4K
  */
-#if (PAGE_SIZE != 4096) || (KSTACK_PAGE_SIZE != 16384)
-#error PAGE_SIZE is not 4K or KSTACK_PAGE_SIZE is not 16K.
+#if (PAGE_SIZE != 4096)
+#error PAGE_SIZE is not 4K.
+#elif defined(CPU_CHERI128)
+#if (KSTACK_PAGE_SIZE != (1 << 14))
+#error CHERI128 KSTACK_PAGE_SIZE is not 16K.
 #endif
+#elif defined(CPU_CHERI)
+#if (KSTACK_PAGE_SIZE != (1 << 16))
+#error CHERI256 KSTACK_PAGE_SIZE is not 64K.
+#endif
+#endif
+	/*
+	 * Number of pairs of 4K pages in the KSTACK_SIZE region
+	 * -1 because the first KSTACK_INVAL has already been done above.
+	 * On cheri kernels we use a larger stack with no guard page
+	 * so we need to perform additional checks depending on KSTACK_SIZE.
+	 */
+	REG_LI	t2, (KSTACK_SIZE >> (PAGE_SHIFT + 1)) - 1
 	move		v1, v0
+kstack_inval_loop:
 	PTR_ADDU	v1, PAGE_SIZE * 2	# advance by 2 pages and try again
 	TLB_KSTACK_INVAL(v1, t0, t1)
-#if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
-	/*
-	 * On cheri256 we use a larger stack (2*16K pages) with no guard page
-	 * so we need to perform another couple of checks for the upper 16K
-	 * of the kstack.
-	 */
-	PTR_ADDU	v1, PAGE_SIZE * 2
-	TLB_KSTACK_INVAL(v1, t0, t1)
-	PTR_ADDU	v1, PAGE_SIZE * 2
-	TLB_KSTACK_INVAL(v1, t0, t1)
-#endif
+	daddi	t2, t2, -1
+	bnez t2, kstack_inval_loop
+	nop
 #endif /* KSTACK_LARGE_PAGE */
 
 	MTC0		v0, MIPS_COP_0_TLB_HI		# set VPN again
@@ -423,8 +436,8 @@ blocked_loop:
  * Now running on new u struct.
  */
 sw2:
-	clc	$c19, zero, TD_PCB($c18)	
-	/* grab newthread kstack */	
+	clc	$c19, zero, TD_PCB($c18)
+	/* grab newthread kstack */
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_STC, CHERIKFRAME_OFF_STC, $c19)
 	RESTORE_U_PCB_CONTEXT(sp, PCB_REG_SP, $c19)
 	// Note we have newthr in c18
@@ -474,7 +487,7 @@ sw2:
 
 	cjr	$c17
 	nop
-END(cpu_switch)
+	END(cpu_switch)
 
 /*----------------------------------------------------------------------------
  *

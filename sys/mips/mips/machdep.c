@@ -299,10 +299,10 @@ mips_proc0_init(void)
 	 * For 16K page size the stack uses the odd page
 	 * and kstack0 was allocated on the 32K boundary.
 	 * So we bump up the address to the odd page boundary.
-	 * For cheri256 we use both pages, so do not bump the
+	 * For cheri we use both pages, so do not bump the
 	 * address.
 	 */
-#if !defined(CHERI_KERNEL) || defined(CPU_CHERI128)
+#ifndef CHERI_KERNEL
 	thread0.td_kstack += KSTACK_PAGE_SIZE;
 #endif
 #endif /* KSTACK_LARGE_PAGE */

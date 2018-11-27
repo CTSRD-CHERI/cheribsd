@@ -308,7 +308,7 @@ cpu_thread_swapin(struct thread *td)
 	 * the pcb struct and kernel stack.
 	 */
 #ifdef KSTACK_LARGE_PAGE
-#if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
+#ifdef CHERI_KERNEL
 	pte = pmap_pte(kernel_pmap, ptr_to_va(td->td_kstack));
 	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
 	pte = pmap_pte(kernel_pmap,
@@ -370,7 +370,7 @@ cpu_thread_alloc(struct thread *td)
 #endif
 	td->td_frame = &td->td_pcb->pcb_regs;
 #ifdef KSTACK_LARGE_PAGE
-#if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
+#if defined(CHERI_KERNEL)
 	pte = pmap_pte(kernel_pmap, ptr_to_va(td->td_kstack));
 	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
 	pte = pmap_pte(kernel_pmap,
