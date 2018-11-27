@@ -8,7 +8,7 @@ NO_WMISSING_VARIABLE_DECLARATIONS=
 
 .include <src.opts.mk>
 
-.if ${MK_BSD_CRTBEGIN} != "no" && !defined(BUILDING_TESTS)
+.if ${MK_BSD_CRTBEGIN} != "no" && !defined(BUILDING_TESTS) && !defined(NO_BSD_CRTBEGIN)
 
 OBJS+=	crtbegin.o crtbeginS.o crtbeginT.o
 OBJS+=	crtend.o crtendS.o
