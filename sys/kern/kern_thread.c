@@ -1267,7 +1267,7 @@ tidhash_remove(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance"

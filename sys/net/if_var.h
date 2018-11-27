@@ -805,7 +805,7 @@ int    ether_poll_deregister(if_t ifp);
 #endif /* !_NET_IF_VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20181127,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:net"

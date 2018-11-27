@@ -947,7 +947,7 @@ static __inline void varp ## _set_ ## var(device_t dev, type t)		\
 #endif /* !_SYS_BUS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20181127,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_shape"

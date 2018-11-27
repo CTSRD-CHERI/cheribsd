@@ -2611,7 +2611,7 @@ __elfN(untrans_prot)(vm_prot_t prot)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",

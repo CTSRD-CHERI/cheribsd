@@ -35,7 +35,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181127,
  *   "target_type": "lib",
  *   "changes": [
  *     "unsupported"

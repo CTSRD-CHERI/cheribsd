@@ -1066,7 +1066,7 @@ typedef struct _ipfw_sopt_info {
 #endif /* _IPFW2_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20181127,
 //   "target_type": "header",
 //   "changes": [
 //     "integer_provenance"
