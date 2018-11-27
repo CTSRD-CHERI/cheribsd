@@ -1,21 +1,26 @@
-# CHERI128_PURECAP_MALTA64 -- 64-bit purecap ABI kernel config for MALTA boards + 128-bit CHERI
+# CHERI_PURECAP_MALTA64 -- 64-bit purecap ABI kernel config for MALTA boards + 256-bit CHERI
 #
 # $FreeBSD$
- 
+
 ident		CHERI128_PURECAP_MALTA64
 
 include		"std.MALTA"
 include		"std.CHERI128"
  
+hints		"CHERI_MALTA64.hints"  #Default places to look for devices.
+
 machine		mips mips64	# Malta supports both, so it isn't in std.malta
 
 nomakeoptions 	ARCH_FLAGS
 makeoptions	ARCH_PIC_FLAGS="-fpic"
-makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips4 -mabi=purecap -mcpu=mips4 -cheri=128"
+# makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=128"
+# makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips4 -mabi=purecap -mcpu=mips4 -cheri=128"
+makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=128 -cheri-cap-table-abi=plt -mxcaptable"
 makeoptions	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 
 options		CHERI_KERNEL
+nooptions	CHERI_IMPLICIT_USER_DDC
 options 	KTRACE
 nooptions	KDB
 nooptions	DDB
@@ -23,11 +28,30 @@ nooptions	DDB
 nooptions	MSDOSFS
 nooptions	NFSD, NFSCL
 nooptions	FFS
+options		CD9660
 # disable raid, we don't need it
 nooptions	GEOM_RAID
 
 # debugging
+options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
+options		BUS_DEBUG
+options		CAMDEBUG
+options		CAM_DEBUG_FLAGS=3
+options		STACK # needed for witness
+options		WITNESS
+options		DEBUG_VFS_LOCKS
+# options		KTR
+# options		KTR_VERBOSE=2
+# nooptions	KTR_ALQ
+# should enable witness and invariants?
+# options	LOCK_DEBUG
+
+# XXX TODO
+# nodevice ata
+# nodevice vga
+# disable nfs
+nooptions	COMPAT_CHERIABI
 
 #
 # Features required for CHERI CPU and CheriBSD support.
@@ -43,3 +67,4 @@ options 	CPU_QEMU_MALTA
 # Qemu doesn't yet support these
 nooptions	CPU_CHERI_HW_CCALL_CHECKS
 nooptions	CPU_CHERI_HW_CCLEAR
+ 
