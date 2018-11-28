@@ -1267,14 +1267,22 @@ everything: .PHONY
 INTERNAL_INC_DIRS=				\
 	include/rpcsvc				\
 	usr.sbin/amd/include
-INTERNAL_LIB_DIRS=				\
+INTERNAL_LIB_DIRS=
+.if ${MK_BINUTILS} != "no"
+INTERNAL_LIB_DIRS+=				\
 	gnu/usr.bin/binutils/libbfd		\
 	gnu/usr.bin/binutils/libbinutils	\
 	gnu/usr.bin/binutils/libiberty		\
-	gnu/usr.bin/binutils/libopcodes		\
-	sbin/ipf/libipf				\
-	usr.sbin/amd/libamu			\
-	usr.sbin/bsnmpd/tools/libbsnmptools	\
+	gnu/usr.bin/binutils/libopcodes
+.endif
+INTERNAL_LIB_DIRS+=sbin/ipf/libipf
+.if ${MK_AMD} != "no"
+INTERNAL_LIB_DIRS+=usr.sbin/amd/libamu
+.endif
+.if ${MK_BSNMP} != "no"
+INTERNAL_LIB_DIRS+=usr.sbin/bsnmpd/tools/libbsnmptools
+.endif
+INTERNAL_LIB_DIRS+=				\
 	usr.sbin/cron/lib			\
 	usr.sbin/fifolog/lib			\
 	usr.sbin/lpr/common_source		\
