@@ -91,7 +91,8 @@ MK_GCC_BOOTSTRAP=	no
 # Pull in compiler metadata from buildworld/toolchain if possible to avoid
 # running CC from bsd.compiler.mk.
 .if make(installworld) || make(installsysroot) || make(install) || \
-    make(distributeworld) || make(stageworld) || make(distribution)
+    make(distributeworld) || make(stageworld) || make(distribution) || \
+    make(distrib-dirs)
 .-include "${OBJTOP}/toolchain-metadata.mk"
 .if !defined(_LOADED_TOOLCHAIN_METADATA)
 .error A build is required first.  You may have the wrong MAKEOBJDIRPREFIX set.
