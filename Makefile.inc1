@@ -2557,6 +2557,8 @@ _basic_bootstrap_tools+=usr.bin/ldd
 _basic_bootstrap_tools+=usr.sbin/services_mkdb usr.sbin/pwd_mkdb
 # sysctl/chflags are required for installkernel:
 _basic_bootstrap_tools+=sbin/sysctl bin/chflags
+# mkfifo is used by sys/conf/newvers.sh
+_basic_bootstrap_tools+=usr.bin/mkfifo
 
 # needed by boot and tests
 _basic_bootstrap_tools+=bin/dd
