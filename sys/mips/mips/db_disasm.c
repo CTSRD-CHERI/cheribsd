@@ -558,7 +558,8 @@ cp2_disas_done:
 	case OP_SDC2: {
 		const char *opcode = i.JType.op == OP_LDC2 ? "clc" : "csc";
 		db_printf("%s\t%s,%s,%d(%s)", opcode, c2_reg[i.CCMType.cs],
-				reg_name[i.CCMType.rt], i.CCMType.offset, c2_reg[i.CCMType.cb]);
+		    reg_name[i.CCMType.rt], i.CCMType.offset * 16,
+		    c2_reg[i.CCMType.cb]);
 		break;
 	}
 #endif /* CPU_CHERI */
