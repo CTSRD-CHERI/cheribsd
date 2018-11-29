@@ -370,14 +370,11 @@ freebsd32_exec_copyin_args(struct image_args *args, const char *fname,
 		if (arg == 0)
 			break;
 		argp = PTRIN(arg);
-		error = exec_args_add_arg_str(args, (void *)argp,
-		    UIO_USERSPACE);
+		error = exec_args_add_arg(args, argp, UIO_USERSPACE);
 		if (error != 0)
 			goto err_exit;
 	}
 			
-	args->begin_envv = args->endp;
-
 	/*
 	 * extract environment strings
 	 */
@@ -390,8 +387,7 @@ freebsd32_exec_copyin_args(struct image_args *args, const char *fname,
 			if (arg == 0)
 				break;
 			envp = PTRIN(arg);
-			error = exec_args_add_env_str(args, (void *)envp,
-			    UIO_USERSPACE);
+			error = exec_args_add_env(args, envp, UIO_USERSPACE);
 			if (error != 0)
 				goto err_exit;
 		}

@@ -346,9 +346,9 @@ kern_execve(struct thread *td, struct image_args *args,
 {
 
 	AUDIT_ARG_ARGV(args->begin_argv, args->argc,
-	    args->begin_envv - args->begin_argv);
-	AUDIT_ARG_ENVV(args->begin_envv, args->envc,
-	    args->endp - args->begin_envv);
+	    exec_args_get_begin_envv(args) - args->begin_argv);
+	AUDIT_ARG_ENVV(exec_args_get_begin_envv(args), args->envc,
+	    args->endp - exec_args_get_begin_envv(args));
 	return (do_execve(td, args, mac_p));
 }
 
@@ -728,7 +728,7 @@ interpret:
 	/*
 	 * Malloc things before we need locks.
 	 */
-	i = imgp->args->begin_envv - imgp->args->begin_argv;
+	i = exec_args_get_begin_envv(imgp->args) - imgp->args->begin_argv;
 	/* Cache arguments if they fit inside our allowance */
 	if (ps_arg_cache_limit >= i + sizeof(struct pargs)) {
 		newargs = pargs_alloc(i);
@@ -1192,7 +1192,7 @@ int
 exec_copyin_args(struct image_args *args, const char *fname,
     enum uio_seg segflg, char **argv, char **envv)
 {
-	u_long argp, envp;
+	u_long arg, env;
 	int error;
 
 	bzero(args, sizeof(*args));
@@ -1218,35 +1218,33 @@ exec_copyin_args(struct image_args *args, const char *fname,
 	 * extract arguments first
 	 */
 	for (;;) {
-		error = fueword(argv++, &argp);
+		error = fueword(argv++, &arg);
 		if (error == -1) {
 			error = EFAULT;
 			goto err_exit;
 		}
-		if (argp == 0)
+		if (arg == 0)
 			break;
-		error = exec_args_add_arg_str(args, (void *)argp,
+		error = exec_args_add_arg(args, (char *)(uintptr_t)arg,
 		    UIO_USERSPACE);
 		if (error != 0)
 			goto err_exit;
 	}
-
-	args->begin_envv = args->endp;
 
 	/*
 	 * extract environment strings
 	 */
 	if (envv) {
 		for (;;) {
-			error = fueword(envv++, &envp);
+			error = fueword(envv++, &env);
 			if (error == -1) {
 				error = EFAULT;
 				goto err_exit;
 			}
-			if (envp == 0)
+			if (env == 0)
 				break;
-			error = exec_args_add_env_str(args, (void *)envp,
-			    UIO_USERSPACE);
+			error = exec_args_add_env(args,
+			    (char *)(uintptr_t)env, UIO_USERSPACE);
 			if (error != 0)
 				goto err_exit;
 		}
@@ -1303,8 +1301,6 @@ exec_copyin_data_fds(struct thread *td, struct image_args *args,
 		/* No argument buffer provided. */
 		args->endp = args->begin_argv;
 	}
-	/* There are no environment variables. */
-	args->begin_envv = args->endp;
 
 	/* Create new file descriptor table. */
 	kfds = malloc(fdslen * sizeof(int), M_TEMP, M_WAITOK);
@@ -1463,13 +1459,16 @@ exec_free_args(struct image_args *args)
 /*
  * A set to functions to fill struct image args.
  *
- * NOTE: exec_args_add_fname() must be called (possiably with a NULL
- * fname) before any _arg_ or _env_ functions.  All _arg_ calls should be
- * made before any _env_ calls.
+ * NOTE: exec_args_add_fname() must be called (possibly with a NULL
+ * fname) before the other functions.  All exec_args_add_arg() calls must
+ * be made before any exec_args_add_env() calls.  exec_args_adjust_args()
+ * may be called any time after exec_args_add_fname().
  *
  * exec_args_add_fname() - install path to be executed
- * exec_args_add_arg_str() - append an argument string
- * exec_args_add_env_str() - append an env string
+ * exec_args_add_arg() - append an argument string
+ * exec_args_add_env() - append an env string
+ * exec_args_adjust_args() - adjust location of the argument list to
+ *                           allow new arguments to be prepended
  */
 int
 exec_args_add_fname(struct image_args *args, const char *fname,
@@ -1483,7 +1482,7 @@ exec_args_add_fname(struct image_args *args, const char *fname,
 
 	if (fname != NULL) {
 		args->fname = args->buf;
-		error = (segflg == UIO_SYSSPACE) ?
+		error = segflg == UIO_SYSSPACE ?
 		    copystr(fname, args->fname, PATH_MAX, &length) :
 		    copyinstr(fname, args->fname, PATH_MAX, &length);
 		if (error != 0)
@@ -1493,56 +1492,88 @@ exec_args_add_fname(struct image_args *args, const char *fname,
 
 	/* Set up for _arg_*()/_env_*() */
 	args->endp = args->buf + length;
-	/* begin_argv and begin_envv must be set and updated */
-	args->begin_argv = args->begin_envv = args->endp;
-	/* Actually (exec_map_entry_size - length) which is >= ARG_MAX */
+	/* begin_argv must be set and kept updated */
+	args->begin_argv = args->endp;
+	KASSERT(exec_map_entry_size - length >= ARG_MAX,
+	    ("too little space remaining for arguments %zu < %zu",
+	    exec_map_entry_size - length, (size_t)ARG_MAX));
 	args->stringspace = ARG_MAX;
 
 	return (0);
 }
 
-int
-exec_args_add_arg_str(struct image_args *args, const char *argp,
-    enum uio_seg segflg)
+static int
+exec_args_add_str(struct image_args *args, const char *str,
+    enum uio_seg segflg, int *countp)
 {
 	int error;
 	size_t length;
 
-	KASSERT(args->begin_argv != NULL, ("begin_argp not initialzed"));
-	KASSERT(args->begin_envv == args->endp, ("appending args after env"));
+	KASSERT(args->endp != NULL, ("endp not initialized"));
+	KASSERT(args->begin_argv != NULL, ("begin_argp not initialized"));
 
 	error = (segflg == UIO_SYSSPACE) ?
-	    copystr(argp, args->endp, args->stringspace, &length) :
-	    copyinstr(argp, args->endp, args->stringspace, &length);
+	    copystr(str, args->endp, args->stringspace, &length) :
+	    copyinstr(str, args->endp, args->stringspace, &length);
 	if (error != 0)
 		return (error == ENAMETOOLONG ? E2BIG : error);
 	args->stringspace -= length;
 	args->endp += length;
-	args->begin_envv += length;
-	args->argc++;
+	(*countp)++;
 
 	return (0);
 }
 
 int
-exec_args_add_env_str(struct image_args *args, const char *envp,
+exec_args_add_arg(struct image_args *args, const char *argp,
     enum uio_seg segflg)
 {
-	int error;
-	size_t length;
 
-	KASSERT(args->begin_envv != NULL, ("begin_envv not initialzed"));
+	KASSERT(args->envc == 0, ("appending args after env"));
 
-	error = (segflg == UIO_SYSSPACE) ?
-	    copystr(envp, args->endp, args->stringspace, &length) :
-	    copyinstr(envp, args->endp, args->stringspace, &length);
-	if (error != 0)
-		return (error == ENAMETOOLONG ? E2BIG : error);
-	args->stringspace -= length;
-	args->endp += length;
-	args->envc++;
+	return (exec_args_add_str(args, argp, segflg, &args->argc));
+}
 
+int
+exec_args_add_env(struct image_args *args, const char *envp,
+    enum uio_seg segflg)
+{
+
+	if (args->envc == 0)
+		args->begin_envv = args->endp;
+
+	return (exec_args_add_str(args, envp, segflg, &args->envc));
+}
+
+int
+exec_args_adjust_args(struct image_args *args, size_t consume, ssize_t extend)
+{
+	ssize_t offset;
+
+	KASSERT(args->endp != NULL, ("endp not initialized"));
+	KASSERT(args->begin_argv != NULL, ("begin_argp not initialized"));
+
+	offset = extend - consume;
+	if (args->stringspace < offset)
+		return (E2BIG);
+	memmove(args->begin_argv + extend, args->begin_argv + consume,
+	    args->endp - args->begin_argv + consume);
+	if (args->envc > 0)
+		args->begin_envv += offset;
+	args->endp += offset;
+	args->stringspace -= offset;
 	return (0);
+}
+
+char *
+exec_args_get_begin_envv(struct image_args *args)
+{
+
+	KASSERT(args->endp != NULL, ("endp not initialized"));
+
+	if (args->envc > 0)
+		return (args->begin_envv);
+	return (args->endp);
 }
 
 /*
