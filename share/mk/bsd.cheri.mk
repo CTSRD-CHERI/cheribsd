@@ -93,6 +93,15 @@ _CHERI_CC=		${CHERI_CC} ${_CHERI_COMMON_FLAGS}
 _CHERI_CXX=		${CHERI_CXX} ${_CHERI_COMMON_FLAGS}
 _CHERI_CPP=		${CHERI_CPP} ${_CHERI_COMMON_FLAGS}
 
+.if defined(CHERI_SUBOBJECT_BOUNDS)
+# Allow per-subdirectory overrides if we know that there is maximum that works
+.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
+_CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
+.else
+_CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.endif
+.endif
+
 .if defined(SYSROOT)
 _CHERI_COMMON_FLAGS+=	--sysroot=${SYSROOT}
 .endif
