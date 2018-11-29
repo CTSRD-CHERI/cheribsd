@@ -651,7 +651,7 @@ STRICTTMPPATH=	${XPATH}:${BPATH}:${UNIVERSE_TOOLCHAIN_PATH}
 # Currently strict $PATH can cause build failures and does not work yet with
 # USING_SYSTEM_LINKER/USING_SYSTEM_COMPILER. Once these issues have been
 # resolved it will be turned on by default.
-BUILD_WITH_STRICT_TMPPATH?=0
+BUILD_WITH_STRICT_TMPPATH?=1
 .if ${BUILD_WITH_STRICT_TMPPATH} != 0
 TMPPATH=	${STRICTTMPPATH}
 .else
