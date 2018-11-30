@@ -1085,12 +1085,17 @@ bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 static void
 bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 {
-	char tmp_cl[mips_dcache_max_linesize], tmp_clend[mips_dcache_max_linesize];
 	vm_ptr_t buf_cl, buf_clend;
 	vm_size_t size_cl, size_clend;
 	int cache_linesize_mask = mips_dcache_max_linesize - 1;
 #ifdef CHERI_KERNEL
 	vm_offset_t tmp_va;
+	char _tmp_cl[mips_dcache_max_linesize] __aligned(sizeof(void *));
+	char _tmp_clend[mips_dcache_max_linesize] __aligned(sizeof(void *));
+	char *tmp_cl = _tmp_cl;
+	char *tmp_clend = _tmp_clend;
+#else
+	char tmp_cl[mips_dcache_max_linesize], tmp_clend[mips_dcache_max_linesize];
 #endif
 
 	/*
@@ -1114,7 +1119,10 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 	 * XXX-AM: This is very bad for CHERI, the buffer pointer does not give
 	 * access to the whole cache line so there is no way we can cleanly
 	 * preserve the non-aligned data without using a global kernel
-	 * capability.
+	 * capability. In CHERI-128 we can have multiple capabilities in a single
+	 * cache line, so if the aligned flag is not set we have to make sure
+	 * that we do not inadvertedly clear tags when copying to the temporary
+	 * buffers.
 	 */
 	if (aligned) {
 		size_cl = 0;
@@ -1123,17 +1131,23 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 #ifdef CHERI_KERNEL
 		tmp_va = ptr_to_va(buf) & ~cache_linesize_mask;
 		size_cl = ptr_to_va(buf) & cache_linesize_mask;
-		if (size_cl)
+		if (size_cl) {
 			buf_cl = (vm_ptr_t)cheri_bound(
 			    cheri_setoffset(cheri_kall_capability, tmp_va),
 			    size_cl);
+			/* Enforce the same misalignment as in buf */
+			tmp_cl += mips_dcache_max_linesize - size_cl;
+		}
 		tmp_va = ptr_to_va(buf + len);
 		size_clend = (mips_dcache_max_linesize -
 		    (tmp_va & cache_linesize_mask)) & cache_linesize_mask;
-		if (size_clend)
+		if (size_clend) {
 			buf_clend = (vm_ptr_t)cheri_bound(
 			    cheri_setoffset(cheri_kall_capability, tmp_va),
 			    size_clend);
+			/* Enforce the same misalignment as in buf */
+			tmp_clend += mips_dcache_max_linesize - size_clend;
+		}
 #else
 		buf_cl = buf & ~cache_linesize_mask;
 		size_cl = buf & cache_linesize_mask;
