@@ -161,8 +161,7 @@ XLEAF(FUNC_PREFIX(bcopy_c))
 	and		a1, a0, -SZREG	// a1: amount we could copy
 	bne		t2, t3, .L.f_cannot_be_cap_aligned
 	li		t9, CHERICAP_SIZE // enough bytes to copy for a cap aligned copy?
-	dsub		t8, t9, t2
-	daddu		t9, t9, t8
+	dsub		t9, t9, t2
 	slt		t9, a0, t9
 	bnez		t9, .L.f_cannot_be_cap_aligned
 .L.f_can_be_cap_aligned:
