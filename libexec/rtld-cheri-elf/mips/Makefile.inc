@@ -7,8 +7,9 @@ plt_code.o:
 plt_code.dump: plt_code.o
 	${OBJDUMP} -triple=cheri-unknown-freebsd -d -x -s plt_code.o > ${.TARGET}
 
+# XXX: llvm-objcopy is require elsewhere, but doesn't support --only-section
 plt_code.text: plt_code.o
-	${OBJCOPY} -O binary --only-section=.text plt_code.o ${.TARGET}
+	objcopy -O binary --only-section=.text plt_code.o ${.TARGET}
 
 # Generate the code for the PLT stubs as a single C array using objcopy+xxd/file2c
 plt_code.inc: plt_code.text
