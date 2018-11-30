@@ -110,7 +110,6 @@ _CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 .endif
 
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
-OBJCOPY:=	objcopy
 MIPS_ABI:=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
 # Don't override libdir for tests since that causes the dlopen tests to fail
