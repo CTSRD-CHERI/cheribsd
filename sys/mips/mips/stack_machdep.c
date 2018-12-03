@@ -138,10 +138,12 @@ stack_save_td(struct stack *st, struct thread *td)
 	if (TD_IS_RUNNING(td))
 		panic("stack_save_td: running");
 
+#ifndef CHERI_KERNEL
 	/* XXXRW: Should be pcb_context? */
 	pc = td->td_pcb->pcb_regs.pc;
 	sp = td->td_pcb->pcb_regs.sp;
 	stack_capture(st, pc, sp);
+#endif
 }
 
 int
@@ -159,8 +161,10 @@ stack_save(struct stack *st)
 	if (curthread == NULL)
 		panic("stack_save: curthread == NULL");
 
+#ifndef CHERI_KERNEL
 	/* XXXRW: Should be pcb_context? */
 	pc = curthread->td_pcb->pcb_regs.pc;
 	sp = curthread->td_pcb->pcb_regs.sp;
 	stack_capture(st, pc, sp);
+#endif
 }
