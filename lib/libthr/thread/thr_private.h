@@ -878,10 +878,6 @@ int     __sys_openat(int, const char *, int, int);
 
 /* #include <signal.h> */
 #ifdef _SIGNAL_H_
-int	__sys_kill(pid_t, int);
-int     __sys_sigaltstack(const struct sigaltstack *, struct sigaltstack *);
-int     __sys_sigpending(sigset_t *);
-int     __sys_sigreturn(const ucontext_t *);
 #ifndef _LIBC_PRIVATE_H_
 int     __sys_sigaction(int, const struct sigaction *, struct sigaction *);
 int     __sys_sigprocmask(int, const sigset_t *, sigset_t *);
@@ -912,8 +908,6 @@ int	__sys_swapcontext(ucontext_t *oucp, const ucontext_t *ucp);
 
 /* #include <unistd.h> */
 #ifdef  _UNISTD_H_
-void	__sys_exit(int);
-pid_t	__sys_getpid(void);
 #ifndef _LIBC_PRIVATE_H_
 int     __sys_close(int);
 int	__sys_fork(void);
