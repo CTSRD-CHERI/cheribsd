@@ -6011,6 +6011,28 @@ rtld_strerror(int errnum)
 	return (sys_errlist[errnum]);
 }
 
+/*
+ * No ifunc relocations.
+ */
+void *
+memset(void *dest, int c, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; i++)
+		((char *)dest)[i] = c;
+	return (dest);
+}
+
+void
+bzero(void *dest, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; i++)
+		((char *)dest)[i] = 0;
+}
+
 #if defined DEBUG || !defined(NDEBUG)
 /* Provide an implementation of __assert that does not pull in fprintf() */
 void
