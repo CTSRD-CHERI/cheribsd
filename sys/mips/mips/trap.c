@@ -1945,6 +1945,20 @@ log_c2e_exception(const char *msg, struct trapframe *frame, int trap_type)
 	    msg, curproc->p_pid, (long)curthread->td_tid, curproc->p_comm,
 	    curproc->p_ucred ? curproc->p_ucred->cr_uid : -1,
 	    trap_type);
+	/* Also print argv to help debugging */
+	if (curproc->p_args) {
+		char* args = curproc->p_args->ar_args;
+		unsigned len = curproc->p_args->ar_length;
+		log(LOG_ERR, "Process arguments: ");
+		for (unsigned i = 0; i < len; i++) {
+			if (args[i] == '\0')
+				log(LOG_ERR, " ");
+			else
+				log(LOG_ERR, "%c", args[i]);
+		}
+		log(LOG_ERR, "\n", len);
+	}
+
 
 	/* log registers in trap frame */
 	log_frame_dump(frame);
