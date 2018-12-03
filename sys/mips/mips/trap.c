@@ -1382,11 +1382,19 @@ err:
 			printf("kernel mode)\n");
 
 #ifdef TRAP_DEBUG
-		if (trap_debug)
+		if (trap_debug) {
+#ifdef CHERI_KERNEL
+			printf("capcause = 0x%x, badaddr = %#jx, pc = %#jx, ra = %p, "
+			    "sp = %p, sr = %jx\n", trapframe->capcause,
+			    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc,
+			    trapframe->c17, trapframe->csp, (intmax_t)trapframe->sr);
+#else
 			printf("badvaddr = %#jx, pc = %#jx, ra = %#jx, sr = %#jxx\n",
-			       (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc, (intmax_t)trapframe->ra,
-			       (intmax_t)trapframe->sr);
+			    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc, (intmax_t)trapframe->ra,
+			    (intmax_t)trapframe->sr);
 #endif
+		}
+#endif /* TRAP_DEBUG */
 
 #ifdef KDB
 		if (debugger_on_panic) {
