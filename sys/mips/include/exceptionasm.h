@@ -79,7 +79,7 @@
 #endif
 
 /*
- * Note: The kernel stack is allocated above the pcb
+ * Note: The kernel stack is allocated below the pcb
  */
 #ifndef CHERI_KERNEL
 #define SWITCH_TO_KERNEL_STACK(pcb)		\

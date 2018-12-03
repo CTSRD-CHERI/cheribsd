@@ -133,6 +133,7 @@ ASSYM(TRAPFRAME_SIZE, sizeof(struct trapframe));
 /* XXX-AM: This is hardcoded in pmap */
 ASSYM(SEGMAP_SIZE, PAGE_SIZE);
 ASSYM(MAXCPU, MAXCPU);
+ASSYM(CHERI_KSTACK_OFFSET, (KSTACK_SIZE - sizeof(struct pcb)));
 #endif
 #endif
 

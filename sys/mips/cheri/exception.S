@@ -411,7 +411,7 @@ SlowFault:
 	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, k1 /* boot kstack bounds */ ;\
 	cincoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1 /* go to the top of kstack */ ;\
 	cmove	CHERI_REG_KR2C, CHERI_REG_STC /* SAVE_CPU will save KR2C as STC */ ;\
-	cmove	CHERI_REG_STC, CHERI_REG_KR1C	/* XXX may want to save context before for the debugger */;\	
+	cmove	CHERI_REG_STC, CHERI_REG_KR1C	/* XXX may want to save context before for the debugger */;\
 	PTR_SUBU	k0, zero, KERN_EXC_FRAME_SIZE /* stop the ddb backtrace here */ ;\
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, k0 ;		\
 	cmove	CHERI_REG_KR2C, $c17 /* Assume the stack is capability aligned */ ;\
@@ -743,12 +743,12 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	clc	CHERI_REG_KR1C, zero, PC_CURPCB(CHERI_REG_KR1C)
 	SAVE_REGS_TO_PCB(CHERI_REG_KR1C)
 	SAVE_CREGS_TO_PCB(CHERI_REG_KR1C, t0, t1)
-	/* Switch to kernel stack */
-	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
-	clc CHERI_REG_KR1C, zero, PC_CURTHREAD(CHERI_REG_KR1C)
-	clc CHERI_REG_STC, zero, TD_KSTACK(CHERI_REG_KR1C)
-	cincoffset CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
-	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
+	/* Switch to kernel stack, use c3 as scratch reg */
+	GET_CPU_PCPU($c3, k1)
+	clc $c3, zero, PC_CURTHREAD($c3)
+	clc CHERI_REG_STC, zero, TD_KSTACK($c3) /* get top of the stack from td */
+	REG_LI t0, (CHERI_KSTACK_OFFSET - CALLFRAME_SIZ)
+	cincoffset CHERI_REG_STC, CHERI_REG_STC, t0 /* start with kstack at bottom */
 
 	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU, find it a place once ddb is ported */
 	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC) # for debugging
@@ -758,12 +758,12 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	/* Turn off fpu and enter kernel mode */
 	and	t0, a0, ~(MIPS_SR_COP_1_BIT | MIPS_SR_EXL | MIPS_SR_KSU_MASK | MIPS_SR_INT_IE)
 	mtc0	t0, MIPS_COP_0_STATUS
+	ITLBNOPFIX
 
+	/* Assume CURPCB left in KR1C */
 	cincoffset	$c3, CHERI_REG_KR1C, U_PCB_REGS
 	REG_LI	t0, TRAPFRAME_SIZE
 	csetbounds	$c3, $c3, t0
-	ITLBNOPFIX
-
 	CAPCALL_LOAD($c12, trap)
 	cjalr	$c12, $c17
 	nop
@@ -1058,8 +1058,9 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	/* Switch to kernel stack */
 	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
 	clc CHERI_REG_KR1C, zero, PC_CURTHREAD(CHERI_REG_KR1C)
-	clc CHERI_REG_STC, zero, TD_KSTACK(CHERI_REG_KR1C)
-	cincoffset CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
+	clc CHERI_REG_STC, zero, TD_KSTACK(CHERI_REG_KR1C) /* get top of the stack from td */
+	REG_LI t0, (CHERI_KSTACK_OFFSET - CALLFRAME_SIZ)
+	cincoffset CHERI_REG_STC, CHERI_REG_STC, t0 /* start with kstack at bottom */
 
 	/* XXX-AM: This should break with cheri, pcb* can not access kernel stack
 	 * am I trashing the pcb?
