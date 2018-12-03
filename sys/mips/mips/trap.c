@@ -1956,7 +1956,7 @@ log_c2e_exception(const char *msg, struct trapframe *frame, int trap_type)
 			else
 				log(LOG_ERR, "%c", args[i]);
 		}
-		log(LOG_ERR, "\n", len);
+		log(LOG_ERR, "\n");
 	}
 
 
