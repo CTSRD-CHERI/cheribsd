@@ -13,6 +13,7 @@ WANT_CHERI=none
 
 .include <src.opts.mk>
 PACKAGE=	clibs
+MK_BIND_NOW=	no
 MK_SSP=		no
 
 CONFS=		libmap.conf
