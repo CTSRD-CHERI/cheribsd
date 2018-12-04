@@ -4191,9 +4191,9 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 	    ("vmspace_exec recursed"));
 #ifdef CHERI_KERNEL
 	/* We create a new userspace capability for this map */
-	user_length = min(maxuser - minuser,
+	user_length = MIN(maxuser - minuser,
 	    VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS);
-	minuser_cap = cheri_csetbounds(
+	minuser_cap = (vm_ptr_t)cheri_csetbounds(
 	    cheri_setoffset(cheri_xuseg_capability, minuser), user_length);
 	maxuser_cap = minuser_cap + user_length;
 	newvmspace = vmspace_alloc(minuser_cap, maxuser_cap, NULL);
