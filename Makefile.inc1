@@ -3117,11 +3117,10 @@ _prereq_libs+= gnu/lib/libssp/libssp_nonshared
 # gnu/lib/csu, gnu/lib/libgcc, lib/csu and lib/libc must be built before
 # all shared libraries for ELF.
 #
-
-.if ! ${MACHINE_ARCH:Mmips*c*}
-_startup_libs=	gnu/lib/csu
+_startup_libs=	lib/csu
+.if ${MK_BSD_CRTBEGIN} == "no"
+_startup_libs+=	gnu/lib/csu
 .endif
-_startup_libs+=	lib/csu
 .if ${MK_CHERI} != "no"
 _startup_libs+= lib/libc_cheri
 .endif
