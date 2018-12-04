@@ -458,7 +458,7 @@ sys_accept4(struct thread *td, struct accept4_args *uap)
 
 #ifdef COMPAT_OLDSOCK
 int
-oaccept(struct thread *td, struct accept_args *uap)
+oaccept(struct thread *td, struct oaccept_args *uap)
 {
 
 	return (user_accept(td, uap->s, __USER_CAP_UNBCOUND(uap->name),
