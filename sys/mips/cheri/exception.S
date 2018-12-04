@@ -993,7 +993,7 @@ END(MipsKernIntr)
 	SAVE_U_PCB_REG(s6, S6, pcb);		\
 	SAVE_U_PCB_REG(s7, S7, pcb);		\
 	SAVE_U_PCB_REG(s8, S8, pcb);		\
-	mflo	v0 # get lo/hi late to avoid stall;	\
+	mflo	v0 /* get lo/hi late to avoid stall*/;	\
 	mfhi	v1;					\
 	mfc0	a0, MIPS_COP_0_STATUS;			\
 	mfc0	a1, MIPS_COP_0_CAUSE;			\
@@ -1019,7 +1019,7 @@ END(MipsKernIntr)
 	RESTORE_U_PCB_REG(t2, PC, pcb);			\
 	mtlo	t0;					\
 	mthi	t1;					\
-	MTC0	t2, MIPS_COP_0_EXC_PC	# set return address;	\
+	MTC0	t2, MIPS_COP_0_EXC_PC /* set return address */;	\
 	RESTORE_U_PCB_REG(v0, V0, pcb);			\
 	RESTORE_U_PCB_REG(v1, V1, pcb);			\
 	RESTORE_U_PCB_REG(a0, A0, pcb);			\
@@ -1055,28 +1055,25 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	clc CHERI_REG_KR1C, zero, PC_CURPCB(CHERI_REG_KR1C)
 	SAVE_UINTR_PCB_REGS(CHERI_REG_KR1C)
 	SAVE_CREGS_TO_PCB(CHERI_REG_KR1C, t0, t1)
-	/* Switch to kernel stack */
-	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
-	clc CHERI_REG_KR1C, zero, PC_CURTHREAD(CHERI_REG_KR1C)
-	clc CHERI_REG_STC, zero, TD_KSTACK(CHERI_REG_KR1C) /* get top of the stack from td */
+	/* Switch to kernel stack, use c3 as scratch reg */
+	GET_CPU_PCPU($c3, k1)
+	clc $c3, zero, PC_CURTHREAD($c3)
+	clc CHERI_REG_STC, zero, TD_KSTACK($c3) /* get top of the stack from td */
 	REG_LI t0, (CHERI_KSTACK_OFFSET - CALLFRAME_SIZ)
 	cincoffset CHERI_REG_STC, CHERI_REG_STC, t0 /* start with kstack at bottom */
 
-	/* XXX-AM: This should break with cheri, pcb* can not access kernel stack
-	 * am I trashing the pcb?
-	 */
-	cincoffset	CHERI_REG_STC, CHERI_REG_KR1C, CALLFRAME_SIZ
-
 	LOAD_KERNEL_GP
 
-	// Turn off fpu, disable interrupts, set kernel mode kernel mode, clear exception level.
+	// Turn off fpu, disable interrupts, set kernel mode, clear exception level.
 	and	t0, a0, ~(MIPS_SR_COP_1_BIT | MIPS_SR_EXL | MIPS_SR_INT_IE | MIPS_SR_KSU_MASK)
 	mtc0	t0, MIPS_COP_0_STATUS
 	ITLBNOPFIX
-	cincoffset $c3, CHERI_REG_KR1C, U_PCB_REGS
+
 	/*
 	 * Call the interrupt handler.
+	 * Assume CURPCB left in KR1C
 	 */
+	cincoffset $c3, CHERI_REG_KR1C, U_PCB_REGS
 #ifdef INTRNG
 	CAPCALL_LOAD($c12, intr_irq_handler)
 #else
