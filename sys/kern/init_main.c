@@ -725,6 +725,7 @@ start_init(void *dummy)
 	char *free_init_path, *tmp_init_path;
 	struct thread *td;
 	struct proc *p;
+	struct vmspace *oldvmspace;
 
 	TSENTER();	/* Here so we don't overlap with mi_startup. */
 
@@ -764,20 +765,20 @@ start_init(void *dummy)
 		options = 0;
 		flagp = &flags[0];
 		*flagp++ = '-';
-#ifdef BOOTCDROM
-		*flagp++ = 'C';
-		options++;
-#endif
+		if (boothowto & RB_SINGLE) {
+			*flagp++ = 's';
+			options++;
+		}
 #ifdef notyet
                 if (boothowto & RB_FASTBOOT) {
 			*flagp++ = 'f';
 			options++;
 		}
 #endif
-		if (boothowto & RB_SINGLE) {
-			*flagp++ = 's';
-			options++;
-		}
+#ifdef BOOTCDROM
+		*flagp++ = 'C';
+		options++;
+#endif
 		if (options == 0)
 			*flagp++ = '-';
 		*flagp++ = 0;
@@ -793,8 +794,19 @@ start_init(void *dummy)
 		 * Otherwise, return via fork_trampoline() all the way
 		 * to user mode as init!
 		 */
+		KASSERT((td->td_pflags & TDP_EXECVMSPC) == 0,
+		    ("nested execve"));
+		oldvmspace = td->td_proc->p_vmspace;
 		error = kern_execve(td, &args, NULL);
+		KASSERT(error != 0,
+		    ("kern_execve returned success, not EJUSTRETURN"));
 		if (error == EJUSTRETURN) {
+			if ((td->td_pflags & TDP_EXECVMSPC) != 0) {
+				KASSERT(p->p_vmspace != oldvmspace,
+				    ("oldvmspace still used"));
+				vmspace_free(oldvmspace);
+				td->td_pflags &= ~TDP_EXECVMSPC;
+			}
 			free(free_init_path, M_TEMP);
 			TSEXIT();
 			return;
