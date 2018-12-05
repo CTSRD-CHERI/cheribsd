@@ -315,7 +315,7 @@ typedef	_Bool	bool;
 #define offsetof(type, field) __offsetof(type, field)
 
 #ifdef CHERI_KERNEL
-#define ptr_to_va(p) ((__cheri_addr vm_offset_t)(void *)(p))
+#define ptr_to_va(p) ((__cheri_addr vm_offset_t)(void *)(uintptr_t)(p))
 #else
 #define ptr_to_va(p) ((vm_offset_t)(p))
 #endif

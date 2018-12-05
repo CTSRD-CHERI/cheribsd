@@ -242,12 +242,12 @@ pmap_lmem_map1(vm_paddr_t phys)
 	return (va);
 }
 
-static __inline vm_offset_t
+static __inline vm_ptr_t
 pmap_lmem_map2(vm_paddr_t phys1, vm_paddr_t phys2)
 {
 	struct local_sysmaps *sysm;
 	pt_entry_t *pte, npte;
-	vm_offset_t va1, va2;
+	vm_ptr_t va1, va2;
 	uint32_t intr;
 	int cpu;
 
@@ -296,21 +296,21 @@ pmap_alloc_lmem_map(void)
 {
 }
 
-static __inline vm_offset_t
+static __inline vm_ptr_t
 pmap_lmem_map1(vm_paddr_t phys)
 {
 
 	return (0);
 }
 
-static __inline vm_offset_t
+static __inline vm_ptr_t
 pmap_lmem_map2(vm_paddr_t phys1, vm_paddr_t phys2)
 {
 
 	return (0);
 }
 
-static __inline vm_offset_t
+static __inline vm_ptr_t
 pmap_lmem_unmap(void)
 {
 
@@ -1135,7 +1135,6 @@ pmap_alloc_direct_page(unsigned int index, int req)
 int
 pmap_pinit(pmap_t pmap)
 {
-	vm_ptr_t ptdva;
 	vm_page_t ptdpg;
 	int i, req_class;
 
@@ -1147,8 +1146,8 @@ pmap_pinit(pmap_t pmap)
 	    NULL)
 		pmap_grow_direct_page(req_class);
 
-	ptdva = MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(ptdpg));
-	pmap->pm_segtab = (pd_entry_t *)ptdva;
+	pmap->pm_segtab = (pd_entry_t *)
+	    MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(ptdpg));
 	CPU_ZERO(&pmap->pm_active);
 	for (i = 0; i < MAXCPU; i++) {
 		pmap->pm_asid[i].asid = PMAP_ASID_RESERVED;
@@ -1195,7 +1194,7 @@ _pmap_allocpte(pmap_t pmap, unsigned ptepindex, u_int flags)
 	 * Map the pagetable page into the process address space, if it
 	 * isn't already there.
 	 */
-	pageva = MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
+	pageva = (vm_ptr_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
 
 #ifdef __mips_n64
 	if (ptepindex >= NUPDE) {
@@ -1394,14 +1393,19 @@ static __inline struct pv_chunk *
 pv_to_chunk(pv_entry_t pv)
 {
 
-	return ((struct pv_chunk *)((uintptr_t)pv & ~(uintptr_t)PAGE_MASK));
+	/* Align down to PAGE_SIZE */
+	return ((struct pv_chunk *)rounddown2(pv, PAGE_SIZE));
 }
 
 #define PV_PMAP(pv) (pv_to_chunk(pv)->pc_pmap)
 
 #ifdef __mips_n64
 #define	PC_FREE0_1	0xfffffffffffffffful
+#if defined(CHERI_KERNEL) && defined(CPU_CHERI128)
+#define PC_FREE2	0x000000000007fffful
+#else /* ! (CHERI_KERNEL && CPU_CHERI128) */
 #define	PC_FREE2	0x000000fffffffffful
+#endif /* ! (CHERI_KERNEL && CPU_CHERI128) */
 #else
 #define	PC_FREE0_9	0xfffffffful	/* Free values for index 0 through 9 */
 #define	PC_FREE10	0x0000fffful	/* Free values for index 10 */
@@ -1409,7 +1413,15 @@ pv_to_chunk(pv_entry_t pv)
 
 static const u_long pc_freemask[_NPCM] = {
 #ifdef __mips_n64
+#ifdef CHERI_KERNEL
+#ifdef CPU_CHERI128
+	PC_FREE0_1, PC_FREE2
+#else /* CPU_CHERI256 */
+	PC_FREE2
+#endif /* CPU_CHERI256 */
+#else  /* ! CHERI_KERNEL */
 	PC_FREE0_1, PC_FREE0_1, PC_FREE2
+#endif /* ! CHERI_KERNEL */
 #else
 	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
 	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
@@ -1782,8 +1794,8 @@ pmap_remove_pte(struct pmap *pmap, pt_entry_t *ptq, vm_offset_t va,
 		m = PHYS_TO_VM_PAGE(pa);
 		if (pte_test(&oldpte, PTE_D)) {
 			KASSERT(!pte_test(&oldpte, PTE_RO),
-			    ("%s: modified page not writable: va: %p, pte: %#jx",
-			    __func__, (void *)va, (uintmax_t)oldpte));
+			    ("%s: modified page not writable: va: %#jx, pte: %#jx",
+			    __func__, va, (uintmax_t)oldpte));
 			vm_page_dirty(m);
 		}
 		if (m->md.pv_flags & PV_TABLE_REF)
@@ -1961,8 +1973,8 @@ pmap_remove_all(vm_page_t m)
 		 */
 		if (pte_test(&tpte, PTE_D)) {
 			KASSERT(!pte_test(&tpte, PTE_RO),
-			    ("%s: modified page not writable: va: %p, pte: %#jx",
-			    __func__, (void *)pv->pv_va, (uintmax_t)tpte));
+			    ("%s: modified page not writable: va: %#jx, pte: %#jx",
+			    __func__, pv->pv_va, (uintmax_t)tpte));
 			vm_page_dirty(m);
 		}
 		pmap_invalidate_page(pmap, pv->pv_va);
@@ -2136,14 +2148,14 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	 * Page Directory table entry not valid, we need a new PT page
 	 */
 	if (pte == NULL) {
-		panic("pmap_enter: invalid page directory, pdir=%p, va=%p",
-		    (void *)pmap->pm_segtab, (void *)va);
+		panic("pmap_enter: invalid page directory, pdir=%p, va=%#jx",
+		    (void *)pmap->pm_segtab, va);
 	}
 
 	origpte = *pte;
 	KASSERT(!pte_test(&origpte, PTE_D | PTE_RO | PTE_VALID),
-	    ("pmap_enter: modified page not writable: va: %p, pte: %#jx",
-	    (void *)va, (uintmax_t)origpte));
+	    ("pmap_enter: modified page not writable: va: %#jx, pte: %#jx",
+	    va, (uintmax_t)origpte));
 	opa = TLBLO_PTE_TO_PA(origpte);
 
 	/*
@@ -2210,7 +2222,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			mpte->wire_count--;
 			KASSERT(mpte->wire_count > 0,
 			    ("pmap_enter: missing reference to page table page,"
-			    " va: %p", (void *)va));
+			    " va: %#jx", va));
 		}
 	} else
 		pmap->pm_stats.resident_count++;
@@ -2419,7 +2431,7 @@ pmap_kenter_temporary(vm_paddr_t pa, int i)
 		    __func__);
 
 	if (MIPS_DIRECT_MAPPABLE(pa)) {
-		va = MIPS_PHYS_TO_DIRECT(pa);
+		va = (vm_ptr_t)MIPS_PHYS_TO_DIRECT(pa);
 	} else {
 #ifndef __mips_n64    /* XXX : to be converted to new style */
 		int cpu;
@@ -2603,7 +2615,7 @@ pmap_zero_page(vm_page_t m)
 	vm_paddr_t phys = VM_PAGE_TO_PHYS(m);
 
 	if (MIPS_DIRECT_MAPPABLE(phys)) {
-		va = MIPS_PHYS_TO_DIRECT(phys);
+		va = (vm_ptr_t)MIPS_PHYS_TO_DIRECT(phys);
 		bzero((caddr_t)va, PAGE_SIZE);
 		mips_dcache_wbinv_range(va, PAGE_SIZE);
 	} else {
@@ -2627,8 +2639,8 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
 	vm_paddr_t phys = VM_PAGE_TO_PHYS(m);
 
 	if (MIPS_DIRECT_MAPPABLE(phys)) {
-		va = MIPS_PHYS_TO_DIRECT(phys);
-		bzero((char *)(caddr_t)va + off, size);
+		va = (vm_ptr_t)MIPS_PHYS_TO_DIRECT(phys);
+		bzero((char *)va + off, size);
 		mips_dcache_wbinv_range(va + off, size);
 	} else {
 		va = pmap_lmem_map1(phys);
@@ -2663,8 +2675,8 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 		pmap_flush_pvcache(src);
 		mips_dcache_wbinv_range_index(
 		    (vm_offset_t)MIPS_PHYS_TO_DIRECT(phys_dst), PAGE_SIZE);
-		va_src = MIPS_PHYS_TO_DIRECT(phys_src);
-		va_dst = MIPS_PHYS_TO_DIRECT(phys_dst);
+		va_src = (vm_ptr_t)MIPS_PHYS_TO_DIRECT(phys_src);
+		va_dst = (vm_ptr_t)MIPS_PHYS_TO_DIRECT(phys_dst);
 #ifdef CPU_CHERI
 		if (flags & PMAP_COPY_TAGS)
 			cheri_bcopy((caddr_t)va_src, (caddr_t)va_dst,
@@ -2790,7 +2802,7 @@ vm_ptr_t
 pmap_quick_enter_page(vm_page_t m)
 {
 #if defined(__mips_n64)
-	return MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
+	return (vm_ptr_t)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(m));
 #else
 	vm_paddr_t pa;
 	struct local_sysmaps *sysm;
@@ -3305,7 +3317,8 @@ void *
 pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 {
 	vm_offset_t offset;
-	void *va, *tmpva;
+	caddr_t va;
+	caddr_t tmpva;
 
 	/*
 	 * KSEG1 maps only first 512M of phys address space. For
@@ -3325,12 +3338,12 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 		offset = pa & PAGE_MASK;
 		size = roundup(size + offset, PAGE_SIZE);
 
-		va = kva_alloc(size);
+		va = (void *)kva_alloc(size);
 		if (!va)
 			panic("pmap_mapdev: Couldn't alloc kernel virtual memory");
 		pa = trunc_page(pa);
 		for (tmpva = va; size > 0;) {
-			pmap_kenter_attr((vm_offset_t)tmpva, pa, ma);
+			pmap_kenter_attr(ptr_to_va(tmpva), pa, ma);
 			size -= PAGE_SIZE;
 			tmpva += PAGE_SIZE;
 			pa += PAGE_SIZE;
@@ -3703,7 +3716,7 @@ pmap_kextract(vm_offset_t va)
 		return (0);
 	}
 
-	panic("%s for unknown address space %p.", __func__, (void *)va);
+	panic("%s for unknown address space %#jx.", __func__, va);
 }
 
 
