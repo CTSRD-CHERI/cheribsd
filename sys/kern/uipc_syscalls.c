@@ -756,9 +756,7 @@ kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 	rights = &cap_send_rights;
 	if (mp->msg_name != NULL) {
 		AUDIT_ARG_SOCKADDR(td, AT_FDCWD,
-		    (__cheri_fromcap struct sockaddr *)
-		    mp->msg_name);
-		AUDIT_ARG_SOCKADDR(td, AT_FDCWD, mp->msg_name);
+		    (__cheri_fromcap struct sockaddr *)mp->msg_name);
 		rights = &cap_send_connect_rights;
 	}
 	error = getsock_cap(td, s, rights, &fp, NULL, NULL);
