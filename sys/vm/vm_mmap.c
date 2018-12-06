@@ -102,6 +102,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
 #include <vm/vnode_pager.h>
+#include <vm/cheri.h>
 
 #if __has_feature(capabilities)
 #include <cheri/cheric.h>
@@ -263,6 +264,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 }
 #endif /* __has_feature(capabilities) */
 
+#if !__has_feature(capabilities)
 int
 sys_sbrk(struct thread *td, struct sbrk_args *uap)
 {
@@ -282,6 +284,7 @@ sys_sstk(struct thread *td, struct sstk_args *uap)
 	/* Not yet implemented */
 	return (EOPNOTSUPP);
 }
+#endif
 
 #if defined(COMPAT_43)
 #ifndef _SYS_SYSPROTO_H_
@@ -382,7 +385,11 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 			return (EINVAL);
 		}
 
-		/* Allocate from the per-thread capability. */
+		/*
+		 * Allocate from the per-thread capability.
+		 * XXX-AM: In the cheri kernel we could use the root
+		 * vmspace capability instead.
+		 */
 		source_cap = td->td_md.md_cheri_mmap_cap;
 	}
 	KASSERT(cheri_gettag(source_cap),
@@ -520,7 +527,8 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	off_t pos;
 	vm_offset_t addr_mask = PAGE_MASK;
 	vm_size_t pageoff, size;
-	vm_offset_t addr, max_addr;
+	vm_ptr_t addr;
+	vm_offset_t max_addr;
 	vm_prot_t cap_maxprot;
 	int align, error, fd, flags, max_prot, prot;
 	cap_rights_t rights;
@@ -709,7 +717,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		 * should be aligned after adjustment by pageoff.
 		 */
 		addr -= pageoff;
-		if (addr & addr_mask) {
+		if (ptr_to_va(addr) & addr_mask) {
 			SYSERRCAUSE("%s: addr (%p) is underaligned "
 			    "(mask 0x%zx)", __func__, (void *)addr, addr_mask);
 			return (EINVAL);
@@ -721,8 +729,8 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 			SYSERRCAUSE("%s: range (%p-%p) is outside user "
 			    "address range (%p-%p)", __func__, (void *)addr,
 			    (void *)(addr + size),
-			    (void *)vm_map_min(&vms->vm_map),
-			    (void *)vm_map_max(&vms->vm_map));
+			    (void *)(uintptr_t)vm_map_min(&vms->vm_map),
+			    (void *)(uintptr_t)vm_map_max(&vms->vm_map));
 			return (EINVAL);
 		}
 		if (addr + size < addr) {
@@ -826,9 +834,18 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 
 	if (error == 0) {
 #if __has_feature(capabilities)
+		/*
+		 * XXX-AM: A capability derived from the vmspace root is
+		 * returned in addr at this point. We should probably
+		 * use it instead of the thread md_cheri_mmap_cap, although
+		 * it gets more complicated to prevent setting bounds and
+		 * permissions.
+		 * For now we ignore it and continue using the hybrid-kernel
+		 * return path.
+		 */
 		if (SV_CURPROC_FLAG(SV_CHERI))
 			td->td_retcap = cheriabi_mmap_retcap(td,
-			    addr + pageoff,  mrp);
+			    ptr_to_va(addr) + pageoff, mrp);
 		/* Unconditionaly return the VA in td_retval[0] for ktrace */
 #endif
 		td->td_retval[0] = (register_t) (addr + pageoff);
@@ -1908,7 +1925,7 @@ vm_mmap_cdev(struct thread *td, vm_size_t objsize, vm_prot_t prot,
  * character device, or NULL for MAP_ANON.
  */
 int
-vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
+vm_mmap(vm_map_t map, vm_ptr_t *addr, vm_size_t size, vm_prot_t prot,
 	vm_prot_t maxprot, int flags,
 	objtype_t handle_type, void *handle,
 	vm_ooffset_t foff)
@@ -1979,13 +1996,15 @@ vm_mmap(vm_map_t map, vm_offset_t *addr, vm_size_t size, vm_prot_t prot,
  * map.  Called by mmap for MAP_ANON, vm_mmap, shm_mmap, and vn_mmap.
  */
 int
-vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
+vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
     vm_size_t size, vm_prot_t prot,
     vm_prot_t maxprot, int flags, vm_object_t object, vm_ooffset_t foff,
     boolean_t writecounted, struct thread *td)
 {
 	boolean_t curmap, fitit;
 	int docow, error, findspace, rv;
+
+	CHERI_VM_ASSERT_FIT_PTR(addr);
 
 	curmap = map == &td->td_proc->p_vmspace->vm_map;
 	if (curmap) {
@@ -2086,10 +2105,20 @@ vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
 			    max_addr, findspace, prot, maxprot, docow);
 		}
 	} else {
-		if (max_addr != 0 && *addr + size > max_addr)
+		if (max_addr != 0 && ptr_to_va(*addr) + size > max_addr)
 			return (ENOMEM);
 		rv = vm_map_fixed(map, object, foff, *addr, size,
 		    prot, maxprot, docow);
+#ifdef CHERI_KERNEL
+		/*
+		 * In this case *addr is not changed by vm_map_fixed but we
+		 * need to return a valid capability for the mapping, so
+		 * we make one.
+		 */
+		if (rv == KERN_SUCCESS)
+			*addr = vm_map_make_ptr(map, ptr_to_va(*addr),
+			    size, prot);
+#endif
 	}
 
 	if (rv == KERN_SUCCESS) {
@@ -2098,7 +2127,8 @@ vm_mmap_object(vm_map_t map, vm_offset_t *addr, vm_offset_t max_addr,
 		 * be wired, then heed this.
 		 */
 		if (map->flags & MAP_WIREFUTURE) {
-			vm_map_wire(map, *addr, *addr + size,
+			vm_map_wire(map, ptr_to_va(*addr),
+			    ptr_to_va(*addr) + size,
 			    VM_MAP_WIRE_USER | ((flags & MAP_STACK) ?
 			    VM_MAP_WIRE_HOLESOK : VM_MAP_WIRE_NOHOLES));
 		}

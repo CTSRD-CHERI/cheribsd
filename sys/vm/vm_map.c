@@ -1649,6 +1649,8 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	KASSERT((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) == 0 ||
 	    object == NULL,
 	    ("vm_map_find: non-NULL backing object for stack"));
+	CHERI_VM_ASSERT_FIT_PTR(addr);
+
 	if (find_space == VMFS_OPTIMAL_SPACE && (object == NULL ||
 	    (object->flags & OBJ_COLORED) == 0))
 		find_space = VMFS_ANY_SPACE;
@@ -1711,11 +1713,11 @@ done:
  */
 int
 vm_map_find_min(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_offset_t *addr, vm_size_t length, vm_offset_t min_addr,
+    vm_ptr_t *addr, vm_size_t length, vm_offset_t min_addr,
     vm_offset_t max_addr, int find_space, vm_prot_t prot, vm_prot_t max,
     int cow)
 {
-	vm_offset_t hint;
+	vm_ptr_t hint;
 	int rv;
 
 	hint = *addr;
