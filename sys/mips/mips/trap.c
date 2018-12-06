@@ -42,7 +42,6 @@
  */
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
-#define TRAP_DEBUG 1
 
 #include "opt_ddb.h"
 #include "opt_ktrace.h"

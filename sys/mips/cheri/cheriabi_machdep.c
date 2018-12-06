@@ -278,6 +278,11 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	td->td_retval[1] = locr0->v1;
 	td->td_retcap = locr0->c3;
 
+#ifdef TRAP_DEBUG
+	if (trap_debug)
+		printf("SYSCALL #%d pid:%u\n", sa->code, td->td_proc->p_pid);
+#endif
+
 	return (error);
 }
 

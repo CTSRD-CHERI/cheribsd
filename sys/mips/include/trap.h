@@ -123,6 +123,10 @@ void MipsTLBModException(void);
 void MipsUserGenException(void);
 void MipsUserIntr(void);
 
+#ifdef TRAP_DEBUG
+extern int trap_debug;
+#endif
+
 register_t trap(struct trapframe *);
 
 #endif /* ! _LOCORE */

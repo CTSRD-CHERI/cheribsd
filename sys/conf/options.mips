@@ -138,6 +138,11 @@ CPU_CHERI128			opt_global.h
 CHERI_KERNEL		opt_global.h
 
 #
+# Enable debugging output on traps
+#
+TRAP_DEBUG		opt_global.h
+
+#
 # Disable system-call authorisation for compartmentalised user code.
 #
 CPU_CHERI_NO_SYSCALL_AUTHORIZE opt_global.h
