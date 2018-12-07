@@ -3222,6 +3222,42 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* cheriabi_getfhat */
+	case 564: {
+		struct cheriabi_getfhat_args *p = params;
+		iarg[0] = p->fd; /* int */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->fhp; /* struct fhandle * __capability */
+		iarg[3] = p->flags; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* cheriabi_fhlink */
+	case 565: {
+		struct cheriabi_fhlink_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->fhp; /* struct fhandle * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->to; /* const char * __capability */
+		*n_args = 2;
+		break;
+	}
+	/* cheriabi_fhlinkat */
+	case 566: {
+		struct cheriabi_fhlinkat_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->fhp; /* struct fhandle * __capability */
+		iarg[1] = p->tofd; /* int */
+		uarg[2] = (__cheri_addr intptr_t) p->to; /* const char * __capability */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi_fhreadlink */
+	case 567: {
+		struct cheriabi_fhreadlink_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->fhp; /* struct fhandle * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->buf; /* char * __capability */
+		uarg[2] = p->bufsize; /* size_t */
+		*n_args = 3;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8589,6 +8625,70 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* cheriabi_getfhat */
+	case 564:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland char * __capability";
+			break;
+		case 2:
+			p = "userland struct fhandle * __capability";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fhlink */
+	case 565:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle * __capability";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fhlinkat */
+	case 566:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle * __capability";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland const char * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fhreadlink */
+	case 567:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle * __capability";
+			break;
+		case 1:
+			p = "userland char * __capability";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10437,6 +10537,26 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_getrandom */
 	case 563:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_getfhat */
+	case 564:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fhlink */
+	case 565:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fhlinkat */
+	case 566:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_fhreadlink */
+	case 567:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
