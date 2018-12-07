@@ -13,9 +13,7 @@ machine		mips mips64	# Malta supports both, so it isn't in std.malta
 
 nomakeoptions 	ARCH_FLAGS
 makeoptions	ARCH_PIC_FLAGS="-fpic"
-# makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=128"
-# makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips4 -mabi=purecap -mcpu=mips4 -cheri=128"
-makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=128 -cheri-cap-table-abi=plt -mxcaptable"
+makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=128 -cheri-cap-table-abi=plt -mxcaptable -cheri-uintcap=offset"
 makeoptions	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 

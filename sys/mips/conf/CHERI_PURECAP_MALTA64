@@ -13,8 +13,7 @@ machine		mips mips64	# Malta supports both, so it isn't in std.malta
 
 nomakeoptions 	ARCH_FLAGS
 makeoptions	ARCH_PIC_FLAGS="-fpic"
-# makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=256"
-makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=256 -cheri-cap-table-abi=plt -mxcaptable"
+makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=256 -cheri-cap-table-abi=plt -mxcaptable -cheri-uintcap=offset"
 makeoptions	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 
@@ -34,12 +33,13 @@ nooptions	GEOM_RAID
 # debugging
 options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
-options		BUS_DEBUG
-options		CAMDEBUG
-options		CAM_DEBUG_FLAGS=3
+#options		BUS_DEBUG
+#options		CAMDEBUG
+#options		CAM_DEBUG_FLAGS=3
 options		STACK # needed for witness
 options		WITNESS
 options		DEBUG_VFS_LOCKS
+options		TRAP_DEBUG
 # options		KTR
 # options		KTR_VERBOSE=2
 # nooptions	KTR_ALQ
