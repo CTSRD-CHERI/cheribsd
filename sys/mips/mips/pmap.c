@@ -1393,8 +1393,7 @@ static __inline struct pv_chunk *
 pv_to_chunk(pv_entry_t pv)
 {
 
-	/* Align down to PAGE_SIZE */
-	return ((struct pv_chunk *)rounddown2(pv, PAGE_SIZE));
+	return ((struct pv_chunk *)trunc_page(pv));
 }
 
 #define PV_PMAP(pv) (pv_to_chunk(pv)->pc_pmap)
