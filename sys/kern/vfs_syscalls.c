@@ -1548,19 +1548,18 @@ kern_linkat(struct thread *td, int fd1, int fd2,
     const char * __capability path1, const char * __capability path2,
     enum uio_seg segflag, int follow)
 {
-	struct vnode *vp;
 	struct nameidata nd;
 	int error;
 
 	do {
 		bwillwrite();
-		NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, segflag, path1, fd1,
-		    &cap_linkat_source_rights, td);
+		NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, segflag,
+		    path1, fd1, &cap_linkat_source_rights, td);
 		if ((error = namei(&nd)) != 0)
 			return (error);
 		NDFREE(&nd, NDF_ONLY_PNBUF);
-		vp = nd.ni_vp;
-	} while ((error = kern_linkat_vp(td, vp, fd2, path2, segflag) == EAGAIN));
+		error = kern_linkat_vp(td, nd.ni_vp, fd2, path2, segflag);
+	} while (error ==  EAGAIN);
 	return (error);
 }
 
