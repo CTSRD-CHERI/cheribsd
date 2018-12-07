@@ -189,8 +189,12 @@ int	kern_ffclock_getestimate(struct thread *td,
 	    struct ffclock_estimate * __capability cest);
 int	kern_ffclock_setestimate(struct thread *td,
 	    const struct ffclock_estimate * __capability ucest);
+int	kern_fhlinkat(struct thread *td, int fd, const char * __capability path,
+	    enum uio_seg pathseg, fhandle_t * __capability fhp);
 int	kern_fhopen(struct thread *td,
 	    const struct fhandle * __capability u_fhp, int flags);
+int	kern_fhreadlink(struct thread *td, fhandle_t * __capability fhp,
+	    char * __capability buf, size_t bufsize);
 int	kern_fhstat(struct thread *td, fhandle_t fh, struct stat *buf);
 int	kern_fhstatfs(struct thread *td, fhandle_t fh, struct statfs *buf);
 int	kern_fpathconf(struct thread *td, int fd, int name, long *valuep);
@@ -210,8 +214,9 @@ int	kern_getaudit_addr(struct thread *td,
 int	kern_getauid(struct thread *td, uid_t * __capability auid);
 int	kern_getdirentries(struct thread *td, int fd, char * __capability buf,
 	    size_t count, off_t *basep, ssize_t *residp, enum uio_seg bufseg);
-int	kern_getfh(struct thread *td, const char * __capability path,
-	    fhandle_t * __capability fhp, int follow);
+int	kern_getfhat(struct thread *td, int flags, int fd,
+	    const char * __capability path, enum uio_seg pathseg,
+	    fhandle_t * __capability fhp);
 int	kern_getfsstat(struct thread *td, struct statfs * __capability *buf,
 	    size_t bufsize, size_t *countp, enum uio_seg bufseg, int mode);
 int	kern_getgroups(struct thread *td, u_int gidsetsize,
