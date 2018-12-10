@@ -231,7 +231,7 @@ Elf_Sym sym_zero;		/* For resolving undefined weak refs. */
 
 #define GDB_STATE(s,m)	r_debug.r_state = s; r_debug_state(&r_debug,m);
 
-extern Elf_Dyn _DYNAMIC;
+extern Elf_Dyn _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
 
 int dlclose(void *) __exported;

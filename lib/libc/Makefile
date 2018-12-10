@@ -1,6 +1,9 @@
 #	@(#)Makefile	8.2 (Berkeley) 2/3/94
 # $FreeBSD$
 
+# disable subobject bounds for now
+CHERI_SUBOBJECT_BOUNDS_MAX=conservative
+
 PACKAGE=	clibs
 SHLIBDIR?= /lib
 WANT_DUMP=	yes

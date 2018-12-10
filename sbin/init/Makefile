@@ -1,6 +1,9 @@
 #	@(#)Makefile	8.1 (Berkeley) 7/19/93
 # $FreeBSD$
 
+# Debugging init is annoying, let's not do that yet...
+CHERI_SUBOBJECT_BOUNDS_MAX=conservative
+
 CONFGROUPS=	CONFTTYS
 PACKAGE=runtime
 PROG=	init

@@ -1393,7 +1393,7 @@ XmlUtf16Encode(int charNum, unsigned short *buf)
 }
 
 struct unknown_encoding {
-  struct normal_encoding normal;
+  struct normal_encoding normal __no_subobject_bounds;
   CONVERTER convert;
   void *userData;
   unsigned short utf16[256];
