@@ -52,7 +52,7 @@ __FBSDID("$FreeBSD$");
 #include "libc_private.h"
 
 extern char **environ;
-extern int _DYNAMIC;
+extern int _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
 
 void *__elf_aux_vector;

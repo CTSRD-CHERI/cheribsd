@@ -1,8 +1,6 @@
 # $FreeBSD$
 
 SSP_CFLAGS=
-# Avoid crashing...
-CHERI_SUBOBJECT_BOUNDS_MAX=conservative
 
 SED_FIX_NOTE = -i "" -e '/\.note\.tag/s/progbits/note/'
 
