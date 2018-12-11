@@ -662,7 +662,7 @@ kern_setauid(struct thread *td, uid_t * __capability auid)
 	if (error)
 		goto fail;
 #endif
-	error = priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT, 0);
+	error = priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT);
 	if (error)
 		goto fail;
 	newcred->cr_audit.ai_auid = id;
@@ -741,7 +741,7 @@ kern_setaudit(struct thread *td, struct auditinfo * __capability auditinfo)
 	if (error)
 		goto fail;
 #endif
-	error = priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT, 0);
+	error = priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT);
 	if (error)
 		goto fail;
 	bzero(&newcred->cr_audit, sizeof(newcred->cr_audit));
@@ -822,7 +822,7 @@ kern_setaudit_addr(struct thread *td,
 	if (error)
 		goto fail;
 #endif
-	error = priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT, 0);
+	error = priv_check_cred(oldcred, PRIV_AUDIT_SETAUDIT);
 	if (error)
 		goto fail;
 	newcred->cr_audit = aia;
