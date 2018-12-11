@@ -134,15 +134,11 @@ LDFLAGS+=	-Wl,--build-id=sha1
 .endif
 
 .if ${MACHINE_CPUARCH} == "amd64"
-LDFLAGS+=	-Wl,-z -Wl,max-page-size=2097152
+LDFLAGS+=	-Wl,-z max-page-size=2097152
 .if ${LINKER_TYPE} != "lld"
-LDFLAGS+=	-Wl,-z -Wl,common-page-size=4096
-.else
-.if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc-noplt} == ""
-.warning "linker ${LD} does not support -z ifunc-noplt. Kernel will be slower!"
+LDFLAGS+=	-Wl,-z common-page-size=4096
 .else
 LDFLAGS+=	-Wl,-z -Wl,ifunc-noplt
-.endif
 .endif
 .endif  # ${MACHINE_CPUARCH} == "amd64"
 
