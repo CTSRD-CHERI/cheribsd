@@ -4301,7 +4301,8 @@ sys_getfhat(struct thread *td, struct getfhat_args *uap)
 	if ((uap->flags & ~(AT_SYMLINK_NOFOLLOW | AT_BENEATH)) != 0)
 		return (EINVAL);
 	return (kern_getfhat(td, uap->flags, uap->fd,
-	    __USER_CAP_STR(uap->path), UIO_SYSSPACE, __USER_CAP_OBJ(uap->fhp)));
+	    __USER_CAP_STR(uap->path), UIO_SYSSPACE,
+	    __USER_CAP_OBJ(uap->fhp)));
 }
 
 int
