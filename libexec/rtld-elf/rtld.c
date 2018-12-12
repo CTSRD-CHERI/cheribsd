@@ -3982,6 +3982,7 @@ dladdr(const void *addr, Dl_info *info)
     info->dli_saddr = (void *)0;
     info->dli_sname = NULL;
 
+    dbg_cat(SYMLOOKUP, "%s: finding name for %#p\n", __func__, addr);
     /*
      * Walk the symbol list looking for the symbol whose address is
      * closest to the address sent in.
@@ -3993,8 +3994,11 @@ dladdr(const void *addr, Dl_info *info)
          * For skip the symbol if st_shndx is either SHN_UNDEF or
          * SHN_COMMON.
          */
-        if (def->st_shndx == SHN_UNDEF || def->st_shndx == SHN_COMMON)
+        if (def->st_shndx == SHN_UNDEF || def->st_shndx == SHN_COMMON) {
+            dbg_cat(SYMLOOKUP, "%s: skipping %s/%p (%#p)\n", __func__,
+                obj->strtab + def->st_name, symbol_addr, symbol_addr);
             continue;
+        }
 
         /*
          * If the symbol is greater than the specified address, or if it
@@ -4002,16 +4006,21 @@ dladdr(const void *addr, Dl_info *info)
          * then reject it.
          */
         symbol_addr = obj->relocbase + def->st_value;
-        if (symbol_addr > addr || symbol_addr < info->dli_saddr)
+        if ((vaddr_t)symbol_addr > (vaddr_t)addr || (vaddr_t)symbol_addr < (vaddr_t)info->dli_saddr)
             continue;
 
+        dbg_cat(SYMLOOKUP, "%s: Found partial match for %s (%#p)\n", __func__,
+            obj->strtab + def->st_name, symbol_addr);
         /* Update our idea of the nearest symbol. */
         info->dli_sname = obj->strtab + def->st_name;
         info->dli_saddr = symbol_addr;
 
         /* Exact match? */
-        if (info->dli_saddr == addr)
+        if ((vaddr_t)info->dli_saddr == (vaddr_t)addr) {
+            dbg_cat(SYMLOOKUP, "%s: Found exact match for %s (%#p)\n", __func__,
+                obj->strtab + def->st_name, symbol_addr);
             break;
+        }
     }
     lock_release(rtld_bind_lock, &lockstate);
     return 1;

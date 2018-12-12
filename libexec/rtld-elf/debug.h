@@ -53,7 +53,9 @@ enum RtldDebugCategory {
 	RTLD_DBG_CHERI_PLT = 1 << 6,
 	RTLD_DBG_CHERI_PLT_VERBOSE = 1 << 7,
 
-	RTLD_DBG_LAST = RTLD_DBG_RELOC_STATS,
+	RTLD_DBG_SYMLOOKUP = 1 << 8,
+
+	RTLD_DBG_LAST = RTLD_DBG_SYMLOOKUP,
 	RTLD_DBG_ALL = (RTLD_DBG_LAST << 1) - 1
 };
 extern void debug_printf(enum RtldDebugCategory cat, const char *, ...) __printflike(2, 3);
