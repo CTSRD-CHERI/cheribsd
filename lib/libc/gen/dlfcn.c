@@ -196,14 +196,27 @@ dl_init_phdr_info(void)
 	for (auxp = __elf_aux_vector; auxp->a_type != AT_NULL; auxp++) {
 		switch (auxp->a_type) {
 		case AT_BASE:
-			phdr_info.dlpi_addr = (Elf_Addr)auxp->a_un.a_ptr;
+			phdr_info.dlpi_addr =
+#ifdef __CHERI_PURE_CAPABILITY__
+			    (uintptr_t)cheri_andperm(auxp->a_un.a_ptr,
+			        /* TODO: should it also have load_cap? */
+			        CHERI_PERM_LOAD);
+#else
+			    (Elf_Addr)auxp->a_un.a_ptr;
+#endif
 			break;
 		case AT_EXECPATH:
 			phdr_info.dlpi_name = (const char *)auxp->a_un.a_ptr;
 			break;
 		case AT_PHDR:
 			phdr_info.dlpi_phdr =
+#ifdef __CHERI_PURE_CAPABILITY__
+			    (const Elf_Phdr *)cheri_andperm(auxp->a_un.a_ptr,
+				/* TODO: should it also have load_cap? */
+				CHERI_PERM_LOAD);
+#else
 			    (const Elf_Phdr *)auxp->a_un.a_ptr;
+#endif
 			break;
 		case AT_PHNUM:
 			phdr_info.dlpi_phnum = (Elf_Half)auxp->a_un.a_val;

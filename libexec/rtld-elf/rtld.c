@@ -4068,9 +4068,15 @@ static void
 rtld_fill_dl_phdr_info(const Obj_Entry *obj, struct dl_phdr_info *phdr_info)
 {
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	phdr_info->dlpi_addr =
+	    (uintptr_t)cheri_andperm(obj->relocbase, CHERI_PERM_LOAD);
+	phdr_info->dlpi_phdr = cheri_andperm(obj->phdr, CHERI_PERM_LOAD);
+#else
 	phdr_info->dlpi_addr = (Elf_Addr)obj->relocbase;
-	phdr_info->dlpi_name = obj->path;
 	phdr_info->dlpi_phdr = obj->phdr;
+#endif
+	phdr_info->dlpi_name = obj->path;
 	phdr_info->dlpi_phnum = obj->phsize / sizeof(obj->phdr[0]);
 	phdr_info->dlpi_tls_modid = obj->tlsindex;
 	phdr_info->dlpi_tls_data = obj->tlsinit;
