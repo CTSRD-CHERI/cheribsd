@@ -44,7 +44,7 @@
 
 CRT_INIT_GLOBALS_STATIC void crt_init_globals(void) __hidden;
 
-__attribute__((weak)) extern int _DYNAMIC;
+__attribute__((weak)) extern int _DYNAMIC __no_subobject_bounds;
 
 CRT_INIT_GLOBALS_STATIC void
 crt_init_globals(void)

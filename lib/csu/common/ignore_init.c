@@ -75,7 +75,12 @@ extern initfini_array_entry __fini_array_end[] __hidden;
 extern void _fini(void) __hidden;
 extern void _init(void) __hidden;
 
-extern int _DYNAMIC;
+/* since this can be NULL we really should not be setting any bounds (it will
+ * crash when used on a NULL pointer) */
+/* TODO: clang should only be setting bounds on globals in very-aggressive mode
+ * since they will be correctly bounded anyway
+ */
+extern int _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
 
 /*
