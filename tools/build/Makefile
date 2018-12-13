@@ -4,10 +4,12 @@
 
 LIB=		egacy
 SRC=
-INCSGROUPS=	INCS SYSINCS
+INCSGROUPS=	INCS SYSINCS UFSINCS FFSINCS
 INCS=
 
 SYSINCSDIR=	${INCLUDEDIR}/sys
+UFSINCSDIR=	${INCLUDEDIR}/ufs/ufs
+FFSINCSDIR=	${INCLUDEDIR}/ufs/ffs
 
 BOOTSTRAPPING?=	0
 
@@ -57,6 +59,12 @@ INCS+=		capsicum_helpers.h
 .PATH: ${SRCTOP}/lib/libcasper/libcasper
 INCS+=		libcasper.h
 .endif
+
+
+# to allow bootstrapping makefs on FreeBSD 11 or non-FreeBSD systems:
+UFSINCS+=	${SRCTOP}/sys/ufs/ufs/dinode.h
+UFSINCS+=	${SRCTOP}/sys/ufs/ufs/dir.h
+FFSINCS+=	${SRCTOP}/sys/ufs/ffs/fs.h
 
 .if empty(SRCS)
 SRCS=		dummy.c
