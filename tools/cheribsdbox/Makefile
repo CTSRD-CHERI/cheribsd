@@ -233,6 +233,7 @@ CRUNCH_PROGS_usr.bin+= \
 		mktemp \
 		nc \
 		passwd \
+		resizewin \
 		sed \
 		seq \
 		sockstat \
