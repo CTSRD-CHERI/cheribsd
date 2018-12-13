@@ -229,6 +229,7 @@ CRUNCH_PROGS_usr.bin+= \
 		ldd \
 		less \
 		limits \
+		locale \
 		login \
 		mktemp \
 		nc \
