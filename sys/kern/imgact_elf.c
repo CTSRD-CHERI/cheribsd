@@ -2108,13 +2108,42 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 #else
 	struct ptrace_lwpinfo pl;
 #endif
+#ifdef COMPAT_CHERIABI
+	struct ptrace_lwpinfo_c plc;
+#endif
 
 	td = (struct thread *)arg;
-	size = sizeof(structsize) + sizeof(pl);
+#ifdef COMPAT_CHERIABI
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) != 0)
+		structsize = sizeof(plc);
+	else
+#endif
+		structsize = sizeof(pl);
+	size = sizeof(structsize) + structsize;
 	if (sb != NULL) {
 		KASSERT(*sizep == size, ("invalid size"));
-		structsize = sizeof(pl);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
+#ifdef COMPAT_CHERIABI
+		if (SV_PROC_FLAG(td->td_proc, SV_CHERI) != 0) {
+			bzero(&plc, sizeof(plc));
+			plc.pl_lwpid = td->td_tid;
+			plc.pl_event = PL_EVENT_NONE;
+			plc.pl_sigmask = td->td_sigmask;
+			plc.pl_siglist = td->td_siglist;
+			if (td->td_si.si_signo != 0) {
+				plc.pl_event = PL_EVENT_SIGNAL;
+				plc.pl_flags |= PL_FLAG_SI;
+				_Static_assert(
+				    sizeof(plc.pl_siginfo) == sizeof(td->td_si),
+				    "_siginfo_t and siginfo_c mismatch");
+				memcpy(&plc.pl_siginfo, &td->td_si,
+				    sizeof(plc.pl_siginfo));
+			}
+			strcpy(plc.pl_tdname, td->td_name);
+			/* XXX TODO: supply more information in struct ptrace_lwpinfo*/
+			sbuf_bcat(sb, &plc, sizeof(plc));
+		} else {
+#endif
 		bzero(&pl, sizeof(pl));
 		pl.pl_lwpid = td->td_tid;
 		pl.pl_event = PL_EVENT_NONE;
@@ -2132,6 +2161,9 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 		strcpy(pl.pl_tdname, td->td_name);
 		/* XXX TODO: supply more information in struct ptrace_lwpinfo*/
 		sbuf_bcat(sb, &pl, sizeof(pl));
+#ifdef COMPAT_CHERIABI
+		}
+#endif
 	}
 	*sizep = size;
 }
