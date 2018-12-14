@@ -162,7 +162,7 @@ SYSINCS+=	${SRCTOP}/sys/sys/nv.h ${SRCTOP}/sys/sys/cnv.h ${SRCTOP}/sys/sys/dnv.h
 # Linux/MacOS since we only use flags that are supported by all of them.
 _host_tools_to_symlink=	basename bzip2 bunzip2 chmod chown cmp comm cp date dd \
 	dirname echo env false find fmt gzip gunzip head hostname id ln ls \
-	mkdir mv nice patch rm realpath sh sleep stat tee touch tr true uname \
+	mkdir mv nice patch rm sh sleep stat tee touch tr true uname \
 	uniq wc which
 
 .include <src.opts.mk>
