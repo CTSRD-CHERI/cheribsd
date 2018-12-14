@@ -1440,11 +1440,22 @@ trapDump(char *msg)
 #endif
 
 
+#ifdef CPU_CHERI
+static bool
+cheri_cap_is_null(struct trapframe *framePtr, int reg)
+{
+	void * __capability * capRegsPtr;
+
+	capRegsPtr = &framePtr->ddc;
+	return (capRegsPtr[reg] == NULL);
+}
+#endif
+
 /*
  * Return the resulting PC as if the branch was executed.
  *
  * XXXRW: What about CHERI branch instructions?
- * XXXAR: This needs to be fixed for cbez/cbnz/cbtu/cbts/cjalr/cjr/ccall_fast
+ * XXXAR: This needs to be fixed for cjalr/cjr/ccall_fast
  */
 uintptr_t
 MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
@@ -1452,6 +1463,9 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 {
 	InstFmt inst;
 	register_t *regsPtr = (register_t *) framePtr;
+#ifdef CPU_CHERI
+	void * __capability *capRegsPtr = &framePtr->ddc;
+#endif
 	uintptr_t retAddr = 0;
 	int condition;
 
@@ -1581,6 +1595,43 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 			retAddr = instPC + 4;
 		}
 		break;
+#ifdef CPU_CHERI
+	case OP_COP2:
+		switch (inst.CType.fmt) {
+		case 0x9:
+		case 0xa:
+		case 0x11:
+		case 0x12:
+			switch (inst.BC2FType.fmt) {
+			case 0x9:
+				/* CBTU */
+				condition = !cheri_gettag(
+				    capRegsPtr[inst.BC2FType.cd]);
+				break;
+			case 0xa:
+				/* CBTS */
+				condition = cheri_gettag(
+				    capRegsPtr[inst.BC2FType.cd]);
+				break;
+			case 0x11:
+				/* CBEZ */
+				condition =
+				    (capRegsPtr[inst.BC2FType.cd] == NULL);
+				break;
+			case 0x12:
+				/* CBNZ */
+				condition =
+				    (capRegsPtr[inst.BC2FType.cd] != NULL);
+				break;
+			}
+			if (condition)
+				retAddr = GetBranchDest(instPC, inst);
+			else
+				retAddr = instPC + 8;
+			return (retAddr);
+		}
+		/* FALLTHROUGH */
+#endif
 
 	default:
 		printf("Unhandled opcode in %s: 0x%x\n", __func__, inst.word);
