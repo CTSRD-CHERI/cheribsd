@@ -198,3 +198,8 @@ typedef	unsigned long	u_long;
 #ifndef __DEQUALIFY
 #define __DEQUALIFY(type, var)	((type)(__uintptr_t)(const volatile void *)(var))
 #endif
+
+// CHERI extensions:
+#ifndef __no_subobject_bounds
+#define __no_subobject_bounds
+#endif
