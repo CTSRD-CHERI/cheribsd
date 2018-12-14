@@ -329,6 +329,7 @@ typedef	struct __siginfo {
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
 		} _fault;
 		struct {
 			int	_timerid;
@@ -365,6 +366,7 @@ struct siginfo_native {
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
 		} _fault;
 		struct {
 			int	_timerid;
@@ -401,6 +403,7 @@ struct siginfo_c {
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
 		} _fault;
 		struct {
 			int	_timerid;
@@ -438,6 +441,7 @@ typedef struct {
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
 		} _fault;
 		struct {
 			int	_timerid;
@@ -458,6 +462,7 @@ typedef struct {
 #endif /* _KERNEL */
 
 #define si_trapno	_reason._fault._trapno
+#define si_capreg	_reason._fault._capreg
 #define si_timerid	_reason._timer._timerid
 #define si_overrun	_reason._timer._overrun
 #define si_mqd		_reason._mesgq._mqd

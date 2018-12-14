@@ -76,6 +76,8 @@ band event for
 .Dv SIGPOLL
 .It Vt int Ta Va si_trapno Ta
 machine trap code
+.It Vt int Ta Va si_capreg Ta
+capability register number
 .It Vt int Ta Va si_timerid Ta
 .Tn POSIX
 timer ID
@@ -263,6 +265,8 @@ machine dependent of trap code
 address of faulting instruction
 .It Ta Va si_trapno Ta
 machine dependent of trap code
+.It Ta Va si_capreg Ta
+capability register number
 .It Dv SIGCHLD Ta Va si_pid Ta
 child process ID
 .It Ta Va si_status Ta

@@ -237,6 +237,7 @@ typedef struct ksiginfo {
 #define	ksi_value	ksi_info.si_value
 #define	ksi_band	ksi_info.si_band
 #define	ksi_trapno	ksi_info.si_trapno
+#define	ksi_capreg	ksi_info.si_capreg
 #define	ksi_overrun	ksi_info.si_overrun
 #define	ksi_timerid	ksi_info.si_timerid
 #define	ksi_mqd		ksi_info.si_mqd
