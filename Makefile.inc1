@@ -551,6 +551,19 @@ BUILDENV_SHELL?=${SHELL}
 BUILDENV_SHELL?=/bin/sh
 .endif
 
+.if ${.MAKE.OS} != "FreeBSD"
+CROSSBUILD_HOST=${.MAKE.OS}
+.if ${.MAKE.OS} != "Linux" && ${.MAKE.OS} != "Darwin"
+.warning "Unsupported crossbuild system: ${.MAKE.OS}. Build will probably fail!"
+.endif
+# We need to force NO_ROOT/DB_FROM_SRC builds when building on other operating
+# systems since the BSD.foo.dist specs contain users and groups that do not
+# exist by default on a Linux/MacOS system
+NO_ROOT:=	1
+DB_FROM_SRC:=	1
+.export NO_ROOT
+.endif
+
 .if !defined(_MKSHOWCONFIG)
 .if !defined(SVN_CMD) || empty(SVN_CMD)
 . for _P in /usr/bin /usr/local/bin
@@ -631,7 +644,10 @@ _CPUTYPE!=	MAKEFLAGS= CPUTYPE=${_TARGET_CPUTYPE} ${MAKE} -f /dev/null \
 .endif
 .if make(buildworld)
 BUILD_ARCH!=	uname -p
-.if ${MACHINE_ARCH} != ${BUILD_ARCH}
+# On some Linux systems uname -p returns "unknown" so skip this check there.
+# This check only exists to tell people to use TARGET_ARCH instead of
+# MACHINE_ARCH so skipping it when crossbuilding on non-FreeBSD should be fine.
+.if ${MACHINE_ARCH} != ${BUILD_ARCH} && ${.MAKE.OS} == "FreeBSD"
 .error To cross-build, set TARGET_ARCH.
 .endif
 .endif
@@ -652,6 +668,13 @@ STRICTTMPPATH=	${XPATH}:${BPATH}:${UNIVERSE_TOOLCHAIN_PATH}
 # USING_SYSTEM_LINKER/USING_SYSTEM_COMPILER. Once these issues have been
 # resolved it will be turned on by default.
 BUILD_WITH_STRICT_TMPPATH?=1
+.if defined(CROSSBUILD_HOST)
+# When building on non-FreeBSD we can't rely on the tools in /usr/bin being compatible
+# with what FreeBSD expects. Therefore we only use tools from STRICTTMPPATH
+# during the world build stage. We build most tools during the bootstrap-tools
+# phase but symlink host tools that are known to work instead of building them
+BUILD_WITH_STRICT_TMPPATH:=1
+.endif
 .if ${BUILD_WITH_STRICT_TMPPATH} != 0
 TMPPATH=	${STRICTTMPPATH}
 .else
@@ -732,6 +755,16 @@ CROSSENV+=	${TARGET_CFLAGS}
 .endif
 
 BOOTSTRAPPING_OSRELDATE?=${OSRELDATE}
+.if !defined(CROSSBUILD_HOST)
+HOST_TOOLS_COMMON_MAKEFLAGS=	-DNO_PIC MK_PROFILE=no -DNO_SHARED
+.else
+# When building Linux or Mac it will usually not be possible to link statically
+# so we can't pass -DNO_PIC, -DNO_SHARED (it is also not necessary since we
+# will never overwrite any of the host libraries).
+# We also want to build BSD grep and avoid any dependencies on libdialog
+HOST_TOOLS_COMMON_MAKEFLAGS=	MK_PROFILE=no MK_NLS=no MK_BSD_GREP=yes \
+	MK_DIALOG=no MK_DEBUG_FILES=no
+.endif
 
 # bootstrap-tools stage
 BMAKEENV=	INSTALL="sh ${.CURDIR}/tools/install.sh" \
@@ -748,8 +781,8 @@ BSARGS= 	DESTDIR= \
 		BOOTSTRAPPING=${BOOTSTRAPPING_OSRELDATE} \
 		BWPHASE=${.TARGET:C,^_,,} \
 		SSP_CFLAGS= \
-		MK_HTML=no NO_LINT=yes MK_MAN=no \
-		-DNO_PIC MK_PROFILE=no -DNO_SHARED \
+		MK_HTML=no NO_LINT=yes MK_MAN=no MK_MAN_UTILS=yes \
+		${HOST_TOOLS_COMMON_MAKEFLAGS} \
 		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FULL=no \
 		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no \
@@ -773,9 +806,8 @@ TMAKE=		\
 		-DNO_LINT \
 		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FULL=no \
-		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no \
-		BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}"
-
+		BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}" \
+		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no MK_DEBUG_FILES=no
 # These get set in tools/build/mk/Makefile.boot
 # BUILD_TOOLS_CFLAGS="${CFLAGS}" BUILD_TOOLS_LDFLAGS="${LDFLAGS}"
 
@@ -801,7 +833,7 @@ KTMAKE=		\
 		BOOTSTRAPPING=${BOOTSTRAPPING_OSRELDATE} \
 		SSP_CFLAGS= \
 		MK_HTML=no -DNO_LINT MK_MAN=no \
-		-DNO_PIC MK_PROFILE=no -DNO_SHARED \
+		${HOST_TOOLS_COMMON_MAKEFLAGS} \
 		-DNO_CPU_CFLAGS MK_RETPOLINE=no MK_WARNS=no MK_CTF=no
 
 # world stage
@@ -922,7 +954,13 @@ NO_META_IGNORE_HOST_HEADERS=	1
 # allows tracking the oldest osreldate to force rebuilds via
 # META_MODE_BADABI_REVS above.
 host-osreldate.h: # DO NOT ADD /usr/include/osreldate.h here
+.if !defined(CROSSBUILD_HOST)
 	@cp -f /usr/include/osreldate.h ${.TARGET}
+.else
+	@echo "#ifndef __FreeBSD_version" > ${.TARGET}
+	@echo "#define __FreeBSD_version ${OSRELDATE}" >> ${.TARGET}
+	@echo "#endif" >> ${.TARGET}
+.endif
 
 WMAKE=		${WMAKEENV} ${MAKE} ${WORLD_FLAGS} -f Makefile.inc1 \
 		BWPHASE=${.TARGET:C,^_,,} \
@@ -1634,24 +1672,26 @@ MTREE_MAGIC?=	mtree 2.0
 distributeworld installworld stageworld installsysroot: _installcheck_world .PHONY
 	mkdir -p ${INSTALLTMP}
 	progs=$$(for prog in ${ITOOLS}; do \
-		if progpath=`which $$prog`; then \
+		if progpath=`env PATH=${TMPPATH} which $$prog`; then \
 			echo $$progpath; \
 		else \
 			echo "Required tool $$prog not found in PATH." >&2; \
 			exit 1; \
 		fi; \
 	    done); \
-	libs=$$(ldd -f "%o %p\n" -f "%o %p\n" $$progs 2>/dev/null | sort -u | \
-	    while read line; do \
-		set -- $$line; \
-		if [ "$$2 $$3" != "not found" ]; then \
-			echo $$2; \
-		else \
-			echo "Required library $$1 not found." >&2; \
-			exit 1; \
-		fi; \
-	    done); \
-	cp $$libs $$progs ${INSTALLTMP}
+	if [ -z "${CROSSBUILD_HOST}" ] ; then \
+		libs=$$(ldd -f "%o %p\n" -f "%o %p\n" $$progs 2>/dev/null | sort -u | \
+		    while read line; do \
+			set -- $$line; \
+			if [ "$$2 $$3" != "not found" ]; then \
+				echo $$2; \
+			else \
+				echo "Required library $$1 not found." >&2; \
+				exit 1; \
+			fi; \
+		    done); \
+	fi; \
+	cp -v $$libs $$progs ${INSTALLTMP}
 	cp -R $${PATH_LOCALE:-"/usr/share/locale"} ${INSTALLTMP}/locale
 .if defined(NO_ROOT)
 	-mkdir -p ${METALOG:H}
@@ -2328,6 +2368,9 @@ update: .PHONY
 # build-tools or cross-tools.
 #
 
+.if defined(CROSSBUILD_HOST)
+_host_bootstrap_libs=	lib/libmd lib/libsbuf
+.endif
 
 # libnv and libl are both requirements for config(8), which is an unconditional
 # bootstrap-tool.
@@ -2339,7 +2382,7 @@ legacy: .PHONY
 	false
 .endif
 
-.for _tool in tools/build ${_config_deps}
+.for _tool in tools/build ${_config_deps} ${_host_bootstrap_libs}
 	${_+_}@${ECHODIR} "===> ${_tool} (obj,includes,all,install)"; \
 	    cd ${.CURDIR}/${_tool}; \
 	    if [ -z "${NO_OBJWALK}" ]; then ${MAKE} DIRPRFX=${_tool}/ obj; fi; \
@@ -2375,6 +2418,12 @@ _bt=		_bootstrap-tools
 # If BOOTSTRAP_ALL_TOOLS is set we will build all the required tools from the
 # current source tree. Otherwise we create a symlink to the version found in
 # $PATH during the bootstrap-tools stage.
+# When building on non-FreeBSD systems we can't assume that the host binaries
+# accept compatible flags or produce compatible output. Therefore we force
+# BOOTSTRAP_ALL_TOOLS and just build the FreeBSD version of the binary.
+.if defined(CROSSBUILD_HOST)
+BOOTSTRAP_ALL_TOOLS:=	1
+.endif
 .if defined(BOOTSTRAP_ALL_TOOLS)
 # BOOTSTRAPPING will be set on the command line so we can't override it here.
 # Instead set BOOTSTRAPPING_OSRELDATE so that the value 0 is set ${BSARGS}
@@ -2472,11 +2521,14 @@ _bootstrap_tools_links+=crunchgen
 .endif
 
 # r296926 -P keymap search path, MFC to stable/10 in r298297
-.if ${BOOTSTRAPPING} < 1003501 || \
-	(${BOOTSTRAPPING} >= 1100000 && ${BOOTSTRAPPING} < 1100103)
+# Note: kbdcontrol can not be bootstrapped on non-FreeBSD systems
+.if !defined(CROSSBUILD_HOST)
+.if (${BOOTSTRAPPING} < 1003501 || \
+	(${BOOTSTRAPPING} >= 1100000 && ${BOOTSTRAPPING} < 1100103))
 _kbdcontrol=	usr.sbin/kbdcontrol
 .else
 _bootstrap_tools_links+=kbdcontrol
+.endif
 .endif
 
 _yacc=		lib/liby \
@@ -2486,10 +2538,6 @@ ${_bt}-usr.bin/yacc: ${_bt}-lib/liby
 
 .if ${MK_BSNMP} != "no"
 _gensnmptree=	usr.sbin/bsnmpd/gensnmptree
-.endif
-
-.if ${MK_LOCALES} != "no"
-_localedef=	usr.bin/localedef
 .endif
 
 # We need to build tblgen when we're building clang or lld, either as
@@ -2558,12 +2606,23 @@ _basic_bootstrap_tools+=usr.bin/uuencode usr.bin/uudecode
 _basic_bootstrap_tools+=usr.bin/xargs
 # cap_mkdb is required for share/termcap:
 _basic_bootstrap_tools+=usr.bin/cap_mkdb
-# ldd is required for installcheck (TODO: just always use /usr/bin/ldd instead?)
-_basic_bootstrap_tools+=usr.bin/ldd
 # services_mkdb/pwd_mkdb are required for installworld:
 _basic_bootstrap_tools+=usr.sbin/services_mkdb usr.sbin/pwd_mkdb
+# ldd is required for installcheck (TODO: just always use /usr/bin/ldd instead?)
+.if !defined(CROSSBUILD_HOST)
+# ldd is only needed for updating the running system so we don't need to
+# bootstrap ldd on non-FreeBSD systems
+_basic_bootstrap_tools+=usr.bin/ldd
+.endif
 # sysctl/chflags are required for installkernel:
+.if !defined(CROSSBUILD_HOST)
 _basic_bootstrap_tools+=sbin/sysctl bin/chflags
+.else
+# When building on non-FreeBSD install stubs instead since the versions from
+# the source tree cannot work:
+_other_bootstrap_tools+=tools/build/cross-build/fake_chflags
+_other_bootstrap_tools+=tools/build/cross-build/fake_sysctl
+.endif
 # mkfifo is used by sys/conf/newvers.sh
 _basic_bootstrap_tools+=usr.bin/mkfifo
 
@@ -3398,7 +3457,7 @@ delete-old-files: .PHONY
 		if [ ! -e "$${manpage}" ]; then \
 			rm ${RM_I} $${catpage} <&3; \
 	        fi; \
-	done
+	done || true
 	@echo ">>> Old files removed"
 
 check-old-files: .PHONY
