@@ -393,11 +393,11 @@ build-tools: make_hash make_keys
 BUILD_TOOLS_CFLAGS+=	-I. -I${.CURDIR}/../ncurses
 BUILD_TOOLS_CFLAGS+=	-I${NCURSES_DIR}/ncurses -I${NCURSES_DIR}/include
 
-make_keys: make_keys.c names.c ncurses_def.h ${HEADERS} ${BUILD_TOOLS_META}
+make_keys: make_keys.c names.c ncurses_def.h ${HEADERS} ${SRCHDRS} ${BUILD_TOOLS_META}
 	${BUILD_TOOLS_CC} -o ${.TARGET} ${BUILD_TOOLS_CFLAGS} \
 	    ${BUILD_TOOLS_LDFLAGS} ${NCURSES_DIR}/ncurses/tinfo/make_keys.c
 
-make_hash: make_hash.c hashsize.h ncurses_def.h ${HEADERS} ${BUILD_TOOLS_META}
+make_hash: make_hash.c hashsize.h ncurses_def.h ${HEADERS} ${SRCHDRS} ${BUILD_TOOLS_META}
 	${BUILD_TOOLS_CC} -o ${.TARGET} ${BUILD_TOOLS_CFLAGS} -DMAIN_PROGRAM \
 	    ${BUILD_TOOLS_LDFLAGS} ${NCURSES_DIR}/ncurses/tinfo/make_hash.c
 
@@ -477,7 +477,7 @@ unctrl.h: unctrl.h.in
 
 # MAN page gunk
 terminfo.5: MKterminfo.sh terminfo.head Caps
-	sh ${NCURSES_DIR}/man/MKterminfo.sh ${NCURSES_DIR}/man/terminfo.head \
+	sh -e ${NCURSES_DIR}/man/MKterminfo.sh ${NCURSES_DIR}/man/terminfo.head \
 	    ${NCURSES_DIR}/include/Caps ${NCURSES_DIR}/man/terminfo.tail >$@
 
 CLEANFILES+=	terminfo.5
