@@ -401,6 +401,30 @@ __DEFAULT_YES_OPTIONS+=PIE
 __DEFAULT_NO_OPTIONS+=PIE
 .endif
 
+.if ${.MAKE.OS} != "FreeBSD"
+# tablegen will not build on non-FreeBSD so also disable target clang and lld
+BROKEN_OPTIONS+=CLANG LLD
+# The cddl bootstrap tools still need some changes in order to compile
+BROKEN_OPTIONS+=CDDL ZFS
+
+# localedef depends on the FreeBSD xlocale headers but those are incompatible
+# with the ones provided by glibc
+BROKEN_OPTIONS+=LOCALES
+
+# Boot cannot be built with clang yet. Will need to bootstrap GNU as..
+BROKEN_OPTIONS+=BOOT
+# libsnmp use ls -D which is not supported on MacOS (and possibly linux)
+BROKEN_OPTIONS+=BSNMP
+.if ${.MAKE.OS} == "Linux"
+# crunchgen fails for some reason on Linux (but it works on MacOS):
+# + cd /local/scratch/alr48/cheri/freebsd-mips/rescue/rescue/../../bin/cat
+# + make -f /tmp//crunchgen_rescue9yuKRG -DRESCUE CRUNCH_CFLAGS=-DRESCUE MK_AUTO_OBJ=yes DIRPRFX=cat/ loop
+# + echo OBJS= cat.o
+# /tmp//crunchgen_rescue9yuKRG: Invalid argument
+BROKEN_OPTIONS+=RESCUE
+.endif
+.endif
+
 # HyperV is currently x86-only
 .if ${__T} != "amd64" && ${__T} != "i386"
 BROKEN_OPTIONS+=HYPERV
@@ -412,6 +436,17 @@ BROKEN_OPTIONS+=NVME
 .endif
 
 .include <bsd.mkopt.mk>
+
+.if ${.MAKE.OS} != "FreeBSD"
+# Building on a Linux/Mac requires an external toolchain to be specified
+# since clang/gcc will not build there using the FreeBSD makefiles
+MK_BINUTILS_BOOTSTRAP:=no
+MK_CLANG_BOOTSTRAP:=no
+MK_LLD_BOOTSTRAP:=no
+MK_GCC_BOOTSTRAP:=no
+# However, the elftoolchain tools build and should be used
+MK_ELFTOOLCHAIN_BOOTSTRAP:=	yes
+.endif
 
 #
 # MK_* options that default to "yes" if the compiler is a C++11 compiler.
