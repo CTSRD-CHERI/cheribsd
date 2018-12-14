@@ -251,11 +251,11 @@ if [ -n "$git_cmd" ] ; then
 	else
 		svn=`$git_cmd log --grep '^git-svn-id:' | \
 		    grep '^    git-svn-id:' | head -1 | \
-		    sed -n 's/^.*@\([0-9][0-9]*\).*$/\1/p'`
+		    sed -n 's/^.*@\([0-9][0-9]*\).*$/\1/p' || true`
 		if [ -z "$svn" ] ; then
 			svn=`$git_cmd log --format='format:%N' | \
 			     grep '^svn ' | head -1 | \
-			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p'`
+			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p' || true`
 		fi
 		if [ -n "$svn" ] ; then
 			svn=" r${svn}"
