@@ -2400,11 +2400,16 @@ _vtfontcvt=	usr.bin/vtfontcvt
 # please ensure that you also add a .else case where you add the tool to the
 # _bootstrap_tools_links variable.
 .if ${BOOTSTRAPPING} < 1000033
-_m4=		usr.bin/m4
+# Note: lex needs m4 to build but m4 also depends on lex (which needs m4 to
+# generate any files). To fix this cyclic dependency we can build a bootstrap
+# version of m4 (with pre-generated files) then use that to build the real m4.
+# For lex we also use the pre-gerated files since we would otherwise need to
+# build awk and sed first (which need lex to build)
+# TODO: add a _bootstrap_lex and then build the real lex afterwards
 _lex=		usr.bin/lex
-# Note: lex needs m4 to build but m4 also depends on lex. However, lex can be
-# bootstrapped so we build lex first.
-${_bt}-usr.bin/m4: ${_bt}-lib/libopenbsd ${_bt}-usr.bin/yacc ${_bt}-${_lex}
+_m4=		tools/build/bootstrap-m4 usr.bin/m4
+${_bt}-tools/build/bootstrap-m4: ${_bt}-lib/liby ${_bt}-usr.bin/lex ${_bt}-lib/libopenbsd
+${_bt}-usr.bin/m4: ${_bt}-lib/libopenbsd ${_bt}-usr.bin/yacc ${_bt}-usr.bin/lex ${_bt}-tools/build/bootstrap-m4
 _bt_m4_depend=${_bt}-${_m4}
 _bt_lex_depend=${_bt}-${_lex} ${_bt_m4_depend}
 .else
@@ -2505,10 +2510,12 @@ ${_bt}-usr.bin/clang/llvm-tblgen: ${_bt}-lib/clang/libllvmminimal
 _dtc= usr.bin/dtc
 .if ${MK_GPL_DTC} != "no"
 _dtc= gnu/usr.bin/dtc
+${_bt}-gnu/usr.bin/dtc: ${_bt_lex_depend}
 .endif
 
 .if ${MK_LOCALES} != "no"
 _localedef=	usr.bin/localedef
+${_bt}-usr.bin/localedef: ${_bt}-usr.bin/yacc ${_bt_lex_depend}
 .endif
 
 .if ${MK_KERBEROS} != "no"
