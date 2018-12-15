@@ -2596,6 +2596,8 @@ _basic_bootstrap_tools_multilink+=bin/test test,[
 _basic_bootstrap_tools=usr.bin/awk usr.bin/cut bin/expr usr.bin/gencat \
     usr.bin/join usr.bin/mktemp bin/realpath bin/rmdir usr.bin/sed \
     usr.bin/sort usr.bin/truncate usr.bin/tsort
+# /bin/sh can behave differently when crossbuilding on Linux/macOS
+_basic_bootstrap_tools=bin/sh
 # elf2aout is required for sparc64 build
 _basic_bootstrap_tools+=usr.bin/elf2aout
 # file2c is required for building usr.sbin/config:
