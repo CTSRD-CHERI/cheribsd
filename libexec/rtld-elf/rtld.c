@@ -3231,7 +3231,7 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (reloc_plt(obj, rtldobj) == -1)
 #else
-	if (reloc_plt(obj) == -1)
+	if (reloc_plt(obj, flags, lockstate) == -1)
 #endif
 		return (-1);
 	/* Relocate the jump slots if we are doing immediate binding. */
