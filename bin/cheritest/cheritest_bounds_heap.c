@@ -59,7 +59,7 @@ test_bounds_calloc(const struct cheri_test *ctp __unused)
 {
 	size_t i;
 	const size_t sizes[] = {1, 2, 4, 8, 16, 32, 64, 128, 1024, 4096, 10000};
-	__capability char *calloc_allocation;
+	char * __capability calloc_allocation;
 
 	for (i = 0; i < sizeof(sizes) / sizeof(*sizes); i++) {
 		calloc_allocation = calloc(1, sizes[i]);
