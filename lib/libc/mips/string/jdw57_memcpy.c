@@ -78,6 +78,9 @@ typedef	uintptr_t ptr;
 }
 
 
+/* We are doing the necessary checks before casting -> silence warning */
+#pragma clang diagnostic ignored "-Wcast-align"
+
 /*
  * Copy a block of memory, handling overlap.
  * This is the routine that actually implements
@@ -178,7 +181,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 					t = -t*wsize;
 					MIPSLOOP(t, -8,
 					    *((word * CAPABILITY)(dst+t)) =
-					    *((word * CAPABILITY)(src+t));,
+					    *((const word * CAPABILITY)(src+t));,
 					    8/*wsize*/);
 				}
 			}
@@ -193,13 +196,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 			t = -(t*psize);
 #if !defined(_MIPS_SZCAP)
 			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==128
 			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==256
 			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
 #endif
 		}
 		t = length & pmask;
@@ -243,7 +246,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 					t = ((t-1)*wsize);
 					MIPSLOOP(t, 0,
 					    *((word * CAPABILITY)(dst+t)) =
-					    *((word * CAPABILITY)(src+t));,
+					    *((const word * CAPABILITY)(src+t));,
 					    -8/*wsize*/);
 				}
 			}
@@ -255,13 +258,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 			t = ((t-1)*psize);
 #if !defined(_MIPS_SZCAP)
 			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==128
 			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==256
 			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
 #endif
 
 		}
