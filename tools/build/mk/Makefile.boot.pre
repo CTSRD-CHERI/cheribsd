@@ -6,6 +6,8 @@
 # And on macOS it is impossible to create a statically linked binary.
 NO_SHARED:=	no
 NO_PIC:=	no
+NOPIE:=		yes
+MK_PIE:=	no
 
 # There is no objcopy on macOS so we can't do the MK_DEBUG_FILES objcopy magic.
 MK_DEBUG_FILES:=no
