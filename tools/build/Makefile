@@ -245,7 +245,7 @@ installdirs:
 
 .for _dir in sbin usr/sbin usr/bin
 # delete existing directories from before r340157
-	@if [ ! -L ${DESTDIR}/${_dir} ]; then \
+	@if [ -e ${DESTDIR}/${_dir} ] && [ ! -L ${DESTDIR}/${_dir} ]; then \
 	    echo "removing old non-symlink ${DESTDIR}/${_dir}"; \
 	    rm -rf "${DESTDIR}/${_dir}"; \
 	fi
