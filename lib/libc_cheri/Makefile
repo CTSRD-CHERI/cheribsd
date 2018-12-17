@@ -12,6 +12,8 @@
 
 # libcheri
 LIB=		c_cheri
+# Anything more than 3 is just too noisy
+WARNS?=		2
 SRCS=		\
 		cheri_printf.c		\
 		cheri_put.c		\
@@ -260,7 +262,7 @@ MK_PROFILE=	no
 NEED_CHERI=	sandbox
 WARNS?= 2
 
-NO_WERROR=	yes
+# NO_WERROR=	yes
 
 CLEANFILES=	libcheri_invoke.o
 
@@ -316,6 +318,10 @@ CFLAGS+=	-Wno-cast-align -DFORCE_C_LOCALE -DFORCE_UTC_TZ
 .ifdef OAKLAND2015
 CFLAGS+=	-DCHERI_NO_OUTPUT
 .endif
+
+CFLAGS.rune.c+=	-Wno-unused-variable
+CFLAGS.ldpart.c+=	-Wno-unused-variable
+CFLAGS.localtime.c+=	-Wno-unused-variable
 
 .include <bsd.lib.mk>
 
