@@ -138,6 +138,9 @@ typedef	unsigned long	u_long;
 #endif
 
 
+#ifndef __has_feature
+#define __has_feature(...) 0
+#endif
 
 /*
  * Nullability qualifiers: currently only supported by Clang.
