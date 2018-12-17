@@ -203,9 +203,9 @@ _host_abs_tools_to_symlink+=	${_make_abs}:make ${_make_abs}:bmake
 _host_tools_to_symlink+=xcrun
 .endif  # ${.MAKE.OS} == "Darwin"
 # On Ubuntu /bin/sh is dash which is totally useless. Let's just link bash
-# as the build sh since that will work fine. Also on MacOS /bin/sh doesn't
-# support the -e flag to echo so let's use the builtin from bash
+# as the build sh since that will work fine.
 _host_abs_tools_to_symlink+=	/bin/bash:sh
+_host_tools_to_symlink:=${_host_tools_to_symlink:Nsh}
 .endif
 
 host-symlinks:
