@@ -5,7 +5,8 @@ DPADD+=		${WORLDTMP}/legacy/usr/lib/libegacy.a
 LDADD+=		-legacy
 LDFLAGS+=	-L${WORLDTMP}/legacy/usr/lib
 
-BUILD_TOOLS_CFLAGS=${CFLAGS}
+# Remove all warning flags that a potentially different compiler might not understand
+BUILD_TOOLS_CFLAGS=${CFLAGS:N-Q*:N-W*}
 BUILD_TOOLS_LDFLAGS=${LDFLAGS}
 
 .if ${.MAKE.OS} != "FreeBSD"
