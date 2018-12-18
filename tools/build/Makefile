@@ -121,11 +121,6 @@ SYSINCS+=	${SRCTOP}/sys/sys/consio.h
 # for gencat:
 INCS+=	${SRCTOP}/include/nl_types.h
 
-# To allow bootstrapping makefs on FreeBSD 11 or non-FreeBSD systems:
-UFSINCS+=	${SRCTOP}/sys/ufs/ufs/dinode.h
-UFSINCS+=	${SRCTOP}/sys/ufs/ufs/dir.h
-FFSINCS+=	${SRCTOP}/sys/ufs/ffs/fs.h
-
 # for vtfontcvt:
 SYSINCS+=	${SRCTOP}/sys/sys/fnv_hash.h
 
@@ -146,6 +141,11 @@ SRCS=		dummy.c
 .if defined(CROSS_BUILD_TESTING)
 SUBDIR+=		cross-build
 .endif
+
+# To allow bootstrapping makefs on FreeBSD 11 or non-FreeBSD systems:
+UFSINCS+=	${SRCTOP}/sys/ufs/ufs/dinode.h
+UFSINCS+=	${SRCTOP}/sys/ufs/ufs/dir.h
+FFSINCS+=	${SRCTOP}/sys/ufs/ffs/fs.h
 
 # Needed to build config (since it uses libnv)
 SYSINCS+=	${SRCTOP}/sys/sys/nv.h ${SRCTOP}/sys/sys/cnv.h ${SRCTOP}/sys/sys/dnv.h
