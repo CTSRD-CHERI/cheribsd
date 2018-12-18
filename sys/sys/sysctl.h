@@ -171,7 +171,7 @@ struct sysctl_req {
 	size_t		 oldlen;
 	size_t		 oldidx;
 	int		(*oldfunc)(struct sysctl_req *, const void *, size_t);
-	void		* __capability newptr;
+	const void	* __capability newptr;
 	size_t		 newlen;
 	size_t		 newidx;
 	int		(*newfunc)(struct sysctl_req *, void *, size_t);
@@ -1093,7 +1093,7 @@ int	kernel_sysctlbyname(struct thread *td, char *name, void *old,
 	    int flags);
 int	userland_sysctl(struct thread *td, int *name, u_int namelen,
 	    void * __capability old, size_t * __capability oldlenp,
-	    int inkernel, void * __capability new, size_t newlen,
+	    int inkernel, const void * __capability new, size_t newlen,
 	    size_t *retval, int flags);
 int	sysctl_find_oid(int *name, u_int namelen, struct sysctl_oid **noid,
 	    int *nindx, struct sysctl_req *req);
