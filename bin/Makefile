@@ -54,7 +54,6 @@ SUBDIR.${MK_CHERI}+=	cheritest-mt
 SUBDIR.${MK_CHERI}+=	helloworld
 SUBDIR.${MK_CHERI}+=	helloworld_cxx
 
-SUBDIR.${MK_RCMDS}+=	rcp
 SUBDIR.${MK_SENDMAIL}+=	rmail
 SUBDIR.${MK_TCSH}+=	csh
 SUBDIR.${MK_TESTS}+=	tests
