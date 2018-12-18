@@ -44,6 +44,21 @@ static char sccsid[] = "@(#)mknodes.c	8.2 (Berkeley) 5/4/95";
 #endif /* not lint */
 #endif
 #include <sys/cdefs.h>
+
+/*
+ * Allow building this build-tool with any /usr/bin/cc by providing stub
+ * defintions of FreeBSD-specific macros
+ */
+#ifndef __printf0like
+#define __printf0like(...)
+#endif
+#ifndef __dead2
+#define __dead2
+#endif
+#ifndef __FBSDID
+#define __FBSDID(...)
+#endif
+
 __FBSDID("$FreeBSD$");
 
 /*
