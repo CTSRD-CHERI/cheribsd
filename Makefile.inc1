@@ -1406,6 +1406,7 @@ buildcheri:
 .for _t in ${_obj} build-tools
 	${_+_}cd ${.CURDIR}/${_dir}; \
 	    WORLDTMP=${WORLDTMP} \
+	    BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}" \
 	    MAKEFLAGS="-m ${.CURDIR}/tools/build/mk ${.MAKEFLAGS}" \
 	    ${MAKE} SSP_CFLAGS= DESTDIR= \
 	    OBJTOP=${LIBCHERI_OBJTOP} \
