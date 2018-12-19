@@ -310,7 +310,7 @@ siginfo_to_siginfo_native(const _siginfo_t *si,
 	si_n->si_pid = si->si_pid;
 	si_n->si_uid = si->si_uid;
 	si_n->si_status = si->si_status;
-	si_n->si_addr = (void *)(uintptr_t)si->si_addr;
+	si_n->si_addr = (__cheri_fromcap void *)si->si_addr;
 	si_n->si_value.sival_ptr_native = si->si_value.sival_ptr_native;
 	memcpy(&si_n->_reason, &si->_reason, sizeof(si_n->_reason));
 #endif
