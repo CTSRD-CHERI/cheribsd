@@ -180,7 +180,7 @@ void
 _rtld_thread_init(void *li __unused)
 {
 
-	PRINT_FUNCTION_NOT_AVAILABLE();
+	/* Do nothing when linked statically. */
 }
 
 #ifndef IN_LIBDL
