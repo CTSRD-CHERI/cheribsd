@@ -6,6 +6,7 @@ LDADD+=		-legacy
 LDFLAGS+=	-L${WORLDTMP}/legacy/usr/lib
 
 # Remove all warning flags that a potentially different compiler might not understand
+BUILD_TOOLS_CC=${CC}
 BUILD_TOOLS_CFLAGS=${CFLAGS:N-Q*:N-W*}
 BUILD_TOOLS_LDFLAGS=${LDFLAGS}
 
