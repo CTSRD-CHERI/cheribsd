@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/sh -e
 # chflags doesn't exist on Linux, just skip the calls for now
 # TODO: we could also create a wrapper that calls `chattr +i` for `chflags schg`, etc
 echo "WARNING: Ignoring chflags $@"
