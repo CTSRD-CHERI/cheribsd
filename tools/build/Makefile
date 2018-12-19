@@ -184,17 +184,17 @@ _host_tools_to_symlink+=gperf
 
 _py3_abs=${PYTHON3_BINARY}
 .if empty(_py3_abs)
-_py3_abs!=	which python3 2>/dev/null || true
+_py3_abs!=	which python3 2>/dev/null || echo "/invalid/path/to/python3"
 .if !exists(${_py3_abs})
 # Fall back to /usr/local/bin/python3 (macOS) if /usr/local/bin is not in $PATH
 # or fail the build if that doesn't exist either
 _py3_abs=/usr/local/bin/python3
 .endif
 .endif
-.if !exists(${_py3_abs})
+.if empty(_py3_abs) || !exists(${_py3_abs})
 .error "Could not determine path to python3. Please set PYTHON3_BINARY"
 .endif
-_host_abs_tools_to_symlink+=	${py3_abs}:python3
+_host_abs_tools_to_symlink+=	${_py3_abs}:python3
 
 _make_abs!=	which "${MAKE}"
 _host_abs_tools_to_symlink+=	${_make_abs}:make ${_make_abs}:bmake
