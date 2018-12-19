@@ -866,8 +866,8 @@ sed -e '
 			if (funcname == "nosys" || funcname == "lkmnosys" ||
 			    funcname == "sysarch" ||
 			    funcname ~ /^cheriabi/ || funcname ~ /^freebsd/ ||
-			    funcname ~ /^linux/ || funcname ~ /^ibcs2/ ||
-			    funcname ~ /^xenix/ || funcname ~ /^cloudabi/) {
+			    funcname ~ /^linux/ || funcname ~ /^xenix/ ||
+			    funcname ~ /^cloudabi/) {
 				printf("%s\t%s(struct thread *, struct %s *)",
 				    rettype, funcname, argalias) > sysdcl
 			} else {
@@ -887,7 +887,7 @@ sed -e '
 			if (funcname == "nosys" || funcname == "sysarch" || 
 			    funcname == "lkmnosys" ||
 			    funcname ~ /^cheriabi/ || funcname ~ /^freebsd/ ||
-			    funcname ~ /^linux/ || funcname ~ /^ibcs2/ ||
+			    funcname ~ /^linux/ ||
 			    funcname ~ /^xenix/ || funcname ~ /^cloudabi/) {
 				printf("%s, %s, NULL, 0, 0, %s, %s },", funcname, auditev, flags, thr_flag) > sysent
 				column = column + length(funcname) + length(auditev) + length(flags) + 3 
