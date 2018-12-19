@@ -66,11 +66,11 @@ ${var}=	${${var}__${${X_}_ld_hash}}
 .if !defined(${X_}LINKER_TYPE) || !defined(${X_}LINKER_VERSION)
 # See bsd.compiler.mk
 .if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
-#XXXXX.error "${.CURDIR}: Rerunning ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!"
+.warning "${.CURDIR}: Rerunning ${${ld}} -v to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!"
 .else
-# .info "${.CURDIR}: Running ${${ld}} --version to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION"
+# .info "${.CURDIR}: Running ${${ld}} -v to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION"
 .endif
-_ld_version!=	(${${ld}} --version || echo none) | sed -n 1p
+_ld_version!=	(${${ld}} -v 2>&1 || echo none) | sed -n 1p
 .if ${_ld_version} == "none"
 .warning Unable to determine linker type from ${ld}=${${ld}}
 .endif
@@ -82,15 +82,28 @@ _v=	${_ld_version:M[1-9].[0-9]*:[1]}
 ${X_}LINKER_TYPE=	lld
 _v=	${_ld_version:[2]}
 ${X_}LINKER_FREEBSD_VERSION!= \
-	${${ld}} --version | \
+	${${ld}} -v | \
 	awk '$$3 ~ /FreeBSD/ {print substr($$4, 1, length($$4)-1)}'
+.elif ${_ld_version:[1]} == "@(#)PROGRAM:ld"
+${X_}LINKER_TYPE=	mac
+.elif ${_ld_version:[1]} == "@(\#)PROGRAM:ld"
+# bootstrap linker on MacOS
+${X_}LINKER_TYPE=        mac
+_v=        ${_ld_version:[2]:S/PROJECT:ld64-//}
+# Convert version 409.12 to 409.12.0 so that the echo + awk below works
+.if empty(_v:M[1-9]*.[0-9]*.[0-9]*) && !empty(_v:M[1-9]*.[0-9]*)
+_v:=${_v}.0
+.else
+# Some versions do not contain a minor version so we need to append .0.0 there
+_v:=${_v}.0.0
+.endif
 .else
 .warning Unknown linker from ${ld}=${${ld}}: ${_ld_version}, defaulting to bfd
 ${X_}LINKER_TYPE=	bfd
 _v=	2.17.50
 .endif
 # See bsd.compiler.mk
-${X_}LINKER_VERSION!=	echo "${_v:M[1-9].[0-9]*}" | \
+${X_}LINKER_VERSION!=	echo "${_v:M[1-9]*.[0-9]*}" | \
 			  awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;}'
 .undef _ld_version
 .undef _v
