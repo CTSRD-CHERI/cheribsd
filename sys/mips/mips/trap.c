@@ -419,16 +419,15 @@ extern void fswintrberr(void); /* XXX */
  * Returns the virtual address (relative to $pcc) that was used to fetch the
  * instruction.
  */
-static intptr_t
+static void * __capability
 fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t *instr)
 {
-	intptr_t vaddr;
-	void *__kerncap bad_inst_ptr;
+	void * __capability bad_inst_ptr;
 
 	/* Should only be called from user mode */
 	/* TODO: if KERNLAND() */
 #ifdef CPU_CHERI
-	bad_inst_ptr = (char * __kerncap)frame->pcc + offset_from_pc;
+	bad_inst_ptr = (char * __capability)frame->pcc + offset_from_pc;
 	if (!cheri_gettag(bad_inst_ptr)) {
 		struct thread *td = curthread;
 		struct proc *p = td->td_proc;
@@ -438,7 +437,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
 		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
 		*instr = -1;
-		return (frame->pc + offset_from_pc);
+		return (bad_inst_ptr);
 	}
 	KASSERT(cheri_getoffset(frame->pcc) == frame->pc,
 	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
@@ -457,8 +456,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		*instr = -1;
 	}
 	/* Should this be a kerncap instead instead of being indirected by $pcc? */
-	vaddr = frame->pc + offset_from_pc;
-	return vaddr;
+	return bad_inst_ptr;
 }
 
 /*
@@ -466,7 +464,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
  *
  * The instruction is stored in frame->badinstr_p.
  */
-static intptr_t
+static void
 fetch_bad_branch_instr(struct trapframe *frame)
 {
 	KASSERT(DELAYBRANCH(frame->cause),
@@ -475,7 +473,7 @@ fetch_bad_branch_instr(struct trapframe *frame)
 	 * In a trap the pc will point to the branch instruction so we fetch
 	 * at offset 0 from the pc.
 	 */
-	return fetch_instr_near_pc(frame, 0, &frame->badinstr_p.inst);
+	fetch_instr_near_pc(frame, 0, &frame->badinstr_p.inst);
 }
 
 /*
@@ -484,7 +482,7 @@ fetch_bad_branch_instr(struct trapframe *frame)
  * The instruction is stored in frame->badinstr and the address (relative to)
  * pcc.base is returned.
  */
-static intptr_t
+static void * __capability
 fetch_bad_instr(struct trapframe *frame)
 {
 	register_t offset_from_pc;
@@ -693,7 +691,7 @@ trap(struct trapframe *trapframe)
 	int access_type;
 	ksiginfo_t ksi;
 	char *msg = NULL;
-	intptr_t addr;
+	char * __capability addr;
 	register_t pc;
 	int cop, error;
 	register_t *frame_regs;
@@ -835,7 +833,11 @@ trap(struct trapframe *trapframe)
 	}
 #endif
 
+#ifdef CPU_CHERI
+	addr = trapframe->pcc;
+#else
 	addr = trapframe->pc;
+#endif
 	switch (type) {
 	case T_MCHECK:
 #ifdef DDB
@@ -1069,7 +1071,7 @@ dofault:
 
 	case T_BREAK + T_USER:
 		{
-			intptr_t va;
+			char * __capability va;
 			uint32_t instr;
 
 			i = SIGTRAP;
@@ -1080,13 +1082,13 @@ dofault:
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 
-			if (td->td_md.md_ss_addr != va) {
+			if (td->td_md.md_ss_addr != (intptr_t)va) {
 				addr = va;
 				break;
 			}
 
 			/* read break instruction */
-			instr = fuword32_c(__USER_CODE_CAP((void *)va));
+			instr = fuword32_c(__USER_CODE_CAP((__cheri_fromcap void *)va));
 
 			if (instr != MIPS_BREAK_SSTEP) {
 				addr = va;
@@ -1095,7 +1097,7 @@ dofault:
 
 			CTR3(KTR_PTRACE,
 			    "trap: tid %d, single step at %#lx: %#08x",
-			    td->td_tid, va, instr);
+			    td->td_tid, (long)(intptr_t)va, instr);
 			PROC_LOCK(p);
 			_PHOLD(p);
 			error = ptrace_clear_single_step(td);
@@ -1111,7 +1113,7 @@ dofault:
 			/* compute address of trapped instruction */
 			if (DELAYBRANCH(trapframe->cause))
 				addr += sizeof(int);
-			printf("watch exception @ %p\n", (void *)addr);
+			printf("watch exception @ %p\n", (__cheri_fromcap void *)addr);
 			i = SIGTRAP;
 			ucode = TRAP_BRKPT;
 			break;
