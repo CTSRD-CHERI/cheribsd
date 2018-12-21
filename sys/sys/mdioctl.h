@@ -94,6 +94,7 @@ struct md_ioctl {
 #define MD_FORCE	0x20	/* Don't try to prevent foot-shooting */
 #define MD_ASYNC	0x40	/* Asynchronous mode */
 #define MD_VERIFY	0x80	/* Open file with O_VERIFY (vnode only) */
+#define	MD_CACHE	0x100	/* Cache vnode data */
 
 #ifdef _KERNEL
 struct md_req {
