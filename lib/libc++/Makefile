@@ -244,7 +244,8 @@ EXP_HEADERS+=	any
 EXP_HEADERS+=	chrono
 EXP_HEADERS+=	coroutine
 EXP_HEADERS+=	deque
-EXP_HEADERS+=	dynarray
+# Removed in 8.0:
+# EXP_HEADERS+=	dynarray
 EXP_HEADERS+=	filesystem
 EXP_HEADERS+=	forward_list
 EXP_HEADERS+=	functional
