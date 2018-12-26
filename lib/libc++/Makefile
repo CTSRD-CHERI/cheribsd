@@ -22,7 +22,7 @@ _LIBCXX_VERSION=8
 _LIBCXXRTDIR=	${SRCTOP}/contrib/cheri-libcxxrt/src
 HDRDIR=		${SRCTOP}/contrib/cheri-libc++/include
 SRCDIR=		${SRCTOP}/contrib/cheri-libc++/src
-_LIBCXX_VERSION=7
+_LIBCXX_VERSION=8
 .endif
 CXXINCLUDEDIR=	${INCLUDEDIR}/c++/v${SHLIB_MAJOR}
 .if ${MACHINE_CPUARCH} == "arm"
