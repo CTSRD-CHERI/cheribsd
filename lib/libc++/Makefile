@@ -38,6 +38,7 @@ SHLIB_LDSCRIPT=	libc++.ldscript
 SRCS+=		algorithm.cpp
 SRCS+=		any.cpp
 SRCS+=		bind.cpp
+SRCS+=		charconv.cpp
 SRCS+=		chrono.cpp
 SRCS+=		condition_variable.cpp
 SRCS+=		debug.cpp
@@ -65,6 +66,12 @@ SRCS+=		utility.cpp
 SRCS+=		valarray.cpp
 SRCS+=		variant.cpp
 SRCS+=		vector.cpp
+
+.if ${MK_CHERI} != "no"
+SRCS+=		filesystem/directory_iterator.cpp
+SRCS+=		filesystem/operations.cpp
+SRCS+=		filesystem/int128_builtins.cpp
+.endif
 
 CXXRT_SRCS+=	auxhelper.cc
 CXXRT_SRCS+=	dynamic_cast.cc
