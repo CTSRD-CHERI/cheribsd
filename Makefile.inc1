@@ -2670,6 +2670,9 @@ _other_bootstrap_tools+=usr.bin/bmake
 _bootstrap_tools_links+=${_basic_bootstrap_tools:T}
 .for _subdir _links in ${_basic_bootstrap_tools_multilink}
 _bootstrap_tools_links+=${_links:S/,/ /g}
+# Some of the build scripts use nawk instead of awk (this happens at least in
+# cddl/contrib/opensolaris/lib/libdtrace/common/mknames.sh)
+_bootstrap_tools_links+=nawk
 .endfor
 .endif	# defined(BOOTSTRAP_ALL_TOOLS)
 
