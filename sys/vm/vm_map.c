@@ -205,8 +205,8 @@ vm_map_log(const char *prefix, vm_map_entry_t entry)
 		prt[2] = '-';
 	prt[3] = '\0';
 	snprintf(buffer, sizeof(buffer), "VMMAP %d: %s: start=%p end=%p prt=%s",
-	    curproc->p_pid, prefix, (void *)entry->start, (void *)entry->end,
-	    prt);
+	    curproc->p_pid, prefix, (void *)(uintptr_t)entry->start,
+	    (void *)(uintptr_t)entry->end, prt);
 	CHERI_TRACE_STRING(buffer);
 }
 #else
@@ -1537,6 +1537,10 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length,
 	panic("vm_map_findspace: max_free corrupt");
 }
 
+/*
+ * This requires that the start address is a valid capablity
+ * for the requested length.
+ */
 int
 vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_offset_t start, vm_size_t length, vm_prot_t prot,
@@ -3633,8 +3637,8 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 #ifndef CHERI_KERNEL
 	vm2 = vmspace_alloc(vm_map_min(old_map), vm_map_max(old_map), NULL);
 #else
-	vm2 = vmspace_alloc(old_map->map_capability,
-	    old_map->map_capability + vm_map_max(old_map), NULL);
+	vm2 = vmspace_alloc((vm_ptr_t)old_map->map_capability,
+	    (vm_ptr_t)old_map->map_capability + vm_map_max(old_map), NULL);
 #endif
 	if (vm2 == NULL)
 		return (NULL);

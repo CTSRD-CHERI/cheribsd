@@ -247,6 +247,13 @@ vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
 	map->flags = (map->flags | set) & ~clear;
 }
 #endif	/* KLD_MODULE */
+#ifdef CHERI_KERNEL
+static __inline void *
+vm_map_rootcap(vm_map_t map)
+{
+	return (map->map_capability);
+}
+#endif
 #endif	/* _KERNEL */
 
 /*
