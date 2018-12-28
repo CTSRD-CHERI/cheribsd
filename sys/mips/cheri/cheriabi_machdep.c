@@ -736,6 +736,7 @@ cheriabi_newthread_init(struct thread *td)
 	cheri_capability_set_user_sealcap(&td->td_proc->p_md.md_cheri_sealcap);
 }
 
+#ifdef CHERI_KERNEL
 void
 exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 {
@@ -895,7 +896,202 @@ exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 	 * TODO: load the AT_BASE value instead of using duplicated code!
 	 */
 	if (imgp->reloc_base) {
-		vaddr_t rtld_base = imgp->reloc_base;
+		td->td_frame->c4 = cheri_andperm((void *)imgp->reloc_base,
+		    CHERI_CAP_USER_DATA_PERMS);
+	}
+	/*
+	 * Restrict the stack capability to the maximum region allowed for
+	 * this process and adjust sp accordingly.
+	 *
+	 * XXXBD: 8MB should be the process stack limit.
+	 */
+	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
+	stackbase = USRSTACK - (1024 * 1024 * 8);
+	KASSERT(stack > stackbase,
+	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
+	stacklen = stack - stackbase;
+	td->td_frame->csp = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, stacklen);
+
+	/*
+	 * Update privileged signal-delivery environment for actual stack.
+	 *
+	 * XXXRW: Not entirely clear whether we want an offset of 'stacklen'
+	 * for csig_csp here.  Maybe we don't want to use csig_csp at all?
+	 * Possibly csig_csp should default to NULL...?
+	 */
+	csigp = &td->td_pcb->pcb_cherisignal;
+	csigp->csig_csp = td->td_frame->csp;
+	csigp->csig_default_stack = csigp->csig_csp;
+
+	td->td_md.md_flags &= ~MDTD_FPUSED;
+	if (PCPU_GET(fpcurthread) == td)
+		PCPU_SET(fpcurthread, (struct thread *)0);
+	td->td_md.md_ss_addr = 0;
+
+	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
+}
+#else /* ! CHERI_KERNEL */
+void
+exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
+{
+	struct cheri_signal *csigp;
+	struct trapframe *frame;
+	u_long auxv, stackbase, stacklen;
+	size_t map_base, map_length, text_end, data_length, code_end;
+	struct rlimit rlim_stack;
+	/* const bool is_dynamic_binary = imgp->interp_end != 0; */
+	/* const bool is_rtld_direct_exec = imgp->reloc_base == imgp->start_addr; */
+
+	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
+	/*
+	 * Ensure we don't have an old retcap value laying around.  In
+	 * principle we won't ever return it wrongly, but better safe
+	 * then sorry.
+	 *
+	 * XXXBD: This doesn't feel like the right place to do this...
+	 */
+	td->td_retcap = NULL;
+
+	KASSERT(stack % sizeof(void * __capability) == 0,
+	    ("CheriABI stack pointer not properly aligned"));
+
+	/*
+	 * Restrict the stack capability to the maximum region allowed for
+	 * this process and adjust csp accordingly.
+	 */
+	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
+	PROC_LOCK(td->td_proc);
+	lim_rlimit_proc(td->td_proc, RLIMIT_STACK, &rlim_stack);
+	PROC_UNLOCK(td->td_proc);
+	stackbase = td->td_proc->p_sysent->sv_usrstack - rlim_stack.rlim_max;
+	KASSERT(stack > stackbase,
+	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
+	stacklen = stack - stackbase;
+	/*
+	 * Round the stack down as required to make it representable.
+	 *
+	 * XXX: should we make the stack sealable?
+	 */
+	stacklen = rounddown2(stacklen, 1ULL << CHERI_ALIGN_SHIFT(stacklen));
+	KASSERT(stackbase ==
+	    rounddown2(stackbase, 1ULL << CHERI_ALIGN_SHIFT(stacklen)),
+	    ("stackbase 0x%lx is not representable at length 0x%lx",
+	    stackbase, stacklen));
+	td->td_frame->csp = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, 0);
+	td->td_frame->sp = stacklen;
+
+	/* Using addr as length means ddc base must be 0. */
+	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
+	if (imgp->end_addr != 0) {
+		text_end = roundup2(imgp->end_addr,
+		    1ULL << CHERI_SEAL_ALIGN_SHIFT(imgp->end_addr));
+		/*
+		 * Less confusing rounded up to a page and 256-bit
+		 * requires no other rounding.
+		 */
+		text_end = roundup2(text_end, PAGE_SIZE);
+	} else {
+		text_end = rounddown2(stackbase,
+		    1ULL << CHERI_SEAL_ALIGN_SHIFT(stackbase));
+	}
+	KASSERT(text_end <= stackbase,
+	    ("text_end 0x%zx > stackbase 0x%lx", text_end, stackbase));
+
+	map_base = (text_end == stackbase) ?
+	    CHERI_CAP_USER_MMAP_BASE :
+	    roundup2(text_end, 1ULL << CHERI_ALIGN_SHIFT(stackbase - text_end));
+	KASSERT(map_base < stackbase,
+	    ("map_base 0x%zx >= stackbase 0x%lx", map_base, stackbase));
+	map_length = stackbase - map_base;
+	map_length = rounddown2(map_length,
+	    1ULL << CHERI_ALIGN_SHIFT(map_length));
+	/*
+	 * Use cheri_capability_build_user_rwx so mmap() can return
+	 * appropriate permissions derived from a single capability.
+	 */
+	td->td_md.md_cheri_mmap_cap = cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
+	    CHERI_CAP_USER_MMAP_OFFSET);
+	KASSERT(cheri_getperm(td->td_md.md_cheri_mmap_cap) &
+	    CHERI_PERM_CHERIABI_VMMAP,
+	    ("%s: mmap() cap lacks CHERI_PERM_CHERIABI_VMMAP", __func__));
+
+	td->td_frame->pc = imgp->entry_addr;
+	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
+	    (mips_rd_status() & MIPS_SR_INT_MASK) |
+	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
+
+	/*
+	 * XXXAR: data_length needs to be the full address space to allow
+	 * legacy ABI to work since the TLS region will be beyond the end of
+	 * the text section.
+	 *
+	 * TODO: Start with a NULL $ddc once we drop legacy ABI support.
+	 *
+	 * Having a full address space $ddc on startup does not matter for new
+	 * binaries since they will all clear $ddc as one of the first user
+	 * instructions anyway.
+	 *
+	 * TODO: for co-processes we should start with NULL $ddc
+	 */
+	data_length = CHERI_CAP_USER_DATA_LENGTH; /* Always representable */
+	frame = &td->td_pcb->pcb_regs;
+	cheriabi_capability_set_user_ddc(&frame->ddc, data_length);
+
+	/*
+	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with
+	 * broad bounds, but in the future, limited as appropriate to the
+	 * run-time linker or statically linked binary?
+	 *
+	 * TODO: restrict $pcc to the mapped binary once we no longer support
+	 * the legacy ABI.
+	 *
+	 * TODO: add a kernel config option for legacy ABI so we can shrink
+	 * this by default!
+	 */
+#ifdef NOTYET
+	/*
+	 * If we are executing a static binary we use text_end as the end of
+	 * the text segment. If $pcc is the start of rtld we use interp_end.
+	 * If we are executing ld-cheri-elf.so.1 directly and can use text_end
+	 * to find the end of the rtld mapping.
+	 */
+	code_end = imgp->interp_end ? imgp->interp_end : text_end;
+	code_end = roundup2(code_length, 1ULL << CHERI_ALIGN_SHIFT(code_end));
+#else
+	code_end = CHERI_CAP_USER_CODE_LENGTH;
+#endif
+	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
+	    code_end);
+	frame->c12 = frame->pcc;
+
+	/*
+	 * Set up CHERI-related state: most register state, signal delivery,
+	 * sealing capabilities, trusted stack.
+	 */
+	cheriabi_newthread_init(td);
+
+	/*
+	 * Pass a pointer to the ELF auxiliary argument vector.
+	 */
+	auxv = stack + (imgp->args->argc + 1 + imgp->args->envc + 1) *
+	    sizeof(void * __capability);
+	td->td_frame->c3 = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, auxv,
+	    AT_COUNT * 2 * sizeof(void * __capability), 0);
+	/*
+	 * Load relocbase for RTLD into $c4 so that rtld has a capability with
+	 * the correct bounds available on startup
+	 *
+	 * XXXAR: this should not be necessary since it should be the same as
+	 * auxv[AT_BASE] but trying to load that from $c3 crashes...
+	 *
+	 * TODO: load the AT_BASE value instead of using duplicated code!
+	 */
+	if (imgp->reloc_base) {
+		vaddr_t rtld_base = ptr_to_va(imgp->reloc_base);
 		rtld_base = rounddown2(rtld_base, 1ULL << CHERI_ALIGN_SHIFT(rtld_base));
 		vaddr_t rtld_end = imgp->interp_end ? imgp->interp_end : imgp->end_addr;
 		vaddr_t rtld_len = rtld_end - rtld_base;
@@ -935,6 +1131,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 
 	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
 }
+#endif /* ! CHERI_KERNEL */
 
 /*
  * The CheriABI equivalent of cpu_set_upcall().

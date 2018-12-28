@@ -69,7 +69,7 @@ struct image_params {
 	unsigned long entry_addr; /* entry address of target executable */
 	unsigned long start_addr; /* start of mapped image (including bss) */
 	unsigned long end_addr;   /* end of mapped image (including bss) */
-	unsigned long reloc_base; /* load address of image */
+	vm_ptr_t reloc_base; /* load address of image */
 	unsigned long interp_end; /* end address of RTLD mapping (or zero) */
 	char vmspace_destroyed;	/* flag - we've blown away original vm space */
 #define IMGACT_SHELL	0x1
