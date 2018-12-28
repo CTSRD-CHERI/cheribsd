@@ -189,7 +189,7 @@ iosize_max(void)
 #ifndef _SYS_SYSPROTO_H_
 struct read_args {
 	int	fd;
-	void	*buf;
+	void * __capability buf;
 	size_t	nbyte;
 };
 #endif
@@ -202,7 +202,7 @@ sys_read(struct thread *td, struct read_args *uap)
 
 	if (uap->nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	IOVEC_INIT(&aiov, uap->buf, uap->nbyte);
+	IOVEC_INIT_C(&aiov, uap->buf, uap->nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = uap->nbyte;
