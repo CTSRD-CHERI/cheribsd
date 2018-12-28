@@ -277,9 +277,9 @@ cheri_bytes_remaining(const void * __capability cap)
  * normal kernel.
  */
 #ifdef CHERI_KERNEL
-#define cheri_bound(ptr, size) cheri_ptr(ptr, size)
-#define cheri_perm(ptr, size, perm) cheri_ptrperm(ptr, size, perm)
-#define cheri_valid(ptr) (cheri_gettag(ptr) == 1)
+#define cheri_bound(ptr, size) cheri_ptr((void *)(ptr), size)
+#define cheri_perm(ptr, size, perm) cheri_ptrperm((void *)(ptr), size, perm)
+#define cheri_valid(ptr) (cheri_gettag((void *)(ptr)) == 1)
 #else /* ! CHERI_KERNEL */
 
 /* Allow use of some cheri_ptr macros in the purecap kernel
