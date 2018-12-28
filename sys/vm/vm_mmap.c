@@ -2107,7 +2107,7 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 	} else {
 		if (max_addr != 0 && ptr_to_va(*addr) + size > max_addr)
 			return (ENOMEM);
-		rv = vm_map_fixed(map, object, foff, *addr, size,
+		rv = vm_map_fixed(map, object, foff, ptr_to_va(*addr), size,
 		    prot, maxprot, docow);
 #ifdef CHERI_KERNEL
 		/*
