@@ -85,7 +85,7 @@ static void
 sf_buf_init(void *arg)
 {
 	struct sf_buf *sf_bufs;
-	vm_offset_t sf_base;
+	vm_ptr_t sf_base;
 	int i;
 
 	if (PMAP_HAS_DMAP)
@@ -100,7 +100,8 @@ sf_buf_init(void *arg)
 	sf_bufs = malloc(nsfbufs * sizeof(struct sf_buf), M_TEMP,
 	    M_WAITOK | M_ZERO);
 	for (i = 0; i < nsfbufs; i++) {
-		sf_bufs[i].kva = sf_base + i * PAGE_SIZE;
+		sf_bufs[i].kva = (vm_ptr_t)cheri_bound(sf_base + i * PAGE_SIZE,
+		    PAGE_SIZE);
 		TAILQ_INSERT_TAIL(&sf_buf_freelist, &sf_bufs[i], free_entry);
 	}
 	sf_buf_alloc_want = 0;
