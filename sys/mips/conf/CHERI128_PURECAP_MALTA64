@@ -39,7 +39,7 @@ options		VERBOSE_SYSINIT
 options		STACK # needed for witness
 options		WITNESS
 options		DEBUG_VFS_LOCKS
-options		TRAP_DEBUG
+#options		TRAP_DEBUG
 # options		KTR
 # options		KTR_VERBOSE=2
 # nooptions	KTR_ALQ
