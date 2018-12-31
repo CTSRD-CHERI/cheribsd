@@ -67,7 +67,8 @@ SRCS+=		valarray.cpp
 SRCS+=		variant.cpp
 SRCS+=		vector.cpp
 
-.if ${MK_CHERI} != "no"
+# TODO: the filesystem code currently crashes clang
+.if 0
 SRCS+=		filesystem/directory_iterator.cpp
 SRCS+=		filesystem/operations.cpp
 SRCS+=		filesystem/int128_builtins.cpp
