@@ -131,7 +131,7 @@ process___cap_relocs(Obj_Entry* obj)
 	 *
 	 * TODO: reject those binaries and suggest relinking with the right flag
 	 */
-	void *mapbase = obj->mapbase;
+	void *mapbase = obj->relocbase;
 	void *pcc = __builtin_cheri_program_counter_get();
 
 	dbg("Processing %lu __cap_relocs for %s\n", (end_relocs - start_relocs),
