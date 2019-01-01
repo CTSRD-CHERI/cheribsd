@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <new>
+#include <algorithm>
 
 #include "rtld.h"
 #include "rtld_small_vector.h"
@@ -66,6 +67,12 @@ struct SimpleExternalCallTrampoline {
 		this->target = target_func;
 		static_assert(sizeof(this->code) == sizeof(simple_plt_code), "");
 		__builtin_memcpy(code, simple_plt_code, sizeof(simple_plt_code));
+	}
+	static const SimpleExternalCallTrampoline*
+	create(const void* target_cgp, dlfunc_t target_func);
+	inline const void* pcc_value() const {
+		const void* result = cheri_incoffset(this, offsetof(SimpleExternalCallTrampoline, code));
+		return cheri_clearperm(result, FUNC_PTR_REMOVE_PERMS);
 	}
 };
 
@@ -204,8 +211,15 @@ _mips_rtld_bind(void* _plt_stub)
 	}
 
 	dlfunc_t target = make_function_pointer(def, defobj);
-	const void* target_cgp = defobj->target_cgp;
+	const void* target_cgp = target_cgp_for_func(defobj, (void*)target);
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+	// Should never be unrepresentable but can be NULL if a function doesn't
+	// use any globals
+	// TODO: Should we set $cgp to be zero length instead?
+	assert(!target_cgp || cheri_gettag(target_cgp));
+#else
 	assert(cheri_gettag(target_cgp));
+#endif
 	dbg_cheri_plt_verbose("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
 	    defobj->strtab + def->st_name, (intmax_t)r_symndx, obj->path,
 	    (void *)plt_stub->trampoline.target, (void *)target);
@@ -254,7 +268,14 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 
 	// TODO: if we decide to directly update captable entries for the pc-relative ABI:
 	// plt->captable_entry = where;
-	plt->rtld_cgp = rtldobj->target_cgp;
+	// For rtld we don't subset $cgp!
+	// TODO: allow building rtld with per-function captable
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 && defined(notyet)
+	plt->rtld_cgp = target_cgp_for_func(rtldobj, (void*)&_rtld_bind_start);
+#else
+	plt->rtld_cgp = rtldobj->_target_cgp;
+#endif
+
 	plt->_obj = obj;	// FIXME: remove
 	plt->_r_symndx = r_symndx; // FIXME: remove
 	// The target cap will span the whole plt stub:
@@ -293,6 +314,17 @@ reloc_jmpslots(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __un
 extern "C" int
 reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 {
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+	if (obj->captable_mapping) {
+		const auto mapping_end = (const CheriCapTableMappingEntry*)cheri_incoffset(
+		    obj->captable_mapping, obj->captable_mapping_size);
+		dbg_assert(std::is_sorted(obj->captable_mapping, mapping_end,
+		    [](const CheriCapTableMappingEntry& a, const CheriCapTableMappingEntry& b) {
+			return a.func_start < b.func_start;
+		    }));
+	}
+#endif
+
 	// FIXME: this needs changes in LLD to emit DT_PLTRELSZ/DT_JMPREL
 	// TODO: assert(!obj->cheri_plt_stubs)
 	if (!obj->cheri_plt_stubs) {
@@ -387,7 +419,7 @@ find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 	// This should be called with a global RTLD lock held so there should
 	// not be any races.
 	// FIXME: verify that this assumption is correct
-	dbg_cheri_plt_verbose("Looking thunk %s thunk (found in obj %s): %-#p",
+	dbg_cheri_plt_verbose("Looking for %s thunk (found in obj %s): %-#p",
 	    strtab_value(obj, symbol->st_name), obj->path, symbol);
 	if (!obj->cheri_exports) {
 		// Use placement-new here to use rtld xmalloc() instead of malloc
@@ -472,6 +504,7 @@ CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 {
 	dbg_cheri_plt_verbose("Adding export thunk for %s (obj %s)",
 	    strtab_value(obj, sym->st_name), obj->path);
+	dbg_assert(obj == defobj);
 #ifdef DEBUG
 	auto sym_vis = ELF_ST_VISIBILITY(sym->st_other);
 	auto sym_bind = ELF_ST_BIND(sym->st_info);
@@ -493,12 +526,14 @@ CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 #endif
 	dbg_assert(s->key == sym);
 	s->thunk = globalRwxAllocator.allocate<SimpleExternalCallTrampoline>();
-	s->thunk->init(obj->target_cgp, make_function_pointer(sym, defobj));
+	dlfunc_t target_func = make_function_pointer(sym, defobj);
+	const void *target_cgp = target_cgp_for_func(defobj, (void*)target_func);
+	s->thunk->init(target_cgp, target_func);
 	return s;
 };
 
 const ExportsTableEntry*
-CheriExports::getOrAddThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
+CheriExports::getOrAddThunk(const Obj_Entry *defobj, const Elf_Sym *sym)
 {
 	assert(this->obj == defobj);
 	const ExportsTableEntry *s = exports_map.find(sym);
@@ -516,3 +551,59 @@ CheriExports::getOrAddThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 #endif
 	return s;
 }
+
+const SimpleExternalCallTrampoline*
+SimpleExternalCallTrampoline::create(const void* target_cgp, dlfunc_t target_func) {
+	auto ret = globalRwxAllocator.allocate<SimpleExternalCallTrampoline>();
+	ret->init(target_cgp, target_func);
+	return ret;
+}
+
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+extern "C" const void*
+find_per_function_cgp(const Obj_Entry *obj, const void* func) {
+	assert(obj->per_function_captable);
+	const auto mapping_end = (const CheriCapTableMappingEntry*)
+	    cheri_incoffset(obj->captable_mapping, obj->captable_mapping_size);
+	uint64_t relative_func_addr = (const char*)func - obj->relocbase;
+	dbg_cheri_plt_verbose("Looking up $cgp for function %p (relative ="
+	    " 0x%zx) in %s", func, (size_t)relative_func_addr, obj->path);
+	CheriCapTableMappingEntry needle;
+	needle.func_start = relative_func_addr;
+	auto it = std::lower_bound(obj->captable_mapping, mapping_end, needle,
+	    [](const CheriCapTableMappingEntry& a, const CheriCapTableMappingEntry& b) {
+		return a.func_start < b.func_start;
+	    });
+	if (it == mapping_end || it->func_start > relative_func_addr) {
+		dbg_cheri_plt_verbose("Could not find function %p (relative ="
+		    " 0x%zx) in captable mapping for %s", func,
+		    (size_t)relative_func_addr, obj->path);
+		return NULL;
+	}
+	dbg_assert(it->func_start <= relative_func_addr && it->func_end >= relative_func_addr);
+	dbg_cheri_plt_verbose("Found captable subset in mapping %d: off=%#zx,"
+	    " len=%#zx", (int)(it - obj->captable_mapping),
+	    (size_t)it->cap_table_offset, (size_t)it->sub_table_size);
+	// __builtin_dump_struct(it, &rtld_printf);
+	const void* captable_subset = cheri_csetbounds(
+	    cheri_incoffset(obj->_target_cgp, it->cap_table_offset), it->sub_table_size);
+	dbg_cheri_plt("captable subset for function %p is %#p. Full table is %#p",
+	    func, captable_subset, obj->_target_cgp);
+	return captable_subset; // FIXME: this is wrong!
+}
+
+extern "C" void add_cgp_stub_for_local_function(Obj_Entry *obj, const void** dest) {
+	const void* func = *dest;
+	dbg_cheri_plt_verbose("Replacing call to %-#p with trampoline.", func);
+	const void* target_cgp = target_cgp_for_func(obj, func);
+	auto trampoline = SimpleExternalCallTrampoline::create(target_cgp,
+	    (dlfunc_t)const_cast<void*>(func));
+	const void* trampoline_func = trampoline->pcc_value();
+	dbg_cheri_plt_verbose("Target cgp is %#-p, trampoline is %#p", target_cgp, trampoline_func);
+	*dest = trampoline_func;
+	assert((cheri_getperm(*dest) & (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP)) == 0);
+
+	return;
+}
+
+#endif

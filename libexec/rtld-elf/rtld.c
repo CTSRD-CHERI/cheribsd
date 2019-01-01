@@ -866,10 +866,11 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     // rtld_start.S $cgp will be set up correctly. We could also pass another
     // reference argument and store obj_main->captable there but this is easier
     // and should have the same effect.
-    __asm__ volatile("cmove $cgp, %0" :: "C"(obj_main->target_cgp));
+    const void *entry_cgp = target_cgp_for_func(obj_main, obj_main->entry);
+    dbg_cheri("Setting initial $cgp for %s to %-#p", obj_main->path, entry_cgp);
+    __asm__ volatile("cmove $cgp, %0" :: "C"(entry_cgp));
     assert(cheri_getperm(obj_main->entry) & CHERI_PERM_EXECUTE);
 #endif
-
     return (func_ptr_type) obj_main->entry;
 }
 
@@ -1342,8 +1343,19 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    /* Can't restrict $pcc in legacy mode */
 	    obj->cheri_captable_abi = abi;
 	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
-	    if (flags)
-		dbg("Unknown DT_MIPS_CHERI_FLAGS: %zx", (size_t)flags);
+	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
+	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+		obj->per_function_captable = true;
+#else
+		rtld_fatal("Cannot load %s with per-file/per-function "
+		    "captable since " _PATH_RTLD " was not compiled with "
+		    "-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1", obj->path);
+#endif
+	    } else if (flags) {
+		rtld_fdprintf(STDERR_FILENO, "Unknown DT_MIPS_CHERI_FLAGS in %s"
+		    ": 0x%zx", obj->path, (size_t)flags);
+	    }
 	    break;
 	}
 
@@ -1355,7 +1367,18 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	case DT_MIPS_CHERI_CAPTABLESZ:
 	    obj->captable_size = dynp->d_un.d_val;
 	    break;
-#endif
+
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+	case DT_MIPS_CHERI_CAPTABLE_MAPPING:
+	    obj->captable_mapping =
+	        (struct CheriCapTableMappingEntry*)(obj->relocbase + dynp->d_un.d_ptr);
+	    break;
+
+	case DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ:
+	    obj->captable_mapping_size = dynp->d_un.d_val;
+	    break;
+#endif /* RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 */
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 	/*
 	 * Don't process DT_DEBUG on MIPS as the dynamic section
@@ -1527,9 +1550,12 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 
 	set_bounds_if_nonnull(obj->cap_relocs, obj->cap_relocs_size);
 	set_bounds_if_nonnull(obj->writable_captable, obj->captable_size);
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+	set_bounds_if_nonnull(obj->captable_mapping, obj->captable_mapping_size);
+#endif
 	// Set the target cgp as a read-only version of the .cap_table section
 	if (obj->writable_captable)
-		obj->target_cgp = cheri_clearperm(obj->writable_captable, TARGET_CGP_REMOVE_PERMS);
+		obj->_target_cgp = cheri_clearperm(obj->writable_captable, TARGET_CGP_REMOVE_PERMS);
 
 	// Now reduce the bounds on text_rodata_cap:  I, and for PLT/FNDESC we can set tight bounds
 	// so we only need .text

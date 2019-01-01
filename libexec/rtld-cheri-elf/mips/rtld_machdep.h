@@ -109,6 +109,23 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	return ret;
 }
 
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+/* Implemented as a C++ function to use std::lower_bound */
+const void* find_per_function_cgp(const struct Struct_Obj_Entry *obj, const void* func);
+void add_cgp_stub_for_local_function(Obj_Entry *obj, const void** dest);
+#endif
+
+static inline const void* target_cgp_for_func(const struct Struct_Obj_Entry *obj, const void* func)
+{
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+	if (obj->per_function_captable)
+		return find_per_function_cgp(obj, func);
+#else
+	(void)func;
+#endif
+	return obj->_target_cgp;
+}
+
 static inline dlfunc_t
 vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
 	const void* text = get_codesegment(obj);

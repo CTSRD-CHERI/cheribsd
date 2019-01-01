@@ -19,6 +19,17 @@ CFLAGS+=-DDEBUG -DDEBUG_VERBOSE=${RTLD_DEBUG_VERBOSE}
 CFLAGS+=-DDEBUG
 .endif
 
+# Make per-file captable opt-in since it slows down normal code that doesn't
+# use it and increases the size of plt stubs.
+# This could be optimized to use different stubs for per-file stubs but for
+# now making it opt-in is easier.
+# TODO: add a make options for this (e.g. MK_BENCHMARK_OPTIONS)?
+.ifdef RTLD_PER_FUNCTION_CAPTABLE_SUPPORT
+CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1
+.else
+CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=0
+.endif
+
 
 PROG?=		ld-cheri-elf.so.1
 SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c cheri_reloc.c

@@ -96,6 +96,13 @@ struct CheriCapTableEntry {
 	void *value;
 };
 
+struct CheriCapTableMappingEntry {
+  uint64_t func_start;       // virtual address relative to base address
+  uint64_t func_end;         // virtual address relative to base address
+  uint32_t cap_table_offset; // offset in bytes into captable
+  uint32_t sub_table_size;   // size in bytes of this sub-table
+};
+
 /* Lists of shared objects */
 typedef struct Struct_Objlist_Entry {
     STAILQ_ENTRY(Struct_Objlist_Entry) link;
@@ -234,15 +241,19 @@ typedef struct Struct_Obj_Entry {
      * for use by RTLD and one read-only for use as the target $cgp in plt stubs.
      */
     struct CheriCapTableEntry* writable_captable;
-    const struct CheriCapTableEntry* target_cgp;
+    const struct CheriCapTableEntry* _target_cgp;
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
     size_t captable_size;	/* size of the .cap_table section */
-#endif
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+    const struct CheriCapTableMappingEntry* captable_mapping;
+    size_t captable_mapping_size;	/* size of the .cap_table_mapping section */
+#endif /* RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 */
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
     Elf_Word local_gotno;	/* Number of local GOT entries */
     Elf_Word symtabno;		/* Number of dynamic symbols */
     Elf_Word gotsym;		/* First dynamic symbol in GOT */
     Elf_Addr *mips_pltgot;	/* Second PLT GOT */
-#endif
+#endif /* defined(__mips__) */
 #ifdef __powerpc64__
     Elf_Addr glink;		/* GLINK PLT call stub section */
 #endif
@@ -337,7 +348,14 @@ typedef struct Struct_Obj_Entry {
     bool restrict_pcc_basic : 1;
     bool restrict_pcc_strict : 1;
     unsigned cheri_captable_abi : 3;
-#endif
+    /*
+     * If we linked the DSO with the per-file or per-function captable flag we
+     * must add a trampoline for every function to set up the correct $cgp.
+     * If RTLD_SUPPORT_PER_FUNCTION_CAPTABLE != 1, loading an object with
+     * this flag will result in an error.
+     */
+    bool per_function_captable : 1;
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
     struct link_map linkmap;	/* For GDB and dlinfo() */
     Objlist dldags;		/* Object belongs to these dlopened DAGs (%) */

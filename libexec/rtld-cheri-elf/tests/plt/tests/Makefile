@@ -7,7 +7,11 @@ PLAIN_TESTS_C=	test_write \
 	load_global_int_fnptr_call \
 	load_global_int_data_ref \
 	test_library_cgp \
-	test_library_fnptr \
+	test_library_fnptr
+
+.ifdef RTLD_PER_FUNCTION_CAPTABLE_SUPPORT
+PLAIN_TESTS_C+=	per_function_table_basic
+.endif
 
 SRCS.test_library_cgp= \
 	test_library_cgp_asm.S \
@@ -28,6 +32,8 @@ SRCS.${_t}+=	local_syscalls.S \
 SRCS.${_t}+=	strlen.c
 .endfor
 
+LDFLAGS.per_function_table_basic+=-Wl,-captable-scope=function
+LDFLAGS.per_function_table_basic+=-Wl,-z,captabledebug
 
 CFLAGS+=-I${SRCTOP}/lib/libc/${TARGET}
 

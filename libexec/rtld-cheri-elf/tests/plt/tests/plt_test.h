@@ -59,13 +59,13 @@ extern const char* ltoa_unsafe(long l, int base);
 		exit(0); \
 	}
 
-static inline void
+static __always_inline __used void
 print_long(long l, int base)
 {
 	print(ltoa_unsafe(l, base));
 }
 
-static inline void
+static __always_inline __used void
 print_cap(const void* __capability cap) {
 	print("v:"); print_long(cheri_gettag(cap), 10);
 	print(" s:"); print_long(cheri_getsealed(cap), 10);
@@ -76,8 +76,8 @@ print_cap(const void* __capability cap) {
 	print(" t:"); print_long(cheri_gettype(cap), 10);
 }
 
-static __always_inline __used
-void _require_eq(register_t r1, register_t r2, const char* r1s, const char* r2s, int line)
+static __always_inline __used void
+_require_eq(register_t r1, register_t r2, const char* r1s, const char* r2s, int line)
 {
 	if (r1 != r2) {
 		print("Test failed at line ");
