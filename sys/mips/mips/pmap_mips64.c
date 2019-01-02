@@ -1465,8 +1465,7 @@ pmap_release(pmap_t pmap)
 	ptdva = (vm_offset_t)pmap->pm_segtab;
 	ptdpg = PHYS_TO_VM_PAGE(MIPS_DIRECT_TO_PHYS(ptdva));
 
-	ptdpg->wire_count--;
-	atomic_subtract_int(&vm_cnt.v_wire_count, 1);
+	vm_page_unwire_noq(ptdpg);
 	vm_page_free_zero(ptdpg);
 }
 
