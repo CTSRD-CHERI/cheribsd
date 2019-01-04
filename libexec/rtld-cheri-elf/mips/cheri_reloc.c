@@ -55,7 +55,8 @@ void _rtld_do___caprelocs_self(const struct capreloc *start_relocs,
 /* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
 static __attribute__((always_inline))
 void _do___caprelocs(const struct capreloc *start_relocs,
-    const struct capreloc * stop_relocs, void* gdc, void* pcc, vaddr_t base_addr)
+    const struct capreloc * stop_relocs, void* gdc, const void* pcc,
+    vaddr_t base_addr, bool tight_pcc_bounds)
 {
 
 	/*
@@ -83,10 +84,11 @@ void _do___caprelocs(const struct capreloc *start_relocs,
 		}
 		void *src;
 		if (isFunction) {
-			src = __builtin_cheri_offset_set(pcc, reloc->object);
+			src = cheri_setaddress(pcc, reloc->object);
+			if (tight_pcc_bounds)
+				src = __builtin_cheri_bounds_set(src, reloc->size);
 		} else {
-			src = __builtin_cheri_offset_increment(gdc,
-			    reloc->object - mapbase);
+			src = cheri_setaddress(gdc, reloc->object);
 			if (reloc->size != 0)
 				src = __builtin_cheri_bounds_set(src, reloc->size);
 		}
@@ -109,8 +111,9 @@ _rtld_do___caprelocs_self(const struct capreloc *start_relocs,
     const struct capreloc* end_relocs, void *relocbase)
 {
 	void *pcc = __builtin_cheri_program_counter_get();
-
-	_do___caprelocs(start_relocs, end_relocs, relocbase, pcc, 0);
+	// TODO: allow using tight bounds for RTLD by passing in the parameter
+	//  from ASM if it was built for the PLT ABI
+	_do___caprelocs(start_relocs, end_relocs, relocbase, pcc, 0, false);
 }
 
 void
@@ -131,11 +134,11 @@ process___cap_relocs(Obj_Entry* obj)
 	 *
 	 * TODO: reject those binaries and suggest relinking with the right flag
 	 */
-	void *mapbase = obj->relocbase;
-	void *pcc = __builtin_cheri_program_counter_get();
+	void *data_base = obj->relocbase;
+	const void *code_base = get_codesegment(obj);
 
-	dbg("Processing %lu __cap_relocs for %s\n", (end_relocs - start_relocs),
-	    obj->path);
+	dbg("Processing %lu __cap_relocs for %s (code base = %-#p, data base = %-#p) \n",
+	    (end_relocs - start_relocs), obj->path, code_base, data_base);
 
 	/*
 	 * We currently emit dynamic relocations for the cap_relocs location, so
@@ -149,7 +152,8 @@ process___cap_relocs(Obj_Entry* obj)
 #endif
 	vaddr_t base_addr = 0;
 
-	_do___caprelocs(start_relocs, end_relocs, mapbase, pcc, base_addr);
+	_do___caprelocs(start_relocs, end_relocs, data_base, code_base, base_addr,
+	    obj->restrict_pcc_strict);
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	// TODO: do this later
 	if (obj->per_function_captable) {
