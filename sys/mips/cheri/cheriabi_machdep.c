@@ -723,7 +723,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
 	u_long auxv, stackbase, stacklen;
-	size_t map_base, map_length, text_end, data_length, code_end;
+	size_t map_base, map_length, text_end, code_end;
+#ifdef CHERIABI_LEGACY_SUPPORT
+	size_t data_length;
+#endif
 	struct rlimit rlim_stack;
 	/* const bool is_dynamic_binary = imgp->interp_end != 0; */
 	/* const bool is_rtld_direct_exec = imgp->reloc_base == imgp->start_addr; */
@@ -808,6 +811,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    (mips_rd_status() & MIPS_SR_INT_MASK) |
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
 
+	frame = &td->td_pcb->pcb_regs;
+#ifdef CHERIABI_LEGACY_SUPPORT
 	/*
 	 * XXXAR: data_length needs to be the full address space to allow
 	 * legacy ABI to work since the TLS region will be beyond the end of
@@ -818,12 +823,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * Having a full address space $ddc on startup does not matter for new
 	 * binaries since they will all clear $ddc as one of the first user
 	 * instructions anyway.
-	 *
-	 * TODO: for co-processes we should start with NULL $ddc
 	 */
 	data_length = CHERI_CAP_USER_DATA_LENGTH; /* Always representable */
-	frame = &td->td_pcb->pcb_regs;
 	cheriabi_capability_set_user_ddc(&frame->ddc, data_length);
+#endif
 
 	/*
 	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with

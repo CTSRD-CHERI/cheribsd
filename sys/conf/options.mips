@@ -128,6 +128,11 @@ CPU_CHERI	opt_global.h
 CHERI_IMPLICIT_USER_DDC	opt_global.h
 
 #
+# Support legacy CheriABI binaries
+#
+CHERIABI_LEGACY_SUPPORT	opt_global.h
+
+#
 # Experimental support for 128-bit capabilities.
 #
 CPU_CHERI128			opt_global.h
