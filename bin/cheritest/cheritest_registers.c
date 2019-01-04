@@ -332,6 +332,26 @@ test_initregs_default(const struct cheri_test *ctp __unused)
  * default capability for the MIPS ABI.
  */
 #ifdef __CHERI_PURE_CAPABILITY__
+
+#define CHERI_STACK_OFFSET_MAX 0x7fffff
+#define CHERI_STACK_OFFSET_MIN 0x7fc000
+
+void
+test_initregs_stack_user_perms(const struct cheri_test *ctp __unused)
+{
+	register_t v;
+
+	/*
+	 * Note: this test is an expected failure since we set VMMAP
+	 * TODO: move this into test_initregs_stack once it passes
+	 */
+	v = cheri_getperm(cheri_getstack());
+	if ((v & CHERI_PERMS_SWALL) !=
+	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
+		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
+		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
+}
+
 void
 test_initregs_stack(const struct cheri_test *ctp __unused)
 {
@@ -352,21 +372,19 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 
 	/* Offset. */
 	v = cheri_getoffset(c);
-	if (v != CHERI_CAP_USER_DATA_OFFSET)
-		cheritest_failure_errx("offset %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_DATA_OFFSET);
+	if (v > CHERI_STACK_OFFSET_MAX || v < CHERI_STACK_OFFSET_MIN)
+		cheritest_failure_errx("stack offset %jx (expected range %jx "
+		    "to %jx)", v, (uintmax_t)CHERI_STACK_OFFSET_MIN,
+		    (uintmax_t)CHERI_STACK_OFFSET_MIN);
 
 	/* Type -- should be zero for an unsealed capability. */
 	v = cheri_gettype(c);
-	if (v != 0)
+	if (v != -1)
 		cheritest_failure_errx("otype %jx (expected %jx)", v,
 		    (uintmax_t)0);
 
 	/* Permissions. */
 	v = cheri_getperm(c);
-	if (v != CHERI_CAP_USER_DATA_PERMS)
-		cheritest_failure_errx("perms %jx (expected %jx)", v,
-		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS);
 
 	/*
 	 * More overt tests for permissions that should -- or should not -- be
@@ -406,10 +424,9 @@ test_initregs_stack(const struct cheri_test *ctp __unused)
 	if ((v & CHERI_PERM_UNSEAL) != 0)
 		cheritest_failure_errx("perms %jx (unseal present)", v);
 
-	if ((v & CHERI_PERMS_SWALL) !=
-	    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP))
-		cheritest_failure_errx("perms %jx (expected swperms %x)", v,
-		    (CHERI_PERMS_SWALL & ~CHERI_PERM_CHERIABI_VMMAP));
+	if (v != CHERI_CAP_USER_DATA_PERMS)
+		cheritest_failure_errx("perms %jx (expected %jx)", v,
+		    (uintmax_t)CHERI_CAP_USER_DATA_PERMS);
 
 	/* Sealed bit. */
 	v = cheri_getsealed(c);

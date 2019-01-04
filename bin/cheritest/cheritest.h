@@ -457,6 +457,7 @@ DECLARE_CHERI_TEST(test_ptrace_basic);
 DECLARE_CHERI_TEST(test_initregs_default);
 #ifdef __CHERI_PURE_CAPABILITY__
 DECLARE_CHERI_TEST(test_initregs_stack);
+DECLARE_CHERI_TEST(test_initregs_stack_user_perms);
 #endif
 DECLARE_CHERI_TEST(test_initregs_idc);
 DECLARE_CHERI_TEST(test_initregs_pcc);
