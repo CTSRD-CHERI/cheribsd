@@ -214,6 +214,7 @@ check_initreg_code(void * __capability c)
 	cheritest_success();
 }
 
+#ifndef __CHERI_CAPABILITY_TABLE__
 static void
 check_initreg_data(void * __capability c)
 {
@@ -302,12 +303,22 @@ check_initreg_data(void * __capability c)
 		cheritest_failure_errx("tag %jx (expected 1)", v);
 	cheritest_success();
 }
+#endif
 
 void
 test_initregs_default(const struct cheri_test *ctp __unused)
 {
 
+#ifdef __CHERI_CAPABILITY_TABLE__
+	if (cheri_getdefault() == NULL)
+		cheritest_success();
+	else
+		cheritest_failure_errx("Expected NULL $ddc but was %-#p",
+		    cheri_getdefault());
+
+#else
 	check_initreg_data(cheri_getdefault());
+#endif
 }
 
 /*
