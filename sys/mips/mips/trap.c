@@ -1082,14 +1082,18 @@ dofault:
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 
-			if (td->td_md.md_ss_addr != va)
+			if (td->td_md.md_ss_addr != va) {
+				addr = va;
 				break;
+			}
 
 			/* read break instruction */
 			instr = fuword32_c(__USER_CODE_CAP((void *)va));
 
-			if (instr != MIPS_BREAK_SSTEP)
+			if (instr != MIPS_BREAK_SSTEP) {
+				addr = va;
 				break;
+			}
 
 			CTR3(KTR_PTRACE,
 			    "trap: tid %d, single step at %#lx: %#08x",
