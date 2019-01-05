@@ -695,7 +695,7 @@ trap(struct trapframe *trapframe)
 	int access_type;
 	ksiginfo_t ksi;
 	char *msg = NULL;
-	intptr_t addr = 0;
+	intptr_t addr;
 	register_t pc;
 	int cop, error;
 	register_t *frame_regs;
@@ -837,6 +837,7 @@ trap(struct trapframe *trapframe)
 	}
 #endif
 
+	addr = trapframe->pc;
 	switch (type) {
 	case T_MCHECK:
 #ifdef DDB
@@ -990,7 +991,6 @@ dofault:
 				ucode = SEGV_ACCERR;
 			else
 				ucode = SEGV_MAPERR;
-			addr = trapframe->pc;
 
 			msg = "BAD_PAGE_FAULT";
 			log_bad_page_fault(msg, trapframe, type);
@@ -1025,7 +1025,6 @@ dofault:
 	case T_BUS_ERR_LD_ST + T_USER:	/* BERR asserted to cpu */
 		ucode = 0;	/* XXX should be VM_PROT_something */
 		i = SIGBUS;
-		addr = trapframe->pc;
 		if (!msg)
 			msg = "BUS_ERR";
 		log_bad_page_fault(msg, trapframe, type);
@@ -1077,10 +1076,9 @@ dofault:
 
 			i = SIGTRAP;
 			ucode = TRAP_BRKPT;
-			addr = trapframe->pc;
 
 			/* compute address of break instruction */
-			va = trapframe->pc;
+			va = addr;
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 
@@ -1108,19 +1106,13 @@ dofault:
 
 	case T_IWATCH + T_USER:
 	case T_DWATCH + T_USER:
-		{
-			intptr_t va;
-
 			/* compute address of trapped instruction */
-			va = trapframe->pc;
 			if (DELAYBRANCH(trapframe->cause))
-				va += sizeof(int);
-			printf("watch exception @ %p\n", (void *)va);
+				addr += sizeof(int);
+			printf("watch exception @ %p\n", (void *)addr);
 			i = SIGTRAP;
 			ucode = TRAP_BRKPT;
-			addr = va;
 			break;
-		}
 
 	case T_TRAP + T_USER:
 		{
@@ -1165,7 +1157,6 @@ dofault:
 
 			log_illegal_instruction("RES_INST", trapframe);
 			i = SIGILL;
-			addr = trapframe->pc;
 		}
 		break;
 #ifdef CPU_CHERI
@@ -1189,7 +1180,6 @@ dofault:
 		log_c2e_exception(msg, trapframe, type);
 		i = SIGPROT;
 		ucode = cheri_capcause_to_sicode(trapframe->capcause);
-		addr = trapframe->pc;
 		break;
 
 #else
@@ -1271,7 +1261,6 @@ dofault:
 				i = SIGILL;
 				break;
 			}
-			addr = trapframe->pc;
 			MipsSwitchFPState(PCPU_GET(fpcurthread), td->td_frame);
 			PCPU_SET(fpcurthread, td);
 #if defined(__mips_n32) || defined(__mips_n64)
@@ -1284,7 +1273,6 @@ dofault:
 		}
 #ifdef	CPU_CNMIPS
 		else  if (cop == 2) {
-			addr = trapframe->pc;
 			if ((td->td_md.md_flags & MDTD_COP2USED) &&
 			    (td->td_md.md_cop2owner == COP2_OWNER_KERNEL)) {
 				if (td->td_md.md_cop2)
@@ -1326,12 +1314,10 @@ dofault:
 	case T_FPE + T_USER:
 #if !defined(CPU_HAVEFPU)
 		i = SIGILL;
-		addr = trapframe->pc;
 		break;
 #else
 		if (!emulate_fp) {
 			i = SIGFPE;
-			addr = trapframe->pc;
 			break;
 		}
 		MipsFPTrap(trapframe->sr, trapframe->cause, trapframe->pc);
@@ -1340,7 +1326,6 @@ dofault:
 
 	case T_OVFLOW + T_USER:
 		i = SIGFPE;
-		addr = trapframe->pc;
 		break;
 
 	case T_ADDR_ERR_LD:	/* misaligned access */
