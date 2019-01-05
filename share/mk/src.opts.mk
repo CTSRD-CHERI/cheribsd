@@ -192,6 +192,7 @@ __DEFAULT_YES_OPTIONS = \
     WIRELESS \
     WPA_SUPPLICANT_EAPOL \
     ZFS \
+    LOADER_ZFS \
     ZONEINFO
 
 __DEFAULT_NO_OPTIONS = \
@@ -511,6 +512,7 @@ MK_SOURCELESS_UCODE:= no
 
 .if ${MK_CDDL} == "no"
 MK_ZFS:=	no
+MK_LOADER_ZFS:=	no
 MK_CTF:=	no
 .endif
 
