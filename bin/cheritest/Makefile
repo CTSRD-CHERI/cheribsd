@@ -21,6 +21,8 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_vm.c							\
 	cheritest_vm_swap.c						\
 	cheritest_zlib.c
+# This test is broken
+CFLAGS.cheritest_vm_swap.c+=-Wno-cheri-capability-misuse
 .endif
 
 CHERITEST_DIR:=	${.PARSEDIR}

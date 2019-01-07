@@ -237,6 +237,7 @@ dotest(int force_pageout)
 	if (p == (void *)MAP_FAILED)
 		err(1, "mmap");
 	PRINTF("p=%p\n", p);
+#pragma message("This test cannot work with a NULL $ddc")
 
 #define	LOOP_INNER do {							\
 		if (j == 8 * sizeof(*pattern)) {			\
