@@ -115,7 +115,9 @@ SRCS+=		cheritest_ccall.c					\
 .endif
 .endif
 
+.ifdef CHERIABI_TESTS
 NO_WERROR=	YES
+.endif
 
 .ifdef CHERITHREAD_TESTS
 LIBADD+=	pthread

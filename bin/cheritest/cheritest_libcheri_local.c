@@ -84,7 +84,7 @@ test_sandbox_store_global_capability_in_bss(
 	void * __capability carg;
 	register_t v;
 
-	carg = (void * __capability)&v;
+	carg = (__cheri_tocap void * __capability)&v;
 	v = invoke_store_capability_in_bss(carg);
 	if (v != 0)
 		cheritest_failure_errx("unexpected return value (%ld)", v);
@@ -102,7 +102,7 @@ test_sandbox_store_local_capability_in_bss_catch(
 	void * __capability carg;
 	register_t v;
 
-	carg = (void * __capability)&v;
+	carg = (__cheri_tocap void * __capability)&v;
 	v = invoke_store_local_capability_in_bss(carg);
 	if (v != -1)
 		cheritest_failure_errx("unexpected return value (%ld)", v);
@@ -122,7 +122,7 @@ test_sandbox_store_local_capability_in_bss_nocatch(
 	register_t v;
 
 	signal_handler_clear(SIGPROT);
-	carg = (void * __capability)&v;
+	carg = (__cheri_tocap void * __capability)&v;
 	v = invoke_store_local_capability_in_bss(carg);
 	if (v != -1)
 		cheritest_failure_errx("unexpected return value (%ld)", v);
@@ -140,7 +140,7 @@ test_sandbox_store_global_capability_in_stack(
 	void * __capability carg;
 	register_t v;
 
-	carg = (void * __capability)&v;
+	carg = (__cheri_tocap void * __capability)&v;
 	v = invoke_store_capability_in_stack(carg);
 	if (v != 0)
 		cheritest_failure_errx("unexpected return value (%ld)", v);
@@ -158,7 +158,7 @@ test_sandbox_store_local_capability_in_stack(
 	void * __capability carg;
 	register_t v;
 
-	carg = (void * __capability)&v;
+	carg = (__cheri_tocap void * __capability)&v;
 	v = invoke_store_local_capability_in_stack(carg);
 	if (v != 0)
 		cheritest_failure_errx("unexpected return value (%ld)", v);
@@ -176,7 +176,7 @@ test_sandbox_return_global_capability(const struct cheri_test *ctp __unused)
 	void * __capability cret = NULL;
 	register_t v;
 
-	carg = (void * __capability)&v;
+	carg = (__cheri_tocap void * __capability)&v;
 	cret = invoke_return_capability(carg);
 	if (cret != carg)
 		cheritest_failure_errx("unexpected capability on return");
@@ -194,7 +194,7 @@ test_sandbox_return_local_capability(const struct cheri_test *ctp __unused)
 	void * __capability cret = NULL;
 	register_t v;
 
-	carg = (void * __capability)&v;
+	carg = (__cheri_tocap void * __capability)&v;
 	libcheri_errno = 0;
 	cret = invoke_return_local_capability(carg);
 	if (cret == carg)
@@ -216,7 +216,7 @@ test_sandbox_pass_local_capability_arg(const struct cheri_test *ctp __unused)
 	void * __capability carg;
 	register_t v;
 
-	carg = (void * __capability)&v;
+	carg = (__cheri_tocap void * __capability)&v;
 	carg = cheri_local(carg);
 	libcheri_errno = 0;
 	v = invoke_store_capability_in_stack(carg);
