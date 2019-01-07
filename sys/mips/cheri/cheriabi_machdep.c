@@ -88,12 +88,10 @@
 #define	DELAYBRANCH(x)	((int)(x) < 0)
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
-#ifdef CHERIABI_LEGACY_SUPPORT
 static void	cheriabi_capability_set_user_ddc(void * __capability *,
 		    size_t);
 static void	cheriabi_capability_set_user_entry(void * __capability *,
 		    unsigned long, size_t);
-#endif
 static int	cheriabi_fetch_syscall_args(struct thread *td);
 static void	cheriabi_set_syscall_retval(struct thread *td, int error);
 static void	cheriabi_sendsig(sig_t, ksiginfo_t *, sigset_t *);
@@ -654,8 +652,6 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		regs->idc = csigp->csig_idc;
 }
 
-#ifdef CHERIABI_LEGACY_SUPPORT
-
 static void
 cheriabi_capability_set_user_ddc(void * __capability *cp, size_t length)
 {
@@ -676,8 +672,6 @@ cheriabi_capability_set_user_entry(void * __capability *cp,
 	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
 	    CHERI_CAP_USER_CODE_BASE, length, entry_addr);
 }
-
-#endif
 
 /*
  * Common per-thread CHERI state initialisation across execve(2) and
@@ -732,8 +726,6 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	size_t map_base, map_length, text_end, code_end;
 #ifdef CHERIABI_LEGACY_SUPPORT
 	size_t data_length;
-#else
-	size_t code_start;
 #endif
 	struct rlimit rlim_stack;
 	/* const bool is_dynamic_binary = imgp->interp_end != 0; */
@@ -847,34 +839,20 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * TODO: add a kernel config option for legacy ABI so we can shrink
 	 * this by default!
 	 */
-#ifdef CHERIABI_LEGACY_SUPPORT
-	/*
-	 * The legacy ABI needs a full address space $pcc (with base == 0)
-	 * to create code capabilities using cgetpccsetoffset
-	 */
-	code_end = CHERI_CAP_USER_CODE_LENGTH;
-	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
-	    code_end);
-#else
+#ifdef NOTYET
 	/*
 	 * If we are executing a static binary we use text_end as the end of
 	 * the text segment. If $pcc is the start of rtld we use interp_end.
-	 * If we are executing ld-cheri-elf.so.1 directly we can use text_end
+	 * If we are executing ld-cheri-elf.so.1 directly and can use text_end
 	 * to find the end of the rtld mapping.
 	 */
 	code_end = imgp->interp_end ? imgp->interp_end : text_end;
-	/*
-	 * Statically linked binaries need a base 0 code capability since
-	 * otherwise crt_init_globals_will fail.
-	 * TODO: use set-address macro instead of csetoffset
-	 */
-	code_start = imgp->interp_end ? imgp->reloc_base : 0;
-	/* Ensure CHERI128 representability */
-	code_end = roundup2(code_end, 1ULL << CHERI_ALIGN_SHIFT(code_end));
-	code_start = rounddown2(code_start, 1ULL << CHERI_ALIGN_SHIFT(code_end));
-	frame->pcc = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
-	    code_start, code_end - code_start, imgp->entry_addr - code_start);
+	code_end = roundup2(code_length, 1ULL << CHERI_ALIGN_SHIFT(code_end));
+#else
+	code_end = CHERI_CAP_USER_CODE_LENGTH;
 #endif
+	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
+	    code_end);
 	frame->c12 = frame->pcc;
 
 	/*
