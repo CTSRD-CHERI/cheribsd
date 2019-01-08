@@ -42,7 +42,11 @@ END {
 	print "#define\tDECLARE_TEST(name, desc) \\"
 	print "    inline void cheri_c_test_ ## name( \\"
 	print "    const struct cheri_test *ctp __unused) {}"
+	print "#define\tDECLARE_TEST_FAULT(name, desc) \\"
+	print "    inline void cheri_c_test_ ## name( \\"
+	print "    const struct cheri_test *ctp __unused) {}"
 	print "    #include <cheri_c_testdecls.h>"
 	print "    #undef\tDECLARE_TEST"
+	print "    #undef\tDECLARE_TEST_FAULT"
 	print "#endif"
 }
