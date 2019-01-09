@@ -134,6 +134,24 @@
 
 #define	RESTORE_U_PCB_CREG(creg, offs, base) \
 	clc	creg, base, (U_PCB_REGS + (SZREG * offs)) ($ddc)
+
+/*
+ * Note: Updating EPCC will also update CP0_EPC. Therefore we should not be
+ * setting CP0_EPC to the value of PC (which is an absolute pc address).
+ * All kernel code updates the PC value and not PCC (which effectively only
+ * contains the bounds). This means we need to update the offset of PCC to
+ * value of PC - PCC.base before writing to EPCC.
+ */
+#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpreg2, pcb)			\
+	/* EPCC is no longer a GPR so load it into KR1C first */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_KR1C, PCC, pcb);			\
+	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
+	RESTORE_EPCC(CHERI_REG_KR1C, pc_vaddr_tmpreg, tmpreg2)
+#else
+/* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
+#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, unused_reg, pcb)	\
+	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);		\
+	MTC0	pc_vaddr_tmpreg, MIPS_COP_0_EXC_PC
 #endif
 
 #define	SAVE_U_PCB_FPREG(reg, offs, base) \

@@ -161,6 +161,7 @@
 	 * XXXRW: If requested PC has been adjusted by stack, similarly	\
 	 * adjust $epcc.offset, which will overwrite an earlier $epc	\
 	 * assignment.							\
+	 * FIXME: this does not work with non-zero $pcc base		\
 	 */								\
 	MFC0	reg, MIPS_COP_0_EXC_PC;					\
 	CGetKCC		CHERI_REG_KR1C;					\
@@ -214,6 +215,12 @@
 	cgetcause	treg;						\
 	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
+
+#define RESTORE_EPCC(capreg, pc_vaddr, tmpreg)			\
+	/* update the address of EPCC to the return pc */ 	\
+	CSetOffset capreg, capreg, pc_vaddr;			\
+	CSetEPCC capreg;
+
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
 	RESTORE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);			\
@@ -242,9 +249,6 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
-	/* EPCC is no longer a GPR so load it into KR1C first */	\
-	RESTORE_U_PCB_CREG(CHERI_REG_KR1C, PCC, pcb);			\
-	CSetEPCC	CHERI_REG_KR1C;					\
 	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
 	csetcause	treg
 

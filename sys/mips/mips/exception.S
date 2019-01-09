@@ -761,7 +761,8 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 
 #ifdef CPU_CHERI
 	/*
-	 * Note: This restores EPCC, matching the explicit EPC restore below.
+	 * Note: This does not restore EPCC, since that is restored by
+	 * RESTORE_U_PCB_PC() (inside RESTORE_REGS_FROM_PCB) below.
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
@@ -1038,7 +1039,8 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 
 #ifdef CPU_CHERI
 	/*
-	 * Note: This restores EPCC, matching the explicit EPC restore below.
+	 * Note: This does not restore EPCC, since that is restored by
+	 * RESTORE_U_PCB_PC() below.
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
@@ -1053,10 +1055,9 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	RESTORE_U_PCB_REG(s8, S8, k1)
 	RESTORE_U_PCB_REG(t0, MULLO, k1)
 	RESTORE_U_PCB_REG(t1, MULHI, k1)
-	RESTORE_U_PCB_REG(t2, PC, k1)
 	mtlo	t0
 	mthi	t1
-	MTC0	t2, MIPS_COP_0_EXC_PC	# set return address
+	RESTORE_U_PCB_PC(t2, t0, k1)	# set return address
 	RESTORE_U_PCB_REG(v0, V0, k1)
 	RESTORE_U_PCB_REG(v1, V1, k1)
 	RESTORE_U_PCB_REG(a0, A0, k1)
