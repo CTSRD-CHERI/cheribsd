@@ -433,14 +433,8 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 	 * Work around bug in the FPGA implementation: EPCC points to the
 	 * delay slot if a trap happenend in the delay slot.
 	 */
-	if (cheri_getoffset(frame->pcc) != frame->pc) {
-		KASSERT(cheri_getoffset(frame->pcc) == frame->pc + 4,
-		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
-		    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
-		frame->pcc = cheri_setoffset(frame->pcc, frame->pc);
-	}
 	KASSERT(cheri_getoffset(frame->pcc) == frame->pc,
-	    ("pcc (%jx) <-> pc (%jx) mismatch:",
+	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
 	    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
 #else
 	bad_inst_ptr = __USER_CODE_CAP((void*)(frame->pc + offset_from_pc));
@@ -727,6 +721,10 @@ trap(struct trapframe *trapframe)
 	trapframe->badinstr.pad = 0;
 	trapframe->badinstr_p.inst = 0;
 #endif
+
+	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
+	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
+	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
 
 	/*
 	 * Enable hardware interrupts if they were on before the trap. If it
@@ -1404,11 +1402,18 @@ err:
 #endif
 	trapsignal(td, &ksi);
 out:
-
 	/*
 	 * Note: we should only get here if returning to user mode.
 	 */
 	userret(td, trapframe);
+#if defined(CPU_CHERI)
+	KASSERT(cheri_getoffset(td->td_frame->pcc) == td->td_frame->pc,
+	    ("td->td_frame->pcc.offset (%jx) <-> td->td_frame->pc (%jx) mismatch:",
+	    (uintmax_t)cheri_getoffset(td->td_frame->pcc), (uintmax_t)td->td_frame->pc));
+	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
+	    ("trapframe->pcc.offset (%jx) <-> trapframe->pc (%jx) mismatch:",
+	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
+#endif
 	return (trapframe->pc);
 }
 
