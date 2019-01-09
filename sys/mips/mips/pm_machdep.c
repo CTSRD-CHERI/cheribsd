@@ -299,8 +299,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	hybridabi_sendsig(td);
 #endif
 
-	regs->pc = (register_t)(__cheri_addr intptr_t)catcher;
-	regs->t9 = (register_t)(__cheri_addr intptr_t)catcher;
+	regs->pc = (register_t)(__cheri_offset intptr_t)catcher;
+	// FIXME: should this be an offset relative to PCC or an address?
+	regs->t9 = (register_t)(__cheri_offset intptr_t)catcher;
 	regs->sp = (register_t)(intptr_t)sfp;
 	if (p->p_sysent->sv_sigcode_base != 0) {
 		/* Signal trampoline code is in the shared page */

@@ -635,8 +635,13 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * Install CHERI signal-delivery register state for handler to run
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (generally) be removed automatically on sigreturn().
+	 *
+	 * Note: regs->pc should currently be the same as the offset of pcc and
+	 * not the virtual address.
+	 * TODO: add an update_trapframe_pc(void* __kerncap) that guarantees
+	 * this invariant always holds.
 	 */
-	regs->pc = (register_t)(__cheri_addr vaddr_t)catcher;
+	regs->pc = (__cheri_offset register_t)catcher;
 	regs->pcc = catcher;
 	regs->csp = sfp;
 	regs->c12 = catcher;
