@@ -580,11 +580,16 @@ SlowFault:
 	RESTORE_CREG(CHERI_REG_C24, sp, C24, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C25, sp, C25, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C26, sp, IDC, $ddc);	\
-	/* EPCC is no longer a GPR so load it into KR1C first */\
-	RESTORE_CREG(CHERI_REG_KR1C, sp, PCC, $ddc);	\
-	CSetEPCC CHERI_REG_KR1C;
+
+/* For CHERI we don't move $v0 to EPC since it is already updated by CSetEPCC */
+#define MTC0_EXC_PC(reg) \
+	/* EPCC is no longer a GPR so load it into KR1C first */	\
+	RESTORE_CREG(CHERI_REG_KR1C, sp, PCC, $ddc);			\
+	/* update the address of EPCC to the return pc */ 		\
+	RESTORE_EPCC(CHERI_REG_KR1C, reg, t0);
 #else
 #define	RESTORE_CHERI
+#define MTC0_EXC_PC(reg) MTC0	reg, MIPS_COP_0_EXC_PC
 #endif
 
 /*
@@ -602,7 +607,7 @@ SlowFault:
 	RESTORE_REG(t1, MULHI, sp)	;\
 	mtlo	t0			;\
 	mthi	t1			;\
-	MTC0	v0, MIPS_COP_0_EXC_PC	;\
+	MTC0_EXC_PC(v0)			;\
 	.set noat		        ;\
 	RESTORE_REG(AT, AST, sp)	;\
 	RESTORE_REG(v0, V0, sp)		;\
