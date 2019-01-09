@@ -429,6 +429,17 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 	/* TODO: if KERNLAND() */
 #ifdef CPU_CHERI
 	bad_inst_ptr = (char * __kerncap)frame->pcc + offset_from_pc;
+	if (!cheri_gettag(bad_inst_ptr)) {
+		struct thread *td = curthread;
+		struct proc *p = td->td_proc;
+		log(LOG_ERR, "%s: pid %d tid %ld (%s), uid %d: Could not fetch "
+		    "faulting instruction from untagged $pcc %p\n",  __func__,
+		    p->p_pid, (long)td->td_tid, p->p_comm,
+		    p->p_ucred ? p->p_ucred->cr_uid : -1,
+		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
+		*instr = -1;
+		return (-1);
+	}
 	/*
 	 * Work around bug in the FPGA implementation: EPCC points to the
 	 * delay slot if a trap happenend in the delay slot.
@@ -447,6 +458,8 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    (long)td->td_tid, p->p_comm,
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
 		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
+		*instr = -1;
+		return (-1);
 	}
 	/* Should this be a kerncap instead instead of being indirected by $pcc? */
 	vaddr = frame->pc + offset_from_pc;
