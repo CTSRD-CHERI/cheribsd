@@ -702,16 +702,12 @@ cheriabi_newthread_init(struct thread *td)
 	 * with ambient authority unless given up by the userspace runtime
 	 * explicitly.  The caller will initialise the stack fields.
 	 *
-	 * XXXRW: In CheriABI, it could be that we should set more of these to
-	 * NULL capabilities rather than initialising to the full address
-	 * space.  Note that some fields are overwritten later in
+	 * Note that some fields are overwritten later in
 	 * cheriabi_exec_setregs() for the initial thread.
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
-	csigp->csig_ddc = frame->ddc;
-	csigp->csig_idc = frame->idc;
-	csigp->csig_pcc = cheri_setoffset(frame->pcc, 0);
+	/* Note: csig_{ddc,idc,pcc} are set to NULL in the pure-capability abi */
 	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
 	    td->td_proc->p_sysent);
 
