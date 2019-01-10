@@ -735,9 +735,11 @@ trap(struct trapframe *trapframe)
 	trapframe->badinstr_p.inst = 0;
 #endif
 
+#ifdef CPU_CHERIs
 	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
 	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
 	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
+#endif
 
 	/*
 	 * Enable hardware interrupts if they were on before the trap. If it
