@@ -171,10 +171,13 @@ static int howto_masks[] = {
 		}
 	} else {
 		n = strsep(&v, "=");
-		if (v == NULL)
-			SETENV(n, "1");
-		else
-			SETENV(n, v);
+		/* We shouldn't add empty variable names to the environment. */
+		if (n && *n != '\0') {
+			if (v == NULL)
+				SETENV(n, "1");
+			else
+				SETENV(n, v);
+		}
 	}
 #endif
 	return (howto);
