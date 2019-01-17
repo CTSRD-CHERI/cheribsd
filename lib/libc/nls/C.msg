@@ -207,10 +207,12 @@ $ ENOTRECOVERABLE
 95 State not recoverable
 $ EOWNERDEAD
 96 Previous owner died
+$ EINTEGRITY
+97 Integrity check failed
 $ EPROT
-97 Memory protection violation
+98 Memory protection violation
 $ ENOMETHOD
-98 Object-capability method not defined
+99 Object-capability method not defined
 $
 $ strsignal() support catalog
 $
