@@ -440,10 +440,6 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		*instr = -1;
 		return (-1);
 	}
-	/*
-	 * Work around bug in the FPGA implementation: EPCC points to the
-	 * delay slot if a trap happenend in the delay slot.
-	 */
 	KASSERT(cheri_getoffset(frame->pcc) == frame->pc,
 	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
 	    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
@@ -735,11 +731,23 @@ trap(struct trapframe *trapframe)
 	trapframe->badinstr_p.inst = 0;
 #endif
 
-#ifdef CPU_CHERIs
+#ifdef CPU_CHERI
+#ifndef CPU_QEMU_MALTA
+	/*
+	 * Work around bug in the FPGA implementation: EPCC points to the
+	 * delay slot if a trap happenend in the delay slot.
+	 */
+	if (cheri_getoffset(frame->pcc) != frame->pc) {
+		KASSERT(cheri_getoffset(frame->pcc) == frame->pc + 4,
+		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
+		    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
+		frame->pcc = cheri_setoffset(frame->pcc, frame->pc);
+	}
+#endif
 	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
 	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
 	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
-#endif
+#endif /* defined(CPU_CHERI) */
 
 	/*
 	 * Enable hardware interrupts if they were on before the trap. If it
