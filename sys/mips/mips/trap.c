@@ -1419,6 +1419,7 @@ err:
 	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
 	ksi.ksi_trapno = type;
 #if defined(CPU_CHERI)
+	td->td_frame->pcc = trapframe->pcc;
 	if (i == SIGPROT)
 		ksi.ksi_capreg = trapframe->capcause &
 		    CHERI_CAPCAUSE_REGNUM_MASK;
