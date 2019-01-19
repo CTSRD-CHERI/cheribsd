@@ -1473,17 +1473,6 @@ trapDump(char *msg)
 #endif
 
 
-#ifdef CPU_CHERI
-static bool
-cheri_cap_is_null(struct trapframe *framePtr, int reg)
-{
-	void * __capability * capRegsPtr;
-
-	capRegsPtr = &framePtr->ddc;
-	return (capRegsPtr[reg] == NULL);
-}
-#endif
-
 /*
  * Return the resulting PC as if the branch was executed.
  *
