@@ -350,7 +350,7 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	if (bootverbose) {
 		printf("cmd line: ");
 		for (i = 0; i < argc; i++)
-			printf("%s ", (char*)(intptr_t)argv[i]);
+			printf("'%s' ", (char*)(intptr_t)argv[i]);
 		printf("\n");
 	}
 
