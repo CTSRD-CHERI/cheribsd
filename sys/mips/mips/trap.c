@@ -737,11 +737,11 @@ trap(struct trapframe *trapframe)
 	 * Work around bug in the FPGA implementation: EPCC points to the
 	 * delay slot if a trap happenend in the delay slot.
 	 */
-	if (cheri_getoffset(frame->pcc) != frame->pc) {
-		KASSERT(cheri_getoffset(frame->pcc) == frame->pc + 4,
+	if (cheri_getoffset(trapframe->pcc) != trapframe->pc) {
+		KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc + 4,
 		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
-		    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
-		frame->pcc = cheri_setoffset(frame->pcc, frame->pc);
+		    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
+		trapframe->pcc = cheri_setoffset(trapframe->pcc, trapframe->pc);
 	}
 #endif
 	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
