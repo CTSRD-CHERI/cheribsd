@@ -1431,9 +1431,13 @@ out:
 	 */
 	userret(td, trapframe);
 #if defined(CPU_CHERI)
-	KASSERT(cheri_getoffset(td->td_frame->pcc) == td->td_frame->pc,
-	    ("td->td_frame->pcc.offset (%jx) <-> td->td_frame->pc (%jx) mismatch:",
-	    (uintmax_t)cheri_getoffset(td->td_frame->pcc), (uintmax_t)td->td_frame->pc));
+	/*
+	 * XXXAR: I don't think this assertion is quite right:
+	 *
+	 * KASSERT(cheri_getoffset(td->td_frame->pcc) == td->td_frame->pc,
+	 *  ("td->td_frame->pcc.offset (%jx) <-> td->td_frame->pc (%jx) mismatch:",
+	 *   (uintmax_t)cheri_getoffset(td->td_frame->pcc), (uintmax_t)td->td_frame->pc));
+	 */
 	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
 	    ("trapframe->pcc.offset (%jx) <-> trapframe->pc (%jx) mismatch:",
 	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
