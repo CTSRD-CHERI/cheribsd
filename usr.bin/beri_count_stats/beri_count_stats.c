@@ -65,10 +65,13 @@ main(int argc, char **argv)
 
 	if (argc == 0)
 		usage(1);
-	if (strcmp("--help", argv[0]) == 0 || strcmp("-h", argv[0]))
+	if (strcmp("--help", argv[0]) == 0 || strcmp("-h", argv[0]) == 0)
 		usage(0);
-	if (strcmp("-v", argv[0]) == 0 || strcmp("--verbose", argv[0]))
+	if (strcmp("-v", argv[0]) == 0 || strcmp("--verbose", argv[0]) == 0) {
+		argc--;
+		argv++;
 		verbose = true;
+	}
 
 	statcounters_bank_t start_count;
 	statcounters_sample(&start_count);
@@ -84,7 +87,7 @@ main(int argc, char **argv)
 	statcounters_bank_t end_count;
 	statcounters_bank_t diff_count;
 	statcounters_sample(&end_count);
-	statcounters_diff(&diff_count, &start_count, &end_count);
+	statcounters_diff(&diff_count, &end_count, &start_count);
 	/*
 	 * Dump the stats and use the command basename as the name
 	 * TODO: arch will be wrong since we are using the architecture of
@@ -92,9 +95,14 @@ main(int argc, char **argv)
 	 */
 	const char* prog_basename = basename(argv[0]);
 	/* Also dump to stderr when -v was passed */
-	if (verbose)
+	if (verbose) {
+		/* Ensure human readable output: */
+		const char* original_fmt = getenv("STATCOUNTERS_FORMAT");
+		unsetenv("STATCOUNTERS_FORMAT");
 		statcounters_dump_with_args(&diff_count, prog_basename, NULL,
 		    NULL, stderr, HUMAN_READABLE);
+		setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
+	}
 	statcounters_dump_with_args(&diff_count, prog_basename, NULL, NULL, NULL, HUMAN_READABLE);
 	exit(WEXITSTATUS(status));
 }
