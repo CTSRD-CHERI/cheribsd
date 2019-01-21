@@ -458,7 +458,7 @@ int statcounters_dump_with_args (
             use_stdout = true;
         }
     } else {
-        use_stdout = true;
+        use_stdout = false;
     }
     if (use_stdout)
         fp = stdout;
