@@ -745,7 +745,7 @@ trap(struct trapframe *trapframe)
 	}
 #endif
 	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
-	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
+	    ("%s(entry): pcc.offset (%jx) <-> pc (%jx) mismatch:", __func__,
 	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
 #endif /* defined(CPU_CHERI) */
 
@@ -1439,7 +1439,7 @@ out:
 	 *   (uintmax_t)cheri_getoffset(td->td_frame->pcc), (uintmax_t)td->td_frame->pc));
 	 */
 	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
-	    ("trapframe->pcc.offset (%jx) <-> trapframe->pc (%jx) mismatch:",
+	    ("%s(exit): pcc.offset (%jx) <-> pc (%jx) mismatch:", __func__,
 	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
 #endif
 	return (trapframe->pc);
