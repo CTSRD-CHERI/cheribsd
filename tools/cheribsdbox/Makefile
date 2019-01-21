@@ -265,6 +265,14 @@ CRUNCH_ALIAS_hexdump=	hd od
 CRUNCH_ALIAS_w=	uptime
 CRUNCH_PROGS_usr.bin+=su
 
+.if ${MK_CHERI} != "no"
+CRUNCH_PROGS_usr.bin+=	qtrace
+.endif
+.if ${MACHINE_ARCH:Mmips64*}
+CRUNCH_PROGS_usr.bin+=	beri_count_stats
+.endif
+
+
 # FIXME: wait -> usr.bin/alias (but that is just a script so how to add
 .if 0
 LINKS=	${BINDIR}/alias ${BINDIR}/bg \
