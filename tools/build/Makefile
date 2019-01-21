@@ -20,7 +20,14 @@ BOOTSTRAPPING?=	0
 _XCODE_ROOT!=xcode-select -p
 # since macOS 10.14 C headers are no longer installed in /usr but only
 # provided via the SDK
-HOST_INCLUDE_ROOT=${_XCODE_ROOT}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include
+.if ${_XCODE_ROOT} == "/Library/Developer/CommandLineTools"
+# Only command line tools installed -> host headers are in the SDKs directory
+_MACOS_SDK_DIR=${_XCODE_ROOT}/SDKs/MacOSX.sdk/
+.else
+# Full XCode installed -> host headers are below Platforms/MacOSX.platform
+_MACOS_SDK_DIR=${_XCODE_ROOT}/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk
+.endif
+HOST_INCLUDE_ROOT=${_MACOS_SDK_DIR}/usr/include
 .if !exists(${HOST_INCLUDE_ROOT}/stdio.h)
 .error "You must install the macOS SDK (try xcode-select --install)"
 .endif
