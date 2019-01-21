@@ -696,6 +696,8 @@ uint64_t statcounters_sample_by_id (int id)
 	return (statcounter_names[id].counter_get());
 }
 
+#ifndef STATCOUNTERS_NO_CTOR_DTOR
+
 // C constructor / atexit interface
 //////////////////////////////////////////////////////////////////////////////
 
@@ -724,3 +726,5 @@ static void end_sample (void)
     // dump the counters
     statcounters_dump(&diff_cnt);
 }
+
+#endif /* STATCOUNTERS_NO_CTOR_DTOR */
