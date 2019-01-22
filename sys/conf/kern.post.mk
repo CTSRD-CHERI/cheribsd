@@ -28,6 +28,10 @@ MKMODULESENV+=	WITH_CTF="${WITH_CTF}"
 MKMODULESENV+=	WITH_EXTRA_TCP_STACKS="${WITH_EXTRA_TCP_STACKS}"
 .endif
 
+.if defined(SAN_CFLAGS)
+MKMODULESENV+=	SAN_CFLAGS="${SAN_CFLAGS}"
+.endif
+
 # Allow overriding the kernel debug directory, so kernel and user debug may be
 # installed in different directories. Setting it to "" restores the historical
 # behavior of installing debug files in the kernel directory.
@@ -433,7 +437,7 @@ vnode_if_typedef.h:
 # start/end/size variables to __start_mfs, __stop_mfs, and mfs_size,
 # respectively.
 embedfs_${MFS_IMAGE:T:R}.o: ${MFS_IMAGE}
-	${OBJCOPY} --input-target binary \
+	${OBJCOPY:C/^.*llvm-objcopy.*/objcopy/} --input-target binary \
 	    --output-target ${EMBEDFS_FORMAT.${MACHINE_ARCH}} \
 	    --binary-architecture ${EMBEDFS_ARCH.${MACHINE_ARCH}} \
 	    ${MFS_IMAGE} ${.TARGET}

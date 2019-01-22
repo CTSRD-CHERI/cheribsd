@@ -613,7 +613,7 @@ int	vntype_to_kinfo(int vtype);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

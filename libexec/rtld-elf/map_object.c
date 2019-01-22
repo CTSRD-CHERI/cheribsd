@@ -29,10 +29,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "prog",
  *   "changes": [
- *     "monotonicity"
+ *     "monotonicity",
+ *     "integer_provenance"
  *   ],
  *   "change_comment": "request sufficent mmap permissions"
  * }
@@ -325,7 +326,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     }
     obj->mapbase = mapbase;
     obj->mapsize = mapsize;
-    obj->textsize = text_end - base_vaddr;
     obj->vaddrbase = base_vaddr;
 
     obj->relocbase = mapbase - base_vaddr;

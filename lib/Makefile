@@ -46,7 +46,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libdevctl \
 	libdevinfo \
 	libdevstat \
-	${_libdl} \
+	libdl \
 	libdwarf \
 	libedit \
 	libelftc \
@@ -59,6 +59,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libifconfig \
 	libipsec \
 	libjail \
+	libjpeg \
 	libkiconv \
 	libkvm \
 	liblzma \
@@ -75,8 +76,6 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 	libpcap \
 	libpjdlog \
 	libpng \
-	libpmc \
-	libpmcstat \
 	${_libproc} \
 	libprocstat \
 	libregex \
@@ -147,7 +146,6 @@ SUBDIR.${MK_BSNMP}+=	libbsnmp
 SUBDIR.${MK_CHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
 SUBDIR.${MK_CHERI}+=	libz-cheri
-SUBDIR.${MK_CHERI}+=	libjpeg
 SUBDIR.${MK_CHERI}+=	libpng_sb
 
 .if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
@@ -226,11 +224,8 @@ _libproc=	libproc
 _librtld_db=	librtld_db
 .endif
 
-.if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mfilter}
-_libdl=		libdl
-.endif
-
 SUBDIR.${MK_OPENSSL}+=	libmp
+SUBDIR.${MK_PMC}+=	libpmc libpmcstat
 SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
 SUBDIR.${MK_SENDMAIL}+=	libmilter libsm libsmdb libsmutil
 SUBDIR.${MK_TELNET}+=	libtelnet

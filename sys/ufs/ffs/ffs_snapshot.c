@@ -794,6 +794,7 @@ out1:
 		brelse(nbp);
 	} else {
 		loc = blkoff(fs, fs->fs_sblockloc);
+		copy_fs->fs_ckhash = ffs_calc_sbhash(copy_fs);
 		bcopy((char *)copy_fs, &nbp->b_data[loc], (u_int)fs->fs_sbsize);
 		bawrite(nbp);
 	}
@@ -1332,12 +1333,12 @@ expunge_ufs2(snapvp, cancelip, fs, acctfunc, expungetype, clearmode)
 	 */
 	dip = (struct ufs2_dinode *)bp->b_data +
 	    ino_to_fsbo(fs, cancelip->i_number);
-	if (clearmode || cancelip->i_effnlink == 0)
-		dip->di_mode = 0;
 	dip->di_size = 0;
 	dip->di_blocks = 0;
 	dip->di_flags &= ~SF_SNAPSHOT;
 	bzero(&dip->di_db[0], (UFS_NDADDR + UFS_NIADDR) * sizeof(ufs2_daddr_t));
+	if (clearmode || cancelip->i_effnlink == 0)
+		dip->di_mode = 0;
 	bdwrite(bp);
 	/*
 	 * Now go through and expunge all the blocks in the file
@@ -2703,7 +2704,7 @@ ffs_snapdata_acquire(struct vnode *devvp)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

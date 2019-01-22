@@ -15,7 +15,8 @@ void test_setup(void);
 
 #define	DECLARE_TEST(name, desc) \
     void cheri_c_test_ ## name(const struct cheri_test *ctp __unused);
-#define DECLARE_TEST_FAULT(name, desc)	/* Not supported */
+#define DECLARE_TEST_FAULT(name, desc)	\
+    void cheri_c_test_ ## name(const struct cheri_test *ctp __unused);
 #define BEGIN_TEST(name) \
     void cheri_c_test_ ## name(const struct cheri_test *ctp __unused) {	\
 	test_setup();

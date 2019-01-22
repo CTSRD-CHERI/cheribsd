@@ -31,10 +31,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "prog",
  *   "changes": [
- *     "pointer_size"
+ *     "pointer_shape"
  *   ],
  *   "change_comment": "aligning struct key_hint, not packing struct key_value"
  * }

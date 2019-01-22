@@ -1481,7 +1481,7 @@ const apr_uint32_t svn__fake__lz4internal = 0xdeadbeef;
 #endif /* SVN_INTERNAL_LZ4 */
 // CHERI CHANGES START
 // {
-//   "updated": 20180830
+//   "updated": 20181113,
 //   "changes": [
 //     "pointer_alignment"
 //   ]

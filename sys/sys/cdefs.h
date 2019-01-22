@@ -241,6 +241,13 @@
 #define	__alloc_align(x)
 #endif
 
+#if __has_attribute(cheri_no_subobject_bounds)
+#define __no_subobject_bounds	__attribute__((cheri_no_subobject_bounds))
+#else
+#define __no_subobject_bounds
+#warning "NO SUBOBJECT BOUNDS MISSING"
+#endif
+
 #if !__GNUC_PREREQ__(2, 95)
 #define	__alignof(x)	__offsetof(struct { char __a; x __b; }, __b)
 #endif
@@ -981,10 +988,10 @@
 #endif /* !_SYS_CDEFS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_integrity",
+//     "integer_provenance",
 //     "support",
 //     "user_capabilities"
 //   ]

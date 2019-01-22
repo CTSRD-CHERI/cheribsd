@@ -58,6 +58,7 @@ __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
 /* For -pie executables rtld will initialize the __cap_relocs */
 #ifndef POSITION_INDEPENDENT_STARTUP
 #define DONT_EXPORT_CRT_INIT_GLOBALS
+#define CRT_INIT_GLOBALS_GDC_ONLY
 #include "crt_init_globals.c"
 #endif
 
@@ -120,14 +121,9 @@ _start(void *auxv,
 	char **env = NULL;
 	Elf_Auxinfo *auxp;
 
-	/* For -pie executables rtld will initialize the __cap_relocs */
-#ifndef POSITION_INDEPENDENT_STARTUP
-	/* Must be called before accessing any globals */
-	crt_init_globals();
-#endif
 	/*
 	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
-	 * first place, but we currently rely on it for crt_init_globals.
+	 * first place.
 	 */
 #ifdef __CHERI_CAPABILITY_TABLE__
 	__asm__ __volatile__ ("csetdefault %0" : : "C" (NULL));
@@ -135,14 +131,20 @@ _start(void *auxv,
 #pragma message("Not clearing $ddc since it is required for the legacy ABI")
 #endif
 
-	__auxargs = auxv;
-	/* Digest the auxiliary vector. */
+	/* Digest the auxiliary vector for local use. */
 	for (i = 0;  i < AT_COUNT;  i++)
 	    aux_info[i] = NULL;
-	for (auxp = __auxargs;  auxp->a_type != AT_NULL;  auxp++) {
+	for (auxp = auxv;  auxp->a_type != AT_NULL;  auxp++) {
 		if (auxp->a_type < AT_COUNT)
 			aux_info[auxp->a_type] = auxp;
 	}
+
+	/* For -pie executables rtld will initialize the __cap_relocs */
+#ifndef POSITION_INDEPENDENT_STARTUP
+	/* Must be called before accessing any globals */
+	crt_init_globals_gdc(aux_info[AT_PHDR]->a_un.a_ptr);
+#endif
+	__auxargs = auxv;
 	argc = aux_info[AT_ARGC]->a_un.a_val;
 	argv = (char **)aux_info[AT_ARGV]->a_un.a_ptr;
 	env = (char **)aux_info[AT_ENVV]->a_un.a_ptr;

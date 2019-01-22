@@ -31,6 +31,33 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	disable the most expensive debugging functionality run
 	"ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20181126:
+	On amd64, arm64 and armv7 (architectures that install LLVM's ld.lld
+	linker as /usr/bin/ld) GNU ld is no longer installed as ld.bfd, as
+	it produces broken binaries when ifuncs are in use.  Users needing
+	GNU ld should install the binutils port or package.
+
+20181123:
+	The BSD crtbegin and crtend code has been enabled by default. It has
+	had extensive testing on amd64, arm64, and i386. It can be disabled
+	by building a world with -DWITHOUT_BSD_CRTBEGIN.
+
+20181115:
+	The set of CTM commands (ctm, ctm_smail, ctm_rmail, ctm_dequeue)
+	has been converted to a port (misc/ctm) and will be removed from
+	FreeBSD-13.  It is available as a package (ctm) for all supported
+	FreeBSD versions.
+
+20181110:
+	The default newsyslog.conf(5) file has been changed to only include
+	files in /etc/newsyslog.conf.d/ and /usr/local/etc/newsyslog.conf.d/ if
+	the filenames end in '.conf' and do not begin with a '.'.
+
+	You should check the configuration files in these two directories match
+	this naming convention. You can verify which configuration files are
+	being included using the command:
+		$ newsyslog -Nrv
+
 20181015:
 	Ports for the DRM modules have been simplified. Now, amd64 users should
 	just install the drm-kmod port. All others should install
@@ -55,6 +82,13 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	cross-threading surprises, especially with automatic driver
 	loading from X11 startup. These will become the defaults in 13-current
 	shortly.
+
+20181012:
+	The ixlv(4) driver has been renamed to iavf(4).  As a consequence,
+	custom kernel and module loading configuration files must be updated
+	accordingly.  Moreover, interfaces previous presented as ixlvN to the
+	system are now exposed as iavfN and network configuration files must
+	be adjusted as necessary.
 
 20181009:
 	OpenSSL has been updated to version 1.1.1.  This update included

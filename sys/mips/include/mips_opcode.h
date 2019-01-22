@@ -101,7 +101,7 @@ typedef union {
 		unsigned cs: 5;
 		unsigned cb: 5;
 		unsigned rt: 5;
-		int offset: 10;
+		int offset: 11;
 	} CCMType;
 	/* Most other capability instructions */
 	struct {

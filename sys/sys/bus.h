@@ -612,6 +612,7 @@ void	device_set_desc(device_t dev, const char* desc);
 void	device_set_desc_copy(device_t dev, const char* desc);
 int	device_set_devclass(device_t dev, const char *classname);
 int	device_set_devclass_fixed(device_t dev, const char *classname);
+bool	device_is_devclass_fixed(device_t dev);
 int	device_set_driver(device_t dev, driver_t *driver);
 void	device_set_flags(device_t dev, u_int32_t flags);
 void	device_set_softc(device_t dev, void *softc);
@@ -946,10 +947,10 @@ static __inline void varp ## _set_ ## var(device_t dev, type t)		\
 #endif /* !_SYS_BUS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180904,
+//   "updated": 20181127,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_size"
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

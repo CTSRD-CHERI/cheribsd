@@ -76,6 +76,8 @@ band event for
 .Dv SIGPOLL
 .It Vt int Ta Va si_trapno Ta
 machine trap code
+.It Vt int Ta Va si_capreg Ta
+capability register number
 .It Vt int Ta Va si_timerid Ta
 .Tn POSIX
 timer ID
@@ -150,6 +152,40 @@ invalid address alignment
 nonexistent physical address
 .It Ta Dv BUS_OBJERR Ta
 object-specific hardware error
+.It Dv SIGPROT Ta Dv PROT_CHERI_BOUNDS Ta
+capability bounds fault
+.It Ta Dv PROT_CHERI_TAG Ta
+capability tag fault
+.It Ta Dv PROT_CHERI_SEALED Ta
+capability sealed fault
+.It Ta Dv PROT_CHERI_TYPE Ta
+type mismatch fault
+.It Ta Dv PROT_CHERI_PERM Ta
+capability permission fault
+.It Ta Dv PROT_CHERI_STORETAG Ta
+tag-store page fault
+.It Ta Dv PROT_CHERI_IMPRECISE Ta
+imprecise bounds fault
+.It Ta Dv PROT_CHERI_STORELOCAL Ta
+store-local fault
+.It Ta Dv PROT_CHERI_CCALL Ta
+CCall fault
+.It Ta Dv PROT_CHERI_CRETURN Ta
+CReturn fault
+.It Ta Dv PROT_CHERI_SYSREG Ta
+capability system register fault
+.It Ta Dv PROT_CHERI_UNSEALED Ta
+CCall unsealed argument fault
+.It Ta Dv PROT_CHERI_OVERFLOW Ta
+trusted stack oveflow fault
+.It Ta Dv PROT_CHERI_UNDERFLOW Ta
+trusted stack underflow fault
+.It Ta Dv PROT_CHERI_CCALLREGS Ta
+CCall argument fault
+.It Ta Dv PROT_CHERI_LOCALARG Ta
+CCall local argument fault
+.It Ta Dv PROT_CHERI_LOCALRET Ta
+CReturn local retval fault
 .It Dv SIGTRAP Ta Dv TRAP_BRKPT Ta
 process breakpoint
 .It Ta Dv TRAP_TRACE Ta
@@ -225,6 +261,12 @@ machine dependent of trap code
 address of faulting instruction
 .It Ta Va si_trapno Ta
 machine dependent of trap code
+.It Dv SIGPROT Ta Va si_addr Ta
+address of faulting instruction
+.It Ta Va si_trapno Ta
+machine dependent of trap code
+.It Ta Va si_capreg Ta
+capability register number
 .It Dv SIGCHLD Ta Va si_pid Ta
 child process ID
 .It Ta Va si_status Ta

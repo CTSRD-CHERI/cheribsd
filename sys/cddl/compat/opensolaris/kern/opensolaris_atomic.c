@@ -138,13 +138,12 @@ membar_producer(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
 //     "other"
 //   ],
-//   "change_comment": "Avoid overloading, don't redefine atomic_add_64",
-//   "hybrid_specific": false
+//   "change_comment": "Avoid overloading, don't redefine atomic_add_64"
 // }
 // CHERI CHANGES END

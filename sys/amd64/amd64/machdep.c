@@ -392,7 +392,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mc_gsbase = pcb->pcb_gsbase;
 	bzero(sf.sf_uc.uc_mcontext.mc_spare,
 	    sizeof(sf.sf_uc.uc_mcontext.mc_spare));
-	bzero(sf.sf_uc.__spare__, sizeof(sf.sf_uc.__spare__));
 
 	/* Allocate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
@@ -1581,6 +1580,7 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 
 	identify_cpu1();
 	identify_hypervisor();
+	identify_cpu_fixup_bsp();
 	identify_cpu2();
 	initializecpucache();
 

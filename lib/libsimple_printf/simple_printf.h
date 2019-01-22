@@ -39,6 +39,8 @@
 
 #define SIMPLE_PRINTF_FN(x)	__CONCAT(__CONCAT(SIMPLE_PRINTF_PREFIX, _), x)
 
+__BEGIN_DECLS
+
 int SIMPLE_PRINTF_FN(snprintf)(char *buf, size_t bufsize, const char *fmt, ...)
     __printflike(3, 4);
 int SIMPLE_PRINTF_FN(vsnprintf)(char *buf, size_t bufsize, const char *fmt,
@@ -55,5 +57,7 @@ void SIMPLE_PRINTF_FN(fdputchar)(int fd, int c);
 void SIMPLE_PRINTF_FN(putchar)(int c);
 
 ssize_t SIMPLE_PRINTF_FN(write)(int fd, const void *buf, size_t count) __hidden;
+
+__END_DECLS
 
 #endif

@@ -33,12 +33,16 @@
 
 extern int (*load_int_fnptr)(void);
 
-void __start(void) {
+static void test(void) {
 	// Check that we can call an function in the other library that uses
 	// the cap-table to load globals (via a function pointer)
 	int loaded_global = 0;
 	loaded_global = load_int_fnptr();
-	print("Loaded global via fnptr!\n");
-	require(loaded_global == 42);
+	print("Loaded global via fnptr: ");
+	print_long(loaded_global, 10);
+	print("\n");
+	require_eq(loaded_global, 42);
 	exit(0);
 }
+
+TEST_MAIN()

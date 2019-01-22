@@ -38,8 +38,13 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20181116: Rename test file.
+OLD_FILES+=usr/tests/sys/netinet/reuseport_lb
+# 20181112: Cleanup old libcap_dns.
+OLD_LIBS+=lib/casper/libcap_dns.so.1
+OLD_LIBS+=usr/lib32/libcap_dns.so.1
 # 20181030: malloc_domain(9) KPI change
-OLD_FILES+=share/man/man9/malloc_domain.9.gz
+OLD_FILES+=usr/share/man/man9/malloc_domain.9.gz
 # 20181026: joy(4) removal
 OLD_FILES+=usr/share/man/man4/joy.4.gz
 # 20181025: OpenSSL libraries version bump to avoid conflict with ports
@@ -62,6 +67,8 @@ OLD_LIBS+=usr/lib32/libcap_pwd.so.0
 OLD_LIBS+=usr/lib32/libcap_random.so.0
 OLD_LIBS+=usr/lib32/libcap_dns.so.0
 OLD_LIBS+=usr/lib32/libcap_syslog.so.0
+# 20181012: rename of ixlv(4) to iavf(4)
+OLD_FILES+=usr/share/man/man4/ixlv.4.gz
 # 20181009: OpenSSL 1.1.1
 OLD_FILES+=usr/include/openssl/des_old.h
 OLD_FILES+=usr/include/openssl/dso.h
@@ -419,29 +426,41 @@ OLD_FILES+=usr/lib/clang/6.0.0/include/xtestintrin.h
 OLD_DIRS+=usr/lib/clang/6.0.0/include
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan-i386.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan-i386.so
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan-mips64.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan-mips64.so
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan-preinit-i386.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan-preinit-mips64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan-preinit-x86_64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan-x86_64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan-x86_64.so
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan_cxx-i386.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan_cxx-mips64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.asan_cxx-x86_64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.profile-arm.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.profile-armhf.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.profile-i386.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.profile-x86_64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.safestack-i386.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.safestack-mips64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.safestack-x86_64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.stats-i386.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.stats-mips64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.stats-x86_64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.stats_client-i386.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.stats_client-mips64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.stats_client-x86_64.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.tsan-mips64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.tsan-x86_64.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.tsan_cxx-mips64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.tsan_cxx-x86_64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.ubsan_minimal-i386.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.ubsan_minimal-mips64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.ubsan_minimal-x86_64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.ubsan_standalone-i386.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.ubsan_standalone-mips64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.ubsan_standalone-x86_64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.ubsan_standalone_cxx-i386.a
+OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.ubsan_standalone_cxx-mips64.a
 OLD_FILES+=usr/lib/clang/6.0.0/lib/freebsd/libclang_rt.ubsan_standalone_cxx-x86_64.a
 OLD_DIRS+=usr/lib/clang/6.0.0/lib/freebsd
 OLD_DIRS+=usr/lib/clang/6.0.0/lib

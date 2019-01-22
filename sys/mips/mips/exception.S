@@ -580,11 +580,16 @@ SlowFault:
 	RESTORE_CREG(CHERI_REG_C24, sp, C24, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C25, sp, C25, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C26, sp, IDC, $ddc);	\
-	/* EPCC is no longer a GPR so load it into KR1C first */\
-	RESTORE_CREG(CHERI_REG_KR1C, sp, PCC, $ddc);	\
-	CSetEPCC CHERI_REG_KR1C;
+
+/* For CHERI we don't move $v0 to EPC since it is already updated by CSetEPCC */
+#define MTC0_EXC_PC(reg) \
+	/* EPCC is no longer a GPR so load it into KR1C first */	\
+	RESTORE_CREG(CHERI_REG_KR1C, sp, PCC, $ddc);			\
+	/* update the address of EPCC to the return pc */ 		\
+	RESTORE_EPCC(CHERI_REG_KR1C, reg, t0);
 #else
 #define	RESTORE_CHERI
+#define MTC0_EXC_PC(reg) MTC0	reg, MIPS_COP_0_EXC_PC
 #endif
 
 /*
@@ -602,7 +607,7 @@ SlowFault:
 	RESTORE_REG(t1, MULHI, sp)	;\
 	mtlo	t0			;\
 	mthi	t1			;\
-	MTC0	v0, MIPS_COP_0_EXC_PC	;\
+	MTC0_EXC_PC(v0)			;\
 	.set noat		        ;\
 	RESTORE_REG(AT, AST, sp)	;\
 	RESTORE_REG(v0, V0, sp)		;\
@@ -761,7 +766,8 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 
 #ifdef CPU_CHERI
 	/*
-	 * Note: This restores EPCC, matching the explicit EPC restore below.
+	 * Note: This does not restore EPCC, since that is restored by
+	 * RESTORE_U_PCB_PC() (inside RESTORE_REGS_FROM_PCB) below.
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
@@ -1038,7 +1044,8 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 
 #ifdef CPU_CHERI
 	/*
-	 * Note: This restores EPCC, matching the explicit EPC restore below.
+	 * Note: This does not restore EPCC, since that is restored by
+	 * RESTORE_U_PCB_PC() below.
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
@@ -1053,10 +1060,9 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	RESTORE_U_PCB_REG(s8, S8, k1)
 	RESTORE_U_PCB_REG(t0, MULLO, k1)
 	RESTORE_U_PCB_REG(t1, MULHI, k1)
-	RESTORE_U_PCB_REG(t2, PC, k1)
 	mtlo	t0
 	mthi	t1
-	MTC0	t2, MIPS_COP_0_EXC_PC	# set return address
+	RESTORE_U_PCB_PC(t2, t0, k1)	# set return address
 	RESTORE_U_PCB_REG(v0, V0, k1)
 	RESTORE_U_PCB_REG(v1, V1, k1)
 	RESTORE_U_PCB_REG(a0, A0, k1)
@@ -1657,7 +1663,7 @@ NESTED_NOPROFILE(MipsCacheException, KERN_EXC_FRAME_SIZE, ra)
 END(MipsCacheException)
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

@@ -62,7 +62,7 @@ call_libcheri_system_helloworld(void)
 int
 call_libcheri_system_puts(void)
 {
-	__capability char *hello_world_str_c;
+	char * __capability hello_world_str_c;
 
 	hello_world_str_c = cheri_ptrperm(&hello_world_str,
 	    sizeof(hello_world_str), CHERI_PERM_LOAD); /* Nul-terminated. */
@@ -73,7 +73,7 @@ call_libcheri_system_puts(void)
 int
 call_libcheri_fd_write_c(struct cheri_object fd_object)
 {
-	__capability char *hello_world_buf_c;
+	char * __capability hello_world_buf_c;
 	size_t len_buf_c;
 
 	len_buf_c = strlen(hello_world_str_nl);

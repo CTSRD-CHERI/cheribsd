@@ -4,11 +4,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181113,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_as_integer"
- *   ]
+ *   ],
+ *   "accepted_upstream": true
  * }
  * CHERI CHANGES END
  */

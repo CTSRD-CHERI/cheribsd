@@ -259,13 +259,6 @@ struct listen_ctx {
 	TAILQ_HEAD(, synq_entry) synq;
 };
 
-struct clip_entry {
-	TAILQ_ENTRY(clip_entry) link;
-	struct in6_addr lip;	/* local IPv6 address */
-	u_int refcount;
-};
-
-TAILQ_HEAD(clip_head, clip_entry);
 struct tom_data {
 	struct toedev tod;
 
@@ -279,12 +272,6 @@ struct tom_data {
 	int lctx_count;		/* # of lctx in the hash table */
 
 	struct ppod_region pr;
-
-	vmem_t *key_map;
-
-	struct mtx clip_table_lock;
-	struct clip_head clip_table;
-	int clip_gen;
 
 	/* WRs that will not be sent to the chip because L2 resolution failed */
 	struct mtx unsent_wr_lock;
@@ -344,9 +331,6 @@ int select_ulp_mode(struct socket *, struct adapter *,
     struct offload_settings *);
 void set_ulp_mode(struct toepcb *, int);
 int negative_advice(int);
-struct clip_entry *hold_lip(struct tom_data *, struct in6_addr *,
-    struct clip_entry *);
-void release_lip(struct tom_data *, struct clip_entry *);
 
 /* t4_connect.c */
 void t4_init_connect_cpl_handlers(void);
@@ -426,8 +410,6 @@ void t4_push_tls_records(struct adapter *, struct toepcb *, int);
 void t4_tls_mod_load(void);
 void t4_tls_mod_unload(void);
 void tls_establish(struct toepcb *);
-void tls_free_kmap(struct tom_data *);
-int tls_init_kmap(struct adapter *, struct tom_data *);
 void tls_init_toep(struct toepcb *);
 int tls_rx_key(struct toepcb *);
 void tls_stop_handshake_timer(struct toepcb *);

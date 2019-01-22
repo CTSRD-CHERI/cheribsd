@@ -777,7 +777,6 @@ proc_set_traced(struct proc *p, bool stop)
 	if (stop)
 		p->p_flag2 |= P2_PTRACE_FSTP;
 	p->p_ptevents = PTRACE_DEFAULT;
-	p->p_oppid = p->p_pptr->p_pid;
 }
 
 int
@@ -1001,7 +1000,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		 */
 		proc_set_traced(p, true);
 		if (p->p_pptr != td->td_proc) {
-			proc_reparent(p, td->td_proc);
+			proc_reparent(p, td->td_proc, false);
 		}
 		CTR2(KTR_PTRACE, "PT_ATTACH: pid %d, oppid %d", p->p_pid,
 		    p->p_oppid);
@@ -1200,7 +1199,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 				PROC_UNLOCK(p->p_pptr);
 
 				pp = proc_realparent(p);
-				proc_reparent(p, pp);
+				proc_reparent(p, pp, false);
 				if (pp == initproc)
 					p->p_sigparent = SIGCHLD;
 				CTR3(KTR_PTRACE,
@@ -1209,7 +1208,6 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			} else
 				CTR2(KTR_PTRACE, "PT_DETACH: pid %d, sig %d",
 				    p->p_pid, data);
-			p->p_oppid = 0;
 			p->p_ptevents = 0;
 			FOREACH_THREAD_IN_PROC(p, td3) {
 				if ((td3->td_dbgflags & TDB_FSTP) != 0) {
@@ -1590,7 +1588,7 @@ stopevent(struct proc *p, unsigned int event, unsigned int val)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

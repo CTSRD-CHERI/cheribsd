@@ -67,7 +67,7 @@ void *libc_dlopen(const char *, int);
 /*
  * For dynamic linker.
  */
-void _rtld_error(const char *fmt, ...);
+void _rtld_error(const char *fmt, ...) __printflike(1, 2);
 
 /*
  * File lock contention is difficult to diagnose without knowing

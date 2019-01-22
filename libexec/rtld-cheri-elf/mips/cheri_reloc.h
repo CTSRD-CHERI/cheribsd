@@ -29,6 +29,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <dlfcn.h>
+
+extern dlfunc_t find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol);
+extern bool add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
+    Elf_Word r_symndx, void** where);
 
 static inline int
 process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
@@ -42,6 +47,10 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		    obj->path, symname(obj, r_symndx));
 		return -1;
 	}
+#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 2
+	dbg("%s: found %s from obj=%s in defobj=%s", __func__, symname(obj, r_symndx),
+	    obj->path, defobj->path);
+#endif
 	assert(ELF_ST_TYPE(def->st_info) != STT_GNU_IFUNC &&
 		"IFUNC not implemented!");
 
@@ -66,7 +75,14 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	}
 	else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 		/* Remove write permissions and set bounds */
-		symval = make_function_pointer(def, defobj);
+		symval = find_external_call_thunk(defobj, def);
+		if (!symval) {
+			// TODO: make this a fatal error
+			rtld_fdprintf(STDERR_FILENO, "Warning: Could not create"
+			    " thunk for %s (in %s)\n",
+			    symname(obj, r_symndx), obj->path);
+			symval = make_function_pointer(def, defobj);
+		}
 	} else {
 		/* Remove execute permissions and set bounds */
 		symval = make_data_pointer(def, defobj);

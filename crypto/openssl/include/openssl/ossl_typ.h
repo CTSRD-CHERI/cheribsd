@@ -160,7 +160,7 @@ typedef struct DIST_POINT_st DIST_POINT;
 typedef struct ISSUING_DIST_POINT_st ISSUING_DIST_POINT;
 typedef struct NAME_CONSTRAINTS_st NAME_CONSTRAINTS;
 
-typedef struct crypto_ex_data_st CRYPTO_EX_DATA;
+typedef struct crypto_ex_data_st CRYPTO_EX_DATA __no_subobject_bounds;
 
 typedef struct ocsp_req_ctx_st OCSP_REQ_CTX;
 typedef struct ocsp_response_st OCSP_RESPONSE;

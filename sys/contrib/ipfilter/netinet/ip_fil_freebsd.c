@@ -57,18 +57,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/tcp.h>
-#if defined(__FreeBSD_version) && (__FreeBSD_version >= 800000)
 #include <net/vnet.h>
-#else
-#define CURVNET_SET(arg)
-#define CURVNET_RESTORE()
-#define	VNET_DEFINE(_t, _v)	_t _v
-#define	VNET_DECLARE(_t, _v)	extern _t _v
-#define	VNET(arg)	arg
-#endif
-#if defined(__osf__)
-# include <netinet/tcp_timer.h>
-#endif
 #include <netinet/udp.h>
 #include <netinet/tcpip.h>
 #include <netinet/ip_icmp.h>
@@ -299,8 +288,7 @@ ipfdetach(softc)
  * Filter ioctl interface.
  */
 int
-ipfioctl(dev, cmd, data, mode
-, p)
+ipfioctl(dev, cmd, data, mode, p)
 	struct thread *p;
 #    define	p_cred	td_ucred
 #    define	p_uid	td_ucred->cr_ruid
@@ -554,12 +542,7 @@ ipf_send_icmp_err(type, fin, dst)
 
 	code = fin->fin_icode;
 #ifdef USE_INET6
-#if 0
-	/* XXX Fix an off by one error: s/>/>=/
-	 was:
-	 if ((code < 0) || (code > sizeof(icmptoicmp6unreach)/sizeof(int)))
-	 Fix obtained from NetBSD ip_fil_netbsd.c r1.4: */
-#endif
+	/* See NetBSD ip_fil_netbsd.c r1.4: */
 	if ((code < 0) || (code >= sizeof(icmptoicmp6unreach)/sizeof(int)))
 		return -1;
 #endif

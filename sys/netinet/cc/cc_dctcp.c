@@ -471,10 +471,10 @@ SYSCTL_PROC(_net_inet_tcp_cc_dctcp, OID_AUTO, slowstart,
 DECLARE_CC_MODULE(dctcp, &dctcp_cc_algo);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "kernel",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

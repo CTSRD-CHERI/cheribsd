@@ -24,10 +24,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "prog",
  *   "changes": [
- *     "function_abi"
+ *     "calling_convention"
  *   ]
  * }
  * CHERI CHANGES END

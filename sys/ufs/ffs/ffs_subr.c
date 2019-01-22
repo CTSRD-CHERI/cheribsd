@@ -46,6 +46,7 @@ __FBSDID("$FreeBSD$");
 #include <ufs/ffs/fs.h>
 
 uint32_t calculate_crc32c(uint32_t, const void *, size_t);
+uint32_t ffs_calc_sbhash(struct fs *);
 struct malloc_type;
 #define UFS_MALLOC(size, type, flags) malloc(size)
 #define UFS_FREE(ptr, type) free(ptr)
@@ -108,31 +109,35 @@ ffs_blkatoff(struct vnode *vp, off_t offset, char **res, struct buf **bpp)
  * Load up the contents of an inode and copy the appropriate pieces
  * to the incore copy.
  */
-void
+int
 ffs_load_inode(struct buf *bp, struct inode *ip, struct fs *fs, ino_t ino)
 {
+	struct ufs1_dinode *dip1;
+	struct ufs2_dinode *dip2;
 
 	if (I_IS_UFS1(ip)) {
-		*ip->i_din1 =
+		dip1 = ip->i_din1;
+		*dip1 =
 		    *((struct ufs1_dinode *)bp->b_data + ino_to_fsbo(fs, ino));
-		ip->i_mode = ip->i_din1->di_mode;
-		ip->i_nlink = ip->i_din1->di_nlink;
-		ip->i_size = ip->i_din1->di_size;
-		ip->i_flags = ip->i_din1->di_flags;
-		ip->i_gen = ip->i_din1->di_gen;
-		ip->i_uid = ip->i_din1->di_uid;
-		ip->i_gid = ip->i_din1->di_gid;
-	} else {
-		*ip->i_din2 =
-		    *((struct ufs2_dinode *)bp->b_data + ino_to_fsbo(fs, ino));
-		ip->i_mode = ip->i_din2->di_mode;
-		ip->i_nlink = ip->i_din2->di_nlink;
-		ip->i_size = ip->i_din2->di_size;
-		ip->i_flags = ip->i_din2->di_flags;
-		ip->i_gen = ip->i_din2->di_gen;
-		ip->i_uid = ip->i_din2->di_uid;
-		ip->i_gid = ip->i_din2->di_gid;
+		ip->i_mode = dip1->di_mode;
+		ip->i_nlink = dip1->di_nlink;
+		ip->i_size = dip1->di_size;
+		ip->i_flags = dip1->di_flags;
+		ip->i_gen = dip1->di_gen;
+		ip->i_uid = dip1->di_uid;
+		ip->i_gid = dip1->di_gid;
+		return (0);
 	}
+	dip2 = ip->i_din2;
+	*dip2 = *((struct ufs2_dinode *)bp->b_data + ino_to_fsbo(fs, ino));
+	ip->i_mode = dip2->di_mode;
+	ip->i_nlink = dip2->di_nlink;
+	ip->i_size = dip2->di_size;
+	ip->i_flags = dip2->di_flags;
+	ip->i_gen = dip2->di_gen;
+	ip->i_uid = dip2->di_uid;
+	ip->i_gid = dip2->di_gid;
+	return (0);
 }
 #endif /* KERNEL */
 
@@ -143,7 +148,6 @@ ffs_load_inode(struct buf *bp, struct inode *ip, struct fs *fs, ino_t ino)
 static off_t sblock_try[] = SBLOCKSEARCH;
 static int readsuper(void *, struct fs **, off_t, int,
 	int (*)(void *, off_t, void **, int));
-static uint32_t calc_sbhash(struct fs *);
 
 /*
  * Read a superblock from the devfd device.
@@ -272,7 +276,13 @@ readsuper(void *devfd, struct fs **fsp, off_t sblockloc, int isaltsblk,
 	    fs->fs_bsize <= MAXBSIZE &&
 	    fs->fs_bsize >= roundup(sizeof(struct fs), DEV_BSIZE) &&
 	    fs->fs_sbsize <= SBLOCKSIZE) {
-		if (fs->fs_ckhash != (ckhash = calc_sbhash(fs))) {
+		/*
+		 * If the filesystem has been run on a kernel without
+		 * metadata check hashes, disable them.
+		 */
+		if ((fs->fs_flags & FS_METACKHASH) == 0)
+			fs->fs_metackhash = 0;
+		if (fs->fs_ckhash != (ckhash = ffs_calc_sbhash(fs))) {
 #ifdef _KERNEL
 			res = uprintf("Superblock check-hash failed: recorded "
 			    "check-hash 0x%x != computed check-hash 0x%x\n",
@@ -335,7 +345,7 @@ ffs_sbput(void *devfd, struct fs *fs, off_t loc,
 	}
 	fs->fs_fmod = 0;
 	fs->fs_time = UFS_TIME;
-	fs->fs_ckhash = calc_sbhash(fs);
+	fs->fs_ckhash = ffs_calc_sbhash(fs);
 	if ((error = (*writefunc)(devfd, loc, fs, fs->fs_sbsize)) != 0)
 		return (error);
 	return (0);
@@ -344,8 +354,8 @@ ffs_sbput(void *devfd, struct fs *fs, off_t loc,
 /*
  * Calculate the check-hash for a superblock.
  */
-static uint32_t
-calc_sbhash(struct fs *fs)
+uint32_t
+ffs_calc_sbhash(struct fs *fs)
 {
 	uint32_t ckhash, save_ckhash;
 

@@ -1,5 +1,7 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
 .PATH: ${SRCTOP}/cddl/contrib/opensolaris/cmd/ztest
 
 PROG=	ztest

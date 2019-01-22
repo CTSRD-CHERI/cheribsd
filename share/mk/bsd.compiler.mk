@@ -145,23 +145,24 @@ _cc_vars+=CHERI_CC CHERI_
 # The value is only used/exported for the same environment that impacts
 # CC and COMPILER_* settings here.
 _exported_vars=	${X_}COMPILER_TYPE ${X_}COMPILER_VERSION \
-		${X_}COMPILER_FREEBSD_VERSION ${X_}COMPILER_RESOURCE_DIR
+		${X_}COMPILER_FREEBSD_VERSION ${X_}COMPILER_RESOURCE_DIR \
+		${X_}COMPILER_ABSOLUTE_PATH
 ${X_}_cc_hash=	${${cc}}${MACHINE}${PATH}
 ${X_}_cc_hash:=	${${X_}_cc_hash:hash}
 # Only import if none of the vars are set differently somehow else.
 _can_export=	yes
 .for var in ${_exported_vars}
-.if defined(${var}) && (!defined(${var}.${${X_}_cc_hash}) || ${${var}.${${X_}_cc_hash}} != ${${var}})
-.if defined(${var}.${${X_}_ld_hash})
-.info "Cannot import ${X_}COMPILER variables since cached ${var} is different: ${${var}.${${X_}_cc_hash}} != ${${var}}"
+.if defined(${var}) && (!defined(${var}__${${X_}_cc_hash}) || ${${var}__${${X_}_cc_hash}} != ${${var}})
+.if defined(${var}__${${X_}_ld_hash})
+.info "Cannot import ${X_}COMPILER variables since cached ${var} is different: ${${var}__${${X_}_cc_hash}} != ${${var}}"
 .endif
 _can_export=	no
 .endif
 .endfor
 .if ${_can_export} == yes
 .for var in ${_exported_vars}
-.if defined(${var}.${${X_}_cc_hash})
-${var}=	${${var}.${${X_}_cc_hash}}
+.if defined(${var}__${${X_}_cc_hash})
+${var}=	${${var}__${${X_}_cc_hash}}
 .endif
 .endfor
 .endif
@@ -233,6 +234,12 @@ ${X_}COMPILER_FEATURES+=	c++11
 ${X_}COMPILER_FEATURES+=	retpoline
 .endif
 
+${X_}COMPILER_ABSOLUTE_PATH!=	which ${${cc}:N${CCACHE_BIN}:[1]}
+.if empty(${X_}COMPILER_ABSOLUTE_PATH)
+.error Could not find $$CC (${${cc}:N${CCACHE_BIN}:[1]}) in $$PATH. \
+	Please pass an absolute path to CC instead.
+.endif
+
 .else
 # Use CC's values
 X_COMPILER_TYPE=	${COMPILER_TYPE}
@@ -240,14 +247,15 @@ X_COMPILER_VERSION=	${COMPILER_VERSION}
 X_COMPILER_FREEBSD_VERSION=	${COMPILER_FREEBSD_VERSION}
 X_COMPILER_FEATURES=	${COMPILER_FEATURES}
 X_COMPILER_RESOURCE_DIR=	${COMPILER_RESOURCE_DIR}
+X_COMPILER_ABSOLUTE_PATH=	${COMPILER_ABSOLUTE_PATH}
 .endif	# ${cc} == "CC" || (${cc} == "XCC" && ${XCC} != ${CC})
 
 # Export the values so sub-makes don't have to look them up again, using the
 # hash key computed above.
 .for var in ${_exported_vars}
-${var}.${${X_}_cc_hash}:=	${${var}}
-.export-env ${var}.${${X_}_cc_hash}
-.undef ${var}.${${X_}_cc_hash}
+${var}__${${X_}_cc_hash}:=	${${var}}
+.export-env ${var}__${${X_}_cc_hash}
+.undef ${var}__${${X_}_cc_hash}
 .endfor
 
 .endif	# ${cc} == "CC" || !empty(XCC)

@@ -3944,7 +3944,7 @@ devclass_t xbb_devclass;
 DRIVER_MODULE(xbbd, xenbusb_back, xbb_driver, xbb_devclass, 0, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kiovec_t"

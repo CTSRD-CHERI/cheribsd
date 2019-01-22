@@ -6,7 +6,7 @@
 #define __attribute__(x)
 #endif
 
-#if defined(__linux__) || defined(__MINT__)
+#if (defined(__linux__) || defined(__MINT__)) && !defined(_GNU_SOURCE)
 #define _GNU_SOURCE	/* See test-*.c what needs this. */
 #endif
 

@@ -21,6 +21,8 @@ SRCS+=	cheritest_bounds_globals.c					\
 	cheritest_vm.c							\
 	cheritest_vm_swap.c						\
 	cheritest_zlib.c
+# This test is broken
+CFLAGS.cheritest_vm_swap.c+=-Wno-cheri-capability-misuse
 .endif
 
 CHERITEST_DIR:=	${.PARSEDIR}
@@ -59,6 +61,12 @@ TEST_SRCS!=	grep ^DECLARE_TEST ${CHERI_C_TESTS_DIR}/cheri_c_testdecls.h | \
 		    sed -e 's/.*(\([^,]*\),.*/\1.c/'
 SRCS+=	test_runtime.c	\
 	${TEST_SRCS}
+
+.for test in ${TEST_SRCS}
+# Avoid the need for extern declarations for variables/functions that are
+# declared global so that the compiler emits them
+CFLAGS.${test}+=-Wno-missing-prototypes -Wno-missing-variable-declarations
+.endfor
 .endif
 .endif
 .endif
@@ -114,8 +122,6 @@ SRCS+=		cheritest_ccall.c					\
 		cheritest_libcheri_var.c
 .endif
 .endif
-
-NO_WERROR=	YES
 
 .ifdef CHERITHREAD_TESTS
 LIBADD+=	pthread

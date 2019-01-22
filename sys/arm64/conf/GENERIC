@@ -92,6 +92,8 @@ options 	MALLOC_DEBUG_MAXZONES=8	# Separate malloc(9) zones
 options 	ALT_BREAK_TO_DEBUGGER	# Enter debugger on keyboard escape sequence
 options 	USB_DEBUG		# enable debug msgs
 options 	VERBOSE_SYSINIT=0	# Support debug.verbose_sysinit, off by default
+# Warning: KUBSAN can result in a kernel too large for loader to load
+#options 	KUBSAN			# Kernel Undefined Behavior Sanitizer
 
 # Kernel dump features.
 options 	EKCD			# Support for encrypted kernel dumps
@@ -207,6 +209,7 @@ device		bcm2835_bsc	# Broadcom BCM283x I2C bus
 device		iicbus
 device		iic
 device		twsi		# Allwinner I2C controller
+device		rk_i2c		# RockChip I2C controller
 
 # Clock and reset controllers
 device		aw_ccu		# Allwinner clock controller
@@ -223,6 +226,7 @@ device		aw_wdog		# Allwinner Watchdog
 
 # Power management controllers
 device		axp81x		# X-Powers AXP81x PMIC
+device		rk805		# RockChip RK805 PMIC
 
 # EFUSE
 device		aw_sid		# Allwinner Secure ID EFUSE
@@ -239,6 +243,11 @@ device		vt
 device		kbdmux
 
 device		vt_efifb
+
+# EVDEV support
+device		evdev			# input event device support
+options		EVDEV_SUPPORT		# evdev support in legacy drivers
+device		uinput			# install /dev/uinput cdev
 
 # Pseudo devices.
 device		crypto		# core crypto support

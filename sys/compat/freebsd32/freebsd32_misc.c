@@ -370,14 +370,11 @@ freebsd32_exec_copyin_args(struct image_args *args, const char *fname,
 		if (arg == 0)
 			break;
 		argp = PTRIN(arg);
-		error = exec_args_add_arg_str(args, (void *)argp,
-		    UIO_USERSPACE);
+		error = exec_args_add_arg(args, argp, UIO_USERSPACE);
 		if (error != 0)
 			goto err_exit;
 	}
 			
-	args->begin_envv = args->endp;
-
 	/*
 	 * extract environment strings
 	 */
@@ -390,8 +387,7 @@ freebsd32_exec_copyin_args(struct image_args *args, const char *fname,
 			if (arg == 0)
 				break;
 			envp = PTRIN(arg);
-			error = exec_args_add_env_str(args, (void *)envp,
-			    UIO_USERSPACE);
+			error = exec_args_add_env(args, envp, UIO_USERSPACE);
 			if (error != 0)
 				goto err_exit;
 		}
@@ -442,25 +438,14 @@ freebsd32_fexecve(struct thread *td, struct freebsd32_fexecve_args *uap)
 	return (error);
 }
 
-#if defined(COMPAT_FREEBSD11)
-int
-freebsd11_freebsd32_mknod(struct thread *td,
-    struct freebsd11_freebsd32_mknod_args *uap)
-{
-
-	return (kern_mknodat(td, AT_FDCWD, uap->path, UIO_USERSPACE, uap->mode,
-	    uap->dev));
-}
 
 int
-freebsd11_freebsd32_mknodat(struct thread *td,
-    struct freebsd11_freebsd32_mknodat_args *uap)
+freebsd32_mknodat(struct thread *td, struct freebsd32_mknodat_args *uap)
 {
 
-	return (kern_mknodat(td, uap->fd, uap->path, UIO_USERSPACE, uap->mode,
-	    uap->dev));
+	return (kern_mknodat(td, uap->fd, uap->path, UIO_USERSPACE,
+	    uap->mode, PAIR32TO64(dev_t, uap->dev)));
 }
-#endif /* COMPAT_FREEBSD11 */
 
 int
 freebsd32_mprotect(struct thread *td, struct freebsd32_mprotect_args *uap)
@@ -2242,7 +2227,7 @@ freebsd11_freebsd32_fhstat(struct thread *td,
 #endif
 
 int
-freebsd32_sysctl(struct thread *td, struct freebsd32_sysctl_args *uap)
+freebsd32___sysctl(struct thread *td, struct freebsd32___sysctl_args *uap)
 {
 	int error, name[CTL_MAXNAME];
 	size_t j, oldlen;
@@ -3489,13 +3474,13 @@ freebsd32_sched_rr_get_interval(struct thread *td,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t",
 //     "kernel_sig_types",
-//     "pointer_integrity",
+//     "integer_provenance",
 //     "user_capabilities",
 //     "other"
 //   ]

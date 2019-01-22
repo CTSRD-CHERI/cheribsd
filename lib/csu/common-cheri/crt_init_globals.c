@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define CHERI_INIT_GLOBALS_GDC_ONLY
 #include <cheri_init_globals.h>
 
 /* Avoid adding an unncessary crt_init_globals() export from crt1.o for a
@@ -42,12 +43,15 @@
 #define CRT_INIT_GLOBALS_STATIC static __always_inline
 #endif
 
+#ifndef CRT_INIT_GLOBALS_GDC_ONLY
 CRT_INIT_GLOBALS_STATIC void crt_init_globals(void) __hidden;
+#endif
+CRT_INIT_GLOBALS_STATIC void crt_init_globals_gdc(void *) __hidden;
 
-__attribute__((weak)) extern int _DYNAMIC;
+__attribute__((weak)) extern int _DYNAMIC __no_subobject_bounds;
 
 CRT_INIT_GLOBALS_STATIC void
-crt_init_globals(void)
+crt_init_globals_gdc(void *gdc)
 {
 #ifdef PCREL_SYMBOL_ADDRESSES_WORK
 	void* _pcc_after_daddui = 0;
@@ -105,5 +109,14 @@ crt_init_globals(void)
 		return;
 #endif
 	/* Otherwise we need to initialize globals manually */
-	cheri_init_globals();
+	cheri_init_globals_gdc(gdc);
 }
+
+#ifndef CRT_INIT_GLOBALS_GDC_ONLY
+CRT_INIT_GLOBALS_STATIC void
+crt_init_globals(void)
+{
+
+	crt_init_globals_gdc(__builtin_cheri_global_data_get());
+}
+#endif /* !CRT_INIT_GLOBALS_GDC_ONLY */

@@ -2560,9 +2560,10 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
+//     "ioctl:net",
 //     "user_capabilities"
 //   ]
 // }

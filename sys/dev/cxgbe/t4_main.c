@@ -82,6 +82,7 @@ __FBSDID("$FreeBSD$");
 #include "common/t4_regs.h"
 #include "common/t4_regs_values.h"
 #include "cudbg/cudbg.h"
+#include "t4_clip.h"
 #include "t4_ioctl.h"
 #include "t4_l2t.h"
 #include "t4_mp_ring.h"
@@ -253,110 +254,150 @@ SLIST_HEAD(, uld_info) t4_uld_list;
  * Tunables applicable to both T4 and T5 are under hw.cxgbe.  Those specific to
  * T5 are under hw.cxl.
  */
+SYSCTL_NODE(_hw, OID_AUTO, cxgbe, CTLFLAG_RD, 0, "cxgbe(4) parameters");
+SYSCTL_NODE(_hw, OID_AUTO, cxl, CTLFLAG_RD, 0, "cxgbe(4) T5+ parameters");
+SYSCTL_NODE(_hw_cxgbe, OID_AUTO, toe, CTLFLAG_RD, 0, "cxgbe(4) TOE parameters");
 
 /*
  * Number of queues for tx and rx, NIC and offload.
  */
 #define NTXQ 16
 int t4_ntxq = -NTXQ;
-TUNABLE_INT("hw.cxgbe.ntxq", &t4_ntxq);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, ntxq, CTLFLAG_RDTUN, &t4_ntxq, 0,
+    "Number of TX queues per port");
 TUNABLE_INT("hw.cxgbe.ntxq10g", &t4_ntxq);	/* Old name, undocumented */
 
 #define NRXQ 8
 int t4_nrxq = -NRXQ;
-TUNABLE_INT("hw.cxgbe.nrxq", &t4_nrxq);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, nrxq, CTLFLAG_RDTUN, &t4_nrxq, 0,
+    "Number of RX queues per port");
 TUNABLE_INT("hw.cxgbe.nrxq10g", &t4_nrxq);	/* Old name, undocumented */
 
 #define NTXQ_VI 1
 static int t4_ntxq_vi = -NTXQ_VI;
-TUNABLE_INT("hw.cxgbe.ntxq_vi", &t4_ntxq_vi);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, ntxq_vi, CTLFLAG_RDTUN, &t4_ntxq_vi, 0,
+    "Number of TX queues per VI");
 
 #define NRXQ_VI 1
 static int t4_nrxq_vi = -NRXQ_VI;
-TUNABLE_INT("hw.cxgbe.nrxq_vi", &t4_nrxq_vi);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, nrxq_vi, CTLFLAG_RDTUN, &t4_nrxq_vi, 0,
+    "Number of RX queues per VI");
 
 static int t4_rsrv_noflowq = 0;
-TUNABLE_INT("hw.cxgbe.rsrv_noflowq", &t4_rsrv_noflowq);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, rsrv_noflowq, CTLFLAG_RDTUN, &t4_rsrv_noflowq,
+    0, "Reserve TX queue 0 of each VI for non-flowid packets");
 
 #if defined(TCP_OFFLOAD) || defined(RATELIMIT)
 #define NOFLDTXQ 8
 static int t4_nofldtxq = -NOFLDTXQ;
-TUNABLE_INT("hw.cxgbe.nofldtxq", &t4_nofldtxq);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, nofldtxq, CTLFLAG_RDTUN, &t4_nofldtxq, 0,
+    "Number of offload TX queues per port");
 
 #define NOFLDRXQ 2
 static int t4_nofldrxq = -NOFLDRXQ;
-TUNABLE_INT("hw.cxgbe.nofldrxq", &t4_nofldrxq);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, nofldrxq, CTLFLAG_RDTUN, &t4_nofldrxq, 0,
+    "Number of offload RX queues per port");
 
 #define NOFLDTXQ_VI 1
 static int t4_nofldtxq_vi = -NOFLDTXQ_VI;
-TUNABLE_INT("hw.cxgbe.nofldtxq_vi", &t4_nofldtxq_vi);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, nofldtxq_vi, CTLFLAG_RDTUN, &t4_nofldtxq_vi, 0,
+    "Number of offload TX queues per VI");
 
 #define NOFLDRXQ_VI 1
 static int t4_nofldrxq_vi = -NOFLDRXQ_VI;
-TUNABLE_INT("hw.cxgbe.nofldrxq_vi", &t4_nofldrxq_vi);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, nofldrxq_vi, CTLFLAG_RDTUN, &t4_nofldrxq_vi, 0,
+    "Number of offload RX queues per VI");
 
 #define TMR_IDX_OFLD 1
 int t4_tmr_idx_ofld = TMR_IDX_OFLD;
-TUNABLE_INT("hw.cxgbe.holdoff_timer_idx_ofld", &t4_tmr_idx_ofld);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, holdoff_timer_idx_ofld, CTLFLAG_RDTUN,
+    &t4_tmr_idx_ofld, 0, "Holdoff timer index for offload queues");
 
 #define PKTC_IDX_OFLD (-1)
 int t4_pktc_idx_ofld = PKTC_IDX_OFLD;
-TUNABLE_INT("hw.cxgbe.holdoff_pktc_idx_ofld", &t4_pktc_idx_ofld);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, holdoff_pktc_idx_ofld, CTLFLAG_RDTUN,
+    &t4_pktc_idx_ofld, 0, "holdoff packet counter index for offload queues");
 
 /* 0 means chip/fw default, non-zero number is value in microseconds */
 static u_long t4_toe_keepalive_idle = 0;
-TUNABLE_ULONG("hw.cxgbe.toe.keepalive_idle", &t4_toe_keepalive_idle);
+SYSCTL_ULONG(_hw_cxgbe_toe, OID_AUTO, keepalive_idle, CTLFLAG_RDTUN,
+    &t4_toe_keepalive_idle, 0, "TOE keepalive idle timer (us)");
 
 /* 0 means chip/fw default, non-zero number is value in microseconds */
 static u_long t4_toe_keepalive_interval = 0;
-TUNABLE_ULONG("hw.cxgbe.toe.keepalive_interval", &t4_toe_keepalive_interval);
+SYSCTL_ULONG(_hw_cxgbe_toe, OID_AUTO, keepalive_interval, CTLFLAG_RDTUN,
+    &t4_toe_keepalive_interval, 0, "TOE keepalive interval timer (us)");
 
 /* 0 means chip/fw default, non-zero number is # of keepalives before abort */
 static int t4_toe_keepalive_count = 0;
-TUNABLE_INT("hw.cxgbe.toe.keepalive_count", &t4_toe_keepalive_count);
+SYSCTL_INT(_hw_cxgbe_toe, OID_AUTO, keepalive_count, CTLFLAG_RDTUN,
+    &t4_toe_keepalive_count, 0, "Number of TOE keepalive probes before abort");
 
 /* 0 means chip/fw default, non-zero number is value in microseconds */
 static u_long t4_toe_rexmt_min = 0;
-TUNABLE_ULONG("hw.cxgbe.toe.rexmt_min", &t4_toe_rexmt_min);
+SYSCTL_ULONG(_hw_cxgbe_toe, OID_AUTO, rexmt_min, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_min, 0, "Minimum TOE retransmit interval (us)");
 
 /* 0 means chip/fw default, non-zero number is value in microseconds */
 static u_long t4_toe_rexmt_max = 0;
-TUNABLE_ULONG("hw.cxgbe.toe.rexmt_max", &t4_toe_rexmt_max);
+SYSCTL_ULONG(_hw_cxgbe_toe, OID_AUTO, rexmt_max, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_max, 0, "Maximum TOE retransmit interval (us)");
 
 /* 0 means chip/fw default, non-zero number is # of rexmt before abort */
 static int t4_toe_rexmt_count = 0;
-TUNABLE_INT("hw.cxgbe.toe.rexmt_count", &t4_toe_rexmt_count);
+SYSCTL_INT(_hw_cxgbe_toe, OID_AUTO, rexmt_count, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_count, 0, "Number of TOE retransmissions before abort");
 
 /* -1 means chip/fw default, other values are raw backoff values to use */
 static int t4_toe_rexmt_backoff[16] = {
 	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1
 };
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.0", &t4_toe_rexmt_backoff[0]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.1", &t4_toe_rexmt_backoff[1]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.2", &t4_toe_rexmt_backoff[2]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.3", &t4_toe_rexmt_backoff[3]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.4", &t4_toe_rexmt_backoff[4]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.5", &t4_toe_rexmt_backoff[5]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.6", &t4_toe_rexmt_backoff[6]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.7", &t4_toe_rexmt_backoff[7]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.8", &t4_toe_rexmt_backoff[8]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.9", &t4_toe_rexmt_backoff[9]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.10", &t4_toe_rexmt_backoff[10]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.11", &t4_toe_rexmt_backoff[11]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.12", &t4_toe_rexmt_backoff[12]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.13", &t4_toe_rexmt_backoff[13]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.14", &t4_toe_rexmt_backoff[14]);
-TUNABLE_INT("hw.cxgbe.toe.rexmt_backoff.15", &t4_toe_rexmt_backoff[15]);
+SYSCTL_NODE(_hw_cxgbe_toe, OID_AUTO, rexmt_backoff, CTLFLAG_RD, 0,
+    "cxgbe(4) TOE retransmit backoff values");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 0, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[0], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 1, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[1], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 2, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[2], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 3, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[3], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 4, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[4], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 5, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[5], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 6, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[6], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 7, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[7], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 8, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[8], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 9, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[9], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 10, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[10], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 11, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[11], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 12, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[12], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 13, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[13], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 14, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[14], 0, "");
+SYSCTL_INT(_hw_cxgbe_toe_rexmt_backoff, OID_AUTO, 15, CTLFLAG_RDTUN,
+    &t4_toe_rexmt_backoff[15], 0, "");
 #endif
 
 #ifdef DEV_NETMAP
 #define NNMTXQ_VI 2
 static int t4_nnmtxq_vi = -NNMTXQ_VI;
-TUNABLE_INT("hw.cxgbe.nnmtxq_vi", &t4_nnmtxq_vi);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, nnmtxq_vi, CTLFLAG_RDTUN, &t4_nnmtxq_vi, 0,
+    "Number of netmap TX queues per VI");
 
 #define NNMRXQ_VI 2
 static int t4_nnmrxq_vi = -NNMRXQ_VI;
-TUNABLE_INT("hw.cxgbe.nnmrxq_vi", &t4_nnmrxq_vi);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, nnmrxq_vi, CTLFLAG_RDTUN, &t4_nnmrxq_vi, 0,
+    "Number of netmap RX queues per VI");
 #endif
 
 /*
@@ -364,28 +405,33 @@ TUNABLE_INT("hw.cxgbe.nnmrxq_vi", &t4_nnmrxq_vi);
  */
 #define TMR_IDX 1
 int t4_tmr_idx = TMR_IDX;
-TUNABLE_INT("hw.cxgbe.holdoff_timer_idx", &t4_tmr_idx);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, holdoff_timer_idx, CTLFLAG_RDTUN, &t4_tmr_idx,
+    0, "Holdoff timer index");
 TUNABLE_INT("hw.cxgbe.holdoff_timer_idx_10G", &t4_tmr_idx);	/* Old name */
 
 #define PKTC_IDX (-1)
 int t4_pktc_idx = PKTC_IDX;
-TUNABLE_INT("hw.cxgbe.holdoff_pktc_idx", &t4_pktc_idx);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, holdoff_pktc_idx, CTLFLAG_RDTUN, &t4_pktc_idx,
+    0, "Holdoff packet counter index");
 TUNABLE_INT("hw.cxgbe.holdoff_pktc_idx_10G", &t4_pktc_idx);	/* Old name */
 
 /*
  * Size (# of entries) of each tx and rx queue.
  */
 unsigned int t4_qsize_txq = TX_EQ_QSIZE;
-TUNABLE_INT("hw.cxgbe.qsize_txq", &t4_qsize_txq);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, qsize_txq, CTLFLAG_RDTUN, &t4_qsize_txq, 0,
+    "Number of descriptors in each TX queue");
 
 unsigned int t4_qsize_rxq = RX_IQ_QSIZE;
-TUNABLE_INT("hw.cxgbe.qsize_rxq", &t4_qsize_rxq);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, qsize_rxq, CTLFLAG_RDTUN, &t4_qsize_rxq, 0,
+    "Number of descriptors in each RX queue");
 
 /*
  * Interrupt types allowed (bits 0, 1, 2 = INTx, MSI, MSI-X respectively).
  */
 int t4_intr_types = INTR_MSIX | INTR_MSI | INTR_INTX;
-TUNABLE_INT("hw.cxgbe.interrupt_types", &t4_intr_types);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, interrupt_types, CTLFLAG_RDTUN, &t4_intr_types,
+    0, "Interrupt types allowed (bit 0 = INTx, 1 = MSI, 2 = MSI-X)");
 
 /*
  * Configuration file.  All the _CF names here are special.
@@ -396,7 +442,8 @@ TUNABLE_INT("hw.cxgbe.interrupt_types", &t4_intr_types);
 #define UWIRE_CF	"uwire"
 #define FPGA_CF		"fpga"
 static char t4_cfg_file[32] = DEFAULT_CF;
-TUNABLE_STR("hw.cxgbe.config_file", t4_cfg_file, sizeof(t4_cfg_file));
+SYSCTL_STRING(_hw_cxgbe, OID_AUTO, config_file, CTLFLAG_RDTUN, t4_cfg_file,
+    sizeof(t4_cfg_file), "Firmware configuration file");
 
 /*
  * PAUSE settings (bit 0, 1, 2 = rx_pause, tx_pause, pause_autoneg respectively).
@@ -408,7 +455,9 @@ TUNABLE_STR("hw.cxgbe.config_file", t4_cfg_file, sizeof(t4_cfg_file));
  *                 Otherwise rx_pause/tx_pause are applied forcibly.
  */
 static int t4_pause_settings = PAUSE_RX | PAUSE_TX | PAUSE_AUTONEG;
-TUNABLE_INT("hw.cxgbe.pause_settings", &t4_pause_settings);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, pause_settings, CTLFLAG_RDTUN,
+    &t4_pause_settings, 0,
+    "PAUSE settings (bit 0 = rx_pause, 1 = tx_pause, 2 = pause_autoneg)");
 
 /*
  * Forward Error Correction settings (bit 0, 1 = RS, BASER respectively).
@@ -416,7 +465,8 @@ TUNABLE_INT("hw.cxgbe.pause_settings", &t4_pause_settings);
  *  0 to disable FEC.
  */
 static int t4_fec = -1;
-TUNABLE_INT("hw.cxgbe.fec", &t4_fec);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, fec, CTLFLAG_RDTUN, &t4_fec, 0,
+    "Forward Error Correction (bit 0 = RS, bit 1 = BASER_RS)");
 
 /*
  * Link autonegotiation.
@@ -425,28 +475,33 @@ TUNABLE_INT("hw.cxgbe.fec", &t4_fec);
  *  1 to enable.
  */
 static int t4_autoneg = -1;
-TUNABLE_INT("hw.cxgbe.autoneg", &t4_autoneg);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, autoneg, CTLFLAG_RDTUN, &t4_autoneg, 0,
+    "Link autonegotiation");
 
 /*
  * Firmware auto-install by driver during attach (0, 1, 2 = prohibited, allowed,
  * encouraged respectively).
  */
 static unsigned int t4_fw_install = 1;
-TUNABLE_INT("hw.cxgbe.fw_install", &t4_fw_install);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, fw_install, CTLFLAG_RDTUN, &t4_fw_install, 0,
+    "Firmware auto-install (0 = prohibited, 1 = allowed, 2 = encouraged)");
 
 /*
  * ASIC features that will be used.  Disable the ones you don't want so that the
  * chip resources aren't wasted on features that will not be used.
  */
 static int t4_nbmcaps_allowed = 0;
-TUNABLE_INT("hw.cxgbe.nbmcaps_allowed", &t4_nbmcaps_allowed);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, nbmcaps_allowed, CTLFLAG_RDTUN,
+    &t4_nbmcaps_allowed, 0, "Default NBM capabilities");
 
 static int t4_linkcaps_allowed = 0;	/* No DCBX, PPP, etc. by default */
-TUNABLE_INT("hw.cxgbe.linkcaps_allowed", &t4_linkcaps_allowed);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, linkcaps_allowed, CTLFLAG_RDTUN,
+    &t4_linkcaps_allowed, 0, "Default link capabilities");
 
 static int t4_switchcaps_allowed = FW_CAPS_CONFIG_SWITCH_INGRESS |
     FW_CAPS_CONFIG_SWITCH_EGRESS;
-TUNABLE_INT("hw.cxgbe.switchcaps_allowed", &t4_switchcaps_allowed);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, switchcaps_allowed, CTLFLAG_RDTUN,
+    &t4_switchcaps_allowed, 0, "Default switch capabilities");
 
 #ifdef RATELIMIT
 static int t4_niccaps_allowed = FW_CAPS_CONFIG_NIC |
@@ -455,28 +510,37 @@ static int t4_niccaps_allowed = FW_CAPS_CONFIG_NIC |
 static int t4_niccaps_allowed = FW_CAPS_CONFIG_NIC |
 	FW_CAPS_CONFIG_NIC_HASHFILTER;
 #endif
-TUNABLE_INT("hw.cxgbe.niccaps_allowed", &t4_niccaps_allowed);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, niccaps_allowed, CTLFLAG_RDTUN,
+    &t4_niccaps_allowed, 0, "Default NIC capabilities");
 
 static int t4_toecaps_allowed = -1;
-TUNABLE_INT("hw.cxgbe.toecaps_allowed", &t4_toecaps_allowed);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, toecaps_allowed, CTLFLAG_RDTUN,
+    &t4_toecaps_allowed, 0, "Default TCP offload capabilities");
 
 static int t4_rdmacaps_allowed = -1;
-TUNABLE_INT("hw.cxgbe.rdmacaps_allowed", &t4_rdmacaps_allowed);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, rdmacaps_allowed, CTLFLAG_RDTUN,
+    &t4_rdmacaps_allowed, 0, "Default RDMA capabilities");
 
 static int t4_cryptocaps_allowed = -1;
-TUNABLE_INT("hw.cxgbe.cryptocaps_allowed", &t4_cryptocaps_allowed);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, cryptocaps_allowed, CTLFLAG_RDTUN,
+    &t4_cryptocaps_allowed, 0, "Default crypto capabilities");
 
 static int t4_iscsicaps_allowed = -1;
-TUNABLE_INT("hw.cxgbe.iscsicaps_allowed", &t4_iscsicaps_allowed);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, iscsicaps_allowed, CTLFLAG_RDTUN,
+    &t4_iscsicaps_allowed, 0, "Default iSCSI capabilities");
 
 static int t4_fcoecaps_allowed = 0;
-TUNABLE_INT("hw.cxgbe.fcoecaps_allowed", &t4_fcoecaps_allowed);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, fcoecaps_allowed, CTLFLAG_RDTUN,
+    &t4_fcoecaps_allowed, 0, "Default FCoE capabilities");
 
 static int t5_write_combine = 0;
-TUNABLE_INT("hw.cxl.write_combine", &t5_write_combine);
+SYSCTL_INT(_hw_cxl, OID_AUTO, write_combine, CTLFLAG_RDTUN, &t5_write_combine,
+    0, "Use WC instead of UC for BAR2");
 
 static int t4_num_vis = 1;
-TUNABLE_INT("hw.cxgbe.num_vis", &t4_num_vis);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, num_vis, CTLFLAG_RDTUN, &t4_num_vis, 0,
+    "Number of VIs per port");
+
 /*
  * PCIe Relaxed Ordering.
  * -1: driver should figure out a good value.
@@ -485,17 +549,22 @@ TUNABLE_INT("hw.cxgbe.num_vis", &t4_num_vis);
  * 2: leave RO alone.
  */
 static int pcie_relaxed_ordering = -1;
-TUNABLE_INT("hw.cxgbe.pcie_relaxed_ordering", &pcie_relaxed_ordering);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, pcie_relaxed_ordering, CTLFLAG_RDTUN,
+    &pcie_relaxed_ordering, 0,
+    "PCIe Relaxed Ordering: 0 = disable, 1 = enable, 2 = leave alone");
 
 static int t4_panic_on_fatal_err = 0;
-TUNABLE_INT("hw.cxgbe.panic_on_fatal_err", &t4_panic_on_fatal_err);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, panic_on_fatal_err, CTLFLAG_RDTUN,
+    &t4_panic_on_fatal_err, 0, "panic on fatal firmware errors");
 
 #ifdef TCP_OFFLOAD
 /*
  * TOE tunables.
  */
 static int t4_cop_managed_offloading = 0;
-TUNABLE_INT("hw.cxgbe.cop_managed_offloading", &t4_cop_managed_offloading);
+SYSCTL_INT(_hw_cxgbe, OID_AUTO, cop_managed_offloading, CTLFLAG_RDTUN,
+    &t4_cop_managed_offloading, 0,
+    "COP (Connection Offload Policy) controls all TOE offload");
 #endif
 
 /* Functions used by VIs to obtain unique MAC addresses for each VI. */
@@ -529,9 +598,9 @@ struct intrs_and_queues {
 
 static void setup_memwin(struct adapter *);
 static void position_memwin(struct adapter *, int, uint32_t);
-static int validate_mem_range(struct adapter *, uint32_t, int);
+static int validate_mem_range(struct adapter *, uint32_t, uint32_t);
 static int fwmtype_to_hwmtype(int);
-static int validate_mt_off_len(struct adapter *, int, uint32_t, int,
+static int validate_mt_off_len(struct adapter *, int, uint32_t, uint32_t,
     uint32_t *);
 static int fixup_devlog_params(struct adapter *);
 static int cfg_itype_and_nqueues(struct adapter *, struct intrs_and_queues *);
@@ -1153,6 +1222,12 @@ t4_attach(device_t dev)
 #ifdef RATELIMIT
 	t4_init_etid_table(sc);
 #endif
+#ifdef INET6
+	t4_init_clip_table(sc);
+#endif
+	if (sc->vres.key.size != 0)
+		sc->key_map = vmem_create("T4TLS key map", sc->vres.key.start,
+		    sc->vres.key.size, 32, 0, M_FIRSTFIT | M_WAITOK);
 
 	/*
 	 * Second pass over the ports.  This time we know the number of rx and
@@ -1438,6 +1513,11 @@ t4_detach_common(device_t dev)
 #ifdef RATELIMIT
 	t4_free_etid_table(sc);
 #endif
+	if (sc->key_map)
+		vmem_destroy(sc->key_map);
+#ifdef INET6
+	t4_destroy_clip_table(sc);
+#endif
 
 #if defined(TCP_OFFLOAD) || defined(RATELIMIT)
 	free(sc->sge.ofld_txq, M_CXGBE);
@@ -1560,10 +1640,6 @@ cxgbe_vi_attach(device_t dev, struct vi_info *vi)
 	if (vi->nofldrxq != 0)
 		ifp->if_capabilities |= IFCAP_TOE;
 #endif
-#ifdef DEV_NETMAP
-	if (vi->nnmrxq != 0)
-		ifp->if_capabilities |= IFCAP_NETMAP;
-#endif
 #ifdef RATELIMIT
 	if (is_ethoffload(vi->pi->adapter) && vi->nofldtxq != 0) {
 		ifp->if_capabilities |= IFCAP_TXRTLMT;
@@ -1583,7 +1659,7 @@ cxgbe_vi_attach(device_t dev, struct vi_info *vi)
 
 	ether_ifattach(ifp, vi->hw_addr);
 #ifdef DEV_NETMAP
-	if (ifp->if_capabilities & IFCAP_NETMAP)
+	if (vi->nnmrxq != 0)
 		cxgbe_nm_attach(vi);
 #endif
 	sb = sbuf_new_auto();
@@ -2827,14 +2903,14 @@ t4_range_cmp(const void *a, const void *b)
  * the card's address space.
  */
 static int
-validate_mem_range(struct adapter *sc, uint32_t addr, int len)
+validate_mem_range(struct adapter *sc, uint32_t addr, uint32_t len)
 {
 	struct t4_range mem_ranges[4], *r, *next;
 	uint32_t em, addr_len;
 	int i, n, remaining;
 
 	/* Memory can only be accessed in naturally aligned 4 byte units */
-	if (addr & 3 || len & 3 || len <= 0)
+	if (addr & 3 || len & 3 || len == 0)
 		return (EINVAL);
 
 	/* Enabled memories */
@@ -2973,7 +3049,7 @@ fwmtype_to_hwmtype(int mtype)
  * the start of the range is returned in addr.
  */
 static int
-validate_mt_off_len(struct adapter *sc, int mtype, uint32_t off, int len,
+validate_mt_off_len(struct adapter *sc, int mtype, uint32_t off, uint32_t len,
     uint32_t *addr)
 {
 	uint32_t em, addr_len, maddr;
@@ -5896,6 +5972,12 @@ t4_sysctls(struct adapter *sc)
 	    CTLTYPE_STRING | CTLFLAG_RD, sc, 0,
 	    sysctl_smt, "A", "hardware source MAC table");
 
+#ifdef INET6
+	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "clip",
+	    CTLTYPE_STRING | CTLFLAG_RD, sc, 0,
+	    sysctl_clip, "A", "active CLIP table entries");
+#endif
+
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "lb_stats",
 	    CTLTYPE_STRING | CTLFLAG_RD, sc, 0,
 	    sysctl_lb_stats, "A", "loopback statistics");
@@ -6206,7 +6288,7 @@ cxgbe_sysctls(struct port_info *pi)
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "pause_settings",
 	    CTLTYPE_STRING | CTLFLAG_RW, pi, 0, sysctl_pause_settings, "A",
-	    "PAUSE settings (bit 0 = rx_pause, bit 1 = tx_pause)");
+    "PAUSE settings (bit 0 = rx_pause, 1 = tx_pause, 2 = pause_autoneg)");
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "fec",
 	    CTLTYPE_STRING | CTLFLAG_RW, pi, 0, sysctl_fec, "A",
 	    "Forward Error Correction (bit 0 = RS, bit 1 = BASER_RS)");
@@ -9805,6 +9887,7 @@ t4_ioctl(struct cdev *dev, unsigned long cmd, caddr_t data, int fflag,
 					txq->txpkts1_wrs = 0;
 					txq->txpkts0_pkts = 0;
 					txq->txpkts1_pkts = 0;
+					txq->raw_wrs = 0;
 					mp_ring_reset_stats(txq->r);
 				}
 
@@ -10451,6 +10534,9 @@ mod_event(module_t mod, int cmd, void *arg)
 			sx_init(&t4_uld_list_lock, "T4/T5 ULDs");
 			SLIST_INIT(&t4_uld_list);
 #endif
+#ifdef INET6
+			t4_clip_modload();
+#endif
 			t4_tracer_modload();
 			tweak_tunables();
 		}
@@ -10490,6 +10576,9 @@ mod_event(module_t mod, int cmd, void *arg)
 
 			if (t4_sge_extfree_refs() == 0) {
 				t4_tracer_modunload();
+#ifdef INET6
+				t4_clip_modunload();
+#endif
 #ifdef TCP_OFFLOAD
 				sx_destroy(&t4_uld_list_lock);
 #endif
@@ -10553,7 +10642,7 @@ DRIVER_MODULE(vcc, cc, vcc_driver, vcc_devclass, 0, 0);
 MODULE_VERSION(vcc, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

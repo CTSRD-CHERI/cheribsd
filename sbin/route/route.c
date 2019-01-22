@@ -108,7 +108,8 @@ static char	rt_line[NI_MAXHOST];
 static char	net_line[MAXHOSTNAMELEN + 1];
 
 static struct {
-	struct	rt_msghdr m_rtm;
+	struct	rt_msghdr m_rtm __no_subobject_bounds; /* XXXAR: uses the
+							  trailing 512 bytes */
 	char	m_space[512];
 } m_rtmsg;
 

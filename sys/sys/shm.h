@@ -183,10 +183,10 @@ __END_DECLS
 #endif /* !_SYS_SHM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ],
 //   "change_comment": "compression of large shared memory allocations"
 // }

@@ -1,6 +1,6 @@
 # Output a list of entries containing no known changes values.
 . - map(select(.changes[] | contains (
-  "function_abi",
+  "calling_convention",
   "hashing",
   "ioctl:misc",
   "ioctl:net",
@@ -12,9 +12,9 @@
   "pointer_alignment",
   "pointer_as_integer",
   "pointer_bit_flags",
-  "pointer_integrity",
+  "integer_provenance",
   "pointer_provenance",
-  "pointer_size",
+  "pointer_shape",
   "support",
   "sysctl",
   "unsupported",

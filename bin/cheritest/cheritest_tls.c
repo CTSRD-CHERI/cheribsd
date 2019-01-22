@@ -50,14 +50,14 @@
  * from multiple threads, bounds on TLS variables, etc.  And, likely, also in
  * sandboxes.
  */
-static __thread char tls_dummy_char0;
+static __thread char tls_dummy_char0 __used;
 static __thread void *tls_ptr0;
-static __thread char tls_dummy_char1;
+static __thread char tls_dummy_char1 __used;
 static __thread void *tls_ptr1;
 
-static __thread char tls_dummy_char0;
+static __thread char tls_dummy_char2 __used;
 static __thread void * __capability tls_cap0;
-static __thread char tls_dummy_char1;
+static __thread char tls_dummy_char3 __used;
 static __thread void * __capability tls_cap1;
 
 static __thread char tls_array_4k[4096] __aligned(4096);

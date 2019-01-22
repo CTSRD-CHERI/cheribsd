@@ -353,7 +353,7 @@ struct tmpfs_mount {
 	ino_t			tm_nodes_max;
 
 	/* unrhdr used to allocate inode numbers */
-	struct unrhdr *		tm_ino_unr;
+	struct unrhdr64		tm_ino_unr;
 
 	/* Number of nodes currently that are in use. */
 	ino_t			tm_nodes_inuse;
@@ -535,7 +535,7 @@ tmpfs_use_nc(struct vnode *vp)
 #endif /* _FS_TMPFS_TMPFS_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

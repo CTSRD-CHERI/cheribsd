@@ -367,9 +367,6 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 {
 	struct proc *p = td->td_proc;
 	struct shmmap_state *shmmap_s;
-#if (defined(AUDIT) && defined(KDTRACE_HOOKS)) || defined(MAC)
-	struct shmid_kernel *shmsegptr;
-#endif
 #ifdef MAC
 	int error;
 #endif
@@ -390,11 +387,9 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 	}
 	if (i == shminfo.shmseg)
 		return (EINVAL);
-#if (defined(AUDIT) && defined(KDTRACE_HOOKS)) || defined(MAC)
-	shmsegptr = &shmsegs[IPCID_TO_IX(shmmap_s->shmid)];
-#endif
 #ifdef MAC
-	error = mac_sysvshm_check_shmdt(td->td_ucred, shmsegptr);
+	error = mac_sysvshm_check_shmdt(td->td_ucred,
+	    &shmsegs[IPCID_TO_IX(shmmap_s->shmid)]);
 	if (error != 0)
 		return (error);
 #endif
@@ -745,7 +740,7 @@ sys_shmctl(struct thread *td, struct shmctl_args *uap)
 int
 cheriabi_shmat(struct thread *td, struct cheriabi_shmat_args *uap)
 {
-	void * __capability shmaddr = uap->shmaddr;
+	const void * __capability shmaddr = uap->shmaddr;
 
 	if (shmaddr != NULL &&
 	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
@@ -757,7 +752,7 @@ cheriabi_shmat(struct thread *td, struct cheriabi_shmat_args *uap)
 int
 cheriabi_shmdt(struct thread *td, struct cheriabi_shmdt_args *uap)
 {
-	void * __capability shmaddr = uap->shmaddr;
+	const void * __capability shmaddr = uap->shmaddr;
 
 	if (shmaddr != NULL &&
 	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
@@ -1901,7 +1896,7 @@ DECLARE_MODULE(sysvshm, sysvshm_mod, SI_SUB_SYSV_SHM, SI_ORDER_FIRST);
 MODULE_VERSION(sysvshm, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

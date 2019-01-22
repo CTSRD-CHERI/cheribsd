@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd August 22, 2018
+.Dd November 30, 2018
 .Dt DEVELOPMENT 7
 .Os
 .Sh NAME
@@ -109,8 +109,8 @@ system:
 .Bd -literal -offset indent
 svnlite co https://svn.FreeBSD.org/base/head src
 cd src
-make -j8 buildworld buildkernel installkernel
-reboot
+make -sj8 buildworld buildkernel installkernel
+shutdown -r now
 .Ed
 .Pp
 After reboot:
@@ -118,6 +118,22 @@ After reboot:
 cd src
 make -j8 installworld
 reboot
+.Ed
+.Pp
+Rebuild and reinstall a single piece of userspace, in this
+case
+.Xr ls 1 :
+.Bd -literal -offset indent
+cd src/bin/ls
+make clean all install
+.Ed
+.Pp
+Quickly rebuild and reinstall the kernel, only recompiling the files
+changed since last build; note that this will only work if the full kernel
+build has been completed in the past, not on a fresh source tree:
+.Bd -literal -offset indent
+cd src
+make -sj8 kernel KERNFAST=1
 .Ed
 .Sh SEE ALSO
 .Xr svnlite 1 ,

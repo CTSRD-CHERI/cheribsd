@@ -246,7 +246,7 @@ static int	pipe_zone_init(void *mem, int size, int flags);
 static void	pipe_zone_fini(void *mem, int size);
 
 static uma_zone_t pipe_zone;
-static struct unrhdr *pipeino_unr;
+static struct unrhdr64 pipeino_unr;
 static dev_t pipedev_ino;
 
 SYSINIT(vfs, SI_SUB_VFS, SI_ORDER_ANY, pipeinit, NULL);
@@ -259,8 +259,7 @@ pipeinit(void *dummy __unused)
 	    pipe_zone_ctor, NULL, pipe_zone_init, pipe_zone_fini,
 	    UMA_ALIGN_PTR, 0);
 	KASSERT(pipe_zone != NULL, ("pipe_zone not initialized"));
-	pipeino_unr = new_unrhdr(1, INT32_MAX, NULL);
-	KASSERT(pipeino_unr != NULL, ("pipe fake inodes not initialized"));
+	new_unrhdr64(&pipeino_unr, 1);
 	pipedev_ino = devfs_alloc_cdp_inode();
 	KASSERT(pipedev_ino > 0, ("pipe dev inode not initialized"));
 }
@@ -392,8 +391,6 @@ pipe_dtor(struct pipe *dpipe)
 		funsetown(&peer->pipe_sigio);
 		pipeclose(peer);
 	}
-	if (ino != 0 && ino != (ino_t)-1)
-		free_unr(pipeino_unr, ino);
 }
 
 /*
@@ -519,9 +516,8 @@ retry:
 	size = round_page(size);
 	buffer = (caddr_t) vm_map_min(pipe_map);
 
-	error = vm_map_find(pipe_map, NULL, 0,
-		(vm_offset_t *) &buffer, size, 0, VMFS_ANY_SPACE,
-		VM_PROT_ALL, VM_PROT_ALL, 0);
+	error = vm_map_find(pipe_map, NULL, 0, (vm_offset_t *)&buffer, size, 0,
+	    VMFS_ANY_SPACE, VM_PROT_RW, VM_PROT_RW, 0);
 	if (error != KERN_SUCCESS) {
 		if ((cpipe->pipe_buffer.buffer == NULL) &&
 			(size > SMALL_PIPE_SIZE)) {
@@ -650,7 +646,7 @@ pipe_create(struct pipe *pipe, int backing)
 			(void)pipespace_new(pipe, PIPE_SIZE);
 	}
 
-	pipe->pipe_ino = -1;
+	pipe->pipe_ino = alloc_unr64(&pipeino_unr);
 }
 
 /* ARGSUSED */
@@ -1470,7 +1466,6 @@ pipe_stat(struct file *fp, struct stat *ub, struct ucred *active_cred,
     struct thread *td)
 {
 	struct pipe *pipe;
-	int new_unr;
 #ifdef MAC
 	int error;
 #endif
@@ -1491,23 +1486,6 @@ pipe_stat(struct file *fp, struct stat *ub, struct ucred *active_cred,
 		return (vnops.fo_stat(fp, ub, active_cred, td));
 	}
 
-	/*
-	 * Lazily allocate an inode number for the pipe.  Most pipe
-	 * users do not call fstat(2) on the pipe, which means that
-	 * postponing the inode allocation until it is must be
-	 * returned to userland is useful.  If alloc_unr failed,
-	 * assign st_ino zero instead of returning an error.
-	 * Special pipe_ino values:
-	 *  -1 - not yet initialized;
-	 *  0  - alloc_unr failed, return 0 as st_ino forever.
-	 */
-	if (pipe->pipe_ino == (ino_t)-1) {
-		new_unr = alloc_unr(pipeino_unr);
-		if (new_unr != -1)
-			pipe->pipe_ino = new_unr;
-		else
-			pipe->pipe_ino = 0;
-	}
 	PIPE_UNLOCK(pipe);
 
 	bzero(ub, sizeof(*ub));
@@ -1804,7 +1782,7 @@ filt_pipenotsup(struct knote *kn, long hint)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

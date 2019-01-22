@@ -87,7 +87,7 @@ int	if_clone_destroyif(struct if_clone *, struct ifnet *);
 #endif /* !_NET_IF_CLONE_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

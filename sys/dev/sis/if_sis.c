@@ -2411,7 +2411,7 @@ DRIVER_MODULE(sis, pci, sis_driver, sis_devclass, 0, 0);
 DRIVER_MODULE(miibus, sis, miibus_driver, miibus_devclass, 0, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

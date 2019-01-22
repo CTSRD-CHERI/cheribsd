@@ -427,7 +427,7 @@ long vmspace_swap_count(struct vmspace *vmspace);
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

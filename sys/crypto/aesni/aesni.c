@@ -935,7 +935,7 @@ aesni_cipher_mac(struct aesni_session *ses, struct cryptodesc *crd,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kiovec_t"

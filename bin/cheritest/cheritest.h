@@ -457,6 +457,7 @@ DECLARE_CHERI_TEST(test_ptrace_basic);
 DECLARE_CHERI_TEST(test_initregs_default);
 #ifdef __CHERI_PURE_CAPABILITY__
 DECLARE_CHERI_TEST(test_initregs_stack);
+DECLARE_CHERI_TEST(test_initregs_stack_user_perms);
 #endif
 DECLARE_CHERI_TEST(test_initregs_idc);
 DECLARE_CHERI_TEST(test_initregs_pcc);
@@ -497,11 +498,13 @@ DECLARE_CHERI_TEST(test_inflate_zeroes);
 DECLARE_CHERI_TEST(test_sandbox_inflate_zeroes);
 
 #ifdef CHERI_C_TESTS
-#define DECLARE_TEST(name, desc) \
-    void	cheri_c_test_ ## name(const struct cheri_test *ctp __unused);
-#define	DECLARE_TEST_FAULT(name, desc)	/* Not supported */
+#define	DECLARE_TEST(name, desc) \
+    void cheri_c_test_ ## name(const struct cheri_test *ctp __unused);
+#define DECLARE_TEST_FAULT(name, desc)	\
+    void cheri_c_test_ ## name(const struct cheri_test *ctp __unused);
 #include <cheri_c_testdecls.h>
 #undef DECLARE_TEST
+#undef DECLARE_TEST_FAULT
 #endif
 
 #endif /* !_CHERITEST_H_ */

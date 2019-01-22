@@ -465,7 +465,7 @@ pci_conf_match_old(struct pci_match_conf_old *matches, int num_matches,
 
 		if (((matches[i].flags & PCI_GETCONF_MATCH_NAME_OLD) != 0)
 		 && (strncmp(matches[i].pd_name, match_buf->pd_name,
-     sizeof(match_buf->pd_name)) != 0))
+		 sizeof(match_buf->pd_name)) != 0))
 			continue;
 
 		return(0);
@@ -539,37 +539,6 @@ pci_conf_match_old32(struct pci_match_conf_old32 *matches, int num_matches,
 }
 #endif	/* COMPAT_FREEBSD32 */
 #endif	/* !PRE7_COMPAT */
-
-#ifdef COMPAT_CHERIABI
-#define	_CASE_PCIOCGETCONF_C	case PCIOCGETCONF_C:
-#else
-#define	_CASE_PCIOCGETCONF_C
-#endif
-
-#ifdef COMPAT_FREEBSD32
-#define	_CASE_PCIOCGETCONF32	case PCIOCGETCONF32:
-#else
-#define	_CASE_PCIOCGETCONF32
-#endif
-
-#ifdef PRE7_COMPAT
-#define	_CASE_PCIOCGETCONF_OLD	case PCIOCGETCONF_OLD:
-#else
-#define	_CASE_PCIOCGETCONF_OLD
-#endif
-
-#if defined(PRE7_COMPAT) && defined(COMPAT_FREEBSD32)
-#define _CASE_PCIOCGETCONF_OLD32	case PCIOCGETCONF_OLD32:
-#else
-#define _CASE_PCIOCGETCONF_OLD32
-#endif
-
-#define CASE_PCIOCGETCONF					\
-    _CASE_PCIOCGETCONF_C					\
-    _CASE_PCIOCGETCONF32					\
-    _CASE_PCIOCGETCONF_OLD					\
-    _CASE_PCIOCGETCONF_OLD32					\
-    case PCIOCGETCONF
 
 union pci_conf_union {
 	struct pci_conf		pc;
@@ -1055,7 +1024,19 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 
 	if (!(flag & FWRITE)) {
 		switch (cmd) {
-		CASE_PCIOCGETCONF:
+		case PCIOCGETCONF:
+#ifdef COMPAT_CHERIABI
+		case PCIOCGETCONF_C:
+#endif
+#ifdef COMPAT_FREEBSD32
+		case PCIOCGETCONF32:
+#endif
+#ifdef PRE7_COMPAT
+		case PCIOCGETCONF_OLD:
+#ifdef COMPAT_FREEBSD32
+		case PCIOCGETCONF_OLD32:
+#endif
+#endif
 		case PCIOCGETBAR:
 		case PCIOCLISTVPD:
 			break;
@@ -1066,7 +1047,19 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 
 
 	switch (cmd) {
-	CASE_PCIOCGETCONF:
+	case PCIOCGETCONF:
+#ifdef COMPAT_CHERIABI
+		case PCIOCGETCONF_C:
+#endif
+#ifdef COMPAT_FREEBSD32
+	case PCIOCGETCONF32:
+#endif
+#ifdef PRE7_COMPAT
+	case PCIOCGETCONF_OLD:
+#ifdef COMPAT_FREEBSD32
+	case PCIOCGETCONF_OLD32:
+#endif
+#endif
 		cio = malloc(sizeof(struct pci_conf_io), M_TEMP,
 		    M_WAITOK | M_ZERO);
 		pci_conf_io_init(cio, data, cmd);
@@ -1396,7 +1389,7 @@ getconfexit:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

@@ -31,14 +31,13 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_size",
- *     "unsupported"
+ *     "pointer_shape",
+ *     "support"
  *   ],
- *   "change_comment": "TLS alignment, non-capability based TLS interface",
- *   "hybrid_specific": false
+ *   "change_comment": "TLS alignment, capability based TLS interface"
  * }
  * CHERI CHANGES END
  */

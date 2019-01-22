@@ -1769,6 +1769,8 @@ tcp_default_ctloutput(struct socket *so, struct sockopt *sopt, struct inpcb *inp
 	switch (sopt->sopt_name) {
 	case TCP_CCALGOOPT:
 		INP_WUNLOCK(inp);
+		if (sopt->sopt_valsize > CC_ALGOOPT_LIMIT)
+			return (EINVAL);
 		pbuf = malloc(sopt->sopt_valsize, M_TEMP, M_WAITOK | M_ZERO);
 		error = sooptcopyin(sopt, pbuf, sopt->sopt_valsize,
 		    sopt->sopt_valsize);
@@ -2681,7 +2683,7 @@ DB_SHOW_COMMAND(tcpcb, db_show_tcpcb)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181115,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

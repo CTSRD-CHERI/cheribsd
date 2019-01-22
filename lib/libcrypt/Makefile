@@ -5,6 +5,9 @@
 PACKAGE=lib${LIB}
 SHLIBDIR?=	/lib
 
+# Debugging init is annoying, let's not do that yet...
+CHERI_SUBOBJECT_BOUNDS_MAX=conservative
+
 .include <src.opts.mk>
 
 SHLIB_MAJOR=	5

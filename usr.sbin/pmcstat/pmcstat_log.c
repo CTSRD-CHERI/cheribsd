@@ -32,7 +32,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181115,
  *   "target_type": "prog",
  *   "changes": [
  *     "pointer_as_integer"
