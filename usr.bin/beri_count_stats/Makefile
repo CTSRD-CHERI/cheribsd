@@ -2,6 +2,7 @@
 # $FreeBSD$
 
 PROG=	beri_count_stats
+MAN=
 SRCS=	beri_count_stats.c
 .PATH: ${SRCTOP}/lib/libstatcounters/
 SRCS+=	statcounters.c
