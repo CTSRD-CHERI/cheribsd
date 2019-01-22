@@ -465,8 +465,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 /*
  * Fetch the branch instruction for a trap that happened in a branch delay slot.
  *
- * The instruction is stored in frame->badinstr_p and the address (relative to)
- * pcc.base is returned.
+ * The instruction is stored in frame->badinstr_p.
  */
 static intptr_t
 fetch_bad_branch_instr(struct trapframe *frame)
