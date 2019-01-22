@@ -3336,7 +3336,7 @@ ifhwioctl(u_long cmd, struct ifnet *ifp, caddr_t data, struct thread *td)
 		break;
 
 	case CASE_IOC_IFGROUPREQ(SIOCGIFGROUP):
-		if ((error = if_getgroup((struct ifgroupreq *)ifr, ifp)))
+		if ((error = if_getgroup((struct ifgroupreq *)data, ifp)))
 			return (error);
 		break;
 
