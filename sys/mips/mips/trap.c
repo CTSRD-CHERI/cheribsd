@@ -1432,15 +1432,19 @@ out:
 	userret(td, trapframe);
 #if defined(CPU_CHERI)
 	/*
-	 * XXXAR: I don't think this assertion is quite right:
+	 * XXXAR: These assertions will currently not hold since in some cases
+	 *  we will only update pc but not pcc. However, this is fine since the
+	 *  return path will set the offset before eret. We should only need the
+	 *  assertion on entry to catch QEMU/FPGA bugs in EPC/EPCC handling.
 	 *
 	 * KASSERT(cheri_getoffset(td->td_frame->pcc) == td->td_frame->pc,
 	 *  ("td->td_frame->pcc.offset (%jx) <-> td->td_frame->pc (%jx) mismatch:",
 	 *   (uintmax_t)cheri_getoffset(td->td_frame->pcc), (uintmax_t)td->td_frame->pc));
+	 *
+	 * KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
+	 *    ("%s(exit): pcc.offset (%jx) <-> pc (%jx) mismatch:", __func__,
+	 *    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
 	 */
-	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
-	    ("%s(exit): pcc.offset (%jx) <-> pc (%jx) mismatch:", __func__,
-	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
 #endif
 	return (trapframe->pc);
 }
