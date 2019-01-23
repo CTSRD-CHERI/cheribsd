@@ -438,7 +438,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
 		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
 		*instr = -1;
-		return (-1);
+		return (frame->pc + offset_from_pc);
 	}
 	KASSERT(cheri_getoffset(frame->pcc) == frame->pc,
 	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
@@ -455,7 +455,6 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
 		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
 		*instr = -1;
-		return (-1);
 	}
 	/* Should this be a kerncap instead instead of being indirected by $pcc? */
 	vaddr = frame->pc + offset_from_pc;
