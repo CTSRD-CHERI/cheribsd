@@ -836,7 +836,7 @@ trap(struct trapframe *trapframe)
 #ifdef CPU_CHERI
 	addr = trapframe->pcc;
 #else
-	addr = trapframe->pc;
+	addr = (void *)(uintptr_t)trapframe->pc;
 #endif
 	switch (type) {
 	case T_MCHECK:
