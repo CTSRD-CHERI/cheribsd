@@ -771,10 +771,12 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * XXX: should we make the stack sealable?
 	 */
 	stacklen = rounddown2(stacklen, 1ULL << CHERI_ALIGN_SHIFT(stacklen));
+#if 0
 	KASSERT(stackbase ==
 	    rounddown2(stackbase, 1ULL << CHERI_ALIGN_SHIFT(stacklen)),
 	    ("stackbase 0x%lx is not representable at length 0x%lx",
 	    stackbase, stacklen));
+#endif
 	td->td_frame->csp = cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, 0);
 	td->td_frame->sp = stacklen;
