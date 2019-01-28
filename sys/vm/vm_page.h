@@ -232,13 +232,13 @@ struct vm_page {
  * 	 under PV management cannot be paged out via the
  * 	 object/vm_page_t because there is no knowledge of their pte
  * 	 mappings, and such pages are also not on any PQ queue.
- *
  */
 #define	VPO_KMEM_EXEC	0x01		/* kmem mapping allows execution */
 #define	VPO_SWAPSLEEP	0x02		/* waiting for swap to finish */
 #define	VPO_UNMANAGED	0x04		/* no PV management for page */
 #define	VPO_SWAPINPROG	0x08		/* swap I/O in progress on page */
 #define	VPO_NOSYNC	0x10		/* do not collect for syncer */
+#define	VPO_PASTCAPSTORE 0x20	/* This page had capabilities in the past */
 
 /*
  * Busy page implementation details.
@@ -363,6 +363,13 @@ extern struct mtx_padalign pa_lock[];
  * PGA_REQUEUE_HEAD is a special flag for enqueuing pages near the head of
  * the inactive queue, thus bypassing LRU.  The page lock must be held to
  * set this flag, and the queue lock for the page must be held to clear it.
+ *
+ * PGA_CAPSTORED indicates that a capability was written to this page since
+ * the last time this bit (and the underlying architectural permission) was
+ * cleared.  Setting this bit happens without the page lock held, but
+ * clearing it requires the page lock (and the page must have been locked
+ * and held across the duration of whatever operation determined that there
+ * are no capabilities on this page).
  */
 #define	PGA_WRITEABLE	0x01		/* page may be mapped writeable */
 #define	PGA_REFERENCED	0x02		/* page has been referenced */
@@ -371,6 +378,7 @@ extern struct mtx_padalign pa_lock[];
 #define	PGA_DEQUEUE	0x10		/* page is due to be dequeued */
 #define	PGA_REQUEUE	0x20		/* page is due to be requeued */
 #define	PGA_REQUEUE_HEAD 0x40		/* page requeue should bypass LRU */
+#define	PGA_CAPSTORED	0x80
 
 #define	PGA_QUEUE_STATE_MASK	(PGA_ENQUEUED | PGA_DEQUEUE | PGA_REQUEUE | \
 				PGA_REQUEUE_HEAD)
@@ -739,6 +747,14 @@ vm_page_dirty(vm_page_t m)
 #else
 	m->dirty = VM_PAGE_BITS_ALL;
 #endif
+}
+
+static __inline void
+vm_page_capdirty(vm_page_t m)
+{
+	if ((m->aflags & PGA_CAPSTORED) == 0) {
+		vm_page_aflag_set(m, PGA_CAPSTORED);
+	}
 }
 
 /*

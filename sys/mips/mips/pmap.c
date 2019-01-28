@@ -1499,6 +1499,8 @@ pmap_pv_reclaim(pmap_t locked_pmap)
 				m = PHYS_TO_VM_PAGE(TLBLO_PTE_TO_PA(oldpte));
 				if (pte_test(&oldpte, PTE_D))
 					vm_page_dirty(m);
+				if (pte_test(&oldpte, PTE_SC) == 0)
+					vm_page_capdirty(m);
 				if (m->md.pv_flags & PV_TABLE_REF)
 					vm_page_aflag_set(m, PGA_REFERENCED);
 				m->md.pv_flags &= ~PV_TABLE_REF;
@@ -1772,6 +1774,8 @@ pmap_remove_pte(struct pmap *pmap, pt_entry_t *ptq, vm_offset_t va,
 			    __func__, (void *)va, (uintmax_t)oldpte));
 			vm_page_dirty(m);
 		}
+		if (pte_test(&oldpte, PTE_SC) == 0)
+			vm_page_capdirty(m);
 		if (m->md.pv_flags & PV_TABLE_REF)
 			vm_page_aflag_set(m, PGA_REFERENCED);
 		m->md.pv_flags &= ~PV_TABLE_REF;
@@ -1951,6 +1955,8 @@ pmap_remove_all(vm_page_t m)
 			    __func__, (void *)pv->pv_va, (uintmax_t)tpte));
 			vm_page_dirty(m);
 		}
+		if (pte_test(&tpte, PTE_SC) == 0)
+			vm_page_capdirty(m);
 		pmap_invalidate_page(pmap, pv->pv_va);
 
 		TAILQ_REMOVE(&m->md.pv_list, pv, pv_next);
@@ -2044,6 +2050,14 @@ pmap_protect(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 					va = va_next;
 				}
 			}
+			if (pte_test(&pbits, PTE_SC) == 0) {
+				pte_set(&pbits, PTE_SC);
+				if (pte_test(&pbits, PTE_MANAGED)) {
+					pa = TLBLO_PTE_TO_PA(pbits);
+					m = PHYS_TO_VM_PAGE(pa);
+					vm_page_capdirty(m);
+				}
+			}
 			*pte = pbits;
 		}
 		if (va != va_next)
@@ -2091,8 +2105,26 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 #ifdef CPU_CHERI
 	if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
 		newpte |= PTE_LC;
-	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
+	/*
+	 * If this page is unmanaged, don't try to track its capdirty status
+	 * (so determine PTE_SC entirely from NOSTORETAGS).  On the other
+	 * hand, if it's already capdirty, avoid the overhead of faulting,
+	 * since all we'd do is set the bit again (eventually, in
+	 * pmap_tc_capdirty).
+	 *
+	 * Transfer NOSTORETAGS to PTE_CRO.
+	 *
+	 * XXX NWF: I would like, eventually, to track capdirty in the
+	 * kernel as well, but for the moment, doing this trips a panic in
+	 * pmap_emulate_capdirty because it can't find the PTE in question.
+	 * I am sure I am just holding something wrong.
+	 */
+	if ((((m->oflags & VPO_UNMANAGED) == 0)
+		&& ((m->aflags & PGA_CAPSTORED) == 0))
+	    || ((flags & PMAP_ENTER_NOSTORETAGS) != 0))
 		newpte |= PTE_SC;
+	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
+		newpte |= PTE_CRO;
 #endif
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		newpte |= PTE_MANAGED;
@@ -2129,6 +2161,9 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	origpte = *pte;
 	KASSERT(!pte_test(&origpte, PTE_D | PTE_RO | PTE_VALID),
 	    ("pmap_enter: modified page not writable: va: %p, pte: %#jx",
+	    (void *)va, (uintmax_t)origpte));
+	KASSERT(!pte_test(&origpte, PTE_CRO | PTE_VALID) || pte_test(&origpte, PTE_SC),
+	    ("pmap_enter: capdirty with CRO set: va: %p, pte: %#jx",
 	    (void *)va, (uintmax_t)origpte));
 	opa = TLBLO_PTE_TO_PA(origpte);
 
@@ -2179,6 +2214,8 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			om = PHYS_TO_VM_PAGE(opa);
 			if (pte_test(&origpte, PTE_D))
 				vm_page_dirty(om);
+			if (pte_test(&origpte, PTE_SC) == 0)
+				vm_page_capdirty(m);
 			if ((om->md.pv_flags & PV_TABLE_REF) != 0) {
 				om->md.pv_flags &= ~PV_TABLE_REF;
 				vm_page_aflag_set(om, PGA_REFERENCED);
@@ -2244,6 +2281,9 @@ validate:
 				if (pte_test(&origpte, PTE_MANAGED))
 					vm_page_dirty(m);
 			}
+			if ((pte_test(&origpte, PTE_SC) == 0)
+			    && pte_test(&origpte, PTE_MANAGED))
+				vm_page_capdirty(m);
 			pmap_update_page(pmap, va, newpte);
 		}
 	}
@@ -2652,10 +2692,21 @@ pmap_copy_page_internal(vm_page_t src, vm_page_t dst, int flags)
 		va_src = MIPS_PHYS_TO_DIRECT(phys_src);
 		va_dst = MIPS_PHYS_TO_DIRECT(phys_dst);
 #ifdef CPU_CHERI
-		if (flags & PMAP_COPY_TAGS)
+		if (flags & PMAP_COPY_TAGS) {
 			cheri_bcopy((caddr_t)va_src, (caddr_t)va_dst,
 			    PAGE_SIZE);
-		else
+
+			/*
+			 * If we're copying tags, consider the target page
+			 * capdirty, even if tere might not be tags on the
+			 * page.  We can't accurately get the PTE's capdirty
+			 * bit, at this point, so err on the side of safety.
+			 *
+			 * XXX Can we do better?
+			 */
+	
+			vm_page_capdirty(dst);
+		} else
 #endif
 			bcopy((caddr_t)va_src, (caddr_t)va_dst, PAGE_SIZE);
 		mips_dcache_wbinv_range(va_dst, PAGE_SIZE);
@@ -2712,6 +2763,7 @@ pmap_copy_pages_internal(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 		cnt = min(cnt, PAGE_SIZE - b_pg_offset);
 		b_m = mb[b_offset >> PAGE_SHIFT];
 		b_phys = VM_PAGE_TO_PHYS(b_m);
+
 		if (MIPS_DIRECT_MAPPABLE(a_phys) &&
 		    MIPS_DIRECT_MAPPABLE(b_phys)) {
 			pmap_flush_pvcache(a_m);
@@ -2722,9 +2774,21 @@ pmap_copy_pages_internal(vm_page_t ma[], vm_offset_t a_offset, vm_page_t mb[],
 			b_cp = (char *)MIPS_PHYS_TO_DIRECT(b_phys) +
 			    b_pg_offset;
 #ifdef CPU_CHERI
-			if (flags & PMAP_COPY_TAGS)
+			if (flags & PMAP_COPY_TAGS) {
 				cheri_bcopy(a_cp, b_cp, cnt);
-			else
+
+				/*
+				 * If we're copying tags, consider the
+				 * target page capdirty, even if tere might
+				 * not be tags on the page.  We can't
+				 * accurately get the PTE's capdirty bit, at
+				 * this point, so err on the side of safety.
+				 *
+				 * XXX Can we do better?
+				 */
+
+				vm_page_capdirty(b_m);
+			} else
 #endif
 				bcopy(a_cp, b_cp, cnt);
 			mips_dcache_wbinv_range((vm_offset_t)b_cp, cnt);
@@ -2935,6 +2999,8 @@ pmap_remove_pages(pmap_t pmap)
 				 */
 				if (pte_test(&tpte, PTE_D))
 					vm_page_dirty(m);
+				if (pte_test(&tpte, PTE_SC) == 0)
+					vm_page_capdirty(m);
 
 				/* Mark free */
 				PV_STAT(pv_entry_frees++);
@@ -2962,7 +3028,7 @@ pmap_remove_pages(pmap_t pmap)
  * pmap_testbit tests bits in pte's
  */
 static boolean_t
-pmap_testbit(vm_page_t m, int bit)
+pmap_testbit(vm_page_t m, pt_entry_t bit)
 {
 	pv_entry_t pv;
 	pmap_t pmap;
@@ -3047,6 +3113,10 @@ pmap_remove_write(vm_page_t m)
 		if (pte_test(&pbits, PTE_D)) {
 			pte_clear(&pbits, PTE_D);
 			vm_page_dirty(m);
+		}
+		if (pte_test(&pbits, PTE_SC) == 0) {
+			pte_set(&pbits, PTE_SC);
+			vm_page_capdirty(m);
 		}
 		pte_set(&pbits, PTE_RO);
 		if (pbits != *pte) {
@@ -3213,6 +3283,10 @@ pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, int advice)
 					pmap_invalidate_range(pmap, va, sva);
 					va = va_next;
 				}
+			}
+			if (pte_test(pte, PTE_SC) == 0) {
+				pte_set(pte, PTE_SC);
+				vm_page_capdirty(m);
 			}
 		}
 		if (va != va_next)
@@ -3612,6 +3686,90 @@ pmap_emulate_referenced(pmap_t pmap, vm_offset_t va)
 
 	return (1);
 }
+
+#ifdef CPU_CHERI
+
+/*
+ * For every mapping of this page, collect and clear its capdirty PTE
+ * entries, promoting them to the page's PGA_CAPSTORED bit.
+ *
+ * XREF pmap_clear_modify and pmap_is_modified
+ */
+boolean_t
+pmap_tc_capdirty(vm_page_t m)
+{
+	pv_entry_t pv;
+	boolean_t found;
+
+	/*
+	 * If the page is not exclusive busied, then PGA_WRITEABLE cannot be
+	 * concurrently set while the object is locked.  Thus, if PGA_WRITEABLE
+	 * is clear, no PTEs can have PTE_SC clear.
+	 */
+	VM_OBJECT_ASSERT_WLOCKED(m->object);
+	if (!vm_page_xbusied(m) && (m->aflags & PGA_WRITEABLE) == 0)
+		return (FALSE);
+
+	found = !!(m->aflags & PGA_CAPSTORED);
+
+	rw_wlock(&pvh_global_lock);
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_next) {
+		pmap_t pmap;
+		pt_entry_t *pte;
+
+		pmap = PV_PMAP(pv);
+		PMAP_LOCK(pmap);
+		pte = pmap_pte(pmap, pv->pv_va);
+		if (pte_test(pte, PTE_SC) == 0) {
+			if (!found)
+				vm_page_capdirty(m);
+			found = 1;
+			pte_set(pte, PTE_SC);
+			pmap_update_page(pmap, pv->pv_va, *pte);
+		}
+		PMAP_UNLOCK(pmap);
+
+	}
+	rw_wunlock(&pvh_global_lock);
+
+	return found;
+}
+
+/* XREF pmap_emulate_modified */
+int
+pmap_emulate_capdirty(pmap_t pmap, vm_offset_t va)
+{
+	pt_entry_t *pte;
+
+	PMAP_LOCK(pmap);
+	pte = pmap_pte(pmap, va);
+	if (pte == NULL)
+		panic("pmap_emulate_capdirty: can't find PTE");
+#ifdef SMP
+	/* It is possible that some other CPU changed m-bit */
+	if (!pte_test(pte, PTE_VALID) || !pte_test(pte, PTE_SC)) {
+		tlb_update(pmap, va, *pte);
+		PMAP_UNLOCK(pmap);
+		return (0);
+	}
+#else
+	if (!pte_test(pte, PTE_VALID) || !pte_test(pte, PTE_SC))
+		panic("pmap_emulate_capdirty: invalid pte");
+#endif
+	if (pte_test(pte, PTE_RO) || pte_test(pte, PTE_CRO)) {
+		PMAP_UNLOCK(pmap);
+		return (1);
+	}
+
+	pte_clear(pte, PTE_SC);
+	tlb_update(pmap, va, *pte);
+	if (!pte_test(pte, PTE_MANAGED))
+		panic("pmap_emulate_capdirty: unmanaged page");
+	PMAP_UNLOCK(pmap);
+	return 0;
+}
+
+#endif
 
 /*
  *	Routine:	pmap_kextract
