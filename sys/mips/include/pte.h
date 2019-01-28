@@ -194,10 +194,10 @@ typedef uint64_t pd_entry_t;
  *
  * Upper bits of a 64 bit PTE:
  *
- *   63-62   61-60  59   58 -- 56    55   54   53
- *   ---------------------------------------------
- *  |  RG  |      | SV | PG SZ IDX | MN | W  | RO |
- *   ---------------------------------------------
+ *   63-62   61  60    59   58 -- 56    55   54   53
+ *   ------------------------------------------------
+ *  |  RG  |   | CRO | SV | PG SZ IDX | MN | W  | RO |
+ *   ------------------------------------------------
  *
  * VM flags managed in software:
  *
@@ -226,6 +226,9 @@ typedef uint64_t pd_entry_t;
  *
  *  W:  Wired.  ???
  *
+ *  CRO: CHERI-only.  Capability read only.  Never clear PTE_SC on this
+ *       entry, and fail attempts to store capabilities to it.
+ *
  *  RO: Read only.  Never set PTE_D on this page, and don't
  *      listen to requests to write to it.
  *
@@ -251,6 +254,7 @@ typedef uint64_t pd_entry_t;
 #define	PTE_HWFLAGS_NBITS_TO_LEFT	58
 #define	SW_VALID		0x40
 #define	PTE_SV			((pt_entry_t)SW_VALID << TLBLO_SWBITS_SHIFT)
+#define	PTE_CRO			(((pt_entry_t)0x80) << TLBLO_SWBITS_SHIFT)
 #else
 #define	PTE_PS_IDX_MASK		0
 #define	PTE_SV			0

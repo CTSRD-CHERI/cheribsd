@@ -669,6 +669,36 @@ cpu_fetch_syscall_args(struct thread *td)
 #define __FBSDID(x)
 #include "../../kern/subr_syscall.c"
 
+#ifdef CPU_CHERI
+static inline int
+try_emulate_capdirty(struct trapframe *trapframe, pmap_t kpmap, pmap_t upmap)
+{
+	register_t cause = trapframe->capcause;
+
+	cause &= CHERI_CAPCAUSE_EXCCODE_MASK;
+	cause >>= CHERI_CAPCAUSE_EXCCODE_SHIFT;
+
+	if (cause == CHERI_EXCCODE_TLBSTORE) {
+		/*
+		 * This could just need capdirty emulation; we cannot get
+		 * here unless the TLB entry is permitted to store, just not
+		 * store capabilities.  That is, all CoW will have already
+		 * been handled for us, thank goodness.
+		 */
+
+		vm_offset_t va = trapframe->badvaddr;
+
+		if (KERNLAND(va)) {
+			if (kpmap) {
+				return pmap_emulate_capdirty(kpmap, va);
+			}
+		} else {
+			return pmap_emulate_capdirty(upmap, va);
+		}
+	}
+	return 1;
+}
+#endif
 
 /*
  * Handle an exception.
@@ -1164,6 +1194,11 @@ dofault:
 		break;
 #ifdef CPU_CHERI
 	case T_C2E:
+		if(try_emulate_capdirty(trapframe, kernel_pmap,
+					&p->p_vmspace->vm_pmap) == 0) {
+			return trapframe->pc;
+		}
+
 		if (td->td_pcb->pcb_onfault != NULL) {
 			pc = (register_t)(intptr_t)td->td_pcb->pcb_onfault;
 			td->td_pcb->pcb_onfault = NULL;
@@ -1179,6 +1214,15 @@ dofault:
 		if (KTRPOINT(td, KTR_CEXCEPTION))
 			ktrcexception(trapframe);
 #endif
+
+		if (try_emulate_capdirty(trapframe, NULL,
+					 &p->p_vmspace->vm_pmap) == 0) {
+			if (!usermode) {
+				return (trapframe->pc);
+			}
+			goto out;
+		}
+
 		fetch_bad_instr(trapframe);
 		log_c2e_exception(msg, trapframe, type);
 		i = SIGPROT;
