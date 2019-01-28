@@ -187,7 +187,7 @@ cloudabi_sock_send(struct thread *td, cloudabi_fd_t fd, kiovec_t *data,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

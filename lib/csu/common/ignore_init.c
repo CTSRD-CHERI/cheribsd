@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-1-Clause
  *
  * Copyright 2012 Konstantin Belousov <kib@FreeBSD.org>
  * Copyright (c) 2018 The FreeBSD Foundation
@@ -12,9 +12,6 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -30,7 +27,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181127,
  *   "target_type": "lib",
  *   "changes": [
  *     "support"
@@ -78,7 +75,12 @@ extern initfini_array_entry __fini_array_end[] __hidden;
 extern void _fini(void) __hidden;
 extern void _init(void) __hidden;
 
-extern int _DYNAMIC;
+/* since this can be NULL we really should not be setting any bounds (it will
+ * crash when used on a NULL pointer) */
+/* TODO: clang should only be setting bounds on globals in very-aggressive mode
+ * since they will be correctly bounded anyway
+ */
+extern int _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
 
 /*

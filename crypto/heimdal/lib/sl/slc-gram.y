@@ -33,9 +33,9 @@
  */
 // CHERI CHANGES START
 // {
-//   "updated": 20181024,
+//   "updated": 20181121,
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

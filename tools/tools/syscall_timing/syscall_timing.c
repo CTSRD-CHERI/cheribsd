@@ -505,6 +505,23 @@ test_getuid(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused
 }
 
 static uintmax_t
+test_lstat(uintmax_t num, uintmax_t int_arg __unused, const char *path)
+{
+	struct stat sb;
+	uintmax_t i;
+	int error;
+
+	benchmark_start();
+	BENCHMARK_FOREACH(i, num) {
+		error = lstat(path, &sb);
+		if (error != 0)
+			err(-1, "lstat");
+	}
+	benchmark_stop();
+	return (i);
+}
+
+static uintmax_t
 test_memcpy(uintmax_t num, uintmax_t int_arg, const char *path __unused)
 {
 	char buf[int_arg], buf2[int_arg];
@@ -946,6 +963,23 @@ test_socketpair_dgram(uintmax_t num, uintmax_t int_arg __unused, const char *pat
 }
 
 static uintmax_t
+test_readlink(uintmax_t num, uintmax_t int_arg __unused, const char *path)
+{
+	char buf[PATH_MAX];
+	ssize_t rv;
+	uintmax_t i;
+
+	benchmark_start();
+	BENCHMARK_FOREACH(i, num) {
+		rv = readlink(path, buf, sizeof(buf));
+		if (rv < 0 && errno != EINVAL)
+			err(-1, "readlink");
+	}
+	benchmark_stop();
+	return (i);
+}
+
+static uintmax_t
 test_vfork(uintmax_t num, uintmax_t int_arg __unused, const char *path __unused)
 {
 	pid_t pid;
@@ -1038,6 +1072,7 @@ static const struct test tests[] = {
 	{ "getresuid", test_getresuid, .t_flags = 0 },
 	{ "gettimeofday", test_gettimeofday, .t_flags = 0 },
 	{ "getuid", test_getuid, .t_flags = 0 },
+	{ "lstat", test_lstat, .t_flags = FLAG_PATH },
 	{ "memcpy_8", test_memcpy, .t_flags = 0, .t_int = 8 },
 	{ "memcpy_80", test_memcpy, .t_flags = 0, .t_int = 80 },
 	{ "memcpy_800", test_memcpy, .t_flags = 0, .t_int = 800 },
@@ -1094,6 +1129,7 @@ static const struct test tests[] = {
 	{ "socketpair_dgram", test_socketpair_dgram, .t_flags = 0 },
 	{ "socket_tcp", test_socket_stream, .t_int = PF_INET },
 	{ "socket_udp", test_socket_dgram, .t_int = PF_INET },
+	{ "readlink", test_readlink, .t_flags = FLAG_PATH },
 	{ "vfork", test_vfork, .t_flags = 0 },
 	{ "vfork_exec", test_vfork_exec, .t_flags = 0 },
 };

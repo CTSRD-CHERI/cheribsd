@@ -3191,7 +3191,7 @@ DECLARE_MODULE(if_vxlan, vxlan_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_vxlan, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

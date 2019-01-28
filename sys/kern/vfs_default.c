@@ -1351,7 +1351,7 @@ vop_sigdefer(struct vop_vector *vop, struct vop_generic_args *a)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

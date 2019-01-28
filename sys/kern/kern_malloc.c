@@ -1326,10 +1326,10 @@ SYSCTL_OID(_kern, OID_AUTO, mprof, CTLTYPE_STRING|CTLFLAG_RD,
 #endif /* MALLOC_PROFILE */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "kernel",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

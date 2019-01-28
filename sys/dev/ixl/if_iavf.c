@@ -260,7 +260,7 @@ static struct if_shared_ctx iavf_sctx_init = {
 	.isc_vendor_info = iavf_vendor_info_array,
 	.isc_driver_version = IAVF_DRIVER_VERSION_STRING,
 	.isc_driver = &iavf_if_driver,
-	.isc_flags = IFLIB_NEED_SCRATCH | IFLIB_NEED_ZERO_CSUM | IFLIB_IS_VF,
+	.isc_flags = IFLIB_NEED_SCRATCH | IFLIB_NEED_ZERO_CSUM | IFLIB_TSO_INIT_IP | IFLIB_IS_VF,
 
 	.isc_nrxd_min = {IXL_MIN_RING},
 	.isc_ntxd_min = {IXL_MIN_RING},
@@ -2432,12 +2432,3 @@ iavf_sysctl_vflr_reset(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 #undef CTX_ACTIVE
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "ioctl:net"
-//   ]
-// }
-// CHERI CHANGES END

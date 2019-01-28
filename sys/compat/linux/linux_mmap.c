@@ -251,7 +251,7 @@ linux_fixup_prot(struct thread *td, int *prot)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

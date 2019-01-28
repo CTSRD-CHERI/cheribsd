@@ -39,7 +39,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <stdint.h>
 #else
-typedef long vaddr_t;
+#ifndef _VADDR_T_DECLARED
+typedef __attribute((memory_address)) __UINT64_TYPE__ vaddr_t;
+#define _VADDR_T_DECLARED
+#endif
 #endif
 /*
  * sizeof(word) MUST BE A POWER OF TWO
@@ -77,6 +80,9 @@ typedef	uintptr_t ptr;
 	} while (index!=last);						\
 }
 
+
+/* We are doing the necessary checks before casting -> silence warning */
+#pragma clang diagnostic ignored "-Wcast-align"
 
 /*
  * Copy a block of memory, handling overlap.
@@ -120,14 +126,17 @@ bcopy(const void *src0, void *dst0, size_t length)
 	if (length == 0 || src0 == dst0)		/* nothing to do */
 		goto done;
 
-#ifdef __CHERI__
+#if defined(MEMMOVE_C) || defined(MEMCPY_C) || defined(CMEMCPY_C)
+	char * CAPABILITY dst = (char * CAPABILITY)dst0;
+	const char * CAPABILITY src = (const char * CAPABILITY)src0;
+#elif defined(__CHERI__)
 	char * CAPABILITY dst =
 	    __builtin_cheri_bounds_set((__cheri_tocap void * CAPABILITY)dst0,length);
 	const char * CAPABILITY src =
 	    __builtin_cheri_bounds_set((__cheri_tocap const void * CAPABILITY)src0,length);
 #else
-	char *dst = dst0;
-	const char *src = src0;
+	char *dst = (char *)dst0;
+	const char *src = (const char *)src0;
 #endif
 	size_t t;
 
@@ -178,7 +187,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 					t = -t*wsize;
 					MIPSLOOP(t, -8,
 					    *((word * CAPABILITY)(dst+t)) =
-					    *((word * CAPABILITY)(src+t));,
+					    *((const word * CAPABILITY)(src+t));,
 					    8/*wsize*/);
 				}
 			}
@@ -193,13 +202,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 			t = -(t*psize);
 #if !defined(_MIPS_SZCAP)
 			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==128
 			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==256
 			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
 #endif
 		}
 		t = length & pmask;
@@ -243,7 +252,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 					t = ((t-1)*wsize);
 					MIPSLOOP(t, 0,
 					    *((word * CAPABILITY)(dst+t)) =
-					    *((word * CAPABILITY)(src+t));,
+					    *((const word * CAPABILITY)(src+t));,
 					    -8/*wsize*/);
 				}
 			}
@@ -255,13 +264,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 			t = ((t-1)*psize);
 #if !defined(_MIPS_SZCAP)
 			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==128
 			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==256
 			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
 #endif
 
 		}

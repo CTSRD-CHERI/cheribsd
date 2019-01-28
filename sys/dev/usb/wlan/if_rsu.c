@@ -3742,7 +3742,7 @@ rsu_ms_delay(struct rsu_softc *sc, int ms)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

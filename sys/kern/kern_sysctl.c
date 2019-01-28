@@ -550,10 +550,10 @@ sysctl_unregister_oid(struct sysctl_oid *oidp)
 	int error;
 
 	SYSCTL_ASSERT_WLOCKED();
-	error = ENOENT;
 	if (oidp->oid_number == OID_AUTO) {
 		error = EINVAL;
 	} else {
+		error = ENOENT;
 		SLIST_FOREACH(p, oidp->oid_parent, oid_link) {
 			if (p == oidp) {
 				SLIST_REMOVE(oidp->oid_parent, oidp,
@@ -569,8 +569,10 @@ sysctl_unregister_oid(struct sysctl_oid *oidp)
 	 * being unloaded afterwards.  It should not be a panic()
 	 * for normal use.
 	 */
-	if (error)
-		printf("%s: failed to unregister sysctl\n", __func__);
+	if (error) {
+		printf("%s: failed(%d) to unregister sysctl(%s)\n",
+		    __func__, error, oidp->oid_name);
+	}
 }
 
 /* Initialize a new context to keep track of dynamically added sysctls. */
@@ -1706,13 +1708,13 @@ sysctl_usec_to_sbintime(SYSCTL_HANDLER_ARGS)
 	sbintime_t sb;
 
 	tt = *(int64_t *)arg1;
-	sb = ustosbt(tt);
+	sb = sbttous(tt);
 
 	error = sysctl_handle_64(oidp, &sb, 0, req);
 	if (error || !req->newptr)
 		return (error);
 
-	tt = sbttous(sb);
+	tt = ustosbt(sb);
 	*(int64_t *)arg1 = tt;
 
 	return (0);
@@ -1729,13 +1731,13 @@ sysctl_msec_to_sbintime(SYSCTL_HANDLER_ARGS)
 	sbintime_t sb;
 
 	tt = *(int64_t *)arg1;
-	sb = mstosbt(tt);
+	sb = sbttoms(tt);
 
 	error = sysctl_handle_64(oidp, &sb, 0, req);
 	if (error || !req->newptr)
 		return (error);
 
-	tt = sbttoms(sb);
+	tt = mstosbt(sb);
 	*(int64_t *)arg1 = tt;
 
 	return (0);
@@ -2126,7 +2128,7 @@ out:
 }
 
 #ifndef _SYS_SYSPROTO_H_
-struct sysctl_args {
+struct __sysctl_args {
 	int	*name;
 	u_int	namelen;
 	void	*old;
@@ -2136,7 +2138,7 @@ struct sysctl_args {
 };
 #endif
 int
-sys___sysctl(struct thread *td, struct sysctl_args *uap)
+sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 {
 
 	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
@@ -2279,7 +2281,7 @@ sbuf_new_for_sysctl(struct sbuf *s, char *buf, int length,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

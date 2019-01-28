@@ -795,7 +795,7 @@ done:
 	return (blk);
 }
 
-static int
+static bool
 swp_pager_isondev(daddr_t blk, struct swdevt *sp)
 {
 
@@ -809,7 +809,7 @@ swp_pager_strategy(struct buf *bp)
 
 	mtx_lock(&sw_dev_mtx);
 	TAILQ_FOREACH(sp, &swtailq, sw_list) {
-		if (bp->b_blkno >= sp->sw_first && bp->b_blkno < sp->sw_end) {
+		if (swp_pager_isondev(bp->b_blkno, sp)) {
 			mtx_unlock(&sw_dev_mtx);
 			if ((sp->sw_flags & SW_UNMAPPED) != 0 &&
 			    unmapped_buf_allowed) {
@@ -843,7 +843,7 @@ swp_pager_freeswapspace(daddr_t blk, daddr_t npages)
 		return;
 	mtx_lock(&sw_dev_mtx);
 	TAILQ_FOREACH(sp, &swtailq, sw_list) {
-		if (blk >= sp->sw_first && blk < sp->sw_end) {
+		if (swp_pager_isondev(blk, sp)) {
 			sp->sw_used -= npages;
 			/*
 			 * If we are attempting to stop swapping on
@@ -2129,13 +2129,13 @@ swp_pager_meta_free(vm_object_t object, vm_pindex_t pindex, vm_pindex_t count)
 			swp_pager_update_freerange(&s_free, &n_free, sb->d[i]);
 			sb->d[i] = SWAPBLK_NONE;
 		}
+		pindex = sb->p + SWAP_META_PAGES;
 		if (swp_pager_swblk_empty(sb, 0, start) &&
 		    swp_pager_swblk_empty(sb, limit, SWAP_META_PAGES)) {
 			SWAP_PCTRIE_REMOVE(&object->un_pager.swp.swp_blks,
 			    sb->p);
 			uma_zfree(swblk_zone, sb);
 		}
-		pindex = sb->p + SWAP_META_PAGES;
 	}
 	swp_pager_freeswapspace(s_free, n_free);
 }
@@ -3075,7 +3075,7 @@ sysctl_swap_async_max(SYSCTL_HANDLER_ARGS)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

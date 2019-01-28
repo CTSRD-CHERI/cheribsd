@@ -1,15 +1,14 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181113,
  *   "target_type": "lib",
  *   "changes": [
  *     "unsupported",
  *     "virtual_address",
  *     "other"
  *   ],
- *   "change_comment": "No MAP_FIXED, LG_PAGE hack",
- *   "hybrid_specific": false
+ *   "change_comment": "No MAP_FIXED, LG_PAGE hack"
  * }
  * CHERI CHANGES END
  */
@@ -210,6 +209,10 @@ pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 	 * touching existing mappings, and to mmap with specific alignment.
 	 */
 	{
+		if (os_overcommits) {
+			*commit = true;
+		}
+
 		int prot = *commit ? PAGES_PROT_COMMIT : PAGES_PROT_DECOMMIT;
 		int flags = mmap_flags;
 

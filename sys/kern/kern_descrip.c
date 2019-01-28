@@ -2662,7 +2662,7 @@ fget_unlocked(struct filedesc *fdp, int fd, cap_rights_t *needrightsp,
 #endif
 
 	fdt = fdp->fd_files;
-	if ((u_int)fd >= fdt->fdt_nfiles)
+	if (__predict_false((u_int)fd >= fdt->fdt_nfiles))
 		return (EBADF);
 	/*
 	 * Fetch the descriptor locklessly.  We avoid fdrop() races by
@@ -4277,7 +4277,7 @@ fildesc_drvinit(void *unused)
 SYSINIT(fildescdev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, fildesc_drvinit, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

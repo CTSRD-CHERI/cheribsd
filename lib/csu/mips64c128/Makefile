@@ -13,6 +13,7 @@ CFLAGS+=	-DCRT_IRELOC_SUPPRESS
 
 NEED_CHERI=	pure
 
+NO_BSD_CRTBEGIN=	yes
 .PATH:	${.CURDIR}/../common-cheri
 CFLAGS+=	-I${.CURDIR}/../common		\
 		-I${.CURDIR}/../common-cheri	\

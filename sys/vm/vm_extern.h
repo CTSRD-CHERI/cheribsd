@@ -135,7 +135,7 @@ u_int vm_wait_count(void);
 #endif				/* !_VM_EXTERN_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

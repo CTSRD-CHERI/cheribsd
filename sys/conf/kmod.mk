@@ -378,6 +378,9 @@ ${_src}:
 .endfor
 .endif
 
+# Add the sanitizer C flags
+CFLAGS+=	${SAN_CFLAGS}
+
 # Respect configuration-specific C flags.
 CFLAGS+=	${ARCH_FLAGS} ${CONF_CFLAGS}
 

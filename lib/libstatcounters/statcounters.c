@@ -450,15 +450,20 @@ int statcounters_dump_with_args (
     FILE * fp = fileptr;
     if (!fp) {
         const char * const fname = getenv("STATCOUNTERS_OUTPUT");
-        if (access(fname, F_OK) != -1)
-            display_header = false;
-        fp = fopen(fname, "a");
-        if (!fp) {
+        if (!fname || fname[0] == '\0') {
+            use_stdout = true;
+        } else {
+            if (access(fname, F_OK) != -1) {
+                display_header = false;
+            }
+            fp = fopen(fname, "a");
+        }
+        if (!fp && !use_stdout) {
             warn("Failed to open statcounters output %s", fname);
             use_stdout = true;
         }
     } else {
-        use_stdout = true;
+        use_stdout = false;
     }
     if (use_stdout)
         fp = stdout;
@@ -696,6 +701,8 @@ uint64_t statcounters_sample_by_id (int id)
 	return (statcounter_names[id].counter_get());
 }
 
+#ifndef STATCOUNTERS_NO_CTOR_DTOR
+
 // C constructor / atexit interface
 //////////////////////////////////////////////////////////////////////////////
 
@@ -724,3 +731,5 @@ static void end_sample (void)
     // dump the counters
     statcounters_dump(&diff_cnt);
 }
+
+#endif /* STATCOUNTERS_NO_CTOR_DTOR */

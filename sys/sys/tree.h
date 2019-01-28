@@ -75,8 +75,8 @@ struct name {								\
 
 #define SPLAY_ENTRY(type)						\
 struct {								\
-	struct type *spe_left; /* left element */			\
-	struct type *spe_right; /* right element */			\
+	struct type *spe_left __no_subobject_bounds; /* left element */			\
+	struct type *spe_right __no_subobject_bounds; /* right element */			\
 }
 
 #define SPLAY_LEFT(elm, field)		(elm)->field.spe_left
@@ -310,10 +310,10 @@ struct name {								\
 #define RB_BLACK	0
 #define RB_RED		1
 #define RB_ENTRY(type)							\
-struct {								\
-	struct type *rbe_left;		/* left element */		\
-	struct type *rbe_right;		/* right element */		\
-	struct type *rbe_parent;	/* parent element */		\
+struct __no_subobject_bounds {						\
+	struct type *rbe_left __no_subobject_bounds;		/* left element */		\
+	struct type *rbe_right __no_subobject_bounds;		/* right element */		\
+	struct type *rbe_parent __no_subobject_bounds;	/* parent element */		\
 	int rbe_color;			/* node color */		\
 }
 

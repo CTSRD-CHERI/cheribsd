@@ -1,4 +1,4 @@
-/*-
+/*
  * SPDX-License-Identifier: BSD-4-Clause
  *
  * Copyright (c) 1995 Terrence R. Lambert
@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/epoch.h>
 #include <sys/exec.h>
 #include <sys/file.h>
 #include <sys/filedesc.h>
@@ -511,6 +512,7 @@ proc0_init(void *dummy __unused)
 	td->td_pflags = TDP_KTHREAD;
 	td->td_cpuset = cpuset_thread0();
 	td->td_domain.dr_policy = td->td_cpuset->cs_domain;
+	epoch_thread_init(td);
 	prison0_init();
 	p->p_peers = 0;
 	p->p_leader = p;
@@ -755,7 +757,7 @@ start_init(void *dummy)
 		if (error != 0)
 			panic("%s: Can't add fname %d", __func__, error);
 
-		error = exec_args_add_arg_str(&args, path, UIO_SYSSPACE);
+		error = exec_args_add_arg(&args, path, UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add argv[0] %d", __func__, error);
 
@@ -780,7 +782,7 @@ start_init(void *dummy)
 			*flagp++ = '-';
 		*flagp++ = 0;
 		KASSERT(flagp <= &flags[0] + sizeof(flags), ("Overran flags"));
-		error = exec_args_add_arg_str(&args, flags, UIO_SYSSPACE);
+		error = exec_args_add_arg(&args, flags, UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add argv[0] %d", __func__, error);
 
@@ -870,7 +872,7 @@ kick_init(const void *udata __unused)
 SYSINIT(kickinit, SI_SUB_KTHREAD_INIT, SI_ORDER_MIDDLE, kick_init, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

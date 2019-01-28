@@ -292,7 +292,7 @@ struct mbuf *(*tbr_dequeue_ptr)(struct ifaltq *, int) = NULL;
  */
 static void	if_attachdomain(void *);
 static void	if_attachdomain1(struct ifnet *);
-static int	ifconf(u_long, caddr_t);
+static int	ifconf(u_long, struct ifconf *);
 static void	*if_grow(void);
 static void	if_input_default(struct ifnet *, struct mbuf *);
 static int	if_requestencap_default(struct ifnet *, struct if_encap_req *);
@@ -634,8 +634,6 @@ if_free_internal(struct ifnet *ifp)
 #ifdef MAC
 	mac_ifnet_destroy(ifp);
 #endif /* MAC */
-	if (ifp->if_description != NULL)
-		free(ifp->if_description, M_IFDESCR);
 	IF_AFDATA_DESTROY(ifp);
 	IF_ADDR_LOCK_DESTROY(ifp);
 	ifq_delete(&ifp->if_snd);
@@ -643,6 +641,8 @@ if_free_internal(struct ifnet *ifp)
 	for (int i = 0; i < IFCOUNTERS; i++)
 		counter_u64_free(ifp->if_counters[i]);
 
+	free(ifp->if_description, M_IFDESCR);
+	free(ifp->if_hw_addr, M_IFADDR);
 	free(ifp, M_IFNET);
 }
 
@@ -1105,6 +1105,8 @@ if_detach_internal(struct ifnet *ifp, int vmove, struct if_clone **ifcp)
 	CK_STAILQ_FOREACH(iter, &V_ifnet, if_link)
 		if (iter == ifp) {
 			CK_STAILQ_REMOVE(&V_ifnet, ifp, ifnet, if_link);
+			if (!vmove)
+				ifp->if_flags |= IFF_DYING;
 			found = 1;
 			break;
 		}
@@ -1219,14 +1221,8 @@ if_detach_internal(struct ifnet *ifp, int vmove, struct if_clone **ifcp)
 		if_dead(ifp);
 
 		/*
-		 * Remove link ifaddr pointer and maybe decrement if_index.
 		 * Clean up all addresses.
 		 */
-		free(ifp->if_hw_addr, M_IFADDR);
-		ifp->if_hw_addr = NULL;
-		ifp->if_addr = NULL;
-
-		/* We can now free link ifaddr. */
 		IF_ADDR_WLOCK(ifp);
 		if (!CK_STAILQ_EMPTY(&ifp->if_addrhead)) {
 			ifa = CK_STAILQ_FIRST(&ifp->if_addrhead);
@@ -1814,35 +1810,29 @@ if_data_copy(struct ifnet *ifp, struct if_data *ifd)
 void
 if_addr_rlock(struct ifnet *ifp)
 {
-	MPASS(*(uint64_t *)&ifp->if_addr_et == 0);
-	epoch_enter_preempt(net_epoch_preempt, &ifp->if_addr_et);
+
+	epoch_enter_preempt(net_epoch_preempt, curthread->td_et);
 }
 
 void
 if_addr_runlock(struct ifnet *ifp)
 {
-	epoch_exit_preempt(net_epoch_preempt, &ifp->if_addr_et);
-#ifdef INVARIANTS
-	bzero(&ifp->if_addr_et, sizeof(struct epoch_tracker));
-#endif
+
+	epoch_exit_preempt(net_epoch_preempt, curthread->td_et);
 }
 
 void
 if_maddr_rlock(if_t ifp)
 {
 
-	MPASS(*(uint64_t *)&ifp->if_maddr_et == 0);
-	epoch_enter_preempt(net_epoch_preempt, &ifp->if_maddr_et);
+	epoch_enter_preempt(net_epoch_preempt, curthread->td_et);
 }
 
 void
 if_maddr_runlock(if_t ifp)
 {
 
-	epoch_exit_preempt(net_epoch_preempt, &ifp->if_maddr_et);
-#ifdef INVARIANTS
-	bzero(&ifp->if_maddr_et, sizeof(struct epoch_tracker));
-#endif
+	epoch_exit_preempt(net_epoch_preempt, curthread->td_et);
 }
 
 /*
@@ -3377,6 +3367,22 @@ struct ifconf32 {
 };
 #define	SIOCGIFCONF32	_IOWR('i', 36, struct ifconf32)
 #endif
+#ifdef COMPAT_CHERIABI
+#define COMPAT_FREEBSD64
+#endif
+#ifdef COMPAT_FREEBSD64
+_Pragma("pointer_interpretation push")
+_Pragma("pointer_interpretation integer")
+struct ifconf64 {
+	int	ifc_len;
+	union {
+		char		*ifcu_buf;
+		struct ifreq	*ifcu_req;
+	} ifc_ifcu;
+};
+_Pragma("pointer_interpretation pop")
+#define	SIOCGIFCONF64	_IOC_NEWTYPE(SIOCGIFCONF, struct ifconf64)
+#endif
 
 static void
 ifmr_init(struct ifmediareq *ifmr, caddr_t data)
@@ -3464,6 +3470,13 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	caddr_t saved_data = NULL;
 	struct ifmediareq ifmr;
 	struct ifmediareq *ifmrp;
+#ifdef COMPAT_FREEBSD32
+	struct ifconf32 *ifc32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct ifconf64 *ifc64;
+#endif
+	struct ifconf ifc;
 #endif
 	struct ifnet *ifp;
 	struct ifreq *ifr;
@@ -3487,26 +3500,34 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 
 	switch (cmd) {
 	case SIOCGIFCONF:
-		error = ifconf(cmd, data);
+		error = ifconf(cmd, (struct ifconf *)data);
 		CURVNET_RESTORE();
 		return (error);
 
 #ifdef COMPAT_FREEBSD32
 	case SIOCGIFCONF32:
-		{
-			struct ifconf32 *ifc32;
-			struct ifconf ifc;
+		ifc32 = (struct ifconf32 *)data;
+		ifc.ifc_len = ifc32->ifc_len;
+		ifc.ifc_buf = __USER_CAP(PTRIN(ifc32->ifc_buf), ifc32->ifc_len);
 
-			ifc32 = (struct ifconf32 *)data;
-			ifc.ifc_len = ifc32->ifc_len;
-			ifc.ifc_buf = PTRIN(ifc32->ifc_buf);
+		error = ifconf(SIOCGIFCONF, (void *)&ifc);
+		CURVNET_RESTORE();
+		if (error == 0)
+			ifc32->ifc_len = ifc.ifc_len;
+		return (error);
+#endif
 
-			error = ifconf(SIOCGIFCONF, (void *)&ifc);
-			CURVNET_RESTORE();
-			if (error == 0)
-				ifc32->ifc_len = ifc.ifc_len;
-			return (error);
-		}
+#ifdef COMPAT_FREEBSD64
+	case SIOCGIFCONF64:
+		ifc64 = (struct ifconf64 *)data;
+		ifc.ifc_len = ifc64->ifc_len;
+		ifc.ifc_buf = __USER_CAP(ifc64->ifc_buf, ifc64->ifc_len);
+
+		error = ifconf(SIOCGIFCONF, (void *)&ifc);
+		CURVNET_RESTORE();
+		if (error == 0)
+			ifc64->ifc_len = ifc.ifc_len;
+		return (error);
 #endif
 	}
 
@@ -3741,9 +3762,8 @@ ifpromisc(struct ifnet *ifp, int pswitch)
  */
 /*ARGSUSED*/
 static int
-ifconf(u_long cmd, caddr_t data)
+ifconf(u_long cmd, struct ifconf *ifc)
 {
-	struct ifconf *ifc = (struct ifconf *)data;
 	struct ifnet *ifp;
 	struct ifaddr *ifa;
 	struct ifreq ifr;
@@ -3835,7 +3855,7 @@ again:
 
 	ifc->ifc_len = valid_len;
 	sbuf_finish(sb);
-	error = copyout(sbuf_data(sb), ifc->ifc_req, ifc->ifc_len);
+	error = copyout_c(sbuf_data(sb), ifc->ifc_req, ifc->ifc_len);
 	sbuf_delete(sb);
 	return (error);
 }
@@ -5096,7 +5116,7 @@ drbr_enqueue_drv(if_t ifh, struct buf_ring *br, struct mbuf *m)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

@@ -429,18 +429,19 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 	/* TODO: if KERNLAND() */
 #ifdef CPU_CHERI
 	bad_inst_ptr = (char * __kerncap)frame->pcc + offset_from_pc;
-	/*
-	 * Work around bug in the FPGA implementation: EPCC points to the
-	 * delay slot if a trap happenend in the delay slot.
-	 */
-	if (cheri_getoffset(frame->pcc) != frame->pc) {
-		KASSERT(cheri_getoffset(frame->pcc) == frame->pc + 4,
-		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
-		    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
-		frame->pcc = cheri_setoffset(frame->pcc, frame->pc);
+	if (!cheri_gettag(bad_inst_ptr)) {
+		struct thread *td = curthread;
+		struct proc *p = td->td_proc;
+		log(LOG_ERR, "%s: pid %d tid %ld (%s), uid %d: Could not fetch "
+		    "faulting instruction from untagged $pcc %p\n",  __func__,
+		    p->p_pid, (long)td->td_tid, p->p_comm,
+		    p->p_ucred ? p->p_ucred->cr_uid : -1,
+		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
+		*instr = -1;
+		return (-1);
 	}
 	KASSERT(cheri_getoffset(frame->pcc) == frame->pc,
-	    ("pcc (%jx) <-> pc (%jx) mismatch:",
+	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
 	    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
 #else
 	bad_inst_ptr = __USER_CODE_CAP((void*)(frame->pc + offset_from_pc));
@@ -453,6 +454,8 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    (long)td->td_tid, p->p_comm,
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
 		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
+		*instr = -1;
+		return (-1);
 	}
 	/* Should this be a kerncap instead instead of being indirected by $pcc? */
 	vaddr = frame->pc + offset_from_pc;
@@ -727,6 +730,24 @@ trap(struct trapframe *trapframe)
 	trapframe->badinstr.pad = 0;
 	trapframe->badinstr_p.inst = 0;
 #endif
+
+#ifdef CPU_CHERI
+#ifndef CPU_QEMU_MALTA
+	/*
+	 * Work around bug in the FPGA implementation: EPCC points to the
+	 * delay slot if a trap happenend in the delay slot.
+	 */
+	if (cheri_getoffset(trapframe->pcc) != trapframe->pc) {
+		KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc + 4,
+		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
+		    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
+		trapframe->pcc = cheri_setoffset(trapframe->pcc, trapframe->pc);
+	}
+#endif
+	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
+	    ("%s(entry): pcc.offset (%jx) <-> pc (%jx) mismatch:", __func__,
+	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
+#endif /* defined(CPU_CHERI) */
 
 	/*
 	 * Enable hardware interrupts if they were on before the trap. If it
@@ -1399,13 +1420,30 @@ err:
 	/* XXXBD: probably not quite right for CheriABI */
 	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
 	ksi.ksi_trapno = type;
+#if defined(CPU_CHERI)
+	td->td_frame->pcc = trapframe->pcc;
+	if (i == SIGPROT)
+		ksi.ksi_capreg = trapframe->capcause &
+		    CHERI_CAPCAUSE_REGNUM_MASK;
+#endif
 	trapsignal(td, &ksi);
 out:
-
 	/*
 	 * Note: we should only get here if returning to user mode.
 	 */
 	userret(td, trapframe);
+#if defined(CPU_CHERI)
+	/*
+	 * XXXAR: I don't think this assertion is quite right:
+	 *
+	 * KASSERT(cheri_getoffset(td->td_frame->pcc) == td->td_frame->pc,
+	 *  ("td->td_frame->pcc.offset (%jx) <-> td->td_frame->pc (%jx) mismatch:",
+	 *   (uintmax_t)cheri_getoffset(td->td_frame->pcc), (uintmax_t)td->td_frame->pc));
+	 */
+	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
+	    ("%s(exit): pcc.offset (%jx) <-> pc (%jx) mismatch:", __func__,
+	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
+#endif
 	return (trapframe->pc);
 }
 
@@ -1446,7 +1484,7 @@ trapDump(char *msg)
  * Return the resulting PC as if the branch was executed.
  *
  * XXXRW: What about CHERI branch instructions?
- * XXXAR: This needs to be fixed for cbez/cbnz/cbtu/cbts/cjalr/cjr/ccall_fast
+ * XXXAR: This needs to be fixed for cjalr/cjr/ccall_fast
  */
 uintptr_t
 MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
@@ -1454,6 +1492,9 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 {
 	InstFmt inst;
 	register_t *regsPtr = (register_t *) framePtr;
+#ifdef CPU_CHERI
+	void * __capability *capRegsPtr = &framePtr->ddc;
+#endif
 	uintptr_t retAddr = 0;
 	int condition;
 
@@ -1583,6 +1624,43 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 			retAddr = instPC + 4;
 		}
 		break;
+#ifdef CPU_CHERI
+	case OP_COP2:
+		switch (inst.CType.fmt) {
+		case 0x9:
+		case 0xa:
+		case 0x11:
+		case 0x12:
+			switch (inst.BC2FType.fmt) {
+			case 0x9:
+				/* CBTU */
+				condition = !cheri_gettag(
+				    capRegsPtr[inst.BC2FType.cd]);
+				break;
+			case 0xa:
+				/* CBTS */
+				condition = cheri_gettag(
+				    capRegsPtr[inst.BC2FType.cd]);
+				break;
+			case 0x11:
+				/* CBEZ */
+				condition =
+				    (capRegsPtr[inst.BC2FType.cd] == NULL);
+				break;
+			case 0x12:
+				/* CBNZ */
+				condition =
+				    (capRegsPtr[inst.BC2FType.cd] != NULL);
+				break;
+			}
+			if (condition)
+				retAddr = GetBranchDest(instPC, inst);
+			else
+				retAddr = instPC + 8;
+			return (retAddr);
+		}
+		/* FALLTHROUGH */
+#endif
 
 	default:
 		printf("Unhandled opcode in %s: 0x%x\n", __func__, inst.word);
@@ -1947,6 +2025,20 @@ log_c2e_exception(const char *msg, struct trapframe *frame, int trap_type)
 	    msg, curproc->p_pid, (long)curthread->td_tid, curproc->p_comm,
 	    curproc->p_ucred ? curproc->p_ucred->cr_uid : -1,
 	    trap_type);
+	/* Also print argv to help debugging */
+	if (curproc->p_args) {
+		char* args = curproc->p_args->ar_args;
+		unsigned len = curproc->p_args->ar_length;
+		log(LOG_ERR, "Process arguments: ");
+		for (unsigned i = 0; i < len; i++) {
+			if (args[i] == '\0')
+				log(LOG_ERR, " ");
+			else
+				log(LOG_ERR, "%c", args[i]);
+		}
+		log(LOG_ERR, "\n");
+	}
+
 
 	/* log registers in trap frame */
 	log_frame_dump(frame);
@@ -2179,7 +2271,7 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

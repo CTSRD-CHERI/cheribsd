@@ -28,12 +28,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
  *     "support"
  *   ],
- *   "change_comment": "find auxargs without walking off of envv"
+ *   "change_comment": "Find auxargs without walking off the end of envv.  Get ps_strings from auxargs."
  * }
  * CHERI CHANGES END
  */
@@ -52,7 +52,7 @@ __FBSDID("$FreeBSD$");
 #include "libc_private.h"
 
 extern char **environ;
-extern int _DYNAMIC;
+extern int _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
 
 void *__elf_aux_vector;

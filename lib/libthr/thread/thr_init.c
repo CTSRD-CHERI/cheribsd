@@ -35,7 +35,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181127,
  *   "target_type": "lib",
  *   "changes": [
  *     "unsupported"
@@ -516,8 +516,9 @@ init_private(void)
 				PANIC("Cannot get stack rlimit");
 			_thr_stack_initial = rlim.rlim_cur;
 		}
-		len = sizeof(_thr_is_smp);
-		sysctlbyname("kern.smp.cpus", &_thr_is_smp, &len, NULL, 0);
+		_thr_is_smp = sysconf(_SC_NPROCESSORS_CONF);
+		if (_thr_is_smp == -1)
+			PANIC("Cannot get _SC_NPROCESSORS_CONF");
 		_thr_is_smp = (_thr_is_smp > 1);
 		_thr_page_size = getpagesize();
 #ifndef __CHERI_PURE_CAPABILITY__

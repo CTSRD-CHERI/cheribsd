@@ -88,10 +88,12 @@
 #define	DELAYBRANCH(x)	((int)(x) < 0)
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
+#ifdef CHERIABI_LEGACY_SUPPORT
 static void	cheriabi_capability_set_user_ddc(void * __capability *,
 		    size_t);
 static void	cheriabi_capability_set_user_entry(void * __capability *,
 		    unsigned long, size_t);
+#endif
 static int	cheriabi_fetch_syscall_args(struct thread *td);
 static void	cheriabi_set_syscall_retval(struct thread *td, int error);
 static void	cheriabi_sendsig(sig_t, ksiginfo_t *, sigset_t *);
@@ -635,8 +637,13 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * Install CHERI signal-delivery register state for handler to run
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (generally) be removed automatically on sigreturn().
+	 *
+	 * Note: regs->pc should currently be the same as the offset of pcc and
+	 * not the virtual address.
+	 * TODO: add an update_trapframe_pc(void* __kerncap) that guarantees
+	 * this invariant always holds.
 	 */
-	regs->pc = (register_t)(__cheri_addr vaddr_t)catcher;
+	regs->pc = (__cheri_offset register_t)catcher;
 	regs->pcc = catcher;
 	regs->csp = sfp;
 	regs->c12 = catcher;
@@ -651,6 +658,8 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	if (cheri_is_sandboxed)
 		regs->idc = csigp->csig_idc;
 }
+
+#ifdef CHERIABI_LEGACY_SUPPORT
 
 static void
 cheriabi_capability_set_user_ddc(void * __capability *cp, size_t length)
@@ -672,6 +681,8 @@ cheriabi_capability_set_user_entry(void * __capability *cp,
 	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
 	    CHERI_CAP_USER_CODE_BASE, length, entry_addr);
 }
+
+#endif
 
 /*
  * Common per-thread CHERI state initialisation across execve(2) and
@@ -697,16 +708,12 @@ cheriabi_newthread_init(struct thread *td)
 	 * with ambient authority unless given up by the userspace runtime
 	 * explicitly.  The caller will initialise the stack fields.
 	 *
-	 * XXXRW: In CheriABI, it could be that we should set more of these to
-	 * NULL capabilities rather than initialising to the full address
-	 * space.  Note that some fields are overwritten later in
+	 * Note that some fields are overwritten later in
 	 * cheriabi_exec_setregs() for the initial thread.
 	 */
 	csigp = &td->td_pcb->pcb_cherisignal;
 	bzero(csigp, sizeof(*csigp));
-	csigp->csig_ddc = frame->ddc;
-	csigp->csig_idc = frame->idc;
-	csigp->csig_pcc = cheri_setoffset(frame->pcc, 0);
+	/* Note: csig_{ddc,idc,pcc} are set to NULL in the pure-capability abi */
 	cheri_capability_set_user_sigcode(&csigp->csig_sigcode,
 	    td->td_proc->p_sysent);
 
@@ -723,7 +730,12 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
 	u_long auxv, stackbase, stacklen;
-	size_t map_base, map_length, text_end, data_length, code_end;
+	size_t map_base, map_length, text_end, code_end;
+#ifdef CHERIABI_LEGACY_SUPPORT
+	size_t data_length;
+#else
+	size_t code_start;
+#endif
 	struct rlimit rlim_stack;
 	/* const bool is_dynamic_binary = imgp->interp_end != 0; */
 	/* const bool is_rtld_direct_exec = imgp->reloc_base == imgp->start_addr; */
@@ -809,6 +821,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	    (mips_rd_status() & MIPS_SR_INT_MASK) |
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
 
+	frame = &td->td_pcb->pcb_regs;
+#ifdef CHERIABI_LEGACY_SUPPORT
 	/*
 	 * XXXAR: data_length needs to be the full address space to allow
 	 * legacy ABI to work since the TLS region will be beyond the end of
@@ -819,12 +833,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * Having a full address space $ddc on startup does not matter for new
 	 * binaries since they will all clear $ddc as one of the first user
 	 * instructions anyway.
-	 *
-	 * TODO: for co-processes we should start with NULL $ddc
 	 */
 	data_length = CHERI_CAP_USER_DATA_LENGTH; /* Always representable */
-	frame = &td->td_pcb->pcb_regs;
 	cheriabi_capability_set_user_ddc(&frame->ddc, data_length);
+#endif
 
 	/*
 	 * XXXRW: Set $pcc and $c12 to the entry address -- for now, also with
@@ -837,20 +849,36 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * TODO: add a kernel config option for legacy ABI so we can shrink
 	 * this by default!
 	 */
-#ifdef NOTYET
+#ifdef CHERIABI_LEGACY_SUPPORT
+	/*
+	 * The legacy ABI needs a full address space $pcc (with base == 0)
+	 * to create code capabilities using cgetpccsetoffset
+	 */
+	code_end = CHERI_CAP_USER_CODE_LENGTH;
+	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
+	    code_end);
+#else
 	/*
 	 * If we are executing a static binary we use text_end as the end of
 	 * the text segment. If $pcc is the start of rtld we use interp_end.
-	 * If we are executing ld-cheri-elf.so.1 directly and can use text_end
+	 * If we are executing ld-cheri-elf.so.1 directly we can use text_end
 	 * to find the end of the rtld mapping.
 	 */
 	code_end = imgp->interp_end ? imgp->interp_end : text_end;
-	code_end = roundup2(code_length, 1ULL << CHERI_ALIGN_SHIFT(code_end));
-#else
-	code_end = CHERI_CAP_USER_CODE_LENGTH;
+	/*
+	 * Statically linked binaries need a base 0 code capability since
+	 * otherwise crt_init_globals_will fail.
+	 * TODO: use set-address macro instead of csetoffset
+	 */
+	code_start = imgp->interp_end ? imgp->reloc_base : 0;
+	/* Ensure CHERI128 representability */
+	code_end = roundup2(code_end, 1ULL << CHERI_ALIGN_SHIFT(code_end));
+	code_start = rounddown2(code_start, 1ULL << CHERI_ALIGN_SHIFT(code_end));
+	frame->pcc = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
+	    code_start, code_end - code_start, imgp->entry_addr - code_start);
+	/* Ensure that frame->pc is the offset of frame->pcc (needed for eret) */
+	frame->pc = cheri_getoffset(frame->pcc);
 #endif
-	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
-	    code_end);
 	frame->c12 = frame->pcc;
 
 	/*

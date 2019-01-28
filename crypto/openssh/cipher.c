@@ -37,10 +37,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180830,
+ *   "updated": 20181121,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_integrity",
+ *     "integer_provenance",
  *     "unsupported"
  *   ],
  *   "change_comment": "pointer over socket",

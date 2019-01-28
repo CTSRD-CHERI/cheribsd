@@ -1949,7 +1949,7 @@ MODULE_VERSION(smsc, 1);
 USB_PNP_HOST_INFO(smsc_devs);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

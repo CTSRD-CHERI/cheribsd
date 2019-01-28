@@ -1441,7 +1441,7 @@ sn_getmcf(struct ifnet *ifp, uint8_t *mcf)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

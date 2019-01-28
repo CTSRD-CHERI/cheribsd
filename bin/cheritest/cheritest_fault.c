@@ -68,7 +68,7 @@ static char sink;
 void
 test_fault_bounds(const struct cheri_test *ctp __unused)
 {
-	__capability char *arrayp = cheri_ptr(array, sizeof(array));
+	char * __capability arrayp = cheri_ptr(array, sizeof(array));
 	int i;
 
 	for (i = 0; i < ARRAY_LEN; i++)
@@ -79,7 +79,7 @@ test_fault_bounds(const struct cheri_test *ctp __unused)
 void
 test_fault_perm_load(const struct cheri_test *ctp __unused)
 {
-	__capability char *arrayp = cheri_ptrperm(array, sizeof(array), 0);
+	char * __capability arrayp = cheri_ptrperm(array, sizeof(array), 0);
 
 	sink = arrayp[0];
 }
@@ -87,7 +87,7 @@ test_fault_perm_load(const struct cheri_test *ctp __unused)
 void
 test_nofault_perm_load(const struct cheri_test *ctp __unused)
 {
-	__capability char *arrayp = cheri_ptrperm(array, sizeof(array),
+	char * __capability arrayp = cheri_ptrperm(array, sizeof(array),
 	    CHERI_PERM_LOAD);
 
 	sink = arrayp[0];
@@ -113,7 +113,7 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 void
 test_fault_perm_store(const struct cheri_test *ctp __unused)
 {
-	__capability char *arrayp = cheri_ptrperm(array, sizeof(array), 0);
+	char * __capability arrayp = cheri_ptrperm(array, sizeof(array), 0);
 
 	arrayp[0] = sink;
 }
@@ -121,7 +121,7 @@ test_fault_perm_store(const struct cheri_test *ctp __unused)
 void
 test_nofault_perm_store(const struct cheri_test *ctp __unused)
 {
-	__capability char *arrayp = cheri_ptrperm(array, sizeof(array),
+	char * __capability arrayp = cheri_ptrperm(array, sizeof(array),
 	    CHERI_PERM_STORE);
 
 	arrayp[0] = sink;
@@ -152,7 +152,7 @@ void
 test_fault_tag(const struct cheri_test *ctp __unused)
 {
 	char ch;
-	__capability char *chp = cheri_ptr(&ch, sizeof(ch));
+	char * __capability chp = cheri_ptr(&ch, sizeof(ch));
 
 	chp = cheri_cleartag(chp);
 	*chp = '\0';

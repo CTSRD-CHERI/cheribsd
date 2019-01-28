@@ -585,7 +585,7 @@ int	kern_copark(struct thread *td);
 #endif /* !_SYS_SYSCALLSUBR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

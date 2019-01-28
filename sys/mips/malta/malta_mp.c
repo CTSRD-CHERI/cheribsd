@@ -190,6 +190,16 @@ platform_init_ap(int cpuid)
 {
 	uint32_t clock_int_mask;
 	uint32_t ipi_intr_mask;
+#if defined(CPU_CHERI)
+	uint32_t status;
+#endif
+
+	/* Make sure capability coprocessor is enabled. */
+#if defined(CPU_CHERI)
+	status = mips_rd_status();
+	status |= MIPS_SR_COP_2_BIT;
+	mips_wr_status(status);
+#endif
 
 	/*
 	 * Clear any pending IPIs.

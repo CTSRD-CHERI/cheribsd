@@ -2344,7 +2344,6 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
     void (*hook)(struct vnode *vp, struct stat *sbp))
 {
 	struct nameidata nd;
-	struct stat sb;
 	int error;
 
 	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_BENEATH)) != 0)
@@ -2357,28 +2356,27 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 
 	if ((error = namei(&nd)) != 0)
 		return (error);
-	error = vn_stat(nd.ni_vp, &sb, td->td_ucred, NOCRED, td);
+	error = vn_stat(nd.ni_vp, sbp, td->td_ucred, NOCRED, td);
 	if (error == 0) {
-		SDT_PROBE2(vfs, , stat, mode, path, sb.st_mode);
-		if (S_ISREG(sb.st_mode))
+		SDT_PROBE2(vfs, , stat, mode, path, sbp->st_mode);
+		if (S_ISREG(sbp->st_mode))
 			SDT_PROBE2(vfs, , stat, reg, path, pathseg);
 		if (__predict_false(hook != NULL))
-			hook(nd.ni_vp, &sb);
+			hook(nd.ni_vp, sbp);
 	}
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	vput(nd.ni_vp);
 	if (error != 0)
 		return (error);
 #ifdef __STAT_TIME_T_EXT
-	sb.st_atim_ext = 0;
-	sb.st_mtim_ext = 0;
-	sb.st_ctim_ext = 0;
-	sb.st_btim_ext = 0;
+	sbp->st_atim_ext = 0;
+	sbp->st_mtim_ext = 0;
+	sbp->st_ctim_ext = 0;
+	sbp->st_btim_ext = 0;
 #endif
-	*sbp = sb;
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_STRUCT))
-		ktrstat(&sb);
+		ktrstat(sbp);
 #endif
 	return (0);
 }
@@ -4743,7 +4741,7 @@ sys_posix_fadvise(struct thread *td, struct posix_fadvise_args *uap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

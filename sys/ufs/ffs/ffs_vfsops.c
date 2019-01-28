@@ -740,16 +740,19 @@ loop:
 		    bread(devvp, fsbtodb(fs, ino_to_fsba(fs, ip->i_number)),
 		    (int)fs->fs_bsize, NOCRED, &bp);
 		if (error) {
-			VOP_UNLOCK(vp, 0);
-			vrele(vp);
+			vput(vp);
 			MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);
 			return (error);
 		}
-		ffs_load_inode(bp, ip, fs, ip->i_number);
+		if ((error = ffs_load_inode(bp, ip, fs, ip->i_number)) != 0) {
+			brelse(bp);
+			vput(vp);
+			MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);
+			return (error);
+		}
 		ip->i_effnlink = ip->i_nlink;
 		brelse(bp);
-		VOP_UNLOCK(vp, 0);
-		vrele(vp);
+		vput(vp);
 	}
 	return (0);
 }
@@ -810,9 +813,6 @@ ffs_mountfs(devvp, mp, td)
 	if ((error = ffs_sbget(devvp, &fs, -1, M_UFSMNT, ffs_use_bread)) != 0)
 		goto out;
 	fs->fs_fmod = 0;
-	/* if we ran on a kernel without metadata check hashes, disable them */
-	if ((fs->fs_flags & FS_METACKHASH) == 0)
-		fs->fs_metackhash = 0;
 	/* none of these types of check-hashes are maintained by this kernel */
 	fs->fs_metackhash &= ~(CK_INODE | CK_INDIR | CK_DIR);
 	/* no support for any undefined flags */
@@ -1729,7 +1729,12 @@ ffs_vgetf(mp, ino, flags, vpp, ffs_flags)
 		ip->i_din1 = uma_zalloc(uma_ufs1, M_WAITOK);
 	else
 		ip->i_din2 = uma_zalloc(uma_ufs2, M_WAITOK);
-	ffs_load_inode(bp, ip, fs, ino);
+	if ((error = ffs_load_inode(bp, ip, fs, ino)) != 0) {
+		bqrelse(bp);
+		vput(vp);
+		*vpp = NULL;
+		return (error);
+	}
 	if (DOINGSOFTDEP(vp))
 		softdep_load_inodeblock(ip);
 	else

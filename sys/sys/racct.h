@@ -91,7 +91,7 @@ struct ucred;
 #define	RACCT_DECAYING		0x20
 
 extern int racct_types[];
-extern int racct_enable;
+extern bool racct_enable;
 
 #define ASSERT_RACCT_ENABLED()	KASSERT(racct_enable, \
 				    ("%s called with !racct_enable", __func__))
@@ -194,6 +194,7 @@ void	racct_proc_exit(struct proc *p);
 void	racct_proc_ucred_changed(struct proc *p, struct ucred *oldcred,
 	    struct ucred *newcred);
 void	racct_move(struct racct *dest, struct racct *src);
+void	racct_proc_throttled(struct proc *p);
 void	racct_proc_throttle(struct proc *p, int timeout);
 
 #else

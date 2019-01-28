@@ -906,7 +906,7 @@ struct pr_usrreqs rip6_usrreqs = {
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181115,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

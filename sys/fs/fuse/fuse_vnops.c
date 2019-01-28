@@ -2389,7 +2389,7 @@ fuse_vnop_print(struct vop_print_args *ap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

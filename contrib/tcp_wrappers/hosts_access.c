@@ -21,10 +21,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180728,
+ *   "updated": 20181121,
  *   "target_type": "lib",
  *   "changes": [
- *     "function_abi"
+ *     "calling_convention"
  *   ],
  *   "comment": "Added function prototypes, and also added parameters to function pointer types"
  * }

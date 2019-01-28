@@ -263,6 +263,7 @@ init_static_kenv(char *buf, size_t len)
 {
 	char *eval;
 
+	KASSERT(!dynamic_kenv, ("kenv: dynamic_kenv already initialized"));
 	/*
 	 * Give the static environment a chance to disable the loader(8)
 	 * environment first.  This is done with loader_env.disabled=1.
@@ -946,7 +947,7 @@ tunable_str_init(void *data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

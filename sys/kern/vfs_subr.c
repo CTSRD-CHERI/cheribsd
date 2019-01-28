@@ -5603,7 +5603,7 @@ __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *mp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "sysctl"

@@ -189,7 +189,7 @@ CLANG_NO_IAS=	 -no-integrated-as
 # incompatible headers, we need to compile with -nobuiltininc and add the
 # resource dir to the end of the search paths. This ensures that headers such as
 # immintrin.h are still found but stddef.h, etc. are picked up from FreeBSD.
-.if ${MK_CLANG_BOOTSTRAP} == "no" && ${COMPILER_RESOURCE_DIR} != "unknown" && \
+.if ${MK_CLANG_BOOTSTRAP} == "no" && ${COMPILER_RESOURCE_DIR:Uunknown} != "unknown" && \
     !defined(BOOTSTRAPPING)
 CFLAGS+=-nobuiltininc -idirafter ${COMPILER_RESOURCE_DIR}/include
 .endif

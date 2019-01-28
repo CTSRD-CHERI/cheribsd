@@ -208,7 +208,6 @@ OLD_FILES+=usr/bin/as
 OLD_FILES+=usr/bin/ld
 OLD_FILES+=usr/share/man/man1/ld.1.gz
 .endif
-OLD_FILES+=usr/bin/ld.bfd
 OLD_FILES+=usr/bin/objdump
 OLD_FILES+=usr/libdata/ldscripts/armelf_fbsd.x
 OLD_FILES+=usr/libdata/ldscripts/armelf_fbsd.xbn
@@ -411,6 +410,9 @@ OLD_FILES+=usr/share/man/man7/as.7.gz
 OLD_FILES+=usr/share/man/man7/ld.7.gz
 OLD_FILES+=usr/share/man/man7/ldint.7.gz
 OLD_FILES+=usr/share/man/man7/binutils.7.gz
+.endif
+.if ${MK_BINUTILS} == no || ${MK_LLD_IS_LD} == yes
+OLD_FILES+=usr/bin/ld.bfd
 .endif
 
 .if ${MK_BLACKLIST} == no
@@ -2420,7 +2422,6 @@ OLD_FILES+=usr/share/man/man8/unstr.8.gz
 .if ${MK_GCC} == no
 OLD_FILES+=usr/bin/g++
 OLD_FILES+=usr/bin/gcc
-OLD_FILES+=usr/bin/gcov
 OLD_FILES+=usr/bin/gcpp
 OLD_FILES+=usr/bin/gperf
 .if ${TARGET_ARCH} == "amd64" || ${TARGET_ARCH} == "i386"
@@ -2457,15 +2458,20 @@ OLD_FILES+=usr/libexec/cc1
 OLD_FILES+=usr/libexec/cc1plus
 OLD_FILES+=usr/share/man/man1/g++.1.gz
 OLD_FILES+=usr/share/man/man1/gcc.1.gz
-OLD_FILES+=usr/share/man/man1/gcov.1.gz
 OLD_FILES+=usr/share/man/man1/gcpp.1.gz
 OLD_FILES+=usr/share/man/man1/gperf.1.gz
 OLD_FILES+=usr/share/man/man1/gperf.7.gz
 .endif
 
-.if ${MK_GCOV} == no
+.if (${MK_GCOV} == no || ${MK_GCC} == no) && ${MK_LLVM_COV} == no
 OLD_FILES+=usr/bin/gcov
 OLD_FILES+=usr/share/man/man1/gcov.1.gz
+.endif
+
+.if ${MK_LLVM_COV} == no
+OLD_FILES+=usr/bin/llvm-cov
+OLD_FILES+=usr/bin/llvm-profdata
+OLD_FILES+=usr/share/man/man1/llvm-cov.1.gz
 .endif
 
 .if ${MK_GDB} == no || ${MK_GDB_LIBEXEC} == yes
@@ -6123,7 +6129,8 @@ OLD_FILES+=usr/tests/usr.bin/bmake/variables/t0/expected.stdout.1
 OLD_FILES+=usr/tests/usr.bin/bmake/variables/t0/legacy_test
 .endif
 
-.if ${MK_MAN} == no
+.if ${MK_MAN} == no && (exists(${DESTDIR}/usr/share/man) || \
+    exists(${DESTDIR}/usr/share/openssl/man))
 MAN_FILES!=find ${DESTDIR}/usr/share/man ${DESTDIR}/usr/share/openssl/man -type f | sed -e 's,^${DESTDIR}/,,'; echo
 OLD_FILES+=${MAN_FILES}
 MAN_DIRS!=find ${DESTDIR}/usr/share/man ${DESTDIR}/usr/share/openssl/man -type d | sed -e 's,^${DESTDIR}/,,'; echo

@@ -106,8 +106,8 @@ smbfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred)
 		de.d_namlen = offset + 1;
 		de.d_name[0] = '.';
 		de.d_name[1] = '.';
-		de.d_name[offset + 1] = '\0';
 		de.d_type = DT_DIR;
+		dirent_terminate(&de);
 		error = uiomove(&de, DE_SIZE, uio);
 		if (error)
 			goto out;
@@ -156,7 +156,7 @@ smbfs_readvdir(struct vnode *vp, struct uio *uio, struct ucred *cred)
 		de.d_type = (ctx->f_attr.fa_attr & SMB_FA_DIR) ? DT_DIR : DT_REG;
 		de.d_namlen = ctx->f_nmlen;
 		bcopy(ctx->f_name, de.d_name, de.d_namlen);
-		de.d_name[de.d_namlen] = '\0';
+		dirent_terminate(&de);
 		if (smbfs_fastlookup) {
 			error = smbfs_nget(vp->v_mount, vp, ctx->f_name,
 			    ctx->f_nmlen, &ctx->f_attr, &newvp);
@@ -678,7 +678,7 @@ smbfs_vinvalbuf(struct vnode *vp, struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

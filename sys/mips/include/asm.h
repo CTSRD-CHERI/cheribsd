@@ -782,7 +782,7 @@ _C_LABEL(x):
 #endif /* !_MACHINE_ASM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

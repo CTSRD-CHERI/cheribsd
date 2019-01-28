@@ -379,8 +379,8 @@ iso_uiodir(idp,dp,off)
 {
 	int error;
 
-	dp->d_name[dp->d_namlen] = 0;
 	dp->d_reclen = GENERIC_DIRSIZ(dp);
+	dirent_terminate(dp);
 
 	if (idp->uio->uio_resid < dp->d_reclen) {
 		idp->eofflag = 0;
@@ -575,6 +575,8 @@ cd9660_readdir(ap)
 				entryoffsetinblock;
 
 		idp->curroff += reclen;
+		/* NOTE: d_off is the offset of *next* entry. */
+		idp->current.d_off = idp->curroff;
 
 		switch (imp->iso_ftype) {
 		case ISO_FTYPE_RRIP:
@@ -919,7 +921,7 @@ struct vop_vector cd9660_fifoops = {
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

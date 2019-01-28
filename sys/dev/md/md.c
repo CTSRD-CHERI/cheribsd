@@ -127,7 +127,7 @@ struct md_ioctl_c {
 	off_t		md_mediasize;	/* size of disk in bytes */
 	unsigned	md_sectorsize;	/* sectorsize */
 	unsigned	md_options;	/* options */
-	u_int64_t	md_base;	/* base address */
+	uint64_t	md_base;	/* base address */
 	int		md_fwheads;	/* firmware heads */
 	int		md_fwsectors;	/* firmware sectors */
 	char * __capability md_label;	/* label of the device (userspace) */
@@ -146,14 +146,14 @@ struct md_ioctl32 {
 	unsigned	md_version;
 	unsigned	md_unit;
 	enum md_types	md_type;
-	u_int32_t	md_file;
+	uint32_t	md_file;
 	off_t		md_mediasize;
 	unsigned	md_sectorsize;
 	unsigned	md_options;
-	u_int64_t	md_base;
+	uint64_t	md_base;
 	int		md_fwheads;
 	int		md_fwsectors;
-	u_int32_t	md_label;
+	uint32_t	md_label;
 	int		md_pad[MDNPAD];
 } __attribute__((__packed__));
 CTASSERT((sizeof(struct md_ioctl32)) == 436);
@@ -2251,7 +2251,7 @@ g_md_fini(struct g_class *mp __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

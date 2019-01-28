@@ -4078,6 +4078,7 @@ void
 sotoxsocket(struct socket *so, struct xsocket *xso)
 {
 
+	bzero(xso, sizeof(*xso));
 	xso->xso_len = sizeof *xso;
 	xso->xso_so = (uintptr_t)so;
 	xso->so_type = so->so_type;
@@ -4096,8 +4097,6 @@ sotoxsocket(struct socket *so, struct xsocket *xso)
 		xso->so_incqlen = so->sol_incqlen;
 		xso->so_qlimit = so->sol_qlimit;
 		xso->so_oobmark = 0;
-		bzero(&xso->so_snd, sizeof(xso->so_snd));
-		bzero(&xso->so_rcv, sizeof(xso->so_rcv));
 	} else {
 		xso->so_state |= so->so_qstate;
 		xso->so_qlen = xso->so_incqlen = xso->so_qlimit = 0;
@@ -4234,7 +4233,7 @@ so_unlock(struct socket *so)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

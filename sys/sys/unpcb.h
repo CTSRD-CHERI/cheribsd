@@ -178,10 +178,10 @@ unp_copy_peercred(struct thread *td, struct unpcb *client_unp,
 #endif /* _SYS_UNPCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

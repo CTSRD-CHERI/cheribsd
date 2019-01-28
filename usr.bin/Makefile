@@ -196,6 +196,10 @@ SUBDIR=	alias \
 	yes \
 	zstd
 
+.if ${MACHINE_ARCH:Mmips64*}
+SUBDIR+=	beri_count_stats
+.endif
+
 # NB: keep these sorted by MK_* knobs
 
 SUBDIR.${MK_AT}+=	at

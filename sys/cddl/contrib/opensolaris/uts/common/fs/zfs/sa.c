@@ -2014,7 +2014,7 @@ sa_handle_unlock(sa_handle_t *hdl)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "pointer_alignment"

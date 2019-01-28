@@ -100,7 +100,8 @@ LEAF(fork_trampoline)
 
 #ifdef CPU_CHERI
 	/*
-	 * Note: This restores EPCC, matching the explicit EPC restore below.
+	 * Note: This restores does not restore EPCC, since that is restored
+	 * by RESTORE_U_PCB_PC() below.
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
@@ -108,10 +109,9 @@ LEAF(fork_trampoline)
 	RESTORE_U_PCB_REG(t1, MULHI, k1)
 	mtlo	t0
 	mthi	t1
-	RESTORE_U_PCB_REG(a0, PC, k1)
+	RESTORE_U_PCB_PC(a0, t0, k1)	# set return address
 	RESTORE_U_PCB_REG(AT, AST, k1)
 	RESTORE_U_PCB_REG(v0, V0, k1)
-	MTC0	a0, MIPS_COP_0_EXC_PC	# set return address
 
 	RESTORE_U_PCB_REG(v1, V1, k1)
 	RESTORE_U_PCB_REG(a0, A0, k1)
@@ -834,7 +834,7 @@ szcheri_sigcode:
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

@@ -33,10 +33,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "lib",
  *   "changes": [
- *     "function_abi",
+ *     "calling_convention",
  *     "unsupported"
  *   ],
  *   "change_comment": "stack pointer"
@@ -789,7 +789,7 @@ extern struct pthread	*_single_thread __hidden;
  * Function prototype definitions.
  */
 __BEGIN_DECLS
-int	_thr_setthreaded(int) __hidden;
+void	_thr_setthreaded(int) __hidden;
 int	_mutex_cv_lock(struct pthread_mutex *, int, bool) __hidden;
 int	_mutex_cv_unlock(struct pthread_mutex *, int *, int *) __hidden;
 int     _mutex_cv_attach(struct pthread_mutex *, int) __hidden;

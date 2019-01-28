@@ -381,8 +381,6 @@ struct ifnet {
 	 */
 	struct netdump_methods *if_netdump_methods;
 	struct epoch_context	if_epoch_ctx;
-	struct epoch_tracker	if_addr_et;
-	struct epoch_tracker	if_maddr_et;
 
 	/*
 	 * Spare fields to be added before branching a stable branch, so
@@ -807,7 +805,7 @@ int    ether_poll_deregister(if_t ifp);
 #endif /* !_NET_IF_VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:net"

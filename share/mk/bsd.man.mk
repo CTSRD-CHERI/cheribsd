@@ -226,8 +226,19 @@ maninstall: ${MAN}
 .endif	# ${MK_MANCOMPRESS} == "no"
 .endif
 .for l t in ${_MANLINKS}
+.if ${l:tl} == ${t:tl}
+	# Don't delete the source file on a case-insensitive file-system and pass -S
+	# to install to avoid overwriting the source
+	if test "${DESTDIR}${l}${ZEXT}" -ef "${DESTDIR}${t}${ZEXT}"; then \
+		echo "Note: installing man link from ${l} to ${t} on case-insensitive file system."; \
+	else \
+		rm -f ${DESTDIR}${t} ${DESTDIR}${t}${MCOMPRESS_EXT}; \
+	fi
+	${INSTALL_MANLINK} -S ${TAG_ARGS} ${DESTDIR}${l}${ZEXT} ${DESTDIR}${t}${ZEXT}
+.else
 	rm -f ${DESTDIR}${t} ${DESTDIR}${t}${MCOMPRESS_EXT}; \
 	    ${INSTALL_MANLINK} ${TAG_ARGS} ${DESTDIR}${l}${ZEXT} ${DESTDIR}${t}${ZEXT}
+.endif
 .endfor
 
 manlint:

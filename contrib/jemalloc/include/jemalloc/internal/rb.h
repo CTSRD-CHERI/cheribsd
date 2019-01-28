@@ -21,11 +21,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_bit_flags",
- *     "pointer_size",
+ *     "pointer_shape",
  *     "virtual_address"
  *   ]
  * }
