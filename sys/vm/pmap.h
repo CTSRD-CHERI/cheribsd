@@ -175,6 +175,9 @@ void		 pmap_remove_all(vm_page_t m);
 void		 pmap_remove_pages(pmap_t);
 void		 pmap_remove_write(vm_page_t m);
 void		 pmap_sync_icache(pmap_t, vm_offset_t, vm_size_t);
+#ifdef CPU_CHERI
+boolean_t	 pmap_tc_capdirty(vm_page_t m);
+#endif
 boolean_t	 pmap_ts_referenced(vm_page_t m);
 void		 pmap_unwire(pmap_t pmap, vm_offset_t start, vm_offset_t end);
 void		 pmap_zero_page(vm_page_t);

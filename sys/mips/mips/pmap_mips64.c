@@ -3056,8 +3056,13 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 #ifdef CPU_CHERI
         if ((flags & PMAP_ENTER_NOLOADTAGS) != 0)
                 newpte |= PTE_LC;
-        if ((flags & PMAP_ENTER_NOSTORETAGS) != 0)
-                newpte |= PTE_SC;
+	if (((m->oflags & VPO_UNMANAGED) == 0) ||
+	    ((flags & PMAP_ENTER_NOSTORETAGS) != 0)) {
+		newpte |= PTE_SC;
+	}
+	if ((flags & PMAP_ENTER_NOSTORETAGS) != 0) {
+		newpte |= PTE_CRO;
+	}
 #endif
 
 	/*
@@ -5610,3 +5615,7 @@ pmap_flush_pvcache(vm_page_t m)
 		}
 	}
 }
+
+#if CPU_CHERI
+#error The new pmap code has not yet been fully updated to work with capdirty; pull from pmap.c
+#endif
