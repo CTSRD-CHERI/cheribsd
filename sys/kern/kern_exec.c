@@ -1166,12 +1166,18 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	 * For CheriABI, create an anonymous, CoW mapping for the revocation
 	 * bitmaps.
 	 *
-	 * XXX There really should be a VM_PROT_TAGS we can clear here.
+	 * XXX This almost surely belongs elsewhere, but I don't immediately
+	 * see a per-sv hook here.
 	 */
 	if (sv->sv_flags & SV_CHERI) {
-		error = vm_map_fixed(map, NULL, 0,
+		vm_pindex_t size = VM_CAPREVOKE_BM_TOP - VM_CAPREVOKE_BM_BASE;
+		vm_object_t vmo = vm_object_allocate(OBJT_DEFAULT, size);
+
+		vmo->flags |= OBJ_NOLOADTAGS | OBJ_NOSTORETAGS;
+
+		error = vm_map_fixed(map, vmo, 0,
 				VM_CAPREVOKE_BM_BASE,
-				VM_CAPREVOKE_BM_TOP - VM_CAPREVOKE_BM_BASE,
+				size,
 				VM_PROT_READ | VM_PROT_WRITE,
 				VM_PROT_READ | VM_PROT_WRITE,
 				0);

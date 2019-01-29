@@ -73,7 +73,13 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 		/* XXX thread register file */
 	}
 	if (uap->flags & CAPREVOKE_JUST_MY_STACK) {
-		/* XXX just the one VM object */
+#if defined(CPU_CHERI)
+		vm_caprevoke_one(td->td_proc, 0,
+			(vm_offset_t)(__cheri_fromcap void *)
+			(td->td_frame->csp), &st);
+#else
+		vm_caprevoke_one(td->td_proc, 0, td->td_frame.sp, &st);
+#endif
 	}
 	if (uap->flags & CAPREVOKE_JUST_HOARDERS) {
 		caprevoke_hoarders(td->td_proc);
@@ -232,6 +238,22 @@ reentry:
 
 		/* XXX And thread register files */
 	}
+
+	/* Walk the VM */
+	vm_caprevoke(td->td_proc,
+		/* If not first pass, only recently capdirty pages */
+	   (entryst == CAPREVST_INIT_DONE) ? VM_CAPREVOKE_INCREMENTAL : 0
+		/*
+		 * If last pass, loop until actually done.
+		 *
+		 * XXX Eventually _LAST_INIT and _LAST_FINI end up on
+		 * opposite sides of the thread_single_end call, for when
+		 * we want to do the load-side story.
+		 */
+	 | (myst == CAPREVST_LAST_PASS) ?
+		(VM_CAPREVOKE_LAST_INIT | VM_CAPREVOKE_LAST_FINI) : 0,
+	 &stat
+	);
 
 	/* OK, that's that.  Where do we stand now? */
 	PROC_LOCK(td->td_proc);

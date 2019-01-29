@@ -610,6 +610,12 @@ void vm_page_assert_locked_KBI(vm_page_t m, const char *file, int line);
 void vm_page_lock_assert_KBI(vm_page_t m, int a, const char *file, int line);
 #endif
 
+#ifdef CPU_CHERI
+#define VM_CAPREVOKE_PAGE_HASCAPS	0x01
+#define VM_CAPREVOKE_PAGE_DIRTY		0x02
+int vm_caprevoke_page(vm_page_t m);
+#endif
+
 #define	vm_page_assert_sbusied(m)					\
 	KASSERT(vm_page_sbusied(m),					\
 	    ("vm_page_assert_sbusied: page %p not shared busy @ %s:%d", \
