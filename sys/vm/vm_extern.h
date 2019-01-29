@@ -130,6 +130,18 @@ u_int vm_active_count(void);
 u_int vm_inactive_count(void);
 u_int vm_laundry_count(void);
 u_int vm_wait_count(void);
+
+#ifdef CPU_CHERI
+int vm_test_caprevoke(const void * __capability);
+
+struct caprevoke_stats;
+#define VM_CAPREVOKE_INCREMENTAL	0x01
+#define VM_CAPREVOKE_LAST_INIT		0x02
+#define VM_CAPREVOKE_LAST_FINI		0x04
+int vm_caprevoke(struct proc*, int, struct caprevoke_stats *);
+int vm_caprevoke_one(struct proc*, int, vm_offset_t, struct caprevoke_stats *);
+#endif
+
 #endif				/* _KERNEL */
 #endif				/* !_VM_EXTERN_H_ */
 // CHERI CHANGES START

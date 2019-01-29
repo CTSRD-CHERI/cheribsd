@@ -319,6 +319,7 @@ compat/cheriabi/cheriabi_sysent.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_time.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_uipc.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_vfs.c		optional compat_cheriabi
+vm/vm_caprevoke.c			optional cpu_cheri
 
 # dtrace specific
 cddl/contrib/opensolaris/uts/common/dtrace/dtrace.c	optional dtrace compile-with "${DTRACE_C}" \
