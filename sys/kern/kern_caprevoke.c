@@ -86,7 +86,14 @@ caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
 		/* XXX thread register file */
 	}
 	if (flags & CAPREVOKE_JUST_MY_STACK) {
-		/* XXX just the one VM object */
+		uintcap_t sp;
+#if defined(__mips__)
+		sp = (uintcap_t)td->td_frame->csp;
+#else
+#error "Can't get stack frame on this architecture"
+#endif
+		vm_caprevoke_one(vmcrc, 0,
+			(vm_offset_t)sp);
 	}
 	if (flags & CAPREVOKE_JUST_HOARDERS) {
 		caprevoke_hoarders(td->td_proc, vmcrc);
@@ -321,10 +328,34 @@ fast_out:
 	vm_caprevoke_publish(&vmcrc, &cri);
 	wmb();
 
-	/* XXX Walk the VM unless told not to */
+	/* Walk the VM unless told not to */
 	if ((flags & CAPREVOKE_LAST_NO_EARLY) == 0) {
-		res = KERN_SUCCESS;
-		// XXX on failure: goto skip_last_pass
+		res = vm_caprevoke(&vmcrc,
+			/* Userspace can ask us to avoid an IPI here */
+		   (((flags & CAPREVOKE_EARLY_SYNC) != 0)
+			? VM_CAPREVOKE_PMAP_SYNC : 0)
+			/* If not first pass, only recently capdirty pages */
+		   | ((entryst == CAPREVST_INIT_DONE)
+			? VM_CAPREVOKE_INCREMENTAL : 0));
+
+		if (res == KERN_SUCCESS) {
+			/*
+			 * That worked; the epoch is certainly open; when we
+			 * set the state below, it's fine to advance the
+			 * clock rather than revert it, even if something
+			 * else goes wrong.
+			 *
+			 * Note that this is a purely local change even so;
+			 * threads interlocking against us will not see it
+			 * until we next publish the state below.
+			 */
+			if (entryst == CAPREVST_NONE) {
+				epoch++;
+				entryst = CAPREVST_INIT_DONE;
+			}
+		} else {
+			goto skip_last_pass;
+		}
 	}
 
 	/*
@@ -368,9 +399,64 @@ fast_out:
 		/* Per-process kernel hoarders */
 		caprevoke_hoarders(td->td_proc, &vmcrc);
 
-		/* XXX The world is stopped; do another pass through the VM */
+		/*
+		 * The world is stopped; do another pass through the VM.
+		 *
+		 * This pass can be incremental if we had previously done an
+		 * init pass, either just now or earlier.  In either case,
+		 * we'll have entryst == CAPREVST_INIT_DONE; there's no need
+		 * to look at CAPREVOKE_LAST_NO_EARLY.
+		 */
+		res = vm_caprevoke(&vmcrc,
+			((entryst == CAPREVST_INIT_DONE)
+				? VM_CAPREVOKE_INCREMENTAL : 0)
+			| VM_CAPREVOKE_LAST_INIT
+			| VM_CAPREVOKE_PMAP_SYNC
+			| (((flags & CAPREVOKE_LAST_NO_LATE) != 0)
+				? VM_CAPREVOKE_LAST_FINI : 0));
+
+		PROC_LOCK(td->td_proc);
+		if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
+			/* Un-single-thread the world */
+			thread_single_end(td->td_proc, SINGLE_BOUNDARY);
+		}
+
+		if (res != KERN_SUCCESS) {
+			PROC_UNLOCK(td->td_proc);
+
+			vm_map_lock(vmm);
+			SET_ST(vmm, epoch, entryst);
+			vm_map_unlock(vmm);
+
+			cv_signal(&vmm->vm_caprev_cv);
+
+			vm_caprevoke_cookie_rele(&vmcrc);
+			vmspace_free(vm);
+
+			stat.epoch_fini = epoch;
+			return caprevoke_fini(td, statout, 0, &stat);
+		}
+		PROC_UNLOCK(td->td_proc);
+
+		if (entryst == CAPREVST_NONE) {
+			/* That counts as our initial pass */
+			epoch++;
+			entryst = CAPREVST_INIT_DONE;
+		}
+
+		if ((flags & CAPREVOKE_LAST_NO_LATE) == 0) {
+			/*
+			 * Walk the VM again, now with the world running;
+			 * as we must have done a pass before here, this is
+			 * certain to be an incremental pass.
+			 */
+			res = vm_caprevoke(&vmcrc,
+				VM_CAPREVOKE_INCREMENTAL
+				| VM_CAPREVOKE_LAST_FINI);
+		}
 	}
 
+skip_last_pass:
 	/* OK, that's that.  Where do we stand now? */
 	if ((res == KERN_SUCCESS) && (myst == CAPREVST_LAST_PASS)) {
 		/* Signal the end of this revocation epoch */
