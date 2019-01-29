@@ -133,6 +133,7 @@ u_int vm_active_count(void);
 u_int vm_inactive_count(void);
 u_int vm_laundry_count(void);
 u_int vm_wait_count(void);
+
 #endif				/* _KERNEL */
 #endif				/* !_VM_EXTERN_H_ */
 // CHERI CHANGES START

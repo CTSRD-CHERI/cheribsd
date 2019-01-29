@@ -83,13 +83,15 @@
 
 #ifdef __mips_n64
 #define	VM_MAXUSER_ADDRESS	(VM_MINUSER_ADDRESS + (NPDEPG * NBSEG))
-#ifdef CPU_CHERI
+
+#if __has_feature(capabilities)
 
 /*
  * Lay out some bitmaps for us, ranging from VM_CAPREVOKE_BM_BASE
  * to VM_CAPREVOKE_BM_TOP:
  *
  * TOP:
+ * 	- shared page for per-process information (_INFO_PAGE)
  * 	- one bit per otype (BM_OTYPE)
  * 	- one bit per page, checked for VMMAP-bearing caps (BM_MEM_MAP)
  * 	- one bit per cap, checked for non-VMMAP-bearing caps (BM_MEM_NOMAP)
@@ -103,14 +105,6 @@
  * Requests to access the shadow space must, therefore, be at least that
  * aligned!
  *
- * XXX
- * For the moment, we use a relatively naive layout that lets us easily vary
- * the granularity of the different shadow spaces; when we're happy with
- * these, we should repack the shadow spaces.  It's quite likely, for
- * example, that BSZ_MEM_MAP and BSZ_OTYPE add up to less than the implicit
- * and unused shadow of the MEM_NOMAP bitmap within itself. (Because the bitmaps
- * cannot contain capabilities, their virtual addresses will never be used
- * as keys.)
  */
 
 #define VM_CAPREVOKE_GSZ_OTYPE		((vm_offset_t)1)
@@ -126,12 +120,15 @@
 #define VM_CAPREVOKE_BM_BASE	( VM_CAPREVOKE_BM_TOP \
 					- VM_CAPREVOKE_BSZ_MEM_NOMAP \
 					- VM_CAPREVOKE_BSZ_MEM_MAP \
-					- VM_CAPREVOKE_BSZ_OTYPE )
+					- VM_CAPREVOKE_BSZ_OTYPE \
+					- PAGE_SIZE )
 #define VM_CAPREVOKE_BM_MEM_NOMAP	VM_CAPREVOKE_BM_BASE
 #define VM_CAPREVOKE_BM_MEM_MAP		( VM_CAPREVOKE_BM_MEM_NOMAP  \
 					+ VM_CAPREVOKE_BSZ_MEM_NOMAP )
 #define VM_CAPREVOKE_BM_OTYPE		( VM_CAPREVOKE_BM_MEM_MAP  \
 					+ VM_CAPREVOKE_BSZ_MEM_MAP )
+#define VM_CAPREVOKE_INFO_PAGE		( VM_CAPREVOKE_BM_OTYPE  \
+					+ VM_CAPREVOKE_BSZ_OTYPE )
 
 #define	SHAREDPAGE		(VM_CAPREVOKE_BM_BASE - PAGE_SIZE)
 #define	USRSTACK		(SHAREDPAGE & ~0xFFFF)
