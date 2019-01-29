@@ -341,9 +341,10 @@ init_pagebucket(void)
 	pagebucket = bucket;
 }
 
-#ifdef IN_RTLD
+#if defined(IN_RTLD) || defined(IN_LIBTHR)
 void * __crt_malloc(size_t nbytes);
 void * __crt_calloc(size_t num, size_t size);
+void * __crt_realloc(void *cp, size_t nbytes);
 void __crt_free(void *cp);
 
 void *
@@ -358,6 +359,13 @@ __crt_calloc(size_t num, size_t size)
 {
 
 	return (calloc(num, size));
+}
+
+void *
+__crt_realloc(void *cp, size_t nbytes)
+{
+
+	return (realloc(cp, nbytes));
 }
 
 void

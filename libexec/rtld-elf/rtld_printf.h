@@ -30,7 +30,7 @@
 #ifndef RTLD_PRINTF_H
 #define RTLD_PRINTF_H 1
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(IN_RTLD) && defined(__CHERI_PURE_CAPABILITY__)
 #include <simple_printf.h>
 #else
 
