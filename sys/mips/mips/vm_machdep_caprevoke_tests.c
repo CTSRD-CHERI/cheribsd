@@ -46,8 +46,7 @@ __FBSDID("$FreeBSD$");
 
 /* Check the coarse-grained MAP bitmap */
 static inline unsigned long
-vm_caprevoke_test_mem_map(
-    const uint8_t * __capability crshadow, const void * __capability cut)
+vm_caprevoke_test_mem_map(const uint8_t * __capability crshadow, uintcap_t cut)
 {
 	uint8_t bmbits;
 	const uint8_t * __capability bmloc;
@@ -76,7 +75,7 @@ vm_caprevoke_test_mem_map(
 /* Check the fine-grained NOMAP bitmap */
 static inline unsigned long
 vm_caprevoke_test_mem_nomap(
-    const uint8_t * __capability crshadow, const void * __capability cut)
+    const uint8_t * __capability crshadow, uintcap_t cut)
 {
 	uint8_t bmbits;
 	const uint8_t * __capability bmloc;
@@ -99,8 +98,8 @@ vm_caprevoke_test_mem_nomap(
 // TODO: if ((perms & CHERI_PERMS_HWALL_CID) != 0)
 
 static unsigned long
-vm_caprevoke_test_just_mem(const uint8_t * __capability crshadow,
-    const void * __capability cut, unsigned long perms)
+vm_caprevoke_test_just_mem(
+    const uint8_t * __capability crshadow, uintcap_t cut, unsigned long perms)
 {
 	if ((perms & (CHERI_PERMS_HWALL_MEMORY | CHERI_PERM_CHERIABI_VMMAP)) !=
 	    0) {
@@ -115,8 +114,8 @@ vm_caprevoke_test_just_mem(const uint8_t * __capability crshadow,
 }
 
 static unsigned long
-vm_caprevoke_test_just_mem_fine(const uint8_t * __capability crshadow,
-    const void * __capability cut, unsigned long perms)
+vm_caprevoke_test_just_mem_fine(
+    const uint8_t * __capability crshadow, uintcap_t cut, unsigned long perms)
 {
 	/*
 	 * Most capabilities are memory capabilities, most are unrevoked,
@@ -136,7 +135,7 @@ vm_caprevoke_test_just_mem_fine(const uint8_t * __capability crshadow,
 }
 
 /*
- *
+ * Install the appropriate test function into the cookie
  */
 void
 vm_caprevoke_set_test(struct vm_caprevoke_cookie *crc, int flags)
