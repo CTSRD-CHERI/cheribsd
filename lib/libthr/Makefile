@@ -31,7 +31,7 @@ CFLAGS+=-I${SRCTOP}/lib/libthread_db
 CFLAGS+=-Winline
 
 CFLAGS.thr_stack.c+=	-Wno-cast-align
-CFLAGS.malloc.c+=	-Wno-cast-align
+CFLAGS.rtld_malloc.c+=	-Wno-cast-align
 .include <bsd.compiler.mk>
 .if !(${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} < 40300)
 CFLAGS.thr_symbols.c+=	-Wno-missing-variable-declarations
@@ -70,7 +70,7 @@ PRECIOUSLIB=
 SRCS+=	malloc.c heap.c
 CFLAGS.malloc.c+=	-DIN_LIBTHR
 .else
-SRCS+= malloc.c
+SRCS+= rtld_malloc.c
 .endif
 
 .if ${MK_INSTALLLIB} != "no"
