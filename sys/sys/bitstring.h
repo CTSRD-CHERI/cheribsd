@@ -222,7 +222,9 @@ bit_ffs_at(bitstr_t *_bitstr, int _start, int _nbits, int *_result)
 	*_result = _value;
 }
 
+#ifdef _KERNEL
 void evil_hack(void *liveptr);
+#endif
 
 /* Find the first bit clear in bit string at or after bit start. */
 static inline void
@@ -245,7 +247,9 @@ bit_ffc_at(bitstr_t *_bitstr, int _start, int _nbits, int *_result)
 
 		_offset = ffsl(~_test);
 		_value = ((_curbitstr - _bitstr) * _BITSTR_BITS) + _offset - 1;
+#ifdef _KERNEL
 		evil_hack(_bitstr);
+#endif
 		if (_offset == 0 || _value >= _nbits)
 			_value = -1;
 	} else {
