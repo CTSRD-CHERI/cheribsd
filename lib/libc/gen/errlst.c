@@ -173,6 +173,7 @@ const char *const sys_errlist[] = {
 	"Memory protection violation",		/* 97 - EPROT */
 	"Object-capability method not defined",	/* 98 - ENOMETHOD */
 
+#ifndef __CHERI_PURE_CAPABILITY__
 /*
  * Reserved space in sys_errlist, take the next slot for a next error code.
  * Reserve prevents the array size from changing for some time.
@@ -229,6 +230,7 @@ const char *const sys_errlist[] = {
 	__uprefix,				/* 148 */
 	__uprefix,				/* 149 */
 	__uprefix,				/* 150 */
+#endif
 };
 const int sys_nerr = ELAST + 1;
 
