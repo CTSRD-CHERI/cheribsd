@@ -1139,12 +1139,12 @@ SYS_STUB(195, int, setrlimit,
 )
 
 SYS_STUB(202, int, __sysctl,
-    /* _protoargs */ (int *  name, u_int namelen, void *  old, size_t *  oldlenp, void *  new, size_t newlen),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int * __capability   name, u_int namelen, void * __capability   old, size_t * __capability   oldlenp, void * __capability   new, size_t newlen),
-    /* _protoargs_err */ (int * __capability stub_errno, int * __capability   name, u_int namelen, void * __capability   old, size_t * __capability   oldlenp, void * __capability   new, size_t newlen),
-    /* _callargs */ ((__cheri_fromcap int * )name, namelen, (__cheri_fromcap void * )old, (__cheri_fromcap size_t * )oldlenp, (__cheri_fromcap void * )new, newlen),
+    /* _protoargs */ (int *  name, u_int namelen, void *  old, size_t *  oldlenp, const void *  new, size_t newlen),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int * __capability   name, u_int namelen, void * __capability   old, size_t * __capability   oldlenp, const void * __capability   new, size_t newlen),
+    /* _protoargs_err */ (int * __capability stub_errno, int * __capability   name, u_int namelen, void * __capability   old, size_t * __capability   oldlenp, const void * __capability   new, size_t newlen),
+    /* _callargs */ ((__cheri_fromcap int * )name, namelen, (__cheri_fromcap void * )old, (__cheri_fromcap size_t * )oldlenp, (__cheri_fromcap const void * )new, newlen),
     /* _callargs_chk */ (&ret, stub_errno, name, namelen, old, oldlenp, new, newlen),
-    /* _callargs_err */ (&errno, (int * )name, namelen, (void * )old, (size_t * )oldlenp, (void * )new, newlen),
+    /* _callargs_err */ (&errno, (int * )name, namelen, (void * )old, (size_t * )oldlenp, (const void * )new, newlen),
     /* _localcheck */ {if (!(cheri_getperm(name) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(old) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(oldlenp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(new) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 

@@ -918,7 +918,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[1] = p->namelen; /* u_int */
 		uarg[2] = (__cheri_addr intptr_t) p->old; /* void * __capability */
 		uarg[3] = (__cheri_addr intptr_t) p->oldlenp; /* size_t * __capability */
-		uarg[4] = (__cheri_addr intptr_t) p->new; /* void * __capability */
+		uarg[4] = (__cheri_addr intptr_t) p->new; /* const void * __capability */
 		uarg[5] = p->newlen; /* size_t */
 		*n_args = 6;
 		break;
@@ -4727,7 +4727,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland size_t * __capability";
 			break;
 		case 4:
-			p = "userland void * __capability";
+			p = "userland const void * __capability";
 			break;
 		case 5:
 			p = "size_t";
