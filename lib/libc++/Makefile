@@ -138,6 +138,9 @@ STD_HEADERS+=	algorithm
 STD_HEADERS+=	any
 STD_HEADERS+=	array
 STD_HEADERS+=	atomic
+.if ${_LIBCXX_VERSION} >= 8
+STD_HEADERS+=	bit
+.endif
 STD_HEADERS+=	bitset
 STD_HEADERS+=	cassert
 STD_HEADERS+=	ccomplex
