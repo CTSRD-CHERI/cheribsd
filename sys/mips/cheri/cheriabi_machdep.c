@@ -107,7 +107,6 @@ extern const char *cheriabi_syscallnames[];
 struct sysentvec elf_freebsd_cheriabi_sysvec = {
 	.sv_size	= CHERIABI_SYS_MAXSYSCALL,
 	.sv_table	= cheriabi_sysent,
-	.sv_mask	= 0,
 	.sv_errsize	= 0,
 	.sv_errtbl	= NULL,
 	.sv_fixup	= cheriabi_elf_fixup,
@@ -214,8 +213,6 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	}
 
 	se = td->td_proc->p_sysent;
-	if (se->sv_mask)
-		sa->code &= se->sv_mask;
 
 	if (sa->code >= se->sv_size)
 		sa->callp = &se->sv_table[0];
