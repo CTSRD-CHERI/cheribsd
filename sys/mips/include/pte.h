@@ -103,7 +103,7 @@ typedef uint64_t pd_entry_t;
 	 * likely to be a correct initial value.
 	 */
 #define	TLBLO_SWBITS_CLEAR_SHIFT	(11)	/* XXXSS: Was 9. */
-#define	TLBLO_PFN_MASK		0xFFFFFFC0ULL
+#define	TLBLO_PFN_MASK		0x3FFFFFC0ULL
 #define	TLB_1M_SUPERPAGE_SHIFT	(PDRSHIFT)
 #define	TLBLO_SWBITS_MASK	((pt_entry_t)0x7F << TLBLO_SWBITS_SHIFT)
 #else
