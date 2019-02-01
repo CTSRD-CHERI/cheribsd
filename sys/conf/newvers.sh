@@ -251,7 +251,7 @@ if [ -n "$git_cmd" ] ; then
 		if [ -z "$gitsvn" ] ; then
 			gitsvn=`$git_cmd log -n 10000 --format='format:%N' | \
 			     grep '^svn ' | head -1 | \
-			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p' || true)
+			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p' || true`
 		fi
 		if [ -n "$gitsvn" ] ; then
 			svn=" r${gitsvn}"
