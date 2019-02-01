@@ -1017,6 +1017,45 @@ map_init_meta(EditLine *el)
 	map[(int) buf[0]] = ED_SEQUENCE_LEAD_IN;
 }
 
+/* set_expected_default_key_bindings():
+ *	Ensure that most key sequences sent by terminal emulator (such as
+ * 	Home/End/Delete/Insert) work by default e.g. in /bin/sh.
+ */
+private void
+set_expected_default_key_bindings(EditLine *e)
+{
+#define DO_BIND(keys, action) do { \
+    const Char* argv[] = { STR("bind"), STR(keys), STR(action), NULL}; \
+    map_bind(e, 3, argv); \
+} while(0)
+	/*
+	 * Allow the use of Home/End keys.
+	 */
+	DO_BIND("\\e[1~", "ed-move-to-beg");
+	DO_BIND("\\e[4~", "ed-move-to-end");
+	DO_BIND("\\e[7~", "ed-move-to-beg");
+	DO_BIND("\\e[8~", "ed-move-to-end");
+	DO_BIND("\\e[H", "ed-move-to-beg");
+	DO_BIND("\\e[F", "ed-move-to-end");
+
+	/*
+	 * Allow the use of the Delete/Insert keys.
+	 */
+	DO_BIND("\\e[3~", "ed-delete-next-char");
+	DO_BIND("\\e[2~", "ed-quoted-insert");
+
+	/*
+	 * Ctrl-left-arrow and Ctrl-right-arrow for word moving.
+	 */
+	DO_BIND("\\e[1;5C", "em-next-word");
+	DO_BIND("\\e[1;5D", "ed-prev-word");
+	DO_BIND("\\e[5C", "em-next-word");
+	DO_BIND("\\e[5D", "ed-prev-word");
+	DO_BIND("\\e\\e[C", "em-next-word");
+	DO_BIND("\\e\\e[D", "ed-prev-word");
+
+#undef DO_BIND
+}
 
 /* map_init_vi():
  *	Initialize the vi bindings
@@ -1045,6 +1084,7 @@ map_init_vi(EditLine *el)
 
 	tty_bind_char(el, 1);
 	terminal_bind_arrow(el);
+	set_expected_default_key_bindings(el);
 }
 
 
@@ -1079,6 +1119,7 @@ map_init_emacs(EditLine *el)
 
 	tty_bind_char(el, 1);
 	terminal_bind_arrow(el);
+	set_expected_default_key_bindings(el);
 }
 
 
