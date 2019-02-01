@@ -137,20 +137,15 @@ bad:
 			INTON;
 		}
 		if (el) {
-			char* editor = NULL;
-
 			if (Vflag)
 				el_set(el, EL_EDITOR, "vi");
 			else if (Eflag)
 				el_set(el, EL_EDITOR, "emacs");
-			el_get(el, EL_EDITOR, &editor);
 			/*
 			 * Set CTRL+R to history search for compatibility with
 			 * other operating systems' default shells.
 			 */
-			if (strcmp(editor, "emacs") == 0)
-				el_set(el, EL_BIND, "^R", "em-inc-search-prev",
-				    NULL);
+			el_set(el, EL_BIND, "^R", "em-inc-search-prev", NULL);
 			el_set(el, EL_BIND, "^I", "sh-complete", NULL);
 			el_source(el, NULL);
 		}
