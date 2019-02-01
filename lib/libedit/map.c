@@ -1024,31 +1024,37 @@ map_init_meta(EditLine *el)
 private void
 set_expected_default_key_bindings(EditLine *e)
 {
+#define DO_BIND(keys, action) do { \
+    const Char* argv[] = { STR("bind"), STR(keys), STR(action), NULL}; \
+    map_bind(e, 3, argv); \
+} while(0)
 	/*
 	 * Allow the use of Home/End keys.
 	 */
-	el_set(e, EL_BIND, "\\e[1~", "ed-move-to-beg", NULL);
-	el_set(e, EL_BIND, "\\e[4~", "ed-move-to-end", NULL);
-	el_set(e, EL_BIND, "\\e[7~", "ed-move-to-beg", NULL);
-	el_set(e, EL_BIND, "\\e[8~", "ed-move-to-end", NULL);
-	el_set(e, EL_BIND, "\\e[H", "ed-move-to-beg", NULL);
-	el_set(e, EL_BIND, "\\e[F", "ed-move-to-end", NULL);
+	DO_BIND("\\e[1~", "ed-move-to-beg");
+	DO_BIND("\\e[4~", "ed-move-to-end");
+	DO_BIND("\\e[7~", "ed-move-to-beg");
+	DO_BIND("\\e[8~", "ed-move-to-end");
+	DO_BIND("\\e[H", "ed-move-to-beg");
+	DO_BIND("\\e[F", "ed-move-to-end");
 
 	/*
 	 * Allow the use of the Delete/Insert keys.
 	 */
-	el_set(e, EL_BIND, "\\e[3~", "ed-delete-next-char", NULL);
-	el_set(e, EL_BIND, "\\e[2~", "ed-quoted-insert", NULL);
+	DO_BIND("\\e[3~", "ed-delete-next-char");
+	DO_BIND("\\e[2~", "ed-quoted-insert");
 
 	/*
 	 * Ctrl-left-arrow and Ctrl-right-arrow for word moving.
 	 */
-	el_set(e, EL_BIND, "\\e[1;5C", "em-next-word", NULL);
-	el_set(e, EL_BIND, "\\e[1;5D", "ed-prev-word", NULL);
-	el_set(e, EL_BIND, "\\e[5C", "em-next-word", NULL);
-	el_set(e, EL_BIND, "\\e[5D", "ed-prev-word", NULL);
-	el_set(e, EL_BIND, "\\e\\e[C", "em-next-word", NULL);
-	el_set(e, EL_BIND, "\\e\\e[D", "ed-prev-word", NULL);
+	DO_BIND("\\e[1;5C", "em-next-word");
+	DO_BIND("\\e[1;5D", "ed-prev-word");
+	DO_BIND("\\e[5C", "em-next-word");
+	DO_BIND("\\e[5D", "ed-prev-word");
+	DO_BIND("\\e\\e[C", "em-next-word");
+	DO_BIND("\\e\\e[D", "ed-prev-word");
+
+#undef DO_BIND
 }
 
 /* map_init_vi():
