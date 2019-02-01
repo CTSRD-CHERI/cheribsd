@@ -278,7 +278,7 @@ cuio_contiguous_segment(struct uio *uio, size_t skip, size_t len)
 	skip = rel_off;
 	if (skip + len > uio->uio_iov[idx].iov_len)
 		return (NULL);
-	return ((char *)uio->uio_iov[idx].iov_base + skip);
+	return ((__capability char *)uio->uio_iov[idx].iov_base + skip);
 }
 
 void *
