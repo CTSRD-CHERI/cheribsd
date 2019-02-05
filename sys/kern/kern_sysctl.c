@@ -2150,7 +2150,7 @@ sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 int
 kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
     void * __capability old, size_t * __capability oldlenp,
-    void * __capability new, size_t newlen, int flags)
+    const void * __capability new, size_t newlen, int flags)
 {
 	int error, i, name[CTL_MAXNAME];
 	size_t j;
