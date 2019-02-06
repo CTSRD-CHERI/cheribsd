@@ -2066,6 +2066,9 @@ je_malloc(size_t size) {
 	dynamic_opts_t dopts;
 
 	LOG("core.malloc.entry", "size: %zu", size);
+#ifndef JEMALLOC_DEBUG
+	assert(false && "assertions should only be enabled if JEMALLOC_DEBUG is set");
+#endif
 
 	static_opts_init(&sopts);
 	dynamic_opts_init(&dopts);
