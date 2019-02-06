@@ -192,7 +192,7 @@ static void	db_cmd_list(struct command_table *table);
 static int	db_cmd_search(char *name, struct command_table *table,
 		    struct command **cmdp);
 static void	db_command(struct command **last_cmdp,
-		    struct command_table *cmd_table);
+		    struct command_table *cmd_table, int dopager);
 
 /*
  * Initialize the command lists from the static tables.
@@ -350,7 +350,8 @@ db_cmd_list(struct command_table *table)
 }
 
 static void
-db_command(struct command **last_cmdp, struct command_table *cmd_table)
+db_command(struct command **last_cmdp, struct command_table *cmd_table,
+    int dopager)
 {
 	struct command	*cmd = NULL;
 	int		t;
@@ -473,7 +474,14 @@ db_command(struct command **last_cmdp, struct command_table *cmd_table)
 	    /*
 	     * Execute the command.
 	     */
+	    if (dopager)
+		db_enable_pager();
+	    else
+		db_disable_pager();
 	    (*cmd->fcn)(addr, have_addr, count, modif);
+	    if (dopager)
+		db_disable_pager();
+
 	    if (cmd->flag & CS_SET_DOT) {
 		/*
 		 * If command changes dot, set dot to
@@ -522,9 +530,8 @@ db_command_loop(void)
 
 	    db_printf("db> ");
 	    (void) db_read_line();
-	    db_enable_pager();
-	    db_command(&db_last_command, &db_cmd_table);
-	    db_disable_pager();
+
+	    db_command(&db_last_command, &db_cmd_table, /* dopager */ 1);
 	}
 }
 
@@ -542,8 +549,7 @@ db_command_script(const char *command)
 {
 	db_prev = db_next = db_dot;
 	db_inject_line(command);
-	db_disable_pager();
-	db_command(&db_last_command, &db_cmd_table);
+	db_command(&db_last_command, &db_cmd_table, /* dopager */ 0);
 }
 
 void
