@@ -5,8 +5,8 @@
  * Define a custom assert() in order to reduce the chances of deadlock during
  * assertion failure.
  */
-#ifndef assert
-#define assert(e) do {							\
+#ifndef je_assert
+#define je_assert(e) do {						\
 	if (unlikely(config_debug && !(e))) {				\
 		malloc_printf(						\
 		    "<jemalloc>: %s:%d: Failed assertion: \"%s\"\n",	\
@@ -14,6 +14,16 @@
 		abort();						\
 	}								\
 } while (0)
+#define _assert_macro_expansion_is_je_assert 1
+#define _assert_macro_expansion_is_assert "should expand to je_assert() and not assert()"
+#endif
+
+#ifndef assert
+/*
+ * Note: This is not declared as a function-like macro to allow checking that
+ * assert is defined to je_assert
+ */
+#define assert je_assert
 #endif
 
 #ifndef not_reached
