@@ -46,7 +46,6 @@ __FBSDID("$FreeBSD$");
 
 #include <ddb/ddb.h>
 #include <ddb/db_command.h>
-#include <ddb/db_output.h>
 #include <ddb/db_sym.h>
 
 SYSCTL_NODE(_debug, OID_AUTO, ddb, CTLFLAG_RW, 0, "DDB settings");
@@ -230,8 +229,6 @@ db_trap(int type, int code)
 	 */
 	if (cnunavailable())
 		return (0);
-
-	db_disable_pager();
 
 	if (db_stop_at_pc(type, code, &bkpt, &watchpt)) {
 		if (db_inst_count) {

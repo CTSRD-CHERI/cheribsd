@@ -88,8 +88,6 @@ static void	db_puts(const char *str);
 static void	db_putchar(int c, void *arg);
 static void	db_pager(void);
 
-#define	CTRL(c)		((c) & 0x1f)
-
 /*
  * Force pending whitespace.
  */
@@ -124,9 +122,6 @@ static void
 db_putchar(int c, void *arg)
 {
 	struct dbputchar_arg *dap = arg;
-
-	if (db_pager_quit)
-		return;
 
 	if (dap->da_pbufr == NULL) {
 
@@ -251,7 +246,6 @@ void
 db_disable_pager(void)
 {
 	db_maxlines = 0;
-	db_pager_quit = 0;
 }
 
 /*
@@ -262,12 +256,11 @@ db_disable_pager(void)
 void
 db_pager(void)
 {
-	int c, done, quit;
+	int c, done;
 
 	db_capture_enterpager();
 	db_printf("--More--\r");
 	done = 0;
-	quit = 0;
 	while (!done) {
 		c = cngetc();
 		switch (c) {
@@ -293,10 +286,9 @@ db_pager(void)
 		case 'Q':
 		case 'x':
 		case 'X':
-		case CTRL('c'):
 			/* Quit */
 			db_maxlines = 0;
-			quit = 1;
+			db_pager_quit = 1;
 			done++;
 			break;
 #if 0
@@ -311,8 +303,6 @@ db_pager(void)
 	db_printf("\r");
 	db_newlines = 0;
 	db_capture_exitpager();
-	if (quit)
-		db_pager_quit = 1;
 }
 
 /*

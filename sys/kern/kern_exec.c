@@ -214,8 +214,7 @@ sys_coexecve(struct thread *td, struct coexecve_args *uap)
 	struct proc *p;
 	int error;
 
-	// XXX: Revisit the flags.
-	error = pget(uap->pid, PGET_HOLD | PGET_CANDEBUG, &p);
+	error = pget(uap->pid, PGET_HOLD | PGET_CANCOLOCATE, &p);
 	if (error != 0)
 		return (error);
 	error = pre_execve(td, &oldvmspace);
