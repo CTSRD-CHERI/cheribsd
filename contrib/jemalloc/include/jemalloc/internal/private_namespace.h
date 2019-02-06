@@ -21,7 +21,6 @@
 #define ncpus JEMALLOC_N(ncpus)
 #define opt_abort JEMALLOC_N(opt_abort)
 #define opt_abort_conf JEMALLOC_N(opt_abort_conf)
-#define opt_cheri_setbounds JEMALLOC_N(opt_cheri_setbounds)
 #define opt_junk JEMALLOC_N(opt_junk)
 #define opt_junk_alloc JEMALLOC_N(opt_junk_alloc)
 #define opt_junk_free JEMALLOC_N(opt_junk_free)
