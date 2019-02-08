@@ -291,14 +291,6 @@ SOLINKOPTS+=	-Wl,--warn-shared-textrel
 SOLINKOPTS+=	-Wl,-z,notext
 .endif
 
-.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
-${SHLIB_NAME}.dump: ${SHLIB_NAME_FULL}
-	${OBJDUMP} ${OBJDUMP_FLAGS} ${SHLIB_NAME_FULL} > ${.TARGET}
-
-_LIBS+=		${SHLIB_NAME}.dump
-CLEANFILES+=	${SHLIB_NAME}.dump
-.endif
-
 .if target(beforelinking)
 beforelinking: ${SOBJS}
 ${SHLIB_NAME_FULL}: beforelinking
@@ -435,11 +427,6 @@ _libinstall:
 	${INSTALL} ${TAG_ARGS} -o ${LIBOWN} -g ${LIBGRP} -m ${LIBMODE} \
 	    ${_INSTALLFLAGS} ${_SHLINSTALLFLAGS} \
 	    ${SHLIB_NAME_INSTALL} ${DESTDIR}${_SHLIBDIR}/${SHLIB_NAME}
-.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
-	${INSTALL} -T dump -o ${LIBOWN} -g ${LIBGRP} -m ${DEBUGMODE} \
-	    ${_INSTALLFLAGS} \
-	    ${SHLIB_NAME}.dump ${DESTDIR}${_SHLIBDIR}/
-.endif
 .if ${MK_DEBUG_FILES} != "no"
 .if defined(DEBUGMKDIR)
 	${INSTALL} ${TAG_ARGS:D${TAG_ARGS},debug} -d ${DESTDIR}${DEBUGFILEDIR}/

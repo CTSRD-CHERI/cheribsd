@@ -205,11 +205,6 @@ ${PROG_INSTALL}: ${PROG}
 	strip -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
 .endif
 
-.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
-${PROGNAME}.dump: ${PROG_FULL}
-	${OBJDUMP} ${OBJDUMP_FLAGS} ${PROG_FULL} > ${.TARGET}
-.endif
-
 .if defined(LLVM_LINK)
 ${PROG_FULL}.bc: ${BCOBJS}
 	${LLVM_LINK} -o ${.TARGET} ${BCOBJS}
@@ -243,9 +238,6 @@ CLEANFILES+= ${PROG} ${PROG}.bc ${PROG}.ll
 CLEANFILES+= ${PROG}.stripped
 .if ${MK_DEBUG_FILES} != "no"
 CLEANFILES+= ${PROG_FULL} ${PROGNAME}.debug
-.endif
-.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
-CLEANFILES+=	${PROGNAME}.dump
 .endif
 .endif
 
@@ -306,10 +298,6 @@ _proginstall:
 .endif
 .endif
 .endif	# !target(realinstall)
-
-.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
-FILES+=	${PROGNAME}.dump
-.endif
 
 .if defined(SCRIPTS) && !empty(SCRIPTS)
 realinstall: _scriptsinstall
