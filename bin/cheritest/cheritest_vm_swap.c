@@ -84,6 +84,9 @@ void
 cheritest_vm_swap(const struct cheri_test *ctp __unused)
 {
 
+	if (cheri_getdefault() == NULL)
+		cheritest_failure_errx("test depends on non-NULL DDC");
+
 	(void)dotest(1);
 }
 
