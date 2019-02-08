@@ -243,12 +243,11 @@ dotest(int force_pageout)
 		if (j == 8 * sizeof(*pattern)) {			\
 			j = 0;						\
 			k++;						\
-			tags = pattern[k];				\
-			if (tags == 0) {				\
+			if (k > NPATTERN) {				\
 				mix_patterns();				\
 				k = 0;					\
-				tags = pattern[k];			\
 			}						\
+			tags = pattern[k];				\
 			hash = quickhash(pattern[k]);			\
 		}							\
 									\
