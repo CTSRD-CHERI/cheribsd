@@ -5,7 +5,6 @@ SRCS=	cheri_helloworld.c
 
 MAN=
 NEED_CHERI=	hybrid
-WANT_DUMP=	yes
 
 LIBADD=  helloworld
 

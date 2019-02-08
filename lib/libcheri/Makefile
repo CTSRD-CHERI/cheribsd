@@ -2,7 +2,6 @@
 
 LIB=	cheri
 
-WANT_DUMP=      yes
 NO_SHARED=	yes
 
 SRCS=	libcheri_ccall.c		\

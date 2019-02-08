@@ -38,7 +38,6 @@ SRCS+=	rtld_lock.c map_object.c xmalloc.c debug.c libmap.c
 
 MAN=
 NEED_CHERI=	pure
-WANT_DUMP=yes
 MK_CHERI_SHARED=yes
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding

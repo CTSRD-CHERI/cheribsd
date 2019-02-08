@@ -6,7 +6,6 @@ SRCS=	readpng-cheri.c				\
 	sysarch.S
 
 NEED_CHERI=	sandbox
-WANT_DUMP=	yes
 
 .PATH: ${SRCTOP}/ctsrd/lib/libimagebox
 SRCS+=	decode_png.c

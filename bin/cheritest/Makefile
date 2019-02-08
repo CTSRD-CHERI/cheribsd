@@ -97,7 +97,6 @@ WANT_CHERI=	pure
 .else
 .error Unknown cheritest variant ${PROG}
 .endif
-WANT_DUMP=	yes
 LIBADD= 	z
 .endif
 

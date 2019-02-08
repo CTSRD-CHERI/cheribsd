@@ -5,7 +5,6 @@
 PROG?=	cheri_minimal_dynamic_exe
 MAN=
 NEED_CHERI=	pure
-WANT_DUMP=	yes
 
 CFLAGS+=	-I${SRCTOP}/lib/libsimple_printf -DSIMPLE_PRINTF_PREFIX=simple
 LDADD+=		-lsimple_printf -nodefaultlibs

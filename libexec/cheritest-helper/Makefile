@@ -14,7 +14,6 @@ MAN=
 LIBADD=	md z c_cheri cheri_syscalls
 
 NEED_CHERI=	sandbox
-WANT_DUMP=	yes
 
 NO_SHARED=	yes
 

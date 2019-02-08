@@ -13,7 +13,6 @@ MAN=
 LIBADD=	c_cheri
 
 NEED_CHERI=	sandbox
-WANT_DUMP=	yes
 
 NO_SHARED=	yes
 
