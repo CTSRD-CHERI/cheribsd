@@ -263,9 +263,6 @@ OBJCFLAGS	?=	${OBJCINCLUDES} ${CFLAGS} -Wno-import
 
 OBJCOPY		?=	objcopy
 
-OBJDUMP		?=	objdump
-OBJDUMP_FLAGS	?=	-r -s -p -S -d -h -l -t
-
 PC		?=	pc
 PFLAGS		?=
 

@@ -5,7 +5,7 @@ plt_code.o:
 	${CC} ${CFLAGS} -c ${.CURDIR}/mips/plt_code.S -o ${.TARGET}
 
 plt_code.dump: plt_code.o
-	${OBJDUMP} -triple=cheri-unknown-freebsd -d -x -s plt_code.o > ${.TARGET}
+	${OBJDUMP:Uobjdump} -triple=cheri-unknown-freebsd -d -x -s plt_code.o > ${.TARGET}
 
 plt_code.text: plt_code.o
 	${OBJCOPY} -O binary --only-section=.text plt_code.o ${.TARGET}
