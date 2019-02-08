@@ -725,7 +725,40 @@ vm_page_aflag_set(vm_page_t m, uint8_t bits)
 	val <<= 24;
 #endif
 	atomic_set_32(addr, val);
-} 
+}
+
+/*
+ * Atomically read and clear some bits in a page's aflags field.  Unlike
+ * vm_page_aflag_clear, this reports the contents of the aflags field before
+ * mutation, allowing for a race-free observation and reset of status.
+ *
+ * Used, at the moment, solely for PGA_CAPSTORED, allowing the MI revoker
+ * outer loops to decide whether a page is recently capdirtied.  See
+ * sys/vm/vm_caprevoke.c .
+ *
+ * XXX NWF This is horrifying and there must be a better way.
+ */
+static inline int
+vm_page_aflag_xclear_acq(vm_page_t m, uint8_t bits)
+{
+	uint32_t *addr, n, o;
+
+	addr = (void *)&m->aflags;
+	o = *addr;
+	do {
+#if BYTE_ORDER == BIG_ENDIAN
+		n = o & ~(bits << 24);
+#else
+		n = o & ~bits;
+#endif
+	} while (!atomic_fcmpset_acq_32(addr, &o, n));
+
+#if BYTE_ORDER == BIG_ENDIAN
+	return (o >> 24) & 0xFF;
+#else
+	return o & 0xFF;
+#endif
+}
 
 /*
  *	vm_page_dirty:
