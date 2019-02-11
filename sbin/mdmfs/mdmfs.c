@@ -481,13 +481,12 @@ do_mdconfig_attach_au(const char *args, const enum md_types mdtype)
 		err(1, "fdopen");
 	linep = fgetln(sfd, &linelen);
 	/* If the output format changes, we want to know about it. */
-	if (linep == NULL || linelen < mdnamelen + 1 ||
+	if (linep == NULL || linelen <= mdnamelen + 1 ||
 	    linelen - mdnamelen >= sizeof(linebuf) ||
 	    strncmp(linep, mdname, mdnamelen) != 0)
 		errx(1, "unexpected output from mdconfig (attach)");
 	linep += mdnamelen;
 	linelen -= mdnamelen;
-	assert(linebuf != NULL);
 	/* Can't use strlcpy because linep is not NULL-terminated. */
 	strncpy(linebuf, linep, linelen);
 	linebuf[linelen] = '\0';
@@ -497,7 +496,6 @@ do_mdconfig_attach_au(const char *args, const enum md_types mdtype)
 	unit = ul;
 
 	fclose(sfd);
-	close(fd);
 }
 
 /*
