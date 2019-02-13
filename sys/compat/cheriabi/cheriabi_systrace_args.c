@@ -1276,6 +1276,24 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* cheriabi_caprevoke_shadow */
+	case 259: {
+		struct cheriabi_caprevoke_shadow_args *p = params;
+		iarg[0] = p->flags; /* int */
+		uarg[1] = (__cheri_addr intptr_t) p->arena; /* void * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->shadow; /* void * __capability */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi_caprevoke */
+	case 260: {
+		struct cheriabi_caprevoke_args *p = params;
+		iarg[0] = p->flags; /* int */
+		uarg[1] = p->start_epoch; /* uint64_t */
+		uarg[2] = (__cheri_addr intptr_t) p->statout; /* struct caprevoke_stats * __capability */
+		*n_args = 3;
+		break;
+	}
 	/* cheriabi_lchmod */
 	case 274: {
 		struct cheriabi_lchmod_args *p = params;
@@ -5272,6 +5290,38 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_caprevoke_shadow */
+	case 259:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland void * __capability";
+			break;
+		case 2:
+			p = "userland void * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_caprevoke */
+	case 260:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "uint64_t";
+			break;
+		case 2:
+			p = "userland struct caprevoke_stats * __capability";
 			break;
 		default:
 			break;
@@ -9458,6 +9508,16 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 258:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
+		break;
+	/* cheriabi_caprevoke_shadow */
+	case 259:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_caprevoke */
+	case 260:
+		if (ndx == 0 || ndx == 1)
+			p = "void *";
 		break;
 	/* cheriabi_lchmod */
 	case 274:

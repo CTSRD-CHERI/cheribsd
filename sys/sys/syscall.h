@@ -235,6 +235,8 @@
 #define	SYS_aio_write	256
 #define	SYS_lio_listio	257
 #define	SYS_kbounce	258
+#define	SYS_caprevoke_shadow	259
+#define	SYS_caprevoke	260
 #define	SYS_freebsd11_getdents	272
 #define	SYS_lchmod	274
 				/* 275 is obsolete netbsd_lchown */

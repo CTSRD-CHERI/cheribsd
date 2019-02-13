@@ -169,6 +169,8 @@ MIASM =  \
 	aio_write.o \
 	lio_listio.o \
 	kbounce.o \
+	caprevoke_shadow.o \
+	caprevoke.o \
 	freebsd11_getdents.o \
 	lchmod.o \
 	lutimes.o \
