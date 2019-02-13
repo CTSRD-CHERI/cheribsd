@@ -235,6 +235,8 @@
 #define	CHERIABI_SYS_cheriabi_aio_write	256
 #define	CHERIABI_SYS_cheriabi_lio_listio	257
 #define	CHERIABI_SYS_cheriabi_kbounce	258
+#define	CHERIABI_SYS_cheriabi_caprevoke_shadow	259
+#define	CHERIABI_SYS_cheriabi_caprevoke	260
 				/* 272 is obsolete freebsd11_getdents */
 #define	CHERIABI_SYS_cheriabi_lchmod	274
 				/* 275 is obsolete netbsd_lchown */
