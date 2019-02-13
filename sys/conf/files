@@ -3825,6 +3825,7 @@ kern/init_sysent.c		standard
 kern/ksched.c			optional _kposix_priority_scheduling
 kern/kern_acct.c		standard
 kern/kern_alq.c			optional alq
+kern/kern_cheri_revoke.c	standard
 kern/kern_clock.c		standard
 kern/kern_clocksource.c		standard
 kern/kern_condvar.c		standard

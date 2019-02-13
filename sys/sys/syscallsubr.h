@@ -42,6 +42,7 @@
 #include <sys/_uio.h>
 
 struct __wrusage;
+struct cheri_revoke_syscall_info;
 struct ffclock_estimate;
 struct file;
 struct filecaps;
@@ -144,6 +145,8 @@ int	kern_cap_rights_get(struct thread *td, int version, int fd,
 int	kern_cap_rights_limit(struct thread *td, int fd, cap_rights_t *rights);
 int	kern_chdir(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
+int	kern_cheri_revoke(struct thread *td, int flags, uint64_t start,
+		struct cheri_revoke_syscall_info * __capability srsi);
 int	kern_chflagsat(struct thread *td, int fd, const char * __capability path,
 	    enum uio_seg pathseg, u_long flags, int atflag);
 int	kern_chroot(struct thread *td, const char * __capability path);
