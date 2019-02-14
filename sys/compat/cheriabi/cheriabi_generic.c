@@ -119,6 +119,14 @@ cheriabi_pwrite(struct thread *td, struct cheriabi_pwrite_args *uap)
 }
 
 int
+cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
+{
+
+	return (user_ioctl(td, uap->fd, uap->com, uap->data,
+	    &uap->data, 1));
+}
+
+int
 cheriabi_pselect(struct thread *td, struct cheriabi_pselect_args *uap)
 {
 	struct timespec ts;

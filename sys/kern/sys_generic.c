@@ -652,19 +652,33 @@ struct ioctl_args {
 int
 sys_ioctl(struct thread *td, struct ioctl_args *uap)
 {
-	u_char smalldata[SYS_IOCTL_SMALL_SIZE] __aligned(SYS_IOCTL_SMALL_ALIGN);
 	u_long com;
+	void * __capability udata;
+
+	com = uap->com;
+	if (com & IOC_VOID)
+		udata = (void * __capability)(intcap_t)uap->data;
+	else
+		udata = __USER_CAP(uap->data, IOCPARM_LEN(com));
+
+	return (user_ioctl(td, uap->fd, com, udata, &uap->data, 0));
+}
+
+int
+user_ioctl(struct thread *td, int fd, u_long com, void * __capability udata,
+    void *datap, int copycaps)
+{
+	u_char smalldata[SYS_IOCTL_SMALL_SIZE] __aligned(SYS_IOCTL_SMALL_ALIGN);
 	int arg, error;
 	u_int size;
 	caddr_t data;
 
-	if (uap->com > 0xffffffff) {
+	if (com > 0xffffffff) {
 		printf(
 		    "WARNING pid %d (%s): ioctl sign-extension ioctl %lx\n",
-		    td->td_proc->p_pid, td->td_name, uap->com);
-		uap->com &= 0xffffffff;
+		    td->td_proc->p_pid, td->td_name, com);
+		com &= 0xffffffff;
 	}
-	com = uap->com;
 
 	/*
 	 * Interpret high order word to find amount of data to be
@@ -684,20 +698,22 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 	if (size > 0) {
 		if (com & IOC_VOID) {
 			/* Integer argument. */
-			arg = (intptr_t)uap->data;
+			arg = (__cheri_addr intptr_t)udata;
 			data = (void *)&arg;
 			size = 0;
 		} else {
 			if (size > SYS_IOCTL_SMALL_SIZE)
-				data = malloc((u_long)size, M_IOCTLOPS, M_WAITOK);
+				data = malloc(size, M_IOCTLOPS, M_WAITOK);
 			else
 				data = smalldata;
 		}
 	} else
-		data = (void *)&uap->data;
+		data = datap;
 	if (com & IOC_IN) {
-		error = copyin(__USER_CAP_UNBOUND(uap->data), data,
-		    (u_int)size);
+		if (copycaps)
+			error = copyincap(udata, data, size);
+		else
+			error = copyin(udata, data, size);
 		if (error != 0)
 			goto out;
 	} else if (com & IOC_OUT) {
@@ -708,11 +724,14 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 		bzero(data, size);
 	}
 
-	error = kern_ioctl(td, uap->fd, com, data);
+	error = kern_ioctl(td, fd, com, data);
 
-	if (error == 0 && (com & IOC_OUT))
-		error = copyout(data, __USER_CAP_UNBOUND(uap->data),
-		    (u_int)size);
+	if (error == 0 && (com & IOC_OUT)) {
+		if (copycaps)
+			error = copyoutcap(data, udata, size);
+		else
+			error = copyout(data, udata, size);
+	}
 
 out:
 	if (size > SYS_IOCTL_SMALL_SIZE)

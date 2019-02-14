@@ -543,6 +543,8 @@ int	user_getsockname(struct thread *td, int fdes,
 	    socklen_t * __capability alen, int compat);
 int	user_getsockopt(struct thread *td, int s, int level, int name,
 	    void * __capability val, socklen_t * __capability avalsize);
+int	user_ioctl(struct thread *td, int fd, u_long com,
+	    void * __capability udata, void *datap, int copycaps);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
 int	user_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void * __capability data);
