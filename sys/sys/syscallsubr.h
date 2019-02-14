@@ -344,16 +344,16 @@ int	kern_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void *data);
 int	kern_profil(struct thread *td, char * __capability samples, size_t size,
 	    size_t offset, u_int scale);
-int	kern_pread(struct thread *td, int fd, void *buf, size_t nbyte,
-	    off_t offset);
+int	kern_pread(struct thread *td, int fd, void * __capability buf,
+	    size_t nbyte, off_t offset);
 int	kern_preadv(struct thread *td, int fd, struct uio *auio, off_t offset);
 int	kern_pselect(struct thread *td, int nd, fd_set * __capability in,
 	    fd_set * __capability ou, fd_set * __capability ex,
 	    struct timeval *tvp, sigset_t *uset, int abi_nfdbits);
 int	kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr,
 	    int data);
-int	kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
-	    off_t offset);
+int	kern_pwrite(struct thread *td, int fd, const void * __capability buf,
+	    size_t nbyte, off_t offset);
 int	kern_pwritev(struct thread *td, int fd, struct uio *auio, off_t offset);
 int	kern_quotactl(struct thread *td, const char * __capability path,
 	    int cmd, int uid, void * __capability arg);
@@ -500,6 +500,8 @@ int	kern_wait4(struct thread *td, int pid, int * __capability status,
 	    int options, struct rusage * __capability rusage);
 int	kern_wait6(struct thread *td, enum idtype idtype, id_t id, int *status,
 	    int options, struct __wrusage *wrup, _siginfo_t *sip);
+int	kern_write(struct thread *td, int fd, const void * __capability buf,
+	    size_t nbyte);
 int	kern_writev(struct thread *td, int fd, struct uio *auio);
 int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);
@@ -546,8 +548,19 @@ int	user_getsockopt(struct thread *td, int s, int level, int name,
 int	user_ioctl(struct thread *td, int fd, u_long com,
 	    void * __capability udata, void *datap, int copycaps);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
+int	user_poll(struct thread *td, struct pollfd * __capability fds,
+	    u_int nfds, int timeout);
+int	user_ppoll(struct thread *td, struct pollfd *__capability fds,
+	    u_int nfds, const struct timespec * __capability uts,
+	    const sigset_t * __capability uset);
 int	user_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void * __capability data);
+int	user_pselect(struct thread *td, int nd, fd_set * __capability in,
+	    fd_set * __capability ou, fd_set * __capability ex,
+	    const struct timespec * __capability uts,
+	    const sigset_t * __capability sm);
+int	user_read(struct thread *td, int fd, void * __capability buf,
+	    size_t nbyte);
 int	user_sched_getparam(struct thread *td, pid_t,
 	    struct sched_param * __capability param);
 int	user_sched_rr_get_interval(struct thread *td, pid_t pid,
@@ -556,6 +569,9 @@ int	user_sched_setparam(struct thread *td, pid_t pid,
 	    const struct sched_param * __capability param);
 int	user_sched_setscheduler(struct thread *td, pid_t pid, int policy,
 	    const struct sched_param * __capability param);
+int	user_select(struct thread *td, int nd, fd_set * __capability in,
+	    fd_set * __capability ou, fd_set * __capability ex,
+	    struct timeval * __capability utv);
 int	user_sendto(struct thread *td, int s, const char * __capability buf,
 	    size_t len, int flags, const struct sockaddr * __capability to,
 	    socklen_t tolen);

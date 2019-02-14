@@ -380,7 +380,7 @@ cheriabi_kevent(struct thread *td, struct cheriabi_kevent_args *uap)
 	return (error);
 }
 
-static int
+int
 cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
     struct uio **uiop)
 {
@@ -414,62 +414,6 @@ cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
 	}
 	*uiop = uio;
 	return (0);
-}
-
-int
-cheriabi_readv(struct thread *td, struct cheriabi_readv_args *uap)
-{
-	struct uio *auio;
-	int error;
-
-	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_readv(td, uap->fd, auio);
-	free(auio, M_IOV);
-	return (error);
-}
-
-int
-cheriabi_writev(struct thread *td, struct cheriabi_writev_args *uap)
-{
-	struct uio *auio;
-	int error;
-
-	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_writev(td, uap->fd, auio);
-	free(auio, M_IOV);
-	return (error);
-}
-
-int
-cheriabi_preadv(struct thread *td, struct cheriabi_preadv_args *uap)
-{
-	struct uio *auio;
-	int error;
-
-	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_preadv(td, uap->fd, auio, uap->offset);
-	free(auio, M_IOV);
-	return (error);
-}
-
-int
-cheriabi_pwritev(struct thread *td, struct cheriabi_pwritev_args *uap)
-{
-	struct uio *auio;
-	int error;
-
-	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_pwritev(td, uap->fd, auio, uap->offset);
-	free(auio, M_IOV);
-	return (error);
 }
 
 int

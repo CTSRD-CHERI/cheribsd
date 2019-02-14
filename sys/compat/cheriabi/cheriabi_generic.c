@@ -43,79 +43,91 @@ __FBSDID("$FreeBSD$");
 #include <sys/uio.h>
 
 #include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_util.h>
 
 int
 cheriabi_read(struct thread *td, struct cheriabi_read_args *uap)
 {
-	struct uio auio;
-	kiovec_t aiov;
-	int error;
 
-	if (uap->nbyte > IOSIZE_MAX)
-		return (EINVAL);
-	IOVEC_INIT_C(&aiov, uap->buf, uap->nbyte);
-	auio.uio_iov = &aiov;
-	auio.uio_iovcnt = 1;
-	auio.uio_resid = uap->nbyte;
-	auio.uio_segflg = UIO_USERSPACE;
-	error = kern_readv(td, uap->fd, &auio);
-	return(error);
+	return (user_read(td, uap->fd, uap->buf, uap->nbyte));
 }
 
 int
 cheriabi_pread(struct thread *td, struct cheriabi_pread_args *uap)
 {
-	struct uio auio;
-	kiovec_t aiov;
+
+	return (kern_pread(td, uap->fd, uap->buf, uap->nbyte, uap->offset));
+}
+
+int
+cheriabi_readv(struct thread *td, struct cheriabi_readv_args *uap)
+{
+	struct uio *auio;
 	int error;
 
-	if (uap->nbyte > IOSIZE_MAX)
-		return (EINVAL);
-	IOVEC_INIT_C(&aiov, uap->buf, uap->nbyte);
-	auio.uio_iov = &aiov;
-	auio.uio_iovcnt = 1;
-	auio.uio_resid = uap->nbyte;
-	auio.uio_segflg = UIO_USERSPACE;
-	error = kern_preadv(td, uap->fd, &auio, uap->offset);
+	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_readv(td, uap->fd, auio);
+	free(auio, M_IOV);
+	return (error);
+}
+
+int
+cheriabi_preadv(struct thread *td, struct cheriabi_preadv_args *uap)
+{
+	struct uio *auio;
+	int error;
+
+	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_preadv(td, uap->fd, auio, uap->offset);
+	free(auio, M_IOV);
 	return (error);
 }
 
 int
 cheriabi_write(struct thread *td, struct cheriabi_write_args *uap)
 {
-	struct uio auio;
-	kiovec_t aiov;
-	int error;
 
-	if (uap->nbyte > IOSIZE_MAX)
-		return (EINVAL);
-	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, uap->buf),
-	    uap->nbyte);
-	auio.uio_iov = &aiov;
-	auio.uio_iovcnt = 1;
-	auio.uio_resid = uap->nbyte;
-	auio.uio_segflg = UIO_USERSPACE;
-	error = kern_writev(td, uap->fd, &auio);
-	return(error);
+	return (kern_write(td, uap->fd, uap->buf, uap->nbyte));
 }
 
 int
 cheriabi_pwrite(struct thread *td, struct cheriabi_pwrite_args *uap)
 {
-	struct uio auio;
-	kiovec_t aiov;
+
+	return (kern_pwrite(td, uap->fd, uap->buf, uap->nbyte,
+	    uap->offset));
+}
+
+int
+cheriabi_writev(struct thread *td, struct cheriabi_writev_args *uap)
+{
+	struct uio *auio;
 	int error;
 
-	if (uap->nbyte > IOSIZE_MAX)
-		return (EINVAL);
-	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, uap->buf),
-	    uap->nbyte);
-	auio.uio_iov = &aiov;
-	auio.uio_iovcnt = 1;
-	auio.uio_resid = uap->nbyte;
-	auio.uio_segflg = UIO_USERSPACE;
-	error = kern_pwritev(td, uap->fd, &auio, uap->offset);
-	return(error);
+	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_writev(td, uap->fd, auio);
+	free(auio, M_IOV);
+	return (error);
+}
+
+int
+cheriabi_pwritev(struct thread *td, struct cheriabi_pwritev_args *uap)
+{
+	struct uio *auio;
+	int error;
+
+	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
+	if (error)
+		return (error);
+	error = kern_pwritev(td, uap->fd, auio, uap->offset);
+	free(auio, M_IOV);
+	return (error);
 }
 
 int
@@ -129,91 +141,29 @@ cheriabi_ioctl(struct thread *td, struct cheriabi_ioctl_args *uap)
 int
 cheriabi_pselect(struct thread *td, struct cheriabi_pselect_args *uap)
 {
-	struct timespec ts;
-	struct timeval tv, *tvp;
-	sigset_t set, *uset;
-	int error;
 
-	if (uap->ts != NULL) {
-		error = copyin(uap->ts, &ts, sizeof(ts));
-		if (error != 0)
-		    return (error);
-		TIMESPEC_TO_TIMEVAL(&tv, &ts);
-		tvp = &tv;
-	} else
-		tvp = NULL;
-	if (uap->sm != NULL) {
-		error = copyin(uap->sm, &set, sizeof(set));
-		if (error != 0)
-			return (error);
-		uset = &set;
-	} else
-		uset = NULL;
-	return (kern_pselect(td, uap->nd, uap->in, uap->ou, uap->ex, tvp,
-	    uset, NFDBITS));
+	return (user_pselect(td, uap->nd, uap->in, uap->ou, uap->ex,
+	    uap->ts, uap->sm));
 }
 
 int
 cheriabi_select(struct thread *td, struct cheriabi_select_args *uap)
 {
-	struct timeval tv, *tvp;
-	int error;
 
-	if (uap->tv != NULL) {
-		error = copyin(uap->tv, &tv, sizeof(tv));
-		if (error)
-			return (error);
-		tvp = &tv;
-	} else
-		tvp = NULL;
-
-	return (kern_select(td, uap->nd, uap->in, uap->ou, uap->ex, tvp,
-	    NFDBITS));
+	return (user_select(td, uap->nd, uap->in, uap->ou, uap->ex,
+	    uap->tv));
 }
 
 int
 cheriabi_poll(struct thread *td, struct cheriabi_poll_args *uap)
 {
 
-	struct timespec ts, *tsp;
-
-	if (uap->timeout != INFTIM) {
-		if (uap->timeout < 0)
-			return (EINVAL);
-		ts.tv_sec = uap->timeout / 1000;
-		ts.tv_nsec = (uap->timeout % 1000) * 1000000;
-		tsp = &ts;
-	} else
-		tsp = NULL;
-
-	return (kern_poll(td, uap->fds, uap->nfds, tsp, NULL));
+	return (user_poll(td, uap->fds, uap->nfds, uap->timeout));
 }
 
 int
 cheriabi_ppoll(struct thread *td, struct cheriabi_ppoll_args *uap)
 {
-	struct timespec ts, *tsp;
-	sigset_t set, *ssp;
-	int error;
 
-	if (uap->ts != NULL) {
-		error = copyin(uap->ts, &ts, sizeof(ts));
-		if (error)
-			return (error);
-		tsp = &ts;
-	} else
-		tsp = NULL;
-	if (uap->set != NULL) {
-		error = copyin(uap->set, &set, sizeof(set));
-		if (error)
-			return (error);
-		ssp = &set;
-	} else
-		ssp = NULL;
-		/*
-		 * fds is still a pointer to user space. kern_poll() will
-		 * perfrom the copyin.
-		 */
-
-	return (kern_poll(td, uap->fds, uap->nfds, tsp, ssp));
+	return (user_ppoll(td, uap->fds, uap->nfds, uap->ts, uap->set));
 }
