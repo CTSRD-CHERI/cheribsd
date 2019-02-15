@@ -437,60 +437,21 @@ cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
 	return (0);
 }
 
-int
-cheriabi_sendfile(struct thread *td, struct cheriabi_sendfile_args *uap)
+static int
+cheriabi_copyin_hdtr(const struct sf_hdtr_c * __capability uhdtr,
+    ksf_hdtr_t *hdtr)
 {
-	struct sf_hdtr_c hdtr_c;
-	struct uio *hdr_uio, *trl_uio;
-	struct file *fp;
-	cap_rights_t rights;
-	off_t offset, sbytes;
-	int error;
 
-	offset = uap->offset;
-	if (offset < 0)
-		return (EINVAL);
+	return(copyincap(uhdtr, hdtr, sizeof(*hdtr)));
+}
 
-	hdr_uio = trl_uio = NULL;
+int cheriabi_sendfile(struct thread *td, struct cheriabi_sendfile_args *uap)
+{
 
-	if (uap->hdtr != NULL) {
-		error = copyincap(uap->hdtr, &hdtr_c, sizeof(hdtr_c));
-		if (error)
-			goto out;
-
-		if (hdtr_c.headers != NULL) {
-			error = cheriabi_copyinuio(hdtr_c.headers,
-			    hdtr_c.hdr_cnt, &hdr_uio);
-			if (error)
-				goto out;
-		}
-		if (hdtr_c.trailers != NULL) {
-			error = cheriabi_copyinuio(hdtr_c.trailers,
-			    hdtr_c.trl_cnt, &trl_uio);
-			if (error)
-				goto out;
-		}
-	}
-
-	AUDIT_ARG_FD(uap->fd);
-
-	if ((error = fget_read(td, uap->fd,
-	    cap_rights_init(&rights, CAP_PREAD), &fp)) != 0)
-		goto out;
-
-	error = fo_sendfile(fp, uap->s, hdr_uio, trl_uio, offset,
-	    uap->nbytes, &sbytes, uap->flags, td);
-	fdrop(fp, td);
-
-	if (uap->sbytes != NULL)
-		copyout(&sbytes, uap->sbytes, sizeof(off_t));
-
-out:
-	if (hdr_uio)
-		free(hdr_uio, M_IOV);
-	if (trl_uio)
-		free(trl_uio, M_IOV);
-	return (error);
+	return (kern_sendfile(td, uap->fd, uap->s, uap->offset, uap->nbytes,
+	    uap->hdtr, uap->sbytes, uap->flags, 0,
+	    (copyin_hdtr_t *)cheriabi_copyin_hdtr,
+	    (copyinuio_t *)cheriabi_copyinuio));
 }
 
 int

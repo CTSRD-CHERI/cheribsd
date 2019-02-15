@@ -683,7 +683,7 @@ struct sf_hdtr_native {
 	int trl_cnt;		/* number of trailer iovec's */
 };
 typedef	struct sf_hdtr_c	ksf_hdtr_t;
-typedef	struct sf_hdtr_native	usf_hdtr_t;
+typedef	int copyin_hdtr_t(const void * __capability hdtrp, ksf_hdtr_t *hdtr);
 #endif /* _KERNEL */
 
 /*

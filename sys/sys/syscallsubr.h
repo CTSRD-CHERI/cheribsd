@@ -409,6 +409,10 @@ int	kern_sched_rr_get_interval_td(struct thread *td, struct thread *targettd,
 	    struct timespec *ts);
 int	kern_semctl(struct thread *td, int semid, int semnum, int cmd,
 	    ksemun_t *arg, register_t *rval);
+int	kern_sendfile(struct thread *td, int fd, int s, off_t offset,
+	    size_t nbytes, void * __capability uhdtr,
+	    off_t * __capability usbytes, int flags, int compat,
+	    copyin_hdtr_t *copyin_hdtr_f, copyinuio_t *copyinuio_f);
 int	kern_setaudit(struct thread *td,
 	    struct auditinfo * __capability auditinfo);
 int	kern_setaudit_addr(struct thread *td,
