@@ -553,14 +553,20 @@ int	user_poll(struct thread *td, struct pollfd * __capability fds,
 int	user_ppoll(struct thread *td, struct pollfd *__capability fds,
 	    u_int nfds, const struct timespec * __capability uts,
 	    const sigset_t * __capability uset);
+int	user_preadv(struct thread *td, int fd, void * __capability iovp,
+	    u_int iovcnt, off_t offset, copyinuio_t *copyinuio_f);
 int	user_procctl(struct thread *td, enum idtype idtype, id_t id, int com,
 	    void * __capability data);
 int	user_pselect(struct thread *td, int nd, fd_set * __capability in,
 	    fd_set * __capability ou, fd_set * __capability ex,
 	    const struct timespec * __capability uts,
 	    const sigset_t * __capability sm);
+int	user_pwritev(struct thread *td, int fd, void *__capability iovp,
+	    u_int iovcnt, off_t offset, copyinuio_t *copyinuio_f);
 int	user_read(struct thread *td, int fd, void * __capability buf,
 	    size_t nbyte);
+int	user_readv(struct thread *td, int fd, void * __capability iovp,
+	    u_int iovcnt, copyinuio_t *copyinuio_f);
 int	user_sched_getparam(struct thread *td, pid_t,
 	    struct sched_param * __capability param);
 int	user_sched_rr_get_interval(struct thread *td, pid_t pid,
@@ -582,6 +588,8 @@ int	user_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int * __capability rsv);
 int	user_statfs(struct thread *td, const char * __capability path,
 	    struct statfs * __capability buf);
+int	user_writev(struct thread *td, int fd, void * __capability iovp,
+	    u_int iovcnt, copyinuio_t *copyinuio_f);
 
 /* flags for kern_sigaction */
 #define	KSA_OSIGSET	0x0001	/* uses osigact_t */

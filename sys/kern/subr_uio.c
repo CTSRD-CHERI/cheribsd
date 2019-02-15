@@ -450,7 +450,7 @@ copyiniov(const uiovec_t * __capability iovp, u_int iovcnt, kiovec_t **iov,
 }
 
 int
-copyinuio(const uiovec_t *iovp, u_int iovcnt, struct uio **uiop)
+copyinuio(const uiovec_t * __capability iovp, u_int iovcnt, struct uio **uiop)
 {
 	uiovec_t u_iov;
 	kiovec_t *iov;
@@ -465,7 +465,7 @@ copyinuio(const uiovec_t *iovp, u_int iovcnt, struct uio **uiop)
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	iov = (kiovec_t *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin(&iovp[i], &u_iov, sizeof(u_iov));
+		error = copyin_c(&iovp[i], &u_iov, sizeof(u_iov));
 		if (error) {
 			free(uio, M_IOV);
 			return (error);

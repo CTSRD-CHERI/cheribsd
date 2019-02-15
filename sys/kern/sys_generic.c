@@ -276,13 +276,22 @@ struct readv_args {
 int
 sys_readv(struct thread *td, struct readv_args *uap)
 {
+
+	return (user_readv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)copyinuio));
+}
+
+int
+user_readv(struct thread *td, int fd, void * __capability iovp, u_int iovcnt,
+    copyinuio_t *copyinuio_f)
+{
 	struct uio *auio;
 	int error;
 
-	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
-	error = kern_readv(td, uap->fd, auio);
+	error = kern_readv(td, fd, auio);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -315,13 +324,22 @@ struct preadv_args {
 int
 sys_preadv(struct thread *td, struct preadv_args *uap)
 {
+
+	return (user_preadv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, uap->offset, (copyinuio_t *)copyinuio));
+}
+
+int
+user_preadv(struct thread *td, int fd, void * __capability iovp, u_int iovcnt,
+    off_t offset, copyinuio_t *copyinuio_f)
+{
 	struct uio *auio;
 	int error;
 
-	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
-	error = kern_preadv(td, uap->fd, auio, uap->offset);
+	error = kern_preadv(td, fd, auio, offset);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -487,13 +505,22 @@ struct writev_args {
 int
 sys_writev(struct thread *td, struct writev_args *uap)
 {
+
+	return (user_writev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)copyinuio));
+}
+
+int
+user_writev(struct thread *td, int fd, void * __capability iovp, u_int iovcnt,
+    copyinuio_t *copyinuio_f)
+{
 	struct uio *auio;
 	int error;
 
-	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
-	error = kern_writev(td, uap->fd, auio);
+	error = kern_writev(td, fd, auio);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -526,13 +553,23 @@ struct pwritev_args {
 int
 sys_pwritev(struct thread *td, struct pwritev_args *uap)
 {
+
+	return (user_pwritev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, uap->offset,
+	    (copyinuio_t *)copyinuio));
+}
+
+int
+user_pwritev(struct thread *td, int fd, void *__capability iovp, u_int iovcnt,
+    off_t offset, copyinuio_t *copyinuio_f)
+{
 	struct uio *auio;
 	int error;
 
-	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
-	error = kern_pwritev(td, uap->fd, auio, uap->offset);
+	error = kern_pwritev(td, fd, auio, offset);
 	free(auio, M_IOV);
 	return (error);
 }

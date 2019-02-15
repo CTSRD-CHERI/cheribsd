@@ -96,6 +96,13 @@ typedef struct iovec_native	uiovec_t;
 	(iovp)->iov_len -= amount;					\
 } while(0)
 
+#ifdef _KERNEL
+struct uio;
+
+typedef int (copyinuio_t)(void * __capability iovp, u_int iovcnt,
+	    struct uio **iov);
+#endif
+
 #endif /* !_SYS__IOVEC_H_ */
 // CHERI CHANGES START
 // {

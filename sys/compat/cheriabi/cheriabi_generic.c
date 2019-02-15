@@ -34,8 +34,6 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ktrace.h"
 
-#define	EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/poll.h>
 #include <sys/syscallsubr.h>
@@ -62,29 +60,17 @@ cheriabi_pread(struct thread *td, struct cheriabi_pread_args *uap)
 int
 cheriabi_readv(struct thread *td, struct cheriabi_readv_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_readv(td, uap->fd, auio);
-	free(auio, M_IOV);
-	return (error);
+	return (user_readv(td, uap->fd, uap->iovp, uap->iovcnt,
+	    (copyinuio_t *)cheriabi_copyinuio));
 }
 
 int
 cheriabi_preadv(struct thread *td, struct cheriabi_preadv_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_preadv(td, uap->fd, auio, uap->offset);
-	free(auio, M_IOV);
-	return (error);
+	return (user_preadv(td, uap->fd, uap->iovp, uap->iovcnt, uap->offset,
+	    (copyinuio_t *)cheriabi_copyinuio));
 }
 
 int
@@ -105,29 +91,17 @@ cheriabi_pwrite(struct thread *td, struct cheriabi_pwrite_args *uap)
 int
 cheriabi_writev(struct thread *td, struct cheriabi_writev_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_writev(td, uap->fd, auio);
-	free(auio, M_IOV);
-	return (error);
+	return (user_writev(td, uap->fd, uap->iovp, uap->iovcnt,
+	     (copyinuio_t *)cheriabi_copyinuio));
 }
 
 int
 cheriabi_pwritev(struct thread *td, struct cheriabi_pwritev_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_pwritev(td, uap->fd, auio, uap->offset);
-	free(auio, M_IOV);
-	return (error);
+	return (user_pwritev(td, uap->fd, uap->iovp, uap->iovcnt,
+	    uap->offset, (copyinuio_t *)cheriabi_copyinuio));
 }
 
 int

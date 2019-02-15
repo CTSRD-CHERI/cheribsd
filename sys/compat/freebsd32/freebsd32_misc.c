@@ -858,7 +858,8 @@ freebsd32_getrusage(struct thread *td, struct freebsd32_getrusage_args *uap)
 }
 
 static int
-freebsd32_copyinuio(struct iovec32 *iovp, u_int iovcnt, struct uio **uiop)
+freebsd32_copyinuio(struct iovec32 * __capability iovp, u_int iovcnt,
+    struct uio **uiop)
 {
 	struct iovec32 iov32;
 	kiovec_t *iov;
@@ -873,7 +874,7 @@ freebsd32_copyinuio(struct iovec32 *iovp, u_int iovcnt, struct uio **uiop)
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	iov = (kiovec_t *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin(&iovp[i], &iov32, sizeof(struct iovec32));
+		error = copyin_c(&iovp[i], &iov32, sizeof(struct iovec32));
 		if (error) {
 			free(uio, M_IOV);
 			return (error);
@@ -900,57 +901,35 @@ freebsd32_copyinuio(struct iovec32 *iovp, u_int iovcnt, struct uio **uiop)
 int
 freebsd32_readv(struct thread *td, struct freebsd32_readv_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_readv(td, uap->fd, auio);
-	free(auio, M_IOV);
-	return (error);
+	return (user_readv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)freebsd32_copyinuio));
 }
 
 int
 freebsd32_writev(struct thread *td, struct freebsd32_writev_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_writev(td, uap->fd, auio);
-	free(auio, M_IOV);
-	return (error);
+	return (user_writev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)freebsd32_copyinuio));
 }
 
 int
 freebsd32_preadv(struct thread *td, struct freebsd32_preadv_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_preadv(td, uap->fd, auio, PAIR32TO64(off_t,uap->offset));
-	free(auio, M_IOV);
-	return (error);
+	return (user_preadv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, PAIR32TO64(off_t, uap->offset),
+	    (copyinuio_t *)freebsd32_copyinuio));
 }
 
 int
 freebsd32_pwritev(struct thread *td, struct freebsd32_pwritev_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_pwritev(td, uap->fd, auio, PAIR32TO64(off_t,uap->offset));
-	free(auio, M_IOV);
-	return (error);
+	return (user_pwritev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, PAIR32TO64(off_t, uap->offset),
+	    (copyinuio_t *)freebsd32_copyinuio));
 }
 
 int
