@@ -1739,16 +1739,16 @@ int
 freebsd6_freebsd32_pread(struct thread *td, struct freebsd6_freebsd32_pread_args *uap)
 {
 
-	return (kern_pread(td, uap->fd, uap->buf, uap->nbyte,
-	    PAIR32TO64(off_t, uap->offset)));
+	return (kern_pread(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, PAIR32TO64(off_t, uap->offset)));
 }
 
 int
 freebsd6_freebsd32_pwrite(struct thread *td, struct freebsd6_freebsd32_pwrite_args *uap)
 {
 
-	return (kern_pwrite(td, uap->fd, uap->buf, uap->nbyte,
-	    PAIR32TO64(off_t, uap->offset)));
+	return (kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, PAIR32TO64(off_t, uap->offset)));
 }
 
 int
