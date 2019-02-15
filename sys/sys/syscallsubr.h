@@ -549,6 +549,11 @@ int	user_getsockopt(struct thread *td, int s, int level, int name,
 	    void * __capability val, socklen_t * __capability avalsize);
 int	user_ioctl(struct thread *td, int fd, u_long com,
 	    void * __capability udata, void *datap, int copycaps);
+int	user_jail_get(struct thread *td, void * __capability iovp,
+	    unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f,
+	    updateiov_t *updateiov_f);
+int	user_jail_set(struct thread *td, void * __capability iovp,
+	    unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
 int	user_poll(struct thread *td, struct pollfd * __capability fds,
 	    u_int nfds, int timeout);

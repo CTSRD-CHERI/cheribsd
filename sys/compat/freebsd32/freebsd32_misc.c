@@ -2293,46 +2293,32 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 int
 freebsd32_jail_set(struct thread *td, struct freebsd32_jail_set_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	/* Check that we have an even number of iovecs. */
-	if (uap->iovcnt & 1)
-		return (EINVAL);
+	return (user_jail_set(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
+	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd32_copyinuio));
+}
 
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_jail_set(td, auio, uap->flags);
-	free(auio, M_IOV);
-	return (error);
+static int
+freebsd32_updateiov(const struct uio *uiop,
+    struct iovec_32 * __capability iovp)
+{
+	int i, error;
+
+	for (i = 0; i < uiop->uio_iovcnt; i++) {
+		error = suword32_c(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
+		if (error != 0)
+			return (error);
+	}
+	return (0);
 }
 
 int
 freebsd32_jail_get(struct thread *td, struct freebsd32_jail_get_args *uap)
 {
-	struct iovec32 iov32;
-	struct uio *auio;
-	int error, i;
 
-	/* Check that we have an even number of iovecs. */
-	if (uap->iovcnt & 1)
-		return (EINVAL);
-
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_jail_get(td, auio, uap->flags);
-	if (error == 0)
-		for (i = 0; i < uap->iovcnt; i++) {
-			PTROUT_CP(auio->uio_iov[i], iov32, iov_base);
-			CP(auio->uio_iov[i], iov32, iov_len);
-			error = copyout(&iov32, uap->iovp + i, sizeof(iov32));
-			if (error != 0)
-				break;
-		}
-	free(auio, M_IOV);
-	return (error);
+	return (user_jail_get(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
+	    uap->iovcnt, uap->flags, (copyinuio_t *)frebsd32_copyinuio,
+	    (updateiov_t *)freebsd32_updateiov));
 }
 
 int

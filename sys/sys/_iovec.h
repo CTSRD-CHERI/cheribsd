@@ -101,6 +101,7 @@ struct uio;
 
 typedef int (copyinuio_t)(void * __capability iovp, u_int iovcnt,
 	    struct uio **iov);
+typedef int (updateiov_t)(const struct uio *uiop, void * __capability iovp);
 #endif
 
 #endif /* !_SYS__IOVEC_H_ */

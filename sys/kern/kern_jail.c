@@ -446,17 +446,26 @@ done:
 int
 sys_jail_set(struct thread *td, struct jail_set_args *uap)
 {
+
+	return (user_jail_set(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
+	    uap->iovcnt, uap->flags, (copyinuio_t *)copyinuio));
+}
+
+int
+user_jail_set(struct thread *td, void * __capability iovp, unsigned int iovcnt,
+    int flags, copyinuio_t *copyinuio_f)
+{
 	struct uio *auio;
 	int error;
 
 	/* Check that we have an even number of iovecs. */
-	if (uap->iovcnt & 1)
+	if (iovcnt & 1)
 		return (EINVAL);
 
-	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	error = copyinuio(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
-	error = kern_jail_set(td, auio, uap->flags);
+	error = kern_jail_set(td, auio, flags);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -1906,19 +1915,29 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 int
 sys_jail_get(struct thread *td, struct jail_get_args *uap)
 {
+
+	return (user_jail_get(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
+	    uap->iovcnt, uap->flags, (copyinuio_t *)copyinuio,
+	    (updateiov_t *)updateiov));
+}
+
+int
+user_jail_get(struct thread *td, void * __capability iovp, unsigned int iovcnt,
+    int flags, copyinuio_t *copyinuio_f, updateiov_t *updateiov_f)
+{
 	struct uio *auio;
 	int error;
 
 	/* Check that we have an even number of iovecs. */
-	if (uap->iovcnt & 1)
+	if (iovcnt & 1)
 		return (EINVAL);
 
-	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
-	error = kern_jail_get(td, auio, uap->flags);
+	error = kern_jail_get(td, auio, flags);
 	if (error == 0)
-		error = updateiov(auio, uap->iovp);
+		error = updateiov_f(auio, iovp);
 	free(auio, M_IOV);
 	return (error);
 }
