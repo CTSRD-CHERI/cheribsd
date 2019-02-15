@@ -668,49 +668,11 @@ cheriabi_procctl(struct thread *td, struct cheriabi_procctl_args *uap)
 }
 
 int
-cheriabi_nmount(struct thread *td,
-    struct cheriabi_nmount_args /* {
-	struct iovec_c * __capability iovp;
-	unsigned int iovcnt;
-	int flags;
-    } */ *uap)
+cheriabi_nmount(struct thread *td, struct cheriabi_nmount_args *uap)
 {
-	struct uio *auio;
-	uint64_t flags;
-	int error;
 
-	/*
-	 * Mount flags are now 64-bits. On 32-bit archtectures only
-	 * 32-bits are passed in, but from here on everything handles
-	 * 64-bit flags correctly.
-	 */
-	flags = uap->flags;
-
-	AUDIT_ARG_FFLAGS(flags);
-
-	/*
-	 * Filter out MNT_ROOTFS.  We do not want clients of nmount() in
-	 * userspace to set this flag, but we must filter it out if we want
-	 * MNT_UPDATE on the root file system to work.
-	 * MNT_ROOTFS should only be set by the kernel when mounting its
-	 * root file system.
-	 */
-	flags &= ~MNT_ROOTFS;
-
-	/*
-	 * check that we have an even number of iovec's
-	 * and that we have at least two options.
-	 */
-	if ((uap->iovcnt & 1) || (uap->iovcnt < 4))
-		return (EINVAL);
-
-	error = cheriabi_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = vfs_donmount(td, flags, auio);
-
-	free(auio, M_IOV);
-	return (error);
+	return (kern_nmount(td, uap->iovp, uap->iovcnt, uap->flags,
+	    (copyinuio_t *)cheriabi_copyinuio));
 }
 
 int

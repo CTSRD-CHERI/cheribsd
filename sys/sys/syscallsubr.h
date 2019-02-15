@@ -320,6 +320,8 @@ int	kern_munlock(struct thread *td, uintptr_t addr, size_t size);
 int	kern_munmap(struct thread *td, uintptr_t addr, size_t size);
 int     kern_nanosleep(struct thread *td, struct timespec *rqt,
 	    struct timespec *rmt);
+int	kern_nmount(struct thread *td, void * __capability iovp, u_int iovcnt,
+	    int flags32, copyinuio_t * copyinuio_f);
 int	kern_ntp_adjtime(struct thread *td, struct timex *tp, int *retval);
 int	kern_ntp_gettime(struct thread *td,
 	    struct ntptimeval * __capability ntvp);
