@@ -335,9 +335,8 @@ CFLAGS+=	-fpic
 CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE:Upcrel}
 .ifdef CHERI_USE_CAP_TLS
 CFLAGS+=	-cheri-cap-tls-abi=${CHERI_USE_CAP_TLS}
-.else
-CFLAGS+=	-ftls-model=local-exec
 .endif
+STATIC_CFLAGS+=	-ftls-model=local-exec
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap
 # mode as we will probably generate wrong code for calling them.
