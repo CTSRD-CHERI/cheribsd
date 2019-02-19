@@ -277,6 +277,24 @@ struct caprevoke_stats {
 	uint32_t	__spare[2];
 };
 
+struct caprevoke_info {
+	caprevoke_epoch epoch_enqueue; /* Label on entry to quarantine */
+	caprevoke_epoch epoch_dequeue; /* Gates removal from quarantine */
+};
+
+#ifdef _KERNEL
+struct caprevoke_info_page {
+	/* Userland will come to hold RO caps to this bit */
+	struct caprevoke_info pub;
+
+	/*
+	 * The kernel is free to use the rest of this page for
+	 * private data that is quite naturally associated with
+	 * this VM space.
+	 */
+};
+#endif
+
 #define	CAPREVOKE_SHADOW_NOVMMAP	0x00	/* The ordinary shadow space */
 #define CAPREVOKE_SHADOW_OTYPE		0x01	/* The otype shadow space */
 /*
@@ -287,6 +305,7 @@ struct caprevoke_stats {
  * of vm objects that we aren't deleting?  They *can* use the NOVMMAP
  * bitmask, but it's 256 times as many bits to flip.
  */
+#define CAPREVOKE_SHADOW_INFO_STRUCT	0x03	/* R/O access to shared state */
 #define CAPREVOKE_SHADOW_SPACE_MASK	0x03	/* Flag bits for shadow index */
 
 #ifndef _KERNEL
