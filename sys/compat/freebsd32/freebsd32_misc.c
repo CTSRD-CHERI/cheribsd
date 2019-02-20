@@ -1802,11 +1802,11 @@ freebsd32_copyin_hdtr(const struct sf_hdtr32 * __capability uhdtr,
 	error = copyin_c(uhdtr, &hdtr32, sizeof(hdtr32));
 	if (error != 0)
 		return (error);
-	hdtr->headers = __USER_CAP_ARRAY(PTRIN(hdtr_n.headers), hdtr_n.hdr_cnt);
-	hdtr->hdr_cnt = hdtr_n.hdr_cnt;
-	hdtr->trailers = __USER_CAP_ARRAY(PTRIN(hdtr_n.trailers),
-	    hdtr_n.trl_cnt);
-	hdtr->hdr_cnt = hdtr_n.trl_cnt;
+	hdtr->headers = __USER_CAP_ARRAY(PTRIN(hdtr32.headers), hdtr32.hdr_cnt);
+	hdtr->hdr_cnt = hdtr32.hdr_cnt;
+	hdtr->trailers = __USER_CAP_ARRAY(PTRIN(hdtr32.trailers),
+	    hdtr32.trl_cnt);
+	hdtr->hdr_cnt = hdtr32.trl_cnt;
 
 	return (0);
 }
@@ -1829,7 +1829,7 @@ int
 freebsd32_sendfile(struct thread *td, struct freebsd32_sendfile_args *uap)
 {
 
-	return (return (kern_sendfile(td, uap->fd, uap->s,
+	return (kern_sendfile(td, uap->fd, uap->s,
 	    PAIR32TO64(off_t, uap->offset), uap->nbytes,
 	    __USER_CAP_OBJ(uap->hdtr), __USER_CAP_OBJ(uap->sbytes),
 	    uap->flags, 0, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
@@ -2252,7 +2252,7 @@ freebsd32_jail_set(struct thread *td, struct freebsd32_jail_set_args *uap)
 
 static int
 freebsd32_updateiov(const struct uio *uiop,
-    struct iovec_32 * __capability iovp)
+    struct iovec32 * __capability iovp)
 {
 	int i, error;
 
@@ -2269,7 +2269,7 @@ freebsd32_jail_get(struct thread *td, struct freebsd32_jail_get_args *uap)
 {
 
 	return (user_jail_get(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)frebsd32_copyinuio,
+	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd32_copyinuio,
 	    (updateiov_t *)freebsd32_updateiov));
 }
 
