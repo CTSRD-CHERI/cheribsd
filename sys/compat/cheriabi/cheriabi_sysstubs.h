@@ -3660,42 +3660,42 @@ SYS_STUB(563, int, getrandom,
 )
 
 SYS_STUB(564, int, coexecve,
-    /* _protoargs */ (pid_t pid, const char *  fname, char *  * __capability argv, char *  * __capability envv),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, pid_t pid, const char * __capability   fname, char * __capability   * __capability  __capability argv, char * __capability   * __capability  __capability envv),
-    /* _protoargs_err */ (int * __capability stub_errno, pid_t pid, const char * __capability   fname, char * __capability   * __capability  __capability argv, char * __capability   * __capability  __capability envv),
-    /* _callargs */ (pid, (__cheri_fromcap const char * )fname, (__cheri_fromcap char *  * __capability)argv, (__cheri_fromcap char *  * __capability)envv),
+    /* _protoargs */ (pid_t pid, char *  fname, char *  * __capability argv, char *  * __capability envv),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, pid_t pid, char * __capability   fname, char * __capability   * __capability  __capability argv, char * __capability   * __capability  __capability envv),
+    /* _protoargs_err */ (int * __capability stub_errno, pid_t pid, char * __capability   fname, char * __capability   * __capability  __capability argv, char * __capability   * __capability  __capability envv),
+    /* _callargs */ (pid, (__cheri_fromcap char * )fname, (__cheri_fromcap char *  * __capability)argv, (__cheri_fromcap char *  * __capability)envv),
     /* _callargs_chk */ (&ret, stub_errno, pid, fname, argv, envv),
-    /* _callargs_err */ (&errno, pid, (const char * )fname, (char *  * __capability)argv, (char *  * __capability)envv),
+    /* _callargs_err */ (&errno, pid, (char * )fname, (char *  * __capability)argv, (char *  * __capability)envv),
     /* _localcheck */ {if (!(cheri_getperm(fname) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(argv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(envv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB(565, int, cosetup,
-    /* _protoargs */ (int what, void *  * __capability code, void *  * __capability data),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int what, void * __capability   * __capability  __capability code, void * __capability   * __capability  __capability data),
-    /* _protoargs_err */ (int * __capability stub_errno, int what, void * __capability   * __capability  __capability code, void * __capability   * __capability  __capability data),
-    /* _callargs */ (what, (__cheri_fromcap void *  * __capability)code, (__cheri_fromcap void *  * __capability)data),
+    /* _protoargs */ (int what, void *  __capability * __capability code, void *  __capability * __capability data),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int what, void * __capability   __capability * __capability  __capability code, void * __capability   __capability * __capability  __capability data),
+    /* _protoargs_err */ (int * __capability stub_errno, int what, void * __capability   __capability * __capability  __capability code, void * __capability   __capability * __capability  __capability data),
+    /* _callargs */ (what, (__cheri_fromcap void *  __capability * __capability)code, (__cheri_fromcap void *  __capability * __capability)data),
     /* _callargs_chk */ (&ret, stub_errno, what, code, data),
-    /* _callargs_err */ (&errno, what, (void *  * __capability)code, (void *  * __capability)data),
+    /* _callargs_err */ (&errno, what, (void *  __capability * __capability)code, (void *  __capability * __capability)data),
     /* _localcheck */ {if (!(cheri_getperm(code) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(data) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB(566, int, coregister,
-    /* _protoargs */ (const char *  name, void *  * __capability cap),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   name, void * __capability   * __capability  __capability cap),
-    /* _protoargs_err */ (int * __capability stub_errno, const char * __capability   name, void * __capability   * __capability  __capability cap),
-    /* _callargs */ ((__cheri_fromcap const char * )name, (__cheri_fromcap void *  * __capability)cap),
+    /* _protoargs */ (const char *  name, void *  __capability * __capability cap),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   name, void * __capability   __capability * __capability  __capability cap),
+    /* _protoargs_err */ (int * __capability stub_errno, const char * __capability   name, void * __capability   __capability * __capability  __capability cap),
+    /* _callargs */ ((__cheri_fromcap const char * )name, (__cheri_fromcap void *  __capability * __capability)cap),
     /* _callargs_chk */ (&ret, stub_errno, name, cap),
-    /* _callargs_err */ (&errno, (const char * )name, (void *  * __capability)cap),
+    /* _callargs_err */ (&errno, (const char * )name, (void *  __capability * __capability)cap),
     /* _localcheck */ {if (!(cheri_getperm(name) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(cap) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
 SYS_STUB(567, int, colookup,
-    /* _protoargs */ (const char *  name, void *  * __capability cap),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   name, void * __capability   * __capability  __capability cap),
-    /* _protoargs_err */ (int * __capability stub_errno, const char * __capability   name, void * __capability   * __capability  __capability cap),
-    /* _callargs */ ((__cheri_fromcap const char * )name, (__cheri_fromcap void *  * __capability)cap),
+    /* _protoargs */ (const char *  name, void *  __capability * __capability cap),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   name, void * __capability   __capability * __capability  __capability cap),
+    /* _protoargs_err */ (int * __capability stub_errno, const char * __capability   name, void * __capability   __capability * __capability  __capability cap),
+    /* _callargs */ ((__cheri_fromcap const char * )name, (__cheri_fromcap void *  __capability * __capability)cap),
     /* _callargs_chk */ (&ret, stub_errno, name, cap),
-    /* _callargs_err */ (&errno, (const char * )name, (void *  * __capability)cap),
+    /* _callargs_err */ (&errno, (const char * )name, (void *  __capability * __capability)cap),
     /* _localcheck */ {if (!(cheri_getperm(name) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(cap) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
@@ -3717,5 +3717,15 @@ SYS_STUB(569, int, cogetpid,
     /* _callargs_chk */ (&ret, stub_errno, pidp),
     /* _callargs_err */ (&errno, (pid_t * )pidp),
     /* _localcheck */ {if (!(cheri_getperm(pidp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
+SYS_STUB(570, int, colocate,
+    /* _protoargs */ (pid_t pid),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, pid_t pid),
+    /* _protoargs_err */ (int * __capability stub_errno, pid_t pid),
+    /* _callargs */ (pid),
+    /* _callargs_chk */ (&ret, stub_errno, pid),
+    /* _callargs_err */ (&errno, pid),
+    /* _localcheck */ {}
 )
 

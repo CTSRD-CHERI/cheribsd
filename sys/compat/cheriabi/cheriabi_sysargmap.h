@@ -370,6 +370,7 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_coregister] = (0x0 | 0x1 | 0x2),
  [CHERIABI_SYS_cheriabi_colookup] = (0x0 | 0x1 | 0x2),
  [CHERIABI_SYS_cheriabi_cogetpid] = (0x0 | 0x1),
+ [CHERIABI_SYS_colocate] = (0x0),
 };
 
 #endif /* !_CHERIABI_SYSARGMAP_H_ */

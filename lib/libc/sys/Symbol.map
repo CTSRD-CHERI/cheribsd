@@ -383,6 +383,7 @@ FBSD_1.5 {
 	clock_nanosleep;
 	coexecve;
 	cogetpid;
+	colocate;
 	colookup;
 	copark;
 	coregister;

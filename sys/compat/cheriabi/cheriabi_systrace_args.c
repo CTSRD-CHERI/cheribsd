@@ -3226,7 +3226,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 564: {
 		struct cheriabi_coexecve_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
-		uarg[1] = (__cheri_addr intptr_t) p->fname; /* const char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->fname; /* char * __capability */
 		uarg[2] = (__cheri_addr intptr_t) p->argv; /* char * __capability * __capability */
 		uarg[3] = (__cheri_addr intptr_t) p->envv; /* char * __capability * __capability */
 		*n_args = 4;
@@ -3236,8 +3236,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 565: {
 		struct cheriabi_cosetup_args *p = params;
 		iarg[0] = p->what; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->code; /* void * __capability * __capability */
-		uarg[2] = (__cheri_addr intptr_t) p->data; /* void * __capability * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->code; /* void * __capability __capability * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->data; /* void * __capability __capability * __capability */
 		*n_args = 3;
 		break;
 	}
@@ -3245,7 +3245,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 566: {
 		struct cheriabi_coregister_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->cap; /* void * __capability * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->cap; /* void * __capability __capability * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -3253,7 +3253,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 567: {
 		struct cheriabi_colookup_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->cap; /* void * __capability * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->cap; /* void * __capability __capability * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -3266,6 +3266,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 569: {
 		struct cheriabi_cogetpid_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->pidp; /* pid_t * __capability */
+		*n_args = 1;
+		break;
+	}
+	/* colocate */
+	case 570: {
+		struct colocate_args *p = params;
+		iarg[0] = p->pid; /* pid_t */
 		*n_args = 1;
 		break;
 	}
@@ -8643,7 +8650,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland const char * __capability";
+			p = "userland char * __capability";
 			break;
 		case 2:
 			p = "userland char * __capability * __capability";
@@ -8662,10 +8669,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __capability * __capability";
+			p = "userland void * __capability __capability * __capability";
 			break;
 		case 2:
-			p = "userland void * __capability * __capability";
+			p = "userland void * __capability __capability * __capability";
 			break;
 		default:
 			break;
@@ -8678,7 +8685,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "userland void * __capability * __capability";
+			p = "userland void * __capability __capability * __capability";
 			break;
 		default:
 			break;
@@ -8691,7 +8698,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "userland void * __capability * __capability";
+			p = "userland void * __capability __capability * __capability";
 			break;
 		default:
 			break;
@@ -8705,6 +8712,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		switch(ndx) {
 		case 0:
 			p = "userland pid_t * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* colocate */
+	case 570:
+		switch(ndx) {
+		case 0:
+			p = "pid_t";
 			break;
 		default:
 			break;
@@ -10585,6 +10602,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 568:
 	/* cheriabi_cogetpid */
 	case 569:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* colocate */
+	case 570:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

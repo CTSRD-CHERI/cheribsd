@@ -1419,22 +1419,22 @@ struct cheriabi_getrandom_args {
 };
 struct cheriabi_coexecve_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
+	char fname_l_[PADL_(char * __capability)]; char * __capability fname; char fname_r_[PADR_(char * __capability)];
 	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
 	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
 };
 struct cheriabi_cosetup_args {
 	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
-	char code_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability code; char code_r_[PADR_(void * __capability * __capability)];
-	char data_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability data; char data_r_[PADR_(void * __capability * __capability)];
+	char code_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability code; char code_r_[PADR_(void * __capability __capability * __capability)];
+	char data_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability data; char data_r_[PADR_(void * __capability __capability * __capability)];
 };
 struct cheriabi_coregister_args {
 	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
-	char cap_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability cap; char cap_r_[PADR_(void * __capability * __capability)];
+	char cap_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability cap; char cap_r_[PADR_(void * __capability __capability * __capability)];
 };
 struct cheriabi_colookup_args {
 	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
-	char cap_l_[PADL_(void * __capability * __capability)]; void * __capability * __capability cap; char cap_r_[PADR_(void * __capability * __capability)];
+	char cap_l_[PADL_(void * __capability __capability * __capability)]; void * __capability __capability * __capability cap; char cap_r_[PADR_(void * __capability __capability * __capability)];
 };
 struct cheriabi_cogetpid_args {
 	char pidp_l_[PADL_(pid_t * __capability)]; pid_t * __capability pidp; char pidp_r_[PADR_(pid_t * __capability)];

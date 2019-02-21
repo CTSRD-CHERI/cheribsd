@@ -411,4 +411,5 @@ MIASM =  \
 	coregister.o \
 	colookup.o \
 	copark.o \
-	cogetpid.o
+	cogetpid.o \
+	colocate.o

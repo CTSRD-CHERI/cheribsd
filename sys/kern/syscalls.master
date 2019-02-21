@@ -3174,6 +3174,12 @@
 		    _Out_ pid_t *pidp
 		);
 	}
+570	AUE_NULL        STD     {
+		int colocate(
+		    pid_t pid,
+		);
+	}
+
 ; Please copy any additions and changes to the following compatability tables:
 ; sys/compat/freebsd32/syscalls.master
 ; vim: syntax=off

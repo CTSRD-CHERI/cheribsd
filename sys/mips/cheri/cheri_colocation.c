@@ -560,3 +560,18 @@ kern_copark(struct thread *td)
 
 	return (error);
 }
+
+int
+kern_colocate(struct thread *td, pid_t pid)
+{
+
+	return (EDOOFUS);
+}
+	
+int
+sys_colocate(struct thread *td, struct colocate_args *uap)
+{
+
+	return (kern_colocate(td, uap->pid));
+}
+

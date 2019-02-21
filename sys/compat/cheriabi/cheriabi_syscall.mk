@@ -383,4 +383,5 @@ MIASM =  \
 	cheriabi_coregister.o \
 	cheriabi_colookup.o \
 	copark.o \
-	cheriabi_cogetpid.o
+	cheriabi_cogetpid.o \
+	colocate.o

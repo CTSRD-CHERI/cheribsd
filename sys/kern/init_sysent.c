@@ -619,4 +619,5 @@ struct sysent sysent[] = {
 	{ AS(colookup_args), (sy_call_t *)sys_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = colookup */
 	{ 0, (sy_call_t *)sys_copark, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 568 = copark */
 	{ AS(cogetpid_args), (sy_call_t *)sys_cogetpid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 569 = cogetpid */
+	{ AS(colocate_args), (sy_call_t *)sys_colocate, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 570 = colocate */
 };

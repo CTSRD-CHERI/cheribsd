@@ -1811,6 +1811,9 @@ struct copark_args {
 struct cogetpid_args {
 	char pidp_l_[PADL_(pid_t *)]; pid_t * pidp; char pidp_r_[PADR_(pid_t *)];
 };
+struct colocate_args {
+	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
+};
 int	nosys(struct thread *, struct nosys_args *);
 void	sys_sys_exit(struct thread *, struct sys_exit_args *);
 int	sys_fork(struct thread *, struct fork_args *);
@@ -2198,6 +2201,7 @@ int	sys_coregister(struct thread *, struct coregister_args *);
 int	sys_colookup(struct thread *, struct colookup_args *);
 int	sys_copark(struct thread *, struct copark_args *);
 int	sys_cogetpid(struct thread *, struct cogetpid_args *);
+int	sys_colocate(struct thread *, struct colocate_args *);
 
 #ifdef COMPAT_43
 
@@ -3102,6 +3106,7 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_colookup	AUE_NULL
 #define	SYS_AUE_copark	AUE_NULL
 #define	SYS_AUE_cogetpid	AUE_NULL
+#define	SYS_AUE_colocate	AUE_NULL
 
 #undef PAD_
 #undef PADL_

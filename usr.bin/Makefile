@@ -22,6 +22,7 @@ SUBDIR=	alias \
 	coexec \
 	col \
 	colldef \
+	colocate \
 	colrm \
 	column \
 	comm \

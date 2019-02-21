@@ -506,4 +506,5 @@
 #define	CHERIABI_SYS_cheriabi_colookup	567
 #define	CHERIABI_SYS_copark	568
 #define	CHERIABI_SYS_cheriabi_cogetpid	569
-#define	CHERIABI_SYS_MAXSYSCALL	570
+#define	CHERIABI_SYS_colocate	570
+#define	CHERIABI_SYS_MAXSYSCALL	571
