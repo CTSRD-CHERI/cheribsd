@@ -404,6 +404,7 @@ SUBDIR=	\
 	${_x86bios} \
 	${_xe} \
 	xl \
+	xz \
 	zlib
 
 .if ${MACHINE_CPUARCH} != "mips"
