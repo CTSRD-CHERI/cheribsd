@@ -166,6 +166,8 @@
         ..
         usb
         ..
+        veriexec
+        ..
         vkbd
         ..
         wi
@@ -359,6 +361,8 @@
         mac_mls
         ..
         mac_partition
+        ..
+        mac_veriexec
         ..
     ..
     ssp
