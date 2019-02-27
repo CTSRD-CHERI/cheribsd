@@ -2043,6 +2043,7 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	void * __capability *p;
 	struct swblk *sb;
 	vm_pindex_t swidx;
+	int mark_capdirty = 0;
 
 	swidx = rounddown(page->pindex, SWAP_META_PAGES);
 	scan = (void *)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(page));
@@ -2052,18 +2053,33 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	    i < (swidx + 1) * BITS_PER_TAGS_PER_PAGE; i++) {
 		p = scan;
 		for (t = sb->swb_tags[i]; t != 0; t >>= j) {
+			mark_capdirty = 1;
 			j = ffsl((long)t);
 			cheri_restore_tag(p + j - 1);
 			p += j;
 		}
 		scan += 8 * sizeof(uint64_t);
 	}
+
+	/*
+	 * Because we stored through the direct region we will have bypassed
+	 * the TLB and all implicit capdirty tracking.  If we stored a
+	 * capability, mark the page as recently dirtied.
+	 *
+	 * This has to be recent (PGA_CAPSTORED) and not just dirty
+	 * (VPO_PASTCAPSTORE) so that incremental scans of the address space
+	 * still consider it.
+	 */
+	if (mark_capdirty)
+		vm_page_aflag_set(page, PGA_CAPSTORED);
 }
 
 /*
  *	swp_pager_meta_cheri_put_tags:
  *
  *	Save the capability tags of a page to its swap metadata structure.
+ *
+ *	XXX Make this use CLoadTags eventually
  */
 static void
 swp_pager_meta_cheri_put_tags(vm_page_t page)
