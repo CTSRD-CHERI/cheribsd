@@ -72,12 +72,12 @@ SYSINIT(colocation_startup, SI_SUB_CPU, SI_ORDER_FIRST, colocation_startup,
     NULL);
 
 static bool
-colocation_fetch_context(struct thread *td, struct switcher_context *scp)
+colocation_fetch_scb(struct thread *td, struct switchercb *scbp)
 {
 	vaddr_t addr;
 	int error;
 
-	addr = td->td_md.md_switcher_context;
+	addr = td->td_md.md_scb;
 	if (addr == 0) {
 		/*
 		 * We've never called cosetup(2).
@@ -86,7 +86,7 @@ colocation_fetch_context(struct thread *td, struct switcher_context *scp)
 	}
 
 	error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap),
-	    &(*scp), sizeof(*scp));
+	    &(*scbp), sizeof(*scbp));
 #if 1
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
 	    __func__, (void *)addr, error));
@@ -98,7 +98,7 @@ colocation_fetch_context(struct thread *td, struct switcher_context *scp)
 	}
 #endif
 
-	if (scp->sc_borrower_td == NULL) {
+	if (scbp->scb_borrower_td == NULL) {
 		/*
 		 * Nothing borrowed yet.
 		 */
@@ -109,12 +109,12 @@ colocation_fetch_context(struct thread *td, struct switcher_context *scp)
 }
 
 static bool
-colocation_fetch_peer_context(struct thread *td, struct switcher_context *scp)
+colocation_fetch_peer_scb(struct thread *td, struct switchercb *scbp)
 {
 	vaddr_t addr;
 	int error;
 
-	addr = td->td_md.md_switcher_context;
+	addr = td->td_md.md_scb;
 	if (addr == 0) {
 		/*
 		 * We've never called cosetup(2).
@@ -123,21 +123,21 @@ colocation_fetch_peer_context(struct thread *td, struct switcher_context *scp)
 	}
 
 	error = copyincap(___USER_CFROMPTR((const void *)addr, userspace_cap),
-	    &(*scp), sizeof(*scp));
+	    &(*scbp), sizeof(*scbp));
 	KASSERT(error == 0, ("%s: copyincap from %p failed with error %d\n",
 	    __func__, (void *)addr, error));
 
-	if (scp->sc_peer_context == NULL) {
+	if (scbp->scb_peer_scb == NULL) {
 		/*
 		 * Not in cocall.
 		 */
 		return (false);
 	}
 
-	error = copyincap(scp->sc_peer_context, &(*scp), sizeof(*scp));
+	error = copyincap(scbp->scb_peer_scb, &(*scbp), sizeof(*scbp));
 	KASSERT(error == 0,
 	    ("%s: copyincap from peer %p failed with error %d\n",
-	    __func__, (__cheri_fromcap void *)scp->sc_peer_context, error));
+	    __func__, (__cheri_fromcap void *)scbp->scb_peer_scb, error));
 
 	return (true);
 }
@@ -145,12 +145,12 @@ colocation_fetch_peer_context(struct thread *td, struct switcher_context *scp)
 void
 colocation_get_peer(struct thread *td, struct thread **peertdp)
 {
-	struct switcher_context sc;
+	struct switchercb scb;
 	bool borrowing;
 
-	borrowing = colocation_fetch_context(td, &sc);
+	borrowing = colocation_fetch_scb(td, &scb);
 	if (borrowing)
-		*peertdp = sc.sc_borrower_td;
+		*peertdp = scb.scb_borrower_td;
 	else
 		*peertdp = NULL;
 }
@@ -158,51 +158,51 @@ colocation_get_peer(struct thread *td, struct thread **peertdp)
 void
 colocation_thread_exit(struct thread *td)
 {
-	struct switcher_context sc, *peersc;
+	struct switchercb scb, *peerscb;
 	vaddr_t addr;
 	bool borrowing;
 	int error;
 
-	borrowing = colocation_fetch_context(td, &sc);
+	borrowing = colocation_fetch_scb(td, &scb);
 	if (!borrowing)
 		return;
 
-	addr = td->td_md.md_switcher_context;
-	peersc = (__cheri_fromcap struct switcher_context *)sc.sc_peer_context;
-	//printf("%s: terminating thread %p, peer context %p\n", __func__, td, peersc);
+	addr = td->td_md.md_scb;
+	peerscb = (__cheri_fromcap struct switchercb *)scb.scb_peer_scb;
+	//printf("%s: terminating thread %p, peer scb %p\n", __func__, td, peerscb);
 
 	/*
-	 * Set sc_peer_context to a special "null" capability, so that cocall(2)
+	 * Set scb_peer_scb to a special "null" capability, so that cocall(2)
 	 * can see the callee thread is dead.
 	 */
-	sc.sc_peer_context = cheri_capability_build_user_rwx(0, 0, 0, 0);
-	sc.sc_td = NULL;
-	sc.sc_borrower_td = NULL;
+	scb.scb_peer_scb = cheri_capability_build_user_rwx(0, 0, 0, 0);
+	scb.scb_td = NULL;
+	scb.scb_borrower_td = NULL;
 
-	error = copyoutcap(&sc, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(sc));
+	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
 	if (error != 0) {
 		printf("%s: copyoutcap to %p failed with error %d\n",
 		    __func__, (void *)addr, error);
 		return;
 	}
 
-	if (peersc == NULL)
+	if (peerscb == NULL)
 		return;
 
-	error = copyincap(___USER_CFROMPTR((void *)peersc, userspace_cap), &sc, sizeof(sc));
+	error = copyincap(___USER_CFROMPTR((void *)peerscb, userspace_cap), &scb, sizeof(scb));
 	if (error != 0) {
 		printf("%s: peer copyincap from %p failed with error %d\n",
-		    __func__, (void *)peersc, error);
+		    __func__, (void *)peerscb, error);
 		return;
 	}
 
-	sc.sc_peer_context = NULL;
-	sc.sc_borrower_td = NULL;
+	scb.scb_peer_scb = NULL;
+	scb.scb_borrower_td = NULL;
 
-	error = copyoutcap(&sc, ___USER_CFROMPTR((void *)peersc, userspace_cap), sizeof(sc));
+	error = copyoutcap(&scb, ___USER_CFROMPTR((void *)peerscb, userspace_cap), sizeof(scb));
 	if (error != 0) {
 		printf("%s: peer copyoutcap to %p failed with error %d\n",
-		    __func__, (void *)peersc, error);
+		    __func__, (void *)peerscb, error);
 		return;
 	}
 }
@@ -213,18 +213,18 @@ colocation_thread_exit(struct thread *td)
 void
 colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 {
-	struct switcher_context sc;
+	struct switchercb scb;
 	struct thread *peertd;
 	struct trapframe peertrapframe;
 	struct syscall_args peersa;
 	register_t peertpc;
 	bool borrowing;
 
-	borrowing = colocation_fetch_context(td, &sc);
+	borrowing = colocation_fetch_scb(td, &scb);
 	if (!borrowing)
 		return;
 
-	peertd = sc.sc_borrower_td;
+	peertd = scb.scb_borrower_td;
 	if (peertd == NULL) {
 		/*
 		 * Nothing borrowed yet.
@@ -236,10 +236,10 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 	    ("%s: peertd %p == td %p\n", __func__, peertd, td));
 
 #if 0
-	printf("%s: replacing current td %p, switcher_context %#lx, md_tls %p, md_tls_tcb_offset %zd, "
-	    "with td %p, switcher_context %#lx, md_tls %p, md_tls_tcb_offset %zd\n", __func__,
-	    td, td->td_md.md_switcher_context, (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
-	    peertd, peertd->td_md.md_switcher_context, (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
+	printf("%s: replacing current td %p, switchercb %#lx, md_tls %p, md_tls_tcb_offset %zd, "
+	    "with td %p, switchercb %#lx, md_tls %p, md_tls_tcb_offset %zd\n", __func__,
+	    td, td->td_md.md_scb, (__cheri_fromcap void *)td->td_md.md_tls, td->td_md.md_tls_tcb_offset,
+	    peertd, peertd->td_md.md_scb, (__cheri_fromcap void *)peertd->td_md.md_tls, peertd->td_md.md_tls_tcb_offset);
 #endif
 
 	/*
@@ -268,7 +268,7 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 
 	*trapframep = td->td_frame;
 
-	wakeup(&peertd->td_md.md_switcher_context);
+	wakeup(&peertd->td_md.md_scb);
 
 	/*
 	 * Continue as usual, but calling copark(2) instead of whatever
@@ -281,14 +281,14 @@ colocation_unborrow(struct thread *td, struct trapframe **trapframep)
 static int
 cosetup(struct thread *td)
 {
-	struct switcher_context sc;
+	struct switchercb scb;
 	vm_map_t map;
 	vm_map_entry_t entry;
 	vm_offset_t addr;
 	boolean_t found;
 	int error;
 
-	KASSERT(td->td_md.md_switcher_context == 0, ("%s: already initialized\n", __func__));
+	KASSERT(td->td_md.md_scb == 0, ("%s: already initialized\n", __func__));
 
 	map = &td->td_proc->p_vmspace->vm_map;
 
@@ -306,7 +306,7 @@ cosetup(struct thread *td)
 		    __func__, error);
 		return (error);
 	}
-	td->td_md.md_switcher_context = addr;
+	td->td_md.md_scb = addr;
 
 	vm_map_lock(map);
 	found = vm_map_lookup_entry(map, addr, &entry);
@@ -315,14 +315,14 @@ cosetup(struct thread *td)
 	entry->owner = 0;
 	vm_map_unlock(map);
 
-	//printf("%s: context at %p, td %p\n", __func__, (void *)addr, td);
-	sc.sc_unsealcap = switcher_sealcap2;
-	sc.sc_td = td;
-	sc.sc_borrower_td = NULL;
-	sc.sc_peer_context = NULL;
+	//printf("%s: scb at %p, td %p\n", __func__, (void *)addr, td);
+	scb.scb_unsealcap = switcher_sealcap2;
+	scb.scb_td = td;
+	scb.scb_borrower_td = NULL;
+	scb.scb_peer_scb = NULL;
 
-	error = copyoutcap(&sc,
-	    ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(sc));
+	error = copyoutcap(&scb,
+	    ___USER_CFROMPTR((void *)addr, userspace_cap), sizeof(scb));
 	KASSERT(error == 0,
 	    ("%s: copyoutcap() failed with error %d\n", __func__, error));
 
@@ -348,7 +348,7 @@ kern_cosetup(struct thread *td, int what,
 	vaddr_t addr;
 	int error;
 
-	if (td->td_md.md_switcher_context == 0) {
+	if (td->td_md.md_scb == 0) {
 		error = cosetup(td);
 		if (error != 0) {
 			printf("%s: cosetup() failed with error %d\n",
@@ -357,7 +357,7 @@ kern_cosetup(struct thread *td, int what,
 		}
 	}
 
-	addr = td->td_md.md_switcher_context;
+	addr = td->td_md.md_scb;
 
 	switch (what) {
 	case COSETUP_COCALL:
@@ -426,13 +426,13 @@ kern_coregister(struct thread *td, const char * __capability namep,
 	if (strlen(name) >= PATH_MAX)
 		return (ENAMETOOLONG);
 
-	if (td->td_md.md_switcher_context == 0) {
+	if (td->td_md.md_scb == 0) {
 		error = cosetup(td);
 		if (error != 0)
 			return (error);
 	}
 
-	addr = td->td_md.md_switcher_context;
+	addr = td->td_md.md_scb;
 
 	vm_map_lock(&vmspace->vm_map);
 	LIST_FOREACH(con, &vmspace->vm_conames, c_next) {
@@ -512,16 +512,16 @@ sys_cogetpid(struct thread *td, struct cogetpid_args *uap)
 int
 kern_cogetpid(struct thread *td, pid_t * __capability pidp)
 {
-	struct switcher_context sc;
+	struct switchercb scb;
 	bool is_callee;
 	pid_t pid;
 	int error;
 
-	is_callee = colocation_fetch_peer_context(td, &sc);
+	is_callee = colocation_fetch_peer_scb(td, &scb);
 	if (!is_callee)
 		return (ESRCH);
 
-	pid = sc.sc_td->td_proc->p_pid;
+	pid = scb.scb_td->td_proc->p_pid;
 	error = copyoutcap(&pid, pidp, sizeof(pid));
 
 	return (error);
@@ -542,7 +542,7 @@ kern_copark(struct thread *td)
 	//printf("%s: go, td %p!\n", __func__, td);
 
 	mtx_lock(&switcher_lock);
-	error = msleep(&td->td_md.md_switcher_context, &switcher_lock,
+	error = msleep(&td->td_md.md_scb, &switcher_lock,
 	    PPAUSE | PCATCH, "copark", 0);
 	mtx_unlock(&switcher_lock);
 

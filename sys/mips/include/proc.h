@@ -49,30 +49,30 @@
 #endif
 
 #ifdef CPU_CHERI
-struct switcher_context {
+struct switchercb {
 	/*
 	 * Peer context - callee in caller's context, caller in callee's.
 	 * This also serves as the callee's spinlock.  Must be first,
 	 * as the cllc instruction doesn't take an offset.
 	 */
-	struct switcher_context * __capability	sc_peer_context;
+	struct switchercb * __capability	scb_peer_scb;
 
 	/*
 	 * Thread owning the context; the same thread that called cosetup(2).
 	 */
-	struct thread				*sc_td;
+	struct thread				*scb_td;
 
 	/*
 	 * Thread owning the context we're lending our thread to.  When
 	 * calling cocall(), this will be the callee thread.  NULL when
 	 * not lending.
 	 */
-	struct thread				*sc_borrower_td;
+	struct thread				*scb_borrower_td;
 
 	/*
 	 * Capability to unseal peer context.
 	 */
-	void * __capability			sc_unsealcap;
+	void * __capability			scb_unsealcap;
 
 	/*
 	 * There's more stuff here; we allocate an entire page.
@@ -109,7 +109,7 @@ struct mdthread {
 #endif
 #ifdef CPU_CHERI
 	void * __capability	md_tls_cap;
-	vaddr_t		md_switcher_context;
+	vaddr_t		md_scb;
 #ifdef COMPAT_CHERIABI
 	void * __capability	md_cheri_mmap_cap;
 #endif

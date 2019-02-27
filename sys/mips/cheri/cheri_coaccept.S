@@ -112,7 +112,7 @@ _C_LABEL(switcher_coaccept):
 	 * only saving the registeres which are defined as callee-saved;
 	 * the caller-saved ones will be zeroed on return.
 	 *
-	 * The "3*CHERICAP_SIZE" is to skip over 'struct switcher_context'.
+	 * The "3*CHERICAP_SIZE" is to skip over 'struct switchercb'.
 	 *
 	 * XXX: Make sure the IDC is cleared if we get a signal while here.
 	 */
@@ -173,7 +173,7 @@ _C_LABEL(switcher_coaccept):
 
 1:
 	/*
-	 * Save the capability to the caller's thread in the callee context.
+	 * Save the capability to the caller's thread in the callee control block.
 	 * This is used by kernel to look up the real thread.  Also clear
 	 * the same field on the caller side.
 	 */
@@ -235,7 +235,7 @@ _C_LABEL(switcher_coaccept):
 	nop
 
 	/*
-	 * Zero out the sc_peer_context variables, releasing the spinlock.
+	 * Zero out the scb_peer_scb variables, releasing the spinlock.
 	 */
 	csd	zero, zero, 0($c25);
 	csd	zero, zero, 0($idc);

@@ -95,7 +95,7 @@ _C_LABEL(switcher_cocall):
 	 * only saving the registeres which are defined as callee-saved;
 	 * the caller-saved ones will be zeroed on return.
 	 *
-	 * The "3*CHERICAP_SIZE" is to skip over 'struct switcher_context'.
+	 * The "3*CHERICAP_SIZE" is to skip over 'struct switchercb'.
 	 *
 	 * XXX: Would be nice if we could redefine the ABI for cocall(2)
 	 *      so that most of those don't need restoring.
