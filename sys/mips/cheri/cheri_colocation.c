@@ -561,13 +561,80 @@ kern_copark(struct thread *td)
 	return (error);
 }
 
+static void
+transpose(void * __capability *capp __unused, size_t delta __unused)
+{
+	void * __capability cap;
+	size_t perm, base, len, offset;
+
+	cap = *capp;
+
+	if (!cheri_gettag(cap))
+		return;
+
+	if (cheri_getsealed(cap))
+		return;
+
+        printf("%s: " _CHERI_PRINTF_CAP_FMT, __func__, _CHERI_PRINTF_CAP_ARG(cap));
+
+	perm = cheri_getperm(cap);
+	base = cheri_getbase(cap);
+	len = cheri_getlen(cap);
+	offset = cheri_getoffset(cap);
+
+	if (base >= 0x7f00000000)
+		delta = -delta;
+
+	cap = cheri_capability_build_user_rwx(perm, base + delta, len, offset);
+        printf(" -> \t" _CHERI_PRINTF_CAP_FMT "\n", _CHERI_PRINTF_CAP_ARG(cap));
+
+	*capp = cap;
+}
+
 int
 kern_colocate(struct thread *td, pid_t pid)
 {
+	struct trapframe *frame;
+	size_t delta;
 
-	return (EDOOFUS);
+	frame = td->td_frame;
+
+	delta = 4l * 1024 * 1024 * 1024;
+
+	transpose(&frame->ddc, delta);
+	transpose(&frame->c1, delta);
+	transpose(&frame->c2, delta);
+	transpose(&frame->c3, delta);
+	transpose(&frame->c4, delta);
+	transpose(&frame->c5, delta);
+	transpose(&frame->c6, delta);
+	transpose(&frame->c7, delta);
+	transpose(&frame->c8, delta);
+	transpose(&frame->c9, delta);
+	transpose(&frame->c10, delta);
+	transpose(&frame->csp, delta);
+	transpose(&frame->c12, delta);
+	transpose(&frame->c13, delta);
+	transpose(&frame->c14, delta);
+	transpose(&frame->c15, delta);
+	transpose(&frame->c16, delta);
+	transpose(&frame->c17, delta);
+	transpose(&frame->c18, delta);
+	transpose(&frame->c19, delta);
+	transpose(&frame->c20, delta);
+	transpose(&frame->c21, delta);
+	transpose(&frame->c22, delta);
+	transpose(&frame->c23, delta);
+	transpose(&frame->c24, delta);
+	transpose(&frame->c25, delta);
+	transpose(&frame->idc, delta);
+	transpose(&frame->pcc, delta);
+
+	td->td_retcap = NULL;
+
+	return (0);
 }
-	
+
 int
 sys_colocate(struct thread *td, struct colocate_args *uap)
 {
