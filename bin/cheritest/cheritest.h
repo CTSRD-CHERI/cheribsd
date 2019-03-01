@@ -556,6 +556,9 @@ DECLARE_CHERI_TEST(cheritest_vm_tag_tmpfile_private_prefault);
 DECLARE_CHERI_TEST(cheritest_vm_cow_read);
 DECLARE_CHERI_TEST(cheritest_vm_cow_write);
 DECLARE_CHERI_TEST(cheritest_vm_capdirty);
+#ifdef __CHERI_PURE_CAPABILITY__
+DECLARE_CHERI_TEST(test_caprevoke_lightly);
+#endif
 const char	*xfail_need_writable_tmp(const char *name);
 
 #if 0
