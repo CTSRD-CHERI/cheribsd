@@ -1063,6 +1063,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "verify capdirty marking and mincore",
 	  .ct_func = cheritest_vm_capdirty, },
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	{ .ct_name = "test_caprevoke_lightly",
+	  .ct_desc = "A gentle test of capability revocation",
+	  .ct_func = test_caprevoke_lightly, },
+#endif
+
 #ifdef CHERI_LIBCHERI_TESTS
 #if 0
 	/*
