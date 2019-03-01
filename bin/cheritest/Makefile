@@ -46,6 +46,9 @@ CHERITEST_DIR:=	${.PARSEDIR}
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	cheritest_cheriabi.c
 SRCS+=	cheritest_cheriabi_open.c
+.if ${MK_CHERI_CAPREVOKE} == "yes"
+CFLAGS+=-DCAPREVOKE
+.endif
 .endif
 
 # This test is broken as written
