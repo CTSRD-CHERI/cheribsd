@@ -650,6 +650,9 @@ DECLARE_CHERIBSD_TEST(cheribsdtest_vm_tag_tmpfile_private_prefault);
 DECLARE_CHERIBSD_TEST(cheribsdtest_vm_cow_read);
 DECLARE_CHERIBSD_TEST(cheribsdtest_vm_cow_write);
 DECLARE_CHERIBSD_TEST(cheribsdtest_vm_capdirty);
+#ifdef CAPREVOKE
+DECLARE_CHERIBSD_TEST(cheribsdtest_caprevoke_lightly);
+#endif
 const char	*xfail_need_writable_tmp(const char *name);
 
 #if 0

@@ -882,6 +882,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "verify capdirty marking and mincore",
 	  .ct_func = cheribsdtest_vm_capdirty, },
 
+#ifdef CAPREVOKE
+	{ .ct_name = "cheribsdtest_caprevoke_lightly",
+	  .ct_desc = "A gentle test of capability revocation",
+	  .ct_func = cheribsdtest_caprevoke_lightly, },
+#endif
+
 #if 0
 	{ .ct_name = "cheribsdtest_vm_swap",
 	  .ct_desc = "check tags are swapped out by swap pager",
