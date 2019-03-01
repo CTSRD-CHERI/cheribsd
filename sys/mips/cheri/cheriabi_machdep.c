@@ -117,7 +117,6 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,	/* XXXBD: or something bigger? */
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= PAGE_SIZE,	/* Disallow mapping at NULL */
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
