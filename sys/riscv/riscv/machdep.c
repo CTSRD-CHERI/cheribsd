@@ -426,7 +426,9 @@ void
 cpu_halt(void)
 {
 
-	panic("cpu_halt");
+	intr_disable();
+	for (;;)
+		__asm __volatile("wfi");
 }
 
 /*
@@ -868,10 +870,6 @@ initriscv(struct riscv_bootparams *rvbp)
 	cninit();
 
 	init_proc0(rvbp->kern_stack);
-
-	/* set page table base register for thread0 */
-	thread0.td_pcb->pcb_l1addr = \
-	    (rvbp->kern_l1pt - KERNBASE + rvbp->kern_phys);
 
 	msgbufinit(msgbufp, msgbufsize);
 	mutex_init();

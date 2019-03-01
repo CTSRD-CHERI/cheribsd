@@ -302,6 +302,7 @@ restart:
 		return (error);
 	}
 	vp = nd.ni_vp;
+	vnode_create_vobject(nd.ni_vp, fs->fs_size, td);
 	vp->v_vflag |= VV_SYSTEM;
 	ip = VTOI(vp);
 	devvp = ITODEVVP(ip);
@@ -1339,6 +1340,8 @@ expunge_ufs2(snapvp, cancelip, fs, acctfunc, expungetype, clearmode)
 	bzero(&dip->di_db[0], (UFS_NDADDR + UFS_NIADDR) * sizeof(ufs2_daddr_t));
 	if (clearmode || cancelip->i_effnlink == 0)
 		dip->di_mode = 0;
+	else
+		ffs_update_dinode_ckhash(fs, dip);
 	bdwrite(bp);
 	/*
 	 * Now go through and expunge all the blocks in the file
@@ -1997,15 +2000,19 @@ ffs_snapshot_mount(mp)
 			continue;
 		}
 		ip = VTOI(vp);
-		if (!IS_SNAPSHOT(ip) || ip->i_size ==
+		if (vp->v_type != VREG) {
+			reason = "non-file snapshot";
+		} else if (!IS_SNAPSHOT(ip)) {
+			reason = "non-snapshot";
+		} else if (ip->i_size ==
 		    lblktosize(fs, howmany(fs->fs_size, fs->fs_frag))) {
-			if (!IS_SNAPSHOT(ip)) {
-				reason = "non-snapshot";
-			} else {
-				reason = "old format snapshot";
-				(void)ffs_truncate(vp, (off_t)0, 0, NOCRED);
-				(void)ffs_syncvnode(vp, MNT_WAIT, 0);
-			}
+			reason = "old format snapshot";
+			(void)ffs_truncate(vp, (off_t)0, 0, NOCRED);
+			(void)ffs_syncvnode(vp, MNT_WAIT, 0);
+		} else {
+			reason = NULL;
+		}
+		if (reason != NULL) {
 			printf("ffs_snapshot_mount: %s inode %d\n",
 			    reason, fs->fs_snapinum[snaploc]);
 			vput(vp);

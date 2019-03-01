@@ -117,6 +117,17 @@ KUBSAN_ENABLED!=	grep KUBSAN opt_global.h || true ; echo
 .if !empty(KUBSAN_ENABLED)
 SAN_CFLAGS+=	-fsanitize=undefined
 .endif
+
+COVERAGE_ENABLED!=	grep COVERAGE opt_global.h || true ; echo
+.if !empty(COVERAGE_ENABLED)
+.if ${COMPILER_TYPE} == "clang" || \
+    (${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} >= 80100)
+SAN_CFLAGS+=	-fsanitize-coverage=trace-pc,trace-cmp
+.else
+SAN_CFLAGS+=	-fsanitize-coverage=trace-pc
+.endif
+.endif
+
 CFLAGS+=	${SAN_CFLAGS}
 
 # Put configuration-specific C flags last (except for ${PROF}) so that they
@@ -134,15 +145,11 @@ LDFLAGS+=	-Wl,--build-id=sha1
 .endif
 
 .if ${MACHINE_CPUARCH} == "amd64"
-LDFLAGS+=	-Wl,-z -Wl,max-page-size=2097152
+LDFLAGS+=	-Wl,-z max-page-size=2097152
 .if ${LINKER_TYPE} != "lld"
-LDFLAGS+=	-Wl,-z -Wl,common-page-size=4096
-.else
-.if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc-noplt} == ""
-.warning "linker ${LD} does not support -z ifunc-noplt. Kernel will be slower!"
+LDFLAGS+=	-Wl,-z common-page-size=4096
 .else
 LDFLAGS+=	-Wl,-z -Wl,ifunc-noplt
-.endif
 .endif
 .endif  # ${MACHINE_CPUARCH} == "amd64"
 

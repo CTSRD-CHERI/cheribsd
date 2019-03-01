@@ -129,7 +129,7 @@ struct xpt_softc {
 	TAILQ_HEAD(,cam_eb)	xpt_busses;
 	u_int			bus_generation;
 
-	struct intr_config_hook	*xpt_config_hook;
+	struct intr_config_hook	xpt_config_hook;
 
 	int			boot_delay;
 	struct callout 		boot_callout;
@@ -982,17 +982,8 @@ xpt_init(void *dummy)
 	/*
 	 * Register a callback for when interrupts are enabled.
 	 */
-	xsoftc.xpt_config_hook =
-	    (struct intr_config_hook *)malloc(sizeof(struct intr_config_hook),
-					      M_CAMXPT, M_NOWAIT | M_ZERO);
-	if (xsoftc.xpt_config_hook == NULL) {
-		printf("xpt_init: Cannot malloc config hook "
-		       "- failing attach\n");
-		return (ENOMEM);
-	}
-	xsoftc.xpt_config_hook->ich_func = xpt_config;
-	if (config_intrhook_establish(xsoftc.xpt_config_hook) != 0) {
-		free (xsoftc.xpt_config_hook, M_CAMXPT);
+	xsoftc.xpt_config_hook.ich_func = xpt_config;
+	if (config_intrhook_establish(&xsoftc.xpt_config_hook) != 0) {
 		printf("xpt_init: config_intrhook_establish failed "
 		       "- failing attach\n");
 	}
@@ -5245,9 +5236,7 @@ xpt_finishconfig_task(void *context, int pending)
 		xpt_for_all_devices(xptpassannouncefunc, NULL);
 
 	/* Release our hook so that the boot can continue. */
-	config_intrhook_disestablish(xsoftc.xpt_config_hook);
-	free(xsoftc.xpt_config_hook, M_CAMXPT);
-	xsoftc.xpt_config_hook = NULL;
+	config_intrhook_disestablish(&xsoftc.xpt_config_hook);
 
 	free(context, M_CAMXPT);
 }
@@ -5422,8 +5411,9 @@ xpt_done_process(struct ccb_hdr *ccb_h)
 	}
 
 	/*
-	 * Insulate against a race where the periph is destroyed
-	 * but CCBs are still not all processed.
+	 * Insulate against a race where the periph is destroyed but CCBs are
+	 * still not all processed. This shouldn't happen, but allows us better
+	 * bug diagnostic when it does.
 	 */
 	if (ccb_h->path->bus)
 		sim = ccb_h->path->bus->sim;
@@ -5445,7 +5435,7 @@ xpt_done_process(struct ccb_hdr *ccb_h)
 
 		if (sim)
 			devq = sim->devq;
-		KASSERT(devq, ("sim missing for XPT_FC_USER_CCB request"));
+		KASSERT(devq, ("Periph disappeared with request pending."));
 
 		mtx_lock(&devq->send_mtx);
 		devq->send_active--;

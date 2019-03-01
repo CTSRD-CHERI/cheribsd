@@ -474,6 +474,10 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	else
 		tf->fixreg[2] = tls;
 
+	/* Disable FPU */
+	tf->srr1 &= ~PSL_FP;
+	pcb->pcb_flags &= ~PCB_FPU;
+
 	if (mcp->mc_flags & _MC_FP_VALID) {
 		/* enable_fpu() will happen lazily on a fault */
 		pcb->pcb_flags |= PCB_FPREGS;
@@ -867,8 +871,6 @@ cpu_set_syscall_retval(struct thread *td, int error)
 	if (tf->fixreg[0] == SYS___syscall &&
 	    (SV_PROC_FLAG(p, SV_ILP32))) {
 		int code = tf->fixreg[FIRSTARG + 1];
-		if (p->p_sysent->sv_mask)
-			code &= p->p_sysent->sv_mask;
 		fixup = (
 #if defined(COMPAT_FREEBSD6) && defined(SYS_freebsd6_lseek)
 		    code != SYS_freebsd6_lseek &&

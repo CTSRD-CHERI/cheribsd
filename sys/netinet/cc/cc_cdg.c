@@ -80,8 +80,6 @@ __FBSDID("$FreeBSD$");
 
 #define	CDG_VERSION "0.1"
 
-#define	CAST_PTR_INT(X) (*((int * __capability)(X)))
-
 /* Private delay-gradient induced congestion control signal. */
 #define	CC_CDG_DELAY 0x01000000
 
@@ -358,22 +356,37 @@ cdg_cb_destroy(struct cc_var *ccv)
 static int
 cdg_beta_handler(SYSCTL_HANDLER_ARGS)
 {
+	int error;
+	uint32_t new;
 
-	if (req->newptr != NULL &&
-	    (CAST_PTR_INT(req->newptr) == 0 || CAST_PTR_INT(req->newptr) > 100))
-		return (EINVAL);
+	new = *(uint32_t *)arg1;
+	error = sysctl_handle_int(oidp, &new, 0, req);
+	if (error == 0 && req->newptr != NULL) {
+		if (new == 0 || new > 100)
+			error = EINVAL;
+		else
+			*(uint32_t *)arg1 = new;
+	}
 
-	return (sysctl_handle_int(oidp, arg1, arg2, req));
+	return (error);
 }
 
 static int
 cdg_exp_backoff_scale_handler(SYSCTL_HANDLER_ARGS)
 {
+	int error;
+	uint32_t new;
 
-	if (req->newptr != NULL && CAST_PTR_INT(req->newptr) < 1)
-		return (EINVAL);
+	new = *(uint32_t *)arg1;
+	error = sysctl_handle_int(oidp, &new, 0, req);
+	if (error == 0 && req->newptr != NULL) {
+		if (new < 1)
+			error = EINVAL;
+		else
+			*(uint32_t *)arg1 = new;
+	}
 
-	return (sysctl_handle_int(oidp, arg1, arg2, req));
+	return (error);
 }
 
 static inline uint32_t
@@ -579,7 +592,11 @@ cdg_ack_received(struct cc_var *ccv, uint16_t ack_type)
 			qdiff_min = ((long)(cdg_data->minrtt_in_rtt -
 			    cdg_data->minrtt_in_prevrtt) << D_P_E );
 
-			calc_moving_average(cdg_data, qdiff_max, qdiff_min);
+			if (cdg_data->sample_q_size == 0) {
+				cdg_data->max_qtrend = qdiff_max;
+				cdg_data->min_qtrend = qdiff_min;
+			} else
+				calc_moving_average(cdg_data, qdiff_max, qdiff_min);
 
 			/* Probabilistic backoff with respect to gradient. */
 			if (slowstart && qdiff_min > 0)

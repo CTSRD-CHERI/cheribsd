@@ -144,7 +144,7 @@ struct vop_vector ffs_fifoops1 = {
 	.vop_default =		&ufs_fifoops,
 	.vop_fsync =		ffs_fsync,
 	.vop_fdatasync =	ffs_fdatasync,
-	.vop_reallocblks =	ffs_reallocblks, /* XXX: really ??? */
+	.vop_lock1 =		ffs_lock,
 	.vop_vptofh =		ffs_vptofh,
 };
 
@@ -857,7 +857,7 @@ ffs_write(ap)
 	 */
 	if ((ip->i_mode & (ISUID | ISGID)) && resid > uio->uio_resid &&
 	    ap->a_cred) {
-		if (priv_check_cred(ap->a_cred, PRIV_VFS_RETAINSUGID, 0)) {
+		if (priv_check_cred(ap->a_cred, PRIV_VFS_RETAINSUGID)) {
 			ip->i_mode &= ~(ISUID | ISGID);
 			DIP_SET(ip, i_mode, ip->i_mode);
 		}
@@ -1099,7 +1099,7 @@ ffs_extwrite(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *ucred)
 	 * tampering.
 	 */
 	if ((ip->i_mode & (ISUID | ISGID)) && resid > uio->uio_resid && ucred) {
-		if (priv_check_cred(ucred, PRIV_VFS_RETAINSUGID, 0)) {
+		if (priv_check_cred(ucred, PRIV_VFS_RETAINSUGID)) {
 			ip->i_mode &= ~(ISUID | ISGID);
 			dp->di_mode = ip->i_mode;
 		}

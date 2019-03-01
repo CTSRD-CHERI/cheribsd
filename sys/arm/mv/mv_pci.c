@@ -100,7 +100,7 @@ struct mv_pci_range {
 };
 
 #define FDT_RANGES_CELLS	((3 + 3 + 2) * 2)
-#define PCI_SPACE_LEN		0x00100000
+#define PCI_SPACE_LEN		0x00400000
 
 static void
 mv_pci_range_dump(struct mv_pci_range *range)
@@ -427,6 +427,9 @@ mv_pcib_probe(device_t self)
 	    ofw_bus_is_compatible(self, "mrvl,pci") ||
 	    ofw_bus_node_is_compatible(
 	    OF_parent(node), "marvell,armada-370-pcie")))
+		return (ENXIO);
+
+	if (!ofw_bus_status_okay(self))
 		return (ENXIO);
 
 	device_set_desc(self, "Marvell Integrated PCI/PCI-E Controller");

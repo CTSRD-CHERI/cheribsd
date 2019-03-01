@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 20, 2018
+.Dd February 12, 2019
 .Dt PORTS 7
 .Os
 .Sh NAME
@@ -38,8 +38,6 @@ Ports Collection
 offers a simple way to compile and install third party applications.
 It is also used to build packages, to be installed using
 .Xr pkg 8 .
-It can be installed and updated using
-.Xr portsnap 8 .
 .Pp
 The ports tree, typically located at
 .Pa /usr/ports ,
@@ -61,6 +59,55 @@ the port depends on in order to build and work.
 Afterwards,
 .Dq Li "make install"
 installs the application.
+.Pp
+The
+.Fx
+Ports Collection is maintained in several branches, which differ mostly
+by versions of software provided: the
+.Em head
+branch contains all the latest changes, while the
+.Em quarterly
+branches only provide critical fixes.
+The
+.Em head
+branch can be installed or updated using either
+.Xr portsnap 8 ,
+or from Subversion repository at:
+.Pp
+.Lk https://svn.FreeBSD.org/ports/head
+.Pp
+The
+.Em quarterly
+branches can be found in Subversion in the
+.Pa branches/
+subdirectory, eg:
+.Pp
+.Lk https://svn.FreeBSD.org/ports/branches/2019Q1
+.Pp
+It is generally a good idea to use the
+.Nm
+branch that matches the
+.Xr pkg 8
+repository being used.
+By default, for
+.Fx CURRENT
+the
+.Xr pkg 8
+is configured to install packages built from the
+.Em head
+branch, while for
+.Fx STABLE
+or RELEASE versions it is configured to install packages built from
+the latest
+.Em quarterly
+branch.
+Currently configured
+.Xr pkg 8
+repository can be verified by looking at the
+.Em url
+field in
+.Cm pkg -vv
+output.
 .Pp
 For more information about using ports, see the
 .Dq "Packages and Ports" section
@@ -505,20 +552,13 @@ More information on these and other related variables may be found in
 and the
 .Fx
 Porter's Handbook.
-.Bl -tag -width ".Va WITH_GHOSTSCRIPT_VER"
+.Bl -tag -width "WITH_CCACHE_BUILD"
 .It Va WITH_DEBUG
 .Pq Vt bool
 If set, debugging symbols are installed for ports binaries.
 .It Va WITH_DEBUG_PORTS
 A list of origins for which to set
 .Va WITH_DEBUG_PORTS .
-.It Va WITH_SSP_PORTS
-.Pq Vt bool
-If set, enables
-.Fl fstack-protector
-for most ports.
-.It Va WITH_GHOSTSCRIPT_VER
-If set, the version of ghostscript to be used by ports.
 .It Va WITH_CCACHE_BUILD
 .Pq Vt bool
 If set, enables the use of
@@ -537,11 +577,33 @@ The default ports directory.
 The big Kahuna.
 .El
 .Sh EXAMPLES
-Build and install Emacs:
-.Bd -literal -offset indent
-cd /usr/ports/editors/emacs
-make install
+.Bl -tag -width 0n
+.It Sy Example 1\&: No Building and Installing a Port
+.Pp
+The following command builds and installs Emacs.
+.Bd -literal -offset 2n
+.Li # Ic cd /usr/ports/editors/emacs
+.Li # Ic make install
 .Ed
+.It Sy Example 2\&: No Installing Dependencies with Xr pkg 8
+.Pp
+The following examples shows how to build and install a port without having to
+build its dependencies.
+Instead, the dependencies are downloaded via
+.Xr pkg 8 .
+.Bd -literal -offset 2n
+.Li # Ic make missing | xargs pkg install --automatic --yes
+.Li # Ic make install
+.Ed
+.Pp
+It is especially useful, when the dependencies are costly
+in time and resources to build
+.Pq like Pa lang/rust .
+The drawback is that
+.Xr pkg 8
+offers only packages built with the default set of
+.Va OPTIONS .
+.El
 .Sh SEE ALSO
 .Xr make 1 ,
 .Xr make.conf 5 ,

@@ -203,6 +203,7 @@ struct vm_map {
 	vm_flags_t flags;		/* flags for this vm_map */
 	vm_map_entry_t root;		/* Root of a binary search tree */
 	pmap_t pmap;			/* (c) Physical map */
+	vm_offset_t anon_loc;
 	int busy;
 };
 
@@ -211,6 +212,9 @@ struct vm_map {
  */
 #define MAP_WIREFUTURE		0x01	/* wire all future pages */
 #define	MAP_BUSY_WAKEUP		0x02
+#define	MAP_IS_SUB_MAP		0x04	/* has parent */
+#define	MAP_ASLR		0x08	/* enabled ASLR */
+#define	MAP_ASLR_IGNSTART	0x10
 
 #ifdef	_KERNEL
 #if defined(KLD_MODULE) && !defined(KLD_TIED)
@@ -343,6 +347,7 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define MAP_DISABLE_COREDUMP	0x0100
 #define MAP_PREFAULT_MADVISE	0x0200	/* from (user) madvise request */
 #define	MAP_VN_WRITECOUNT	0x0400
+#define	MAP_REMAP		0x0800
 #define	MAP_STACK_GROWS_DOWN	0x1000
 #define	MAP_STACK_GROWS_UP	0x2000
 #define	MAP_ACC_CHARGED		0x4000

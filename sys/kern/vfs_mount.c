@@ -390,9 +390,17 @@ struct nmount_args {
 int
 sys_nmount(struct thread *td, struct nmount_args *uap)
 {
+
+	return (kern_nmount(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
+	    uap->iovcnt, uap->flags, (copyinuio_t *)copyinuio));
+}
+
+int
+kern_nmount(struct thread *td, void * __capability iovp, u_int iovcnt,
+    int flags32, copyinuio_t * copyinuio_f)
+{
 	struct uio *auio;
 	int error;
-	u_int iovcnt;
 	uint64_t flags;
 
 	/*
@@ -400,11 +408,11 @@ sys_nmount(struct thread *td, struct nmount_args *uap)
 	 * 32-bits are passed in, but from here on everything handles
 	 * 64-bit flags correctly.
 	 */
-	flags = uap->flags;
+	flags = flags32;
 
 	AUDIT_ARG_FFLAGS(flags);
 	CTR4(KTR_VFS, "%s: iovp %p with iovcnt %d and flags %d", __func__,
-	    uap->iovp, uap->iovcnt, flags);
+	    (void *)(__cheri_addr intptr_t)iovp, iovcnt, flags);
 
 	/*
 	 * Filter out MNT_ROOTFS.  We do not want clients of nmount() in
@@ -415,18 +423,17 @@ sys_nmount(struct thread *td, struct nmount_args *uap)
 	 */
 	flags &= ~MNT_ROOTFS;
 
-	iovcnt = uap->iovcnt;
 	/*
 	 * Check that we have an even number of iovec's
 	 * and that we have at least two options.
 	 */
 	if ((iovcnt & 1) || (iovcnt < 4)) {
 		CTR2(KTR_VFS, "%s: failed for invalid iovcnt %d", __func__,
-		    uap->iovcnt);
+		    iovcnt);
 		return (EINVAL);
 	}
 
-	error = copyinuio(uap->iovp, iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error) {
 		CTR2(KTR_VFS, "%s: failed for invalid uio op with %d errno",
 		    __func__, error);
@@ -846,7 +853,7 @@ vfs_domount_first(
 	struct vattr va;
 	struct mount *mp;
 	struct vnode *newdp;
-	int error;
+	int error, error1;
 
 	ASSERT_VOP_ELOCKED(vp, __func__);
 	KASSERT((fsflags & MNT_UPDATE) == 0, ("MNT_UPDATE shouldn't be here"));
@@ -867,7 +874,7 @@ vfs_domount_first(
 	 */
 	error = VOP_GETATTR(vp, &va, td->td_ucred);
 	if (error == 0 && va.va_uid != td->td_ucred->cr_uid)
-		error = priv_check_cred(td->td_ucred, PRIV_VFS_ADMIN, 0);
+		error = priv_check_cred(td->td_ucred, PRIV_VFS_ADMIN);
 	if (error == 0)
 		error = vinvalbuf(vp, V_SAVE, 0, 0);
 	if (error == 0 && vp->v_type != VDIR)
@@ -898,8 +905,15 @@ vfs_domount_first(
 	 * XXX The final recipients of VFS_MOUNT just overwrite the ndp they
 	 * get.  No freeing of cn_pnbuf.
 	 */
-	error = VFS_MOUNT(mp);
-	if (error != 0) {
+	error1 = 0;
+	if ((error = VFS_MOUNT(mp)) != 0 ||
+	    (error1 = VFS_STATFS(mp, &mp->mnt_stat)) != 0 ||
+	    (error1 = VFS_ROOT(mp, LK_EXCLUSIVE, &newdp)) != 0) {
+		if (error1 != 0) {
+			error = error1;
+			if ((error1 = VFS_UNMOUNT(mp, 0)) != 0)
+				printf("VFS_UNMOUNT returned %d\n", error1);
+		}
 		vfs_unbusy(mp);
 		mp->mnt_vnodecovered = NULL;
 		vfs_mount_destroy(mp);
@@ -909,12 +923,12 @@ vfs_domount_first(
 		vrele(vp);
 		return (error);
 	}
+	VOP_UNLOCK(newdp, 0);
 
 	if (mp->mnt_opt != NULL)
 		vfs_freeopts(mp->mnt_opt);
 	mp->mnt_opt = mp->mnt_optnew;
 	*optlist = NULL;
-	(void)VFS_STATFS(mp, &mp->mnt_stat);
 
 	/*
 	 * Prevent external consumers of mount options from reading mnt_optnew.
@@ -940,8 +954,7 @@ vfs_domount_first(
 	TAILQ_INSERT_TAIL(&mountlist, mp, mnt_list);
 	mtx_unlock(&mountlist_mtx);
 	vfs_event_signal(NULL, VQ_MOUNT, 0);
-	if (VFS_ROOT(mp, LK_EXCLUSIVE, &newdp))
-		panic("mount: lost mount");
+	vn_lock(newdp, LK_EXCLUSIVE | LK_RETRY);
 	VOP_UNLOCK(vp, 0);
 	EVENTHANDLER_DIRECT_INVOKE(vfs_mounted, mp, newdp, td);
 	VOP_UNLOCK(newdp, 0);

@@ -5,7 +5,6 @@ PROG=	pngsb
 MAN=
 
 NO_SHARED=yes
-WANT_DUMP=yes
 
 WARNS=	6
 

@@ -82,9 +82,9 @@ _Static_assert(offsetof(struct thread, td_flags) == 0xfc,
     "struct thread KBI td_flags");
 _Static_assert(offsetof(struct thread, td_pflags) == 0x104,
     "struct thread KBI td_pflags");
-_Static_assert(offsetof(struct thread, td_frame) == 0x470,
+_Static_assert(offsetof(struct thread, td_frame) == 0x478,
     "struct thread KBI td_frame");
-_Static_assert(offsetof(struct thread, td_emuldata) == 0x528,
+_Static_assert(offsetof(struct thread, td_emuldata) == 0x530,
     "struct thread KBI td_emuldata");
 _Static_assert(offsetof(struct proc, p_flag) == 0xb0,
     "struct proc KBI p_flag");
@@ -102,9 +102,9 @@ _Static_assert(offsetof(struct thread, td_flags) == 0x98,
     "struct thread KBI td_flags");
 _Static_assert(offsetof(struct thread, td_pflags) == 0xa0,
     "struct thread KBI td_pflags");
-_Static_assert(offsetof(struct thread, td_frame) == 0x2e8,
+_Static_assert(offsetof(struct thread, td_frame) == 0x2ec,
     "struct thread KBI td_frame");
-_Static_assert(offsetof(struct thread, td_emuldata) == 0x334,
+_Static_assert(offsetof(struct thread, td_emuldata) == 0x338,
     "struct thread KBI td_emuldata");
 _Static_assert(offsetof(struct proc, p_flag) == 0x68,
     "struct proc KBI p_flag");
@@ -197,7 +197,7 @@ thread_ctor(void *mem, int size, void *arg, int flags)
 
 	td = (struct thread *)mem;
 	td->td_state = TDS_INACTIVE;
-	td->td_oncpu = NOCPU;
+	td->td_lastcpu = td->td_oncpu = NOCPU;
 
 	td->td_tid = tid_alloc();
 

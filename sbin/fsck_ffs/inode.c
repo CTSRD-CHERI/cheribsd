@@ -286,6 +286,7 @@ union dinode *
 ginode(ino_t inumber)
 {
 	ufs2_daddr_t iblk;
+	union dinode *dp;
 
 	if (inumber < UFS_ROOTINO || inumber > maxino)
 		errx(EEXIT, "bad inode number %ju to ginode",
@@ -301,7 +302,19 @@ ginode(ino_t inumber)
 	if (sblock.fs_magic == FS_UFS1_MAGIC)
 		return ((union dinode *)
 		    &pbp->b_un.b_dinode1[inumber % INOPB(&sblock)]);
-	return ((union dinode *)&pbp->b_un.b_dinode2[inumber % INOPB(&sblock)]);
+	dp = (union dinode *)&pbp->b_un.b_dinode2[inumber % INOPB(&sblock)];
+	if (ffs_verify_dinode_ckhash(&sblock, (struct ufs2_dinode *)dp) != 0) {
+		pwarn("INODE CHECK-HASH FAILED");
+		prtinode(inumber, dp);
+		if (preen || reply("FIX") != 0) {
+			if (preen)
+				printf(" (FIXED)\n");
+			ffs_update_dinode_ckhash(&sblock,
+			    (struct ufs2_dinode *)dp);
+			inodirty(dp);
+		}
+	}
+	return (dp);
 }
 
 /*
@@ -347,6 +360,21 @@ getnextinode(ino_t inumber, int rebuildcg)
 		nextinop += sizeof(struct ufs1_dinode);
 	else
 		nextinop += sizeof(struct ufs2_dinode);
+	if ((ckhashadd & CK_INODE) != 0) {
+		ffs_update_dinode_ckhash(&sblock, (struct ufs2_dinode *)dp);
+		dirty(&inobuf);
+	}
+	if (ffs_verify_dinode_ckhash(&sblock, (struct ufs2_dinode *)dp) != 0) {
+		pwarn("INODE CHECK-HASH FAILED");
+		prtinode(inumber, dp);
+		if (preen || reply("FIX") != 0) {
+			if (preen)
+				printf(" (FIXED)\n");
+			ffs_update_dinode_ckhash(&sblock,
+			    (struct ufs2_dinode *)dp);
+			dirty(&inobuf);
+		}
+	}
 	if (rebuildcg && (char *)dp == inobuf.b_un.b_buf) {
 		/*
 		 * Try to determine if we have reached the end of the
@@ -522,6 +550,8 @@ void
 inodirty(union dinode *dp)
 {
 
+	if (sblock.fs_magic == FS_UFS2_MAGIC)
+		ffs_update_dinode_ckhash(&sblock, (struct ufs2_dinode *)dp);
 	dirty(pbp);
 }
 
@@ -692,7 +722,7 @@ allocino(ino_t request, int type)
 	default:
 		return (0);
 	}
-	dirty(cgbp);
+	cgdirty(cgbp);
 	dp = ginode(ino);
 	DIP_SET(dp, di_db[0], allocblk((long)1));
 	if (DIP(dp, di_db[0]) == 0) {

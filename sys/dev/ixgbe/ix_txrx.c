@@ -131,7 +131,7 @@ ixgbe_tx_ctx_setup(struct ixgbe_adv_tx_context_desc *TXD, if_pkt_info_t pi)
 
 	switch (pi->ipi_ipproto) {
 	case IPPROTO_TCP:
-		if (pi->ipi_csum_flags & (CSUM_IP_TCP | CSUM_IP6_TCP))
+		if (pi->ipi_csum_flags & (CSUM_IP_TCP | CSUM_IP6_TCP | CSUM_TSO))
 			type_tucmd_mlhl |= IXGBE_ADVTXD_TUCMD_L4T_TCP;
 		else
 			offload = FALSE;
@@ -296,11 +296,11 @@ ixgbe_isc_txd_credits_update(void *arg, uint16_t txqid, bool clear)
 	prev = txr->tx_cidx_processed;
 	ntxd = scctx->isc_ntxd[0];
 	do {
+		MPASS(prev != cur);
 		delta = (int32_t)cur - (int32_t)prev;
-		if (prev == 0 && cur == 0)
-			delta += 1;
 		if (delta < 0)
 			delta += ntxd;
+		MPASS(delta > 0);
 
 		processed += delta;
 		prev = cur;

@@ -339,8 +339,7 @@ in_pcbinslbgrouphash(struct inpcb *inp)
 	}
 #endif
 
-	idx = INP_PCBLBGROUP_PORTHASH(inp->inp_lport,
-	    pcbinfo->ipi_lbgrouphashmask);
+	idx = INP_PCBPORTHASH(inp->inp_lport, pcbinfo->ipi_lbgrouphashmask);
 	hdr = &pcbinfo->ipi_lbgrouphashbase[idx];
 	CK_LIST_FOREACH(grp, hdr, il_list) {
 		if (grp->il_vflag == inp->inp_vflag &&
@@ -397,9 +396,7 @@ in_pcbremlbgrouphash(struct inpcb *inp)
 	INP_HASH_WLOCK_ASSERT(pcbinfo);
 
 	hdr = &pcbinfo->ipi_lbgrouphashbase[
-	    INP_PCBLBGROUP_PORTHASH(inp->inp_lport,
-	        pcbinfo->ipi_lbgrouphashmask)];
-
+	    INP_PCBPORTHASH(inp->inp_lport, pcbinfo->ipi_lbgrouphashmask)];
 	CK_LIST_FOREACH(grp, hdr, il_list) {
 		for (i = 0; i < grp->il_inpcnt; ++i) {
 			if (grp->il_inp[i] != inp)
@@ -439,6 +436,8 @@ in_pcbinfo_init(struct inpcbinfo *pcbinfo, const char *name,
     char *inpcbzone_name, uma_init inpcbzone_init, u_int hashfields)
 {
 
+	porthash_nelements = imin(porthash_nelements, IPPORT_MAX + 1);
+
 	INP_INFO_LOCK_INIT(pcbinfo, name);
 	INP_HASH_LOCK_INIT(pcbinfo, "pcbinfohash");	/* XXXRW: argument? */
 	INP_LIST_LOCK_INIT(pcbinfo, "pcbinfolist");
@@ -452,7 +451,7 @@ in_pcbinfo_init(struct inpcbinfo *pcbinfo, const char *name,
 	    &pcbinfo->ipi_hashmask);
 	pcbinfo->ipi_porthashbase = hashinit(porthash_nelements, M_PCB,
 	    &pcbinfo->ipi_porthashmask);
-	pcbinfo->ipi_lbgrouphashbase = hashinit(hash_nelements, M_PCB,
+	pcbinfo->ipi_lbgrouphashbase = hashinit(porthash_nelements, M_PCB,
 	    &pcbinfo->ipi_lbgrouphashmask);
 #ifdef PCBGROUP
 	in_pcbgroup_init(pcbinfo, hashfields, hash_nelements);
@@ -623,7 +622,7 @@ in_pcb_lport(struct inpcb *inp, struct in_addr *laddrp, u_short *lportp,
 		last  = V_ipport_hilastauto;
 		lastport = &pcbinfo->ipi_lasthi;
 	} else if (inp->inp_flags & INP_LOWPORT) {
-		error = priv_check_cred(cred, PRIV_NETINET_RESERVEDPORT, 0);
+		error = priv_check_cred(cred, PRIV_NETINET_RESERVEDPORT);
 		if (error)
 			return (error);
 		first = V_ipport_lowfirstauto;	/* 1023 */
@@ -867,12 +866,10 @@ in_pcbbind_setup(struct inpcb *inp, struct sockaddr *nam, in_addr_t *laddrp,
 			/* GROSS */
 			if (ntohs(lport) <= V_ipport_reservedhigh &&
 			    ntohs(lport) >= V_ipport_reservedlow &&
-			    priv_check_cred(cred, PRIV_NETINET_RESERVEDPORT,
-			    0))
+			    priv_check_cred(cred, PRIV_NETINET_RESERVEDPORT))
 				return (EACCES);
 			if (!IN_MULTICAST(ntohl(sin->sin_addr.s_addr)) &&
-			    priv_check_cred(inp->inp_cred,
-			    PRIV_NETINET_REUSEPORT, 0) != 0) {
+			    priv_check_cred(inp->inp_cred, PRIV_NETINET_REUSEPORT) != 0) {
 				t = in_pcblookup_local(pcbinfo, sin->sin_addr,
 				    lport, INPLOOKUP_WILDCARD, cred);
 	/*
@@ -1015,6 +1012,7 @@ in_pcbladdr(struct inpcb *inp, struct in_addr *faddr, struct in_addr *laddr,
 	struct sockaddr *sa;
 	struct sockaddr_in *sin;
 	struct route sro;
+	struct epoch_tracker et;
 	int error;
 
 	KASSERT(laddr != NULL, ("%s: laddr NULL", __func__));
@@ -1050,7 +1048,7 @@ in_pcbladdr(struct inpcb *inp, struct in_addr *faddr, struct in_addr *laddr,
 	 * network and try to find a corresponding interface to take
 	 * the source address from.
 	 */
-	NET_EPOCH_ENTER();
+	NET_EPOCH_ENTER(et);
 	if (sro.ro_rt == NULL || sro.ro_rt->rt_ifp == NULL) {
 		struct in_ifaddr *ia;
 		struct ifnet *ifp;
@@ -1214,7 +1212,7 @@ in_pcbladdr(struct inpcb *inp, struct in_addr *faddr, struct in_addr *laddr,
 	}
 
 done:
-	NET_EPOCH_EXIT();
+	NET_EPOCH_EXIT(et);
 	if (sro.ro_rt != NULL)
 		RTFREE(sro.ro_rt);
 	return (error);
@@ -1567,6 +1565,7 @@ in_pcbfree_deferred(epoch_context_t ctx)
 	inp = __containerof(ctx, struct inpcb, inp_epoch_ctx);
 
 	INP_WLOCK(inp);
+	CURVNET_SET(inp->inp_vnet);
 #ifdef INET
 	struct ip_moptions *imo = inp->inp_moptions;
 	inp->inp_moptions = NULL;
@@ -1599,6 +1598,7 @@ in_pcbfree_deferred(epoch_context_t ctx)
 #ifdef INET
 	inp_freemoptions(imo);
 #endif	
+	CURVNET_RESTORE();
 }
 
 /*
@@ -1950,8 +1950,8 @@ in_pcblookup_lbgroup(const struct inpcbinfo *pcbinfo,
 
 	INP_HASH_LOCK_ASSERT(pcbinfo);
 
-	hdr = &pcbinfo->ipi_lbgrouphashbase[INP_PCBLBGROUP_PORTHASH(lport,
-	    pcbinfo->ipi_lbgrouphashmask)];
+	hdr = &pcbinfo->ipi_lbgrouphashbase[
+	    INP_PCBPORTHASH(lport, pcbinfo->ipi_lbgrouphashmask)];
 
 	/*
 	 * Order of socket selection:

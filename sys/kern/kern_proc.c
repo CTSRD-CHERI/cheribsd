@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/bitstring.h>
 #include <sys/elf.h>
 #include <sys/eventhandler.h>
 #include <sys/exec.h>
@@ -133,6 +134,7 @@ struct sx __exclusive_cache_line allproc_lock;
 struct sx __exclusive_cache_line zombproc_lock;
 struct sx __exclusive_cache_line proctree_lock;
 struct mtx __exclusive_cache_line ppeers_lock;
+struct mtx __exclusive_cache_line procid_lock;
 uma_zone_t proc_zone;
 
 /*
@@ -191,6 +193,7 @@ procinit(void)
 	sx_init(&zombproc_lock, "zombproc");
 	sx_init(&proctree_lock, "proctree");
 	mtx_init(&ppeers_lock, "p_peers", NULL, MTX_DEF);
+	mtx_init(&procid_lock, "procid", NULL, MTX_DEF);
 	LIST_INIT(&allproc);
 	LIST_INIT(&zombproc);
 	pidhashtbl = hashinit(maxproc / 4, M_PROC, &pidhash);
@@ -303,6 +306,62 @@ proc_fini(void *mem, int size)
 }
 
 /*
+ * PID space management.
+ *
+ * These bitmaps are used by fork_findpid.
+ */
+bitstr_t bit_decl(proc_id_pidmap, PID_MAX);
+bitstr_t bit_decl(proc_id_grpidmap, PID_MAX);
+bitstr_t bit_decl(proc_id_sessidmap, PID_MAX);
+bitstr_t bit_decl(proc_id_reapmap, PID_MAX);
+
+static bitstr_t *proc_id_array[] = {
+	proc_id_pidmap,
+	proc_id_grpidmap,
+	proc_id_sessidmap,
+	proc_id_reapmap,
+};
+
+void
+proc_id_set(int type, pid_t id)
+{
+
+	KASSERT(type >= 0 && type < nitems(proc_id_array),
+	    ("invalid type %d\n", type));
+	mtx_lock(&procid_lock);
+	KASSERT(bit_test(proc_id_array[type], id) == 0,
+	    ("bit %d already set in %d\n", id, type));
+	bit_set(proc_id_array[type], id);
+	mtx_unlock(&procid_lock);
+}
+
+void
+proc_id_set_cond(int type, pid_t id)
+{
+
+	KASSERT(type >= 0 && type < nitems(proc_id_array),
+	    ("invalid type %d\n", type));
+	if (bit_test(proc_id_array[type], id))
+		return;
+	mtx_lock(&procid_lock);
+	bit_set(proc_id_array[type], id);
+	mtx_unlock(&procid_lock);
+}
+
+void
+proc_id_clear(int type, pid_t id)
+{
+
+	KASSERT(type >= 0 && type < nitems(proc_id_array),
+	    ("invalid type %d\n", type));
+	mtx_lock(&procid_lock);
+	KASSERT(bit_test(proc_id_array[type], id) != 0,
+	    ("bit %d not set in %d\n", id, type));
+	bit_clear(proc_id_array[type], id);
+	mtx_unlock(&procid_lock);
+}
+
+/*
  * Is p an inferior of the current process?
  */
 int
@@ -339,7 +398,7 @@ _pfind(pid_t pid, bool zombie)
 		if (p->p_pid == pid) {
 			PROC_LOCK(p);
 			if (p->p_state == PRS_NEW ||
-			    (zombie && p->p_state == PRS_ZOMBIE)) {
+			    (!zombie && p->p_state == PRS_ZOMBIE)) {
 				PROC_UNLOCK(p);
 				p = NULL;
 			}
@@ -510,6 +569,7 @@ enterpgrp(struct proc *p, pid_t pgid, struct pgrp *pgrp, struct session *sess)
 		PGRP_LOCK(pgrp);
 		sess->s_leader = p;
 		sess->s_sid = p->p_pid;
+		proc_id_set(PROC_ID_SESSION, p->p_pid);
 		refcount_init(&sess->s_count, 1);
 		sess->s_ttyvp = NULL;
 		sess->s_ttydp = NULL;
@@ -525,6 +585,7 @@ enterpgrp(struct proc *p, pid_t pgid, struct pgrp *pgrp, struct session *sess)
 		PGRP_LOCK(pgrp);
 	}
 	pgrp->pg_id = pgid;
+	proc_id_set(PROC_ID_GROUP, p->p_pid);
 	LIST_INIT(&pgrp->pg_members);
 
 	/*
@@ -655,6 +716,7 @@ pgdelete(struct pgrp *pgrp)
 		tty_rel_pgrp(tp, pgrp);
 	}
 
+	proc_id_clear(PROC_ID_GROUP, pgrp->pg_id);
 	mtx_destroy(&pgrp->pg_mtx);
 	free(pgrp, M_PGRP);
 	sess_release(savesess);
@@ -839,6 +901,7 @@ sess_release(struct session *s)
 			tty_lock(s->s_ttyp);
 			tty_rel_sess(s->s_ttyp, s);
 		}
+		proc_id_clear(PROC_ID_SESSION, s->s_sid);
 		mtx_destroy(&s->s_mtx);
 		free(s, M_SESSION);
 	}
@@ -3534,8 +3597,8 @@ allproc_loop:
 			PROC_UNLOCK(p);
 			continue;
 		}
-		_PHOLD(p);
 		sx_xunlock(&allproc_lock);
+		_PHOLD(p);
 		r = thread_single(p, SINGLE_ALLPROC);
 		if (r != 0)
 			restart = true;

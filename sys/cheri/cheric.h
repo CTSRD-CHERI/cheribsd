@@ -298,13 +298,18 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 /* Turn on the checking by default for now (until we have fixed everything)*/
 #define __check_low_ptr_bits_assignment
 #if defined(_KERNEL) /* Don't pull in assert.h when building the kernel */
-#undef __check_low_ptr_bits_assignment
+#define _cheri_bits_assert(e) (void)0
 #endif
 #ifdef __check_low_ptr_bits_assignment
+#ifndef _cheri_bits_assert
+#ifndef assert
 #include <assert.h>
+#endif
+#define _cheri_bits_assert(e) assert(e)
+#endif
 #define __runtime_assert_sensible_low_bits(bits)                               \
   __extension__({                                                              \
-    assert(bits < 32 && "Should only use the low 5 pointer bits");             \
+    _cheri_bits_assert(bits < 32 && "Should only use the low 5 pointer bits"); \
     bits;                                                                      \
   })
 #else

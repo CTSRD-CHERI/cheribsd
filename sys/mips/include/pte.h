@@ -89,12 +89,21 @@ typedef uint64_t pd_entry_t;
  * XXXRW: On CHERI, bits 63 and 62 are used for additional permissions that
  * prevent loading and storing of capabilities, so we have reduced the 55-bit
  * shift to 53 bits.
+ *
+ *   This is an incursion into the PFNX field of MIPS64, but when large
+ *   physical address and 1K pages are disabled, we could reduce the value all
+ *   the way to 30 (consuming the entirety of PFNX for software use).
  */
 #if defined(__mips_n64) || defined(__mips_n32) /*  PHYSADDR_64_BIT */
 #define	TLBLO_SWBITS_SHIFT	(53)		/* XXXRW: Was 55. */
-#define	TLBLO_REF_BIT_SHIFT	(61)
+	/*
+	 * XXX The mechanism of clearing bits by SLL; SRL is a little rude;
+	 * CHERI and MIPS64, for example, define bits 63 and 62 as
+	 * meaningful.  They are, admittedly, inhibit bits, so zero is
+	 * likely to be a correct initial value.
+	 */
 #define	TLBLO_SWBITS_CLEAR_SHIFT	(11)	/* XXXSS: Was 9. */
-#define	TLBLO_PFN_MASK		0xFFFFFFC0ULL
+#define	TLBLO_PFN_MASK		0x3FFFFFC0ULL
 #define	TLB_1M_SUPERPAGE_SHIFT	(PDRSHIFT)
 #define	TLBLO_SWBITS_MASK	((pt_entry_t)0x7F << TLBLO_SWBITS_SHIFT)
 #else
@@ -173,15 +182,6 @@ typedef uint64_t pd_entry_t;
 #define	PTE_VR			0x02
 #define	PTE_G			0x01
 
-#ifdef CPU_CHERI
-/*
- * CHERI EntryLo extensions that limit storing loading and storing tagged
- * values.
- */
-#define	PTE_SC			(0x1ULL << 63)
-#define	PTE_LC			(0x1ULL << 62)
-#endif
-
 /*
  * PTE Software Bits
  *
@@ -200,8 +200,14 @@ typedef uint64_t pd_entry_t;
  *   ---------------------------------------------
  *
  * VM flags managed in software:
+ *
  *  RG: Region.  (Reserved. Currently not used.)
+ *      On CHERI, used for cap-store (63) and -load (62) inhibit bits and
+ *      exposed to hardware.  In MIPS64, these are the Read Inhibit (63)
+ *      and eXecute Inhibit (62) bits and are also exposed to hardware.
+ *
  *  SV: Soft Valid bit.
+ *
  *  PG SZ IDX: Page Size Index (0-7).
  *      Index   Page Mask (Binary)  HW Page Size
  *      -----   ------------------- ------------
@@ -216,10 +222,12 @@ typedef uint64_t pd_entry_t;
  *      7   0011 1111 1111 1111  64M
  *      8   1111 1111 1111 1111 256M (Not currently supported)
  *
+ *  MN: Managed.  This PTE maps a managed page.
+ *
+ *  W:  Wired.  ???
+ *
  *  RO: Read only.  Never set PTE_D on this page, and don't
  *      listen to requests to write to it.
- *  W:  Wired.  ???
- *  MANAGED:Managed.  This PTE maps a managed page.
  *
  * These bits should not be written into the TLB, so must first be masked out
  * explicitly in C, or using CLEAR_PTE_SWBITS() in assembly.
@@ -246,6 +254,15 @@ typedef uint64_t pd_entry_t;
 #else
 #define	PTE_PS_IDX_MASK		0
 #define	PTE_SV			0
+#endif
+
+#ifdef CPU_CHERI
+/*
+ * CHERI EntryLo extensions that limit storing loading and storing tagged
+ * values.  Note that these are *inhibit* bits, not permission bits!
+ */
+#define	PTE_SC			(0x1ULL << 63)
+#define	PTE_LC			(0x1ULL << 62)
 #endif
 
 /*

@@ -767,6 +767,7 @@ options 	NETGRAPH_BLUETOOTH_UBTBCMFW	# ubtbcmfw(4)
 options 	NETGRAPH_BPF
 options 	NETGRAPH_BRIDGE
 options 	NETGRAPH_CAR
+options 	NETGRAPH_CHECKSUM
 options 	NETGRAPH_CISCO
 options 	NETGRAPH_DEFLATE
 options 	NETGRAPH_DEVICE
@@ -842,7 +843,6 @@ device		vxlan
 #  and ath drivers and will eventually be required by all 802.11 drivers.
 device		wlan
 options 	IEEE80211_DEBUG		#enable debugging msgs
-options 	IEEE80211_AMPDU_AGE	#age frames in AMPDU reorder q's
 options 	IEEE80211_SUPPORT_MESH	#enable 802.11s D3.0 support
 options 	IEEE80211_SUPPORT_TDMA	#enable TDMA support
 
@@ -2092,15 +2092,18 @@ device		vte		# DM&P Vortex86 RDC R6040 Fast Ethernet
 device		wb		# Winbond W89C840F
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 
+# PCI/PCI-X/PCIe Ethernet NICs that use iflib infrastructure
+device		iflib
+device		em		# Intel Pro/1000 Gigabit Ethernet
+device		ix		# Intel Pro/10Gbe PCIE Ethernet
+device		ixv		# Intel Pro/10Gbe PCIE Ethernet VF
+
 # PCI Ethernet NICs.
 device		cxgb		# Chelsio T3 10 Gigabit Ethernet
 device		cxgb_t3fw	# Chelsio T3 10 Gigabit Ethernet firmware
 device		cxgbe		# Chelsio T4-T6 1/10/25/40/100 Gigabit Ethernet
 device		cxgbev		# Chelsio T4-T6 Virtual Functions
 device		de		# DEC/Intel DC21x4x (``Tulip'')
-device		em		# Intel Pro/1000 Gigabit Ethernet
-device		ix		# Intel Pro/10Gbe PCIE Ethernet
-device		ixv		# Intel Pro/10Gbe PCIE Ethernet VF
 device		le		# AMD Am7900 LANCE and Am79C9xx PCnet
 device		mxge		# Myricom Myri-10G 10GbE NIC
 device		oce		# Emulex 10 GbE (OneConnect Ethernet)
@@ -2121,7 +2124,6 @@ device		ath_hal		# pci/cardbus chip support
 #device		ath_rf5112
 #device		ath_rf5413
 #device		ath_ar5416	# AR5416 chips
-options 	AH_SUPPORT_AR5416	# enable AR5416 tx/rx descriptors
 # All of the AR5212 parts have a problem when paired with the AR71xx
 # CPUS.  These parts have a bug that triggers a fatal bus error on the AR71xx
 # only.  Details of the exact nature of the bug are sketchy, but some can be

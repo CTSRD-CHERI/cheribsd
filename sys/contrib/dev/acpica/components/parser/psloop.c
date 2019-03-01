@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -580,7 +580,7 @@ AcpiPsParseLoop (
     ParserState = &WalkState->ParserState;
     WalkState->ArgTypes = 0;
 
-#if (!defined (ACPI_NO_METHOD_EXECUTION) && !defined (ACPI_CONSTANT_EVAL_ONLY))
+#ifndef ACPI_CONSTANT_EVAL_ONLY
 
     if (WalkState->WalkType & ACPI_WALK_METHOD_RESTART)
     {

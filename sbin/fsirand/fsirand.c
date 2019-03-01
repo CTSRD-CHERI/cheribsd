@@ -126,7 +126,7 @@ fsirand(char *device)
 	dp2 = NULL;
 
 	/* Read in master superblock */
-	if ((ret = sbget(devfd, &sblock, -1)) != 0) {
+	if ((ret = sbget(devfd, &sblock, STDSB)) != 0) {
 		switch (ret) {
 		case ENOENT:
 			warn("Cannot find file system superblock");
@@ -202,6 +202,7 @@ fsirand(char *device)
 				dp1++;
 			} else {
 				dp2->di_gen = arc4random();
+				ffs_update_dinode_ckhash(sblock, dp2);
 				dp2++;
 			}
 		}

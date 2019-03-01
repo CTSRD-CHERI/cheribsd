@@ -135,4 +135,7 @@ int	cheriabi_set_user_tls(struct thread *td, void * __capability tls_base);
 void	*cheriabi_build_kevent_udata(__intcap_t ident,
 	    void * __capability udata);
 
+int	cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
+	    struct uio **uiop);
+
 #endif /* !_COMPAT_CHERIABI_CHERIABI_UTIL_H_ */

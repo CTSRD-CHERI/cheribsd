@@ -52,23 +52,43 @@ ID="/usr/bin/id"
 IDCMD="if [ -x $ID ]; then $ID -un; fi"
 PS="/bin/ps -ww"
 JID=0
+# rc_service provides the path to the service script that we are executing.
+# This is not being set here in an execution context, necessarily, so it's
+# really just a reasonable guess, and it will get overwritten later if
+# we are executing from some other means than direct execution by service(8)
+# or manual invocation of the service script.  The prime example of this is
+# during system startup, all rc scripts will be invoked via /etc/rc, so
+# run_rc_script will overwrite rc_service with the file being sourced.
+rc_service="$0"
 
 #
 #	functions
 #	---------
 
 # list_vars pattern
-#	List vars matching pattern.
+#	List variables matching glob pattern.
 # 
 list_vars()
 {
-	set | { while read LINE; do
-		var="${LINE%%=*}"
-		case "$var" in
-		"$LINE"|*[!a-zA-Z0-9_]*) continue ;;
-		$1) echo $var
+	# Localize 'set' option below.
+	local -
+	local IFS=$'\n' line varname
+
+	# Disable path expansion in unquoted 'for' parameters below.
+	set -o noglob
+
+	for line in $(set); do
+		varname="${line%%=*}"
+
+		case "$varname" in
+		"$line"|*[!a-zA-Z0-9_]*)
+			continue
+			;;
+		$1)
+			echo $varname
+			;;
 		esac
-	done; }
+	done
 }
 
 # set_rcvar [var] [defval] [desc]
@@ -867,6 +887,9 @@ check_startmsgs()
 #			by $flags from the environment.
 #			This variable may be changed by the precmd method.
 #
+#       rc_service      Path to the service being executed, in case the service
+#                       needs to re-invoke itself.
+#
 #	rc_pid		PID of command (if appropriate)
 #
 #	rc_fast		Not empty if "fast" was provided (q.v.)
@@ -1370,6 +1393,7 @@ run_rc_script()
 		required_vars
 	eval unset ${_arg}_cmd ${_arg}_precmd ${_arg}_postcmd
 
+	rc_service="$_file"
 	case "$_file" in
 	/etc/rc.d/*.sh)			# no longer allowed in the base
 		warn "Ignoring old-style startup script $_file"

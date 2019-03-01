@@ -221,7 +221,7 @@ CROSS_BINUTILS_PREFIX=/usr/local/${TARGET_TRIPLE}/bin/
 .endif
 .endif
 .endif
-XBINUTILS=	AS AR LD NM OBJCOPY OBJDUMP RANLIB SIZE STRINGS
+XBINUTILS=	AS AR LD NM OBJCOPY RANLIB SIZE STRINGS
 .for BINUTIL in ${XBINUTILS}
 .if defined(CROSS_BINUTILS_PREFIX) && \
     exists(${CROSS_BINUTILS_PREFIX}/${${BINUTIL}})
@@ -856,7 +856,6 @@ CROSSENV+=	CC="${XCC} ${XCFLAGS}" CXX="${XCXX} ${XCXXFLAGS} ${XCFLAGS}" \
 		CPP="${XCPP} ${XCFLAGS}" \
 		AS="${XAS}" AR="${XAR}" LD="${XLD}" LLVM_LINK="${XLLVM_LINK}" \
 		NM=${XNM} OBJCOPY="${XOBJCOPY}" \
-		OBJDUMP="${XOBJDUMP}" \
 		RANLIB=${XRANLIB} STRINGS=${XSTRINGS} \
 		SIZE="${XSIZE}"
 
@@ -1142,6 +1141,14 @@ _cleanobj_fast_depend_hack: .PHONY
 	    ${OBJTOP}/usr.sbin/ntp/libntpevent/.depend.bufferevent_openssl.o ; then \
 		echo "Removing stale libevent dependencies"; \
 		rm -f ${OBJTOP}/usr.sbin/ntp/libntpevent/.depend.*; \
+	fi
+
+# 20181209  r341759 track migration across wpa update
+	@if [ -e "${OBJTOP}/usr.sbin/wpa/wpa_supplicant/.depend.rrm.o" ] && \
+	    egrep -q 'src/ap/rrm.c' \
+	    ${OBJTOP}/usr.sbin/wpa/wpa_supplicant/.depend.rrm.o; then \
+		echo "Removing stale wpa dependencies"; \
+		rm -f ${OBJTOP}/usr.sbin/wpa/*/.depend*; \
 	fi
 
 .if ${TARGET:Mmips*}
@@ -1807,7 +1814,6 @@ packageworld: .PHONY
 _sysent_dirs=	sys/kern
 _sysent_dirs+=	sys/compat/freebsd32
 _sysent_dirs+=	sys/compat/cheriabi
-_sysent_dirs+=	sys/i386/ibcs2
 _sysent_dirs+=	sys/amd64/linux		\
 		sys/amd64/linux32	\
 		sys/arm64/linux		\
@@ -3117,11 +3123,10 @@ _prereq_libs+= gnu/lib/libssp/libssp_nonshared
 # gnu/lib/csu, gnu/lib/libgcc, lib/csu and lib/libc must be built before
 # all shared libraries for ELF.
 #
-
-.if ! ${MACHINE_ARCH:Mmips*c*}
-_startup_libs=	gnu/lib/csu
+_startup_libs=	lib/csu
+.if ${MK_BSD_CRTBEGIN} == "no"
+_startup_libs+=	gnu/lib/csu
 .endif
-_startup_libs+=	lib/csu
 .if ${MK_CHERI} != "no"
 _startup_libs+= lib/libc_cheri
 .endif

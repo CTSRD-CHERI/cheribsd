@@ -1753,13 +1753,6 @@ mmu_booke_bootstrap(mmu_t mmu, vm_offset_t start, vm_offset_t kernelend)
 	data_start = round_page(kernelend);
 	data_end = data_start;
 
-	/*
-	 * Addresses of preloaded modules (like file systems) use
-	 * physical addresses. Make sure we relocate those into
-	 * virtual addresses.
-	 */
-	preload_addr_relocate = kernstart - kernload;
-
 	/* Allocate the dynamic per-cpu area. */
 	dpcpu = (void *)data_end;
 	data_end += DPCPU_SIZE;
@@ -4331,6 +4324,21 @@ tid_flush(tlbtid_t tid)
 
 	msr = mfmsr();
 	__asm __volatile("wrteei 0");
+
+	/*
+	 * Newer (e500mc and later) have tlbilx, which doesn't broadcast, so use
+	 * it for PID invalidation.
+	 */
+	switch ((mfpvr() >> 16) & 0xffff) {
+	case FSL_E500mc:
+	case FSL_E5500:
+	case FSL_E6500:
+		mtspr(SPR_MAS6, tid << MAS6_SPID0_SHIFT);
+		/* tlbilxpid */
+		__asm __volatile("isync; .long 0x7c000024; isync; msync");
+		mtmsr(msr);
+		return;
+	}
 
 	for (way = 0; way < TLB0_WAYS; way++)
 		for (entry = 0; entry < TLB0_ENTRIES_PER_WAY; entry++) {

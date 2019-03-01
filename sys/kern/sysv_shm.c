@@ -430,7 +430,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	vm_offset_t attach_va = 0, max_va;
 	vm_prot_t prot;
 	vm_size_t size;
-	int error, findspace, i, rv;
+	int cow, error, find_space, i, rv;
 
 	AUDIT_ARG_SVIPC_ID(shmid);
 	AUDIT_ARG_VALUE(shmflg);
@@ -473,10 +473,10 @@ kern_shmat_locked(struct thread *td, int shmid,
 		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
 #endif
 	prot = VM_PROT_READ;
+	cow = MAP_INHERIT_SHARE | MAP_PREFAULT_PARTIAL;
 	if ((shmflg & SHM_RDONLY) == 0)
 		prot |= VM_PROT_WRITE;
 	if (shmaddr != NULL) {
-		findspace = VMFS_NO_SPACE;
 #ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			if ((shmflg & SHM_RND) != 0)
@@ -498,8 +498,18 @@ kern_shmat_locked(struct thread *td, int shmid,
 			else
 				return (EINVAL);
 		}
+		if ((shmflg & SHM_RND) != 0)
+			attach_va = rounddown2((__cheri_addr vm_offset_t)shmaddr, SHMLBA);
+		else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
+			attach_va = (__cheri_addr vm_offset_t)shmaddr;
+		else
+			return (EINVAL);
 		shmaddr = (const char * __capability)shmaddr -
 		    ((__cheri_addr vm_offset_t)shmaddr - attach_va);
+		if ((shmflg & SHM_REMAP) != 0)
+			cow |= MAP_REMAP;
+		find_space = VMFS_NO_SPACE;
+	} else {
 		/*
 		 * Check that shmaddr (as adjusted for SHM_RND) has
 		 * enough space for a mapping.  For CheriABI this means
@@ -514,7 +524,6 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 */
 		if (!__CAP_CHECK(shmaddr, size))
 			return (EINVAL);
-	} else {
 #ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			/*
@@ -524,7 +533,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			 *
 			 * XXX: 12 should probably be the superpage shift.
 			 */
-			findspace = CHERI_ALIGN_SHIFT(size) < 12 ?
+			find_space = CHERI_ALIGN_SHIFT(size) < 12 ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
 			shmaddr = td->td_md.md_cheri_mmap_cap;
@@ -532,7 +541,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		} else
 #endif
 		{
-			findspace = VMFS_OPTIMAL_SPACE;
+			find_space = VMFS_OPTIMAL_SPACE;
 			/*
 			 * This is just a hint to vm_map_find() about where to
 			 * put it.
@@ -549,8 +558,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 #endif
 	vm_object_reference(shmseg->object);
 	rv = vm_map_find(&p->p_vmspace->vm_map, shmseg->object, 0, &attach_va,
-	    size, max_va, findspace,
-	    prot, prot, MAP_INHERIT_SHARE | MAP_PREFAULT_PARTIAL);
+	    size, max_va, find_space, prot, prot, cow);
 	if (rv != KERN_SUCCESS) {
 		vm_object_deallocate(shmseg->object);
 		return (ENOMEM);

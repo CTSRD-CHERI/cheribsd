@@ -45,6 +45,11 @@ __FBSDID("$FreeBSD$");
 #include "be.h"
 #include "be_impl.h"
 
+struct be_destroy_data {
+	libbe_handle_t		*lbh;
+	char			*snapname;
+};
+
 #if SOON
 static int be_create_child_noent(libbe_handle_t *lbh, const char *active,
     const char *child_path);
@@ -90,6 +95,7 @@ be_locate_rootfs(libbe_handle_t *lbh)
 libbe_handle_t *
 libbe_init(const char *root)
 {
+	char altroot[MAXPATHLEN];
 	libbe_handle_t *lbh;
 	char *poolname, *pos;
 	int pnamelen;
@@ -140,6 +146,11 @@ libbe_init(const char *root)
 	    sizeof(lbh->bootfs), NULL, true) != 0)
 		goto err;
 
+	if (zpool_get_prop(lbh->active_phandle, ZPOOL_PROP_ALTROOT,
+	    altroot, sizeof(altroot), NULL, true) == 0 &&
+	    strcmp(altroot, "-") != 0)
+		lbh->altroot_len = strlen(altroot);
+
 	return (lbh);
 err:
 	if (lbh != NULL) {
@@ -180,12 +191,38 @@ be_nicenum(uint64_t num, char *buf, size_t buflen)
 static int
 be_destroy_cb(zfs_handle_t *zfs_hdl, void *data)
 {
+	char path[BE_MAXPATHLEN];
+	struct be_destroy_data *bdd;
+	zfs_handle_t *snap;
 	int err;
 
-	if ((err = zfs_iter_children(zfs_hdl, be_destroy_cb, data)) != 0)
+	bdd = (struct be_destroy_data *)data;
+	if (bdd->snapname == NULL) {
+		err = zfs_iter_children(zfs_hdl, be_destroy_cb, data);
+		if (err != 0)
+			return (err);
+		return (zfs_destroy(zfs_hdl, false));
+	}
+	/* If we're dealing with snapshots instead, delete that one alone */
+	err = zfs_iter_filesystems(zfs_hdl, be_destroy_cb, data);
+	if (err != 0)
 		return (err);
-	if ((err = zfs_destroy(zfs_hdl, false)) != 0)
-		return (err);
+	/*
+	 * This part is intentionally glossing over any potential errors,
+	 * because there's a lot less potential for errors when we're cleaning
+	 * up snapshots rather than a full deep BE.  The primary error case
+	 * here being if the snapshot doesn't exist in the first place, which
+	 * the caller will likely deem insignificant as long as it doesn't
+	 * exist after the call.  Thus, such a missing snapshot shouldn't jam
+	 * up the destruction.
+	 */
+	snprintf(path, sizeof(path), "%s@%s", zfs_get_name(zfs_hdl),
+	    bdd->snapname);
+	if (!zfs_dataset_exists(bdd->lbh->lzh, path, ZFS_TYPE_SNAPSHOT))
+		return (0);
+	snap = zfs_open(bdd->lbh->lzh, path, ZFS_TYPE_SNAPSHOT);
+	if (snap != NULL)
+		zfs_destroy(snap, false);
 	return (0);
 }
 
@@ -193,57 +230,95 @@ be_destroy_cb(zfs_handle_t *zfs_hdl, void *data)
  * Destroy the boot environment or snapshot specified by the name
  * parameter. Options are or'd together with the possible values:
  * BE_DESTROY_FORCE : forces operation on mounted datasets
+ * BE_DESTROY_ORIGIN: destroy the origin snapshot as well
  */
 int
 be_destroy(libbe_handle_t *lbh, const char *name, int options)
 {
+	struct be_destroy_data bdd;
+	char origin[BE_MAXPATHLEN], path[BE_MAXPATHLEN];
 	zfs_handle_t *fs;
-	char path[BE_MAXPATHLEN];
-	char *p;
+	char *snapdelim;
 	int err, force, mounted;
+	size_t rootlen;
 
-	p = path;
+	bdd.lbh = lbh;
+	bdd.snapname = NULL;
 	force = options & BE_DESTROY_FORCE;
+	*origin = '\0';
 
 	be_root_concat(lbh, name, path);
 
-	if (strchr(name, '@') == NULL) {
+	if ((snapdelim = strchr(path, '@')) == NULL) {
 		if (!zfs_dataset_exists(lbh->lzh, path, ZFS_TYPE_FILESYSTEM))
 			return (set_error(lbh, BE_ERR_NOENT));
 
-		if (strcmp(path, lbh->rootfs) == 0)
+		if (strcmp(path, lbh->rootfs) == 0 ||
+		    strcmp(path, lbh->bootfs) == 0)
 			return (set_error(lbh, BE_ERR_DESTROYACT));
 
-		fs = zfs_open(lbh->lzh, p, ZFS_TYPE_FILESYSTEM);
-	} else {
+		fs = zfs_open(lbh->lzh, path, ZFS_TYPE_FILESYSTEM);
+		if (fs == NULL)
+			return (set_error(lbh, BE_ERR_ZFSOPEN));
 
+		if ((options & BE_DESTROY_ORIGIN) != 0 &&
+		    zfs_prop_get(fs, ZFS_PROP_ORIGIN, origin, sizeof(origin),
+		    NULL, NULL, 0, 1) != 0)
+			return (set_error(lbh, BE_ERR_NOORIGIN));
+	} else {
 		if (!zfs_dataset_exists(lbh->lzh, path, ZFS_TYPE_SNAPSHOT))
 			return (set_error(lbh, BE_ERR_NOENT));
 
-		fs = zfs_open(lbh->lzh, p, ZFS_TYPE_SNAPSHOT);
+		bdd.snapname = strdup(snapdelim + 1);
+		if (bdd.snapname == NULL)
+			return (set_error(lbh, BE_ERR_NOMEM));
+		*snapdelim = '\0';
+		fs = zfs_open(lbh->lzh, path, ZFS_TYPE_DATASET);
+		if (fs == NULL) {
+			free(bdd.snapname);
+			return (set_error(lbh, BE_ERR_ZFSOPEN));
+		}
 	}
-
-	if (fs == NULL)
-		return (set_error(lbh, BE_ERR_ZFSOPEN));
 
 	/* Check if mounted, unmount if force is specified */
 	if ((mounted = zfs_is_mounted(fs, NULL)) != 0) {
-		if (force)
+		if (force) {
 			zfs_unmount(fs, NULL, 0);
-		else
+		} else {
+			free(bdd.snapname);
 			return (set_error(lbh, BE_ERR_DESTROYMNT));
+		}
 	}
 
-	if ((err = be_destroy_cb(fs, NULL)) != 0) {
+	err = be_destroy_cb(fs, &bdd);
+	zfs_close(fs);
+	free(bdd.snapname);
+	if (err != 0) {
 		/* Children are still present or the mount is referenced */
 		if (err == EBUSY)
 			return (set_error(lbh, BE_ERR_DESTROYMNT));
 		return (set_error(lbh, BE_ERR_UNKNOWN));
 	}
 
-	return (0);
-}
+	if ((options & BE_DESTROY_ORIGIN) == 0)
+		return (0);
 
+	/* The origin can't possibly be shorter than the BE root */
+	rootlen = strlen(lbh->root);
+	if (*origin == '\0' || strlen(origin) <= rootlen + 1)
+		return (set_error(lbh, BE_ERR_INVORIGIN));
+
+	/*
+	 * We'll be chopping off the BE root and running this back through
+	 * be_destroy, so that we properly handle the origin snapshot whether
+	 * it be that of a deep BE or not.
+	 */
+	if (strncmp(origin, lbh->root, rootlen) != 0 || origin[rootlen] != '/')
+		return (0);
+
+	return (be_destroy(lbh, origin + rootlen + 1,
+	    options & ~BE_DESTROY_ORIGIN));
+}
 
 int
 be_snapshot(libbe_handle_t *lbh, const char *source, const char *snap_name,
@@ -313,7 +388,6 @@ be_create(libbe_handle_t *lbh, const char *name)
 	return (set_error(lbh, err));
 }
 
-
 static int
 be_deep_clone_prop(int prop, void *cb)
 {
@@ -344,12 +418,9 @@ be_deep_clone_prop(int prop, void *cb)
 
 	/* Augment mountpoint with altroot, if needed */
 	val = pval;
-	if (prop == ZFS_PROP_MOUNTPOINT && *dccb->altroot != '\0') {
-		if (pval[strlen(dccb->altroot)] == '\0')
-			strlcpy(pval, "/", sizeof(pval));
-		else
-			val = pval + strlen(dccb->altroot);
-	}
+	if (prop == ZFS_PROP_MOUNTPOINT)
+		val = be_mountpoint_augmented(dccb->lbh, val);
+
 	nvlist_add_string(dccb->props, zfs_prop_to_name(prop), val);
 
 	return (ZPROP_CONT);
@@ -391,12 +462,9 @@ be_deep_clone(zfs_handle_t *ds, void *data)
 	nvlist_alloc(&props, NV_UNIQUE_NAME, KM_SLEEP);
 	nvlist_add_string(props, "canmount", "noauto");
 
+	dccb.lbh = isdc->lbh;
 	dccb.zhp = ds;
 	dccb.props = props;
-	if (zpool_get_prop(isdc->lbh->active_phandle, ZPOOL_PROP_ALTROOT,
-	    dccb.altroot, sizeof(dccb.altroot), NULL, true) != 0 ||
-	    strcmp(dccb.altroot, "-") == 0)
-		*dccb.altroot = '\0';
 	if (zprop_iter(be_deep_clone_prop, &dccb, B_FALSE, B_FALSE,
 	    ZFS_TYPE_FILESYSTEM) == ZPROP_INVAL)
 		return (-1);
@@ -649,32 +717,14 @@ int
 be_import(libbe_handle_t *lbh, const char *bootenv, int fd)
 {
 	char buf[BE_MAXPATHLEN];
-	time_t rawtime;
 	nvlist_t *props;
 	zfs_handle_t *zfs;
-	int err, len;
-	char nbuf[24];
+	recvflags_t flags = { .nomount = 1 };
+	int err;
 
-	/*
-	 * We don't need this to be incredibly random, just unique enough that
-	 * it won't conflict with an existing dataset name.  Chopping time
-	 * down to 32 bits is probably good enough for this.
-	 */
-	snprintf(nbuf, 24, "tmp%u",
-	    (uint32_t)(time(NULL) & 0xFFFFFFFF));
-	if ((err = be_root_concat(lbh, nbuf, buf)) != 0)
-		/*
-		 * Technically this is our problem, but we try to use short
-		 * enough names that we won't run into problems except in
-		 * worst-case BE root approaching MAXPATHLEN.
-		 */
-		return (set_error(lbh, BE_ERR_PATHLEN));
+	be_root_concat(lbh, bootenv, buf);
 
-	time(&rawtime);
-	len = strlen(buf);
-	strftime(buf + len, sizeof(buf) - len, "@%F-%T", localtime(&rawtime));
-
-	if ((err = lzc_receive(buf, NULL, NULL, false, fd)) != 0) {
+	if ((err = zfs_receive(lbh->lzh, buf, NULL, &flags, fd, NULL)) != 0) {
 		switch (err) {
 		case EINVAL:
 			return (set_error(lbh, BE_ERR_NOORIGIN));
@@ -687,39 +737,22 @@ be_import(libbe_handle_t *lbh, const char *bootenv, int fd)
 		}
 	}
 
-	if ((zfs = zfs_open(lbh->lzh, buf, ZFS_TYPE_SNAPSHOT)) == NULL)
+	if ((zfs = zfs_open(lbh->lzh, buf, ZFS_TYPE_FILESYSTEM)) == NULL)
 		return (set_error(lbh, BE_ERR_ZFSOPEN));
 
 	nvlist_alloc(&props, NV_UNIQUE_NAME, KM_SLEEP);
 	nvlist_add_string(props, "canmount", "noauto");
 	nvlist_add_string(props, "mountpoint", "/");
 
-	be_root_concat(lbh, bootenv, buf);
-
-	err = zfs_clone(zfs, buf, props);
-	zfs_close(zfs);
+	err = zfs_prop_set_list(zfs, props);
 	nvlist_free(props);
 
-	if (err != 0)
-		return (set_error(lbh, BE_ERR_UNKNOWN));
-
-	/*
-	 * Finally, we open up the dataset we just cloned the snapshot so that
-	 * we may promote it.  This is necessary in order to clean up the ghost
-	 * snapshot that doesn't need to be seen after the operation is
-	 * complete.
-	 */
-	if ((zfs = zfs_open(lbh->lzh, buf, ZFS_TYPE_DATASET)) == NULL)
-		return (set_error(lbh, BE_ERR_ZFSOPEN));
-
-	err = zfs_promote(zfs);
 	zfs_close(zfs);
 
 	if (err != 0)
 		return (set_error(lbh, BE_ERR_UNKNOWN));
 
-	/* Clean up the temporary snapshot */
-	return (be_destroy(lbh, nbuf, 0));
+	return (0);
 }
 
 #if SOON

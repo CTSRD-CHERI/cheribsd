@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2018 Eugene Grosbein <eugen@FreeBSD.org>.
+ * Copyright (c) 2019 Eugene Grosbein <eugen@FreeBSD.org>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -133,7 +133,7 @@ opendev(const char *path, int flags)
 	}
 
 	if (fd < 0)
-		err(EX_NOINPUT, "fstat failed: %s", path);
+		err(EX_NOINPUT, "open failed: %s", path);
 
 	return (fd);
 }

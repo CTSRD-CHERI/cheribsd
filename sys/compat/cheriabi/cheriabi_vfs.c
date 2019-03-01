@@ -689,14 +689,49 @@ int
 cheriabi_lgetfh(struct thread *td, struct cheriabi_lgetfh_args *uap)
 {
 
-	return (kern_getfh(td, uap->fname, uap->fhp, NOFOLLOW));
+	return (kern_getfhat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD, uap->fname,
+	    UIO_USERSPACE, uap->fhp));
 }
 
 int
 cheriabi_getfh(struct thread *td, struct cheriabi_getfh_args *uap)
 {
 
-	return (kern_getfh(td, uap->fname, uap->fhp, FOLLOW));
+	return (kern_getfhat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD, uap->fname,
+	    UIO_USERSPACE, uap->fhp));
+}
+
+int
+cheriabi_getfhat(struct thread *td, struct cheriabi_getfhat_args *uap)
+{
+
+	if ((uap->flags & ~(AT_SYMLINK_NOFOLLOW | AT_BENEATH)) != 0)
+		return (EINVAL);
+	return (kern_getfhat(td, uap->flags, uap->fd, uap->path,
+	    UIO_SYSSPACE, uap->fhp));
+}
+
+int
+cheriabi_fhlink(struct thread *td, struct cheriabi_fhlink_args *uap)
+{
+
+	return (kern_fhlinkat(td, AT_FDCWD, uap->to, UIO_USERSPACE,
+	    uap->fhp));
+}
+
+int
+cheriabi_fhlinkat(struct thread *td, struct cheriabi_fhlinkat_args *uap)
+{
+
+	return (kern_fhlinkat(td, uap->tofd, uap->to, UIO_USERSPACE,
+	    uap->fhp));
+}
+
+int
+cheriabi_fhreadlink(struct thread *td, struct cheriabi_fhreadlink_args *uap)
+{
+
+	return (kern_fhreadlink(td, uap->fhp, uap->buf, uap->bufsize));
 }
 
 int

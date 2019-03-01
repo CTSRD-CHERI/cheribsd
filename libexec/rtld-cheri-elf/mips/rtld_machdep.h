@@ -38,6 +38,7 @@
 /* Don't pull this in when building libthr */
 #include "debug.h"
 #else
+#include <assert.h>
 #define dbg_assert(cond) assert(cond)
 #define dbg(...)
 #endif

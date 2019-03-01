@@ -96,14 +96,14 @@ CTASSERT(LK_UNLOCKED == (LK_UNLOCKED &
 	int _i = 0;							\
 	WITNESS_SAVE_DECL(Giant)
 #define	GIANT_RESTORE() do {						\
-	if (_i > 0) {							\
+	if (__predict_false(_i > 0)) {					\
 		while (_i--)						\
 			mtx_lock(&Giant);				\
 		WITNESS_RESTORE(&Giant.lock_object, Giant);		\
 	}								\
 } while (0)
 #define	GIANT_SAVE() do {						\
-	if (mtx_owned(&Giant)) {					\
+	if (__predict_false(mtx_owned(&Giant))) {			\
 		WITNESS_SAVE(&Giant.lock_object, Giant);		\
 		while (mtx_owned(&Giant)) {				\
 			_i++;						\
@@ -450,6 +450,8 @@ lockinit(struct lock *lk, int pri, const char *wmesg, int timo, int flags)
 		iflags |= LO_QUIET;
 	if (flags & LK_IS_VNODE)
 		iflags |= LO_IS_VNODE;
+	if (flags & LK_NEW)
+		iflags |= LO_NEW;
 	iflags |= flags & (LK_ADAPTIVE | LK_NOSHARE);
 
 	lock_init(&lk->lock_object, &lock_class_lockmgr, wmesg, NULL, iflags);

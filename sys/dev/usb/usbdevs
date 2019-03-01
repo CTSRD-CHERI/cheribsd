@@ -140,6 +140,7 @@ vendor SANYO		0x0474	Sanyo Electric
 vendor SEAGATE		0x0477	Seagate
 vendor CONNECTIX	0x0478	Connectix
 vendor SEMTECH		0x047a	Semtech
+vendor DELL2		0x047c	Dell
 vendor KENSINGTON	0x047d	Kensington
 vendor LUCENT		0x047e	Lucent
 vendor PLANTRONICS	0x047f	Plantronics
@@ -498,6 +499,7 @@ vendor ASAHIOPTICAL	0x0a17	Asahi Optical
 vendor BOCASYSTEMS	0x0a43	Boca Systems
 vendor SHANTOU		0x0a46	ShanTou
 vendor MEDIAGEAR	0x0a48	MediaGear
+vendor PLOYTEC		0x0a4a	Ploytec GmbH
 vendor BROADCOM		0x0a5c	Broadcom
 vendor GREENHOUSE	0x0a6b	GREENHOUSE
 vendor MEDELI		0x0a67	Medeli
@@ -553,6 +555,7 @@ vendor ACDC		0x0d7e	American Computer & Digital Components
 vendor CMEDIA		0x0d8c	CMEDIA
 vendor CONCEPTRONIC	0x0d8e	Conceptronic
 vendor SKANHEX		0x0d96	Skanhex Technology, Inc.
+vendor POWERCOM		0x0d9f	PowerCOM
 vendor MSI		0x0db0	Micro Star International
 vendor ELCON		0x0db7	ELCON Systemtechnik
 vendor UNKNOWN4		0x0dcd	Unknown vendor
@@ -560,6 +563,7 @@ vendor NETAC		0x0dd8	Netac
 vendor SITECOMEU	0x0df6	Sitecom Europe
 vendor MOBILEACTION	0x0df7	Mobile Action
 vendor AMIGO		0x0e0b	Amigo Technology
+vendor SMART2		0x0e39	Smart Modular Technologies
 vendor SPEEDDRAGON	0x0e55	Speed Dragon Multimedia
 vendor HAWKING		0x0e66	Hawking
 vendor FOSSIL		0x0e67	Fossil, Inc
@@ -763,7 +767,6 @@ vendor SIMTEC		0x20df	Simtec Electronics
 vendor TRENDNET		0x20f4  TRENDnet
 vendor RTSYSTEMS	0x2100	RT Systems
 vendor DLINK4		0x2101	D-Link
-vendor INTENSO		0x2109	INTENSO
 vendor VIALABS		0x2109	VIA Labs
 vendor ERICSSON		0x2282	Ericsson
 vendor MOTOROLA2	0x22b8	Motorola
@@ -1364,8 +1367,16 @@ product BELKIN USB2LAN		0x0121	USB to LAN
 product BELKIN F5U208		0x0208	F5U208 VideoBus II
 product BELKIN F5U237		0x0237	F5U237 USB 2.0 7-Port Hub
 product BELKIN F5U257		0x0257	F5U257 Serial
+product BELKIN F6H375USB	0x0375	F6H375-USB
 product BELKIN F5U409		0x0409	F5U409 Serial
 product BELKIN F6C550AVR	0x0551	F6C550-AVR UPS
+product BELKIN F6C1250TWRK	0x0750	F6C1250-TW-RK
+product BELKIN F6C1500TWRK	0x0751	F6C1500-TW-RK
+product BELKIN F6C900UNV	0x0900	F6C900-UNV
+product BELKIN F6C100UNV	0x0910	F6C100-UNV
+product BELKIN F6C120UNV	0x0912	F6C120-UNV UPS
+product BELKIN F6C800UNV	0x0980	F6C800-UNV
+product BELKIN F6C1100UNV	0x1100	F6C1100-UNV, F6C1200-UNV
 product BELKIN F5U120		0x1203	F5U120-PC Hub
 product BELKIN RTL8188CU	0x1102  RTL8188CU Wireless Adapter
 product BELKIN F9L1103		0x1103	F9L1103 Wireless Adapter
@@ -1569,9 +1580,11 @@ product COREGA FETHER_USB_TXC	0x9601	FEther USB-TXC
 
 /* Corsair products */
 product CORSAIR K60		0x0a60	Corsair Vengeance K60 keyboard
+product CORSAIR K68		0x1b3f	Corsair Gaming K68 keyboard
 product CORSAIR K70		0x1b09	Corsair Vengeance K70 keyboard
 product CORSAIR K70_RGB		0x1b13	Corsair K70 RGB Keyboard
-product CORSAIR STRAFE		0x1b15	Cossair STRAFE Gaming keyboard
+product CORSAIR STRAFE		0x1b15	Corsair STRAFE Gaming keyboard
+product CORSAIR STRAFE2		0x1b44	Corsair STRAFE Gaming keyboard
 
 /* Creative products */
 product CREATIVE NOMAD_II	0x1002	Nomad II MP3 player
@@ -1599,7 +1612,9 @@ product CURITEL UM150		0x3711	EVDO modem
 product CURITEL UM175		0x3714	EVDO modem
 
 /* CyberPower products */
-product CYBERPOWER 1500CAVRLCD	0x0501	1500CAVRLCD
+product CYBERPOWER BC900D		0x0005	900AVR/BC900D, CP1200AVR/BC1200D
+product CYBERPOWER 1500CAVRLCD		0x0501	1500CAVRLCD
+product CYBERPOWER OR2200LCDRM2U	0x0601	OR2200LCDRM2U
 
 /* CyberTAN Technology products */
 product CYBERTAN TG54USB	0x1666	TG54USB
@@ -1651,6 +1666,7 @@ product DELL U5730		0x8180	Dell 5730 3G
 product DELL U5730_2		0x8181	Dell 5730 3G
 product DELL U5730_3		0x8182	Dell 5730 3G
 product DELL DW700		0x9500	Dell DW700 GPS
+product DELL2 VARIOUS_UPS	0xffff	Various UPS Models
 
 /* Delorme Paublishing products */
 product DELORME EARTHMATE	0x0100	Earthmate GPS
@@ -2399,6 +2415,8 @@ product HP 930C			0x1204	DeskJet 930c
 product HP3 RTL8188CU		0x1629	RTL8188CU
 product HP P2000U		0x1801	Inkjet P-2000U
 product HP HS2300		0x1e1d  HS2300 HSDPA (aka MC8775)
+product HP T500			0x1f01	T500
+product HP T750			0x1f02	T750
 product HP 640C			0x2004	DeskJet 640c
 product HP 4670V		0x3005	ScanJet 4670v
 product HP P1100		0x3102	Photosmart P1100
@@ -2553,9 +2571,6 @@ product INSYSTEM ISD105		0x0202	IDE Adapter ISD105
 product INSYSTEM USBCABLE	0x081a	USB cable
 product INSYSTEM STORAGE_V2	0x5701	USB Storage Adapter V2
 
-/* Intenso products */
-product INTENSO MEMORY_BOX	0x0701	External disk
-
 /* Intel products */
 product INTEL EASYPC_CAMERA	0x0110	Easy PC Camera
 product INTEL TESTBOARD		0x9890	82930 test board
@@ -2629,6 +2644,7 @@ product JATON EDA		0x5704	Ethernet
 product JETI SPC1201		0x04b2	FTDI compatible adapter
 
 /* JMicron products */
+product JMICRON JMS566		0x3569	USB to SATA 3.0Gb/s bridge 
 product JMICRON JMS567		0x0567	USB to SATA 6.0Gb/s bridge 
 product JMICRON JM20336		0x2336	USB to SATA Bridge
 product JMICRON JM20337		0x2338	USB to ATA/ATAPI Bridge
@@ -2762,6 +2778,7 @@ product LEADTEK 9531		0x2101	9531 GPS
 product LENOVO GIGALAN		0x304b	USB 3.0 Ethernet
 product LENOVO ETHERNET		0x7203	USB 2.0 Ethernet
 product LENOVO RTL8153		0x7205	USB 3.0 Ethernet
+product LENOVO ONELINK		0x720a	USB 3.0 Ethernet
 product LENOVO TBT3LAN		0x3069	LAN port in Thinkpad TB3 dock
 product LENOVO USBCLAN		0x3062	LAN port in Thinkpad USB-C dock
 
@@ -2775,6 +2792,7 @@ product LEXMARK S2450		0x0009	Optra S 2450
 
 /* Liebert products */
 product LIEBERT POWERSURE_PXT	0xffff	PowerSure Personal XT
+product LIEBERT2 POWERSURE_PSA	0x0001	PowerSure PSA UPS
 product LIEBERT2 PSI1000	0x0004	UPS PSI 1000 FW:08
 
 /* Link Instruments Inc. products */
@@ -2824,6 +2842,7 @@ product LOGITECH UN58A		0xc030	iFeel Mouse
 product LOGITECH UN53B		0xc032	iFeel MouseMan
 product LOGITECH WMPAD		0xc208	WingMan GamePad Extreme
 product LOGITECH WMRPAD		0xc20a	WingMan RumblePad
+product LOGITECH G510S		0xc22d  G510s Keyboard
 product LOGITECH WMJOY		0xc281	WingMan Force joystick
 product LOGITECH BB13		0xc401	USB-PS/2 Trackball
 product LOGITECH RK53		0xc501	Cordless mouse
@@ -3693,9 +3712,19 @@ product PLANEX2 GWUSNANO	0xab28	GW-USNano
 /* Plextor Corp. */
 product PLEXTOR 40_12_40U	0x0011	PlexWriter 40/12/40U
 
+/* Ploytec GmbH */
+product PLOYTEC SPL_CRIMSON_1	0xc150	SPL Crimson Revision 1
+
 /* PLX products */
 product PLX TESTBOARD		0x9060	test board
 product PLX CA42		0xac70	CA-42
+
+/* PowerCOM products */
+product POWERCOM IMPERIAL_SERIES	0x00a2	IMPERIAL Series
+product POWERCOM SMART_KING_PRO		0x00a3	Smart KING Pro
+product POWERCOM WOW			0x00a4	WOW
+product POWERCOM VANGUARD		0x00a5	Vanguard
+product POWERCOM BLACK_KNIGHT_PRO	0x00a6	Black Knight Pro
 
 /* PNY products */
 product PNY ATTACHE2		0x0010	USB 2.0 Flash Drive
@@ -3923,6 +3952,7 @@ product REALTEK DUMMY		0x0000	Dummy product
 product REALTEK USB20CRW	0x0158	USB20CRW Card Reader
 product REALTEK RTL8188ETV	0x0179	RTL8188ETV
 product REALTEK RTL8188CTV      0x018a  RTL8188CTV
+product REALTEK RTL8821AU_2	0x0811	RTL8821AU
 product REALTEK RTL8188RU_2	0x317f	RTL8188RU
 product REALTEK USBKR100	0x8150	USBKR100 USB Ethernet
 product REALTEK RTL8152		0x8152	RTL8152 USB Ethernet
@@ -3953,6 +3983,7 @@ product REALTEK RTL8187B_2	0x8198	RTL8187B Wireless Adapter
 product REALTEK RTL8712		0x8712	RTL8712
 product REALTEK RTL8713		0x8713	RTL8713
 product REALTEK RTL8188CU_COMBO	0x8754	RTL8188CU
+product REALTEK RTL8821AU_1	0xa811	RTL8821AU
 product REALTEK RTL8723BU	0xb720	RTL8723BU
 product REALTEK RTL8192SU	0xc512	RTL8192SU
 product REALTEK RTL8812AU	0x8812  RTL8812AU Wireless Adapter
@@ -3994,6 +4025,8 @@ product ROLAND SD20		0x0027	SD-20 MIDI Synth
 product ROLAND SD80		0x0029	SD-80 MIDI Synth
 product ROLAND UA700		0x002b	UA-700 Audio I/F
 product ROLAND PCR300		0x0033  EDIROL PCR-300 MIDI I/F
+product ROLAND UA25EX_AD	0x00e6  EDIROL UA-25EX (Advanced Driver)
+product ROLAND UA25EX_CC	0x00e7  EDIROL UA-25EX (Class Compliant)
 
 /* Rockfire products */
 product ROCKFIRE GAMEPAD	0x2033	gamepad 203USB
@@ -4346,6 +4379,7 @@ product SITECOMEU RT3072_4	0x0048	RT3072
 product SITECOMEU RT3072_5	0x004a	RT3072
 product SITECOMEU WL349V1	0x004b	WL-349 v1
 product SITECOMEU RT3072_6	0x004d	RT3072
+product SITECOMEU WLA1000	0x005b	WLA-1000
 product SITECOMEU RTL8188CU_1	0x0052	RTL8188CU
 product SITECOMEU RTL8188CU_2	0x005c	RTL8188CU
 product SITECOMEU RTL8192CU	0x0061	RTL8192CU
@@ -4364,6 +4398,9 @@ product SKANHEX SX_520Z		0x5200	SX 520z Camera
 
 /* Smart Technologies products */
 product SMART PL2303		0x2303	Serial adapter
+
+/* Smart Modular Technologies products */
+product SMART2 G2MEMKEY		0x1700	G2 Memory Key
 
 /* SmartBridges products */
 product SMARTBRIDGES SMARTLINK	0x0001	SmartLink USB Ethernet
@@ -4609,9 +4646,12 @@ product TOSHIBA TRANSMEMORY	0x6545	USB ThumbDrive
 
 /* TP-Link products */
 product TPLINK T4U		0x0101	Archer T4U
+product TPLINK WN821NV5		0x0107	TL-WN821N v5
 product TPLINK WN822NV4		0x0108	TL-WN822N v4
 product TPLINK WN823NV2		0x0109	TL-WN823N v2
+product TPLINK WN722NV2		0x010c	TL-WN722N v2
 product TPLINK T4UV2		0x010d	Archer T4U ver 2
+product TPLINK T4UHV1		0x0103	Archer T4UH ver 1
 product TPLINK T4UHV2		0x010e	Archer T4UH ver 2
 product TPLINK RTL8153		0x0601	RTL8153 USB 10/100/1000 LAN
 
@@ -4627,7 +4667,20 @@ product TRENDNET RTL8188CU	0x648b	RTL8188CU
 product TRENDNET TEW805UB	0x805b	TEW-805UB
 
 /* Tripp-Lite products */
-product TRIPPLITE U209		0x2008	Serial
+product TRIPPLITE U209			0x2008	Serial
+product TRIPPLITE2 OMNIVS1000		0x0001	OMNIVS1000, SMART550USB
+product TRIPPLITE2 AVR550U		0x1003	AVR550U
+product TRIPPLITE2 AVR750U		0x1007	AVR750U
+product TRIPPLITE2 ECO550UPS		0x1008	ECO550UPS
+product TRIPPLITE2 T750_INTL		0x1f06	T750 INTL
+product TRIPPLITE2 RT_2200_INTL		0x1f0a	R/T 2200 INTL
+product TRIPPLITE2 OMNI1000LCD		0x2005	OMNI1000LCD
+product TRIPPLITE2 OMNI900LCD		0x2007	OMNI900LCD
+product TRIPPLITE2 SMART_2200RMXL2U	0x3012	smart2200RMXL2U
+product TRIPPLITE2 UPS_3014		0x3014	Unknown UPS
+product TRIPPLITE2 SU1500RTXL2UA	0x4001	SmartOnline SU1500RTXL2UA
+product TRIPPLITE2 SU6000RT4U		0x4002	SmartOnline SU6000RT4U
+product TRIPPLITE2 SU1500RTXL2UA_2	0x4003	SmartOnline SU1500RTXL2UA
 
 /* Trumpion products */
 product TRUMPION T33520		0x1001	T33520 USB Flash Card Controller
@@ -4681,6 +4734,7 @@ product VIA USB2IDEBRIDGE	0x6204	USB 2.0 IDE Bridge
 
 /* VIA Labs */
 product VIALABS USB30SATABRIDGE	0x0700	USB 3.0 SATA Bridge
+product VIALABS VL701		0x0701	VL701 USB 3.0 SATA Bridge
 
 /* Vaisala products */
 product VAISALA CABLE		0x0200	USB Interface cable

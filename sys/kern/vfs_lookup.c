@@ -416,6 +416,7 @@ namei(struct nameidata *ndp)
 	dp = NULL;
 	cnp->cn_nameptr = cnp->cn_pnbuf;
 	if (cnp->cn_pnbuf[0] == '/') {
+		ndp->ni_resflags |= NIRES_ABS;
 		error = namei_handle_root(ndp, &dp);
 	} else {
 		if (ndp->ni_startdir != NULL) {
@@ -1318,12 +1319,13 @@ NDINIT_ALL_C(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg
 	ndp->ni_dirp = namep;
 	ndp->ni_dirfd = dirfd;
 	ndp->ni_startdir = startdir;
+	ndp->ni_resflags = 0;
+	filecaps_init(&ndp->ni_filecaps);
+	ndp->ni_cnd.cn_thread = td;
 	if (rightsp != NULL)
 		ndp->ni_rightsneeded = *rightsp;
 	else
 		cap_rights_init(&ndp->ni_rightsneeded);
-	filecaps_init(&ndp->ni_filecaps);
-	ndp->ni_cnd.cn_thread = td;
 }
 
 /*

@@ -378,4 +378,8 @@ MIASM =  \
 	cheriabi_cpuset_getdomain.o \
 	cheriabi_cpuset_setdomain.o \
 	cheriabi_getrandom.o \
-	cheriabi_coexecve.o
+	cheriabi_getfhat.o \
+	cheriabi_coexecve.o \
+	cheriabi_fhlink.o \
+	cheriabi_fhlinkat.o \
+	cheriabi_fhreadlink.o

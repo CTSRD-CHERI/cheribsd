@@ -302,6 +302,8 @@ END(memcmp)
 
 	ALIGN_TEXT
 1256:
+	testb	$15,%dil
+	jnz	100f
 .if \erms == 1
 	rep
 	movsb
@@ -309,6 +311,34 @@ END(memcmp)
 	shrq	$3,%rcx                         /* copy by 64-bit words */
 	rep
 	movsq
+	movq	%rdx,%rcx
+	andl	$7,%ecx                         /* any bytes left? */
+	jne	100408b
+.endif
+	\end
+	ret
+100:
+	movq	(%rsi),%r8
+	movq	8(%rsi),%r9
+	movq	%rdi,%r10
+	movq	%rdi,%rcx
+	andq	$15,%rcx
+	leaq	-16(%rdx,%rcx),%rdx
+	neg	%rcx
+	leaq	16(%rdi,%rcx),%rdi
+	leaq	16(%rsi,%rcx),%rsi
+	movq	%rdx,%rcx
+.if \erms == 1
+	rep
+	movsb
+	movq	%r8,(%r10)
+	movq	%r9,8(%r10)
+.else
+	shrq	$3,%rcx                         /* copy by 64-bit words */
+	rep
+	movsq
+	movq	%r8,(%r10)
+	movq	%r9,8(%r10)
 	movq	%rdx,%rcx
 	andl	$7,%ecx                         /* any bytes left? */
 	jne	100408b
@@ -1125,7 +1155,6 @@ ENTRY(suword16_nosmap)
 
 	movw	%si,(%rdi)
 	xorl	%eax,%eax
-	movq	PCPU(CURPCB),%rcx		/* restore trashed register */
 	movq	%rax,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret
@@ -1144,7 +1173,6 @@ ENTRY(suword16_smap)
 	movw	%si,(%rdi)
 	clac
 	xorl	%eax,%eax
-	movq	PCPU(CURPCB),%rcx		/* restore trashed register */
 	movq	%rax,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret
@@ -1162,7 +1190,6 @@ ENTRY(subyte_nosmap)
 	movl	%esi,%eax
 	movb	%al,(%rdi)
 	xorl	%eax,%eax
-	movq	PCPU(CURPCB),%rcx		/* restore trashed register */
 	movq	%rax,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret
@@ -1182,7 +1209,6 @@ ENTRY(subyte_smap)
 	movb	%al,(%rdi)
 	clac
 	xorl	%eax,%eax
-	movq	PCPU(CURPCB),%rcx		/* restore trashed register */
 	movq	%rax,PCB_ONFAULT(%rcx)
 	POP_FRAME_POINTER
 	ret

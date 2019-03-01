@@ -83,15 +83,6 @@ bool	opt_utrace = false;
 bool	opt_xmalloc = false;
 bool	opt_zero = false;
 unsigned	opt_narenas = 0;
-
-bool		opt_cheri_setbounds =
-#if defined(JEMALLOC_NO_PTR_BOUNDS)
-    false
-#else
-    true
-#endif
-    ;
-
 unsigned	ncpus;
 
 /* Protects arenas initialization. */
@@ -210,7 +201,7 @@ typedef struct {
 #define	BOUND_PTR(ptr, size)	(ptr)
 #else
 #define	BOUND_PTR(ptr, size)	\
-    ((opt_cheri_setbounds && ptr != NULL) ? \
+    ((config_cheri_setbounds && ptr != NULL) ? \
     cheri_andperm(cheri_csetbounds((ptr), (size)), \
 	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP) : \
     (ptr))
@@ -1226,10 +1217,6 @@ malloc_conf_init(void) {
 				CONF_HANDLE_BOOL(opt_prof_final, "prof_final")
 				CONF_HANDLE_BOOL(opt_prof_leak, "prof_leak")
 			}
-#ifdef __CHERI_PURE_CAPABILITY__
-			CONF_HANDLE_BOOL(opt_cheri_setbounds,
-			    "cheri_setbounds");
-#endif
 			if (config_log) {
 				if (CONF_MATCH("log")) {
 					size_t cpylen = (
@@ -2056,7 +2043,6 @@ imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 /*
  * Begin malloc(3)-compatible functions.
  */
-
 JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
 void JEMALLOC_NOTHROW *
 JEMALLOC_ATTR(malloc) JEMALLOC_ALLOC_SIZE(1)
@@ -2066,6 +2052,9 @@ je_malloc(size_t size) {
 	dynamic_opts_t dopts;
 
 	LOG("core.malloc.entry", "size: %zu", size);
+#ifndef JEMALLOC_DEBUG
+	assert(false && "assertions should only be enabled if JEMALLOC_DEBUG is set");
+#endif
 
 	static_opts_init(&sopts);
 	dynamic_opts_init(&dopts);
@@ -3192,7 +3181,7 @@ je_malloc_usable_size(JEMALLOC_USABLE_SIZE_CONST void *ptr) {
 			ret = isalloc(tsdn, ptr);
 		}
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (opt_cheri_setbounds && ret != 0) {
+		if (config_cheri_setbounds && ret != 0) {
 			ret = MIN(ret, cheri_getlen(ptr));
 		}
 #endif
@@ -3231,7 +3220,7 @@ je_allocm(void **ptr, size_t *rsize, size_t size, int flags) {
 	if (rsize != NULL) {
 		*rsize = isalloc(tsdn_fetch(), p);
 	}
-	*ptr = BOUND_PTR(p, isalloc(tsdn_fetch(), p));
+	*ptr = BOUND_PTR(p, size);
 	return ALLOCM_SUCCESS;
 }
 
@@ -3254,7 +3243,7 @@ je_rallocm(void **ptr, size_t *rsize, size_t size, size_t extra, int flags) {
 	} else {
 		void *p = je_rallocx(*ptr, size+extra, flags);
 		if (p != NULL) {
-			*ptr = BOUND_PTR(p, isalloc(tsdn_fetch(), p));
+			*ptr = BOUND_PTR(p, size+extra);
 			ret = ALLOCM_SUCCESS;
 		} else {
 			ret = ALLOCM_ERR_OOM;

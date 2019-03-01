@@ -208,6 +208,13 @@ setup(char *dev)
 		pwarn("USING ALTERNATE SUPERBLOCK AT %jd\n", bflag);
 		bflag = 0;
 	}
+	/* Save copy of things needed by libufs */
+	memcpy(&disk.d_fs, &sblock, sblock.fs_sbsize);
+	disk.d_ufs = (sblock.fs_magic == FS_UFS1_MAGIC) ? 1 : 2;
+	disk.d_bsize = sblock.fs_fsize / fsbtodb(&sblock, 1);
+	disk.d_sblock = sblock.fs_sblockloc / disk.d_bsize;
+	disk.d_sbcsum = sblock.fs_csp;
+
 	if (skipclean && ckclean && sblock.fs_clean) {
 		pwarn("FILE SYSTEM CLEAN; SKIPPING CHECKS\n");
 		return (-1);
@@ -320,7 +327,7 @@ readsb(int listerr)
 	int bad, ret;
 	struct fs *fs;
 
-	super = bflag ? bflag * dev_bsize : -1;
+	super = bflag ? bflag * dev_bsize : STDSB;
 	readcnt[sblk.b_type]++;
 	if ((ret = sbget(fsreadfd, &fs, super)) != 0) {
 		switch (ret) {

@@ -203,6 +203,7 @@ dev/acpica/acpi_pci_link.c	optional acpi pci
 dev/acpica/acpi_pcib.c		optional acpi pci
 dev/acpica/acpi_pcib_acpi.c	optional acpi pci
 dev/acpica/acpi_pcib_pci.c	optional acpi pci
+dev/acpica/acpi_pxm.c		optional	acpi
 dev/acpica/acpi_timer.c		optional	acpi
 dev/acpi_support/acpi_wmi_if.m	standard
 dev/agp/agp_amd64.c		optional	agp
@@ -490,6 +491,9 @@ dev/syscons/scvesactl.c		optional	sc vga vesa
 dev/syscons/scvgarndr.c		optional	sc vga
 dev/syscons/scvtb.c		optional	sc
 dev/tpm/tpm.c			optional	tpm
+dev/tpm/tpm20.c		optional	tpm
+dev/tpm/tpm_crb.c		optional	tpm acpi
+dev/tpm/tpm_tis.c		optional	tpm acpi
 dev/tpm/tpm_acpi.c		optional	tpm acpi
 dev/tpm/tpm_isa.c		optional	tpm isa
 dev/uart/uart_cpu_x86.c		optional	uart

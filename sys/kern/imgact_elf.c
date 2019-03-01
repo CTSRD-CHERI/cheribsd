@@ -139,18 +139,37 @@ SYSCTL_INT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO,
     nxstack, CTLFLAG_RW, &__elfN(nxstack), 0,
     __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE)) ": enable non-executable stack");
 
-#if __ELF_WORD_SIZE == 32
-#if defined(__amd64__)
+#if __ELF_WORD_SIZE == 32 && (defined(__amd64__) || defined(__i386__))
 int i386_read_exec = 0;
 SYSCTL_INT(_kern_elf32, OID_AUTO, read_exec, CTLFLAG_RW, &i386_read_exec, 0,
     "enable execution from readable segments");
 #endif
-#endif
-static unsigned long __elfN(et_dyn_load_addr) = ET_DYN_LOAD_ADDR;
 
+static unsigned long __elfN(et_dyn_load_addr) = ET_DYN_LOAD_ADDR;
 SYSCTL_ULONG(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO,
     dyn_load_addr, CTLFLAG_RW, &__elfN(et_dyn_load_addr), 0,
     __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE)) ": default load address for PIE executables");
+
+SYSCTL_NODE(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO, aslr, CTLFLAG_RW, 0,
+    "");
+#define	ASLR_NODE_OID	__CONCAT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), _aslr)
+
+static int __elfN(aslr_enabled) = 0;
+SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, enable, CTLFLAG_RWTUN,
+    &__elfN(aslr_enabled), 0,
+    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+    ": enable address map randomization");
+
+static int __elfN(pie_aslr_enabled) = 0;
+SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, pie_enable, CTLFLAG_RWTUN,
+    &__elfN(pie_aslr_enabled), 0,
+    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+    ": enable address map randomization for PIE binaries");
+
+static int __elfN(aslr_honor_sbrk) = 1;
+SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, honor_sbrk, CTLFLAG_RW,
+    &__elfN(aslr_honor_sbrk), 0,
+    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE)) ": assume sbrk is used");
 
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
 
@@ -799,6 +818,36 @@ fail:
 	return (error);
 }
 
+static u_long
+__CONCAT(rnd_, __elfN(base))(vm_map_t map __unused, u_long minv, u_long maxv,
+    u_int align)
+{
+	u_long rbase, res;
+
+	MPASS(vm_map_min(map) <= minv);
+	MPASS(maxv <= vm_map_max(map));
+	MPASS(minv < maxv);
+	MPASS(minv + align < maxv);
+	arc4rand(&rbase, sizeof(rbase), 0);
+	res = roundup(minv, (u_long)align) + rbase % (maxv - minv);
+	res &= ~((u_long)align - 1);
+	if (res >= maxv)
+		res -= align;
+	KASSERT(res >= minv,
+	    ("res %#lx < minv %#lx, maxv %#lx rbase %#lx",
+	    res, minv, maxv, rbase));
+	KASSERT(res < maxv,
+	    ("res %#lx > maxv %#lx, minv %#lx rbase %#lx",
+	    res, maxv, minv, rbase));
+	return (res);
+}
+
+/*
+ * Impossible et_dyn_addr initial value indicating that the real base
+ * must be calculated later with some randomization applied.
+ */
+#define	ET_DYN_ADDR_RAND	1
+
 static int
 __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 {
@@ -807,6 +856,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	const Elf_Phdr *phdr;
 	Elf_Auxargs *elf_auxargs;
 	struct vmspace *vmspace;
+	vm_map_t map;
 	const char *err_str, *newinterp;
 	char *interp, *interp_buf, *path;
 	Elf_Brandinfo *brand_info;
@@ -814,6 +864,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	vm_prot_t prot;
 	u_long text_size, data_size, total_size, text_addr, data_addr;
 	u_long seg_size, seg_addr, addr, baddr, et_dyn_addr, entry, proghdr;
+	u_long maxalign, mapsz, maxv, maxv1;
 	uint32_t fctl0;
 	int32_t osrel;
 	int error, i, n, interp_name_len, have_interp;
@@ -857,12 +908,17 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	err_str = newinterp = NULL;
 	interp = interp_buf = NULL;
 	td = curthread;
+	maxalign = PAGE_SIZE;
+	mapsz = 0;
 
 	for (i = 0; i < hdr->e_phnum; i++) {
 		switch (phdr[i].p_type) {
 		case PT_LOAD:
 			if (n == 0)
 				baddr = phdr[i].p_vaddr;
+			if (phdr[i].p_align > maxalign)
+				maxalign = phdr[i].p_align;
+			mapsz += phdr[i].p_memsz;
 			n++;
 			break;
 		case PT_INTERP:
@@ -923,6 +979,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		error = ENOEXEC;
 		goto ret;
 	}
+	sv = brand_info->sysvec;
 	et_dyn_addr = 0;
 	if (hdr->e_type == ET_DYN) {
 		if ((brand_info->flags & BI_CAN_EXEC_DYN) == 0) {
@@ -934,8 +991,17 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		 * Honour the base load address from the dso if it is
 		 * non-zero for some reason.
 		 */
-		if (baddr == 0)
-			et_dyn_addr = __elfN(et_dyn_load_addr);
+		if (baddr == 0) {
+			if ((sv->sv_flags & SV_ASLR) == 0 ||
+			    (fctl0 & NT_FREEBSD_FCTL_ASLR_DISABLE) != 0)
+				et_dyn_addr = __elfN(et_dyn_load_addr);
+			else if ((__elfN(pie_aslr_enabled) &&
+			    (imgp->proc->p_flag2 & P2_ASLR_DISABLE) == 0) ||
+			    (imgp->proc->p_flag2 & P2_ASLR_ENABLE) != 0)
+				et_dyn_addr = ET_DYN_ADDR_RAND;
+			else
+				et_dyn_addr = __elfN(et_dyn_load_addr);
+		}
 
 		/*
 		 * For coexecve(2), adjust the load address to be above
@@ -979,7 +1045,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		error = EINVAL;
 		goto ret;
 	}
-	sv = brand_info->sysvec;
 	if (interp != NULL && brand_info->interp_newpath != NULL)
 		newinterp = brand_info->interp_newpath;
 
@@ -996,8 +1061,53 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	VOP_UNLOCK(imgp->vp, 0);
 
+	/*
+	 * Decide whether to enable randomization of user mappings.
+	 * First, reset user preferences for the setid binaries.
+	 * Then, account for the support of the randomization by the
+	 * ABI, by user preferences, and make special treatment for
+	 * PIE binaries.
+	 */
+	if (imgp->credential_setid) {
+		PROC_LOCK(imgp->proc);
+		imgp->proc->p_flag2 &= ~(P2_ASLR_ENABLE | P2_ASLR_DISABLE);
+		PROC_UNLOCK(imgp->proc);
+	}
+	if ((sv->sv_flags & SV_ASLR) == 0 ||
+	    (imgp->proc->p_flag2 & P2_ASLR_DISABLE) != 0 ||
+	    (fctl0 & NT_FREEBSD_FCTL_ASLR_DISABLE) != 0) {
+		KASSERT(et_dyn_addr != ET_DYN_ADDR_RAND,
+		    ("et_dyn_addr == RAND and !ASLR"));
+	} else if ((imgp->proc->p_flag2 & P2_ASLR_ENABLE) != 0 ||
+	    (__elfN(aslr_enabled) && hdr->e_type == ET_EXEC) ||
+	    et_dyn_addr == ET_DYN_ADDR_RAND) {
+		imgp->map_flags |= MAP_ASLR;
+		/*
+		 * If user does not care about sbrk, utilize the bss
+		 * grow region for mappings as well.  We can select
+		 * the base for the image anywere and still not suffer
+		 * from the fragmentation.
+		 */
+		if (!__elfN(aslr_honor_sbrk) ||
+		    (imgp->proc->p_flag2 & P2_ASLR_IGNSTART) != 0)
+			imgp->map_flags |= MAP_ASLR_IGNSTART;
+	}
+
 	error = exec_new_vmspace(imgp, sv);
+	vmspace = imgp->proc->p_vmspace;
+	map = &vmspace->vm_map;
+
 	imgp->proc->p_sysent = sv;
+
+	maxv = vm_map_max(map) - lim_max(td, RLIMIT_STACK);
+	if (et_dyn_addr == ET_DYN_ADDR_RAND) {
+		KASSERT((map->flags & MAP_ASLR) != 0,
+		    ("ET_DYN_ADDR_RAND but !MAP_ASLR"));
+		et_dyn_addr = __CONCAT(rnd_, __elfN(base))(map,
+		    vm_map_min(map) + mapsz + lim_max(td, RLIMIT_DATA),
+		    /* reserve half of the address space to interpreter */
+		    maxv / 2, 1UL << flsl(maxalign));
+	}
 
 	vn_lock(imgp->vp, LK_EXCLUSIVE | LK_RETRY);
 	if (error != 0)
@@ -1101,7 +1211,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		goto ret;
 	}
 
-	vmspace = imgp->proc->p_vmspace;
 	vmspace->vm_tsize = text_size >> PAGE_SHIFT;
 	vmspace->vm_taddr = (caddr_t)(uintptr_t)text_addr;
 	vmspace->vm_dsize = data_size >> PAGE_SHIFT;
@@ -1138,6 +1247,14 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	/* Round up so signficant bits of rtld addresses aren't touched */
 	if (imgp->proc->p_sysent->sv_flags & SV_CHERI)
 		addr = roundup2(addr, 0x1000000);
+	if ((map->flags & MAP_ASLR) != 0) {
+		maxv1 = maxv / 2 + addr / 2;
+		MPASS(maxv1 >= addr);	/* No overflow */
+		map->anon_loc = __CONCAT(rnd_, __elfN(base))(map, addr, maxv1,
+		    MAXPAGESIZES > 1 ? pagesizes[1] : pagesizes[0]);
+	} else {
+		map->anon_loc = addr;
+	}
 	PROC_UNLOCK(imgp->proc);
 
 	imgp->entry_addr = entry;
@@ -1146,6 +1263,13 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (interp != NULL) {
 		have_interp = FALSE;
 		VOP_UNLOCK(imgp->vp, 0);
+		if ((map->flags & MAP_ASLR) != 0) {
+			/* Assume that interpeter fits into 1/4 of AS */
+			maxv1 = maxv / 2 + addr / 2;
+			MPASS(maxv1 >= addr);	/* No overflow */
+			addr = __CONCAT(rnd_, __elfN(base))(map, addr,
+			    maxv1, PAGE_SIZE);
+		}
 		if (brand_info->emul_path != NULL &&
 		    brand_info->emul_path[0] != '\0') {
 			path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
@@ -2280,10 +2404,8 @@ __elfN(note_procstat_proc)(void *arg, struct sbuf *sb, size_t *sizep)
 		KASSERT(*sizep == size, ("invalid size"));
 		structsize = sizeof(elf_kinfo_proc_t);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
-		sx_slock(&proctree_lock);
 		PROC_LOCK(p);
 		kern_proc_out(p, sb, ELF_KERN_PROC_MASK);
-		sx_sunlock(&proctree_lock);
 	}
 	*sizep = size;
 }
@@ -2685,11 +2807,9 @@ __elfN(trans_prot)(Elf_Word flags)
 		prot |= VM_PROT_WRITE;
 	if (flags & PF_R)
 		prot |= VM_PROT_READ;
-#if __ELF_WORD_SIZE == 32
-#if defined(__amd64__)
+#if __ELF_WORD_SIZE == 32 && (defined(__amd64__) || defined(__i386__))
 	if (i386_read_exec && (flags & PF_R))
 		prot |= VM_PROT_EXECUTE;
-#endif
 #endif
 	return (prot);
 }

@@ -159,6 +159,8 @@ device		scc
 device		uart
 device		uart_z8530
 
+device		iflib
+
 # Ethernet hardware
 device		em		# Intel PRO/1000 Gigabit Ethernet Family
 device		ix		# Intel PRO/10GbE PCIE PF Ethernet Family
@@ -214,7 +216,6 @@ device		kue		# Kawasaki LSI USB Ethernet
 
 # Wireless NIC cards
 options 	IEEE80211_SUPPORT_MESH
-options 	AH_SUPPORT_AR5416
 
 # FireWire support
 device		firewire	# FireWire bus code

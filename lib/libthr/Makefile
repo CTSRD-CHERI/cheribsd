@@ -9,6 +9,7 @@ PACKAGE=	clibs
 SHLIBDIR?= /lib
 
 .include <src.opts.mk>
+MK_BIND_NOW= no
 MK_SSP=	no
 
 LIB=thr
@@ -30,6 +31,7 @@ CFLAGS+=-I${SRCTOP}/lib/libthread_db
 CFLAGS+=-Winline
 
 CFLAGS.thr_stack.c+=	-Wno-cast-align
+CFLAGS.rtld_malloc.c+=	-Wno-cast-align
 .include <bsd.compiler.mk>
 .if !(${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} < 40300)
 CFLAGS.thr_symbols.c+=	-Wno-missing-variable-declarations
@@ -53,12 +55,23 @@ CFLAGS+=-D_PTHREADS_INVARIANTS
 PRECIOUSLIB=
 
 .PATH: ${.CURDIR}/arch/${MACHINE_CPUARCH}/${MACHINE_CPUARCH}
+.if ${MACHINE_ARCH:Mmips*c*}
+.PATH: ${SRCTOP}/lib/libmalloc_simple
+.else
+.PATH: ${SRCTOP}/libexec/rtld-elf
+.endif
 
 .if exists(${.CURDIR}/arch/${MACHINE_CPUARCH}/Makefile.inc)
 .include "${.CURDIR}/arch/${MACHINE_CPUARCH}/Makefile.inc"
 .endif
 .include "${.CURDIR}/sys/Makefile.inc"
 .include "${.CURDIR}/thread/Makefile.inc"
+.if ${MACHINE_ARCH:Mmips*c*}
+SRCS+=	malloc.c heap.c
+CFLAGS.malloc.c+=	-DIN_LIBTHR
+.else
+SRCS+= rtld_malloc.c
+.endif
 
 .if ${MK_INSTALLLIB} != "no"
 SYMLINKS+=lib${LIB}.a ${LIBDIR}/libpthread.a

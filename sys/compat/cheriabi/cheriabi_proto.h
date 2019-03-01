@@ -384,7 +384,7 @@ struct cheriabi___sysctl_args {
 	char namelen_l_[PADL_(u_int)]; u_int namelen; char namelen_r_[PADR_(u_int)];
 	char old_l_[PADL_(void * __capability)]; void * __capability old; char old_r_[PADR_(void * __capability)];
 	char oldlenp_l_[PADL_(size_t * __capability)]; size_t * __capability oldlenp; char oldlenp_r_[PADR_(size_t * __capability)];
-	char new_l_[PADL_(void * __capability)]; void * __capability new; char new_r_[PADR_(void * __capability)];
+	char new_l_[PADL_(const void * __capability)]; const void * __capability new; char new_r_[PADR_(const void * __capability)];
 	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
 };
 struct cheriabi_mlock_args {
@@ -1417,11 +1417,31 @@ struct cheriabi_getrandom_args {
 	char buflen_l_[PADL_(size_t)]; size_t buflen; char buflen_r_[PADR_(size_t)];
 	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
 };
+struct cheriabi_getfhat_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char path_l_[PADL_(char * __capability)]; char * __capability path; char path_r_[PADR_(char * __capability)];
+	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
 struct cheriabi_coexecve_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
+	char fname_l_[PADL_(char * __capability)]; char * __capability fname; char fname_r_[PADR_(char * __capability)];
 	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
 	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
+};
+struct cheriabi_fhlink_args {
+	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
+	char to_l_[PADL_(const char * __capability)]; const char * __capability to; char to_r_[PADR_(const char * __capability)];
+};
+struct cheriabi_fhlinkat_args {
+	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
+	char tofd_l_[PADL_(int)]; int tofd; char tofd_r_[PADR_(int)];
+	char to_l_[PADL_(const char * __capability)]; const char * __capability to; char to_r_[PADR_(const char * __capability)];
+};
+struct cheriabi_fhreadlink_args {
+	char fhp_l_[PADL_(struct fhandle * __capability)]; struct fhandle * __capability fhp; char fhp_r_[PADR_(struct fhandle * __capability)];
+	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
+	char bufsize_l_[PADL_(size_t)]; size_t bufsize; char bufsize_r_[PADR_(size_t)];
 };
 int	cheriabi_read(struct thread *, struct cheriabi_read_args *);
 int	cheriabi_write(struct thread *, struct cheriabi_write_args *);
@@ -1708,7 +1728,11 @@ int	cheriabi_kevent(struct thread *, struct cheriabi_kevent_args *);
 int	cheriabi_cpuset_getdomain(struct thread *, struct cheriabi_cpuset_getdomain_args *);
 int	cheriabi_cpuset_setdomain(struct thread *, struct cheriabi_cpuset_setdomain_args *);
 int	cheriabi_getrandom(struct thread *, struct cheriabi_getrandom_args *);
+int	cheriabi_getfhat(struct thread *, struct cheriabi_getfhat_args *);
 int	cheriabi_coexecve(struct thread *, struct cheriabi_coexecve_args *);
+int	cheriabi_fhlink(struct thread *, struct cheriabi_fhlink_args *);
+int	cheriabi_fhlinkat(struct thread *, struct cheriabi_fhlinkat_args *);
+int	cheriabi_fhreadlink(struct thread *, struct cheriabi_fhreadlink_args *);
 
 #ifdef COMPAT_43
 
@@ -2030,7 +2054,11 @@ int	cheriabi_coexecve(struct thread *, struct cheriabi_coexecve_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset_getdomain	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset_setdomain	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_getrandom	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_getfhat	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_coexecve	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_fhlink	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_fhlinkat	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_fhreadlink	AUE_NULL
 
 #undef PAD_
 #undef PADL_

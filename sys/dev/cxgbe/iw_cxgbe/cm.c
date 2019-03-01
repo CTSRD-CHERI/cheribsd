@@ -429,7 +429,7 @@ static void process_timeout(struct c4iw_ep *ep)
 		abort = 0;
 		break;
 	default:
-		CTR4(KTR_IW_CXGBE, "%s unexpected state ep %p tid %u state %u\n"
+		CTR4(KTR_IW_CXGBE, "%s unexpected state ep %p tid %u state %u"
 				, __func__, ep, ep->hwtid, ep->com.state);
 		abort = 0;
 	}
@@ -841,7 +841,7 @@ setiwsockopt(struct socket *so)
 	sopt.sopt_val = &on;
 	sopt.sopt_valsize = sizeof on;
 	sopt.sopt_td = NULL;
-	rc = sosetopt(so, &sopt);
+	rc = -sosetopt(so, &sopt);
 	if (rc) {
 		log(LOG_ERR, "%s: can't set TCP_NODELAY on so %p (%d)\n",
 		    __func__, so, rc);
@@ -1020,7 +1020,7 @@ process_newconn(struct c4iw_listen_ep *master_lep, struct socket *new_so)
 	ret = soaccept(new_so, (struct sockaddr **)&remote);
 	if (ret != 0) {
 		CTR4(KTR_IW_CXGBE,
-				"%s:listen sock:%p, new sock:%p, ret:%d\n",
+				"%s:listen sock:%p, new sock:%p, ret:%d",
 				__func__, master_lep->com.so, new_so, ret);
 		if (remote != NULL)
 			free(remote, M_SONAME);
@@ -1264,6 +1264,18 @@ SYSCTL_INT(_hw_iw_cxgbe, OID_AUTO, rcv_win, CTLFLAG_RWTUN, &rcv_win, 0,
 static int snd_win = 128 * 1024;
 SYSCTL_INT(_hw_iw_cxgbe, OID_AUTO, snd_win, CTLFLAG_RWTUN, &snd_win, 0,
 		"TCP send window in bytes (default = 128KB)");
+
+int use_dsgl = 1;
+SYSCTL_INT(_hw_iw_cxgbe, OID_AUTO, use_dsgl, CTLFLAG_RWTUN, &use_dsgl, 0,
+		"Use DSGL for PBL/FastReg (default=1)");
+
+int inline_threshold = 128;
+SYSCTL_INT(_hw_iw_cxgbe, OID_AUTO, inline_threshold, CTLFLAG_RWTUN, &inline_threshold, 0,
+		"inline vs dsgl threshold (default=128)");
+
+static int reuseaddr = 0;
+SYSCTL_INT(_hw_iw_cxgbe, OID_AUTO, reuseaddr, CTLFLAG_RWTUN, &reuseaddr, 0,
+		"Enable SO_REUSEADDR & SO_REUSEPORT socket options on all iWARP client connections(default = 0)");
 
 static void
 start_ep_timer(struct c4iw_ep *ep)
@@ -1639,7 +1651,7 @@ send_abort(struct c4iw_ep *ep)
 	sopt.sopt_val = &l;
 	sopt.sopt_valsize = sizeof l;
 	sopt.sopt_td = NULL;
-	rc = sosetopt(so, &sopt);
+	rc = -sosetopt(so, &sopt);
 	if (rc != 0) {
 		log(LOG_ERR, "%s: sosetopt(%p, linger = 0) failed with %d.\n",
 		    __func__, so, rc);
@@ -2297,7 +2309,7 @@ process_mpa_request(struct c4iw_ep *ep)
 				MPA_V2_IRD_ORD_MASK;
 			ep->ord = min_t(u32, ep->ord,
 					cur_max_read_depth(ep->com.dev));
-			CTR3(KTR_IW_CXGBE, "%s initiator ird %u ord %u\n",
+			CTR3(KTR_IW_CXGBE, "%s initiator ird %u ord %u",
 				 __func__, ep->ird, ep->ord);
 			if (ntohs(mpa_v2_params->ird) & MPA_V2_PEER2PEER_MODEL)
 				if (peer2peer) {
@@ -2451,7 +2463,7 @@ int c4iw_accept_cr(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
 			ep->ird = 1;
 	}
 
-	CTR4(KTR_IW_CXGBE, "%s %d ird %d ord %d\n", __func__, __LINE__,
+	CTR4(KTR_IW_CXGBE, "%s %d ird %d ord %d", __func__, __LINE__,
 			ep->ird, ep->ord);
 
 	ep->com.cm_id = cm_id;
@@ -2510,8 +2522,9 @@ static int
 c4iw_sock_create(struct sockaddr_storage *laddr, struct socket **so)
 {
 	int ret;
-	int size;
+	int size, on;
 	struct socket *sock = NULL;
+	struct sockopt sopt;
 
 	ret = sock_create_kern(laddr->ss_family,
 			SOCK_STREAM, IPPROTO_TCP, &sock);
@@ -2521,7 +2534,34 @@ c4iw_sock_create(struct sockaddr_storage *laddr, struct socket **so)
 		return ret;
 	}
 
-	ret = sobind(sock, (struct sockaddr *)laddr, curthread);
+	if (reuseaddr) {
+		bzero(&sopt, sizeof(struct sockopt));
+		sopt.sopt_dir = SOPT_SET;
+		sopt.sopt_level = SOL_SOCKET;
+		sopt.sopt_name = SO_REUSEADDR;
+		on = 1;
+		sopt.sopt_val = &on;
+		sopt.sopt_valsize = sizeof(on);
+		ret = -sosetopt(sock, &sopt);
+		if (ret != 0) {
+			log(LOG_ERR, "%s: sosetopt(%p, SO_REUSEADDR) "
+				"failed with %d.\n", __func__, sock, ret);
+		}
+		bzero(&sopt, sizeof(struct sockopt));
+		sopt.sopt_dir = SOPT_SET;
+		sopt.sopt_level = SOL_SOCKET;
+		sopt.sopt_name = SO_REUSEPORT;
+		on = 1;
+		sopt.sopt_val = &on;
+		sopt.sopt_valsize = sizeof(on);
+		ret = -sosetopt(sock, &sopt);
+		if (ret != 0) {
+			log(LOG_ERR, "%s: sosetopt(%p, SO_REUSEPORT) "
+				"failed with %d.\n", __func__, sock, ret);
+		}
+	}
+
+	ret = -sobind(sock, (struct sockaddr *)laddr, curthread);
 	if (ret) {
 		CTR2(KTR_IW_CXGBE, "%s:Failed to bind socket. err %p",
 				__func__, ret);
@@ -2705,7 +2745,7 @@ c4iw_create_listen(struct iw_cm_id *cm_id, int backlog)
 		goto fail;
 	}
 
-	rc = solisten(lep->com.so, backlog, curthread);
+	rc = -solisten(lep->com.so, backlog, curthread);
 	if (rc) {
 		CTR3(KTR_IW_CXGBE, "%s:Failed to listen on sock:%p. err %d",
 				__func__, lep->com.so, rc);

@@ -1789,10 +1789,10 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 #ifdef CPU_CHERI
 	if (req->flags & SCTL_PTRIN)
 		memcpy_c((__cheri_tocap char * __capability)p,
-		    (char * __capability)req->newptr + req->newidx, l);
+		    (const char * __capability)req->newptr + req->newidx, l);
 	else
 #endif
-		memcpy(p, (__cheri_fromcap char *)req->newptr + req->newidx, l);
+		memcpy(p, (__cheri_fromcap const char *)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);
 }
@@ -1932,11 +1932,11 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "sysctl_new_user()");
 	if (req->flags & SCTL_PTRIN)
-		error = copyincap((char * __capability)req->newptr +
+		error = copyincap((const char * __capability)req->newptr +
 		    req->newidx, p, l);
 	else
-		error = copyin((char * __capability)req->newptr + req->newidx,
-		    p, l);
+		error = copyin((const char * __capability)req->newptr +
+		    req->newidx, p, l);
 	req->newidx += l;
 	return (error);
 }
@@ -2150,7 +2150,7 @@ sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 int
 kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
     void * __capability old, size_t * __capability oldlenp,
-    void * __capability new, size_t newlen, int flags)
+    const void * __capability new, size_t newlen, int flags)
 {
 	int error, i, name[CTL_MAXNAME];
 	size_t j;
@@ -2181,7 +2181,7 @@ kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
 int
 userland_sysctl(struct thread *td, int *name, u_int namelen,
     void * __capability old, size_t * __capability oldlenp, int inkernel,
-    void * __capability new, size_t newlen, size_t *retval, int flags)
+    const void * __capability new, size_t newlen, size_t *retval, int flags)
 {
 	int error = 0, memlocked;
 	struct sysctl_req req;

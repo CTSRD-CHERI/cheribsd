@@ -185,7 +185,7 @@ int
 display_init(struct statics * statics)
 {
     int lines;
-    char **pp;
+    const char * const *pp;
     int *ip;
     int i;
 
@@ -517,8 +517,8 @@ void
 z_cpustates(void)
 {
     int i = 0;
-    const char **names;
-    char *thisname;
+    const char * const *names;
+    const char *thisname;
     int cpu, value;
 
     for (cpu = 0; cpu < num_cpus; cpu++) {
@@ -752,7 +752,7 @@ static int header_length;
  * allocated area with the trimmed header.
  */
 
-const char *
+char *
 trim_header(const char *text)
 {
 	char *s;
@@ -830,7 +830,11 @@ i_process(int line, char *thisline)
     }
 
     /* truncate the line to conform to our current screen width */
-    thisline[screen_width] = '\0';
+    int len = strlen(thisline);
+    if (screen_width < len)
+    {
+	thisline[screen_width] = '\0';
+    }
 
     /* write the line out */
     fputs(thisline, stdout);
@@ -840,7 +844,10 @@ i_process(int line, char *thisline)
     p = stpcpy(base, thisline);
 
     /* zero fill the rest of it */
-    memset(p, 0, screen_width - (p - base));
+    if (p - base < screen_width)
+    {
+	memset(p, 0, screen_width - (p - base));
+    }
 }
 
 void
@@ -854,7 +861,11 @@ u_process(int line, char *newline)
     bufferline = &screenbuf[lineindex(line)];
 
     /* truncate the line to conform to our current screen width */
-    newline[screen_width] = '\0';
+    int len = strlen(newline);
+    if (screen_width < len)
+    {
+	newline[screen_width] = '\0';
+    }
 
     /* is line higher than we went on the last display? */
     if (line >= last_hi)
@@ -879,7 +890,10 @@ u_process(int line, char *newline)
 	optr = stpcpy(bufferline, newline);
 
 	/* zero fill the rest of it */
-	memset(optr, 0, screen_width - (optr - bufferline));
+	if (optr - bufferline < screen_width)
+	{
+	    memset(optr, 0, screen_width - (optr - bufferline));
+	}
     }
     else
     {

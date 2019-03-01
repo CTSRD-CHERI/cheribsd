@@ -931,13 +931,16 @@ kmeminit(void)
 	 * variable:
 	 */
 	if (vm_kmem_size == 0) {
-		vm_kmem_size = (mem_size / vm_kmem_size_scale) * PAGE_SIZE;
-
+		vm_kmem_size = mem_size / vm_kmem_size_scale;
+		vm_kmem_size = vm_kmem_size * PAGE_SIZE < vm_kmem_size ?
+		    vm_kmem_size_max : vm_kmem_size * PAGE_SIZE;
 		if (vm_kmem_size_min > 0 && vm_kmem_size < vm_kmem_size_min)
 			vm_kmem_size = vm_kmem_size_min;
 		if (vm_kmem_size_max > 0 && vm_kmem_size >= vm_kmem_size_max)
 			vm_kmem_size = vm_kmem_size_max;
 	}
+	if (vm_kmem_size == 0)
+		panic("Tune VM_KMEM_SIZE_* for the platform");
 
 	/*
 	 * The amount of KVA space that is preallocated to the
@@ -1216,7 +1219,7 @@ restart:
 DB_SHOW_COMMAND(malloc, db_show_malloc)
 {
 	struct malloc_type_internal *mtip;
-	struct malloc_type_internal *mtsp;
+	struct malloc_type_stats *mtsp;
 	struct malloc_type *mtp;
 	uint64_t allocs, frees;
 	uint64_t alloced, freed;
@@ -1232,10 +1235,10 @@ DB_SHOW_COMMAND(malloc, db_show_malloc)
 		freed = 0;
 		for (i = 0; i <= mp_maxid; i++) {
 			mtsp = zpcpu_get_cpu(mtip->mti_stats, i);
-			allocs += mtip->mti_stats[i].mts_numallocs;
-			frees += mtip->mti_stats[i].mts_numfrees;
-			alloced += mtip->mti_stats[i].mts_memalloced;
-			freed += mtip->mti_stats[i].mts_memfreed;
+			allocs += mtsp->mts_numallocs;
+			frees += mtsp->mts_numfrees;
+			alloced += mtsp->mts_memalloced;
+			freed += mtsp->mts_memfreed;
 		}
 		db_printf("%18s %12ju %12juK %12ju\n",
 		    mtp->ks_shortdesc, allocs - frees,

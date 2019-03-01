@@ -317,7 +317,6 @@ cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri
 compat/cheriabi/cheriabi_abort2.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_generic.c	optional compat_cheriabi
-compat/cheriabi/cheriabi_ioctl.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_mac.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_mmap.c		optional compat_cheriabi
 compat/cheriabi/cheriabi_misc.c		optional compat_cheriabi
@@ -671,7 +670,9 @@ contrib/zstd/lib/compress/zstd_fast.c		optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/zstd_lazy.c		optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/zstd_ldm.c		optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/compress/zstd_opt.c		optional zstdio compile-with ${ZSTD_C}
+contrib/zstd/lib/decompress/zstd_ddict.c	optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/decompress/zstd_decompress.c	optional zstdio compile-with ${ZSTD_C}
+contrib/zstd/lib/decompress/zstd_decompress_block.c	optional zstdio compile-with ${ZSTD_C}
 contrib/zstd/lib/decompress/huf_decompress.c	optional zstdio compile-with ${ZSTD_C}
 # Blake 2
 contrib/libb2/blake2b-ref.c	optional crypto | ipsec | ipsec_support \
@@ -1783,6 +1784,7 @@ dev/fdt/fdt_slicer.c		optional fdt cfi | fdt nand | fdt mx25l | fdt n25q
 dev/fdt/fdt_static_dtb.S	optional fdt fdt_dtb_static \
 	dependency	"fdt_dtb_file"
 dev/fdt/simplebus.c		optional fdt
+dev/fdt/simple_mfd.c		optional fdt
 dev/fe/if_fe.c			optional fe
 dev/fe/if_fe_pccard.c		optional fe pccard
 dev/filemon/filemon.c		optional filemon
@@ -1847,6 +1849,7 @@ dev/iicbus/ds13rtc.c		optional ds13rtc | ds133x | ds1374
 dev/iicbus/ds1672.c		optional ds1672
 dev/iicbus/ds3231.c		optional ds3231
 dev/iicbus/rtc8583.c		optional rtc8583
+dev/iicbus/syr827.c		optional ext_resources syr827
 dev/iicbus/icee.c		optional icee
 dev/iicbus/if_ic.c		optional ic
 dev/iicbus/iic.c		optional iic
@@ -2537,17 +2540,19 @@ dev/nand/nandsim_swap.c		optional nandsim nand
 dev/nand/nfc_if.m		optional nand
 dev/netmap/if_ptnet.c		optional netmap inet
 dev/netmap/netmap.c		optional netmap
+dev/netmap/netmap_bdg.c		optional netmap
 dev/netmap/netmap_freebsd.c	optional netmap
 dev/netmap/netmap_generic.c	optional netmap
+dev/netmap/netmap_kloop.c	optional netmap
+dev/netmap/netmap_legacy.c	optional netmap
 dev/netmap/netmap_mbq.c		optional netmap
 dev/netmap/netmap_mem2.c	optional netmap
 dev/netmap/netmap_monitor.c	optional netmap
+dev/netmap/netmap_null.c	optional netmap
 dev/netmap/netmap_offloadings.c	optional netmap
 dev/netmap/netmap_pipe.c	optional netmap
 dev/netmap/netmap_pt.c		optional netmap
 dev/netmap/netmap_vale.c	optional netmap
-dev/netmap/netmap_legacy.c	optional netmap
-dev/netmap/netmap_bdg.c		optional netmap
 # compile-with "${NORMAL_C} -Wconversion -Wextra"
 dev/nfsmb/nfsmb.c		optional nfsmb pci
 dev/nge/if_nge.c		optional nge
@@ -2763,6 +2768,11 @@ dev/puc/puc.c			optional puc
 dev/puc/puc_cfg.c		optional puc
 dev/puc/puc_pccard.c		optional puc pccard
 dev/puc/puc_pci.c		optional puc pci
+dev/pwm/pwmc.c			optional pwm
+dev/pwm/pwmbus.c		optional pwm
+dev/pwm/pwm_if.m		optional pwm
+dev/pwm/pwmbus_if.m		optional pwm
+dev/pwm/ofw_pwm.c		optional pwm fdt
 dev/quicc/quicc_core.c		optional quicc
 dev/ral/rt2560.c		optional ral
 dev/ral/rt2661.c		optional ral
@@ -2869,9 +2879,11 @@ dev/rtwn/rtl8188e/r88e_tx.c	optional rtwn
 dev/rtwn/rtl8188e/r88e_rf.c	optional rtwn
 dev/rtwn/rtl8188e/r88e_rom.c	optional rtwn
 dev/rtwn/rtl8188e/r88e_rx.c	optional rtwn
+dev/rtwn/rtl8188e/pci/r88ee_attach.c	optional rtwn_pci pci
+dev/rtwn/rtl8188e/pci/r88ee_init.c	optional rtwn_pci pci
+dev/rtwn/rtl8188e/pci/r88ee_rx.c	optional rtwn_pci pci
 dev/rtwn/rtl8188e/usb/r88eu_attach.c	optional rtwn_usb
 dev/rtwn/rtl8188e/usb/r88eu_init.c	optional rtwn_usb
-dev/rtwn/rtl8188e/usb/r88eu_rx.c	optional rtwn_usb
 # RTL8192C
 dev/rtwn/rtl8192c/r92c_attach.c	optional rtwn
 dev/rtwn/rtl8192c/r92c_beacon.c	optional rtwn
@@ -2934,6 +2946,20 @@ dev/rtwn/rtl8821a/r21a_rx.c	optional rtwn
 dev/rtwn/rtl8821a/usb/r21au_attach.c	optional rtwn_usb
 dev/rtwn/rtl8821a/usb/r21au_dfs.c	optional rtwn_usb
 dev/rtwn/rtl8821a/usb/r21au_init.c	optional rtwn_usb
+rtwn-rtl8188eefw.c		optional rtwn-rtl8188eefw | rtwnfw	\
+	compile-with	"${AWK} -f $S/tools/fw_stub.awk rtwn-rtl8188eefw.fw:rtwn-rtl8188eefw:111 -mrtwn-rtl8188eefw -c${.TARGET}" \
+	no-implicit-rule before-depend local				\
+	clean		"rtwn-rtl8188eefw.c"
+rtwn-rtl8188eefw.fwo		optional rtwn-rtl8188eefw | rtwnfw	\
+	dependency	"rtwn-rtl8188eefw.fw"				\
+	compile-with	"${NORMAL_FWO}"					\
+	no-implicit-rule						\
+	clean		"rtwn-rtl8188eefw.fwo"
+rtwn-rtl8188eefw.fw		optional rtwn-rtl8188eefw | rtwnfw	\
+	dependency	"$S/contrib/dev/rtwn/rtwn-rtl8188eefw.fw.uu"	\
+	compile-with	"${NORMAL_FW}"					\
+	no-obj no-implicit-rule						\
+	clean		"rtwn-rtl8188eefw.fw"
 rtwn-rtl8188eufw.c		optional rtwn-rtl8188eufw | rtwnfw	\
 	compile-with	"${AWK} -f $S/tools/fw_stub.awk rtwn-rtl8188eufw.fw:rtwn-rtl8188eufw:111 -mrtwn-rtl8188eufw -c${.TARGET}" \
 	no-implicit-rule before-depend local				\
@@ -3801,6 +3827,8 @@ kern/kern_hhook.c		standard
 kern/kern_idle.c		standard
 kern/kern_intr.c		standard
 kern/kern_jail.c		standard
+kern/kern_kcov.c		optional kcov			\
+	compile-with "${NORMAL_C:N-fsanitize*}"
 kern/kern_khelp.c		standard
 kern/kern_kthread.c		standard
 kern/kern_ktr.c			optional ktr
@@ -3875,6 +3903,8 @@ kern/subr_capability.c		standard
 kern/subr_clock.c		standard
 kern/subr_compressor.c		standard \
 	compile-with "${NORMAL_C} -I$S/contrib/zstd/lib/freebsd"
+kern/subr_coverage.c		optional coverage \
+	compile-with "${NORMAL_C:N-fsanitize*}"
 kern/subr_counter.c		standard
 kern/subr_devstat.c		standard
 kern/subr_disk.c		standard
@@ -4079,7 +4109,6 @@ libkern/timingsafe_bcmp.c	standard
 libkern/zlib.c			optional crypto | geom_uzip | ipsec | \
 	ipsec_support | mxge | netgraph_deflate | ddb_ctf | gzio
 net/altq/altq_cbq.c		optional altq
-net/altq/altq_cdnr.c		optional altq
 net/altq/altq_codel.c		optional altq
 net/altq/altq_hfsc.c		optional altq
 net/altq/altq_fairq.c		optional altq
@@ -4124,10 +4153,10 @@ net/if_tun.c			optional tun
 net/if_tap.c			optional tap
 net/if_vlan.c			optional vlan
 net/if_vxlan.c			optional vxlan inet | vxlan inet6
-net/ifdi_if.m			optional ether pci
-net/iflib.c			optional ether pci
-net/iflib_clone.c		optional ether pci
-net/mp_ring.c			optional ether
+net/ifdi_if.m			optional ether pci iflib
+net/iflib.c			optional ether pci iflib
+net/iflib_clone.c		optional ether pci iflib
+net/mp_ring.c			optional ether iflib
 net/mppcc.c			optional netgraph_mppc_compression
 net/mppcd.c			optional netgraph_mppc_compression
 net/netisr.c			standard
@@ -4231,6 +4260,7 @@ netgraph/ng_base.c		optional netgraph
 netgraph/ng_bpf.c		optional netgraph_bpf
 netgraph/ng_bridge.c		optional netgraph_bridge
 netgraph/ng_car.c		optional netgraph_car
+netgraph/ng_checksum.c		optional netgraph_checksum
 netgraph/ng_cisco.c		optional netgraph_cisco
 netgraph/ng_deflate.c		optional netgraph_deflate
 netgraph/ng_device.c		optional netgraph_device
@@ -4792,6 +4822,8 @@ dev/mlx5/mlx5_core/mlx5_vsc.c			optional mlx5 pci	\
 	compile-with "${OFED_C}"
 dev/mlx5/mlx5_core/mlx5_wq.c			optional mlx5 pci	\
 	compile-with "${OFED_C}"
+dev/mlx5/mlx5_lib/mlx5_gid.c			optional mlx5 pci	\
+	compile-with "${OFED_C}"
 
 dev/mlx5/mlx5_en/mlx5_en_ethtool.c		optional mlx5en pci inet inet6	\
 	compile-with "${OFED_C}"
@@ -4836,6 +4868,8 @@ crypto/libsodium/randombytes.c	optional crypto \
 	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include -I$S/crypto/libsodium"
 crypto/libsodium/utils.c	optional crypto \
 	compile-with "${NORMAL_C} -I$S/contrib/libsodium/src/libsodium/include -I$S/crypto/libsodium"
+opencrypto/cbc_mac.c		optional crypto
+opencrypto/xform_cbc_mac.c	optional crypto
 rpc/auth_none.c			optional krpc | nfslockd | nfscl | nfsd
 rpc/auth_unix.c			optional krpc | nfslockd | nfscl | nfsd
 rpc/authunix_prot.c		optional krpc | nfslockd | nfscl | nfsd

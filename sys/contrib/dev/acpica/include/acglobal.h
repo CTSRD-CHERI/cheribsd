@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -308,6 +308,7 @@ ACPI_GLOBAL (ACPI_MEMORY_LIST *,        AcpiGbl_GlobalList);
 ACPI_GLOBAL (ACPI_MEMORY_LIST *,        AcpiGbl_NsNodeList);
 ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DisplayFinalMemStats);
 ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DisableMemTracking);
+ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_VerboseLeakDump);
 #endif
 
 
@@ -317,11 +318,7 @@ ACPI_GLOBAL (BOOLEAN,                   AcpiGbl_DisableMemTracking);
  *
  ****************************************************************************/
 
-#if !defined (ACPI_NO_METHOD_EXECUTION) || defined (ACPI_CONSTANT_EVAL_ONLY)
 #define NUM_PREDEFINED_NAMES            10
-#else
-#define NUM_PREDEFINED_NAMES            9
-#endif
 
 ACPI_GLOBAL (ACPI_NAMESPACE_NODE,       AcpiGbl_RootNodeStruct);
 ACPI_GLOBAL (ACPI_NAMESPACE_NODE *,     AcpiGbl_RootNode);

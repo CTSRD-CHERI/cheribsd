@@ -116,7 +116,7 @@ STD_HEADERS+=	__bsd_locale_defaults.h
 STD_HEADERS+=	__bsd_locale_fallbacks.h
 STD_HEADERS+=	__config
 STD_HEADERS+=	__debug
-STD_HEADERS_8+=	__errc
+STD_HEADERS+=	__errc
 STD_HEADERS+=	__functional_03
 STD_HEADERS+=	__functional_base
 STD_HEADERS+=	__functional_base_03
@@ -124,7 +124,7 @@ STD_HEADERS+=	__hash_table
 STD_HEADERS+=	__libcpp_version
 STD_HEADERS+=	__locale
 STD_HEADERS+=	__mutex_base
-STD_HEADERS_8+=	__node_handle
+STD_HEADERS+=	__node_handle
 STD_HEADERS+=	__nullptr
 STD_HEADERS+=	__split_buffer
 STD_HEADERS+=	__sso_allocator
@@ -138,7 +138,9 @@ STD_HEADERS+=	algorithm
 STD_HEADERS+=	any
 STD_HEADERS+=	array
 STD_HEADERS+=	atomic
-STD_HEADERS_8+=	bit
+.if ${_LIBCXX_VERSION} >= 8
+STD_HEADERS+=	bit
+.endif
 STD_HEADERS+=	bitset
 STD_HEADERS+=	cassert
 STD_HEADERS+=	ccomplex
@@ -146,7 +148,7 @@ STD_HEADERS+=	cctype
 STD_HEADERS+=	cerrno
 STD_HEADERS+=	cfenv
 STD_HEADERS+=	cfloat
-STD_HEADERS_8+=	charconv
+STD_HEADERS+=	charconv
 STD_HEADERS+=	chrono
 STD_HEADERS+=	cinttypes
 STD_HEADERS+=	ciso646
@@ -154,7 +156,7 @@ STD_HEADERS+=	climits
 STD_HEADERS+=	clocale
 STD_HEADERS+=	cmath
 STD_HEADERS+=	codecvt
-STD_HEADERS_8+=	compare
+STD_HEADERS+=	compare
 STD_HEADERS+=	complex
 STD_HEADERS+=	complex.h
 STD_HEADERS+=	condition_variable
@@ -175,7 +177,7 @@ STD_HEADERS+=	cwctype
 STD_HEADERS+=	deque
 STD_HEADERS+=	errno.h
 STD_HEADERS+=	exception
-STD_HEADERS_8+=	filesystem
+STD_HEADERS+=	filesystem
 STD_HEADERS+=	float.h
 STD_HEADERS+=	forward_list
 STD_HEADERS+=	fstream
@@ -210,7 +212,7 @@ STD_HEADERS+=	scoped_allocator
 STD_HEADERS+=	set
 STD_HEADERS+=	setjmp.h
 STD_HEADERS+=	shared_mutex
-STD_HEADERS_8+=	span
+STD_HEADERS+=	span
 STD_HEADERS+=	sstream
 STD_HEADERS+=	stack
 STD_HEADERS+=	stdbool.h
@@ -237,13 +239,9 @@ STD_HEADERS+=	utility
 STD_HEADERS+=	valarray
 STD_HEADERS+=	variant
 STD_HEADERS+=	vector
-STD_HEADERS_8+=	version
+STD_HEADERS+=	version
 STD_HEADERS+=	wchar.h
 STD_HEADERS+=	wctype.h
-
-.if ${_LIBCXX_VERSION} >= 8
-STD_HEADERS+=	${STD_HEADERS_8}
-.endif
 
 RT_HEADERS+=	cxxabi.h
 RT_HEADERS+=	unwind-arm.h
@@ -266,10 +264,6 @@ EXP_HEADERS+=	any
 EXP_HEADERS+=	chrono
 EXP_HEADERS+=	coroutine
 EXP_HEADERS+=	deque
-# Removed in 8.0:
-.if ${_LIBCXX_VERSION} < 8
-EXP_HEADERS+=	dynarray
-.endif
 EXP_HEADERS+=	filesystem
 EXP_HEADERS+=	forward_list
 EXP_HEADERS+=	functional
@@ -283,7 +277,7 @@ EXP_HEADERS+=	propagate_const
 EXP_HEADERS+=	ratio
 EXP_HEADERS+=	regex
 EXP_HEADERS+=	set
-EXP_HEADERS_8+=	simd
+EXP_HEADERS+=	simd
 EXP_HEADERS+=	string
 EXP_HEADERS+=	string_view
 EXP_HEADERS+=	system_error
@@ -293,10 +287,6 @@ EXP_HEADERS+=	unordered_map
 EXP_HEADERS+=	unordered_set
 EXP_HEADERS+=	utility
 EXP_HEADERS+=	vector
-
-.if ${_LIBCXX_VERSION} >= 8
-EXP_HEADERS+=	${EXP_HEADERS_8}
-.endif
 
 .for hdr in ${EXP_HEADERS}
 EXP+=		${HDRDIR}/experimental/${hdr}

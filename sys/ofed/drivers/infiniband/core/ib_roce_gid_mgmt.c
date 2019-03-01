@@ -167,6 +167,7 @@ roce_gid_update_addr_callback(struct ib_device *device, u8 port,
 #if defined(INET) || defined(INET6)
 	struct ifaddr *ifa;
 #endif
+	VNET_ITERATOR_DECL(vnet_iter);
 	struct ib_gid_attr gid_attr;
 	union ib_gid gid;
 	int default_gids;
@@ -180,9 +181,13 @@ roce_gid_update_addr_callback(struct ib_device *device, u8 port,
 	/* make sure default GIDs are in */
 	default_gids = roce_gid_enum_netdev_default(device, port, ndev);
 
-	CURVNET_SET(ndev->if_vnet);
-	IFNET_RLOCK();
-	CK_STAILQ_FOREACH(idev, &V_ifnet, if_link) {
+	VNET_LIST_RLOCK();
+	VNET_FOREACH(vnet_iter) {
+	    CURVNET_SET(vnet_iter);
+	    IFNET_RLOCK();
+	    CK_STAILQ_FOREACH(idev, &V_ifnet, if_link) {
+		struct epoch_tracker et;
+
 		if (idev != ndev) {
 			if (idev->if_type != IFT_L2VLAN)
 				continue;
@@ -191,7 +196,7 @@ roce_gid_update_addr_callback(struct ib_device *device, u8 port,
 		}
 
 		/* clone address information for IPv4 and IPv6 */
-		IF_ADDR_RLOCK(idev);
+		NET_EPOCH_ENTER(et);
 #if defined(INET)
 		CK_STAILQ_FOREACH(ifa, &idev->if_addrhead, ifa_link) {
 			if (ifa->ifa_addr == NULL ||
@@ -229,10 +234,12 @@ roce_gid_update_addr_callback(struct ib_device *device, u8 port,
 			STAILQ_INSERT_TAIL(&ipx_head, entry, entry);
 		}
 #endif
-		IF_ADDR_RUNLOCK(idev);
+		NET_EPOCH_EXIT(et);
+	    }
+	    IFNET_RUNLOCK();
+	    CURVNET_RESTORE();
 	}
-	IFNET_RUNLOCK();
-	CURVNET_RESTORE();
+	VNET_LIST_RUNLOCK();
 
 	/* add missing GIDs, if any */
 	STAILQ_FOREACH(entry, &ipx_head, entry) {

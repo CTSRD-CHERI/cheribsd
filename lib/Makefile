@@ -192,6 +192,9 @@ _libclang_rt=	libclang_rt
 _libcxxrt=	libcxxrt
 _libcplusplus=	libc++
 _libcplusplus+=	libc++experimental
+.if ${MK_CHERI} == no
+_libcplusplus+=	libc++fs
+.endif
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar

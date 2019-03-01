@@ -405,8 +405,10 @@ ieee80211_ifdetach(struct ieee80211com *ic)
 	 * The VAP is responsible for setting and clearing
 	 * the VIMAGE context.
 	 */
-	while ((vap = TAILQ_FIRST(&ic->ic_vaps)) != NULL)
+	while ((vap = TAILQ_FIRST(&ic->ic_vaps)) != NULL) {
+		ieee80211_com_vdetach(vap);
 		ieee80211_vap_destroy(vap);
+	}
 	ieee80211_waitfor_parent(ic);
 
 	ieee80211_sysctl_detach(ic);
@@ -1627,6 +1629,17 @@ ieee80211_add_channel_list_2ghz(struct ieee80211_channel chans[], int maxchans,
 	KASSERT(flags[0] != 0, ("%s: no correct mode provided\n", __func__));
 
 	return (add_chanlist(chans, maxchans, nchans, ieee, nieee, flags));
+}
+
+int
+ieee80211_add_channels_default_2ghz(struct ieee80211_channel chans[],
+    int maxchans, int *nchans, const uint8_t bands[], int ht40)
+{
+	const uint8_t default_chan_list[] =
+	    { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
+
+	return (ieee80211_add_channel_list_2ghz(chans, maxchans, nchans,
+	    default_chan_list, nitems(default_chan_list), bands, ht40));
 }
 
 int

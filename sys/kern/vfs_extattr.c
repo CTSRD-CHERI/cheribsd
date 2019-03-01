@@ -675,8 +675,6 @@ extattr_list_vp(struct vnode *vp, int attrnamespace, void * __capability data,
 	if (nbytes > IOSIZE_MAX)
 		return (EINVAL);
 
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-
 	auiop = NULL;
 	sizep = NULL;
 	cnt = 0;
@@ -694,24 +692,25 @@ extattr_list_vp(struct vnode *vp, int attrnamespace, void * __capability data,
 	} else
 		sizep = &size;
 
+	vn_lock(vp, LK_SHARED | LK_RETRY);
+
 #ifdef MAC
 	error = mac_vnode_check_listextattr(td->td_ucred, vp, attrnamespace);
-	if (error)
-		goto done;
+	if (error) {
+		VOP_UNLOCK(vp, 0);
+		return (error);
+	}
 #endif
 
 	error = VOP_LISTEXTATTR(vp, attrnamespace, auiop, sizep,
 	    td->td_ucred, td);
+	VOP_UNLOCK(vp, 0);
 
 	if (auiop != NULL) {
 		cnt -= auio.uio_resid;
 		td->td_retval[0] = cnt;
 	} else
 		td->td_retval[0] = size;
-#ifdef MAC
-done:
-#endif
-	VOP_UNLOCK(vp, 0);
 	return (error);
 }
 

@@ -1,6 +1,7 @@
 /*-
  * Copyright (c) 2017, 2018 The FreeBSD Foundation
  * All rights reserved.
+ * Copyright (c) 2018, 2019 Intel Corporation
  *
  * This software was developed by Konstantin Belousov <kib@FreeBSD.org>
  * under sponsorship from the FreeBSD Foundation.
@@ -64,66 +65,82 @@ __FBSDID("$FreeBSD$");
 #include <dev/acpica/acpivar.h>
 #include <dev/nvdimm/nvdimm_var.h>
 
-struct SPA_mapping *spa_mappings;
-int spa_mappings_cnt;
-
-static int
-nvdimm_spa_count(void *nfitsubtbl __unused, void *arg)
-{
-	int *cnt;
-
-	cnt = arg;
-	(*cnt)++;
-	return (0);
-}
+#define UUID_INITIALIZER_VOLATILE_MEMORY \
+    {0x7305944f,0xfdda,0x44e3,0xb1,0x6c,{0x3f,0x22,0xd2,0x52,0xe5,0xd0}}
+#define UUID_INITIALIZER_PERSISTENT_MEMORY \
+    {0x66f0d379,0xb4f3,0x4074,0xac,0x43,{0x0d,0x33,0x18,0xb7,0x8c,0xdb}}
+#define UUID_INITIALIZER_CONTROL_REGION \
+    {0x92f701f6,0x13b4,0x405d,0x91,0x0b,{0x29,0x93,0x67,0xe8,0x23,0x4c}}
+#define UUID_INITIALIZER_DATA_REGION \
+    {0x91af0530,0x5d86,0x470e,0xa6,0xb0,{0x0a,0x2d,0xb9,0x40,0x82,0x49}}
+#define UUID_INITIALIZER_VOLATILE_VIRTUAL_DISK \
+    {0x77ab535a,0x45fc,0x624b,0x55,0x60,{0xf7,0xb2,0x81,0xd1,0xf9,0x6e}}
+#define UUID_INITIALIZER_VOLATILE_VIRTUAL_CD \
+    {0x3d5abd30,0x4175,0x87ce,0x6d,0x64,{0xd2,0xad,0xe5,0x23,0xc4,0xbb}}
+#define UUID_INITIALIZER_PERSISTENT_VIRTUAL_DISK \
+    {0x5cea02c9,0x4d07,0x69d3,0x26,0x9f,{0x44,0x96,0xfb,0xe0,0x96,0xf9}}
+#define UUID_INITIALIZER_PERSISTENT_VIRTUAL_CD \
+    {0x08018188,0x42cd,0xbb48,0x10,0x0f,{0x53,0x87,0xd5,0x3d,0xed,0x3d}}
 
 static struct nvdimm_SPA_uuid_list_elm {
 	const char		*u_name;
-	const char		*u_id_str;
 	struct uuid		u_id;
 	const bool		u_usr_acc;
 } nvdimm_SPA_uuid_list[] = {
 	[SPA_TYPE_VOLATILE_MEMORY] = {
 		.u_name =	"VOLA MEM ",
-		.u_id_str =	UUID_VOLATILE_MEMORY,
+		.u_id =		UUID_INITIALIZER_VOLATILE_MEMORY,
 		.u_usr_acc =	true,
 	},
 	[SPA_TYPE_PERSISTENT_MEMORY] = {
 		.u_name =	"PERS MEM",
-		.u_id_str =	UUID_PERSISTENT_MEMORY,
+		.u_id =		UUID_INITIALIZER_PERSISTENT_MEMORY,
 		.u_usr_acc =	true,
 	},
 	[SPA_TYPE_CONTROL_REGION] = {
 		.u_name =	"CTRL RG ",
-		.u_id_str =	UUID_CONTROL_REGION,
+		.u_id =		UUID_INITIALIZER_CONTROL_REGION,
 		.u_usr_acc =	false,
 	},
 	[SPA_TYPE_DATA_REGION] = {
 		.u_name =	"DATA RG ",
-		.u_id_str =	UUID_DATA_REGION,
+		.u_id =		UUID_INITIALIZER_DATA_REGION,
 		.u_usr_acc =	true,
 	},
 	[SPA_TYPE_VOLATILE_VIRTUAL_DISK] = {
 		.u_name =	"VIRT DSK",
-		.u_id_str =	UUID_VOLATILE_VIRTUAL_DISK,
+		.u_id =		UUID_INITIALIZER_VOLATILE_VIRTUAL_DISK,
 		.u_usr_acc =	true,
 	},
 	[SPA_TYPE_VOLATILE_VIRTUAL_CD] = {
 		.u_name =	"VIRT CD ",
-		.u_id_str =	UUID_VOLATILE_VIRTUAL_CD,
+		.u_id =		UUID_INITIALIZER_VOLATILE_VIRTUAL_CD,
 		.u_usr_acc =	true,
 	},
 	[SPA_TYPE_PERSISTENT_VIRTUAL_DISK] = {
 		.u_name =	"PV DSK  ",
-		.u_id_str =	UUID_PERSISTENT_VIRTUAL_DISK,
+		.u_id =		UUID_INITIALIZER_PERSISTENT_VIRTUAL_DISK,
 		.u_usr_acc =	true,
 	},
 	[SPA_TYPE_PERSISTENT_VIRTUAL_CD] = {
 		.u_name =	"PV CD   ",
-		.u_id_str =	UUID_PERSISTENT_VIRTUAL_CD,
+		.u_id =		UUID_INITIALIZER_PERSISTENT_VIRTUAL_CD,
 		.u_usr_acc =	true,
 	},
 };
+
+enum SPA_mapping_type
+nvdimm_spa_type_from_uuid(struct uuid *uuid)
+{
+	int j;
+
+	for (j = 0; j < nitems(nvdimm_SPA_uuid_list); j++) {
+		if (uuidcmp(uuid, &nvdimm_SPA_uuid_list[j].u_id) != 0)
+			continue;
+		return (j);
+	}
+	return (SPA_TYPE_UNKNOWN);
+}
 
 static vm_memattr_t
 nvdimm_spa_memattr(struct SPA_mapping *spa)
@@ -337,8 +354,10 @@ nvdimm_spa_g_thread(void *arg)
 				auio.uio_td = curthread;
 				error = uiomove_fromphys(bp->bio_ma,
 				    bp->bio_ma_offset, bp->bio_length, &auio);
+				bp->bio_resid = auio.uio_resid;
 			} else {
 				nvdimm_spa_g_all_unmapped(spa, bp, bp->bio_cmd);
+				bp->bio_resid = bp->bio_length;
 				error = 0;
 			}
 		} else {
@@ -353,7 +372,9 @@ nvdimm_spa_g_thread(void *arg)
 			    UIO_WRITE;
 			auio.uio_td = curthread;
 			error = nvdimm_spa_uio(spa, &auio);
+			bp->bio_resid = auio.uio_resid;
 		}
+		bp->bio_bcount = bp->bio_length;
 		devstat_end_transaction_bio(spa->spa_g_devstat, bp);
 completed:
 		bp->bio_completed = bp->bio_length;
@@ -385,22 +406,17 @@ nvdimm_spa_g_access(struct g_provider *pp, int r, int w, int e)
 	return (0);
 }
 
-static g_init_t nvdimm_spa_g_init;
-static g_fini_t nvdimm_spa_g_fini;
-
 struct g_class nvdimm_spa_g_class = {
 	.name =		"SPA",
 	.version =	G_VERSION,
 	.start =	nvdimm_spa_g_start,
 	.access =	nvdimm_spa_g_access,
-	.init =		nvdimm_spa_g_init,
-	.fini =		nvdimm_spa_g_fini,
 };
 DECLARE_GEOM_CLASS(nvdimm_spa_g_class, g_spa);
 
-static int
-nvdimm_spa_init_one(struct SPA_mapping *spa, ACPI_NFIT_SYSTEM_ADDRESS *nfitaddr,
-    int spa_type)
+int
+nvdimm_spa_init(struct SPA_mapping *spa, ACPI_NFIT_SYSTEM_ADDRESS *nfitaddr,
+    enum SPA_mapping_type spa_type)
 {
 	struct make_dev_args mda;
 	struct sglist *spa_sg;
@@ -478,7 +494,7 @@ nvdimm_spa_init_one(struct SPA_mapping *spa, ACPI_NFIT_SYSTEM_ADDRESS *nfitaddr,
 		if (error1 == 0)
 			error1 = error;
 	} else {
-		g_topology_assert();
+		g_topology_lock();
 		spa->spa_g = g_new_geomf(&nvdimm_spa_g_class, "spa%d",
 		    spa->spa_nfit_idx);
 		spa->spa_g->softc = spa;
@@ -492,12 +508,13 @@ nvdimm_spa_init_one(struct SPA_mapping *spa, ACPI_NFIT_SYSTEM_ADDRESS *nfitaddr,
 		spa->spa_g_devstat = devstat_new_entry("spa", spa->spa_nfit_idx,
 		    DEV_BSIZE, DEVSTAT_ALL_SUPPORTED, DEVSTAT_TYPE_DIRECT,
 		    DEVSTAT_PRIORITY_MAX);
+		g_topology_unlock();
 	}
 	return (error1);
 }
 
-static void
-nvdimm_spa_fini_one(struct SPA_mapping *spa)
+void
+nvdimm_spa_fini(struct SPA_mapping *spa)
 {
 
 	mtx_lock(&spa->spa_g_mtx);
@@ -528,106 +545,4 @@ nvdimm_spa_fini_one(struct SPA_mapping *spa)
 	}
 	mtx_destroy(&spa->spa_g_mtx);
 	mtx_destroy(&spa->spa_g_stat_mtx);
-}
-
-static int
-nvdimm_spa_parse(void *nfitsubtbl, void *arg)
-{
-	ACPI_NFIT_SYSTEM_ADDRESS *nfitaddr;
-	struct SPA_mapping *spa;
-	int error, *i, j;
-
-	i = arg;
-	spa = &spa_mappings[*i];
-	nfitaddr = nfitsubtbl;
-
-	for (j = 0; j < nitems(nvdimm_SPA_uuid_list); j++) {
-		/* XXXKIB: is ACPI UUID representation compatible ? */
-		if (uuidcmp((struct uuid *)&nfitaddr->RangeGuid,
-		    &nvdimm_SPA_uuid_list[j].u_id) != 0)
-			continue;
-		error = nvdimm_spa_init_one(spa, nfitaddr, j);
-		if (error != 0)
-			nvdimm_spa_fini_one(spa);
-		break;
-	}
-	if (j == nitems(nvdimm_SPA_uuid_list) && bootverbose) {
-		printf("Unknown SPA UUID %d ", nfitaddr->RangeIndex);
-		printf_uuid((struct uuid *)&nfitaddr->RangeGuid);
-		printf("\n");
-	}
-	(*i)++;
-	return (0);
-}
-
-static int
-nvdimm_spa_init1(ACPI_TABLE_NFIT *nfitbl)
-{
-	struct nvdimm_SPA_uuid_list_elm *sle;
-	int error, i;
-
-	for (i = 0; i < nitems(nvdimm_SPA_uuid_list); i++) {
-		sle = &nvdimm_SPA_uuid_list[i];
-		error = parse_uuid(sle->u_id_str, &sle->u_id);
-		if (error != 0) {
-			if (bootverbose)
-				printf("nvdimm_identify: error %d parsing "
-				    "known SPA UUID %d %s\n", error, i,
-				    sle->u_id_str);
-			return (error);
-		}
-	}
-
-	error = nvdimm_iterate_nfit(nfitbl, ACPI_NFIT_TYPE_SYSTEM_ADDRESS,
-	    nvdimm_spa_count, &spa_mappings_cnt);
-	if (error != 0)
-		return (error);
-	spa_mappings = malloc(sizeof(struct SPA_mapping) * spa_mappings_cnt,
-	    M_NVDIMM, M_WAITOK | M_ZERO);
-	i = 0;
-	error = nvdimm_iterate_nfit(nfitbl, ACPI_NFIT_TYPE_SYSTEM_ADDRESS,
-	    nvdimm_spa_parse, &i);
-	if (error != 0) {
-		free(spa_mappings, M_NVDIMM);
-		spa_mappings = NULL;
-		return (error);
-	}
-	return (0);
-}
-
-static void
-nvdimm_spa_g_init(struct g_class *mp __unused)
-{
-	ACPI_TABLE_NFIT *nfitbl;
-	ACPI_STATUS status;
-	int error;
-
-	spa_mappings_cnt = 0;
-	spa_mappings = NULL;
-	if (acpi_disabled("nvdimm"))
-		return;
-	status = AcpiGetTable(ACPI_SIG_NFIT, 1, (ACPI_TABLE_HEADER **)&nfitbl);
-	if (ACPI_FAILURE(status)) {
-		if (bootverbose)
-			printf("nvdimm_spa_g_init: cannot find NFIT\n");
-		return;
-	}
-	error = nvdimm_spa_init1(nfitbl);
-	if (error != 0)
-		printf("nvdimm_spa_g_init: error %d\n", error);
-	AcpiPutTable(&nfitbl->Header);
-}
-
-static void
-nvdimm_spa_g_fini(struct g_class *mp __unused)
-{
-	int i;
-
-	if (spa_mappings == NULL)
-		return;
-	for (i = 0; i < spa_mappings_cnt; i++)
-		nvdimm_spa_fini_one(&spa_mappings[i]);
-	free(spa_mappings, M_NVDIMM);
-	spa_mappings = NULL;
-	spa_mappings_cnt = 0;
 }
