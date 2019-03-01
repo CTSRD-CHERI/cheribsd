@@ -48,6 +48,7 @@
 #include <sys/ucontext.h>
 #include <sys/wait.h>
 
+#include <cheri/revoke.h>
 #include <sys/event.h>
 
 #include <machine/frame.h>
@@ -1280,4 +1281,136 @@ CHERIBSDTEST(vm_capdirty, "verify capdirty marking and mincore")
 	cheribsdtest_success();
 #undef CHERIBSDTEST_VM_CAPDIRTY_NPG
 }
+
+#ifdef CHERI_REVOKE
+/*
+ * Revocation tests
+ */
+
+static int
+check_revoked(void *r)
+{
+	return (cheri_gettag(r) == 0) ||
+	    ((cheri_gettype(r) == -1L) && (cheri_getperm(r) == 0));
+}
+
+static void
+install_kqueue_cap(int kq, void *revme)
+{
+	struct kevent ike;
+
+	EV_SET(&ike, (uintptr_t)&install_kqueue_cap,
+	    EVFILT_USER, EV_ADD | EV_ONESHOT | EV_DISABLE, NOTE_FFNOP, 0,
+	    revme);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+	EV_SET(&ike, (uintptr_t)&install_kqueue_cap, EVFILT_USER, EV_KEEPUDATA,
+	    NOTE_FFNOP | NOTE_TRIGGER, 0, NULL);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+}
+
+static void
+check_kqueue_cap(int kq, unsigned int valid)
+{
+	struct kevent ike, oke = { 0 };
+
+	EV_SET(&ike, (uintptr_t)&install_kqueue_cap,
+	    EVFILT_USER, EV_ENABLE|EV_KEEPUDATA, NOTE_FFNOP, 0, NULL);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, NULL, 0, &oke, 1, NULL));
+	CHERIBSDTEST_VERIFY2(
+	    __builtin_cheri_equal_exact(oke.ident, &install_kqueue_cap),
+	    "Bad identifier from kqueue");
+	CHERIBSDTEST_VERIFY2(oke.filter == EVFILT_USER,
+	    "Bad filter from kqueue");
+	CHERIBSDTEST_VERIFY2(check_revoked(oke.udata) == !valid,
+				"kqueue-held cap not as expected");
+}
+
+CHERIBSDTEST(cheri_revoke_lightly, "A gentle test of capability revocation")
+{
+	void **mb;
+	void *sh;
+	const volatile struct cheri_revoke_info *cri;
+	void *revme;
+	struct cheri_revoke_syscall_info crsi;
+	int kq;
+
+	kq = CHERIBSDTEST_CHECK_SYSCALL(kqueue());
+	mb = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
+
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_get_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL, __DEQUALIFY(void **, &cri)));
+
+	/*
+	 * OK, armed with the shadow mapping... generate a capability to
+	 * the 0th granule of the map, spill it to the 1st granule,
+	 * stash it in the kqueue, and mark it as revoked in the shadow.
+	 */
+	revme = cheri_andperm(mb, ~CHERI_PERM_SW_VMEM);
+	((void **)mb)[1] = revme;
+	install_kqueue_cap(kq, revme);
+
+	((uint8_t *)sh)[0] = 1;
+
+	crsi.epochs.enqueue = 0xC0FFEE;
+	crsi.epochs.dequeue = 0xB00;
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS , 0, &crsi));
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]), "Memory tag persists");
+	check_kqueue_cap(kq, 0);
+
+	/* Clear the revocation bit and do that again */
+	((uint8_t *)sh)[0] = 0;
+
+	/*
+	 * We don't derive exactly the same thing, to prevent CSE from
+	 * firing.  More specifically, we adjust the offset first, taking
+	 * the path through the commutation diagram that doesn't share an
+	 * edge with the derivation above.
+	 */
+	revme = cheri_andperm(mb + 1, ~CHERI_PERM_SW_VMEM);
+	CHERIBSDTEST_VERIFY2(!check_revoked(revme), "Tag clear on 2nd revme?");
+	((void **)mb)[1] = revme;
+	install_kqueue_cap(kq, revme);
+
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+
+	CHERIBSDTEST_VERIFY2(
+	    crsi.epochs.enqueue >= crsi.epochs.dequeue + 1,
+	    "Bad epoch clock state");
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
+	    crsi.epochs.enqueue, &crsi));
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	CHERIBSDTEST_VERIFY2(!check_revoked(mb[1]), "Memory tag cleared");
+
+	check_kqueue_cap(kq, 1);
+
+	munmap(mb, PAGE_SIZE);
+	close(kq);
+
+	cheribsdtest_success();
+}
+#endif /* CHERI_REVOKE */
+
 #endif /* __CHERI_PURE_CAPABILITY__ */
