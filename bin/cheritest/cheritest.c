@@ -1060,6 +1060,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_signum = SIGSEGV,
 	  .ct_mips_exccode = T_TLB_LD_MISS, },
 
+#ifdef CHERIABI_TESTS
+	{ .ct_name = "test_caprevoke_lightly",
+	  .ct_desc = "A gentle test of capability revocation",
+	  .ct_func = test_caprevoke_lightly, },
+#endif
+
 #ifdef CHERI_LIBCHERI_TESTS
 #if 0
 	/*
