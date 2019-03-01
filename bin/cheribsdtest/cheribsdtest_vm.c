@@ -47,6 +47,7 @@
 #include <sys/ucontext.h>
 #include <sys/wait.h>
 
+#include <cheri/revoke.h>
 #include <sys/event.h>
 
 #include <machine/frame.h>
@@ -1174,4 +1175,220 @@ CHERIBSDTEST(cheribsdtest_vm_capdirty, "verify capdirty marking and mincore")
 	cheribsdtest_success();
 #undef CHERIBSDTEST_VM_CAPDIRTY_NPG
 }
+
+/*
+ * Revocation tests
+ */
+
+#ifdef CHERI_REVOKE
+
+/* Ick */
+static inline uint64_t
+get_cyclecount()
+{
+#if defined(__mips__)
+	return cheri_get_cyclecount();
+#elif defined(__riscv)
+	return __builtin_readcyclecounter();
+#else
+	return 0;
+#endif
+}
+
+static int
+check_revoked(void * __capability r)
+{
+	return (cheri_gettag(r) == 0) ||
+	    ((cheri_gettype(r) == -1L) && (cheri_getperm(r) == 0));
+}
+
+static void
+install_kqueue_cap(int kq, void * __capability revme)
+{
+	struct kevent ike;
+
+	EV_SET(&ike, (uintptr_t)&install_kqueue_cap,
+	    EVFILT_USER, EV_ADD | EV_ONESHOT | EV_DISABLE, NOTE_FFNOP, 0,
+	    revme);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+	EV_SET(&ike, (uintptr_t)&install_kqueue_cap, EVFILT_USER, EV_KEEPUDATA,
+	    NOTE_FFNOP | NOTE_TRIGGER, 0, NULL);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+}
+
+static void
+check_kqueue_cap(int kq, unsigned int valid)
+{
+	struct kevent ike, oke = { 0 };
+
+	EV_SET(&ike, (uintptr_t)&install_kqueue_cap,
+	    EVFILT_USER, EV_ENABLE|EV_KEEPUDATA, NOTE_FFNOP, 0, NULL);
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+	CHERIBSDTEST_CHECK_SYSCALL(kevent(kq, NULL, 0, &oke, 1, NULL));
+	CHERIBSDTEST_VERIFY2(
+	    __builtin_cheri_equal_exact(oke.ident, &install_kqueue_cap),
+	    "Bad identifier from kqueue");
+	CHERIBSDTEST_VERIFY2(oke.filter == EVFILT_USER,
+	    "Bad filter from kqueue");
+	CHERIBSDTEST_VERIFY2(check_revoked(oke.udata) == !valid,
+				"kqueue-held cap not as expected");
+}
+
+static void
+fprintf_cheri_revoke_stats(FILE *f, struct cheri_revoke_syscall_info crsi,
+    uint32_t cycsum)
+{
+	fprintf(f, "revoke:"
+		" edeq=%" PRIu64
+		" eenq=%" PRIu64
+
+		" psro=%" PRIu32
+		" psrw=%" PRIu32
+
+		" pfro=%" PRIu32
+		" pfrw=%" PRIu32
+
+		" pclg=%" PRIu32
+
+		" pskf=%" PRIu32
+		" pskn=%" PRIu32
+		" psks=%" PRIu32
+
+		" cfnd=%" PRIu32
+		" cfrv=%" PRIu32
+		" cnuk=%" PRIu32
+
+		" lscn=%" PRIu32
+		" pmkc=%" PRIu32
+
+		" pcyc=%" PRIu64
+		" fcyc=%" PRIu64
+		" tcyc=%" PRIu32
+		"\n",
+
+		crsi.epochs.dequeue,
+		crsi.epochs.enqueue,
+
+		crsi.stats.pages_scan_ro,
+		crsi.stats.pages_scan_rw,
+
+		crsi.stats.pages_faulted_ro,
+		crsi.stats.pages_faulted_rw,
+
+		crsi.stats.fault_visits,
+
+		crsi.stats.pages_skip_fast,
+		crsi.stats.pages_skip_nofill,
+		crsi.stats.pages_skip,
+
+		crsi.stats.caps_found,
+		crsi.stats.caps_found_revoked,
+		crsi.stats.caps_cleared,
+
+		crsi.stats.lines_scan,
+		crsi.stats.pages_mark_clean,
+
+		crsi.stats.page_scan_cycles,
+		crsi.stats.fault_cycles,
+		cycsum);
+}
+
+CHERIBSDTEST(cheribsdtest_cheri_revoke_lightly,
+    "A gentle test of capability revocation")
+{
+	void * __capability * __capability mb;
+	void * __capability sh;
+	const volatile struct cheri_revoke_info * __capability cri;
+	void * __capability revme;
+	struct cheri_revoke_syscall_info crsi;
+	int kq;
+	uint32_t cyc_start, cyc_end;
+
+	kq = CHERIBSDTEST_CHECK_SYSCALL(kqueue());
+	mb = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, mb, &sh));
+
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke_shadow(
+	    CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+	    __DEQUALIFY_CAP(void * __capability *, &cri)));
+
+	/*
+	 * OK, armed with the shadow mapping... generate a capability to
+	 * the 0th granule of the map, spill it to the 1st granule,
+	 * stash it in the kqueue, and mark it as revoked in the shadow.
+	 */
+	revme = cheri_andperm(mb, ~CHERI_PERM_CHERIABI_VMMAP);
+	((void * __capability *)mb)[1] = revme;
+	install_kqueue_cap(kq, revme);
+
+	((uint8_t * __capability)sh)[0] = 1;
+
+	crsi.epochs.enqueue = 0xC0FFEE;
+	crsi.epochs.dequeue = 0xB00;
+
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS , 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	CHERIBSDTEST_VERIFY2(check_revoked(mb[1]), "Memory tag persists");
+	check_kqueue_cap(kq, 0);
+
+	/* Clear the revocation bit and do that again */
+	((uint8_t * __capability)sh)[0] = 0;
+
+	/*
+	 * We don't derive exactly the same thing, to prevent CSE from
+	 * firing.  More specifically, we adjust the offset first, taking
+	 * the path through the commutation diagram that doesn't share an
+	 * edge with the derivation above.
+	 */
+	revme = cheri_andperm(mb + 1, ~CHERI_PERM_CHERIABI_VMMAP);
+	CHERIBSDTEST_VERIFY2(!check_revoked(revme), "Tag clear on 2nd revme?");
+	((void * __capability *)mb)[1] = revme;
+	install_kqueue_cap(kq, revme);
+
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(CHERI_REVOKE_IGNORE_START |
+	    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_VERIFY2(
+	    crsi.epochs.enqueue >= crsi.epochs.dequeue + 1,
+	    "Bad epoch clock state");
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	cyc_start = get_cyclecount();
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke(CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_TAKE_STATS,
+	    crsi.epochs.enqueue, &crsi));
+	cyc_end = get_cyclecount();
+	fprintf_cheri_revoke_stats(stderr, crsi, cyc_end - cyc_start);
+
+	CHERIBSDTEST_VERIFY2(
+	    cri->epochs.dequeue == crsi.epochs.dequeue,
+	    "Bad shared clock");
+
+	CHERIBSDTEST_VERIFY2(!check_revoked(mb[1]), "Memory tag cleared");
+
+	check_kqueue_cap(kq, 1);
+
+	munmap(mb, PAGE_SIZE);
+	close(kq);
+
+	cheribsdtest_success();
+}
+#endif
 #endif /* __CHERI_PURE_CAPABILITY__ */
