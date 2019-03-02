@@ -105,7 +105,11 @@ void __libc_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
 #endif
 
 #if defined(__mips__) || defined(__powerpc__) || defined(__riscv)
+#ifndef __CHERI_PURE_CAPABILITY__
 #define DTV_OFFSET 0x8000
+#else
+#define DTV_OFFSET 0
+#endif
 #else
 #define DTV_OFFSET 0
 #endif

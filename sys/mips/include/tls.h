@@ -38,8 +38,16 @@
  * TLS parameters
  */
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define TLS_TP_OFFSET	0
+#define TLS_DTP_OFFSET	0
+#else
 #define TLS_TP_OFFSET	0x7000
 #define TLS_DTP_OFFSET	0x8000
+#ifdef COMPAT_CHERIABI
+#define	TLS_TP_OFFSET_C	0
+#endif
+#endif
 
 
 /* XXX-AR: #define TLS_TCB_SIZE	(2 * sizeof(void*)) for all ABIs? */
