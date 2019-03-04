@@ -70,8 +70,8 @@ SRCS+=		vector.cpp
 # TODO: the filesystem code currently crashes clang
 .if 0
 SRCS+=		filesystem/directory_iterator.cpp
-SRCS+=		filesystem/operations.cpp
 SRCS+=		filesystem/int128_builtins.cpp
+SRCS+=		filesystem/operations.cpp
 .endif
 
 CXXRT_SRCS+=	auxhelper.cc
@@ -138,9 +138,7 @@ STD_HEADERS+=	algorithm
 STD_HEADERS+=	any
 STD_HEADERS+=	array
 STD_HEADERS+=	atomic
-.if ${_LIBCXX_VERSION} >= 8
 STD_HEADERS+=	bit
-.endif
 STD_HEADERS+=	bitset
 STD_HEADERS+=	cassert
 STD_HEADERS+=	ccomplex
