@@ -53,7 +53,8 @@ struct timezone {
 
 #if __BSD_VISIBLE
 struct bintime {
-	time_t	sec;
+	/* XXXAR: hack to avoid memcpy() dep in libsyscalls */
+	_Alignas(sizeof(void*)) time_t	sec;
 	uint64_t frac;
 };
 
