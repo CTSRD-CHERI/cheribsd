@@ -234,7 +234,7 @@ ${X_}COMPILER_FEATURES+=	c++11
 ${X_}COMPILER_FEATURES+=	retpoline
 .endif
 
-${X_}COMPILER_ABSOLUTE_PATH!=	which ${${cc}:N${CCACHE_BIN}:[1]}
+${X_}COMPILER_ABSOLUTE_PATH!=	/usr/bin/which ${${cc}:N${CCACHE_BIN}:[1]}
 .if empty(${X_}COMPILER_ABSOLUTE_PATH)
 .error Could not find $$CC (${${cc}:N${CCACHE_BIN}:[1]}) in $$PATH. \
 	Please pass an absolute path to CC instead.
