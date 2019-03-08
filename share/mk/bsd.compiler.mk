@@ -234,7 +234,11 @@ ${X_}COMPILER_FEATURES+=	c++11
 ${X_}COMPILER_FEATURES+=	retpoline
 .endif
 
+.if ${${cc}:N${CCACHE_BIN}:[1]:M/*} && exists(${${cc}:N${CCACHE_BIN}:[1]})
+${X_}COMPILER_ABSOLUTE_PATH=	${${cc}:N${CCACHE_BIN}:[1]}
+.else
 ${X_}COMPILER_ABSOLUTE_PATH!=	which ${${cc}:N${CCACHE_BIN}:[1]}
+.endif
 .if empty(${X_}COMPILER_ABSOLUTE_PATH)
 .error Could not find $$CC (${${cc}:N${CCACHE_BIN}:[1]}) in $$PATH. \
 	Please pass an absolute path to CC instead.
