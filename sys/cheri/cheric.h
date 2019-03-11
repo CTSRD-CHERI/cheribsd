@@ -122,7 +122,7 @@ cheri_codeptr(const void *ptr, size_t len)
 #ifdef NOTYET
 	void (* __capability c)(void) = ptr;
 #else
-	void * __capability c = cheri_setoffset(cheri_getpcc(),
+	void * __capability c = cheri_setaddress(cheri_getpcc(),
 	    (register_t)ptr);
 #endif
 
