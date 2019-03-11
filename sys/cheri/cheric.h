@@ -103,6 +103,24 @@ cheri_setaddress(const void * __capability dst, vaddr_t addr)
 	return (cheri_incoffset(dst, addr - cheri_getaddress(dst)));
 }
 
+/* Get the top of a capability (i.e. one byte past the last accessible one) */
+static inline vaddr_t
+cheri_gettop(const void * __capability cap)
+{
+	return (cheri_getbase(cap) + cheri_getlen(cap));
+}
+
+/* Check if the address is between cap.base and cap.top, i.e. in bounds */
+#ifdef __cplusplus
+static inline bool
+#else
+static inline _Bool
+#endif
+cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
+{
+	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
+}
+
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
  * data capability.  The compiler's use of CFromPtr will be with respect to
