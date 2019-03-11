@@ -62,7 +62,7 @@ typedef void (*init_function_ptr)(int, char**, char**);
 	((type)entry)
 #else
 #define array_entry_to_function_ptr(type, entry) \
-	((type)cheri_setoffset(cheri_getpcc(), entry));
+	((type)cheri_setaddress(cheri_getpcc(), entry));
 #endif
 
 
