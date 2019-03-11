@@ -215,7 +215,7 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_ptr(cap, min_size)	__extension__({			\
 	typedef __typeof__(*(cap)) __underlying_type;			\
 	__underlying_type* __result = 0;				\
-	if (cheri_bytes_remaining(cap) >= (uint64_t)min_size) {		\
+	if (cheri_gettag(cap) && cheri_bytes_remaining(cap) >= (uint64_t)min_size) { \
 		__result = (__cheri_fromcap __underlying_type*)(cap);	\
 	} __result; })
 
