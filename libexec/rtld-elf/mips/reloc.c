@@ -1073,7 +1073,7 @@ _mips_get_tls(void)
 #elif defined(__CHERI_CAPABILITY_TLS__)
 	return (void *)_rv;
 #else
-	return cheri_setoffset(cheri_getdefault(), _rv);
+	return cheri_setaddress(cheri_getdefault(), _rv);
 #endif
 }
 
