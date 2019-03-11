@@ -203,9 +203,7 @@ __rederive_pointer(void *ptr)
 	TLS_MALLOC_LOCK;
 	for (i = 0; i < n_pagepools; i++) {
 		char *pool = pagepool_list[i];
-		vm_offset_t base = cheri_getbase(pool);
-		// FIXME: add cheri_is_address_inbounds(pool, addr)
-		if (addr >= base && addr < base + cheri_getlen(pool))
+		if (cheri_is_address_inbounds(pool, addr))
 			return (cheri_setaddress(pool, addr));
 	}
 	TLS_MALLOC_UNLOCK;

@@ -105,10 +105,9 @@ __rederive_pointer(void *ptr)
 	vm_offset_t addr;
 
 	addr = cheri_getaddress(ptr);
-	vm_offset_t base = cheri_getbase(pool);
 
-	if (addr >= base && addr < base + cheri_getlen(pool))
-		return(cheri_setaddress(pool, addr));
+	if (cheri_is_address_inbounds(pool, addr))
+		return (cheri_setaddress(pool, addr));
 
 	return (NULL);
 }
