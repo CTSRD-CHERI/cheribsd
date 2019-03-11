@@ -87,6 +87,7 @@ __init_heap(size_t pagesz)
 	 */
 	assert(_sb_heapbase == roundup2(_sb_heapbase, (ssize_t)pagesz));
 
+	assert(cheri_getoffset(cheri_getdefault()) == 0);
 	sb_heap = cheri_setoffset(cheri_getdefault(), _sb_heapbase);
 	sb_heap = cheri_csetbounds(sb_heap, _sb_heaplen);
 	assert(cheri_getoffset(sb_heap) == 0);
@@ -103,11 +104,11 @@ __rederive_pointer(void *ptr)
 {
 	vm_offset_t addr;
 
-	addr = cheri_getbase(ptr) + cheri_getoffset(ptr);
+	addr = cheri_getaddress(ptr);
 	vm_offset_t base = cheri_getbase(pool);
 
 	if (addr >= base && addr < base + cheri_getlen(pool))
-		return(cheri_setoffset(pool, addr - base));
+		return(cheri_setaddress(pool, addr));
 
 	return (NULL);
 }
