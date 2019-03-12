@@ -44,6 +44,7 @@
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/vm_extern.h>
+#include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_map.h>
@@ -591,6 +592,76 @@ transpose(void * __capability *capp __unused, size_t delta __unused)
 	*capp = cap;
 }
 
+static void
+transpose_maps(size_t delta)
+{
+	struct proc *p;
+	struct vmspace *vm;
+	vm_map_t map;
+	vm_map_entry_t entry, new_entry;
+	vm_offset_t start;
+	int found, rv;
+
+	p = curproc;
+	vm = p->p_vmspace;
+	map = &vm->vm_map;
+
+	vm_map_lock(map);
+
+again:
+	for (entry = map->header.next; entry != &map->header;
+	    entry = entry->next) {
+		if (entry->owner != p->p_pid)
+			continue;
+
+		if (entry->eflags & MAP_ENTRY_TRANSPOSED)
+			continue;
+
+		if (entry->start > 0x7f00000000) {
+			continue;
+		}
+
+		if (entry->start < 0x7f00000000)
+			start = entry->start + delta;
+		else
+			start = entry->start - delta;
+
+		vm_map_unlock(map); // XXX
+		rv = vm_map_fixed(map, entry->object.vm_object, 0, start,
+		    start + entry->end - entry->start,
+		    entry->protection, entry->max_protection, MAP_CHECK_EXCL /* XXX */);
+		vm_map_lock(map); // XXX
+		if (rv != KERN_SUCCESS) {
+			printf("%s: failed to remap %#llx, owner %d, to %#llx, rv %d\n", __func__,
+			    (unsigned long long)entry->start, entry->owner, (unsigned long long)start, rv);
+			break;
+		}
+		vm_object_reference(entry->object.vm_object);
+
+		/*
+		 * Don't try to reallocate it again.
+		 */
+		found = vm_map_lookup_entry(map, start, &new_entry);
+		KASSERT(found, ("meh"));
+		new_entry->eflags |= MAP_ENTRY_TRANSPOSED;
+		entry->eflags |= MAP_ENTRY_TRANSPOSED;
+
+		goto again;
+	}
+
+	/*
+	 * Clean up the MAP_ENTRY_TRANSPOSED bits.
+	 */
+	for (entry = map->header.next; entry != &map->header;
+	    entry = entry->next) {
+		if (entry->owner != p->p_pid)
+			continue;
+		entry->eflags &= ~MAP_ENTRY_TRANSPOSED;
+	}
+
+	vm_map_unlock(map);
+}
+
 int
 kern_colocate(struct thread *td, pid_t pid)
 {
@@ -601,6 +672,9 @@ kern_colocate(struct thread *td, pid_t pid)
 
 	delta = 4l * 1024 * 1024 * 1024;
 
+	transpose_maps(delta);
+
+#if 0
 	transpose(&frame->ddc, delta);
 	transpose(&frame->c1, delta);
 	transpose(&frame->c2, delta);
@@ -630,7 +704,11 @@ kern_colocate(struct thread *td, pid_t pid)
 	transpose(&frame->idc, delta);
 	transpose(&frame->pcc, delta);
 
+	frame->pc += delta;
 	td->td_retcap = NULL;
+#endif
+
+	printf("%s: \\o/\n", __func__);
 
 	return (0);
 }

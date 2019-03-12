@@ -138,6 +138,7 @@ struct vm_map_entry {
 #define MAP_ENTRY_IN_TRANSITION		0x0100	/* entry being changed */
 #define MAP_ENTRY_NEEDS_WAKEUP		0x0200	/* waiters in transition */
 #define MAP_ENTRY_NOCOREDUMP		0x0400	/* don't include in a core */
+#define MAP_ENTRY_TRANSPOSED		0x0800
 
 #define	MAP_ENTRY_GROWS_DOWN		0x1000	/* Top-down stacks */
 #define	MAP_ENTRY_GROWS_UP		0x2000	/* Bottom-up stacks */
