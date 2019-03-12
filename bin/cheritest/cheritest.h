@@ -478,6 +478,9 @@ DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_private);
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared2x);
 DECLARE_CHERI_TEST(cheritest_vm_shm_open_anon_unix_surprise);
+#ifdef CHERIABI_TESTS
+DECLARE_CHERI_TEST(cheritest_vm_cap_share_fd_kqueue);
+#endif
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_private);
 DECLARE_CHERI_TEST(cheritest_vm_notag_tmpfile_shared);
