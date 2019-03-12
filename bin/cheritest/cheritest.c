@@ -991,6 +991,12 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = cheritest_vm_cap_share_fd_kqueue,
 	  .ct_xfail_reason =
 	    "Tags currently survive cross-AS shared FD tables", },
+
+	{ .ct_name = "cheritest_vm_cap_share_sigaction",
+	  .ct_desc = "Demonstrate capability passing via shared sigaction table",
+	  .ct_func = cheritest_vm_cap_share_sigaction,
+	  .ct_xfail_reason =
+	    "Tags currently survive cross-AS shared sigaction table", },
 #endif
 
 	{ .ct_name = "cheritest_vm_tag_dev_zero_shared",

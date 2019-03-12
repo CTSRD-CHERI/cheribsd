@@ -328,6 +328,52 @@ cheritest_vm_cap_share_fd_kqueue(const struct cheri_test *ctp __unused)
 	}
 }
 
+/*
+ * We can rfork and share the sigaction table across parent and child, which
+ * again allows for capability passing across address spaces.
+ */
+void
+cheritest_vm_cap_share_sigaction(const struct cheri_test *ctp __unused)
+{
+	int pid;
+
+	pid = rfork(RFPROC | RFSIGSHARE);
+	if (pid == -1)
+		cheritest_failure_errx("Fork failed; errno=%d", errno);
+
+	if (pid == 0) {
+		void * __capability passme;
+		struct sigaction sa;
+
+		bzero(&sa, sizeof(sa));
+
+		/* This is a little abusive, but shows the point, I think */
+
+		passme = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE,
+				PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON, -1, 0));
+		sa.sa_handler = passme;
+		sa.sa_flags = 0;
+
+		CHERITEST_CHECK_SYSCALL(sigaction(SIGUSR1, &sa, NULL));
+		exit(0);
+	} else {
+		struct sigaction sa;
+
+		waitpid(pid, NULL, 0);
+
+		sa.sa_handler = NULL;
+		CHERITEST_CHECK_SYSCALL(sigaction(SIGUSR1, NULL, &sa));
+
+		CHERI_FPRINT_PTR(stderr, sa.sa_handler);
+
+		if (cheri_gettag(sa.sa_handler)) {
+			cheritest_failure_errx("tag transfer");
+		} else {
+			cheritest_success();
+		}
+	}
+}
+
 #endif
 
 void
