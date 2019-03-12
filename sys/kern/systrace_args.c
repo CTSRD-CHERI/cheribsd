@@ -3286,18 +3286,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* coexecve */
-	case 565: {
-		struct coexecve_args *p = params;
-		iarg[0] = p->pid; /* pid_t */
-		uarg[1] = (intptr_t) p->fname; /* char * */
-		uarg[2] = (intptr_t) p->argv; /* char ** */
-		uarg[3] = (intptr_t) p->envv; /* char ** */
-		*n_args = 4;
-		break;
-	}
 	/* fhlink */
-	case 566: {
+	case 565: {
 		struct fhlink_args *p = params;
 		uarg[0] = (intptr_t) p->fhp; /* struct fhandle * */
 		uarg[1] = (intptr_t) p->to; /* const char * */
@@ -3305,7 +3295,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* fhlinkat */
-	case 567: {
+	case 566: {
 		struct fhlinkat_args *p = params;
 		uarg[0] = (intptr_t) p->fhp; /* struct fhandle * */
 		iarg[1] = p->tofd; /* int */
@@ -3314,12 +3304,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* fhreadlink */
-	case 568: {
+	case 567: {
 		struct fhreadlink_args *p = params;
 		uarg[0] = (intptr_t) p->fhp; /* struct fhandle * */
 		uarg[1] = (intptr_t) p->buf; /* char * */
 		uarg[2] = p->bufsize; /* size_t */
 		*n_args = 3;
+		break;
+	}
+	/* coexecve */
+	case 568: {
+		struct coexecve_args *p = params;
+		iarg[0] = p->pid; /* pid_t */
+		uarg[1] = (intptr_t) p->fname; /* char * */
+		uarg[2] = (intptr_t) p->argv; /* char ** */
+		uarg[3] = (intptr_t) p->envv; /* char ** */
+		*n_args = 4;
 		break;
 	}
 	default:
@@ -8804,27 +8804,8 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* coexecve */
-	case 565:
-		switch(ndx) {
-		case 0:
-			p = "pid_t";
-			break;
-		case 1:
-			p = "userland char *";
-			break;
-		case 2:
-			p = "userland char **";
-			break;
-		case 3:
-			p = "userland char **";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* fhlink */
-	case 566:
+	case 565:
 		switch(ndx) {
 		case 0:
 			p = "userland struct fhandle *";
@@ -8837,7 +8818,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* fhlinkat */
-	case 567:
+	case 566:
 		switch(ndx) {
 		case 0:
 			p = "userland struct fhandle *";
@@ -8853,7 +8834,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* fhreadlink */
-	case 568:
+	case 567:
 		switch(ndx) {
 		case 0:
 			p = "userland struct fhandle *";
@@ -8863,6 +8844,25 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 2:
 			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* coexecve */
+	case 568:
+		switch(ndx) {
+		case 0:
+			p = "pid_t";
+			break;
+		case 1:
+			p = "userland char *";
+			break;
+		case 2:
+			p = "userland char **";
+			break;
+		case 3:
+			p = "userland char **";
 			break;
 		default:
 			break;
@@ -10754,22 +10754,22 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* coexecve */
+	/* fhlink */
 	case 565:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* fhlink */
+	/* fhlinkat */
 	case 566:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* fhlinkat */
+	/* fhreadlink */
 	case 567:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* fhreadlink */
+	/* coexecve */
 	case 568:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

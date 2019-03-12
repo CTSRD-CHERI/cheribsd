@@ -614,8 +614,8 @@ struct sysent sysent[] = {
 	{ AS(cpuset_setdomain_args), (sy_call_t *)sys_cpuset_setdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = cpuset_setdomain */
 	{ AS(getrandom_args), (sy_call_t *)sys_getrandom, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 563 = getrandom */
 	{ AS(getfhat_args), (sy_call_t *)sys_getfhat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = getfhat */
-	{ AS(coexecve_args), (sy_call_t *)sys_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = coexecve */
-	{ AS(fhlink_args), (sy_call_t *)sys_fhlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = fhlink */
-	{ AS(fhlinkat_args), (sy_call_t *)sys_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = fhlinkat */
-	{ AS(fhreadlink_args), (sy_call_t *)sys_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 568 = fhreadlink */
+	{ AS(fhlink_args), (sy_call_t *)sys_fhlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = fhlink */
+	{ AS(fhlinkat_args), (sy_call_t *)sys_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = fhlinkat */
+	{ AS(fhreadlink_args), (sy_call_t *)sys_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = fhreadlink */
+	{ AS(coexecve_args), (sy_call_t *)sys_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 568 = coexecve */
 };

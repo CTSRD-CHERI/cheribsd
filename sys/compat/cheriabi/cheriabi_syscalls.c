@@ -571,8 +571,8 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_cpuset_setdomain",			/* 562 = cheriabi_cpuset_setdomain */
 	"cheriabi_getrandom",			/* 563 = cheriabi_getrandom */
 	"cheriabi_getfhat",			/* 564 = cheriabi_getfhat */
-	"cheriabi_coexecve",			/* 565 = cheriabi_coexecve */
-	"cheriabi_fhlink",			/* 566 = cheriabi_fhlink */
-	"cheriabi_fhlinkat",			/* 567 = cheriabi_fhlinkat */
-	"cheriabi_fhreadlink",			/* 568 = cheriabi_fhreadlink */
+	"cheriabi_fhlink",			/* 565 = cheriabi_fhlink */
+	"cheriabi_fhlinkat",			/* 566 = cheriabi_fhlinkat */
+	"cheriabi_fhreadlink",			/* 567 = cheriabi_fhreadlink */
+	"cheriabi_coexecve",			/* 568 = cheriabi_coexecve */
 };

@@ -579,8 +579,8 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_cpuset_setdomain_args), (sy_call_t *)cheriabi_cpuset_setdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = cheriabi_cpuset_setdomain */
 	{ AS(cheriabi_getrandom_args), (sy_call_t *)cheriabi_getrandom, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 563 = cheriabi_getrandom */
 	{ AS(cheriabi_getfhat_args), (sy_call_t *)cheriabi_getfhat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = cheriabi_getfhat */
-	{ AS(cheriabi_coexecve_args), (sy_call_t *)cheriabi_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = cheriabi_coexecve */
-	{ AS(cheriabi_fhlink_args), (sy_call_t *)cheriabi_fhlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = cheriabi_fhlink */
-	{ AS(cheriabi_fhlinkat_args), (sy_call_t *)cheriabi_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = cheriabi_fhlinkat */
-	{ AS(cheriabi_fhreadlink_args), (sy_call_t *)cheriabi_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 568 = cheriabi_fhreadlink */
+	{ AS(cheriabi_fhlink_args), (sy_call_t *)cheriabi_fhlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = cheriabi_fhlink */
+	{ AS(cheriabi_fhlinkat_args), (sy_call_t *)cheriabi_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = cheriabi_fhlinkat */
+	{ AS(cheriabi_fhreadlink_args), (sy_call_t *)cheriabi_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = cheriabi_fhreadlink */
+	{ AS(cheriabi_coexecve_args), (sy_call_t *)cheriabi_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 568 = cheriabi_coexecve */
 };

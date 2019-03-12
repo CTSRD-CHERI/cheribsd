@@ -501,8 +501,8 @@
 #define	SYS_cpuset_setdomain	562
 #define	SYS_getrandom	563
 #define	SYS_getfhat	564
-#define	SYS_coexecve	565
-#define	SYS_fhlink	566
-#define	SYS_fhlinkat	567
-#define	SYS_fhreadlink	568
+#define	SYS_fhlink	565
+#define	SYS_fhlinkat	566
+#define	SYS_fhreadlink	567
+#define	SYS_coexecve	568
 #define	SYS_MAXSYSCALL	569

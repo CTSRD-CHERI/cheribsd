@@ -1792,12 +1792,6 @@ struct getfhat_args {
 	char fhp_l_[PADL_(struct fhandle *)]; struct fhandle * fhp; char fhp_r_[PADR_(struct fhandle *)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
-struct coexecve_args {
-	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char fname_l_[PADL_(char *)]; char * fname; char fname_r_[PADR_(char *)];
-	char argv_l_[PADL_(char **)]; char ** argv; char argv_r_[PADR_(char **)];
-	char envv_l_[PADL_(char **)]; char ** envv; char envv_r_[PADR_(char **)];
-};
 struct fhlink_args {
 	char fhp_l_[PADL_(struct fhandle *)]; struct fhandle * fhp; char fhp_r_[PADR_(struct fhandle *)];
 	char to_l_[PADL_(const char *)]; const char * to; char to_r_[PADR_(const char *)];
@@ -1811,6 +1805,12 @@ struct fhreadlink_args {
 	char fhp_l_[PADL_(struct fhandle *)]; struct fhandle * fhp; char fhp_r_[PADR_(struct fhandle *)];
 	char buf_l_[PADL_(char *)]; char * buf; char buf_r_[PADR_(char *)];
 	char bufsize_l_[PADL_(size_t)]; size_t bufsize; char bufsize_r_[PADR_(size_t)];
+};
+struct coexecve_args {
+	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
+	char fname_l_[PADL_(char *)]; char * fname; char fname_r_[PADR_(char *)];
+	char argv_l_[PADL_(char **)]; char ** argv; char argv_r_[PADR_(char **)];
+	char envv_l_[PADL_(char **)]; char ** envv; char envv_r_[PADR_(char **)];
 };
 int	nosys(struct thread *, struct nosys_args *);
 void	sys_sys_exit(struct thread *, struct sys_exit_args *);
@@ -2194,10 +2194,10 @@ int	sys_cpuset_getdomain(struct thread *, struct cpuset_getdomain_args *);
 int	sys_cpuset_setdomain(struct thread *, struct cpuset_setdomain_args *);
 int	sys_getrandom(struct thread *, struct getrandom_args *);
 int	sys_getfhat(struct thread *, struct getfhat_args *);
-int	sys_coexecve(struct thread *, struct coexecve_args *);
 int	sys_fhlink(struct thread *, struct fhlink_args *);
 int	sys_fhlinkat(struct thread *, struct fhlinkat_args *);
 int	sys_fhreadlink(struct thread *, struct fhreadlink_args *);
+int	sys_coexecve(struct thread *, struct coexecve_args *);
 
 #ifdef COMPAT_43
 
@@ -3102,10 +3102,10 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_cpuset_setdomain	AUE_NULL
 #define	SYS_AUE_getrandom	AUE_NULL
 #define	SYS_AUE_getfhat	AUE_NULL
-#define	SYS_AUE_coexecve	AUE_NULL
 #define	SYS_AUE_fhlink	AUE_NULL
 #define	SYS_AUE_fhlinkat	AUE_NULL
 #define	SYS_AUE_fhreadlink	AUE_NULL
+#define	SYS_AUE_coexecve	AUE_NULL
 
 #undef PAD_
 #undef PADL_

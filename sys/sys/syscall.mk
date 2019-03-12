@@ -407,7 +407,7 @@ MIASM =  \
 	cpuset_setdomain.o \
 	getrandom.o \
 	getfhat.o \
-	coexecve.o \
 	fhlink.o \
 	fhlinkat.o \
-	fhreadlink.o
+	fhreadlink.o \
+	coexecve.o
