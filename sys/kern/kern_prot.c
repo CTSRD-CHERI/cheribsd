@@ -72,6 +72,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/resourcevar.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/sysent.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 
@@ -1711,6 +1712,23 @@ SYSCTL_PROC(_security_bsd, OID_AUTO, unprivileged_proc_debug,
 int
 p_cancolocate(struct thread *td, struct proc *p)
 {
+	/*
+	 * In theory, when joining an address space with several
+	 * processes living inside, we should check whether we can
+	 * colocate with each of them.  Let's assume that if we are
+	 * permitted to colocate with one of them, we are permitted
+	 * to colocate with all of them.
+	 */
+
+	/*
+	 * Prevent colocating non-CheriABI processes.
+	 */
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) == 0)
+		return (EPERM);
+
+	if (SV_PROC_FLAG(p, SV_CHERI) == 0)
+		return (EPERM);
+
 	/*
 	 * XXX: Relax it a bit.
 	 */
