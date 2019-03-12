@@ -128,7 +128,7 @@ _tcb_get(void)
 #if !defined(__CHERI_PURE_CAPABILITY__) || defined(__CHERI_CAPABILITY_TLS__)
 	return (struct tcb *)(_rv - TLS_TP_OFFSET - TLS_TCB_SIZE);
 #else
-	return (struct tcb *)cheri_setoffset(cheri_getdefault(),
+	return (struct tcb *)cheri_setaddress(cheri_getdefault(),
 	    _rv - TLS_TP_OFFSET - TLS_TCB_SIZE);
 #endif
 }

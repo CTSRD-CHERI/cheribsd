@@ -869,8 +869,7 @@ fp_common:
 				size = buf + BUF - cp;
 				break;
 			}
-			ujval = cheri_getbase(pointer) +
-			    cheri_getoffset(pointer);
+			ujval = cheri_getaddress(pointer);
 #endif
 			base = 16;
 			xdigs = xdigs_lower;

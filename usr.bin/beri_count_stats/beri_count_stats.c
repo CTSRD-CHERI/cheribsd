@@ -82,7 +82,6 @@ main(int argc, char **argv)
 	waitpid(pid, &status, 0);
 	if (!WIFEXITED(status)) {
 		warnx("child exited abnormally");
-		exit(-1);
 	}
 	statcounters_bank_t end_count;
 	statcounters_bank_t diff_count;

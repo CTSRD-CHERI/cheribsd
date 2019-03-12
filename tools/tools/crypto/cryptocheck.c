@@ -111,6 +111,7 @@
  */
 
 #include <sys/param.h>
+#include <sys/sysctl.h>
 #include <assert.h>
 #include <err.h>
 #include <fcntl.h>
@@ -275,13 +276,41 @@ devcrypto(void)
 	return (fd);
 }
 
+/*
+ * Called on exit to change kern.cryptodevallowsoft back to 0
+ */
+#define CRYPT_SOFT_ALLOW	"kern.cryptodevallowsoft"
+
+static void
+reset_user_soft(void)
+{
+	int off = 0;
+	sysctlbyname(CRYPT_SOFT_ALLOW, NULL, NULL, &off, sizeof(off));
+}
+
+static void
+enable_user_soft(void)
+{
+	int curstate;
+	int on = 1;
+	size_t cursize = sizeof(curstate);
+
+	if (sysctlbyname(CRYPT_SOFT_ALLOW, &curstate, &cursize,
+		&on, sizeof(on)) == 0) {
+		if (curstate == 0)
+			atexit(reset_user_soft);
+	}
+}
+
 static int
 crlookup(const char *devname)
 {
 	struct crypt_find_op find;
 
-	if (strncmp(devname, "soft", 4) == 0)
+	if (strncmp(devname, "soft", 4) == 0) {
+		enable_user_soft();
 		return CRYPTO_FLAG_SOFTWARE;
+	}
 
 	find.crid = -1;
 	strlcpy(find.name, devname, sizeof(find.name));
@@ -1184,6 +1213,9 @@ openssl_ccm_encrypt(struct alg *alg, const EVP_CIPHER *cipher, const char *key,
 		    size, ERR_error_string(ERR_get_error(), NULL));
 	if (EVP_EncryptInit_ex(ctx, cipher, NULL, NULL, NULL) != 1)
 		errx(1, "OpenSSL %s (%zu) ctx init failed: %s", alg->name,
+		    size, ERR_error_string(ERR_get_error(), NULL));
+	if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_CCM_SET_IVLEN, iv_len, NULL) != 1)
+		errx(1, "OpenSSL %s (%zu) setting iv length failed: %s", alg->name,
 		    size, ERR_error_string(ERR_get_error(), NULL));
 	if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_CCM_SET_TAG, AES_CBC_MAC_HASH_LEN, NULL) != 1)
 		errx(1, "OpenSSL %s (%zu) setting tag length failed: %s", alg->name,

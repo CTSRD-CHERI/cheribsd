@@ -107,6 +107,14 @@ struct thread0_storage thread0_st __aligned(32);
 struct	vmspace vmspace0;
 struct	proc *initproc;
 
+int
+linux_alloc_current_noop(struct thread *td __unused, int flags __unused)
+{
+	return (0);
+}
+int (*lkpi_alloc_current)(struct thread *, int) = linux_alloc_current_noop;
+
+
 #ifndef BOOTHOWTO
 #define	BOOTHOWTO	0
 #endif
@@ -412,7 +420,6 @@ struct sysentvec null_sysvec = {
 	.sv_coredump	= NULL,
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= 0,
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
@@ -454,7 +461,7 @@ proc0_init(void *dummy __unused)
 	GIANT_REQUIRED;
 	p = &proc0;
 	td = &thread0;
-	
+
 	/*
 	 * Initialize magic number and osrel.
 	 */

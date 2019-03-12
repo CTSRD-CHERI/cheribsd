@@ -823,13 +823,8 @@ nvme_qpair_submit_tracker(struct nvme_qpair *qpair, struct nvme_tracker *tr)
 	ctrlr = qpair->ctrlr;
 
 	if (req->timeout)
-#if __FreeBSD_version >= 800030
 		callout_reset_curcpu(&tr->timer, ctrlr->timeout_period * hz,
 		    nvme_timeout, tr);
-#else
-		callout_reset(&tr->timer, ctrlr->timeout_period * hz,
-		    nvme_timeout, tr);
-#endif
 
 	/* Copy the command from the tracker to the submission queue. */
 	memcpy(&qpair->cmd[qpair->sq_tail], &req->cmd, sizeof(req->cmd));
@@ -959,7 +954,6 @@ _nvme_qpair_submit_request(struct nvme_qpair *qpair, struct nvme_request *req)
 	case NVME_REQUEST_NULL:
 		nvme_qpair_submit_tracker(tr->qpair, tr);
 		break;
-#ifdef NVME_UNMAPPED_BIO_SUPPORT
 	case NVME_REQUEST_BIO:
 		KASSERT(req->u.bio->bio_bcount <= qpair->ctrlr->max_xfer_size,
 		    ("bio->bio_bcount (%jd) exceeds max_xfer_size (%d)\n",
@@ -971,7 +965,6 @@ _nvme_qpair_submit_request(struct nvme_qpair *qpair, struct nvme_request *req)
 			nvme_printf(qpair->ctrlr,
 			    "bus_dmamap_load_bio returned 0x%x!\n", err);
 		break;
-#endif
 	case NVME_REQUEST_CCB:
 		err = bus_dmamap_load_ccb(tr->qpair->dma_tag_payload,
 		    tr->payload_dma_map, req->u.payload,

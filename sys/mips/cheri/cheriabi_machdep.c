@@ -117,7 +117,6 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,	/* XXXBD: or something bigger? */
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= PAGE_SIZE,	/* Disallow mapping at NULL */
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
@@ -935,7 +934,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 		PCPU_SET(fpcurthread, (struct thread *)0);
 	td->td_md.md_ss_addr = 0;
 
-	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE_C;
+	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET_C + TLS_TCB_SIZE_C;
 }
 
 /*
@@ -1030,7 +1029,7 @@ int
 cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 {
 
-	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE_C;
+	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET_C + TLS_TCB_SIZE_C;
 	/* XXX-AR: add a TLS alignment check here */
 	td->td_md.md_tls = tls_base;
 	/* XXX-JC: only use cwritehwr */
