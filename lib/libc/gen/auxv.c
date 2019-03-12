@@ -95,6 +95,9 @@ static char *canary, *pagesizes;
 #ifdef AT_PS_STRINGS
 static void *ps_strings;
 #endif
+#ifdef AT_EXECPATH
+static const char *execpath;
+#endif
 static void *timekeep;
 static u_long hwcap, hwcap2;
 
@@ -150,6 +153,11 @@ init_aux(void)
 #ifdef AT_PS_STRINGS
 		case AT_PS_STRINGS:
 			ps_strings = aux->a_un.a_ptr;
+			break;
+#endif
+#ifdef AT_EXECPATH
+		case AT_EXECPATH:
+			execpath = aux->a_un.a_ptr;
 			break;
 #endif
 		}
@@ -249,6 +257,20 @@ _elf_aux_info(int aux, void *buf, int buflen)
 				res = ENOENT;
 		} else
 			res = EINVAL;
+		break;
+#endif
+#ifdef AT_EXECPATH
+	case AT_EXECPATH:
+		if (execpath != NULL) {
+			if (buflen > strlen(execpath)) {
+				strlcpy(buf, execpath, buflen);
+				res = 0;
+			} else {
+				res = EINVAL;
+			}
+		} else {
+			res = ENOENT;
+		}
 		break;
 #endif
 	default:
