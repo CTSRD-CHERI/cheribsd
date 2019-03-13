@@ -2555,8 +2555,6 @@ vm_map_madvise(
 	 * we need to use an exclusive lock on the map and we need to perform
 	 * various clipping operations.  Otherwise we only need a read-lock
 	 * on the map.
-	 *
-	 * XXX: Except that vm_map_check_owner() requires the exclusive lock.
 	 */
 	switch(behav) {
 	case MADV_NORMAL:
@@ -2576,7 +2574,8 @@ vm_map_madvise(
 	case MADV_FREE:
 		if (start == end)
 			return (0);
-		vm_map_lock(map);
+		modify_map = false;
+		vm_map_lock_read(map);
 		break;
 	default:
 		return (EINVAL);
@@ -2586,7 +2585,10 @@ vm_map_madvise(
 	if (result != KERN_SUCCESS) {
 		printf("%s: vm_map_check_owner returned %d\n",
 		    __func__, result);
-		vm_map_unlock(map);
+		if (modify_map)
+			vm_map_unlock(map);
+		else
+			vm_map_unlock_read(map);
 		return (result);
 	}
 
@@ -2712,7 +2714,7 @@ vm_map_madvise(
 				);
 			}
 		}
-		vm_map_unlock(map);
+		vm_map_unlock_read(map);
 	}
 	return (0);
 }
