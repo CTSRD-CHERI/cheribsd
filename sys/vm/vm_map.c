@@ -2344,16 +2344,15 @@ int
 vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end)
 {
 	vm_map_entry_t entry;
+	bool found;
 
 	VM_MAP_ASSERT_LOCKED(map);
 
 	VM_MAP_RANGE_CHECK(map, start, end);
 
-	if (vm_map_lookup_entry(map, start, &entry)) {
-		vm_map_clip_start(map, entry, start);
-	} else {
-		entry = entry->next;
-	}
+	found = vm_map_lookup_entry(map, start, &entry);
+	if (!found)
+		return (KERN_SUCCESS);
 
 	for (; entry != &map->header && entry->start < end;
 	    entry = entry->next) {
