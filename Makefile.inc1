@@ -1561,14 +1561,27 @@ buildsysroot: buildworld_prologue ${BUILDSYSROOT_TGTS} buildworld_epilogue .PHON
 # Checks to be sure system is ready for installworld/installkernel.
 #
 installcheck: _installcheck_world _installcheck_kernel .PHONY
-_installcheck_world: .PHONY
+_installcheck_world: _installcheck_tmpdir .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> Install check world"
 	@echo "--------------------------------------------------------------"
-_installcheck_kernel: .PHONY
+_installcheck_kernel: _installcheck_tmpdir .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> Install check kernel"
 	@echo "--------------------------------------------------------------"
+
+_installcheck_tmpdir:
+	tmpfile=`mktemp`; \
+	    trap 'rm -rf "$$tmpfile"' EXIT; \
+	    echo "tmpfile=$$tmpfile"; \
+	    echo "#!/bin/sh -e" > "$$tmpfile"; \
+	    echo 'echo "Temporary directory $$PWD is executable."' >> "$$tmpfile"; \
+	    chmod +x "$$tmpfile"; \
+	    if ! $$tmpfile; then \
+	        echo "FATAL: Temporary directory $$(dirname "$$tmpfile") is not executable"; \
+	        echo "Possibly the containing filesystem is mounted with the noexec flag?"; \
+	        false; \
+	    fi
 
 #
 # Require DESTDIR to be set if installing for a different architecture or
