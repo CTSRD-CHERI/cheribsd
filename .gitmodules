@@ -6,7 +6,3 @@
 	path = contrib/cheri-libcxxrt
 	url = https://github.com/CTSRD-CHERI/libcxxrt.git
 	# branch = master
-[submodule "contrib/cheri-libunwind"]
-	path = contrib/cheri-libunwind
-	url = https://github.com/CTSRD-CHERI/libunwind.git
-	# branch = master
