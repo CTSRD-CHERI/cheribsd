@@ -1,4 +1,0 @@
-[submodule "contrib/cheri-libc++"]
-	path = contrib/cheri-libc++
-	url = https://github.com/CTSRD-CHERI/libcxx.git
-	# branch = master
