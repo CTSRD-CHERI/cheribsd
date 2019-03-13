@@ -2,7 +2,3 @@
 	path = contrib/cheri-libc++
 	url = https://github.com/CTSRD-CHERI/libcxx.git
 	# branch = master
-[submodule "contrib/cheri-libcxxrt"]
-	path = contrib/cheri-libcxxrt
-	url = https://github.com/CTSRD-CHERI/libcxxrt.git
-	# branch = master
