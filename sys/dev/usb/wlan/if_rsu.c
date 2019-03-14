@@ -39,12 +39,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/bus.h>
-#include <sys/rman.h>
 #include <sys/firmware.h>
 #include <sys/module.h>
-
-#include <machine/bus.h>
-#include <machine/resource.h>
 
 #include <net/bpf.h>
 #include <net/if.h>
@@ -114,6 +110,7 @@ static const STRUCT_USB_HOST_ID rsu_devs[] = {
 				   RSU_HT_NOT_SUPPORTED) }
 	RSU_DEV(ASUS,			RTL8192SU),
 	RSU_DEV(AZUREWAVE,		RTL8192SU_4),
+	RSU_DEV(SITECOMEU,		WLA1000),
 	RSU_DEV_HT(ACCTON,		RTL8192SU),
 	RSU_DEV_HT(ASUS,		USBN10),
 	RSU_DEV_HT(AZUREWAVE,		RTL8192SU_1),
@@ -284,9 +281,6 @@ MODULE_DEPEND(rsu, usb, 1, 1, 1);
 MODULE_DEPEND(rsu, firmware, 1, 1, 1);
 MODULE_VERSION(rsu, 1);
 USB_PNP_HOST_INFO(rsu_devs);
-
-static const uint8_t rsu_chan_2ghz[] =
-	{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
 
 static uint8_t rsu_wme_ac_xfer_map[4] = {
 	[WME_AC_BE] = RSU_BULK_TX_BE_BK,
@@ -783,9 +777,8 @@ rsu_getradiocaps(struct ieee80211com *ic,
 	setbit(bands, IEEE80211_MODE_11G);
 	if (sc->sc_ht)
 		setbit(bands, IEEE80211_MODE_11NG);
-	ieee80211_add_channel_list_2ghz(chans, maxchans, nchans,
-	    rsu_chan_2ghz, nitems(rsu_chan_2ghz), bands,
-	    (ic->ic_htcaps & IEEE80211_HTCAP_CHWIDTH40) != 0);
+	ieee80211_add_channels_default_2ghz(chans, maxchans, nchans,
+	    bands, (ic->ic_htcaps & IEEE80211_HTCAP_CHWIDTH40) != 0);
 }
 
 static void
@@ -2756,15 +2749,17 @@ static int
 rsu_tx_start(struct rsu_softc *sc, struct ieee80211_node *ni, 
     struct mbuf *m0, struct rsu_data *data)
 {
+	const struct ieee80211_txparam *tp = ni->ni_txparms;
 	struct ieee80211com *ic = &sc->sc_ic;
         struct ieee80211vap *vap = ni->ni_vap;
 	struct ieee80211_frame *wh;
 	struct ieee80211_key *k = NULL;
 	struct r92s_tx_desc *txd;
-	uint8_t type, cipher;
+	uint8_t rate, ridx, type, cipher, qos;
 	int prio = 0;
 	uint8_t which;
 	int hasqos;
+	int ismcast;
 	int xferlen;
 	int qid;
 
@@ -2772,9 +2767,25 @@ rsu_tx_start(struct rsu_softc *sc, struct ieee80211_node *ni,
 
 	wh = mtod(m0, struct ieee80211_frame *);
 	type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
+	ismcast = IEEE80211_IS_MULTICAST(wh->i_addr1);
 
 	RSU_DPRINTF(sc, RSU_DEBUG_TX, "%s: data=%p, m=%p\n",
 	    __func__, data, m0);
+
+	/* Choose a TX rate index. */
+	if (type == IEEE80211_FC0_TYPE_MGT ||
+	    type == IEEE80211_FC0_TYPE_CTL ||
+	    (m0->m_flags & M_EAPOL) != 0)
+		rate = tp->mgmtrate;
+	else if (ismcast)
+		rate = tp->mcastrate;
+	else if (tp->ucastrate != IEEE80211_FIXED_RATE_NONE)
+		rate = tp->ucastrate;
+	else
+		rate = 0;
+
+	if (rate != 0)
+		ridx = rate2ridx(rate);
 
 	if (wh->i_fc[1] & IEEE80211_FC1_PROTECTED) {
 		k = ieee80211_crypto_encap(ni, m0);
@@ -2793,12 +2804,14 @@ rsu_tx_start(struct rsu_softc *sc, struct ieee80211_node *ni,
 		prio = M_WME_GETAC(m0);
 		which = rsu_wme_ac_xfer_map[prio];
 		hasqos = 1;
+		qos = ((const struct ieee80211_qosframe *)wh)->i_qos[0];
 	} else {
 		/* Non-QoS TID */
 		/* XXX TODO: tid=0 for non-qos TID? */
 		which = rsu_wme_ac_xfer_map[WME_AC_BE];
 		hasqos = 0;
 		prio = 0;
+		qos = 0;
 	}
 
 	qid = rsu_ac2qid[prio];
@@ -2854,8 +2867,23 @@ rsu_tx_start(struct rsu_softc *sc, struct ieee80211_node *ni,
 	}
 	/* XXX todo: set AGGEN bit if appropriate? */
 	txd->txdw2 |= htole32(R92S_TXDW2_BK);
-	if (IEEE80211_IS_MULTICAST(wh->i_addr1))
+	if (ismcast)
 		txd->txdw2 |= htole32(R92S_TXDW2_BMCAST);
+
+	if (!ismcast && (!qos || (qos & IEEE80211_QOS_ACKPOLICY) !=
+	    IEEE80211_QOS_ACKPOLICY_NOACK)) {
+		txd->txdw2 |= htole32(R92S_TXDW2_RTY_LMT_ENA);
+		txd->txdw2 |= htole32(SM(R92S_TXDW2_RTY_LMT, tp->maxretry));
+	}
+
+	/* Force mgmt / mcast / ucast rate if needed. */
+	if (rate != 0) {
+		/* Data rate fallback limit (max). */
+		txd->txdw5 |= htole32(SM(R92S_TXDW5_DATARATE_FB_LMT, 0x1f));
+		txd->txdw5 |= htole32(SM(R92S_TXDW5_DATARATE, ridx));
+		txd->txdw4 |= htole32(R92S_TXDW4_DRVRATE);
+	}
+
 	/*
 	 * Firmware will use and increment the sequence number for the
 	 * specified priority.

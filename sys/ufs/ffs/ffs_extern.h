@@ -108,6 +108,8 @@ void	ffs_sync_snap(struct mount *, int);
 int	ffs_syncvnode(struct vnode *vp, int waitfor, int flags);
 int	ffs_truncate(struct vnode *, off_t, int, struct ucred *);
 int	ffs_update(struct vnode *, int);
+void	ffs_update_dinode_ckhash(struct fs *, struct ufs2_dinode *);
+int	ffs_verify_dinode_ckhash(struct fs *, struct ufs2_dinode *);
 int	ffs_valloc(struct vnode *, int, struct ucred *, struct vnode **);
 int	ffs_vfree(struct vnode *, ino_t, int);
 vfs_vget_t ffs_vget;
@@ -124,6 +126,12 @@ void	process_deferred_inactive(struct mount *mp);
  */
 #define	FFSR_FORCE	0x0001
 #define	FFSR_UNSUSPEND	0x0002
+
+/*
+ * Request standard superblock location in ffs_sbget
+ */
+#define	STDSB			-1	/* Fail if check-hash is bad */
+#define	STDSB_NOHASHFAIL	-2	/* Ignore check-hash failure */
 
 /*
  * Definitions for TRIM interface

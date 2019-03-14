@@ -133,6 +133,7 @@ static int	lagg_ioctl(struct ifnet *, u_long, caddr_t);
 static int	lagg_snd_tag_alloc(struct ifnet *,
 		    union if_snd_tag_alloc_params *,
 		    struct m_snd_tag **);
+static void	lagg_snd_tag_free(struct m_snd_tag *);
 #endif
 static int	lagg_setmulti(struct lagg_port *);
 static int	lagg_clrmulti(struct lagg_port *);
@@ -514,10 +515,9 @@ lagg_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 	ifp->if_flags = IFF_SIMPLEX | IFF_BROADCAST | IFF_MULTICAST;
 #ifdef RATELIMIT
 	ifp->if_snd_tag_alloc = lagg_snd_tag_alloc;
-	ifp->if_capenable = ifp->if_capabilities = IFCAP_HWSTATS | IFCAP_TXRTLMT;
-#else
-	ifp->if_capenable = ifp->if_capabilities = IFCAP_HWSTATS;
+	ifp->if_snd_tag_free = lagg_snd_tag_free;
 #endif
+	ifp->if_capenable = ifp->if_capabilities = IFCAP_HWSTATS;
 
 	/*
 	 * Attach as an ordinary ethernet device, children will be attached
@@ -1571,6 +1571,13 @@ lagg_snd_tag_alloc(struct ifnet *ifp,
 	/* forward allocation request */
 	return (ifp->if_snd_tag_alloc(ifp, params, ppmt));
 }
+
+static void
+lagg_snd_tag_free(struct m_snd_tag *tag)
+{
+	tag->ifp->if_snd_tag_free(tag);
+}
+
 #endif
 
 static int

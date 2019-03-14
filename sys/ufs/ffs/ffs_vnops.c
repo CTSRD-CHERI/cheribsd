@@ -111,6 +111,7 @@ extern int	ffs_rawread(struct vnode *vp, struct uio *uio, int *workdone);
 static vop_fdatasync_t	ffs_fdatasync;
 static vop_fsync_t	ffs_fsync;
 static vop_getpages_t	ffs_getpages;
+static vop_getpages_async_t	ffs_getpages_async;
 static vop_lock1_t	ffs_lock;
 static vop_read_t	ffs_read;
 static vop_write_t	ffs_write;
@@ -132,7 +133,7 @@ struct vop_vector ffs_vnodeops1 = {
 	.vop_fsync =		ffs_fsync,
 	.vop_fdatasync =	ffs_fdatasync,
 	.vop_getpages =		ffs_getpages,
-	.vop_getpages_async =	vnode_pager_local_getpages_async,
+	.vop_getpages_async =	ffs_getpages_async,
 	.vop_lock1 =		ffs_lock,
 	.vop_read =		ffs_read,
 	.vop_reallocblks =	ffs_reallocblks,
@@ -144,7 +145,7 @@ struct vop_vector ffs_fifoops1 = {
 	.vop_default =		&ufs_fifoops,
 	.vop_fsync =		ffs_fsync,
 	.vop_fdatasync =	ffs_fdatasync,
-	.vop_reallocblks =	ffs_reallocblks, /* XXX: really ??? */
+	.vop_lock1 =		ffs_lock,
 	.vop_vptofh =		ffs_vptofh,
 };
 
@@ -154,7 +155,7 @@ struct vop_vector ffs_vnodeops2 = {
 	.vop_fsync =		ffs_fsync,
 	.vop_fdatasync =	ffs_fdatasync,
 	.vop_getpages =		ffs_getpages,
-	.vop_getpages_async =	vnode_pager_local_getpages_async,
+	.vop_getpages_async =	ffs_getpages_async,
 	.vop_lock1 =		ffs_lock,
 	.vop_read =		ffs_read,
 	.vop_reallocblks =	ffs_reallocblks,
@@ -857,7 +858,7 @@ ffs_write(ap)
 	 */
 	if ((ip->i_mode & (ISUID | ISGID)) && resid > uio->uio_resid &&
 	    ap->a_cred) {
-		if (priv_check_cred(ap->a_cred, PRIV_VFS_RETAINSUGID, 0)) {
+		if (priv_check_cred(ap->a_cred, PRIV_VFS_RETAINSUGID)) {
 			ip->i_mode &= ~(ISUID | ISGID);
 			DIP_SET(ip, i_mode, ip->i_mode);
 		}
@@ -1099,7 +1100,7 @@ ffs_extwrite(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *ucred)
 	 * tampering.
 	 */
 	if ((ip->i_mode & (ISUID | ISGID)) && resid > uio->uio_resid && ucred) {
-		if (priv_check_cred(ucred, PRIV_VFS_RETAINSUGID, 0)) {
+		if (priv_check_cred(ucred, PRIV_VFS_RETAINSUGID)) {
 			ip->i_mode &= ~(ISUID | ISGID);
 			dp->di_mode = ip->i_mode;
 		}
@@ -1740,9 +1741,31 @@ ffs_getpages(struct vop_getpages_args *ap)
 	return (vfs_bio_getpages(vp, ap->a_m, ap->a_count, ap->a_rbehind,
 	    ap->a_rahead, ffs_gbp_getblkno, ffs_gbp_getblksz));
 }
+
+static int
+ffs_getpages_async(struct vop_getpages_async_args *ap)
+{
+	struct vnode *vp;
+	struct ufsmount *um;
+	int error;
+
+	vp = ap->a_vp;
+	um = VFSTOUFS(vp->v_mount);
+
+	if (um->um_devvp->v_bufobj.bo_bsize <= PAGE_SIZE)
+		return (vnode_pager_generic_getpages(vp, ap->a_m, ap->a_count,
+		    ap->a_rbehind, ap->a_rahead, ap->a_iodone, ap->a_arg));
+
+	error = vfs_bio_getpages(vp, ap->a_m, ap->a_count, ap->a_rbehind,
+	    ap->a_rahead, ffs_gbp_getblkno, ffs_gbp_getblksz);
+	ap->a_iodone(ap->a_arg, ap->a_m, ap->a_count, error);
+
+	return (error);
+}
+
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190307,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

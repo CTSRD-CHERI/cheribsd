@@ -76,7 +76,6 @@ sandbox_class_load(struct sandbox_class *sbcp)
 	void * __capability codecap;
 #endif
 	int saved_errno;
-	caddr_t base;
 
 	/*
 	 * Set up the code capability for a new sandbox class.  Very similar

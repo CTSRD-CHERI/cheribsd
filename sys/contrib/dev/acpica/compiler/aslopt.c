@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -814,7 +814,7 @@ OptOptimizeNamePath (
     ACPI_FREE (ExternalNameString);
 
     /*
-     * Attempt an optmization depending on the type of namepath
+     * Attempt an optimization depending on the type of namepath
      */
     if (Flags & (AML_NAMED | AML_CREATE))
     {

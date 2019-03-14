@@ -31,6 +31,59 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	disable the most expensive debugging functionality run
 	"ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20190219:
+	drm and drm2 have been removed from the tree. Please see
+	https://wiki.freebsd.org/Graphics for the latest information on
+	migrating to the drm ports.
+
+20190131:
+	Iflib is no longer unconditionally compiled into the kernel.  Drivers
+	using iflib and statically compiled into the kernel, now require
+	the 'device iflib' config option.  For the same drivers loaded as
+	modules on kernels not having 'device iflib', the iflib.ko module
+	is loaded automatically.
+
+20190125:
+	The IEEE80211_AMPDU_AGE and AH_SUPPORT_AR5416 kernel configuration
+	options no longer exist since r343219 and r343427 respectively;
+	nothing uses them, so they should be just removed from custom
+	kernel config files.
+
+20181230:
+	r342635 changes the way efibootmgr(8) works by requiring users to add
+	the -b (bootnum) parameter for commands where the bootnum was previously
+	specified with each option. For example 'efibootmgr -B 0001' is now
+	'efibootmgr -B -b 0001'.
+
+20181220:
+	r342286 modifies the NFSv4 server so that it obeys vfs.nfsd.nfs_privport
+	in the same as it is applied to NFSv2 and 3.  This implies that NFSv4
+	servers that have vfs.nfsd.nfs_privport set will only allow mounts
+	from clients using a reserved port#. Since both the FreeBSD and Linux
+	NFSv4 clients use reserved port#s by default, this should not affect
+	most NFSv4 mounts.
+
+20181219:
+	The XLP config has been removed. We can't support 64-bit atomics in this
+	kernel because it is running in 32-bit mode. XLP users must transition
+	to running a 64-bit kernel (XLP64 or XLPN32).
+
+	The mips GXEMUL support has been removed from FreeBSD. MALTA* + qemu is
+	the preferred emulator today and we don't need two different ones.
+
+	The old sibyte / swarm / Broadcom BCM1250 support has been
+	removed from the mips port.
+
+20181211:
+	Clang, llvm, lld, lldb, compiler-rt and libc++ have been upgraded to
+	7.0.1.  Please see the 20141231 entry below for information about
+	prerequisites and upgrading, if you are not already using clang 3.5.0
+	or higher.
+
+20181211:
+	Remove the timed and netdate programs from the base tree.  Setting
+	the time with these deamons has been obsolete for over a decade.
+
 20181126:
 	On amd64, arm64 and armv7 (architectures that install LLVM's ld.lld
 	linker as /usr/bin/ld) GNU ld is no longer installed as ld.bfd, as
@@ -189,7 +242,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 20180719:
 	ARM64 now have efifb support, if you want to have serial console
 	on your arm64 board when an screen is connected and the bootloader
-	setup a frambuffer for us to use, just add :
+	setup a framebuffer for us to use, just add :
 	boot_serial=YES
 	boot_multicons=YES
 	in /boot/loader.conf
@@ -1866,12 +1919,13 @@ COMMON ITEMS:
 	can be deleted by "make delete-old-libs", but you have to make
 	sure that no program is using those libraries anymore.
 
-	[8] In order to have a kernel that can run the 4.x binaries needed to
-	do an installworld, you must include the COMPAT_FREEBSD4 option in
-	your kernel.  Failure to do so may leave you with a system that is
-	hard to boot to recover. A similar kernel option COMPAT_FREEBSD5 is
-	required to run the 5.x binaries on more recent kernels.  And so on
-	for COMPAT_FREEBSD6 and COMPAT_FREEBSD7.
+	[8] The new kernel must be able to run existing binaries used by
+	an installworld.  When upgrading across major versions, the new
+	kernel's configuration must include the correct COMPAT_FREEBSD<n>
+	option for existing binaries (e.g. COMPAT_FREEBSD11 to run 11.x
+	binaries).  Failure to do so may leave you with a system that is
+	hard to boot to recover.  A GENERIC kernel will include suitable
+	compatibility options to run binaries from older branches.
 
 	Make sure that you merge any new devices from GENERIC since the
 	last time you updated your kernel config file.
@@ -1893,7 +1947,7 @@ to fetch an UPDATING file from an older FreeBSD release.
 
 Copyright information:
 
-Copyright 1998-2009 M. Warner Losh.  All Rights Reserved.
+Copyright 1998-2009 M. Warner Losh.
 
 Redistribution, publication, translation and use, with or without
 modification, in full or in part, in any form or format of this

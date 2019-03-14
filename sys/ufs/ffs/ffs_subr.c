@@ -51,6 +51,11 @@ struct malloc_type;
 #define UFS_MALLOC(size, type, flags) malloc(size)
 #define UFS_FREE(ptr, type) free(ptr)
 #define UFS_TIME time(NULL)
+/*
+ * Request standard superblock location in ffs_sbget
+ */
+#define	STDSB			-1	/* Fail if check-hash is bad */
+#define	STDSB_NOHASHFAIL	-2	/* Ignore check-hash failure */
 
 #else /* _KERNEL */
 #include <sys/systm.h>
@@ -114,6 +119,7 @@ ffs_load_inode(struct buf *bp, struct inode *ip, struct fs *fs, ino_t ino)
 {
 	struct ufs1_dinode *dip1;
 	struct ufs2_dinode *dip2;
+	int error;
 
 	if (I_IS_UFS1(ip)) {
 		dip1 = ip->i_din1;
@@ -121,6 +127,7 @@ ffs_load_inode(struct buf *bp, struct inode *ip, struct fs *fs, ino_t ino)
 		    *((struct ufs1_dinode *)bp->b_data + ino_to_fsbo(fs, ino));
 		ip->i_mode = dip1->di_mode;
 		ip->i_nlink = dip1->di_nlink;
+		ip->i_effnlink = dip1->di_nlink;
 		ip->i_size = dip1->di_size;
 		ip->i_flags = dip1->di_flags;
 		ip->i_gen = dip1->di_gen;
@@ -128,10 +135,17 @@ ffs_load_inode(struct buf *bp, struct inode *ip, struct fs *fs, ino_t ino)
 		ip->i_gid = dip1->di_gid;
 		return (0);
 	}
+	dip2 = ((struct ufs2_dinode *)bp->b_data + ino_to_fsbo(fs, ino));
+	if ((error = ffs_verify_dinode_ckhash(fs, dip2)) != 0) {
+		printf("%s: inode %jd: check-hash failed\n", fs->fs_fsmnt,
+		    (intmax_t)ino);
+		return (error);
+	}
+	*ip->i_din2 = *dip2;
 	dip2 = ip->i_din2;
-	*dip2 = *((struct ufs2_dinode *)bp->b_data + ino_to_fsbo(fs, ino));
 	ip->i_mode = dip2->di_mode;
 	ip->i_nlink = dip2->di_nlink;
+	ip->i_effnlink = dip2->di_nlink;
 	ip->i_size = dip2->di_size;
 	ip->i_flags = dip2->di_flags;
 	ip->i_gen = dip2->di_gen;
@@ -139,14 +153,57 @@ ffs_load_inode(struct buf *bp, struct inode *ip, struct fs *fs, ino_t ino)
 	ip->i_gid = dip2->di_gid;
 	return (0);
 }
-#endif /* KERNEL */
+#endif /* _KERNEL */
+
+/*
+ * Verify an inode check-hash.
+ */
+int
+ffs_verify_dinode_ckhash(struct fs *fs, struct ufs2_dinode *dip)
+{
+	uint32_t ckhash, save_ckhash;
+
+	/*
+	 * Return success if unallocated or we are not doing inode check-hash.
+	 */
+	if (dip->di_mode == 0 || (fs->fs_metackhash & CK_INODE) == 0)
+		return (0);
+	/*
+	 * Exclude di_ckhash from the crc32 calculation, e.g., always use
+	 * a check-hash value of zero when calculating the check-hash.
+	 */
+	save_ckhash = dip->di_ckhash;
+	dip->di_ckhash = 0;
+	ckhash = calculate_crc32c(~0L, (void *)dip, sizeof(*dip));
+	dip->di_ckhash = save_ckhash;
+	if (save_ckhash == ckhash)
+		return (0);
+	return (EINVAL);
+}
+
+/*
+ * Update an inode check-hash.
+ */
+void
+ffs_update_dinode_ckhash(struct fs *fs, struct ufs2_dinode *dip)
+{
+
+	if (dip->di_mode == 0 || (fs->fs_metackhash & CK_INODE) == 0)
+		return;
+	/*
+	 * Exclude old di_ckhash from the crc32 calculation, e.g., always use
+	 * a check-hash value of zero when calculating the new check-hash.
+	 */
+	dip->di_ckhash = 0;
+	dip->di_ckhash = calculate_crc32c(~0L, (void *)dip, sizeof(*dip));
+}
 
 /*
  * These are the low-level functions that actually read and write
  * the superblock and its associated data.
  */
 static off_t sblock_try[] = SBLOCKSEARCH;
-static int readsuper(void *, struct fs **, off_t, int,
+static int readsuper(void *, struct fs **, off_t, int, int,
 	int (*)(void *, off_t, void **, int));
 
 /*
@@ -177,21 +234,25 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t altsblock,
 	int i, error, size, blks;
 	uint8_t *space;
 	int32_t *lp;
+	int chkhash;
 	char *buf;
 
 	fs = NULL;
 	*fsp = NULL;
-	if (altsblock != -1) {
-		if ((error = readsuper(devfd, &fs, altsblock, 1,
+	chkhash = 1;
+	if (altsblock >= 0) {
+		if ((error = readsuper(devfd, &fs, altsblock, 1, chkhash,
 		     readfunc)) != 0) {
 			if (fs != NULL)
 				UFS_FREE(fs, filltype);
 			return (error);
 		}
 	} else {
+		if (altsblock == STDSB_NOHASHFAIL)
+			chkhash = 0;
 		for (i = 0; sblock_try[i] != -1; i++) {
 			if ((error = readsuper(devfd, &fs, sblock_try[i], 0,
-			     readfunc)) == 0)
+			     chkhash, readfunc)) == 0)
 				break;
 			if (fs != NULL) {
 				UFS_FREE(fs, filltype);
@@ -255,7 +316,7 @@ ffs_sbget(void *devfd, struct fs **fsp, off_t altsblock,
  */
 static int
 readsuper(void *devfd, struct fs **fsp, off_t sblockloc, int isaltsblk,
-    int (*readfunc)(void *devfd, off_t loc, void **bufp, int size))
+    int chkhash, int (*readfunc)(void *devfd, off_t loc, void **bufp, int size))
 {
 	struct fs *fs;
 	int error, res;
@@ -285,8 +346,9 @@ readsuper(void *devfd, struct fs **fsp, off_t sblockloc, int isaltsblk,
 		if (fs->fs_ckhash != (ckhash = ffs_calc_sbhash(fs))) {
 #ifdef _KERNEL
 			res = uprintf("Superblock check-hash failed: recorded "
-			    "check-hash 0x%x != computed check-hash 0x%x\n",
-			    fs->fs_ckhash, ckhash);
+			    "check-hash 0x%x != computed check-hash 0x%x%s\n",
+			    fs->fs_ckhash, ckhash,
+			    chkhash == 0 ? " (Ignored)" : "");
 #else
 			res = 0;
 #endif
@@ -297,7 +359,14 @@ readsuper(void *devfd, struct fs **fsp, off_t sblockloc, int isaltsblk,
 			if (res == 0)
 				printf("Superblock check-hash failed: recorded "
 				    "check-hash 0x%x != computed check-hash "
-				    "0x%x\n", fs->fs_ckhash, ckhash);
+				    "0x%x%s\n", fs->fs_ckhash, ckhash,
+				    chkhash == 0 ? " (Ignored)" : "");
+			if (chkhash == 0) {
+				fs->fs_flags |= FS_NEEDSFSCK;
+				fs->fs_fmod = 1;
+				return (0);
+			}
+			fs->fs_fmod = 0;
 			return (EINVAL);
 		}
 		/* Have to set for old filesystems that predate this field */

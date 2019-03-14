@@ -3,6 +3,7 @@
  *
  * Copyright (c) 2011 NetApp, Inc.
  * All rights reserved.
+ * Copyright (c) 2018 Joyent, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -81,7 +82,7 @@ __FBSDID("$FreeBSD$");
 	(PROCBASED_INT_WINDOW_EXITING	|				\
 	 PROCBASED_NMI_WINDOW_EXITING)
 
-#define	PROCBASED_CTLS_ONE_SETTING 					\
+#define	PROCBASED_CTLS_ONE_SETTING					\
 	(PROCBASED_SECONDARY_CONTROLS	|				\
 	 PROCBASED_MWAIT_EXITING	|				\
 	 PROCBASED_MONITOR_EXITING	|				\
@@ -428,7 +429,7 @@ vmx_allow_x2apic_msrs(struct vmx *vmx)
 
 	for (i = 0; i < 8; i++)
 		error += guest_msr_ro(vmx, MSR_APIC_TMR0 + i);
-	
+
 	for (i = 0; i < 8; i++)
 		error += guest_msr_ro(vmx, MSR_APIC_IRR0 + i);
 
@@ -576,7 +577,7 @@ vmx_disable(void *arg __unused)
 static int
 vmx_cleanup(void)
 {
-	
+
 	if (pirvec >= 0)
 		lapic_ipi_free(pirvec);
 
@@ -1097,7 +1098,7 @@ static int
 vmx_handle_cpuid(struct vm *vm, int vcpu, struct vmxctx *vmxctx)
 {
 	int handled, func;
-	
+
 	func = vmxctx->guest_rax;
 
 	handled = x86_emulate_cpuid(vm, vcpu,
@@ -3096,7 +3097,7 @@ vmx_get_intr_shadow(struct vmx *vmx, int vcpu, int running, uint64_t *retval)
 	uint64_t gi;
 	int error;
 
-	error = vmcs_getreg(&vmx->vmcs[vcpu], running, 
+	error = vmcs_getreg(&vmx->vmcs[vcpu], running,
 	    VMCS_IDENT(VMCS_GUEST_INTERRUPTIBILITY), &gi);
 	*retval = (gi & HWINTR_BLOCKING) ? 1 : 0;
 	return (error);
@@ -3140,8 +3141,8 @@ vmx_shadow_reg(int reg)
 	switch (reg) {
 	case VM_REG_GUEST_CR0:
 		shreg = VMCS_CR0_SHADOW;
-                break;
-        case VM_REG_GUEST_CR4:
+		break;
+	case VM_REG_GUEST_CR4:
 		shreg = VMCS_CR4_SHADOW;
 		break;
 	default:
@@ -3212,7 +3213,7 @@ vmx_setreg(void *arg, int vcpu, int reg, uint64_t val)
 		if (shadow > 0) {
 			/*
 			 * Store the unmodified value in the shadow
-			 */			
+			 */
 			error = vmcs_setreg(&vmx->vmcs[vcpu], running,
 				    VMCS_IDENT(shadow), val);
 		}
@@ -3395,14 +3396,17 @@ vmx_setcap(void *arg, int vcpu, int type, int val)
 		}
 	}
 
-        return (retval);
+	return (retval);
 }
 
 struct vlapic_vtx {
 	struct vlapic	vlapic;
 	struct pir_desc	*pir_desc;
 	struct vmx	*vmx;
+	u_int	pending_prio;
 };
+
+#define VPR_PRIO_BIT(vpr)	(1 << ((vpr) >> 4))
 
 #define	VMX_CTR_PIR(vm, vcpuid, pir_desc, notify, vector, level, msg)	\
 do {									\
@@ -3425,7 +3429,7 @@ vmx_set_intr_ready(struct vlapic *vlapic, int vector, bool level)
 	struct vlapic_vtx *vlapic_vtx;
 	struct pir_desc *pir_desc;
 	uint64_t mask;
-	int idx, notify;
+	int idx, notify = 0;
 
 	vlapic_vtx = (struct vlapic_vtx *)vlapic;
 	pir_desc = vlapic_vtx->pir_desc;
@@ -3438,7 +3442,37 @@ vmx_set_intr_ready(struct vlapic *vlapic, int vector, bool level)
 	idx = vector / 64;
 	mask = 1UL << (vector % 64);
 	atomic_set_long(&pir_desc->pir[idx], mask);
-	notify = atomic_cmpset_long(&pir_desc->pending, 0, 1);
+
+	/*
+	 * A notification is required whenever the 'pending' bit makes a
+	 * transition from 0->1.
+	 *
+	 * Even if the 'pending' bit is already asserted, notification about
+	 * the incoming interrupt may still be necessary.  For example, if a
+	 * vCPU is HLTed with a high PPR, a low priority interrupt would cause
+	 * the 0->1 'pending' transition with a notification, but the vCPU
+	 * would ignore the interrupt for the time being.  The same vCPU would
+	 * need to then be notified if a high-priority interrupt arrived which
+	 * satisfied the PPR.
+	 *
+	 * The priorities of interrupts injected while 'pending' is asserted
+	 * are tracked in a custom bitfield 'pending_prio'.  Should the
+	 * to-be-injected interrupt exceed the priorities already present, the
+	 * notification is sent.  The priorities recorded in 'pending_prio' are
+	 * cleared whenever the 'pending' bit makes another 0->1 transition.
+	 */
+	if (atomic_cmpset_long(&pir_desc->pending, 0, 1) != 0) {
+		notify = 1;
+		vlapic_vtx->pending_prio = 0;
+	} else {
+		const u_int old_prio = vlapic_vtx->pending_prio;
+		const u_int prio_bit = VPR_PRIO_BIT(vector & APIC_TPR_INT);
+
+		if ((old_prio & prio_bit) == 0 && prio_bit > old_prio) {
+			atomic_set_int(&vlapic_vtx->pending_prio, prio_bit);
+			notify = 1;
+		}
+	}
 
 	VMX_CTR_PIR(vlapic->vm, vlapic->vcpuid, pir_desc, notify, vector,
 	    level, "vmx_set_intr_ready");
@@ -3504,14 +3538,31 @@ vmx_pending_intr(struct vlapic *vlapic, int *vecptr)
 	VCPU_CTR1(vlapic->vm, vlapic->vcpuid, "HLT with non-zero PPR %d",
 	    lapic->ppr);
 
+	vpr = 0;
 	for (i = 3; i >= 0; i--) {
 		pirval = pir_desc->pir[i];
 		if (pirval != 0) {
 			vpr = (i * 64 + flsl(pirval) - 1) & APIC_TPR_INT;
-			return (vpr > ppr);
+			break;
 		}
 	}
-	return (0);
+
+	/*
+	 * If the highest-priority pending interrupt falls short of the
+	 * processor priority of this vCPU, ensure that 'pending_prio' does not
+	 * have any stale bits which would preclude a higher-priority interrupt
+	 * from incurring a notification later.
+	 */
+	if (vpr <= ppr) {
+		const u_int prio_bit = VPR_PRIO_BIT(vpr);
+		const u_int old = vlapic_vtx->pending_prio;
+
+		if (old > prio_bit && (old & prio_bit) == 0) {
+			vlapic_vtx->pending_prio = prio_bit;
+		}
+		return (0);
+	}
+	return (1);
 }
 
 static void
@@ -3698,7 +3749,7 @@ vmx_vlapic_init(void *arg, int vcpuid)
 	struct vmx *vmx;
 	struct vlapic *vlapic;
 	struct vlapic_vtx *vlapic_vtx;
-	
+
 	vmx = arg;
 
 	vlapic = malloc(sizeof(struct vlapic_vtx), M_VLAPIC, M_WAITOK | M_ZERO);

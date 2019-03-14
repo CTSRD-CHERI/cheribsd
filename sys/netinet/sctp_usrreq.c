@@ -1122,22 +1122,25 @@ sctp_fill_up_addresses_vrf(struct sctp_inpcb *inp,
 						}
 #ifdef INET6
 						if (sctp_is_feature_on(inp, SCTP_PCB_FLAGS_NEEDS_MAPPED_V4)) {
+							if (actual + sizeof(struct sockaddr_in6) > limit) {
+								return (actual);
+							}
 							in6_sin_2_v4mapsin6(sin, (struct sockaddr_in6 *)sas);
 							((struct sockaddr_in6 *)sas)->sin6_port = inp->sctp_lport;
 							sas = (struct sockaddr_storage *)((caddr_t)sas + sizeof(struct sockaddr_in6));
 							actual += sizeof(struct sockaddr_in6);
 						} else {
 #endif
-							memcpy(sas, sin, sizeof(*sin));
+							if (actual + sizeof(struct sockaddr_in) > limit) {
+								return (actual);
+							}
+							memcpy(sas, sin, sizeof(struct sockaddr_in));
 							((struct sockaddr_in *)sas)->sin_port = inp->sctp_lport;
-							sas = (struct sockaddr_storage *)((caddr_t)sas + sizeof(*sin));
-							actual += sizeof(*sin);
+							sas = (struct sockaddr_storage *)((caddr_t)sas + sizeof(struct sockaddr_in));
+							actual += sizeof(struct sockaddr_in);
 #ifdef INET6
 						}
 #endif
-						if (actual >= limit) {
-							return (actual);
-						}
 					} else {
 						continue;
 					}
@@ -1182,13 +1185,13 @@ sctp_fill_up_addresses_vrf(struct sctp_inpcb *inp,
 						    (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr))) {
 							continue;
 						}
-						memcpy(sas, sin6, sizeof(*sin6));
-						((struct sockaddr_in6 *)sas)->sin6_port = inp->sctp_lport;
-						sas = (struct sockaddr_storage *)((caddr_t)sas + sizeof(*sin6));
-						actual += sizeof(*sin6);
-						if (actual >= limit) {
+						if (actual + sizeof(struct sockaddr_in6) > limit) {
 							return (actual);
 						}
+						memcpy(sas, sin6, sizeof(struct sockaddr_in6));
+						((struct sockaddr_in6 *)sas)->sin6_port = inp->sctp_lport;
+						sas = (struct sockaddr_storage *)((caddr_t)sas + sizeof(struct sockaddr_in6));
+						actual += sizeof(struct sockaddr_in6);
 					} else {
 						continue;
 					}
@@ -1202,12 +1205,17 @@ sctp_fill_up_addresses_vrf(struct sctp_inpcb *inp,
 		}
 	} else {
 		struct sctp_laddr *laddr;
+		size_t sa_len;
 
 		LIST_FOREACH(laddr, &inp->sctp_addr_list, sctp_nxt_addr) {
 			if (stcb) {
 				if (sctp_is_addr_restricted(stcb, laddr->ifa)) {
 					continue;
 				}
+			}
+			sa_len = laddr->ifa->address.sa.sa_len;
+			if (actual + sa_len > limit) {
+				return (actual);
 			}
 			if (sctp_fill_user_address(sas, &laddr->ifa->address.sa))
 				continue;
@@ -1226,12 +1234,8 @@ sctp_fill_up_addresses_vrf(struct sctp_inpcb *inp,
 				/* TSNH */
 				break;
 			}
-			sas = (struct sockaddr_storage *)((caddr_t)sas +
-			    laddr->ifa->address.sa.sa_len);
-			actual += laddr->ifa->address.sa.sa_len;
-			if (actual >= limit) {
-				return (actual);
-			}
+			sas = (struct sockaddr_storage *)((caddr_t)sas + sa_len);
+			actual += sa_len;
 		}
 	}
 	return (actual);
@@ -4654,13 +4658,13 @@ sctp_setopt(struct socket *so, int optname, void *optval, size_t optsize,
 			}
 			for (i = 0; i < strrst->srs_number_streams; i++) {
 				if ((send_in) &&
-				    (strrst->srs_stream_list[i] > stcb->asoc.streamincnt)) {
+				    (strrst->srs_stream_list[i] >= stcb->asoc.streamincnt)) {
 					SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
 					error = EINVAL;
 					break;
 				}
 				if ((send_out) &&
-				    (strrst->srs_stream_list[i] > stcb->asoc.streamoutcnt)) {
+				    (strrst->srs_stream_list[i] >= stcb->asoc.streamoutcnt)) {
 					SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
 					error = EINVAL;
 					break;
@@ -6115,6 +6119,10 @@ sctp_setopt(struct socket *so, int optname, void *optval, size_t optsize,
 						SCTP_INP_RUNLOCK(inp);
 					}
 				}
+			} else {
+				if (stcb) {
+					SCTP_TCB_UNLOCK(stcb);
+				}
 			}
 			break;
 		}
@@ -6209,6 +6217,9 @@ sctp_setopt(struct socket *so, int optname, void *optval, size_t optsize,
 			SCTP_FIND_STCB(inp, stcb, info->pr_assoc_id);
 
 			if (info->pr_policy > SCTP_PR_SCTP_MAX) {
+				if (stcb) {
+					SCTP_TCB_UNLOCK(stcb);
+				}
 				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
 				error = EINVAL;
 				break;
@@ -6328,6 +6339,9 @@ sctp_setopt(struct socket *so, int optname, void *optval, size_t optsize,
 				}
 			}
 			if (thlds->spt_pathcpthld != 0xffff) {
+				if (stcb != NULL) {
+					SCTP_TCB_UNLOCK(stcb);
+				}
 				error = EINVAL;
 				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, error);
 				break;
@@ -6828,6 +6842,10 @@ sctp_ctloutput(struct socket *so, struct sockopt *sopt)
 		return (error);
 	}
 	optsize = sopt->sopt_valsize;
+	if (optsize > SCTP_SOCKET_OPTION_LIMIT) {
+		SCTP_LTRACE_ERR_RET(so->so_pcb, NULL, NULL, SCTP_FROM_SCTP_USRREQ, ENOBUFS);
+		return (ENOBUFS);
+	}
 	if (optsize) {
 		SCTP_MALLOC(optval, void *, optsize, SCTP_M_SOCKOPT);
 		if (optval == NULL) {

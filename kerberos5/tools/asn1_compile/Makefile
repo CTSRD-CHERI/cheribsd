@@ -6,6 +6,7 @@ LIBROKEN_A=	${_LIB_OBJTOP}/kerberos5/lib/libroken/libroken.a
 LIBADD=	vers
 LDADD=	${LIBROKEN_A}
 DPADD=	${LIBROKEN_A}
+MK_PIE:=	no
 
 SRCS=	\
 	asn1parse.y \

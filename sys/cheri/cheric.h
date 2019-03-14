@@ -103,6 +103,24 @@ cheri_setaddress(const void * __capability dst, vaddr_t addr)
 	return (cheri_incoffset(dst, addr - cheri_getaddress(dst)));
 }
 
+/* Get the top of a capability (i.e. one byte past the last accessible one) */
+static inline vaddr_t
+cheri_gettop(const void * __capability cap)
+{
+	return (cheri_getbase(cap) + cheri_getlen(cap));
+}
+
+/* Check if the address is between cap.base and cap.top, i.e. in bounds */
+#ifdef __cplusplus
+static inline bool
+#else
+static inline _Bool
+#endif
+cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
+{
+	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
+}
+
 /*
  * Two variations on cheri_ptr() based on whether we are looking for a code or
  * data capability.  The compiler's use of CFromPtr will be with respect to
@@ -122,7 +140,7 @@ cheri_codeptr(const void *ptr, size_t len)
 #ifdef NOTYET
 	void (* __capability c)(void) = ptr;
 #else
-	void * __capability c = cheri_setoffset(cheri_getpcc(),
+	void * __capability c = cheri_setaddress(cheri_getpcc(),
 	    (register_t)ptr);
 #endif
 
@@ -215,7 +233,7 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_ptr(cap, min_size)	__extension__({			\
 	typedef __typeof__(*(cap)) __underlying_type;			\
 	__underlying_type* __result = 0;				\
-	if (cheri_bytes_remaining(cap) >= (uint64_t)min_size) {		\
+	if (cheri_gettag(cap) && cheri_bytes_remaining(cap) >= (uint64_t)min_size) { \
 		__result = (__cheri_fromcap __underlying_type*)(cap);	\
 	} __result; })
 
@@ -298,13 +316,18 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 /* Turn on the checking by default for now (until we have fixed everything)*/
 #define __check_low_ptr_bits_assignment
 #if defined(_KERNEL) /* Don't pull in assert.h when building the kernel */
-#undef __check_low_ptr_bits_assignment
+#define _cheri_bits_assert(e) (void)0
 #endif
 #ifdef __check_low_ptr_bits_assignment
+#ifndef _cheri_bits_assert
+#ifndef assert
 #include <assert.h>
+#endif
+#define _cheri_bits_assert(e) assert(e)
+#endif
 #define __runtime_assert_sensible_low_bits(bits)                               \
   __extension__({                                                              \
-    assert(bits < 32 && "Should only use the low 5 pointer bits");             \
+    _cheri_bits_assert(bits < 32 && "Should only use the low 5 pointer bits"); \
     bits;                                                                      \
   })
 #else

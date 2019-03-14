@@ -38,6 +38,7 @@
 /* Don't pull this in when building libthr */
 #include "debug.h"
 #else
+#include <assert.h>
 #define dbg_assert(cond) assert(cond)
 #define dbg(...)
 #endif
@@ -94,7 +95,7 @@ make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 	 * TODO: remove once we have decided on a sane(r) ABI
 	 */
 	assert(cheri_getbase(cheri_getpcc()) == 0);
-	return (dlfunc_t)cheri_setoffset(cheri_getpcc(), (vaddr_t)ret);
+	return (dlfunc_t)cheri_setaddress(cheri_getpcc(), (vaddr_t)ret);
 }
 
 static inline void*

@@ -53,7 +53,7 @@
 
 /* The casts are bogus but will do for now. */
 struct sysent freebsd32_sysent[] = {
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },		/* 0 = syscall */
@@ -647,4 +647,8 @@ struct sysent freebsd32_sysent[] = {
 	{ AS(freebsd32_cpuset_getdomain_args), (sy_call_t *)freebsd32_cpuset_getdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 561 = freebsd32_cpuset_getdomain */
 	{ AS(freebsd32_cpuset_setdomain_args), (sy_call_t *)freebsd32_cpuset_setdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = freebsd32_cpuset_setdomain */
 	{ AS(getrandom_args), (sy_call_t *)sys_getrandom, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 563 = getrandom */
+	{ AS(getfhat_args), (sy_call_t *)sys_getfhat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = getfhat */
+	{ AS(fhlink_args), (sy_call_t *)sys_fhlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = fhlink */
+	{ AS(fhlinkat_args), (sy_call_t *)sys_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = fhlinkat */
+	{ AS(fhreadlink_args), (sy_call_t *)sys_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = fhreadlink */
 };

@@ -2204,18 +2204,6 @@ ieee80211_ioctl_setregdomain(struct ieee80211vap *vap,
 }
 
 static int
-ieee80211_ioctl_setroam(struct ieee80211vap *vap,
-	const struct ieee80211req *ireq)
-{
-	if (ireq->i_len != sizeof(vap->iv_roamparms))
-		return EINVAL;
-	/* XXX validate params */
-	/* XXX? ENETRESET to push to device? */
-	return copyin(ireq->i_data, vap->iv_roamparms,
-	    sizeof(vap->iv_roamparms));
-}
-
-static int
 checkrate(const struct ieee80211_rateset *rs, int rate)
 {
 	int i;
@@ -2242,6 +2230,73 @@ checkmcs(const struct ieee80211_htrateset *rs, int mcs)
 		if (IEEE80211_RV(rs->rs_rates[i]) == rate_val)
 			return 1;
 	return 0;
+}
+
+static int
+ieee80211_ioctl_setroam(struct ieee80211vap *vap,
+        const struct ieee80211req *ireq)
+{
+	struct ieee80211com *ic = vap->iv_ic;
+	struct ieee80211_roamparams_req *parms;
+	struct ieee80211_roamparam *src, *dst;
+	const struct ieee80211_htrateset *rs_ht;
+	const struct ieee80211_rateset *rs;
+	int changed, error, mode, is11n, nmodes;
+
+	if (ireq->i_len != sizeof(vap->iv_roamparms))
+		return EINVAL;
+
+	parms = IEEE80211_MALLOC(sizeof(*parms), M_TEMP,
+	    IEEE80211_M_NOWAIT | IEEE80211_M_ZERO);
+	if (parms == NULL)
+		return ENOMEM;
+
+	error = copyin(ireq->i_data, parms, ireq->i_len);
+	if (error != 0)
+		goto fail;
+
+	changed = 0;
+	nmodes = IEEE80211_MODE_MAX;
+
+	/* validate parameters and check if anything changed */
+	for (mode = IEEE80211_MODE_11A; mode < nmodes; mode++) {
+		if (isclr(ic->ic_modecaps, mode))
+			continue;
+		src = &parms->params[mode];
+		dst = &vap->iv_roamparms[mode];
+		rs = &ic->ic_sup_rates[mode];	/* NB: 11n maps to legacy */
+		rs_ht = &ic->ic_sup_htrates;
+		is11n = (mode == IEEE80211_MODE_11NA ||
+			 mode == IEEE80211_MODE_11NG);
+		/* XXX TODO: 11ac */
+		if (src->rate != dst->rate) {
+			if (!checkrate(rs, src->rate) &&
+			    (!is11n || !checkmcs(rs_ht, src->rate))) {
+				error = EINVAL;
+				goto fail;
+			}
+			changed++;
+		}
+		if (src->rssi != dst->rssi)
+			changed++;
+	}
+	if (changed) {
+		/*
+		 * Copy new parameters in place and notify the
+		 * driver so it can push state to the device.
+		 */
+		/* XXX locking? */
+		for (mode = IEEE80211_MODE_11A; mode < nmodes; mode++) {
+			if (isset(ic->ic_modecaps, mode))
+				vap->iv_roamparms[mode] = parms->params[mode];
+		}
+
+		if (vap->iv_roaming == IEEE80211_ROAMING_DEVICE)
+			error = ERESTART;
+	}
+
+fail:	IEEE80211_FREE(parms, M_TEMP);
+	return error;
 }
 
 static int
@@ -2515,20 +2570,12 @@ ieee80211_scanreq(struct ieee80211vap *vap, struct ieee80211_scan_req *sr)
 		    sr->sr_duration > IEEE80211_IOC_SCAN_DURATION_MAX)
 			return EINVAL;
 		sr->sr_duration = msecs_to_ticks(sr->sr_duration);
-		if (sr->sr_duration < 1)
-			sr->sr_duration = 1;
 	}
 	/* convert min/max channel dwell */
-	if (sr->sr_mindwell != 0) {
+	if (sr->sr_mindwell != 0)
 		sr->sr_mindwell = msecs_to_ticks(sr->sr_mindwell);
-		if (sr->sr_mindwell < 1)
-			sr->sr_mindwell = 1;
-	}
-	if (sr->sr_maxdwell != 0) {
+	if (sr->sr_maxdwell != 0)
 		sr->sr_maxdwell = msecs_to_ticks(sr->sr_maxdwell);
-		if (sr->sr_maxdwell < 1)
-			sr->sr_maxdwell = 1;
-	}
 	/* NB: silently reduce ssid count to what is supported */
 	if (sr->sr_nssid > IEEE80211_SCAN_MAX_SSID)
 		sr->sr_nssid = IEEE80211_SCAN_MAX_SSID;
@@ -3480,9 +3527,13 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
 	struct ieee80211vap *vap = ifp->if_softc;
 	struct ieee80211com *ic = vap->iv_ic;
-	int error = 0, wait = 0;
+	int error = 0, wait = 0, ic_used;
 	struct ifreq *ifr;
 	struct ifaddr *ifa;			/* XXX */
+
+	ic_used = (cmd != SIOCSIFMTU && cmd != SIOCG80211STATS);
+	if (ic_used && (error = ieee80211_com_vincref(vap)) != 0)
+		return (error);
 
 	switch (cmd) {
 	case CASE_IOC_IFREQ(SIOCSIFFLAGS):
@@ -3537,9 +3588,13 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			/*
 			 * Check if the MAC address was changed
 			 * via SIOCSIFLLADDR ioctl.
+			 *
+			 * NB: device may be detached during initialization;
+			 * use if_ioctl for existence check.
 			 */
 			if_addr_rlock(ifp);
-			if ((ifp->if_flags & IFF_UP) == 0 &&
+			if (ifp->if_ioctl == ieee80211_ioctl &&
+			    (ifp->if_flags & IFF_UP) == 0 &&
 			    !IEEE80211_ADDR_EQ(vap->iv_myaddr, IF_LLADDR(ifp)))
 				IEEE80211_ADDR_COPY(vap->iv_myaddr,
 				    IF_LLADDR(ifp));
@@ -3616,6 +3671,10 @@ ieee80211_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		error = ether_ioctl(ifp, cmd, data);
 		break;
 	}
+
+	if (ic_used)
+		ieee80211_com_vdecref(vap);
+
 	return (error);
 }
 // CHERI CHANGES START

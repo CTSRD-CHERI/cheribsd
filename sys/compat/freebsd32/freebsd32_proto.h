@@ -44,7 +44,7 @@ struct thread;
 #define	PADR_(t)	CHERI_PADR_(t)
 #endif
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 struct freebsd32_wait4_args {
@@ -177,7 +177,7 @@ struct freebsd32___sysctl_args {
 	char namelen_l_[PADL_(u_int)]; u_int namelen; char namelen_r_[PADR_(u_int)];
 	char old_l_[PADL_(void *)]; void * old; char old_r_[PADR_(void *)];
 	char oldlenp_l_[PADL_(uint32_t *)]; uint32_t * oldlenp; char oldlenp_r_[PADR_(uint32_t *)];
-	char new_l_[PADL_(void *)]; void * new; char new_r_[PADR_(void *)];
+	char new_l_[PADL_(const void *)]; const void * new; char new_r_[PADR_(const void *)];
 	char newlen_l_[PADL_(uint32_t)]; uint32_t newlen; char newlen_r_[PADR_(uint32_t)];
 };
 struct freebsd32_futimes_args {
@@ -731,7 +731,7 @@ struct freebsd32_cpuset_setdomain_args {
 	char mask_l_[PADL_(domainset_t *)]; domainset_t * mask; char mask_r_[PADR_(domainset_t *)];
 	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
 };
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 int	freebsd32_wait4(struct thread *, struct freebsd32_wait4_args *);
@@ -870,7 +870,7 @@ int	freebsd32_cpuset_setdomain(struct thread *, struct freebsd32_cpuset_setdomai
 
 #ifdef COMPAT_43
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 struct ofreebsd32_lseek_args {
@@ -965,7 +965,7 @@ int	ofreebsd32_getdirentries(struct thread *, struct ofreebsd32_getdirentries_ar
 
 #ifdef COMPAT_FREEBSD4
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 struct freebsd4_freebsd32_getfsstat_args {
@@ -1031,7 +1031,7 @@ int	freebsd4_freebsd32_sigreturn(struct thread *, struct freebsd4_freebsd32_sigr
 
 #ifdef COMPAT_FREEBSD6
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 struct freebsd6_freebsd32_pread_args {
@@ -1121,7 +1121,7 @@ int	freebsd6_freebsd32_lio_listio(struct thread *, struct freebsd6_freebsd32_lio
 
 #ifdef COMPAT_FREEBSD7
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 struct freebsd7_freebsd32_semctl_args {
@@ -1164,7 +1164,7 @@ int	freebsd7_freebsd32_shmctl(struct thread *, struct freebsd7_freebsd32_shmctl_
 
 #ifdef COMPAT_FREEBSD10
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 #ifdef PAD64_REQUIRED
@@ -1189,7 +1189,7 @@ int	freebsd10_freebsd32_pipe(struct thread *, struct freebsd10_freebsd32_pipe_ar
 
 #ifdef COMPAT_FREEBSD11
 
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 struct freebsd11_freebsd32_stat_args {

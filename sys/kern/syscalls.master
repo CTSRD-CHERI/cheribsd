@@ -454,10 +454,10 @@
 		    _Inout_opt_ size_t *size,
 		    int arg
 		);
-	} getkerninfo getkerninfo_args int
+	}
 64	AUE_NULL	COMPAT {
 		int getpagesize(void);
-	} getpagesize getpagesize_args int
+	}
 65	AUE_MSYNC	STD {
 		int msync(
 		    _In_ void *addr,
@@ -571,13 +571,13 @@
 		    _Out_writes_z_(len) char *hostname,
 		    u_int len
 		);
-	} gethostname gethostname_args int
+	}
 88	AUE_SYSCTL	COMPAT {
 		int sethostname(
 		    _In_reads_z_(len) char *hostname,
 		    u_int len
 		);
-	} sethostname sethostname_args int
+	}
 89	AUE_GETDTABLESIZE	STD {
 		int getdtablesize(void);
 	}
@@ -631,13 +631,13 @@
 		    __socklen_t namelen
 		);
 	}
-99	AUE_ACCEPT	COMPAT|NOARGS {
+99	AUE_ACCEPT	COMPAT {
 		int accept(
 		    int s,
 		    _Out_writes_bytes_opt_(*anamelen) struct sockaddr *name,
 		    _Inout_opt_ __socklen_t *anamelen
 		);
-	} accept accept_args int
+	}
 100	AUE_GETPRIORITY	STD {
 		int getpriority(
 		    int which,
@@ -1204,7 +1204,7 @@
 		    u_int namelen,
 		    _Out_writes_bytes_opt_(*oldlenp) void *old,
 		    _Inout_opt_ size_t *oldlenp,
-		    _In_reads_bytes_opt_(newlen) void *new,
+		    _In_reads_bytes_opt_(newlen) const void *new,
 		    size_t newlen
 		);
 	}
@@ -3140,36 +3140,64 @@
 		    unsigned int flags
 		);
 	}
-564	AUE_NULL	STD	{
+564	AUE_NULL	STD {
+		int getfhat(
+		    int fd,
+		    _In_z_ char *path,
+		    _Out_ struct fhandle *fhp,
+		    int flags
+		);
+	}
+565	AUE_NULL	STD {
+		int fhlink(
+		    _In_ struct fhandle *fhp,
+		    _In_z_ const char *to
+		);
+	}
+566	AUE_NULL	STD {
+		int fhlinkat(
+		    _In_ struct fhandle *fhp,
+		    int tofd,
+		    _In_z_ const char *to,
+		);
+	}
+567	AUE_NULL	STD {
+		int fhreadlink(
+		    _In_ struct fhandle *fhp,
+		    _Out_writes_(bufsize) char *buf,
+		    size_t bufsize
+		);
+	}
+568	AUE_NULL	STD	{
 		int coexecve(
 		    pid_t pid,
 		    char *fname, char **argv,
 		    char **envv
 		);
 	}
-565	AUE_NULL	STD	{
+569	AUE_NULL	STD	{
 		int cosetup(
 		    int what,
 		    _Out_ void * __capability *code,
 		    _Out_ void * __capability *data
 		);
 	}
-566	AUE_NULL	STD	{
+570	AUE_NULL	STD	{
 		int coregister(
 		    _In_z_ const char *name,
 		    _Out_opt_ void * __capability *cap
 		);
 	}
-567	AUE_NULL	STD	{
+571	AUE_NULL	STD	{
 		int colookup(
 		    _In_z_ const char *name,
 		    _Out_ void * __capability *cap
 		);
 	}
-568	AUE_NULL	STD	{
+572	AUE_NULL	STD	{
 		int copark(void);
 	}
-569	AUE_NULL        STD     {
+573	AUE_NULL        STD     {
 		int cogetpid(
 		    _Out_ pid_t *pidp
 		);

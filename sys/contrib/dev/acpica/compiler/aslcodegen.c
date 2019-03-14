@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -769,12 +769,6 @@ CgWriteNode (
     if ((Op->Asl.ParseOpcode == PARSEOP_DEFAULT_ARG)  ||
         (Op->Asl.ParseOpcode == PARSEOP_INCLUDE)      ||
         (Op->Asl.ParseOpcode == PARSEOP_INCLUDE_END))
-    {
-        return;
-    }
-
-    if ((Op->Asl.ParseOpcode == PARSEOP_EXTERNAL) &&
-        AslGbl_DoExternals == FALSE)
     {
         return;
     }

@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -1053,7 +1053,7 @@ AcpiDmGetHardwareIdType (
             }
         }
 
-        /* Mark this node as convertable to an EISA ID string */
+        /* Mark this node as convertible to an EISA ID string */
 
         Op->Common.DisasmOpcode = ACPI_DASM_EISAID;
         break;

@@ -378,7 +378,7 @@ msdosfs_setattr(struct vop_setattr_args *ap)
 		if (vp->v_mount->mnt_flag & MNT_RDONLY)
 			return (EROFS);
 		if (cred->cr_uid != pmp->pm_uid) {
-			error = priv_check_cred(cred, PRIV_VFS_ADMIN, 0);
+			error = priv_check_cred(cred, PRIV_VFS_ADMIN);
 			if (error)
 				return (error);
 		}
@@ -427,7 +427,7 @@ msdosfs_setattr(struct vop_setattr_args *ap)
 			gid = pmp->pm_gid;
 		if (cred->cr_uid != pmp->pm_uid || uid != pmp->pm_uid ||
 		    (gid != pmp->pm_gid && !groupmember(gid, cred))) {
-			error = priv_check_cred(cred, PRIV_VFS_CHOWN, 0);
+			error = priv_check_cred(cred, PRIV_VFS_CHOWN);
 			if (error)
 				return (error);
 		}
@@ -498,7 +498,7 @@ msdosfs_setattr(struct vop_setattr_args *ap)
 		if (vp->v_mount->mnt_flag & MNT_RDONLY)
 			return (EROFS);
 		if (cred->cr_uid != pmp->pm_uid) {
-			error = priv_check_cred(cred, PRIV_VFS_ADMIN, 0);
+			error = priv_check_cred(cred, PRIV_VFS_ADMIN);
 			if (error)
 				return (error);
 		}
@@ -1740,6 +1740,7 @@ out:
 static int
 msdosfs_bmap(struct vop_bmap_args *ap)
 {
+	struct fatcache savefc;
 	struct denode *dep;
 	struct mount *mp;
 	struct msdosfsmount *pmp;
@@ -1766,6 +1767,20 @@ msdosfs_bmap(struct vop_bmap_args *ap)
 	if (error != 0 || (ap->a_runp == NULL && ap->a_runb == NULL))
 		return (error);
 
+	/*
+	 * Prepare to back out updates of the fatchain cache after the one
+	 * for the first block done by pcbmap() above.  Without the backout,
+	 * then whenever the caller doesn't do i/o to all of the blocks that
+	 * we find, the single useful cache entry would be too far in advance
+	 * of the actual i/o to work for the next sequential i/o.  Then the
+	 * FAT would be searched from the beginning.  With the backout, the
+	 * FAT is searched starting at most a few blocks early.  This wastes
+	 * much less time.  Time is also wasted finding more blocks than the
+	 * caller will do i/o to.  This is necessary because the runlength
+	 * parameters are output-only.
+	 */
+	savefc = dep->de_fc[FC_LASTMAP];
+
 	mp = vp->v_mount;
 	maxio = mp->mnt_iosize_max / mp->mnt_stat.f_iosize;
 	bnpercn = de_cn2bn(pmp, 1);
@@ -1787,6 +1802,7 @@ msdosfs_bmap(struct vop_bmap_args *ap)
 		}
 		*ap->a_runb = run - 1;
 	}
+	dep->de_fc[FC_LASTMAP] = savefc;
 	return (0);
 }
 

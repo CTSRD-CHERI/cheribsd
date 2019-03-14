@@ -1193,8 +1193,7 @@ nvpair_create_stringv(const char *name, const char *valuefmt, va_list valueap)
 	if (len < 0)
 		return (NULL);
 	nvp = nvpair_create_string(name, str);
-	if (nvp == NULL)
-		nv_free(str);
+	nv_free(str);
 	return (nvp);
 }
 
@@ -2054,6 +2053,7 @@ nvpair_free(nvpair_t *nvp)
 	case NV_TYPE_DESCRIPTOR_ARRAY:
 		for (i = 0; i < nvp->nvp_nitems; i++)
 			close(((int *)nvp->nvp_data)[i]);
+		nv_free((int *)(intptr_t)nvp->nvp_data);
 		break;
 #endif
 	case NV_TYPE_NVLIST:

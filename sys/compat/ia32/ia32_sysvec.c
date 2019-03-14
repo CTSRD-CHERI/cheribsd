@@ -98,7 +98,6 @@ SYSCTL_ULONG(_compat_ia32, OID_AUTO, maxvmem, CTLFLAG_RWTUN, &ia32_maxvmem, 0, "
 struct sysentvec ia32_freebsd_sysvec = {
 	.sv_size	= FREEBSD32_SYS_MAXSYSCALL,
 	.sv_table	= freebsd32_sysent,
-	.sv_mask	= 0,
 	.sv_errsize	= 0,
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
@@ -110,7 +109,6 @@ struct sysentvec ia32_freebsd_sysvec = {
 	.sv_coredump	= elf32_coredump,
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
-	.sv_pagesize	= IA32_PAGE_SIZE,
 	.sv_minuser	= FREEBSD32_MINUSER,
 	.sv_maxuser	= FREEBSD32_MAXUSER,
 	.sv_usrstack	= FREEBSD32_USRSTACK,
@@ -120,7 +118,7 @@ struct sysentvec ia32_freebsd_sysvec = {
 	.sv_setregs	= ia32_setregs,
 	.sv_fixlimit	= ia32_fixlimit,
 	.sv_maxssiz	= &ia32_maxssiz,
-	.sv_flags	= SV_ABI_FREEBSD | SV_IA32 | SV_ILP32 |
+	.sv_flags	= SV_ABI_FREEBSD | SV_ASLR | SV_IA32 | SV_ILP32 |
 			    SV_SHP | SV_TIMEKEEP,
 	.sv_set_syscall_retval = ia32_set_syscall_retval,
 	.sv_fetch_syscall_args = ia32_fetch_syscall_args,

@@ -121,11 +121,16 @@ ip_output_pfil(struct mbuf **mp, struct ifnet *ifp, struct inpcb *inp,
 
 	/* Run through list of hooks for output packets. */
 	odst.s_addr = ip->ip_dst.s_addr;
-	*error = pfil_run_hooks(&V_inet_pfil_hook, mp, ifp, PFIL_OUT, 0, inp);
-	m = *mp;
-	if ((*error) != 0 || m == NULL)
+	switch (pfil_run_hooks(V_inet_pfil_head, mp, ifp, PFIL_OUT, inp)) {
+	case PFIL_DROPPED:
+		*error = EPERM;
+		/* FALLTHROUGH */
+	case PFIL_CONSUMED:
 		return 1; /* Finished */
-
+	case PFIL_PASS:
+		*error = 0;
+	}
+	m = *mp;
 	ip = mtod(m, struct ip *);
 
 	/* See if destination IP address was changed by packet filter. */
@@ -215,6 +220,7 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
     struct ip_moptions *imo, struct inpcb *inp)
 {
 	struct rm_priotracker in_ifa_tracker;
+	struct epoch_tracker et;
 	struct ip *ip;
 	struct ifnet *ifp = NULL;	/* keep compiler happy */
 	struct mbuf *m0;
@@ -285,7 +291,7 @@ ip_output(struct mbuf *m, struct mbuf *opt, struct route *ro, int flags,
 		dst->sin_len = sizeof(*dst);
 		dst->sin_addr = ip->ip_dst;
 	}
-	NET_EPOCH_ENTER();
+	NET_EPOCH_ENTER(et);
 again:
 	/*
 	 * Validate route against routing table additions;
@@ -567,7 +573,7 @@ sendit:
 #endif /* IPSEC */
 
 	/* Jump over all PFIL processing if hooks are not active. */
-	if (PFIL_HOOKED(&V_inet_pfil_hook)) {
+	if (PFIL_HOOKED_OUT(V_inet_pfil_head)) {
 		switch (ip_output_pfil(&m, ifp, inp, dst, &fibnum, &error)) {
 		case 1: /* Finished */
 			goto done;
@@ -733,7 +739,7 @@ done:
 		 * calling RTFREE on it again.
 		 */
 		ro->ro_rt = NULL;
-	NET_EPOCH_EXIT();
+	NET_EPOCH_EXIT(et);
 	return (error);
  bad:
 	m_freem(m);
@@ -1262,7 +1268,8 @@ ip_ctloutput(struct socket *so, struct sockopt *sopt)
 			if (inp->inp_options) {
 				struct mbuf *options;
 
-				options = m_dup(inp->inp_options, M_NOWAIT);
+				options = m_copym(inp->inp_options, 0,
+				    M_COPYALL, M_NOWAIT);
 				INP_RUNLOCK(inp);
 				if (options != NULL) {
 					error = sooptcopyout(sopt,

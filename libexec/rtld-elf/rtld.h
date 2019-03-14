@@ -328,6 +328,7 @@ typedef struct Struct_Obj_Entry {
     bool irelative : 1;		/* Object has R_MACHDEP_IRELATIVE relocs */
     bool gnu_ifunc : 1;		/* Object has references to STT_GNU_IFUNC */
     bool non_plt_gnu_ifunc : 1;	/* Object has non-plt IFUNC references */
+    bool ifuncs_resolved : 1;	/* Object ifuncs were already resolved */
     bool crt_no_init : 1;	/* Object' crt does not call _init/_fini */
     bool valid_hash_sysv : 1;	/* A valid System V hash hash tag is available */
     bool valid_hash_gnu : 1;	/* A valid GNU hash tag is available */
@@ -515,11 +516,10 @@ int convert_prot(int elfflags);
 int do_copy_relocations(Obj_Entry *);
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,
     struct Struct_RtldLockState *);
-
 #ifdef __CHERI_PURE_CAPABILITY__
 int reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj);
 #else
-int reloc_plt(Obj_Entry *);
+int reloc_plt(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 #endif
 int reloc_jmpslots(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
@@ -528,6 +528,11 @@ void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
 void pre_init(void);
 void init_pltgot(Obj_Entry *);
 void allocate_initial_tls(Obj_Entry *);
+
+void *__crt_calloc(size_t num, size_t size);
+void __crt_free(void *cp);
+void *__crt_malloc(size_t nbytes);
+void *__crt_realloc(void *cp, size_t nbytes);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 void process___cap_relocs(Obj_Entry*);

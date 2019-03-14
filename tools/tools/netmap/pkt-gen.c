@@ -195,7 +195,7 @@ struct virt_header {
 	uint8_t fields[VIRT_HDR_MAX];
 };
 
-#define MAX_BODYSIZE	16384
+#define MAX_BODYSIZE	65536
 
 struct pkt {
 	struct virt_header vh;
@@ -238,7 +238,6 @@ struct mac_range {
 
 /* ifname can be netmap:foo-xxxx */
 #define MAX_IFNAMELEN	64	/* our buffer for ifname */
-//#define MAX_PKTSIZE	1536
 #define MAX_PKTSIZE	MAX_BODYSIZE	/* XXX: + IP_HDR + ETH_HDR */
 
 /* compact timestamp to fit into 60 byte packet. (enough to obtain RTT) */
@@ -263,7 +262,7 @@ struct glob_arg {
 	int forever;
 	uint64_t npackets;	/* total packets to send */
 	int frags;		/* fragments per packet */
-	u_int mtu;		/* size of each fragment */
+	u_int frag_size;	/* size of each fragment */
 	int nthreads;
 	int cpus;	/* cpus used for running */
 	int system_cpus;	/* cpus on the system */
@@ -308,6 +307,11 @@ struct glob_arg {
 };
 enum dev_type { DEV_NONE, DEV_NETMAP, DEV_PCAP, DEV_TAP };
 
+enum {
+	TD_TYPE_SENDER = 1,
+	TD_TYPE_RECEIVER,
+	TD_TYPE_OTHER,
+};
 
 /*
  * Arguments for a new thread. The same structure is used by
@@ -509,6 +513,42 @@ extract_mac_range(struct mac_range *r)
 	return 0;
 }
 
+static int
+get_if_mtu(const struct glob_arg *g)
+{
+	char ifname[IFNAMSIZ];
+	struct ifreq ifreq;
+	int s, ret;
+
+	if (!strncmp(g->ifname, "netmap:", 7) && !strchr(g->ifname, '{')
+			&& !strchr(g->ifname, '}')) {
+		/* Parse the interface name and ask the kernel for the
+		 * MTU value. */
+		strncpy(ifname, g->ifname+7, IFNAMSIZ-1);
+		ifname[strcspn(ifname, "-*^{}/@")] = '\0';
+
+		s = socket(AF_INET, SOCK_DGRAM, 0);
+		if (s < 0) {
+			D("socket() failed: %s", strerror(errno));
+			return s;
+		}
+
+		memset(&ifreq, 0, sizeof(ifreq));
+		strncpy(ifreq.ifr_name, ifname, IFNAMSIZ);
+
+		ret = ioctl(s, SIOCGIFMTU, &ifreq);
+		if (ret) {
+			D("ioctl(SIOCGIFMTU) failed: %s", strerror(errno));
+		}
+
+		return ifreq.ifr_mtu;
+	}
+
+	/* This is a pipe or a VALE port, where the MTU is very large,
+	 * so we use some practical limit. */
+	return 65536;
+}
+
 static struct targ *targs;
 static int global_nthreads;
 
@@ -586,10 +626,10 @@ parse_nmr_config(const char* conf, struct nmreq *nmr)
 	char *w, *tok;
 	int i, v;
 
-	nmr->nr_tx_rings = nmr->nr_rx_rings = 0;
-	nmr->nr_tx_slots = nmr->nr_rx_slots = 0;
 	if (conf == NULL || ! *conf)
 		return 0;
+	nmr->nr_tx_rings = nmr->nr_rx_rings = 0;
+	nmr->nr_tx_slots = nmr->nr_rx_slots = 0;
 	w = strdup(conf);
 	for (i = 0, tok = strtok(w, ","); tok; i++, tok = strtok(NULL, ",")) {
 		v = atoi(tok);
@@ -1118,22 +1158,22 @@ static int
 send_packets(struct netmap_ring *ring, struct pkt *pkt, void *frame,
 		int size, struct targ *t, u_int count, int options)
 {
-	u_int n, sent, cur = ring->cur;
+	u_int n, sent, head = ring->head;
 	u_int frags = t->frags;
 	u_int frag_size = t->frag_size;
-	struct netmap_slot *slot = &ring->slot[cur];
+	struct netmap_slot *slot = &ring->slot[head];
 
 	n = nm_ring_space(ring);
 #if 0
 	if (options & (OPT_COPY | OPT_PREFETCH) ) {
 		for (sent = 0; sent < count; sent++) {
-			struct netmap_slot *slot = &ring->slot[cur];
+			struct netmap_slot *slot = &ring->slot[head];
 			char *p = NETMAP_BUF(ring, slot->buf_idx);
 
 			__builtin_prefetch(p);
-			cur = nm_ring_next(ring, cur);
+			head = nm_ring_next(ring, head);
 		}
-		cur = ring->cur;
+		head = ring->head;
 	}
 #endif
 	for (sent = 0; sent < count && n >= frags; sent++, n--) {
@@ -1141,7 +1181,7 @@ send_packets(struct netmap_ring *ring, struct pkt *pkt, void *frame,
 		int buf_changed;
 		u_int tosend = size;
 
-		slot = &ring->slot[cur];
+		slot = &ring->slot[head];
 		p = NETMAP_BUF(ring, slot->buf_idx);
 		buf_changed = slot->flags & NS_BUF_CHANGED;
 
@@ -1160,11 +1200,11 @@ send_packets(struct netmap_ring *ring, struct pkt *pkt, void *frame,
 				slot->len = frag_size;
 				slot->flags = NS_MOREFRAG;
 				if (options & OPT_DUMP)
-					dump_payload(fp, frag_size, ring, cur);
+					dump_payload(fp, frag_size, ring, head);
 				tosend -= frag_size;
 				f += frag_size;
-				cur = nm_ring_next(ring, cur);
-				slot = &ring->slot[cur];
+				head = nm_ring_next(ring, head);
+				slot = &ring->slot[head];
 				fp = NETMAP_BUF(ring, slot->buf_idx);
 			}
 			n -= (frags - 1);
@@ -1183,12 +1223,12 @@ send_packets(struct netmap_ring *ring, struct pkt *pkt, void *frame,
 		}
 		slot->len = tosend;
 		if (options & OPT_DUMP)
-			dump_payload(p, tosend, ring, cur);
-		cur = nm_ring_next(ring, cur);
+			dump_payload(p, tosend, ring, head);
+		head = nm_ring_next(ring, head);
 	}
 	if (sent) {
 		slot->flags |= NS_REPORT;
-		ring->head = ring->cur = cur;
+		ring->head = ring->cur = head;
 	}
 	if (sent < count) {
 		/* tell netmap that we need more slots */
@@ -1289,7 +1329,7 @@ ping_body(void *data)
 		if (n > 0 && n - sent < limit)
 			limit = n - sent;
 		for (m = 0; (unsigned)m < limit; m++) {
-			slot = &ring->slot[ring->cur];
+			slot = &ring->slot[ring->head];
 			slot->len = size;
 			p = NETMAP_BUF(ring, slot->buf_idx);
 
@@ -1305,7 +1345,7 @@ ping_body(void *data)
 				tp->sec = (uint32_t)ts.tv_sec;
 				tp->nsec = (uint32_t)ts.tv_nsec;
 				sent++;
-				ring->head = ring->cur = nm_ring_next(ring, ring->cur);
+				ring->head = ring->cur = nm_ring_next(ring, ring->head);
 			}
 		}
 		if (m > 0)
@@ -1341,7 +1381,7 @@ ping_body(void *data)
 				struct tstamp *tp;
 				int pos;
 
-				slot = &ring->slot[ring->cur];
+				slot = &ring->slot[ring->head];
 				p = NETMAP_BUF(ring, slot->buf_idx);
 
 				clock_gettime(CLOCK_REALTIME_PRECISE, &now);
@@ -1366,7 +1406,7 @@ ping_body(void *data)
 				pos = msb64(t_cur);
 				buckets[pos]++;
 				/* now store it in a bucket */
-				ring->head = ring->cur = nm_ring_next(ring, ring->cur);
+				ring->head = ring->cur = nm_ring_next(ring, ring->head);
 				rx++;
 			}
 		}
@@ -1446,7 +1486,7 @@ pong_body(void *data)
 		D("understood ponger %llu but don't know how to do it",
 			(unsigned long long)n);
 	while (!targ->cancel && (n == 0 || sent < n)) {
-		uint32_t txcur, txavail;
+		uint32_t txhead, txavail;
 //#define BUSYWAIT
 #ifdef BUSYWAIT
 		ioctl(pfd.fd, NIOCRXSYNC, NULL);
@@ -1459,24 +1499,24 @@ pong_body(void *data)
 		}
 #endif
 		txring = NETMAP_TXRING(nifp, targ->nmd->first_tx_ring);
-		txcur = txring->cur;
+		txhead = txring->head;
 		txavail = nm_ring_space(txring);
 		/* see what we got back */
 		for (i = targ->nmd->first_rx_ring; i <= targ->nmd->last_rx_ring; i++) {
 			rxring = NETMAP_RXRING(nifp, i);
 			while (!nm_ring_empty(rxring)) {
 				uint16_t *spkt, *dpkt;
-				uint32_t cur = rxring->cur;
-				struct netmap_slot *slot = &rxring->slot[cur];
+				uint32_t head = rxring->head;
+				struct netmap_slot *slot = &rxring->slot[head];
 				char *src, *dst;
 				src = NETMAP_BUF(rxring, slot->buf_idx);
 				//D("got pkt %p of size %d", src, slot->len);
-				rxring->head = rxring->cur = nm_ring_next(rxring, cur);
+				rxring->head = rxring->cur = nm_ring_next(rxring, head);
 				rx++;
 				if (txavail == 0)
 					continue;
 				dst = NETMAP_BUF(txring,
-				    txring->slot[txcur].buf_idx);
+				    txring->slot[txhead].buf_idx);
 				/* copy... */
 				dpkt = (uint16_t *)dst;
 				spkt = (uint16_t *)src;
@@ -1488,13 +1528,13 @@ pong_body(void *data)
 				dpkt[3] = spkt[0];
 				dpkt[4] = spkt[1];
 				dpkt[5] = spkt[2];
-				txring->slot[txcur].len = slot->len;
-				txcur = nm_ring_next(txring, txcur);
+				txring->slot[txhead].len = slot->len;
+				txhead = nm_ring_next(txring, txhead);
 				txavail--;
 				sent++;
 			}
 		}
-		txring->head = txring->cur = txcur;
+		txring->head = txring->cur = txhead;
 		targ->ctr.pkts = sent;
 #ifdef BUSYWAIT
 		ioctl(pfd.fd, NIOCTXSYNC, NULL);
@@ -1581,18 +1621,18 @@ sender_body(void *data)
 #endif /* NO_PCAP */
     } else {
 	int tosend = 0;
-	u_int bufsz, mtu = targ->g->mtu;
+	u_int bufsz, frag_size = targ->g->frag_size;
 
 	nifp = targ->nmd->nifp;
 	txring = NETMAP_TXRING(nifp, targ->nmd->first_tx_ring);
 	bufsz = txring->nr_buf_size;
-	if (bufsz < mtu)
-		mtu = bufsz;
+	if (bufsz < frag_size)
+		frag_size = bufsz;
 	targ->frag_size = targ->g->pkt_size / targ->frags;
-	if (targ->frag_size > mtu) {
-		targ->frags = targ->g->pkt_size / mtu;
-		targ->frag_size = mtu;
-		if (targ->g->pkt_size % mtu != 0)
+	if (targ->frag_size > frag_size) {
+		targ->frags = targ->g->pkt_size / frag_size;
+		targ->frag_size = frag_size;
+		if (targ->g->pkt_size % frag_size != 0)
 			targ->frags++;
 	}
 	D("frags %u frag_size %u", targ->frags, targ->frag_size);
@@ -1720,30 +1760,30 @@ receive_pcap(u_char *user, const struct pcap_pkthdr * h,
 static int
 receive_packets(struct netmap_ring *ring, u_int limit, int dump, uint64_t *bytes)
 {
-	u_int cur, rx, n;
+	u_int head, rx, n;
 	uint64_t b = 0;
 	u_int complete = 0;
 
 	if (bytes == NULL)
 		bytes = &b;
 
-	cur = ring->cur;
+	head = ring->head;
 	n = nm_ring_space(ring);
 	if (n < limit)
 		limit = n;
 	for (rx = 0; rx < limit; rx++) {
-		struct netmap_slot *slot = &ring->slot[cur];
+		struct netmap_slot *slot = &ring->slot[head];
 		char *p = NETMAP_BUF(ring, slot->buf_idx);
 
 		*bytes += slot->len;
 		if (dump)
-			dump_payload(p, slot->len, ring, cur);
+			dump_payload(p, slot->len, ring, head);
 		if (!(slot->flags & NS_MOREFRAG))
 			complete++;
 
-		cur = nm_ring_next(ring, cur);
+		head = nm_ring_next(ring, head);
 	}
-	ring->head = ring->cur = cur;
+	ring->head = ring->cur = head;
 
 	return (complete);
 }
@@ -2441,12 +2481,6 @@ usage(int errcode)
 	exit(errcode);
 }
 
-enum {
-	TD_TYPE_SENDER = 1,
-	TD_TYPE_RECEIVER,
-	TD_TYPE_OTHER,
-};
-
 static void
 start_threads(struct glob_arg *g) {
 	int i;
@@ -2779,8 +2813,8 @@ main(int arc, char **argv)
 	g.cpus = 1;		/* default */
 	g.forever = 1;
 	g.tx_rate = 0;
-	g.frags =1;
-	g.mtu = 1500;
+	g.frags = 1;
+	g.frag_size = (u_int)-1;	/* use the netmap buffer size by default */
 	g.nmr_config = "";
 	g.virt_header = 0;
 	g.wait_link = 2;	/* wait 2 seconds for physical ports */
@@ -2824,7 +2858,7 @@ main(int arc, char **argv)
 			break;
 
 		case 'M':
-			g.mtu = atoi(optarg);
+			g.frag_size = atoi(optarg);
 			break;
 
 		case 'f':
@@ -3102,6 +3136,16 @@ main(int arc, char **argv)
 	if (g.nthreads < 1 || g.nthreads > devqueues) {
 		D("bad nthreads %d, have %d queues", g.nthreads, devqueues);
 		// continue, fail later
+	}
+
+	if (g.td_type == TD_TYPE_SENDER) {
+		int mtu = get_if_mtu(&g);
+
+		if (mtu > 0 && g.pkt_size > mtu) {
+			D("pkt_size (%d) must be <= mtu (%d)",
+				g.pkt_size, mtu);
+			return -1;
+		}
 	}
 
 	if (verbose) {

@@ -62,7 +62,7 @@ typedef void (*init_function_ptr)(int, char**, char**);
 	((type)entry)
 #else
 #define array_entry_to_function_ptr(type, entry) \
-	((type)cheri_setoffset(cheri_getpcc(), entry));
+	((type)cheri_setaddress(cheri_getpcc(), entry));
 #endif
 
 
@@ -174,7 +174,7 @@ handle_static_init(int argc, char **argv, char **env)
 	array = __preinit_array_start;
 	for (n = 0; n < array_size; n++) {
 		initfini_array_entry addr = array[n];
-		if (addr == 0 && addr == 1)
+		if (addr == 0 || addr == 1)
 			continue;
 		fn = array_entry_to_function_ptr(init_function_ptr, addr);
 		fn(argc, argv, env);
@@ -186,7 +186,7 @@ handle_static_init(int argc, char **argv, char **env)
 	array = __init_array_start;
 	for (n = 0; n < array_size; n++) {
 		initfini_array_entry addr = array[n];
-		if (addr == 0 && addr == 1)
+		if (addr == 0 || addr == 1)
 			continue;
 		fn = array_entry_to_function_ptr(init_function_ptr, addr);
 		fn(argc, argv, env);

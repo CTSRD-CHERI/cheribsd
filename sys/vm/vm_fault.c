@@ -272,7 +272,8 @@ vm_fault_soft_fast(struct faultstate *fs, vm_offset_t vaddr, vm_prot_t prot,
 {
 	vm_page_t m, m_map;
 #if (defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
-    __ARM_ARCH >= 6) || defined(__i386__)) && VM_NRESERVLEVEL > 0
+    __ARM_ARCH >= 6) || defined(__i386__) || defined(__riscv)) && \
+    VM_NRESERVLEVEL > 0
 	vm_page_t m_super;
 	int flags;
 #endif
@@ -287,7 +288,8 @@ vm_fault_soft_fast(struct faultstate *fs, vm_offset_t vaddr, vm_prot_t prot,
 	m_map = m;
 	psind = 0;
 #if (defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
-    __ARM_ARCH >= 6) || defined(__i386__)) && VM_NRESERVLEVEL > 0
+    __ARM_ARCH >= 6) || defined(__i386__) || defined(__riscv)) && \
+    VM_NRESERVLEVEL > 0
 	if ((m->flags & PG_FICTITIOUS) == 0 &&
 	    (m_super = vm_reserv_to_superpage(m)) != NULL &&
 	    rounddown2(vaddr, pagesizes[m_super->psind]) >= fs->entry->start &&
@@ -470,7 +472,7 @@ vm_fault_populate(struct faultstate *fs, vm_prot_t prot, int fault_type,
 	    pidx += npages, m = vm_page_next(&m[npages - 1])) {
 		vaddr = fs->entry->start + IDX_TO_OFF(pidx) - fs->entry->offset;
 #if defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
-    __ARM_ARCH >= 6) || defined(__i386__)
+    __ARM_ARCH >= 6) || defined(__i386__) || defined(__riscv)
 		psind = m->psind;
 		if (psind > 0 && ((vaddr & (pagesizes[psind] - 1)) != 0 ||
 		    pidx + OFF_TO_IDX(pagesizes[psind]) - 1 > pager_last ||
@@ -486,8 +488,20 @@ vm_fault_populate(struct faultstate *fs, vm_prot_t prot, int fault_type,
 			    fault_flags, true);
 		}
 		VM_OBJECT_WUNLOCK(fs->first_object);
-		pmap_enter(fs->map->pmap, vaddr, m, prot, fault_type | (wired ?
-		    PMAP_ENTER_WIRED : 0), psind);
+		rv = pmap_enter(fs->map->pmap, vaddr, m, prot, fault_type |
+		    (wired ? PMAP_ENTER_WIRED : 0), psind);
+#if defined(__amd64__)
+		if (psind > 0 && rv == KERN_FAILURE) {
+			for (i = 0; i < npages; i++) {
+				rv = pmap_enter(fs->map->pmap, vaddr + ptoa(i),
+				    &m[i], prot, fault_type |
+				    (wired ? PMAP_ENTER_WIRED : 0), 0);
+				MPASS(rv == KERN_SUCCESS);
+			}
+		}
+#else
+		MPASS(rv == KERN_SUCCESS);
+#endif
 		VM_OBJECT_WLOCK(fs->first_object);
 		m_mtx = NULL;
 		for (i = 0; i < npages; i++) {

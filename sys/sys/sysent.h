@@ -95,7 +95,6 @@ struct vnode;
 struct sysentvec {
 	int		sv_size;	/* number of entries */
 	struct sysent	*sv_table;	/* pointer to sysent */
-	u_int		sv_mask;	/* optional mask to index */
 	int		sv_errsize;	/* size of errno translation table */
 	const int 	*sv_errtbl;	/* errno translation table */
 	int		(*sv_transtrap)(int, int);
@@ -111,7 +110,6 @@ struct sysentvec {
 					/* function to dump core, or NULL */
 	int		(*sv_imgact_try)(struct image_params *);
 	int		sv_minsigstksz;	/* minimum signal stack size */
-	int		sv_pagesize;	/* pagesize */
 	vm_offset_t	sv_minuser;	/* VM_MIN_ADDRESS */
 	vm_offset_t	sv_maxuser;	/* VM_MAXUSER_ADDRESS */
 	vm_offset_t	sv_usrstack;	/* USRSTACK */
@@ -149,7 +147,8 @@ struct sysentvec {
 #define	SV_SHP		0x010000	/* Shared page. */
 #define	SV_CAPSICUM	0x020000	/* Force cap_enter() on startup. */
 #define	SV_TIMEKEEP	0x040000	/* Shared page timehands. */
-#define	SV_CHERI	0x080000	/* CheriABI executable. */
+#define	SV_ASLR		0x080000	/* ASLR allowed. */
+#define	SV_CHERI	0x08000000	/* CheriABI executable. */
 
 #define	SV_ABI_MASK	0xff
 #define	SV_ABI_ERRNO(p, e)	((p)->p_sysent->sv_errsize <= 0 ? e :	\
@@ -168,10 +167,6 @@ struct sysentvec {
 extern struct sysentvec aout_sysvec;
 extern struct sysent sysent[];
 extern const char *syscallnames[];
-
-#if defined(__amd64__)
-extern int i386_read_exec;
-#endif
 
 #define	NO_SYSCALL (-1)
 

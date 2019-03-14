@@ -27,7 +27,7 @@
         aout
         ..
         clang
-            6.0.1
+            7.0.1
                 include
                     sanitizer
                     ..
@@ -254,8 +254,6 @@
             hast
             ..
             hostapd
-            ..
-            ibcs2
             ..
             indent
             ..

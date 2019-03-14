@@ -210,20 +210,16 @@ g_concat_candelete(struct bio *bp)
 {
 	struct g_concat_softc *sc;
 	struct g_concat_disk *disk;
-	int i, *val;
-
-	val = (int *)bp->bio_data;
-	*val = 0;
+	int i, val;
 
 	sc = bp->bio_to->geom->softc;
 	for (i = 0; i < sc->sc_ndisks; i++) {
 		disk = &sc->sc_disks[i];
-		if (!disk->d_removed && disk->d_candelete) {
-			*val = 1;
+		if (!disk->d_removed && disk->d_candelete)
 			break;
-		}
 	}
-	g_io_deliver(bp, 0);
+	val = i < sc->sc_ndisks;
+	g_handleattr(bp, "GEOM::candelete", &val, sizeof(val));
 }
 
 static void
@@ -242,8 +238,10 @@ g_concat_kernel_dump(struct bio *bp)
 		    sc->sc_disks[i].d_end > gkd->offset)
 			break;
 	}
-	if (i == sc->sc_ndisks)
+	if (i == sc->sc_ndisks) {
 		g_io_deliver(bp, EOPNOTSUPP);
+		return;
+	}
 	disk = &sc->sc_disks[i];
 	gkd->offset -= disk->d_start;
 	if (gkd->length > disk->d_end - disk->d_start - gkd->offset)

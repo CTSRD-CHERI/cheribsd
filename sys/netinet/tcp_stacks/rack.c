@@ -1,6 +1,5 @@
 /*-
- * Copyright (c) 2016-2018
- *	Netflix Inc.  All rights reserved.
+ * Copyright (c) 2016-2018 Netflix, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -1425,21 +1424,9 @@ rack_cc_after_idle(struct tcpcb *tp, int reduce_largest)
 
 	if (tp->snd_cwnd == 1)
 		i_cwnd = tp->t_maxseg;		/* SYN(-ACK) lost */
-	else if (V_tcp_initcwnd_segments)
-		i_cwnd = min((V_tcp_initcwnd_segments * tp->t_maxseg),
-		    max(2 * tp->t_maxseg, V_tcp_initcwnd_segments * 1460));
-	else if (V_tcp_do_rfc3390)
-		i_cwnd = min(4 * tp->t_maxseg,
-		    max(2 * tp->t_maxseg, 4380));
-	else {
-		/* Per RFC5681 Section 3.1 */
-		if (tp->t_maxseg > 2190)
-			i_cwnd = 2 * tp->t_maxseg;
-		else if (tp->t_maxseg > 1095)
-			i_cwnd = 3 * tp->t_maxseg;
-		else
-			i_cwnd = 4 * tp->t_maxseg;
-	}
+	else 
+		i_cwnd = tcp_compute_initwnd(tcp_maxseg(tp));
+
 	if (reduce_largest) {
 		/*
 		 * Do we reduce the largest cwnd to make 
@@ -2882,7 +2869,7 @@ rack_timeout_rxt(struct tcpcb *tp, struct tcp_rack *rack, uint32_t cts)
 	TCPSTAT_INC(tcps_rexmttimeo);
 	if ((tp->t_state == TCPS_SYN_SENT) ||
 	    (tp->t_state == TCPS_SYN_RECEIVED))
-		rexmt = MSEC_2_TICKS(RACK_INITIAL_RTO * tcp_syn_backoff[tp->t_rxtshift]);
+		rexmt = MSEC_2_TICKS(RACK_INITIAL_RTO * tcp_backoff[tp->t_rxtshift]);
 	else
 		rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
 	TCPT_RANGESET(tp->t_rxtcur, rexmt,
@@ -5245,7 +5232,8 @@ rack_do_syn_sent(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			tp->t_flags |= TF_ACKNOW;
 		}
 
-		if ((thflags & TH_ECE) && V_tcp_do_ecn) {
+		if (((thflags & (TH_CWR | TH_ECE)) == TH_ECE) &&
+		    V_tcp_do_ecn) {
 			tp->t_flags |= TF_ECN_PERMIT;
 			TCPSTAT_INC(tcps_ecn_shs);
 		}
@@ -5444,6 +5432,7 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		tp->ts_recent_age = tcp_ts_getticks();
 		tp->ts_recent = to->to_tsval;
 	}
+	tp->snd_wnd = tiwin;
 	/*
 	 * If the ACK bit is off:  if in SYN-RECEIVED state or SENDSYN flag
 	 * is on (half-synchronized state), then queue data for later
@@ -5451,7 +5440,6 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 */
 	if ((thflags & TH_ACK) == 0) {
 		if (IS_FASTOPEN(tp->t_flags)) {
-			tp->snd_wnd = tiwin;
 			cc_conn_init(tp);
 		}
 		return (rack_process_data(m, th, so, tp, drop_hdrlen, tlen,
@@ -5463,7 +5451,6 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	if ((tp->t_flags & (TF_RCVD_SCALE | TF_REQ_SCALE)) ==
 	    (TF_RCVD_SCALE | TF_REQ_SCALE)) {
 		tp->rcv_scale = tp->request_r_scale;
-		tp->snd_wnd = tiwin;
 	}
 	/*
 	 * Make transitions: SYN-RECEIVED  -> ESTABLISHED SYN-RECEIVED* ->

@@ -972,7 +972,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[1] = p->namelen; /* u_int */
 		uarg[2] = (intptr_t) p->old; /* void * */
 		uarg[3] = (intptr_t) p->oldlenp; /* size_t * */
-		uarg[4] = (intptr_t) p->new; /* void * */
+		uarg[4] = (intptr_t) p->new; /* const void * */
 		uarg[5] = p->newlen; /* size_t */
 		*n_args = 6;
 		break;
@@ -3276,8 +3276,44 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* coexecve */
+	/* getfhat */
 	case 564: {
+		struct getfhat_args *p = params;
+		iarg[0] = p->fd; /* int */
+		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[2] = (intptr_t) p->fhp; /* struct fhandle * */
+		iarg[3] = p->flags; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* fhlink */
+	case 565: {
+		struct fhlink_args *p = params;
+		uarg[0] = (intptr_t) p->fhp; /* struct fhandle * */
+		uarg[1] = (intptr_t) p->to; /* const char * */
+		*n_args = 2;
+		break;
+	}
+	/* fhlinkat */
+	case 566: {
+		struct fhlinkat_args *p = params;
+		uarg[0] = (intptr_t) p->fhp; /* struct fhandle * */
+		iarg[1] = p->tofd; /* int */
+		uarg[2] = (intptr_t) p->to; /* const char * */
+		*n_args = 3;
+		break;
+	}
+	/* fhreadlink */
+	case 567: {
+		struct fhreadlink_args *p = params;
+		uarg[0] = (intptr_t) p->fhp; /* struct fhandle * */
+		uarg[1] = (intptr_t) p->buf; /* char * */
+		uarg[2] = p->bufsize; /* size_t */
+		*n_args = 3;
+		break;
+	}
+	/* coexecve */
+	case 568: {
 		struct coexecve_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
 		uarg[1] = (intptr_t) p->fname; /* char * */
@@ -3287,7 +3323,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* cosetup */
-	case 565: {
+	case 569: {
 		struct cosetup_args *p = params;
 		iarg[0] = p->what; /* int */
 		uarg[1] = (intptr_t) p->code; /* void *__capability * */
@@ -3296,7 +3332,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* coregister */
-	case 566: {
+	case 570: {
 		struct coregister_args *p = params;
 		uarg[0] = (intptr_t) p->name; /* const char * */
 		uarg[1] = (intptr_t) p->cap; /* void *__capability * */
@@ -3304,7 +3340,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* colookup */
-	case 567: {
+	case 571: {
 		struct colookup_args *p = params;
 		uarg[0] = (intptr_t) p->name; /* const char * */
 		uarg[1] = (intptr_t) p->cap; /* void *__capability * */
@@ -3312,12 +3348,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* copark */
-	case 568: {
+	case 572: {
 		*n_args = 0;
 		break;
 	}
 	/* cogetpid */
-	case 569: {
+	case 573: {
 		struct cogetpid_args *p = params;
 		uarg[0] = (intptr_t) p->pidp; /* pid_t * */
 		*n_args = 1;
@@ -4888,7 +4924,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland size_t *";
 			break;
 		case 4:
-			p = "userland void *";
+			p = "userland const void *";
 			break;
 		case 5:
 			p = "size_t";
@@ -8786,8 +8822,72 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* coexecve */
+	/* getfhat */
 	case 564:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland char *";
+			break;
+		case 2:
+			p = "userland struct fhandle *";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fhlink */
+	case 565:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle *";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fhlinkat */
+	case 566:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle *";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland const char *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fhreadlink */
+	case 567:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle *";
+			break;
+		case 1:
+			p = "userland char *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* coexecve */
+	case 568:
 		switch(ndx) {
 		case 0:
 			p = "pid_t";
@@ -8806,7 +8906,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* cosetup */
-	case 565:
+	case 569:
 		switch(ndx) {
 		case 0:
 			p = "int";
@@ -8822,7 +8922,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* coregister */
-	case 566:
+	case 570:
 		switch(ndx) {
 		case 0:
 			p = "userland const char *";
@@ -8835,7 +8935,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* colookup */
-	case 567:
+	case 571:
 		switch(ndx) {
 		case 0:
 			p = "userland const char *";
@@ -8848,10 +8948,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* copark */
-	case 568:
+	case 572:
 		break;
 	/* cogetpid */
-	case 569:
+	case 573:
 		switch(ndx) {
 		case 0:
 			p = "userland pid_t *";
@@ -10741,30 +10841,50 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* coexecve */
+	/* getfhat */
 	case 564:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cosetup */
+	/* fhlink */
 	case 565:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* coregister */
+	/* fhlinkat */
 	case 566:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* colookup */
+	/* fhreadlink */
 	case 567:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* copark */
+	/* coexecve */
 	case 568:
-	/* cogetpid */
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cosetup */
 	case 569:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* coregister */
+	case 570:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* colookup */
+	case 571:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* copark */
+	case 572:
+	/* cogetpid */
+	case 573:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

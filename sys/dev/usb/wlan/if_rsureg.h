@@ -688,6 +688,9 @@ struct r92s_tx_desc {
 #define R92S_TXDW1_HWPC		0x80000000
 
 	uint32_t	txdw2;
+#define R92S_TXDW2_RTY_LMT_M	0x0000003f
+#define R92S_TXDW2_RTY_LMT_S	0
+#define R92S_TXDW2_RTY_LMT_ENA	0x00000040
 #define R92S_TXDW2_BMCAST	0x00000080
 #define R92S_TXDW2_AGGEN	0x20000000
 #define R92S_TXDW2_BK		0x40000000
@@ -700,9 +703,14 @@ struct r92s_tx_desc {
 
 	uint32_t	txdw4;
 #define R92S_TXDW4_TXBW		0x00040000
+#define R92S_TXDW4_DRVRATE	0x80000000
 
 	uint32_t	txdw5;
-#define R92S_TXDW5_DISFB	0x00008000
+#define R92S_TXDW5_DATARATE_M		0x00007e00
+#define R92S_TXDW5_DATARATE_S		9
+#define R92S_TXDW5_DISFB		0x00008000
+#define R92S_TXDW5_DATARATE_FB_LMT_M	0x001f0000
+#define R92S_TXDW5_DATARATE_FB_LMT_S	16
 
 	uint16_t	ipchksum;
 	uint16_t	tcpchksum;

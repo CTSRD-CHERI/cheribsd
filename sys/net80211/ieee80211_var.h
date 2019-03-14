@@ -400,6 +400,7 @@ struct ieee80211vap {
 	uint32_t		iv_caps;	/* capabilities */
 	uint32_t		iv_htcaps;	/* HT capabilities */
 	uint32_t		iv_htextcaps;	/* HT extended capabilities */
+	uint32_t		iv_com_state;	/* com usage / detached flag */
 	enum ieee80211_opmode	iv_opmode;	/* operation mode */
 	enum ieee80211_state	iv_state;	/* state machine state */
 	enum ieee80211_state	iv_nstate;	/* pending state */
@@ -685,6 +686,12 @@ MALLOC_DECLARE(M_80211_VAP);
 #define	IEEE80211_VFHT_BITS \
 	"\20\1VHT\2VHT40\3VHT80\4VHT80P80\5VHT160"
 
+#define	IEEE80211_COM_DETACHED	0x00000001	/* ieee80211_ifdetach called */
+#define	IEEE80211_COM_REF_ADD	0x00000002	/* add / remove reference */
+#define	IEEE80211_COM_REF_M	0xfffffffe	/* reference counter bits */
+#define	IEEE80211_COM_REF_S	1
+#define	IEEE80211_COM_REF_MAX	(IEEE80211_COM_REF_M >> IEEE80211_COM_REF_S)
+
 int	ic_printf(struct ieee80211com *, const char *, ...) __printflike(2, 3);
 void	ieee80211_ifattach(struct ieee80211com *);
 void	ieee80211_ifdetach(struct ieee80211com *);
@@ -727,6 +734,8 @@ uint32_t ieee80211_get_channel_center_freq1(const struct ieee80211_channel *);
 uint32_t ieee80211_get_channel_center_freq2(const struct ieee80211_channel *);
 int	ieee80211_add_channel_list_2ghz(struct ieee80211_channel[], int, int *,
 	    const uint8_t[], int, const uint8_t[], int);
+int	ieee80211_add_channels_default_2ghz(struct ieee80211_channel[], int,
+	    int *, const uint8_t[], int);
 int	ieee80211_add_channel_list_5ghz(struct ieee80211_channel[], int, int *,
 	    const uint8_t[], int, const uint8_t[], int);
 struct ieee80211_channel *ieee80211_find_channel(struct ieee80211com *,

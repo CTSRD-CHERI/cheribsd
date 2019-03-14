@@ -74,8 +74,6 @@ dev/sound/macio/onyx.c		optional	snd_ai2s iicbus powermac
 dev/sound/macio/snapper.c	optional	snd_ai2s iicbus powermac
 dev/sound/macio/tumbler.c	optional	snd_ai2s iicbus powermac
 dev/syscons/scgfbrndr.c		optional	sc
-dev/syscons/scterm-teken.c	optional	sc
-dev/syscons/scvtb.c		optional	sc
 dev/tsec/if_tsec.c		optional	tsec
 dev/tsec/if_tsec_fdt.c		optional	tsec 
 dev/uart/uart_cpu_powerpc.c	optional	uart
@@ -126,15 +124,15 @@ powerpc/cpufreq/mpc85xx_jog.c	optional	cpufreq mpc85xx
 powerpc/cpufreq/pcr.c		optional	cpufreq aim
 powerpc/cpufreq/pmcr.c		optional	cpufreq aim powerpc64
 powerpc/cpufreq/pmufreq.c	optional	cpufreq aim pmu
-powerpc/fpu/fpu_add.c		optional	fpu_emu
-powerpc/fpu/fpu_compare.c	optional	fpu_emu
-powerpc/fpu/fpu_div.c		optional	fpu_emu
+powerpc/fpu/fpu_add.c		optional	fpu_emu | powerpcspe
+powerpc/fpu/fpu_compare.c	optional	fpu_emu | powerpcspe
+powerpc/fpu/fpu_div.c		optional	fpu_emu | powerpcspe
 powerpc/fpu/fpu_emu.c		optional	fpu_emu
-powerpc/fpu/fpu_explode.c	optional	fpu_emu
-powerpc/fpu/fpu_implode.c	optional	fpu_emu
-powerpc/fpu/fpu_mul.c		optional	fpu_emu
+powerpc/fpu/fpu_explode.c	optional	fpu_emu | powerpcspe
+powerpc/fpu/fpu_implode.c	optional	fpu_emu | powerpcspe
+powerpc/fpu/fpu_mul.c		optional	fpu_emu | powerpcspe
 powerpc/fpu/fpu_sqrt.c		optional	fpu_emu
-powerpc/fpu/fpu_subr.c		optional	fpu_emu
+powerpc/fpu/fpu_subr.c		optional	fpu_emu | powerpcspe
 powerpc/mambo/mambocall.S	optional	mambo
 powerpc/mambo/mambo.c		optional	mambo
 powerpc/mambo/mambo_console.c	optional	mambo
@@ -191,8 +189,10 @@ powerpc/powermac/uninorth.c	optional	powermac
 powerpc/powermac/uninorthpci.c	optional	powermac pci
 powerpc/powermac/vcoregpio.c	optional	powermac 
 powerpc/powernv/opal.c		optional	powernv
+powerpc/powernv/opal_async.c	optional	powernv
 powerpc/powernv/opal_console.c	optional	powernv
 powerpc/powernv/opal_dev.c	optional	powernv
+powerpc/powernv/opal_flash.c	optional	powernv
 powerpc/powernv/opal_i2c.c	optional	iicbus fdt powernv
 powerpc/powernv/opal_i2cm.c	optional	iicbus fdt powernv
 powerpc/powernv/opal_pci.c	optional	powernv pci
@@ -201,6 +201,7 @@ powerpc/powernv/opalcall.S	optional	powernv
 powerpc/powernv/platform_powernv.c optional	powernv
 powerpc/powernv/powernv_centaur.c	optional	powernv
 powerpc/powernv/powernv_xscom.c	optional	powernv
+powerpc/powernv/xive.c		optional	powernv
 powerpc/powerpc/altivec.c	optional	powerpc | powerpc64
 powerpc/powerpc/autoconf.c	standard
 powerpc/powerpc/bus_machdep.c	standard

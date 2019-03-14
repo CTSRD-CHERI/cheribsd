@@ -916,7 +916,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
  *  Process the PLT relocations.
  */
 int
-reloc_plt(Obj_Entry *obj)
+reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
 {
 	const Elf_Rel *rellim;
 	const Elf_Rel *rel;
@@ -1073,7 +1073,7 @@ _mips_get_tls(void)
 #elif defined(__CHERI_CAPABILITY_TLS__)
 	return (void *)_rv;
 #else
-	return cheri_setoffset(cheri_getdefault(), _rv);
+	return cheri_setaddress(cheri_getdefault(), _rv);
 #endif
 }
 

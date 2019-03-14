@@ -2,7 +2,7 @@
  * Copyright (c) 2010 Isilon Systems, Inc.
  * Copyright (c) 2010 iX Systems, Inc.
  * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013-2017 Mellanox Technologies, Ltd.
+ * Copyright (c) 2013-2018 Mellanox Technologies, Ltd.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -54,6 +54,7 @@ struct vm_area_struct;
 struct poll_table_struct;
 struct files_struct;
 struct pfs_node;
+struct linux_cdev;
 
 #define	inode	vnode
 #define	i_cdev	v_rdev
@@ -104,6 +105,9 @@ struct linux_file {
 	/* protects f_selinfo.si_note */
 	spinlock_t	f_kqlock;
 	struct linux_file_wait_queue f_wait_queue;
+
+	/* pointer to associated character device, if any */
+	struct linux_cdev *f_cdev;
 };
 
 #define	file		linux_file
@@ -124,25 +128,25 @@ do {									\
 		pgsigio(*(queue), (sig), 0);				\
 } while (0)
 
-typedef int (*filldir_t)(void *, const char *, int, loff_t, u64, unsigned);
+typedef int (*filldir_t)(void *, const char *, int, off_t, u64, unsigned);
 
 struct file_operations {
 	struct module *owner;
-	ssize_t (*read)(struct file *, char __user *, size_t, loff_t *);
-	ssize_t (*write)(struct file *, const char __user *, size_t, loff_t *);
-	unsigned int (*poll) (struct file *, struct poll_table_struct *);
-	long (*unlocked_ioctl)(struct file *, unsigned int, unsigned long);
-	long (*compat_ioctl)(struct file *, unsigned int, unsigned long);
-	int (*mmap)(struct file *, struct vm_area_struct *);
+	ssize_t (*read)(struct linux_file *, char __user *, size_t, off_t *);
+	ssize_t (*write)(struct linux_file *, const char __user *, size_t, off_t *);
+	unsigned int (*poll) (struct linux_file *, struct poll_table_struct *);
+	long (*unlocked_ioctl)(struct linux_file *, unsigned int, unsigned long);
+	long (*compat_ioctl)(struct linux_file *, unsigned int, unsigned long);
+	int (*mmap)(struct linux_file *, struct vm_area_struct *);
 	int (*open)(struct inode *, struct file *);
-	int (*release)(struct inode *, struct file *);
-	int (*fasync)(int, struct file *, int);
+	int (*release)(struct inode *, struct linux_file *);
+	int (*fasync)(int, struct linux_file *, int);
 
 /* Although not supported in FreeBSD, to align with Linux code
  * we are adding llseek() only when it is mapped to no_llseek which returns
  * an illegal seek error
  */
-	loff_t (*llseek)(struct file *, loff_t, int);
+	off_t (*llseek)(struct linux_file *, off_t, int);
 #if 0
 	/* We do not support these methods.  Don't permit them to compile. */
 	loff_t (*llseek)(struct file *, loff_t, int);

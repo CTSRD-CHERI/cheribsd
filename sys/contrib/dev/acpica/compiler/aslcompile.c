@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -388,23 +388,20 @@ CmDoCompile (
 
     /* Resolve External Declarations */
 
-    if (AslGbl_DoExternals)
-    {
-        Event = UtBeginEvent ("Resolve all Externals");
-        DbgPrint (ASL_DEBUG_OUTPUT, "\nResolve Externals\n\n");
+    Event = UtBeginEvent ("Resolve all Externals");
+    DbgPrint (ASL_DEBUG_OUTPUT, "\nResolve Externals\n\n");
 
-        if (AslGbl_DoExternalsInPlace)
-        {
-            TrWalkParseTree (AslGbl_ParseTreeRoot, ASL_WALK_VISIT_DOWNWARD,
-                ExAmlExternalWalkBegin, NULL, NULL);
-        }
-        else
-        {
-            TrWalkParseTree (AslGbl_ParseTreeRoot, ASL_WALK_VISIT_TWICE,
-                ExAmlExternalWalkBegin, ExAmlExternalWalkEnd, NULL);
-        }
-        UtEndEvent (Event);
+    if (AslGbl_DoExternalsInPlace)
+    {
+        TrWalkParseTree (AslGbl_ParseTreeRoot, ASL_WALK_VISIT_DOWNWARD,
+            ExAmlExternalWalkBegin, NULL, NULL);
     }
+    else
+    {
+        TrWalkParseTree (AslGbl_ParseTreeRoot, ASL_WALK_VISIT_TWICE,
+            ExAmlExternalWalkBegin, ExAmlExternalWalkEnd, NULL);
+    }
+    UtEndEvent (Event);
 
     /*
      * Semantic analysis. This can happen only after the
@@ -497,6 +494,7 @@ CmDoCompile (
     UtEndEvent (Event);
 
     UtEndEvent (FullCompile);
+    AslCheckExpectedExceptions ();
     CmCleanupAndExit ();
     return (0);
 
@@ -814,7 +812,6 @@ CmCleanupAndExit (
     BOOLEAN                 DeleteAmlFile = FALSE;
 
 
-    AslCheckExpectedExceptions ();
     AePrintErrorLog (ASL_FILE_STDERR);
     if (AslGbl_DebugFlag)
     {

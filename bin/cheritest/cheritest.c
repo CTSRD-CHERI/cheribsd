@@ -2245,6 +2245,22 @@ cheritest_run_test_name(const char *name)
 		errx(EX_USAGE, "unknown test: %s", name);
 	cheritest_run_test(&cheri_tests[i]);
 }
+
+/* For libc_memcpy and libc_memset tests: */
+extern void *cheritest_memcpy(void *dst, const void *src, size_t n);
+extern void *cheritest_memmove(void *dst, const void *src, size_t n);
+
+__noinline void *
+cheritest_memcpy(void *dst, const void *src, size_t n)
+{
+	return memcpy(dst, src, n);
+}
+
+__noinline void *
+cheritest_memmove(void *dst, const void *src, size_t n)
+{
+	return memmove(dst, src, n);
+}
 #endif /* !LIST_ONLY */
 
 int

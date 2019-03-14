@@ -49,7 +49,8 @@ __FBSDID("$FreeBSD$");
  * This is not the correct prototype, but we only need it for
  * a function pointer to a simple asm function.
  */
-void *_rtld_tlsdesc(void *);
+void *_rtld_tlsdesc_static(void *);
+void *_rtld_tlsdesc_undef(void *);
 void *_rtld_tlsdesc_dynamic(void *);
 
 void _exit(int);
@@ -109,9 +110,8 @@ do_copy_relocations(Obj_Entry *dstobj)
 			}
 		}
 		if (srcobj == NULL) {
-			_rtld_error(
-"Undefined symbol \"%s\" referenced from COPY relocation in %s",
-			    name, dstobj->path);
+			_rtld_error("Undefined symbol \"%s\" referenced from "
+			    "COPY relocation in %s", name, dstobj->path);
 			return (-1);
 		}
 
@@ -123,78 +123,58 @@ do_copy_relocations(Obj_Entry *dstobj)
 }
 
 struct tls_data {
-	int64_t index;
-	Obj_Entry *obj;
-	const Elf_Rela *rela;
+	Elf_Addr	dtv_gen;
+	int		tls_index;
+	Elf_Addr	tls_offs;
 };
 
-int64_t rtld_tlsdesc_handle(struct tls_data *tlsdesc, int flags);
-
-static struct tls_data *
-reloc_tlsdesc_alloc(Obj_Entry *obj, const Elf_Rela *rela)
+static Elf_Addr
+reloc_tlsdesc_alloc(int tlsindex, Elf_Addr tlsoffs)
 {
 	struct tls_data *tlsdesc;
 
 	tlsdesc = xmalloc(sizeof(struct tls_data));
-	tlsdesc->index = -1;
-	tlsdesc->obj = obj;
-	tlsdesc->rela = rela;
+	tlsdesc->dtv_gen = tls_dtv_generation;
+	tlsdesc->tls_index = tlsindex;
+	tlsdesc->tls_offs = tlsoffs;
 
-	return (tlsdesc);
-}
-
-/*
- * Look up the symbol to find its tls index
- */
-static int64_t
-rtld_tlsdesc_handle_locked(struct tls_data *tlsdesc, int flags,
-    RtldLockState *lockstate)
-{
-	const Elf_Rela *rela;
-	const Elf_Sym *def;
-	const Obj_Entry *defobj;
-	Obj_Entry *obj;
-
-	rela = tlsdesc->rela;
-	obj = tlsdesc->obj;
-
-	def = find_symdef(ELF_R_SYM(rela->r_info), obj, &defobj, flags, NULL,
-	    lockstate);
-	if (def == NULL)
-		rtld_die();
-
-	tlsdesc->index = defobj->tlsoffset + def->st_value + rela->r_addend;
-
-	return (tlsdesc->index);
-}
-
-int64_t
-rtld_tlsdesc_handle(struct tls_data *tlsdesc, int flags)
-{
-	RtldLockState lockstate;
-
-	/* We have already found the index, return it */
-	if (tlsdesc->index >= 0)
-		return (tlsdesc->index);
-
-	wlock_acquire(rtld_bind_lock, &lockstate);
-	/* tlsdesc->index may have been set by another thread */
-	if (tlsdesc->index == -1)
-		rtld_tlsdesc_handle_locked(tlsdesc, flags, &lockstate);
-	lock_release(rtld_bind_lock, &lockstate);
-
-	return (tlsdesc->index);
+	return ((Elf_Addr)tlsdesc);
 }
 
 static void
-reloc_tlsdesc(Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where)
+reloc_tlsdesc(const Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where,
+    int flags, RtldLockState *lockstate)
 {
-	if (ELF_R_SYM(rela->r_info) == 0) {
-		where[0] = (Elf_Addr)_rtld_tlsdesc;
-		where[1] = obj->tlsoffset + rela->r_addend;
+	const Elf_Sym *def;
+	const Obj_Entry *defobj;
+	Elf_Addr offs;
+
+
+	offs = 0;
+	if (ELF_R_SYM(rela->r_info) != 0) {
+		def = find_symdef(ELF_R_SYM(rela->r_info), obj, &defobj, flags,
+			    NULL, lockstate);
+		if (def == NULL)
+			rtld_die();
+		offs = def->st_value;
+		obj = defobj;
+		if (def->st_shndx == SHN_UNDEF) {
+			/* Weak undefined thread variable */
+			where[0] = (Elf_Addr)_rtld_tlsdesc_undef;
+			where[1] = rela->r_addend;
+			return;
+		}
+	}
+	offs += rela->r_addend;
+
+	if (obj->tlsoffset != 0) {
+		/* Variable is in initialy allocated TLS segment */
+		where[0] = (Elf_Addr)_rtld_tlsdesc_static;
+		where[1] = obj->tlsoffset + offs;
 	} else {
+		/* TLS offest is unknown at load time, use dynamic resolving */
 		where[0] = (Elf_Addr)_rtld_tlsdesc_dynamic;
-		where[1] = (Elf_Addr)reloc_tlsdesc_alloc(obj, rela);
+		where[1] = reloc_tlsdesc_alloc(obj->tlsindex, offs);
 	}
 }
 
@@ -202,12 +182,13 @@ reloc_tlsdesc(Obj_Entry *obj, const Elf_Rela *rela, Elf_Addr *where)
  * Process the PLT relocations.
  */
 int
-reloc_plt(Obj_Entry *obj)
+reloc_plt(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 {
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
 
-	relalim = (const Elf_Rela *)((const char *)obj->pltrela + obj->pltrelasize);
+	relalim = (const Elf_Rela *)((const char *)obj->pltrela +
+	    obj->pltrelasize);
 	for (rela = obj->pltrela; rela < relalim; rela++) {
 		Elf_Addr *where;
 
@@ -218,10 +199,13 @@ reloc_plt(Obj_Entry *obj)
 			*where += (Elf_Addr)obj->relocbase;
 			break;
 		case R_AARCH64_TLSDESC:
-			reloc_tlsdesc(obj, rela, where);
+			reloc_tlsdesc(obj, rela, where, SYMLOOK_IN_PLT | flags,
+			    lockstate);
 			break;
 		case R_AARCH64_IRELATIVE:
 			obj->irelative = true;
+			break;
+		case R_AARCH64_NONE:
 			break;
 		default:
 			_rtld_error("Unknown relocation type %u in PLT",
@@ -243,9 +227,12 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
 	const Elf_Sym *def;
-	struct tls_data *tlsdesc;
 
-	relalim = (const Elf_Rela *)((const char *)obj->pltrela + obj->pltrelasize);
+	if (obj->jmpslots_done)
+		return (0);
+
+	relalim = (const Elf_Rela *)((const char *)obj->pltrela +
+	    obj->pltrelasize);
 	for (rela = obj->pltrela; rela < relalim; rela++) {
 		Elf_Addr *where, target;
 
@@ -264,20 +251,9 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
 			reloc_jmpslot(where, target, defobj, obj,
 			    (const Elf_Rel *)rela);
 			break;
-		case R_AARCH64_TLSDESC:
-			if (ELF_R_SYM(rela->r_info) != 0) {
-				tlsdesc = (struct tls_data *)where[1];
-				if (tlsdesc->index == -1)
-					rtld_tlsdesc_handle_locked(tlsdesc,
-					    SYMLOOK_IN_PLT | flags, lockstate);
-			}
-			break;
-		default:
-			_rtld_error("Unknown relocation type %x in jmpslot",
-			    (unsigned int)ELF_R_TYPE(rela->r_info));
-			return (-1);
 		}
 	}
+	obj->jmpslots_done = true;
 
 	return (0);
 }
@@ -399,6 +375,8 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 		case R_AARCH64_ABS64:
 		case R_AARCH64_GLOB_DAT:
 		case R_AARCH64_TLS_TPREL64:
+		case R_AARCH64_TLS_DTPREL64:
+		case R_AARCH64_TLS_DTPMOD64:
 			def = find_symdef(ELF_R_SYM(rela->r_info), obj,
 			    &defobj, flags, cache, lockstate);
 			if (def == NULL)
@@ -462,7 +440,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			}
 			break;
 		case R_AARCH64_TLSDESC:
-			reloc_tlsdesc(obj, rela, where);
+			reloc_tlsdesc(obj, rela, where, flags, lockstate);
 			break;
 		case R_AARCH64_TLS_TPREL64:
 			/*
@@ -482,12 +460,43 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 					return (-1);
 				}
 			}
+			/* Test weak undefined thread variable */
+			if (def->st_shndx != SHN_UNDEF) {
+				*where = def->st_value + rela->r_addend +
+				    defobj->tlsoffset;
+			} else {
+				/*
+				 * XXX We should relocate undefined thread
+				 * weak variable address to NULL, but how?
+				 * Can we return error in this situation?
+				 */
+				rtld_printf("%s: Unable to relocate undefined "
+				"weak TLS variable\n", obj->path);
+#if 0
+				return (-1);
+#else
+				*where = def->st_value + rela->r_addend +
+				    defobj->tlsoffset;
+#endif
+			}
+			break;
 
-			*where = def->st_value + rela->r_addend +
-			    defobj->tlsoffset;
+		/*
+		 * !!! BEWARE !!!
+		 * ARM ELF ABI defines TLS_DTPMOD64 as 1029, and TLS_DTPREL64
+		 * as 1028. But actual bfd linker and the glibc RTLD linker
+		 * treats TLS_DTPMOD64 as 1028 and TLS_DTPREL64 1029.
+		 */
+		case R_AARCH64_TLS_DTPREL64: /* efectively is TLS_DTPMOD64 */
+			*where += (Elf_Addr)defobj->tlsindex;
+			break;
+		case R_AARCH64_TLS_DTPMOD64: /* efectively is TLS_DTPREL64 */
+			*where += (Elf_Addr)(def->st_value + rela->r_addend);
 			break;
 		case R_AARCH64_RELATIVE:
 			*where = (Elf_Addr)(obj->relocbase + rela->r_addend);
+			break;
+		case R_AARCH64_NONE:
 			break;
 		default:
 			rtld_printf("%s: Unhandled relocation %lu\n",
@@ -515,4 +524,16 @@ allocate_initial_tls(Obj_Entry *objs)
 	tp = (Elf_Addr **) allocate_tls(objs, NULL, TLS_TCB_SIZE, 16);
 
 	asm volatile("msr	tpidr_el0, %0" : : "r"(tp));
+}
+
+void *
+__tls_get_addr(tls_index* ti)
+{
+      char *p;
+      void *_tp;
+
+      __asm __volatile("mrs	%0, tpidr_el0"  : "=r" (_tp));
+      p = tls_get_addr_common((Elf_Addr **)(_tp), ti->ti_module, ti->ti_offset);
+
+      return (p);
 }

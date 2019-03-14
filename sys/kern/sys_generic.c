@@ -192,18 +192,26 @@ struct read_args {
 int
 sys_read(struct thread *td, struct read_args *uap)
 {
+
+	return (user_read(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte));
+}
+
+int
+user_read(struct thread *td, int fd, void * __capability buf, size_t nbyte)
+{
 	struct uio auio;
 	kiovec_t aiov;
 	int error;
 
-	if (uap->nbyte > IOSIZE_MAX)
+	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	IOVEC_INIT(&aiov, uap->buf, uap->nbyte);
+	IOVEC_INIT_C(&aiov, buf, nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	auio.uio_resid = uap->nbyte;
+	auio.uio_resid = nbyte;
 	auio.uio_segflg = UIO_USERSPACE;
-	error = kern_readv(td, uap->fd, &auio);
+	error = kern_readv(td, fd, &auio);
 	return (error);
 }
 
@@ -223,11 +231,13 @@ int
 sys_pread(struct thread *td, struct pread_args *uap)
 {
 
-	return (kern_pread(td, uap->fd, uap->buf, uap->nbyte, uap->offset));
+	return (kern_pread(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, uap->offset));
 }
 
 int
-kern_pread(struct thread *td, int fd, void *buf, size_t nbyte, off_t offset)
+kern_pread(struct thread *td, int fd, void * __capability buf, size_t nbyte,
+    off_t offset)
 {
 	struct uio auio;
 	kiovec_t aiov;
@@ -235,7 +245,7 @@ kern_pread(struct thread *td, int fd, void *buf, size_t nbyte, off_t offset)
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	IOVEC_INIT(&aiov, buf, nbyte);
+	IOVEC_INIT_C(&aiov, buf, nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;
@@ -266,13 +276,22 @@ struct readv_args {
 int
 sys_readv(struct thread *td, struct readv_args *uap)
 {
+
+	return (user_readv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)copyinuio));
+}
+
+int
+user_readv(struct thread *td, int fd, void * __capability iovp, u_int iovcnt,
+    copyinuio_t *copyinuio_f)
+{
 	struct uio *auio;
 	int error;
 
-	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
-	error = kern_readv(td, uap->fd, auio);
+	error = kern_readv(td, fd, auio);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -305,13 +324,22 @@ struct preadv_args {
 int
 sys_preadv(struct thread *td, struct preadv_args *uap)
 {
+
+	return (user_preadv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, uap->offset, (copyinuio_t *)copyinuio));
+}
+
+int
+user_preadv(struct thread *td, int fd, void * __capability iovp, u_int iovcnt,
+    off_t offset, copyinuio_t *copyinuio_f)
+{
 	struct uio *auio;
 	int error;
 
-	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
-	error = kern_preadv(td, uap->fd, auio, uap->offset);
+	error = kern_preadv(td, fd, auio, offset);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -391,18 +419,27 @@ struct write_args {
 int
 sys_write(struct thread *td, struct write_args *uap)
 {
+
+	return (kern_write(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte));
+}
+
+int
+kern_write(struct thread *td, int fd, const void * __capability buf,
+    size_t nbyte)
+{
 	struct uio auio;
 	kiovec_t aiov;
 	int error;
 
-	if (uap->nbyte > IOSIZE_MAX)
+	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	IOVEC_INIT(&aiov, __DECONST(void *, uap->buf), uap->nbyte);
+	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
-	auio.uio_resid = uap->nbyte;
+	auio.uio_resid = nbyte;
 	auio.uio_segflg = UIO_USERSPACE;
-	error = kern_writev(td, uap->fd, &auio);
+	error = kern_writev(td, fd, &auio);
 	return (error);
 }
 
@@ -422,12 +459,13 @@ int
 sys_pwrite(struct thread *td, struct pwrite_args *uap)
 {
 
-	return (kern_pwrite(td, uap->fd, uap->buf, uap->nbyte, uap->offset));
+	return (kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, uap->offset));
 }
 
 int
-kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
-    off_t offset)
+kern_pwrite(struct thread *td, int fd, const void * __capability buf,
+    size_t nbyte, off_t offset)
 {
 	struct uio auio;
 	kiovec_t aiov;
@@ -435,7 +473,7 @@ kern_pwrite(struct thread *td, int fd, const void *buf, size_t nbyte,
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
-	IOVEC_INIT(&aiov, __DECONST(void *, buf), nbyte);
+	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), nbyte);
 	auio.uio_iov = &aiov;
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;
@@ -449,7 +487,8 @@ int
 freebsd6_pwrite(struct thread *td, struct freebsd6_pwrite_args *uap)
 {
 
-	return (kern_pwrite(td, uap->fd, uap->buf, uap->nbyte, uap->offset));
+	return (kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, uap->offset));
 }
 #endif
 
@@ -466,13 +505,22 @@ struct writev_args {
 int
 sys_writev(struct thread *td, struct writev_args *uap)
 {
+
+	return (user_writev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)copyinuio));
+}
+
+int
+user_writev(struct thread *td, int fd, void * __capability iovp, u_int iovcnt,
+    copyinuio_t *copyinuio_f)
+{
 	struct uio *auio;
 	int error;
 
-	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
-	error = kern_writev(td, uap->fd, auio);
+	error = kern_writev(td, fd, auio);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -505,13 +553,23 @@ struct pwritev_args {
 int
 sys_pwritev(struct thread *td, struct pwritev_args *uap)
 {
+
+	return (user_pwritev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, uap->offset,
+	    (copyinuio_t *)copyinuio));
+}
+
+int
+user_pwritev(struct thread *td, int fd, void *__capability iovp, u_int iovcnt,
+    off_t offset, copyinuio_t *copyinuio_f)
+{
 	struct uio *auio;
 	int error;
 
-	error = copyinuio(uap->iovp, uap->iovcnt, &auio);
+	error = copyinuio_f(iovp, iovcnt, &auio);
 	if (error)
 		return (error);
-	error = kern_pwritev(td, uap->fd, auio, uap->offset);
+	error = kern_pwritev(td, fd, auio, offset);
 	free(auio, M_IOV);
 	return (error);
 }
@@ -652,19 +710,33 @@ struct ioctl_args {
 int
 sys_ioctl(struct thread *td, struct ioctl_args *uap)
 {
-	u_char smalldata[SYS_IOCTL_SMALL_SIZE] __aligned(SYS_IOCTL_SMALL_ALIGN);
 	u_long com;
+	void * __capability udata;
+
+	com = uap->com;
+	if (com & IOC_VOID)
+		udata = (void * __capability)(intcap_t)uap->data;
+	else
+		udata = __USER_CAP(uap->data, IOCPARM_LEN(com));
+
+	return (user_ioctl(td, uap->fd, com, udata, &uap->data, 0));
+}
+
+int
+user_ioctl(struct thread *td, int fd, u_long com, void * __capability udata,
+    void *datap, int copycaps)
+{
+	u_char smalldata[SYS_IOCTL_SMALL_SIZE] __aligned(SYS_IOCTL_SMALL_ALIGN);
 	int arg, error;
 	u_int size;
 	caddr_t data;
 
-	if (uap->com > 0xffffffff) {
+	if (com > 0xffffffff) {
 		printf(
 		    "WARNING pid %d (%s): ioctl sign-extension ioctl %lx\n",
-		    td->td_proc->p_pid, td->td_name, uap->com);
-		uap->com &= 0xffffffff;
+		    td->td_proc->p_pid, td->td_name, com);
+		com &= 0xffffffff;
 	}
-	com = uap->com;
 
 	/*
 	 * Interpret high order word to find amount of data to be
@@ -684,20 +756,22 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 	if (size > 0) {
 		if (com & IOC_VOID) {
 			/* Integer argument. */
-			arg = (intptr_t)uap->data;
+			arg = (__cheri_addr intptr_t)udata;
 			data = (void *)&arg;
 			size = 0;
 		} else {
 			if (size > SYS_IOCTL_SMALL_SIZE)
-				data = malloc((u_long)size, M_IOCTLOPS, M_WAITOK);
+				data = malloc(size, M_IOCTLOPS, M_WAITOK);
 			else
 				data = smalldata;
 		}
 	} else
-		data = (void *)&uap->data;
+		data = datap;
 	if (com & IOC_IN) {
-		error = copyin(__USER_CAP_UNBOUND(uap->data), data,
-		    (u_int)size);
+		if (copycaps)
+			error = copyincap(udata, data, size);
+		else
+			error = copyin(udata, data, size);
 		if (error != 0)
 			goto out;
 	} else if (com & IOC_OUT) {
@@ -708,11 +782,14 @@ sys_ioctl(struct thread *td, struct ioctl_args *uap)
 		bzero(data, size);
 	}
 
-	error = kern_ioctl(td, uap->fd, com, data);
+	error = kern_ioctl(td, fd, com, data);
 
-	if (error == 0 && (com & IOC_OUT))
-		error = copyout(data, __USER_CAP_UNBOUND(uap->data),
-		    (u_int)size);
+	if (error == 0 && (com & IOC_OUT)) {
+		if (copycaps)
+			error = copyoutcap(data, udata, size);
+		else
+			error = copyout(data, udata, size);
+	}
 
 out:
 	if (size > SYS_IOCTL_SMALL_SIZE)
@@ -836,29 +913,38 @@ poll_no_poll(int events)
 int
 sys_pselect(struct thread *td, struct pselect_args *uap)
 {
+
+	return (user_pselect(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
+	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex),
+	    __USER_CAP_OBJ(uap->ts), __USER_CAP_OBJ(uap->sm)));
+}
+
+int
+user_pselect(struct thread *td, int nd, fd_set * __capability in,
+    fd_set * __capability ou, fd_set * __capability ex,
+    const struct timespec * __capability uts, const sigset_t * __capability sm)
+{
 	struct timespec ts;
 	struct timeval tv, *tvp;
 	sigset_t set, *uset;
 	int error;
 
-	if (uap->ts != NULL) {
-		error = copyin(__USER_CAP_OBJ(uap->ts), &ts, sizeof(ts));
+	if (uts != NULL) {
+		error = copyin(uts, &ts, sizeof(ts));
 		if (error != 0)
 		    return (error);
 		TIMESPEC_TO_TIMEVAL(&tv, &ts);
 		tvp = &tv;
 	} else
 		tvp = NULL;
-	if (uap->sm != NULL) {
-		error = copyin(__USER_CAP_OBJ(uap->sm), &set, sizeof(set));
+	if (sm != NULL) {
+		error = copyin(sm, &set, sizeof(set));
 		if (error != 0)
 			return (error);
 		uset = &set;
 	} else
 		uset = NULL;
-	return (kern_pselect(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
-	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex),
-	    tvp, uset, NFDBITS));
+	return (kern_pselect(td, nd, in, ou, ex, tvp, uset, NFDBITS));
 }
 
 int
@@ -897,20 +983,29 @@ struct select_args {
 int
 sys_select(struct thread *td, struct select_args *uap)
 {
+
+	return (user_select(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
+	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex),
+	    __USER_CAP_OBJ(uap->tv)));
+}
+
+int
+user_select(struct thread *td, int nd, fd_set * __capability in,
+    fd_set * __capability ou, fd_set * __capability ex,
+    struct timeval * __capability utv)
+{
 	struct timeval tv, *tvp;
 	int error;
 
-	if (uap->tv != NULL) {
-		error = copyin(__USER_CAP_OBJ(uap->tv), &tv, sizeof(tv));
+	if (utv != NULL) {
+		error = copyin(utv, &tv, sizeof(tv));
 		if (error)
 			return (error);
 		tvp = &tv;
 	} else
 		tvp = NULL;
 
-	return (kern_select(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
-	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex),
-	    tvp, NFDBITS));
+	return (kern_select(td, nd, in, ou, ex, tvp, NFDBITS));
 }
 
 /*
@@ -1294,19 +1389,27 @@ selscan(struct thread *td, fd_mask **ibits, fd_mask **obits, int nfd)
 int
 sys_poll(struct thread *td, struct poll_args *uap)
 {
+
+	return (user_poll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds),
+	    uap->nfds, uap->timeout));
+}
+
+int
+user_poll(struct thread *td, struct pollfd * __capability fds, u_int nfds,
+    int timeout)
+{
 	struct timespec ts, *tsp;
 
-	if (uap->timeout != INFTIM) {
-		if (uap->timeout < 0)
+	if (timeout != INFTIM) {
+		if (timeout < 0)
 			return (EINVAL);
-		ts.tv_sec = uap->timeout / 1000;
-		ts.tv_nsec = (uap->timeout % 1000) * 1000000;
+		ts.tv_sec = timeout / 1000;
+		ts.tv_nsec = (timeout % 1000) * 1000000;
 		tsp = &ts;
 	} else
 		tsp = NULL;
 
-	return (kern_poll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds), uap->nfds,
-	    tsp, NULL));
+	return (kern_poll(td, fds, nfds, tsp, NULL));
 }
 
 int
@@ -1413,19 +1516,29 @@ out:
 int
 sys_ppoll(struct thread *td, struct ppoll_args *uap)
 {
+
+	return (user_ppoll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds),
+	    uap->nfds, __USER_CAP_OBJ(uap->ts), __USER_CAP_OBJ(uap->set)));
+}
+
+int
+user_ppoll(struct thread *td, struct pollfd *__capability fds, u_int nfds,
+    const struct timespec * __capability uts,
+    const sigset_t * __capability uset)
+{
 	struct timespec ts, *tsp;
 	sigset_t set, *ssp;
 	int error;
 
-	if (uap->ts != NULL) {
-		error = copyin(__USER_CAP_OBJ(uap->ts), &ts, sizeof(ts));
+	if (uts != NULL) {
+		error = copyin(uts, &ts, sizeof(ts));
 		if (error)
 			return (error);
 		tsp = &ts;
 	} else
 		tsp = NULL;
-	if (uap->set != NULL) {
-		error = copyin(__USER_CAP_OBJ(uap->set), &set, sizeof(set));
+	if (uset != NULL) {
+		error = copyin(uset, &set, sizeof(set));
 		if (error)
 			return (error);
 		ssp = &set;
@@ -1436,8 +1549,7 @@ sys_ppoll(struct thread *td, struct ppoll_args *uap)
 	 * take care of copyin that array to the kernel space.
 	 */
 
-	return (kern_poll(td,
-	     __USER_CAP_ARRAY(uap->fds, uap->nfds), uap->nfds, tsp, ssp));
+	return (kern_poll(td, fds, nfds, tsp, ssp));
 }
 
 static int

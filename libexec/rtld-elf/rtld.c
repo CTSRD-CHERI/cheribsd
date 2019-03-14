@@ -72,6 +72,7 @@ __FBSDID("$FreeBSD$");
 #include "paths.h"
 #include "rtld_tls.h"
 #include "rtld_printf.h"
+#include "rtld_malloc.h"
 #include "rtld_utrace.h"
 #include "notes.h"
 
@@ -117,6 +118,7 @@ static void init_pagesizes(Elf_Auxinfo **aux_info);
 static void init_rtld(caddr_t, Elf_Auxinfo **);
 static void initlist_add_neededs(Needed_Entry *, Objlist *);
 static void initlist_add_objects(Obj_Entry *, Obj_Entry *, Objlist *);
+static int initlist_objects_ifunc(Objlist *, bool, int, RtldLockState *);
 static void linkmap_add(Obj_Entry *);
 static void linkmap_delete(Obj_Entry *);
 static void load_filtees(Obj_Entry *, int flags, RtldLockState *);
@@ -125,6 +127,7 @@ static int load_needed_objects(Obj_Entry *, int);
 static int load_preload_objects(void);
 static Obj_Entry *load_object(const char *, int fd, const Obj_Entry *, int);
 static void map_stacks_exec(RtldLockState *);
+static int obj_disable_relro(Obj_Entry *);
 static int obj_enforce_relro(Obj_Entry *);
 static Obj_Entry *obj_from_addr(const void *);
 static void objlist_call_fini(Objlist *, Obj_Entry *, RtldLockState *);
@@ -149,8 +152,6 @@ static int relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 static int relocate_objects(Obj_Entry *, bool, Obj_Entry *, int,
     RtldLockState *);
 static int resolve_object_ifunc(Obj_Entry *, bool, int, RtldLockState *);
-static int resolve_objects_ifunc(Obj_Entry *first, bool bind_now,
-    int flags, RtldLockState *lockstate);
 static int rtld_dirname(const char *, char *);
 static int rtld_dirname_abs(const char *, char *);
 static void *rtld_dlopen(const char *name, int fd, int mode);
@@ -806,20 +807,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     map_stacks_exec(NULL);
 
-    dbg("resolving ifuncs");
-    if (resolve_objects_ifunc(obj_main,
-      ld_bind_now != NULL && *ld_bind_now != '\0', SYMLOOK_EARLY,
-      NULL) == -1)
-	rtld_die();
 #ifdef __CHERI_PURE_CAPABILITY__
     /* old crt does not exist for CheriABI */
     obj_main->crt_no_init = true;
 #else
-
-    dbg("enforcing main obj relro");
-    if (obj_enforce_relro(obj_main) == -1)
-	rtld_die();
-
     if (!obj_main->crt_no_init) {
 	/*
 	 * Make sure we don't call the main program's init and fini
@@ -839,6 +830,12 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     pre_init();
 
     wlock_acquire(rtld_bind_lock, &lockstate);
+
+    dbg("resolving ifuncs");
+    if (initlist_objects_ifunc(&initlist, ld_bind_now != NULL &&
+      *ld_bind_now != '\0', SYMLOOK_EARLY, &lockstate) == -1)
+	rtld_die();
+
     if (obj_main->crt_no_init)
 	preinit_main();
     objlist_call_init(&initlist, &lockstate);
@@ -851,6 +848,11 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	if (ld_loadfltr || obj->z_loadfltr)
 	    load_filtees(obj, 0, &lockstate);
     }
+
+    dbg("enforcing main obj relro");
+    if (obj_enforce_relro(obj_main) == -1)
+	rtld_die();
+
     lock_release(rtld_bind_lock, &lockstate);
 
     dbg("transferring control to program entry point = %-#p", obj_main->entry);
@@ -2566,9 +2568,7 @@ initlist_add_objects(Obj_Entry *obj, Obj_Entry *tail, Objlist *list)
 	initlist_add_neededs(obj->needed_aux_filtees, list);
 
     /* Add the object to the init list. */
-    if (obj->preinit_array_ptr != NULL || obj->init_ptr != NULL ||
-      obj->init_array_ptr != NULL)
-	objlist_push_tail(list, obj);
+    objlist_push_tail(list, obj);
 
     /* Add the object to the global fini list in the reverse order. */
     if ((obj->fini_ptr != NULL || obj->fini_array_ptr != NULL)
@@ -3232,24 +3232,12 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 #ifdef __CHERI_PURE_CAPABILITY__
 	if (reloc_plt(obj, rtldobj) == -1)
 #else
-	if (reloc_plt(obj) == -1)
+	if (reloc_plt(obj, flags, lockstate) == -1)
 #endif
 		return (-1);
 	/* Relocate the jump slots if we are doing immediate binding. */
-	if (obj->bind_now || bind_now) {
-		if (reloc_jmpslots(obj, flags, lockstate) == -1 ||
-		    resolve_object_ifunc(obj, true, flags, lockstate) == -1)
-			return (-1);
-	}
-
-	/*
-	 * Process the non-PLT IFUNC relocations.  The relocations are
-	 * processed in two phases, because IFUNC resolvers may
-	 * reference other symbols, which must be readily processed
-	 * before resolvers are called.
-	 */
-	if (obj->non_plt_gnu_ifunc &&
-	    reloc_non_plt(obj, rtldobj, flags | SYMLOOK_IFUNC, lockstate))
+	if ((obj->bind_now || bind_now) && reloc_jmpslots(obj, flags,
+	    lockstate) == -1)
 		return (-1);
 
 	if (!obj->mainprog && obj_enforce_relro(obj) == -1)
@@ -3306,24 +3294,16 @@ static int
 resolve_object_ifunc(Obj_Entry *obj, bool bind_now, int flags,
     RtldLockState *lockstate)
 {
+
+	if (obj->ifuncs_resolved)
+		return (0);
+	obj->ifuncs_resolved = true;
 	if (obj->irelative && reloc_iresolve(obj, lockstate) == -1)
 		return (-1);
-	if ((obj->bind_now || bind_now) && obj->gnu_ifunc &&
-	    reloc_gnu_ifunc(obj, flags, lockstate) == -1)
-		return (-1);
-	return (0);
-}
-
-static int
-resolve_objects_ifunc(Obj_Entry *first, bool bind_now, int flags,
-    RtldLockState *lockstate)
-{
-	Obj_Entry *obj;
-
-	for (obj = first; obj != NULL; obj = TAILQ_NEXT(obj, next)) {
-		if (obj->marker)
-			continue;
-		if (resolve_object_ifunc(obj, bind_now, flags, lockstate) == -1)
+	if ((obj->bind_now || bind_now) && obj->gnu_ifunc) {
+		if (obj_disable_relro(obj) ||
+		    reloc_gnu_ifunc(obj, flags, lockstate) == -1 ||
+		    obj_enforce_relro(obj))
 			return (-1);
 	}
 	return (0);
@@ -3334,9 +3314,13 @@ initlist_objects_ifunc(Objlist *list, bool bind_now, int flags,
     RtldLockState *lockstate)
 {
 	Objlist_Entry *elm;
+	Obj_Entry *obj;
 
 	STAILQ_FOREACH(elm, list, link) {
-		if (resolve_object_ifunc(elm->obj, bind_now, flags,
+		obj = elm->obj;
+		if (obj->marker)
+			continue;
+		if (resolve_object_ifunc(obj, bind_now, flags,
 		    lockstate) == -1)
 			return (-1);
 	}
@@ -5732,20 +5716,35 @@ _rtld_is_dlopened(void *arg)
 	return (res);
 }
 
-int
-obj_enforce_relro(Obj_Entry *obj)
+static int
+obj_remap_relro(Obj_Entry *obj, int prot)
 {
 	if (obj->relro_size == 0)
 		return (0);
 
 	dbg("Enforcing RELRO for %s (%p -> %p)", obj->path, obj->relro_page,
 	    obj->relro_page + obj->relro_size);
-	if (mprotect(obj->relro_page, obj->relro_size, PROT_READ) == -1) {
-		_rtld_error("%s: Cannot enforce relro protection: %s",
-		    obj->path, rtld_strerror(errno));
+	if (obj->relro_size > 0 && mprotect(obj->relro_page, obj->relro_size,
+	    prot) == -1) {
+		_rtld_error("%s: Cannot set relro protection to %#x: %s",
+		    obj->path, prot, rtld_strerror(errno));
 		return (-1);
 	}
 	return (0);
+}
+
+static int
+obj_disable_relro(Obj_Entry *obj)
+{
+
+	return (obj_remap_relro(obj, PROT_READ | PROT_WRITE));
+}
+
+static int
+obj_enforce_relro(Obj_Entry *obj)
+{
+
+	return (obj_remap_relro(obj, PROT_READ));
 }
 
 static void
@@ -6010,6 +6009,59 @@ rtld_strerror(int errnum)
 		return ("Unknown error");
 	return (sys_errlist[errnum]);
 }
+
+/*
+ * No ifunc relocations.
+ */
+void *
+memset(void *dest, int c, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; i++)
+		((char *)dest)[i] = c;
+	return (dest);
+}
+
+void
+bzero(void *dest, size_t len)
+{
+	size_t i;
+
+	for (i = 0; i < len; i++)
+		((char *)dest)[i] = 0;
+}
+
+#ifndef __CHERI_PURE_CAPABILITY__
+/* malloc */
+void *
+malloc(size_t nbytes)
+{
+
+	return (__crt_malloc(nbytes));
+}
+
+void *
+calloc(size_t num, size_t size)
+{
+
+	return (__crt_calloc(num, size));
+}
+
+void
+free(void *cp)
+{
+
+	__crt_free(cp);
+}
+
+void *
+realloc(void *cp, size_t nbytes)
+{
+
+	return (__crt_realloc(cp, nbytes));
+}
+#endif
 
 #if defined DEBUG || !defined(NDEBUG)
 /* Provide an implementation of __assert that does not pull in fprintf() */

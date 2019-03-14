@@ -295,6 +295,13 @@ void	init_param2(long physpages);
 void	init_static_kenv(char *, size_t);
 void	tablefull(const char *);
 
+/*
+ * Allocate per-thread "current" state in the linuxkpi
+ */
+extern int (*lkpi_alloc_current)(struct thread *, int);
+int linux_alloc_current_noop(struct thread *, int);
+
+
 #if defined(KLD_MODULE) || defined(KTR_CRITICAL) || !defined(_KERNEL) || defined(GENOFFSET)
 #define critical_enter() critical_enter_KBI()
 #define critical_exit() critical_exit_KBI()
@@ -743,7 +750,7 @@ int alloc_unr_specific(struct unrhdr *uh, u_int item);
 int alloc_unrl(struct unrhdr *uh);
 void free_unr(struct unrhdr *uh, u_int item);
 
-#if defined(__mips__) || defined(__powerpc__)
+#ifndef __LP64__
 #define UNR64_LOCKED
 #endif
 

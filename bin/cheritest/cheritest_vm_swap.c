@@ -84,6 +84,9 @@ void
 cheritest_vm_swap(const struct cheri_test *ctp __unused)
 {
 
+	if (cheri_getdefault() == NULL)
+		cheritest_failure_errx("test depends on non-NULL DDC");
+
 	(void)dotest(1);
 }
 
@@ -243,12 +246,11 @@ dotest(int force_pageout)
 		if (j == 8 * sizeof(*pattern)) {			\
 			j = 0;						\
 			k++;						\
-			tags = pattern[k];				\
-			if (tags == 0) {				\
+			if (k > NPATTERN) {				\
 				mix_patterns();				\
 				k = 0;					\
-				tags = pattern[k];			\
 			}						\
+			tags = pattern[k];				\
 			hash = quickhash(pattern[k]);			\
 		}							\
 									\

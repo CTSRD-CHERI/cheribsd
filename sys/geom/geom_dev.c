@@ -64,7 +64,10 @@ struct g_dev_softc {
 	struct cdev	*sc_dev;
 	struct cdev	*sc_alias;
 	int		 sc_open;
-	int		 sc_active;
+	u_int		 sc_active;
+#define	SC_A_DESTROY	(1 << 31)
+#define	SC_A_OPEN	(1 << 30)
+#define	SC_A_ACTIVE	(SC_A_OPEN - 1)
 };
 
 static d_open_t		g_dev_open;
@@ -420,9 +423,13 @@ g_dev_open(struct cdev *dev, int flags, int fmt, struct thread *td)
 	if (error == 0) {
 		sc = cp->private;
 		mtx_lock(&sc->sc_mtx);
-		if (sc->sc_open == 0 && sc->sc_active != 0)
+		if (sc->sc_open == 0 && (sc->sc_active & SC_A_ACTIVE) != 0)
 			wakeup(&sc->sc_active);
 		sc->sc_open += r + w + e;
+		if (sc->sc_open == 0)
+			atomic_clear_int(&sc->sc_active, SC_A_OPEN);
+		else
+			atomic_set_int(&sc->sc_active, SC_A_OPEN);
 		mtx_unlock(&sc->sc_mtx);
 	}
 	return (error);
@@ -465,8 +472,12 @@ g_dev_close(struct cdev *dev, int flags, int fmt, struct thread *td)
 	sc = cp->private;
 	mtx_lock(&sc->sc_mtx);
 	sc->sc_open += r + w + e;
-	while (sc->sc_open == 0 && sc->sc_active != 0)
-		msleep(&sc->sc_active, &sc->sc_mtx, 0, "PRIBIO", 0);
+	if (sc->sc_open == 0)
+		atomic_clear_int(&sc->sc_active, SC_A_OPEN);
+	else
+		atomic_set_int(&sc->sc_active, SC_A_OPEN);
+	while (sc->sc_open == 0 && (sc->sc_active & SC_A_ACTIVE) != 0)
+		msleep(&sc->sc_active, &sc->sc_mtx, 0, "g_dev_close", hz / 10);
 	mtx_unlock(&sc->sc_mtx);
 	g_topology_lock();
 	error = g_access(cp, r, w, e);
@@ -583,6 +594,20 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 			error = EINVAL;
 			break;
 		}
+		if ((cp->provider->mediasize > 0) &&
+		    (offset >= cp->provider->mediasize)) {
+			/*
+			 * Catch out-of-bounds requests here. The problem is
+			 * that due to historical GEOM I/O implementation
+			 * peculatities, g_delete_data() would always return
+			 * success for requests starting just the next byte
+			 * after providers media boundary. Condition check on
+			 * non-zero media size, since that condition would
+			 * (most likely) cause ENXIO instead.
+			 */
+			error = EIO;
+			break;
+		}
 		while (length > 0) {
 			chunk = length;
 			if (g_dev_del_max_sectors != 0 && chunk >
@@ -652,8 +677,10 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 		alloc_size = 0;
 
 		if (zone_args->zone_cmd == DISK_ZONE_REPORT_ZONES) {
-
 			rep = &zone_args->zone_params.report;
+#define	MAXENTRIES	(MAXPHYS / sizeof(struct disk_zone_rep_entry))
+			if (rep->entries_allocated > MAXENTRIES)
+				rep->entries_allocated = MAXENTRIES;
 			alloc_size = rep->entries_allocated *
 			    sizeof(struct disk_zone_rep_entry);
 			if (alloc_size != 0)
@@ -663,15 +690,11 @@ g_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int fflag, struct thread
 			rep->entries = new_entries;
 		}
 		error = g_io_zonecmd(zone_args, cp);
-		if ((zone_args->zone_cmd == DISK_ZONE_REPORT_ZONES)
-		 && (alloc_size != 0)
-		 && (error == 0)) {
+		if (zone_args->zone_cmd == DISK_ZONE_REPORT_ZONES &&
+		    alloc_size != 0 && error == 0)
 			error = copyout(new_entries, old_entries, alloc_size);
-		}
-		if ((old_entries != NULL)
-		 && (rep != NULL))
+		if (old_entries != NULL && rep != NULL)
 			rep->entries = old_entries;
-
 		if (new_entries != NULL)
 			g_free(new_entries);
 		break;
@@ -693,7 +716,7 @@ g_dev_done(struct bio *bp2)
 	struct g_consumer *cp;
 	struct g_dev_softc *sc;
 	struct bio *bp;
-	int destroy;
+	int active;
 
 	cp = bp2->bio_from;
 	sc = cp->private;
@@ -713,17 +736,13 @@ g_dev_done(struct bio *bp2)
 		    bp2, bp, bp2->bio_resid, (intmax_t)bp2->bio_completed);
 	}
 	g_destroy_bio(bp2);
-	destroy = 0;
-	mtx_lock(&sc->sc_mtx);
-	if ((--sc->sc_active) == 0) {
-		if (sc->sc_open == 0)
+	active = atomic_fetchadd_int(&sc->sc_active, -1) - 1;
+	if ((active & SC_A_ACTIVE) == 0) {
+		if ((active & SC_A_OPEN) == 0)
 			wakeup(&sc->sc_active);
-		if (sc->sc_dev == NULL)
-			destroy = 1;
+		if (active & SC_A_DESTROY)
+			g_post_event(g_dev_destroy, cp, M_NOWAIT, NULL);
 	}
-	mtx_unlock(&sc->sc_mtx);
-	if (destroy)
-		g_post_event(g_dev_destroy, cp, M_NOWAIT, NULL);
 	biodone(bp);
 }
 
@@ -755,10 +774,8 @@ g_dev_strategy(struct bio *bp)
 		return;
 	}
 #endif
-	mtx_lock(&sc->sc_mtx);
 	KASSERT(sc->sc_open > 0, ("Closed device in g_dev_strategy"));
-	sc->sc_active++;
-	mtx_unlock(&sc->sc_mtx);
+	atomic_add_int(&sc->sc_active, 1);
 
 	for (;;) {
 		/*
@@ -796,18 +813,16 @@ g_dev_callback(void *arg)
 {
 	struct g_consumer *cp;
 	struct g_dev_softc *sc;
-	int destroy;
+	int active;
 
 	cp = arg;
 	sc = cp->private;
 	g_trace(G_T_TOPOLOGY, "g_dev_callback(%p(%s))", cp, cp->geom->name);
 
-	mtx_lock(&sc->sc_mtx);
 	sc->sc_dev = NULL;
 	sc->sc_alias = NULL;
-	destroy = (sc->sc_active == 0);
-	mtx_unlock(&sc->sc_mtx);
-	if (destroy)
+	active = atomic_fetchadd_int(&sc->sc_active, SC_A_DESTROY);
+	if ((active & SC_A_ACTIVE) == 0)
 		g_post_event(g_dev_destroy, cp, M_WAITOK, NULL);
 }
 

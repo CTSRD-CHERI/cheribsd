@@ -79,6 +79,9 @@ CTL_PROTO(thread_allocatedp)
 CTL_PROTO(thread_deallocated)
 CTL_PROTO(thread_deallocatedp)
 CTL_PROTO(config_cache_oblivious)
+#ifdef __CHERI_PURE_CAPABILITY__
+CTL_PROTO(config_cheri_setbounds)
+#endif
 CTL_PROTO(config_debug)
 CTL_PROTO(config_fill)
 CTL_PROTO(config_lazy_lock)
@@ -91,9 +94,6 @@ CTL_PROTO(config_utrace)
 CTL_PROTO(config_xmalloc)
 CTL_PROTO(opt_abort)
 CTL_PROTO(opt_abort_conf)
-#ifdef __CHERI_PURE_CAPABILITY__
-CTL_PROTO(opt_cheri_setbounds)
-#endif
 CTL_PROTO(opt_metadata_thp)
 CTL_PROTO(opt_retain)
 CTL_PROTO(opt_dss)
@@ -280,6 +280,9 @@ static const ctl_named_node_t	thread_node[] = {
 
 static const ctl_named_node_t	config_node[] = {
 	{NAME("cache_oblivious"), CTL(config_cache_oblivious)},
+#ifdef __CHERI_PURE_CAPABILITY__
+	{NAME("cheri_setbounds"), CTL(config_cheri_setbounds)},
+#endif
 	{NAME("debug"),		CTL(config_debug)},
 	{NAME("fill"),		CTL(config_fill)},
 	{NAME("lazy_lock"),	CTL(config_lazy_lock)},
@@ -295,9 +298,6 @@ static const ctl_named_node_t	config_node[] = {
 static const ctl_named_node_t opt_node[] = {
 	{NAME("abort"),		CTL(opt_abort)},
 	{NAME("abort_conf"),	CTL(opt_abort_conf)},
-#ifdef __CHERI_PURE_CAPABILITY__
-	{NAME("cheri_setbounds"), CTL(opt_cheri_setbounds)},
-#endif
 	{NAME("metadata_thp"),	CTL(opt_metadata_thp)},
 	{NAME("retain"),	CTL(opt_retain)},
 	{NAME("dss"),		CTL(opt_dss)},
@@ -1655,6 +1655,9 @@ label_return:
 /******************************************************************************/
 
 CTL_RO_CONFIG_GEN(config_cache_oblivious, bool)
+#ifdef __CHERI_PURE_CAPABILITY__
+CTL_RO_CONFIG_GEN(config_cheri_setbounds, bool)
+#endif
 CTL_RO_CONFIG_GEN(config_debug, bool)
 CTL_RO_CONFIG_GEN(config_fill, bool)
 CTL_RO_CONFIG_GEN(config_lazy_lock, bool)
@@ -1670,9 +1673,6 @@ CTL_RO_CONFIG_GEN(config_xmalloc, bool)
 
 CTL_RO_NL_GEN(opt_abort, opt_abort, bool)
 CTL_RO_NL_GEN(opt_abort_conf, opt_abort_conf, bool)
-#ifdef __CHERI_PURE_CAPABILITY__
-CTL_RO_NL_GEN(opt_cheri_setbounds, opt_cheri_setbounds, bool)
-#endif
 CTL_RO_NL_GEN(opt_metadata_thp, metadata_thp_mode_names[opt_metadata_thp],
     const char *)
 CTL_RO_NL_GEN(opt_retain, opt_retain, bool)

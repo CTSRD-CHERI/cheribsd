@@ -341,15 +341,18 @@ bectl_cmd_add(int argc, char *argv[])
 static int
 bectl_cmd_destroy(int argc, char *argv[])
 {
-	char *target;
-	int opt, err;
-	bool force;
+	nvlist_t *props;
+	char *origin, *target, targetds[BE_MAXPATHLEN];
+	int err, flags, opt;
 
-	force = false;
-	while ((opt = getopt(argc, argv, "F")) != -1) {
+	flags = 0;
+	while ((opt = getopt(argc, argv, "Fo")) != -1) {
 		switch (opt) {
 		case 'F':
-			force = true;
+			flags |= BE_DESTROY_FORCE;
+			break;
+		case 'o':
+			flags |= BE_DESTROY_ORIGIN;
 			break;
 		default:
 			fprintf(stderr, "bectl destroy: unknown option '-%c'\n",
@@ -368,7 +371,24 @@ bectl_cmd_destroy(int argc, char *argv[])
 
 	target = argv[0];
 
-	err = be_destroy(be, target, force);
+	/* We'll emit a notice if there's an origin to be cleaned up */
+	if ((flags & BE_DESTROY_ORIGIN) == 0 && strchr(target, '@') == NULL) {
+		if (be_root_concat(be, target, targetds) != 0)
+			goto destroy;
+		if (be_prop_list_alloc(&props) != 0)
+			goto destroy;
+		if (be_get_dataset_props(be, targetds, props) != 0) {
+			be_prop_list_free(props);
+			goto destroy;
+		}
+		if (nvlist_lookup_string(props, "origin", &origin) == 0)
+			fprintf(stderr, "bectl destroy: leaving origin '%s' intact\n",
+			    origin);
+		be_prop_list_free(props);
+	}
+
+destroy:
+	err = be_destroy(be, target, flags);
 
 	return (err);
 }
@@ -378,8 +398,10 @@ bectl_cmd_mount(int argc, char *argv[])
 {
 	char result_loc[BE_MAXPATHLEN];
 	char *bootenv, *mountpoint;
-	int err;
+	int err, mntflags;
 
+	/* XXX TODO: Allow shallow */
+	mntflags = BE_MNT_DEEP;
 	if (argc < 2) {
 		fprintf(stderr, "bectl mount: missing argument(s)\n");
 		return (usage(false));
@@ -393,7 +415,7 @@ bectl_cmd_mount(int argc, char *argv[])
 	bootenv = argv[1];
 	mountpoint = ((argc == 3) ? argv[2] : NULL);
 
-	err = be_mount(be, bootenv, mountpoint, 0, result_loc);
+	err = be_mount(be, bootenv, mountpoint, mntflags, result_loc);
 
 	switch (err) {
 	case BE_ERR_SUCCESS:

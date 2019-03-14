@@ -180,14 +180,15 @@ in6_pcbbind(struct inpcb *inp, struct sockaddr *nam,
 			    (SO_REUSEADDR|SO_REUSEPORT_LB)) != 0)
 				reuseport_lb = SO_REUSEADDR|SO_REUSEPORT_LB;
 		} else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
+			struct epoch_tracker et;
 			struct ifaddr *ifa;
 
 			sin6->sin6_port = 0;		/* yech... */
-			NET_EPOCH_ENTER();
+			NET_EPOCH_ENTER(et);
 			if ((ifa = ifa_ifwithaddr((struct sockaddr *)sin6)) ==
 			    NULL &&
 			    (inp->inp_flags & INP_BINDANY) == 0) {
-				NET_EPOCH_EXIT();
+				NET_EPOCH_EXIT(et);
 				return (EADDRNOTAVAIL);
 			}
 
@@ -200,10 +201,10 @@ in6_pcbbind(struct inpcb *inp, struct sockaddr *nam,
 			if (ifa != NULL &&
 			    ((struct in6_ifaddr *)ifa)->ia6_flags &
 			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|IN6_IFF_DETACHED)) {
-				NET_EPOCH_EXIT();
+				NET_EPOCH_EXIT(et);
 				return (EADDRNOTAVAIL);
 			}
-			NET_EPOCH_EXIT();
+			NET_EPOCH_EXIT(et);
 		}
 		if (lport) {
 			struct inpcb *t;
@@ -212,12 +213,10 @@ in6_pcbbind(struct inpcb *inp, struct sockaddr *nam,
 			/* GROSS */
 			if (ntohs(lport) <= V_ipport_reservedhigh &&
 			    ntohs(lport) >= V_ipport_reservedlow &&
-			    priv_check_cred(cred, PRIV_NETINET_RESERVEDPORT,
-			    0))
+			    priv_check_cred(cred, PRIV_NETINET_RESERVEDPORT))
 				return (EACCES);
 			if (!IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) &&
-			    priv_check_cred(inp->inp_cred,
-			    PRIV_NETINET_REUSEPORT, 0) != 0) {
+			    priv_check_cred(inp->inp_cred, PRIV_NETINET_REUSEPORT) != 0) {
 				t = in6_pcblookup_local(pcbinfo,
 				    &sin6->sin6_addr, lport,
 				    INPLOOKUP_WILDCARD, cred);
@@ -880,8 +879,8 @@ in6_pcblookup_lbgroup(const struct inpcbinfo *pcbinfo,
 
 	INP_HASH_LOCK_ASSERT(pcbinfo);
 
-	hdr = &pcbinfo->ipi_lbgrouphashbase[INP_PCBLBGROUP_PORTHASH(
-	    lport, pcbinfo->ipi_lbgrouphashmask)];
+	hdr = &pcbinfo->ipi_lbgrouphashbase[
+	    INP_PCBPORTHASH(lport, pcbinfo->ipi_lbgrouphashmask)];
 
 	/*
 	 * Order of socket selection:

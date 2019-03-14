@@ -164,8 +164,13 @@ SRCS+=  explicit_bzero.c crc32_libkern.c
 .include "${SASRC}/geli/Makefile.inc"
 .endif
 
+.if ${MK_LOADER_VERIEXEC} == "yes" && ${MK_BEARSSL} == "yes"
+.include "${SRCTOP}/lib/libbearssl/Makefile.libsa.inc"
+.include "${SRCTOP}/lib/libsecureboot/Makefile.libsa.inc"
+.endif
+
 # Maybe ZFS
-.if ${MK_ZFS} == "yes"
+.if ${MK_LOADER_ZFS} == "yes"
 .include "${SASRC}/zfs/Makefile.inc"
 .endif
 

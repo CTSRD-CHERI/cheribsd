@@ -236,7 +236,7 @@ libcheri_set_errno:
 	#
 	dla	$a2, libcheri_errno
 	b	libcheri_invoke_restore_regs
-	csw	$a0, $a2, 0($c0)
+	csw	$a0, $a2, 0($ddc)
 #endif
 	.end	libcheri_invoke
 	# Also add size information for cheri_invoke to avoid linker warnings

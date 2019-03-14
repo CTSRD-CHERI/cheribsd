@@ -918,7 +918,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[1] = p->namelen; /* u_int */
 		uarg[2] = (__cheri_addr intptr_t) p->old; /* void * __capability */
 		uarg[3] = (__cheri_addr intptr_t) p->oldlenp; /* size_t * __capability */
-		uarg[4] = (__cheri_addr intptr_t) p->new; /* void * __capability */
+		uarg[4] = (__cheri_addr intptr_t) p->new; /* const void * __capability */
 		uarg[5] = p->newlen; /* size_t */
 		*n_args = 6;
 		break;
@@ -3222,48 +3222,84 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* cheriabi_coexecve */
+	/* cheriabi_getfhat */
 	case 564: {
+		struct cheriabi_getfhat_args *p = params;
+		iarg[0] = p->fd; /* int */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* char * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->fhp; /* struct fhandle * __capability */
+		iarg[3] = p->flags; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* cheriabi_fhlink */
+	case 565: {
+		struct cheriabi_fhlink_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->fhp; /* struct fhandle * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->to; /* const char * __capability */
+		*n_args = 2;
+		break;
+	}
+	/* cheriabi_fhlinkat */
+	case 566: {
+		struct cheriabi_fhlinkat_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->fhp; /* struct fhandle * __capability */
+		iarg[1] = p->tofd; /* int */
+		uarg[2] = (__cheri_addr intptr_t) p->to; /* const char * __capability */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi_fhreadlink */
+	case 567: {
+		struct cheriabi_fhreadlink_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->fhp; /* struct fhandle * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->buf; /* char * __capability */
+		uarg[2] = p->bufsize; /* size_t */
+		*n_args = 3;
+		break;
+	}
+	/* cheriabi_coexecve */
+	case 568: {
 		struct cheriabi_coexecve_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
-		uarg[1] = (__cheri_addr intptr_t) p->fname; /* const char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->fname; /* char * __capability */
 		uarg[2] = (__cheri_addr intptr_t) p->argv; /* char * __capability * __capability */
 		uarg[3] = (__cheri_addr intptr_t) p->envv; /* char * __capability * __capability */
 		*n_args = 4;
 		break;
 	}
 	/* cheriabi_cosetup */
-	case 565: {
+	case 569: {
 		struct cheriabi_cosetup_args *p = params;
 		iarg[0] = p->what; /* int */
-		uarg[1] = (__cheri_addr intptr_t) p->code; /* void * __capability * __capability */
-		uarg[2] = (__cheri_addr intptr_t) p->data; /* void * __capability * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->code; /* void * __capability __capability * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->data; /* void * __capability __capability * __capability */
 		*n_args = 3;
 		break;
 	}
 	/* cheriabi_coregister */
-	case 566: {
+	case 570: {
 		struct cheriabi_coregister_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->cap; /* void * __capability * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->cap; /* void * __capability __capability * __capability */
 		*n_args = 2;
 		break;
 	}
 	/* cheriabi_colookup */
-	case 567: {
+	case 571: {
 		struct cheriabi_colookup_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
-		uarg[1] = (__cheri_addr intptr_t) p->cap; /* void * __capability * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->cap; /* void * __capability __capability * __capability */
 		*n_args = 2;
 		break;
 	}
 	/* copark */
-	case 568: {
+	case 572: {
 		*n_args = 0;
 		break;
 	}
 	/* cheriabi_cogetpid */
-	case 569: {
+	case 573: {
 		struct cheriabi_cogetpid_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->pidp; /* pid_t * __capability */
 		*n_args = 1;
@@ -4738,7 +4774,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland size_t * __capability";
 			break;
 		case 4:
-			p = "userland void * __capability";
+			p = "userland const void * __capability";
 			break;
 		case 5:
 			p = "size_t";
@@ -8636,14 +8672,78 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cheriabi_coexecve */
+	/* cheriabi_getfhat */
 	case 564:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland char * __capability";
+			break;
+		case 2:
+			p = "userland struct fhandle * __capability";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fhlink */
+	case 565:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle * __capability";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fhlinkat */
+	case 566:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle * __capability";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland const char * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_fhreadlink */
+	case 567:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle * __capability";
+			break;
+		case 1:
+			p = "userland char * __capability";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_coexecve */
+	case 568:
 		switch(ndx) {
 		case 0:
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland const char * __capability";
+			p = "userland char * __capability";
 			break;
 		case 2:
 			p = "userland char * __capability * __capability";
@@ -8656,52 +8756,52 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* cheriabi_cosetup */
-	case 565:
+	case 569:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland void * __capability * __capability";
+			p = "userland void * __capability __capability * __capability";
 			break;
 		case 2:
-			p = "userland void * __capability * __capability";
+			p = "userland void * __capability __capability * __capability";
 			break;
 		default:
 			break;
 		};
 		break;
 	/* cheriabi_coregister */
-	case 566:
+	case 570:
 		switch(ndx) {
 		case 0:
 			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "userland void * __capability * __capability";
+			p = "userland void * __capability __capability * __capability";
 			break;
 		default:
 			break;
 		};
 		break;
 	/* cheriabi_colookup */
-	case 567:
+	case 571:
 		switch(ndx) {
 		case 0:
 			p = "userland const char * __capability";
 			break;
 		case 1:
-			p = "userland void * __capability * __capability";
+			p = "userland void * __capability __capability * __capability";
 			break;
 		default:
 			break;
 		};
 		break;
 	/* copark */
-	case 568:
+	case 572:
 		break;
 	/* cheriabi_cogetpid */
-	case 569:
+	case 573:
 		switch(ndx) {
 		case 0:
 			p = "userland pid_t * __capability";
@@ -10561,30 +10661,50 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_coexecve */
+	/* cheriabi_getfhat */
 	case 564:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_cosetup */
+	/* cheriabi_fhlink */
 	case 565:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_coregister */
+	/* cheriabi_fhlinkat */
 	case 566:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_colookup */
+	/* cheriabi_fhreadlink */
 	case 567:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* copark */
+	/* cheriabi_coexecve */
 	case 568:
-	/* cheriabi_cogetpid */
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_cosetup */
 	case 569:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_coregister */
+	case 570:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_colookup */
+	case 571:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* copark */
+	case 572:
+	/* cheriabi_cogetpid */
+	case 573:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

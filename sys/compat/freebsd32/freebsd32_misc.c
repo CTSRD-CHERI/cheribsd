@@ -106,6 +106,9 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/cpu.h>
 #include <machine/elf.h>
+#ifdef __amd64__
+#include <machine/md_var.h>
+#endif
 
 #include <security/audit/audit.h>
 
@@ -858,7 +861,8 @@ freebsd32_getrusage(struct thread *td, struct freebsd32_getrusage_args *uap)
 }
 
 static int
-freebsd32_copyinuio(struct iovec32 *iovp, u_int iovcnt, struct uio **uiop)
+freebsd32_copyinuio(struct iovec32 * __capability iovp, u_int iovcnt,
+    struct uio **uiop)
 {
 	struct iovec32 iov32;
 	kiovec_t *iov;
@@ -873,7 +877,7 @@ freebsd32_copyinuio(struct iovec32 *iovp, u_int iovcnt, struct uio **uiop)
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	iov = (kiovec_t *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
-		error = copyin(&iovp[i], &iov32, sizeof(struct iovec32));
+		error = copyin_c(&iovp[i], &iov32, sizeof(struct iovec32));
 		if (error) {
 			free(uio, M_IOV);
 			return (error);
@@ -900,57 +904,35 @@ freebsd32_copyinuio(struct iovec32 *iovp, u_int iovcnt, struct uio **uiop)
 int
 freebsd32_readv(struct thread *td, struct freebsd32_readv_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_readv(td, uap->fd, auio);
-	free(auio, M_IOV);
-	return (error);
+	return (user_readv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)freebsd32_copyinuio));
 }
 
 int
 freebsd32_writev(struct thread *td, struct freebsd32_writev_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_writev(td, uap->fd, auio);
-	free(auio, M_IOV);
-	return (error);
+	return (user_writev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)freebsd32_copyinuio));
 }
 
 int
 freebsd32_preadv(struct thread *td, struct freebsd32_preadv_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_preadv(td, uap->fd, auio, PAIR32TO64(off_t,uap->offset));
-	free(auio, M_IOV);
-	return (error);
+	return (user_preadv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, PAIR32TO64(off_t, uap->offset),
+	    (copyinuio_t *)freebsd32_copyinuio));
 }
 
 int
 freebsd32_pwritev(struct thread *td, struct freebsd32_pwritev_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_pwritev(td, uap->fd, auio, PAIR32TO64(off_t,uap->offset));
-	free(auio, M_IOV);
-	return (error);
+	return (user_pwritev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
+	    uap->iovcnt), uap->iovcnt, PAIR32TO64(off_t, uap->offset),
+	    (copyinuio_t *)freebsd32_copyinuio));
 }
 
 int
@@ -1760,16 +1742,16 @@ int
 freebsd6_freebsd32_pread(struct thread *td, struct freebsd6_freebsd32_pread_args *uap)
 {
 
-	return (kern_pread(td, uap->fd, uap->buf, uap->nbyte,
-	    PAIR32TO64(off_t, uap->offset)));
+	return (kern_pread(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, PAIR32TO64(off_t, uap->offset)));
 }
 
 int
 freebsd6_freebsd32_pwrite(struct thread *td, struct freebsd6_freebsd32_pwrite_args *uap)
 {
 
-	return (kern_pwrite(td, uap->fd, uap->buf, uap->nbyte,
-	    PAIR32TO64(off_t, uap->offset)));
+	return (kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, PAIR32TO64(off_t, uap->offset)));
 }
 
 int
@@ -1811,81 +1793,22 @@ struct sf_hdtr32 {
 };
 
 static int
-freebsd32_do_sendfile(struct thread *td,
-    struct freebsd32_sendfile_args *uap, int compat)
+freebsd32_copyin_hdtr(const struct sf_hdtr32 * __capability uhdtr,
+    ksf_hdtr_t *hdtr)
 {
 	struct sf_hdtr32 hdtr32;
-	ksf_hdtr_t hdtr;
-	struct uio *hdr_uio, *trl_uio;
-	struct file *fp;
-	cap_rights_t rights;
-	struct iovec32 *iov32;
-	off_t offset, sbytes;
 	int error;
 
-	offset = PAIR32TO64(off_t, uap->offset);
-	if (offset < 0)
-		return (EINVAL);
+	error = copyin_c(uhdtr, &hdtr32, sizeof(hdtr32));
+	if (error != 0)
+		return (error);
+	hdtr->headers = __USER_CAP_ARRAY(PTRIN(hdtr32.headers), hdtr32.hdr_cnt);
+	hdtr->hdr_cnt = hdtr32.hdr_cnt;
+	hdtr->trailers = __USER_CAP_ARRAY(PTRIN(hdtr32.trailers),
+	    hdtr32.trl_cnt);
+	hdtr->hdr_cnt = hdtr32.trl_cnt;
 
-	hdr_uio = trl_uio = NULL;
-
-	if (uap->hdtr != NULL) {
-		error = copyin(uap->hdtr, &hdtr32, sizeof(hdtr32));
-		if (error)
-			goto out;
-		PTRIN_CP(hdtr32, hdtr, headers);
-		CP(hdtr32, hdtr, hdr_cnt);
-		PTRIN_CP(hdtr32, hdtr, trailers);
-		CP(hdtr32, hdtr, trl_cnt);
-
-		if (hdtr.headers != NULL) {
-			iov32 = PTRIN(hdtr32.headers);
-			error = freebsd32_copyinuio(iov32,
-			    hdtr32.hdr_cnt, &hdr_uio);
-			if (error)
-				goto out;
-#ifdef COMPAT_FREEBSD4
-			/*
-			 * In FreeBSD < 5.0 the nbytes to send also included
-			 * the header.  If compat is specified subtract the
-			 * header size from nbytes.
-			 */
-			if (compat) {
-				if (uap->nbytes > hdr_uio->uio_resid)
-					uap->nbytes -= hdr_uio->uio_resid;
-				else
-					uap->nbytes = 0;
-			}
-#endif
-		}
-		if (hdtr.trailers != NULL) {
-			iov32 = PTRIN(hdtr32.trailers);
-			error = freebsd32_copyinuio(iov32,
-			    hdtr32.trl_cnt, &trl_uio);
-			if (error)
-				goto out;
-		}
-	}
-
-	AUDIT_ARG_FD(uap->fd);
-
-	if ((error = fget_read(td, uap->fd,
-	    cap_rights_init(&rights, CAP_PREAD), &fp)) != 0)
-		goto out;
-
-	error = fo_sendfile(fp, uap->s, hdr_uio, trl_uio, offset,
-	    uap->nbytes, &sbytes, uap->flags, td);
-	fdrop(fp, td);
-
-	if (uap->sbytes != NULL)
-		copyout(&sbytes, uap->sbytes, sizeof(off_t));
-
-out:
-	if (hdr_uio)
-		free(hdr_uio, M_IOV);
-	if (trl_uio)
-		free(trl_uio, M_IOV);
-	return (error);
+	return (0);
 }
 
 #ifdef COMPAT_FREEBSD4
@@ -1893,8 +1816,12 @@ int
 freebsd4_freebsd32_sendfile(struct thread *td,
     struct freebsd4_freebsd32_sendfile_args *uap)
 {
-	return (freebsd32_do_sendfile(td,
-	    (struct freebsd32_sendfile_args *)uap, 1));
+
+	return (return (kern_sendfile(td, uap->fd, uap->s,
+	    PAIR32TO64(off_t, uap->offset), uap->nbytes,
+	    __USER_CAP_OBJ(uap->hdtr), __USER_CAP_OBJ(uap->sbytes),
+	    uap->flags, 1, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
+	    (copyinuio_t *)freebsd32_copyinuio));
 }
 #endif
 
@@ -1902,7 +1829,11 @@ int
 freebsd32_sendfile(struct thread *td, struct freebsd32_sendfile_args *uap)
 {
 
-	return (freebsd32_do_sendfile(td, uap, 0));
+	return (kern_sendfile(td, uap->fd, uap->s,
+	    PAIR32TO64(off_t, uap->offset), uap->nbytes,
+	    __USER_CAP_OBJ(uap->hdtr), __USER_CAP_OBJ(uap->sbytes),
+	    uap->flags, 0, (copyin_hdtr_t *)freebsd32_copyin_hdtr,
+	    (copyinuio_t *)freebsd32_copyinuio));
 }
 
 static void
@@ -2314,46 +2245,32 @@ freebsd32_jail(struct thread *td, struct freebsd32_jail_args *uap)
 int
 freebsd32_jail_set(struct thread *td, struct freebsd32_jail_set_args *uap)
 {
-	struct uio *auio;
-	int error;
 
-	/* Check that we have an even number of iovecs. */
-	if (uap->iovcnt & 1)
-		return (EINVAL);
+	return (user_jail_set(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
+	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd32_copyinuio));
+}
 
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_jail_set(td, auio, uap->flags);
-	free(auio, M_IOV);
-	return (error);
+static int
+freebsd32_updateiov(const struct uio *uiop,
+    struct iovec32 * __capability iovp)
+{
+	int i, error;
+
+	for (i = 0; i < uiop->uio_iovcnt; i++) {
+		error = suword32_c(&iovp[i].iov_len, uiop->uio_iov[i].iov_len);
+		if (error != 0)
+			return (error);
+	}
+	return (0);
 }
 
 int
 freebsd32_jail_get(struct thread *td, struct freebsd32_jail_get_args *uap)
 {
-	struct iovec32 iov32;
-	struct uio *auio;
-	int error, i;
 
-	/* Check that we have an even number of iovecs. */
-	if (uap->iovcnt & 1)
-		return (EINVAL);
-
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = kern_jail_get(td, auio, uap->flags);
-	if (error == 0)
-		for (i = 0; i < uap->iovcnt; i++) {
-			PTROUT_CP(auio->uio_iov[i], iov32, iov_base);
-			CP(auio->uio_iov[i], iov32, iov_len);
-			error = copyout(&iov32, uap->iovp + i, sizeof(iov32));
-			if (error != 0)
-				break;
-		}
-	free(auio, M_IOV);
-	return (error);
+	return (user_jail_get(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
+	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd32_copyinuio,
+	    (updateiov_t *)freebsd32_updateiov));
 }
 
 int
@@ -2995,49 +2912,11 @@ freebsd32_cpuset_setdomain(struct thread *td,
 }
 
 int
-freebsd32_nmount(struct thread *td,
-    struct freebsd32_nmount_args /* {
-	struct iovec32 *iovp;
-    	unsigned int iovcnt;
-    	int flags;
-    } */ *uap)
+freebsd32_nmount(struct thread *td, struct freebsd32_nmount_args *uap)
 {
-	struct uio *auio;
-	uint64_t flags;
-	int error;
 
-	/*
-	 * Mount flags are now 64-bits. On 32-bit archtectures only
-	 * 32-bits are passed in, but from here on everything handles
-	 * 64-bit flags correctly.
-	 */
-	flags = uap->flags;
-
-	AUDIT_ARG_FFLAGS(flags);
-
-	/*
-	 * Filter out MNT_ROOTFS.  We do not want clients of nmount() in
-	 * userspace to set this flag, but we must filter it out if we want
-	 * MNT_UPDATE on the root file system to work.
-	 * MNT_ROOTFS should only be set by the kernel when mounting its
-	 * root file system.
-	 */
-	flags &= ~MNT_ROOTFS;
-
-	/*
-	 * check that we have an even number of iovec's
-	 * and that we have at least two options.
-	 */
-	if ((uap->iovcnt & 1) || (uap->iovcnt < 4))
-		return (EINVAL);
-
-	error = freebsd32_copyinuio(uap->iovp, uap->iovcnt, &auio);
-	if (error)
-		return (error);
-	error = vfs_donmount(td, flags, auio);
-
-	free(auio, M_IOV);
-	return error;
+	return (kern_nmount(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
+	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd32_copyinuio));
 }
 
 #if 0
@@ -3327,6 +3206,7 @@ freebsd32_procctl(struct thread *td, struct freebsd32_procctl_args *uap)
 	int error, error1, flags, signum;
 
 	switch (uap->com) {
+	case PROC_ASLR_CTL:
 	case PROC_SPROTECT:
 	case PROC_TRACE_CTL:
 	case PROC_TRAPCAP_CTL:
@@ -3358,6 +3238,7 @@ freebsd32_procctl(struct thread *td, struct freebsd32_procctl_args *uap)
 			return (error);
 		data = &x.rk;
 		break;
+	case PROC_ASLR_STATUS:
 	case PROC_TRACE_STATUS:
 	case PROC_TRAPCAP_STATUS:
 		data = &flags;
@@ -3386,6 +3267,7 @@ freebsd32_procctl(struct thread *td, struct freebsd32_procctl_args *uap)
 		if (error == 0)
 			error = error1;
 		break;
+	case PROC_ASLR_STATUS:
 	case PROC_TRACE_STATUS:
 	case PROC_TRAPCAP_STATUS:
 		if (error == 0)

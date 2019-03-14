@@ -105,7 +105,11 @@ void __libc_free_tls(void *tls, size_t tcbsize, size_t tcbalign);
 #endif
 
 #if defined(__mips__) || defined(__powerpc__) || defined(__riscv)
+#ifndef __CHERI_PURE_CAPABILITY__
 #define DTV_OFFSET 0x8000
+#else
+#define DTV_OFFSET 0
+#endif
 #else
 #define DTV_OFFSET 0
 #endif
@@ -468,9 +472,8 @@ _init_tls(void)
 #ifndef __CHERI_PURE_CAPABILITY__
 			tls_init = (void*) phdr[i].p_vaddr;
 #else
-			tls_init = cheri_csetbounds(cheri_setoffset(
-			    phdr, phdr[i].p_vaddr - cheri_getbase(phdr)),
-			    tls_init_size);
+			tls_init = cheri_csetbounds(cheri_setaddress(phdr,
+			    phdr[i].p_vaddr), tls_init_size);
 #endif
 			break;
 		}

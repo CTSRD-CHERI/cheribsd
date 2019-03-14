@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -657,6 +657,7 @@ OpnDoRegion (
     ACPI_PARSE_OBJECT       *Op)
 {
     ACPI_PARSE_OBJECT       *Next;
+    ACPI_ADR_SPACE_TYPE     SpaceId;
 
 
     /* Opcode is parent node */
@@ -664,9 +665,10 @@ OpnDoRegion (
 
     Next = Op->Asl.Child;
 
-    /* Second child is the space ID*/
+    /* Second child is the space ID */
 
     Next = Next->Asl.Next;
+    SpaceId = (ACPI_ADR_SPACE_TYPE) Next->Common.Value.Integer;
 
     /* Third child is the region offset */
 
@@ -677,7 +679,13 @@ OpnDoRegion (
     Next = Next->Asl.Next;
     if (Next->Asl.ParseOpcode == PARSEOP_INTEGER)
     {
+        /* Check for zero length */
+
         Op->Asl.Value.Integer = Next->Asl.Value.Integer;
+        if (!Op->Asl.Value.Integer && (SpaceId < ACPI_NUM_PREDEFINED_REGIONS))
+        {
+            AslError (ASL_ERROR, ASL_MSG_REGION_LENGTH, Op, NULL);
+        }
     }
     else
     {

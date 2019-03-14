@@ -62,11 +62,16 @@ __FBSDID("$FreeBSD$");
 #include "sdhci_if.h"
 
 #include "opt_mmccam.h"
+#include "opt_soc.h"
 
 #define	MAX_SLOTS		6
 
 static struct ofw_compat_data compat_data[] = {
 	{ "marvell,armada-3700-sdhci",	1 },
+#ifdef SOC_MARVELL_8K
+	{ "marvell,armada-cp110-sdhci",	1 },
+	{ "marvell,armada-ap806-sdhci",	1 },
+#endif
 	{ NULL, 0 }
 };
 
@@ -545,7 +550,7 @@ static devclass_t sdhci_xenon_devclass;
 DRIVER_MODULE(sdhci_xenon, simplebus, sdhci_xenon_driver, sdhci_xenon_devclass,
     NULL, NULL);
 
-MODULE_DEPEND(sdhci_xenon, sdhci, 1, 1, 1);
+SDHCI_DEPEND(sdhci_xenon);
 #ifndef MMCCAM
 MMC_DECLARE_BRIDGE(sdhci_xenon);
 #endif

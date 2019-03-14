@@ -32,6 +32,7 @@
 // CHERI CHANGES END
 
 #include "archive_platform.h"
+#include "archive_endian.h"
 
 #ifdef HAVE_ERRNO_H
 #include <errno.h>
@@ -233,18 +234,17 @@ struct bit_reader {
     int in_addr;        /* Current byte pointer. */
 };
 
-/* RARv5 block header structure. */
+/* RARv5 block header structure. Use bf_* functions to get values from
+ * block_flags_u8 field. I.e. bf_byte_count, etc. */
 struct compressed_block_header {
-    union {
-        struct {
-            uint8_t bit_size : 3;
-            uint8_t byte_count : 3;
-            uint8_t is_last_block : 1;
-            uint8_t is_table_present : 1;
-        } block_flags;
-        uint8_t block_flags_u8;
-    };
-
+    /* block_flags_u8 contain fields encoded in little-endian bitfield:
+     *
+     * - table present flag (shr 7, and 1),
+     * - last block flag    (shr 6, and 1),
+     * - byte_count         (shr 3, and 7),
+     * - bit_size           (shr 0, and 7).
+     */
+    uint8_t block_flags_u8;
     uint8_t block_cksum;
 };
 
@@ -437,26 +437,35 @@ static void cdeque_free(struct cdeque* d) {
     d->cap_mask = 0;
 }
 
+static inline
+uint8_t bf_bit_size(const struct compressed_block_header* hdr) {
+    return hdr->block_flags_u8 & 7;
+}
+
+static inline
+uint8_t bf_byte_count(const struct compressed_block_header* hdr) {
+    return (hdr->block_flags_u8 >> 3) & 7;
+}
+
+static inline
+uint8_t bf_is_table_present(const struct compressed_block_header* hdr) {
+    return (hdr->block_flags_u8 >> 7) & 1;
+}
+
 static inline struct rar5* get_context(struct archive_read* a) {
     return (struct rar5*) a->format->data;
 }
 
-// TODO: make sure these functions return a little endian number
-
 /* Convenience functions used by filter implementations. */
 
 static uint32_t read_filter_data(struct rar5* rar, uint32_t offset) {
-    uint32_t* dptr = (uint32_t*) &rar->cstate.window_buf[offset];
-    // TODO: bswap if big endian
-    return *dptr;
+    return archive_le32dec(&rar->cstate.window_buf[offset]);
 }
 
 static void write_filter_data(struct rar5* rar, uint32_t offset,
         uint32_t value)
 {
-    uint32_t* dptr = (uint32_t*) &rar->cstate.filtered_buf[offset];
-    // TODO: bswap if big endian
-    *dptr = value;
+    archive_le32enc(&rar->cstate.filtered_buf[offset], value);
 }
 
 static void circular_memcpy(uint8_t* dst, uint8_t* window, const int mask,
@@ -587,8 +596,7 @@ static int run_filter(struct archive_read* a, struct filter_info* flt) {
     int ret;
     struct rar5* rar = get_context(a);
 
-    if(rar->cstate.filtered_buf)
-        free(rar->cstate.filtered_buf);
+    free(rar->cstate.filtered_buf);
 
     rar->cstate.filtered_buf = malloc(flt->block_length);
     if(!rar->cstate.filtered_buf) {
@@ -771,7 +779,7 @@ static void free_filters(struct rar5* rar) {
         struct filter_info* f = NULL;
 
         /* Pop_front will also decrease the collection's size. */
-        if(CDE_OK == cdeque_pop_front(d, cdeque_filter_p(&f)) && f != NULL)
+        if (CDE_OK == cdeque_pop_front(d, cdeque_filter_p(&f)))
             free(f);
     }
 
@@ -872,7 +880,7 @@ static int read_var(struct archive_read* a, uint64_t* pvalue,
 
         /* Strip the MSB from the input byte and add the resulting number
          * to the `result`. */
-        result += (b & 0x7F) << shift;
+        result += (b & (uint64_t)0x7F) << shift;
 
         /* MSB set to 1 means we need to continue decoding process. MSB set
          * to 0 means we're done.
@@ -1003,8 +1011,7 @@ static int read_u32(struct archive_read* a, uint32_t* pvalue) {
     if(!read_ahead(a, 4, &p))
         return 0;
 
-    *pvalue = *(const uint32_t*)p;
-
+    *pvalue = archive_le32dec(p);
     return ARCHIVE_OK == consume(a, 4) ? 1 : 0;
 }
 
@@ -1013,8 +1020,7 @@ static int read_u64(struct archive_read* a, uint64_t* pvalue) {
     if(!read_ahead(a, 8, &p))
         return 0;
 
-    *pvalue = *(const uint64_t*)p;
-
+    *pvalue = archive_le64dec(p);
     return ARCHIVE_OK == consume(a, 8) ? 1 : 0;
 }
 
@@ -1302,7 +1308,7 @@ static int process_head_file(struct archive_read* a, struct rar5* rar,
     char name_utf8_buf[2048 * 4];
     const uint8_t* p;
 
-    memset(entry, 0, sizeof(struct archive_entry));
+    archive_entry_clear(entry);
 
     /* Do not reset file context if we're switching archives. */
     if(!rar->cstate.switch_multivolume) {
@@ -1796,8 +1802,14 @@ static int skip_base_block(struct archive_read* a) {
     int ret;
     struct rar5* rar = get_context(a);
 
-    struct archive_entry entry;
-    ret = process_base_block(a, &entry);
+    /* Create a new local archive_entry structure that will be operated on
+     * by header reader; operations on this archive_entry will be discarded.
+     */
+    struct archive_entry* entry = archive_entry_new();
+    ret = process_base_block(a, entry);
+
+    /* Discard operations on this archive_entry structure. */
+    archive_entry_free(entry);
 
     if(rar->generic.last_header_id == 2 && rar->generic.split_before > 0)
         return ARCHIVE_OK;
@@ -1837,13 +1849,14 @@ static int rar5_read_header(struct archive_read *a,
 
 static void init_unpack(struct rar5* rar) {
     rar->file.calculated_crc32 = 0;
-    rar->cstate.window_mask = rar->cstate.window_size - 1;
+    if (rar->cstate.window_size)
+        rar->cstate.window_mask = rar->cstate.window_size - 1;
+    else
+        rar->cstate.window_mask = 0;
 
-    if(rar->cstate.window_buf)
-        free(rar->cstate.window_buf);
+    free(rar->cstate.window_buf);
 
-    if(rar->cstate.filtered_buf)
-        free(rar->cstate.filtered_buf);
+    free(rar->cstate.filtered_buf);
 
     rar->cstate.window_buf = calloc(1, rar->cstate.window_size);
     rar->cstate.filtered_buf = calloc(1, rar->cstate.window_size);
@@ -1944,7 +1957,7 @@ static int create_decode_tables(uint8_t* bit_length,
         dist = bit_field - table->decode_len[cur_len - 1];
         dist >>= (16 - cur_len);
 
-        pos = table->decode_pos[cur_len] + dist;
+        pos = table->decode_pos[cur_len & 15] + dist;
         if(cur_len < rar5_countof(table->decode_pos) && pos < size) {
             table->quick_num[code] = table->decode_num[pos];
         } else {
@@ -2167,17 +2180,17 @@ static int parse_block_header(struct archive_read* a, const uint8_t* p,
 {
     memcpy(hdr, p, sizeof(struct compressed_block_header));
 
-    if(hdr->block_flags.byte_count > 2) {
+    if(bf_byte_count(hdr) > 2) {
         archive_set_error(&a->archive, ARCHIVE_ERRNO_FILE_FORMAT,
                 "Unsupported block header size (was %d, max is 2)",
-                hdr->block_flags.byte_count);
+                bf_byte_count(hdr));
         return ARCHIVE_FATAL;
     }
 
     /* This should probably use bit reader interface in order to be more
      * future-proof. */
     *block_size = 0;
-    switch(hdr->block_flags.byte_count) {
+    switch(bf_byte_count(hdr)) {
         /* 1-byte block size */
         case 0:
             *block_size = *(const uint8_t*) &p[2];
@@ -2185,12 +2198,12 @@ static int parse_block_header(struct archive_read* a, const uint8_t* p,
 
         /* 2-byte block size */
         case 1:
-            *block_size = *(const uint16_t*) &p[2];
+            *block_size = archive_le16dec(&p[2]);
             break;
 
         /* 3-byte block size */
         case 2:
-            *block_size = *(const uint32_t*) &p[2];
+            *block_size = archive_le32dec(&p[2]);
             *block_size &= 0x00FFFFFF;
             break;
 
@@ -2387,7 +2400,7 @@ static int do_uncompress_block(struct archive_read* a, const uint8_t* p) {
 
     const int cmask = rar->cstate.window_mask;
     const struct compressed_block_header* hdr = &rar->last_block_hdr;
-    const uint8_t bit_size = 1 + hdr->block_flags.bit_size;
+    const uint8_t bit_size = 1 + bf_bit_size(hdr);
 
     while(1) {
         if(rar->cstate.write_ptr - rar->cstate.last_write_ptr >
@@ -2677,12 +2690,20 @@ static int merge_block(struct archive_read* a, ssize_t block_size,
     if(rar->vol.push_buf)
         free((void*) rar->vol.push_buf);
 
-    rar->vol.push_buf = malloc(block_size);
+    /* Increasing the allocation block by 8 is due to bit reading functions,
+     * which are using additional 2 or 4 bytes. Allocating the block size
+     * by exact value would make bit reader perform reads from invalid memory
+     * block when reading the last byte from the buffer. */
+    rar->vol.push_buf = malloc(block_size + 8);
     if(!rar->vol.push_buf) {
         archive_set_error(&a->archive, ENOMEM, "Can't allocate memory for a "
                 "merge block buffer.");
         return ARCHIVE_FATAL;
     }
+
+    /* Valgrind complains if the extension block for bit reader is not
+     * initialized, so initialize it. */
+    memset(&rar->vol.push_buf[block_size], 0, 8);
 
     /* A single block can span across multiple multivolume archive files,
      * so we use a loop here. This loop will consume enough multivolume
@@ -2785,7 +2806,7 @@ static int process_block(struct archive_read* a) {
 
         /* Skip block header. Next data is huffman tables, if present. */
         ssize_t to_skip = sizeof(struct compressed_block_header) +
-            rar->last_block_hdr.block_flags.byte_count + 1;
+            bf_byte_count(&rar->last_block_hdr) + 1;
 
         if(ARCHIVE_OK != consume(a, to_skip))
             return ARCHIVE_EOF;
@@ -2841,7 +2862,7 @@ static int process_block(struct archive_read* a) {
         rar->bits.in_addr = 0;
         rar->bits.bit_addr = 0;
 
-        if(rar->last_block_hdr.block_flags.is_table_present) {
+        if(bf_is_table_present(&rar->last_block_hdr)) {
             /* Load Huffman tables. */
             ret = parse_tables(a, rar, p);
             if(ret != ARCHIVE_OK) {
@@ -3395,14 +3416,11 @@ static int64_t rar5_seek_data(struct archive_read *a, int64_t offset,
 static int rar5_cleanup(struct archive_read *a) {
     struct rar5* rar = get_context(a);
 
-    if(rar->cstate.window_buf)
-        free(rar->cstate.window_buf);
+    free(rar->cstate.window_buf);
 
-    if(rar->cstate.filtered_buf)
-        free(rar->cstate.filtered_buf);
+    free(rar->cstate.filtered_buf);
 
-    if(rar->vol.push_buf)
-        free(rar->vol.push_buf);
+    free(rar->vol.push_buf);
 
     free_filters(rar);
     cdeque_free(&rar->cstate.filters);

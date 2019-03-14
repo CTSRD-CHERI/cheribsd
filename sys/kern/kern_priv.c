@@ -76,7 +76,7 @@ SDT_PROBE_DEFINE1(priv, kernel, priv_check, priv__err, "int");
  * only a few to grant it.
  */
 int
-priv_check_cred(struct ucred *cred, int priv, int flags)
+priv_check_cred(struct ucred *cred, int priv)
 {
 	int error;
 
@@ -194,10 +194,12 @@ priv_check_cred(struct ucred *cred, int priv, int flags)
 	 */
 	error = EPERM;
 out:
-	if (error)
-		SDT_PROBE1(priv, kernel, priv_check, priv__err, priv);
-	else
-		SDT_PROBE1(priv, kernel, priv_check, priv__ok, priv);
+	if (SDT_PROBES_ENABLED()) {
+		if (error)
+			SDT_PROBE1(priv, kernel, priv_check, priv__err, priv);
+		else
+			SDT_PROBE1(priv, kernel, priv_check, priv__ok, priv);
+	}
 	return (error);
 }
 
@@ -207,5 +209,5 @@ priv_check(struct thread *td, int priv)
 
 	KASSERT(td == curthread, ("priv_check: td != curthread"));
 
-	return (priv_check_cred(td->td_ucred, priv, 0));
+	return (priv_check_cred(td->td_ucred, priv));
 }

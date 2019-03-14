@@ -124,8 +124,8 @@ SYSCTL_ULONG(_vm, OID_AUTO, max_kernel_address, CTLFLAG_RD,
 #if VM_NRESERVLEVEL > 0
 #define	KVA_QUANTUM_SHIFT	(VM_LEVEL_0_ORDER + PAGE_SHIFT)
 #else
-/* On non-superpage architectures want large import sizes. */
-#define	KVA_QUANTUM_SHIFT	(10 + PAGE_SHIFT)
+/* On non-superpage architectures we want large import sizes. */
+#define	KVA_QUANTUM_SHIFT	(8 + PAGE_SHIFT)
 #endif
 #define	KVA_QUANTUM		(1 << KVA_QUANTUM_SHIFT)
 
@@ -184,6 +184,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	vm_offset_t addr, i, offset;
 	vm_page_t m;
 	int pflags, tries;
+	vm_prot_t prot;
 
 	size = round_page(size);
 	vmem = vm_dom[domain].vmd_kernel_arena;
@@ -193,6 +194,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
 	pflags &= ~(VM_ALLOC_NOWAIT | VM_ALLOC_WAITOK | VM_ALLOC_WAITFAIL);
 	pflags |= VM_ALLOC_NOWAIT;
+	prot = (flags & M_EXEC) != 0 ? VM_PROT_ALL : VM_PROT_RW;
 	VM_OBJECT_WLOCK(object);
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		tries = 0;
@@ -220,8 +222,8 @@ retry:
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
-		pmap_enter(kernel_pmap, addr + i, m, VM_PROT_RW,
-		    VM_PROT_RW | PMAP_ENTER_WIRED, 0);
+		pmap_enter(kernel_pmap, addr + i, m, prot,
+		    prot | PMAP_ENTER_WIRED, 0);
 	}
 	VM_OBJECT_WUNLOCK(object);
 	return (addr);

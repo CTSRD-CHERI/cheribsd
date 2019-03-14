@@ -480,9 +480,10 @@ SYSCTL_INT(_hw_cxgbe, OID_AUTO, autoneg, CTLFLAG_RDTUN, &t4_autoneg, 0,
 
 /*
  * Firmware auto-install by driver during attach (0, 1, 2 = prohibited, allowed,
- * encouraged respectively).
+ * encouraged respectively).  '-n' is the same as 'n' except the firmware
+ * version used in the checks is read from the firmware bundled with the driver.
  */
-static unsigned int t4_fw_install = 1;
+static int t4_fw_install = 1;
 SYSCTL_INT(_hw_cxgbe, OID_AUTO, fw_install, CTLFLAG_RDTUN, &t4_fw_install, 0,
     "Firmware auto-install (0 = prohibited, 1 = allowed, 2 = encouraged)");
 
@@ -555,7 +556,7 @@ SYSCTL_INT(_hw_cxgbe, OID_AUTO, pcie_relaxed_ordering, CTLFLAG_RDTUN,
 
 static int t4_panic_on_fatal_err = 0;
 SYSCTL_INT(_hw_cxgbe, OID_AUTO, panic_on_fatal_err, CTLFLAG_RDTUN,
-    &t4_panic_on_fatal_err, 0, "panic on fatal firmware errors");
+    &t4_panic_on_fatal_err, 0, "panic on fatal errors");
 
 #ifdef TCP_OFFLOAD
 /*
@@ -604,10 +605,10 @@ static int validate_mt_off_len(struct adapter *, int, uint32_t, uint32_t,
     uint32_t *);
 static int fixup_devlog_params(struct adapter *);
 static int cfg_itype_and_nqueues(struct adapter *, struct intrs_and_queues *);
-static int prep_firmware(struct adapter *);
-static int partition_resources(struct adapter *, const struct firmware *,
-    const char *);
+static int contact_firmware(struct adapter *);
+static int partition_resources(struct adapter *);
 static int get_params__pre_init(struct adapter *);
+static int set_params__pre_init(struct adapter *);
 static int get_params__post_init(struct adapter *);
 static int set_params__post_init(struct adapter *);
 static void t4_set_desc(struct adapter *);
@@ -648,7 +649,6 @@ static int sysctl_loadavg(SYSCTL_HANDLER_ARGS);
 static int sysctl_cctrl(SYSCTL_HANDLER_ARGS);
 static int sysctl_cim_ibq_obq(SYSCTL_HANDLER_ARGS);
 static int sysctl_cim_la(SYSCTL_HANDLER_ARGS);
-static int sysctl_cim_la_t6(SYSCTL_HANDLER_ARGS);
 static int sysctl_cim_ma_la(SYSCTL_HANDLER_ARGS);
 static int sysctl_cim_pif_la(SYSCTL_HANDLER_ARGS);
 static int sysctl_cim_qcfg(SYSCTL_HANDLER_ARGS);
@@ -737,6 +737,10 @@ struct {
 	{0x5419,  "Chelsio T540-LP-BT"},	/* 4 x 10GBaseT */
 	{0x541a,  "Chelsio T540-SO-BT"},	/* 4 x 10GBaseT, nomem */
 	{0x541b,  "Chelsio T540-SO-CR"},	/* 4 x 10G, nomem */
+
+	/* Custom */
+	{0x5483, "Custom T540-CR"},
+	{0x5484, "Custom T540-BT"},
 }, t6_pciids[] = {
 	{0xc006, "Chelsio Terminator 6 FPGA"},	/* T6 PE10K6 FPGA (PF0) */
 	{0x6400, "Chelsio T6-DBG-25"},		/* 2 x 10/25G, debug */
@@ -1059,10 +1063,22 @@ t4_attach(device_t dev)
 	}
 #endif
 
-	/* Prepare the firmware for operation */
-	rc = prep_firmware(sc);
+	/* Contact the firmware and try to become the master driver. */
+	rc = contact_firmware(sc);
 	if (rc != 0)
 		goto done; /* error message displayed already */
+	MPASS(sc->flags & FW_OK);
+
+	rc = get_params__pre_init(sc);
+	if (rc != 0)
+		goto done; /* error message displayed already */
+
+	if (sc->flags & MASTER_PF) {
+		rc = partition_resources(sc);
+		if (rc != 0)
+			goto done; /* error message displayed already */
+		t4_intr_clear(sc);
+	}
 
 	rc = get_params__post_init(sc);
 	if (rc != 0)
@@ -1356,10 +1372,19 @@ done:
 static int
 t4_child_location_str(device_t bus, device_t dev, char *buf, size_t buflen)
 {
+	struct adapter *sc;
 	struct port_info *pi;
+	int i;
 
-	pi = device_get_softc(dev);
-	snprintf(buf, buflen, "port=%d", pi->port_id);
+	sc = device_get_softc(bus);
+	buf[0] = '\0';
+	for_each_port(sc, i) {
+		pi = sc->port[i];
+		if (pi != NULL && pi->dev == dev) {
+			snprintf(buf, buflen, "port=%d", pi->port_id);
+			break;
+		}
+	}
 	return (0);
 }
 
@@ -2548,15 +2573,37 @@ vcxgbe_detach(device_t dev)
 	return (0);
 }
 
-void
-t4_fatal_err(struct adapter *sc)
+static struct callout fatal_callout;
+
+static void
+delayed_panic(void *arg)
 {
-	t4_set_reg_field(sc, A_SGE_CONTROL, F_GLOBALENABLE, 0);
-	t4_intr_disable(sc);
-	log(LOG_EMERG, "%s: encountered fatal error, adapter stopped.\n",
+	struct adapter *sc = arg;
+
+	panic("%s: panic on fatal error", device_get_nameunit(sc->dev));
+}
+
+void
+t4_fatal_err(struct adapter *sc, bool fw_error)
+{
+
+	t4_shutdown_adapter(sc);
+	log(LOG_ALERT, "%s: encountered fatal error, adapter stopped.\n",
 	    device_get_nameunit(sc->dev));
-	if (t4_panic_on_fatal_err)
-		panic("panic requested on fatal error");
+	if (fw_error) {
+		ASSERT_SYNCHRONIZED_OP(sc);
+		sc->flags |= ADAP_ERR;
+	} else {
+		ADAPTER_LOCK(sc);
+		sc->flags |= ADAP_ERR;
+		ADAPTER_UNLOCK(sc);
+	}
+
+	if (t4_panic_on_fatal_err) {
+		log(LOG_ALERT, "%s: panic on fatal error after 30s",
+		    device_get_nameunit(sc->dev));
+		callout_reset(&fatal_callout, hz * 30, delayed_panic, sc);
+	}
 }
 
 void
@@ -3311,17 +3358,38 @@ restart:
     V_FW_HDR_FW_VER_BUILD(chip##FW_VERSION_BUILD))
 #define FW_INTFVER(chip, intf) (chip##FW_HDR_INTFVER_##intf)
 
+/* Just enough of fw_hdr to cover all version info. */
+struct fw_h {
+	__u8	ver;
+	__u8	chip;
+	__be16	len512;
+	__be32	fw_ver;
+	__be32	tp_microcode_ver;
+	__u8	intfver_nic;
+	__u8	intfver_vnic;
+	__u8	intfver_ofld;
+	__u8	intfver_ri;
+	__u8	intfver_iscsipdu;
+	__u8	intfver_iscsi;
+	__u8	intfver_fcoepdu;
+	__u8	intfver_fcoe;
+};
+/* Spot check a couple of fields. */
+CTASSERT(offsetof(struct fw_h, fw_ver) == offsetof(struct fw_hdr, fw_ver));
+CTASSERT(offsetof(struct fw_h, intfver_nic) == offsetof(struct fw_hdr, intfver_nic));
+CTASSERT(offsetof(struct fw_h, intfver_fcoe) == offsetof(struct fw_hdr, intfver_fcoe));
+
 struct fw_info {
 	uint8_t chip;
 	char *kld_name;
 	char *fw_mod_name;
-	struct fw_hdr fw_hdr;	/* XXX: waste of space, need a sparse struct */
+	struct fw_h fw_h;
 } fw_info[] = {
 	{
 		.chip = CHELSIO_T4,
 		.kld_name = "t4fw_cfg",
 		.fw_mod_name = "t4fw",
-		.fw_hdr = {
+		.fw_h = {
 			.chip = FW_HDR_CHIP_T4,
 			.fw_ver = htobe32(FW_VERSION(T4)),
 			.intfver_nic = FW_INTFVER(T4, NIC),
@@ -3337,7 +3405,7 @@ struct fw_info {
 		.chip = CHELSIO_T5,
 		.kld_name = "t5fw_cfg",
 		.fw_mod_name = "t5fw",
-		.fw_hdr = {
+		.fw_h = {
 			.chip = FW_HDR_CHIP_T5,
 			.fw_ver = htobe32(FW_VERSION(T5)),
 			.intfver_nic = FW_INTFVER(T5, NIC),
@@ -3353,7 +3421,7 @@ struct fw_info {
 		.chip = CHELSIO_T6,
 		.kld_name = "t6fw_cfg",
 		.fw_mod_name = "t6fw",
-		.fw_hdr = {
+		.fw_h = {
 			.chip = FW_HDR_CHIP_T6,
 			.fw_ver = htobe32(FW_VERSION(T6)),
 			.intfver_nic = FW_INTFVER(T6, NIC),
@@ -3385,7 +3453,7 @@ find_fw_info(int chip)
  * with?
  */
 static int
-fw_compatible(const struct fw_hdr *hdr1, const struct fw_hdr *hdr2)
+fw_compatible(const struct fw_h *hdr1, const struct fw_h *hdr2)
 {
 
 	/* short circuit if it's the exact same firmware version */
@@ -3406,71 +3474,16 @@ fw_compatible(const struct fw_hdr *hdr1, const struct fw_hdr *hdr2)
 	return (0);
 }
 
-/*
- * The firmware in the KLD is usable, but should it be installed?  This routine
- * explains itself in detail if it indicates the KLD firmware should be
- * installed.
- */
 static int
-should_install_kld_fw(struct adapter *sc, int card_fw_usable, int k, int c)
+load_fw_module(struct adapter *sc, const struct firmware **dcfg,
+    const struct firmware **fw)
 {
-	const char *reason;
-
-	if (!card_fw_usable) {
-		reason = "incompatible or unusable";
-		goto install;
-	}
-
-	if (k > c) {
-		reason = "older than the version bundled with this driver";
-		goto install;
-	}
-
-	if (t4_fw_install == 2 && k != c) {
-		reason = "different than the version bundled with this driver";
-		goto install;
-	}
-
-	return (0);
-
-install:
-	if (t4_fw_install == 0) {
-		device_printf(sc->dev, "firmware on card (%u.%u.%u.%u) is %s, "
-		    "but the driver is prohibited from installing a different "
-		    "firmware on the card.\n",
-		    G_FW_HDR_FW_VER_MAJOR(c), G_FW_HDR_FW_VER_MINOR(c),
-		    G_FW_HDR_FW_VER_MICRO(c), G_FW_HDR_FW_VER_BUILD(c), reason);
-
-		return (0);
-	}
-
-	device_printf(sc->dev, "firmware on card (%u.%u.%u.%u) is %s, "
-	    "installing firmware %u.%u.%u.%u on card.\n",
-	    G_FW_HDR_FW_VER_MAJOR(c), G_FW_HDR_FW_VER_MINOR(c),
-	    G_FW_HDR_FW_VER_MICRO(c), G_FW_HDR_FW_VER_BUILD(c), reason,
-	    G_FW_HDR_FW_VER_MAJOR(k), G_FW_HDR_FW_VER_MINOR(k),
-	    G_FW_HDR_FW_VER_MICRO(k), G_FW_HDR_FW_VER_BUILD(k));
-
-	return (1);
-}
-
-/*
- * Establish contact with the firmware and determine if we are the master driver
- * or not, and whether we are responsible for chip initialization.
- */
-static int
-prep_firmware(struct adapter *sc)
-{
-	const struct firmware *fw = NULL, *default_cfg;
-	int rc, pf, card_fw_usable, kld_fw_usable, need_fw_reset = 1;
-	enum dev_state state;
 	struct fw_info *fw_info;
-	struct fw_hdr *card_fw;		/* fw on the card */
-	const struct fw_hdr *kld_fw;	/* fw in the KLD */
-	const struct fw_hdr *drv_fw;	/* fw header the driver was compiled
-					   against */
 
-	/* This is the firmware whose headers the driver was compiled against */
+	*dcfg = NULL;
+	if (fw != NULL)
+		*fw = NULL;
+
 	fw_info = find_fw_info(chip_id(sc));
 	if (fw_info == NULL) {
 		device_printf(sc->dev,
@@ -3478,187 +3491,355 @@ prep_firmware(struct adapter *sc)
 		    chip_id(sc));
 		return (EINVAL);
 	}
-	drv_fw = &fw_info->fw_hdr;
+
+	*dcfg = firmware_get(fw_info->kld_name);
+	if (*dcfg != NULL) {
+		if (fw != NULL)
+			*fw = firmware_get(fw_info->fw_mod_name);
+		return (0);
+	}
+
+	return (ENOENT);
+}
+
+static void
+unload_fw_module(struct adapter *sc, const struct firmware *dcfg,
+    const struct firmware *fw)
+{
+
+	if (fw != NULL)
+		firmware_put(fw, FIRMWARE_UNLOAD);
+	if (dcfg != NULL)
+		firmware_put(dcfg, FIRMWARE_UNLOAD);
+}
+
+/*
+ * Return values:
+ * 0 means no firmware install attempted.
+ * ERESTART means a firmware install was attempted and was successful.
+ * +ve errno means a firmware install was attempted but failed.
+ */
+static int
+install_kld_firmware(struct adapter *sc, struct fw_h *card_fw,
+    const struct fw_h *drv_fw, const char *reason, int *already)
+{
+	const struct firmware *cfg, *fw;
+	const uint32_t c = be32toh(card_fw->fw_ver);
+	uint32_t d, k;
+	int rc, fw_install;
+	struct fw_h bundled_fw;
+	bool load_attempted;
+
+	cfg = fw = NULL;
+	load_attempted = false;
+	fw_install = t4_fw_install < 0 ? -t4_fw_install : t4_fw_install;
+
+	if (reason != NULL)
+		goto install;
+
+	if ((sc->flags & FW_OK) == 0) {
+
+		if (c == 0xffffffff) {
+			reason = "missing";
+			goto install;
+		}
+
+		return (0);
+	}
+
+	memcpy(&bundled_fw, drv_fw, sizeof(bundled_fw));
+	if (t4_fw_install < 0) {
+		rc = load_fw_module(sc, &cfg, &fw);
+		if (rc != 0 || fw == NULL) {
+			device_printf(sc->dev,
+			    "failed to load firmware module: %d. cfg %p, fw %p;"
+			    " will use compiled-in firmware version for"
+			    "hw.cxgbe.fw_install checks.\n",
+			    rc, cfg, fw);
+		} else {
+			memcpy(&bundled_fw, fw->data, sizeof(bundled_fw));
+		}
+		load_attempted = true;
+	}
+	d = be32toh(bundled_fw.fw_ver);
+
+	if (!fw_compatible(card_fw, &bundled_fw)) {
+		reason = "incompatible or unusable";
+		goto install;
+	}
+
+	if (d > c) {
+		reason = "older than the version bundled with this driver";
+		goto install;
+	}
+
+	if (fw_install == 2 && d != c) {
+		reason = "different than the version bundled with this driver";
+		goto install;
+	}
+
+	/* No reason to do anything to the firmware already on the card. */
+	rc = 0;
+	goto done;
+
+install:
+	rc = 0;
+	if ((*already)++)
+		goto done;
+
+	if (fw_install == 0) {
+		device_printf(sc->dev, "firmware on card (%u.%u.%u.%u) is %s, "
+		    "but the driver is prohibited from installing a firmware "
+		    "on the card.\n",
+		    G_FW_HDR_FW_VER_MAJOR(c), G_FW_HDR_FW_VER_MINOR(c),
+		    G_FW_HDR_FW_VER_MICRO(c), G_FW_HDR_FW_VER_BUILD(c), reason);
+
+		goto done;
+	}
 
 	/*
-	 * The firmware KLD contains many modules.  The KLD name is also the
-	 * name of the module that contains the default config file.
+	 * We'll attempt to install a firmware.  Load the module first (if it
+	 * hasn't been loaded already).
 	 */
-	default_cfg = firmware_get(fw_info->kld_name);
-
-	/* This is the firmware in the KLD */
-	fw = firmware_get(fw_info->fw_mod_name);
-	if (fw != NULL) {
-		kld_fw = (const void *)fw->data;
-		kld_fw_usable = fw_compatible(drv_fw, kld_fw);
-	} else {
-		kld_fw = NULL;
-		kld_fw_usable = 0;
+	if (!load_attempted) {
+		rc = load_fw_module(sc, &cfg, &fw);
+		if (rc != 0 || fw == NULL) {
+			device_printf(sc->dev,
+			    "failed to load firmware module: %d. cfg %p, fw %p\n",
+			    rc, cfg, fw);
+			/* carry on */
+		}
 	}
+	if (fw == NULL) {
+		device_printf(sc->dev, "firmware on card (%u.%u.%u.%u) is %s, "
+		    "but the driver cannot take corrective action because it "
+		    "is unable to load the firmware module.\n",
+		    G_FW_HDR_FW_VER_MAJOR(c), G_FW_HDR_FW_VER_MINOR(c),
+		    G_FW_HDR_FW_VER_MICRO(c), G_FW_HDR_FW_VER_BUILD(c), reason);
+		rc = sc->flags & FW_OK ? 0 : ENOENT;
+		goto done;
+	}
+	k = be32toh(((const struct fw_hdr *)fw->data)->fw_ver);
+	if (k != d) {
+		MPASS(t4_fw_install > 0);
+		device_printf(sc->dev,
+		    "firmware in KLD (%u.%u.%u.%u) is not what the driver was "
+		    "expecting (%u.%u.%u.%u) and will not be used.\n",
+		    G_FW_HDR_FW_VER_MAJOR(k), G_FW_HDR_FW_VER_MINOR(k),
+		    G_FW_HDR_FW_VER_MICRO(k), G_FW_HDR_FW_VER_BUILD(k),
+		    G_FW_HDR_FW_VER_MAJOR(d), G_FW_HDR_FW_VER_MINOR(d),
+		    G_FW_HDR_FW_VER_MICRO(d), G_FW_HDR_FW_VER_BUILD(d));
+		rc = sc->flags & FW_OK ? 0 : EINVAL;
+		goto done;
+	}
+
+	device_printf(sc->dev, "firmware on card (%u.%u.%u.%u) is %s, "
+	    "installing firmware %u.%u.%u.%u on card.\n",
+	    G_FW_HDR_FW_VER_MAJOR(c), G_FW_HDR_FW_VER_MINOR(c),
+	    G_FW_HDR_FW_VER_MICRO(c), G_FW_HDR_FW_VER_BUILD(c), reason,
+	    G_FW_HDR_FW_VER_MAJOR(d), G_FW_HDR_FW_VER_MINOR(d),
+	    G_FW_HDR_FW_VER_MICRO(d), G_FW_HDR_FW_VER_BUILD(d));
+
+	rc = -t4_fw_upgrade(sc, sc->mbox, fw->data, fw->datasize, 0);
+	if (rc != 0) {
+		device_printf(sc->dev, "failed to install firmware: %d\n", rc);
+	} else {
+		/* Installed successfully, update the cached header too. */
+		rc = ERESTART;
+		memcpy(card_fw, fw->data, sizeof(*card_fw));
+	}
+done:
+	unload_fw_module(sc, cfg, fw);
+
+	return (rc);
+}
+
+/*
+ * Establish contact with the firmware and attempt to become the master driver.
+ *
+ * A firmware will be installed to the card if needed (if the driver is allowed
+ * to do so).
+ */
+static int
+contact_firmware(struct adapter *sc)
+{
+	int rc, already = 0;
+	enum dev_state state;
+	struct fw_info *fw_info;
+	struct fw_hdr *card_fw;		/* fw on the card */
+	const struct fw_h *drv_fw;
+
+	fw_info = find_fw_info(chip_id(sc));
+	if (fw_info == NULL) {
+		device_printf(sc->dev,
+		    "unable to look up firmware information for chip %d.\n",
+		    chip_id(sc));
+		return (EINVAL);
+	}
+	drv_fw = &fw_info->fw_h;
 
 	/* Read the header of the firmware on the card */
 	card_fw = malloc(sizeof(*card_fw), M_CXGBE, M_ZERO | M_WAITOK);
-	rc = -t4_read_flash(sc, FLASH_FW_START,
-	    sizeof (*card_fw) / sizeof (uint32_t), (uint32_t *)card_fw, 1);
-	if (rc == 0) {
-		card_fw_usable = fw_compatible(drv_fw, (const void*)card_fw);
-		if (card_fw->fw_ver == be32toh(0xffffffff)) {
-			uint32_t d = be32toh(kld_fw->fw_ver);
-
-			if (!kld_fw_usable) {
-				device_printf(sc->dev,
-				    "no firmware on the card and no usable "
-				    "firmware bundled with the driver.\n");
-				rc = EIO;
-				goto done;
-			} else if (t4_fw_install == 0) {
-				device_printf(sc->dev,
-				    "no firmware on the card and the driver "
-				    "is prohibited from installing new "
-				    "firmware.\n");
-				rc = EIO;
-				goto done;
-			}
-
-			device_printf(sc->dev, "no firmware on the card, "
-			    "installing firmware %d.%d.%d.%d\n",
-			    G_FW_HDR_FW_VER_MAJOR(d), G_FW_HDR_FW_VER_MINOR(d),
-			    G_FW_HDR_FW_VER_MICRO(d), G_FW_HDR_FW_VER_BUILD(d));
-			rc = t4_fw_forceinstall(sc, fw->data, fw->datasize);
-			if (rc < 0) {
-				rc = -rc;
-				device_printf(sc->dev,
-				    "firmware install failed: %d.\n", rc);
-				goto done;
-			}
-			memcpy(card_fw, kld_fw, sizeof(*card_fw));
-			card_fw_usable = 1;
-			need_fw_reset = 0;
-		}
-	} else {
+restart:
+	rc = -t4_get_fw_hdr(sc, card_fw);
+	if (rc != 0) {
 		device_printf(sc->dev,
-		    "Unable to read card's firmware header: %d\n", rc);
-		card_fw_usable = 0;
+		    "unable to read firmware header from card's flash: %d\n",
+		    rc);
+		goto done;
 	}
 
-	/* Contact firmware. */
+	rc = install_kld_firmware(sc, (struct fw_h *)card_fw, drv_fw, NULL,
+	    &already);
+	if (rc == ERESTART)
+		goto restart;
+	if (rc != 0)
+		goto done;
+
 	rc = t4_fw_hello(sc, sc->mbox, sc->mbox, MASTER_MAY, &state);
 	if (rc < 0 || state == DEV_STATE_ERR) {
 		rc = -rc;
 		device_printf(sc->dev,
-		    "failed to connect to the firmware: %d, %d.\n", rc, state);
+		    "failed to connect to the firmware: %d, %d.  "
+		    "PCIE_FW 0x%08x\n", rc, state, t4_read_reg(sc, A_PCIE_FW));
+#if 0
+		if (install_kld_firmware(sc, (struct fw_h *)card_fw, drv_fw,
+		    "not responding properly to HELLO", &already) == ERESTART)
+			goto restart;
+#endif
 		goto done;
 	}
-	pf = rc;
-	if (pf == sc->mbox)
+	MPASS(be32toh(card_fw->flags) & FW_HDR_FLAGS_RESET_HALT);
+	sc->flags |= FW_OK;	/* The firmware responded to the FW_HELLO. */
+
+	if (rc == sc->pf) {
 		sc->flags |= MASTER_PF;
-	else if (state == DEV_STATE_UNINIT) {
+		rc = install_kld_firmware(sc, (struct fw_h *)card_fw, drv_fw,
+		    NULL, &already);
+		if (rc == ERESTART)
+			rc = 0;
+		else if (rc != 0)
+			goto done;
+	} else if (state == DEV_STATE_UNINIT) {
 		/*
 		 * We didn't get to be the master so we definitely won't be
 		 * configuring the chip.  It's a bug if someone else hasn't
 		 * configured it already.
 		 */
 		device_printf(sc->dev, "couldn't be master(%d), "
-		    "device not already initialized either(%d).\n", rc, state);
+		    "device not already initialized either(%d).  "
+		    "PCIE_FW 0x%08x\n", rc, state, t4_read_reg(sc, A_PCIE_FW));
 		rc = EPROTO;
 		goto done;
+	} else {
+		/*
+		 * Some other PF is the master and has configured the chip.
+		 * This is allowed but untested.
+		 */
+		device_printf(sc->dev, "PF%d is master, device state %d.  "
+		    "PCIE_FW 0x%08x\n", rc, state, t4_read_reg(sc, A_PCIE_FW));
+		snprintf(sc->cfg_file, sizeof(sc->cfg_file), "pf%d", rc);
+		sc->cfcsum = 0;
+		rc = 0;
+	}
+done:
+	if (rc != 0 && sc->flags & FW_OK) {
+		t4_fw_bye(sc, sc->mbox);
+		sc->flags &= ~FW_OK;
+	}
+	free(card_fw, M_CXGBE);
+	return (rc);
+}
+
+static int
+copy_cfg_file_to_card(struct adapter *sc, char *cfg_file,
+    uint32_t mtype, uint32_t moff)
+{
+	struct fw_info *fw_info;
+	const struct firmware *dcfg, *rcfg = NULL;
+	const uint32_t *cfdata;
+	uint32_t cflen, addr;
+	int rc;
+
+	load_fw_module(sc, &dcfg, NULL);
+
+	/* Card specific interpretation of "default". */
+	if (strncmp(cfg_file, DEFAULT_CF, sizeof(t4_cfg_file)) == 0) {
+		if (pci_get_device(sc->dev) == 0x440a)
+			snprintf(cfg_file, sizeof(t4_cfg_file), UWIRE_CF);
+		if (is_fpga(sc))
+			snprintf(cfg_file, sizeof(t4_cfg_file), FPGA_CF);
 	}
 
-	if (card_fw_usable && card_fw->fw_ver == drv_fw->fw_ver &&
-	    (!kld_fw_usable || kld_fw->fw_ver == drv_fw->fw_ver)) {
-		/*
-		 * Common case: the firmware on the card is an exact match and
-		 * the KLD is an exact match too, or the KLD is
-		 * absent/incompatible.  Note that t4_fw_install = 2 is ignored
-		 * here -- use cxgbetool loadfw if you want to reinstall the
-		 * same firmware as the one on the card.
-		 */
-	} else if (kld_fw_usable && state == DEV_STATE_UNINIT &&
-	    should_install_kld_fw(sc, card_fw_usable, be32toh(kld_fw->fw_ver),
-	    be32toh(card_fw->fw_ver))) {
-
-		rc = -t4_fw_upgrade(sc, sc->mbox, fw->data, fw->datasize, 0);
-		if (rc != 0) {
+	if (strncmp(cfg_file, DEFAULT_CF, sizeof(t4_cfg_file)) == 0) {
+		if (dcfg == NULL) {
 			device_printf(sc->dev,
-			    "failed to install firmware: %d\n", rc);
+			    "KLD with default config is not available.\n");
+			rc = ENOENT;
 			goto done;
 		}
+		cfdata = dcfg->data;
+		cflen = dcfg->datasize & ~3;
+	} else {
+		char s[32];
 
-		/* Installed successfully, update the cached header too. */
-		memcpy(card_fw, kld_fw, sizeof(*card_fw));
-		card_fw_usable = 1;
-		need_fw_reset = 0;	/* already reset as part of load_fw */
+		fw_info = find_fw_info(chip_id(sc));
+		if (fw_info == NULL) {
+			device_printf(sc->dev,
+			    "unable to look up firmware information for chip %d.\n",
+			    chip_id(sc));
+			rc = EINVAL;
+			goto done;
+		}
+		snprintf(s, sizeof(s), "%s_%s", fw_info->kld_name, cfg_file);
+
+		rcfg = firmware_get(s);
+		if (rcfg == NULL) {
+			device_printf(sc->dev,
+			    "unable to load module \"%s\" for configuration "
+			    "profile \"%s\".\n", s, cfg_file);
+			rc = ENOENT;
+			goto done;
+		}
+		cfdata = rcfg->data;
+		cflen = rcfg->datasize & ~3;
 	}
 
-	if (!card_fw_usable) {
-		uint32_t d, c, k;
-
-		d = ntohl(drv_fw->fw_ver);
-		c = ntohl(card_fw->fw_ver);
-		k = kld_fw ? ntohl(kld_fw->fw_ver) : 0;
-
-		device_printf(sc->dev, "Cannot find a usable firmware: "
-		    "fw_install %d, chip state %d, "
-		    "driver compiled with %d.%d.%d.%d, "
-		    "card has %d.%d.%d.%d, KLD has %d.%d.%d.%d\n",
-		    t4_fw_install, state,
-		    G_FW_HDR_FW_VER_MAJOR(d), G_FW_HDR_FW_VER_MINOR(d),
-		    G_FW_HDR_FW_VER_MICRO(d), G_FW_HDR_FW_VER_BUILD(d),
-		    G_FW_HDR_FW_VER_MAJOR(c), G_FW_HDR_FW_VER_MINOR(c),
-		    G_FW_HDR_FW_VER_MICRO(c), G_FW_HDR_FW_VER_BUILD(c),
-		    G_FW_HDR_FW_VER_MAJOR(k), G_FW_HDR_FW_VER_MINOR(k),
-		    G_FW_HDR_FW_VER_MICRO(k), G_FW_HDR_FW_VER_BUILD(k));
+	if (cflen > FLASH_CFG_MAX_SIZE) {
+		device_printf(sc->dev,
+		    "config file too long (%d, max allowed is %d).\n",
+		    cflen, FLASH_CFG_MAX_SIZE);
 		rc = EINVAL;
 		goto done;
 	}
 
-	/* Reset device */
-	if (need_fw_reset &&
-	    (rc = -t4_fw_reset(sc, sc->mbox, F_PIORSTMODE | F_PIORST)) != 0) {
-		device_printf(sc->dev, "firmware reset failed: %d.\n", rc);
-		if (rc != ETIMEDOUT && rc != EIO)
-			t4_fw_bye(sc, sc->mbox);
+	rc = validate_mt_off_len(sc, mtype, moff, cflen, &addr);
+	if (rc != 0) {
+		device_printf(sc->dev,
+		    "%s: addr (%d/0x%x) or len %d is not valid: %d.\n",
+		    __func__, mtype, moff, cflen, rc);
+		rc = EINVAL;
 		goto done;
 	}
-	sc->flags |= FW_OK;
-
-	rc = get_params__pre_init(sc);
-	if (rc != 0)
-		goto done; /* error message displayed already */
-
-	/* Partition adapter resources as specified in the config file. */
-	if (state == DEV_STATE_UNINIT) {
-
-		KASSERT(sc->flags & MASTER_PF,
-		    ("%s: trying to change chip settings when not master.",
-		    __func__));
-
-		rc = partition_resources(sc, default_cfg, fw_info->kld_name);
-		if (rc != 0)
-			goto done;	/* error message displayed already */
-
-		t4_tweak_chip_settings(sc);
-
-		/* get basic stuff going */
-		rc = -t4_fw_initialize(sc, sc->mbox);
-		if (rc != 0) {
-			device_printf(sc->dev, "fw init failed: %d.\n", rc);
-			goto done;
-		}
-	} else {
-		snprintf(sc->cfg_file, sizeof(sc->cfg_file), "pf%d", pf);
-		sc->cfcsum = 0;
-	}
-
+	write_via_memwin(sc, 2, addr, cfdata, cflen);
 done:
-	free(card_fw, M_CXGBE);
-	if (fw != NULL)
-		firmware_put(fw, FIRMWARE_UNLOAD);
-	if (default_cfg != NULL)
-		firmware_put(default_cfg, FIRMWARE_UNLOAD);
-
+	if (rcfg != NULL)
+		firmware_put(rcfg, FIRMWARE_UNLOAD);
+	unload_fw_module(sc, dcfg, NULL);
 	return (rc);
 }
+
+struct caps_allowed {
+	uint16_t nbmcaps;
+	uint16_t linkcaps;
+	uint16_t switchcaps;
+	uint16_t niccaps;
+	uint16_t toecaps;
+	uint16_t rdmacaps;
+	uint16_t cryptocaps;
+	uint16_t iscsicaps;
+	uint16_t fcoecaps;
+};
 
 #define FW_PARAM_DEV(param) \
 	(V_FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) | \
@@ -3668,78 +3849,39 @@ done:
 	 V_FW_PARAMS_PARAM_X(FW_PARAMS_PARAM_PFVF_##param))
 
 /*
- * Partition chip resources for use between various PFs, VFs, etc.
+ * Provide a configuration profile to the firmware and have it initialize the
+ * chip accordingly.  This may involve uploading a configuration file to the
+ * card.
  */
 static int
-partition_resources(struct adapter *sc, const struct firmware *default_cfg,
-    const char *name_prefix)
+apply_cfg_and_initialize(struct adapter *sc, char *cfg_file,
+    const struct caps_allowed *caps_allowed)
 {
-	const struct firmware *cfg = NULL;
-	int rc = 0;
+	int rc;
 	struct fw_caps_config_cmd caps;
-	uint32_t mtype, moff, finicsum, cfcsum;
+	uint32_t mtype, moff, finicsum, cfcsum, param, val;
 
-	/*
-	 * Figure out what configuration file to use.  Pick the default config
-	 * file for the card if the user hasn't specified one explicitly.
-	 */
-	snprintf(sc->cfg_file, sizeof(sc->cfg_file), "%s", t4_cfg_file);
-	if (strncmp(t4_cfg_file, DEFAULT_CF, sizeof(t4_cfg_file)) == 0) {
-		/* Card specific overrides go here. */
-		if (pci_get_device(sc->dev) == 0x440a)
-			snprintf(sc->cfg_file, sizeof(sc->cfg_file), UWIRE_CF);
-		if (is_fpga(sc))
-			snprintf(sc->cfg_file, sizeof(sc->cfg_file), FPGA_CF);
-	} else if (strncmp(t4_cfg_file, BUILTIN_CF, sizeof(t4_cfg_file)) == 0)
-		goto use_built_in_config;	/* go straight to config. */
-
-	/*
-	 * We need to load another module if the profile is anything except
-	 * "default" or "flash".
-	 */
-	if (strncmp(sc->cfg_file, DEFAULT_CF, sizeof(sc->cfg_file)) != 0 &&
-	    strncmp(sc->cfg_file, FLASH_CF, sizeof(sc->cfg_file)) != 0) {
-		char s[32];
-
-		snprintf(s, sizeof(s), "%s_%s", name_prefix, sc->cfg_file);
-		cfg = firmware_get(s);
-		if (cfg == NULL) {
-			if (default_cfg != NULL) {
-				device_printf(sc->dev,
-				    "unable to load module \"%s\" for "
-				    "configuration profile \"%s\", will use "
-				    "the default config file instead.\n",
-				    s, sc->cfg_file);
-				snprintf(sc->cfg_file, sizeof(sc->cfg_file),
-				    "%s", DEFAULT_CF);
-			} else {
-				device_printf(sc->dev,
-				    "unable to load module \"%s\" for "
-				    "configuration profile \"%s\", will use "
-				    "the config file on the card's flash "
-				    "instead.\n", s, sc->cfg_file);
-				snprintf(sc->cfg_file, sizeof(sc->cfg_file),
-				    "%s", FLASH_CF);
-			}
-		}
+	rc = -t4_fw_reset(sc, sc->mbox, F_PIORSTMODE | F_PIORST);
+	if (rc != 0) {
+		device_printf(sc->dev, "firmware reset failed: %d.\n", rc);
+		return (rc);
 	}
 
-	if (strncmp(sc->cfg_file, DEFAULT_CF, sizeof(sc->cfg_file)) == 0 &&
-	    default_cfg == NULL) {
-		device_printf(sc->dev,
-		    "default config file not available, will use the config "
-		    "file on the card's flash instead.\n");
-		snprintf(sc->cfg_file, sizeof(sc->cfg_file), "%s", FLASH_CF);
-	}
-
-	if (strncmp(sc->cfg_file, FLASH_CF, sizeof(sc->cfg_file)) != 0) {
-		u_int cflen;
-		const uint32_t *cfdata;
-		uint32_t param, val, addr;
-
-		KASSERT(cfg != NULL || default_cfg != NULL,
-		    ("%s: no config to upload", __func__));
-
+	bzero(&caps, sizeof(caps));
+	caps.op_to_write = htobe32(V_FW_CMD_OP(FW_CAPS_CONFIG_CMD) |
+	    F_FW_CMD_REQUEST | F_FW_CMD_READ);
+	if (strncmp(cfg_file, BUILTIN_CF, sizeof(t4_cfg_file)) == 0) {
+		mtype = 0;
+		moff = 0;
+		caps.cfvalid_to_len16 = htobe32(FW_LEN16(caps));
+	} else if (strncmp(cfg_file, FLASH_CF, sizeof(t4_cfg_file)) == 0) {
+		mtype = FW_MEMTYPE_FLASH;
+		moff = t4_flash_cfg_addr(sc);
+		caps.cfvalid_to_len16 = htobe32(F_FW_CAPS_CONFIG_CMD_CFVALID |
+		    V_FW_CAPS_CONFIG_CMD_MEMTYPE_CF(mtype) |
+		    V_FW_CAPS_CONFIG_CMD_MEMADDR64K_CF(moff >> 16) |
+		    FW_LEN16(caps));
+	} else {
 		/*
 		 * Ask the firmware where it wants us to upload the config file.
 		 */
@@ -3753,110 +3895,52 @@ partition_resources(struct adapter *sc, const struct firmware *default_cfg,
 		}
 		mtype = G_FW_PARAMS_PARAM_Y(val);
 		moff = G_FW_PARAMS_PARAM_Z(val) << 16;
+		caps.cfvalid_to_len16 = htobe32(F_FW_CAPS_CONFIG_CMD_CFVALID |
+		    V_FW_CAPS_CONFIG_CMD_MEMTYPE_CF(mtype) |
+		    V_FW_CAPS_CONFIG_CMD_MEMADDR64K_CF(moff >> 16) |
+		    FW_LEN16(caps));
 
-		/*
-		 * XXX: sheer laziness.  We deliberately added 4 bytes of
-		 * useless stuffing/comments at the end of the config file so
-		 * it's ok to simply throw away the last remaining bytes when
-		 * the config file is not an exact multiple of 4.  This also
-		 * helps with the validate_mt_off_len check.
-		 */
-		if (cfg != NULL) {
-			cflen = cfg->datasize & ~3;
-			cfdata = cfg->data;
-		} else {
-			cflen = default_cfg->datasize & ~3;
-			cfdata = default_cfg->data;
-		}
-
-		if (cflen > FLASH_CFG_MAX_SIZE) {
-			device_printf(sc->dev,
-			    "config file too long (%d, max allowed is %d).  "
-			    "Will try to use the config on the card, if any.\n",
-			    cflen, FLASH_CFG_MAX_SIZE);
-			goto use_config_on_flash;
-		}
-
-		rc = validate_mt_off_len(sc, mtype, moff, cflen, &addr);
+		rc = copy_cfg_file_to_card(sc, cfg_file, mtype, moff);
 		if (rc != 0) {
 			device_printf(sc->dev,
-			    "%s: addr (%d/0x%x) or len %d is not valid: %d.  "
-			    "Will try to use the config on the card, if any.\n",
-			    __func__, mtype, moff, cflen, rc);
-			goto use_config_on_flash;
+			    "failed to upload config file to card: %d.\n", rc);
+			goto done;
 		}
-		write_via_memwin(sc, 2, addr, cfdata, cflen);
-	} else {
-use_config_on_flash:
-		mtype = FW_MEMTYPE_FLASH;
-		moff = t4_flash_cfg_addr(sc);
 	}
-
-	bzero(&caps, sizeof(caps));
-	caps.op_to_write = htobe32(V_FW_CMD_OP(FW_CAPS_CONFIG_CMD) |
-	    F_FW_CMD_REQUEST | F_FW_CMD_READ);
-	caps.cfvalid_to_len16 = htobe32(F_FW_CAPS_CONFIG_CMD_CFVALID |
-	    V_FW_CAPS_CONFIG_CMD_MEMTYPE_CF(mtype) |
-	    V_FW_CAPS_CONFIG_CMD_MEMADDR64K_CF(moff >> 16) | FW_LEN16(caps));
 	rc = -t4_wr_mbox(sc, sc->mbox, &caps, sizeof(caps), &caps);
 	if (rc != 0) {
-		device_printf(sc->dev,
-		    "failed to pre-process config file: %d "
-		    "(mtype %d, moff 0x%x).  Will reset the firmware and retry "
-		    "with the built-in configuration.\n", rc, mtype, moff);
-
-	    	rc = -t4_fw_reset(sc, sc->mbox, F_PIORSTMODE | F_PIORST);
-		if (rc != 0) {
-			device_printf(sc->dev,
-			    "firmware reset failed: %d.\n", rc);
-			if (rc != ETIMEDOUT && rc != EIO) {
-				t4_fw_bye(sc, sc->mbox);
-				sc->flags &= ~FW_OK;
-			}
-			goto done;
-		}
-		snprintf(sc->cfg_file, sizeof(sc->cfg_file), "%s", "built-in");
-use_built_in_config:
-		bzero(&caps, sizeof(caps));
-		caps.op_to_write = htobe32(V_FW_CMD_OP(FW_CAPS_CONFIG_CMD) |
-		    F_FW_CMD_REQUEST | F_FW_CMD_READ);
-		caps.cfvalid_to_len16 = htobe32(FW_LEN16(caps));
-		rc = t4_wr_mbox(sc, sc->mbox, &caps, sizeof(caps), &caps);
-		if (rc != 0) {
-			device_printf(sc->dev,
-			    "built-in configuration failed: %d.\n", rc);
-			goto done;
-		}
+		device_printf(sc->dev, "failed to pre-process config file: %d "
+		    "(mtype %d, moff 0x%x).\n", rc, mtype, moff);
+		goto done;
 	}
 
 	finicsum = be32toh(caps.finicsum);
-	cfcsum = be32toh(caps.cfcsum);
+	cfcsum = be32toh(caps.cfcsum);	/* actual */
 	if (finicsum != cfcsum) {
 		device_printf(sc->dev,
 		    "WARNING: config file checksum mismatch: %08x %08x\n",
 		    finicsum, cfcsum);
 	}
 	sc->cfcsum = cfcsum;
-
-#define LIMIT_CAPS(x) do { \
-	caps.x &= htobe16(t4_##x##_allowed); \
-} while (0)
+	snprintf(sc->cfg_file, sizeof(sc->cfg_file), "%s", cfg_file);
 
 	/*
 	 * Let the firmware know what features will (not) be used so it can tune
 	 * things accordingly.
 	 */
-	LIMIT_CAPS(nbmcaps);
-	LIMIT_CAPS(linkcaps);
-	LIMIT_CAPS(switchcaps);
-	LIMIT_CAPS(niccaps);
-	LIMIT_CAPS(toecaps);
-	LIMIT_CAPS(rdmacaps);
-	LIMIT_CAPS(cryptocaps);
-	LIMIT_CAPS(iscsicaps);
-	LIMIT_CAPS(fcoecaps);
+#define LIMIT_CAPS(x) do { \
+	caps.x##caps &= htobe16(caps_allowed->x##caps); \
+} while (0)
+	LIMIT_CAPS(nbm);
+	LIMIT_CAPS(link);
+	LIMIT_CAPS(switch);
+	LIMIT_CAPS(nic);
+	LIMIT_CAPS(toe);
+	LIMIT_CAPS(rdma);
+	LIMIT_CAPS(crypto);
+	LIMIT_CAPS(iscsi);
+	LIMIT_CAPS(fcoe);
 #undef LIMIT_CAPS
-
 	if (caps.niccaps & htobe16(FW_CAPS_CONFIG_NIC_HASHFILTER)) {
 		/*
 		 * TOE and hashfilters are mutually exclusive.  It is a config
@@ -3878,10 +3962,68 @@ use_built_in_config:
 	if (rc != 0) {
 		device_printf(sc->dev,
 		    "failed to process config file: %d.\n", rc);
+		goto done;
+	}
+
+	t4_tweak_chip_settings(sc);
+	set_params__pre_init(sc);
+
+	/* get basic stuff going */
+	rc = -t4_fw_initialize(sc, sc->mbox);
+	if (rc != 0) {
+		device_printf(sc->dev, "fw_initialize failed: %d.\n", rc);
+		goto done;
 	}
 done:
-	if (cfg != NULL)
-		firmware_put(cfg, FIRMWARE_UNLOAD);
+	return (rc);
+}
+
+/*
+ * Partition chip resources for use between various PFs, VFs, etc.
+ */
+static int
+partition_resources(struct adapter *sc)
+{
+	char cfg_file[sizeof(t4_cfg_file)];
+	struct caps_allowed caps_allowed;
+	int rc;
+	bool fallback;
+
+	/* Only the master driver gets to configure the chip resources. */
+	MPASS(sc->flags & MASTER_PF);
+
+#define COPY_CAPS(x) do { \
+	caps_allowed.x##caps = t4_##x##caps_allowed; \
+} while (0)
+	bzero(&caps_allowed, sizeof(caps_allowed));
+	COPY_CAPS(nbm);
+	COPY_CAPS(link);
+	COPY_CAPS(switch);
+	COPY_CAPS(nic);
+	COPY_CAPS(toe);
+	COPY_CAPS(rdma);
+	COPY_CAPS(crypto);
+	COPY_CAPS(iscsi);
+	COPY_CAPS(fcoe);
+	fallback = sc->debug_flags & DF_DISABLE_CFG_RETRY ? false : true;
+	snprintf(cfg_file, sizeof(cfg_file), "%s", t4_cfg_file);
+retry:
+	rc = apply_cfg_and_initialize(sc, cfg_file, &caps_allowed);
+	if (rc != 0 && fallback) {
+		device_printf(sc->dev,
+		    "failed (%d) to configure card with \"%s\" profile, "
+		    "will fall back to a basic configuration and retry.\n",
+		    rc, cfg_file);
+		snprintf(cfg_file, sizeof(cfg_file), "%s", BUILTIN_CF);
+		bzero(&caps_allowed, sizeof(caps_allowed));
+		COPY_CAPS(nbm);
+		COPY_CAPS(link);
+		COPY_CAPS(switch);
+		COPY_CAPS(nic);
+		fallback = false;
+		goto retry;
+	}
+#undef COPY_CAPS
 	return (rc);
 }
 
@@ -3947,6 +4089,35 @@ get_params__pre_init(struct adapter *sc)
 }
 
 /*
+ * Any params that need to be set before FW_INITIALIZE.
+ */
+static int
+set_params__pre_init(struct adapter *sc)
+{
+	int rc = 0;
+	uint32_t param, val;
+
+	if (chip_id(sc) >= CHELSIO_T6) {
+		param = FW_PARAM_DEV(HPFILTER_REGION_SUPPORT);
+		val = 1;
+		rc = -t4_set_params(sc, sc->mbox, sc->pf, 0, 1, &param, &val);
+		/* firmwares < 1.20.1.0 do not have this param. */
+		if (rc == FW_EINVAL && sc->params.fw_vers <
+		    (V_FW_HDR_FW_VER_MAJOR(1) | V_FW_HDR_FW_VER_MINOR(20) |
+		    V_FW_HDR_FW_VER_MICRO(1) | V_FW_HDR_FW_VER_BUILD(0))) {
+			rc = 0;
+		}
+		if (rc != 0) {
+			device_printf(sc->dev,
+			    "failed to enable high priority filters :%d.\n",
+			    rc);
+		}
+	}
+
+	return (rc);
+}
+
+/*
  * Retrieve various parameters that are of interest to the driver.  The device
  * has been initialized by the firmware at this point.
  */
@@ -3988,20 +4159,6 @@ get_params__post_init(struct adapter *sc)
 	sc->params.core_vdd = val[6];
 
 	if (chip_id(sc) >= CHELSIO_T6) {
-
-#ifdef INVARIANTS
-		if (sc->params.fw_vers >=
-		    (V_FW_HDR_FW_VER_MAJOR(1) | V_FW_HDR_FW_VER_MINOR(20) |
-		    V_FW_HDR_FW_VER_MICRO(1) | V_FW_HDR_FW_VER_BUILD(0))) {
-			/*
-			 * Note that the code to enable the region should run
-			 * before t4_fw_initialize and not here.  This is just a
-			 * reminder to add said code.
-			 */
-			device_printf(sc->dev,
-			    "hpfilter region not enabled.\n");
-		}
-#endif
 
 		sc->tids.tid_base = t4_read_reg(sc,
 		    A_LE_DB_ACTIVE_TABLE_START_INDEX);
@@ -4052,6 +4209,18 @@ get_params__post_init(struct adapter *sc)
 		sc->params.filter2_wr_support = val[0] != 0;
 	else
 		sc->params.filter2_wr_support = 0;
+
+	/*
+	 * Find out whether we're allowed to use the ULPTX MEMWRITE DSGL.
+	 * This is queried separately for the same reason as other params above.
+	 */
+	param[0] = FW_PARAM_DEV(ULPTX_MEMWRITE_DSGL);
+	val[0] = 0;
+	rc = -t4_query_params(sc, sc->mbox, sc->pf, 0, 1, param, val);
+	if (rc == 0)
+		sc->params.ulptx_memwrite_dsgl = val[0] != 0;
+	else
+		sc->params.ulptx_memwrite_dsgl = false;
 
 	/* get capabilites */
 	bzero(&caps, sizeof(caps));
@@ -4906,6 +5075,8 @@ cxgbe_init_synchronized(struct vi_info *vi)
 		callout_reset(&vi->tick, hz, vi_tick, vi);
 	else
 		callout_reset(&pi->tick, hz, cxgbe_tick, pi);
+	if (pi->link_cfg.link_ok)
+		t4_os_link_changed(pi);
 	PORT_UNLOCK(pi);
 done:
 	if (rc != 0)
@@ -5404,6 +5575,8 @@ vi_full_uninit(struct vi_info *vi)
 	struct sge_txq *txq;
 #ifdef TCP_OFFLOAD
 	struct sge_ofld_rxq *ofld_rxq;
+#endif
+#if defined(TCP_OFFLOAD) || defined(RATELIMIT)
 	struct sge_wrq *ofld_txq;
 #endif
 
@@ -5419,7 +5592,7 @@ vi_full_uninit(struct vi_info *vi)
 			quiesce_txq(sc, txq);
 		}
 
-#ifdef TCP_OFFLOAD
+#if defined(TCP_OFFLOAD) || defined(RATELIMIT)
 		for_each_ofld_txq(vi, i, ofld_txq) {
 			quiesce_wrq(sc, ofld_txq);
 		}
@@ -5894,8 +6067,7 @@ t4_sysctls(struct adapter *sc)
 	    sysctl_cim_ibq_obq, "A", "CIM IBQ 5 (NCSI)");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cim_la",
-	    CTLTYPE_STRING | CTLFLAG_RD, sc, 0,
-	    chip_id(sc) <= CHELSIO_T5 ? sysctl_cim_la : sysctl_cim_la_t6,
+	    CTLTYPE_STRING | CTLFLAG_RD, sc, 0, sysctl_cim_la,
 	    "A", "CIM logic analyzer");
 
 	SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "cim_ma_la",
@@ -6207,15 +6379,9 @@ vi_sysctls(struct vi_info *vi)
 		SYSCTL_ADD_INT(ctx, children, OID_AUTO, "nofldrxq", CTLFLAG_RD,
 		    &vi->nofldrxq, 0,
 		    "# of rx queues for offloaded TCP connections");
-		SYSCTL_ADD_INT(ctx, children, OID_AUTO, "nofldtxq", CTLFLAG_RD,
-		    &vi->nofldtxq, 0,
-		    "# of tx queues for offloaded TCP connections");
 		SYSCTL_ADD_INT(ctx, children, OID_AUTO, "first_ofld_rxq",
 		    CTLFLAG_RD, &vi->first_ofld_rxq, 0,
 		    "index of first TOE rx queue");
-		SYSCTL_ADD_INT(ctx, children, OID_AUTO, "first_ofld_txq",
-		    CTLFLAG_RD, &vi->first_ofld_txq, 0,
-		    "index of first TOE tx queue");
 		SYSCTL_ADD_PROC(ctx, children, OID_AUTO, "holdoff_tmr_idx_ofld",
 		    CTLTYPE_INT | CTLFLAG_RW, vi, 0,
 		    sysctl_holdoff_tmr_idx_ofld, "I",
@@ -6224,6 +6390,16 @@ vi_sysctls(struct vi_info *vi)
 		    CTLTYPE_INT | CTLFLAG_RW, vi, 0,
 		    sysctl_holdoff_pktc_idx_ofld, "I",
 		    "holdoff packet counter index for TOE queues");
+	}
+#endif
+#if defined(TCP_OFFLOAD) || defined(RATELIMIT)
+	if (vi->nofldtxq != 0) {
+		SYSCTL_ADD_INT(ctx, children, OID_AUTO, "nofldtxq", CTLFLAG_RD,
+		    &vi->nofldtxq, 0,
+		    "# of tx queues for TOE/ETHOFLD");
+		SYSCTL_ADD_INT(ctx, children, OID_AUTO, "first_ofld_txq",
+		    CTLFLAG_RD, &vi->first_ofld_txq, 0,
+		    "index of first TOE/ETHOFLD tx queue");
 	}
 #endif
 #ifdef DEV_NETMAP
@@ -7113,35 +7289,10 @@ done:
 	return (rc);
 }
 
-static int
-sysctl_cim_la(SYSCTL_HANDLER_ARGS)
+static void
+sbuf_cim_la4(struct adapter *sc, struct sbuf *sb, uint32_t *buf, uint32_t cfg)
 {
-	struct adapter *sc = arg1;
-	u_int cfg;
-	struct sbuf *sb;
-	uint32_t *buf, *p;
-	int rc;
-
-	MPASS(chip_id(sc) <= CHELSIO_T5);
-
-	rc = -t4_cim_read(sc, A_UP_UP_DBG_LA_CFG, 1, &cfg);
-	if (rc != 0)
-		return (rc);
-
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
-	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
-	if (sb == NULL)
-		return (ENOMEM);
-
-	buf = malloc(sc->params.cim_la_size * sizeof(uint32_t), M_CXGBE,
-	    M_ZERO | M_WAITOK);
-
-	rc = -t4_cim_read_la(sc, buf, NULL);
-	if (rc != 0)
-		goto done;
+	uint32_t *p;
 
 	sbuf_printf(sb, "Status   Data      PC%s",
 	    cfg & F_UPDBGLACAPTPCONLY ? "" :
@@ -7166,43 +7317,12 @@ sysctl_cim_la(SYSCTL_HANDLER_ARGS)
 			    p[6], p[7]);
 		}
 	}
-
-	rc = sbuf_finish(sb);
-	sbuf_delete(sb);
-done:
-	free(buf, M_CXGBE);
-	return (rc);
 }
 
-static int
-sysctl_cim_la_t6(SYSCTL_HANDLER_ARGS)
+static void
+sbuf_cim_la6(struct adapter *sc, struct sbuf *sb, uint32_t *buf, uint32_t cfg)
 {
-	struct adapter *sc = arg1;
-	u_int cfg;
-	struct sbuf *sb;
-	uint32_t *buf, *p;
-	int rc;
-
-	MPASS(chip_id(sc) > CHELSIO_T5);
-
-	rc = -t4_cim_read(sc, A_UP_UP_DBG_LA_CFG, 1, &cfg);
-	if (rc != 0)
-		return (rc);
-
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		return (rc);
-
-	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
-	if (sb == NULL)
-		return (ENOMEM);
-
-	buf = malloc(sc->params.cim_la_size * sizeof(uint32_t), M_CXGBE,
-	    M_ZERO | M_WAITOK);
-
-	rc = -t4_cim_read_la(sc, buf, NULL);
-	if (rc != 0)
-		goto done;
+	uint32_t *p;
 
 	sbuf_printf(sb, "Status   Inst    Data      PC%s",
 	    cfg & F_UPDBGLACAPTPCONLY ? "" :
@@ -7229,12 +7349,76 @@ sysctl_cim_la_t6(SYSCTL_HANDLER_ARGS)
 			    p[2], p[1], p[0], p[5], p[4], p[3]);
 		}
 	}
+}
 
-	rc = sbuf_finish(sb);
-	sbuf_delete(sb);
+static int
+sbuf_cim_la(struct adapter *sc, struct sbuf *sb, int flags)
+{
+	uint32_t cfg, *buf;
+	int rc;
+
+	rc = -t4_cim_read(sc, A_UP_UP_DBG_LA_CFG, 1, &cfg);
+	if (rc != 0)
+		return (rc);
+
+	MPASS(flags == M_WAITOK || flags == M_NOWAIT);
+	buf = malloc(sc->params.cim_la_size * sizeof(uint32_t), M_CXGBE,
+	    M_ZERO | flags);
+	if (buf == NULL)
+		return (ENOMEM);
+
+	rc = -t4_cim_read_la(sc, buf, NULL);
+	if (rc != 0)
+		goto done;
+	if (chip_id(sc) < CHELSIO_T6)
+		sbuf_cim_la4(sc, sb, buf, cfg);
+	else
+		sbuf_cim_la6(sc, sb, buf, cfg);
+
 done:
 	free(buf, M_CXGBE);
 	return (rc);
+}
+
+static int
+sysctl_cim_la(SYSCTL_HANDLER_ARGS)
+{
+	struct adapter *sc = arg1;
+	struct sbuf *sb;
+	int rc;
+
+	rc = sysctl_wire_old_buffer(req, 0);
+	if (rc != 0)
+		return (rc);
+	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
+	if (sb == NULL)
+		return (ENOMEM);
+
+	rc = sbuf_cim_la(sc, sb, M_WAITOK);
+	if (rc == 0)
+		rc = sbuf_finish(sb);
+	sbuf_delete(sb);
+	return (rc);
+}
+
+bool
+t4_os_dump_cimla(struct adapter *sc, int arg, bool verbose)
+{
+	struct sbuf sb;
+	int rc;
+
+	if (sbuf_new(&sb, NULL, 4096, SBUF_AUTOEXTEND) != &sb)
+		return (false);
+	rc = sbuf_cim_la(sc, &sb, M_NOWAIT);
+	if (rc == 0) {
+		rc = sbuf_finish(&sb);
+		if (rc == 0) {
+			log(LOG_DEBUG, "%s: CIM LA dump follows.\n%s",
+		    		device_get_nameunit(sc->dev), sbuf_data(&sb));
+		}
+	}
+	sbuf_delete(&sb);
+	return (false);
 }
 
 static int
@@ -7489,19 +7673,18 @@ static const char * const devlog_facility_strings[] = {
 };
 
 static int
-sysctl_devlog(SYSCTL_HANDLER_ARGS)
+sbuf_devlog(struct adapter *sc, struct sbuf *sb, int flags)
 {
-	struct adapter *sc = arg1;
+	int i, j, rc, nentries, first = 0;
 	struct devlog_params *dparams = &sc->params.devlog;
 	struct fw_devlog_e *buf, *e;
-	int i, j, rc, nentries, first = 0;
-	struct sbuf *sb;
 	uint64_t ftstamp = UINT64_MAX;
 
 	if (dparams->addr == 0)
 		return (ENXIO);
 
-	buf = malloc(dparams->size, M_CXGBE, M_NOWAIT);
+	MPASS(flags == M_WAITOK || flags == M_NOWAIT);
+	buf = malloc(dparams->size, M_CXGBE, M_ZERO | flags);
 	if (buf == NULL)
 		return (ENOMEM);
 
@@ -7530,15 +7713,6 @@ sysctl_devlog(SYSCTL_HANDLER_ARGS)
 	if (buf[first].timestamp == 0)
 		goto done;	/* nothing in the log */
 
-	rc = sysctl_wire_old_buffer(req, 0);
-	if (rc != 0)
-		goto done;
-
-	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
-	if (sb == NULL) {
-		rc = ENOMEM;
-		goto done;
-	}
 	sbuf_printf(sb, "%10s  %15s  %8s  %8s  %s\n",
 	    "Seq#", "Tstamp", "Level", "Facility", "Message");
 
@@ -7561,12 +7735,49 @@ sysctl_devlog(SYSCTL_HANDLER_ARGS)
 		if (++i == nentries)
 			i = 0;
 	} while (i != first);
-
-	rc = sbuf_finish(sb);
-	sbuf_delete(sb);
 done:
 	free(buf, M_CXGBE);
 	return (rc);
+}
+
+static int
+sysctl_devlog(SYSCTL_HANDLER_ARGS)
+{
+	struct adapter *sc = arg1;
+	int rc;
+	struct sbuf *sb;
+
+	rc = sysctl_wire_old_buffer(req, 0);
+	if (rc != 0)
+		return (rc);
+	sb = sbuf_new_for_sysctl(NULL, NULL, 4096, req);
+	if (sb == NULL)
+		return (ENOMEM);
+
+	rc = sbuf_devlog(sc, sb, M_WAITOK);
+	if (rc == 0)
+		rc = sbuf_finish(sb);
+	sbuf_delete(sb);
+	return (rc);
+}
+
+void
+t4_os_dump_devlog(struct adapter *sc)
+{
+	int rc;
+	struct sbuf sb;
+
+	if (sbuf_new(&sb, NULL, 4096, SBUF_AUTOEXTEND) != &sb)
+		return;
+	rc = sbuf_devlog(sc, &sb, M_NOWAIT);
+	if (rc == 0) {
+		rc = sbuf_finish(&sb);
+		if (rc == 0) {
+			log(LOG_DEBUG, "%s: device log follows.\n%s",
+		    		device_get_nameunit(sc->dev), sbuf_data(&sb));
+		}
+	}
+	sbuf_delete(&sb);
 }
 
 static int
@@ -9891,7 +10102,7 @@ t4_ioctl(struct cdev *dev, unsigned long cmd, caddr_t data, int fflag,
 					mp_ring_reset_stats(txq->r);
 				}
 
-#ifdef TCP_OFFLOAD
+#if defined(TCP_OFFLOAD) || defined(RATELIMIT)
 				/* nothing to clear for each ofld_rxq */
 
 				for_each_ofld_txq(vi, i, wrq) {
@@ -9941,20 +10152,6 @@ t4_ioctl(struct cdev *dev, unsigned long cmd, caddr_t data, int fflag,
 	}
 
 	return (rc);
-}
-
-void
-t4_db_full(struct adapter *sc)
-{
-
-	CXGBE_UNIMPLEMENTED(__func__);
-}
-
-void
-t4_db_dropped(struct adapter *sc)
-{
-
-	CXGBE_UNIMPLEMENTED(__func__);
 }
 
 #ifdef TCP_OFFLOAD
@@ -10530,6 +10727,7 @@ mod_event(module_t mod, int cmd, void *arg)
 			    do_smt_write_rpl);
 			sx_init(&t4_list_lock, "T4/T5 adapters");
 			SLIST_INIT(&t4_list);
+			callout_init(&fatal_callout, 1);
 #ifdef TCP_OFFLOAD
 			sx_init(&t4_uld_list_lock, "T4/T5 ULDs");
 			SLIST_INIT(&t4_uld_list);

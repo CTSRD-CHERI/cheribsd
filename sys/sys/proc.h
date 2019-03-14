@@ -175,6 +175,7 @@ struct filecaps;
 struct filemon;
 struct kaioinfo;
 struct kaudit_record;
+struct kcov_info;
 struct kdtrace_proc;
 struct kdtrace_thread;
 struct mqueue_notifier;
@@ -304,6 +305,7 @@ struct thread {
 	sbintime_t	td_sleeptimo;	/* (t) Sleep timeout. */
 	int		td_rtcgen;	/* (s) rtc_generation of abs. sleep */
 	size_t		td_vslock_sz;	/* (k) amount of vslock-ed space */
+	struct kcov_info *td_kcov_info;	/* (*) Kernel code coverage data */
 #ifdef CPU_CHERI
 	void * __capability	td_retcap; /* (k) Syscall cap return . */
 #endif
@@ -763,6 +765,9 @@ struct proc {
 #define	P2_AST_SU	0x00000008	/* Handles SU ast for kthreads. */
 #define	P2_PTRACE_FSTP	0x00000010 /* SIGSTOP from PT_ATTACH not yet handled. */
 #define	P2_TRAPCAP	0x00000020	/* SIGTRAP on ENOTCAPABLE */
+#define	P2_ASLR_ENABLE	0x00000040	/* Force enable ASLR. */
+#define	P2_ASLR_DISABLE	0x00000080	/* Force disable ASLR. */
+#define	P2_ASLR_IGNSTART 0x00000100	/* Enable ASLR to consume sbrk area. */
 
 /* Flags protected by proctree_lock, kept in p_treeflags. */
 #define	P_TREE_ORPHANED		0x00000001	/* Reparented, on orphan list */
@@ -971,6 +976,7 @@ extern int allproc_gen;
 extern struct sx zombproc_lock;
 extern struct sx proctree_lock;
 extern struct mtx ppeers_lock;
+extern struct mtx procid_lock;
 extern struct proc proc0;		/* Process slot for swapper. */
 extern struct thread0_storage thread0_st;	/* Primary thread in proc0. */
 #define	thread0 (thread0_st.t0st_thread)
@@ -1035,6 +1041,7 @@ int	enterthispgrp(struct proc *p, struct pgrp *pgrp);
 void	faultin(struct proc *p);
 void	fixjobc(struct proc *p, struct pgrp *pgrp, int entering);
 int	fork1(struct thread *, struct fork_req *);
+void	fork_rfppwait(struct thread *);
 void	fork_exit(void (*)(void *, struct trapframe *), void *,
 	    struct trapframe *);
 void	fork_return(struct thread *, struct trapframe *);
@@ -1175,6 +1182,15 @@ td_softdep_cleanup(struct thread *td)
 	if (td->td_su != NULL && softdep_ast_cleanup != NULL)
 		softdep_ast_cleanup(td);
 }
+
+#define	PROC_ID_PID	0
+#define	PROC_ID_GROUP	1
+#define	PROC_ID_SESSION	2
+#define	PROC_ID_REAP	3
+
+void	proc_id_set(int type, pid_t id);
+void	proc_id_set_cond(int type, pid_t id);
+void	proc_id_clear(int type, pid_t id);
 
 #endif	/* _KERNEL */
 

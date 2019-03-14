@@ -86,7 +86,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_map.h>
 #include <vm/swap_pager.h>
-#include "opt_swap.h"
 
 static MALLOC_DEFINE(M_BIOBUF, "biobuf", "BIO buffer");
 
@@ -1017,10 +1016,6 @@ bd_speedup(void)
 	mtx_unlock(&bdlock);
 }
 
-#ifndef NSWBUF_MIN
-#define	NSWBUF_MIN	16
-#endif
-
 #ifdef __i386__
 #define	TRANSIENT_DENOM	5
 #else
@@ -1129,20 +1124,15 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 			nbuf = buf_sz / BKVASIZE;
 	}
 
-	/*
-	 * swbufs are used as temporary holders for I/O, such as paging I/O.
-	 * We have no less then 16 and no more then 256.
-	 */
-	nswbuf = min(nbuf / 4, 256);
-	TUNABLE_INT_FETCH("kern.nswbuf", &nswbuf);
-	if (nswbuf < NSWBUF_MIN)
-		nswbuf = NSWBUF_MIN;
+	if (nswbuf == 0) {
+		nswbuf = min(nbuf / 4, 256);
+		if (nswbuf < NSWBUF_MIN)
+			nswbuf = NSWBUF_MIN;
+	}
 
 	/*
 	 * Reserve space for the buffer cache buffers
 	 */
-	swbuf = (void *)v;
-	v = (caddr_t)(swbuf + nswbuf);
 	buf = (void *)v;
 	v = (caddr_t)(buf + nbuf);
 
@@ -2231,7 +2221,7 @@ bufwrite(struct buf *bp)
 	}
 
 	if (bp->b_flags & B_BARRIER)
-		barrierwrites++;
+		atomic_add_long(&barrierwrites, 1);
 
 	oldflags = bp->b_flags;
 
@@ -5339,9 +5329,12 @@ DB_SHOW_COMMAND(buffer, db_show_buffer)
 	}
 
 	db_printf("buf at %p\n", bp);
-	db_printf("b_flags = 0x%b, b_xflags=0x%b, b_vflags=0x%b\n",
-	    (u_int)bp->b_flags, PRINT_BUF_FLAGS, (u_int)bp->b_xflags,
-	    PRINT_BUF_XFLAGS, (u_int)bp->b_vflags, PRINT_BUF_VFLAGS);
+	db_printf("b_flags = 0x%b, b_xflags=0x%b\n",
+	    (u_int)bp->b_flags, PRINT_BUF_FLAGS,
+	    (u_int)bp->b_xflags, PRINT_BUF_XFLAGS);
+	db_printf("b_vflags=0x%b b_ioflags0x%b\n",
+	    (u_int)bp->b_vflags, PRINT_BUF_VFLAGS,
+	    (u_int)bp->b_ioflags, PRINT_BIO_FLAGS);
 	db_printf(
 	    "b_error = %d, b_bufsize = %ld, b_bcount = %ld, b_resid = %ld\n"
 	    "b_bufobj = (%p), b_data = %p, b_blkno = %jd, b_lblkno = %jd, "

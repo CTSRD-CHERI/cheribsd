@@ -526,6 +526,15 @@ ACPI_HANDLE	acpi_GetReference(ACPI_HANDLE scope, ACPI_OBJECT *obj);
 SYSCTL_DECL(_debug_acpi);
 
 /*
+ * Parse and use proximity information in SRAT and SLIT.
+ */
+int		acpi_pxm_init(int ncpus, vm_paddr_t maxphys);
+void		acpi_pxm_parse_tables(void);
+void		acpi_pxm_set_mem_locality(void);
+void		acpi_pxm_set_cpu_locality(void);
+void		acpi_pxm_free(void);
+
+/*
  * Map a PXM to a VM domain.
  *
  * Returns the VM domain ID if found, or -1 if not found / invalid.
@@ -535,5 +544,12 @@ int		acpi_get_cpus(device_t dev, device_t child, enum cpu_sets op,
 		    size_t setsize, cpuset_t *cpuset);
 int		acpi_get_domain(device_t dev, device_t child, int *domain);
 
+#ifdef __aarch64__
+/*
+ * ARM specific ACPI interfaces, relating to IORT table.
+ */
+int	acpi_iort_map_pci_msi(u_int seg, u_int rid, u_int *xref, u_int *devid);
+int	acpi_iort_its_lookup(u_int its_id, u_int *xref, int *pxm);
+#endif
 #endif /* _KERNEL */
 #endif /* !_ACPIVAR_H_ */

@@ -442,13 +442,15 @@ madt_handler(ACPI_SUBTABLE_HEADER *entry, void *arg)
 {
 	ACPI_MADT_GENERIC_INTERRUPT *intr;
 	u_int *cpuid;
+	u_int id;
 
 	switch(entry->Type) {
 	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
 		intr = (ACPI_MADT_GENERIC_INTERRUPT *)entry;
 		cpuid = arg;
-
-		start_cpu((*cpuid), intr->ArmMpidr);
+		id = *cpuid;
+		start_cpu(id, intr->ArmMpidr);
+		__pcpu[id].pc_acpi_id = intr->Uid;
 		(*cpuid)++;
 		break;
 	default:
@@ -478,6 +480,12 @@ cpu_init_acpi(void)
 	    madt_handler, &cpuid);
 
 	acpi_unmap_table(madt);
+
+#if MAXMEMDOM > 1
+	/* set proximity info */
+	acpi_pxm_set_cpu_locality();
+	acpi_pxm_free();
+#endif
 }
 #endif
 
@@ -630,9 +638,10 @@ cpu_find_cpu0_fdt(u_int id, phandle_t node, u_int addr_size, pcell_t *reg)
 void
 cpu_mp_setmaxid(void)
 {
-#if defined(DEV_ACPI) || defined(FDT)
 	int cores;
-#endif
+
+	mp_ncpus = 1;
+	mp_maxid = 0;
 
 	switch(arm64_bus_method) {
 #ifdef DEV_ACPI
@@ -645,7 +654,6 @@ cpu_mp_setmaxid(void)
 				    cores);
 			mp_ncpus = cores;
 			mp_maxid = cores - 1;
-			return;
 		}
 		break;
 #endif
@@ -659,18 +667,21 @@ cpu_mp_setmaxid(void)
 				    cores);
 			mp_ncpus = cores;
 			mp_maxid = cores - 1;
-			return;
 		}
 		break;
 #endif
 	default:
+		if (bootverbose)
+			printf("No CPU data, limiting to 1 core\n");
 		break;
 	}
 
-	if (bootverbose)
-		printf("No CPU data, limiting to 1 core\n");
-	mp_ncpus = 1;
-	mp_maxid = 0;
+	if (TUNABLE_INT_FETCH("hw.ncpu", &cores)) {
+		if (cores > 0 && cores < mp_ncpus) {
+			mp_ncpus = cores;
+			mp_maxid = cores - 1;
+		}
+	}
 }
 
 /*

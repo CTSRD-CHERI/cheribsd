@@ -909,7 +909,6 @@ linux32_fixlimit(struct rlimit *rl, int which)
 struct sysentvec elf_linux_sysvec = {
 	.sv_size	= LINUX32_SYS_MAXSYSCALL,
 	.sv_table	= linux32_sysent,
-	.sv_mask	= 0,
 	.sv_errsize	= ELAST + 1,
 	.sv_errtbl	= linux_errtbl,
 	.sv_transtrap	= linux_translate_traps,
@@ -921,7 +920,6 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_coredump	= elf32_coredump,
 	.sv_imgact_try	= linux_exec_imgact_try,
 	.sv_minsigstksz	= LINUX_MINSIGSTKSZ,
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= LINUX32_MAXUSER,
 	.sv_usrstack	= LINUX32_USRSTACK,
