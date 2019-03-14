@@ -23,6 +23,7 @@
 #include "jemalloc/internal/malloc_io.h"
 
 #ifdef __CHERI_PURE_CAPABILITY__
+#include <machine/cherireg.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -209,6 +210,11 @@ pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 	 * touching existing mappings, and to mmap with specific alignment.
 	 */
 	{
+#ifdef __CHERI_PURE_CAPABILITY__
+		if (size & CHERI_ALIGN_MASK(size))
+			abort();
+#endif
+
 		if (os_overcommits) {
 			*commit = true;
 		}
