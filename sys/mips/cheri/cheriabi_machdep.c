@@ -169,6 +169,12 @@ cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)
 	return FALSE;
 }
 
+static int allow_cheriabi_version_mismatch = 0;
+SYSCTL_DECL(_compat_cheriabi);
+SYSCTL_INT(_compat_cheriabi, OID_AUTO, allow_abi_version_mismatch,
+    CTLFLAG_RW, &allow_cheriabi_version_mismatch, 0,
+    "Allow loading CheriABI binaries with the wrong ABI version");
+
 static boolean_t
 cheriabi_elf_header_supported(struct image_params *imgp)
 {
@@ -177,6 +183,15 @@ cheriabi_elf_header_supported(struct image_params *imgp)
 
 	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI)
 		return FALSE;
+
+	/* TODO: add a sysctl to allow loading old binaries */
+	if (hdr->e_ident[EI_ABIVERSION] != ELF_CHERIABI_ABIVERSION) {
+		printf("warning: attempting to execute CheriABI binary '%s'"
+		    " with ABI version %d on a system expecting version %d\n",
+		    imgp->execpath, hdr->e_ident[EI_ABIVERSION],
+		    ELF_CHERIABI_ABIVERSION);
+		return (boolean_t)allow_cheriabi_version_mismatch;
+	}
 
 	if (machine == EF_MIPS_MACH_CHERI128)
 		return cheriabi_check_cpu_compatible(128, imgp->execpath);

@@ -96,6 +96,12 @@
 #define	ELF_TARG_VER	1
 
 /*
+ * The expected EI_ABIVERSION value for CheriABI binaries. Can be used to
+ * reject loading of binaries compiled with a too new/old toolchain.
+ */
+#define ELF_CHERIABI_ABIVERSION 2
+
+/*
  * Auxiliary vector entries for passing information to the interpreter.
  *
  * The i386 supplement to the SVR4 ABI specification names this "auxv_t",
