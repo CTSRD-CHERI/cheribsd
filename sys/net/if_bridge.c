@@ -3048,6 +3048,7 @@ bridge_rtable_expire(struct ifnet *ifp, int age)
 	struct bridge_softc *sc = ifp->if_bridge;
 	struct bridge_rtnode *brt;
 
+	CURVNET_SET(ifp->if_vnet);
 	BRIDGE_LOCK(sc);
 
 	/*
@@ -3066,6 +3067,7 @@ bridge_rtable_expire(struct ifnet *ifp, int age)
 		}
 	}
 	BRIDGE_UNLOCK(sc);
+	CURVNET_RESTORE();
 }
 
 /*
