@@ -133,6 +133,7 @@ u_int vm_wait_count(void);
 
 #ifdef CPU_CHERI
 int vm_test_caprevoke(const void * __capability);
+void caprevoke_td_frame(struct thread *td); /* MD; XXX prototype elsewhere? */
 
 struct caprevoke_stats;
 #define VM_CAPREVOKE_INCREMENTAL	0x01

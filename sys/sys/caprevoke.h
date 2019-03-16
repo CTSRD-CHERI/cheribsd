@@ -155,6 +155,10 @@ struct caprevoke_stats {
  */
 #define CAPREVOKE_SHADOW_SPACE_MASK	0x03	/* Flag bits for shadow index */
 
+#ifdef _KERNEL
+void caprevoke_td_frame(struct thread *td);
+#endif
+
 #ifndef _KERNEL
 int caprevoke(int flags, uint64_t start_epoch,
 		struct caprevoke_stats *statout);

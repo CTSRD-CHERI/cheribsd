@@ -93,7 +93,7 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	 */
 
 	if (uap->flags & CAPREVOKE_JUST_MY_REGS) {
-		/* XXX thread register file */
+		caprevoke_td_frame(td);
 	}
 	if (uap->flags & CAPREVOKE_JUST_MY_STACK) {
 #if defined(CPU_CHERI)
@@ -256,10 +256,17 @@ reentry:
 	 * become visible during the body of the last pass.
 	 */
 	if (myst == CAPREVST_LAST_PASS) {
+		struct thread *ptd;
+
 		/* Kernel hoarders */
 		caprevoke_hoarders(td->td_proc);
 
-		/* XXX And thread register files */
+		/* And thread register files */
+		PROC_LOCK(td->td_proc);
+		FOREACH_THREAD_IN_PROC(td->td_proc, ptd) {
+			caprevoke_td_frame(ptd);
+		}
+		PROC_UNLOCK(td->td_proc);
 	}
 
 	/* Walk the VM */
