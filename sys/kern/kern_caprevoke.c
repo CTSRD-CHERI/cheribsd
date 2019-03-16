@@ -93,7 +93,7 @@ caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
 	stats->epoch_init = vmcrc->map->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
 	if (flags & CAPREVOKE_JUST_MY_REGS) {
-		/* XXX thread register file */
+		caprevoke_td_frame(td, vmcrc);
 	}
 	if (flags & CAPREVOKE_JUST_MY_STACK) {
 		uintcap_t sp;
@@ -376,6 +376,8 @@ fast_out:
 	 * during the body of the last pass.
 	 */
 	if (myst == CAPREVST_LAST_PASS) {
+		struct thread *ptd;
+
 		PROC_LOCK(td->td_proc);
 		if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
 			if (thread_single(td->td_proc, SINGLE_BOUNDARY)) {
@@ -404,9 +406,13 @@ fast_out:
 		 * process, which should either be "just us" or "just us
 		 * running and everybody stopped at the syscall boundary".
 		 */
+
 		PROC_UNLOCK(td->td_proc);
 
-		/* XXX Per-thread kernel hoarders */
+		/* Per-thread kernel hoarders */
+		FOREACH_THREAD_IN_PROC (td->td_proc, ptd) {
+			caprevoke_td_frame(ptd, &vmcrc);
+		}
 
 		/* Per-process kernel hoarders */
 		caprevoke_hoarders(td->td_proc, &vmcrc);
