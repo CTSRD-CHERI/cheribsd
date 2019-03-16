@@ -107,7 +107,7 @@ caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
 		vmcrc->map->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
 	if (flags & CAPREVOKE_JUST_MY_REGS) {
-		/* XXX thread register file */
+		caprevoke_td_frame(td, vmcrc);
 	}
 	if (flags & CAPREVOKE_JUST_MY_STACK) {
 		uintcap_t sp;
@@ -388,6 +388,8 @@ fast_out:
 	 * during the body of the last pass.
 	 */
 	if (myst == CAPREVST_LAST_PASS) {
+		struct thread *ptd;
+
 		PROC_LOCK(td->td_proc);
 		if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
 			if (thread_single(td->td_proc, SINGLE_BOUNDARY)) {
@@ -408,8 +410,10 @@ fast_out:
 			}
 		}
 
-		/* XXX And thread register files */
-
+		/* Register files */
+		FOREACH_THREAD_IN_PROC(td->td_proc, ptd) {
+			caprevoke_td_frame(ptd, &vmcrc);
+		}
 		PROC_UNLOCK(td->td_proc);
 
 		/* Kernel hoarders */
