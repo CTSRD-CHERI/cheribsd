@@ -5,11 +5,11 @@
 COMPILERRTDIR=	${SRCTOP}/contrib/compiler-rt
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
-UNWINDINCDIR=   ${SRCTOP}/contrib/cheri-libunwind/include
-UNWINDSRCDIR=   ${SRCTOP}/contrib/cheri-libunwind/src
+UNWINDINCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/include
+UNWINDSRCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 .elif ${MACHINE_ARCH:Mmips*}
-UNWINDINCDIR=   ${SRCTOP}/contrib/cheri-libunwind/include
-UNWINDSRCDIR=   ${SRCTOP}/contrib/cheri-libunwind/src
+UNWINDINCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/include
+UNWINDSRCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 .else
 UNWINDINCDIR=   ${SRCTOP}/contrib/llvm/projects/libunwind/include
 UNWINDSRCDIR=   ${SRCTOP}/contrib/llvm/projects/libunwind/src
@@ -51,8 +51,8 @@ STATIC_CXXFLAGS+= -fvisibility=hidden -fPIC
 .if ${MK_DIRDEPS_BUILD} == "yes"
 # Avoid dependency on lib/libc++
 .if ${MK_CHERI} != "no"
-CFLAGS+=	-isystem ${SRCTOP}/contrib/cheri-libc++/include -nostdinc++
+CFLAGS+=	-isystem ${SRCTOP}/contrib/subrepo-cheri-libc++/include -nostdinc++
 .else
-CFLAGS+=	-isystem ${SRCTOP}/contrib/cheri-libc++/include -nostdinc++
+CFLAGS+=	-isystem ${SRCTOP}/contrib/subrepo-cheri-libc++/include -nostdinc++
 .endif
 .endif
