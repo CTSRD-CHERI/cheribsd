@@ -168,7 +168,7 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 
 	if (pid == 0) {
 		void * __capability * map;
-		void * __capability c;
+		void * __capability crx;
 		int fd, tag;
 		struct msghdr msg = { 0 };
 		struct cmsghdr * cmsg;
@@ -195,13 +195,11 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		map = CHERITEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
 						PROT_READ, MAP_SHARED, fd,
 						0));
-		c = *map;
+		crx = *map;
 
-		fprintf(stderr, "rx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			(unsigned long)cheri_gettag(c), cheri_getbase(c),
-			cheri_getlen(c), cheri_getoffset(c));
+		CHERI_FPRINT_PTR(stderr, crx);
 
-		tag = cheri_gettag(c);
+		tag = cheri_gettag(crx);
 		CHERITEST_VERIFY2(tag == 0, "tag read");
 
 		CHERITEST_CHECK_SYSCALL(munmap(map, getpagesize()));
@@ -211,7 +209,7 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		exit(tag);
 	} else {
 		void * __capability * map;
-		void * __capability c;
+		void * __capability ctx;
 		int fd, res;
 		struct msghdr msg = { 0 };
 		struct cmsghdr * cmsg;
@@ -230,12 +228,10 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 
 		/* Just some pointer */
 		*map = &fd;
-		c = *map;
-		CHERITEST_VERIFY2(cheri_gettag(c) != 0, "tag written");
+		ctx = *map;
+		CHERITEST_VERIFY2(cheri_gettag(ctx) != 0, "tag written");
 
-		fprintf(stderr, "tx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			(unsigned long)cheri_gettag(c), cheri_getbase(c),
-			cheri_getlen(c), cheri_getoffset(c));
+		CHERI_FPRINT_PTR(stderr, ctx);
 
 		CHERITEST_CHECK_SYSCALL(munmap(map, getpagesize()));
 
