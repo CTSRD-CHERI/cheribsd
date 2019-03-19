@@ -1327,6 +1327,19 @@ vm_object_shadow(
 		VM_OBJECT_WUNLOCK(source);
 	}
 
+	/*
+	 * XXX CHERI: This does not feel like the right place to do this,
+	 * and yet here we are.
+	 *
+	 * When shadowing a DEFAULT object type, if that object is marked
+	 * with tag-inhibit bits, then so should the shadow-casting object.
+	 * However, when shadowing non-DEFAULT objects, we often want to
+	 * permit tag stores, so don't inherit the inhibits.
+	 */
+	if (source->type == OBJT_DEFAULT)
+		result->flags |= source->flags
+				& (OBJ_NOLOADTAGS | OBJ_NOSTORETAGS);
+
 
 	/*
 	 * Return the new things
