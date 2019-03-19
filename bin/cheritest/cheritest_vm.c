@@ -196,8 +196,8 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		c = *map;
 
 		fprintf(stderr, "rx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			cheri_gettag(c), cheri_getbase(c), cheri_getlen(c),
-			cheri_getoffset(c));
+			(unsigned long)cheri_gettag(c), cheri_getbase(c),
+			cheri_getlen(c), cheri_getoffset(c));
 
 		tag = cheri_gettag(c);
 		CHERITEST_VERIFY2(tag == 0, "tag read");
@@ -232,8 +232,8 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		CHERITEST_VERIFY2(cheri_gettag(c) != 0, "tag written");
 
 		fprintf(stderr, "tx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			cheri_gettag(c), cheri_getbase(c), cheri_getlen(c),
-			cheri_getoffset(c));
+			(unsigned long)cheri_gettag(c), cheri_getbase(c),
+			cheri_getlen(c), cheri_getoffset(c));
 
 		CHERITEST_CHECK_SYSCALL(munmap(map, getpagesize()));
 
