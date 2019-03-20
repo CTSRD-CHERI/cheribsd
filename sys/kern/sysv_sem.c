@@ -74,7 +74,6 @@ __FBSDID("$FreeBSD$");
 
 #ifdef COMPAT_CHERIABI
 #include <sys/user.h>
-#include <compat/cheriabi/cheriabi_ipc_sem.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_util.h>
 #endif
@@ -308,6 +307,23 @@ static struct syscall_helper_data sem32_syscalls[] = {
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
+
+struct semid_ds_c {
+	struct ipc_perm	 		sem_perm;
+	struct sem * __capability	sem_base;
+	unsigned short			sem_nsems;
+	time_t				sem_otime;
+	time_t				sem_ctime;
+};
+
+struct semid_kernel_c {
+	/* Data structure exposed to user space. */
+	struct semid_ds_c		 u;
+
+	/* Kernel-private components of the semaphore. */
+	struct label * __capability	label;
+	struct ucred * __capability	cred;
+};
 
 static struct syscall_helper_data cheriabi_sem_syscalls[] = {
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi___semctl),

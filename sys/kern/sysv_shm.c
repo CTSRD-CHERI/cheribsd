@@ -100,7 +100,6 @@ __FBSDID("$FreeBSD$");
 #ifdef COMPAT_CHERIABI
 #include <cheri/cheric.h>
 #include <sys/user.h>
-#include <compat/cheriabi/cheriabi_ipc_shm.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_util.h>
@@ -218,6 +217,13 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, shmsegs, CTLTYPE_OPAQUE | CTLFLAG_RD |
     "Array of struct shmid_kernel for each potential shared memory segment");
 
 #ifdef COMPAT_CHERIABI
+struct shmid_kernel_c {
+	struct shmid_ds u;	/* Contains no pointers so no _c needed. */
+	struct vm_object * __capability	object;
+	struct label * __capability	label;
+	struct ucred * __capability	cred;
+};
+
 SYSCTL_DECL(_compat_cheriabi);
 static SYSCTL_NODE(_compat_cheriabi, OID_AUTO, sysv_shm, CTLFLAG_RW, 0,
     "System V shared memory");
