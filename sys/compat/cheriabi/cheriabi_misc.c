@@ -154,30 +154,18 @@ cheriabi_wait4(struct thread *td, struct cheriabi_wait4_args *uap)
 int
 cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 {
-	struct __wrusage wru, *wrup;
-	struct siginfo_c si, *sip;
-	int error, status;
+	_siginfo_t si, *sip;
+	int error;
 
-	if (uap->wrusage != NULL)
-		wrup = &wru;
-	else
-		wrup = NULL;
 	if (uap->info != NULL) {
 		sip = &si;
 		bzero(sip, sizeof(*sip));
 	} else
 		sip = NULL;
-	error = kern_wait6(td, uap->idtype, uap->id, &status, uap->options,
-	    wrup, (_siginfo_t *)sip);
-	if (error != 0)
-		return (error);
-	if (uap->status != NULL)
-		error = copyout(&status, uap->status, sizeof(status));
-	if (uap->wrusage != NULL && error == 0)
-		error = copyout(&wru, uap->wrusage, sizeof(wru));
-	if (uap->info != NULL && error == 0) {
-		error = copyout(&si, uap->info, sizeof(si));
-	}
+	error = user_wait6(td, uap->idtype, uap->id, uap->status,
+	    uap->options, uap->wrusage, sip);
+	if (uap->info != NULL && error == 0)
+		error = copyout(sip, uap->info, sizeof(*sip));
 	return (error);
 }
 

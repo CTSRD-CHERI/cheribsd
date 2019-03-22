@@ -599,6 +599,9 @@ int	user_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int * __capability rsv);
 int	user_statfs(struct thread *td, const char * __capability path,
 	    struct statfs * __capability buf);
+int	user_wait6(struct thread *td, enum idtype idtype, id_t id,
+	    int * __capability statusp, int options,
+	    struct __wrusage * __capability wrusage, _siginfo_t *sip);
 int	user_writev(struct thread *td, int fd, void * __capability iovp,
 	    u_int iovcnt, copyinuio_t *copyinuio_f);
 
