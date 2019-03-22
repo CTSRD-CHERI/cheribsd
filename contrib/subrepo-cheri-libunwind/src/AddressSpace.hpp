@@ -216,7 +216,7 @@ public:
 #ifdef __CHERI_PURE_CAPABILITY__
     assert(__builtin_cheri_tag_get((void*)addr) && "Value should be tagged!");
 #endif
-    memcpy(&val, (void *)addr, sizeof(val));
+    memcpy(&val, (T*)(void *)addr, sizeof(val));
     return val;
   }
   uint8_t         get8(pint_t addr) {
