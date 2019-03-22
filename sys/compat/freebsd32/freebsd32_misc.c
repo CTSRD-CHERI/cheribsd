@@ -331,78 +331,6 @@ freebsd32_sigaltstack(struct thread *td,
 	return (error);
 }
 
-/*
- * Custom version of exec_copyin_args() so that we can translate
- * the pointers.
- */
-int
-freebsd32_exec_copyin_args(struct image_args *args, const char *fname,
-    enum uio_seg segflg, u_int32_t *argv, u_int32_t *envv)
-{
-	char *argp, *envp;
-	u_int32_t *p32, arg;
-	int error;
-
-	bzero(args, sizeof(*args));
-	if (argv == NULL)
-		return (EFAULT);
-
-	/*
-	 * Allocate demand-paged memory for the file name, argument, and
-	 * environment strings.
-	 */
-	error = exec_alloc_args(args);
-	if (error != 0)
-		return (error);
-
-	/*
-	 * Copy the file name.
-	 */
-	error = exec_args_add_fname(args, fname, segflg);
-	if (error != 0)
-		goto err_exit;
-
-	/*
-	 * extract arguments first
-	 */
-	p32 = argv;
-	for (;;) {
-		error = copyin(p32++, &arg, sizeof(arg));
-		if (error)
-			goto err_exit;
-		if (arg == 0)
-			break;
-		argp = PTRIN(arg);
-		error = exec_args_add_arg(args, argp, UIO_USERSPACE);
-		if (error != 0)
-			goto err_exit;
-	}
-			
-	/*
-	 * extract environment strings
-	 */
-	if (envv) {
-		p32 = envv;
-		for (;;) {
-			error = copyin(p32++, &arg, sizeof(arg));
-			if (error)
-				goto err_exit;
-			if (arg == 0)
-				break;
-			envp = PTRIN(arg);
-			error = exec_args_add_env(args, envp, UIO_USERSPACE);
-			if (error != 0)
-				goto err_exit;
-		}
-	}
-
-	return (0);
-
-err_exit:
-	exec_free_args(args);
-	return (error);
-}
-
 int
 freebsd32_execve(struct thread *td, struct freebsd32_execve_args *uap)
 {
@@ -413,7 +341,7 @@ freebsd32_execve(struct thread *td, struct freebsd32_execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = freebsd32_exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
+	error = exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0)
 		error = kern_execve(td, &eargs, NULL);
@@ -431,7 +359,7 @@ freebsd32_fexecve(struct thread *td, struct freebsd32_fexecve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = freebsd32_exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
+	error = exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0) {
 		eargs.fd = uap->fd;

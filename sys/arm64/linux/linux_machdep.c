@@ -57,8 +57,7 @@ LIN_SDT_PROBE_DEFINE0(machdep, linux_sigaltstack, todo);
 LIN_SDT_PROBE_DEFINE0(machdep, linux_set_cloned_tls, todo);
 
 /*
- * LINUXTODO: deduplicate; linux_execve is common across archs, except that on
- * amd64 compat linuxulator it calls freebsd32_exec_copyin_args.
+ * LINUXTODO: deduplicate; linux_execve is common across archs.
  */
 int
 linux_execve(struct thread *td, struct linux_execve_args *uap)

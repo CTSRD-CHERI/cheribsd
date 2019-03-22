@@ -1192,14 +1192,46 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 }
 
 /*
+ * Takes a pointer to a pointer an array of pointers in userspace, loads
+ * the loads the current value and updates the array pointer.
+ */
+static int
+get_argenv_ptr(void **arrayp, void **ptrp)
+{
+	uintptr_t ptr;
+	char *array;
+#ifdef COMPAT_FREEBSD32
+	uint32_t ptr32;
+#endif
+
+	array = *arrayp;
+#ifdef COMPAT_FREEBSD32
+	if (SV_CURPROC_FLAG(SV_ILP32)) {
+		if (fueword32(array, &ptr32) == -1)
+			return (EFAULT);
+		array += sizeof(ptr32);
+		*ptrp = (void *)(uintptr_t)ptr32;
+	} else
+#endif
+	{
+		if (fueword(array, &ptr) == -1)
+			return (EFAULT);
+		array += sizeof(ptr);
+		*ptrp = (void *)(uintptr_t)ptr;
+	}
+	*arrayp = array;
+	return (0);
+}
+
+/*
  * Copy out argument and environment strings from the old process address
  * space into the temporary string buffer.
  */
 int
 exec_copyin_args(struct image_args *args, const char *fname,
-    enum uio_seg segflg, char **argv, char **envv)
+    enum uio_seg segflg, void *argv, void *envv)
 {
-	u_long arg, env;
+	void *ptr;
 	int error;
 
 	bzero(args, sizeof(*args));
@@ -1225,15 +1257,12 @@ exec_copyin_args(struct image_args *args, const char *fname,
 	 * extract arguments first
 	 */
 	for (;;) {
-		error = fueword(argv++, &arg);
-		if (error == -1) {
-			error = EFAULT;
+		error = get_argenv_ptr(&argv, &ptr);
+		if (error != 0)
 			goto err_exit;
-		}
-		if (arg == 0)
+		if (ptr == NULL)
 			break;
-		error = exec_args_add_arg(args, (char *)(uintptr_t)arg,
-		    UIO_USERSPACE);
+		error = exec_args_add_arg(args, ptr, UIO_USERSPACE);
 		if (error != 0)
 			goto err_exit;
 	}
@@ -1243,15 +1272,12 @@ exec_copyin_args(struct image_args *args, const char *fname,
 	 */
 	if (envv) {
 		for (;;) {
-			error = fueword(envv++, &env);
-			if (error == -1) {
-				error = EFAULT;
+			error = get_argenv_ptr(&envv, &ptr);
+			if (error != 0)
 				goto err_exit;
-			}
-			if (env == 0)
+			if (ptr == NULL)
 				break;
-			error = exec_args_add_env(args,
-			    (char *)(uintptr_t)env, UIO_USERSPACE);
+			error = exec_args_add_env(args, ptr, UIO_USERSPACE);
 			if (error != 0)
 				goto err_exit;
 		}

@@ -138,8 +138,8 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 		printf(ARGS(execve, "%s"), path);
 #endif
 
-	error = freebsd32_exec_copyin_args(&eargs, path, UIO_SYSSPACE,
-	    args->argp, args->envp);
+	error = exec_copyin_args(&eargs, path, UIO_SYSSPACE, args->argp,
+	    args->envp);
 	free(path, M_TEMP);
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
