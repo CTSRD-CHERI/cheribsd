@@ -216,7 +216,8 @@ CONFS+=		inetd
 CONFS+=	ipfilter \
 	ipfs \
 	ipmon \
-	ipnat
+	ipnat \
+	ippool
 .endif
 
 .if ${MK_IPFW} != "no"
