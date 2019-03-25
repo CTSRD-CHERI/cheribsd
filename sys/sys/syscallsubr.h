@@ -595,6 +595,8 @@ int	user_select(struct thread *td, int nd, fd_set * __capability in,
 int	user_sendto(struct thread *td, int s, const char * __capability buf,
 	    size_t len, int flags, const struct sockaddr * __capability to,
 	    socklen_t tolen);
+int	user_setgroups(struct thread *td, u_int gidsetsize,
+	    const gid_t * __capability gidset);
 int	user_settimeofday(struct thread *td,
 	    const struct timeval * __capability tp,
 	    const struct timezone * __capability tz);

@@ -1239,28 +1239,8 @@ cheriabi_getgroups(struct thread *td, struct cheriabi_getgroups_args *uap)
 int
 cheriabi_setgroups(struct thread *td, struct cheriabi_setgroups_args *uap)
 {
-	gid_t smallgroups[XU_NGROUPS];
-	gid_t *groups;
-	u_int gidsetsize;
-	int error;
 
-	gidsetsize = uap->gidsetsize;
-	if (gidsetsize > ngroups_max + 1)
-		return (EINVAL);
-
-	if (gidsetsize > XU_NGROUPS)
-		groups = malloc(gidsetsize * sizeof(gid_t), M_TEMP, M_WAITOK);
-	else
-		/* XXX: CTSRD-CHERI/clang#179 */
-		groups = &smallgroups[0];
-
-	error = copyin(uap->gidset, groups, gidsetsize * sizeof(gid_t));
-	if (error == 0)
-		error = kern_setgroups(td, gidsetsize, groups);
-
-	if (gidsetsize > XU_NGROUPS)
-		free(groups, M_TEMP);
-	return (error);
+	return (user_setgroups(td, uap->gidsetsize, uap->gidset));
 }
 
 int
