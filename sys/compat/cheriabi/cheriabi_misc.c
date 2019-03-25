@@ -1205,25 +1205,8 @@ cheriabi_setloginclass(struct thread *td,
 int
 cheriabi_uuidgen(struct thread *td, struct cheriabi_uuidgen_args *uap)
 {
-	struct uuid *store;
-	size_t count;
-	int error;
 
-	/*
-	 * Limit the number of UUIDs that can be created at the same time
-	 * to some arbitrary number. This isn't really necessary, but I
-	 * like to have some sort of upper-bound that's less than 2G :-)
-	 * XXX probably needs to be tunable.
-	 */
-	if (uap->count < 1 || uap->count > 2048)
-		return (EINVAL);
-
-	count = uap->count;
-	store = malloc(count * sizeof(struct uuid), M_TEMP, M_WAITOK);
-	kern_uuidgen(store, count);
-	error = copyout(store, uap->store, count * sizeof(struct uuid));
-	free(store, M_TEMP);
-	return (error);
+	return (user_uuidgen(td, uap->store, uap->count));
 }
 
 /*

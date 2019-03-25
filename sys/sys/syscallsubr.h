@@ -68,6 +68,7 @@ struct stat;
 struct thr_param;
 struct timex;
 struct uio;
+struct uuid;
 
 
 int	kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
@@ -601,6 +602,8 @@ int	user_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int * __capability rsv);
 int	user_statfs(struct thread *td, const char * __capability path,
 	    struct statfs * __capability buf);
+int	user_uuidgen(struct thread *td, struct uuid * __capability storep,
+	    int count);
 int	user_wait6(struct thread *td, enum idtype idtype, id_t id,
 	    int * __capability statusp, int options,
 	    struct __wrusage * __capability wrusage, _siginfo_t *sip);
