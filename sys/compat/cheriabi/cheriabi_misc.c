@@ -1166,7 +1166,6 @@ int
 cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
 {
 	struct kld_sym_lookup_c lookup;
-	char *symstr;
 	int error;
 
 	error = copyincap(uap->data, &lookup, sizeof(lookup));
@@ -1175,18 +1174,12 @@ cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
 	if (lookup.version != sizeof(lookup) ||
 	    uap->cmd != KLDSYM_LOOKUP)
 		return (EINVAL);
-	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr(lookup.symname, symstr, MAXPATHLEN, NULL);
-	if (error != 0)
-		goto done;
-	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,
+	error = kern_kldsym(td, uap->fileid, uap->cmd, lookup.symname,
 	    &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
-		goto done;
+		return (error);
 	error = copyoutcap(&lookup, uap->data, sizeof(lookup));
 
-done:
-	free(symstr, M_TEMP);
 	return (error);
 }
 

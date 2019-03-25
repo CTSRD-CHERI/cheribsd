@@ -265,8 +265,9 @@ int	kern_kqueue(struct thread *td, int flags, struct filecaps *fcaps);
 int	kern_kldfind(struct thread *td, const char * __capability file);
 int	kern_kldload(struct thread *td, const char *file, int *fileid);
 int	kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat);
-int	kern_kldsym(struct thread *td, int fileid, int cmd, const char *symstr,
-	    u_long *symvalue, size_t *symsize);
+int	kern_kldsym(struct thread *td, int fileid, int cmd,
+	    const char * __capability symstr, u_long *symvalue,
+	    size_t *symsize);
 int	kern_kldunload(struct thread *td, int fileid, int flags);
 int	kern_ktrace(struct thread *td, const char * __capability fname,
 	    int uops, int ufacs, int pid);
