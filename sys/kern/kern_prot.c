@@ -87,8 +87,7 @@ static MALLOC_DEFINE(M_CRED, "cred", "credentials");
 
 SYSCTL_NODE(_security, OID_AUTO, bsd, CTLFLAG_RW, 0, "BSD security policy");
 
-static void crsetgroups_locked(struct ucred *cr, int ngrp,
-    gid_t *groups);
+static void crsetgroups_locked(struct ucred *cr, int ngrp, gid_t *groups);
 
 #ifndef _SYS_SYSPROTO_H_
 struct getpid_args {
