@@ -1125,21 +1125,8 @@ cheriabi_utrace(struct thread *td, struct cheriabi_utrace_args *uap)
 int
 cheriabi_kldload(struct thread *td, struct cheriabi_kldload_args *uap)
 {
-	char *pathname = NULL;
-	int error, fileid;
 
-	td->td_retval[0] = -1;
-
-	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr(uap->file, pathname, MAXPATHLEN, NULL);
-	if (error != 0)
-		goto error;
-	error = kern_kldload(td, pathname, &fileid);
-	if (error == 0)
-		td->td_retval[0] = fileid;
-error:
-	free(pathname, M_TEMP);
-	return (error);
+	return (user_kldload(td, uap->file));
 }
 
 int

@@ -1102,7 +1102,7 @@ done:
 }
 
 int
-sys_kldload(struct thread *td, struct kldload_args *uap)
+user_kldload(struct thread *td, const char * __capability file)
 {
 	char *pathname = NULL;
 	int error, fileid;
@@ -1110,7 +1110,7 @@ sys_kldload(struct thread *td, struct kldload_args *uap)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr(uap->file, pathname, MAXPATHLEN, NULL);
+	error = copyinstr_c(file, pathname, MAXPATHLEN, NULL);
 	if (error == 0) {
 		error = kern_kldload(td, pathname, &fileid);
 		if (error == 0)
@@ -1118,6 +1118,13 @@ sys_kldload(struct thread *td, struct kldload_args *uap)
 	}
 	free(pathname, M_TEMP);
 	return (error);
+}
+
+int
+sys_kldload(struct thread *td, struct kldload_args *uap)
+{
+
+	return (user_kldload(td, __USER_CAP_STR(uap->file)));
 }
 
 int

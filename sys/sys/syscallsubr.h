@@ -558,6 +558,7 @@ int	user_jail_get(struct thread *td, void * __capability iovp,
 	    updateiov_t *updateiov_f);
 int	user_jail_set(struct thread *td, void * __capability iovp,
 	    unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f);
+int	user_kldload(struct thread *td, const char * __capability file);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
 int	user_poll(struct thread *td, struct pollfd * __capability fds,
 	    u_int nfds, int timeout);
