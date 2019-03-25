@@ -219,8 +219,9 @@ sys_execve(struct thread *td, struct execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
-	    uap->argv, uap->envv);
+	error = exec_copyin_args(&args, __USER_CAP_STR(uap->fname),
+	    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argv),
+	    __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0)
 		error = kern_execve(td, &args, NULL);
 	post_execve(td, error, oldvmspace);
@@ -245,7 +246,7 @@ sys_fexecve(struct thread *td, struct fexecve_args *uap)
 	if (error != 0)
 		return (error);
 	error = exec_copyin_args(&args, NULL, UIO_SYSSPACE,
-	    uap->argv, uap->envv);
+	    __USER_CAP_UNBOUND(uap->argv), __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0) {
 		args.fd = uap->fd;
 		error = kern_execve(td, &args, NULL);
@@ -274,8 +275,9 @@ sys___mac_execve(struct thread *td, struct __mac_execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
-	    uap->argv, uap->envv);
+	error = exec_copyin_args(&args, __USER_CAP_STR(uap->fname),
+	    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argv),
+	    __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0)
 		error = kern_execve(td, &args, __USER_CAP_OBJ(uap->mac_p));
 	post_execve(td, error, oldvmspace);
@@ -1196,10 +1198,13 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
  * the loads the current value and updates the array pointer.
  */
 static int
-get_argenv_ptr(void **arrayp, void **ptrp)
+get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 {
 	uintptr_t ptr;
-	char *array;
+	char * __capability array;
+#if __has_feature(capabilities)
+	intcap_t ptr_c;
+#endif
 #ifdef COMPAT_FREEBSD32
 	uint32_t ptr32;
 #endif
@@ -1207,17 +1212,25 @@ get_argenv_ptr(void **arrayp, void **ptrp)
 	array = *arrayp;
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32)) {
-		if (fueword32(array, &ptr32) == -1)
+		if (fueword32_c(array, &ptr32) == -1)
 			return (EFAULT);
 		array += sizeof(ptr32);
-		*ptrp = (void *)(uintptr_t)ptr32;
+		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr32);
+	} else
+#endif
+#if __has_feature(capabilities)
+	if (SV_CURPROC_FLAG(SV_CHERI)) {
+		if (fuecap(array, &ptr_c) == -1)
+			return (EFAULT);
+		array += sizeof(ptr_c);
+		*ptrp = (void * __capability)ptr_c;
 	} else
 #endif
 	{
-		if (fueword(array, &ptr) == -1)
+		if (fueword_c(array, &ptr) == -1)
 			return (EFAULT);
 		array += sizeof(ptr);
-		*ptrp = (void *)(uintptr_t)ptr;
+		*ptrp = __USER_CAP_STR((void *)(uintptr_t)ptr);
 	}
 	*arrayp = array;
 	return (0);
@@ -1228,10 +1241,10 @@ get_argenv_ptr(void **arrayp, void **ptrp)
  * space into the temporary string buffer.
  */
 int
-exec_copyin_args(struct image_args *args, const char *fname,
-    enum uio_seg segflg, void *argv, void *envv)
+exec_copyin_args(struct image_args *args, const char * __capability fname,
+    enum uio_seg segflg, void * __capability argv, void * __capability envv)
 {
-	void *ptr;
+	void * __capability ptr;
 	int error;
 
 	bzero(args, sizeof(*args));
@@ -1504,7 +1517,7 @@ exec_free_args(struct image_args *args)
  *                           allow new arguments to be prepended
  */
 int
-exec_args_add_fname(struct image_args *args, const char *fname,
+exec_args_add_fname(struct image_args *args, const char * __capability fname,
     enum uio_seg segflg)
 {
 	int error;
@@ -1515,9 +1528,12 @@ exec_args_add_fname(struct image_args *args, const char *fname,
 
 	if (fname != NULL) {
 		args->fname = args->buf;
-		error = segflg == UIO_SYSSPACE ?
-		    copystr(fname, args->fname, PATH_MAX, &length) :
-		    copyinstr(fname, args->fname, PATH_MAX, &length);
+		if (segflg == UIO_SYSSPACE)
+			error = copystr((__cheri_fromcap const char *)fname,
+			    args->fname, PATH_MAX, &length);
+		else
+			error = copyinstr_c(fname, args->fname, PATH_MAX,
+			    &length);
 		if (error != 0)
 			return (error == ENAMETOOLONG ? E2BIG : error);
 	} else
@@ -1536,7 +1552,7 @@ exec_args_add_fname(struct image_args *args, const char *fname,
 }
 
 static int
-exec_args_add_str(struct image_args *args, const char *str,
+exec_args_add_str(struct image_args *args, const char * __capability str,
     enum uio_seg segflg, int *countp)
 {
 	int error;
@@ -1545,9 +1561,12 @@ exec_args_add_str(struct image_args *args, const char *str,
 	KASSERT(args->endp != NULL, ("endp not initialized"));
 	KASSERT(args->begin_argv != NULL, ("begin_argp not initialized"));
 
-	error = (segflg == UIO_SYSSPACE) ?
-	    copystr(str, args->endp, args->stringspace, &length) :
-	    copyinstr(str, args->endp, args->stringspace, &length);
+	if (segflg == UIO_SYSSPACE)
+		error = copystr((__cheri_fromcap const char *)str, args->endp,
+		    args->stringspace, &length);
+	else
+		error = copyinstr_c(str, args->endp, args->stringspace,
+		    &length);
 	if (error != 0)
 		return (error == ENAMETOOLONG ? E2BIG : error);
 	args->stringspace -= length;
@@ -1558,7 +1577,7 @@ exec_args_add_str(struct image_args *args, const char *str,
 }
 
 int
-exec_args_add_arg(struct image_args *args, const char *argp,
+exec_args_add_arg(struct image_args *args, const char * __capability argp,
     enum uio_seg segflg)
 {
 
@@ -1568,7 +1587,7 @@ exec_args_add_arg(struct image_args *args, const char *argp,
 }
 
 int
-exec_args_add_env(struct image_args *args, const char *envp,
+exec_args_add_env(struct image_args *args, const char * __capability envp,
     enum uio_seg segflg)
 {
 

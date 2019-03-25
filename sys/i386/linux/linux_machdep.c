@@ -111,8 +111,9 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 		printf(ARGS(execve, "%s"), newpath);
 #endif
 
-	error = exec_copyin_args(&eargs, newpath, UIO_SYSSPACE,
-	    args->argp, args->envp);
+	error = exec_copyin_args(&eargs,
+	    (__cheri_tocap char * __capability)newpath, UIO_SYSSPACE,
+	    __USER_CAP_UNBOUND(args->argp), __USER_CAP_UNBOUND(args->envp));
 	free(newpath, M_TEMP);
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);

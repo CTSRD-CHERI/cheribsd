@@ -68,8 +68,9 @@ linux_execve(struct thread *td, struct linux_execve_args *uap)
 
 	LCONVPATHEXIST(td, uap->path, &path);
 
-	error = exec_copyin_args(&eargs, path, UIO_SYSSPACE, uap->argp,
-	    uap->envp);
+	error = exec_copyin_args(&eargs,
+	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE,
+	    __USER_CAP_UNBOUND(uap->argp), __USER_CAP_UNBOUND(uap->envp));
 	free(path, M_TEMP);
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);

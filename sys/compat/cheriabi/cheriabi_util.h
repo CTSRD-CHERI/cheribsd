@@ -108,12 +108,6 @@ register_t *cheriabi_copyout_strings(struct image_params *imgp);
 int	cheriabi_copyiniov(struct iovec_c * __capability iovp, u_int iovcnt,
 	    kiovec_t **iov, int error);
 
-struct image_args;
-int	cheriabi_exec_copyin_args(struct image_args *args,
-	    const char * __capability fname, enum uio_seg segflg,
-	    char * __capability * __capability argv,
-	    char * __capability * __capability envv);
-
 int	cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp);
 
 void	cheriabi_get_signal_stack_capability(struct thread *td,

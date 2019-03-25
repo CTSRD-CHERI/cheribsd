@@ -169,109 +169,6 @@ cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 	return (error);
 }
 
-/*
- * Custom version of exec_copyin_args() so that we can translate
- * the pointers.
- */
-int
-cheriabi_exec_copyin_args(struct image_args *args,
-    const char * __capability fname, enum uio_seg segflg,
-    char * __capability * __capability argv,
-    char * __capability * __capability envv)
-{
-	char * __capability * __capability pcap;
-	void * __capability argcap;
-	size_t length;
-	int error;
-
-	bzero(args, sizeof(*args));
-	if (argv == NULL)
-		return (EFAULT);
-
-	/*
-	 * Allocate demand-paged memory for the file name, argument, and
-	 * environment strings.
-	 */
-	error = exec_alloc_args(args);
-	if (error != 0)
-		return (error);
-
-	/*
-	 * Copy the file name.
-	 */
-	if (fname != NULL) {
-		args->fname = args->buf;
-		if (segflg == UIO_SYSSPACE) {
-			error = copystr((__cheri_fromcap const char *)fname,
-			    args->fname, PATH_MAX, &length);
-		} else {
-			error = copyinstr(fname, args->fname, PATH_MAX,
-			    &length);
-		}
-		if (error != 0)
-			goto err_exit;
-	} else
-		length = 0;
-
-	args->begin_argv = args->buf + length;
-	args->endp = args->begin_argv;
-	args->stringspace = ARG_MAX;
-
-	/*
-	 * extract arguments first
-	 */
-	pcap = argv;
-	for (;;) {
-		error = copyincap(pcap++, &argcap, sizeof(argcap));
-		if (error)
-			goto err_exit;
-		if (argcap == NULL)
-			break;
-		error = copyinstr(argcap, args->endp, args->stringspace,
-		    &length);
-		if (error != 0) {
-			if (error == ENAMETOOLONG)
-				error = E2BIG;
-			goto err_exit;
-		}
-		args->stringspace -= length;
-		args->endp += length;
-		args->argc++;
-	}
-
-	args->begin_envv = args->endp;
-
-	/*
-	 * extract environment strings
-	 */
-	if (envv) {
-		pcap = envv;
-		for (;;) {
-			error = copyincap(pcap++, &argcap, sizeof(argcap));
-			if (error != 0)
-				goto err_exit;
-			if (argcap == NULL)
-				break;
-			error = copyinstr(argcap, args->endp,
-			    args->stringspace, &length);
-			if (error != 0) {
-				if (error == ENAMETOOLONG)
-					error = E2BIG;
-				goto err_exit;
-			}
-			args->stringspace -= length;
-			args->endp += length;
-			args->envc++;
-		}
-	}
-
-	return (0);
-
-err_exit:
-	exec_free_args(args);
-	return (error);
-}
-
 int
 cheriabi_execve(struct thread *td, struct cheriabi_execve_args *uap)
 {
@@ -282,7 +179,7 @@ cheriabi_execve(struct thread *td, struct cheriabi_execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = cheriabi_exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
+	error = exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0)
 		error = kern_execve(td, &eargs, NULL);
@@ -300,7 +197,7 @@ cheriabi_fexecve(struct thread *td, struct cheriabi_fexecve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = cheriabi_exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
+	error = exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0) {
 		eargs.fd = uap->fd;

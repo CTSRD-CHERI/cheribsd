@@ -134,8 +134,8 @@ cheriabi___mac_execve(struct thread *td, struct cheriabi___mac_execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = cheriabi_exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
-	    uap->argv, uap->envv);
+	error = exec_copyin_args(&eargs, NULL, UIO_SYSSPACE, uap->argv,
+	    uap->envv);
 	if (error == 0)
 		error = kern_execve(td, &eargs, uap->mac_p);
 
