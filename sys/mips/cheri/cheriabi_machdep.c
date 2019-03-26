@@ -976,7 +976,6 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	 * want to point it at our stack instead?
 	 */
 	frame->pc = cheri_getoffset(param->start_func);
-	frame->ddc = param->ddc;
 	frame->pcc = param->start_func;
 	frame->c12 = param->start_func;
 	frame->c3 = param->arg;
@@ -1014,28 +1013,6 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	csigp = &td->td_pcb->pcb_cherisignal;
 	csigp->csig_csp = td->td_frame->csp;
 	csigp->csig_default_stack = csigp->csig_csp;
-}
-
-/*
- * When thr_new() creates a new thread, we might need to lift properties from
- * the capability state in the parent thread.  This is our opportunity to do
- * so.
- */
-void
-cheriabi_thr_new_md(struct thread *parent_td, struct thr_param_c *param)
-{
-	register_t tag_set;
-
-	/*
-	 * XXXRW: Currently, we'll install the parent's DDC in the child
-	 * thread if there is (effectively) a NULL capability in the param
-	 * structure for DDC.  Really, we should trigger this based on a flag
-	 * set in the param, so that the parent thread can request a NULL DDC
-	 * if it wants to.
-	 */
-	tag_set = cheri_gettag(param->ddc);
-	if (!tag_set)
-		param->ddc = parent_td->td_pcb->pcb_regs.ddc;
 }
 
 int

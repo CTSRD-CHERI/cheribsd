@@ -1518,13 +1518,6 @@ cheriabi_thr_new(struct thread *td, struct cheriabi_thr_new_args *uap)
 	if (error != 0)
 		return (error);
 
-	/*
-	 * Opportunity for machine-dependent code to provide a DDC if the
-	 * caller didn't provide one.
-	 *
-	 * XXXRW: But should only do so if a suitable flag is set?
-	 */
-	cheriabi_thr_new_md(td, &param_c);
 	if (param_c.rtp != NULL) {
 		error = copyin(param_c.rtp, &rtp, sizeof(struct rtprio));
 		if (error)
