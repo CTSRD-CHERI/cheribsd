@@ -467,8 +467,7 @@ int
 sys_pipe2(struct thread *td, struct pipe2_args *uap)
 {
 
-	return (kern_pipe2(td, __USER_CAP(uap->fildes, 2 * sizeof(int)),
-	    uap->flags));
+	return (kern_pipe2(td, __USER_CAP_ARRAY(uap->fildes, 2), uap->flags));
 }
 
 int
