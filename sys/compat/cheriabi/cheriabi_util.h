@@ -107,13 +107,10 @@ struct iovec_c;
 register_t *cheriabi_copyout_strings(struct image_params *imgp);
 int	cheriabi_copyiniov(struct iovec_c * __capability iovp, u_int iovcnt,
 	    kiovec_t **iov, int error);
+int	cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
+	    struct uio **uiop);
 
 int	cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp);
-
-void	cheriabi_get_signal_stack_capability(struct thread *td,
-	    void * __capability *csig);
-void	cheriabi_set_signal_stack_capability(struct thread *td,
-	    void * __capability *csig);
 
 void	cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *arg,
 	    int argnum, int ptrmask);
@@ -125,11 +122,5 @@ int	cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags);
 int	cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp);
 void	cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param);
 int	cheriabi_set_user_tls(struct thread *td, void * __capability tls_base);
-
-void	*cheriabi_build_kevent_udata(__intcap_t ident,
-	    void * __capability udata);
-
-int	cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
-	    struct uio **uiop);
 
 #endif /* !_COMPAT_CHERIABI_CHERIABI_UTIL_H_ */
