@@ -751,7 +751,6 @@ lagg_port_create(struct lagg_softc *sc, struct ifnet *ifp)
 	 * is predictable and `ifconfig laggN create ...` command
 	 * will lead to the same result each time.
 	 */
-	LAGG_RLOCK();
 	CK_SLIST_FOREACH(tlp, &sc->sc_ports, lp_entries) {
 		if (tlp->lp_ifp->if_index < ifp->if_index && (
 		    CK_SLIST_NEXT(tlp, lp_entries) == NULL ||
@@ -759,7 +758,6 @@ lagg_port_create(struct lagg_softc *sc, struct ifnet *ifp)
 		    ifp->if_index))
 			break;
 	}
-	LAGG_RUNLOCK();
 	if (tlp != NULL)
 		CK_SLIST_INSERT_AFTER(tlp, lp, lp_entries);
 	else
@@ -1538,14 +1536,17 @@ lagg_snd_tag_alloc(struct ifnet *ifp,
 	struct lagg_lb *lb;
 	uint32_t p;
 
+	LAGG_RLOCK();
 	switch (sc->sc_proto) {
 	case LAGG_PROTO_FAILOVER:
 		lp = lagg_link_active(sc, sc->sc_primary);
 		break;
 	case LAGG_PROTO_LOADBALANCE:
 		if ((sc->sc_opts & LAGG_OPT_USE_FLOWID) == 0 ||
-		    params->hdr.flowtype == M_HASHTYPE_NONE)
+		    params->hdr.flowtype == M_HASHTYPE_NONE) {
+			LAGG_RUNLOCK();
 			return (EOPNOTSUPP);
+		}
 		p = params->hdr.flowid >> sc->flowid_shift;
 		p %= sc->sc_count;
 		lb = (struct lagg_lb *)sc->sc_psc;
@@ -1554,16 +1555,22 @@ lagg_snd_tag_alloc(struct ifnet *ifp,
 		break;
 	case LAGG_PROTO_LACP:
 		if ((sc->sc_opts & LAGG_OPT_USE_FLOWID) == 0 ||
-		    params->hdr.flowtype == M_HASHTYPE_NONE)
+		    params->hdr.flowtype == M_HASHTYPE_NONE) {
+			LAGG_RUNLOCK();
 			return (EOPNOTSUPP);
+		}
 		lp = lacp_select_tx_port_by_hash(sc, params->hdr.flowid);
 		break;
 	default:
+		LAGG_RUNLOCK();
 		return (EOPNOTSUPP);
 	}
-	if (lp == NULL)
+	if (lp == NULL) {
+		LAGG_RUNLOCK();
 		return (EOPNOTSUPP);
+	}
 	ifp = lp->lp_ifp;
+	LAGG_RUNLOCK();
 	if (ifp == NULL || ifp->if_snd_tag_alloc == NULL ||
 	    (ifp->if_capenable & IFCAP_TXRTLMT) == 0)
 		return (EOPNOTSUPP);
@@ -1854,11 +1861,17 @@ struct lagg_port *
 lagg_link_active(struct lagg_softc *sc, struct lagg_port *lp)
 {
 	struct lagg_port *lp_next, *rval = NULL;
-	struct epoch_tracker net_et;
 
 	/*
 	 * Search a port which reports an active link state.
 	 */
+
+	/*
+	 * This is called with either LAGG_RLOCK() held or
+	 * LAGG_XLOCK(sc) held.
+	 */
+	if (!in_epoch(net_epoch_preempt))
+		LAGG_XLOCK_ASSERT(sc);
 
 	if (lp == NULL)
 		goto search;
@@ -1872,15 +1885,12 @@ lagg_link_active(struct lagg_softc *sc, struct lagg_port *lp)
 		goto found;
 	}
 
- search:
-	epoch_enter_preempt(net_epoch_preempt, &net_et);
+search:
 	CK_SLIST_FOREACH(lp_next, &sc->sc_ports, lp_entries) {
 		if (LAGG_PORTACTIVE(lp_next)) {
-			epoch_exit_preempt(net_epoch_preempt, &net_et);
 			return (lp_next);
 		}
 	}
-	epoch_exit_preempt(net_epoch_preempt, &net_et);
 found:
 	return (rval);
 }
@@ -1962,7 +1972,7 @@ lagg_bcast_start(struct lagg_softc *sc, struct mbuf *m)
 	struct lagg_port *lp, *last = NULL;
 	struct mbuf *m0;
 
-	LAGG_RLOCK();
+	LAGG_RLOCK_ASSERT();
 	CK_SLIST_FOREACH(lp, &sc->sc_ports, lp_entries) {
 		if (!LAGG_PORTACTIVE(lp))
 			continue;
@@ -1983,7 +1993,6 @@ lagg_bcast_start(struct lagg_softc *sc, struct mbuf *m)
 		}
 		last = lp;
 	}
-	LAGG_RUNLOCK();
 
 	if (last == NULL) {
 		m_freem(m);
@@ -2096,7 +2105,7 @@ lagg_lb_porttable(struct lagg_softc *sc, struct lagg_port *lp)
 
 	rv = 0;
 	bzero(&lb->lb_ports, sizeof(lb->lb_ports));
-	LAGG_RLOCK();
+	LAGG_XLOCK_ASSERT(sc);
 	CK_SLIST_FOREACH(lp_next, &sc->sc_ports, lp_entries) {
 		if (lp_next == lp)
 			continue;
@@ -2109,7 +2118,6 @@ lagg_lb_porttable(struct lagg_softc *sc, struct lagg_port *lp)
 			    sc->sc_ifname, lp_next->lp_ifp->if_xname, i);
 		lb->lb_ports[i++] = lp_next;
 	}
-	LAGG_RUNLOCK();
 
 	return (rv);
 }
