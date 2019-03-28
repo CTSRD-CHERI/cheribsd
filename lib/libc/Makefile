@@ -7,8 +7,6 @@ WANT_CHERI=	variables
 
 .include <src.opts.mk>
 
-# BIND_NOW in libc results in segfault at startup (PR 233333)
-MK_BIND_NOW=	no
 # Force building of libc_pic.a
 MK_TOOLCHAIN=	yes
 
