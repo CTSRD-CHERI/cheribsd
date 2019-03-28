@@ -302,13 +302,13 @@ __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF
 # Clang is enabled, and will be installed as the default /usr/bin/cc.
 __DEFAULT_YES_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
 __DEFAULT_NO_OPTIONS+=GCC GCC_BOOTSTRAP GNUCXX GPL_DTC
-.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mriscv*} == "" && ${__T} != "sparc64" && ! ${__T:Mmips*c*}
+.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mriscv*} == "" && ${__T} != "sparc64" && ! (${__T:Mmips*c*} || ${MACHINE_ARCH:Mmips*c*})
 # If an external compiler that supports C++11 is used as ${CC} and Clang
 # supports the target, then Clang is enabled but GCC is installed as the
 # default /usr/bin/cc.
 __DEFAULT_YES_OPTIONS+=CLANG GCC GCC_BOOTSTRAP GNUCXX GPL_DTC LLD
 __DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
-.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mmips*c*}
+.elif ${COMPILER_FEATURES:Mc++11} && (${__T:Mmips*c*} || ${MACHINE_ARCH:Mmips*c*})
 # CHERI pure-capability targets alwasy use libc++
 # Don't build CLANG for now
 __DEFAULT_NO_OPTIONS+=CLANG CLANG_IS_CC
