@@ -985,6 +985,20 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_xfail_reason =
 	    "Tags currently survive cross-AS aliasing of SHM_ANON objects", },
 
+#ifdef CHERIABI_TESTS
+	{ .ct_name = "cheritest_vm_cap_share_fd_kqueue",
+	  .ct_desc = "Demonstrate capability passing via shared FD table",
+	  .ct_func = cheritest_vm_cap_share_fd_kqueue,
+	  .ct_xfail_reason =
+	    "Tags currently survive cross-AS shared FD tables", },
+
+	{ .ct_name = "cheritest_vm_cap_share_sigaction",
+	  .ct_desc = "Demonstrate capability passing via shared sigaction table",
+	  .ct_func = cheritest_vm_cap_share_sigaction,
+	  .ct_xfail_reason =
+	    "Tags currently survive cross-AS shared sigaction table", },
+#endif
+
 	{ .ct_name = "cheritest_vm_tag_dev_zero_shared",
 	  .ct_desc = "check tags are stored for /dev/zero MAP_SHARED pages",
 	  .ct_func = cheritest_vm_tag_dev_zero_shared, },
