@@ -175,9 +175,9 @@ test_sealcap_seal(const struct cheri_test *ctp __unused)
 
 	/* Type. */
 	v = cheri_gettype(sealed);
-	if (v != (vaddr_t)sealcap)
+	if (v != cheri_getaddress(sealcap))
 		cheritest_failure_errx("otype %jx (expected %jx)", v,
-		    (uintmax_t)(vaddr_t)sealcap);
+		    (uintmax_t)cheri_getaddress(sealcap));
 
 	/* Sealed bit. */
 	v = cheri_getsealed(sealed);

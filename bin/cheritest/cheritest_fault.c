@@ -107,7 +107,7 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
 	sealed = cheri_seal(ip, sealcap);
 	cheritest_failure_errx("cheri_seal() performed successfully (%jx)",
-	    (vaddr_t)sealed);
+	    (uintmax_t)cheri_getaddress(sealcap));
 }
 
 void
@@ -145,7 +145,7 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_UNSEAL);
 	unsealed = cheri_unseal(sealed, sealcap);
 	cheritest_failure_errx("cheri_unseal() performed successfully (%jx)",
-	    (vaddr_t)unsealed);
+	    (uintmax_t)cheri_getaddress(unsealed));
 }
 
 void
