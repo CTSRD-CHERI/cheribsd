@@ -1582,7 +1582,6 @@ _installcheck_kernel: _installcheck_tmpdir .PHONY
 _installcheck_tmpdir:
 	tmpfile=`mktemp`; \
 	    trap 'rm -rf "$$tmpfile"' EXIT; \
-	    echo "tmpfile=$$tmpfile"; \
 	    echo "#!/bin/sh -e" > "$$tmpfile"; \
 	    echo 'echo "Temporary directory $$PWD is executable."' >> "$$tmpfile"; \
 	    chmod +x "$$tmpfile"; \
