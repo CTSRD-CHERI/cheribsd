@@ -1626,6 +1626,20 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test explicit capability memmove",
 	  .ct_func = test_string_memmove_c },
 
+	/* Unaligned memcpy/memmove with capabilities */
+	{ .ct_name = "test_unaligned_capability_copy_memcpy",
+	  .ct_desc = "Check that a memcpy() of valid capabilities to an "
+		     "unaligned destination fails",
+	  .ct_func = test_unaligned_capability_copy_memcpy,
+	  .ct_flags = CT_FLAG_SIGEXIT,
+	  .ct_signum = SIGABRT },
+	{ .ct_name = "test_unaligned_capability_copy_memmove",
+	  .ct_desc = "Check that a memmove() of valid capabilities to an "
+		     "unaligned destination fails",
+	  .ct_func = test_unaligned_capability_copy_memmove,
+	  .ct_flags = CT_FLAG_SIGEXIT,
+	  .ct_signum = SIGABRT },
+
 	/*
 	 * Thread-Local Storage (TLS) tests.
 	 */
@@ -2259,10 +2273,6 @@ cheritest_run_test_name(const char *name)
 		errx(EX_USAGE, "unknown test: %s", name);
 	cheritest_run_test(&cheri_tests[i]);
 }
-
-/* For libc_memcpy and libc_memset tests: */
-extern void *cheritest_memcpy(void *dst, const void *src, size_t n);
-extern void *cheritest_memmove(void *dst, const void *src, size_t n);
 
 __noinline void *
 cheritest_memcpy(void *dst, const void *src, size_t n)

@@ -38,6 +38,8 @@ static char sccsid[] = "@(#)bcopy.c	8.1 (Berkeley) 6/4/93";
 __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #else
 #ifndef _VADDR_T_DECLARED
 typedef __attribute((memory_address)) __UINT64_TYPE__ vaddr_t;
@@ -80,6 +82,51 @@ typedef	uintptr_t ptr;
 	} while (index!=last);						\
 }
 
+#if defined(__CHERI__)
+/*
+ * Check that we aren't attempting to copy a capabilities to a misaligned
+ * destination (which would strip the tag bit instead of raising an exception).
+ */
+static __noinline __attribute__((optnone)) void
+check_no_tagged_capabilities_in_copy(
+    const char *__capability src, const char *__capability dst, size_t len)
+{
+	if (len < sizeof(void *__capability)) {
+		return; /* return early if copying less than a capability */
+	}
+	const vaddr_t src_addr = (__cheri_addr vaddr_t)src;
+	const vaddr_t to_first_cap =
+	    __builtin_align_up(src_addr, sizeof(void *__capability)) - src_addr;
+	const vaddr_t last_clc_offset = len - sizeof(void *__capability);
+	for (vaddr_t offset = to_first_cap; offset <= last_clc_offset;
+	     offset += sizeof(void *__capability)) {
+		const void *__capability *__capability aligned_src =
+		    (const void *__capability *__capability)(src + offset);
+		if (__predict_true(!__builtin_cheri_tag_get(*aligned_src))) {
+			continue; /* untagged values are fine */
+		}
+		/* Got a tagged value, this is always an error! */
+		/* XXXAR: can we safely use printf here? */
+		fprintf(stderr,
+		    "Attempting to copy a tagged capability"
+		    " (%#p) from 0x%jx to underaligned destination 0x%jx."
+		    /* XXXAR: These functions do not exist yet... */
+		    " Use memmove_nocap()/memcpy_nocap() if you intended to"
+		    " strip tags.\n",
+#ifdef __CHERI_PURE_CAPABILITY__
+		    *aligned_src,
+#else
+		    /* Can't use capabilities in fprintf in hybrid mode */
+		    (void *)(uintptr_t)(__cheri_addr vaddr_t)(*aligned_src),
+#endif
+		    (__cheri_addr uintmax_t)(src + offset),
+		    (__cheri_addr uintmax_t)(dst + offset));
+		abort();
+	}
+}
+#else
+#define check_no_tagged_capabilities_in_copy(...) (void)0
+#endif
 
 /* We are doing the necessary checks before casting -> silence warning */
 #pragma clang diagnostic ignored "-Wcast-align"
@@ -156,10 +203,12 @@ bcopy(const void *src0, void *dst0, size_t length)
 			 * Try to align operands.  This cannot be done
 			 * unless the low bits match.
 			 */
-			if ((t ^ (__cheri_addr vaddr_t)dst) & wmask || length < wsize)
+			if ((t ^ (__cheri_addr vaddr_t)dst) & wmask || length < wsize) {
+				check_no_tagged_capabilities_in_copy(src, dst, length);
 				t = length;
-			else
+			} else {
 				t = wsize - (t & wmask);
+			}
 			length -= t;
 			dst += t;
 			src += t;
@@ -176,10 +225,12 @@ bcopy(const void *src0, void *dst0, size_t length)
 				 * Try to align operands.  This cannot be done
 				 * unless the low bits match.
 				 */
-				if ((t ^ (__cheri_addr vaddr_t)dst) & pmask || length < psize)
+				if ((t ^ (__cheri_addr vaddr_t)dst) & pmask || length < psize) {
+					check_no_tagged_capabilities_in_copy(src, dst, length);
 					t = length / wsize;
-				else
+				} else {
 					t = (psize - (t & pmask)) / wsize;
+				}
 				if (t) {
 					length -= t*wsize;
 					dst += t*wsize;
@@ -228,10 +279,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 		dst += length;
 		t = (__cheri_addr vaddr_t)src;
 		if ((t | (__cheri_addr vaddr_t)dst) & wmask) {
-			if ((t ^ (__cheri_addr vaddr_t)dst) & wmask || length <= wsize)
+			if ((t ^ (__cheri_addr vaddr_t)dst) & wmask || length <= wsize) {
+				/* Subtract length since we are copying backwards */
+				check_no_tagged_capabilities_in_copy(src - length, dst - length, length);
 				t = length;
-			else
+			} else {
 				t &= wmask;
+			}
 			length -= t;
 			dst -= t;
 			src -= t;
@@ -241,10 +295,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 		if (bigptr) {
 			t = (__cheri_addr vaddr_t)src;	/* only need low bits */
 			if ((t | (__cheri_addr vaddr_t)dst) & pmask) {
-				if ((t ^ (__cheri_addr vaddr_t)dst) & pmask || length < psize)
+				if ((t ^ (__cheri_addr vaddr_t)dst) & pmask || length < psize) {
+					/* Subtract length since we are copying backwards */
+					check_no_tagged_capabilities_in_copy(src - length, dst - length, length);
 					t = length / wsize;
-				else
+				} else {
 					t = (t & pmask) / wsize;
+				}
 				if (t) {
 					length -= t*wsize;
 					dst -= t*wsize;
