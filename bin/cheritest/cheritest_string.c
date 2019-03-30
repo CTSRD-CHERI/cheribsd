@@ -437,6 +437,71 @@ test_string_memmove(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+/*
+ * XXXAR: We use cheritest_memcpy()/cheritest_memmove() so that the compiler
+ * can't replace it with an inline loop. We could also use -fno-builtin but that
+ * could interfere with the other tests.
+ */
+void
+test_unaligned_capability_copy_memcpy(const struct cheri_test *ctp __unused)
+{
+	/* Copying a tagged capability to an unaligned destination should trap. */
+	void * __capability src_buffer[2];
+	_Alignas(void * __capability) char dest_buffer[2 * sizeof(void* __capability) + 1];
+
+	/* Check that dest buffer is capability aligned so that dest + 1 isn't */
+	/* TODO: __builtin_is_aligned does not work on arrays (yet) */
+	CHERITEST_VERIFY(__builtin_is_aligned((void*)dest_buffer, sizeof(void* __capability)));
+	CHERITEST_VERIFY(__builtin_is_aligned((void*)src_buffer, sizeof(void * __capability)));
+
+	src_buffer[0] = cheri_setoffset(NULL, 0x1234);
+	src_buffer[1] = cheri_setoffset(NULL, 0x4321);
+	CHERITEST_VERIFY(!cheri_gettag(src_buffer[0]));
+	CHERITEST_VERIFY(!cheri_gettag(src_buffer[1]));
+	/* This should succeed */
+	cheritest_memcpy(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
+	/* TODO: verify the contents of the buffer? */
+
+	/* Now place a valid capability in buffer[1] and check that it causes a fault */
+	src_buffer[1] = (__cheri_tocap void* __capability)&strcpy;
+	CHERITEST_VERIFY(!cheri_gettag(src_buffer[0]));
+	CHERITEST_VERIFY(cheri_gettag(src_buffer[1]));
+
+	cheritest_memcpy(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
+	/* should have aborted: */
+	cheritest_failure_errx("memcpy() of an unaligned capability succeeded unexpectedly");
+}
+
+void
+test_unaligned_capability_copy_memmove(const struct cheri_test *ctp __unused)
+{
+	/* Copying a tagged capability to an unaligned destination should trap. */
+	void * __capability src_buffer[2];
+	_Alignas(void * __capability) char dest_buffer[2 * sizeof(void* __capability) + 1];
+
+	/* Check that dest buffer is capability aligned so that dest + 1 isn't */
+	/* TODO: __builtin_is_aligned does not work on arrays (yet) */
+	CHERITEST_VERIFY(__builtin_is_aligned((void*)dest_buffer, sizeof(void* __capability)));
+	CHERITEST_VERIFY(__builtin_is_aligned((void*)src_buffer, sizeof(void * __capability)));
+
+	src_buffer[0] = cheri_setoffset(NULL, 0x1234);
+	src_buffer[1] = cheri_setoffset(NULL, 0x4321);
+	CHERITEST_VERIFY(!cheri_gettag(src_buffer[0]));
+	CHERITEST_VERIFY(!cheri_gettag(src_buffer[1]));
+	/* This should succeed */
+	cheritest_memmove(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
+	/* TODO: verify the contents of the buffer? */
+
+	/* Now place a valid capability in buffer[1] and check that it causes a fault */
+	src_buffer[1] =  (__cheri_tocap void* __capability)&strcpy;
+	CHERITEST_VERIFY(!cheri_gettag(src_buffer[0]));
+	CHERITEST_VERIFY(cheri_gettag(src_buffer[1]));
+
+	cheritest_memmove(dest_buffer + 1 /* unaligned! */, src_buffer, sizeof(src_buffer));
+	/* should have aborted: */
+	cheritest_failure_errx("memmove() of an unaligned capability succeeded unexpectedly");
+}
+
 #ifdef KERNEL_MEMCPY_TESTS
 void
 test_string_kern_memcpy_c(const struct cheri_test *ctp __unused)
