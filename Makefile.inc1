@@ -1478,7 +1478,7 @@ WMAKE_TGTS+=	build${libcompat}
 .endif
 
 # record buildworld time in seconds
-.if make(buildworld)
+.if make(buildworld) || make(buildsysroot)
 _BUILDWORLD_START!= date '+%s'
 .export _BUILDWORLD_START
 .endif
