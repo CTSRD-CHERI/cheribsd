@@ -443,7 +443,11 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	sbop->sbo_ddc = idc;
 
 	/* XXXRW: Does this remain the right capability to use for TLS? */
+#ifdef __CHERI_CAPABILITY_TLS__
+	__asm__ volatile("creadhwr %0, $chwr_userlocal": "=C"(sbop->sbo_libcheri_tls));
+#else
 	sbop->sbo_libcheri_tls = cheri_getdefault();
+#endif
 
 	/*
 	 * Construct sealed rtld and invocation capabilities for use with
