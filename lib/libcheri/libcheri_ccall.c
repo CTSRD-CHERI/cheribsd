@@ -137,8 +137,11 @@ libcheri_ccall_init(void)
 	libcheri_creturn_object.co_codecap =
 	    cheri_seal(cap, libcheri_creturn_type);
 
-	cap = cheri_getdefault();
-	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_creturn_data);
+#ifdef __CHERI_PURE_CAPABILITY__
+	cap = &libcheri_creturn_data;
+#else
+	cap = cheri_ptr(&libcheri_creturn_data, sizeof(libcheri_creturn_data));
+#endif
 	libcheri_creturn_object.co_datacap =
 	    cheri_seal(cap, libcheri_creturn_type);
 }

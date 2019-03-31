@@ -133,8 +133,15 @@ sandbox_program_init(void)
 		close(fd);
 		return (-1);
 	}
-	if (sandbox_set_required_method_variables(cheri_getdefault(),
-	    main_required_methods) == -1) {
+#ifdef __CHERI_PURE_CAPABILITY__
+	// This needs full address space $pcc
+	void *datacap = cheri_clearperm(
+	    cheri_setoffset(cheri_getpcc(), 0), CHERI_PERM_EXECUTE);
+#else
+	void *__capability datacap = cheri_getdefault();
+#endif
+	if (sandbox_set_required_method_variables(
+		datacap, main_required_methods) == -1) {
 		warnx("%s: sandbox_set_required_method_variables for main "
 		    "program", __func__);
 		return (-1);
@@ -360,8 +367,15 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 	 *
 	 * XXXBD: Doing this in every class is inefficient.
 	 */
-	if (sandbox_set_required_method_variables(cheri_getdefault(),
-	    main_required_methods) == -1) {
+#ifdef __CHERI_PURE_CAPABILITY__
+	// This needs full address space $pcc
+	void *datacap = cheri_clearperm(
+	    cheri_setoffset(cheri_getpcc(), 0), CHERI_PERM_EXECUTE);
+#else
+	void *__capability datacap = cheri_getdefault();
+#endif
+	if (sandbox_set_required_method_variables(
+		datacap, main_required_methods) == -1) {
 		warnx("%s: sandbox_set_required_method_variables for main "
 		    "program", __func__);
 		return (-1);
