@@ -725,7 +725,9 @@ sandbox_make_vtable(void *dataptr, const char *class,
 	 * here, but probably the caller should do that instead.
 	 */
 	if (dataptr == NULL)
-		dataptr = cheri_getdefault();
+		dataptr = cheri_clearperm(
+		    cheri_setoffset(cheri_getpcc(), 0), CHERI_PERM_EXECUTE);
+
 #endif
 	cheri_ccallee_base = (vm_offset_t *)dataptr + provided_classes->spcs_base
 	    / sizeof(vm_offset_t);
