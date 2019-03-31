@@ -248,6 +248,10 @@ libcheri_ccall_rtld_fetch_stack:
 	 * required -- e.g., once we have dynamically linked pure-capability
 	 * binaries using.
 	 */
+#ifdef __CHERI_CAPABILITY_TLS__
+	lui	$at, %captab_tprel_hi(__libcheri_stack_tls_storage)
+	daddiu	$at, $at, %captab_tprel_lo(__libcheri_stack_tls_storage)
+#else
 	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
 	.set	push
 	.set	mips32r2
@@ -255,8 +259,11 @@ libcheri_ccall_rtld_fetch_stack:
 	.set	pop
 	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
 	daddu	$at, $t0, $at
+#endif
 	clc		$c14, $zero, (5*CHERICAP_SIZE)($c26)
 	csetoffset	$c14, $c14, $at
+	# Check that the value is still tagged and in bounds
+	CAssertInBounds $c14, 8
 
 libcheri_ccall_rtld_check_stack:
 	/*
@@ -628,6 +635,10 @@ libcheri_ccall_invoke_fetch_stack:
 	 * required -- e.g., once we have dynamically linked pure-capability
 	 * binaries using.
 	 */
+#ifdef __CHERI_CAPABILITY_TLS__
+	lui	$at, %captab_tprel_hi(__libcheri_stack_tls_storage)
+	daddiu	$at, $at, %captab_tprel_lo(__libcheri_stack_tls_storage)
+#else
 	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
 	.set	push
 	.set	mips32r2
@@ -635,8 +646,11 @@ libcheri_ccall_invoke_fetch_stack:
 	.set	pop
 	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
 	daddu	$at, $t0, $at
+#endif
 	clc		$c14, $zero, (5*CHERICAP_SIZE)($c26)
 	csetoffset	$c14, $c14, $at
+	# Check that the value is still tagged and in bounds
+	CAssertInBounds $c14, 8
 
 libcheri_ccall_invoke_check_stack:
 	/*
