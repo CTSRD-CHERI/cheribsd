@@ -184,6 +184,8 @@ sandbox_class_unload(struct sandbox_class *sbcp)
 
 #ifdef SPLIT_CODE_DATA
 	munmap(sbcp->sbc_codemem, sbcp->sbc_codelen);
+#else
+	(void)sbcp;
 #endif
 }
 
