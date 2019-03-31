@@ -366,10 +366,10 @@ sandbox_parse_ccall_methods(int fd,
 	for (i = 1; i < nsyms; i++) {
 		sname = strtab + symtab[i].st_name;
 #if defined(DEBUG) && DEBUG > 1
-		printf("symtab[%d] name     %s\n", i, sname);
-		printf("symtab[%d] section  %d\n", i, symtab[i].st_shndx);
-		printf("symtab[%d] addr     0x%lx\n", i, symtab[i].st_value);
-		printf("symtab[%d] size     0x%zx\n", i, symtab[i].st_size);
+		printf("symtab[%zd] name     %s\n", i, sname);
+		printf("symtab[%zd] section  %d\n", i, symtab[i].st_shndx);
+		printf("symtab[%zd] addr     0x%lx\n", i, symtab[i].st_value);
+		printf("symtab[%zd] size     0x%zx\n", i, symtab[i].st_size);
 #endif
 		if (symtab[i].st_name == 0)
 			continue;
