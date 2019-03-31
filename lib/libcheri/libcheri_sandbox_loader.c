@@ -262,7 +262,12 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	length += heaplen;
 	sbop->sbo_datalen = length;
 	base = sbop->sbo_datamem = mmap(NULL, length,
+#ifdef SPLIT_CODE_DATA
 	    PROT_MAX(PROT_READ|PROT_WRITE) | PROT_NONE,
+#else
+	    /* When mapping code+data together we have to use a RWX cap */
+	    PROT_MAX(PROT_ALL) | PROT_NONE,
+#endif
 	    MAP_ANON | MAP_ALIGNED_CHERI_SEAL, -1, 0);
 	if (sbop->sbo_datamem == MAP_FAILED) {
 		saved_errno = errno;
