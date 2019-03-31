@@ -2,30 +2,34 @@
 ---
 BasedOnStyle: WebKit
 AlignAfterOpenBracket: DontAlign
-AlignConsecutiveAssignments: 'false'
-AlignConsecutiveDeclarations: 'false'
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
 AlignEscapedNewlines: Left
-AlignOperands: 'false'
-AlignTrailingComments: 'false'
-AllowAllParametersOfDeclarationOnNextLine: 'false'
-AllowShortBlocksOnASingleLine: 'false'
-AllowShortCaseLabelsOnASingleLine: 'false'
+AlignOperands: false
+AlignTrailingComments: false
+AllowAllParametersOfDeclarationOnNextLine: false
+AllowShortBlocksOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: InlineOnly
-AllowShortIfStatementsOnASingleLine: 'false'
-AllowShortLoopsOnASingleLine: 'false'
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
 AlwaysBreakAfterDefinitionReturnType: TopLevel
 AlwaysBreakAfterReturnType: TopLevelDefinitions
-BinPackArguments: 'true'
-BinPackParameters: 'true'
+BinPackArguments: true
+BinPackParameters: true
 BreakBeforeBinaryOperators: None
 BreakBeforeBraces: WebKit
-BreakBeforeTernaryOperators: 'false'
-CommentPragmas: ^ CHERI CHANGES START
-CompactNamespaces: 'true'
-DerivePointerAlignment: 'true'
-DisableFormat: 'false'
-ForEachMacros: ['SLIST_FOREACH', 'LIST_FOREACH', 'STAILQ_FOREACH', 'TAILQ_FOREACH']
-IndentCaseLabels: 'false'
+BreakBeforeTernaryOperators: false
+CommentPragmas: '^ CHERI CHANGES START'
+CompactNamespaces: true
+DerivePointerAlignment: false
+DisableFormat: false
+ForEachMacros:
+  - SLIST_FOREACH
+  - LIST_FOREACH
+  - STAILQ_FOREACH
+  - TAILQ_FOREACH
+IndentCaseLabels: false
 IndentPPDirectives: None
 Language: Cpp
 NamespaceIndentation: None
@@ -35,4 +39,5 @@ IndentWidth: 8
 TabWidth: 8
 ColumnLimit: 80
 UseTab: Always
+SortIncludes: false
 ...
