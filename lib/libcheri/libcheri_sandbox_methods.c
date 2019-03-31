@@ -758,7 +758,7 @@ sandbox_make_vtable(void *dataptr, const char *class,
 			pm = pms->spms_methods + m;
 			index = (pm->spm_index_offset -
 			    provided_classes->spcs_base) / sizeof(*vtable);
-#ifdef DEBUG
+#if defined(DEBUG) && DEBUG > 1
 			printf("%s: provided_classes[%zd] method[%zd] is '%s'."
 			       " index = %zd\n",
 			    __func__, i, m, pm->spm_method, index);
@@ -766,6 +766,10 @@ sandbox_make_vtable(void *dataptr, const char *class,
 			assert(vtable[m] == 0);
 			vtable[m] = cheri_ccallee_base[index];
 		}
+#ifdef DEBUG
+		printf("%s: added [%zd] methods to vtable for %s\n", __func__,
+		    m, pms->spms_class);
+#endif
 		/* TODO: set bounds on vtable up to last index? */
 		return (cheri_andperm(vtable, CHERI_PERM_LOAD));
 	}
@@ -796,6 +800,11 @@ sandbox_set_required_method_variables(void * __capability datacap,
 
 		method_var_p = cheri_setoffset(datacap,
 		    rmethods[i].srm_index_offset);
+#ifdef DEBUG
+		printf("%s: updating method %zd (%s::%s) variable: %#p\n",
+		 __func__, i, rmethods[i].srm_class, rmethods[i].srm_method, (__cheri_fromcap void*)method_var_p);
+		printf("\t 0x%zd -> 0x%zx\n", *method_var_p, rmethods[i].srm_vtable_offset);
+#endif
 		*method_var_p = rmethods[i].srm_vtable_offset;
 	}
 	return(0);
