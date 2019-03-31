@@ -715,7 +715,6 @@ sandbox_make_vtable(void *dataptr, const char *class,
 		warnx("%s: calloc", __func__);
 		return (NULL);
 	}
-
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * XXXRW: For system classes, a NULL dataptr is passed in, signifying
@@ -732,14 +731,26 @@ sandbox_make_vtable(void *dataptr, const char *class,
 	cheri_ccallee_base = (vm_offset_t *)dataptr + provided_classes->spcs_base
 	    / sizeof(vm_offset_t);
 	length = provided_classes->spcs_nmethods * sizeof(*vtable);
+	assert(cheri_getlen(vtable) >= length);
+#ifdef DEBUG
+	printf("%s(%s): spcs_nmethods = %zd, length = %zd\n", __func__, class,
+	    provided_classes->spcs_nmethods, length);
+#endif
 
 	if (class == NULL) {
+#ifdef DEBUG
+		printf("%s: class == NULL -> copying whole table\n", __func__);
+#endif
 		memcpy_c_tocap(vtable, cheri_ccallee_base, length);
 		return (cheri_andperm(vtable, CHERI_PERM_LOAD));
 	}
 
 	for (i = 0; i < provided_classes->spcs_nclasses; i++) {
 		pms = provided_classes->spcs_classes[i];
+#ifdef DEBUG
+		printf("%s: provided_classes[%zd]='%s', want '%s'\n", __func__,
+		    i, pms->spms_class, class);
+#endif
 		if (strcmp(pms->spms_class, class) != 0)
 			continue;
 
@@ -747,8 +758,15 @@ sandbox_make_vtable(void *dataptr, const char *class,
 			pm = pms->spms_methods + m;
 			index = (pm->spm_index_offset -
 			    provided_classes->spcs_base) / sizeof(*vtable);
-			vtable[index] = cheri_ccallee_base[index];
+#ifdef DEBUG
+			printf("%s: provided_classes[%zd] method[%zd] is '%s'."
+			       " index = %zd\n",
+			    __func__, i, m, pm->spm_method, index);
+#endif
+			assert(vtable[m] == 0);
+			vtable[m] = cheri_ccallee_base[index];
 		}
+		/* TODO: set bounds on vtable up to last index? */
 		return (cheri_andperm(vtable, CHERI_PERM_LOAD));
 	}
 	free_c(vtable);
