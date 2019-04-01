@@ -226,7 +226,6 @@ MAN=	accept_filter.9 \
 	own.9 \
 	panic.9 \
 	PCBGROUP.9 \
-	p_cancolocate.9 \
 	p_candebug.9 \
 	p_cansee.9 \
 	pci.9 \

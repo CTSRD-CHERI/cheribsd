@@ -500,11 +500,6 @@ pget(pid_t pid, int flags, struct proc **pp)
 				goto errout;
 		}
 	}
-	if ((flags & PGET_CANCOLOCATE) != 0) {
-		error = p_cancolocate(curthread, p);
-		if (error != 0)
-			goto errout;
-	}
 	if ((flags & PGET_CANDEBUG) != 0) {
 		error = p_candebug(curthread, p);
 		if (error != 0)
