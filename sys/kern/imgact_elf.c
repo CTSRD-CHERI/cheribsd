@@ -978,6 +978,18 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		goto ret;
 	}
 	sv = brand_info->sysvec;
+
+	/*
+	 * Check if colocation is allowed.  We can only do it after we know
+	 * if the binary is for CheriABI or not.
+	 */
+	if (imgp->cop != NULL) {
+		if ((sv->sv_flags & SV_CHERI) == 0) {
+			error = EPERM;
+			goto ret;
+		}
+	}
+
 	et_dyn_addr = 0;
 	if (hdr->e_type == ET_DYN) {
 		if ((brand_info->flags & BI_CAN_EXEC_DYN) == 0) {
