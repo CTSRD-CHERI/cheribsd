@@ -319,7 +319,11 @@ XLEAF(FUNC_PREFIX(bcopy_c))
 	dadd		a2, a2, a3
 
 .L.return:
+#ifndef __CHERI_PURE_CAPABILITY__
 	jr	ra
+#else
+	cjr     $c17
+#endif
 	cmove	$c3, $c1	/* need to return original c3 for memcpy */
 XEND(FUNC_PREFIX(bcopy_c))
 XEND(FUNC_PREFIX(bcopynocap_c))
