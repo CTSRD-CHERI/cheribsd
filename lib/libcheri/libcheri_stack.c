@@ -72,9 +72,12 @@
  * here -- e.g., do we want to do a soft-interrupt-style thing along the lines
  * if interrupts taken during spl()s in the kernel, with the signal handler
  * "scheduling" the change to take place once the preempted code returns..?
+ *
+ * XXXAR: we use local-exec tls model here to ensure that we can load the
+ * values without using the captable.
  */
 __thread struct libcheri_stack __libcheri_stack_tls_storage
-    __attribute__((__aligned__(32))) = {
+    __attribute__((__aligned__(32), tls_model("local-exec"))) = {
 	.lcs_tsize = LIBCHERI_STACK_SIZE,
 	.lcs_tsp = LIBCHERI_STACK_SIZE,
 };
