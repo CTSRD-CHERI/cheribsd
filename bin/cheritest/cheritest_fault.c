@@ -110,8 +110,13 @@ test_fault_perm_seal(const struct cheri_test *ctp __unused)
 		cheritest_failure_err("sysarch(CHERI_GET_SEALCAP)");
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_SEAL);
 	sealed = cheri_seal(ip, sealcap);
-	cheritest_failure_errx("cheri_seal() performed successfully (%jx)",
-	    (uintmax_t)cheri_getaddress(sealcap));
+	/*
+	 * Ensure that sealed is actually use, otherwise the faulting
+	 * instruction can be optimized away since it is dead.
+	 */
+	cheritest_failure_errx("cheri_seal() performed successfully "
+	    _CHERI_PRINTF_CAP_FMT " with bad sealcap" _CHERI_PRINTF_CAP_FMT,
+	    _CHERI_PRINTF_CAP_ARG(sealed), _CHERI_PRINTF_CAP_ARG(sealcap));
 }
 
 void
@@ -148,8 +153,13 @@ test_fault_perm_unseal(const struct cheri_test *ctp __unused)
 	sealed = cheri_seal(ip, sealcap);
 	sealcap = cheri_andperm(sealcap, ~CHERI_PERM_UNSEAL);
 	unsealed = cheri_unseal(sealed, sealcap);
-	cheritest_failure_errx("cheri_unseal() performed successfully (%jx)",
-	    (uintmax_t)cheri_getaddress(unsealed));
+	/*
+	 * Ensure that unsealed is actually use, otherwise the faulting
+	 * instruction can be optimized away since it is dead.
+	 */
+	cheritest_failure_errx("cheri_unseal() performed successfully "
+	    _CHERI_PRINTF_CAP_FMT " with bad unsealcap" _CHERI_PRINTF_CAP_FMT,
+	    _CHERI_PRINTF_CAP_ARG(unsealed), _CHERI_PRINTF_CAP_ARG(sealcap));
 }
 
 void
