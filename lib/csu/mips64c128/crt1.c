@@ -51,6 +51,7 @@ __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
 
 #include <machine/elf.h>
 
+#include <stdbool.h>
 #include <stdlib.h>
 #include "libc_private.h"
 #include "crtbrand.c"
@@ -99,6 +100,105 @@ asm(
 	"nop\n\t");
 #endif
 
+#ifndef POSITION_INDEPENDENT_STARTUP
+/* This is __always_inline since it is called before globals have been set up */
+static __always_inline void *
+create_data_cap(const Elf_Phdr *phdr, long phnum)
+{
+	const Elf_Phdr *phlimit = phdr + phnum;
+	Elf_Addr text_start = (Elf_Addr)-1l;
+	Elf_Addr text_end = 0;
+	Elf_Addr readonly_start = (Elf_Addr)-1l;
+	Elf_Addr readonly_end = 0;
+	Elf_Addr writable_start = (Elf_Addr)-1l;
+	Elf_Addr writable_end = 0;
+
+	bool have_rodata_segment = false;
+	bool have_text_segment = false;
+	bool have_data_segment = false;
+
+	/* Attempt to bound the data capability to only the writable segment */
+	for (const Elf_Phdr *ph = phdr; ph < phlimit; ph++) {
+		if (ph->p_type != PT_LOAD) {
+			/* Static binaries should not have a PT_DYNAMIC phdr */
+			if (ph->p_type == PT_DYNAMIC) {
+				__builtin_trap();
+				break;
+			}
+			continue;
+		}
+		Elf_Addr seg_start = ph->p_vaddr;
+		Elf_Addr seg_end = seg_start + ph->p_memsz;
+		if ((ph->p_flags & PF_X)) {
+			/* text segment */
+			have_text_segment = true;
+			text_start = MIN(text_start, seg_start);
+			text_end = MAX(text_end, seg_end);
+		} else if ((ph->p_flags & PF_W)) {
+			/* data segment */
+			have_data_segment = true;
+			writable_start = MIN(writable_start, seg_start);
+			writable_end = MAX(writable_end, seg_end);
+		} else {
+			have_rodata_segment = true;
+			/* read-only segment (not always present) */
+			readonly_start = MIN(readonly_start, seg_start);
+			readonly_end = MAX(readonly_end, seg_end);
+		}
+	}
+
+	if (!have_text_segment) {
+		/* No text segment??? Must be an error somewhere else. */
+		__builtin_trap();
+	}
+
+	/* No data segment -> should not need a writable cap -> use $pcc */
+	if (!have_data_segment) {
+		void* result = cheri_clearperm(cheri_getpcc(), CHERI_PERM_EXECUTE);
+		Elf_Addr start = MIN(readonly_start, text_start);
+		Elf_Addr end = MAX(readonly_end, text_end);
+		result = cheri_setaddress(result, start);
+		return cheri_csetbounds(result, end - start);
+	}
+
+	/*
+	 * FIXME: For now, if we don't have a separate rodata segment we also
+	 *  need to include the text segment in the data cap since we can't
+	 *  initialize constant variables otherwise.
+	 */
+	if (!have_rodata_segment) {
+		readonly_start = text_start;
+		readonly_end = text_end;
+	}
+
+	/* Check that ranges are well-formed */
+	if (writable_end < writable_start || readonly_end < readonly_start)
+		__builtin_trap();
+	/* Abort if readonly and writeable overlap: */
+	if (MAX(writable_start, readonly_start) <=
+	    MIN(writable_end, readonly_end)) {
+		__builtin_trap();
+	}
+
+	/*
+	 * For now we also must include the rodata segment in the RW cap since
+	 * we don't yet have a flag in __cap_relocs for writable vs readonly
+	 * data.
+	 *
+	 * TODO: we should really use a different capability for constant data!
+	 */
+	writable_start = MIN(writable_start, readonly_start);
+	writable_end = MAX(writable_end, readonly_end);
+
+	void* result = cheri_setaddress(phdr, writable_start);
+	/* Bound the result and clear execute permissions. */
+	result = cheri_clearperm(result, CHERI_PERM_EXECUTE);
+	/* TODO: should we use exact setbounds? */
+	result = cheri_csetbounds(result, writable_end - writable_start);
+	return result;
+}
+#endif
+
 /* The entry function, C part. This performs the bulk of program initialisation
  * before handing off to main(). It is called by __start, which is defined in
  * crt1_s.s, and necessarily written in raw assembly so that it can re-align
@@ -141,8 +241,13 @@ _start(void *auxv,
 
 	/* For -pie executables rtld will initialize the __cap_relocs */
 #ifndef POSITION_INDEPENDENT_STARTUP
-	/* Must be called before accessing any globals */
-	crt_init_globals_gdc(aux_info[AT_PHDR]->a_un.a_ptr);
+	/*
+	 * crt_init_globals_gdc must be called before accessing any globals.
+	 *
+	 * Note: We parse the phdrs to ensure that the global data cap does
+	 * not span the readonly segment or text segment.
+	 */
+	crt_init_globals_gdc(create_data_cap(aux_info[AT_PHDR]->a_un.a_ptr, aux_info[AT_PHNUM]->a_un.a_val));
 #endif
 	__auxargs = auxv;
 	argc = aux_info[AT_ARGC]->a_un.a_val;
