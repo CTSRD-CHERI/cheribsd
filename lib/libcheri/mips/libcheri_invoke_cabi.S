@@ -219,6 +219,13 @@ libcheri_set_errno:
 	# Get the address of the thread-local libcheri_errno variable.
 	#
 #ifdef HAVE_WORKING_TLS
+#ifdef __CHERI_CAPABILITY_TLS__
+	/* Note: initial-exec since we don't have captable pointer */
+	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
+	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
+	creadhwr $c3, $chwr_userlocal
+#else
+	/* Legacy: we need a valid $ddc here */
 	lui	$at, %tprel_hi(libcheri_errno)
 	.set	push
 	.set	mips32r2
@@ -226,11 +233,14 @@ libcheri_set_errno:
 	.set	pop
 	daddiu	$at, $at, %tprel_lo(libcheri_errno)
 	daddu	$at, $t0, $at
+	cgetdefault $c3
+#endif
 	b	libcheri_invoke_restore_regs
-	sw	$a0, 0($at)
-
-
+	csw	$a0, $at, 0($c3)
 #else
+#ifdef __CHERI_CAPABILITY_TABLE__
+#error "This code will not work with a captable since $ddc is null"
+#endif
 	#
 	# We currently don't have working TLS inside sandboxes, so set a global.
 	#
@@ -238,6 +248,7 @@ libcheri_set_errno:
 	b	libcheri_invoke_restore_regs
 	csw	$a0, $a2, 0($ddc)
 #endif
+	teq $zero, $zero
 	.end	libcheri_invoke
 	# Also add size information for cheri_invoke to avoid linker warnings
 .L.cheri_invoke.end:
