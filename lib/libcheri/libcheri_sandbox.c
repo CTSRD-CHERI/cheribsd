@@ -368,7 +368,7 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 	 * writable $pcc. I'm not quite sure what this is doing, but if I
 	 * #if 0 this code we get further into startup.
 	 */
-#ifndef SPLIT_CODE_DATA
+#ifdef SPLIT_CODE_DATA
 	/*
 	 * Update main program method variables.
 	 *
