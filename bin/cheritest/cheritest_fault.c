@@ -74,6 +74,8 @@ test_fault_bounds(const struct cheri_test *ctp __unused)
 	for (i = 0; i < ARRAY_LEN; i++)
 		arrayp[i] = 0;
 	arrayp[i] = 0;
+
+	cheritest_failure_errx("out of bounds access did not fault");
 }
 
 void
@@ -82,6 +84,8 @@ test_fault_perm_load(const struct cheri_test *ctp __unused)
 	char * __capability arrayp = cheri_ptrperm(array, sizeof(array), 0);
 
 	sink = arrayp[0];
+
+	cheritest_failure_errx("access without required permissions did not fault");
 }
 
 void
