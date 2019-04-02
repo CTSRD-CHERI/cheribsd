@@ -20,6 +20,10 @@ BinPackParameters: true
 BreakBeforeBinaryOperators: None
 BreakBeforeBraces: WebKit
 BreakBeforeTernaryOperators: false
+# TODO: BreakStringLiterals can cause very strange formatting so turn it off?
+# BreakStringLiterals: false
+# Avoid breaking function calls before the first argument:
+PenaltyBreakBeforeFirstCallParameter: 100000
 CommentPragmas: '^ CHERI CHANGES START'
 CompactNamespaces: true
 DerivePointerAlignment: false
