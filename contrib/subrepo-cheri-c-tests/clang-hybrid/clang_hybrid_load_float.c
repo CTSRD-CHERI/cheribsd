@@ -44,11 +44,9 @@
  * floating point.
  */
 
-static long config1;
-
-static long get_config_reg()
+__unused static long get_config_reg()
 {
-unsigned long val;
+  unsigned long val;
 
   asm volatile ("dmfc0 %0, $16, 1" : "=r"(val));
 
@@ -82,12 +80,16 @@ float * __capability fp;
 }
 
 BEGIN_TEST(clang_hybrid_load_float)
-
-  config1 = get_config_reg();
+// dmfc0 can only be used in the kernel (or baremetal). This test should
+// also work fine for soft-float.
+#ifdef _KERNEL
+  long config1 = get_config_reg();
   if (config1 & 0x1)
     test_body();
   else
     assert(1);
-
+#else
+  test_body();
+#endif
   assert(faults == 0);
 END_TEST
