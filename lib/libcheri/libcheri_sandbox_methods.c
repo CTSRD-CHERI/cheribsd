@@ -486,7 +486,7 @@ sandbox_parse_ccall_methods(int fd,
 			required_class_name = NULL; /* prevent double free */
 			rmethods[nrmethods].srm_index_offset =
 			    symtab[i].st_value;
-#ifdef DEBUG
+#if defined(DEBUG) && DEBUG > 1
 			printf("required method: %s class: %s "
 			    "(index offset 0x%lx)\n",
 			    rmethods[nrmethods].srm_method,
@@ -800,7 +800,7 @@ sandbox_set_required_method_variables(void * __capability datacap,
 
 		method_var_p = cheri_setoffset(datacap,
 		    rmethods[i].srm_index_offset);
-#ifdef DEBUG
+#if defined(DEBUG) && DEBUG > 1
 		printf("%s: updating method %zd (%s::%s) variable: %#p\n",
 		 __func__, i, rmethods[i].srm_class, rmethods[i].srm_method, (__cheri_fromcap void*)method_var_p);
 		printf("\t 0x%zd -> 0x%zx\n", *method_var_p, rmethods[i].srm_vtable_offset);
