@@ -28,6 +28,10 @@
 # SUCH DAMAGE.
 #
 
+/* We want the XNESTED,XEND(), etc. macros but not the register name defines */
+#define _MIPS_REGDEF_H
+#include <machine/asm.h>
+
 #include <machine/cherireg.h>
 #define _CHERI_INTERNAL
 #include <machine/cheriasm.h>
@@ -69,14 +73,12 @@
 # - The compiler needs to handle unused argument/return registers.
 #
 
+#define LIBCHERI_INVOKE_FRAME_SIZE (11*CHERICAP_SIZE + 96)
+
 	.text
 	.option pic0
-	.global libcheri_invoke
-	.global cheri_invoke
-	.ent	libcheri_invoke
-libcheri_invoke:
-cheri_invoke:
-
+NESTED(libcheri_invoke, LIBCHERI_INVOKE_FRAME_SIZE, _FRAME_RETURN_REG)
+XNESTED(cheri_invoke)
 	#
 	# Wrap up all caller-save state suitable to be preseved by CCall and
 	# restored by CReturn.  This happens in two phases:
@@ -249,10 +251,10 @@ libcheri_set_errno:
 	csw	$a0, $a2, 0($ddc)
 #endif
 	teq $zero, $zero
-	.end	libcheri_invoke
-	# Also add size information for cheri_invoke to avoid linker warnings
-.L.cheri_invoke.end:
-	.size cheri_invoke, .L.cheri_invoke.end - cheri_invoke
+
+END(libcheri_invoke)
+# Also add size information for cheri_invoke to avoid linker warnings
+XEND(cheri_invoke)
 
 
 	.type	libcheri_errno,@object      # @libcheri_errno
