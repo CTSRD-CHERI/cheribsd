@@ -240,7 +240,8 @@ libcheri_set_errno:
 	b	libcheri_invoke_restore_regs
 	csw	$a0, $at, 0($c3)
 #else
-#ifdef __CHERI_CAPABILITY_TABLE__
+#if defined(__CHERI_CAPABILITY_TABLE__) && !defined(BUILDING_LIBC_CHERI)
+/* we still need this for libc_cheri */
 #error "This code will not work with a captable since $ddc is null"
 #endif
 	#
