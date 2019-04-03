@@ -55,10 +55,13 @@ LDFLAGS+= -Wl,-zretpolineplt
 .endif
 .endif
 
+# macOS linker doesn't understand the --fatal-warnings flag
+.if ${LINKER_TYPE} != "mac"
 .if defined(LD_FATAL_WARNINGS) && ${LD_FATAL_WARNINGS} == "no"
 LDFLAGS+=	-Wl,--no-fatal-warnings
 .else
 LDFLAGS+=	-Wl,--fatal-warnings
+.endif
 .endif
 
 .if defined(CRUNCH_CFLAGS)
