@@ -223,8 +223,9 @@ sys_coexecve(struct thread *td, struct coexecve_args *uap)
 		PRELE(p);
 		return (error);
 	}
-	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
-	    uap->argv, uap->envv);
+	error = exec_copyin_args(&args, __USER_CAP_STR(uap->fname),
+	    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argv),
+	    __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0)
 		error = kern_coexecve(td, &args, NULL, p);
 	post_execve(td, error, oldvmspace);

@@ -204,7 +204,7 @@ cheriabi_coexecve(struct thread *td, struct cheriabi_coexecve_args *uap)
 		PRELE(p);
 		return (error);
 	}
-	error = cheriabi_exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
+	error = exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0)
 		error = kern_coexecve(td, &eargs, NULL, p);
