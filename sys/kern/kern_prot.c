@@ -87,8 +87,7 @@ static MALLOC_DEFINE(M_CRED, "cred", "credentials");
 
 SYSCTL_NODE(_security, OID_AUTO, bsd, CTLFLAG_RW, 0, "BSD security policy");
 
-static void crsetgroups_locked(struct ucred *cr, int ngrp,
-    gid_t *groups);
+static void crsetgroups_locked(struct ucred *cr, int ngrp, gid_t *groups);
 
 #ifndef _SYS_SYSPROTO_H_
 struct getpid_args {
@@ -802,12 +801,19 @@ struct setgroups_args {
 int
 sys_setgroups(struct thread *td, struct setgroups_args *uap)
 {
+
+	return (user_setgroups(td, uap->gidsetsize,
+	    __USER_CAP_ARRAY(uap->gidset, uap->gidsetsize)));
+}
+
+int
+user_setgroups(struct thread *td, u_int gidsetsize,
+    const gid_t * __capability gidset)
+{
 	gid_t smallgroups[XU_NGROUPS];
 	gid_t *groups;
-	u_int gidsetsize;
 	int error;
 
-	gidsetsize = uap->gidsetsize;
 	if (gidsetsize > ngroups_max + 1)
 		return (EINVAL);
 
@@ -816,8 +822,7 @@ sys_setgroups(struct thread *td, struct setgroups_args *uap)
 	else
 		groups = smallgroups;
 
-	error = copyin(__USER_CAP_ARRAY(uap->gidset, uap->gidsetsize), groups,
-	    gidsetsize * sizeof(gid_t));
+	error = copyin(gidset, groups, gidsetsize * sizeof(gid_t));
 	if (error == 0)
 		error = kern_setgroups(td, gidsetsize, groups);
 

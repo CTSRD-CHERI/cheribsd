@@ -266,7 +266,9 @@
  * If defined, explicitly attempt to more uniformly distribute large allocation
  * pointer alignments across all cache indices.
  */
+#ifndef __CHERI_PURE_CAPABILITY__
 #define JEMALLOC_CACHE_OBLIVIOUS 
+#endif
 
 /*
  * If defined, enable logging facilities.  We make this a configure option to

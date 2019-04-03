@@ -43,7 +43,7 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/s
 execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/sys/cheri ${TMPSYSROOT}/include/cheri)
 execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/sys/bsm ${TMPSYSROOT}/include/bsm)
 # TODO: should only be for CHERI
-execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/contrib/cheri-libc++/include ${TMPSYSROOT}/include/c++/v1)
+execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/contrib/subrepo-cheri-libc++/include ${TMPSYSROOT}/include/c++/v1)
 
 set(CMAKE_C_COMPILER_TARGET ${CLANG_TRIPLE})
 set(CMAKE_CXX_COMPILER_TARGET ${CLANG_TRIPLE})

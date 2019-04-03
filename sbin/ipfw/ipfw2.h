@@ -278,6 +278,7 @@ enum tokens {
 	TOK_AGG_LEN,
 	TOK_AGG_COUNT,
 	TOK_MAX_PORTS,
+	TOK_STATES_CHUNKS,
 	TOK_JMAXLEN,
 	TOK_PORT_RANGE,
 	TOK_HOST_DEL_AGE,
@@ -288,6 +289,13 @@ enum tokens {
 	TOK_UDP_AGE,
 	TOK_ICMP_AGE,
 	TOK_LOGOFF,
+	TOK_PRIVATE,
+	TOK_PRIVATEOFF,
+
+	/* NAT64 CLAT tokens */
+	TOK_NAT64CLAT,
+	TOK_PLAT_PREFIX,
+	TOK_CLAT_PREFIX,
 
 	/* NPTv6 tokens */
 	TOK_NPTV6,
@@ -385,6 +393,7 @@ void ipfw_flush(int force);
 void ipfw_zero(int ac, char *av[], int optname);
 void ipfw_list(int ac, char *av[], int show_counters);
 void ipfw_internal_handler(int ac, char *av[]);
+void ipfw_nat64clat_handler(int ac, char *av[]);
 void ipfw_nat64lsn_handler(int ac, char *av[]);
 void ipfw_nat64stl_handler(int ac, char *av[]);
 void ipfw_nptv6_handler(int ac, char *av[]);

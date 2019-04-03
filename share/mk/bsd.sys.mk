@@ -170,6 +170,12 @@ CWARNFLAGS+=	-Wno-error=aggressive-loop-optimizations	\
 		-Wno-error=stringop-truncation
 .endif
 
+.ifdef LIBCHERI
+# Ignore unaligned memcpy() calls. This is just a missed optimization
+# so it should not cause the build to fail.
+CWARNFLAGS+=	-Wno-error=pass-failed
+.endif
+
 # How to handle FreeBSD custom printf format specifiers.
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 30600
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__

@@ -138,8 +138,9 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 		printf(ARGS(execve, "%s"), path);
 #endif
 
-	error = freebsd32_exec_copyin_args(&eargs, path, UIO_SYSSPACE,
-	    args->argp, args->envp);
+	error = exec_copyin_args(&eargs,
+	    (__cheri_tocap char * __capability)path, UIO_SYSSPACE,
+	    __USER_CAP_UNBOUND(args->argp), __USER_CAP_UNBOUND(args->envp));
 	free(path, M_TEMP);
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
@@ -672,8 +673,8 @@ linux_gettimeofday(struct thread *td, struct linux_gettimeofday_args *uap)
 		error = copyout(&atv32, uap->tp, sizeof(atv32));
 	}
 	if (error == 0 && uap->tzp != NULL) {
-		rtz.tz_minuteswest = tz_minuteswest;
-		rtz.tz_dsttime = tz_dsttime;
+		rtz.tz_minuteswest = 0;
+		rtz.tz_dsttime = 0;
 		error = copyout(&rtz, uap->tzp, sizeof(rtz));
 	}
 	return (error);

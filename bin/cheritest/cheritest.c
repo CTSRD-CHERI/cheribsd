@@ -985,6 +985,20 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_xfail_reason =
 	    "Tags currently survive cross-AS aliasing of SHM_ANON objects", },
 
+#ifdef CHERIABI_TESTS
+	{ .ct_name = "cheritest_vm_cap_share_fd_kqueue",
+	  .ct_desc = "Demonstrate capability passing via shared FD table",
+	  .ct_func = cheritest_vm_cap_share_fd_kqueue,
+	  .ct_xfail_reason =
+	    "Tags currently survive cross-AS shared FD tables", },
+
+	{ .ct_name = "cheritest_vm_cap_share_sigaction",
+	  .ct_desc = "Demonstrate capability passing via shared sigaction table",
+	  .ct_func = cheritest_vm_cap_share_sigaction,
+	  .ct_xfail_reason =
+	    "Tags currently survive cross-AS shared sigaction table", },
+#endif
+
 	{ .ct_name = "cheritest_vm_tag_dev_zero_shared",
 	  .ct_desc = "check tags are stored for /dev/zero MAP_SHARED pages",
 	  .ct_func = cheritest_vm_tag_dev_zero_shared, },
@@ -1612,6 +1626,20 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_desc = "Test explicit capability memmove",
 	  .ct_func = test_string_memmove_c },
 
+	/* Unaligned memcpy/memmove with capabilities */
+	{ .ct_name = "test_unaligned_capability_copy_memcpy",
+	  .ct_desc = "Check that a memcpy() of valid capabilities to an "
+		     "unaligned destination fails",
+	  .ct_func = test_unaligned_capability_copy_memcpy,
+	  .ct_flags = CT_FLAG_SIGEXIT,
+	  .ct_signum = SIGABRT },
+	{ .ct_name = "test_unaligned_capability_copy_memmove",
+	  .ct_desc = "Check that a memmove() of valid capabilities to an "
+		     "unaligned destination fails",
+	  .ct_func = test_unaligned_capability_copy_memmove,
+	  .ct_flags = CT_FLAG_SIGEXIT,
+	  .ct_signum = SIGABRT },
+
 	/*
 	 * Thread-Local Storage (TLS) tests.
 	 */
@@ -1738,6 +1766,7 @@ static int sleep_after_test;
 static int unsandboxed_tests_only;
 static int verbose;
 static int coredump_enabled;
+static int debugger_enabled;
 
 static void
 usage(void)
@@ -1756,6 +1785,7 @@ usage(void)
 "    -f  -- Only include \"fast\" tests\n"
 #ifndef LIST_ONLY
 "    -c  -- Enable core dumps\n"
+"    -d  -- Attach debugger before running test\n"
 "    -s  -- Sleep one second after each test\n"
 "    -q  -- Enable qemu tracing in test process\n"
 #endif
@@ -2011,6 +2041,15 @@ cheritest_run_test(const struct cheri_test *ctp)
 		if (qtrace)
 			set_thread_tracing();
 
+		/* When debugging wait until GDB has attached */
+		if (debugger_enabled) {
+			if (verbose)
+				fprintf(stderr,
+				    "Waiting for GDB to attach to %d\n",
+				    getpid());
+			raise(SIGSTOP);
+		}
+
 		/* Run the actual test. */
 		if (ctp->ct_arg != 0)
 			ctp->ct_func_arg(ctp, ctp->ct_arg);
@@ -2022,6 +2061,17 @@ cheritest_run_test(const struct cheri_test *ctp)
 	close(pipefd_stdout[1]);
 	if (fcntl(pipefd_stdout[0], F_SETFL, O_NONBLOCK) < 0)
 		err(EX_OSERR, "fcntl(F_SETFL, O_NONBLOCK) on test stdout");
+
+	if (debugger_enabled) {
+		char command[256];
+		snprintf(
+		    command, sizeof(command), "gdb --pid=%d -ex=c", childpid);
+		if (verbose)
+			fprintf(stderr, "Running '%s' to debug %s\n", command,
+			    ctp->ct_name);
+		system(command);
+	}
+
 	(void)waitpid(childpid, &status, 0);
 
 	/*
@@ -2246,10 +2296,6 @@ cheritest_run_test_name(const char *name)
 	cheritest_run_test(&cheri_tests[i]);
 }
 
-/* For libc_memcpy and libc_memset tests: */
-extern void *cheritest_memcpy(void *dst, const void *src, size_t n);
-extern void *cheritest_memmove(void *dst, const void *src, size_t n);
-
 __noinline void *
 cheritest_memcpy(void *dst, const void *src, size_t n)
 {
@@ -2280,13 +2326,16 @@ main(int argc, char *argv[])
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "acfglqsuv")) != -1) {
+	while ((opt = getopt(argc, argv, "acdfglqsuv")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
 			break;
 		case 'c':
 			coredump_enabled = 1;
+			break;
+		case 'd':
+			debugger_enabled = 1;
 			break;
 		case 'f':
 			fast_tests_only = 1;

@@ -219,8 +219,8 @@ __gcc_personality_v0(int version, _Unwind_Action actions,
     if ( lsda == (uint8_t*) 0 )
         return continueUnwind(exceptionObject, context);
 
-    uintptr_t pc = _Unwind_GetIP(context)-1;
-    uintptr_t funcStart = _Unwind_GetRegionStart(context);
+    uintptr_t pc = (uintptr_t)_Unwind_GetIP(context)-1;
+    uintptr_t funcStart = (uintptr_t)_Unwind_GetRegionStart(context);
     uintptr_t pcOffset = pc - funcStart;
 
     /* Parse LSDA header. */
@@ -262,4 +262,3 @@ __gcc_personality_v0(int version, _Unwind_Action actions,
     /* No landing pad found, continue unwinding. */
     return continueUnwind(exceptionObject, context);
 }
-

@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/CTSRD-CHERI/cheri-c-tests.git
+	branch = master
+	commit = 944239f60d45bc94d162a84c3b022df33fabf853
+	parent = 066f9643a1c0b57224818ed79c7a4733a687c8a5
+	method = rebase
+	cmdver = 0.4.0

@@ -104,12 +104,12 @@ struct thread;
 struct vmspace;
 
 int	exec_alloc_args(struct image_args *);
-int	exec_args_add_arg(struct image_args *args, const char *argp,
-	    enum uio_seg segflg);
-int	exec_args_add_env(struct image_args *args, const char *envp,
-	    enum uio_seg segflg);
-int	exec_args_add_fname(struct image_args *args, const char *fname,
-	    enum uio_seg segflg);
+int	exec_args_add_arg(struct image_args *args,
+	    const char * __capability argp, enum uio_seg segflg);
+int	exec_args_add_env(struct image_args *args,
+	    const char * __capability envp, enum uio_seg segflg);
+int	exec_args_add_fname(struct image_args *args,
+	    const char *__capability fname, enum uio_seg segflg);
 int	exec_args_adjust_args(struct image_args *args, size_t consume,
 	    ssize_t extend);
 char	*exec_args_get_begin_envv(struct image_args *args);
@@ -119,8 +119,8 @@ void	exec_free_args(struct image_args *);
 int	exec_new_vmspace(struct image_params *, const struct sysentvec *);
 void	exec_setregs(struct thread *, struct image_params *, u_long);
 int	exec_shell_imgact(struct image_params *);
-int	exec_copyin_args(struct image_args *, const char *, enum uio_seg,
-	char **, char **);
+int	exec_copyin_args(struct image_args *, const char * __capability,
+	    enum uio_seg, void * __capability, void * __capability);
 int	exec_copyin_data_fds(struct thread *, struct image_args *, const void *,
 	size_t, const int *, size_t);
 int	pre_execve(struct thread *td, struct vmspace **oldvmspace);

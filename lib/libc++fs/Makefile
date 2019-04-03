@@ -5,7 +5,7 @@
 PACKAGE=	clibs
 .if ${MK_CHERI} == "yes"
 WANT_CHERI?=	hybrid
-SRCDIR=		${SRCTOP}/contrib/cheri-libc++
+SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++
 .else
 SRCDIR=		${SRCTOP}/contrib/libc++
 .endif

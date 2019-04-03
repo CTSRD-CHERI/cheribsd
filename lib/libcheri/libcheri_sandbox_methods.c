@@ -366,10 +366,10 @@ sandbox_parse_ccall_methods(int fd,
 	for (i = 1; i < nsyms; i++) {
 		sname = strtab + symtab[i].st_name;
 #if defined(DEBUG) && DEBUG > 1
-		printf("symtab[%d] name     %s\n", i, sname);
-		printf("symtab[%d] section  %d\n", i, symtab[i].st_shndx);
-		printf("symtab[%d] addr     0x%lx\n", i, symtab[i].st_value);
-		printf("symtab[%d] size     0x%zx\n", i, symtab[i].st_size);
+		printf("symtab[%zd] name     %s\n", i, sname);
+		printf("symtab[%zd] section  %d\n", i, symtab[i].st_shndx);
+		printf("symtab[%zd] addr     0x%lx\n", i, symtab[i].st_value);
+		printf("symtab[%zd] size     0x%zx\n", i, symtab[i].st_size);
 #endif
 		if (symtab[i].st_name == 0)
 			continue;
@@ -486,7 +486,7 @@ sandbox_parse_ccall_methods(int fd,
 			required_class_name = NULL; /* prevent double free */
 			rmethods[nrmethods].srm_index_offset =
 			    symtab[i].st_value;
-#ifdef DEBUG
+#if defined(DEBUG) && DEBUG > 1
 			printf("required method: %s class: %s "
 			    "(index offset 0x%lx)\n",
 			    rmethods[nrmethods].srm_method,
@@ -715,7 +715,6 @@ sandbox_make_vtable(void *dataptr, const char *class,
 		warnx("%s: calloc", __func__);
 		return (NULL);
 	}
-
 #ifdef __CHERI_PURE_CAPABILITY__
 	/*
 	 * XXXRW: For system classes, a NULL dataptr is passed in, signifying
@@ -725,19 +724,33 @@ sandbox_make_vtable(void *dataptr, const char *class,
 	 * here, but probably the caller should do that instead.
 	 */
 	if (dataptr == NULL)
-		dataptr = cheri_getdefault();
+		dataptr = cheri_clearperm(
+		    cheri_setoffset(cheri_getpcc(), 0), CHERI_PERM_EXECUTE);
+
 #endif
 	cheri_ccallee_base = (vm_offset_t *)dataptr + provided_classes->spcs_base
 	    / sizeof(vm_offset_t);
 	length = provided_classes->spcs_nmethods * sizeof(*vtable);
+	assert(cheri_getlen(vtable) >= length);
+#ifdef DEBUG
+	printf("%s(%s): spcs_nmethods = %zd, length = %zd\n", __func__, class,
+	    provided_classes->spcs_nmethods, length);
+#endif
 
 	if (class == NULL) {
+#ifdef DEBUG
+		printf("%s: class == NULL -> copying whole table\n", __func__);
+#endif
 		memcpy_c_tocap(vtable, cheri_ccallee_base, length);
 		return (cheri_andperm(vtable, CHERI_PERM_LOAD));
 	}
 
 	for (i = 0; i < provided_classes->spcs_nclasses; i++) {
 		pms = provided_classes->spcs_classes[i];
+#ifdef DEBUG
+		printf("%s: provided_classes[%zd]='%s', want '%s'\n", __func__,
+		    i, pms->spms_class, class);
+#endif
 		if (strcmp(pms->spms_class, class) != 0)
 			continue;
 
@@ -745,8 +758,19 @@ sandbox_make_vtable(void *dataptr, const char *class,
 			pm = pms->spms_methods + m;
 			index = (pm->spm_index_offset -
 			    provided_classes->spcs_base) / sizeof(*vtable);
-			vtable[index] = cheri_ccallee_base[index];
+#if defined(DEBUG) && DEBUG > 1
+			printf("%s: provided_classes[%zd] method[%zd] is '%s'."
+			       " index = %zd\n",
+			    __func__, i, m, pm->spm_method, index);
+#endif
+			assert(vtable[m] == 0);
+			vtable[m] = cheri_ccallee_base[index];
 		}
+#ifdef DEBUG
+		printf("%s: added [%zd] methods to vtable for %s\n", __func__,
+		    m, pms->spms_class);
+#endif
+		/* TODO: set bounds on vtable up to last index? */
 		return (cheri_andperm(vtable, CHERI_PERM_LOAD));
 	}
 	free_c(vtable);
@@ -776,6 +800,11 @@ sandbox_set_required_method_variables(void * __capability datacap,
 
 		method_var_p = cheri_setoffset(datacap,
 		    rmethods[i].srm_index_offset);
+#if defined(DEBUG) && DEBUG > 1
+		printf("%s: updating method %zd (%s::%s) variable: %#p\n",
+		 __func__, i, rmethods[i].srm_class, rmethods[i].srm_method, (__cheri_fromcap void*)method_var_p);
+		printf("\t 0x%zd -> 0x%zx\n", *method_var_p, rmethods[i].srm_vtable_offset);
+#endif
 		*method_var_p = rmethods[i].srm_vtable_offset;
 	}
 	return(0);

@@ -44,7 +44,7 @@ CFLAGS+=	-DKERNEL_MEMCPY_TESTS
 .endif
 
 .ifdef CHERI_C_TESTS
-CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/cheri-c-tests
+CHERI_C_TESTS_DIR=	${SRCTOP}/contrib/subrepo-cheri-c-tests
 .if exists(${CHERI_C_TESTS_DIR}/Makefile)
 .PATH: ${CHERI_C_TESTS_DIR} \
 		${CHERI_C_TESTS_DIR}/clang-hybrid \

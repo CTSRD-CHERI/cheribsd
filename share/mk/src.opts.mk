@@ -108,6 +108,7 @@ __DEFAULT_YES_OPTIONS = \
     GDB \
     GNU_DIFF \
     GNU_GREP \
+    GOOGLETEST \
     GPIO \
     HAST \
     HTML \
@@ -222,6 +223,7 @@ __DEFAULT_DEPENDENT_OPTIONS= \
 	CLANG_FULL/CLANG \
 	LLVM_TARGET_ALL/CLANG \
 	LOADER_VERIEXEC/BEARSSL \
+	LOADER_EFI_SECUREBOOT/LOADER_VERIEXEC \
 	VERIEXEC/BEARSSL \
 
 # MK_*_SUPPORT options which default to "yes" unless their corresponding
@@ -300,13 +302,13 @@ __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF
 # Clang is enabled, and will be installed as the default /usr/bin/cc.
 __DEFAULT_YES_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
 __DEFAULT_NO_OPTIONS+=GCC GCC_BOOTSTRAP GNUCXX GPL_DTC
-.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mriscv*} == "" && ${__T} != "sparc64" && ! ${__T:Mmips*c*}
+.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mriscv*} == "" && ${__T} != "sparc64" && ! (${__T:Mmips*c*} || ${MACHINE_ARCH:Mmips*c*})
 # If an external compiler that supports C++11 is used as ${CC} and Clang
 # supports the target, then Clang is enabled but GCC is installed as the
 # default /usr/bin/cc.
 __DEFAULT_YES_OPTIONS+=CLANG GCC GCC_BOOTSTRAP GNUCXX GPL_DTC LLD
 __DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
-.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mmips*c*}
+.elif ${COMPILER_FEATURES:Mc++11} && (${__T:Mmips*c*} || ${MACHINE_ARCH:Mmips*c*})
 # CHERI pure-capability targets alwasy use libc++
 # Don't build CLANG for now
 __DEFAULT_NO_OPTIONS+=CLANG CLANG_IS_CC
@@ -445,6 +447,18 @@ BROKEN_OPTIONS+=NVME
 .if ${__T:Mpowerpc*} || ${__T:Msparc64}
 BROKEN_OPTIONS+=BSD_CRTBEGIN
 .endif
+
+# Doesn't link
+.if ${__T:Mmips*}
+BROKEN_OPTIONS+=GOOGLETEST
+.endif
+
+.if ${COMPILER_FEATURES:Mc++11} && (${__T} == "amd64" || ${__T} == "i386")
+__DEFAULT_YES_OPTIONS+=OPENMP
+.else
+__DEFAULT_NO_OPTIONS+=OPENMP
+.endif
+
 .include <bsd.mkopt.mk>
 
 .if ${.MAKE.OS} != "FreeBSD"
@@ -485,11 +499,8 @@ MK_${var}:=	no
 # Order is somewhat important.
 #
 .if !${COMPILER_FEATURES:Mc++11}
+MK_GOOGLETEST:=	no
 MK_LLVM_LIBUNWIND:=	no
-.endif
-
-.if ${MK_BINUTILS} == "no"
-MK_GDB:=	no
 .endif
 
 .if ${MK_CAPSICUM} == "no"
@@ -567,6 +578,10 @@ MK_FREEBSD_UPDATE:=	no
 
 .if ${MK_TESTS} == "no"
 MK_DTRACE_TESTS:= no
+.endif
+
+.if ${MK_TESTS_SUPPORT} == "no"
+MK_GOOGLETEST:=	no
 .endif
 
 .if ${MK_ZONEINFO} == "no"

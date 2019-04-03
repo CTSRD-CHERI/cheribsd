@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/CTSRD-CHERI/libcxx.git
+	branch = monorepo-mirror
+	commit = 23bf3b767d4fc014c2756dbbe21d33e6d3bf1537
+	parent = b6d1ba3cc6191d05028456938788e4974849629c
+	method = rebase
+	cmdver = 0.4.0

@@ -331,78 +331,6 @@ freebsd32_sigaltstack(struct thread *td,
 	return (error);
 }
 
-/*
- * Custom version of exec_copyin_args() so that we can translate
- * the pointers.
- */
-int
-freebsd32_exec_copyin_args(struct image_args *args, const char *fname,
-    enum uio_seg segflg, u_int32_t *argv, u_int32_t *envv)
-{
-	char *argp, *envp;
-	u_int32_t *p32, arg;
-	int error;
-
-	bzero(args, sizeof(*args));
-	if (argv == NULL)
-		return (EFAULT);
-
-	/*
-	 * Allocate demand-paged memory for the file name, argument, and
-	 * environment strings.
-	 */
-	error = exec_alloc_args(args);
-	if (error != 0)
-		return (error);
-
-	/*
-	 * Copy the file name.
-	 */
-	error = exec_args_add_fname(args, fname, segflg);
-	if (error != 0)
-		goto err_exit;
-
-	/*
-	 * extract arguments first
-	 */
-	p32 = argv;
-	for (;;) {
-		error = copyin(p32++, &arg, sizeof(arg));
-		if (error)
-			goto err_exit;
-		if (arg == 0)
-			break;
-		argp = PTRIN(arg);
-		error = exec_args_add_arg(args, argp, UIO_USERSPACE);
-		if (error != 0)
-			goto err_exit;
-	}
-			
-	/*
-	 * extract environment strings
-	 */
-	if (envv) {
-		p32 = envv;
-		for (;;) {
-			error = copyin(p32++, &arg, sizeof(arg));
-			if (error)
-				goto err_exit;
-			if (arg == 0)
-				break;
-			envp = PTRIN(arg);
-			error = exec_args_add_env(args, envp, UIO_USERSPACE);
-			if (error != 0)
-				goto err_exit;
-		}
-	}
-
-	return (0);
-
-err_exit:
-	exec_free_args(args);
-	return (error);
-}
-
 int
 freebsd32_execve(struct thread *td, struct freebsd32_execve_args *uap)
 {
@@ -413,8 +341,9 @@ freebsd32_execve(struct thread *td, struct freebsd32_execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = freebsd32_exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
-	    uap->argv, uap->envv);
+	error = exec_copyin_args(&eargs, __USER_CAP_STR(uap->fname),
+	    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argv),
+	    __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0)
 		error = kern_execve(td, &eargs, NULL);
 	post_execve(td, error, oldvmspace);
@@ -431,8 +360,8 @@ freebsd32_fexecve(struct thread *td, struct freebsd32_fexecve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = freebsd32_exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
-	    uap->argv, uap->envv);
+	error = exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
+	    __USER_CAP_UNBOUND(uap->argv), __USER_CAP_UNBOUND(uap->envv));
 	if (error == 0) {
 		eargs.fd = uap->fd;
 		error = kern_execve(td, &eargs, NULL);
@@ -838,8 +767,8 @@ freebsd32_gettimeofday(struct thread *td,
 		error = copyout(&atv32, uap->tp, sizeof (atv32));
 	}
 	if (error == 0 && uap->tzp != NULL) {
-		rtz.tz_minuteswest = tz_minuteswest;
-		rtz.tz_dsttime = tz_dsttime;
+		rtz.tz_minuteswest = 0;
+		rtz.tz_dsttime = 0;
 		error = copyout(&rtz, uap->tzp, sizeof (rtz));
 	}
 	return (error);
@@ -3204,6 +3133,10 @@ freebsd32_procctl(struct thread *td, struct freebsd32_procctl_args *uap)
 		struct procctl_reaper_pids32 rp;
 	} x32;
 	int error, error1, flags, signum;
+
+	if (uap->com >= PROC_PROCCTL_MD_MIN)
+		return (cpu_procctl(td, uap->idtype, PAIR32TO64(id_t, uap->id),
+		    uap->com, PTRIN(uap->data)));
 
 	switch (uap->com) {
 	case PROC_ASLR_CTL:

@@ -1080,7 +1080,7 @@ dofault:
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 
-			if (td->td_md.md_ss_addr != (intptr_t)va) {
+			if (td->td_md.md_ss_addr != (__cheri_addr intptr_t)va) {
 				addr = va;
 				break;
 			}

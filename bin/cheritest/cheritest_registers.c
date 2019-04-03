@@ -448,7 +448,15 @@ test_initregs_idc(const struct cheri_test *ctp __unused)
 #ifndef __CHERI_CAPABILITY_TABLE__
 	check_initreg_data(cheri_getidc());
 #else
+#if __has_builtin(__builtin_mips_cheri_get_captable)
+	void* __capability cgp = __builtin_mips_cheri_get_captable();
+#else
+	/*
+	 * XXXAR: this is not guaranteed to work (and in the pc-relative ABI it
+	 * will almost certainly be wrong
+	 */
 	void* __capability cgp = cheri_getidc();
+#endif
 	uintmax_t perms = cheri_getperm(cgp);
 	extern void _CHERI_CAPABILITY_TABLE_;
 	void* __capability cap_table = &_CHERI_CAPABILITY_TABLE_;

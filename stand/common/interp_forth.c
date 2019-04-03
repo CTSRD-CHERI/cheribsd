@@ -39,9 +39,9 @@ INTERP_DEFINE("4th");
 /* #define BFORTH_DEBUG */
 
 #ifdef BFORTH_DEBUG
-#define	DEBUG(fmt, args...)	printf("%s: " fmt "\n" , __func__ , ## args)
+#define	DPRINTF(fmt, args...)	printf("%s: " fmt "\n" , __func__ , ## args)
 #else
-#define	DEBUG(fmt, args...)
+#define	DPRINTF(fmt, args...)
 #endif
 
 /*
@@ -128,7 +128,7 @@ bf_command(FICL_VM *vm)
 			vmUpdateTib(vm, tail + len);
 		}
 	}
-	DEBUG("cmd '%s'", line);
+	DPRINTF("cmd '%s'", line);
 
 	command_errmsg = command_errbuf;
 	command_errbuf[0] = 0;
@@ -283,6 +283,12 @@ bf_init(void)
 
 	/* try to load and run init file if present */
 	if ((fd = open("/boot/boot.4th", O_RDONLY)) != -1) {
+#ifdef LOADER_VERIEXEC
+		if (verify_file(fd, "/boot/boot.4th", 0, VE_GUESS) < 0) {
+			close(fd);
+			return;
+		}
+#endif
 		(void)ficlExecFD(bf_vm, fd);
 		close(fd);
 	}
@@ -305,7 +311,7 @@ bf_run(const char *line)
 	 */
 	result = ficlExec(bf_vm, __DECONST(char *, line));
 
-	DEBUG("ficlExec '%s' = %d", line, result);
+	DPRINTF("ficlExec '%s' = %d", line, result);
 	switch (result) {
 	case VM_OUTOFTEXT:
 	case VM_ABORTQ:

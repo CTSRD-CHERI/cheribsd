@@ -52,6 +52,7 @@ sandbox_creturn:
 	.global sandbox_creturn_end
 sandbox_creturn_end:
 	.size sandbox_creturn, sandbox_creturn_end - sandbox_creturn
+	.size sandbox_creturn_end, 0
 
 
 	/*
@@ -73,6 +74,7 @@ sandbox_nop_creturn:
 	.global sandbox_nop_creturn_end
 sandbox_nop_creturn_end:
 	.size sandbox_nop_creturn, sandbox_nop_creturn_end - sandbox_nop_creturn
+	.size sandbox_nop_creturn_end, 0
 
 
 	/*
@@ -92,3 +94,4 @@ sandbox_dli_creturn:
 	.global sandbox_dli_creturn_end
 sandbox_dli_creturn_end:
 	.size sandbox_dli_creturn, sandbox_dli_creturn_end - sandbox_dli_creturn
+	.size sandbox_dli_creturn_end, 0

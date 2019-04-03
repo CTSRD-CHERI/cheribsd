@@ -690,8 +690,9 @@ sigonstack(size_t sp)
 	if (td->td_sigstk.ss_size == 0)
 		return ((td->td_sigstk.ss_flags & SS_ONSTACK) != 0);
 #endif
-	return (sp >= (size_t)td->td_sigstk.ss_sp &&
-	    sp < td->td_sigstk.ss_size + (size_t)td->td_sigstk.ss_sp);
+	return (sp >= (__cheri_addr size_t)td->td_sigstk.ss_sp &&
+	    sp < td->td_sigstk.ss_size
+	       + (__cheri_addr size_t)td->td_sigstk.ss_sp);
 }
 
 int

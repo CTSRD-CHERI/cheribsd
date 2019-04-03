@@ -100,7 +100,6 @@ __FBSDID("$FreeBSD$");
 #ifdef COMPAT_CHERIABI
 #include <cheri/cheric.h>
 #include <sys/user.h>
-#include <compat/cheriabi/cheriabi_ipc_shm.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_util.h>
@@ -218,6 +217,13 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, shmsegs, CTLTYPE_OPAQUE | CTLFLAG_RD |
     "Array of struct shmid_kernel for each potential shared memory segment");
 
 #ifdef COMPAT_CHERIABI
+struct shmid_kernel_c {
+	struct shmid_ds u;	/* Contains no pointers so no _c needed. */
+	struct vm_object * __capability	object;
+	struct label * __capability	label;
+	struct ucred * __capability	cred;
+};
+
 SYSCTL_DECL(_compat_cheriabi);
 static SYSCTL_NODE(_compat_cheriabi, OID_AUTO, sysv_shm, CTLFLAG_RW, 0,
     "System V shared memory");
@@ -1068,6 +1074,56 @@ static struct syscall_helper_data shm_syscalls[] = {
 #include <compat/freebsd32/freebsd32_signal.h>
 #include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/freebsd32/freebsd32_util.h>
+
+struct shmid_ds32 {
+	struct ipc_perm32 shm_perm;
+	int32_t		shm_segsz;
+	pid_t		shm_lpid;
+	pid_t		shm_cpid;
+	unsigned int	shm_nattch;
+	int32_t		shm_atime;
+	int32_t		shm_dtime;
+	int32_t		shm_ctime;
+};
+
+#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
+    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
+struct shmid_ds32_old {
+	struct ipc_perm32_old shm_perm;
+	int32_t		shm_segsz;
+	pid_t		shm_lpid;
+	pid_t		shm_cpid;
+	int16_t		shm_nattch;
+	int32_t		shm_atime;
+	int32_t		shm_dtime;
+	int32_t		shm_ctime;
+	uint32_t	shm_internal;
+};
+#endif
+
+struct shmid_kernel32 {
+	struct shmid_ds32	 u;
+	int32_t			*object;
+	int32_t			*label;
+	int32_t			*cred;
+};
+
+struct shm_info32 {
+	int32_t		used_ids;
+	uint32_t	shm_tot;
+	uint32_t	shm_rss;
+	uint32_t	shm_swp;
+	uint32_t	swap_attempts;
+	uint32_t	swap_successes;
+};
+
+struct shminfo32 {
+	uint32_t	shmmax;
+	uint32_t	shmmin;
+	uint32_t	shmmni;
+	uint32_t	shmseg;
+	uint32_t	shmall;
+};
 
 static struct syscall_helper_data shm32_syscalls[] = {
 	SYSCALL32_INIT_HELPER_COMPAT(shmat),

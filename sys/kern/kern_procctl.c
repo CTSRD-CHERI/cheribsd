@@ -520,6 +520,9 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 	} xpids;
 	int error, error1, flags, signum;
 
+	if (com >= PROC_PROCCTL_MD_MIN)
+		return (cpu_procctl(td, idtype, id, com, udata));
+
 	switch (com) {
 	case PROC_ASLR_CTL:
 	case PROC_SPROTECT:

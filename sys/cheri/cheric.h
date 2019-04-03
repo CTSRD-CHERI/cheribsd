@@ -56,6 +56,7 @@
 #define	cheri_cleartag(x)	__builtin_cheri_tag_clear((x))
 #define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
 #define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))
+#define	cheri_setaddress(x, y)	__builtin_cheri_address_set((x), (y))
 
 #define	cheri_seal(x, y)	__builtin_cheri_seal((x), (y))
 #define	cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
@@ -89,22 +90,15 @@
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
 
 /* Increment @p dst to have the address of @p src */
-static inline void * __capability
+static __always_inline inline void * __capability
 cheri_copyaddress(const void * __capability dst, const void * __capability src)
 {
 	return (cheri_incoffset(dst,
 	    (const char* __capability)src - (const char* __capability)dst));
 }
 
-/* Same as above but using an absolute virtual address instead of another cap */
-static inline void * __capability
-cheri_setaddress(const void * __capability dst, vaddr_t addr)
-{
-	return (cheri_incoffset(dst, addr - cheri_getaddress(dst)));
-}
-
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
-static inline vaddr_t
+static __always_inline inline vaddr_t
 cheri_gettop(const void * __capability cap)
 {
 	return (cheri_getbase(cap) + cheri_getlen(cap));
@@ -112,9 +106,9 @@ cheri_gettop(const void * __capability cap)
 
 /* Check if the address is between cap.base and cap.top, i.e. in bounds */
 #ifdef __cplusplus
-static inline bool
+static __always_inline inline bool
 #else
-static inline _Bool
+static __always_inline inline _Bool
 #endif
 cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
 {
@@ -247,8 +241,8 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx b:%016jx l:%016zx o:%jx t:%ld"
 #define _CHERI_PRINTF_CAP_ARG(ptr)					\
-	    cheri_gettag((const void * __capability)(ptr)),		\
-	    cheri_getsealed((const void * __capability)(ptr)),		\
+	    (unsigned long)cheri_gettag((const void * __capability)(ptr)),		\
+	    (unsigned long)cheri_getsealed((const void * __capability)(ptr)),		\
 	    cheri_getperm((const void * __capability)(ptr)),		\
 	    cheri_getbase((const void * __capability)(ptr)),		\
 	    cheri_getlen((const void * __capability)(ptr)),		\
