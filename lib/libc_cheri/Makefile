@@ -24,8 +24,7 @@ SRCS=		\
 		libcheri_invoke_cabi.S	\
 		malloc.c
 
-# TODO: is this actually true?
-CFLAGS.libcheri_invoke_cabi.S+=-DBUILDING_LIBC_CHERI
+CFLAGS.libcheri_invoke_cabi.S+=-DHAVE_VALID_DDC
 
 CFLAGS.malloc.c=	-Wno-cast-align
 
