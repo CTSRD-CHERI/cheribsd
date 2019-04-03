@@ -55,6 +55,12 @@ LDFLAGS+= -Wl,-zretpolineplt
 .endif
 .endif
 
+.if defined(LD_FATAL_WARNINGS) && ${LD_FATAL_WARNINGS} == "no"
+LDFLAGS+=	-Wl,--no-fatal-warnings
+.else
+LDFLAGS+=	-Wl,--fatal-warnings
+.endif
+
 .if defined(CRUNCH_CFLAGS)
 CFLAGS+=${CRUNCH_CFLAGS}
 .else
