@@ -1273,8 +1273,8 @@ exec_new_vmspace(struct image_params *imgp, const struct sysentvec *sv)
 		do {
 			p->p_usrstack -= MAXSSIZ;
 			stack_addr = p->p_usrstack - ssiz;
-			error = vm_map_findspace(map, stack_addr, ssiz, &dummy);
-		} while (error != 0);
+			dummy = vm_map_findspace(map, stack_addr, ssiz);
+		} while (dummy == vm_map_max(map) - ssiz + 1);
 	} else {
 		stack_addr = p->p_usrstack - ssiz;
 	}

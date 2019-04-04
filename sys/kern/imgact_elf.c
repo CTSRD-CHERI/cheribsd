@@ -1125,6 +1125,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		 */
 		if (imgp->cop != NULL) {
 			struct vmspace *covmspace;
+			vm_offset_t addr;
 			vm_size_t len;
 
 			// XXX: What protects p_vmspace?
@@ -1139,10 +1140,12 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 				}
 			}
 
+			addr = MAX((vm_offset_t)covmspace->vm_daddr + covmspace->vm_dsize, et_dyn_addr);
+
 			// XXX: Use vm_map_lock() to avoid race with concurrent mmap(2).
-			error = vm_map_findspace(&covmspace->vm_map, (vm_offset_t)covmspace->vm_daddr + covmspace->vm_dsize, len, &et_dyn_addr);
-			if (error != 0) {
-				printf("%s: vm_map_findspace() failed with error %d\n", __func__, error);
+			et_dyn_addr = vm_map_findspace(&covmspace->vm_map, addr, len);
+			if (et_dyn_addr == vm_map_max(&covmspace->vm_map) - len + 1) {
+				printf("%s: vm_map_findspace() failed\n", __func__);
 				goto ret;
 			}
 			//printf("%s: et_dyn_addr adjusted to %lx, end at %lx, len %lu\n", __func__, et_dyn_addr, et_dyn_addr + len, len);
@@ -1290,9 +1293,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		covmspace = imgp->cop->p_vmspace;
 
 		// XXX: Hardcoded size, meh.
-		error = vm_map_findspace(&covmspace->vm_map, addr, 1024 * 1024, &addr);
-		if (error != 0) {
-			printf("%s: vm_map_findspace() failed with error %d\n", __func__, error);
+		addr = vm_map_findspace(&covmspace->vm_map, addr, 1024 * 1024);
+		if (addr == vm_map_max(&covmspace->vm_map) - 1024 * 1024 + 1) {
+			printf("%s: vm_map_findspace() failed\n", __func__);
 			goto ret;
 		}
 		//printf("%s: rtld addr adjusted to %lx\n", __func__, addr);
