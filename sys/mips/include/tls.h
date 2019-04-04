@@ -52,7 +52,7 @@
 
 /* XXX-AR: #define TLS_TCB_SIZE	(2 * sizeof(void*)) for all ABIs? */
 #ifdef __CHERI_PURE_CAPABILITY__
-#define TLS_TCB_SIZE	(2 * CHERICAP_SIZE)
+#define TLS_TCB_SIZE	(2 * __SIZEOF_CHERI_CAPABILITY__)
 #elif defined(__mips_n64)
 #define TLS_TCB_SIZE	16
 #ifdef COMPAT_FREEBSD32
