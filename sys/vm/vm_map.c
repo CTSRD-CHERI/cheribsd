@@ -149,8 +149,6 @@ static int vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos,
 static void vm_map_wire_entry_failure(vm_map_t map, vm_map_entry_t entry,
     vm_offset_t failed_addr);
 static vm_map_entry_t vm_map_entry_create(vm_map_t map);
-static void vm_map_entry_link(vm_map_t map, vm_map_entry_t after_where,
-    vm_map_entry_t entry);
 
 #define	ENTRY_CHARGED(e) ((e)->cred != NULL || \
     ((e)->object.vm_object != NULL && (e)->object.vm_object->cred != NULL && \
