@@ -663,6 +663,47 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 	return (0);
 }
 
+static int
+__elfN(find_space)(const struct image_params *imgp, const Elf_Ehdr *hdr,
+    const Elf_Phdr *phdr, vm_offset_t *addrp)
+{
+	struct vmspace *vmspace;
+	vm_offset_t addr;
+	size_t size;
+	int i;
+
+	vmspace = imgp->proc->p_vmspace;
+
+	size = 0;
+	for (i = 0; i < hdr->e_phnum; i++) {
+		if (phdr[i].p_type != PT_LOAD)
+			continue;
+		if (phdr[i].p_vaddr + phdr[i].p_memsz <= size)
+			continue;
+		size = round_page(phdr[i].p_vaddr + phdr[i].p_memsz);
+	}
+
+	addr = (vm_offset_t)vmspace->vm_daddr + vmspace->vm_dsize;
+	addr = MAX(addr, *addrp);
+
+	/* Round up so signficant bits of rtld addresses aren't touched */
+	if (imgp->proc->p_sysent->sv_flags & SV_CHERI) {
+		/*
+		 * XXX: This is one more '0' than the one in the master
+		 *	branch; crashes otherwise.
+		 */
+		addr = roundup2(addr, 0x10000000);
+	}
+	addr = vm_map_findspace(&vmspace->vm_map, addr, size);
+	if (addr == vm_map_max(&vmspace->vm_map) - size + 1) {
+		printf("%s: vm_map_findspace()\n", __func__);
+		return (ENOMEM);
+	}
+
+	*addrp = addr;
+	return (0);
+}
+
 /*
  * Load the file "file" into memory.  It may be either a shared object
  * or an executable.
@@ -773,6 +814,14 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 
 	phdr = (const Elf_Phdr *)(imgp->image_header + hdr->e_phoff);
 	if (!aligned(phdr, Elf_Addr)) {
+		error = ENOEXEC;
+		goto fail;
+	}
+
+	error = __elfN(find_space)(imgp, hdr, phdr, &rbase);
+	if (error != 0) {
+		printf("%s: find_space() failed with error %d\n",
+		    __func__, error);
 		error = ENOEXEC;
 		goto fail;
 	}
@@ -1124,31 +1173,17 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		 * 	the other process' binary and its rtld.  Oh well.
 		 */
 		if (imgp->cop != NULL) {
-			struct vmspace *covmspace;
-			vm_offset_t addr;
-			vm_size_t len;
-
 			// XXX: What protects p_vmspace?
-			covmspace = imgp->cop->p_vmspace;
-			len = 0;
-			for (i = 0; i < hdr->e_phnum; i++) {
-				if (phdr[i].p_type != PT_LOAD)
-					continue;
-				if (phdr[i].p_vaddr + phdr[i].p_memsz > len) {
-					//printf("%s: adjusting size from %lu to %lu\n", __func__, len, phdr[i].p_vaddr + phdr[i].p_memsz);
-					len = round_page(phdr[i].p_vaddr + phdr[i].p_memsz);
-				}
-			}
-
-			addr = MAX((vm_offset_t)covmspace->vm_daddr + covmspace->vm_dsize, et_dyn_addr);
-
-			// XXX: Use vm_map_lock() to avoid race with concurrent mmap(2).
-			et_dyn_addr = vm_map_findspace(&covmspace->vm_map, addr, len);
-			if (et_dyn_addr == vm_map_max(&covmspace->vm_map) - len + 1) {
-				printf("%s: vm_map_findspace() failed\n", __func__);
+			error = __elfN(find_space)(imgp, hdr, phdr, &et_dyn_addr);
+			if (error != 0) {
+				printf("%s: find_space() failed with error %d\n",
+				    __func__, error);
 				goto ret;
 			}
-			//printf("%s: et_dyn_addr adjusted to %lx, end at %lx, len %lu\n", __func__, et_dyn_addr, et_dyn_addr + len, len);
+#if 0
+			printf("%s: et_dyn_addr adjusted to %lx\n",
+			    __func__, et_dyn_addr);
+#endif
 		}
 	} else if (imgp->cop != NULL) {
 #if 0
@@ -1209,6 +1244,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	}
 
 	error = exec_new_vmspace(imgp, sv);
+	/*
+	 * If coexecuting, from this point on we're in a shared vmspace.
+	 */
 	vmspace = imgp->proc->p_vmspace;
 	map = &vmspace->vm_map;
 
@@ -1282,25 +1320,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	addr = round_page((vm_offset_t)vmspace->vm_daddr + lim_max(td,
 	    RLIMIT_DATA));
 
-	/*
-	 * ... unless we need to colocate with another process.  In that
-	 * case, just try to find some free space above that.
-	 */
-	if (imgp->cop != NULL) {
-		struct vmspace *covmspace;
-
-		// XXX: What protects p_vmspace?
-		covmspace = imgp->cop->p_vmspace;
-
-		// XXX: Hardcoded size, meh.
-		addr = vm_map_findspace(&covmspace->vm_map, addr, 1024 * 1024);
-		if (addr == vm_map_max(&covmspace->vm_map) - 1024 * 1024 + 1) {
-			printf("%s: vm_map_findspace() failed\n", __func__);
-			goto ret;
-		}
-		//printf("%s: rtld addr adjusted to %lx\n", __func__, addr);
-	}
-
 	/* Round up so signficant bits of rtld addresses aren't touched */
 	if (imgp->proc->p_sysent->sv_flags & SV_CHERI)
 		addr = roundup2(addr, 0x1000000);
@@ -1326,6 +1345,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			addr = __CONCAT(rnd_, __elfN(base))(map, addr,
 			    maxv1, PAGE_SIZE);
 		}
+
 		if (brand_info->emul_path != NULL &&
 		    brand_info->emul_path[0] != '\0') {
 			path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
