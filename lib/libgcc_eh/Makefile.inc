@@ -32,13 +32,9 @@ SRCS_EXC+=	libunwind.cpp
 SRCS+=		${SRCS_EXC}
 .for file in ${SRCS_EXC:M*.c}
 CFLAGS.${file}+=	-fno-exceptions -funwind-tables
-# Avoid tons of debug output (might speed up running GDB)
-CFLAGS.${file}+=	-DNDEBUG
 .endfor
 .for file in ${SRCS_EXC:M*.cpp}
 CXXFLAGS.${file}+=	-fno-exceptions -funwind-tables
-# Avoid tons of debug output (might speed up running GDB)
-CXXFLAGS.${file}+=	-DNDEBUG
 .endfor
 
 CFLAGS+=	-I${UNWINDINCDIR} -I${.CURDIR} -D_LIBUNWIND_IS_NATIVE_ONLY
