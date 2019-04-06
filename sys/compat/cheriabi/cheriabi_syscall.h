@@ -504,4 +504,5 @@
 #define	CHERIABI_SYS_cheriabi_fhlink	565
 #define	CHERIABI_SYS_cheriabi_fhlinkat	566
 #define	CHERIABI_SYS_cheriabi_fhreadlink	567
-#define	CHERIABI_SYS_MAXSYSCALL	568
+#define	CHERIABI_SYS_cheriabi_funlinkat	568
+#define	CHERIABI_SYS_MAXSYSCALL	569

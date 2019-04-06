@@ -1437,6 +1437,12 @@ struct cheriabi_fhreadlink_args {
 	char buf_l_[PADL_(char * __capability)]; char * __capability buf; char buf_r_[PADR_(char * __capability)];
 	char bufsize_l_[PADL_(size_t)]; size_t bufsize; char bufsize_r_[PADR_(size_t)];
 };
+struct cheriabi_funlinkat_args {
+	char dfd_l_[PADL_(int)]; int dfd; char dfd_r_[PADR_(int)];
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char flag_l_[PADL_(int)]; int flag; char flag_r_[PADR_(int)];
+};
 int	cheriabi_read(struct thread *, struct cheriabi_read_args *);
 int	cheriabi_write(struct thread *, struct cheriabi_write_args *);
 int	cheriabi_open(struct thread *, struct cheriabi_open_args *);
@@ -1726,6 +1732,7 @@ int	cheriabi_getfhat(struct thread *, struct cheriabi_getfhat_args *);
 int	cheriabi_fhlink(struct thread *, struct cheriabi_fhlink_args *);
 int	cheriabi_fhlinkat(struct thread *, struct cheriabi_fhlinkat_args *);
 int	cheriabi_fhreadlink(struct thread *, struct cheriabi_fhreadlink_args *);
+int	cheriabi_funlinkat(struct thread *, struct cheriabi_funlinkat_args *);
 
 #ifdef COMPAT_43
 
@@ -2051,6 +2058,7 @@ int	cheriabi_fhreadlink(struct thread *, struct cheriabi_fhreadlink_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_fhlink	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_fhlinkat	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_fhreadlink	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_funlinkat	AUE_UNLINKAT
 
 #undef PAD_
 #undef PADL_

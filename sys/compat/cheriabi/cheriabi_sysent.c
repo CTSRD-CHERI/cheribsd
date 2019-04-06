@@ -582,4 +582,5 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_fhlink_args), (sy_call_t *)cheriabi_fhlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = cheriabi_fhlink */
 	{ AS(cheriabi_fhlinkat_args), (sy_call_t *)cheriabi_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = cheriabi_fhlinkat */
 	{ AS(cheriabi_fhreadlink_args), (sy_call_t *)cheriabi_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = cheriabi_fhreadlink */
+	{ AS(cheriabi_funlinkat_args), (sy_call_t *)cheriabi_funlinkat, AUE_UNLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 568 = cheriabi_funlinkat */
 };

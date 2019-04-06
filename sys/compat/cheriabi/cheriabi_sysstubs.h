@@ -3699,3 +3699,13 @@ SYS_STUB(567, int, fhreadlink,
     /* _localcheck */ {if (!(cheri_getperm(fhp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(buf) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(568, int, funlinkat,
+    /* _protoargs */ (int dfd, const char *  path, int fd, int flag),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, int dfd, const char * __capability   path, int fd, int flag),
+    /* _protoargs_err */ (int * __capability stub_errno, int dfd, const char * __capability   path, int fd, int flag),
+    /* _callargs */ (dfd, (__cheri_fromcap const char * )path, fd, flag),
+    /* _callargs_chk */ (&ret, stub_errno, dfd, path, fd, flag),
+    /* _callargs_err */ (&errno, dfd, (const char * )path, fd, flag),
+    /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+
