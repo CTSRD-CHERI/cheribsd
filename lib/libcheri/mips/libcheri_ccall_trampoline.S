@@ -98,10 +98,10 @@
 	lui	\dst_reg, %tprel_hi(__libcheri_stack_tls_storage)
 	daddiu	\dst_reg, \dst_reg, %tprel_lo(__libcheri_stack_tls_storage)
 #else
-	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
+	lui	\dst_reg, %tprel_hi(__libcheri_stack_tls_storage)
 	.set	push
 	.set	mips32r2
-	rdhwr	\dst_reg, $29
+	rdhwr	\tmp_reg, $29
 	.set	pop
 	daddiu	\dst_reg, \dst_reg, %tprel_lo(__libcheri_stack_tls_storage)
 	daddu	\dst_reg, \tmp_reg, \dst_reg
