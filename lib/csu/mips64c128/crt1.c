@@ -102,8 +102,8 @@ asm(
 
 #ifndef POSITION_INDEPENDENT_STARTUP
 /* This is __always_inline since it is called before globals have been set up */
-static __always_inline void *
-create_data_cap(const Elf_Phdr *phdr, long phnum)
+static __always_inline void
+do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 {
 	const Elf_Phdr *phlimit = phdr + phnum;
 	Elf_Addr text_start = (Elf_Addr)-1l;
@@ -127,6 +127,7 @@ create_data_cap(const Elf_Phdr *phdr, long phnum)
 			}
 			continue;
 		}
+		/* TODO: handle PT_GNU_RELRO? */
 		Elf_Addr seg_start = ph->p_vaddr;
 		Elf_Addr seg_end = seg_start + ph->p_memsz;
 		if ((ph->p_flags & PF_X)) {
@@ -151,53 +152,68 @@ create_data_cap(const Elf_Phdr *phdr, long phnum)
 		/* No text segment??? Must be an error somewhere else. */
 		__builtin_trap();
 	}
-
-	/* No data segment -> should not need a writable cap -> use $pcc */
-	if (!have_data_segment) {
-		void* result = cheri_clearperm(cheri_getpcc(), CHERI_PERM_EXECUTE);
-		Elf_Addr start = MIN(readonly_start, text_start);
-		Elf_Addr end = MAX(readonly_end, text_end);
-		result = cheri_setaddress(result, start);
-		return cheri_csetbounds(result, end - start);
-	}
-
-	/*
-	 * FIXME: For now, if we don't have a separate rodata segment we also
-	 *  need to include the text segment in the data cap since we can't
-	 *  initialize constant variables otherwise.
-	 */
+	const void *code_cap = cheri_getpcc();
+	const void *rodata_cap = NULL;
 	if (!have_rodata_segment) {
+		/*
+		 * Note: If we don't have a separate rodata segment we also
+		 * need to include the text segment in the rodata cap. This is
+		 * required since all constants will be part of the read/exec
+		 * segment instead of a separate read-only one.
+		 */
 		readonly_start = text_start;
 		readonly_end = text_end;
 	}
+	rodata_cap = cheri_clearperm(phdr,
+	    CHERI_PERM_EXECUTE | CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
+		CHERI_PERM_STORE_LOCAL_CAP);
+	rodata_cap = cheri_setaddress(rodata_cap, readonly_start);
+	rodata_cap =
+	    cheri_csetbounds(rodata_cap, readonly_end - readonly_start);
 
-	/* Check that ranges are well-formed */
-	if (writable_end < writable_start || readonly_end < readonly_start)
-		__builtin_trap();
-	/* Abort if readonly and writeable overlap: */
-	if (MAX(writable_start, readonly_start) <=
-	    MIN(writable_end, readonly_end)) {
-		__builtin_trap();
-	}
-
-	/*
-	 * For now we also must include the rodata segment in the RW cap since
-	 * we don't yet have a flag in __cap_relocs for writable vs readonly
-	 * data.
-	 *
-	 * TODO: we should really use a different capability for constant data!
-	 */
-	writable_start = MIN(writable_start, readonly_start);
-	writable_end = MAX(writable_end, readonly_end);
-
-	void* result = cheri_setaddress(phdr, writable_start);
-	/* Bound the result and clear execute permissions. */
-	result = cheri_clearperm(result, CHERI_PERM_EXECUTE);
-	/* TODO: should we use exact setbounds? */
-	result = cheri_csetbounds(result, writable_end - writable_start);
-	return result;
-}
+	void *data_cap = NULL;
+	if (!have_data_segment) {
+		/*
+		 * There cannot be any capabilities to initialize if there
+		 * is no data segment. Set all to NULL to catch errors.
+		 *
+		 * Note: RELRO segment will be part of a R/W PT_LOAD.
+		 */
+		rodata_cap = NULL;
+		code_cap = NULL;
+	} else {
+		/* Check that ranges are well-formed */
+		if (writable_end < writable_start ||
+		    readonly_end < readonly_start)
+			__builtin_trap();
+		/* Abort if readonly and writeable overlap: */
+		if (MAX(writable_start, readonly_start) <=
+		    MIN(writable_end, readonly_end)) {
+			__builtin_trap();
+		}
+#ifndef CHERI_INIT_GLOBALS_SUPPORTS_CONSTANT_FLAG
+#pragma message("Warning: cheri_init_globals.h is outdated. Please update LLVM")
+		/*
+		 * For backwards compat support the old cheri_init_globals.
+		 * In this case we must include the rodata segment in the
+		 * RW cap since we don't yet have a flag in __cap_relocs for
+		 * writable vs readonly data.
+		 *
+		 * TODO: remove this in a few days/weeks
+		 */
+		writable_start = MIN(writable_start, readonly_start);
+		writable_end = MAX(writable_end, readonly_end);
 #endif
+		data_cap = cheri_setaddress(phdr, writable_start);
+		/* Bound the result and clear execute permissions. */
+		data_cap = cheri_clearperm(data_cap, CHERI_PERM_EXECUTE);
+		/* TODO: should we use exact setbounds? */
+		data_cap =
+		    cheri_csetbounds(data_cap, writable_end - writable_start);
+	}
+	crt_init_globals_3(data_cap, code_cap, rodata_cap);
+}
+#endif /* !defined(POSITION_INDEPENDENT_STARTUP) */
 
 /* The entry function, C part. This performs the bulk of program initialisation
  * before handing off to main(). It is called by __start, which is defined in
@@ -242,12 +258,13 @@ _start(void *auxv,
 	/* For -pie executables rtld will initialize the __cap_relocs */
 #ifndef POSITION_INDEPENDENT_STARTUP
 	/*
-	 * crt_init_globals_gdc must be called before accessing any globals.
+	 * crt_init_globals_3 must be called before accessing any globals.
 	 *
 	 * Note: We parse the phdrs to ensure that the global data cap does
 	 * not span the readonly segment or text segment.
 	 */
-	crt_init_globals_gdc(create_data_cap(aux_info[AT_PHDR]->a_un.a_ptr, aux_info[AT_PHNUM]->a_un.a_val));
+	do_crt_init_globals(
+	    aux_info[AT_PHDR]->a_un.a_ptr, aux_info[AT_PHNUM]->a_un.a_val);
 #endif
 	__auxargs = auxv;
 	argc = aux_info[AT_ARGC]->a_un.a_val;

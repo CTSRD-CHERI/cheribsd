@@ -46,12 +46,13 @@
 #ifndef CRT_INIT_GLOBALS_GDC_ONLY
 CRT_INIT_GLOBALS_STATIC void crt_init_globals(void) __hidden;
 #endif
-CRT_INIT_GLOBALS_STATIC void crt_init_globals_gdc(void *) __hidden;
+CRT_INIT_GLOBALS_STATIC void crt_init_globals_3(
+    void *, const void *, const void *) __hidden;
 
 __attribute__((weak)) extern int _DYNAMIC __no_subobject_bounds;
 
 CRT_INIT_GLOBALS_STATIC void
-crt_init_globals_gdc(void *gdc)
+crt_init_globals_3(void *data_cap, const void *code_cap, const void *rodata_cap)
 {
 #ifdef PCREL_SYMBOL_ADDRESSES_WORK
 	void* _pcc_after_daddui = 0;
@@ -96,20 +97,21 @@ crt_init_globals_gdc(void *gdc)
 	 * a single instruction to load rather than the full dla/pcrel sequence.
 	 */
 	int64_t _has__DYNAMIC;
-	__asm__ volatile(".global _DYNAMIC\n\t"
-	    /*
-	     * XXXAR: For some reason the attribute weak above is ignored if we
-	     * don't also include it in the inline assembly
-	     */
-	    ".weak _DYNAMIC\n\t"
-	    "ori %0, $zero, %%lo(_HAS__DYNAMIC)\n\t"
-	    : "+r"(_has__DYNAMIC));
+	__asm__ volatile("ori %0, $zero, %%lo(_HAS__DYNAMIC)\n\t"
+			 : "+r"(_has__DYNAMIC));
 	/* If we are dynamically linked, the runtime linker takes care of this */
 	if (_has__DYNAMIC)
 		return;
 #endif
 	/* Otherwise we need to initialize globals manually */
-	cheri_init_globals_gdc(gdc);
+#ifdef CHERI_INIT_GLOBALS_SUPPORTS_CONSTANT_FLAG
+	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
+#else
+#pragma message("Warning: cheri_init_globals.h is outdated. Please update LLVM")
+	(void)code_cap;
+	(void)rodata_cap;
+	cheri_init_globals_gdc(data_cap);
+#endif
 }
 
 #ifndef CRT_INIT_GLOBALS_GDC_ONLY
@@ -117,6 +119,8 @@ CRT_INIT_GLOBALS_STATIC void
 crt_init_globals(void)
 {
 
-	crt_init_globals_gdc(__builtin_cheri_global_data_get());
+	crt_init_globals_3(__builtin_cheri_global_data_get(),
+	    __builtin_cheri_program_counter_get(),
+	    __builtin_cheri_global_data_get());
 }
 #endif /* !CRT_INIT_GLOBALS_GDC_ONLY */
