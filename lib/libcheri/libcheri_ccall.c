@@ -137,10 +137,14 @@ libcheri_ccall_init(void)
 	libcheri_creturn_object.co_codecap =
 	    cheri_seal(cap, libcheri_creturn_type);
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef __CHERI_CAPABILITY_TLS__
 	cap = &libcheri_creturn_data;
 #else
-	cap = cheri_ptr(&libcheri_creturn_data, sizeof(libcheri_creturn_data));
+	/*
+	 * Needed without bounds so it covers TLS.
+	 */
+	cap = cheri_getdefault();
+	cap = cheri_setaddress(cap, (vaddr_t)&libcheri_creturn_data);
 #endif
 	libcheri_creturn_object.co_datacap =
 	    cheri_seal(cap, libcheri_creturn_type);

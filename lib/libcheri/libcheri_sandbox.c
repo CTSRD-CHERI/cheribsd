@@ -593,9 +593,8 @@ sandbox_object_new_system_object(void * __capability private_data,
 	(*sbopp)->sbo_ddc = cheri_getdefault();
 	(*sbopp)->sbo_private_data = private_data;
 
-	/* XXXRW: Does this remain the right capability to use for TLS? */
 #ifdef __CHERI_CAPABILITY_TLS__
-	__asm__ volatile("creadhwr %0, $chwr_userlocal": "=C"((*sbopp)->sbo_libcheri_tls));
+	(*sbopp)->sbo_libcheri_tls = NULL;
 #else
 	(*sbopp)->sbo_libcheri_tls = cheri_getdefault();
 #endif
