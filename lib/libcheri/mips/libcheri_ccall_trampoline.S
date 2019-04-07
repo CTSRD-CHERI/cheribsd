@@ -108,6 +108,19 @@
 #endif
 .endm
 
+.macro compute_libcheri_trusted_stack dst_cap, sbop_cap, tmp_reg1, tmp_reg2
+	compute_libcheri_trusted_stack_tls_offset \tmp_reg1, \tmp_reg2
+#ifdef __CHERI_CAPABILITY_TLS__
+	creadhwr	\dst_cap, $chwr_userlocal
+	cincoffset	\dst_cap, \dst_cap, \tmp_reg1
+#else
+	clc		\dst_cap, $zero, (5*CHERICAP_SIZE)(\sbop_cap)
+	csetoffset	\dst_cap, \dst_cap, \tmp_reg1
+#endif
+	# Check that the value is still tagged and in bounds
+	CAssertInBounds \dst_cap, 8
+.endm
+
 /*
  * Implementations of CCall suitable for use within a sealed code capability.
  *
@@ -279,12 +292,7 @@ libcheri_ccall_rtld_fetch_stack:
 	 * (referring to the ambient portion of the process).  Prepare $c14
 	 * for use in pointing at the trusted-stack container structure.
 	 */
-	compute_libcheri_trusted_stack_tls_offset $at, $t0
-
-	clc		$c14, $zero, (5*CHERICAP_SIZE)($c26)
-	csetoffset	$c14, $c14, $at
-	# Check that the value is still tagged and in bounds
-	CAssertInBounds $c14, 8
+	compute_libcheri_trusted_stack $c14, $c26, $at, $t0
 
 libcheri_ccall_rtld_check_stack:
 	/*
@@ -644,11 +652,7 @@ libcheri_ccall_invoke_check_globals:
 	nop					# Branch-delay slot
 
 libcheri_ccall_invoke_fetch_stack:
-	compute_libcheri_trusted_stack_tls_offset $at, $t0
-	clc		$c14, $zero, (5*CHERICAP_SIZE)($c26)
-	csetoffset	$c14, $c14, $at
-	# Check that the value is still tagged and in bounds
-	CAssertInBounds $c14, 8
+	compute_libcheri_trusted_stack $c14, $c26, $at, $t0
 
 libcheri_ccall_invoke_check_stack:
 	/*
@@ -907,7 +911,12 @@ libcheri_creturn_fetch_stack:
 	 * XXXRW: Read note above on TLS and testing.
 	 */
 	compute_libcheri_trusted_stack_tls_offset $at, $t0
+#ifdef __CHERI_CAPABILITY_TLS__
+	creadhwr	$c14, $chwr_userlocal
+	cincoffset	$c14, $c14, $at
+#else
 	csetoffset	$c14, $c26, $at
+#endif
 
 libcheri_creturn_pop_stack_unlock_sandbox:
 	/*
