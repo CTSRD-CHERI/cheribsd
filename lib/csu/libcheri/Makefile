@@ -17,6 +17,7 @@ FILESDIR=       ${LIBDIR}
 .undef LIBRARIES_ONLY
 CLEANFILES=	${FILES}
 CFLAGS+=-mxgot -mllvm -mxmxgot
+CFLAGS.crt_init_globals.c+=-DCHERI_INIT_GLOBALS_USE_OFFSET
 
 NEED_CHERI=	pure
 
