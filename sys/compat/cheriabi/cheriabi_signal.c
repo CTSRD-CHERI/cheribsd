@@ -108,24 +108,9 @@ cheriabi_sigtimedwait(struct thread *td, struct cheriabi_sigtimedwait_args *uap)
 int
 cheriabi_sigwaitinfo(struct thread *td, struct cheriabi_sigwaitinfo_args *uap)
 {
-	ksiginfo_t ksi;
-	sigset_t set;
-	int error;
 
-	error = copyin(uap->set, &set, sizeof(set));
-	if (error)
-		return (error);
-
-	error = kern_sigtimedwait(td, set, &ksi, NULL);
-	if (error)
-		return (error);
-
-	if (uap->info != NULL)
-		error = copyout(&ksi.ksi_info, uap->info,
-		    sizeof(struct siginfo_c));
-	if (error == 0)
-		td->td_retval[0] = ksi.ksi_signo;
-	return (error);
+	return (user_sigwaitinfo(td, uap->set, uap->info,
+	    (copyout_siginfo_t *)cheriabi_copyout_siginfo));
 }
 
 int

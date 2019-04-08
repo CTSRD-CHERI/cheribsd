@@ -2693,6 +2693,16 @@ siginfo_to_siginfo32(const _siginfo_t *src, struct siginfo32 *dst)
 	dst->si_overrun = src->si_overrun;
 }
 
+static int
+freebsd32_copyout_siginfo(const _siginfo_t *si, void * __capability info)
+{
+	struct siginfo32 si32;
+
+	siginfo_to_siginfo32(si, &si32);
+	return (copyout_c(&si32, info, sizeof(si32)));
+}
+
+
 #ifndef _FREEBSD32_SYSPROTO_H_
 struct freebsd32_sigqueue_args {
         pid_t pid;
@@ -2764,26 +2774,10 @@ freebsd32_sigtimedwait(struct thread *td, struct freebsd32_sigtimedwait_args *ua
 int
 freebsd32_sigwaitinfo(struct thread *td, struct freebsd32_sigwaitinfo_args *uap)
 {
-	ksiginfo_t ksi;
-	struct siginfo32 si32;
-	sigset_t set;
-	int error;
 
-	error = copyin(uap->set, &set, sizeof(set));
-	if (error)
-		return (error);
-
-	error = kern_sigtimedwait(td, set, &ksi, NULL);
-	if (error)
-		return (error);
-
-	if (uap->info) {
-		siginfo_to_siginfo32(&ksi.ksi_info, &si32);
-		error = copyout(&si32, uap->info, sizeof(struct siginfo32));
-	}	
-	if (error == 0)
-		td->td_retval[0] = ksi.ksi_signo;
-	return (error);
+	return (user_sigwaitinfo(td, __USER_CAP_OBJ(uap->set),
+	    __USER_CAP_OBJ(uap->info),
+	    (copyout_siginfo_t *)freebsd32_copyout_siginfo));
 }
 
 int

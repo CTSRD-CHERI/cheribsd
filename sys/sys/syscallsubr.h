@@ -607,6 +607,8 @@ int	user_sigtimedwait(struct thread *td,
 	    copyout_siginfo_t *copyout_siginfop);
 int	user_sigwait(struct thread *td, const sigset_t * __capability uset,
 	    int * __capability usig);
+int	user_sigwaitinfo(struct thread *td, const sigset_t * __capability uset,
+	    void * __capability info, copyout_siginfo_t *copyout_siginfop);
 int	user_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int * __capability rsv);
 int	user_statfs(struct thread *td, const char * __capability path,
