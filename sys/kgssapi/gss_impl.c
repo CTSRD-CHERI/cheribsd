@@ -143,7 +143,7 @@ cheriabi_gssd_syscall(struct thread *td,
     struct cheriabi_gssd_syscall_args *uap)
 {
 
-	return (kern_gssd_syscall(td, __USER_CAP_STR(uap->path)));
+	return (kern_gssd_syscall(td, uap->path));
 }
 #endif
 

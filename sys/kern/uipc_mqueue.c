@@ -2957,7 +2957,7 @@ int
 cheriabi_kmq_unlink(struct thread *td, struct cheriabi_kmq_unlink_args *uap)
 {
 
-	return (kern_kmq_unlink(td, __USER_CAP_STR(uap->path)));
+	return (kern_kmq_unlink(td, uap->path));
 }
 
 int
@@ -2972,9 +2972,8 @@ cheriabi_kmq_timedsend(struct thread *td,
     struct cheriabi_kmq_timedsend_args *uap)
 {
 
-	return (kern_kmq_timedsend(td, uap->mqd,
-	    __USER_CAP(uap->msg_ptr, uap->msg_len), uap->msg_len,
-	    uap->msg_prio, __USER_CAP_OBJ(uap->abs_timeout)));
+	return (kern_kmq_timedsend(td, uap->mqd, uap->msg_ptr, uap->msg_len,
+	    uap->msg_prio, uap->abs_timeout));
 }
 
 int
