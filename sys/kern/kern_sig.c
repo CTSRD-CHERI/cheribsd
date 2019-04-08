@@ -1218,20 +1218,29 @@ struct sigprocmask_args {
 int
 sys_sigprocmask(struct thread *td, struct sigprocmask_args *uap)
 {
+
+	return (user_sigprocmask(td, uap->how, __USER_CAP_OBJ(uap->set),
+	    __USER_CAP_OBJ(uap->oset)));
+}
+
+int
+user_sigprocmask(struct thread *td, int how,
+    const sigset_t * __capability uset, sigset_t * __capability uoset)
+{
 	sigset_t set, oset;
 	sigset_t *setp, *osetp;
 	int error;
 
-	setp = (uap->set != NULL) ? &set : NULL;
-	osetp = (uap->oset != NULL) ? &oset : NULL;
+	setp = (uset != NULL) ? &set : NULL;
+	osetp = (uoset != NULL) ? &oset : NULL;
 	if (setp) {
-		error = copyin(uap->set, setp, sizeof(set));
+		error = copyin_c(uset, setp, sizeof(set));
 		if (error)
 			return (error);
 	}
-	error = kern_sigprocmask(td, uap->how, setp, osetp, 0);
+	error = kern_sigprocmask(td, how, setp, osetp, 0);
 	if (osetp && !error) {
-		error = copyout(osetp, uap->oset, sizeof(oset));
+		error = copyout_c(osetp, uoset, sizeof(oset));
 	}
 	return (error);
 }

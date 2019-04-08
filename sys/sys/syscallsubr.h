@@ -599,6 +599,8 @@ int	user_setgroups(struct thread *td, u_int gidsetsize,
 int	user_settimeofday(struct thread *td,
 	    const struct timeval * __capability tp,
 	    const struct timezone * __capability tz);
+int	user_sigprocmask(struct thread *td, int how,
+	    const sigset_t * __capability uset, sigset_t * __capability uoset);
 int	user_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int * __capability rsv);
 int	user_statfs(struct thread *td, const char * __capability path,

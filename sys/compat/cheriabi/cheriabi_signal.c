@@ -79,23 +79,8 @@ cheriabi_sigaction(struct thread *td, struct cheriabi_sigaction_args *uap)
 int
 cheriabi_sigprocmask(struct thread *td, struct cheriabi_sigprocmask_args *uap)
 {
-	sigset_t set, oset;
-	sigset_t *setp, *osetp;
-	int error;
 
-	if (uap->set != NULL) {
-		error = copyin(uap->set, &set, sizeof(set));
-		setp = &set;
-	} else
-		setp = NULL;
-	if (uap->oset != NULL)
-		osetp = &oset;
-	else
-		osetp = NULL;
-	error = kern_sigprocmask(td, uap->how, setp, osetp, 0);
-	if (osetp && error == 0)
-		error = copyout(osetp, uap->oset, sizeof(oset));
-	return (error);
+	return (user_sigprocmask(td, uap->how, uap->set, uap->oset));
 }
 
 int
