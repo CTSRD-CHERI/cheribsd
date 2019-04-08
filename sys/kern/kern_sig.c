@@ -1653,10 +1653,17 @@ struct sigsuspend_args {
 int
 sys_sigsuspend(struct thread *td, struct sigsuspend_args *uap)
 {
+
+	return (user_sigsuspend(td, __USER_CAP_OBJ(uap->sigmask)));
+}
+
+int
+user_sigsuspend(struct thread *td, const sigset_t * __capability sigmask)
+{
 	sigset_t mask;
 	int error;
 
-	error = copyin(uap->sigmask, &mask, sizeof(mask));
+	error = copyin_c(sigmask, &mask, sizeof(mask));
 	if (error)
 		return (error);
 	return (kern_sigsuspend(td, mask));

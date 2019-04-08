@@ -602,6 +602,8 @@ int	user_settimeofday(struct thread *td,
 	    const struct timezone * __capability tz);
 int	user_sigprocmask(struct thread *td, int how,
 	    const sigset_t * __capability uset, sigset_t * __capability uoset);
+int	user_sigsuspend(struct thread *td,
+	    const sigset_t * __capability sigmask);
 int	user_sigtimedwait(struct thread *td,
 	    const sigset_t * __capability uset, void * __capability info,
 	    const struct timespec * __capability utimeout,

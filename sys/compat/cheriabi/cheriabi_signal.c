@@ -123,13 +123,8 @@ cheriabi_sigpending(struct thread *td, struct cheriabi_sigpending_args *uap)
 int
 cheriabi_sigsuspend(struct thread *td, struct cheriabi_sigsuspend_args *uap)
 {
-	sigset_t mask;
-	int error;
 
-	error = copyin(uap->sigmask, &mask, sizeof(mask));
-	if (error)
-		return (error);
-	return (kern_sigsuspend(td, mask));
+	return (user_sigsuspend(td, uap->sigmask));
 }
 
 int
