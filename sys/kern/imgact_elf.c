@@ -1132,10 +1132,15 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 
 	/*
 	 * Check if colocation is allowed.  We can only do it after we know
-	 * if the binary is for CheriABI or not.
+	 * if the binary is for CheriABI or not.  We also check the proccess
+	 * to colocate with.
 	 */
 	if (imgp->cop != NULL) {
 		if ((sv->sv_flags & SV_CHERI) == 0) {
+			error = EPERM;
+			goto ret;
+		}
+		if (SV_PROC_FLAG(imgp->cop, SV_CHERI) == 0) {
 			error = EPERM;
 			goto ret;
 		}
