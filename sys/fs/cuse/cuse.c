@@ -1559,7 +1559,7 @@ cuse_client_read(struct cdev *dev, struct uio *uio, int ioflag)
 
 		cuse_lock();
 		cuse_client_send_command_locked(pccmd,
-		    (uintptr_t)uio->uio_iov->iov_base,
+		    (__cheri_addr uintptr_t)uio->uio_iov->iov_base,
 		    (unsigned long)(unsigned int)len, pcc->fflags, ioflag);
 
 		error = cuse_client_receive_command_locked(pccmd, 0, 0);
@@ -1618,7 +1618,7 @@ cuse_client_write(struct cdev *dev, struct uio *uio, int ioflag)
 
 		cuse_lock();
 		cuse_client_send_command_locked(pccmd,
-		    (uintptr_t)uio->uio_iov->iov_base,
+		    (__cheri_addr uintptr_t)uio->uio_iov->iov_base,
 		    (unsigned long)(unsigned int)len, pcc->fflags, ioflag);
 
 		error = cuse_client_receive_command_locked(pccmd, 0, 0);
