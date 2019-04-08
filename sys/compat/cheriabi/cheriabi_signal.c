@@ -116,14 +116,8 @@ cheriabi_sigwaitinfo(struct thread *td, struct cheriabi_sigwaitinfo_args *uap)
 int
 cheriabi_sigpending(struct thread *td, struct cheriabi_sigpending_args *uap)
 {
-	struct proc *p = td->td_proc;
-	sigset_t pending;
 
-	PROC_LOCK(p);
-	pending = p->p_sigqueue.sq_signals;
-	SIGSETOR(pending, td->td_sigqueue.sq_signals);
-	PROC_UNLOCK(p);
-	return (copyout(&pending, uap->set, sizeof(sigset_t)));
+	return (kern_sigpending(td, uap->set));
 }
 
 int

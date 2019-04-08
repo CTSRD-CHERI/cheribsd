@@ -1524,6 +1524,13 @@ struct sigpending_args {
 int
 sys_sigpending(struct thread *td, struct sigpending_args *uap)
 {
+
+	return (kern_sigpending(td, __USER_CAP_OBJ(uap->set)));
+}
+
+int
+kern_sigpending(struct thread *td, sigset_t * __capability set)
+{
 	struct proc *p = td->td_proc;
 	sigset_t pending;
 
@@ -1531,7 +1538,7 @@ sys_sigpending(struct thread *td, struct sigpending_args *uap)
 	pending = p->p_sigqueue.sq_signals;
 	SIGSETOR(pending, td->td_sigqueue.sq_signals);
 	PROC_UNLOCK(p);
-	return (copyout(&pending, uap->set, sizeof(sigset_t)));
+	return (copyout_c(&pending, set, sizeof(sigset_t)));
 }
 
 #ifdef COMPAT_43	/* XXX - COMPAT_FBSD3 */

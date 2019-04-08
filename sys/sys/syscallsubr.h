@@ -449,6 +449,7 @@ int	kern_sigaction_cap(struct thread *td, int sig,
 	    const ksigaction_t *act, ksigaction_t *oact, int flags,
 	    void * __capability *cap);
 int	kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss);
+int	kern_sigpending(struct thread *td, sigset_t * __capability set);
 int	kern_sigprocmask(struct thread *td, int how,
 	    sigset_t *set, sigset_t *oset, int flags);
 int	kern_sigsuspend(struct thread *td, sigset_t mask);
