@@ -1862,13 +1862,11 @@ kern_funlinkat(struct thread *td, int dfd, const char * __capability path,
 	struct vnode *vp;
 	struct nameidata nd;
 	struct stat sb;
-	cap_rights_t rights;
 	int error;
 
 	fp = NULL;
 	if (fd != FD_NONE) {
-		error = getvnode(td, fd, cap_rights_init(&rights, CAP_LOOKUP),
-		    &fp);
+		error = getvnode(td, fd, &cap_no_rights, &fp);
 		if (error != 0)
 			return (error);
 	}
