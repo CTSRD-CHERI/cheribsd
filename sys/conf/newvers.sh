@@ -156,9 +156,9 @@ touch version
 v=$(cat version)
 u=${USER:-root}
 d=$(pwd)
-h=${HOSTNAME:-`hostname`}
+h=${HOSTNAME:-$(hostname)}
 if [ -n "$SOURCE_DATE_EPOCH" ]; then
-	if ! t=$(date -r "$SOURCE_DATE_EPOCH" 2>/dev/null); then
+	if ! t=$(date -r $SOURCE_DATE_EPOCH 2>/dev/null); then
 		echo "Invalid SOURCE_DATE_EPOCH" >&2
 		exit 1
 	fi
@@ -210,7 +210,7 @@ if findvcs .hg; then
 fi
 
 if [ -n "$svnversion" ] ; then
-	svn=$(cd "${SYSDIR}" && $svnversion 2>/dev/null)
+	svn=$(cd ${SYSDIR} && $svnversion 2>/dev/null)
 	case "$svn" in
 	[0-9]*[MSP]|*:*)
 		svn=" r${svn}"
@@ -226,8 +226,8 @@ if [ -n "$svnversion" ] ; then
 fi
 
 if [ -n "$git_cmd" ] ; then
-	git=`$git_cmd rev-parse --verify --short HEAD 2>/dev/null`
-	gitsvn=`$git_cmd svn find-rev $git 2>/dev/null`
+	git=$($git_cmd rev-parse --verify --short HEAD 2>/dev/null)
+	gitsvn=$($git_cmd svn find-rev $git 2>/dev/null)
 	if [ -n "$gitsvn" ] ; then
 		svn=" r${gitsvn}"
 		git="=${git}"
@@ -236,13 +236,13 @@ if [ -n "$git_cmd" ] ; then
 #		We assume that if a tree is more than 10k commits out-of-sync
 #		with FreeBSD, it has forked the the OS and the SVN rev no
 #		longer matters.
-		gitsvn=`$git_cmd log -n 10000 |
+		gitsvn=$($git_cmd log -n 10000 |
 		    grep '^    git-svn-id:' | head -1 | \
-		    sed -n 's/^.*@\([0-9][0-9]*\).*$/\1/p'`
+		    sed -n 's/^.*@\([0-9][0-9]*\).*$/\1/p')
 		if [ -z "$gitsvn" ] ; then
-			gitsvn=`$git_cmd log -n 10000 --format='format:%N' | \
+			gitsvn=$($git_cmd log -n 10000 --format='format:%N' | \
 			     grep '^svn ' | head -1 | \
-			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p' || true`
+			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p')
 		fi
 		if [ -n "$gitsvn" ] ; then
 			svn=" r${gitsvn}"
@@ -262,9 +262,9 @@ if [ -n "$git_cmd" ] ; then
 fi
 
 if [ -n "$hg_cmd" ] ; then
-	hg=`$hg_cmd id 2>/dev/null`
-	hgsvn=`$hg_cmd svn info 2>/dev/null | \
-		awk -F': ' '/Revision/ { print $2 }'`
+	hg=$($hg_cmd id 2>/dev/null)
+	hgsvn=$($hg_cmd svn info 2>/dev/null | \
+		awk -F': ' '/Revision/ { print $2 }')
 	if [ -n "$hgsvn" ] ; then
 		svn=" r${hgsvn}"
 	fi
