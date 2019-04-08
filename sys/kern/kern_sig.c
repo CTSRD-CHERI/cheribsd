@@ -1303,17 +1303,35 @@ user_sigwait(struct thread *td, const sigset_t * __capability uset,
 }
 
 int
+copyout_siginfo_native(const _siginfo_t *si, void * __capability info)
+{
+	struct siginfo_native si_n;
+
+	siginfo_to_siginfo_native(si, &si_n);
+	return (copyout_c(&si_n, info, sizeof(si_n)));
+}
+
+int
 sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
+{
+
+	return (user_sigtimedwait(td, __USER_CAP_OBJ(uap->set),
+	    __USER_CAP_OBJ(uap->info), __USER_CAP_OBJ(uap->timeout),
+	    (copyout_siginfo_t *)copyout_siginfo_native));
+}
+
+int user_sigtimedwait(struct thread *td, const sigset_t * __capability uset,
+    void * __capability info, const struct timespec * __capability utimeout,
+    copyout_siginfo_t *copyout_siginfop)
 {
 	struct timespec ts;
 	struct timespec *timeout;
-	struct siginfo_native si_n;
 	sigset_t set;
 	ksiginfo_t ksi;
 	int error;
 
-	if (uap->timeout) {
-		error = copyin(uap->timeout, &ts, sizeof(ts));
+	if (utimeout) {
+		error = copyin_c(utimeout, &ts, sizeof(ts));
 		if (error)
 			return (error);
 
@@ -1321,7 +1339,7 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 	} else
 		timeout = NULL;
 
-	error = copyin(uap->set, &set, sizeof(set));
+	error = copyin_c(uset, &set, sizeof(set));
 	if (error)
 		return (error);
 
@@ -1329,10 +1347,8 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 	if (error)
 		return (error);
 
-	if (uap->info) {
-		siginfo_to_siginfo_native(&ksi.ksi_info, &si_n);
-		error = copyout(&si_n, uap->info, sizeof(si_n));
-	}
+	if (info != NULL)
+		error = copyout_siginfop(&ksi.ksi_info, info);
 
 	if (error == 0)
 		td->td_retval[0] = ksi.ksi_signo;
