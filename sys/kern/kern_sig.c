@@ -1268,11 +1268,20 @@ osigprocmask(struct thread *td, struct osigprocmask_args *uap)
 int
 sys_sigwait(struct thread *td, struct sigwait_args *uap)
 {
+
+	return (user_sigwait(td, __USER_CAP_OBJ(uap->set),
+	    __USER_CAP_OBJ(uap->sig)));
+}
+
+int
+user_sigwait(struct thread *td, const sigset_t * __capability uset,
+    int * __capability usig)
+{
 	ksiginfo_t ksi;
 	sigset_t set;
 	int error;
 
-	error = copyin(uap->set, &set, sizeof(set));
+	error = copyin_c(uset, &set, sizeof(set));
 	if (error) {
 		td->td_retval[0] = error;
 		return (0);
@@ -1288,7 +1297,7 @@ sys_sigwait(struct thread *td, struct sigwait_args *uap)
 		return (0);
 	}
 
-	error = copyout(&ksi.ksi_signo, uap->sig, sizeof(ksi.ksi_signo));
+	error = copyout_c(&ksi.ksi_signo, usig, sizeof(ksi.ksi_signo));
 	td->td_retval[0] = error;
 	return (0);
 }

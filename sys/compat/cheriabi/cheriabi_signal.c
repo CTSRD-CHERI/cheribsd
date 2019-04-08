@@ -86,29 +86,8 @@ cheriabi_sigprocmask(struct thread *td, struct cheriabi_sigprocmask_args *uap)
 int
 cheriabi_sigwait(struct thread *td, struct cheriabi_sigwait_args *uap)
 {
-	ksiginfo_t ksi;
-	sigset_t set;
-	int error;
 
-	error = copyin(uap->set, &set, sizeof(set));
-	if (error) {
-		td->td_retval[0] = error;
-		return (0);
-	}
-
-	error = kern_sigtimedwait(td, set, &ksi, NULL);
-	if (error != 0) {
-		if (error == EINTR && td->td_proc->p_osrel < P_OSREL_SIGWAIT)
-			error = ERESTART;
-		if (error == ERESTART)
-			return (error);
-		td->td_retval[0] = error;
-		return (0);
-	}
-
-	error = copyout(&ksi.ksi_signo, uap->sig, sizeof(ksi.ksi_signo));
-	td->td_retval[0] = error;
-	return (0);
+	return (user_sigwait(td, uap->set, uap->sig));
 }
 
 int
