@@ -658,6 +658,49 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 	return (0);
 }
 
+static int
+__elfN(load_sections)(struct image_params *imgp, const Elf_Ehdr *hdr,
+    const Elf_Phdr *phdr, u_long rbase, u_long *base_addrp, u_long *max_addrp)
+{
+	vm_prot_t prot;
+	u_long base_addr, max_addr;
+	bool first;
+	int error, i;
+
+	base_addr = 0;
+	max_addr = 0;
+	first = true;
+
+	for (i = 0; i < hdr->e_phnum; i++) {
+		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
+			continue;
+
+		/* Loadable segment */
+		prot = __elfN(trans_prot)(phdr[i].p_flags);
+		error = __elfN(load_section)(imgp, phdr[i].p_offset,
+		    (caddr_t)(uintptr_t)phdr[i].p_vaddr + rbase,
+		    phdr[i].p_memsz, phdr[i].p_filesz, prot);
+		if (error != 0)
+			return (error);
+
+		/*
+		 * Establish the base address if this is the first segment.
+		 */
+		if (first) {
+  			base_addr = trunc_page(phdr[i].p_vaddr + rbase);
+			first = false;
+		}
+		max_addr = MAX(max_addr, phdr[i].p_vaddr + phdr[i].p_memsz);
+	}
+
+	if (base_addrp != NULL)
+		*base_addrp = base_addr;
+	if (max_addrp != NULL)
+		*max_addrp = max_addr;
+
+	return (0);
+}
+
 /*
  * Load the file "file" into memory.  It may be either a shared object
  * or an executable.
@@ -688,11 +731,10 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	struct nameidata *nd;
 	struct vattr *attr;
 	struct image_params *imgp;
-	vm_prot_t prot;
 	u_long rbase;
 	u_long base_addr = 0;
 	u_long max_addr = 0;
-	int error, i, numsegs;
+	int error;
 
 #ifdef CAPABILITY_MODE
 	/*
@@ -772,27 +814,11 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		goto fail;
 	}
 
-	for (i = 0, numsegs = 0; i < hdr->e_phnum; i++) {
-		if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz != 0) {
-			/* Loadable segment */
-			prot = __elfN(trans_prot)(phdr[i].p_flags);
-			error = __elfN(load_section)(imgp, phdr[i].p_offset,
-			    (caddr_t)(uintptr_t)phdr[i].p_vaddr + rbase,
-			    phdr[i].p_memsz, phdr[i].p_filesz, prot);
-			if (error != 0)
-				goto fail;
-			/*
-			 * Establish the base address if this is the
-			 * first segment.
-			 */
-			if (numsegs == 0)
-  				base_addr = trunc_page(phdr[i].p_vaddr +
-				    rbase);
+	error = __elfN(load_sections)(imgp, hdr, phdr, rbase, &base_addr,
+	   &max_addr);
+	if (error != 0)
+		goto fail;
 
-			max_addr = MAX(max_addr, phdr[i].p_vaddr + phdr[i].p_memsz);
-			numsegs++;
-		}
-	}
 	*addr = base_addr;
 	*end_addr = base_addr + max_addr;
 	*entry = (unsigned long)hdr->e_entry + rbase;
@@ -1023,7 +1049,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	char *interp;
 	Elf_Brandinfo *brand_info;
 	struct sysentvec *sv;
-	vm_prot_t prot;
 	u_long addr, baddr, et_dyn_addr, entry, proghdr;
 	u_long maxalign, mapsz, maxv, maxv1;
 	uint32_t fctl0;
@@ -1080,6 +1105,17 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 				maxalign = phdr[i].p_align;
 			mapsz += phdr[i].p_memsz;
 			n++;
+
+			/*
+			 * If this segment contains the program headers,
+			 * remember their virtual address for the AT_PHDR
+			 * aux entry. Static binaries don't usually include
+			 * a PT_PHDR entry.
+			 */
+			if (phdr[i].p_offset == 0 &&
+			    hdr->e_phoff + hdr->e_phnum * hdr->e_phentsize
+				<= phdr[i].p_filesz)
+				proghdr = phdr[i].p_vaddr + hdr->e_phoff;
 			break;
 		case PT_INTERP:
 			/* Path to interpreter */
@@ -1098,6 +1134,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 				imgp->stack_prot =
 				    __elfN(trans_prot)(phdr[i].p_flags);
 			imgp->stack_sz = phdr[i].p_memsz;
+			break;
+		case PT_PHDR: 	/* Program header table info */
+			proghdr = phdr[i].p_vaddr;
 			break;
 		}
 	}
@@ -1199,44 +1238,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	if (error != 0)
 		goto ret;
 
-	/*
-	 * XXX: For some reason imgp->start_addr is changed from ~0UL to 0 so due
-	 * to computing the minimum we were always getting a start_addr of 0.
-	 */
-	/* KASSERT(imgp->start_addr != 0,
-	 *   ("Should be ULONG_MAX and not 0x%lx", imgp->start_addr)); */
-	imgp->start_addr = ~0UL;
-	for (i = 0; i < hdr->e_phnum; i++) {
-		switch (phdr[i].p_type) {
-		case PT_LOAD:	/* Loadable segment */
-			if (phdr[i].p_memsz == 0)
-				break;
-			prot = __elfN(trans_prot)(phdr[i].p_flags);
-			error = __elfN(load_section)(imgp, phdr[i].p_offset,
-			    (caddr_t)(uintptr_t)phdr[i].p_vaddr + et_dyn_addr,
-			    phdr[i].p_memsz, phdr[i].p_filesz, prot);
-			if (error != 0)
-				goto ret;
-
-			/*
-			 * If this segment contains the program headers,
-			 * remember their virtual address for the AT_PHDR
-			 * aux entry. Static binaries don't usually include
-			 * a PT_PHDR entry.
-			 */
-			if (phdr[i].p_offset == 0 &&
-			    hdr->e_phoff + hdr->e_phnum * hdr->e_phentsize
-				<= phdr[i].p_filesz)
-				proghdr = phdr[i].p_vaddr + hdr->e_phoff +
-				    et_dyn_addr;
-			break;
-		case PT_PHDR: 	/* Program header table info */
-			proghdr = phdr[i].p_vaddr + et_dyn_addr;
-			break;
-		default:
-			break;
-		}
-	}
+	error = __elfN(load_sections)(imgp, hdr, phdr, et_dyn_addr, NULL, NULL);
+	if (error != 0)
+		goto ret;
 
 	error = __elfN(enforce_limits)(imgp, hdr, phdr, et_dyn_addr);
 	if (error != 0)
@@ -1289,7 +1293,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	elf_auxargs = malloc(sizeof(Elf_Auxargs), M_TEMP, M_WAITOK);
 	elf_auxargs->execfd = -1;
-	elf_auxargs->phdr = proghdr;
+	elf_auxargs->phdr = proghdr + et_dyn_addr;
 	elf_auxargs->phent = hdr->e_phentsize;
 	elf_auxargs->phnum = hdr->e_phnum;
 	elf_auxargs->pagesz = PAGE_SIZE;
