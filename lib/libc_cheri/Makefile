@@ -127,6 +127,7 @@ SRCS+=		atoi.c			\
 # libc/string
 CFLAGS.strerror.c=	-Wno-incompatible-pointer-types-discards-qualifiers
 SRCS+=		bcopy.S			\
+		bcmp.c			\
 		explicit_bzero.c	\
 		ffs.c			\
 		memchr.c		\
