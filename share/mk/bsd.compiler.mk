@@ -41,7 +41,12 @@ COMPILER_TYPE=none
 X_COMPILER_TYPE=none
 COMPILER_VERSION=0
 X_COMPILER_VERSION=0
-COMPILER_FEATURES=none
+COMPILER_FEATURES=
+LINKER_TYPE?=none
+X_LINKER_TYPE?=none
+LINKER_VERSION?=0
+X_LINKER_VERSION?=0
+LINKER_FEATURES?=
 .else
 # command = /usr/local/bin/ccache cc ...
 # wrapper = /usr/local/libexec/ccache/cc ...
