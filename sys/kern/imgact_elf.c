@@ -693,20 +693,23 @@ __elfN(reserve_space)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 	addr = (vm_offset_t)vmspace->vm_daddr + vmspace->vm_dsize;
 	addr = MAX(addr, *addrp);
 
-	/* Round up so signficant bits of rtld addresses aren't touched */
-	if (imgp->proc->p_sysent->sv_flags & SV_CHERI) {
-		/*
-		 * XXX: This is one more '0' than the one in the master
-		 *	branch; crashes otherwise.
-		 */
-		addr = roundup2(addr, 0x10000000);
-	}
+	/*
+	 * Increase our chances for vm_map_findspace() to find chunk
+	 * large enough even after rounding up the addr afterwards.
+	 */
+	if (imgp->proc->p_sysent->sv_flags & SV_CHERI)
+		size = roundup2(size, 0x1000000);
+
 again:
 	addr = vm_map_findspace(map, addr, size);
 	if (addr == vm_map_max(map) - size + 1) {
 		printf("%s: vm_map_findspace()\n", __func__);
 		return (ENOMEM);
 	}
+
+	/* Round up so signficant bits of rtld addresses aren't touched */
+	if (imgp->proc->p_sysent->sv_flags & SV_CHERI)
+		addr = roundup2(addr, 0x1000000);
 
 	/*
 	 * This is basically MAP_GUARD.
