@@ -464,7 +464,7 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	 * Create the page if it doesn't exist yet. Ignore errors.
 	 */
 	vm_map_fixed(map, NULL, 0, trunc_page(start), round_page(end) -
-	    trunc_page(start), VM_PROT_ALL, VM_PROT_ALL, MAP_CHECK_EXCL);
+	    trunc_page(start), VM_PROT_ALL, VM_PROT_ALL, 0);
 
 	/*
 	 * Find the page from the underlying object.
@@ -517,9 +517,12 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 		 * to copy the data.
 		 */
 		rv = vm_map_fixed(map, NULL, 0, start, end - start,
-		    prot | VM_PROT_WRITE, VM_PROT_ALL, MAP_CHECK_EXCL);
-		if (rv != KERN_SUCCESS)
+		    prot | VM_PROT_WRITE, VM_PROT_ALL, 0);
+		if (rv != KERN_SUCCESS) {
+			printf("%s: unaligned vm_map_fixed failed, rv %d\n",
+			    __func__, rv);
 			return (rv);
+		}
 		if (object == NULL)
 			return (KERN_SUCCESS);
 		for (; start < end; start += sz) {
@@ -540,8 +543,10 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 	} else {
 		vm_object_reference(object);
 		rv = vm_map_fixed(map, object, offset, start, end - start,
-		    prot, VM_PROT_ALL, cow | MAP_CHECK_EXCL);
+		    prot, VM_PROT_ALL, cow);
 		if (rv != KERN_SUCCESS) {
+			printf("%s: vm_map_fixed failed, rv %d\n",
+			    __func__, rv);
 			locked = VOP_ISLOCKED(imgp->vp);
 			VOP_UNLOCK(imgp->vp, 0);
 			vm_object_deallocate(object);
@@ -664,15 +669,17 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 }
 
 static int
-__elfN(find_space)(const struct image_params *imgp, const Elf_Ehdr *hdr,
+__elfN(reserve_space)(const struct image_params *imgp, const Elf_Ehdr *hdr,
     const Elf_Phdr *phdr, vm_offset_t *addrp)
 {
 	struct vmspace *vmspace;
+	vm_map_t map;
 	vm_offset_t addr;
 	size_t size;
-	int i;
+	int i, rv;
 
 	vmspace = imgp->proc->p_vmspace;
+	map = &vmspace->vm_map;
 
 	size = 0;
 	for (i = 0; i < hdr->e_phnum; i++) {
@@ -694,10 +701,21 @@ __elfN(find_space)(const struct image_params *imgp, const Elf_Ehdr *hdr,
 		 */
 		addr = roundup2(addr, 0x10000000);
 	}
-	addr = vm_map_findspace(&vmspace->vm_map, addr, size);
-	if (addr == vm_map_max(&vmspace->vm_map) - size + 1) {
+again:
+	addr = vm_map_findspace(map, addr, size);
+	if (addr == vm_map_max(map) - size + 1) {
 		printf("%s: vm_map_findspace()\n", __func__);
 		return (ENOMEM);
+	}
+
+	/*
+	 * This is basically MAP_GUARD.
+	 */
+	rv = vm_map_fixed(map, NULL, 0, addr, size,
+	    VM_PROT_NONE, VM_PROT_NONE, MAP_FIXED | MAP_CHECK_EXCL);
+	if (rv != KERN_SUCCESS) {
+		printf("%s: vm_map_fixed failed, rv %d\n", __func__, rv);
+		goto again;
 	}
 
 	*addrp = addr;
@@ -818,9 +836,9 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		goto fail;
 	}
 
-	error = __elfN(find_space)(imgp, hdr, phdr, &rbase);
+	error = __elfN(reserve_space)(imgp, hdr, phdr, &rbase);
 	if (error != 0) {
-		printf("%s: find_space() failed with error %d\n",
+		printf("%s: reserve_space() failed with error %d\n",
 		    __func__, error);
 		error = ENOEXEC;
 		goto fail;
@@ -1178,10 +1196,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		 * 	the other process' binary and its rtld.  Oh well.
 		 */
 		if (imgp->cop != NULL) {
-			// XXX: What protects p_vmspace?
-			error = __elfN(find_space)(imgp, hdr, phdr, &et_dyn_addr);
+			error = __elfN(reserve_space)(imgp, hdr, phdr, &et_dyn_addr);
 			if (error != 0) {
-				printf("%s: find_space() failed with error %d\n",
+				printf("%s: reserve_space() failed with error %d\n",
 				    __func__, error);
 				goto ret;
 			}
