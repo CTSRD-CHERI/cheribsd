@@ -88,6 +88,8 @@ int	kern___acl_set_path(struct thread *td, const char *__capability path,
 	    acl_type_t type, const struct acl * __capability aclp, int follow);
 int	kern___getcwd(struct thread *td, char * __capability buf,
 	    enum uio_seg bufseg, size_t buflen, size_t path_max);
+int	kern_abort2(struct thread *td, const char * __capability why,
+            int nargs, void **uargs);
 int	kern_accept(struct thread *td, int s, struct sockaddr **name,
 	    socklen_t *namelen, struct file **fp);
 int	kern_accept4(struct thread *td, int s, struct sockaddr **name,

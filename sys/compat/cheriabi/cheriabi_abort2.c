@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/sbuf.h>
+#include <sys/syscallsubr.h>
 #include <sys/syslog.h>
 
 #include <compat/cheriabi/cheriabi_proto.h>
@@ -41,75 +42,28 @@ __FBSDID("$FreeBSD$");
 int
 cheriabi_abort2(struct thread *td, struct cheriabi_abort2_args *uap)
 {
-	struct proc *p = td->td_proc;
-	struct sbuf *sb;
-	void * __capability uargs[16];
-	int error, i, sig;
+	void *uargs[16];
+	void *uargsp;
+	uintcap_t cap;
+	int i, nargs;
 
-	/*
-	 * Do it right now so we can log either proper call of abort2(), or
-	 * note, that invalid argument was passed. 512 is big enough to
-	 * handle 16 arguments' descriptions with additional comments.
-	 */
-	sb = sbuf_new(NULL, NULL, 512, SBUF_FIXEDLEN);
-	sbuf_clear(sb);
-	sbuf_printf(sb, "%s(pid %d uid %d) aborted: ",
-	    p->p_comm, p->p_pid, td->td_ucred->cr_uid);
-	/*
-	 * Since we can't return from abort2(), send SIGKILL in cases, where
-	 * abort2() was called improperly
-	 */
-	sig = SIGKILL;
-	/* Prevent from DoSes from user-space. */
-	if (uap->nargs < 0 || uap->nargs > 16)
-		goto out;
-	if (uap->nargs > 0) {
-		if (uap->args == NULL)
-			goto out;
-		error = copyin(uap->args, &uargs[0],
-		    uap->nargs * sizeof(void *));
-		if (error != 0)
-			goto out;
+	nargs = uap->nargs;
+	if (nargs < 0 || nargs > nitems(uargs))
+		nargs = -1;
+	uargsp = NULL;
+	if (nargs > 0) {
+		if (uap->args != NULL) {
+			for (i = 0; i < nargs; i++) {
+				if (fuecap(uap->args + i, &cap) != 0) {
+					nargs = -1;
+					break;
+				} else
+					uargs[i] = (void *)(uintptr_t)cap;
+			}
+			if (nargs > 0)
+				uargsp = &uargs;
+		} else
+			nargs = -1;
 	}
-	/*
-	 * Limit size of 'reason' string to 128. Will fit even when
-	 * maximal number of arguments was chosen to be logged.
-	 */
-	if (uap->why != NULL) {
-		error = sbuf_copyin(sb, uap->why, 128);
-		if (error < 0)
-			goto out;
-	} else {
-		sbuf_printf(sb, "(null)");
-	}
-	if (uap->nargs > 0) {
-		sbuf_printf(sb, "(");
-		for (i = 0; i < uap->nargs; i++) {
-			/*
-			 * XXX-CHERI: fromcap is safe because we're not
-			 * dereferencing, but should we print more
-			 * pointer details?
-			 */
-			sbuf_printf(sb, "%s%p", i == 0 ? "" : ", ",
-			    (__cheri_fromcap void *)uargs[i]);
-		}
-		sbuf_printf(sb, ")");
-	}
-	/*
-	 * Final stage: arguments were proper, string has been
-	 * successfully copied from userspace, and copying pointers
-	 * from user-space succeed.
-	 */
-	sig = SIGABRT;
-out:
-	if (sig == SIGKILL) {
-		sbuf_trim(sb);
-		sbuf_printf(sb, " (Reason text inaccessible)");
-	}
-	sbuf_cat(sb, "\n");
-	sbuf_finish(sb);
-	log(LOG_INFO, "%s", sbuf_data(sb));
-	sbuf_delete(sb);
-	exit1(td, 0, sig);
-	return (0);
+	return (kern_abort2(td, uap->why, nargs, uargsp));
 }
