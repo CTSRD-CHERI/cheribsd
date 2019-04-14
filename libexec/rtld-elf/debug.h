@@ -58,11 +58,11 @@ enum RtldDebugCategory {
 	RTLD_DBG_LAST = RTLD_DBG_SYMLOOKUP,
 	RTLD_DBG_ALL = (RTLD_DBG_LAST << 1) - 1
 };
-extern void debug_printf(enum RtldDebugCategory cat, const char *, ...) __printflike(2, 3);
+void debug_printf(enum RtldDebugCategory cat, const char *, ...) __printflike(2, 3);
 extern int debug;
 __END_DECLS
 
-#ifdef DEBUG
+#ifndef NO_LD_DEBUG
 #define dbg(...)	debug_printf(RTLD_DBG_NO_CATEGORY, __VA_ARGS__)
 #define dbg_cat(category, ...)	debug_printf(RTLD_DBG_ ## category, __VA_ARGS__)
 #define dbg_assert(cond)	assert(cond)
