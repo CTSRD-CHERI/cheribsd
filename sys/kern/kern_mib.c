@@ -156,27 +156,11 @@ SYSCTL_INT(_hw, HW_PAGESIZE, pagesize, CTLFLAG_RD|CTLFLAG_CAPRD,
 static int
 sysctl_kern_arnd(SYSCTL_HANDLER_ARGS)
 {
-	static struct timeval lastfail;
 	char buf[256];
 	size_t len;
-	static int curfail;
 
-	/*-
-	 * This is one of the very few legitimate uses of read_random(9).
-	 * Use of arc4random(9) is not recommended as that will ignore
-	 * an unsafe (i.e. unseeded) random(4).
-	 *
-	 * If random(4) is not seeded, then this returns 0, so the
-	 * sysctl will return a zero-length buffer.
-	 */
-	size_t reqsize = MIN(req->oldlen, sizeof(buf));
-	len = read_random(buf, reqsize);
-	/* XXXAR: spammy debug message should be rate limited */
-	if (reqsize != len && ppsratecheck(&lastfail, &curfail, 3)) {
-		printf("%s: %s (pid %d) requested %zu bytes of random data but "
-		    "only got %zu\n", __func__, curproc->p_comm, curproc->p_pid,
-		    reqsize, len);
-	}
+	len = MIN(req->oldlen, sizeof(buf));
+	read_random(buf, len);
 	return (SYSCTL_OUT(req, buf, len));
 }
 
