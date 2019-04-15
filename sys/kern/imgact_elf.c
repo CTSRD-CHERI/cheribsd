@@ -711,11 +711,8 @@ again:
 	if (imgp->proc->p_sysent->sv_flags & SV_CHERI)
 		addr = roundup2(addr, 0x1000000);
 
-	/*
-	 * This is basically MAP_GUARD.
-	 */
 	rv = vm_map_fixed(map, NULL, 0, addr, size,
-	    VM_PROT_NONE, VM_PROT_NONE, MAP_FIXED | MAP_CHECK_EXCL);
+	    VM_PROT_NONE, VM_PROT_NONE, MAP_CHECK_EXCL | MAP_CREATE_GUARD);
 	if (rv != KERN_SUCCESS) {
 		printf("%s: vm_map_fixed failed, rv %d\n", __func__, rv);
 		goto again;
