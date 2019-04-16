@@ -1021,6 +1021,7 @@ struct	fork_req {
 #define	PGET_NOTWEXIT	0x00010	/* Check that the process is not in P_WEXIT. */
 #define	PGET_NOTINEXEC	0x00020	/* Check that the process is not in P_INEXEC. */
 #define	PGET_NOTID	0x00040	/* Do not assume tid if pid > PID_MAX. */
+#define	PGET_CANCOLOCATE	0x00080	/* Check against p_cancolocate(). */
 
 #define	PGET_WANTREAD	(PGET_HOLD | PGET_CANDEBUG | PGET_NOTWEXIT)
 
@@ -1054,6 +1055,7 @@ int	leavepgrp(struct proc *p);
 int	maybe_preempt(struct thread *td);
 void	maybe_yield(void);
 void	mi_switch(int flags, struct thread *newtd);
+int	p_cancolocate(struct thread *td, struct proc *p);
 int	p_candebug(struct thread *td, struct proc *p);
 int	p_cansee(struct thread *td, struct proc *p);
 int	p_cansched(struct thread *td, struct proc *p);

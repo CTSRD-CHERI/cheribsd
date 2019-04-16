@@ -1705,6 +1705,24 @@ SYSCTL_PROC(_security_bsd, OID_AUTO, unprivileged_proc_debug,
     "Unprivileged processes may use process debugging facilities");
 
 /*-
+ * Determine whether td may colocate (live in a single address space)
+ * with  p.
+ * Returns: 0 for permitted, an errno value otherwise
+ * Locks: Sufficient locks to protect various components of td and p
+ *        must be held.  td must be curthread, and a lock must
+ *        be held for p.
+ * References: td and p must be valid for the lifetime of the call
+ */
+int
+p_cancolocate(struct thread *td, struct proc *p)
+{
+	/*
+	 * XXX: Relax it a bit.
+	 */
+	return (p_candebug(td, p));
+}
+
+/*-
  * Determine whether td may debug p.
  * Returns: 0 for permitted, an errno value otherwise
  * Locks: Sufficient locks to protect various components of td and p
