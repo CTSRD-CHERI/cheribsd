@@ -375,8 +375,9 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 	 * XXXBD: Doing this in every class is inefficient.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	void *__capability datacap =
-	    cheri_clearperm(sbcp->sbc_codemem, CHERI_PERM_EXECUTE);
+	// This needs full address space $pcc
+	void *datacap = cheri_clearperm(
+	    cheri_setoffset(cheri_getpcc(), 0), CHERI_PERM_EXECUTE);
 #else
 	void *__capability datacap = cheri_getdefault();
 #endif
