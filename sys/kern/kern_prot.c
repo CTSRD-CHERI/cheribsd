@@ -1706,7 +1706,8 @@ SYSCTL_PROC(_security_bsd, OID_AUTO, unprivileged_proc_debug,
 
 /*-
  * Determine whether td may colocate (live in a single address space)
- * with  p.
+ * with p.  Note that there might be additional restrictions enforced
+ * eg by the ELF loader.
  * Returns: 0 for permitted, an errno value otherwise
  * Locks: Sufficient locks to protect various components of td and p
  *        must be held.  td must be curthread, and a lock must
