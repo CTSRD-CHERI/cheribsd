@@ -46,6 +46,7 @@ SUBDIR+=	cheri_bench
 .endif
 
 SUBDIR.${MK_CHERI}+=	cheri_helloworld
+SUBDIR.${MK_CHERI}+=	cheriabi_helloworld
 SUBDIR.${MK_CHERI}+=	cheri_pthreads
 SUBDIR.${MK_CHERI}+=	cheriabitest
 SUBDIR.${MK_CHERI}+=	cheriabitest-mt
