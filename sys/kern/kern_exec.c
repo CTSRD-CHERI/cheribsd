@@ -401,10 +401,13 @@ kern_execve(struct thread *td, struct image_args *args,
 	if (opportunistic_coexecve != 0) {
 		sx_slock(&proctree_lock);
 		cop = proc_realparent(td->td_proc);
+		PROC_LOCK(cop);
 		if (p_cancolocate(td, cop) != 0) {
+			PROC_UNLOCK(cop);
 			sx_sunlock(&proctree_lock);
 			goto fallback;
 		}
+		PROC_UNLOCK(cop);
 		PHOLD(cop);
 		sx_sunlock(&proctree_lock);
 		error = kern_coexecve(td, args, mac_p, cop);
