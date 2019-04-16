@@ -362,13 +362,6 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 			goto error;
 		}
 	}
-
-	/*
-	 * XXXAR: this crashes in the main program because we don't have a
-	 * writable $pcc. I'm not quite sure what this is doing, but if I
-	 * #if 0 this code we get further into startup.
-	 */
-#ifndef SPLIT_CODE_DATA
 	/*
 	 * Update main program method variables.
 	 *
@@ -387,7 +380,6 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 		    "program", __func__);
 		return (-1);
 	}
-#endif
 
 	/*
 	 * Register the class on the list of classes.
