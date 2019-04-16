@@ -402,7 +402,7 @@ kern_execve(struct thread *td, struct image_args *args,
 		sx_slock(&proctree_lock);
 		cop = proc_realparent(td->td_proc);
 		PROC_LOCK(cop);
-		if (p_cancolocate(td, cop) != 0) {
+		if (p_cancolocate(td, cop, true) != 0) {
 			PROC_UNLOCK(cop);
 			sx_sunlock(&proctree_lock);
 			goto fallback;

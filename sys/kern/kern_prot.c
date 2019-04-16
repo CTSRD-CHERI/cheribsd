@@ -1715,12 +1715,48 @@ SYSCTL_PROC(_security_bsd, OID_AUTO, unprivileged_proc_debug,
  * References: td and p must be valid for the lifetime of the call
  */
 int
-p_cancolocate(struct thread *td, struct proc *p)
+p_cancolocate(struct thread *td, struct proc *p, bool opportunistic)
 {
+	int error;
+
+	KASSERT(td == curthread, ("%s: td not curthread", __func__));
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	if (td->td_proc == p)
+		return (0);
+
+	if (p_candebug(td, p) == 0)
+		return (0);
+
+	if ((error = prison_check(td->td_ucred, p->p_ucred)))
+		return (error);
+
+	if (opportunistic) {
+		if ((error = prison_check(p->p_ucred, td->td_ucred)))
+			return (error);
+	}
+
+#ifdef MAC
 	/*
-	 * XXX: Relax it a bit.
+	 * XXX
 	 */
-	return (p_candebug(td, p));
+#endif
+	if ((error = cr_canseeotheruids(td->td_ucred, p->p_ucred)))
+		return (error);
+	if ((error = cr_canseeothergids(td->td_ucred, p->p_ucred)))
+		return (error);
+
+	if (opportunistic) {
+		if ((error = cr_canseeotheruids(p->p_ucred, td->td_ucred)))
+			return (error);
+		if ((error = cr_canseeothergids(p->p_ucred, td->td_ucred)))
+			return (error);
+	}
+
+	if (proc_realparent(td->td_proc) == p)
+		return (0);
+
+	return (EPERM);
 }
 
 /*-
