@@ -72,6 +72,73 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 
+#ifdef __CHERI_CAPABILITY_TABLE__
+
+/* TODO: Support other captable ABIs that aren't pcrel */
+
+#define	LIBCHERI_CLASS_ASM(class)					\
+	.text;								\
+	.option pic0;							\
+	.global __libcheri_ ## class ## _entry;				\
+	.type __libcheri_ ## class ## _entry,@function;			\
+	.ent __libcheri_ ## class ## _entry;				\
+__libcheri_ ## class ## _entry:						\
+	/*								\
+	 * Load sandbox object's DDC via IDC.				\
+	 */								\
+	clc	$c12, zero, (4*CHERICAP_SIZE)($c26);			\
+	csetdefault	$c12;						\
+									\
+	/*								\
+	 * Install global invocation stack.  NB: this means we can't	\
+	 * support recursion or concurrency.  Further note: this is	\
+	 * shared by all classes outside of the sandbox.		\
+	 */								\
+	lui $t0, %hi(%neg(%captab_rel(0f)));				\
+	daddiu $t0, $t0, %lo(%neg(%captab_rel(0f)));			\
+0:	cgetpcc	$c12;							\
+	cincoffset	$c12, $c12, $t0;				\
+	clcbi	$c12, %captab20(__libcheri_enter_stack_csp)($c12);	\
+	clc	$csp, zero, 0($c12);					\
+									\
+	/*								\
+	 * Set up global pointer.					\
+	 */								\
+	dla	$gp, _gp;						\
+									\
+	/*								\
+	 * The fourth entry of $idc is a method vtable.  If it is a	\
+	 * valid capability, then load the address at offset $v0	\
+	 * rather than using the "enter" functions.			\
+	 */								\
+	clc	$c12, zero, (3*CHERICAP_SIZE)($c26);			\
+	cld	$t9, $v0, 0($c12);					\
+	dla	$ra, 1f;						\
+	cgetpcc	$c12;							\
+	csetoffset	$c12, $c12, $t9;				\
+	cjalr	$c12, $c17;						\
+	nop;			/* Branch-delay slot */			\
+									\
+1:									\
+	/*								\
+	 * Return to caller - load creturn capability from		\
+	 * __libcheri_object_creturn into $c1, $c2, and then ccall.	\
+	 */								\
+	lui $t0, %hi(%neg(%captab_rel(2f)));				\
+	daddiu $t0, $t0, %lo(%neg(%captab_rel(2f)));			\
+2:	cgetpcc	$c2;							\
+	cincoffset	$c2, $c2, $t0;					\
+	clcbi	$c2, %captab20(__libcheri_object_creturn)($c2);		\
+	clc	$c1, zero, 0($c2);					\
+	clc	$c2, zero, CHERICAP_SIZE($c2);				\
+	CCALL($c1, $c2);						\
+									\
+$__libcheri_ ## class ## _entry_end:					\
+	.end __libcheri_## class ## _entry;				\
+	.size __libcheri_ ## class ## _entry,$__libcheri_ ## class ## _entry_end - __libcheri_ ## class ## _entry
+
+#else /* !__CHERI_CAPABILITY_TABLE__ */
+
 #define	LIBCHERI_CLASS_ASM(class)					\
 	.text;								\
 	.option pic0;							\
@@ -126,6 +193,8 @@ __libcheri_ ## class ## _entry:						\
 $__libcheri_ ## class ## _entry_end:					\
 	.end __libcheri_## class ## _entry;				\
 	.size __libcheri_ ## class ## _entry,$__libcheri_ ## class ## _entry_end - __libcheri_ ## class ## _entry
+
+#endif /* !__CHERI_CAPABILITY_TABLE__ */
 
 #else /* !__CHERI_PURE_CAPABILITY__ */
 
