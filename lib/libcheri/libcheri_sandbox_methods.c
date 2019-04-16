@@ -779,7 +779,7 @@ sandbox_make_vtable(void *dataptr, const char *class,
 
 int
 sandbox_set_required_method_variables(void * __capability datacap,
-    struct sandbox_required_methods *required_methods)
+    vm_offset_t datacap_bias, struct sandbox_required_methods *required_methods)
 {
 	size_t i;
 	vm_offset_t * __capability method_var_p;
@@ -799,7 +799,7 @@ sandbox_set_required_method_variables(void * __capability datacap,
 		assert(rmethods[i].srm_index_offset != 0);
 
 		method_var_p = cheri_setoffset(datacap,
-		    rmethods[i].srm_index_offset);
+		    rmethods[i].srm_index_offset - datacap_bias);
 #if defined(DEBUG) && DEBUG > 1
 		printf("%s: updating method %zd (%s::%s) variable: %#p\n",
 		 __func__, i, rmethods[i].srm_class, rmethods[i].srm_method, (__cheri_fromcap void*)method_var_p);
