@@ -31,6 +31,8 @@
 
 #include <sys/param.h>
 #include <sys/capsicum.h>
+#include <sys/filio.h> /* for FIODTYPE */
+#include <sys/ttycom.h> /* for TIOCGWINSZ */
 #include <sys/ioctl.h>
 
 #include <errno.h>
