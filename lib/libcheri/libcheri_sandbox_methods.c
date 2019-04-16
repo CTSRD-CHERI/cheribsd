@@ -763,8 +763,8 @@ sandbox_make_vtable(void *dataptr, const char *class,
 			       " index = %zd\n",
 			    __func__, i, m, pm->spm_method, index);
 #endif
-			assert(vtable[m] == 0);
-			vtable[m] = cheri_ccallee_base[index];
+			assert(vtable[index] == 0);
+			vtable[index] = cheri_ccallee_base[index];
 		}
 #ifdef DEBUG
 		printf("%s: added [%zd] methods to vtable for %s\n", __func__,
