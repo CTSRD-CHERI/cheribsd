@@ -417,7 +417,7 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 	int i, prot;
 	size_t taddr;
 	ssize_t rlen;
-	size_t maplen, mappedbytes, offset, tailbytes;
+	size_t maplen, mappedbytes, offset, headbytes, tailbytes;
 	size_t min_section_addr = (size_t)-1;
 	Elf64_Ehdr raw_ehdr; /* Not endian converted */
 	Elf64_Phdr raw_phdr;
@@ -562,8 +562,8 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 
 		taddr = rounddown2((phdr_member(p_vaddr)), PAGE_SIZE);
 		offset = rounddown2(phdr_member(p_offset), PAGE_SIZE);
-		maplen = phdr_member(p_offset) - rounddown2(phdr_member(p_offset), PAGE_SIZE)
-		    + phdr_member(p_filesz);
+		headbytes = phdr_member(p_offset) - offset;
+		maplen = headbytes + phdr_member(p_filesz);
 		/* XXX-BD: rtld handles this, but I don't see why you would. */
 		if (phdr_member(p_filesz) != phdr_member(p_memsz) && !(phdr_member(p_flags) & PF_W)) {
 			warnx("%s: segment %d expects 0 fill, but is not "
@@ -588,12 +588,12 @@ sandbox_parse_elf64(int fd, const char* name, unsigned flags)
 		 * If we would map everything directly or everything fit
 		 * in the mapped range we're done.
 		 */
-		if (phdr_member(p_filesz) == phdr_member(p_memsz) || phdr_member(p_memsz) <= mappedbytes)
+		if (phdr_member(p_filesz) == phdr_member(p_memsz) ||
+		    headbytes + phdr_member(p_memsz) <= mappedbytes)
 			continue;
 
 		taddr = taddr + mappedbytes;
-		maplen = (phdr_member(p_offset) - rounddown2(phdr_member(p_offset), PAGE_SIZE)) +
-		    phdr_member(p_memsz) - mappedbytes;
+		maplen = headbytes + phdr_member(p_memsz) - mappedbytes;
 
 		if ((sme = sandbox_map_entry_new(taddr, maplen, prot,
 		    MAP_FIXED | MAP_ANON, -1, 0, 0)) == NULL)
