@@ -49,7 +49,7 @@ __invoke_vector_addr__ = __vector_base__ + __vector_size__ * 1;
 PROVIDE_HIDDEN(__reserved0_vector__ = __vector_base__ + __vector_size__ * 2);
 PROVIDE_HIDDEN(__reserved1_vector__ = __vector_base__ + __vector_size__ * 3);
 
-__code_body__ = __vector_base__ + __vector_size__ * 4;
+__vector_end_addr__ = __vector_base__ + __vector_size__ * 4;
 
 CAP_ALIGN = 0x20;
 PAGE_ALIGN = 0x1000;
@@ -83,19 +83,22 @@ SECTIONS
 	 * Adding the . after the section name forces the output section
 	 * to be placed at the address of the current location counter:
 	 * https://sourceware.org/binutils/docs/ld/Output-Section-Address.html
+	 *
+	 * Specifying the address again rather than . ensures that . doesn't
+	 * change due to orphan sections being added in unwanted places. If LLD
+	 * decides to put an orphan section where our vectors belong, it will
+	 * instead give an error about overlapping sections, rather than
+	 * shifting a vector entry.
 	 */
-	rtld_vector_text . : {
-		__rtld_vector_addr = .;
+	rtld_vector_text __rtld_vector_addr__ : {
 		KEEP(*crt_rtld.o(.text *vector_text))
 	}
 	. = __invoke_vector_addr__;
-	invoke_vector_text . : {
-		__invoke_vector_addr = .;
+	invoke_vector_text __invoke_vector_addr__ : {
 		KEEP(*crt_invoke.o(.text *vector_text))
 	}
-	. = __code_body__;
-	.init . : {
-		__code_body_addr = .;
+	. = __vector_end_addr__;
+	.init : {
 		KEEP (*(.init))
 	} = 0
 	.text ALIGN(CAP_ALIGN): {
@@ -104,25 +107,23 @@ SECTIONS
 	.fini ALIGN(CAP_ALIGN): {
 		KEEP (*(.fini))
 	} = 0
-	/* Try to trick the linker into not adding any orphan sections before
-	 * .text:
-	 * https://sourceware.org/binutils/docs/ld/Location-Counter.html#Location-Counter
-	 */
-	. = .;
-	.rodata ALIGN(CAP_ALIGN) : {
-		*(.rodata)
-	}
-	/*
-	 * Memory to be mapped into the data segment.  For compiler-generated
-	 * content, it would be much preferable to map into the code segment
-	 * and use $pcc-relative loads, but we are not yet there.
-	 */
 	.MIPS.options ALIGN(PAGE_ALIGN): {
 		*(.MIPS.options)
 	}
 	.MIPS.abiflags ALIGN(PAGE_ALIGN): {
 		*(.MIPS.abiflags)
 	}
+	.rodata ALIGN(CAP_ALIGN) : {
+		*(.rodata)
+	}
+	__cap_relocs : {
+		KEEP(*(__cap_relocs))
+	}
+	/*
+	 * Memory to be mapped into the data segment.  For compiler-generated
+	 * content, it would be much preferable to map into the code segment
+	 * and use $pcc-relative loads, but we are not yet there.
+	 */
 	.ctors ALIGN(CAP_ALIGN) : {
 		KEEP (crtbeginC.o(.ctors))
 		KEEP (*(EXCLUDE_FILE (*crtendC.o) .ctors))
@@ -152,28 +153,18 @@ SECTIONS
 		KEEP (*(SORT(.fini_array.*)))
 		PROVIDE_HIDDEN (__fini_array_end = .);
 	}
-	__cap_relocs : {
-		KEEP(*(__cap_relocs))
+	.data ALIGN(CAP_ALIGN): {
+		*(.data)
+	}
+	.got ALIGN(CAP_ALIGN): {
+		*(.got.plt)
+		*(.got)
 	}
 	.bss ALIGN(CAP_ALIGN): {
 		*(.bss)
 	}
-	.data ALIGN(CAP_ALIGN): {
-		*(.data)
-	}
-	_gp = ABSOLUTE(ALIGN(CAP_ALIGN) + 0x7fc0);
-	.got : {
-		*(.got.plt)
-		*(.got)
-	}
-
-	/*
-	 * Force zero-filling of previous segments in generated image.
-	 */
-	sandbox_trailer : {
-		QUAD(0xffffffffffffffff)
-	}
 
 	__bss_start = ADDR(.bss);
 	__bss_end = ALIGN(__bss_start + SIZEOF(.bss), 0x8);
+	_gp = ADDR(.got) + 0x7fc0;
 }
