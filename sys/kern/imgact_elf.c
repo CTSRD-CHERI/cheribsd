@@ -1187,26 +1187,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 				et_dyn_addr = __elfN(et_dyn_load_addr);
 		}
 
-		/*
-		 * For coexecve(2), adjust the load address to be above
-		 * the existing mappings.
-		 *
-		 * XXX: This doesn't really work the way I want - it should
-		 * 	put the address above all the mappings, not between
-		 * 	the other process' binary and its rtld.  Oh well.
-		 */
-		if (imgp->cop != NULL) {
-			error = __elfN(reserve_space)(imgp, hdr, phdr, &et_dyn_addr);
-			if (error != 0) {
-				printf("%s: reserve_space() failed with error %d\n",
-				    __func__, error);
-				goto ret;
-			}
-#if 0
-			printf("%s: et_dyn_addr adjusted to %lx\n",
-			    __func__, et_dyn_addr);
-#endif
-		}
 	} else if (imgp->cop != NULL) {
 #if 0
 		/*
@@ -1287,6 +1267,19 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	vn_lock(imgp->vp, LK_EXCLUSIVE | LK_RETRY);
 	if (error != 0)
 		goto ret;
+
+	/*
+	 * For coexecve(2), adjust the load address to be above
+	 * the existing mappings.
+	 */
+	if (imgp->cop != NULL && hdr->e_type == ET_DYN) {
+		error = __elfN(reserve_space)(imgp, hdr, phdr, &et_dyn_addr);
+		if (error != 0) {
+			printf("%s: reserve_space() failed with error %d\n",
+			    __func__, error);
+			goto ret;
+		}
+	}
 
 	/*
 	 * XXX: For some reason imgp->start_addr is changed from ~0UL to 0 so due
