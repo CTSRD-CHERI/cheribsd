@@ -63,8 +63,8 @@ PAGE_ALIGN = 0x1000;
  */
 INPUT(crt_rtld.o crt_invoke.o)
 INPUT(crtbeginC.o crtendC.o)
-/* Currently needed to process __cap_relocs in sandboxes: */
-INPUT(crt_init_globals.o)
+/* Currently needed to process __cap_relocs and .init_array in sandboxes: */
+INPUT(Ccrt1.o)
 
 ENTRY(__rtld_vector)
 /* Not supported by LLD: STARTUP(crt_rtld.o) */
@@ -107,6 +107,9 @@ SECTIONS
 	.fini ALIGN(CAP_ALIGN): {
 		KEEP (*(.fini))
 	} = 0
+	.note.tag : {
+		*(.note.tag)
+	}
 	.MIPS.options ALIGN(PAGE_ALIGN): {
 		*(.MIPS.options)
 	}

@@ -61,8 +61,13 @@ typedef void (*init_function_ptr)(int, char**, char**);
 #define array_entry_to_function_ptr(type, entry) \
 	((type)entry)
 #else
+#ifdef CRT_INIT_ARRAY_ENTRIES_ARE_OFFSETS
+#define array_entry_to_function_ptr(type, entry) \
+	((type)cheri_setoffset(cheri_getpcc(), entry));
+#else
 #define array_entry_to_function_ptr(type, entry) \
 	((type)cheri_setaddress(cheri_getpcc(), entry));
+#endif
 #endif
 
 
@@ -138,6 +143,7 @@ process_irelocs(void)
 char **environ = NULL;
 const char *__progname = "";
 
+#ifndef CRT_ATEXIT_SUPPRESS
 static void
 finalizer(void)
 {
@@ -157,6 +163,7 @@ finalizer(void)
 	_fini();
 #endif
 }
+#endif
 
 static inline void
 handle_static_init(int argc, char **argv, char **env)
@@ -168,7 +175,9 @@ handle_static_init(int argc, char **argv, char **env)
 	if (&_DYNAMIC != NULL)
 		return;
 
+#ifndef CRT_ATEXIT_SUPPRESS
 	atexit(finalizer);
+#endif
 
 	array_size = weak_array_size(__preinit_array);
 	array = __preinit_array_start;
