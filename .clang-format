@@ -30,9 +30,13 @@ DerivePointerAlignment: false
 DisableFormat: false
 ForEachMacros:
   - SLIST_FOREACH
+  - SLIST_FOREACH_SAFE
   - LIST_FOREACH
+  - LIST_FOREACH_SAFE
   - STAILQ_FOREACH
+  - STAILQ_FOREACH_SAFE
   - TAILQ_FOREACH
+  - TAILQ_FOREACH_SAFE
 IndentCaseLabels: false
 IndentPPDirectives: None
 Language: Cpp
