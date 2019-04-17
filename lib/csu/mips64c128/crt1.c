@@ -119,7 +119,7 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 
 	/* Attempt to bound the data capability to only the writable segment */
 	for (const Elf_Phdr *ph = phdr; ph < phlimit; ph++) {
-		if (ph->p_type != PT_LOAD) {
+		if (ph->p_type != PT_LOAD && ph->p_type != PT_GNU_RELRO) {
 			/* Static binaries should not have a PT_DYNAMIC phdr */
 			if (ph->p_type == PT_DYNAMIC) {
 				__builtin_trap();
@@ -127,7 +127,15 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 			}
 			continue;
 		}
-		/* TODO: handle PT_GNU_RELRO? */
+		/*
+		 * We found a PT_LOAD or PT_GNU_RELRO phdr. PT_GNU_RELRO will
+		 * be a subset of a matching PT_LOAD but we need to add the
+		 * range from PT_GNU_RELRO to the constant capability since
+		 * __cap_relocs could have some constants pointing to the relro
+		 * section. The phdr for the matching PT_LOAD has PF_R|PF_W so
+		 * it would not be added to the readonly if we didn't also
+		 * parse PT_GNU_RELRO.
+		 */
 		Elf_Addr seg_start = ph->p_vaddr;
 		Elf_Addr seg_end = seg_start + ph->p_memsz;
 		if ((ph->p_flags & PF_X)) {
@@ -184,11 +192,13 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 	} else {
 		/* Check that ranges are well-formed */
 		if (writable_end < writable_start ||
-		    readonly_end < readonly_start)
+		    readonly_end < readonly_start ||
+		    text_end < text_start)
 			__builtin_trap();
-		/* Abort if readonly and writeable overlap: */
-		if (MAX(writable_start, readonly_start) <=
-		    MIN(writable_end, readonly_end)) {
+		/* Abort if text and writeable overlap: */
+		if (MAX(writable_start, text_start) <=
+		    MIN(writable_end, text_end)) {
+			/* TODO: should we allow a single RWX segment? */
 			__builtin_trap();
 		}
 #ifndef CHERI_INIT_GLOBALS_SUPPORTS_CONSTANT_FLAG
