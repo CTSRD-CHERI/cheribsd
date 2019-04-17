@@ -2,6 +2,7 @@
 
 #include_next <unistd.h>
 #include <fcntl.h>
+#include <sys/random.h> /* getentropy() */
 #include <sys/signal.h>
 #include <sys/time.h>
 #include <sys/types.h>
