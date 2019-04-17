@@ -305,7 +305,7 @@ proc_rwmem(struct proc *p, struct uio *uio)
 		len = min(PAGE_SIZE - page_offset, uio->uio_resid);
 
 		vm_map_lock(map);
-		error = vm_map_check_owner_proc(map, pageno, len, p);
+		error = vm_map_check_owner_proc(map, pageno, pageno + len, p);
 		vm_map_unlock(map);
 		if (error != KERN_SUCCESS) {
 			printf("%s: nope, %d at %#lx\n", __func__, len, pageno);
