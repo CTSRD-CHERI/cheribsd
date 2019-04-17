@@ -33,7 +33,6 @@
 #include <assert.h>
 #include <stdlib.h>
 
-void	crt_init_globals(void);
 void	crt_call_constructors(void);
 
 /*

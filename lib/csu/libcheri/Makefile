@@ -2,9 +2,11 @@
 # $FreeBSD$
 #
 .PATH: ${.CURDIR}/../common-cheri
-SRCS=	crt_init_globals.c			\
-	crt_invoke.S				\
+CFLAGS+=	-I${.CURDIR}/../common		\
+		-I${.CURDIR}/../common-cheri
+SRCS=	crt_invoke.S				\
 	crt_rtld.S				\
+	Ccrt1.c					\
 	crtbeginC.c				\
 	crtendC.c
 FILES=	${SRCS:C/.[cS]$/.o/}
@@ -17,7 +19,7 @@ FILESDIR=       ${LIBDIR}
 .undef LIBRARIES_ONLY
 CLEANFILES=	${FILES}
 CFLAGS+=-mxgot -mllvm -mxmxgot
-CFLAGS.crt_init_globals.c+=-DCHERI_INIT_GLOBALS_USE_OFFSET
+CFLAGS+=	-DCRT_IRELOC_SUPPRESS -DCRT_ATEXIT_SUPPRESS
 
 NEED_CHERI=	pure
 
