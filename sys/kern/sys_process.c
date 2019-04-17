@@ -308,7 +308,6 @@ proc_rwmem(struct proc *p, struct uio *uio)
 		error = vm_map_check_owner_proc(map, pageno, pageno + len, p);
 		vm_map_unlock(map);
 		if (error != KERN_SUCCESS) {
-			printf("%s: nope, %d at %#lx\n", __func__, len, pageno);
 			error = EFAULT;
 			break;
 		}
