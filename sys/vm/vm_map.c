@@ -2491,7 +2491,8 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 }
 
 int
-vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end)
+vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end,
+    struct proc *p)
 {
 	vm_map_entry_t entry;
 	bool found;
@@ -2504,14 +2505,25 @@ vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end)
 
 	for (; entry != &map->header && entry->start < end;
 	    entry = entry->next) {
-		if (entry->owner != curproc->p_pid) {
-			printf("%s: requested range [%#lx, %#lx], owner %d (%s), map %#p, would overlap with existing entry [%#lx, %#lx], owner %d\n",
-			    __func__, start, end, curproc->p_pid, curproc->p_comm, &curproc->p_vmspace->vm_map, entry->start, entry->end, entry->owner);
+		if (entry->owner != p->p_pid) {
+			printf("%s: requested range [%#lx, %#lx], "
+			    "owner %d (%s), map %#p, would overlap with "
+			    "existing entry [%#lx, %#lx], owner %d\n",
+			    __func__, start, end,
+			    p->p_pid, p->p_comm, &p->p_vmspace->vm_map,
+			    entry->start, entry->end, entry->owner);
 			return (KERN_PROTECTION_FAILURE);
 		}
 	}
 
 	return (KERN_SUCCESS);
+}
+
+int
+vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end)
+{
+
+	return (vm_map_check_owner_proc(map, start, end, curproc));
 }
 
 /*
