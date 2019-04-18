@@ -411,6 +411,7 @@ int	sigev_findtd(struct proc *p, ksigevent_t *sigev, struct thread **);
 int	sig_ffs(sigset_t *set);
 void	siginfo_to_siginfo_native(const _siginfo_t *si,
 	    struct siginfo_native *si_n);
+int	copyout_siginfo_native(const _siginfo_t *si, void * __capability info);
 void	siginfo_native_to_siginfo(const struct siginfo_native *si_n,
 	    _siginfo_t *si);
 void	siginit(struct proc *p);

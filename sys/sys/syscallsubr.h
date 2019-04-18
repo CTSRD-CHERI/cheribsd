@@ -451,6 +451,7 @@ int	kern_sigaction_cap(struct thread *td, int sig,
 	    const ksigaction_t *act, ksigaction_t *oact, int flags,
 	    void * __capability *cap);
 int	kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss);
+int	kern_sigpending(struct thread *td, sigset_t * __capability set);
 int	kern_sigprocmask(struct thread *td, int how,
 	    sigset_t *set, sigset_t *oset, int flags);
 int	kern_sigsuspend(struct thread *td, sigset_t mask);
@@ -601,6 +602,18 @@ int	user_setgroups(struct thread *td, u_int gidsetsize,
 int	user_settimeofday(struct thread *td,
 	    const struct timeval * __capability tp,
 	    const struct timezone * __capability tz);
+int	user_sigprocmask(struct thread *td, int how,
+	    const sigset_t * __capability uset, sigset_t * __capability uoset);
+int	user_sigsuspend(struct thread *td,
+	    const sigset_t * __capability sigmask);
+int	user_sigtimedwait(struct thread *td,
+	    const sigset_t * __capability uset, void * __capability info,
+	    const struct timespec * __capability utimeout,
+	    copyout_siginfo_t *copyout_siginfop);
+int	user_sigwait(struct thread *td, const sigset_t * __capability uset,
+	    int * __capability usig);
+int	user_sigwaitinfo(struct thread *td, const sigset_t * __capability uset,
+	    void * __capability info, copyout_siginfo_t *copyout_siginfop);
 int	user_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int * __capability rsv);
 int	user_statfs(struct thread *td, const char * __capability path,

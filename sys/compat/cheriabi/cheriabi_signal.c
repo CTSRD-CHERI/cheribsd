@@ -79,133 +79,52 @@ cheriabi_sigaction(struct thread *td, struct cheriabi_sigaction_args *uap)
 int
 cheriabi_sigprocmask(struct thread *td, struct cheriabi_sigprocmask_args *uap)
 {
-	sigset_t set, oset;
-	sigset_t *setp, *osetp;
-	int error;
 
-	if (uap->set != NULL) {
-		error = copyin(uap->set, &set, sizeof(set));
-		setp = &set;
-	} else
-		setp = NULL;
-	if (uap->oset != NULL)
-		osetp = &oset;
-	else
-		osetp = NULL;
-	error = kern_sigprocmask(td, uap->how, setp, osetp, 0);
-	if (osetp && error == 0)
-		error = copyout(osetp, uap->oset, sizeof(oset));
-	return (error);
+	return (user_sigprocmask(td, uap->how, uap->set, uap->oset));
 }
 
 int
 cheriabi_sigwait(struct thread *td, struct cheriabi_sigwait_args *uap)
 {
-	ksiginfo_t ksi;
-	sigset_t set;
-	int error;
 
-	error = copyin(uap->set, &set, sizeof(set));
-	if (error) {
-		td->td_retval[0] = error;
-		return (0);
-	}
+	return (user_sigwait(td, uap->set, uap->sig));
+}
 
-	error = kern_sigtimedwait(td, set, &ksi, NULL);
-	if (error != 0) {
-		if (error == EINTR && td->td_proc->p_osrel < P_OSREL_SIGWAIT)
-			error = ERESTART;
-		if (error == ERESTART)
-			return (error);
-		td->td_retval[0] = error;
-		return (0);
-	}
+static int
+cheriabi_copyout_siginfo(const _siginfo_t *si, void * __capability info)
+{
 
-	error = copyout(&ksi.ksi_signo, uap->sig, sizeof(ksi.ksi_signo));
-	td->td_retval[0] = error;
-	return (0);
+	return (copyout(si, info, sizeof(*si)));
 }
 
 int
 cheriabi_sigtimedwait(struct thread *td, struct cheriabi_sigtimedwait_args *uap)
 {
-	struct timespec ts;
-	struct timespec *timeout;
-	sigset_t set;
-	ksiginfo_t ksi;
-	int error;
 
-	if (uap->timeout) {
-		error = copyin(uap->timeout, &ts, sizeof(ts));
-		if (error)
-			return (error);
-		timeout = &ts;
-	} else
-		timeout = NULL;
-
-	error = copyin(uap->set, &set, sizeof(set));
-	if (error)
-		return (error);
-
-	error = kern_sigtimedwait(td, set, &ksi, timeout);
-	if (error)
-		return (error);
-
-	if (uap->info != NULL)
-		error = copyout(&ksi.ksi_info, uap->info,
-		    sizeof(struct siginfo_c));
-
-	if (error == 0)
-		td->td_retval[0] = ksi.ksi_signo;
-	return (error);
+	return (user_sigtimedwait(td, uap->set, uap->info, uap->timeout,
+	    (copyout_siginfo_t *)cheriabi_copyout_siginfo));
 }
 
 int
 cheriabi_sigwaitinfo(struct thread *td, struct cheriabi_sigwaitinfo_args *uap)
 {
-	ksiginfo_t ksi;
-	sigset_t set;
-	int error;
 
-	error = copyin(uap->set, &set, sizeof(set));
-	if (error)
-		return (error);
-
-	error = kern_sigtimedwait(td, set, &ksi, NULL);
-	if (error)
-		return (error);
-
-	if (uap->info != NULL)
-		error = copyout(&ksi.ksi_info, uap->info,
-		    sizeof(struct siginfo_c));
-	if (error == 0)
-		td->td_retval[0] = ksi.ksi_signo;
-	return (error);
+	return (user_sigwaitinfo(td, uap->set, uap->info,
+	    (copyout_siginfo_t *)cheriabi_copyout_siginfo));
 }
 
 int
 cheriabi_sigpending(struct thread *td, struct cheriabi_sigpending_args *uap)
 {
-	struct proc *p = td->td_proc;
-	sigset_t pending;
 
-	PROC_LOCK(p);
-	pending = p->p_sigqueue.sq_signals;
-	SIGSETOR(pending, td->td_sigqueue.sq_signals);
-	PROC_UNLOCK(p);
-	return (copyout(&pending, uap->set, sizeof(sigset_t)));
+	return (kern_sigpending(td, uap->set));
 }
 
 int
 cheriabi_sigsuspend(struct thread *td, struct cheriabi_sigsuspend_args *uap)
 {
-	sigset_t mask;
-	int error;
 
-	error = copyin(uap->sigmask, &mask, sizeof(mask));
-	if (error)
-		return (error);
-	return (kern_sigsuspend(td, mask));
+	return (user_sigsuspend(td, uap->sigmask));
 }
 
 int

@@ -52,6 +52,7 @@ SUBDIR.${MK_CHERI}+=	cheriabitest-mt
 SUBDIR.${MK_CHERI}+=	cheritest
 SUBDIR.${MK_CHERI}+=	cheritest-mt
 SUBDIR.${MK_CHERI}+=	helloworld
+SUBDIR.${MK_CHERI}+=	helloworld_static
 SUBDIR.${MK_CHERI}+=	helloworld_cxx
 
 SUBDIR.${MK_SENDMAIL}+=	rmail

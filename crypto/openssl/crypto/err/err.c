@@ -7,6 +7,18 @@
  * https://www.openssl.org/source/license.html
  */
 
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20180629,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "pointer_bit_flags", "other"
+ *   ]
+ * }
+ * CHERI CHANGES END
+ */
+
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
@@ -922,7 +934,9 @@ int ERR_clear_last_mark(void)
  * so that attempt to fill the gaps means that one would have to identify
  * that track these gaps, which would be undesirable. Macro it is...
  */
-#if defined(__VMS) && __INITIAL_POINTER_SIZE==64
+#if defined(__UINTPTR_TYPE__)
+#define UINTPTR_T __UINTPTR_TYPE__
+#elif defined(__VMS) && __INITIAL_POINTER_SIZE==64
 /*
  * But we can't use size_t on VMS, because it adheres to sizeof(size_t)==4
  * even in 64-bit builds, which means that it won't work as mask.
@@ -945,8 +959,18 @@ void err_clear_last_constant_time(int clear)
 
     es->err_flags[top] &= ~(0 - clear);
     es->err_buffer[top] &= ~(0UL - clear);
+#ifndef __CHERI_PURE_CAPABILITY__
     es->err_file[top] = (const char *)((UINTPTR_T)es->err_file[top] &
                                        ~((UINTPTR_T)0 - clear));
+#else
+    /*
+     * XXXAR: the above "contant time" clearing could almost be done using
+     * __builtin_cheri_address_set() but an address of zero will not
+     * necessarily clear the tag bit. Just do the ?: version instead which
+     * might actually be constant time if the compiler uses cmovz.
+     */
+    es->err_file[top] = clear ? NULL : es->err_file[top];
+#endif
     es->err_line[top] |= 0 - clear;
 
     es->top = (top + ERR_NUM_ERRORS - clear) % ERR_NUM_ERRORS;
