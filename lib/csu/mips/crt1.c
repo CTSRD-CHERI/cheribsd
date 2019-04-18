@@ -1,7 +1,6 @@
 /*-
  * SPDX-License-Identifier: BSD-4-Clause
  *
- * Copyright 2013 Philip Withnall
  * Copyright 1996-1998 John D. Polstra.
  * All rights reserved.
  * Copyright (c) 1995 Christopher G. Demetriou
@@ -33,23 +32,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
- */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "pointer_shape"
- *   ],
- *   "change_comment": "stack alignment"
- * }
- * CHERI CHANGES END
+ * $FreeBSD: head/lib/csu/mips/crt1.c 326219 2017-11-26 02:00:33Z pfg $
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $");
+__FBSDID("$FreeBSD: head/lib/csu/mips/crt1.c 326219 2017-11-26 02:00:33Z pfg $");
 
 #include <stdlib.h>
 #include "libc_private.h"
@@ -59,31 +46,18 @@ __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
 struct Struct_Obj_Entry;
 struct ps_strings;
 
-extern void __start(char **, void (*)(void), struct Struct_Obj_Entry *,
-                    struct ps_strings *);
-void _start1(char **, void (*)(void), struct Struct_Obj_Entry *,
-             struct ps_strings *);
-
 #ifdef GCRT
-/* Profiling support. */
 extern void _mcleanup(void);
 extern void monstartup(void *, void *);
 extern int eprol;
 extern int etext;
 #endif
 
-/* The entry function, C part. This performs the bulk of program initialisation
- * before handing off to main(). It is called by __start, which is defined in
- * crt1_s.s, and necessarily written in raw assembly so that it can re-align
- * the stack before setting up the first stack frame and calling _start1().
- *
- * It would be nice to be able to hide the _start1 symbol, but that's not
- * possible, since it must be present in the GOT in order to be resolvable by
- * the position independent code in __start.
- * See: http://stackoverflow.com/questions/8095531/mips-elf-and-partial-linking
- */
+void __start(char **, void (*)(void), struct Struct_Obj_Entry *, struct ps_strings *);
+
+/* The entry function. */
 void
-_start1(char **ap,
+__start(char **ap,
 	void (*cleanup)(void),			/* from shared loader */
 	struct Struct_Obj_Entry *obj __unused,	/* from shared loader */
 	struct ps_strings *ps_strings __unused)
@@ -103,20 +77,16 @@ _start1(char **ap,
 		_init_tls();
 
 #ifdef GCRT
-	/* Set up profiling support for the program, if we're being compiled
-	 * with profiling support enabled (-DGCRT).
-	 * See: http://sourceware.org/binutils/docs/gprof/Implementation.html
-	 */
 	atexit(_mcleanup);
 	monstartup(&eprol, &etext);
-
-	/* Create an 'eprol' (end of prologue?) label which delimits the start
-	 * of the .text section covered by profiling. This must be before
-	 * main(). */
-__asm__("eprol:");
 #endif
 
 	handle_static_init(argc, argv, env);
-
 	exit(main(argc, argv, env));
 }
+
+#ifdef GCRT
+__asm__(".text");
+__asm__("eprol:");
+__asm__(".previous");
+#endif
