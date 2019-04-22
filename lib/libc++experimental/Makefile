@@ -25,6 +25,6 @@ CXXFLAGS+=	-nostdinc++
 CXXFLAGS+=	-nostdlib
 CXXFLAGS+=	-D_LIBCPP_BUILDING_LIBRARY
 CXXFLAGS+=	-DLIBCXXRT
-CXXSTD=		c++14
+CXXSTD?=	c++14
 
 .include <bsd.lib.mk>
