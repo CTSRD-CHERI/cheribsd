@@ -38,7 +38,11 @@
 static __inline uintptr_t
 _libc_get_static_tls_base(size_t offset)
 {
+#ifndef __CHERI_CAPABILITY_TLS__
+	vaddr_t tlsbase;
+#else
 	uintptr_t tlsbase;
+#endif
 
 #if defined(__mips_n64)
 #ifndef __CHERI_CAPABILITY_TLS__
