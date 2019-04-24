@@ -154,133 +154,18 @@ cheriabi_wait4(struct thread *td, struct cheriabi_wait4_args *uap)
 int
 cheriabi_wait6(struct thread *td, struct cheriabi_wait6_args *uap)
 {
-	struct __wrusage wru, *wrup;
-	struct siginfo_c si, *sip;
-	int error, status;
+	_siginfo_t si, *sip;
+	int error;
 
-	if (uap->wrusage != NULL)
-		wrup = &wru;
-	else
-		wrup = NULL;
 	if (uap->info != NULL) {
 		sip = &si;
 		bzero(sip, sizeof(*sip));
 	} else
 		sip = NULL;
-	error = kern_wait6(td, uap->idtype, uap->id, &status, uap->options,
-	    wrup, (_siginfo_t *)sip);
-	if (error != 0)
-		return (error);
-	if (uap->status != NULL)
-		error = copyout(&status, uap->status, sizeof(status));
-	if (uap->wrusage != NULL && error == 0)
-		error = copyout(&wru, uap->wrusage, sizeof(wru));
-	if (uap->info != NULL && error == 0) {
-		error = copyout(&si, uap->info, sizeof(si));
-	}
-	return (error);
-}
-
-/*
- * Custom version of exec_copyin_args() so that we can translate
- * the pointers.
- */
-int
-cheriabi_exec_copyin_args(struct image_args *args,
-    const char * __capability fname, enum uio_seg segflg,
-    char * __capability * __capability argv,
-    char * __capability * __capability envv)
-{
-	char * __capability * __capability pcap;
-	void * __capability argcap;
-	size_t length;
-	int error;
-
-	bzero(args, sizeof(*args));
-	if (argv == NULL)
-		return (EFAULT);
-
-	/*
-	 * Allocate demand-paged memory for the file name, argument, and
-	 * environment strings.
-	 */
-	error = exec_alloc_args(args);
-	if (error != 0)
-		return (error);
-
-	/*
-	 * Copy the file name.
-	 */
-	if (fname != NULL) {
-		args->fname = args->buf;
-		if (segflg == UIO_SYSSPACE) {
-			error = copystr((__cheri_fromcap const char *)fname,
-			    args->fname, PATH_MAX, &length);
-		} else {
-			error = copyinstr(fname, args->fname, PATH_MAX,
-			    &length);
-		}
-		if (error != 0)
-			goto err_exit;
-	} else
-		length = 0;
-
-	args->begin_argv = args->buf + length;
-	args->endp = args->begin_argv;
-	args->stringspace = ARG_MAX;
-
-	/*
-	 * extract arguments first
-	 */
-	pcap = argv;
-	for (;;) {
-		error = copyincap(pcap++, &argcap, sizeof(argcap));
-		if (error)
-			goto err_exit;
-		if (argcap == NULL)
-			break;
-		error = copyinstr(argcap, args->endp, args->stringspace,
-		    &length);
-		if (error != 0) {
-			if (error == ENAMETOOLONG)
-				error = E2BIG;
-			goto err_exit;
-		}
-		args->stringspace -= length;
-		args->endp += length;
-		args->argc++;
-	}
-
-	args->begin_envv = args->endp;
-
-	/*
-	 * extract environment strings
-	 */
-	if (envv) {
-		pcap = envv;
-		for (;;) {
-			error = copyincap(pcap++, &argcap, sizeof(argcap));
-			if (error != 0)
-				goto err_exit;
-			if (argcap == NULL)
-				break;
-			error = copyinstr(argcap, args->endp,
-			    args->stringspace, &length);
-			if (error != 0) {
-				if (error == ENAMETOOLONG)
-					error = E2BIG;
-				goto err_exit;
-			}
-			args->stringspace -= length;
-			args->endp += length;
-			args->envc++;
-		}
-	}
-
-	return (0);
-
-err_exit:
-	exec_free_args(args);
+	error = user_wait6(td, uap->idtype, uap->id, uap->status,
+	    uap->options, uap->wrusage, sip);
+	if (uap->info != NULL && error == 0)
+		error = copyout(sip, uap->info, sizeof(*sip));
 	return (error);
 }
 
@@ -294,7 +179,7 @@ cheriabi_execve(struct thread *td, struct cheriabi_execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = cheriabi_exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
+	error = exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0)
 		error = kern_execve(td, &eargs, NULL);
@@ -318,7 +203,7 @@ cheriabi_coexecve(struct thread *td, struct cheriabi_coexecve_args *uap)
 		PRELE(p);
 		return (error);
 	}
-	error = cheriabi_exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
+	error = exec_copyin_args(&eargs, uap->fname, UIO_USERSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0)
 		error = kern_coexecve(td, &eargs, NULL, p);
@@ -338,7 +223,7 @@ cheriabi_fexecve(struct thread *td, struct cheriabi_fexecve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = cheriabi_exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
+	error = exec_copyin_args(&eargs, NULL, UIO_SYSSPACE,
 	    uap->argv, uap->envv);
 	if (error == 0) {
 		eargs.fd = uap->fd;
@@ -1279,21 +1164,8 @@ cheriabi_utrace(struct thread *td, struct cheriabi_utrace_args *uap)
 int
 cheriabi_kldload(struct thread *td, struct cheriabi_kldload_args *uap)
 {
-	char *pathname = NULL;
-	int error, fileid;
 
-	td->td_retval[0] = -1;
-
-	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr(uap->file, pathname, MAXPATHLEN, NULL);
-	if (error != 0)
-		goto error;
-	error = kern_kldload(td, pathname, &fileid);
-	if (error == 0)
-		td->td_retval[0] = fileid;
-error:
-	free(pathname, M_TEMP);
-	return (error);
+	return (user_kldload(td, uap->file));
 }
 
 int
@@ -1333,7 +1205,6 @@ int
 cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
 {
 	struct kld_sym_lookup_c lookup;
-	char *symstr;
 	int error;
 
 	error = copyincap(uap->data, &lookup, sizeof(lookup));
@@ -1342,18 +1213,12 @@ cheriabi_kldsym(struct thread *td, struct cheriabi_kldsym_args *uap)
 	if (lookup.version != sizeof(lookup) ||
 	    uap->cmd != KLDSYM_LOOKUP)
 		return (EINVAL);
-	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr(lookup.symname, symstr, MAXPATHLEN, NULL);
-	if (error != 0)
-		goto done;
-	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,
+	error = kern_kldsym(td, uap->fileid, uap->cmd, lookup.symname,
 	    &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
-		goto done;
+		return (error);
 	error = copyoutcap(&lookup, uap->data, sizeof(lookup));
 
-done:
-	free(symstr, M_TEMP);
 	return (error);
 }
 
@@ -1379,25 +1244,8 @@ cheriabi_setloginclass(struct thread *td,
 int
 cheriabi_uuidgen(struct thread *td, struct cheriabi_uuidgen_args *uap)
 {
-	struct uuid *store;
-	size_t count;
-	int error;
 
-	/*
-	 * Limit the number of UUIDs that can be created at the same time
-	 * to some arbitrary number. This isn't really necessary, but I
-	 * like to have some sort of upper-bound that's less than 2G :-)
-	 * XXX probably needs to be tunable.
-	 */
-	if (uap->count < 1 || uap->count > 2048)
-		return (EINVAL);
-
-	count = uap->count;
-	store = malloc(count * sizeof(struct uuid), M_TEMP, M_WAITOK);
-	kern_uuidgen(store, count);
-	error = copyout(store, uap->store, count * sizeof(struct uuid));
-	free(store, M_TEMP);
-	return (error);
+	return (user_uuidgen(td, uap->store, uap->count));
 }
 
 /*
@@ -1430,28 +1278,8 @@ cheriabi_getgroups(struct thread *td, struct cheriabi_getgroups_args *uap)
 int
 cheriabi_setgroups(struct thread *td, struct cheriabi_setgroups_args *uap)
 {
-	gid_t smallgroups[XU_NGROUPS];
-	gid_t *groups;
-	u_int gidsetsize;
-	int error;
 
-	gidsetsize = uap->gidsetsize;
-	if (gidsetsize > ngroups_max + 1)
-		return (EINVAL);
-
-	if (gidsetsize > XU_NGROUPS)
-		groups = malloc(gidsetsize * sizeof(gid_t), M_TEMP, M_WAITOK);
-	else
-		/* XXX: CTSRD-CHERI/clang#179 */
-		groups = &smallgroups[0];
-
-	error = copyin(uap->gidset, groups, gidsetsize * sizeof(gid_t));
-	if (error == 0)
-		error = kern_setgroups(td, gidsetsize, groups);
-
-	if (gidsetsize > XU_NGROUPS)
-		free(groups, M_TEMP);
-	return (error);
+	return (user_setgroups(td, uap->gidsetsize, uap->gidset));
 }
 
 int
@@ -1729,13 +1557,6 @@ cheriabi_thr_new(struct thread *td, struct cheriabi_thr_new_args *uap)
 	if (error != 0)
 		return (error);
 
-	/*
-	 * Opportunity for machine-dependent code to provide a DDC if the
-	 * caller didn't provide one.
-	 *
-	 * XXXRW: But should only do so if a suitable flag is set?
-	 */
-	cheriabi_thr_new_md(td, &param_c);
 	if (param_c.rtp != NULL) {
 		error = copyin(param_c.rtp, &rtp, sizeof(struct rtprio));
 		if (error)

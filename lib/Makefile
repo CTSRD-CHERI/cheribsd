@@ -199,6 +199,7 @@ _libcplusplus+=	libc++fs
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
+SUBDIR.${MK_GOOGLETEST}+=	googletest
 SUBDIR.${MK_LIBTHR}+=	libthr
 SUBDIR.${MK_LLVM_LIBUNWIND}+=	libgcc_eh
 SUBDIR.${MK_LLVM_LIBUNWIND}+=	libgcc_s
@@ -228,6 +229,7 @@ _libproc=	libproc
 _librtld_db=	librtld_db
 .endif
 
+SUBDIR.${MK_OPENMP}+=	libomp
 SUBDIR.${MK_OPENSSL}+=	libmp
 SUBDIR.${MK_PMC}+=	libpmc libpmcstat
 SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius

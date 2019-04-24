@@ -300,10 +300,8 @@ sys_extattr_set_link(struct thread *td, struct extattr_set_link_args *uap)
 {
 
 	return (kern_extattr_set_path(td, __USER_CAP_STR(uap->path),
-	    uap->attrnamespace,
-	    __USER_CAP_STR(uap->attrname),
-	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes,
-	    NOFOLLOW));
+	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
+	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, NOFOLLOW));
 }
 
 int

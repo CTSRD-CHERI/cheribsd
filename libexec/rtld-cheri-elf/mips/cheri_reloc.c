@@ -58,21 +58,27 @@ void _do___caprelocs(const struct capreloc *start_relocs,
     const struct capreloc * stop_relocs, void* gdc, const void* pcc,
     vaddr_t base_addr, bool tight_pcc_bounds)
 {
-
+#if defined(CHERI_INIT_GLOBALS_VERSION) && CHERI_INIT_GLOBALS_VERSION >= 2
+	cheri_init_globals_impl(start_relocs, stop_relocs, /*data_cap=*/gdc,
+	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
+	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
+#else
+#pragma message("LLVM cheri_init_globals.h is too old, please update LLVM")
+	(void)base_addr;
 	/*
 	 * XXX: Aux args capabilities have base 0, but mmap gives us a tight
 	 * base. Since reloc->object and (currently) reloc->capability_location
 	 * are now absolute addresses, we must subtract the absolute address of
 	 * gdc to avoid including mapbase twice.
 	 */
-	vaddr_t mapbase = __builtin_cheri_address_get(gdc);
-	gdc = __builtin_cheri_perms_and(gdc, global_pointer_permissions);
-	pcc = __builtin_cheri_perms_and(pcc, function_pointer_permissions);
+	// vaddr_t mapbase = __builtin_cheri_address_get(gdc);
+	gdc = cheri_clearperm(gdc, DATA_PTR_REMOVE_PERMS);
+	pcc = cheri_clearperm(pcc, FUNC_PTR_REMOVE_PERMS);
 	for (const struct capreloc *reloc = start_relocs; reloc < stop_relocs; reloc++) {
 		_Bool isFunction = (reloc->permissions & function_reloc_flag) ==
 		    function_reloc_flag;
-		void **dest = __builtin_cheri_offset_increment(gdc,
-		    reloc->capability_location + base_addr - mapbase);
+		void **dest = __builtin_cheri_address_set(
+		    gdc, reloc->capability_location);
 		if (reloc->object == 0) {
 			/*
 			 * XXXAR: clang fills uninitialized capabilities with
@@ -95,6 +101,7 @@ void _do___caprelocs(const struct capreloc *start_relocs,
 		src = __builtin_cheri_offset_increment(src, reloc->offset);
 		*dest = src;
 	}
+#endif
 }
 
 /*

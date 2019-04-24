@@ -5,11 +5,11 @@
 COMPILERRTDIR=	${SRCTOP}/contrib/compiler-rt
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
-UNWINDINCDIR=   ${SRCTOP}/contrib/cheri-libunwind/include
-UNWINDSRCDIR=   ${SRCTOP}/contrib/cheri-libunwind/src
+UNWINDINCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/include
+UNWINDSRCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 .elif ${MACHINE_ARCH:Mmips*}
-UNWINDINCDIR=   ${SRCTOP}/contrib/cheri-libunwind/include
-UNWINDSRCDIR=   ${SRCTOP}/contrib/cheri-libunwind/src
+UNWINDINCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/include
+UNWINDSRCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 .else
 UNWINDINCDIR=   ${SRCTOP}/contrib/llvm/projects/libunwind/include
 UNWINDSRCDIR=   ${SRCTOP}/contrib/llvm/projects/libunwind/src
@@ -42,17 +42,15 @@ CXXFLAGS.${file}+=	-DNDEBUG
 .endfor
 
 CFLAGS+=	-I${UNWINDINCDIR} -I${.CURDIR} -D_LIBUNWIND_IS_NATIVE_ONLY
-.if empty(CXXFLAGS:M-std=*)
-CXXFLAGS+=	-std=c++11
-.endif
 CXXFLAGS+=	-fno-rtti
+CXXSTD=		c++11
 STATIC_CXXFLAGS+= -fvisibility=hidden -fPIC
 # Probably need to just move this earlier or use CXXFLAGS
 .if ${MK_DIRDEPS_BUILD} == "yes"
 # Avoid dependency on lib/libc++
 .if ${MK_CHERI} != "no"
-CFLAGS+=	-isystem ${SRCTOP}/contrib/cheri-libc++/include -nostdinc++
+CFLAGS+=	-isystem ${SRCTOP}/contrib/subrepo-cheri-libc++/include -nostdinc++
 .else
-CFLAGS+=	-isystem ${SRCTOP}/contrib/cheri-libc++/include -nostdinc++
+CFLAGS+=	-isystem ${SRCTOP}/contrib/subrepo-cheri-libc++/include -nostdinc++
 .endif
 .endif

@@ -3754,6 +3754,8 @@ DIOCCHANGEADDR_error:
 			break;
 		}
 
+		nr = 0;
+
 		p = pstore = malloc(psn->psn_len, M_TEMP, M_WAITOK);
 		for (i = 0, sh = V_pf_srchash; i <= pf_srchashmask;
 		    i++, sh++) {
@@ -4351,7 +4353,7 @@ pf_load(void)
 
 	pf_mtag_initialize();
 
-	pf_dev = make_dev(&pf_cdevsw, 0, 0, 0, 0600, PF_NAME);
+	pf_dev = make_dev(&pf_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, PF_NAME);
 	if (pf_dev == NULL)
 		return (ENOMEM);
 

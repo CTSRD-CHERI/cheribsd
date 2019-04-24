@@ -5,9 +5,9 @@
 PACKAGE=	clibs
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
-SRCDIR=		${SRCTOP}/contrib/cheri-libcxxrt/src
+SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 .else
-SRCDIR=		${SRCTOP}/contrib/cheri-libcxxrt/src
+SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 .endif
 SHLIB_MAJOR=	1
 SHLIBDIR?=	/lib
@@ -28,9 +28,7 @@ SRCS+=		libelftc_dem_gnu3.c\
 
 WARNS=		0
 CFLAGS+=	-isystem ${SRCDIR} -nostdinc++
-.if empty(CXXFLAGS:M-std=*)
-CXXFLAGS+=	-std=c++11
-.endif
+CXXSTD=		c++11
 VERSION_MAP=	${.CURDIR}/Version.map
 
 .include <bsd.lib.mk>

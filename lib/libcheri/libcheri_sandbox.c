@@ -133,8 +133,15 @@ sandbox_program_init(void)
 		close(fd);
 		return (-1);
 	}
-	if (sandbox_set_required_method_variables(cheri_getdefault(),
-	    main_required_methods) == -1) {
+#ifdef __CHERI_PURE_CAPABILITY__
+	// This needs full address space $pcc
+	void *datacap = cheri_clearperm(
+	    cheri_setoffset(cheri_getpcc(), 0), CHERI_PERM_EXECUTE);
+#else
+	void *__capability datacap = cheri_getdefault();
+#endif
+	if (sandbox_set_required_method_variables(
+		datacap, main_required_methods) == -1) {
 		warnx("%s: sandbox_set_required_method_variables for main "
 		    "program", __func__);
 		return (-1);
@@ -355,17 +362,31 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 			goto error;
 		}
 	}
+
+	/*
+	 * XXXAR: this crashes in the main program because we don't have a
+	 * writable $pcc. I'm not quite sure what this is doing, but if I
+	 * #if 0 this code we get further into startup.
+	 */
+#ifdef SPLIT_CODE_DATA
 	/*
 	 * Update main program method variables.
 	 *
 	 * XXXBD: Doing this in every class is inefficient.
 	 */
-	if (sandbox_set_required_method_variables(cheri_getdefault(),
-	    main_required_methods) == -1) {
+#ifdef __CHERI_PURE_CAPABILITY__
+	void *__capability datacap =
+	    cheri_clearperm(sbcp->sbc_codemem, CHERI_PERM_EXECUTE);
+#else
+	void *__capability datacap = cheri_getdefault();
+#endif
+	if (sandbox_set_required_method_variables(
+		datacap, main_required_methods) == -1) {
 		warnx("%s: sandbox_set_required_method_variables for main "
 		    "program", __func__);
 		return (-1);
 	}
+#endif
 
 	/*
 	 * Register the class on the list of classes.
@@ -573,7 +594,11 @@ sandbox_object_new_system_object(void * __capability private_data,
 	(*sbopp)->sbo_private_data = private_data;
 
 	/* XXXRW: Does this remain the right capability to use for TLS? */
+#ifdef __CHERI_CAPABILITY_TLS__
+	__asm__ volatile("creadhwr %0, $chwr_userlocal": "=C"((*sbopp)->sbo_libcheri_tls));
+#else
 	(*sbopp)->sbo_libcheri_tls = cheri_getdefault();
+#endif
 
 	/*
 	 * Construct sealed invocation capabilities for use with

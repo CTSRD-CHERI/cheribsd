@@ -9,7 +9,6 @@ PACKAGE=	clibs
 SHLIBDIR?= /lib
 
 .include <src.opts.mk>
-MK_BIND_NOW= no
 MK_SSP=	no
 
 LIB=thr
@@ -18,8 +17,10 @@ NO_WTHREAD_SAFETY=1
 NO_WCAST_ALIGN.gcc=1    # for gcc 4.2
 CFLAGS+=        -DTLS_USE_SYSARCH=1
 CFLAGS+=-DPTHREAD_KERNEL
-CFLAGS+=-I${SRCTOP}/lib/libc/include -I${.CURDIR}/thread \
-	-I${SRCTOP}/include
+CFLAGS+=-I${SRCTOP}/lib/libc/include
+CFLAGS+=-I${SRCTOP}/lib/libc/${MACHINE_CPUARCH}
+CFLAGS+=-I${.CURDIR}/thread
+CFLAGS+=-I${SRCTOP}/include
 CFLAGS+=-I${.CURDIR}/arch/${MACHINE_CPUARCH}/include
 CFLAGS+=-I${.CURDIR}/sys
 CFLAGS+=-I${SRCTOP}/libexec/rtld-elf

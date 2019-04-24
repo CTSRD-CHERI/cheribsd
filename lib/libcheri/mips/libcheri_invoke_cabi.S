@@ -28,6 +28,10 @@
 # SUCH DAMAGE.
 #
 
+/* We want the XNESTED,XEND(), etc. macros but not the register name defines */
+#define _MIPS_REGDEF_H
+#include <machine/asm.h>
+
 #include <machine/cherireg.h>
 #define _CHERI_INTERNAL
 #include <machine/cheriasm.h>
@@ -69,14 +73,12 @@
 # - The compiler needs to handle unused argument/return registers.
 #
 
+#define LIBCHERI_INVOKE_FRAME_SIZE (11*CHERICAP_SIZE + 96)
+
 	.text
 	.option pic0
-	.global libcheri_invoke
-	.global cheri_invoke
-	.ent	libcheri_invoke
-libcheri_invoke:
-cheri_invoke:
-
+NESTED(libcheri_invoke, LIBCHERI_INVOKE_FRAME_SIZE, _FRAME_RETURN_REG)
+XNESTED(cheri_invoke)
 	#
 	# Wrap up all caller-save state suitable to be preseved by CCall and
 	# restored by CReturn.  This happens in two phases:
@@ -219,6 +221,13 @@ libcheri_set_errno:
 	# Get the address of the thread-local libcheri_errno variable.
 	#
 #ifdef HAVE_WORKING_TLS
+#ifdef __CHERI_CAPABILITY_TLS__
+	/* Note: initial-exec since we don't have captable pointer */
+	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
+	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
+	creadhwr $c3, $chwr_userlocal
+#else
+	/* Legacy: we need a valid $ddc here */
 	lui	$at, %tprel_hi(libcheri_errno)
 	.set	push
 	.set	mips32r2
@@ -226,11 +235,15 @@ libcheri_set_errno:
 	.set	pop
 	daddiu	$at, $at, %tprel_lo(libcheri_errno)
 	daddu	$at, $t0, $at
+	cgetdefault $c3
+#endif
 	b	libcheri_invoke_restore_regs
-	sw	$a0, 0($at)
-
-
+	csw	$a0, $at, 0($c3)
 #else
+#if defined(__CHERI_CAPABILITY_TABLE__) && !defined(HAVE_VALID_DDC)
+/* we still need this for libc_cheri */
+#error "This code will not work with a captable since $ddc is null"
+#endif
 	#
 	# We currently don't have working TLS inside sandboxes, so set a global.
 	#
@@ -238,10 +251,11 @@ libcheri_set_errno:
 	b	libcheri_invoke_restore_regs
 	csw	$a0, $a2, 0($ddc)
 #endif
-	.end	libcheri_invoke
-	# Also add size information for cheri_invoke to avoid linker warnings
-.L.cheri_invoke.end:
-	.size cheri_invoke, .L.cheri_invoke.end - cheri_invoke
+	teq $zero, $zero
+
+END(libcheri_invoke)
+# Also add size information for cheri_invoke to avoid linker warnings
+XEND(cheri_invoke)
 
 
 	.type	libcheri_errno,@object      # @libcheri_errno

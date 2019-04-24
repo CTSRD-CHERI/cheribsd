@@ -38,9 +38,9 @@ __FBSDID("$FreeBSD$");
 #include "disk.h"
 
 #ifdef DISK_DEBUG
-# define DEBUG(fmt, args...)	printf("%s: " fmt "\n" , __func__ , ## args)
+# define DPRINTF(fmt, args...)	printf("%s: " fmt "\n" , __func__ , ## args)
 #else
-# define DEBUG(fmt, args...)
+# define DPRINTF(fmt, args...)
 #endif
 
 struct open_disk {
@@ -129,15 +129,8 @@ ptable_print(void *arg, const char *pname, const struct ptable_entry *part)
 		dev.dd.d_dev = pa->dev->dd.d_dev;
 		dev.dd.d_unit = pa->dev->dd.d_unit;
 		dev.d_slice = part->index;
-		dev.d_partition = -1;
+		dev.d_partition = D_PARTNONE;
 		if (disk_open(&dev, partsize, sectsize) == 0) {
-			/*
-			 * disk_open() for partition -1 on a bsd slice assumes
-			 * you want the first bsd partition.  Reset things so
-			 * that we're looking at the start of the raw slice.
-			 */
-			dev.d_partition = -1;
-			dev.d_offset = part->start;
 			table = ptable_open(&dev, partsize, sectsize, ptblread);
 			if (table != NULL) {
 				sprintf(line, "  %s%s", pa->prefix, pname);
@@ -231,7 +224,7 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, u_int sectorsize)
 	rc = 0;
 	od = (struct open_disk *)malloc(sizeof(struct open_disk));
 	if (od == NULL) {
-		DEBUG("no memory");
+		DPRINTF("no memory");
 		return (ENOMEM);
 	}
 	dev->dd.d_opendata = od;
@@ -244,22 +237,22 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, u_int sectorsize)
 	 */
 	memcpy(&partdev, dev, sizeof(partdev));
 	partdev.d_offset = 0;
-	partdev.d_slice = -1;
-	partdev.d_partition = -1;
+	partdev.d_slice = D_SLICENONE;
+	partdev.d_partition = D_PARTNONE;
 
 	dev->d_offset = 0;
 	table = NULL;
 	slice = dev->d_slice;
 	partition = dev->d_partition;
 
-	DEBUG("%s unit %d, slice %d, partition %d => %p",
+	DPRINTF("%s unit %d, slice %d, partition %d => %p",
 	    disk_fmtdev(dev), dev->dd.d_unit, dev->d_slice, dev->d_partition, od);
 
 	/* Determine disk layout. */
 	od->table = ptable_open(&partdev, mediasize / sectorsize, sectorsize,
 	    ptblread);
 	if (od->table == NULL) {
-		DEBUG("Can't read partition table");
+		DPRINTF("Can't read partition table");
 		rc = ENXIO;
 		goto out;
 	}
@@ -315,7 +308,7 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, u_int sectorsize)
 		table = ptable_open(dev, part.end - part.start + 1,
 		    od->sectorsize, ptblread);
 		if (table == NULL) {
-			DEBUG("Can't read BSD label");
+			DPRINTF("Can't read BSD label");
 			rc = ENXIO;
 			goto out;
 		}
@@ -343,12 +336,12 @@ out:
 		if (od->table != NULL)
 			ptable_close(od->table);
 		free(od);
-		DEBUG("%s could not open", disk_fmtdev(dev));
+		DPRINTF("%s could not open", disk_fmtdev(dev));
 	} else {
 		/* Save the slice and partition number to the dev */
 		dev->d_slice = slice;
 		dev->d_partition = partition;
-		DEBUG("%s offset %lld => %p", disk_fmtdev(dev),
+		DPRINTF("%s offset %lld => %p", disk_fmtdev(dev),
 		    (long long)dev->d_offset, od);
 	}
 	return (rc);
@@ -360,7 +353,7 @@ disk_close(struct disk_devdesc *dev)
 	struct open_disk *od;
 
 	od = (struct open_disk *)dev->dd.d_opendata;
-	DEBUG("%s closed => %p", disk_fmtdev(dev), od);
+	DPRINTF("%s closed => %p", disk_fmtdev(dev), od);
 	ptable_close(od->table);
 	free(od);
 	return (0);
@@ -373,9 +366,9 @@ disk_fmtdev(struct disk_devdesc *dev)
 	char *cp;
 
 	cp = buf + sprintf(buf, "%s%d", dev->dd.d_dev->dv_name, dev->dd.d_unit);
-	if (dev->d_slice >= 0) {
+	if (dev->d_slice > D_SLICENONE) {
 #ifdef LOADER_GPT_SUPPORT
-		if (dev->d_partition == 255) {
+		if (dev->d_partition == D_PARTISGPT) {
 			sprintf(cp, "p%d:", dev->d_slice);
 			return (buf);
 		} else
@@ -384,7 +377,7 @@ disk_fmtdev(struct disk_devdesc *dev)
 			cp += sprintf(cp, "s%d", dev->d_slice);
 #endif
 	}
-	if (dev->d_partition >= 0)
+	if (dev->d_partition > D_PARTNONE)
 		cp += sprintf(cp, "%c", dev->d_partition + 'a');
 	strcat(cp, ":");
 	return (buf);
@@ -398,7 +391,9 @@ disk_parsedev(struct disk_devdesc *dev, const char *devspec, const char **path)
 	char *cp;
 
 	np = devspec;
-	unit = slice = partition = -1;
+	unit = -1;
+	slice = D_SLICEWILD;
+	partition = D_PARTWILD;
 	if (*np != '\0' && *np != ':') {
 		unit = strtol(np, &cp, 10);
 		if (cp == np)

@@ -184,6 +184,8 @@ sandbox_class_unload(struct sandbox_class *sbcp)
 
 #ifdef SPLIT_CODE_DATA
 	munmap(sbcp->sbc_codemem, sbcp->sbc_codelen);
+#else
+	(void)sbcp;
 #endif
 }
 
@@ -260,7 +262,12 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	length += heaplen;
 	sbop->sbo_datalen = length;
 	base = sbop->sbo_datamem = mmap(NULL, length,
+#ifdef SPLIT_CODE_DATA
 	    PROT_MAX(PROT_READ|PROT_WRITE) | PROT_NONE,
+#else
+	    /* When mapping code+data together we have to use a RWX cap */
+	    PROT_MAX(PROT_ALL) | PROT_NONE,
+#endif
 	    MAP_ANON | MAP_ALIGNED_CHERI_SEAL, -1, 0);
 	if (sbop->sbo_datamem == MAP_FAILED) {
 		saved_errno = errno;
@@ -436,7 +443,11 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	sbop->sbo_ddc = idc;
 
 	/* XXXRW: Does this remain the right capability to use for TLS? */
+#ifdef __CHERI_CAPABILITY_TLS__
+	__asm__ volatile("creadhwr %0, $chwr_userlocal": "=C"(sbop->sbo_libcheri_tls));
+#else
 	sbop->sbo_libcheri_tls = cheri_getdefault();
+#endif
 
 	/*
 	 * Construct sealed rtld and invocation capabilities for use with

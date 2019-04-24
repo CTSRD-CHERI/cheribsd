@@ -143,9 +143,7 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define _FRAME_STACK_REG	$c11
-/* FIXME: uncomment this in a few days when everyone has updated clang:
- * #define _FRAME_RETURN_REG	$c17 */
-#define _FRAME_RETURN_REG	ra
+#define _FRAME_RETURN_REG	$c17
 #else
 #define _FRAME_STACK_REG	sp
 #define _FRAME_RETURN_REG	ra

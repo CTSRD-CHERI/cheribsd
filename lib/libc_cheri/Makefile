@@ -24,6 +24,8 @@ SRCS=		\
 		libcheri_invoke_cabi.S	\
 		malloc.c
 
+CFLAGS.libcheri_invoke_cabi.S+=-DHAVE_VALID_DDC
+
 CFLAGS.malloc.c=	-Wno-cast-align
 
 CFLAGS+=	-I${.CURDIR}/../libc/include \
@@ -125,6 +127,7 @@ SRCS+=		atoi.c			\
 # libc/string
 CFLAGS.strerror.c=	-Wno-incompatible-pointer-types-discards-qualifiers
 SRCS+=		bcopy.S			\
+		bcmp.c			\
 		explicit_bzero.c	\
 		ffs.c			\
 		memchr.c		\

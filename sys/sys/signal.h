@@ -459,6 +459,8 @@ typedef struct {
 		} __spare__;
 	} _reason;
 } _siginfo_t;
+
+typedef int (copyout_siginfo_t)(const _siginfo_t *si, void * __capability info);
 #endif /* _KERNEL */
 
 #define si_trapno	_reason._fault._trapno

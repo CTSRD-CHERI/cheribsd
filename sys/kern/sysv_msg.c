@@ -85,10 +85,6 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_ipc_msg.h>
-#endif
-
 #if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32)
 #define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
 #endif
@@ -206,6 +202,50 @@ static struct syscall_helper_data msg_syscalls[] = {
 #include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/freebsd32/freebsd32_util.h>
 
+struct msqid_ds32 {
+	struct ipc_perm32 msg_perm;
+	uint32_t	__msg_first;
+	uint32_t	__msg_last;
+	uint32_t	msg_cbytes;
+	uint32_t	msg_qnum;
+	uint32_t	msg_qbytes;
+	pid_t		msg_lspid;
+	pid_t		msg_lrpid;
+	int32_t		msg_stime;
+	int32_t		msg_rtime;
+	int32_t		msg_ctime;
+};
+
+#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
+    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
+struct msqid_ds32_old {
+	struct ipc_perm32_old msg_perm;
+	uint32_t	__msg_first;
+	uint32_t	__msg_last;
+	uint32_t	msg_cbytes;
+	uint32_t	msg_qnum;
+	uint32_t	msg_qbytes;
+	pid_t		msg_lspid;
+	pid_t		msg_lrpid;
+	int32_t		msg_stime;
+	int32_t		msg_pad1;
+	int32_t		msg_rtime;
+	int32_t		msg_pad2;
+	int32_t		msg_ctime;
+	int32_t		msg_pad3;
+	int32_t		msg_pad4[4];
+};
+#endif
+
+struct msqid_kernel32 {
+	/* Data structure exposed to user space. */
+	struct msqid_ds32	u;
+
+	/* Kernel-private components of the message queue. */
+	uint32_t		label;
+	uint32_t		cred;
+};
+
 static struct syscall_helper_data msg32_syscalls[] = {
 	SYSCALL32_INIT_HELPER(freebsd32_msgctl),
 	SYSCALL32_INIT_HELPER(freebsd32_msgsnd),
@@ -224,6 +264,29 @@ static struct syscall_helper_data msg32_syscalls[] = {
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 #include <compat/cheriabi/cheriabi_util.h>
+
+struct msqid_ds_c {
+	struct ipc_perm	 		msg_perm;
+	struct msg * __capability	kmsg_first;
+	struct msg * __capability	kmsg_last;
+	msglen_t	 		msg_cbytes;
+	msgqnum_t	 		msg_qnum;
+	msglen_t	 		msg_qbytes;
+	pid_t		 		msg_lspid;
+	pid_t		 		msg_lrpid;
+	time_t		 		msg_stime;
+	time_t		 		msg_rtime;
+	time_t		 		msg_ctime;
+};
+
+struct msqid_kernel_c {
+	/* Data structure exposed to user space. */
+	struct msqid_ds_c			 u;
+
+	/* Kernel-private components of the message queue. */
+	struct label * __capability	label;
+	struct ucred * __capability	cred;
+};
 
 static struct syscall_helper_data cheriabi_msg_syscalls[] = {
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_msgctl),

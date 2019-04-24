@@ -33,6 +33,7 @@
 #include <cheri/cheric.h>
 #include <machine/atomic.h>
 #include <machine/tls.h>
+#include <stdlib.h>
 
 #ifdef IN_RTLD
 /* Don't pull this in when building libthr */
@@ -207,7 +208,7 @@ reloc_jmpslot(Elf_Addr *where __unused, Elf_Addr target, const Obj_Entry *defobj
 	return (target);
 }
 
-// Validating e_flags:
+// Validating e_flags (and ABI version):
 #if _MIPS_SZCAP == 128
 #define _RTLD_EXPECTED_MIPS_MACH EF_MIPS_MACH_CHERI128
 #else
@@ -229,6 +230,18 @@ _rtld_validate_target_eflags(const char* path, Elf_Ehdr *hdr, const char* main_p
 		_rtld_error("%s: cannot load %s since it is not CheriABI"
 		    " (e_flags=0x%zx)", main_path, path, (size_t)hdr->e_flags);
 		return false;
+	}
+	if (hdr->e_ident[EI_ABIVERSION] != ELF_CHERIABI_ABIVERSION) {
+		const char* allow_mismatch = getenv("LD_CHERI_ALLOW_ABIVERSION_MISMATCH");
+		if (allow_mismatch == NULL || *allow_mismatch == '\0' ||
+		    *allow_mismatch == '0') {
+			_rtld_error("%s: cannot load %s since it is CheriABI "
+			    "version %d and not %d. Set "
+			    "LD_CHERI_ALLOW_ABIVERSION_MISMATCH to ignore this "
+			    "error.", main_path, path,
+			    hdr->e_ident[EI_ABIVERSION], ELF_CHERIABI_ABIVERSION);
+			return false;
+		}
 	}
 	return true;
 }

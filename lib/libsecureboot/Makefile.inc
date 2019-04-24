@@ -31,6 +31,17 @@ BRSSL_SRCS+= \
 	${BEARSSL}/tools/xmem.c \
 	${BEARSSL}/tools/vector.c
 
+BRSSL_DEPS= \
+	brf.c \
+	vets.c \
+	veta.c
+
+.if ${MK_LOADER_EFI_SECUREBOOT} != "no"
+BRSSL_DEPS+= \
+	efi_init.c \
+	efi_variables.c
+.endif
+
 # we do not need/want nested objdirs
 OBJS_SRCS_FILTER = T R
 
@@ -92,6 +103,19 @@ VE_HASH_KAT_STR?= vc_PEM
 XCFLAGS.vets+= -DVE_HASH_KAT_STR=${VE_HASH_KAT_STR}
 .endif
 
+# this should be updated occassionally this is 2019-01-01Z
+SOURCE_DATE_EPOCH?= 1546329600
+.if ${MK_REPRODUCIBLE_BUILD} == "yes"
+BUILD_UTC?= ${SOURCE_DATE_EPOCH}
+.endif
+# BUILD_UTC provides a basis for the loader's notion of time
+# By default we use the mtime of BUILD_UTC_FILE
+.if empty(BUILD_UTC_FILE)
+BUILD_UTC_FILE:= ${.PARSEDIR:tA}/${.PARSEFILE}
+.endif
+# you can of course set BUILD_UTC to any value you like
+BUILD_UTC?= ${${STAT:Ustat} -f %m ${BUILD_UTC_FILE}:L:sh}
+
 # Generate ta.h containing one or more PEM encoded trust anchors in ta_PEM.
 #
 # If we are doing self-tests, we define another arrary vc_PEM
@@ -110,9 +134,7 @@ ta.h: ${.ALLTARGETS:M[tv]*pem:O:u}
 	( cat ${.ALLSRC:N*crl*:Mv*.pem} /dev/null | \
 	file2c -sx 'static const char vc_PEM[] = {' '};'; echo ) >> ${.TARGET}
 .endif
-.if !empty(BUILD_UTC_FILE)
-	echo '#define BUILD_UTC ${${STAT:Ustat} -f %m ${BUILD_UTC_FILE}:L:sh}' >> ${.TARGET} ${.OODATE:MNOMETA_CMP}
-.endif
+	echo '#define BUILD_UTC ${BUILD_UTC}' >> ${.TARGET} ${.OODATE:MNOMETA_CMP}
 
 # This header records our preference for signature extensions.
 vesigned.o vesigned.po vesigned.pico: vse.h
@@ -123,7 +145,7 @@ vse.h:
 	echo 'NULL };' ) > ${.TARGET}
 
 
-.for s in ${BRSSL_SRCS} brf.c vets.c veta.c
+.for s in ${BRSSL_SRCS} ${BRSSL_DEPS}
 .ifdef BRSSL_SED
 $s: brssl.h
 .endif

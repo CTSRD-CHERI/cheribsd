@@ -113,7 +113,7 @@ libcheri_ccall_init(void)
 	 * Pointer to the invocation vector.
 	 */
 	cap = cheri_getpcc();
-	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_ccall_invoke_vector);
+	cap = cheri_setaddress(cap, (vaddr_t)&libcheri_ccall_invoke_vector);
 	libcheri_ccall_invoke_sealed_code = cheri_seal(cap,
 	    libcheri_ccall_invoke_type);
 
@@ -121,7 +121,7 @@ libcheri_ccall_init(void)
 	 * Pointer to the rtld vector.
 	 */
 	cap = cheri_getpcc();
-	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_ccall_rtld_vector);
+	cap = cheri_setaddress(cap, (vaddr_t)&libcheri_ccall_rtld_vector);
 	libcheri_ccall_rtld_sealed_code =
 	    cheri_seal(cap, libcheri_ccall_rtld_type);
 
@@ -133,12 +133,15 @@ libcheri_ccall_init(void)
 	 * XXXRW: Global bounds only for code, not data..?
 	 */
 	cap = cheri_getpcc();
-	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_creturn_vector);
+	cap = cheri_setaddress(cap, (vaddr_t)&libcheri_creturn_vector);
 	libcheri_creturn_object.co_codecap =
 	    cheri_seal(cap, libcheri_creturn_type);
 
-	cap = cheri_getdefault();
-	cap = cheri_setoffset(cap, (vaddr_t)&libcheri_creturn_data);
+#ifdef __CHERI_PURE_CAPABILITY__
+	cap = &libcheri_creturn_data;
+#else
+	cap = cheri_ptr(&libcheri_creturn_data, sizeof(libcheri_creturn_data));
+#endif
 	libcheri_creturn_object.co_datacap =
 	    cheri_seal(cap, libcheri_creturn_type);
 }

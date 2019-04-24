@@ -5,9 +5,9 @@
 PACKAGE=	clibs
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
-SRCDIR=		${SRCTOP}/contrib/cheri-libc++
+SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++
 .else
-SRCDIR=		${SRCTOP}/contrib/cheri-libc++
+SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++
 .endif
 
 LIB=		c++experimental
@@ -25,8 +25,6 @@ CXXFLAGS+=	-nostdinc++
 CXXFLAGS+=	-nostdlib
 CXXFLAGS+=	-D_LIBCPP_BUILDING_LIBRARY
 CXXFLAGS+=	-DLIBCXXRT
-.if empty(CXXFLAGS:M-std=*)
-CXXFLAGS+=	-std=c++14
-.endif
+CXXSTD=		c++14
 
 .include <bsd.lib.mk>

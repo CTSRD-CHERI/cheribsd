@@ -169,6 +169,12 @@ cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)
 	return FALSE;
 }
 
+static int allow_cheriabi_version_mismatch = 0;
+SYSCTL_DECL(_compat_cheriabi);
+SYSCTL_INT(_compat_cheriabi, OID_AUTO, allow_abi_version_mismatch,
+    CTLFLAG_RW, &allow_cheriabi_version_mismatch, 0,
+    "Allow loading CheriABI binaries with the wrong ABI version");
+
 static boolean_t
 cheriabi_elf_header_supported(struct image_params *imgp)
 {
@@ -177,6 +183,15 @@ cheriabi_elf_header_supported(struct image_params *imgp)
 
 	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI)
 		return FALSE;
+
+	/* TODO: add a sysctl to allow loading old binaries */
+	if (hdr->e_ident[EI_ABIVERSION] != ELF_CHERIABI_ABIVERSION) {
+		printf("warning: attempting to execute CheriABI binary '%s'"
+		    " with ABI version %d on a system expecting version %d\n",
+		    imgp->execpath, hdr->e_ident[EI_ABIVERSION],
+		    ELF_CHERIABI_ABIVERSION);
+		return (boolean_t)allow_cheriabi_version_mismatch;
+	}
 
 	if (machine == EF_MIPS_MACH_CHERI128)
 		return cheriabi_check_cpu_compatible(128, imgp->execpath);
@@ -963,7 +978,6 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	 * want to point it at our stack instead?
 	 */
 	frame->pc = cheri_getoffset(param->start_func);
-	frame->ddc = param->ddc;
 	frame->pcc = param->start_func;
 	frame->c12 = param->start_func;
 	frame->c3 = param->arg;
@@ -1001,28 +1015,6 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	csigp = &td->td_pcb->pcb_cherisignal;
 	csigp->csig_csp = td->td_frame->csp;
 	csigp->csig_default_stack = csigp->csig_csp;
-}
-
-/*
- * When thr_new() creates a new thread, we might need to lift properties from
- * the capability state in the parent thread.  This is our opportunity to do
- * so.
- */
-void
-cheriabi_thr_new_md(struct thread *parent_td, struct thr_param_c *param)
-{
-	register_t tag_set;
-
-	/*
-	 * XXXRW: Currently, we'll install the parent's DDC in the child
-	 * thread if there is (effectively) a NULL capability in the param
-	 * structure for DDC.  Really, we should trigger this based on a flag
-	 * set in the param, so that the parent thread can request a NULL DDC
-	 * if it wants to.
-	 */
-	tag_set = cheri_gettag(param->ddc);
-	if (!tag_set)
-		param->ddc = parent_td->td_pcb->pcb_regs.ddc;
 }
 
 int

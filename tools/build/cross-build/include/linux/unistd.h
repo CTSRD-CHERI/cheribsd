@@ -42,11 +42,18 @@ strtofflags(char **stringp, u_long *setp, u_long *clrp) {
 	return 0; /* success */
 }
 
+#ifndef __GLIBC_PREREQ
+#define __GLIBC_PREREQ(min, maj) 0
+#endif
+
+/* getentropy was added in glibc 2.25. Declare it for !glibc or older versions */
+#if !__GLIBC_PREREQ(2, 25)
 static inline int
 getentropy(void *buf, size_t buflen) {
 
 	return syscall(__NR_getrandom, buf, buflen, 0);
 }
+#endif
 
 /* Used by elftoolchain: */
 extern char *program_invocation_name;

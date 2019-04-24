@@ -447,6 +447,9 @@ DECLARE_CHERI_TEST(test_string_memcpy_c);
 DECLARE_CHERI_TEST(test_string_memmove);
 DECLARE_CHERI_TEST(test_string_memmove_c);
 
+DECLARE_CHERI_TEST(test_unaligned_capability_copy_memcpy);
+DECLARE_CHERI_TEST(test_unaligned_capability_copy_memmove);
+
 /* cheritest_syscall.c */
 DECLARE_CHERI_TEST(test_sandbox_syscall);
 DECLARE_CHERI_TEST(test_sig_dfl_neq_ign);
@@ -478,6 +481,10 @@ DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_private);
 DECLARE_CHERI_TEST(cheritest_vm_tag_shm_open_anon_shared2x);
 DECLARE_CHERI_TEST(cheritest_vm_shm_open_anon_unix_surprise);
+#ifdef CHERIABI_TESTS
+DECLARE_CHERI_TEST(cheritest_vm_cap_share_fd_kqueue);
+DECLARE_CHERI_TEST(cheritest_vm_cap_share_sigaction);
+#endif
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_shared);
 DECLARE_CHERI_TEST(cheritest_vm_tag_dev_zero_private);
 DECLARE_CHERI_TEST(cheritest_vm_notag_tmpfile_shared);
@@ -496,6 +503,10 @@ const char	*xfail_swap_required(const char *name);
 DECLARE_CHERI_TEST(test_deflate_zeroes);
 DECLARE_CHERI_TEST(test_inflate_zeroes);
 DECLARE_CHERI_TEST(test_sandbox_inflate_zeroes);
+
+/* For libc_memcpy and libc_memset tests and the unaligned copy tests: */
+extern void *cheritest_memcpy(void *dst, const void *src, size_t n);
+extern void *cheritest_memmove(void *dst, const void *src, size_t n);
 
 #ifdef CHERI_C_TESTS
 #define	DECLARE_TEST(name, desc) \

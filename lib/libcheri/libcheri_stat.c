@@ -149,8 +149,9 @@ sandbox_stat_init(void)
 	 * semantics.
 	 */
 #ifdef __CHERI_PURE_CAPABILITY__
-	ps_strings = (struct ps_strings *)cheri_setoffset(cheri_getdefault(),
-	    ul_ps_strings);
+	/* XXXAR: will it be accessible from pcc? */
+	ps_strings = (struct ps_strings *)cheri_setaddress(
+	    cheri_getpcc(), ul_ps_strings);
 #else
 	ps_strings = (struct ps_strings *)ul_ps_strings;
 #endif

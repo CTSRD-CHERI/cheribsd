@@ -31,9 +31,9 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <signal.h>
 #include <stdio.h>
 #include <sys/types.h>
-#include <sys/signal.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
@@ -61,12 +61,14 @@ static int VGLAbortPending;
 static int VGLOnDisplay;
 static unsigned int VGLCurWindow;
 static int VGLInitDone = 0;
+static video_info_t VGLOldModeInfo;
 static vid_info_t VGLOldVInfo;
 
 void
 VGLEnd()
 {
 struct vt_mode smode;
+  int size[3];
 
   if (!VGLInitDone)
     return;
@@ -81,18 +83,15 @@ struct vt_mode smode;
     munmap(VGLMem, VGLAdpInfo.va_window_size);
   }
 
-  if (VGLOldMode >= M_VESA_BASE) {
-    /* ugly, but necessary */
+  if (VGLOldMode >= M_VESA_BASE)
     ioctl(0, _IO('V', VGLOldMode - M_VESA_BASE), 0);
-    if (VGLOldMode == M_VESA_800x600) {
-      int size[3];
-      size[0] = VGLOldVInfo.mv_csz;
-      size[1] = VGLOldVInfo.mv_rsz;
-      size[2] = 16;
-      ioctl(0, KDRASTER, size);
-    }
-  } else {
+  else
     ioctl(0, _IO('S', VGLOldMode), 0);
+  if (VGLOldModeInfo.vi_flags & V_INFO_GRAPHICS) {
+    size[0] = VGLOldVInfo.mv_csz;
+    size[1] = VGLOldVInfo.mv_rsz;
+    size[2] = VGLOldVInfo.font_size;;
+    ioctl(0, KDRASTER, size);
   }
   ioctl(0, KDDISABIO, 0);
   ioctl(0, KDSETMODE, KD_TEXT);
@@ -107,14 +106,22 @@ struct vt_mode smode;
 }
 
 static void 
-VGLAbort(int arg __unused)
+VGLAbort(int arg)
 {
+  sigset_t mask;
+
   VGLAbortPending = 1;
   signal(SIGINT, SIG_IGN);
   signal(SIGTERM, SIG_IGN);
-  signal(SIGSEGV, SIG_IGN);
-  signal(SIGBUS, SIG_IGN);
   signal(SIGUSR2, SIG_IGN);
+  if (arg == SIGBUS || arg == SIGSEGV) {
+    signal(arg, SIG_DFL);
+    sigemptyset(&mask);
+    sigaddset(&mask, arg);
+    sigprocmask(SIG_UNBLOCK, &mask, NULL);
+    VGLEnd();
+    kill(getpid(), arg);
+  }
 }
 
 static void
@@ -132,7 +139,7 @@ int
 VGLInit(int mode)
 {
   struct vt_mode smode;
-  int adptype;
+  int adptype, depth;
 
   if (VGLInitDone)
     return -1;
@@ -157,12 +164,13 @@ VGLInit(int mode)
   if (ioctl(0, CONS_MODEINFO, &VGLModeInfo))	/* FBIO_MODEINFO */
     return -1;
 
-  /* If current mode is VESA_800x600 then save its geometry to restore later */
-  if ((VGLOldMode >= M_VESA_BASE) && (VGLOldMode == M_VESA_800x600)) {
-    VGLOldVInfo.size = sizeof(VGLOldVInfo);
-    if (ioctl(0, CONS_GETINFO, &VGLOldVInfo))
-      return -1;
-  }
+  /* Save info for old mode to restore font size if old mode is graphics. */
+  VGLOldModeInfo.vi_mode = VGLOldMode;
+  if (ioctl(0, CONS_MODEINFO, &VGLOldModeInfo))
+    return -1;
+  VGLOldVInfo.size = sizeof(VGLOldVInfo);
+  if (ioctl(0, CONS_GETINFO, &VGLOldVInfo))
+    return -1;
 
   VGLDisplay = (VGLBitmap *)malloc(sizeof(VGLBitmap));
   if (VGLDisplay == NULL)
@@ -188,6 +196,7 @@ VGLInit(int mode)
       return -4;
     }
     VGLDisplay->Type = VIDBUF4;
+    VGLDisplay->PixelBytes = 1;
     break;
   case V_INFO_MM_PACKED:
     /* we can do only 256 color packed modes */
@@ -294,14 +303,17 @@ VGLInit(int mode)
 
   VGLDisplay->Xsize = VGLModeInfo.vi_width;
   VGLDisplay->Ysize = VGLModeInfo.vi_height;
+  depth = VGLModeInfo.vi_depth;
+  if (depth == 15)
+    depth = 16;
   VGLDisplay->VXsize = VGLAdpInfo.va_line_width
-			   *8/(VGLModeInfo.vi_depth/VGLModeInfo.vi_planes);
+			   *8/(depth/VGLModeInfo.vi_planes);
   VGLDisplay->VYsize = VGLBufSize/VGLModeInfo.vi_planes/VGLAdpInfo.va_line_width;
   VGLDisplay->Xorigin = 0;
   VGLDisplay->Yorigin = 0;
 
   VGLMem = (byte*)mmap(0, VGLAdpInfo.va_window_size, PROT_READ|PROT_WRITE,
-		       MAP_FILE, 0, 0);
+		       MAP_FILE | MAP_SHARED, 0, 0);
   if (VGLMem == MAP_FAILED) {
     VGLEnd();
     return -7;
@@ -350,7 +362,7 @@ VGLCheckSwitch()
       ioctl(0, VGLMode, 0);
       VGLCurWindow = 0;
       VGLMem = (byte*)mmap(0, VGLAdpInfo.va_window_size, PROT_READ|PROT_WRITE,
-			   MAP_FILE, 0, 0);
+			   MAP_FILE | MAP_SHARED, 0, 0);
 
       /* XXX: what if mmap() has failed! */
       VGLDisplay->Type = VIDBUF8;	/* XXX */
@@ -530,6 +542,8 @@ VGLSetSegment(unsigned int offset)
 int
 VGLSetVScreenSize(VGLBitmap *object, int VXsize, int VYsize)
 {
+  int depth;
+
   if (VXsize < object->Xsize || VYsize < object->Ysize)
     return -1;
   if (object->Type == MEMBUF)
@@ -537,8 +551,11 @@ VGLSetVScreenSize(VGLBitmap *object, int VXsize, int VYsize)
   if (ioctl(0, FBIO_SETLINEWIDTH, &VXsize))
     return -1;
   ioctl(0, CONS_ADPINFO, &VGLAdpInfo);	/* FBIO_ADPINFO */
+  depth = VGLModeInfo.vi_depth;
+  if (depth == 15)
+    depth = 16;
   object->VXsize = VGLAdpInfo.va_line_width
-			   *8/(VGLModeInfo.vi_depth/VGLModeInfo.vi_planes);
+			   *8/(depth/VGLModeInfo.vi_planes);
   object->VYsize = VGLBufSize/VGLModeInfo.vi_planes/VGLAdpInfo.va_line_width;
   if (VYsize < object->VYsize)
     object->VYsize = VYsize;

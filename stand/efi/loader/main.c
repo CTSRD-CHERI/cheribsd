@@ -217,12 +217,12 @@ set_currdev_pdinfo(pdinfo_t *dp)
 		currdev.dd.d_dev = dp->pd_devsw;
 		if (dp->pd_parent == NULL) {
 			currdev.dd.d_unit = dp->pd_unit;
-			currdev.d_slice = -1;
-			currdev.d_partition = -1;
+			currdev.d_slice = D_SLICENONE;
+			currdev.d_partition = D_PARTNONE;
 		} else {
 			currdev.dd.d_unit = dp->pd_parent->pd_unit;
 			currdev.d_slice = dp->pd_unit;
-			currdev.d_partition = 255;	/* Assumes GPT */
+			currdev.d_partition = D_PARTISGPT; /* XXX Assumes GPT */
 		}
 		set_currdev_devdesc((struct devdesc *)&currdev);
 	} else {
@@ -962,6 +962,17 @@ main(int argc, CHAR16 *argv[])
 	 * normal functioning in any way...
 	 */
 	BS->SetWatchdogTimer(0, 0, 0, NULL);
+
+	/*
+	 * Initialize the trusted/forbidden certificates from UEFI.
+	 * They will be later used to verify the manifest(s),
+	 * which should contain hashes of verified files.
+	 * This needs to be initialized before any configuration files
+	 * are loaded.
+	 */
+#ifdef EFI_SECUREBOOT
+	ve_efi_init();
+#endif
 
 	/*
 	 * Try and find a good currdev based on the image that was booted.

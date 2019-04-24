@@ -252,6 +252,7 @@ __start:
 	isync
 	bl	zero_mas7
 	bl	zero_mas8
+	isync
 	tlbwe
 	isync
 	msync
@@ -302,7 +303,8 @@ done_mapping:
 	subf    %r31,%r31,%r2	/* Subtract from real TOC base to get base */
 
 	/* Set up the stack pointer */
-	ld	%r1,TOC_REF(tmpstack)(%r2)
+	addis	%r1,%r2,TOC_REF(tmpstack)@ha
+	ld	%r1,TOC_REF(tmpstack)@l(%r1)
 	addi	%r1,%r1,TMPSTACKSZ-96
 	add	%r1,%r1,%r31
 	bl	1f
@@ -505,6 +507,7 @@ bp_kernload:
 	isync
 	bl	zero_mas7
 	bl	zero_mas8
+	isync
 	tlbwe
 	isync
 	msync
@@ -550,7 +553,8 @@ bp_kernload:
 	mtspr	SPR_SPRG8, %r2
 
 	/* Set up the stack pointer */
-	ld	%r1,TOC_REF(tmpstack)(%r2)
+	addis	%r1,%r2,TOC_REF(tmpstack)@ha
+	ld	%r1,TOC_REF(tmpstack)@l(%r1)
 	addi	%r1,%r1,TMPSTACKSZ-96
 #else
 /*
@@ -695,6 +699,7 @@ tlb1_temp_mapping_as1:
 	bl	zero_mas7
 	bl	zero_mas8
 	mtlr	%r3
+	isync
 	tlbwe
 	isync
 	msync
@@ -742,7 +747,6 @@ zero_mas7:
 
 	li	%r20, 0
 	mtspr	SPR_MAS7, %r20
-	isync
 1:
 	blr
 
@@ -759,7 +763,6 @@ zero_mas8:
 1:
 	li	%r20, 0
 	mtspr	SPR_MAS8, %r20
-	isync
 	blr
 #endif
 

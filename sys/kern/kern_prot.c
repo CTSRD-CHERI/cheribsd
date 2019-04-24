@@ -72,7 +72,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/resourcevar.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <sys/sysent.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
 
@@ -88,8 +87,7 @@ static MALLOC_DEFINE(M_CRED, "cred", "credentials");
 
 SYSCTL_NODE(_security, OID_AUTO, bsd, CTLFLAG_RW, 0, "BSD security policy");
 
-static void crsetgroups_locked(struct ucred *cr, int ngrp,
-    gid_t *groups);
+static void crsetgroups_locked(struct ucred *cr, int ngrp, gid_t *groups);
 
 #ifndef _SYS_SYSPROTO_H_
 struct getpid_args {
@@ -803,12 +801,19 @@ struct setgroups_args {
 int
 sys_setgroups(struct thread *td, struct setgroups_args *uap)
 {
+
+	return (user_setgroups(td, uap->gidsetsize,
+	    __USER_CAP_ARRAY(uap->gidset, uap->gidsetsize)));
+}
+
+int
+user_setgroups(struct thread *td, u_int gidsetsize,
+    const gid_t * __capability gidset)
+{
 	gid_t smallgroups[XU_NGROUPS];
 	gid_t *groups;
-	u_int gidsetsize;
 	int error;
 
-	gidsetsize = uap->gidsetsize;
 	if (gidsetsize > ngroups_max + 1)
 		return (EINVAL);
 
@@ -817,8 +822,7 @@ sys_setgroups(struct thread *td, struct setgroups_args *uap)
 	else
 		groups = smallgroups;
 
-	error = copyin(__USER_CAP_ARRAY(uap->gidset, uap->gidsetsize), groups,
-	    gidsetsize * sizeof(gid_t));
+	error = copyin(gidset, groups, gidsetsize * sizeof(gid_t));
 	if (error == 0)
 		error = kern_setgroups(td, gidsetsize, groups);
 
@@ -1702,7 +1706,8 @@ SYSCTL_PROC(_security_bsd, OID_AUTO, unprivileged_proc_debug,
 
 /*-
  * Determine whether td may colocate (live in a single address space)
- * with  p.
+ * with p.  Note that there might be additional restrictions enforced
+ * eg by the ELF loader.
  * Returns: 0 for permitted, an errno value otherwise
  * Locks: Sufficient locks to protect various components of td and p
  *        must be held.  td must be curthread, and a lock must
@@ -1710,29 +1715,48 @@ SYSCTL_PROC(_security_bsd, OID_AUTO, unprivileged_proc_debug,
  * References: td and p must be valid for the lifetime of the call
  */
 int
-p_cancolocate(struct thread *td, struct proc *p)
+p_cancolocate(struct thread *td, struct proc *p, bool opportunistic)
 {
-	/*
-	 * In theory, when joining an address space with several
-	 * processes living inside, we should check whether we can
-	 * colocate with each of them.  Let's assume that if we are
-	 * permitted to colocate with one of them, we are permitted
-	 * to colocate with all of them.
-	 */
+	int error;
 
-	/*
-	 * Prevent colocating non-CheriABI processes.
-	 */
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) == 0)
-		return (EPERM);
+	KASSERT(td == curthread, ("%s: td not curthread", __func__));
+	PROC_LOCK_ASSERT(p, MA_OWNED);
 
-	if (SV_PROC_FLAG(p, SV_CHERI) == 0)
-		return (EPERM);
+	if (td->td_proc == p)
+		return (0);
 
+	if (p_candebug(td, p) == 0)
+		return (0);
+
+	if ((error = prison_check(td->td_ucred, p->p_ucred)))
+		return (error);
+
+	if (opportunistic) {
+		if ((error = prison_check(p->p_ucred, td->td_ucred)))
+			return (error);
+	}
+
+#ifdef MAC
 	/*
-	 * XXX: Relax it a bit.
+	 * XXX
 	 */
-	return (p_candebug(td, p));
+#endif
+	if ((error = cr_canseeotheruids(td->td_ucred, p->p_ucred)))
+		return (error);
+	if ((error = cr_canseeothergids(td->td_ucred, p->p_ucred)))
+		return (error);
+
+	if (opportunistic) {
+		if ((error = cr_canseeotheruids(p->p_ucred, td->td_ucred)))
+			return (error);
+		if ((error = cr_canseeothergids(p->p_ucred, td->td_ucred)))
+			return (error);
+	}
+
+	if (proc_realparent(td->td_proc) == p)
+		return (0);
+
+	return (EPERM);
 }
 
 /*-

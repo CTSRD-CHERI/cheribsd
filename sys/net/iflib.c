@@ -173,6 +173,7 @@ struct iflib_ctx {
 	uint32_t ifc_if_flags;
 	uint32_t ifc_flags;
 	uint32_t ifc_max_fl_buf_size;
+	uint32_t ifc_rx_mbuf_sz;
 
 	int ifc_link_state;
 	int ifc_link_irq;
@@ -2174,7 +2175,6 @@ iflib_fl_setup(iflib_fl_t fl)
 {
 	iflib_rxq_t rxq = fl->ifl_rxq;
 	if_ctx_t ctx = rxq->ifr_ctx;
-	if_softc_ctx_t sctx = &ctx->ifc_softc_ctx;
 
 	bit_nclear(fl->ifl_rx_bitmap, 0, fl->ifl_size - 1);
 	/*
@@ -2183,23 +2183,7 @@ iflib_fl_setup(iflib_fl_t fl)
 	iflib_fl_bufs_free(fl);
 	/* Now replenish the mbufs */
 	MPASS(fl->ifl_credits == 0);
-	/*
-	 * XXX don't set the max_frame_size to larger
-	 * than the hardware can handle
-	 */
-	if (sctx->isc_max_frame_size <= 2048)
-		fl->ifl_buf_size = MCLBYTES;
-#ifndef CONTIGMALLOC_WORKS
-	else
-		fl->ifl_buf_size = MJUMPAGESIZE;
-#else
-	else if (sctx->isc_max_frame_size <= 4096)
-		fl->ifl_buf_size = MJUMPAGESIZE;
-	else if (sctx->isc_max_frame_size <= 9216)
-		fl->ifl_buf_size = MJUM9BYTES;
-	else
-		fl->ifl_buf_size = MJUM16BYTES;
-#endif
+	fl->ifl_buf_size = ctx->ifc_rx_mbuf_sz;
 	if (fl->ifl_buf_size > ctx->ifc_max_fl_buf_size)
 		ctx->ifc_max_fl_buf_size = fl->ifl_buf_size;
 	fl->ifl_cltype = m_gettype(fl->ifl_buf_size);
@@ -2325,6 +2309,27 @@ iflib_timer(void *arg)
 }
 
 static void
+iflib_calc_rx_mbuf_sz(if_ctx_t ctx)
+{
+	if_softc_ctx_t sctx = &ctx->ifc_softc_ctx;
+
+	/*
+	 * XXX don't set the max_frame_size to larger
+	 * than the hardware can handle
+	 */
+	if (sctx->isc_max_frame_size <= MCLBYTES)
+		ctx->ifc_rx_mbuf_sz = MCLBYTES;
+	else
+		ctx->ifc_rx_mbuf_sz = MJUMPAGESIZE;
+}
+
+uint32_t
+iflib_get_rx_mbuf_sz(if_ctx_t ctx)
+{
+	return (ctx->ifc_rx_mbuf_sz);
+}
+
+static void
 iflib_init_locked(if_ctx_t ctx)
 {
 	if_softc_ctx_t sctx = &ctx->ifc_softc_ctx;
@@ -2358,6 +2363,14 @@ iflib_init_locked(if_ctx_t ctx)
 		CALLOUT_UNLOCK(txq);
 		iflib_netmap_txq_init(ctx, txq);
 	}
+
+	/*
+	 * Calculate a suitable Rx mbuf size prior to calling IFDI_INIT, so
+	 * that drivers can use the value when setting up the hardware receive
+	 * buffers.
+	 */
+	iflib_calc_rx_mbuf_sz(ctx);
+
 #ifdef INVARIANTS
 	i = if_getdrvflags(ifp);
 #endif
@@ -3287,9 +3300,14 @@ defrag:
 				txq->ift_mbuf_defrag++;
 				m_head = m_defrag(*m_headp, M_NOWAIT);
 			}
-			remap++;
-			if (__predict_false(m_head == NULL))
+			/*
+			 * remap should never be >1 unless bus_dmamap_load_mbuf_sg
+			 * failed to map an mbuf that was run through m_defrag
+			 */
+			MPASS(remap <= 1);
+			if (__predict_false(m_head == NULL || remap > 1))
 				goto defrag_failed;
+			remap++;
 			*m_headp = m_head;
 			goto retry;
 			break;
@@ -3882,7 +3900,7 @@ iflib_if_transmit(if_t ifp, struct mbuf *m)
 	if (__predict_false((ifp->if_drv_flags & IFF_DRV_RUNNING) == 0 || !LINK_ACTIVE(ctx))) {
 		DBG_COUNTER_INC(tx_frees);
 		m_freem(m);
-		return (ENOBUFS);
+		return (ENETDOWN);
 	}
 
 	MPASS(m->m_nextpkt == NULL);
@@ -4646,10 +4664,10 @@ iflib_pseudo_register(device_t dev, if_shared_ctx_t sctx, if_ctx_t *ctxp,
 	 * XXX sanity check that ntxd & nrxd are a power of 2
 	 */
 	iflib_reset_qvalues(ctx);
-
+	CTX_LOCK(ctx);
 	if ((err = IFDI_ATTACH_PRE(ctx)) != 0) {
 		device_printf(dev, "IFDI_ATTACH_PRE failed %d\n", err);
-		goto fail_ctx_free;
+		goto fail_unlock;
 	}
 	if (sctx->isc_flags & IFLIB_GEN_MAC)
 		iflib_gen_mac(ctx);
@@ -4803,6 +4821,7 @@ iflib_pseudo_register(device_t dev, if_shared_ctx_t sctx, if_ctx_t *ctxp,
 	if_setgetcounterfn(ctx->ifc_ifp, iflib_if_get_counter);
 	iflib_add_device_sysctl_post(ctx);
 	ctx->ifc_flags |= IFC_INIT_DONE;
+	CTX_UNLOCK(ctx);
 	return (0);
 fail_detach:
 	ether_ifdetach(ctx->ifc_ifp);
@@ -4811,6 +4830,8 @@ fail_queues:
 	iflib_rx_structures_free(ctx);
 fail_iflib_detach:
 	IFDI_DETACH(ctx);
+fail_unlock:
+	CTX_UNLOCK(ctx);
 fail_ctx_free:
 	free(ctx->ifc_softc, M_IFLIB);
 	free(ctx, M_IFLIB);
@@ -6241,8 +6262,8 @@ iflib_add_device_sysctl_pre(if_ctx_t ctx)
 						      CTLFLAG_RD, NULL, "IFLIB fields");
 	oid_list = SYSCTL_CHILDREN(node);
 
-	SYSCTL_ADD_STRING(ctx_list, oid_list, OID_AUTO, "driver_version",
-		       CTLFLAG_RD, ctx->ifc_sctx->isc_driver_version, 0,
+	SYSCTL_ADD_CONST_STRING(ctx_list, oid_list, OID_AUTO, "driver_version",
+		       CTLFLAG_RD, ctx->ifc_sctx->isc_driver_version,
 		       "driver version");
 
 	SYSCTL_ADD_U16(ctx_list, oid_list, OID_AUTO, "override_ntxqs",

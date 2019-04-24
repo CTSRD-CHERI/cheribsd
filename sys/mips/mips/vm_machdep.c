@@ -95,12 +95,10 @@ __FBSDID("$FreeBSD$");
  * ready to run and return to user mode.
  */
 void
-cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2,int flags)
+cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 {
-	struct proc *p1;
 	struct pcb *pcb2;
 
-	p1 = td1->td_proc;
 	if ((flags & RFPROC) == 0)
 		return;
 	/* It is assumed that the vm_thread_alloc called
@@ -110,7 +108,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2,int flags)
 	/* Point the pcb to the top of the stack */
 	pcb2 = td2->td_pcb;
 
-	/* Copy p1's pcb, note that in this case
+	/* Copy td1's pcb, note that in this case
 	 * our pcb also includes the td_frame being copied
 	 * too. The older mips2 code did an additional copy
 	 * of the td_frame, for us that's not needed any
@@ -121,7 +119,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2,int flags)
 #else
 	cheri_bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
 	cheri_signal_copy(pcb2, td1->td_pcb);
-	cheri_sealcap_copy(p2, p1);
+	cheri_sealcap_copy(p2, td1->td_proc);
 #endif
 
 	/* Point mdproc and then copy over td1's contents */
@@ -555,13 +553,20 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	 */
 }
 
-/*
- * Implement the pre-zeroed page mechanism.
- * This routine is called from the idle loop.
- */
+bool
+cpu_exec_vmspace_reuse(struct proc *p __unused, vm_map_t map __unused)
+{
 
-#define	ZIDLE_LO(v)	((v) * 2 / 3)
-#define	ZIDLE_HI(v)	((v) * 4 / 5)
+	return (true);
+}
+
+int
+cpu_procctl(struct thread *td __unused, int idtype __unused, id_t id __unused,
+    int com __unused, void * __capability data __unused)
+{
+
+	return (EINVAL);
+}
 
 /*
  * Software interrupt handler for queued VM system processing.

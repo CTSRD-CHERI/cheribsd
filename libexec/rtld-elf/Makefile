@@ -13,7 +13,6 @@ WANT_CHERI=none
 
 .include <src.opts.mk>
 PACKAGE=	clibs
-MK_BIND_NOW=	no
 MK_PIE=		no # Always position independent using local rules
 MK_SSP=		no
 

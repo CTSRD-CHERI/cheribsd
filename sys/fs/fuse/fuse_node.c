@@ -89,8 +89,13 @@ __FBSDID("$FreeBSD$");
 #include "fuse_io.h"
 #include "fuse_ipc.h"
 
-#define FUSE_DEBUG_MODULE VNOPS
-#include "fuse_debug.h"
+SDT_PROVIDER_DECLARE(fuse);
+/* 
+ * Fuse trace probe:
+ * arg0: verbosity.  Higher numbers give more verbose messages
+ * arg1: Textual message
+ */
+SDT_PROBE_DEFINE2(fuse, , node, trace, "int", "char*");
 
 MALLOC_DEFINE(M_FUSEVN, "fuse_vnode", "fuse vnode private data");
 
@@ -98,47 +103,47 @@ static int sysctl_fuse_cache_mode(SYSCTL_HANDLER_ARGS);
 
 static int fuse_node_count = 0;
 
-SYSCTL_INT(_vfs_fuse, OID_AUTO, node_count, CTLFLAG_RD,
+SYSCTL_INT(_vfs_fusefs, OID_AUTO, node_count, CTLFLAG_RD,
     &fuse_node_count, 0, "Count of FUSE vnodes");
 
 int	fuse_data_cache_mode = FUSE_CACHE_WT;
 
-SYSCTL_PROC(_vfs_fuse, OID_AUTO, data_cache_mode, CTLTYPE_INT|CTLFLAG_RW,
+SYSCTL_PROC(_vfs_fusefs, OID_AUTO, data_cache_mode, CTLTYPE_INT|CTLFLAG_RW,
     &fuse_data_cache_mode, 0, sysctl_fuse_cache_mode, "I",
     "Zero: disable caching of FUSE file data; One: write-through caching "
     "(default); Two: write-back caching (generally unsafe)");
 
 int	fuse_data_cache_invalidate = 0;
 
-SYSCTL_INT(_vfs_fuse, OID_AUTO, data_cache_invalidate, CTLFLAG_RW,
+SYSCTL_INT(_vfs_fusefs, OID_AUTO, data_cache_invalidate, CTLFLAG_RW,
     &fuse_data_cache_invalidate, 0,
     "If non-zero, discard cached clean file data when there are no active file"
     " users");
 
 int	fuse_mmap_enable = 1;
 
-SYSCTL_INT(_vfs_fuse, OID_AUTO, mmap_enable, CTLFLAG_RW,
+SYSCTL_INT(_vfs_fusefs, OID_AUTO, mmap_enable, CTLFLAG_RW,
     &fuse_mmap_enable, 0,
     "If non-zero, and data_cache_mode is also non-zero, enable mmap(2) of "
     "FUSE files");
 
 int	fuse_refresh_size = 0;
 
-SYSCTL_INT(_vfs_fuse, OID_AUTO, refresh_size, CTLFLAG_RW,
+SYSCTL_INT(_vfs_fusefs, OID_AUTO, refresh_size, CTLFLAG_RW,
     &fuse_refresh_size, 0,
     "If non-zero, and no dirty file extension data is buffered, fetch file "
     "size before write operations");
 
 int	fuse_sync_resize = 1;
 
-SYSCTL_INT(_vfs_fuse, OID_AUTO, sync_resize, CTLFLAG_RW,
+SYSCTL_INT(_vfs_fusefs, OID_AUTO, sync_resize, CTLFLAG_RW,
     &fuse_sync_resize, 0,
     "If a cached write extended a file, inform FUSE filesystem of the changed"
     "size immediately subsequent to the issued writes");
 
 int	fuse_fix_broken_io = 0;
 
-SYSCTL_INT(_vfs_fuse, OID_AUTO, fix_broken_io, CTLFLAG_RW,
+SYSCTL_INT(_vfs_fusefs, OID_AUTO, fix_broken_io, CTLFLAG_RW,
     &fuse_fix_broken_io, 0,
     "If non-zero, print a diagnostic warning if a userspace filesystem returns"
     " EIO on reads of recently extended portions of files");
@@ -219,8 +224,6 @@ fuse_vnode_alloc(struct mount *mp,
 	struct vnode *vp2;
 	int err = 0;
 
-	FS_DEBUG("been asked for vno #%ju\n", (uintmax_t)nodeid);
-
 	if (vtyp == VNON) {
 		return EINVAL;
 	}
@@ -232,7 +235,7 @@ fuse_vnode_alloc(struct mount *mp,
 
 	if (*vpp) {
 		MPASS((*vpp)->v_type == vtyp && (*vpp)->v_data != NULL);
-		FS_DEBUG("vnode taken from hash\n");
+		SDT_PROBE2(fuse, , node, trace, 1, "vnode taken from hash");
 		return (0);
 	}
 	fvdat = malloc(sizeof(*fvdat), M_FUSEVN, M_WAITOK | M_ZERO);
@@ -275,8 +278,6 @@ fuse_vnode_get(struct mount *mp,
 {
 	struct thread *td = (cnp != NULL ? cnp->cn_thread : curthread);
 	int err = 0;
-
-	debug_printf("dvp=%p\n", dvp);
 
 	err = fuse_vnode_alloc(mp, td, nodeid, vtyp, vpp);
 	if (err) {
@@ -354,8 +355,6 @@ fuse_vnode_savesize(struct vnode *vp, struct ucred *cred)
 	struct fuse_setattr_in *fsai;
 	int err = 0;
 
-	FS_DEBUG("inode=%ju size=%ju\n", (uintmax_t)VTOI(vp),
-	    (uintmax_t)fvdat->filesize);
 	ASSERT_VOP_ELOCKED(vp, "fuse_io_extend");
 
 	if (fuse_isdeadfs(vp)) {
@@ -405,7 +404,7 @@ fuse_vnode_refreshsize(struct vnode *vp, struct ucred *cred)
 		return;
 
 	VOP_GETATTR(vp, &va, cred);
-	FS_DEBUG("refreshed file size: %jd\n", (intmax_t)VTOFUD(vp)->filesize);
+	SDT_PROBE2(fuse, , node, trace, 1, "refreshed file size");
 }
 
 int
@@ -415,9 +414,6 @@ fuse_vnode_setsize(struct vnode *vp, struct ucred *cred, off_t newsize)
 	off_t oldsize;
 	int err = 0;
 
-	FS_DEBUG("inode=%ju oldsize=%ju newsize=%ju\n",
-	    (uintmax_t)VTOI(vp), (uintmax_t)fvdat->filesize,
-	    (uintmax_t)newsize);
 	ASSERT_VOP_ELOCKED(vp, "fuse_vnode_setsize");
 
 	oldsize = fvdat->filesize;

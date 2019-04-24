@@ -1102,7 +1102,7 @@ done:
 }
 
 int
-sys_kldload(struct thread *td, struct kldload_args *uap)
+user_kldload(struct thread *td, const char * __capability file)
 {
 	char *pathname = NULL;
 	int error, fileid;
@@ -1110,7 +1110,7 @@ sys_kldload(struct thread *td, struct kldload_args *uap)
 	td->td_retval[0] = -1;
 
 	pathname = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr(uap->file, pathname, MAXPATHLEN, NULL);
+	error = copyinstr_c(file, pathname, MAXPATHLEN, NULL);
 	if (error == 0) {
 		error = kern_kldload(td, pathname, &fileid);
 		if (error == 0)
@@ -1118,6 +1118,13 @@ sys_kldload(struct thread *td, struct kldload_args *uap)
 	}
 	free(pathname, M_TEMP);
 	return (error);
+}
+
+int
+sys_kldload(struct thread *td, struct kldload_args *uap)
+{
+
+	return (user_kldload(td, __USER_CAP_STR(uap->file)));
 }
 
 int
@@ -1368,7 +1375,6 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 {
 
 	struct kld_sym_lookup lookup;
-	char *symstr;
 	int error;
 
 	error = copyin(uap->data, &lookup, sizeof(lookup));
@@ -1377,27 +1383,23 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	if (lookup.version != sizeof(lookup) ||
 	    uap->cmd != KLDSYM_LOOKUP)
 		return (EINVAL);
-	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr(lookup.symname, symstr, MAXPATHLEN, NULL);
+	error = kern_kldsym(td, uap->fileid, uap->cmd,
+	    __USER_CAP_STR(lookup.symname), &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
-		goto done;
-	error = kern_kldsym(td, uap->fileid, uap->cmd, symstr,
-	    &lookup.symvalue, &lookup.symsize);
-	if (error != 0)
-		goto done;
+		return (error);
 	error = copyout(&lookup, uap->data, sizeof(lookup));
-done:
-	free(symstr, M_TEMP);
+
 	return (error);
 }
 
 int
-kern_kldsym(struct thread *td, int fileid, int cmd, const char *symstr,
-    u_long *symvalue, size_t *symsize)
+kern_kldsym(struct thread *td, int fileid, int cmd,
+    const char * __capability symname, u_long *symvalue, size_t *symsize)
 {
 	c_linker_sym_t sym;
 	linker_symval_t symval;
 	linker_file_t lf;
+	char *symstr;
 	int error;
 
 #ifdef MAC
@@ -1406,6 +1408,10 @@ kern_kldsym(struct thread *td, int fileid, int cmd, const char *symstr,
 		return (error);
 #endif
 
+	symstr = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+	error = copyinstr_c(symname, symstr, MAXPATHLEN, NULL);
+	if (error != 0)
+		goto done;
 	sx_xlock(&kld_sx);
 	if (fileid != 0) {
 		lf = linker_find_file_by_id(fileid);
@@ -1432,6 +1438,8 @@ kern_kldsym(struct thread *td, int fileid, int cmd, const char *symstr,
 			error = ENOENT;
 	}
 	sx_xunlock(&kld_sx);
+done:
+	free(symstr, M_TEMP);
 	return (error);
 }
 

@@ -68,6 +68,7 @@ struct stat;
 struct thr_param;
 struct timex;
 struct uio;
+struct uuid;
 
 
 int	kern___acl_aclcheck_fd(struct thread *td, int filedes, acl_type_t type,
@@ -267,8 +268,9 @@ int	kern_kqueue(struct thread *td, int flags, struct filecaps *fcaps);
 int	kern_kldfind(struct thread *td, const char * __capability file);
 int	kern_kldload(struct thread *td, const char *file, int *fileid);
 int	kern_kldstat(struct thread *td, int fileid, struct kld_file_stat *stat);
-int	kern_kldsym(struct thread *td, int fileid, int cmd, const char *symstr,
-	    u_long *symvalue, size_t *symsize);
+int	kern_kldsym(struct thread *td, int fileid, int cmd,
+	    const char * __capability symstr, u_long *symvalue,
+	    size_t *symsize);
 int	kern_kldunload(struct thread *td, int fileid, int flags);
 int	kern_ktrace(struct thread *td, const char * __capability fname,
 	    int uops, int ufacs, int pid);
@@ -428,8 +430,7 @@ int	kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	    struct timeval *tvp, int abi_nfdbits);
 int	kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 	    struct mbuf *control, enum uio_seg segflg);
-int	kern_setgroups(struct thread *td, u_int ngrp,
-	    gid_t *groups);
+int	kern_setgroups(struct thread *td, u_int ngrp, gid_t *groups);
 int	kern_setitimer(struct thread *, u_int, struct itimerval *,
 	    struct itimerval *);
 int	kern_setrlimit(struct thread *, u_int, struct rlimit *);
@@ -450,6 +451,7 @@ int	kern_sigaction_cap(struct thread *td, int sig,
 	    const ksigaction_t *act, ksigaction_t *oact, int flags,
 	    void * __capability *cap);
 int	kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss);
+int	kern_sigpending(struct thread *td, sigset_t * __capability set);
 int	kern_sigprocmask(struct thread *td, int how,
 	    sigset_t *set, sigset_t *oset, int flags);
 int	kern_sigsuspend(struct thread *td, sigset_t mask);
@@ -560,6 +562,7 @@ int	user_jail_get(struct thread *td, void * __capability iovp,
 	    updateiov_t *updateiov_f);
 int	user_jail_set(struct thread *td, void * __capability iovp,
 	    unsigned int iovcnt, int flags, copyinuio_t *copyinuio_f);
+int	user_kldload(struct thread *td, const char * __capability file);
 int	user_pdgetpid(struct thread *td, int fd, pid_t * __capability pidp);
 int	user_poll(struct thread *td, struct pollfd * __capability fds,
 	    u_int nfds, int timeout);
@@ -594,13 +597,32 @@ int	user_select(struct thread *td, int nd, fd_set * __capability in,
 int	user_sendto(struct thread *td, int s, const char * __capability buf,
 	    size_t len, int flags, const struct sockaddr * __capability to,
 	    socklen_t tolen);
+int	user_setgroups(struct thread *td, u_int gidsetsize,
+	    const gid_t * __capability gidset);
 int	user_settimeofday(struct thread *td,
 	    const struct timeval * __capability tp,
 	    const struct timezone * __capability tz);
+int	user_sigprocmask(struct thread *td, int how,
+	    const sigset_t * __capability uset, sigset_t * __capability uoset);
+int	user_sigsuspend(struct thread *td,
+	    const sigset_t * __capability sigmask);
+int	user_sigtimedwait(struct thread *td,
+	    const sigset_t * __capability uset, void * __capability info,
+	    const struct timespec * __capability utimeout,
+	    copyout_siginfo_t *copyout_siginfop);
+int	user_sigwait(struct thread *td, const sigset_t * __capability uset,
+	    int * __capability usig);
+int	user_sigwaitinfo(struct thread *td, const sigset_t * __capability uset,
+	    void * __capability info, copyout_siginfo_t *copyout_siginfop);
 int	user_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int * __capability rsv);
 int	user_statfs(struct thread *td, const char * __capability path,
 	    struct statfs * __capability buf);
+int	user_uuidgen(struct thread *td, struct uuid * __capability storep,
+	    int count);
+int	user_wait6(struct thread *td, enum idtype idtype, id_t id,
+	    int * __capability statusp, int options,
+	    struct __wrusage * __capability wrusage, _siginfo_t *sip);
 int	user_writev(struct thread *td, int fd, void * __capability iovp,
 	    u_int iovcnt, copyinuio_t *copyinuio_f);
 

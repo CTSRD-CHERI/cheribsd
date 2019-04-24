@@ -64,11 +64,15 @@ fi
 if [ -n "${linkmode}" ]; then
 	# Don't delete the source file on a case insensitive file system since
 	# `ln -f` will remove the file first and then attempt to create the link
-	src_lower=$(echo "$1" | awk '{print tolower($0)}')
-	target_lower=$(echo "$2" | awk '{print tolower($0)}')
-	if [ "$src_lower" = "$target_lower" ] && test "$1" -ef "$2"; then
-		echo "$0: not creating link from $1 to $2 on case-insensitive file system." >&2
-		exit 0
+	if test "$1" -ef "$2"; then
+		# Only run awk twice if $1 and $2 are the same file. This speeds
+		# up install.sh a lot (but it should really just be written in C)
+		src_lower=$(echo "$1" | awk '{print tolower($0)}')
+		target_lower=$(echo "$2" | awk '{print tolower($0)}')
+		if [ "$src_lower" = "$target_lower" ]; then
+			echo "$0: not creating link from $1 to $2 on case-insensitive file system." >&2
+			exit 0
+		fi
 	fi
 	if [ "${linkmode}" = "symbolic" ]; then
 		ln -fsn "$@"

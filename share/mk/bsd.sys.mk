@@ -24,6 +24,19 @@ CFLAGS+=	-std=iso9899:1999
 .else # CSTD
 CFLAGS+=	-std=${CSTD}
 .endif # CSTD
+
+.if ${COMPILER_FEATURES:Mc++11}
+CXXSTD?=	c++11
+.elif ${COMPILER_TYPE} == "gcc"
+# Prior versions of g++ support C++98 with GNU extensions by default.
+CXXSTD?=	gnu++98
+.else
+# Assume that the compiler supports at least C++98.
+CXXSTD?=	c++98
+.endif
+CXXFLAGS+=	-std=${CXXSTD}
+# CXXSTD
+
 # -pedantic is problematic because it also imposes namespace restrictions
 #CFLAGS+=	-pedantic
 .if defined(WARNS)
@@ -168,6 +181,12 @@ CWARNFLAGS+=	-Wno-error=aggressive-loop-optimizations	\
 		-Wno-error=restrict				\
 		-Wno-error=sizeof-pointer-memaccess		\
 		-Wno-error=stringop-truncation
+.endif
+
+.ifdef LIBCHERI
+# Ignore unaligned memcpy() calls. This is just a missed optimization
+# so it should not cause the build to fail.
+CWARNFLAGS+=	-Wno-error=pass-failed
 .endif
 
 # How to handle FreeBSD custom printf format specifiers.
