@@ -238,10 +238,6 @@ public:
     return get<v128>(addr);
   }
   capability_t     getCapability(pint_t addr) { return get<capability_t>(addr); }
-  addr_t           getAddr(pint_t addr) {
-    // FIXME: for CHERI the actually address is the second 8 byte sequence
-    return get<addr_t>(addr);
-  }
   __attribute__((always_inline))
   uintptr_t       getP(pint_t addr);
   uint64_t        getRegister(pint_t addr);
@@ -348,8 +344,8 @@ LocalAddressSpace::getEncodedP(pint_t &addr, pint_t end, uint8_t encoding,
   // first get value
   switch (encoding & 0x0F) {
   case DW_EH_PE_ptr:
-    result = getAddr(addr);
-    p += sizeof(addr_t);
+    result = assert_pointer_in_bounds(getP(addr));
+    p += sizeof(pint_t);
     addr = (pint_t) p;
     break;
   case DW_EH_PE_uleb128:
@@ -571,17 +567,22 @@ inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
         }
 #endif
 
-        if ((vaddr_t)cbdata->targetAddr < (vaddr_t)pinfo->dlpi_addr) {
+        if (cbdata->targetAddr < pinfo->dlpi_addr) {
           CHERI_DBG("%#p out of bounds of %#p (%s)\n", (void*)cbdata->targetAddr, (void*)pinfo->dlpi_addr, pinfo->dlpi_name);
           return false;
         }
 #ifdef __CHERI_PURE_CAPABILITY__
         check_same_type<__uintcap_t, decltype(pinfo->dlpi_addr)>();
         check_same_type<const Elf_Phdr *, decltype(pinfo->dlpi_phdr)>();
+
+        // Cannot use CTestSubset here because the dpli_addr perms are a strict
+        // subset that never includes execute and so won't match targetAddr
+        // which is always executable.
+        //
         // TODO: __builtin_cheri_top_get_would be nice
         if (__builtin_cheri_length_get((void *)pinfo->dlpi_addr) +
                 __builtin_cheri_base_get((void *)pinfo->dlpi_addr) <
-            (vaddr_t)cbdata->targetAddr) {
+            (__cheri_addr vaddr_t)cbdata->targetAddr) {
           CHERI_DBG("%#p out of bounds of %#p (%s)\n", (void*)cbdata->targetAddr, (void*)pinfo->dlpi_addr, pinfo->dlpi_name);
           return false;
         }
@@ -641,7 +642,7 @@ inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
             if (pinfo->dlpi_addr == 0 && phdr->p_vaddr < image_base)
               begin = begin + image_base;
 #endif
-            if ((vaddr_t)cbdata->targetAddr >= (vaddr_t)begin && (vaddr_t)cbdata->targetAddr < (vaddr_t)end) {
+            if (cbdata->targetAddr >= begin && cbdata->targetAddr < end) {
               cbdata->sects->dso_base = begin;
               object_length = phdr->p_memsz;
               found_obj = true;
@@ -669,8 +670,32 @@ inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
 
         if (found_obj && found_hdr) {
           CHERI_DBG("found_obj && found_hdr in %s\n", pinfo->dlpi_name);
-          cbdata->sects->dwarf_section_length = object_length;
-          return true;
+
+	  // Find the PT_LOAD containing .eh_frame.
+          for (Elf_Half i = 0; i < pinfo->dlpi_phnum; i++) {
+            const Elf_Phdr *phdr = &pinfo->dlpi_phdr[i];
+            if (phdr->p_type == PT_LOAD) {
+              uintptr_t begin = getPhdrCapability(pinfo, phdr);
+              uintptr_t end = begin + phdr->p_memsz;
+#if defined(__ANDROID__)
+              if (pinfo->dlpi_addr == 0 && phdr->p_vaddr < image_base)
+                begin = begin + image_base;
+#endif
+              if (cbdata->sects->dwarf_section() >= begin &&
+                  cbdata->sects->dwarf_section() < end) {
+
+                // This still overestimates the length of .eh_frame, but it
+                // should respect the bounds of the containing PT_LOAD.
+                cbdata->sects->dwarf_section_length = phdr->p_memsz -
+                  ((__cheri_addr vaddr_t)cbdata->sects->dwarf_section() -
+                   (__cheri_addr vaddr_t)begin);
+                return true;
+              }
+            }
+          }
+          CHERI_DBG("Could not find PT_LOAD of .eh_frame in %s\n",
+                    pinfo->dlpi_name);
+          return false;
         } else {
           CHERI_DBG("Could not find EHDR in %s\n", pinfo->dlpi_name);
           return false;

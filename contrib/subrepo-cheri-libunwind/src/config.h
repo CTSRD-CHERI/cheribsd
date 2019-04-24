@@ -62,6 +62,36 @@
   #endif
 #endif
 
+#define STR(a) #a
+#define XSTR(a) STR(a)
+#define SYMBOL_NAME(name) XSTR(__USER_LABEL_PREFIX__) #name
+
+#if defined(__APPLE__)
+#define _LIBUNWIND_WEAK_ALIAS(name, aliasname)                                 \
+  __asm__(".globl " SYMBOL_NAME(aliasname));                                   \
+  __asm__(SYMBOL_NAME(aliasname) " = " SYMBOL_NAME(name));                     \
+  _LIBUNWIND_EXPORT                                                            \
+  extern "C" __typeof(name) aliasname __attribute__((weak_import));
+#elif defined(__ELF__)
+#define _LIBUNWIND_WEAK_ALIAS(name, aliasname)                                 \
+  _LIBUNWIND_EXPORT                                                            \
+  extern "C" __typeof(name) aliasname __attribute__((weak, alias(#name)));
+#elif defined(_WIN32)
+#if defined(__MINGW32__)
+#define _LIBUNWIND_WEAK_ALIAS(name, aliasname)                                 \
+  _LIBUNWIND_EXPORT                                                            \
+  extern "C" __typeof(name) aliasname __attribute__((alias(#name)));
+#else
+#define _LIBUNWIND_WEAK_ALIAS(name, aliasname)                                 \
+  __pragma(comment(linker, "/alternatename:" SYMBOL_NAME(aliasname) "="        \
+                                             SYMBOL_NAME(name)))               \
+  _LIBUNWIND_EXPORT \
+  extern "C" __typeof(name) aliasname;
+#endif
+#else
+#error Unsupported target
+#endif
+
 #if (defined(__APPLE__) && defined(__arm__)) || defined(__USING_SJLJ_EXCEPTIONS__)
 #define _LIBUNWIND_BUILD_SJLJ_APIS
 #endif
@@ -162,17 +192,15 @@ static inline uintptr_t assert_pointer_in_bounds(uintptr_t value) {
   #define _LIBUNWIND_TRACE_DWARF(...)
   #define CHERI_DBG(...) (void)0
 #else
-  #ifndef __CHERI_PURE_CAPABILITY__
-    #define CHERI_DBG(...) (void)0
-  #else
-    #define CHERI_DBG(...) fprintf(stderr, __VA_ARGS__)
-  #endif
   #ifdef __cplusplus
     extern "C" {
   #endif
     extern  bool logAPIs();
     extern  bool logUnwinding();
     extern  bool logDWARF();
+  #ifdef __CHERI_PURE_CAPABILITY__
+    extern  bool logCHERI();
+  #endif
   #ifdef __cplusplus
     }
   #endif
@@ -194,6 +222,15 @@ static inline uintptr_t assert_pointer_in_bounds(uintptr_t value) {
       if (logDWARF())                                                          \
         fprintf(stderr, __VA_ARGS__);                                          \
     } while (0)
+  #ifndef __CHERI_PURE_CAPABILITY__
+    #define CHERI_DBG(...) (void)0
+  #else
+    #define CHERI_DBG(...)                                                     \
+      do {                                                                     \
+        if (logCHERI())                                                        \
+          fprintf(stderr, __VA_ARGS__);                                        \
+      } while (0)
+  #endif
 #endif
 
 #ifdef __cplusplus

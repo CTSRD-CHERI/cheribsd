@@ -313,7 +313,6 @@ DwarfInstructions<A, R>::evaluateExpression(pint_t expression, A &addressSpace,
 #ifdef __CHERI__
 #pragma clang diagnostic ignored "-Wcheri-bitwise-operations"
 #endif
-  *(volatile char*)expression;
   const bool log = true;
   pint_t p = expression;
   pint_t expressionEnd = expression + 20; // temp, until len read

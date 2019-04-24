@@ -38,7 +38,7 @@ public:
   /// Information encoded in a CIE (Common Information Entry)
   struct CIE_Info {
     pint_t    cieStart;
-    pint_t    cieLength;
+    size_t    cieLength; // XXXAR: or uint32_t?
     pint_t    cieInstructions;
     uint8_t   pointerEncoding;
     uint8_t   lsdaEncoding;
@@ -58,7 +58,7 @@ public:
   /// Information about an FDE (Frame Description Entry)
   struct FDE_Info {
     pint_t  fdeStart;
-    pint_t  fdeLength;
+    size_t  fdeLength; // XXXAR: or uint32_t?
     pint_t  fdeInstructions;
     pint_t  pcStart;
     pint_t  pcEnd;
@@ -118,7 +118,7 @@ public:
 private:
   static bool parseInstructions(A &addressSpace, pint_t instructions,
                                 pint_t instructionsEnd, const CIE_Info &cieInfo,
-                                pint_t pcoffset,
+                                ptrdiff_t pcoffset,
                                 PrologInfoStackEntry *&rememberStack, int arch,
                                 PrologInfo *results);
 };
@@ -171,7 +171,7 @@ const char *CFI_Parser<A>::decodeFDE(A &addressSpace, pint_t fdeStart,
     p = endOfAug;
   }
   fdeInfo->fdeStart = fdeStart;
-  fdeInfo->fdeLength = nextCFI - fdeStart;
+  fdeInfo->fdeLength = (size_t)(nextCFI - fdeStart);
   fdeInfo->fdeInstructions = p;
   fdeInfo->pcStart = pcStart;
   fdeInfo->pcEnd = pcStart + pcRange;
@@ -262,10 +262,15 @@ bool CFI_Parser<A>::findFDE(A &addressSpace, pint_t pc, pint_t ehSectionStart,
               p = endOfAug;
             }
             fdeInfo->fdeStart = currentCFI;
-            fdeInfo->fdeLength = nextCFI - currentCFI;
+            fdeInfo->fdeLength = (size_t)(nextCFI - currentCFI);
             fdeInfo->fdeInstructions = p;
+#ifdef __CHERI_PURE_CAPABILITY__
+            fdeInfo->pcStart = assert_pointer_in_bounds(pc - (pcAddr - pcStart));
+            fdeInfo->pcEnd = assert_pointer_in_bounds(fdeInfo->pcStart + pcRange);
+#else
             fdeInfo->pcStart = pcStart;
             fdeInfo->pcEnd = pcStart + pcRange;
+#endif
             return true;
           } else {
             // pc is not in begin/range, skip this FDE
@@ -300,12 +305,12 @@ const char *CFI_Parser<A>::parseCIE(A &addressSpace, pint_t cie,
 #endif
   cieInfo->cieStart = cie;
   pint_t p = cie;
-  pint_t cieLength = (pint_t)addressSpace.get32(p);
+  uint64_t cieLength = addressSpace.get32(p);
   p += 4;
   pint_t cieContentEnd = p + cieLength;
   if (cieLength == 0xffffffff) {
     // 0xffffffff means length is really next 8 bytes
-    cieLength = (pint_t)addressSpace.get64(p);
+    cieLength = (uint64_t)addressSpace.get64(p);
     p += 8;
     cieContentEnd = p + cieLength;
   }
@@ -377,7 +382,7 @@ const char *CFI_Parser<A>::parseCIE(A &addressSpace, pint_t cie,
       }
     }
   }
-  cieInfo->cieLength = cieContentEnd - cieInfo->cieStart;
+  cieInfo->cieLength = (size_t)(cieContentEnd - cieInfo->cieStart);
   cieInfo->cieInstructions = p;
   return result;
 }
@@ -396,22 +401,22 @@ bool CFI_Parser<A>::parseFDEInstructions(A &addressSpace,
   // parse CIE then FDE instructions
   return parseInstructions(addressSpace, cieInfo.cieInstructions,
                            cieInfo.cieStart + cieInfo.cieLength, cieInfo,
-                           (pint_t)(-1), rememberStack, arch, results) &&
+                           (ptrdiff_t)(-1), rememberStack, arch, results) &&
          parseInstructions(addressSpace, fdeInfo.fdeInstructions,
                            fdeInfo.fdeStart + fdeInfo.fdeLength, cieInfo,
-                           upToPC - fdeInfo.pcStart, rememberStack, arch,
-                           results);
+                           (ptrdiff_t)(upToPC - fdeInfo.pcStart), rememberStack,
+                           arch, results);
 }
 
 /// "run" the DWARF instructions
 template <typename A>
 bool CFI_Parser<A>::parseInstructions(A &addressSpace, pint_t instructions,
                                       pint_t instructionsEnd,
-                                      const CIE_Info &cieInfo, pint_t pcoffset,
+                                      const CIE_Info &cieInfo, ptrdiff_t pcoffset,
                                       PrologInfoStackEntry *&rememberStack,
                                       int arch, PrologInfo *results) {
   pint_t p = instructions;
-  pint_t codeOffset = 0;
+  ptrdiff_t codeOffset = 0;
   PrologInfo initialState = *results;
 
   _LIBUNWIND_TRACE_DWARF("parseInstructions(instructions=0x%0" PRIx64 ")\n",
@@ -434,8 +439,8 @@ bool CFI_Parser<A>::parseInstructions(A &addressSpace, pint_t instructions,
       _LIBUNWIND_TRACE_DWARF("DW_CFA_nop\n");
       break;
     case DW_CFA_set_loc:
-      codeOffset =
-          addressSpace.getEncodedP(p, instructionsEnd, cieInfo.pointerEncoding);
+      codeOffset = (ptrdiff_t)addressSpace.getEncodedP(p, instructionsEnd,
+                                                       cieInfo.pointerEncoding);
       _LIBUNWIND_TRACE_DWARF("DW_CFA_set_loc\n");
       break;
     case DW_CFA_advance_loc1:
