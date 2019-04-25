@@ -48,6 +48,18 @@
 #	include "unwind.h"
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+static inline uintptr_t assert_pointer_in_bounds(uintptr_t value) {
+  assert(__builtin_cheri_tag_get((void*)value));
+  assert(__builtin_cheri_offset_get((void*)value) <
+         __builtin_cheri_length_get((void*)value));
+  return value;
+}
+#else
+static inline uintptr_t assert_pointer_in_bounds(uintptr_t value) {
+  return value;
+}
+#endif
 
 /// Type used for pointers into DWARF data
 typedef unsigned char *dw_eh_ptr_t;
@@ -140,7 +152,7 @@ static inline int dwarf_size_of_fixed_size_field(unsigned char type)
 		case DW_EH_PE_udata4: return 4;
 		case DW_EH_PE_sdata8:
 		case DW_EH_PE_udata8: return 8;
-		case DW_EH_PE_absptr: return sizeof(size_t);
+		case DW_EH_PE_absptr: return sizeof(uintptr_t);
 	}
 	abort();
 }
@@ -216,7 +228,7 @@ static int64_t read_sleb128(dw_eh_ptr_t *data)
  * *data.  Updates the value of *data to point to the next byte after the end
  * of the data.
  */
-static uint64_t read_value(char encoding, dw_eh_ptr_t *data)
+static uintptr_t read_value(char encoding, dw_eh_ptr_t *data)
 {
 	enum dwarf_data_encoding type = get_encoding(encoding);
 	switch (type)
@@ -228,7 +240,7 @@ static uint64_t read_value(char encoding, dw_eh_ptr_t *data)
 			type t;\
 			memcpy(&t, *data, sizeof t);\
 			*data += sizeof t;\
-			return static_cast<uint64_t>(t);\
+			return static_cast<uintptr_t>(t);\
 		}
 		READ(DW_EH_PE_udata2, uint16_t)
 		READ(DW_EH_PE_udata4, uint32_t)
@@ -237,9 +249,15 @@ static uint64_t read_value(char encoding, dw_eh_ptr_t *data)
 		READ(DW_EH_PE_sdata4, int32_t)
 		READ(DW_EH_PE_sdata8, int64_t)
 #ifdef __CHERI_PURE_CAPABILITY__
-		READ(DW_EH_PE_absptr, int64_t)
+        case DW_EH_PE_absptr:
+                {
+                        uintptr_t t;
+                        memcpy(&t, *data, sizeof t);
+                        t = assert_pointer_in_bounds(t);
+                        return t;
+                }
 #else
-		READ(DW_EH_PE_absptr, intptr_t)
+		READ(DW_EH_PE_absptr, uintptr_t)
 #endif
 			break;
 #undef READ
@@ -279,11 +297,7 @@ static uintptr_t resolve_indirect_value(struct _Unwind_Context *c,
 		case DW_EH_PE_funcrel:
 			p = _Unwind_GetRegionStart(c) + v;
 		default:
-#ifdef __CHERI_PURE_CAPABILITY__
-			p = (uintptr_t)__builtin_cheri_offset_set(__builtin_cheri_program_counter_get(), v);
-#else
 			p = v;
-#endif
 			break;
 	}
 	// If this is an indirect value, then it is really the address of the real
@@ -292,7 +306,7 @@ static uintptr_t resolve_indirect_value(struct _Unwind_Context *c,
 	// be a GCC extensions, so not properly documented...
 	if (is_indirect(encoding))
 	{
-		p = *(uintptr_t*)p;
+		p = assert_pointer_in_bounds(*(uintptr_t*)p);
 	}
 	return p;
 }
