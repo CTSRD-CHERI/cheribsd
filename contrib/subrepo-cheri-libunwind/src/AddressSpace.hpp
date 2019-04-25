@@ -687,8 +687,11 @@ inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
                 // This still overestimates the length of .eh_frame, but it
                 // should respect the bounds of the containing PT_LOAD.
                 cbdata->sects->dwarf_section_length = phdr->p_memsz -
-                  ((__cheri_addr vaddr_t)cbdata->sects->dwarf_section() -
-                   (__cheri_addr vaddr_t)begin);
+#ifdef __CHERI_PURE_CAPABILITY__
+                  (__cheri_addr vaddr_t)(cbdata->sects->dwarf_section() - begin);
+#else
+                  (vaddr_t)(cbdata->sects->dwarf_section() - begin);
+#endif
                 return true;
               }
             }
