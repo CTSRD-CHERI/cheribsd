@@ -698,8 +698,7 @@ static void report_failure(_Unwind_Reason_Code err, __cxa_exception *thrown_exce
 #endif
 		case _URC_END_OF_STACK:
 			__cxa_begin_catch (&(thrown_exception->unwindHeader));
- 			std::terminate();
-			fprintf(stderr, "Terminating due to uncaught exception %p", 
+			fprintf(stderr, "Terminating due to uncaught exception %p",
 					static_cast<void*>(thrown_exception));
 			thrown_exception = realExceptionFromException(thrown_exception);
 			static const __class_type_info *e_ti =
@@ -725,10 +724,11 @@ static void report_failure(_Unwind_Reason_Code err, __cxa_exception *thrown_exce
 			fprintf(stderr, " of type %s\n", 
 				status == 0 ? demangled : mangled);
 			if (status == 0) { free(demangled); }
+
 			// Print a back trace if no handler is found.
 			// TODO: Make this optional
 			_Unwind_Backtrace(trace, 0);
-
+			std::terminate();
 			// Just abort. No need to call std::terminate for the second time
 			abort();
 			break;

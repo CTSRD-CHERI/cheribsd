@@ -365,7 +365,6 @@ static inline struct dwarf_eh_lsda parse_lsda(_Unwind_Context *context,
                                               unsigned char *data)
 {
 	struct dwarf_eh_lsda lsda;
-	void *lsda_addr = data;
 
 	lsda.region_start = reinterpret_cast<dw_eh_ptr_t>(_Unwind_GetRegionStart(context));
 

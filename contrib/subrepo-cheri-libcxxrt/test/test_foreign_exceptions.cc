@@ -21,7 +21,7 @@ extern "C" _Unwind_Reason_Code __wrap__Unwind_RaiseException (_Unwind_Exception 
 	// clobber exception class forcing libcxx own exceptions to be treated
 	// as foreign exception within libcxx itself
 	e->exception_class = EXCEPTION_CLASS('F','O','R','E','I','G','N','\0');
-	__real__Unwind_RaiseException(e);
+	return __real__Unwind_RaiseException(e);
 }
 
 _Unwind_Exception global_e;

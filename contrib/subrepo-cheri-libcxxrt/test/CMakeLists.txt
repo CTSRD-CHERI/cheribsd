@@ -49,10 +49,6 @@ find_library(LIBCOMPILER_RT_STATIC libcompiler_rt.a)
 if(LIBCOMPILER_RT_STATIC)
     list(APPEND STATIC_LIB_DEPS ${LIBCOMPILER_RT_STATIC})
 endif()
-find_library(LIBGCC_S_STATIC libgcc_s.a)
-if(LIBGCC_S_STATIC)
-    list(APPEND STATIC_LIB_DEPS ${LIBGCC_S_STATIC})
-endif()
 message(STATUS "static lib deps: ${STATIC_LIB_DEPS}")
 
 if(NOT NO_STATIC_TEST)
@@ -65,6 +61,12 @@ endif()
 if(NOT NO_SHARED)
     add_executable(cxxrt-test-shared ${CXXTEST_SOURCES})
     set_property(TARGET cxxrt-test-shared PROPERTY LINK_FLAGS -nodefaultlibs)
+    if(NOT CMAKE_CROSSCOMPILING)
+        set_target_properties(cxxrt-test-shared PROPERTIES
+           INSTALL_RPATH "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}"
+           INSTALL_RPATH_USE_LINK_PATH ON
+           BUILD_WITH_INSTALL_RPATH ON)
+    endif()
     target_link_libraries(cxxrt-test-shared cxxrt-shared pthread ${CMAKE_DL_LIBS} c)
     add_cxxrt_test(cxxrt-test-shared test-shared-output.log)
 endif()
@@ -99,6 +101,13 @@ endif()
 option(TEST_LIBUNWIND "Test libcxxrt with libunwind" OFF)
 
 if(TEST_LIBUNWIND)
+    add_executable(cxxrt-test-libunwind-allstatic ${CXXTEST_SOURCES})
+    set_property(TARGET cxxrt-test-libunwind-allstatic PROPERTY LINK_FLAGS
+                 "-L${LIBUNWIND_PATH} -nodefaultlibs -static")
+    target_link_libraries(cxxrt-test-libunwind-allstatic cxxrt-static
+                          ${LIBUNWIND_STATIC} pthread ${CMAKE_DL_LIBS} c ${STATIC_LIB_DEPS}
+                          )
+
     add_executable(cxxrt-test-libunwind-static ${CXXTEST_SOURCES})
     set_property(TARGET cxxrt-test-libunwind-static PROPERTY LINK_FLAGS
                  "-L${LIBUNWIND_PATH} -nodefaultlibs")
