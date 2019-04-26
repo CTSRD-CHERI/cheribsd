@@ -24,7 +24,7 @@ _libzpool=	libzpool
 .endif
 
 .if ${MACHINE_CPUARCH} != "sparc64"
-_drti=		drti
+_drti=		drti .WAIT
 _libdtrace=	libdtrace
 .endif
 
