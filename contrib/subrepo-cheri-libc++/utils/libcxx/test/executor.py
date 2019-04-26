@@ -187,6 +187,9 @@ class RemoteExecutor(Executor):
             else:
                 cmd = [target_exe_path]
 
+            if self.config and self.config.lit_config.run_with_debugger:
+                cmd = "gdb --quiet --batch --return-child-result -ex=r -ex=bt --args".split() + cmd
+
             srcs = [exe_path]
             dsts = [target_exe_path]
             if file_deps is not None:
@@ -265,7 +268,7 @@ class SSHExecutor(RemoteExecutor):
             env_cmd = ['env'] + ['\'%s=%s\'' % (k, v) for k, v in env.items()]
         else:
             env_cmd = []
-        remote_cmd = ' '.join(env_cmd + cmd)
+        remote_cmd = ' '.join(env_cmd + cmd)  # TODO: shlex.quote()
         if remote_work_dir != '.':
             remote_cmd = 'cd \'' + remote_work_dir + '\' && ' + remote_cmd
         if self.config and self.config.lit_config.debug:

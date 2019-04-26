@@ -10,12 +10,12 @@
 
 // <span>
 
-// template <class ElementType, ptrdiff_t Extent>
+// template <class ElementType, size_t Extent>
 //     span<byte,
 //          Extent == dynamic_extent
 //              ? dynamic_extent
-//              : static_cast<ptrdiff_t>(sizeof(ElementType)) * Extent>
-//     as_writeable_bytes(span<ElementType, Extent> s) noexcept;
+//              : sizeof(ElementType) * Extent>
+//     as_writable_bytes(span<ElementType, Extent> s) noexcept;
 
 
 #include <span>
@@ -27,16 +27,16 @@
 template<typename Span>
 void testRuntimeSpan(Span sp)
 {
-    ASSERT_NOEXCEPT(std::as_writeable_bytes(sp));
+    ASSERT_NOEXCEPT(std::as_writable_bytes(sp));
 
-    auto spBytes = std::as_writeable_bytes(sp);
+    auto spBytes = std::as_writable_bytes(sp);
     using SB = decltype(spBytes);
     ASSERT_SAME_TYPE(std::byte, typename SB::element_type);
 
     if (sp.extent == std::dynamic_extent)
         assert(spBytes.extent == std::dynamic_extent);
     else
-        assert(spBytes.extent == static_cast<std::ptrdiff_t>(sizeof(typename Span::element_type)) * sp.extent);
+        assert(spBytes.extent == sizeof(typename Span::element_type) * sp.extent);
 
     assert(static_cast<void*>(spBytes.data()) == static_cast<void*>(sp.data()));
     assert(spBytes.size() == sp.size_bytes());
@@ -72,7 +72,7 @@ int main(int, char**)
     testRuntimeSpan(std::span<int, 5>(iArr2 + 1, 5));
 
     std::string s;
-    testRuntimeSpan(std::span<std::string>(&s, (std::ptrdiff_t) 0));
+    testRuntimeSpan(std::span<std::string>(&s, (std::size_t) 0));
     testRuntimeSpan(std::span<std::string>(&s, 1));
 
   return 0;
