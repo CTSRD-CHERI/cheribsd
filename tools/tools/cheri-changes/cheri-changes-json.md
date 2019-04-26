@@ -28,6 +28,7 @@ comments.  The following example shows all the current annotations.
  *     "pointer_provenance",
  *     "pointer_shape",
  *     "support",
+ *     "subobject_bounds",
  *     "sysctl",
  *     "unsupported",
  *     "user_capabilities",
@@ -92,6 +93,8 @@ values are:
  * `pointer_shape` - Working around issues caused by larger pointers
    such as increased alignment.  Also dealing with conflation of the
    size of pointers and the size of the virtual address space.
+ * `subobject_bounds` - Adding support for tight sub-object bounds - such
+   as adding opt-out annotations for code that uses `containerof()`, etc.
  * `support` - Adding support for CHERI.
  * `sysctl` - (kernel) Sysctl compatability support for CheriABI.
  * `unsupported` - Working around unsupported features such as combining
