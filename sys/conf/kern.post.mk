@@ -466,7 +466,7 @@ vnode_if_typedef.h:
 # start/end/size variables to __start_mfs, __stop_mfs, and mfs_size,
 # respectively.
 embedfs_${MFS_IMAGE:T:R}.o: ${MFS_IMAGE}
-	${OBJCOPY:C/^.*llvm-objcopy.*/objcopy/} --input-target binary \
+	${OBJCOPY} --input-target binary \
 	    --output-target ${EMBEDFS_FORMAT.${MACHINE_ARCH}} \
 	    --binary-architecture ${EMBEDFS_ARCH.${MACHINE_ARCH}} \
 	    ${MFS_IMAGE} ${.TARGET}
