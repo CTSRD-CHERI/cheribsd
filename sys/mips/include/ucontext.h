@@ -118,6 +118,57 @@ typedef struct __ucontext32 {
 } ucontext32_t;
 #endif
 
+#if defined(COMPAT_FREEBSD64)
+#include <compat/freebsd64/freebsd64_signal.h>
+
+typedef struct	__mcontext64 {
+	/*
+	 * These fields must match the corresponding fields in struct 
+	 * sigcontext which follow 'sc_mask'. That way we can support
+	 * struct sigcontext and ucontext_t at the same time.
+	 */
+	int		mc_onstack;	/* sigstack state to restore */
+	__register_t	mc_pc;		/* pc at time of signal */
+	__register_t	mc_regs[32];	/* processor regs 0 to 31 */
+	__register_t	sr;		/* status register */
+	__register_t	mullo, mulhi;	/* mullo and mulhi registers... */
+	int		mc_fpused;	/* fp has been used */
+	f_register_t	mc_fpregs[33];	/* fp regs 0 to 31 and csr */
+	__register_t	mc_fpc_eir;	/* fp exception instruction reg */
+	void		*mc_tls;	/* pointer to TLS area */
+	__register_t	cause;		/* cause register */
+
+        /*
+         * Optional externally referenced storage for coprocessors.  Modeled
+         * on the approach taken for extended FPU state on x86, which leaves
+         * some ABI concerns but appears to work in practice.
+         */
+        __register_t    mc_cp2state;    /* Pointer to external state. */
+        __register_t    mc_cp2state_len;/* Length of external state. */
+
+        /*
+         * XXXRW: Unfortunately, reserved space in the MIPS sigcontext was
+         * made an 'int' rather than '__register_t', so embedding new pointers
+         * changes the 32-bit vs. 64-bit versions of this structure
+         * differently.
+         */
+#if (defined(__mips_n32) || defined(__mips_n64))
+        int             xxx[2];         /* XXX reserved */
+#else
+        int             xxx[5];         /* XXX reserved */
+#endif
+} mcontext64_t;
+
+typedef struct __ucontext64 {
+	sigset_t		uc_sigmask;
+	mcontext64_t		uc_mcontext;
+	void			*uc_link;
+	struct sigaltstack64	uc_stack;
+	int			uc_flags;
+	int			__spare__[4];
+} ucontext64_t;
+#endif
+
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi_signal.h>
 

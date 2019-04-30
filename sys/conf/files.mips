@@ -19,6 +19,7 @@ mips/mips/elf_machdep.c			standard
 mips/mips/exception.S			standard
 mips/mips/fp.S				standard
 mips/mips/freebsd32_machdep.c		optional	compat_freebsd32
+mips/mips/freebsd64_machdep.c		optional	compat_freebsd64
 mips/mips/gdb_machdep.c			standard
 mips/mips/in_cksum.c			optional	inet
 mips/mips/libkern_machdep.c		standard
