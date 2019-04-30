@@ -3,14 +3,12 @@
 .PATH: ${SRCTOP}/cddl/contrib/opensolaris/lib/libdtrace/common
 
 SRCS=		drti.c
-OBJS=		${SRCS:R:S/$/.o/g}
-FILES=		${OBJS}
+FILES=		${SRCS:R:S/$/.o/g}
 FILESOWN=	${LIBOWN}
 FILESGRP=	${LIBGRP}
 FILESMODE=	${LIBMODE}
 FILESDIR=	${LIBDIR}/dtrace
-CLEANFILES=	${OBJS}
-
+CLEANFILES=	${FILES}
 # These FILES qualify as libraries for the purpose of LIBRARIES_ONLY.
 .undef LIBRARIES_ONLY
 
