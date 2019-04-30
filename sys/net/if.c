@@ -3393,9 +3393,6 @@ struct ifconf32 {
 };
 #define	SIOCGIFCONF32	_IOWR('i', 36, struct ifconf32)
 #endif
-#ifdef COMPAT_CHERIABI
-#define COMPAT_FREEBSD64
-#endif
 #ifdef COMPAT_FREEBSD64
 _Pragma("pointer_interpretation push")
 _Pragma("pointer_interpretation integer")

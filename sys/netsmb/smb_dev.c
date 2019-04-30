@@ -152,9 +152,6 @@ struct smbioc_rw32 {
 #define	SMBIOC_WRITE32		_IOC_NEWTYPE(SMBIOC_WRITE, struct smbioc_rw32)
 #endif /* COMPAT_FREEBSD32 */
 
-#ifdef COMPAT_CHERIABI
-#define	COMPAT_FREEBSD64
-#endif
 #ifdef COMPAT_FREEBSD64
 struct smbioc_ossn64 {
 	int		ioc_opt;

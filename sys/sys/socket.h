@@ -438,6 +438,7 @@ struct msghdr {
 	int		 msg_flags;		/* flags on received message */
 };
 #else /* _KERNEL */
+#if __has_feature(capabilities)
 struct msghdr_c {
 	void		* __capability msg_name;		/* optional address */
 	socklen_t	 msg_namelen;		/* size of address */
@@ -447,6 +448,16 @@ struct msghdr_c {
 	socklen_t	 msg_controllen;	/* ancillary data buffer len */
 	int		 msg_flags;		/* flags on received message */
 };
+struct msghdr64 {
+	void		*msg_name;		/* optional address */
+	socklen_t	 msg_namelen;		/* size of address */
+	struct iovec_native	*msg_iov;	/* scatter/gather array */
+	int		 msg_iovlen;		/* # elements in msg_iov */
+	void		*msg_control;		/* ancillary data, see below */
+	socklen_t	 msg_controllen;	/* ancillary data buffer len */
+	int		 msg_flags;		/* flags on received message */
+};
+#endif
 struct msghdr_native {
 	void		*msg_name;		/* optional address */
 	socklen_t	 msg_namelen;		/* size of address */
