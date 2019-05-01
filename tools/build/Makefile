@@ -191,7 +191,9 @@ _host_abs_tools_to_symlink=	${_make_abs}:make ${_make_abs}:bmake
 
 .if ${.MAKE.OS} != "FreeBSD"
 # can we bootstrap this instead?
+.if ${MK_GCC} != "no" && ${MK_CXX} != "no"
 _host_tools_to_symlink+=gperf
+.endif
 
 _py3_abs=${PYTHON3_BINARY}
 .if empty(_py3_abs)
@@ -223,9 +225,9 @@ host-symlinks:
 	@echo "Linking host tools into ${DESTDIR}/bin"
 .for _tool in ${_host_tools_to_symlink}
 	@if [ ! -e "${DESTDIR}/bin/${_tool}" ]; then \
-		source_path=`which ${_tool}`; \
+		source_path=`which ${_tool} || true`; \
 		if [ ! -e "$${source_path}" ] ; then \
-			echo "Cannot find host tool '${_tool}'"; false; \
+			echo "Cannot find host tool '${_tool}'" >&2; false; \
 		fi; \
 		ln -sfnv "$${source_path}" "${DESTDIR}/bin/${_tool}"; \
 	fi

@@ -49,6 +49,12 @@ __FBSDID("$FreeBSD$");
 
 /* Always include the defines for the target: */
 #define _DONT_USE_CTYPE_INLINE_ /* Avoid dependencies on runetype.h" */
+
+#ifndef __FreeBSD__
+typedef	int		__ct_rune_t;	/* arg type for ctype funcs */
+typedef	__ct_rune_t	__rune_t;	/* rune_t (see above) */
+typedef	__ct_rune_t	__wint_t;	/* wint_t (see above) */
+#endif
 #include "../../include/_ctype.h"
 #include "../../lib/libc/locale/runefile.h"
 
