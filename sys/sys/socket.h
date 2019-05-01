@@ -721,15 +721,21 @@ struct mmsghdr {
 	ssize_t		msg_len;		/* message length */
 };
 #else /* _KERNEL */
+#if __has_feature(capabilities)
 struct mmsghdr_c {
 	struct msghdr_c	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */
 };
+#endif
 struct mmsghdr_native {
 	struct msghdr_native	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */
 };
+#if __has_feature(capabilities)
 typedef	struct mmsghdr_c	kmmsghdr_t;
+#else
+typedef	struct mmsghdr_native	kmmsghdr_t;
+#endif
 typedef	struct mmsghdr_native	ummsghdr_t;
 #endif /* _KERNEL */
 #endif /* __BSD_VISIBLE */
