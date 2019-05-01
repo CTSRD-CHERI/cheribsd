@@ -2926,7 +2926,7 @@ _gcc=		gnu/usr.bin/cc
 _usb_tools=	stand/usb/tools
 .endif
 
-.if ${BUILD_WITH_STRICT_TMPPATH} != 0 || defined(BOOTSTRAP_ALL_TOOLS)
+.if ${MK_ELFTOOLCHAIN_BOOTSTRAP} != "no" && (${BUILD_WITH_STRICT_TMPPATH} != 0 || defined(BOOTSTRAP_ALL_TOOLS))
 _ar=usr.bin/ar
 .endif
 

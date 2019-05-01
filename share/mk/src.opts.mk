@@ -466,7 +466,7 @@ MK_CLANG_BOOTSTRAP:=no
 MK_LLD_BOOTSTRAP:=no
 MK_GCC_BOOTSTRAP:=no
 # However, the elftoolchain tools build and should be used
-MK_ELFTOOLCHAIN_BOOTSTRAP:=	yes
+# MK_ELFTOOLCHAIN_BOOTSTRAP:=	yes
 .endif
 
 #
