@@ -43,12 +43,15 @@ __FBSDID("$FreeBSD$");
 #include <string.h>
 #include <sys/types.h>
 #include <wchar.h>
-#include <ctype.h>
-#include <wctype.h>
 #include <unistd.h>
 #include "localedef.h"
 #include "parser.h"
-#include "runefile.h"
+
+/* Always include the defines for the target: */
+#define _DONT_USE_CTYPE_INLINE_ /* Avoid dependencies on runetype.h" */
+#include "../../include/_ctype.h"
+#include "../../lib/libc/locale/runefile.h"
+
 
 
 /* Needed for bootstrapping, _CTYPE_N */

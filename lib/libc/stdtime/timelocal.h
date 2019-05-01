@@ -35,7 +35,7 @@
 
 #ifndef _TIMELOCAL_H_
 #define	_TIMELOCAL_H_
-#include "xlocale_private.h"
+#include "../locale/xlocale_private.h"
 
 /*
  * Private header file for the strftime and strptime localization

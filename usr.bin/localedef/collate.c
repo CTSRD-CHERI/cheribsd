@@ -47,7 +47,8 @@ __FBSDID("$FreeBSD$");
 #include <limits.h>
 #include "localedef.h"
 #include "parser.h"
-#include "collate.h"
+
+#include "../../lib/libc/locale/collate.h"
 
 /*
  * Design notes.

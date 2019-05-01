@@ -61,7 +61,7 @@ struct lc_monetary_T {
 	const char	*int_n_sign_posn;
 };
 struct xlocale_monetary {
-	struct xlocale_component header;
+	XLOCALE_STRUCT(component) header;
 	char *buffer;
 	struct lc_monetary_T locale;
 };

@@ -43,7 +43,7 @@ struct lc_numeric_T {
 	const char	*grouping;
 };
 struct xlocale_numeric {
-	struct xlocale_component header;
+	XLOCALE_STRUCT(component) header;
 	char *buffer;
 	struct lc_numeric_T locale;
 };

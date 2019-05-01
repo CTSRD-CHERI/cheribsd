@@ -416,10 +416,6 @@ BROKEN_OPTIONS+=CLANG LLD
 # The cddl bootstrap tools still need some changes in order to compile
 BROKEN_OPTIONS+=CDDL ZFS
 
-# localedef depends on the FreeBSD xlocale headers but those are incompatible
-# with the ones provided by glibc
-BROKEN_OPTIONS+=LOCALES
-
 # Boot cannot be built with clang yet. Will need to bootstrap GNU as..
 BROKEN_OPTIONS+=BOOT
 # libsnmp use ls -D which is not supported on MacOS (and possibly linux)
