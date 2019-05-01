@@ -48,7 +48,7 @@ struct xlocale_numeric {
 	struct lc_numeric_T locale;
 };
 
-struct lc_numeric_T *__get_current_numeric_locale(locale_t loc);
+struct lc_numeric_T *__get_current_numeric_locale(XLOCALE_NAMESPACED(locale_t) loc);
 int	__numeric_load_locale(const char *);
 
 #endif /* !_LNUMERIC_H_ */

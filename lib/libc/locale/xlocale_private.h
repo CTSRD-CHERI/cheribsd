@@ -157,6 +157,7 @@ struct _xlocale {
 	/** Buffer used by nl_langinfo_l() */
 	char *csym;
 };
+typedef struct _xlocale* XLOCALE_NAMESPACED(locale_t);
 
 /**
  * Increments the reference count of a reference-counted structure.
@@ -187,12 +188,12 @@ XLOCALE_NAMESPACED(release)(void *val)
  * Load functions.  Each takes the name of a locale and a pointer to the data
  * to be initialised as arguments.  Two special values are allowed for the 
  */
-extern void* __collate_load(const char*, locale_t);
-extern void* __ctype_load(const char*, locale_t);
-extern void* __messages_load(const char*, locale_t);
-extern void* __monetary_load(const char*, locale_t);
-extern void* __numeric_load(const char*, locale_t);
-extern void* __time_load(const char*, locale_t);
+extern void* __collate_load(const char*, XLOCALE_NAMESPACED(locale_t));
+extern void* __ctype_load(const char*, XLOCALE_NAMESPACED(locale_t));
+extern void* __messages_load(const char*, XLOCALE_NAMESPACED(locale_t));
+extern void* __monetary_load(const char*, XLOCALE_NAMESPACED(locale_t));
+extern void* __numeric_load(const char*, XLOCALE_NAMESPACED(locale_t));
+extern void* __time_load(const char*, XLOCALE_NAMESPACED(locale_t));
 
 extern struct _xlocale __xlocale_global_locale;
 extern struct _xlocale __xlocale_C_locale;
@@ -200,7 +201,7 @@ extern struct _xlocale __xlocale_C_locale;
 /**
  * Caches the rune table in TLS for fast access.
  */
-void __set_thread_rune_locale(locale_t loc);
+void __set_thread_rune_locale(XLOCALE_NAMESPACED(locale_t) loc);
 /**
  * Flag indicating whether a per-thread locale has been set.  If no per-thread
  * locale has ever been set, then we always use the global locale.
@@ -211,7 +212,7 @@ extern int __has_thread_locale;
  * The per-thread locale.  Avoids the need to use pthread lookup functions when
  * getting the per-thread locale.
  */
-extern _Thread_local struct _xlocale *__thread_locale;
+extern _Thread_local XLOCALE_NAMESPACED(locale_t) __thread_locale;
 
 /**
  * Returns the current locale for this thread, or the global locale if none is
@@ -219,7 +220,7 @@ extern _Thread_local struct _xlocale *__thread_locale;
  * this call is not guaranteed to remain valid after the locale changes.  As
  * such, this should only be called within libc functions.
  */
-static inline struct _xlocale *__get_locale(void)
+static inline XLOCALE_NAMESPACED(locale_t) __get_locale(void)
 {
 
 #ifdef FORCE_C_LOCALE
@@ -232,14 +233,15 @@ static inline struct _xlocale *__get_locale(void)
 #endif
 }
 #else
-struct _xlocale *__get_locale(void);
+XLOCALE_NAMESPACED(locale_t) __get_locale(void);
 #endif
 
 /**
  * Two magic values are allowed for locale_t objects.  NULL and -1.  This
  * function maps those to the real locales that they represent.
  */
-static inline struct _xlocale *get_real_locale(struct _xlocale *locale)
+static inline XLOCALE_NAMESPACED(locale_t)
+get_real_locale(XLOCALE_NAMESPACED(locale_t) locale)
 {
 	switch ((size_t)locale) {
 		case 0: return (&__xlocale_C_locale);

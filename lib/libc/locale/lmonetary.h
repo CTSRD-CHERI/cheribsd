@@ -66,7 +66,7 @@ struct xlocale_monetary {
 	struct lc_monetary_T locale;
 };
 
-struct lc_monetary_T *__get_current_monetary_locale(locale_t loc);
+struct lc_monetary_T *__get_current_monetary_locale(XLOCALE_NAMESPACED(locale_t) loc);
 int	__monetary_load_locale(const char *);
 
 #endif /* !_LMONETARY_H_ */
