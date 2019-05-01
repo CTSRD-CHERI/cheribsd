@@ -273,10 +273,12 @@ again:
 			 */
 
 			res = vm_fault_hold(map, *addr, VM_PROT_READ,
-						VM_FAULT_NORMAL, &mh);
+						VM_FAULT_TAGCAPABLE, &mh);
 			vm_map_lock_read(map);
-			if (res != KERN_SUCCESS)
+			if ((res != KERN_SUCCESS) && (res != KERN_NO_ACCESS)) {
+				KASSERT(mh == NULL, ("Failure yet page held?"));
 				return;
+			}
 			if (last_timestamp != map->timestamp) {
 				/*
 				 * The map has changed out from under us;
@@ -288,6 +290,21 @@ again:
 				vm_page_unhold(mh);
 				vm_page_unlock(mh);
 				return;
+			}
+			if (res == KERN_NO_ACCESS) {
+				/*
+				 * This address is not backed by an object
+				 * that can store tags.  Bump up by the
+				 * baseline page size and try again.
+				 *
+				 * XXX We'd much rather find out the next
+				 * possible tag-capable address rather than
+				 * probe like this...
+				 */
+				KASSERT(mh == NULL, ("KERN_NO_ACCESS page held?"));
+				*addr += PAGE_SIZE;
+				stat->pages_fault_skip++;
+				goto again;
 			}
 
 			/*

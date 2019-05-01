@@ -643,6 +643,10 @@ RetryFault:;
 	 */
 	if (fs.vp == NULL /* avoid locked vnode leak */ &&
 	    (fault_flags & (VM_FAULT_WIRE | VM_FAULT_DIRTY)) == 0 &&
+	    /* Not restricting to tags or object is tag capable */
+	    (((fault_flags & VM_FAULT_TAGCAPABLE) == 0) ||
+		((fs.first_object->flags &
+		    (OBJ_NOLOADTAGS | OBJ_NOSTORETAGS)) == 0)) &&
 	    /* avoid calling vm_object_set_writeable_dirty() */
 	    ((prot & VM_PROT_WRITE) == 0 ||
 	    (fs.first_object->type != OBJT_VNODE &&
@@ -701,6 +705,23 @@ RetryFault:;
 				return (KERN_PROTECTION_FAILURE);
 			pause("vmf_de", 1);
 			goto RetryFault;
+		}
+
+		if ((fault_flags & VM_FAULT_TAGCAPABLE) &&
+		    ((fs.object->flags &
+			(OBJ_NOLOADTAGS | OBJ_NOSTORETAGS))
+			== (OBJ_NOLOADTAGS | OBJ_NOSTORETAGS))) {
+			/*
+			 * We have restricted to tag-capable locations and
+			 * this object is not tag capable, because both of
+			 * the inhibit bits are set (if neither or just one,
+			 * it's possible there are tags here).  Bail out.
+			 *
+			 * XXX This ought to be more of a max-prot kind of
+			 * thing.
+			 */
+			unlock_and_deallocate(&fs);
+			return (KERN_NO_ACCESS);
 		}
 
 		/*
