@@ -744,7 +744,7 @@ MINIMUM_SUPPORTED_REL?= 10.3
 CROSSENV+=	\
 		MACHINE_ARCH=${TARGET_ARCH} \
 		MACHINE=${TARGET} \
-		BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}" \
+		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
 		CPUTYPE=${TARGET_CPUTYPE}
 .if ${MK_META_MODE} != "no"
 # Don't rebuild build-tools targets during normal build.
@@ -806,7 +806,7 @@ TMAKE=		\
 		-DNO_LINT \
 		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FULL=no \
-		BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}" \
+		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
 		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no MK_DEBUG_FILES=no
 # These get set in tools/build/mk/Makefile.boot
 # BUILD_TOOLS_CFLAGS="${CFLAGS}" BUILD_TOOLS_LDFLAGS="${LDFLAGS}"
@@ -998,7 +998,11 @@ LIBCHERIWMAKEENV= \
 		TESTSBASE=${LIBCHERI_TESTSBASE} \
 		CC="${CHERI_CC}" \
 		LD=${CHERI_LD:U${XLD}} \
-		BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}"
+		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
+		AS="${XAS}" AR="${XAR}" LD="${XLD}" LLVM_LINK="${XLLVM_LINK}" \
+		NM=${XNM} OBJCOPY="${XOBJCOPY}" \
+		RANLIB=${XRANLIB} STRINGS=${XSTRINGS} \
+		SIZE="${XSIZE}"
 
 LIBCHERIWMAKEENV+=	MACHINE=mips
 .if ${MK_CHERI128} == "yes"
@@ -1425,7 +1429,7 @@ buildcheri:
 .for _t in ${_obj} build-tools
 	${_+_}cd ${.CURDIR}/${_dir}; \
 	    WORLDTMP=${WORLDTMP} \
-	    BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}" \
+	    BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
 	    MAKEFLAGS="-m ${.CURDIR}/tools/build/mk ${.MAKEFLAGS}" \
 	    ${MAKE} SSP_CFLAGS= DESTDIR= \
 	    OBJTOP=${LIBCHERI_OBJTOP} \
