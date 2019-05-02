@@ -1063,7 +1063,9 @@ Arch_Touch(GNode *gn)
     free(p1);
     free(p2);
 
+#ifndef __clang__
 #pragma GCC diagnostic ignored -Wformat-truncation
+#endif
     snprintf(arh.AR_DATE, sizeof(arh.AR_DATE), "%-12ld", (long) now);
 
     if (arch != NULL) {
