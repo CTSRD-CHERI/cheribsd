@@ -91,6 +91,8 @@ static __noinline __attribute__((optnone)) void
 check_no_tagged_capabilities_in_copy(
     const char *__capability src, const char *__capability dst, size_t len)
 {
+	static int error_logged = 0;
+
 	if (len < sizeof(void *__capability)) {
 		return; /* return early if copying less than a capability */
 	}
@@ -105,6 +107,10 @@ check_no_tagged_capabilities_in_copy(
 		if (__predict_true(!__builtin_cheri_tag_get(*aligned_src))) {
 			continue; /* untagged values are fine */
 		}
+
+		if (error_logged)
+			continue;
+		error_logged = 1;
 		/* Got a tagged value, this is always an error! */
 		/* XXXAR: can we safely use printf here? */
 		fprintf(stderr,
@@ -121,7 +127,9 @@ check_no_tagged_capabilities_in_copy(
 #endif
 		    (__cheri_addr uintmax_t)(src + offset),
 		    (__cheri_addr uintmax_t)(dst + offset));
+#if 0
 		abort();
+#endif
 	}
 }
 #else
