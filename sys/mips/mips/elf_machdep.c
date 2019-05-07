@@ -52,7 +52,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/cache.h>
 
 #ifdef __mips_n64
-#ifndef COMPAT_CHERIABI
 struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
@@ -94,7 +93,6 @@ struct sysentvec elf64_freebsd_sysvec = {
 	.sv_trap	= NULL,
 };
 INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
-#endif /* !COMPAT_CHERIABI */
 
 #ifdef CPU_CHERI
 static __inline boolean_t
@@ -126,7 +124,6 @@ mips_elf_header_supported(struct image_params * imgp)
 }
 #endif
 
-#ifndef COMPAT_CHERIABI
 static Elf64_Brandinfo freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_MIPS,
@@ -145,7 +142,6 @@ static Elf64_Brandinfo freebsd_brand_info = {
 SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_brand_info);
-#endif /* !COMPAT_CHERIABI */
 
 void
 elf64_dump_thread(struct thread *td __unused, void *dst __unused,
