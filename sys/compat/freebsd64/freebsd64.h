@@ -217,7 +217,7 @@ struct msqid_ds64 {
 
 struct iovec64 {
 	void 	*iov_base;
-	int	iov_len;
+	size_t	iov_len;
 };
 
 #endif /* !_COMPAT_CHERIABI_CHERIABI_H_ */
