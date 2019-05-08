@@ -1024,7 +1024,7 @@ sys_kevent(struct thread *td, struct kevent_args *uap)
 		.arg = uap,
 		.k_copyout = kevent_copyout,
 		.k_copyin = kevent_copyin,
-		.kevent_size = sizeof(struct kevent),
+		.kevent_size = sizeof(struct kevent_native),
 	};
 	struct g_kevent_args gk_args = {
 		.fd = uap->fd,
@@ -1070,6 +1070,7 @@ kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
 
 	return (error);
 }
+	struct kevent_native kev_n[KQ_NEVENTS];
 
 /*
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
@@ -1078,12 +1079,30 @@ static int
 kevent_copyout(void *arg, kkevent_t *kevp, int count)
 {
 	struct kevent_args *uap;
+#if __has_feature(capabilities)
+	struct kevent_native ks_n[KQ_NEVENTS];
+	int i;
+#endif
 	int error;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct kevent_args *)arg;
 
-	error = copyoutcap(kevp, uap->eventlist, count * sizeof(*kevp));
+#if !__has_feature(capabilities)
+	error = copyout(kevp, uap->eventlist, count * sizeof *kevp);
+#else
+	for (i = 0; i < count; i++) {
+		ks_n[i].ident = kevp[i].ident;
+		ks_n[i].filter = kevp[i].filter;
+		ks_n[i].flags = kevp[i].flags;
+		ks_n[i].fflags = kevp[i].fflags;
+		ks_n[i].data = kevp[i].data;
+		ks_n[i].udata = (void *)(__cheri_addr vaddr_t)kevp[i].udata;
+		memcpy(&ks_n[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
+	}
+	error = copyout(ks_n, __USER_CAP_UNBOUND(uap->eventlist),
+	    count * sizeof(*ks_n));
+#endif
 	if (error == 0)
 		uap->eventlist += count;
 	return (error);
@@ -1096,12 +1115,33 @@ static int
 kevent_copyin(void *arg, kkevent_t *kevp, int count)
 {
 	struct kevent_args *uap;
+#if __has_feature(capabilities)
+	struct kevent_native ks_n[KQ_NEVENTS];
+	int i;
+#endif
 	int error;
 
 	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
 	uap = (struct kevent_args *)arg;
 
-	error = copyincap(uap->changelist, kevp, count * sizeof *kevp);
+#if !__has_feature(capabilities)
+	error = copyin(uap->changelist, kevp, count * sizeof *kevp);
+#else
+	error = copyin(__USER_CAP_UNBOUND(uap->changelist), ks_n,
+	    count * sizeof(*ks_n));
+	if (error != 0)
+		return (error);
+	for (i = 0; i < count; i++) {
+		kevp[i].ident = ks_n[i].ident;
+		kevp[i].filter = ks_n[i].filter;
+		kevp[i].flags = ks_n[i].flags;
+		kevp[i].fflags = ks_n[i].fflags;
+		kevp[i].data = ks_n[i].data;
+		/* Store untagged. */
+		kevp[i].udata = (void * __capability)(intcap_t)ks_n[i].udata;
+		memcpy(&kevp[i].ext[0], &ks_n->ext[0], sizeof(ks_n->ext));
+	}
+#endif
 	if (error == 0)
 		uap->changelist += count;
 	return (error);
@@ -1124,13 +1164,8 @@ kevent11_copyout(void *arg, kkevent_t *kevp, int count)
 		kev11.flags = kevp->flags;
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
-#ifndef COMPAT_FREEBSD64
-		/* XXX-AM: fix for freebsd64 */
-		kev11.udata = kevp->udata;
-#else
 		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
-#endif
-		error = copyoutcap(&kev11, __USER_CAP_OBJ(uap->eventlist),
+		error = copyout(&kev11, __USER_CAP_OBJ(uap->eventlist),
 		    sizeof(kev11));
 		if (error != 0)
 			break;
@@ -1154,7 +1189,7 @@ kevent11_copyin(void *arg, kkevent_t *kevp, int count)
 	uap = (struct freebsd11_kevent_args *)arg;
 
 	for (i = 0; i < count; i++) {
-		error = copyincap(__USER_CAP_OBJ(uap->changelist), &kev11,
+		error = copyin(__USER_CAP_OBJ(uap->changelist), &kev11,
 		    sizeof(kev11));
 		if (error != 0)
 			break;
@@ -1163,13 +1198,7 @@ kevent11_copyin(void *arg, kkevent_t *kevp, int count)
 		kevp->flags = kev11.flags;
 		kevp->fflags = kev11.fflags;
 		kevp->data = (uintptr_t)kev11.data;
-#ifndef COMPAT_FREEBSD64
-		/* XXX-AM: fix for freebsd64 */
-		kevp->udata = kev11.udata;
-#else
-		kevp->udata = kev11.udata;
-#endif
-
+		kevp->udata = (void * __capability)(uintcap_t)kev11.udata;
 		bzero(&kevp->ext, sizeof(kevp->ext));
 		uap->changelist++;
 		kevp++;

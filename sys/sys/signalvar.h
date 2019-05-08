@@ -40,6 +40,13 @@
 #include <sys/_mutex.h>
 #include <sys/signal.h>
 
+#ifdef _KERNEL
+#ifdef COMPAT_CHERIABI
+#include <sys/malloc.h>
+#include <cheri/cheri.h>
+#endif
+#endif
+
 /*
  * Kernel signal definitions and data structures.
  */
@@ -308,8 +315,8 @@ ksiginfo_set_sigev(ksiginfo_t *dst, ksigevent_t *sigev)
 {
 	dst->ksi_signo = sigev->sigev_signo;
 	__builtin_memset(&dst->ksi_value, 0, sizeof(dst->ksi_value));
-#if __has_feature(capabilities)
-	dst->ksi_value.sival_ptr_c = sigev->sigev_value.sival_ptr_c;
+#if __has_feature(capability)
+	dst->ksi_value.sival_ptr_c = sigev->sigev_value.siavl_ptr_c;
 #else
 	dst->ksi_value.sival_ptr_native = sigev->sigev_value.sival_ptr_native;
 #endif

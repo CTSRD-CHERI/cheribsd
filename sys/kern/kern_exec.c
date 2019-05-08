@@ -88,7 +88,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/pmckern.h>
 #endif
 
-#include <cheri/cheric.h>
 #include <machine/reg.h>
 
 #include <security/audit/audit.h>
@@ -204,9 +203,9 @@ static const struct execsw **execsw;
 
 #ifndef _SYS_SYSPROTO_H_
 struct execve_args {
-	char    * __capability fname;
-	char    * __capability * __capability argv;
-	char    * __capability * __capability envv;
+	char    *fname; 
+	char    **argv;
+	char    **envv; 
 };
 #endif
 
@@ -232,8 +231,8 @@ sys_execve(struct thread *td, struct execve_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct fexecve_args {
 	int	fd;
-	char	* __capability * __capability argv;
-	char	* __capability * __capability envv;
+	char	**argv;
+	char	**envv;
 }
 #endif
 int
@@ -258,10 +257,10 @@ sys_fexecve(struct thread *td, struct fexecve_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct __mac_execve_args {
-	char	* __capability fname;
-	char	* __capability * __capability argv;
-	char	* __capability * __capability envv;
-	struct mac * __capability mac_p;
+	char	*fname;
+	char	**argv;
+	char	**envv;
+	struct mac_native	*mac_p;
 };
 #endif
 
@@ -1177,7 +1176,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	 * are still used to enforce the stack rlimit on the process stack.
 	 */
 	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
-	vmspace->vm_maxsaddr = stack_addr;
+	vmspace->vm_maxsaddr = (char *)stack_addr;
 
 	return (0);
 }

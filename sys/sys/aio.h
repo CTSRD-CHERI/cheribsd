@@ -76,47 +76,67 @@
 
 #endif
 
+#ifndef _KERNEL
 /*
  * I/O control block
  */
 typedef struct aiocb {
 	int	aio_fildes;		/* File descriptor */
 	off_t	aio_offset;		/* File offset for I/O */
-	volatile void * __kerncap aio_buf; /* I/O buffer in process space */
+	volatile void *aio_buf;         /* I/O buffer in process space */
 	size_t	aio_nbytes;		/* Number of bytes for I/O */
 	int	__spare__[2];
-	void * __kerncap __spare2__;
+	void	*__spare2__;
 	int	aio_lio_opcode;		/* LIO opcode */
 	int	aio_reqprio;		/* Request priority -- ignored */
 	struct {
 		long	status;
 		long	error;
-		void * __kerncap kernelinfo;
+		void	*kernelinfo;
 	} _aiocb_private;
 	struct	sigevent aio_sigevent;	/* Signal to deliver */
 } aiocb_t;
+#endif
 
 #ifdef _KERNEL
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
-struct aiocb64 {
+
+struct aiocb_native {
 	int	aio_fildes;		/* File descriptor */
 	off_t	aio_offset;		/* File offset for I/O */
-	volatile uint64_t aio_buf;	/* I/O buffer in process space */
+	volatile void *aio_buf;         /* I/O buffer in process space */
 	size_t	aio_nbytes;		/* Number of bytes for I/O */
 	int	__spare__[2];
-	uint64_t __spare2__;
+	void	*__spare2__;
 	int	aio_lio_opcode;		/* LIO opcode */
 	int	aio_reqprio;		/* Request priority -- ignored */
 	struct {
 		long	status;
 		long	error;
-		uint64_t kernelinfo;
+		void	*kernelinfo;
 	} _aiocb_private;
-	struct sigevent64 aio_sigevent;	/* Signal to deliver */
+	struct sigevent_native aio_sigevent;	/* Signal to deliver */
 };
-#endif /* COMPAT_FREEBSD64 */
-typedef	struct aiocb	kaiocb_t;
+#if __has_feature(capabilities)
+struct aiocb_c {
+	int	aio_fildes;		/* File descriptor */
+	off_t	aio_offset;		/* File offset for I/O */
+	volatile void * __capability aio_buf; /* I/O buffer in process space */
+	size_t	aio_nbytes;		/* Number of bytes for I/O */
+	int	__spare__[2];
+	void * __capability __spare2__;
+	int	aio_lio_opcode;		/* LIO opcode */
+	int	aio_reqprio;		/* Request priority -- ignored */
+	struct {
+		long	status;
+		long	error;
+		void * __capability kernelinfo;
+	} _aiocb_private;
+	struct sigevent_c aio_sigevent;	/* Signal to deliver */
+};
+typedef	struct aiocb_c		kaiocb_t;
+#else
+typedef	struct aiocb_native	kaiocb_t;
+#endif
 
 typedef void aio_cancel_fn_t(struct kaiocb *);
 typedef void aio_handle_fn_t(struct kaiocb *);

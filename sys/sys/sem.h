@@ -55,15 +55,6 @@ struct semid_ds {
     					/* Times measured in secs since */
     					/* 00:00:00 UTC, Jan. 1, 1970, without leap seconds */
 };
-#if __has_feature(capabilities)
-struct semid_ds_c {
-	struct ipc_perm	 		sem_perm;
-	struct sem * __capability	sem_base;
-	unsigned short			sem_nsems;
-	time_t				sem_otime;
-	time_t				sem_ctime;
-};
-#endif
 
 /*
  * semop's sops parameter structure
@@ -84,14 +75,14 @@ union semun_old {
 	unsigned short	*array;		/* array for GETALL & SETALL */
 };
 #endif
-#if defined(_KERNEL) || defined(_WANT_SEMUN)
+#if defined(_WANT_SEMUN) && !defined(_KERNEL)
 /*
  * semctl's arg parameter structure
  */
 union semun {
-	int		val;	/* value for SETVAL */
-	struct semid_ds * __kerncap buf;	/* buffer for IPC_STAT & IPC_SET */
-	unsigned short * __kerncap array;	/* array for GETALL & SETALL */
+	int		val;		/* value for SETVAL */
+	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
+	unsigned short	*array;		/* array for GETALL & SETALL */
 };
 #endif
 #if defined(_KERNEL)
@@ -107,22 +98,17 @@ union semun_kernel {
 	unsigned short * __capability array;	/* array for GETALL & SETALL */
 };
 #endif
-
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
 union semun_native {
 	int		val;		/* value for SETVAL */
 	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
 	unsigned short	*array;		/* array for GETALL & SETALL */
 };
-#endif
-
 #if __has_feature(capabilities)
 typedef union semun_kernel	ksemun_t;
 #else
-typedef union semun	ksemun_t;
+typedef union semun_native	ksemun_t;
 #endif
-typedef union semun	usemun_t;
+typedef union semun_native	usemun_t;
 #endif /* defined(_KERNEL) */
 
 /*
@@ -168,16 +154,6 @@ struct semid_kernel {
 	struct	label *label;	/* MAC framework label */
 	struct	ucred *cred;	/* creator's credentials */
 };
-#if __has_feature(capabilities)
-/* User-facing wrapper used by sysctl handler, this should not really be
- * used since 
- */
-struct semid_kernel_c {
-	struct	semid_ds_c u;
-	struct	label * __capability label;	/* MAC framework label */
-	struct	ucred * __capability cred;	/* creator's credentials */
-};
-#endif
 
 /* internal "mode" bits */
 #define	SEM_ALLOC	01000	/* semaphore is allocated */
