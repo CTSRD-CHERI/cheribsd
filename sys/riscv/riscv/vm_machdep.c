@@ -92,9 +92,6 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	td2->td_pcb = pcb2;
 	bcopy(td1->td_pcb, pcb2, sizeof(*pcb2));
 
-	td2->td_pcb->pcb_l1addr =
-	    vtophys(vmspace_pmap(td2->td_proc->p_vmspace)->pm_l1);
-
 	tf = (struct trapframe *)STACKALIGN((struct trapframe *)pcb2 - 1);
 	bcopy(td1->td_frame, tf, sizeof(*tf));
 
@@ -265,6 +262,21 @@ cpu_fork_kthread_handler(struct thread *td, void (*func)(void *), void *arg)
 void
 cpu_exit(struct thread *td)
 {
+}
+
+bool
+cpu_exec_vmspace_reuse(struct proc *p __unused, vm_map_t map __unused)
+{
+
+	return (true);
+}
+
+int
+cpu_procctl(struct thread *td __unused, int idtype __unused, id_t id __unused,
+    int com __unused, void * __capability data __unused)
+{
+
+	return (EINVAL);
 }
 
 void

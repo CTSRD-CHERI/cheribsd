@@ -86,9 +86,13 @@ struct r_debug {
 
 struct dl_phdr_info
 {
+#ifndef __CHERI_PURE_CAPABILITY__
 	Elf_Addr dlpi_addr;			/* module relocation base */
+#else
+	uintptr_t dlpi_addr;			/* read-only capability for module */
+#endif
 	const char *dlpi_name;			/* module name */
-	const Elf_Phdr *dlpi_phdr;		/* pointer to module's phdr */
+	const Elf_Phdr *dlpi_phdr;		/* pointer to module's phdr (read-only for CheriABI) */
 	Elf_Half dlpi_phnum;			/* number of entries in phdr */
 	unsigned long long int dlpi_adds;	/* total # of loads */
 	unsigned long long int dlpi_subs;	/* total # of unloads */

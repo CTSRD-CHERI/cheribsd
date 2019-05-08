@@ -29,26 +29,28 @@ const Builtin::Info AArch64TargetInfo::BuiltinInfo[] = {
    {#ID, TYPE, ATTRS, nullptr, ALL_LANGUAGES, nullptr},
 #define LANGBUILTIN(ID, TYPE, ATTRS, LANG)                                     \
   {#ID, TYPE, ATTRS, nullptr, LANG, nullptr},
+#define TARGET_HEADER_BUILTIN(ID, TYPE, ATTRS, HEADER, LANGS, FEATURE)         \
+  {#ID, TYPE, ATTRS, HEADER, LANGS, FEATURE},
 #include "clang/Basic/BuiltinsAArch64.def"
 };
 
 AArch64TargetInfo::AArch64TargetInfo(const llvm::Triple &Triple,
                                      const TargetOptions &Opts)
     : TargetInfo(Triple), ABI("aapcs") {
-  if (getTriple().getOS() == llvm::Triple::NetBSD ||
-      getTriple().getOS() == llvm::Triple::OpenBSD) {
-    // NetBSD apparently prefers consistency across ARM targets to
-    // consistency across 64-bit targets.
+  if (getTriple().isOSOpenBSD()) {
     Int64Type = SignedLongLong;
     IntMaxType = SignedLongLong;
   } else {
-    if (!getTriple().isOSDarwin())
+    if (!getTriple().isOSDarwin() && !getTriple().isOSNetBSD())
       WCharType = UnsignedInt;
 
     Int64Type = SignedLong;
     IntMaxType = SignedLong;
   }
 
+  // All AArch64 implementations support ARMv8 FP, which makes half a legal type.
+  HasLegalHalfType = true;
+  HasFloat16 = true;
 
   LongWidth = LongAlign = PointerWidth = PointerAlign = 64;
   MaxVectorAlign = 128;
@@ -101,6 +103,11 @@ bool AArch64TargetInfo::setCPU(const std::string &Name) {
   return isValidCPUName(Name);
 }
 
+void AArch64TargetInfo::fillValidCPUList(
+    SmallVectorImpl<StringRef> &Values) const {
+  llvm::AArch64::fillValidCPUArchList(Values);
+}
+
 void AArch64TargetInfo::getTargetDefinesARMV81A(const LangOptions &Opts,
                                                 MacroBuilder &Builder) const {
   Builder.defineMacro("__ARM_FEATURE_QRDMX", "1");
@@ -116,10 +123,9 @@ void AArch64TargetInfo::getTargetDefines(const LangOptions &Opts,
                                          MacroBuilder &Builder) const {
   // Target identification.
   Builder.defineMacro("__aarch64__");
-  // For bare-metal none-eabi.
+  // For bare-metal.
   if (getTriple().getOS() == llvm::Triple::UnknownOS &&
-      (getTriple().getEnvironment() == llvm::Triple::EABI ||
-       getTriple().getEnvironment() == llvm::Triple::EABIHF))
+      getTriple().isOSBinFormatELF())
     Builder.defineMacro("__ELF__");
 
   // Target properties.
@@ -183,6 +189,14 @@ void AArch64TargetInfo::getTargetDefines(const LangOptions &Opts,
 
   if ((FPU & NeonMode) && HasFullFP16)
     Builder.defineMacro("__ARM_FEATURE_FP16_VECTOR_ARITHMETIC", "1");
+  if (HasFullFP16)
+   Builder.defineMacro("__ARM_FEATURE_FP16_SCALAR_ARITHMETIC", "1");
+
+  if (HasDotProd)
+    Builder.defineMacro("__ARM_FEATURE_DOTPROD", "1");
+
+  if ((FPU & NeonMode) && HasFP16FML)
+    Builder.defineMacro("__ARM_FEATURE_FP16FML", "1");
 
   switch (ArchKind) {
   default:
@@ -220,6 +234,8 @@ bool AArch64TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
   Crypto = 0;
   Unaligned = 1;
   HasFullFP16 = 0;
+  HasDotProd = 0;
+  HasFP16FML = 0;
   ArchKind = llvm::AArch64::ArchKind::ARMV8A;
 
   for (const auto &Feature : Features) {
@@ -239,6 +255,10 @@ bool AArch64TargetInfo::handleTargetFeatures(std::vector<std::string> &Features,
       ArchKind = llvm::AArch64::ArchKind::ARMV8_2A;
     if (Feature == "+fullfp16")
       HasFullFP16 = 1;
+    if (Feature == "+dotprod")
+      HasDotProd = 1;
+    if (Feature == "+fp16fml")
+      HasFP16FML = 1;
   }
 
   setDataLayout();
@@ -254,6 +274,7 @@ AArch64TargetInfo::checkCallingConvention(CallingConv CC) const {
   case CC_PreserveMost:
   case CC_PreserveAll:
   case CC_OpenCLKernel:
+  case CC_AArch64VectorCall:
   case CC_Win64:
     return CCCR_OK;
   default:
@@ -494,6 +515,7 @@ WindowsARM64TargetInfo::checkCallingConvention(CallingConv CC) const {
   case CC_OpenCLKernel:
   case CC_PreserveMost:
   case CC_PreserveAll:
+  case CC_Swift:
   case CC_Win64:
     return CCCR_OK;
   default:
@@ -517,6 +539,11 @@ void MicrosoftARM64TargetInfo::getTargetDefines(const LangOptions &Opts,
                                                 MacroBuilder &Builder) const {
   WindowsTargetInfo::getTargetDefines(Opts, Builder);
   getVisualStudioDefines(Opts, Builder);
+}
+
+TargetInfo::CallingConvKind
+MicrosoftARM64TargetInfo::getCallingConvKind(bool ClangABICompat4) const {
+  return CCK_MicrosoftWin64;
 }
 
 MinGWARM64TargetInfo::MinGWARM64TargetInfo(const llvm::Triple &Triple,

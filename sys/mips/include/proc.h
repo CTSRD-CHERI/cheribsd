@@ -127,7 +127,7 @@ struct syscall_args {
 #endif	/* !_MACHINE_PROC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support",

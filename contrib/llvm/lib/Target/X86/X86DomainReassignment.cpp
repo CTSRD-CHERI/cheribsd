@@ -31,10 +31,6 @@
 
 using namespace llvm;
 
-namespace llvm {
-void initializeX86DomainReassignmentPass(PassRegistry &);
-}
-
 #define DEBUG_TYPE "x86-domain-reassignment"
 
 STATISTIC(NumClosuresConverted, "Number of closures converted by the pass");
@@ -217,6 +213,27 @@ public:
   InstrCOPYReplacer(unsigned SrcOpcode, RegDomain DstDomain, unsigned DstOpcode)
       : InstrReplacer(SrcOpcode, DstOpcode), DstDomain(DstDomain) {}
 
+  bool isLegal(const MachineInstr *MI,
+               const TargetInstrInfo *TII) const override {
+    if (!InstrConverterBase::isLegal(MI, TII))
+      return false;
+
+    // Don't allow copies to/flow GR8/GR16 physical registers.
+    // FIXME: Is there some better way to support this?
+    unsigned DstReg = MI->getOperand(0).getReg();
+    if (TargetRegisterInfo::isPhysicalRegister(DstReg) &&
+        (X86::GR8RegClass.contains(DstReg) ||
+         X86::GR16RegClass.contains(DstReg)))
+      return false;
+    unsigned SrcReg = MI->getOperand(1).getReg();
+    if (TargetRegisterInfo::isPhysicalRegister(SrcReg) &&
+        (X86::GR8RegClass.contains(SrcReg) ||
+         X86::GR16RegClass.contains(SrcReg)))
+      return false;
+
+    return true;
+  }
+
   double getExtraCost(const MachineInstr *MI,
                       MachineRegisterInfo *MRI) const override {
     assert(MI->getOpcode() == TargetOpcode::COPY && "Expected a COPY");
@@ -340,7 +357,7 @@ public:
       if (!First)
         dbgs() << ", ";
       First = false;
-      dbgs() << printReg(Reg, MRI->getTargetRegisterInfo());
+      dbgs() << printReg(Reg, MRI->getTargetRegisterInfo(), 0, MRI);
     }
     dbgs() << "\n" << "Instructions:";
     for (MachineInstr *MI : Instrs) {
@@ -708,13 +725,17 @@ bool X86DomainReassignment::runOnMachineFunction(MachineFunction &MF) {
   if (DisableX86DomainReassignment)
     return false;
 
-  DEBUG(dbgs() << "***** Machine Function before Domain Reassignment *****\n");
-  DEBUG(MF.print(dbgs()));
+  LLVM_DEBUG(
+      dbgs() << "***** Machine Function before Domain Reassignment *****\n");
+  LLVM_DEBUG(MF.print(dbgs()));
 
   STI = &MF.getSubtarget<X86Subtarget>();
   // GPR->K is the only transformation currently supported, bail out early if no
   // AVX512.
-  if (!STI->hasAVX512())
+  // TODO: We're also bailing of AVX512BW isn't supported since we use VK32 and
+  // VK64 for GR32/GR64, but those aren't legal classes on KNL. If the register
+  // coalescer doesn't clean it up and we generate a spill we will crash.
+  if (!STI->hasAVX512() || !STI->hasBWI())
     return false;
 
   MRI = &MF.getRegInfo();
@@ -752,7 +773,7 @@ bool X86DomainReassignment::runOnMachineFunction(MachineFunction &MF) {
   }
 
   for (Closure &C : Closures) {
-    DEBUG(C.dump(MRI));
+    LLVM_DEBUG(C.dump(MRI));
     if (isReassignmentProfitable(C, MaskDomain)) {
       reassign(C, MaskDomain);
       ++NumClosuresConverted;
@@ -762,8 +783,9 @@ bool X86DomainReassignment::runOnMachineFunction(MachineFunction &MF) {
 
   DeleteContainerSeconds(Converters);
 
-  DEBUG(dbgs() << "***** Machine Function after Domain Reassignment *****\n");
-  DEBUG(MF.print(dbgs()));
+  LLVM_DEBUG(
+      dbgs() << "***** Machine Function after Domain Reassignment *****\n");
+  LLVM_DEBUG(MF.print(dbgs()));
 
   return Changed;
 }

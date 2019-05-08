@@ -154,7 +154,12 @@ static int	 syncookie_cmp(struct in_conninfo *inc, struct syncache_head *sch,
 
 /*
  * Transmit the SYN,ACK fewer times than TCP_MAXRXTSHIFT specifies.
- * 3 retransmits corresponds to a timeout of 3 * (1 + 2 + 4 + 8) == 45 seconds,
+ * 3 retransmits corresponds to a timeout with default values of
+ * tcp_rexmit_initial * (             1 +
+ *                       tcp_backoff[1] +
+ *                       tcp_backoff[2] +
+ *                       tcp_backoff[3]) + 3 * tcp_rexmit_slop,
+ * 1000 ms * (1 + 2 + 4 + 8) +  3 * 200 ms = 15600 ms,
  * the odds are that the user has given up attempting to connect by then.
  */
 #define SYNCACHE_MAXREXMTS		3
@@ -419,9 +424,10 @@ syncache_timeout(struct syncache *sc, struct syncache_head *sch, int docallout)
 	int rexmt;
 
 	if (sc->sc_rxmits == 0)
-		rexmt = TCPTV_RTOBASE;
+		rexmt = tcp_rexmit_initial;
 	else
-		TCPT_RANGESET(rexmt, TCPTV_RTOBASE * tcp_syn_backoff[sc->sc_rxmits],
+		TCPT_RANGESET(rexmt,
+		    tcp_rexmit_initial * tcp_backoff[sc->sc_rxmits],
 		    tcp_rexmit_min, TCPTV_REXMTMAX);
 	sc->sc_rxttime = ticks + rexmt;
 	sc->sc_rxmits++;
@@ -581,15 +587,28 @@ syncache_chkrst(struct in_conninfo *inc, struct tcphdr *th, struct mbuf *m)
 	/*
 	 * If the RST bit is set, check the sequence number to see
 	 * if this is a valid reset segment.
+	 *
 	 * RFC 793 page 37:
 	 *   In all states except SYN-SENT, all reset (RST) segments
 	 *   are validated by checking their SEQ-fields.  A reset is
 	 *   valid if its sequence number is in the window.
 	 *
-	 *   The sequence number in the reset segment is normally an
-	 *   echo of our outgoing acknowlegement numbers, but some hosts
-	 *   send a reset with the sequence number at the rightmost edge
-	 *   of our receive window, and we have to handle this case.
+	 * RFC 793 page 69:
+	 *   There are four cases for the acceptability test for an incoming
+	 *   segment:
+	 *
+	 * Segment Receive  Test
+	 * Length  Window
+	 * ------- -------  -------------------------------------------
+	 *    0       0     SEG.SEQ = RCV.NXT
+	 *    0      >0     RCV.NXT =< SEG.SEQ < RCV.NXT+RCV.WND
+	 *   >0       0     not acceptable
+	 *   >0      >0     RCV.NXT =< SEG.SEQ < RCV.NXT+RCV.WND
+	 *               or RCV.NXT =< SEG.SEQ+SEG.LEN-1 < RCV.NXT+RCV.WND
+	 *
+	 * Note that when receiving a SYN segment in the LISTEN state,
+	 * IRS is set to SEG.SEQ and RCV.NXT is set to SEG.SEQ+1, as
+	 * described in RFC 793, page 66.
 	 */
 	if ((SEQ_GEQ(th->th_seq, sc->sc_irs + 1) &&
 	    SEQ_LT(th->th_seq, sc->sc_irs + 1 + sc->sc_wnd)) ||
@@ -758,6 +777,9 @@ syncache_socket(struct syncache *sc, struct socket *lso, struct mbuf *m)
 	if (m != NULL && M_HASHTYPE_GET(m) != M_HASHTYPE_NONE) {
 		inp->inp_flowid = m->m_pkthdr.flowid;
 		inp->inp_flowtype = M_HASHTYPE_GET(m);
+#ifdef NUMA
+		inp->inp_numa_domain = m->m_pkthdr.numa_domain;
+#endif
 	}
 
 	/*

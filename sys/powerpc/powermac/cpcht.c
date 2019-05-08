@@ -139,7 +139,8 @@ struct cpcht_softc {
 static devclass_t	cpcht_devclass;
 DEFINE_CLASS_1(pcib, cpcht_driver, cpcht_methods, sizeof(struct cpcht_softc),
     ofw_pci_driver);
-DRIVER_MODULE(cpcht, ofwbus, cpcht_driver, cpcht_devclass, 0, 0);
+EARLY_DRIVER_MODULE(cpcht, ofwbus, cpcht_driver, cpcht_devclass, 0, 0,
+    BUS_PASS_BUS);
 
 #define CPCHT_IOPORT_BASE	0xf4000000UL /* Hardwired */
 #define CPCHT_IOPORT_SIZE	0x00400000UL
@@ -511,9 +512,10 @@ static int	openpic_cpcht_probe(device_t);
 static int	openpic_cpcht_attach(device_t);
 static void	openpic_cpcht_config(device_t, u_int irq,
 		    enum intr_trigger trig, enum intr_polarity pol);
-static void	openpic_cpcht_enable(device_t, u_int irq, u_int vector);
-static void	openpic_cpcht_unmask(device_t, u_int irq);
-static void	openpic_cpcht_eoi(device_t, u_int irq);
+static void	openpic_cpcht_enable(device_t, u_int irq, u_int vector,
+		    void **priv);
+static void	openpic_cpcht_unmask(device_t, u_int irq, void *priv);
+static void	openpic_cpcht_eoi(device_t, u_int irq, void *priv);
 
 static device_method_t  openpic_cpcht_methods[] = {
 	/* Device interface */
@@ -545,7 +547,8 @@ static driver_t openpic_cpcht_driver = {
 	sizeof(struct openpic_cpcht_softc),
 };
 
-DRIVER_MODULE(openpic, unin, openpic_cpcht_driver, openpic_devclass, 0, 0);
+EARLY_DRIVER_MODULE(openpic, unin, openpic_cpcht_driver, openpic_devclass,
+    0, 0, BUS_PASS_INTERRUPT);
 
 static int
 openpic_cpcht_probe(device_t dev)
@@ -647,12 +650,12 @@ openpic_cpcht_config(device_t dev, u_int irq, enum intr_trigger trig,
 }
 
 static void
-openpic_cpcht_enable(device_t dev, u_int irq, u_int vec)
+openpic_cpcht_enable(device_t dev, u_int irq, u_int vec, void **priv)
 {
 	struct openpic_cpcht_softc *sc;
 	uint32_t ht_irq;
 
-	openpic_enable(dev, irq, vec);
+	openpic_enable(dev, irq, vec, priv);
 
 	sc = device_get_softc(dev);
 
@@ -672,16 +675,16 @@ openpic_cpcht_enable(device_t dev, u_int irq, u_int vec)
 		mtx_unlock_spin(&sc->sc_ht_mtx);
 	}
 		
-	openpic_cpcht_eoi(dev, irq);
+	openpic_cpcht_eoi(dev, irq, *priv);
 }
 
 static void
-openpic_cpcht_unmask(device_t dev, u_int irq)
+openpic_cpcht_unmask(device_t dev, u_int irq, void *priv)
 {
 	struct openpic_cpcht_softc *sc;
 	uint32_t ht_irq;
 
-	openpic_unmask(dev, irq);
+	openpic_unmask(dev, irq, priv);
 
 	sc = device_get_softc(dev);
 
@@ -701,11 +704,11 @@ openpic_cpcht_unmask(device_t dev, u_int irq)
 		mtx_unlock_spin(&sc->sc_ht_mtx);
 	}
 
-	openpic_cpcht_eoi(dev, irq);
+	openpic_cpcht_eoi(dev, irq, priv);
 }
 
 static void
-openpic_cpcht_eoi(device_t dev, u_int irq)
+openpic_cpcht_eoi(device_t dev, u_int irq, void *priv)
 {
 	struct openpic_cpcht_softc *sc;
 	uint32_t off, mask;
@@ -735,5 +738,5 @@ openpic_cpcht_eoi(device_t dev, u_int irq)
 		}
 	}
 
-	openpic_eoi(dev, irq);
+	openpic_eoi(dev, irq, priv);
 }

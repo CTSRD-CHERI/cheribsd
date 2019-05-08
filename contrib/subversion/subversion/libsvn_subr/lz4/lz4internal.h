@@ -466,9 +466,9 @@ LZ4_DEPRECATED("use LZ4_decompress_fast_usingDict() instead") int LZ4_decompress
 #endif /* SVN_INTERNAL_LZ4 */
 // CHERI CHANGES START
 // {
-//   "updated": 20180830,
+//   "updated": 20181121,
 //   "changes": [
-//     "pointer_size"
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

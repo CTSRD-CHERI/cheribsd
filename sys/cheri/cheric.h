@@ -38,7 +38,7 @@
 
 #include <machine/cherireg.h>	/* Permission definitions. */
 
-#if __has_feature(capabilities)
+#if __has_feature(capabilities) || defined(__CHERI__)
 
 /*
  * Programmer-friendly macros for CHERI-aware C code -- requires use of
@@ -54,9 +54,11 @@
 #define	cheri_gettype(x)	__builtin_cheri_type_get((x))
 
 #define	cheri_andperm(x, y)	__builtin_cheri_perms_and((x), (y))
+#define	cheri_clearperm(x, y)	__builtin_cheri_perms_and((x), ~(y))
 #define	cheri_cleartag(x)	__builtin_cheri_tag_clear((x))
 #define	cheri_incoffset(x, y)	__builtin_cheri_offset_increment((x), (y))
 #define	cheri_setoffset(x, y)	__builtin_cheri_offset_set((x), (y))
+#define	cheri_setaddress(x, y)	__builtin_cheri_address_set((x), (y))
 
 #define	cheri_seal(x, y)	__builtin_cheri_seal((x), (y))
 #define	cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
@@ -90,18 +92,29 @@
 #define cheri_fromint(x)	cheri_incoffset(NULL, x)
 
 /* Increment @p dst to have the address of @p src */
-static inline void * __capability
+static __always_inline inline void * __capability
 cheri_copyaddress(const void * __capability dst, const void * __capability src)
 {
 	return (cheri_incoffset(dst,
 	    (const char* __capability)src - (const char* __capability)dst));
 }
 
-/* Same as above but using an absolute virtual address instead of another cap */
-static inline void * __capability
-cheri_setaddress(const void * __capability dst, vaddr_t addr)
+/* Get the top of a capability (i.e. one byte past the last accessible one) */
+static __always_inline inline vaddr_t
+cheri_gettop(const void * __capability cap)
 {
-	return (cheri_incoffset(dst, addr - cheri_getaddress(dst)));
+	return (cheri_getbase(cap) + cheri_getlen(cap));
+}
+
+/* Check if the address is between cap.base and cap.top, i.e. in bounds */
+#ifdef __cplusplus
+static __always_inline inline bool
+#else
+static __always_inline inline _Bool
+#endif
+cheri_is_address_inbounds(const void * __capability cap, vaddr_t addr)
+{
+	return (addr >= cheri_getbase(cap) && addr < cheri_gettop(cap));
 }
 
 #ifdef _KERNEL
@@ -144,7 +157,7 @@ cheri_codeptr(const void *ptr, size_t len)
 #ifdef NOTYET
 	void (* __capability c)(void) = ptr;
 #else
-	void * __capability c = cheri_setoffset(cheri_getpcc(),
+	void * __capability c = cheri_setaddress(cheri_getpcc(),
 	    (register_t)ptr);
 #endif
 
@@ -238,7 +251,7 @@ cheri_bytes_remaining(const void * __capability cap)
 #define cheri_cap_to_ptr(cap, min_size)	__extension__({			\
 	typedef __typeof__(*(cap)) __underlying_type;			\
 	__underlying_type* __result = 0;				\
-	if (cheri_bytes_remaining(cap) >= (uint64_t)min_size) {		\
+	if (cheri_gettag(cap) && cheri_bytes_remaining(cap) >= (uint64_t)min_size) { \
 		__result = (__cheri_fromcap __underlying_type*)(cap);	\
 	} __result; })
 
@@ -252,8 +265,8 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #define _CHERI_PRINTF_CAP_FMT  "v:%lu s:%lu p:%08lx b:%016jx l:%016zx o:%jx t:%ld"
 #define _CHERI_PRINTF_CAP_ARG(ptr)					\
-	    cheri_gettag((const void * __capability)(ptr)),		\
-	    cheri_getsealed((const void * __capability)(ptr)),		\
+	    (unsigned long)cheri_gettag((const void * __capability)(ptr)),		\
+	    (unsigned long)cheri_getsealed((const void * __capability)(ptr)),		\
 	    cheri_getperm((const void * __capability)(ptr)),		\
 	    cheri_getbase((const void * __capability)(ptr)),		\
 	    cheri_getlen((const void * __capability)(ptr)),		\
@@ -342,13 +355,18 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 /* Turn on the checking by default for now (until we have fixed everything)*/
 #define __check_low_ptr_bits_assignment
 #if defined(_KERNEL) /* Don't pull in assert.h when building the kernel */
-#undef __check_low_ptr_bits_assignment
+#define _cheri_bits_assert(e) (void)0
 #endif
 #ifdef __check_low_ptr_bits_assignment
+#ifndef _cheri_bits_assert
+#ifndef assert
 #include <assert.h>
+#endif
+#define _cheri_bits_assert(e) assert(e)
+#endif
 #define __runtime_assert_sensible_low_bits(bits)                               \
   __extension__({                                                              \
-    assert(bits < 32 && "Should only use the low 5 pointer bits");             \
+    _cheri_bits_assert(bits < 32 && "Should only use the low 5 pointer bits"); \
     bits;                                                                      \
   })
 #else

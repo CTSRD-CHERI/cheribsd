@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2014 John Baldwin <jhb@FreeBSD.org>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,6 +30,7 @@
 
 #include <stdbool.h>
 
+__BEGIN_DECLS
 int	devctl_attach(const char *device);
 int	devctl_detach(const char *device, bool force);
 int	devctl_enable(const char *device);
@@ -43,5 +43,7 @@ int	devctl_rescan(const char *device);
 int	devctl_delete(const char *device, bool force);
 int	devctl_freeze(void);
 int	devctl_thaw(void);
+int	devctl_reset(const char *device, bool detach);
+__END_DECLS
 
 #endif /* !__DEVCTL_H__ */

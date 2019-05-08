@@ -89,7 +89,7 @@ restore_kernsrs:
 	GET_CPUINFO(%r28)
 	addi	%r28,%r28,PC_KERNSLB
 	ld	%r29,16(%r28)		/* One past USER_SLB_SLOT */
-	cmpdi	%r28,0
+	cmpdi	%r29,0
 	beqlr				/* If first kernel entry is invalid,
 					 * SLBs not in use, so exit early */
 
@@ -345,7 +345,8 @@ CNAME(rstcodeend):
 cpu_reset_handler:
 	GET_TOCBASE(%r2)
 
-	ld	%r1,TOC_REF(tmpstk)(%r2)	/* get new SP */
+	addis	%r1,%r2,TOC_REF(tmpstk)@ha
+	ld	%r1,TOC_REF(tmpstk)@l(%r1)	/* get new SP */
 	addi	%r1,%r1,(TMPSTKSZ-48)
 
 	bl	CNAME(cpudep_ap_early_bootstrap) /* Set PCPU */
@@ -380,7 +381,8 @@ cpu_wakeup_handler:
 	GET_TOCBASE(%r2)
 
 	/* Check for false wake up due to badly SRR1 set (eg. by OPAL) */
-	ld	%r3,TOC_REF(can_wakeup)(%r2)
+	addis	%r3,%r2,TOC_REF(can_wakeup)@ha
+	ld	%r3,TOC_REF(can_wakeup)@l(%r3)
 	ld	%r3,0(%r3)
 	cmpdi	%r3,0
 	beq	cpu_reset_handler
@@ -897,8 +899,9 @@ dbtrap:
 	mtsprg3	%r1
 
 	GET_TOCBASE(%r1)			/* get new SP */
-	ld	%r1,TOC_REF(tmpstk)(%r1)
-	addi	%r1,%r1,(TMPSTKSZ-48)
+	addis	%r1,%r1,TOC_REF(trapstk)@ha
+	ld	%r1,TOC_REF(trapstk)@l(%r1)
+	addi	%r1,%r1,(TRAPSTKSZ-48)
 
 	FRAME_SETUP(PC_DBSAVE)
 /* Call C trap code: */

@@ -171,7 +171,7 @@ struct sysctl_req {
 	size_t		 oldlen;
 	size_t		 oldidx;
 	int		(*oldfunc)(struct sysctl_req *, const void *, size_t);
-	void		* __capability newptr;
+	const void	* __capability newptr;
 	size_t		 newlen;
 	size_t		 newidx;
 	int		(*newfunc)(struct sysctl_req *, void *, size_t);
@@ -221,6 +221,9 @@ int sysctl_handle_counter_u64_array(SYSCTL_HANDLER_ARGS);
 
 int sysctl_handle_uma_zone_max(SYSCTL_HANDLER_ARGS);
 int sysctl_handle_uma_zone_cur(SYSCTL_HANDLER_ARGS);
+
+int sysctl_msec_to_sbintime(SYSCTL_HANDLER_ARGS);
+int sysctl_usec_to_sbintime(SYSCTL_HANDLER_ARGS);
 
 int sysctl_dpcpu_int(SYSCTL_HANDLER_ARGS);
 int sysctl_dpcpu_long(SYSCTL_HANDLER_ARGS);
@@ -354,6 +357,25 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_STRING);	\
 	sysctl_add_oid(ctx, parent, nbr, name, CTLTYPE_STRING|(access),	\
 	    __arg, len, sysctl_handle_string, "A", __DESCR(descr),	\
+	    NULL); \
+})
+
+/* Oid for a constant '\0' terminated string. */
+#define	SYSCTL_CONST_STRING(parent, nbr, name, access, arg, descr)	\
+	SYSCTL_OID(parent, nbr, name, CTLTYPE_STRING|(access),		\
+	    __DECONST(char *, arg), 0, sysctl_handle_string, "A", descr); \
+	CTASSERT(!(access & CTLFLAG_WR));				\
+	CTASSERT(((access) & CTLTYPE) == 0 ||				\
+	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_STRING)
+
+#define	SYSCTL_ADD_CONST_STRING(ctx, parent, nbr, name, access, arg, descr) \
+({									\
+	char *__arg = __DECONST(char *, arg);				\
+	CTASSERT(!(access & CTLFLAG_WR));				\
+	CTASSERT(((access) & CTLTYPE) == 0 ||				\
+	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_STRING);	\
+	sysctl_add_oid(ctx, parent, nbr, name, CTLTYPE_STRING|(access),	\
+	    __arg, 0, sysctl_handle_string, "A", __DESCR(descr),	\
 	    NULL); \
 })
 
@@ -805,6 +827,42 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	    NULL);							\
 })
 
+/* OID expressing a sbintime_t as microseconds */
+#define	SYSCTL_SBINTIME_USEC(parent, nbr, name, access, ptr, descr)	\
+	SYSCTL_OID(parent, nbr, name,					\
+	    CTLTYPE_INT | CTLFLAG_MPSAFE | CTLFLAG_RD | (access),	\
+	    (ptr), 0, sysctl_usec_to_sbintime, "Q", descr);		\
+	CTASSERT(((access) & CTLTYPE) == 0 ||				\
+	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_S64)
+#define	SYSCTL_ADD_SBINTIME_USEC(ctx, parent, nbr, name, access, ptr, descr) \
+({									\
+	sbintime_t *__ptr = (ptr);					\
+	CTASSERT(((access) & CTLTYPE) == 0 ||				\
+	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_S64);		\
+	sysctl_add_oid(ctx, parent, nbr, name,				\
+	    CTLTYPE_INT | CTLFLAG_MPSAFE | CTLFLAG_RD | (access),	\
+	    __ptr, 0, sysctl_usec_to_sbintime, "Q", __DESCR(descr),	\
+	    NULL);							\
+})
+
+/* OID expressing a sbintime_t as milliseconds */
+#define	SYSCTL_SBINTIME_MSEC(parent, nbr, name, access, ptr, descr)	\
+	SYSCTL_OID(parent, nbr, name,					\
+	    CTLTYPE_INT | CTLFLAG_MPSAFE | CTLFLAG_RD | (access),	\
+	    (ptr), 0, sysctl_msec_to_sbintime, "Q", descr);		\
+	CTASSERT(((access) & CTLTYPE) == 0 ||				\
+	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_S64)
+#define	SYSCTL_ADD_SBINTIME_MSEC(ctx, parent, nbr, name, access, ptr, descr) \
+({									\
+	sbintime_t *__ptr = (ptr);					\
+	CTASSERT(((access) & CTLTYPE) == 0 ||				\
+	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_S64);		\
+	sysctl_add_oid(ctx, parent, nbr, name,				\
+	    CTLTYPE_INT | CTLFLAG_MPSAFE | CTLFLAG_RD | (access),	\
+	    __ptr, 0, sysctl_msec_to_sbintime, "Q", __DESCR(descr),	\
+	    NULL);							\
+})
+
 /*
  * A macro to generate a read-only sysctl to indicate the presence of optional
  * kernel features.
@@ -1054,7 +1112,7 @@ int	kernel_sysctlbyname(struct thread *td, char *name, void *old,
 	    int flags);
 int	userland_sysctl(struct thread *td, int *name, u_int namelen,
 	    void * __capability old, size_t * __capability oldlenp,
-	    int inkernel, void * __capability new, size_t newlen,
+	    int inkernel, const void * __capability new, size_t newlen,
 	    size_t *retval, int flags);
 int	sysctl_find_oid(int *name, u_int namelen, struct sysctl_oid **noid,
 	    int *nindx, struct sysctl_req *req);
@@ -1078,7 +1136,7 @@ __END_DECLS
 #endif	/* !_SYS_SYSCTL_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

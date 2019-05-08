@@ -59,8 +59,8 @@ g_eli_ctl_attach(struct gctl_req *req, struct g_class *mp)
 	struct g_provider *pp;
 	const char *name;
 	u_char *key, mkey[G_ELI_DATAIVKEYLEN];
-	int *nargs, *detach, *readonly, *dryrun;
-	int keysize, error, nkey;
+	int *nargs, *detach, *readonly, *dryrunp;
+	int keysize, error, nkey, dryrun, dummy;
 	intmax_t *valp;
 
 	g_topology_assert();
@@ -81,12 +81,14 @@ g_eli_ctl_attach(struct gctl_req *req, struct g_class *mp)
 		return;
 	}
 
-	valp = gctl_get_paraml(req, "keyno", sizeof(*valp));
-	if (valp == NULL) {
-		gctl_error(req, "No '%s' argument.", "keyno");
-		return;
+	/* "keyno" is optional for backward compatibility */
+	nkey = -1;
+	valp = gctl_get_param(req, "keyno", &dummy);
+	if (valp != NULL) {
+		valp = gctl_get_paraml(req, "keyno", sizeof(*valp));
+		if (valp != NULL)
+			nkey = *valp;
 	}
-	nkey = *valp;
 	if (nkey < -1 || nkey >= G_ELI_MAXMKEYS) {
 		gctl_error(req, "Invalid '%s' argument.", "keyno");
 		return;
@@ -98,10 +100,13 @@ g_eli_ctl_attach(struct gctl_req *req, struct g_class *mp)
 		return;
 	}
 
-	dryrun = gctl_get_paraml(req, "dryrun", sizeof(*dryrun));
-	if (dryrun == NULL) {
-		gctl_error(req, "No '%s' argument.", "dryrun");
-		return;
+	/* "dryrun" is optional for backward compatibility */
+	dryrun = 0;
+	dryrunp = gctl_get_param(req, "dryrun", &dummy);
+	if (dryrunp != NULL) {
+		dryrunp = gctl_get_paraml(req, "dryrun", sizeof(*dryrunp));
+		if (dryrunp != NULL)
+			dryrun = *dryrunp;
 	}
 
 	if (*detach && *readonly) {
@@ -161,7 +166,7 @@ g_eli_ctl_attach(struct gctl_req *req, struct g_class *mp)
 		md.md_flags |= G_ELI_FLAG_WO_DETACH;
 	if (*readonly)
 		md.md_flags |= G_ELI_FLAG_RO;
-	if (!*dryrun)
+	if (!dryrun)
 		g_eli_create(req, mp, pp, &md, mkey, nkey);
 	explicit_bzero(mkey, sizeof(mkey));
 	explicit_bzero(&md, sizeof(md));
@@ -259,7 +264,7 @@ g_eli_ctl_onetime(struct gctl_req *req, struct g_class *mp)
 	const char *name;
 	intmax_t *keylen, *sectorsize;
 	u_char mkey[G_ELI_DATAIVKEYLEN];
-	int *nargs, *detach, *notrim;
+	int *nargs, *detach, *noautoresize, *notrim;
 
 	g_topology_assert();
 	bzero(&md, sizeof(md));
@@ -277,10 +282,15 @@ g_eli_ctl_onetime(struct gctl_req *req, struct g_class *mp)
 	strlcpy(md.md_magic, G_ELI_MAGIC, sizeof(md.md_magic));
 	md.md_version = G_ELI_VERSION;
 	md.md_flags |= G_ELI_FLAG_ONETIME;
+	md.md_flags |= G_ELI_FLAG_AUTORESIZE;
 
 	detach = gctl_get_paraml(req, "detach", sizeof(*detach));
 	if (detach != NULL && *detach)
 		md.md_flags |= G_ELI_FLAG_WO_DETACH;
+	noautoresize = gctl_get_paraml(req, "noautoresize",
+	    sizeof(*noautoresize));
+	if (noautoresize != NULL && *noautoresize)
+		md.md_flags &= ~G_ELI_FLAG_AUTORESIZE;
 	notrim = gctl_get_paraml(req, "notrim", sizeof(*notrim));
 	if (notrim != NULL && *notrim)
 		md.md_flags |= G_ELI_FLAG_NODELETE;
@@ -400,7 +410,7 @@ g_eli_ctl_configure(struct gctl_req *req, struct g_class *mp)
 	const char *prov;
 	u_char *sector;
 	int *nargs, *boot, *noboot, *trim, *notrim, *geliboot, *nogeliboot;
-	int *displaypass, *nodisplaypass;
+	int *displaypass, *nodisplaypass, *autoresize, *noautoresize;
 	int zero, error, changed;
 	u_int i;
 
@@ -469,6 +479,20 @@ g_eli_ctl_configure(struct gctl_req *req, struct g_class *mp)
 		return;
 	}
 	if (*displaypass || *nodisplaypass)
+		changed = 1;
+
+	autoresize = gctl_get_paraml(req, "autoresize", sizeof(*autoresize));
+	if (autoresize == NULL)
+		autoresize = &zero;
+	noautoresize = gctl_get_paraml(req, "noautoresize",
+	    sizeof(*noautoresize));
+	if (noautoresize == NULL)
+		noautoresize = &zero;
+	if (*autoresize && *noautoresize) {
+		gctl_error(req, "Options -r and -R are mutually exclusive.");
+		return;
+	}
+	if (*autoresize || *noautoresize)
 		changed = 1;
 
 	if (!changed) {
@@ -540,6 +564,17 @@ g_eli_ctl_configure(struct gctl_req *req, struct g_class *mp)
 			continue;
 		}
 
+		if (*autoresize && (sc->sc_flags & G_ELI_FLAG_AUTORESIZE)) {
+			G_ELI_DEBUG(1, "AUTORESIZE flag already configured for %s.",
+			    prov);
+			continue;
+		} else if (*noautoresize &&
+		    !(sc->sc_flags & G_ELI_FLAG_AUTORESIZE)) {
+			G_ELI_DEBUG(1, "AUTORESIZE flag not configured for %s.",
+			    prov);
+			continue;
+		}
+
 		if (!(sc->sc_flags & G_ELI_FLAG_ONETIME)) {
 			/*
 			 * ONETIME providers don't write metadata to
@@ -589,6 +624,14 @@ g_eli_ctl_configure(struct gctl_req *req, struct g_class *mp)
 		} else if (*nodisplaypass) {
 			md.md_flags &= ~G_ELI_FLAG_GELIDISPLAYPASS;
 			sc->sc_flags &= ~G_ELI_FLAG_GELIDISPLAYPASS;
+		}
+
+		if (*autoresize) {
+			md.md_flags |= G_ELI_FLAG_AUTORESIZE;
+			sc->sc_flags |= G_ELI_FLAG_AUTORESIZE;
+		} else if (*noautoresize) {
+			md.md_flags &= ~G_ELI_FLAG_AUTORESIZE;
+			sc->sc_flags &= ~G_ELI_FLAG_AUTORESIZE;
 		}
 
 		if (sc->sc_flags & G_ELI_FLAG_ONETIME) {

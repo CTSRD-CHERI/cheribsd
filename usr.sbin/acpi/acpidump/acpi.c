@@ -970,7 +970,18 @@ acpi_handle_tcpa(ACPI_TABLE_HEADER *sdp)
 
 	printf(END_COMMENT);
 }
-
+static void acpi_handle_tpm2(ACPI_TABLE_HEADER *sdp)
+{
+	ACPI_TABLE_TPM2 *tpm2;
+	
+	printf (BEGIN_COMMENT);
+	acpi_print_sdt(sdp);
+	tpm2 = (ACPI_TABLE_TPM2 *) sdp;
+	printf ("\t\tControlArea=%jx\n", tpm2->ControlAddress);
+	printf ("\t\tStartMethod=%x\n", tpm2->StartMethod);	
+	printf (END_COMMENT);
+}
+	
 static const char *
 devscope_type2str(int type)
 {
@@ -1452,7 +1463,7 @@ static void
 acpi_print_sdt(ACPI_TABLE_HEADER *sdp)
 {
 	printf("  ");
-	acpi_print_string(sdp->Signature, ACPI_NAME_SIZE);
+	acpi_print_string(sdp->Signature, ACPI_NAMESEG_SIZE);
 	printf(": Length=%d, Revision=%d, Checksum=%d,\n",
 	       sdp->Length, sdp->Revision, sdp->Checksum);
 	printf("\tOEMID=");
@@ -1461,7 +1472,7 @@ acpi_print_sdt(ACPI_TABLE_HEADER *sdp)
 	acpi_print_string(sdp->OemTableId, ACPI_OEM_TABLE_ID_SIZE);
 	printf(", OEM Revision=0x%x,\n", sdp->OemRevision);
 	printf("\tCreator ID=");
-	acpi_print_string(sdp->AslCompilerId, ACPI_NAME_SIZE);
+	acpi_print_string(sdp->AslCompilerId, ACPI_NAMESEG_SIZE);
 	printf(", Creator Revision=0x%x\n", sdp->AslCompilerRevision);
 }
 
@@ -1769,6 +1780,8 @@ acpi_handle_rsdt(ACPI_TABLE_HEADER *rsdp)
 			acpi_handle_wddt(sdp);
 		else if (!memcmp(sdp->Signature, ACPI_SIG_LPIT, 4))
 			acpi_handle_lpit(sdp);
+		else if (!memcmp(sdp->Signature, ACPI_SIG_TPM2, 4))
+			acpi_handle_tpm2(sdp);
 		else {
 			printf(BEGIN_COMMENT);
 			acpi_print_sdt(sdp);

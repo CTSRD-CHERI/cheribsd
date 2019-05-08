@@ -76,7 +76,7 @@ SDT_PROBE_DEFINE1(priv, kernel, priv_check, priv__err, "int");
  * only a few to grant it.
  */
 int
-priv_check_cred(struct ucred *cred, int priv, int flags)
+priv_check_cred(struct ucred *cred, int priv)
 {
 	int error;
 
@@ -166,6 +166,18 @@ priv_check_cred(struct ucred *cred, int priv, int flags)
 	}
 
 	/*
+	 * Allow unprivileged process debugging on a per-jail basis.
+	 * Do this here instead of prison_priv_check(), so it can also
+	 * apply to prison0.
+	 */
+	if (priv == PRIV_DEBUG_UNPRIV) {
+		if (prison_allow(cred, PR_ALLOW_UNPRIV_DEBUG)) {
+			error = 0;
+			goto out;
+		}
+	}
+
+	/*
 	 * Now check with MAC, if enabled, to see if a policy module grants
 	 * privilege.
 	 */
@@ -182,10 +194,12 @@ priv_check_cred(struct ucred *cred, int priv, int flags)
 	 */
 	error = EPERM;
 out:
-	if (error)
-		SDT_PROBE1(priv, kernel, priv_check, priv__err, priv);
-	else
-		SDT_PROBE1(priv, kernel, priv_check, priv__ok, priv);
+	if (SDT_PROBES_ENABLED()) {
+		if (error)
+			SDT_PROBE1(priv, kernel, priv_check, priv__err, priv);
+		else
+			SDT_PROBE1(priv, kernel, priv_check, priv__ok, priv);
+	}
 	return (error);
 }
 
@@ -195,5 +209,5 @@ priv_check(struct thread *td, int priv)
 
 	KASSERT(td == curthread, ("priv_check: td != curthread"));
 
-	return (priv_check_cred(td->td_ucred, priv, 0));
+	return (priv_check_cred(td->td_ucred, priv));
 }

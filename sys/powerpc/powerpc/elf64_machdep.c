@@ -58,7 +58,6 @@ static void exec_setregs_funcdesc(struct thread *td, struct image_params *imgp,
 struct sysentvec elf64_freebsd_sysvec_v1 = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_mask	= 0,
 	.sv_errsize	= 0,
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
@@ -70,7 +69,6 @@ struct sysentvec elf64_freebsd_sysvec_v1 = {
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
@@ -80,7 +78,7 @@ struct sysentvec elf64_freebsd_sysvec_v1 = {
 	.sv_setregs	= exec_setregs_funcdesc,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP,
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_SHP | SV_ASLR,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_syscallnames = syscallnames,
@@ -97,7 +95,6 @@ INIT_SYSENTVEC(elf64_sysvec_v1, &elf64_freebsd_sysvec_v1);
 struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_mask	= 0,
 	.sv_errsize	= 0,
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
@@ -109,7 +106,6 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
@@ -127,6 +123,9 @@ struct sysentvec elf64_freebsd_sysvec_v2 = {
 	.sv_shared_page_len = PAGE_SIZE,
 	.sv_schedtail	= NULL,
 	.sv_thread_detach = NULL,
+	.sv_trap	= NULL,
+	.sv_hwcap	= &cpu_features,
+	.sv_hwcap2	= &cpu_features2,
 };
 INIT_SYSENTVEC(elf64_sysvec_v2, &elf64_freebsd_sysvec_v2);
 
@@ -332,7 +331,7 @@ elf_reloc_internal(linker_file_t lf, Elf_Addr relocbase, const void *data,
 #if !defined(_CALL_ELF) || _CALL_ELF == 1
 		memcpy(where, (Elf_Addr *)addr, 3*sizeof(Elf_Addr));
 #else
-		memcpy(where, (Elf_Addr *)addr, sizeof(Elf_Addr));
+		*where = addr;
 #endif
 		__asm __volatile("dcbst 0,%0; sync" :: "r"(where) : "memory");
 		break;

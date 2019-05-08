@@ -71,6 +71,56 @@
  * - cs.offset vs cs.length
  */
 
+.macro compute_libcheri_trusted_stack_tls_offset dst_reg, tmp_reg
+	/*
+	 * Use thread-local storage to retrieve the trusted stack for the
+	 * current pthread.  Load TLS data relative to sbo_libcheri_tls
+	 * (referring to the ambient portion of the process).  Prepare $c14
+	 * for use in pointing at the trusted-stack container structure.
+	 *
+	 * XXXRW: Clang appears to generate roughly this code across multiple
+	 * ABIs and regardless of -fpic/-fno-pic, if -mno-abicalls is used.
+	 * So, go with this in all cases, but much testing definitely
+	 * required -- e.g., once we have dynamically linked pure-capability
+	 * binaries using.
+	 */
+#ifdef __CHERI_CAPABILITY_TLS__
+	/*
+	 * Note: captab_tprel_hi() relocation returns the captable index where
+	 * we can find the offset that should be added to the TLS pointer.
+	 * To avoid the need for the captable pointer we use local-exec for
+	 * the __libcheri_stack_tls_storage variable.
+	 * This means we need to use tprel_hi and tlrel_lo instead since there
+	 * is no captable equivalent.
+	 */
+	// lui	$at, %captab_tprel_hi(__libcheri_stack_tls_storage)
+	// daddiu	$at, $at, %captab_tprel_lo(__libcheri_stack_tls_storage)
+	lui	\dst_reg, %tprel_hi(__libcheri_stack_tls_storage)
+	daddiu	\dst_reg, \dst_reg, %tprel_lo(__libcheri_stack_tls_storage)
+#else
+	lui	\dst_reg, %tprel_hi(__libcheri_stack_tls_storage)
+	.set	push
+	.set	mips32r2
+	rdhwr	\tmp_reg, $29
+	.set	pop
+	daddiu	\dst_reg, \dst_reg, %tprel_lo(__libcheri_stack_tls_storage)
+	daddu	\dst_reg, \tmp_reg, \dst_reg
+#endif
+.endm
+
+.macro compute_libcheri_trusted_stack dst_cap, sbop_cap, tmp_reg1, tmp_reg2
+	compute_libcheri_trusted_stack_tls_offset \tmp_reg1, \tmp_reg2
+#ifdef __CHERI_CAPABILITY_TLS__
+	creadhwr	\dst_cap, $chwr_userlocal
+	cincoffset	\dst_cap, \dst_cap, \tmp_reg1
+#else
+	clc		\dst_cap, $zero, (5*CHERICAP_SIZE)(\sbop_cap)
+	csetoffset	\dst_cap, \dst_cap, \tmp_reg1
+#endif
+	# Check that the value is still tagged and in bounds
+	CAssertInBounds \dst_cap, 8
+.endm
+
 /*
  * Implementations of CCall suitable for use within a sealed code capability.
  *
@@ -241,22 +291,8 @@ libcheri_ccall_rtld_fetch_stack:
 	 * current pthread.  Load TLS data relative to sbo_libcheri_tls
 	 * (referring to the ambient portion of the process).  Prepare $c14
 	 * for use in pointing at the trusted-stack container structure.
-	 *
-	 * XXXRW: Clang appears to generate roughly this code across multiple
-	 * ABIs and regardless of -fpic/-fno-pic, if -mno-abicalls is used.
-	 * So, go with this in all cases, but much testing definitely
-	 * required -- e.g., once we have dynamically linked pure-capability
-	 * binaries using.
 	 */
-	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
-	.set	push
-	.set	mips32r2
-	rdhwr	$t0, $29
-	.set	pop
-	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
-	daddu	$at, $t0, $at
-	clc		$c14, $zero, (5*CHERICAP_SIZE)($c26)
-	csetoffset	$c14, $c14, $at
+	compute_libcheri_trusted_stack $c14, $c26, $at, $t0
 
 libcheri_ccall_rtld_check_stack:
 	/*
@@ -616,27 +652,7 @@ libcheri_ccall_invoke_check_globals:
 	nop					# Branch-delay slot
 
 libcheri_ccall_invoke_fetch_stack:
-	/*
-	 * Use thread-local storage to retrieve the trusted stack for the
-	 * current pthread.  Load TLS data relative to sbo_libcheri_tls
-	 * (referring to the ambient portion of the process).  Prepare $c14
-	 * for use in pointing at the trusted-stack container structure.
-	 *
-	 * XXXRW: Clang appears to generate roughly this code across multiple
-	 * ABIs and regardless of -fpic/-fno-pic, if -mno-abicalls is used.
-	 * So, go with this in all cases, but much testing definitely
-	 * required -- e.g., once we have dynamically linked pure-capability
-	 * binaries using.
-	 */
-	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
-	.set	push
-	.set	mips32r2
-	rdhwr	$t0, $29
-	.set	pop
-	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
-	daddu	$at, $t0, $at
-	clc		$c14, $zero, (5*CHERICAP_SIZE)($c26)
-	csetoffset	$c14, $c14, $at
+	compute_libcheri_trusted_stack $c14, $c26, $at, $t0
 
 libcheri_ccall_invoke_check_stack:
 	/*
@@ -894,14 +910,13 @@ libcheri_creturn_fetch_stack:
 	 *
 	 * XXXRW: Read note above on TLS and testing.
 	 */
-	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
-	.set	push
-	.set	mips32r2
-	rdhwr	$t0, $29
-	.set	pop
-	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
-	daddu	$at, $t0, $at
+	compute_libcheri_trusted_stack_tls_offset $at, $t0
+#ifdef __CHERI_CAPABILITY_TLS__
+	creadhwr	$c14, $chwr_userlocal
+	cincoffset	$c14, $c14, $at
+#else
 	csetoffset	$c14, $c26, $at
+#endif
 
 libcheri_creturn_pop_stack_unlock_sandbox:
 	/*

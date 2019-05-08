@@ -2401,7 +2401,7 @@ dmu_objset_willuse_space(objset_t *os, int64_t space, dmu_tx_t *tx)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "hashing"

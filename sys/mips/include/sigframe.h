@@ -79,7 +79,7 @@ struct sigframe64 {
 #endif /* !_MACHINE_SIGFRAME_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

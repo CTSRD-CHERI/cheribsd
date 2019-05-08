@@ -33,10 +33,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "lib",
  *   "changes": [
- *     "function_abi",
+ *     "calling_convention",
  *     "unsupported"
  *   ],
  *   "change_comment": "stack pointer"
@@ -789,7 +789,7 @@ extern struct pthread	*_single_thread __hidden;
  * Function prototype definitions.
  */
 __BEGIN_DECLS
-int	_thr_setthreaded(int) __hidden;
+void	_thr_setthreaded(int) __hidden;
 int	_mutex_cv_lock(struct pthread_mutex *, int, bool) __hidden;
 int	_mutex_cv_unlock(struct pthread_mutex *, int *, int *) __hidden;
 int     _mutex_cv_attach(struct pthread_mutex *, int) __hidden;
@@ -878,10 +878,6 @@ int     __sys_openat(int, const char *, int, int);
 
 /* #include <signal.h> */
 #ifdef _SIGNAL_H_
-int	__sys_kill(pid_t, int);
-int     __sys_sigaltstack(const struct sigaltstack *, struct sigaltstack *);
-int     __sys_sigpending(sigset_t *);
-int     __sys_sigreturn(const ucontext_t *);
 #ifndef _LIBC_PRIVATE_H_
 int     __sys_sigaction(int, const struct sigaction *, struct sigaction *);
 int     __sys_sigprocmask(int, const sigset_t *, sigset_t *);
@@ -912,8 +908,6 @@ int	__sys_swapcontext(ucontext_t *oucp, const ucontext_t *ucp);
 
 /* #include <unistd.h> */
 #ifdef  _UNISTD_H_
-void	__sys_exit(int);
-pid_t	__sys_getpid(void);
 #ifndef _LIBC_PRIVATE_H_
 int     __sys_close(int);
 int	__sys_fork(void);
@@ -992,6 +986,8 @@ void __pthread_cxa_finalize(struct dl_phdr_info *phdr_info);
 void _thr_tsd_unload(struct dl_phdr_info *phdr_info) __hidden;
 void _thr_sigact_unload(struct dl_phdr_info *phdr_info) __hidden;
 void _thr_stack_fix_protection(struct pthread *thrd);
+void __pthread_distribute_static_tls(size_t offset, void *src, size_t len,
+    size_t total_len);
 
 int *__error_threaded(void) __hidden;
 void __thr_interpose_libc(void) __hidden;
@@ -1021,6 +1017,14 @@ void *__thr_pshared_offpage(void *key, int doalloc) __hidden;
 void __thr_pshared_destroy(void *key) __hidden;
 void __thr_pshared_atfork_pre(void) __hidden;
 void __thr_pshared_atfork_post(void) __hidden;
+
+void *__thr_calloc(size_t num, size_t size);
+void __thr_free(void *cp);
+void *__thr_malloc(size_t nbytes);
+void *__thr_realloc(void *cp, size_t nbytes);
+void __thr_malloc_init(void);
+void __thr_malloc_prefork(struct pthread *curthread);
+void __thr_malloc_postfork(struct pthread *curthread);
 
 __END_DECLS
 __NULLABILITY_PRAGMA_POP

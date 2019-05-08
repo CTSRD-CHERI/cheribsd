@@ -4,6 +4,8 @@ LIB=	cheri_support
 SRCS=	libcheri_invoke_cabi.S \
 	libcheri_system_stub.c
 
+CFLAGS.libcheri_invoke_cabi.S+=-DHAVE_VALID_DDC
+
 NEED_CHERI=	sandbox
 
 NO_SHARED=yes

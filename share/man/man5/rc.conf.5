@@ -24,7 +24,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd August 22, 2018
+.Dd March 21, 2019
 .Dt RC.CONF 5
 .Os
 .Sh NAME
@@ -248,12 +248,14 @@ Default
 .Pa /etc/ddb.conf .
 .It Va kld_list
 .Pq Vt str
-A list of kernel modules to load right after the local
-disks are mounted.
+A whitespace-separated list of kernel modules to load right after
+the local disks are mounted, without any
+.Pa .ko
+extension or path.
 Loading modules at this point in the boot process is
 much faster than doing it via
 .Pa /boot/loader.conf
-for those modules not necessary for mounting local disk.
+for those modules not necessary for mounting local disks.
 .It Va kldxref_enable
 .Pq Vt bool
 Set to
@@ -571,9 +573,11 @@ equivalent of
 .Va natd_enable .
 Setting this to
 .Dq Li YES
-enables kernel NAT.
+will automatically load the
+.Xr ipfw 8
+NAT kernel module if
 .Va firewall_enable
-must also be set to
+is also set to
 .Dq Li YES .
 .It Va firewall_nat_interface
 .Pq Vt str
@@ -586,6 +590,36 @@ kernel NAT should run.
 .It Va firewall_nat_flags
 .Pq Vt str
 Additional configuration parameters for kernel NAT should be placed here.
+.It Va firewall_nat64_enable
+.Pq Vt bool
+Setting this to
+.Dq Li YES
+will automatically load the
+.Xr ipfw 8
+NAT64 kernel module if
+.Va firewall_enable
+is also set to
+.Dq Li YES .
+.It Va firewall_nptv6_enable
+.Pq Vt bool
+Setting this to
+.Dq Li YES
+will automatically load the
+.Xr ipfw 8
+NPTv6 kernel module if
+.Va firewall_enable
+is also set to
+.Dq Li YES .
+.It Va firewall_pmod_enable
+.Pq Vt bool
+Setting this to
+.Dq Li YES
+will automatically load the
+.Xr ipfw 8
+pmod kernel module if
+.Va firewall_enable
+is also set to
+.Dq Li YES .
 .It Va dummynet_enable
 .Pq Vt bool
 Setting this to
@@ -3540,21 +3574,6 @@ Set to
 to enable system accounting through the
 .Xr accton 8
 facility.
-.It Va ibcs2_enable
-.Pq Vt bool
-Set to
-.Dq Li YES
-to enable iBCS2 (SCO) binary emulation at system initial boot
-time.
-.It Va ibcs2_loaders
-.Pq Vt str
-If not set to
-.Dq Li NO
-and if
-.Va ibcs2_enable
-is set to
-.Dq Li YES ,
-this specifies a list of additional iBCS2 loaders to enable.
 .It Va firstboot_sentinel
 .Pq Vt str
 This variable specifies the full path to a
@@ -4509,6 +4528,14 @@ at boot time.
 The directory where the files exported by USB LUN are located.
 The default directory is
 .Pa /var/cfumass .
+.It Va service_delete_empty
+.Pq Vt bool
+If set to
+.Dq Li YES ,
+.Ql Li service delete
+removes empty
+.Dq Li rc.conf.d
+files.
 .El
 .Sh FILES
 .Bl -tag -width ".Pa /etc/defaults/rc.conf" -compact
@@ -4597,6 +4624,7 @@ The default directory is
 .Xr rwhod 8 ,
 .Xr savecore 8 ,
 .Xr sdpd 8 ,
+.Xr service 8 ,
 .Xr sshd 8 ,
 .Xr swapon 8 ,
 .Xr sysctl 8 ,

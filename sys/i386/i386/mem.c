@@ -148,7 +148,6 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 		error = uiomove((caddr_t)&ptvmmap[o], (int)c, uio);
 		pmap_qremove((vm_offset_t)ptvmmap, 1);
 		sx_xunlock(&memsxlock);
-		
 	}
 
 	return (error);
@@ -233,7 +232,7 @@ memioctl(struct cdev *dev __unused, u_long cmd, caddr_t data, int flags,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kiovec_t"

@@ -799,6 +799,7 @@ libzfs_mnttab_cache_compare(const void *arg1, const void *arg2)
 void
 libzfs_mnttab_init(libzfs_handle_t *hdl)
 {
+	pthread_mutex_init(&hdl->libzfs_mnttab_cache_lock, NULL);
 	assert(avl_numnodes(&hdl->libzfs_mnttab_cache) == 0);
 	avl_create(&hdl->libzfs_mnttab_cache, libzfs_mnttab_cache_compare,
 	    sizeof (mnttab_node_t), offsetof(mnttab_node_t, mtn_node));
@@ -839,6 +840,7 @@ libzfs_mnttab_fini(libzfs_handle_t *hdl)
 		free(mtn);
 	}
 	avl_destroy(&hdl->libzfs_mnttab_cache);
+	(void) pthread_mutex_destroy(&hdl->libzfs_mnttab_cache_lock);
 }
 
 void
@@ -853,6 +855,7 @@ libzfs_mnttab_find(libzfs_handle_t *hdl, const char *fsname,
 {
 	mnttab_node_t find;
 	mnttab_node_t *mtn;
+	int ret = ENOENT;
 
 	if (!hdl->libzfs_mnttab_enable) {
 		struct mnttab srch = { 0 };
@@ -868,6 +871,7 @@ libzfs_mnttab_find(libzfs_handle_t *hdl, const char *fsname,
 			return (ENOENT);
 	}
 
+	pthread_mutex_lock(&hdl->libzfs_mnttab_cache_lock);
 	if (avl_numnodes(&hdl->libzfs_mnttab_cache) == 0)
 		libzfs_mnttab_update(hdl);
 
@@ -875,9 +879,10 @@ libzfs_mnttab_find(libzfs_handle_t *hdl, const char *fsname,
 	mtn = avl_find(&hdl->libzfs_mnttab_cache, &find, NULL);
 	if (mtn) {
 		*entry = mtn->mtn_mt;
-		return (0);
+		ret = 0;
 	}
-	return (ENOENT);
+	pthread_mutex_unlock(&hdl->libzfs_mnttab_cache_lock);
+	return (ret);
 }
 
 void
@@ -886,15 +891,17 @@ libzfs_mnttab_add(libzfs_handle_t *hdl, const char *special,
 {
 	mnttab_node_t *mtn;
 
-	if (avl_numnodes(&hdl->libzfs_mnttab_cache) == 0)
-		return;
-	mtn = zfs_alloc(hdl, sizeof (mnttab_node_t));
-	mtn->mtn_mt.mnt_special = zfs_strdup(hdl, special);
-	mtn->mtn_mt.mnt_mountp = zfs_strdup(hdl, mountp);
-	mtn->mtn_mt.mnt_fstype = zfs_strdup(hdl, MNTTYPE_ZFS);
-	mtn->mtn_mt.mnt_mntopts = zfs_strdup(hdl, mntopts);
-	avl_add(&hdl->libzfs_mnttab_cache, mtn);
-}
+	pthread_mutex_lock(&hdl->libzfs_mnttab_cache_lock);
+	if (avl_numnodes(&hdl->libzfs_mnttab_cache) == 0) {
+		mtn = zfs_alloc(hdl, sizeof (mnttab_node_t));
+		mtn->mtn_mt.mnt_special = zfs_strdup(hdl, special);
+		mtn->mtn_mt.mnt_mountp = zfs_strdup(hdl, mountp);
+		mtn->mtn_mt.mnt_fstype = zfs_strdup(hdl, MNTTYPE_ZFS);
+		mtn->mtn_mt.mnt_mntopts = zfs_strdup(hdl, mntopts);
+		avl_add(&hdl->libzfs_mnttab_cache, mtn);
+	}
+	pthread_mutex_unlock(&hdl->libzfs_mnttab_cache_lock);
+}		
 
 void
 libzfs_mnttab_remove(libzfs_handle_t *hdl, const char *fsname)
@@ -902,6 +909,7 @@ libzfs_mnttab_remove(libzfs_handle_t *hdl, const char *fsname)
 	mnttab_node_t find;
 	mnttab_node_t *ret;
 
+	pthread_mutex_lock(&hdl->libzfs_mnttab_cache_lock);
 	find.mtn_mt.mnt_special = (char *)fsname;
 	if ((ret = avl_find(&hdl->libzfs_mnttab_cache, (void *)&find, NULL))
 	    != NULL) {
@@ -912,6 +920,7 @@ libzfs_mnttab_remove(libzfs_handle_t *hdl, const char *fsname)
 		free(ret->mtn_mt.mnt_mntopts);
 		free(ret);
 	}
+	pthread_mutex_unlock(&hdl->libzfs_mnttab_cache_lock);
 }
 
 int
@@ -3647,32 +3656,34 @@ zfs_create(libzfs_handle_t *hdl, const char *path, zfs_type_t type,
 int
 zfs_destroy(zfs_handle_t *zhp, boolean_t defer)
 {
-	zfs_cmd_t zc = { 0 };
+	int error;
+
+	if (zhp->zfs_type != ZFS_TYPE_SNAPSHOT && defer)
+		return (EINVAL);
 
 	if (zhp->zfs_type == ZFS_TYPE_BOOKMARK) {
 		nvlist_t *nv = fnvlist_alloc();
 		fnvlist_add_boolean(nv, zhp->zfs_name);
-		int error = lzc_destroy_bookmarks(nv, NULL);
+		error = lzc_destroy_bookmarks(nv, NULL);
 		fnvlist_free(nv);
 		if (error != 0) {
-			return (zfs_standard_error_fmt(zhp->zfs_hdl, errno,
+			return (zfs_standard_error_fmt(zhp->zfs_hdl, error,
 			    dgettext(TEXT_DOMAIN, "cannot destroy '%s'"),
 			    zhp->zfs_name));
 		}
 		return (0);
 	}
 
-	(void) strlcpy(zc.zc_name, zhp->zfs_name, sizeof (zc.zc_name));
-
-	if (ZFS_IS_VOLUME(zhp)) {
-		zc.zc_objset_type = DMU_OST_ZVOL;
+	if (zhp->zfs_type == ZFS_TYPE_SNAPSHOT) {
+		nvlist_t *nv = fnvlist_alloc();
+		fnvlist_add_boolean(nv, zhp->zfs_name);
+		error = lzc_destroy_snaps(nv, defer, NULL);
+		fnvlist_free(nv);
 	} else {
-		zc.zc_objset_type = DMU_OST_ZFS;
+		error = lzc_destroy(zhp->zfs_name);
 	}
 
-	zc.zc_defer_destroy = defer;
-	if (zfs_ioctl(zhp->zfs_hdl, ZFS_IOC_DESTROY, &zc) != 0 &&
-	    errno != ENOENT) {
+	if (error != 0 && error != ENOENT) {
 		return (zfs_standard_error_fmt(zhp->zfs_hdl, errno,
 		    dgettext(TEXT_DOMAIN, "cannot destroy '%s'"),
 		    zhp->zfs_name));

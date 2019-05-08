@@ -106,7 +106,6 @@ struct vm_map_entry {
 	vm_offset_t start;		/* start address */
 	vm_offset_t end;		/* end address */
 	vm_offset_t next_read;		/* vaddr of the next sequential read */
-	vm_size_t adj_free;		/* amount of adjacent free space */
 	vm_size_t max_free;		/* max free space in subtree */
 	union vm_map_object object;	/* object I point to */
 	vm_ooffset_t offset;		/* offset into object */
@@ -146,6 +145,7 @@ struct vm_map_entry {
 #define	MAP_ENTRY_GUARD			0x10000
 #define	MAP_ENTRY_STACK_GAP_DN		0x20000
 #define	MAP_ENTRY_STACK_GAP_UP		0x40000
+#define	MAP_ENTRY_HEADER		0x80000
 
 #ifdef	_KERNEL
 static __inline u_char
@@ -175,24 +175,22 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
  *	list.  Both structures are ordered based upon the start and
  *	end addresses contained within each map entry.
  *
- *	Counterintuitively, the map's min offset value is stored in
- *	map->header.end, and its max offset value is stored in
- *	map->header.start.
- *
- *	The list header has max start value and min end value to act
- *	as sentinels for sequential search of the doubly-linked list.
  *	Sleator and Tarjan's top-down splay algorithm is employed to
  *	control height imbalance in the binary search tree.
+ *
+ *	The map's min offset value is stored in map->header.end, and
+ *	its max offset value is stored in map->header.start.  These
+ *	values act as sentinels for any forward or backward address
+ *	scan of the list.  The map header has a special value for the
+ *	eflags field, MAP_ENTRY_HEADER, that is set initially, is
+ *	never changed, and prevents an eflags match of the header
+ *	with any other map entry.
  *
  *	List of locks
  *	(c)	const until freed
  */
 struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
-/*
-	map min_offset	header.end	(c)
-	map max_offset	header.start	(c)
-*/
 	struct sx lock;			/* Lock for map data */
 	struct mtx system_mtx;
 	int nentries;			/* Number of entries */
@@ -203,6 +201,7 @@ struct vm_map {
 	vm_flags_t flags;		/* flags for this vm_map */
 	vm_map_entry_t root;		/* Root of a binary search tree */
 	pmap_t pmap;			/* (c) Physical map */
+	vm_offset_t anon_loc;
 	int busy;
 #ifdef CHERI_KERNEL
 	void *map_capability;		/* Capability spanning the whole map */
@@ -214,6 +213,9 @@ struct vm_map {
  */
 #define MAP_WIREFUTURE		0x01	/* wire all future pages */
 #define	MAP_BUSY_WAKEUP		0x02
+#define	MAP_IS_SUB_MAP		0x04	/* has parent */
+#define	MAP_ASLR		0x08	/* enabled ASLR */
+#define	MAP_ASLR_IGNSTART	0x10
 
 #ifdef	_KERNEL
 #if defined(KLD_MODULE) && !defined(KLD_TIED)
@@ -363,6 +365,7 @@ vm_ptr_t vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot
 #define MAP_DISABLE_COREDUMP	0x0100
 #define MAP_PREFAULT_MADVISE	0x0200	/* from (user) madvise request */
 #define	MAP_VN_WRITECOUNT	0x0400
+#define	MAP_REMAP		0x0800
 #define	MAP_STACK_GROWS_DOWN	0x1000
 #define	MAP_STACK_GROWS_UP	0x2000
 #define	MAP_ACC_CHARGED		0x4000
@@ -418,7 +421,7 @@ int vm_map_find_min(vm_map_t, vm_object_t, vm_ooffset_t, vm_ptr_t *,
     vm_size_t, vm_offset_t, vm_offset_t, int, vm_prot_t, vm_prot_t, int);
 int vm_map_fixed(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t, vm_size_t,
     vm_prot_t, vm_prot_t, int);
-int vm_map_findspace (vm_map_t, vm_offset_t, vm_size_t, vm_offset_t *);
+vm_offset_t vm_map_findspace(vm_map_t, vm_offset_t, vm_size_t);
 int vm_map_inherit (vm_map_t, vm_offset_t, vm_offset_t, vm_inherit_t);
 void vm_map_init(vm_map_t, pmap_t, vm_ptr_t, vm_ptr_t);
 int vm_map_insert (vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t, vm_offset_t, vm_prot_t, vm_prot_t, int);
@@ -446,7 +449,7 @@ long vmspace_swap_count(struct vmspace *vmspace);
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

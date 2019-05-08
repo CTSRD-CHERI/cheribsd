@@ -411,7 +411,7 @@ mqnode_free(struct mqfs_node *node)
 static __inline void
 mqnode_addref(struct mqfs_node *node)
 {
-	atomic_fetchadd_int(&node->mn_refcount, 1);
+	atomic_add_int(&node->mn_refcount, 1);
 }
 
 static __inline void
@@ -1050,7 +1050,7 @@ int do_unlink(struct mqfs_node *pn, struct ucred *ucred)
 	sx_assert(&pn->mn_info->mi_lock, SX_LOCKED);
 
 	if (ucred->cr_uid != pn->mn_uid &&
-	    (error = priv_check_cred(ucred, PRIV_MQ_ADMIN, 0)) != 0)
+	    (error = priv_check_cred(ucred, PRIV_MQ_ADMIN)) != 0)
 		error = EACCES;
 	else if (!pn->mn_deleted) {
 		parent = pn->mn_parent;
@@ -1446,7 +1446,6 @@ mqfs_readdir(struct vop_readdir_args *ap)
 		entry.d_fileno = pn->mn_fileno;
 		for (i = 0; i < MQFS_NAMELEN - 1 && pn->mn_name[i] != '\0'; ++i)
 			entry.d_name[i] = pn->mn_name[i];
-		entry.d_name[i] = 0;
 		entry.d_namlen = i;
 		switch (pn->mn_type) {
 		case mqfstype_root:
@@ -1465,6 +1464,7 @@ mqfs_readdir(struct vop_readdir_args *ap)
 			panic("%s has unexpected node type: %d", pn->mn_name,
 				pn->mn_type);
 		}
+		dirent_terminate(&entry);
 		if (entry.d_reclen > uio->uio_resid)
                         break;
 		if (offset >= uio->uio_offset) {
@@ -2648,7 +2648,7 @@ mqf_chown(struct file *fp, uid_t uid, gid_t gid, struct ucred *active_cred,
 		gid = pn->mn_gid;
 	if (((uid != pn->mn_uid && uid != active_cred->cr_uid) ||
 	    (gid != pn->mn_gid && !groupmember(gid, active_cred))) &&
-	    (error = priv_check_cred(active_cred, PRIV_VFS_CHOWN, 0)))
+	    (error = priv_check_cred(active_cred, PRIV_VFS_CHOWN)))
 		goto out;
 	pn->mn_uid = uid;
 	pn->mn_gid = gid;
@@ -2956,7 +2956,7 @@ int
 cheriabi_kmq_unlink(struct thread *td, struct cheriabi_kmq_unlink_args *uap)
 {
 
-	return (kern_kmq_unlink(td, __USER_CAP_STR(uap->path)));
+	return (kern_kmq_unlink(td, uap->path));
 }
 
 int
@@ -2971,9 +2971,8 @@ cheriabi_kmq_timedsend(struct thread *td,
     struct cheriabi_kmq_timedsend_args *uap)
 {
 
-	return (kern_kmq_timedsend(td, uap->mqd,
-	    __USER_CAP(uap->msg_ptr, uap->msg_len), uap->msg_len,
-	    uap->msg_prio, __USER_CAP_OBJ(uap->abs_timeout)));
+	return (kern_kmq_timedsend(td, uap->mqd, uap->msg_ptr, uap->msg_len,
+	    uap->msg_prio, uap->abs_timeout));
 }
 
 int
@@ -3103,7 +3102,7 @@ DECLARE_MODULE(mqueuefs, mqueuefs_mod, SI_SUB_VFS, SI_ORDER_MIDDLE);
 MODULE_VERSION(mqueuefs, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",

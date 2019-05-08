@@ -1,4 +1,4 @@
-/*	$Id: lib.in,v 1.20 2017/08/20 02:30:27 schwarze Exp $ */
+/*	$Id: lib.in,v 1.21 2019/03/04 17:35:21 schwarze Exp $ */
 /*
  * Copyright (c) 2009 Kristaps Dzonsons <kristaps@bsd.lv>
  * Copyright (c) 2009, 2012 Joerg Sonnenberger <joerg@netbsd.org>
@@ -62,7 +62,9 @@ LINE("libfsid",		"Filesystem Identification Library (libfsid, \\-lfsid)")
 LINE("libftpio",	"FTP Connection Management Library (libftpio, \\-lftpio)")
 LINE("libform",		"Curses Form Library (libform, \\-lform)")
 LINE("libgeom",		"Userland API Library for Kernel GEOM subsystem (libgeom, \\-lgeom)")
+LINE("libgmock",	"GoogleMock library (libgmock, \\-lgmock)")
 LINE("libgpio",		"General-Purpose Input Output (GPIO) library (libgpio, \\-lgpio)")
+LINE("libgtest",	"GoogleTest library (libgtest, \\-lgtest)")
 LINE("libhammer",	"HAMMER Filesystem Userland Library (libhammer, \\-lhammer)")
 LINE("libi386",		"i386 Architecture Library (libi386, \\-li386)")
 LINE("libintl",		"Internationalized Message Handling Library (libintl, \\-lintl)")

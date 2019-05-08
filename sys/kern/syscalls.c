@@ -570,4 +570,9 @@ const char *syscallnames[] = {
 	"cpuset_getdomain",			/* 561 = cpuset_getdomain */
 	"cpuset_setdomain",			/* 562 = cpuset_setdomain */
 	"getrandom",			/* 563 = getrandom */
+	"getfhat",			/* 564 = getfhat */
+	"fhlink",			/* 565 = fhlink */
+	"fhlinkat",			/* 566 = fhlinkat */
+	"fhreadlink",			/* 567 = fhreadlink */
+	"funlinkat",			/* 568 = funlinkat */
 };

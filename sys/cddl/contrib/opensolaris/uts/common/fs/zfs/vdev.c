@@ -165,29 +165,38 @@ static vdev_ops_t *vdev_ops_table[] = {
 
 /* target number of metaslabs per top-level vdev */
 int vdev_max_ms_count = 200;
-SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, max_ms_count, CTLFLAG_RDTUN,
+SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, max_ms_count, CTLFLAG_RWTUN,
     &vdev_max_ms_count, 0,
-    "Maximum number of metaslabs per top-level vdev");
+    "Target number of metaslabs per top-level vdev");
 
 /* minimum number of metaslabs per top-level vdev */
 int vdev_min_ms_count = 16;
-SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, min_ms_count, CTLFLAG_RDTUN,
+SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, min_ms_count, CTLFLAG_RWTUN,
     &vdev_min_ms_count, 0,
     "Minimum number of metaslabs per top-level vdev");
 
 /* practical upper limit of total metaslabs per top-level vdev */
 int vdev_ms_count_limit = 1ULL << 17;
+SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, max_ms_count_limit, CTLFLAG_RWTUN,
+    &vdev_ms_count_limit, 0,
+    "Maximum number of metaslabs per top-level vdev");
 
 /* lower limit for metaslab size (512M) */
 int vdev_default_ms_shift = 29;
-SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, default_ms_shift, CTLFLAG_RDTUN,
+SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, default_ms_shift, CTLFLAG_RWTUN,
     &vdev_default_ms_shift, 0,
-    "Shift between vdev size and number of metaslabs");
+    "Default shift between vdev size and number of metaslabs");
 
 /* upper limit for metaslab size (256G) */
 int vdev_max_ms_shift = 38;
+SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, max_ms_shift, CTLFLAG_RWTUN,
+    &vdev_max_ms_shift, 0,
+    "Maximum shift between vdev size and number of metaslabs");
 
 boolean_t vdev_validate_skip = B_FALSE;
+SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, validate_skip, CTLFLAG_RWTUN,
+    &vdev_validate_skip, 0,
+    "Bypass vdev validation");
 
 /*
  * Since the DTL space map of a vdev is not expected to have a lot of
@@ -1467,15 +1476,19 @@ vdev_open_children(vdev_t *vd)
 	taskq_t *tq;
 	int children = vd->vdev_children;
 
+	vd->vdev_nonrot = B_TRUE;
+
 	/*
 	 * in order to handle pools on top of zvols, do the opens
 	 * in a single thread so that the same thread holds the
 	 * spa_namespace_lock
 	 */
 	if (B_TRUE || vdev_uses_zvols(vd)) {
-		for (int c = 0; c < children; c++)
+		for (int c = 0; c < children; c++) {
 			vd->vdev_child[c]->vdev_open_error =
 			    vdev_open(vd->vdev_child[c]);
+			vd->vdev_nonrot &= vd->vdev_child[c]->vdev_nonrot;
+		}
 		return;
 	}
 	tq = taskq_create("vdev_open", children, minclsyspri,
@@ -1486,6 +1499,9 @@ vdev_open_children(vdev_t *vd)
 		    TQ_SLEEP) != 0);
 
 	taskq_destroy(tq);
+
+	for (int c = 0; c < children; c++)
+		vd->vdev_nonrot &= vd->vdev_child[c]->vdev_nonrot;
 }
 
 /*

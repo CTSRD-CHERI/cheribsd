@@ -1414,6 +1414,8 @@ devfs_readdir(struct vop_readdir_args *ap)
 		if (dp->d_reclen > uio->uio_resid)
 			break;
 		dp->d_fileno = de->de_inode;
+		/* NOTE: d_off is the offset for the *next* entry. */
+		dp->d_off = off + dp->d_reclen;
 		if (off >= uio->uio_offset) {
 			error = vfs_read_dirent(ap, dp, off);
 			if (error)
@@ -2026,10 +2028,11 @@ CTASSERT(O_NONBLOCK == IO_NDELAY);
 CTASSERT(O_FSYNC == IO_SYNC);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:misc"
+//     "ioctl:misc",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

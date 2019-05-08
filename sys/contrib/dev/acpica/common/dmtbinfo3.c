@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -368,6 +368,20 @@ ACPI_DMTABLE_INFO           AcpiDmTableInfoSrat4[] =
     ACPI_DMT_TERMINATOR
 };
 
+/* 5: Generic Initiator Affinity Structure (ACPI 6.3) */
+
+ACPI_DMTABLE_INFO           AcpiDmTableInfoSrat5[] =
+{
+    {ACPI_DMT_UINT8,    ACPI_SRAT5_OFFSET (Reserved),               "Reserved1", 0},
+    {ACPI_DMT_UINT8,    ACPI_SRAT5_OFFSET (DeviceHandleType),       "Device Handle Type", 0},
+    {ACPI_DMT_UINT32,   ACPI_SRAT5_OFFSET (ProximityDomain),        "Proximity Domain", 0},
+    {ACPI_DMT_BUF16,    ACPI_SRAT5_OFFSET (DeviceHandle),           "Device Handle", 0},
+    {ACPI_DMT_UINT32,   ACPI_SRAT5_OFFSET (Flags),                  "Flags (decoded below)", DT_FLAG},
+    {ACPI_DMT_FLAG0,    ACPI_SRAT5_FLAG_OFFSET (Flags,0),           "Enabled", 0},
+    {ACPI_DMT_UINT32,   ACPI_SRAT5_OFFSET (Reserved1),              "Reserved2", 0},
+    ACPI_DMT_TERMINATOR
+};
+
 
 /*******************************************************************************
  *
@@ -445,6 +459,26 @@ ACPI_DMTABLE_INFO           AcpiDmTableInfoTcpaServer[] =
  * TPM2 - Trusted Platform Module (TPM) 2.0 Hardware Interface Table
  *
  ******************************************************************************/
+
+/* TPM2 revision 3 */
+
+ACPI_DMTABLE_INFO           AcpiDmTableInfoTpm23[] =
+{
+    {ACPI_DMT_UINT32,   ACPI_TPM23_OFFSET (Reserved),           "Reserved", 0},
+    {ACPI_DMT_UINT64,   ACPI_TPM23_OFFSET (ControlAddress),     "Control Address", 0},
+    {ACPI_DMT_UINT32,   ACPI_TPM23_OFFSET (StartMethod),        "Start Method", 0},
+    ACPI_DMT_TERMINATOR
+};
+
+/* Trailer in the case that StartMethod == 2 */
+
+ACPI_DMTABLE_INFO           AcpiDmTableInfoTpm23a[] =
+{
+    {ACPI_DMT_UINT32,   ACPI_TPM23A_OFFSET (Reserved),          "Reserved", DT_OPTIONAL},
+    ACPI_DMT_TERMINATOR
+};
+
+/* TPM2 revision 4 */
 
 ACPI_DMTABLE_INFO           AcpiDmTableInfoTpm2[] =
 {

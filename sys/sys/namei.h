@@ -89,6 +89,10 @@ struct nameidata {
 	struct	vnode *ni_vp;		/* vnode of result */
 	struct	vnode *ni_dvp;		/* vnode of intermediate directory */
 	/*
+	 * Results: flags returned from namei
+	 */
+	u_int	ni_resflags;
+	/*
 	 * Shared between namei and lookup/commit routines.
 	 */
 	size_t	ni_pathlen;		/* remaining chars in path */
@@ -101,6 +105,7 @@ struct nameidata {
 	 */
 	struct componentname ni_cnd;
 	struct nameicap_tracker_head ni_cap_tracker;
+	struct vnode *ni_beneath_latch;
 };
 
 /*
@@ -159,10 +164,18 @@ struct nameidata {
 #define	PARAMASK	0x3ffffe00 /* mask of parameter descriptors */
 
 /*
+ * Namei results flags
+ */
+#define	NIRES_ABS	0x00000001 /* Path was absolute */
+
+/*
  * Flags in ni_lcf, valid for the duration of the namei call.
  */
 #define	NI_LCF_STRICTRELATIVE	0x0001	/* relative lookup only */
 #define	NI_LCF_CAP_DOTDOT	0x0002	/* ".." in strictrelative case */
+#define	NI_LCF_BENEATH_ABS	0x0004	/* BENEATH with absolute path */
+#define	NI_LCF_BENEATH_LATCHED	0x0008	/* BENEATH_ABS traversed starting dir */
+#define	NI_LCF_LATCH		0x0010	/* ni_beneath_latch valid */
 
 /*
  * Initialization of a nameidata structure.
@@ -226,7 +239,7 @@ extern struct nchstats nchstats;
 #endif /* !_SYS_NAMEI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

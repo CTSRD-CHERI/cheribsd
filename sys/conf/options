@@ -95,6 +95,7 @@ _COMPAT_LINUX32	opt_compat.h	# XXX: make sure opt_compat.h exists
 COMPILING_LINT	opt_global.h
 CY_PCI_FASTINTR
 DEADLKRES	opt_watchdog.h
+EXPERIMENTAL	opt_global.h
 EXT_RESOURCES	opt_global.h
 DIRECTIO
 FILEMON		opt_dontuse.h
@@ -185,7 +186,7 @@ NO_ADAPTIVE_SX
 NO_EVENTTIMERS		opt_timer.h
 NO_OBSOLETE_CODE	opt_global.h
 NO_SYSCTL_DESCR	opt_global.h
-NSWBUF_MIN	opt_swap.h
+NSWBUF_MIN	opt_param.h
 MBUF_PACKET_ZONE_DISABLE	opt_global.h
 PANIC_REBOOT_WAIT_TIME	opt_panic.h
 PCI_HP		opt_pci.h
@@ -200,7 +201,6 @@ SCHED_STATS	opt_sched.h
 SCHED_ULE	opt_sched.h
 SLEEPQUEUE_PROFILING
 SLHCI_DEBUG	opt_slhci.h
-SPX_HACK
 STACK		opt_stack.h
 SUIDDIR
 MSGMNB		opt_sysvipc.h
@@ -231,6 +231,11 @@ UMTX_CHAINS	opt_global.h
 VERBOSE_SYSINIT
 ZSTDIO		opt_zstdio.h
 
+# Sanitizers
+COVERAGE	opt_global.h
+KCOV
+KUBSAN		opt_global.h
+
 # POSIX kernel options
 P1003_1B_MQUEUE			opt_posix.h
 P1003_1B_SEMAPHORES		opt_posix.h
@@ -248,7 +253,7 @@ CD9660		opt_dontuse.h
 EXT2FS		opt_dontuse.h
 FDESCFS		opt_dontuse.h
 FFS		opt_dontuse.h
-FUSE		opt_dontuse.h
+FUSEFS		opt_dontuse.h
 MSDOSFS		opt_dontuse.h
 NANDFS		opt_dontuse.h
 NULLFS		opt_dontuse.h
@@ -503,6 +508,7 @@ NETGRAPH_BLUETOOTH_UBTBCMFW	opt_netgraph.h
 NETGRAPH_BPF		opt_netgraph.h
 NETGRAPH_BRIDGE		opt_netgraph.h
 NETGRAPH_CAR		opt_netgraph.h
+NETGRAPH_CHECKSUM	opt_netgraph.h
 NETGRAPH_CISCO		opt_netgraph.h
 NETGRAPH_DEFLATE	opt_netgraph.h
 NETGRAPH_DEVICE		opt_netgraph.h
@@ -637,6 +643,9 @@ NFS_MINDIRATTRTIMO	opt_nfs.h
 NFS_MAXDIRATTRTIMO	opt_nfs.h
 NFS_DEBUG		opt_nfs.h
 
+# TMPFS options
+TMPFS_PAGES_MINRESERVED		opt_tmpfs.h
+
 # For the Bt848/Bt848A/Bt849/Bt878/Bt879 driver
 OVERRIDE_CARD			opt_bktr.h
 OVERRIDE_TUNER			opt_bktr.h
@@ -764,6 +773,7 @@ SC_CUT_SPACES2TABS	opt_syscons.h
 SC_CUT_SEPCHARS		opt_syscons.h
 SC_DEBUG_LEVEL		opt_syscons.h
 SC_DFLT_FONT		opt_syscons.h
+SC_DFLT_TERM		opt_syscons.h
 SC_DISABLE_KDBKEY	opt_syscons.h
 SC_DISABLE_REBOOT	opt_syscons.h
 SC_HISTORY_SIZE		opt_syscons.h
@@ -777,6 +787,9 @@ SC_NO_HISTORY		opt_syscons.h
 SC_NO_MODE_CHANGE	opt_syscons.h
 SC_NO_SUSPEND_VTYSWITCH	opt_syscons.h
 SC_NO_SYSMOUSE		opt_syscons.h
+SC_NO_TERM_DUMB		opt_syscons.h
+SC_NO_TERM_SC		opt_syscons.h
+SC_NO_TERM_TEKEN	opt_syscons.h
 SC_NORM_ATTR		opt_syscons.h
 SC_NORM_REV_ATTR	opt_syscons.h
 SC_PIXEL_MODE		opt_syscons.h
@@ -825,7 +838,6 @@ ATH_DEBUG_ALQ		opt_ath.h
 ATH_KTR_INTR_DEBUG	opt_ath.h
 
 # options for the Atheros hal
-AH_SUPPORT_AR5416	opt_ah.h
 # XXX For now, this breaks non-AR9130 chipsets, so only use it
 # XXX when actually targeting AR9130.
 AH_SUPPORT_AR9130	opt_ah.h
@@ -905,7 +917,6 @@ HWPMC_MIPS_BACKTRACE 	opt_hwpmc_hooks.h
 # 802.11 support layer
 IEEE80211_DEBUG		opt_wlan.h
 IEEE80211_DEBUG_REFCNT	opt_wlan.h
-IEEE80211_AMPDU_AGE	opt_wlan.h
 IEEE80211_SUPPORT_MESH	opt_wlan.h
 IEEE80211_SUPPORT_SUPERG	opt_wlan.h
 IEEE80211_SUPPORT_TDMA	opt_wlan.h
@@ -978,6 +989,9 @@ RANDOM_LOADABLE	opt_global.h
 RANDOM_ENABLE_UMA	opt_global.h
 RANDOM_ENABLE_ETHER	opt_global.h
 
+# This options turns TPM into entropy source.
+TPM_HARVEST	opt_tpm.h
+
 # BHND(4) driver
 BHND_LOGLEVEL	opt_global.h
 
@@ -1008,3 +1022,7 @@ NVME_USE_NVD	opt_nvme.h
 
 # amdsbwd options
 AMDSBWD_DEBUG	opt_amdsbwd.h
+
+# gcov support
+GCOV		opt_global.h
+LINDEBUGFS

@@ -2299,7 +2299,7 @@ passerror(union ccb *ccb, u_int32_t cam_flags, u_int32_t sense_flags)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

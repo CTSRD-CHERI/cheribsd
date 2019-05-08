@@ -52,6 +52,7 @@
 
 #define SHM_RDONLY  010000  /* Attach read-only (else read-write) */
 #define SHM_RND     020000  /* Round attach address to SHMLBA */
+#define	SHM_REMAP   030000  /* Unmap before mapping */
 #ifndef __CHERI_PURE_CAPABILITY__
 #define SHMLBA      PAGE_SIZE /* Segment low boundary address multiple */
 #else
@@ -190,10 +191,10 @@ __END_DECLS
 #endif /* !_SYS_SHM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ],
 //   "change_comment": "compression of large shared memory allocations"
 // }

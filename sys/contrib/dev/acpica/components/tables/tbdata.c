@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -676,7 +676,7 @@ AcpiTbVerifyTempTable (
     /* If a particular signature is expected (DSDT/FACS), it must match */
 
     if (Signature &&
-        !ACPI_COMPARE_NAME (&TableDesc->Signature, Signature))
+        !ACPI_COMPARE_NAMESEG (&TableDesc->Signature, Signature))
     {
         ACPI_BIOS_ERROR ((AE_INFO,
             "Invalid signature 0x%X for ACPI table, expected [%s]",

@@ -2607,7 +2607,7 @@ sysctl_hw_stge_rxint_dmawait(SYSCTL_HANDLER_ARGS)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

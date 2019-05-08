@@ -95,7 +95,7 @@ _Static_assert(OFFSETOF_CURTHREAD == offsetof(struct pcpu, pc_curthread),
 _Static_assert(OFFSETOF_CURPCB == offsetof(struct pcpu, pc_curpcb),
     "OFFSETOF_CURPCB does not correspond with offset of pc_curpcb.");
 _Static_assert(__OFFSETOF_MONITORBUF == offsetof(struct pcpu, pc_monitorbuf),
-    "__OFFSETOF_MONINORBUF does not correspond with offset of pc_monitorbuf.");
+    "__OFFSETOF_MONITORBUF does not correspond with offset of pc_monitorbuf.");
 
 union savefpu *
 get_pcb_user_save_td(struct thread *td)
@@ -230,11 +230,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	 * Set registers for trampoline to user mode.  Leave space for the
 	 * return address on stack.  These are the kernel mode register values.
 	 */
-#if defined(PAE) || defined(PAE_TABLES)
-	pcb2->pcb_cr3 = vtophys(vmspace_pmap(p2->p_vmspace)->pm_pdpt);
-#else
-	pcb2->pcb_cr3 = vtophys(vmspace_pmap(p2->p_vmspace)->pm_pdir);
-#endif
+	pcb2->pcb_cr3 = pmap_get_cr3(vmspace_pmap(p2->p_vmspace));
 	pcb2->pcb_edi = 0;
 	pcb2->pcb_esi = (int)fork_return;	/* fork_trampoline argument */
 	pcb2->pcb_ebp = 0;
@@ -384,6 +380,21 @@ cpu_thread_free(struct thread *td)
 {
 
 	cpu_thread_clean(td);
+}
+
+bool
+cpu_exec_vmspace_reuse(struct proc *p __unused, vm_map_t map __unused)
+{
+
+	return (true);
+}
+
+int
+cpu_procctl(struct thread *td __unused, int idtype __unused, id_t id __unused,
+    int com __unused, void *data __unused)
+{
+
+	return (EINVAL);
 }
 
 void
@@ -572,34 +583,10 @@ kvtop(void *addr)
 void
 sf_buf_map(struct sf_buf *sf, int flags)
 {
-	pt_entry_t opte, *ptep;
 
-	/*
-	 * Update the sf_buf's virtual-to-physical mapping, flushing the
-	 * virtual address from the TLB.  Since the reference count for 
-	 * the sf_buf's old mapping was zero, that mapping is not 
-	 * currently in use.  Consequently, there is no need to exchange 
-	 * the old and new PTEs atomically, even under PAE.
-	 */
-	ptep = vtopte(sf->kva);
-	opte = *ptep;
-	*ptep = VM_PAGE_TO_PHYS(sf->m) | PG_RW | PG_V |
-	    pmap_cache_bits(kernel_pmap, sf->m->md.pat_mode, 0);
-
-	/*
-	 * Avoid unnecessary TLB invalidations: If the sf_buf's old
-	 * virtual-to-physical mapping was not used, then any processor
-	 * that has invalidated the sf_buf's virtual address from its TLB
-	 * since the last used mapping need not invalidate again.
-	 */
+	pmap_sf_buf_map(sf);
 #ifdef SMP
-	if ((opte & (PG_V | PG_A)) ==  (PG_V | PG_A))
-		CPU_ZERO(&sf->cpumask);
-
 	sf_buf_shootdown(sf, flags);
-#else
-	if ((opte & (PG_V | PG_A)) ==  (PG_V | PG_A))
-		pmap_invalidate_page(kernel_pmap, sf->kva);
 #endif
 }
 

@@ -93,6 +93,8 @@
 #include <sys/socket.h>		/* apple needs sockaddr */
 #include <net/if.h>		/* IFNAMSIZ */
 #include <ctype.h>
+#include <string.h>	/* memset */
+#include <sys/time.h>   /* gettimeofday */
 
 #ifndef likely
 #define likely(x)	__builtin_expect(!!(x), 1)
@@ -111,7 +113,8 @@
 	nifp, (nifp)->ring_ofs[index] )
 
 #define NETMAP_RXRING(nifp, index) _NETMAP_OFFSET(struct netmap_ring *,	\
-	nifp, (nifp)->ring_ofs[index + (nifp)->ni_tx_rings + 1] )
+	nifp, (nifp)->ring_ofs[index + (nifp)->ni_tx_rings + 		\
+		(nifp)->ni_host_tx_rings] )
 
 #define NETMAP_BUF(ring, index)				\
 	((char *)(ring) + (ring)->buf_ofs + ((index)*(ring)->nr_buf_size))
@@ -138,36 +141,16 @@ nm_tx_pending(struct netmap_ring *r)
 	return nm_ring_next(r, r->tail) != r->head;
 }
 
-
+/* Compute the number of slots available in the netmap ring. We use
+ * ring->head as explained in the comment above nm_ring_empty(). */
 static inline uint32_t
 nm_ring_space(struct netmap_ring *ring)
 {
-        int ret = ring->tail - ring->cur;
+        int ret = ring->tail - ring->head;
         if (ret < 0)
                 ret += ring->num_slots;
         return ret;
 }
-
-
-#ifdef NETMAP_WITH_LIBS
-/*
- * Support for simple I/O libraries.
- * Include other system headers required for compiling this.
- */
-
-#ifndef HAVE_NETMAP_WITH_LIBS
-#define HAVE_NETMAP_WITH_LIBS
-
-#include <stdio.h>
-#include <sys/time.h>
-#include <sys/mman.h>
-#include <string.h>	/* memset */
-#include <sys/ioctl.h>
-#include <sys/errno.h>	/* EINVAL */
-#include <fcntl.h>	/* O_RDWR */
-#include <unistd.h>	/* close() */
-#include <signal.h>
-#include <stdlib.h>
 
 #ifndef ND /* debug macros */
 /* debug support */
@@ -196,6 +179,53 @@ nm_ring_space(struct netmap_ring *ring)
         }                                                       \
     } while (0)
 #endif
+
+/*
+ * this is a slightly optimized copy routine which rounds
+ * to multiple of 64 bytes and is often faster than dealing
+ * with other odd sizes. We assume there is enough room
+ * in the source and destination buffers.
+ */
+static inline void
+nm_pkt_copy(const void *_src, void *_dst, int l)
+{
+	const uint64_t *src = (const uint64_t *)_src;
+	uint64_t *dst = (uint64_t *)_dst;
+
+	if (unlikely(l >= 1024 || l % 64)) {
+		memcpy(dst, src, l);
+		return;
+	}
+	for (; likely(l > 0); l-=64) {
+		*dst++ = *src++;
+		*dst++ = *src++;
+		*dst++ = *src++;
+		*dst++ = *src++;
+		*dst++ = *src++;
+		*dst++ = *src++;
+		*dst++ = *src++;
+		*dst++ = *src++;
+	}
+}
+
+#ifdef NETMAP_WITH_LIBS
+/*
+ * Support for simple I/O libraries.
+ * Include other system headers required for compiling this.
+ */
+
+#ifndef HAVE_NETMAP_WITH_LIBS
+#define HAVE_NETMAP_WITH_LIBS
+
+#include <stdio.h>
+#include <sys/time.h>
+#include <sys/mman.h>
+#include <sys/ioctl.h>
+#include <sys/errno.h>	/* EINVAL */
+#include <fcntl.h>	/* O_RDWR */
+#include <unistd.h>	/* close() */
+#include <signal.h>
+#include <stdlib.h>
 
 struct nm_pkthdr {	/* first part is the same as pcap_pkthdr */
 	struct timeval	ts;
@@ -267,33 +297,6 @@ struct nm_desc {
 #define NETMAP_FD(d)		(P2NMD(d)->fd)
 
 
-/*
- * this is a slightly optimized copy routine which rounds
- * to multiple of 64 bytes and is often faster than dealing
- * with other odd sizes. We assume there is enough room
- * in the source and destination buffers.
- */
-static inline void
-nm_pkt_copy(const void *_src, void *_dst, int l)
-{
-	const uint64_t *src = (const uint64_t *)_src;
-	uint64_t *dst = (uint64_t *)_dst;
-
-	if (unlikely(l >= 1024 || l % 64)) {
-		memcpy(dst, src, l);
-		return;
-	}
-	for (; likely(l > 0); l-=64) {
-		*dst++ = *src++;
-		*dst++ = *src++;
-		*dst++ = *src++;
-		*dst++ = *src++;
-		*dst++ = *src++;
-		*dst++ = *src++;
-		*dst++ = *src++;
-		*dst++ = *src++;
-	}
-}
 
 
 /*
@@ -1091,18 +1094,36 @@ nm_dispatch(struct nm_desc *d, int cnt, nm_cb_t cb, u_char *arg)
 		ring = NETMAP_RXRING(d->nifp, ri);
 		for ( ; !nm_ring_empty(ring) && cnt != got; got++) {
 			u_int idx, i;
+			u_char *oldbuf;
+			struct netmap_slot *slot;
 			if (d->hdr.buf) { /* from previous round */
 				cb(arg, &d->hdr, d->hdr.buf);
 			}
 			i = ring->cur;
-			idx = ring->slot[i].buf_idx;
+			slot = &ring->slot[i];
+			idx = slot->buf_idx;
 			/* d->cur_rx_ring doesn't change inside this loop, but
 			 * set it here, so it reflects d->hdr.buf's ring */
 			d->cur_rx_ring = ri;
-			d->hdr.slot = &ring->slot[i];
-			d->hdr.buf = (u_char *)NETMAP_BUF(ring, idx);
+			d->hdr.slot = slot;
+			oldbuf = d->hdr.buf = (u_char *)NETMAP_BUF(ring, idx);
 			// __builtin_prefetch(buf);
-			d->hdr.len = d->hdr.caplen = ring->slot[i].len;
+			d->hdr.len = d->hdr.caplen = slot->len;
+			while (slot->flags & NS_MOREFRAG) {
+				u_char *nbuf;
+				u_int oldlen = slot->len;
+				i = nm_ring_next(ring, i);
+				slot = &ring->slot[i];
+				d->hdr.len += slot->len;
+				nbuf = (u_char *)NETMAP_BUF(ring, slot->buf_idx);
+				if (oldbuf != NULL && nbuf - oldbuf == ring->nr_buf_size &&
+						oldlen == ring->nr_buf_size) {
+					d->hdr.caplen += slot->len;
+					oldbuf = nbuf;
+				} else {
+					oldbuf = NULL;
+				}
+			}
 			d->hdr.ts = ring->ts;
 			ring->head = ring->cur = nm_ring_next(ring, i);
 		}

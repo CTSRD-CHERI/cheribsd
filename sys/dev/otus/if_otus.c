@@ -1670,8 +1670,6 @@ otus_sub_rxeof(struct otus_softc *sc, uint8_t *buf, int len, struct mbufq *rxq)
 		struct mbuf mb;
 
 		tap->wr_flags = 0;
-		tap->wr_chan_freq = htole16(ic->ic_ibss_chan->ic_freq);
-		tap->wr_chan_flags = htole16(ic->ic_ibss_chan->ic_flags);
 		tap->wr_antsignal = tail->rssi;
 		tap->wr_rate = 2;	/* In case it can't be found below. */
 		switch (tail->status & AR_RX_STATUS_MT_MASK) {
@@ -3110,7 +3108,7 @@ otus_set_operating_mode(struct otus_softc *sc)
 	 */
 	IEEE80211_ADDR_COPY(bssid, zero_macaddr);
 	vap = TAILQ_FIRST(&ic->ic_vaps);
-	macaddr = ic->ic_macaddr;
+	macaddr = vap ? vap->iv_myaddr : ic->ic_macaddr;
 
 	switch (ic->ic_opmode) {
 	case IEEE80211_M_STA:

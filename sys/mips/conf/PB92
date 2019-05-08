@@ -55,7 +55,7 @@ options         FFS                     #Berkeley Fast Filesystem
 #options         UFS_DIRHASH             #Improve performance on big directories
 
 # Support uncompress lzma rootfs
-device		geom_uzip
+device		xz
 options 	GEOM_UZIP
 options 	ROOTDEVNAME=\"ufs:/dev/map/rootfs.uzip\"
 
@@ -84,7 +84,6 @@ options 	ATH_ENABLE_11N
 options 	ATH_DIAGAPI
 
 # device		ath_hal
-options 	AH_SUPPORT_AR5416
 options 	AH_DEBUG
 options 	AH_DEBUG_ALQ
 
@@ -134,5 +133,5 @@ device		loop
 device		ether
 #device		md
 #device		bpf
-#device		random
+device		random
 #device		if_bridge

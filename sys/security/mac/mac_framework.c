@@ -71,6 +71,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/condvar.h>
@@ -78,10 +80,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/mac.h>
 #include <sys/module.h>
+#include <sys/proc.h>
 #include <sys/rmlock.h>
 #include <sys/sdt.h>
 #include <sys/sx.h>
 #include <sys/sysctl.h>
+#include <sys/sysent.h>
 
 #include <security/mac/mac_framework.h>
 #include <security/mac/mac_internal.h>
@@ -605,17 +609,16 @@ copyin_mac(void * __capability mac_p, kmac_t *mac)
 		error = EOPNOTSUPP;
 	else
 #endif
-#ifdef COMPAT_FREEBSD64
-	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
-		/* XXX-AM: fix for freebsd64 */
-		struct mac64 tmpmac;
-		error = copyin_c(mac_p, &tmpmac, sizeof(tmpmac));
-		mac->m_buflen = tmpmac.m_buflen;
-		mac->m_string = __USER_CAP(tmpmac.m_string, tmpmac.m_buflen);
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI)) {
+		error = copyincap(mac_p, mac, sizeof(*mac));
 	} else
 #endif
 	{
-		error = copyincap(mac_p, mac, sizeof(*mac));
+		struct mac_native tmpmac;
+		error = copyin(mac_p, &tmpmac, sizeof(tmpmac));
+		mac->m_buflen = tmpmac.m_buflen;
+		mac->m_string = __USER_CAP(tmpmac.m_string, tmpmac.m_buflen);
 	}
 	return (error);
 }
@@ -624,7 +627,7 @@ SYSINIT(mac, SI_SUB_MAC, SI_ORDER_FIRST, mac_init, NULL);
 SYSINIT(mac_late, SI_SUB_MAC_LATE, SI_ORDER_FIRST, mac_late_init, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

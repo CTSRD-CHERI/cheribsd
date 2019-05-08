@@ -1,11 +1,16 @@
 # $FreeBSD$
 
-PROG=	cheri_helloworld
+PROG?=	cheri_helloworld
 SRCS=	cheri_helloworld.c
 
 MAN=
+.if ${PROG} == cheri_helloworld
 NEED_CHERI=	hybrid
-WANT_DUMP=	yes
+.elif ${PROG} == cheriabi_helloworld
+WANT_CHERI=	pure
+.else
+.error Unknown cheri_helloworld variant ${PROG}
+.endif
 
 LIBADD=  helloworld
 

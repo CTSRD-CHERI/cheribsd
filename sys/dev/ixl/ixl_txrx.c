@@ -225,7 +225,7 @@ ixl_tx_setup_offload(struct ixl_tx_queue *que,
 	switch (pi->ipi_etype) {
 #ifdef INET
 		case ETHERTYPE_IP:
-			if (pi->ipi_csum_flags & CSUM_IP)
+			if (pi->ipi_csum_flags & IXL_CSUM_IPV4)
 				*cmd |= I40E_TX_DESC_CMD_IIPT_IPV4_CSUM;
 			else
 				*cmd |= I40E_TX_DESC_CMD_IIPT_IPV4;
@@ -515,10 +515,11 @@ ixl_isc_txd_credits_update_dwb(void *arg, uint16_t txqid, bool clear)
 	prev = txr->tx_cidx_processed;
 	ntxd = scctx->isc_ntxd[0];
 	do {
+		MPASS(prev != cur);
 		delta = (int32_t)cur - (int32_t)prev;
-		MPASS(prev == 0 || delta != 0);
 		if (delta < 0)
 			delta += ntxd;
+		MPASS(delta > 0);
 #if 0
 		device_printf(iflib_get_dev(vsi->ctx),
 			      "%s: (q%d) cidx_processed=%u cur=%u clear=%d delta=%d\n",
@@ -787,7 +788,14 @@ ixl_init_tx_rsqs(struct ixl_vsi *vsi)
 	for (i = 0, tx_que = vsi->tx_queues; i < vsi->num_tx_queues; i++, tx_que++) {
 		struct tx_ring *txr = &tx_que->txr;
 
-		txr->tx_rs_cidx = txr->tx_rs_pidx = txr->tx_cidx_processed = 0;
+		txr->tx_rs_cidx = txr->tx_rs_pidx;
+
+		/* Initialize the last processed descriptor to be the end of
+		 * the ring, rather than the start, so that we avoid an
+		 * off-by-one error when calculating how many descriptors are
+		 * done in the credits_update function.
+		 */
+		txr->tx_cidx_processed = scctx->isc_ntxd[0] - 1;
 
 		for (j = 0; j < scctx->isc_ntxd[0]; j++)
 			txr->tx_rsq[j] = QIDX_INVALID;
@@ -797,13 +805,14 @@ ixl_init_tx_rsqs(struct ixl_vsi *vsi)
 void
 ixl_init_tx_cidx(struct ixl_vsi *vsi)
 {
+	if_softc_ctx_t scctx = vsi->shared;
 	struct ixl_tx_queue *tx_que;
 	int i;
 	
 	for (i = 0, tx_que = vsi->tx_queues; i < vsi->num_tx_queues; i++, tx_que++) {
 		struct tx_ring *txr = &tx_que->txr;
 
-		txr->tx_cidx_processed = 0;
+		txr->tx_cidx_processed = scctx->isc_ntxd[0] - 1;
 	}
 }
 

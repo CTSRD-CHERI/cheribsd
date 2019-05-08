@@ -1,5 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
+ * SPDX-License-Identifier: BSD-1-Clause
  *
  * Copyright 2012 Konstantin Belousov <kib@FreeBSD.org>
  * Copyright (c) 2018 The FreeBSD Foundation
@@ -12,9 +12,6 @@
  * are met:
  * 1. Redistributions of source code must retain the above copyright
  *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
  * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
@@ -30,7 +27,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181127,
  *   "target_type": "lib",
  *   "changes": [
  *     "support"
@@ -64,8 +61,13 @@ typedef void (*init_function_ptr)(int, char**, char**);
 #define array_entry_to_function_ptr(type, entry) \
 	((type)entry)
 #else
+#ifdef CRT_INIT_ARRAY_ENTRIES_ARE_OFFSETS
 #define array_entry_to_function_ptr(type, entry) \
 	((type)cheri_setoffset(cheri_getpcc(), entry));
+#else
+#define array_entry_to_function_ptr(type, entry) \
+	((type)cheri_setaddress(cheri_getpcc(), entry));
+#endif
 #endif
 
 
@@ -78,7 +80,12 @@ extern initfini_array_entry __fini_array_end[] __hidden;
 extern void _fini(void) __hidden;
 extern void _init(void) __hidden;
 
-extern int _DYNAMIC;
+/* since this can be NULL we really should not be setting any bounds (it will
+ * crash when used on a NULL pointer) */
+/* TODO: clang should only be setting bounds on globals in very-aggressive mode
+ * since they will be correctly bounded anyway
+ */
+extern int _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
 
 /*
@@ -136,6 +143,7 @@ process_irelocs(void)
 char **environ = NULL;
 const char *__progname = "";
 
+#ifndef CRT_ATEXIT_SUPPRESS
 static void
 finalizer(void)
 {
@@ -155,6 +163,7 @@ finalizer(void)
 	_fini();
 #endif
 }
+#endif
 
 static inline void
 handle_static_init(int argc, char **argv, char **env)
@@ -166,13 +175,15 @@ handle_static_init(int argc, char **argv, char **env)
 	if (&_DYNAMIC != NULL)
 		return;
 
+#ifndef CRT_ATEXIT_SUPPRESS
 	atexit(finalizer);
+#endif
 
 	array_size = weak_array_size(__preinit_array);
 	array = __preinit_array_start;
 	for (n = 0; n < array_size; n++) {
 		initfini_array_entry addr = array[n];
-		if (addr == 0 && addr == 1)
+		if (addr == 0 || addr == 1)
 			continue;
 		fn = array_entry_to_function_ptr(init_function_ptr, addr);
 		fn(argc, argv, env);
@@ -184,7 +195,7 @@ handle_static_init(int argc, char **argv, char **env)
 	array = __init_array_start;
 	for (n = 0; n < array_size; n++) {
 		initfini_array_entry addr = array[n];
-		if (addr == 0 && addr == 1)
+		if (addr == 0 || addr == 1)
 			continue;
 		fn = array_entry_to_function_ptr(init_function_ptr, addr);
 		fn(argc, argv, env);

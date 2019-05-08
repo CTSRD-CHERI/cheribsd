@@ -1789,7 +1789,13 @@ nfscl_cleanupkext(struct nfsclclient *clp, struct nfscllockownerfhhead *lhp)
 	struct nfscllockowner *lp, *nlp;
 	struct nfscldeleg *dp;
 
-	NFSPROCLISTLOCK();
+	/*
+	 * All the pidhash locks must be acquired, since they are sx locks
+	 * and must be acquired before the mutexes.  The pid(s) that will
+	 * be used aren't known yet, so all the locks need to be acquired.
+	 * Fortunately, this function is only performed once/sec.
+	 */
+	pidhash_slockall();
 	NFSLOCKCLSTATE();
 	LIST_FOREACH_SAFE(owp, &clp->nfsc_owner, nfsow_list, nowp) {
 		LIST_FOREACH(op, &owp->nfsow_open, nfso_list) {
@@ -1816,7 +1822,7 @@ nfscl_cleanupkext(struct nfsclclient *clp, struct nfscllockownerfhhead *lhp)
 		}
 	}
 	NFSUNLOCKCLSTATE();
-	NFSPROCLISTUNLOCK();
+	pidhash_sunlockall();
 }
 
 /*
@@ -3188,9 +3194,10 @@ lookformore:
 			    !NFSBCMP(op->nfso_fh, nfhp->nfh_fh,
 			    nfhp->nfh_len)) {
 				/* Found an open, close it. */
-#if 0
+#ifdef DIAGNOSTIC
 				KASSERT((op->nfso_opencnt == 0),
-				    ("nfscl: bad open cnt on server (%d)", op->nfso_opencnt));
+				    ("nfscl: bad open cnt on server (%d)",
+				     op->nfso_opencnt));
 #endif
 				NFSUNLOCKCLSTATE();
 				nfsrpc_doclose(VFSTONFS(vnode_mount(vp)), op,

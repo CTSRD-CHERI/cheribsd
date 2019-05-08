@@ -570,15 +570,6 @@ ndis_attach(device_t dev)
 	callout_init(&sc->ndis_stat_callout, 1);
 	mbufq_init(&sc->ndis_rxqueue, INT_MAX);	/* XXXGL: sane maximum */
 
-	if (sc->ndis_iftype == PCMCIABus) {
-		error = ndis_alloc_amem(sc);
-		if (error) {
-			device_printf(dev, "failed to allocate "
-			    "attribute memory\n");
-			goto fail;
-		}
-	}
-
 	/* Create sysctl registry nodes */
 	ndis_create_sysctls(sc);
 
@@ -1099,9 +1090,6 @@ ndis_detach(device_t dev)
 
 	if (ifp != NULL)
 		if_free(ifp);
-
-	if (sc->ndis_iftype == PCMCIABus)
-		ndis_free_amem(sc);
 
 	if (sc->ndis_sc)
 		ndis_destroy_dma(sc);
@@ -3432,7 +3420,7 @@ ndis_scan_end(struct ieee80211com *ic)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

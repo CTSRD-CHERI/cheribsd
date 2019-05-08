@@ -352,8 +352,8 @@
 
 /*
  * 82574 has a nonstandard address for EIAC
- * and since its only used in MSIX, and in
- * the em driver only 82574 uses MSIX we can
+ * and since its only used in MSI-X, and in
+ * the em driver only 82574 uses MSI-X we can
  * solve it just using this define.
  */
 #define EM_EIAC 0x000DC
@@ -468,7 +468,6 @@ struct adapter {
 	struct resource *memory;
 	struct resource *flash;
 	struct resource	*ioport;
-	int		io_rid;
 
 	struct resource	*res;
 	void		*tag;
@@ -520,7 +519,6 @@ struct adapter {
 
 	u64		que_mask;
 
-	
 	struct em_int_delay_info tx_int_delay;
 	struct em_int_delay_info tx_abs_int_delay;
 	struct em_int_delay_info rx_int_delay;
@@ -530,9 +528,6 @@ struct adapter {
 	/* Misc stats maintained by the driver */
 	unsigned long	dropped_pkts;
 	unsigned long	link_irq;
-	unsigned long	mbuf_defrag_failed;
-	unsigned long	no_tx_dma_setup;
-	unsigned long	no_tx_map_avail;
 	unsigned long	rx_overruns;
 	unsigned long	watchdog_events;
 

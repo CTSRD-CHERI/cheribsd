@@ -41,6 +41,7 @@
 #include <sys/cpuset.h>
 #include <sys/malloc.h>
 #include <sys/refcount.h>
+#include <sys/sysctl.h>
 #include <sys/lock.h>
 #include <sys/rmlock.h>
 #include <sys/tree.h>
@@ -94,6 +95,9 @@ struct pf_addr_wrap {
 };
 
 #ifdef _KERNEL
+
+SYSCTL_DECL(_net_pf);
+MALLOC_DECLARE(M_PFHASH);
 
 struct pfi_dynaddr {
 	TAILQ_ENTRY(pfi_dynaddr)	 entry;
@@ -824,13 +828,21 @@ typedef	void		pfsync_update_state_t(struct pf_state *);
 typedef	void		pfsync_delete_state_t(struct pf_state *);
 typedef void		pfsync_clear_states_t(u_int32_t, const char *);
 typedef int		pfsync_defer_t(struct pf_state *, struct mbuf *);
+typedef void		pfsync_detach_ifnet_t(struct ifnet *);
 
-extern pfsync_state_import_t	*pfsync_state_import_ptr;
-extern pfsync_insert_state_t	*pfsync_insert_state_ptr;
-extern pfsync_update_state_t	*pfsync_update_state_ptr;
-extern pfsync_delete_state_t	*pfsync_delete_state_ptr;
-extern pfsync_clear_states_t	*pfsync_clear_states_ptr;
-extern pfsync_defer_t		*pfsync_defer_ptr;
+VNET_DECLARE(pfsync_state_import_t *, pfsync_state_import_ptr);
+#define V_pfsync_state_import_ptr	VNET(pfsync_state_import_ptr)
+VNET_DECLARE(pfsync_insert_state_t *, pfsync_insert_state_ptr);
+#define V_pfsync_insert_state_ptr	VNET(pfsync_insert_state_ptr)
+VNET_DECLARE(pfsync_update_state_t *, pfsync_update_state_ptr);
+#define V_pfsync_update_state_ptr	VNET(pfsync_update_state_ptr)
+VNET_DECLARE(pfsync_delete_state_t *, pfsync_delete_state_ptr);
+#define V_pfsync_delete_state_ptr	VNET(pfsync_delete_state_ptr)
+VNET_DECLARE(pfsync_clear_states_t *, pfsync_clear_states_ptr);
+#define V_pfsync_clear_states_ptr	VNET(pfsync_clear_states_ptr)
+VNET_DECLARE(pfsync_defer_t *, pfsync_defer_ptr);
+#define V_pfsync_defer_ptr		VNET(pfsync_defer_ptr)
+extern pfsync_detach_ifnet_t	*pfsync_detach_ifnet_ptr;
 
 void			pfsync_state_export(struct pfsync_state *,
 			    struct pf_state *);
@@ -1009,6 +1021,17 @@ struct pfr_tstats {
 	int		 pfrts_cnt;
 	int		 pfrts_refcnt[PFR_REFCNT_MAX];
 };
+
+struct pfr_ktstats {
+	struct pfr_table pfrts_t;
+	counter_u64_t	 pfrkts_packets[PFR_DIR_MAX][PFR_OP_TABLE_MAX];
+	counter_u64_t	 pfrkts_bytes[PFR_DIR_MAX][PFR_OP_TABLE_MAX];
+	counter_u64_t	 pfrkts_match;
+	counter_u64_t	 pfrkts_nomatch;
+	long		 pfrkts_tzero;
+	int		 pfrkts_cnt;
+	int		 pfrkts_refcnt[PFR_REFCNT_MAX];
+};
 #define	pfrts_name	pfrts_t.pfrt_name
 #define pfrts_flags	pfrts_t.pfrt_flags
 
@@ -1022,8 +1045,9 @@ union sockaddr_union {
 #endif /* _SOCKADDR_UNION_DEFINED */
 
 struct pfr_kcounters {
-	u_int64_t		 pfrkc_packets[PFR_DIR_MAX][PFR_OP_ADDR_MAX];
-	u_int64_t		 pfrkc_bytes[PFR_DIR_MAX][PFR_OP_ADDR_MAX];
+	counter_u64_t		 pfrkc_packets[PFR_DIR_MAX][PFR_OP_ADDR_MAX];
+	counter_u64_t		 pfrkc_bytes[PFR_DIR_MAX][PFR_OP_ADDR_MAX];
+	long			 pfrkc_tzero;
 };
 
 SLIST_HEAD(pfr_kentryworkq, pfr_kentry);
@@ -1031,8 +1055,7 @@ struct pfr_kentry {
 	struct radix_node	 pfrke_node[2];
 	union sockaddr_union	 pfrke_sa;
 	SLIST_ENTRY(pfr_kentry)	 pfrke_workq;
-	struct pfr_kcounters	*pfrke_counters;
-	long			 pfrke_tzero;
+	struct pfr_kcounters	 pfrke_counters;
 	u_int8_t		 pfrke_af;
 	u_int8_t		 pfrke_net;
 	u_int8_t		 pfrke_not;
@@ -1042,7 +1065,7 @@ struct pfr_kentry {
 SLIST_HEAD(pfr_ktableworkq, pfr_ktable);
 RB_HEAD(pfr_ktablehead, pfr_ktable);
 struct pfr_ktable {
-	struct pfr_tstats	 pfrkt_ts;
+	struct pfr_ktstats	 pfrkt_kts;
 	RB_ENTRY(pfr_ktable)	 pfrkt_tree;
 	SLIST_ENTRY(pfr_ktable)	 pfrkt_workq;
 	struct radix_node_head	*pfrkt_ip4;
@@ -1053,18 +1076,18 @@ struct pfr_ktable {
 	long			 pfrkt_larg;
 	int			 pfrkt_nflags;
 };
-#define pfrkt_t		pfrkt_ts.pfrts_t
+#define pfrkt_t		pfrkt_kts.pfrts_t
 #define pfrkt_name	pfrkt_t.pfrt_name
 #define pfrkt_anchor	pfrkt_t.pfrt_anchor
 #define pfrkt_ruleset	pfrkt_t.pfrt_ruleset
 #define pfrkt_flags	pfrkt_t.pfrt_flags
-#define pfrkt_cnt	pfrkt_ts.pfrts_cnt
-#define pfrkt_refcnt	pfrkt_ts.pfrts_refcnt
-#define pfrkt_packets	pfrkt_ts.pfrts_packets
-#define pfrkt_bytes	pfrkt_ts.pfrts_bytes
-#define pfrkt_match	pfrkt_ts.pfrts_match
-#define pfrkt_nomatch	pfrkt_ts.pfrts_nomatch
-#define pfrkt_tzero	pfrkt_ts.pfrts_tzero
+#define pfrkt_cnt	pfrkt_kts.pfrkts_cnt
+#define pfrkt_refcnt	pfrkt_kts.pfrkts_refcnt
+#define pfrkt_packets	pfrkt_kts.pfrkts_packets
+#define pfrkt_bytes	pfrkt_kts.pfrkts_bytes
+#define pfrkt_match	pfrkt_kts.pfrkts_match
+#define pfrkt_nomatch	pfrkt_kts.pfrkts_nomatch
+#define pfrkt_tzero	pfrkt_kts.pfrkts_tzero
 
 /* keep synced with pfi_kif, used in RB_FIND */
 struct pfi_kif_cmp {
@@ -1203,6 +1226,19 @@ struct pf_divert {
 
 #define PFFRAG_FRENT_HIWAT	5000	/* Number of fragment entries */
 #define PFR_KENTRY_HIWAT	200000	/* Number of table entries */
+
+/*
+ * Limit the length of the fragment queue traversal.  Remember
+ * search entry points based on the fragment offset.
+ */
+#define PF_FRAG_ENTRY_POINTS		16
+
+/*
+ * The number of entries in the fragment queue must be limited
+ * to avoid DoS by linear seaching.  Instead of a global limit,
+ * use a limit per entry point.  For large packets these sum up.
+ */
+#define PF_FRAG_ENTRY_LIMIT		64
 
 /*
  * ioctl parameter structures
@@ -1580,7 +1616,7 @@ VNET_DECLARE(uint64_t, pf_stateid[MAXCPU]);
 #define	V_pf_stateid	VNET(pf_stateid)
 
 TAILQ_HEAD(pf_altqqueue, pf_altq);
-VNET_DECLARE(struct pf_altqqueue,	 pf_altqs[2]);
+VNET_DECLARE(struct pf_altqqueue,	 pf_altqs[4]);
 #define	V_pf_altqs			 VNET(pf_altqs)
 VNET_DECLARE(struct pf_palist,		 pf_pabuf);
 #define	V_pf_pabuf			 VNET(pf_pabuf)
@@ -1595,8 +1631,12 @@ VNET_DECLARE(u_int32_t,			 ticket_pabuf);
 #define	V_ticket_pabuf			 VNET(ticket_pabuf)
 VNET_DECLARE(struct pf_altqqueue *,	 pf_altqs_active);
 #define	V_pf_altqs_active		 VNET(pf_altqs_active)
+VNET_DECLARE(struct pf_altqqueue *,	 pf_altq_ifs_active);
+#define	V_pf_altq_ifs_active		 VNET(pf_altq_ifs_active)
 VNET_DECLARE(struct pf_altqqueue *,	 pf_altqs_inactive);
 #define	V_pf_altqs_inactive		 VNET(pf_altqs_inactive)
+VNET_DECLARE(struct pf_altqqueue *,	 pf_altq_ifs_inactive);
+#define	V_pf_altq_ifs_inactive		 VNET(pf_altq_ifs_inactive)
 
 VNET_DECLARE(struct pf_rulequeue, pf_unlinked_rules);
 #define	V_pf_unlinked_rules	VNET(pf_unlinked_rules)

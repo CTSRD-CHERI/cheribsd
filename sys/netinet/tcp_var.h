@@ -754,7 +754,6 @@ extern	int tcp_log_in_vain;
 VNET_DECLARE(int, drop_synfin);
 VNET_DECLARE(int, path_mtu_discovery);
 VNET_DECLARE(int, tcp_abc_l_var);
-VNET_DECLARE(int, tcp_autorcvbuf_inc);
 VNET_DECLARE(int, tcp_autorcvbuf_max);
 VNET_DECLARE(int, tcp_autosndbuf_inc);
 VNET_DECLARE(int, tcp_autosndbuf_max);
@@ -789,7 +788,6 @@ VNET_DECLARE(struct inpcbinfo, tcbinfo);
 #define	V_tcb				VNET(tcb)
 #define	V_tcbinfo			VNET(tcbinfo)
 #define	V_tcp_abc_l_var			VNET(tcp_abc_l_var)
-#define	V_tcp_autorcvbuf_inc		VNET(tcp_autorcvbuf_inc)
 #define	V_tcp_autorcvbuf_max		VNET(tcp_autorcvbuf_max)
 #define	V_tcp_autosndbuf_inc		VNET(tcp_autosndbuf_inc)
 #define	V_tcp_autosndbuf_max		VNET(tcp_autosndbuf_max)
@@ -942,6 +940,7 @@ void	 tcp_sack_partialack(struct tcpcb *, struct tcphdr *);
 void	 tcp_free_sackholes(struct tcpcb *tp);
 int	 tcp_newreno(struct tcpcb *, struct tcphdr *);
 int	 tcp_compute_pipe(struct tcpcb *);
+uint32_t tcp_compute_initwnd(uint32_t);
 void	 tcp_sndbuf_autoscale(struct tcpcb *, struct socket *, uint32_t);
 struct mbuf *
 	 tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,

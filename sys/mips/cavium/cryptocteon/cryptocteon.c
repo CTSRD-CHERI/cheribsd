@@ -444,7 +444,7 @@ static devclass_t cryptocteon_devclass;
 DRIVER_MODULE(cryptocteon, nexus, cryptocteon_driver, cryptocteon_devclass, 0, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros"

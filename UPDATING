@@ -31,6 +31,148 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	disable the most expensive debugging functionality run
 	"ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20190418:
+	The following knobs have been added related to tradeoffs between
+	safe use of the random device and availability in the absence of
+	entropy:
+
+	kern.random.initial_seeding.bypass_before_seeding: tunable; set
+	non-zero to bypass the random device prior to seeding, or zero to
+	block random requests until the random device is initially seeded.
+	For now, set to 1 (unsafe) by default to restore pre-r346250 boot
+	availability properties.
+
+	kern.random.initial_seeding.read_random_bypassed_before_seeding:
+	read-only diagnostic sysctl that is set when bypass is enabled and
+	read_random(9) is bypassed, to enable programmatic handling of this
+	initial condition, if desired.
+
+	kern.random.initial_seeding.arc4random_bypassed_before_seeding:
+	Similar to the above, but for for arc4random(9) initial seeding.
+
+	kern.random.initial_seeding.disable_bypass_warnings: tunable; set
+	non-zero to disable warnings in dmesg when the same conditions are
+	met as for the diagnostic sysctls above.  Defaults to zero, i.e.,
+	produce warnings in dmesg when the conditions are met.
+
+20190416:
+	The tunable "security.stack_protect.permit_nonrandom_cookies" may be
+	set to a non-zero value to boot systems that do not provide early
+	entropy.  Otherwise, such systems may see the panic message:
+	"cannot initialize stack cookies because random device is not yet
+	seeded."
+
+20190416:
+	The loadable random module KPI has changed; the random_infra_init()
+	routine now requires a 3rd function pointer for a bool (*)(void)
+	method that returns true if the random device is seeded (and
+	therefore unblocked).
+
+20190404:
+	r345895 reverts r320698. This implies that an nfsuserd(8) daemon
+	built from head sources between r320757 (July 6, 2017) and
+	r338192 (Aug. 22, 2018) will not work unless the "-use-udpsock"
+	is added to the command line.
+	nfsuserd daemons built from head sources that are post-r338192 are
+	not affected and should continue to work.
+
+20190320:
+	The fuse(4) module has been renamed to fusefs(4) for consistency with
+	other filesystems.  You should update any kld_load="fuse" entries in
+	/etc/rc.conf, fuse_load="YES" entries in /boot/loader.conf, and
+	"options FUSE" enties in kernel config files.
+
+20190304:
+	Clang, llvm, lld, lldb, compiler-rt and libc++ have been upgraded to
+	8.0.0.  Please see the 20141231 entry below for information about
+	prerequisites and upgrading, if you are not already using clang 3.5.0
+	or higher.
+
+20190226:
+	geom_uzip(4) depends on the new module xz.  If geom_uzip is statically
+	compiled into your custom kernel, add 'device xz' statement to the
+	kernel config.
+
+20190219:
+	drm and drm2 have been removed from the tree. Please see
+	https://wiki.freebsd.org/Graphics for the latest information on
+	migrating to the drm ports.
+
+20190131:
+	Iflib is no longer unconditionally compiled into the kernel.  Drivers
+	using iflib and statically compiled into the kernel, now require
+	the 'device iflib' config option.  For the same drivers loaded as
+	modules on kernels not having 'device iflib', the iflib.ko module
+	is loaded automatically.
+
+20190125:
+	The IEEE80211_AMPDU_AGE and AH_SUPPORT_AR5416 kernel configuration
+	options no longer exist since r343219 and r343427 respectively;
+	nothing uses them, so they should be just removed from custom
+	kernel config files.
+
+20181230:
+	r342635 changes the way efibootmgr(8) works by requiring users to add
+	the -b (bootnum) parameter for commands where the bootnum was previously
+	specified with each option. For example 'efibootmgr -B 0001' is now
+	'efibootmgr -B -b 0001'.
+
+20181220:
+	r342286 modifies the NFSv4 server so that it obeys vfs.nfsd.nfs_privport
+	in the same as it is applied to NFSv2 and 3.  This implies that NFSv4
+	servers that have vfs.nfsd.nfs_privport set will only allow mounts
+	from clients using a reserved port#. Since both the FreeBSD and Linux
+	NFSv4 clients use reserved port#s by default, this should not affect
+	most NFSv4 mounts.
+
+20181219:
+	The XLP config has been removed. We can't support 64-bit atomics in this
+	kernel because it is running in 32-bit mode. XLP users must transition
+	to running a 64-bit kernel (XLP64 or XLPN32).
+
+	The mips GXEMUL support has been removed from FreeBSD. MALTA* + qemu is
+	the preferred emulator today and we don't need two different ones.
+
+	The old sibyte / swarm / Broadcom BCM1250 support has been
+	removed from the mips port.
+
+20181211:
+	Clang, llvm, lld, lldb, compiler-rt and libc++ have been upgraded to
+	7.0.1.  Please see the 20141231 entry below for information about
+	prerequisites and upgrading, if you are not already using clang 3.5.0
+	or higher.
+
+20181211:
+	Remove the timed and netdate programs from the base tree.  Setting
+	the time with these deamons has been obsolete for over a decade.
+
+20181126:
+	On amd64, arm64 and armv7 (architectures that install LLVM's ld.lld
+	linker as /usr/bin/ld) GNU ld is no longer installed as ld.bfd, as
+	it produces broken binaries when ifuncs are in use.  Users needing
+	GNU ld should install the binutils port or package.
+
+20181123:
+	The BSD crtbegin and crtend code has been enabled by default. It has
+	had extensive testing on amd64, arm64, and i386. It can be disabled
+	by building a world with -DWITHOUT_BSD_CRTBEGIN.
+
+20181115:
+	The set of CTM commands (ctm, ctm_smail, ctm_rmail, ctm_dequeue)
+	has been converted to a port (misc/ctm) and will be removed from
+	FreeBSD-13.  It is available as a package (ctm) for all supported
+	FreeBSD versions.
+
+20181110:
+	The default newsyslog.conf(5) file has been changed to only include
+	files in /etc/newsyslog.conf.d/ and /usr/local/etc/newsyslog.conf.d/ if
+	the filenames end in '.conf' and do not begin with a '.'.
+
+	You should check the configuration files in these two directories match
+	this naming convention. You can verify which configuration files are
+	being included using the command:
+		$ newsyslog -Nrv
+
 20181015:
 	Ports for the DRM modules have been simplified. Now, amd64 users should
 	just install the drm-kmod port. All others should install
@@ -47,14 +189,21 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 
 	Other than KPI chasing, drm-legacy-kmod will not be updated. As outlined
 	elsewhere, the drm and drm2 modules will be eliminated from the src base
-	soon (with a limited exception for arm). Please update to the package asap
-	and report any issues to x11@freebsd.org.
+	soon (with a limited exception for arm). Please update to the package
+	asap and report any issues to x11@freebsd.org.
 
 	Generally, anybody using the drm*-kmod packages should add
 	WITHOUT_DRM_MODULE=t and WITHOUT_DRM2_MODULE=t to avoid nasty
 	cross-threading surprises, especially with automatic driver
 	loading from X11 startup. These will become the defaults in 13-current
 	shortly.
+
+20181012:
+	The ixlv(4) driver has been renamed to iavf(4).  As a consequence,
+	custom kernel and module loading configuration files must be updated
+	accordingly.  Moreover, interfaces previous presented as ixlvN to the
+	system are now exposed as iavfN and network configuration files must
+	be adjusted as necessary.
 
 20181009:
 	OpenSSL has been updated to version 1.1.1.  This update included
@@ -155,7 +304,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 20180719:
 	ARM64 now have efifb support, if you want to have serial console
 	on your arm64 board when an screen is connected and the bootloader
-	setup a frambuffer for us to use, just add :
+	setup a framebuffer for us to use, just add :
 	boot_serial=YES
 	boot_multicons=YES
 	in /boot/loader.conf
@@ -216,7 +365,8 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 20180628:
 	r335753 introduced a new quoting method. However, etc/devd/devmatch.conf
 	needed to be changed to work with it. This change was made with r335763
-	and requires a mergemaster / etcupdate / etc to update the installed file.
+	and requires a mergemaster / etcupdate / etc to update the installed
+	file.
 
 20180612:
 	r334930 changed the interface between the NFS modules, so they all
@@ -357,8 +507,9 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 
 20180211:
 	devmatch functionality has been turned on in devd. It will automatically
-	load drivers for unattached devices. This may cause unexpected drivers to
-	be loaded. Please report any problems to current@ and imp@freebsd.org.
+	load drivers for unattached devices. This may cause unexpected drivers
+	to be loaded. Please report any problems to current@ and
+	imp@freebsd.org.
 
 20180114:
 	Clang, llvm, lld, lldb, compiler-rt and libc++ have been upgraded to
@@ -376,9 +527,9 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 
 20180110:
 	On i386, pmtimer has been removed. Its functionality has been folded
-	into apm. It was a no-op on ACPI in current for a while now (but was still
-	needed on i386 in FreeBSD 11 and earlier). Users may need to remove it
-	from kernel config files.
+	into apm. It was a no-op on ACPI in current for a while now (but was
+	still needed on i386 in FreeBSD 11 and earlier). Users may need to
+	remove it from kernel config files.
 
 20180104:
 	The use of RSS hash from the network card aka flowid has been
@@ -619,11 +770,13 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	system will be running the ino64 kernel with the existing world).
 
 	For the safest in-place upgrade begin by removing previous build
-	artifacts via "rm -rf /usr/obj/*".   Then, carefully follow the
-	full procedure documented below under the heading "To rebuild
-	everything and install it on the current system."  Specifically,
-	a reboot is required after installing the new kernel before
-	installing world.
+	artifacts via "rm -rf /usr/obj/*".  Then, carefully follow the full
+	procedure documented below under the heading "To rebuild everything and
+	install it on the current system."  Specifically, a reboot is required
+	after installing the new kernel before installing world. While an
+	installworld normally works by accident from multiuser after rebooting
+	the proper kernel, there are many cases where this will fail across this
+	upgrade and installworld from single user is required.
 
 20170424:
 	The NATM framework including the en(4), fatm(4), hatm(4), and
@@ -720,7 +873,8 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 20170109:
 	The igb(4), em(4) and lem(4) ethernet drivers are now implemented via
 	IFLIB.  If you have a custom kernel configuration that excludes em(4)
-	but you use igb(4), you need to re-add em(4) to your custom configuration.
+	but you use igb(4), you need to re-add em(4) to your custom
+	configuration.
 
 20161217:
 	Clang, llvm, lldb, compiler-rt and libc++ have been upgraded to 3.9.1.
@@ -1808,7 +1962,8 @@ COMMON ITEMS:
 		fsck -p
 		mount -u /
 		mount -a
-		cd src
+		sh /etc/rc.d/zfs start	# mount zfs filesystem, if needed
+		cd src			# full path to source
 		adjkerntz -i		# if CMOS is wall time
 	Also, when doing a major release upgrade, it is required that
 	you boot into single user mode to do the installworld.
@@ -1832,15 +1987,19 @@ COMMON ITEMS:
 	can be deleted by "make delete-old-libs", but you have to make
 	sure that no program is using those libraries anymore.
 
-	[8] In order to have a kernel that can run the 4.x binaries needed to
-	do an installworld, you must include the COMPAT_FREEBSD4 option in
-	your kernel.  Failure to do so may leave you with a system that is
-	hard to boot to recover. A similar kernel option COMPAT_FREEBSD5 is
-	required to run the 5.x binaries on more recent kernels.  And so on
-	for COMPAT_FREEBSD6 and COMPAT_FREEBSD7.
+	[8] The new kernel must be able to run existing binaries used by an
+	installworld.  When upgrading across major versions, the new kernel's
+	configuration must include the correct COMPAT_FREEBSD<n> option for
+	existing binaries (e.g. COMPAT_FREEBSD11 to run 11.x binaries).  Failure
+	to do so may leave you with a system that is hard to boot to recover. A
+	GENERIC kernel will include suitable compatibility options to run
+	binaries from older branches.  Note that the ability to run binaries
+	from unsupported branches is not guaranteed.
 
 	Make sure that you merge any new devices from GENERIC since the
-	last time you updated your kernel config file.
+	last time you updated your kernel config file. Options also
+	change over time, so you may need to adjust your custom kernels
+	for these as well.
 
 	[9] If CPUTYPE is defined in your /etc/make.conf, make sure to use the
 	"?=" instead of the "=" assignment operator, so that buildworld can
@@ -1859,7 +2018,7 @@ to fetch an UPDATING file from an older FreeBSD release.
 
 Copyright information:
 
-Copyright 1998-2009 M. Warner Losh.  All Rights Reserved.
+Copyright 1998-2009 M. Warner Losh.
 
 Redistribution, publication, translation and use, with or without
 modification, in full or in part, in any form or format of this

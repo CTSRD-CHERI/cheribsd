@@ -3030,20 +3030,25 @@ nfs_advlock(struct vop_advlock_args *ap)
 	struct proc *p = (struct proc *)ap->a_id;
 	struct thread *td = curthread;	/* XXX */
 	struct vattr va;
-	int ret, error = EOPNOTSUPP;
+	int ret, error;
 	u_quad_t size;
 	
+	error = NFSVOPLOCK(vp, LK_SHARED);
+	if (error != 0)
+		return (EBADF);
 	if (NFS_ISV4(vp) && (ap->a_flags & (F_POSIX | F_FLOCK)) != 0) {
-		if (vp->v_type != VREG)
-			return (EINVAL);
+		if (vp->v_type != VREG) {
+			error = EINVAL;
+			goto out;
+		}
 		if ((ap->a_flags & F_POSIX) != 0)
 			cred = p->p_ucred;
 		else
 			cred = td->td_ucred;
-		NFSVOPLOCK(vp, LK_EXCLUSIVE | LK_RETRY);
+		NFSVOPLOCK(vp, LK_UPGRADE | LK_RETRY);
 		if (vp->v_iflag & VI_DOOMED) {
-			NFSVOPUNLOCK(vp, 0);
-			return (EBADF);
+			error = EBADF;
+			goto out;
 		}
 
 		/*
@@ -3072,21 +3077,21 @@ nfs_advlock(struct vop_advlock_args *ap)
 					return (EINTR);
 				NFSVOPLOCK(vp, LK_EXCLUSIVE | LK_RETRY);
 				if (vp->v_iflag & VI_DOOMED) {
-					NFSVOPUNLOCK(vp, 0);
-					return (EBADF);
+					error = EBADF;
+					goto out;
 				}
 			}
 		} while (ret == NFSERR_DENIED && (ap->a_flags & F_WAIT) &&
 		     ap->a_op == F_SETLK);
 		if (ret == NFSERR_DENIED) {
-			NFSVOPUNLOCK(vp, 0);
-			return (EAGAIN);
+			error = EAGAIN;
+			goto out;
 		} else if (ret == EINVAL || ret == EBADF || ret == EINTR) {
-			NFSVOPUNLOCK(vp, 0);
-			return (ret);
+			error = ret;
+			goto out;
 		} else if (ret != 0) {
-			NFSVOPUNLOCK(vp, 0);
-			return (EACCES);
+			error = EACCES;
+			goto out;
 		}
 
 		/*
@@ -3116,12 +3121,7 @@ nfs_advlock(struct vop_advlock_args *ap)
 			np->n_flag |= NHASBEENLOCKED;
 			mtx_unlock(&np->n_mtx);
 		}
-		NFSVOPUNLOCK(vp, 0);
-		return (0);
 	} else if (!NFS_ISV4(vp)) {
-		error = NFSVOPLOCK(vp, LK_SHARED);
-		if (error)
-			return (error);
 		if ((VFSTONFS(vp->v_mount)->nm_flag & NFSMNT_NOLOCKD) != 0) {
 			size = VTONFS(vp)->n_size;
 			NFSVOPUNLOCK(vp, 0);
@@ -3144,7 +3144,11 @@ nfs_advlock(struct vop_advlock_args *ap)
 				NFSVOPUNLOCK(vp, 0);
 			}
 		}
-	}
+		return (error);
+	} else
+		error = EOPNOTSUPP;
+out:
+	NFSVOPUNLOCK(vp, 0);
 	return (error);
 }
 
@@ -3507,9 +3511,6 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 	case _PC_NO_TRUNC:
 		*ap->a_retval = pc.pc_notrunc;
 		break;
-	case _PC_ACL_EXTENDED:
-		*ap->a_retval = 0;
-		break;
 	case _PC_ACL_NFS4:
 		if (NFS_ISV4(vp) && nfsrv_useacl != 0 && attrflag != 0 &&
 		    NFSISSET_ATTRBIT(&nfsva.na_suppattr, NFSATTRBIT_ACL))
@@ -3522,9 +3523,6 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 			*ap->a_retval = ACL_MAX_ENTRIES;
 		else
 			*ap->a_retval = 3;
-		break;
-	case _PC_MAC_PRESENT:
-		*ap->a_retval = 0;
 		break;
 	case _PC_PRIO_IO:
 		*ap->a_retval = 0;
@@ -3566,7 +3564,7 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

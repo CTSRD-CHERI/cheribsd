@@ -43,6 +43,7 @@
 
 #include <sys/param.h>
 #include <sys/conf.h>
+#include <sys/lock.h>
 #include <sys/fcntl.h>
 #include <sys/filio.h>
 #include <sys/jail.h>
@@ -57,6 +58,7 @@
 #include <sys/signalvar.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
+#include <sys/sx.h>
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/ttycom.h>
@@ -167,6 +169,9 @@ MALLOC_DECLARE(M_TAP);
 MALLOC_DEFINE(M_TAP, CDEV_NAME, "Ethernet tunnel interface");
 SYSCTL_INT(_debug, OID_AUTO, if_tap_debug, CTLFLAG_RW, &tapdebug, 0, "");
 
+static struct sx tap_ioctl_sx;
+SX_SYSINIT(tap_ioctl_sx, &tap_ioctl_sx, "tap_ioctl");
+
 SYSCTL_DECL(_net_link);
 static SYSCTL_NODE(_net_link, OID_AUTO, tap, CTLFLAG_RW, 0,
     "Ethernet tunnel software network interface");
@@ -179,6 +184,7 @@ SYSCTL_INT(_net_link_tap, OID_AUTO, devfs_cloning, CTLFLAG_RWTUN, &tapdclone, 0,
 SYSCTL_INT(_net_link_tap, OID_AUTO, debug, CTLFLAG_RW, &tapdebug, 0, "");
 
 DEV_MODULE(if_tap, tapmodevent, NULL);
+MODULE_VERSION(if_tap, 1);
 
 static int
 tap_clone_create(struct if_clone *ifc, int unit, void * __capability params)
@@ -221,6 +227,10 @@ tap_destroy(struct tap_softc *tp)
 	struct ifnet *ifp = tp->tap_ifp;
 
 	CURVNET_SET(ifp->if_vnet);
+	sx_xlock(&tap_ioctl_sx);
+	ifp->if_softc = NULL;
+	sx_xunlock(&tap_ioctl_sx);
+
 	destroy_dev(tp->tap_dev);
 	seldrain(&tp->tap_rsel);
 	knlist_clear(&tp->tap_rsel.si_note, 0);
@@ -350,7 +360,7 @@ tapclone(void *arg, struct ucred *cred, char *name, int namelen, struct cdev **d
 		return;
 
 	if (!tapdclone ||
-	    (!tapuopen && priv_check_cred(cred, PRIV_NET_IFCREATE, 0) != 0))
+	    (!tapuopen && priv_check_cred(cred, PRIV_NET_IFCREATE) != 0))
 		return;
 
 	unit = 0;
@@ -604,12 +614,18 @@ tapifinit(void *xtp)
 static int
 tapifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 {
-	struct tap_softc	*tp = ifp->if_softc;
+	struct tap_softc	*tp;
 	struct ifreq		*ifr = (struct ifreq *)data;
 	struct ifstat		*ifs = NULL;
 	struct ifmediareq	*ifmr = NULL;
 	int			 dummy, error = 0;
 
+	sx_xlock(&tap_ioctl_sx);
+	tp = ifp->if_softc;
+	if (tp == NULL) {
+		error = ENXIO;
+		goto bad;
+	}
 	switch (cmd) {
 		case CASE_IOC_IFREQ(SIOCSIFFLAGS): /* XXX -- just like vmnet does */
 		case CASE_IOC_IFREQ(SIOCADDMULTI):
@@ -652,6 +668,8 @@ tapifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			break;
 	}
 
+bad:
+	sx_xunlock(&tap_ioctl_sx);
 	return (error);
 } /* tapifioctl */
 
@@ -1131,7 +1149,7 @@ tapkqdetach(struct knote *kn)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

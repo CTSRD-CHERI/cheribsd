@@ -33,6 +33,7 @@
 #include <machine/param.h>
 #include <machine/spr.h>
 #include <machine/asm.h>
+#include <machine/vmparam.h>
 #include "opt_platform.h"
 
 /* Locate the per-CPU data structure */
@@ -58,6 +59,12 @@ GLOBAL(__endkernel)
 #define	TMPSTKSZ	8192		/* 8K temporary stack */
 GLOBAL(tmpstk)
 	.space	TMPSTKSZ
+
+#ifdef KDB
+#define TRAPSTKSZ       4096            /* 4k trap stack */
+GLOBAL(trapstk)
+        .space        TRAPSTKSZ
+#endif
 
 	.text
 	.globl	btext

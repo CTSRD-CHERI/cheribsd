@@ -16,14 +16,11 @@ ATF_TESTS_SH+=	integrity_test
 ATF_TESTS_SH+=	kill_test
 ATF_TESTS_SH+=	misc_test
 ATF_TESTS_SH+=	onetime_test
+ATF_TESTS_SH+=	online_resize_test
 ATF_TESTS_SH+=	resize_test
 ATF_TESTS_SH+=	setkey_test
 
 ${PACKAGE}FILES+=		conf.sh
-
-.for t in ${TAP_TESTS_SH}
-TEST_METADATA.$t+=	required_user="root"
-.endfor
 
 CFLAGS.pbkdf2_test=	-I${SRCTOP}/sys
 

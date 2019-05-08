@@ -11,7 +11,11 @@
         defaults
         ..
         dtb
+            allwinner             tags=package=runtime
+            ..
             overlays              tags=package=runtime
+            ..
+            rockchip              tags=package=runtime
             ..
         ..
         firmware
@@ -22,6 +26,8 @@
         ..
         modules
         ..
+        uboot
+        ..
         zfs
         ..
     ..
@@ -29,6 +35,8 @@
     ..
     etc
         X11
+        ..
+        authpf
         ..
         autofs
         ..
@@ -87,6 +95,8 @@
         casper
         ..
         geom
+        ..
+        nvmecontrol
         ..
     ..
     libexec

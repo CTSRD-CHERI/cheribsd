@@ -66,7 +66,6 @@ int	ext2_bmaparray(struct vnode *, daddr_t, daddr_t *, int *, int *);
 int	ext4_bmapext(struct vnode *, int32_t, int64_t *, int *, int *);
 void	ext2_clusteracct(struct m_ext2fs *, char *, int, e4fs_daddr_t, int);
 void	ext2_dirbad(struct inode *ip, doff_t offset, char *how);
-void	ext2_fserr(struct m_ext2fs *, uid_t, char *);
 int	ext2_ei2i(struct ext2fs_dinode *, struct inode *);
 int	ext2_getlbns(struct vnode *, daddr_t, struct indir *, int *);
 int	ext2_i2ei(struct inode *, struct ext2fs_dinode *);
@@ -80,7 +79,7 @@ int	ext2_vfree(struct vnode *, ino_t, int);
 int	ext2_vinit(struct mount *, struct vop_vector *, struct vnode **vpp);
 int	ext2_lookup(struct vop_cachedlookup_args *);
 int	ext2_readdir(struct vop_readdir_args *);
-#ifdef EXT2FS_DEBUG
+#ifdef EXT2FS_PRINT_EXTENTS
 void	ext2_print_inode(struct inode *);
 #endif
 int	ext2_direnter(struct inode *, 
@@ -91,6 +90,7 @@ int	ext2_dirrewrite(struct inode *,
 int	ext2_dirempty(struct inode *, ino_t, struct ucred *);
 int	ext2_checkpath(struct inode *, struct inode *, struct ucred *);
 int	ext2_cg_has_sb(struct m_ext2fs *fs, int cg);
+uint64_t	ext2_cg_number_gdb(struct m_ext2fs *fs, int cg);
 int	ext2_inactive(struct vop_inactive_args *);
 int	ext2_htree_add_entry(struct vnode *, struct ext2fs_direct_2 *,
 	    struct componentname *);
@@ -104,6 +104,8 @@ int	ext2_htree_lookup(struct inode *, const char *, int, struct buf **,
 int	ext2_search_dirblock(struct inode *, void *, int *, const char *, int,
 	    int *, doff_t *, doff_t *, doff_t *, struct ext2fs_searchslot *);
 uint32_t	e2fs_gd_get_ndirs(struct ext2_gd *gd);
+uint64_t	e2fs_gd_get_b_bitmap(struct ext2_gd *);
+uint64_t	e2fs_gd_get_i_bitmap(struct ext2_gd *);
 uint64_t	e2fs_gd_get_i_tables(struct ext2_gd *);
 void	ext2_sb_csum_set_seed(struct m_ext2fs *);
 int	ext2_sb_csum_verify(struct m_ext2fs *);

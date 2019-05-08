@@ -157,7 +157,7 @@ group_unpack(const nvlist_t *nvl, struct group *grp, char *buffer,
 	if (!nvlist_exists_string(nvl, "gr_name"))
 		return (EINVAL);
 
-	memset(grp, 0, sizeof(*grp));
+	explicit_bzero(grp, sizeof(*grp));
 
 	error = group_unpack_string(nvl, "gr_name", &grp->gr_name, &buffer,
 	    &bufsize);
@@ -791,7 +791,7 @@ grp_command(const char *cmd, const nvlist_t *limits, nvlist_t *nvlin,
 CREATE_SERVICE("system.grp", grp_limit, grp_command, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "lib",
 //   "changes": [
 //     "pointer_alignment"

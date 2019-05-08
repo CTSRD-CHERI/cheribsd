@@ -45,7 +45,6 @@ local MSG_FAILOPENCFG = "Failed to open config: '%s'"
 local MSG_FAILREADCFG = "Failed to read config: '%s'"
 local MSG_FAILPARSECFG = "Failed to parse config: '%s'"
 local MSG_FAILEXBEF = "Failed to execute '%s' before loading '%s'"
-local MSG_FAILEXMOD = "Failed to execute '%s'"
 local MSG_FAILEXAF = "Failed to execute '%s' after loading '%s'"
 local MSG_MALFORMED = "Malformed line (%d):\n\t'%s'"
 local MSG_DEFAULTKERNFAIL = "No kernel set, failed to load from module_path"
@@ -266,12 +265,12 @@ local function isValidComment(line)
 end
 
 local function getBlacklist()
+	local blacklist = {}
 	local blacklist_str = loader.getenv('module_blacklist')
 	if blacklist_str == nil then
-		return nil
+		return blacklist
 	end
 
-	local blacklist = {}
 	for mod in blacklist_str:gmatch("[;, ]?([%w-_]+)[;, ]?") do
 		blacklist[mod] = true
 	end

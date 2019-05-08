@@ -71,7 +71,11 @@ extern char * getenv JPP((const char * name));
  */
 
 #ifndef ALIGN_TYPE		/* so can override from jconfig.h */
+#ifdef __CHERI_PURE_CAPABILITY__
+#define ALIGN_TYPE  __intcap_t
+#else
 #define ALIGN_TYPE  double
+#endif
 #endif
 
 

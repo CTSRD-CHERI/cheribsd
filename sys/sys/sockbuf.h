@@ -98,7 +98,7 @@ struct	sockbuf {
 	u_int	sb_ctl;		/* (a) non-data chars in buffer */
 	int	sb_lowat;	/* (a) low water mark */
 	sbintime_t	sb_timeo;	/* (a) timeout for read/write */
-	short	sb_flags;	/* (a) flags, see below */
+	short	sb_flags;	/* (a) flags, see above */
 	int	(*sb_upcall)(struct socket *, void *, int); /* (a) */
 	void	*sb_upcallarg;	/* (a) */
 	TAILQ_HEAD(, kaiocb) sb_aiojobq; /* (a) pending AIO ops */
@@ -163,8 +163,6 @@ void	sbrelease_locked(struct sockbuf *sb, struct socket *so);
 int	sbsetopt(struct socket *so, int cmd, u_long cc);
 int	sbreserve_locked(struct sockbuf *sb, u_long cc, struct socket *so,
 	    struct thread *td);
-struct mbuf *
-	sbsndptr(struct sockbuf *sb, u_int off, u_int len, u_int *moff);
 void	sbsndptr_adv(struct sockbuf *sb, struct mbuf *mb, u_int len);
 struct mbuf *
 	sbsndptr_noadv(struct sockbuf *sb, u_int off, u_int *moff);

@@ -106,6 +106,10 @@ static int setutimes(struct thread *td, struct vnode *,
     const struct timespec *, int, int);
 static int vn_access(struct vnode *vp, int user_flags, struct ucred *cred,
     struct thread *td);
+static int kern_readlink_vp(struct vnode *vp, char * __capability buf,
+    enum uio_seg bufseg, size_t count, struct thread *td);
+static int kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
+    const char * __capability path, enum uio_seg segflag);
 
 /*
  * Sync each mounted filesystem.
@@ -149,10 +153,10 @@ sys_sync(struct thread *td, struct sync_args *uap)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct quotactl_args {
-	char * __capability path;
+	char *path;
 	int cmd;
 	int uid;
-	void * __capability arg;
+	caddr_t arg;
 };
 #endif
 int
@@ -288,8 +292,8 @@ out:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct statfs_args {
-	char * __capability path;
-	struct statfs * __capability buf;
+	char *path;
+	struct statfs *buf;
 };
 #endif
 int
@@ -341,7 +345,7 @@ kern_statfs(struct thread *td, const char * __capability path,
 #ifndef _SYS_SYSPROTO_H_
 struct fstatfs_args {
 	int fd;
-	struct statfs * __capability buf;
+	struct statfs *buf;
 };
 #endif
 int
@@ -395,7 +399,7 @@ kern_fstatfs(struct thread *td, int fd, struct statfs *buf)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct getfsstat_args {
-	struct statfs * __capability buf;
+	struct statfs *buf;
 	long bufsize;
 	int mode;
 };
@@ -942,7 +946,7 @@ kern_chdir(struct thread *td, const char * __CAPABILITY path,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct chroot_args {
-	char	* __capability path;
+	char	*path;
 };
 #endif
 int
@@ -1049,7 +1053,7 @@ flags_to_rights(int flags, cap_rights_t *rightsp)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct open_args {
-	char	* __capability path;
+	char	*path;
 	int	flags;
 	int	mode;
 };
@@ -1065,7 +1069,7 @@ sys_open(struct thread *td, struct open_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct openat_args {
 	int	fd;
-	char	* __capability path;
+	char	*path;
 	int	flag;
 	int	mode;
 };
@@ -1243,7 +1247,7 @@ ocreat(struct thread *td, struct ocreat_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct mknodat_args {
 	int	fd;
-	char	* __capability path;
+	char	*path;
 	mode_t	mode;
 	dev_t	dev;
 };
@@ -1378,7 +1382,7 @@ restart:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct mkfifo_args {
-	char	* __capability path;
+	char	*path;
 	int	mode;
 };
 #endif
@@ -1393,7 +1397,7 @@ sys_mkfifo(struct thread *td, struct mkfifo_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct mkfifoat_args {
 	int	fd;
-	char	* __capability path;
+	char	*path;
 	mode_t	mode;
 };
 #endif
@@ -1464,8 +1468,8 @@ out:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct link_args {
-	char	* __capability path;
-	char	* __capability to;
+	char	*path;
+	char	*to;
 };
 #endif
 int
@@ -1479,9 +1483,9 @@ sys_link(struct thread *td, struct link_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct linkat_args {
 	int	fd1;
-	char	* __capability path1;
+	char	*path1;
 	int	fd2;
-	char	* __capability path2;
+	char	*path2;
 	int	flag;
 };
 #endif
@@ -1525,13 +1529,13 @@ can_hardlink(struct vnode *vp, struct ucred *cred)
 		return (error);
 
 	if (hardlink_check_uid && cred->cr_uid != va.va_uid) {
-		error = priv_check_cred(cred, PRIV_VFS_LINK, 0);
+		error = priv_check_cred(cred, PRIV_VFS_LINK);
 		if (error != 0)
 			return (error);
 	}
 
 	if (hardlink_check_gid && !groupmember(va.va_gid, cred)) {
-		error = priv_check_cred(cred, PRIV_VFS_LINK, 0);
+		error = priv_check_cred(cred, PRIV_VFS_LINK);
 		if (error != 0)
 			return (error);
 	}
@@ -1542,28 +1546,37 @@ can_hardlink(struct vnode *vp, struct ucred *cred)
 int
 kern_linkat(struct thread *td, int fd1, int fd2,
     const char * __capability path1, const char * __capability path2,
-    enum uio_seg segflg, int follow)
+    enum uio_seg segflag, int follow)
 {
-	struct vnode *vp;
-	struct mount *mp;
 	struct nameidata nd;
 	int error;
 
-again:
-	bwillwrite();
-	NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, segflg, path1, fd1,
-	    &cap_linkat_source_rights, td);
+	do {
+		bwillwrite();
+		NDINIT_ATRIGHTS_C(&nd, LOOKUP, follow | AUDITVNODE1, segflag,
+		    path1, fd1, &cap_linkat_source_rights, td);
+		if ((error = namei(&nd)) != 0)
+			return (error);
+		NDFREE(&nd, NDF_ONLY_PNBUF);
+		error = kern_linkat_vp(td, nd.ni_vp, fd2, path2, segflag);
+	} while (error ==  EAGAIN);
+	return (error);
+}
 
-	if ((error = namei(&nd)) != 0)
-		return (error);
-	NDFREE(&nd, NDF_ONLY_PNBUF);
-	vp = nd.ni_vp;
+static int
+kern_linkat_vp(struct thread *td, struct vnode *vp, int fd,
+    const char * __capability path, enum uio_seg segflag)
+{
+	struct nameidata nd;
+	struct mount *mp;
+	int error;
+
 	if (vp->v_type == VDIR) {
 		vrele(vp);
 		return (EPERM);		/* POSIX */
 	}
 	NDINIT_ATRIGHTS_C(&nd, CREATE,
-	    LOCKPARENT | SAVENAME | AUDITVNODE2 | NOCACHE, segflg, path2, fd2,
+	    LOCKPARENT | SAVENAME | AUDITVNODE2 | NOCACHE, segflag, path, fd,
 	    &cap_linkat_target_rights, td);
 	if ((error = namei(&nd)) == 0) {
 		if (nd.ni_vp != NULL) {
@@ -1607,7 +1620,7 @@ again:
 				    V_XSLEEP | PCATCH);
 				if (error != 0)
 					return (error);
-				goto again;
+				return (EAGAIN);
 			}
 			error = VOP_LINK(nd.ni_dvp, vp, &nd.ni_cnd);
 			VOP_UNLOCK(vp, 0);
@@ -1618,7 +1631,7 @@ again:
 			vput(nd.ni_dvp);
 			NDFREE(&nd, NDF_ONLY_PNBUF);
 			vrele(vp);
-			goto again;
+			return (EAGAIN);
 		}
 	}
 	vrele(vp);
@@ -1630,8 +1643,8 @@ again:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct symlink_args {
-	char	* __capability path;
-	char	* __capability link;
+	char	*path;
+	char	*link;
 };
 #endif
 int
@@ -1644,9 +1657,9 @@ sys_symlink(struct thread *td, struct symlink_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct symlinkat_args {
-	char	* __capability path;
+	char	*path;
 	int	fd;
-	char	* __capability path2;
+	char	*path2;
 };
 #endif
 int
@@ -1672,8 +1685,7 @@ kern_symlinkat(struct thread *td, const char * __capability path1, int fd,
 		syspath = (__cheri_fromcap const char *)path1;
 	} else {
 		tmppath = uma_zalloc(namei_zone, M_WAITOK);
-		if ((error = copyinstr(path1, tmppath, MAXPATHLEN,
-		    NULL)) != 0)
+		if ((error = copyinstr(path1, tmppath, MAXPATHLEN, NULL)) != 0)
 			goto out;
 		syspath = tmppath;
 	}
@@ -1731,7 +1743,7 @@ out:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct undelete_args {
-	char * __capability path;
+	char *path;
 };
 #endif
 int
@@ -1785,67 +1797,102 @@ restart:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct unlink_args {
-	char	* __capability path;
+	char	*path;
 };
 #endif
 int
 sys_unlink(struct thread *td, struct unlink_args *uap)
 {
 
-	return (kern_unlinkat(td, AT_FDCWD, __USER_CAP_STR(uap->path),
-	    UIO_USERSPACE, 0, 0));
+	return (kern_funlinkat(td, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    FD_NONE, UIO_USERSPACE, 0, 0));
+}
+
+int
+kern_funlinkat_ex(struct thread *td, int dfd, const char * __capability path,
+    int fd, int flag, enum uio_seg pathseg, ino_t oldinum)
+{
+
+	if ((flag & ~AT_REMOVEDIR) != 0)
+		return (EINVAL);
+
+	if ((flag & AT_REMOVEDIR) != 0)
+		return (kern_frmdirat(td, dfd, path, fd, UIO_USERSPACE, 0));
+
+	return (kern_funlinkat(td, dfd, path, fd, UIO_USERSPACE, 0, 0));
 }
 
 #ifndef _SYS_SYSPROTO_H_
 struct unlinkat_args {
 	int	fd;
-	char	* __capability path;
+	char	*path;
 	int	flag;
 };
 #endif
 int
 sys_unlinkat(struct thread *td, struct unlinkat_args *uap)
 {
-	int fd, flag;
-	char * __capability path;
 
-	flag = uap->flag;
-	fd = uap->fd;
-	path = __USER_CAP_STR(uap->path);
+	return (kern_funlinkat_ex(td, uap->fd, __USER_CAP_STR(uap->path),
+	    FD_NONE, uap->flag, UIO_USERSPACE, 0));
+}
 
-	if ((flag & ~(AT_REMOVEDIR | AT_BENEATH)) != 0)
-		return (EINVAL);
+#ifndef _SYS_SYSPROTO_H_
+struct funlinkat_args {
+	int		dfd;
+	const char	*path;
+	int		fd;
+	int		flag;
+};
+#endif
+int
+sys_funlinkat(struct thread *td, struct funlinkat_args *uap)
+{
 
-	if ((uap->flag & AT_REMOVEDIR) != 0)
-		return (kern_rmdirat(td, fd, path, UIO_USERSPACE, flag));
-	else
-		return (kern_unlinkat(td, fd, path, UIO_USERSPACE, flag, 0));
+	return (kern_funlinkat_ex(td, uap->dfd, __USER_CAP_STR(uap->path),
+	    uap->fd, uap->flag, UIO_USERSPACE, 0));
 }
 
 int
-kern_unlinkat(struct thread *td, int fd, const char * __capability path,
-    enum uio_seg pathseg, int flag, ino_t oldinum)
+kern_funlinkat(struct thread *td, int dfd, const char * __capability path,
+    int fd, enum uio_seg pathseg, int flag, ino_t oldinum)
 {
 	struct mount *mp;
+	struct file *fp;
 	struct vnode *vp;
 	struct nameidata nd;
 	struct stat sb;
 	int error;
 
+	fp = NULL;
+	if (fd != FD_NONE) {
+		error = getvnode(td, fd, &cap_no_rights, &fp);
+		if (error != 0)
+			return (error);
+	}
+
 restart:
 	bwillwrite();
 	NDINIT_ATRIGHTS_C(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1 |
 	    ((flag & AT_BENEATH) != 0 ? BENEATH : 0),
-	    pathseg, path, fd, &cap_unlinkat_rights, td);
-	if ((error = namei(&nd)) != 0)
-		return (error == EINVAL ? EPERM : error);
+	    pathseg, path, dfd, &cap_unlinkat_rights, td);
+	if ((error = namei(&nd)) != 0) {
+		if (error == EINVAL)
+			error = EPERM;
+		goto fdout;
+	}
 	vp = nd.ni_vp;
 	if (vp->v_type == VDIR && oldinum == 0) {
 		error = EPERM;		/* POSIX */
 	} else if (oldinum != 0 &&
 		  ((error = vn_stat(vp, &sb, td->td_ucred, NOCRED, td)) == 0) &&
 		  sb.st_ino != oldinum) {
-			error = EIDRM;	/* Identifier removed */
+		error = EIDRM;	/* Identifier removed */
+	} else if (fp != NULL && fp->f_vnode != vp) {
+		if ((fp->f_vnode->v_iflag & VI_DOOMED) != 0)
+			error = EBADF;
+		else
+			error = EDEADLK;
 	} else {
 		/*
 		 * The root of a mounted filesystem cannot be deleted.
@@ -1864,8 +1911,9 @@ restart:
 			else
 				vput(vp);
 			if ((error = vn_start_write(NULL, &mp,
-			    V_XSLEEP | PCATCH)) != 0)
-				return (error);
+			    V_XSLEEP | PCATCH)) != 0) {
+				goto fdout;
+			}
 			goto restart;
 		}
 #ifdef MAC
@@ -1887,6 +1935,9 @@ out:
 		vrele(vp);
 	else
 		vput(vp);
+fdout:
+	if (fp != NULL)
+		fdrop(fp, td);
 	return (error);
 }
 
@@ -1989,7 +2040,7 @@ vn_access(struct vnode *vp, int user_flags, struct ucred *cred,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct access_args {
-	char	* __capability path;
+	char	*path;
 	int	amode;
 };
 #endif
@@ -2004,7 +2055,7 @@ sys_access(struct thread *td, struct access_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct faccessat_args {
 	int	dirfd;
-	char	* __capability path;
+	char	*path;
 	int	amode;
 	int	flag;
 }
@@ -2069,7 +2120,7 @@ out:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct eaccess_args {
-	char	* __capability path;
+	char	*path;
 	int	amode;
 };
 #endif
@@ -2312,8 +2363,8 @@ freebsd11_fstatat(struct thread *td, struct freebsd11_fstatat_args* uap)
 #ifndef _SYS_SYSPROTO_H_
 struct fstatat_args {
 	int	fd;
-	char	* __capability path;
-	struct stat	* __capability buf;
+	char	*path;
+	struct stat	*buf;
 	int	flag;
 }
 #endif
@@ -2345,7 +2396,6 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
     void (*hook)(struct vnode *vp, struct stat *sbp))
 {
 	struct nameidata nd;
-	struct stat sb;
 	int error;
 
 	if ((flag & ~(AT_SYMLINK_NOFOLLOW | AT_BENEATH)) != 0)
@@ -2358,28 +2408,27 @@ kern_statat(struct thread *td, int flag, int fd, const char * __capability path,
 
 	if ((error = namei(&nd)) != 0)
 		return (error);
-	error = vn_stat(nd.ni_vp, &sb, td->td_ucred, NOCRED, td);
+	error = vn_stat(nd.ni_vp, sbp, td->td_ucred, NOCRED, td);
 	if (error == 0) {
-		SDT_PROBE2(vfs, , stat, mode, path, sb.st_mode);
-		if (S_ISREG(sb.st_mode))
+		SDT_PROBE2(vfs, , stat, mode, path, sbp->st_mode);
+		if (S_ISREG(sbp->st_mode))
 			SDT_PROBE2(vfs, , stat, reg, path, pathseg);
 		if (__predict_false(hook != NULL))
-			hook(nd.ni_vp, &sb);
+			hook(nd.ni_vp, sbp);
 	}
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	vput(nd.ni_vp);
 	if (error != 0)
 		return (error);
 #ifdef __STAT_TIME_T_EXT
-	sb.st_atim_ext = 0;
-	sb.st_mtim_ext = 0;
-	sb.st_ctim_ext = 0;
-	sb.st_btim_ext = 0;
+	sbp->st_atim_ext = 0;
+	sbp->st_mtim_ext = 0;
+	sbp->st_ctim_ext = 0;
+	sbp->st_btim_ext = 0;
 #endif
-	*sbp = sb;
 #ifdef KTRACE
 	if (KTRPOINT(td, KTR_STRUCT))
-		ktrstat(&sb);
+		ktrstat(sbp);
 #endif
 	return (0);
 }
@@ -2462,7 +2511,7 @@ freebsd11_nlstat(struct thread *td, struct freebsd11_nlstat_args *uap)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct pathconf_args {
-	char	* __capability path;
+	char	*path;
 	int	name;
 };
 #endif
@@ -2481,7 +2530,7 @@ sys_pathconf(struct thread *td, struct pathconf_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct lpathconf_args {
-	char	* __capability path;
+	char	*path;
 	int	name;
 };
 #endif
@@ -2521,8 +2570,8 @@ kern_pathconf(struct thread *td, const char * __capability path,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct readlink_args {
-	char	* __capability path;
-	char	* __capability buf;
+	char	*path;
+	char	*buf;
 	size_t	count;
 };
 #endif
@@ -2538,8 +2587,8 @@ sys_readlink(struct thread *td, struct readlink_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct readlinkat_args {
 	int	fd;
-	char	* __capability path;
-	char	* __capability buf;
+	char	*path;
+	char	*buf;
 	size_t	bufsize;
 };
 #endif
@@ -2559,8 +2608,6 @@ kern_readlinkat(struct thread *td, int fd, const char * __capability path,
     size_t count)
 {
 	struct vnode *vp;
-	kiovec_t aiov;
-	struct uio auio;
 	struct nameidata nd;
 	int error;
 
@@ -2574,28 +2621,43 @@ kern_readlinkat(struct thread *td, int fd, const char * __capability path,
 		return (error);
 	NDFREE(&nd, NDF_ONLY_PNBUF);
 	vp = nd.ni_vp;
+
+	error = kern_readlink_vp(vp, buf, bufseg, count, td);
+	vput(vp);
+
+	return (error);
+}
+
+/*
+ * Helper function to readlink from a vnode
+ */
+static int
+kern_readlink_vp(struct vnode *vp, char * __capability buf,
+    enum uio_seg bufseg, size_t count, struct thread *td)
+{
+	kiovec_t aiov;
+	struct uio auio;
+	int error;
+
+	ASSERT_VOP_LOCKED(vp, "kern_readlink_vp(): vp not locked");
 #ifdef MAC
 	error = mac_vnode_check_readlink(td->td_ucred, vp);
-	if (error != 0) {
-		vput(vp);
+	if (error != 0)
 		return (error);
-	}
 #endif
 	if (vp->v_type != VLNK && (vp->v_vflag & VV_READLINK) == 0)
-		error = EINVAL;
-	else {
-		IOVEC_INIT_C(&aiov, buf, count);
-		auio.uio_iov = &aiov;
-		auio.uio_iovcnt = 1;
-		auio.uio_offset = 0;
-		auio.uio_rw = UIO_READ;
-		auio.uio_segflg = bufseg;
-		auio.uio_td = td;
-		auio.uio_resid = count;
-		error = VOP_READLINK(vp, &auio, td->td_ucred);
-		td->td_retval[0] = count - auio.uio_resid;
-	}
-	vput(vp);
+		return (EINVAL);
+
+	IOVEC_INIT_C(&aiov, buf, count);
+	auio.uio_iov = &aiov;
+	auio.uio_iovcnt = 1;
+	auio.uio_offset = 0;
+	auio.uio_rw = UIO_READ;
+	auio.uio_segflg = bufseg;
+	auio.uio_td = td;
+	auio.uio_resid = count;
+	error = VOP_READLINK(vp, &auio, td->td_ucred);
+	td->td_retval[0] = count - auio.uio_resid;
 	return (error);
 }
 
@@ -2645,7 +2707,7 @@ setfflags(struct thread *td, struct vnode *vp, u_long flags)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct chflags_args {
-	const char * __capability path;
+	const char *path;
 	u_long	flags;
 };
 #endif
@@ -2660,7 +2722,7 @@ sys_chflags(struct thread *td, struct chflags_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct chflagsat_args {
 	int	fd;
-	const char * __capability path;
+	const char *path;
 	u_long	flags;
 	int	atflag;
 }
@@ -2668,6 +2730,7 @@ struct chflagsat_args {
 int
 sys_chflagsat(struct thread *td, struct chflagsat_args *uap)
 {
+
 	if ((uap->atflag & ~(AT_SYMLINK_NOFOLLOW | AT_BENEATH)) != 0)
 		return (EINVAL);
 
@@ -2680,7 +2743,7 @@ sys_chflagsat(struct thread *td, struct chflagsat_args *uap)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct lchflags_args {
-	const char * __capability path;
+	const char *path;
 	u_long flags;
 };
 #endif
@@ -2773,7 +2836,7 @@ setfmode(struct thread *td, struct ucred *cred, struct vnode *vp, int mode)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct chmod_args {
-	char	* __capability path;
+	char	*path;
 	int	mode;
 };
 #endif
@@ -2788,7 +2851,7 @@ sys_chmod(struct thread *td, struct chmod_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct fchmodat_args {
 	int	dirfd;
-	char	* __capability path;
+	char	*path;
 	mode_t	mode;
 	int	flag;
 }
@@ -2809,7 +2872,7 @@ sys_fchmodat(struct thread *td, struct fchmodat_args *uap)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct lchmod_args {
-	char	* __capability path;
+	char	*path;
 	int	mode;
 };
 #endif
@@ -2900,7 +2963,7 @@ setfown(struct thread *td, struct ucred *cred, struct vnode *vp, uid_t uid,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct chown_args {
-	char	* __capability path;
+	char	*path;
 	int	uid;
 	int	gid;
 };
@@ -2916,7 +2979,7 @@ sys_chown(struct thread *td, struct chown_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct fchownat_args {
 	int fd;
-	const char * __capability path;
+	const char * path;
 	uid_t uid;
 	gid_t gid;
 	int flag;
@@ -2959,7 +3022,7 @@ kern_fchownat(struct thread *td, int fd, const char * __capability path,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct lchown_args {
-	char	* __capability path;
+	char	*path;
 	int	uid;
 	int	gid;
 };
@@ -3122,8 +3185,8 @@ setutimes(struct thread *td, struct vnode *vp,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct utimes_args {
-	char	* __capability path;
-	struct	timeval * __capability tptr;
+	char	*path;
+	struct	timeval *tptr;
 };
 #endif
 int
@@ -3137,8 +3200,8 @@ sys_utimes(struct thread *td, struct utimes_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct futimesat_args {
 	int fd;
-	const char * __capability path;
-	const struct timeval * __capability times;
+	const char * path;
+	const struct timeval * times;
 };
 #endif
 int
@@ -3177,8 +3240,8 @@ kern_utimesat(struct thread *td, int fd,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct lutimes_args {
-	char	* __capability path;
-	struct	timeval * __capability tptr;
+	char	*path;
+	struct	timeval *tptr;
 };
 #endif
 int
@@ -3215,7 +3278,7 @@ kern_lutimes(struct thread *td,
 #ifndef _SYS_SYSPROTO_H_
 struct futimes_args {
 	int	fd;
-	struct	timeval * __capability tptr;
+	struct	timeval *tptr;
 };
 #endif
 int
@@ -3333,7 +3396,7 @@ kern_utimensat(struct thread *td, int fd,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct truncate_args {
-	char	* __capability path;
+	char	*path;
 	int	pad;
 	off_t	length;
 };
@@ -3494,8 +3557,8 @@ sys_fdatasync(struct thread *td, struct fdatasync_args *uap)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct rename_args {
-	char	* __capability from;
-	char	* __capability to;
+	char	*from;
+	char	*to;
 };
 #endif
 int
@@ -3510,9 +3573,9 @@ sys_rename(struct thread *td, struct rename_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct renameat_args {
 	int	oldfd;
-	char	* __capability old;
+	char	*old;
 	int	newfd;
-	char	* __capability new;
+	char	*new;
 };
 #endif
 int
@@ -3600,10 +3663,10 @@ again:
 			goto out;
 		}
 #ifdef CAPABILITIES
-		if (newfd != AT_FDCWD) {
+		if (newfd != AT_FDCWD && (tond.ni_resflags & NIRES_ABS) == 0) {
 			/*
 			 * If the target already exists we require CAP_UNLINKAT
-			 * from 'newfd'.
+			 * from 'newfd', when newfd was used for the lookup.
 			 */
 			error = cap_check(&tond.ni_filecaps.fc_rights,
 			    &cap_unlinkat_rights);
@@ -3660,7 +3723,7 @@ out1:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct mkdir_args {
-	char	* __capability path;
+	char	*path;
 	int	mode;
 };
 #endif
@@ -3675,7 +3738,7 @@ sys_mkdir(struct thread *td, struct mkdir_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct mkdirat_args {
 	int	fd;
-	char	* __capability path;
+	char	*path;
 	mode_t	mode;
 };
 #endif
@@ -3754,33 +3817,43 @@ out:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct rmdir_args {
-	char	* __capability path;
+	char	*path;
 };
 #endif
 int
 sys_rmdir(struct thread *td, struct rmdir_args *uap)
 {
 
-	return (kern_rmdirat(td, AT_FDCWD, __USER_CAP_STR(uap->path),
-	    UIO_USERSPACE, 0));
+	return (kern_frmdirat(td, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    FD_NONE, UIO_USERSPACE, 0));
 }
 
 int
-kern_rmdirat(struct thread *td, int fd, const char * __capability path,
-    enum uio_seg pathseg, int flag)
+kern_frmdirat(struct thread *td, int dfd, const char * __capability path,
+    int fd, enum uio_seg pathseg, int flag)
 {
 	struct mount *mp;
 	struct vnode *vp;
+	struct file *fp;
 	struct nameidata nd;
+	cap_rights_t rights;
 	int error;
+
+	fp = NULL;
+	if (fd != FD_NONE) {
+		error = getvnode(td, fd, cap_rights_init(&rights, CAP_LOOKUP),
+		    &fp);
+		if (error != 0)
+			return (error);
+	}
 
 restart:
 	bwillwrite();
 	NDINIT_ATRIGHTS_C(&nd, DELETE, LOCKPARENT | LOCKLEAF | AUDITVNODE1 |
 	    ((flag & AT_BENEATH) != 0 ? BENEATH : 0),
-	    pathseg, path, fd, &cap_unlinkat_rights, td);
+	    pathseg, path, dfd, &cap_unlinkat_rights, td);
 	if ((error = namei(&nd)) != 0)
-		return (error);
+		goto fdout;
 	vp = nd.ni_vp;
 	if (vp->v_type != VDIR) {
 		error = ENOTDIR;
@@ -3800,6 +3873,15 @@ restart:
 		error = EBUSY;
 		goto out;
 	}
+
+	if (fp != NULL && fp->f_vnode != vp) {
+		if ((fp->f_vnode->v_iflag & VI_DOOMED) != 0)
+			error = EBADF;
+		else
+			error = EDEADLK;
+		goto out;
+	}
+
 #ifdef MAC
 	error = mac_vnode_check_unlink(td->td_ucred, nd.ni_dvp, vp,
 	    &nd.ni_cnd);
@@ -3814,7 +3896,7 @@ restart:
 		else
 			vput(nd.ni_dvp);
 		if ((error = vn_start_write(NULL, &mp, V_XSLEEP | PCATCH)) != 0)
-			return (error);
+			goto fdout;
 		goto restart;
 	}
 	vfs_notify_upper(vp, VFS_NOTIFY_UPPER_UNLINK);
@@ -3827,6 +3909,9 @@ out:
 		vrele(nd.ni_dvp);
 	else
 		vput(nd.ni_dvp);
+fdout:
+	if (fp != NULL)
+		fdrop(fp, td);
 	return (error);
 }
 
@@ -4137,7 +4222,7 @@ sys_umask(struct thread *td, struct umask_args *uap)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct revoke_args {
-	char	* __capability path;
+	char	*path;
 };
 #endif
 int
@@ -4228,35 +4313,63 @@ getvnode(struct thread *td, int fd, cap_rights_t *rightsp, struct file **fpp)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct lgetfh_args {
-	char	* __capability fname;
-	fhandle_t * __capability fhp;
+	char *fname;
+	fhandle_t *fhp;
 };
 #endif
 int
 sys_lgetfh(struct thread *td, struct lgetfh_args *uap)
 {
 
-	return (kern_getfh(td, __USER_CAP_STR(uap->fname),
-	    __USER_CAP_OBJ(uap->fhp), NOFOLLOW));
+	return (kern_getfhat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
+	    __USER_CAP_STR(uap->fname), UIO_USERSPACE,
+	    __USER_CAP_OBJ(uap->fhp)));
 }
 
 #ifndef _SYS_SYSPROTO_H_
 struct getfh_args {
-	char	* __capability fname;
-	fhandle_t * __capability fhp;
+	char *fname;
+	fhandle_t *fhp;
 };
 #endif
 int
 sys_getfh(struct thread *td, struct getfh_args *uap)
 {
 
-	return (kern_getfh(td, __USER_CAP_STR(uap->fname),
-	    __USER_CAP_OBJ(uap->fhp), FOLLOW));
+	return (kern_getfhat(td, 0, AT_FDCWD, __USER_CAP_STR(uap->fname),
+	    UIO_USERSPACE, __USER_CAP_OBJ(uap->fhp)));
+}
+
+/*
+ * syscall for the rpc.lockd to use to translate an open descriptor into
+ * a NFS file handle.
+ *
+ * warning: do not remove the priv_check() call or this becomes one giant
+ * security hole.
+ */
+#ifndef _SYS_SYSPROTO_H_
+struct getfhat_args {
+	int fd;
+	char *path;
+	fhandle_t *fhp;
+	int flags;
+};
+#endif
+int
+sys_getfhat(struct thread *td, struct getfhat_args *uap)
+{
+
+	if ((uap->flags & ~(AT_SYMLINK_NOFOLLOW | AT_BENEATH)) != 0)
+		return (EINVAL);
+	return (kern_getfhat(td, uap->flags, uap->fd,
+	    __USER_CAP_STR(uap->path), UIO_SYSSPACE,
+	    __USER_CAP_OBJ(uap->fhp)));
 }
 
 int
-kern_getfh(struct thread *td, const char * __capability fname,
-    fhandle_t * __capability fhp, int follow)
+kern_getfhat(struct thread *td, int flags, int fd,
+    const char * __capability path, enum uio_seg pathseg,
+    fhandle_t * __capability fhp)
 {
 	struct nameidata nd;
 	fhandle_t fh;
@@ -4266,8 +4379,10 @@ kern_getfh(struct thread *td, const char * __capability fname,
 	error = priv_check(td, PRIV_VFS_GETFH);
 	if (error != 0)
 		return (error);
-	NDINIT_C(&nd, LOOKUP, follow | LOCKLEAF | AUDITVNODE1, UIO_USERSPACE,
-	    fname, td);
+	NDINIT_AT_C(&nd, LOOKUP,
+	    ((flags & AT_SYMLINK_NOFOLLOW) != 0 ? NOFOLLOW : FOLLOW) |
+	    ((flags & AT_BENEATH) != 0 ? BENEATH : 0) | LOCKLEAF | AUDITVNODE1,
+	    pathseg, path, fd, td);
 	error = namei(&nd);
 	if (error != 0)
 		return (error);
@@ -4282,6 +4397,106 @@ kern_getfh(struct thread *td, const char * __capability fname,
 	return (error);
 }
 
+#ifndef _SYS_SYSPROTO_H_
+struct fhlink_args {
+	fhandle_t *fhp;
+	const char *to;
+};
+#endif
+int
+sys_fhlink(struct thread *td, struct fhlink_args *uap)
+{
+
+	return (kern_fhlinkat(td, AT_FDCWD, __USER_CAP_STR(uap->to),
+	    UIO_USERSPACE, __USER_CAP_OBJ(uap->fhp)));
+}
+
+#ifndef _SYS_SYSPROTO_H_
+struct fhlinkat_args {
+	fhandle_t *fhp;
+	int tofd;
+	const char *to;
+};
+#endif
+int
+sys_fhlinkat(struct thread *td, struct fhlinkat_args *uap)
+{
+
+	return (kern_fhlinkat(td, uap->tofd, __USER_CAP_STR(uap->to),
+	    UIO_USERSPACE, __USER_CAP_OBJ(uap->fhp)));
+}
+
+int
+kern_fhlinkat(struct thread *td, int fd, const char * __capability path,
+    enum uio_seg pathseg, fhandle_t * __capability fhp)
+{
+	fhandle_t fh;
+	struct mount *mp;
+	struct vnode *vp;
+	int error;
+
+	error = priv_check(td, PRIV_VFS_GETFH);
+	if (error != 0)
+		return (error);
+	error = copyin(fhp, &fh, sizeof(fh));
+	if (error != 0)
+		return (error);
+	do {
+		bwillwrite();
+		if ((mp = vfs_busyfs(&fh.fh_fsid)) == NULL)
+			return (ESTALE);
+		error = VFS_FHTOVP(mp, &fh.fh_fid, LK_SHARED, &vp);
+		vfs_unbusy(mp);
+		if (error != 0)
+			return (error);
+		VOP_UNLOCK(vp, 0);
+	} while ((error = kern_linkat_vp(td, vp, fd, path, pathseg)) == EAGAIN);
+	return (error);
+}
+
+#ifndef _SYS_SYSPROTO_H_
+struct fhreadlink_args {
+	fhandle_t *fhp;
+	char *buf;
+	size_t bufsize;
+};
+#endif
+int
+sys_fhreadlink(struct thread *td, struct fhreadlink_args *uap)
+{
+	
+	return (kern_fhreadlink(td, __USER_CAP_OBJ(uap->fhp),
+	    __USER_CAP(uap->buf, uap->bufsize), uap->bufsize));
+}
+
+int
+kern_fhreadlink(struct thread *td, fhandle_t * __capability fhp,
+    char * __capability buf, size_t bufsize)
+{
+	fhandle_t fh;
+	struct mount *mp;
+	struct vnode *vp;
+	int error;
+
+	error = priv_check(td, PRIV_VFS_GETFH);
+	if (error != 0)
+		return (error);
+	if (bufsize > IOSIZE_MAX)
+		return (EINVAL);
+	error = copyin(fhp, &fh, sizeof(fh));
+	if (error != 0)
+		return (error);
+	if ((mp = vfs_busyfs(&fh.fh_fsid)) == NULL)
+		return (ESTALE);
+	error = VFS_FHTOVP(mp, &fh.fh_fid, LK_SHARED, &vp);
+	vfs_unbusy(mp);
+	if (error != 0)
+		return (error);
+	error = kern_readlink_vp(vp, buf, UIO_USERSPACE, bufsize, td);
+	vput(vp);
+	return (error);
+}
+
 /*
  * syscall for the rpc.lockd to use to translate a NFS file handle into an
  * open descriptor.
@@ -4291,7 +4506,7 @@ kern_getfh(struct thread *td, const char * __capability fname,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct fhopen_args {
-	const struct fhandle * __capability u_fhp;
+	const struct fhandle *u_fhp;
 	int flags;
 };
 #endif
@@ -4383,8 +4598,8 @@ bad:
  */
 #ifndef _SYS_SYSPROTO_H_
 struct fhstat_args {
-	struct fhandle * __capability u_fhp;
-	struct stat * __capability sb;
+	struct fhandle *u_fhp;
+	struct stat *sb;
 };
 #endif
 int
@@ -4438,8 +4653,8 @@ kern_fhstat(struct thread *td, struct fhandle fh, struct stat *sb)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct fhstatfs_args {
-	struct fhandle * __capability u_fhp;
-	struct statfs * __capability buf;
+	struct fhandle *u_fhp;
+	struct statfs *buf;
 };
 #endif
 int
@@ -4743,7 +4958,7 @@ sys_posix_fadvise(struct thread *td, struct posix_fadvise_args *uap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

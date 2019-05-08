@@ -9,4 +9,9 @@ SRCS=	pw_scan.c pwd_mkdb.c
 
 CFLAGS+= -I${SRCTOP}/lib/libc/gen		# for pw_scan.h
 
+# This is needed to bootstrap on a Linux host:
+.if defined(BOOTSTRAPPING) && ${.MAKE.OS} != "FreeBSD"
+CFLAGS+=-DNEED_FREEBSD_STRUCT_PASSWD
+.endif
+
 .include <bsd.prog.mk>

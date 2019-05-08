@@ -78,8 +78,8 @@ machdep_ap_bootstrap(void)
 	__asm __volatile("msync; isync");
 
 	while (ap_letgo == 0)
-		__asm __volatile("or 27,27,27");
-	__asm __volatile("or 6,6,6");
+		nop_prio_vlow();
+	nop_prio_medium();
 
 	/*
 	 * Set timebase as soon as possible to meet an implicit rendezvous
@@ -100,7 +100,11 @@ machdep_ap_bootstrap(void)
 	/* Serialize console output and AP count increment */
 	mtx_lock_spin(&ap_boot_mtx);
 	ap_awake++;
-	printf("SMP: AP CPU #%d launched\n", PCPU_GET(cpuid));
+	if (bootverbose)
+		printf("SMP: AP CPU #%d launched\n", PCPU_GET(cpuid));
+	else
+		printf("%s%d%s", ap_awake == 2 ? "Launching APs: " : "",
+		    PCPU_GET(cpuid), ap_awake == mp_ncpus ? "\n" : " ");
 	mtx_unlock_spin(&ap_boot_mtx);
 
 	while(smp_started == 0)
@@ -178,10 +182,23 @@ cpu_mp_start(void)
 			pc->pc_bsp = 1;
 		}
 		pc->pc_hwref = cpu.cr_hwref;
+
+		if (vm_ndomains > 1)
+			pc->pc_domain = cpu.cr_domain;
+		else
+			pc->pc_domain = 0;
+
+		CPU_SET(pc->pc_cpuid, &cpuset_domain[pc->pc_domain]);
+		KASSERT(pc->pc_domain < MAXMEMDOM, ("bad domain value %d\n",
+		    pc->pc_domain));
 		CPU_SET(pc->pc_cpuid, &all_cpus);
 next:
 		error = platform_smp_next_cpu(&cpu);
 	}
+
+#ifdef SMP
+	platform_smp_probe_threads();
+#endif
 }
 
 void
@@ -197,7 +214,7 @@ cpu_mp_announce(void)
 		pc = pcpu_find(i);
 		if (pc == NULL)
 			continue;
-		printf("cpu%d: dev=%x", i, (int)pc->pc_hwref);
+		printf("cpu%d: dev=%x domain=%d ", i, (int)pc->pc_hwref, pc->pc_domain);
 		if (pc->pc_bsp)
 			printf(" (BSP)");
 		printf("\n");

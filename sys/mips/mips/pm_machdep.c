@@ -83,12 +83,6 @@ __FBSDID("$FreeBSD$");
 
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
-#if !__has_feature(capabilities)
-/* XXX-AM: fix for freebsd64
- * Note that this is really not used when we do not define
- * the elf64 sysentvec.
- */
-
 /*
  * Send an interrupt to process.
  *
@@ -100,7 +94,7 @@ __FBSDID("$FreeBSD$");
  * specified pc, psl.
  */
 void
-freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
+sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
 	struct proc *p;
 	struct thread *td;
@@ -305,8 +299,9 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	hybridabi_sendsig(td);
 #endif
 
-	regs->pc = (__cheri_addr register_t)catcher;
-	regs->t9 = (__cheri_addr register_t)catcher;
+	regs->pc = (register_t)(__cheri_offset intptr_t)catcher;
+	// FIXME: should this be an offset relative to PCC or an address?
+	regs->t9 = (register_t)(__cheri_offset intptr_t)catcher;
 	regs->sp = (register_t)(intptr_t)sfp;
 	if (p->p_sysent->sv_sigcode_base != 0) {
 		/* Signal trampoline code is in the shared page */
@@ -320,7 +315,6 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
 }
-#endif /* ! feature(capabilities) */
 
 /*
  * System call to cleanup state after a signal
@@ -475,8 +469,6 @@ set_regs(struct thread *td, struct reg *regs)
 	return (0);
 }
 
-#if !__has_feature(capabilities)
-/* XXX-AM: fix for freebsd64 */
 int
 get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 {
@@ -570,7 +562,6 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 
 	return (0);
 }
-#endif /* __has_feature(capabilities) */
 
 int
 fill_fpregs(struct thread *td, struct fpreg *fpregs)
@@ -610,7 +601,6 @@ set_capregs(struct thread *td, struct capreg *capregs)
 }
 #endif
 
-#if !__has_feature(capabilities)
 /*
  * Clear registers on exec
  * $sp is set to the stack pointer passed in.  $pc is set to the entry
@@ -686,7 +676,6 @@ exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
 
 	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
 }
-#endif /* !feature(capabilities) */
 
 int
 ptrace_clear_single_step(struct thread *td)
@@ -723,7 +712,7 @@ ptrace_clear_single_step(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",

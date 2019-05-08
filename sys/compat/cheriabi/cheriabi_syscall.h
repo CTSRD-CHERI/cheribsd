@@ -500,4 +500,9 @@
 #define	CHERIABI_SYS_cheriabi_cpuset_getdomain	561
 #define	CHERIABI_SYS_cheriabi_cpuset_setdomain	562
 #define	CHERIABI_SYS_cheriabi_getrandom	563
-#define	CHERIABI_SYS_MAXSYSCALL	564
+#define	CHERIABI_SYS_cheriabi_getfhat	564
+#define	CHERIABI_SYS_cheriabi_fhlink	565
+#define	CHERIABI_SYS_cheriabi_fhlinkat	566
+#define	CHERIABI_SYS_cheriabi_fhreadlink	567
+#define	CHERIABI_SYS_cheriabi_funlinkat	568
+#define	CHERIABI_SYS_MAXSYSCALL	569

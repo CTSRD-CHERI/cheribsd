@@ -230,6 +230,7 @@ typedef struct ksiginfo {
 #define	ksi_value	ksi_info.si_value
 #define	ksi_band	ksi_info.si_band
 #define	ksi_trapno	ksi_info.si_trapno
+#define	ksi_capreg	ksi_info.si_capreg
 #define	ksi_overrun	ksi_info.si_overrun
 #define	ksi_timerid	ksi_info.si_timerid
 #define	ksi_mqd		ksi_info.si_mqd
@@ -403,6 +404,7 @@ int	sigev_findtd(struct proc *p, ksigevent_t *sigev, struct thread **);
 int	sig_ffs(sigset_t *set);
 void	siginfo_to_siginfo_native(const _siginfo_t *si,
 	    struct siginfo_native *si_n);
+int	copyout_siginfo_native(const _siginfo_t *si, void * __capability info);
 void	siginfo_native_to_siginfo(const struct siginfo_native *si_n,
 	    _siginfo_t *si);
 void	siginit(struct proc *p);
@@ -425,7 +427,7 @@ void	trapsignal(struct thread *td, ksiginfo_t *ksi);
 #endif /* !_SYS_SIGNALVAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",

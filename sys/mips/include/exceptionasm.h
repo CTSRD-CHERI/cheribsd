@@ -142,9 +142,8 @@
 	RESTORE_U_PCB_REG(t1, MULHI, pcb)	; \
 	mtlo	t0				; \
 	mthi	t1				; \
-	RESTORE_U_PCB_REG(a0, PC, pcb)		; \
+	RESTORE_U_PCB_PC(a0, t0, pcb)		; \
 	RESTORE_U_PCB_REG(v0, V0, pcb)		; \
-        MTC0	a0, MIPS_COP_0_EXC_PC		; \
 	RESTORE_U_PCB_REG(v1, V1, pcb)		; \
 	RESTORE_U_PCB_REG(a0, A0, pcb)		; \
 	RESTORE_U_PCB_REG(a1, A1, pcb)		; \

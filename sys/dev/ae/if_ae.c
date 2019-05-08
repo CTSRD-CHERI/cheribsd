@@ -2261,7 +2261,7 @@ ae_update_stats_rx(uint16_t flags, ae_stats_t *stats)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

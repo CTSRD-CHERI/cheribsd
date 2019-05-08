@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/imgact.h>
 #include <sys/bio.h>
+#include <sys/boot.h>
 #include <sys/buf.h>
 #include <sys/bus.h>
 #include <sys/cpu.h>
@@ -360,9 +361,10 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	/* 
 	 * Parse kernel cmdline.
 	 * YAMON uses 32bit pointers to strings so
-	 * convert them to proper type manually
+	 * sign-extend them to the correct type manually.
 	 */
-	printf("cmd line: ");
+	if (bootverbose)
+		printf("cmd line: ");
 	for (i = 0; i < argc; i++) {
 		char *arg;
 #ifdef CHERI_KERNEL
@@ -374,7 +376,8 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 #else
 		arg = (char*)(intptr_t)argv[i];
 #endif
-		printf("%s ", arg);
+		if (bootverbose)
+			printf("%s ", arg);
 		while (*arg != '\0') {
 			if (*arg++ != '-')
 				continue;
@@ -392,7 +395,28 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 			}
 		}
 	}
-	printf("\n");
+	if (bootverbose)
+		printf("\n");
+
+#ifdef CPU_QEMU_MALTA
+	/*
+	 * QEMU passes the -kernel path as argv[0] and the value of the
+	 * -append command line flag as argv[1]. We must use
+	 * boot_parse_cmdline() for argv[0] if we want to support multiple
+	 * values to be set in the environment (This happens e.g. when a user
+	 * passes -append "foo=bar value2=123"). We also skip argv[0] since it
+	 * is not useful to have /path/to/kernel=1 in the environment.
+	 */
+	if (argc >= 2) {
+		boothowto |= boot_parse_cmdline((char*)(intptr_t)argv[1]);
+	} else {
+		panic("QEMU has changed and allows multiple -append flags?");
+	}
+#else
+	/* On non-QEMU CPUs we can parse argv normally. */
+	for (i = 0; i < argc; i++)
+		boothowto |= boot_parse_arg((char*)(intptr_t)argv[i]);
+#endif
 
 	if (bootverbose)
 		printf("envp:\n");

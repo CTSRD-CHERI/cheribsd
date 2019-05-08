@@ -221,7 +221,8 @@
 #define	FFS_UNLINK		14	/* remove a name in the filesystem */
 #define	FFS_SET_INODE		15	/* update an on-disk inode */
 #define	FFS_SET_BUFOUTPUT	16	/* set buffered writing on descriptor */
-#define	FFS_MAXID		16	/* number of valid ffs ids */
+#define	FFS_SET_SIZE		17	/* set inode size */
+#define	FFS_MAXID		17	/* number of valid ffs ids */
 
 /*
  * Command structure passed in to the filesystem to adjust filesystem values.
@@ -847,10 +848,10 @@ extern u_char *fragtbl[];
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180816,
+//   "updated": 20181121,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_size"
+//     "pointer_shape"
 //   ],
 //   "change_comment": "embedded pointer storage in superblock"
 // }

@@ -270,7 +270,27 @@
             test-programs
             ..
         ..
+        csu
+            dynamic
+            ..
+            dynamiclib
+            ..
+            static
+            ..
+        ..
+        googletest
+            gmock
+            ..
+            gmock_main
+            ..
+            gtest
+            ..
+            gtest_main
+            ..
+        ..
         libarchive
+        ..
+        libbe
         ..
         libc
             c063
@@ -390,6 +410,8 @@
         ..
     ..
     sbin
+        bectl
+        ..
         dhclient
         ..
         devd
@@ -419,6 +441,8 @@
         examples
             tests
                 atf
+                ..
+                googletest
                 ..
                 plain
                 ..
@@ -750,6 +774,8 @@
             tunnel
             ..
         ..
+    netmap
+    ..
         netpfil
             pf
                 ioctl

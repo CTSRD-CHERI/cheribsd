@@ -215,9 +215,26 @@ linux_get_pid_task(pid_t pid)
 	return (NULL);
 }
 
+bool
+linux_task_exiting(struct task_struct *task)
+{
+	struct proc *p;
+	bool ret;
+
+	ret = false;
+	p = pfind(task->pid);
+	if (p != NULL) {
+		if ((p->p_flag & P_WEXIT) != 0)
+			ret = true;
+		PROC_UNLOCK(p);
+	}
+	return (ret);
+}
+
 static void
 linux_current_init(void *arg __unused)
 {
+	lkpi_alloc_current = linux_alloc_current;
 	linuxkpi_thread_dtor_tag = EVENTHANDLER_REGISTER(thread_dtor,
 	    linuxkpi_thread_dtor, NULL, EVENTHANDLER_PRI_ANY);
 }
@@ -242,7 +259,7 @@ linux_current_uninit(void *arg __unused)
 		PROC_UNLOCK(p);
 	}
 	sx_sunlock(&allproc_lock);
-
 	EVENTHANDLER_DEREGISTER(thread_dtor, linuxkpi_thread_dtor_tag);
+	lkpi_alloc_current = linux_alloc_current_noop;
 }
 SYSUNINIT(linux_current, SI_SUB_EVENTHANDLER, SI_ORDER_SECOND, linux_current_uninit, NULL);

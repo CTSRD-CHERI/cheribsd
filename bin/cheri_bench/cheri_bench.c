@@ -123,13 +123,13 @@ DEFINE_GET_STAT_COUNTER(l2cache_write_miss,10,1);
 DEFINE_GET_STAT_COUNTER(l2cache_read_hit,10,2);
 DEFINE_GET_STAT_COUNTER(l2cache_read_miss,10,3);
 
-typedef void memcpy_t(__capability char *, __capability char *, size_t, void *data);
+typedef void memcpy_t(char * __capability , char * __capability , size_t, void *data);
 
 struct semaphore_shared_data {
   sem_t sem_request;
   sem_t sem_response;
-  __capability char * volatile datain;
-  __capability char * volatile dataout;
+  char * __capability volatile datain;
+  char * __capability volatile dataout;
   volatile size_t len;
   int core;
 };
@@ -162,13 +162,13 @@ static void set_my_affinity(int cpunum)
 
 }
 
-static void do_memcpy (__capability char *dataout, __capability char *datain, size_t len, void * __unused data)
+static void do_memcpy (char * __capability dataout, char * __capability datain, size_t len, void * __unused data)
 {
   memcpy_c(dataout, datain, len);
 }
 
 #ifdef CAP
-static void invoke_memcpy(__capability char *dataout, __capability char *datain, size_t len, void * __unused data)
+static void invoke_memcpy(char * __capability dataout, char * __capability datain, size_t len, void * __unused data)
 {
   int ret;
   ret = cheri_bench_memcpy_cap(
@@ -193,7 +193,7 @@ static inline void read_retry(int fd, char *buf, size_t len)
     }
 }
 
-static void socket_memcpy(__capability char *dataout, __capability char *datain, size_t len, void *data)
+static void socket_memcpy(char * __capability dataout, char * __capability datain, size_t len, void *data)
 {
   int fd = *((int *) data);
   ssize_t  io_len;
@@ -228,7 +228,7 @@ static void socket_sandbox_func(int fd, size_t max_size)
     }
 }
 
-static void shmem_memcpy(__capability char *dataout __unused, __capability char *datain __unused, size_t len, void *data)
+static void shmem_memcpy(char * __capability dataout __unused, char * __capability datain __unused, size_t len, void *data)
 {
   ssize_t  io_len;
   int fd = *((int *) data);
@@ -238,7 +238,7 @@ static void shmem_memcpy(__capability char *dataout __unused, __capability char 
   assert(io_len == sizeof(len));
 }
 
-static void shmem_sandbox_func(int fd, __capability char *datain, __capability char *dataout)
+static void shmem_sandbox_func(int fd, char * __capability datain, char * __capability dataout)
 {
   size_t len;
   ssize_t io_len;
@@ -254,7 +254,7 @@ static void shmem_sandbox_func(int fd, __capability char *datain, __capability c
     }
 }
 
-static void semaphore_memcpy(__capability char *dataout, __capability char *datain, size_t len, void *data)
+static void semaphore_memcpy(char * __capability dataout, char * __capability datain, size_t len, void *data)
 {
   struct semaphore_shared_data *sdata = (struct semaphore_shared_data *) data;
   sdata->dataout = dataout;
@@ -277,8 +277,8 @@ static void *semaphore_sandbox_func(void *arg)
     }
 }
 
-int benchmark(memcpy_t *memcpy_func, __capability char *dataout, __capability char *datain, size_t size, const char* name, uint reps, struct counters *samples, void *data) __attribute__((__noinline__));
-int benchmark(memcpy_t *memcpy_func, __capability char *dataout, __capability char *datain, size_t size, const char* name, uint reps, struct counters *samples, void *data)
+int benchmark(memcpy_t *memcpy_func, char * __capability dataout, char * __capability datain, size_t size, const char* name, uint reps, struct counters *samples, void *data) __attribute__((__noinline__));
+int benchmark(memcpy_t *memcpy_func, char * __capability dataout, char * __capability datain, size_t size, const char* name, uint reps, struct counters *samples, void *data)
 {
       int32_t cycles, cycles2, insts, insts2, instTLB, instTLB2, dataTLB, dataTLB2;
       int64_t l2whit, l2whit2, l2wmiss, l2wmiss2, l2rhit, l2rhit2, l2rmiss, l2rmiss2;
@@ -368,7 +368,8 @@ main(int argc, char *argv[])
 	struct sandbox_object *sandboxp;
 #endif
 	char *datain, *dataout;
-	__capability char *datain_cap, *dataout_cap;
+	char * __capability datain_cap;
+	char * __capability dataout_cap;
 	int socket_pair[2], pipe_pair[2], shmem_socket_pair[2];
 	int arg;
 	uint rep, reps = 100;

@@ -61,6 +61,7 @@ MIPS64ELHF
 MIPSN32
 
 COMPAT_FREEBSD32	opt_global.h
+COMPAT_FREEBSD64	opt_global.h
 
 COMPAT_CHERIABI		opt_global.h
 
@@ -126,6 +127,11 @@ CPU_CHERI	opt_global.h
 # Access user space through kernel DDC (via legacy load/store instructions)
 #
 CHERI_IMPLICIT_USER_DDC	opt_global.h
+
+#
+# Support legacy CheriABI binaries
+#
+CHERIABI_LEGACY_SUPPORT	opt_global.h
 
 #
 # Experimental support for 128-bit capabilities.

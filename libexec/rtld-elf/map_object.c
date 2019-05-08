@@ -29,10 +29,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "prog",
  *   "changes": [
- *     "monotonicity"
+ *     "monotonicity",
+ *     "integer_provenance"
  *   ],
  *   "change_comment": "request sufficent mmap permissions"
  * }
@@ -105,11 +106,11 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     caddr_t note_end;
     char *note_map;
     size_t note_map_len;
+    Elf_Addr text_end;
 #ifdef __CHERI_PURE_CAPABILITY__
     Elf_Addr text_rodata_start = 0;
     Elf_Addr text_rodata_end = 0;
 #endif
-
 
     hdr = get_elf_header(fd, path, sb, main_path);
     if (hdr == NULL)
@@ -134,6 +135,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     note_map_len = 0;
     segs = alloca(sizeof(segs[0]) * hdr->e_phnum);
     stack_flags = RTLD_DEFAULT_STACK_PF_EXEC | PF_R | PF_W;
+    text_end = 0;
     while (phdr < phlimit) {
 	switch (phdr->p_type) {
 
@@ -158,6 +160,10 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 		    (size_t)text_rodata_start, (size_t)text_rodata_end);
 	    }
 #endif
+	    if ((segs[nsegs]->p_flags & PF_X) == PF_X) {
+		text_end = MAX(text_end,
+		    round_page(segs[nsegs]->p_vaddr + segs[nsegs]->p_memsz));
+	    }
 	    break;
 
 	case PT_PHDR:
@@ -320,8 +326,6 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     }
     obj->mapbase = mapbase;
     obj->mapsize = mapsize;
-    obj->textsize = round_page(segs[0]->p_vaddr + segs[0]->p_memsz) -
-      base_vaddr;
     obj->vaddrbase = base_vaddr;
 
     obj->relocbase = mapbase - base_vaddr;

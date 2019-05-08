@@ -21,11 +21,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180803,
+ *   "updated": 20181121,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_as_integer",
- *     "function_abi"
+ *     "calling_convention"
  *   ],
  *   "comment": "thread_create was using a function pointer without prototypes"
  * }

@@ -35,6 +35,7 @@
 #include <machine/param.h>
 #include <machine/spr.h>
 #include <machine/asm.h>
+#include <machine/vmparam.h>
 
 #ifdef _CALL_ELF
 .abiversion _CALL_ELF
@@ -63,6 +64,14 @@ GLOBAL(tmpstk)
 
 TOC_ENTRY(tmpstk)
 TOC_ENTRY(can_wakeup)
+
+#ifdef KDB
+#define TRAPSTKSZ       4096            /* 4k trap stack */
+GLOBAL(trapstk)
+        .space        TRAPSTKSZ
+TOC_ENTRY(trapstk)
+#endif
+
 
 /*
  * Entry point for bootloaders that do not fully implement ELF and start

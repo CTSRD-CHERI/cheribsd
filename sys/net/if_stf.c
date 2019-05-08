@@ -369,6 +369,7 @@ stf_encapcheck(const struct mbuf *m, int off, int proto, void *arg)
 static int
 stf_getsrcifa6(struct ifnet *ifp, struct in6_addr *addr, struct in6_addr *mask)
 {
+	struct rm_priotracker in_ifa_tracker;
 	struct ifaddr *ia;
 	struct in_ifaddr *ia4;
 	struct in6_ifaddr *ia6;
@@ -384,9 +385,11 @@ stf_getsrcifa6(struct ifnet *ifp, struct in6_addr *addr, struct in6_addr *mask)
 			continue;
 
 		bcopy(GET_V4(&sin6->sin6_addr), &in, sizeof(in));
+		IN_IFADDR_RLOCK(&in_ifa_tracker);
 		LIST_FOREACH(ia4, INADDR_HASH(in.s_addr), ia_hash)
 			if (ia4->ia_addr.sin_addr.s_addr == in.s_addr)
 				break;
+		IN_IFADDR_RUNLOCK(&in_ifa_tracker);
 		if (ia4 == NULL)
 			continue;
 
@@ -723,6 +726,7 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 
 		ifp->if_flags |= IFF_UP;
+		ifp->if_drv_flags |= IFF_DRV_RUNNING;
 		break;
 
 	case CASE_IOC_IFREQ(SIOCADDMULTI):
@@ -753,7 +757,7 @@ stf_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

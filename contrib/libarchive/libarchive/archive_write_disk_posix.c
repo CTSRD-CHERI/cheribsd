@@ -1705,6 +1705,20 @@ _archive_write_disk_finish_entry(struct archive *_a)
 	}
 
 	/*
+	 * HYPOTHESIS:
+	 * If we're not root, we won't be setting any security
+	 * attributes that may be wiped by the set_mode() routine
+	 * below.  We also can't set xattr on non-owner-writable files,
+	 * which may be the state after set_mode(). Perform
+	 * set_xattrs() first based on these constraints.
+	 */
+	if (a->user_uid != 0 &&
+	    (a->todo & TODO_XATTR)) {
+		int r2 = set_xattrs(a);
+		if (r2 < ret) ret = r2;
+	}
+
+	/*
 	 * set_mode must precede ACLs on systems such as Solaris and
 	 * FreeBSD where setting the mode implicitly clears extended ACLs
 	 */
@@ -1717,8 +1731,10 @@ _archive_write_disk_finish_entry(struct archive *_a)
 	 * Security-related extended attributes (such as
 	 * security.capability on Linux) have to be restored last,
 	 * since they're implicitly removed by other file changes.
+	 * We do this last only when root.
 	 */
-	if (a->todo & TODO_XATTR) {
+	if (a->user_uid == 0 &&
+	    (a->todo & TODO_XATTR)) {
 		int r2 = set_xattrs(a);
 		if (r2 < ret) ret = r2;
 	}
@@ -1775,10 +1791,8 @@ finish_metadata:
 		a->fd = -1;
 	}
 	/* If there's an entry, we can release it now. */
-	if (a->entry) {
-		archive_entry_free(a->entry);
-		a->entry = NULL;
-	}
+	archive_entry_free(a->entry);
+	a->entry = NULL;
 	a->archive.state = ARCHIVE_STATE_HEADER;
 	return (ret);
 }
@@ -2223,6 +2237,15 @@ create_filesystem_object(struct archive_write_disk *a)
 	 */
 	mode = final_mode & 0777 & ~a->user_umask;
 
+	/* 
+	 * Always create writable such that [f]setxattr() works if we're not
+	 * root.
+	 */
+	if (a->user_uid != 0 &&
+	    a->todo & (TODO_HFS_COMPRESSION | TODO_XATTR)) {
+		mode |= 0200;
+	}
+
 	switch (a->mode & AE_IFMT) {
 	default:
 		/* POSIX requires that we fall through here. */
@@ -2373,8 +2396,7 @@ _archive_write_disk_free(struct archive *_a)
 	ret = _archive_write_disk_close(&a->archive);
 	archive_write_disk_set_group_lookup(&a->archive, NULL, NULL, NULL);
 	archive_write_disk_set_user_lookup(&a->archive, NULL, NULL, NULL);
-	if (a->entry)
-		archive_entry_free(a->entry);
+	archive_entry_free(a->entry);
 	archive_string_free(&a->_name_data);
 	archive_string_free(&a->archive.error_string);
 	archive_string_free(&a->path_safe);
@@ -2566,8 +2588,11 @@ check_symlinks_fsobj(char *path, int *a_eno, struct archive_string *a_estr,
 	 */
 	restore_pwd = open(".", O_RDONLY | O_BINARY | O_CLOEXEC);
 	__archive_ensure_cloexec_flag(restore_pwd);
-	if (restore_pwd < 0)
+	if (restore_pwd < 0) {
+		fsobj_error(a_eno, a_estr, errno,
+		    "Could not open ", path);
 		return (ARCHIVE_FATAL);
+	}
 	head = path;
 	tail = path;
 	last = 0;
@@ -3106,12 +3131,14 @@ create_dir(struct archive_write_disk *a, char *path)
 static int
 set_ownership(struct archive_write_disk *a)
 {
-#ifndef __CYGWIN__
-/* unfortunately, on win32 there is no 'root' user with uid 0,
-   so we just have to try the chown and see if it works */
-
-	/* If we know we can't change it, don't bother trying. */
-	if (a->user_uid != 0  &&  a->user_uid != a->uid) {
+#if !defined(__CYGWIN__) && !defined(__linux__)
+/*
+ * On Linux, a process may have the CAP_CHOWN capability.
+ * On Windows there is no 'root' user with uid 0.
+ * Elsewhere we can skip calling chown if we are not root and the desired
+ * user id does not match the current user.
+ */
+	if (a->user_uid != 0 && a->user_uid != a->uid) {
 		archive_set_error(&a->archive, errno,
 		    "Can't set UID=%jd", (intmax_t)a->uid);
 		return (ARCHIVE_WARN);
@@ -3478,9 +3505,7 @@ set_fflags(struct archive_write_disk *a)
 	struct fixup_entry *le;
 	unsigned long	set, clear;
 	int		r;
-	int		critical_flags;
 	mode_t		mode = archive_entry_mode(a->entry);
-
 	/*
 	 * Make 'critical_flags' hold all file flags that can't be
 	 * immediately restored.  For example, on BSD systems,
@@ -3496,33 +3521,33 @@ set_fflags(struct archive_write_disk *a)
 	 * other programs that might try to muck with files as they're
 	 * being restored.
 	 */
-	/* Hopefully, the compiler will optimize this mess into a constant. */
-	critical_flags = 0;
+	const int	critical_flags = 0
 #ifdef SF_IMMUTABLE
-	critical_flags |= SF_IMMUTABLE;
+	    | SF_IMMUTABLE
 #endif
 #ifdef UF_IMMUTABLE
-	critical_flags |= UF_IMMUTABLE;
+	    | UF_IMMUTABLE
 #endif
 #ifdef SF_APPEND
-	critical_flags |= SF_APPEND;
+	    | SF_APPEND
 #endif
 #ifdef UF_APPEND
-	critical_flags |= UF_APPEND;
+	    | UF_APPEND
 #endif
 #if defined(FS_APPEND_FL)
-	critical_flags |= FS_APPEND_FL;
+	    | FS_APPEND_FL
 #elif defined(EXT2_APPEND_FL)
-	critical_flags |= EXT2_APPEND_FL;
+	    | EXT2_APPEND_FL
 #endif
 #if defined(FS_IMMUTABLE_FL)
-	critical_flags |= FS_IMMUTABLE_FL;
+	    | FS_IMMUTABLE_FL
 #elif defined(EXT2_IMMUTABLE_FL)
-	critical_flags |= EXT2_IMMUTABLE_FL;
+	    | EXT2_IMMUTABLE_FL
 #endif
 #ifdef FS_JOURNAL_DATA_FL
-	critical_flags |= FS_JOURNAL_DATA_FL;
+	    | FS_JOURNAL_DATA_FL
 #endif
+	;
 
 	if (a->todo & TODO_FFLAGS) {
 		archive_entry_fflags(a->entry, &set, &clear);
@@ -3553,29 +3578,27 @@ set_fflags(struct archive_write_disk *a)
 static int
 clear_nochange_fflags(struct archive_write_disk *a)
 {
-	int		nochange_flags;
 	mode_t		mode = archive_entry_mode(a->entry);
-
-	/* Hopefully, the compiler will optimize this mess into a constant. */
-	nochange_flags = 0;
+	const int nochange_flags = 0
 #ifdef SF_IMMUTABLE
-	nochange_flags |= SF_IMMUTABLE;
+	    | SF_IMMUTABLE
 #endif
 #ifdef UF_IMMUTABLE
-	nochange_flags |= UF_IMMUTABLE;
+	    | UF_IMMUTABLE
 #endif
 #ifdef SF_APPEND
-	nochange_flags |= SF_APPEND;
+	    | SF_APPEND
 #endif
 #ifdef UF_APPEND
-	nochange_flags |= UF_APPEND;
+	    | UF_APPEND
 #endif
 #ifdef EXT2_APPEND_FL
-	nochange_flags |= EXT2_APPEND_FL;
+	    | EXT2_APPEND_FL
 #endif
 #ifdef EXT2_IMMUTABLE_FL
-	nochange_flags |= EXT2_IMMUTABLE_FL;
+	    | EXT2_IMMUTABLE_FL
 #endif
+	;
 
 	return (set_fflags_platform(a, a->fd, a->name, mode, 0,
 	    nochange_flags));
@@ -3591,8 +3614,22 @@ set_fflags_platform(struct archive_write_disk *a, int fd, const char *name,
     mode_t mode, unsigned long set, unsigned long clear)
 {
 	int r;
-
+	const int sf_mask = 0
+#ifdef SF_APPEND
+	    | SF_APPEND
+#endif
+#ifdef SF_ARCHIVED
+	    | SF_ARCHIVED
+#endif
+#ifdef SF_IMMUTABLE
+	    | SF_IMMUTABLE
+#endif
+#ifdef SF_NOUNLINK
+	    | SF_NOUNLINK
+#endif
+	;
 	(void)mode; /* UNUSED */
+
 	if (set == 0  && clear == 0)
 		return (ARCHIVE_OK);
 
@@ -3607,6 +3644,12 @@ set_fflags_platform(struct archive_write_disk *a, int fd, const char *name,
 
 	a->st.st_flags &= ~clear;
 	a->st.st_flags |= set;
+
+	/* Only super-user may change SF_* flags */
+
+	if (a->user_uid != 0)
+		a->st.st_flags &= ~sf_mask;
+
 #ifdef HAVE_FCHFLAGS
 	/* If platform has fchflags() and we were given an fd, use it. */
 	if (fd >= 0 && fchflags(fd, a->st.st_flags) == 0)
@@ -3648,7 +3691,28 @@ set_fflags_platform(struct archive_write_disk *a, int fd, const char *name,
 	int		 ret;
 	int		 myfd = fd;
 	int newflags, oldflags;
-	int sf_mask = 0;
+	/*
+	 * Linux has no define for the flags that are only settable by
+	 * the root user.  This code may seem a little complex, but
+	 * there seem to be some Linux systems that lack these
+	 * defines. (?)  The code below degrades reasonably gracefully
+	 * if sf_mask is incomplete.
+	 */
+	const int sf_mask = 0
+#if defined(FS_IMMUTABLE_FL)
+	    | FS_IMMUTABLE_FL
+#elif defined(EXT2_IMMUTABLE_FL)
+	    | EXT2_IMMUTABLE_FL
+#endif
+#if defined(FS_APPEND_FL)
+	    | FS_APPEND_FL
+#elif defined(EXT2_APPEND_FL)
+	    | EXT2_APPEND_FL
+#endif
+#if defined(FS_JOURNAL_DATA_FL)
+	    | FS_JOURNAL_DATA_FL
+#endif
+	;
 
 	if (set == 0 && clear == 0)
 		return (ARCHIVE_OK);
@@ -3664,26 +3728,6 @@ set_fflags_platform(struct archive_write_disk *a, int fd, const char *name,
 	if (myfd < 0)
 		return (ARCHIVE_OK);
 
-	/*
-	 * Linux has no define for the flags that are only settable by
-	 * the root user.  This code may seem a little complex, but
-	 * there seem to be some Linux systems that lack these
-	 * defines. (?)  The code below degrades reasonably gracefully
-	 * if sf_mask is incomplete.
-	 */
-#if defined(FS_IMMUTABLE_FL)
-	sf_mask |= FS_IMMUTABLE_FL;
-#elif defined(EXT2_IMMUTABLE_FL)
-	sf_mask |= EXT2_IMMUTABLE_FL;
-#endif
-#if defined(FS_APPEND_FL)
-	sf_mask |= FS_APPEND_FL;
-#elif defined(EXT2_APPEND_FL)
-	sf_mask |= EXT2_APPEND_FL;
-#endif
-#if defined(FS_JOURNAL_DATA_FL)
-	sf_mask |= FS_JOURNAL_DATA_FL;
-#endif
 	/*
 	 * XXX As above, this would be way simpler if we didn't have
 	 * to read the current flags from disk. XXX

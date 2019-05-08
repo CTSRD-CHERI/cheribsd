@@ -134,6 +134,13 @@ typedef struct _ip_fw3_opheader {
 #define	IP_FW_NPTV6_STATS	154	/* Get NPTv6 instance statistics */
 #define	IP_FW_NPTV6_RESET_STATS	155	/* Reset NPTv6 instance statistics */
 
+#define	IP_FW_NAT64CLAT_CREATE	160	/* Create clat NAT64 instance */
+#define	IP_FW_NAT64CLAT_DESTROY	161	/* Destroy clat NAT64 instance */
+#define	IP_FW_NAT64CLAT_CONFIG	162	/* Modify clat NAT64 instance */
+#define	IP_FW_NAT64CLAT_LIST	163	/* List clat NAT64 instances */
+#define	IP_FW_NAT64CLAT_STATS	164	/* Get NAT64CLAT instance statistics */
+#define	IP_FW_NAT64CLAT_RESET_STATS 165	/* Reset NAT64CLAT instance statistics */
+
 /*
  * The kernel representation of ipfw rules is made of a list of
  * 'instructions' (for all practical purposes equivalent to BPF
@@ -551,11 +558,12 @@ typedef struct	_ipfw_insn_nat {
 } ipfw_insn_nat;
 
 /* Apply ipv6 mask on ipv6 addr */
-#define APPLY_MASK(addr,mask)                          \
+#define APPLY_MASK(addr,mask)	do {					\
     (addr)->__u6_addr.__u6_addr32[0] &= (mask)->__u6_addr.__u6_addr32[0]; \
     (addr)->__u6_addr.__u6_addr32[1] &= (mask)->__u6_addr.__u6_addr32[1]; \
     (addr)->__u6_addr.__u6_addr32[2] &= (mask)->__u6_addr.__u6_addr32[2]; \
-    (addr)->__u6_addr.__u6_addr32[3] &= (mask)->__u6_addr.__u6_addr32[3];
+    (addr)->__u6_addr.__u6_addr32[3] &= (mask)->__u6_addr.__u6_addr32[3]; \
+} while (0)
 
 /* Structure for ipv6 */
 typedef struct _ipfw_insn_ip6 {
@@ -707,6 +715,7 @@ struct _ipfw_dyn_rule {
 	u_int32_t	state;		/* state of this rule (typically a
 					 * combination of TCP flags)
 					 */
+#define	IPFW_DYN_ORPHANED	0x40000	/* state's parent rule was deleted */
 	u_int32_t	ack_fwd;	/* most recent ACKs in forward	*/
 	u_int32_t	ack_rev;	/* and reverse directions (used	*/
 					/* to generate keepalives)	*/
@@ -943,9 +952,10 @@ typedef struct _ipfw_range_tlv {
 #define	IPFW_RCFLAG_RANGE	0x01	/* rule range is set		*/
 #define	IPFW_RCFLAG_ALL		0x02	/* match ALL rules		*/
 #define	IPFW_RCFLAG_SET		0x04	/* match rules in given set	*/
+#define	IPFW_RCFLAG_DYNAMIC	0x08	/* match only dynamic states	*/
 /* User-settable flags */
 #define	IPFW_RCFLAG_USER	(IPFW_RCFLAG_RANGE | IPFW_RCFLAG_ALL | \
-	IPFW_RCFLAG_SET)
+	IPFW_RCFLAG_SET | IPFW_RCFLAG_DYNAMIC)
 /* Internally used flags */
 #define	IPFW_RCFLAG_DEFAULT	0x0100	/* Do not skip defaul rule	*/
 
@@ -1065,10 +1075,10 @@ typedef struct _ipfw_sopt_info {
 #endif /* _IPFW2_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

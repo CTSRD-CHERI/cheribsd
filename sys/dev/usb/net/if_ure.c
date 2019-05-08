@@ -62,6 +62,9 @@ SYSCTL_INT(_hw_usb_ure, OID_AUTO, debug, CTLFLAG_RWTUN, &ure_debug, 0,
     "Debug level");
 #endif
 
+#define	ETHER_IS_ZERO(addr) \
+	(!(addr[0] | addr[1] | addr[2] | addr[3] | addr[4] | addr[5]))
+
 /*
  * Various supported device vendors/products.
  */
@@ -69,6 +72,7 @@ static const STRUCT_USB_HOST_ID ure_devs[] = {
 #define	URE_DEV(v,p,i)	{ USB_VPI(USB_VENDOR_##v, USB_PRODUCT_##v##_##p, i) }
 	URE_DEV(LENOVO, RTL8153, 0),
 	URE_DEV(LENOVO, TBT3LAN, 0),
+	URE_DEV(LENOVO, ONELINK, 0),
 	URE_DEV(LENOVO, USBCLAN, 0),
 	URE_DEV(NVIDIA, RTL8153, 0),
 	URE_DEV(REALTEK, RTL8152, URE_FLAG_8152),
@@ -672,12 +676,20 @@ ure_attach_post(struct usb_ether *ue)
 	else
 		ure_rtl8153_init(sc);
 
-	if (sc->sc_chip & URE_CHIP_VER_4C00)
+	if ((sc->sc_chip & URE_CHIP_VER_4C00) ||
+	    (sc->sc_chip & URE_CHIP_VER_4C10))
 		ure_read_mem(sc, URE_PLA_IDR, URE_MCU_TYPE_PLA,
 		    ue->ue_eaddr, 8);
 	else
 		ure_read_mem(sc, URE_PLA_BACKUP, URE_MCU_TYPE_PLA,
 		    ue->ue_eaddr, 8);
+
+	if (ETHER_IS_ZERO(sc->sc_ue.ue_eaddr)) {
+		device_printf(sc->sc_ue.ue_dev, "MAC assigned randomly\n");
+		arc4rand(sc->sc_ue.ue_eaddr, ETHER_ADDR_LEN, 0);
+		sc->sc_ue.ue_eaddr[0] &= ~0x01; /* unicast */
+		sc->sc_ue.ue_eaddr[0] |= 0x02;  /* locally administered */
+	}
 }
 
 static int
@@ -723,8 +735,10 @@ ure_init(struct usb_ether *ue)
 	ure_reset(sc);
 
 	/* Set MAC address. */
+	ure_write_1(sc, URE_PLA_CRWECR, URE_MCU_TYPE_PLA, URE_CRWECR_CONFIG);
 	ure_write_mem(sc, URE_PLA_IDR, URE_MCU_TYPE_PLA | URE_BYTE_EN_SIX_BYTES,
 	    IF_LLADDR(ifp), 8);
+	ure_write_1(sc, URE_PLA_CRWECR, URE_MCU_TYPE_PLA, URE_CRWECR_NORAML);
 
 	/* Reset the packet filter. */
 	ure_write_2(sc, URE_PLA_FMC, URE_MCU_TYPE_PLA,
@@ -1267,7 +1281,7 @@ ure_init_fifo(struct ure_softc *sc)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

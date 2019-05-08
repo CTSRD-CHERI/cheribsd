@@ -48,6 +48,13 @@ WANT_CHERI?=	hybrid
 # a version that defaults to libc++
 LDFLAGS+=	-stdlib=libc++
 .endif
+
+# Seems like subobject bounds on references are too aggressive:
+# Implementations of vector/string take refernces to internal storage arrays and
+# then use address-of operator and assume the result will be unbounded.
+# TODO: fix this assumption in clang
+CHERI_SUBOBJECT_BOUNDS_MAX:=conservative
+
 .endif
 
 .if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none")
@@ -88,10 +95,19 @@ CHERI_CXX=${CHERI_CC:H}/${CHERI_CC:T:S/clang/clang++/}
 .endif
 
 _CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
-			-msoft-float
+			-msoft-float -cheri-uintcap=offset
 _CHERI_CC=		${CHERI_CC} ${_CHERI_COMMON_FLAGS}
 _CHERI_CXX=		${CHERI_CXX} ${_CHERI_COMMON_FLAGS}
 _CHERI_CPP=		${CHERI_CPP} ${_CHERI_COMMON_FLAGS}
+
+.if defined(CHERI_SUBOBJECT_BOUNDS)
+# Allow per-subdirectory overrides if we know that there is maximum that works
+.if defined(CHERI_SUBOBJECT_BOUNDS_MAX)
+_CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
+.else
+_CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
+.endif
+.endif
 
 .if defined(SYSROOT)
 _CHERI_COMMON_FLAGS+=	--sysroot=${SYSROOT}
@@ -101,7 +117,6 @@ _CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 .endif
 
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
-OBJCOPY:=	objcopy
 MIPS_ABI:=	purecap
 _CHERI_COMMON_FLAGS+=	-fpic
 # Don't override libdir for tests since that causes the dlopen tests to fail
@@ -116,9 +131,8 @@ CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE}
 .endif
 .ifdef CHERI_USE_CAP_TLS
 CFLAGS+=	-cheri-cap-tls-abi=${CHERI_USE_CAP_TLS}
-.else
-CFLAGS+=	-ftls-model=local-exec
 .endif
+STATIC_CFLAGS+=	-ftls-model=local-exec
 
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap mode as
@@ -162,6 +176,9 @@ _CHERI_CFLAGS+=	-Werror=cheri-bitwise-operations
 .if ${MK_CHERI_SHARED} == "no" || defined(CHERI_NO_SHARED)
 NO_SHARED=	yes
 .elif defined(__BSD_PROG_MK) && ${MK_CHERI_SHARED_PROG} == "no"
+NO_SHARED=	yes
+.elif ${WANT_CHERI} == "sandbox"
+# Force position-dependent sandboxes; PIEs aren't supported
 NO_SHARED=	yes
 .endif
 CC:=	${_CHERI_CC}

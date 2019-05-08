@@ -31,15 +31,96 @@
  */
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#include <cheri/cheric.h>
 
 #include "testlib_exports.h"
 
 void __start(void);
 
-#define print(msg) write(1, msg, __builtin_strlen(msg))
+extern void __plt_test_local_exit(int code);
+#define exit(code) __plt_test_local_exit(code)
+#define write(fd, buf, n) __plt_test_local_write(fd, buf, n)
+extern ssize_t __plt_test_local_write(int fd, const void *buf, size_t nbytes);
+extern const char* ltoa_unsafe(long l, int base);
+
+
+#define print(msg) __plt_test_local_write(1, msg, __builtin_strlen(msg))
 #define require(cond) do {				\
 	if (!(cond)) {					\
 		print("Test failed: " #cond "\n");	\
 		exit(1);				\
 	}						\
 } while(0)
+
+#define TEST_MAIN() \
+	void __start(void) { \
+		test(); \
+		print("Success!\n"); \
+		exit(0); \
+	}
+
+static __always_inline __used void
+print_long(long l, int base)
+{
+	print(ltoa_unsafe(l, base));
+}
+
+static __always_inline __used void
+print_cap(const void* __capability cap) {
+	print("v:"); print_long(cheri_gettag(cap), 10);
+	print(" s:"); print_long(cheri_getsealed(cap), 10);
+	print(" p:"); print_long(cheri_getperm(cap), 16);
+	print(" b:"); print_long(cheri_getbase(cap), 16);
+	print(" l:"); print_long(cheri_getlen(cap), 16);
+	print(" o:"); print_long(cheri_getoffset(cap), 16);
+	print(" t:"); print_long(cheri_gettype(cap), 10);
+}
+
+static __always_inline __used void
+_require_eq(register_t r1, register_t r2, const char* r1s, const char* r2s, int line)
+{
+	if (r1 != r2) {
+		print("Test failed at line ");
+		print_long(line, 10);
+		print(": expected same value but ");
+		print(r1s);
+		print(" (");
+		print_long(r1, 10);
+		print("/");
+		print_long(r1, 16);
+		print(") != ");
+		print(r2s);
+		print(" (");
+		print_long(r2, 10);
+		print("/");
+		print_long(r2, 16);
+		print(")\n");
+		exit(1);
+	}
+}
+
+static __always_inline __used
+void _require_not_eq(register_t r1, register_t r2, const char* r1s, const char* r2s, int line)
+{
+	if (r1 == r2) {
+		print("Test failed at line ");
+		print_long(line, 10);
+		print(": expected different value but ");
+		print(r1s);
+		print(" (");
+		print_long(r1, 10);
+		print("/");
+		print_long(r1, 16);
+		print(") == ");
+		print(r2s);
+		print(" (");
+		print_long(r2, 10);
+		print("/");
+		print_long(r2, 16);
+		print(")\n");
+		exit(1);
+	}
+}
+
+#define require_eq(r1, r2) _require_eq(r1, r2, #r1, #r2, __LINE__)
+#define require_not_eq(r1, r2) _require_not_eq(r1, r2, #r1, #r2, __LINE__)

@@ -1531,7 +1531,7 @@ kbd_ev_event(keyboard_t *kbd, uint16_t type, uint16_t code, int32_t value)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

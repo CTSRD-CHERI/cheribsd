@@ -7,7 +7,6 @@ SRCS=	cheri_bench.c
 
 MAN=
 WANT_CHERI=	yes
-WANT_DUMP=	yes
 
 NO_SHARED?=	YES
 

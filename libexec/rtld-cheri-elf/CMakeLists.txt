@@ -8,7 +8,7 @@ list(APPEND rtld_SRCS
 	../../lib/libmalloc_simple/heap.c
 	../rtld-elf/${RTLD_ARCH}/reloc.c
 	../rtld-elf/rtld.c
-	../rtld-elf/malloc.c
+	../rtld-elf/rtld_malloc.c
 	../rtld-elf/rtld_lock.c
 	../rtld-elf/map_object.c
 	../rtld-elf/xmalloc.c
@@ -18,6 +18,8 @@ list(APPEND rtld_SRCS
 
 # For code completion:
 add_definitions(-D__CHERI_PURE_CAPABILITY__=2)
+add_definitions(-D__CHERI__=1)
+add_definitions(-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1)
 add_definitions(-DIN_RTLD=1)
 # add_compile_options(-v)
 add_compile_options(-mabi=purecap)

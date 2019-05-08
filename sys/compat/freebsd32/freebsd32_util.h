@@ -124,14 +124,10 @@ int	freebsd32_copyiniov(struct iovec32 * __capability iovp, u_int iovcnt,
 	    kiovec_t **iov, int error);
 void	freebsd32_rusage_out(const struct rusage *s, struct rusage32 *s32);
 
-struct image_args;
-int freebsd32_exec_copyin_args(struct image_args *args, char *fname,
-	    enum uio_seg segflg, u_int32_t *argv, u_int32_t *envv);
-
 #endif /* !_COMPAT_FREEBSD32_FREEBSD32_UTIL_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "kiovec_t",

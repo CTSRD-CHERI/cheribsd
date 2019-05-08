@@ -309,6 +309,8 @@ ntp_sysctl(SYSCTL_HANDLER_ARGS)
 {
 	struct ntptimeval ntv;	/* temporary structure */
 
+	memset(&ntv, 0, sizeof(ntv));
+
 	NTP_LOCK();
 	ntp_gettime1(&ntv);
 	NTP_UNLOCK();
@@ -1096,7 +1098,7 @@ SYSINIT(periodic_resettodr, SI_SUB_LAST, SI_ORDER_MIDDLE,
 	start_periodic_resettodr, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

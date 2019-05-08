@@ -245,6 +245,12 @@ __elfN(load_elf_header)(char *filename, elf_file_t ef)
 		goto error;
 	}
 
+#ifdef LOADER_VERIEXEC
+	if (verify_file(ef->fd, filename, bytes_read, VE_MUST) < 0) {
+	    err = EAUTH;
+	    goto error;
+	}
+#endif
 	return (0);
 
 error:
@@ -862,14 +868,16 @@ fake_modname(const char *name)
 		sp++;
 	else
 		sp = name;
-	ep = strrchr(name, '.');
-	if (ep) {
-		if (ep == name) {
-			sp = invalid_name;
-			ep = invalid_name + sizeof(invalid_name) - 1;
-		}
-	} else
-		ep = name + strlen(name);
+
+	ep = strrchr(sp, '.');
+	if (ep == NULL) {
+		ep = sp + strlen(sp);
+	}
+	if (ep == sp) {
+		sp = invalid_name;
+		ep = invalid_name + sizeof(invalid_name) - 1;
+	}
+
 	len = ep - sp;
 	fp = malloc(len + 1);
 	if (fp == NULL)

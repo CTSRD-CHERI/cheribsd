@@ -1,6 +1,5 @@
 /*-
  * Copyright (c) 2015 John H. Baldwin <jhb@FreeBSD.org>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -52,7 +51,7 @@ typedef uint64_t	mips64_pte_t;
 #define	MIPS64_KSEG1_END	0xffffffffbfffffff
 
 #define	MIPS32_PFN_MASK		(0x1FFFFFC0)
-#define	MIPS64_PFN_MASK		0xFFFFFFC0
+#define	MIPS64_PFN_MASK		0x3FFFFFC0
 #define	MIPS_PFN_SHIFT		(6)
 
 #define	MIPS_PFN_TO_PA(pfn)	(((pfn) >> MIPS_PFN_SHIFT) << MIPS_PAGE_SHIFT)

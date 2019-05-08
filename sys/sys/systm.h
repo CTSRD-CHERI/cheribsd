@@ -322,6 +322,13 @@ void	init_param2(long physpages);
 void	init_static_kenv(char *, size_t);
 void	tablefull(const char *);
 
+/*
+ * Allocate per-thread "current" state in the linuxkpi
+ */
+extern int (*lkpi_alloc_current)(struct thread *, int);
+int linux_alloc_current_noop(struct thread *, int);
+
+
 #if defined(KLD_MODULE) || defined(KTR_CRITICAL) || !defined(_KERNEL) || defined(GENOFFSET)
 #define critical_enter() critical_enter_KBI()
 #define critical_exit() critical_exit_KBI()
@@ -771,6 +778,32 @@ int alloc_unr_specific(struct unrhdr *uh, u_int item);
 int alloc_unrl(struct unrhdr *uh);
 void free_unr(struct unrhdr *uh, u_int item);
 
+#ifndef __LP64__
+#define UNR64_LOCKED
+#endif
+
+struct unrhdr64 {
+        uint64_t	counter;
+};
+
+static __inline void
+new_unrhdr64(struct unrhdr64 *unr64, uint64_t low)
+{
+
+	unr64->counter = low;
+}
+
+#ifdef UNR64_LOCKED
+uint64_t alloc_unr64(struct unrhdr64 *);
+#else
+static __inline uint64_t
+alloc_unr64(struct unrhdr64 *unr64)
+{
+
+	return (atomic_fetchadd_64(&unr64->counter, 1));
+}
+#endif
+
 void	intr_prof_stack_use(struct thread *td, struct trapframe *frame);
 
 void counted_warning(unsigned *counter, const char *msg);
@@ -799,7 +832,7 @@ __NULLABILITY_PRAGMA_POP
 #endif /* !_SYS_SYSTM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

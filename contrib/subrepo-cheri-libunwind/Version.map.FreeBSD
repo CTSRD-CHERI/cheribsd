@@ -1,0 +1,52 @@
+/*
+ * $FreeBSD$
+ */
+
+/*
+ * This version script allows testing libunwind as a drop-in replacement for
+ * libgcc_s.so (needed to test exceptions when linking libcxxrt.so)
+ * This does not include local* statement from libgcc_s to allow unw* APIs
+ */
+GCC_3.0 {
+	_Unwind_DeleteException;
+	_Unwind_Find_FDE;
+	_Unwind_ForcedUnwind;
+	_Unwind_GetDataRelBase;
+	_Unwind_GetGR;
+	_Unwind_GetIP;
+	_Unwind_GetLanguageSpecificData;
+	_Unwind_GetRegionStart;
+	_Unwind_GetTextRelBase;
+	_Unwind_RaiseException;
+	_Unwind_Resume;
+	_Unwind_SetGR;
+	_Unwind_SetIP;
+};
+GCC_3.3 {
+	_Unwind_Backtrace;
+	_Unwind_FindEnclosingFunction;
+	_Unwind_GetCFA;
+	_Unwind_Resume_or_Rethrow;
+} GCC_3.0;
+
+GCC_3.3.1 {
+} GCC_3.3;
+
+GCC_3.4 {
+} GCC_3.3.1;
+
+GCC_3.4.2 {
+} GCC_3.4;
+
+GCC_3.4.4 {
+} GCC_3.4.2;
+
+GCC_4.0.0 {
+} GCC_3.4.4;
+
+GCC_4.2.0 {
+	_Unwind_GetIPInfo;
+} GCC_4.0.0;
+
+GCC_4.3.0 {
+} GCC_4.2.0;

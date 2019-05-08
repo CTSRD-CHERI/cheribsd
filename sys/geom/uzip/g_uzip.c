@@ -849,9 +849,9 @@ g_uzip_taste(struct g_class *mp, struct g_provider *pp, int flags)
 	g_error_provider(pp2, 0);
 	g_access(cp, -1, 0, 0);
 
-	DPRINTF(GUZ_DBG_INFO, ("%s: taste ok (%d, %jd), (%d, %d), %x\n",
-	    gp->name, pp2->sectorsize, (intmax_t)pp2->mediasize,
-	    pp2->stripeoffset, pp2->stripesize, pp2->flags));
+	DPRINTF(GUZ_DBG_INFO, ("%s: taste ok (%d, %ju), (%ju, %ju), %x\n",
+	    gp->name, pp2->sectorsize, (uintmax_t)pp2->mediasize,
+	    (uintmax_t)pp2->stripeoffset, (uintmax_t)pp2->stripesize, pp2->flags));
 	DPRINTF(GUZ_DBG_INFO, ("%s: %u x %u blocks\n", gp->name, sc->nblocks,
 	    sc->blksz));
 	return (gp);
@@ -886,6 +886,7 @@ g_uzip_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp)
 {
 	struct g_provider *pp;
 
+	KASSERT(gp != NULL, ("NULL geom"));
 	g_trace(G_T_TOPOLOGY, "%s(%s, %s)", __func__, mp->name, gp->name);
 	g_topology_assert();
 
@@ -895,7 +896,6 @@ g_uzip_destroy_geom(struct gctl_req *req, struct g_class *mp, struct g_geom *gp)
 		return (ENXIO);
 	}
 
-	KASSERT(gp != NULL, ("NULL geom"));
 	pp = LIST_FIRST(&gp->provider);
 	KASSERT(pp != NULL, ("NULL provider"));
 	if (pp->acr > 0 || pp->acw > 0 || pp->ace > 0)
@@ -921,5 +921,6 @@ static struct g_class g_uzip_class = {
 };
 
 DECLARE_GEOM_CLASS(g_uzip_class, g_uzip);
+MODULE_DEPEND(g_uzip, xz, 1, 1, 1);
 MODULE_DEPEND(g_uzip, zlib, 1, 1, 1);
 MODULE_VERSION(geom_uzip, 0);

@@ -53,6 +53,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/power.h>
 
+#include <vm/vm.h>
+#include <vm/pmap.h>
+
 #include <machine/asmacros.h>
 #include <machine/clock.h>
 #include <machine/cputypes.h>
@@ -978,7 +981,12 @@ printcpuinfo(void)
 				       "\003UMIP"
 				       "\004PKU"
 				       "\005OSPKE"
+				       "\006WAITPKG"
+				       "\011GFNI"
 				       "\027RDPID"
+				       "\032CLDEMOTE"
+				       "\034MOVDIRI"
+				       "\035MOVDIRI64B"
 				       "\037SGXLC"
 				       );
 			}
@@ -987,10 +995,12 @@ printcpuinfo(void)
 				printf("\n  Structured Extended Features3=0x%b",
 				    cpu_stdext_feature3,
 				       "\020"
+				       "\016TSXFA"
 				       "\033IBPB"
 				       "\034STIBP"
 				       "\035L1DFL"
 				       "\036ARCH_CAP"
+				       "\037CORE_CAP"
 				       "\040SSBD"
 				       );
 			}
@@ -1014,17 +1024,41 @@ printcpuinfo(void)
 				       "\020"
 				       "\001RDCL_NO"
 				       "\002IBRS_ALL"
+				       "\003RSBA"
+				       "\004SKIP_L1DFL_VME"
+				       "\005SSB_NO"
 				       );
 			}
 
 			if (amd_extended_feature_extensions != 0) {
+				u_int amd_fe_masked;
+
+				amd_fe_masked = amd_extended_feature_extensions;
+				if ((amd_fe_masked & AMDFEID_IBRS) == 0)
+					amd_fe_masked &=
+					    ~(AMDFEID_IBRS_ALWAYSON |
+						AMDFEID_PREFER_IBRS);
+				if ((amd_fe_masked & AMDFEID_STIBP) == 0)
+					amd_fe_masked &=
+					    ~AMDFEID_STIBP_ALWAYSON;
+
 				printf("\n  "
 				    "AMD Extended Feature Extensions ID EBX="
-				    "0x%b", amd_extended_feature_extensions,
+				    "0x%b", amd_fe_masked,
 				    "\020"
 				    "\001CLZERO"
 				    "\002IRPerf"
-				    "\003XSaveErPtr");
+				    "\003XSaveErPtr"
+				    "\015IBPB"
+				    "\017IBRS"
+				    "\020STIBP"
+				    "\021IBRS_ALWAYSON"
+				    "\022STIBP_ALWAYSON"
+				    "\023PREFER_IBRS"
+				    "\031SSBD"
+				    "\032VIRT_SSBD"
+				    "\033SSB_NO"
+				    );
 			}
 
 			if (via_feature_rng != 0 || via_feature_xcrypt != 0)
@@ -1467,6 +1501,19 @@ identify_cpu2(void)
 	}
 }
 
+void
+identify_cpu_fixup_bsp(void)
+{
+	u_int regs[4];
+
+	cpu_vendor_id = find_cpu_vendor_id();
+
+	if (fix_cpuid()) {
+		do_cpuid(0, regs);
+		cpu_high = regs[0];
+	}
+}
+
 /*
  * Final stage of CPU identification.
  */
@@ -1478,12 +1525,7 @@ finishidentcpu(void)
 	u_char ccr3;
 #endif
 
-	cpu_vendor_id = find_cpu_vendor_id();
-
-	if (fix_cpuid()) {
-		do_cpuid(0, regs);
-		cpu_high = regs[0];
-	}
+	identify_cpu_fixup_bsp();
 
 	if (cpu_high >= 5 && (cpu_feature2 & CPUID2_MON) != 0) {
 		do_cpuid(5, regs);
@@ -2500,4 +2542,19 @@ print_hypervisor_info(void)
 
 	if (*hv_vendor)
 		printf("Hypervisor: Origin = \"%s\"\n", hv_vendor);
+}
+
+/*
+ * Returns the maximum physical address that can be used with the
+ * current system.
+ */
+vm_paddr_t
+cpu_getmaxphyaddr(void)
+{
+
+#if defined(__i386__)
+	if (!pae_mode)
+		return (0xffffffff);
+#endif
+	return ((1ULL << cpu_maxphyaddr) - 1);
 }

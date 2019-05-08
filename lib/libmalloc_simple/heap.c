@@ -152,13 +152,12 @@ __rederive_pointer(void *ptr)
 	size_t i;
 	vm_offset_t addr;
 
-	addr = cheri_getbase(ptr) + cheri_getoffset(ptr);
+	addr = cheri_getaddress(ptr);
 	for (i = 0; i < n_pagepools; i++) {
 		char *pool = pagepool_list[i];
-		vm_offset_t base = cheri_getbase(pool);
 
-		if (addr >= base && addr < base + cheri_getlen(pool))
-			return(cheri_setoffset(pool, addr - base));
+		if (cheri_is_address_inbounds(pool, addr))
+			return (cheri_setaddress(pool, addr));
 	}
 
 	return (NULL);

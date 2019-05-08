@@ -47,6 +47,8 @@
 #include <sys/ucontext.h>
 #include <sys/wait.h>
 
+#include <sys/event.h>
+
 #include <machine/cpuregs.h>
 #include <machine/frame.h>
 #include <machine/trap.h>
@@ -196,8 +198,8 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		c = *map;
 
 		fprintf(stderr, "rx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			cheri_gettag(c), cheri_getbase(c), cheri_getlen(c),
-			cheri_getoffset(c));
+			(unsigned long)cheri_gettag(c), cheri_getbase(c),
+			cheri_getlen(c), cheri_getoffset(c));
 
 		tag = cheri_gettag(c);
 		CHERITEST_VERIFY2(tag == 0, "tag read");
@@ -232,8 +234,8 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		CHERITEST_VERIFY2(cheri_gettag(c) != 0, "tag written");
 
 		fprintf(stderr, "tx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			cheri_gettag(c), cheri_getbase(c), cheri_getlen(c),
-			cheri_getoffset(c));
+			(unsigned long)cheri_gettag(c), cheri_getbase(c),
+			cheri_getlen(c), cheri_getoffset(c));
 
 		CHERITEST_CHECK_SYSCALL(munmap(map, getpagesize()));
 
@@ -264,6 +266,115 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		}
 	}
 }
+
+#ifdef CHERIABI_TESTS
+
+/*
+ * We can fork processes with shared file descriptor tables, including
+ * shared access to a kqueue, which can hoard capabilities for us, allowing
+ * them to flow between address spaces.  It is difficult to know what to do
+ * about this case, but it seems important to acknowledge.
+ */
+void
+cheritest_vm_cap_share_fd_kqueue(const struct cheri_test *ctp __unused)
+{
+	int kq, pid;
+
+	kq = CHERITEST_CHECK_SYSCALL(kqueue());
+	pid = rfork(RFPROC);
+	if (pid == -1)
+		cheritest_failure_errx("Fork failed; errno=%d", errno);
+
+	if (pid == 0) {
+		struct kevent oke;
+		/*
+		 * Wait for receipt of the user event, and witness the
+		 * capability received from the parent.
+		 */
+		oke.udata = NULL;
+		CHERITEST_CHECK_SYSCALL(kevent(kq, NULL, 0, &oke, 1, NULL));
+		CHERITEST_VERIFY2(oke.ident == 0x2BAD, "Bad identifier from kqueue");
+		CHERITEST_VERIFY2(oke.filter == EVFILT_USER, "Bad filter from kqueue");
+
+		CHERI_FPRINT_PTR(stderr, oke.udata);
+
+		exit(cheri_gettag(oke.udata));
+	} else {
+		int res;
+		struct kevent ike;
+		void * __capability passme;
+
+		/*
+		 * Generate a capability to a new mapping to pass to the
+		 * child, who will not have this region mapped.
+		 */
+		passme = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE,
+				PROT_READ | PROT_WRITE, MAP_ANON, -1, 0));
+
+		EV_SET(&ike, 0x2BAD, EVFILT_USER, EV_ADD|EV_ONESHOT,
+			NOTE_FFNOP, 0, passme);
+		CHERITEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+
+		EV_SET(&ike, 0x2BAD, EVFILT_USER, EV_KEEPUDATA,
+			NOTE_FFNOP|NOTE_TRIGGER, 0, NULL);
+		CHERITEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+
+		waitpid(pid, &res, 0);
+		if (res == 0) {
+			cheritest_success();
+		} else {
+			cheritest_failure_errx("tag transfer");
+		}
+	}
+}
+
+/*
+ * We can rfork and share the sigaction table across parent and child, which
+ * again allows for capability passing across address spaces.
+ */
+void
+cheritest_vm_cap_share_sigaction(const struct cheri_test *ctp __unused)
+{
+	int pid;
+
+	pid = rfork(RFPROC | RFSIGSHARE);
+	if (pid == -1)
+		cheritest_failure_errx("Fork failed; errno=%d", errno);
+
+	if (pid == 0) {
+		void * __capability passme;
+		struct sigaction sa;
+
+		bzero(&sa, sizeof(sa));
+
+		/* This is a little abusive, but shows the point, I think */
+
+		passme = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE,
+				PROT_READ | PROT_WRITE | PROT_EXEC, MAP_ANON, -1, 0));
+		sa.sa_handler = passme;
+		sa.sa_flags = 0;
+
+		CHERITEST_CHECK_SYSCALL(sigaction(SIGUSR1, &sa, NULL));
+		exit(0);
+	} else {
+		struct sigaction sa;
+
+		waitpid(pid, NULL, 0);
+
+		sa.sa_handler = NULL;
+		CHERITEST_CHECK_SYSCALL(sigaction(SIGUSR1, NULL, &sa));
+
+		CHERI_FPRINT_PTR(stderr, sa.sa_handler);
+
+		if (cheri_gettag(sa.sa_handler)) {
+			cheritest_failure_errx("tag transfer");
+		} else {
+			cheritest_success();
+		}
+	}
+}
+
+#endif
 
 void
 cheritest_vm_tag_dev_zero_shared(const struct cheri_test *ctp __unused)

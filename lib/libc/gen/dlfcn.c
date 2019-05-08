@@ -180,7 +180,7 @@ void
 _rtld_thread_init(void *li __unused)
 {
 
-	PRINT_FUNCTION_NOT_AVAILABLE();
+	/* Do nothing when linked statically. */
 }
 
 #ifndef IN_LIBDL
@@ -196,14 +196,27 @@ dl_init_phdr_info(void)
 	for (auxp = __elf_aux_vector; auxp->a_type != AT_NULL; auxp++) {
 		switch (auxp->a_type) {
 		case AT_BASE:
-			phdr_info.dlpi_addr = (Elf_Addr)auxp->a_un.a_ptr;
+			phdr_info.dlpi_addr =
+#ifdef __CHERI_PURE_CAPABILITY__
+			    /* XXXAR: currently needs load_cap for libunwind */
+			    (uintptr_t)cheri_andperm(auxp->a_un.a_ptr,
+			        CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
+#else
+			    (Elf_Addr)auxp->a_un.a_ptr;
+#endif
 			break;
 		case AT_EXECPATH:
 			phdr_info.dlpi_name = (const char *)auxp->a_un.a_ptr;
 			break;
 		case AT_PHDR:
 			phdr_info.dlpi_phdr =
+#ifdef __CHERI_PURE_CAPABILITY__
+			    /* XXXAR: currently needs load_cap for libunwind */
+			    (const Elf_Phdr *)cheri_andperm(auxp->a_un.a_ptr,
+			        CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP);
+#else
 			    (const Elf_Phdr *)auxp->a_un.a_ptr;
+#endif
 			break;
 		case AT_PHNUM:
 			phdr_info.dlpi_phnum = (Elf_Half)auxp->a_un.a_val;
@@ -217,9 +230,8 @@ dl_init_phdr_info(void)
 #ifndef __CHERI_PURE_CAPABILITY__
 			    (void*)phdr_info.dlpi_phdr[i].p_vaddr;
 #else
-			    cheri_csetbounds(cheri_setoffset(phdr_info.dlpi_phdr,
-				phdr_info.dlpi_phdr[i].p_vaddr -
-				    cheri_getbase(phdr_info.dlpi_phdr)),
+			    cheri_csetbounds(cheri_setaddress(phdr_info.dlpi_phdr,
+				phdr_info.dlpi_phdr[i].p_vaddr),
 				phdr_info.dlpi_phdr[i].p_filesz);
 
 #endif

@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/xen/xen-os.h>
 
 #include <xen/xen-os.h>
+#include <xen/hvm.h>
 #include <xen/hypervisor.h>
 #include <xen/xen_intr.h>
 #include <xen/evtchn/evtchnvar.h>
@@ -620,6 +621,10 @@ xen_intr_handle_upcall(struct trapframe *trap_frame)
 			l1 &= ~(1UL << l1i);
 		}
 	}
+
+	if (xen_evtchn_needs_ack)
+		lapic_eoi();
+
 	critical_exit();
 }
 
@@ -690,6 +695,8 @@ void
 xen_intr_alloc_irqs(void)
 {
 
+	if (num_io_irqs > UINT_MAX - NR_EVENT_CHANNELS)
+		panic("IRQ allocation overflow (num_msi_irqs too high?)");
 	first_evtchn_irq = num_io_irqs;
 	num_io_irqs += NR_EVENT_CHANNELS;
 }

@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2000 John Baldwin <jhb@FreeBSD.org>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -341,7 +340,7 @@ ktr_tracepoint(uint64_t mask, const char *file, int line, const char *format,
 #ifdef KTR_ALQ
 	if (ktr_alq_enabled) {
 		if (td->td_critnest == 0 &&
-		    (td->td_flags & TDF_IDLETD) == 0 &&
+		    (TD_IS_IDLETHREAD(td)) == 0 &&
 		    td != ald_thread) {
 			if (ktr_alq_max && ktr_alq_cnt > ktr_alq_max)
 				goto done;

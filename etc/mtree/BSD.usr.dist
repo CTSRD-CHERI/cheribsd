@@ -15,6 +15,18 @@
             ..
             png
             ..
+            gmock
+                internal
+                    custom
+                    ..
+                ..
+            ..
+            gtest
+                internal
+                    custom
+                    ..
+                ..
+            ..
             sqlite3
             ..
             ucl
@@ -27,7 +39,7 @@
         aout
         ..
         clang
-            6.0.1
+            8.0.0
                 include
                     sanitizer
                     ..
@@ -253,8 +265,6 @@
             ..
             hostapd
             ..
-            ibcs2
-            ..
             indent
             ..
             ipfilter
@@ -420,9 +430,9 @@
         ..
         keys
             pkg
-                revoked
+                revoked tags=package=runtime
                 ..
-                trusted
+                trusted tags=package=runtime
                 ..
             ..
         ..
@@ -636,6 +646,8 @@
             fr_FR.ISO8859-15
             ..
             fr_FR.UTF-8
+            ..
+            ga_IE.UTF-8
             ..
             he_IL.UTF-8
             ..

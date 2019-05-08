@@ -38,18 +38,23 @@
 struct uio;
 
 #if defined(DEV_RANDOM)
-u_int read_random(void *, u_int);
+void read_random(void *, u_int);
 int read_random_uio(struct uio *, bool);
+bool is_random_seeded(void);
 #else
 static __inline int
 read_random_uio(void *a __unused, u_int b __unused)
 {
 	return (0);
 }
-static __inline u_int
+static __inline void
 read_random(void *a __unused, u_int b __unused)
 {
-	return (0);
+}
+static __inline bool
+is_random_seeded(void)
+{
+	return (false);
 }
 #endif
 
@@ -87,17 +92,14 @@ enum random_entropy_source {
 	RANDOM_PURE_BROADCOM,
 	RANDOM_PURE_CCP,
 	RANDOM_PURE_DARN,
+	RANDOM_PURE_TPM,
 	ENTROPYSOURCE
 };
 _Static_assert(ENTROPYSOURCE <= 32,
     "hardcoded assumption that values fit in a typical word-sized bitset");
 
-#define RANDOM_HARVEST_EVERYTHING_MASK ((1 << (RANDOM_ENVIRONMENTAL_END + 1)) - 1)
-#define RANDOM_HARVEST_PURE_MASK (((1 << ENTROPYSOURCE) - 1) & (-1UL << RANDOM_PURE_START))
-
 #define RANDOM_LEGACY_BOOT_ENTROPY_MODULE	"/boot/entropy"
 #define RANDOM_CACHED_BOOT_ENTROPY_MODULE	"boot_entropy_cache"
-#define	RANDOM_CACHED_SKIP_START	256
 
 #if defined(DEV_RANDOM)
 extern u_int hc_source_mask;
@@ -156,6 +158,9 @@ void random_harvest_deregister_source(enum random_entropy_source);
 
 #define GRND_NONBLOCK	0x1
 #define GRND_RANDOM	0x2
+
+__BEGIN_DECLS
 ssize_t getrandom(void *buf, size_t buflen, unsigned int flags);
+__END_DECLS
 
 #endif /* _SYS_RANDOM_H_ */

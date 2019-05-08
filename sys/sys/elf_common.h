@@ -711,12 +711,15 @@ typedef struct {
 #define	DT_MIPS_PLTGOT			0x70000032
 #define	DT_MIPS_RLD_OBJ_UPDATE		0x70000033
 #define	DT_MIPS_RWPLT			0x70000034
+#define	DT_MIPS_RLD_MAP_REL		0x70000035
 
 #define	DT_MIPS_CHERI___CAPRELOCS	0x7000c000 /* start of __cap_relocs section */
 #define	DT_MIPS_CHERI___CAPRELOCSSZ	0x7000c001 /* size of __cap_relocs section */
 #define	DT_MIPS_CHERI_FLAGS		0x7000c002 /* various CHERI flags (e.g. ABI) */
-#define	DT_MIPS_CHERI_CAPTABLE		0x7000c003 /* various CHERI flags (e.g. ABI) */
-#define	DT_MIPS_CHERI_CAPTABLESZ	0x7000c004 /* various CHERI flags (e.g. ABI) */
+#define	DT_MIPS_CHERI_CAPTABLE		0x7000c003 /* start of .captable */
+#define	DT_MIPS_CHERI_CAPTABLESZ	0x7000c004 /* size of .captable */
+#define	DT_MIPS_CHERI_CAPTABLE_MAPPING	0x7000c005 /* start of .captable_mapping */
+#define	DT_MIPS_CHERI_CAPTABLE_MAPPINGSZ	0x7000c006 /* size of .captable_mapping */
 
 enum MipsCheriFlags {
 	DF_MIPS_CHERI_NONE		= 0x00000000,
@@ -724,7 +727,9 @@ enum MipsCheriFlags {
 	DF_MIPS_CHERI_ABI_LEGACY	= 0x00000000,
 	DF_MIPS_CHERI_ABI_PCREL		= 0x00000001,
 	DF_MIPS_CHERI_ABI_PLT		= 0x00000002,
-	DF_MIPS_CHERI_ABI_FNDESC	= 0x00000003
+	DF_MIPS_CHERI_ABI_FNDESC	= 0x00000003,
+	DF_MIPS_CHERI_CAPTABLE_PER_FILE = 0x00000008,
+	DF_MIPS_CHERI_CAPTABLE_PER_FUNC = 0x00000010
 };
 
 #define	DT_PPC_GOT			0x70000000
@@ -778,6 +783,10 @@ enum MipsCheriFlags {
 #define	NT_FREEBSD_ABI_TAG	1
 #define	NT_FREEBSD_NOINIT_TAG	2
 #define	NT_FREEBSD_ARCH_TAG	3
+#define	NT_FREEBSD_FEATURE_CTL	4
+
+/* NT_FREEBSD_FEATURE_CTL desc[0] bits */
+#define	NT_FREEBSD_FCTL_ASLR_DISABLE	0x00000001
 
 /* Values for n_type.  Used in core files. */
 #define	NT_PRSTATUS	1	/* Process status. */
@@ -1436,7 +1445,7 @@ enum MipsCheriFlags {
 #endif /* !_SYS_ELF_COMMON_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180823,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

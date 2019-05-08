@@ -6,6 +6,9 @@
 # Common functions for virtual machine image build scripts.
 #
 
+scriptdir=$(dirname $(realpath $0))
+. ${scriptdir}/../../tools/boot/install-boot.sh
+
 export PATH="/bin:/usr/bin:/sbin:/usr/sbin:/usr/local/bin:/usr/local/sbin"
 trap "cleanup" INT QUIT TRAP ABRT TERM
 
@@ -29,10 +32,14 @@ write_partition_layout() {
 				-o ${VMIMAGE}
 			;;
 		arm64:aarch64)
+			# Create an ESP
+			espfilename=$(mktemp /tmp/efiboot.XXXXXX)
+			make_esp_file ${espfilename} ${fat32min} ${BOOTFILES}/efi/loader_lua/loader_lua.efi
 			mkimg -s mbr -f ${VMFORMAT} \
-				-p efi:=${BOOTFILES}/efi/boot1/boot1.efifat \
+				-p efi:=${espfilename} \
 				-p freebsd:=${VMBASE} \
 				-o ${VMIMAGE}
+			rm ${espfilename}
 			;;
 		powerpc:powerpc*)
 			mkimg -s apm -f ${VMFORMAT} \
@@ -141,10 +148,15 @@ vm_install_base() {
 	hostname="$(echo $(uname -o) | tr '[:upper:]' '[:lower:]')"
 	echo "hostname=\"${hostname}\"" >> ${DESTDIR}/etc/rc.conf
 
+	if ! [ -z "${QEMUSTATIC}" ]; then
+		export EMULATOR=/qemu
+		cp ${QEMUSTATIC} ${DESTDIR}/${EMULATOR}
+	fi
+
 	mkdir -p ${DESTDIR}/dev
 	mount -t devfs devfs ${DESTDIR}/dev
-	chroot ${DESTDIR} /usr/bin/newaliases
-	chroot ${DESTDIR} /etc/rc.d/ldconfig forcestart
+	chroot ${DESTDIR} ${EMULATOR} /usr/bin/newaliases
+	chroot ${DESTDIR} ${EMULATOR} /bin/sh /etc/rc.d/ldconfig forcestart
 	umount_loop ${DESTDIR}/dev
 
 	cp /etc/resolv.conf ${DESTDIR}/etc/resolv.conf
@@ -181,9 +193,9 @@ vm_extra_install_packages() {
 	fi
 	mkdir -p ${DESTDIR}/dev
 	mount -t devfs devfs ${DESTDIR}/dev
-	chroot ${DESTDIR} env ASSUME_ALWAYS_YES=yes \
+	chroot ${DESTDIR} ${EMULATOR} env ASSUME_ALWAYS_YES=yes \
 		/usr/sbin/pkg bootstrap -y
-	chroot ${DESTDIR} env ASSUME_ALWAYS_YES=yes \
+	chroot ${DESTDIR} ${EMULATOR} env ASSUME_ALWAYS_YES=yes \
 		/usr/sbin/pkg install -y ${VM_EXTRA_PACKAGES}
 	umount_loop ${DESTDIR}/dev
 
@@ -203,13 +215,16 @@ vm_extra_pre_umount() {
 	# Note: When overriding this function, removing resolv.conf in the
 	# disk image must be included.
 
+	if ! [ -z "${QEMUSTATIC}" ]; then
+		rm -f ${DESTDIR}/${EMULATOR}
+	fi
 	rm -f ${DESTDIR}/etc/resolv.conf
 	return 0
 }
 
 vm_extra_pkg_rmcache() {
 	if [ -e ${DESTDIR}/usr/local/sbin/pkg ]; then
-		chroot ${DESTDIR} env ASSUME_ALWAYS_YES=yes \
+		chroot ${DESTDIR} ${EMULATOR} env ASSUME_ALWAYS_YES=yes \
 			/usr/local/sbin/pkg clean -y -a
 	fi
 

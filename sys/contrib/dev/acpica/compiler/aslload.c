@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -324,6 +324,7 @@ LdLoadFieldElements (
                     (Node->Flags & ANOBJ_IS_EXTERNAL))
                 {
                     Node->Type = (UINT8) ACPI_TYPE_LOCAL_REGION_FIELD;
+                    Node->Flags &= ~ANOBJ_IS_EXTERNAL;
                 }
                 else
                 {
@@ -331,8 +332,8 @@ LdLoadFieldElements (
                      * The name already exists in this scope
                      * But continue processing the elements
                      */
-                    AslDualParseOpError (ASL_WARNING, ASL_MSG_EXTERN_COLLISION, Child,
-                        Child->Asl.Value.String, ASL_MSG_EXTERN_FOUND_HERE, Node->Op,
+                    AslDualParseOpError (ASL_WARNING, ASL_MSG_NAME_EXISTS, Child,
+                        Child->Asl.Value.String, ASL_MSG_FOUND_HERE, Node->Op,
                         Node->Op->Asl.ExternalName);
                 }
             }
@@ -417,10 +418,8 @@ LdLoadResourceElements (
         {
             Status = AcpiNsLookup (WalkState->ScopeInfo,
                 InitializerOp->Asl.ExternalName,
-                ACPI_TYPE_LOCAL_RESOURCE_FIELD,
-                ACPI_IMODE_LOAD_PASS1,
-                ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE,
-                NULL, &Node);
+                ACPI_TYPE_LOCAL_RESOURCE_FIELD, ACPI_IMODE_LOAD_PASS1,
+                ACPI_NS_NO_UPSEARCH | ACPI_NS_DONT_OPEN_SCOPE, NULL, &Node);
             if (ACPI_FAILURE (Status))
             {
                 return (Status);
@@ -494,7 +493,7 @@ LdNamespace1Begin (
     case AML_FIELD_OP:
 
         Status = LdLoadFieldElements (Op, WalkState);
-        return (Status);
+        break;
 
     case AML_INT_CONNECTION_OP:
 
@@ -558,7 +557,8 @@ LdNamespace1Begin (
          * We only want references to named objects:
          *      Store (2, WXYZ) -> Attempt to resolve the name
          */
-        if (OpInfo->Class == AML_CLASS_NAMED_OBJECT)
+        if ((OpInfo->Class == AML_CLASS_NAMED_OBJECT) &&
+            (OpInfo->Type != AML_TYPE_NAMED_FIELD))
         {
             return (AE_OK);
         }
@@ -577,7 +577,7 @@ LdNamespace1Begin (
         if (Status == AE_NOT_FOUND)
         {
             /*
-             * This is either a foward reference or the object truly
+             * This is either a forward reference or the object truly
              * does not exist. The two cases can only be differentiated
              * during the cross-reference stage later. Mark the Op/Name
              * as not-found for now to indicate the need for further
@@ -687,8 +687,7 @@ LdNamespace1Begin (
          * handle this case. Perhaps someday this case can go away.
          */
         Status = AcpiNsLookup (WalkState->ScopeInfo, Path, ACPI_TYPE_ANY,
-            ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT,
-            WalkState, &(Node));
+            ACPI_IMODE_EXECUTE, ACPI_NS_SEARCH_PARENT, WalkState, &Node);
         if (ACPI_FAILURE (Status))
         {
             if (Status == AE_NOT_FOUND)
@@ -696,23 +695,26 @@ LdNamespace1Begin (
                 /* The name was not found, go ahead and create it */
 
                 Status = AcpiNsLookup (WalkState->ScopeInfo, Path,
-                    ACPI_TYPE_LOCAL_SCOPE,
-                    ACPI_IMODE_LOAD_PASS1, Flags,
-                    WalkState, &(Node));
+                    ACPI_TYPE_LOCAL_SCOPE, ACPI_IMODE_LOAD_PASS1,
+                    Flags, WalkState, &Node);
                 if (ACPI_FAILURE (Status))
                 {
                     return_ACPI_STATUS (Status);
                 }
 
-                /*
-                 * However, this is an error -- primarily because the MS
-                 * interpreter can't handle a forward reference from the
-                 * Scope() operator.
-                 */
-                AslError (ASL_ERROR, ASL_MSG_NOT_FOUND, Op,
-                    Op->Asl.ExternalName);
-                AslError (ASL_ERROR, ASL_MSG_SCOPE_FWD_REF, Op,
-                    Op->Asl.ExternalName);
+                /* However, this is an error -- operand to Scope must exist */
+
+                if (strlen (Op->Asl.ExternalName) == ACPI_NAMESEG_SIZE)
+                {
+                    AslError (ASL_ERROR, ASL_MSG_NOT_FOUND, Op,
+                        Op->Asl.ExternalName);
+                }
+                else
+                {
+                    AslError (ASL_ERROR, ASL_MSG_NAMEPATH_NOT_EXIST, Op,
+                        Op->Asl.ExternalName);
+                }
+
                 goto FinishNode;
             }
 
@@ -731,7 +733,7 @@ LdNamespace1Begin (
              * 10/2015.
              */
             if ((Node->Flags & ANOBJ_IS_EXTERNAL) &&
-                (ACPI_COMPARE_NAME (AslGbl_TableSignature, "DSDT")))
+                (ACPI_COMPARE_NAMESEG (AslGbl_TableSignature, "DSDT")))
             {
                 /* However, allowed if the reference is within a method */
 
@@ -824,13 +826,24 @@ LdNamespace1Begin (
         break;
     }
 
-
     ACPI_DEBUG_PRINT ((ACPI_DB_DISPATCH, "Loading name: %s, (%s)\n",
         Op->Asl.ExternalName, AcpiUtGetTypeName (ObjectType)));
 
     /* The name must not already exist */
 
     Flags |= ACPI_NS_ERROR_IF_FOUND;
+
+    /*
+     * For opcodes that enter new names into the namespace,
+     * all prefix NameSegs must exist.
+     */
+    WalkState->OpInfo = AcpiPsGetOpcodeInfo (Op->Asl.AmlOpcode);
+    if (((WalkState->OpInfo->Flags & AML_NAMED) ||
+        (WalkState->OpInfo->Flags & AML_CREATE)) &&
+        (Op->Asl.AmlOpcode != AML_EXTERNAL_OP))
+    {
+        Flags |= ACPI_NS_PREFIX_MUST_EXIST;
+    }
 
     /*
      * Enter the named type into the internal namespace. We enter the name
@@ -915,8 +928,20 @@ LdNamespace1Begin (
                 return_ACPI_STATUS (AE_OK);
             }
         }
+        else if (AE_NOT_FOUND)
+        {
+            /*
+             * One or more prefix NameSegs of the NamePath do not exist
+             * (all of them must exist). Attempt to continue compilation
+             * by setting the current scope to the root.
+             */
+            Node = AcpiGbl_RootNode;
+            Status = AE_OK;
+        }
         else
         {
+            /* Flag all other errors as coming from the ACPICA core */
+
             AslCoreSubsystemError (Op, Status,
                 "Failure from namespace lookup", FALSE);
             return_ACPI_STATUS (Status);
@@ -1043,10 +1068,10 @@ LdNamespace2Begin (
 
     if (Op->Asl.ParseOpcode == PARSEOP_ALIAS)
     {
-        /* Complete the alias node by getting and saving the target node */
-
-        /* First child is the alias target */
-
+        /*
+         * Complete the alias node by getting and saving the target node.
+         * First child is the alias target
+         */
         Arg = Op->Asl.Child;
 
         /* Get the target pathname */
@@ -1070,18 +1095,34 @@ LdNamespace2Begin (
         {
             if (Status == AE_NOT_FOUND)
             {
-                AslError (ASL_ERROR, ASL_MSG_NOT_FOUND, Op,
-                    Op->Asl.ExternalName);
+                /* Standalone NameSeg vs. NamePath */
 
+                if (strlen (Arg->Asl.ExternalName) == ACPI_NAMESEG_SIZE)
+                {
+                    AslError (ASL_ERROR, ASL_MSG_NOT_FOUND, Op,
+                        Arg->Asl.ExternalName);
+                }
+                else
+                {
+                    AslError (ASL_ERROR, ASL_MSG_NAMEPATH_NOT_EXIST, Op,
+                        Arg->Asl.ExternalName);
+                }
+
+#if 0
+/*
+ * NOTE: Removed 10/2018 to enhance compiler error reporting. No
+ * regressions seen.
+ */
                 /*
                  * The name was not found, go ahead and create it.
                  * This prevents more errors later.
                  */
                 Status = AcpiNsLookup (WalkState->ScopeInfo, Path,
-                    ACPI_TYPE_ANY,
-                    ACPI_IMODE_LOAD_PASS1, ACPI_NS_NO_UPSEARCH,
-                    WalkState, &(Node));
-                return (AE_OK);
+                    ACPI_TYPE_ANY, ACPI_IMODE_LOAD_PASS1,
+                    ACPI_NS_NO_UPSEARCH, WalkState, &Node);
+#endif
+                return (Status);
+/* Removed: return (AE_OK)*/
             }
 
             AslCoreSubsystemError (Op, Status,

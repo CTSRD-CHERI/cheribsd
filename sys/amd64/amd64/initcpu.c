@@ -233,6 +233,9 @@ initializecpu(void)
 	if (cpu_stdext_feature & CPUID_STDEXT_FSGSBASE)
 		cr4 |= CR4_FSGSBASE;
 
+	if (cpu_stdext_feature2 & CPUID_STDEXT2_PKU)
+		cr4 |= CR4_PKE;
+
 	/*
 	 * Postpone enabling the SMEP on the boot CPU until the page
 	 * tables are switched from the boot loader identity mapping
@@ -262,6 +265,10 @@ initializecpu(void)
 		init_via();
 		break;
 	}
+
+	if ((amd_feature & AMDID_RDTSCP) != 0 ||
+	    (cpu_stdext_feature2 & CPUID_STDEXT2_RDPID) != 0)
+		wrmsr(MSR_TSC_AUX, PCPU_GET(cpuid));
 }
 
 void

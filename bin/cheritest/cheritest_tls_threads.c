@@ -47,16 +47,24 @@
  * Tests to ensure that Thread-Local Storage (TLS) works as expected.
  */
 #ifdef CHERI_DYNAMIC_TESTS
+extern __thread int tls_gd;
+extern __thread int tls_ld;
 __thread int tls_gd __attribute__((tls_model("global-dynamic"))) = 1;
 __thread int tls_ld __attribute__((tls_model("local-dynamic"))) = 2;
 #endif
+extern __thread int tls_ie;
+extern __thread int tls_le;
 __thread int tls_ie __attribute__((tls_model("initial-exec"))) = 3;
 __thread int tls_le __attribute__((tls_model("local-exec"))) = 4;
 
 #ifdef CHERI_DYNAMIC_TESTS
+extern int *thr_tls_gd;
+extern int *thr_tls_ld;
 int *thr_tls_gd;
 int *thr_tls_ld;
 #endif
+extern int *thr_tls_ie;
+extern int *thr_tls_le;
 int *thr_tls_ie;
 int *thr_tls_le;
 
@@ -106,7 +114,9 @@ test_tls_threads(const struct cheri_test *ctp __unused)
 #endif
 	int *my_tls_ie, *my_tls_le;
 	int thr_tls_ie_val, thr_tls_le_val;
+#ifdef __CHERI_PURE_CAPABILITY__
 	size_t my_bottom, my_top, thr_bottom, thr_top;
+#endif
 
 	if (pthread_create(&thread, NULL,
 	    test_tls_threads_get_vars, NULL) != 0)

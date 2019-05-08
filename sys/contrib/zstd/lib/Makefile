@@ -25,13 +25,18 @@ endif
 CFLAGS  ?= -O3
 DEBUGFLAGS= -Wall -Wextra -Wcast-qual -Wcast-align -Wshadow \
             -Wstrict-aliasing=1 -Wswitch-enum -Wdeclaration-after-statement \
-            -Wstrict-prototypes -Wundef -Wpointer-arith -Wformat-security \
+            -Wstrict-prototypes -Wundef -Wpointer-arith \
             -Wvla -Wformat=2 -Winit-self -Wfloat-equal -Wwrite-strings \
-            -Wredundant-decls -Wmissing-prototypes
+            -Wredundant-decls -Wmissing-prototypes -Wc++-compat
 CFLAGS  += $(DEBUGFLAGS) $(MOREFLAGS)
 FLAGS    = $(CPPFLAGS) $(CFLAGS)
 
-GREP = grep --color=never
+HAVE_COLORNEVER = $(shell echo a | grep --color=never a > /dev/null 2> /dev/null && echo 1 || echo 0)
+GREP_OPTIONS ?=
+ifeq ($HAVE_COLORNEVER, 1)
+GREP_OPTIONS += --color=never
+endif
+GREP = grep $(GREP_OPTIONS)
 
 ZSTDCOMMON_FILES := $(sort $(wildcard common/*.c))
 ZSTDCOMP_FILES := $(sort $(wildcard compress/*.c))
@@ -45,6 +50,13 @@ ZSTD_LIB_COMPRESSION ?= 1
 ZSTD_LIB_DECOMPRESSION ?= 1
 ZSTD_LIB_DICTBUILDER ?= 1
 ZSTD_LIB_DEPRECATED ?= 1
+HUF_FORCE_DECOMPRESS_X1 ?= 0
+HUF_FORCE_DECOMPRESS_X2 ?= 0
+ZSTD_FORCE_DECOMPRESS_SHORT ?= 0
+ZSTD_FORCE_DECOMPRESS_LONG ?= 0
+ZSTD_NO_INLINE ?= 0
+ZSTD_STRIP_ERROR_STRINGS ?= 0
+ZSTD_LEGACY_MULTITHREADED_API ?= 0
 
 ifeq ($(ZSTD_LIB_COMPRESSION), 0)
 	ZSTD_LIB_DICTBUILDER = 0
@@ -70,6 +82,34 @@ endif
 
 ifneq ($(ZSTD_LIB_DICTBUILDER), 0)
 	ZSTD_FILES += $(ZDICT_FILES)
+endif
+
+ifneq ($(HUF_FORCE_DECOMPRESS_X1), 0)
+	CFLAGS += -DHUF_FORCE_DECOMPRESS_X1
+endif
+
+ifneq ($(HUF_FORCE_DECOMPRESS_X2), 0)
+	CFLAGS += -DHUF_FORCE_DECOMPRESS_X2
+endif
+
+ifneq ($(ZSTD_FORCE_DECOMPRESS_SHORT), 0)
+	CFLAGS += -DZSTD_FORCE_DECOMPRESS_SHORT
+endif
+
+ifneq ($(ZSTD_FORCE_DECOMPRESS_LONG), 0)
+	CFLAGS += -DZSTD_FORCE_DECOMPRESS_LONG
+endif
+
+ifneq ($(ZSTD_NO_INLINE), 0)
+	CFLAGS += -DZSTD_NO_INLINE
+endif
+
+ifneq ($(ZSTD_STRIP_ERROR_STRINGS), 0)
+	CFLAGS += -DZSTD_STRIP_ERROR_STRINGS
+endif
+
+ifneq ($(ZSTD_LEGACY_MULTITHREADED_API), 0)
+	CFLAGS += -DZSTD_LEGACY_MULTITHREADED_API
 endif
 
 ifneq ($(ZSTD_LEGACY_SUPPORT), 0)
@@ -116,8 +156,7 @@ ifneq (,$(filter Windows%,$(OS)))
 LIBZSTD = dll\libzstd.dll
 $(LIBZSTD): $(ZSTD_FILES)
 	@echo compiling dynamic library $(LIBVER)
-	@$(CC) $(FLAGS) -DZSTD_DLL_EXPORT=1 -shared $^ -o $@
-	dlltool -D $@ -d dll\libzstd.def -l dll\libzstd.lib
+	$(CC) $(FLAGS) -DZSTD_DLL_EXPORT=1 -Wl,--out-implib,dll\libzstd.lib -shared $^ -o $@
 
 else
 

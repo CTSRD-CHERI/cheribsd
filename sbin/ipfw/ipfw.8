@@ -1,7 +1,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd October 21, 2018
+.Dd April 21, 2019
 .Dt IPFW 8
 .Os
 .Sh NAME
@@ -105,16 +105,6 @@ in-kernel NAT.
 .Ar number
 .Cm config
 .Ar config-options
-.Pp
-.Nm
-.Op Fl cfnNqS
-.Oo
-.Fl p Ar preproc
-.Oo
-.Ar preproc-flags
-.Oc
-.Oc
-.Ar pathname
 .Ss STATEFUL IPv6/IPv4 NETWORK ADDRESS AND PROTOCOL TRANSLATION
 .Nm
 .Oo Cm set Ar N Oc Cm nat64lsn Ar name Cm create Ar create-options
@@ -146,6 +136,21 @@ in-kernel NAT.
 .Cm destroy
 .Nm
 .Oo Cm set Ar N Oc Cm nat64stl Ar name Cm stats Op Cm reset
+.Ss XLAT464 CLAT IPv6/IPv4 NETWORK ADDRESS AND PROTOCOL TRANSLATION
+.Nm
+.Oo Cm set Ar N Oc Cm nat64clat Ar name Cm create Ar create-options
+.Nm
+.Oo Cm set Ar N Oc Cm nat64clat Ar name Cm config Ar config-options
+.Nm
+.Oo Cm set Ar N Oc Cm nat64clat
+.Brq Ar name | all
+.Brq Cm list | show
+.Nm
+.Oo Cm set Ar N Oc Cm nat64clat
+.Brq Ar name | all
+.Cm destroy
+.Nm
+.Oo Cm set Ar N Oc Cm nat64clat Ar name Cm stats Op Cm reset
 .Ss IPv6-to-IPv6 NETWORK PREFIX TRANSLATION
 .Nm
 .Oo Cm set Ar N Oc Cm nptv6 Ar name Cm create Ar create-options
@@ -166,6 +171,16 @@ in-kernel NAT.
 .Cm internal talist
 .Nm
 .Cm internal vlist
+.Ss LIST OF RULES AND PREPROCESSING
+.Nm
+.Op Fl cfnNqS
+.Oo
+.Fl p Ar preproc
+.Oo
+.Ar preproc-flags
+.Oc
+.Oc
+.Ar pathname
 .Sh DESCRIPTION
 The
 .Nm
@@ -233,9 +248,9 @@ or
 .Cm limit
 rule, and are typically used to open the firewall on-demand to
 legitimate traffic only.
-Please, note, that
+Please note, that
 .Cm keep-state
-amd
+and
 .Cm limit
 imply implicit
 .Cm check-state
@@ -310,10 +325,9 @@ i.e., omitting the "ip from any to any" string
 when this does not carry any additional information.
 .It Fl d
 When listing, show dynamic rules in addition to static ones.
-.It Fl e
-When listing and
-.Fl d
-is specified, also show expired dynamic rules.
+.It Fl D
+When listing, show only dynamic states.
+When deleting, delete only dynamic states.
 .It Fl f
 Run without prompting for confirmation for commands that can cause problems if misused,
 i.e.,
@@ -511,6 +525,27 @@ ipfw add 10 skipto 4000 all from any to any layer2 out
 .Pp
 (yes, at the moment there is no way to differentiate between
 ether_demux and bdg_forward).
+.Pp
+Also note that only actions
+.Cm allow,
+.Cm deny,
+.Cm netgraph,
+.Cm ngtee
+and related to
+.Cm dummynet
+are processed for
+.Cm layer2
+frames and all other actions act as if they were
+.Cm allow
+for such frames.
+Full set of actions is supported for IP packets without
+.Cm layer2
+headers only.
+For example,
+.Cm divert
+action does not divert
+.Cm layer2
+frames.
 .Sh SYNTAX
 In general, each keyword or argument must be provided as
 a separate command line argument, with no leading or trailing
@@ -664,8 +699,8 @@ is set to 0 (default), one can use
 attached to the
 .Li ipfw0
 pseudo interface.
-This pseudo interface can be created after a boot
-manually by using the following command:
+This pseudo interface can be created manually after a system
+boot by using the following command:
 .Bd -literal -offset indent
 # ifconfig ipfw0 create
 .Ed
@@ -678,7 +713,7 @@ file:
 firewall_logif="YES"
 .Ed
 .Pp
-There is no overhead if no
+There is zero overhead when no
 .Xr bpf 4
 is attached to the pseudo interface.
 .Pp
@@ -901,6 +936,11 @@ protocol translation): see the
 Section for further information.
 .It Cm nat64stl Ar name
 Pass packet to a stateless NAT64 instance (for IPv6/IPv4 network address and
+protocol translation): see the
+.Sx IPv6/IPv4 NETWORK ADDRESS AND PROTOCOL TRANSLATION
+Section for further information.
+.It Cm nat64clat Ar name
+Pass packet to a CLAT NAT64 instance (for client-side IPv6/IPv4 network address and
 protocol translation): see the
 .Sx IPv6/IPv4 NETWORK ADDRESS AND PROTOCOL TRANSLATION
 Section for further information.
@@ -1138,11 +1178,11 @@ Supported values are:
 .Pq Dv 101110 ,
 .Cm be
 .Pq Dv 000000 .
-Additionally, DSCP value can be specified by number (0..64).
+Additionally, DSCP value can be specified by number (0..63).
 It is also possible to use the
 .Cm tablearg
 keyword with setdscp.
-If the tablearg value is not within the 0..64 range, lower 6 bits of supplied
+If the tablearg value is not within the 0..63 range, lower 6 bits of supplied
 value are used.
 .It Cm tcp-setmss Ar mss
 Set the Maximum Segment Size (MSS) in the TCP segment to value
@@ -1309,11 +1349,11 @@ its use is discouraged.
 .Brc
 .Bl -tag -width indent
 .It Cm any
-matches any IP address.
+Matches any IP address.
 .It Cm me
-matches any IP address configured on an interface in the system.
+Matches any IP address configured on an interface in the system.
 .It Cm me6
-matches any IPv6 address configured on an interface in the system.
+Matches any IPv6 address configured on an interface in the system.
 The address list is evaluated at the time the packet is
 analysed.
 .It Cm table Ns Pq Ar name Ns Op , Ns Ar value
@@ -2063,7 +2103,7 @@ The following table types are supported:
 .It Ar flow-spec : Ar flow-field Ns Op , Ns Ar flow-spec
 .It Ar flow-field : src-ip | proto | src-port | dst-ip | dst-port
 .It Cm addr
-matches IPv4 or IPv6 address.
+Matches IPv4 or IPv6 address.
 Each entry is represented by an
 .Ar addr Ns Op / Ns Ar masklen
 and will match all addresses with base
@@ -2077,11 +2117,11 @@ is not specified, it defaults to 32 for IPv4 and 128 for IPv6.
 When looking up an IP address in a table, the most specific
 entry will match.
 .It Cm iface
-matches interface names.
+Matches interface names.
 Each entry is represented by string treated as interface name.
 Wildcards are not supported.
 .It Cm number
-maches protocol ports, uids/gids or jail IDs.
+Matches protocol ports, uids/gids or jail IDs.
 Each entry is represented by 32-bit unsigned integer.
 Ranges are not supported.
 .It Cm flow
@@ -2772,7 +2812,7 @@ specifies the quantum (credit) of the scheduler.
 .Ar m
 is the number of bytes a queue can serve before being moved to the tail
 of old queues list.
-The default is 1514 bytes, and the maximum accepable value
+The default is 1514 bytes, and the maximum acceptable value
 is 9000 bytes.
 .It Cm limit
 .Ar m
@@ -2780,14 +2820,14 @@ specifies the hard size limit (in unit of packets) of all queues managed by an
 instance of the scheduler.
 The default value of
 .Ar m
-is 10240 packets, and the maximum accepable value is 20480 packets.
+is 10240 packets, and the maximum acceptable value is 20480 packets.
 .It Cm flows
 .Ar m
 specifies the total number of flow queues (sub-queues) that fq_*
 creates and manages.
 By default, 1024 sub-queues are created when an instance
 of the fq_{codel/pie} scheduler is created.
-The maximum accepable value is
+The maximum acceptable value is
 65536.
 .El
 .Pp
@@ -2886,7 +2926,7 @@ is the typical queue size for Ethernet devices.
 Note that for slow speed links you should keep the queue
 size short or your traffic might be affected by a significant
 queueing delay.
-E.g., 50 max-sized ethernet packets (1500 bytes) mean 600Kbit
+E.g., 50 max-sized Ethernet packets (1500 bytes) mean 600Kbit
 or 20s of queue on a 30Kbit/s pipe.
 Even worse effects can result if you get packets from an
 interface with a much larger MTU, e.g.\& the loopback interface
@@ -3033,7 +3073,7 @@ De-randomisation is enabled by default.
 .It Cm onoff
 enable turning PIE on and off depending on queue load.
 If this option is enabled,
-PIE turnes on when over 1/3 of queue becomes full.
+PIE turns on when over 1/3 of queue becomes full.
 This option is disabled by
 default.
 .It Cm dre | ts
@@ -3260,6 +3300,7 @@ See
 .Sx SYSCTL VARIABLES
 for more info.
 .Sh IPv6/IPv4 NETWORK ADDRESS AND PROTOCOL TRANSLATION
+.Ss Stateful translation
 .Nm
 supports in-kernel IPv6/IPv4 network address and protocol translation.
 Stateful NAT64 translation allows IPv6-only clients to contact IPv4 servers
@@ -3277,7 +3318,8 @@ to be able use stateful NAT64 translator.
 Stateful NAT64 uses a bunch of memory for several types of objects.
 When IPv6 client initiates connection, NAT64 translator creates a host entry
 in the states table.
-Each host entry has a number of ports group entries allocated on demand.
+Each host entry uses preallocated IPv4 alias entry.
+Each alias entry has a number of ports group entries allocated on demand.
 Ports group entries contains connection state entries.
 There are several options to control limits and lifetime for these objects.
 .Pp
@@ -3297,6 +3339,11 @@ First time an original packet is handled and consumed by translator,
 and then it is handled again as translated packet.
 This behavior can be changed by sysctl variable 
 .Va net.inet.ip.fw.nat64_direct_output .
+Also translated packet can be tagged using
+.Cm tag
+rule action, and then matched by
+.Cm tagged
+opcode to avoid loops and extra overhead.
 .Pp
 The stateful NAT64 configuration command is the following:
 .Bd -ragged -offset indent
@@ -3324,15 +3371,16 @@ to represent IPv4 addresses. This IPv6 prefix should be configured in DNS64.
 The translator implementation follows RFC6052, that restricts the length of
 prefixes to one of following: 32, 40, 48, 56, 64, or 96.
 The Well-Known IPv6 Prefix 64:ff9b:: must be 96 bits long.
-.It Cm max_ports Ar number
-Maximum number of ports reserved for upper level protocols to one IPv6 client.
-All reserved ports are divided into chunks between supported protocols.
-The number of connections from one IPv6 client is limited by this option.
-Note that closed TCP connections still remain in the list of connections until
-.Cm tcp_close_age
-interval will not expire.
-Default value is
-.Ar 2048 .
+The special
+.Ar ::/length
+prefix can be used to handle several IPv6 prefixes with one NAT64 instance.
+The NAT64 instance will determine a destination IPv4 address from prefix
+.Ar length .
+.It Cm states_chunks Ar number
+The number of states chunks in single ports group.
+Each ports group by default can keep 64 state entries in single chunk.
+The above value affects the maximum number of states that can be associated with single IPv4 alias address and port.
+The value must be power of 2, and up to 128.
 .It Cm host_del_age Ar seconds
 The number of seconds until the host entry for a IPv6 client will be deleted
 and all its resources will be released due to inactivity.
@@ -3393,6 +3441,14 @@ With
 you are able to see each handled packet before and after translation.
 .It Cm -log
 Turn off logging of all handled packets via BPF.
+.It Cm allow_private
+Turn on processing private IPv4 addresses. By default IPv6 packets with
+destinations mapped to private address ranges defined by RFC1918 are not
+processed.
+.It Cm -allow_private
+Turn off private address handling in
+.Nm nat64
+instance.
 .El
 .Pp
 To inspect a states table of stateful NAT64 the following command can be used:
@@ -3440,12 +3496,71 @@ Turn on logging of all handled packets via BPF through
 interface.
 .It Cm -log
 Turn off logging of all handled packets via BPF.
+.It Cm allow_private
+Turn on processing private IPv4 addresses. By default IPv6 packets with
+destinations mapped to private address ranges defined by RFC1918 are not
+processed.
+.It Cm -allow_private
+Turn off private address handling in
+.Nm nat64
+instance.
 .El
 .Pp
 Note that the behavior of stateless translator with respect to not matched
 packets differs from stateful translator.
 If corresponding addresses was not found in the lookup tables, the packet
 will not be dropped and the search continues.
+.Pp
+.Pp
+.Ss XLAT464 CLAT translation
+XLAT464 CLAT NAT64 translator implements client-side stateless translation as
+defined in RFC6877 and is very similar to statless NAT64 translator
+explained above. Instead of lookup tables it uses one-to-one mapping
+between IPv4 and IPv6 addresses using configured prefixes.
+This mode can be used as a replacement of DNS64 service for applications
+that are not using it (e.g. VoIP) allowing them to access IPv4-only Internet
+over IPv6-only networks with help of remote NAT64 translator.
+.Pp
+The CLAT NAT64 configuration command is the following:
+.Bd -ragged -offset indent
+.Bk -words
+.Cm nat64clat
+.Ar name
+.Cm create
+.Ar create-options
+.Ek
+.Ed
+.Pp
+The following parameters can be configured:
+.Bl -tag -width indent
+.It Cm clat_prefix Ar ipv6_prefix/length
+The IPv6 prefix defines IPv4-embedded IPv6 addresses used by translator
+to represent source IPv4 addresses.
+.It Cm plat_prefix Ar ipv6_prefix/length
+The IPv6 prefix defines IPv4-embedded IPv6 addresses used by translator
+to represent destination IPv4 addresses. This IPv6 prefix should be configured
+on a remote NAT64 translator.
+.It Cm log
+Turn on logging of all handled packets via BPF through
+.Ar ipfwlog0
+interface.
+.It Cm -log
+Turn off logging of all handled packets via BPF.
+.It Cm allow_private
+Turn on processing private IPv4 addresses. By default
+.Nm nat64clat
+instance will not process IPv4 packets with destination address from private
+ranges as defined in RFC1918.
+.It Cm -allow_private
+Turn off private address handling in
+.Nm nat64clat
+instance.
+.El
+.Pp
+Note that the behavior of CLAT translator with respect to not matched
+packets differs from stateful translator.
+If corresponding addresses were not matched against prefixes configured,
+the packet will not be dropped and the search continues.
 .Sh IPv6-to-IPv6 NETWORK PREFIX TRANSLATION (NPTv6)
 .Nm
 supports in-kernel IPv6-to-IPv6 network prefix translation as described
@@ -3474,6 +3589,15 @@ NPTv6 module translates source address when it matches this prefix.
 .It Cm ext_prefix Ar ipv6_prefix
 IPv6 prefix used in external network.
 NPTv6 module translates destination address when it matches this prefix.
+.It Cm ext_if Ar nic
+The NPTv6 module will use first global IPv6 address from interface
+.Ar nic
+as external prefix.
+It can be useful when IPv6 prefix of external network is dynamically obtained.
+.Cm ext_prefix
+and
+.Cm ext_if
+options are mutually exclusive.
 .It Cm prefixlen Ar length
 The length of specified IPv6 prefixes. It must be in range from 8 to 64.
 .El
@@ -3919,16 +4043,6 @@ Default is no.
 Controls whether bridged packets are passed to
 .Nm .
 Default is no.
-.It Va net.inet.ip.fw.nat64_allow_private : No 0
-Defines how
-.Nm nat64
-handles private IPv4 addresses:
-.Bl -tag -width indent
-.It Cm 0
-Packets with private IPv4 will not be handled by translator
-.It Cm 1
-Translator will accept and process packets with private IPv4 addresses.
-.El
 .It Va net.inet.ip.fw.nat64_debug : No 0
 Controls debugging messages produced by
 .Nm ipfw_nat64
@@ -4056,6 +4170,55 @@ option could be used to (re)mark user traffic,
 by adding the following to the appropriate place in ruleset:
 .Pp
 .Dl "ipfw add setdscp be ip from any to any dscp af11,af21"
+.Ss SELECTIVE MIRRORING
+If your network has network traffic analyzer
+connected to your host directly via dedicated interface
+or remotely via RSPAN vlan, you can selectively mirror
+some Ethernet layer2 frames to the analyzer.
+.Pp
+First, make sure your firewall is already configured and runs.
+Then, enable layer2 processing if not already enabled:
+.Pp
+.Dl "sysctl net.link.ether.ipfw=1"
+.Pp
+Next, load needed additional kernel modules:
+.Pp
+.Dl "kldload ng_ether ng_ipfw"
+.Pp
+Optionally, make system load these modules automatically
+at startup:
+.Pp
+.Dl sysrc kld_list+="ng_ether ng_ipfw"
+.Pp
+Next, configure
+.Xr ng_ipfw 4
+kernel module to transmit mirrored copies of layer2 frames
+out via vlan900 interface:
+.Pp
+.Dl "ngctl connect ipfw: vlan900: 1 lower"
+.Pp
+Think of "1" here as of "mirroring instance index" and vlan900 is its
+destination.
+You can have arbitrary number of instances.
+Refer to
+.Xr ng_ipfw 4
+for details.
+.Pp
+At last, actually start mirroring of selected frames using "instance 1".
+For frames incoming from em0 interface:
+.Pp
+.Dl "ipfw add ngtee 1 ip from any to 192.168.0.1 layer2 in recv em0"
+.Pp
+For frames outgoing to em0 interface:
+.Pp
+.Dl "ipfw add ngtee 1 ip from any to 192.168.0.1 layer2 out xmit em0"
+.Pp
+For both incoming and outgoing frames while flowing through em0:
+.Pp
+.Dl "ipfw add ngtee 1 ip from any to 192.168.0.1 layer2 via em0"
+.Pp
+Make sure you do not perform mirroring for already duplicated frames
+or kernel may hang as there is no safety net.
 .Ss DYNAMIC RULES
 In order to protect a site from flood attacks involving fake
 TCP packets, it is safer to use dynamic rules:
@@ -4264,7 +4427,7 @@ In the following example per-interface firewall is created:
 .Pp
 The following example illustrate usage of flow tables:
 .Pp
-.Dl "ipfw table fl create type flow:flow:src-ip,proto,dst-ip,dst-port"
+.Dl "ipfw table fl create type flow:src-ip,proto,dst-ip,dst-port"
 .Dl "ipfw table fl add 2a02:6b8:77::88,tcp,2a02:6b8:77::99,80 11"
 .Dl "ipfw table fl add 10.0.0.1,udp,10.0.0.2,53 12"
 .Dl ".."
@@ -4356,7 +4519,7 @@ or it could be split in:
 .Dl "ipfw nat 5 config redirect_port tcp"
 .Dl "			192.168.0.1:80,192.168.0.10:22,192.168.0.20:25 500"
 .Pp
-Sometimes you may want to mix NAT and dynamic rules. It could be achived with
+Sometimes you may want to mix NAT and dynamic rules. It could be achieved with
 .Cm record-state
 and
 .Cm defer-action
@@ -4369,8 +4532,8 @@ rule will be performed as soon as rule is matched. In case of NAT and
 .Cm allow
 rule packet need to be passed to NAT, not allowed as soon is possible.
 .Pp
-There is example of set of rules to achive this. Bear in mind that this
-is exmaple only and it is not very usefult by itself.
+There is example of set of rules to achieve this. Bear in mind that this
+is exmaple only and it is not very useful by itself.
 .Pp
 On way out, after all checks place this rules:
 .Pp
@@ -4494,6 +4657,7 @@ can be changed in a similar way as for
 .Xr if_bridge 4 ,
 .Xr ip 4 ,
 .Xr ipfirewall 4 ,
+.Xr ng_ether 4 ,
 .Xr ng_ipfw 4 ,
 .Xr protocols 5 ,
 .Xr services 5 ,
@@ -4501,6 +4665,7 @@ can be changed in a similar way as for
 .Xr kldload 8 ,
 .Xr reboot 8 ,
 .Xr sysctl 8 ,
+.Xr sysrc 8 ,
 .Xr syslogd 8
 .Sh HISTORY
 The
@@ -4537,7 +4702,7 @@ The ipfw core (ipfw2) has been completely redesigned and
 reimplemented by Luigi Rizzo in summer 2002.
 Further
 actions and
-options have been added by various developer over the years.
+options have been added by various developers over the years.
 .Pp
 .An -nosplit
 In-kernel NAT support written by

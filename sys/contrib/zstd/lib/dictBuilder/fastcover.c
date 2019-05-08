@@ -20,7 +20,7 @@
 /*-*************************************
 *  Constants
 ***************************************/
-#define FASTCOVER_MAX_SAMPLES_SIZE (sizeof(size_t) == 8 ? ((U32)-1) : ((U32)1 GB))
+#define FASTCOVER_MAX_SAMPLES_SIZE (sizeof(size_t) == 8 ? ((unsigned)-1) : ((unsigned)1 GB))
 #define FASTCOVER_MAX_F 31
 #define FASTCOVER_MAX_ACCEL 10
 #define DEFAULT_SPLITPOINT 0.75
@@ -132,7 +132,7 @@ typedef struct {
  *
  *     Score(S) = F(S_1) + F(S_2) + ... + F(S_{k-d+1})
  *
- * Once the dmer with hash value d is in the dictionay we set F(d) = 0.
+ * Once the dmer with hash value d is in the dictionary we set F(d) = 0.
  */
 static COVER_segment_t FASTCOVER_selectSegment(const FASTCOVER_ctx_t *ctx,
                                               U32 *freqs, U32 begin, U32 end,
@@ -159,15 +159,15 @@ static COVER_segment_t FASTCOVER_selectSegment(const FASTCOVER_ctx_t *ctx,
    */
   while (activeSegment.end < end) {
     /* Get hash value of current dmer */
-    const size_t index = FASTCOVER_hashPtrToIndex(ctx->samples + activeSegment.end, f, d);
+    const size_t idx = FASTCOVER_hashPtrToIndex(ctx->samples + activeSegment.end, f, d);
 
-    /* Add frequency of this index to score if this is the first occurence of index in active segment */
-    if (segmentFreqs[index] == 0) {
-      activeSegment.score += freqs[index];
+    /* Add frequency of this index to score if this is the first occurrence of index in active segment */
+    if (segmentFreqs[idx] == 0) {
+      activeSegment.score += freqs[idx];
     }
     /* Increment end of segment and segmentFreqs*/
     activeSegment.end += 1;
-    segmentFreqs[index] += 1;
+    segmentFreqs[idx] += 1;
     /* If the window is now too large, drop the first position */
     if (activeSegment.end - activeSegment.begin == dmersInK + 1) {
       /* Get hash value of the dmer to be eliminated from active segment */
@@ -309,7 +309,7 @@ FASTCOVER_ctx_init(FASTCOVER_ctx_t* ctx,
     if (totalSamplesSize < MAX(d, sizeof(U64)) ||
         totalSamplesSize >= (size_t)FASTCOVER_MAX_SAMPLES_SIZE) {
         DISPLAYLEVEL(1, "Total samples size is too large (%u MB), maximum size is %u MB\n",
-                    (U32)(totalSamplesSize >> 20), (FASTCOVER_MAX_SAMPLES_SIZE >> 20));
+                    (unsigned)(totalSamplesSize >> 20), (FASTCOVER_MAX_SAMPLES_SIZE >> 20));
         return 0;
     }
 
@@ -328,9 +328,9 @@ FASTCOVER_ctx_init(FASTCOVER_ctx_t* ctx,
     /* Zero the context */
     memset(ctx, 0, sizeof(*ctx));
     DISPLAYLEVEL(2, "Training on %u samples of total size %u\n", nbTrainSamples,
-                    (U32)trainingSamplesSize);
+                    (unsigned)trainingSamplesSize);
     DISPLAYLEVEL(2, "Testing on %u samples of total size %u\n", nbTestSamples,
-                    (U32)testSamplesSize);
+                    (unsigned)testSamplesSize);
 
     ctx->samples = samples;
     ctx->samplesSizes = samplesSizes;
@@ -386,29 +386,35 @@ FASTCOVER_buildDictionary(const FASTCOVER_ctx_t* ctx,
 {
   BYTE *const dict = (BYTE *)dictBuffer;
   size_t tail = dictBufferCapacity;
-  /* Divide the data up into epochs of equal size.
-   * We will select at least one segment from each epoch.
-   */
-  const U32 epochs = MAX(1, (U32)(dictBufferCapacity / parameters.k));
-  const U32 epochSize = (U32)(ctx->nbDmers / epochs);
+  /* Divide the data into epochs. We will select one segment from each epoch. */
+  const COVER_epoch_info_t epochs = COVER_computeEpochs(
+      (U32)dictBufferCapacity, (U32)ctx->nbDmers, parameters.k, 1);
+  const size_t maxZeroScoreRun = 10;
+  size_t zeroScoreRun = 0;
   size_t epoch;
-  DISPLAYLEVEL(2, "Breaking content into %u epochs of size %u\n", epochs,
-               epochSize);
+  DISPLAYLEVEL(2, "Breaking content into %u epochs of size %u\n",
+                (U32)epochs.num, (U32)epochs.size);
   /* Loop through the epochs until there are no more segments or the dictionary
    * is full.
    */
-  for (epoch = 0; tail > 0; epoch = (epoch + 1) % epochs) {
-    const U32 epochBegin = (U32)(epoch * epochSize);
-    const U32 epochEnd = epochBegin + epochSize;
+  for (epoch = 0; tail > 0; epoch = (epoch + 1) % epochs.num) {
+    const U32 epochBegin = (U32)(epoch * epochs.size);
+    const U32 epochEnd = epochBegin + epochs.size;
     size_t segmentSize;
     /* Select a segment */
     COVER_segment_t segment = FASTCOVER_selectSegment(
         ctx, freqs, epochBegin, epochEnd, parameters, segmentFreqs);
 
-    /* If the segment covers no dmers, then we are out of content */
+    /* If the segment covers no dmers, then we are out of content.
+     * There may be new content in other epochs, for continue for some time.
+     */
     if (segment.score == 0) {
-      break;
+      if (++zeroScoreRun >= maxZeroScoreRun) {
+          break;
+      }
+      continue;
     }
+    zeroScoreRun = 0;
 
     /* Trim the segment if necessary and if it is too small then we are done */
     segmentSize = MIN(segment.end - segment.begin + parameters.d - 1, tail);
@@ -423,7 +429,7 @@ FASTCOVER_buildDictionary(const FASTCOVER_ctx_t* ctx,
     memcpy(dict + tail, ctx->samples + segment.begin, segmentSize);
     DISPLAYUPDATE(
         2, "\r%u%%       ",
-        (U32)(((dictBufferCapacity - tail) * 100) / dictBufferCapacity));
+        (unsigned)(((dictBufferCapacity - tail) * 100) / dictBufferCapacity));
   }
   DISPLAYLEVEL(2, "\r%79s\r", "");
   return tail;
@@ -564,6 +570,7 @@ ZDICT_trainFromBuffer_fastCover(void* dictBuffer, size_t dictBufferCapacity,
       DISPLAYLEVEL(1, "Failed to initialize context\n");
       return ERROR(GENERIC);
     }
+    COVER_warnOnSmallCorpus(dictBufferCapacity, ctx.nbDmers, g_displayLevel);
     /* Build the dictionary */
     DISPLAYLEVEL(2, "Building dictionary\n");
     {
@@ -577,7 +584,7 @@ ZDICT_trainFromBuffer_fastCover(void* dictBuffer, size_t dictBufferCapacity,
           samplesBuffer, samplesSizes, nbFinalizeSamples, coverParams.zParams);
       if (!ZSTD_isError(dictionarySize)) {
           DISPLAYLEVEL(2, "Constructed dictionary of size %u\n",
-                      (U32)dictionarySize);
+                      (unsigned)dictionarySize);
       }
       FASTCOVER_ctx_destroy(&ctx);
       free(segmentFreqs);
@@ -616,6 +623,7 @@ ZDICT_optimizeTrainFromBuffer_fastCover(
     unsigned k;
     COVER_best_t best;
     POOL_ctx *pool = NULL;
+    int warned = 0;
     /* Checks */
     if (splitPoint <= 0 || splitPoint > 1) {
       LOCALDISPLAYLEVEL(displayLevel, 1, "Incorrect splitPoint\n");
@@ -664,6 +672,10 @@ ZDICT_optimizeTrainFromBuffer_fastCover(
         POOL_free(pool);
         return ERROR(GENERIC);
       }
+      if (!warned) {
+        COVER_warnOnSmallCorpus(dictBufferCapacity, ctx.nbDmers, displayLevel);
+        warned = 1;
+      }
       /* Loop through k reusing the same context */
       for (k = kMinK; k <= kMaxK; k += kStepSize) {
         /* Prepare the arguments */
@@ -702,7 +714,7 @@ ZDICT_optimizeTrainFromBuffer_fastCover(
         }
         /* Print status */
         LOCALDISPLAYUPDATE(displayLevel, 2, "\r%u%%       ",
-                           (U32)((iteration * 100) / kIterations));
+                           (unsigned)((iteration * 100) / kIterations));
         ++iteration;
       }
       COVER_best_wait(&best);

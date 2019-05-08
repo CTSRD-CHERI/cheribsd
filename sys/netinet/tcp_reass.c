@@ -38,6 +38,10 @@ __FBSDID("$FreeBSD$");
 #include "opt_inet6.h"
 #include "opt_tcpdebug.h"
 
+/* For debugging we want counters and BB logging */
+/* #define TCP_REASS_COUNTERS 1 */
+/* #define TCP_REASS_LOGGING 1 */
+
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/eventhandler.h>
@@ -72,8 +76,10 @@ __FBSDID("$FreeBSD$");
 #include <netinet/tcp_seq.h>
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
+#ifdef TCP_REASS_LOGGING
 #include <netinet/tcp_log_buf.h>
 #include <netinet/tcp_hpts.h>
+#endif
 #include <netinet6/tcp6_var.h>
 #include <netinet/tcpip.h>
 #ifdef TCPDEBUG
@@ -91,10 +97,6 @@ __FBSDID("$FreeBSD$");
 #define TCP_R_LOG_ZERO		9
 #define TCP_R_LOG_DUMP		10
 #define TCP_R_LOG_TRIM		11
-
-/* For debugging we want counters and BB logging */
-/* #define TCP_REASS_COUNTERS 1 */
-/* #define TCP_REASS_LOGGING 1 */
 
 static SYSCTL_NODE(_net_inet_tcp, OID_AUTO, reass, CTLFLAG_RW, 0,
     "TCP Segment Reassembly Queue");
@@ -540,6 +542,10 @@ tcp_reass(struct tcpcb *tp, struct tcphdr *th, tcp_seq *seq_start,
 	 * and should be rewritten (see NetBSD for optimizations).
 	 */
 
+	KASSERT(th == NULL || (seq_start != NULL && tlenp != NULL),
+	        ("tcp_reass called with illegal parameter combination "
+	         "(tp=%p, th=%p, seq_start=%p, tlenp=%p, m=%p)",
+	         tp, th, seq_start, tlenp, m));
 	/*
 	 * Call with th==NULL after become established to
 	 * force pre-ESTABLISHED data up to user socket.
@@ -579,7 +585,8 @@ tcp_reass(struct tcpcb *tp, struct tcphdr *th, tcp_seq *seq_start,
 	 */
 	lenofoh = tcp_reass_overhead_of_chain(m, &mlast);
 	sb = &tp->t_inpcb->inp_socket->so_rcv;
-	if ((sb->sb_mbcnt + tp->t_segqmbuflen + lenofoh) > sb->sb_mbmax) {
+	if ((th->th_seq != tp->rcv_nxt || !TCPS_HAVEESTABLISHED(tp->t_state)) &&
+	    (sb->sb_mbcnt + tp->t_segqmbuflen + lenofoh) > sb->sb_mbmax) {
 		/* No room */
 		TCPSTAT_INC(tcps_rcvreassfull);
 #ifdef TCP_REASS_COUNTERS
@@ -588,6 +595,11 @@ tcp_reass(struct tcpcb *tp, struct tcphdr *th, tcp_seq *seq_start,
 #ifdef TCP_REASS_LOGGING
 		tcp_log_reassm(tp, NULL, NULL, th->th_seq, lenofoh, TCP_R_LOG_LIMIT_REACHED, 0);
 #endif
+		if ((s = tcp_log_addrs(&tp->t_inpcb->inp_inc, th, NULL, NULL))) {
+			log(LOG_DEBUG, "%s; %s: mbuf count limit reached, "
+			    "segment dropped\n", s, __func__);
+			free(s, M_TCPLOG);
+		}
 		m_freem(m);
 		*tlenp = 0;
 #ifdef TCP_REASS_LOGGING
@@ -936,6 +948,20 @@ tcp_reass(struct tcpcb *tp, struct tcphdr *th, tcp_seq *seq_start,
 	 * is understood.
 	 */
 new_entry:
+	if (th->th_seq == tp->rcv_nxt && TCPS_HAVEESTABLISHED(tp->t_state)) {
+		tp->rcv_nxt += *tlenp;
+		flags = th->th_flags & TH_FIN;
+		TCPSTAT_INC(tcps_rcvoopack);
+		TCPSTAT_ADD(tcps_rcvoobyte, *tlenp);
+		SOCKBUF_LOCK(&so->so_rcv);
+		if (so->so_rcv.sb_state & SBS_CANTRCVMORE) {
+			m_freem(m);
+		} else {
+			sbappendstream_locked(&so->so_rcv, m, 0);
+		}
+		sorwakeup_locked(so);
+		return (flags);
+	}
 	if (tcp_new_limits) {
 		if ((tp->t_segqlen > tcp_reass_queue_guard) &&
 		    (*tlenp < MSIZE)) {
@@ -960,9 +986,7 @@ new_entry:
 			return (0);
 		}
 	} else {
-
-		if ((th->th_seq != tp->rcv_nxt || !TCPS_HAVEESTABLISHED(tp->t_state)) &&
-		    tp->t_segqlen >= min((so->so_rcv.sb_hiwat / tp->t_maxseg) + 1,
+		if (tp->t_segqlen >= min((so->so_rcv.sb_hiwat / tp->t_maxseg) + 1,
 					 tcp_reass_maxqueuelen)) {
 			TCPSTAT_INC(tcps_rcvreassfull);
 			*tlenp = 0;
@@ -1042,12 +1066,20 @@ present:
 		} else {
 #ifdef TCP_REASS_LOGGING
 			tcp_reass_log_new_in(tp, q->tqe_start, q->tqe_len, q->tqe_m, TCP_R_LOG_READ, q);
-			tcp_log_reassm(tp, q, NULL, th->th_seq, *tlenp, TCP_R_LOG_READ, 1);
+			if (th != NULL) {
+				tcp_log_reassm(tp, q, NULL, th->th_seq, *tlenp, TCP_R_LOG_READ, 1);
+			} else {
+				tcp_log_reassm(tp, q, NULL, 0, 0, TCP_R_LOG_READ, 1);
+			}
 #endif
 			sbappendstream_locked(&so->so_rcv, q->tqe_m, 0);
 		}
 #ifdef TCP_REASS_LOGGING
-		tcp_log_reassm(tp, q, NULL, th->th_seq, *tlenp, TCP_R_LOG_READ, 2);
+		if (th != NULL) {
+			tcp_log_reassm(tp, q, NULL, th->th_seq, *tlenp, TCP_R_LOG_READ, 2);
+		} else {
+			tcp_log_reassm(tp, q, NULL, 0, 0, TCP_R_LOG_READ, 2);
+		}
 #endif
 		KASSERT(tp->t_segqmbuflen >= q->tqe_mbuf_cnt,
 			("tp:%p seg queue goes negative", tp));
@@ -1063,7 +1095,11 @@ present:
 		      tp, &tp->t_segq, tp->t_segqmbuflen);
 #else
 #ifdef TCP_REASS_LOGGING
-		tcp_log_reassm(tp, NULL, NULL, th->th_seq, *tlenp, TCP_R_LOG_ZERO, 0);
+		if (th != NULL) {
+			tcp_log_reassm(tp, NULL, NULL, th->th_seq, *tlenp, TCP_R_LOG_ZERO, 0);
+		} else {
+			tcp_log_reassm(tp, NULL, NULL, 0, 0, TCP_R_LOG_ZERO, 0);
+		}
 #endif
 		tp->t_segqmbuflen = 0;
 #endif

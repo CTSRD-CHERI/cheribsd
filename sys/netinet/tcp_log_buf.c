@@ -1,8 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2016-2018
- *	Netflix Inc.  All rights reserved.
+ * Copyright (c) 2016-2018 Netflix, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -755,6 +754,7 @@ refind:
 			RECHECK_INP();
 			if (tp->t_lib != NULL) {
 				TCPID_BUCKET_UNLOCK(tlb);
+				bucket_locked = false;
 				tlb = NULL;
 				goto restart;
 			}

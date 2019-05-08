@@ -2,19 +2,24 @@
 
 .include <src.opts.mk>
 
+# Seems like subobject bounds on references are too aggressive:
+# Implementations of vector/string take refernces to internal storage arrays and
+# then use address-of operator and assume the result will be unbounded.
+# TODO: fix this assumption in clang
+CHERI_SUBOBJECT_BOUNDS_MAX:=conservative
+
 PACKAGE=	clibs
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
-.if !exists(${SRCTOP}/contrib/cheri-libc++/src)
-.error "CHERI C++ submodules missing! Run `git submodule init && git submodule update` to fetch them."
-.endif
-_LIBCXXRTDIR=   ${SRCTOP}/contrib/cheri-libcxxrt/src
-HDRDIR=         ${SRCTOP}/contrib/cheri-libc++/include
-SRCDIR=         ${SRCTOP}/contrib/cheri-libc++/src
+_LIBCXXRTDIR=   ${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
+HDRDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/include
+SRCDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/src
+_LIBCXX_VERSION=8
 .else
-_LIBCXXRTDIR=	${SRCTOP}/contrib/cheri-libcxxrt/src
-HDRDIR=		${SRCTOP}/contrib/cheri-libc++/include
-SRCDIR=		${SRCTOP}/contrib/cheri-libc++/src
+_LIBCXXRTDIR=	${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
+HDRDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/include
+SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/src
+_LIBCXX_VERSION=8
 .endif
 CXXINCLUDEDIR=	${INCLUDEDIR}/c++/v${SHLIB_MAJOR}
 .if ${MACHINE_CPUARCH} == "arm"
@@ -30,6 +35,7 @@ SHLIB_LDSCRIPT=	libc++.ldscript
 SRCS+=		algorithm.cpp
 SRCS+=		any.cpp
 SRCS+=		bind.cpp
+SRCS+=		charconv.cpp
 SRCS+=		chrono.cpp
 SRCS+=		condition_variable.cpp
 SRCS+=		debug.cpp
@@ -58,6 +64,13 @@ SRCS+=		valarray.cpp
 SRCS+=		variant.cpp
 SRCS+=		vector.cpp
 
+# TODO: the filesystem code currently crashes clang
+.if 0
+SRCS+=		filesystem/directory_iterator.cpp
+SRCS+=		filesystem/int128_builtins.cpp
+SRCS+=		filesystem/operations.cpp
+.endif
+
 CXXRT_SRCS+=	auxhelper.cc
 CXXRT_SRCS+=	dynamic_cast.cc
 CXXRT_SRCS+=	exception.cc
@@ -82,9 +95,7 @@ CFLAGS+=	-nostdinc++
 CFLAGS+=	-nostdlib
 CFLAGS+=	-D_LIBCPP_BUILDING_LIBRARY
 CFLAGS+=	-DLIBCXXRT
-.if empty(CXXFLAGS:M-std=*)
-CXXFLAGS+=	-std=c++11
-.endif
+CXXSTD?=	c++11
 
 LIBADD+=	cxxrt
 
@@ -100,6 +111,7 @@ STD_HEADERS+=	__bsd_locale_defaults.h
 STD_HEADERS+=	__bsd_locale_fallbacks.h
 STD_HEADERS+=	__config
 STD_HEADERS+=	__debug
+STD_HEADERS+=	__errc
 STD_HEADERS+=	__functional_03
 STD_HEADERS+=	__functional_base
 STD_HEADERS+=	__functional_base_03
@@ -107,6 +119,7 @@ STD_HEADERS+=	__hash_table
 STD_HEADERS+=	__libcpp_version
 STD_HEADERS+=	__locale
 STD_HEADERS+=	__mutex_base
+STD_HEADERS+=	__node_handle
 STD_HEADERS+=	__nullptr
 STD_HEADERS+=	__split_buffer
 STD_HEADERS+=	__sso_allocator
@@ -120,6 +133,7 @@ STD_HEADERS+=	algorithm
 STD_HEADERS+=	any
 STD_HEADERS+=	array
 STD_HEADERS+=	atomic
+STD_HEADERS+=	bit
 STD_HEADERS+=	bitset
 STD_HEADERS+=	cassert
 STD_HEADERS+=	ccomplex
@@ -127,6 +141,7 @@ STD_HEADERS+=	cctype
 STD_HEADERS+=	cerrno
 STD_HEADERS+=	cfenv
 STD_HEADERS+=	cfloat
+STD_HEADERS+=	charconv
 STD_HEADERS+=	chrono
 STD_HEADERS+=	cinttypes
 STD_HEADERS+=	ciso646
@@ -134,6 +149,7 @@ STD_HEADERS+=	climits
 STD_HEADERS+=	clocale
 STD_HEADERS+=	cmath
 STD_HEADERS+=	codecvt
+STD_HEADERS+=	compare
 STD_HEADERS+=	complex
 STD_HEADERS+=	complex.h
 STD_HEADERS+=	condition_variable
@@ -154,6 +170,7 @@ STD_HEADERS+=	cwctype
 STD_HEADERS+=	deque
 STD_HEADERS+=	errno.h
 STD_HEADERS+=	exception
+STD_HEADERS+=	filesystem
 STD_HEADERS+=	float.h
 STD_HEADERS+=	forward_list
 STD_HEADERS+=	fstream
@@ -188,6 +205,7 @@ STD_HEADERS+=	scoped_allocator
 STD_HEADERS+=	set
 STD_HEADERS+=	setjmp.h
 STD_HEADERS+=	shared_mutex
+STD_HEADERS+=	span
 STD_HEADERS+=	sstream
 STD_HEADERS+=	stack
 STD_HEADERS+=	stdbool.h
@@ -214,6 +232,7 @@ STD_HEADERS+=	utility
 STD_HEADERS+=	valarray
 STD_HEADERS+=	variant
 STD_HEADERS+=	vector
+STD_HEADERS+=	version
 STD_HEADERS+=	wchar.h
 STD_HEADERS+=	wctype.h
 
@@ -238,7 +257,6 @@ EXP_HEADERS+=	any
 EXP_HEADERS+=	chrono
 EXP_HEADERS+=	coroutine
 EXP_HEADERS+=	deque
-EXP_HEADERS+=	dynarray
 EXP_HEADERS+=	filesystem
 EXP_HEADERS+=	forward_list
 EXP_HEADERS+=	functional
@@ -252,6 +270,7 @@ EXP_HEADERS+=	propagate_const
 EXP_HEADERS+=	ratio
 EXP_HEADERS+=	regex
 EXP_HEADERS+=	set
+EXP_HEADERS+=	simd
 EXP_HEADERS+=	string
 EXP_HEADERS+=	string_view
 EXP_HEADERS+=	system_error

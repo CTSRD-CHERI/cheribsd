@@ -94,6 +94,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/trap.h>
 #include <machine/vmparam.h>
 
+#include <vm/pmap.h>
+
 #ifdef FPU_EMU
 #include <powerpc/fpu/fpu_extern.h>
 #endif
@@ -121,6 +123,10 @@ static int	grab_mcontext32(struct thread *td, mcontext32_t *, int flags);
 #endif
 
 static int	grab_mcontext(struct thread *, mcontext_t *, int);
+
+#ifdef __powerpc64__
+extern struct sysentvec elf64_freebsd_sysvec_v2;
+#endif
 
 void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
@@ -468,6 +474,10 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	else
 		tf->fixreg[2] = tls;
 
+	/* Disable FPU */
+	tf->srr1 &= ~PSL_FP;
+	pcb->pcb_flags &= ~PCB_FPU;
+
 	if (mcp->mc_flags & _MC_FP_VALID) {
 		/* enable_fpu() will happen lazily on a fault */
 		pcb->pcb_flags |= PCB_FPREGS;
@@ -783,6 +793,7 @@ freebsd32_getcontext(struct thread *td, struct freebsd32_getcontext_args *uap)
 	if (uap->ucp == NULL)
 		ret = EINVAL;
 	else {
+		bzero(&uc, sizeof(uc));
 		get_mcontext32(td, &uc.uc_mcontext, GET_MC_CLEAR_RET);
 		PROC_LOCK(td->td_proc);
 		uc.uc_sigmask = td->td_sigmask;
@@ -822,6 +833,7 @@ freebsd32_swapcontext(struct thread *td, struct freebsd32_swapcontext_args *uap)
 	if (uap->oucp == NULL || uap->ucp == NULL)
 		ret = EINVAL;
 	else {
+		bzero(&uc, sizeof(uc));
 		get_mcontext32(td, &uc.uc_mcontext, GET_MC_CLEAR_RET);
 		PROC_LOCK(td->td_proc);
 		uc.uc_sigmask = td->td_sigmask;
@@ -859,8 +871,6 @@ cpu_set_syscall_retval(struct thread *td, int error)
 	if (tf->fixreg[0] == SYS___syscall &&
 	    (SV_PROC_FLAG(p, SV_ILP32))) {
 		int code = tf->fixreg[FIRSTARG + 1];
-		if (p->p_sysent->sv_mask)
-			code &= p->p_sysent->sv_mask;
 		fixup = (
 #if defined(COMPAT_FREEBSD6) && defined(SYS_freebsd6_lseek)
 		    code != SYS_freebsd6_lseek &&
@@ -1010,11 +1020,18 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 		#endif
 	} else {
 	    #ifdef __powerpc64__
-		register_t entry_desc[3];
-		(void)copyin((void *)entry, entry_desc, sizeof(entry_desc));
-		tf->srr0 = entry_desc[0];
-		tf->fixreg[2] = entry_desc[1];
-		tf->fixreg[11] = entry_desc[2];
+		if (td->td_proc->p_sysent == &elf64_freebsd_sysvec_v2) {
+			tf->srr0 = (register_t)entry;
+			/* ELFv2 ABI requires that the global entry point be in r12. */
+			tf->fixreg[12] = (register_t)entry;
+		}
+		else {
+			register_t entry_desc[3];
+			(void)copyin((void *)entry, entry_desc, sizeof(entry_desc));
+			tf->srr0 = entry_desc[0];
+			tf->fixreg[2] = entry_desc[1];
+			tf->fixreg[11] = entry_desc[2];
+		}
 		tf->srr1 = psl_userset | PSL_FE_DFLT;
 	    #endif
 	}
@@ -1064,8 +1081,9 @@ emulate_mtspr(int spr, int reg, struct trapframe *frame){
 
 #define XFX 0xFC0007FF
 int
-ppc_instr_emulate(struct trapframe *frame, struct pcb *pcb)
+ppc_instr_emulate(struct trapframe *frame, struct thread *td)
 {
+	struct pcb *pcb;
 	uint32_t instr;
 	int reg, sig;
 	int rs, spr;
@@ -1092,13 +1110,25 @@ ppc_instr_emulate(struct trapframe *frame, struct pcb *pcb)
 		return (0);
 	}
 
+	pcb = td->td_pcb;
 #ifdef FPU_EMU
 	if (!(pcb->pcb_flags & PCB_FPREGS)) {
 		bzero(&pcb->pcb_fpu, sizeof(pcb->pcb_fpu));
 		pcb->pcb_flags |= PCB_FPREGS;
-	}
+	} else if (pcb->pcb_flags & PCB_FPU)
+		save_fpu(td);
 	sig = fpu_emulate(frame, &pcb->pcb_fpu);
+	if ((sig == 0 || sig == SIGFPE) && pcb->pcb_flags & PCB_FPU)
+		enable_fpu(td);
 #endif
+	if (sig == SIGILL) {
+		if (pcb->pcb_lastill != frame->srr0) {
+			/* Allow a second chance, in case of cache sync issues. */
+			sig = 0;
+			pmap_sync_icache(PCPU_GET(curpmap), frame->srr0, 4);
+			pcb->pcb_lastill = frame->srr0;
+		}
+	}
 
 	return (sig);
 }

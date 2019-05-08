@@ -491,6 +491,8 @@ static const size_t ZSTDv05_frameHeaderSize_min = 5;
 
 #define WILDCOPY_OVERLENGTH 8
 
+#define ZSTD_CONTENTSIZE_ERROR   (0ULL - 2)
+
 typedef enum { bt_compressed, bt_raw, bt_rle, bt_end } blockType_t;
 
 
@@ -836,7 +838,7 @@ MEM_STATIC void BITv05_skipBits(BITv05_DStream_t* bitD, U32 nbBits)
     bitD->bitsConsumed += nbBits;
 }
 
-MEM_STATIC size_t BITv05_readBits(BITv05_DStream_t* bitD, U32 nbBits)
+MEM_STATIC size_t BITv05_readBits(BITv05_DStream_t* bitD, unsigned nbBits)
 {
     size_t value = BITv05_lookBits(bitD, nbBits);
     BITv05_skipBits(bitD, nbBits);
@@ -845,7 +847,7 @@ MEM_STATIC size_t BITv05_readBits(BITv05_DStream_t* bitD, U32 nbBits)
 
 /*!BITv05_readBitsFast :
 *  unsafe version; only works only if nbBits >= 1 */
-MEM_STATIC size_t BITv05_readBitsFast(BITv05_DStream_t* bitD, U32 nbBits)
+MEM_STATIC size_t BITv05_readBitsFast(BITv05_DStream_t* bitD, unsigned nbBits)
 {
     size_t value = BITv05_lookBitsFast(bitD, nbBits);
     BITv05_skipBits(bitD, nbBits);
@@ -1162,7 +1164,7 @@ MEM_STATIC unsigned FSEv05_endOfDState(const FSEv05_DState_t* DStatePtr)
 /* **************************************************************
 *  Complex types
 ****************************************************************/
-typedef U32 DTable_max_t[FSEv05_DTABLE_SIZE_U32(FSEv05_MAX_TABLELOG)];
+typedef unsigned DTable_max_t[FSEv05_DTABLE_SIZE_U32(FSEv05_MAX_TABLELOG)];
 
 
 /* **************************************************************
@@ -2191,7 +2193,7 @@ static void HUFv05_fillDTableX4(HUFv05_DEltX4* DTable, const U32 targetLog,
     }
 }
 
-size_t HUFv05_readDTableX4 (U32* DTable, const void* src, size_t srcSize)
+size_t HUFv05_readDTableX4 (unsigned* DTable, const void* src, size_t srcSize)
 {
     BYTE weightList[HUFv05_MAX_SYMBOL_VALUE + 1];
     sortedSymbol_t sortedSymbol[HUFv05_MAX_SYMBOL_VALUE + 1];
@@ -2205,7 +2207,7 @@ size_t HUFv05_readDTableX4 (U32* DTable, const void* src, size_t srcSize)
     void* dtPtr = DTable;
     HUFv05_DEltX4* const dt = ((HUFv05_DEltX4*)dtPtr) + 1;
 
-    HUFv05_STATIC_ASSERT(sizeof(HUFv05_DEltX4) == sizeof(U32));   /* if compilation fails here, assertion is false */
+    HUFv05_STATIC_ASSERT(sizeof(HUFv05_DEltX4) == sizeof(unsigned));   /* if compilation fails here, assertion is false */
     if (memLog > HUFv05_ABSOLUTEMAX_TABLELOG) return ERROR(tableLog_tooLarge);
     //memset(weightList, 0, sizeof(weightList));   /* is not necessary, even though some analyzer complain ... */
 
@@ -2332,7 +2334,7 @@ static inline size_t HUFv05_decodeStreamX4(BYTE* p, BITv05_DStream_t* bitDPtr, B
 size_t HUFv05_decompress1X4_usingDTable(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,
-    const U32* DTable)
+    const unsigned* DTable)
 {
     const BYTE* const istart = (const BYTE*) cSrc;
     BYTE* const ostart = (BYTE*) dst;
@@ -2375,7 +2377,7 @@ size_t HUFv05_decompress1X4 (void* dst, size_t dstSize, const void* cSrc, size_t
 size_t HUFv05_decompress4X4_usingDTable(
           void* dst,  size_t dstSize,
     const void* cSrc, size_t cSrcSize,
-    const U32* DTable)
+    const unsigned* DTable)
 {
     if (cSrcSize < 10) return ERROR(corruption_detected);   /* strict minimum : jump table + 1 byte per stream */
 
@@ -2999,7 +3001,7 @@ static size_t ZSTDv05_decodeSeqHeaders(int* nbSeq, const BYTE** dumpsPtr, size_t
     const BYTE* ip = istart;
     const BYTE* const iend = istart + srcSize;
     U32 LLtype, Offtype, MLtype;
-    U32 LLlog, Offlog, MLlog;
+    unsigned LLlog, Offlog, MLlog;
     size_t dumpsLength;
 
     /* check */
@@ -3057,7 +3059,7 @@ static size_t ZSTDv05_decodeSeqHeaders(int* nbSeq, const BYTE** dumpsPtr, size_t
             break;
         case FSEv05_ENCODING_DYNAMIC :
         default :   /* impossible */
-            {   U32 max = MaxLL;
+            {   unsigned max = MaxLL;
                 headerSize = FSEv05_readNCount(norm, &max, &LLlog, ip, iend-ip);
                 if (FSEv05_isError(headerSize)) return ERROR(GENERIC);
                 if (LLlog > LLFSEv05Log) return ERROR(corruption_detected);
@@ -3081,7 +3083,7 @@ static size_t ZSTDv05_decodeSeqHeaders(int* nbSeq, const BYTE** dumpsPtr, size_t
             break;
         case FSEv05_ENCODING_DYNAMIC :
         default :   /* impossible */
-            {   U32 max = MaxOff;
+            {   unsigned max = MaxOff;
                 headerSize = FSEv05_readNCount(norm, &max, &Offlog, ip, iend-ip);
                 if (FSEv05_isError(headerSize)) return ERROR(GENERIC);
                 if (Offlog > OffFSEv05Log) return ERROR(corruption_detected);
@@ -3105,7 +3107,7 @@ static size_t ZSTDv05_decodeSeqHeaders(int* nbSeq, const BYTE** dumpsPtr, size_t
             break;
         case FSEv05_ENCODING_DYNAMIC :
         default :   /* impossible */
-            {   U32 max = MaxML;
+            {   unsigned max = MaxML;
                 headerSize = FSEv05_readNCount(norm, &max, &MLlog, ip, iend-ip);
                 if (FSEv05_isError(headerSize)) return ERROR(GENERIC);
                 if (MLlog > MLFSEv05Log) return ERROR(corruption_detected);
@@ -3217,7 +3219,7 @@ static size_t ZSTDv05_execSequence(BYTE* op,
                                 const BYTE* const base, const BYTE* const vBase, const BYTE* const dictEnd)
 {
     static const int dec32table[] = { 0, 1, 2, 1, 4, 4, 4, 4 };   /* added */
-    static const int dec64table[] = { 8, 8, 8, 7, 8, 9,10,11 };   /* substracted */
+    static const int dec64table[] = { 8, 8, 8, 7, 8, 9,10,11 };   /* subtracted */
     BYTE* const oLitEnd = op + sequence.litLength;
     const size_t sequenceLength = sequence.litLength + sequence.matchLength;
     BYTE* const oMatchEnd = op + sequenceLength;   /* risk : address space overflow (32-bits) */
@@ -3305,9 +3307,9 @@ static size_t ZSTDv05_decompressSequences(
     const BYTE* const litEnd = litPtr + dctx->litSize;
     int nbSeq=0;
     const BYTE* dumps = NULL;
-    U32* DTableLL = dctx->LLTable;
-    U32* DTableML = dctx->MLTable;
-    U32* DTableOffb = dctx->OffTable;
+    unsigned* DTableLL = dctx->LLTable;
+    unsigned* DTableML = dctx->MLTable;
+    unsigned* DTableOffb = dctx->OffTable;
     const BYTE* const base = (const BYTE*) (dctx->base);
     const BYTE* const vBase = (const BYTE*) (dctx->vBase);
     const BYTE* const dictEnd = (const BYTE*) (dctx->dictEnd);
@@ -3508,34 +3510,57 @@ size_t ZSTDv05_decompress(void* dst, size_t maxDstSize, const void* src, size_t 
 #endif
 }
 
-size_t ZSTDv05_findFrameCompressedSize(const void *src, size_t srcSize)
+/* ZSTD_errorFrameSizeInfoLegacy() :
+   assumes `cSize` and `dBound` are _not_ NULL */
+static void ZSTD_errorFrameSizeInfoLegacy(size_t* cSize, unsigned long long* dBound, size_t ret)
+{
+    *cSize = ret;
+    *dBound = ZSTD_CONTENTSIZE_ERROR;
+}
+
+void ZSTDv05_findFrameSizeInfoLegacy(const void *src, size_t srcSize, size_t* cSize, unsigned long long* dBound)
 {
     const BYTE* ip = (const BYTE*)src;
     size_t remainingSize = srcSize;
+    size_t nbBlocks = 0;
     blockProperties_t blockProperties;
 
     /* Frame Header */
-    if (srcSize < ZSTDv05_frameHeaderSize_min) return ERROR(srcSize_wrong);
-    if (MEM_readLE32(src) != ZSTDv05_MAGICNUMBER) return ERROR(prefix_unknown);
+    if (srcSize < ZSTDv05_frameHeaderSize_min) {
+        ZSTD_errorFrameSizeInfoLegacy(cSize, dBound, ERROR(srcSize_wrong));
+        return;
+    }
+    if (MEM_readLE32(src) != ZSTDv05_MAGICNUMBER) {
+        ZSTD_errorFrameSizeInfoLegacy(cSize, dBound, ERROR(prefix_unknown));
+        return;
+    }
     ip += ZSTDv05_frameHeaderSize_min; remainingSize -= ZSTDv05_frameHeaderSize_min;
 
     /* Loop on each block */
     while (1)
     {
         size_t cBlockSize = ZSTDv05_getcBlockSize(ip, remainingSize, &blockProperties);
-        if (ZSTDv05_isError(cBlockSize)) return cBlockSize;
+        if (ZSTDv05_isError(cBlockSize)) {
+            ZSTD_errorFrameSizeInfoLegacy(cSize, dBound, cBlockSize);
+            return;
+        }
 
         ip += ZSTDv05_blockHeaderSize;
         remainingSize -= ZSTDv05_blockHeaderSize;
-        if (cBlockSize > remainingSize) return ERROR(srcSize_wrong);
+        if (cBlockSize > remainingSize) {
+            ZSTD_errorFrameSizeInfoLegacy(cSize, dBound, ERROR(srcSize_wrong));
+            return;
+        }
 
         if (cBlockSize == 0) break;   /* bt_end */
 
         ip += cBlockSize;
         remainingSize -= cBlockSize;
+        nbBlocks++;
     }
 
-    return ip - (const BYTE*)src;
+    *cSize = ip - (const BYTE*)src;
+    *dBound = nbBlocks * BLOCKSIZE;
 }
 
 /* ******************************
@@ -3633,7 +3658,7 @@ static size_t ZSTDv05_loadEntropy(ZSTDv05_DCtx* dctx, const void* dict, size_t d
 {
     size_t hSize, offcodeHeaderSize, matchlengthHeaderSize, errorCode, litlengthHeaderSize;
     short offcodeNCount[MaxOff+1];
-    U32 offcodeMaxValue=MaxOff, offcodeLog;
+    unsigned offcodeMaxValue=MaxOff, offcodeLog;
     short matchlengthNCount[MaxML+1];
     unsigned matchlengthMaxValue = MaxML, matchlengthLog;
     short litlengthNCount[MaxLL+1];

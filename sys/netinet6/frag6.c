@@ -43,6 +43,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mbuf.h>
 #include <sys/domain.h>
 #include <sys/eventhandler.h>
+#include <sys/kernel.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
@@ -277,12 +278,12 @@ frag6_input(struct mbuf **mp, int *offp, int proto)
 	offset += sizeof(struct ip6_frag);
 
 	/*
-	 * RFC 6946: Handle "atomic" fragments (offset and m bit set to 0)
-	 * upfront, unrelated to any reassembly.  Just skip the fragment header.
+	 * Handle "atomic" fragments (offset and m bit set to 0) upfront,
+	 * unrelated to any reassembly (see RFC 6946 and section 4.5 of RFC
+	 * 8200).  Just skip the fragment header.
 	 */
 	if ((ip6f->ip6f_offlg & ~IP6F_RESERVED_MASK) == 0) {
-		/* XXX-BZ we want dedicated counters for this. */
-		IP6STAT_INC(ip6s_reassembled);
+		IP6STAT_INC(ip6s_atomicfrags);
 		in6_ifstat_inc(dstifp, ifs6_reass_ok);
 		*offp = offset;
 		m->m_flags |= M_FRAGMENTED;
@@ -593,7 +594,7 @@ insert:
 	     af6 = af6->ip6af_down) {
 		if (af6->ip6af_off != next) {
 			if (q6->ip6q_nfrag > V_ip6_maxfragsperpacket) {
-				IP6STAT_INC(ip6s_fragdropped);
+				IP6STAT_ADD(ip6s_fragdropped, q6->ip6q_nfrag);
 				frag6_freef(q6, hash);
 			}
 			IP6Q_UNLOCK(hash);
@@ -603,7 +604,7 @@ insert:
 	}
 	if (af6->ip6af_up->ip6af_mff) {
 		if (q6->ip6q_nfrag > V_ip6_maxfragsperpacket) {
-			IP6STAT_INC(ip6s_fragdropped);
+			IP6STAT_ADD(ip6s_fragdropped, q6->ip6q_nfrag);
 			frag6_freef(q6, hash);
 		}
 		IP6Q_UNLOCK(hash);
@@ -861,7 +862,8 @@ frag6_slowtimo(void)
 				--q6->ip6q_ttl;
 				q6 = q6->ip6q_next;
 				if (q6->ip6q_prev->ip6q_ttl == 0) {
-					IP6STAT_INC(ip6s_fragtimeout);
+					IP6STAT_ADD(ip6s_fragtimeout,
+						q6->ip6q_prev->ip6q_nfrag);
 					/* XXX in6_ifstat_inc(ifp, ifs6_reass_fail) */
 					frag6_freef(q6->ip6q_prev, i);
 				}
@@ -879,7 +881,8 @@ frag6_slowtimo(void)
 			    (V_ip6_maxfragpackets > 0 &&
 			    V_ip6q[i].count > V_ip6_maxfragbucketsize)) &&
 			    head->ip6q_prev != head) {
-				IP6STAT_INC(ip6s_fragoverflow);
+				IP6STAT_ADD(ip6s_fragoverflow,
+					q6->ip6q_prev->ip6q_nfrag);
 				/* XXX in6_ifstat_inc(ifp, ifs6_reass_fail) */
 				frag6_freef(head->ip6q_prev, i);
 			}
@@ -896,7 +899,8 @@ frag6_slowtimo(void)
 			IP6Q_LOCK(i);
 			head = IP6Q_HEAD(i);
 			if (head->ip6q_prev != head) {
-				IP6STAT_INC(ip6s_fragoverflow);
+				IP6STAT_ADD(ip6s_fragoverflow,
+					q6->ip6q_prev->ip6q_nfrag);
 				/* XXX in6_ifstat_inc(ifp, ifs6_reass_fail) */
 				frag6_freef(head->ip6q_prev, i);
 			}

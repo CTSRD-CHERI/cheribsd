@@ -246,8 +246,8 @@ void
 test_sandbox_trustedstack_underflow(const struct cheri_test *ctp __unused)
 {
 	struct cheri_object returncap;
-	void * __capability codecap asm ("$c1");
-	void * __capability datacap asm ("$c2");
+	void * __capability codecap /* currently ignored: asm ("$c1") */;
+	void * __capability datacap /* currently ignored: asm ("$c2") */;
 
 	returncap = libcheri_make_sealed_return_object();
 	codecap = returncap.co_codecap;

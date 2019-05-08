@@ -1063,7 +1063,7 @@ DRIVER_MODULE(dme, simplebus, dme_driver, dme_devclass, 0, 0);
 DRIVER_MODULE(miibus, dme, miibus_driver, miibus_devclass, 0, 0);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

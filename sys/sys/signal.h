@@ -183,24 +183,31 @@ typedef	__sigset_t	sigset_t;
 #endif
 
 #if __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE >= 500
+#ifndef _KERNEL
 union sigval {
 	/* Members as suggested by Annex C of POSIX 1003.1b. */
 	int	sival_int;
-	void * __kerncap sival_ptr;
+	void	*sival_ptr;
 	/* 6.0 compatibility */
 	int     sigval_int;
-	void * __kerncap sigval_ptr;
+	void    *sigval_ptr;
 };
 
-#ifdef _KERNEL
-
-union sigval64 {
+#else /* _KERNEL */
+union sigval_native {
 	int	sival_int;
 #ifdef __LP64__
 	uint32_t sival_ptr32;
 #endif
-	uint64_t sival_ptr64;
+	void	*sival_ptr_native;
 };
+#if __has_feature(capabilities)
+union sigval_c {
+	int	sival_int;
+	void * __capability sival_ptr;
+};
+#endif
+#endif /* _KERNEL */
 
 #if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
 union sigval32 {
@@ -212,63 +219,78 @@ union sigval32 {
 };
 #endif
 
-/* 
- * XXX-AM: can we possibly merge this and union sigval as well?
- */
+#ifdef _KERNEL
 typedef union {
 	int		sival_int;
-	uint64_t	sival_ptr_native;
+	void		*sival_ptr_native;
 #if (defined(_KERNEL) && defined(__LP64__))
 	uint32_t	sival_ptr32;
 #endif
+#if __has_feature(capabilities)
+	void * /* __ptr64 */ sival_ptr64;
 	void * __capability sival_ptr_c;
+#endif
 } ksigval_union;
-#endif /* _KERNEL */
+#endif
 #endif /* __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE >= 500 */
 
 #if __POSIX_VISIBLE >= 199309
 
 struct pthread_attr;
 
+#ifndef _KERNEL
 struct sigevent {
 	int	sigev_notify;		/* Notification type */
 	int	sigev_signo;		/* Signal number */
-#ifdef _KERNEL
-	ksigval_union sigev_value;	/* Signal value */
-#else
 	union sigval sigev_value;	/* Signal value */
-#endif
 	union {
 		__lwpid_t	_threadid;
 		struct {
 			void (*_function)(union sigval);
-			struct pthread_attr * __kerncap * __kerncap _attribute;
-		} _sigev_thread;
-		unsigned short _kevent_flags;
-		long __spare__[8];
-	} _sigev_un;
-};
-
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-/* XXX-AM: fix for freebsd64 */
-struct sigevent64 {
-	int	sigev_notify;		/* Notification type */
-	int	sigev_signo;		/* Signal number */
-	union sigval64 sigev_value;	/* Signal value */
-	union {
-		__lwpid_t	_threadid;
-		struct {
-			void (*_function)(union sigval64);
 			struct pthread_attr **_attribute;
 		} _sigev_thread;
 		unsigned short _kevent_flags;
 		long __spare__[8];
 	} _sigev_un;
 };
-#endif
 
-/* XXX-AM: ksigevent_t may be removed */
-typedef	struct sigevent	ksigevent_t;
+#else /* _KERNEL */
+
+struct sigevent_native {
+	int	sigev_notify;		/* Notification type */
+	int	sigev_signo;		/* Signal number */
+	union sigval_native sigev_value;	/* Signal value */
+	union {
+		__lwpid_t	_threadid;
+		struct {
+			void (*_function)(union sigval_native);
+			struct pthread_attr **_attribute;
+		} _sigev_thread;
+		unsigned short _kevent_flags;
+		long __spare__[8];
+	} _sigev_un;
+};
+
+#if __has_feature(capabilities)
+struct sigevent_c {
+	int	sigev_notify;		/* Notification type */
+	int	sigev_signo;		/* Signal number */
+	ksigval_union sigev_value;	/* Signal value */
+	union {
+		__lwpid_t	_threadid;
+		struct {
+			void (* __capability _function)(ksigval_union);
+			struct pthread_attr * __capability * __capability _attribute;
+		} _sigev_thread;
+		unsigned short _kevent_flags;
+		long __spare__[8];
+	} _sigev_un;
+};
+typedef	struct sigevent_c	ksigevent_t;
+#else
+typedef	struct sigevent_native	ksigevent_t;
+#endif
+#endif /* _KERNEL */
 
 #if __BSD_VISIBLE
 #define	sigev_notify_kqueue		sigev_signo
@@ -289,6 +311,7 @@ typedef	struct sigevent	ksigevent_t;
 #endif /* __POSIX_VISIBLE >= 199309 */
 
 #if __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE
+#ifndef _KERNEL
 typedef	struct __siginfo {
 	int	si_signo;		/* signal number */
 	int	si_errno;		/* errno association */
@@ -302,11 +325,12 @@ typedef	struct __siginfo {
 	__pid_t	si_pid;			/* sending process */
 	__uid_t	si_uid;			/* sender's ruid */
 	int	si_status;		/* exit value */
-	void * __kerncap si_addr;		/* faulting instruction */
+	void	*si_addr;		/* faulting instruction */
 	union sigval si_value;		/* signal value */
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
 		} _fault;
 		struct {
 			int	_timerid;
@@ -324,9 +348,7 @@ typedef	struct __siginfo {
 		} __spare__;
 	} _reason;
 } siginfo_t;
-
-#ifdef _KERNEL
-/* XXX-AM: this has to stay because it is used by ptrace */
+#else /* _KERNEL */
 struct siginfo_native {
 	int	si_signo;		/* signal number */
 	int	si_errno;		/* errno association */
@@ -341,10 +363,11 @@ struct siginfo_native {
 	__uid_t	si_uid;			/* sender's ruid */
 	int	si_status;		/* exit value */
 	void	*si_addr;		/* faulting instruction */
-	union sigval64 si_value;
+	union sigval_native si_value;
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
 		} _fault;
 		struct {
 			int	_timerid;
@@ -362,6 +385,80 @@ struct siginfo_native {
 		} __spare__;
 	} _reason;
 };
+#if __has_feature(capabilities)
+struct siginfo_c {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	/*
+	 * Cause of signal, one of the SI_ macros or signal-specific
+	 * values, i.e. one of the FPE_... values for SIGFPE.  This
+	 * value is equivalent to the second argument to an old-style
+	 * FreeBSD signal handler.
+	 */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void* __capability si_addr;	/* faulting instruction */
+	union sigval_c si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+struct siginfo64 {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	/*
+	 * Cause of signal, one of the SI_ macros or signal-specific
+	 * values, i.e. one of the FPE_... values for SIGFPE.  This
+	 * value is equivalent to the second argument to an old-style
+	 * FreeBSD signal handler.
+	 */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void	*si_addr;		/* faulting instruction */
+	union sigval_native si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+#endif
 
 typedef struct {
 	int	si_signo;		/* signal number */
@@ -381,6 +478,7 @@ typedef struct {
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
 		} _fault;
 		struct {
 			int	_timerid;
@@ -398,9 +496,12 @@ typedef struct {
 		} __spare__;
 	} _reason;
 } _siginfo_t;
+
+typedef int (copyout_siginfo_t)(const _siginfo_t *si, void * __capability info);
 #endif /* _KERNEL */
 
 #define si_trapno	_reason._fault._trapno
+#define si_capreg	_reason._fault._capreg
 #define si_timerid	_reason._timer._timerid
 #define si_overrun	_reason._timer._overrun
 #define si_mqd		_reason._mesgq._mqd
@@ -519,20 +620,26 @@ struct __siginfo;
 /*
  * Signal vector "template" used in sigaction call.
  */
+#ifndef _KERNEL
 struct sigaction {
 	union {
-		void    (* __kerncap __sa_handler)(int);
-		void    (* __kerncap __sa_sigaction)(int, struct __siginfo *, void *);
+		void    (*__sa_handler)(int);
+		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
 	} __sigaction_u;		/* signal handler */
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
-
-/* XXX-AM: ksigaction can be removed?*/
-typedef struct sigaction	ksigaction_t;
-
-#ifndef _KERNEL
-/* XXX-AM: fix for freebsd64 */
+#else
+#if __has_feature(capabilities)
+struct sigaction_c {
+	union {
+		void    (* __capability __sa_handler)(int);
+		void    (* __capability __sa_sigaction)
+			    (int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
 struct sigaction64 {
 	union {
 		void    (*__sa_handler)(int);
@@ -541,6 +648,20 @@ struct sigaction64 {
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
+#endif
+struct sigaction_native {
+	union {
+		void    (*__sa_handler)(int);
+		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
+#if __has_feature(capabilities)
+typedef struct sigaction_c	ksigaction_t;
+#else
+typedef	struct sigaction_native	ksigaction_t;
+#endif
 #endif
 
 #define	sa_handler	__sigaction_u.__sa_handler
@@ -614,7 +735,6 @@ struct __stack_t {
 };
 
 #ifdef _KERNEL
-/* XXX-AM: fix for freebsd64 */
 struct sigaltstack_native {
 	void	*ss_sp;			/* signal stack base */
 	__size_t ss_size;		/* signal stack length */
@@ -689,15 +809,27 @@ __BEGIN_DECLS
 __sighandler_t *signal(int, __sighandler_t *);
 __END_DECLS
 
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-/* XXX-AM: fix for freebsd64 */
+#ifdef _KERNEL
 int	convert_sigevent(const struct sigevent_native *, ksigevent_t *);
+
+#if __has_feature(capabilities)
+static inline bool
+is_magic_sighandler_constant(void* handler) {
+	/*
+	 * Instead of enumerating all the SIG_* constants, just check if
+	 * it is a small (positive or negative) integer so that this doesn't
+	 * break if someone adds a new SIG_* constant. The manual checks that
+	 * we were using before weren't handling SIG_HOLD.
+	 */
+	return (vaddr_t)handler < 64;
+}
+#endif
 #endif
 
 #endif /* !_SYS_SIGNAL_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",

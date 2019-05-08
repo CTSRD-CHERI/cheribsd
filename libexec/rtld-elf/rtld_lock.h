@@ -30,6 +30,10 @@
 #ifndef _RTLD_LOCK_H_
 #define	_RTLD_LOCK_H_
 
+#include <sys/cdefs.h>
+
+__BEGIN_DECLS
+
 #define	RTLI_VERSION	0x01
 #define	MAX_RTLD_LOCKS	8
 
@@ -73,5 +77,7 @@ void	lock_upgrade(rtld_lock_t, RtldLockState *);
 void	lock_restart_for_upgrade(RtldLockState *);
 
 #endif	/* IN_RTLD */
+
+__END_DECLS
 
 #endif

@@ -40,10 +40,10 @@ __FBSDID("$FreeBSD$");
 #include <unistd.h>
 
 #include <be.h>
-
 #include "bectl.h"
 
-static void jailparam_grow(void);
+#define MNTTYPE_ZFS	222
+
 static void jailparam_add(const char *name, const char *val);
 static int jailparam_del(const char *name);
 static bool jailparam_addarg(char *arg);
@@ -51,84 +51,28 @@ static int jailparam_delarg(char *arg);
 
 static int bectl_search_jail_paths(const char *mnt);
 static int bectl_locate_jail(const char *ident);
+static int bectl_jail_cleanup(char *mountpoint, int jid);
 
-/* We'll start with 8 parameters initially and grow as needed. */
-#define	INIT_PARAMCOUNT	8
-
-static struct jailparam *jp;
-static int jpcnt;
-static int jpused;
 static char mnt_loc[BE_MAXPATHLEN];
+static nvlist_t *jailparams;
 
-static void
-jailparam_grow(void)
-{
+static const char *disabled_params[] = {
+    "command", "exec.start", "nopersist", "persist", NULL
+};
 
-	jpcnt *= 2;
-	jp = realloc(jp, jpcnt * sizeof(*jp));
-	if (jp == NULL)
-		err(2, "realloc");
-}
 
 static void
 jailparam_add(const char *name, const char *val)
 {
-	int i;
 
-	for (i = 0; i < jpused; ++i) {
-		if (strcmp(name, jp[i].jp_name) == 0)
-			break;
-	}
-
-	if (i < jpused)
-		jailparam_free(&jp[i], 1);
-	else if (jpused == jpcnt)
-		/* The next slot isn't allocated yet */
-		jailparam_grow();
-
-	if (jailparam_init(&jp[i], name) != 0)
-		return;
-	if (jailparam_import(&jp[i], val) != 0)
-		return;
-	++jpused;
+	nvlist_add_string(jailparams, name, val);
 }
 
 static int
 jailparam_del(const char *name)
 {
-	int i;
-	char *val;
 
-	for (i = 0; i < jpused; ++i) {
-		if (strcmp(name, jp[i].jp_name) == 0)
-			break;
-	}
-
-	if (i == jpused)
-		return (ENOENT);
-
-	for (; i < jpused - 1; ++i) {
-		val = jailparam_export(&jp[i + 1]);
-
-		jailparam_free(&jp[i], 1);
-		/*
-		 * Given the context, the following will really only fail if
-		 * they can't allocate the copy of the name or value.
-		 */
-		if (jailparam_init(&jp[i], jp[i + 1].jp_name) != 0) {
-			free(val);
-			return (ENOMEM);
-		}
-		if (jailparam_import(&jp[i], val) != 0) {
-			jailparam_free(&jp[i], 1);
-			free(val);
-			return (ENOMEM);
-		}
-		free(val);
-	}
-
-	jailparam_free(&jp[i], 1);
-	--jpused;
+	nvlist_remove_all(jailparams, name);
 	return (0);
 }
 
@@ -136,6 +80,7 @@ static bool
 jailparam_addarg(char *arg)
 {
 	char *name, *val;
+	size_t i, len;
 
 	if (arg == NULL)
 		return (false);
@@ -156,6 +101,15 @@ jailparam_addarg(char *arg)
 		}
 		strlcpy(mnt_loc, val, sizeof(mnt_loc));
 	}
+
+	for (i = 0; disabled_params[i] != NULL; i++) {
+		len = strlen(disabled_params[i]);
+		if (strncmp(disabled_params[i], name, len) == 0) {
+			fprintf(stderr, "invalid jail parameter: %s\n", name);
+			return (false);
+		}
+	}
+
 	jailparam_add(name, val);
 	return (true);
 }
@@ -176,19 +130,127 @@ jailparam_delarg(char *arg)
 	return (jailparam_del(name));
 }
 
+static int
+build_jailcmd(char ***argvp, bool interactive, int argc, char *argv[])
+{
+	char *cmd, **jargv, *name, *val;
+	nvpair_t *nvp;
+	size_t i, iarg, nargv;
+
+	cmd = NULL;
+	nvp = NULL;
+	iarg = i = 0;
+	if (nvlist_size(jailparams, &nargv, NV_ENCODE_NATIVE) != 0)
+		return (1);
+
+	/*
+	 * Number of args + "/usr/sbin/jail", "-c", and ending NULL.
+	 * If interactive also include command.
+	 */
+	nargv += 3;
+	if (interactive) {
+		if (argc == 0)
+			nargv++;
+		else
+			nargv += argc;
+	}
+
+	jargv = *argvp = calloc(nargv, sizeof(jargv));
+	if (jargv == NULL)
+		err(2, "calloc");
+
+	jargv[iarg++] = strdup("/usr/sbin/jail");
+	jargv[iarg++] = strdup("-c");
+	while ((nvp = nvlist_next_nvpair(jailparams, nvp)) != NULL) {
+		name = nvpair_name(nvp);
+		if (nvpair_value_string(nvp, &val) != 0)
+			continue;
+
+		if (asprintf(&jargv[iarg++], "%s=%s", name, val) < 0)
+			goto error;
+	}
+	if (interactive) {
+		if (argc < 1)
+			cmd = strdup("/bin/sh");
+		else {
+			cmd = argv[0];
+			argc--;
+			argv++;
+		}
+
+		if (asprintf(&jargv[iarg++], "command=%s", cmd) < 0) {
+			goto error;
+		}
+		if (argc < 1) {
+			free(cmd);
+			cmd = NULL;
+		}
+
+		for (; argc > 0; argc--) {
+			if (asprintf(&jargv[iarg++], "%s", argv[0]) < 0)
+				goto error;
+			argv++;
+		}
+	}
+
+	return (0);
+
+error:
+	if (interactive && argc < 1)
+		free(cmd);
+	for (; i < iarg - 1; i++) {
+		free(jargv[i]);
+	}
+	free(jargv);
+	return (1);
+}
+
+/* Remove jail and cleanup any non zfs mounts. */
+static int
+bectl_jail_cleanup(char *mountpoint, int jid)
+{
+	struct statfs *mntbuf;
+	size_t i, searchlen, mntsize;
+
+	if (jid >= 0 && jail_remove(jid) != 0) {
+		fprintf(stderr, "unable to remove jail");
+		return (1);
+	}
+
+	searchlen = strnlen(mountpoint, MAXPATHLEN);
+	mntsize = getmntinfo(&mntbuf, MNT_NOWAIT);
+	for (i = 0; i < mntsize; i++) {
+		if (strncmp(mountpoint, mntbuf[i].f_mntonname, searchlen) == 0 &&
+		    mntbuf[i].f_type != MNTTYPE_ZFS) {
+
+			if (unmount(mntbuf[i].f_mntonname, 0) != 0) {
+				fprintf(stderr, "bectl jail: unable to unmount filesystem %s",
+				    mntbuf[i].f_mntonname);
+				return (1);
+			}
+		}
+	}
+
+	return (0);
+}
+
 int
 bectl_cmd_jail(int argc, char *argv[])
 {
-	char *bootenv, *mountpoint;
-	int jid, opt, ret;
-	bool default_hostname, default_name, interactive, unjail;
+	char *bootenv, **jargv, *mountpoint;
+	int i, jid, mntflags, opt, ret;
+	bool default_hostname, interactive, unjail;
 	pid_t pid;
 
-	default_hostname = default_name = interactive = unjail = true;
-	jpcnt = INIT_PARAMCOUNT;
-	jp = malloc(jpcnt * sizeof(*jp));
-	if (jp == NULL)
-		err(2, "malloc");
+
+	/* XXX TODO: Allow shallow */
+	mntflags = BE_MNT_DEEP;
+	default_hostname = interactive = unjail = true;
+
+	if ((nvlist_alloc(&jailparams, NV_UNIQUE_NAME, 0)) != 0) {
+		fprintf(stderr, "nvlist_alloc() failed\n");
+		return (1);
+	}
 
 	jailparam_add("persist", "true");
 	jailparam_add("allow.mount", "true");
@@ -206,10 +268,10 @@ bectl_cmd_jail(int argc, char *argv[])
 				 * optarg has been modified to null terminate
 				 * at the assignment operator.
 				 */
-				if (strcmp(optarg, "name") == 0)
-					default_name = false;
 				if (strcmp(optarg, "host.hostname") == 0)
 					default_hostname = false;
+			} else {
+				return (1);
 			}
 			break;
 		case 'U':
@@ -217,8 +279,6 @@ bectl_cmd_jail(int argc, char *argv[])
 			break;
 		case 'u':
 			if ((ret = jailparam_delarg(optarg)) == 0) {
-				if (strcmp(optarg, "name") == 0)
-					default_name = true;
 				if (strcmp(optarg, "host.hostname") == 0)
 					default_hostname = true;
 			} else if (ret != ENOENT) {
@@ -238,13 +298,14 @@ bectl_cmd_jail(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* struct jail be_jail = { 0 }; */
 	if (argc < 1) {
 		fprintf(stderr, "bectl jail: missing boot environment name\n");
 		return (usage(false));
 	}
 
 	bootenv = argv[0];
+	argc--;
+	argv++;
 
 	/*
 	 * XXX TODO: if its already mounted, perhaps there should be a flag to
@@ -254,13 +315,11 @@ bectl_cmd_jail(int argc, char *argv[])
 		mountpoint = NULL;
 	else
 		mountpoint = mnt_loc;
-	if (be_mount(be, bootenv, mountpoint, 0, mnt_loc) != BE_ERR_SUCCESS) {
+	if (be_mount(be, bootenv, mountpoint, mntflags, mnt_loc) != BE_ERR_SUCCESS) {
 		fprintf(stderr, "could not mount bootenv\n");
 		return (1);
 	}
 
-	if (default_name)
-		jailparam_add("name", bootenv);
 	if (default_hostname)
 		jailparam_add("host.hostname", bootenv);
 
@@ -268,46 +327,47 @@ bectl_cmd_jail(int argc, char *argv[])
 	 * This is our indicator that path was not set by the user, so we'll use
 	 * the path that libbe generated for us.
 	 */
-	if (mountpoint == NULL)
+	if (mountpoint == NULL) {
 		jailparam_add("path", mnt_loc);
-	/* Create the jail for now, attach later as-needed */
-	jid = jailparam_set(jp, jpused, JAIL_CREATE);
-	if (jid == -1) {
-		fprintf(stderr, "unable to create jail.  error: %d\n", errno);
+		mountpoint = mnt_loc;
+	}
+
+	if ((build_jailcmd(&jargv, interactive, argc, argv)) != 0) {
+		fprintf(stderr, "unable to build argument list for jail command\n");
 		return (1);
 	}
 
-	jailparam_free(jp, jpused);
-	free(jp);
-
-	/* We're not interactive, nothing more to do here. */
-	if (!interactive)
-		return (0);
-
 	pid = fork();
-	switch(pid) {
+
+	switch (pid) {
 	case -1:
 		perror("fork");
 		return (1);
 	case 0:
-		jail_attach(jid);
-		/* We're attached within the jail... good bye! */
-		chdir("/");
-		if (argc > 1)
-			execve(argv[1], &argv[1], NULL);
-		else
-			execl("/bin/sh", "/bin/sh", NULL);
-		fprintf(stderr, "bectl jail: failed to execute %s\n",
-		    (argc > 1 ? argv[1] : "/bin/sh"));
-		_exit(1);
+		execv("/usr/sbin/jail", jargv);
+		fprintf(stderr, "bectl jail: failed to execute\n");
 	default:
-		/* Wait for the child to get back, see if we need to unjail */
 		waitpid(pid, NULL, 0);
 	}
 
+	for (i = 0; jargv[i] != NULL; i++) {
+		free(jargv[i]);
+	}
+	free(jargv);
+
+	if (!interactive)
+		return (0);
+
 	if (unjail) {
-		jail_remove(jid);
-		unmount(mnt_loc, 0);
+		/*
+		 *  We're not checking the jail id result here because in the
+		 *  case of invalid param, or last command in jail was an error
+		 *  the jail will not exist upon exit. bectl_jail_cleanup will
+		 *  only jail_remove if the jid is >= 0.
+		 */
+		jid = bectl_locate_jail(bootenv);
+		bectl_jail_cleanup(mountpoint, jid);
+		be_unmount(be, bootenv, 0);
 	}
 
 	return (0);
@@ -316,15 +376,22 @@ bectl_cmd_jail(int argc, char *argv[])
 static int
 bectl_search_jail_paths(const char *mnt)
 {
-	char jailpath[MAXPATHLEN];
 	int jid;
+	char lastjid[16];
+	char jailpath[MAXPATHLEN];
 
-	jid = 0;
-	(void)mnt;
-	while ((jid = jail_getv(0, "lastjid", &jid, "path", &jailpath,
+	/* jail_getv expects name/value strings */
+	snprintf(lastjid, sizeof(lastjid), "%d", 0);
+
+	while ((jid = jail_getv(0, "lastjid", lastjid, "path", &jailpath,
 	    NULL)) != -1) {
+
+		/* the jail we've been looking for */
 		if (strcmp(jailpath, mnt) == 0)
 			return (jid);
+
+		/* update lastjid and keep on looking */
+		snprintf(lastjid, sizeof(lastjid), "%d", jid);
 	}
 
 	return (-1);
@@ -354,8 +421,11 @@ bectl_locate_jail(const char *ident)
 		return (-1);
 
 	if (nvlist_lookup_nvlist(belist, ident, &props) == 0) {
-		/* We'll attempt to resolve the jid by way of mountpoint */
-		if (nvlist_lookup_string(props, "mountpoint", &mnt) == 0) {
+
+		/* path where a boot environment is mounted */
+		if (nvlist_lookup_string(props, "mounted", &mnt) == 0) {
+
+			/* looking for a jail that matches our bootenv path */
 			jid = bectl_search_jail_paths(mnt);
 			be_prop_list_free(belist);
 			return (jid);
@@ -409,8 +479,8 @@ bectl_cmd_unjail(int argc, char *argv[])
 		return (1);
 	}
 
-	jail_remove(jid);
-	unmount(path, 0);
+	bectl_jail_cleanup(path, jid);
+	be_unmount(be, target, 0);
 
 	return (0);
 }

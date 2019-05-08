@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/CTSRD-CHERI/libcxxrt.git
+	branch = master
+	commit = 8eedc4ab0118c98150daf8c4579ecb48fe1a82bf
+	parent = b6c39f3922054e16e577c9c881e3b5e28faedda8
+	method = rebase
+	cmdver = 0.4.0

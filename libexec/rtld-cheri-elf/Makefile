@@ -19,6 +19,17 @@ CFLAGS+=-DDEBUG -DDEBUG_VERBOSE=${RTLD_DEBUG_VERBOSE}
 CFLAGS+=-DDEBUG
 .endif
 
+# Make per-file captable opt-in since it slows down normal code that doesn't
+# use it and increases the size of plt stubs.
+# This could be optimized to use different stubs for per-file stubs but for
+# now making it opt-in is easier.
+# TODO: add a make options for this (e.g. MK_BENCHMARK_OPTIONS)?
+.ifdef RTLD_PER_FUNCTION_CAPTABLE_SUPPORT
+CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1
+.else
+CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=0
+.endif
+
 
 PROG?=		ld-cheri-elf.so.1
 SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c cheri_reloc.c
@@ -27,7 +38,6 @@ SRCS+=	rtld_lock.c map_object.c xmalloc.c debug.c libmap.c
 
 MAN=
 NEED_CHERI=	pure
-WANT_DUMP=yes
 MK_CHERI_SHARED=yes
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
@@ -43,6 +53,7 @@ LDFLAGS+=	-nostdlib -e rtld_start
 NO_WCAST_ALIGN=	yes
 WARNS?=		6
 INSTALLFLAGS=	-C -b
+CXXFLAGS+=-Wall -Wextra
 PRECIOUSPROG=
 BINDIR=		/libexec
 #SYMLINKS=	${BINDIR}/${PROG} ${LIBEXECDIR}/${PROG}
@@ -79,7 +90,7 @@ SYMBOL_MAPS+=	${.CURDIR}/${RTLD_ARCH}/Symbol.map
 .endif
 .endif
 
-#.sinclude "${.CURDIR}/${RTLD_ARCH}/Makefile.inc"
+.sinclude "${.CURDIR}/${RTLD_ARCH}/Makefile.inc"
 
 .PATH: ${.CURDIR}/${RTLD_ARCH} ${.CURDIR}/../rtld-elf/${RTLD_ARCH}
 

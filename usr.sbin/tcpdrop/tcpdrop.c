@@ -386,9 +386,9 @@ usage(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180907,
+//   "updated": 20181121,
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

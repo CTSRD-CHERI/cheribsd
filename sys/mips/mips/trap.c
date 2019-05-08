@@ -418,28 +418,28 @@ extern void fswintrberr(void); /* XXX */
  * Returns the virtual address (relative to $pcc) that was used to fetch the
  * instruction.
  */
-static intptr_t
+static void * __capability
 fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t *instr)
 {
-	intptr_t vaddr;
-	void *__kerncap bad_inst_ptr;
+	void * __capability bad_inst_ptr;
 
 	/* Should only be called from user mode */
 	/* TODO: if KERNLAND() */
 #ifdef CPU_CHERI
-	bad_inst_ptr = (char * __kerncap)frame->pcc + offset_from_pc;
-	/*
-	 * Work around bug in the FPGA implementation: EPCC points to the
-	 * delay slot if a trap happenend in the delay slot.
-	 */
-	if (cheri_getoffset(frame->pcc) != frame->pc) {
-		KASSERT(cheri_getoffset(frame->pcc) == frame->pc + 4,
-		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
-		    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
-		frame->pcc = cheri_setoffset(frame->pcc, frame->pc);
+	bad_inst_ptr = (char * __capability)frame->pcc + offset_from_pc;
+	if (!cheri_gettag(bad_inst_ptr)) {
+		struct thread *td = curthread;
+		struct proc *p = td->td_proc;
+		log(LOG_ERR, "%s: pid %d tid %ld (%s), uid %d: Could not fetch "
+		    "faulting instruction from untagged $pcc %p\n",  __func__,
+		    p->p_pid, (long)td->td_tid, p->p_comm,
+		    p->p_ucred ? p->p_ucred->cr_uid : -1,
+		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
+		*instr = -1;
+		return (bad_inst_ptr);
 	}
 	KASSERT(cheri_getoffset(frame->pcc) == frame->pc,
-	    ("pcc (%jx) <-> pc (%jx) mismatch:",
+	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
 	    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
 #else
 	bad_inst_ptr = __USER_CODE_CAP((void*)(frame->pc + offset_from_pc));
@@ -452,19 +452,18 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    (long)td->td_tid, p->p_comm,
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
 		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
+		*instr = -1;
 	}
 	/* Should this be a kerncap instead instead of being indirected by $pcc? */
-	vaddr = frame->pc + offset_from_pc;
-	return vaddr;
+	return bad_inst_ptr;
 }
 
 /*
  * Fetch the branch instruction for a trap that happened in a branch delay slot.
  *
- * The instruction is stored in frame->badinstr_p and the address (relative to)
- * pcc.base is returned.
+ * The instruction is stored in frame->badinstr_p.
  */
-static intptr_t
+static void
 fetch_bad_branch_instr(struct trapframe *frame)
 {
 	KASSERT(DELAYBRANCH(frame->cause),
@@ -473,7 +472,7 @@ fetch_bad_branch_instr(struct trapframe *frame)
 	 * In a trap the pc will point to the branch instruction so we fetch
 	 * at offset 0 from the pc.
 	 */
-	return fetch_instr_near_pc(frame, 0, &frame->badinstr_p.inst);
+	fetch_instr_near_pc(frame, 0, &frame->badinstr_p.inst);
 }
 
 /*
@@ -482,7 +481,7 @@ fetch_bad_branch_instr(struct trapframe *frame)
  * The instruction is stored in frame->badinstr and the address (relative to)
  * pcc.base is returned.
  */
-static intptr_t
+static void * __capability
 fetch_bad_instr(struct trapframe *frame)
 {
 	register_t offset_from_pc;
@@ -605,8 +604,6 @@ cpu_fetch_syscall_args(struct thread *td)
 	 * XXX
 	 * Shouldn't this go before switching on the code?
 	 */
-	if (se->sv_mask)
-		sa->code &= se->sv_mask;
 
 	if (sa->code >= se->sv_size)
 		sa->callp = &se->sv_table[0];
@@ -691,7 +688,7 @@ trap(struct trapframe *trapframe)
 	int access_type;
 	ksiginfo_t ksi;
 	char *msg = NULL;
-	intptr_t addr = 0;
+	char * __capability addr;
 	register_t pc;
 	int cop, error;
 	register_t *frame_regs;
@@ -726,6 +723,24 @@ trap(struct trapframe *trapframe)
 	trapframe->badinstr.pad = 0;
 	trapframe->badinstr_p.inst = 0;
 #endif
+
+#ifdef CPU_CHERI
+#ifndef CPU_QEMU_MALTA
+	/*
+	 * Work around bug in the FPGA implementation: EPCC points to the
+	 * delay slot if a trap happenend in the delay slot.
+	 */
+	if (cheri_getoffset(trapframe->pcc) != trapframe->pc) {
+		KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc + 4,
+		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
+		    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
+		trapframe->pcc = cheri_setoffset(trapframe->pcc, trapframe->pc);
+	}
+#endif
+	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
+	    ("%s(entry): pcc.offset (%jx) <-> pc (%jx) mismatch:", __func__,
+	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
+#endif /* defined(CPU_CHERI) */
 
 	/*
 	 * Enable hardware interrupts if they were on before the trap. If it
@@ -823,6 +838,11 @@ trap(struct trapframe *trapframe)
 	}
 #endif
 
+#ifdef CPU_CHERI
+	addr = trapframe->pcc;
+#else
+	addr = (void *)(uintptr_t)trapframe->pc;
+#endif
 	switch (type) {
 	case T_MCHECK:
 #ifdef DDB
@@ -976,7 +996,6 @@ dofault:
 				ucode = SEGV_ACCERR;
 			else
 				ucode = SEGV_MAPERR;
-			addr = trapframe->pc;
 
 			msg = "BAD_PAGE_FAULT";
 			log_bad_page_fault(msg, trapframe, type);
@@ -1011,7 +1030,6 @@ dofault:
 	case T_BUS_ERR_LD_ST + T_USER:	/* BERR asserted to cpu */
 		ucode = 0;	/* XXX should be VM_PROT_something */
 		i = SIGBUS;
-		addr = trapframe->pc;
 		if (!msg)
 			msg = "BUS_ERR";
 		log_bad_page_fault(msg, trapframe, type);
@@ -1058,31 +1076,33 @@ dofault:
 
 	case T_BREAK + T_USER:
 		{
-			intptr_t va;
+			char * __capability va;
 			uint32_t instr;
 
 			i = SIGTRAP;
 			ucode = TRAP_BRKPT;
-			addr = trapframe->pc;
 
 			/* compute address of break instruction */
-			va = trapframe->pc;
+			va = addr;
 			if (DELAYBRANCH(trapframe->cause))
 				va += sizeof(int);
 
-			if (td->td_md.md_ss_addr != va)
+			if (td->td_md.md_ss_addr != (__cheri_addr intptr_t)va) {
+				addr = va;
 				break;
+			}
 
 			/* read break instruction */
-			/* XXX-AM: can't we use pcc? */
-			instr = fuword32_c(__HYBRID_USER_CODE_CAP((void *)va));
+			instr = fuword32_c(__USER_CODE_CAP((__cheri_fromcap void *)va));
 
-			if (instr != MIPS_BREAK_SSTEP)
+			if (instr != MIPS_BREAK_SSTEP) {
+				addr = va;
 				break;
+			}
 
 			CTR3(KTR_PTRACE,
 			    "trap: tid %d, single step at %#lx: %#08x",
-			    td->td_tid, va, instr);
+			    td->td_tid, (long)(intptr_t)va, instr);
 			PROC_LOCK(p);
 			_PHOLD(p);
 			error = ptrace_clear_single_step(td);
@@ -1095,19 +1115,13 @@ dofault:
 
 	case T_IWATCH + T_USER:
 	case T_DWATCH + T_USER:
-		{
-			intptr_t va;
-
 			/* compute address of trapped instruction */
-			va = trapframe->pc;
 			if (DELAYBRANCH(trapframe->cause))
-				va += sizeof(int);
-			printf("watch exception @ %p\n", (void *)va);
+				addr += sizeof(int);
+			printf("watch exception @ %p\n", (__cheri_fromcap void *)addr);
 			i = SIGTRAP;
 			ucode = TRAP_BRKPT;
-			addr = va;
 			break;
-		}
 
 	case T_TRAP + T_USER:
 		{
@@ -1152,7 +1166,6 @@ dofault:
 
 			log_illegal_instruction("RES_INST", trapframe);
 			i = SIGILL;
-			addr = trapframe->pc;
 		}
 		break;
 #ifdef CPU_CHERI
@@ -1176,7 +1189,6 @@ dofault:
 		log_c2e_exception(msg, trapframe, type);
 		i = SIGPROT;
 		ucode = cheri_capcause_to_sicode(trapframe->capcause);
-		addr = trapframe->pc;
 		break;
 
 #else
@@ -1258,7 +1270,6 @@ dofault:
 				i = SIGILL;
 				break;
 			}
-			addr = trapframe->pc;
 			MipsSwitchFPState(PCPU_GET(fpcurthread), td->td_frame);
 			PCPU_SET(fpcurthread, td);
 #if defined(__mips_n32) || defined(__mips_n64)
@@ -1271,7 +1282,6 @@ dofault:
 		}
 #ifdef	CPU_CNMIPS
 		else  if (cop == 2) {
-			addr = trapframe->pc;
 			if ((td->td_md.md_flags & MDTD_COP2USED) &&
 			    (td->td_md.md_cop2owner == COP2_OWNER_KERNEL)) {
 				if (td->td_md.md_cop2)
@@ -1313,12 +1323,10 @@ dofault:
 	case T_FPE + T_USER:
 #if !defined(CPU_HAVEFPU)
 		i = SIGILL;
-		addr = trapframe->pc;
 		break;
 #else
 		if (!emulate_fp) {
 			i = SIGFPE;
-			addr = trapframe->pc;
 			break;
 		}
 		MipsFPTrap(trapframe->sr, trapframe->cause, trapframe->pc);
@@ -1327,7 +1335,6 @@ dofault:
 
 	case T_OVFLOW + T_USER:
 		i = SIGFPE;
-		addr = trapframe->pc;
 		break;
 
 	case T_ADDR_ERR_LD:	/* misaligned access */
@@ -1396,7 +1403,7 @@ err:
 #endif /* TRAP_DEBUG */
 
 #ifdef KDB
-		if (debugger_on_panic) {
+		if (debugger_on_trap) {
 			kdb_why = KDB_WHY_TRAP;
 			kdb_trap(type, 0, trapframe);
 			kdb_why = KDB_WHY_UNSET;
@@ -1413,13 +1420,34 @@ err:
 	/* XXXBD: probably not quite right for CheriABI */
 	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
 	ksi.ksi_trapno = type;
+#if defined(CPU_CHERI)
+	td->td_frame->pcc = trapframe->pcc;
+	if (i == SIGPROT)
+		ksi.ksi_capreg = trapframe->capcause &
+		    CHERI_CAPCAUSE_REGNUM_MASK;
+#endif
 	trapsignal(td, &ksi);
 out:
-
 	/*
 	 * Note: we should only get here if returning to user mode.
 	 */
 	userret(td, trapframe);
+#if defined(CPU_CHERI)
+	/*
+	 * XXXAR: These assertions will currently not hold since in some cases
+	 *  we will only update pc but not pcc. However, this is fine since the
+	 *  return path will set the offset before eret. We should only need the
+	 *  assertion on entry to catch QEMU/FPGA bugs in EPC/EPCC handling.
+	 *
+	 * KASSERT(cheri_getoffset(td->td_frame->pcc) == td->td_frame->pc,
+	 *  ("td->td_frame->pcc.offset (%jx) <-> td->td_frame->pc (%jx) mismatch:",
+	 *   (uintmax_t)cheri_getoffset(td->td_frame->pcc), (uintmax_t)td->td_frame->pc));
+	 *
+	 * KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
+	 *    ("%s(exit): pcc.offset (%jx) <-> pc (%jx) mismatch:", __func__,
+	 *    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
+	 */
+#endif
 	return (trapframe->pc);
 }
 
@@ -1460,7 +1488,7 @@ trapDump(char *msg)
  * Return the resulting PC as if the branch was executed.
  *
  * XXXRW: What about CHERI branch instructions?
- * XXXAR: This needs to be fixed for cbez/cbnz/cbtu/cbts/cjalr/cjr/ccall_fast
+ * XXXAR: This needs to be fixed for cjalr/cjr/ccall_fast
  */
 uintptr_t
 MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
@@ -1468,6 +1496,9 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 {
 	InstFmt inst;
 	register_t *regsPtr = (register_t *) framePtr;
+#ifdef CPU_CHERI
+	void * __capability *capRegsPtr = &framePtr->ddc;
+#endif
 	uintptr_t retAddr = 0;
 	int condition;
 
@@ -1597,6 +1628,43 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 			retAddr = instPC + 4;
 		}
 		break;
+#ifdef CPU_CHERI
+	case OP_COP2:
+		switch (inst.CType.fmt) {
+		case 0x9:
+		case 0xa:
+		case 0x11:
+		case 0x12:
+			switch (inst.BC2FType.fmt) {
+			case 0x9:
+				/* CBTU */
+				condition = !cheri_gettag(
+				    capRegsPtr[inst.BC2FType.cd]);
+				break;
+			case 0xa:
+				/* CBTS */
+				condition = cheri_gettag(
+				    capRegsPtr[inst.BC2FType.cd]);
+				break;
+			case 0x11:
+				/* CBEZ */
+				condition =
+				    (capRegsPtr[inst.BC2FType.cd] == NULL);
+				break;
+			case 0x12:
+				/* CBNZ */
+				condition =
+				    (capRegsPtr[inst.BC2FType.cd] != NULL);
+				break;
+			}
+			if (condition)
+				retAddr = GetBranchDest(instPC, inst);
+			else
+				retAddr = instPC + 8;
+			return (retAddr);
+		}
+		/* FALLTHROUGH */
+#endif
 
 	default:
 		printf("Unhandled opcode in %s: 0x%x\n", __func__, inst.word);
@@ -1961,6 +2029,20 @@ log_c2e_exception(const char *msg, struct trapframe *frame, int trap_type)
 	    msg, curproc->p_pid, (long)curthread->td_tid, curproc->p_comm,
 	    curproc->p_ucred ? curproc->p_ucred->cr_uid : -1,
 	    trap_type);
+	/* Also print argv to help debugging */
+	if (curproc->p_args) {
+		char* args = curproc->p_args->ar_args;
+		unsigned len = curproc->p_args->ar_length;
+		log(LOG_ERR, "Process arguments: ");
+		for (unsigned i = 0; i < len; i++) {
+			if (args[i] == '\0')
+				log(LOG_ERR, " ");
+			else
+				log(LOG_ERR, "%c", args[i]);
+		}
+		log(LOG_ERR, "\n");
+	}
+
 
 	/* log registers in trap frame */
 	log_frame_dump(frame);
@@ -2193,7 +2275,7 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

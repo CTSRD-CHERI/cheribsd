@@ -139,20 +139,21 @@ in_localip(struct in_addr in)
 int
 in_ifhasaddr(struct ifnet *ifp, struct in_addr in)
 {
+	struct epoch_tracker et;
 	struct ifaddr *ifa;
 	struct in_ifaddr *ia;
 
-	IF_ADDR_RLOCK(ifp);
+	NET_EPOCH_ENTER(et);
 	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family != AF_INET)
 			continue;
 		ia = (struct in_ifaddr *)ifa;
 		if (ia->ia_addr.sin_addr.s_addr == in.s_addr) {
-			IF_ADDR_RUNLOCK(ifp);
+			NET_EPOCH_EXIT(et);
 			return (1);
 		}
 	}
-	IF_ADDR_RUNLOCK(ifp);
+	NET_EPOCH_EXIT(et);
 
 	return (0);
 }
@@ -190,15 +191,10 @@ int
 in_canforward(struct in_addr in)
 {
 	u_long i = ntohl(in.s_addr);
-	u_long net;
 
-	if (IN_EXPERIMENTAL(i) || IN_MULTICAST(i) || IN_LINKLOCAL(i))
+	if (IN_EXPERIMENTAL(i) || IN_MULTICAST(i) || IN_LINKLOCAL(i) ||
+	    IN_ZERONET(i) || IN_LOOPBACK(i))
 		return (0);
-	if (IN_CLASSA(i)) {
-		net = i & IN_CLASSA_NET;
-		if (net == 0 || net == (IN_LOOPBACKNET << IN_CLASSA_NSHIFT))
-			return (0);
-	}
 	return (1);
 }
 
@@ -227,6 +223,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
     struct thread *td)
 {
 	struct sockaddr_in *addr = (struct sockaddr_in *)ifr_addr_get_sa(data);
+	struct epoch_tracker et;
 	struct ifaddr *ifa;
 	struct in_ifaddr *ia;
 	int error;
@@ -276,7 +273,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 	 * address was specified, find that one instead of the
 	 * first one on the interface, if possible.
 	 */
-	IF_ADDR_RLOCK(ifp);
+	NET_EPOCH_ENTER(et);
 	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family != AF_INET)
 			continue;
@@ -294,7 +291,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 			}
 
 	if (ifa == NULL) {
-		IF_ADDR_RUNLOCK(ifp);
+		NET_EPOCH_EXIT(et);
 		return (EADDRNOTAVAIL);
 	}
 
@@ -325,7 +322,7 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 		break;
 	}
 
-	IF_ADDR_RUNLOCK(ifp);
+	NET_EPOCH_EXIT(et);
 
 	return (error);
 }
@@ -339,6 +336,7 @@ in_aifaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 	const struct sockaddr_in *mask = &ifra->ifra_mask;
 	const struct sockaddr_in *dstaddr = &ifra->ifra_dstaddr;
 	const int vhid = (cmd == SIOCAIFADDR) ? ifra->ifra_vhid : 0;
+	struct epoch_tracker et;
 	struct ifaddr *ifa;
 	struct in_ifaddr *ia;
 	bool iaIsFirst;
@@ -375,7 +373,7 @@ in_aifaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 	 */
 	iaIsFirst = true;
 	ia = NULL;
-	IF_ADDR_RLOCK(ifp);
+	NET_EPOCH_ENTER(et);
 	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		struct in_ifaddr *it;
 
@@ -388,7 +386,7 @@ in_aifaddr_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp, struct thread *td)
 		    prison_check_ip4(td->td_ucred, &addr->sin_addr) == 0)
 			ia = it;
 	}
-	IF_ADDR_RUNLOCK(ifp);
+	NET_EPOCH_EXIT(et);
 
 	if (ia != NULL)
 		(void )in_difaddr_ioctl(cmd, data, ifp, td);
@@ -923,7 +921,7 @@ in_ifscrub_all(void)
 	IFNET_RLOCK();
 	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
 		/* Cannot lock here - lock recursion. */
-		/* IF_ADDR_RLOCK(ifp); */
+		/* NET_EPOCH_ENTER(et); */
 		CK_STAILQ_FOREACH_SAFE(ifa, &ifp->if_addrhead, ifa_link, nifa) {
 			if (ifa->ifa_addr->sa_family != AF_INET)
 				continue;
@@ -939,7 +937,7 @@ in_ifscrub_all(void)
 			(void)in_control(NULL, SIOCDIFADDR, (caddr_t)&ifr,
 			    ifp, NULL);
 		}
-		/* IF_ADDR_RUNLOCK(ifp); */
+		/* NET_EPOCH_EXIT(et); */
 		in_purgemaddrs(ifp);
 		igmp_domifdetach(ifp);
 	}
@@ -971,6 +969,7 @@ in_ifaddr_broadcast(struct in_addr in, struct in_ifaddr *ia)
 int
 in_broadcast(struct in_addr in, struct ifnet *ifp)
 {
+	struct epoch_tracker et;
 	struct ifaddr *ifa;
 	int found;
 
@@ -984,14 +983,14 @@ in_broadcast(struct in_addr in, struct ifnet *ifp)
 	 * Look through the list of addresses for a match
 	 * with a broadcast address.
 	 */
-	IF_ADDR_RLOCK(ifp);
+	NET_EPOCH_ENTER(et);
 	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
 		if (ifa->ifa_addr->sa_family == AF_INET &&
 		    in_ifaddr_broadcast(in, (struct in_ifaddr *)ifa)) {
 			found = 1;
 			break;
 		}
-	IF_ADDR_RUNLOCK(ifp);
+	NET_EPOCH_EXIT(et);
 	return (found);
 }
 
@@ -1382,15 +1381,13 @@ in_lltable_lookup(struct lltable *llt, u_int flags, const struct sockaddr *l3add
 	IF_AFDATA_LOCK_ASSERT(llt->llt_ifp);
 	KASSERT(l3addr->sa_family == AF_INET,
 	    ("sin_family %d", l3addr->sa_family));
-	lle = in_lltable_find_dst(llt, sin->sin_addr);
+	KASSERT((flags & (LLE_UNLOCKED | LLE_EXCLUSIVE)) !=
+	    (LLE_UNLOCKED | LLE_EXCLUSIVE),
+	    ("wrong lle request flags: %#x", flags));
 
+	lle = in_lltable_find_dst(llt, sin->sin_addr);
 	if (lle == NULL)
 		return (NULL);
-
-	KASSERT((flags & (LLE_UNLOCKED|LLE_EXCLUSIVE)) !=
-	    (LLE_UNLOCKED|LLE_EXCLUSIVE),("wrong lle request flags: 0x%X",
-	    flags));
-
 	if (flags & LLE_UNLOCKED)
 		return (lle);
 
@@ -1399,6 +1396,17 @@ in_lltable_lookup(struct lltable *llt, u_int flags, const struct sockaddr *l3add
 	else
 		LLE_RLOCK(lle);
 
+	/*
+	 * If the afdata lock is not held, the LLE may have been unlinked while
+	 * we were blocked on the LLE lock.  Check for this case.
+	 */
+	if (__predict_false((lle->la_flags & LLE_LINKED) == 0)) {
+		if (flags & LLE_EXCLUSIVE)
+			LLE_WUNLOCK(lle);
+		else
+			LLE_RUNLOCK(lle);
+		return (NULL);
+	}
 	return (lle);
 }
 
@@ -1513,7 +1521,7 @@ in_domifdetach(struct ifnet *ifp, void *aux)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

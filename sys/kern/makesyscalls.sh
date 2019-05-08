@@ -30,8 +30,7 @@ systrace="systrace_args.c"
 ptr_intptr_t_cast="intptr_t"
 ptr_qualified="*"
 mincompat="0"
-abi_flags=""
-abi_type_suffix=""
+abi_intptr_t="intptr_t"
 
 # tmp files:
 sysaue="sysent.aue.$$"
@@ -57,7 +56,6 @@ systraceret="systraceret.$$"
 sysstubfwd="sysstubfwd.$$"
 sysstubstubs="sysstubstubs.$$"
 
-# default input files:
 capabilities_conf="capabilities.conf"
 
 trap "rm $sysaue $sysdcl $syscompat $syscompatdcl $syscompat4 $syscompat4dcl $syscompat6 $syscompat6dcl $syscompat7 $syscompat7dcl $syscompat10 $syscompat10dcl $syscompat11 $syscompat11dcl $sysent $sysinc $sysarg $sysprotoend $systracetmp $systraceret $sysstubfwd $sysstubstubs" 0
@@ -75,7 +73,7 @@ if [ -n "$2" ]; then
 fi
 
 if [ -r $capabilities_conf ]; then
-	capenabled=`cat $capabilities_conf | grep -v "^#" | grep -v "^$"`
+	capenabled=`egrep -v '^#|^$' $capabilities_conf`
 	capenabled=`echo $capenabled | sed 's/ /,/g'`
 else
 	capenabled=""
@@ -86,6 +84,7 @@ sed -e '
 	/.*\$FreeBSD/b done_joining
 	/^[#;]/b done_joining
 	/^$/b done_joining
+	/^%%ABI_HEADERS%%/b done_joining
 
 	# Join lines ending in backslash
 :joining
@@ -160,6 +159,8 @@ sed -e '
 		mincompat = \"$mincompat\" + 0
 		abi_flags = \"$abi_flags\"
 		abi_func_prefix = \"$abi_func_prefix\"
+		abi_headers = \"$abi_headers\"
+		abi_intptr_t = \"$abi_intptr_t\"
 		abi_type_suffix = \"$abi_type_suffix\"
 		abi_obsolete_syscalls = \"$abi_obsolete_syscalls\"
 		no_stub_syscalls = \"$no_stub_syscalls\"
@@ -282,6 +283,11 @@ sed -e '
 	}
 	$1 ~ /^#[ 	]*include/ {
 		print > sysinc
+		next
+	}
+	$1 ~ /^%%ABI_HEADERS%%/ {
+		if (abi_headers != "")
+			print abi_headers > sysinc
 		next
 	}
 	$1 ~ /^#[ 	]*if/ {
@@ -463,9 +469,13 @@ sed -e '
 			parserr($end, ")")
 		end--
 
-		f += ret_inc
 		syscallret=$f
 		f++
+		while (ret_inc > 0) {
+			syscallret=syscallret " " $f
+			f++
+			ret_inc--
+		}
 
 		funcname=$f
 
@@ -475,7 +485,8 @@ sed -e '
 		# from it.
 		#
 		for (cap in capenabled) {
-			if (funcname == capenabled[cap]) {
+			if (funcname == capenabled[cap] ||
+			    funcname == abi_func_prefix capenabled[cap]) {
 				flags = "SYF_CAPENABLED";
 				break;
 			}
@@ -511,15 +522,16 @@ sed -e '
 			argc++
 			argtype[argc]=""
 			oldf=""
+			struct_name=""
+			union_name=""
 			needs_suffix=0
 			while (f < end && $(f+1) != ",") {
 				if (argtype[argc] != "" && oldf != "*")
 					argtype[argc] = argtype[argc]" ";
-				if (oldf == "struct") {
-					arg_structs[$f]
-				}
+				if (oldf == "struct")
+					struct_name=$f
 				if (oldf == "union")
-					arg_unions[$f]
+					union_name=$f
 				argtype[argc] = argtype[argc]$f;
 				oldf = $f;
 				f++
@@ -541,6 +553,10 @@ sed -e '
 					sub(/caddr_t/, "char *", argtype[argc]);
 			}
 
+			# Replace intptr_t arguments with an ABI
+			# appropriate value
+			gsub(/intptr_t/, abi_intptr_t, argtype[argc]);
+
 			# The parser adds space around parens.
 			# Remove it from annotations.
 			gsub(/ \( /, "(", argtype[argc]);
@@ -553,8 +569,23 @@ sed -e '
 
 			# Add suffix if required
 			# XXX-BD: should this happen in the loop above?
-			if (needs_suffix)
+			if (needs_suffix) {
+				sub(/_native /, " ", argtype[argc])
 				sub(/(struct|union) [^ ]*/, "&" abi_type_suffix, argtype[argc])
+				if (struct_name != "") {
+					sub(/_native/, "", struct_name);
+					struct_name = struct_name abi_type_suffix
+				}
+				if (union_name != "") {
+					sub(/_native/, "", union_name);
+					union_name = union_name abi_type_suffix
+				}
+			}
+
+			if (struct_name != "")
+				arg_structs[struct_name]
+			if (union_name != "")
+				arg_unions[union_name]
 
 			# Allow pointers to be qualified
 			gsub(/\*/, ptr_qualified, argtype[argc]);
@@ -836,10 +867,9 @@ sed -e '
 		if (!flag("NOPROTO") && !flag("NODEF") && \
 		    !(!abi_changes("defaultabi") && ptrargs == 0)) {
 			if (funcname == "nosys" || funcname == "lkmnosys" ||
-			    funcname == "sysarch" ||
-			    funcname ~ /^cheriabi/ || funcname ~ /^freebsd/ ||
-			    funcname ~ /^linux/ || funcname ~ /^ibcs2/ ||
-			    funcname ~ /^xenix/ || funcname ~ /^cloudabi/) {
+			    funcname == "sysarch" || funcname ~ /^freebsd/ ||
+			    funcname ~ /^cheriabi/ ||
+			    funcname ~ /^linux/ || funcname ~ /^cloudabi/) {
 				printf("%s\t%s(struct thread *, struct %s *)",
 				    rettype, funcname, argalias) > sysdcl
 			} else {
@@ -857,10 +887,9 @@ sed -e '
 			column = column + length("lkmressys") + length("AUE_NULL") + 3
 		} else {
 			if (funcname == "nosys" || funcname == "sysarch" || 
-			    funcname == "lkmnosys" ||
-			    funcname ~ /^cheriabi/ || funcname ~ /^freebsd/ ||
-			    funcname ~ /^linux/ || funcname ~ /^ibcs2/ ||
-			    funcname ~ /^xenix/ || funcname ~ /^cloudabi/) {
+			    funcname == "lkmnosys" || funcname ~ /^freebsd/ ||
+			    funcname ~ /^cheriabi/ ||
+			    funcname ~ /^linux/ || funcname ~ /^cloudabi/) {
 				printf("%s, %s, NULL, 0, 0, %s, %s },", funcname, auditev, flags, thr_flag) > sysent
 				column = column + length(funcname) + length(auditev) + length(flags) + 3 
 			} else {

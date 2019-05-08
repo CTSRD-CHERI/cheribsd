@@ -2529,8 +2529,8 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp, int *ncookies, u_lon
 			 */
 			eodp->ed_ino = objnum;
 			eodp->ed_reclen = reclen;
-			/* NOTE: ed_off is the offset for the *next* entry */
-			next = &(eodp->ed_off);
+			/* NOTE: ed_off is the offset for the *next* entry. */
+			next = &eodp->ed_off;
 			eodp->ed_eflags = zap.za_normalization_conflict ?
 			    ED_CASE_CONFLICT : 0;
 			(void) strncpy(eodp->ed_name, zap.za_name,
@@ -2543,8 +2543,11 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp, int *ncookies, u_lon
 			odp->d_ino = objnum;
 			odp->d_reclen = reclen;
 			odp->d_namlen = strlen(zap.za_name);
+			/* NOTE: d_off is the offset for the *next* entry. */
+			next = &odp->d_off;
 			(void) strlcpy(odp->d_name, zap.za_name, odp->d_namlen + 1);
 			odp->d_type = type;
+			dirent_terminate(odp);
 			odp = (dirent64_t *)((intptr_t)odp + reclen);
 		}
 		outcount += reclen;
@@ -2567,6 +2570,9 @@ zfs_readdir(vnode_t *vp, uio_t *uio, cred_t *cr, int *eofp, int *ncookies, u_lon
 			offset += 1;
 		}
 
+		/* Fill the offset right after advancing the cursor. */
+		if (next != NULL)
+			*next = offset;
 		if (cooks != NULL) {
 			*cooks++ = offset;
 			ncooks--;
@@ -5194,12 +5200,11 @@ zfs_freebsd_setattr(ap)
 		 * Privileged non-jail processes may not modify system flags
 		 * if securelevel > 0 and any existing system flags are set.
 		 * Privileged jail processes behave like privileged non-jail
-		 * processes if the security.jail.chflags_allowed sysctl is
-		 * is non-zero; otherwise, they behave like unprivileged
-		 * processes.
+		 * processes if the PR_ALLOW_CHFLAGS permission bit is set;
+		 * otherwise, they behave like unprivileged processes.
 		 */
 		if (secpolicy_fs_owner(vp->v_mount, cred) == 0 ||
-		    priv_check_cred(cred, PRIV_VFS_SYSFLAGS, 0) == 0) {
+		    priv_check_cred(cred, PRIV_VFS_SYSFLAGS) == 0) {
 			if (zflags &
 			    (ZFS_IMMUTABLE | ZFS_APPENDONLY | ZFS_NOUNLINK)) {
 				error = securelevel_gt(cred, 0);
@@ -6069,7 +6074,7 @@ struct vop_vector zfs_shareops = {
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

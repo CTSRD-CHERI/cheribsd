@@ -1,9 +1,10 @@
 /*-
  * Copyright (c) 2008-2010 Rui Paulo
  * Copyright (c) 2006 Marcel Moolenaar
- * Copyright (c) 2018 Netflix, Inc
  * All rights reserved.
  *
+ * Copyright (c) 2016-2019 Netflix, Inc. written by M. Warner Losh
+ * 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -49,10 +50,7 @@ __FBSDID("$FreeBSD$");
 #include <bootstrap.h>
 #include <smbios.h>
 
-#ifdef EFI_ZFS_BOOT
-#include <libzfs.h>
 #include "efizfs.h"
-#endif
 
 #include "loader_efi.h"
 
@@ -89,6 +87,11 @@ static int fail_timeout = 5;
  * Current boot variable
  */
 UINT16 boot_current;
+
+/*
+ * Image that we booted from.
+ */
+EFI_LOADED_IMAGE *boot_img;
 
 static bool
 has_keyboard(void)
@@ -216,12 +219,12 @@ set_currdev_pdinfo(pdinfo_t *dp)
 		currdev.dd.d_dev = dp->pd_devsw;
 		if (dp->pd_parent == NULL) {
 			currdev.dd.d_unit = dp->pd_unit;
-			currdev.d_slice = -1;
-			currdev.d_partition = -1;
+			currdev.d_slice = D_SLICENONE;
+			currdev.d_partition = D_PARTNONE;
 		} else {
 			currdev.dd.d_unit = dp->pd_parent->pd_unit;
 			currdev.d_slice = dp->pd_unit;
-			currdev.d_partition = 255;	/* Assumes GPT */
+			currdev.d_partition = D_PARTISGPT; /* XXX Assumes GPT */
 		}
 		set_currdev_devdesc((struct devdesc *)&currdev);
 	} else {
@@ -302,7 +305,7 @@ fix_dosisms(char *p)
 
 enum { BOOT_INFO_OK = 0, BAD_CHOICE = 1, NOT_SPECIFIC = 2  };
 static int
-match_boot_info(EFI_LOADED_IMAGE *img __unused, char *boot_info, size_t bisz)
+match_boot_info(char *boot_info, size_t bisz)
 {
 	uint32_t attr;
 	uint16_t fplen;
@@ -450,7 +453,7 @@ match_boot_info(EFI_LOADED_IMAGE *img __unused, char *boot_info, size_t bisz)
  * a drop to the OK boot loader prompt is possible.
  */
 static int
-find_currdev(EFI_LOADED_IMAGE *img, bool do_bootmgr, bool is_last,
+find_currdev(bool do_bootmgr, bool is_last,
     char *boot_info, size_t boot_info_sz)
 {
 	pdinfo_t *dp, *pp;
@@ -483,7 +486,7 @@ find_currdev(EFI_LOADED_IMAGE *img, bool do_bootmgr, bool is_last,
 	 * loader.conf.
 	 */
 	if (do_bootmgr) {
-		rv = match_boot_info(img, boot_info, boot_info_sz);
+		rv = match_boot_info(boot_info, boot_info_sz);
 		switch (rv) {
 		case BOOT_INFO_OK:	/* We found it */
 			return (0);
@@ -516,7 +519,7 @@ find_currdev(EFI_LOADED_IMAGE *img, bool do_bootmgr, bool is_last,
 	 * boot protocol to do so. We fail and let UEFI go on to
 	 * the next candidate.
 	 */
-	dp = efiblk_get_pdinfo_by_handle(img->DeviceHandle);
+	dp = efiblk_get_pdinfo_by_handle(boot_img->DeviceHandle);
 	if (dp != NULL) {
 		text = efi_devpath_name(dp->pd_devpath);
 		if (text != NULL) {
@@ -555,7 +558,7 @@ find_currdev(EFI_LOADED_IMAGE *img, bool do_bootmgr, bool is_last,
 	 * any of the nodes in that path match one of the enumerated
 	 * handles. Currently, this handle list is only for netboot.
 	 */
-	if (efi_handle_lookup(img->DeviceHandle, &dev, &unit, &extra) == 0) {
+	if (efi_handle_lookup(boot_img->DeviceHandle, &dev, &unit, &extra) == 0) {
 		set_currdev_devsw(dev, unit);
 		if (sanity_check_currdev())
 			return (0);
@@ -753,7 +756,6 @@ main(int argc, CHAR16 *argv[])
 	size_t sz, bosz = 0, bisz = 0;
 	UINT16 boot_order[100];
 	char boot_info[4096];
-	EFI_LOADED_IMAGE *img;
 	char buf[32];
 	bool uefi_boot_mgr;
 
@@ -762,37 +764,49 @@ main(int argc, CHAR16 *argv[])
 	archsw.arch_copyin = efi_copyin;
 	archsw.arch_copyout = efi_copyout;
 	archsw.arch_readin = efi_readin;
-#ifdef EFI_ZFS_BOOT
-	/* Note this needs to be set before ZFS init. */
 	archsw.arch_zfs_probe = efi_zfs_probe;
-#endif
 
         /* Get our loaded image protocol interface structure. */
-	BS->HandleProtocol(IH, &imgid, (VOID**)&img);
-
-#ifdef EFI_ZFS_BOOT
-	/* Tell ZFS probe code where we booted from */
-	efizfs_set_preferred(img->DeviceHandle);
-#endif
-	/* Init the time source */
-	efi_time_init();
-
-	has_kbd = has_keyboard();
+	BS->HandleProtocol(IH, &imgid, (VOID**)&boot_img);
 
 	/*
-	 * XXX Chicken-and-egg problem; we want to have console output
-	 * early, but some console attributes may depend on reading from
-	 * eg. the boot device, which we can't do yet.  We can use
-	 * printf() etc. once this is done.
+	 * Chicken-and-egg problem; we want to have console output early, but
+	 * some console attributes may depend on reading from eg. the boot
+	 * device, which we can't do yet.  We can use printf() etc. once this is
+	 * done. So, we set it to the efi console, then call console init. This
+	 * gets us printf early, but also primes the pump for all future console
+	 * changes to take effect, regardless of where they come from.
 	 */
 	setenv("console", "efi", 1);
 	cons_probe();
+
+	/* Init the time source */
+	efi_time_init();
 
 	/*
 	 * Initialise the block cache. Set the upper limit.
 	 */
 	bcache_init(32768, 512);
 
+	/*
+	 * Scan the BLOCK IO MEDIA handles then
+	 * march through the device switch probing for things.
+	 */
+	i = efipart_inithandles();
+	if (i != 0 && i != ENOENT) {
+		printf("efipart_inithandles failed with ERRNO %d, expect "
+		    "failures\n", i);
+	}
+
+	for (i = 0; devsw[i] != NULL; i++)
+		if (devsw[i]->dv_init != NULL)
+			(devsw[i]->dv_init)();
+
+	/*
+	 * Detect console settings two different ways: one via the command
+	 * args (eg -h) or via the UEFI ConOut variable.
+	 */
+	has_kbd = has_keyboard();
 	howto = parse_args(argc, argv);
 	if (!has_kbd && (howto & RB_PROBE))
 		howto |= RB_SERIAL | RB_MULTIPLE;
@@ -812,17 +826,15 @@ main(int argc, CHAR16 *argv[])
 		if ((howto & CON_MASK) == 0) {
 			/* No override, uhowto is controlling and efi cons is perfect */
 			howto = howto | (uhowto & CON_MASK);
-			setenv("console", "efi", 1);
 		} else if ((howto & CON_MASK) == (uhowto & CON_MASK)) {
 			/* override matches what UEFI told us, efi console is perfect */
-			setenv("console", "efi", 1);
 		} else if ((uhowto & (CON_MASK)) != 0) {
 			/*
 			 * We detected a serial console on ConOut. All possible
 			 * overrides include serial. We can't really override what efi
 			 * gives us, so we use it knowing it's the best choice.
 			 */
-			setenv("console", "efi", 1);
+			/* Do nothing */
 		} else {
 			/*
 			 * We detected some kind of serial in the override, but ConOut
@@ -857,20 +869,6 @@ main(int argc, CHAR16 *argv[])
 	if ((s = getenv("fail_timeout")) != NULL)
 		fail_timeout = strtol(s, NULL, 10);
 
-	/*
-	 * Scan the BLOCK IO MEDIA handles then
-	 * march through the device switch probing for things.
-	 */
-	i = efipart_inithandles();
-	if (i != 0 && i != ENOENT) {
-		printf("efipart_inithandles failed with ERRNO %d, expect "
-		    "failures\n", i);
-	}
-
-	for (i = 0; devsw[i] != NULL; i++)
-		if (devsw[i]->dv_init != NULL)
-			(devsw[i]->dv_init)();
-
 	printf("%s\n", bootprog_info);
 	printf("   Command line arguments:");
 	for (i = 0; i < argc; i++)
@@ -883,17 +881,15 @@ main(int argc, CHAR16 *argv[])
 	    ST->FirmwareRevision >> 16, ST->FirmwareRevision & 0xffff);
 	printf("   Console: %s (%#x)\n", getenv("console"), howto);
 
-
-
 	/* Determine the devpath of our image so we can prefer it. */
-	text = efi_devpath_name(img->FilePath);
+	text = efi_devpath_name(boot_img->FilePath);
 	if (text != NULL) {
 		printf("   Load Path: %S\n", text);
 		efi_setenv_freebsd_wcs("LoaderPath", text);
 		efi_free_devpath_name(text);
 	}
 
-	rv = BS->HandleProtocol(img->DeviceHandle, &devid, (void **)&imgpath);
+	rv = BS->HandleProtocol(boot_img->DeviceHandle, &devid, (void **)&imgpath);
 	if (rv == EFI_SUCCESS) {
 		text = efi_devpath_name(imgpath);
 		if (text != NULL) {
@@ -963,13 +959,24 @@ main(int argc, CHAR16 *argv[])
 	BS->SetWatchdogTimer(0, 0, 0, NULL);
 
 	/*
+	 * Initialize the trusted/forbidden certificates from UEFI.
+	 * They will be later used to verify the manifest(s),
+	 * which should contain hashes of verified files.
+	 * This needs to be initialized before any configuration files
+	 * are loaded.
+	 */
+#ifdef EFI_SECUREBOOT
+	ve_efi_init();
+#endif
+
+	/*
 	 * Try and find a good currdev based on the image that was booted.
 	 * It might be desirable here to have a short pause to allow falling
 	 * through to the boot loader instead of returning instantly to follow
 	 * the boot protocol and also allow an escape hatch for users wishing
 	 * to try something different.
 	 */
-	if (find_currdev(img, uefi_boot_mgr, is_last, boot_info, bisz) != 0)
+	if (find_currdev(uefi_boot_mgr, is_last, boot_info, bisz) != 0)
 		if (!interactive_interrupt("Failed to find bootable partition"))
 			return (EFI_NOT_FOUND);
 
@@ -1041,7 +1048,7 @@ command_quit(int argc, char *argv[])
 COMMAND_SET(memmap, "memmap", "print memory map", command_memmap);
 
 static int
-command_memmap(int argc, char *argv[])
+command_memmap(int argc __unused, char *argv[] __unused)
 {
 	UINTN sz;
 	EFI_MEMORY_DESCRIPTOR *map, *p;
@@ -1050,22 +1057,6 @@ command_memmap(int argc, char *argv[])
 	EFI_STATUS status;
 	int i, ndesc;
 	char line[80];
-	static char *types[] = {
-	    "Reserved",
-	    "LoaderCode",
-	    "LoaderData",
-	    "BootServicesCode",
-	    "BootServicesData",
-	    "RuntimeServicesCode",
-	    "RuntimeServicesData",
-	    "ConventionalMemory",
-	    "UnusableMemory",
-	    "ACPIReclaimMemory",
-	    "ACPIMemoryNVS",
-	    "MemoryMappedIO",
-	    "MemoryMappedIOPortSpace",
-	    "PalCode"
-	};
 
 	sz = 0;
 	status = BS->GetMemoryMap(&sz, 0, &key, &dsz, &dver);
@@ -1091,9 +1082,12 @@ command_memmap(int argc, char *argv[])
 
 	for (i = 0, p = map; i < ndesc;
 	     i++, p = NextMemoryDescriptor(p, dsz)) {
-		printf("%23s %012jx %012jx %08jx ", types[p->Type],
-		    (uintmax_t)p->PhysicalStart, (uintmax_t)p->VirtualStart,
-		    (uintmax_t)p->NumberOfPages);
+		snprintf(line, sizeof(line), "%23s %012jx %012jx %08jx ",
+		    efi_memory_type(p->Type), (uintmax_t)p->PhysicalStart,
+		    (uintmax_t)p->VirtualStart, (uintmax_t)p->NumberOfPages);
+		if (pager_output(line))
+			break;
+
 		if (p->Attribute & EFI_MEMORY_UC)
 			printf("UC ");
 		if (p->Attribute & EFI_MEMORY_WC)
@@ -1110,6 +1104,12 @@ command_memmap(int argc, char *argv[])
 			printf("RP ");
 		if (p->Attribute & EFI_MEMORY_XP)
 			printf("XP ");
+		if (p->Attribute & EFI_MEMORY_NV)
+			printf("NV ");
+		if (p->Attribute & EFI_MEMORY_MORE_RELIABLE)
+			printf("MR ");
+		if (p->Attribute & EFI_MEMORY_RO)
+			printf("RO ");
 		if (pager_output("\n"))
 			break;
 	}
@@ -1121,73 +1121,30 @@ command_memmap(int argc, char *argv[])
 COMMAND_SET(configuration, "configuration", "print configuration tables",
     command_configuration);
 
-static const char *
-guid_to_string(EFI_GUID *guid)
-{
-	static char buf[40];
-
-	sprintf(buf, "%08x-%04x-%04x-%02x%02x-%02x%02x%02x%02x%02x%02x",
-	    guid->Data1, guid->Data2, guid->Data3, guid->Data4[0],
-	    guid->Data4[1], guid->Data4[2], guid->Data4[3], guid->Data4[4],
-	    guid->Data4[5], guid->Data4[6], guid->Data4[7]);
-	return (buf);
-}
-
 static int
 command_configuration(int argc, char *argv[])
 {
-	char line[80];
 	UINTN i;
+	char *name;
 
-	snprintf(line, sizeof(line), "NumberOfTableEntries=%lu\n",
+	printf("NumberOfTableEntries=%lu\n",
 		(unsigned long)ST->NumberOfTableEntries);
-	pager_open();
-	if (pager_output(line)) {
-		pager_close();
-		return (CMD_OK);
-	}
 
 	for (i = 0; i < ST->NumberOfTableEntries; i++) {
 		EFI_GUID *guid;
 
 		printf("  ");
 		guid = &ST->ConfigurationTable[i].VendorGuid;
-		if (!memcmp(guid, &mps, sizeof(EFI_GUID)))
-			printf("MPS Table");
-		else if (!memcmp(guid, &acpi, sizeof(EFI_GUID)))
-			printf("ACPI Table");
-		else if (!memcmp(guid, &acpi20, sizeof(EFI_GUID)))
-			printf("ACPI 2.0 Table");
-		else if (!memcmp(guid, &smbios, sizeof(EFI_GUID)))
-			printf("SMBIOS Table %p",
-			    ST->ConfigurationTable[i].VendorTable);
-		else if (!memcmp(guid, &smbios3, sizeof(EFI_GUID)))
-			printf("SMBIOS3 Table");
-		else if (!memcmp(guid, &dxe, sizeof(EFI_GUID)))
-			printf("DXE Table");
-		else if (!memcmp(guid, &hoblist, sizeof(EFI_GUID)))
-			printf("HOB List Table");
-		else if (!memcmp(guid, &lzmadecomp, sizeof(EFI_GUID)))
-			printf("LZMA Compression");
-		else if (!memcmp(guid, &mpcore, sizeof(EFI_GUID)))
-			printf("ARM MpCore Information Table");
-		else if (!memcmp(guid, &esrt, sizeof(EFI_GUID)))
-			printf("ESRT Table");
-		else if (!memcmp(guid, &memtype, sizeof(EFI_GUID)))
-			printf("Memory Type Information Table");
-		else if (!memcmp(guid, &debugimg, sizeof(EFI_GUID)))
-			printf("Debug Image Info Table");
-		else if (!memcmp(guid, &fdtdtb, sizeof(EFI_GUID)))
-			printf("FDT Table");
-		else
-			printf("Unknown Table (%s)", guid_to_string(guid));
-		snprintf(line, sizeof(line), " at %p\n",
-		    ST->ConfigurationTable[i].VendorTable);
-		if (pager_output(line))
-			break;
+
+		if (efi_guid_to_name(guid, &name) == true) {
+			printf(name);
+			free(name);
+		} else {
+			printf("Error while translating UUID to name");
+		}
+		printf(" at %p\n", ST->ConfigurationTable[i].VendorTable);
 	}
 
-	pager_close();
 	return (CMD_OK);
 }
 
@@ -1242,6 +1199,75 @@ command_mode(int argc, char *argv[])
 	if (i != 0)
 		printf("Select a mode with the command \"mode <number>\"\n");
 
+	return (CMD_OK);
+}
+
+COMMAND_SET(lsefi, "lsefi", "list EFI handles", command_lsefi);
+
+static int
+command_lsefi(int argc __unused, char *argv[] __unused)
+{
+	char *name;
+	EFI_HANDLE *buffer = NULL;
+	EFI_HANDLE handle;
+	UINTN bufsz = 0, i, j;
+	EFI_STATUS status;
+	int ret = 0;
+
+	status = BS->LocateHandle(AllHandles, NULL, NULL, &bufsz, buffer);
+	if (status != EFI_BUFFER_TOO_SMALL) {
+		snprintf(command_errbuf, sizeof (command_errbuf),
+		    "unexpected error: %lld", (long long)status);
+		return (CMD_ERROR);
+	}
+	if ((buffer = malloc(bufsz)) == NULL) {
+		sprintf(command_errbuf, "out of memory");
+		return (CMD_ERROR);
+	}
+
+	status = BS->LocateHandle(AllHandles, NULL, NULL, &bufsz, buffer);
+	if (EFI_ERROR(status)) {
+		free(buffer);
+		snprintf(command_errbuf, sizeof (command_errbuf),
+		    "LocateHandle() error: %lld", (long long)status);
+		return (CMD_ERROR);
+	}
+
+	pager_open();
+	for (i = 0; i < (bufsz / sizeof (EFI_HANDLE)); i++) {
+		UINTN nproto = 0;
+		EFI_GUID **protocols = NULL;
+
+		handle = buffer[i];
+		printf("Handle %p", handle);
+		if (pager_output("\n"))
+			break;
+		/* device path */
+
+		status = BS->ProtocolsPerHandle(handle, &protocols, &nproto);
+		if (EFI_ERROR(status)) {
+			snprintf(command_errbuf, sizeof (command_errbuf),
+			    "ProtocolsPerHandle() error: %lld",
+			    (long long)status);
+			continue;
+		}
+
+		for (j = 0; j < nproto; j++) {
+			if (efi_guid_to_name(protocols[j], &name) == true) {
+				printf("  %s", name);
+				free(name);
+			} else {
+				printf("Error while translating UUID to name");
+			}
+			if ((ret = pager_output("\n")) != 0)
+				break;
+		}
+		BS->FreePool(protocols);
+		if (ret != 0)
+			break;
+	}
+	pager_close();
+	free(buffer);
 	return (CMD_OK);
 }
 

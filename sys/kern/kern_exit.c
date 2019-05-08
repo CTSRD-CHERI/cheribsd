@@ -109,14 +109,9 @@ proc_realparent(struct proc *child)
 	struct proc *p, *parent;
 
 	sx_assert(&proctree_lock, SX_LOCKED);
-	if ((child->p_treeflag & P_TREE_ORPHANED) == 0) {
-		if (child->p_oppid == 0 ||
-		    child->p_pptr->p_pid == child->p_oppid)
-			parent = child->p_pptr;
-		else
-			parent = initproc;
-		return (parent);
-	}
+	if ((child->p_treeflag & P_TREE_ORPHANED) == 0)
+		return (child->p_pptr->p_pid == child->p_oppid ?
+			    child->p_pptr : initproc);
 	for (p = child; (p->p_treeflag & P_TREE_FIRST_ORPHAN) == 0;) {
 		/* Cannot use LIST_PREV(), since the list head is not known. */
 		p = __containerof(p->p_orphan.le_prev, struct proc,
@@ -146,12 +141,33 @@ reaper_abandon_children(struct proc *p, bool exiting)
 		LIST_INSERT_HEAD(&p1->p_reaplist, p2, p_reapsibling);
 		if (exiting && p2->p_pptr == p) {
 			PROC_LOCK(p2);
-			proc_reparent(p2, p1);
+			proc_reparent(p2, p1, true);
 			PROC_UNLOCK(p2);
 		}
 	}
 	KASSERT(LIST_EMPTY(&p->p_reaplist), ("p_reaplist not empty"));
 	p->p_treeflag &= ~P_TREE_REAPER;
+}
+
+static void
+reaper_clear(struct proc *p)
+{
+	struct proc *p1;
+	bool clear;
+
+	sx_assert(&proctree_lock, SX_LOCKED);
+	LIST_REMOVE(p, p_reapsibling);
+	if (p->p_reapsubtree == 1)
+		return;
+	clear = true;
+	LIST_FOREACH(p1, &p->p_reaper->p_reaplist, p_reapsibling) {
+		if (p1->p_reapsubtree == p->p_reapsubtree) {
+			clear = false;
+			break;
+		}
+	}
+	if (clear)
+		proc_id_clear(PROC_ID_REAP, p->p_reapsubtree);
 }
 
 static void
@@ -434,16 +450,17 @@ exit1(struct thread *td, int rval, int signo)
 
 	WITNESS_WARN(WARN_PANIC, NULL, "process (pid %d) exiting", p->p_pid);
 
-	sx_xlock(&proctree_lock);
 	/*
-	 * Remove proc from allproc queue and pidhash chain.
-	 * Place onto zombproc.  Unlink from parent's child list.
+	 * Move proc from allproc queue to zombproc.
 	 */
 	sx_xlock(&allproc_lock);
+	sx_xlock(&zombproc_lock);
 	LIST_REMOVE(p, p_list);
 	LIST_INSERT_HEAD(&zombproc, p, p_list);
-	LIST_REMOVE(p, p_hash);
+	sx_xunlock(&zombproc_lock);
 	sx_xunlock(&allproc_lock);
+
+	sx_xlock(&proctree_lock);
 
 	/*
 	 * Reparent all children processes:
@@ -460,7 +477,7 @@ exit1(struct thread *td, int rval, int signo)
 		q->p_sigparent = SIGCHLD;
 
 		if (!(q->p_flag & P_TRACED)) {
-			proc_reparent(q, q->p_reaper);
+			proc_reparent(q, q->p_reaper, true);
 			if (q->p_state == PRS_ZOMBIE) {
 				/*
 				 * Inform reaper about the reparented
@@ -496,10 +513,10 @@ exit1(struct thread *td, int rval, int signo)
 			 */
 			t = proc_realparent(q);
 			if (t == p) {
-				proc_reparent(q, q->p_reaper);
+				proc_reparent(q, q->p_reaper, true);
 			} else {
 				PROC_LOCK(t);
-				proc_reparent(q, t);
+				proc_reparent(q, t, true);
 				PROC_UNLOCK(t);
 			}
 			/*
@@ -528,6 +545,11 @@ exit1(struct thread *td, int rval, int signo)
 	 */
 	while ((q = LIST_FIRST(&p->p_orphans)) != NULL) {
 		PROC_LOCK(q);
+		KASSERT(q->p_oppid == p->p_pid,
+		    ("orphan %p of %p has unexpected oppid %d", q, p,
+		    q->p_oppid));
+		q->p_oppid = q->p_reaper->p_pid;
+
 		/*
 		 * If we are the real parent of this process
 		 * but it has been reparented to a debugger, then
@@ -540,6 +562,17 @@ exit1(struct thread *td, int rval, int signo)
 		clear_orphan(q);
 		PROC_UNLOCK(q);
 	}
+
+#ifdef KDTRACE_HOOKS
+	if (SDT_PROBES_ENABLED()) {
+		int reason = CLD_EXITED;
+		if (WCOREDUMP(signo))
+			reason = CLD_DUMPED;
+		else if (WIFSIGNALED(signo))
+			reason = CLD_KILLED;
+		SDT_PROBE1(proc, , , exit, reason);
+	}
+#endif
 
 	/* Save exit status. */
 	PROC_LOCK(p);
@@ -558,15 +591,6 @@ exit1(struct thread *td, int rval, int signo)
 	 * Notify interested parties of our demise.
 	 */
 	KNOTE_LOCKED(p->p_klist, NOTE_EXIT);
-
-#ifdef KDTRACE_HOOKS
-	int reason = CLD_EXITED;
-	if (WCOREDUMP(signo))
-		reason = CLD_DUMPED;
-	else if (WIFSIGNALED(signo))
-		reason = CLD_KILLED;
-	SDT_PROBE1(proc, , , exit, reason);
-#endif
 
 	/*
 	 * If this is a process with a descriptor, we may not need to deliver
@@ -591,7 +615,7 @@ exit1(struct thread *td, int rval, int signo)
 			mtx_unlock(&p->p_pptr->p_sigacts->ps_mtx);
 			pp = p->p_pptr;
 			PROC_UNLOCK(pp);
-			proc_reparent(p, p->p_reaper);
+			proc_reparent(p, p->p_reaper, true);
 			p->p_sigparent = SIGCHLD;
 			PROC_LOCK(p->p_pptr);
 
@@ -678,9 +702,40 @@ struct abort2_args {
 int
 sys_abort2(struct thread *td, struct abort2_args *uap)
 {
+	void *uargs[16];
+	void *uargsp;
+	int error, nargs;
+
+	nargs = uap->nargs;
+	if (nargs < 0 || nargs > nitems(uargs))
+		nargs = -1;
+	uargsp = NULL;
+	if (nargs > 0) {
+		if (uap->args != NULL) {
+			error = copyin(__USER_CAP_UNBOUND(uap->args), uargs,
+			    uap->nargs * sizeof(void *));
+			if (error != 0)
+				nargs = -1;
+			else
+				uargsp = &uargs;
+		} else
+			nargs = -1;
+	}
+	return (kern_abort2(td, __USER_CAP_STR(uap->why), nargs, uargsp));
+}
+/*
+ * kern_abort2()
+ * Arguments:
+ *  why - user point to why
+ *  nargs - number of arguments copied or -1 if an error occured in copying
+ *  args - pointer to an array of points in kernel format
+ */
+int
+kern_abort2(struct thread *td, const char * __capability why, int nargs,
+    void **uargs)
+{
 	struct proc *p = td->td_proc;
 	struct sbuf *sb;
-	void * __capability uargs[16];
 	int error, i, sig;
 
 	/*
@@ -697,33 +752,25 @@ sys_abort2(struct thread *td, struct abort2_args *uap)
 	 * abort2() was called improperly
 	 */
 	sig = SIGKILL;
-	/* Prevent from DoSes from user-space. */
-	if (uap->nargs < 0 || uap->nargs > 16)
+	if (nargs == -1)
 		goto out;
-	if (uap->nargs > 0) {
-		if (uap->args == NULL)
-			goto out;
-		error = copyin(__USER_CAP_UNBOUND(uap->args), uargs,
-		    uap->nargs * sizeof(void *));
-		if (error != 0)
-			goto out;
-	}
+	KASSERT(nargs >= 0 && nargs <= 16, ("called with too many args (%d)",
+	    nargs));
 	/*
 	 * Limit size of 'reason' string to 128. Will fit even when
 	 * maximal number of arguments was chosen to be logged.
 	 */
-	if (uap->why != NULL) {
-		error = sbuf_copyin(sb, __USER_CAP_STR(uap->why), 128);
+	if (why != NULL) {
+		error = sbuf_copyin(sb, why, 128);
 		if (error < 0)
 			goto out;
 	} else {
 		sbuf_printf(sb, "(null)");
 	}
-	if (uap->nargs > 0) {
+	if (nargs > 0) {
 		sbuf_printf(sb, "(");
-		for (i = 0;i < uap->nargs; i++)
-			sbuf_printf(sb, "%s%p", i == 0 ? "" : ", ",
-			    (__cheri_fromcap void *)uargs[i]);
+		for (i = 0;i < nargs; i++)
+			sbuf_printf(sb, "%s%p", i == 0 ? "" : ", ", uargs[i]);
 		sbuf_printf(sb, ")");
 	}
 	/*
@@ -795,49 +842,48 @@ kern_wait4(struct thread *td, int pid, int * __capability statusp, int options,
 int
 sys_wait6(struct thread *td, struct wait6_args *uap)
 {
-	struct __wrusage wru, *wrup;
 	_siginfo_t si, *sip;
-#ifdef COMPAT_FREEBSD64
-	/* XXX-AM: fix for freebsd64 */
 	struct siginfo_native si_n;
-#endif
-	idtype_t idtype;
-	id_t id;
-	int error, status;
-
-	idtype = uap->idtype;
-	id = uap->id;
-
-	if (uap->wrusage != NULL)
-		wrup = &wru;
-	else
-		wrup = NULL;
+	int error;
 
 	if (uap->info != NULL) {
 		sip = &si;
 		bzero(sip, sizeof(*sip));
 	} else
 		sip = NULL;
+	error = user_wait6(td, uap->idtype, uap->id,
+	    __USER_CAP_OBJ(uap->status), uap->options,
+	    __USER_CAP_OBJ(uap->wrusage), sip);
+	if (uap->info != NULL && error == 0) {
+		siginfo_to_siginfo_native(&si, &si_n);
+		error = copyout(&si_n, __USER_CAP_OBJ(uap->info), sizeof(si_n));
+	}
+	return (error);
+}
+
+int
+user_wait6(struct thread *td, idtype_t idtype, id_t id,
+    int * __capability statusp, int options,
+    struct __wrusage * __capability wrusage, _siginfo_t *sip)
+{
+	struct __wrusage wru, *wrup;
+	int error, status;
+
+	if (wrusage != NULL)
+		wrup = &wru;
+	else
+		wrup = NULL;
 
 	/*
 	 *  We expect all callers of wait6() to know about WEXITED and
 	 *  WTRAPPED.
 	 */
-	error = kern_wait6(td, idtype, id, &status, uap->options, wrup, sip);
+	error = kern_wait6(td, idtype, id, &status, options, wrup, sip);
 
-	if (uap->status != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout(&status, __USER_CAP_OBJ(uap->status),
-		    sizeof(status));
-	if (uap->wrusage != NULL && error == 0 && td->td_retval[0] != 0)
-		error = copyout(&wru, __USER_CAP_OBJ(uap->wrusage),
-		    sizeof(wru));
-	if (uap->info != NULL && error == 0) {
-#ifdef COMPAT_FREEBSD64
-		/* XXX-AM: fix this should go in compat64 */
-		siginfo_to_siginfo_native(&si, &si_n);
-#endif
-		error = copyout(&si, __USER_CAP_OBJ(uap->info), sizeof(si));
-	}
+	if (statusp != NULL && error == 0 && td->td_retval[0] != 0)
+		error = copyout(&status, statusp, sizeof(status));
+	if (wrusage != NULL && error == 0 && td->td_retval[0] != 0)
+		error = copyout(&wru, wrusage, sizeof(wru));
 	return (error);
 }
 
@@ -879,7 +925,7 @@ proc_reap(struct thread *td, struct proc *p, int *status, int options)
 	 * If we got the child via a ptrace 'attach', we need to give it back
 	 * to the old parent.
 	 */
-	if (p->p_oppid != 0 && p->p_oppid != p->p_pptr->p_pid) {
+	if (p->p_oppid != p->p_pptr->p_pid) {
 		PROC_UNLOCK(p);
 		t = proc_realparent(p);
 		PROC_LOCK(t);
@@ -887,8 +933,7 @@ proc_reap(struct thread *td, struct proc *p, int *status, int options)
 		CTR2(KTR_PTRACE,
 		    "wait: traced child %d moved back to parent %d", p->p_pid,
 		    t->p_pid);
-		proc_reparent(p, t);
-		p->p_oppid = 0;
+		proc_reparent(p, t, false);
 		PROC_UNLOCK(p);
 		pksignal(t, SIGCHLD, p->p_ksi);
 		wakeup(t);
@@ -897,19 +942,22 @@ proc_reap(struct thread *td, struct proc *p, int *status, int options)
 		sx_xunlock(&proctree_lock);
 		return;
 	}
-	p->p_oppid = 0;
 	PROC_UNLOCK(p);
 
 	/*
 	 * Remove other references to this process to ensure we have an
 	 * exclusive reference.
 	 */
-	sx_xlock(&allproc_lock);
+	sx_xlock(&zombproc_lock);
 	LIST_REMOVE(p, p_list);	/* off zombproc */
-	sx_xunlock(&allproc_lock);
+	sx_xunlock(&zombproc_lock);
+	sx_xlock(PIDHASHLOCK(p->p_pid));
+	LIST_REMOVE(p, p_hash);
+	sx_xunlock(PIDHASHLOCK(p->p_pid));
 	LIST_REMOVE(p, p_sibling);
 	reaper_abandon_children(p, true);
-	LIST_REMOVE(p, p_reapsibling);
+	reaper_clear(p);
+	proc_id_clear(PROC_ID_PID, p->p_pid);
 	PROC_LOCK(p);
 	clear_orphan(p);
 	PROC_UNLOCK(p);
@@ -1357,7 +1405,7 @@ loop_locked:
  * Must be called with an exclusive hold of proctree lock.
  */
 void
-proc_reparent(struct proc *child, struct proc *parent)
+proc_reparent(struct proc *child, struct proc *parent, bool set_oppid)
 {
 
 	sx_assert(&proctree_lock, SX_XLOCKED);
@@ -1385,10 +1433,12 @@ proc_reparent(struct proc *child, struct proc *parent)
 	}
 
 	child->p_pptr = parent;
+	if (set_oppid)
+		child->p_oppid = parent->p_pid;
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

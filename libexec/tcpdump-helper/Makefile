@@ -58,8 +58,6 @@ NO_SHARED=	yes
 .PATH: ${.CURDIR}/../../lib/libc/string
 .PATH: ${.CURDIR}/../../contrib/tcpdump
 
-WANT_DUMP=yes
-
 .include <src.opts.mk>
 .include <bsd.prog.mk>
 

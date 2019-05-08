@@ -148,12 +148,19 @@ loop:
 	if (I_IS_UFS1(ip)) {
 		*((struct ufs1_dinode *)bp->b_data +
 		    ino_to_fsbo(fs, ip->i_number)) = *ip->i_din1;
-		/* XXX: FIX? The entropy here is desirable, but the harvesting may be expensive */
+		/*
+		 * XXX: FIX? The entropy here is desirable,
+		 * but the harvesting may be expensive
+		 */
 		random_harvest_queue(&(ip->i_din1), sizeof(ip->i_din1), RANDOM_FS_ATIME);
 	} else {
+		ffs_update_dinode_ckhash(fs, ip->i_din2);
 		*((struct ufs2_dinode *)bp->b_data +
 		    ino_to_fsbo(fs, ip->i_number)) = *ip->i_din2;
-		/* XXX: FIX? The entropy here is desirable, but the harvesting may be expensive */
+		/*
+		 * XXX: FIX? The entropy here is desirable,
+		 * but the harvesting may be expensive
+		 */
 		random_harvest_queue(&(ip->i_din2), sizeof(ip->i_din2), RANDOM_FS_ATIME);
 	}
 	if (waitfor)
@@ -587,15 +594,20 @@ done:
 #ifdef INVARIANTS
 	for (level = SINGLE; level <= TRIPLE; level++)
 		if (newblks[UFS_NDADDR + level] != DIP(ip, i_ib[level]))
-			panic("ffs_truncate1");
+			panic("ffs_truncate1: level %d newblks %jd != i_ib %jd",
+			    level, (intmax_t)newblks[UFS_NDADDR + level],
+			    (intmax_t)DIP(ip, i_ib[level]));
 	for (i = 0; i < UFS_NDADDR; i++)
 		if (newblks[i] != DIP(ip, i_db[i]))
-			panic("ffs_truncate2");
+			panic("ffs_truncate2: blkno %d newblks %jd != i_db %jd",
+			    i, (intmax_t)newblks[UFS_NDADDR + level],
+			    (intmax_t)DIP(ip, i_ib[level]));
 	BO_LOCK(bo);
 	if (length == 0 &&
 	    (fs->fs_magic != FS_UFS2_MAGIC || ip->i_din2->di_extsize == 0) &&
 	    (bo->bo_dirty.bv_cnt > 0 || bo->bo_clean.bv_cnt > 0))
-		panic("ffs_truncate3");
+		panic("ffs_truncate3: vp = %p, buffers: dirty = %d, clean = %d",
+			vp, bo->bo_dirty.bv_cnt, bo->bo_clean.bv_cnt);
 	BO_UNLOCK(bo);
 #endif /* INVARIANTS */
 	/*

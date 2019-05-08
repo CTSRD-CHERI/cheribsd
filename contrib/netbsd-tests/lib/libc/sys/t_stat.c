@@ -31,10 +31,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180719,
+ *   "updated": 20181121,
  *   "target_type": "test",
  *   "changes": [
- *     "function_abi"
+ *     "calling_convention"
  *   ],
  *   "change_comment": "Missing mode to open with O_CREAT"
  * }

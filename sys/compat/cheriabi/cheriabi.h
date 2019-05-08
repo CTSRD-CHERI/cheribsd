@@ -66,8 +66,7 @@ struct thr_param_c {
 	long * __capability		parent_tid;
 	int				flags;
 	struct rtprio * __capability	rtp;
-	void * __capability		ddc;
-	void * __capability		spare[2];
+	void * __capability		spare[3];
 };
 
 struct kinfo_proc_c {

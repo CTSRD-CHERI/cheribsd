@@ -202,7 +202,7 @@ void umtx_thread_exit(struct thread *);
 #endif /* !_SYS_UMTX_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

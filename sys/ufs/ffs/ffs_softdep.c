@@ -6698,12 +6698,14 @@ softdep_journal_freeblocks(ip, cred, length, flags)
 	if (bp->b_bufsize == fs->fs_bsize)
 		bp->b_flags |= B_CLUSTEROK;
 	softdep_update_inodeblock(ip, bp, 0);
-	if (ump->um_fstype == UFS1)
+	if (ump->um_fstype == UFS1) {
 		*((struct ufs1_dinode *)bp->b_data +
 		    ino_to_fsbo(fs, ip->i_number)) = *ip->i_din1;
-	else
+	} else {
+		ffs_update_dinode_ckhash(fs, ip->i_din2);
 		*((struct ufs2_dinode *)bp->b_data +
 		    ino_to_fsbo(fs, ip->i_number)) = *ip->i_din2;
+	}
 	ACQUIRE_LOCK(ump);
 	(void) inodedep_lookup(mp, ip->i_number, DEPALLOC, &inodedep);
 	if ((inodedep->id_state & IOSTARTED) != 0)
@@ -6956,6 +6958,7 @@ softdep_setup_freeblocks(ip, length, flags)
 		dp2 = ((struct ufs2_dinode *)bp->b_data +
 		    ino_to_fsbo(fs, ip->i_number));
 		ip->i_din2->di_freelink = dp2->di_freelink;
+		ffs_update_dinode_ckhash(fs, ip->i_din2);
 		*dp2 = *ip->i_din2;
 	}
 	/*
@@ -9640,6 +9643,7 @@ static void
 clear_unlinked_inodedep(inodedep)
 	struct inodedep *inodedep;
 {
+	struct ufs2_dinode *dip;
 	struct ufsmount *ump;
 	struct inodedep *idp;
 	struct inodedep *idn;
@@ -9743,12 +9747,15 @@ clear_unlinked_inodedep(inodedep)
 			ffs_oldfscompat_write((struct fs *)bp->b_data, ump);
 			softdep_setup_sbupdate(ump, (struct fs *)bp->b_data,
 			    bp);
-		} else if (fs->fs_magic == FS_UFS1_MAGIC)
+		} else if (fs->fs_magic == FS_UFS1_MAGIC) {
 			((struct ufs1_dinode *)bp->b_data +
 			    ino_to_fsbo(fs, pino))->di_freelink = nino;
-		else
-			((struct ufs2_dinode *)bp->b_data +
-			    ino_to_fsbo(fs, pino))->di_freelink = nino;
+		} else {
+			dip = (struct ufs2_dinode *)bp->b_data +
+			    ino_to_fsbo(fs, pino);
+			dip->di_freelink = nino;
+			ffs_update_dinode_ckhash(fs, dip);
+		}
 		/*
 		 * If the bwrite fails we have no recourse to recover.  The
 		 * filesystem is corrupted already.
@@ -10388,6 +10395,7 @@ initiate_write_inodeblock_ufs2(inodedep, bp)
 
 		inon = TAILQ_NEXT(inodedep, id_unlinked);
 		dp->di_freelink = inon ? inon->id_ino : 0;
+		ffs_update_dinode_ckhash(fs, dp);
 	}
 	/*
 	 * If the bitmap is not yet written, then the allocated
@@ -10549,6 +10557,7 @@ initiate_write_inodeblock_ufs2(inodedep, bp)
 #endif /* INVARIANTS */
 			dp->di_ib[i] = 0;
 		}
+		ffs_update_dinode_ckhash(fs, dp);
 		return;
 	}
 	/*
@@ -10577,6 +10586,7 @@ initiate_write_inodeblock_ufs2(inodedep, bp)
 	 */
 	for (; adp; adp = TAILQ_NEXT(adp, ad_next))
 		dp->di_ib[adp->ad_offset - UFS_NDADDR] = 0;
+	ffs_update_dinode_ckhash(fs, dp);
 }
 
 /*
@@ -11026,6 +11036,9 @@ softdep_disk_write_complete(bp)
 	struct buf *sbp;
 
 	ump = softdep_bp_to_mp(bp);
+	KASSERT(LIST_EMPTY(&bp->b_dep) || ump != NULL,
+	    ("softdep_disk_write_complete: softdep_bp_to_mp returned NULL "
+	     "with outstanding dependencies for buffer %p", bp));
 	if (ump == NULL)
 		return;
 
@@ -11615,8 +11628,11 @@ handle_written_inodeblock(inodedep, bp, flags)
 	 * marked dirty so that its will eventually get written back in
 	 * its correct form.
 	 */
-	if (hadchanges)
+	if (hadchanges) {
+		if (fstype == UFS2)
+			ffs_update_dinode_ckhash(inodedep->id_fs, dp2);
 		bdirty(bp);
+	}
 bufwait:
 	/*
 	 * If the write did not succeed, we have done all the roll-forward
@@ -13386,7 +13402,7 @@ softdep_request_cleanup(fs, vp, cred, resource)
 	} else if (resource == FLUSH_BLOCKS_WAIT) {
 		needed = (vp->v_mount->mnt_writeopcount + 2) *
 		    fs->fs_contigsumsize;
-		if (priv_check_cred(cred, PRIV_VFS_BLOCKRESERVE, 0))
+		if (priv_check_cred(cred, PRIV_VFS_BLOCKRESERVE))
 			needed += fragstoblks(fs,
 			    roundup((fs->fs_dsize * fs->fs_minfree / 100) -
 			    fs->fs_cstotal.cs_nffree, fs->fs_frag));
@@ -13954,6 +13970,8 @@ softdep_bp_to_mp(bp)
 	if (LIST_EMPTY(&bp->b_dep))
 		return (NULL);
 	vp = bp->b_vp;
+	KASSERT(vp != NULL,
+	    ("%s, buffer with dependencies lacks vnode", __func__));
 
 	/*
 	 * The ump mount point is stable after we get a correct
@@ -13963,17 +13981,33 @@ softdep_bp_to_mp(bp)
 	 * workitem might be freed while dereferenced.
 	 */
 retry:
-	if (vp->v_type == VCHR) {
+	switch (vp->v_type) {
+	case VCHR:
 		VI_LOCK(vp);
 		mp = vp->v_type == VCHR ? vp->v_rdev->si_mountpt : NULL;
 		VI_UNLOCK(vp);
 		if (mp == NULL)
 			goto retry;
-	} else if (vp->v_type == VREG || vp->v_type == VDIR ||
-	    vp->v_type == VLNK) {
+		break;
+	case VREG:
+	case VDIR:
+	case VLNK:
+	case VFIFO:
+	case VSOCK:
 		mp = vp->v_mount;
-	} else {
-		return (NULL);
+		break;
+	case VBLK:
+		vn_printf(vp, "softdep_bp_to_mp: unexpected block device\n");
+		/* FALLTHROUGH */
+	case VNON:
+	case VBAD:
+	case VMARKER:
+		mp = NULL;
+		break;
+	default:
+		vn_printf(vp, "unknown vnode type");
+		mp = NULL;
+		break;
 	}
 	return (VFSTOUFS(mp));
 }
@@ -14393,47 +14427,129 @@ softdep_error(func, error)
 
 #ifdef DDB
 
+/* exported to ffs_vfsops.c */
+extern void db_print_ffs(struct ufsmount *ump);
+void
+db_print_ffs(struct ufsmount *ump)
+{
+	db_printf("mp %p (%s) devvp %p\n", ump->um_mountp,
+	    ump->um_mountp->mnt_stat.f_mntonname, ump->um_devvp);
+	db_printf("    fs %p su_wl %d su_deps %d su_req %d\n",
+	    ump->um_fs, ump->softdep_on_worklist,
+	    ump->softdep_deps, ump->softdep_req);
+}
+
+static void
+worklist_print(struct worklist *wk, int verbose)
+{
+
+	if (!verbose) {
+		db_printf("%s: %p state 0x%b\n", TYPENAME(wk->wk_type), wk,
+		    (u_int)wk->wk_state, PRINT_SOFTDEP_FLAGS);
+		return;
+	}
+	db_printf("worklist: %p type %s state 0x%b next %p\n    ", wk,
+	    TYPENAME(wk->wk_type), (u_int)wk->wk_state, PRINT_SOFTDEP_FLAGS,
+	    LIST_NEXT(wk, wk_list));
+	db_print_ffs(VFSTOUFS(wk->wk_mp));
+}
+
 static void
 inodedep_print(struct inodedep *inodedep, int verbose)
 {
-	db_printf("%p fs %p st %x ino %jd inoblk %jd delta %jd nlink %jd"
-	    " saveino %p\n",
-	    inodedep, inodedep->id_fs, inodedep->id_state,
+
+	worklist_print(&inodedep->id_list, 0);
+	db_printf("    fs %p ino %jd inoblk %jd delta %jd nlink %jd\n",
+	    inodedep->id_fs,
 	    (intmax_t)inodedep->id_ino,
 	    (intmax_t)fsbtodb(inodedep->id_fs,
-	    ino_to_fsba(inodedep->id_fs, inodedep->id_ino)),
+	        ino_to_fsba(inodedep->id_fs, inodedep->id_ino)),
 	    (intmax_t)inodedep->id_nlinkdelta,
-	    (intmax_t)inodedep->id_savednlink,
-	    inodedep->id_savedino1);
+	    (intmax_t)inodedep->id_savednlink);
 
 	if (verbose == 0)
 		return;
 
-	db_printf("\tpendinghd %p, bufwait %p, inowait %p, inoreflst %p, "
-	    "mkdiradd %p\n",
+	db_printf("    bmsafemap %p, mkdiradd %p, inoreflst %p\n",
+	    inodedep->id_bmsafemap,
+	    inodedep->id_mkdiradd,
+	    TAILQ_FIRST(&inodedep->id_inoreflst));
+	db_printf("    dirremhd %p, pendinghd %p, bufwait %p\n",
+	    LIST_FIRST(&inodedep->id_dirremhd),
 	    LIST_FIRST(&inodedep->id_pendinghd),
-	    LIST_FIRST(&inodedep->id_bufwait),
+	    LIST_FIRST(&inodedep->id_bufwait));
+	db_printf("    inowait %p, inoupdt %p, newinoupdt %p\n",
 	    LIST_FIRST(&inodedep->id_inowait),
-	    TAILQ_FIRST(&inodedep->id_inoreflst),
-	    inodedep->id_mkdiradd);
-	db_printf("\tinoupdt %p, newinoupdt %p, extupdt %p, newextupdt %p\n",
 	    TAILQ_FIRST(&inodedep->id_inoupdt),
-	    TAILQ_FIRST(&inodedep->id_newinoupdt),
+	    TAILQ_FIRST(&inodedep->id_newinoupdt));
+	db_printf("    extupdt %p, newextupdt %p, freeblklst %p\n",
 	    TAILQ_FIRST(&inodedep->id_extupdt),
-	    TAILQ_FIRST(&inodedep->id_newextupdt));
+	    TAILQ_FIRST(&inodedep->id_newextupdt),
+	    TAILQ_FIRST(&inodedep->id_freeblklst));
+	db_printf("    saveino %p, savedsize %jd, savedextsize %jd\n",
+	    inodedep->id_savedino1,
+	    (intmax_t)inodedep->id_savedsize,
+	    (intmax_t)inodedep->id_savedextsize);
 }
 
-DB_SHOW_COMMAND(inodedep, db_show_inodedep)
+static void
+newblk_print(struct newblk *nbp)
+{
+
+	worklist_print(&nbp->nb_list, 0);
+	db_printf("    newblkno %jd\n", (intmax_t)nbp->nb_newblkno);
+	db_printf("    jnewblk %p, bmsafemap %p, freefrag %p\n",
+	    &nbp->nb_jnewblk,
+	    &nbp->nb_bmsafemap,
+	    &nbp->nb_freefrag);
+	db_printf("    indirdeps %p, newdirblk %p, jwork %p\n",
+	    LIST_FIRST(&nbp->nb_indirdeps),
+	    LIST_FIRST(&nbp->nb_newdirblk),
+	    LIST_FIRST(&nbp->nb_jwork));
+}
+
+static void
+allocdirect_print(struct allocdirect *adp)
+{
+
+	newblk_print(&adp->ad_block);
+	db_printf("    oldblkno %jd, oldsize %ld, newsize %ld\n",
+	    adp->ad_oldblkno, adp->ad_oldsize, adp->ad_newsize);
+	db_printf("    offset %d, inodedep %p\n",
+	    adp->ad_offset, adp->ad_inodedep);
+}
+
+static void
+allocindir_print(struct allocindir *aip)
+{
+
+	newblk_print(&aip->ai_block);
+	db_printf("    oldblkno %jd, lbn %jd\n",
+	    (intmax_t)aip->ai_oldblkno, (intmax_t)aip->ai_lbn);
+	db_printf("    offset %d, indirdep %p\n",
+	    aip->ai_offset, aip->ai_indirdep);
+}
+
+static void
+mkdir_print(struct mkdir *mkdir)
+{
+
+	worklist_print(&mkdir->md_list, 0);
+	db_printf("    diradd %p, jaddref %p, buf %p\n",
+		mkdir->md_diradd, mkdir->md_jaddref, mkdir->md_buf);
+}
+
+DB_SHOW_COMMAND(sd_inodedep, db_show_sd_inodedep)
 {
 
 	if (have_addr == 0) {
-		db_printf("Address required\n");
+		db_printf("inodedep address required\n");
 		return;
 	}
 	inodedep_print((struct inodedep*)addr, 1);
 }
 
-DB_SHOW_COMMAND(inodedeps, db_show_inodedeps)
+DB_SHOW_COMMAND(sd_allinodedeps, db_show_sd_allinodedeps)
 {
 	struct inodedep_hashhead *inodedephd;
 	struct inodedep *inodedep;
@@ -14441,7 +14557,7 @@ DB_SHOW_COMMAND(inodedeps, db_show_inodedeps)
 	int cnt;
 
 	if (have_addr == 0) {
-		db_printf("Address required\n");
+		db_printf("ufsmount address required\n");
 		return;
 	}
 	ump = (struct ufsmount *)addr;
@@ -14453,72 +14569,108 @@ DB_SHOW_COMMAND(inodedeps, db_show_inodedeps)
 	}
 }
 
-DB_SHOW_COMMAND(worklist, db_show_worklist)
+DB_SHOW_COMMAND(sd_worklist, db_show_sd_worklist)
 {
-	struct worklist *wk;
 
 	if (have_addr == 0) {
-		db_printf("Address required\n");
+		db_printf("worklist address required\n");
 		return;
 	}
-	wk = (struct worklist *)addr;
-	printf("worklist: %p type %s state 0x%X\n",
-	    wk, TYPENAME(wk->wk_type), wk->wk_state);
+	worklist_print((struct worklist *)addr, 1);
 }
 
-DB_SHOW_COMMAND(workhead, db_show_workhead)
+DB_SHOW_COMMAND(sd_workhead, db_show_sd_workhead)
 {
+	struct worklist *wk;
 	struct workhead *wkhd;
-	struct worklist *wk;
-	int i;
 
 	if (have_addr == 0) {
-		db_printf("Address required\n");
+		db_printf("worklist address required "
+		    "(for example value in bp->b_dep)\n");
 		return;
 	}
-	wkhd = (struct workhead *)addr;
-	wk = LIST_FIRST(wkhd);
-	for (i = 0; i < 100 && wk != NULL; i++, wk = LIST_NEXT(wk, wk_list))
-		db_printf("worklist: %p type %s state 0x%X",
-		    wk, TYPENAME(wk->wk_type), wk->wk_state);
-	if (i == 100)
-		db_printf("workhead overflow");
-	printf("\n");
+	/*
+	 * We often do not have the address of the worklist head but
+	 * instead a pointer to its first entry (e.g., we have the
+	 * contents of bp->b_dep rather than &bp->b_dep). But the back
+	 * pointer of bp->b_dep will point at the head of the list, so
+	 * we cheat and use that instead. If we are in the middle of
+	 * a list we will still get the same result, so nothing
+	 * unexpected will result.
+	 */
+	wk = (struct worklist *)addr;
+	if (wk == NULL)
+		return;
+	wkhd = (struct workhead *)wk->wk_list.le_prev;
+	LIST_FOREACH(wk, wkhd, wk_list) {
+		switch(wk->wk_type) {
+		case D_INODEDEP:
+			inodedep_print(WK_INODEDEP(wk), 0);
+			continue;
+		case D_ALLOCDIRECT:
+			allocdirect_print(WK_ALLOCDIRECT(wk));
+			continue;
+		case D_ALLOCINDIR:
+			allocindir_print(WK_ALLOCINDIR(wk));
+			continue;
+		case D_MKDIR:
+			mkdir_print(WK_MKDIR(wk));
+			continue;
+		default:
+			worklist_print(wk, 0);
+			continue;
+		}
+	}
 }
 
+DB_SHOW_COMMAND(sd_mkdir, db_show_sd_mkdir)
+{
+	if (have_addr == 0) {
+		db_printf("mkdir address required\n");
+		return;
+	}
+	mkdir_print((struct mkdir *)addr);
+}
 
-DB_SHOW_COMMAND(mkdirs, db_show_mkdirs)
+DB_SHOW_COMMAND(sd_mkdir_list, db_show_sd_mkdir_list)
 {
 	struct mkdirlist *mkdirlisthd;
-	struct jaddref *jaddref;
-	struct diradd *diradd;
 	struct mkdir *mkdir;
 
 	if (have_addr == 0) {
-		db_printf("Address required\n");
+		db_printf("mkdir listhead address required\n");
 		return;
 	}
 	mkdirlisthd = (struct mkdirlist *)addr;
 	LIST_FOREACH(mkdir, mkdirlisthd, md_mkdirs) {
-		diradd = mkdir->md_diradd;
-		db_printf("mkdir: %p state 0x%X dap %p state 0x%X",
-		    mkdir, mkdir->md_state, diradd, diradd->da_state);
-		if ((jaddref = mkdir->md_jaddref) != NULL)
-			db_printf(" jaddref %p jaddref state 0x%X",
-			    jaddref, jaddref->ja_state);
-		db_printf("\n");
+		mkdir_print(mkdir);
+		if (mkdir->md_diradd != NULL) {
+			db_printf("    ");
+			worklist_print(&mkdir->md_diradd->da_list, 0);
+		}
+		if (mkdir->md_jaddref != NULL) {
+			db_printf("    ");
+			worklist_print(&mkdir->md_jaddref->ja_list, 0);
+		}
 	}
 }
 
-/* exported to ffs_vfsops.c */
-extern void db_print_ffs(struct ufsmount *ump);
-void
-db_print_ffs(struct ufsmount *ump)
+DB_SHOW_COMMAND(sd_allocdirect, db_show_sd_allocdirect)
 {
-	db_printf("mp %p %s devvp %p fs %p su_wl %d su_deps %d su_req %d\n",
-	    ump->um_mountp, ump->um_mountp->mnt_stat.f_mntonname,
-	    ump->um_devvp, ump->um_fs, ump->softdep_on_worklist,
-	    ump->softdep_deps, ump->softdep_req);
+	if (have_addr == 0) {
+		db_printf("allocdirect address required\n");
+		return;
+	}
+	allocdirect_print((struct allocdirect *)addr);
+}
+
+DB_SHOW_COMMAND(sd_allocindir, db_show_sd_allocindir)
+{
+	if (have_addr == 0) {
+		db_printf("allocindir address required\n");
+		return;
+	}
+	allocindir_print((struct allocindir *)addr);
 }
 
 #endif /* DDB */

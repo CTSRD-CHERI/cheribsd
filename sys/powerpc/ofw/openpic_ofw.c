@@ -95,9 +95,12 @@ static driver_t openpic_ofw_driver = {
 	sizeof(struct openpic_softc),
 };
 
-DRIVER_MODULE(openpic, ofwbus, openpic_ofw_driver, openpic_devclass, 0, 0);
-DRIVER_MODULE(openpic, simplebus, openpic_ofw_driver, openpic_devclass, 0, 0);
-DRIVER_MODULE(openpic, macio, openpic_ofw_driver, openpic_devclass, 0, 0);
+EARLY_DRIVER_MODULE(openpic, ofwbus, openpic_ofw_driver, openpic_devclass,
+    0, 0, BUS_PASS_INTERRUPT);
+EARLY_DRIVER_MODULE(openpic, simplebus, openpic_ofw_driver, openpic_devclass,
+    0, 0, BUS_PASS_INTERRUPT);
+EARLY_DRIVER_MODULE(openpic, macio, openpic_ofw_driver, openpic_devclass, 0, 0,
+    BUS_PASS_INTERRUPT);
 
 static int
 openpic_ofw_probe(device_t dev)
@@ -125,14 +128,19 @@ openpic_ofw_probe(device_t dev)
 static int
 openpic_ofw_attach(device_t dev)
 {
+	struct openpic_softc *sc;
 	phandle_t xref, node;
 
 	node = ofw_bus_get_node(dev);
+	sc = device_get_softc(dev);
 
 	if (OF_getencprop(node, "phandle", &xref, sizeof(xref)) == -1 &&
 	    OF_getencprop(node, "ibm,phandle", &xref, sizeof(xref)) == -1 &&
 	    OF_getencprop(node, "linux,phandle", &xref, sizeof(xref)) == -1)
 		xref = node;
+	
+	if (ofw_bus_is_compatible(dev, "fsl,mpic"))
+		sc->sc_quirks = OPENPIC_QUIRK_SINGLE_BIND;
 
 	return (openpic_common_attach(dev, xref));
 }

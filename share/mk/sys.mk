@@ -246,7 +246,6 @@ LFLAGS		?=
 # compiler driver flags (e.g. -mabi=*) that conflict with flags to LD.
 LD		?=	ld
 LDFLAGS		?=
-LDFLAGS		+=	-Wl,--no-warn-mismatch
 _LDFLAGS	=	${LDFLAGS:S/-Wl,//g:N-mabi=*:N-fuse-ld=*}
 
 MAKE		?=	make
@@ -263,9 +262,6 @@ OBJC		?=	cc
 OBJCFLAGS	?=	${OBJCINCLUDES} ${CFLAGS} -Wno-import
 
 OBJCOPY		?=	objcopy
-
-OBJDUMP		?=	objdump
-OBJDUMP_FLAGS	?=	-r -s -p -S -d -h -l -t
 
 PC		?=	pc
 PFLAGS		?=

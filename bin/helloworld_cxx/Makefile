@@ -7,7 +7,6 @@ PROG_CXX=	helloworld_cxx
 MAN=
 NEED_CHERI=	pure
 
-WANT_DUMP=	yes
 CXXFLAGS+=	-std=c++11
 
 .if ${MK_CHERI_SHARED} == "yes"

@@ -95,6 +95,9 @@ interpos_func_t __libc_interposing[INTERPOS_MAX] = {
 #endif
 	SLOT_SYS(fdatasync)
 	SLOT_SYS(clock_nanosleep)
+#ifndef INTERPOS_SYSCALLS_ONLY
+	SLOT(distribute_static_tls, __libc_distribute_static_tls)
+#endif
 };
 #undef SLOT
 #undef SLOT_SYS

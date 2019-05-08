@@ -272,7 +272,7 @@ struct inpcb {
 			 inp_hpts_calls :1,	/* (i) from output hpts */
 			 inp_input_calls :1,	/* (i) from input hpts */
 			 inp_spare_bits2 : 4;
-	uint8_t inp_spare_byte;		/* Compiler hole */
+	uint8_t inp_numa_domain;	/* numa domain */
 	void	*inp_ppcb;		/* (i) pointer to per-protocol pcb */
 	struct	socket *inp_socket;	/* (i) back pointer to socket */
 	uint32_t 	 inp_hptsslot;	/* Hpts wheel slot this tcb is Lock(i&b) */
@@ -632,12 +632,12 @@ int	inp_so_options(const struct inpcb *inp);
 #define INP_INFO_LOCK_INIT(ipi, d) \
 	mtx_init(&(ipi)->ipi_lock, (d), NULL, MTX_DEF| MTX_RECURSE)
 #define INP_INFO_LOCK_DESTROY(ipi)  mtx_destroy(&(ipi)->ipi_lock)
-#define INP_INFO_RLOCK_ET(ipi, et)	NET_EPOCH_ENTER_ET((et))
+#define INP_INFO_RLOCK_ET(ipi, et)	NET_EPOCH_ENTER((et))
 #define INP_INFO_WLOCK(ipi) mtx_lock(&(ipi)->ipi_lock)
 #define INP_INFO_TRY_WLOCK(ipi)	mtx_trylock(&(ipi)->ipi_lock)
 #define INP_INFO_WLOCKED(ipi)	mtx_owned(&(ipi)->ipi_lock)
-#define INP_INFO_RUNLOCK_ET(ipi, et)	NET_EPOCH_EXIT_ET((et))
-#define INP_INFO_RUNLOCK_TP(ipi, tp)	NET_EPOCH_EXIT_ET(*(tp)->t_inpcb->inp_et)
+#define INP_INFO_RUNLOCK_ET(ipi, et)	NET_EPOCH_EXIT((et))
+#define INP_INFO_RUNLOCK_TP(ipi, tp)	NET_EPOCH_EXIT(*(tp)->t_inpcb->inp_et)
 #define INP_INFO_WUNLOCK(ipi)	mtx_unlock(&(ipi)->ipi_lock)
 #define	INP_INFO_LOCK_ASSERT(ipi)	MPASS(in_epoch(net_epoch_preempt) || mtx_owned(&(ipi)->ipi_lock))
 #define INP_INFO_RLOCK_ASSERT(ipi)	MPASS(in_epoch(net_epoch_preempt))
@@ -670,8 +670,8 @@ int	inp_so_options(const struct inpcb *inp);
 #define	INP_HASH_RLOCK(ipi)		struct epoch_tracker inp_hash_et; epoch_enter_preempt(net_epoch_preempt, &inp_hash_et)
 #define	INP_HASH_RLOCK_ET(ipi, et)		epoch_enter_preempt(net_epoch_preempt, &(et))
 #define	INP_HASH_WLOCK(ipi)		mtx_lock(&(ipi)->ipi_hash_lock)
-#define	INP_HASH_RUNLOCK(ipi)		NET_EPOCH_EXIT_ET(inp_hash_et)
-#define	INP_HASH_RUNLOCK_ET(ipi, et)		NET_EPOCH_EXIT_ET((et))
+#define	INP_HASH_RUNLOCK(ipi)		NET_EPOCH_EXIT(inp_hash_et)
+#define	INP_HASH_RUNLOCK_ET(ipi, et)	NET_EPOCH_EXIT((et))
 #define	INP_HASH_WUNLOCK(ipi)		mtx_unlock(&(ipi)->ipi_hash_lock)
 #define	INP_HASH_LOCK_ASSERT(ipi)	MPASS(in_epoch(net_epoch_preempt) || mtx_owned(&(ipi)->ipi_hash_lock))
 #define	INP_HASH_WLOCK_ASSERT(ipi)	mtx_assert(&(ipi)->ipi_hash_lock, MA_OWNED);
@@ -687,8 +687,6 @@ int	inp_so_options(const struct inpcb *inp);
 #define INP_PCBHASH(faddr, lport, fport, mask) \
 	(((faddr) ^ ((faddr) >> 16) ^ ntohs((lport) ^ (fport))) & (mask))
 #define INP_PCBPORTHASH(lport, mask) \
-	(ntohs((lport)) & (mask))
-#define	INP_PCBLBGROUP_PORTHASH(lport, mask) \
 	(ntohs((lport)) & (mask))
 #define	INP_PCBLBGROUP_PKTHASH(faddr, lport, fport) \
 	((faddr) ^ ((faddr) >> 16) ^ ntohs((lport) ^ (fport)))
@@ -896,10 +894,10 @@ void	in_pcboutput_eagain(struct inpcb *);
 #endif /* !_NETINET_IN_PCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "header",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

@@ -19,6 +19,7 @@ mips/mips/elf_machdep.c			standard
 mips/mips/exception.S			optional	!cheri_kernel
 mips/mips/fp.S				standard
 mips/mips/freebsd32_machdep.c		optional	compat_freebsd32
+mips/mips/freebsd64_machdep.c		optional	compat_freebsd64
 mips/mips/gdb_machdep.c			standard
 mips/mips/in_cksum.c			optional	inet
 mips/mips/libkern_machdep.c		standard
@@ -82,8 +83,6 @@ dev/cfe/cfe_env.c			optional	cfe_env
 # syscons support
 dev/fb/fb.c				optional	sc
 dev/syscons/scgfbrndr.c			optional	sc
-dev/syscons/scterm-teken.c		optional	sc
-dev/syscons/scvtb.c			optional	sc
 mips/mips/sc_machdep.c			optional	sc
 
 # FDT support

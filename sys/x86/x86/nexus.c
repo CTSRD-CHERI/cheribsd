@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rman.h>
 #include <sys/interrupt.h>
 
+#include <machine/md_var.h>
 #include <machine/vmparam.h>
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -124,6 +125,8 @@ static	int nexus_setup_intr(device_t, device_t, struct resource *, int flags,
 			      void **);
 static	int nexus_teardown_intr(device_t, device_t, struct resource *,
 				void *);
+static	int nexus_suspend_intr(device_t, device_t, struct resource *);
+static	int nexus_resume_intr(device_t, device_t, struct resource *);
 static struct resource_list *nexus_get_reslist(device_t dev, device_t child);
 static	int nexus_set_resource(device_t, device_t, int, int,
 			       rman_res_t, rman_res_t);
@@ -161,6 +164,8 @@ static device_method_t nexus_methods[] = {
 	DEVMETHOD(bus_unmap_resource,	nexus_unmap_resource),
 	DEVMETHOD(bus_setup_intr,	nexus_setup_intr),
 	DEVMETHOD(bus_teardown_intr,	nexus_teardown_intr),
+	DEVMETHOD(bus_suspend_intr,	nexus_suspend_intr),
+	DEVMETHOD(bus_resume_intr,	nexus_resume_intr),
 #ifdef SMP
 	DEVMETHOD(bus_bind_intr,	nexus_bind_intr),
 #endif
@@ -265,11 +270,7 @@ nexus_init_resources(void)
 		panic("nexus_init_resources port_rman");
 
 	mem_rman.rm_start = 0;
-#ifndef PAE
-	mem_rman.rm_end = BUS_SPACE_MAXADDR;
-#else
-	mem_rman.rm_end = ((1ULL << cpu_maxphyaddr) - 1);
-#endif
+	mem_rman.rm_end = cpu_getmaxphyaddr();
 	mem_rman.rm_type = RMAN_ARRAY;
 	mem_rman.rm_descr = "I/O memory addresses";
 	if (rman_init(&mem_rman)
@@ -595,6 +596,8 @@ nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 
 	error = intr_add_handler(device_get_nameunit(child),
 	    rman_get_start(irq), filter, ihand, arg, flags, cookiep, domain);
+	if (error == 0)
+		rman_set_irq_cookie(irq, *cookiep);
 
 	return (error);
 }
@@ -602,7 +605,24 @@ nexus_setup_intr(device_t bus, device_t child, struct resource *irq,
 static int
 nexus_teardown_intr(device_t dev, device_t child, struct resource *r, void *ih)
 {
-	return (intr_remove_handler(ih));
+	int error;
+
+	error = intr_remove_handler(ih);
+	if (error == 0)
+		rman_set_irq_cookie(r, NULL);
+	return (error);
+}
+
+static int
+nexus_suspend_intr(device_t dev, device_t child, struct resource *irq)
+{
+	return (intr_event_suspend_handler(rman_get_irq_cookie(irq)));
+}
+
+static int
+nexus_resume_intr(device_t dev, device_t child, struct resource *irq)
+{
+	return (intr_event_resume_handler(rman_get_irq_cookie(irq)));
 }
 
 #ifdef SMP
@@ -764,6 +784,7 @@ ram_attach(device_t dev)
 {
 	struct bios_smap *smapbase, *smap, *smapend;
 	struct resource *res;
+	rman_res_t length;
 	vm_paddr_t *p;
 	caddr_t kmdp;
 	uint32_t smapsize;
@@ -784,16 +805,12 @@ ram_attach(device_t dev)
 			if (smap->type != SMAP_TYPE_MEMORY ||
 			    smap->length == 0)
 				continue;
-#ifdef __i386__
-			/*
-			 * Resources use long's to track resources, so
-			 * we can't include memory regions above 4GB.
-			 */
-			if (smap->base > ~0ul)
+			if (smap->base > mem_rman.rm_end)
 				continue;
-#endif
+			length = smap->base + smap->length > mem_rman.rm_end ?
+			    mem_rman.rm_end - smap->base : smap->length;
 			error = bus_set_resource(dev, SYS_RES_MEMORY, rid,
-			    smap->base, smap->length);
+			    smap->base, length);
 			if (error)
 				panic(
 				    "ram_attach: resource %d failed set with %d",
@@ -818,16 +835,12 @@ ram_attach(device_t dev)
 	 * segment is 0.
 	 */
 	for (rid = 0, p = dump_avail; p[1] != 0; rid++, p += 2) {
-#ifdef PAE
-		/*
-		 * Resources use long's to track resources, so we can't
-		 * include memory regions above 4GB.
-		 */
-		if (p[0] > ~0ul)
+		if (p[0] > mem_rman.rm_end)
 			break;
-#endif
+		length = (p[1] > mem_rman.rm_end ? mem_rman.rm_end : p[1]) -
+		    p[0];
 		error = bus_set_resource(dev, SYS_RES_MEMORY, rid, p[0],
-		    p[1] - p[0]);
+		    length);
 		if (error)
 			panic("ram_attach: resource %d failed set with %d", rid,
 			    error);

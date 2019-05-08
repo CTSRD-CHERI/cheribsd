@@ -242,12 +242,14 @@ main(int argc, char *argv[])
 			if (*(argv + 1) == NULL) {
 #ifdef HAVE_CAPSICUM
 				cap_rights_init(&rights, CAP_READ);
-				if ((cap_rights_limit(fd, &rights) < 0 &&
-				    errno != ENOSYS) || caph_enter() < 0)
+				if (caph_rights_limit(fd, &rights) < 0 ||
+				    caph_enter() < 0)
 					err(1, "capsicum");
 #endif
 			}
-			if ((p = Algorithm[digest].Fd(fd, buf)) == NULL) {
+			p = Algorithm[digest].Fd(fd, buf);
+			(void)close(fd);
+			if (p == NULL) {
 				warn("%s", *argv);
 				failed++;
 			} else {

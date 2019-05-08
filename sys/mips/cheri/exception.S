@@ -795,6 +795,10 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	and	a1, a1, ~MIPS_SR_INT_MASK
 	or	a1, a1, a0
 	SAVE_U_PCB_REG(a1, SR, CHERI_REG_KR1C)
+	/*
+	 * Note: This does not restore EPCC, since that is restored by
+	 * RESTORE_U_PCB_PC() (inside RESTORE_REGS_FROM_PCB) below.
+	 */
 	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, t0)
 	/* This also sets k0 from PCB */
 	RESTORE_REGS_FROM_PCB(CHERI_REG_KR1C)
@@ -1019,7 +1023,7 @@ END(MipsKernIntr)
 	RESTORE_U_PCB_REG(t2, PC, pcb);			\
 	mtlo	t0;					\
 	mthi	t1;					\
-	MTC0	t2, MIPS_COP_0_EXC_PC /* set return address */;	\
+	RESTORE_U_PCB_PC(t2, t0, pcb)/* set return address */;	\
 	RESTORE_U_PCB_REG(v0, V0, pcb);			\
 	RESTORE_U_PCB_REG(v1, V1, pcb);			\
 	RESTORE_U_PCB_REG(a0, A0, pcb);			\
@@ -1121,6 +1125,10 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 
 	SAVE_U_PCB_REG(a1, SR, CHERI_REG_KR1C)
 
+	/*
+	 * Note: This does not restore EPCC, since that is restored by
+	 * RESTORE_U_PCB_PC() below.
+	 */
 	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, t0)
 	RESTORE_UINTR_PCB_REGS(CHERI_REG_KR1C)
 

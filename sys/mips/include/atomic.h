@@ -901,10 +901,10 @@ ATOMIC_STORE_LOAD(64)
  * two values are equal, update the value of *p with newval. Returns
  * zero if the compare failed, nonzero otherwise.
  */
-static __inline uint32_t
+static __inline int
 atomic_cmpset_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
 {
-	uint32_t ret;
+	int ret;
 
 #ifndef __CHERI_PURE_CAPABILITY__
 	__asm __volatile (
@@ -948,7 +948,7 @@ atomic_cmpset_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
  * two values are equal, update the value of *p with newval. Returns
  * zero if the compare failed, nonzero otherwise.
  */
-static __inline uint32_t
+static __inline int
 atomic_cmpset_acq_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
 {
 	int retval;
@@ -958,17 +958,17 @@ atomic_cmpset_acq_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
 	return (retval);
 }
 
-static __inline uint32_t
+static __inline int
 atomic_cmpset_rel_32(__volatile uint32_t *p, uint32_t cmpval, uint32_t newval)
 {
 	mips_sync();
 	return (atomic_cmpset_32(p, cmpval, newval));
 }
 
-static __inline uint32_t
+static __inline int
 atomic_fcmpset_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
 {
-	uint32_t ret;
+	int ret;
 
 #ifndef __CHERI_PURE_CAPABILITY__
 	__asm __volatile (
@@ -1011,7 +1011,7 @@ atomic_fcmpset_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
 	return ret;
 }
 
-static __inline uint32_t
+static __inline int
 atomic_fcmpset_acq_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
 {
 	int retval;
@@ -1021,7 +1021,7 @@ atomic_fcmpset_acq_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
 	return (retval);
 }
 
-static __inline uint32_t
+static __inline int
 atomic_fcmpset_rel_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
 {
 	mips_sync();
@@ -1067,10 +1067,10 @@ atomic_fetchadd_32(__volatile uint32_t *p, uint32_t v)
  * two values are equal, update the value of *p with newval. Returns
  * zero if the compare failed, nonzero otherwise.
  */
-static __inline uint64_t
+static __inline int
 atomic_cmpset_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
 {
-	uint64_t ret;
+	int ret;
 
 #ifndef __CHERI_PURE_CAPABILITY__
 	__asm __volatile (
@@ -1115,7 +1115,7 @@ atomic_cmpset_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
  * two values are equal, update the value of *p with newval. Returns
  * zero if the compare failed, nonzero otherwise.
  */
-static __inline uint64_t
+static __inline int
 atomic_cmpset_acq_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
 {
 	int retval;
@@ -1125,17 +1125,17 @@ atomic_cmpset_acq_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
 	return (retval);
 }
 
-static __inline uint64_t
+static __inline int
 atomic_cmpset_rel_64(__volatile uint64_t *p, uint64_t cmpval, uint64_t newval)
 {
 	mips_sync();
 	return (atomic_cmpset_64(p, cmpval, newval));
 }
 
-static __inline uint32_t
+static __inline int
 atomic_fcmpset_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
 {
-        uint32_t ret;
+        int ret;
 
 #ifndef __CHERI_PURE_CAPABILITY__
         __asm __volatile (
@@ -1178,7 +1178,7 @@ atomic_fcmpset_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
 	return ret;
 }
 
-static __inline uint64_t
+static __inline int
 atomic_fcmpset_acq_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
 {
 	int retval;
@@ -1188,7 +1188,7 @@ atomic_fcmpset_acq_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
 	return (retval);
 }
 
-static __inline uint64_t
+static __inline int
 atomic_fcmpset_rel_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
 {
 	mips_sync();
@@ -1668,6 +1668,73 @@ atomic_thread_fence_seq_cst(void)
 #define	atomic_store_rel_ptr	atomic_store_rel_cap
 #define	atomic_readandclear_ptr	atomic_readandclear_cap
 #endif /* CHERI_KERNEL */
+
+static __inline unsigned int
+atomic_swap_int(volatile unsigned int *ptr, const unsigned int value)
+{
+	unsigned int retval;
+
+	retval = *ptr;
+
+	while (!atomic_fcmpset_int(ptr, &retval, value))
+		;
+	return (retval);
+}
+
+static __inline uint32_t
+atomic_swap_32(volatile uint32_t *ptr, const uint32_t value)
+{
+	uint32_t retval;
+
+	retval = *ptr;
+
+	while (!atomic_fcmpset_32(ptr, &retval, value))
+		;
+	return (retval);
+}
+
+#if defined(__mips_n64) || defined(__mips_n32)
+static __inline uint64_t
+atomic_swap_64(volatile uint64_t *ptr, const uint64_t value)
+{
+	uint64_t retval;
+
+	retval = *ptr;
+
+	while (!atomic_fcmpset_64(ptr, &retval, value))
+		;
+	return (retval);
+}
+#endif
+
+#ifdef __mips_n64
+static __inline unsigned long
+atomic_swap_long(volatile unsigned long *ptr, const unsigned long value)
+{
+	unsigned long retval;
+
+	retval = *ptr;
+
+	while (!atomic_fcmpset_64((volatile uint64_t *)ptr,
+	    (uint64_t *)&retval, value))
+		;
+	return (retval);
+}
+#else
+static __inline unsigned long
+atomic_swap_long(volatile unsigned long *ptr, const unsigned long value)
+{
+	unsigned long retval;
+
+	retval = *ptr;
+
+	while (!atomic_fcmpset_32((volatile uint32_t *)ptr,
+	    (uint32_t *)&retval, value))
+		;
+	return (retval);
+}
+#endif
+#define	atomic_swap_ptr(ptr, value) atomic_swap_long((unsigned long *)(ptr), value)
 
 #endif /* ! _MACHINE_ATOMIC_H_ */
 // CHERI CHANGES START

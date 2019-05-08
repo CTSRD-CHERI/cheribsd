@@ -203,6 +203,7 @@ dev/acpica/acpi_pci_link.c	optional acpi pci
 dev/acpica/acpi_pcib.c		optional acpi pci
 dev/acpica/acpi_pcib_acpi.c	optional acpi pci
 dev/acpica/acpi_pcib_pci.c	optional acpi pci
+dev/acpica/acpi_pxm.c		optional	acpi
 dev/acpica/acpi_timer.c		optional	acpi
 dev/acpi_support/acpi_wmi_if.m	standard
 dev/agp/agp_amd64.c		optional	agp
@@ -413,6 +414,7 @@ dev/qlnx/qlnxe/qlnx_os.c	optional	qlnxe pci \
 	compile-with "${LINUXKPI_C}"
 dev/sfxge/common/ef10_ev.c	optional	sfxge pci
 dev/sfxge/common/ef10_filter.c	optional	sfxge pci
+dev/sfxge/common/ef10_image.c	optional	sfxge pci
 dev/sfxge/common/ef10_intr.c	optional	sfxge pci
 dev/sfxge/common/ef10_mac.c	optional	sfxge pci
 dev/sfxge/common/ef10_mcdi.c	optional	sfxge pci
@@ -438,11 +440,13 @@ dev/sfxge/common/efx_phy.c	optional	sfxge pci
 dev/sfxge/common/efx_port.c	optional	sfxge pci
 dev/sfxge/common/efx_rx.c	optional	sfxge pci
 dev/sfxge/common/efx_sram.c	optional	sfxge pci
+dev/sfxge/common/efx_tunnel.c	optional	sfxge pci
 dev/sfxge/common/efx_tx.c	optional	sfxge pci
 dev/sfxge/common/efx_vpd.c	optional	sfxge pci
 dev/sfxge/common/hunt_nic.c	optional	sfxge pci
 dev/sfxge/common/mcdi_mon.c	optional	sfxge pci
 dev/sfxge/common/medford_nic.c	optional	sfxge pci
+dev/sfxge/common/medford2_nic.c	optional	sfxge pci
 dev/sfxge/common/siena_mac.c	optional	sfxge pci
 dev/sfxge/common/siena_mcdi.c	optional	sfxge pci
 dev/sfxge/common/siena_nic.c	optional	sfxge pci
@@ -482,11 +486,12 @@ dev/smartpqi/smartpqi_sis.c     optional 	smartpqi
 dev/smartpqi/smartpqi_tag.c     optional 	smartpqi
 dev/speaker/spkr.c		optional	speaker
 dev/syscons/apm/apm_saver.c	optional	apm_saver apm
-dev/syscons/scterm-teken.c	optional	sc
 dev/syscons/scvesactl.c		optional	sc vga vesa
 dev/syscons/scvgarndr.c		optional	sc vga
-dev/syscons/scvtb.c		optional	sc
 dev/tpm/tpm.c			optional	tpm
+dev/tpm/tpm20.c		optional	tpm
+dev/tpm/tpm_crb.c		optional	tpm acpi
+dev/tpm/tpm_tis.c		optional	tpm acpi
 dev/tpm/tpm_acpi.c		optional	tpm acpi
 dev/tpm/tpm_isa.c		optional	tpm isa
 dev/uart/uart_cpu_x86.c		optional	uart
@@ -721,6 +726,7 @@ x86/isa/isa_dma.c		standard
 x86/isa/nmi.c			standard
 x86/isa/orm.c			optional	isa
 x86/pci/pci_bus.c		optional	pci
+x86/pci/pci_early_quirks.c	optional	pci
 x86/pci/qpi.c			optional	pci
 x86/x86/autoconf.c		standard
 x86/x86/bus_machdep.c		standard

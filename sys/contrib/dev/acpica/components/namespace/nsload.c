@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -173,7 +173,6 @@ AcpiNsDeleteSubtree (
 #endif
 
 
-#ifndef ACPI_NO_METHOD_EXECUTION
 /*******************************************************************************
  *
  * FUNCTION:    AcpiNsLoadTable
@@ -234,7 +233,7 @@ AcpiNsLoadTable (
         /*
          * On error, delete any namespace objects created by this table.
          * We cannot initialize these objects, so delete them. There are
-         * a couple of expecially bad cases:
+         * a couple of especially bad cases:
          * AE_ALREADY_EXISTS - namespace collision.
          * AE_NOT_FOUND - the target of a Scope operator does not
          * exist. This target of Scope must already exist in the
@@ -476,5 +475,4 @@ AcpiNsUnloadNamespace (
     Status = AcpiNsDeleteSubtree (Handle);
     return_ACPI_STATUS (Status);
 }
-#endif
 #endif

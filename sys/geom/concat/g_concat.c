@@ -206,6 +206,23 @@ fail:
 }
 
 static void
+g_concat_candelete(struct bio *bp)
+{
+	struct g_concat_softc *sc;
+	struct g_concat_disk *disk;
+	int i, val;
+
+	sc = bp->bio_to->geom->softc;
+	for (i = 0; i < sc->sc_ndisks; i++) {
+		disk = &sc->sc_disks[i];
+		if (!disk->d_removed && disk->d_candelete)
+			break;
+	}
+	val = i < sc->sc_ndisks;
+	g_handleattr(bp, "GEOM::candelete", &val, sizeof(val));
+}
+
+static void
 g_concat_kernel_dump(struct bio *bp)
 {
 	struct g_concat_softc *sc;
@@ -221,8 +238,10 @@ g_concat_kernel_dump(struct bio *bp)
 		    sc->sc_disks[i].d_end > gkd->offset)
 			break;
 	}
-	if (i == sc->sc_ndisks)
+	if (i == sc->sc_ndisks) {
 		g_io_deliver(bp, EOPNOTSUPP);
+		return;
+	}
 	disk = &sc->sc_disks[i];
 	gkd->offset -= disk->d_start;
 	if (gkd->length > disk->d_end - disk->d_start - gkd->offset)
@@ -327,6 +346,9 @@ g_concat_start(struct bio *bp)
 		if (strcmp("GEOM::kerneldump", bp->bio_attribute) == 0) {
 			g_concat_kernel_dump(bp);
 			return;
+		} else if (strcmp("GEOM::candelete", bp->bio_attribute) == 0) {
+			g_concat_candelete(bp);
+			return;
 		}
 		/* To which provider it should be delivered? */
 		/* FALLTHROUGH */
@@ -408,6 +430,7 @@ g_concat_check_and_run(struct g_concat_softc *sc)
 	struct g_provider *dp, *pp;
 	u_int no, sectorsize = 0;
 	off_t start;
+	int error;
 
 	g_topology_assert();
 	if (g_concat_nvalid(sc) != sc->sc_ndisks)
@@ -425,6 +448,16 @@ g_concat_check_and_run(struct g_concat_softc *sc)
 		if (sc->sc_type == G_CONCAT_TYPE_AUTOMATIC)
 			disk->d_end -= dp->sectorsize;
 		start = disk->d_end;
+		error = g_access(disk->d_consumer, 1, 0, 0);
+		if (error == 0) {
+			error = g_getattr("GEOM::candelete", disk->d_consumer,
+			    &disk->d_candelete);
+			if (error != 0)
+				disk->d_candelete = 0;
+			(void)g_access(disk->d_consumer, -1, 0, 0);
+		} else
+			G_CONCAT_DEBUG(1, "Failed to access disk %s, error %d.",
+			    dp->name, error);
 		if (no == 0)
 			sectorsize = dp->sectorsize;
 		else

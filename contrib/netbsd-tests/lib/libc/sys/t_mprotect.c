@@ -31,25 +31,13 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "test",
  *   "changes": [
+ *     "calling_convention",
  *     "other"
  *   ],
- *   "change_comment": "EPROT",
- *   "hybrid_specific": false
- * }
- * CHERI CHANGES END
- */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180719,
- *   "target_type": "test",
- *   "changes": [
- *     "function_abi"
- *   ],
- *   "change_comment": "Missing mode to open with O_CREAT"
+ *   "change_comment": "EPROT, Missing mode to open with O_CREAT"
  * }
  * CHERI CHANGES END
  */

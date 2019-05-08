@@ -111,8 +111,9 @@ linux_execve(struct thread *td, struct linux_execve_args *args)
 		printf(ARGS(execve, "%s"), newpath);
 #endif
 
-	error = exec_copyin_args(&eargs, newpath, UIO_SYSSPACE,
-	    args->argp, args->envp);
+	error = exec_copyin_args(&eargs,
+	    (__cheri_tocap char * __capability)newpath, UIO_SYSSPACE,
+	    __USER_CAP_UNBOUND(args->argp), __USER_CAP_UNBOUND(args->envp));
 	free(newpath, M_TEMP);
 	if (error == 0)
 		error = linux_common_execve(td, &eargs);
@@ -133,7 +134,7 @@ linux_ipc(struct thread *td, struct linux_ipc_args *args)
 		struct linux_semop_args a;
 
 		a.semid = args->arg1;
-		a.tsops = args->ptr;
+		a.tsops = PTRIN(args->ptr);
 		a.nsops = args->arg2;
 		return (linux_semop(td, &a));
 	}
@@ -152,7 +153,7 @@ linux_ipc(struct thread *td, struct linux_ipc_args *args)
 		a.semid = args->arg1;
 		a.semnum = args->arg2;
 		a.cmd = args->arg3;
-		error = copyin(args->ptr, &a.arg, sizeof(a.arg));
+		error = copyin(PTRIN(args->ptr), &a.arg, sizeof(a.arg));
 		if (error)
 			return (error);
 		return (linux_semctl(td, &a));
@@ -161,7 +162,7 @@ linux_ipc(struct thread *td, struct linux_ipc_args *args)
 		struct linux_msgsnd_args a;
 
 		a.msqid = args->arg1;
-		a.msgp = args->ptr;
+		a.msgp = PTRIN(args->ptr);
 		a.msgsz = args->arg2;
 		a.msgflg = args->arg3;
 		return (linux_msgsnd(td, &a));
@@ -176,15 +177,15 @@ linux_ipc(struct thread *td, struct linux_ipc_args *args)
 			struct l_ipc_kludge tmp;
 			int error;
 
-			if (args->ptr == NULL)
+			if (args->ptr == 0)
 				return (EINVAL);
-			error = copyin(args->ptr, &tmp, sizeof(tmp));
+			error = copyin(PTRIN(args->ptr), &tmp, sizeof(tmp));
 			if (error)
 				return (error);
-			a.msgp = tmp.msgp;
+			a.msgp = PTRIN(tmp.msgp);
 			a.msgtyp = tmp.msgtyp;
 		} else {
-			a.msgp = args->ptr;
+			a.msgp = PTRIN(args->ptr);
 			a.msgtyp = args->arg5;
 		}
 		return (linux_msgrcv(td, &a));
@@ -201,22 +202,29 @@ linux_ipc(struct thread *td, struct linux_ipc_args *args)
 
 		a.msqid = args->arg1;
 		a.cmd = args->arg2;
-		a.buf = args->ptr;
+		a.buf = PTRIN(args->ptr);
 		return (linux_msgctl(td, &a));
 	}
 	case LINUX_SHMAT: {
 		struct linux_shmat_args a;
+		l_uintptr_t addr;
+		int error;
 
 		a.shmid = args->arg1;
-		a.shmaddr = args->ptr;
+		a.shmaddr = PTRIN(args->ptr);
 		a.shmflg = args->arg2;
-		a.raddr = (l_ulong *)args->arg3;
-		return (linux_shmat(td, &a));
+		error = linux_shmat(td, &a);
+		if (error != 0)
+			return (error);
+		addr = td->td_retval[0];
+		error = copyout(&addr, PTRIN(args->arg3), sizeof(addr));
+		td->td_retval[0] = 0;
+		return (error);
 	}
 	case LINUX_SHMDT: {
 		struct linux_shmdt_args a;
 
-		a.shmaddr = args->ptr;
+		a.shmaddr = PTRIN(args->ptr);
 		return (linux_shmdt(td, &a));
 	}
 	case LINUX_SHMGET: {
@@ -232,7 +240,7 @@ linux_ipc(struct thread *td, struct linux_ipc_args *args)
 
 		a.shmid = args->arg1;
 		a.cmd = args->arg2;
-		a.buf = args->ptr;
+		a.buf = PTRIN(args->ptr);
 		return (linux_shmctl(td, &a));
 	}
 	default:

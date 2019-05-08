@@ -113,7 +113,7 @@ __start:
  *  - Create temp entry in the second AS (make sure it's not TLB[1])
  *  - Switch to temp mapping
  *  - Map 64MB of RAM in TLB1[1]
- *  - Use AS=1, set EPN to KERNBASE and RPN to kernel load address
+ *  - Use AS=0, set EPN to VM_MIN_KERNEL_ADDRESS and RPN to kernel load address
  *  - Switch to TLB1[1] mapping
  *  - Invalidate temp mapping
  *
@@ -238,7 +238,7 @@ __start:
 	mtspr	SPR_MAS1, %r3		/* note TS was not filled, so it's TS=0 */
 	isync
 
-	LOAD_ADDR(%r3, KERNBASE)
+	LOAD_ADDR(%r3, VM_MIN_KERNEL_ADDRESS)
 	ori	%r3, %r3, (_TLB_ENTRY_SHARED | MAS2_M)@l /* WIMGE = 0b00100 */
 	mtspr	SPR_MAS2, %r3
 	isync
@@ -252,6 +252,7 @@ __start:
 	isync
 	bl	zero_mas7
 	bl	zero_mas8
+	isync
 	tlbwe
 	isync
 	msync
@@ -302,7 +303,8 @@ done_mapping:
 	subf    %r31,%r31,%r2	/* Subtract from real TOC base to get base */
 
 	/* Set up the stack pointer */
-	ld	%r1,TOC_REF(tmpstack)(%r2)
+	addis	%r1,%r2,TOC_REF(tmpstack)@ha
+	ld	%r1,TOC_REF(tmpstack)@l(%r1)
 	addi	%r1,%r1,TMPSTACKSZ-96
 	add	%r1,%r1,%r31
 	bl	1f
@@ -471,7 +473,7 @@ bp_kernload:
 	mtspr	SPR_MAS1, %r3		/* note TS was not filled, so it's TS=0 */
 	isync
 
-	LOAD_ADDR(%r3, KERNBASE)
+	LOAD_ADDR(%r3, VM_MIN_KERNEL_ADDRESS)
 	ori	%r3, %r3, (_TLB_ENTRY_SHARED | MAS2_M)@l /* WIMGE = 0b00100 */
 	mtspr	SPR_MAS2, %r3
 	isync
@@ -505,6 +507,7 @@ bp_kernload:
 	isync
 	bl	zero_mas7
 	bl	zero_mas8
+	isync
 	tlbwe
 	isync
 	msync
@@ -526,8 +529,8 @@ bp_kernload:
 7:
 
 /*
- * At this point we're running at virtual addresses KERNBASE and beyond so
- * it's allowed to directly access all locations the kernel was linked
+ * At this point we're running at virtual addresses VM_MIN_KERNEL_ADDRESS and
+ * beyond so it's allowed to directly access all locations the kernel was linked
  * against.
  */
 
@@ -549,14 +552,10 @@ bp_kernload:
 	add	%r2,%r1,%r2
 	mtspr	SPR_SPRG8, %r2
 
-	/* Get load offset */
-	ld	%r31,-0x8000(%r2) /* First TOC entry is TOC base */
-	subf    %r31,%r31,%r2	/* Subtract from real TOC base to get base */
-
 	/* Set up the stack pointer */
-	ld	%r1,TOC_REF(tmpstack)(%r2)
+	addis	%r1,%r2,TOC_REF(tmpstack)@ha
+	ld	%r1,TOC_REF(tmpstack)@l(%r1)
 	addi	%r1,%r1,TMPSTACKSZ-96
-	add	%r1,%r1,%r31
 #else
 /*
  * Setup a temporary stack
@@ -700,6 +699,7 @@ tlb1_temp_mapping_as1:
 	bl	zero_mas7
 	bl	zero_mas8
 	mtlr	%r3
+	isync
 	tlbwe
 	isync
 	msync
@@ -747,7 +747,6 @@ zero_mas7:
 
 	li	%r20, 0
 	mtspr	SPR_MAS7, %r20
-	isync
 1:
 	blr
 
@@ -764,7 +763,6 @@ zero_mas8:
 1:
 	li	%r20, 0
 	mtspr	SPR_MAS8, %r20
-	isync
 	blr
 #endif
 

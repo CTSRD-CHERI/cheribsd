@@ -28,6 +28,7 @@
  * help. */
 #define __LIBARCHIVE_BUILD
 #include <archive_crc32.h>
+#include <archive_endian.h>
 
 #define PROLOGUE(reffile) \
     struct archive_entry *ae; \
@@ -81,7 +82,7 @@ int verify_data(const uint8_t* data_ptr, int magic, int size) {
         /* *lptr is a value inside unpacked test file, val is the
          * value that should be in the unpacked test file. */
 
-        if(*lptr != val)
+        if(archive_le32dec(lptr) != (uint32_t) val)
             return 0;
     }
 
@@ -90,32 +91,32 @@ int verify_data(const uint8_t* data_ptr, int magic, int size) {
 
 static
 int extract_one(struct archive* a, struct archive_entry* ae, uint32_t crc) {
-    la_ssize_t fsize, read;
+    la_ssize_t fsize, bytes_read;
     uint8_t* buf;
     int ret = 1;
     uint32_t computed_crc;
 
-    fsize = archive_entry_size(ae);
+    fsize = (la_ssize_t) archive_entry_size(ae);
     buf = malloc(fsize);
     if(buf == NULL)
         return 1;
 
-    read = archive_read_data(a, buf, fsize);
-    if(read != fsize) {
-        assertEqualInt(read, fsize);
+    bytes_read = archive_read_data(a, buf, fsize);
+    if(bytes_read != fsize) {
+        assertEqualInt(bytes_read, fsize);
         goto fn_exit;
     }
 
     computed_crc = crc32(0, buf, fsize);
     assertEqualInt(computed_crc, crc);
     ret = 0;
-    
+
 fn_exit:
     free(buf);
     return ret;
 }
 
-DEFINE_TEST(test_read_format_rar5_stored) 
+DEFINE_TEST(test_read_format_rar5_stored)
 {
     const char helloworld_txt[] = "hello libarchive test suite!\n";
     la_ssize_t file_size = sizeof(helloworld_txt) - 1;
@@ -142,7 +143,7 @@ DEFINE_TEST(test_read_format_rar5_stored)
 DEFINE_TEST(test_read_format_rar5_compressed)
 {
     const int DATA_SIZE = 1200;
-    uint8_t buff[DATA_SIZE];
+    uint8_t buff[1200];
 
     PROLOGUE("test_read_format_rar5_compressed.rar");
 
@@ -160,7 +161,7 @@ DEFINE_TEST(test_read_format_rar5_compressed)
 DEFINE_TEST(test_read_format_rar5_multiple_files)
 {
     const int DATA_SIZE = 4096;
-    uint8_t buff[DATA_SIZE];
+    uint8_t buff[4096];
 
     PROLOGUE("test_read_format_rar5_multiple_files.rar");
 
@@ -172,7 +173,7 @@ DEFINE_TEST(test_read_format_rar5_multiple_files)
     assertEqualInt(DATA_SIZE, archive_entry_size(ae));
     assertA(DATA_SIZE == archive_read_data(a, buff, DATA_SIZE));
     assertA(verify_data(buff, 1, DATA_SIZE));
-    
+
     assertA(0 == archive_read_next_header(a, &ae));
     assertEqualString("test2.bin", archive_entry_pathname(ae));
     assertEqualInt(DATA_SIZE, archive_entry_size(ae));
@@ -206,7 +207,7 @@ DEFINE_TEST(test_read_format_rar5_multiple_files)
 DEFINE_TEST(test_read_format_rar5_multiple_files_solid)
 {
     const int DATA_SIZE = 4096;
-    uint8_t buff[DATA_SIZE];
+    uint8_t buff[4096];
 
     PROLOGUE("test_read_format_rar5_multiple_files_solid.rar");
 
@@ -215,7 +216,7 @@ DEFINE_TEST(test_read_format_rar5_multiple_files_solid)
     assertEqualInt(DATA_SIZE, archive_entry_size(ae));
     assertA(DATA_SIZE == archive_read_data(a, buff, DATA_SIZE));
     assertA(verify_data(buff, 1, DATA_SIZE));
-    
+
     assertA(0 == archive_read_next_header(a, &ae));
     assertEqualString("test2.bin", archive_entry_pathname(ae));
     assertEqualInt(DATA_SIZE, archive_entry_size(ae));
@@ -308,7 +309,7 @@ DEFINE_TEST(test_read_format_rar5_multiarchive_skip_all_but_second)
 DEFINE_TEST(test_read_format_rar5_blake2)
 {
     const la_ssize_t proper_size = 814;
-    uint8_t buf[proper_size];
+    uint8_t buf[814];
 
     PROLOGUE("test_read_format_rar5_blake2.rar");
     assertA(0 == archive_read_next_header(a, &ae));
@@ -333,7 +334,7 @@ DEFINE_TEST(test_read_format_rar5_arm_filter)
      * test. */
 
     const la_ssize_t proper_size = 90808;
-    uint8_t buf[proper_size];
+    uint8_t buf[90808];
 
     PROLOGUE("test_read_format_rar5_arm.rar");
     assertA(0 == archive_read_next_header(a, &ae));
@@ -597,7 +598,7 @@ DEFINE_TEST(test_read_format_rar5_multiarchive_solid_skip_all_but_last)
     EPILOGUE();
 }
 
-DEFINE_TEST(test_read_format_rar5_solid_skip_all) 
+DEFINE_TEST(test_read_format_rar5_solid_skip_all)
 {
     const char* reffile = "test_read_format_rar5_solid.rar";
 
@@ -622,7 +623,7 @@ DEFINE_TEST(test_read_format_rar5_solid_skip_all)
     EPILOGUE();
 }
 
-DEFINE_TEST(test_read_format_rar5_solid_skip_all_but_first) 
+DEFINE_TEST(test_read_format_rar5_solid_skip_all_but_first)
 {
     const char* reffile = "test_read_format_rar5_solid.rar";
 
@@ -648,7 +649,7 @@ DEFINE_TEST(test_read_format_rar5_solid_skip_all_but_first)
     EPILOGUE();
 }
 
-DEFINE_TEST(test_read_format_rar5_solid_skip_all_but_second) 
+DEFINE_TEST(test_read_format_rar5_solid_skip_all_but_second)
 {
     const char* reffile = "test_read_format_rar5_solid.rar";
 
@@ -724,5 +725,46 @@ DEFINE_TEST(test_read_format_rar5_extract_win32)
     assertA(0 == archive_read_next_header(a, &ae));
     assertEqualString("test6.bin", archive_entry_pathname(ae));
     assertA(0 == extract_one(a, ae, 0x36A448FF));
+    EPILOGUE();
+}
+
+DEFINE_TEST(test_read_format_rar5_block_by_block)
+{
+    /* This test uses strange buffer sizes intentionally. */
+
+    struct archive_entry *ae;
+    struct archive *a;
+    uint8_t buf[173];
+    int bytes_read;
+    uint32_t computed_crc = 0;
+
+    extract_reference_file("test_read_format_rar5_compressed.rar");
+    assert((a = archive_read_new()) != NULL);
+    assertA(0 == archive_read_support_filter_all(a));
+    assertA(0 == archive_read_support_format_all(a));
+    assertA(0 == archive_read_open_filename(a, "test_read_format_rar5_compressed.rar", 130));
+    assertA(0 == archive_read_next_header(a, &ae));
+    assertEqualString("test.bin", archive_entry_pathname(ae));
+    assertEqualInt(1200, archive_entry_size(ae));
+
+    /* File size is 1200 bytes, we're reading it using a buffer of 173 bytes.
+     * Libarchive is configured to use a buffer of 130 bytes. */
+
+    while(1) {
+        /* archive_read_data should return one of:
+         * a) 0, if there is no more data to be read,
+         * b) negative value, if there was an error,
+         * c) positive value, meaning how many bytes were read.
+         */
+
+        bytes_read = archive_read_data(a, buf, sizeof(buf));
+        assertA(bytes_read >= 0);
+        if(bytes_read <= 0)
+            break;
+
+        computed_crc = crc32(computed_crc, buf, bytes_read);
+    }
+
+    assertEqualInt(computed_crc, 0x7CCA70CD);
     EPILOGUE();
 }

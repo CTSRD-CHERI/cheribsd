@@ -623,10 +623,11 @@ static const char *
 subevalvar_misc(const char *p, struct nodelist **restrict argbackq,
     const char *var, int subtype, int startloc, int varflags)
 {
+	const char *end;
 	char *startp;
 	int amount;
 
-	p = argstr(p, argbackq, EXP_TILDE, NULL);
+	end = argstr(p, argbackq, EXP_TILDE, NULL);
 	STACKSTRNUL(expdest);
 	startp = stackblock() + startloc;
 
@@ -635,7 +636,7 @@ subevalvar_misc(const char *p, struct nodelist **restrict argbackq,
 		setvar(var, startp, 0);
 		amount = startp - expdest;
 		STADJUST(amount, expdest);
-		return p;
+		return end;
 
 	case VSQUESTION:
 		if (*p != CTLENDVAR) {
@@ -1170,7 +1171,11 @@ expmeta(char *enddir, char *name, struct arglist *arglist)
 		if (dp->d_name[0] == '.' && ! matchdot)
 			continue;
 		if (patmatch(start, dp->d_name)) {
+#ifdef _D_EXACT_NAMLEN
+			namlen = _D_EXACT_NAMLEN(dp);
+#else
 			namlen = dp->d_namlen;
+#endif
 			if (enddir + namlen + 1 > expdir_end)
 				continue;
 			memcpy(enddir, dp->d_name, namlen + 1);

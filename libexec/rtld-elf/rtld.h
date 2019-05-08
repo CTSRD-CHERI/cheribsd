@@ -30,7 +30,7 @@
  /*
   * CHERI CHANGES START
   * {
-  *   "updated": 20180828,
+  *   "updated": 20181127,
   *   "target_type": "prog",
   *   "changes": [
   *     "support"
@@ -90,6 +90,18 @@ extern char **environ;
 struct stat;
 struct Struct_Obj_Entry;
 struct CheriExports;
+struct CheriPlt;
+/* Instead of using void** to get warnings on casts */
+struct CheriCapTableEntry {
+	void *value;
+};
+
+struct CheriCapTableMappingEntry {
+  uint64_t func_start;       // virtual address relative to base address
+  uint64_t func_end;         // virtual address relative to base address
+  uint32_t cap_table_offset; // offset in bytes into captable
+  uint32_t sub_table_size;   // size in bytes of this sub-table
+};
 
 /* Lists of shared objects */
 typedef struct Struct_Objlist_Entry {
@@ -175,7 +187,6 @@ typedef struct Struct_Obj_Entry {
     /* These items are computed by map_object() or by digest_phdr(). */
     caddr_t mapbase;		/* Base address of mapped region */
     size_t mapsize;		/* Size of mapped region in bytes */
-    size_t textsize;		/* Size of text segment in bytes */
     Elf_Addr vaddrbase;		/* Base address in shared object file */
 #ifdef __CHERI_PURE_CAPABILITY__
     /*
@@ -187,7 +198,8 @@ typedef struct Struct_Obj_Entry {
     Elf_Addr text_rodata_start;
     Elf_Addr text_rodata_end;
     const char* text_rodata_cap;	/* Capability for the executable mapping */
-    struct CheriExports *cheri_exports;	/* Thunks for external calls */
+    struct CheriExports *cheri_exports;	/* Unique thunks for function pointers */
+    struct CheriPlt *cheri_plt_stubs;	/* PLT stubs for external calls */
 #endif
     caddr_t relocbase;		/* Relocation constant = mapbase - vaddrbase */
     const Elf_Dyn *dynamic;	/* Dynamic section */
@@ -224,15 +236,24 @@ typedef struct Struct_Obj_Entry {
 #ifdef __mips__
 #ifdef __CHERI_PURE_CAPABILITY__
     caddr_t cap_relocs;		/* start of the __cap_relocs section */
-    caddr_t captable;		/* start of the .cap_table section */
+    /*
+     * Two pointers to the start of the .cap_table section: one writable
+     * for use by RTLD and one read-only for use as the target $cgp in plt stubs.
+     */
+    struct CheriCapTableEntry* writable_captable;
+    const struct CheriCapTableEntry* _target_cgp;
     size_t cap_relocs_size;	/* size of the __cap_relocs section */
     size_t captable_size;	/* size of the .cap_table section */
-#endif
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+    const struct CheriCapTableMappingEntry* captable_mapping;
+    size_t captable_mapping_size;	/* size of the .cap_table_mapping section */
+#endif /* RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 */
+#endif /* defined(__CHERI_PURE_CAPABILITY__) */
     Elf_Word local_gotno;	/* Number of local GOT entries */
     Elf_Word symtabno;		/* Number of dynamic symbols */
     Elf_Word gotsym;		/* First dynamic symbol in GOT */
     Elf_Addr *mips_pltgot;	/* Second PLT GOT */
-#endif
+#endif /* defined(__mips__) */
 #ifdef __powerpc64__
     Elf_Addr glink;		/* GLINK PLT call stub section */
 #endif
@@ -278,6 +299,7 @@ typedef struct Struct_Obj_Entry {
     int fini_array_num; 	/* Number of entries in fini_array */
 
     int32_t osrel;		/* OSREL note value */
+    uint32_t fctl0;		/* FEATURE_CONTROL note desc[0] value */
 
     bool mainprog : 1;		/* True if this is the main program */
     bool rtld : 1;		/* True if this is the dynamic linker */
@@ -298,6 +320,8 @@ typedef struct Struct_Obj_Entry {
     bool z_interpose : 1;	/* Interpose all objects but main */
     bool z_nodeflib : 1;	/* Don't search default library path */
     bool z_global : 1;		/* Make the object global */
+    bool static_tls : 1;	/* Needs static TLS allocation */
+    bool static_tls_copied : 1;	/* Needs static TLS copying */
     bool ref_nodel : 1;		/* Refcount increased to prevent dlclose */
     bool init_scanned: 1;	/* Object is already on init list. */
     bool on_fini_list: 1;	/* Object is already on fini list. */
@@ -306,6 +330,7 @@ typedef struct Struct_Obj_Entry {
     bool irelative : 1;		/* Object has R_MACHDEP_IRELATIVE relocs */
     bool gnu_ifunc : 1;		/* Object has references to STT_GNU_IFUNC */
     bool non_plt_gnu_ifunc : 1;	/* Object has non-plt IFUNC references */
+    bool ifuncs_resolved : 1;	/* Object ifuncs were already resolved */
     bool crt_no_init : 1;	/* Object' crt does not call _init/_fini */
     bool valid_hash_sysv : 1;	/* A valid System V hash hash tag is available */
     bool valid_hash_gnu : 1;	/* A valid GNU hash tag is available */
@@ -326,7 +351,14 @@ typedef struct Struct_Obj_Entry {
     bool restrict_pcc_basic : 1;
     bool restrict_pcc_strict : 1;
     unsigned cheri_captable_abi : 3;
-#endif
+    /*
+     * If we linked the DSO with the per-file or per-function captable flag we
+     * must add a trampoline for every function to set up the correct $cgp.
+     * If RTLD_SUPPORT_PER_FUNCTION_CAPTABLE != 1, loading an object with
+     * this flag will result in an error.
+     */
+    bool per_function_captable : 1;
+#endif /* __CHERI_PURE_CAPABILITY__ */
 
     struct link_map linkmap;	/* For GDB and dlinfo() */
     Objlist dldags;		/* Object belongs to these dlopened DAGs (%) */
@@ -486,7 +518,11 @@ int convert_prot(int elfflags);
 int do_copy_relocations(Obj_Entry *);
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,
     struct Struct_RtldLockState *);
-int reloc_plt(Obj_Entry *);
+#ifdef __CHERI_PURE_CAPABILITY__
+int reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj);
+#else
+int reloc_plt(Obj_Entry *, int flags, struct Struct_RtldLockState *);
+#endif
 int reloc_jmpslots(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 int reloc_iresolve(Obj_Entry *, struct Struct_RtldLockState *);
 int reloc_gnu_ifunc(Obj_Entry *, int flags, struct Struct_RtldLockState *);
@@ -494,6 +530,11 @@ void ifunc_init(Elf_Auxinfo[__min_size(AT_COUNT)]);
 void pre_init(void);
 void init_pltgot(Obj_Entry *);
 void allocate_initial_tls(Obj_Entry *);
+
+void *__crt_calloc(size_t num, size_t size);
+void __crt_free(void *cp);
+void *__crt_malloc(size_t nbytes);
+void *__crt_realloc(void *cp, size_t nbytes);
 
 #ifdef __CHERI_PURE_CAPABILITY__
 void process___cap_relocs(Obj_Entry*);

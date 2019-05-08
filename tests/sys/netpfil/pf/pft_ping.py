@@ -3,31 +3,22 @@
 import argparse
 import scapy.all as sp
 import sys
-import threading
+from sniffer import Sniffer
 
 PAYLOAD_MAGIC = 0x42c0ffee
 
-class Sniffer(threading.Thread):
-	def __init__(self, recvif):
-		threading.Thread.__init__(self)
-
-		self._recvif = recvif
-
-		self.start()
-
-	def run(self):
-		self.packets = sp.sniff(iface=self._recvif, timeout=3)
-
-def check_ping_request(packet, dst_ip, args):
+def check_ping_request(args, packet):
 	if args.ip6:
-		return check_ping6_request(packet, dst_ip, args)
+		return check_ping6_request(args, packet)
 	else:
-		return check_ping4_request(packet, dst_ip, args)
+		return check_ping4_request(args, packet)
 
-def check_ping4_request(packet, dst_ip, args):
+def check_ping4_request(args, packet):
 	"""
 	Verify that the packet matches what we'd have sent
 	"""
+	dst_ip = args.to[0]
+
 	ip = packet.getlayer(sp.IP)
 	if not ip:
 		return False
@@ -54,13 +45,14 @@ def check_ping4_request(packet, dst_ip, args):
 				% (ip.tos, args.expect_tos[0])
 			return False
 
-
 	return True
 
-def check_ping6_request(packet, dst_ip, args):
+def check_ping6_request(args, packet):
 	"""
 	Verify that the packet matches what we'd have sent
 	"""
+	dst_ip = args.to[0]
+
 	ip = packet.getlayer(sp.IPv6)
 	if not ip:
 		return False
@@ -124,7 +116,7 @@ def main():
 
 	sniffer = None
 	if not args.recvif is None:
-		sniffer = Sniffer(args.recvif[0])
+		sniffer = Sniffer(args, check_ping_request)
 
 	if args.ip6:
 		ping6(args.sendif[0], args.to[0], args)
@@ -134,12 +126,10 @@ def main():
 	if sniffer:
 		sniffer.join()
 
-		for packet in sniffer.packets:
-			if check_ping_request(packet, args.to[0], args):
-				sys.exit(0)
-
-		# We did not get the packet we expected
-		sys.exit(1)
+		if sniffer.foundCorrectPacket:
+			sys.exit(0)
+		else:
+			sys.exit(1)
 
 if __name__ == '__main__':
 	main()

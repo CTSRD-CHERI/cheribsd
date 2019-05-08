@@ -65,8 +65,9 @@ __FBSDID("$FreeBSD$");
 /*
  * UART console routines.
  */
+extern struct bus_space memmap_bus;
 bus_space_tag_t uart_bus_space_io;
-bus_space_tag_t uart_bus_space_mem;
+bus_space_tag_t uart_bus_space_mem = &memmap_bus;
 
 int
 uart_cpu_eqres(struct uart_bas *b1, struct uart_bas *b2)
@@ -127,6 +128,13 @@ uart_cpu_acpi_probe(struct uart_class **classp, bus_space_tag_t *bst,
 		goto out;
 
 	switch(spcr->BaudRate) {
+	case 0:
+		/*
+		 * A BaudRate of 0 is a special value which means not to
+		 * change the rate that's already programmed.
+		 */
+		*baud = 0;
+		break;
 	case 3:
 		*baud = 9600;
 		break;
@@ -149,8 +157,13 @@ uart_cpu_acpi_probe(struct uart_class **classp, bus_space_tag_t *bst,
 
 	*classp = cd->cd_class;
 	*rclk = 0;
-	*shiftp = 2;
+	*shiftp = spcr->SerialPort.AccessWidth - 1;
 	*iowidthp = spcr->SerialPort.BitWidth / 8;
+
+	if ((cd->cd_quirks & UART_F_IGNORE_SPCR_REGSHFT) ==
+	    UART_F_IGNORE_SPCR_REGSHFT) {
+		*shiftp = cd->cd_regshft;
+	}
 
 out:
 	acpi_unmap_table(spcr);

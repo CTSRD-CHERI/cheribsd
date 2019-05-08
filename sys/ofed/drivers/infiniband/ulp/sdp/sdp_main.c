@@ -1124,7 +1124,8 @@ restart:
 		}
 		if (space < resid &&
 		    (atomic || space < so->so_snd.sb_lowat)) {
-			if ((so->so_state & SS_NBIO) || (flags & MSG_NBIO)) {
+			if ((so->so_state & SS_NBIO) ||
+			    (flags & (MSG_NBIO | MSG_DONTWAIT)) != 0) {
 				SOCKBUF_UNLOCK(&so->so_snd);
 				error = EWOULDBLOCK;
 				goto release;
@@ -1810,6 +1811,7 @@ sdp_pcblist(SYSCTL_HANDLER_ARGS)
 	if (error != 0)
 		return (error);
 
+	bzero(&xig, sizeof(xig));
 	xig.xig_len = sizeof xig;
 	xig.xig_count = n;
 	xig.xig_gen = 0;

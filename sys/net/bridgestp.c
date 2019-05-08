@@ -2022,6 +2022,7 @@ bstp_same_bridgeid(uint64_t id1, uint64_t id2)
 void
 bstp_reinit(struct bstp_state *bs)
 {
+	struct epoch_tracker et;
 	struct bstp_port *bp;
 	struct ifnet *ifp, *mif;
 	u_char *e_addr;
@@ -2042,7 +2043,7 @@ bstp_reinit(struct bstp_state *bs)
 	 * from is part of this bridge, so we can have more than one independent
 	 * bridges in the same STP domain.
 	 */
-	IFNET_RLOCK_NOSLEEP();
+	NET_EPOCH_ENTER(et);
 	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
 		if (ifp->if_type != IFT_ETHER)
 			continue;	/* Not Ethernet */
@@ -2062,7 +2063,7 @@ bstp_reinit(struct bstp_state *bs)
 			continue;
 		}
 	}
-	IFNET_RUNLOCK_NOSLEEP();
+	NET_EPOCH_EXIT(et);
 	if (mif == NULL)
 		goto disablestp;
 
@@ -2273,4 +2274,7 @@ bstp_destroy(struct bstp_port *bp)
 	taskqueue_drain(taskqueue_swi, &bp->bp_statetask);
 	taskqueue_drain(taskqueue_swi, &bp->bp_rtagetask);
 	taskqueue_drain(taskqueue_swi, &bp->bp_mediatask);
+
+	if (bp->bp_bs->bs_root_port == bp)
+		bstp_assign_roles(bp->bp_bs);
 }

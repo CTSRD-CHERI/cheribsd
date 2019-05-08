@@ -42,17 +42,39 @@
 #include "rtld_printf.h"
 
 __BEGIN_DECLS
-extern void debug_printf(const char *, ...) __printflike(1, 2);
+enum RtldDebugCategory {
+	RTLD_DBG_NO_CATEGORY = 1 << 0,
+	RTLD_DBG_RELOC = 1 << 1,
+	RTLD_DBG_RELOC_SELF = 1 << 2,
+	RTLD_DBG_PLT = 1 << 3,
+	RTLD_DBG_RELOC_STATS = 1 << 4,
+
+	RTLD_DBG_CHERI = 1 << 5,
+	RTLD_DBG_CHERI_PLT = 1 << 6,
+	RTLD_DBG_CHERI_PLT_VERBOSE = 1 << 7,
+
+	RTLD_DBG_SYMLOOKUP = 1 << 8,
+
+	RTLD_DBG_LAST = RTLD_DBG_SYMLOOKUP,
+	RTLD_DBG_ALL = (RTLD_DBG_LAST << 1) - 1
+};
+void debug_printf(enum RtldDebugCategory cat, const char *, ...) __printflike(2, 3);
 extern int debug;
 __END_DECLS
 
-#ifdef DEBUG
-#define dbg(...)	debug_printf(__VA_ARGS__)
+#ifndef NO_LD_DEBUG
+#define dbg(...)	debug_printf(RTLD_DBG_NO_CATEGORY, __VA_ARGS__)
+#define dbg_cat(category, ...)	debug_printf(RTLD_DBG_ ## category, __VA_ARGS__)
 #define dbg_assert(cond)	assert(cond)
 #else
 #define dbg(...)	((void) 0)
+#define dbg_cat(category, ...)	((void) 0)
 #define dbg_assert(cond)	((void) 0)
 #endif
+#define dbg_cheri(...)			dbg_cat(CHERI, __VA_ARGS__)
+#define dbg_cheri_plt(...)		dbg_cat(CHERI_PLT, __VA_ARGS__)
+#define dbg_cheri_plt_verbose(...)	dbg_cat(CHERI_PLT_VERBOSE, __VA_ARGS__)
+
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #define _MYNAME	"ld-cheri-elf.so.1"

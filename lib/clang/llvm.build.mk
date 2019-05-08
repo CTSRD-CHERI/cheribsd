@@ -69,6 +69,12 @@ CFLAGS+=	-DLLVM_TARGET_ENABLE_POWERPC
 LLVM_NATIVE_ARCH=	PowerPC
 . endif
 .endif
+.if ${MK_LLVM_TARGET_RISCV} != "no"
+CFLAGS+=	-DLLVM_TARGET_ENABLE_RISCV
+. if ${MACHINE_CPUARCH} == "riscv"
+LLVM_NATIVE_ARCH=	RISCV
+. endif
+.endif
 .if ${MK_LLVM_TARGET_SPARC} != "no"
 CFLAGS+=	-DLLVM_TARGET_ENABLE_SPARC
 . if ${MACHINE_CPUARCH} == "sparc64"
@@ -95,7 +101,7 @@ CFLAGS+=	-ffunction-sections
 CFLAGS+=	-fdata-sections
 LDFLAGS+=	-Wl,--gc-sections
 
-CXXFLAGS+=	-std=c++11
+CXXSTD?=	c++11
 CXXFLAGS+=	-fno-exceptions
 CXXFLAGS+=	-fno-rtti
 CXXFLAGS.clang+= -stdlib=libc++

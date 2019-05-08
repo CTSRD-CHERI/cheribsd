@@ -49,9 +49,12 @@ SRCS.miscellaneous+=		utils.c
 TEST_METADATA+= timeout="30"
 TEST_METADATA+= required_user="root"
 TEST_METADATA+= is_exclusive="true"
+TEST_METADATA+=	required_files="/etc/rc.d/auditd"
 
 WARNS?=	6
 
 LDFLAGS+=	-lbsm -lutil
+
+CFLAGS.process-control.c+=	-I${SRCTOP}/tests
 
 .include <bsd.test.mk>

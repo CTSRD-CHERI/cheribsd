@@ -450,8 +450,7 @@ copyiniov(const uiovec_t * __capability iovp, u_int iovcnt, kiovec_t **iov,
 }
 
 int
-copyinuio(const uiovec_t * __capability iovp, u_int iovcnt,
-    struct uio **uiop)
+copyinuio(const uiovec_t * __capability iovp, u_int iovcnt, struct uio **uiop)
 {
 	uiovec_t u_iov;
 	kiovec_t *iov;
@@ -471,7 +470,7 @@ copyinuio(const uiovec_t * __capability iovp, u_int iovcnt,
 		return (error);
 	}
 	for (i = 0; i < iovcnt; i++) {
-		error = copyincap(&iovp[i], &u_iov, sizeof(u_iov));
+		error = copyin_c(&iovp[i], &u_iov, sizeof(u_iov));
 		if (error) {
 			free(uio, M_IOV);
 			return (error);
@@ -949,7 +948,7 @@ casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

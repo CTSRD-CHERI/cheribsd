@@ -99,7 +99,7 @@ static void newdev(char *name);
 static void newfile(char *name);
 static void newenvvar(char *name, bool is_file);
 static void rmdev_schedule(struct device_head *dh, char *name);
-static void newopt(struct opt_head *list, char *name, char *value, int append);
+static void newopt(struct opt_head *list, char *name, char *value, int append, int dupe);
 static void rmopt_schedule(struct opt_head *list, char *name);
 
 static char *
@@ -212,7 +212,7 @@ System_spec:
 	  ;
 
 System_id:
-	Save_id { newopt(&mkopt, ns("KERNEL"), $1, 0); };
+	Save_id { newopt(&mkopt, ns("KERNEL"), $1, 0, 0); };
 
 System_parameter_list:
 	  System_parameter_list ID
@@ -232,13 +232,13 @@ NoOpt_list:
 		;
 Option:
 	Save_id {
-		newopt(&opt, $1, NULL, 0);
+		newopt(&opt, $1, NULL, 0, 1);
 		if (strchr($1, '=') != NULL)
 			errx(1, "%s:%d: The `=' in options should not be "
 			    "quoted", yyfile, yyline);
 	      } |
 	Save_id EQUALS Opt_value {
-		newopt(&opt, $1, $3, 0);
+		newopt(&opt, $1, $3, 0, 1);
 	      } ;
 
 NoOption:
@@ -266,10 +266,10 @@ Mkopt_list:
 		;
 
 Mkoption:
-	Save_id { newopt(&mkopt, $1, ns(""), 0); } |
-	Save_id EQUALS { newopt(&mkopt, $1, ns(""), 0); } |
-	Save_id EQUALS Opt_value { newopt(&mkopt, $1, $3, 0); } |
-	Save_id PLUSEQUALS Opt_value { newopt(&mkopt, $1, $3, 1); } ;
+	Save_id { newopt(&mkopt, $1, ns(""), 0, 0); } |
+	Save_id EQUALS { newopt(&mkopt, $1, ns(""), 0, 0); } |
+	Save_id EQUALS Opt_value { newopt(&mkopt, $1, $3, 0, 0); } |
+	Save_id PLUSEQUALS Opt_value { newopt(&mkopt, $1, $3, 1, 0); } ;
 
 Dev:
 	ID { $$ = $1; }
@@ -295,7 +295,7 @@ NoDev_list:
 
 Device:
 	Dev {
-		newopt(&opt, devopt($1), ns("1"), 0);
+		newopt(&opt, devopt($1), ns("1"), 0, 0);
 		/* and the device part */
 		newdev($1);
 		}
@@ -382,11 +382,13 @@ finddev(struct device_head *dlist, char *name)
 static void
 newdev(char *name)
 {
-	struct device *np;
+	struct device *np, *dp;
 
-	if (finddev(&dtab, name)) {
-		fprintf(stderr,
-		    "WARNING: duplicate device `%s' encountered.\n", name);
+	if ((dp = finddev(&dtab, name)) != NULL) {
+		if (strcmp(dp->yyfile, yyfile) == 0)
+			fprintf(stderr,
+			    "WARNING: duplicate device `%s' encountered in %s\n",
+			    name, yyfile);
 		return;
 	}
 
@@ -394,6 +396,7 @@ newdev(char *name)
 	if (np == NULL)
 		err(EXIT_FAILURE, "calloc");
 	np->d_name = name;
+	np->yyfile = strdup(yyfile);
 	STAILQ_INSERT_TAIL(&dtab, np, d_next);
 }
 
@@ -408,6 +411,7 @@ rmdev_schedule(struct device_head *dh, char *name)
 	dp = finddev(dh, name);
 	if (dp != NULL) {
 		STAILQ_REMOVE(dh, dp, device, d_next);
+		free(dp->yyfile);
 		free(dp->d_name);
 		free(dp);
 	}
@@ -432,7 +436,7 @@ findopt(struct opt_head *list, char *name)
  * Add an option to the list of options.
  */
 static void
-newopt(struct opt_head *list, char *name, char *value, int append)
+newopt(struct opt_head *list, char *name, char *value, int append, int dupe)
 {
 	struct opt *op, *op2;
 
@@ -445,9 +449,10 @@ newopt(struct opt_head *list, char *name, char *value, int append)
 	}
 
 	op2 = findopt(list, name);
-	if (op2 != NULL && !append) {
-		fprintf(stderr,
-		    "WARNING: duplicate option `%s' encountered.\n", name);
+	if (op2 != NULL && !append && !dupe) {
+		if (strcmp(op2->yyfile, yyfile) == 0)
+			fprintf(stderr,
+			    "WARNING: duplicate option `%s' encountered.\n", name);
 		return;
 	}
 
@@ -457,10 +462,17 @@ newopt(struct opt_head *list, char *name, char *value, int append)
 	op->op_name = name;
 	op->op_ownfile = 0;
 	op->op_value = value;
+	op->yyfile = strdup(yyfile);
 	if (op2 != NULL) {
-		while (SLIST_NEXT(op2, op_append) != NULL)
-			op2 = SLIST_NEXT(op2, op_append);
-		SLIST_NEXT(op2, op_append) = op;
+		if (append) {
+			while (SLIST_NEXT(op2, op_append) != NULL)
+				op2 = SLIST_NEXT(op2, op_append);
+			SLIST_NEXT(op2, op_append) = op;
+		} else {
+			while (SLIST_NEXT(op2, op_next) != NULL)
+				op2 = SLIST_NEXT(op2, op_next);
+			SLIST_NEXT(op2, op_next) = op;
+		}
 	} else
 		SLIST_INSERT_HEAD(list, op, op_next);
 }
@@ -473,9 +485,9 @@ rmopt_schedule(struct opt_head *list, char *name)
 {
 	struct opt *op;
 
-	op = findopt(list, name);
-	if (op != NULL) {
+	while ((op = findopt(list, name)) != NULL) {
 		SLIST_REMOVE(list, op, opt, op_next);
+		free(op->yyfile);
 		free(op->op_name);
 		free(op);
 	}

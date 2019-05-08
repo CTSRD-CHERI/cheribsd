@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2005 John Baldwin <jhb@FreeBSD.org>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -79,8 +78,6 @@ refcount_release(volatile u_int *count)
 /*
  * This functions returns non-zero if the refcount was
  * incremented. Else zero is returned.
- *
- * A temporary hack until refcount_* APIs are sorted out.
  */
 static __inline __result_use_check int
 refcount_acquire_if_not_zero(volatile u_int *count)

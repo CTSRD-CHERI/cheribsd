@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -885,9 +885,9 @@ ACPI_EXPORT_SYMBOL (AcpiGetGpeStatus)
  *
  * RETURN:      Status
  *
- * DESCRIPTION: Clear and conditionally reenable a GPE. This completes the GPE
+ * DESCRIPTION: Clear and conditionally re-enable a GPE. This completes the GPE
  *              processing. Intended for use by asynchronous host-installed
- *              GPE handlers. The GPE is only reenabled if the EnableForRun bit
+ *              GPE handlers. The GPE is only re-enabled if the EnableForRun bit
  *              is set in the GPE info.
  *
  ******************************************************************************/

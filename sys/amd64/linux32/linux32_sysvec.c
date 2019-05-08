@@ -32,6 +32,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "opt_compat.h"
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -907,7 +909,6 @@ linux32_fixlimit(struct rlimit *rl, int which)
 struct sysentvec elf_linux_sysvec = {
 	.sv_size	= LINUX32_SYS_MAXSYSCALL,
 	.sv_table	= linux32_sysent,
-	.sv_mask	= 0,
 	.sv_errsize	= ELAST + 1,
 	.sv_errtbl	= linux_errtbl,
 	.sv_transtrap	= linux_translate_traps,
@@ -919,7 +920,6 @@ struct sysentvec elf_linux_sysvec = {
 	.sv_coredump	= elf32_coredump,
 	.sv_imgact_try	= linux_exec_imgact_try,
 	.sv_minsigstksz	= LINUX_MINSIGSTKSZ,
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= LINUX32_MAXUSER,
 	.sv_usrstack	= LINUX32_USRSTACK,
@@ -1071,7 +1071,7 @@ linux_elf_modevent(module_t mod, int type, void *data)
 				error = EINVAL;
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
-				linux_ioctl_register_handler(*lihp);
+				linux32_ioctl_register_handler(*lihp);
 			LIST_INIT(&futex_list);
 			mtx_init(&futex_mtx, "ftllk", NULL, MTX_DEF);
 			stclohz = (stathz ? stathz : hz);
@@ -1093,7 +1093,7 @@ linux_elf_modevent(module_t mod, int type, void *data)
 		}
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
-				linux_ioctl_unregister_handler(*lihp);
+				linux32_ioctl_unregister_handler(*lihp);
 			mtx_destroy(&futex_mtx);
 			if (bootverbose)
 				printf("Linux ELF exec handler removed\n");

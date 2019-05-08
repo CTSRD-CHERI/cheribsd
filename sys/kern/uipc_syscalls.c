@@ -458,7 +458,7 @@ sys_accept4(struct thread *td, struct accept4_args *uap)
 
 #ifdef COMPAT_OLDSOCK
 int
-oaccept(struct thread *td, struct accept_args *uap)
+oaccept(struct thread *td, struct oaccept_args *uap)
 {
 
 	return (user_accept(td, uap->s, __USER_CAP_UNBCOUND(uap->name),
@@ -756,9 +756,7 @@ kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 	rights = &cap_send_rights;
 	if (mp->msg_name != NULL) {
 		AUDIT_ARG_SOCKADDR(td, AT_FDCWD,
-		    (__cheri_fromcap struct sockaddr *)
-		    mp->msg_name);
-		AUDIT_ARG_SOCKADDR(td, AT_FDCWD, mp->msg_name);
+		    (__cheri_fromcap struct sockaddr *)mp->msg_name);
 		rights = &cap_send_connect_rights;
 	}
 	error = getsock_cap(td, s, rights, &fp, NULL, NULL);
@@ -1759,8 +1757,10 @@ m_dispose_extcontrolm(struct mbuf *m)
 					fd = *fds++;
 					error = fget(td, fd, &cap_no_rights,
 					    &fp);
-					if (error == 0)
+					if (error == 0) {
 						fdclose(td, fp, fd);
+						fdrop(fp, td);
+					}
 				}
 			}
 			clen -= datalen;
@@ -1771,7 +1771,7 @@ m_dispose_extcontrolm(struct mbuf *m)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

@@ -44,12 +44,12 @@
 #                      checkout from a version control system.  Metadata is
 #                      included if the tree is modified.
 
+# Note: usr.sbin/amd/include/newvers.sh assumes all variable assignments of
+# upper case variables starting in column 1 are on one line w/o continuation.
+
 TYPE="FreeBSD"
 REVISION="13.0"
-BRANCH="CURRENT"
-if [ -n "${BRANCH_OVERRIDE}" ]; then
-	BRANCH=${BRANCH_OVERRIDE}
-fi
+BRANCH=${BRANCH_OVERRIDE:-CURRENT}
 RELEASE="${REVISION}-${BRANCH}"
 VERSION="${TYPE} ${RELEASE}"
 
@@ -62,48 +62,70 @@ findvcs()
 	local savedir
 
 	savedir=$(pwd)
-	cd ${SYSDIR}/..
-	while [ $(pwd) != "/" ]; do
+	cd "${SYSDIR}/.." || return 1
+	while [ "$(pwd)" != "/" ]; do
 		if [ -e "./$1" ]; then
 			VCSTOP=$(pwd)
 			VCSDIR=${VCSTOP}"/$1"
-			cd ${savedir}
+			cd "${savedir}" || exit 1
 			return 0
 		fi
 		cd ..
 	done
-	cd ${savedir}
+	cd "${savedir}" || exit 1
 	return 1
 }
 
+git_tree_modified()
+{
+	# git diff-index lists both files that are known to have changes as
+	# well as those with metadata that does not match what is recorded in
+	# git's internal state.  The latter case is indicated by an all-zero
+	# destination file hash.
+
+	local fifo
+
+	fifo=$(mktemp -u)
+	mkfifo -m 600 "$fifo" || exit 1
+	$git_cmd "--work-tree=${VCSTOP}" diff-index HEAD > "$fifo" &
+	while read -r smode dmode ssha dsha status file; do
+		if ! expr "$dsha" : '^00*$' >/dev/null; then
+			rm "$fifo"
+			return 0
+		fi
+		if ! $git_cmd "--work-tree=${VCSTOP}" diff --quiet -- "${file}"; then
+			rm "$fifo"
+			return 0
+		fi
+	done < "$fifo"
+	# No files with content differences.
+	rm "$fifo"
+	return 1
+}
+
+
 if [ -z "${SYSDIR}" ]; then
-    SYSDIR=$(dirname $0)/..
+    SYSDIR=$(dirname "$0")/..
 fi
 
-if [ -n "${PARAMFILE}" ]; then
-	RELDATE=$(awk '/__FreeBSD_version.*propagated to newvers/ {print $3}' \
-		${PARAMFILE})
-else
-	RELDATE=$(awk '/__FreeBSD_version.*propagated to newvers/ {print $3}' \
-		${SYSDIR}/sys/param.h)
-fi
+RELDATE=$(awk '/__FreeBSD_version.*propagated to newvers/ {print $3}' ${PARAMFILE:-${SYSDIR}/sys/param.h})
 
-b=share/examples/etc/bsd-style-copyright
 if [ -r "${SYSDIR}/../COPYRIGHT" ]; then
-	year=$(sed -Ee '/^Copyright .* The FreeBSD Project/!d;s/^.*1992-([0-9]*) .*$/\1/g' ${SYSDIR}/../COPYRIGHT)
+	year=$(sed -Ee '/^Copyright .* The FreeBSD Project/!d;s/^.*1992-([0-9]*) .*$/\1/g' "${SYSDIR}/../COPYRIGHT")
 else
 	year=$(date +%Y)
 fi
 # look for copyright template
+b=share/examples/etc/bsd-style-copyright
 for bsd_copyright in ../$b ../../$b ../../../$b /usr/src/$b /usr/$b
 do
 	if [ -r "$bsd_copyright" ]; then
-		COPYRIGHT=`sed \
+		COPYRIGHT=$(sed \
 		    -e "s/\[year\]/1992-$year/" \
 		    -e 's/\[your name here\]\.* /The FreeBSD Project./' \
 		    -e 's/\[your name\]\.*/The FreeBSD Project./' \
 		    -e '/\[id for your version control system, if any\]/d' \
-		    $bsd_copyright` 
+		    $bsd_copyright)
 		break
 	fi
 done
@@ -112,7 +134,6 @@ done
 if [ -z "$COPYRIGHT" ]; then
 	COPYRIGHT="/*-
  * Copyright (c) 1992-$year The FreeBSD Project.
- * All rights reserved.
  *
  */"
 fi
@@ -123,9 +144,7 @@ COPYRIGHT="$COPYRIGHT
 
 # VARS_ONLY means no files should be generated, this is just being
 # included.
-if [ -n "$VARS_ONLY" ]; then
-	return 0
-fi
+[ -n "$VARS_ONLY" ] && return 0
 
 LC_ALL=C; export LC_ALL
 if [ ! -r version ]
@@ -134,31 +153,30 @@ then
 fi
 
 touch version
-v=`cat version`
+v=$(cat version)
 u=${USER:-root}
-d=`pwd`
-h=${HOSTNAME:-`hostname`}
+d=$(pwd)
+h=${HOSTNAME:-$(hostname)}
 if [ -n "$SOURCE_DATE_EPOCH" ]; then
-	if ! t=`date -r $SOURCE_DATE_EPOCH 2>/dev/null`; then
+	if ! t=$(date -r $SOURCE_DATE_EPOCH 2>/dev/null); then
 		echo "Invalid SOURCE_DATE_EPOCH" >&2
 		exit 1
 	fi
 else
-	t=`date`
+	t=$(date)
 fi
-i=`${MAKE:-make} -V KERN_IDENT`
+i=$(${MAKE:-make} -V KERN_IDENT)
 compiler_v=$($(${MAKE:-make} -V CC) -v 2>&1 | grep -w 'version')
 
 for dir in /usr/bin /usr/local/bin; do
-	if [ ! -z "${svnversion}" ] ; then
+	if [ -n "${svnversion}" ] ; then
 		break
 	fi
-	if [ -x "${dir}/svnversion" ] && [ -z ${svnversion} ] ; then
+	if [ -x "${dir}/svnversion" ] && [ -z "${svnversion}" ] ; then
 		# Run svnversion from ${dir} on this script; if return code
 		# is not zero, the checkout might not be compatible with the
 		# svnversion being used.
-		${dir}/svnversion $(realpath ${0}) >/dev/null 2>&1
-		if [ $? -eq 0 ]; then
+		if ${dir}/svnversion "$(realpath "${0}")" >/dev/null 2>&1; then
 			svnversion=${dir}/svnversion
 			break
 		fi
@@ -166,19 +184,12 @@ for dir in /usr/bin /usr/local/bin; do
 done
 
 if [ -z "${svnversion}" ] && [ -x /usr/bin/svnliteversion ] ; then
-	/usr/bin/svnliteversion $(realpath ${0}) >/dev/null 2>&1
-	if [ $? -eq 0 ]; then
+	if /usr/bin/svnliteversion "$(realpath "${0}")" >/dev/null 2>&1; then
 		svnversion=/usr/bin/svnliteversion
 	else
 		svnversion=
 	fi
 fi
-
-for dir in /usr/bin /usr/local/bin; do
-	if [ -x "${dir}/p4" ] && [ -z ${p4_cmd} ] ; then
-		p4_cmd=${dir}/p4
-	fi
-done
 
 if findvcs .git; then
 	for dir in /usr/bin /usr/local/bin; do
@@ -199,7 +210,7 @@ if findvcs .hg; then
 fi
 
 if [ -n "$svnversion" ] ; then
-	svn=`cd ${SYSDIR} && $svnversion 2>/dev/null`
+	svn=$(cd ${SYSDIR} && $svnversion 2>/dev/null)
 	case "$svn" in
 	[0-9]*[MSP]|*:*)
 		svn=" r${svn}"
@@ -215,63 +226,47 @@ if [ -n "$svnversion" ] ; then
 fi
 
 if [ -n "$git_cmd" ] ; then
-	git=`$git_cmd rev-parse --verify --short HEAD 2>/dev/null`
-	svn=`$git_cmd svn find-rev $git 2>/dev/null`
-	if [ -n "$svn" ] ; then
-		svn=" r${svn}"
+	git=$($git_cmd rev-parse --verify --short HEAD 2>/dev/null)
+	gitsvn=$($git_cmd svn find-rev $git 2>/dev/null)
+	if [ -n "$gitsvn" ] ; then
+		svn=" r${gitsvn}"
 		git="=${git}"
 	else
-		svn=`$git_cmd log --grep '^git-svn-id:' | \
+#		Log searches are limited to 10k commits to speed up failures.
+#		We assume that if a tree is more than 10k commits out-of-sync
+#		with FreeBSD, it has forked the the OS and the SVN rev no
+#		longer matters.
+		gitsvn=$($git_cmd log -n 10000 |
 		    grep '^    git-svn-id:' | head -1 | \
-		    sed -n 's/^.*@\([0-9][0-9]*\).*$/\1/p'`
-		if [ -z "$svn" ] ; then
-			svn=`$git_cmd log --format='format:%N' | \
+		    sed -n 's/^.*@\([0-9][0-9]*\).*$/\1/p')
+		if [ -z "$gitsvn" ] ; then
+			gitsvn=$($git_cmd log -n 10000 --format='format:%N' | \
 			     grep '^svn ' | head -1 | \
-			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p'`
+			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p')
 		fi
-		if [ -n "$svn" ] ; then
-			svn=" r${svn}"
+		if [ -n "$gitsvn" ] ; then
+			svn=" r${gitsvn}"
 			git="+${git}"
 		else
 			git=" ${git}"
 		fi
 	fi
-	git_b=`$git_cmd rev-parse --abbrev-ref HEAD`
+	git_b=$($git_cmd rev-parse --abbrev-ref HEAD)
 	if [ -n "$git_b" ] ; then
 		git="${git}(${git_b})"
 	fi
-	if $git_cmd --work-tree=${VCSTOP} diff-index \
-	    --name-only HEAD | read dummy; then
+	if git_tree_modified; then
 		git="${git}-dirty"
 		modified=true
 	fi
 fi
 
-if [ -n "$p4_cmd" ] ; then
-	p4version=`cd ${SYSDIR} && $p4_cmd changes -m1 "./...#have" 2>&1 | \
-		awk '{ print $2 }'`
-	case "$p4version" in
-	[0-9]*)
-		p4version=" ${p4version}"
-		p4opened=`cd ${SYSDIR} && $p4_cmd opened ./... 2>&1`
-		case "$p4opened" in
-		File*) ;;
-		//*)
-			p4version="${p4version}+edit"
-			modified=true
-			;;
-		esac
-		;;
-	*)	unset p4version ;;
-	esac
-fi
-
 if [ -n "$hg_cmd" ] ; then
-	hg=`$hg_cmd id 2>/dev/null`
-	svn=`$hg_cmd svn info 2>/dev/null | \
-		awk -F': ' '/Revision/ { print $2 }'`
-	if [ -n "$svn" ] ; then
-		svn=" r${svn}"
+	hg=$($hg_cmd id 2>/dev/null)
+	hgsvn=$($hg_cmd svn info 2>/dev/null | \
+		awk -F': ' '/Revision/ { print $2 }')
+	if [ -n "$hgsvn" ] ; then
+		svn=" r${hgsvn}"
 	fi
 	if [ -n "$hg" ] ; then
 		hg=" ${hg}"
@@ -293,14 +288,14 @@ done
 shift $((OPTIND - 1))
 
 if [ -z "${include_metadata}" ]; then
-	VERINFO="${VERSION}${svn}${git}${hg}${p4version} ${i}"
+	VERINFO="${VERSION}${svn}${git}${hg} ${i}"
 	VERSTR="${VERINFO}\\n"
 else
-	VERINFO="${VERSION} #${v}${svn}${git}${hg}${p4version}: ${t}"
+	VERINFO="${VERSION} #${v}${svn}${git}${hg}: ${t}"
 	VERSTR="${VERINFO}\\n    ${u}@${h}:${d}\\n"
 fi
 
-cat << EOF > vers.c
+vers_content_new=$(cat << EOF
 $COPYRIGHT
 #define SCCSSTR "@(#)${VERINFO}"
 #define VERSTR "${VERSTR}"
@@ -314,5 +309,10 @@ char osrelease[sizeof(RELSTR) > 32 ? sizeof(RELSTR) : 32] = RELSTR;
 int osreldate = ${RELDATE};
 char kern_ident[] = "${i}";
 EOF
+)
+vers_content_old=$(cat vers.c 2>/dev/null || true)
+if [ "$vers_content_new" != "$vers_content_old" ]; then
+	echo "$vers_content_new" > vers.c
+fi
 
 echo $((v + 1)) > version

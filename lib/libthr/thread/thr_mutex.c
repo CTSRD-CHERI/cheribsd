@@ -306,10 +306,11 @@ init_static(struct pthread *thread, pthread_mutex_t *mutex)
 	THR_LOCK_ACQUIRE(thread, &_mutex_static_lock);
 
 	if (*mutex == THR_MUTEX_INITIALIZER)
-		ret = mutex_init(mutex, &_pthread_mutexattr_default, calloc);
+		ret = mutex_init(mutex, &_pthread_mutexattr_default,
+		    __thr_calloc);
 	else if (*mutex == THR_ADAPTIVE_MUTEX_INITIALIZER)
 		ret = mutex_init(mutex, &_pthread_mutexattr_adaptive_default,
-		    calloc);
+		    __thr_calloc);
 	else
 		ret = 0;
 	THR_LOCK_RELEASE(thread, &_mutex_static_lock);
@@ -389,8 +390,9 @@ __pthread_mutex_init(pthread_mutex_t * __restrict mutex,
 	}
 	if (mutex_attr == NULL ||
 	    (*mutex_attr)->m_pshared == PTHREAD_PROCESS_PRIVATE) {
+		__thr_malloc_init();
 		return (mutex_init(mutex, mutex_attr ? *mutex_attr : NULL,
-		    calloc));
+		    __thr_calloc));
 	}
 	pmtx = __thr_pshared_offpage(__DECONST(void *, mutex), 1);
 	if (pmtx == NULL)
@@ -483,7 +485,7 @@ _pthread_mutex_destroy(pthread_mutex_t *mutex)
 		} else {
 			*mutex = THR_MUTEX_DESTROYED;
 			mutex_assert_not_owned(_get_curthread(), m);
-			free(m);
+			__thr_free(m);
 			ret = 0;
 		}
 	}
@@ -947,7 +949,7 @@ mutex_unlock_common(struct pthread_mutex *m, bool cv, int *mtx_defer)
 {
 	struct pthread *curthread;
 	uint32_t id;
-	int deferred, error, robust;
+	int deferred, error, private, robust;
 
 	if (__predict_false(m <= THR_MUTEX_DESTROYED)) {
 		if (m == THR_MUTEX_DESTROYED)
@@ -965,6 +967,7 @@ mutex_unlock_common(struct pthread_mutex *m, bool cv, int *mtx_defer)
 		return (EPERM);
 
 	error = 0;
+	private = (m->m_flags & PMUTEX_FLAG_PRIVATE) != 0;
 	if (__predict_false(PMUTEX_TYPE(m->m_flags) ==
 	    PTHREAD_MUTEX_RECURSIVE && m->m_count > 0)) {
 		m->m_count--;
@@ -989,7 +992,7 @@ mutex_unlock_common(struct pthread_mutex *m, bool cv, int *mtx_defer)
 		if (robust)
 			_mutex_leave_robust(curthread, m);
 	}
-	if (!cv && m->m_flags & PMUTEX_FLAG_PRIVATE)
+	if (!cv && private)
 		THR_CRITICAL_LEAVE(curthread);
 	return (error);
 }

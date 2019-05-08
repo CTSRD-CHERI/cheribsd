@@ -28,10 +28,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "prog",
  *   "changes": [
- *     "pointer_size"
+ *     "pointer_shape"
  *   ],
  *   "change_comment": "pointer size is not equivalent to address size"
  * }

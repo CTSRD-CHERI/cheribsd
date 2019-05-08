@@ -37,10 +37,31 @@ PROG=	${PROG_CXX}
 MK_DEBUG_FILES=	no
 .endif
 
+# ELF hardening knobs
+.if ${MK_BIND_NOW} != "no"
+LDFLAGS+= -Wl,-znow
+.endif
+.if ${MK_PIE} != "no" && (!defined(NO_SHARED) || ${NO_SHARED:tl} == "no")
+CFLAGS+= -fPIE
+CXXFLAGS+= -fPIE
+LDFLAGS+= -pie
+.endif
 .if ${MK_RETPOLINE} != "no"
 CFLAGS+= -mretpoline
 CXXFLAGS+= -mretpoline
+# retpolineplt is broken with static linking (PR 233336)
+.if !defined(NO_SHARED) || ${NO_SHARED:tl} == "no"
 LDFLAGS+= -Wl,-zretpolineplt
+.endif
+.endif
+
+# macOS linker doesn't understand the --fatal-warnings flag
+.if ${LINKER_TYPE} != "mac"
+.if defined(LD_FATAL_WARNINGS) && ${LD_FATAL_WARNINGS} == "no"
+LDFLAGS+=	-Wl,--no-fatal-warnings
+.else
+LDFLAGS+=	-Wl,--fatal-warnings
+.endif
 .endif
 
 .if defined(CRUNCH_CFLAGS)
@@ -64,7 +85,7 @@ TAGS+=		package=${PACKAGE:Uruntime}
 TAG_ARGS=	-T ${TAGS:[*]:S/ /,/g}
 .endif
 
-.if defined(NO_SHARED) && (${NO_SHARED} != "no" && ${NO_SHARED} != "NO")
+.if defined(NO_SHARED) && ${NO_SHARED:tl} != "no"
 LDFLAGS+= -static
 .endif
 
@@ -198,11 +219,6 @@ ${PROG_INSTALL}: ${PROG}
 	strip -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
 .endif
 
-.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
-${PROGNAME}.dump: ${PROG_FULL}
-	${OBJDUMP} ${OBJDUMP_FLAGS} ${PROG_FULL} > ${.TARGET}
-.endif
-
 .if defined(LLVM_LINK)
 ${PROG_FULL}.bc: ${BCOBJS}
 	${LLVM_LINK} -o ${.TARGET} ${BCOBJS}
@@ -236,9 +252,6 @@ CLEANFILES+= ${PROG} ${PROG}.bc ${PROG}.ll
 CLEANFILES+= ${PROG}.stripped
 .if ${MK_DEBUG_FILES} != "no"
 CLEANFILES+= ${PROG_FULL} ${PROGNAME}.debug
-.endif
-.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
-CLEANFILES+=	${PROGNAME}.dump
 .endif
 .endif
 
@@ -299,10 +312,6 @@ _proginstall:
 .endif
 .endif
 .endif	# !target(realinstall)
-
-.if defined(WANT_DUMP) && ${WANT_DUMP} != "no"
-FILES+=	${PROGNAME}.dump
-.endif
 
 .if defined(SCRIPTS) && !empty(SCRIPTS)
 realinstall: _scriptsinstall

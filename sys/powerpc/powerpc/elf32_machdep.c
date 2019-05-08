@@ -83,7 +83,6 @@ struct sysentvec elf32_freebsd_sysvec = {
 #else
 	.sv_table	= sysent,
 #endif
-	.sv_mask	= 0,
 	.sv_errsize	= 0,
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
@@ -95,7 +94,6 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_stackprot	= VM_PROT_ALL,
 #ifdef __powerpc64__
@@ -116,7 +114,7 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_fixlimit	= NULL,
 #endif
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 | SV_SHP,
+	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 | SV_SHP | SV_ASLR,
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 	.sv_shared_page_base = FREEBSD32_SHAREDPAGE,

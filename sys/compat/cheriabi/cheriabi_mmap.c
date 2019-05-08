@@ -267,7 +267,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 
 	memset(&mr, 0, sizeof(mr));
 	mr.mr_hint = hint;
-	mr.mr_max_addr = cheri_getbase(source_cap) + cheri_getlen(source_cap);
+	mr.mr_max_addr = cheri_gettop(source_cap);
 	mr.mr_size = uap->len;
 	mr.mr_prot = uap->prot;
 	mr.mr_flags = flags;
@@ -407,6 +407,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 		 * with the offset pointing to hint.
 		 */
 		cap_base = cheri_getbase(newcap);
+		/* TODO: use cheri_setaddress? */
 		/* Set offset to vaddr of page */
 		newcap = cheri_setoffset(newcap,
 		    rounddown2(addr, PAGE_SIZE) - cap_base);

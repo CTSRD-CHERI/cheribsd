@@ -52,6 +52,7 @@ MAN=	aac.4 \
 	${_apic.4} \
 	arcmsr.4 \
 	${_asmc.4} \
+	at45d.4 \
 	ata.4 \
 	ath.4 \
 	ath_ahb.4 \
@@ -265,6 +266,7 @@ MAN=	aac.4 \
 	mac_lomac.4 \
 	mac_mls.4 \
 	mac_none.4 \
+	mac_ntpd.4 \
 	mac_partition.4 \
 	mac_portacl.4 \
 	mac_seeotheruids.4 \
@@ -301,6 +303,7 @@ MAN=	aac.4 \
 	mvs.4 \
 	mwl.4 \
 	mwlfw.4 \
+	mx25l.4 \
 	mxge.4 \
 	my.4 \
 	nand.4 \
@@ -323,6 +326,7 @@ MAN=	aac.4 \
 	ng_btsocket.4 \
 	ng_car.4 \
 	ng_ccatm.4 \
+	ng_checksum.4 \
 	ng_cisco.4 \
 	ng_deflate.4 \
 	ng_device.4 \
@@ -544,6 +548,7 @@ MAN=	aac.4 \
 	${_virtio_console.4} \
 	${_virtio_random.4} \
 	${_virtio_scsi.4} \
+	${_vmci.4} \
 	vkbd.4 \
 	vlan.4 \
 	vxlan.4 \
@@ -820,6 +825,7 @@ _spkr.4=	spkr.4
 _tpm.4=		tpm.4
 _urtw.4=	urtw.4
 _viawd.4=	viawd.4
+_vmci.4=	vmci.4
 _wbwd.4=	wbwd.4
 _wpi.4=		wpi.4
 _xen.4=		xen.4

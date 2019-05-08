@@ -120,8 +120,6 @@ int64_t idcache_line_size;	/* The minimum cache line size */
 extern int *end;
 extern int *initstack_end;
 
-struct pcpu *pcpup;
-
 uintptr_t mcall_trap(uintptr_t mcause, uintptr_t* regs);
 
 uintptr_t
@@ -178,7 +176,6 @@ set_regs(struct thread *td, struct reg *regs)
 
 	frame = td->td_frame;
 	frame->tf_sepc = regs->sepc;
-	frame->tf_sstatus = regs->sstatus;
 	frame->tf_ra = regs->ra;
 	frame->tf_sp = regs->sp;
 	frame->tf_gp = regs->gp;
@@ -254,7 +251,7 @@ int
 ptrace_set_pc(struct thread *td, u_long addr)
 {
 
-	panic("ptrace_set_pc");
+	td->td_frame->tf_sepc = addr;
 	return (0);
 }
 
@@ -263,7 +260,7 @@ ptrace_single_step(struct thread *td)
 {
 
 	/* TODO; */
-	return (0);
+	return (EOPNOTSUPP);
 }
 
 int
@@ -271,7 +268,7 @@ ptrace_clear_single_step(struct thread *td)
 {
 
 	/* TODO; */
-	return (0);
+	return (EOPNOTSUPP);
 }
 
 void
@@ -427,7 +424,9 @@ void
 cpu_halt(void)
 {
 
-	panic("cpu_halt");
+	intr_disable();
+	for (;;)
+		__asm __volatile("wfi");
 }
 
 /*
@@ -583,13 +582,14 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	fp = (struct sigframe *)STACKALIGN(fp);
 
 	/* Fill in the frame to copy out */
+	bzero(&frame, sizeof(frame));
 	get_mcontext(td, &frame.sf_uc.uc_mcontext, 0);
 	get_fpcontext(td, &frame.sf_uc.uc_mcontext);
 	frame.sf_si = ksi->ksi_info;
 	frame.sf_uc.uc_sigmask = *mask;
-	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) ?
-	    ((onstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 	frame.sf_uc.uc_stack = td->td_sigstk;
+	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
+	    (onstack ? SS_ONSTACK : 0) : SS_DISABLE;
 	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(td->td_proc);
 
@@ -625,6 +625,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 static void
 init_proc0(vm_offset_t kstack)
 {
+	struct pcpu *pcpup;
 
 	pcpup = &__pcpu[0];
 
@@ -796,6 +797,7 @@ void
 initriscv(struct riscv_bootparams *rvbp)
 {
 	struct mem_region mem_regions[FDT_MEM_REGIONS];
+	struct pcpu *pcpup;
 	vm_offset_t rstart, rend;
 	vm_offset_t s, e;
 	int mem_regions_sz;
@@ -803,6 +805,15 @@ initriscv(struct riscv_bootparams *rvbp)
 	vm_size_t kernlen;
 	caddr_t kmdp;
 	int i;
+
+	/* Set the pcpu data, this is needed by pmap_bootstrap */
+	pcpup = &__pcpu[0];
+	pcpu_init(pcpup, 0, sizeof(struct pcpu));
+
+	/* Set the pcpu pointer */
+	__asm __volatile("mv gp, %0" :: "r"(pcpup));
+
+	PCPU_SET(curthread, &thread0);
 
 	/* Set the module data location */
 	lastaddr = fake_preload_metadata(rvbp);
@@ -847,15 +858,6 @@ initriscv(struct riscv_bootparams *rvbp)
 	}
 #endif
 
-	/* Set the pcpu data, this is needed by pmap_bootstrap */
-	pcpup = &__pcpu[0];
-	pcpu_init(pcpup, 0, sizeof(struct pcpu));
-
-	/* Set the pcpu pointer */
-	__asm __volatile("mv gp, %0" :: "r"(pcpup));
-
-	PCPU_SET(curthread, &thread0);
-
 	/* Do basic tuning, hz etc */
 	init_param1();
 
@@ -868,10 +870,6 @@ initriscv(struct riscv_bootparams *rvbp)
 	cninit();
 
 	init_proc0(rvbp->kern_stack);
-
-	/* set page table base register for thread0 */
-	thread0.td_pcb->pcb_l1addr = \
-	    (rvbp->kern_l1pt - KERNBASE + rvbp->kern_phys);
 
 	msgbufinit(msgbufp, msgbufsize);
 	mutex_init();

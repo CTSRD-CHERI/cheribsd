@@ -758,8 +758,16 @@ numberstring	: NUMBER				{
 		;
 
 varset		: STRING '=' varstring	{
+			char *s = $1;
 			if (pf->opts & PF_OPT_VERBOSE)
 				printf("%s = \"%s\"\n", $1, $3);
+			while (*s++) {
+				if (isspace((unsigned char)*s)) {
+					yyerror("macro name cannot contain "
+					   "whitespace");
+					YYERROR;
+				}
+			}
 			if (symset($1, $3, 0) == -1)
 				err(1, "cannot store variable %s", $1);
 			free($1);
@@ -4735,6 +4743,8 @@ process_tabledef(char *name, struct table_opts *opts)
 {
 	struct pfr_buffer	 ab;
 	struct node_tinit	*ti;
+	unsigned long		 maxcount;
+	size_t			 s = sizeof(maxcount);
 
 	bzero(&ab, sizeof(ab));
 	ab.pfrb_type = PFRB_ADDRS;
@@ -4762,8 +4772,19 @@ process_tabledef(char *name, struct table_opts *opts)
 	if (!(pf->opts & PF_OPT_NOACTION) &&
 	    pfctl_define_table(name, opts->flags, opts->init_addr,
 	    pf->anchor->name, &ab, pf->anchor->ruleset.tticket)) {
-		yyerror("cannot define table %s: %s", name,
-		    pfr_strerror(errno));
+
+		if (sysctlbyname("net.pf.request_maxcount", &maxcount, &s,
+		    NULL, 0) == -1)
+			maxcount = 65535;
+
+		if (ab.pfrb_size > maxcount)
+			yyerror("cannot define table %s: too many elements.\n"
+			    "Consider increasing net.pf.request_maxcount.",
+			    name);
+		else
+			yyerror("cannot define table %s: %s", name,
+			    pfr_strerror(errno));
+
 		goto _error;
 	}
 	pf->tdirty = 1;

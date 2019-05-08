@@ -91,6 +91,7 @@ codecap_create(void (*sandbox_base)(void), void *sandbox_end)
 	void * __capability codecap;
 
 #ifdef __CHERI_PURE_CAPABILITY__
+	(void)sandbox_end;
 	codecap = cheri_andperm(sandbox_base,
 	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_EXECUTE);
 #else
@@ -107,6 +108,7 @@ datacap_create(void *sandbox_base, void *sandbox_end)
 	void * __capability datacap;
 
 #ifdef __CHERI_PURE_CAPABILITY__
+	(void)sandbox_end;
 	datacap = cheri_andperm(sandbox_base,
 	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_STORE |
 	    CHERI_PERM_LOAD_CAP | CHERI_PERM_STORE_CAP |

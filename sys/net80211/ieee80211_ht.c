@@ -886,10 +886,7 @@ ieee80211_ampdu_reorder(struct ieee80211_node *ni, struct mbuf *m,
 	if (IEEE80211_IS_MULTICAST(wh->i_addr1))
 		return PROCESS;
 
-	if (IEEE80211_IS_DSTODS(wh))
-		tid = ((struct ieee80211_qosframe_addr4 *)wh)->i_qos[0];
-	else
-		tid = wh->i_qos[0];
+	tid = ieee80211_getqos(wh)[0];
 	tid &= IEEE80211_QOS_TID;
 	rap = &ni->ni_rx_ampdu[tid];
 	if ((rap->rxa_flags & IEEE80211_AGGR_XCHGPEND) == 0) {
@@ -1730,7 +1727,7 @@ ieee80211_ht_updateparams(struct ieee80211_node *ni,
 	const struct ieee80211_ie_htinfo *htinfo;
 
 	ieee80211_parse_htcap(ni, htcapie);
-	if (vap->iv_htcaps & IEEE80211_HTCAP_SMPS)
+	if (vap->iv_htcaps & IEEE80211_HTC_SMPS)
 		htcap_update_mimo_ps(ni);
 	htcap_update_shortgi(ni);
 	htcap_update_ldpc(ni);
@@ -1883,7 +1880,7 @@ ieee80211_ht_updatehtcap(struct ieee80211_node *ni, const uint8_t *htcapie)
 	struct ieee80211vap *vap = ni->ni_vap;
 
 	ieee80211_parse_htcap(ni, htcapie);
-	if (vap->iv_htcaps & IEEE80211_HTCAP_SMPS)
+	if (vap->iv_htcaps & IEEE80211_HTC_SMPS)
 		htcap_update_mimo_ps(ni);
 	htcap_update_shortgi(ni);
 	htcap_update_ldpc(ni);

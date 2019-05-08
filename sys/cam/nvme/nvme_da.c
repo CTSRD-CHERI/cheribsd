@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 2015 Netflix, Inc
+ * Copyright (c) 2015 Netflix, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -770,10 +770,6 @@ ndaregister(struct cam_periph *periph, void *arg)
 	softc->quirks = quirks;
 	cam_iosched_set_sort_queue(softc->cam_iosched, 0);
 	softc->disk = disk = disk_alloc();
-	strlcpy(softc->disk->d_descr, cd->mn,
-	    MIN(sizeof(softc->disk->d_descr), sizeof(cd->mn)));
-	strlcpy(softc->disk->d_ident, cd->sn,
-	    MIN(sizeof(softc->disk->d_ident), sizeof(cd->sn)));
 	disk->d_rotation_rate = DISK_RR_NON_ROTATING;
 	disk->d_open = ndaopen;
 	disk->d_close = ndaclose;
@@ -798,7 +794,7 @@ ndaregister(struct cam_periph *periph, void *arg)
 	disk->d_mediasize = (off_t)(disk->d_sectorsize * nsd->nsze);
 	disk->d_delmaxsize = disk->d_mediasize;
 	disk->d_flags = DISKFLAG_DIRECT_COMPLETION;
-//	if (cd->oncs.dsm) // XXX broken?
+	if (nvme_ctrlr_has_dataset_mgmt(cd))
 		disk->d_flags |= DISKFLAG_CANDELETE;
 	vwc_present = (cd->vwc >> NVME_CTRLR_DATA_VWC_PRESENT_SHIFT) &
 		NVME_CTRLR_DATA_VWC_PRESENT_MASK;
@@ -812,9 +808,9 @@ ndaregister(struct cam_periph *periph, void *arg)
 	 * d_ident and d_descr are both far bigger than the length of either
 	 *  the serial or model number strings.
 	 */
-	nvme_strvis(disk->d_descr, cd->mn,
+	cam_strvis(disk->d_descr, cd->mn,
 	    sizeof(disk->d_descr), NVME_MODEL_NUMBER_LENGTH);
-	nvme_strvis(disk->d_ident, cd->sn,
+	cam_strvis(disk->d_ident, cd->sn,
 	    sizeof(disk->d_ident), NVME_SERIAL_NUMBER_LENGTH);
 	disk->d_hba_vendor = cpi.hba_vendor;
 	disk->d_hba_device = cpi.hba_device;

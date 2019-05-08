@@ -201,6 +201,7 @@ bioq_insert_tail(struct bio_queue_head *head, struct bio *bp)
 
 	TAILQ_INSERT_TAIL(&head->queue, bp, bio_queue);
 	head->total++;
+	head->batched = 0;
 	head->insert_point = bp;
 	head->last_offset = bp->bio_offset;
 }
@@ -255,6 +256,17 @@ bioq_disksort(struct bio_queue_head *head, struct bio *bp)
 		 * also have barrier semantics - no transactions
 		 * queued in the future can pass them.
 		 */
+		bioq_insert_tail(head, bp);
+		return;
+	}
+
+	/*
+	 * We should only sort requests of types that have concept of offset.
+	 * Other types, such as BIO_FLUSH or BIO_ZONE, may imply some degree
+	 * of ordering even if strict ordering is not requested explicitly.
+	 */
+	if (bp->bio_cmd != BIO_READ && bp->bio_cmd != BIO_WRITE &&
+	    bp->bio_cmd != BIO_DELETE) {
 		bioq_insert_tail(head, bp);
 		return;
 	}

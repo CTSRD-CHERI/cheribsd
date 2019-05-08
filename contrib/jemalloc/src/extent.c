@@ -1,7 +1,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181127,
  *   "target_type": "lib",
  *   "changes": [
  *     "virtual_address"
@@ -1124,14 +1124,15 @@ extent_recycle(tsdn_t *tsdn, arena_t *arena, extent_hooks_t **r_extent_hooks,
 
 	if (*zero) {
 		void *addr = extent_base_get(extent);
-		size_t size = extent_size_get(extent);
 		if (!extent_zeroed_get(extent)) {
+			size_t size = extent_size_get(extent);
 			if (pages_purge_forced(addr, size)) {
 				memset(addr, 0, size);
 			}
 		} else if (config_debug) {
 			size_t *p = (size_t *)addr;
-			for (size_t i = 0; i < size / sizeof(size_t); i++) {
+			/* Check the first page only. */
+			for (size_t i = 0; i < PAGE / sizeof(size_t); i++) {
 				assert(p[i] == 0);
 			}
 		}

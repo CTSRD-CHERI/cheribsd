@@ -47,7 +47,7 @@
 
 #include "_elftc.h"
 
-ELFTC_VCSID("$Id: readelf.c 3580 2017-09-15 23:29:59Z emaste $");
+ELFTC_VCSID("$Id: readelf.c 3649 2018-11-24 03:26:23Z emaste $");
 
 /* Backwards compatability for older FreeBSD releases. */
 #ifndef	STB_GNU_UNIQUE
@@ -220,6 +220,20 @@ struct mips_option {
 	const char *desc;
 };
 
+struct flag_desc {
+	uint64_t flag;
+	const char *desc;
+};
+
+struct loc_at {
+	Dwarf_Attribute la_at;
+	Dwarf_Unsigned la_off;
+	Dwarf_Unsigned la_lowpc;
+	Dwarf_Half la_cu_psize;
+	Dwarf_Half la_cu_osize;
+	Dwarf_Half la_cu_ver;
+};
+
 static void add_dumpop(struct readelf *re, size_t si, const char *sn, int op,
     int t);
 static const char *aeabi_adv_simd_arch(uint64_t simd);
@@ -293,6 +307,7 @@ static void dump_dwarf_ranges_foreach(struct readelf *re, Dwarf_Die die,
 static void dump_dwarf_str(struct readelf *re);
 static void dump_eflags(struct readelf *re, uint64_t e_flags);
 static void dump_elf(struct readelf *re);
+static void dump_flags(struct flag_desc *fd, uint64_t flags);
 static void dump_dyn_val(struct readelf *re, GElf_Dyn *dyn, uint32_t stab);
 static void dump_dynamic(struct readelf *re);
 static void dump_liblist(struct readelf *re);
@@ -307,6 +322,8 @@ static void dump_mips_specific_info(struct readelf *re);
 static void dump_notes(struct readelf *re);
 static void dump_notes_content(struct readelf *re, const char *buf, size_t sz,
     off_t off);
+static void dump_notes_data(const char *name, uint32_t type, const char *buf,
+    size_t sz);
 static void dump_svr4_hash(struct section *s);
 static void dump_svr4_hash64(struct readelf *re, struct section *s);
 static void dump_gnu_hash(struct readelf *re, struct section *s);
@@ -333,6 +350,7 @@ static const char *get_string(struct readelf *re, int strtab, size_t off);
 static const char *get_symbol_name(struct readelf *re, int symtab, int i);
 static uint64_t get_symbol_value(struct readelf *re, int symtab, int i);
 static void load_sections(struct readelf *re);
+static int loc_at_comparator(const void *la1, const void *la2);
 static const char *mips_abi_fp(uint64_t fp);
 static const char *note_type(const char *note_name, unsigned int et,
     unsigned int nt);
@@ -351,7 +369,8 @@ static const char *ppc_abi_vector(uint64_t vec);
 static void readelf_usage(int status);
 static void readelf_version(void);
 static void search_loclist_at(struct readelf *re, Dwarf_Die die,
-    Dwarf_Unsigned lowpc);
+    Dwarf_Unsigned lowpc, struct loc_at **la_list,
+    size_t *la_list_len, size_t *la_list_cap);
 static void search_ver(struct readelf *re);
 static const char *section_type(unsigned int mach, unsigned int stype);
 static void set_cu_context(struct readelf *re, Dwarf_Half psize,
@@ -1121,6 +1140,7 @@ note_type_freebsd(unsigned int nt)
 	case 1: return "NT_FREEBSD_ABI_TAG";
 	case 2: return "NT_FREEBSD_NOINIT_TAG";
 	case 3: return "NT_FREEBSD_ARCH_TAG";
+	case 4: return "NT_FREEBSD_FEATURE_CTL";
 	default: return (note_type_unknown(nt));
 	}
 }
@@ -2723,6 +2743,59 @@ dump_arch_dyn_val(struct readelf *re, GElf_Dyn *dyn)
 }
 
 static void
+dump_flags(struct flag_desc *desc, uint64_t val)
+{
+	struct flag_desc *fd;
+
+	for (fd = desc; fd->flag != 0; fd++) {
+		if (val & fd->flag) {
+			val &= ~fd->flag;
+			printf(" %s", fd->desc);
+		}
+	}
+	if (val != 0)
+		printf(" unknown (0x%jx)", (uintmax_t)val);
+	printf("\n");
+}
+
+static struct flag_desc dt_flags[] = {
+	{ DF_ORIGIN,		"ORIGIN" },
+	{ DF_SYMBOLIC,		"SYMBOLIC" },
+	{ DF_TEXTREL,		"TEXTREL" },
+	{ DF_BIND_NOW,		"BIND_NOW" },
+	{ DF_STATIC_TLS,	"STATIC_TLS" },
+	{ 0, NULL }
+};
+
+static struct flag_desc dt_flags_1[] = {
+	{ DF_1_BIND_NOW,	"NOW" },
+	{ DF_1_GLOBAL,		"GLOBAL" },
+	{ 0x4,			"GROUP" },
+	{ DF_1_NODELETE,	"NODELETE" },
+	{ DF_1_LOADFLTR,	"LOADFLTR" },
+	{ 0x20,			"INITFIRST" },
+	{ DF_1_NOOPEN,		"NOOPEN" },
+	{ DF_1_ORIGIN,		"ORIGIN" },
+	{ 0x100,		"DIRECT" },
+	{ DF_1_INTERPOSE,	"INTERPOSE" },
+	{ DF_1_NODEFLIB,	"NODEFLIB" },
+	{ 0x1000,		"NODUMP" },
+	{ 0x2000,		"CONFALT" },
+	{ 0x4000,		"ENDFILTEE" },
+	{ 0x8000,		"DISPRELDNE" },
+	{ 0x10000,		"DISPRELPND" },
+	{ 0x20000,		"NODIRECT" },
+	{ 0x40000,		"IGNMULDEF" },
+	{ 0x80000,		"NOKSYMS" },
+	{ 0x100000,		"NOHDR" },
+	{ 0x200000,		"EDITED" },
+	{ 0x400000,		"NORELOC" },
+	{ 0x800000,		"SYMINTPOSE" },
+	{ 0x1000000,		"GLOBAUDIT" },
+	{ 0, NULL }
+};
+
+static void
 dump_dyn_val(struct readelf *re, GElf_Dyn *dyn, uint32_t stab)
 {
 	const char *name;
@@ -2805,6 +2878,12 @@ dump_dyn_val(struct readelf *re, GElf_Dyn *dyn, uint32_t stab)
 		break;
 	case DT_GNU_PRELINKED:
 		printf(" %s\n", timestamp(dyn->d_un.d_val));
+		break;
+	case DT_FLAGS:
+		dump_flags(dt_flags, dyn->d_un.d_val);
+		break;
+	case DT_FLAGS_1:
+		dump_flags(dt_flags_1, dyn->d_un.d_val);
 		break;
 	default:
 		printf("\n");
@@ -3424,6 +3503,52 @@ dump_notes(struct readelf *re)
 	}
 }
 
+static struct flag_desc note_feature_ctl_flags[] = {
+	{ NT_FREEBSD_FCTL_ASLR_DISABLE,		"ASLR_DISABLE" },
+	{ 0, NULL }
+};
+
+static void
+dump_notes_data(const char *name, uint32_t type, const char *buf, size_t sz)
+{
+	size_t i;
+	const uint32_t *ubuf;
+
+	/* Note data is at least 4-byte aligned. */
+	if (!__builtin_is_aligned(buf, 4)) {
+		warnx("bad note data alignment");
+		goto unknown;
+	}
+	ubuf = (const uint32_t *)(const void *)buf;
+
+	if (strcmp(name, "FreeBSD") == 0) {
+		switch (type) {
+		case NT_FREEBSD_ABI_TAG:
+			if (sz != 4)
+				goto unknown;
+			printf("   ABI tag: %u\n", ubuf[0]);
+			return;
+		/* NT_FREEBSD_NOINIT_TAG carries no data, treat as unknown. */
+		case NT_FREEBSD_ARCH_TAG:
+			if (sz != 4)
+				goto unknown;
+			printf("   Arch tag: %x\n", ubuf[0]);
+			return;
+		case NT_FREEBSD_FEATURE_CTL:
+			if (sz != 4)
+				goto unknown;
+			printf("   Features:");
+			dump_flags(note_feature_ctl_flags, ubuf[0]);
+			return;
+		}
+	}
+unknown:
+	printf("   description data:");
+	for (i = 0; i < sz; i++)
+		printf(" %02x", (unsigned char)buf[i]);
+	printf("\n");
+}
+
 static void
 dump_notes_content(struct readelf *re, const char *buf, size_t sz, off_t off)
 {
@@ -3440,7 +3565,9 @@ dump_notes_content(struct readelf *re, const char *buf, size_t sz, off_t off)
 			return;
 		}
 		note = (Elf_Note *)(uintptr_t) buf;
-		name = (char *)(uintptr_t)(note + 1);
+		buf += sizeof(Elf_Note);
+		name = buf;
+		buf += roundup2(note->n_namesz, 4);
 		/*
 		 * The name field is required to be nul-terminated, and
 		 * n_namesz includes the terminating nul in observed
@@ -3458,8 +3585,8 @@ dump_notes_content(struct readelf *re, const char *buf, size_t sz, off_t off)
 		printf("  %-13s %#010jx", name, (uintmax_t) note->n_descsz);
 		printf("      %s\n", note_type(name, re->ehdr.e_type,
 		    note->n_type));
-		buf += sizeof(Elf_Note) + roundup2(note->n_namesz, 4) +
-		    roundup2(note->n_descsz, 4);
+		dump_notes_data(name, note->n_type, buf, note->n_descsz);
+		buf += roundup2(note->n_descsz, 4);
 	}
 }
 
@@ -4722,7 +4849,7 @@ dump_dwarf_line_decoded(struct readelf *re)
 		    DW_DLV_OK)
 			dir = NULL;
 		printf("CU: ");
-		if (dir && file)
+		if (dir && file && file[0] != '/')
 			printf("%s/", dir);
 		if (file)
 			printf("%s", file);
@@ -5921,21 +6048,27 @@ dump_dwarf_str(struct readelf *re)
 	}
 }
 
-struct loc_at {
-	Dwarf_Attribute la_at;
-	Dwarf_Unsigned la_off;
-	Dwarf_Unsigned la_lowpc;
-	Dwarf_Half la_cu_psize;
-	Dwarf_Half la_cu_osize;
-	Dwarf_Half la_cu_ver;
-	TAILQ_ENTRY(loc_at) la_next;
-};
+static int
+loc_at_comparator(const void *la1, const void *la2)
+{
+	const struct loc_at *left, *right;
 
-static TAILQ_HEAD(, loc_at) lalist = TAILQ_HEAD_INITIALIZER(lalist);
+	left = (const struct loc_at *)la1;
+	right = (const struct loc_at *)la2;
+
+	if (left->la_off > right->la_off)
+		return (1);
+	else if (left->la_off < right->la_off)
+		return (-1);
+	else
+		return (0);
+}
 
 static void
-search_loclist_at(struct readelf *re, Dwarf_Die die, Dwarf_Unsigned lowpc)
+search_loclist_at(struct readelf *re, Dwarf_Die die, Dwarf_Unsigned lowpc,
+    struct loc_at **la_list, size_t *la_list_len, size_t *la_list_cap)
 {
+	struct loc_at *la;
 	Dwarf_Attribute *attr_list;
 	Dwarf_Die ret_die;
 	Dwarf_Unsigned off;
@@ -5944,7 +6077,6 @@ search_loclist_at(struct readelf *re, Dwarf_Die die, Dwarf_Unsigned lowpc)
 	Dwarf_Half attr, form;
 	Dwarf_Bool is_info;
 	Dwarf_Error de;
-	struct loc_at *la, *nla;
 	int i, ret;
 
 	is_info = dwarf_get_die_infotypes_flag(die);
@@ -5992,33 +6124,21 @@ search_loclist_at(struct readelf *re, Dwarf_Die die, Dwarf_Unsigned lowpc)
 		} else
 			continue;
 
-		TAILQ_FOREACH(la, &lalist, la_next) {
-			if (off == la->la_off)
-				break;
-			if (off < la->la_off) {
-				if ((nla = malloc(sizeof(*nla))) == NULL)
-					err(EXIT_FAILURE, "malloc failed");
-				nla->la_at = attr_list[i];
-				nla->la_off = off;
-				nla->la_lowpc = lowpc;
-				nla->la_cu_psize = re->cu_psize;
-				nla->la_cu_osize = re->cu_osize;
-				nla->la_cu_ver = re->cu_ver;
-				TAILQ_INSERT_BEFORE(la, nla, la_next);
-				break;
-			}
+		if (*la_list_cap == *la_list_len) {
+			*la_list = realloc(*la_list,
+			    *la_list_cap * 2 * sizeof(**la_list));
+			if (la_list == NULL)
+				errx(EXIT_FAILURE, "realloc failed");
+			*la_list_cap *= 2;
 		}
-		if (la == NULL) {
-			if ((nla = malloc(sizeof(*nla))) == NULL)
-				err(EXIT_FAILURE, "malloc failed");
-			nla->la_at = attr_list[i];
-			nla->la_off = off;
-			nla->la_lowpc = lowpc;
-			nla->la_cu_psize = re->cu_psize;
-			nla->la_cu_osize = re->cu_osize;
-			nla->la_cu_ver = re->cu_ver;
-			TAILQ_INSERT_TAIL(&lalist, nla, la_next);
-		}
+		la = &((*la_list)[*la_list_len]);
+		la->la_at = attr_list[i];
+		la->la_off = off;
+		la->la_lowpc = lowpc;
+		la->la_cu_psize = re->cu_psize;
+		la->la_cu_osize = re->cu_osize;
+		la->la_cu_ver = re->cu_ver;
+		(*la_list_len)++;
 	}
 
 cont_search:
@@ -6027,14 +6147,16 @@ cont_search:
 	if (ret == DW_DLV_ERROR)
 		warnx("dwarf_child: %s", dwarf_errmsg(de));
 	else if (ret == DW_DLV_OK)
-		search_loclist_at(re, ret_die, lowpc);
+		search_loclist_at(re, ret_die, lowpc, la_list,
+		    la_list_len, la_list_cap);
 
 	/* Search sibling. */
 	ret = dwarf_siblingof_b(re->dbg, die, &ret_die, is_info, &de);
 	if (ret == DW_DLV_ERROR)
 		warnx("dwarf_siblingof: %s", dwarf_errmsg(de));
 	else if (ret == DW_DLV_OK)
-		search_loclist_at(re, ret_die, lowpc);
+		search_loclist_at(re, ret_die, lowpc, la_list,
+		    la_list_len, la_list_cap);
 }
 
 static void
@@ -6317,9 +6439,15 @@ dump_dwarf_loclist(struct readelf *re)
 	Dwarf_Signed lcnt;
 	Dwarf_Half tag, version, pointer_size, off_size;
 	Dwarf_Error de;
-	struct loc_at *la;
+	struct loc_at *la_list, *left, *right, *la;
+	size_t la_list_len, la_list_cap;
+	unsigned int duplicates, k;
 	int i, j, ret, has_content;
 
+	la_list_len = 0;
+	la_list_cap = 200;
+	if ((la_list = calloc(la_list_cap, sizeof(struct loc_at))) == NULL)
+		errx(EXIT_FAILURE, "calloc failed");
 	/* Search .debug_info section. */
 	while ((ret = dwarf_next_cu_header_b(re->dbg, NULL, &version, NULL,
 	    &pointer_size, &off_size, NULL, NULL, &de)) == DW_DLV_OK) {
@@ -6340,7 +6468,8 @@ dump_dwarf_loclist(struct readelf *re)
 		}
 
 		/* Search attributes for reference to .debug_loc section. */
-		search_loclist_at(re, die, lowpc);
+		search_loclist_at(re, die, lowpc, &la_list,
+		    &la_list_len, &la_list_cap);
 	}
 	if (ret == DW_DLV_ERROR)
 		warnx("dwarf_next_cu_header: %s", dwarf_errmsg(de));
@@ -6372,17 +6501,37 @@ dump_dwarf_loclist(struct readelf *re)
 			 * Search attributes for reference to .debug_loc
 			 * section.
 			 */
-			search_loclist_at(re, die, lowpc);
+			search_loclist_at(re, die, lowpc, &la_list,
+			    &la_list_len, &la_list_cap);
 		}
 		if (ret == DW_DLV_ERROR)
 			warnx("dwarf_next_cu_header: %s", dwarf_errmsg(de));
 	} while (dwarf_next_types_section(re->dbg, &de) == DW_DLV_OK);
 
-	if (TAILQ_EMPTY(&lalist))
+	if (la_list_len == 0) {
+		free(la_list);
 		return;
+	}
+
+	/* Sort la_list using loc_at_comparator. */
+	qsort(la_list, la_list_len, sizeof(struct loc_at), loc_at_comparator);
+
+	/* Get rid of the duplicates in la_list. */
+	duplicates = 0;
+	for (k = 1; k < la_list_len; ++k) {
+		left = &la_list[k - 1 - duplicates];
+		right = &la_list[k];
+
+		if (left->la_off == right->la_off)
+			duplicates++;
+		else
+			la_list[k - duplicates] = *right;
+	}
+	la_list_len -= duplicates;
 
 	has_content = 0;
-	TAILQ_FOREACH(la, &lalist, la_next) {
+	for (k = 0; k < la_list_len; ++k) {
+		la = &la_list[k];
 		if ((ret = dwarf_loclist_n(la->la_at, &llbuf, &lcnt, &de)) !=
 		    DW_DLV_OK) {
 			if (ret != DW_DLV_NO_ENTRY)
@@ -6432,6 +6581,8 @@ dump_dwarf_loclist(struct readelf *re)
 
 	if (!has_content)
 		printf("\nSection '.debug_loc' has no debugging data.\n");
+
+	free(la_list);
 }
 
 /*
@@ -6779,7 +6930,6 @@ dump_elf(struct readelf *re)
 static void
 dump_dwarf(struct readelf *re)
 {
-	struct loc_at *la, *_la;
 	Dwarf_Error de;
 	int error;
 
@@ -6816,11 +6966,6 @@ dump_dwarf(struct readelf *re)
 		dump_dwarf_str(re);
 	if (re->dop & DW_O)
 		dump_dwarf_loclist(re);
-
-	TAILQ_FOREACH_SAFE(la, &lalist, la_next, _la) {
-		TAILQ_REMOVE(&lalist, la, la_next);
-		free(la);
-	}
 
 	dwarf_finish(re->dbg, &de);
 }

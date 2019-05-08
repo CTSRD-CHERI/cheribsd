@@ -39,6 +39,7 @@
 
 /* XXXAR: This code currently requires non-PIC DLA expansions */
 .option pic0
+.set noreorder
 
 
 /*
@@ -56,6 +57,7 @@
  *      c4      relocabase capability
  */
 LEAF(rtld_start)
+	// .cfi_startproc
 #ifdef __CHERI_CAPABILITY_TABLE__
 	/*
 	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
@@ -118,16 +120,15 @@ LEAF(rtld_start)
 	clc		$c4, zero, SFRAME_CLEANUP($c11)
 	clc		$c5, zero, SFRAME_OBJP($c11)
 
-	cmove		$c17, $c12 /* return == PCC signals backtrace routine to stop */
+	cmove		$cra, $c12 /* return == PCC signals backtrace routine to stop */
 	cjr		$c12
 	nop
+	// .cfi_endproc
 END(rtld_start)
 
-/* TODO: implement lazy binding */
-#if 0
-
-#define	XCALLFRAME_CAPSIZ	(9*CHERICAP_SIZE)
-#define	XCALLFRAME_SIZ		(12*SZREG + XCALLFRAME_CAPSIZ)
+#define	_XCALLFRAME_SIZ		(11*SZREG + XCALLFRAME_CAPSIZ)
+/* Ensure the callframe size is capability aligned: */
+#define	XCALLFRAME_SIZ		((_XCALLFRAME_SIZ) + (CHERICAP_SIZE - (_XCALLFRAME_SIZ % CHERICAP_SIZE)))
 #define	XCALLFRAME_RA		(10*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_GP		(9*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_S0		(8*SZREG + XCALLFRAME_CAPSIZ)
@@ -139,6 +140,13 @@ END(rtld_start)
 #define	XCALLFRAME_A6		(2*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_A5		(1*SZREG + XCALLFRAME_CAPSIZ)
 #define	XCALLFRAME_A4		(0*SZREG + XCALLFRAME_CAPSIZ)
+#define	XCALLFRAME_CAPSIZ	(11*CHERICAP_SIZE)
+#define	XCALLFRAME_CFP		(10*CHERICAP_SIZE)
+/*
+ * We need to save $c13 for varidics and on-stack arguments since the any calls
+ * calls with variadic args in rtld (e.g.g debug printfs) will clobber it
+ */
+#define	XCALLFRAME_C13		(9*CHERICAP_SIZE)
 #define	XCALLFRAME_C3		(8*CHERICAP_SIZE)
 #define	XCALLFRAME_C4		(7*CHERICAP_SIZE)
 #define	XCALLFRAME_C5		(6*CHERICAP_SIZE)
@@ -147,80 +155,137 @@ END(rtld_start)
 #define	XCALLFRAME_C8		(3*CHERICAP_SIZE)
 #define	XCALLFRAME_C9		(2*CHERICAP_SIZE)
 #define	XCALLFRAME_C10		(1*CHERICAP_SIZE)
-#define	XCALLFRAME_C17		(0*CHERICAP_SIZE)
+#define	XCALLFRAME_CRA		(0*CHERICAP_SIZE)
 
-	.globl	_rtld_bind_start
-	.ent	_rtld_bind_start
-_rtld_bind_start:
-	.frame	sp, XCALLFRAME_SIZ, $15
-	move	v1, gp			/* save old GP */
-	dli	sp, -XCALLFRAME_SIZ
-	cincoffset $c11, $c11, sp	/* save arguments and sp value in stack */
+#if (XCALLFRAME_SIZ % CHERICAP_SIZE) != 0
+#error BAD_XCALLFRAME_SIZE
+#endif
+
+LEAF(_rtld_bind_start)
+	// move	v1, gp			/* save old GP */
+	// FIXME: the .cfi annotations seem to be wrong since the backtrace is better without them...
+	// .cfi_startproc
+	// .cfi_def_cfa_register	$c11, 0
+#ifdef DEBUG
+	// FIXME: can we assume capability alignment?
+	cgetaddr	t0, $c11
+	andi	t0, t0, (CHERICAP_SIZE - 1)
+	tne	t0, zero
+#endif
+
+	cincoffset $c11, $c11, -XCALLFRAME_SIZ	/* save arguments and sp value in stack */
+	// .cfi_def_cfa_offset XCALLFRAME_SIZ
 	//SETUP_GP64(XCALLFRAME_GP, _rtld_bind_start)
 	csd	gp,  zero, XCALLFRAME_GP($c11)
+	// .cfi_rel_offset gp, XCALLFRAME_GP
 	csd	a0,  zero, XCALLFRAME_A0($c11)
+	// .cfi_rel_offset a0, XCALLFRAME_A0
 	csd	a1,  zero, XCALLFRAME_A1($c11)
+	// .cfi_rel_offset a1, XCALLFRAME_A1
 	csd	a2,  zero, XCALLFRAME_A2($c11)
+	// .cfi_rel_offset a2, XCALLFRAME_A2
 	csd	a3,  zero, XCALLFRAME_A3($c11)
+	// .cfi_rel_offset a3, XCALLFRAME_A3
 	csd	a4,  zero, XCALLFRAME_A4($c11)
+	// .cfi_rel_offset a4, XCALLFRAME_A4
 	csd	a5,  zero, XCALLFRAME_A5($c11)
+	// .cfi_rel_offset a5, XCALLFRAME_A5
 	csd	a6,  zero, XCALLFRAME_A6($c11)
+	// .cfi_rel_offset a6, XCALLFRAME_A6
 	csd	a7,  zero, XCALLFRAME_A7($c11)
-	csd	$15, zero, XCALLFRAME_RA($c11)	/* ra is in t7/t3 */
+	// .cfi_rel_offset a7, XCALLFRAME_A7
 	csd	s0,  zero, XCALLFRAME_S0($c11)
+	// .cfi_rel_offset s0, XCALLFRAME_S0
 	/* XXX-BD: What about ccall functions?  Do we need v0, c1, c2? */
 	csc	$c3, zero, XCALLFRAME_C3($c11)
+	// .cfi_rel_offset $c3, XCALLFRAME_C3
 	csc	$c4, zero, XCALLFRAME_C4($c11)
+	// .cfi_rel_offset $c4, XCALLFRAME_C4
 	csc	$c5, zero, XCALLFRAME_C5($c11)
+	// .cfi_rel_offset $c5, XCALLFRAME_C5
 	csc	$c6, zero, XCALLFRAME_C6($c11)
+	// .cfi_rel_offset $c6, XCALLFRAME_C6
 	csc	$c7, zero, XCALLFRAME_C7($c11)
+	// .cfi_rel_offset $c7, XCALLFRAME_C7
 	csc	$c8, zero, XCALLFRAME_C8($c11)
+	// .cfi_rel_offset $c8, XCALLFRAME_C8
 	csc	$c9, zero, XCALLFRAME_C9($c11)
+	// .cfi_rel_offset $c9, XCALLFRAME_C9
 	csc	$c10, zero, XCALLFRAME_C10($c11)
-	csc	$c17, zero, XCALLFRAME_C17($c11)
-	cmove	$c24, $c11
+	// .cfi_rel_offset $c10, XCALLFRAME_C10
+	csc	$c13, zero, XCALLFRAME_C13($c11)
+	// .cfi_rel_offset $c13, XCALLFRAME_C13
 
-	move	a0, v1			/* old GP */
-	PTR_SUBU	a0, a0, 0x7ff0	/* The offset of $gp from the	*/
-       					/* beginning of the .got section: */
-					/* $gp = .got + 0x7ff0, so	*/
-					/* .got = $gp - 0x7ff0		*/
-					/* Simple math as you can see.	*/
-	ld	a0, 8(a0)	/* object = pltgot[1] */
-	dli	t9, 0x7fffffffffffffff;
-	and	a0, a0, t9
-	cgetdefault	$c3
-	csetoffset	$c3, $c3, a0
-	move	a0, t8			/* symbol index */
+	csc	$cra, zero, XCALLFRAME_CRA($c11)
+	// .cfi_rel_offset $cra, XCALLFRAME_CRA
+	// We also need to save the frame pointer since it is callee-save
+	csc	$cfp, zero, XCALLFRAME_CFP($c11)
+	// .cfi_rel_offset $cfp, XCALLFRAME_CFP
+	cmove	$cfp, $c11
 
-	PIC_CALL(_mips_rtld_bind)
-	cgetpccsetoffset $c12, v0
+	// Current naive implementation contains rtld_cgp at offset 0
+	cmove	$c3, $cgp
+	// TODO: load this from privileged $chwr instead
+	clc	$cgp, zero, 0($c3) #const void* rtld_cgp = plt_stub->rtld_cgp;
+	// Now that the rtld $cgp has been restored we can call functions again
+	PIC_CALL(_mips_rtld_bind)	# $c3 = _mips_rtld_bind(plt_stub)
+	cmove	$c12, $c3
 
-	cmove	$c11, $c24
-	clc	$c17, zero, XCALLFRAME_C17($c11)
+	cmove	$c11, $cfp
+	// FIMXE: using .cfi_restore with a capreg crashes
+	clc	$cfp, zero, XCALLFRAME_CFP($c11)
+	//.cfi_restore $cfp
+	clc	$cra, zero, XCALLFRAME_CRA($c11)
+	//.cfi_restore $cra
+	clc	$c13, zero, XCALLFRAME_C13($c11)
+	//.cfi_restore $c13
 	clc	$c10, zero, XCALLFRAME_C10($c11)
+	//.cfi_restore $c10
 	clc	$c9, zero, XCALLFRAME_C9($c11)
+	// .cfi_restore $c9
 	clc	$c8, zero, XCALLFRAME_C8($c11)
+	//.cfi_restore $c8
 	clc	$c7, zero, XCALLFRAME_C7($c11)
+	//.cfi_restore $c7
 	clc	$c6, zero, XCALLFRAME_C6($c11)
+	//.cfi_restore $c6
 	clc	$c5, zero, XCALLFRAME_C5($c11)
+	//.cfi_restore $c5
 	clc	$c4, zero, XCALLFRAME_C4($c11)
+	//.cfi_restore $c4
 	clc	$c3, zero, XCALLFRAME_C3($c11)
-	cld	ra, zero, XCALLFRAME_RA($c11)
+	// .cfi_restore $c3
 	cld	s0, zero, XCALLFRAME_S0($c11)
+	// .cfi_restore s0
 	cld	a0, zero, XCALLFRAME_A0($c11)
+	// .cfi_restore a0
 	cld	a1, zero, XCALLFRAME_A1($c11)
+	// .cfi_restore a1
 	cld	a2, zero, XCALLFRAME_A2($c11)
+	// .cfi_restore a2
 	cld	a3, zero, XCALLFRAME_A3($c11)
+	// .cfi_restore a3
 	cld	a4, zero, XCALLFRAME_A4($c11)
+	// .cfi_restore a4
 	cld	a5, zero, XCALLFRAME_A5($c11)
+	// .cfi_restore a5
 	cld	a6, zero, XCALLFRAME_A6($c11)
+	// .cfi_restore a6
 	cld	a7, zero, XCALLFRAME_A7($c11)
+	// .cfi_restore a7
 	cld	gp, zero, XCALLFRAME_GP($c11)
-	//RESTORE_GP64
-	dli	sp, XCALLFRAME_SIZ
-	cjr	$c12
-	cincoffset $c11, $c11, sp
-END(_rtld_bind_start)
-
+	// .cfi_restore gp
+#ifdef DEBUG
+	# Check that the target resulting stack address is aligned
+	cgetaddr	t0, $c11
+	daddiu	t0, t0, XCALLFRAME_SIZ
+	andi	t0, t0, (CHERICAP_SIZE - 1)
+	tne	t0, zero
+	cgetaddr	t0, $cfp
+	andi	t0, t0, (CHERICAP_SIZE - 1)
+	tne	t0, zero
 #endif
+	cjr	$c12	# call the resolved target
+	cincoffset $c11, $c11, XCALLFRAME_SIZ	# delay slot
+	// .cfi_endproc
+END(_rtld_bind_start)

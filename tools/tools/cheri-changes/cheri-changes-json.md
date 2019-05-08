@@ -12,7 +12,7 @@ comments.  The following example shows all the current annotations.
  *   "updated": 20180626,
  *   "target_type": "header, kernel, lib, or prog"
  *   "changes": [
- *     "function_abi",
+ *     "calling_convention",
  *     "hashing",
  *     "ioctl:misc",
  *     "ioctl:net",
@@ -24,10 +24,11 @@ comments.  The following example shows all the current annotations.
  *     "pointer_alignment",
  *     "pointer_as_integer",
  *     "pointer_bit_flags",
- *     "pointer_integrity",
+ *     "integer_provenance",
  *     "pointer_provenance",
- *     "pointer_size",
+ *     "pointer_shape",
  *     "support",
+ *     "subobject_bounds",
  *     "sysctl",
  *     "unsupported",
  *     "user_capabilities",
@@ -57,7 +58,7 @@ for used by validation tools.
 `changes`: Zero or more tags indicating the types of changes.  Current
 values are:
 
- * `function_abi` - Changes required by the CHERI-MIPS calling
+ * `calling_convention` - Changes required by the CHERI-MIPS calling
    convention such as declaring arguments in prototypes and va_args and
    non-va_args functions having different register use.
  * `hashing` - Use of pointer addresses in a hash.  In practice, a subset
@@ -83,15 +84,17 @@ values are:
    pointers).
  * `pointer_bit_flags` - Storing and retrieving flags from the lower
    bits of strongly-aligned pointers.
- * `pointer_integrity` - Avoiding casts or misaligned storage that does
+ * `integer_provenance` - Avoiding casts or misaligned storage that does
    not preserve tags.
  * `pointer_provenance` - Deriving pointers from the wrong source.  A
    common(ish) optimization in updating pointers from `realloc()` by
    incrementing the old pointer by the difference of the old and new
    pointers.
- * `pointer_size` - Working around issues caused by larger pointers
+ * `pointer_shape` - Working around issues caused by larger pointers
    such as increased alignment.  Also dealing with conflation of the
    size of pointers and the size of the virtual address space.
+ * `subobject_bounds` - Adding support for tight sub-object bounds - such
+   as adding opt-out annotations for code that uses `containerof()`, etc.
  * `support` - Adding support for CHERI.
  * `sysctl` - (kernel) Sysctl compatability support for CheriABI.
  * `unsupported` - Working around unsupported features such as combining

@@ -31,6 +31,8 @@ MACHINE_CPU = ultrasparc
 . if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
 .  if ${CPUTYPE} == "barcelona"
 CPUTYPE = amdfam10
+.  elif ${CPUTYPE} == "skx"
+CPUTYPE = skylake-avx512
 .  elif ${CPUTYPE} == "core-avx2"
 CPUTYPE = haswell
 .  elif ${CPUTYPE} == "core-avx-i"
@@ -135,7 +137,7 @@ _CPUCFLAGS = -Wa,-me500 -msoft-float
 _CPUCFLAGS = -mcpu=${CPUTYPE} -mno-powerpc64
 .  endif
 . elif ${MACHINE_ARCH} == "powerpcspe"
-_CPUCFLAGS = -Wa,-me500 -mspe=yes -mabi=spe -mfloat-gprs=double
+_CPUCFLAGS = -Wa,-me500 -mspe=yes -mabi=spe -mfloat-gprs=double -mcpu=8548
 . elif ${MACHINE_ARCH} == "powerpc64"
 _CPUCFLAGS = -mcpu=${CPUTYPE}
 . elif ${MACHINE_CPUARCH} == "mips"
@@ -199,15 +201,18 @@ MACHINE_CPU = 3dnow mmx k6 k5 i586
 MACHINE_CPU = mmx k6 k5 i586
 .  elif ${CPUTYPE} == "k5"
 MACHINE_CPU = k5 i586
-.  elif ${CPUTYPE} == "cannonlake" || ${CPUTYPE} == "knm" || \
-    ${CPUTYPE} == "skylake-avx512" || ${CPUTYPE} == "knl"
+.  elif ${CPUTYPE} == "cascadelake" || ${CPUTYPE} == "icelake-server" || \
+    ${CPUTYPE} == "icelake-client" || ${CPUTYPE} == "cannonlake" || \
+    ${CPUTYPE} == "knm" || ${CPUTYPE} == "skylake-avx512" || \
+    ${CPUTYPE} == "knl"
 MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
 .  elif ${CPUTYPE} == "skylake" || ${CPUTYPE} == "broadwell" || \
     ${CPUTYPE} == "haswell"
 MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
 .  elif ${CPUTYPE} == "ivybridge" || ${CPUTYPE} == "sandybridge"
 MACHINE_CPU = avx sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
-.  elif ${CPUTYPE} == "goldmont" || ${CPUTYPE} == "westmere" || \
+.  elif ${CPUTYPE} == "tremont" || ${CPUTYPE} == "goldmont-plus" || \
+    ${CPUTYPE} == "goldmont" || ${CPUTYPE} == "westmere" || \
     ${CPUTYPE} == "nehalem" || ${CPUTYPE} == "silvermont"
 MACHINE_CPU = sse42 sse41 ssse3 sse3 sse2 sse i686 mmx i586
 .  elif ${CPUTYPE} == "penryn"
@@ -262,15 +267,18 @@ MACHINE_CPU = k8 3dnow sse3
 .  elif ${CPUTYPE} == "opteron" || ${CPUTYPE} == "athlon64" || \
     ${CPUTYPE} == "athlon-fx" || ${CPUTYPE} == "k8"
 MACHINE_CPU = k8 3dnow
-.  elif ${CPUTYPE} == "cannonlake" || ${CPUTYPE} == "knm" || \
-    ${CPUTYPE} == "skylake-avx512" || ${CPUTYPE} == "knl"
+.  elif ${CPUTYPE} == "cascadelake" || ${CPUTYPE} == "icelake-server" || \
+    ${CPUTYPE} == "icelake-client" || ${CPUTYPE} == "cannonlake" || \
+    ${CPUTYPE} == "knm" || ${CPUTYPE} == "skylake-avx512" || \
+    ${CPUTYPE} == "knl"
 MACHINE_CPU = avx512 avx2 avx sse42 sse41 ssse3 sse3
 .  elif ${CPUTYPE} == "skylake" || ${CPUTYPE} == "broadwell" || \
     ${CPUTYPE} == "haswell"
 MACHINE_CPU = avx2 avx sse42 sse41 ssse3 sse3
 .  elif ${CPUTYPE} == "ivybridge" || ${CPUTYPE} == "sandybridge"
 MACHINE_CPU = avx sse42 sse41 ssse3 sse3
-.  elif ${CPUTYPE} == "goldmont" || ${CPUTYPE} == "westmere" || \
+.  elif ${CPUTYPE} == "tremont" || ${CPUTYPE} == "goldmont-plus" || \
+    ${CPUTYPE} == "goldmont" || ${CPUTYPE} == "westmere" || \
     ${CPUTYPE} == "nehalem" || ${CPUTYPE} == "silvermont"
 MACHINE_CPU = sse42 sse41 ssse3 sse3
 .  elif ${CPUTYPE} == "penryn"
@@ -335,9 +343,8 @@ CFLAGS+=	-fpic
 CFLAGS+=	-cheri-cap-table-abi=${CHERI_USE_CAP_TABLE:Upcrel}
 .ifdef CHERI_USE_CAP_TLS
 CFLAGS+=	-cheri-cap-tls-abi=${CHERI_USE_CAP_TLS}
-.else
-CFLAGS+=	-ftls-model=local-exec
 .endif
+STATIC_CFLAGS+=	-ftls-model=local-exec
 .ifdef NO_WERROR
 # Implicit function declarations should always be an error in purecap
 # mode as we will probably generate wrong code for calling them.
@@ -410,7 +417,7 @@ CFLAGS += -mfloat-abi=softfp
 .endif
 
 .if ${MACHINE_ARCH} == "powerpcspe"
-CFLAGS += -mcpu=8540 -Wa,-me500 -mspe=yes -mabi=spe -mfloat-gprs=double
+CFLAGS += -mcpu=8548 -Wa,-me500 -mspe=yes -mabi=spe -mfloat-gprs=double
 .endif
 
 .if ${MACHINE_CPUARCH} == "riscv"

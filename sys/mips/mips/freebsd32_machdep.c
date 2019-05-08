@@ -77,7 +77,6 @@ extern const char *freebsd32_syscallnames[];
 struct sysentvec elf32_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= freebsd32_sysent,
-	.sv_mask	= 0,
 	.sv_errsize	= 0,
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
@@ -89,7 +88,6 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= ((vm_offset_t)0x80000000),
 	.sv_usrstack	= FREEBSD32_USRSTACK,
@@ -303,6 +301,7 @@ freebsd32_getcontext(struct thread *td, struct freebsd32_getcontext_args *uap)
 	if (uap->ucp == NULL)
 		ret = EINVAL;
 	else {
+		bzero(&uc, sizeof(uc));
 		get_mcontext32(td, &uc.uc_mcontext, GET_MC_CLEAR_RET);
 		PROC_LOCK(td->td_proc);
 		uc.uc_sigmask = td->td_sigmask;
@@ -342,6 +341,7 @@ freebsd32_swapcontext(struct thread *td, struct freebsd32_swapcontext_args *uap)
 	if (uap->oucp == NULL || uap->ucp == NULL)
 		ret = EINVAL;
 	else {
+		bzero(&uc, sizeof(uc));
 		get_mcontext32(td, &uc.uc_mcontext, GET_MC_CLEAR_RET);
 		PROC_LOCK(td->td_proc);
 		uc.uc_sigmask = td->td_sigmask;
@@ -469,8 +469,8 @@ freebsd32_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		sigexit(td, SIGILL);
 	}
 
-	td->td_frame->pc = (register_t)(intptr_t)catcher;
-	td->td_frame->t9 = (register_t)(intptr_t)catcher;
+	td->td_frame->pc = (register_t)(__cheri_offset intptr_t)catcher;
+	td->td_frame->t9 = (register_t)(__cheri_offset intptr_t)catcher;
 	td->td_frame->sp = (register_t)(intptr_t)sfp;
 	/*
 	 * Signal trampoline code is at base of user stack.
@@ -508,7 +508,7 @@ elf32_dump_thread(struct thread *td __unused, void *dst __unused,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",

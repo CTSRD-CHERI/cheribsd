@@ -50,8 +50,6 @@ __DEFAULT_YES_OPTIONS = \
 __DEFAULT_NO_OPTIONS = \
     EXTRA_TCP_STACKS \
     KERNEL_RETPOLINE \
-    MODULE_DRM \
-    MODULE_DRM2 \
     NAND \
     OFED \
     RATELIMIT
@@ -63,6 +61,11 @@ __DEFAULT_NO_OPTIONS = \
 # and sometimes what is in the opt_*.h files by default.
 # Kernel config files are unaffected, though some targets can be
 # affected by KERNEL_SYMBOLS, FORMAT_EXTENSIONS, CTF and SSP.
+
+.if ${.MAKE.OS} != "FreeBSD"
+# The cddl bootstrap tools still need some changes in order to compile
+BROKEN_OPTIONS+=CDDL ZFS
+.endif
 
 # Things that don't work based on the CPU
 .if ${MACHINE_CPUARCH} == "arm"
@@ -168,6 +171,20 @@ MK_${var}_SUPPORT:= yes
 .endif
 .endif
 .endfor
+
+.if ${MK_CDDL} == "no"
+# ctfconvert may not exist if MK_CDDL=false
+MK_CTF:=	no
+.endif
+
+# FIXME: duplicated from bsd.own.mk since the value of MK_CTF may have changed
+.if ${MK_CTF} != "no"
+CTFCONVERT_CMD=	${CTFCONVERT} ${CTFFLAGS} ${.TARGET}
+.elif defined(.PARSEDIR) || (defined(MAKE_VERSION) && ${MAKE_VERSION} >= 5201111300)
+CTFCONVERT_CMD=
+.else
+CTFCONVERT_CMD=	@:
+.endif
 
 # Some modules only compile successfully if option FDT is set, due to #ifdef FDT
 # wrapped around declarations.  Module makefiles can optionally compile such

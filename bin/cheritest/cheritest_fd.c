@@ -95,7 +95,7 @@ test_sandbox_fd_lseek(const struct cheri_test *ctp __unused)
 void
 test_sandbox_fd_read(const struct cheri_test *ctp)
 {
-	__capability char *stringc;
+	char * __capability stringc;
 	register_t v;
 	size_t len;
 
@@ -116,7 +116,7 @@ test_sandbox_fd_read(const struct cheri_test *ctp)
 void
 test_sandbox_fd_read_revoke(const struct cheri_test *ctp __unused)
 {
-	__capability char *stringc;
+	char * __capability stringc;
 	register_t v;
 	size_t len;
 
@@ -138,7 +138,7 @@ test_sandbox_fd_read_revoke(const struct cheri_test *ctp __unused)
 void
 test_sandbox_fd_write(const struct cheri_test *ctp __unused)
 {
-	__capability char *stringc;
+	char * __capability stringc;
 	register_t v;
 	size_t len;
 
@@ -155,7 +155,7 @@ test_sandbox_fd_write(const struct cheri_test *ctp __unused)
 void
 test_sandbox_fd_write_revoke(const struct cheri_test *ctp __unused)
 {
-	__capability char *stringc;
+	char * __capability stringc;
 	register_t v;
 	size_t len;
 

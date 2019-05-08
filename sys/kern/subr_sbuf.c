@@ -886,7 +886,7 @@ sbuf_end_section(struct sbuf *s, ssize_t old_len, size_t pad, int c)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

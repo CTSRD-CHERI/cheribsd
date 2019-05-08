@@ -52,7 +52,7 @@ options 	PROCFS			# Process filesystem (requires PSEUDOFS)
 options 	PSEUDOFS		# Pseudo-filesystem framework
 options 	GEOM_RAID		# Soft RAID functionality.
 options 	GEOM_LABEL		# Provides labelization
-options 	COMPAT_FREEBSD32	# Incomplete, but used by cloudabi32.ko.
+options 	COMPAT_FREEBSD32	# Compatible with FreeBSD/arm
 options 	COMPAT_FREEBSD11	# Compatible with FreeBSD11
 options 	SCSI_DELAY=5000		# Delay (in ms) before probing SCSI
 options 	KTRACE			# ktrace(1) support
@@ -91,6 +91,13 @@ options 	WITNESS_SKIPSPIN	# Don't run witness on spinlocks for speed
 options 	MALLOC_DEBUG_MAXZONES=8	# Separate malloc(9) zones
 options 	ALT_BREAK_TO_DEBUGGER	# Enter debugger on keyboard escape sequence
 options 	USB_DEBUG		# enable debug msgs
+options 	VERBOSE_SYSINIT=0	# Support debug.verbose_sysinit, off by default
+
+# Kernel Sanitizers
+#options 	COVERAGE		# Generic kernel coverage. Used by KCOV
+#options 	KCOV			# Kernel Coverage Sanitizer
+# Warning: KUBSAN can result in a kernel too large for loader to load
+#options 	KUBSAN			# Kernel Undefined Behavior Sanitizer
 
 # Kernel dump features.
 options 	EKCD			# Support for encrypted kernel dumps
@@ -104,7 +111,9 @@ options 	SOC_ALLWINNER_H5
 options 	SOC_CAVM_THUNDERX
 options 	SOC_HISI_HI6220
 options 	SOC_BRCM_BCM2837
+options 	SOC_MARVELL_8K
 options 	SOC_ROCKCHIP_RK3328
+options 	SOC_ROCKCHIP_RK3399
 options 	SOC_XILINX_ZYNQ
 
 # Timer drivers
@@ -136,20 +145,28 @@ device		al_pci		# Annapurna Alpine PCI-E
 options 	PCI_HP			# PCI-Express native HotPlug
 options 	PCI_IOV		# PCI SR-IOV support
 
+# PCI/PCI-X/PCIe Ethernet NICs that use iflib infrastructure
+device		iflib
+device		em		# Intel PRO/1000 Gigabit Ethernet Family
+device		ix		# Intel 10Gb Ethernet Family
+
 # Ethernet NICs
 device		mdio
 device		mii
 device		miibus		# MII bus support
 device		awg		# Allwinner EMAC Gigabit Ethernet
 device		axgbe		# AMD Opteron A1100 integrated NIC
-device		em		# Intel PRO/1000 Gigabit Ethernet Family
-device		ix		# Intel 10Gb Ethernet Family
 device		msk		# Marvell/SysKonnect Yukon II Gigabit Ethernet
 device		neta		# Marvell Armada 370/38x/XP/3700 NIC
 device  	smc		# SMSC LAN91C111
 device		vnic		# Cavium ThunderX NIC
 device		al_eth		# Annapurna Alpine Ethernet NIC
 device		dwc_rk		# Rockchip Designware
+
+# Etherswitch devices
+device		etherswitch	# Enable etherswitch support
+device		miiproxy	# Required for etherswitch
+device		e6000sw		# Marvell mv88e6085 based switches
 
 # Block devices
 device		ahci
@@ -158,6 +175,11 @@ device		da
 
 # ATA/SCSI peripherals
 device		pass		# Passthrough device (direct ATA/SCSI access)
+
+# NVM Express (NVMe) support
+device		nvme		# base NVMe driver
+options 	NVME_USE_NVD=0	# prefer the cam(4) based nda(4) driver
+device		nvd		# expose NVMe namespaces as disks, depends on nvme
 
 # MMC/SD/SDIO Card slot support
 device		sdhci
@@ -184,7 +206,6 @@ device		ohci			# OHCI USB interface
 device		ehci			# EHCI USB interface (USB 2.0)
 device		ehci_mv			# Marvell EHCI USB interface
 device		xhci			# XHCI PCI->USB interface (USB 3.0)
-device		xhci_mv			# Marvell XHCI USB interface
 device		usb			# USB Bus (required)
 device		ukbd			# Keyboard
 device		umass			# Disks/Mass storage - Requires scbus and da
@@ -194,11 +215,15 @@ device		muge
 device		smcphy
 device		smsc
 
-# GPIO
+# GPIO / PINCTRL
 device		aw_gpio		# Allwinner GPIO controller
 device		gpio
 device		gpioled
 device		fdt_pinctrl
+device		mv_gpio		# Marvell GPIO controller
+device		mvebu_pinctrl	# Marvell Pinmux Controller
+device		rk_gpio		# RockChip GPIO Controller
+device		rk_pinctrl	# RockChip Pinmux Controller
 
 # I2C
 device		aw_rsb		# Allwinner Reduced Serial Bus
@@ -206,12 +231,17 @@ device		bcm2835_bsc	# Broadcom BCM283x I2C bus
 device		iicbus
 device		iic
 device		twsi		# Allwinner I2C controller
+device		rk_i2c		# RockChip I2C controller
+device		syr827		# Silergy SYR827 PMIC
+device		sy8106a		# SY8106A Buck Regulator
 
 # Clock and reset controllers
 device		aw_ccu		# Allwinner clock controller
 
 # Interrupt controllers
 device		aw_nmi		# Allwinner NMI support
+device		mv_cp110_icu	# Marvell CP110 ICU
+device		mv_ap806_gicp	# Marvell AP806 GICP
 
 # Real-time clock support
 device		aw_rtc		# Allwinner Real-time Clock
@@ -222,22 +252,34 @@ device		aw_wdog		# Allwinner Watchdog
 
 # Power management controllers
 device		axp81x		# X-Powers AXP81x PMIC
+device		rk805		# RockChip RK805 PMIC
 
 # EFUSE
 device		aw_sid		# Allwinner Secure ID EFUSE
 
 # Thermal sensors
 device		aw_thermal	# Allwinner Thermal Sensor Controller
+device		mv_thermal	# Marvell Thermal Sensor Controller
 
 # SPI
 device		spibus
 device		bcm2835_spi	# Broadcom BCM283x SPI bus
+
+# PWM
+device		pwm
+device		aw_pwm
 
 # Console
 device		vt
 device		kbdmux
 
 device		vt_efifb
+
+# EVDEV support
+device		evdev			# input event device support
+options		EVDEV_SUPPORT		# evdev support in legacy drivers
+device		uinput			# install /dev/uinput cdev
+device		aw_cir
 
 # Pseudo devices.
 device		crypto		# core crypto support
@@ -273,4 +315,4 @@ options 	FDT
 device		acpi
 
 # DTBs
-makeoptions	MODULES_EXTRA="dtb/allwinner"
+makeoptions	MODULES_EXTRA="dtb/allwinner dtb/rockchip dtb/rpi"

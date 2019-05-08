@@ -31,20 +31,28 @@
 #include <sys/systm.h>
 #include <sys/endian.h>
 #include <sys/lock.h>
+#include <sys/sdt.h>
 #include <sys/stat.h>
 #include <sys/vnode.h>
 
-#include <fs/ext2fs/ext2fs.h>
 #include <fs/ext2fs/fs.h>
 #include <fs/ext2fs/inode.h>
 #include <fs/ext2fs/ext2fs.h>
 #include <fs/ext2fs/ext2_dinode.h>
 #include <fs/ext2fs/ext2_extern.h>
 
+SDT_PROVIDER_DECLARE(ext2fs);
+/*
+ * ext2fs trace probe:
+ * arg0: verbosity. Higher numbers give more verbose messages
+ * arg1: Textual message
+ */
+SDT_PROBE_DEFINE2(ext2fs, , trace, inode_cnv, "int", "char*");
+
 #define XTIME_TO_NSEC(x)	((x & EXT3_NSEC_MASK) >> 2)
 #define NSEC_TO_XTIME(t)	(le32toh(t << 2) & EXT3_NSEC_MASK)
 
-#ifdef EXT2FS_DEBUG
+#ifdef EXT2FS_PRINT_EXTENTS
 void
 ext2_print_inode(struct inode *in)
 {
@@ -84,7 +92,7 @@ ext2_print_inode(struct inode *in)
 		printf("\n");
 	}
 }
-#endif	/* EXT2FS_DEBUG */
+#endif	/* EXT2FS_PRINT_EXTENTS */
 
 /*
  *	raw ext2 inode to inode
@@ -92,8 +100,31 @@ ext2_print_inode(struct inode *in)
 int
 ext2_ei2i(struct ext2fs_dinode *ei, struct inode *ip)
 {
+	struct m_ext2fs *fs = ip->i_e2fs;
 
+	if ((ip->i_number < EXT2_FIRST_INO(fs) && ip->i_number != EXT2_ROOTINO) ||
+	    (ip->i_number < EXT2_ROOTINO) ||
+	    (ip->i_number > fs->e2fs->e2fs_icount)) {
+		SDT_PROBE2(ext2fs, , trace, inode_cnv, 1, "bad inode number");
+		return (EINVAL);
+	}
+
+	if (ip->i_number == EXT2_ROOTINO && ei->e2di_nlink == 0) {
+		SDT_PROBE2(ext2fs, , trace, inode_cnv, 1, "root inode unallocated");
+		return (EINVAL);
+	}
 	ip->i_nlink = ei->e2di_nlink;
+
+	/* Check extra inode size */
+	if (EXT2_INODE_SIZE(fs) > E2FS_REV0_INODE_SIZE) {
+		if (E2FS_REV0_INODE_SIZE + ei->e2di_extra_isize >
+		    EXT2_INODE_SIZE(fs) || (ei->e2di_extra_isize & 3)) {
+			SDT_PROBE2(ext2fs, , trace, inode_cnv, 1,
+			    "bad extra inode size");
+			return (EINVAL);
+		}
+	}
+
 	/*
 	 * Godmar thinks - if the link count is zero, then the inode is
 	 * unused - according to ext2 standards. Ufs marks this fact by
@@ -177,7 +208,7 @@ ext2_i2ei(struct inode *ip, struct ext2fs_dinode *ei)
 	ei->e2di_flags |= (ip->i_flag & IN_E4EXTENTS) ? EXT4_EXTENTS : 0;
 	if (ip->i_blocks > ~0U &&
 	    !EXT2_HAS_RO_COMPAT_FEATURE(fs, EXT2F_ROCOMPAT_HUGE_FILE)) {
-		ext2_fserr(fs, ip->i_uid, "i_blocks value is out of range");
+		SDT_PROBE2(ext2fs, , trace, inode_cnv, 1, "i_blocks value is out of range");
 		return (EIO);
 	}
 	if (ip->i_blocks <= 0xffffffffffffULL) {

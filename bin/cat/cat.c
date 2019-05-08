@@ -258,7 +258,9 @@ cook_cat(FILE *fp)
 				if (ferror(fp) && errno == EILSEQ) {
 					clearerr(fp);
 					/* Resync attempt. */
+#ifdef __FreeBSD__
 					memset(&fp->_mbstate, 0, sizeof(mbstate_t));
+#endif
 					if ((ch = getc(fp)) == EOF)
 						break;
 					wch = ch;

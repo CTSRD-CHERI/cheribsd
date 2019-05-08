@@ -93,8 +93,8 @@ static int opalpci_route_interrupt(device_t bus, device_t dev, int pin);
 /*
  * MSI PIC interface.
  */
-static void opalpic_pic_enable(device_t dev, u_int irq, u_int vector);
-static void opalpic_pic_eoi(device_t dev, u_int irq);
+static void opalpic_pic_enable(device_t dev, u_int irq, u_int vector, void **);
+static void opalpic_pic_eoi(device_t dev, u_int irq, void *);
 
 /* Bus interface */
 static bus_dma_tag_t opalpci_get_dma_tag(device_t dev, device_t child);
@@ -149,6 +149,8 @@ static device_method_t	opalpci_methods[] = {
 
 	/* Bus interface */
 	DEVMETHOD(bus_get_dma_tag,	opalpci_get_dma_tag),
+	DEVMETHOD(bus_get_cpus,		ofw_pcibus_get_cpus),
+	DEVMETHOD(bus_get_domain,	ofw_pcibus_get_domain),
 
 	DEVMETHOD_END
 };
@@ -367,7 +369,7 @@ opalpci_attach(device_t dev)
 	tce_size = max_tce_size(dev);
 	maxmem = roundup2(powerpc_ptob(Maxmem), tce_size);
 	entries = round_pow2(maxmem / tce_size);
-	tce_tbl_size = max(entries * sizeof(uint64_t), 4096);
+	tce_tbl_size = MAX(entries * sizeof(uint64_t), 4096);
 	if (entries > OPAL_PCI_TCE_MAX_ENTRIES)
 		panic("POWERNV supports only %jdGB of memory space\n",
 		    (uintmax_t)((OPAL_PCI_TCE_MAX_ENTRIES * tce_size) >> 30));
@@ -433,20 +435,26 @@ opalpci_attach(device_t dev)
 	}
 
 	/* Create the parent DMA tag */
-	err = bus_dma_tag_create(bus_get_dma_tag(dev), /* parent */
-	    1, 0,				/* alignment, bounds */
-	    OPAL_PCI_BUS_SPACE_LOWADDR_32BIT,	/* lowaddr */
-	    BUS_SPACE_MAXADDR_32BIT,		/* highaddr */
-	    NULL, NULL,				/* filter, filterarg */
-	    BUS_SPACE_MAXSIZE,			/* maxsize */
-	    BUS_SPACE_UNRESTRICTED,		/* nsegments */
-	    BUS_SPACE_MAXSIZE,			/* maxsegsize */
-	    0,					/* flags */
-	    NULL, NULL,				/* lockfunc, lockarg */
-	    &sc->ofw_sc.sc_dmat);
-	if (err != 0) {
-		device_printf(dev, "Failed to create DMA tag\n");
-		return (err);
+	/*
+	 * Constrain it to POWER8 PHB (ioda2) for now.  It seems to mess up on
+	 * POWER9 systems.
+	 */
+	if (ofw_bus_is_compatible(dev, "ibm,ioda2-phb")) {
+		err = bus_dma_tag_create(bus_get_dma_tag(dev), /* parent */
+		    1, 0,				/* alignment, bounds */
+		    OPAL_PCI_BUS_SPACE_LOWADDR_32BIT,	/* lowaddr */
+		    BUS_SPACE_MAXADDR_32BIT,		/* highaddr */
+		    NULL, NULL,				/* filter, filterarg */
+		    BUS_SPACE_MAXSIZE,			/* maxsize */
+		    BUS_SPACE_UNRESTRICTED,		/* nsegments */
+		    BUS_SPACE_MAXSIZE,			/* maxsegsize */
+		    0,					/* flags */
+		    NULL, NULL,				/* lockfunc, lockarg */
+		    &sc->ofw_sc.sc_dmat);
+		if (err != 0) {
+			device_printf(dev, "Failed to create DMA tag\n");
+			return (err);
+		}
 	}
 
 	/*
@@ -669,22 +677,22 @@ opalpci_map_msi(device_t dev, device_t child, int irq, uint64_t *addr,
 }
 
 static void
-opalpic_pic_enable(device_t dev, u_int irq, u_int vector)
+opalpic_pic_enable(device_t dev, u_int irq, u_int vector, void **priv)
 {
 	struct opalpci_softc *sc = device_get_softc(dev);
 
-	PIC_ENABLE(root_pic, irq, vector);
-	opal_call(OPAL_PCI_MSI_EOI, sc->phb_id, irq);
+	PIC_ENABLE(root_pic, irq, vector, priv);
+	opal_call(OPAL_PCI_MSI_EOI, sc->phb_id, irq, priv);
 }
 
-static void opalpic_pic_eoi(device_t dev, u_int irq)
+static void opalpic_pic_eoi(device_t dev, u_int irq, void *priv)
 {
 	struct opalpci_softc *sc;
 
 	sc = device_get_softc(dev);
 	opal_call(OPAL_PCI_MSI_EOI, sc->phb_id, irq);
 
-	PIC_EOI(root_pic, irq);
+	PIC_EOI(root_pic, irq, priv);
 }
 
 static bus_dma_tag_t

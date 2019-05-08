@@ -137,6 +137,10 @@ int cacheline_size = 32;
 #endif
 int hw_direct_map = 1;
 
+#ifdef BOOKE
+extern vm_paddr_t kernload;
+#endif
+
 extern void *ap_pcpu;
 
 struct pcpu __pcpu[MAXCPU];
@@ -295,6 +299,8 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp,
 #ifdef AIM
 		if ((uintptr_t)&powerpc_init > DMAP_BASE_ADDRESS)
 			md_offset = DMAP_BASE_ADDRESS;
+#else /* BOOKE */
+		md_offset = VM_MIN_KERNEL_ADDRESS - kernload;
 #endif
 
 		preload_metadata = mdp;
@@ -309,6 +315,11 @@ powerpc_init(vm_offset_t fdt, vm_offset_t toc, vm_offset_t ofentry, void *mdp,
 			if (envp != NULL)
 				envp += md_offset;
 			init_static_kenv(envp, 0);
+			if (fdt == 0) {
+				fdt = MD_FETCH(kmdp, MODINFOMD_DTBP, uintptr_t);
+				if (fdt != 0)
+					fdt += md_offset;
+			}
 			kernelendphys = MD_FETCH(kmdp, MODINFOMD_KERNEND,
 			    vm_offset_t);
 			if (kernelendphys != 0)
@@ -483,7 +494,7 @@ spinlock_enter(void)
 
 	td = curthread;
 	if (td->td_md.md_spinlock_count == 0) {
-		__asm __volatile("or 2,2,2"); /* Set high thread priority */
+		nop_prio_mhigh();
 		msr = intr_disable();
 		td->td_md.md_spinlock_count = 1;
 		td->td_md.md_saved_msr = msr;
@@ -504,7 +515,7 @@ spinlock_exit(void)
 	td->td_md.md_spinlock_count--;
 	if (td->td_md.md_spinlock_count == 0) {
 		intr_restore(msr);
-		__asm __volatile("or 6,6,6"); /* Set normal thread priority */
+		nop_prio_medium();
 	}
 }
 
@@ -530,8 +541,16 @@ DB_SHOW_COMMAND(spr, db_show_spr)
 	saved_sprno = sprno = (intptr_t) addr;
 	sprno = ((sprno & 0x3e0) >> 5) | ((sprno & 0x1f) << 5);
 	p = (uint32_t *)(void *)&get_spr;
+#ifdef __powerpc64__
+#if defined(_CALL_ELF) && _CALL_ELF == 2
+	/* Account for ELFv2 function prologue. */
+	p += 2;
+#else
+	p = *(volatile uint32_t * volatile *)p;
+#endif
+#endif
 	*p = (*p & ~0x001ff800) | (sprno << 11);
-	__syncicache(get_spr, cacheline_size);
+	__syncicache(__DEVOLATILE(uint32_t *, p), cacheline_size);
 	spr = get_spr(sprno);
 
 	db_printf("SPR %d(%x): %lx\n", saved_sprno, saved_sprno,

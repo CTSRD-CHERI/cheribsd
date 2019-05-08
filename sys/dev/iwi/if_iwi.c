@@ -134,8 +134,6 @@ static const struct iwi_ident iwi_ident_table[] = {
 	{ 0, 0, NULL }
 };
 
-static const uint8_t def_chan_2ghz[] =
-	{ 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14 };
 static const uint8_t def_chan_5ghz_band1[] =
 	{ 36, 40, 44, 48, 52, 56, 60, 64 };
 static const uint8_t def_chan_5ghz_band2[] =
@@ -2580,15 +2578,18 @@ static int
 iwi_config(struct iwi_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
+	struct ieee80211vap *vap = TAILQ_FIRST(&ic->ic_vaps);
 	struct iwi_configuration config;
 	struct iwi_txpower power;
+	uint8_t *macaddr;
 	uint32_t data;
 	int error, i;
 
 	IWI_LOCK_ASSERT(sc);
 
-	DPRINTF(("Setting MAC address to %6D\n", ic->ic_macaddr, ":"));
-	error = iwi_cmd(sc, IWI_CMD_SET_MAC_ADDRESS, ic->ic_macaddr,
+	macaddr = vap ? vap->iv_myaddr : ic->ic_macaddr;
+	DPRINTF(("Setting MAC address to %6D\n", macaddr, ":"));
+	error = iwi_cmd(sc, IWI_CMD_SET_MAC_ADDRESS, macaddr,
 	    IEEE80211_ADDR_LEN);
 	if (error != 0)
 		return error;
@@ -2835,12 +2836,12 @@ iwi_auth_and_assoc(struct iwi_softc *sc, struct ieee80211vap *vap)
 
 	IWI_LOCK_ASSERT(sc);
 
-	ni = ieee80211_ref_node(vap->iv_bss);
-
 	if (sc->flags & IWI_FLAG_ASSOCIATED) {
 		DPRINTF(("Already associated\n"));
 		return (-1);
 	}
+
+	ni = ieee80211_ref_node(vap->iv_bss);
 
 	IWI_STATE_BEGIN(sc, IWI_FW_ASSOCIATING);
 	error = 0;
@@ -3606,8 +3607,8 @@ iwi_getradiocaps(struct ieee80211com *ic,
 	iwi_collect_bands(ic, bands, sizeof(bands));
 	*nchans = 0;
 	if (isset(bands, IEEE80211_MODE_11B) || isset(bands, IEEE80211_MODE_11G))
-		ieee80211_add_channel_list_2ghz(chans, maxchans, nchans,
-		    def_chan_2ghz, nitems(def_chan_2ghz), bands, 0);
+		ieee80211_add_channels_default_2ghz(chans, maxchans, nchans,
+		    bands, 0);
 	if (isset(bands, IEEE80211_MODE_11A)) {
 		ieee80211_add_channel_list_5ghz(chans, maxchans, nchans,
 		    def_chan_5ghz_band1, nitems(def_chan_5ghz_band1),
@@ -3622,7 +3623,7 @@ iwi_getradiocaps(struct ieee80211com *ic,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

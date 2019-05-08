@@ -889,6 +889,8 @@ solisten_wakeup(struct socket *sol)
 	}
 	SOLISTEN_UNLOCK(sol);
 	wakeup_one(&sol->sol_comp);
+	if ((sol->so_state & SS_ASYNC) && sol->so_sigio != NULL)
+		pgsigio(&sol->so_sigio, SIGIO, 0);
 }
 
 /*
@@ -1175,7 +1177,6 @@ soabort(struct socket *so)
 	KASSERT(so->so_count == 0, ("soabort: so_count"));
 	KASSERT((so->so_state & SS_PROTOREF) == 0, ("soabort: SS_PROTOREF"));
 	KASSERT(so->so_state & SS_NOFDREF, ("soabort: !SS_NOFDREF"));
-	KASSERT(so->so_qstate == SQ_NONE, ("soabort: !SQ_NONE"));
 	VNET_SO_ASSERT(so);
 
 	if (so->so_proto->pr_usrreqs->pru_abort != NULL)
@@ -1525,7 +1526,8 @@ restart:
 		}
 		if (space < resid + clen &&
 		    (atomic || space < so->so_snd.sb_lowat || space < clen)) {
-			if ((so->so_state & SS_NBIO) || (flags & MSG_NBIO)) {
+			if ((so->so_state & SS_NBIO) ||
+			    (flags & (MSG_NBIO | MSG_DONTWAIT)) != 0) {
 				SOCKBUF_UNLOCK(&so->so_snd);
 				error = EWOULDBLOCK;
 				goto release;
@@ -2762,12 +2764,10 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 	CURVNET_SET(so->so_vnet);
 	error = 0;
 	if (sopt->sopt_level != SOL_SOCKET) {
-		if (so->so_proto->pr_ctloutput != NULL) {
+		if (so->so_proto->pr_ctloutput != NULL)
 			error = (*so->so_proto->pr_ctloutput)(so, sopt);
-			CURVNET_RESTORE();
-			return (error);
-		}
-		error = ENOPROTOOPT;
+		else
+			error = ENOPROTOOPT;
 	} else {
 		switch (sopt->sopt_name) {
 		case SO_ACCEPTFILTER:
@@ -4081,6 +4081,7 @@ void
 sotoxsocket(struct socket *so, struct xsocket *xso)
 {
 
+	bzero(xso, sizeof(*xso));
 	xso->xso_len = sizeof *xso;
 	xso->xso_so = (uintptr_t)so;
 	xso->so_type = so->so_type;
@@ -4099,8 +4100,6 @@ sotoxsocket(struct socket *so, struct xsocket *xso)
 		xso->so_incqlen = so->sol_incqlen;
 		xso->so_qlimit = so->sol_qlimit;
 		xso->so_oobmark = 0;
-		bzero(&xso->so_snd, sizeof(xso->so_snd));
-		bzero(&xso->so_rcv, sizeof(xso->so_rcv));
 	} else {
 		xso->so_state |= so->so_qstate;
 		xso->so_qlen = xso->so_incqlen = xso->so_qlimit = 0;
@@ -4237,7 +4236,7 @@ so_unlock(struct socket *so)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

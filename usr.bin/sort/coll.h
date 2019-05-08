@@ -31,10 +31,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "prog",
  *   "changes": [
- *     "pointer_size"
+ *     "pointer_shape"
  *   ],
  *   "change_comment": "aligning struct key_hint, not packing struct key_value"
  * }
@@ -77,6 +77,17 @@ struct M_hint
 };
 
 /*
+ * Sort hint data for -R
+ *
+ * This stores the first 12 bytes of the digest rather than the full output to
+ * avoid increasing the size of the 'key_hint' object via the 'v' union.
+ */
+struct R_hint
+{
+	unsigned char		 cached[12];
+};
+
+/*
  * Status of a sort hint object
  */
 typedef enum
@@ -95,6 +106,7 @@ struct key_hint
 		struct n_hint		nh;
 		struct g_hint		gh;
 		struct M_hint		Mh;
+		struct R_hint		Rh;
 	}			v;
 }
 #ifdef __CHERI_PURE_CAPABILITY__

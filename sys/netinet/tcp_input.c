@@ -212,11 +212,6 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, recvbuf_auto, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_do_autorcvbuf), 0,
     "Enable automatic receive buffer sizing");
 
-VNET_DEFINE(int, tcp_autorcvbuf_inc) = 16*1024;
-SYSCTL_INT(_net_inet_tcp, OID_AUTO, recvbuf_inc, CTLFLAG_VNET | CTLFLAG_RW,
-    &VNET_NAME(tcp_autorcvbuf_inc), 0,
-    "Incrementor step size of automatic receive buffer");
-
 VNET_DEFINE(int, tcp_autorcvbuf_max) = 2*1024*1024;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, recvbuf_max, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(tcp_autorcvbuf_max), 0,
@@ -371,31 +366,14 @@ cc_conn_init(struct tcpcb *tp)
 	/*
 	 * Set the initial slow-start flight size.
 	 *
-	 * RFC5681 Section 3.1 specifies the default conservative values.
-	 * RFC3390 specifies slightly more aggressive values.
-	 * RFC6928 increases it to ten segments.
-	 * Support for user specified value for initial flight size.
-	 *
 	 * If a SYN or SYN/ACK was lost and retransmitted, we have to
 	 * reduce the initial CWND to one segment as congestion is likely
 	 * requiring us to be cautious.
 	 */
 	if (tp->snd_cwnd == 1)
 		tp->snd_cwnd = maxseg;		/* SYN(-ACK) lost */
-	else if (V_tcp_initcwnd_segments)
-		tp->snd_cwnd = min(V_tcp_initcwnd_segments * maxseg,
-		    max(2 * maxseg, V_tcp_initcwnd_segments * 1460));
-	else if (V_tcp_do_rfc3390)
-		tp->snd_cwnd = min(4 * maxseg, max(2 * maxseg, 4380));
-	else {
-		/* Per RFC5681 Section 3.1 */
-		if (maxseg > 2190)
-			tp->snd_cwnd = 2 * maxseg;
-		else if (maxseg > 1095)
-			tp->snd_cwnd = 3 * maxseg;
-		else
-			tp->snd_cwnd = 4 * maxseg;
-	}
+	else
+		tp->snd_cwnd = tcp_compute_initwnd(maxseg);
 
 	if (CC_ALGO(tp)->conn_init != NULL)
 		CC_ALGO(tp)->conn_init(tp->ccv);
@@ -1466,13 +1444,16 @@ drop:
  * The criteria to step up the receive buffer one notch are:
  *  1. Application has not set receive buffer size with
  *     SO_RCVBUF. Setting SO_RCVBUF clears SB_AUTOSIZE.
- *  2. the number of bytes received during the time it takes
- *     one timestamp to be reflected back to us (the RTT);
- *  3. received bytes per RTT is within seven eighth of the
- *     current socket buffer size;
- *  4. receive buffer size has not hit maximal automatic size;
+ *  2. the number of bytes received during 1/2 of an sRTT
+ *     is at least 3/8 of the current socket buffer size.
+ *  3. receive buffer size has not hit maximal automatic size;
  *
- * This algorithm does one step per RTT at most and only if
+ * If all of the criteria are met we increaset the socket buffer
+ * by a 1/2 (bounded by the max). This allows us to keep ahead
+ * of slow-start but also makes it so our peer never gets limited
+ * by our rwnd which we then open up causing a burst.
+ *
+ * This algorithm does two steps per RTT at most and only if
  * we receive a bulk stream w/o packet losses or reorderings.
  * Shrinking the buffer during idle times is not necessary as
  * it doesn't consume any memory when idle.
@@ -1489,11 +1470,10 @@ tcp_autorcvbuf(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	if (V_tcp_do_autorcvbuf && (so->so_rcv.sb_flags & SB_AUTOSIZE) &&
 	    tp->t_srtt != 0 && tp->rfbuf_ts != 0 &&
 	    TCP_TS_TO_TICKS(tcp_ts_getticks() - tp->rfbuf_ts) >
-	    (tp->t_srtt >> TCP_RTT_SHIFT)) {
-		if (tp->rfbuf_cnt > (so->so_rcv.sb_hiwat / 8 * 7) &&
+	    ((tp->t_srtt >> TCP_RTT_SHIFT)/2)) {
+		if (tp->rfbuf_cnt > ((so->so_rcv.sb_hiwat / 2)/ 4 * 3) &&
 		    so->so_rcv.sb_hiwat < V_tcp_autorcvbuf_max) {
-			newsize = min(so->so_rcv.sb_hiwat +
-			    V_tcp_autorcvbuf_inc, V_tcp_autorcvbuf_max);
+			newsize = min((so->so_rcv.sb_hiwat + (so->so_rcv.sb_hiwat/2)), V_tcp_autorcvbuf_max);
 		}
 		TCP_PROBE6(receive__autoresize, NULL, tp, m, tp, th, newsize);
 
@@ -2027,7 +2007,8 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			else
 				tp->t_flags |= TF_ACKNOW;
 
-			if ((thflags & TH_ECE) && V_tcp_do_ecn) {
+			if (((thflags & (TH_CWR | TH_ECE)) == TH_ECE) &&
+			    V_tcp_do_ecn) {
 				tp->t_flags |= TF_ECN_PERMIT;
 				TCPSTAT_INC(tcps_ecn_shs);
 			}
@@ -2401,8 +2382,8 @@ tcp_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		if ((tp->t_flags & (TF_RCVD_SCALE|TF_REQ_SCALE)) ==
 			(TF_RCVD_SCALE|TF_REQ_SCALE)) {
 			tp->rcv_scale = tp->request_r_scale;
-			tp->snd_wnd = tiwin;
 		}
+		tp->snd_wnd = tiwin;
 		/*
 		 * Make transitions:
 		 *      SYN-RECEIVED  -> ESTABLISHED
@@ -3817,4 +3798,31 @@ tcp_compute_pipe(struct tcpcb *tp)
 	return (tp->snd_max - tp->snd_una +
 		tp->sackhint.sack_bytes_rexmit -
 		tp->sackhint.sacked_bytes);
+}
+
+uint32_t
+tcp_compute_initwnd(uint32_t maxseg)
+{
+	/*
+	 * Calculate the Initial Window, also used as Restart Window
+	 *
+	 * RFC5681 Section 3.1 specifies the default conservative values.
+	 * RFC3390 specifies slightly more aggressive values.
+	 * RFC6928 increases it to ten segments.
+	 * Support for user specified value for initial flight size.
+	 */
+	if (V_tcp_initcwnd_segments)
+		return min(V_tcp_initcwnd_segments * maxseg,
+		    max(2 * maxseg, V_tcp_initcwnd_segments * 1460));
+	else if (V_tcp_do_rfc3390)
+		return min(4 * maxseg, max(2 * maxseg, 4380));
+	else {
+		/* Per RFC5681 Section 3.1 */
+		if (maxseg > 2190)
+			return (2 * maxseg);
+		else if (maxseg > 1095)
+			return (3 * maxseg);
+		else
+			return (4 * maxseg);
+	}
 }

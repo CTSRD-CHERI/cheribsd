@@ -31,12 +31,17 @@ SRCS	+= skein.c skein_block.c
 # unroll the 256 and 512 loops, half unroll the 1024
 CFLAGS+= -DSKEIN_LOOP=995
 .if exists(${MACHINE_ARCH}/skein_block_asm.s)
+# Don't build the optimized sken_block_asm.s unless we have GNU as:
+.if ${AS:!which ${AS}!} == ""
+.warning as not available: not using optimized Skein asm
+.else
 .PATH:	${SRCTOP}/sys/crypto/skein/${MACHINE_ARCH}
 SRCS	+= skein_block_asm.s
 CFLAGS	+= -DSKEIN_ASM -DSKEIN_USE_ASM=1792 # list of block functions to replace with assembly: 256+512+1024 = 1792
 ACFLAGS	+= -DELF -Wa,--noexecstack
 # Fully unroll all loops in the assembly optimized version
 AFLAGS+= --defsym SKEIN_LOOP=0
+.endif
 .endif
 SRCS	+= siphash.c
 SRCS	+= gmac.c gfmult.c
@@ -68,5 +73,7 @@ CFLAGS.utils.c			+= -I${LIBSODIUM_INC} -I${LIBSODIUM_COMPAT}
 
 SRCS	+= opt_param.h cryptodev_if.h bus_if.h device_if.h
 SRCS	+= opt_ddb.h
+SRCS	+= cbc_mac.c
+SRCS	+= xform_cbc_mac.c
 
 .include <bsd.kmod.mk>

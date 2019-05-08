@@ -31,12 +31,15 @@
  */
 #include "plt_test.h"
 
-void __start(void) {
+static void test(void) {
 	// Check that we can call an function in the other library that uses
 	// the cap-table to load globals
 	int loaded_global = 0;
 	loaded_global = load_global_int();
-	print("Loaded global via call!\n");
-	require(loaded_global == 42);
-	exit(0);
+	print("Loaded global via call: ");
+	print_long(loaded_global, 10);
+	print("\n");
+	require_eq(loaded_global, 42);
 }
+
+TEST_MAIN()

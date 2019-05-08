@@ -56,7 +56,6 @@ __FBSDID("$FreeBSD$");
 struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_mask	= 0,
 	.sv_errsize	= 0,
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
@@ -68,7 +67,6 @@ struct sysentvec elf64_freebsd_sysvec = {
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
@@ -78,7 +76,7 @@ struct sysentvec elf64_freebsd_sysvec = {
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 |
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_ASLR |
 #ifdef MIPS_SHAREDPAGE
 			    SV_SHP,
 #else
@@ -113,7 +111,7 @@ mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
 	return FALSE;
 }
 
-static boolean_t
+boolean_t
 mips_elf_header_supported(struct image_params * imgp)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
@@ -155,7 +153,6 @@ elf64_dump_thread(struct thread *td __unused, void *dst __unused,
 struct sysentvec elf32_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
-	.sv_mask	= 0,
 	.sv_errsize	= 0,
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
@@ -167,7 +164,6 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
@@ -177,7 +173,7 @@ struct sysentvec elf32_freebsd_sysvec = {
 	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 |
+	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 | SV_ASLR |
 #ifdef MIPS_SHAREDPAGE
 			    SV_SHP,
 #else
@@ -608,7 +604,7 @@ elf_cpu_unload_file(linker_file_t lf __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

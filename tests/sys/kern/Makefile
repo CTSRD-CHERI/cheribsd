@@ -5,11 +5,13 @@ TESTSRC=	${SRCTOP}/contrib/netbsd-tests/kernel
 
 TESTSDIR=	${TESTSBASE}/sys/kern
 
+#ATF_TESTS_C+=	kcov
 ATF_TESTS_C+=	kern_copyin
 ATF_TESTS_C+=	kern_descrip_test
 ATF_TESTS_C+=	ptrace_test
 TEST_METADATA.ptrace_test+=		timeout="15"
 ATF_TESTS_C+=	reaper
+ATF_TESTS_C+=	sigaltstack
 PLAIN_TESTS_C+=	subr_unit_test
 ATF_TESTS_C+=	sys_getrandom
 ATF_TESTS_C+=	unix_passfd_test
@@ -31,6 +33,7 @@ LIBADD.sys_getrandom+=			c
 LIBADD.sys_getrandom+=			pthread
 LIBADD.ptrace_test+=			pthread
 LIBADD.unix_seqpacket_test+=		pthread
+LIBADD.kcov+=				pthread
 
 NETBSD_ATF_TESTS_C+=	lockf_test
 NETBSD_ATF_TESTS_C+=	mqueue_test

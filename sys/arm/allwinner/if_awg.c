@@ -1466,6 +1466,12 @@ awg_setup_extres(device_t dev)
 		goto fail;
 	}
 	if (rst_ephy != NULL) {
+		/*
+		 * The ephy reset is left de-asserted by U-Boot.  Assert it
+		 * here to make sure that we're in a known good state going
+		 * into the PHY reset.
+		 */
+		hwreset_assert(rst_ephy);
 		error = hwreset_deassert(rst_ephy);
 		if (error != 0) {
 			device_printf(dev, "cannot de-assert ephy reset\n");
@@ -1961,12 +1967,13 @@ static devclass_t awg_devclass;
 
 DRIVER_MODULE(awg, simplebus, awg_driver, awg_devclass, 0, 0);
 DRIVER_MODULE(miibus, awg, miibus_driver, miibus_devclass, 0, 0);
-
 MODULE_DEPEND(awg, ether, 1, 1, 1);
 MODULE_DEPEND(awg, miibus, 1, 1, 1);
+MODULE_DEPEND(awg, aw_sid, 1, 1, 1);
+SIMPLEBUS_PNP_INFO(compat_data);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20190429,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

@@ -695,10 +695,9 @@ vm_pageout_launder(struct vm_domain *vmd, int launder, bool in_shortfall)
 	vm_page_t m, marker;
 	int act_delta, error, numpagedout, queue, starting_target;
 	int vnodes_skipped;
-	bool obj_locked, pageout_ok;
+	bool pageout_ok;
 
 	mtx = NULL;
-	obj_locked = false;
 	object = NULL;
 	starting_target = launder;
 	vnodes_skipped = 0;
@@ -760,22 +759,16 @@ recheck:
 		}
 
 		if (object != m->object) {
-			if (obj_locked) {
+			if (object != NULL)
 				VM_OBJECT_WUNLOCK(object);
-				obj_locked = false;
-			}
 			object = m->object;
-		}
-		if (!obj_locked) {
 			if (!VM_OBJECT_TRYWLOCK(object)) {
 				mtx_unlock(mtx);
 				/* Depends on type-stability. */
 				VM_OBJECT_WLOCK(object);
-				obj_locked = true;
 				mtx_lock(mtx);
 				goto recheck;
-			} else
-				obj_locked = true;
+			}
 		}
 
 		if (vm_page_busied(m))
@@ -897,16 +890,16 @@ free_page:
 				vnodes_skipped++;
 			}
 			mtx = NULL;
-			obj_locked = false;
+			object = NULL;
 		}
 	}
 	if (mtx != NULL) {
 		mtx_unlock(mtx);
 		mtx = NULL;
 	}
-	if (obj_locked) {
+	if (object != NULL) {
 		VM_OBJECT_WUNLOCK(object);
-		obj_locked = false;
+		object = NULL;
 	}
 	vm_pagequeue_lock(pq);
 	vm_pageout_end_scan(&ss);
@@ -973,7 +966,7 @@ vm_pageout_laundry_worker(void *arg)
 	shortfall = 0;
 	in_shortfall = false;
 	shortfall_cycle = 0;
-	target = 0;
+	last_target = target = 0;
 	nfreed = 0;
 
 	/*
@@ -1368,7 +1361,6 @@ vm_pageout_scan_inactive(struct vm_domain *vmd, int shortage,
 	vm_object_t object;
 	int act_delta, addl_page_shortage, deficit, page_shortage;
 	int starting_page_shortage;
-	bool obj_locked;
 
 	/*
 	 * The addl_page_shortage is an estimate of the number of temporarily
@@ -1388,7 +1380,6 @@ vm_pageout_scan_inactive(struct vm_domain *vmd, int shortage,
 	starting_page_shortage = page_shortage = shortage + deficit;
 
 	mtx = NULL;
-	obj_locked = false;
 	object = NULL;
 	vm_batchqueue_init(&rq);
 
@@ -1446,22 +1437,16 @@ recheck:
 		}
 
 		if (object != m->object) {
-			if (obj_locked) {
+			if (object != NULL)
 				VM_OBJECT_WUNLOCK(object);
-				obj_locked = false;
-			}
 			object = m->object;
-		}
-		if (!obj_locked) {
 			if (!VM_OBJECT_TRYWLOCK(object)) {
 				mtx_unlock(mtx);
 				/* Depends on type-stability. */
 				VM_OBJECT_WLOCK(object);
-				obj_locked = true;
 				mtx_lock(mtx);
 				goto recheck;
-			} else
-				obj_locked = true;
+			}
 		}
 
 		if (vm_page_busied(m)) {
@@ -1563,14 +1548,10 @@ free_page:
 reinsert:
 		vm_pageout_reinsert_inactive(&ss, &rq, m);
 	}
-	if (mtx != NULL) {
+	if (mtx != NULL)
 		mtx_unlock(mtx);
-		mtx = NULL;
-	}
-	if (obj_locked) {
+	if (object != NULL)
 		VM_OBJECT_WUNLOCK(object);
-		obj_locked = false;
-	}
 	vm_pageout_reinsert_inactive(&ss, &rq, NULL);
 	vm_pageout_reinsert_inactive(&ss, &ss.bq, NULL);
 	vm_pagequeue_lock(pq);
@@ -2072,41 +2053,41 @@ vm_pageout_init(void)
 static void
 vm_pageout(void)
 {
-	int error;
-	int i;
+	struct proc *p;
+	struct thread *td;
+	int error, first, i;
+
+	p = curproc;
+	td = curthread;
 
 	swap_pager_swap_init();
-	snprintf(curthread->td_name, sizeof(curthread->td_name), "dom0");
-	error = kthread_add(vm_pageout_laundry_worker, NULL, curproc, NULL,
-	    0, 0, "laundry: dom0");
-	if (error != 0)
-		panic("starting laundry for domain 0, error %d", error);
-	for (i = 1; i < vm_ndomains; i++) {
+	for (first = -1, i = 0; i < vm_ndomains; i++) {
 		if (VM_DOMAIN_EMPTY(i)) {
 			if (bootverbose)
 				printf("domain %d empty; skipping pageout\n",
 				    i);
 			continue;
 		}
-
-		error = kthread_add(vm_pageout_worker, (void *)(uintptr_t)i,
-		    curproc, NULL, 0, 0, "dom%d", i);
-		if (error != 0) {
-			panic("starting pageout for domain %d, error %d\n",
-			    i, error);
+		if (first == -1)
+			first = i;
+		else {
+			error = kthread_add(vm_pageout_worker,
+			    (void *)(uintptr_t)i, p, NULL, 0, 0, "dom%d", i);
+			if (error != 0)
+				panic("starting pageout for domain %d: %d\n",
+				    i, error);
 		}
 		error = kthread_add(vm_pageout_laundry_worker,
-		    (void *)(uintptr_t)i, curproc, NULL, 0, 0,
-		    "laundry: dom%d", i);
+		    (void *)(uintptr_t)i, p, NULL, 0, 0, "laundry: dom%d", i);
 		if (error != 0)
-			panic("starting laundry for domain %d, error %d",
-			    i, error);
+			panic("starting laundry for domain %d: %d", i, error);
 	}
-	error = kthread_add(uma_reclaim_worker, NULL, curproc, NULL,
-	    0, 0, "uma");
+	error = kthread_add(uma_reclaim_worker, NULL, p, NULL, 0, 0, "uma");
 	if (error != 0)
 		panic("starting uma_reclaim helper, error %d\n", error);
-	vm_pageout_worker((void *)(uintptr_t)0);
+
+	snprintf(td->td_name, sizeof(td->td_name), "dom%d", first);
+	vm_pageout_worker((void *)(uintptr_t)first);
 }
 
 /*

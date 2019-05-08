@@ -256,7 +256,7 @@ reloc_nonplt_object(Obj_Entry *obj_rtld __unused, Obj_Entry *obj,
 
 		*(Elf_Addr **)where = *where * sizeof(Elf_Addr)
 		    + (Elf_Addr *)(def->st_value + rela->r_addend
-		    + defobj->tlsoffset - TLS_TP_OFFSET);
+		    + defobj->tlsoffset - TLS_TP_OFFSET - TLS_TCB_SIZE);
 
 		break;
 
@@ -291,6 +291,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 {
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
+	const Elf_Phdr *phdr;
 	SymCache *cache;
 	int bytes = obj->dynsymcount * sizeof(SymCache);
 	int r = -1;
@@ -327,8 +328,18 @@ done:
 	if (cache)
 		munmap(cache, bytes);
 
-	/* Synchronize icache for text seg in case we made any changes */
-	__syncicache(obj->mapbase, obj->textsize);
+	/*
+	 * Synchronize icache for executable segments in case we made
+	 * any changes.
+	 */
+	for (phdr = obj->phdr;
+	    (const char *)phdr < (const char *)obj->phdr + obj->phsize;
+	    phdr++) {
+		if (phdr->p_type == PT_LOAD && (phdr->p_flags & PF_X) != 0) {
+			__syncicache(obj->relocbase + phdr->p_vaddr,
+			    phdr->p_memsz);
+		}
+	}
 
 	return (r);
 }
@@ -365,7 +376,7 @@ reloc_plt_object(Obj_Entry *obj, const Elf_Rela *rela)
  * Process the PLT relocations.
  */
 int
-reloc_plt(Obj_Entry *obj)
+reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
 {
 	const Elf_Rela *relalim;
 	const Elf_Rela *rela;
@@ -436,7 +447,7 @@ reloc_jmpslots(Obj_Entry *obj, int flags, RtldLockState *lockstate)
  * Update the value of a PLT jump slot.
  */
 Elf_Addr
-reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target, const Obj_Entry *defobj,
+reloc_jmpslot(Elf_Addr *wherep, Elf_Addr target, const Obj_Entry *defobj __unused,
     const Obj_Entry *obj __unused, const Elf_Rel *rel __unused)
 {
 

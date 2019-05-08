@@ -85,10 +85,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/endian.h>
 #include <sys/kdb.h>
 
-#include <machine/bus.h>
-#include <machine/resource.h>
-#include <sys/rman.h>
-
 #include <net/bpf.h>
 #include <net/if.h>
 #include <net/if_var.h>
@@ -1280,8 +1276,8 @@ uath_watchdog(void *arg)
 	if (sc->sc_tx_timer > 0) {
 		if (--sc->sc_tx_timer == 0) {
 			device_printf(sc->sc_dev, "device timeout\n");
-			/*uath_init(sc); XXX needs a process context! */
 			counter_u64_add(ic->ic_oerrors, 1);
+			ieee80211_restart_all(ic);
 			return;
 		}
 		callout_reset(&sc->watchdog_ch, hz, uath_watchdog, sc);

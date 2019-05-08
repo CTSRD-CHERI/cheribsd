@@ -466,6 +466,7 @@ md_printins(int ins, int mdbdot)
 			}
 			break;
 		case 5:
+			/* CCall (TODO: disassemble the selector) */
 			ops = 2;
 			opcode = cheri_flow_control_opname[i.CTypeOld.fmt];
 			operands[0] = c2_reg[i.CTypeOld.r1];
@@ -482,24 +483,40 @@ md_printins(int ins, int mdbdot)
 			operands[0] = c2_reg[i.CTypeOld.r2];
 			operands[1] = reg_name[i.CTypeOld.r3];
 			break;
-		case 9:
+		case 0x9:
 			db_printf("cbtu\t%s,", c2_reg[i.BC2FType.cd]);
 			goto pr_displ;
-		case 10:
+		case 0xa:
 			db_printf("cbts\t%s,", c2_reg[i.BC2FType.cd]);
 			goto pr_displ;
-		case 11:
-			db_printf("cbez\t%s,", c2_reg[i.BC2FType.cd]);
-			goto pr_displ;
-		case 12:
-			db_printf("cbnz\t%s,", c2_reg[i.BC2FType.cd]);
-			goto pr_displ;
-		case 13:
+		case 0xd:
 			ops = 2;
 			opcode = cheri_flow_control_opname[i.CTypeOld.fmt];
 			operands[0] = reg_name[i.CTypeOld.r1];
 			operands[1] = c2_reg[i.CTypeOld.r2];
 			break;
+		case 0x11:
+			db_printf("cbez\t%s,", c2_reg[i.BC2FType.cd]);
+			goto pr_displ;
+		case 0x12:
+			db_printf("cbnz\t%s,", c2_reg[i.BC2FType.cd]);
+			goto pr_displ;
+		case 0x13: {
+			/* CIncOffset with 11 bit signed immediate */
+			int immediate = (i.CType.r3 << 6) | i.CType.func;
+			if (immediate > 1024)
+				immediate = -immediate;
+			db_printf("cincoffset\t%s, %s, %d", c2_reg[i.CType.r1],
+			    c2_reg[i.CType.r2], immediate);
+			goto cp2_disas_done;
+		}
+		case 0x14: {
+			/* CSetBounds with 11 bit unsigned immediate */
+			int immediate = (i.CType.r3 << 6) | i.CType.func;
+			db_printf("csetbounds\t%s, %s, %d", c2_reg[i.CType.r1],
+			    c2_reg[i.CType.r2], immediate);
+			goto cp2_disas_done;
+		}
 		default:
 			ops = 0;
 			opcode = "<unknown inst>";
@@ -524,6 +541,8 @@ md_printins(int ins, int mdbdot)
 			db_printf("unknown COP2 opcode (fmt %d, func %d)", i.CType.fmt, i.CType.func);
 			break;
 		}
+cp2_disas_done:
+		(void)0;
 	}
 		break;
 	case OP_LWC2:
@@ -539,7 +558,8 @@ md_printins(int ins, int mdbdot)
 	case OP_SDC2: {
 		const char *opcode = i.JType.op == OP_LDC2 ? "clc" : "csc";
 		db_printf("%s\t%s,%s,%d(%s)", opcode, c2_reg[i.CCMType.cs],
-				reg_name[i.CCMType.rt], i.CCMType.offset, c2_reg[i.CCMType.cb]);
+		    reg_name[i.CCMType.rt], i.CCMType.offset * 16,
+		    c2_reg[i.CCMType.cb]);
 		break;
 	}
 #endif /* CPU_CHERI */

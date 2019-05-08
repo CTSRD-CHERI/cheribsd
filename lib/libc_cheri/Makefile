@@ -12,6 +12,8 @@
 
 # libcheri
 LIB=		c_cheri
+# Anything more than 3 is just too noisy
+WARNS?=		2
 SRCS=		\
 		cheri_printf.c		\
 		cheri_put.c		\
@@ -21,6 +23,8 @@ SRCS=		\
 		heap.c			\
 		libcheri_invoke_cabi.S	\
 		malloc.c
+
+CFLAGS.libcheri_invoke_cabi.S+=-DHAVE_VALID_DDC
 
 CFLAGS.malloc.c=	-Wno-cast-align
 
@@ -123,6 +127,7 @@ SRCS+=		atoi.c			\
 # libc/string
 CFLAGS.strerror.c=	-Wno-incompatible-pointer-types-discards-qualifiers
 SRCS+=		bcopy.S			\
+		bcmp.c			\
 		explicit_bzero.c	\
 		ffs.c			\
 		memchr.c		\
@@ -260,7 +265,7 @@ MK_PROFILE=	no
 NEED_CHERI=	sandbox
 WARNS?= 2
 
-NO_WERROR=	yes
+# NO_WERROR=	yes
 
 CLEANFILES=	libcheri_invoke.o
 
@@ -316,6 +321,10 @@ CFLAGS+=	-Wno-cast-align -DFORCE_C_LOCALE -DFORCE_UTC_TZ
 .ifdef OAKLAND2015
 CFLAGS+=	-DCHERI_NO_OUTPUT
 .endif
+
+CFLAGS.rune.c+=	-Wno-unused-variable
+CFLAGS.ldpart.c+=	-Wno-unused-variable
+CFLAGS.localtime.c+=	-Wno-unused-variable
 
 .include <bsd.lib.mk>
 

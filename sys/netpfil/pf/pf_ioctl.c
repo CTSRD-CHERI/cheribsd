@@ -46,11 +46,14 @@ __FBSDID("$FreeBSD$");
 #include "opt_pf.h"
 
 #include <sys/param.h>
+#include <sys/_bitset.h>
+#include <sys/bitset.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/endian.h>
 #include <sys/fcntl.h>
 #include <sys/filio.h>
+#include <sys/hash.h>
 #include <sys/interrupt.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
@@ -129,18 +132,40 @@ VNET_DEFINE_STATIC(int,		pf_altq_running);
 
 #define	TAGID_MAX	 50000
 struct pf_tagname {
-	TAILQ_ENTRY(pf_tagname)	entries;
+	TAILQ_ENTRY(pf_tagname)	namehash_entries;
+	TAILQ_ENTRY(pf_tagname)	taghash_entries;
 	char			name[PF_TAG_NAME_SIZE];
 	uint16_t		tag;
 	int			ref;
 };
 
-TAILQ_HEAD(pf_tags, pf_tagname);
-#define	V_pf_tags		VNET(pf_tags)
-VNET_DEFINE(struct pf_tags, pf_tags);
-#define	V_pf_qids		VNET(pf_qids)
-VNET_DEFINE(struct pf_tags, pf_qids);
-static MALLOC_DEFINE(M_PFTAG, "pf_tag", "pf(4) tag names");
+struct pf_tagset {
+	TAILQ_HEAD(, pf_tagname)	*namehash;
+	TAILQ_HEAD(, pf_tagname)	*taghash;
+	unsigned int			 mask;
+	uint32_t			 seed;
+	BITSET_DEFINE(, TAGID_MAX)	 avail;
+};
+
+VNET_DEFINE(struct pf_tagset, pf_tags);
+#define	V_pf_tags	VNET(pf_tags)
+static unsigned int	pf_rule_tag_hashsize;
+#define	PF_RULE_TAG_HASH_SIZE_DEFAULT	128
+SYSCTL_UINT(_net_pf, OID_AUTO, rule_tag_hashsize, CTLFLAG_RDTUN,
+    &pf_rule_tag_hashsize, PF_RULE_TAG_HASH_SIZE_DEFAULT,
+    "Size of pf(4) rule tag hashtable");
+
+#ifdef ALTQ
+VNET_DEFINE(struct pf_tagset, pf_qids);
+#define	V_pf_qids	VNET(pf_qids)
+static unsigned int	pf_queue_tag_hashsize;
+#define	PF_QUEUE_TAG_HASH_SIZE_DEFAULT	128
+SYSCTL_UINT(_net_pf, OID_AUTO, queue_tag_hashsize, CTLFLAG_RDTUN,
+    &pf_queue_tag_hashsize, PF_QUEUE_TAG_HASH_SIZE_DEFAULT,
+    "Size of pf(4) queue tag hashtable");
+#endif
+VNET_DEFINE(uma_zone_t,	 pf_tag_z);
+#define	V_pf_tag_z		 VNET(pf_tag_z)
 static MALLOC_DEFINE(M_PFALTQ, "pf_altq", "pf(4) altq configuration db");
 static MALLOC_DEFINE(M_PFRULE, "pf_rule", "pf(4) rules");
 
@@ -148,9 +173,14 @@ static MALLOC_DEFINE(M_PFRULE, "pf_rule", "pf(4) rules");
 #error PF_QNAME_SIZE must be equal to PF_TAG_NAME_SIZE
 #endif
 
-static u_int16_t	 tagname2tag(struct pf_tags *, char *);
+static void		 pf_init_tagset(struct pf_tagset *, unsigned int *,
+			    unsigned int);
+static void		 pf_cleanup_tagset(struct pf_tagset *);
+static uint16_t		 tagname2hashindex(const struct pf_tagset *, const char *);
+static uint16_t		 tag2hashindex(const struct pf_tagset *, uint16_t);
+static u_int16_t	 tagname2tag(struct pf_tagset *, char *);
 static u_int16_t	 pf_tagname2tag(char *);
-static void		 tag_unref(struct pf_tags *, u_int16_t);
+static void		 tag_unref(struct pf_tagset *, u_int16_t);
 
 #define DPFPRINTF(n, x) if (V_pf_status.debug >= (n)) printf x
 
@@ -169,16 +199,16 @@ static void		 pf_tbladdr_copyout(struct pf_addr_wrap *);
  * Wrapper functions for pfil(9) hooks
  */
 #ifdef INET
-static int pf_check_in(void *arg, struct mbuf **m, struct ifnet *ifp,
-    int dir, int flags, struct inpcb *inp);
-static int pf_check_out(void *arg, struct mbuf **m, struct ifnet *ifp,
-    int dir, int flags, struct inpcb *inp);
+static pfil_return_t pf_check_in(struct mbuf **m, struct ifnet *ifp,
+    int flags, void *ruleset __unused, struct inpcb *inp);
+static pfil_return_t pf_check_out(struct mbuf **m, struct ifnet *ifp,
+    int flags, void *ruleset __unused, struct inpcb *inp);
 #endif
 #ifdef INET6
-static int pf_check6_in(void *arg, struct mbuf **m, struct ifnet *ifp,
-    int dir, int flags, struct inpcb *inp);
-static int pf_check6_out(void *arg, struct mbuf **m, struct ifnet *ifp,
-    int dir, int flags, struct inpcb *inp);
+static pfil_return_t pf_check6_in(struct mbuf **m, struct ifnet *ifp,
+    int flags, void *ruleset __unused, struct inpcb *inp);
+static pfil_return_t pf_check6_out(struct mbuf **m, struct ifnet *ifp,
+    int flags, void *ruleset __unused, struct inpcb *inp);
 #endif
 
 static int		hook_pf(void);
@@ -212,12 +242,14 @@ struct sx			pf_ioctl_lock;
 struct sx			pf_end_lock;
 
 /* pfsync */
-pfsync_state_import_t 		*pfsync_state_import_ptr = NULL;
-pfsync_insert_state_t		*pfsync_insert_state_ptr = NULL;
-pfsync_update_state_t		*pfsync_update_state_ptr = NULL;
-pfsync_delete_state_t		*pfsync_delete_state_ptr = NULL;
-pfsync_clear_states_t		*pfsync_clear_states_ptr = NULL;
-pfsync_defer_t			*pfsync_defer_ptr = NULL;
+VNET_DEFINE(pfsync_state_import_t *, pfsync_state_import_ptr);
+VNET_DEFINE(pfsync_insert_state_t *, pfsync_insert_state_ptr);
+VNET_DEFINE(pfsync_update_state_t *, pfsync_update_state_ptr);
+VNET_DEFINE(pfsync_delete_state_t *, pfsync_delete_state_ptr);
+VNET_DEFINE(pfsync_clear_states_t *, pfsync_clear_states_ptr);
+VNET_DEFINE(pfsync_defer_t *, pfsync_defer_ptr);
+pfsync_detach_ifnet_t *pfsync_detach_ifnet_ptr;
+
 /* pflog */
 pflog_packet_t			*pflog_packet_ptr = NULL;
 
@@ -434,68 +466,141 @@ pf_free_rule(struct pf_rule *rule)
 	free(rule, M_PFRULE);
 }
 
-static u_int16_t
-tagname2tag(struct pf_tags *head, char *tagname)
+static void
+pf_init_tagset(struct pf_tagset *ts, unsigned int *tunable_size,
+    unsigned int default_size)
 {
-	struct pf_tagname	*tag, *p = NULL;
-	u_int16_t		 new_tagid = 1;
+	unsigned int i;
+	unsigned int hashsize;
+	
+	if (*tunable_size == 0 || !powerof2(*tunable_size))
+		*tunable_size = default_size;
+
+	hashsize = *tunable_size;
+	ts->namehash = mallocarray(hashsize, sizeof(*ts->namehash), M_PFHASH,
+	    M_WAITOK);
+	ts->taghash = mallocarray(hashsize, sizeof(*ts->taghash), M_PFHASH,
+	    M_WAITOK);
+	ts->mask = hashsize - 1;
+	ts->seed = arc4random();
+	for (i = 0; i < hashsize; i++) {
+		TAILQ_INIT(&ts->namehash[i]);
+		TAILQ_INIT(&ts->taghash[i]);
+	}
+	BIT_FILL(TAGID_MAX, &ts->avail);
+}
+
+static void
+pf_cleanup_tagset(struct pf_tagset *ts)
+{
+	unsigned int i;
+	unsigned int hashsize;
+	struct pf_tagname *t, *tmp;
+
+	/*
+	 * Only need to clean up one of the hashes as each tag is hashed
+	 * into each table.
+	 */
+	hashsize = ts->mask + 1;
+	for (i = 0; i < hashsize; i++)
+		TAILQ_FOREACH_SAFE(t, &ts->namehash[i], namehash_entries, tmp)
+			uma_zfree(V_pf_tag_z, t);
+
+	free(ts->namehash, M_PFHASH);
+	free(ts->taghash, M_PFHASH);
+}
+
+static uint16_t
+tagname2hashindex(const struct pf_tagset *ts, const char *tagname)
+{
+
+	return (murmur3_32_hash(tagname, strlen(tagname), ts->seed) & ts->mask);
+}
+
+static uint16_t
+tag2hashindex(const struct pf_tagset *ts, uint16_t tag)
+{
+
+	return (tag & ts->mask);
+}
+
+static u_int16_t
+tagname2tag(struct pf_tagset *ts, char *tagname)
+{
+	struct pf_tagname	*tag;
+	u_int32_t		 index;
+	u_int16_t		 new_tagid;
 
 	PF_RULES_WASSERT();
 
-	TAILQ_FOREACH(tag, head, entries)
+	index = tagname2hashindex(ts, tagname);
+	TAILQ_FOREACH(tag, &ts->namehash[index], namehash_entries)
 		if (strcmp(tagname, tag->name) == 0) {
 			tag->ref++;
 			return (tag->tag);
 		}
 
 	/*
+	 * new entry
+	 *
 	 * to avoid fragmentation, we do a linear search from the beginning
-	 * and take the first free slot we find. if there is none or the list
-	 * is empty, append a new entry at the end.
+	 * and take the first free slot we find.
 	 */
-
-	/* new entry */
-	if (!TAILQ_EMPTY(head))
-		for (p = TAILQ_FIRST(head); p != NULL &&
-		    p->tag == new_tagid; p = TAILQ_NEXT(p, entries))
-			new_tagid = p->tag + 1;
-
-	if (new_tagid > TAGID_MAX)
+	new_tagid = BIT_FFS(TAGID_MAX, &ts->avail);
+	/*
+	 * Tags are 1-based, with valid tags in the range [1..TAGID_MAX].
+	 * BIT_FFS() returns a 1-based bit number, with 0 indicating no bits
+	 * set.  It may also return a bit number greater than TAGID_MAX due
+	 * to rounding of the number of bits in the vector up to a multiple
+	 * of the vector word size at declaration/allocation time.
+	 */
+	if ((new_tagid == 0) || (new_tagid > TAGID_MAX))
 		return (0);
 
+	/* Mark the tag as in use.  Bits are 0-based for BIT_CLR() */
+	BIT_CLR(TAGID_MAX, new_tagid - 1, &ts->avail);
+	
 	/* allocate and fill new struct pf_tagname */
-	tag = malloc(sizeof(*tag), M_PFTAG, M_NOWAIT|M_ZERO);
+	tag = uma_zalloc(V_pf_tag_z, M_NOWAIT);
 	if (tag == NULL)
 		return (0);
 	strlcpy(tag->name, tagname, sizeof(tag->name));
 	tag->tag = new_tagid;
-	tag->ref++;
+	tag->ref = 1;
 
-	if (p != NULL)	/* insert new entry before p */
-		TAILQ_INSERT_BEFORE(p, tag, entries);
-	else	/* either list empty or no free slot in between */
-		TAILQ_INSERT_TAIL(head, tag, entries);
+	/* Insert into namehash */
+	TAILQ_INSERT_TAIL(&ts->namehash[index], tag, namehash_entries);
 
+	/* Insert into taghash */
+	index = tag2hashindex(ts, new_tagid);
+	TAILQ_INSERT_TAIL(&ts->taghash[index], tag, taghash_entries);
+	
 	return (tag->tag);
 }
 
 static void
-tag_unref(struct pf_tags *head, u_int16_t tag)
+tag_unref(struct pf_tagset *ts, u_int16_t tag)
 {
-	struct pf_tagname	*p, *next;
-
+	struct pf_tagname	*t;
+	uint16_t		 index;
+	
 	PF_RULES_WASSERT();
 
-	for (p = TAILQ_FIRST(head); p != NULL; p = next) {
-		next = TAILQ_NEXT(p, entries);
-		if (tag == p->tag) {
-			if (--p->ref == 0) {
-				TAILQ_REMOVE(head, p, entries);
-				free(p, M_PFTAG);
+	index = tag2hashindex(ts, tag);
+	TAILQ_FOREACH(t, &ts->taghash[index], taghash_entries)
+		if (tag == t->tag) {
+			if (--t->ref == 0) {
+				TAILQ_REMOVE(&ts->taghash[index], t,
+				    taghash_entries);
+				index = tagname2hashindex(ts, t->name);
+				TAILQ_REMOVE(&ts->namehash[index], t,
+				    namehash_entries);
+				/* Bits are 0-based for BIT_SET() */
+				BIT_SET(TAGID_MAX, tag - 1, &ts->avail);
+				uma_zfree(V_pf_tag_z, t);
 			}
 			break;
 		}
-	}
 }
 
 static u_int16_t
@@ -520,22 +625,25 @@ pf_qid_unref(u_int32_t qid)
 static int
 pf_begin_altq(u_int32_t *ticket)
 {
-	struct pf_altq	*altq;
+	struct pf_altq	*altq, *tmp;
 	int		 error = 0;
 
 	PF_RULES_WASSERT();
 
-	/* Purge the old altq list */
-	while ((altq = TAILQ_FIRST(V_pf_altqs_inactive)) != NULL) {
-		TAILQ_REMOVE(V_pf_altqs_inactive, altq, entries);
-		if (altq->qname[0] == 0 &&
-		    (altq->local_flags & PFALTQ_FLAG_IF_REMOVED) == 0) {
+	/* Purge the old altq lists */
+	TAILQ_FOREACH_SAFE(altq, V_pf_altq_ifs_inactive, entries, tmp) {
+		if ((altq->local_flags & PFALTQ_FLAG_IF_REMOVED) == 0) {
 			/* detach and destroy the discipline */
 			error = altq_remove(altq);
-		} else
-			pf_qid_unref(altq->qid);
+		}
 		free(altq, M_PFALTQ);
 	}
+	TAILQ_INIT(V_pf_altq_ifs_inactive);
+	TAILQ_FOREACH_SAFE(altq, V_pf_altqs_inactive, entries, tmp) {
+		pf_qid_unref(altq->qid);
+		free(altq, M_PFALTQ);
+	}
+	TAILQ_INIT(V_pf_altqs_inactive);
 	if (error)
 		return (error);
 	*ticket = ++V_ticket_altqs_inactive;
@@ -546,24 +654,27 @@ pf_begin_altq(u_int32_t *ticket)
 static int
 pf_rollback_altq(u_int32_t ticket)
 {
-	struct pf_altq	*altq;
+	struct pf_altq	*altq, *tmp;
 	int		 error = 0;
 
 	PF_RULES_WASSERT();
 
 	if (!V_altqs_inactive_open || ticket != V_ticket_altqs_inactive)
 		return (0);
-	/* Purge the old altq list */
-	while ((altq = TAILQ_FIRST(V_pf_altqs_inactive)) != NULL) {
-		TAILQ_REMOVE(V_pf_altqs_inactive, altq, entries);
-		if (altq->qname[0] == 0 &&
-		   (altq->local_flags & PFALTQ_FLAG_IF_REMOVED) == 0) {
+	/* Purge the old altq lists */
+	TAILQ_FOREACH_SAFE(altq, V_pf_altq_ifs_inactive, entries, tmp) {
+		if ((altq->local_flags & PFALTQ_FLAG_IF_REMOVED) == 0) {
 			/* detach and destroy the discipline */
 			error = altq_remove(altq);
-		} else
-			pf_qid_unref(altq->qid);
+		}
 		free(altq, M_PFALTQ);
 	}
+	TAILQ_INIT(V_pf_altq_ifs_inactive);
+	TAILQ_FOREACH_SAFE(altq, V_pf_altqs_inactive, entries, tmp) {
+		pf_qid_unref(altq->qid);
+		free(altq, M_PFALTQ);
+	}
+	TAILQ_INIT(V_pf_altqs_inactive);
 	V_altqs_inactive_open = 0;
 	return (error);
 }
@@ -571,8 +682,8 @@ pf_rollback_altq(u_int32_t ticket)
 static int
 pf_commit_altq(u_int32_t ticket)
 {
-	struct pf_altqqueue	*old_altqs;
-	struct pf_altq		*altq;
+	struct pf_altqqueue	*old_altqs, *old_altq_ifs;
+	struct pf_altq		*altq, *tmp;
 	int			 err, error = 0;
 
 	PF_RULES_WASSERT();
@@ -582,14 +693,16 @@ pf_commit_altq(u_int32_t ticket)
 
 	/* swap altqs, keep the old. */
 	old_altqs = V_pf_altqs_active;
+	old_altq_ifs = V_pf_altq_ifs_active;
 	V_pf_altqs_active = V_pf_altqs_inactive;
+	V_pf_altq_ifs_active = V_pf_altq_ifs_inactive;
 	V_pf_altqs_inactive = old_altqs;
+	V_pf_altq_ifs_inactive = old_altq_ifs;
 	V_ticket_altqs_active = V_ticket_altqs_inactive;
 
 	/* Attach new disciplines */
-	TAILQ_FOREACH(altq, V_pf_altqs_active, entries) {
-	if (altq->qname[0] == 0 &&
-	   (altq->local_flags & PFALTQ_FLAG_IF_REMOVED) == 0) {
+	TAILQ_FOREACH(altq, V_pf_altq_ifs_active, entries) {
+		if ((altq->local_flags & PFALTQ_FLAG_IF_REMOVED) == 0) {
 			/* attach the discipline */
 			error = altq_pfattach(altq);
 			if (error == 0 && V_pf_altq_running)
@@ -599,11 +712,9 @@ pf_commit_altq(u_int32_t ticket)
 		}
 	}
 
-	/* Purge the old altq list */
-	while ((altq = TAILQ_FIRST(V_pf_altqs_inactive)) != NULL) {
-		TAILQ_REMOVE(V_pf_altqs_inactive, altq, entries);
-		if (altq->qname[0] == 0 &&
-		    (altq->local_flags & PFALTQ_FLAG_IF_REMOVED) == 0) {
+	/* Purge the old altq lists */
+	TAILQ_FOREACH_SAFE(altq, V_pf_altq_ifs_inactive, entries, tmp) {
+		if ((altq->local_flags & PFALTQ_FLAG_IF_REMOVED) == 0) {
 			/* detach and destroy the discipline */
 			if (V_pf_altq_running)
 				error = pf_disable_altq(altq);
@@ -613,10 +724,15 @@ pf_commit_altq(u_int32_t ticket)
 			err = altq_remove(altq);
 			if (err != 0 && error == 0)
 				error = err;
-		} else
-			pf_qid_unref(altq->qid);
+		}
 		free(altq, M_PFALTQ);
 	}
+	TAILQ_INIT(V_pf_altq_ifs_inactive);
+	TAILQ_FOREACH_SAFE(altq, V_pf_altqs_inactive, entries, tmp) {
+		pf_qid_unref(altq->qid);
+		free(altq, M_PFALTQ);
+	}
+	TAILQ_INIT(V_pf_altqs_inactive);
 
 	V_altqs_inactive_open = 0;
 	return (error);
@@ -673,13 +789,45 @@ pf_disable_altq(struct pf_altq *altq)
 	return (error);
 }
 
+static int
+pf_altq_ifnet_event_add(struct ifnet *ifp, int remove, u_int32_t ticket,
+    struct pf_altq *altq)
+{
+	struct ifnet	*ifp1;
+	int		 error = 0;
+	
+	/* Deactivate the interface in question */
+	altq->local_flags &= ~PFALTQ_FLAG_IF_REMOVED;
+	if ((ifp1 = ifunit(altq->ifname)) == NULL ||
+	    (remove && ifp1 == ifp)) {
+		altq->local_flags |= PFALTQ_FLAG_IF_REMOVED;
+	} else {
+		error = altq_add(ifp1, altq);
+
+		if (ticket != V_ticket_altqs_inactive)
+			error = EBUSY;
+
+		if (error)
+			free(altq, M_PFALTQ);
+	}
+
+	return (error);
+}
+
 void
 pf_altq_ifnet_event(struct ifnet *ifp, int remove)
 {
-	struct ifnet	*ifp1;
 	struct pf_altq	*a1, *a2, *a3;
 	u_int32_t	 ticket;
 	int		 error = 0;
+
+	/*
+	 * No need to re-evaluate the configuration for events on interfaces
+	 * that do not support ALTQ, as it's not possible for such
+	 * interfaces to be part of the configuration.
+	 */
+	if (!ALTQ_IS_READY(&ifp->if_snd))
+		return;
 
 	/* Interrupt userland queue modifications */
 	if (V_altqs_inactive_open)
@@ -690,6 +838,22 @@ pf_altq_ifnet_event(struct ifnet *ifp, int remove)
 		return;
 
 	/* Copy the current active set */
+	TAILQ_FOREACH(a1, V_pf_altq_ifs_active, entries) {
+		a2 = malloc(sizeof(*a2), M_PFALTQ, M_NOWAIT);
+		if (a2 == NULL) {
+			error = ENOMEM;
+			break;
+		}
+		bcopy(a1, a2, sizeof(struct pf_altq));
+
+		error = pf_altq_ifnet_event_add(ifp, remove, ticket, a2);
+		if (error)
+			break;
+
+		TAILQ_INSERT_TAIL(V_pf_altq_ifs_inactive, a2, entries);
+	}
+	if (error)
+		goto out;
 	TAILQ_FOREACH(a1, V_pf_altqs_active, entries) {
 		a2 = malloc(sizeof(*a2), M_PFALTQ, M_NOWAIT);
 		if (a2 == NULL) {
@@ -698,41 +862,27 @@ pf_altq_ifnet_event(struct ifnet *ifp, int remove)
 		}
 		bcopy(a1, a2, sizeof(struct pf_altq));
 
-		if (a2->qname[0] != 0) {
-			if ((a2->qid = pf_qname2qid(a2->qname)) == 0) {
-				error = EBUSY;
-				free(a2, M_PFALTQ);
-				break;
-			}
-			a2->altq_disc = NULL;
-			TAILQ_FOREACH(a3, V_pf_altqs_inactive, entries) {
-				if (strncmp(a3->ifname, a2->ifname,
-				    IFNAMSIZ) == 0 && a3->qname[0] == 0) {
-					a2->altq_disc = a3->altq_disc;
-					break;
-				}
-			}
+		if ((a2->qid = pf_qname2qid(a2->qname)) == 0) {
+			error = EBUSY;
+			free(a2, M_PFALTQ);
+			break;
 		}
-		/* Deactivate the interface in question */
-		a2->local_flags &= ~PFALTQ_FLAG_IF_REMOVED;
-		if ((ifp1 = ifunit(a2->ifname)) == NULL ||
-		    (remove && ifp1 == ifp)) {
-			a2->local_flags |= PFALTQ_FLAG_IF_REMOVED;
-		} else {
-			error = altq_add(a2);
-
-			if (ticket != V_ticket_altqs_inactive)
-				error = EBUSY;
-
-			if (error) {
-				free(a2, M_PFALTQ);
+		a2->altq_disc = NULL;
+		TAILQ_FOREACH(a3, V_pf_altq_ifs_inactive, entries) {
+			if (strncmp(a3->ifname, a2->ifname,
+				IFNAMSIZ) == 0) {
+				a2->altq_disc = a3->altq_disc;
 				break;
 			}
 		}
+		error = pf_altq_ifnet_event_add(ifp, remove, ticket, a2);
+		if (error)
+			break;
 
 		TAILQ_INSERT_TAIL(V_pf_altqs_inactive, a2, entries);
 	}
 
+out:
 	if (error != 0)
 		pf_rollback_altq(ticket);
 	else
@@ -1209,6 +1359,28 @@ pf_import_kaltq(struct pfioc_altq_v1 *pa, struct pf_altq *q, size_t ioc_size)
 #undef COPY
 	
 	return (0);
+}
+
+static struct pf_altq *
+pf_altq_get_nth_active(u_int32_t n)
+{
+	struct pf_altq		*altq;
+	u_int32_t		 nr;
+
+	nr = 0;
+	TAILQ_FOREACH(altq, V_pf_altq_ifs_active, entries) {
+		if (nr == n)
+			return (altq);
+		nr++;
+	}
+
+	TAILQ_FOREACH(altq, V_pf_altqs_active, entries) {
+		if (nr == n)
+			return (altq);
+		nr++;
+	}
+
+	return (NULL);
 }
 #endif /* ALTQ */
 
@@ -1873,8 +2045,8 @@ relock_DIOCCLRSTATES:
 			PF_HASHROW_UNLOCK(ih);
 		}
 		psk->psk_killed = killed;
-		if (pfsync_clear_states_ptr != NULL)
-			pfsync_clear_states_ptr(V_pf_status.hostid, psk->psk_ifname);
+		if (V_pfsync_clear_states_ptr != NULL)
+			V_pfsync_clear_states_ptr(V_pf_status.hostid, psk->psk_ifname);
 		break;
 	}
 
@@ -1961,9 +2133,9 @@ relock_DIOCKILLSTATES:
 			error = EINVAL;
 			break;
 		}
-		if (pfsync_state_import_ptr != NULL) {
+		if (V_pfsync_state_import_ptr != NULL) {
 			PF_RULES_RLOCK();
-			error = pfsync_state_import_ptr(sp, PFSYNC_SI_IOCTL);
+			error = V_pfsync_state_import_ptr(sp, PFSYNC_SI_IOCTL);
 			PF_RULES_RUNLOCK();
 		} else
 			error = EOPNOTSUPP;
@@ -2259,9 +2431,8 @@ DIOCGETSTATES_full:
 
 		PF_RULES_WLOCK();
 		/* enable all altq interfaces on active list */
-		TAILQ_FOREACH(altq, V_pf_altqs_active, entries) {
-			if (altq->qname[0] == 0 && (altq->local_flags &
-			    PFALTQ_FLAG_IF_REMOVED) == 0) {
+		TAILQ_FOREACH(altq, V_pf_altq_ifs_active, entries) {
+			if ((altq->local_flags & PFALTQ_FLAG_IF_REMOVED) == 0) {
 				error = pf_enable_altq(altq);
 				if (error != 0)
 					break;
@@ -2279,9 +2450,8 @@ DIOCGETSTATES_full:
 
 		PF_RULES_WLOCK();
 		/* disable all altq interfaces on active list */
-		TAILQ_FOREACH(altq, V_pf_altqs_active, entries) {
-			if (altq->qname[0] == 0 && (altq->local_flags &
-			    PFALTQ_FLAG_IF_REMOVED) == 0) {
+		TAILQ_FOREACH(altq, V_pf_altq_ifs_active, entries) {
+			if ((altq->local_flags & PFALTQ_FLAG_IF_REMOVED) == 0) {
 				error = pf_disable_altq(altq);
 				if (error != 0)
 					break;
@@ -2326,9 +2496,9 @@ DIOCGETSTATES_full:
 				break;
 			}
 			altq->altq_disc = NULL;
-			TAILQ_FOREACH(a, V_pf_altqs_inactive, entries) {
+			TAILQ_FOREACH(a, V_pf_altq_ifs_inactive, entries) {
 				if (strncmp(a->ifname, altq->ifname,
-				    IFNAMSIZ) == 0 && a->qname[0] == 0) {
+				    IFNAMSIZ) == 0) {
 					altq->altq_disc = a->altq_disc;
 					break;
 				}
@@ -2338,7 +2508,7 @@ DIOCGETSTATES_full:
 		if ((ifp = ifunit(altq->ifname)) == NULL)
 			altq->local_flags |= PFALTQ_FLAG_IF_REMOVED;
 		else
-			error = altq_add(altq);
+			error = altq_add(ifp, altq);
 
 		if (error) {
 			PF_RULES_WUNLOCK();
@@ -2346,7 +2516,10 @@ DIOCGETSTATES_full:
 			break;
 		}
 
-		TAILQ_INSERT_TAIL(V_pf_altqs_inactive, altq, entries);
+		if (altq->qname[0] != 0)
+			TAILQ_INSERT_TAIL(V_pf_altqs_inactive, altq, entries);
+		else
+			TAILQ_INSERT_TAIL(V_pf_altq_ifs_inactive, altq, entries);
 		/* version error check done on import above */
 		pf_export_kaltq(altq, pa, IOCPARM_LEN(cmd));
 		PF_RULES_WUNLOCK();
@@ -2360,6 +2533,8 @@ DIOCGETSTATES_full:
 
 		PF_RULES_RLOCK();
 		pa->nr = 0;
+		TAILQ_FOREACH(altq, V_pf_altq_ifs_active, entries)
+			pa->nr++;
 		TAILQ_FOREACH(altq, V_pf_altqs_active, entries)
 			pa->nr++;
 		pa->ticket = V_ticket_altqs_active;
@@ -2371,7 +2546,6 @@ DIOCGETSTATES_full:
 	case DIOCGETALTQV1: {
 		struct pfioc_altq_v1	*pa = (struct pfioc_altq_v1 *)addr;
 		struct pf_altq		*altq;
-		u_int32_t		 nr;
 
 		PF_RULES_RLOCK();
 		if (pa->ticket != V_ticket_altqs_active) {
@@ -2379,12 +2553,7 @@ DIOCGETSTATES_full:
 			error = EBUSY;
 			break;
 		}
-		nr = 0;
-		altq = TAILQ_FIRST(V_pf_altqs_active);
-		while ((altq != NULL) && (nr < pa->nr)) {
-			altq = TAILQ_NEXT(altq, entries);
-			nr++;
-		}
+		altq = pf_altq_get_nth_active(pa->nr);
 		if (altq == NULL) {
 			PF_RULES_RUNLOCK();
 			error = EBUSY;
@@ -2405,7 +2574,6 @@ DIOCGETSTATES_full:
 	case DIOCGETQSTATSV1: {
 		struct pfioc_qstats_v1	*pq = (struct pfioc_qstats_v1 *)addr;
 		struct pf_altq		*altq;
-		u_int32_t		 nr;
 		int			 nbytes;
 		u_int32_t		 version;
 
@@ -2416,12 +2584,7 @@ DIOCGETSTATES_full:
 			break;
 		}
 		nbytes = pq->nbytes;
-		nr = 0;
-		altq = TAILQ_FIRST(V_pf_altqs_active);
-		while ((altq != NULL) && (nr < pq->nr)) {
-			altq = TAILQ_NEXT(altq, entries);
-			nr++;
-		}
+		altq = pf_altq_get_nth_active(pq->nr);
 		if (altq == NULL) {
 			PF_RULES_RUNLOCK();
 			error = EBUSY;
@@ -2940,24 +3103,20 @@ DIOCCHANGEADDR_error:
 			break;
 		}
 
-		PF_RULES_WLOCK();
+		PF_RULES_RLOCK();
 		n = pfr_table_count(&io->pfrio_table, io->pfrio_flags);
 		io->pfrio_size = min(io->pfrio_size, n);
+		PF_RULES_RUNLOCK();
 
 		totlen = io->pfrio_size * sizeof(struct pfr_table);
 		pfrts = mallocarray(io->pfrio_size, sizeof(struct pfr_table),
-		    M_TEMP, M_NOWAIT);
-		if (pfrts == NULL) {
-			error = ENOMEM;
-			PF_RULES_WUNLOCK();
-			break;
-		}
+		    M_TEMP, M_WAITOK);
 		error = copyin(io->pfrio_buffer, pfrts, totlen);
 		if (error) {
 			free(pfrts, M_TEMP);
-			PF_RULES_WUNLOCK();
 			break;
 		}
+		PF_RULES_WLOCK();
 		error = pfr_set_tflags(pfrts, io->pfrio_size,
 		    io->pfrio_setflag, io->pfrio_clrflag, &io->pfrio_nchange,
 		    &io->pfrio_ndel, io->pfrio_flags | PFR_FLAG_USERIOCTL);
@@ -3575,17 +3734,23 @@ DIOCCHANGEADDR_error:
 		struct pf_src_node	*n, *p, *pstore;
 		uint32_t		 i, nr = 0;
 
+		for (i = 0, sh = V_pf_srchash; i <= pf_srchashmask;
+				i++, sh++) {
+			PF_HASHROW_LOCK(sh);
+			LIST_FOREACH(n, &sh->nodes, entry)
+				nr++;
+			PF_HASHROW_UNLOCK(sh);
+		}
+
+		psn->psn_len = min(psn->psn_len,
+		    sizeof(struct pf_src_node) * nr);
+
 		if (psn->psn_len == 0) {
-			for (i = 0, sh = V_pf_srchash; i <= pf_srchashmask;
-			    i++, sh++) {
-				PF_HASHROW_LOCK(sh);
-				LIST_FOREACH(n, &sh->nodes, entry)
-					nr++;
-				PF_HASHROW_UNLOCK(sh);
-			}
 			psn->psn_len = sizeof(struct pf_src_node) * nr;
 			break;
 		}
+
+		nr = 0;
 
 		p = pstore = malloc(psn->psn_len, M_TEMP, M_WAITOK);
 		for (i = 0, sh = V_pf_srchash; i <= pf_srchashmask;
@@ -3983,65 +4148,59 @@ shutdown_pf(void)
 
 		/* status does not use malloced mem so no need to cleanup */
 		/* fingerprints and interfaces have their own cleanup code */
-
-		/* Free counters last as we updated them during shutdown. */
-		counter_u64_free(V_pf_default_rule.states_cur);
-		counter_u64_free(V_pf_default_rule.states_tot);
-		counter_u64_free(V_pf_default_rule.src_nodes);
-
-		for (int i = 0; i < PFRES_MAX; i++)
-			counter_u64_free(V_pf_status.counters[i]);
-		for (int i = 0; i < LCNT_MAX; i++)
-			counter_u64_free(V_pf_status.lcounters[i]);
-		for (int i = 0; i < FCNT_MAX; i++)
-			counter_u64_free(V_pf_status.fcounters[i]);
-		for (int i = 0; i < SCNT_MAX; i++)
-			counter_u64_free(V_pf_status.scounters[i]);
 	} while(0);
 
 	return (error);
 }
 
+static pfil_return_t
+pf_check_return(int chk, struct mbuf **m)
+{
+
+	switch (chk) {
+	case PF_PASS:
+		if (*m == NULL)
+			return (PFIL_CONSUMED);
+		else
+			return (PFIL_PASS);
+		break;
+	default:
+		if (*m != NULL) {
+			m_freem(*m);
+			*m = NULL;
+		}
+		return (PFIL_DROPPED);
+	}
+}
+
 #ifdef INET
-static int
-pf_check_in(void *arg, struct mbuf **m, struct ifnet *ifp, int dir, int flags,
-    struct inpcb *inp)
+static pfil_return_t
+pf_check_in(struct mbuf **m, struct ifnet *ifp, int flags,
+    void *ruleset __unused, struct inpcb *inp)
 {
 	int chk;
 
 	chk = pf_test(PF_IN, flags, ifp, m, inp);
-	if (chk && *m) {
-		m_freem(*m);
-		*m = NULL;
-	}
 
-	if (chk != PF_PASS)
-		return (EACCES);
-	return (0);
+	return (pf_check_return(chk, m));
 }
 
-static int
-pf_check_out(void *arg, struct mbuf **m, struct ifnet *ifp, int dir, int flags,
-    struct inpcb *inp)
+static pfil_return_t
+pf_check_out(struct mbuf **m, struct ifnet *ifp, int flags,
+    void *ruleset __unused,  struct inpcb *inp)
 {
 	int chk;
 
 	chk = pf_test(PF_OUT, flags, ifp, m, inp);
-	if (chk && *m) {
-		m_freem(*m);
-		*m = NULL;
-	}
 
-	if (chk != PF_PASS)
-		return (EACCES);
-	return (0);
+	return (pf_check_return(chk, m));
 }
 #endif
 
 #ifdef INET6
-static int
-pf_check6_in(void *arg, struct mbuf **m, struct ifnet *ifp, int dir, int flags,
-    struct inpcb *inp)
+static pfil_return_t
+pf_check6_in(struct mbuf **m, struct ifnet *ifp, int flags,
+    void *ruleset __unused,  struct inpcb *inp)
 {
 	int chk;
 
@@ -4053,67 +4212,89 @@ pf_check6_in(void *arg, struct mbuf **m, struct ifnet *ifp, int dir, int flags,
 	CURVNET_SET(ifp->if_vnet);
 	chk = pf_test6(PF_IN, flags, (*m)->m_flags & M_LOOP ? V_loif : ifp, m, inp);
 	CURVNET_RESTORE();
-	if (chk && *m) {
-		m_freem(*m);
-		*m = NULL;
-	}
-	if (chk != PF_PASS)
-		return (EACCES);
-	return (0);
+
+	return (pf_check_return(chk, m));
 }
 
-static int
-pf_check6_out(void *arg, struct mbuf **m, struct ifnet *ifp, int dir, int flags,
-    struct inpcb *inp)
+static pfil_return_t
+pf_check6_out(struct mbuf **m, struct ifnet *ifp, int flags,
+    void *ruleset __unused,  struct inpcb *inp)
 {
 	int chk;
 
 	CURVNET_SET(ifp->if_vnet);
 	chk = pf_test6(PF_OUT, flags, ifp, m, inp);
 	CURVNET_RESTORE();
-	if (chk && *m) {
-		m_freem(*m);
-		*m = NULL;
-	}
-	if (chk != PF_PASS)
-		return (EACCES);
-	return (0);
+
+	return (pf_check_return(chk, m));
 }
 #endif /* INET6 */
+
+#ifdef INET
+VNET_DEFINE_STATIC(pfil_hook_t, pf_ip4_in_hook);
+VNET_DEFINE_STATIC(pfil_hook_t, pf_ip4_out_hook);
+#define	V_pf_ip4_in_hook	VNET(pf_ip4_in_hook)
+#define	V_pf_ip4_out_hook	VNET(pf_ip4_out_hook)
+#endif
+#ifdef INET6
+VNET_DEFINE_STATIC(pfil_hook_t, pf_ip6_in_hook);
+VNET_DEFINE_STATIC(pfil_hook_t, pf_ip6_out_hook);
+#define	V_pf_ip6_in_hook	VNET(pf_ip6_in_hook)
+#define	V_pf_ip6_out_hook	VNET(pf_ip6_out_hook)
+#endif
 
 static int
 hook_pf(void)
 {
-#ifdef INET
-	struct pfil_head *pfh_inet;
-#endif
-#ifdef INET6
-	struct pfil_head *pfh_inet6;
-#endif
+	struct pfil_hook_args pha;
+	struct pfil_link_args pla;
 
 	if (V_pf_pfil_hooked)
 		return (0);
 
+	pha.pa_version = PFIL_VERSION;
+	pha.pa_modname = "pf";
+	pha.pa_ruleset = NULL;
+
+	pla.pa_version = PFIL_VERSION;
+
 #ifdef INET
-	pfh_inet = pfil_head_get(PFIL_TYPE_AF, AF_INET);
-	if (pfh_inet == NULL)
-		return (ESRCH); /* XXX */
-	pfil_add_hook_flags(pf_check_in, NULL, PFIL_IN | PFIL_WAITOK, pfh_inet);
-	pfil_add_hook_flags(pf_check_out, NULL, PFIL_OUT | PFIL_WAITOK, pfh_inet);
+	pha.pa_type = PFIL_TYPE_IP4;
+	pha.pa_func = pf_check_in;
+	pha.pa_flags = PFIL_IN;
+	pha.pa_rulname = "default-in";
+	V_pf_ip4_in_hook = pfil_add_hook(&pha);
+	pla.pa_flags = PFIL_IN | PFIL_HEADPTR | PFIL_HOOKPTR;
+	pla.pa_head = V_inet_pfil_head;
+	pla.pa_hook = V_pf_ip4_in_hook;
+	(void)pfil_link(&pla);
+	pha.pa_func = pf_check_out;
+	pha.pa_flags = PFIL_OUT;
+	pha.pa_rulname = "default-out";
+	V_pf_ip4_out_hook = pfil_add_hook(&pha);
+	pla.pa_flags = PFIL_OUT | PFIL_HEADPTR | PFIL_HOOKPTR;
+	pla.pa_head = V_inet_pfil_head;
+	pla.pa_hook = V_pf_ip4_out_hook;
+	(void)pfil_link(&pla);
 #endif
 #ifdef INET6
-	pfh_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6);
-	if (pfh_inet6 == NULL) {
-#ifdef INET
-		pfil_remove_hook_flags(pf_check_in, NULL, PFIL_IN | PFIL_WAITOK,
-		    pfh_inet);
-		pfil_remove_hook_flags(pf_check_out, NULL, PFIL_OUT | PFIL_WAITOK,
-		    pfh_inet);
-#endif
-		return (ESRCH); /* XXX */
-	}
-	pfil_add_hook_flags(pf_check6_in, NULL, PFIL_IN | PFIL_WAITOK, pfh_inet6);
-	pfil_add_hook_flags(pf_check6_out, NULL, PFIL_OUT | PFIL_WAITOK, pfh_inet6);
+	pha.pa_type = PFIL_TYPE_IP6;
+	pha.pa_func = pf_check6_in;
+	pha.pa_flags = PFIL_IN;
+	pha.pa_rulname = "default-in6";
+	V_pf_ip6_in_hook = pfil_add_hook(&pha);
+	pla.pa_flags = PFIL_IN | PFIL_HEADPTR | PFIL_HOOKPTR;
+	pla.pa_head = V_inet6_pfil_head;
+	pla.pa_hook = V_pf_ip6_in_hook;
+	(void)pfil_link(&pla);
+	pha.pa_func = pf_check6_out;
+	pha.pa_rulname = "default-out6";
+	pha.pa_flags = PFIL_OUT;
+	V_pf_ip6_out_hook = pfil_add_hook(&pha);
+	pla.pa_flags = PFIL_OUT | PFIL_HEADPTR | PFIL_HOOKPTR;
+	pla.pa_head = V_inet6_pfil_head;
+	pla.pa_hook = V_pf_ip6_out_hook;
+	(void)pfil_link(&pla);
 #endif
 
 	V_pf_pfil_hooked = 1;
@@ -4123,33 +4304,17 @@ hook_pf(void)
 static int
 dehook_pf(void)
 {
-#ifdef INET
-	struct pfil_head *pfh_inet;
-#endif
-#ifdef INET6
-	struct pfil_head *pfh_inet6;
-#endif
 
 	if (V_pf_pfil_hooked == 0)
 		return (0);
 
 #ifdef INET
-	pfh_inet = pfil_head_get(PFIL_TYPE_AF, AF_INET);
-	if (pfh_inet == NULL)
-		return (ESRCH); /* XXX */
-	pfil_remove_hook_flags(pf_check_in, NULL, PFIL_IN | PFIL_WAITOK,
-	    pfh_inet);
-	pfil_remove_hook_flags(pf_check_out, NULL, PFIL_OUT | PFIL_WAITOK,
-	    pfh_inet);
+	pfil_remove_hook(V_pf_ip4_in_hook);
+	pfil_remove_hook(V_pf_ip4_out_hook);
 #endif
 #ifdef INET6
-	pfh_inet6 = pfil_head_get(PFIL_TYPE_AF, AF_INET6);
-	if (pfh_inet6 == NULL)
-		return (ESRCH); /* XXX */
-	pfil_remove_hook_flags(pf_check6_in, NULL, PFIL_IN | PFIL_WAITOK,
-	    pfh_inet6);
-	pfil_remove_hook_flags(pf_check6_out, NULL, PFIL_OUT | PFIL_WAITOK,
-	    pfh_inet6);
+	pfil_remove_hook(V_pf_ip6_in_hook);
+	pfil_remove_hook(V_pf_ip6_out_hook);
 #endif
 
 	V_pf_pfil_hooked = 0;
@@ -4159,8 +4324,15 @@ dehook_pf(void)
 static void
 pf_load_vnet(void)
 {
-	TAILQ_INIT(&V_pf_tags);
-	TAILQ_INIT(&V_pf_qids);
+	V_pf_tag_z = uma_zcreate("pf tags", sizeof(struct pf_tagname),
+	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, 0);
+
+	pf_init_tagset(&V_pf_tags, &pf_rule_tag_hashsize,
+	    PF_RULE_TAG_HASH_SIZE_DEFAULT);
+#ifdef ALTQ
+	pf_init_tagset(&V_pf_qids, &pf_queue_tag_hashsize,
+	    PF_QUEUE_TAG_HASH_SIZE_DEFAULT);
+#endif
 
 	pfattach_vnet();
 	V_pf_vnet_active = 1;
@@ -4177,7 +4349,7 @@ pf_load(void)
 
 	pf_mtag_initialize();
 
-	pf_dev = make_dev(&pf_cdevsw, 0, 0, 0, 0600, PF_NAME);
+	pf_dev = make_dev(&pf_cdevsw, 0, UID_ROOT, GID_WHEEL, 0600, PF_NAME);
 	if (pf_dev == NULL)
 		return (ENOMEM);
 
@@ -4226,6 +4398,26 @@ pf_unload_vnet(void)
 	pf_cleanup();
 	if (IS_DEFAULT_VNET(curvnet))
 		pf_mtag_cleanup();
+
+	pf_cleanup_tagset(&V_pf_tags);
+#ifdef ALTQ
+	pf_cleanup_tagset(&V_pf_qids);
+#endif
+	uma_zdestroy(V_pf_tag_z);
+
+	/* Free counters last as we updated them during shutdown. */
+	counter_u64_free(V_pf_default_rule.states_cur);
+	counter_u64_free(V_pf_default_rule.states_tot);
+	counter_u64_free(V_pf_default_rule.src_nodes);
+
+	for (int i = 0; i < PFRES_MAX; i++)
+		counter_u64_free(V_pf_status.counters[i]);
+	for (int i = 0; i < LCNT_MAX; i++)
+		counter_u64_free(V_pf_status.lcounters[i]);
+	for (int i = 0; i < FCNT_MAX; i++)
+		counter_u64_free(V_pf_status.fcounters[i]);
+	for (int i = 0; i < SCNT_MAX; i++)
+		counter_u64_free(V_pf_status.scounters[i]);
 }
 
 static void

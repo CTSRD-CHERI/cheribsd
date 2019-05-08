@@ -3453,7 +3453,7 @@ dmu_objset_is_receiving(objset_t *os)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

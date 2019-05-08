@@ -144,12 +144,25 @@ struct kevent32_freebsd11 {
 #endif
 #endif
 
+#if defined(_WANT_KEVENT64) || (defined(_KERNEL) && __has_feature(capabilities))
+struct kevent64 {
+	__uint64_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	unsigned short	flags;
+	unsigned int	fflags;
+	__int64_t	data;
+	void		*udata;		/* opaque user data identifier */
+	__uint64_t	ext[4];
+};
+#endif
+
 /* actions */
 #define EV_ADD		0x0001		/* add event to kq (implies enable) */
 #define EV_DELETE	0x0002		/* delete event from kq */
 #define EV_ENABLE	0x0004		/* enable event */
 #define EV_DISABLE	0x0008		/* disable event (not reported) */
 #define EV_FORCEONESHOT	0x0100		/* enable _ONESHOT and force trigger */
+#define EV_KEEPUDATA	0x0200		/* do not update the udata field */
 
 /* flags */
 #define EV_ONESHOT	0x0010		/* only report one occurrence */
@@ -307,7 +320,6 @@ struct knote {
 #define KN_DETACHED	0x08			/* knote is detached */
 #define KN_MARKER	0x20			/* ignore this knote */
 #define KN_KQUEUE	0x40			/* this knote belongs to a kq */
-#define KN_HASKQLOCK	0x80			/* for _inevent */
 #define	KN_SCAN		0x100			/* flux set in kqueue_scan() */
 	int			kn_influx;
 	int			kn_sfflags;	/* saved filter flags */
@@ -362,7 +374,7 @@ void	knlist_cleardel(struct knlist *knl, struct thread *td,
 	knlist_cleardel((knl), (td), (islocked), 1)
 void	knote_fdclose(struct thread *p, int fd);
 int 	kqfd_register(int fd, kkevent_t *kev, struct thread *p,
-	    int waitok);
+	    int mflag);
 int	kqueue_add_filteropts(int filt, struct filterops *filtops);
 int	kqueue_del_filteropts(int filt);
 
@@ -383,7 +395,7 @@ __END_DECLS
 #endif /* !_SYS_EVENT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181203,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

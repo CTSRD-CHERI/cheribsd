@@ -38,8 +38,13 @@ static char sccsid[] = "@(#)bcopy.c	8.1 (Berkeley) 6/4/93";
 __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #else
-typedef long vaddr_t;
+#ifndef _VADDR_T_DECLARED
+typedef __attribute((memory_address)) __UINT64_TYPE__ vaddr_t;
+#define _VADDR_T_DECLARED
+#endif
 #endif
 /*
  * sizeof(word) MUST BE A POWER OF TWO
@@ -77,6 +82,54 @@ typedef	uintptr_t ptr;
 	} while (index!=last);						\
 }
 
+#if defined(__CHERI__)
+/*
+ * Check that we aren't attempting to copy a capabilities to a misaligned
+ * destination (which would strip the tag bit instead of raising an exception).
+ */
+static __noinline __attribute__((optnone)) void
+check_no_tagged_capabilities_in_copy(
+    const char *__capability src, const char *__capability dst, size_t len)
+{
+	if (len < sizeof(void *__capability)) {
+		return; /* return early if copying less than a capability */
+	}
+	const vaddr_t src_addr = (__cheri_addr vaddr_t)src;
+	const vaddr_t to_first_cap =
+	    __builtin_align_up(src_addr, sizeof(void *__capability)) - src_addr;
+	const vaddr_t last_clc_offset = len - sizeof(void *__capability);
+	for (vaddr_t offset = to_first_cap; offset <= last_clc_offset;
+	     offset += sizeof(void *__capability)) {
+		const void *__capability *__capability aligned_src =
+		    (const void *__capability *__capability)(src + offset);
+		if (__predict_true(!__builtin_cheri_tag_get(*aligned_src))) {
+			continue; /* untagged values are fine */
+		}
+		/* Got a tagged value, this is always an error! */
+		/* XXXAR: can we safely use printf here? */
+		fprintf(stderr,
+		    "Attempting to copy a tagged capability"
+		    " (%#p) from 0x%jx to underaligned destination 0x%jx."
+		    /* XXXAR: These functions do not exist yet... */
+		    " Use memmove_nocap()/memcpy_nocap() if you intended to"
+		    " strip tags.\n",
+#ifdef __CHERI_PURE_CAPABILITY__
+		    *aligned_src,
+#else
+		    /* Can't use capabilities in fprintf in hybrid mode */
+		    (void *)(uintptr_t)(__cheri_addr vaddr_t)(*aligned_src),
+#endif
+		    (__cheri_addr uintmax_t)(src + offset),
+		    (__cheri_addr uintmax_t)(dst + offset));
+		abort();
+	}
+}
+#else
+#define check_no_tagged_capabilities_in_copy(...) (void)0
+#endif
+
+/* We are doing the necessary checks before casting -> silence warning */
+#pragma clang diagnostic ignored "-Wcast-align"
 
 /*
  * Copy a block of memory, handling overlap.
@@ -120,14 +173,17 @@ bcopy(const void *src0, void *dst0, size_t length)
 	if (length == 0 || src0 == dst0)		/* nothing to do */
 		goto done;
 
-#ifdef __CHERI__
+#if defined(MEMMOVE_C) || defined(MEMCPY_C) || defined(CMEMCPY_C)
+	char * CAPABILITY dst = (char * CAPABILITY)dst0;
+	const char * CAPABILITY src = (const char * CAPABILITY)src0;
+#elif defined(__CHERI__)
 	char * CAPABILITY dst =
 	    __builtin_cheri_bounds_set((__cheri_tocap void * CAPABILITY)dst0,length);
 	const char * CAPABILITY src =
 	    __builtin_cheri_bounds_set((__cheri_tocap const void * CAPABILITY)src0,length);
 #else
-	char *dst = dst0;
-	const char *src = src0;
+	char *dst = (char *)dst0;
+	const char *src = (const char *)src0;
 #endif
 	size_t t;
 
@@ -147,10 +203,12 @@ bcopy(const void *src0, void *dst0, size_t length)
 			 * Try to align operands.  This cannot be done
 			 * unless the low bits match.
 			 */
-			if ((t ^ (__cheri_addr vaddr_t)dst) & wmask || length < wsize)
+			if ((t ^ (__cheri_addr vaddr_t)dst) & wmask || length < wsize) {
+				check_no_tagged_capabilities_in_copy(src, dst, length);
 				t = length;
-			else
+			} else {
 				t = wsize - (t & wmask);
+			}
 			length -= t;
 			dst += t;
 			src += t;
@@ -167,10 +225,12 @@ bcopy(const void *src0, void *dst0, size_t length)
 				 * Try to align operands.  This cannot be done
 				 * unless the low bits match.
 				 */
-				if ((t ^ (__cheri_addr vaddr_t)dst) & pmask || length < psize)
+				if ((t ^ (__cheri_addr vaddr_t)dst) & pmask || length < psize) {
+					check_no_tagged_capabilities_in_copy(src, dst, length);
 					t = length / wsize;
-				else
+				} else {
 					t = (psize - (t & pmask)) / wsize;
+				}
 				if (t) {
 					length -= t*wsize;
 					dst += t*wsize;
@@ -178,7 +238,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 					t = -t*wsize;
 					MIPSLOOP(t, -8,
 					    *((word * CAPABILITY)(dst+t)) =
-					    *((word * CAPABILITY)(src+t));,
+					    *((const word * CAPABILITY)(src+t));,
 					    8/*wsize*/);
 				}
 			}
@@ -193,13 +253,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 			t = -(t*psize);
 #if !defined(_MIPS_SZCAP)
 			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, 8/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==128
 			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, 16/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==256
 			MIPSLOOP(t, -psize, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, 32/*sizeof(ptr)*/);
 #endif
 		}
 		t = length & pmask;
@@ -219,10 +279,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 		dst += length;
 		t = (__cheri_addr vaddr_t)src;
 		if ((t | (__cheri_addr vaddr_t)dst) & wmask) {
-			if ((t ^ (__cheri_addr vaddr_t)dst) & wmask || length <= wsize)
+			if ((t ^ (__cheri_addr vaddr_t)dst) & wmask || length <= wsize) {
+				/* Subtract length since we are copying backwards */
+				check_no_tagged_capabilities_in_copy(src - length, dst - length, length);
 				t = length;
-			else
+			} else {
 				t &= wmask;
+			}
 			length -= t;
 			dst -= t;
 			src -= t;
@@ -232,10 +295,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 		if (bigptr) {
 			t = (__cheri_addr vaddr_t)src;	/* only need low bits */
 			if ((t | (__cheri_addr vaddr_t)dst) & pmask) {
-				if ((t ^ (__cheri_addr vaddr_t)dst) & pmask || length < psize)
+				if ((t ^ (__cheri_addr vaddr_t)dst) & pmask || length < psize) {
+					/* Subtract length since we are copying backwards */
+					check_no_tagged_capabilities_in_copy(src - length, dst - length, length);
 					t = length / wsize;
-				else
+				} else {
 					t = (t & pmask) / wsize;
+				}
 				if (t) {
 					length -= t*wsize;
 					dst -= t*wsize;
@@ -243,7 +309,7 @@ bcopy(const void *src0, void *dst0, size_t length)
 					t = ((t-1)*wsize);
 					MIPSLOOP(t, 0,
 					    *((word * CAPABILITY)(dst+t)) =
-					    *((word * CAPABILITY)(src+t));,
+					    *((const word * CAPABILITY)(src+t));,
 					    -8/*wsize*/);
 				}
 			}
@@ -255,13 +321,13 @@ bcopy(const void *src0, void *dst0, size_t length)
 			t = ((t-1)*psize);
 #if !defined(_MIPS_SZCAP)
 			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, -8/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==128
 			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, -16/*sizeof(ptr)*/);
 #elif _MIPS_SZCAP==256
 			MIPSLOOP(t, 0, *((ptr * CAPABILITY)(dst+t)) =
-			    *((ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
+			    *((const ptr * CAPABILITY)(src+t));, -32/*sizeof(ptr)*/);
 #endif
 
 		}

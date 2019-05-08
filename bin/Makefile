@@ -46,15 +46,16 @@ SUBDIR+=	cheri_bench
 .endif
 
 SUBDIR.${MK_CHERI}+=	cheri_helloworld
+SUBDIR.${MK_CHERI}+=	cheriabi_helloworld
 SUBDIR.${MK_CHERI}+=	cheri_pthreads
 SUBDIR.${MK_CHERI}+=	cheriabitest
 SUBDIR.${MK_CHERI}+=	cheriabitest-mt
 SUBDIR.${MK_CHERI}+=	cheritest
 SUBDIR.${MK_CHERI}+=	cheritest-mt
 SUBDIR.${MK_CHERI}+=	helloworld
+SUBDIR.${MK_CHERI}+=	helloworld_static
 SUBDIR.${MK_CHERI}+=	helloworld_cxx
 
-SUBDIR.${MK_RCMDS}+=	rcp
 SUBDIR.${MK_SENDMAIL}+=	rmail
 SUBDIR.${MK_TCSH}+=	csh
 SUBDIR.${MK_TESTS}+=	tests

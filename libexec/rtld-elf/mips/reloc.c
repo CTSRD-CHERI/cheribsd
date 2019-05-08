@@ -32,11 +32,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "prog",
  *   "changes": [
  *     "support",
- *     "pointer_alignment",
+ *     "pointer_alignment"
  *   ],
  *   "change_comment": "CHERI relocation"
  * }
@@ -409,8 +409,8 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			    (void *)(uintptr_t)load_ptr(where, sizeof(Elf_Sword)),
 			    strtab + symtab[r_symndx].st_name);
 #endif
-			rtld_printf("%s: Unsupported relocation type %ld "
-			    "in non-PLT relocations\n",
+			rtld_fdprintf(STDERR_FILENO, "%s: Unsupported relocation"
+			    "type %ld in non-PLT relocations\n",
 			    __func__, (u_long) ELF_R_TYPE(rel->r_info));
 			/* Abort won't work yet since it needs global caps */
 			/* abort(); */
@@ -782,7 +782,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			if (def == NULL)
 				return -1;
 
-			if (!defobj->tls_done && allocate_tls_offset(obj))
+			if (!defobj->tls_done && !allocate_tls_offset(obj))
 				return -1;
 
 			val += (Elf_Addr)def->st_value - TLS_DTP_OFFSET;
@@ -810,7 +810,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			if (def == NULL)
 				return -1;
 
-			if (!defobj->tls_done && allocate_tls_offset(obj))
+			if (!defobj->tls_done && !allocate_tls_offset(obj))
 				return -1;
 
 			val += (Elf_Addr)(def->st_value + defobj->tlsoffset
@@ -876,14 +876,22 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
 			break;
 		}
 
-		case R_TYPE(CHERI_CAPABILITY_CALL): /* TODO: lazy binding */
+		case R_TYPE(CHERI_CAPABILITY_CALL):
+			// TODO: make this an error in a few weeks
+
+			rtld_fdprintf(STDERR_FILENO,
+			    "%s: deprecated: found CHERI_CAPABILITY_CALL call "
+			    "PLT relocation against %s in rel.dyn instead of "
+			    "rel.plt. Please update LLD and recompile world!\n",
+			    obj->path, symname(obj, r_symndx));
+			if (!add_cheri_plt_stub(obj, obj_rtld, r_symndx, where))
+				return (-1);
+			break;
 		case R_TYPE(CHERI_CAPABILITY):
-		{
 			if (process_r_cheri_capability(obj, r_symndx, lockstate,
 			    flags, where) != 0)
 				return (-1);
 			break;
-		}
 #endif /* __CHERI_PURE_CAPABILITY__ */
 		default:
 			dbg("sym = %lu, type = %lu, offset = %p, "
@@ -908,7 +916,7 @@ reloc_non_plt(Obj_Entry *obj, Obj_Entry *obj_rtld, int flags,
  *  Process the PLT relocations.
  */
 int
-reloc_plt(Obj_Entry *obj)
+reloc_plt(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
 {
 	const Elf_Rel *rellim;
 	const Elf_Rel *rel;
@@ -1065,7 +1073,7 @@ _mips_get_tls(void)
 #elif defined(__CHERI_CAPABILITY_TLS__)
 	return (void *)_rv;
 #else
-	return cheri_setoffset(cheri_getdefault(), _rv);
+	return cheri_setaddress(cheri_getdefault(), _rv);
 #endif
 }
 

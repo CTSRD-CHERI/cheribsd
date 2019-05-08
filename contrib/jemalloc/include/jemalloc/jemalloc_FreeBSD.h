@@ -4,10 +4,11 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "lib",
  *   "changes": [
- *     "pointer_size"
+ *     "pointer_shape",
+ *     "unsupported"
  *   ]
  * }
  * CHERI CHANGES END
@@ -15,6 +16,9 @@
 
 #undef JEMALLOC_OVERRIDE_VALLOC
 
+#ifndef MALLOC_PRODUCTION
+#define	MALLOC_PRODUCTION
+#endif
 #ifndef MALLOC_PRODUCTION
 #define	JEMALLOC_DEBUG
 #endif

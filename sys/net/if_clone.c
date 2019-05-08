@@ -759,7 +759,7 @@ ifc_flags_get(struct if_clone *ifc)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180830,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

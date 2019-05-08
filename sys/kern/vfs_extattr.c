@@ -300,10 +300,8 @@ sys_extattr_set_link(struct thread *td, struct extattr_set_link_args *uap)
 {
 
 	return (kern_extattr_set_path(td, __USER_CAP_STR(uap->path),
-	    uap->attrnamespace,
-	    __USER_CAP_STR(uap->attrname),
-	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes,
-	    NOFOLLOW));
+	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
+	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, NOFOLLOW));
 }
 
 int
@@ -675,8 +673,6 @@ extattr_list_vp(struct vnode *vp, int attrnamespace, void * __capability data,
 	if (nbytes > IOSIZE_MAX)
 		return (EINVAL);
 
-	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-
 	auiop = NULL;
 	sizep = NULL;
 	cnt = 0;
@@ -694,24 +690,25 @@ extattr_list_vp(struct vnode *vp, int attrnamespace, void * __capability data,
 	} else
 		sizep = &size;
 
+	vn_lock(vp, LK_SHARED | LK_RETRY);
+
 #ifdef MAC
 	error = mac_vnode_check_listextattr(td->td_ucred, vp, attrnamespace);
-	if (error)
-		goto done;
+	if (error) {
+		VOP_UNLOCK(vp, 0);
+		return (error);
+	}
 #endif
 
 	error = VOP_LISTEXTATTR(vp, attrnamespace, auiop, sizep,
 	    td->td_ucred, td);
+	VOP_UNLOCK(vp, 0);
 
 	if (auiop != NULL) {
 		cnt -= auio.uio_resid;
 		td->td_retval[0] = cnt;
 	} else
 		td->td_retval[0] = size;
-#ifdef MAC
-done:
-#endif
-	VOP_UNLOCK(vp, 0);
 	return (error);
 }
 
@@ -808,7 +805,7 @@ kern_extattr_list_path(struct thread *td, const char * __capability path,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

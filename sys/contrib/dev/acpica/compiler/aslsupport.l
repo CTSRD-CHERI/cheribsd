@@ -9,7 +9,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -532,14 +532,18 @@ count (
     {
     case 2:
 
-        AslGbl_TotalKeywords++;
-        AslGbl_TotalNamedObjects++;
+        ++AslGbl_TotalKeywords;
+        ++AslGbl_TotalNamedObjects;
+        ++AslGbl_FilesList->TotalKeywords;
+        ++AslGbl_FilesList->TotalNamedObjects;
         break;
 
     case 3:
 
-        AslGbl_TotalKeywords++;
-        AslGbl_TotalExecutableOpcodes++;
+        ++AslGbl_TotalKeywords;
+        ++AslGbl_TotalExecutableOpcodes;
+        ++AslGbl_FilesList->TotalKeywords;
+        ++AslGbl_FilesList->TotalExecutableOpcodes;
         break;
 
     default:
@@ -610,7 +614,7 @@ loop:
 
     /*
      * Check for nested comment -- can help catch cases where a previous
-     * comment was accidently left unterminated
+     * comment was accidentally left unterminated
      */
     if ((c1 == '/') && (c == '*'))
     {

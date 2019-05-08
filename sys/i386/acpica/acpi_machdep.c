@@ -134,7 +134,7 @@ table_map(vm_paddr_t pa, int offset, vm_offset_t length)
 
 	off = pa & PAGE_MASK;
 	length = round_page(length + off);
-	pa = pa & PG_FRAME;
+	pa = pmap_pg_frame(pa);
 	va = (vm_offset_t)pmap_kenter_temporary(pa, offset) +
 	    (offset * PAGE_SIZE);
 	data = (void *)(va + off);
@@ -180,7 +180,7 @@ map_table(vm_paddr_t pa, int offset, const char *sig)
 	void *table;
 
 	header = table_map(pa, offset, sizeof(ACPI_TABLE_HEADER));
-	if (strncmp(header->Signature, sig, ACPI_NAME_SIZE) != 0) {
+	if (strncmp(header->Signature, sig, ACPI_NAMESEG_SIZE) != 0) {
 		table_unmap(header, sizeof(ACPI_TABLE_HEADER));
 		return (NULL);
 	}
@@ -218,7 +218,7 @@ probe_table(vm_paddr_t address, const char *sig)
 		printf("Table '%.4s' at 0x%jx\n", table->Signature,
 		    (uintmax_t)address);
 
-	if (strncmp(table->Signature, sig, ACPI_NAME_SIZE) != 0) {
+	if (strncmp(table->Signature, sig, ACPI_NAMESEG_SIZE) != 0) {
 		table_unmap(table, sizeof(ACPI_TABLE_HEADER));
 		return (0);
 	}

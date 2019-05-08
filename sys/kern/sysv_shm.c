@@ -97,8 +97,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/jail.h>
 
+#ifdef COMPAT_CHERIABI
 #include <cheri/cheric.h>
 #include <sys/user.h>
+#include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_syscall.h>
+#include <compat/cheriabi/cheriabi_util.h>
+#endif
 
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
@@ -211,7 +216,14 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, shmsegs, CTLTYPE_OPAQUE | CTLFLAG_RD |
     CTLFLAG_MPSAFE, NULL, 0, sysctl_shmsegs, "",
     "Array of struct shmid_kernel for each potential shared memory segment");
 
-#ifdef CPU_CHERI
+#ifdef COMPAT_CHERIABI
+struct shmid_kernel_c {
+	struct shmid_ds u;	/* Contains no pointers so no _c needed. */
+	struct vm_object * __capability	object;
+	struct label * __capability	label;
+	struct ucred * __capability	cred;
+};
+
 SYSCTL_DECL(_compat_cheriabi);
 static SYSCTL_NODE(_compat_cheriabi, OID_AUTO, sysv_shm, CTLFLAG_RW, 0,
     "System V shared memory");
@@ -274,7 +286,7 @@ shm_deallocate_segment(struct shmid_kernel *shmseg)
 	vm_object_deallocate(shmseg->object);
 	shmseg->object = NULL;
 	size = round_page(shmseg->u.shm_segsz);
-#ifdef CPU_CHERI
+#ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
 		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
 #endif
@@ -304,7 +316,7 @@ shm_delete_mapping(struct vmspace *vm, struct shmmap_state *shmmap_s)
 
 	shmseg = &shmsegs[segnum];
 	size = round_page(shmseg->u.shm_segsz);
-#ifdef CPU_CHERI
+#ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
 		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
 #endif
@@ -361,9 +373,6 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 {
 	struct proc *p = td->td_proc;
 	struct shmmap_state *shmmap_s;
-#if (defined(AUDIT) && defined(KDTRACE_HOOKS)) || defined(MAC)
-	struct shmid_kernel *shmsegptr;
-#endif
 #ifdef MAC
 	int error;
 #endif
@@ -384,11 +393,9 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 	}
 	if (i == shminfo.shmseg)
 		return (EINVAL);
-#if (defined(AUDIT) && defined(KDTRACE_HOOKS)) || defined(MAC)
-	shmsegptr = &shmsegs[IPCID_TO_IX(shmmap_s->shmid)];
-#endif
 #ifdef MAC
-	error = mac_sysvshm_check_shmdt(td->td_ucred, shmsegptr);
+	error = mac_sysvshm_check_shmdt(td->td_ucred,
+	    &shmsegs[IPCID_TO_IX(shmmap_s->shmid)]);
 	if (error != 0)
 		return (error);
 #endif
@@ -397,20 +404,14 @@ kern_shmdt_locked(struct thread *td, const void * __capability shmaddr)
 
 #ifndef _SYS_SYSPROTO_H_
 struct shmdt_args {
-	const void * __capability shmaddr;
+	const void *shmaddr;
 };
 #endif
 int
 sys_shmdt(struct thread *td, struct shmdt_args *uap)
 {
-	const void * __capability shmaddr = uap->shmaddr;
 
-#if __has_feature(capabilities)
-	if (shmaddr != NULL &&
-	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
-		return (EPROT);
-#endif
-	return (kern_shmdt(td, __USER_CAP_UNBOUND(shmaddr)));
+	return (kern_shmdt(td, __USER_CAP_UNBOUND(uap->shmaddr)));
 }
 
 static int
@@ -435,7 +436,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	vm_offset_t attach_va = 0, max_va;
 	vm_prot_t prot;
 	vm_size_t size;
-	int error, findspace, i, rv;
+	int cow, error, find_space, i, rv;
 
 	AUDIT_ARG_SVIPC_ID(shmid);
 	AUDIT_ARG_VALUE(shmflg);
@@ -473,16 +474,16 @@ kern_shmat_locked(struct thread *td, int shmid,
 	if (i >= shminfo.shmseg)
 		return (EMFILE);
 	size = round_page(shmseg->u.shm_segsz);
-#ifdef CPU_CHERI
+#ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
 		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
 #endif
 	prot = VM_PROT_READ;
+	cow = MAP_INHERIT_SHARE | MAP_PREFAULT_PARTIAL;
 	if ((shmflg & SHM_RDONLY) == 0)
 		prot |= VM_PROT_WRITE;
 	if (shmaddr != NULL) {
-		findspace = VMFS_NO_SPACE;
-#ifdef CPU_CHERI
+#ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			if ((shmflg & SHM_RND) != 0)
 				attach_va = rounddown2((__cheri_addr vm_offset_t)shmaddr,
@@ -503,8 +504,18 @@ kern_shmat_locked(struct thread *td, int shmid,
 			else
 				return (EINVAL);
 		}
+		if ((shmflg & SHM_RND) != 0)
+			attach_va = rounddown2((__cheri_addr vm_offset_t)shmaddr, SHMLBA);
+		else if (((__cheri_addr vm_offset_t)shmaddr & (SHMLBA-1)) == 0)
+			attach_va = (__cheri_addr vm_offset_t)shmaddr;
+		else
+			return (EINVAL);
 		shmaddr = (const char * __capability)shmaddr -
 		    ((__cheri_addr vm_offset_t)shmaddr - attach_va);
+		if ((shmflg & SHM_REMAP) != 0)
+			cow |= MAP_REMAP;
+		find_space = VMFS_NO_SPACE;
+	} else {
 		/*
 		 * Check that shmaddr (as adjusted for SHM_RND) has
 		 * enough space for a mapping.  For CheriABI this means
@@ -519,8 +530,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		 */
 		if (!__CAP_CHECK(shmaddr, size))
 			return (EINVAL);
-	} else {
-#ifdef CPU_CHERI
+#ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			/*
 			 * Require representable alignment for large objects
@@ -529,7 +539,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			 *
 			 * XXX: 12 should probably be the superpage shift.
 			 */
-			findspace = CHERI_ALIGN_SHIFT(size) < 12 ?
+			find_space = CHERI_ALIGN_SHIFT(size) < 12 ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
 			shmaddr = td->td_md.md_cheri_mmap_cap;
@@ -537,7 +547,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		} else
 #endif
 		{
-			findspace = VMFS_OPTIMAL_SPACE;
+			find_space = VMFS_OPTIMAL_SPACE;
 			/*
 			 * This is just a hint to vm_map_find() about where to
 			 * put it.
@@ -554,8 +564,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 #endif
 	vm_object_reference(shmseg->object);
 	rv = vm_map_find(&p->p_vmspace->vm_map, shmseg->object, 0, &attach_va,
-	    size, max_va, findspace,
-	    prot, prot, MAP_INHERIT_SHARE | MAP_PREFAULT_PARTIAL);
+	    size, max_va, find_space, prot, prot, cow);
 	if (rv != KERN_SUCCESS) {
 		vm_object_deallocate(shmseg->object);
 		return (ENOMEM);
@@ -566,7 +575,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	shmseg->u.shm_lpid = p->p_pid;
 	shmseg->u.shm_atime = time_second;
 	shmseg->u.shm_nattch++;
-#ifdef CPU_CHERI
+#ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
 		shmaddr = cheri_setoffset(shmaddr,
 		    attach_va - cheri_getbase(shmaddr));
@@ -598,21 +607,15 @@ kern_shmat(struct thread *td, int shmid, const void * __capability shmaddr,
 #ifndef _SYS_SYSPROTO_H_
 struct shmat_args {
 	int shmid;
-	const void * __capability shmaddr;
+	const void *shmaddr;
 	int shmflg;
 };
 #endif
 int
 sys_shmat(struct thread *td, struct shmat_args *uap)
 {
-	const void * __capability shmaddr = uap->shmaddr;
 
-#if __has_feature(capabilities)
-	if (shmaddr != NULL &&
-	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
-		return (EPROT);
-#endif
-	return (kern_shmat(td, uap->shmid, __USER_CAP_UNBOUND(shmaddr),
+	return (kern_shmat(td, uap->shmid, __USER_CAP_UNBOUND(uap->shmaddr),
 	    uap->shmflg));
 }
 
@@ -736,7 +739,7 @@ kern_shmctl(struct thread *td, int shmid, int cmd, void *buf, size_t *bufsz)
 struct shmctl_args {
 	int shmid;
 	int cmd;
-	struct shmid_ds * __capability buf;
+	struct shmid_ds *buf;
 };
 #endif
 int
@@ -745,8 +748,40 @@ sys_shmctl(struct thread *td, struct shmctl_args *uap)
 
 	return (user_shmctl(td, uap->shmid, uap->cmd,
 	    __USER_CAP_OBJ(uap->buf)));
-
 }
+
+#ifdef COMPAT_CHERIABI
+int
+cheriabi_shmat(struct thread *td, struct cheriabi_shmat_args *uap)
+{
+	const void * __capability shmaddr = uap->shmaddr;
+
+	if (shmaddr != NULL &&
+	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+		return (EPROT);
+
+	return (kern_shmat(td, uap->shmid, shmaddr, uap->shmflg));
+}
+
+int
+cheriabi_shmdt(struct thread *td, struct cheriabi_shmdt_args *uap)
+{
+	const void * __capability shmaddr = uap->shmaddr;
+
+	if (shmaddr != NULL &&
+	    (cheri_getperm(shmaddr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
+		return (EPROT);
+
+	return (kern_shmdt(td, shmaddr));
+}
+
+int
+cheriabi_shmctl(struct thread *td, struct cheriabi_shmctl_args *uap)
+{
+
+	return (user_shmctl(td, uap->shmid, uap->cmd, uap->buf));
+}
+#endif
 
 static int
 user_shmctl(struct thread *td, int shmid, int cmd,
@@ -832,7 +867,7 @@ shmget_allocate_segment(struct thread *td, struct shmget_args *uap, int mode)
 	if (shm_nused >= shminfo.shmmni) /* Any shmids left? */
 		return (ENOSPC);
 	size = round_page(uap->size);
-#if __has_feature(capabilities)
+#ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
 		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
 #endif
@@ -1040,6 +1075,56 @@ static struct syscall_helper_data shm_syscalls[] = {
 #include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/freebsd32/freebsd32_util.h>
 
+struct shmid_ds32 {
+	struct ipc_perm32 shm_perm;
+	int32_t		shm_segsz;
+	pid_t		shm_lpid;
+	pid_t		shm_cpid;
+	unsigned int	shm_nattch;
+	int32_t		shm_atime;
+	int32_t		shm_dtime;
+	int32_t		shm_ctime;
+};
+
+#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
+    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
+struct shmid_ds32_old {
+	struct ipc_perm32_old shm_perm;
+	int32_t		shm_segsz;
+	pid_t		shm_lpid;
+	pid_t		shm_cpid;
+	int16_t		shm_nattch;
+	int32_t		shm_atime;
+	int32_t		shm_dtime;
+	int32_t		shm_ctime;
+	uint32_t	shm_internal;
+};
+#endif
+
+struct shmid_kernel32 {
+	struct shmid_ds32	 u;
+	int32_t			*object;
+	int32_t			*label;
+	int32_t			*cred;
+};
+
+struct shm_info32 {
+	int32_t		used_ids;
+	uint32_t	shm_tot;
+	uint32_t	shm_rss;
+	uint32_t	shm_swp;
+	uint32_t	swap_attempts;
+	uint32_t	swap_successes;
+};
+
+struct shminfo32 {
+	uint32_t	shmmax;
+	uint32_t	shmmin;
+	uint32_t	shmmni;
+	uint32_t	shmseg;
+	uint32_t	shmall;
+};
+
 static struct syscall_helper_data shm32_syscalls[] = {
 	SYSCALL32_INIT_HELPER_COMPAT(shmat),
 	SYSCALL32_INIT_HELPER_COMPAT(shmdt),
@@ -1054,17 +1139,19 @@ static struct syscall_helper_data shm32_syscalls[] = {
 };
 #endif
 
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
+#ifdef COMPAT_CHERIABI
+#include <compat/cheriabi/cheriabi.h>
+#include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_syscall.h>
 
-/* static struct syscall_helper_data cheriabi_shm_syscalls[] = { */
-/* 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmat), */
-/* 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmdt), */
-/* 	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmget), */
-/* 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmctl), */
-/* 	SYSCALL_INIT_LAST */
-/* }; */
-#endif /* COMPAT_FREEBSD64 */
+static struct syscall_helper_data cheriabi_shm_syscalls[] = {
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmat),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmdt),
+	CHERIABI_SYSCALL_INIT_HELPER_COMPAT(shmget),
+	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_shmctl),
+	SYSCALL_INIT_LAST
+};
+#endif /* COMPAT_CHERIABI */
 
 static int
 shminit(void)
@@ -1139,11 +1226,10 @@ shminit(void)
 	if (error != 0)
 		return (error);
 #endif
-#ifdef COMPAT_FREEBSD64
-	/* XXX-AM: fix for freebsd64 */
-	/* error = freebsd64_syscall_helper_register(freebsd64_shm_syscalls, SY_THR_STATIC_KLD); */
-	/* if (error != 0) */
-	/* 	return (error); */
+#ifdef COMPAT_CHERIABI
+	error = cheriabi_syscall_helper_register(cheriabi_shm_syscalls, SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
 #endif
 	return (0);
 }
@@ -1159,9 +1245,8 @@ shmunload(void)
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(shm32_syscalls);
 #endif
-#ifdef COMPAT_FREEBSD64
-	/* XXX-AM: fix for freebsd64 */
-	/* freebsd64_syscall_helper_unregister(freebsd64_shm_syscalls); */
+#ifdef COMPAT_CHERIABI
+	cheriabi_syscall_helper_unregister(cheriabi_shm_syscalls);
 #endif
 	syscall_helper_unregister(shm_syscalls);
 	if (shm_prison_slot != 0)
@@ -1186,17 +1271,15 @@ shmunload(void)
 	return (0);
 }
 
-#ifndef CP
-#define CP(src, dst, fld)	do { (dst).fld = (src).fld; } while (0)
-#endif
-
 static int
 sysctl_shmsegs(SYSCTL_HANDLER_ARGS)
 {
 	struct shmid_kernel tshmseg;
-	struct shmid_kernel_c tshmseg_c;
 #ifdef COMPAT_FREEBSD32
 	struct shmid_kernel32 tshmseg32;
+#endif
+#ifdef COMPAT_CHERIABI
+	struct shmid_kernel_c tshmseg_c;
 #endif
 	struct prison *pr, *rpr;
 	void *outaddr;
@@ -1234,17 +1317,8 @@ sysctl_shmsegs(SYSCTL_HANDLER_ARGS)
 			outsize = sizeof(tshmseg32);
 		} else
 #endif
-#ifdef COMPAT_FREEBSD64
-		if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
-			/* XXX-AM: fix for freebsd64 */
-			tshmseg.object = NULL;
-			tshmseg.label = NULL;
-			tshmseg.cred = NULL;
-			outaddr = &tshmseg;
-			outsize = sizeof(tshmseg);
-		} else
-#endif
-		{
+#ifdef COMPAT_CHERIABI
+		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			bzero(&tshmseg_c, sizeof(tshmseg_c));
 			CP(tshmseg, tshmseg_c, u.shm_perm);
 			CP(tshmseg, tshmseg_c, u.shm_segsz);
@@ -1257,6 +1331,14 @@ sysctl_shmsegs(SYSCTL_HANDLER_ARGS)
 			/* Don't copy object, label, or cred */
 			outaddr = &tshmseg_c;
 			outsize = sizeof(tshmseg_c);
+		} else
+#endif
+		{
+			tshmseg.object = NULL;
+			tshmseg.label = NULL;
+			tshmseg.cred = NULL;
+			outaddr = &tshmseg;
+			outsize = sizeof(tshmseg);
 		}
 		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
@@ -1765,6 +1847,10 @@ done:
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
 
+#ifndef CP
+#define CP(src, dst, fld)	do { (dst).fld = (src).fld; } while (0)
+#endif
+
 #ifndef _SYS_SYSPROTO_H_
 struct freebsd7_shmctl_args {
 	int shmid;
@@ -1874,7 +1960,7 @@ DECLARE_MODULE(sysvshm, sysvshm_mod, SI_SUB_SYSV_SHM, SI_ORDER_FIRST);
 MODULE_VERSION(sysvshm, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -34,10 +34,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "prog",
  *   "changes": [
- *     "pointer_integrity"
+ *     "integer_provenance"
  *   ],
  *   "change_comments": "BDB hashes don't preserve pointers"
  * }
@@ -1116,7 +1116,7 @@ execute_script(char *argv[])
 	error = access(script, X_OK);
 	if (error == 0) {
 		execv(script, argv + 1);
-		warning("can't exec %s: %m", script);
+		warning("can't directly exec %s: %m", script);
 	} else if (errno != EACCES) {
 		warning("can't access %s: %m", script);
 	}

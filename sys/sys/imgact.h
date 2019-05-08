@@ -46,7 +46,8 @@ struct image_args {
 	char *buf;		/* pointer to string buffer */
 	void *bufkva;		/* cookie for string buffer KVA */
 	char *begin_argv;	/* beginning of argv in buf */
-	char *begin_envv;	/* beginning of envv in buf */
+	char *begin_envv;	/* (interal use only) beginning of envv in buf,
+				 * access with exec_args_get_begin_envv(). */
 	char *endp;		/* current `end' pointer of arg & env strings */
 	char *fname;            /* pointer to filename of executable (system space) */
 	char *fname_buf;	/* pointer to optional malloc(M_TEMP) buffer */
@@ -69,7 +70,7 @@ struct image_params {
 	unsigned long entry_addr; /* entry address of target executable */
 	unsigned long start_addr; /* start of mapped image (including bss) */
 	unsigned long end_addr;   /* end of mapped image (including bss) */
-	vm_ptr_t reloc_base; /* load address of image */
+	unsigned long reloc_base; /* load address of image */
 	unsigned long interp_end; /* end address of RTLD mapping (or zero) */
 	char vmspace_destroyed;	/* flag - we've blown away original vm space */
 #define IMGACT_SHELL	0x1
@@ -93,6 +94,7 @@ struct image_params {
 	u_long stack_sz;
 	struct ucred *newcred;		/* new credentials if changing */
 	bool credential_setid;		/* true if becoming setid */
+	u_int map_flags;
 };
 
 #ifdef _KERNEL
@@ -101,20 +103,23 @@ struct thread;
 struct vmspace;
 
 int	exec_alloc_args(struct image_args *);
-int	exec_args_add_arg_str(struct image_args *args,
-	    char * __capability argp, enum uio_seg segflg);
-int	exec_args_add_env_str(struct image_args *args,
-	    char * __capability envp, enum uio_seg segflg);
+int	exec_args_add_arg(struct image_args *args,
+	    const char * __capability argp, enum uio_seg segflg);
+int	exec_args_add_env(struct image_args *args,
+	    const char * __capability envp, enum uio_seg segflg);
 int	exec_args_add_fname(struct image_args *args,
-	    char * __capability fname, enum uio_seg segflg);
+	    const char *__capability fname, enum uio_seg segflg);
+int	exec_args_adjust_args(struct image_args *args, size_t consume,
+	    ssize_t extend);
+char	*exec_args_get_begin_envv(struct image_args *args);
 int	exec_check_permissions(struct image_params *);
 register_t *exec_copyout_strings(struct image_params *);
 void	exec_free_args(struct image_args *);
 int	exec_new_vmspace(struct image_params *, struct sysentvec *);
 void	exec_setregs(struct thread *, struct image_params *, u_long);
 int	exec_shell_imgact(struct image_params *);
-int	exec_copyin_args(struct image_args *, char * __capability, enum uio_seg,
-	char * __capability * __capability, char * __capability * __capability);
+int	exec_copyin_args(struct image_args *, const char * __capability,
+	    enum uio_seg, void * __capability, void * __capability);
 int	exec_copyin_data_fds(struct thread *, struct image_args *, const void *,
 	size_t, const int *, size_t);
 int	pre_execve(struct thread *td, struct vmspace **oldvmspace);
@@ -124,7 +129,7 @@ void	post_execve(struct thread *td, int error, struct vmspace *oldvmspace);
 #endif /* !_SYS_IMGACT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

@@ -235,7 +235,7 @@ linux_clone_proc(struct thread *td, struct linux_clone_args *args)
 	if (args->flags & LINUX_CLONE_PARENT) {
 		sx_xlock(&proctree_lock);
 		PROC_LOCK(p2);
-		proc_reparent(p2, td->td_proc->p_pptr);
+		proc_reparent(p2, td->td_proc->p_pptr, true);
 		PROC_UNLOCK(p2);
 		sx_xunlock(&proctree_lock);
 	}
@@ -353,7 +353,7 @@ linux_clone_thread(struct thread *td, struct linux_clone_args *args)
 	thread_unlock(td);
 	if (P_SHOULDSTOP(p))
 		newtd->td_flags |= TDF_ASTPENDING | TDF_NEEDSUSPCHK;
-	
+
 	if (p->p_ptevents & PTRACE_LWP)
 		newtd->td_dbgflags |= TDB_BORN;
 	PROC_UNLOCK(p);

@@ -414,6 +414,11 @@ struct bus_dmadesc {
 struct ioat_descriptor {
 	struct bus_dmadesc	bus_dmadesc;
 	uint32_t		id;
+	bus_dmamap_t		src_dmamap;
+	bus_dmamap_t		dst_dmamap;
+	bus_dmamap_t		src2_dmamap;
+	bus_dmamap_t		dst2_dmamap;
+	bus_dmamap_t		crc_dmamap;
 };
 
 /* Unused by this driver at this time. */
@@ -426,12 +431,6 @@ struct ioat_descriptor {
 #define	IOAT_OP_OLD_XOR		0x85
 #define	IOAT_OP_OLD_XOR_VAL	0x86
 
-enum ioat_ref_kind {
-	IOAT_DMAENGINE_REF = 0,
-	IOAT_ACTIVE_DESCR_REF,
-	IOAT_NUM_REF_KINDS
-};
-
 /* One of these per allocated PCI device. */
 struct ioat_softc {
 	bus_dmaengine_t		dmaengine;
@@ -442,52 +441,41 @@ struct ioat_softc {
 	    offsetof(struct ioat_softc, dmaengine));			\
 })
 
+	device_t		device;
 	int			version;
 	unsigned		chan_idx;
 
-	struct mtx		submit_lock;
-	device_t		device;
 	bus_space_tag_t		pci_bus_tag;
 	bus_space_handle_t	pci_bus_handle;
-	int			pci_resource_id;
 	struct resource		*pci_resource;
+	int			pci_resource_id;
 	uint32_t		max_xfer_size;
 	uint32_t		capabilities;
+	uint32_t		ring_size_order;
 	uint16_t		intrdelay_max;
 	uint16_t		cached_intrdelay;
 
-	struct resource		*res;
 	int			rid;
+	struct resource		*res;
 	void			*tag;
 
 	bus_dma_tag_t		hw_desc_tag;
 	bus_dmamap_t		hw_desc_map;
+
+	bus_dma_tag_t		data_tag;
+	bus_dma_tag_t		data_crc_tag;
 
 	bus_dma_tag_t		comp_update_tag;
 	bus_dmamap_t		comp_update_map;
 	uint64_t		*comp_update;
 	bus_addr_t		comp_update_bus_addr;
 
-	struct callout		poll_timer;
-	struct callout		shrink_timer;
-	struct task		reset_task;
-
 	boolean_t		quiescing;
 	boolean_t		destroying;
 	boolean_t		is_submitter_processing;
-	boolean_t		is_completion_pending;	/* submit_lock */
-	boolean_t		is_reset_pending;
-	boolean_t		is_channel_running;
 	boolean_t		intrdelay_supported;
 	boolean_t		resetting;		/* submit_lock */
 	boolean_t		resetting_cleanup;	/* cleanup_lock */
-
-	uint32_t		head;
-	uint32_t		acq_head;
-	uint32_t		tail;
-	uint32_t		hw_head;
-	uint32_t		ring_size_order;
-	bus_addr_t		last_seen;
 
 	struct ioat_descriptor	*ring;
 
@@ -506,11 +494,16 @@ struct ioat_softc {
 #define	RING_PHYS_ADDR(sc, i)	(sc)->hw_desc_bus_addr + \
     (((i) % (1 << (sc)->ring_size_order)) * sizeof(struct ioat_dma_hw_descriptor))
 
-	struct mtx		cleanup_lock;
-	volatile uint32_t	refcnt;
-#ifdef INVARIANTS
-	volatile uint32_t	refkinds[IOAT_NUM_REF_KINDS];
-#endif
+	struct mtx_padalign	submit_lock;
+	struct callout		poll_timer;
+	struct task		reset_task;
+	struct mtx_padalign	cleanup_lock;
+
+	uint32_t		refcnt;
+	uint32_t		head;
+	uint32_t		acq_head;
+	uint32_t		tail;
+	bus_addr_t		last_seen;
 
 	struct {
 		uint64_t	interrupts;

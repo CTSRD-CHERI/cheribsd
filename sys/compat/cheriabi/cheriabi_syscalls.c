@@ -570,4 +570,9 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_cpuset_getdomain",			/* 561 = cheriabi_cpuset_getdomain */
 	"cheriabi_cpuset_setdomain",			/* 562 = cheriabi_cpuset_setdomain */
 	"cheriabi_getrandom",			/* 563 = cheriabi_getrandom */
+	"cheriabi_getfhat",			/* 564 = cheriabi_getfhat */
+	"cheriabi_fhlink",			/* 565 = cheriabi_fhlink */
+	"cheriabi_fhlinkat",			/* 566 = cheriabi_fhlinkat */
+	"cheriabi_fhreadlink",			/* 567 = cheriabi_fhreadlink */
+	"cheriabi_funlinkat",			/* 568 = cheriabi_funlinkat */
 };

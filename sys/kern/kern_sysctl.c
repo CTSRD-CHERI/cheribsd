@@ -550,10 +550,10 @@ sysctl_unregister_oid(struct sysctl_oid *oidp)
 	int error;
 
 	SYSCTL_ASSERT_WLOCKED();
-	error = ENOENT;
 	if (oidp->oid_number == OID_AUTO) {
 		error = EINVAL;
 	} else {
+		error = ENOENT;
 		SLIST_FOREACH(p, oidp->oid_parent, oid_link) {
 			if (p == oidp) {
 				SLIST_REMOVE(oidp->oid_parent, oidp,
@@ -569,8 +569,10 @@ sysctl_unregister_oid(struct sysctl_oid *oidp)
 	 * being unloaded afterwards.  It should not be a panic()
 	 * for normal use.
 	 */
-	if (error)
-		printf("%s: failed to unregister sysctl\n", __func__);
+	if (error) {
+		printf("%s: failed(%d) to unregister sysctl(%s)\n",
+		    __func__, error, oidp->oid_name);
+	}
 }
 
 /* Initialize a new context to keep track of dynamically added sysctls. */
@@ -1696,6 +1698,53 @@ retry:
 }
 
 /*
+ * Based on on sysctl_handle_int() convert microseconds to a sbintime.
+ */
+int
+sysctl_usec_to_sbintime(SYSCTL_HANDLER_ARGS)
+{
+	int error;
+	int64_t tt;
+	sbintime_t sb;
+
+	tt = *(int64_t *)arg1;
+	sb = sbttous(tt);
+
+	error = sysctl_handle_64(oidp, &sb, 0, req);
+	if (error || !req->newptr)
+		return (error);
+
+	tt = ustosbt(sb);
+	*(int64_t *)arg1 = tt;
+
+	return (0);
+}
+
+/*
+ * Based on on sysctl_handle_int() convert milliseconds to a sbintime.
+ */
+int
+sysctl_msec_to_sbintime(SYSCTL_HANDLER_ARGS)
+{
+	int error;
+	int64_t tt;
+	sbintime_t sb;
+
+	tt = *(int64_t *)arg1;
+	sb = sbttoms(tt);
+
+	error = sysctl_handle_64(oidp, &sb, 0, req);
+	if (error || !req->newptr)
+		return (error);
+
+	tt = mstosbt(sb);
+	*(int64_t *)arg1 = tt;
+
+	return (0);
+}
+
+
+/*
  * Transfer functions to/from kernel space.
  * XXX: rather untested at this point
  */
@@ -1740,10 +1789,10 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 #ifdef CPU_CHERI
 	if (req->flags & SCTL_PTRIN)
 		memcpy_c((__cheri_tocap char * __capability)p,
-		    (char * __capability)req->newptr + req->newidx, l);
+		    (const char * __capability)req->newptr + req->newidx, l);
 	else
 #endif
-		memcpy(p, (__cheri_fromcap char *)req->newptr + req->newidx, l);
+		memcpy(p, (__cheri_fromcap const char *)req->newptr + req->newidx, l);
 	req->newidx += l;
 	return (0);
 }
@@ -1883,11 +1932,11 @@ sysctl_new_user(struct sysctl_req *req, void *p, size_t l)
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
 	    "sysctl_new_user()");
 	if (req->flags & SCTL_PTRIN)
-		error = copyincap((char * __capability)req->newptr +
+		error = copyincap((const char * __capability)req->newptr +
 		    req->newidx, p, l);
 	else
-		error = copyin((char * __capability)req->newptr + req->newidx,
-		    p, l);
+		error = copyin((const char * __capability)req->newptr +
+		    req->newidx, p, l);
 	req->newidx += l;
 	return (error);
 }
@@ -2079,32 +2128,29 @@ out:
 }
 
 #ifndef _SYS_SYSPROTO_H_
-struct sysctl_args {
-	int * __capability name;
+struct __sysctl_args {
+	int	*name;
 	u_int	namelen;
-	void * __capability old;
-	size_t * __capability oldlenp;
-	void * __capability new;
+	void	*old;
+	size_t	*oldlenp;
+	void	*new;
 	size_t	newlen;
 };
 #endif
 int
-sys___sysctl(struct thread *td, struct sysctl_args *uap)
+sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 {
-	int flags = 0;
-#if __has_feature(capabilities)
-	flags = SCTL_CHERIABI;
-#endif
+
 	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
 	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
 	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
-	    uap->newlen, flags));
+	    uap->newlen, 0));
 }
 
 int
 kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
     void * __capability old, size_t * __capability oldlenp,
-    void * __capability new, size_t newlen, int flags)
+    const void * __capability new, size_t newlen, int flags)
 {
 	int error, i, name[CTL_MAXNAME];
 	size_t j;
@@ -2135,7 +2181,7 @@ kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
 int
 userland_sysctl(struct thread *td, int *name, u_int namelen,
     void * __capability old, size_t * __capability oldlenp, int inkernel,
-    void * __capability new, size_t newlen, size_t *retval, int flags)
+    const void * __capability new, size_t newlen, size_t *retval, int flags)
 {
 	int error = 0, memlocked;
 	struct sysctl_req req;
@@ -2235,7 +2281,7 @@ sbuf_new_for_sysctl(struct sbuf *s, char *buf, int length,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

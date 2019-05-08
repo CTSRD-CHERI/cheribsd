@@ -75,6 +75,160 @@ SYSCTL_INT(_net_smb, OID_AUTO, version, CTLFLAG_RD, &smb_version, 0, "");
 
 static MALLOC_DEFINE(M_NSMBDEV, "NETSMBDEV", "NET/SMB device");
 
+#ifdef COMPAT_FREEBSD32
+struct smbioc_ossn32 {
+	int		ioc_opt;
+	uint32_t	ioc_svlen;	/* size of ioc_server address */
+	uint32_t	ioc_server;	/* struct sockaddr * */
+	uint32_t	ioc_lolen;	/* size of ioc_local address */
+	uint32_t	ioc_local;	/* struct sockaddr * */
+	char		ioc_srvname[SMB_MAXSRVNAMELEN + 1];
+	int		ioc_timeout;
+	int		ioc_retrycount;	/* number of retries before giveup */
+	char		ioc_localcs[16];/* local charset */
+	char		ioc_servercs[16];/* server charset */
+	char		ioc_user[SMB_MAXUSERNAMELEN + 1];
+	char		ioc_workgroup[SMB_MAXUSERNAMELEN + 1];
+	char		ioc_password[SMB_MAXPASSWORDLEN + 1];
+	uid_t		ioc_owner;	/* proposed owner */
+	gid_t		ioc_group;	/* proposed group */
+	mode_t		ioc_mode;	/* desired access mode */
+	mode_t		ioc_rights;	/* SMBM_* */
+};
+
+struct smbioc_rq32 {
+	u_char		ioc_cmd;
+	u_char		ioc_twc;
+	uint32_t	ioc_twords;	/* void * */
+	u_short		ioc_tbc;
+	uint32_t	ioc_tbytes;	/* void * */
+	int		ioc_rpbufsz;
+	uint32_t	ioc_rpbuf;	/* char * */
+	u_char		ioc_rwc;
+	u_short		ioc_rbc;
+	u_int8_t	ioc_errclass;
+	u_int16_t	ioc_serror;
+	u_int32_t	ioc_error;
+};
+
+struct smbioc_t2rq32 {
+	u_int16_t	ioc_setup[3];
+	int		ioc_setupcnt;
+	uint32_t	ioc_name;	/* char * */
+	u_short		ioc_tparamcnt;
+	uint32_t	ioc_tparam;	/* void * */
+	u_short		ioc_tdatacnt;
+	uint32_t	ioc_tdata;	/* void * */
+	u_short		ioc_rparamcnt;
+	uint32_t	ioc_rparam;	/* void * */
+	u_short		ioc_rdatacnt;
+	uint32_t	ioc_rdata;	/* void * */
+};
+
+struct smbioc_lookup32 {
+	int		ioc_level;
+	int		ioc_flags;
+	struct smbioc_ossn32	ioc_ssn;
+	struct smbioc_oshare	ioc_sh;
+};
+
+struct smbioc_rw32 {
+	smbfh		ioc_fh;
+	uint32_t	ioc_base;	/* char * */
+	off_t		ioc_offset;
+	int		ioc_cnt;
+};
+
+/*
+ * Device IOCTLs
+ */
+#define	SMBIOC_OPENSESSION32	\
+    _IOC_NEWTYPE(SMBIOC_OPENSESSION, struct smbioc_ossn32)
+#define	SMBIOC_REQUEST32	_IOC_NEWTYPE(SMBIOC_REQUEST, struct smbioc_rq32)
+#define	SMBIOC_T2RQ32		_IOC_NEWTYPE(SMBIOC_T2RQ, struct smbioc_t2rq32)
+#define	SMBIOC_LOOKUP32			\
+    _IOC_NEWTYPE(SMBIOC_LOOKUP, struct smbioc_lookup32)
+#define	SMBIOC_READ32		_IOC_NEWTYPE(SMBIOC_READ, struct smbioc_rw32)
+#define	SMBIOC_WRITE32		_IOC_NEWTYPE(SMBIOC_WRITE, struct smbioc_rw32)
+#endif /* COMPAT_FREEBSD32 */
+
+#ifdef COMPAT_FREEBSD64
+struct smbioc_ossn64 {
+	int		ioc_opt;
+	uint32_t	ioc_svlen;	/* size of ioc_server address */
+	uint64_t	ioc_server;	/* struct sockaddr * */
+	uint32_t	ioc_lolen;	/* size of ioc_local address */
+	uint64_t	ioc_local;	/* struct sockaddr * */
+	char		ioc_srvname[SMB_MAXSRVNAMELEN + 1];
+	int		ioc_timeout;
+	int		ioc_retrycount;	/* number of retries before giveup */
+	char		ioc_localcs[16];/* local charset */
+	char		ioc_servercs[16];/* server charset */
+	char		ioc_user[SMB_MAXUSERNAMELEN + 1];
+	char		ioc_workgroup[SMB_MAXUSERNAMELEN + 1];
+	char		ioc_password[SMB_MAXPASSWORDLEN + 1];
+	uid_t		ioc_owner;	/* proposed owner */
+	gid_t		ioc_group;	/* proposed group */
+	mode_t		ioc_mode;	/* desired access mode */
+	mode_t		ioc_rights;	/* SMBM_* */
+};
+
+struct smbioc_rq64 {
+	u_char		ioc_cmd;
+	u_char		ioc_twc;
+	uint64_t	ioc_twords;	/* void * */
+	u_short		ioc_tbc;
+	uint64_t	ioc_tbytes;	/* void * */
+	int		ioc_rpbufsz;
+	uint64_t	ioc_rpbuf;	/* char * */
+	u_char		ioc_rwc;
+	u_short		ioc_rbc;
+	u_int8_t	ioc_errclass;
+	u_int16_t	ioc_serror;
+	u_int32_t	ioc_error;
+};
+
+struct smbioc_t2rq64 {
+	u_int16_t	ioc_setup[3];
+	int		ioc_setupcnt;
+	uint64_t	ioc_name;	/* char * */
+	u_short		ioc_tparamcnt;
+	uint64_t	ioc_tparam;	/* void * */
+	u_short		ioc_tdatacnt;
+	uint64_t	ioc_tdata;	/* void * */
+	u_short		ioc_rparamcnt;
+	uint64_t	ioc_rparam;	/* void * */
+	u_short		ioc_rdatacnt;
+	uint64_t	ioc_rdata;	/* void * */
+};
+
+struct smbioc_lookup64 {
+	int		ioc_level;
+	int		ioc_flags;
+	struct smbioc_ossn64	ioc_ssn;
+	struct smbioc_oshare	ioc_sh;
+};
+
+struct smbioc_rw64 {
+	smbfh		ioc_fh;
+	uint64_t	ioc_base;	/* char * */
+	off_t		ioc_offset;
+	int		ioc_cnt;
+};
+
+/*
+ * Device IOCTLs
+ */
+#define	SMBIOC_OPENSESSION64	\
+    _IOC_NEWTYPE(SMBIOC_OPENSESSION, struct smbioc_ossn64)
+#define	SMBIOC_REQUEST64	_IOC_NEWTYPE(SMBIOC_REQUEST, struct smbioc_rq64)
+#define	SMBIOC_T2RQ64		_IOC_NEWTYPE(SMBIOC_T2RQ, struct smbioc_t2rq64)
+#define	SMBIOC_LOOKUP64			\
+    _IOC_NEWTYPE(SMBIOC_LOOKUP, struct smbioc_lookup64)
+#define	SMBIOC_READ64		_IOC_NEWTYPE(SMBIOC_READ, struct smbioc_rw64)
+#define	SMBIOC_WRITE64		_IOC_NEWTYPE(SMBIOC_WRITE, struct smbioc_rw64)
+#endif /* COMPAT_FREEBSD64 */
+
 static struct cdevsw nsmb_cdevsw = {
 	.d_version =	D_VERSION,
 	.d_open =	nsmb_dev_open,
@@ -172,6 +326,269 @@ sdp_trydestroy(struct smb_dev *sdp)
 	return;
 }
 
+#ifdef COMPAT_FREEBSD32
+static void
+smbioc_ossn32_to_ossn(struct smbioc_ossn *ossn, const void *data)
+{
+	const struct smbioc_ossn32 *ossn32;
+
+	ossn32 = data;
+	ossn->ioc_opt = ossn32->ioc_opt;
+	ossn->ioc_svlen = ossn32->ioc_svlen;
+	ossn->ioc_server = __USER_CAP((void *)(uintptr_t)ossn32->ioc_server,
+	    ossn32->ioc_svlen);
+	ossn->ioc_lolen = ossn32->ioc_lolen;
+	ossn->ioc_local = __USER_CAP((void *)(uintptr_t)ossn32->ioc_local,
+	    ossn32->ioc_lolen);
+	memcpy(&ossn->ioc_srvname, &ossn32->ioc_srvname,
+	    sizeof(*ossn) - offsetof(struct smbioc_ossn, ioc_srvname));
+}
+
+static void
+smbioc_rq32_to_rq(struct smbioc_rq *rq, const void *data)
+{
+	const struct smbioc_rq32 *rq32;
+
+	rq32 = data;
+	rq->ioc_cmd = rq32->ioc_cmd;
+	rq->ioc_twc = rq32->ioc_twc;
+	rq->ioc_twords = __USER_CAP((void *)(uintptr_t)rq32->ioc_twords,
+	    rq32->ioc_twc);
+	rq->ioc_tbc = rq32->ioc_tbc;
+	rq->ioc_tbytes = __USER_CAP((void *)(uintptr_t)rq32->ioc_tbytes,
+	    rq32->ioc_tbc);
+	rq->ioc_rpbufsz = rq32->ioc_rpbufsz;
+	rq->ioc_rpbuf = __USER_CAP((char *)(uintptr_t)rq32->ioc_rpbuf,
+	    rq32->ioc_rpbufsz);
+	memcpy(&rq->ioc_rwc, &rq32->ioc_rwc,
+	    sizeof(*rq) - offsetof(struct smbioc_rq, ioc_rwc));
+}
+
+static void
+smbioc_rq32_from_rq(void *data, const struct smbioc_rq *rq)
+{
+	struct smbioc_rq32 *rq32;
+
+	rq32 = data;
+	/* Don't update pointers, the kernel doesn't change them. */
+	rq32->ioc_cmd = rq->ioc_cmd;
+	rq32->ioc_twc = rq->ioc_twc;
+	rq32->ioc_tbc = rq->ioc_tbc;
+	rq32->ioc_rpbufsz = rq->ioc_rpbufsz;
+	memcpy(&rq32->ioc_rwc, &rq->ioc_rwc,
+	    sizeof(*rq32) - offsetof(struct smbioc_rq32, ioc_rwc));
+}
+
+static void
+smbioc_t2rq32_to_t2rq(struct smbioc_t2rq *t2rq, const void *data)
+{
+	const struct smbioc_t2rq32 *t2rq32;
+
+	t2rq32 = data;
+	memset(t2rq, 0, sizeof(*t2rq));
+	memcpy(&t2rq->ioc_setup, &t2rq32->ioc_setup, sizeof(t2rq->ioc_setup));
+	t2rq->ioc_setupcnt = t2rq32->ioc_setupcnt;
+	t2rq->ioc_name = __USER_CAP_STR((char *)(uintptr_t)t2rq32->ioc_name);
+	t2rq->ioc_tparamcnt = t2rq32->ioc_tparamcnt;
+	t2rq->ioc_tparam = __USER_CAP((void *)(uintptr_t)t2rq32->ioc_tparam,
+	    t2rq32->ioc_tparamcnt);
+	t2rq->ioc_tdatacnt = t2rq32->ioc_tdatacnt;
+	t2rq->ioc_tdata = __USER_CAP((void *)(uintptr_t)t2rq32->ioc_tdata,
+	    t2rq32->ioc_tdatacnt);
+	t2rq->ioc_rparamcnt = t2rq32->ioc_rparamcnt;
+	t2rq->ioc_rparam = __USER_CAP((void *)(uintptr_t)t2rq32->ioc_rparam,
+	    t2rq32->ioc_rparamcnt);
+	t2rq->ioc_rdatacnt = t2rq32->ioc_rdatacnt;
+	t2rq->ioc_rdata = __USER_CAP((void *)(uintptr_t)t2rq32->ioc_rdata,
+	    t2rq32->ioc_rdatacnt);
+}
+
+static void
+smbioc_t2rq32_from_t2rq(void *data, const struct smbioc_t2rq *t2rq)
+{
+	struct smbioc_t2rq32 *t2rq32;
+
+	t2rq32 = data;
+	/* Don't update pointers, the kernel doesn't change them. */
+	memcpy(&t2rq32->ioc_setup, &t2rq->ioc_setup, sizeof(t2rq32->ioc_setup));
+	t2rq32->ioc_setupcnt = t2rq->ioc_setupcnt;
+	t2rq32->ioc_tparamcnt = t2rq->ioc_tparamcnt;
+	t2rq32->ioc_tdatacnt = t2rq->ioc_tdatacnt;
+	t2rq32->ioc_rparamcnt = t2rq->ioc_rparamcnt;
+	t2rq32->ioc_rdatacnt = t2rq->ioc_rdatacnt;
+}
+
+static void
+smbioc_lookup32_to_lookup(struct smbioc_lookup *lookup, void *data)
+{
+	struct smbioc_lookup32 *lookup32;
+
+	lookup32 = data;
+	memset(lookup, 0, sizeof(*lookup));
+	lookup->ioc_level = lookup32->ioc_level;
+	lookup->ioc_flags = lookup32->ioc_flags;
+	smbioc_ossn32_to_ossn(&lookup->ioc_ssn, &lookup32->ioc_ssn);
+	memcpy(&lookup->ioc_sh, &lookup32->ioc_sh, sizeof(lookup->ioc_sh));
+}
+
+static void
+smbioc_rw32_to_rw(struct smbioc_rw *rw, const void *data)
+{
+	const struct smbioc_rw32 *rw32;
+
+	rw32 = data;
+	memset(rw, 0, sizeof(*rw));
+	rw->ioc_fh = rw32->ioc_fh;
+	rw->ioc_base = __USER_CAP((char *)(uintptr_t)rw32->ioc_base,
+	    rw32->ioc_cnt);
+	rw->ioc_offset = rw32->ioc_offset;
+	rw->ioc_cnt = rw32->ioc_cnt;
+}
+
+static void
+smbioc_rw32_from_rw(void *data, const struct smbioc_rw *rw)
+{
+	struct smbioc_rw32 *rw32;
+
+	rw32 = data;
+	/* Don't update pointers, the kernel doesn't change them. */
+	rw32->ioc_fh = rw->ioc_fh;
+	rw32->ioc_offset = rw->ioc_offset;
+	rw32->ioc_cnt = rw->ioc_cnt;
+}
+#endif /* COMPAT_FREEBSD32 */
+
+#ifdef COMPAT_FREEBSD64
+static void
+smbioc_ossn64_to_ossn(struct smbioc_ossn *ossn, const void *data)
+{
+	const struct smbioc_ossn64 *ossn64;
+
+	ossn64 = data;
+	ossn->ioc_opt = ossn64->ioc_opt;
+	ossn->ioc_svlen = ossn64->ioc_svlen;
+	ossn->ioc_server = __USER_CAP((void *)(uintptr_t)ossn64->ioc_server,
+	    ossn64->ioc_svlen);
+	ossn->ioc_lolen = ossn64->ioc_lolen;
+	ossn->ioc_local = __USER_CAP((void *)(uintptr_t)ossn64->ioc_local,
+	    ossn64->ioc_lolen);
+	memcpy(&ossn->ioc_srvname, &ossn64->ioc_srvname,
+	    sizeof(*ossn) - offsetof(struct smbioc_ossn, ioc_srvname));
+}
+
+static void
+smbioc_rq64_to_rq(struct smbioc_rq *rq, const void *data)
+{
+	const struct smbioc_rq64 *rq64;
+
+	rq64 = data;
+	rq->ioc_cmd = rq64->ioc_cmd;
+	rq->ioc_twc = rq64->ioc_twc;
+	rq->ioc_twords = __USER_CAP((void *)(uintptr_t)rq64->ioc_twords,
+	    rq64->ioc_twc);
+	rq->ioc_tbc = rq64->ioc_tbc;
+	rq->ioc_tbytes = __USER_CAP((void *)(uintptr_t)rq64->ioc_tbytes,
+	    rq64->ioc_tbc);
+	rq->ioc_rpbufsz = rq64->ioc_rpbufsz;
+	rq->ioc_rpbuf = __USER_CAP((char *)(uintptr_t)rq64->ioc_rpbuf,
+	    rq64->ioc_rpbufsz);
+	memcpy(&rq->ioc_rwc, &rq64->ioc_rwc,
+	    sizeof(*rq) - offsetof(struct smbioc_rq, ioc_rwc));
+}
+
+static void
+smbioc_rq64_from_rq(void *data, const struct smbioc_rq *rq)
+{
+	struct smbioc_rq64 *rq64;
+
+	rq64 = data;
+	/* Don't update pointers, the kernel doesn't change them. */
+	rq64->ioc_cmd = rq->ioc_cmd;
+	rq64->ioc_twc = rq->ioc_twc;
+	rq64->ioc_tbc = rq->ioc_tbc;
+	rq64->ioc_rpbufsz = rq->ioc_rpbufsz;
+	memcpy(&rq64->ioc_rwc, &rq->ioc_rwc,
+	    sizeof(*rq64) - offsetof(struct smbioc_rq64, ioc_rwc));
+}
+
+static void
+smbioc_t2rq64_to_t2rq(struct smbioc_t2rq *t2rq, const void *data)
+{
+	const struct smbioc_t2rq64 *t2rq64;
+
+	t2rq64 = data;
+	memset(t2rq, 0, sizeof(*t2rq));
+	memcpy(&t2rq->ioc_setup, &t2rq64->ioc_setup, sizeof(t2rq->ioc_setup));
+	t2rq->ioc_setupcnt = t2rq64->ioc_setupcnt;
+	t2rq->ioc_name = __USER_CAP_STR((char *)(uintptr_t)t2rq64->ioc_name);
+	t2rq->ioc_tparamcnt = t2rq64->ioc_tparamcnt;
+	t2rq->ioc_tparam = __USER_CAP((void *)(uintptr_t)t2rq64->ioc_tparam,
+	    t2rq64->ioc_tparamcnt);
+	t2rq->ioc_tdatacnt = t2rq64->ioc_tdatacnt;
+	t2rq->ioc_tdata = __USER_CAP((void *)(uintptr_t)t2rq64->ioc_tdata,
+	    t2rq64->ioc_tdatacnt);
+	t2rq->ioc_rparamcnt = t2rq64->ioc_rparamcnt;
+	t2rq->ioc_rparam = __USER_CAP((void *)(uintptr_t)t2rq64->ioc_rparam,
+	    t2rq64->ioc_rparamcnt);
+	t2rq->ioc_rdatacnt = t2rq64->ioc_rdatacnt;
+	t2rq->ioc_rdata = __USER_CAP((void *)(uintptr_t)t2rq64->ioc_rdata,
+	    t2rq64->ioc_rdatacnt);
+}
+
+static void
+smbioc_t2rq64_from_t2rq(void *data, const struct smbioc_t2rq *t2rq)
+{
+	struct smbioc_t2rq64 *t2rq64;
+
+	t2rq64 = data;
+	/* Don't update pointers, the kernel doesn't change them. */
+	memcpy(&t2rq64->ioc_setup, &t2rq->ioc_setup, sizeof(t2rq64->ioc_setup));
+	t2rq64->ioc_setupcnt = t2rq->ioc_setupcnt;
+	t2rq64->ioc_tparamcnt = t2rq->ioc_tparamcnt;
+	t2rq64->ioc_tdatacnt = t2rq->ioc_tdatacnt;
+	t2rq64->ioc_rparamcnt = t2rq->ioc_rparamcnt;
+	t2rq64->ioc_rdatacnt = t2rq->ioc_rdatacnt;
+}
+
+static void
+smbioc_lookup64_to_lookup(struct smbioc_lookup *lookup, void *data)
+{
+	struct smbioc_lookup64 *lookup64;
+
+	lookup64 = data;
+	memset(lookup, 0, sizeof(*lookup));
+	lookup->ioc_level = lookup64->ioc_level;
+	lookup->ioc_flags = lookup64->ioc_flags;
+	smbioc_ossn64_to_ossn(&lookup->ioc_ssn, &lookup64->ioc_ssn);
+	memcpy(&lookup->ioc_sh, &lookup64->ioc_sh, sizeof(lookup->ioc_sh));
+}
+
+static void
+smbioc_rw64_to_rw(struct smbioc_rw *rw, const void *data)
+{
+	const struct smbioc_rw64 *rw64;
+
+	rw64 = data;
+	memset(rw, 0, sizeof(*rw));
+	rw->ioc_fh = rw64->ioc_fh;
+	rw->ioc_base = __USER_CAP((char *)(uintptr_t)rw64->ioc_base,
+	    rw64->ioc_cnt);
+	rw->ioc_offset = rw64->ioc_offset;
+	rw->ioc_cnt = rw64->ioc_cnt;
+}
+
+static void
+smbioc_rw64_from_rw(void *data, const struct smbioc_rw *rw)
+{
+	struct smbioc_rw64 *rw64;
+
+	rw64 = data;
+	/* Don't update pointers, the kernel doesn't change them. */
+	rw64->ioc_fh = rw->ioc_fh;
+	rw64->ioc_offset = rw->ioc_offset;
+	rw64->ioc_cnt = rw->ioc_cnt;
+}
+#endif /* COMPAT_FREEBSD64 */
 
 static int
 nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
@@ -180,6 +597,20 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 	struct smb_vc *vcp;
 	struct smb_share *ssp;
 	struct smb_cred *scred;
+	struct smbioc_ossn *ossn;
+	struct smbioc_rq *rq;
+	struct smbioc_t2rq *t2rq;
+	struct smbioc_lookup *lookup;
+	struct smbioc_rw *rwrq;
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
+	union {
+		struct smbioc_ossn ossn;
+		struct smbioc_rq rq;
+		struct smbioc_t2rq t2rq;
+		struct smbioc_lookup lookup;
+		struct smbioc_rw rw;
+	} u;
+#endif
 	int error = 0;
 
 	error = devfs_get_cdevpriv((void **)&sdp);
@@ -190,12 +621,31 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 	smb_makescred(scred, td, NULL);
 	switch (cmd) {
 	    case SMBIOC_OPENSESSION:
+#ifdef COMPAT_FREEBSD32
+	    case SMBIOC_OPENSESSION32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	    case SMBIOC_OPENSESSION64:
+#endif
 		if (sdp->sd_vc) {
 			error = EISCONN;
 			goto out;
 		}
-		error = smb_usr_opensession((struct smbioc_ossn*)data,
-		    scred, &vcp);
+#ifdef COMPAT_FREEBSD32
+		if (cmd == SMBIOC_OPENSESSION32) {
+			ossn = &u.ossn;
+			smbioc_ossn32_to_ossn(ossn, data);
+		} else
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (cmd == SMBIOC_OPENSESSION64) {
+			ossn = &u.ossn;
+			smbioc_ossn64_to_ossn(ossn, data);
+		} else
+#endif
+			ossn = (struct smbioc_ossn *)data;
+
+		error = smb_usr_opensession(ossn, scred, &vcp);
 		if (error)
 			break;
 		sdp->sd_vc = vcp;
@@ -220,20 +670,72 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 		sdp->sd_level = SMBL_SHARE;
 		break;
 	    case SMBIOC_REQUEST:
+#ifdef COMPAT_FREEBSD32
+	    case SMBIOC_REQUEST32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	    case SMBIOC_REQUEST64:
+#endif
 		if (sdp->sd_share == NULL) {
 			error = ENOTCONN;
 			goto out;
 		}
-		error = smb_usr_simplerequest(sdp->sd_share,
-		    (struct smbioc_rq*)data, scred);
+#ifdef COMPAT_FREEBSD32
+		if (cmd == SMBIOC_REQUEST32) {
+			rq = &u.rq;
+			smbioc_rq32_to_rq(rq, data);
+		} else
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (cmd == SMBIOC_REQUEST64) {
+			rq = &u.rq;
+			smbioc_rq64_to_rq(rq, data);
+		} else
+#endif
+			rq = (struct smbioc_rq *)data;
+		error = smb_usr_simplerequest(sdp->sd_share, rq, scred);
+#ifdef COMPAT_FREEBSD32
+		if (cmd == SMBIOC_OPENSESSION32)
+			smbioc_rq32_from_rq(data, rq);
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (cmd == SMBIOC_OPENSESSION64)
+			smbioc_rq64_from_rq(data, rq);
+#endif
 		break;
 	    case SMBIOC_T2RQ:
+#ifdef COMPAT_FREEBSD32
+	    case SMBIOC_T2RQ32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	    case SMBIOC_T2RQ64:
+#endif
 		if (sdp->sd_share == NULL) {
 			error = ENOTCONN;
 			goto out;
 		}
-		error = smb_usr_t2request(sdp->sd_share,
-		    (struct smbioc_t2rq*)data, scred);
+#ifdef COMPAT_FREEBSD32
+		if (cmd == SMBIOC_T2RQ32) {
+			t2rq = &u.t2rq;
+			smbioc_t2rq32_to_t2rq(t2rq, data);
+		} else
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (cmd == SMBIOC_T2RQ64) {
+			t2rq = &u.t2rq;
+			smbioc_t2rq64_to_t2rq(t2rq, data);
+		} else
+#endif
+			t2rq = (struct smbioc_t2rq *)data;
+		error = smb_usr_t2request(sdp->sd_share, t2rq, scred);
+#ifdef COMPAT_FREEBSD32
+		if (cmd == SMBIOC_T2RQ32)
+			smbioc_t2rq32_from_t2rq(data, t2rq);
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (cmd == SMBIOC_T2RQ64)
+			smbioc_t2rq64_from_t2rq(data, t2rq);
+#endif
 		break;
 	    case SMBIOC_SETFLAGS: {
 		struct smbioc_flags *fl = (struct smbioc_flags*)data;
@@ -285,13 +787,32 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 		break;
 	    }
 	    case SMBIOC_LOOKUP:
+#ifdef COMPAT_FREEBSD32
+	    case SMBIOC_LOOKUP32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	    case SMBIOC_LOOKUP64:
+#endif
 		if (sdp->sd_vc || sdp->sd_share) {
 			error = EISCONN;
 			goto out;
 		}
 		vcp = NULL;
 		ssp = NULL;
-		error = smb_usr_lookup((struct smbioc_lookup*)data, scred, &vcp, &ssp);
+#ifdef COMPAT_FREEBSD32
+		if (cmd == SMBIOC_LOOKUP32) {
+			lookup = &u.lookup;
+			smbioc_lookup32_to_lookup(lookup, data);
+		} else
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (cmd == SMBIOC_LOOKUP64) {
+			lookup = &u.lookup;
+			smbioc_lookup64_to_lookup(lookup, data);
+		} else
+#endif
+			lookup = (struct smbioc_lookup *)data;
+		error = smb_usr_lookup(lookup, scred, &vcp, &ssp);
 		if (error)
 			break;
 		if (vcp) {
@@ -305,8 +826,14 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 			sdp->sd_level = SMBL_SHARE;
 		}
 		break;
-	    case SMBIOC_READ: case SMBIOC_WRITE: {
-		struct smbioc_rw *rwrq = (struct smbioc_rw*)data;
+	    case SMBIOC_READ: case SMBIOC_WRITE:
+#ifdef COMPAT_FREEBSD32
+	    case SMBIOC_READ32: case SMBIOC_WRITE32:
+#endif
+#ifdef COMPAT_FREEBSD64
+	    case SMBIOC_READ64: case SMBIOC_WRITE64:
+#endif
+	    {
 		struct uio auio;
 		kiovec_t iov;
 	
@@ -314,6 +841,19 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 			error = ENOTCONN;
 			goto out;
 	 	}
+#ifdef COMPAT_FREEBSD32
+		if (cmd == SMBIOC_READ32 || cmd == SMBIOC_WRITE32) {
+			rwrq = &u.rw;
+			smbioc_rw32_to_rw(rwrq, data);
+		} else
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (cmd == SMBIOC_READ64 || cmd == SMBIOC_WRITE64) {
+			rwrq = &u.rw;
+			smbioc_rw64_to_rw(rwrq, data);
+		} else
+#endif
+			rwrq = (struct smbioc_rw *)data;
 		IOVEC_INIT(&iov, rwrq->ioc_base, rwrq->ioc_cnt);
 		auio.uio_iov = &iov;
 		auio.uio_iovcnt = 1;
@@ -327,6 +867,14 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 		else
 			error = smb_write(ssp, rwrq->ioc_fh, &auio, scred);
 		rwrq->ioc_cnt -= auio.uio_resid;
+#ifdef COMPAT_FREEBSD32
+		if (cmd == SMBIOC_READ32 || cmd == SMBIOC_WRITE32)
+			smbioc_rw32_from_rw(data, rwrq);
+#endif
+#ifdef COMPAT_FREEBSD64
+		if (cmd == SMBIOC_READ64 || cmd == SMBIOC_WRITE64)
+			smbioc_rw64_from_rw(data, rwrq);
+#endif
 		break;
 	    }
 	    default:
@@ -414,9 +962,10 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
+//     "ioctl:misc",
 //     "iovec-macros",
 //     "kiovec_t"
 //   ]

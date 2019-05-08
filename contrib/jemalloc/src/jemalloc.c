@@ -1,7 +1,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181113,
  *   "target_type": "lib",
  *   "changes": [
  *     "support",
@@ -83,15 +83,6 @@ bool	opt_utrace = false;
 bool	opt_xmalloc = false;
 bool	opt_zero = false;
 unsigned	opt_narenas = 0;
-
-bool		opt_cheri_setbounds =
-#if defined(JEMALLOC_NO_PTR_BOUNDS)
-    false
-#else
-    true
-#endif
-    ;
-
 unsigned	ncpus;
 
 /* Protects arenas initialization. */
@@ -208,12 +199,22 @@ typedef struct {
 
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	BOUND_PTR(ptr, size)	(ptr)
+#define	ROUND_SIZE(size)		(size)
 #else
 #define	BOUND_PTR(ptr, size)	\
-    ((opt_cheri_setbounds && ptr != NULL) ? \
+    ((config_cheri_setbounds && ptr != NULL) ? \
     cheri_andperm(cheri_csetbounds((ptr), (size)), \
 	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP) : \
     (ptr))
+#define roundup2(x, y)	(((x)+((y)-1))&(~((y)-1)))
+
+/*
+ * XXX-BD: In theory this poses an overflow risk.  It's overflow
+ * handling is probalby needed in each individual function, returning
+ * an appropriate error value.
+ */
+#define	ROUND_SIZE(size)						\
+    roundup2((size), (1ULL << CHERI_ALIGN_SHIFT(size)))
 #endif
 
 /* Whether encountered any invalid config options. */
@@ -295,6 +296,7 @@ bootstrap_malloc(size_t size) {
 	if (unlikely(size == 0)) {
 		size = 1;
 	}
+	size = ROUND_SIZE(size);
 
 	return BOUND_PTR(a0ialloc(size, false, false), size);
 }
@@ -308,6 +310,7 @@ bootstrap_calloc(size_t num, size_t size) {
 		assert(num == 0 || size == 0);
 		num_size = 1;
 	}
+	num_size = ROUND_SIZE(num_size);
 
 	return BOUND_PTR(a0ialloc(num_size, true, false), num_size);
 }
@@ -1226,10 +1229,6 @@ malloc_conf_init(void) {
 				CONF_HANDLE_BOOL(opt_prof_final, "prof_final")
 				CONF_HANDLE_BOOL(opt_prof_leak, "prof_leak")
 			}
-#ifdef __CHERI_PURE_CAPABILITY__
-			CONF_HANDLE_BOOL(opt_cheri_setbounds,
-			    "cheri_setbounds");
-#endif
 			if (config_log) {
 				if (CONF_MATCH("log")) {
 					size_t cpylen = (
@@ -1848,6 +1847,8 @@ imalloc_body(static_opts_t *sopts, dynamic_opts_t *dopts, tsd_t *tsd) {
 		goto label_oom;
 	}
 
+	size = ROUND_SIZE(size);
+
 	/* Validate the user input. */
 	if (sopts->bump_empty_alloc) {
 		if (unlikely(size == 0)) {
@@ -2023,6 +2024,8 @@ JEMALLOC_ALWAYS_INLINE int
 imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 	int ret;
 
+	/* NB: Rounding of allocation size occurs in imalloc_body() */
+
 	if (unlikely(!malloc_initialized()) && unlikely(malloc_init())) {
 		if (config_xmalloc && unlikely(opt_xmalloc)) {
 			malloc_write(sopts->oom_string);
@@ -2056,7 +2059,6 @@ imalloc(static_opts_t *sopts, dynamic_opts_t *dopts) {
 /*
  * Begin malloc(3)-compatible functions.
  */
-
 JEMALLOC_EXPORT JEMALLOC_ALLOCATOR JEMALLOC_RESTRICT_RETURN
 void JEMALLOC_NOTHROW *
 JEMALLOC_ATTR(malloc) JEMALLOC_ALLOC_SIZE(1)
@@ -2066,6 +2068,9 @@ je_malloc(size_t size) {
 	dynamic_opts_t dopts;
 
 	LOG("core.malloc.entry", "size: %zu", size);
+#ifndef JEMALLOC_DEBUG
+	assert(false && "assertions should only be enabled if JEMALLOC_DEBUG is set");
+#endif
 
 	static_opts_init(&sopts);
 	dynamic_opts_init(&dopts);
@@ -2356,6 +2361,7 @@ je_realloc(void *ptr, size_t size) {
 		}
 		size = 1;
 	}
+	size = ROUND_SIZE(size);
 
 	if (likely(ptr != NULL)) {
 		assert(malloc_initialized() || IS_INITIALIZER);
@@ -2720,6 +2726,7 @@ je_rallocx(void *ptr, size_t size, int flags) {
 	assert(malloc_initialized() || IS_INITIALIZER);
 	tsd = tsd_fetch();
 	check_entry_exit_locking(tsd_tsdn(tsd));
+	size = ROUND_SIZE(size);
 
 	if (unlikely((flags & MALLOCX_ARENA_MASK) != 0)) {
 		unsigned arena_ind = MALLOCX_ARENA_GET(flags);
@@ -3192,7 +3199,7 @@ je_malloc_usable_size(JEMALLOC_USABLE_SIZE_CONST void *ptr) {
 			ret = isalloc(tsdn, ptr);
 		}
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (opt_cheri_setbounds && ret != 0) {
+		if (config_cheri_setbounds && ret != 0) {
 			ret = MIN(ret, cheri_getlen(ptr));
 		}
 #endif
@@ -3224,6 +3231,7 @@ int
 je_allocm(void **ptr, size_t *rsize, size_t size, int flags) {
 	assert(ptr != NULL);
 
+	size = ROUND_SIZE(size);
 	void *p = je_mallocx(size, flags);
 	if (p == NULL) {
 		return (ALLOCM_ERR_OOM);
@@ -3231,7 +3239,7 @@ je_allocm(void **ptr, size_t *rsize, size_t size, int flags) {
 	if (rsize != NULL) {
 		*rsize = isalloc(tsdn_fetch(), p);
 	}
-	*ptr = BOUND_PTR(p, isalloc(tsdn_fetch(), p));
+	*ptr = BOUND_PTR(p, size);
 	return ALLOCM_SUCCESS;
 }
 
@@ -3245,6 +3253,8 @@ je_rallocm(void **ptr, size_t *rsize, size_t size, size_t extra, int flags) {
 	int ret;
 	bool no_move = flags & ALLOCM_NO_MOVE;
 
+	size += ROUND_SIZE(size + extra) - (size + extra);
+
 	if (no_move) {
 		size_t usize = je_xallocx(*ptr, size, extra, flags);
 		ret = (usize >= size) ? ALLOCM_SUCCESS : ALLOCM_ERR_NOT_MOVED;
@@ -3254,7 +3264,7 @@ je_rallocm(void **ptr, size_t *rsize, size_t size, size_t extra, int flags) {
 	} else {
 		void *p = je_rallocx(*ptr, size+extra, flags);
 		if (p != NULL) {
-			*ptr = BOUND_PTR(p, isalloc(tsdn_fetch(), p));
+			*ptr = BOUND_PTR(p, size+extra);
 			ret = ALLOCM_SUCCESS;
 		} else {
 			ret = ALLOCM_ERR_OOM;

@@ -22,7 +22,6 @@ PV_STATS		opt_pmap.h
 # they are handled like options for static filesystems
 # (see src/sys/conf/options), except for broken debugging options.
 COMPAT_AOUT		opt_dontuse.h
-IBCS2			opt_dontuse.h
 COMPAT_LINUX		opt_dontuse.h
 LINPROCFS		opt_dontuse.h
 LINSYSFS		opt_dontuse.h
@@ -33,11 +32,6 @@ KVA_PAGES		opt_global.h
 
 # Physical address extensions and support for >4G ram.  As above.
 PAE			opt_global.h
-
-# Use PAE page tables, but limit memory support to 4GB.
-# This keeps the i386 non-PAE KBI, in particular, drivers see
-# 32bit vm_paddr_t.
-PAE_TABLES		opt_global.h
 
 TIMER_FREQ			opt_clock.h
 

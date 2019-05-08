@@ -4264,12 +4264,3 @@ dbuf_write(dbuf_dirty_record_t *dr, arc_buf_t *data, dmu_tx_t *tx)
 		    ZIO_PRIORITY_ASYNC_WRITE, ZIO_FLAG_MUSTSUCCEED, &zb);
 	}
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "hashing"
-//   ]
-// }
-// CHERI CHANGES END

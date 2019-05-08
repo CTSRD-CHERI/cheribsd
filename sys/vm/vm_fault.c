@@ -272,7 +272,8 @@ vm_fault_soft_fast(struct faultstate *fs, vm_offset_t vaddr, vm_prot_t prot,
 {
 	vm_page_t m, m_map;
 #if (defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
-    __ARM_ARCH >= 6) || defined(__i386__)) && VM_NRESERVLEVEL > 0
+    __ARM_ARCH >= 6) || defined(__i386__) || defined(__riscv)) && \
+    VM_NRESERVLEVEL > 0
 	vm_page_t m_super;
 	int flags;
 #endif
@@ -287,13 +288,14 @@ vm_fault_soft_fast(struct faultstate *fs, vm_offset_t vaddr, vm_prot_t prot,
 	m_map = m;
 	psind = 0;
 #if (defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
-    __ARM_ARCH >= 6) || defined(__i386__)) && VM_NRESERVLEVEL > 0
+    __ARM_ARCH >= 6) || defined(__i386__) || defined(__riscv)) && \
+    VM_NRESERVLEVEL > 0
 	if ((m->flags & PG_FICTITIOUS) == 0 &&
 	    (m_super = vm_reserv_to_superpage(m)) != NULL &&
 	    rounddown2(vaddr, pagesizes[m_super->psind]) >= fs->entry->start &&
 	    roundup2(vaddr + 1, pagesizes[m_super->psind]) <= fs->entry->end &&
 	    (vaddr & (pagesizes[m_super->psind] - 1)) == (VM_PAGE_TO_PHYS(m) &
-	    (pagesizes[m_super->psind] - 1)) &&
+	    (pagesizes[m_super->psind] - 1)) && !wired &&
 	    pmap_ps_enabled(fs->map->pmap)) {
 		flags = PS_ALL_VALID;
 		if ((prot & VM_PROT_WRITE) != 0) {
@@ -470,11 +472,11 @@ vm_fault_populate(struct faultstate *fs, vm_prot_t prot, int fault_type,
 	    pidx += npages, m = vm_page_next(&m[npages - 1])) {
 		vaddr = fs->entry->start + IDX_TO_OFF(pidx) - fs->entry->offset;
 #if defined(__aarch64__) || defined(__amd64__) || (defined(__arm__) && \
-    __ARM_ARCH >= 6) || defined(__i386__)
+    __ARM_ARCH >= 6) || defined(__i386__) || defined(__riscv)
 		psind = m->psind;
 		if (psind > 0 && ((vaddr & (pagesizes[psind] - 1)) != 0 ||
 		    pidx + OFF_TO_IDX(pagesizes[psind]) - 1 > pager_last ||
-		    !pmap_ps_enabled(fs->map->pmap)))
+		    !pmap_ps_enabled(fs->map->pmap) || wired))
 			psind = 0;
 #else
 		psind = 0;
@@ -486,8 +488,20 @@ vm_fault_populate(struct faultstate *fs, vm_prot_t prot, int fault_type,
 			    fault_flags, true);
 		}
 		VM_OBJECT_WUNLOCK(fs->first_object);
-		pmap_enter(fs->map->pmap, vaddr, m, prot, fault_type | (wired ?
-		    PMAP_ENTER_WIRED : 0), psind);
+		rv = pmap_enter(fs->map->pmap, vaddr, m, prot, fault_type |
+		    (wired ? PMAP_ENTER_WIRED : 0), psind);
+#if defined(__amd64__)
+		if (psind > 0 && rv == KERN_FAILURE) {
+			for (i = 0; i < npages; i++) {
+				rv = pmap_enter(fs->map->pmap, vaddr + ptoa(i),
+				    &m[i], prot, fault_type |
+				    (wired ? PMAP_ENTER_WIRED : 0), 0);
+				MPASS(rv == KERN_SUCCESS);
+			}
+		}
+#else
+		MPASS(rv == KERN_SUCCESS);
+#endif
 		VM_OBJECT_WLOCK(fs->first_object);
 		m_mtx = NULL;
 		for (i = 0; i < npages; i++) {
@@ -1199,6 +1213,16 @@ readrest:
 			 */
 			vm_object_pip_wakeup(fs.object);
 			VM_OBJECT_WUNLOCK(fs.object);
+
+			/*
+			 * We only try to prefault read-only mappings to the
+			 * neighboring pages when this copy-on-write fault is
+			 * a hard fault.  In other cases, trying to prefault
+			 * is typically wasted effort.
+			 */
+			if (faultcount == 0)
+				faultcount = 1;
+
 			/*
 			 * Only use the new page below...
 			 */
@@ -1768,8 +1792,7 @@ again:
 			 */
 			pmap_copy_page_tags(src_m, dst_m);
 			VM_OBJECT_RUNLOCK(object);
-			dst_m->valid = VM_PAGE_BITS_ALL;
-			dst_m->dirty = VM_PAGE_BITS_ALL;
+			dst_m->dirty = dst_m->valid = src_m->valid;
 		} else {
 			dst_m = src_m;
 			if (vm_page_sleep_if_busy(dst_m, "fltupg"))
@@ -1782,8 +1805,6 @@ again:
 				 */
 				break;
 			vm_page_xbusy(dst_m);
-			KASSERT(dst_m->valid == VM_PAGE_BITS_ALL,
-			    ("invalid dst page %p", dst_m));
 		}
 		VM_OBJECT_WUNLOCK(dst_object);
 
@@ -1791,6 +1812,13 @@ again:
 		 * Enter it in the pmap. If a wired, copy-on-write
 		 * mapping is being replaced by a write-enabled
 		 * mapping, then wire that new mapping.
+		 *
+		 * The page can be invalid if the user called
+		 * msync(MS_INVALIDATE) or truncated the backing vnode
+		 * or shared memory object.  In this case, do not
+		 * insert it into pmap, but still do the copy so that
+		 * all copies of the wired map entry have similar
+		 * backing pages.
 		 */
 		flags = access;
 		if (upgrade)
@@ -1801,7 +1829,10 @@ again:
 		if (dst_object->flags & OBJ_NOSTORETAGS)
 			flags |= PMAP_ENTER_NOSTORETAGS;
 #endif
-		pmap_enter(dst_map->pmap, vaddr, dst_m, prot, flags, 0);
+		if (dst_m->valid == VM_PAGE_BITS_ALL) {
+			pmap_enter(dst_map->pmap, vaddr, dst_m, prot,
+			    access | (upgrade ? PMAP_ENTER_WIRED : 0), 0);
+		}
 
 		/*
 		 * Mark it no longer busy, and put it on the active list.
@@ -1855,7 +1886,7 @@ vm_fault_enable_pagefaults(int save)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

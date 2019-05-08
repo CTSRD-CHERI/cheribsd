@@ -289,24 +289,24 @@ enc_hhook(int32_t hhook_type, int32_t hhook_id, void *udata, void *ctx_data,
 	switch (hhook_id) {
 #ifdef INET
 	case AF_INET:
-		ph = &V_inet_pfil_hook;
+		ph = V_inet_pfil_head;
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
-		ph = &V_inet6_pfil_hook;
+		ph = V_inet6_pfil_head;
 		break;
 #endif
 	default:
 		ph = NULL;
 	}
-	if (ph == NULL || !PFIL_HOOKED(ph))
+	if (ph == NULL || (pdir == PFIL_OUT && !PFIL_HOOKED_OUT(ph)) ||
+	    (pdir == PFIL_IN && !PFIL_HOOKED_IN(ph)))
 		return (0);
 	/* Make a packet looks like it was received on enc(4) */
 	rcvif = (*ctx->mp)->m_pkthdr.rcvif;
 	(*ctx->mp)->m_pkthdr.rcvif = ifp;
-	if (pfil_run_hooks(ph, ctx->mp, ifp, pdir, 0, ctx->inp) != 0 ||
-	    *ctx->mp == NULL) {
+	if (pfil_run_hooks(ph, ctx->mp, ifp, pdir, ctx->inp) != PFIL_PASS) {
 		*ctx->mp = NULL; /* consumed by filter */
 		return (EACCES);
 	}
@@ -449,7 +449,7 @@ DECLARE_MODULE(if_enc, enc_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
 MODULE_VERSION(if_enc, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",

@@ -34,10 +34,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "prog",
  *   "changes": [
- *     "pointer_integrity"
+ *     "integer_provenance"
  *   ],
  *   "change_comment": "BDB hashes don't preserve tags"
  * }

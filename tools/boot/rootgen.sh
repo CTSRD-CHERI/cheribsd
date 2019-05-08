@@ -5,7 +5,8 @@
 passphrase=passphrase
 iterations=50000
 
-do_boot1_efi=0
+# The smallest FAT32 filesystem is 33292 KB
+espsize=33292
 
 #
 # Builds all the bat-shit crazy combinations we support booting from,
@@ -16,15 +17,17 @@ do_boot1_efi=0
 # Sad panda sez: this runs as root, but could be userland if someone
 # creates userland geli and zfs tools.
 #
-# This assumes an external prograam install-boot.sh which will install
+# This assumes an external program install-boot.sh which will install
 # the appropriate boot files in the appropriate locations.
 #
 # These images assume ada0 will be the root image. We should likely
 # use labels, but we don't.
 #
-# ASsumes you've already rebuilt... maybe bad? Also maybe bad: the env
+# Assumes you've already rebuilt... maybe bad? Also maybe bad: the env
 # vars should likely be conditionally set to allow better automation.
 #
+
+. $(dirname $0)/install-boot.sh
 
 cpsys() {
     src=$1
@@ -32,29 +35,6 @@ cpsys() {
 
     # Copy kernel + boot loader
     (cd $src ; tar cf - .) | (cd $dst; tar xf -)
-}
-
-make_esp()
-{
-    local src dst md mntpt
-    src=$1
-    dst=$2
-
-    if [ "${do_boot1_efi}" -eq 1 ]; then
-	cp ${src}/boot/boot1.efifat ${dst}
-    else
-	dd if=/dev/zero of=${dst} count=1 seek=$((100 * 1024 * 1024 / 512))
-	md=$(mdconfig -f ${dst})
-	newfs_msdos -a 32 /dev/${md}
-	mntpt=$(mktemp -d /tmp/stand-test.XXXXXX)
-	mount -t msdos /dev/${md} ${mntpt}
-#	mkdir -p ${mntpt}/efi/freebsd # not yet
-	mkdir -p ${mntpt}/efi/boot
-	cp ${src}/boot/loader.efi ${mntpt}/efi/boot/bootx64.efi
-	umount ${mntpt}
-	rmdir ${mntpt}
-	mdconfig -d -u ${md}
-    fi
 }
 
 mk_nogeli_gpt_ufs_legacy() {
@@ -78,7 +58,7 @@ mk_nogeli_gpt_ufs_uefi() {
     cat > ${src}/etc/fstab <<EOF
 /dev/ada0p2	/		ufs	rw	1	1
 EOF
-    make_esp ${src} ${img}.p1
+    make_esp_file ${img}.p1 ${espsize} ${src}/boot/loader.efi
     makefs -t ffs -B little -s 200m ${img}.p2 ${src}
     mkimg -s gpt \
 	  -p efi:=${img}.p1 \
@@ -93,7 +73,7 @@ mk_nogeli_gpt_ufs_both() {
     cat > ${src}/etc/fstab <<EOF
 /dev/ada0p3	/		ufs	rw	1	1
 EOF
-    make_esp ${src} ${img}.p1
+    make_esp_file ${img}.p1 ${espsize} ${src}/boot/loader.efi
     makefs -t ffs -B little -s 200m ${img}.p3 ${src}
     # p1 is boot for uefi, p2 is boot for gpt, p3 is /
     mkimg -b ${src}/boot/pmbr -s gpt \
@@ -130,6 +110,7 @@ mk_nogeli_gpt_zfs_legacy() {
 zfs_load=YES
 opensolaris_load=YES
 EOF
+    cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
     cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
@@ -155,7 +136,7 @@ mk_nogeli_gpt_zfs_uefi() {
     dd if=/dev/zero of=${img} count=1 seek=$((200 * 1024 * 1024 / 512))
     md=$(mdconfig -f ${img})
     gpart create -s gpt ${md}
-    gpart add -t efi -s 800k -a 4k ${md}
+    gpart add -t efi -s ${espsize}k -a 4k ${md}
     gpart add -t freebsd-zfs -l root $md
     # install-boot will make this bootable
     zpool create -O mountpoint=none -R ${mntpt} ${pool} ${md}p2
@@ -168,6 +149,7 @@ mk_nogeli_gpt_zfs_uefi() {
 zfs_load=YES
 opensolaris_load=YES
 EOF
+    cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
     cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
@@ -193,7 +175,7 @@ mk_nogeli_gpt_zfs_both() {
     dd if=/dev/zero of=${img} count=1 seek=$((200 * 1024 * 1024 / 512))
     md=$(mdconfig -f ${img})
     gpart create -s gpt ${md}
-    gpart add -t efi -s 800k -a 4k ${md}
+    gpart add -t efi -s ${espsize}k -a 4k ${md}
     gpart add -t freebsd-boot -s 400k -a 4k	${md}	# <= ~540k
     gpart add -t freebsd-zfs -l root $md
     # install-boot will make this bootable
@@ -207,6 +189,7 @@ mk_nogeli_gpt_zfs_both() {
 zfs_load=YES
 opensolaris_load=YES
 EOF
+    cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
     cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
@@ -239,7 +222,7 @@ mk_nogeli_mbr_ufs_uefi() {
     cat > ${src}/etc/fstab <<EOF
 /dev/ada0s2a	/		ufs	rw	1	1
 EOF
-    make_esp ${src} ${img}.s1
+    make_esp_file ${img}.s1 ${espsize} ${src}/boot/loader.efi
     makefs -t ffs -B little -s 200m ${img}.s2a ${src}
     mkimg -s bsd -p freebsd-ufs:=${img}.s2a -o ${img}.s2
     mkimg -a 1 -s mbr -p efi:=${img}.s1 -p freebsd:=${img}.s2 -o ${img}
@@ -253,7 +236,7 @@ mk_nogeli_mbr_ufs_both() {
     cat > ${src}/etc/fstab <<EOF
 /dev/ada0s2a	/		ufs	rw	1	1
 EOF
-    make_esp ${src} ${img}.s1
+    make_esp_file ${img}.s1 ${espsize} ${src}/boot/loader.efi
     makefs -t ffs -B little -s 200m ${img}.s2a ${src}
     mkimg -s bsd -b ${src}/boot/boot -p freebsd-ufs:=${img}.s2a -o ${img}.s2
     mkimg -a 2 -s mbr -b ${src}/boot/mbr -p efi:=${img}.s1 -p freebsd:=${img}.s2 -o ${img}
@@ -288,6 +271,7 @@ mk_nogeli_mbr_zfs_legacy() {
 zfs_load=YES
 opensolaris_load=YES
 EOF
+    cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
     cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
@@ -313,7 +297,7 @@ mk_nogeli_mbr_zfs_uefi() {
     dd if=/dev/zero of=${img} count=1 seek=$((200 * 1024 * 1024 / 512))
     md=$(mdconfig -f ${img})
     gpart create -s mbr ${md}
-    gpart add -t \!239 -s 800k ${md}
+    gpart add -t efi -s ${espsize}k ${md}
     gpart add -t freebsd ${md}
     gpart set -a active -i 2 ${md}
     gpart create -s bsd ${md}s2
@@ -329,6 +313,7 @@ mk_nogeli_mbr_zfs_uefi() {
 zfs_load=YES
 opensolaris_load=YES
 EOF
+    cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
     cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
@@ -354,7 +339,7 @@ mk_nogeli_mbr_zfs_both() {
     dd if=/dev/zero of=${img} count=1 seek=$((200 * 1024 * 1024 / 512))
     md=$(mdconfig -f ${img})
     gpart create -s mbr ${md}
-    gpart add -t \!239 -s 800k ${md}
+    gpart add -t efi -s  ${espsize}k ${md}
     gpart add -t freebsd ${md}
     gpart set -a active -i 2 ${md}
     gpart create -s bsd ${md}s2
@@ -370,6 +355,7 @@ mk_nogeli_mbr_zfs_both() {
 zfs_load=YES
 opensolaris_load=YES
 EOF
+    cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
     cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     # end tweaks
@@ -430,7 +416,7 @@ mk_geli_gpt_ufs_uefi() {
     dd if=/dev/zero of=${img} count=1 seek=$(( 200 * 1024 * 1024 / 512 ))
     md=$(mdconfig -f ${img})
     gpart create -s gpt ${md}
-    gpart add -t efi -s 800k -a 4k ${md}
+    gpart add -t efi -s ${espsize}k -a 4k ${md}
     gpart add -t freebsd-ufs -l root $md
     # install-boot will make this bootable
     echo ${passphrase} | geli init -bg -e AES-XTS -i ${iterations} -J - -l 256 -s 4096 ${md}p2
@@ -466,7 +452,7 @@ mk_geli_gpt_ufs_both() {
     dd if=/dev/zero of=${img} count=1 seek=$(( 200 * 1024 * 1024 / 512 ))
     md=$(mdconfig -f ${img})
     gpart create -s gpt ${md}
-    gpart add -t efi -s 800k -a 4k ${md}
+    gpart add -t efi -s ${espsize}k -a 4k ${md}
     gpart add -t freebsd-boot -s 400k -a 4k	${md}	# <= ~540k
     gpart add -t freebsd-ufs -l root $md
     # install-boot will make this bootable
@@ -501,15 +487,20 @@ mk_geli_gpt_zfs_legacy() {
     bios=$7
     pool=geli-gpt-zfs-legacy
 
-    dd if=/dev/zero of=${img} count=1 seek=$(( 200 * 1024 * 1024 / 512 ))
+    # Note that in this flavor we create an empty p2 ufs partition, and put
+    # the bootable zfs stuff on p3, just to test the ability of the zfs probe
+    # probe routines to find a pool on a partition other than the first one.
+
+    dd if=/dev/zero of=${img} count=1 seek=$(( 300 * 1024 * 1024 / 512 ))
     md=$(mdconfig -f ${img})
     gpart create -s gpt ${md}
     gpart add -t freebsd-boot -s 400k -a 4k	${md}	# <= ~540k
+    gpart add -t freebsd-ufs -s 100m ${md}
     gpart add -t freebsd-zfs -l root $md
     # install-boot will make this bootable
-    echo ${passphrase} | geli init -bg -e AES-XTS -i ${iterations} -J - -l 256 -s 4096 ${md}p2
-    echo ${passphrase} | geli attach -j - ${md}p2
-    zpool create -O mountpoint=none -R ${mntpt} ${pool} ${md}p2.eli
+    echo ${passphrase} | geli init -bg -e AES-XTS -i ${iterations} -J - -l 256 -s 4096 ${md}p3
+    echo ${passphrase} | geli attach -j - ${md}p3
+    zpool create -O mountpoint=none -R ${mntpt} ${pool} ${md}p3.eli
     zpool set bootfs=${pool} ${pool}
     zfs create -po mountpoint=/ ${pool}/ROOT/default
     # NB: The online guides go nuts customizing /var and other mountpoints here, no need
@@ -520,6 +511,7 @@ zfs_load=YES
 opensolaris_load=YES
 geom_eli_load=YES
 EOF
+    cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
     cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     cp /boot/kernel/geom_eli.ko ${mntpt}/boot/kernel/geom_eli.ko
@@ -529,7 +521,7 @@ EOF
     zpool set bootfs=${pool}/ROOT/default ${pool}
     zpool set autoexpand=on ${pool}
     zpool export ${pool}
-    geli detach ${md}p2
+    geli detach ${md}p3
     ${SRCTOP}/tools/boot/install-boot.sh -g ${geli} -s ${scheme} -f ${fs} -b ${bios} -d ${src} ${md}
     mdconfig -d -u ${md}
 }
@@ -544,15 +536,20 @@ mk_geli_gpt_zfs_uefi() {
     bios=$7
     pool=geli-gpt-zfs-uefi
 
-    dd if=/dev/zero of=${img} count=1 seek=$(( 200 * 1024 * 1024 / 512 ))
+    # Note that in this flavor we create an empty p2 ufs partition, and put
+    # the bootable zfs stuff on p3, just to test the ability of the zfs probe
+    # probe routines to find a pool on a partition other than the first one.
+
+    dd if=/dev/zero of=${img} count=1 seek=$(( 300 * 1024 * 1024 / 512 ))
     md=$(mdconfig -f ${img})
     gpart create -s gpt ${md}
-    gpart add -t efi -s 800k -a 4k ${md}
+    gpart add -t efi -s ${espsize}k -a 4k ${md}
+    gpart add -t freebsd-ufs -s 100m ${md}
     gpart add -t freebsd-zfs -l root $md
     # install-boot will make this bootable
-    echo ${passphrase} | geli init -bg -e AES-XTS -i ${iterations} -J - -l 256 -s 4096 ${md}p2
-    echo ${passphrase} | geli attach -j - ${md}p2
-    zpool create -O mountpoint=none -R ${mntpt} ${pool} ${md}p2.eli
+    echo ${passphrase} | geli init -bg -e AES-XTS -i ${iterations} -J - -l 256 -s 4096 ${md}p3
+    echo ${passphrase} | geli attach -j - ${md}p3
+    zpool create -O mountpoint=none -R ${mntpt} ${pool} ${md}p3.eli
     zpool set bootfs=${pool} ${pool}
     zfs create -po mountpoint=/ ${pool}/ROOT/default
     # NB: The online guides go nuts customizing /var and other mountpoints here, no need
@@ -563,6 +560,7 @@ zfs_load=YES
 opensolaris_load=YES
 geom_eli_load=YES
 EOF
+    cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
     cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     cp /boot/kernel/geom_eli.ko ${mntpt}/boot/kernel/geom_eli.ko
@@ -572,7 +570,7 @@ EOF
     zpool set bootfs=${pool}/ROOT/default ${pool}
     zpool set autoexpand=on ${pool}
     zpool export ${pool}
-    geli detach ${md}p2
+    geli detach ${md}p3
     ${SRCTOP}/tools/boot/install-boot.sh -g ${geli} -s ${scheme} -f ${fs} -b ${bios} -d ${src} ${md}
     mdconfig -d -u ${md}
 }
@@ -590,7 +588,7 @@ mk_geli_gpt_zfs_both() {
     dd if=/dev/zero of=${img} count=1 seek=$(( 200 * 1024 * 1024 / 512 ))
     md=$(mdconfig -f ${img})
     gpart create -s gpt ${md}
-    gpart add -t efi -s 800k -a 4k ${md}
+    gpart add -t efi -s ${espsize}k -a 4k ${md}
     gpart add -t freebsd-boot -s 400k -a 4k	${md}	# <= ~540k
     gpart add -t freebsd-zfs -l root $md
     # install-boot will make this bootable
@@ -607,6 +605,7 @@ zfs_load=YES
 opensolaris_load=YES
 geom_eli_load=YES
 EOF
+    cp /boot/kernel/acl_nfs4.ko ${mntpt}/boot/kernel/acl_nfs4.ko
     cp /boot/kernel/zfs.ko ${mntpt}/boot/kernel/zfs.ko
     cp /boot/kernel/opensolaris.ko ${mntpt}/boot/kernel/opensolaris.ko
     cp /boot/kernel/geom_eli.ko ${mntpt}/boot/kernel/geom_eli.ko
@@ -803,7 +802,11 @@ EOF
 # XXX
 cp /boot/device.hints ${DESTDIR}/boot/device.hints
 # Assume we're already built
-make install DESTDIR=${DESTDIR} MK_MAN=no MK_INSTALL_AS_USER=yes
+make install DESTDIR=${DESTDIR} MK_MAN=no MK_INSTALL_AS_USER=yes WITHOUT_DEBUG_FILES=yes
+if [ $? -ne 0 ]; then
+        echo "make install failed"
+        exit 1
+fi
 # Copy init, /bin/sh, minimal libraries and testing /etc/rc
 mkdir -p ${DESTDIR}/sbin ${DESTDIR}/bin \
       ${DESTDIR}/lib ${DESTDIR}/libexec \

@@ -26,6 +26,8 @@
 #
 #ident	"%Z%%M%	%I%	%E% SMI"
 
+set -e
+
 echo "\
 /*\n\
  * Copyright 2003 Sun Microsystems, Inc.  All rights reserved.\n\

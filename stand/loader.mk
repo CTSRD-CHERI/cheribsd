@@ -31,7 +31,7 @@ SRCS+=	metadata.c
 .endif
 
 .if ${LOADER_DISK_SUPPORT:Uyes} == "yes"
-SRCS+=	disk.c part.c
+SRCS+=	disk.c part.c vdisk.c
 .endif
 
 .if ${LOADER_NET_SUPPORT:Uno} == "yes"
@@ -71,6 +71,14 @@ LDR_INTERP32=	${LIBFICL32}
 SRCS+=	interp_simple.c
 .else
 .error Unknown interpreter ${LOADER_INTERP}
+.endif
+
+.if ${MK_LOADER_VERIEXEC} != "no"
+CFLAGS+= -DLOADER_VERIEXEC -I${SRCTOP}/lib/libsecureboot/h
+.endif
+
+.if ${MK_LOADER_VERIEXEC_PASS_MANIFEST} != "no"
+CFLAGS+= -DLOADER_VERIEXEC_PASS_MANIFEST -I${SRCTOP}/lib/libsecureboot/h
 .endif
 
 .if defined(BOOT_PROMPT_123)
@@ -154,6 +162,10 @@ REPRO_FLAG=	-r
 vers.c: ${LDRSRC}/newvers.sh ${VERSION_FILE}
 	sh ${LDRSRC}/newvers.sh ${REPRO_FLAG} ${VERSION_FILE} \
 	    ${NEWVERSWHAT}
+
+.if ${MK_LOADER_VERBOSE} != "no"
+CFLAGS+=	-DELF_VERBOSE
+.endif
 
 .if !empty(HELP_FILES)
 HELP_FILES+=	${LDRSRC}/help.common

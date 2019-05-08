@@ -278,7 +278,8 @@ retry:
 	}
 
 	/* Print a subset of the capability information. */
-	device_printf(dev, "PF-ID[%d]: VFs %d, MSIX %d, VF MSIX %d, QPs %d, %s\n",
+	device_printf(dev,
+	    "PF-ID[%d]: VFs %d, MSI-X %d, VF MSI-X %d, QPs %d, %s\n",
 	    hw->pf_id, hw->func_caps.num_vfs, hw->func_caps.num_msix_vectors,
 	    hw->func_caps.num_msix_vectors_vf, hw->func_caps.num_tx_qp,
 	    (hw->func_caps.mdio_port_mode == 2) ? "I2C" :
@@ -505,7 +506,7 @@ ixl_intr(void *arg)
 
 /*********************************************************************
  *
- *  MSIX VSI Interrupt Service routine
+ *  MSI-X VSI Interrupt Service routine
  *
  **********************************************************************/
 int
@@ -524,7 +525,7 @@ ixl_msix_que(void *arg)
 
 /*********************************************************************
  *
- *  MSIX Admin Queue Interrupt Service routine
+ *  MSI-X Admin Queue Interrupt Service routine
  *
  **********************************************************************/
 int
@@ -791,7 +792,7 @@ ixl_configure_intr0_msix(struct ixl_pf *pf)
 	/*
 	 * 0x7FF is the end of the queue list.
 	 * This means we won't use MSI-X vector 0 for a queue interrupt
-	 * in MSIX mode.
+	 * in MSI-X mode.
 	 */
 	wr32(hw, I40E_PFINT_LNKLST0, 0x7FF);
 	/* Value is in 2 usec units, so 0x3E is 62*2 = 124 usecs. */
@@ -909,12 +910,12 @@ ixl_free_pci_resources(struct ixl_pf *pf)
 	device_t		dev = iflib_get_dev(vsi->ctx);
 	struct ixl_rx_queue	*rx_que = vsi->rx_queues;
 
-	/* We may get here before stations are setup */
+	/* We may get here before stations are set up */
 	if (rx_que == NULL)
 		goto early;
 
 	/*
-	**  Release all msix VSI resources:
+	**  Release all MSI-X VSI resources:
 	*/
 	iflib_irq_free(vsi->ctx, &vsi->irq);
 
@@ -923,7 +924,7 @@ ixl_free_pci_resources(struct ixl_pf *pf)
 early:
 	if (pf->pci_mem != NULL)
 		bus_release_resource(dev, SYS_RES_MEMORY,
-		    PCIR_BAR(0), pf->pci_mem);
+		    rman_get_rid(pf->pci_mem), pf->pci_mem);
 }
 
 void
@@ -1299,10 +1300,7 @@ ixl_initialize_vsi(struct ixl_vsi *vsi)
 		struct i40e_hmc_obj_rxq rctx;
 
 		/* Next setup the HMC RX Context  */
-		if (scctx->isc_max_frame_size <= MCLBYTES)
-			rxr->mbuf_sz = MCLBYTES;
-		else
-			rxr->mbuf_sz = MJUMPAGESIZE;
+		rxr->mbuf_sz = iflib_get_rx_mbuf_sz(vsi->ctx);
 
 		u16 max_rxmax = rxr->mbuf_sz * hw->func_caps.rx_buf_chain_len;
 
@@ -3663,23 +3661,34 @@ ixl_handle_nvmupd_cmd(struct ixl_pf *pf, struct ifdrv *ifd)
 	struct i40e_nvm_access *nvma;
 	device_t dev = pf->dev;
 	enum i40e_status_code status = 0;
-	int perrno;
+	size_t nvma_size, ifd_len, exp_len;
+	int err, perrno;
 
 	DEBUGFUNC("ixl_handle_nvmupd_cmd");
 
 	/* Sanity checks */
-	if (ifd->ifd_len < sizeof(struct i40e_nvm_access) ||
+	nvma_size = sizeof(struct i40e_nvm_access);
+	ifd_len = ifd->ifd_len;
+
+	if (ifd_len < nvma_size ||
 	    ifd->ifd_data == NULL) {
 		device_printf(dev, "%s: incorrect ifdrv length or data pointer\n",
 		    __func__);
 		device_printf(dev, "%s: ifdrv length: %zu, sizeof(struct i40e_nvm_access): %zu\n",
-		    __func__, ifd->ifd_len, sizeof(struct i40e_nvm_access));
+		    __func__, ifd_len, nvma_size);
 		device_printf(dev, "%s: data pointer: %p\n", __func__,
 		    ifd->ifd_data);
 		return (EINVAL);
 	}
 
-	nvma = (struct i40e_nvm_access *)ifd->ifd_data;
+	nvma = malloc(ifd_len, M_DEVBUF, M_WAITOK);
+	err = copyin(ifd->ifd_data, nvma, ifd_len);
+	if (err) {
+		device_printf(dev, "%s: Cannot get request from user space\n",
+		    __func__);
+		free(nvma, M_DEVBUF);
+		return (err);
+	}
 
 	if (pf->dbg_mask & IXL_DBG_NVMUPD)
 		ixl_print_nvm_cmd(dev, nvma);
@@ -3693,13 +3702,49 @@ ixl_handle_nvmupd_cmd(struct ixl_pf *pf, struct ifdrv *ifd)
 		}
 	}
 
-	if (!(pf->state & IXL_PF_STATE_ADAPTER_RESETTING)) {
-		// TODO: Might need a different lock here
-		// IXL_PF_LOCK(pf);
-		status = i40e_nvmupd_command(hw, nvma, nvma->data, &perrno);
-		// IXL_PF_UNLOCK(pf);
-	} else {
-		perrno = -EBUSY;
+	if (pf->state & IXL_PF_STATE_ADAPTER_RESETTING) {
+		free(nvma, M_DEVBUF);
+		return (-EBUSY);
+	}
+
+	if (nvma->data_size < 1 || nvma->data_size > 4096) {
+		device_printf(dev, "%s: invalid request, data size not in supported range\n",
+		    __func__);
+		free(nvma, M_DEVBUF);
+		return (EINVAL);
+	}
+
+	/*
+	 * Older versions of the NVM update tool don't set ifd_len to the size
+	 * of the entire buffer passed to the ioctl. Check the data_size field
+	 * in the contained i40e_nvm_access struct and ensure everything is
+	 * copied in from userspace.
+	 */
+	exp_len = nvma_size + nvma->data_size - 1; /* One byte is kept in struct */
+
+	if (ifd_len < exp_len) {
+		ifd_len = exp_len;
+		nvma = realloc(nvma, ifd_len, M_DEVBUF, M_WAITOK);
+		err = copyin(ifd->ifd_data, nvma, ifd_len);
+		if (err) {
+			device_printf(dev, "%s: Cannot get request from user space\n",
+					__func__);
+			free(nvma, M_DEVBUF);
+			return (err);
+		}
+	}
+
+	// TODO: Might need a different lock here
+	// IXL_PF_LOCK(pf);
+	status = i40e_nvmupd_command(hw, nvma, nvma->data, &perrno);
+	// IXL_PF_UNLOCK(pf);
+
+	err = copyout(nvma, ifd->ifd_data, ifd_len);
+	free(nvma, M_DEVBUF);
+	if (err) {
+		device_printf(dev, "%s: Cannot return data to user space\n",
+				__func__);
+		return (err);
 	}
 
 	/* Let the nvmupdate report errors, show them only when debug is enabled */

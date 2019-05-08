@@ -22,14 +22,14 @@ MIPS_ABIS+=elf64btsmip_cheri_fbsd
 LIBSEARCHPATH.elf64btsmip_cheri_fbsd=\"=/usr/libcheri\"
 .endif
 .for abi in ${MIPS_ABIS}
-#.if (${abi} != ${NATIVE_EMULATION})
 EMS+= ${abi}
-#.endif
+.if ${abi} != ${NATIVE_EMULATION}
 .for ext in ${ELF_SCR_EXT}
 LDSCRIPTS+= ${abi}.${ext}
 ldscripts/${abi}.${ext}: e${abi}.c
 .endfor
-SRCS+=	e${abi}.c 
+.endif
+SRCS+=	e${abi}.c
 CLEANFILES+=	e${abi}.c
 # nb: elf32 handles both elf32 and elf64 targets
 e${abi}.c:	${.CURDIR}/${abi}.sh emultempl/elf32.em \

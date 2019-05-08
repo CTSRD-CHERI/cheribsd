@@ -129,7 +129,6 @@ int main(void);
 #ifdef LOADER_GELI_SUPPORT
 #include "geliboot.h"
 static char gelipw[GELI_PW_MAXLEN];
-static struct keybuf *gelibuf;
 #endif
 
 struct zfsdsk {
@@ -546,32 +545,19 @@ probe_drive(struct zfsdsk *zdsk)
     char *sec;
     unsigned i;
 
-    /*
-     * If we find a vdev on the whole disk, stop here.
-     */
-    if (vdev_probe(vdev_read2, zdsk, NULL) == 0)
-	return;
-
 #ifdef LOADER_GELI_SUPPORT
     /*
-     * Taste the disk, if it is GELI encrypted, decrypt it and check to see if
-     * it is a usable vdev then. Otherwise dig
-     * out the partition table and probe each slice/partition
-     * in turn for a vdev or GELI encrypted vdev.
+     * Taste the disk, if it is GELI encrypted, decrypt it then dig out the
+     * partition table and probe each slice/partition in turn for a vdev or
+     * GELI encrypted vdev.
      */
     elba = drvsize_ext(zdsk);
     if (elba > 0) {
 	elba--;
     }
     zdsk->gdev = geli_taste(vdev_read, zdsk, elba, "disk%u:0:");
-    if (zdsk->gdev != NULL) {
-	if (geli_havekey(zdsk->gdev) == 0 || 
-	    geli_passphrase(zdsk->gdev, gelipw) == 0) {
-	    if (vdev_probe(vdev_read2, zdsk, NULL) == 0) {
-		return;
-	    }
-	}
-    }
+    if ((zdsk->gdev != NULL) && (geli_havekey(zdsk->gdev) == 0))
+	    geli_passphrase(zdsk->gdev, gelipw);
 #endif /* LOADER_GELI_SUPPORT */
 
     sec = dmadat->secbuf;
@@ -993,18 +979,17 @@ load(void)
     zfsargs.primary_pool = primary_spa->spa_guid;
 #ifdef LOADER_GELI_SUPPORT
     explicit_bzero(gelipw, sizeof(gelipw));
-    gelibuf = malloc(sizeof(struct keybuf) + (GELI_MAX_KEYS * sizeof(struct keybuf_ent)));
-    geli_export_key_buffer(gelibuf);
-    zfsargs.notapw = '\0';
-    zfsargs.keybuf_sentinel = KEYBUF_SENTINEL;
-    zfsargs.keybuf = gelibuf;
-#else
-    zfsargs.gelipw[0] = '\0';
+    export_geli_boot_data(&zfsargs.gelidata);
 #endif
     if (primary_vdev != NULL)
 	zfsargs.primary_vdev = primary_vdev->v_guid;
     else
 	printf("failed to detect primary vdev\n");
+    /*
+     * Note that the zfsargs struct is passed by value, not by pointer.  Code in
+     * btxldr.S copies the values from the entry stack to a fixed location
+     * within loader(8) at startup due to the presence of KARGS_FLAGS_EXTARG.
+     */
     __exec((caddr_t)addr, RB_BOOTINFO | (opts & RBX_MASK),
 	   bootdev,
 	   KARGS_FLAGS_ZFS | KARGS_FLAGS_EXTARG,

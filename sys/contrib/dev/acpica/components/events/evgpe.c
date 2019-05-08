@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2018, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -239,6 +239,14 @@ AcpiEvEnableGpe (
 
     ACPI_FUNCTION_TRACE (EvEnableGpe);
 
+
+    /* Clear the GPE (of stale events) */
+
+    Status = AcpiHwClearGpe(GpeEventInfo);
+    if (ACPI_FAILURE(Status))
+    {
+        return_ACPI_STATUS(Status);
+    }
 
     /* Enable the requested GPE */
 
@@ -1012,7 +1020,7 @@ AcpiEvGpeDispatch (
             GpeDevice, GpeNumber,
             GpeEventInfo->Dispatch.Handler->Context);
 
-        /* If requested, clear (if level-triggered) and reenable the GPE */
+        /* If requested, clear (if level-triggered) and re-enable the GPE */
 
         if (ReturnValue & ACPI_REENABLE_GPE)
         {

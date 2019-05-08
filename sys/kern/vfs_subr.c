@@ -156,7 +156,7 @@ SYSCTL_ULONG(_vfs, OID_AUTO, mnt_free_list_batch, CTLFLAG_RW,
  */
 enum vtype iftovt_tab[16] = {
 	VNON, VFIFO, VCHR, VNON, VDIR, VNON, VBLK, VNON,
-	VREG, VNON, VLNK, VNON, VSOCK, VNON, VNON, VBAD,
+	VREG, VNON, VLNK, VNON, VSOCK, VNON, VNON, VNON
 };
 int vttoif_tab[10] = {
 	0, S_IFREG, S_IFDIR, S_IFBLK, S_IFCHR, S_IFLNK,
@@ -1756,8 +1756,16 @@ flushbuflist(struct bufv *bufv, int flags, struct bufobj *bo, int slpflag,
 
 	retval = 0;
 	TAILQ_FOREACH_SAFE(bp, &bufv->bv_hd, b_bobufs, nbp) {
-		if (((flags & V_NORMAL) && (bp->b_xflags & BX_ALTDATA)) ||
-		    ((flags & V_ALT) && (bp->b_xflags & BX_ALTDATA) == 0)) {
+		/*
+		 * If we are flushing both V_NORMAL and V_ALT buffers then
+		 * do not skip any buffers. If we are flushing only V_NORMAL
+		 * buffers then skip buffers marked as BX_ALTDATA. If we are
+		 * flushing only V_ALT buffers then skip buffers not marked
+		 * as BX_ALTDATA.
+		 */
+		if (((flags & (V_NORMAL | V_ALT)) != (V_NORMAL | V_ALT)) &&
+		   (((flags & V_NORMAL) && (bp->b_xflags & BX_ALTDATA) != 0) ||
+		    ((flags & V_ALT) && (bp->b_xflags & BX_ALTDATA) == 0))) {
 			continue;
 		}
 		if (nbp != NULL) {
@@ -1840,7 +1848,7 @@ again:
 		 * reused.  Dirty buffers will have the hint applied once
 		 * they've been written.
 		 */
-		if (bp->b_vp->v_object != NULL)
+		if ((bp->b_flags & B_VMIO) != 0)
 			bp->b_flags |= B_NOREUSE;
 		brelse(bp);
 		BO_RLOCK(bo);
@@ -1858,7 +1866,7 @@ vtruncbuf(struct vnode *vp, struct ucred *cred, off_t length, int blksize)
 {
 	struct buf *bp, *nbp;
 	int anyfreed;
-	int trunclbn;
+	daddr_t trunclbn;
 	struct bufobj *bo;
 
 	CTR5(KTR_VFS, "%s: vp %p with cred %p and block %d:%ju", __func__,
@@ -4507,7 +4515,7 @@ privcheck:
 		 * requests, instead of PRIV_VFS_EXEC.
 		 */
 		if ((accmode & VEXEC) && ((dac_granted & VEXEC) == 0) &&
-		    !priv_check_cred(cred, PRIV_VFS_LOOKUP, 0))
+		    !priv_check_cred(cred, PRIV_VFS_LOOKUP))
 			priv_granted |= VEXEC;
 	} else {
 		/*
@@ -4517,20 +4525,20 @@ privcheck:
 		 */
 		if ((accmode & VEXEC) && ((dac_granted & VEXEC) == 0) &&
 		    (file_mode & (S_IXUSR | S_IXGRP | S_IXOTH)) != 0 &&
-		    !priv_check_cred(cred, PRIV_VFS_EXEC, 0))
+		    !priv_check_cred(cred, PRIV_VFS_EXEC))
 			priv_granted |= VEXEC;
 	}
 
 	if ((accmode & VREAD) && ((dac_granted & VREAD) == 0) &&
-	    !priv_check_cred(cred, PRIV_VFS_READ, 0))
+	    !priv_check_cred(cred, PRIV_VFS_READ))
 		priv_granted |= VREAD;
 
 	if ((accmode & VWRITE) && ((dac_granted & VWRITE) == 0) &&
-	    !priv_check_cred(cred, PRIV_VFS_WRITE, 0))
+	    !priv_check_cred(cred, PRIV_VFS_WRITE))
 		priv_granted |= (VWRITE | VAPPEND);
 
 	if ((accmode & VADMIN) && ((dac_granted & VADMIN) == 0) &&
-	    !priv_check_cred(cred, PRIV_VFS_ADMIN, 0))
+	    !priv_check_cred(cred, PRIV_VFS_ADMIN))
 		priv_granted |= VADMIN;
 
 	if ((accmode & (priv_granted | dac_granted)) == accmode) {
@@ -4565,7 +4573,7 @@ extattr_check_cred(struct vnode *vp, int attrnamespace, struct ucred *cred,
 	switch (attrnamespace) {
 	case EXTATTR_NAMESPACE_SYSTEM:
 		/* Potentially should be: return (EPERM); */
-		return (priv_check_cred(cred, PRIV_VFS_EXTATTR_SYSTEM, 0));
+		return (priv_check_cred(cred, PRIV_VFS_EXTATTR_SYSTEM));
 	case EXTATTR_NAMESPACE_USER:
 		return (VOP_ACCESS(vp, accmode, cred, td));
 	default:
@@ -5602,7 +5610,7 @@ __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *mp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "sysctl"

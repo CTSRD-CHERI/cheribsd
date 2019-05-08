@@ -276,17 +276,36 @@ set_dbregs(struct thread *td, struct dbreg *regs)
 int
 fill_regs32(struct thread *td, struct reg32 *regs)
 {
+	int i;
+	struct trapframe *tf;
 
-	printf("ARM64TODO: fill_regs32");
-	return (EDOOFUS);
+	tf = td->td_frame;
+	for (i = 0; i < 13; i++)
+		regs->r[i] = tf->tf_x[i];
+	regs->r_sp = tf->tf_sp;
+	regs->r_lr = tf->tf_lr;
+	regs->r_pc = tf->tf_elr;
+	regs->r_cpsr = tf->tf_spsr;
+
+	return (0);
 }
 
 int
 set_regs32(struct thread *td, struct reg32 *regs)
 {
+	int i;
+	struct trapframe *tf;
 
-	printf("ARM64TODO: set_regs32");
-	return (EDOOFUS);
+	tf = td->td_frame;
+	for (i = 0; i < 13; i++)
+		tf->tf_x[i] = regs->r[i];
+	tf->tf_sp = regs->r_sp;
+	tf->tf_lr = regs->r_lr;
+	tf->tf_elr = regs->r_pc;
+	tf->tf_spsr = regs->r_cpsr;
+
+
+	return (0);
 }
 
 int
@@ -656,13 +675,14 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	fp = (struct sigframe *)STACKALIGN(fp);
 
 	/* Fill in the frame to copy out */
+	bzero(&frame, sizeof(frame));
 	get_mcontext(td, &frame.sf_uc.uc_mcontext, 0);
 	get_fpcontext(td, &frame.sf_uc.uc_mcontext);
 	frame.sf_si = ksi->ksi_info;
 	frame.sf_uc.uc_sigmask = *mask;
-	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) ?
-	    ((onstack) ? SS_ONSTACK : 0) : SS_DISABLE;
 	frame.sf_uc.uc_stack = td->td_sigstk;
+	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
+	    (onstack ? SS_ONSTACK : 0) : SS_DISABLE;
 	mtx_unlock(&psp->ps_mtx);
 	PROC_UNLOCK(td->td_proc);
 

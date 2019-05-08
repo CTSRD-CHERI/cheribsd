@@ -122,7 +122,7 @@ static void	nonfs(int);
 static void	reapchild(int);
 static int	setbindhost(struct addrinfo **ia, const char *bindhost,
 		    struct addrinfo hints);
-static void	start_server(int, struct nfsd_nfsd_args *);
+static void	start_server(int, struct nfsd_nfsd_args *, const char *vhost);
 static void	unregistration(void);
 static void	usage(void);
 static void	open_stable(int *, int *);
@@ -160,10 +160,8 @@ main(int argc, char **argv)
 	struct addrinfo *ai_udp, *ai_tcp, *ai_udp6, *ai_tcp6, hints;
 	struct netconfig *nconf_udp, *nconf_tcp, *nconf_udp6, *nconf_tcp6;
 	struct netbuf nb_udp, nb_tcp, nb_udp6, nb_tcp6;
-	struct sockaddr_in inetpeer;
-	struct sockaddr_in6 inet6peer;
+	struct sockaddr_storage peer;
 	fd_set ready, sockbits;
-	fd_set v4bits, v6bits;
 	int ch, connect_type_cnt, i, maxsock, msgsock;
 	socklen_t len;
 	int on = 1, unregister, reregister, sock;
@@ -178,6 +176,7 @@ main(int argc, char **argv)
 	char **bindhost = NULL;
 	pid_t pid;
 	struct nfsd_nfsd_args nfsdargs;
+	const char *vhostname = NULL;
 
 	nfsdargs.mirrorcnt = 1;
 	nfsdargs.addr = NULL;
@@ -185,16 +184,24 @@ main(int argc, char **argv)
 	nfsdcnt = DEFNFSDCNT;
 	unregister = reregister = tcpflag = maxsock = 0;
 	bindanyflag = udpflag = connect_type_cnt = bindhostc = 0;
-	getopt_shortopts = "ah:n:rdtuep:m:";
+	getopt_shortopts = "ah:n:rdtuep:m:V:";
 	getopt_usage =
 	    "usage:\n"
 	    "  nfsd [-ardtue] [-h bindip]\n"
 	    "       [-n numservers] [--minthreads #] [--maxthreads #]\n"
 	    "       [-p/--pnfs dsserver0:/dsserver0-mounted-on-dir,...,"
-	    "dsserverN:/dsserverN-mounted-on-dir] [-m mirrorlevel]\n";
+	    "dsserverN:/dsserverN-mounted-on-dir] [-m mirrorlevel]\n"
+	    "       [-V virtual_hostname]\n";
 	while ((ch = getopt_long(argc, argv, getopt_shortopts, longopts,
 		    &longindex)) != -1)
 		switch (ch) {
+		case 'V':
+			if (strlen(optarg) <= MAXHOSTNAMELEN)
+				vhostname = optarg;
+			else
+				warnx("Virtual host name (%s) is too long",
+				    optarg);
+			break;
 		case 'a':
 			bindanyflag = 1;
 			break;
@@ -475,13 +482,11 @@ main(int argc, char **argv)
 		} else {
 			(void)signal(SIGUSR1, child_cleanup);
 			setproctitle("server");
-			start_server(0, &nfsdargs);
+			start_server(0, &nfsdargs, vhostname);
 		}
 	}
 
 	(void)signal(SIGUSR1, cleanup);
-	FD_ZERO(&v4bits);
-	FD_ZERO(&v6bits);
 	FD_ZERO(&sockbits);
  
 	rpcbregcnt = 0;
@@ -663,7 +668,6 @@ main(int argc, char **argv)
 				}
 				freeaddrinfo(ai_tcp);
 				FD_SET(tcpsock, &sockbits);
-				FD_SET(tcpsock, &v4bits); 
 				maxsock = tcpsock;
 				connect_type_cnt++;
 			}
@@ -742,7 +746,6 @@ main(int argc, char **argv)
 				}
 				freeaddrinfo(ai_tcp6);
 				FD_SET(tcp6sock, &sockbits);
-				FD_SET(tcp6sock, &v6bits);
 				if (maxsock < tcp6sock)
 					maxsock = tcp6sock;
 				connect_type_cnt++;
@@ -796,7 +799,7 @@ main(int argc, char **argv)
 	 * a "server" too. start_server will not return.
 	 */
 	if (!tcpflag)
-		start_server(1, &nfsdargs);
+		start_server(1, &nfsdargs, vhostname);
 
 	/*
 	 * Loop forever accepting connections and passing the sockets
@@ -816,52 +819,25 @@ main(int argc, char **argv)
 		}
 		for (tcpsock = 0; tcpsock <= maxsock; tcpsock++) {
 			if (FD_ISSET(tcpsock, &ready)) {
-				if (FD_ISSET(tcpsock, &v4bits)) {
-					len = sizeof(inetpeer);
-					if ((msgsock = accept(tcpsock,
-					    (struct sockaddr *)&inetpeer, &len)) < 0) {
-						error = errno;
-						syslog(LOG_ERR, "accept failed: %m");
-						if (error == ECONNABORTED ||
-						    error == EINTR)
-							continue;
-						nfsd_exit(1);
-					}
-					memset(inetpeer.sin_zero, 0,
-						sizeof(inetpeer.sin_zero));
-					if (setsockopt(msgsock, SOL_SOCKET,
-					    SO_KEEPALIVE, (char *)&on, sizeof(on)) < 0)
-						syslog(LOG_ERR,
-						    "setsockopt SO_KEEPALIVE: %m");
-					addsockargs.sock = msgsock;
-					addsockargs.name = (caddr_t)&inetpeer;
-					addsockargs.namelen = len;
-					nfssvc(nfssvc_addsock, &addsockargs);
-					(void)close(msgsock);
-				} else if (FD_ISSET(tcpsock, &v6bits)) {
-					len = sizeof(inet6peer);
-					if ((msgsock = accept(tcpsock,
-					    (struct sockaddr *)&inet6peer,
-					    &len)) < 0) {
-						error = errno;
-						syslog(LOG_ERR,
-						     "accept failed: %m");
-						if (error == ECONNABORTED ||
-						    error == EINTR)
-							continue;
-						nfsd_exit(1);
-					}
-					if (setsockopt(msgsock, SOL_SOCKET,
-					    SO_KEEPALIVE, (char *)&on,
-					    sizeof(on)) < 0)
-						syslog(LOG_ERR, "setsockopt "
-						    "SO_KEEPALIVE: %m");
-					addsockargs.sock = msgsock;
-					addsockargs.name = (caddr_t)&inet6peer;
-					addsockargs.namelen = len;
-					nfssvc(nfssvc_addsock, &addsockargs);
-					(void)close(msgsock);
+				len = sizeof(peer);
+				if ((msgsock = accept(tcpsock,
+				    (struct sockaddr *)&peer, &len)) < 0) {
+					error = errno;
+					syslog(LOG_ERR, "accept failed: %m");
+					if (error == ECONNABORTED ||
+					    error == EINTR)
+						continue;
+					nfsd_exit(1);
 				}
+				if (setsockopt(msgsock, SOL_SOCKET,
+				    SO_KEEPALIVE, (char *)&on, sizeof(on)) < 0)
+					syslog(LOG_ERR,
+					    "setsockopt SO_KEEPALIVE: %m");
+				addsockargs.sock = msgsock;
+				addsockargs.name = (caddr_t)&peer;
+				addsockargs.namelen = len;
+				nfssvc(nfssvc_addsock, &addsockargs);
+				(void)close(msgsock);
 			}
 		}
 	}
@@ -1020,7 +996,7 @@ get_tuned_nfsdcount(void)
 }
 
 static void
-start_server(int master, struct nfsd_nfsd_args *nfsdargp)
+start_server(int master, struct nfsd_nfsd_args *nfsdargp, const char *vhost)
 {
 	char principal[MAXHOSTNAMELEN + 5];
 	int status, error;
@@ -1028,7 +1004,10 @@ start_server(int master, struct nfsd_nfsd_args *nfsdargp)
 	struct addrinfo *aip, hints;
 
 	status = 0;
-	gethostname(hostname, sizeof (hostname));
+	if (vhost == NULL)
+		gethostname(hostname, sizeof (hostname));
+	else
+		strlcpy(hostname, vhost, sizeof (hostname));
 	snprintf(principal, sizeof (principal), "nfs@%s", hostname);
 	if ((cp = strchr(hostname, '.')) == NULL ||
 	    *(cp + 1) == '\0') {

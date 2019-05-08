@@ -103,7 +103,7 @@ r92c_tx_protection(struct rtwn_softc *sc, struct r92c_tx_desc *txd,
 			rate = rtwn_ctl_mcsrate(ic->ic_rt, ridx);
 		else
 			rate = ieee80211_ctl_rate(ic->ic_rt, ridx2rate[ridx]);
-		ridx = rate2ridx(rate);
+		ridx = rate2ridx(IEEE80211_RV(rate));
 
 		txd->txdw4 |= htole32(SM(R92C_TXDW4_RTSRATE, ridx));
 		/* RTS rate fallback limit (max). */
@@ -211,6 +211,12 @@ r92c_tx_setup_macid(void *buf, int id)
 	struct r92c_tx_desc *txd = (struct r92c_tx_desc *)buf;
 
 	txd->txdw1 |= htole32(SM(R92C_TXDW1_MACID, id));
+
+	/* XXX does not belong here */
+	/* XXX temporary (I hope) */
+	/* Force CCK1 for RTS / CTS frames (driver bug) */
+	txd->txdw4 &= ~htole32(SM(R92C_TXDW4_RTSRATE, R92C_TXDW4_RTSRATE_M));
+	txd->txdw4 &= ~htole32(R92C_TXDW4_RTS_SHORT);
 }
 
 void

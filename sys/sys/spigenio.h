@@ -64,7 +64,7 @@ struct spigen_transfer_mmapped {
 #endif /* !_SYS_SPIGENIO_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "kiovec_t"

@@ -101,10 +101,10 @@ extern bool_t xdr_ypresp_master();
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180728,
+ *   "updated": 20181121,
  *   "target_type": "lib",
  *   "changes": [
- *     "function_abi"
+ *     "calling_convention"
  *   ],
  *   "comment": "Fixed using a function pointer without prototypes"
  * }

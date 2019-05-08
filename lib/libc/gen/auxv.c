@@ -28,12 +28,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
  *     "support"
  *   ],
- *   "change_comment": "find auxargs without walking off of envv"
+ *   "change_comment": "Find auxargs without walking off the end of envv.  Get ps_strings from auxargs."
  * }
  * CHERI CHANGES END
  */
@@ -52,7 +52,7 @@ __FBSDID("$FreeBSD$");
 #include "libc_private.h"
 
 extern char **environ;
-extern int _DYNAMIC;
+extern int _DYNAMIC __no_subobject_bounds;
 #pragma weak _DYNAMIC
 
 void *__elf_aux_vector;
@@ -94,6 +94,9 @@ static int hwcap_present, hwcap2_present;
 static char *canary, *pagesizes;
 #ifdef AT_PS_STRINGS
 static void *ps_strings;
+#endif
+#ifdef AT_EXECPATH
+static const char *execpath;
 #endif
 static void *timekeep;
 static u_long hwcap, hwcap2;
@@ -150,6 +153,11 @@ init_aux(void)
 #ifdef AT_PS_STRINGS
 		case AT_PS_STRINGS:
 			ps_strings = aux->a_un.a_ptr;
+			break;
+#endif
+#ifdef AT_EXECPATH
+		case AT_EXECPATH:
+			execpath = aux->a_un.a_ptr;
 			break;
 #endif
 		}
@@ -249,6 +257,20 @@ _elf_aux_info(int aux, void *buf, int buflen)
 				res = ENOENT;
 		} else
 			res = EINVAL;
+		break;
+#endif
+#ifdef AT_EXECPATH
+	case AT_EXECPATH:
+		if (execpath != NULL) {
+			if (buflen > strlen(execpath)) {
+				strlcpy(buf, execpath, buflen);
+				res = 0;
+			} else {
+				res = EINVAL;
+			}
+		} else {
+			res = ENOENT;
+		}
 		break;
 #endif
 	default:

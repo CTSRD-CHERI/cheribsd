@@ -113,6 +113,7 @@
 
 #define MD_SHUTDOWN	0x10000		/* Tell worker thread to terminate. */
 #define	MD_EXITING	0x20000		/* Worker thread is exiting. */
+#define MD_PROVIDERGONE	0x40000		/* Safe to free the softc */
 
 #ifndef MD_NSECT
 #define MD_NSECT (10000 * 2)
@@ -128,7 +129,7 @@ struct md_ioctl64 {
 	off_t		md_mediasize;	/* size of disk in bytes */
 	unsigned	md_sectorsize;	/* sectorsize */
 	unsigned	md_options;	/* options */
-	u_int64_t	md_base;	/* base address */
+	uint64_t	md_base;	/* base address */
 	int		md_fwheads;	/* firmware heads */
 	int		md_fwsectors;	/* firmware sectors */
 	char * __capability md_label;	/* label of the device (userspace) */
@@ -147,14 +148,14 @@ struct md_ioctl32 {
 	unsigned	md_version;
 	unsigned	md_unit;
 	enum md_types	md_type;
-	u_int32_t	md_file;
+	uint32_t	md_file;
 	off_t		md_mediasize;
 	unsigned	md_sectorsize;
 	unsigned	md_options;
-	u_int64_t	md_base;
+	uint64_t	md_base;
 	int		md_fwheads;
 	int		md_fwsectors;
-	u_int32_t	md_label;
+	uint32_t	md_label;
 	int		md_pad[MDNPAD];
 } __attribute__((__packed__));
 CTASSERT((sizeof(struct md_ioctl32)) == 436);
@@ -211,6 +212,7 @@ static g_start_t g_md_start;
 static g_access_t g_md_access;
 static void g_md_dumpconf(struct sbuf *sb, const char *indent,
     struct g_geom *gp, struct g_consumer *cp __unused, struct g_provider *pp);
+static g_provgone_t g_md_providergone;
 
 static struct cdev *status_dev = NULL;
 static struct sx md_sx;
@@ -232,6 +234,7 @@ struct g_class g_md_class = {
 	.start = g_md_start,
 	.access = g_md_access,
 	.dumpconf = g_md_dumpconf,
+	.providergone = g_md_providergone,
 };
 
 DECLARE_GEOM_CLASS(g_md_class, g_md);
@@ -243,7 +246,7 @@ static LIST_HEAD(, md_s) md_softc_list = LIST_HEAD_INITIALIZER(md_softc_list);
 #define NMASK	(NINDIR-1)
 static int nshift;
 
-static int md_vnode_pbuf_freecnt;
+static uma_zone_t md_pbuf_zone;
 
 struct indir {
 	uintptr_t	*array;
@@ -493,8 +496,8 @@ g_md_start(struct bio *bp)
 	}
 	mtx_lock(&sc->queue_mtx);
 	bioq_disksort(&sc->bio_queue, bp);
-	mtx_unlock(&sc->queue_mtx);
 	wakeup(sc);
+	mtx_unlock(&sc->queue_mtx);
 }
 
 #define	MD_MALLOC_MOVE_ZERO	1
@@ -892,7 +895,7 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 	struct buf *pb;
 	bus_dma_segment_t *vlist;
 	struct thread *td;
-	off_t iolen, len, zerosize;
+	off_t iolen, iostart, len, zerosize;
 	int ma_offs, npages;
 
 	switch (bp->bio_cmd) {
@@ -971,7 +974,7 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 		auio.uio_iovcnt = piov - auio.uio_iov;
 		piov = auio.uio_iov;
 	} else if ((bp->bio_flags & BIO_UNMAPPED) != 0) {
-		pb = getpbuf(&md_vnode_pbuf_freecnt);
+		pb = uma_zalloc(md_pbuf_zone, M_WAITOK);
 		bp->bio_resid = len;
 unmapped_step:
 		npages = atop(min(MAXPHYS, round_page(len + (ma_offs &
@@ -991,13 +994,10 @@ unmapped_step:
 		auio.uio_iov = &aiov;
 		auio.uio_iovcnt = 1;
 	}
-	/*
-	 * When reading set IO_DIRECT to try to avoid double-caching
-	 * the data.  When writing IO_DIRECT is not optimal.
-	 */
+	iostart = auio.uio_offset;
 	if (auio.uio_rw == UIO_READ) {
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-		error = VOP_READ(vp, &auio, IO_DIRECT, sc->cred);
+		error = VOP_READ(vp, &auio, 0, sc->cred);
 		VOP_UNLOCK(vp, 0);
 	} else {
 		(void) vn_start_write(vp, &mp, V_WAIT);
@@ -1010,6 +1010,11 @@ unmapped_step:
 			sc->flags &= ~MD_VERIFY;
 	}
 
+	/* When MD_CACHE is set, try to avoid double-caching the data. */
+	if (error == 0 && (sc->flags & MD_CACHE) == 0)
+		VOP_ADVISE(vp, iostart, auio.uio_offset - 1,
+		    POSIX_FADV_DONTNEED);
+
 	if (pb != NULL) {
 		pmap_qremove((vm_offset_t)pb->b_data, npages);
 		if (error == 0) {
@@ -1019,7 +1024,7 @@ unmapped_step:
 			if (len > 0)
 				goto unmapped_step;
 		}
-		relpbuf(pb, &md_vnode_pbuf_freecnt);
+		uma_zfree(md_pbuf_zone, pb);
 	}
 
 	free(piov, M_MD);
@@ -1247,10 +1252,20 @@ md_kthread(void *arg)
 			error = sc->start(sc, bp);
 		}
 
+		if (bp->bio_cmd == BIO_READ || bp->bio_cmd == BIO_WRITE) {
+			/*
+			 * Devstat uses (bio_bcount, bio_resid) for
+			 * determining the length of the completed part of
+			 * the i/o.  g_io_deliver() will translate from
+			 * bio_completed to that, but it also destroys the
+			 * bio so we must do our own translation.
+			 */
+			bp->bio_bcount = bp->bio_length;
+			bp->bio_resid = (error == -1 ? bp->bio_bcount : 0);
+			devstat_end_transaction_bio(sc->devstat, bp);
+		}
 		if (error != -1) {
 			bp->bio_completed = bp->bio_length;
-			if ((bp->bio_cmd == BIO_READ) || (bp->bio_cmd == BIO_WRITE))
-				devstat_end_transaction_bio(sc->devstat, bp);
 			g_io_deliver(bp, error);
 		}
 	}
@@ -1472,7 +1487,8 @@ mdcreate_vnode(struct md_s *sc, struct md_req *mdr, struct thread *td)
 		sc->fwheads = mdr->md_fwheads;
 	snprintf(sc->ident, sizeof(sc->ident), "MD-DEV%ju-INO%ju",
 	    (uintmax_t)vattr.va_fsid, (uintmax_t)vattr.va_fileid);
-	sc->flags = mdr->md_options & (MD_FORCE | MD_ASYNC | MD_VERIFY);
+	sc->flags = mdr->md_options & (MD_ASYNC | MD_CACHE | MD_FORCE |
+	    MD_VERIFY);
 	if (!(flags & FWRITE))
 		sc->flags |= MD_READONLY;
 	sc->vnode = nd.ni_vp;
@@ -1491,17 +1507,30 @@ bad:
 	return (error);
 }
 
+static void
+g_md_providergone(struct g_provider *pp)
+{
+	struct md_s *sc = pp->geom->softc;
+
+	mtx_lock(&sc->queue_mtx);
+	sc->flags |= MD_PROVIDERGONE;
+	wakeup(&sc->flags);
+	mtx_unlock(&sc->queue_mtx);
+}
+
 static int
 mddestroy(struct md_s *sc, struct thread *td)
 {
 
 	if (sc->gp) {
-		sc->gp->softc = NULL;
 		g_topology_lock();
 		g_wither_geom(sc->gp, ENXIO);
 		g_topology_unlock();
-		sc->gp = NULL;
-		sc->pp = NULL;
+
+		mtx_lock(&sc->queue_mtx);
+		while (!(sc->flags & MD_PROVIDERGONE))
+			msleep(&sc->flags, &sc->queue_mtx, PRIBIO, "mddestroy", 0);
+		mtx_unlock(&sc->queue_mtx);
 	}
 	if (sc->devstat) {
 		devstat_remove_entry(sc->devstat);
@@ -2153,7 +2182,7 @@ g_md_init(struct g_class *mp __unused)
 			sx_xunlock(&md_sx);
 		}
 	}
-	md_vnode_pbuf_freecnt = nswbuf / 10;
+	md_pbuf_zone = pbuf_zsecond_create("mdpbuf", nswbuf / 10);
 	status_dev = make_dev(&mdctl_cdevsw, INT_MAX, UID_ROOT, GID_WHEEL,
 	    0600, MDCTL_NAME);
 	kern_mdattach_p = &kern_mdattach;
@@ -2234,6 +2263,9 @@ g_md_dumpconf(struct sbuf *sb, const char *indent, struct g_geom *gp,
 				g_conf_printf_escaped(sb, "%s", mp->file);
 				sbuf_printf(sb, "</file>\n");
 			}
+			if (mp->type == MD_VNODE)
+				sbuf_printf(sb, "%s<cache>%s</cache>\n", indent,
+				    (mp->flags & MD_CACHE) == 0 ? "off": "on");
 			sbuf_printf(sb, "%s<label>", indent);
 			g_conf_printf_escaped(sb, "%s", mp->label);
 			sbuf_printf(sb, "</label>\n");
@@ -2248,11 +2280,12 @@ g_md_fini(struct g_class *mp __unused)
 	sx_destroy(&md_sx);
 	if (status_dev != NULL)
 		destroy_dev(status_dev);
+	uma_zdestroy(md_pbuf_zone);
 	delete_unrhdr(md_uh);
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

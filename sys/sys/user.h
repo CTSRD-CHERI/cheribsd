@@ -370,6 +370,7 @@ struct user {
 #define	KF_TYPE_SEM	9
 #define	KF_TYPE_PTS	10
 #define	KF_TYPE_PROCDESC	11
+#define	KF_TYPE_DEV	12
 #define	KF_TYPE_UNKNOWN	255
 
 #define	KF_VTYPE_VNON	0
@@ -578,6 +579,7 @@ struct kinfo_file {
 #define	KVME_FLAG_SUPER		0x00000008
 #define	KVME_FLAG_GROWS_UP	0x00000010
 #define	KVME_FLAG_GROWS_DOWN	0x00000020
+#define	KVME_FLAG_USER_WIRED	0x00000040
 
 #if defined(__amd64__)
 #define	KINFO_OVMENTRY_SIZE	1168
@@ -720,7 +722,7 @@ int	vntype_to_kinfo(int vtype);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

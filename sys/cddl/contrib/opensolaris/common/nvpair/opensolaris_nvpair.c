@@ -3600,10 +3600,10 @@ nvs_xdr(nvstream_t *nvs, nvlist_t *nvl, char *buf, size_t *buflen)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "kernel",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

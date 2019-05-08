@@ -819,7 +819,7 @@ lance_zerobuf_gap16(struct lance_softc *sc, int boff, int len)
 #endif /* Example only */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

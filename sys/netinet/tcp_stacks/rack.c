@@ -1,6 +1,5 @@
 /*-
- * Copyright (c) 2016-2018
- *	Netflix Inc.  All rights reserved.
+ * Copyright (c) 2016-2018 Netflix, Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -1425,21 +1424,9 @@ rack_cc_after_idle(struct tcpcb *tp, int reduce_largest)
 
 	if (tp->snd_cwnd == 1)
 		i_cwnd = tp->t_maxseg;		/* SYN(-ACK) lost */
-	else if (V_tcp_initcwnd_segments)
-		i_cwnd = min((V_tcp_initcwnd_segments * tp->t_maxseg),
-		    max(2 * tp->t_maxseg, V_tcp_initcwnd_segments * 1460));
-	else if (V_tcp_do_rfc3390)
-		i_cwnd = min(4 * tp->t_maxseg,
-		    max(2 * tp->t_maxseg, 4380));
-	else {
-		/* Per RFC5681 Section 3.1 */
-		if (tp->t_maxseg > 2190)
-			i_cwnd = 2 * tp->t_maxseg;
-		else if (tp->t_maxseg > 1095)
-			i_cwnd = 3 * tp->t_maxseg;
-		else
-			i_cwnd = 4 * tp->t_maxseg;
-	}
+	else 
+		i_cwnd = tcp_compute_initwnd(tcp_maxseg(tp));
+
 	if (reduce_largest) {
 		/*
 		 * Do we reduce the largest cwnd to make 
@@ -2882,7 +2869,7 @@ rack_timeout_rxt(struct tcpcb *tp, struct tcp_rack *rack, uint32_t cts)
 	TCPSTAT_INC(tcps_rexmttimeo);
 	if ((tp->t_state == TCPS_SYN_SENT) ||
 	    (tp->t_state == TCPS_SYN_RECEIVED))
-		rexmt = MSEC_2_TICKS(RACK_INITIAL_RTO * tcp_syn_backoff[tp->t_rxtshift]);
+		rexmt = MSEC_2_TICKS(RACK_INITIAL_RTO * tcp_backoff[tp->t_rxtshift]);
 	else
 		rexmt = TCP_REXMTVAL(tp) * tcp_backoff[tp->t_rxtshift];
 	TCPT_RANGESET(tp->t_rxtcur, rexmt,
@@ -5245,7 +5232,8 @@ rack_do_syn_sent(struct mbuf *m, struct tcphdr *th, struct socket *so,
 			tp->t_flags |= TF_ACKNOW;
 		}
 
-		if ((thflags & TH_ECE) && V_tcp_do_ecn) {
+		if (((thflags & (TH_CWR | TH_ECE)) == TH_ECE) &&
+		    V_tcp_do_ecn) {
 			tp->t_flags |= TF_ECN_PERMIT;
 			TCPSTAT_INC(tcps_ecn_shs);
 		}
@@ -5444,6 +5432,7 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		tp->ts_recent_age = tcp_ts_getticks();
 		tp->ts_recent = to->to_tsval;
 	}
+	tp->snd_wnd = tiwin;
 	/*
 	 * If the ACK bit is off:  if in SYN-RECEIVED state or SENDSYN flag
 	 * is on (half-synchronized state), then queue data for later
@@ -5451,7 +5440,6 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 */
 	if ((thflags & TH_ACK) == 0) {
 		if (IS_FASTOPEN(tp->t_flags)) {
-			tp->snd_wnd = tiwin;
 			cc_conn_init(tp);
 		}
 		return (rack_process_data(m, th, so, tp, drop_hdrlen, tlen,
@@ -5463,7 +5451,6 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	if ((tp->t_flags & (TF_RCVD_SCALE | TF_REQ_SCALE)) ==
 	    (TF_RCVD_SCALE | TF_REQ_SCALE)) {
 		tp->rcv_scale = tp->request_r_scale;
-		tp->snd_wnd = tiwin;
 	}
 	/*
 	 * Make transitions: SYN-RECEIVED  -> ESTABLISHED SYN-RECEIVED* ->
@@ -6528,6 +6515,19 @@ rack_hpts_do_segment(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		TCP_LOG_EVENT(tp, th, &so->so_rcv, &so->so_snd, TCP_LOG_IN, 0,
 		    tlen, &log, true);
 	}
+	if ((thflags & TH_SYN) && (thflags & TH_FIN) && V_drop_synfin) {
+		way_out = 4;
+		goto done_with_input;
+	}
+	/*
+	 * If a segment with the ACK-bit set arrives in the SYN-SENT state
+	 * check SEQ.ACK first as described on page 66 of RFC 793, section 3.9.
+	 */
+	if ((tp->t_state == TCPS_SYN_SENT) && (thflags & TH_ACK) &&
+	    (SEQ_LEQ(th->th_ack, tp->iss) || SEQ_GT(th->th_ack, tp->snd_max))) {
+		rack_do_dropwithreset(m, tp, th, BANDLIM_RST_OPENPORT, tlen);
+		return;
+	}
 	/*
 	 * Segment received on connection. Reset idle time and keep-alive
 	 * timer. XXX: This should be done after segment validation to
@@ -7053,12 +7053,10 @@ again:
 		tlen = rsm->r_end - rsm->r_start;
 		if (tlen > tp->t_maxseg)
 			tlen = tp->t_maxseg;
-#ifdef INVARIANTS
-		if (SEQ_GT(tp->snd_una, rsm->r_start)) {
-			panic("tp:%p rack:%p snd_una:%u rsm:%p r_start:%u",
-			    tp, rack, tp->snd_una, rsm, rsm->r_start);
-		}
-#endif
+		KASSERT(SEQ_LEQ(tp->snd_una, rsm->r_start),
+		    ("%s:%d: r.start:%u < SND.UNA:%u; tp:%p, rack:%p, rsm:%p",
+		    __func__, __LINE__,
+		    rsm->r_start, tp->snd_una, tp, rack, rsm));
 		sb_offset = rsm->r_start - tp->snd_una;
 		cwin = min(tp->snd_wnd, tlen);
 		len = cwin;
@@ -7069,12 +7067,14 @@ again:
 		len = rsm->r_end - rsm->r_start;
 		sack_rxmit = 1;
 		sendalot = 0;
+		KASSERT(SEQ_LEQ(tp->snd_una, rsm->r_start),
+		    ("%s:%d: r.start:%u < SND.UNA:%u; tp:%p, rack:%p, rsm:%p",
+		    __func__, __LINE__,
+		    rsm->r_start, tp->snd_una, tp, rack, rsm));
 		sb_offset = rsm->r_start - tp->snd_una;
 		if (len >= tp->t_maxseg) {
 			len = tp->t_maxseg;
 		}
-		KASSERT(sb_offset >= 0, ("%s: sack block to the left of una : %d",
-		    __func__, sb_offset));
 	} else if ((rack->rc_in_persist == 0) &&
 	    ((rsm = tcp_rack_output(tp, rack, cts)) != NULL)) {
 		long tlen;
@@ -7099,6 +7099,10 @@ again:
 		}
 #endif
 		tlen = rsm->r_end - rsm->r_start;
+		KASSERT(SEQ_LEQ(tp->snd_una, rsm->r_start),
+		    ("%s:%d: r.start:%u < SND.UNA:%u; tp:%p, rack:%p, rsm:%p",
+		    __func__, __LINE__,
+		    rsm->r_start, tp->snd_una, tp, rack, rsm));
 		sb_offset = rsm->r_start - tp->snd_una;
 		if (tlen > rack->r_ctl.rc_prr_sndcnt) {
 			len = rack->r_ctl.rc_prr_sndcnt;
@@ -7120,8 +7124,6 @@ again:
 				goto just_return_nolock;
 			}
 		}
-		KASSERT(sb_offset >= 0, ("%s: sack block to the left of una : %d",
-		    __func__, sb_offset));
 		if (len > 0) {
 			sub_from_prr = 1;
 			sack_rxmit = 1;
@@ -8187,15 +8189,20 @@ send:
 	/*
 	 * Calculate receive window.  Don't shrink window, but avoid silly
 	 * window syndrome.
+	 * If a RST segment is sent, advertise a window of zero.
 	 */
-	if (recwin < (long)(so->so_rcv.sb_hiwat / 4) &&
-	    recwin < (long)tp->t_maxseg)
+	if (flags & TH_RST) {
 		recwin = 0;
-	if (SEQ_GT(tp->rcv_adv, tp->rcv_nxt) &&
-	    recwin < (long)(tp->rcv_adv - tp->rcv_nxt))
-		recwin = (long)(tp->rcv_adv - tp->rcv_nxt);
-	if (recwin > (long)TCP_MAXWIN << tp->rcv_scale)
-		recwin = (long)TCP_MAXWIN << tp->rcv_scale;
+	} else {
+		if (recwin < (long)(so->so_rcv.sb_hiwat / 4) &&
+		    recwin < (long)tp->t_maxseg)
+			recwin = 0;
+		if (SEQ_GT(tp->rcv_adv, tp->rcv_nxt) &&
+		    recwin < (long)(tp->rcv_adv - tp->rcv_nxt))
+			recwin = (long)(tp->rcv_adv - tp->rcv_nxt);
+		if (recwin > (long)TCP_MAXWIN << tp->rcv_scale)
+			recwin = (long)TCP_MAXWIN << tp->rcv_scale;
+	}
 
 	/*
 	 * According to RFC1323 the window field in a SYN (i.e., a <SYN> or
@@ -8486,9 +8493,7 @@ out:
 	    pass, rsm);
 	if ((tp->t_flags & TF_FORCEDATA) == 0 ||
 	    (rack->rc_in_persist == 0)) {
-#ifdef NETFLIX_STATS
 		tcp_seq startseq = tp->snd_nxt;
-#endif
 
 		/*
 		 * Advance snd_nxt over sequence space of this segment.
@@ -8520,6 +8525,17 @@ out:
 				tp->t_acktime = ticks;
 			}
 			tp->snd_max = tp->snd_nxt;
+			/*
+			 * Time this transmission if not a retransmission and
+			 * not currently timing anything.
+			 * This is only relevant in case of switching back to
+			 * the base stack.
+			 */
+			if (tp->t_rtttime == 0) {
+				tp->t_rtttime = ticks;
+				tp->t_rtseq = startseq;
+				TCPSTAT_INC(tcps_segstimed);
+			}
 #ifdef NETFLIX_STATS
 			if (!(tp->t_flags & TF_GPUTINPROG) && len) {
 				tp->t_flags |= TF_GPUTINPROG;

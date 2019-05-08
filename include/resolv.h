@@ -48,10 +48,10 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181121,
  *   "target_type": "header",
  *   "changes": [
- *     "pointer_size"
+ *     "pointer_shape"
  *   ]
  * }
  * CHERI CHANGES END

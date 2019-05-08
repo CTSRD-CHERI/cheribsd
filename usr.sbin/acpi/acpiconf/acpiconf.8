@@ -27,7 +27,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd September 22, 2015
+.Dd December 27, 2018
 .Dt ACPICONF 8
 .Os
 .Sh NAME
@@ -49,7 +49,9 @@ The following command-line options are recognized:
 .It Fl h
 Displays a summary of available options.
 .It Fl i Ar batt
-Get design information about the specified battery.
+Get design information and current status of the battery specified
+by its number, starting with
+.Cm 0 .
 .It Fl k Ar ack
 Ack or abort a pending suspend request using the argument provided.
 .Sy Most users should not use this option directly.
@@ -72,13 +74,35 @@ If the
 .Pa /etc/rc.suspend
 and
 .Pa /etc/rc.resume
-scripts are executable, they will be run before and after entering
-the given sleep state.
+scripts are executable, they will be run by
+.Xr devd 8
+or
+.Xr apmd 8
+before and after entering the given sleep state.
+.Pp
+The
+.Pa /etc/rc.resume
+script uses the
+.Xr rcorder 8
+utility to call scripts in
+.Pa /etc/rc.d/
+and the
+.Va $local_startup
+directories that have a "resume" KEYWORD.
+Called scripts are supplied with single "resume"
+command line argument. See
+.Xr rc.conf 5
+for more information about
+.Va $local_startup .
 .El
 .Sh SEE ALSO
 .Xr acpi 4 ,
 .Xr acpidump 8 ,
-.Xr apm 8
+.Xr apm 8 ,
+.Xr apmd 8 ,
+.Xr devd 8 ,
+.Xr rc.conf 5 ,
+.Xr rcorder 8
 .Sh HISTORY
 The
 .Nm

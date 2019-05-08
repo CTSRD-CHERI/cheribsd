@@ -39,10 +39,6 @@ CWARNEXTRA+=	-Wno-address-of-packed-member
 .endif
 
 CLANG_NO_IAS= -no-integrated-as
-.if ${COMPILER_VERSION} < 30500
-# XXX: clang < 3.5 integrated-as doesn't grok .codeNN directives
-CLANG_NO_IAS34= -no-integrated-as
-.endif
 .endif
 
 .if ${COMPILER_TYPE} == "gcc"
@@ -60,12 +56,13 @@ CWARNEXTRA?=	-Wno-error=address				\
 		-Wno-error=maybe-uninitialized			\
 		-Wno-error=overflow				\
 		-Wno-error=sequence-point			\
-		-Wno-error=unused-but-set-variable
+		-Wno-unused-but-set-variable
 .if ${COMPILER_VERSION} >= 60100
 CWARNEXTRA+=	-Wno-error=misleading-indentation		\
 		-Wno-error=nonnull-compare			\
 		-Wno-error=shift-overflow			\
-		-Wno-error=tautological-compare
+		-Wno-error=tautological-compare			\
+		-Wno-format-zero-length
 .endif
 .if ${COMPILER_VERSION} >= 70200
 CWARNEXTRA+=	-Wno-error=memset-elt-size
@@ -277,6 +274,17 @@ CFLAGS+=        -std=iso9899:1999
 .else # CSTD
 CFLAGS+=        -std=${CSTD}
 .endif # CSTD
+
+.if ${LD} != "ld" && (${CC:[1]:H} != ${LD:[1]:H} || ${LD:[1]:T} != "ld")
+# Add -fuse-ld=${LD} if LD is in a different directory or not called "ld".
+.if ${COMPILER_TYPE} == "clang"
+CC+=	-fuse-ld=${LD:[1]} -Qunused-arguments
+.else
+# GCC does not support an absolute path for -fuse-ld so we just print this
+# warning instead and let the user add the required symlinks
+.warning LD (${LD}) is not the default linker for ${CC} but -fuse-ld= is not supported
+.endif
+.endif
 
 # Set target-specific linker emulation name.
 LD_EMULATION_aarch64=aarch64elf

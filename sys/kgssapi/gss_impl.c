@@ -143,7 +143,7 @@ cheriabi_gssd_syscall(struct thread *td,
     struct cheriabi_gssd_syscall_args *uap)
 {
 
-	return (kern_gssd_syscall(td, __USER_CAP_STR(uap->path)));
+	return (kern_gssd_syscall(td, uap->path));
 }
 #endif
 
@@ -175,6 +175,15 @@ kern_gssd_syscall(struct thread *td, const char * __capability upath)
 		cl = clnt_reconnect_create(nconf,
 		    (struct sockaddr *) &sun, GSSD, GSSDVERS,
 		    RPC_MAXDATASIZE, RPC_MAXDATASIZE);
+		/*
+		 * The number of retries defaults to INT_MAX, which effectively
+		 * means an infinite, uninterruptable loop.  Limiting it to
+		 * five retries keeps it from running forever.
+		 */
+		if (cl != NULL) {
+			int retry_count = 5;
+			CLNT_CONTROL(cl, CLSET_RETRIES, &retry_count);
+		}
 	} else
 		cl = NULL;
 
@@ -400,7 +409,7 @@ MODULE_DEPEND(kgssapi, krpc, 1, 1, 1);
 MODULE_VERSION(kgssapi, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -95,8 +95,9 @@ CK_STAILQ_HEAD(ifmultihead, ifmultiaddr);
 CK_STAILQ_HEAD(ifgrouphead, ifg_group);
 
 #ifdef _KERNEL
-VNET_DECLARE(struct pfil_head, link_pfil_hook);	/* packet filter hooks */
-#define	V_link_pfil_hook	VNET(link_pfil_hook)
+VNET_DECLARE(struct pfil_head *, link_pfil_head);
+#define	V_link_pfil_head	VNET(link_pfil_head)
+#define	PFIL_ETHER_NAME		"ethernet"
 
 #define	HHOOK_IPSEC_INET	0
 #define	HHOOK_IPSEC_INET6	1
@@ -243,7 +244,7 @@ struct ifnet {
 	CK_STAILQ_HEAD(, ifg_list) if_groups; /* linked list of groups per if (CK_) */
 					/* protected by if_addr_lock */
 	u_char	if_alloctype;		/* if_type at time of allocation */
-
+	uint8_t	if_numa_domain;		/* NUMA domain of device */
 	/* Driver and protocol specific information that remains stable. */
 	void	*if_softc;		/* pointer to driver state */
 	void	*if_llsoftc;		/* link layer softc */
@@ -381,8 +382,6 @@ struct ifnet {
 	 */
 	struct netdump_methods *if_netdump_methods;
 	struct epoch_context	if_epoch_ctx;
-	struct epoch_tracker	if_addr_et;
-	struct epoch_tracker	if_maddr_et;
 
 	/*
 	 * Spare fields to be added before branching a stable branch, so
@@ -395,24 +394,21 @@ struct ifnet {
 /* for compatibility with other BSDs */
 #define	if_name(ifp)	((ifp)->if_xname)
 
+#define	IF_NODOM	255
 /*
  * Locks for address lists on the network interface.
  */
 #define	IF_ADDR_LOCK_INIT(if)	mtx_init(&(if)->if_addr_lock, "if_addr_lock", NULL, MTX_DEF)
 #define	IF_ADDR_LOCK_DESTROY(if)	mtx_destroy(&(if)->if_addr_lock)
-#define	IF_ADDR_RLOCK(if)       struct epoch_tracker if_addr_et; epoch_enter_preempt(net_epoch_preempt, &if_addr_et);
-#define	IF_ADDR_RUNLOCK(if)     epoch_exit_preempt(net_epoch_preempt, &if_addr_et);
 
 #define	IF_ADDR_WLOCK(if)	mtx_lock(&(if)->if_addr_lock)
 #define	IF_ADDR_WUNLOCK(if)	mtx_unlock(&(if)->if_addr_lock)
 #define	IF_ADDR_LOCK_ASSERT(if)	MPASS(in_epoch(net_epoch_preempt) || mtx_owned(&(if)->if_addr_lock))
 #define	IF_ADDR_WLOCK_ASSERT(if) mtx_assert(&(if)->if_addr_lock, MA_OWNED)
-#define	NET_EPOCH_ENTER() struct epoch_tracker nep_et; epoch_enter_preempt(net_epoch_preempt, &nep_et)
-#define	NET_EPOCH_ENTER_ET(et) epoch_enter_preempt(net_epoch_preempt, &(et))
-#define	NET_EPOCH_EXIT() epoch_exit_preempt(net_epoch_preempt, &nep_et)
-#define	NET_EPOCH_EXIT_ET(et) epoch_exit_preempt(net_epoch_preempt, &(et))
-#define	NET_EPOCH_WAIT() epoch_wait_preempt(net_epoch_preempt)
-
+#define	NET_EPOCH_ENTER(et)	epoch_enter_preempt(net_epoch_preempt, &(et))
+#define	NET_EPOCH_EXIT(et)	epoch_exit_preempt(net_epoch_preempt, &(et))
+#define	NET_EPOCH_WAIT()	epoch_wait_preempt(net_epoch_preempt)
+#define	NET_EPOCH_ASSERT()	MPASS(in_epoch(net_epoch_preempt))
 
 /*
  * Function variations on locking macros intended to be used by loadable
@@ -492,16 +488,13 @@ EVENTHANDLER_DECLARE(group_change_event, group_change_event_handler_t);
 	mtx_init(&(ifp)->if_afdata_lock, "if_afdata", NULL, MTX_DEF)
 
 #define	IF_AFDATA_WLOCK(ifp)	mtx_lock(&(ifp)->if_afdata_lock)
-#define	IF_AFDATA_RLOCK(ifp)	struct epoch_tracker if_afdata_et; epoch_enter_preempt(net_epoch_preempt, &if_afdata_et)
 #define	IF_AFDATA_WUNLOCK(ifp)	mtx_unlock(&(ifp)->if_afdata_lock)
-#define	IF_AFDATA_RUNLOCK(ifp)	epoch_exit_preempt(net_epoch_preempt, &if_afdata_et)
 #define	IF_AFDATA_LOCK(ifp)	IF_AFDATA_WLOCK(ifp)
 #define	IF_AFDATA_UNLOCK(ifp)	IF_AFDATA_WUNLOCK(ifp)
 #define	IF_AFDATA_TRYLOCK(ifp)	mtx_trylock(&(ifp)->if_afdata_lock)
 #define	IF_AFDATA_DESTROY(ifp)	mtx_destroy(&(ifp)->if_afdata_lock)
 
 #define	IF_AFDATA_LOCK_ASSERT(ifp)	MPASS(in_epoch(net_epoch_preempt) || mtx_owned(&(ifp)->if_afdata_lock))
-#define	IF_AFDATA_RLOCK_ASSERT(ifp)	MPASS(in_epoch(net_epoch_preempt));
 #define	IF_AFDATA_WLOCK_ASSERT(ifp)	mtx_assert(&(ifp)->if_afdata_lock, MA_OWNED)
 #define	IF_AFDATA_UNLOCK_ASSERT(ifp)	mtx_assert(&(ifp)->if_afdata_lock, MA_NOTOWNED)
 
@@ -585,16 +578,13 @@ extern	struct sx ifnet_sxlock;
  * write, but also whether it was acquired with sleep support or not.
  */
 #define	IFNET_RLOCK_ASSERT()		sx_assert(&ifnet_sxlock, SA_SLOCKED)
-#define	IFNET_RLOCK_NOSLEEP_ASSERT()	MPASS(in_epoch(net_epoch_preempt))
 #define	IFNET_WLOCK_ASSERT() do {					\
 	sx_assert(&ifnet_sxlock, SA_XLOCKED);				\
 	rw_assert(&ifnet_rwlock, RA_WLOCKED);				\
 } while (0)
 
 #define	IFNET_RLOCK()		sx_slock(&ifnet_sxlock)
-#define	IFNET_RLOCK_NOSLEEP()	struct epoch_tracker ifnet_rlock_et; epoch_enter_preempt(net_epoch_preempt, &ifnet_rlock_et)
 #define	IFNET_RUNLOCK()		sx_sunlock(&ifnet_sxlock)
-#define	IFNET_RUNLOCK_NOSLEEP()	epoch_exit_preempt(net_epoch_preempt, &ifnet_rlock_et)
 
 /*
  * Look up an ifnet given its index; the _ref variant also acquires a
@@ -633,6 +623,8 @@ int	if_delgroup(struct ifnet *, const char *);
 int	if_addmulti(struct ifnet *, struct sockaddr *, struct ifmultiaddr **);
 int	if_allmulti(struct ifnet *, int);
 struct	ifnet* if_alloc(u_char);
+struct	ifnet* if_alloc_dev(u_char, device_t dev);
+struct	ifnet* if_alloc_domain(u_char, int numa_domain);
 void	if_attach(struct ifnet *);
 void	if_dead(struct ifnet *);
 int	if_delmulti(struct ifnet *, struct sockaddr *);
@@ -807,7 +799,7 @@ int    ether_poll_deregister(if_t ifp);
 #endif /* !_NET_IF_VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:net"

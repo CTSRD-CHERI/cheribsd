@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD AND BSD-2-Clause-NetBSD
  *
- * Copyright (c) 2013 M. Warner Losh. All Rights Reserved.
+ * Copyright (c) 2013 M. Warner Losh.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -94,6 +94,12 @@
 #endif
 #define	ELF_TARG_MACH	EM_MIPS
 #define	ELF_TARG_VER	1
+
+/*
+ * The expected EI_ABIVERSION value for CheriABI binaries. Can be used to
+ * reject loading of binaries compiled with a too new/old toolchain.
+ */
+#define ELF_CHERIABI_ABIVERSION 2
 
 /*
  * Auxiliary vector entries for passing information to the interpreter.
@@ -230,10 +236,13 @@ __ElfType(Auxinfo);
 #define	R_MIPS_COPY		126
 #define	R_MIPS_JUMP_SLOT	127
 
+struct image_params;
+int       mips_elf_header_supported(struct image_params * imgp);
+
 #endif /* __MIPS_ELF_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20180823,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

@@ -51,6 +51,7 @@
 #include <sys/vnode.h>
 #include <sys/selinfo.h>
 #include <sys/ptrace.h>
+#include <sys/sysent.h>
 
 #include <machine/bus.h>
 
@@ -536,7 +537,10 @@ cuse_client_send_command_locked(struct cuse_client_command *pccmd,
 
 	if (ioflag & IO_NDELAY)
 		cuse_fflags |= CUSE_FFLAG_NONBLOCK;
-
+#if defined(__LP64__)
+	if (SV_CURPROC_FLAG(SV_ILP32))
+		cuse_fflags |= CUSE_FFLAG_COMPAT32;
+#endif
 	pccmd->sub.fflags = cuse_fflags;
 	pccmd->sub.data_pointer = data_ptr;
 	pccmd->sub.argument = arg;
@@ -1559,7 +1563,7 @@ cuse_client_read(struct cdev *dev, struct uio *uio, int ioflag)
 
 		cuse_lock();
 		cuse_client_send_command_locked(pccmd,
-		    (uintptr_t)uio->uio_iov->iov_base,
+		    (__cheri_addr uintptr_t)uio->uio_iov->iov_base,
 		    (unsigned long)(unsigned int)len, pcc->fflags, ioflag);
 
 		error = cuse_client_receive_command_locked(pccmd, 0, 0);
@@ -1618,7 +1622,7 @@ cuse_client_write(struct cdev *dev, struct uio *uio, int ioflag)
 
 		cuse_lock();
 		cuse_client_send_command_locked(pccmd,
-		    (uintptr_t)uio->uio_iov->iov_base,
+		    (__cheri_addr uintptr_t)uio->uio_iov->iov_base,
 		    (unsigned long)(unsigned int)len, pcc->fflags, ioflag);
 
 		error = cuse_client_receive_command_locked(pccmd, 0, 0);
@@ -1891,7 +1895,7 @@ cuse_client_kqfilter(struct cdev *dev, struct knote *kn)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

@@ -1,4 +1,4 @@
-/*-
+/*
  * SPDX-License-Identifier: BSD-4-Clause
  *
  * Copyright (c) 1995 Terrence R. Lambert
@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/epoch.h>
 #include <sys/exec.h>
 #include <sys/file.h>
 #include <sys/filedesc.h>
@@ -107,6 +108,14 @@ struct	proc proc0;
 struct thread0_storage thread0_st __aligned(32);
 struct	vmspace vmspace0;
 struct	proc *initproc;
+
+int
+linux_alloc_current_noop(struct thread *td __unused, int flags __unused)
+{
+	return (0);
+}
+int (*lkpi_alloc_current)(struct thread *, int) = linux_alloc_current_noop;
+
 
 #ifndef BOOTHOWTO
 #define	BOOTHOWTO	0
@@ -402,7 +411,6 @@ null_set_syscall_retval(struct thread *td __unused, int error __unused)
 struct sysentvec null_sysvec = {
 	.sv_size	= 0,
 	.sv_table	= NULL,
-	.sv_mask	= 0,
 	.sv_errsize	= 0,
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
@@ -414,7 +422,6 @@ struct sysentvec null_sysvec = {
 	.sv_coredump	= NULL,
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= 0,
-	.sv_pagesize	= PAGE_SIZE,
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
@@ -456,7 +463,7 @@ proc0_init(void *dummy __unused)
 	GIANT_REQUIRED;
 	p = &proc0;
 	td = &thread0;
-	
+
 	/*
 	 * Initialize magic number and osrel.
 	 */
@@ -513,6 +520,7 @@ proc0_init(void *dummy __unused)
 	td->td_pflags = TDP_KTHREAD;
 	td->td_cpuset = cpuset_thread0();
 	td->td_domain.dr_policy = td->td_cpuset->cs_domain;
+	epoch_thread_init(td);
 	prison0_init();
 	p->p_peers = 0;
 	p->p_leader = p;
@@ -735,13 +743,12 @@ static void
 start_init(void *dummy)
 {
 	struct image_args args;
-	int options, error;
-	size_t pathlen;
-	char flags[8], *flagp;
+	int error;
 	char *var, *path;
 	char *free_init_path, *tmp_init_path;
 	struct thread *td;
 	struct proc *p;
+	struct vmspace *oldvmspace;
 
 	TSENTER();	/* Here so we don't overlap with mi_startup. */
 
@@ -760,7 +767,6 @@ start_init(void *dummy)
 	free_init_path = tmp_init_path = strdup(init_path, M_TEMP);
 	
 	while ((path = strsep(&tmp_init_path, ":")) != NULL) {
-		pathlen = strlen(path) + 1;
 		if (bootverbose)
 			printf("start_init: trying %s\n", path);
 			
@@ -775,34 +781,12 @@ start_init(void *dummy)
 		if (error != 0)
 			panic("%s: Can't add fname %d", __func__, error);
 
-		error = exec_args_add_arg_str(&args,
+		error = exec_args_add_arg(&args,
 		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add argv[0] %d", __func__, error);
-
-		options = 0;
-		flagp = &flags[0];
-		*flagp++ = '-';
-#ifdef BOOTCDROM
-		*flagp++ = 'C';
-		options++;
-#endif
-#ifdef notyet
-                if (boothowto & RB_FASTBOOT) {
-			*flagp++ = 'f';
-			options++;
-		}
-#endif
-		if (boothowto & RB_SINGLE) {
-			*flagp++ = 's';
-			options++;
-		}
-		if (options == 0)
-			*flagp++ = '-';
-		*flagp++ = 0;
-		KASSERT(flagp <= &flags[0] + sizeof(flags), ("Overran flags"));
-		error = exec_args_add_arg_str(&args,
-		    (__cheri_tocap char * __capability)flags, UIO_SYSSPACE);
+		if (boothowto & RB_SINGLE)
+			error = exec_args_add_arg(&args, "-s", UIO_SYSSPACE);
 		if (error != 0)
 			panic("%s: Can't add argv[0] %d", __func__, error);
 
@@ -813,8 +797,19 @@ start_init(void *dummy)
 		 * Otherwise, return via fork_trampoline() all the way
 		 * to user mode as init!
 		 */
+		KASSERT((td->td_pflags & TDP_EXECVMSPC) == 0,
+		    ("nested execve"));
+		oldvmspace = td->td_proc->p_vmspace;
 		error = kern_execve(td, &args, NULL);
+		KASSERT(error != 0,
+		    ("kern_execve returned success, not EJUSTRETURN"));
 		if (error == EJUSTRETURN) {
+			if ((td->td_pflags & TDP_EXECVMSPC) != 0) {
+				KASSERT(p->p_vmspace != oldvmspace,
+				    ("oldvmspace still used"));
+				vmspace_free(oldvmspace);
+				td->td_pflags &= ~TDP_EXECVMSPC;
+			}
 			free(free_init_path, M_TEMP);
 			TSEXIT();
 			return;
@@ -892,7 +887,7 @@ kick_init(const void *udata __unused)
 SYSINIT(kickinit, SI_SUB_KTHREAD_INIT, SI_ORDER_MIDDLE, kick_init, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -24,6 +24,11 @@ CFLAGS+=	-std=iso9899:1999
 .else # CSTD
 CFLAGS+=	-std=${CSTD}
 .endif # CSTD
+
+.if !empty(CXXSTD)
+CXXFLAGS+=	-std=${CXXSTD}
+.endif
+
 # -pedantic is problematic because it also imposes namespace restrictions
 #CFLAGS+=	-pedantic
 .if defined(WARNS)
@@ -79,6 +84,10 @@ CWARNFLAGS.clang+=	-Wno-unused-local-typedef
 .endif
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 40000
 CWARNFLAGS.clang+=	-Wno-address-of-packed-member
+.endif
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 70000 && \
+    ${MACHINE_CPUARCH} == "arm" && !${MACHINE_ARCH:Marmv[67]*}
+CWARNFLAGS.clang+=	-Wno-atomic-alignment
 .endif
 .endif # WARNS <= 3
 .if ${WARNS} <= 2
@@ -166,6 +175,12 @@ CWARNFLAGS+=	-Wno-error=aggressive-loop-optimizations	\
 		-Wno-error=stringop-truncation
 .endif
 
+.ifdef LIBCHERI
+# Ignore unaligned memcpy() calls. This is just a missed optimization
+# so it should not cause the build to fail.
+CWARNFLAGS+=	-Wno-error=pass-failed
+.endif
+
 # How to handle FreeBSD custom printf format specifiers.
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 30600
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__
@@ -189,7 +204,7 @@ CLANG_NO_IAS=	 -no-integrated-as
 # incompatible headers, we need to compile with -nobuiltininc and add the
 # resource dir to the end of the search paths. This ensures that headers such as
 # immintrin.h are still found but stddef.h, etc. are picked up from FreeBSD.
-.if ${MK_CLANG_BOOTSTRAP} == "no" && ${COMPILER_RESOURCE_DIR} != "unknown" && \
+.if ${MK_CLANG_BOOTSTRAP} == "no" && ${COMPILER_RESOURCE_DIR:Uunknown} != "unknown" && \
     !defined(BOOTSTRAPPING)
 CFLAGS+=-nobuiltininc -idirafter ${COMPILER_RESOURCE_DIR}/include
 .endif

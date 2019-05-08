@@ -91,6 +91,8 @@ options 	KDTRACE_HOOKS		# Kernel DTrace hooks
 options 	DDB_CTF			# Kernel ELF linker loads CTF data
 options 	INCLUDE_CONFIG_FILE	# Include this file in kernel
 options 	TMPFS			# Temporary file system
+options 	CAPABILITY_MODE		# Capsicum capability mode
+options 	CAPABILITIES		# Capsicum capabilities
 
 # Debugging for use in -current
 #options 	KDB			# Enable kernel debugger support.
@@ -134,7 +136,6 @@ device		octm
 # Wireless NIC cards
 device		wlan		# 802.11 support
 options 	IEEE80211_DEBUG	# enable debug msgs
-options 	IEEE80211_AMPDU_AGE # age frames in AMPDU reorder q's
 options 	IEEE80211_SUPPORT_MESH	# enable 802.11s draft support
 device		wlan_wep	# 802.11 WEP support
 device		wlan_ccmp	# 802.11 CCMP support
@@ -143,7 +144,6 @@ device		wlan_amrr	# AMRR transmit rate control algorithm
 #device		ath		# Atheros NIC's
 #device		ath_pci		# Atheros pci/cardbus glue
 #device		ath_hal		# pci/cardbus chip support
-#options 	AH_SUPPORT_AR5416	# enable AR5416 tx/rx descriptors
 #device		ath_rate_sample	# SampleRate tx rate control for ath
 
 # Pseudo devices.

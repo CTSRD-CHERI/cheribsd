@@ -88,7 +88,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/swap_pager.h>
 
 #include <cheri/cheric.h>
-#include "opt_swap.h"
 
 static MALLOC_DEFINE(M_BIOBUF, "biobuf", "BIO buffer");
 
@@ -1019,10 +1018,6 @@ bd_speedup(void)
 	mtx_unlock(&bdlock);
 }
 
-#ifndef NSWBUF_MIN
-#define	NSWBUF_MIN	16
-#endif
-
 #ifdef __i386__
 #define	TRANSIENT_DENOM	5
 #else
@@ -1131,19 +1126,17 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 			nbuf = buf_sz / BKVASIZE;
 	}
 
-	/*
-	 * swbufs are used as temporary holders for I/O, such as paging I/O.
-	 * We have no less then 16 and no more then 256.
-	 */
-	nswbuf = min(nbuf / 4, 256);
-	TUNABLE_INT_FETCH("kern.nswbuf", &nswbuf);
-	if (nswbuf < NSWBUF_MIN)
-		nswbuf = NSWBUF_MIN;
+	if (nswbuf == 0) {
+		nswbuf = min(nbuf / 4, 256);
+		if (nswbuf < NSWBUF_MIN)
+			nswbuf = NSWBUF_MIN;
+	}
 
 	/*
 	 * Reserve space for the buffer cache buffers
 	 * When we are called the first time, the capability is invalid
 	 * so we can not set bounds.
+	 * XXX-AM: this is hacky.
 	 */
 	if (!cheri_valid(v)) {
 	  return (v + (nbuf * sizeof(*buf)) + (nswbuf * sizeof(*swbuf)));
@@ -1152,7 +1145,9 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 	swbuf = (void *)cheri_bound(v, nswbuf * sizeof(*swbuf));
 	v = (caddr_t)(v + nswbuf * sizeof(*swbuf));
 	buf = (void *)cheri_bound(v, nbuf * sizeof(*buf));
-	v = (caddr_t)(v + nbuf * sizeof(*buf));
+	v = (caddr_t)(v + nbuf * sizeof(*buf));	
+	buf = (void *)v;
+	v = (caddr_t)(buf + nbuf);
 
 	return(v);
 }
@@ -1664,7 +1659,7 @@ buf_alloc(struct bufdomain *bd)
 	if (freebufs > 0)
 		bp = uma_zalloc(buf_zone, M_NOWAIT);
 	if (bp == NULL) {
-		atomic_fetchadd_int(&bd->bd_freebuffers, 1);
+		atomic_add_int(&bd->bd_freebuffers, 1);
 		bufspace_daemon_wakeup(bd);
 		counter_u64_add(numbufallocfails, 1);
 		return (NULL);
@@ -2012,7 +2007,7 @@ bufkva_free(struct buf *bp)
 	if (bp->b_kvasize == 0)
 		return;
 
-	vmem_free(buffer_arena, (vmem_addr_t)bp->b_kvabase, bp->b_kvasize);
+	vmem_free(buffer_arena, (vm_offset_t)bp->b_kvabase, bp->b_kvasize);
 	counter_u64_add(bufkvaspace, -bp->b_kvasize);
 	counter_u64_add(buffreekvacnt, 1);
 	bp->b_data = bp->b_kvabase = unmapped_buf;
@@ -2239,7 +2234,7 @@ bufwrite(struct buf *bp)
 	}
 
 	if (bp->b_flags & B_BARRIER)
-		barrierwrites++;
+		atomic_add_long(&barrierwrites, 1);
 
 	oldflags = bp->b_flags;
 
@@ -4442,7 +4437,7 @@ bufwait(struct buf *bp)
  *	read error occurred, or if the op was a write.  B_CACHE is never
  *	set if the buffer is invalid or otherwise uncacheable.
  *
- *	biodone does not mess with B_INVAL, allowing the I/O routine or the
+ *	bufdone does not mess with B_INVAL, allowing the I/O routine or the
  *	initiator to leave B_INVAL set to brelse the buffer out of existence
  *	in the biodone routine.
  */
@@ -4860,6 +4855,8 @@ b_io_dismiss(struct buf *bp, int ioflag, bool release)
 
 	if ((ioflag & IO_DIRECT) != 0)
 		bp->b_flags |= B_DIRECT;
+	if ((ioflag & IO_EXT) != 0)
+		bp->b_xflags |= BX_ALTDATA;
 	if ((ioflag & (IO_VMIO | IO_DIRECT)) != 0 && LIST_EMPTY(&bp->b_dep)) {
 		bp->b_flags |= B_RELBUF;
 		if ((ioflag & IO_NOREUSE) != 0)
@@ -5347,16 +5344,19 @@ DB_SHOW_COMMAND(buffer, db_show_buffer)
 	}
 
 	db_printf("buf at %p\n", bp);
-	db_printf("b_flags = 0x%b, b_xflags=0x%b, b_vflags=0x%b\n",
-	    (u_int)bp->b_flags, PRINT_BUF_FLAGS, (u_int)bp->b_xflags,
-	    PRINT_BUF_XFLAGS, (u_int)bp->b_vflags, PRINT_BUF_VFLAGS);
+	db_printf("b_flags = 0x%b, b_xflags=0x%b\n",
+	    (u_int)bp->b_flags, PRINT_BUF_FLAGS,
+	    (u_int)bp->b_xflags, PRINT_BUF_XFLAGS);
+	db_printf("b_vflags=0x%b b_ioflags0x%b\n",
+	    (u_int)bp->b_vflags, PRINT_BUF_VFLAGS,
+	    (u_int)bp->b_ioflags, PRINT_BIO_FLAGS);
 	db_printf(
 	    "b_error = %d, b_bufsize = %ld, b_bcount = %ld, b_resid = %ld\n"
-	    "b_bufobj = (%p), b_data = %p, b_blkno = %jd, b_lblkno = %jd, "
-	    "b_dep = %p\n",
+	    "b_bufobj = (%p), b_data = %p\n, b_blkno = %jd, b_lblkno = %jd, "
+	    "b_vp = %p, b_dep = %p\n",
 	    bp->b_error, bp->b_bufsize, bp->b_bcount, bp->b_resid,
 	    bp->b_bufobj, bp->b_data, (intmax_t)bp->b_blkno,
-	    (intmax_t)bp->b_lblkno, bp->b_dep.lh_first);
+	    (intmax_t)bp->b_lblkno, bp->b_vp, bp->b_dep.lh_first);
 	db_printf("b_kvabase = %p, b_kvasize = %d\n",
 	    bp->b_kvabase, bp->b_kvasize);
 	if (bp->b_npages) {

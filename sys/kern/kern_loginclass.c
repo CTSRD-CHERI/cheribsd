@@ -87,10 +87,8 @@ loginclass_hold(struct loginclass *lc)
 void
 loginclass_free(struct loginclass *lc)
 {
-	int old;
 
-	old = lc->lc_refcount;
-	if (old > 1 && atomic_cmpset_int(&lc->lc_refcount, old, old - 1))
+	if (refcount_release_if_not_last(&lc->lc_refcount))
 		return;
 
 	rw_wlock(&loginclasses_lock);
@@ -284,7 +282,7 @@ loginclass_racct_foreach(void (*callback)(struct racct *racct,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

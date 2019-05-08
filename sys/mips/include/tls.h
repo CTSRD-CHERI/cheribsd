@@ -38,14 +38,21 @@
  * TLS parameters
  */
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define TLS_TP_OFFSET	0
+#define TLS_DTP_OFFSET	0
+#else
 #define TLS_TP_OFFSET	0x7000
 #define TLS_DTP_OFFSET	0x8000
+#ifdef COMPAT_CHERIABI
+#define	TLS_TP_OFFSET_C	0
+#endif
+#endif
 
 
 /* XXX-AR: #define TLS_TCB_SIZE	(2 * sizeof(void*)) for all ABIs? */
 #ifdef __CHERI_PURE_CAPABILITY__
-#define TLS_TCB_SIZE	(2 * CHERICAP_SIZE)
-#define TLS_TCB_SIZE_C TLS_TCB_SIZE
+#define TLS_TCB_SIZE	(2 * __SIZEOF_CHERI_CAPABILITY__)
 #elif defined(__mips_n64)
 #if __has_feature(capabilities)
 #define	TLS_TCB_SIZE	(2*sizeof(struct chericap))
@@ -65,7 +72,7 @@
 #endif	/* __MIPS_TLS_H__ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

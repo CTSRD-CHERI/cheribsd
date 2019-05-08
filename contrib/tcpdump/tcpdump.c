@@ -756,7 +756,7 @@ capdns_setup(void)
 	if (capdnsloc == NULL)
 		error("unable to open system.dns service");
 	/* Limit system.dns to reverse DNS lookups. */
-	types[0] = "ADDR";
+	types[0] = "ADDR2NAME";
 	if (cap_dns_type_limit(capdnsloc, types, 1) < 0)
 		error("unable to limit access to system.dns service");
 	families[0] = AF_INET;
@@ -1939,7 +1939,7 @@ main(int argc, char **argv)
 	if (pcap_setfilter(pd, &fcode) < 0)
 		error("%s", pcap_geterr(pd));
 #ifdef HAVE_CAPSICUM
-	if (RFileName == NULL && VFileName == NULL) {
+	if (RFileName == NULL && VFileName == NULL && pcap_fileno(pd) != -1) {
 		static const unsigned long cmds[] = { BIOCGSTATS, BIOCROTZBUF };
 
 		/*
@@ -2087,7 +2087,8 @@ main(int argc, char **argv)
 	}
 
 #ifdef HAVE_CAPSICUM
-	cansandbox = (VFileName == NULL && zflag == NULL);
+	cansandbox = (VFileName == NULL && zflag == NULL &&
+	    ndo->ndo_espsecret == NULL);
 #ifdef HAVE_CASPER
 	cansandbox = (cansandbox && (ndo->ndo_nflag || capdns != NULL));
 #else

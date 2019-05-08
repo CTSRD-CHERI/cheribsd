@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#include <vm/vm_domainset.h>
 #include <vm/vm_pageout.h>
 #include <vm/vm_param.h>
 #include <vm/vm_kern.h>
@@ -462,13 +463,13 @@ contigmalloc(unsigned long size, struct malloc_type *type, int flags,
 }
 
 void *
-contigmalloc_domain(unsigned long size, struct malloc_type *type,
-    int domain, int flags, vm_paddr_t low, vm_paddr_t high,
+contigmalloc_domainset(unsigned long size, struct malloc_type *type,
+    struct domainset *ds, int flags, vm_paddr_t low, vm_paddr_t high,
     unsigned long alignment, vm_paddr_t boundary)
 {
 	void *ret;
 
-	ret = (void *)kmem_alloc_contig_domain(domain, size, flags, low, high,
+	ret = (void *)kmem_alloc_contig_domainset(ds, size, flags, low, high,
 	    alignment, boundary, VM_MEMATTR_DEFAULT);
 	if (ret != NULL)
 		malloc_type_allocated(type, round_page(size));
@@ -604,9 +605,8 @@ void *
 	return ((void *) va);
 }
 
-void *
-malloc_domain(size_t size, struct malloc_type *mtp, int domain,
-    int flags)
+static void *
+malloc_domain(size_t size, struct malloc_type *mtp, int domain, int flags)
 {
 	int indx;
 	caddr_t va;
@@ -648,6 +648,24 @@ malloc_domain(size_t size, struct malloc_type *mtp, int domain,
 #endif
 	CHERI_VM_ASSERT_VALID(va);
 	return ((void *) va);
+}
+
+void *
+malloc_domainset(size_t size, struct malloc_type *mtp, struct domainset *ds,
+    int flags)
+{
+	struct vm_domainset_iter di;
+	void *ret;
+	int domain;
+
+	vm_domainset_iter_policy_init(&di, ds, &domain, &flags);
+	do {
+		ret = malloc_domain(size, mtp, domain, flags);
+		if (ret != NULL)
+			break;
+	} while (vm_domainset_iter_policy(&di, &domain) == 0);
+
+	return (ret);
 }
 
 void *
@@ -928,13 +946,16 @@ kmeminit(void)
 	 * variable:
 	 */
 	if (vm_kmem_size == 0) {
-		vm_kmem_size = (mem_size / vm_kmem_size_scale) * PAGE_SIZE;
-
+		vm_kmem_size = mem_size / vm_kmem_size_scale;
+		vm_kmem_size = vm_kmem_size * PAGE_SIZE < vm_kmem_size ?
+		    vm_kmem_size_max : vm_kmem_size * PAGE_SIZE;
 		if (vm_kmem_size_min > 0 && vm_kmem_size < vm_kmem_size_min)
 			vm_kmem_size = vm_kmem_size_min;
 		if (vm_kmem_size_max > 0 && vm_kmem_size >= vm_kmem_size_max)
 			vm_kmem_size = vm_kmem_size_max;
 	}
+	if (vm_kmem_size == 0)
+		panic("Tune VM_KMEM_SIZE_* for the platform");
 
 	/*
 	 * The amount of KVA space that is preallocated to the
@@ -1208,7 +1229,7 @@ restart:
 DB_SHOW_COMMAND(malloc, db_show_malloc)
 {
 	struct malloc_type_internal *mtip;
-	struct malloc_type_internal *mtsp;
+	struct malloc_type_stats *mtsp;
 	struct malloc_type *mtp;
 	uint64_t allocs, frees;
 	uint64_t alloced, freed;
@@ -1224,10 +1245,10 @@ DB_SHOW_COMMAND(malloc, db_show_malloc)
 		freed = 0;
 		for (i = 0; i <= mp_maxid; i++) {
 			mtsp = zpcpu_get_cpu(mtip->mti_stats, i);
-			allocs += mtip->mti_stats[i].mts_numallocs;
-			frees += mtip->mti_stats[i].mts_numfrees;
-			alloced += mtip->mti_stats[i].mts_memalloced;
-			freed += mtip->mti_stats[i].mts_memfreed;
+			allocs += mtsp->mts_numallocs;
+			frees += mtsp->mts_numfrees;
+			alloced += mtsp->mts_memalloced;
+			freed += mtsp->mts_memfreed;
 		}
 		db_printf("%18s %12ju %12juK %12ju\n",
 		    mtp->ks_shortdesc, allocs - frees,
@@ -1318,10 +1339,10 @@ SYSCTL_OID(_kern, OID_AUTO, mprof, CTLTYPE_STRING|CTLFLAG_RD,
 #endif /* MALLOC_PROFILE */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "kernel",
 //   "changes": [
-//     "pointer_integrity"
+//     "integer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

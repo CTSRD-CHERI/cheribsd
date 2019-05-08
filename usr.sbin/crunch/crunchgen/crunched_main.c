@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <stdlib.h>
 #include <string.h>
 #include <sys/param.h>
+#include <sys/auxv.h>
 #include <sys/sysctl.h>
 
 struct stub {
@@ -100,7 +101,39 @@ main(int argc, char **argv, char **envp)
 	ep = find_entry_point(basename);
     }
 
+#ifdef AT_EXECPATH
+    /*
+     * Try AT_EXECPATH to get the actual binary that was executed.
+     * This is needed since su will set argv[0] to -su instead of the shell.
+     */
+    if (ep->name == NULL) {
+	int error = elf_aux_info(AT_EXECPATH, &exe_buf, sizeof(exe_buf));
+	if (error == 0) {
+	    const char *exe_name = get_basename(exe_buf);
+	    /*
+	     * Keep using argv[0] if AT_EXECPATH is the crunched binary
+	     * so that symlinks to the crunched binary report "not compiled in"
+	     * instead of invoking crunched_main().
+	     */
+	    if (strcmp(exe_name, EXECNAME) != 0) {
+		basename = exe_name;
+		ep = find_entry_point(basename);
+	    }
+	} else {
+		fprintf(stderr, "elf_aux_info(AT_EXECPATH) got error %d: %s\n", error, strerror(error));
+	}
+    }
+#else
+#error "EXPECTED AT_EXECPATH to exist!"
+#endif
+
     /* Finally fall back to using KERN_PROC_PATHNAME */
+    /*
+     * XXXAR: this does not seem to work correctly since it appears to return
+     * the last resolved path for a hardlink rather than the one that was
+     * actually used to execute the command.
+     */
+#if 0
     if (ep->name == NULL) {
 	size_t len = sizeof(exe_buf);
 	int name[4] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
@@ -117,6 +150,7 @@ main(int argc, char **argv, char **envp)
 	    }
 	}
     }
+#endif
 
     if (basename == NULL || *basename == '\0')
 	crunched_usage();

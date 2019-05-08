@@ -500,4 +500,9 @@
 #define	SYS_cpuset_getdomain	561
 #define	SYS_cpuset_setdomain	562
 #define	SYS_getrandom	563
-#define	SYS_MAXSYSCALL	564
+#define	SYS_getfhat	564
+#define	SYS_fhlink	565
+#define	SYS_fhlinkat	566
+#define	SYS_fhreadlink	567
+#define	SYS_funlinkat	568
+#define	SYS_MAXSYSCALL	569

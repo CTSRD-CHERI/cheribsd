@@ -549,8 +549,9 @@ handle_ddp_data(struct toepcb *toep, __be32 ddp_report, __be32 rcv_nxt, int len)
 	    V_tcp_do_autorcvbuf &&
 	    sb->sb_hiwat < V_tcp_autorcvbuf_max &&
 	    len > (sbspace(sb) / 8 * 7)) {
+		struct adapter *sc = td_adapter(toep->td);
 		unsigned int hiwat = sb->sb_hiwat;
-		unsigned int newsize = min(hiwat + V_tcp_autorcvbuf_inc,
+		unsigned int newsize = min(hiwat + sc->tt.autorcvbuf_inc,
 		    V_tcp_autorcvbuf_max);
 
 		if (!sbreserve_locked(sb, newsize, so, NULL))
@@ -1977,7 +1978,7 @@ t4_ddp_mod_unload(void)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

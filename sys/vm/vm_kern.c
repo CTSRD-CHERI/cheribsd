@@ -125,8 +125,8 @@ SYSCTL_ULONG(_vm, OID_AUTO, max_kernel_address, CTLFLAG_RD,
 #if VM_NRESERVLEVEL > 0
 #define	KVA_QUANTUM_SHIFT	(VM_LEVEL_0_ORDER + PAGE_SHIFT)
 #else
-/* On non-superpage architectures want large import sizes. */
-#define	KVA_QUANTUM_SHIFT	(10 + PAGE_SHIFT)
+/* On non-superpage architectures we want large import sizes. */
+#define	KVA_QUANTUM_SHIFT	(8 + PAGE_SHIFT)
 #endif
 #define	KVA_QUANTUM		(1 << KVA_QUANTUM_SHIFT)
 
@@ -190,7 +190,7 @@ kva_free(vm_offset_t addr, vm_size_t size)
  *	necessarily physically contiguous.  If M_ZERO is specified through the
  *	given flags, then the pages are zeroed before they are mapped.
  */
-vm_ptr_t
+static vm_ptr_t
 kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
     vm_paddr_t high, vm_memattr_t memattr)
 {
@@ -200,6 +200,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	vm_offset_t i, offset;
 	vm_page_t m;
 	int pflags, tries;
+	vm_prot_t prot;
 
 	size = round_page(size);
 	vmem = vm_dom[domain].vmd_kernel_arena;
@@ -209,6 +210,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
 	pflags &= ~(VM_ALLOC_NOWAIT | VM_ALLOC_WAITOK | VM_ALLOC_WAITFAIL);
 	pflags |= VM_ALLOC_NOWAIT;
+	prot = (flags & M_EXEC) != 0 ? VM_PROT_ALL : VM_PROT_RW;
 	VM_OBJECT_WLOCK(object);
 	for (i = 0; i < size; i += PAGE_SIZE) {
 		tries = 0;
@@ -236,8 +238,8 @@ retry:
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
-		pmap_enter(kernel_pmap, ptr_to_va(addr) + i, m, VM_PROT_RW,
-		    VM_PROT_RW | PMAP_ENTER_WIRED, 0);
+		pmap_enter(kernel_pmap, ptr_to_va(addr) + i, m, prot,
+		    prot | PMAP_ENTER_WIRED, 0);
 	}
 	VM_OBJECT_WUNLOCK(object);
 	CHERI_VM_ASSERT_VALID(addr);
@@ -248,11 +250,20 @@ vm_ptr_t
 kmem_alloc_attr(vm_size_t size, int flags, vm_paddr_t low, vm_paddr_t high,
     vm_memattr_t memattr)
 {
+
+	return (kmem_alloc_attr_domainset(DOMAINSET_RR(), size, flags, low,
+	    high, memattr));
+}
+
+vm_ptr_t
+kmem_alloc_attr_domainset(struct domainset *ds, vm_size_t size, int flags,
+    vm_paddr_t low, vm_paddr_t high, vm_memattr_t memattr)
+{
 	struct vm_domainset_iter di;
 	vm_ptr_t addr;
 	int domain;
 
-	vm_domainset_iter_policy_init(&di, DOMAINSET_RR(), &domain, &flags);
+	vm_domainset_iter_policy_init(&di, ds, &domain, &flags);
 	do {
 		addr = kmem_alloc_attr_domain(domain, size, flags, low, high,
 		    memattr);
@@ -271,7 +282,7 @@ kmem_alloc_attr(vm_size_t size, int flags, vm_paddr_t low, vm_paddr_t high,
  *	through the given flags, then the pages are zeroed before they are
  *	mapped.
  */
-vm_ptr_t
+static vm_ptr_t
 kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
     vm_paddr_t high, u_long alignment, vm_paddr_t boundary,
     vm_memattr_t memattr)
@@ -334,11 +345,21 @@ vm_ptr_t
 kmem_alloc_contig(vm_size_t size, int flags, vm_paddr_t low, vm_paddr_t high,
     u_long alignment, vm_paddr_t boundary, vm_memattr_t memattr)
 {
+
+	return (kmem_alloc_contig_domainset(DOMAINSET_RR(), size, flags, low,
+	    high, alignment, boundary, memattr));
+}
+
+vm_ptr_t
+kmem_alloc_contig_domainset(struct domainset *ds, vm_size_t size, int flags,
+    vm_paddr_t low, vm_paddr_t high, u_long alignment, vm_paddr_t boundary,
+    vm_memattr_t memattr)
+{
 	struct vm_domainset_iter di;
 	vm_ptr_t addr;
 	int domain;
 
-	vm_domainset_iter_policy_init(&di, DOMAINSET_RR(), &domain, &flags);
+	vm_domainset_iter_policy_init(&di, ds, &domain, &flags);
 	do {
 		addr = kmem_alloc_contig_domain(domain, size, flags, low, high,
 		    alignment, boundary, memattr);
@@ -389,12 +410,12 @@ kmem_suballoc(vm_map_t parent, vm_ptr_t *min, vm_ptr_t *max,
 }
 
 /*
- *	kmem_malloc:
+ *	kmem_malloc_domain:
  *
  *	Allocate wired-down pages in the kernel's address space.
  */
-vm_ptr_t
-kmem_malloc_domain(int domain, vm_size_t size, int flags)
+static vm_ptr_t
+kmem_malloc_domain(int domain, vm_size_t size, int flags, vm_size_t align)
 {
 	vmem_t *arena;
 	vm_ptr_t addr;
@@ -409,7 +430,11 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags)
 	arena = vm_dom[domain].vmd_kernel_arena;
 #endif
 	size = round_page(size);
-	if (vmem_alloc(arena, size, flags | M_BESTFIT, &addr))
+
+	if (align == 0 && vmem_alloc(arena, size, flags | M_BESTFIT, &addr))
+		return (0);
+	else if (vmem_xalloc(arena, size, align, 0, 0, VMEM_ADDR_MIN, VMEM_ADDR_MAX,
+			     flags | M_BESTFIT, &addr))
 		return (0);
 
 	rv = kmem_back_domain(domain, kernel_object, addr, size, flags);
@@ -422,37 +447,23 @@ kmem_malloc_domain(int domain, vm_size_t size, int flags)
 }
 
 vm_ptr_t
-kmem_malloc_domain_aligned(int domain, vm_size_t size, vm_offset_t align, int flags)
+kmem_malloc(vm_size_t size, int flags)
 {
-	vmem_t *vmem;
-	vm_ptr_t addr;
-	int rv;
 
-	vmem = vm_dom[domain].vmd_kernel_arena;
-	size = round_page(size);
-	if (vmem_xalloc(vmem, size, align, 0, 0, VMEM_ADDR_MIN, VMEM_ADDR_MAX,
-			flags | M_BESTFIT, &addr))
-		return (0);
-
-	rv = kmem_back_domain(domain, kernel_object, addr, size, flags);
-	if (rv != KERN_SUCCESS) {
-		vmem_free(vmem, addr, size);
-		return (0);
-	}
-	CHERI_VM_ASSERT_VALID(addr);
-	return (addr);
+	return (kmem_malloc_domainset(DOMAINSET_RR(), size, flags));
 }
 
 vm_ptr_t
-kmem_malloc(vm_size_t size, int flags)
+kmem_malloc_domainset(struct domainset *ds, vm_size_t size, int flags,
+   vm_size_t align)
 {
 	struct vm_domainset_iter di;
 	vm_ptr_t addr;
 	int domain;
 
-	vm_domainset_iter_policy_init(&di, DOMAINSET_RR(), &domain, &flags);
+	vm_domainset_iter_policy_init(&di, ds, &domain, &flags);
 	do {
-		addr = kmem_malloc_domain(domain, size, flags);
+		addr = kmem_malloc_domain(domain, size, flags, align);
 		if (addr != 0)
 			break;
 	} while (vm_domainset_iter_policy(&di, &domain) == 0);
@@ -663,7 +674,8 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		 * to lock out sleepers/wakers.
 		 */
 		vm_map_lock(map);
-		if (vm_map_findspace(map, vm_map_min(map), size, &addr) == 0)
+		addr = vm_map_findspace(map, vm_map_min(map), size);
+		if (addr + size <= vm_map_max(map))
 			break;
 		/* no space now; see if we can ever get space */
 		if (vm_map_max(map) - vm_map_min(map) < size) {
@@ -674,8 +686,8 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		map->needs_wakeup = TRUE;
 		vm_map_unlock_and_wait(map, 0);
 	}
-	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_ALL,
-	    VM_PROT_ALL, MAP_ACC_CHARGED);
+	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_RW, VM_PROT_RW,
+	    MAP_ACC_CHARGED);
 	vm_map_unlock(map);
 
 	mapped = vm_map_make_ptr(map, addr, size, VM_PROT_ALL);
@@ -865,7 +877,6 @@ kmem_bootstrap_free(vm_offset_t start, vm_size_t size)
 		vmd = vm_pagequeue_domain(m);
 		vm_domain_free_lock(vmd);
 		vm_phys_free_pages(m, 0);
-		vmd->vmd_page_count++;
 		vm_domain_free_unlock(vmd);
 
 		vm_domain_freecnt_inc(vmd, 1);

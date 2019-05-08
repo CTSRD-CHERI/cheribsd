@@ -239,9 +239,16 @@ rip6_input(struct mbuf **mp, int *offp, int proto)
 		}
 		if (in6p->in6p_cksum != -1) {
 			RIP6STAT_INC(rip6s_isum);
-			if (in6_cksum(m, proto, *offp,
+			if (m->m_pkthdr.len - (*offp + in6p->in6p_cksum) < 2 ||
+			    in6_cksum(m, proto, *offp,
 			    m->m_pkthdr.len - *offp)) {
 				RIP6STAT_INC(rip6s_badsum);
+				/*
+				 * Drop the received message, don't send an
+				 * ICMP6 message. Set proto to IPPROTO_NONE
+				 * to achieve that.
+				 */
+				proto = IPPROTO_NONE;
 				goto skip_2;
 			}
 		}
@@ -495,7 +502,7 @@ rip6_output(struct mbuf *m, struct socket *so, ...)
 			off = offsetof(struct icmp6_hdr, icmp6_cksum);
 		else
 			off = in6p->in6p_cksum;
-		if (plen < off + 1) {
+		if (plen < off + 2) {
 			error = EINVAL;
 			goto bad;
 		}
@@ -729,6 +736,7 @@ rip6_disconnect(struct socket *so)
 static int
 rip6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 {
+	struct epoch_tracker et;
 	struct inpcb *inp;
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)nam;
 	struct ifaddr *ifa = NULL;
@@ -746,20 +754,20 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	if ((error = sa6_embedscope(addr, V_ip6_use_defzone)) != 0)
 		return (error);
 
-	NET_EPOCH_ENTER();
+	NET_EPOCH_ENTER(et);
 	if (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
 	    (ifa = ifa_ifwithaddr((struct sockaddr *)addr)) == NULL) {
-		NET_EPOCH_EXIT();
+		NET_EPOCH_EXIT(et);
 		return (EADDRNOTAVAIL);
 	}
 	if (ifa != NULL &&
 	    ((struct in6_ifaddr *)ifa)->ia6_flags &
 	    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|
 	     IN6_IFF_DETACHED|IN6_IFF_DEPRECATED)) {
-		NET_EPOCH_EXIT();
+		NET_EPOCH_EXIT(et);
 		return (EADDRNOTAVAIL);
 	}
-	NET_EPOCH_EXIT();
+	NET_EPOCH_EXIT(et);
 	INP_INFO_WLOCK(&V_ripcbinfo);
 	INP_WLOCK(inp);
 	inp->in6p_laddr = addr->sin6_addr;
@@ -906,7 +914,7 @@ struct pr_usrreqs rip6_usrreqs = {
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181115,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

@@ -39,7 +39,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181114,
  *   "target_type": "lib",
  *   "changes": [
  *     "support"
@@ -869,8 +869,7 @@ fp_common:
 				size = buf + BUF - cp;
 				break;
 			}
-			ujval = cheri_getbase(pointer) +
-			    cheri_getoffset(pointer);
+			ujval = cheri_getaddress(pointer);
 #endif
 			base = 16;
 			xdigs = xdigs_lower;

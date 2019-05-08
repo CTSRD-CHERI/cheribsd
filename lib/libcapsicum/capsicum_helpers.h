@@ -31,6 +31,8 @@
 
 #include <sys/param.h>
 #include <sys/capsicum.h>
+#include <sys/filio.h> /* for FIODTYPE */
+#include <sys/ttycom.h> /* for TIOCGWINSZ */
 #include <sys/ioctl.h>
 
 #include <errno.h>
@@ -136,6 +138,35 @@ caph_enter(void)
 	return (0);
 }
 
+static __inline int
+caph_rights_limit(int fd, const cap_rights_t *rights)
+{
+
+	if (cap_rights_limit(fd, rights) < 0 && errno != ENOSYS)
+		return (-1);
+
+	return (0);
+}
+
+static __inline int
+caph_ioctls_limit(int fd, const unsigned long *cmds, size_t ncmds)
+{
+
+	if (cap_ioctls_limit(fd, cmds, ncmds) < 0 && errno != ENOSYS)
+		return (-1);
+
+	return (0);
+}
+
+static __inline int
+caph_fcntls_limit(int fd, uint32_t fcntlrights)
+{
+
+	if (cap_fcntls_limit(fd, fcntlrights) < 0 && errno != ENOSYS)
+		return (-1);
+
+	return (0);
+}
 
 static __inline int
 caph_enter_casper(void)

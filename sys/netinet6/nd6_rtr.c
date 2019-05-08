@@ -106,6 +106,10 @@ VNET_DEFINE(u_int32_t, ip6_temp_valid_lifetime) = DEF_TEMP_VALID_LIFETIME;
 
 VNET_DEFINE(int, ip6_temp_regen_advance) = TEMPADDR_REGEN_ADVANCE;
 
+#ifdef EXPERIMENTAL
+VNET_DEFINE(int, nd6_ignore_ipv6_only_ra) = 1;
+#endif
+
 /* RTPREF_MEDIUM has to be 0! */
 #define RTPREF_HIGH	1
 #define RTPREF_MEDIUM	0
@@ -202,6 +206,110 @@ nd6_rs_input(struct mbuf *m, int off, int icmp6len)
  bad:
 	ICMP6STAT_INC(icp6s_badrs);
 	m_freem(m);
+}
+
+#ifdef EXPERIMENTAL
+/*
+ * An initial update routine for draft-ietf-6man-ipv6only-flag.
+ * We need to iterate over all default routers for the given
+ * interface to see whether they are all advertising the "S"
+ * (IPv6-Only) flag.  If they do set, otherwise unset, the
+ * interface flag we later use to filter on.
+ */
+static void
+defrtr_ipv6_only_ifp(struct ifnet *ifp)
+{
+	struct nd_defrouter *dr;
+	bool ipv6_only, ipv6_only_old;
+#ifdef INET
+	struct epoch_tracker et;
+	struct ifaddr *ifa;
+	bool has_ipv4_addr;
+#endif
+
+	if (V_nd6_ignore_ipv6_only_ra != 0)
+		return;
+
+	ipv6_only = true;
+	ND6_RLOCK();
+	TAILQ_FOREACH(dr, &V_nd_defrouter, dr_entry)
+		if (dr->ifp == ifp &&
+		    (dr->raflags & ND_RA_FLAG_IPV6_ONLY) == 0)
+			ipv6_only = false;
+	ND6_RUNLOCK();
+
+	IF_AFDATA_WLOCK(ifp);
+	ipv6_only_old = ND_IFINFO(ifp)->flags & ND6_IFF_IPV6_ONLY;
+	IF_AFDATA_WUNLOCK(ifp);
+
+	/* If nothing changed, we have an early exit. */
+	if (ipv6_only == ipv6_only_old)
+		return;
+
+#ifdef INET
+	/*
+	 * Should we want to set the IPV6-ONLY flag, check if the
+	 * interface has a non-0/0 and non-link-local IPv4 address
+	 * configured on it.  If it has we will assume working
+	 * IPv4 operations and will clear the interface flag.
+	 */
+	has_ipv4_addr = false;
+	if (ipv6_only) {
+		NET_EPOCH_ENTER(et);
+		CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+			if (ifa->ifa_addr->sa_family != AF_INET)
+				continue;
+			if (in_canforward(
+			    satosin(ifa->ifa_addr)->sin_addr)) {
+				has_ipv4_addr = true;
+				break;
+			}
+		}
+		NET_EPOCH_EXIT(et);
+	}
+	if (ipv6_only && has_ipv4_addr) {
+		log(LOG_NOTICE, "%s rcvd RA w/ IPv6-Only flag set but has IPv4 "
+		    "configured, ignoring IPv6-Only flag.\n", ifp->if_xname);
+		ipv6_only = false;
+	}
+#endif
+
+	IF_AFDATA_WLOCK(ifp);
+	if (ipv6_only)
+		ND_IFINFO(ifp)->flags |= ND6_IFF_IPV6_ONLY;
+	else
+		ND_IFINFO(ifp)->flags &= ~ND6_IFF_IPV6_ONLY;
+	IF_AFDATA_WUNLOCK(ifp);
+
+#ifdef notyet
+	/* Send notification of flag change. */
+#endif
+}
+
+static void
+defrtr_ipv6_only_ipf_down(struct ifnet *ifp)
+{
+
+	IF_AFDATA_WLOCK(ifp);
+	ND_IFINFO(ifp)->flags &= ~ND6_IFF_IPV6_ONLY;
+	IF_AFDATA_WUNLOCK(ifp);
+}
+#endif	/* EXPERIMENTAL */
+
+void
+nd6_ifnet_link_event(void *arg __unused, struct ifnet *ifp, int linkstate)
+{
+
+	/*
+	 * XXX-BZ we might want to trigger re-evaluation of our default router
+	 * availability. E.g., on link down the default router might be
+	 * unreachable but a different interface might still have connectivity.
+	 */
+
+#ifdef EXPERIMENTAL
+	if (linkstate == LINK_STATE_DOWN)
+		defrtr_ipv6_only_ipf_down(ifp);
+#endif
 }
 
 /*
@@ -319,6 +427,9 @@ nd6_ra_input(struct mbuf *m, int off, int icmp6len)
 		}
 	}
 	dr = defrtrlist_update(&dr0);
+#ifdef EXPERIMENTAL
+	defrtr_ipv6_only_ifp(ifp);
+#endif
     }
 
 	/*
@@ -477,11 +588,13 @@ nd6_rtmsg(int cmd, struct rtentry *rt)
 	info.rti_info[RTAX_NETMASK] = rt_mask(rt);
 	ifp = rt->rt_ifp;
 	if (ifp != NULL) {
-		IF_ADDR_RLOCK(ifp);
+		struct epoch_tracker et;
+
+		NET_EPOCH_ENTER(et);
 		ifa = CK_STAILQ_FIRST(&ifp->if_addrhead);
 		info.rti_info[RTAX_IFP] = ifa->ifa_addr;
 		ifa_ref(ifa);
-		IF_ADDR_RUNLOCK(ifp);
+		NET_EPOCH_EXIT(et);
 		info.rti_info[RTAX_IFA] = rt->rt_ifa->ifa_addr;
 	} else
 		ifa = NULL;
@@ -692,6 +805,10 @@ defrouter_del(struct nd_defrouter *dr)
 	if (ND_IFINFO(dr->ifp)->flags & ND6_IFF_ACCEPT_RTADV)
 		rt6_flush(&dr->rtaddr, dr->ifp);
 
+#ifdef EXPERIMENTAL
+	defrtr_ipv6_only_ifp(dr->ifp);
+#endif
+
 	if (dr->installed) {
 		deldr = dr;
 		defrouter_delreq(dr);
@@ -751,6 +868,7 @@ defrouter_del(struct nd_defrouter *dr)
 void
 defrouter_select_fib(int fibnum)
 {
+	struct epoch_tracker et;
 	struct nd_defrouter *dr, *selected_dr, *installed_dr;
 	struct llentry *ln = NULL;
 
@@ -777,14 +895,14 @@ defrouter_select_fib(int fibnum)
 	 */
 	selected_dr = installed_dr = NULL;
 	TAILQ_FOREACH(dr, &V_nd_defrouter, dr_entry) {
-		IF_AFDATA_RLOCK(dr->ifp);
+		NET_EPOCH_ENTER(et);
 		if (selected_dr == NULL && dr->ifp->if_fib == fibnum &&
 		    (ln = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
 			selected_dr = dr;
 			defrouter_ref(selected_dr);
 		}
-		IF_AFDATA_RUNLOCK(dr->ifp);
+		NET_EPOCH_EXIT(et);
 		if (ln != NULL) {
 			LLE_RUNLOCK(ln);
 			ln = NULL;
@@ -828,7 +946,7 @@ defrouter_select_fib(int fibnum)
 			}
 		}
 	} else if (installed_dr != NULL) {
-		IF_AFDATA_RLOCK(installed_dr->ifp);
+		NET_EPOCH_ENTER(et);
 		if ((ln = nd6_lookup(&installed_dr->rtaddr, 0,
 		                     installed_dr->ifp)) &&
 		    ND6_IS_LLINFO_PROBREACH(ln) &&
@@ -837,7 +955,7 @@ defrouter_select_fib(int fibnum)
 			defrouter_rele(selected_dr);
 			selected_dr = installed_dr;
 		}
-		IF_AFDATA_RUNLOCK(installed_dr->ifp);
+		NET_EPOCH_EXIT(et);
 		if (ln != NULL)
 			LLE_RUNLOCK(ln);
 	}
@@ -1233,6 +1351,7 @@ prelist_update(struct nd_prefixctl *new, struct nd_defrouter *dr,
 	int auth;
 	struct in6_addrlifetime lt6_tmp;
 	char ip6buf[INET6_ADDRSTRLEN];
+	struct epoch_tracker et;
 
 	auth = 0;
 	if (m) {
@@ -1346,7 +1465,7 @@ prelist_update(struct nd_prefixctl *new, struct nd_defrouter *dr,
 	 * consider autoconfigured addresses while RFC2462 simply said
 	 * "address".
 	 */
-	IF_ADDR_RLOCK(ifp);
+	NET_EPOCH_ENTER(et);
 	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		struct in6_ifaddr *ifa6;
 		u_int32_t remaininglifetime;
@@ -1469,7 +1588,7 @@ prelist_update(struct nd_prefixctl *new, struct nd_defrouter *dr,
 		ifa6->ia6_lifetime = lt6_tmp;
 		ifa6->ia6_updatetime = time_uptime;
 	}
-	IF_ADDR_RUNLOCK(ifp);
+	NET_EPOCH_EXIT(et);
 	if (ia6_match == NULL && new->ndpr_vltime) {
 		int ifidlen;
 
@@ -1558,6 +1677,7 @@ end:
 static struct nd_pfxrouter *
 find_pfxlist_reachable_router(struct nd_prefix *pr)
 {
+	struct epoch_tracker et;
 	struct nd_pfxrouter *pfxrtr;
 	struct llentry *ln;
 	int canreach;
@@ -1565,9 +1685,9 @@ find_pfxlist_reachable_router(struct nd_prefix *pr)
 	ND6_LOCK_ASSERT();
 
 	LIST_FOREACH(pfxrtr, &pr->ndpr_advrtrs, pfr_entry) {
-		IF_AFDATA_RLOCK(pfxrtr->router->ifp);
+		NET_EPOCH_ENTER(et);
 		ln = nd6_lookup(&pfxrtr->router->rtaddr, 0, pfxrtr->router->ifp);
-		IF_AFDATA_RUNLOCK(pfxrtr->router->ifp);
+		NET_EPOCH_EXIT(et);
 		if (ln == NULL)
 			continue;
 		canreach = ND6_IS_LLINFO_PROBREACH(ln);
@@ -1906,15 +2026,17 @@ nd6_prefix_onlink(struct nd_prefix *pr)
 	ifa = (struct ifaddr *)in6ifa_ifpforlinklocal(ifp,
 	    IN6_IFF_NOTREADY | IN6_IFF_ANYCAST);
 	if (ifa == NULL) {
+		struct epoch_tracker et;
+
 		/* XXX: freebsd does not have ifa_ifwithaf */
-		IF_ADDR_RLOCK(ifp);
+		NET_EPOCH_ENTER(et);
 		CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 			if (ifa->ifa_addr->sa_family == AF_INET6) {
 				ifa_ref(ifa);
 				break;
 			}
 		}
-		IF_ADDR_RUNLOCK(ifp);
+		NET_EPOCH_EXIT(et);
 		/* should we care about ia6_flags? */
 	}
 	if (ifa == NULL) {

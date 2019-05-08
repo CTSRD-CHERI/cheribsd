@@ -159,7 +159,8 @@ ENTRY(cpu_switch)
 cpu_switchin:
 #if defined(SMP) && defined(SCHED_ULE)
 	/* Wait for the new thread to become unblocked */
-	ld	%r6,TOC_REF(blocked_lock)(%r2)
+	addis	%r6,%r2,TOC_REF(blocked_lock)@ha
+	ld	%r6,TOC_REF(blocked_lock)@l(%r6)
 blocked_loop:
 	ld	%r7,TD_LOCK(%r13)
 	cmpd	%r6,%r7 
@@ -276,6 +277,7 @@ ENTRY(savectx)
 
 	mfcr	%r4			/* Save the condition register */
 	std	%r4,PCB_CR(%r3)
+	std	%r1,PCB_SP(%r3)		/* Save the stack pointer */
 	std	%r2,PCB_TOC(%r3)	/* Save the TOC pointer */
 	mflr	%r4			/* Save the link register */
 	std	%r4,PCB_LR(%r3)

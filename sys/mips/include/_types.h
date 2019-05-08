@@ -174,7 +174,7 @@ typedef	int		___wchar_t;
 #endif /* !_MACHINE__TYPES_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

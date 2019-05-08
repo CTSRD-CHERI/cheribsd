@@ -62,9 +62,6 @@
 #include <netpfil/pf/pf.h>
 #include <netpfil/pf/pf_altq.h>
 #include <net/altq/altq.h>
-#ifdef ALTQ3_COMPAT
-#include <net/altq/altq_conf.h>
-#endif
 
 /* machine dependent clock related includes */
 #include <sys/bus.h>
@@ -155,22 +152,6 @@ altq_attach(ifq, type, discipline, enqueue, dequeue, request, clfier, classify)
 		return ENXIO;
 	}
 
-#ifdef ALTQ3_COMPAT
-	/*
-	 * pfaltq can override the existing discipline, but altq3 cannot.
-	 * check these if clfier is not NULL (which implies altq3).
-	 */
-	if (clfier != NULL) {
-		if (ALTQ_IS_ENABLED(ifq)) {
-			IFQ_UNLOCK(ifq);
-			return EBUSY;
-		}
-		if (ALTQ_IS_ATTACHED(ifq)) {
-			IFQ_UNLOCK(ifq);
-			return EEXIST;
-		}
-	}
-#endif
 	ifq->altq_type     = type;
 	ifq->altq_disc     = discipline;
 	ifq->altq_enqueue  = enqueue;
@@ -179,11 +160,6 @@ altq_attach(ifq, type, discipline, enqueue, dequeue, request, clfier, classify)
 	ifq->altq_clfier   = clfier;
 	ifq->altq_classify = classify;
 	ifq->altq_flags &= (ALTQF_CANTCHANGE|ALTQF_ENABLED);
-#ifdef ALTQ3_COMPAT
-#ifdef ALTQ_KLD
-	altq_module_incref(type);
-#endif
-#endif
 	IFQ_UNLOCK(ifq);
 	return 0;
 }
@@ -206,11 +182,6 @@ altq_detach(ifq)
 		IFQ_UNLOCK(ifq);
 		return (0);
 	}
-#ifdef ALTQ3_COMPAT
-#ifdef ALTQ_KLD
-	altq_module_declref(ifq->altq_type);
-#endif
-#endif
 
 	ifq->altq_type     = ALTQT_NONE;
 	ifq->altq_disc     = NULL;
@@ -439,11 +410,11 @@ tbr_timeout(arg)
 {
 	VNET_ITERATOR_DECL(vnet_iter);
 	struct ifnet *ifp;
-	int active, s;
+	struct epoch_tracker et;
+	int active;
 
 	active = 0;
-	s = splnet();
-	IFNET_RLOCK_NOSLEEP();
+	NET_EPOCH_ENTER(et);
 	VNET_LIST_RLOCK_NOSLEEP();
 	VNET_FOREACH(vnet_iter) {
 		CURVNET_SET(vnet_iter);
@@ -460,8 +431,7 @@ tbr_timeout(arg)
 		CURVNET_RESTORE();
 	}
 	VNET_LIST_RUNLOCK_NOSLEEP();
-	IFNET_RUNLOCK_NOSLEEP();
-	splx(s);
+	NET_EPOCH_EXIT(et);
 	if (active > 0)
 		CALLOUT_RESET(&tbr_callout, 1, tbr_timeout, (void *)0);
 	else
@@ -550,7 +520,7 @@ altq_pfdetach(struct pf_altq *a)
  * malloc with WAITOK, also it is not yet clear which lock to use.
  */
 int
-altq_add(struct pf_altq *a)
+altq_add(struct ifnet *ifp, struct pf_altq *a)
 {
 	int error = 0;
 
@@ -565,27 +535,27 @@ altq_add(struct pf_altq *a)
 	switch (a->scheduler) {
 #ifdef ALTQ_CBQ
 	case ALTQT_CBQ:
-		error = cbq_add_altq(a);
+		error = cbq_add_altq(ifp, a);
 		break;
 #endif
 #ifdef ALTQ_PRIQ
 	case ALTQT_PRIQ:
-		error = priq_add_altq(a);
+		error = priq_add_altq(ifp, a);
 		break;
 #endif
 #ifdef ALTQ_HFSC
 	case ALTQT_HFSC:
-		error = hfsc_add_altq(a);
+		error = hfsc_add_altq(ifp, a);
 		break;
 #endif
 #ifdef ALTQ_FAIRQ
         case ALTQT_FAIRQ:
-                error = fairq_add_altq(a);
+                error = fairq_add_altq(ifp, a);
                 break;
 #endif
 #ifdef ALTQ_CODEL
 	case ALTQT_CODEL:
-		error = codel_add_altq(a);
+		error = codel_add_altq(ifp, a);
 		break;
 #endif
 	default:

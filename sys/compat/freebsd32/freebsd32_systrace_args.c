@@ -11,7 +11,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 {
 	int64_t *iarg  = (int64_t *) uarg;
 	switch (sysnum) {
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 	/* nosys */
@@ -52,9 +52,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* open */
 	case 5: {
 		struct open_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->flags; /* int */
-		iarg[2] = p->mode; /* int */
+		iarg[2] = p->mode; /* mode_t */
 		*n_args = 3;
 		break;
 	}
@@ -79,21 +79,21 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 9: {
 		struct link_args *p = params;
 		uarg[0] = (intptr_t) p->path; /* char * */
-		uarg[1] = (intptr_t) p->to; /* char * */
+		uarg[1] = (intptr_t) p->to; /* const char * */
 		*n_args = 2;
 		break;
 	}
 	/* unlink */
 	case 10: {
 		struct unlink_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* chdir */
 	case 12: {
 		struct chdir_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -107,15 +107,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* chmod */
 	case 15: {
 		struct chmod_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
-		iarg[1] = p->mode; /* int */
+		uarg[0] = (intptr_t) p->path; /* const char * */
+		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
 	}
 	/* chown */
 	case 16: {
 		struct chown_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->uid; /* int */
 		iarg[2] = p->gid; /* int */
 		*n_args = 3;
@@ -136,17 +136,17 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* mount */
 	case 21: {
 		struct mount_args *p = params;
-		uarg[0] = (intptr_t) p->type; /* char * */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->type; /* const char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		iarg[2] = p->flags; /* int */
-		uarg[3] = (intptr_t) p->data; /* caddr_t */
+		uarg[3] = (intptr_t) p->data; /* void * */
 		*n_args = 4;
 		break;
 	}
 	/* unmount */
 	case 22: {
 		struct unmount_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->flags; /* int */
 		*n_args = 2;
 		break;
@@ -200,10 +200,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 29: {
 		struct freebsd32_recvfrom_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = p->buf; /* uint32_t */
+		uarg[1] = (intptr_t) p->buf; /* void * */
 		uarg[2] = p->len; /* uint32_t */
 		iarg[3] = p->flags; /* int */
-		uarg[4] = p->from; /* uint32_t */
+		uarg[4] = (intptr_t) p->from; /* struct sockaddr * */
 		uarg[5] = p->fromlenaddr; /* uint32_t */
 		*n_args = 6;
 		break;
@@ -212,7 +212,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 30: {
 		struct accept_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->name; /* caddr_t */
+		uarg[1] = (intptr_t) p->name; /* struct sockaddr * */
 		uarg[2] = (intptr_t) p->anamelen; /* int * */
 		*n_args = 3;
 		break;
@@ -221,7 +221,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 31: {
 		struct getpeername_args *p = params;
 		iarg[0] = p->fdes; /* int */
-		uarg[1] = (intptr_t) p->asa; /* caddr_t */
+		uarg[1] = (intptr_t) p->asa; /* struct sockaddr * */
 		uarg[2] = (intptr_t) p->alen; /* int * */
 		*n_args = 3;
 		break;
@@ -230,7 +230,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 32: {
 		struct getsockname_args *p = params;
 		iarg[0] = p->fdes; /* int */
-		uarg[1] = (intptr_t) p->asa; /* caddr_t */
+		uarg[1] = (intptr_t) p->asa; /* struct sockaddr * */
 		uarg[2] = (intptr_t) p->alen; /* int * */
 		*n_args = 3;
 		break;
@@ -238,7 +238,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* access */
 	case 33: {
 		struct access_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->amode; /* int */
 		*n_args = 2;
 		break;
@@ -292,7 +292,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* profil */
 	case 44: {
 		struct profil_args *p = params;
-		uarg[0] = (intptr_t) p->samples; /* caddr_t */
+		uarg[0] = (intptr_t) p->samples; /* char * */
 		uarg[1] = p->size; /* size_t */
 		uarg[2] = p->offset; /* size_t */
 		uarg[3] = p->scale; /* u_int */
@@ -325,14 +325,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* setlogin */
 	case 50: {
 		struct setlogin_args *p = params;
-		uarg[0] = (intptr_t) p->namebuf; /* char * */
+		uarg[0] = (intptr_t) p->namebuf; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* acct */
 	case 51: {
 		struct acct_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -363,22 +363,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* revoke */
 	case 56: {
 		struct revoke_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* symlink */
 	case 57: {
 		struct symlink_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
-		uarg[1] = (intptr_t) p->link; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
+		uarg[1] = (intptr_t) p->link; /* const char * */
 		*n_args = 2;
 		break;
 	}
 	/* readlink */
 	case 58: {
 		struct readlink_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		uarg[1] = (intptr_t) p->buf; /* char * */
 		uarg[2] = p->count; /* size_t */
 		*n_args = 3;
@@ -387,7 +387,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_execve */
 	case 59: {
 		struct freebsd32_execve_args *p = params;
-		uarg[0] = (intptr_t) p->fname; /* char * */
+		uarg[0] = (intptr_t) p->fname; /* const char * */
 		uarg[1] = (intptr_t) p->argv; /* uint32_t * */
 		uarg[2] = (intptr_t) p->envv; /* uint32_t * */
 		*n_args = 3;
@@ -396,14 +396,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* umask */
 	case 60: {
 		struct umask_args *p = params;
-		iarg[0] = p->newmask; /* int */
+		iarg[0] = p->newmask; /* mode_t */
 		*n_args = 1;
 		break;
 	}
 	/* chroot */
 	case 61: {
 		struct chroot_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -511,7 +511,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* swapon */
 	case 85: {
 		struct swapon_args *p = params;
-		uarg[0] = (intptr_t) p->name; /* char * */
+		uarg[0] = (intptr_t) p->name; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -585,7 +585,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 98: {
 		struct connect_args *p = params;
 		iarg[0] = p->s; /* int */
-		iarg[1] = p->name; /* const struct sockaddr */
+		uarg[1] = (intptr_t) p->name; /* const struct sockaddr * */
 		iarg[2] = p->namelen; /* int */
 		*n_args = 3;
 		break;
@@ -613,7 +613,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->s; /* int */
 		iarg[1] = p->level; /* int */
 		iarg[2] = p->name; /* int */
-		uarg[3] = (intptr_t) p->val; /* caddr_t */
+		uarg[3] = (intptr_t) p->val; /* const void * */
 		iarg[4] = p->valsize; /* int */
 		*n_args = 5;
 		break;
@@ -648,7 +648,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->s; /* int */
 		iarg[1] = p->level; /* int */
 		iarg[2] = p->name; /* int */
-		uarg[3] = (intptr_t) p->val; /* caddr_t */
+		uarg[3] = (intptr_t) p->val; /* void * */
 		uarg[4] = (intptr_t) p->avalsize; /* int * */
 		*n_args = 5;
 		break;
@@ -692,7 +692,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 124: {
 		struct fchmod_args *p = params;
 		iarg[0] = p->fd; /* int */
-		iarg[1] = p->mode; /* int */
+		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
 	}
@@ -715,8 +715,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* rename */
 	case 128: {
 		struct rename_args *p = params;
-		uarg[0] = (intptr_t) p->from; /* char * */
-		uarg[1] = (intptr_t) p->to; /* char * */
+		uarg[0] = (intptr_t) p->from; /* const char * */
+		uarg[1] = (intptr_t) p->to; /* const char * */
 		*n_args = 2;
 		break;
 	}
@@ -731,8 +731,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* mkfifo */
 	case 132: {
 		struct mkfifo_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
-		iarg[1] = p->mode; /* int */
+		uarg[0] = (intptr_t) p->path; /* const char * */
+		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
 	}
@@ -740,10 +740,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 133: {
 		struct sendto_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->buf; /* caddr_t */
+		uarg[1] = (intptr_t) p->buf; /* const void * */
 		uarg[2] = p->len; /* size_t */
 		iarg[3] = p->flags; /* int */
-		uarg[4] = (intptr_t) p->to; /* struct sockaddr * */
+		uarg[4] = (intptr_t) p->to; /* const struct sockaddr * */
 		iarg[5] = p->tolen; /* int */
 		*n_args = 6;
 		break;
@@ -769,22 +769,22 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* mkdir */
 	case 136: {
 		struct mkdir_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
-		iarg[1] = p->mode; /* int */
+		uarg[0] = (intptr_t) p->path; /* const char * */
+		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
 	}
 	/* rmdir */
 	case 137: {
 		struct rmdir_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
 	/* freebsd32_utimes */
 	case 138: {
 		struct freebsd32_utimes_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		uarg[1] = (intptr_t) p->tptr; /* struct timeval32 * */
 		*n_args = 2;
 		break;
@@ -805,17 +805,17 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* quotactl */
 	case 148: {
 		struct quotactl_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->cmd; /* int */
 		iarg[2] = p->uid; /* int */
-		uarg[3] = (intptr_t) p->arg; /* caddr_t */
+		uarg[3] = (intptr_t) p->arg; /* void * */
 		*n_args = 4;
 		break;
 	}
 	/* getfh */
 	case 161: {
 		struct getfh_args *p = params;
-		uarg[0] = (intptr_t) p->fname; /* char * */
+		uarg[0] = (intptr_t) p->fname; /* const char * */
 		uarg[1] = (intptr_t) p->fhp; /* struct fhandle * */
 		*n_args = 2;
 		break;
@@ -901,7 +901,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* pathconf */
 	case 191: {
 		struct pathconf_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->name; /* int */
 		*n_args = 2;
 		break;
@@ -935,14 +935,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 0;
 		break;
 	}
-	/* freebsd32_sysctl */
+	/* freebsd32___sysctl */
 	case 202: {
-		struct freebsd32_sysctl_args *p = params;
+		struct freebsd32___sysctl_args *p = params;
 		uarg[0] = (intptr_t) p->name; /* int * */
 		uarg[1] = p->namelen; /* u_int */
 		uarg[2] = (intptr_t) p->old; /* void * */
 		uarg[3] = (intptr_t) p->oldlenp; /* uint32_t * */
-		uarg[4] = (intptr_t) p->new; /* void * */
+		uarg[4] = (intptr_t) p->new; /* const void * */
 		uarg[5] = p->newlen; /* uint32_t */
 		*n_args = 6;
 		break;
@@ -966,7 +966,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* undelete */
 	case 205: {
 		struct undelete_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
@@ -1254,7 +1254,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* lchown */
 	case 254: {
 		struct lchown_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->uid; /* int */
 		iarg[2] = p->gid; /* int */
 		*n_args = 3;
@@ -1297,7 +1297,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* lchmod */
 	case 274: {
 		struct lchmod_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->mode; /* mode_t */
 		*n_args = 2;
 		break;
@@ -1305,7 +1305,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_lutimes */
 	case 276: {
 		struct freebsd32_lutimes_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		uarg[1] = (intptr_t) p->tptr; /* struct timeval32 * */
 		*n_args = 2;
 		break;
@@ -1800,7 +1800,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* eaccess */
 	case 376: {
 		struct eaccess_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->amode; /* int */
 		*n_args = 2;
 		break;
@@ -1966,29 +1966,29 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_sigreturn */
 	case 417: {
 		struct freebsd32_sigreturn_args *p = params;
-		uarg[0] = (intptr_t) p->sigcntxp; /* const struct freebsd32_ucontext * */
+		uarg[0] = (intptr_t) p->sigcntxp; /* const struct __ucontext32 * */
 		*n_args = 1;
 		break;
 	}
 	/* freebsd32_getcontext */
 	case 421: {
 		struct freebsd32_getcontext_args *p = params;
-		uarg[0] = (intptr_t) p->ucp; /* struct freebsd32_ucontext * */
+		uarg[0] = (intptr_t) p->ucp; /* struct __ucontext32 * */
 		*n_args = 1;
 		break;
 	}
 	/* freebsd32_setcontext */
 	case 422: {
 		struct freebsd32_setcontext_args *p = params;
-		uarg[0] = (intptr_t) p->ucp; /* const struct freebsd32_ucontext * */
+		uarg[0] = (intptr_t) p->ucp; /* const struct __ucontext32 * */
 		*n_args = 1;
 		break;
 	}
 	/* freebsd32_swapcontext */
 	case 423: {
 		struct freebsd32_swapcontext_args *p = params;
-		uarg[0] = (intptr_t) p->oucp; /* struct freebsd32_ucontext * */
-		uarg[1] = (intptr_t) p->ucp; /* const struct freebsd32_ucontext * */
+		uarg[0] = (intptr_t) p->oucp; /* struct __ucontext32 * */
+		uarg[1] = (intptr_t) p->ucp; /* const struct __ucontext32 * */
 		*n_args = 2;
 		break;
 	}
@@ -2188,13 +2188,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* auditctl */
 	case 453: {
 		struct auditctl_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		*n_args = 1;
 		break;
 	}
-	/* freebsd32_umtx_op */
+	/* freebsd32__umtx_op */
 	case 454: {
-		struct freebsd32_umtx_op_args *p = params;
+		struct freebsd32__umtx_op_args *p = params;
 		uarg[0] = (intptr_t) p->obj; /* void * */
 		iarg[1] = p->op; /* int */
 		uarg[2] = p->val; /* u_long */
@@ -2322,9 +2322,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 472: {
 		struct sctp_generic_sendmsg_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->msg; /* caddr_t */
+		uarg[1] = (intptr_t) p->msg; /* void * */
 		iarg[2] = p->mlen; /* int */
-		uarg[3] = (intptr_t) p->to; /* caddr_t */
+		uarg[3] = (intptr_t) p->to; /* struct sockaddr * */
 		iarg[4] = p->tolen; /* __socklen_t */
 		uarg[5] = (intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * */
 		iarg[6] = p->flags; /* int */
@@ -2337,7 +2337,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->sd; /* int */
 		uarg[1] = (intptr_t) p->iov; /* struct iovec * */
 		iarg[2] = p->iovlen; /* int */
-		uarg[3] = (intptr_t) p->to; /* caddr_t */
+		uarg[3] = (intptr_t) p->to; /* struct sockaddr * */
 		iarg[4] = p->tolen; /* __socklen_t */
 		uarg[5] = (intptr_t) p->sinfo; /* struct sctp_sndrcvinfo * */
 		iarg[6] = p->flags; /* int */
@@ -2385,7 +2385,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_mmap */
 	case 477: {
 		struct freebsd32_mmap_args *p = params;
-		uarg[0] = (intptr_t) p->addr; /* caddr_t */
+		uarg[0] = (intptr_t) p->addr; /* void * */
 		uarg[1] = p->len; /* size_t */
 		iarg[2] = p->prot; /* int */
 		iarg[3] = p->flags; /* int */
@@ -2410,7 +2410,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_truncate */
 	case 479: {
 		struct freebsd32_truncate_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->pad; /* int */
 		uarg[2] = p->length1; /* uint32_t */
 		uarg[3] = p->length2; /* uint32_t */
@@ -2453,7 +2453,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_mmap */
 	case 477: {
 		struct freebsd32_mmap_args *p = params;
-		uarg[0] = (intptr_t) p->addr; /* caddr_t */
+		uarg[0] = (intptr_t) p->addr; /* void * */
 		uarg[1] = p->len; /* size_t */
 		iarg[2] = p->prot; /* int */
 		iarg[3] = p->flags; /* int */
@@ -2476,7 +2476,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_truncate */
 	case 479: {
 		struct freebsd32_truncate_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		uarg[1] = p->length1; /* uint32_t */
 		uarg[2] = p->length2; /* uint32_t */
 		*n_args = 3;
@@ -2587,7 +2587,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 489: {
 		struct faccessat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		iarg[2] = p->amode; /* int */
 		iarg[3] = p->flag; /* int */
 		*n_args = 4;
@@ -2607,7 +2607,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 491: {
 		struct fchownat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		uarg[2] = p->uid; /* uid_t */
 		iarg[3] = p->gid; /* gid_t */
 		iarg[4] = p->flag; /* int */
@@ -2627,7 +2627,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 494: {
 		struct freebsd32_futimesat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		uarg[2] = (intptr_t) p->times; /* struct timeval * */
 		*n_args = 3;
 		break;
@@ -2636,9 +2636,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 495: {
 		struct linkat_args *p = params;
 		iarg[0] = p->fd1; /* int */
-		uarg[1] = (intptr_t) p->path1; /* char * */
+		uarg[1] = (intptr_t) p->path1; /* const char * */
 		iarg[2] = p->fd2; /* int */
-		uarg[3] = (intptr_t) p->path2; /* char * */
+		uarg[3] = (intptr_t) p->path2; /* const char * */
 		iarg[4] = p->flag; /* int */
 		*n_args = 5;
 		break;
@@ -2647,7 +2647,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 496: {
 		struct mkdirat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		iarg[2] = p->mode; /* mode_t */
 		*n_args = 3;
 		break;
@@ -2656,7 +2656,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 497: {
 		struct mkfifoat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		iarg[2] = p->mode; /* mode_t */
 		*n_args = 3;
 		break;
@@ -2665,7 +2665,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 499: {
 		struct openat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		iarg[2] = p->flag; /* int */
 		iarg[3] = p->mode; /* mode_t */
 		*n_args = 4;
@@ -2675,7 +2675,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 500: {
 		struct readlinkat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		uarg[2] = (intptr_t) p->buf; /* char * */
 		uarg[3] = p->bufsize; /* size_t */
 		*n_args = 4;
@@ -2685,7 +2685,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 501: {
 		struct renameat_args *p = params;
 		iarg[0] = p->oldfd; /* int */
-		uarg[1] = (intptr_t) p->old; /* char * */
+		uarg[1] = (intptr_t) p->old; /* const char * */
 		iarg[2] = p->newfd; /* int */
 		uarg[3] = (intptr_t) p->new; /* const char * */
 		*n_args = 4;
@@ -2694,9 +2694,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* symlinkat */
 	case 502: {
 		struct symlinkat_args *p = params;
-		uarg[0] = (intptr_t) p->path1; /* char * */
+		uarg[0] = (intptr_t) p->path1; /* const char * */
 		iarg[1] = p->fd; /* int */
-		uarg[2] = (intptr_t) p->path2; /* char * */
+		uarg[2] = (intptr_t) p->path2; /* const char * */
 		*n_args = 3;
 		break;
 	}
@@ -2704,7 +2704,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 503: {
 		struct unlinkat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		iarg[2] = p->flag; /* int */
 		*n_args = 3;
 		break;
@@ -2786,7 +2786,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* lpathconf */
 	case 513: {
 		struct lpathconf_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		iarg[1] = p->name; /* int */
 		*n_args = 2;
 		break;
@@ -3048,7 +3048,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct connectat_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->s; /* int */
-		iarg[2] = p->name; /* const struct sockaddr */
+		uarg[2] = (intptr_t) p->name; /* const struct sockaddr * */
 		iarg[3] = p->namelen; /* int */
 		*n_args = 4;
 		break;
@@ -3136,7 +3136,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 547: {
 		struct freebsd32_utimensat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		uarg[2] = (intptr_t) p->times; /* struct timespec * */
 		iarg[3] = p->flag; /* int */
 		*n_args = 4;
@@ -3161,7 +3161,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 552: {
 		struct freebsd32_fstatat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		uarg[2] = (intptr_t) p->buf; /* struct stat32 * */
 		iarg[3] = p->flag; /* int */
 		*n_args = 4;
@@ -3188,7 +3188,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* statfs */
 	case 555: {
 		struct statfs_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* char * */
+		uarg[0] = (intptr_t) p->path; /* const char * */
 		uarg[1] = (intptr_t) p->buf; /* struct statfs32 * */
 		*n_args = 2;
 		break;
@@ -3218,16 +3218,32 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 2;
 		break;
 	}
-	/* mknodat */
+#ifdef PAD64_REQUIRED
+	/* freebsd32_mknodat */
 	case 559: {
-		struct mknodat_args *p = params;
+		struct freebsd32_mknodat_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[1] = (intptr_t) p->path; /* const char * */
 		iarg[2] = p->mode; /* mode_t */
-		iarg[3] = p->dev; /* dev_t */
-		*n_args = 4;
+		iarg[3] = p->pad; /* int */
+		uarg[4] = p->dev1; /* uint32_t */
+		uarg[5] = p->dev2; /* uint32_t */
+		*n_args = 6;
 		break;
 	}
+#else
+	/* freebsd32_mknodat */
+	case 559: {
+		struct freebsd32_mknodat_args *p = params;
+		iarg[0] = p->fd; /* int */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		iarg[2] = p->mode; /* mode_t */
+		uarg[3] = p->dev1; /* uint32_t */
+		uarg[4] = p->dev2; /* uint32_t */
+		*n_args = 5;
+		break;
+	}
+#endif
 	/* freebsd32_kevent */
 	case 560: {
 		struct freebsd32_kevent_args *p = params;
@@ -3275,6 +3291,52 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* getfhat */
+	case 564: {
+		struct getfhat_args *p = params;
+		iarg[0] = p->fd; /* int */
+		uarg[1] = (intptr_t) p->path; /* char * */
+		uarg[2] = (intptr_t) p->fhp; /* struct fhandle * */
+		iarg[3] = p->flags; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* fhlink */
+	case 565: {
+		struct fhlink_args *p = params;
+		uarg[0] = (intptr_t) p->fhp; /* struct fhandle * */
+		uarg[1] = (intptr_t) p->to; /* const char * */
+		*n_args = 2;
+		break;
+	}
+	/* fhlinkat */
+	case 566: {
+		struct fhlinkat_args *p = params;
+		uarg[0] = (intptr_t) p->fhp; /* struct fhandle * */
+		iarg[1] = p->tofd; /* int */
+		uarg[2] = (intptr_t) p->to; /* const char * */
+		*n_args = 3;
+		break;
+	}
+	/* fhreadlink */
+	case 567: {
+		struct fhreadlink_args *p = params;
+		uarg[0] = (intptr_t) p->fhp; /* struct fhandle * */
+		uarg[1] = (intptr_t) p->buf; /* char * */
+		uarg[2] = p->bufsize; /* size_t */
+		*n_args = 3;
+		break;
+	}
+	/* funlinkat */
+	case 568: {
+		struct funlinkat_args *p = params;
+		iarg[0] = p->dfd; /* int */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		iarg[2] = p->fd; /* int */
+		iarg[3] = p->flag; /* int */
+		*n_args = 4;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -3285,7 +3347,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 {
 	const char *p = NULL;
 	switch (sysnum) {
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 	/* nosys */
@@ -3340,13 +3402,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 5:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -3388,7 +3450,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland char *";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -3398,7 +3460,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 10:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -3408,7 +3470,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 12:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -3428,10 +3490,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 15:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -3441,7 +3503,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 16:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -3470,16 +3532,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 21:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "caddr_t";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -3489,7 +3551,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 22:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -3572,7 +3634,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "uint32_t";
+			p = "userland void *";
 			break;
 		case 2:
 			p = "uint32_t";
@@ -3581,7 +3643,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 4:
-			p = "uint32_t";
+			p = "userland struct sockaddr *";
 			break;
 		case 5:
 			p = "uint32_t";
@@ -3597,7 +3659,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "userland struct sockaddr *";
 			break;
 		case 2:
 			p = "userland int *";
@@ -3613,7 +3675,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "userland struct sockaddr *";
 			break;
 		case 2:
 			p = "userland int *";
@@ -3629,7 +3691,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "userland struct sockaddr *";
 			break;
 		case 2:
 			p = "userland int *";
@@ -3642,7 +3704,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 33:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -3713,7 +3775,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 44:
 		switch(ndx) {
 		case 0:
-			p = "caddr_t";
+			p = "userland char *";
 			break;
 		case 1:
 			p = "size_t";
@@ -3767,7 +3829,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 50:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -3777,7 +3839,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 51:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -3826,7 +3888,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 56:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -3836,10 +3898,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 57:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -3849,7 +3911,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 58:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "userland char *";
@@ -3865,7 +3927,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 59:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "userland uint32_t *";
@@ -3881,7 +3943,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 60:
 		switch(ndx) {
 		case 0:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -3891,7 +3953,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 61:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4059,7 +4121,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 85:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4181,7 +4243,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "const struct sockaddr";
+			p = "userland const struct sockaddr *";
 			break;
 		case 2:
 			p = "int";
@@ -4232,7 +4294,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "caddr_t";
+			p = "userland const void *";
 			break;
 		case 4:
 			p = "int";
@@ -4293,7 +4355,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "caddr_t";
+			p = "userland void *";
 			break;
 		case 4:
 			p = "userland int *";
@@ -4370,7 +4432,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -4406,10 +4468,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 128:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4432,10 +4494,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 132:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -4448,7 +4510,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "userland const void *";
 			break;
 		case 2:
 			p = "size_t";
@@ -4457,7 +4519,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 4:
-			p = "userland struct sockaddr *";
+			p = "userland const struct sockaddr *";
 			break;
 		case 5:
 			p = "int";
@@ -4502,10 +4564,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 136:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
-			p = "int";
+			p = "mode_t";
 			break;
 		default:
 			break;
@@ -4515,7 +4577,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 137:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -4525,7 +4587,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 138:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "userland struct timeval32 *";
@@ -4554,7 +4616,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 148:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -4563,7 +4625,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "caddr_t";
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -4573,7 +4635,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 161:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "userland struct fhandle *";
@@ -4721,7 +4783,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 191:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -4772,7 +4834,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* nosys */
 	case 198:
 		break;
-	/* freebsd32_sysctl */
+	/* freebsd32___sysctl */
 	case 202:
 		switch(ndx) {
 		case 0:
@@ -4788,7 +4850,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland uint32_t *";
 			break;
 		case 4:
-			p = "userland void *";
+			p = "userland const void *";
 			break;
 		case 5:
 			p = "uint32_t";
@@ -4827,7 +4889,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 205:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -5251,7 +5313,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 254:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -5325,7 +5387,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 274:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "mode_t";
@@ -5338,7 +5400,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 276:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "userland struct timeval32 *";
@@ -6148,7 +6210,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 376:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -6437,7 +6499,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 417:
 		switch(ndx) {
 		case 0:
-			p = "userland const struct freebsd32_ucontext *";
+			p = "userland const struct __ucontext32 *";
 			break;
 		default:
 			break;
@@ -6447,7 +6509,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 421:
 		switch(ndx) {
 		case 0:
-			p = "userland struct freebsd32_ucontext *";
+			p = "userland struct __ucontext32 *";
 			break;
 		default:
 			break;
@@ -6457,7 +6519,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 422:
 		switch(ndx) {
 		case 0:
-			p = "userland const struct freebsd32_ucontext *";
+			p = "userland const struct __ucontext32 *";
 			break;
 		default:
 			break;
@@ -6467,10 +6529,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 423:
 		switch(ndx) {
 		case 0:
-			p = "userland struct freebsd32_ucontext *";
+			p = "userland struct __ucontext32 *";
 			break;
 		case 1:
-			p = "userland const struct freebsd32_ucontext *";
+			p = "userland const struct __ucontext32 *";
 			break;
 		default:
 			break;
@@ -6795,13 +6857,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 453:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
 		};
 		break;
-	/* freebsd32_umtx_op */
+	/* freebsd32__umtx_op */
 	case 454:
 		switch(ndx) {
 		case 0:
@@ -7032,13 +7094,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "caddr_t";
+			p = "userland void *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "caddr_t";
+			p = "userland struct sockaddr *";
 			break;
 		case 4:
 			p = "__socklen_t";
@@ -7066,7 +7128,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "caddr_t";
+			p = "userland struct sockaddr *";
 			break;
 		case 4:
 			p = "__socklen_t";
@@ -7164,7 +7226,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 477:
 		switch(ndx) {
 		case 0:
-			p = "caddr_t";
+			p = "userland void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -7217,7 +7279,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 479:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -7300,7 +7362,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 477:
 		switch(ndx) {
 		case 0:
-			p = "caddr_t";
+			p = "userland void *";
 			break;
 		case 1:
 			p = "size_t";
@@ -7347,7 +7409,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 479:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "uint32_t";
@@ -7551,7 +7613,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
@@ -7589,7 +7651,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "uid_t";
@@ -7627,7 +7689,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "userland struct timeval *";
@@ -7643,13 +7705,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 4:
 			p = "int";
@@ -7665,7 +7727,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "mode_t";
@@ -7681,7 +7743,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "mode_t";
@@ -7697,7 +7759,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
@@ -7716,7 +7778,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "userland char *";
@@ -7735,7 +7797,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
@@ -7751,13 +7813,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 502:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
 			break;
 		case 2:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		default:
 			break;
@@ -7770,7 +7832,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "int";
@@ -7906,7 +7968,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 513:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "int";
@@ -8388,7 +8450,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "const struct sockaddr";
+			p = "userland const struct sockaddr *";
 			break;
 		case 3:
 			p = "int";
@@ -8547,7 +8609,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "userland struct timespec *";
@@ -8589,7 +8651,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "userland struct stat32 *";
@@ -8637,7 +8699,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 555:
 		switch(ndx) {
 		case 0:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 1:
 			p = "userland struct statfs32 *";
@@ -8688,25 +8750,56 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* mknodat */
+#ifdef PAD64_REQUIRED
+	/* freebsd32_mknodat */
 	case 559:
 		switch(ndx) {
 		case 0:
 			p = "int";
 			break;
 		case 1:
-			p = "userland char *";
+			p = "userland const char *";
 			break;
 		case 2:
 			p = "mode_t";
 			break;
 		case 3:
-			p = "dev_t";
+			p = "int";
+			break;
+		case 4:
+			p = "uint32_t";
+			break;
+		case 5:
+			p = "uint32_t";
 			break;
 		default:
 			break;
 		};
 		break;
+#else
+	/* freebsd32_mknodat */
+	case 559:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "mode_t";
+			break;
+		case 3:
+			p = "uint32_t";
+			break;
+		case 4:
+			p = "uint32_t";
+			break;
+		default:
+			break;
+		};
+		break;
+#endif
 	/* freebsd32_kevent */
 	case 560:
 		switch(ndx) {
@@ -8804,6 +8897,89 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* getfhat */
+	case 564:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland char *";
+			break;
+		case 2:
+			p = "userland struct fhandle *";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fhlink */
+	case 565:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle *";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fhlinkat */
+	case 566:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle *";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "userland const char *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* fhreadlink */
+	case 567:
+		switch(ndx) {
+		case 0:
+			p = "userland struct fhandle *";
+			break;
+		case 1:
+			p = "userland char *";
+			break;
+		case 2:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* funlinkat */
+	case 568:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -8815,7 +8991,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 {
 	const char *p = NULL;
 	switch (sysnum) {
-#if !defined(PAD64_REQUIRED) && (defined(__powerpc__) || defined(__mips__))
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
 	/* nosys */
@@ -8885,7 +9061,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* break */
 	case 17:
 		if (ndx == 0 || ndx == 1)
-			p = "caddr_t";
+			p = "void *";
 		break;
 	/* getpid */
 	case 20:
@@ -9351,7 +9527,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* nosys */
 	case 198:
-	/* freebsd32_sysctl */
+	/* freebsd32___sysctl */
 	case 202:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -9434,7 +9610,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* shmat */
 	case 228:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "void *";
 		break;
 	/* shmdt */
 	case 230:
@@ -10091,7 +10267,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* freebsd32_umtx_op */
+	/* freebsd32__umtx_op */
 	case 454:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
@@ -10190,7 +10366,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* freebsd32_mmap */
 	case 477:
 		if (ndx == 0 || ndx == 1)
-			p = "caddr_t";
+			p = "void *";
 		break;
 	/* freebsd32_lseek */
 	case 478:
@@ -10221,7 +10397,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* freebsd32_mmap */
 	case 477:
 		if (ndx == 0 || ndx == 1)
-			p = "caddr_t";
+			p = "void *";
 		break;
 	/* freebsd32_lseek */
 	case 478:
@@ -10335,7 +10511,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* readlinkat */
 	case 500:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "ssize_t";
 		break;
 	/* renameat */
 	case 501:
@@ -10630,11 +10806,19 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* mknodat */
+#ifdef PAD64_REQUIRED
+	/* freebsd32_mknodat */
 	case 559:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
+#else
+	/* freebsd32_mknodat */
+	case 559:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+#endif
 	/* freebsd32_kevent */
 	case 560:
 		if (ndx == 0 || ndx == 1)
@@ -10652,6 +10836,31 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* getrandom */
 	case 563:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* getfhat */
+	case 564:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fhlink */
+	case 565:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fhlinkat */
+	case 566:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* fhreadlink */
+	case 567:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* funlinkat */
+	case 568:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

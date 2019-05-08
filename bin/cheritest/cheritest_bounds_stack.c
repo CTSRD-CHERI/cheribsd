@@ -88,7 +88,7 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 static void
 test_bounds_stack_alloca(size_t len)
 {
-	void * __capability c = (void * __capability)alloca(len);
+	void * __capability c = (__cheri_tocap void * __capability)alloca(len);
 
 	test_bounds_precise(c, len);
 }
@@ -97,7 +97,7 @@ void
 test_bounds_stack_static_uint8(const struct cheri_test *ctp __unused)
 {
 	uint8_t u8;
-	__capability uint8_t *u8p = (__capability uint8_t *)&u8;
+	uint8_t * __capability u8p = (__cheri_tocap uint8_t * __capability)&u8;
 
 	test_bounds_precise(u8p, sizeof(*u8p));
 }
@@ -113,7 +113,7 @@ void
 test_bounds_stack_static_uint16(const struct cheri_test *ctp __unused)
 {
 	uint16_t u16;
-	__capability uint16_t *u16p = (__capability uint16_t *)&u16;
+	uint16_t * __capability u16p = (__cheri_tocap uint16_t * __capability)&u16;
 
 	test_bounds_precise(u16p, sizeof(*u16p));
 }
@@ -129,7 +129,7 @@ void
 test_bounds_stack_static_uint32(const struct cheri_test *ctp __unused)
 {
 	uint32_t u32;
-	__capability uint32_t *u32p = (__capability uint32_t *)&u32;
+	uint32_t * __capability u32p = (__cheri_tocap uint32_t * __capability)&u32;
 
 	test_bounds_precise(u32p, sizeof(*u32p));
 }
@@ -145,7 +145,7 @@ void
 test_bounds_stack_static_uint64(const struct cheri_test *ctp __unused)
 {
 	uint64_t u64;
-	__capability uint64_t *u64p = (__capability uint64_t *)&u64;
+	uint64_t * __capability u64p = (__cheri_tocap uint64_t * __capability)&u64;
 
 	test_bounds_precise(u64p, sizeof(*u64p));
 }
@@ -162,7 +162,7 @@ test_bounds_stack_static_cap(const struct cheri_test *ctp __unused)
 {
 	void * __capability c;
 	void * __capability * __capability cp =
-	    (void * __capability * __capability)&c;
+	    (__cheri_tocap void * __capability * __capability)&c;
 
 	test_bounds_precise(cp, sizeof(*cp));
 }
@@ -183,7 +183,7 @@ void
 test_bounds_stack_static_16(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[16];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -199,7 +199,7 @@ void
 test_bounds_stack_static_32(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[32];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -215,7 +215,7 @@ void
 test_bounds_stack_static_64(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[64];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -231,7 +231,7 @@ void
 test_bounds_stack_static_128(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[128];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -247,7 +247,7 @@ void
 test_bounds_stack_static_256(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[256];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -263,7 +263,7 @@ void
 test_bounds_stack_static_512(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[512];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -279,7 +279,7 @@ void
 test_bounds_stack_static_1024(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[1024];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -295,7 +295,7 @@ void
 test_bounds_stack_static_2048(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[2048];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -311,7 +311,7 @@ void
 test_bounds_stack_static_4096(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[4096];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -327,7 +327,7 @@ void
 test_bounds_stack_static_8192(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[8192];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -343,7 +343,7 @@ void
 test_bounds_stack_static_16384(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[16384];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -359,7 +359,7 @@ void
 test_bounds_stack_static_32768(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[32768];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -375,7 +375,7 @@ void
 test_bounds_stack_static_65536(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[65536];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -391,7 +391,7 @@ void
 test_bounds_stack_static_131072(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[131072];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -407,7 +407,7 @@ void
 test_bounds_stack_static_262144(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[262144];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -423,7 +423,7 @@ void
 test_bounds_stack_static_524288(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[524288];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }
@@ -439,7 +439,7 @@ void
 test_bounds_stack_static_1048576(const struct cheri_test *ctp __unused)
 {
 	uint8_t array[1048576];
-	__capability uint8_t *arrayp = (__capability uint8_t *)&array;
+	uint8_t * __capability arrayp = (__cheri_tocap uint8_t * __capability)&array[0];
 
 	test_bounds_precise(arrayp, sizeof(array));
 }

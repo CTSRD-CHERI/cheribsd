@@ -91,8 +91,8 @@ libcheri_system_new(struct sandbox_object *sbop,
 	 * Set up vector pointer, remove sealing, point at tranpoline?
 	 */
 	invoke_pcc = cheri_getpcc();
-	invoke_pcc = cheri_setoffset(invoke_pcc,
-	    (register_t)LIBCHERI_CLASS_ENTRY(libcheri_system));
+	invoke_pcc = cheri_setaddress(
+	    invoke_pcc, (register_t)LIBCHERI_CLASS_ENTRY(libcheri_system));
 
 	return (sandbox_object_new_system_object(
 	    (__cheri_tocap void * __capability)(void *)sbop, invoke_pcc,

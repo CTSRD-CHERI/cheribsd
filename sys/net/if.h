@@ -271,6 +271,7 @@ struct if_msghdr {
 	int	ifm_addrs;	/* like rtm_addrs */
 	int	ifm_flags;	/* value of if_flags */
 	u_short	ifm_index;	/* index for associated ifp */
+	u_short	_ifm_spare1;
 	struct	if_data ifm_data;/* statistics and other data about if */
 };
 
@@ -296,6 +297,7 @@ struct if_msghdrl {
 	u_short _ifm_spare1;	/* spare space to grow if_index, see if_var.h */
 	u_short	ifm_len;	/* length of if_msghdrl incl. if_data */
 	u_short	ifm_data_off;	/* offset of if_data from beginning */
+	int	_ifm_spare2;
 	struct	if_data ifm_data;/* statistics and other data about if */
 };
 
@@ -311,6 +313,7 @@ struct ifa_msghdr {
 	int	ifam_addrs;	/* like rtm_addrs */
 	int	ifam_flags;	/* value of ifa_flags */
 	u_short	ifam_index;	/* index for associated ifp */
+	u_short	_ifam_spare1;
 	int	ifam_metric;	/* value of ifa_ifp->if_metric */
 };
 
@@ -352,6 +355,7 @@ struct ifma_msghdr {
 	int	ifmam_addrs;	/* like rtm_addrs */
 	int	ifmam_flags;	/* value of ifa_flags */
 	u_short	ifmam_index;	/* index for associated ifp */
+	u_short	_ifmam_spare1;
 };
 
 /*
@@ -518,8 +522,8 @@ struct ifstat {
 struct	ifconf {
 	int	ifc_len;		/* size of associated buffer */
 	union {
-		caddr_t	ifcu_buf;
-		struct	ifreq *ifcu_req;
+		char * __kerncap		ifcu_buf;
+		struct ifreq * __kerncap	ifcu_req;
 	} ifc_ifcu;
 #define	ifc_buf	ifc_ifcu.ifcu_buf	/* buffer address */
 #define	ifc_req	ifc_ifcu.ifcu_req	/* array of structures returned */
@@ -634,7 +638,7 @@ __END_DECLS
 #endif /* !_NET_IF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181121,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:net"

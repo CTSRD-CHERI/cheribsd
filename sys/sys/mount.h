@@ -554,7 +554,8 @@ struct ovfsconf {
 #define	VFCF_UNICODE	0x00200000	/* stores file names as Unicode */
 #define	VFCF_JAIL	0x00400000	/* can be mounted from within a jail */
 #define	VFCF_DELEGADMIN	0x00800000	/* supports delegated administration */
-#define	VFCF_SBDRY	0x01000000	/* defer stop requests */
+#define	VFCF_SBDRY	0x01000000	/* Stop at Boundary: defer stop requests
+					   to kernel->user (AST) transition */
 
 typedef uint32_t fsctlop_t;
 
@@ -932,11 +933,15 @@ struct iovec;
 struct stat;
 
 __BEGIN_DECLS
+int	fhlink(struct fhandle *, const char *);
+int	fhlinkat(struct fhandle *, int, const char *);
 int	fhopen(const struct fhandle *, int);
+int	fhreadlink(struct fhandle *, char *, size_t);
 int	fhstat(const struct fhandle *, struct stat *);
 int	fhstatfs(const struct fhandle *, struct statfs *);
 int	fstatfs(int, struct statfs *);
 int	getfh(const char *, fhandle_t *);
+int	getfhat(int, char *, struct fhandle *, int);
 int	getfsstat(struct statfs *, long, int);
 int	getmntinfo(struct statfs **, int);
 int	lgetfh(const char *, fhandle_t *);
@@ -954,7 +959,7 @@ __END_DECLS
 #endif /* !_SYS_MOUNT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"

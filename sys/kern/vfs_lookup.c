@@ -183,6 +183,13 @@ nameicap_tracker_add(struct nameidata *ndp, struct vnode *dp)
 
 	if ((ndp->ni_lcf & NI_LCF_CAP_DOTDOT) == 0 || dp->v_type != VDIR)
 		return;
+	if ((ndp->ni_lcf & (NI_LCF_BENEATH_ABS | NI_LCF_BENEATH_LATCHED)) ==
+	    NI_LCF_BENEATH_ABS) {
+		MPASS((ndp->ni_lcf & NI_LCF_LATCH) != 0);
+		if (dp != ndp->ni_beneath_latch)
+			return;
+		ndp->ni_lcf |= NI_LCF_BENEATH_LATCHED;
+	}
 	nt = uma_zalloc(nt_zone, M_WAITOK);
 	vhold(dp);
 	nt->dp = dp;
@@ -190,7 +197,7 @@ nameicap_tracker_add(struct nameidata *ndp, struct vnode *dp)
 }
 
 static void
-nameicap_cleanup(struct nameidata *ndp)
+nameicap_cleanup(struct nameidata *ndp, bool clean_latch)
 {
 	struct nameicap_tracker *nt, *nt1;
 
@@ -200,6 +207,10 @@ nameicap_cleanup(struct nameidata *ndp)
 		TAILQ_REMOVE(&ndp->ni_cap_tracker, nt, nm_link);
 		vdrop(nt->dp);
 		uma_zfree(nt_zone, nt);
+	}
+	if (clean_latch && (ndp->ni_lcf & NI_LCF_LATCH) != 0) {
+		ndp->ni_lcf &= ~NI_LCF_LATCH;
+		vrele(ndp->ni_beneath_latch);
 	}
 }
 
@@ -228,6 +239,11 @@ nameicap_check_dotdot(struct nameidata *ndp, struct vnode *dp)
 		if (dp == nt->dp)
 			return (0);
 	}
+	if ((ndp->ni_lcf & NI_LCF_BENEATH_ABS) != 0) {
+		ndp->ni_lcf &= ~NI_LCF_BENEATH_LATCHED;
+		nameicap_cleanup(ndp, false);
+		return (0);
+	}
 	return (ENOTCAPABLE);
 }
 
@@ -248,13 +264,17 @@ namei_handle_root(struct nameidata *ndp, struct vnode **dpp)
 	struct componentname *cnp;
 
 	cnp = &ndp->ni_cnd;
-	if ((ndp->ni_lcf & NI_LCF_STRICTRELATIVE) != 0 ||
-	    (cnp->cn_flags & BENEATH) != 0) {
+	if ((ndp->ni_lcf & NI_LCF_STRICTRELATIVE) != 0) {
 #ifdef KTRACE
 		if (KTRPOINT(curthread, KTR_CAPFAIL))
 			ktrcapfail(CAPFAIL_LOOKUP, NULL, NULL);
 #endif
 		return (ENOTCAPABLE);
+	}
+	if ((cnp->cn_flags & BENEATH) != 0) {
+		ndp->ni_lcf |= NI_LCF_BENEATH_ABS;
+		ndp->ni_lcf &= ~NI_LCF_BENEATH_LATCHED;
+		nameicap_cleanup(ndp, false);
 	}
 	while (*(cnp->cn_nameptr) == '/') {
 		cnp->cn_nameptr++;
@@ -296,6 +316,7 @@ namei(struct nameidata *ndp)
 	struct thread *td;
 	struct proc *p;
 	cap_rights_t rights;
+	struct filecaps dirfd_caps;
 	struct uio auio;
 	int error, linklen, startdir_used;
 
@@ -395,6 +416,7 @@ namei(struct nameidata *ndp)
 	dp = NULL;
 	cnp->cn_nameptr = cnp->cn_pnbuf;
 	if (cnp->cn_pnbuf[0] == '/') {
+		ndp->ni_resflags |= NIRES_ABS;
 		error = namei_handle_root(ndp, &dp);
 	} else {
 		if (ndp->ni_startdir != NULL) {
@@ -433,6 +455,23 @@ namei(struct nameidata *ndp)
 		if (error == 0 && dp->v_type != VDIR)
 			error = ENOTDIR;
 	}
+	if (error == 0 && (cnp->cn_flags & BENEATH) != 0) {
+		if (ndp->ni_dirfd == AT_FDCWD) {
+			ndp->ni_beneath_latch = fdp->fd_cdir;
+			vrefact(ndp->ni_beneath_latch);
+		} else {
+			rights = ndp->ni_rightsneeded;
+			cap_rights_set(&rights, CAP_LOOKUP);
+			error = fgetvp_rights(td, ndp->ni_dirfd, &rights,
+			    &dirfd_caps, &ndp->ni_beneath_latch);
+			if (error == 0 && dp->v_type != VDIR) {
+				vrele(ndp->ni_beneath_latch);
+				error = ENOTDIR;
+			}
+		}
+		if (error == 0)
+			ndp->ni_lcf |= NI_LCF_LATCH;
+	}
 	FILEDESC_SUNLOCK(fdp);
 	if (ndp->ni_startdir != NULL && !startdir_used)
 		vrele(ndp->ni_startdir);
@@ -441,6 +480,8 @@ namei(struct nameidata *ndp)
 			vrele(dp);
 		goto out;
 	}
+	MPASS((ndp->ni_lcf & (NI_LCF_BENEATH_ABS | NI_LCF_LATCH)) !=
+	    NI_LCF_BENEATH_ABS);
 	if (((ndp->ni_lcf & NI_LCF_STRICTRELATIVE) != 0 &&
 	    lookup_cap_dotdot != 0) ||
 	    ((ndp->ni_lcf & NI_LCF_STRICTRELATIVE) == 0 &&
@@ -462,9 +503,15 @@ namei(struct nameidata *ndp)
 				namei_cleanup_cnp(cnp);
 			} else
 				cnp->cn_flags |= HASBUF;
-			nameicap_cleanup(ndp);
-			SDT_PROBE2(vfs, namei, lookup, return, 0, ndp->ni_vp);
-			return (0);
+			if ((ndp->ni_lcf & (NI_LCF_BENEATH_ABS |
+			    NI_LCF_BENEATH_LATCHED)) == NI_LCF_BENEATH_ABS) {
+				NDFREE(ndp, 0);
+				error = ENOTCAPABLE;
+			}
+			nameicap_cleanup(ndp, true);
+			SDT_PROBE2(vfs, namei, lookup, return, error,
+			    (error == 0 ? ndp->ni_vp : NULL));
+			return (error);
 		}
 		if (ndp->ni_loopcnt++ >= MAXSYMLINKS) {
 			error = ELOOP;
@@ -534,8 +581,9 @@ namei(struct nameidata *ndp)
 	vrele(ndp->ni_dvp);
 out:
 	vrele(ndp->ni_rootdir);
+	MPASS(error != 0);
 	namei_cleanup_cnp(cnp);
-	nameicap_cleanup(ndp);
+	nameicap_cleanup(ndp, true);
 	SDT_PROBE2(vfs, namei, lookup, return, error, NULL);
 	return (error);
 }
@@ -1271,12 +1319,13 @@ NDINIT_ALL_C(struct nameidata *ndp, u_long op, u_long flags, enum uio_seg segflg
 	ndp->ni_dirp = namep;
 	ndp->ni_dirfd = dirfd;
 	ndp->ni_startdir = startdir;
+	ndp->ni_resflags = 0;
+	filecaps_init(&ndp->ni_filecaps);
+	ndp->ni_cnd.cn_thread = td;
 	if (rightsp != NULL)
 		ndp->ni_rightsneeded = *rightsp;
 	else
 		cap_rights_init(&ndp->ni_rightsneeded);
-	filecaps_init(&ndp->ni_filecaps);
-	ndp->ni_cnd.cn_thread = td;
 }
 
 /*
@@ -1449,7 +1498,7 @@ keeporig:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181127,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

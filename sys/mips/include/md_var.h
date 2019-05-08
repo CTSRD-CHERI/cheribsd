@@ -48,7 +48,11 @@ extern	int	szsigcode;
 extern	char	sigcode32[];
 extern	int	szsigcode32;
 #endif
-#if __has_feature(capabilities)
+#if defined(COMPAT_FREEBSD64)
+extern	char	freebsd64_sigcode[];
+extern	int	freebsd64_szsigcode;
+#endif
+#ifdef COMPAT_CHERIABI
 extern	char	cheri_sigcode[];
 extern	int	szcheri_sigcode;
 #endif
@@ -91,7 +95,7 @@ int	minidumpsys(struct dumperinfo *);
 #endif /* !_MACHINE_MD_VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

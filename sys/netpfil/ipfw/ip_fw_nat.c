@@ -45,7 +45,6 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
-#include <net/pfil.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
@@ -348,7 +347,7 @@ ipfw_nat(struct ip_fw_args *args, struct cfg_nat *t, struct mbuf *m)
 
 	/* Check if this is 'global' instance */
 	if (t == NULL) {
-		if (args->oif == NULL) {
+		if (args->flags & IPFW_ARGS_IN) {
 			/* Wrong direction, skip processing */
 			args->m = mcl;
 			return (IP_FW_NAT);
@@ -375,7 +374,7 @@ ipfw_nat(struct ip_fw_args *args, struct cfg_nat *t, struct mbuf *m)
 			return (IP_FW_NAT);
 		}
 	} else {
-		if (args->oif == NULL)
+		if (args->flags & IPFW_ARGS_IN)
 			retval = LibAliasIn(t->lib, c,
 				mcl->m_len + M_TRAILINGSPACE(mcl));
 		else
@@ -392,7 +391,8 @@ ipfw_nat(struct ip_fw_args *args, struct cfg_nat *t, struct mbuf *m)
 	 *		PKT_ALIAS_DENY_INCOMING flag is set.
 	 */
 	if (retval == PKT_ALIAS_ERROR ||
-	    (args->oif == NULL && (retval == PKT_ALIAS_UNRESOLVED_FRAGMENT ||
+	    ((args->flags & IPFW_ARGS_IN) &&
+	    (retval == PKT_ALIAS_UNRESOLVED_FRAGMENT ||
 	    (retval == PKT_ALIAS_IGNORED &&
 	    (t->mode & PKT_ALIAS_DENY_INCOMING) != 0)))) {
 		/* XXX - should i add some logging? */

@@ -849,7 +849,8 @@ hash_realloc(SEGMENT **p_ptr, int oldsize, int newsize)
 	void *p;
 
 	if ( (p = malloc(newsize)) ) {
-		memmove(p, *p_ptr, oldsize);
+		/* XXXAR: tell clang that p is at least capability aligned. */
+		memmove((SEGMENT *)p, *p_ptr, oldsize);
 		memset((char *)p + oldsize, 0, newsize - oldsize);
 		free(*p_ptr);
 		*p_ptr = p;

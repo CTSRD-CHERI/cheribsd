@@ -70,7 +70,18 @@ typedef struct bitcmd {
 #define	CMD2_OBITS	0x08
 #define	CMD2_UBITS	0x10
 
-static mode_t	 getumask(void);
+#ifdef __GLIBC__
+/*
+ * We build this file to allow bootstrapping on Linux systems. There sys/stat.h
+ * declares a non-static getumask() function (which is unimplemented!). To avoid
+ * compilation failures declare it as a non-static function in that case.
+ */
+#define GETUMASK_STATIC
+#else
+#define GETUMASK_STATIC static
+#endif
+
+GETUMASK_STATIC mode_t	 getumask(void);
 static BITCMD	*addcmd(BITCMD *, mode_t, mode_t, mode_t, mode_t);
 static void	 compress_mode(BITCMD *);
 #ifdef SETMODE_DEBUG
@@ -342,7 +353,7 @@ out:
 	return NULL;
 }
 
-static mode_t
+GETUMASK_STATIC mode_t
 getumask(void)
 {
 	sigset_t sigset, sigoset;
@@ -350,6 +361,7 @@ getumask(void)
 	mode_t mask;
 	u_short smask;
 
+#ifdef KERN_PROC_UMASK
 	/*
 	 * First try requesting the umask without temporarily modifying it.
 	 * Note that this does not work if the sysctl
@@ -359,7 +371,7 @@ getumask(void)
 	if (sysctl((int[4]){ CTL_KERN, KERN_PROC, KERN_PROC_UMASK, 0 },
 	    4, &smask, &len, NULL, 0) == 0)
 		return (smask);
-
+#endif
 	/*
 	 * Since it's possible that the caller is opening files inside a signal
 	 * handler, protect them as best we can.

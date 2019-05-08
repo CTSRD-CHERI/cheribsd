@@ -38,6 +38,7 @@
 #include <sys/rwlock.h>
 #include <sys/sysctl.h>
 #include <sys/taskqueue.h>
+#include <sys/time.h>
 
 /*
  * Common state locking definitions.
@@ -224,6 +225,11 @@ typedef struct mtx ieee80211_rt_lock_t;
  */
 #include <machine/atomic.h>
 
+struct ieee80211vap;
+int	ieee80211_com_vincref(struct ieee80211vap *);
+void	ieee80211_com_vdecref(struct ieee80211vap *);
+void	ieee80211_com_vdetach(struct ieee80211vap *);
+
 #define ieee80211_node_initref(_ni) \
 	do { ((_ni)->ni_refcnt = 1); } while (0)
 #define ieee80211_node_incref(_ni) \
@@ -235,7 +241,6 @@ int	ieee80211_node_dectestref(struct ieee80211_node *ni);
 #define	ieee80211_node_refcnt(_ni)	(_ni)->ni_refcnt
 
 struct ifqueue;
-struct ieee80211vap;
 void	ieee80211_drain_ifq(struct ifqueue *);
 void	ieee80211_flush_ifq(struct ifqueue *, struct ieee80211vap *);
 
@@ -245,9 +250,8 @@ void	ieee80211_vap_destroy(struct ieee80211vap *);
 	(((_ifp)->if_flags & IFF_UP) && \
 	 ((_ifp)->if_drv_flags & IFF_DRV_RUNNING))
 
-/* XXX TODO: cap these at 1, as hz may not be 1000 */
-#define	msecs_to_ticks(ms)	(((ms)*hz)/1000)
-#define	ticks_to_msecs(t)	(1000*(t) / hz)
+#define	msecs_to_ticks(ms)	MSEC_2_TICKS(ms)
+#define	ticks_to_msecs(t)	TICKS_2_MSEC(t)
 #define	ticks_to_secs(t)	((t) / hz)
 
 #define ieee80211_time_after(a,b) 	((long)(b) - (long)(a) < 0)

@@ -2590,24 +2590,22 @@ bpfattach2(struct ifnet *ifp, u_int dlt, u_int hdrlen, struct bpf_if **driverp)
 {
 	struct bpf_if *bp;
 
-	bp = malloc(sizeof(*bp), M_BPF, M_NOWAIT | M_ZERO);
-	if (bp == NULL)
-		panic("bpfattach");
+	KASSERT(*driverp == NULL, ("bpfattach2: driverp already initialized"));
 
+	bp = malloc(sizeof(*bp), M_BPF, M_WAITOK | M_ZERO);
+
+	rw_init(&bp->bif_lock, "bpf interface lock");
 	LIST_INIT(&bp->bif_dlist);
 	LIST_INIT(&bp->bif_wlist);
 	bp->bif_ifp = ifp;
 	bp->bif_dlt = dlt;
-	rw_init(&bp->bif_lock, "bpf interface lock");
-	KASSERT(*driverp == NULL, ("bpfattach2: driverp already initialized"));
+	bp->bif_hdrlen = hdrlen;
 	bp->bif_bpf = driverp;
 	*driverp = bp;
 
 	BPF_LOCK();
 	LIST_INSERT_HEAD(&bpf_iflist, bp, bif_next);
 	BPF_UNLOCK();
-
-	bp->bif_hdrlen = hdrlen;
 
 	if (bootverbose && IS_DEFAULT_VNET(curvnet))
 		if_printf(ifp, "bpf attached\n");
@@ -3106,7 +3104,7 @@ DB_SHOW_COMMAND(bpf_if, db_show_bpf_if)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc"

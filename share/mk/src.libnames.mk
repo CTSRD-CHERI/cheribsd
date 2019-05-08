@@ -18,9 +18,12 @@ _PRIVATELIBS=	\
 		bsdstat \
 		devdctl \
 		event \
+		gmock \
+		gtest \
+		gmock_main \
+		gtest_main \
 		heimipcc \
 		heimipcs \
-		ifconfig \
 		ldns \
 		sqlite3 \
 		ssh \
@@ -41,6 +44,7 @@ _INTERNALLIBS=	\
 		fifolog \
 		gdb \
 		iberty \
+		ifconfig \
 		ipf \
 		lpr \
 		netbsd \
@@ -87,6 +91,7 @@ _LIBRARIES=	\
 		cheri_support \
 		cheri_syscalls \
 		cap_dns \
+		cap_fileargs \
 		cap_grp \
 		cap_pwd \
 		cap_random \
@@ -187,6 +192,7 @@ _LIBRARIES=	\
 		smb \
 		ssl \
 		ssp_nonshared \
+		statcounters \
 		stdthreads \
 		supcplusplus \
 		svgtiny \
@@ -237,6 +243,21 @@ _LIBRARIES+= \
 		osmvendor
 .endif
 
+.if ${MK_BEARSSL} == "yes"
+_INTERNALLIBS+= \
+		bearssl \
+		secureboot \
+
+LIBBEARSSL?=	${LIBBEARSSLDIR}/libbearssl${PIE_SUFFIX}.a
+LIBSECUREBOOT?=	${LIBSECUREBOOTDIR}/libsecureboot${PIE_SUFFIX}.a
+.endif
+
+.if ${MK_VERIEXEC} == "yes"
+_INTERNALLIBS+= veriexec
+
+LIBVERIEXEC?=	${LIBVERIEXECDIR}/libveriexec${PIE_SUFFIX}.a
+.endif
+
 # Each library's LIBADD needs to be duplicated here for static linkage of
 # 2nd+ order consumers.  Auto-generating this would be better.
 _DP_80211=	sbuf bsdxml
@@ -266,6 +287,7 @@ _DP_cam=	sbuf
 _DP_kvm=	elf
 _DP_casper=	nv
 _DP_cap_dns=	nv
+_DP_cap_fileargs=	nv
 _DP_cap_grp=	nv
 _DP_cap_pwd=	nv
 _DP_cap_random=	nv
@@ -314,6 +336,10 @@ _DP_dpv=	dialog figpar util ncursesw
 _DP_dialog=	ncursesw m
 _DP_cuse=	pthread
 _DP_atf_cxx=	atf_c
+_DP_gtest=	pthread
+_DP_gmock=	gtest
+_DP_gmock_main=	gmock
+_DP_gtest_main=	gtest
 _DP_devstat=	kvm
 _DP_pam=	radius tacplus opie md util
 .if ${MK_KERBEROS} != "no"
@@ -397,9 +423,22 @@ LIBATF_CXX=	${LIBDESTDIR}${LIBDIR_BASE}/libprivateatf-c++.a
 LDADD_atf_c=	-lprivateatf-c
 LDADD_atf_cxx=	-lprivateatf-c++
 
+LIBGMOCK=	${LIBDESTDIR}${LIBDIR_BASE}/libprivategmock.a
+LIBGMOCK_MAIN=	${LIBDESTDIR}${LIBDIR_BASE}/libprivategmock_main.a
+LIBGTEST=	${LIBDESTDIR}${LIBDIR_BASE}/libprivategtest.a
+LIBGTEST_MAIN=	${LIBDESTDIR}${LIBDIR_BASE}/libprivategtest_main.a
+LDADD_gmock=	-lprivategmock
+LDADD_gtest=	-lprivategtest
+LDADD_gmock_main= -lprivategmock_main
+LDADD_gtest_main= -lprivategtest_main
+
 .for _l in ${_PRIVATELIBS}
 LIB${_l:tu}?=	${LIBDESTDIR}${LIBDIR_BASE}/libprivate${_l}.a
 .endfor
+
+.if ${MK_PIE} != "no"
+PIE_SUFFIX=	_pie
+.endif
 
 .for _l in ${_LIBRARIES}
 .if ${_INTERNALLIBS:M${_l}} || !defined(SYSROOT)
@@ -408,12 +447,14 @@ LDADD_${_l}_L+=		-L${LIB${_l:tu}DIR}
 DPADD_${_l}?=	${LIB${_l:tu}}
 .if ${_PRIVATELIBS:M${_l}}
 LDADD_${_l}?=	-lprivate${_l}
+.elif ${_INTERNALLIBS:M${_l}}
+LDADD_${_l}?=	${LDADD_${_l}_L} -l${_l:S/${PIE_SUFFIX}//}${PIE_SUFFIX}
 .else
 LDADD_${_l}?=	${LDADD_${_l}_L} -l${_l}
 .endif
 # Add in all dependencies for static linkage.
 .if defined(_DP_${_l}) && (${_INTERNALLIBS:M${_l}} || \
-    (defined(NO_SHARED) && (${NO_SHARED} != "no" && ${NO_SHARED} != "NO")))
+    (defined(NO_SHARED) && ${NO_SHARED:tl} != "no"))
 .for _d in ${_DP_${_l}}
 DPADD_${_l}+=	${DPADD_${_d}}
 LDADD_${_l}+=	${LDADD_${_d}}
@@ -432,6 +473,15 @@ LDADD_${_l}+=	${LDADD_${_d}}
 # atf_cxx
 DPADD_atf_cxx+=	${DPADD_atf_c}
 LDADD_atf_cxx+=	${LDADD_atf_c}
+
+DPADD_gmock+=	${DPADD_gtest}
+LDADD_gmock+=	${LDADD_gtest}
+
+DPADD_gmock_main+=	${DPADD_gmock}
+LDADD_gmock_main+=	${LDADD_gmock}
+
+DPADD_gtest_main+=	${DPADD_gtest}
+LDADD_gtest_main+=	${LDADD_gtest}
 
 # Detect LDADD/DPADD that should be LIBADD, before modifying LDADD here.
 _BADLDADD=
@@ -453,88 +503,91 @@ _LIB_OBJTOP?=	${OBJTOP}
 
 # INTERNALLIB definitions.
 LIBELFTCDIR=	${_LIB_OBJTOP}/lib/libelftc
-LIBELFTC?=	${LIBELFTCDIR}/libelftc.a
+LIBELFTC?=	${LIBELFTCDIR}/libelftc${PIE_SUFFIX}.a
 
 LIBPEDIR=	${_LIB_OBJTOP}/lib/libpe
-LIBPE?=		${LIBPEDIR}/libpe.a
+LIBPE?=		${LIBPEDIR}/libpe${PIE_SUFFIX}.a
 
 LIBOPENBSDDIR=	${_LIB_OBJTOP}/lib/libopenbsd
-LIBOPENBSD?=	${LIBOPENBSDDIR}/libopenbsd.a
+LIBOPENBSD?=	${LIBOPENBSDDIR}/libopenbsd${PIE_SUFFIX}.a
 
 LIBSMDIR=	${_LIB_OBJTOP}/lib/libsm
-LIBSM?=		${LIBSMDIR}/libsm.a
+LIBSM?=		${LIBSMDIR}/libsm${PIE_SUFFIX}.a
 
 LIBSMDBDIR=	${_LIB_OBJTOP}/lib/libsmdb
-LIBSMDB?=	${LIBSMDBDIR}/libsmdb.a
+LIBSMDB?=	${LIBSMDBDIR}/libsmdb${PIE_SUFFIX}.a
 
 LIBSMUTILDIR=	${_LIB_OBJTOP}/lib/libsmutil
-LIBSMUTIL?=	${LIBSMUTILDIR}/libsmutil.a
+LIBSMUTIL?=	${LIBSMUTILDIR}/libsmutil${PIE_SUFFIX}.a
 
 LIBNETBSDDIR?=	${_LIB_OBJTOP}/lib/libnetbsd
-LIBNETBSD?=	${LIBNETBSDDIR}/libnetbsd.a
+LIBNETBSD?=	${LIBNETBSDDIR}/libnetbsd${PIE_SUFFIX}.a
 
 LIBVERSDIR?=	${_LIB_OBJTOP}/kerberos5/lib/libvers
-LIBVERS?=	${LIBVERSDIR}/libvers.a
+LIBVERS?=	${LIBVERSDIR}/libvers${PIE_SUFFIX}.a
 
 LIBSLDIR=	${_LIB_OBJTOP}/kerberos5/lib/libsl
-LIBSL?=		${LIBSLDIR}/libsl.a
+LIBSL?=		${LIBSLDIR}/libsl${PIE_SUFFIX}.a
+
+LIBIFCONFIGDIR=	${_LIB_OBJTOP}/lib/libifconfig
+LIBIFCONFIG?=	${LIBIFCONFIGDIR}libifconfig${PIE_SUFFIX}.a
 
 LIBIPFDIR=	${_LIB_OBJTOP}/sbin/ipf/libipf
-LIBIPF?=	${LIBIPFDIR}/libipf.a
+LIBIPF?=	${LIBIPFDIR}/libipf${PIE_SUFFIX}.a
 
 LIBTELNETDIR=	${_LIB_OBJTOP}/lib/libtelnet
-LIBTELNET?=	${LIBTELNETDIR}/libtelnet.a
+LIBTELNET?=	${LIBTELNETDIR}/libtelnet${PIE_SUFFIX}.a
 
 LIBCRONDIR=	${_LIB_OBJTOP}/usr.sbin/cron/lib
-LIBCRON?=	${LIBCRONDIR}/libcron.a
+LIBCRON?=	${LIBCRONDIR}/libcron${PIE_SUFFIX}.a
 
 LIBNTPDIR=	${_LIB_OBJTOP}/usr.sbin/ntp/libntp
-LIBNTP?=	${LIBNTPDIR}/libntp.a
+LIBNTP?=	${LIBNTPDIR}/libntp${PIE_SUFFIX}.a
 
 LIBNTPEVENTDIR=	${_LIB_OBJTOP}/usr.sbin/ntp/libntpevent
-LIBNTPEVENT?=	${LIBNTPEVENTDIR}/libntpevent.a
+LIBNTPEVENT?=	${LIBNTPEVENTDIR}/libntpevent${PIE_SUFFIX}.a
 
 LIBOPTSDIR=	${_LIB_OBJTOP}/usr.sbin/ntp/libopts
-LIBOPTS?=	${LIBOPTSDIR}/libopts.a
+LIBOPTS?=	${LIBOPTSDIR}/libopts${PIE_SUFFIX}.a
 
 LIBPARSEDIR=	${_LIB_OBJTOP}/usr.sbin/ntp/libparse
-LIBPARSE?=	${LIBPARSEDIR}/libparse.a
+LIBPARSE?=	${LIBPARSEDIR}/libparse${PIE_SUFFIX}.a
 
 LIBLPRDIR=	${_LIB_OBJTOP}/usr.sbin/lpr/common_source
-LIBLPR?=	${LIBLPRDIR}/liblpr.a
+LIBLPR?=	${LIBLPRDIR}/liblpr${PIE_SUFFIX}.a
 
 LIBFIFOLOGDIR=	${_LIB_OBJTOP}/usr.sbin/fifolog/lib
-LIBFIFOLOG?=	${LIBFIFOLOGDIR}/libfifolog.a
+LIBFIFOLOG?=	${LIBFIFOLOGDIR}/libfifolog${PIE_SUFFIX}.a
 
 LIBBSNMPTOOLSDIR=	${_LIB_OBJTOP}/usr.sbin/bsnmpd/tools/libbsnmptools
-LIBBSNMPTOOLS?=	${LIBBSNMPTOOLSDIR}/libbsnmptools.a
+LIBBSNMPTOOLS?=	${LIBBSNMPTOOLSDIR}/libbsnmptools${PIE_SUFFIX}.a
 
 LIBAMUDIR=	${_LIB_OBJTOP}/usr.sbin/amd/libamu
-LIBAMU?=	${LIBAMUDIR}/libamu.a
+LIBAMU?=	${LIBAMUDIR}/libamu${PIE_SUFFIX}${PIE_SUFFIX}.a
 
 LIBBEDIR=	${_LIB_OBJTOP}/lib/libbe
-LIBBE?=		${LIBBEDIR}/libbe.a
+LIBBE?=		${LIBBEDIR}/libbe${PIE_SUFFIX}.a
 
 LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
-LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat.a
+LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat${PIE_SUFFIX}${PIE_SUFFIX}.a
 
 LIBC_NOSSP_PICDIR=	${OBJTOP}/lib/libc
-LIBC_NOSSP_PIC?=	${LIBC_NOSSP_PICDIR}/libc_nossp_pic.a
+LIBC_NOSSP_PIC?=	${LIBC_NOSSP_PICDIR}/libc_nossp_pic${PIE_SUFFIX}.a
 
 LIBBFDDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbfd
-LIBBFD?=	${LIBBFDDIR}/libbfd.a
+LIBBFD?=	${LIBBFDDIR}/libbfd${PIE_SUFFIX}.a
 
 LIBBINUTILSDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbinutils
-LIBBINUTILS?=	${LIBBINUTILSDIR}/libbinutils.a
+LIBBINUTILS?=	${LIBBINUTILSDIR}/libbinutils${PIE_SUFFIX}.a
 
 LIBGDBDIR=	${_LIB_OBJTOP}/gnu/usr.bin/gdb/libgdb
-LIBGDB?=	${LIBGDBDIR}/libgdb.a
+LIBGDB?=	${LIBGDBDIR}/libgdb${PIE_SUFFIX}.a
 
 LIBIBERTYDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libiberty
-LIBIBERTY?=	${LIBIBERTYDIR}/libiberty.a
+LIBIBERTY?=	${LIBIBERTYDIR}/libiberty${PIE_SUFFIX}.a
 
 LIBOPCODESDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libopcodes
-LIBOPCODES?=	${LIBOPCODESDIR}/libopcodes.a
+LIBOPCODES?=	${LIBOPCODESDIR}/libopcodes${PIE_SUFFIX}.a
 
 # Define a directory for each library.  This is useful for adding -L in when
 # not using a --sysroot or for meta mode bootstrapping when there is no
@@ -589,6 +642,11 @@ LIBROKENDIR=	${_LIB_OBJTOP}/kerberos5/lib/libroken
 LIBWINDDIR=	${_LIB_OBJTOP}/kerberos5/lib/libwind
 LIBATF_CDIR=	${_LIB_OBJTOP}/lib/atf/libatf-c
 LIBATF_CXXDIR=	${_LIB_OBJTOP}/lib/atf/libatf-c++
+LIBGMOCKDIR=	${_LIB_OBJTOP}/lib/googletest/gmock
+LIBGMOCK_MAINDIR=	${_LIB_OBJTOP}/lib/googletest/gmock_main
+LIBGTESTDIR=	${_LIB_OBJTOP}/lib/googletest/gtest
+LIBGTEST_MAINDIR=	${_LIB_OBJTOP}/lib/googletest/gtest_main
+LIBALIASDIR=	${OBJTOP}/lib/libalias/libalias
 LIBALIASDIR=	${_LIB_OBJTOP}/lib/libalias/libalias
 LIBBLACKLISTDIR=	${_LIB_OBJTOP}/lib/libblacklist
 LIBBLOCKSRUNTIMEDIR=	${_LIB_OBJTOP}/lib/libblocksruntime

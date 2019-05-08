@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #define	ED_SYMTAB	(1<<9)
 #define	ED_CAPREL	(1<<10)
 #define	ED_ALL		((1<<11)-1)
+#define	ED_IS_ELF	(1<<31)	/* Exclusive with other flags */
 
 #define	elf_get_addr	elf_get_quad
 #define	elf_get_off	elf_get_quad
@@ -326,10 +327,19 @@ static const char *p_flags[] = {
 	"PF_X|PF_W|PF_R"
 };
 
+#define NT_ELEM(x)	[x] = #x,
+static const char *nt_types[] = {
+	"",
+	NT_ELEM(NT_FREEBSD_ABI_TAG)
+	NT_ELEM(NT_FREEBSD_NOINIT_TAG)
+	NT_ELEM(NT_FREEBSD_ARCH_TAG)
+	NT_ELEM(NT_FREEBSD_FEATURE_CTL)
+};
+
 /* http://www.sco.com/developers/gabi/latest/ch4.sheader.html#sh_type */
 static const char *
 sh_types(uint64_t machine, uint64_t sht) {
-	static char unknown_buf[64]; 
+	static char unknown_buf[64];
 
 	if (sht < 0x60000000) {
 		switch (sht) {
@@ -529,7 +539,7 @@ main(int ac, char **av)
 
 	out = stdout;
 	flags = 0;
-	while ((ch = getopt(ac, av, "aCcdeiGhnprsw:")) != -1)
+	while ((ch = getopt(ac, av, "aCcdEeiGhnprsw:")) != -1)
 		switch (ch) {
 		case 'a':
 			flags = ED_ALL;
@@ -542,6 +552,9 @@ main(int ac, char **av)
 			break;
 		case 'd':
 			flags |= ED_DYN;
+			break;
+		case 'E':
+			flags = ED_IS_ELF;
 			break;
 		case 'e':
 			flags |= ED_EHDR;
@@ -571,7 +584,7 @@ main(int ac, char **av)
 			if ((out = fopen(optarg, "w")) == NULL)
 				err(1, "%s", optarg);
 			cap_rights_init(&rights, CAP_FSTAT, CAP_WRITE);
-			if (cap_rights_limit(fileno(out), &rights) < 0 && errno != ENOSYS)
+			if (caph_rights_limit(fileno(out), &rights) < 0)
 				err(1, "unable to limit rights for %s", optarg);
 			break;
 		case '?':
@@ -580,16 +593,17 @@ main(int ac, char **av)
 		}
 	ac -= optind;
 	av += optind;
-	if (ac == 0 || flags == 0)
+	if (ac == 0 || flags == 0 || ((flags & ED_IS_ELF) &&
+	    (ac != 1 || (flags & ~ED_IS_ELF) || out != stdout)))
 		usage();
 	if ((fd = open(*av, O_RDONLY)) < 0 ||
 	    fstat(fd, &sb) < 0)
 		err(1, "%s", *av);
 	cap_rights_init(&rights, CAP_MMAP_R);
-	if (cap_rights_limit(fd, &rights) < 0 && errno != ENOSYS)
+	if (caph_rights_limit(fd, &rights) < 0)
 		err(1, "unable to limit rights for %s", *av);
 	cap_rights_init(&rights);
-	if ((cap_rights_limit(STDIN_FILENO, &rights) < 0 && errno != ENOSYS) ||
+	if (caph_rights_limit(STDIN_FILENO, &rights) < 0 ||
 	    caph_limit_stdout() < 0 || caph_limit_stderr() < 0) {
                 err(1, "unable to limit rights for stdio");
 	}
@@ -598,8 +612,12 @@ main(int ac, char **av)
 	e = mmap(NULL, sb.st_size, PROT_READ, MAP_SHARED, fd, 0);
 	if (e == MAP_FAILED)
 		err(1, NULL);
-	if (!IS_ELF(*(Elf32_Ehdr *)e))
+	if (!IS_ELF(*(Elf32_Ehdr *)e)) {
+		if (flags & ED_IS_ELF)
+			exit(1);
 		errx(1, "not an elf file");
+	} else if (flags & ED_IS_ELF)
+		exit (0);
 	phoff = elf_get_off(e, e, E_PHOFF);
 	shoff = elf_get_off(e, e, E_SHOFF);
 	phentsize = elf_get_quarter(e, e, E_PHENTSIZE);
@@ -1096,19 +1114,26 @@ elf_print_note(Elf32_Ehdr *e, void *sh)
 	u_int32_t namesz;
 	u_int32_t descsz;
 	u_int32_t desc;
+	u_int32_t type;
 	char *n, *s;
+	const char *nt_type;
 
 	offset = elf_get_off(e, sh, SH_OFFSET);
 	size = elf_get_size(e, sh, SH_SIZE);
 	name = elf_get_word(e, sh, SH_NAME);
 	n = (char *)e + offset;
 	fprintf(out, "\nnote (%s):\n", shstrtab + name);
- 	while (n < ((char *)e + offset + size)) {
+	while (n < ((char *)e + offset + size)) {
 		namesz = elf_get_word(e, n, N_NAMESZ);
 		descsz = elf_get_word(e, n, N_DESCSZ);
- 		s = n + sizeof(Elf_Note);
- 		desc = elf_get_word(e, n + sizeof(Elf_Note) + namesz, 0);
-		fprintf(out, "\t%s %d\n", s, desc);
+		type = elf_get_word(e, n, N_TYPE);
+		if (type < nitems(nt_types) && nt_types[type] != NULL)
+			nt_type = nt_types[type];
+		else
+			nt_type = "Unknown type";
+		s = n + sizeof(Elf_Note);
+		desc = elf_get_word(e, n + sizeof(Elf_Note) + namesz, 0);
+		fprintf(out, "\t%s %d (%s)\n", s, desc, nt_type);
 		n += sizeof(Elf_Note) + namesz + descsz;
 	}
 }
@@ -1298,6 +1323,7 @@ elf_get_quad(Elf32_Ehdr *e, void *base, elf_member_t member)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: elfdump -a | -CcdeGhinprs [-w file] file\n");
+	fprintf(stderr,
+	    "usage: elfdump -a | -E | -CcdeGhinprs [-w file] file\n");
 	exit(1);
 }

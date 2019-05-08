@@ -39,8 +39,9 @@ struct vdso_timehands {
 	uint64_t	th_scale;
 	uint32_t 	th_offset_count;
 	uint32_t	th_counter_mask;
-	struct bintime	th_offset;
-	struct bintime	th_boottime;
+	/* XXXAR: temporary workaround to avoid memcpy */
+	_Alignas(sizeof(void*)) struct bintime	th_offset;
+	_Alignas(sizeof(void*)) struct bintime	th_boottime;
 	VDSO_TIMEHANDS_MD
 };
 

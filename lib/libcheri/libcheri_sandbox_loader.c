@@ -76,7 +76,6 @@ sandbox_class_load(struct sandbox_class *sbcp)
 	void * __capability codecap;
 #endif
 	int saved_errno;
-	caddr_t base;
 
 	/*
 	 * Set up the code capability for a new sandbox class.  Very similar
@@ -185,6 +184,8 @@ sandbox_class_unload(struct sandbox_class *sbcp)
 
 #ifdef SPLIT_CODE_DATA
 	munmap(sbcp->sbc_codemem, sbcp->sbc_codelen);
+#else
+	(void)sbcp;
 #endif
 }
 
@@ -261,7 +262,12 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	length += heaplen;
 	sbop->sbo_datalen = length;
 	base = sbop->sbo_datamem = mmap(NULL, length,
+#ifdef SPLIT_CODE_DATA
 	    PROT_MAX(PROT_READ|PROT_WRITE) | PROT_NONE,
+#else
+	    /* When mapping code+data together we have to use a RWX cap */
+	    PROT_MAX(PROT_ALL) | PROT_NONE,
+#endif
 	    MAP_ANON | MAP_ALIGNED_CHERI_SEAL, -1, 0);
 	if (sbop->sbo_datamem == MAP_FAILED) {
 		saved_errno = errno;
@@ -405,7 +411,7 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	/*
 	 * Configure methods for object.
 	 */
-	if (sandbox_set_required_method_variables(idc,
+	if (sandbox_set_required_method_variables(idc, 0,
 	    sbcp->sbc_required_methods) == -1) {
 		saved_errno = EINVAL;
 		warnx("%s: sandbox_set_ccaller_method_variables", __func__);
@@ -436,8 +442,11 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	sbop->sbo_vtable = NULL;
 	sbop->sbo_ddc = idc;
 
-	/* XXXRW: Does this remain the right capability to use for TLS? */
+#ifdef __CHERI_CAPABILITY_TLS__
+	sbop->sbo_libcheri_tls = NULL;
+#else
 	sbop->sbo_libcheri_tls = cheri_getdefault();
+#endif
 
 	/*
 	 * Construct sealed rtld and invocation capabilities for use with
@@ -546,7 +555,7 @@ sandbox_object_reload(struct sandbox_object *sbop)
 	    CHERI_PERM_GLOBAL | CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP |
 	    CHERI_PERM_STORE | CHERI_PERM_STORE_CAP |
 	    CHERI_PERM_STORE_LOCAL_CAP);
-	if (sandbox_set_required_method_variables(datacap,
+	if (sandbox_set_required_method_variables(datacap, 0,
 	    sbcp->sbc_required_methods)
 	    == -1) {
 		saved_errno = EINVAL;

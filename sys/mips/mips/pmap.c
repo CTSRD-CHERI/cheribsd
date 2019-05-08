@@ -3846,7 +3846,7 @@ pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

@@ -67,7 +67,7 @@ __FBSDID("$FreeBSD$");
 History *hist;	/* history cookie */
 EditLine *el;	/* editline cookie */
 int displayhist;
-static FILE *el_in, *el_out, *el_err;
+static FILE *el_in, *el_out;
 
 static char *fc_replace(const char *, char *, char *);
 static int not_fcnumber(const char *);
@@ -106,18 +106,16 @@ histedit(void)
 			INTOFF;
 			if (el_in == NULL)
 				el_in = fdopen(0, "r");
-			if (el_err == NULL)
-				el_err = fdopen(1, "w");
 			if (el_out == NULL)
 				el_out = fdopen(2, "w");
-			if (el_in == NULL || el_err == NULL || el_out == NULL)
+			if (el_in == NULL || el_out == NULL)
 				goto bad;
 			term = lookupvar("TERM");
 			if (term)
 				setenv("TERM", term, 1);
 			else
 				unsetenv("TERM");
-			el = el_init(arg0, el_in, el_out, el_err);
+			el = el_init(arg0, el_in, el_out, el_out);
 			if (el != NULL) {
 				if (hist)
 					el_set(el, EL_HIST, history, hist);
@@ -141,6 +139,11 @@ bad:
 				el_set(el, EL_EDITOR, "vi");
 			else if (Eflag)
 				el_set(el, EL_EDITOR, "emacs");
+			/*
+			 * Set CTRL+R to history search for compatibility with
+			 * other operating systems' default shells.
+			 */
+			el_set(el, EL_BIND, "^R", "em-inc-search-prev", NULL);
 			el_set(el, EL_BIND, "^I", "sh-complete", NULL);
 			el_source(el, NULL);
 		}
@@ -474,10 +477,31 @@ str_to_event(const char *str, int last)
 int
 bindcmd(int argc, char **argv)
 {
+	int ret;
+	FILE *old;
+	FILE *out;
 
 	if (el == NULL)
 		error("line editing is disabled");
-	return (el_parse(el, argc, __DECONST(const char **, argv)));
+
+	INTOFF;
+
+	out = out1fp();
+	if (out == NULL)
+		error("Out of space");
+
+	el_get(el, EL_GETFP, 1, &old);
+	el_set(el, EL_SETFP, 1, out);
+
+	ret = el_parse(el, argc, __DECONST(const char **, argv));
+
+	el_set(el, EL_SETFP, 1, old);
+
+	fclose(out);
+
+	INTON;
+
+	return ret;
 }
 
 #else

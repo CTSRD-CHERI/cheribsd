@@ -309,10 +309,8 @@ dev/sio/sio_pci.c		optional sio pci
 dev/sio/sio_puc.c		optional sio puc
 dev/speaker/spkr.c		optional speaker
 dev/syscons/apm/apm_saver.c	optional apm_saver apm
-dev/syscons/scterm-teken.c	optional sc
 dev/syscons/scvesactl.c		optional sc vga vesa
 dev/syscons/scvgarndr.c		optional sc vga
-dev/syscons/scvtb.c		optional sc
 dev/tpm/tpm.c			optional tpm
 dev/tpm/tpm_acpi.c		optional tpm acpi
 dev/tpm/tpm_isa.c		optional tpm isa
@@ -332,6 +330,7 @@ dev/vmware/vmci/vmci_resource.c		optional	vmci
 dev/acpica/acpi_if.m		standard
 dev/acpica/acpi_hpet.c		optional acpi
 dev/acpica/acpi_timer.c		optional acpi
+dev/acpica/acpi_pxm.c		optional acpi
 dev/acpi_support/acpi_wmi_if.m	standard
 dev/wbwd/wbwd.c			optional wbwd
 dev/isci/isci.c							optional isci
@@ -491,12 +490,16 @@ i386/i386/longrun.c		optional cpu_enable_longrun
 i386/i386/machdep.c		standard
 i386/i386/mem.c			optional mem
 i386/i386/minidump_machdep.c	standard
+i386/i386/minidump_machdep_pae.c	standard
+i386/i386/minidump_machdep_nopae.c	standard
 i386/i386/mp_clock.c		optional smp
 i386/i386/mp_machdep.c		optional smp
 i386/i386/mpboot.s		optional smp
 i386/i386/npx.c			standard
 i386/i386/perfmon.c		optional perfmon
-i386/i386/pmap.c		standard
+i386/i386/pmap_base.c		standard
+i386/i386/pmap_nopae.c		standard
+i386/i386/pmap_pae.c		standard
 i386/i386/prof_machdep.c	optional profiling-routine
 i386/i386/ptrace_machdep.c	standard
 i386/i386/sigtramp.s		standard
@@ -507,25 +510,6 @@ i386/i386/trap.c		standard
 i386/i386/uio_machdep.c		standard
 i386/i386/vm86.c		standard
 i386/i386/vm_machdep.c		standard
-i386/ibcs2/ibcs2_errno.c	optional ibcs2
-i386/ibcs2/ibcs2_fcntl.c	optional ibcs2
-i386/ibcs2/ibcs2_ioctl.c	optional ibcs2
-i386/ibcs2/ibcs2_ipc.c		optional ibcs2
-i386/ibcs2/ibcs2_isc.c		optional ibcs2
-i386/ibcs2/ibcs2_isc_sysent.c	optional ibcs2
-i386/ibcs2/ibcs2_misc.c		optional ibcs2
-i386/ibcs2/ibcs2_msg.c		optional ibcs2
-i386/ibcs2/ibcs2_other.c	optional ibcs2
-i386/ibcs2/ibcs2_signal.c	optional ibcs2
-i386/ibcs2/ibcs2_socksys.c	optional ibcs2
-i386/ibcs2/ibcs2_stat.c		optional ibcs2
-i386/ibcs2/ibcs2_sysent.c	optional ibcs2
-i386/ibcs2/ibcs2_sysi86.c	optional ibcs2
-i386/ibcs2/ibcs2_sysvec.c	optional ibcs2
-i386/ibcs2/ibcs2_util.c		optional ibcs2
-i386/ibcs2/ibcs2_xenix.c	optional ibcs2
-i386/ibcs2/ibcs2_xenix_sysent.c	optional ibcs2
-i386/ibcs2/imgact_coff.c	optional ibcs2
 i386/linux/imgact_linux.c	optional compat_linux
 i386/linux/linux_copyout.c	optional compat_linux
 i386/linux/linux_dummy.c	optional compat_linux

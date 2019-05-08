@@ -88,7 +88,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 
 bool __read_frequently trap_enotcap;
-SYSCTL_BOOL(_kern, OID_AUTO, trap_enotcap, CTLFLAG_RW, &trap_enotcap, 0,
+SYSCTL_BOOL(_kern, OID_AUTO, trap_enotcap, CTLFLAG_RWTUN, &trap_enotcap, 0,
     "Deliver SIGTRAP on ENOTCAPABLE");
 
 #ifdef CAPABILITY_MODE
@@ -711,7 +711,7 @@ sys_cap_fcntls_get(struct thread *td, struct cap_fcntls_get_args *uap)
 #endif /* CAPABILITIES */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

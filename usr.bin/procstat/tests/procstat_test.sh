@@ -1,6 +1,5 @@
 #
-# Copyright (c) 2017 Ngie Cooper <ngie@FreeBSD.org>
-# All rights reserved.
+# Copyright (c) 2017 Enji Cooper <ngie@FreeBSD.org>
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -79,6 +78,8 @@ command_line_arguments_head()
 }
 command_line_arguments_body()
 {
+	atf_skip "https://bugs.freebsd.org/233587"
+
 	arguments="my arguments"
 
 	start_program $arguments
@@ -103,6 +104,8 @@ environment_head()
 }
 environment_body()
 {
+	atf_skip "https://bugs.freebsd.org/233588"
+
 	var="MY_VARIABLE=foo"
 	eval "export $var"
 

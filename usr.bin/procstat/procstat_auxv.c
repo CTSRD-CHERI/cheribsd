@@ -31,7 +31,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20180629,
+ *   "updated": 20181115,
  *   "target_type": "prog",
  *   "changes": [
  *     "support"
@@ -145,12 +145,6 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 			    prefix, "AT_EGID", (long)auxv[i].a_un.a_val);
 			break;
 #endif
-#ifdef AT_EHDRFLAGS
-		case AT_EHDRFLAGS:
-			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_EHDRFLAGS/%#lx}\n",
-			    prefix, "AT_EHDRFLAGS", (long)auxv[i].a_un.a_val);
-			break;
-#endif
 		case AT_EXECPATH:
 			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_EXECPATH/%p}\n",
 			    prefix, "AT_EXECPATH", auxv[i].a_un.a_ptr);
@@ -194,6 +188,12 @@ procstat_auxv(struct procstat *procstat, struct kinfo_proc *kipp)
 		case AT_TIMEKEEP:
 			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_TIMEKEEP/%p}\n",
 			    prefix, "AT_TIMEKEEP", auxv[i].a_un.a_ptr);
+			break;
+#endif
+#ifdef AT_EHDRFLAGS
+		case AT_EHDRFLAGS:
+			xo_emit("{dw:/%s}{Lw:/%-16s/%s}{:AT_EHDRFLAGS/%#lx}\n",
+			    prefix, "AT_EHDRFLAGS", (u_long)auxv[i].a_un.a_val);
 			break;
 #endif
 #ifdef AT_ARGC

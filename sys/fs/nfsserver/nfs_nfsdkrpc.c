@@ -90,7 +90,7 @@ SVCPOOL		*nfsrvd_pool;
 static int	nfs_privport = 0;
 SYSCTL_INT(_vfs_nfsd, OID_AUTO, nfs_privport, CTLFLAG_RWTUN,
     &nfs_privport, 0,
-    "Only allow clients using a privileged port for NFSv2 and 3");
+    "Only allow clients using a privileged port for NFSv2, 3 and 4");
 
 static int	nfs_minvers = NFS_VER2;
 SYSCTL_INT(_vfs_nfsd, OID_AUTO, server_min_nfsvers, CTLFLAG_RWTUN,
@@ -166,7 +166,7 @@ nfssvc_program(struct svc_req *rqst, SVCXPRT *xprt)
 	nd.nd_mreq = NULL;
 	nd.nd_cred = NULL;
 
-	if (nfs_privport && (nd.nd_flag & ND_NFSV4) == 0) {
+	if (nfs_privport != 0) {
 		/* Check if source port is privileged */
 		u_short port;
 		struct sockaddr *nam = nd.nd_nam;
@@ -323,7 +323,6 @@ static int
 nfs_proc(struct nfsrv_descript *nd, u_int32_t xid, SVCXPRT *xprt,
     struct nfsrvcache **rpp)
 {
-	struct thread *td = curthread;
 	int cacherep = RC_DOIT, isdgram, taglen = -1;
 	struct mbuf *m;
 	u_char tag[NFSV4_SMALLSTR + 1], *tagstr = NULL;
@@ -384,7 +383,7 @@ nfs_proc(struct nfsrv_descript *nd, u_int32_t xid, SVCXPRT *xprt,
 	if (cacherep == RC_DOIT) {
 		if ((nd->nd_flag & ND_NFSV41) != 0)
 			nd->nd_xprt = xprt;
-		nfsrvd_dorpc(nd, isdgram, tagstr, taglen, minorvers, td);
+		nfsrvd_dorpc(nd, isdgram, tagstr, taglen, minorvers);
 		if ((nd->nd_flag & ND_NFSV41) != 0) {
 			if (nd->nd_repstat != NFSERR_REPLYFROMCACHE &&
 			    (nd->nd_flag & ND_SAVEREPLY) != 0) {

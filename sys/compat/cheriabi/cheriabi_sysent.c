@@ -8,10 +8,6 @@
 #include <sys/param.h>
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
-#include <sys/mount.h>
-#include <sys/socket.h>
-#include <sys/user.h>
-#include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))
@@ -72,7 +68,7 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_acct_args), (sy_call_t *)cheriabi_acct, AUE_ACCT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 51 = cheriabi_acct */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 52 = obsolete osigpending */
 	{ AS(cheriabi_sigaltstack_args), (sy_call_t *)cheriabi_sigaltstack, AUE_SIGALTSTACK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 53 = cheriabi_sigaltstack */
-	{ AS(cheriabi_ioctl_args), (sy_call_t *)cheriabi_ioctl, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 54 = cheriabi_ioctl */
+	{ AS(cheriabi_ioctl_args), (sy_call_t *)cheriabi_ioctl, AUE_IOCTL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 54 = cheriabi_ioctl */
 	{ AS(reboot_args), (sy_call_t *)sys_reboot, AUE_REBOOT, NULL, 0, 0, 0, SY_THR_STATIC },	/* 55 = reboot */
 	{ AS(cheriabi_revoke_args), (sy_call_t *)cheriabi_revoke, AUE_REVOKE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 56 = cheriabi_revoke */
 	{ AS(cheriabi_symlink_args), (sy_call_t *)cheriabi_symlink, AUE_SYMLINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 57 = cheriabi_symlink */
@@ -563,7 +559,7 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_pipe2_args), (sy_call_t *)cheriabi_pipe2, AUE_PIPE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 542 = cheriabi_pipe2 */
 	{ AS(cheriabi_aio_mlock_args), (sy_call_t *)cheriabi_aio_mlock, AUE_AIO_MLOCK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 543 = cheriabi_aio_mlock */
 	{ AS(cheriabi_procctl_args), (sy_call_t *)cheriabi_procctl, AUE_PROCCTL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 544 = cheriabi_procctl */
-	{ AS(cheriabi_ppoll_args), (sy_call_t *)cheriabi_ppoll, AUE_POLL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 545 = cheriabi_ppoll */
+	{ AS(cheriabi_ppoll_args), (sy_call_t *)cheriabi_ppoll, AUE_POLL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 545 = cheriabi_ppoll */
 	{ AS(cheriabi_futimens_args), (sy_call_t *)cheriabi_futimens, AUE_FUTIMES, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 546 = cheriabi_futimens */
 	{ AS(cheriabi_utimensat_args), (sy_call_t *)cheriabi_utimensat, AUE_FUTIMESAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 547 = cheriabi_utimensat */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 548 = obsolete numa_getaffinity */
@@ -582,4 +578,9 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_cpuset_getdomain_args), (sy_call_t *)cheriabi_cpuset_getdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 561 = cheriabi_cpuset_getdomain */
 	{ AS(cheriabi_cpuset_setdomain_args), (sy_call_t *)cheriabi_cpuset_setdomain, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 562 = cheriabi_cpuset_setdomain */
 	{ AS(cheriabi_getrandom_args), (sy_call_t *)cheriabi_getrandom, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 563 = cheriabi_getrandom */
+	{ AS(cheriabi_getfhat_args), (sy_call_t *)cheriabi_getfhat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 564 = cheriabi_getfhat */
+	{ AS(cheriabi_fhlink_args), (sy_call_t *)cheriabi_fhlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = cheriabi_fhlink */
+	{ AS(cheriabi_fhlinkat_args), (sy_call_t *)cheriabi_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = cheriabi_fhlinkat */
+	{ AS(cheriabi_fhreadlink_args), (sy_call_t *)cheriabi_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = cheriabi_fhreadlink */
+	{ AS(cheriabi_funlinkat_args), (sy_call_t *)cheriabi_funlinkat, AUE_UNLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 568 = cheriabi_funlinkat */
 };

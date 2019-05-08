@@ -26,6 +26,7 @@ extern "C" {
 #    define _CRT_SECURE_NO_DEPRECATE /* VS2005 - must be declared before <io.h> and <windows.h> */
 #    define snprintf sprintf_s       /* snprintf unsupported by Visual <= 2013 */
 #  endif
+#  pragma warning(disable : 4127)    /* disable: C4127: conditional expression is constant */
 #endif
 
 
@@ -86,8 +87,8 @@ extern "C" {
  * The following list of build macros tries to "guess" if target OS is likely unix-like, and therefore can #include <unistd.h>
  */
 #  elif !defined(_WIN32) \
-     && (defined(__unix__) || defined(__unix) \
-     || defined(__midipix__) || defined(__VMS) || defined(__HAIKU__))
+     && ( defined(__unix__) || defined(__unix) \
+       || defined(__midipix__) || defined(__VMS) || defined(__HAIKU__) )
 
 #    if defined(__linux__) || defined(__linux)
 #      ifndef _POSIX_C_SOURCE
@@ -106,6 +107,7 @@ extern "C" {
 #  endif
 
 #endif   /* PLATFORM_POSIX_VERSION */
+
 
 /*-*********************************************
 *  Detect if isatty() and fileno() are available

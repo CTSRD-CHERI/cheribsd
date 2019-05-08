@@ -81,10 +81,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
 #include <sys/jail.h>
-#include <sys/cheriabi.h>
 
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
+
+#if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32)
+#define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
+#endif
 
 FEATURE(sysv_msg, "System V message queues support");
 
@@ -199,6 +202,50 @@ static struct syscall_helper_data msg_syscalls[] = {
 #include <compat/freebsd32/freebsd32_syscall.h>
 #include <compat/freebsd32/freebsd32_util.h>
 
+struct msqid_ds32 {
+	struct ipc_perm32 msg_perm;
+	uint32_t	__msg_first;
+	uint32_t	__msg_last;
+	uint32_t	msg_cbytes;
+	uint32_t	msg_qnum;
+	uint32_t	msg_qbytes;
+	pid_t		msg_lspid;
+	pid_t		msg_lrpid;
+	int32_t		msg_stime;
+	int32_t		msg_rtime;
+	int32_t		msg_ctime;
+};
+
+#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
+    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
+struct msqid_ds32_old {
+	struct ipc_perm32_old msg_perm;
+	uint32_t	__msg_first;
+	uint32_t	__msg_last;
+	uint32_t	msg_cbytes;
+	uint32_t	msg_qnum;
+	uint32_t	msg_qbytes;
+	pid_t		msg_lspid;
+	pid_t		msg_lrpid;
+	int32_t		msg_stime;
+	int32_t		msg_pad1;
+	int32_t		msg_rtime;
+	int32_t		msg_pad2;
+	int32_t		msg_ctime;
+	int32_t		msg_pad3;
+	int32_t		msg_pad4[4];
+};
+#endif
+
+struct msqid_kernel32 {
+	/* Data structure exposed to user space. */
+	struct msqid_ds32	u;
+
+	/* Kernel-private components of the message queue. */
+	uint32_t		label;
+	uint32_t		cred;
+};
+
 static struct syscall_helper_data msg32_syscalls[] = {
 	SYSCALL32_INIT_HELPER(freebsd32_msgctl),
 	SYSCALL32_INIT_HELPER(freebsd32_msgsnd),
@@ -213,8 +260,33 @@ static struct syscall_helper_data msg32_syscalls[] = {
 };
 #endif
 
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
+#ifdef COMPAT_CHERIABI
+#include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_syscall.h>
+#include <compat/cheriabi/cheriabi_util.h>
+
+struct msqid_ds_c {
+	struct ipc_perm	 		msg_perm;
+	struct msg * __capability	kmsg_first;
+	struct msg * __capability	kmsg_last;
+	msglen_t	 		msg_cbytes;
+	msgqnum_t	 		msg_qnum;
+	msglen_t	 		msg_qbytes;
+	pid_t		 		msg_lspid;
+	pid_t		 		msg_lrpid;
+	time_t		 		msg_stime;
+	time_t		 		msg_rtime;
+	time_t		 		msg_ctime;
+};
+
+struct msqid_kernel_c {
+	/* Data structure exposed to user space. */
+	struct msqid_ds_c			 u;
+
+	/* Kernel-private components of the message queue. */
+	struct label * __capability	label;
+	struct ucred * __capability	cred;
+};
 
 static struct syscall_helper_data cheriabi_msg_syscalls[] = {
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_msgctl),
@@ -223,7 +295,7 @@ static struct syscall_helper_data cheriabi_msg_syscalls[] = {
 	CHERIABI_SYSCALL_INIT_HELPER(cheriabi_msgrcv),
 	SYSCALL_INIT_LAST
 };
-#endif /* COMPAT_FREEBSD64 */
+#endif /* COMPAT_CHERIABI */
 
 static int
 msginit()
@@ -325,8 +397,7 @@ msginit()
 	if (error != 0)
 		return (error);
 #endif
-#ifdef COMPAT_FREEBSD64
-	/* XXX-AM: fix for freebsd64 */
+#ifdef COMPAT_CHERIABI
 	error = cheriabi_syscall_helper_register(cheriabi_msg_syscalls,
 	    SY_THR_STATIC_KLD);
 	if (error != 0)
@@ -348,8 +419,7 @@ msgunload()
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(msg32_syscalls);
 #endif
-#ifdef COMPAT_FREEBSD64
-	/* XXX-AM: fix for freebsd64 */
+#ifdef COMPAT_CHERIABI
 	cheriabi_syscall_helper_unregister(cheriabi_msg_syscalls);
 #endif
 
@@ -502,54 +572,9 @@ msq_prison_cansee(struct prison *rpr, struct msqid_kernel *msqkptr)
 struct msgctl_args {
 	int	msqid;
 	int	cmd;
-	struct	msqid_ds * __capability buf;
+	struct	msqid_ds *buf;
 };
 #endif
-#if __has_feature(capabilities)
-int
-sys_msgctl(struct thread *td, struct msgctl_args *uap)
-{
-	struct msqid_ds msqbuf;
-	struct msqid_ds_c msqbuf_c;
-	int error;
-
-	if (uap->cmd == IPC_SET) {
-		error = copyin(uap->buf, &msqbuf_c, sizeof(msqbuf_c));
-		if (error)
-			return (error);
-		CP(msqbuf_c, msqbuf, msg_perm);
-		msqbuf.__msg_first = NULL;	/* Ignored */
-		msqbuf.__msg_last = NULL;	/* Ignored */
-		CP(msqbuf_c, msqbuf, msg_cbytes);
-		CP(msqbuf_c, msqbuf, msg_qnum);
-		CP(msqbuf_c, msqbuf, msg_qbytes);
-		CP(msqbuf_c, msqbuf, msg_lspid);
-		CP(msqbuf_c, msqbuf, msg_lrpid);
-		CP(msqbuf_c, msqbuf, msg_stime);
-		CP(msqbuf_c, msqbuf, msg_rtime);
-		CP(msqbuf_c, msqbuf, msg_ctime);
-	}
-	error = kern_msgctl(td, uap->msqid, uap->cmd, &msqbuf);
-	if (error)
-		return (error);
-	if (uap->cmd == IPC_STAT) {
-		CP(msqbuf, msqbuf_c, msg_perm);
-		msqbuf_c.kmsg_first = NULL;	/* Don't leak kernel ptr */
-		msqbuf_c.kmsg_last = NULL;	/* Don't leak kernel ptr */
-		CP(msqbuf, msqbuf_c, msg_cbytes);
-		CP(msqbuf, msqbuf_c, msg_qnum);
-		CP(msqbuf, msqbuf_c, msg_qbytes);
-		CP(msqbuf, msqbuf_c, msg_lspid);
-		CP(msqbuf, msqbuf_c, msg_lrpid);
-		CP(msqbuf, msqbuf_c, msg_stime);
-		CP(msqbuf, msqbuf_c, msg_rtime);
-		CP(msqbuf, msqbuf_c, msg_ctime);
-		error = copyout(&msqbuf_c, uap->buf,
-		    sizeof(struct msqid_ds_c));
-	}
-	return (error);
-}
-#else /* !__has_feature(capabilities) */
 int
 sys_msgctl(struct thread *td, struct msgctl_args *uap)
 {
@@ -568,7 +593,6 @@ sys_msgctl(struct thread *td, struct msgctl_args *uap)
 		error = copyout(&msqbuf, buf, sizeof(struct msqid_ds));
 	return (error);
 }
-#endif /* !__has_feature(capabilities) */
 
 int
 kern_msgctl(struct thread *td, int msqid, int cmd, struct msqid_ds *msqbuf)
@@ -1458,7 +1482,7 @@ done2:
 #ifndef _SYS_SYSPROTO_H_
 struct msgrcv_args {
 	int	msqid;
-	void	* __capability msgp;
+	void	*msgp;
 	size_t	msgsz;
 	long	msgtyp;
 	int	msgflg;
@@ -1489,10 +1513,7 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD32
 	struct msqid_kernel32 tmsqk32;
 #endif
-#ifdef COMPAT_FREEBSD64
-	struct msqid_kernel64 tmsqk64;
-#endif
-#if __has_feature(capabilities)
+#ifdef COMPAT_CHERIABI
 	struct msqid_kernel_c tmsqk_c;
 #endif
 	struct prison *pr, *rpr;
@@ -1533,27 +1554,8 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 			outsize = sizeof(tmsqk32);
 		} else
 #endif
-#ifdef COMPAT_FREEBSD64
-		if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
-			/* XXX-AM: fix for freebsd64 */
-			bzero(&tmsqk64, sizeof(tmsqk64));
-			CP(tmsqk, tmsqk64, u.msg_perm);
-			/* Don't copy u.msg_first or u.msg_last */
-			CP(tmsqk, tmsqk64, u.msg_cbytes);
-			CP(tmsqk, tmsqk64, u.msg_qnum);
-			CP(tmsqk, tmsqk64, u.msg_qbytes);
-			CP(tmsqk, tmsqk64, u.msg_lspid);
-			CP(tmsqk, tmsqk64, u.msg_lrpid);
-			CP(tmsqk, tmsqk64, u.msg_stime);
-			CP(tmsqk, tmsqk64, u.msg_rtime);
-			CP(tmsqk, tmsqk64, u.msg_ctime);
-			/* Don't copy label or cred */
-			outaddr = &tmsqk64;
-			outsize = sizeof(tmsqk64);
-		} else
-#endif
-#if __has_feature(capabilities)
-		{
+#ifdef COMPAT_CHERIABI
+		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			bzero(&tmsqk_c, sizeof(tmsqk_c));
 			CP(tmsqk, tmsqk_c, u.msg_perm);
 			/* Don't copy u.msg_first or u.msg_last */
@@ -1568,8 +1570,8 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 			/* Don't copy label or cred */
 			outaddr = &tmsqk_c;
 			outsize = sizeof(tmsqk_c);
-		}
-#else /* !__has_feature(capabilities) */
+		} else
+#endif
 		{
 			/* Don't leak kernel pointers */
 			tmsqk.u.__msg_first = NULL;
@@ -1583,8 +1585,7 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 			 */
 			outaddr = &tmsqk;
 			outsize = sizeof(tmsqk);
-		}		
-#endif /* !__has_feature(capabilities) */
+		}
 		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
 			break;
@@ -1936,8 +1937,7 @@ freebsd32_msgrcv(struct thread *td, struct freebsd32_msgrcv_args *uap)
 }
 #endif
 
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
+#ifdef COMPAT_CHERIABI
 int
 cheriabi_msgctl(struct thread *td, struct cheriabi_msgctl_args *uap)
 {
@@ -2017,7 +2017,7 @@ cheriabi_msgsnd(struct thread *td, struct cheriabi_msgsnd_args *uap)
 	    (const char * __capability)uap->msgp + sizeof(mtype),
 	    uap->msgsz, uap->msgflg, mtype));
 }
-#endif /* COMPAT_FREEBSD64 */
+#endif /* COMPAT_CHERIABI */
 
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
@@ -2116,7 +2116,7 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 	   COMPAT_FREEBSD7 */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
