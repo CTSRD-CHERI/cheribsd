@@ -34,14 +34,15 @@ typedef Clock::duration duration;
 typedef std::chrono::milliseconds ms;
 typedef std::chrono::nanoseconds ns;
 
-ms WaitTime = ms(250);
 
 // Thread sanitizer causes more overhead and will sometimes cause this test
 // to fail. To prevent this we give Thread sanitizer more time to complete the
 // test.
-#if !defined(TEST_HAS_SANITIZERS) && !defined(TEST_SLOW_HOST)
+#if !defined(TEST_HAS_SANITIZERS) && !TEST_SLOW_HOST()
+ms WaitTime = ms(250);
 ms Tolerance = ms(25);
 #else
+ms WaitTime = ms(500);
 ms Tolerance = ms(25 * 5);
 #endif
 

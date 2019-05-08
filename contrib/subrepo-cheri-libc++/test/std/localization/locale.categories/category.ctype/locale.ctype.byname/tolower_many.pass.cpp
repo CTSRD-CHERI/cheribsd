@@ -30,7 +30,7 @@ int main(int, char**)
             const F& f = std::use_facet<F>(ll);
             std::string in("c A\x07.a1");
 
-            assert(f.tolower(&in[0], in.data() + in.size()) == in.data() + in.size());
+            assert(f.tolower(in.data(), in.data() + in.size()) == in.data() + in.size());
             assert(in[0] == 'c');
             assert(in[1] == ' ');
             assert(in[2] == 'a');
@@ -48,7 +48,7 @@ int main(int, char**)
             const F& f = std::use_facet<F>(ll);
             std::string in("\xDA A\x07.a1");
 
-            assert(f.tolower(&in[0], in.data() + in.size()) == in.data() + in.size());
+            assert(f.tolower(in.data(), in.data() + in.size()) == in.data() + in.size());
             assert(in[0] == '\xDA');
             assert(in[1] == ' ');
             assert(in[2] == 'a');
@@ -66,7 +66,7 @@ int main(int, char**)
             const F& f = std::use_facet<F>(ll);
             std::wstring in(L"\xDA A\x07.a1");
 
-            assert(f.tolower(&in[0], in.data() + in.size()) == in.data() + in.size());
+            assert(f.tolower(in.data(), in.data() + in.size()) == in.data() + in.size());
             assert(in[0] == L'\xFA');
             assert(in[1] == L' ');
             assert(in[2] == L'a');
@@ -84,7 +84,7 @@ int main(int, char**)
             const F& f = std::use_facet<F>(ll);
             std::wstring in(L"\xDA A\x07.a1");
 
-            assert(f.tolower(&in[0], in.data() + in.size()) == in.data() + in.size());
+            assert(f.tolower(in.data(), in.data() + in.size()) == in.data() + in.size());
             assert(in[0] == L'\xDA');
             assert(in[1] == L' ');
             assert(in[2] == L'a');

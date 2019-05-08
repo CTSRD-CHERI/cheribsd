@@ -262,7 +262,9 @@ class SSHExecutor(RemoteExecutor):
 
     def _execute_command_remote(self, cmd, remote_work_dir='.', env=None):
         remote = self.user_prefix + self.host
-        ssh_cmd = self.ssh_command + ['-oBatchMode=yes', remote]
+        # Add -tt to force a TTY allocation so that the remote process is killed
+        # when SSH exits.
+        ssh_cmd = self.ssh_command + ['-tt', '-oBatchMode=yes', remote]
         # FIXME: doesn't handle spaces... and Py2.7 doesn't have shlex.quote()
         if env:
             env_cmd = ['env'] + ['\'%s=%s\'' % (k, v) for k, v in env.items()]

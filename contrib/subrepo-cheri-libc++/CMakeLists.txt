@@ -233,7 +233,7 @@ option(LIBCXX_ENABLE_RTTI "Use run time type information." OFF)
 option(LIBCXX_ENABLE_GLOBAL_FILESYSTEM_NAMESPACE "Build libc++ with support for the global filesystem namespace." ON)
 option(LIBCXX_ENABLE_STDIN "Build libc++ with support for stdin/std::cin." ON)
 option(LIBCXX_ENABLE_STDOUT "Build libc++ with support for stdout/std::cout." ON)
-option(LIBCXX_ENABLE_THREADS "Build libc++ with support for threads." OFF)
+option(LIBCXX_ENABLE_THREADS "Build libc++ with support for threads." ON)
 option(LIBCXX_ENABLE_THREAD_UNSAFE_C_FUNCTIONS "Build libc++ with support for thread-unsafe C functions" ON)
 option(LIBCXX_ENABLE_MONOTONIC_CLOCK
   "Build libc++ with support for a monotonic clock.
