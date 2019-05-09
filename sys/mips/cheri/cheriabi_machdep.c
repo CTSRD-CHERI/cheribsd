@@ -302,6 +302,8 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 	struct sysentvec *se;
 
 	code = locr0->v0;
+	if (code == SYS_syscall || code == SYS___syscall)
+		code = locr0->a0;
 
 	se = td->td_proc->p_sysent;
 	/*
