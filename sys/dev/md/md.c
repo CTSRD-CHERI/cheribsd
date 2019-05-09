@@ -119,30 +119,6 @@
 #define MD_NSECT (10000 * 2)
 #endif
 
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
-struct md_ioctl64 {
-	unsigned	md_version;	/* Structure layout version */
-	unsigned	md_unit;	/* unit number */
-	enum md_types	md_type;	/* type of disk */
-	void * __capability md_file;	/* pathname of file to mount */
-	off_t		md_mediasize;	/* size of disk in bytes */
-	unsigned	md_sectorsize;	/* sectorsize */
-	unsigned	md_options;	/* options */
-	uint64_t	md_base;	/* base address */
-	int		md_fwheads;	/* firmware heads */
-	int		md_fwsectors;	/* firmware sectors */
-	char * __capability md_label;	/* label of the device (userspace) */
-	int		md_pad[MDNPAD];	/* used by MDIOCLIST */
-};
-
-#define	MDIOCATTACH_64	_IOC_NEWTYPE(MDIOCATTACH, struct md_ioctl64)
-#define	MDIOCDETACH_64	_IOC_NEWTYPE(MDIOCDETACH, struct md_ioctl64)
-#define	MDIOCQUERY_64	_IOC_NEWTYPE(MDIOCQUERY, struct md_ioctl64)
-/* MDIOCLIST is broken by design and not supported in CheriABI */
-#define	MDIOCRESIZE_64	_IOC_NEWTYPE(MDIOCRESIZE, struct md_ioctl64)
-#endif /* COMPAT_FREEBSD64 */
-
 #ifdef COMPAT_FREEBSD32
 struct md_ioctl32 {
 	unsigned	md_version;
@@ -166,6 +142,30 @@ CTASSERT((sizeof(struct md_ioctl32)) == 436);
 #define	MDIOCLIST_32	_IOC_NEWTYPE(MDIOCLIST, struct md_ioctl32)
 #define	MDIOCRESIZE_32	_IOC_NEWTYPE(MDIOCRESIZE, struct md_ioctl32)
 #endif /* COMPAT_FREEBSD32 */
+
+#ifdef COMPAT_FREEBSD64
+struct md_ioctl64 {
+	unsigned	md_version;
+	unsigned	md_unit;
+	enum md_types	md_type;
+	uint64_t	md_file;	/* (void *) */
+	off_t		md_mediasize;
+	unsigned	md_sectorsize;
+	unsigned	md_options;
+	uint64_t	md_base;
+	int		md_fwheads;
+	int		md_fwsectors;
+	uint64_t	md_label;	/* (char *) */
+	int		md_pad[MDNPAD];
+};
+
+#define	MDIOCATTACH_64	_IOC_NEWTYPE(MDIOCATTACH, struct md_ioctl64)
+#define	MDIOCDETACH_64	_IOC_NEWTYPE(MDIOCDETACH, struct md_ioctl64)
+#define	MDIOCQUERY_64	_IOC_NEWTYPE(MDIOCQUERY, struct md_ioctl64)
+/* MDIOCLIST is broken by design and not supported in CheriABI */
+#define	MDIOCLIST_64	_IOC_NEWTYPE(MDIOCLIST, struct md_ioctl64)
+#define	MDIOCRESIZE_64	_IOC_NEWTYPE(MDIOCRESIZE, struct md_ioctl64)
+#endif /* COMPAT_FREEBSD64 */
 
 static MALLOC_DEFINE(M_MD, "md_disk", "Memory Disk");
 static MALLOC_DEFINE(M_MDSECT, "md_sectors", "Memory Disk Sectors");
@@ -1966,13 +1966,23 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case MDIOCATTACH:
 	case MDIOCDETACH:
 	case MDIOCRESIZE:
-	case MDIOCQUERY: {
+	case MDIOCQUERY:
+	case MDIOCLIST: {
 		struct md_ioctl *mdio = (struct md_ioctl *)addr;
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
-		mdr.md_file = mdio->md_file;
-		mdr.md_file_seg = UIO_USERSPACE;
+		/* If the file is adjacent to the md_ioctl it's in kernel. */
+		if ((void *)mdio->md_file == (void *)(mdio + 1)) {
+			mdr.md_file =
+			    (__cheri_tocap char * __capability)mdio->md_file;
+			mdr.md_file_seg = UIO_SYSSPACE;
+		} else {
+			mdr.md_file = mdio->md_file;
+			mdr.md_file_seg = UIO_USERSPACE;			
+			mdr.md_file = __USER_CAP_STR(mdio->md_file);
+			mdr.md_file_seg = UIO_USERSPACE;
+		}		
 		mdr.md_label = mdio->md_label;
 		break;
 	}
@@ -1986,16 +1996,10 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
 		MD_IOCTL2REQ(mdio, &mdr);
-		/* If the file is adjacent to the md_ioctl it's in kernel. */
-		if ((void *)mdio->md_file == (void *)(mdio + 1)) {
-			mdr.md_file =
-			    (__cheri_tocap char * __capability)mdio->md_file;
-			mdr.md_file_seg = UIO_SYSSPACE;
-		} else {
-			mdr.md_file = __USER_CAP_STR(mdio->md_file);
-			mdr.md_file_seg = UIO_USERSPACE;
-		}
-		mdr.md_label = __USER_CAP_STR(mdio->md_label);
+		mdr.md_file = __USER_CAP_STR((void *)(uintptr_t)mdio->md_file);
+		mdr.md_file_seg = UIO_USERSPACE;
+		mdr.md_label =
+		    __USER_CAP_STR((void *)(uintptr_t)mdio->md_label);
 		break;
 	}
 #endif
@@ -2059,7 +2063,13 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 #endif
 		error = kern_mdquery(&mdr);
 		break;
+#ifndef CHERI_KERNEL
+	/* MDIOCLIST is broken by design and not supported in CheriABI */
 	case MDIOCLIST:
+#endif
+#ifdef COMPAT_FREEBSD64
+	case MDIOCLIST_64:
+#endif
 #ifdef COMPAT_FREEBSD32
 	case MDIOCLIST_32:
 #endif
@@ -2079,7 +2089,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 #ifdef COMPAT_FREEBSD64
 	case MDIOCATTACH_64:
 	case MDIOCQUERY_64: {
-		struct md_ioctl_c *mdio = (struct md_ioctl_c *)addr;
+		struct md_ioctl64 *mdio = (struct md_ioctl64 *)addr;
 		MD_REQ2IOCTL(&mdr, mdio);
 		break;
 	}
@@ -2285,7 +2295,7 @@ g_md_fini(struct g_class *mp __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

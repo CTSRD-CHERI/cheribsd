@@ -64,12 +64,12 @@ struct fiodgname_arg {
 #define	FIOSEEKHOLE	_IOWR('f', 98, off_t)	/* SEEK_HOLE */
 
 #ifdef _KERNEL
-#ifdef COMPAT_CHERIABI
-struct fiodgname_arg_c {
+#ifdef COMPAT_FREEBSD64
+struct fiodgname_arg64 {
 	int		len;
-	void * __capability buf;
+	uint64_t	buf;	/* (void *) */
 };
-#define FIODGNAME_C	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg_c)
+#define FIODGNAME_64	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg64)
 #endif
 
 #ifdef COMPAT_FREEBSD32

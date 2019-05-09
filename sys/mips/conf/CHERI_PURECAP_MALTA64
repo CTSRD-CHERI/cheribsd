@@ -50,7 +50,6 @@ options		TRAP_DEBUG
 # nodevice ata
 # nodevice vga
 # disable nfs
-nooptions	COMPAT_CHERIABI
 
 #
 # Features required for CHERI CPU and CheriBSD support.

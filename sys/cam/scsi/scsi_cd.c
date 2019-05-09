@@ -230,7 +230,7 @@ struct ioc_read_toc_entry64 {
 	u_char	address_format;
 	u_char	starting_track;
 	u_short	data_len;
-	struct cd_toc_entry *data;
+	uint64_t data; /* (struct cd_toc_entry *) */
 };
 #define	CDIOREADTOCENTRYS_64	\
     _IOC_NEWTYPE(CDIOREADTOCENTRYS, struct ioc_read_toc_entry64)

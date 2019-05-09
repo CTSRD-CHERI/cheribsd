@@ -42,20 +42,29 @@ typedef	__size_t	size_t;
 #define	_SIZE_T_DECLARED
 #endif
 
+#ifndef _KERNEL
 struct iovec {
-	void * __kerncap iov_base;		/* Base address. */
-	size_t			iov_len;	/* Length. */
-};
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
-struct iovec64 {
 	void *	iov_base;	/* Base address. */
 	size_t			iov_len;	/* Length. */
 };
 #endif
+#if __has_feature(capabilities)
+struct iovec_c {
+	void * __capability	iov_base;	/* Base address. */
+	size_t			iov_len;	/* Length. */
+};
+#endif
+struct iovec_native {
+	void *	iov_base;	/* Base address. */
+	size_t			iov_len;	/* Length. */
+};
 /* XXX: need some ifdefs */
-typedef struct iovec	kiovec_t;
-typedef struct iovec	uiovec_t;
+#if __has_feature(capabilities)
+typedef struct iovec_c		kiovec_t;
+#else
+typedef	struct iovec_native	kiovec_t;
+#endif
+typedef struct iovec_native	uiovec_t;
 
 #if defined(_KERNEL)
 #define	IOVEC_INIT(iovp, base, len)	do {				\

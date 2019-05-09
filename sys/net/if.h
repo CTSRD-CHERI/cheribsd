@@ -433,11 +433,9 @@ struct	ifreq {
 #endif /* !defined(_KERNEL) */
 
 #if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-/* XXX-AM: fix for freebsd64 */
-
 struct ifreq_buffer64 {
 	size_t			length;		/* (size_t) */
-	void * __capability	buffer;		/* (void *) */
+	uint64_t		buffer;		/* (void *) */
 };
 
 struct ifreq64 {
@@ -454,13 +452,13 @@ struct ifreq64 {
 		int		ifru_mtu;
 		int		ifru_phys;
 		int		ifru_media;
-		void * __capability ifru_data;
+		uint64_t	ifru_data;	/* (caddr_t) */
 		int		ifru_cap[2];
 		u_int		ifru_fib;
 		u_char		ifru_vlan_pcp;
 	} ifr_ifru;
 };
-#endif /* defined(_KERNEL) && __has_feature(capabilities) */
+#endif /* defined(_KERNEL) && defined(COMPAT_FREEBSD64) */
 
 #define	_SIZEOF_ADDR_IFREQ(ifr) \
 	((ifr).ifr_addr.sa_len > sizeof(struct sockaddr) ? \

@@ -133,25 +133,24 @@ CTASSERT(offsetof(struct bpf_if, bif_ext) == 0);
     (offsetof(type, bh_hdrlen) + sizeof(((type *)0)->bh_hdrlen))
 
 #ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
 
 struct bpf_program64 {
 	u_int bf_len;
-	struct bpf_insn * __capability bf_insns;
+	uint64_t bf_insns; /* (struct bpf_insn *) */
 };
 struct bpf_dltlist64 {
 	u_int bfl_len;
-	u_int * __capability bfl_list;
+	uint64_t bfl_list; /* (u_int *) */
 };
 
 #define	_CASE_IOC_BPF_DLTLIST64(cmd)				\
     _IOC_NEWTYPE((cmd), struct bpf_dltlist64): case
 #define	_CASE_IOC_BPF_PROGRAM64(cmd)				\
     _IOC_NEWTYPE((cmd), struct bpf_program64): case
-#else /* !COMPAT_CHERIABI */
+#else /* !COMPAT_FREEBSD64 */
 #define	_CASE_IOC_BPF_DLTLIST64(cmd)
 #define	_CASE_IOC_BPF_PROGRAM64(cmd)
-#endif /* !COMPAT_CHERIABI */
+#endif /* !COMPAT_FREEBSD64 */
 
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>
@@ -1832,7 +1831,7 @@ bf_insns_get_ptr(void *fpp)
 	union {
 		struct bpf_program fp;
 #ifdef COMPAT_FREEBSD64
-		struct bpf_program_c fp64;
+		struct bpf_program64 fp64;
 #endif
 #ifdef COMPAT_FREEBSD32
 		struct bpf_program32 fp32;
@@ -1840,6 +1839,10 @@ bf_insns_get_ptr(void *fpp)
 	} *fpup;
 
 	fpup = fpp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (fpup->fp.bf_insns);
+#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP(
@@ -1847,12 +1850,13 @@ bf_insns_get_ptr(void *fpp)
 		    fpup->fp32.bf_len * sizeof(struct bpf_insn)));
 #endif
 #ifdef COMPAT_FREEBSD64
-	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI))
-		/* XXX-AM: fix for freebsd64 */
-		return (__USER_CAP(fpup->fp64.bf_insns,
-				   fpup->fp64.bf_len * sizeof(struct bpf_insn)));
+	return (__USER_CAP(
+	    (struct bpf_insn *)(uintptr_t)fpup->fp64.bf_insns,
+	    fpup->fp64.bf_len * sizeof(struct bpf_insn)));
+#else
+	return (__USER_CAP(fpup->fp.bf_insns,
+	    fpup->fp.bf_len * sizeof(struct bpf_insn)));
 #endif
-	return (fpup->fp.bf_insns);
 }
 
 /*
@@ -2755,18 +2759,22 @@ bfl_list_get_ptr(void *bflp)
 	} *bflup;
 
 	bflup = bflp;
+#ifdef COMPAT_CHERIABI
+	if (SV_CURPROC_FLAG(SV_CHERI))
+		return (bflup->bfl.bfl_list);
+#endif
 #ifdef COMPAT_FREEBSD32
 	if (SV_CURPROC_FLAG(SV_ILP32))
 		return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl32.bfl_list,
 		    bflup->bfl32.bfl_len * sizeof(u_int)));
 #endif
 #ifdef COMPAT_FREEBSD64
-	if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI))
-		/* XXX-AM: fix for freebsd64 */
-		return (__USER_CAP(bflup->bfl64.bfl_list,
-		    bflup->bfl64.bfl_len * sizeof(u_int)));
+	return (__USER_CAP((u_int *)(uintptr_t)bflup->bfl64.bfl_list,
+	    bflup->bfl64.bfl_len * sizeof(u_int)));
+#else
+	return (__USER_CAP(bflup->bfl.bfl_list,
+	    bflup->bfl.bfl_len * sizeof(u_int)));
 #endif
-	return (bflup->bfl.bfl_list);
 }
 
 /*
@@ -3104,7 +3112,7 @@ DB_SHOW_COMMAND(bpf_if, db_show_bpf_if)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190513,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc"

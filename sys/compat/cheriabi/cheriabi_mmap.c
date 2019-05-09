@@ -101,7 +101,7 @@ cheriabi_msync(struct thread *td, struct cheriabi_msync_args *uap)
 	if (uap->len != 0 && cap_covers_pages(uap->addr, uap->len) == 0)
 		return (EINVAL);
 
-	return (kern_msync(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	return (kern_msync(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
 	    uap->flags));
 }
 
@@ -121,7 +121,7 @@ cheriabi_madvise(struct thread *td, struct cheriabi_madvise_args *uap)
 			return (EPROT);
 	}
 
-	return (kern_madvise(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	return (kern_madvise(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
 	    uap->behav));
 }
 
@@ -287,7 +287,7 @@ cheriabi_munmap(struct thread *td, struct cheriabi_munmap_args *uap)
 	if ((cheri_getperm(uap->addr) & CHERI_PERM_CHERIABI_VMMAP) == 0)
 		return (EPROT);
 
-	return (kern_munmap(td, (__cheri_addr uintptr_t)uap->addr, uap->len));
+	return (kern_munmap(td, (__cheri_addr vaddr_t)uap->addr, uap->len));
 }
 
 
@@ -441,7 +441,7 @@ cheriabi_mincore(struct thread *td, struct cheriabi_mincore_args *uap)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (ENOMEM);	/* XXX: EPROT? */
 
-	return (kern_mincore(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	return (kern_mincore(td, (__cheri_addr vaddr_t)uap->addr, uap->len,
 	    uap->vec));
 }
 
@@ -453,7 +453,7 @@ cheriabi_mlock(struct thread *td, struct cheriabi_mlock_args *uap)
 		return (ENOMEM);	/* XXX: EPROT? */
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    (__cheri_addr uintptr_t)uap->addr, uap->len));
+	    (__cheri_addr vaddr_t)uap->addr, uap->len));
 }
 
 int
@@ -463,5 +463,5 @@ cheriabi_munlock(struct thread *td, struct cheriabi_munlock_args *uap)
 	if (cap_covers_pages(uap->addr, uap->len) == 0)
 		return (ENOMEM);	/* XXX: EPROT? */
 
-	return (kern_munlock(td, (__cheri_addr uintptr_t)uap->addr, uap->len));
+	return (kern_munlock(td, (__cheri_addr vaddr_t)uap->addr, uap->len));
 }

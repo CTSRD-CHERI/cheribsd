@@ -752,7 +752,7 @@ user_ioctl(struct thread *td, int fd, u_long com, void * __capability udata,
 	if (size > 0) {
 		if (com & IOC_VOID) {
 			/* Integer argument. */
-			arg = (__cheri_addr intptr_t)udata;
+			arg = (__cheri_addr vaddr_t)udata;
 			data = (void *)&arg;
 			size = 0;
 		} else {

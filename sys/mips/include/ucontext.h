@@ -41,7 +41,7 @@
 
 #ifndef _LOCORE
 
-#if __has_feature(capabilities)
+#if defined(COMPAT_CHERIABI) || defined(__CHERI_PURE_CAPABILITY__)
 #include <cheri/cheri.h>
 #endif
 
@@ -62,11 +62,7 @@ typedef struct	__mcontext {
 	void		*mc_tls;	/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 
-	/*
-	 *  XXX-AM: should this be defined(_KERNEL) && __has_feature(capabilities) ||
-	 *  __CHERI_PURE_CAPABILITY__ ?
-	 */
-#ifndef __CHERI_PURE_CAPABILITY__
+#if !defined(__CHERI_PURE_CAPABILITY__) || defined(CHERI_KERNEL)
         /*
          * Optional externally referenced storage for coprocessors.  Modeled
          * on the approach taken for extended FPU state on x86, which leaves
@@ -82,14 +78,13 @@ typedef struct	__mcontext {
          * differently.
          */
 #if (defined(__mips_n32) || defined(__mips_n64))
-        int             xxx[6];         /* XXX reserved */
+        int             xxx[2];         /* XXX reserved */
 #else
-        int             xxx[7];         /* XXX reserved */
+        int             xxx[5];         /* XXX reserved */
 #endif
-
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	void * __capability	__spare__[8];
+	struct chericap	__spare__[8];
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 } mcontext_t;
 
@@ -186,10 +181,10 @@ typedef struct	__mcontext_c {
 	int		mc_fpused;	/* fp has been used */
 	f_register_t	mc_fpregs[33];	/* fp regs 0 to 31 and csr */
 	register_t	mc_fpc_eir;	/* fp exception instruction reg */
-	void * _capability     	mc_tls;		/* pointer to TLS area */
+	void * __capability	mc_tls;		/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	void * __capability	__spare__[8];  
+	void * __capability	__spare__[8];
 } mcontext_c_t;
 
 typedef struct __ucontext_c {
@@ -201,7 +196,7 @@ typedef struct __ucontext_c {
 	int			__spare__[4];
 } ucontext_c_t;
 #endif
-#endif /* _LOCORE */
+#endif /* ! defined(_LOCORE) */
 
 #ifndef SZREG
 #if defined(__mips_o32)

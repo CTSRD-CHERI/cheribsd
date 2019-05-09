@@ -148,7 +148,6 @@ struct bufdomain {
 #define	BD_DOMAIN(bd)		(bd - bdomain)
 
 static struct buf *buf;		/* buffer header pool */
-extern struct buf *swbuf;	/* Swap buffer header pool. */
 caddr_t unmapped_buf;
 
 /* Used below and for softdep flushing threads in ufs/ffs/ffs_softdep.c */
@@ -1139,15 +1138,11 @@ kern_vfs_bio_buffer_alloc(caddr_t v, long physmem_est)
 	 * XXX-AM: this is hacky.
 	 */
 	if (!cheri_valid(v)) {
-	  return (v + (nbuf * sizeof(*buf)) + (nswbuf * sizeof(*swbuf)));
+	  return (v + nbuf * sizeof(*buf));
 	}
 
-	swbuf = (void *)cheri_bound(v, nswbuf * sizeof(*swbuf));
-	v = (caddr_t)(v + nswbuf * sizeof(*swbuf));
 	buf = (void *)cheri_bound(v, nbuf * sizeof(*buf));
-	v = (caddr_t)(v + nbuf * sizeof(*buf));	
-	buf = (void *)v;
-	v = (caddr_t)(buf + nbuf);
+	v = (caddr_t)(v + nbuf * sizeof(*buf));
 
 	return(v);
 }

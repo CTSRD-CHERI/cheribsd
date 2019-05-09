@@ -450,7 +450,7 @@ vm_ptr_t
 kmem_malloc(vm_size_t size, int flags)
 {
 
-	return (kmem_malloc_domainset(DOMAINSET_RR(), size, flags));
+	return (kmem_malloc_domainset(DOMAINSET_RR(), size, flags, 0));
 }
 
 vm_ptr_t

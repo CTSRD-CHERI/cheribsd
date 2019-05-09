@@ -82,23 +82,6 @@ static struct fileops devfs_ops_f;
 #include <vm/vm_extern.h>
 #include <vm/vm_object.h>
 
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
-struct fiodgname_arg64 {
-	int		len;
-	void * __capability buf;
-};
-#define FIODGNAME_64	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg64)
-#endif
-
-#ifdef COMPAT_FREEBSD32
-struct fiodgname_arg32 {
-	int		len;
-	uint32_t	buf;	/* (void *) */
-};
-#define FIODGNAME_32	_IOC_NEWTYPE(FIODGNAME, struct fiodgname_arg32)
-#endif
-
 static MALLOC_DEFINE(M_CDEVPDATA, "DEVFSP", "Metainfo for cdev-fp data");
 
 struct mtx	devfs_de_interlock;
@@ -804,16 +787,16 @@ fiodgname_buf_get_ptr(void *fgnp, u_long com)
 	switch (com) {
 	case FIODGNAME:
 		return (fgnup->fgn.buf);
+#ifdef COMPAT_FREEBSD64
+	case FIODGNAME_64:
+		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn64.buf,
+		    fgnup->fgn.len));
+
+#endif
 #ifdef COMPAT_FREEBSD32
 	case FIODGNAME_32:
 		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn32.buf,
 		    fgnup->fgn32.len));
-#endif
-#ifdef COMPAT_FREEBSD64
-	case FIODGNAME_64:
-		/* XXX-AM: fix for freebsd64 */
-		return (__USER_CAP((void *)(uintptr_t)fgnup->fgn64.buf,
-		    fgnup->fgn.len));
 #endif
 	default:
 		panic("Unhandled ioctl command %ld", com);
@@ -2028,7 +2011,7 @@ CTASSERT(O_NONBLOCK == IO_NDELAY);
 CTASSERT(O_FSYNC == IO_SYNC);
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190510,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

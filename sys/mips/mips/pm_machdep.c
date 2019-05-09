@@ -299,9 +299,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	hybridabi_sendsig(td);
 #endif
 
-	regs->pc = (register_t)(__cheri_offset intptr_t)catcher;
+	regs->pc = (register_t)(__cheri_offset vaddr_t)catcher;
 	// FIXME: should this be an offset relative to PCC or an address?
-	regs->t9 = (register_t)(__cheri_offset intptr_t)catcher;
+	regs->t9 = (register_t)(__cheri_offset vaddr_t)catcher;
 	regs->sp = (register_t)(intptr_t)sfp;
 	if (p->p_sysent->sv_sigcode_base != 0) {
 		/* Signal trampoline code is in the shared page */
@@ -329,7 +329,7 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	ucontext_t uc;
 	int error;
 
-	error = copyincap(uap->sigcntxp, &uc, sizeof(uc));
+	error = copyin(uap->sigcntxp, &uc, sizeof(uc));
 	if (error != 0)
 	    return (error);
 
@@ -600,6 +600,7 @@ set_capregs(struct thread *td, struct capreg *capregs)
 	return (ENOSYS);
 }
 #endif
+
 
 /*
  * Clear registers on exec

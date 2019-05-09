@@ -140,13 +140,6 @@ struct shmid_kernel {
 	struct label *label;	/* MAC label */
 	struct ucred *cred;	/* creator's credendials */
 };
-
-struct shmid_kernel_c {
-	struct shmid_ds u;	/* Contains no pointers so no _c needed. */
-	struct vm_object * __capability	object;
-	struct label * __capability	label;
-	struct ucred * __capability	cred;
-};
 #endif
 
 struct shm_info {

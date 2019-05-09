@@ -574,10 +574,50 @@ szsigcode:
 	.long	esigcode-sigcode
 	.text
 
+#if defined(__mips_n64) && defined(COMPAT_FREEBSD64)
+	.globl	_C_LABEL(freebsd64_sigcode)
+_C_LABEL(freebsd64_sigcode):
+	PTR_ADDU	a0, sp, SIGF_UC		# address of ucontext
+	li		v0, SYS_sigreturn
+# sigreturn (ucp)
+	syscall
+	break	0				# just in case sigreturn fails
+	.globl	_C_LABEL(freebsd64_esigcode)
+_C_LABEL(freebsd64_esigcode):
+
+	.data
+	.globl	freebsd64_szsigcode
+freebsd64_szsigcode:
+	.long	freebsd64_esigcode-freebsd64_sigcode
+	.text
+#endif
+
+#if (defined(__mips_n32) || defined(__mips_n64)) && defined(COMPAT_FREEBSD32)
+	.globl	_C_LABEL(sigcode32)
+_C_LABEL(sigcode32):
+	addu		a0, sp, SIGF32_UC	# address of ucontext
+	li		v0, SYS_sigreturn
+# sigreturn (ucp)
+	syscall
+	break	0				# just in case sigreturn fails
+	.globl	_C_LABEL(esigcode32)
+_C_LABEL(esigcode32):
+
+	.data
+	.globl	szsigcode32
+szsigcode32:
+	.long	esigcode32-sigcode32
+	.text
+#endif
+
+/*
+ * Always build the CheriABI sigcode symbols since this file is only ever
+ * compiled with capability support.
+ */
 	.globl	_C_LABEL(cheri_sigcode)
 _C_LABEL(cheri_sigcode):
 	dli		t0, SIGF_UC
-	cincoffset	$c3, CHERI_REG_STC, t0	# In the hybrid ABI named $c11,
+	cincoffset	$c3, $c11, t0		# In the hybrid ABI named $c11,
 	li		v0, SYS_sigreturn	# but we really mean $csp.
 # sigreturn (ucp)
 	syscall
@@ -590,3 +630,13 @@ _C_LABEL(echeri_sigcode):
 szcheri_sigcode:
 	.long	echeri_sigcode-cheri_sigcode
 	.text
+// CHERI CHANGES START
+// {
+//   "updated": 20190514,
+//   "target_type": "header",
+//   "changes": [
+//     "support"
+//   ],
+//   "change_comment": ""
+// }
+// CHERI CHANGES END

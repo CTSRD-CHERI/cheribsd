@@ -148,57 +148,6 @@ struct msqid_kernel {
 	struct	label *label;	/* MAC label */
 	struct	ucred *cred;	/* creator's credentials */
 };
-
-#if __has_feature(capabilities)
-struct msqid_ds_c {
-	struct	ipc_perm msg_perm;	/* msg queue permission bits */
-	struct	msg * __capability kmsg_first;	/* first message in the queue */
-	struct	msg * __capability kmsg_last;	/* last message in the queue */
-	msglen_t msg_cbytes;	/* number of bytes in use on the queue */
-	msgqnum_t msg_qnum;	/* number of msgs in the queue */
-	msglen_t msg_qbytes;	/* max # of bytes on the queue */
-	pid_t	msg_lspid;	/* pid of last msgsnd() */
-	pid_t	msg_lrpid;	/* pid of last msgrcv() */
-	time_t	msg_stime;	/* time of last msgsnd() */
-	time_t	msg_rtime;	/* time of last msgrcv() */
-	time_t	msg_ctime;	/* time of last msgctl() */
-};
-
-struct msqid_kernel_c {
-	/* Data structure exposed to user space. */
-	struct msqid_ds_c		 u;
-
-	/* Kernel-private components of the message queue. */
-	struct label * __capability	label;
-	struct ucred * __capability	cred;  
-};
-#endif
-
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
-struct msqid_ds64 {
-	struct ipc_perm	 		msg_perm;
-	struct msg * __capability	kmsg_first;
-	struct msg * __capability	kmsg_last;
-	msglen_t	 		msg_cbytes;
-	msgqnum_t	 		msg_qnum;
-	msglen_t	 		msg_qbytes;
-	pid_t		 		msg_lspid;
-	pid_t		 		msg_lrpid;
-	time_t		 		msg_stime;
-	time_t		 		msg_rtime;
-	time_t		 		msg_ctime;
-};
-
-struct msqid_kernel64 {
-	/* Data structure exposed to user space. */
-	struct msqid_ds64		 u;
-
-	/* Kernel-private components of the message queue. */
-	struct label * __capability	label;
-	struct ucred * __capability	cred;  
-};
-#endif /* COMPAT_FREEBSD64 */
 #endif
 
 #ifdef _KERNEL

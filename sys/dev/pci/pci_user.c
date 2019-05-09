@@ -66,25 +66,41 @@ __FBSDID("$FreeBSD$");
 #include "pcib_if.h"
 #include "pci_if.h"
 
-#if __has_feature(capabilities)
-struct pci_conf_io_c {
+/* #if __has_feature(capabilities) */
+/* struct pci_conf_io_c { */
+/* 	u_int32_t		pat_buf_len; */
+/* 	u_int32_t		num_patterns; */
+/* 	struct pci_match_conf * __capability patterns; */
+/* 	u_int32_t		match_buf_len; */
+/* 	u_int32_t		num_matches; */
+/* 	struct pci_conf * __capability matches; */
+/* 	u_int32_t		offset; */
+/* 	u_int32_t		generation; */
+/* 	u_int32_t		status; */
+/* }; */
+/* typedef	struct pci_conf_io_c	kpci_conf_io_t; */
+/* #else */
+typedef	struct pci_conf_io	kpci_conf_io_t;
+/* #endif */
+
+/* #ifdef COMPAT_CHERIABI */
+/* #define	PCIOCGETCONF_C	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf_io_c) */
+/* #endif */
+
+#ifdef COMPAT_FREEBSD64
+struct pci_conf_io64 {
 	u_int32_t		pat_buf_len;
 	u_int32_t		num_patterns;
-	struct pci_match_conf * __capability patterns;
+	uint64_t		patterns;	/* (struct pci_match_conf *) */
 	u_int32_t		match_buf_len;
 	u_int32_t		num_matches;
-	struct pci_conf * __capability matches;
+	uint64_t		matches;	/* (struct pci_conf *) */
 	u_int32_t		offset;
 	u_int32_t		generation;
 	u_int32_t		status;
 };
-typedef	struct pci_conf_io_c	kpci_conf_io_t;
-#else
-typedef	struct pci_conf_io	kpci_conf_io_t;
-#endif
 
-#ifdef COMPAT_CHERIABI
-#define	PCIOCGETCONF_C	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf_io_c)
+#define	PCIOCGETCONF64	_IOC_NEWTYPE(PCIOCGETCONF, struct pci_conf_io64)
 #endif
 
 #ifdef COMPAT_FREEBSD32
@@ -560,8 +576,8 @@ pci_conf_match(u_long cmd, struct pci_match_conf *matches, int num_matches,
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF64:
 #endif
 		return (pci_conf_match_native(
 		    (struct pci_match_conf *)matches, num_matches, match_buf));
@@ -685,8 +701,8 @@ pci_match_conf_size(u_long cmd)
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF64:
 #endif
 		return (sizeof(struct pci_match_conf));
 #ifdef COMPAT_FREEBSD32
@@ -713,8 +729,8 @@ pci_conf_size(u_long cmd)
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF64:
 #endif
 		return (sizeof(struct pci_conf));
 #ifdef COMPAT_FREEBSD32
@@ -738,9 +754,11 @@ pci_conf_size(u_long cmd)
 static void
 pci_conf_io_init(kpci_conf_io_t *cio, caddr_t data, u_long cmd)
 {
-	struct pci_conf_io *cio_native;
 #ifdef COMPAT_FREEBSD32
 	struct pci_conf_io32 *cio32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct pci_conf_io64 *cio64;
 #endif
 
 	switch (cmd) {
@@ -748,23 +766,23 @@ pci_conf_io_init(kpci_conf_io_t *cio, caddr_t data, u_long cmd)
 #ifdef PRE7_COMPAT
 	case PCIOCGETCONF_OLD:
 #endif
-		cio_native = (struct pci_conf_io *)data;
-		cio->pat_buf_len = cio_native->pat_buf_len;
-		cio->num_patterns = cio_native->num_patterns;
-		cio->patterns = __USER_CAP(cio_native->patterns,
-		    cio_native->pat_buf_len);
-		cio->match_buf_len = cio_native->match_buf_len;
-		cio->num_matches = cio_native->num_matches;
-		cio->matches = __USER_CAP(cio_native->matches,
-		    cio_native->match_buf_len);
-		cio->offset = cio_native->offset;
-		cio->generation = cio_native->generation;
-		cio->status = cio_native->status;
+		*cio = *(struct pci_conf_io *)data;
 		return;
 
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
-		*cio = *(struct pci_conf_io_c *)data;
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF64:
+		cio64 = (struct pci_conf_io64 *)data;
+		cio->pat_buf_len = cio64->pat_buf_len;
+		cio->num_patterns = cio64->num_patterns;
+		cio->patterns = __USER_CAP((void *)(uintptr_t)cio64->patterns,
+		    cio64->pat_buf_len);
+		cio->match_buf_len = cio64->match_buf_len;
+		cio->num_matches = cio64->num_matches;
+		cio->matches = __USER_CAP((void *)(uintptr_t)cio64->matches,
+		    cio64->match_buf_len);
+		cio->offset = cio64->offset;
+		cio->generation = cio64->generation;
+		cio->status = cio64->status;
 		return;
 #endif
 
@@ -799,8 +817,8 @@ pci_conf_io_update_data(const kpci_conf_io_t *cio, caddr_t data,
     u_long cmd)
 {
 	struct pci_conf_io *d_cio;
-#ifdef COMPAT_CHERIABI
-	struct pci_conf_io_c *cio_c;
+#ifdef COMPAT_FREEBSD64
+	struct pci_conf_io64 *cio64;
 #endif
 #ifdef COMPAT_FREEBSD32
 	struct pci_conf_io32 *cio32;
@@ -818,13 +836,13 @@ pci_conf_io_update_data(const kpci_conf_io_t *cio, caddr_t data,
 		d_cio->num_matches = cio->num_matches;
 		return;
 
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
-		cio_c = (struct pci_conf_io_c *)data;
-		cio_c->status = cio->status;
-		cio_c->generation = cio->generation;
-		cio_c->offset = cio->offset;
-		cio_c->num_matches = cio->num_matches;
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF64:
+		cio64 = (struct pci_conf_io64 *)data;
+		cio64->status = cio->status;
+		cio64->generation = cio->generation;
+		cio64->offset = cio->offset;
+		cio64->num_matches = cio->num_matches;
 		return;
 #endif
 
@@ -857,8 +875,8 @@ pci_conf_for_copyout(const struct pci_conf *pcp, union pci_conf_union *pcup,
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_CHERIABI
-	case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF64:
 #endif
 		pcup->pc = *pcp;
 		return;
@@ -937,7 +955,7 @@ pci_bar_mmap(device_t pcidev, struct pci_bar_mmap *pbm)
 	struct pci_map *pm;
 	vm_paddr_t pbase;
 	vm_size_t plen;
-	vm_offset_t addr;
+	vm_ptr_t addr;
 	vm_prot_t prot;
 	int error, flags;
 
@@ -1025,8 +1043,8 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 	if (!(flag & FWRITE)) {
 		switch (cmd) {
 		case PCIOCGETCONF:
-#ifdef COMPAT_CHERIABI
-		case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+		case PCIOCGETCONF64:
 #endif
 #ifdef COMPAT_FREEBSD32
 		case PCIOCGETCONF32:
@@ -1048,8 +1066,8 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 
 	switch (cmd) {
 	case PCIOCGETCONF:
-#ifdef COMPAT_CHERIABI
-		case PCIOCGETCONF_C:
+#ifdef COMPAT_FREEBSD64
+	case PCIOCGETCONF64:
 #endif
 #ifdef COMPAT_FREEBSD32
 	case PCIOCGETCONF32:
@@ -1389,7 +1407,7 @@ getconfexit:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190510,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",

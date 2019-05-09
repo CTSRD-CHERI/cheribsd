@@ -1176,7 +1176,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	 * are still used to enforce the stack rlimit on the process stack.
 	 */
 	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
-	vmspace->vm_maxsaddr = (char *)stack_addr;
+	vmspace->vm_maxsaddr = stack_addr;
 
 	return (0);
 }

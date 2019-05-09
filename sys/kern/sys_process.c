@@ -34,8 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/lock.h>
@@ -65,10 +63,6 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
 #include <vm/vm_param.h>
-
-#if __has_feature(capabilities)
-#include <cheri/cheric.h>
-#endif
 
 #ifdef COMPAT_FREEBSD32
 #include <sys/procfs.h>
@@ -577,7 +571,7 @@ ptrace_lwpinfo_to32(const struct ptrace_lwpinfo *pl,
 struct ptrace_args {
 	int	req;
 	pid_t	pid;
-	void * __capability addr;
+	caddr_t	addr;
 	int	data;
 };
 #endif
@@ -607,176 +601,6 @@ struct ptrace_args {
 #define	COPYIN(u, k, s)		copyin(u, k, s)
 #define	COPYOUT(k, u, s)	copyout(k, u, s)
 #endif
-
-#if __has_feature(capabilities)
-int
-sys_ptrace(struct thread *td, struct ptrace_args *uap)
-{
-	union {
-		struct ptrace_io_desc piod;
-		struct ptrace_lwpinfo pl;
-		struct ptrace_vm_entry pve;
-#ifdef CPU_CHERI
-		struct capreg capreg;
-#endif
-		struct dbreg dbreg;
-		struct fpreg fpreg;
-		struct reg reg;
-		char args[nitems(td->td_sa.args) * sizeof(register_t)];
-		int ptevents;
-	} r = { 0 };
-
-	int error = 0, data;
-	void * __capability addr = &r;
-
-	AUDIT_ARG_PID(uap->pid);
-	AUDIT_ARG_CMD(uap->req);
-	AUDIT_ARG_VALUE(uap->data);
-
-	data = uap->data;
-
-	switch (uap->req) {
-	/* If we're supposed to ignore user parameters... */
-	case PT_ATTACH:
-	case PT_DETACH:
-	case PT_KILL:
-	case PT_TRACE_ME:
-	case PT_FOLLOW_FORK:
-		addr = NULL;
-		break;
-
-	/* No preparatory work to do for most fetch operations */
-	case PT_GET_EVENT_MASK:
-	case PT_GETREGS:
-	case PT_GETFPREGS:
-	case PT_GETDBREGS:
-#ifdef CPU_CHERI
-	case PT_GETCAPREGS:
-#endif
-	case PT_GETNUMLWPS:
-	case PT_GET_SC_ARGS:
-	case PT_LWP_EVENTS:
-	case PT_SUSPEND:
-		break;
-
-	case PT_LWPINFO:
-		if (uap->data > sizeof(r.pl))
-			error = EINVAL;
-		else
-			data = sizeof(r.pl);
-		break;
-
-	/* Pass along an untagged virtual address for the desired PC. */
-	case PT_CONTINUE:
-	case PT_STEP:
-	case PT_TO_SCE:
-	case PT_TO_SCX:
-	case PT_SYSCALL:
-		addr = cheri_cleartag(uap->addr);
-		break;
-
-#ifdef CPU_CHERI
-	/*
-	 * XXXNWF Prohibited at the moment, because we have no sane way of
-	 * conveying tags through the kernel.
-	 */
-	case PT_SETCAPREGS:
-		error = EINVAL;
-		break;
-#endif
-
-	/* Several set operations just move data through the kernel */
-	case PT_SETREGS:
-		error = copyin(uap->addr, &r.reg, sizeof r.reg);
-		break;
-	case PT_SETFPREGS:
-		error = copyin(uap->addr, &r.fpreg, sizeof r.fpreg);
-		break;
-	case PT_SETDBREGS:
-		error = copyin(uap->addr, &r.dbreg, sizeof r.dbreg);
-		break;
-	case PT_SET_EVENT_MASK:
-		if (uap->data != sizeof(r.ptevents))
-			error = EINVAL;
-		else
-			error = copyin(uap->addr, &r.ptevents, uap->data);
-		break;
-
-	case PT_VM_ENTRY:
-		error = copyincap(uap->addr, (char *)&r.pve, sizeof r.pve);
-		if (error)
-			break;
-
-		break;
-
-#if 0
-	case PT_READ_I:
-	case PT_READ_D:
-	case PT_WRITE_I:
-	case PT_WRITE_D:
-	case PT_IO:
-		// XXX TODO
-		break;
-	default:
-		addr = uap->addr;
-		break;
-#endif
-	default:
-		/* XXXNWF */
-		error = EINVAL;
-		break;
-	}
-
-	if (error)
-		return (error);
-
-	error = kern_ptrace(td, uap->req, uap->pid, addr, data);
-	if (error)
-		return (error);
-
-	switch (uap->req) {
-#if 0
-	case PT_VM_ENTRY:
-		error = COPYOUT(&r.pve, uap->addr, sizeof r.pve);
-		break;
-	case PT_IO:
-		error = COPYOUT(&r.piod, uap->addr, sizeof r.piod);
-		break;
-	case PT_GETREGS:
-		error = COPYOUT(&r.reg, uap->addr, sizeof r.reg);
-		break;
-	case PT_GETFPREGS:
-		error = COPYOUT(&r.fpreg, uap->addr, sizeof r.fpreg);
-		break;
-	case PT_GETDBREGS:
-		error = COPYOUT(&r.dbreg, uap->addr, sizeof r.dbreg);
-		break;
-#ifdef CPU_CHERI
-	case PT_GETCAPREGS:
-		error = COPYOUT(&r.capreg, uap->addr, sizeof r.capreg);
-		break;
-#endif
-#endif
-	case PT_GET_EVENT_MASK:
-		/* NB: The size in uap->data is validated in kern_ptrace(). */
-		error = copyout(&r.ptevents, uap->addr, uap->data);
-		break;
-	case PT_LWPINFO:
-		error = copyout(&r.pl, uap->addr, uap->data);
-		break;
-#if 0
-	case PT_GET_SC_ARGS:
-		error = copyout(r.args, uap->addr, MIN(uap->data,
-		    sizeof(r.args)));
-		break;
-#endif
-	default:
-		break;
-	}
-
-	return (error);
-}
-#else /* ! feature(capabilities) */
 int
 sys_ptrace(struct thread *td, struct ptrace_args *uap)
 {
@@ -930,7 +754,6 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 
 	return (error);
 }
-#endif /* !feature(capabilities) */
 #undef COPYIN
 #undef COPYOUT
 #undef BZERO
@@ -1636,13 +1459,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 #endif
 			){
 				pl->pl_flags |= PL_FLAG_SI;
-#ifdef COMPAT_FREEBSD64
-				/* XXX-AM: fix for freebsd64 */
 				siginfo_to_siginfo_native(&td2->td_si,
 				    (__cheri_fromcap struct siginfo_native *)&pl->pl_siginfo);
-#endif
-				memcpy((__cheri_fromcap siginfo_t *)&pl->pl_siginfo,
-				    &td2->td_si, sizeof(siginfo_t));
 			}
 		}
 		if (td2->td_dbgflags & TDB_SCE)

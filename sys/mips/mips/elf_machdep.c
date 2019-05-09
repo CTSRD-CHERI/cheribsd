@@ -52,7 +52,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/cache.h>
 
 #ifdef __mips_n64
-#if !__has_feature(capabilities)
 struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
@@ -123,7 +122,7 @@ mips_elf_header_supported(struct image_params * imgp)
 		return mips_hybrid_check_cap_size(256, imgp->execpath);
 	return TRUE;
 }
-#endif /* CPU_CHERI */
+#endif
 
 static Elf64_Brandinfo freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
@@ -143,13 +142,13 @@ static Elf64_Brandinfo freebsd_brand_info = {
 SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_brand_info);
-#endif /* !feature(capabilities) */
+
 void
 elf64_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
-#else /* ! __mips_n64 */
+#else
 struct sysentvec elf32_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
@@ -213,7 +212,7 @@ elf32_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
-#endif /* ! __mips_n64 */
+#endif
 
 /*
  * The following MIPS relocation code for tracking multiple

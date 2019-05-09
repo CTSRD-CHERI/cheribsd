@@ -2905,22 +2905,21 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				error = EOPNOTSUPP;
 			else
 #endif
-#ifdef COMPAT_FREEBSD64
-			if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
-				/* XXX-AM: fix for freebsd64 */
-				struct mac64 tmpmac;
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI)) {
+				sopt->sopt_dir = SOPT_SETCAP;
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_SET;
+			} else
+#endif
+			{
+				struct mac_native tmpmac;
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
 				extmac.m_string = __USER_CAP(tmpmac.m_string,
 				    tmpmac.m_buflen);
-			} else
-#endif
-			{
-				sopt->sopt_dir = SOPT_SETCAP;
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-				sopt->sopt_dir = SOPT_SET;
 			}
 			if (error)
 				goto bad;
@@ -3114,22 +3113,21 @@ integer:
 				error = EOPNOTSUPP;
 			else
 #endif
-#ifdef COMPAT_FREEBSD64
-			if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
-				/* XXX-AM: fix for freebsd64 */
-				struct mac64 tmpmac;
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI)) {
+				sopt->sopt_dir = SOPT_GETCAP;
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_GET;
+			} else
+#endif
+			{
+				struct mac_native tmpmac;
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
 				extmac.m_string = __USER_CAP(tmpmac.m_string,
 				    tmpmac.m_buflen);
-			} else
-#endif
-			{
-				sopt->sopt_dir = SOPT_GETCAP;
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-				sopt->sopt_dir = SOPT_GET;
 			}
 			if (error)
 				goto bad;
@@ -3150,22 +3148,21 @@ integer:
 				error = EOPNOTSUPP;
 			else
 #endif
-#ifdef COMPAT_FREEBSD64
-			if (SV_CURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
-				/* XXX-AM: fix for freebsd64 */
-				struct mac64 tmpmac;
+#ifdef COMPAT_CHERIABI
+			if (SV_CURPROC_FLAG(SV_CHERI)) {
+				sopt->sopt_dir = SOPT_GETCAP;
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_GET;
+			} else
+#endif
+			{
+				struct mac_native tmpmac;
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
 				extmac.m_string = __USER_CAP(tmpmac.m_string,
 				    tmpmac.m_buflen);
-			} else
-#endif
-			{
-				sopt->sopt_dir = SOPT_GETCAP;
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-				sopt->sopt_dir = SOPT_GET;
 			}
 			if (error)
 				goto bad;

@@ -125,18 +125,6 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 	} a_un;
 } Elf64_Auxinfo;
 
-#if __has_feature(capabilities)
-typedef struct {	/* Auxiliary vector entry on initial stack */
-	long	a_type;		/* Entry type. */
-	/* long    pad[(CHERICAP_SIZE / 8) - 1]; */
-	union {
-		long	a_val;		/* Integer value. */
-		void * __capability	a_ptr;	/* Address. */
-		/* void	(*a_fcn)(void); */ /* Function pointer (not used). */
-       } a_un;
-} ElfCheriABI_Auxinfo;
-#endif
-
 __ElfType(Auxinfo);
 
 #define	ET_DYN_LOAD_ADDR 0x0120000

@@ -55,6 +55,12 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd32/freebsd32.h>
 #endif
 
+struct procctl_reaper_pids_c {
+	u_int	rp_count;
+	u_int	rp_pad0[15];
+	struct procctl_reaper_pidinfo * __capability rp_pids;
+};
+
 static int
 protect_setchild(struct thread *td, struct proc *p, int flags)
 {
@@ -204,7 +210,7 @@ reap_status(struct thread *td, struct proc *p,
 }
 
 static int
-reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids *rp)
+reap_getpids(struct thread *td, struct proc *p, struct procctl_reaper_pids_c *rp)
 {
 	struct proc *reap, *p2;
 	struct procctl_reaper_pidinfo *pi;
@@ -484,7 +490,7 @@ struct procctl_args {
 	idtype_t idtype;
 	id_t	id;
 	int	com;
-	void * __capability data;
+	void	*data;
 };
 #endif
 /* ARGSUSED */
@@ -503,20 +509,15 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 	void *data;
 	union {
 		struct procctl_reaper_status rs;
-		struct procctl_reaper_pids rp;
+		struct procctl_reaper_pids_c rp;
 		struct procctl_reaper_kill rk;
 	} x;
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 	union {
-#ifdef COMPAT_FREEBSD64
-		/* Fix for freebsd64 */
-		struct procctl_reaper_pids64 rp64;
-#endif
+		struct procctl_reaper_pids rp;
 #ifdef COMPAT_FREEBSD32
 		struct procctl_reaper_pids32 rp32;
 #endif
 	} xpids;
-#endif
 	int error, error1, flags, signum;
 
 	if (com >= PROC_PROCCTL_MD_MIN)
@@ -543,15 +544,11 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		break;
 	case PROC_REAP_GETPIDS:
 		/* XXX: fix for cheriabi and freebsd32 */
-#ifdef COMPAT_FREEBSD64
-		/* XXX-AM: fix for freebsd64 and freebsd32 */
-		if (SV_COURPROC_FLAG(SV_LP64) && !SV_CURPROC_FLAG(SV_CHERI)) {
-			error = copyin(udata, &xpids.rp64, sizeof(xpids.rp64));
+#ifdef COMPAT_CHERIABI
+		if (SV_CURPROC_FLAG(SV_CHERI)) {
+			error = copyincap(udata, &x.rp, sizeof(x.rp));
 			if (error != 0)
 				return (error);
-			x.rp.rp_count = xpids.rp64.rp_count;
-			x.rp.rp_pids = __USER_CAP_ARRAY(xpids.rp64.rp_pids,
-			    xpids.rp64.rp_count);
 		} else
 #endif
 #ifdef COMPAT_FREEBSD32
@@ -567,9 +564,12 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		} else
 #endif
 		{
-			error = copyincap(udata, &x.rp, sizeof(x.rp));
+			error = copyin(udata, &xpids.rp, sizeof(xpids.rp));
 			if (error != 0)
 				return (error);
+			x.rp.rp_count = xpids.rp.rp_count;
+			x.rp.rp_pids = __USER_CAP_ARRAY(xpids.rp.rp_pids,
+			    xpids.rp.rp_count);
 		}
 		data = &x.rp;
 		break;
