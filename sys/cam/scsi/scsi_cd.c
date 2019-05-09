@@ -226,7 +226,6 @@ struct ioc_read_toc_entry32 {
 #endif
 
 #ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
 struct ioc_read_toc_entry64 {
 	u_char	address_format;
 	u_char	starting_track;
@@ -1604,7 +1603,7 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 			cam_periph_unlock(periph);
 			if (nocopyout == 0) {
 				if (copyout(data,
-				    __HYBRID_USER_CAP_UNBOUND(args->data), len) != 0) {
+				    __USER_CAP_UNBOUND(args->data), len) != 0) {
 					error = EFAULT;
 				}
 			} else {

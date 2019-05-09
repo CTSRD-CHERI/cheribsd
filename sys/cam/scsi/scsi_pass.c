@@ -1232,7 +1232,7 @@ passcopysglist(struct cam_periph *periph, struct pass_io_req *io_req,
 		user_watermark += len_to_copy;
 		kern_watermark += len_to_copy;
 
-		if (!useracc(__HYBRID_USER_CAP(user_ptr, len_to_copy), len_to_copy,
+		if (!useracc(__USER_CAP(user_ptr, len_to_copy), len_to_copy,
 		    (direction == CAM_DIR_IN) ? VM_PROT_WRITE : VM_PROT_READ)) {
 			xpt_print(periph->path, "%s: unable to access user "
 				  "S/G list element %p len %zu\n", __func__,
@@ -1449,7 +1449,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 			 * Make sure that the user's buffer is accessible
 			 * to that process.
 			 */
-			if (!useracc(__HYBRID_USER_CAP(io_req->user_bufs[i],
+			if (!useracc(__USER_CAP(io_req->user_bufs[i],
 			    io_req->lengths[i]), io_req->lengths[i],
 			    (io_req->dirs[i] == CAM_DIR_IN) ? VM_PROT_WRITE :
 			     VM_PROT_READ)) {
@@ -1562,7 +1562,7 @@ passmemsetup(struct cam_periph *periph, struct pass_io_req *io_req)
 		} else
 			io_req->user_segptr = io_req->user_segs;
 
-		if (!useracc(__HYBRID_USER_CAP(*data_ptrs[0], sg_length), sg_length,
+		if (!useracc(__USER_CAP(*data_ptrs[0], sg_length), sg_length,
 		    VM_PROT_READ)) {
 			xpt_print(periph->path, "%s: unable to access user "
 				  "S/G list at %p\n", __func__, *data_ptrs[0]);
@@ -1862,8 +1862,7 @@ passdoioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flag, struct thread 
 		union ccb **user_ccb, *ccb;
 		xpt_opcode fc;
 
-#if __has_feature(capabilities)
-		/* XXX-AM: do we need to do something for freebsd64? */
+#ifdef COMPAT_CHERIABI
 		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 			error = ENOTTY;
 			goto bailout;
@@ -2049,8 +2048,7 @@ camioqueue_error:
 		struct pass_io_req *io_req;
 		int old_error;
 
-#if __has_feature(capabilities)
-		/* XXX-AM: do we need to do something for freebsd64? */
+#ifdef COMPAT_CHERIABI
 		if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 			error = ENOTTY;
 			goto bailout;

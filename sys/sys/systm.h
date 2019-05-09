@@ -171,8 +171,6 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * thread's address space and are created from the DDC or PCC of
  * the current PCB.
  */
-#if __has_feature(capabilities)
-/* XXX-AM: fix for freebsd64 */
 
 /*
  * Derive out-of-bounds and small values from NULL.  This allows common
@@ -185,7 +183,6 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 	__builtin_cheri_offset_set(NULL, (vaddr_t)(ptr)) :		\
 	__builtin_cheri_offset_set((cap), (vaddr_t)(ptr)))
 
-#if 0
 #define	__USER_CAP_UNBOUND(ptr)						\
     ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.ddc)
 
@@ -199,35 +196,6 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 	    __builtin_cheri_tag_get(unbound) ?				\
 	    __builtin_cheri_bounds_set(unbound, (len)) : unbound);	\
 })
-#endif /* disable */
-#define	__USER_CAP_UNBOUND(ptr)	(ptr)
-#define	__USER_CODE_CAP(ptr)	(ptr)
-#define	__USER_CAP(ptr, len)	(ptr)
-
-/*
- * These are temporarily used in the hybrid kernel
- * to mark places where __USER_CAP* can not be disabled yet.
- */
-#define	__HYBRID_USER_CAP_UNBOUND(ptr)					\
-    ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.ddc)
-
-#define	__HYBRID_USER_CODE_CAP(ptr)					\
-     ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.pcc)
-
-#define	__HYBRID_USER_CAP(ptr, len)					\
-({									\
-	void * __capability unbound = __HYBRID_USER_CAP_UNBOUND(ptr);	\
-	(security_cheri_bound_legacy_capabilities &&			\
-	    __builtin_cheri_tag_get(unbound) ?				\
-	    __builtin_cheri_bounds_set(unbound, (len)) : unbound);	\
-})
-#define	__HYBRID_USER_CAP_STR(strp)	__HYBRID_USER_CAP_UNBOUND(strp)
-
-#else /* !has_feature(capabilities) */
-#define	__USER_CAP_UNBOUND(ptr)	(ptr)
-#define	__USER_CODE_CAP(ptr)	(ptr)
-#define	__USER_CAP(ptr, len)	(ptr)
-#endif /* !has_feature(capabilities) */
 
 #define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)
 #define	__USER_CAP_ARRAY(objp, cnt) \

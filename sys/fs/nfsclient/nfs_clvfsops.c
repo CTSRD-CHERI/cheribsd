@@ -1238,7 +1238,7 @@ nfs_mount(struct mount *mp)
 		bzero(&hst[hstlen], MNAMELEN - hstlen);
 		args.hostname = hst;
 		/* getsockaddr() call must be after above copyin() calls */
-		error = getsockaddr(&nam, __HYBRID_USER_CAP(args.addr, args.addrlen),
+		error = getsockaddr(&nam, __USER_CAP(args.addr, args.addrlen),
 		    args.addrlen);
 		if (error != 0)
 			goto out;
