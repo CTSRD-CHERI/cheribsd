@@ -219,6 +219,7 @@ cheriabi_fetch_syscall_args(struct thread *td)
 		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0, 0);
 	else
 		locr0->pc += sizeof(int);
+
 	sa->code = locr0->v0;
 	sa->argoff = 0;
 	if (sa->code == SYS_syscall || sa->code == SYS___syscall) {
