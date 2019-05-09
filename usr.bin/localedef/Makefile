@@ -26,3 +26,5 @@ CFLAGS+=	-I${.CURDIR}/bootstrap
 .endif
 
 .include <bsd.prog.mk>
+
+CFLAGS+=-O0 -fsanitize=address,undefined
