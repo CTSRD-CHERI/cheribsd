@@ -69,8 +69,6 @@ struct break_args {
 	char *nsize;
 };
 #endif
-#if !__has_feature(capabilities)
-/* Obsolete in CheriABI. */
 int
 sys_break(struct thread *td, struct break_args *uap)
 {
@@ -87,7 +85,6 @@ sys_break(struct thread *td, struct break_args *uap)
 	return (ENOSYS);
 #endif /* defined(__aarch64__) || defined(__riscv) */
 }
-#endif
 
 int
 kern_break(struct thread *td, uintptr_t *addr)
