@@ -206,7 +206,10 @@ typedef struct {
     cheri_andperm(cheri_csetbounds((ptr), (size)), \
 	CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP) : \
     (ptr))
+
+#ifndef roundup2
 #define roundup2(x, y)	(((x)+((y)-1))&(~((y)-1)))
+#endif
 
 /*
  * XXX-BD: In theory this poses an overflow risk.  It's overflow
