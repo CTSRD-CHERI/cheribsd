@@ -404,7 +404,7 @@ bool CFI_Parser<A>::parseFDEInstructions(A &addressSpace,
                            (ptrdiff_t)(-1), rememberStack, arch, results) &&
          parseInstructions(addressSpace, fdeInfo.fdeInstructions,
                            fdeInfo.fdeStart + fdeInfo.fdeLength, cieInfo,
-                           (ptrdiff_t)(upToPC - fdeInfo.pcStart), rememberStack,
+                           (ptrdiff_t)((char *)upToPC - (char *)fdeInfo.pcStart), rememberStack,
                            arch, results);
 }
 

@@ -93,11 +93,12 @@
 
 #define	SPR_MQ			0x000	/* .6. 601 MQ register */
 #define	SPR_XER			0x001	/* 468 Fixed Point Exception Register */
+#define	SPR_DSCR		0x003	/* .6. Data Stream Control Register (Unprivileged) */
 #define	SPR_RTCU_R		0x004	/* .6. 601 RTC Upper - Read */
 #define	SPR_RTCL_R		0x005	/* .6. 601 RTC Lower - Read */
 #define	SPR_LR			0x008	/* 468 Link Register */
 #define	SPR_CTR			0x009	/* 468 Count Register */
-#define	SPR_DSCR		0x011   /* Data Stream Control Register */
+#define	SPR_DSCRP		0x011   /* Data Stream Control Register (Privileged) */
 #define	SPR_DSISR		0x012	/* .68 DSI exception source */
 #define	  DSISR_DIRECT		  0x80000000 /* Direct-store error exception */
 #define	  DSISR_NOTFOUND	  0x40000000 /* Translation not found */
@@ -134,7 +135,15 @@
 #define	  FSCR_IC_TAR		  0x0800000000000000ULL	/* Access to Target Address Register */
 #define	  FSCR_IC_STOP		  0x0900000000000000ULL	/* Access to the 'stop' instruction in privileged non-hypervisor state */
 #define	  FSCR_IC_MSG		  0x0A00000000000000ULL	/* Access to 'msgsndp' or 'msgclrp' instructions */
+#define	  FSCR_IC_LM		  0x0A00000000000000ULL	/* Access to load monitored facility */
 #define	  FSCR_IC_SCV		  0x0C00000000000000ULL	/* Execution of a 'scv' instruction */
+#define	  FSCR_SCV		  0x0000000000001000 /* scv instruction available */
+#define	  FSCR_LM		  0x0000000000000800 /* Load monitored facilities available */
+#define	  FSCR_MSGP		  0x0000000000000400 /* msgsndp and SPRs available */
+#define	  FSCR_TAR		  0x0000000000000100 /* TAR register available */
+#define	  FSCR_EBB		  0x0000000000000080 /* Event-based branch available */
+#define	  FSCR_DSCR		  0x0000000000000004 /* DSCR available in PR state */
+#define	SPR_DPDES		0x0b0	/* .6. Directed Privileged Doorbell Exception State Register */
 #define	SPR_USPRG0		0x100	/* 4.. User SPR General 0 */
 #define	SPR_VRSAVE		0x100	/* .6. AltiVec VRSAVE */
 #define	SPR_SPRG0		0x110	/* 468 SPR General 0 */
@@ -188,6 +197,7 @@
 #define	  IBMPOWERPCA2		  0x0049
 #define	  IBMPOWER7PLUS		  0x004a
 #define	  IBMPOWER8E		  0x004b
+#define	  IBMPOWER8NVL		  0x004c
 #define	  IBMPOWER8		  0x004d
 #define	  IBMPOWER9		  0x004e
 #define	  MPC860		  0x0050
@@ -245,6 +255,7 @@
 #define	SPR_HMER		0x150	/* Hypervisor Maintenance Exception Register */
 #define	SPR_HMEER		0x151	/* Hypervisor Maintenance Exception Enable Register */
 
+#define	SPR_TIR			0x1be	/* .6. Thread Identification Register */
 #define	SPR_PTCR		0x1d0	/* Partition Table Control Register */
 #define	SPR_SPEFSCR		0x200	/* ..8 Signal Processing Engine FSCR. */
 #define	  SPEFSCR_SOVH		  0x80000000
@@ -405,6 +416,16 @@
 #define	SPR_MD_TWC		0x31d	/* ..8 DMMU tablewalk control */
 #define	SPR_MD_RPN		0x31e	/* ..8 DMMU real (phys) page number */
 #define	SPR_MD_TW		0x31f	/* ..8 MMU tablewalk scratch */
+#define	SPR_BESCRS		0x320	/* .6. Branch Event Status and Control Set Register */
+#define	SPR_BESCRSU		0x321	/* .6. Branch Event Status and Control Set Register (upper 32-bit) */
+#define	SPR_BESCRR		0x322	/* .6. Branch Event Status and Control Reset Register */
+#define	SPR_BESCRRU		0x323	/* .6. Branch Event Status and Control Register (upper 32-bit) */
+#define	SPR_EBBHR		0x324	/* .6. Event-based Branch Handler Register */
+#define	SPR_EBBRR		0x325	/* .6. Event-based Branch Return Register */
+#define	SPR_BESCR		0x326	/* .6. Branch Event Status and Control Register */
+#define	SPR_LMRR		0x32d	/* .6. Load Monitored Region Register */
+#define	SPR_LMSER		0x32e	/* .6. Load Monitored Section Enable Register */
+#define	SPR_TAR			0x32f	/* .6. Branch Target Address Register */
 #define	SPR_MI_CAM		0x330	/* ..8 IMMU CAM entry read */
 #define	SPR_MI_RAM0		0x331	/* ..8 IMMU RAM entry read reg 0 */
 #define	SPR_MI_RAM1		0x332	/* ..8 IMMU RAM entry read reg 1 */

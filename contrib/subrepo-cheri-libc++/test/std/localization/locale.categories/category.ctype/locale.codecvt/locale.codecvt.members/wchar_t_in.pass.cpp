@@ -33,7 +33,7 @@ int main(int, char**)
     const F::extern_type* from_next = 0;
     F::intern_type* to_next = 0;
     F::result r = f.in(mbs, from.data(), from.data() + from.size(), from_next,
-                            &to[0], &to[0] + to.size(), to_next);
+                            to.data(), to.data() + to.size(), to_next);
     assert(r == F::ok);
     assert(static_cast<std::size_t>(from_next - from.data()) == from.size());
     assert(static_cast<std::size_t>(to_next - to.data()) == expected.size());

@@ -23,6 +23,8 @@
 #include <atomic>
 #include <cassert>
 
+#include "test_macros.h"
+
 enum class WorkerThreadState { Uninitialized, AllowedToRun, Exiting };
 typedef std::chrono::milliseconds ms;
 
@@ -66,8 +68,8 @@ int main(int, char**)
 {
 
     ms delay = ms(10);
-    ms Tolerance = ms(5)
-#if defined(TEST_HAS_SANITIZERS) || defined(TEST_SLOW_HOST)
+    ms Tolerance = ms(5);
+#if defined(TEST_HAS_SANITIZERS) || TEST_SLOW_HOST()
     delay *= 4;
     Tolerance *= 4;
 #endif

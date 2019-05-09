@@ -209,27 +209,40 @@ def executeCommand(command, cwd=None, env=None, input=None, timeout=0):
     # need to use a reference to a mutable object rather than a plain
     # bool. In Python 3 we could use the "nonlocal" keyword but we need
     # to support Python 2 as well.
-    # FIXME: this seems broken?
     hitTimeOut = [False]
-    try:
-        if timeout > 0:
-            def killProcess():
-                # We may be invoking a shell so we need to kill the
-                # process and all its children.
-                hitTimeOut[0] = True
-                killProcessAndChildren(p.pid)
+    # For python >= 3.3 we can use the timeout parameter to p.communicate which
+    # is much less fragile than the timer code.
+    if sys.version_info > (3, 3):
+        try:
+            if timeout <= 0:
+                timeout = None
+            out, err = p.communicate(input=input, timeout=timeout)
+        except subprocess.TimeoutExpired:
+            killProcessAndChildren(p.pid)
+            # p.communicate should return immediately and return the remaining
+            # stdout/stderr until the process was killed.
+            out, err = p.communicate(input=input)
+            hitTimeOut[0] = True
+        finally:
+            exitCode = p.returncode
+    else:  # python < 3.3
+        try:
+            if timeout > 0:
+                def killProcess():
+                    # We may be invoking a shell so we need to kill the
+                    # process and all its children.
+                    hitTimeOut[0] = True
+                    killProcessAndChildren(p.pid)
 
-            timerObject = threading.Timer(timeout, killProcess)
-            timerObject.start()
+                timerObject = threading.Timer(timeout, killProcess)
+                timerObject.start()
 
-        kwargs = dict()
-        if sys.version_info > (3, 3) and timeout > 0:
-            kwargs["timeout"] = timeout
-        out, err = p.communicate(input=input, **kwargs)
-        exitCode = p.wait()
-    finally:
-        if timerObject != None:
-            timerObject.cancel()
+            kwargs = dict()
+            out, err = p.communicate(input=input)
+            exitCode = p.wait()
+        finally:
+            if timerObject != None:
+                timerObject.cancel()
 
     # Ensure the resulting output is always of string type.
     out = convert_string(out)

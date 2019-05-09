@@ -1,4 +1,8 @@
-// #pragma once
+#ifdef _INCLUDING_USR_INCLUDE_LIMTITS
+#if __has_include_next(<limits.h>)
+#include_next <limits.h>
+#endif
+#else
 
 #ifdef __STRICT_ANSI__
 #warning __STRICT_ANSI__ defined
@@ -7,12 +11,18 @@
 #include <sys/types.h>
 #include <sys/uio.h> // For IOV_MAX
 
-#if !defined(__clang__) && __has_include(</usr/include/limits.h>)
+#if !defined(__clang__) && __has_include(</usr/include/limits.h>) && !defined(_INCLUDING_USR_INCLUDE_LIMTITS)
+#define _INCLUDING_USR_INCLUDE_LIMTITS
 /* For some reason GCC picks the wrong limits.h */
 #include </usr/include/limits.h>
+#undef _INCLUDING_USR_INCLUDE_LIMTITS
 #endif
 
 #include_next <limits.h>
+
+#if __has_include(<linux/limits.h>)
+#include <linux/limits.h>
+#endif
 
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 199901L
 #if !defined(_GNU_SOURCE)
@@ -29,10 +39,6 @@
 #error IOV_MAX should be defined
 #endif
 #endif /* C89 */
-
-#if __has_include(<linux/limits.h>)
-#include <linux/limits.h>
-#endif
 
 #ifndef MAXBSIZE
 #define MAXBSIZE        65536   /* must be power of 2 */
@@ -84,3 +90,5 @@
 #define _POSIX_PATH_MAX PATH_MAX
 // #error _POSIX_PATH_MAX should be defined
 #endif
+
+#endif /* _INCLUDING_USR_INCLUDE_LIMTITS */

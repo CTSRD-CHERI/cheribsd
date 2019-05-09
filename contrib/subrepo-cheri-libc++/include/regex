@@ -10,6 +10,17 @@
 #ifndef _LIBCPP_REGEX
 #define _LIBCPP_REGEX
 
+// CHERI CHANGES START
+// {
+//   "updated": 20190430,
+//   "target_type": "header"
+//   "changes": [
+//     "subobject_bounds",
+//   ],
+//   "change_comment": "address of std::string::operator[]: `std::string __s; &__s[0] -> buf.data()`",
+// }
+// CHERI CHANGES END
+
 /*
     regex synopsis
 
@@ -1250,7 +1261,7 @@ regex_traits<_CharT>::__lookup_classname(_ForwardIterator __f,
                                          bool __icase, char) const
 {
     string_type __s(__f, __l);
-    __ct_->tolower(&__s[0], &__s[0] + __s.size());
+    __ct_->tolower(__s.data(), __s.data() + __s.size());
     return __get_classname(__s.c_str(), __icase);
 }
 
@@ -1262,7 +1273,7 @@ regex_traits<_CharT>::__lookup_classname(_ForwardIterator __f,
                                          bool __icase, wchar_t) const
 {
     string_type __s(__f, __l);
-    __ct_->tolower(&__s[0], &__s[0] + __s.size());
+    __ct_->tolower(__s.data(), __s.data() + __s.size());
     string __n;
     __n.reserve(__s.size());
     for (typename string_type::const_iterator __i = __s.begin(), __e = __s.end();

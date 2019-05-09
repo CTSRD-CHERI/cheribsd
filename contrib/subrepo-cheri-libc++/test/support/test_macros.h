@@ -205,8 +205,11 @@
 #define TEST_HAS_SANITIZERS
 #endif
 
+// Use a function macro to generate an error if test_macros.h was not included
 #if defined(_LIBCPP_SLOW_TEST_HOST)
-#define TEST_SLOW_HOST
+#define TEST_SLOW_HOST() 1
+#else
+#define TEST_SLOW_HOST() 0
 #endif
 
 #if defined(_LIBCPP_NORETURN)

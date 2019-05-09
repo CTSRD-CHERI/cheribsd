@@ -26,7 +26,7 @@ int main(int, char**)
         std::wstring in(L" A\x07.a1");
         std::vector<char> v(in.size());
 
-        assert(f.narrow(&in[0], in.data() + in.size(), '*', v.data()) == in.data() + in.size());
+        assert(f.narrow(in.data(), in.data() + in.size(), '*', v.data()) == in.data() + in.size());
         assert(v[0] == ' ');
         assert(v[1] == 'A');
         assert(v[2] == '\x07');

@@ -227,6 +227,8 @@ class Configuration(object):
                 te = ValgrindExecutor(self.lit_config.valgrindArgs, te)
         self.executor = te
         if te.is_remote:
+            # Don't assume that we can use python to create test files and directories
+            self.config.available_features.add('libcpp-no-dynamic-test-helper')
             # Don't pass in the current local environment variables to the remote machine
             # since this might completely break the test
             self.exec_env = {k: v for k, v in self.exec_env.items() if k not in os.environ or v != os.environ[k]}
@@ -747,6 +749,12 @@ class Configuration(object):
         static_env = os.path.realpath(static_env)
         assert os.path.isdir(static_env)
         self.cxx.compile_flags += ['-DLIBCXX_FILESYSTEM_STATIC_TEST_ROOT="%s"' % static_env]
+
+        if 'libcpp-no-dynamic-test-helper' in self.config.available_features:
+            self.cxx.compile_flags += ['-DLIBCXX_FILESYSTEM_DYNAMIC_TEST_HELPER=this_should_not_compile']
+            self.cxx.compile_flags += ['-DLIBCXX_SKIP_DYNAMIC_FILESYSTEM_TESTS=1']
+            self.cxx.compile_flags += ['-ULIBCXX_FILESYSTEM_DYNAMIC_TEST_ROOT']
+            return
 
         dynamic_env = os.path.join(self.config.test_exec_root,
                                    'filesystem', 'Output', 'dynamic_env')

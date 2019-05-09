@@ -24,7 +24,7 @@ int main(int, char**)
         const F& f = std::use_facet<F>(l);
         std::wstring in(L" A\x07.a1");
 
-        assert(f.tolower(&in[0], in.data() + in.size()) == in.data() + in.size());
+        assert(f.tolower(in.data(), in.data() + in.size()) == in.data() + in.size());
         assert(in[0] == L' ');
         assert(in[1] == L'a');
         assert(in[2] == L'\x07');

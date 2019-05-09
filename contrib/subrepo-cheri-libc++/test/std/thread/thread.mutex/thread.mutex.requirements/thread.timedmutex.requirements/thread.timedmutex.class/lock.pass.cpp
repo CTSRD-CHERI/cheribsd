@@ -19,6 +19,8 @@
 #include <cstdlib>
 #include <cassert>
 
+#include "test_macros.h"
+
 std::timed_mutex m;
 
 typedef std::chrono::system_clock Clock;
@@ -34,7 +36,7 @@ void f()
     time_point t1 = Clock::now();
     m.unlock();
     ns d = t1 - t0 - ms(250);
-#ifdef TEST_SLOW_HOST
+#if TEST_SLOW_HOST()
     assert(d < ms(150));  // within 150ms
 #else
     assert(d < ms(50));  // within 50ms

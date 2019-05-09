@@ -18,6 +18,8 @@
 #include <cstdlib>
 #include <cassert>
 
+#include "test_macros.h"
+
 int main(int, char**)
 {
     typedef std::chrono::system_clock Clock;
@@ -28,7 +30,7 @@ int main(int, char**)
     time_point t1 = Clock::now();
     std::chrono::nanoseconds ns = (t1 - t0) - ms;
     std::chrono::nanoseconds err = 5 * ms / 100;
-#ifdef TEST_SLOW_HOST
+#if TEST_SLOW_HOST()
     // 25ms is sometimes not enough tolerance on a busy jenkins slave running
     // multiple QEMU instances. 100ms should hopefully be enough
     err *= 4;
