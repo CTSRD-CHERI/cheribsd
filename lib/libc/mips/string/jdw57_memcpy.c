@@ -128,6 +128,7 @@ check_no_tagged_capabilities_in_copy(
 #endif
 		    (__cheri_addr uintmax_t)(src + offset),
 		    (__cheri_addr uintmax_t)(dst + offset));
+#ifndef BUILDING_LIBC_CHERI
 		static uint32_t abort_on_tag_loss = -1;
 		if (abort_on_tag_loss == -1) {
 			size_t olen = sizeof(abort_on_tag_loss);
@@ -141,6 +142,7 @@ check_no_tagged_capabilities_in_copy(
 		}
 		if (abort_on_tag_loss)
 			abort();
+#endif
 	}
 }
 #else
