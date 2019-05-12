@@ -685,7 +685,7 @@ inline bool LocalAddressSpace::findUnwindSections(pint_t targetAddr,
                 // This still overestimates the length of .eh_frame, but it
                 // should respect the bounds of the containing PT_LOAD.
                 cbdata->sects->dwarf_section_length = phdr->p_memsz -
-                  ((char *)cbdata->sects->dwarf_section() - (char *)begin);
+                  (size_t)((char *)cbdata->sects->dwarf_section() - (char *)begin);
                 return true;
               }
             }
@@ -743,11 +743,11 @@ inline bool LocalAddressSpace::findFunctionName(pint_t addr, char *buf,
   if (dladdr((void *)addr, &dyldInfo)) {
     if (dyldInfo.dli_sname != NULL) {
       snprintf(buf, bufLen, "%s", dyldInfo.dli_sname);
-      *offset = (addr - (pint_t) dyldInfo.dli_saddr);
+      *offset = (size_t)((char*)addr - (char*)dyldInfo.dli_saddr);
       return true;
     } else if (dyldInfo.dli_fname != NULL) {
       snprintf(buf, bufLen, "%s", dyldInfo.dli_fname);
-      *offset = (addr - (pint_t) dyldInfo.dli_fbase);
+      *offset = (size_t)((char*)addr - (char*)dyldInfo.dli_fbase);
       return true;
     }
   }

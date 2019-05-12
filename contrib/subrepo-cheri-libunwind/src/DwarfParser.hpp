@@ -171,7 +171,7 @@ const char *CFI_Parser<A>::decodeFDE(A &addressSpace, pint_t fdeStart,
     p = endOfAug;
   }
   fdeInfo->fdeStart = fdeStart;
-  fdeInfo->fdeLength = (size_t)(nextCFI - fdeStart);
+  fdeInfo->fdeLength = (size_t)((char*)nextCFI - (char*)fdeStart);
   fdeInfo->fdeInstructions = p;
   fdeInfo->pcStart = pcStart;
   fdeInfo->pcEnd = pcStart + pcRange;
@@ -262,7 +262,7 @@ bool CFI_Parser<A>::findFDE(A &addressSpace, pint_t pc, pint_t ehSectionStart,
               p = endOfAug;
             }
             fdeInfo->fdeStart = currentCFI;
-            fdeInfo->fdeLength = (size_t)(nextCFI - currentCFI);
+            fdeInfo->fdeLength = (size_t)((char*)nextCFI - (char*)currentCFI);
             fdeInfo->fdeInstructions = p;
 #ifdef __CHERI_PURE_CAPABILITY__
             fdeInfo->pcStart = assert_pointer_in_bounds(pc - (pcAddr - pcStart));
@@ -356,7 +356,7 @@ const char *CFI_Parser<A>::parseCIE(A &addressSpace, pint_t cie,
       case 'P':
         cieInfo->personalityEncoding = addressSpace.get8(p);
         ++p;
-        cieInfo->personalityOffsetInCIE = (uint8_t)(p - cie);
+        cieInfo->personalityOffsetInCIE = (uint8_t)((char*)p - (char*)cie);
         cieInfo->personality = addressSpace
             .getEncodedP(p, cieContentEnd, cieInfo->personalityEncoding);
         break;
@@ -382,7 +382,7 @@ const char *CFI_Parser<A>::parseCIE(A &addressSpace, pint_t cie,
       }
     }
   }
-  cieInfo->cieLength = (size_t)(cieContentEnd - cieInfo->cieStart);
+  cieInfo->cieLength = (size_t)((char*)cieContentEnd - (char*)cieInfo->cieStart);
   cieInfo->cieInstructions = p;
   return result;
 }
