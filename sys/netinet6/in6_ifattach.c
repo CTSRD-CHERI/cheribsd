@@ -328,6 +328,14 @@ found:
 		NET_EPOCH_EXIT(et);
 		return -1;
 
+	case IFT_INFINIBAND:
+		if (addrlen != 20) {
+			NET_EPOCH_EXIT(et);
+			return -1;
+		}
+		bcopy(addr + 12, &in6->s6_addr[8], 8);
+		break;
+
 	default:
 		NET_EPOCH_EXIT(et);
 		return -1;
@@ -692,6 +700,7 @@ in6_ifattach(struct ifnet *ifp, struct ifnet *altifp)
 		 * it is rather harmful to have one.
 		 */
 		ND_IFINFO(ifp)->flags &= ~ND6_IFF_AUTO_LINKLOCAL;
+		ND_IFINFO(ifp)->flags |= ND6_IFF_NO_DAD;
 		break;
 	default:
 		break;

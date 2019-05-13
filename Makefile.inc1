@@ -744,7 +744,7 @@ MINIMUM_SUPPORTED_REL?= 10.3
 CROSSENV+=	\
 		MACHINE_ARCH=${TARGET_ARCH} \
 		MACHINE=${TARGET} \
-		BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}" \
+		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
 		CPUTYPE=${TARGET_CPUTYPE}
 .if ${MK_META_MODE} != "no"
 # Don't rebuild build-tools targets during normal build.
@@ -806,7 +806,7 @@ TMAKE=		\
 		-DNO_LINT \
 		-DNO_CPU_CFLAGS MK_WARNS=no MK_CTF=no \
 		MK_CLANG_EXTRAS=no MK_CLANG_FULL=no \
-		BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}" \
+		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
 		MK_LLDB=no MK_RETPOLINE=no MK_TESTS=no MK_DEBUG_FILES=no
 # These get set in tools/build/mk/Makefile.boot
 # BUILD_TOOLS_CFLAGS="${CFLAGS}" BUILD_TOOLS_LDFLAGS="${LDFLAGS}"
@@ -852,8 +852,20 @@ HMAKE=		PATH=${TMPPATH} ${MAKE} LOCAL_MTREE=${LOCAL_MTREE:Q}
 HMAKE+=		PATH=${TMPPATH} METALOG=${METALOG} -DNO_ROOT
 .endif
 
-CROSSENV+=	CC="${XCC} ${XCFLAGS}" CXX="${XCXX} ${XCXXFLAGS} ${XCFLAGS}" \
-		CPP="${XCPP} ${XCFLAGS}" \
+
+# cross-building -> add -target flag to clang command line
+.if ${MACHINE:Nhost:Ncommon} != "" && ${TARGET_MACHINE} != ${HOST_MACHINE} && ${X_COMPILER_TYPE} == "clang"
+.if ${TARGET_ARCH} == "amd64"
+_triple_arch=x86_64
+.else
+_triple_arch=${TARGET_ARCH}
+.endif
+CROSS_TARGET_FLAGS=-target ${_triple_arch}-unknown-freebsd${_REVISION}
+.endif
+
+CROSSENV+=	CC="${XCC} ${CROSS_TARGET_FLAGS} ${XCFLAGS}"\
+		CXX="${XCXX} ${CROSS_TARGET_FLAGS} ${XCXXFLAGS} ${XCFLAGS}" \
+		CPP="${XCPP} ${CROSS_TARGET_FLAGS} ${XCFLAGS}" \
 		AS="${XAS}" AR="${XAR}" LD="${XLD}" LLVM_LINK="${XLLVM_LINK}" \
 		NM=${XNM} OBJCOPY="${XOBJCOPY}" \
 		RANLIB=${XRANLIB} STRINGS=${XSTRINGS} \
@@ -986,7 +998,11 @@ LIBCHERIWMAKEENV= \
 		TESTSBASE=${LIBCHERI_TESTSBASE} \
 		CC="${CHERI_CC}" \
 		LD=${CHERI_LD:U${XLD}} \
-		BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}"
+		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
+		AS="${XAS}" AR="${XAR}" LD="${XLD}" LLVM_LINK="${XLLVM_LINK}" \
+		NM=${XNM} OBJCOPY="${XOBJCOPY}" \
+		RANLIB=${XRANLIB} STRINGS=${XSTRINGS} \
+		SIZE="${XSIZE}"
 
 LIBCHERIWMAKEENV+=	MACHINE=mips
 .if ${MK_CHERI128} == "yes"
@@ -1413,7 +1429,7 @@ buildcheri:
 .for _t in ${_obj} build-tools
 	${_+_}cd ${.CURDIR}/${_dir}; \
 	    WORLDTMP=${WORLDTMP} \
-	    BUILD_TOOLS_CC="${COMPILER_ABSOLUTE_PATH}" \
+	    BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
 	    MAKEFLAGS="-m ${.CURDIR}/tools/build/mk ${.MAKEFLAGS}" \
 	    ${MAKE} SSP_CFLAGS= DESTDIR= \
 	    OBJTOP=${LIBCHERI_OBJTOP} \
@@ -1834,6 +1850,7 @@ packageworld: .PHONY
 
 _sysent_dirs=	sys/kern
 _sysent_dirs+=	sys/compat/freebsd32
+_sysent_dirs+=	sys/compat/freebsd64
 _sysent_dirs+=	sys/compat/cheriabi
 _sysent_dirs+=	sys/amd64/linux		\
 		sys/amd64/linux32	\
@@ -2701,6 +2718,10 @@ ${_bt}-usr.sbin/config: ${_bt}-usr.bin/file2c ${_bt_lex_depend}
 # `make legacy` step. Not adding a link to make is important on non-FreeBSD
 # since "make" will usually point to GNU make there.
 _other_bootstrap_tools+=usr.bin/bmake
+
+# Avoid dependency on host bz2 headers:
+_other_bootstrap_tools+=lib/libbz2
+${_bt}-usr.bin/grep: ${_bt}-lib/libbz2
 .else
 # All tools in _basic_bootstrap_tools have the same name as the subdirectory
 # so we can use :T to get the name of the symlinks that we need to create.
@@ -2909,7 +2930,7 @@ _gcc=		gnu/usr.bin/cc
 _usb_tools=	stand/usb/tools
 .endif
 
-.if ${BUILD_WITH_STRICT_TMPPATH} != 0 || defined(BOOTSTRAP_ALL_TOOLS)
+.if ${MK_ELFTOOLCHAIN_BOOTSTRAP} != "no" && (${BUILD_WITH_STRICT_TMPPATH} != 0 || defined(BOOTSTRAP_ALL_TOOLS))
 _ar=usr.bin/ar
 .endif
 

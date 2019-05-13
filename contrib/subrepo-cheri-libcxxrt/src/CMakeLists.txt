@@ -31,6 +31,8 @@ set_target_properties(cxxrt-static PROPERTIES OUTPUT_NAME "cxxrt")
 if (NOT NO_SHARED)
     add_library(cxxrt-shared SHARED ${CXXRT_SOURCES})
     target_link_libraries(cxxrt-shared PUBLIC ${CMAKE_DL_LIBS})
+    # Do not attempt to link libcxxrt against libc++/libstdc++
+    target_link_libraries(cxxrt-shared PUBLIC -nostdlib++)
     if(NOT NO_UNWIND_LIBRARY)
         target_link_libraries(cxxrt-shared PUBLIC ${LIBUNWIND_SHARED})
         target_link_libraries(cxxrt-static PUBLIC ${LIBUNWIND_STATIC})

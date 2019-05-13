@@ -95,7 +95,7 @@ CFLAGS+=	-nostdinc++
 CFLAGS+=	-nostdlib
 CFLAGS+=	-D_LIBCPP_BUILDING_LIBRARY
 CFLAGS+=	-DLIBCXXRT
-CXXSTD=		c++11
+CXXSTD?=	c++11
 
 LIBADD+=	cxxrt
 

@@ -2717,7 +2717,7 @@
 		);
 	}
 500	AUE_READLINKAT	STD {
-		int readlinkat(
+		ssize_t readlinkat(
 		    int fd,
 		    _In_z_ const char *path,
 		    _Out_writes_bytes_(bufsize) char *buf,
@@ -3168,7 +3168,15 @@
 		    size_t bufsize
 		);
 	}
-568	AUE_NULL	STD	{
+568	AUE_UNLINKAT	STD {
+		int funlinkat(
+		    int dfd,
+		    _In_z_ const char *path,
+		    int fd,
+		    int flag
+		);
+	}
+569	AUE_NULL	STD {
 		int coexecve(
 		    pid_t pid,
 		    char *fname, char **argv,

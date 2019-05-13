@@ -293,7 +293,7 @@ __elfN(get_brandinfo)(struct image_params *imgp, const char *interp,
 	boolean_t ret;
 	int i, interp_name_len;
 
-	interp_name_len = interp != NULL ? strlen(interp) : 0;
+	interp_name_len = interp != NULL ? strlen(interp) + 1 : 0;
 
 	/*
 	 * We support four types of branding -- (1) the ELF EI_OSABI field
@@ -722,6 +722,51 @@ again:
 	return (0);
 }
 
+static int
+__elfN(load_sections)(struct image_params *imgp, const Elf_Ehdr *hdr,
+    const Elf_Phdr *phdr, u_long rbase, u_long *base_addrp, u_long *max_addrp)
+{
+	vm_prot_t prot;
+	u_long base_addr, max_addr;
+	bool first;
+	int error, i;
+
+	ASSERT_VOP_LOCKED(imgp->vp, __func__);
+
+	base_addr = 0;
+	max_addr = 0;
+	first = true;
+
+	for (i = 0; i < hdr->e_phnum; i++) {
+		if (phdr[i].p_type != PT_LOAD || phdr[i].p_memsz == 0)
+			continue;
+
+		/* Loadable segment */
+		prot = __elfN(trans_prot)(phdr[i].p_flags);
+		error = __elfN(load_section)(imgp, phdr[i].p_offset,
+		    (caddr_t)(uintptr_t)phdr[i].p_vaddr + rbase,
+		    phdr[i].p_memsz, phdr[i].p_filesz, prot);
+		if (error != 0)
+			return (error);
+
+		/*
+		 * Establish the base address if this is the first segment.
+		 */
+		if (first) {
+  			base_addr = trunc_page(phdr[i].p_vaddr + rbase);
+			first = false;
+		}
+		max_addr = MAX(max_addr, phdr[i].p_vaddr + phdr[i].p_memsz);
+	}
+
+	if (base_addrp != NULL)
+		*base_addrp = base_addr;
+	if (max_addrp != NULL)
+		*max_addrp = max_addr;
+
+	return (0);
+}
+
 /*
  * Load the file "file" into memory.  It may be either a shared object
  * or an executable.
@@ -752,11 +797,10 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	struct nameidata *nd;
 	struct vattr *attr;
 	struct image_params *imgp;
-	vm_prot_t prot;
-	u_long rbase;
+	u_long flags, rbase;
 	u_long base_addr = 0;
 	u_long max_addr = 0;
-	int error, i, numsegs;
+	int error;
 
 #ifdef CAPABILITY_MODE
 	/*
@@ -784,7 +828,10 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	imgp->start_addr = ~0UL;
 	imgp->end_addr = 0;
 
-	NDINIT(nd, LOOKUP, LOCKLEAF | FOLLOW, UIO_SYSSPACE, file, curthread);
+	flags = FOLLOW | LOCKSHARED | LOCKLEAF;
+
+again:
+	NDINIT(nd, LOOKUP, flags, UIO_SYSSPACE, file, curthread);
 	if ((error = namei(nd)) != 0) {
 		nd->ni_vp = NULL;
 		goto fail;
@@ -799,15 +846,30 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 	if (error)
 		goto fail;
 
+	/*
+	 * Also make certain that the interpreter stays the same,
+	 * so set its VV_TEXT flag, too.  Since this function is only
+	 * used to load the interpreter, the VV_TEXT is almost always
+	 * already set.
+	 */
+	if (VOP_IS_TEXT(nd->ni_vp) == 0) {
+		if (VOP_ISLOCKED(nd->ni_vp) != LK_EXCLUSIVE) {
+			/*
+			 * LK_UPGRADE could have resulted in dropping
+			 * the lock.  Just try again from the start,
+			 * this time with exclusive vnode lock.
+			 */
+			vput(nd->ni_vp);
+			flags &= ~LOCKSHARED;
+			goto again;
+		}
+
+		VOP_SET_TEXT(nd->ni_vp);
+	}
+
 	error = exec_map_first_page(imgp);
 	if (error)
 		goto fail;
-
-	/*
-	 * Also make certain that the interpreter stays the same, so set
-	 * its VV_TEXT flag, too.
-	 */
-	VOP_SET_TEXT(nd->ni_vp);
 
 	imgp->object = nd->ni_vp->v_object;
 
@@ -844,27 +906,11 @@ __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
 		goto fail;
 	}
 
-	for (i = 0, numsegs = 0; i < hdr->e_phnum; i++) {
-		if (phdr[i].p_type == PT_LOAD && phdr[i].p_memsz != 0) {
-			/* Loadable segment */
-			prot = __elfN(trans_prot)(phdr[i].p_flags);
-			error = __elfN(load_section)(imgp, phdr[i].p_offset,
-			    (caddr_t)(uintptr_t)phdr[i].p_vaddr + rbase,
-			    phdr[i].p_memsz, phdr[i].p_filesz, prot);
-			if (error != 0)
-				goto fail;
-			/*
-			 * Establish the base address if this is the
-			 * first segment.
-			 */
-			if (numsegs == 0)
-  				base_addr = trunc_page(phdr[i].p_vaddr +
-				    rbase);
+	error = __elfN(load_sections)(imgp, hdr, phdr, rbase, &base_addr,
+	   &max_addr);
+	if (error != 0)
+		goto fail;
 
-			max_addr = MAX(max_addr, phdr[i].p_vaddr + phdr[i].p_memsz);
-			numsegs++;
-		}
-	}
 	*addr = base_addr;
 	*end_addr = base_addr + max_addr;
 	*entry = (unsigned long)hdr->e_entry + rbase;
@@ -997,8 +1043,7 @@ __elfN(get_interp)(struct image_params *imgp, const Elf_Phdr *phdr,
 
 	KASSERT(phdr->p_type == PT_INTERP,
 	    ("%s: p_type %u != PT_INTERP", __func__, phdr->p_type));
-	KASSERT(VOP_ISLOCKED(imgp->vp),
-	    ("%s: vp %p is not locked", __func__, imgp->vp));
+	ASSERT_VOP_LOCKED(imgp->vp, __func__);
 
 	td = curthread;
 
@@ -1041,6 +1086,42 @@ __elfN(get_interp)(struct image_params *imgp, const Elf_Phdr *phdr,
 	return (0);
 }
 
+static int
+__elfN(load_interp)(struct image_params *imgp, const Elf_Brandinfo *brand_info,
+    const char *interp, u_long *addr, u_long *end_addr, u_long *entry)
+{
+	char *path;
+	int error;
+
+	if (brand_info->emul_path != NULL &&
+	    brand_info->emul_path[0] != '\0') {
+		path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
+		snprintf(path, MAXPATHLEN, "%s%s",
+		    brand_info->emul_path, interp);
+		error = __elfN(load_file)(imgp->proc, path, addr, end_addr,
+		    entry);
+		free(path, M_TEMP);
+		if (error == 0)
+			return (0);
+	}
+
+	if (brand_info->interp_newpath != NULL &&
+	    (brand_info->interp_path == NULL ||
+	    strcmp(interp, brand_info->interp_path) == 0)) {
+		error = __elfN(load_file)(imgp->proc,
+		    brand_info->interp_newpath, addr, end_addr, entry);
+		if (error == 0)
+			return (0);
+	}
+
+	error = __elfN(load_file)(imgp->proc, interp, addr, end_addr, entry);
+	if (error == 0)
+		return (0);
+
+	uprintf("ELF interpreter %s not found, error %d\n", interp, error);
+	return (error);
+}
+
 /*
  * Impossible et_dyn_addr initial value indicating that the real base
  * must be calculated later with some randomization applied.
@@ -1056,17 +1137,15 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	Elf_Auxargs *elf_auxargs;
 	struct vmspace *vmspace;
 	vm_map_t map;
-	const char *newinterp;
-	char *interp, *path;
+	char *interp;
 	Elf_Brandinfo *brand_info;
-	const struct sysentvec *sv;
-	vm_prot_t prot;
+	struct sysentvec *sv;
 	u_long addr, baddr, et_dyn_addr, entry, proghdr;
 	u_long maxalign, mapsz, maxv, maxv1;
 	uint32_t fctl0;
 	int32_t osrel;
 	bool free_interp;
-	int error, i, n, have_interp;
+	int error, i, n;
 
 	hdr = (const Elf_Ehdr *)imgp->image_header;
 
@@ -1102,7 +1181,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	osrel = 0;
 	fctl0 = 0;
 	entry = proghdr = 0;
-	newinterp = interp = NULL;
+	interp = NULL;
 	free_interp = false;
 	td = curthread;
 	maxalign = PAGE_SIZE;
@@ -1117,6 +1196,17 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 				maxalign = phdr[i].p_align;
 			mapsz += phdr[i].p_memsz;
 			n++;
+
+			/*
+			 * If this segment contains the program headers,
+			 * remember their virtual address for the AT_PHDR
+			 * aux entry. Static binaries don't usually include
+			 * a PT_PHDR entry.
+			 */
+			if (phdr[i].p_offset == 0 &&
+			    hdr->e_phoff + hdr->e_phnum * hdr->e_phentsize
+				<= phdr[i].p_filesz)
+				proghdr = phdr[i].p_vaddr + hdr->e_phoff;
 			break;
 		case PT_INTERP:
 			/* Path to interpreter */
@@ -1135,6 +1225,9 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 				imgp->stack_prot =
 				    __elfN(trans_prot)(phdr[i].p_flags);
 			imgp->stack_sz = phdr[i].p_memsz;
+			break;
+		case PT_PHDR: 	/* Program header table info */
+			proghdr = phdr[i].p_vaddr;
 			break;
 		}
 	}
@@ -1197,8 +1290,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		error = EINVAL;
 		goto ret;
 	}
-	if (interp != NULL && brand_info->interp_newpath != NULL)
-		newinterp = brand_info->interp_newpath;
 
 	/*
 	 * Avoid a possible deadlock if the current address space is destroyed
@@ -1288,37 +1379,10 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	/* KASSERT(imgp->start_addr != 0,
 	 *   ("Should be ULONG_MAX and not 0x%lx", imgp->start_addr)); */
 	imgp->start_addr = ~0UL;
-	for (i = 0; i < hdr->e_phnum; i++) {
-		switch (phdr[i].p_type) {
-		case PT_LOAD:	/* Loadable segment */
-			if (phdr[i].p_memsz == 0)
-				break;
-			prot = __elfN(trans_prot)(phdr[i].p_flags);
-			error = __elfN(load_section)(imgp, phdr[i].p_offset,
-			    (caddr_t)(uintptr_t)phdr[i].p_vaddr + et_dyn_addr,
-			    phdr[i].p_memsz, phdr[i].p_filesz, prot);
-			if (error != 0)
-				goto ret;
 
-			/*
-			 * If this segment contains the program headers,
-			 * remember their virtual address for the AT_PHDR
-			 * aux entry. Static binaries don't usually include
-			 * a PT_PHDR entry.
-			 */
-			if (phdr[i].p_offset == 0 &&
-			    hdr->e_phoff + hdr->e_phnum * hdr->e_phentsize
-				<= phdr[i].p_filesz)
-				proghdr = phdr[i].p_vaddr + hdr->e_phoff +
-				    et_dyn_addr;
-			break;
-		case PT_PHDR: 	/* Program header table info */
-			proghdr = phdr[i].p_vaddr + et_dyn_addr;
-			break;
-		default:
-			break;
-		}
-	}
+	error = __elfN(load_sections)(imgp, hdr, phdr, et_dyn_addr, NULL, NULL);
+	if (error != 0)
+		goto ret;
 
 	error = __elfN(enforce_limits)(imgp, hdr, phdr, et_dyn_addr);
 	if (error != 0)
@@ -1351,7 +1415,6 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	imgp->interp_end = 0;
 
 	if (interp != NULL) {
-		have_interp = FALSE;
 		VOP_UNLOCK(imgp->vp, 0);
 		if ((map->flags & MAP_ASLR) != 0) {
 			/* Assume that interpeter fits into 1/4 of AS */
@@ -1360,36 +1423,11 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 			addr = __CONCAT(rnd_, __elfN(base))(map, addr,
 			    maxv1, PAGE_SIZE);
 		}
-
-		if (brand_info->emul_path != NULL &&
-		    brand_info->emul_path[0] != '\0') {
-			path = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-			snprintf(path, MAXPATHLEN, "%s%s",
-			    brand_info->emul_path, interp);
-			error = __elfN(load_file)(imgp->proc, path, &addr,
-			    &imgp->interp_end, &imgp->entry_addr);
-			free(path, M_TEMP);
-			if (error == 0)
-				have_interp = TRUE;
-		}
-		if (!have_interp && newinterp != NULL &&
-		    (brand_info->interp_path == NULL ||
-		    strcmp(interp, brand_info->interp_path) == 0)) {
-			error = __elfN(load_file)(imgp->proc, newinterp, &addr,
-			    &imgp->interp_end, &imgp->entry_addr);
-			if (error == 0)
-				have_interp = TRUE;
-		}
-		if (!have_interp) {
-			error = __elfN(load_file)(imgp->proc, interp, &addr,
-			    &imgp->interp_end, &imgp->entry_addr);
-		}
+		error = __elfN(load_interp)(imgp, brand_info, interp, &addr,
+		    &imgp->interp_end, &imgp->entry_addr);
 		vn_lock(imgp->vp, LK_EXCLUSIVE | LK_RETRY);
-		if (error != 0) {
-			uprintf("ELF interpreter %s not found, error %d\n",
-			    interp, error);
+		if (error != 0)
 			goto ret;
-		}
 	} else
 		addr = et_dyn_addr;
 
@@ -1398,7 +1436,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	elf_auxargs = malloc(sizeof(Elf_Auxargs), M_TEMP, M_WAITOK);
 	elf_auxargs->execfd = -1;
-	elf_auxargs->phdr = proghdr;
+	elf_auxargs->phdr = proghdr + et_dyn_addr;
 	elf_auxargs->phent = hdr->e_phentsize;
 	elf_auxargs->phnum = hdr->e_phnum;
 	elf_auxargs->pagesz = PAGE_SIZE;

@@ -68,6 +68,11 @@ MK_PIE:=	no
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
 # avoid accidentally depending on non-existent symbols
 LDFLAGS+=	-Wl,-no-undefined
+
+# Add this flag once everyone has a new-enough toolchain
+.if ${COMPILER_VERSION} > 100000
+LDFLAGS+=	-Wl,--building-freebsd-rtld
+.endif
 LIBADD=		c_pic
 
 # For floating-point functions used by gdtoa.

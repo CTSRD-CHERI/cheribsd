@@ -574,5 +574,6 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_fhlink",			/* 565 = cheriabi_fhlink */
 	"cheriabi_fhlinkat",			/* 566 = cheriabi_fhlinkat */
 	"cheriabi_fhreadlink",			/* 567 = cheriabi_fhreadlink */
-	"cheriabi_coexecve",			/* 568 = cheriabi_coexecve */
+	"cheriabi_funlinkat",			/* 568 = cheriabi_funlinkat */
+	"cheriabi_coexecve",			/* 569 = cheriabi_coexecve */
 };

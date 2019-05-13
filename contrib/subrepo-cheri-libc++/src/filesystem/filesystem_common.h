@@ -24,6 +24,17 @@
 
 #include "../include/apple_availability.h"
 
+// CHERI CHANGES START
+// {
+//   "updated": 20190426,
+//   "target_type": "lib"
+//   "changes": [
+//     "subobject_bounds",
+//   ],
+//   "change_comment": "std::string: &str[0] -> str.data()",
+// }
+// CHERI CHANGES END
+
 #if !defined(__APPLE__)
 // We can use the presence of UTIME_OMIT to detect platforms that provide
 // utimensat.
@@ -87,7 +98,8 @@ static string format_string_imp(const char* msg, ...) {
   // needed for formatting.
   size_with_null = static_cast<size_t>(ret) + 1;
   result.__resize_default_init(size_with_null - 1);
-  ret = ::vsnprintf(&result[0], size_with_null, msg, args);
+  // ret = ::vsnprintf(&result[0], size_with_null, msg, args);
+  ret = ::vsnprintf(result.data(), size_with_null, msg, args);
   _LIBCPP_ASSERT(static_cast<size_t>(ret) == (size_with_null - 1), "TODO");
 
   return result;

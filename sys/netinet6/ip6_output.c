@@ -322,6 +322,9 @@ ip6_output(struct mbuf *m0, struct ip6_pktopts *opt,
 			m->m_pkthdr.flowid = inp->inp_flowid;
 			M_HASHTYPE_SET(m, inp->inp_flowtype);
 		}
+#ifdef NUMA
+		m->m_pkthdr.numa_domain = inp->inp_numa_domain;
+#endif
 	}
 
 #if defined(IPSEC) || defined(IPSEC_SUPPORT)
@@ -2221,8 +2224,11 @@ ip6_raw_ctloutput(struct socket *so, struct sockopt *sopt)
 					    sizeof(optval));
 			if (error)
 				break;
-			if ((optval % 2) != 0) {
-				/* the API assumes even offset values */
+			if (optval < -1 || (optval % 2) != 0) {
+				/*
+				 * The API assumes non-negative even offset
+				 * values or -1 as a special value.
+				 */
 				error = EINVAL;
 			} else if (so->so_proto->pr_protocol ==
 			    IPPROTO_ICMPV6) {

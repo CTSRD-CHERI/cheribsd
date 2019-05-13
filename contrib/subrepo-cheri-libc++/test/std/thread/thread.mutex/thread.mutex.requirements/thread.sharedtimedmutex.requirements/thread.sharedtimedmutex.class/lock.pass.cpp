@@ -33,7 +33,7 @@ typedef std::chrono::milliseconds ms;
 typedef std::chrono::nanoseconds ns;
 
 
-#if !defined(TEST_SLOW_HOST)
+#if !TEST_SLOW_HOST()
 ms WaitTime = ms(250);
 #else
 ms WaitTime = ms(750);
@@ -42,7 +42,7 @@ ms WaitTime = ms(750);
 // Thread sanitizer causes more overhead and will sometimes cause this test
 // to fail. To prevent this we give Thread sanitizer more time to complete the
 // test.
-#if !TEST_HAS_FEATURE(thread_sanitizer) && !defined(TEST_SLOW_HOST)
+#if !TEST_HAS_FEATURE(thread_sanitizer) && !TEST_SLOW_HOST()
 ms Tolerance = ms(50);
 #else
 ms Tolerance = ms(100);
@@ -56,7 +56,7 @@ void f()
     time_point t1 = Clock::now();
     m.unlock();
     ns d = t1 - t0 - ms(250);
-#ifdef TEST_SLOW_HOST
+#if TEST_SLOW_HOST()
     assert(d < ms(150));  // within 150ms
 #else
     assert(d < ms(50));  // within 50ms

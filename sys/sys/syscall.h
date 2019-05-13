@@ -504,5 +504,6 @@
 #define	SYS_fhlink	565
 #define	SYS_fhlinkat	566
 #define	SYS_fhreadlink	567
-#define	SYS_coexecve	568
-#define	SYS_MAXSYSCALL	569
+#define	SYS_funlinkat	568
+#define	SYS_coexecve	569
+#define	SYS_MAXSYSCALL	570

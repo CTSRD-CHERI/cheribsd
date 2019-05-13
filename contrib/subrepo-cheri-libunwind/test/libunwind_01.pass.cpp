@@ -13,7 +13,7 @@ void backtrace(int lower_bound) {
   unw_word_t offset = 0;
 
   int n = 0;
-  do {
+  while (1) {
     n++;
     if (unw_get_proc_name(&cursor, buffer, sizeof(buffer), &offset) == 0) {
       fprintf(stderr, "Frame %d: %s+%p\n", n, buffer, (void*)offset);
@@ -24,7 +24,15 @@ void backtrace(int lower_bound) {
       fprintf(stderr, "ERROR: Got %d frames, but expected at most 100\n", n);
       abort();
     }
-  } while (unw_step(&cursor) > 0);
+    int error = unw_step(&cursor);
+    if (error == 0) {
+      fprintf(stderr, "Note: Reached final frame after %d steps\n", n);
+      break;
+    } else if (error < 0) {
+      fprintf(stderr, "ERROR: Got error in unw_step: %d\n", error);
+      abort();
+    }
+  };
 
   if (n < lower_bound) {
     fprintf(stderr, "ERROR: Got %d frames, but expected at least %d\n", n, lower_bound);

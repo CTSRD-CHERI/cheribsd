@@ -35,7 +35,7 @@
 
 #ifndef _TIMELOCAL_H_
 #define	_TIMELOCAL_H_
-#include "xlocale_private.h"
+#include "../locale/xlocale_private.h"
 
 /*
  * Private header file for the strftime and strptime localization
@@ -57,7 +57,7 @@ struct lc_time_T {
 	const char	*ampm_fmt;
 };
 
-struct lc_time_T *__get_current_time_locale(locale_t);
+struct lc_time_T *__get_current_time_locale(XLOCALE_NAMESPACED(locale_t));
 int	__time_load_locale(const char *);
 
 #endif /* !_TIMELOCAL_H_ */

@@ -22,6 +22,8 @@
 #include <cstdlib>
 #include <cassert>
 
+#include "test_macros.h"
+
 std::shared_mutex m;
 
 typedef std::chrono::system_clock Clock;
@@ -30,7 +32,7 @@ typedef Clock::duration duration;
 typedef std::chrono::milliseconds ms;
 typedef std::chrono::nanoseconds ns;
 
-#if !defined(TEST_HAS_SANITIZERS) && !defined(TEST_SLOW_HOST)
+#if !defined(TEST_HAS_SANITIZERS) && !TEST_SLOW_HOST()
 static ms main_thread_sleep_duration = ms(750);
 static ms tolerance = ms(500);
 #else

@@ -23,13 +23,19 @@
 
 typedef std::chrono::milliseconds ms;
 
+#if !TEST_SLOW_HOST()
+static ms WaitTime = ms(250);
+#else
+static ms WaitTime = ms(750);
+#endif
+
 std::once_flag flg0;
 
 int init0_called = 0;
 
 void init0()
 {
-    std::this_thread::sleep_for(ms(250));
+    std::this_thread::sleep_for(WaitTime);
     ++init0_called;
 }
 
@@ -46,7 +52,7 @@ int init3_completed = 0;
 void init3()
 {
     ++init3_called;
-    std::this_thread::sleep_for(ms(250));
+    std::this_thread::sleep_for(WaitTime);
     if (init3_called == 1)
         TEST_THROW(1);
     ++init3_completed;
@@ -112,13 +118,13 @@ void init42();
 
 void init41()
 {
-    std::this_thread::sleep_for(ms(250));
+    std::this_thread::sleep_for(WaitTime);
     ++init41_called;
 }
 
 void init42()
 {
-    std::this_thread::sleep_for(ms(250));
+    std::this_thread::sleep_for(WaitTime);
     ++init42_called;
 }
 

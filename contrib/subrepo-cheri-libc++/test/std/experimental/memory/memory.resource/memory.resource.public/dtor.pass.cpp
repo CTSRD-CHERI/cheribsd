@@ -9,6 +9,7 @@
 // UNSUPPORTED: c++98, c++03
 
 // <experimental/memory_resource>
+// UNSUPPORTED: libcpp-no-rtti
 
 //------------------------------------------------------------------------------
 // TESTING virtual ~memory_resource()

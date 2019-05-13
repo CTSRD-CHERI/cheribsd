@@ -6,6 +6,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+// CHERI CHANGES START
+// {
+//   "updated": 20190429,
+//   "target_type": "lib"
+//   "changes": [
+//     "subobject_bounds",
+//   ],
+//   "change_comment": "std::string: &str[N] -> str.data()/str.end()",
+// }
+// CHERI CHANGES END
+
 #include "filesystem"
 #include "array"
 #include "iterator"
@@ -244,7 +255,7 @@ private:
     case PS_InRootName:
     case PS_InRootDir:
     case PS_InFilenames:
-      return &RawEntry.back() + 1;
+      return RawEntry.end();
     case PS_InTrailingSep:
     case PS_AtEnd:
       return getAfterBack();
@@ -258,13 +269,13 @@ private:
     switch (State) {
     case PS_BeforeBegin:
     case PS_InRootName:
-      return &Path.front();
+      return Path.data();
     case PS_InRootDir:
     case PS_InFilenames:
     case PS_InTrailingSep:
-      return &RawEntry.front();
+      return RawEntry.data();
     case PS_AtEnd:
-      return &Path.back() + 1;
+      return Path.end();
     }
     _LIBCPP_UNREACHABLE();
   }
@@ -1248,7 +1259,7 @@ path __weakly_canonical(const path& p, error_code* ec) {
   vector<string_view_t> DNEParts;
 
   while (PP.State != PathParser::PS_BeforeBegin) {
-    tmp.assign(createView(p.native().data(), &PP.RawEntry.back()));
+    tmp.assign(createView(p.native().data(), std::prev(PP.RawEntry.end())));
     error_code m_ec;
     file_status st = __status(tmp, &m_ec);
     if (!status_known(st)) {
@@ -1316,7 +1327,7 @@ string_view_t path::__root_path_raw() const {
     auto NextCh = PP.peek();
     if (NextCh && *NextCh == '/') {
       ++PP;
-      return createView(__pn_.data(), &PP.RawEntry.back());
+      return createView(__pn_.data(), std::prev(PP.RawEntry.end()));
     }
     return PP.RawEntry;
   }
@@ -1347,7 +1358,7 @@ string_view_t path::__relative_path() const {
   auto PP = PathParser::CreateBegin(__pn_);
   if (ConsumeRootDir(&PP))
     return {};
-  return createView(PP.RawEntry.data(), &__pn_.back());
+  return createView(PP.RawEntry.data(), __pn_.data() + __pn_.size() - 1);
 }
 
 string_view_t path::__parent_path() const {
@@ -1368,7 +1379,7 @@ string_view_t path::__parent_path() const {
     if (PP.RawEntry.data() == __pn_.data())
       return {};
     --PP;
-    return createView(__pn_.data(), &PP.RawEntry.back());
+    return createView(__pn_.data(), std::prev(PP.RawEntry.end()));
   }
 }
 

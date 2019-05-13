@@ -8,7 +8,7 @@
 # should be defined in the kern.pre.mk so that port makefiles can
 # override or augment them.
 
-.if defined(DTS) || defined(DTSO)
+.if defined(DTS) || defined(DTSO) || defined(FDT_DTS_FILE)
 .include "dtb.build.mk"
 
 KERNEL_EXTRA+=	${DTB} ${DTBO}
@@ -227,7 +227,7 @@ kernel-clean:
 HACK_EXTRA_FLAGS?= -shared
 hack.pico: Makefile
 	:> hack.c
-	${CC} ${HACK_EXTRA_FLAGS} -nostdlib hack.c -o hack.pico
+	${CC} ${CFLAGS:N-flto:N-fno-common} ${HACK_EXTRA_FLAGS} -nostdlib hack.c -o hack.pico
 	rm -f hack.c
 
 offset.inc: $S/kern/genoffset.sh genoffset.o
@@ -466,7 +466,7 @@ vnode_if_typedef.h:
 # start/end/size variables to __start_mfs, __stop_mfs, and mfs_size,
 # respectively.
 embedfs_${MFS_IMAGE:T:R}.o: ${MFS_IMAGE}
-	${OBJCOPY:C/^.*llvm-objcopy.*/objcopy/} --input-target binary \
+	${OBJCOPY} --input-target binary \
 	    --output-target ${EMBEDFS_FORMAT.${MACHINE_ARCH}} \
 	    --binary-architecture ${EMBEDFS_ARCH.${MACHINE_ARCH}} \
 	    ${MFS_IMAGE} ${.TARGET}

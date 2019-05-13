@@ -286,9 +286,9 @@ disk_open(struct disk_devdesc *dev, uint64_t mediasize, u_int sectorsize)
 		od->entrysize = part.end - part.start + 1;
 		slice = part.index;
 		if (ptable_gettype(od->table) == PTABLE_GPT) {
-			partition = 255;
+			partition = D_PARTISGPT;
 			goto out; /* Nothing more to do */
-		} else if (partition == 255) {
+		} else if (partition == D_PARTISGPT) {
 			/*
 			 * When we try to open GPT partition, but partition
 			 * table isn't GPT, reset d_partition value to -1
@@ -392,8 +392,20 @@ disk_parsedev(struct disk_devdesc *dev, const char *devspec, const char **path)
 
 	np = devspec;
 	unit = -1;
-	slice = D_SLICEWILD;
-	partition = D_PARTWILD;
+	/*
+	 * If there is path/file info after the device info, then any missing
+	 * slice or partition info should be considered a request to search for
+	 * an appropriate partition.  Otherwise we want to open the raw device
+	 * itself and not try to fill in missing info by searching.
+	 */
+	if ((cp = strchr(np, ':')) != NULL && cp[1] != '\0') {
+		slice = D_SLICEWILD;
+		partition = D_PARTWILD;
+	} else {
+		slice = D_SLICENONE;
+		partition = D_PARTNONE;
+	}
+
 	if (*np != '\0' && *np != ':') {
 		unit = strtol(np, &cp, 10);
 		if (cp == np)
@@ -407,7 +419,7 @@ disk_parsedev(struct disk_devdesc *dev, const char *devspec, const char **path)
 			/* we don't support nested partitions on GPT */
 			if (*cp != '\0' && *cp != ':')
 				return (EINVAL);
-			partition = 255;
+			partition = D_PARTISGPT;
 		} else
 #endif
 #ifdef LOADER_MBR_SUPPORT

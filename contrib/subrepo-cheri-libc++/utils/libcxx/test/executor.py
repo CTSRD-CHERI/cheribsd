@@ -187,6 +187,9 @@ class RemoteExecutor(Executor):
             else:
                 cmd = [target_exe_path]
 
+            if self.config and self.config.lit_config.run_with_debugger:
+                cmd = "gdb --quiet --batch --return-child-result -ex=r -ex=bt --args".split() + cmd
+
             srcs = [exe_path]
             dsts = [target_exe_path]
             if file_deps is not None:
@@ -259,13 +262,15 @@ class SSHExecutor(RemoteExecutor):
 
     def _execute_command_remote(self, cmd, remote_work_dir='.', env=None):
         remote = self.user_prefix + self.host
-        ssh_cmd = self.ssh_command + ['-oBatchMode=yes', remote]
+        # Add -tt to force a TTY allocation so that the remote process is killed
+        # when SSH exits.
+        ssh_cmd = self.ssh_command + ['-tt', '-oBatchMode=yes', remote]
         # FIXME: doesn't handle spaces... and Py2.7 doesn't have shlex.quote()
         if env:
             env_cmd = ['env'] + ['\'%s=%s\'' % (k, v) for k, v in env.items()]
         else:
             env_cmd = []
-        remote_cmd = ' '.join(env_cmd + cmd)
+        remote_cmd = ' '.join(env_cmd + cmd)  # TODO: shlex.quote()
         if remote_work_dir != '.':
             remote_cmd = 'cd \'' + remote_work_dir + '\' && ' + remote_cmd
         if self.config and self.config.lit_config.debug:

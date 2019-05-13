@@ -14,7 +14,7 @@
 #if !defined(__USING_SJLJ_EXCEPTIONS__)
 
 #if defined(__i386__)
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_x866jumptoEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind13Registers_x866jumptoEv)
 #
 # void libunwind::Registers_x86::jumpto()
 #
@@ -61,7 +61,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_x866jumptoEv)
 
 #elif defined(__x86_64__)
 
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind16Registers_x86_646jumptoEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind16Registers_x86_646jumptoEv)
 #
 # void libunwind::Registers_x86_64::jumpto()
 #
@@ -129,7 +129,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind16Registers_x86_646jumptoEv)
 #elif defined(__CHERI_PURE_CAPABILITY__)
 .set noreorder
 
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind20Registers_mips_cheri6jumptoEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind20Registers_mips_cheri6jumptoEv)
 #
 # void libunwind::Registers_mips_cheri::jumpto()
 #
@@ -219,7 +219,7 @@ END_LIBUNWIND_FUNCTION(_ZN9libunwind20Registers_mips_cheri6jumptoEv)
 
 #elif defined(__powerpc64__)
 
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind15Registers_ppc646jumptoEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_ppc646jumptoEv)
 //
 // void libunwind::Registers_ppc64::jumpto()
 //
@@ -484,7 +484,7 @@ Lnovec:
 
 #elif defined(__ppc__)
 
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_ppc6jumptoEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind13Registers_ppc6jumptoEv)
 ;
 ; void libunwind::Registers_ppc::jumpto()
 ;
@@ -656,7 +656,7 @@ Lnovec:
 //  thread_state pointer is in x0
 //
   .p2align 2
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind15Registers_arm646jumptoEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_arm646jumptoEv)
   // skip restore of x0,x1 for now
   ldp    x2, x3,  [x0, #0x010]
   ldp    x4, x5,  [x0, #0x020]
@@ -710,7 +710,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind15Registers_arm646jumptoEv)
 @  thread_state pointer is in r0
 @
   .p2align 2
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm20restoreCoreAndJumpToEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind13Registers_arm20restoreCoreAndJumpToEv)
 #if !defined(__ARM_ARCH_ISA_ARM) && __ARM_ARCH_ISA_THUMB == 1
   @ r8-r11: ldm into r1-r4, then mov to r8-r11
   adds r0, #0x20
@@ -748,7 +748,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm20restoreCoreAndJu
 #if defined(__ELF__)
   .fpu vfpv3-d16
 #endif
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm19restoreVFPWithFLDMDEPv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind13Registers_arm19restoreVFPWithFLDMDEPv)
   @ VFP and iwMMX instructions are only available when compiling with the flags
   @ that enable them. We do not want to do that in the library (because we do not
   @ want the compiler to generate instructions that access those) but this is
@@ -769,7 +769,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm19restoreVFPWithFL
 #if defined(__ELF__)
   .fpu vfpv3-d16
 #endif
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm19restoreVFPWithFLDMXEPv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind13Registers_arm19restoreVFPWithFLDMXEPv)
   vldmia r0, {d0-d15} @ fldmiax is deprecated in ARMv7+ and now behaves like vldmia
   JMP(lr)
 
@@ -783,7 +783,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm19restoreVFPWithFL
 #if defined(__ELF__)
   .fpu vfpv3
 #endif
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm12restoreVFPv3EPv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind13Registers_arm12restoreVFPv3EPv)
   vldmia r0, {d16-d31}
   JMP(lr)
 
@@ -799,7 +799,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm12restoreVFPv3EPv)
 #if defined(__ELF__)
   .arch armv5te
 #endif
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm12restoreiWMMXEPv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind13Registers_arm12restoreiWMMXEPv)
   ldcl p1, cr0, [r0], #8  @ wldrd wR0, [r0], #8
   ldcl p1, cr1, [r0], #8  @ wldrd wR1, [r0], #8
   ldcl p1, cr2, [r0], #8  @ wldrd wR2, [r0], #8
@@ -828,7 +828,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm12restoreiWMMXEPv)
 #if defined(__ELF__)
   .arch armv5te
 #endif
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm19restoreiWMMXControlEPj)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind13Registers_arm19restoreiWMMXControlEPj)
   ldc2 p1, cr8, [r0], #4  @ wldrw wCGR0, [r0], #4
   ldc2 p1, cr9, [r0], #4  @ wldrw wCGR1, [r0], #4
   ldc2 p1, cr10, [r0], #4  @ wldrw wCGR2, [r0], #4
@@ -839,7 +839,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind13Registers_arm19restoreiWMMXCont
 
 #elif defined(__or1k__)
 
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind14Registers_or1k6jumptoEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind14Registers_or1k6jumptoEv)
 #
 # void libunwind::Registers_or1k::jumpto()
 #
@@ -898,7 +898,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind14Registers_or1k6jumptoEv)
 // On entry:
 //  thread state pointer is in a0 ($4)
 //
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind18Registers_mips_o326jumptoEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind18Registers_mips_o326jumptoEv)
   .set push
   .set noat
   .set noreorder
@@ -1007,7 +1007,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind18Registers_mips_o326jumptoEv)
 // On entry:
 //  thread state pointer is in a0 ($4)
 //
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind21Registers_mips_newabi6jumptoEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind21Registers_mips_newabi6jumptoEv)
   .set push
   .set noat
   .set noreorder
@@ -1097,7 +1097,7 @@ DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind21Registers_mips_newabi6jumptoEv)
 // On entry:
 //  thread_state pointer is in o0
 //
-DEFINE_LIBUNWIND_PRIVATE_FUNCTION(_ZN9libunwind15Registers_sparc6jumptoEv)
+DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind15Registers_sparc6jumptoEv)
   ta 3
   ldd [%o0 + 64],  %l0
   ldd [%o0 + 72],  %l2

@@ -1771,7 +1771,7 @@ vmmap_remove(void *addr)
 	return (vmmap);
 }
 
-#if defined(__i386__) || defined(__amd64__) || defined(__powerpc__)
+#if defined(__i386__) || defined(__amd64__) || defined(__powerpc__) || defined(__aarch64__)
 void *
 _ioremap_attr(vm_paddr_t phys_addr, unsigned long size, int attr)
 {
@@ -1794,7 +1794,7 @@ iounmap(void *addr)
 	vmmap = vmmap_remove(addr);
 	if (vmmap == NULL)
 		return;
-#if defined(__i386__) || defined(__amd64__) || defined(__powerpc__)
+#if defined(__i386__) || defined(__amd64__) || defined(__powerpc__) || defined(__aarch64__)
 	pmap_unmapdev((vm_offset_t)addr, vmmap->vm_size);
 #endif
 	kfree(vmmap);
@@ -2326,7 +2326,7 @@ __register_chrdev(unsigned int major, unsigned int baseminor,
 
 	for (i = baseminor; i < baseminor + count; i++) {
 		cdev = cdev_alloc();
-		cdev_init(cdev, fops);
+		cdev->ops = fops;
 		kobject_set_name(&cdev->kobj, name);
 
 		ret = cdev_add(cdev, makedev(major, i), 1);
@@ -2348,7 +2348,7 @@ __register_chrdev_p(unsigned int major, unsigned int baseminor,
 
 	for (i = baseminor; i < baseminor + count; i++) {
 		cdev = cdev_alloc();
-		cdev_init(cdev, fops);
+		cdev->ops = fops;
 		kobject_set_name(&cdev->kobj, name);
 
 		ret = cdev_add_ext(cdev, makedev(major, i), uid, gid, mode);

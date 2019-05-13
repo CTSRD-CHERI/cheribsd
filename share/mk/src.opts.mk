@@ -206,6 +206,7 @@ __DEFAULT_NO_OPTIONS = \
     LOADER_FIREWIRE \
     LOADER_FORCE_LE \
     LOADER_VERBOSE \
+    LOADER_VERIEXEC_PASS_MANIFEST \
     NAND \
     OFED_EXTRA \
     OPENLDAP \
@@ -290,6 +291,7 @@ __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}/LLVM
 .endfor
 
 __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF
+__DEFAULT_NO_OPTIONS+=LLVM_TARGET_RISCV
 
 .include <bsd.compiler.mk>
 # If the compiler is not C++11 capable, disable Clang and use GCC instead.
@@ -414,10 +416,6 @@ BROKEN_OPTIONS+=CLANG LLD
 # The cddl bootstrap tools still need some changes in order to compile
 BROKEN_OPTIONS+=CDDL ZFS
 
-# localedef depends on the FreeBSD xlocale headers but those are incompatible
-# with the ones provided by glibc
-BROKEN_OPTIONS+=LOCALES
-
 # Boot cannot be built with clang yet. Will need to bootstrap GNU as..
 BROKEN_OPTIONS+=BOOT
 # libsnmp use ls -D which is not supported on MacOS (and possibly linux)
@@ -468,7 +466,7 @@ MK_CLANG_BOOTSTRAP:=no
 MK_LLD_BOOTSTRAP:=no
 MK_GCC_BOOTSTRAP:=no
 # However, the elftoolchain tools build and should be used
-MK_ELFTOOLCHAIN_BOOTSTRAP:=	yes
+# MK_ELFTOOLCHAIN_BOOTSTRAP:=	yes
 .endif
 
 #
@@ -610,6 +608,10 @@ MK_LLDB:=	no
 MK_CLANG_EXTRAS:= no
 MK_CLANG_FULL:= no
 MK_LLVM_COV:= no
+.endif
+
+.if ${MK_LOADER_VERIEXEC} == "no"
+MK_LOADER_VERIEXEC_PASS_MANIFEST := no
 .endif
 
 #

@@ -3207,7 +3207,7 @@ pf_tcp_iss(struct pf_pdesc *pd)
 	u_int32_t digest[4];
 
 	if (V_pf_tcp_secret_init == 0) {
-		read_random(&V_pf_tcp_secret, sizeof(V_pf_tcp_secret));
+		arc4random_buf(&V_pf_tcp_secret, sizeof(V_pf_tcp_secret));
 		MD5Init(&V_pf_tcp_secret_ctx);
 		MD5Update(&V_pf_tcp_secret_ctx, V_pf_tcp_secret,
 		    sizeof(V_pf_tcp_secret));
@@ -6170,7 +6170,7 @@ done:
 	    pd.proto == IPPROTO_UDP) && s != NULL && s->nat_rule.ptr != NULL &&
 	    (s->nat_rule.ptr->action == PF_RDR ||
 	    s->nat_rule.ptr->action == PF_BINAT) &&
-	    (ntohl(pd.dst->v4.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET)
+	    IN_LOOPBACK(ntohl(pd.dst->v4.s_addr)))
 		m->m_flags |= M_SKIP_FIREWALL;
 
 	if (action == PF_PASS && r->divert.port && ip_divert_ptr != NULL &&

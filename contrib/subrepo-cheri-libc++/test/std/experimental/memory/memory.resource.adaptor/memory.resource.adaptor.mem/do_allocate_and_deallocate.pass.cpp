@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++98, c++03
+// UNSUPPORTED: libcpp-no-rtti
 
 // <experimental/memory_resource>
 
@@ -15,6 +16,10 @@
 // void * do_allocate(size_t size, size_t align)
 // void   do_deallocate(void*, size_t, size_t)
 
+// When back-deploying to macosx10.7, the RTTI for exception classes
+// incorrectly provided by libc++.dylib is mixed with the one in
+// libc++abi.dylib and exceptions are not caught properly.
+// XFAIL: with_system_cxx_lib=macosx10.7
 
 #include <experimental/memory_resource>
 #include <type_traits>

@@ -110,7 +110,7 @@ mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
 	return FALSE;
 }
 
-static boolean_t
+boolean_t
 mips_elf_header_supported(struct image_params * imgp)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;

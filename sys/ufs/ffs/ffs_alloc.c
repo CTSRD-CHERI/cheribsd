@@ -3431,14 +3431,14 @@ sysctl_ffs_fsck(SYSCTL_HANDLER_ARGS)
 		}
 #endif /* DEBUG */
 		/*
-		 * kern_unlinkat will do its own start/finish writes and
+		 * kern_funlinkat will do its own start/finish writes and
 		 * they do not nest, so drop ours here. Setting mp == NULL
 		 * indicates that vn_finished_write is not needed down below.
 		 */
 		vn_finished_write(mp);
 		mp = NULL;
-		error = kern_unlinkat(td, AT_FDCWD,
-		    __USER_CAP_STR((char *)(intptr_t)cmd.value),
+		error = kern_funlinkat(td, AT_FDCWD,
+		    __USER_CAP_STR((char *)(intptr_t)cmd.value), FD_NONE,
 		    UIO_USERSPACE, 0, (ino_t)cmd.size);
 		break;
 

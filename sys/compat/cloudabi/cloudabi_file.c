@@ -759,18 +759,19 @@ cloudabi_sys_file_unlink(struct thread *td,
 		return (error);
 
 	if (uap->flags & CLOUDABI_UNLINK_REMOVEDIR)
-		error = kern_rmdirat(td, uap->fd,
-		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, 0);
+		error = kern_frmdirat(td, uap->fd,
+		    (__cheri_tocap char * __capability)path, FD_NONE,
+		    UIO_SYSSPACE, 0);
 	else
-		error = kern_unlinkat(td, uap->fd,
-		    (__cheri_tocap char * __capability)path, UIO_SYSSPACE, 0,
-		    0);
+		error = kern_funlinkat(td, uap->fd,
+		    (__cheri_tocap char * __capability)path, FD_NONE,
+		    UIO_SYSSPACE, 0, 0);
 	cloudabi_freestr(path);
 	return (error);
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190429,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",

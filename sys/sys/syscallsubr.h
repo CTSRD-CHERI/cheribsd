@@ -88,6 +88,8 @@ int	kern___acl_set_path(struct thread *td, const char *__capability path,
 	    acl_type_t type, const struct acl * __capability aclp, int follow);
 int	kern___getcwd(struct thread *td, char * __capability buf,
 	    enum uio_seg bufseg, size_t buflen, size_t path_max);
+int	kern_abort2(struct thread *td, const char * __capability why,
+            int nargs, void **uargs);
 int	kern_accept(struct thread *td, int s, struct sockaddr **name,
 	    socklen_t *namelen, struct file **fp);
 int	kern_accept4(struct thread *td, int s, struct sockaddr **name,
@@ -393,8 +395,9 @@ int	kern_renameat(struct thread *td, int oldfd,
 	    const char * __capability new, enum uio_seg pathseg);
 int	kern_revoke(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
-int	kern_rmdirat(struct thread *td, int fd, const char * __capability path,
-	    enum uio_seg pathseg, int flag);
+int	kern_frmdirat(struct thread *td, int dfd,
+	    const char * __capability path, int fd, enum uio_seg pathseg,
+	    int flag);
 int	kern_rtprio(struct thread *td, int function, pid_t pid,
 	    struct rtprio * __capability urtp);
 int	kern_rtprio_thread(struct thread *td, int function, lwpid_t lwpid,
@@ -493,6 +496,12 @@ int	kern_undelete(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
 int	kern_unmount(struct thread *td, const char * __capability path,
 	    int flags);
+int	kern_funlinkat(struct thread *td, int dfd,
+	    const char * __capability path, int fd, enum uio_seg pathseg,
+	    int flag, ino_t oldinum);
+int	kern_funlinkat_ex(struct thread *td, int dfd,
+	    const char * __capability path, int fd, int flag,
+	    enum uio_seg pathseg, ino_t oldinum);
 int	kern_unlinkat(struct thread *td, int fd,
 	    const char * __capability path, enum uio_seg pathseg,
 	    int flag, ino_t oldinum);

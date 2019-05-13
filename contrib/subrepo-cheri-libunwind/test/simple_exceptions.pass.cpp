@@ -4,7 +4,9 @@
 
 #include <stdio.h>
 
+#ifndef _GNU_SOURCE
 #define _GNU_SOURCE
+#endif
 
 #include <unwind.h>
 
@@ -54,6 +56,8 @@ main()
 	} catch (double d) {
 		printf("d = %g\n", d);
 	}
+
+	fprintf(stderr, "Success!\n");
 
 	return (0);
 }

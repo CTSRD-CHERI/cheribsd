@@ -30,15 +30,17 @@ ATF_TESTS_C+=	${_T}
 SRCS.${_T}=	${_T}.c test_helpers.c
 .endfor
 
+.for _T in	atf_c_test \
+		build_test \
+		check_test \
+		macros_test
+
 .if ${CC} == "cc" && !defined(LIBCHERI)
 # These tests are broken when using a cross toolchain (they embed ${CC}
 # and try to compile with it).
-.for _T in	atf_c_test \
-		check_test \
-		macros_test
-ATF_TESTS_C+=	${_T}
-SRCS.${_T}=	${_T}.c test_helpers.c
-.endfor
+ATF_TESTS_C:=	${ATF_TESTS_C:N${_T}}
 .endif
+TEST_METADATA.${_T}+=	required_programs="cc"
+.endfor
 
 .include <bsd.test.mk>

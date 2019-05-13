@@ -110,6 +110,12 @@
 #define	__unreachable()	__builtin_unreachable()
 #endif
 
+#ifndef __clang__
+/* GCC doesn't like the printf0 format specifier. Clang treats it the same as
+ * printf so add the compatibility macro here. */
+#define __printf0__ __printf__
+#endif
+
 
 /*
  * These should probably be in sys/types.h but mtree expects them to exist
@@ -140,6 +146,10 @@ typedef	unsigned long	u_long;
 
 #ifndef __has_feature
 #define __has_feature(...) 0
+#endif
+
+#ifndef __has_builtin
+#define __has_builtin(...) 0
 #endif
 
 /*

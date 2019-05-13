@@ -557,8 +557,8 @@ netdump_handle_ip(struct mbuf **mb)
 	}
 
 #ifdef INVARIANTS
-	if (((ntohl(ip->ip_dst.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET ||
-	    (ntohl(ip->ip_src.s_addr) >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET) &&
+	if ((IN_LOOPBACK(ntohl(ip->ip_dst.s_addr)) ||
+	    IN_LOOPBACK(ntohl(ip->ip_src.s_addr))) &&
 	    (m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
 		NETDDEBUG("Bad IP header (RFC1122)\n");
 		return;
@@ -1140,17 +1140,31 @@ netdump_ioctl(struct cdev *dev __unused, u_long cmd, caddr_t addr,
 	struct netdump_conf *conf;
 	uint8_t *encryptedkey;
 	int error;
+#ifdef COMPAT_FREEBSD11
 	u_int u;
+#endif
 
 	error = 0;
 	switch (cmd) {
-	case DIOCSKERNELDUMP:
+#ifdef COMPAT_FREEBSD11
+	case DIOCSKERNELDUMP_FREEBSD11:
 		u = *(u_int *)addr;
 		if (u != 0) {
 			error = ENXIO;
 			break;
 		}
-
+		if (nd_enabled) {
+			nd_enabled = 0;
+			netdump_mbuf_drain();
+		}
+		break;
+#endif
+	case DIOCSKERNELDUMP:
+		kda = (void *)addr;
+		if (kda->kda_enable != 0) {
+			error = ENXIO;
+			break;
+		}
 		if (nd_enabled) {
 			nd_enabled = 0;
 			netdump_mbuf_drain();

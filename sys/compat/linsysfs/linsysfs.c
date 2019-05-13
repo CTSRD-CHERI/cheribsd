@@ -31,22 +31,12 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/queue.h>
-#include <sys/blist.h>
-#include <sys/conf.h>
-#include <sys/exec.h>
-#include <sys/filedesc.h>
 #include <sys/kernel.h>
-#include <sys/linker.h>
 #include <sys/malloc.h>
 #include <sys/mount.h>
-#include <sys/mutex.h>
-#include <sys/proc.h>
-#include <sys/resourcevar.h>
 #include <sys/sbuf.h>
 #include <sys/smp.h>
 #include <sys/socket.h>
-#include <sys/vnode.h>
 #include <sys/bus.h>
 #include <sys/pciio.h>
 
@@ -55,17 +45,6 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 
-#include <vm/vm.h>
-#include <vm/pmap.h>
-#include <vm/vm_map.h>
-#include <vm/vm_param.h>
-#include <vm/vm_object.h>
-#include <vm/swap_pager.h>
-
-#include <machine/bus.h>
-
-#include <compat/linux/linux_ioctl.h>
-#include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_util.h>
 #include <fs/pseudofs/pseudofs.h>
 
@@ -436,7 +415,7 @@ linsysfs_run_bus(device_t dev, struct pfs_node *dir, struct pfs_node *scsi,
 }
 
 /*
- * Filler function for sys/devices/system/cpu/online
+ * Filler function for sys/devices/system/cpu/{online,possible,present}
  */
 static int
 linsysfs_cpuonline(PFS_FILL_ARGS)
@@ -532,6 +511,10 @@ linsysfs_init(PFS_INIT_ARGS)
 	cpu = pfs_create_dir(sys, "cpu", NULL, NULL, NULL, 0);
 
 	pfs_create_file(cpu, "online", &linsysfs_cpuonline,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(cpu, "possible", &linsysfs_cpuonline,
+	    NULL, NULL, NULL, PFS_RD);
+	pfs_create_file(cpu, "present", &linsysfs_cpuonline,
 	    NULL, NULL, NULL, PFS_RD);
 
 	linsysfs_listcpus(cpu);

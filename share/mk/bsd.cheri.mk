@@ -177,6 +177,9 @@ _CHERI_CFLAGS+=	-Werror=cheri-bitwise-operations
 NO_SHARED=	yes
 .elif defined(__BSD_PROG_MK) && ${MK_CHERI_SHARED_PROG} == "no"
 NO_SHARED=	yes
+.elif ${WANT_CHERI} == "sandbox"
+# Force position-dependent sandboxes; PIEs aren't supported
+NO_SHARED=	yes
 .endif
 CC:=	${_CHERI_CC}
 CXX:=   ${_CHERI_CXX}

@@ -223,8 +223,8 @@ libcheri_set_errno:
 #ifdef HAVE_WORKING_TLS
 #ifdef __CHERI_CAPABILITY_TLS__
 	/* Note: initial-exec since we don't have captable pointer */
-	lui	$at, %tprel_hi(__libcheri_stack_tls_storage)
-	daddiu	$at, $at, %tprel_lo(__libcheri_stack_tls_storage)
+	lui	$at, %tprel_hi(libcheri_errno)
+	daddiu	$at, $at, %tprel_lo(libcheri_errno)
 	creadhwr $c3, $chwr_userlocal
 #else
 	/* Legacy: we need a valid $ddc here */

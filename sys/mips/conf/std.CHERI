@@ -8,6 +8,7 @@ nomakeoptions	ARCH_FLAGS
 makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips4 -mabi=64 -mcpu=mips4 -cheri=256 -Wno-unused-command-line-argument"
 options 	CPU_CHERI
 options 	COMPAT_CHERIABI
+options 	COMPAT_FREEBSD64
 #options 	CHERI_IMPLICIT_USER_DDC
 
 options 	TMPFS

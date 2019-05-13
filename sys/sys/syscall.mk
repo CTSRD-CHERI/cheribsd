@@ -410,4 +410,5 @@ MIASM =  \
 	fhlink.o \
 	fhlinkat.o \
 	fhreadlink.o \
+	funlinkat.o \
 	coexecve.o

@@ -27,7 +27,12 @@
 #ifndef LIBBSD_LOCAL_LINK_H
 #define LIBBSD_LOCAL_LINK_H
 
+#ifdef notyet
 #define libbsd_link_warning(symbol, msg) \
 	static const char libbsd_emit_link_warning_##symbol[] \
 		__attribute__((__used__,__section__(".gnu.warning." #symbol))) = msg;
+#else
+#define libbsd_link_warning(symbol, msg)
+#endif
+
 #endif

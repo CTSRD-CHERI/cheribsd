@@ -19,17 +19,9 @@ bhnd_nvram_map_data.h		optional bhnd				   \
 	compile-with	"sh $S/dev/bhnd/tools/nvram_map_gen.sh $S/dev/bhnd/nvram/nvram_map -d" \
 	no-obj no-implicit-rule before-depend				   \
 	clean		"bhnd_nvram_map_data.h"
-#
-# The 'fdt_dtb_file' target covers an actual DTB file name, which is derived
-# from the specified source (DTS) file: <platform>.dts -> <platform>.dtb
-#
-fdt_dtb_file			optional fdt fdt_dtb_static \
-	compile-with "sh -c 'MACHINE=${MACHINE} sh $S/tools/fdt/make_dtb.sh $S ${FDT_DTS_FILE} ${.CURDIR}'" \
-	no-obj no-implicit-rule before-depend	\
-	clean		"${FDT_DTS_FILE:R}.dtb"
 fdt_static_dtb.h		optional fdt fdt_dtb_static \
-	compile-with "sh -c 'MACHINE=${MACHINE} sh $S/tools/fdt/make_dtbh.sh ${FDT_DTS_FILE} ${.CURDIR}'" \
-	dependency	"fdt_dtb_file" \
+	compile-with "sh -c 'MACHINE=${MACHINE} $S/tools/fdt/make_dtbh.sh ${FDT_DTS_FILE} ${.CURDIR}'" \
+	dependency	"${FDT_DTS_FILE:T:R}.dtb" \
 	no-obj no-implicit-rule before-depend \
 	clean		"fdt_static_dtb.h"
 feeder_eq_gen.h			optional sound				   \
@@ -86,9 +78,9 @@ cam/cam_xpt.c			optional scbus
 cam/ata/ata_all.c		optional scbus
 cam/ata/ata_xpt.c		optional scbus
 cam/ata/ata_pmp.c		optional scbus
-cam/nvme/nvme_all.c		optional scbus nvme
-cam/nvme/nvme_da.c		optional scbus nvme da
-cam/nvme/nvme_xpt.c		optional scbus nvme
+cam/nvme/nvme_all.c		optional scbus
+cam/nvme/nvme_da.c		optional nda | da
+cam/nvme/nvme_xpt.c		optional scbus
 cam/scsi/scsi_xpt.c		optional scbus
 cam/scsi/scsi_all.c		optional scbus
 cam/scsi/scsi_cd.c		optional cd
@@ -368,6 +360,18 @@ compat/freebsd32/freebsd32_ioctl.c	optional compat_freebsd32
 compat/freebsd32/freebsd32_misc.c	optional compat_freebsd32
 compat/freebsd32/freebsd32_syscalls.c	optional compat_freebsd32
 compat/freebsd32/freebsd32_sysent.c	optional compat_freebsd32
+compat/freebsd64/freebsd64_abort2.c	optional compat_freebsd64
+compat/freebsd64/freebsd64_generic.c	optional compat_freebsd64
+compat/freebsd64/freebsd64_jail.c		optional compat_freebsd64
+compat/freebsd64/freebsd64_mac.c		optional compat_freebsd64
+compat/freebsd64/freebsd64_mmap.c		optional compat_freebsd64
+compat/freebsd64/freebsd64_misc.c		optional compat_freebsd64
+compat/freebsd64/freebsd64_signal.c	optional compat_freebsd64
+compat/freebsd64/freebsd64_syscalls.c	optional compat_freebsd64
+compat/freebsd64/freebsd64_sysent.c	optional compat_freebsd64
+compat/freebsd64/freebsd64_time.c		optional compat_freebsd64
+compat/freebsd64/freebsd64_uipc.c		optional compat_freebsd64
+compat/freebsd64/freebsd64_vfs.c		optional compat_freebsd64
 contrib/ck/src/ck_array.c				standard compile-with "${NORMAL_C} -I$S/contrib/ck/include"
 contrib/ck/src/ck_barrier_centralized.c			standard compile-with "${NORMAL_C} -I$S/contrib/ck/include"
 contrib/ck/src/ck_barrier_combining.c			standard compile-with "${NORMAL_C} -I$S/contrib/ck/include"
@@ -706,8 +710,8 @@ crypto/rijndael/rijndael-alg-fst.c optional crypto | ekcd | geom_bde | \
 crypto/rijndael/rijndael-api-fst.c optional ekcd | geom_bde | random !random_loadable
 crypto/rijndael/rijndael-api.c	optional crypto | ipsec | ipsec_support | \
 	wlan_ccmp
-crypto/sha1.c			optional carp | crypto | ipsec | \
-	ipsec_support | netgraph_mppc_encryption | sctp 
+crypto/sha1.c			optional carp | crypto | ether | ipsec | \
+	ipsec_support | netgraph_mppc_encryption | sctp
 crypto/sha2/sha256c.c		optional crypto | ekcd | geom_bde | ipsec | \
 	ipsec_support | random !random_loadable | sctp | zfs
 crypto/sha2/sha512c.c		optional crypto | geom_bde | ipsec | \
@@ -1743,7 +1747,7 @@ dev/fdt/fdt_pinctrl.c		optional fdt fdt_pinctrl
 dev/fdt/fdt_pinctrl_if.m	optional fdt fdt_pinctrl
 dev/fdt/fdt_slicer.c		optional fdt cfi | fdt nand | fdt mx25l | fdt n25q | fdt at45d
 dev/fdt/fdt_static_dtb.S	optional fdt fdt_dtb_static \
-	dependency	"fdt_dtb_file"
+	dependency	"${FDT_DTS_FILE:T:R}.dtb"
 dev/fdt/simplebus.c		optional fdt
 dev/fdt/simple_mfd.c		optional fdt
 dev/fe/if_fe.c			optional fe
@@ -2564,6 +2568,7 @@ dev/ofw/ofw_bus_subr.c		optional fdt
 dev/ofw/ofw_cpu.c		optional fdt
 dev/ofw/ofw_fdt.c		optional fdt
 dev/ofw/ofw_if.m		optional fdt
+dev/ofw/ofw_graph.c		optional fdt
 dev/ofw/ofw_subr.c		optional fdt
 dev/ofw/ofwbus.c		optional fdt
 dev/ofw/openfirm.c		optional fdt
@@ -4911,14 +4916,15 @@ security/mac_portacl/mac_portacl.c optional mac_portacl
 security/mac_seeotheruids/mac_seeotheruids.c optional mac_seeotheruids
 security/mac_stub/mac_stub.c	optional mac_stub
 security/mac_test/mac_test.c	optional mac_test
-security/mac_veriexec/mac_veriexec.c		optional mac_veriexec
-security/mac_veriexec/veriexec_fingerprint.c	optional mac_veriexec
-security/mac_veriexec/veriexec_metadata.c	optional mac_veriexec
-security/mac_veriexec/mac_veriexec_rmd160.c	optional mac_veriexec_rmd160
-security/mac_veriexec/mac_veriexec_sha1.c	optional mac_veriexec_sha1
-security/mac_veriexec/mac_veriexec_sha256.c	optional mac_veriexec_sha256
-security/mac_veriexec/mac_veriexec_sha384.c	optional mac_veriexec_sha384
-security/mac_veriexec/mac_veriexec_sha512.c	optional mac_veriexec_sha512
+security/mac_veriexec/mac_veriexec.c			optional mac_veriexec
+security/mac_veriexec/veriexec_fingerprint.c		optional mac_veriexec
+security/mac_veriexec/veriexec_metadata.c		optional mac_veriexec
+security/mac_veriexec_parser/mac_veriexec_parser.c	optional mac_veriexec mac_veriexec_parser
+security/mac_veriexec/mac_veriexec_rmd160.c		optional mac_veriexec_rmd160
+security/mac_veriexec/mac_veriexec_sha1.c		optional mac_veriexec_sha1
+security/mac_veriexec/mac_veriexec_sha256.c		optional mac_veriexec_sha256
+security/mac_veriexec/mac_veriexec_sha384.c		optional mac_veriexec_sha384
+security/mac_veriexec/mac_veriexec_sha512.c		optional mac_veriexec_sha512
 teken/teken.c			optional sc !SC_NO_TERM_TEKEN | vt
 ufs/ffs/ffs_alloc.c		optional ffs
 ufs/ffs/ffs_balloc.c		optional ffs

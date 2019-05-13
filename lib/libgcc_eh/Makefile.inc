@@ -32,18 +32,14 @@ SRCS_EXC+=	libunwind.cpp
 SRCS+=		${SRCS_EXC}
 .for file in ${SRCS_EXC:M*.c}
 CFLAGS.${file}+=	-fno-exceptions -funwind-tables
-# Avoid tons of debug output (might speed up running GDB)
-CFLAGS.${file}+=	-DNDEBUG
 .endfor
 .for file in ${SRCS_EXC:M*.cpp}
 CXXFLAGS.${file}+=	-fno-exceptions -funwind-tables
-# Avoid tons of debug output (might speed up running GDB)
-CXXFLAGS.${file}+=	-DNDEBUG
 .endfor
 
 CFLAGS+=	-I${UNWINDINCDIR} -I${.CURDIR} -D_LIBUNWIND_IS_NATIVE_ONLY
 CXXFLAGS+=	-fno-rtti
-CXXSTD=		c++11
+CXXSTD?=	c++11
 STATIC_CXXFLAGS+= -fvisibility=hidden -fPIC
 # Probably need to just move this earlier or use CXXFLAGS
 .if ${MK_DIRDEPS_BUILD} == "yes"
