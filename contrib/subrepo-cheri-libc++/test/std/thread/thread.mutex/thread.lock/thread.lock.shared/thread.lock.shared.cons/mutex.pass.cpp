@@ -8,6 +8,7 @@
 //
 // UNSUPPORTED: libcpp-has-no-threads
 // UNSUPPORTED: c++98, c++03, c++11
+// XFAIL: dylib-has-no-shared_mutex
 
 // FLAKY_TEST.
 
@@ -39,7 +40,7 @@ ms WaitTime = ms(250);
 // Thread sanitizer causes more overhead and will sometimes cause this test
 // to fail. To prevent this we give Thread sanitizer more time to complete the
 // test.
-#if !defined(TEST_HAS_SANITIZERS) && !defined(TEST_SLOW_HOST)
+#if !defined(TEST_HAS_SANITIZERS) && !TEST_SLOW_HOST()
 ms Tolerance = ms(50);
 #else
 ms Tolerance = ms(50 * 5);

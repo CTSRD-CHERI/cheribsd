@@ -41,6 +41,7 @@
 #include <cheri/cheric.h>
 
 #include <assert.h>
+#include <elf.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -106,6 +107,55 @@ sandbox_init(void)
 	}
 }
 
+static int
+sandbox_update_main_required_method_variables(void)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * AT_PHDR is always a writable capability for the executable's
+	 * entire mapping.
+	 */
+	extern Elf_Auxinfo *__auxargs;
+	Elf_Auxinfo *auxp;
+	Elf_Phdr *phdr = NULL;
+	for (auxp = __auxargs; auxp->a_type != AT_NULL && phdr == NULL;
+	    auxp++) {
+		switch (auxp->a_type) {
+		case AT_PHDR:
+			phdr = auxp->a_un.a_ptr;
+			break;
+		}
+	}
+	if (phdr == NULL) {
+		warnx("%s: could not find AT_PHDR", __func__);
+		return (-1);
+	}
+	/*
+	 * No need to ensure the offset is 0, as datacap only needs to be
+	 * authorising, its offset doesn't matter.
+	 */
+	void *datacap = phdr;
+	/*
+	 * Unlike sandboxes, the main program's symbol values are addresses not
+	 * offsets, so tell sandbox_set_required_method_variables to subtract
+	 * the base from these to get an offset. This avoids branching in
+	 * sandbox_set_required_method_variables, or having two variants.
+	 */
+	vm_offset_t datacap_bias = cheri_getbase(datacap);
+#else
+	void *__capability datacap = cheri_getdefault();
+	vm_offset_t datacap_bias = 0;
+#endif
+	if (sandbox_set_required_method_variables(
+		datacap, datacap_bias, main_required_methods) == -1) {
+		warnx("%s: sandbox_set_required_method_variables for main "
+		    "program", __func__);
+		return (-1);
+	}
+
+	return (0);
+}
+
 /* XXXBD: should be done in sandbox_init(), but need access to argv[0]. */
 int
 sandbox_program_init(void)
@@ -133,17 +183,9 @@ sandbox_program_init(void)
 		close(fd);
 		return (-1);
 	}
-#ifdef __CHERI_PURE_CAPABILITY__
-	// This needs full address space $pcc
-	void *datacap = cheri_clearperm(
-	    cheri_setoffset(cheri_getpcc(), 0), CHERI_PERM_EXECUTE);
-#else
-	void *__capability datacap = cheri_getdefault();
-#endif
-	if (sandbox_set_required_method_variables(
-		datacap, main_required_methods) == -1) {
-		warnx("%s: sandbox_set_required_method_variables for main "
-		    "program", __func__);
+	if (sandbox_update_main_required_method_variables() == -1) {
+		warnx("%s: sandbox_update_main_required_method_variables",
+		    __func__);
 		return (-1);
 	}
 	/* XXXBD: cheri_system needs to do this. */
@@ -362,31 +404,16 @@ sandbox_class_new(const char *path, size_t maxmaplen,
 			goto error;
 		}
 	}
-
-	/*
-	 * XXXAR: this crashes in the main program because we don't have a
-	 * writable $pcc. I'm not quite sure what this is doing, but if I
-	 * #if 0 this code we get further into startup.
-	 */
-#ifdef SPLIT_CODE_DATA
 	/*
 	 * Update main program method variables.
 	 *
 	 * XXXBD: Doing this in every class is inefficient.
 	 */
-#ifdef __CHERI_PURE_CAPABILITY__
-	void *__capability datacap =
-	    cheri_clearperm(sbcp->sbc_codemem, CHERI_PERM_EXECUTE);
-#else
-	void *__capability datacap = cheri_getdefault();
-#endif
-	if (sandbox_set_required_method_variables(
-		datacap, main_required_methods) == -1) {
-		warnx("%s: sandbox_set_required_method_variables for main "
-		    "program", __func__);
+	if (sandbox_update_main_required_method_variables() == -1) {
+		warnx("%s: sandbox_update_main_required_method_variables",
+		    __func__);
 		return (-1);
 	}
-#endif
 
 	/*
 	 * Register the class on the list of classes.
@@ -593,9 +620,8 @@ sandbox_object_new_system_object(void * __capability private_data,
 	(*sbopp)->sbo_ddc = cheri_getdefault();
 	(*sbopp)->sbo_private_data = private_data;
 
-	/* XXXRW: Does this remain the right capability to use for TLS? */
 #ifdef __CHERI_CAPABILITY_TLS__
-	__asm__ volatile("creadhwr %0, $chwr_userlocal": "=C"((*sbopp)->sbo_libcheri_tls));
+	(*sbopp)->sbo_libcheri_tls = NULL;
 #else
 	(*sbopp)->sbo_libcheri_tls = cheri_getdefault();
 #endif

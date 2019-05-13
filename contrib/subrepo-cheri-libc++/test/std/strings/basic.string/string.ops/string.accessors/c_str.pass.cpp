@@ -23,7 +23,7 @@ test(const S& s)
     const typename S::value_type* str = s.c_str();
     if (s.size() > 0)
     {
-        assert(T::compare(str, &s[0], s.size()) == 0);
+        assert(T::compare(str, s.data(), s.size()) == 0);
         assert(T::eq(str[s.size()], typename S::value_type()));
     }
     else

@@ -325,6 +325,7 @@ CFLAGS+=	-DCHERI_NO_OUTPUT
 CFLAGS.rune.c+=	-Wno-unused-variable
 CFLAGS.ldpart.c+=	-Wno-unused-variable
 CFLAGS.localtime.c+=	-Wno-unused-variable
+CFLAGS+=	-DBUILDING_LIBC_CHERI
 
 .include <bsd.lib.mk>
 

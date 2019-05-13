@@ -48,6 +48,10 @@ extern	int	szsigcode;
 extern	char	sigcode32[];
 extern	int	szsigcode32;
 #endif
+#if defined(COMPAT_FREEBSD64)
+extern	char	freebsd64_sigcode[];
+extern	int	freebsd64_szsigcode;
+#endif
 #ifdef COMPAT_CHERIABI
 extern	char	cheri_sigcode[];
 extern	int	szcheri_sigcode;

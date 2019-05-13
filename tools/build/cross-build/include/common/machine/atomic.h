@@ -1,6 +1,6 @@
 #pragma once
 
-#ifndef __BUILDING_LOCALEDEF
+#ifndef __BUILDING_LOCALEDEF_BOOTSTRAP
 #error "Should only be used when building localedef"
 #endif
 

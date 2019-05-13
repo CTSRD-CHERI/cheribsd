@@ -11,6 +11,7 @@
 // aligned".
 
 #include <unwind.h>
+#include <stdio.h>
 
 // EHABI  : 8-byte aligned
 // itanium: largest supported alignment for the system
@@ -25,4 +26,5 @@ static_assert(alignof(_Unwind_Exception) == alignof(MaxAligned),
 
 int main()
 {
+	fprintf(stderr, "Success!\n");
 }

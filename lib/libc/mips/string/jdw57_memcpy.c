@@ -37,6 +37,7 @@ static char sccsid[] = "@(#)bcopy.c	8.1 (Berkeley) 6/4/93";
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 #include <sys/types.h>
+#include <sys/sysctl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -91,6 +92,8 @@ static __noinline __attribute__((optnone)) void
 check_no_tagged_capabilities_in_copy(
     const char *__capability src, const char *__capability dst, size_t len)
 {
+	static int error_logged = 0;
+
 	if (len < sizeof(void *__capability)) {
 		return; /* return early if copying less than a capability */
 	}
@@ -105,6 +108,10 @@ check_no_tagged_capabilities_in_copy(
 		if (__predict_true(!__builtin_cheri_tag_get(*aligned_src))) {
 			continue; /* untagged values are fine */
 		}
+
+		if (error_logged)
+			continue;
+		error_logged = 1;
 		/* Got a tagged value, this is always an error! */
 		/* XXXAR: can we safely use printf here? */
 		fprintf(stderr,
@@ -121,7 +128,21 @@ check_no_tagged_capabilities_in_copy(
 #endif
 		    (__cheri_addr uintmax_t)(src + offset),
 		    (__cheri_addr uintmax_t)(dst + offset));
-		abort();
+#ifndef BUILDING_LIBC_CHERI
+		static uint32_t abort_on_tag_loss = -1;
+		if (abort_on_tag_loss == -1) {
+			size_t olen = sizeof(abort_on_tag_loss);
+			if (sysctlbyname("security.cheri.abort_on_memcpy_tag_loss",
+			    &abort_on_tag_loss, &olen, NULL, 0) == -1) {
+				fprintf(stderr,
+				    "ERROR: could not determine whether tag "
+				    "stripping is fatal. Assuming it isn't.\n");
+				abort_on_tag_loss = 0;
+			}
+		}
+		if (abort_on_tag_loss)
+			abort();
+#endif
 	}
 }
 #else

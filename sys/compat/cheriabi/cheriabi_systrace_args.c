@@ -3258,8 +3258,18 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* cheriabi_coexecve */
+	/* cheriabi_funlinkat */
 	case 568: {
+		struct cheriabi_funlinkat_args *p = params;
+		iarg[0] = p->dfd; /* int */
+		uarg[1] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		iarg[2] = p->fd; /* int */
+		iarg[3] = p->flag; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* cheriabi_coexecve */
+	case 569: {
 		struct cheriabi_coexecve_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
 		uarg[1] = (__cheri_addr intptr_t) p->fname; /* char * __capability */
@@ -3269,7 +3279,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* cheriabi_cosetup */
-	case 569: {
+	case 570: {
 		struct cheriabi_cosetup_args *p = params;
 		iarg[0] = p->what; /* int */
 		uarg[1] = (__cheri_addr intptr_t) p->code; /* void * __capability __capability * __capability */
@@ -3278,7 +3288,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* cheriabi_coregister */
-	case 570: {
+	case 571: {
 		struct cheriabi_coregister_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
 		uarg[1] = (__cheri_addr intptr_t) p->cap; /* void * __capability __capability * __capability */
@@ -3286,7 +3296,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* cheriabi_colookup */
-	case 571: {
+	case 572: {
 		struct cheriabi_colookup_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
 		uarg[1] = (__cheri_addr intptr_t) p->cap; /* void * __capability __capability * __capability */
@@ -3294,12 +3304,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* copark */
-	case 572: {
+	case 573: {
 		*n_args = 0;
 		break;
 	}
 	/* cheriabi_cogetpid */
-	case 573: {
+	case 574: {
 		struct cheriabi_cogetpid_args *p = params;
 		uarg[0] = (__cheri_addr intptr_t) p->pidp; /* pid_t * __capability */
 		*n_args = 1;
@@ -8736,8 +8746,27 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cheriabi_coexecve */
+	/* cheriabi_funlinkat */
 	case 568:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_coexecve */
+	case 569:
 		switch(ndx) {
 		case 0:
 			p = "pid_t";
@@ -8756,7 +8785,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* cheriabi_cosetup */
-	case 569:
+	case 570:
 		switch(ndx) {
 		case 0:
 			p = "int";
@@ -8772,19 +8801,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* cheriabi_coregister */
-	case 570:
-		switch(ndx) {
-		case 0:
-			p = "userland const char * __capability";
-			break;
-		case 1:
-			p = "userland void * __capability __capability * __capability";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* cheriabi_colookup */
 	case 571:
 		switch(ndx) {
 		case 0:
@@ -8797,11 +8813,24 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* copark */
+	/* cheriabi_colookup */
 	case 572:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "userland void * __capability __capability * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* copark */
+	case 573:
 		break;
 	/* cheriabi_cogetpid */
-	case 573:
+	case 574:
 		switch(ndx) {
 		case 0:
 			p = "userland pid_t * __capability";
@@ -10367,7 +10396,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* cheriabi_readlinkat */
 	case 500:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "ssize_t";
 		break;
 	/* cheriabi_renameat */
 	case 501:
@@ -10681,30 +10710,35 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_coexecve */
+	/* cheriabi_funlinkat */
 	case 568:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_cosetup */
+	/* cheriabi_coexecve */
 	case 569:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_coregister */
+	/* cheriabi_cosetup */
 	case 570:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_colookup */
+	/* cheriabi_coregister */
 	case 571:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* copark */
+	/* cheriabi_colookup */
 	case 572:
-	/* cheriabi_cogetpid */
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* copark */
 	case 573:
+	/* cheriabi_cogetpid */
+	case 574:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

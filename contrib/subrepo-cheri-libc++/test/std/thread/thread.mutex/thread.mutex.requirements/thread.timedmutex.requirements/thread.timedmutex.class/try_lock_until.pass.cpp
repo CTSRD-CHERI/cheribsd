@@ -20,6 +20,8 @@
 #include <cstdlib>
 #include <cassert>
 
+#include "test_macros.h"
+
 std::timed_mutex m;
 
 typedef std::chrono::steady_clock Clock;
@@ -31,12 +33,13 @@ typedef std::chrono::nanoseconds ns;
 void f1()
 {
     time_point t0 = Clock::now();
-    assert(m.try_lock_until(Clock::now() + ms(300)) == true);
+    assert(m.try_lock_until(Clock::now() + ms(TEST_SLOW_HOST() ? 600 : 300)) ==
+           true);
     time_point t1 = Clock::now();
     m.unlock();
     ns d = t1 - t0 - ms(250);
-#ifdef TEST_SLOW_HOST
-    assert(d < ms(150));  // within 150ms
+#if TEST_SLOW_HOST()
+    assert(d < ms(200)); // within 200ms
 #else
     assert(d < ms(50));  // within 50ms
 #endif
@@ -48,8 +51,8 @@ void f2()
     assert(m.try_lock_until(Clock::now() + ms(250)) == false);
     time_point t1 = Clock::now();
     ns d = t1 - t0 - ms(250);
-#ifdef TEST_SLOW_HOST
-    assert(d < ms(150));  // within 150ms
+#if TEST_SLOW_HOST()
+    assert(d < ms(200)); // within 200ms
 #else
     assert(d < ms(50));  // within 50ms
 #endif
@@ -67,7 +70,7 @@ int main(int, char**)
     {
         m.lock();
         std::thread t(f2);
-        std::this_thread::sleep_for(ms(300));
+        std::this_thread::sleep_for(ms(TEST_SLOW_HOST() ? 800 : 300));
         m.unlock();
         t.join();
     }

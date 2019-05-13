@@ -141,17 +141,12 @@ constructors:
 	csc	$c12, $t2, CHERICAP_SIZE($c26)
 
 	#
-	# Perform global capability initialisation from C.
+	# Perform global capability and constructor initialisation from C; the
+	# C code must be very careful not to depend on the outcome of any
+	# constructors!  Here, as above, set $v0 to indicate success, and scrub
+	# $v1/$c3 before returning.
 	#
-	dla	$t9, crt_init_globals
-	abicall	$t9
-	#
-	# Perform constructor initialisation from C; the C code must be very
-	# careful not to depend on the outcome of any constructors!  Here, as
-	# above, set $v0 to indicate success, and scrub $v1/$c3 before
-	# returning.
-	#
-	dla	$t9, crt_call_constructors
+	dla	$t9, crt_sandbox_init
 	abicall	$t9
 
 	#

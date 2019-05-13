@@ -582,10 +582,11 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_fhlink_args), (sy_call_t *)cheriabi_fhlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = cheriabi_fhlink */
 	{ AS(cheriabi_fhlinkat_args), (sy_call_t *)cheriabi_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = cheriabi_fhlinkat */
 	{ AS(cheriabi_fhreadlink_args), (sy_call_t *)cheriabi_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = cheriabi_fhreadlink */
-	{ AS(cheriabi_coexecve_args), (sy_call_t *)cheriabi_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 568 = cheriabi_coexecve */
-	{ AS(cheriabi_cosetup_args), (sy_call_t *)cheriabi_cosetup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 569 = cheriabi_cosetup */
-	{ AS(cheriabi_coregister_args), (sy_call_t *)cheriabi_coregister, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 570 = cheriabi_coregister */
-	{ AS(cheriabi_colookup_args), (sy_call_t *)cheriabi_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 571 = cheriabi_colookup */
-	{ 0, (sy_call_t *)sys_copark, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 572 = copark */
-	{ AS(cheriabi_cogetpid_args), (sy_call_t *)cheriabi_cogetpid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 573 = cheriabi_cogetpid */
+	{ AS(cheriabi_funlinkat_args), (sy_call_t *)cheriabi_funlinkat, AUE_UNLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 568 = cheriabi_funlinkat */
+	{ AS(cheriabi_coexecve_args), (sy_call_t *)cheriabi_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 569 = cheriabi_coexecve */
+	{ AS(cheriabi_cosetup_args), (sy_call_t *)cheriabi_cosetup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 570 = cheriabi_cosetup */
+	{ AS(cheriabi_coregister_args), (sy_call_t *)cheriabi_coregister, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 571 = cheriabi_coregister */
+	{ AS(cheriabi_colookup_args), (sy_call_t *)cheriabi_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 572 = cheriabi_colookup */
+	{ 0, (sy_call_t *)sys_copark, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 573 = copark */
+	{ AS(cheriabi_cogetpid_args), (sy_call_t *)cheriabi_cogetpid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 574 = cheriabi_cogetpid */
 };

@@ -227,6 +227,7 @@ typedef union {
 	uint32_t	sival_ptr32;
 #endif
 #if __has_feature(capabilities)
+	void * /* __ptr64 */ sival_ptr64;
 	void * __capability sival_ptr_c;
 #endif
 } ksigval_union;
@@ -400,6 +401,42 @@ struct siginfo_c {
 	int	si_status;		/* exit value */
 	void* __capability si_addr;	/* faulting instruction */
 	union sigval_c si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+struct siginfo64 {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	/*
+	 * Cause of signal, one of the SI_ macros or signal-specific
+	 * values, i.e. one of the FPE_... values for SIGFPE.  This
+	 * value is equivalent to the second argument to an old-style
+	 * FreeBSD signal handler.
+	 */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	void	*si_addr;		/* faulting instruction */
+	union sigval_native si_value;
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
@@ -603,6 +640,14 @@ struct sigaction_c {
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
+struct sigaction64 {
+	union {
+		void    (*__sa_handler)(int);
+		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
 #endif
 struct sigaction_native {
 	union {
@@ -766,6 +811,19 @@ __END_DECLS
 
 #ifdef _KERNEL
 int	convert_sigevent(const struct sigevent_native *, ksigevent_t *);
+
+#if __has_feature(capabilities)
+static inline bool
+is_magic_sighandler_constant(void* handler) {
+	/*
+	 * Instead of enumerating all the SIG_* constants, just check if
+	 * it is a small (positive or negative) integer so that this doesn't
+	 * break if someone adds a new SIG_* constant. The manual checks that
+	 * we were using before weren't handling SIG_HOLD.
+	 */
+	return (vaddr_t)handler < 64;
+}
+#endif
 #endif
 
 #endif /* !_SYS_SIGNAL_H_ */

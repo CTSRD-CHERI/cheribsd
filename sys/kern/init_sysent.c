@@ -617,10 +617,11 @@ struct sysent sysent[] = {
 	{ AS(fhlink_args), (sy_call_t *)sys_fhlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 565 = fhlink */
 	{ AS(fhlinkat_args), (sy_call_t *)sys_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = fhlinkat */
 	{ AS(fhreadlink_args), (sy_call_t *)sys_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = fhreadlink */
-	{ AS(coexecve_args), (sy_call_t *)sys_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 568 = coexecve */
-	{ AS(cosetup_args), (sy_call_t *)sys_cosetup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 569 = cosetup */
-	{ AS(coregister_args), (sy_call_t *)sys_coregister, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 570 = coregister */
-	{ AS(colookup_args), (sy_call_t *)sys_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 571 = colookup */
-	{ 0, (sy_call_t *)sys_copark, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 572 = copark */
-	{ AS(cogetpid_args), (sy_call_t *)sys_cogetpid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 573 = cogetpid */
+	{ AS(funlinkat_args), (sy_call_t *)sys_funlinkat, AUE_UNLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 568 = funlinkat */
+	{ AS(coexecve_args), (sy_call_t *)sys_coexecve, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 569 = coexecve */
+	{ AS(cosetup_args), (sy_call_t *)sys_cosetup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 570 = cosetup */
+	{ AS(coregister_args), (sy_call_t *)sys_coregister, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 571 = coregister */
+	{ AS(colookup_args), (sy_call_t *)sys_colookup, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 572 = colookup */
+	{ 0, (sy_call_t *)sys_copark, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 573 = copark */
+	{ AS(cogetpid_args), (sy_call_t *)sys_cogetpid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 574 = cogetpid */
 };

@@ -796,6 +796,24 @@ szsigcode:
 	.long	esigcode-sigcode
 	.text
 
+#if defined(__mips_n64) && defined(COMPAT_FREEBSD64)
+	.globl	_C_LABEL(freebsd64_sigcode)
+_C_LABEL(freebsd64_sigcode):
+	PTR_ADDU	a0, sp, SIGF_UC		# address of ucontext
+	li		v0, SYS_sigreturn
+# sigreturn (ucp)
+	syscall
+	break	0				# just in case sigreturn fails
+	.globl	_C_LABEL(freebsd64_esigcode)
+_C_LABEL(freebsd64_esigcode):
+
+	.data
+	.globl	freebsd64_szsigcode
+freebsd64_szsigcode:
+	.long	freebsd64_esigcode-freebsd64_sigcode
+	.text
+#endif
+
 #if (defined(__mips_n32) || defined(__mips_n64)) && defined(COMPAT_FREEBSD32)
 	.globl	_C_LABEL(sigcode32)
 _C_LABEL(sigcode32):

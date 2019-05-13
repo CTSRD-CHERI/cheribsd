@@ -574,10 +574,11 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_fhlink",			/* 565 = cheriabi_fhlink */
 	"cheriabi_fhlinkat",			/* 566 = cheriabi_fhlinkat */
 	"cheriabi_fhreadlink",			/* 567 = cheriabi_fhreadlink */
-	"cheriabi_coexecve",			/* 568 = cheriabi_coexecve */
-	"cheriabi_cosetup",			/* 569 = cheriabi_cosetup */
-	"cheriabi_coregister",			/* 570 = cheriabi_coregister */
-	"cheriabi_colookup",			/* 571 = cheriabi_colookup */
-	"copark",			/* 572 = copark */
-	"cheriabi_cogetpid",			/* 573 = cheriabi_cogetpid */
+	"cheriabi_funlinkat",			/* 568 = cheriabi_funlinkat */
+	"cheriabi_coexecve",			/* 569 = cheriabi_coexecve */
+	"cheriabi_cosetup",			/* 570 = cheriabi_cosetup */
+	"cheriabi_coregister",			/* 571 = cheriabi_coregister */
+	"cheriabi_colookup",			/* 572 = cheriabi_colookup */
+	"copark",			/* 573 = copark */
+	"cheriabi_cogetpid",			/* 574 = cheriabi_cogetpid */
 };

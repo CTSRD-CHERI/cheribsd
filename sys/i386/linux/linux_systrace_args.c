@@ -815,7 +815,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[1] = p->arg1; /* l_int */
 		iarg[2] = p->arg2; /* l_int */
 		iarg[3] = p->arg3; /* l_uint */
-		iarg[4] = p->ptr; /* l_uintptr_t */
+		uarg[4] = (intptr_t) p->ptr; /* l_uintptr_t */
 		iarg[5] = p->arg5; /* l_uint */
 		*n_args = 6;
 		break;

@@ -369,6 +369,7 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_fhlink] = (0x0 | 0x1 | 0x2),
  [CHERIABI_SYS_cheriabi_fhlinkat] = (0x0 | 0x1 | 0x4),
  [CHERIABI_SYS_cheriabi_fhreadlink] = (0x0 | 0x1 | 0x2),
+ [CHERIABI_SYS_cheriabi_funlinkat] = (0x0 | 0x2),
  [CHERIABI_SYS_cheriabi_coexecve] = (0x0 | 0x2 | 0x4 | 0x8),
  [CHERIABI_SYS_cheriabi_cosetup] = (0x0 | 0x2 | 0x4),
  [CHERIABI_SYS_cheriabi_coregister] = (0x0 | 0x1 | 0x2),

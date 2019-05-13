@@ -157,6 +157,18 @@ struct kevent32_freebsd11 {
 #endif
 #endif
 
+#if defined(_WANT_KEVENT64) || (defined(_KERNEL) && __has_feature(capabilities))
+struct kevent64 {
+	__uint64_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	unsigned short	flags;
+	unsigned int	fflags;
+	__int64_t	data;
+	void		*udata;		/* opaque user data identifier */
+	__uint64_t	ext[4];
+};
+#endif
+
 /* actions */
 #define EV_ADD		0x0001		/* add event to kq (implies enable) */
 #define EV_DELETE	0x0002		/* delete event from kq */

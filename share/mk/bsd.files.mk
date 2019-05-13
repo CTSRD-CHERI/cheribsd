@@ -103,12 +103,11 @@ STAGE_AS_${file}= ${${group}NAME_${file}}
 STAGE_DIR.${file}= ${STAGE_OBJTOP}${${_${group}DIR_${file}}}
 stage_as.${file}: ${file}
 
-installfiles-${group}: _${group}INS1_${file}
-_${group}INS1_${file}: installdirs-${_${group}DIR_${file}} _${group}INS_${file}
-_${group}INS_${file}: ${file}
+installfiles-${group}: _${group}INS_${file}
+_${group}INS_${file}: ${file} installdirs-${_${group}DIR_${file}}
 	${INSTALL} ${${group}TAG_ARGS} -o ${${group}OWN_${file}} \
 	    -g ${${group}GRP_${file}} -m ${${group}MODE_${file}} \
-	    ${.ALLSRC} ${${group}PREFIX_${file}}/${${group}NAME_${file}}
+	    ${.ALLSRC:[1]} ${${group}PREFIX_${file}}/${${group}NAME_${file}}
 .endfor # file in ${${group}}
 
 .endif # defined(${group}) && !empty(${group})

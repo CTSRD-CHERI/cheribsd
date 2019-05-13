@@ -574,10 +574,11 @@ const char *syscallnames[] = {
 	"fhlink",			/* 565 = fhlink */
 	"fhlinkat",			/* 566 = fhlinkat */
 	"fhreadlink",			/* 567 = fhreadlink */
-	"coexecve",			/* 568 = coexecve */
-	"cosetup",			/* 569 = cosetup */
-	"coregister",			/* 570 = coregister */
-	"colookup",			/* 571 = colookup */
-	"copark",			/* 572 = copark */
-	"cogetpid",			/* 573 = cogetpid */
+	"funlinkat",			/* 568 = funlinkat */
+	"coexecve",			/* 569 = coexecve */
+	"cosetup",			/* 570 = cosetup */
+	"coregister",			/* 571 = coregister */
+	"colookup",			/* 572 = colookup */
+	"copark",			/* 573 = copark */
+	"cogetpid",			/* 574 = cogetpid */
 };

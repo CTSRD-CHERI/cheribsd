@@ -51,7 +51,6 @@ static char *rcsid = "$FreeBSD$";
 #include <cheri/cheric.h>
 
 #include <assert.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -63,6 +62,11 @@ static char *rcsid = "$FreeBSD$";
 #undef assert
 #define	assert	ASSERT
 #define	printf	rtld_printf
+#elif defined(IN_LIBTHR)
+#include "thr_private.h"
+#define	printf(...)	_thread_printf(STDOUT_FILENO, __VA_ARGS__)
+#else
+#include <stdio.h>
 #endif
 
 union overhead;
@@ -100,12 +104,14 @@ static	int pagebucket;			/* page size bucket */
 
 
 #if defined(MALLOC_DEBUG) || defined(RCHECK) || defined(IN_RTLD)
-#define	ASSERT(p)   if (!(p)) botch("p")
+#define	ASSERT(p)   if (!(p)) botch(#p)
 static void
 botch(const char *s)
 {
 #ifdef IN_RTLD
 	rtld_fdprintf(STDERR_FILENO, "\r\nassertion botched: %s\r\n", s);
+#elif defined(IN_LIBTHR)
+	_thread_printf(STDERR_FILENO, "\r\nassertion botched: %s\r\n", s);
 #else
 	fprintf(stderr, "\r\nassertion botched: %s\r\n", s);
 	(void) fflush(stderr);		/* just in case user buffered it */
@@ -116,8 +122,8 @@ botch(const char *s)
 #define	ASSERT(p)
 #endif
 
-void *
-malloc(size_t nbytes)
+static void *
+__simple_malloc(size_t nbytes)
 {
 	union overhead *op;
 	int bucket;
@@ -167,8 +173,8 @@ malloc(size_t nbytes)
 	return (cheri_csetbounds(op + 1, nbytes));
 }
 
-void *
-calloc(size_t num, size_t size)
+static void *
+__simple_calloc(size_t num, size_t size)
 {
 	void *ret;
 
@@ -261,8 +267,8 @@ find_overhead(void * cp)
 	return (NULL);
 }
 
-void
-free(void *cp)
+static void
+__simple_free(void *cp)
 {
 	int bucket;
 	union overhead *op;
@@ -278,8 +284,8 @@ free(void *cp)
 	nextf[bucket] = op;
 }
 
-void *
-realloc(void *cp, size_t nbytes)
+static void *
+__simple_realloc(void *cp, size_t nbytes)
 {
 	size_t cur_space;	/* Space in the current bucket */
 	size_t smaller_space;	/* Space in the next smaller bucket */
@@ -351,27 +357,55 @@ void *
 __crt_malloc(size_t nbytes)
 {
 
-	return (malloc(nbytes));
+	return (__simple_malloc(nbytes));
 }
 
 void *
 __crt_calloc(size_t num, size_t size)
 {
 
-	return (calloc(num, size));
+	return (__simple_calloc(num, size));
 }
 
 void *
 __crt_realloc(void *cp, size_t nbytes)
 {
 
-	return (realloc(cp, nbytes));
+	return (__simple_realloc(cp, nbytes));
 }
 
 void
 __crt_free(void *cp)
 {
 
-	free(cp);
+	__simple_free(cp);
+}
+#else
+void *
+malloc(size_t nbytes)
+{
+
+	return (__simple_malloc(nbytes));
+}
+
+void *
+calloc(size_t num, size_t size)
+{
+
+	return (__simple_calloc(num, size));
+}
+
+void *
+realloc(void *cp, size_t nbytes)
+{
+
+	return (__simple_realloc(cp, nbytes));
+}
+
+void
+free(void *cp)
+{
+
+	__simple_free(cp);
 }
 #endif

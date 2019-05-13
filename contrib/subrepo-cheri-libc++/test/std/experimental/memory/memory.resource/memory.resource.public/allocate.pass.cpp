@@ -9,6 +9,7 @@
 // <experimental/memory_resource>
 
 // UNSUPPORTED: c++98, c++03
+// UNSUPPORTED: libcpp-no-rtti
 
 //------------------------------------------------------------------------------
 // TESTING void * memory_resource::allocate(size_t, size_t = max_align)

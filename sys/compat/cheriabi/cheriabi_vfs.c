@@ -402,23 +402,24 @@ int
 cheriabi_unlink(struct thread *td, struct cheriabi_unlink_args *uap)
 {
 
-	return (kern_unlinkat(td, AT_FDCWD, uap->path, UIO_USERSPACE, 0, 0));
+	return (kern_funlinkat(td, AT_FDCWD, uap->path, FD_NONE,
+	    UIO_USERSPACE, 0, 0));
 }
 
 int
 cheriabi_unlinkat(struct thread *td, struct cheriabi_unlinkat_args *uap)
 {
-	int flag = uap->flag;
 
-	if (flag & ~AT_REMOVEDIR)
-		return (EINVAL);
+	return (kern_funlinkat_ex(td, uap->fd, uap->path, FD_NONE,
+	    uap->flag, UIO_USERSPACE, 0));
+}
 
-	if (flag & AT_REMOVEDIR)
-		return (kern_rmdirat(td, uap->fd, uap->path, UIO_USERSPACE,
-		0));
-	else
-		return (kern_unlinkat(td, uap->fd, uap->path, UIO_USERSPACE,
-		    0, 0));
+int
+cheriabi_funlinkat(struct thread *td, struct cheriabi_funlinkat_args *uap)
+{
+
+	return (kern_funlinkat_ex(td, uap->dfd, uap->path, uap->fd, uap->flag,
+	    UIO_USERSPACE, 0));
 }
 
 int
@@ -659,7 +660,8 @@ int
 cheriabi_rmdir(struct thread *td, struct cheriabi_rmdir_args *uap)
 {
 
-	return (kern_rmdirat(td, AT_FDCWD, uap->path, UIO_USERSPACE, 0));
+	return (kern_frmdirat(td, AT_FDCWD, uap->path, FD_NONE,
+	    UIO_USERSPACE, 0));
 }
 
 int

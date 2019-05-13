@@ -202,7 +202,6 @@ user_read(struct thread *td, int fd, void * __capability buf, size_t nbyte)
 {
 	struct uio auio;
 	kiovec_t aiov;
-	int error;
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
@@ -211,8 +210,7 @@ user_read(struct thread *td, int fd, void * __capability buf, size_t nbyte)
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;
 	auio.uio_segflg = UIO_USERSPACE;
-	error = kern_readv(td, fd, &auio);
-	return (error);
+	return (kern_readv(td, fd, &auio));
 }
 
 /*
@@ -241,7 +239,6 @@ kern_pread(struct thread *td, int fd, void * __capability buf, size_t nbyte,
 {
 	struct uio auio;
 	kiovec_t aiov;
-	int error;
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
@@ -250,8 +247,7 @@ kern_pread(struct thread *td, int fd, void * __capability buf, size_t nbyte,
 	auio.uio_iovcnt = 1;
 	auio.uio_resid = nbyte;
 	auio.uio_segflg = UIO_USERSPACE;
-	error = kern_preadv(td, fd, &auio, offset);
-	return (error);
+	return (kern_preadv(td, fd, &auio, offset));
 }
 
 #if defined(COMPAT_FREEBSD6)

@@ -6,6 +6,17 @@
 //
 //===----------------------------------------------------------------------===//
 
+// CHERI CHANGES START
+// {
+//   "updated": 20190426,
+//   "target_type": "lib"
+//   "changes": [
+//     "subobject_bounds",
+//   ],
+//   "change_comment": "std::string: &str[0] -> str.data()",
+// }
+// CHERI CHANGES END
+
 #include "string"
 #include "cstdlib"
 #include "cwchar"
@@ -357,7 +368,9 @@ as_string(P sprintf_like, S s, const typename S::value_type* fmt, V a)
     size_type available = s.size();
     while (true)
     {
-        int status = sprintf_like(&s[0], available + 1, fmt, a);
+        // XXXAR: subobject-bounds: avoid
+        // int status = sprintf_like(&s[0], available + 1, fmt, a);
+        int status = sprintf_like(s.data(), available + 1, fmt, a);
         if ( status >= 0 )
         {
             size_type used = static_cast<size_type>(status);

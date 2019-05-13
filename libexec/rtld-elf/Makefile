@@ -2,11 +2,9 @@
 
 # Use the following command to build local debug version of dynamic
 # linker:
-# make DEBUG_FLAGS=-g DEBUG=-DDEBUG WITHOUT_TESTS=yes all
+# make DEBUG_FLAGS=-g WITHOUT_TESTS=yes all
 .ifdef RTLD_DEBUG_VERBOSE
-CFLAGS+=-DDEBUG -DDEBUG_VERBOSE=${RTLD_DEBUG_VERBOSE}
-.elif defined(BUILD_RTLD_DEBUG)
-CFLAGS+=-DDEBUG
+CFLAGS+=-DDEBUG_VERBOSE=${RTLD_DEBUG_VERBOSE}
 .endif
 # Not adapted for CHERI
 WANT_CHERI=none

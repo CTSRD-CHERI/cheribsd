@@ -1290,7 +1290,7 @@ atse_attach(device_t dev)
 	 * Chapter 15. On-Chip FIFO Memory Core.
 	 * Embedded Peripherals IP User Guide.
 	 */
-	caps = XCHAN_CAP_BUSDMA_NOSEG;
+	caps = XCHAN_CAP_NOSEG;
 
 	/* Alloc xDMA virtual channel. */
 	sc->xchan_tx = xdma_channel_alloc(sc->xdma_tx, caps);

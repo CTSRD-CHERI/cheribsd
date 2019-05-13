@@ -256,6 +256,8 @@ aw_mmc_cam_action(struct cam_sim *sim, union ccb *ccb)
 		cts->proto_specific.mmc.host_f_min = sc->aw_host.f_min;
 		cts->proto_specific.mmc.host_f_max = sc->aw_host.f_max;
 		cts->proto_specific.mmc.host_caps = sc->aw_host.caps;
+		cts->proto_specific.mmc.host_max_data = (sc->aw_mmc_conf->dma_xferlen *
+		    AW_MMC_DMA_SEGS) / MMC_SECTOR_SIZE;
 		memcpy(&cts->proto_specific.mmc.ios, &sc->aw_host.ios, sizeof(struct mmc_ios));
 		ccb->ccb_h.status = CAM_REQ_CMP;
 		break;
@@ -1102,10 +1104,17 @@ aw_mmc_request(device_t bus, device_t child, struct mmc_request *req)
 		}
 		if (cmd->data->flags & MMC_DATA_WRITE)
 			cmdreg |= AW_MMC_CMDR_DIR_WRITE;
-
 		blksz = min(cmd->data->len, MMC_SECTOR_SIZE);
-		AW_MMC_WRITE_4(sc, AW_MMC_BKSR, blksz);
-		AW_MMC_WRITE_4(sc, AW_MMC_BYCR, cmd->data->len);
+#ifdef MMCCAM
+		if (cmd->data->flags & MMC_DATA_BLOCK_SIZE) {
+			AW_MMC_WRITE_4(sc, AW_MMC_BKSR, cmd->data->block_size);
+			AW_MMC_WRITE_4(sc, AW_MMC_BYCR, cmd->data->len);
+		} else
+#endif
+		{
+			AW_MMC_WRITE_4(sc, AW_MMC_BKSR, blksz);
+			AW_MMC_WRITE_4(sc, AW_MMC_BYCR, cmd->data->len);
+		}
 	} else {
 		imask |= AW_MMC_INT_CMD_DONE;
 	}

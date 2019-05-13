@@ -219,6 +219,7 @@ cheriabi_fetch_syscall_args(struct thread *td)
 		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0, 0);
 	else
 		locr0->pc += sizeof(int);
+
 	sa->code = locr0->v0;
 	sa->argoff = 0;
 	if (sa->code == SYS_syscall || sa->code == SYS___syscall) {
@@ -302,6 +303,8 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 	const struct sysentvec *se;
 
 	code = locr0->v0;
+	if (code == SYS_syscall || code == SYS___syscall)
+		code = locr0->a0;
 
 	se = td->td_proc->p_sysent;
 	/*

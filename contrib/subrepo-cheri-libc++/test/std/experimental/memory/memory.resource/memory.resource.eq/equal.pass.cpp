@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 // UNSUPPORTED: c++98, c++03
+// UNSUPPORTED: libcpp-no-rtti
 
 // <experimental/memory_resource>
 

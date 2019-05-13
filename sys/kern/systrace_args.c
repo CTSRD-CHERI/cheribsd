@@ -3312,8 +3312,18 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* coexecve */
+	/* funlinkat */
 	case 568: {
+		struct funlinkat_args *p = params;
+		iarg[0] = p->dfd; /* int */
+		uarg[1] = (intptr_t) p->path; /* const char * */
+		iarg[2] = p->fd; /* int */
+		iarg[3] = p->flag; /* int */
+		*n_args = 4;
+		break;
+	}
+	/* coexecve */
+	case 569: {
 		struct coexecve_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
 		uarg[1] = (intptr_t) p->fname; /* char * */
@@ -3323,7 +3333,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* cosetup */
-	case 569: {
+	case 570: {
 		struct cosetup_args *p = params;
 		iarg[0] = p->what; /* int */
 		uarg[1] = (intptr_t) p->code; /* void *__capability * */
@@ -3332,7 +3342,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* coregister */
-	case 570: {
+	case 571: {
 		struct coregister_args *p = params;
 		uarg[0] = (intptr_t) p->name; /* const char * */
 		uarg[1] = (intptr_t) p->cap; /* void *__capability * */
@@ -3340,7 +3350,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* colookup */
-	case 571: {
+	case 572: {
 		struct colookup_args *p = params;
 		uarg[0] = (intptr_t) p->name; /* const char * */
 		uarg[1] = (intptr_t) p->cap; /* void *__capability * */
@@ -3348,12 +3358,12 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		break;
 	}
 	/* copark */
-	case 572: {
+	case 573: {
 		*n_args = 0;
 		break;
 	}
 	/* cogetpid */
-	case 573: {
+	case 574: {
 		struct cogetpid_args *p = params;
 		uarg[0] = (intptr_t) p->pidp; /* pid_t * */
 		*n_args = 1;
@@ -8886,8 +8896,27 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* coexecve */
+	/* funlinkat */
 	case 568:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* coexecve */
+	case 569:
 		switch(ndx) {
 		case 0:
 			p = "pid_t";
@@ -8906,7 +8935,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* cosetup */
-	case 569:
+	case 570:
 		switch(ndx) {
 		case 0:
 			p = "int";
@@ -8922,19 +8951,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		};
 		break;
 	/* coregister */
-	case 570:
-		switch(ndx) {
-		case 0:
-			p = "userland const char *";
-			break;
-		case 1:
-			p = "userland void *__capability *";
-			break;
-		default:
-			break;
-		};
-		break;
-	/* colookup */
 	case 571:
 		switch(ndx) {
 		case 0:
@@ -8947,11 +8963,24 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* copark */
+	/* colookup */
 	case 572:
+		switch(ndx) {
+		case 0:
+			p = "userland const char *";
+			break;
+		case 1:
+			p = "userland void *__capability *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* copark */
+	case 573:
 		break;
 	/* cogetpid */
-	case 573:
+	case 574:
 		switch(ndx) {
 		case 0:
 			p = "userland pid_t *";
@@ -10547,7 +10576,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	/* readlinkat */
 	case 500:
 		if (ndx == 0 || ndx == 1)
-			p = "int";
+			p = "ssize_t";
 		break;
 	/* renameat */
 	case 501:
@@ -10861,30 +10890,35 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* coexecve */
+	/* funlinkat */
 	case 568:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cosetup */
+	/* coexecve */
 	case 569:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* coregister */
+	/* cosetup */
 	case 570:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* colookup */
+	/* coregister */
 	case 571:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* copark */
+	/* colookup */
 	case 572:
-	/* cogetpid */
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* copark */
 	case 573:
+	/* cogetpid */
+	case 574:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

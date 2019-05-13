@@ -382,6 +382,7 @@ MIASM =  \
 	cheriabi_fhlink.o \
 	cheriabi_fhlinkat.o \
 	cheriabi_fhreadlink.o \
+	cheriabi_funlinkat.o \
 	cheriabi_coexecve.o \
 	cheriabi_cosetup.o \
 	cheriabi_coregister.o \

@@ -2717,7 +2717,7 @@
 		);
 	}
 500	AUE_READLINKAT	STD {
-		int readlinkat(
+		ssize_t readlinkat(
 		    int fd,
 		    _In_z_ const char *path,
 		    _Out_writes_bytes_(bufsize) char *buf,
@@ -3168,36 +3168,44 @@
 		    size_t bufsize
 		);
 	}
-568	AUE_NULL	STD	{
+568	AUE_UNLINKAT	STD {
+		int funlinkat(
+		    int dfd,
+		    _In_z_ const char *path,
+		    int fd,
+		    int flag
+		);
+	}
+569	AUE_NULL	STD {
 		int coexecve(
 		    pid_t pid,
 		    char *fname, char **argv,
 		    char **envv
 		);
 	}
-569	AUE_NULL	STD	{
+570	AUE_NULL	STD	{
 		int cosetup(
 		    int what,
 		    _Out_ void * __capability *code,
 		    _Out_ void * __capability *data
 		);
 	}
-570	AUE_NULL	STD	{
+571	AUE_NULL	STD	{
 		int coregister(
 		    _In_z_ const char *name,
 		    _Out_opt_ void * __capability *cap
 		);
 	}
-571	AUE_NULL	STD	{
+572	AUE_NULL	STD	{
 		int colookup(
 		    _In_z_ const char *name,
 		    _Out_ void * __capability *cap
 		);
 	}
-572	AUE_NULL	STD	{
+573	AUE_NULL	STD	{
 		int copark(void);
 	}
-573	AUE_NULL        STD     {
+574	AUE_NULL        STD     {
 		int cogetpid(
 		    _Out_ pid_t *pidp
 		);

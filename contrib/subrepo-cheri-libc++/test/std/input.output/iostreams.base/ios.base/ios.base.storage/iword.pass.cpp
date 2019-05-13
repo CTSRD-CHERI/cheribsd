@@ -19,6 +19,8 @@
 #include <string>
 #include <cassert>
 
+#include "test_macros.h"
+
 class test
     : public std::ios
 {
@@ -33,8 +35,8 @@ int main(int, char**)
 {
     test t;
     std::ios_base& b = t;
-#ifdef TEST_SLOW_HOST
-    for (std::intptr_t i = 0; i < 400; ++i)
+#if TEST_SLOW_HOST()
+    for (std::intptr_t i = 0; i < 500; ++i)
 #else
     for (std::intptr_t i = 0; i < 10000; ++i)
 #endif
