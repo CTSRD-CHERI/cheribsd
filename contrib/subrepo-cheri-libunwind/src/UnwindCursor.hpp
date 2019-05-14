@@ -166,10 +166,10 @@ void DwarfFDECache<A>::add(pint_t mh, pint_t ip_start, pint_t ip_end,
     _bufferUsed = &newBuffer[oldSize];
     _bufferEnd = &newBuffer[newSize];
   }
-  _bufferUsed->mh = mh;
-  _bufferUsed->ip_start = ip_start;
-  _bufferUsed->ip_end = ip_end;
-  _bufferUsed->fde = fde;
+  _bufferUsed->mh = assert_pointer_in_bounds(mh);
+  _bufferUsed->ip_start = assert_pointer_in_bounds(ip_start);
+  _bufferUsed->ip_end = assert_pointer_in_bounds(ip_end);
+  _bufferUsed->fde = assert_pointer_in_bounds(fde);
   ++_bufferUsed;
 #ifdef __APPLE__
   if (!_registeredForDyldUnloads) {
@@ -1918,8 +1918,7 @@ void UnwindCursor<A, R>::setInfoBasedOnIPRegister(bool isReturnAddress) {
   if (cachedFDE != 0) {
     CFI_Parser<LocalAddressSpace>::FDE_Info fdeInfo;
     CFI_Parser<LocalAddressSpace>::CIE_Info cieInfo;
-    const char *msg = CFI_Parser<A>::decodeFDE(_addressSpace,
-                                                cachedFDE, &fdeInfo, &cieInfo);
+    const char *msg = CFI_Parser<A>::decodeFDE(_addressSpace, cachedFDE, pc, &fdeInfo, &cieInfo);
     if (msg == NULL) {
       typename CFI_Parser<A>::PrologInfo prolog;
       if (CFI_Parser<A>::parseFDEInstructions(_addressSpace, fdeInfo, cieInfo,
@@ -1948,7 +1947,7 @@ void UnwindCursor<A, R>::setInfoBasedOnIPRegister(bool isReturnAddress) {
   if (_addressSpace.findOtherFDE(pc, fde)) {
     CFI_Parser<LocalAddressSpace>::FDE_Info fdeInfo;
     CFI_Parser<LocalAddressSpace>::CIE_Info cieInfo;
-    if (!CFI_Parser<A>::decodeFDE(_addressSpace, fde, &fdeInfo, &cieInfo)) {
+    if (!CFI_Parser<A>::decodeFDE(_addressSpace, pc, fde, &fdeInfo, &cieInfo)) {
       // Double check this FDE is for a function that includes the pc.
       if ((fdeInfo.pcStart <= pc) && (pc < fdeInfo.pcEnd)) {
         typename CFI_Parser<A>::PrologInfo prolog;

@@ -267,7 +267,7 @@ void __unw_add_dynamic_fde(unw_word_t fde) {
   CFI_Parser<LocalAddressSpace>::FDE_Info fdeInfo;
   CFI_Parser<LocalAddressSpace>::CIE_Info cieInfo;
   const char *message = CFI_Parser<LocalAddressSpace>::decodeFDE(
-                           LocalAddressSpace::sThisAddressSpace,
+                           LocalAddressSpace::sThisAddressSpace, 0,
                           (LocalAddressSpace::pint_t) fde, &fdeInfo, &cieInfo);
   if (message == NULL) {
     // dynamically registered FDEs don't have a mach_header group they are in.

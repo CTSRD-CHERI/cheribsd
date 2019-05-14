@@ -201,7 +201,7 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pint_t pc,
                                            pint_t fdeStart, R &registers) {
   FDE_Info fdeInfo;
   CIE_Info cieInfo;
-  if (CFI_Parser<A>::decodeFDE(addressSpace, fdeStart, &fdeInfo,
+  if (CFI_Parser<A>::decodeFDE(addressSpace, pc, fdeStart, &fdeInfo,
                                &cieInfo) == NULL) {
     PrologInfo prolog;
     if (CFI_Parser<A>::parseFDEInstructions(addressSpace, fdeInfo, cieInfo, pc,
