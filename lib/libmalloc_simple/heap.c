@@ -53,15 +53,19 @@ static char *rcsid = "$FreeBSD$";
 
 #include <assert.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 
 #include "malloc_heap.h"
 
 #ifdef IN_RTLD
 #include "simple_printf.h"
-
-#define	printf	rtld_printf
+#define	error_printf(...)	rtld_fdprintf(STDERR_FILENO, __VA_ARGS__)
+#elif defined(IN_LIBTHR)
+#include "thr_private.h"
+#define	error_printf(...)	_thread_printf(STDERR_FILENO, __VA_ARGS__)
+#else
+#include <stdio.h>
+#define	error_printf(...)	fprintf(stderr, __VA_ARGS__)
 #endif
 
 #define	NPOOLPAGES	(32*1024/_pagesz)
@@ -88,7 +92,7 @@ __morepages(int n)
 		if ((new_pagepool_list = mmap(0,
 		    max_pagepools * sizeof(char *), PROT_READ|PROT_WRITE,
 		    MAP_ANON, fd, 0)) == MAP_FAILED) {
-			printf("%s: Can not map pagepool_list\n", __func__);
+			error_printf("%s: Can not map pagepool_list\n", __func__);
 			return (0);
 		}
 		memcpy(new_pagepool_list, pagepool_list,
@@ -96,7 +100,7 @@ __morepages(int n)
 		if (pagepool_list != NULL) {
 			if (munmap(pagepool_list,
 			    max_pagepools * sizeof(char *) / 2) != 0) {
-				printf("%s: failed to unmap pagepool_list\n",
+				error_printf("%s: failed to unmap pagepool_list\n",
 				    __func__);
 				/* XXX: leak the region */
 			}
@@ -112,12 +116,7 @@ __morepages(int n)
 		caddr_t	addr = cheri_setoffset(pagepool_start,
 		    roundup2(cheri_getoffset(pagepool_start), _pagesz));
 		if (munmap(addr, pagepool_end - addr) != 0) {
-#ifdef IN_RTLD
-			rtld_fdprintf(STDERR_FILENO, "%s: munmap %p", __func__,
-			    addr);
-#else
-			fprintf(stderr, "%s: munmap %p", __func__, addr);
-#endif
+			error_printf("%s: munmap %p failed\n", __func__, addr);
 		} else {
 			/* Shrink the pool */
 			pagepool_list[n_pagepools - 1] =
@@ -130,7 +129,7 @@ __morepages(int n)
 	if ((pagepool_start = mmap(0, n * _pagesz,
 			PROT_READ|PROT_WRITE,
 			MAP_ANON, fd, 0)) == (caddr_t)-1) {
-		printf("Cannot map anonymous memory\n");
+		error_printf("Cannot map anonymous memory\n");
 		return 0;
 	}
 	pagepool_end = pagepool_start + n * _pagesz;

@@ -61,12 +61,13 @@ static char *rcsid = "$FreeBSD$";
 
 #undef assert
 #define	assert	ASSERT
-#define	printf	rtld_printf
+#define	error_printf(...)	rtld_fdprintf(STDERR_FILENO, __VA_ARGS__)
 #elif defined(IN_LIBTHR)
 #include "thr_private.h"
-#define	printf(...)	_thread_printf(STDOUT_FILENO, __VA_ARGS__)
+#define	error_printf(...)	_thread_printf(STDERR_FILENO, __VA_ARGS__)
 #else
 #include <stdio.h>
+#define	error_printf(...)	fprintf(stderr, __VA_ARGS__)
 #endif
 
 union overhead;
@@ -103,17 +104,13 @@ static	size_t pagesz;			/* page size */
 static	int pagebucket;			/* page size bucket */
 
 
-#if defined(MALLOC_DEBUG) || defined(RCHECK) || defined(IN_RTLD)
+#if defined(MALLOC_DEBUG) || defined(RCHECK) || defined(IN_RTLD) || defined(IN_LIBTHR)
 #define	ASSERT(p)   if (!(p)) botch(#p)
 static void
 botch(const char *s)
 {
-#ifdef IN_RTLD
-	rtld_fdprintf(STDERR_FILENO, "\r\nassertion botched: %s\r\n", s);
-#elif defined(IN_LIBTHR)
-	_thread_printf(STDERR_FILENO, "\r\nassertion botched: %s\r\n", s);
-#else
-	fprintf(stderr, "\r\nassertion botched: %s\r\n", s);
+	error_printf("\r\nassertion botched: %s\r\n", s);
+#if !defined(IN_RTLD) && !defined(IN_LIBTHR)
 	(void) fflush(stderr);		/* just in case user buffered it */
 #endif
 	abort();
@@ -247,7 +244,7 @@ find_overhead(void * cp)
 		return (NULL);
 	op = __rederive_pointer(cp);
 	if (op == NULL) {
-		printf("%s: no region found for %#p\n", __func__, cp);
+		error_printf("%s: no region found for %#p\n", __func__, cp);
 		return (NULL);
 	}
 	op--;
@@ -261,9 +258,9 @@ find_overhead(void * cp)
 	 * should save all allocation ranges to allow us to find the
 	 * metadata.
 	 */
-	printf("%s: Attempting to free or realloc unallocated memory\n",
+	error_printf("%s: Attempting to free or realloc unallocated memory\n",
 	    __func__);
-	CHERI_PRINT_PTR(cp);
+	error_printf(_CHERI_PRINT_PTR_FMT(cp));
 	return (NULL);
 }
 
