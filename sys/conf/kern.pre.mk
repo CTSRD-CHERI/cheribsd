@@ -158,7 +158,7 @@ LDFLAGS+=	-z max-page-size=2097152
 .if ${LINKER_TYPE} != "lld"
 LDFLAGS+=	-z common-page-size=4096
 .else
-LDFLAGS+=	-z ifunc-noplt
+LDFLAGS+=	-z notext -z ifunc-noplt
 .endif
 .endif  # ${MACHINE_CPUARCH} == "amd64"
 
