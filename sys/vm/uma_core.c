@@ -4134,7 +4134,7 @@ uma_dbg_getslab(uma_zone_t zone, void *item)
 	uma_keg_t keg;
 	uint8_t *mem;
 
-	mem = rounddown2(item, UMA_SLAB_SIZE);
+	mem = rounddown2(item, PAGE_SIZE);
 	if (zone->uz_flags & UMA_ZONE_VTOSLAB) {
 		slab = vtoslab(ptr_to_va(mem));
 	} else {
@@ -4219,7 +4219,7 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 	/* Check first that item is a subset of slab->us_data */
 	if (!cheri_is_subset(slab->us_data, item))
 		panic("Item capability %p is not a subset of the"
-		    "slab capability %p.", item, slab->us_data);
+		    " slab capability %p.", item, slab->us_data);
 #endif
 	freei = (ptr_to_va(item) - ptr_to_va(slab->us_data)) / keg->uk_rsize;
 
