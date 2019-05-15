@@ -220,6 +220,13 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 		/* TODO: should we use exact setbounds? */
 		data_cap =
 		    cheri_csetbounds(data_cap, writable_end - writable_start);
+
+		if (!cheri_gettag(data_cap))
+			__builtin_trap();
+		if (!cheri_gettag(rodata_cap))
+			__builtin_trap();
+		if (!cheri_gettag(code_cap))
+			__builtin_trap();
 	}
 	crt_init_globals_3(data_cap, code_cap, rodata_cap);
 }
