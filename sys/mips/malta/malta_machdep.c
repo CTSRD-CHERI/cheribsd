@@ -317,6 +317,55 @@ malta_cpu_freq(void)
 	return (platform_counter_freq);
 }
 
+#ifdef CHERI_KERNEL
+static void
+platform_clear_bss()
+{
+	/*
+	 * We need to hand-craft a capability for edata because it is defined
+	 * by the linker script and have no size info.
+	 */
+	void *edata_start;
+	size_t edata_siz = (__cheri_addr size_t)(&end) -
+	    (__cheri_addr size_t)(&edata);
+
+	edata_start = cheri_ptrpermoff((caddr_t)cheri_getkdc() +
+	    (__cheri_addr vm_offset_t)(&edata), edata_siz, CHERI_PERM_STORE, 0);
+	memset(edata_start, 0, edata_siz);
+}
+
+static char *
+platform_argv_ptr(int32_t argv)
+{
+	char *arg;
+
+	/*
+	 * Trust that YAMON initialized the strings correctly and
+	 * do not try to get the precise string length.
+	 */
+	arg = cheri_ptrpermoff((caddr_t)cheri_getkdc() + (vm_offset_t)(argv),
+	    4096, CHERI_PERM_LOAD, 0);
+
+	return (arg);
+}
+
+#else
+static void
+platform_clear_bss()
+{
+	vm_offset_t kernend;
+
+	kernend = (vm_offset_t)&end;
+	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
+}
+
+static char *
+platform_argv_ptr(int32_t argv)
+{
+	return ((char*)(intptr_t)argv);
+}
+#endif
+
 void
 platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
     __register_t a3)
@@ -330,22 +379,11 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	int i;
 
 	/* clear the BSS and SBSS segments */
+	platform_clear_bss();
+
 #ifdef CHERI_KERNEL
-	/* we need to hand-craft a capability for edata because it is defined
-	 * by the linker script and have no size info.
-	 */
-	void *edata_start;
-	size_t edata_siz = (__cheri_addr size_t)(&end) -
-	    (__cheri_addr size_t)(&edata);
-	edata_start = cheri_ptrpermoff((caddr_t)cheri_getkdc() +
-	    (__cheri_addr vm_offset_t)(&edata), edata_siz, CHERI_PERM_STORE, 0);
-	memset(edata_start, 0, edata_siz);
 	/* early capability-related initialization */
 	cheri_init_capabilities();
-#else
-	vm_offset_t kernend;
-	kernend = (vm_offset_t)&end;
-	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
 #endif
 
 	mips_postboot_fixup();
@@ -366,16 +404,7 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	if (bootverbose)
 		printf("cmd line: ");
 	for (i = 0; i < argc; i++) {
-		char *arg;
-#ifdef CHERI_KERNEL
-		/* trust that YAMON initialized the strings correctly and
-		 * do not try to get the precise string length.
-		 */
-		arg = cheri_ptrpermoff((caddr_t)cheri_getkdc() +
-		    (vm_offset_t)(argv[i]), 4096, CHERI_PERM_LOAD, 0);
-#else
-		arg = (char*)(intptr_t)argv[i];
-#endif
+		char *arg = platform_argv_ptr(argv[i]);
 		if (bootverbose)
 			printf("%s ", arg);
 		while (*arg != '\0') {
@@ -408,14 +437,14 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 * is not useful to have /path/to/kernel=1 in the environment.
 	 */
 	if (argc >= 2) {
-		boothowto |= boot_parse_cmdline((char*)(intptr_t)argv[1]);
+		boothowto |= boot_parse_cmdline(platform_argv_ptr(argv[1]));
 	} else {
 		panic("QEMU has changed and allows multiple -append flags?");
 	}
 #else
 	/* On non-QEMU CPUs we can parse argv normally. */
 	for (i = 0; i < argc; i++)
-		boothowto |= boot_parse_arg((char*)(intptr_t)argv[i]);
+		boothowto |= boot_parse_arg(platform_argv_ptr(argv[i]));
 #endif
 
 	if (bootverbose)
@@ -425,19 +454,8 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 * Parse the environment for things like ememsize.
 	 */
 	for (i = 0; envp[i]; i += 2) {
-		char *a, *v;
-#ifdef CHERI_KERNEL
-		/* trust that YAMON initialized the strings correctly and
-		 * do not try to get the precise string length.
-		 */
-		a = cheri_ptrpermoff((caddr_t)cheri_getkdc() +
-		    (vm_offset_t)(envp[i]), 4096, CHERI_PERM_LOAD, 0);
-		v = cheri_ptrpermoff((caddr_t)cheri_getkdc() +
-		    (vm_offset_t)(envp[i+1]), 4096, CHERI_PERM_LOAD, 0);
-#else
-		a = (char *)(intptr_t)envp[i];
-		v = (char *)(intptr_t)envp[i+1];
-#endif
+		char *a = platform_argv_ptr(envp[i]);
+		char *v = platform_argv_ptr(envp[i+1]);
 		if (bootverbose)
 			printf("\t%s = %s\n", a, v);
 
@@ -460,7 +478,6 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 			ememsize = 2ULL * 1024 * 1024 * 1024 - PAGE_SIZE;
 #endif
 	}
-
 	/*
 	 * For <= 256MB RAM amounts, ememsize should equal memsize.
 	 * For > 256MB RAM amounts it's the total RAM available;
