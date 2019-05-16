@@ -65,8 +65,9 @@ private:
   static v128 getSavedVectorRegister(A &addressSpace, const R &registers,
                                   pint_t cfa, const RegisterLocation &savedReg);
 
-  static pint_t getCFA(A &addressSpace, const PrologInfo &prolog,
-                       const R &registers) {
+  static pint_t getCFA(A &addressSpace, const PrologInfo &prolog, pint_t pc,
+                       const R &registers, bool *success) {
+    *success = true;
     if (prolog.cfaRegister != 0) {
 #if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
       // Ugly hack for old binaries that report SP instead of C11
@@ -83,8 +84,13 @@ private:
     if (prolog.cfaExpression != 0)
       return evaluateExpression((pint_t)prolog.cfaExpression, addressSpace, 
                                 registers, 0);
+    fprintf(stderr, "WARNING: libunwind got broken prolog for pc %#p\n", (void*)pc);
+    *success = false;
+#if 0
     assert(0 && "getCFA(): unknown location");
     __builtin_unreachable();
+#endif
+    return (pint_t)-1;
   }
 };
 
@@ -207,7 +213,10 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pint_t pc,
     if (CFI_Parser<A>::parseFDEInstructions(addressSpace, fdeInfo, cieInfo, pc,
                                             R::getArch(), &prolog)) {
       // get pointer to cfa (architecture specific)
-      pint_t cfa = getCFA(addressSpace, prolog, registers);
+      bool cfa_valid = false;
+      pint_t cfa = getCFA(addressSpace, prolog, pc, registers, &cfa_valid);
+      if (!cfa_valid)
+        return UNW_EBADFRAME;
 
        // restore registers that DWARF says were saved
       R newRegisters = registers;

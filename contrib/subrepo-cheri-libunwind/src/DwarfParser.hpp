@@ -128,11 +128,11 @@ template <typename A>
 const char *CFI_Parser<A>::decodeFDE(A &addressSpace, pint_t pc, pint_t fdeStart,
                                      FDE_Info *fdeInfo, CIE_Info *cieInfo) {
   pint_t p = fdeStart;
-  pint_t cfiLength = (pint_t)addressSpace.get32(p);
+  uint64_t cfiLength = addressSpace.get32(p);
   p += 4;
   if (cfiLength == 0xffffffff) {
     // 0xffffffff means length is really next 8 bytes
-    cfiLength = (pint_t)addressSpace.get64(p);
+    cfiLength = addressSpace.get64(p);
     p += 8;
   }
   if (cfiLength == 0)
@@ -167,7 +167,7 @@ const char *CFI_Parser<A>::decodeFDE(A &addressSpace, pint_t pc, pint_t fdeStart
   fdeInfo->lsda = 0;
   // Check for augmentation length.
   if (cieInfo->fdesHaveAugmentationData) {
-    pint_t augLen = (pint_t)addressSpace.getULEB128(p, nextCFI);
+    uint64_t augLen = addressSpace.getULEB128(p, nextCFI);
     pint_t endOfAug = p + augLen;
     if (cieInfo->lsdaEncoding != DW_EH_PE_omit) {
       // Peek at value (without indirection).  Zero means no LSDA.
@@ -224,11 +224,11 @@ bool CFI_Parser<A>::findFDE(A &addressSpace, pint_t pc, pint_t ehSectionStart,
   while (p < ehSectionEnd) {
     pint_t currentCFI = p;
     // fprintf(stderr, "findFDE() CFI at %#p\n", (void*)p);
-    pint_t cfiLength = addressSpace.get32(p);
+    uint64_t cfiLength = addressSpace.get32(p);
     p += 4;
     if (cfiLength == 0xffffffff) {
       // 0xffffffff means length is really next 8 bytes
-      cfiLength = (pint_t)addressSpace.get64(p);
+      cfiLength = addressSpace.get64(p);
       p += 8;
     }
     if (cfiLength == 0)
@@ -273,7 +273,7 @@ bool CFI_Parser<A>::findFDE(A &addressSpace, pint_t pc, pint_t ehSectionStart,
             fdeInfo->lsda = 0;
             // check for augmentation length
             if (cieInfo->fdesHaveAugmentationData) {
-              pint_t augLen = (pint_t)addressSpace.getULEB128(p, nextCFI);
+              uint64_t augLen = addressSpace.getULEB128(p, nextCFI);
               pint_t endOfAug = p + augLen;
               if (cieInfo->lsdaEncoding != DW_EH_PE_omit) {
                 // Peek at value (without indirection).  Zero means no LSDA.
