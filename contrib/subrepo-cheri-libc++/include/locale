@@ -920,9 +920,9 @@ num_get<_CharT, _InputIterator>::__do_get_signed(iter_type __b, iter_type __e,
     string __buf;
     __buf.resize(__buf.capacity());
     // XXXAR: &__buf[0] would set bounds to 1 since operator[] returns a reference
-    // Note __unwrap_iter(__buf.begin()) instead of buf.data() since non-const version requires c++17
+    // Note __buf.begin().base() instead of buf.data() since non-const version requires c++17
     // char* __a = &__buf[0];
-    char* __a = __unwrap_iter(__buf.begin());
+    char* __a = __buf.begin().base();
     char* __a_end = __a;
     unsigned __g[__num_get_base::__num_get_buf_sz];
     unsigned* __g_end = __g;
@@ -936,7 +936,7 @@ num_get<_CharT, _InputIterator>::__do_get_signed(iter_type __b, iter_type __e,
             __buf.resize(__buf.capacity());
             // XXXAR: &__buf[0] would set bounds to 1 since operator[] returns a reference
             // __a = &__buf[0];
-            __a = __unwrap_iter(__buf.begin());
+            __a = __buf.begin().base();
             __a_end = __a + __tmp;
         }
         if (this->__stage2_int_loop(*__b, __base, __a, __a_end, __dc,
@@ -983,7 +983,7 @@ num_get<_CharT, _InputIterator>::__do_get_unsigned(iter_type __b, iter_type __e,
     __buf.resize(__buf.capacity());
     // XXXAR: &__buf[0] would set bounds to 1 since operator[] returns a reference
     // char* __a = &__buf[0];
-    char* __a = __unwrap_iter(__buf.begin());
+    char* __a = __buf.begin().base();
     char* __a_end = __a;
     unsigned __g[__num_get_base::__num_get_buf_sz];
     unsigned* __g_end = __g;
@@ -997,7 +997,7 @@ num_get<_CharT, _InputIterator>::__do_get_unsigned(iter_type __b, iter_type __e,
             __buf.resize(__buf.capacity());
             // XXXAR: &__buf[0] would set bounds to 1 since operator[] returns a reference
             // __a = &__buf[0];
-            __a = __unwrap_iter(__buf.begin());
+            __a = __buf.begin().base();
             __a_end = __a + __tmp;
         }
         if (this->__stage2_int_loop(*__b, __base, __a, __a_end, __dc,
@@ -1039,7 +1039,7 @@ num_get<_CharT, _InputIterator>::__do_get_floating_point(iter_type __b, iter_typ
     __buf.resize(__buf.capacity());
     // XXXAR: &__buf[0] would set bounds to 1 since operator[] returns a reference
     // char* __a = &__buf[0];
-    char* __a = __unwrap_iter(__buf.begin());
+    char* __a = __buf.begin().base();
     char* __a_end = __a;
     unsigned __g[__num_get_base::__num_get_buf_sz];
     unsigned* __g_end = __g;
@@ -1055,7 +1055,7 @@ num_get<_CharT, _InputIterator>::__do_get_floating_point(iter_type __b, iter_typ
             __buf.resize(__buf.capacity());
             // XXXAR: &__buf[0] would set bounds to 1 since operator[] returns a reference
             // __a = &__buf[0];
-            __a = __unwrap_iter(__buf.begin());
+            __a = __buf.begin().base();
             __a_end = __a + __tmp;
         }
         if (this->__stage2_float_loop(*__b, __in_units, __exp, __a, __a_end,
@@ -1095,7 +1095,7 @@ num_get<_CharT, _InputIterator>::do_get(iter_type __b, iter_type __e,
     __buf.resize(__buf.capacity());
     // XXXAR: &__buf[0] would set bounds to 1 since operator[] returns a reference
     // char* __a = &__buf[0];
-    char* __a = __unwrap_iter(__buf.begin());
+    char* __a = __buf.begin().base();
     char* __a_end = __a;
     unsigned __g[__num_get_base::__num_get_buf_sz];
     unsigned* __g_end = __g;
@@ -1109,7 +1109,7 @@ num_get<_CharT, _InputIterator>::do_get(iter_type __b, iter_type __e,
             __buf.resize(__buf.capacity());
             // XXXAR: &__buf[0] would set bounds to 1 since operator[] returns a reference
             // __a = &__buf[0];
-            __a = __unwrap_iter(__buf.begin());
+            __a = __buf.begin().base();
             __a_end = __a + __tmp;
         }
         if (this->__stage2_int_loop(*__b, __base, __a, __a_end, __dc,
