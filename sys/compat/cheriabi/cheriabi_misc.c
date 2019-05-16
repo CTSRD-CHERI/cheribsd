@@ -759,15 +759,13 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	    1ULL << CHERI_ALIGN_SHIFT(imgp->end_addr - prog_base));
 
 
-	if (imgp->interp_end) {
-		rtld_base = rounddown2(args->base,
-		    1ULL << CHERI_ALIGN_SHIFT(args->base));
-		rtld_len = roundup2(imgp->interp_end - rtld_base,
-		    1ULL << CHERI_ALIGN_SHIFT(imgp->interp_end - rtld_base));
-	} else {
-		rtld_base = prog_base;
-		rtld_len = prog_len;
+	if (!imgp->interp_end) {
+		imgp->interp_end = imgp->end_addr;
 	}
+	rtld_base = rounddown2(args->base,
+	    1ULL << CHERI_ALIGN_SHIFT(args->base));
+	rtld_len = roundup2(imgp->interp_end - rtld_base,
+	    1ULL << CHERI_ALIGN_SHIFT(imgp->interp_end - rtld_base));
 
 	if (args->execfd != -1)
 		AUXARGS_ENTRY_NOCAP(pos, AT_EXECFD, args->execfd);
@@ -787,8 +785,8 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	/*
 	 * XXX-BD: grant code and data perms to allow textrel fixups.
 	 */
-	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, 0, rtld_len,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, args->base - rtld_base,
+	    rtld_len, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);
 	if (imgp->execpathp != 0)
 		AUXARGS_ENTRY_CAP(pos, AT_EXECPATH, imgp->execpathp, 0,

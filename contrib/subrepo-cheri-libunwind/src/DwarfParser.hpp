@@ -107,7 +107,7 @@ public:
   static bool findFDE(A &addressSpace, pint_t pc, pint_t ehSectionStart,
                       uint32_t sectionLength, pint_t fdeHint, FDE_Info *fdeInfo,
                       CIE_Info *cieInfo);
-  static const char *decodeFDE(A &addressSpace, pint_t fdeStart,
+  static const char *decodeFDE(A &addressSpace, pint_t pc, pint_t fdeStart,
                                FDE_Info *fdeInfo, CIE_Info *cieInfo);
   static bool parseFDEInstructions(A &addressSpace, const FDE_Info &fdeInfo,
                                    const CIE_Info &cieInfo, pint_t upToPC,
@@ -118,21 +118,21 @@ public:
 private:
   static bool parseInstructions(A &addressSpace, pint_t instructions,
                                 pint_t instructionsEnd, const CIE_Info &cieInfo,
-                                ptrdiff_t pcoffset,
+                                size_t pcoffset,
                                 PrologInfoStackEntry *&rememberStack, int arch,
                                 PrologInfo *results);
 };
 
 /// Parse a FDE into a CIE_Info and an FDE_Info
 template <typename A>
-const char *CFI_Parser<A>::decodeFDE(A &addressSpace, pint_t fdeStart,
+const char *CFI_Parser<A>::decodeFDE(A &addressSpace, pint_t pc, pint_t fdeStart,
                                      FDE_Info *fdeInfo, CIE_Info *cieInfo) {
   pint_t p = fdeStart;
-  pint_t cfiLength = (pint_t)addressSpace.get32(p);
+  uint64_t cfiLength = addressSpace.get32(p);
   p += 4;
   if (cfiLength == 0xffffffff) {
     // 0xffffffff means length is really next 8 bytes
-    cfiLength = (pint_t)addressSpace.get64(p);
+    cfiLength = addressSpace.get64(p);
     p += 8;
   }
   if (cfiLength == 0)
@@ -141,21 +141,33 @@ const char *CFI_Parser<A>::decodeFDE(A &addressSpace, pint_t fdeStart,
   if (ciePointer == 0)
     return "FDE is really a CIE"; // this is a CIE not an FDE
   pint_t nextCFI = p + cfiLength;
-  pint_t cieStart = p - ciePointer;
+  pint_t cieStart = assert_pointer_in_bounds(p - ciePointer);
   const char *err = parseCIE(addressSpace, cieStart, cieInfo);
   if (err != NULL)
     return err;
   p += 4;
   // Parse pc begin and range.
-  pint_t pcStart =
+  pint_t _pcStart =
       addressSpace.getEncodedP(p, nextCFI, cieInfo->pointerEncoding);
-  pint_t pcRange =
-      addressSpace.getEncodedP(p, nextCFI, cieInfo->pointerEncoding & 0x0F);
+#ifdef __CHERI_PURE_CAPABILITY__
+  assert(!__builtin_cheri_tag_get((void*)_pcStart));
+  addr_t pcStart = __builtin_cheri_address_get((void*)_pcStart);
+#else
+  addr_t pcStart = (addr_t)_pcStart;
+#endif
+  pint_t _pcRange = addressSpace.getEncodedP(
+      p, nextCFI, cieInfo->pointerEncoding & 0x0F);
+#ifdef __CHERI_PURE_CAPABILITY__
+  assert(!__builtin_cheri_tag_get((void*)_pcRange));
+  addr_t pcRange = __builtin_cheri_address_get((void*)_pcRange);
+#else
+  addr_t pcRange = (addr_t)_pcRange;
+#endif
   // Parse rest of info.
   fdeInfo->lsda = 0;
   // Check for augmentation length.
   if (cieInfo->fdesHaveAugmentationData) {
-    pint_t augLen = (pint_t)addressSpace.getULEB128(p, nextCFI);
+    uint64_t augLen = addressSpace.getULEB128(p, nextCFI);
     pint_t endOfAug = p + augLen;
     if (cieInfo->lsdaEncoding != DW_EH_PE_omit) {
       // Peek at value (without indirection).  Zero means no LSDA.
@@ -170,11 +182,26 @@ const char *CFI_Parser<A>::decodeFDE(A &addressSpace, pint_t fdeStart,
     }
     p = endOfAug;
   }
-  fdeInfo->fdeStart = fdeStart;
-  fdeInfo->fdeLength = (size_t)(nextCFI - fdeStart);
+  fdeInfo->fdeStart = assert_pointer_in_bounds(fdeStart);
+  fdeInfo->fdeLength = (size_t)((char*)nextCFI - (char*)fdeStart);
+#ifdef __CHERI_PURE_CAPABILITY__
+  // Set bounds on the individual items
+  // Note: Cannot set bounds on fdeStart since that is used to get pointers to other data structures
+  // However, it should be fine to set bounds on fdeInstructions
+  pint_t boundedFde = (pint_t)__builtin_cheri_bounds_set(
+      (char *)fdeInfo->fdeStart, fdeInfo->fdeLength);
+  fdeInfo->fdeInstructions = boundedFde + (size_t)((char *)p - (char *)boundedFde);
+#else
   fdeInfo->fdeInstructions = p;
+#endif
+
+#ifdef __CHERI_PURE_CAPABILITY__
+  fdeInfo->pcStart = assert_pointer_in_bounds((pint_t)__builtin_cheri_address_set((void*)pc, pcStart));
+  fdeInfo->pcEnd = assert_pointer_in_bounds(fdeInfo->pcStart + pcRange);
+#else
   fdeInfo->pcStart = pcStart;
   fdeInfo->pcEnd = pcStart + pcRange;
+#endif
   return NULL; // success
 }
 
@@ -197,11 +224,11 @@ bool CFI_Parser<A>::findFDE(A &addressSpace, pint_t pc, pint_t ehSectionStart,
   while (p < ehSectionEnd) {
     pint_t currentCFI = p;
     // fprintf(stderr, "findFDE() CFI at %#p\n", (void*)p);
-    pint_t cfiLength = addressSpace.get32(p);
+    uint64_t cfiLength = addressSpace.get32(p);
     p += 4;
     if (cfiLength == 0xffffffff) {
       // 0xffffffff means length is really next 8 bytes
-      cfiLength = (pint_t)addressSpace.get64(p);
+      cfiLength = addressSpace.get64(p);
       p += 8;
     }
     if (cfiLength == 0)
@@ -246,7 +273,7 @@ bool CFI_Parser<A>::findFDE(A &addressSpace, pint_t pc, pint_t ehSectionStart,
             fdeInfo->lsda = 0;
             // check for augmentation length
             if (cieInfo->fdesHaveAugmentationData) {
-              pint_t augLen = (pint_t)addressSpace.getULEB128(p, nextCFI);
+              uint64_t augLen = addressSpace.getULEB128(p, nextCFI);
               pint_t endOfAug = p + augLen;
               if (cieInfo->lsdaEncoding != DW_EH_PE_omit) {
                 // Peek at value (without indirection).  Zero means no LSDA.
@@ -261,10 +288,16 @@ bool CFI_Parser<A>::findFDE(A &addressSpace, pint_t pc, pint_t ehSectionStart,
               }
               p = endOfAug;
             }
-            fdeInfo->fdeStart = currentCFI;
-            fdeInfo->fdeLength = (size_t)(nextCFI - currentCFI);
+            fdeInfo->fdeStart = assert_pointer_in_bounds(currentCFI);
+            fdeInfo->fdeLength = (size_t)((char*)nextCFI - (char*)currentCFI);
             fdeInfo->fdeInstructions = p;
 #ifdef __CHERI_PURE_CAPABILITY__
+            // Set bounds on the individual items
+            // Note: Cannot set bounds on fdeStart since that is used to get pointers to other data structures
+            // However, it should be fine to set bounds on fdeInstructions
+            pint_t boundedFde = (pint_t)__builtin_cheri_bounds_set(
+                (char *)fdeInfo->fdeStart, fdeInfo->fdeLength);
+            fdeInfo->fdeInstructions = boundedFde + (size_t)((char *)p - (char *)boundedFde);
             fdeInfo->pcStart = assert_pointer_in_bounds(pc - (pcAddr - pcStart));
             fdeInfo->pcEnd = assert_pointer_in_bounds(fdeInfo->pcStart + pcRange);
 #else
@@ -303,7 +336,7 @@ const char *CFI_Parser<A>::parseCIE(A &addressSpace, pint_t cie,
 #if defined(_LIBUNWIND_TARGET_AARCH64)
   cieInfo->addressesSignedWithBKey = false;
 #endif
-  cieInfo->cieStart = cie;
+  cieInfo->cieStart = assert_pointer_in_bounds(cie);
   pint_t p = cie;
   uint64_t cieLength = addressSpace.get32(p);
   p += 4;
@@ -341,6 +374,10 @@ const char *CFI_Parser<A>::parseCIE(A &addressSpace, pint_t cie,
 #ifdef __CHERI_PURE_CAPABILITY__
   // FIXME: This is entirely wrong, but for some reason we get the wrong value
   // from the compiler-generated DWARF
+  if (cieInfo->returnAddressRegister != UNW_MIPS_C17) {
+    fprintf(stderr, "WARNING: return register was not $c17: %d in cie=%p\n",
+            cieInfo->returnAddressRegister, (void *)cie);
+  }
   cieInfo->returnAddressRegister = (uint8_t)UNW_MIPS_C17;
 #endif
   // parse augmentation data based on augmentation string
@@ -356,7 +393,7 @@ const char *CFI_Parser<A>::parseCIE(A &addressSpace, pint_t cie,
       case 'P':
         cieInfo->personalityEncoding = addressSpace.get8(p);
         ++p;
-        cieInfo->personalityOffsetInCIE = (uint8_t)(p - cie);
+        cieInfo->personalityOffsetInCIE = (uint8_t)((char*)p - (char*)cie);
         cieInfo->personality = addressSpace
             .getEncodedP(p, cieContentEnd, cieInfo->personalityEncoding);
         break;
@@ -382,8 +419,15 @@ const char *CFI_Parser<A>::parseCIE(A &addressSpace, pint_t cie,
       }
     }
   }
-  cieInfo->cieLength = (size_t)(cieContentEnd - cieInfo->cieStart);
+  cieInfo->cieLength = (size_t)((char*)cieContentEnd - (char*)cieInfo->cieStart);
+#ifdef __CHERI_PURE_CAPABILITY__
+  cieInfo->cieStart = (pint_t)__builtin_cheri_bounds_set(
+      (char *)cieInfo->cieStart, cieInfo->cieLength);
+  cieInfo->cieInstructions = assert_pointer_in_bounds(
+      cieInfo->cieStart + (size_t)((char *)p - (char *)cieInfo->cieStart));
+#else
   cieInfo->cieInstructions = p;
+#endif
   return result;
 }
 
@@ -401,26 +445,26 @@ bool CFI_Parser<A>::parseFDEInstructions(A &addressSpace,
   // parse CIE then FDE instructions
   return parseInstructions(addressSpace, cieInfo.cieInstructions,
                            cieInfo.cieStart + cieInfo.cieLength, cieInfo,
-                           (ptrdiff_t)(-1), rememberStack, arch, results) &&
+                           (size_t)(-1), rememberStack, arch, results) &&
          parseInstructions(addressSpace, fdeInfo.fdeInstructions,
                            fdeInfo.fdeStart + fdeInfo.fdeLength, cieInfo,
-                           (ptrdiff_t)((char *)upToPC - (char *)fdeInfo.pcStart), rememberStack,
-                           arch, results);
+                           (size_t)((char*)upToPC - (char*)fdeInfo.pcStart),
+                           rememberStack, arch, results);
 }
 
 /// "run" the DWARF instructions
 template <typename A>
 bool CFI_Parser<A>::parseInstructions(A &addressSpace, pint_t instructions,
                                       pint_t instructionsEnd,
-                                      const CIE_Info &cieInfo, ptrdiff_t pcoffset,
+                                      const CIE_Info &cieInfo, size_t pcoffset,
                                       PrologInfoStackEntry *&rememberStack,
                                       int arch, PrologInfo *results) {
   pint_t p = instructions;
-  ptrdiff_t codeOffset = 0;
+  size_t codeOffset = 0;
   PrologInfo initialState = *results;
 
-  _LIBUNWIND_TRACE_DWARF("parseInstructions(instructions=0x%0" PRIx64 ")\n",
-                         static_cast<uint64_t>(instructionsEnd));
+  _LIBUNWIND_TRACE_DWARF("parseInstructions(instructions=%#p-%p, pcoffset=0x%zx)\n",
+                         (void*)instructions, (void*)instructionsEnd, pcoffset);
 
   // see DWARF Spec, section 6.4.2 for details on unwind opcodes
   while ((p < instructionsEnd) && (codeOffset < pcoffset)) {
@@ -439,9 +483,9 @@ bool CFI_Parser<A>::parseInstructions(A &addressSpace, pint_t instructions,
       _LIBUNWIND_TRACE_DWARF("DW_CFA_nop\n");
       break;
     case DW_CFA_set_loc:
-      codeOffset = (ptrdiff_t)addressSpace.getEncodedP(p, instructionsEnd,
-                                                       cieInfo.pointerEncoding);
-      _LIBUNWIND_TRACE_DWARF("DW_CFA_set_loc\n");
+      codeOffset = addressSpace.template get<addr_t>(p);
+      _LIBUNWIND_TRACE_DWARF("DW_CFA_set_loc: new offset %" PRIu64 "\n",
+                             static_cast<uint64_t>(codeOffset));
       break;
     case DW_CFA_advance_loc1:
       codeOffset += (addressSpace.get8(p) * cieInfo.codeAlignFactor);
@@ -606,8 +650,8 @@ bool CFI_Parser<A>::parseInstructions(A &addressSpace, pint_t instructions,
       results->savedRegisters[reg].location = kRegisterAtExpression;
       results->savedRegisters[reg].value = (int64_t)p;
       length = addressSpace.getULEB128(p, instructionsEnd);
-      assert(length < static_cast<pint_t>(~0) && "pointer overflow");
-      p += static_cast<pint_t>(length);
+      assert(length < static_cast<uint64_t>(~0) && "pointer overflow");
+      p += static_cast<uint64_t>(length);
       _LIBUNWIND_TRACE_DWARF("DW_CFA_expression(reg=%" PRIu64 ", "
                              "expression=%p, length=%" PRIu64 ")\n",
                              reg, (void*)results->savedRegisters[reg].value, length);

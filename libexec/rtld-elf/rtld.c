@@ -6086,7 +6086,6 @@ bzero(void *dest, size_t len)
 		((char *)dest)[i] = 0;
 }
 
-#ifndef __CHERI_PURE_CAPABILITY__
 /* malloc */
 void *
 malloc(size_t nbytes)
@@ -6115,7 +6114,6 @@ realloc(void *cp, size_t nbytes)
 
 	return (__crt_realloc(cp, nbytes));
 }
-#endif
 
 #if defined DEBUG || !defined(NDEBUG)
 /* Provide an implementation of __assert that does not pull in fprintf() */

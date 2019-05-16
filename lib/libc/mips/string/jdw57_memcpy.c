@@ -37,6 +37,7 @@ static char sccsid[] = "@(#)bcopy.c	8.1 (Berkeley) 6/4/93";
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 #include <sys/types.h>
+#include <sys/sysctl.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -127,8 +128,20 @@ check_no_tagged_capabilities_in_copy(
 #endif
 		    (__cheri_addr uintmax_t)(src + offset),
 		    (__cheri_addr uintmax_t)(dst + offset));
-#if 0
-		abort();
+#ifndef BUILDING_LIBC_CHERI
+		static uint32_t abort_on_tag_loss = -1;
+		if (abort_on_tag_loss == -1) {
+			size_t olen = sizeof(abort_on_tag_loss);
+			if (sysctlbyname("security.cheri.abort_on_memcpy_tag_loss",
+			    &abort_on_tag_loss, &olen, NULL, 0) == -1) {
+				fprintf(stderr,
+				    "ERROR: could not determine whether tag "
+				    "stripping is fatal. Assuming it isn't.\n");
+				abort_on_tag_loss = 0;
+			}
+		}
+		if (abort_on_tag_loss)
+			abort();
 #endif
 	}
 }

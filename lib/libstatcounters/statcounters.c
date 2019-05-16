@@ -161,6 +161,10 @@ enum
 
 DEFINE_GET_STAT_COUNTER(cycle,2,0);
 DEFINE_GET_STAT_COUNTER(inst,4,0);
+DEFINE_GET_STAT_COUNTER(inst_user,4,1);
+DEFINE_GET_STAT_COUNTER(inst_kernel,4,2);
+DEFINE_GET_STAT_COUNTER(imprecise_setbounds,4,3);
+DEFINE_GET_STAT_COUNTER(unrepresentable_caps,4,4);
 DEFINE_GET_STAT_COUNTER(itlb_miss,5,0);
 DEFINE_GET_STAT_COUNTER(dtlb_miss,6,0);
 DEFINE_GET_STAT_COUNTER(icache_write_hit,8,0);
@@ -330,6 +334,10 @@ int statcounters_sample (statcounters_bank_t * const cnt_bank)
     cnt_bank->dtlb_miss                                   = get_dtlb_miss_count();
     cnt_bank->itlb_miss                                   = get_itlb_miss_count();
     cnt_bank->inst                                        = get_inst_count();
+    cnt_bank->inst_user                                   = get_inst_user_count();
+    cnt_bank->inst_kernel                                 = get_inst_kernel_count();
+    cnt_bank->imprecise_setbounds                         = get_imprecise_setbounds_count();
+    cnt_bank->unrepresentable_caps                        = get_unrepresentable_caps_count();
     cnt_bank->cycle                                       = get_cycle_count();
     return 0;
 }
@@ -353,6 +361,10 @@ int statcounters_diff (
     bd->dtlb_miss    = be->dtlb_miss - bs->dtlb_miss;
     bd->cycle        = be->cycle - bs->cycle;
     bd->inst         = be->inst - bs->inst;
+    bd->inst_user    = be->inst_user - bs->inst_user;
+    bd->inst_kernel  = be->inst_kernel - bs->inst_kernel;
+    bd->imprecise_setbounds = be->imprecise_setbounds - bs->imprecise_setbounds;
+    bd->unrepresentable_caps = be->unrepresentable_caps - bs->unrepresentable_caps;
     for (int i = 0; i < STATCOUNTERS_MAX_MOD_CNT; i++)
     {
         bd->icache[i]         = be->icache[i] - bs->icache[i];
@@ -536,6 +548,11 @@ int statcounters_dump_with_args (
             fprintf(fp, "tagcachemaster_read_rsp,");
             fprintf(fp, "tagcachemaster_read_rsp_flit,");
             fprintf(fp, "tagcachemaster_write_rsp");
+            // TODO: move these to the beginning or will that break scripts?
+            fprintf(fp, "inst_user,");
+            fprintf(fp, "inst_kernel,");
+            fprintf(fp, "imprecise_setbounds,");
+            fprintf(fp, "unrepresentable_caps,");
             fprintf(fp, "\n");
         case CSV_NOHEADER:
             fprintf(fp, "%s,",pname);
@@ -592,6 +609,11 @@ int statcounters_dump_with_args (
             fprintf(fp, "%lu,",b->tagcachemaster[STATCOUNTERS_READ_RSP]);
             fprintf(fp, "%lu,",b->tagcachemaster[STATCOUNTERS_READ_RSP_FLIT]);
             fprintf(fp, "%lu",b->tagcachemaster[STATCOUNTERS_WRITE_RSP]);
+            // TODO: move these earlier
+            fprintf(fp, "%lu",b->inst_user);
+            fprintf(fp, "%lu",b->inst_kernel);
+            fprintf(fp, "%lu",b->imprecise_setbounds);
+            fprintf(fp, "%lu",b->unrepresentable_caps);
             fprintf(fp, "\n");
             break;
         case HUMAN_READABLE:
@@ -599,8 +621,12 @@ int statcounters_dump_with_args (
             fprintf(fp, "===== %s -- %s =====\n",pname, aname);
             fprintf(fp, "cycles:                       \t%lu\n",b->cycle);
             fprintf(fp, "instructions:                 \t%lu\n",b->inst);
+            fprintf(fp, "instructions (user):          \t%lu\n",b->inst_user);
+            fprintf(fp, "instructions (kernel):        \t%lu\n",b->inst_kernel);
             fprintf(fp, "itlb_miss:                    \t%lu\n",b->itlb_miss);
             fprintf(fp, "dtlb_miss:                    \t%lu\n",b->dtlb_miss);
+            fprintf(fp, "imprecise_setbounds:          \t%lu\n",b->imprecise_setbounds);
+            fprintf(fp, "unrepresentable_caps:         \t%lu\n",b->unrepresentable_caps);
             fprintf(fp, "\n");
             fprintf(fp, "icache_write_hit:             \t%lu\n",b->icache[STATCOUNTERS_WRITE_HIT]);
             fprintf(fp, "icache_write_miss:            \t%lu\n",b->icache[STATCOUNTERS_WRITE_MISS]);

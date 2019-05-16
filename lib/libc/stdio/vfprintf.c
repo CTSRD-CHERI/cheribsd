@@ -444,13 +444,13 @@ __vfprintf(FILE *fp, locale_t locale, const char *fmt0, va_list ap)
 #define	INTMAX_SIZE	(INTMAXT|INTPTRT|SIZET|PTRDIFFT|LLONGINT)
 #define SJARG() \
 	(flags&INTMAXT ? GETARG(intmax_t) : \
-	    flags&INTPTRT ? (intmax_t)GETARG(intptr_t) : \
+	    flags&INTPTRT ? (intmax_t)(void*)GETARG(intptr_t) : \
 	    flags&SIZET ? (intmax_t)GETARG(ssize_t) : \
 	    flags&PTRDIFFT ? (intmax_t)GETARG(ptrdiff_t) : \
 	    (intmax_t)GETARG(long long))
 #define	UJARG() \
 	(flags&INTMAXT ? GETARG(uintmax_t) : \
-	    flags&INTPTRT ? (uintmax_t)GETARG(uintptr_t) : \
+	    flags&INTPTRT ? (uintmax_t)(void*)GETARG(uintptr_t) : \
 	    flags&SIZET ? (uintmax_t)GETARG(size_t) : \
 	    flags&PTRDIFFT ? (uintmax_t)GETARG(ptrdiff_t) : \
 	    (uintmax_t)GETARG(unsigned long long))

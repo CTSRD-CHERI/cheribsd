@@ -31,10 +31,13 @@
 #ifndef __MALLOC_HEAP_H__
 #define	__MALLOC_HEAP_H__
 
-extern	caddr_t	pagepool_start, pagepool_end;
+#include <sys/cdefs.h>
 
-int	__morepages(int n);
-void	__init_heap(size_t pagesz);
-void	*__rederive_pointer(void *ptr);
+extern	caddr_t	pagepool_start __hidden;
+extern caddr_t pagepool_end __hidden;
+
+int	__morepages(int n) __hidden;
+void	__init_heap(size_t pagesz) __hidden;
+void	*__rederive_pointer(void *ptr) __hidden;
 
 #endif /* __MALLOC_HEAP_H__ */
