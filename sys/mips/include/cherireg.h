@@ -428,6 +428,8 @@
 #if CHERICAP_SIZE == 32
 #define	CHERI_ALIGN_SHIFT(l)	0ULL
 #define	CHERI_SEAL_ALIGN_SHIFT(l)	0ULL
+#define CHERI_REPRESENTABLE_LENGTH(len) (len)
+#define CHERI_REPRESENTABLE_BASE(addr) (addr)
 #else /* (!(CHERICAP_SIZE == 32)) */
 
 #define	CHERI_BASELEN_BITS	10
@@ -453,15 +455,15 @@
 #define CHERI_SEAL_ALIGN_SHIFT(l)					\
     (_CHERI_SEAL_ALIGN_SHIFT(l) < CHERI_SEAL_MIN_ALIGN ?		\
      CHERI_SEAL_MIN_ALIGN : _CHERI_SEAL_ALIGN_SHIFT(l))
-#endif /* (!(CHERICAP_SIZE == 32)) */
-
-#define	CHERI_ALIGN_MASK(l)		~(~0ULL << CHERI_ALIGN_SHIFT(l))
-#define	CHERI_SEAL_ALIGN_MASK(l)	~(~0ULL << CHERI_SEAL_ALIGN_SHIFT(l))
 
 /* TODO: use compiler builtins */
 #define CHERI_REPRESENTABLE_LENGTH(len) \
 	roundup2((len), 1ULL << CHERI_ALIGN_SHIFT(len))
 #define CHERI_REPRESENTABLE_BASE(addr) \
 	rounddown2((addr), 1ULL << CHERI_ALIGN_SHIFT(addr))
+#endif /* (!(CHERICAP_SIZE == 32)) */
+
+#define	CHERI_ALIGN_MASK(l)		~(~0ULL << CHERI_ALIGN_SHIFT(l))
+#define	CHERI_SEAL_ALIGN_MASK(l)	~(~0ULL << CHERI_SEAL_ALIGN_SHIFT(l))
 
 #endif /* _MIPS_INCLUDE_CHERIREG_H_ */
