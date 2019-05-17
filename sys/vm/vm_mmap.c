@@ -371,7 +371,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 				    "(0x%zx) is insufficently rounded (mask "
 				    "0x%llx)", __func__, size,
 				    CHERI_ALIGN_MASK(size));
-				return (EINVAL);
+				return (ERANGE);
 			}
 
 			if (CHERI_ALIGN_MASK(size) != 0)
@@ -389,7 +389,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 				    "size (0x%zx) is insufficently rounded "
 				    "(mask 0x%llx)", __func__, size,
 				    CHERI_SEAL_ALIGN_MASK(size));
-				return (EINVAL);
+				return (ERANGE);
 			}
 
 			if (CHERI_ALIGN_MASK(size) != 0)
