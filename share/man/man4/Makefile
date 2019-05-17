@@ -519,7 +519,6 @@ MAN=	aac.4 \
 	textdump.4 \
 	ti.4 \
 	timecounters.4 \
-	tl.4 \
 	${_tpm.4} \
 	trm.4 \
 	tty.4 \
@@ -720,7 +719,6 @@ MLINKS+=tap.4 if_tap.4
 MLINKS+=terasic_de4led.4 de4led.4
 MLINKS+=tdfx.4 tdfx_linux.4
 MLINKS+=ti.4 if_ti.4
-MLINKS+=tl.4 if_tl.4
 MLINKS+=tun.4 if_tun.4
 MLINKS+=tx.4 if_tx.4
 MLINKS+=txp.4 if_txp.4
