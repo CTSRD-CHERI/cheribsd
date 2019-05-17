@@ -498,6 +498,8 @@ int statcounters_dump_with_args (
             fprintf(fp, "archname,");
             fprintf(fp, "cycles,");
             fprintf(fp, "instructions,");
+            fprintf(fp, "inst_user,");
+            fprintf(fp, "inst_kernel,");
             fprintf(fp, "itlb_miss,");
             fprintf(fp, "dtlb_miss,");
             fprintf(fp, "icache_write_hit,");
@@ -547,18 +549,17 @@ int statcounters_dump_with_args (
             fprintf(fp, "tagcachemaster_write_req_flit,");
             fprintf(fp, "tagcachemaster_read_rsp,");
             fprintf(fp, "tagcachemaster_read_rsp_flit,");
-            fprintf(fp, "tagcachemaster_write_rsp");
-            // TODO: move these to the beginning or will that break scripts?
-            fprintf(fp, "inst_user,");
-            fprintf(fp, "inst_kernel,");
+            fprintf(fp, "tagcachemaster_write_rsp,");
             fprintf(fp, "imprecise_setbounds,");
-            fprintf(fp, "unrepresentable_caps,");
+            fprintf(fp, "unrepresentable_caps");
             fprintf(fp, "\n");
         case CSV_NOHEADER:
             fprintf(fp, "%s,",pname);
             fprintf(fp, "%s,",aname);
             fprintf(fp, "%lu,",b->cycle);
             fprintf(fp, "%lu,",b->inst);
+            fprintf(fp, "%lu,",b->inst_user);
+            fprintf(fp, "%lu,",b->inst_kernel);
             fprintf(fp, "%lu,",b->itlb_miss);
             fprintf(fp, "%lu,",b->dtlb_miss);
             fprintf(fp, "%lu,",b->icache[STATCOUNTERS_WRITE_HIT]);
@@ -608,11 +609,8 @@ int statcounters_dump_with_args (
             fprintf(fp, "%lu,",b->tagcachemaster[STATCOUNTERS_WRITE_REQ_FLIT]);
             fprintf(fp, "%lu,",b->tagcachemaster[STATCOUNTERS_READ_RSP]);
             fprintf(fp, "%lu,",b->tagcachemaster[STATCOUNTERS_READ_RSP_FLIT]);
-            fprintf(fp, "%lu",b->tagcachemaster[STATCOUNTERS_WRITE_RSP]);
-            // TODO: move these earlier
-            fprintf(fp, "%lu",b->inst_user);
-            fprintf(fp, "%lu",b->inst_kernel);
-            fprintf(fp, "%lu",b->imprecise_setbounds);
+            fprintf(fp, "%lu,",b->tagcachemaster[STATCOUNTERS_WRITE_RSP]);
+            fprintf(fp, "%lu,",b->imprecise_setbounds);
             fprintf(fp, "%lu",b->unrepresentable_caps);
             fprintf(fp, "\n");
             break;
@@ -625,8 +623,6 @@ int statcounters_dump_with_args (
             fprintf(fp, "instructions (kernel):        \t%lu\n",b->inst_kernel);
             fprintf(fp, "itlb_miss:                    \t%lu\n",b->itlb_miss);
             fprintf(fp, "dtlb_miss:                    \t%lu\n",b->dtlb_miss);
-            fprintf(fp, "imprecise_setbounds:          \t%lu\n",b->imprecise_setbounds);
-            fprintf(fp, "unrepresentable_caps:         \t%lu\n",b->unrepresentable_caps);
             fprintf(fp, "\n");
             fprintf(fp, "icache_write_hit:             \t%lu\n",b->icache[STATCOUNTERS_WRITE_HIT]);
             fprintf(fp, "icache_write_miss:            \t%lu\n",b->icache[STATCOUNTERS_WRITE_MISS]);
@@ -682,6 +678,9 @@ int statcounters_dump_with_args (
             fprintf(fp, "tagcachemaster_read_rsp:      \t%lu\n",b->tagcachemaster[STATCOUNTERS_READ_RSP]);
             fprintf(fp, "tagcachemaster_read_rsp_flit: \t%lu\n",b->tagcachemaster[STATCOUNTERS_READ_RSP_FLIT]);
             fprintf(fp, "tagcachemaster_write_rsp:     \t%lu\n",b->tagcachemaster[STATCOUNTERS_WRITE_RSP]);
+            fprintf(fp, "\n");
+            fprintf(fp, "imprecise_setbounds:          \t%lu\n",b->imprecise_setbounds);
+            fprintf(fp, "unrepresentable_caps:         \t%lu\n",b->unrepresentable_caps);
             fprintf(fp, "\n");
             break;
     }
