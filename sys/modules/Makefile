@@ -110,7 +110,6 @@ SUBDIR=	\
 	${_efirt} \
 	${_em} \
 	${_ena} \
-	${_ep} \
 	${_epic} \
 	esp \
 	${_et} \
@@ -608,7 +607,6 @@ _cpuctl=	cpuctl
 _cpufreq=	cpufreq
 _dpms=		dpms
 _em=		em
-_ep=		ep
 _et=		et
 _exca=		exca
 _fe=		fe
