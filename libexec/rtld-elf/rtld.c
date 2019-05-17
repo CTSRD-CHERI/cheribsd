@@ -1350,6 +1350,10 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    /* Can't restrict $pcc in legacy mode */
 	    obj->cheri_captable_abi = abi;
 	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
+	    if (flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) {
+		flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
+		obj->relative_cap_relocs = true;
+	    }
 	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
 	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1

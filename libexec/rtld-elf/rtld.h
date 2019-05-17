@@ -340,6 +340,7 @@ typedef struct Struct_Obj_Entry {
     bool doomed : 1;		/* Object cannot be referenced */
 #ifdef __CHERI_PURE_CAPABILITY__
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
+    bool relative_cap_relocs : 1; /* __cap_relocs section has been processed */
     /*
      * If restrict_pcc_basic is true we can restricted $pcc to the object's
      * executable segment, if restrict_pcc_strict is true we can restrict it
