@@ -325,7 +325,6 @@ SUBDIR=	\
 	sdhci_pci \
 	sem \
 	send \
-	${_sf} \
 	${_sfxge} \
 	sge \
 	${_sgx} \
@@ -521,7 +520,6 @@ _pfsync=	pfsync
 _bce=		bce
 _fxp=		fxp
 _ispfw=		ispfw
-_sf=		sf
 _ti=		ti
 _txp=		txp
 
