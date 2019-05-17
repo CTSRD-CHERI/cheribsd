@@ -355,7 +355,6 @@ SUBDIR=	\
 	${_twa} \
 	twe \
 	tws \
-	${_txp} \
 	${_uart} \
 	ubsec \
 	udf \
@@ -518,7 +517,6 @@ _bce=		bce
 _fxp=		fxp
 _ispfw=		ispfw
 _ti=		ti
-_txp=		txp
 
 .if ${MACHINE_CPUARCH} != "mips"
 _mwlfw=		mwlfw
