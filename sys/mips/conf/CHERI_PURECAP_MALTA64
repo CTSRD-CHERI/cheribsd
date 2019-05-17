@@ -33,6 +33,7 @@ nooptions	GEOM_RAID
 # debugging
 options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
+options		BOOTVERBOSE
 #options		BUS_DEBUG
 #options		CAMDEBUG
 #options		CAM_DEBUG_FLAGS=3
