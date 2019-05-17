@@ -34,6 +34,7 @@
 #include <sys/wait.h>
 
 #include <err.h>
+#include <inttypes.h>
 #include <libgen.h>
 #include <spawn.h>
 #include <statcounters.h>
@@ -48,7 +49,7 @@ extern char **environ;
 static void
 usage(int exitcode)
 {
-	warnx("usage: beri_count_stats [-v/--verbose] <command>");
+	warnx("usage: beri_count_stats [-q/--quiet] [-v/--verbose] <command>");
 	exit(exitcode);
 }
 
@@ -58,6 +59,7 @@ main(int argc, char **argv)
 	int status;
 	pid_t pid;
 	bool verbose = false;
+	bool quiet = false;
 
 	/* Adjust argc and argv as though we've used getopt. */
 	argc--;
@@ -67,6 +69,11 @@ main(int argc, char **argv)
 		usage(1);
 	if (strcmp("--help", argv[0]) == 0 || strcmp("-h", argv[0]) == 0)
 		usage(0);
+	if (strcmp("-q", argv[0]) == 0 || strcmp("--quiet", argv[0]) == 0) {
+		argc--;
+		argv++;
+		quiet = true;
+	}
 	if (strcmp("-v", argv[0]) == 0 || strcmp("--verbose", argv[0]) == 0) {
 		argc--;
 		argv++;
@@ -93,6 +100,16 @@ main(int argc, char **argv)
 	 * the beri_count_stats_binary!
 	 */
 	const char* prog_basename = basename(argv[0]);
+	if (quiet) {
+		/* Only print cycles,instructions and TLB misses */
+		printf("cyles:                 %12" PRId64 "\n", diff_count.cycle);
+		printf("instructions:          %12" PRId64 "\n", diff_count.inst);
+		printf("instructions (user):   %12" PRId64 "\n", diff_count.inst_user);
+		printf("instructions (kernel): %12" PRId64 "\n", diff_count.inst_kernel);
+		printf("tlb misses (data):     %12" PRId64 "\n", diff_count.dtlb_miss);
+		printf("tlb misses (instr):    %12" PRId64 "\n", diff_count.itlb_miss);
+		exit(WEXITSTATUS(status));
+	}
 	/* Also dump to stderr when -v was passed */
 	if (verbose) {
 		/* Ensure human readable output: */
