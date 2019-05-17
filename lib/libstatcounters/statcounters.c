@@ -553,6 +553,7 @@ int statcounters_dump_with_args (
             fprintf(fp, "imprecise_setbounds,");
             fprintf(fp, "unrepresentable_caps");
             fprintf(fp, "\n");
+            // fallthrough
         case CSV_NOHEADER:
             fprintf(fp, "%s,",pname);
             fprintf(fp, "%s,",aname);

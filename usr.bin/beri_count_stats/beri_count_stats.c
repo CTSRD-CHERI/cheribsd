@@ -47,10 +47,25 @@
 
 extern char **environ;
 
+static const struct option options[] = {
+	{ "csv-noheader", no_argument, NULL, 'c' },
+	{ "help", no_argument, NULL, 'h' },
+	{ "format", required_argument, NULL, 'f' },
+	{ "output", required_argument, NULL, 'o' },
+	{ "quiet", no_argument, NULL, 'q' },
+	{ "verbose", no_argument, NULL, 'v' },
+	{ NULL, 0, NULL, 0 }
+};
+
 static void
 usage(int exitcode)
 {
-	warnx("usage: beri_count_stats [-q/--quiet] [-v/--verbose] <command>");
+	warnx("usage: beri_count_stats [-q/--quiet] [-v/--verbose] [-o file] <command>");
+	warnx("options:");
+	for (int i = 0; options[i].flag != 0; i++) {
+		warnx("  --%s/%c", options[i].name, options[i].val);
+	}
+
 	exit(exitcode);
 }
 
@@ -61,16 +76,12 @@ main(int argc, char **argv)
 	pid_t pid;
 	bool verbose = false;
 	bool quiet = false;
+	const char* output_filename = NULL;
 	int opt;
+	statcounters_fmt_flag_t statcounters_format = HUMAN_READABLE;
 
-	const struct option options[] = {
-		{ "help", no_argument, NULL, 'h' },
-		{ "verbose", no_argument, NULL, 'v' },
-		{ "quiet", no_argument, NULL, 'a' },
-		{ NULL, 0, NULL, 0 }
-	};
 	/* Start option string with + to avoid parsing after first non-option */
-	while ((opt = getopt_long(argc, argv, "+hqv", options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "+chfoqv", options, NULL)) != -1) {
 		switch (opt) {
 		case 'q':
 			quiet = true;
@@ -80,6 +91,17 @@ main(int argc, char **argv)
 			break;
 		case 'h':
 			usage(0);
+			break;
+		case 'o':
+			output_filename = optarg;
+			break;
+		case 'c':
+			/* Force the use of CSV format without the header: */
+			unsetenv("STATCOUNTERS_FORMAT");
+			statcounters_format = CSV_NOHEADER;
+			break;
+		case 'f':
+			setenv("STATCOUNTERS_FORMAT", optarg, 1);
 			break;
 		default:
 			usage(1);
@@ -142,6 +164,18 @@ main(int argc, char **argv)
 		    NULL, stderr, HUMAN_READABLE);
 		setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
 	}
-	statcounters_dump_with_args(&diff_count, prog_basename, NULL, NULL, NULL, HUMAN_READABLE);
+	FILE* output_file = NULL;
+	if (!output_filename || strcmp(output_filename, "-") == 0) {
+		output_file = stdout;
+	} else {
+		output_file = fopen(output_filename, "a");
+		if (!output_file) {
+			err(EX_OSERR, "fopen(%s)", output_filename);
+		}
+	}
+	// FIXME: find out architecture from executable header e_flags?
+	const char* architecture = "unknown";
+	statcounters_dump_with_args(&diff_count, prog_basename, NULL,
+	    architecture, output_file, statcounters_format);
 	exit(WEXITSTATUS(status));
 }
