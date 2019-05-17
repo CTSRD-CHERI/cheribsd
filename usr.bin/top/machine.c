@@ -883,7 +883,7 @@ format_next_process(struct handle * xhandle, char *(*get_userid)(int), int flags
 	if (procbuf != NULL) {
 		sbuf_clear(procbuf);
 	} else {
-		procbuf = sbuf_new(NULL, NULL, screen_width + 1, SBUF_AUTOEXTEND);
+		procbuf = sbuf_new_auto();
 	}
 
 

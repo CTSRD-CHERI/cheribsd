@@ -214,11 +214,7 @@ proc_read(struct proc_handle *phdl, void *buf, size_t size, size_t addr)
 	piod.piod_op = PIOD_READ_D;
 	piod.piod_len = size;
 	piod.piod_addr = (void *)buf;
-#ifdef __CHERI_PURE_CAPABILITY__
-	piod.piod_offs = addr;
-#else
 	piod.piod_offs = (void *)(uintptr_t)addr;
-#endif
 
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0)
 		return (-1);

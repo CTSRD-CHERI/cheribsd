@@ -1045,11 +1045,7 @@ get_struct(pid_t pid, uintptr_t offset, void *buf, int len)
 	struct ptrace_io_desc iorequest;
 
 	iorequest.piod_op = PIOD_READ_D;
-#ifdef __CHERI_PURE_CAPABILITY__
-	iorequest.piod_offs = (__cheri_addr uint64_t)(void *)offset;
-#else
 	iorequest.piod_offs = (void *)offset;
-#endif
 	iorequest.piod_addr = buf;
 	iorequest.piod_len = len;
 	if (ptrace(PT_IO, pid, (caddr_t)&iorequest, 0) < 0)
@@ -1086,11 +1082,7 @@ get_string(pid_t pid, uintptr_t addr, int max)
 		return (NULL);
 	for (;;) {
 		iorequest.piod_op = PIOD_READ_D;
-#ifdef __CHERI_PURE_CAPABILITY__
-		iorequest.piod_offs = (__cheri_addr uint64_t)(void *)(addr + offset);
-#else
 		iorequest.piod_offs = (void *)(addr + offset);
-#endif
 		iorequest.piod_addr = buf + offset;
 		iorequest.piod_len = size;
 		if (ptrace(PT_IO, pid, (caddr_t)&iorequest, 0) < 0) {

@@ -604,7 +604,7 @@ int	tvtohz(struct timeval *tv);
 #include <sys/select.h>
 
 __BEGIN_DECLS
-int	setitimer(u_int, const struct itimerval *, struct itimerval *);
+int	setitimer(int, const struct itimerval *, struct itimerval *);
 int	utimes(const char *, const struct timeval *);
 
 #if __BSD_VISIBLE
@@ -617,7 +617,7 @@ int	settimeofday(const struct timeval *, const struct timezone *);
 #endif
 
 #if __XSI_VISIBLE
-int	getitimer(u_int, struct itimerval *);
+int	getitimer(int, struct itimerval *);
 int	gettimeofday(struct timeval *, struct timezone *);
 #endif
 

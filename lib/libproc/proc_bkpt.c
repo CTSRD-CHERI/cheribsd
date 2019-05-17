@@ -126,11 +126,7 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
 	 */
 	instr = 0;
 	piod.piod_op = PIOD_READ_I;
-#ifdef __CHERI_PURE_CAPABILITY__
-	piod.piod_offs = (__cheri_addr uint64_t)(void *)address;
-#else
 	piod.piod_offs = (void *)address;
-#endif
 	piod.piod_addr = &instr;
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {
@@ -145,11 +141,7 @@ proc_bkptset(struct proc_handle *phdl, uintptr_t address,
 	 */
 	instr = BREAKPOINT_INSTR;
 	piod.piod_op = PIOD_WRITE_I;
-#ifdef __CHERI_PURE_CAPABILITY__
-	piod.piod_offs = (__cheri_addr uint64_t)(void *)address;
-#else
 	piod.piod_offs = (void *)address;
-#endif
 	piod.piod_addr = &instr;
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {
@@ -195,11 +187,7 @@ proc_bkptdel(struct proc_handle *phdl, uintptr_t address,
 	 */
 	instr = saved;
 	piod.piod_op = PIOD_WRITE_I;
-#ifdef __CHERI_PURE_CAPABILITY__
-	piod.piod_offs = (__cheri_addr uint64_t)(void *)address;
-#else
 	piod.piod_offs = (void *)address;
-#endif
 	piod.piod_addr = &instr;
 	piod.piod_len  = BREAKPOINT_INSTR_SZ;
 	if (ptrace(PT_IO, proc_getpid(phdl), (caddr_t)&piod, 0) < 0) {

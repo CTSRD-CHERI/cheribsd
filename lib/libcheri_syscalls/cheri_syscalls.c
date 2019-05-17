@@ -64,7 +64,7 @@ _sys _protoargs								\
 _ret _sys _vprotoargs;							\
 __weak_reference(_sys, _##_sys);
 
-#include <sys/sysstubs.h>
+#include <compat/cheriabi/cheriabi_sysstubs.h>
 
 #undef SYS_STUB
 #undef SYS_STUB_VA

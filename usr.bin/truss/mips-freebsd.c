@@ -96,14 +96,8 @@ mips_fetch_args(struct trussinfo *trussinfo, u_int narg)
 		cs->args[i] = regs.r_regs[reg];
 	if (narg > i) {
 		iorequest.piod_op = PIOD_READ_D;
-#ifdef __CHERI_PURE_CAPABILITY__
-		/* XXX-AM: we should probably use STC here */
-		iorequest.piod_offs = (__cheri_addr uint64_t)(void *)((uintptr_t)regs.r_regs[SP] +
-		    4 * sizeof(cs->args[0]));
-#else
 		iorequest.piod_offs = (void *)((uintptr_t)regs.r_regs[SP] +
 		    4 * sizeof(cs->args[0]));
-#endif
 		iorequest.piod_addr = &cs->args[i];
 		iorequest.piod_len = (narg - i) * sizeof(cs->args[0]);
 		ptrace(PT_IO, tid, (caddr_t)&iorequest, 0);

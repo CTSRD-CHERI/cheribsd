@@ -296,7 +296,7 @@ __libcheri_system_sys_##_sys _protoargs_err				\
 #pragma clang diagnostic ignored "-Wunused-parameter"
 #endif
 
-#include <sys/sysstubs.h>
+#include <compat/cheriabi/cheriabi_sysstubs.h>
 
 #ifndef __CHERI_PURE_CAPABILITY__
 #pragma clang diagnostic pop

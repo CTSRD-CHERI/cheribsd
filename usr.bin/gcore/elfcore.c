@@ -258,11 +258,7 @@ elf_coredump(int efd, int fd, pid_t pid)
 		uintmax_t nleft = php->p_filesz;
 
 		iorequest.piod_op = PIOD_READ_D;
-#ifdef __CHERI_PURE_CAPABILITY__
-		iorequest.piod_offs = php->p_vaddr;
-#else
 		iorequest.piod_offs = (caddr_t)(uintptr_t)php->p_vaddr;
-#endif
 		while (nleft > 0) {
 			char buf[8*1024];
 			size_t nwant;

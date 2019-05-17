@@ -128,7 +128,7 @@ extern vm_offset_t * __capability	libcheri_system_vtable;
     _callargs, _callargs_chk, _callargs_err, _localcheck)		\
     LIBCHERI_SYSTEM_CCALL _ret __libcheri_system_sys_##_sys _protoargs_err;
 
-#include <sys/sysstubs.h>
+#include <compat/cheriabi/cheriabi_sysstubs.h>
 
 #undef SYS_STUB
 #undef SYS_STUB_ARGHASPTRS
