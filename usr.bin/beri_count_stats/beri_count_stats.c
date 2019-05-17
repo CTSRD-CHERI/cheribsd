@@ -81,7 +81,7 @@ main(int argc, char **argv)
 	statcounters_fmt_flag_t statcounters_format = HUMAN_READABLE;
 
 	/* Start option string with + to avoid parsing after first non-option */
-	while ((opt = getopt_long(argc, argv, "+chfoqv", options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "+chf:o:qv", options, NULL)) != -1) {
 		switch (opt) {
 		case 'q':
 			quiet = true;
