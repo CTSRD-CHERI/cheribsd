@@ -34,6 +34,7 @@
 #include <sys/wait.h>
 
 #include <err.h>
+#include <getopt.h>
 #include <inttypes.h>
 #include <libgen.h>
 #include <spawn.h>
@@ -60,10 +61,32 @@ main(int argc, char **argv)
 	pid_t pid;
 	bool verbose = false;
 	bool quiet = false;
+	int opt;
 
-	/* Adjust argc and argv as though we've used getopt. */
-	argc--;
-	argv++;
+	const struct option options[] = {
+		{ "help", no_argument, NULL, 'h' },
+		{ "verbose", no_argument, NULL, 'v' },
+		{ "quiet", no_argument, NULL, 'a' },
+		{ NULL, 0, NULL, 0 }
+	};
+	/* Start option string with + to avoid parsing after first non-option */
+	while ((opt = getopt_long(argc, argv, "+hqv", options, NULL)) != -1) {
+		switch (opt) {
+		case 'q':
+			quiet = true;
+			break;
+		case 'v':
+			verbose = true;
+			break;
+		case 'h':
+			usage(0);
+			break;
+		default:
+			usage(1);
+		}
+	}
+	argc -= optind;
+	argv += optind;
 
 	if (argc == 0)
 		usage(1);
@@ -84,7 +107,7 @@ main(int argc, char **argv)
 	statcounters_sample(&start_count);
 	status = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
 	if (status != 0)
-		errc(EX_OSERR, status, "posix_spawnp");
+		errc(EX_OSERR, status, "posix_spawnp(%s)", argv[0]);
 
 	waitpid(pid, &status, 0);
 	if (!WIFEXITED(status)) {
