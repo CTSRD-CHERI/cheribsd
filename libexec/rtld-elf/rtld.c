@@ -457,6 +457,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     /* Initialize and relocate ourselves. */
     assert(aux_info[AT_BASE] != NULL);
+    assert((vaddr_t)aux_info[AT_BASE]->a_un.a_ptr != 0 && "rtld cannot be mapped at address zero!");
     init_rtld((caddr_t) aux_info[AT_BASE]->a_un.a_ptr, aux_info);
 
     __progname = obj_rtld.path;
