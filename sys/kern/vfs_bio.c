@@ -2002,7 +2002,7 @@ bufkva_free(struct buf *bp)
 	if (bp->b_kvasize == 0)
 		return;
 
-	vmem_free(buffer_arena, (vm_offset_t)bp->b_kvabase, bp->b_kvasize);
+	vmem_free(buffer_arena, (vmem_addr_t)bp->b_kvabase, bp->b_kvasize);
 	counter_u64_add(bufkvaspace, -bp->b_kvasize);
 	counter_u64_add(buffreekvacnt, 1);
 	bp->b_data = bp->b_kvabase = unmapped_buf;
