@@ -102,8 +102,8 @@ LEAF(rtld_start)
 	PIC_LOAD_CODE_PTR($c3, a0, __start___cap_relocs)
 	PIC_LOAD_CODE_PTR($c4, a1, __stop___cap_relocs)
 	clc		$c5, zero, SFRAME_RELOCBASE($c11) /* relocbase */
-	move	v0, a0
-	PIC_CALL(_rtld_do___caprelocs_self) /* (&__start___cap_relocs, &__stop___cap_relocs, relocbase) */
+	move	a0, v0
+	PIC_CALL(_rtld_do___caprelocs_self) /* (&__start___cap_relocs, &__stop___cap_relocs, relocbase, flags) */
 
 
 	clc		$c3, zero, SFRAME_AUXARGS($c11)
