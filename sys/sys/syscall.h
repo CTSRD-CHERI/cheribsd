@@ -22,7 +22,7 @@
 #define	SYS_freebsd11_mknod	14
 #define	SYS_chmod	15
 #define	SYS_chown	16
-				/* 17 is obsolete break */
+#define	SYS_break	17
 				/* 18 is freebsd4 getfsstat */
 				/* 19 is old lseek */
 #define	SYS_getpid	20
@@ -74,8 +74,8 @@
 #define	SYS_vfork	66
 				/* 67 is obsolete vread */
 				/* 68 is obsolete vwrite */
-				/* 69 is obsolete sbrk */
-				/* 70 is obsolete sstk */
+#define	SYS_sbrk	69
+#define	SYS_sstk	70
 				/* 71 is old mmap */
 #define	SYS_freebsd11_vadvise	72
 #define	SYS_munmap	73
@@ -165,9 +165,9 @@
 				/* 164 is freebsd4 uname */
 #define	SYS_sysarch	165
 #define	SYS_rtprio	166
-				/* 169 is obsolete semsys */
-				/* 170 is obsolete msgsys */
-				/* 171 is obsolete shmsys */
+#define	SYS_semsys	169
+#define	SYS_msgsys	170
+#define	SYS_shmsys	171
 				/* 173 is freebsd6 pread */
 				/* 174 is freebsd6 pwrite */
 #define	SYS_setfib	175

@@ -17,6 +17,7 @@ MIASM =  \
 	freebsd11_mknod.o \
 	chmod.o \
 	chown.o \
+	break.o \
 	getpid.o \
 	mount.o \
 	unmount.o \
@@ -56,6 +57,8 @@ MIASM =  \
 	chroot.o \
 	msync.o \
 	vfork.o \
+	sbrk.o \
+	sstk.o \
 	freebsd11_vadvise.o \
 	munmap.o \
 	mprotect.o \
@@ -108,6 +111,9 @@ MIASM =  \
 	getfh.o \
 	sysarch.o \
 	rtprio.o \
+	semsys.o \
+	msgsys.o \
+	shmsys.o \
 	setfib.o \
 	ntp_adjtime.o \
 	setgid.o \
