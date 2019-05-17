@@ -61,12 +61,12 @@
  * a0 - length
  *
  * memcpy has inverted source/destination pointers and returns dest.
-*/
+ */
 #ifdef CHERI_KERNEL
 LEAF(FUNC_PREFIX(memcpy))
 XLEAF(FUNC_PREFIX(memcpy_c))
 XLEAF(FUNC_PREFIX(cheri_memcpy))
-XLEAF(FUNC_PREFIX(memmove))	
+XLEAF(FUNC_PREFIX(memmove))
 #else
 LEAF(FUNC_PREFIX(memcpy_c))
 #endif
@@ -360,5 +360,5 @@ XEND(FUNC_PREFIX(memcpy_c))
 XEND(FUNC_PREFIX(cheri_memcpy))
 END(FUNC_PREFIX(memcpy))
 #else
-XEND(FUNC_PREFIX(memcpy))
+END(FUNC_PREFIX(memcpy_c))
 #endif
