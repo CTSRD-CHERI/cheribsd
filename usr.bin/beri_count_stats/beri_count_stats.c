@@ -48,6 +48,7 @@
 extern char **environ;
 
 static const struct option options[] = {
+	{ "archname", required_argument, NULL, 'a' },
 	{ "csv-noheader", no_argument, NULL, 'c' },
 	{ "help", no_argument, NULL, 'h' },
 	{ "format", required_argument, NULL, 'f' },
@@ -77,11 +78,12 @@ main(int argc, char **argv)
 	bool verbose = false;
 	bool quiet = false;
 	const char* output_filename = NULL;
+	const char* architecture = "unknown";
 	int opt;
 	statcounters_fmt_flag_t statcounters_format = HUMAN_READABLE;
 
 	/* Start option string with + to avoid parsing after first non-option */
-	while ((opt = getopt_long(argc, argv, "+chf:o:qv", options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "+a:chf:o:qv", options, NULL)) != -1) {
 		switch (opt) {
 		case 'q':
 			quiet = true;
@@ -92,6 +94,9 @@ main(int argc, char **argv)
 		case 'h':
 			usage(0);
 			break;
+		case 'a':
+			architecture = optarg;
+			break;
 		case 'o':
 			output_filename = optarg;
 			break;
@@ -101,7 +106,14 @@ main(int argc, char **argv)
 			statcounters_format = CSV_NOHEADER;
 			break;
 		case 'f':
-			setenv("STATCOUNTERS_FORMAT", optarg, 1);
+			unsetenv("STATCOUNTERS_FORMAT");
+			if (strcmp(optarg, "csv") == 0) {
+				statcounters_format = CSV_HEADER;
+			} else if (strcmp(optarg, "csv-noheader") == 0) {
+				statcounters_format = CSV_NOHEADER;
+			} else {
+				errx(EX_DATAERR, "Invalid format %s", optarg);
+			}
 			break;
 		default:
 			usage(1);
@@ -169,12 +181,16 @@ main(int argc, char **argv)
 		output_file = stdout;
 	} else {
 		output_file = fopen(output_filename, "a");
+		/* If we are writing to a regular file and the offset is not
+		 * zero omit the CSV header */
+		if (statcounters_format == CSV_HEADER && ftello(output_file) > 0) {
+			statcounters_format = CSV_NOHEADER;
+		}
 		if (!output_file) {
 			err(EX_OSERR, "fopen(%s)", output_filename);
 		}
 	}
 	// FIXME: find out architecture from executable header e_flags?
-	const char* architecture = "unknown";
 	statcounters_dump_with_args(&diff_count, prog_basename, NULL,
 	    architecture, output_file, statcounters_format);
 	exit(WEXITSTATUS(status));
