@@ -62,9 +62,9 @@ static void
 usage(int exitcode)
 {
 	warnx("usage: beri_count_stats [-q/--quiet] [-v/--verbose] [-o file] <command>");
-	warnx("options:");
-	for (int i = 0; options[i].flag != 0; i++) {
-		warnx("  --%s/%c", options[i].name, options[i].val);
+	fprintf(stderr, "options:\n");
+	for (int i = 0; options[i].name != NULL; i++) {
+		fprintf(stderr, "  --%s/-%c\n", options[i].name, options[i].val);
 	}
 
 	exit(exitcode);
