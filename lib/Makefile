@@ -18,6 +18,7 @@ SUBDIR_BOOTSTRAP= \
 	${_libc_cheri} \
 	${_libcheri} \
 	${_libclang_rt} \
+	${_libunwind} \
 	${_libcplusplus} \
 	${_libcxxrt} \
 	libelf \
@@ -198,11 +199,16 @@ _libcplusplus+=	libc++fs
 .endif
 .endif
 
+.if ${MK_LLVM_LIBUNWIND} != "no"
+# When building with LLVM libunwind we must build libgcc_s/libgcc_eh as part
+# of SUBDIR_BOOTSTRAP to avoid build failures due to other libraries linking
+# against -lgcc_s
+_libunwind=	libgcc_s libgcc_eh
+.endif
+
 SUBDIR.${MK_EFI}+=	libefivar
 SUBDIR.${MK_GOOGLETEST}+=	googletest
 SUBDIR.${MK_LIBTHR}+=	libthr
-SUBDIR.${MK_LLVM_LIBUNWIND}+=	libgcc_eh
-SUBDIR.${MK_LLVM_LIBUNWIND}+=	libgcc_s
 SUBDIR.${MK_NAND}+=	libnandfs
 SUBDIR.${MK_NETGRAPH}+=	libnetgraph
 SUBDIR.${MK_NIS}+=	libypclnt
@@ -260,7 +266,6 @@ SUBDIR:=	${SUBDIR:Nlibc++experimental}
 SUBDIR+=	libmalloc_simple
 SUBDIR+=	libcheri_syscalls
 SUBDIR+=	libcheri_support
-SUBDIR_BOOTSTRAP:=	libgcc_s libgcc_eh ${SUBDIR_BOOTSTRAP}
 .endif
 
 .include <bsd.subdir.mk>
