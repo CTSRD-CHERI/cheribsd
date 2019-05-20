@@ -1188,7 +1188,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 static int
 get_argenv_ptr(void * __capability *arrayp, void * __capability *ptrp)
 {
-	uintptr_t ptr;
+	vaddr_t ptr;
 	char * __capability array;
 #if __has_feature(capabilities)
 	intcap_t ptr_c;
@@ -1646,7 +1646,13 @@ exec_copyout_strings(struct image_params *imgp)
 		execpath_len = 0;
 	p = imgp->proc;
 	szsigcode = 0;
+#ifdef CHERI_KERNEL
+	arginfo = (struct ps_strings *)cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
+	    CHERI_CAP_USER_DATA_LENGTH, p->p_sysent->sv_psstrings);
+#else
 	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
+#endif
 	if (p->p_sysent->sv_sigcode_base == 0) {
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);

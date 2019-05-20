@@ -1702,10 +1702,6 @@ vm_map_findspace(vm_map_t map, vm_offset_t start, vm_size_t length)
 	return (root->end);
 }
 
-/*
- * This requires that the start address is a valid capablity
- * for the requested length.
- */
 int
 vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_offset_t start, vm_size_t length, vm_prot_t prot,

@@ -98,10 +98,10 @@ __FBSDID("$FreeBSD$");
 static int __elfN(check_header)(const Elf_Ehdr *hdr);
 static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
     const char *interp, int32_t *osrel, uint32_t *fctl0);
-static int __elfN(load_file)(struct proc *p, const char *file, vm_ptr_t *addr,
-    vm_ptr_t *end_addr, vm_ptr_t *entry);
+static int __elfN(load_file)(struct proc *p, const char *file, u_long *addr,
+    u_long *end_addr, u_long *entry);
 static int __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
-    caddr_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot);
+    vm_offset_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot);
 static int __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp);
 static bool __elfN(freebsd_trans_osrel)(const Elf_Note *note,
     int32_t *osrel);
@@ -110,6 +110,8 @@ static boolean_t __elfN(check_note)(struct image_params *imgp,
     Elf_Brandnote *checknote, int32_t *osrel, uint32_t *fctl0);
 static vm_prot_t __elfN(trans_prot)(Elf_Word);
 static Elf_Word __elfN(untrans_prot)(vm_prot_t);
+static int __elfN(copyout)(vm_map_t map, caddr_t kaddr, vm_offset_t uaddr,
+    size_t sz);
 
 SYSCTL_NODE(_kern, OID_AUTO, __CONCAT(elf, __ELF_WORD_SIZE), CTLFLAG_RW, 0,
     "");
@@ -448,8 +450,24 @@ __elfN(check_header)(const Elf_Ehdr *hdr)
 }
 
 static int
+__elfN(copyout)(vm_map_t map, caddr_t kaddr, vm_offset_t uaddr, size_t sz)
+{
+	int error;
+
+#ifdef CHERI_KERNEL
+	caddr_t uaddr_cap = cheri_bound(
+	    cheri_setoffset(vm_map_rootcap(map), uaddr), sz);
+	error = copyout(kaddr, uaddr_cap, sz);
+#else
+	error = copyout_implicit_cap(kaddr, (caddr_t)uaddr, sz);
+#endif
+
+	return (error);
+}
+
+static int
 __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
-    vm_ptr_t start, vm_ptr_t end, vm_prot_t prot)
+    vm_offset_t start, vm_offset_t end, vm_prot_t prot)
 {
 	struct sf_buf *sf;
 	int error;
@@ -458,9 +476,8 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	/*
 	 * Create the page if it doesn't exist yet. Ignore errors.
 	 */
-	vm_map_fixed(map, NULL, 0, trunc_page(start), ptr_to_va(round_page(end)) -
-	    ptr_to_va(trunc_page(start)), VM_PROT_ALL, VM_PROT_ALL,
-	    MAP_CHECK_EXCL);
+	vm_map_fixed(map, NULL, 0, trunc_page(start), round_page(end) -
+	    trunc_page(start), VM_PROT_ALL, VM_PROT_ALL, MAP_CHECK_EXCL);
 
 	/*
 	 * Find the page from the underlying object.
@@ -470,8 +487,8 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		if (sf == NULL)
 			return (KERN_FAILURE);
 		off = offset - trunc_page(offset);
-		error = copyout_implicit_cap((caddr_t)sf_buf_kva(sf) + off,
-		    (caddr_t)start, ptr_to_va(end) - ptr_to_va(start));
+		error = __elfN(copyout)(map, (caddr_t)sf_buf_kva(sf) + off,
+		    start, end - start);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (KERN_FAILURE);
@@ -482,7 +499,7 @@ __elfN(map_partial)(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 
 static int
 __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
-    vm_ooffset_t offset, vm_ptr_t start, vm_ptr_t end, vm_prot_t prot,
+    vm_ooffset_t offset, vm_offset_t start, vm_offset_t end, vm_prot_t prot,
     int cow)
 {
 	struct sf_buf *sf;
@@ -490,30 +507,18 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 	vm_size_t sz;
 	int error, locked, rv;
 
-#ifdef CHERI_KERNEL
-	/*
-	 * It's necessary to fail if the capability provided does
-	 * cover the requested mapping size (permission?).
-	 * XXX-AM: end could just be an offset.
-	 */
-	KASSERT(cheri_valid(start) && cheri_valid(end) &&
-		cheri_getlen((void *)start) >= ptr_to_va(end) - ptr_to_va(start),
-		("Invalid capability for map_insert s=%d e=%d l=%d",
-		 cheri_valid(start), cheri_valid(end),
-		 cheri_getlen((void *)start) >= ptr_to_va(end) - ptr_to_va(start)));
-#endif
 	if (start != trunc_page(start)) {
 		rv = __elfN(map_partial)(map, object, offset, start,
 		    round_page(start), prot);
 		if (rv != KERN_SUCCESS)
 			return (rv);
-		offset += ptr_to_va(round_page(start)) - ptr_to_va(start);
+		offset += round_page(start) - start;
 		start = round_page(start);
 	}
 	if (end != round_page(end)) {
 		rv = __elfN(map_partial)(map, object, offset +
-		    ptr_to_va(trunc_page(end)) - ptr_to_va(start),
-		    trunc_page(end), end, prot);
+		    trunc_page(end) - start, trunc_page(end),
+		    end, prot);
 		if (rv != KERN_SUCCESS)
 			return (rv);
 		end = trunc_page(end);
@@ -525,8 +530,7 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 		 * The mapping is not page aligned.  This means that we have
 		 * to copy the data.
 		 */
-		rv = vm_map_fixed(map, NULL, 0, start,
-		    ptr_to_va(end) - ptr_to_va(start),
+		rv = vm_map_fixed(map, NULL, 0, start, end - start,
 		    prot | VM_PROT_WRITE, VM_PROT_ALL, MAP_CHECK_EXCL);
 		if (rv != KERN_SUCCESS)
 			return (rv);
@@ -537,11 +541,11 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 			if (sf == NULL)
 				return (KERN_FAILURE);
 			off = offset - trunc_page(offset);
-			sz = ptr_to_va(end) - ptr_to_va(start);
+			sz = end - start;
 			if (sz > PAGE_SIZE - off)
 				sz = PAGE_SIZE - off;
-			error = copyout_implicit_cap((caddr_t)sf_buf_kva(sf) + off,
-			    (caddr_t)start, sz);
+			error = __elfN(copyout)(map,
+			    (caddr_t)sf_buf_kva(sf) + off, start, end - start);
 			vm_imgact_unmap_page(sf);
 			if (error != 0)
 				return (KERN_FAILURE);
@@ -549,8 +553,7 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 		}
 	} else {
 		vm_object_reference(object);
-		rv = vm_map_fixed(map, object, offset, ptr_to_va(start),
-		    ptr_to_va(end) - ptr_to_va(start),
+		rv = vm_map_fixed(map, object, offset, start, end - start,
 		    prot, VM_PROT_ALL, cow | MAP_CHECK_EXCL);
 		if (rv != KERN_SUCCESS) {
 			locked = VOP_ISLOCKED(imgp->vp);
@@ -563,20 +566,15 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 	return (KERN_SUCCESS);
 }
 
-/*
- * XXX-AM: Do we assume that vmaddr has the correct permission or
- * we try to set them based on prot here?
- */
 static int
 __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
-    caddr_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot)
+    vm_offset_t vmaddr, size_t memsz, size_t filsz, vm_prot_t prot)
 {
 	struct sf_buf *sf;
 	size_t map_len;
 	vm_map_t map;
 	vm_object_t object;
-	vm_offset_t off;
-	vm_ptr_t map_addr;
+	vm_offset_t off, map_addr;
 	int error, rv, cow;
 	size_t copy_len;
 	vm_ooffset_t file_addr;
@@ -595,18 +593,10 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 		uprintf("elf_load_section: truncated ELF file\n");
 		return (ENOEXEC);
 	}
-#ifdef CHERI_KERNEL
-	/*
-	 * It's necessary to fail if the capability provided does
-	 * cover the requested mapping size (permission?).
-	 */
-	if (!cheri_gettag(vmaddr) || cheri_getlen(vmaddr) < memsz)
-		return (EINVAL);
-#endif
 
 	object = imgp->object;
 	map = &imgp->proc->p_vmspace->vm_map;
-	map_addr = trunc_page((vm_ptr_t)vmaddr);
+	map_addr = trunc_page(vmaddr);
 	file_addr = trunc_page(offset);
 
 	/*
@@ -651,8 +641,8 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 	 */
 	copy_len = filsz == 0 ? 0 : (offset + filsz) - trunc_page(offset +
 	    filsz);
-	map_addr = trunc_page((vm_ptr_t)vmaddr + filsz);
-	map_len = round_page((vm_ptr_t)vmaddr + memsz) - ptr_to_va(map_addr);
+	map_addr = trunc_page(vmaddr + filsz);
+	map_len = round_page(vmaddr + memsz) - map_addr;
 
 	/* This had damn well better be true! */
 	if (map_len != 0) {
@@ -669,8 +659,8 @@ __elfN(load_section)(struct image_params *imgp, vm_ooffset_t offset,
 
 		/* send the page fragment to user space */
 		off = trunc_page(offset + filsz) - trunc_page(offset + filsz);
-		error = copyout_implicit_cap((caddr_t)sf_buf_kva(sf) + off,
-		    (caddr_t)map_addr, copy_len);
+		error = __elfN(copyout)(map, (caddr_t)sf_buf_kva(sf) + off,
+		    map_addr, copy_len);
 		vm_imgact_unmap_page(sf);
 		if (error != 0)
 			return (error);
@@ -709,7 +699,7 @@ __elfN(load_sections)(struct image_params *imgp, const Elf_Ehdr *hdr,
 		/* Loadable segment */
 		prot = __elfN(trans_prot)(phdr[i].p_flags);
 		error = __elfN(load_section)(imgp, phdr[i].p_offset,
-		    (caddr_t)(uintptr_t)phdr[i].p_vaddr + rbase,
+		    (vm_offset_t)phdr[i].p_vaddr + rbase,
 		    phdr[i].p_memsz, phdr[i].p_filesz, prot);
 		if (error != 0)
 			return (error);
@@ -754,8 +744,8 @@ __elfN(load_sections)(struct image_params *imgp, const Elf_Ehdr *hdr,
  *
  */
 static int
-__elfN(load_file)(struct proc *p, const char *file, vm_ptr_t *addr,
-	vm_ptr_t *end_addr, vm_ptr_t *entry)
+__elfN(load_file)(struct proc *p, const char *file, u_long *addr,
+	u_long *end_addr, u_long *entry)
 {
 	struct {
 		struct nameidata nd;
@@ -767,10 +757,9 @@ __elfN(load_file)(struct proc *p, const char *file, vm_ptr_t *addr,
 	struct nameidata *nd;
 	struct vattr *attr;
 	struct image_params *imgp;
-	u_long flags;
-	vm_ptr_t rbase;
-	vm_ptr_t base_addr = 0;
-	vm_ptr_t max_addr = 0;
+	u_long flags, rbase;
+	u_long base_addr = 0;
+	u_long max_addr = 0;
 	int error;
 
 #ifdef CAPABILITY_MODE
@@ -850,12 +839,7 @@ again:
 	if (hdr->e_type == ET_DYN)
 		rbase = *addr;
 	else if (hdr->e_type == ET_EXEC) {
-#ifdef CHERI_KERNEL
-		rbase = (vm_ptr_t)cheri_setoffset(
-		    vm_map_rootcap(&imgp->proc->p_vmspace->vm_map), 0);
-#else
 		rbase = 0;
-#endif
 	}
 	else {
 		error = ENOEXEC;
@@ -1314,7 +1298,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 * calculation is that it leaves room for the heap to grow to
 	 * its maximum allowed size.
 	 */
-	addr = round_page((vm_ptr_t)vmspace->vm_daddr + lim_max(td,
+	addr = round_page((vm_offset_t)vmspace->vm_daddr + lim_max(td,
 	    RLIMIT_DATA));
 	/* Round up so signficant bits of rtld addresses aren't touched */
 	if (imgp->proc->p_sysent->sv_flags & SV_CHERI)
