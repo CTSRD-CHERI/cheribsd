@@ -68,11 +68,13 @@ struct SimpleExternalCallTrampoline {
 		static_assert(sizeof(this->code) == sizeof(simple_plt_code), "");
 		__builtin_memcpy(code, simple_plt_code, sizeof(simple_plt_code));
 	}
-	static const SimpleExternalCallTrampoline*
+	static SimpleExternalCallTrampoline*
 	create(const void* target_cgp, dlfunc_t target_func);
-	inline const void* pcc_value() const {
+	static SimpleExternalCallTrampoline*
+	create(const Obj_Entry* defobj, const Elf_Sym *sym);
+	inline dlfunc_t pcc_value() const {
 		const void* result = cheri_incoffset(this, offsetof(SimpleExternalCallTrampoline, code));
-		return cheri_clearperm(result, FUNC_PTR_REMOVE_PERMS);
+		return (dlfunc_t)cheri_clearperm(result, FUNC_PTR_REMOVE_PERMS);
 	}
 };
 
@@ -211,7 +213,7 @@ _mips_rtld_bind(void* _plt_stub)
 	}
 
 	dlfunc_t target = make_function_pointer(def, defobj);
-	const void* target_cgp = target_cgp_for_func(defobj, (void*)target);
+	const void* target_cgp = target_cgp_for_func(defobj, target);
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	// Should never be unrepresentable but can be NULL if a function doesn't
 	// use any globals
@@ -271,7 +273,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	// For rtld we don't subset $cgp!
 	// TODO: allow building rtld with per-function captable
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 && defined(notyet)
-	plt->rtld_cgp = target_cgp_for_func(rtldobj, (void*)&_rtld_bind_start);
+	plt->rtld_cgp = target_cgp_for_func(rtldobj, (dlfunc_t)&_rtld_bind_start);
 #else
 	plt->rtld_cgp = rtldobj->_target_cgp;
 #endif
@@ -591,10 +593,7 @@ CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 	s->name = strtab_value(obj, sym->st_name);
 #endif
 	dbg_assert(s->key == sym);
-	s->thunk = globalRwxAllocator.allocate<SimpleExternalCallTrampoline>();
-	dlfunc_t target_func = make_function_pointer(sym, defobj);
-	const void *target_cgp = target_cgp_for_func(defobj, (void*)target_func);
-	s->thunk->init(target_cgp, target_func);
+	s->thunk = SimpleExternalCallTrampoline::create(defobj, sym);
 	return s;
 };
 
@@ -618,11 +617,18 @@ CheriExports::getOrAddThunk(const Obj_Entry *defobj, const Elf_Sym *sym)
 	return s;
 }
 
-const SimpleExternalCallTrampoline*
+SimpleExternalCallTrampoline*
 SimpleExternalCallTrampoline::create(const void* target_cgp, dlfunc_t target_func) {
 	auto ret = globalRwxAllocator.allocate<SimpleExternalCallTrampoline>();
 	ret->init(target_cgp, target_func);
 	return ret;
+}
+
+SimpleExternalCallTrampoline*
+SimpleExternalCallTrampoline::create(const Obj_Entry* defobj, const Elf_Sym *sym) {
+	dlfunc_t target_func = make_function_pointer(sym, defobj);
+	const void *target_cgp = target_cgp_for_func(defobj, target_func);
+	return create(target_cgp, target_func);
 }
 
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
@@ -658,17 +664,15 @@ find_per_function_cgp(const Obj_Entry *obj, const void* func) {
 	return captable_subset; // FIXME: this is wrong!
 }
 
-extern "C" void add_cgp_stub_for_local_function(Obj_Entry *obj, const void** dest) {
-	const void* func = *dest;
-	dbg_cheri_plt_verbose("Replacing call to %-#p with trampoline.", func);
+extern "C" void add_cgp_stub_for_local_function(Obj_Entry *obj, dlfunc_t *dest) {
+	const dlfunc_t func = *dest;
+	dbg_cheri_plt_verbose("Replacing call to %-#p with trampoline.", (void*)func);
 	const void* target_cgp = target_cgp_for_func(obj, func);
-	auto trampoline = SimpleExternalCallTrampoline::create(target_cgp,
-	    (dlfunc_t)const_cast<void*>(func));
-	const void* trampoline_func = trampoline->pcc_value();
-	dbg_cheri_plt_verbose("Target cgp is %#-p, trampoline is %#p", target_cgp, trampoline_func);
+	auto trampoline = SimpleExternalCallTrampoline::create(target_cgp, func);
+	const dlfunc_t trampoline_func = trampoline->pcc_value();
+	dbg_cheri_plt_verbose("Target cgp is %#-p, trampoline is %#p", target_cgp, (void*)trampoline_func);
 	*dest = trampoline_func;
-	assert((cheri_getperm(*dest) & (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP)) == 0);
-
+	assert((cheri_getperm((void*)*dest) & (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP)) == 0);
 	return;
 }
 

@@ -874,7 +874,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     // rtld_start.S $cgp will be set up correctly. We could also pass another
     // reference argument and store obj_main->captable there but this is easier
     // and should have the same effect.
-    const void *entry_cgp = target_cgp_for_func(obj_main, obj_main->entry);
+    const void *entry_cgp = target_cgp_for_func(obj_main, (dlfunc_t)obj_main->entry);
     dbg_cheri("Setting initial $cgp for %s to %-#p", obj_main->path, entry_cgp);
     __asm__ volatile("cmove $cgp, %0" :: "C"(entry_cgp));
     assert(cheri_getperm(obj_main->entry) & CHERI_PERM_EXECUTE);

@@ -114,14 +114,14 @@ make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 /* Implemented as a C++ function to use std::lower_bound */
 const void* find_per_function_cgp(const struct Struct_Obj_Entry *obj, const void* func);
-void add_cgp_stub_for_local_function(Obj_Entry *obj, const void** dest);
+void add_cgp_stub_for_local_function(Obj_Entry *obj, dlfunc_t* dest);
 #endif
 
-static inline const void* target_cgp_for_func(const struct Struct_Obj_Entry *obj, const void* func)
+static inline const void* target_cgp_for_func(const struct Struct_Obj_Entry *obj, const dlfunc_t func)
 {
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	if (obj->per_function_captable)
-		return find_per_function_cgp(obj, func);
+		return find_per_function_cgp(obj, (const void*)func);
 #else
 	(void)func;
 #endif
