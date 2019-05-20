@@ -115,7 +115,7 @@ LEAF(rtld_start)
 	dli		t0, SFRAME_OBJP
 	cincoffset	$c5, $c11, t0			/* &objp */
 	csetbounds	$c5, $c5, t1
-	PIC_CALL(_rtld)		/* v0 = _rtld(auxargs, cleanup, objp) */
+	PIC_CALL(_rtld)		/* c3 = _rtld(auxargs, cleanup, objp) */
 
 	cmove		$c12, $c3
 	clc		$c3, zero, SFRAME_AUXARGS($c11)
