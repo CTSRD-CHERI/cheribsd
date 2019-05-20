@@ -223,7 +223,7 @@ _mips_rtld_bind(void* _plt_stub)
 	assert(cheri_gettag(target_cgp));
 #endif
 	dbg_cheri_plt_verbose("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
-	    defobj->strtab + def->st_name, (intmax_t)r_symndx, obj->path,
+	    symname(obj, r_symndx), (intmax_t)r_symndx, obj->path,
 	    (void *)plt_stub->trampoline.target, (void *)target);
 
 	if (!ld_bind_not) {
@@ -324,7 +324,7 @@ reloc_plt_bind_now(Obj_Entry *obj, int flags, const Obj_Entry *rtldobj __unused,
 		const Obj_Entry *defobj;
 		const Elf_Sym *def = find_symdef(r_symndx, obj, &defobj,
 		    SYMLOOK_IN_PLT | flags, NULL, lockstate);
-		if (def == NULL) {
+		if (__predict_false(def == NULL)) {
 			_rtld_error("Could not resolve symbol %s in PLT",
 			    symname(obj, r_symndx));
 			return (-1);
@@ -355,10 +355,13 @@ reloc_plt_bind_now(Obj_Entry *obj, int flags, const Obj_Entry *rtldobj __unused,
 			auto thunk = SimpleExternalCallTrampoline::create(defobj, def);
 			target = thunk->pcc_value();
 		}
-		dbg_cheri_plt("BIND_NOW: %p <-- %#p (%s)", where, target,
+		dbg_cheri_plt_verbose("BIND_NOW: %p <-- %#p (%s)", where, target,
 		    symname(obj, r_symndx));
 		*where = target;
 	}
+	dbg_cheri_plt("%s: done relocating %zd PLT entries.", obj->path,
+	    (size_t)(pltrellim - obj->pltrel));
+
 	obj->jmpslots_done = true;
 	return (0);
 }
@@ -412,7 +415,7 @@ reloc_plt(Obj_Entry *obj, bool bind_now, int flags __unused, const Obj_Entry *rt
 			return (-1);
 		}
 	}
-	dbg_cheri_plt("%s: done relocating %zd PLT entries: ", obj->path,
+	dbg_cheri_plt("%s: done relocating %zd PLT entries.", obj->path,
 	    obj->cheri_plt_stubs->count());
 #if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 3
 	for (size_t i = 0; i < obj->captable_size / sizeof(void*); i++) {
