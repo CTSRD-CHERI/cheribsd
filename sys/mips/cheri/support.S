@@ -61,8 +61,8 @@
  * c5 - pointer length copied (size_t)
  * a0 - maximum length
  */
-LEAF(copystr_c)
-XLEAF(copystr)
+LEAF(copystr)
+XLEAF(copystr_c)
 	li		v0, 0	/* Hopefully we succeed */
 	beqz		a0, cstr_return_toolong /* Return if zero-length. */
 	li		t1, 1	/* Length we will have copied in loop */
@@ -83,7 +83,8 @@ cstr_return_nul:	/* Store length read if c5 is non-NULL */
 cstr_return:
 	cjr	$c17
 	nop
-END(copystr_c)
+XEND(copystr_c)
+END(copystr)	
 
 /*
  * pure capability ABI-only versions of the support routines
@@ -315,7 +316,8 @@ END(memcpy)
  * c5 - pointer length copied
  * a0 - maximum length
  */
-NESTED(copyinstr_c, CALLFRAME_SIZ, ra)
+NESTED(copyinstr, CALLFRAME_SIZ, ra)
+XNESTED(copyinstr_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	cgetbase	t0, $c3 # make sure source is in userspace
 	bge	t0, zero, 1f
@@ -338,7 +340,8 @@ NESTED(copyinstr_c, CALLFRAME_SIZ, ra)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
-END(copyinstr_c)
+XEND(copyinstr_c)
+END(copyinstr)
 
 /*
  * Copy a null terminated string from the kernel address space into
@@ -375,6 +378,7 @@ XNESTED(copyoutstr_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	cjr	$c17
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
+XEND(copyoutstr_c)
 END(copyoutstr)
 
 /*
@@ -385,7 +389,8 @@ END(copyoutstr)
  * c4 - kernel destination pointer
  * a0 - length of the copy
  */
-NESTED(copyin_c, CALLFRAME_SIZ, ra)
+NESTED(copyin, CALLFRAME_SIZ, ra)
+XNESTED(copyin_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	cgetbase t0, $c3	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -409,7 +414,8 @@ NESTED(copyin_c, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 	cjr	$c17
 	move	v0, zero
-END(copyin_c)
+XEND(copyin_c)
+END(copyin)
 
 /*
  * Copy specified amount of data from user space into the kernel, preserving
@@ -445,6 +451,7 @@ XNESTED(copyincap_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 	cjr	$c17
 	move	v0, zero
+XEND(copyincap_c)
 END(copyincap)
 
 /*
@@ -455,7 +462,8 @@ END(copyincap)
  * c4 - user destination pointer
  * a0 - length of the copy
  */
-NESTED(copyout_c, CALLFRAME_SIZ, ra)
+NESTED(copyout, CALLFRAME_SIZ, ra)
+XNESTED(copyout_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	cgetbase t0, $c4	# make sure source is in userspace
 	bge	t0, zero, 1f
@@ -479,7 +487,8 @@ NESTED(copyout_c, CALLFRAME_SIZ, ra)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 	cjr	$c17
 	move	v0, zero
-END(copyout_c)
+XEND(copyout_c)
+END(copyout)
 
 /*
  * Copy specified amount of data from kernel to the user space, preserving
@@ -515,6 +524,7 @@ XNESTED(copyoutcap_c)
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, CALLFRAME_SIZ
 	cjr	$c17
 	move	v0, zero
+XEND(copyoutcap_c)
 END(copyoutcap)
 
 LEAF(copyerr)
@@ -535,6 +545,7 @@ END(copyerr)
  */
 LEAF(fueword64_c)
 XLEAF(fueword_c)
+XLEAF(fueword)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
@@ -551,9 +562,12 @@ XLEAF(fueword_c)
 1:
 	cjr	$c2	# fswberr
 	nop
+XEND(fueword)
+XEND(fueword_c)
 END(fueword64_c)
 
-LEAF(fueword32_c)
+LEAF(fueword32)
+XLEAF(fueword32_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
@@ -570,9 +584,11 @@ LEAF(fueword32_c)
 1:
 	cjr	$c2
 	nop
-END(fueword32_c)
+XEND(fueword32_c)
+END(fueword32)
 
-LEAF(fuesword_c)
+LEAF(fuesword)
+XLEAF(fuesword_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
@@ -588,9 +604,11 @@ LEAF(fuesword_c)
 1:
 	cjr	$c2	# fswberr
 	nop
-END(fuesword_c)
+XEND(fuesword_c)
+END(fuesword)
 
-LEAF(fubyte_c)
+LEAF(fubyte)
+XLEAF(fubyte_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
@@ -604,7 +622,8 @@ LEAF(fubyte_c)
 1:
 	cjr	$c2	# fswberr
 	nop
-END(fubyte_c)
+XEND(fubyte_c)
+END(fubyte)
 
 LEAF(fuecap)
 	cgetaddr	t0, $c3
@@ -627,6 +646,8 @@ END(fuecap)
 
 LEAF(suword64_c)
 XLEAF(suword_c)
+XLEAF(suword64)
+XLEAF(suword)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
@@ -641,9 +662,13 @@ XLEAF(suword_c)
 1:
 	cjr	$c2	# fswberr
 	nop
+XEND(suword)
+XEND(suword64)	
+XEND(suword_c)
 END(suword64_c)
 
-LEAF(suword32_c)
+LEAF(suword32)
+XLEAF(suword32_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
@@ -658,7 +683,8 @@ LEAF(suword32_c)
 1:
 	cjr	$c2	# fswberr
 	nop
-END(suword32_c)
+XEND(suword32_c)
+END(suword32)
 
 /*
  * casueword_c(9)
@@ -670,7 +696,8 @@ END(suword32_c)
  * <v0>uint32_t casueword32_c(<c3>uint32_t *p, <a0>uint32_t oldval,
  *     <c4>int32_t *oldval_p, <a1>uint32_t newval);
  */
-LEAF(casueword32_c)
+LEAF(casueword32)
+XLEAF(casueword32_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
@@ -698,10 +725,12 @@ LEAF(casueword32_c)
 1:
 	cjr	$c2	# fswberr
 	nop
-END(casueword32_c)
+XEND(casueword32_c)
+END(casueword32)
 
 LEAF(casueword64_c)
 XLEAF(casueword_c)
+XLEAF(casueword)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
@@ -729,12 +758,15 @@ XLEAF(casueword_c)
 1:
 	cjr	$c2	# fswberr
 	nop
+XEND(casueword)
+XEND(casueword_c)
 END(casueword64_c)
 
 /*
  * Will have to flush the instruction cache if byte merging is done in hardware.
  */
-LEAF(susword_c)
+LEAF(susword)
+XLEAF(susword_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
@@ -750,9 +782,11 @@ LEAF(susword_c)
 1:
 	cjr	$c2	# fswberr
 	nop
-END(susword_c)
+XEND(susword_c)
+END(susword)
 
-LEAF(subyte_c)
+LEAF(subyte)
+XLEAF(subyte_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
@@ -768,7 +802,8 @@ LEAF(subyte_c)
 1:
 	cjr	$c2	# fswberr
 	nop
-END(subyte_c)
+XEND(subyte_c)
+END(subyte)
 
 LEAF(fswberr)
 	cjr	$c17
