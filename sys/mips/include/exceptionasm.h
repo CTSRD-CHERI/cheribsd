@@ -137,12 +137,16 @@
 	SAVE_U_PCB_REG(a2, BADVADDR, pcb)	; \
 	SAVE_U_PCB_REG(a3, PC, pcb)
 
-#define	RESTORE_REGS_FROM_PCB(pcb)		\
+/*
+ * Note: tmpcreg must be a temporary capability register.
+ * This sets k0 to the restored status register.
+ */
+#define	RESTORE_REGS_FROM_PCB(pcb, tmpcreg)	  \
 	RESTORE_U_PCB_REG(t0, MULLO, pcb)	; \
 	RESTORE_U_PCB_REG(t1, MULHI, pcb)	; \
 	mtlo	t0				; \
 	mthi	t1				; \
-	RESTORE_U_PCB_PC(a0, t0, pcb)		; \
+	RESTORE_U_PCB_PC(a0, tmpcreg, pcb)	; \
 	RESTORE_U_PCB_REG(v0, V0, pcb)		; \
 	RESTORE_U_PCB_REG(v1, V1, pcb)		; \
 	RESTORE_U_PCB_REG(a0, A0, pcb)		; \

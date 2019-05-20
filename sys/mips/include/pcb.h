@@ -235,12 +235,16 @@
  * All kernel code updates the PC value and not PCC (which effectively only
  * contains the bounds). This means we need to update the offset of PCC to
  * value of PC - PCC.base before writing to EPCC.
+ *
+ * pc_vaddr_tmpreg: u_long register used for the pc offset.
+ * tmpcreg: this is a capability temporary register.
+ * pcb: pointer to the PCB structure.
  */
-#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpreg2, pcb)			\
+#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpcreg, pcb)			\
 	/* EPCC is no longer a GPR so load it into KR1C first */	\
-	RESTORE_U_PCB_CREG(CHERI_REG_KR1C, PCC, pcb);			\
+	RESTORE_U_PCB_CREG(tmpcreg, PCC, pcb);				\
 	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
-	RESTORE_EPCC(CHERI_REG_KR1C, pc_vaddr_tmpreg, tmpreg2)
+	RESTORE_EPCC(tmpcreg, pc_vaddr_tmpreg)
 #else
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, unused_reg, pcb)	\

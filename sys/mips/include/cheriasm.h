@@ -246,7 +246,7 @@
 	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)
 
 
-#define RESTORE_EPCC(capreg, pc_vaddr, tmpreg)			\
+#define RESTORE_EPCC(capreg, pc_vaddr)				\
 	/* update the address of EPCC to the return pc */ 	\
 	CSetOffset capreg, capreg, pc_vaddr;			\
 	CSetEPCC capreg;

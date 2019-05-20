@@ -109,7 +109,7 @@ LEAF(fork_trampoline)
 	RESTORE_U_PCB_REG(t1, MULHI, k1)
 	mtlo	t0
 	mthi	t1
-	RESTORE_U_PCB_PC(a0, t0, k1)	# set return address
+	RESTORE_U_PCB_PC(a0, CHERI_REG_KR1C, k1)	# set return address
 	RESTORE_U_PCB_REG(AT, AST, k1)
 	RESTORE_U_PCB_REG(v0, V0, k1)
 

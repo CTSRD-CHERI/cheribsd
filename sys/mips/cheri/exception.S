@@ -218,7 +218,7 @@ VECTOR_END(MipsTLBMiss)
  * Context and XContext registers.  That is really what it was designed for.
  *----------------------------------------------------------------------------
  */
- 	.set push
+	.set push
 	.set noat
 MipsDoTLBMiss:
 	bltz		k0, 1f				#02: k0<0 -> 1f (kernel fault)
@@ -795,13 +795,13 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	and	a1, a1, ~MIPS_SR_INT_MASK
 	or	a1, a1, a0
 	SAVE_U_PCB_REG(a1, SR, CHERI_REG_KR1C)
+	/* This also sets k0 from PCB */
+	RESTORE_REGS_FROM_PCB(CHERI_REG_KR1C, CHERI_REG_KR2C)
 	/*
 	 * Note: This does not restore EPCC, since that is restored by
-	 * RESTORE_U_PCB_PC() (inside RESTORE_REGS_FROM_PCB) below.
+	 * RESTORE_U_PCB_PC() (inside RESTORE_REGS_FROM_PCB) above.
 	 */
-	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, t0)
-	/* This also sets k0 from PCB */
-	RESTORE_REGS_FROM_PCB(CHERI_REG_KR1C)
+	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, k1)
 
 	mtc0	k0, MIPS_COP_0_STATUS	# still exception level
 	ITLBNOPFIX
@@ -1008,6 +1008,7 @@ END(MipsKernIntr)
 	SAVE_U_PCB_REG(a1, CAUSE, pcb);			\
 	SAVE_U_PCB_REG(a3, PC, pcb)
 
+/* Note: this trashes KR2C */
 #define RESTORE_UINTR_PCB_REGS(pcb)			\
 	RESTORE_U_PCB_REG(s0, S0, pcb);			\
 	RESTORE_U_PCB_REG(s1, S1, pcb);			\
@@ -1023,7 +1024,7 @@ END(MipsKernIntr)
 	RESTORE_U_PCB_REG(t2, PC, pcb);			\
 	mtlo	t0;					\
 	mthi	t1;					\
-	RESTORE_U_PCB_PC(t2, t0, pcb)/* set return address */;	\
+	RESTORE_U_PCB_PC(t2, CHERI_REG_KR2C, pcb)/* set return address */;	\
 	RESTORE_U_PCB_REG(v0, V0, pcb);			\
 	RESTORE_U_PCB_REG(v1, V1, pcb);			\
 	RESTORE_U_PCB_REG(a0, A0, pcb);			\
@@ -1125,12 +1126,8 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 
 	SAVE_U_PCB_REG(a1, SR, CHERI_REG_KR1C)
 
-	/*
-	 * Note: This does not restore EPCC, since that is restored by
-	 * RESTORE_U_PCB_PC() below.
-	 */
-	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, t0)
 	RESTORE_UINTR_PCB_REGS(CHERI_REG_KR1C)
+	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, k1)
 
 	mtc0	k0, MIPS_COP_0_STATUS	# SR with EXL set.
 	ITLBNOPFIX

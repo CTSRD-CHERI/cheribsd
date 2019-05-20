@@ -117,17 +117,12 @@ LEAF(fork_trampoline)
 	GET_CPU_PCPU(CHERI_REG_KR1C, k1)
 	clc CHERI_REG_KR1C, zero, PC_CURPCB(CHERI_REG_KR1C)
 
-	/*
-	 * Note: This restores does not restore EPCC, since that is restored
-	 * by RESTORE_U_PCB_PC() below.
-	 */
-	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, t0)
-
 	RESTORE_U_PCB_REG(t0, MULLO, CHERI_REG_KR1C)
 	RESTORE_U_PCB_REG(t1, MULHI, CHERI_REG_KR1C)
 	mtlo	t0
 	mthi	t1
-	RESTORE_U_PCB_PC(a0, t0, CHERI_REG_KR1C) # set return address
+	/* Note: this trashes KR2C. */
+	RESTORE_U_PCB_PC(a0, CHERI_REG_KR2C, CHERI_REG_KR1C) # set return address
 	RESTORE_U_PCB_REG(a0, PC, CHERI_REG_KR1C)
 	RESTORE_U_PCB_REG(AT, AST, CHERI_REG_KR1C)
 	RESTORE_U_PCB_REG(v0, V0, CHERI_REG_KR1C)
@@ -160,6 +155,13 @@ LEAF(fork_trampoline)
 	RESTORE_U_PCB_REG(s8, S8, CHERI_REG_KR1C)
 	RESTORE_U_PCB_REG(ra, RA, CHERI_REG_KR1C)
 	RESTORE_U_PCB_REG(sp, SP, CHERI_REG_KR1C)
+
+	/*
+	 * Note: This restores does not restore EPCC, since that is restored
+	 * by RESTORE_U_PCB_PC() above.
+	 */
+	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, k1)
+
 	li	k1, ~MIPS_SR_INT_MASK
 	and	k0, k0, k1
 	mfc0	k1, MIPS_COP_0_STATUS
