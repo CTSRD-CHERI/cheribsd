@@ -3250,15 +3250,19 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 
 	/* Process the PLT relocations. */
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (reloc_plt(obj, rtldobj) == -1)
+	/* No reloc_jmpslots for CHERI since it works differently: if BIND_NOW
+	 * is set, reloc_plt can avoid allocating trampolines for pc-rel code */
+	if (reloc_plt(obj, (obj->bind_now || bind_now), flags, rtldobj,
+	    lockstate) == -1)
+		return (-1);
 #else
 	if (reloc_plt(obj, flags, lockstate) == -1)
-#endif
 		return (-1);
 	/* Relocate the jump slots if we are doing immediate binding. */
 	if ((obj->bind_now || bind_now) && reloc_jmpslots(obj, flags,
 	    lockstate) == -1)
 		return (-1);
+#endif
 
 	if (!obj->mainprog && obj_enforce_relro(obj) == -1)
 		return (-1);

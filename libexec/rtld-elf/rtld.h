@@ -520,7 +520,8 @@ int do_copy_relocations(Obj_Entry *);
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,
     struct Struct_RtldLockState *);
 #ifdef __CHERI_PURE_CAPABILITY__
-int reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj);
+int reloc_plt(Obj_Entry *obj, bool bind_now, int flags, const Obj_Entry *rtldobj,
+    struct Struct_RtldLockState *lockstate);
 #else
 int reloc_plt(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 #endif

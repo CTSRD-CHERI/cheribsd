@@ -295,15 +295,63 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	return true;
 }
 
-
-/*
- * LD_BIND_NOW was set - force relocation for all jump slots
- */
-extern "C" int
-reloc_jmpslots(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
+static int
+reloc_plt_bind_now(Obj_Entry *obj, int flags, const Obj_Entry *rtldobj __unused,
+    RtldLockState *lockstate)
 {
-	// FIXME: this needs changes in LLD to emit DT_PLTRELSZ/DT_JMPREL
-	/* Do nothing. TODO: needed once we have lazy binding */
+	dbg_cat(PLT, "BIND_NOW PLT relocation processing for %s", obj->path);
+	// Trampolines are only needed if we reference a non-pcrel DSO.
+	// Otherwise we can just write the target function pointer to the
+	// captable directly.
+	const Elf_Rel *pltrellim =
+	    (const Elf_Rel *)((const char *)obj->pltrel + obj->pltrelsize);
+	for (const Elf_Rel *rel = obj->pltrel; rel < pltrellim; rel++) {
+		dlfunc_t *where = (dlfunc_t *)(obj->relocbase + rel->r_offset);
+		// Target should be inside the captable:
+		dbg_assert(cheri_is_address_inbounds(
+		    obj->writable_captable, cheri_getaddress(where)));
+
+		Elf_Word r_symndx = ELF_R_SYM(rel->r_info);
+		Elf_Word r_type = ELF_R_TYPE(rel->r_info);
+		// .rel.plt should only ever contain CHERI_CAPABILITY_CALL!
+		if ((r_type & 0xff) != R_TYPE(CHERI_CAPABILITY_CALL)) {
+			_rtld_error("Unknown relocation type %x in PLT",
+			    (unsigned int)r_type);
+			return (-1);
+		}
+		const Obj_Entry *defobj;
+		const Elf_Sym *def = find_symdef(r_symndx, obj, &defobj,
+		    SYMLOOK_IN_PLT | flags, NULL, lockstate);
+		if (def == NULL) {
+			_rtld_error("Could not resolve symbol %s in PLT",
+			    symname(obj, r_symndx));
+			return (-1);
+		}
+		if (__predict_false(ELF_ST_TYPE(def->st_info) != STT_FUNC)) {
+			if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
+				obj->gnu_ifunc = true;
+				_rtld_error("IFUNC not suported yet! Symbol %s "
+				    "in PLT", symname(obj, r_symndx));
+			} else {
+				_rtld_error("Unsupported type %x! Symbol %s "
+				    "in PLT", ELF_ST_TYPE(def->st_info),
+				    symname(obj, r_symndx));
+			}
+			return (-1);
+		}
+		if (__predict_true(
+			obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL)) {
+			// No trampoline need for PCREL
+			// TODO: can we have any addends for plt relocations?
+			dlfunc_t target = make_function_pointer(def, defobj);
+			dbg_cheri_plt("BIND_NOW: %p <-- %#p (%s)", where,
+			    target, symname(obj, r_symndx));
+			*where = target;
+		} else {
+			// FIXME: implement this
+			rtld_fatal("NOT IMPLEMENTED yet for non-pcrel ABI!");
+		}
+	}
 	obj->jmpslots_done = true;
 	return (0);
 }
@@ -312,7 +360,8 @@ reloc_jmpslots(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __un
  *  Process the PLT relocations.
  */
 extern "C" int
-reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
+reloc_plt(Obj_Entry *obj, bool bind_now, int flags __unused, const Obj_Entry *rtldobj,
+    RtldLockState *lockstate __unused)
 {
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	if (obj->captable_mapping) {
@@ -324,6 +373,10 @@ reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 		    }));
 	}
 #endif
+
+	if (bind_now) {
+		return reloc_plt_bind_now(obj, flags, rtldobj, lockstate);
+	}
 
 	// FIXME: this needs changes in LLD to emit DT_PLTRELSZ/DT_JMPREL
 	// TODO: assert(!obj->cheri_plt_stubs)
@@ -360,6 +413,7 @@ reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 		    &obj->writable_captable[i], obj->writable_captable[i].value);
 	}
 #endif
+
 	return (0);
 }
 
