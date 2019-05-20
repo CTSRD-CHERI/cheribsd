@@ -419,8 +419,20 @@ find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 	// This should be called with a global RTLD lock held so there should
 	// not be any races.
 	// FIXME: verify that this assumption is correct
-	dbg_cheri_plt_verbose("Looking for %s thunk (found in obj %s): %-#p",
-	    strtab_value(obj, symbol->st_name), obj->path, symbol);
+	dbg_cheri_plt_verbose("Looking for %s() thunk (found in obj %s): 0x%jx",
+	    strtab_value(obj, symbol->st_name), obj->path, (uintmax_t)symbol->st_value);
+	if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL) {
+		// PC-relative ABI does not need thunks for function pointers
+		// since $cgp can be derived from $pcc/$c12.
+		dlfunc_t result = make_function_pointer(symbol, obj);
+		// TODO: return a sentry!
+		dbg_cheri_plt_verbose("  Do not need %s() thunk in pc-relative "
+		    "ABI, returning raw pointer to function: %-#p",
+		    strtab_value(obj, symbol->st_name), (void*)result);
+		return result;
+	}
+	// Otherwise, we need to add a UNIQUE call trampoline (since function
+	// pointers to the same function MUST compare equal).
 	if (!obj->cheri_exports) {
 		// Use placement-new here to use rtld xmalloc() instead of malloc
 		// FIXME: const_cast should not be needed
