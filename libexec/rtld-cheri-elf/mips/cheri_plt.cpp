@@ -341,18 +341,23 @@ reloc_plt_bind_now(Obj_Entry *obj, int flags, const Obj_Entry *rtldobj __unused,
 			}
 			return (-1);
 		}
+		dlfunc_t target;
 		if (__predict_true(
 			obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL)) {
 			// No trampoline need for PCREL
 			// TODO: can we have any addends for plt relocations?
-			dlfunc_t target = make_function_pointer(def, defobj);
-			dbg_cheri_plt("BIND_NOW: %p <-- %#p (%s)", where,
-			    target, symname(obj, r_symndx));
-			*where = target;
+			target = make_function_pointer(def, defobj);
 		} else {
-			// FIXME: implement this
-			rtld_fatal("NOT IMPLEMENTED yet for non-pcrel ABI!");
+			// PLT ABI needs a thunk that loads the right $cgp
+			// TODO: could skip this thunk if defobj == obj since
+			// they will only ever be invoked from a context where
+			// we have the correct $cgp for this DSO.
+			auto thunk = SimpleExternalCallTrampoline::create(defobj, def);
+			target = thunk->pcc_value();
 		}
+		dbg_cheri_plt("BIND_NOW: %p <-- %#p (%s)", where, target,
+		    symname(obj, r_symndx));
+		*where = target;
 	}
 	obj->jmpslots_done = true;
 	return (0);
