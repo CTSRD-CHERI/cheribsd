@@ -86,6 +86,11 @@ struct cheri_frame {
 	void * __capability	cf_c24;
 	void * __capability	cf_c25;
 	void * __capability	cf_idc;
+	void * __capability	cf_c27;
+	void * __capability	cf_c28;
+	void * __capability	cf_c29;
+	void * __capability	cf_c30;
+	void * __capability	cf_c31;
 #else
 	struct chericap	cf_c1, cf_c2, cf_c3, cf_c4;
 	struct chericap	cf_c5, cf_c6, cf_c7;
@@ -93,6 +98,7 @@ struct cheri_frame {
 	struct chericap	cf_c13, cf_c14, cf_c15, cf_c16, cf_c17;
 	struct chericap	cf_c18, cf_c19, cf_c20, cf_c21, cf_c22;
 	struct chericap cf_c23, cf_c24, cf_c25, cf_idc;
+	struct chericap	cf_c27, cf_c28, cf_c29, cf_c30, cf_c31;
 #endif
 
 	/*

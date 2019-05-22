@@ -51,8 +51,8 @@
 #include <machine/vmparam.h>
 
 CTASSERT(sizeof(void * __capability) == CHERICAP_SIZE);
-/* 28 capability registers + capcause + padding. */
-CTASSERT(sizeof(struct cheri_frame) == (29 * CHERICAP_SIZE));
+/* 33 capability registers + capcause + capvalid + padding. */
+CTASSERT(sizeof(struct cheri_frame) == (34 * CHERICAP_SIZE));
 
 /*
  * Beginnings of a programming interface for explicitly managing capability

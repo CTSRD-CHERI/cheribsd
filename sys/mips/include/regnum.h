@@ -197,10 +197,15 @@
 #define	C24		(CHERIBASE + 24 * CHERIREGOFFSIZE)
 #define	C25		(CHERIBASE + 25 * CHERIREGOFFSIZE)
 #define	IDC		(CHERIBASE + 26 * CHERIREGOFFSIZE)
-#define	PCC		(CHERIBASE + 27 * CHERIREGOFFSIZE)
-#define	CAPCAUSE	(CHERIBASE + 28 * CHERIREGOFFSIZE)
+#define	C27		(CHERIBASE + 27 * CHERIREGOFFSIZE)
+#define	C28		(CHERIBASE + 28 * CHERIREGOFFSIZE)
+#define	C29		(CHERIBASE + 29 * CHERIREGOFFSIZE)
+#define	C30		(CHERIBASE + 30 * CHERIREGOFFSIZE)
+#define	C31		(CHERIBASE + 31 * CHERIREGOFFSIZE)
+#define	PCC		(CHERIBASE + 32 * CHERIREGOFFSIZE)
+#define	CAPCAUSE	(CHERIBASE + 33 * CHERIREGOFFSIZE)
 
-#define	NUMCHERISAVEREGS	29	/* Plenty of alignment already. */
+#define	NUMCHERISAVEREGS	34	/* Plenty of alignment already. */
 
 /*
  * Index of FP registers in 'struct frame', counting from the beginning
