@@ -429,11 +429,11 @@ SlowFault:
 	csd	reg, treg, 0(cregbase)
 
 #define	SAVE_CHERI(treg0, treg1)				\
-	/* Save C27 (KR1C) before it gets overwritten. */	\
+	/* Save C27 (KSCRATCH1) before it gets overwritten. */	\
 	SAVE_CREG(CHERI_REG_C27, sp, C27, $ddc);	\
 	/* $ddc should no longer be accessed using $c0 */	\
-	CGetDefault CHERI_REG_KR1C;				\
-	SAVE_CREG(CHERI_REG_KR1C, sp, DDC, $ddc);	\
+	CGetDefault CHERI_REG_KSCRATCH1;		\
+	SAVE_CREG(CHERI_REG_KSCRATCH1, sp, DDC, $ddc);	\
 	SAVE_CREG(CHERI_REG_C1, sp, C1, $ddc);		\
 	SAVE_CREG(CHERI_REG_C2, sp, C2, $ddc);		\
 	SAVE_CREG(CHERI_REG_C3, sp, C3, $ddc);		\
@@ -464,9 +464,9 @@ SlowFault:
 	SAVE_CREG(CHERI_REG_C29, sp, C29, $ddc);	\
 	SAVE_CREG(CHERI_REG_C30, sp, C30, $ddc);	\
 	SAVE_CREG(CHERI_REG_C31, sp, C31, $ddc);	\
-	/* EPCC is no longer a GPR so load it into KR1C first */\
-	CGetEPCC CHERI_REG_KR1C;				\
-	SAVE_CREG(CHERI_REG_KR1C, sp, PCC, $ddc);	\
+	/* EPCC is no longer a GPR so load it into KSCRATCH1 first */\
+	CGetEPCC CHERI_REG_KSCRATCH1;			\
+	SAVE_CREG(CHERI_REG_KSCRATCH1, sp, PCC, $ddc);	\
 	cgetcause	treg0;					\
 	SAVE_CAPCAUSE(treg0, treg1, sp, CAPCAUSE, $ddc)
 #else
@@ -558,8 +558,8 @@ SlowFault:
  */
 #define	RESTORE_CHERI						\
 	/* $ddc should no longer be accessed using $c0 */	\
-	RESTORE_CREG(CHERI_REG_KR1C, sp, DDC, $ddc);	\
-	CSetDefault CHERI_REG_KR1C;				\
+	RESTORE_CREG(CHERI_REG_KSCRATCH1, sp, DDC, $ddc);	\
+	CSetDefault CHERI_REG_KSCRATCH1;		\
 	RESTORE_CREG(CHERI_REG_C1, sp, C1, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C2, sp, C2, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C3, sp, C3, $ddc);	\
@@ -594,10 +594,10 @@ SlowFault:
 
 /* For CHERI we don't move $v0 to EPC since it is already updated by CSetEPCC */
 #define MTC0_EXC_PC(reg) \
-	/* EPCC is no longer a GPR so load it into KR1C first */	\
-	RESTORE_CREG(CHERI_REG_KR1C, sp, PCC, $ddc);			\
+	/* EPCC is no longer a GPR so load it into KSCRATCH1 first */	\
+	RESTORE_CREG(CHERI_REG_KSCRATCH1, sp, PCC, $ddc);		\
 	/* update the address of EPCC to the return pc */ 		\
-	RESTORE_EPCC(CHERI_REG_KR1C, reg, t0);
+	RESTORE_EPCC(CHERI_REG_KSCRATCH1, reg, t0);
 #else
 #define	RESTORE_CHERI
 #define MTC0_EXC_PC(reg) MTC0	reg, MIPS_COP_0_EXC_PC
