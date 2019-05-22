@@ -208,6 +208,9 @@ static struct cheri_operand_info cheri_three_op_info[64] = {
 
 	/* 0x20 */ {"ctestsubset", COPT_GPR, COPT_CAP, COPT_CAP },
 	/* 0x21 */ {"cnexeq", COPT_GPR, COPT_CAP, COPT_CAP },
+	/* 0x22 */ {"csetaddr", COPT_CAP, COPT_CAP, COPT_GPR },
+	/* 0x23 */ {"cgetandaddr", COPT_GPR, COPT_CAP, COPT_GPR },
+	/* 0x24 */ {"candddr", COPT_CAP, COPT_CAP, COPT_GPR },
 };
 
 static struct cheri_operand_info cheri_two_op_info[32] = {
