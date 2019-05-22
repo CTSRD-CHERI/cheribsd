@@ -409,8 +409,8 @@ md_printins(int ins, int mdbdot)
 
 #ifdef CPU_CHERI
 	case OP_JALX:
-		db_printf("clcbi\t%s, %d(%s)", c2_reg[i.IType.rt],
-			(short)i.IType.imm * 16, c2_reg[i.IType.rs]);
+		db_printf("clcbi\t%s, %d(%s)", c2_reg[i.IType.rs],
+			(short)i.IType.imm * 16, c2_reg[i.IType.rt]);
 		break;
 	case OP_COP2: {
 		int ops = -1;
