@@ -587,7 +587,7 @@ SlowFault:
 	RESTORE_CREG(CHERI_REG_C25, sp, C25, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C26, sp, IDC, $ddc);	\
 	/* Explicitly don't restore C27. */		\
-	/* Explicitly don't restore C28 ($sec0). */	\
+	RESTORE_CREG(CHERI_REG_C28, sp, C28, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C29, sp, C29, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C30, sp, C30, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C31, sp, C31, $ddc);	\
