@@ -1936,10 +1936,6 @@ bf_insns_get_ptr(void *fpp)
 static int
 bpf_setf(struct bpf_d *d, struct bpf_program *fp, u_long cmd)
 {
-#ifdef COMPAT_FREEBSD32
-	struct bpf_program fp_swab;
-	struct bpf_program32 *fp32;
-#endif
 	struct bpf_program_buffer *fcode;
 	struct bpf_insn *filter;
 #ifdef BPF_JITTER
