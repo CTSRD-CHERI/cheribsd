@@ -671,27 +671,6 @@ struct cheri_kframe {
 } while (0)
 
 /*
- * Utility functions for the kernel -- as they depend on $kdc.
- */
-#ifdef _KERNEL
-static inline void
-cheri_capability_load(u_int crn_to, struct chericap *cp)
-{
-
-       CHERI_CLC(crn_to, CHERI_CR_KDC, cp, 0);
-}
-
-static inline void
-cheri_capability_setoffset(struct chericap *cp, register_t offset)
-{
-
-	CHERI_CLC(CHERI_CR_CTEMP0, CHERI_CR_KDC, cp, 0);
-	CHERI_CSETOFFSET(CHERI_CR_CTEMP0, CHERI_CR_CTEMP0, offset);
-	CHERI_CSC(CHERI_CR_CTEMP0, CHERI_CR_KDC, (register_t)cp, 0);
-}
-#endif
-
-/*
  * CHERI-MIPS-specific kernel utility functions.
  */
 #ifdef _KERNEL
