@@ -161,7 +161,6 @@
 #define	TA3	15
 #endif
 
-#ifdef CPU_CHERI
 /*
  * Load/store offsets for saved registers are with respect to the basic
  * register size (8 bytes on CHERI), not the CHERI capability register size
@@ -202,7 +201,6 @@
 #define	CAPCAUSE	(CHERIBASE + 28 * CHERIREGOFFSIZE)
 
 #define	NUMCHERISAVEREGS	29	/* Plenty of alignment already. */
-#endif
 
 /*
  * Index of FP registers in 'struct frame', counting from the beginning
