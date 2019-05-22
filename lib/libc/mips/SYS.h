@@ -110,11 +110,18 @@
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 #ifdef __PIC__
 # define PIC_PROLOGUE(x)
-# define PIC_LOAD_CODE_PTR(capreg, gpr, l)		\
+# if defined(__CHERI_CAPABILITY_TABLE__) && __CHERI_CAPABILITY_TABLE__ != 3
+/* Cannot derive the target from $pcc with tight code bounds -> use captable: */
+#  define PIC_LOAD_CODE_PTR(capreg, gpr, l)		\
+	clcbi		capreg, %captab20(l)($cgp);
+# else
+/* Legacy/PC-relative ABI -> can derive the target using $pcc */
+#  define PIC_LOAD_CODE_PTR(capreg, gpr, l)		\
 	lui		gpr, %pcrel_hi(l - 8);		\
 	daddiu		gpr, gpr, %pcrel_lo(l - 4);	\
 	cgetpcc		capreg;				\
 	cincoffset	capreg, capreg, gpr;
+# endif
 # define PIC_TAILCALL(l)				\
 	PIC_LOAD_CODE_PTR($c12, t9, _C_LABEL(l))	\
 	cjr $c12;
