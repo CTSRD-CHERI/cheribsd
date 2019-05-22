@@ -68,10 +68,10 @@
 #define	CHERI_REG_C25	$c25
 #define	CHERI_REG_C26	$c26	/* Invoked data capability. */
 #define	CHERI_REG_IDC	CHERI_REG_C26
-
-/* 5 exception-context registers -- with names where appropriate. */
-#define	CHERI_REG_KR1C	$c27	/* Kernel exception handling capability (1). */
-#define	CHERI_REG_KR2C	$c28	/* Kernel exception handling capability (2). */
+#define	CHERI_REG_C27	$c27
+#define	CHERI_REG_KR1C	CHERI_REG_C27 /* Kernel scratch capability. */
+#define	CHERI_REG_C28	$c28
+#define	CHERI_REG_KR2C	CHERI_REG_C28 /* Used for CHERI_REG_SEC0. */
 #define	CHERI_REG_C29	$c29	/* Former Kernel code capability. */
 #define	CHERI_REG_C30	$c30	/* Former Kernel data capability. */
 #define	CHERI_REG_C31	$c31	/* Former Exception program counter cap. */
@@ -125,6 +125,9 @@
 	andi	reg, reg, MIPS_SR_KSU_USER;				\
 	beq	reg, $0, 64f;						\
 	nop;								\
+	/* Save user $c27 and $c28. */					\
+	csetkr1c	CHERI_REG_KR1C;					\
+	csetkr2c	CHERI_REG_KR2C;					\
 	/* Save user $ddc; install kernel $ddc. */			\
 	cgetdefault	CHERI_REG_SEC0;					\
 	cgetkdc		CHERI_REG_KR1C;					\
@@ -151,10 +154,11 @@
 	nop;								\
 	/* If returning to userspace, restore saved user $ddc. */	\
 	csetdefault	CHERI_REG_SEC0; 				\
+	/* Restore user $c27 and $c28. */				\
+	cgetkr1c	CHERI_REG_KR1C;					\
+	cgetkr2c	CHERI_REG_KR2C;					\
 	b	66f;							\
-	/* Clear c29-c31 when returning to userspace (needs recent bitfile-> nop for now) */ 		\
-	/* CClearHi (CHERI_CLEAR_CAPHI_C29 | CHERI_CLEAR_CAPHI_C30 |	\
-	    CHERI_CLEAR_CAPHI_C31);*/ nop; /* delay slot */			\
+	nop; /* delay slot */						\
 65:									\
 	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
 	/*								\
@@ -167,9 +171,7 @@
 	CGetKCC		CHERI_REG_KR1C;					\
 	CSetOffset	CHERI_REG_KR1C, CHERI_REG_KR1C, reg;		\
 	CSetEPCC	CHERI_REG_KR1C;					\
-66:									\
-	/* Clear C27 and C28 before returning */			\
-	CClearHi (CHERI_CLEAR_CAPHI_KR1C | CHERI_CLEAR_CAPHI_KR2C);
+66:
 
 /*
  * Save and restore user CHERI state on an exception.  Assumes that $ddc has
@@ -209,6 +211,15 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
+	/* C27 is saved in the "real" KR1C. */				\
+	CGetKR1C	CHERI_REG_KR1C;					\
+	SAVE_U_PCB_CREG(CHERI_REG_KR1C, C27, pcb);			\
+	/* C28 is saved in the "real" KR2C. */				\
+	CGetKR2C	CHERI_REG_KR1C;					\
+	SAVE_U_PCB_CREG(CHERI_REG_KR1C, C28, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
 	/* EPCC is no longer a GPR so load it into KR1C first */	\
 	CGetEPCC	CHERI_REG_KR1C;					\
 	SAVE_U_PCB_CREG(CHERI_REG_KR1C, PCC, pcb);			\
@@ -249,6 +260,15 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
+	/* C27 is saved in the "real" KR1C. */				\
+	RESTORE_U_PCB_CREG(CHERI_REG_KR1C, C27, pcb);			\
+	CSetKR1C	CHERI_REG_KR1C;					\
+	/* C28 is saved in the "real" KR2C. */				\
+	RESTORE_U_PCB_CREG(CHERI_REG_KR1C, C28, pcb);			\
+	CSetKR2C	CHERI_REG_KR1C;					\
+	RESTORE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
 	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
 	csetcause	treg
 

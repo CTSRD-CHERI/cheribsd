@@ -172,7 +172,7 @@ db_show_cheri_trapframe(struct trapframe *frame)
 	db_print_cap("$ddc: ", frame->ddc);
 	db_print_cap("$pcc: ", frame->pcc);
 	/* Laboriously load and print each trapframe capability. */
-	for (i = 1; i < 27; i++) {
+	for (i = 1; i < 31; i++) {
 		void * __capability cap = *(&frame->ddc + i);
 		db_printf("$c%02d: " _CHERI_PRINTF_CAP_FMT "\n", i,
 		    _CHERI_PRINTF_CAP_ARG(cap));
