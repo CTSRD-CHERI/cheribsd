@@ -87,8 +87,6 @@
 /*
  * Where to save the user $ddc during low-level exception handling.  Possibly
  * this should be an argument to macros rather than hard-coded in the macros.
- *
- * Ensure this is kept in sync with CHERI_CLEAR_CAPHI_SEC0.
  */
 #define	CHERI_REG_SEC0	CHERI_REG_KR2C	/* Saved $ddc in exception handling. */
 
@@ -390,9 +388,6 @@
 #define CHERI_CLEAR_CAPHI_C29  (1 << (29 - 16))
 #define CHERI_CLEAR_CAPHI_C30  (1 << (30 - 16))
 #define CHERI_CLEAR_CAPHI_C31  (1 << (31 - 16))
-
-/* Ensure that this is kept in sync with CHERI_REG_SEC0. */
-#define	CHERI_CLEAR_CAPHI_SEC0	CHERI_CLEAR_CAPHI_KR2C
 
 /*
  * The CCall (selector 1) branch delay slot has been removed but in order to
