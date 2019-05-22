@@ -8,7 +8,7 @@
 WANT_CHERI=none
 .endif
 
-CONFS=	fbtab login.conf motd
+CONFS=	fbtab login.conf motd login.access
 PROG=	login
 SRCS=	login.c login_fbtab.c
 CFLAGS+=-DLOGALL
