@@ -71,7 +71,7 @@
 #define	CHERI_REG_C27	$c27
 #define	CHERI_REG_KR1C	CHERI_REG_C27 /* Kernel scratch capability. */
 #define	CHERI_REG_C28	$c28
-#define	CHERI_REG_KR2C	CHERI_REG_C28 /* Used for CHERI_REG_SEC0. */
+#define	CHERI_REG_KR2C	CHERI_REG_C28 /* Second kernel scratch used in locore. */
 #define	CHERI_REG_C29	$c29	/* Former Kernel code capability. */
 #define	CHERI_REG_C30	$c30	/* Former Kernel data capability. */
 #define	CHERI_REG_C31	$c31	/* Former Exception program counter cap. */
@@ -83,12 +83,6 @@
  */
 #define	CHERI_REG_CTEMP0	CHERI_REG_C13	/* C capability manipulation. */
 #define	CHERI_REG_CTEMP1	CHERI_REG_C14	/* C capability manipulation. */
-
-/*
- * Where to save the user $ddc during low-level exception handling.  Possibly
- * this should be an argument to macros rather than hard-coded in the macros.
- */
-#define	CHERI_REG_SEC0	CHERI_REG_KR2C	/* Saved $ddc in exception handling. */
 
 /*
  * (Possibly) temporary ABI in which $c1 is the code argument to CCall, and
@@ -123,11 +117,12 @@
 	andi	reg, reg, MIPS_SR_KSU_USER;				\
 	beq	reg, $0, 64f;						\
 	nop;								\
-	/* Save user $c27 and $c28. */					\
+	/* Save user $c27. */						\
 	csetkr1c	CHERI_REG_KR1C;					\
-	csetkr2c	CHERI_REG_KR2C;					\
-	/* Save user $ddc; install kernel $ddc. */			\
-	cgetdefault	CHERI_REG_SEC0;					\
+	/* Save user $ddc in $kr2c. */					\
+	cgetdefault	CHERI_REG_KR1C;					\
+	csetkr2c	CHERI_REG_KR1C;					\
+	/* Install kernel $ddc. */					\
 	cgetkdc		CHERI_REG_KR1C;					\
 	csetdefault	CHERI_REG_KR1C;					\
 64:
@@ -151,10 +146,10 @@
 	beq	reg, $0, 65f;						\
 	nop;								\
 	/* If returning to userspace, restore saved user $ddc. */	\
-	csetdefault	CHERI_REG_SEC0; 				\
-	/* Restore user $c27 and $c28. */				\
+	cgetkr2c	CHERI_REG_KR1C;					\
+	csetdefault	CHERI_REG_KR1C; 				\
+	/* Restore user $c27. */					\
 	cgetkr1c	CHERI_REG_KR1C;					\
-	cgetkr2c	CHERI_REG_KR2C;					\
 	b	66f;							\
 	nop; /* delay slot */						\
 65:									\
@@ -173,16 +168,16 @@
 
 /*
  * Save and restore user CHERI state on an exception.  Assumes that $ddc has
- * already been moved to $sec0, and that if we write $sec0, it will get moved
+ * already been moved to $krc2, and that if we write $krc2, it will get moved
  * to $ddc later.  Unlike kernel context switches, we both save and restore
  * the capability cause register.
- *
- * XXXRW: Note hard-coding of SEC0 here.
  *
  * XXXRW: We should in fact also do this for the kernel version?
  */
 #define	SAVE_CREGS_TO_PCB(pcb, treg)					\
-	SAVE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
+	/* User DDC is saved in $kr2c. */				\
+	CGetKR2C	CHERI_REG_KR1C;					\
+	SAVE_U_PCB_CREG(CHERI_REG_KR1C, DDC, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);				\
 	SAVE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);				\
 	SAVE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);				\
@@ -212,9 +207,7 @@
 	/* C27 is saved in the "real" KR1C. */				\
 	CGetKR1C	CHERI_REG_KR1C;					\
 	SAVE_U_PCB_CREG(CHERI_REG_KR1C, C27, pcb);			\
-	/* C28 is saved in the "real" KR2C. */				\
-	CGetKR2C	CHERI_REG_KR1C;					\
-	SAVE_U_PCB_CREG(CHERI_REG_KR1C, C28, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
@@ -231,7 +224,9 @@
 	CSetEPCC capreg;
 
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
-	RESTORE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
+	/* User DDC is saved in $kr2c. */				\
+	RESTORE_U_PCB_CREG(CHERI_REG_KR1C, DDC, pcb);			\
+	CSetKR2C	CHERI_REG_KR1C;					\
 	RESTORE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);			\
@@ -261,9 +256,7 @@
 	/* C27 is saved in the "real" KR1C. */				\
 	RESTORE_U_PCB_CREG(CHERI_REG_KR1C, C27, pcb);			\
 	CSetKR1C	CHERI_REG_KR1C;					\
-	/* C28 is saved in the "real" KR2C. */				\
-	RESTORE_U_PCB_CREG(CHERI_REG_KR1C, C28, pcb);			\
-	CSetKR2C	CHERI_REG_KR1C;					\
+	RESTORE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\

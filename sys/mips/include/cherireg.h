@@ -347,7 +347,6 @@
 
 #define	CHERI_CR_CTEMP0	CHERI_CR_C13	/* C capability manipulation. */
 #define	CHERI_CR_CTEMP1	CHERI_CR_C14	/* C capability manipulation. */
-#define	CHERI_CR_SEC0	CHERI_CR_KR2C	/* Saved $c0 in exception handler. */
 
 /*
  * Offsets of registers in struct cheri_kframe -- must match the definition in
