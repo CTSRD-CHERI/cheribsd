@@ -31,7 +31,6 @@
  */
 #include <dlfcn.h>
 
-extern dlfunc_t find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol);
 extern bool add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
     Elf_Word r_symndx, void** where);
 
@@ -75,13 +74,11 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 	}
 	else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 		/* Remove write permissions and set bounds */
-		symval = find_external_call_thunk(defobj, def);
-		if (!symval) {
-			// TODO: make this a fatal error
-			rtld_fdprintf(STDERR_FILENO, "Warning: Could not create"
-			    " thunk for %s (in %s)\n",
-			    symname(obj, r_symndx), obj->path);
-			symval = make_function_pointer(def, defobj);
+		symval = make_function_pointer(def, defobj);
+		if (__predict_false(symval == NULL)) {
+			_rtld_error("Could not create function pointer for %s "
+			    "(in %s)\n", symname(obj, r_symndx), obj->path);
+			return -1;
 		}
 	} else {
 		/* Remove execute permissions and set bounds */
