@@ -841,7 +841,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
       *ld_bind_now != '\0', SYMLOOK_EARLY, &lockstate) == -1)
 	rtld_die();
 
-    rtld_exit_ptr = rtld_exit;
     if (obj_main->crt_no_init)
 	preinit_main();
     objlist_call_init(&initlist, &lockstate);
@@ -864,6 +863,9 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     dbg("transferring control to program entry point = %-#p", obj_main->entry);
 
     /* Return the exit procedure and the program entry point. */
+    if (rtld_exit_ptr == NULL)
+	rtld_exit_ptr =
+	    (func_ptr_type)make_rtld_function_pointer((dlfunc_t)rtld_exit, &obj_rtld);
     *exit_proc = rtld_exit_ptr;
     *objp = obj_main;
 
@@ -3029,8 +3031,12 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	}
 	lock_release(rtld_bind_lock, lockstate);
 	if (reg != NULL) {
-		reg(rtld_exit);
-		rtld_exit_ptr = rtld_nop_exit;
+		dlfunc_t exit_fn_ptr =
+		    make_rtld_function_pointer((dlfunc_t)rtld_exit, &obj_rtld);
+		dbg("Calling __libc_atexit(rtld_exit (%#p))", (void*)exit_fn_ptr);
+		reg((func_ptr_type)exit_fn_ptr);
+		rtld_exit_ptr = (func_ptr_type)make_rtld_function_pointer(
+		(dlfunc_t)rtld_nop_exit, &obj_rtld);
 	}
 
         /*
@@ -3060,6 +3066,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 		}
 	    }
 	}
+	dbg("Done calling init functions for %s", elm->obj->path);
 	wlock_acquire(rtld_bind_lock, lockstate);
 	unhold_object(elm->obj);
     }
@@ -4457,8 +4464,7 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
     else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC)
 	return ((const void **)rtld_resolve_ifunc(req.defobj_out, req.sym_out));
     else
-	return ((const void **)(req.defobj_out->relocbase +
-	  req.sym_out->st_value));
+	return (const void **)make_data_pointer(req.sym_out, req.defobj_out);
 }
 
 /*
