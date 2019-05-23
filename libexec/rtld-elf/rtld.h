@@ -341,16 +341,6 @@ typedef struct Struct_Obj_Entry {
 #ifdef __CHERI_PURE_CAPABILITY__
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
     bool relative_cap_relocs : 1; /* __cap_relocs section has been processed */
-    /*
-     * If restrict_pcc_basic is true we can restricted $pcc to the object's
-     * executable segment, if restrict_pcc_strict is true we can restrict it
-     * to just the functions bounds in dlsym()/dlfunc(). Otherwise we need to
-     * fall back to giving the full address space bounds in $pcc.
-     *
-     * TODO: remove these options once we have decided on the correct ABI
-     */
-    bool restrict_pcc_basic : 1;
-    bool restrict_pcc_strict : 1;
     unsigned cheri_captable_abi : 3;
     /*
      * If we linked the DSO with the per-file or per-function captable flag we

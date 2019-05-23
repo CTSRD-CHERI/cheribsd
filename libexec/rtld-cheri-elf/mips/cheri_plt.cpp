@@ -71,7 +71,7 @@ struct SimpleExternalCallTrampoline {
 	static SimpleExternalCallTrampoline*
 	create(const void* target_cgp, dlfunc_t target_func);
 	static SimpleExternalCallTrampoline*
-	create(const Obj_Entry* defobj, const Elf_Sym *sym);
+	create(const Obj_Entry* defobj, const Elf_Sym *sym, bool tight_bounds);
 	inline dlfunc_t pcc_value() const {
 		const void* result = cheri_incoffset(this, offsetof(SimpleExternalCallTrampoline, code));
 		return (dlfunc_t)cheri_clearperm(result, FUNC_PTR_REMOVE_PERMS);
@@ -211,8 +211,19 @@ _mips_rtld_bind(void* _plt_stub)
 		rtld_fatal("Could not find symbol definition for PLT symbol %s"
 		    " in %s", symname(obj, r_symndx), obj->path);
 	}
-
-	dlfunc_t target = make_function_pointer(def, defobj);
+	dlfunc_t target;
+	if (can_use_tight_pcc_bounds(defobj)) {
+		// We can use tight bounds (but can't update .captable to point
+		// to the target function directly)
+		// TODO: actually we should be able to for local calls!
+		target = make_code_pointer(def, defobj, /*tight_bounds=*/true);
+	} else {
+		// PC-relative/legacy does not need any trampolines and uses the
+		// full DSO bounds (or full addrspace for legacy)
+		target = make_code_pointer(def, defobj, /*tight_bounds=*/false);
+		// TODO: update .captable entry to avoid future trampoline jumps
+		// TODO: could also free the stub, but that probably just wastes time
+	}
 	const void* target_cgp = target_cgp_for_func(defobj, target);
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	// Should never be unrepresentable but can be NULL if a function doesn't
@@ -342,18 +353,17 @@ reloc_plt_bind_now(Obj_Entry *obj, int flags, const Obj_Entry *rtldobj __unused,
 			return (-1);
 		}
 		dlfunc_t target;
-		if (__predict_true(
-			obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL)) {
-			// No trampoline need for PCREL
-			// TODO: can we have any addends for plt relocations?
-			target = make_function_pointer(def, defobj);
-		} else {
+		if (__predict_false(can_use_tight_pcc_bounds(defobj))) {
 			// PLT ABI needs a thunk that loads the right $cgp
 			// TODO: could skip this thunk if defobj == obj since
 			// they will only ever be invoked from a context where
 			// we have the correct $cgp for this DSO.
-			auto thunk = SimpleExternalCallTrampoline::create(defobj, def);
+			auto thunk = SimpleExternalCallTrampoline::create(defobj, def, /*tight_bounds=*/true);
 			target = thunk->pcc_value();
+		} else {
+			// No trampoline needed for PCREL or legacy
+			// TODO: can we have any addends for plt relocations?
+			target = make_code_pointer(def, defobj, /*tight_bounds=*/false);
 		}
 		dbg_cheri_plt_verbose("BIND_NOW: %p <-- %#p (%s)", where, target,
 		    symname(obj, r_symndx));
@@ -478,23 +488,16 @@ private:
 };
 
 extern "C" dlfunc_t
-find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
+find_external_call_thunk(const Elf_Sym* symbol, const Obj_Entry* obj)
 {
 	// This should be called with a global RTLD lock held so there should
 	// not be any races.
 	// FIXME: verify that this assumption is correct
 	dbg_cheri_plt_verbose("Looking for %s() thunk (found in obj %s): 0x%jx",
 	    strtab_value(obj, symbol->st_name), obj->path, (uintmax_t)symbol->st_value);
-	if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL) {
-		// PC-relative ABI does not need thunks for function pointers
-		// since $cgp can be derived from $pcc/$c12.
-		dlfunc_t result = make_function_pointer(symbol, obj);
-		// TODO: return a sentry!
-		dbg_cheri_plt_verbose("  Do not need %s() thunk in pc-relative "
-		    "ABI, returning raw pointer to function: %-#p",
-		    strtab_value(obj, symbol->st_name), (void*)result);
-		return result;
-	}
+	// PC-relative ABI does not need thunks for function pointers
+	// since $cgp can be derived from $pcc/$c12.
+	assert(obj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
 	// Otherwise, we need to add a UNIQUE call trampoline (since function
 	// pointers to the same function MUST compare equal).
 	if (!obj->cheri_exports) {
@@ -601,7 +604,8 @@ CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 	s->name = strtab_value(obj, sym->st_name);
 #endif
 	dbg_assert(s->key == sym);
-	s->thunk = SimpleExternalCallTrampoline::create(defobj, sym);
+	s->thunk = SimpleExternalCallTrampoline::create(defobj, sym,
+	    can_use_tight_pcc_bounds(defobj));
 	return s;
 };
 
@@ -633,8 +637,8 @@ SimpleExternalCallTrampoline::create(const void* target_cgp, dlfunc_t target_fun
 }
 
 SimpleExternalCallTrampoline*
-SimpleExternalCallTrampoline::create(const Obj_Entry* defobj, const Elf_Sym *sym) {
-	dlfunc_t target_func = make_function_pointer(sym, defobj);
+SimpleExternalCallTrampoline::create(const Obj_Entry* defobj, const Elf_Sym *sym, bool tight_bounds) {
+	dlfunc_t target_func = make_code_pointer(sym, defobj, tight_bounds);
 	const void *target_cgp = target_cgp_for_func(defobj, target_func);
 	return create(target_cgp, target_func);
 }

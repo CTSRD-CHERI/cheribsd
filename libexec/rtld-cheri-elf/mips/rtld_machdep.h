@@ -77,26 +77,74 @@ get_codesegment(const struct Struct_Obj_Entry *obj) {
 	return obj->text_rodata_cap;
 }
 
-static inline dlfunc_t
-make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
-{
-	const void* ret = get_codesegment(defobj) + def->st_value;
+extern dlfunc_t find_external_call_thunk(const Elf_Sym* def, const Obj_Entry* defobj);
 
+static inline bool
+can_use_tight_pcc_bounds(const struct Struct_Obj_Entry *defobj)
+{
+	switch (defobj->cheri_captable_abi) {
+	case DF_MIPS_CHERI_ABI_PLT:
+	case DF_MIPS_CHERI_ABI_FNDESC:
+		return true;
+#ifndef __CHERI_CAPABILITY_TABLE__
+	case DF_MIPS_CHERI_ABI_LEGACY:
+#endif
+	case DF_MIPS_CHERI_ABI_PCREL:
+		return false;
+	default:
+		dbg_assert(false && "Invalid abi");
+		__builtin_unreachable();
+		__builtin_trap();
+	}
+}
+
+/*
+ * Create a pointer to a function.
+ * Important: this is not necessarily callable! For the PLT ABI we need a
+ * to load $cgp first -> use make_function_pointer() instead.
+ */
+static inline dlfunc_t
+make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
+    bool tight_bounds)
+{
+	const void *ret = get_codesegment(defobj) + def->st_value;
+#ifndef __CHERI_CAPABILITY_TABLE__
+	if (defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_LEGACY) {
+		/*
+		 * Legacy abi: we need to give it full address space range
+		 * (including the full permissions mask) to support legacy binaries.
+		 */
+		assert(cheri_getbase(cheri_getpcc()) == 0);
+		return (dlfunc_t)cheri_setaddress(cheri_getpcc(), (vaddr_t)ret);
+	}
+#endif
 	/* Remove store and seal permissions */
 	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
-	if (defobj->restrict_pcc_strict)
+	dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_LEGACY);
+	if (tight_bounds) {
+		dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
 		return (dlfunc_t)cheri_csetbounds(ret, def->st_size);
-	if (defobj->restrict_pcc_basic)
-		return __DECONST(dlfunc_t, ret); /* Shouldn't a function pointer be const implicitly? */
+	} else {
+		/* PC-relative ABI needs full DSO bounds */
+		dbg_assert(defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL);
+		return __DECONST(dlfunc_t, ret);
+	}
+}
 
-	/*
-	 * Otherwise we need to give it full address space range (including
-	 * the full permissions mask) to support legacy binaries.
-	 *
-	 * TODO: remove once we have decided on a sane(r) ABI
-	 */
-	assert(cheri_getbase(cheri_getpcc()) == 0);
-	return (dlfunc_t)cheri_setaddress(cheri_getpcc(), (vaddr_t)ret);
+/*
+ * Create a function pointer that can be called anywhere (i.e. for the PLT ABI
+ * this will be a pointer to a trampoline that loads the correct $cgp.
+ */
+static inline dlfunc_t
+make_function_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
+{
+	// Add a trampoline if the target ABI is not PCREL
+	if (can_use_tight_pcc_bounds(defobj)) {
+		return find_external_call_thunk(def, defobj);
+	} else {
+		/* No need for a function pointer trampoline in the legacy/pcrel ABI */
+		return make_code_pointer(def, defobj, /*tight_bounds=*/false);
+	}
 }
 
 static inline void*

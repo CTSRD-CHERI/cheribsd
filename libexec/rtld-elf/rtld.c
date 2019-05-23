@@ -1344,11 +1344,6 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	case DT_MIPS_CHERI_FLAGS: {
 	    size_t flags = dynp->d_un.d_val;
 	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
-	    if (abi == DF_MIPS_CHERI_ABI_PCREL)
-		obj->restrict_pcc_basic = 1;
-	    else if (abi == DF_MIPS_CHERI_ABI_PLT || abi == DF_MIPS_CHERI_ABI_FNDESC)
-		obj->restrict_pcc_strict = 1;
-	    /* Can't restrict $pcc in legacy mode */
 	    obj->cheri_captable_abi = abi;
 	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
 	    if (flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) {
@@ -3053,7 +3048,6 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	     */
 	    call_initfini_pointer(elm->obj, elm->obj->init_ptr);
 	}
-	/* TODO: we should do a CSetBounds after parsing .dynamic */
 	init_addr = elm->obj->init_array_ptr;
 	if (init_addr != NULL) {
 	    for (index = 0; index < elm->obj->init_array_num; index++) {

@@ -183,13 +183,13 @@ process___cap_relocs(Obj_Entry* obj)
 	vaddr_t base_addr = obj->relative_cap_relocs ? cheri_getaddress(obj->relocbase) : 0;
 
 	_do___caprelocs(start_relocs, end_relocs, data_base, code_base, base_addr,
-	    obj->restrict_pcc_strict);
+	    can_use_tight_pcc_bounds(obj));
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	// TODO: do this later
 	if (obj->per_function_captable) {
 		dbg_cheri_plt("Adding per-function plt stubs for %s", obj->path);
 		for (const struct capreloc *reloc = start_relocs; reloc < end_relocs; reloc++) {
-			_Bool isFunction = (reloc->permissions & function_reloc_flag) == function_reloc_flag;
+			bool isFunction = (reloc->permissions & function_reloc_flag) == function_reloc_flag;
 			if (!isFunction)
 				continue;
 			// TODO: write location as a relative value
