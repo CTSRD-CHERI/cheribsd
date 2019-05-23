@@ -471,6 +471,10 @@ __END_DECLS
 #define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, target)
 #endif
 
+#ifndef make_rtld_function_pointer
+#define make_rtld_function_pointer(target_func, rtld_obj) (dlfunc_t)(target_func)
+#endif
+
 #ifndef __CHERI_PURE_CAPABILITY__
 /* For CHERI we also set bounds (see rtld_machdep in rtld-cheri-elf) */
 #define make_data_pointer(def, defobj)	(defobj->relocbase + def->st_value)

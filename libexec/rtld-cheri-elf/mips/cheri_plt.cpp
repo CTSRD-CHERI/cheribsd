@@ -636,6 +636,13 @@ SimpleExternalCallTrampoline::create(const void* target_cgp, dlfunc_t target_fun
 	return ret;
 }
 
+extern "C" dlfunc_t
+allocate_function_pointer_trampoline(dlfunc_t target_func, const Obj_Entry *obj)
+{
+	dbg_assert(can_use_tight_pcc_bounds(obj));
+	return SimpleExternalCallTrampoline::create(obj->_target_cgp, target_func)->pcc_value();
+}
+
 SimpleExternalCallTrampoline*
 SimpleExternalCallTrampoline::create(const Obj_Entry* defobj, const Elf_Sym *sym, bool tight_bounds) {
 	dlfunc_t target_func = make_code_pointer(sym, defobj, tight_bounds);

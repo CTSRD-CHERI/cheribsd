@@ -169,7 +169,7 @@ END(rtld_start)
 #define	XCALLFRAME_CFP		(10*CHERICAP_SIZE)
 /*
  * We need to save $c13 for varidics and on-stack arguments since the any calls
- * calls with variadic args in rtld (e.g.g debug printfs) will clobber it
+ * calls with variadic args in rtld (e.g. debug printfs) will clobber it
  */
 #define	XCALLFRAME_C13		(9*CHERICAP_SIZE)
 #define	XCALLFRAME_C3		(8*CHERICAP_SIZE)

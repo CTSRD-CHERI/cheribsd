@@ -98,6 +98,23 @@ can_use_tight_pcc_bounds(const struct Struct_Obj_Entry *defobj)
 	}
 }
 
+/* Create a callable function pointer (needed for PLT ABI)  */
+extern dlfunc_t
+allocate_function_pointer_trampoline(dlfunc_t target_func, const Obj_Entry *obj);
+
+/* Create a callable function pointer to a rtld-internal function */
+static inline dlfunc_t
+_make_rtld_function_pointer(dlfunc_t target_func, const Obj_Entry *rtld_obj) {
+	if (can_use_tight_pcc_bounds(rtld_obj)) {
+		return allocate_function_pointer_trampoline(target_func, rtld_obj);
+	}
+	// Otherwise, we are in the pcrel/legacy ABI -> can just return target
+	return target_func;
+}
+/* Define this as a macro to allow a single definition for non-CHERI architectures */
+#define make_rtld_function_pointer(target_func, rtld_obj)	\
+	_make_rtld_function_pointer(target_func, rtld_obj)
+
 /*
  * Create a pointer to a function.
  * Important: this is not necessarily callable! For the PLT ABI we need a
