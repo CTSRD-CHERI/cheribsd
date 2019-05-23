@@ -745,10 +745,11 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	SAVE_CREGS_TO_PCB(CHERI_REG_KR1C, t0, t1)
 	/* Switch to kernel stack, use c3 as scratch reg */
 	GET_CPU_PCPU($c3, k1)
-	clc $c3, zero, PC_CURTHREAD($c3)
-	clc CHERI_REG_STC, zero, TD_KSTACK($c3) /* get top of the stack from td */
+	/* get top of the stack from pcpu */
+	clc CHERI_REG_STC, zero, PC_KSTACK_CAP($c3)
 	REG_LI t0, (CHERI_KSTACK_OFFSET - CALLFRAME_SIZ)
-	cincoffset CHERI_REG_STC, CHERI_REG_STC, t0 /* start with kstack at bottom */
+	/* start with kstack at bottom */
+	cincoffset CHERI_REG_STC, CHERI_REG_STC, t0
 
 	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU, find it a place once ddb is ported */
 	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC) # for debugging
@@ -901,6 +902,7 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
  * Call the interrupt handler.   SAVE_CPU has left a0 pointing at the saved
  * frame.
  */
+	/* XXX-AM: This is probably useless since we are coming from the kernel */
 	LOAD_KERNEL_GP
 #ifdef INTRNG
 	CAPCALL_LOAD($c12, intr_irq_handler)
@@ -1126,6 +1128,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 
 	SAVE_U_PCB_REG(a1, SR, CHERI_REG_KR1C)
 
+	/* This also restores SR in k0 */
 	RESTORE_UINTR_PCB_REGS(CHERI_REG_KR1C)
 	RESTORE_CREGS_FROM_PCB(CHERI_REG_KR1C, k1)
 

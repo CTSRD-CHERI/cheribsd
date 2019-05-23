@@ -355,6 +355,8 @@ blocked_loop:
 	clc	$c1, zero, TD_PCB($c4)
 	csc	$c1, zero, PC_CURPCB($c2)
 	clc	$c1, zero, TD_KSTACK($c4)	# va of 1st half of kstack
+	/* set the newthread kstack in pcpu for the exception handlers to use. */
+	csc	$c1, zero, PC_KSTACK_CAP($c2)
 	cgetbase	v0, $c1			# get kstack base
 	cgetoffset	t0, $c1			# get kstack offset
 	daddu		v0, v0, t0		# get kstack va

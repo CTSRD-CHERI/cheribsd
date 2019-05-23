@@ -96,6 +96,9 @@ ASSYM(PC_TLB_MISS_CNT, offsetof(struct pcpu, pc_tlb_miss_cnt));
 ASSYM(PC_TLB_INVALID_CNT, offsetof(struct pcpu, pc_tlb_invalid_cnt));
 ASSYM(PC_TLB_MOD_CNT, offsetof(struct pcpu, pc_tlb_mod_cnt));
 #endif /* defined(MIPS_EXC_CNTRS) */
+#if defined(CHERI_KERNEL)
+ASSYM(PC_KSTACK_CAP, offsetof(struct pcpu, pc_kstack_cap));
+#endif /* defined(CHERI_KERNEL) */
 
 ASSYM(VM_MAX_KERNEL_ADDRESS, VM_MAX_KERNEL_ADDRESS);
 ASSYM(VM_MAXUSER_ADDRESS, VM_MAXUSER_ADDRESS);

@@ -51,6 +51,18 @@
 #define	PCPU_NUM_EXC_CNTRS	0
 #endif
 
+#if defined(CHERI_KERNEL)
+/*
+ * Add an extra MD PCPU field for a cached copy of the current thread
+ * kernel stack capability.
+ * This must be kept in sync when context switching.
+ */
+#define PCPU_MD_CAPABILITY_FIELDS					\
+	void	*pc_kstack_cap;		/* cached curthread kstack capability */
+#else
+#define PCPU_MD_CAPABILITY_FIELDS
+#endif
+
 #define	PCPU_MD_COMMON_FIELDS						\
 	pd_entry_t	*pc_segbase;		/* curthread segbase */	\
 	struct	pmap	*pc_curpmap;		/* pmap of curthread */	\
@@ -58,28 +70,32 @@
 	u_int32_t	pc_next_asid;		/* next ASID to alloc */ \
 	u_int32_t	pc_asid_generation;	/* current ASID generation */ \
 	u_int		pc_pending_ipis;	/* IPIs pending to this CPU */ \
-	struct	pcpu	*pc_self;		/* globally-uniqe self pointer */
+	struct	pcpu	*pc_self;		/* globally-uniqe self pointer */\
+	PCPU_MD_CAPABILITY_FIELDS
 
 #ifdef	__mips_n64
+
 #if defined(CHERI_KERNEL) && defined(CPU_CHERI128)
 // struct pcpu aligns to 512 bytes boundary
-#define PCPU_MD_MIPS64_PAD (128 - (PCPU_NUM_EXC_CNTRS * 8))
+#define PCPU_MD_MIPS64_PAD (112 - (PCPU_NUM_EXC_CNTRS * 8))
 #elif defined(CHERI_KERNEL) && defined(CPU_CHERI)
 // struct pcpu aligns to 1024 bytes boundary
-#define PCPU_MD_MIPS64_PAD (352 - (PCPU_NUM_EXC_CNTRS * 8))
-#else
+#define PCPU_MD_MIPS64_PAD (320 - (PCPU_NUM_EXC_CNTRS * 8))
+#else /* ! defined(CHERI_KERNEL) */
 // struct pcpu aligns to 512 bytes boundary
 #define PCPU_MD_MIPS64_PAD (245 - (PCPU_NUM_EXC_CNTRS * 8))
-#endif /* __CHERI_PURE_CAPABILITY__ */
+#endif /* ! defined(CHERI_KERNEL) */
 #define	PCPU_MD_MIPS64_FIELDS						\
 	PCPU_MD_COMMON_FIELDS						\
 	char		__pad[PCPU_MD_MIPS64_PAD]
 
-#else
+#else /* ! defined(__mips_n64) */
+
 #define	PCPU_MD_MIPS32_FIELDS						\
 	PCPU_MD_COMMON_FIELDS						\
 	char		__pad[(125 - (PCPU_NUM_EXC_CNTRS * 4))]
-#endif
+
+#endif /* ! defined(__mips_n64) */
 
 #ifdef	__mips_n64
 #define	PCPU_MD_FIELDS	PCPU_MD_MIPS64_FIELDS
