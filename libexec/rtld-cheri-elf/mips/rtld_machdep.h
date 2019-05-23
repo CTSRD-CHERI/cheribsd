@@ -103,7 +103,6 @@ static inline void*
 make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 {
 	void* ret = defobj->relocbase + def->st_value;
-
 	/* Remove execute and seal permissions */
 	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
 	/* TODO: can we always set bounds here or does it break compat? */
@@ -142,12 +141,24 @@ vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
 // ignore _init/_fini
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
 
+static inline void
+_call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, vaddr_t target, int argc, char** argv, char** env) {
+
+	InitArrFunc func = (InitArrFunc)vaddr_to_code_pointer(obj, target);
+#if defined(__CHERI_CAPABILITY_TABLE__)
+	/* Set the target object $cgp when calling the pointer:
+	 * Note: we use target_cgp_for_func() to support per-function captable */
+	const void *init_fini_cgp = target_cgp_for_func(obj, (dlfunc_t)func);
+	__asm__ volatile("cmove $cgp, %0" :: "C"(init_fini_cgp));
+#endif
+	/* FIXME: should probably do this from assembly to ensure that $cgp is correct */
+	func(argc, argv, env);
+}
+
 #define call_init_array_pointer(obj, target)			\
-	(((InitArrFunc)(vaddr_to_code_pointer(obj, (target))))	\
-	    (main_argc, main_argv, environ))
+	_call_init_fini_array_pointer(obj, (target), main_argc, main_argv, environ)
 #define call_fini_array_pointer(obj, target)			\
-	(((InitArrFunc)(vaddr_to_code_pointer(obj, (target))))	\
-	    (main_argc, main_argv, environ))
+	_call_init_fini_array_pointer(obj, (target), main_argc, main_argv, environ)
 
 // Not implemented for CHERI:
 // #define	call_ifunc_resolver(ptr) \
