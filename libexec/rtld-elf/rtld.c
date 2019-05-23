@@ -2454,7 +2454,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	size_t cap_relocs_size =
 	    ((caddr_t)&__stop___cap_relocs - (caddr_t)&__start___cap_relocs);
 	rtld_printf("RTLD has DT_CHERI___CAPRELOCS = %#p, __start___cap_relocs"
-	    "= %#p\nDT_CHERI___CAPRELOCSSZ = %zd, difference = %zd",
+	    "= %#p\nDT_CHERI___CAPRELOCSSZ = %zd, difference = %zd\n",
 	    objtmp.cap_relocs, &__start___cap_relocs, cap_relocs_size,
 	    objtmp.cap_relocs_size);
 	assert((vaddr_t)objtmp.cap_relocs == (vaddr_t)&__start___cap_relocs);
