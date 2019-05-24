@@ -97,7 +97,7 @@ mips_intrcnt_setname(mips_intrcnt_t counter, const char *name)
 static void
 mips_mask_hard_irq(void *source)
 {
-	uintptr_t irq = (uintptr_t)source;
+	register_t irq = (register_t)source;
 
 	mips_wr_status(mips_rd_status() & ~(((1 << irq) << 8) << 2));
 }
@@ -105,7 +105,7 @@ mips_mask_hard_irq(void *source)
 static void
 mips_unmask_hard_irq(void *source)
 {
-	uintptr_t irq = (uintptr_t)source;
+	register_t irq = (register_t)source;
 
 	mips_wr_status(mips_rd_status() | (((1 << irq) << 8) << 2));
 }
@@ -113,7 +113,7 @@ mips_unmask_hard_irq(void *source)
 static void
 mips_mask_soft_irq(void *source)
 {
-	uintptr_t irq = (uintptr_t)source;
+	register_t irq = (register_t)source;
 
 	mips_wr_status(mips_rd_status() & ~((1 << irq) << 8));
 }
@@ -121,7 +121,7 @@ mips_mask_soft_irq(void *source)
 static void
 mips_unmask_soft_irq(void *source)
 {
-	uintptr_t irq = (uintptr_t)source;
+	register_t irq = (register_t)source;
 
 	mips_wr_status(mips_rd_status() | ((1 << irq) << 8));
 }
