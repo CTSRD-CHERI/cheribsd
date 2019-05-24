@@ -64,10 +64,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktrace.h>
 #endif
 
-#if __has_feature(capabilities)
-#include <cheri/cheric.h>
-#endif
-
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
@@ -350,7 +346,6 @@ namei(struct nameidata *ndp)
 	else
 		error = copyinstr(ndp->ni_dirp, cnp->cn_pnbuf, MAXPATHLEN,
 		    &ndp->ni_pathlen);
-
 	/*
 	 * Don't allow empty pathnames.
 	 */
