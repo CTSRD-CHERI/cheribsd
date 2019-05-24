@@ -143,10 +143,10 @@
  * value of PC - PCC.base before writing to EPCC.
  */
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpreg2, pcb)			\
-	/* EPCC is no longer a GPR so load it into KSCRATCH1 first */	\
-	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH1, PCC, pcb);		\
+	/* EPCC is no longer a GPR so load it into KSCRATCH first */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);		\
 	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
-	RESTORE_EPCC(CHERI_REG_KSCRATCH1, pc_vaddr_tmpreg, tmpreg2)
+	RESTORE_EPCC(CHERI_REG_KSCRATCH, pc_vaddr_tmpreg, tmpreg2)
 #else
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, unused_reg, pcb)	\
