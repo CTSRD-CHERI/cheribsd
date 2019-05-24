@@ -71,7 +71,6 @@
 #define	CHERI_REG_C27	$c27
 #define	CHERI_REG_KSCRATCH1 CHERI_REG_C27 /* Kernel scratch capability. */
 #define	CHERI_REG_C28	$c28
-#define	CHERI_REG_KSCRATCH2 CHERI_REG_C28 /* Second kernel scratch cap. */
 #define	CHERI_REG_C29	$c29	/* Former Kernel code capability. */
 #define	CHERI_REG_C30	$c30	/* Former Kernel data capability. */
 #define	CHERI_REG_C31	$c31	/* Former Exception program counter cap. */
