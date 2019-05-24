@@ -154,7 +154,7 @@ VECTOR(_locore, unknown)
 	/*
 	 * Grab the initial omnipotent capability
 	 */
-	cgetdefault	CHERI_REG_KSCRATCH2
+	cgetdefault	CHERI_REG_C28
 
 	/*
 	 * Create a reduced DDC.
@@ -162,19 +162,19 @@ VECTOR(_locore, unknown)
 	 * XXX-BD: Actually changing base/length requires changes in
 	 * linkage.
 	 */
-	cmove		CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH2
+	cmove		CHERI_REG_C27, CHERI_REG_C28
 	REG_LI		t0, CHERI_CAP_KERN_BASE
-	csetoffset	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI		t0, CHERI_CAP_KERN_LENGTH
-	csetbounds	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI		t0, CHERI_PERMS_KERNEL_DATA
-	candperm	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
 
 	/* Preserve a copy in KDC for exception handlers. */
-	csetkdc		CHERI_REG_KSCRATCH1
+	csetkdc		CHERI_REG_C27
 
 	/* Install the new DDC. */
-	csetdefault	CHERI_REG_KSCRATCH1
+	csetdefault	CHERI_REG_C27
 
 	/*
 	 * Create a reduced PCC.
@@ -182,17 +182,17 @@ VECTOR(_locore, unknown)
 	 * XXX-BD: Actually changing base/length requires changes in
 	 * linkage.
 	 */
-	cgetpcc		CHERI_REG_KSCRATCH1
+	cgetpcc		CHERI_REG_C27
 	REG_LI		t0, CHERI_CAP_KERN_BASE
-	csetoffset	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI		t0, CHERI_CAP_KERN_LENGTH
-	csetbounds	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI		t0, CHERI_PERMS_KERNEL_CODE
-	candperm	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
 
 	/* Preserve a copy in KCC for exception handlers.  */
 
-	csetkcc		CHERI_REG_KSCRATCH1
+	csetkcc		CHERI_REG_C27
 
 	/* Install the new PCC. */
 	REG_LI		t0, CHERI_CAP_KERN_BASE
@@ -200,23 +200,23 @@ VECTOR(_locore, unknown)
 	cgetoffset	t1, CHERI_REG_C29			# 1
 	PTR_SUBU	t1, t1, t0				# 2
 	PTR_ADDIU	t1, t1, (4 * 7)				# 3
-	csetoffset	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t1	# 4
-	cjr		CHERI_REG_KSCRATCH1				# 5
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t1	# 4
+	cjr		CHERI_REG_C27				# 5
 	nop							# 6
 	# 7 (land here)
 
 	/*
 	 * Create the parent kernel sealing capablity.
 	 */
-	cmove		CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH2
+	cmove		CHERI_REG_C27, CHERI_REG_C28
 	REG_LI	t0, CHERI_SEALCAP_KERNEL_BASE
-	csetoffset	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI	t0, CHERI_SEALCAP_KERNEL_LENGTH
-	csetbounds	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI	t0, CHERI_SEALCAP_KERNEL_PERMS
-	candperm	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
 	PTR_LA	t0, _C_LABEL(kernel_sealcap)
-	csc	CHERI_REG_KSCRATCH1, t0, 0($ddc)
+	csc	CHERI_REG_C27, t0, 0($ddc)
 
 	/*
 	 * Create a capability covering all of userspace from which to
@@ -228,34 +228,34 @@ VECTOR(_locore, unknown)
 	 * XXX-BD: This is actually an ABI property and should probably
 	 * per sysent.
 	 */
-	cmove		CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH2
+	cmove		CHERI_REG_C27, CHERI_REG_C28
 	REG_LI	t0, CHERI_CAP_USER_DATA_BASE
-	csetoffset	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI	t0, CHERI_CAP_USER_DATA_LENGTH
-	csetbounds	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI	t0, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS
-	candperm	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
 	PTR_LA	t0, _C_LABEL(userspace_cap)
-	csc	CHERI_REG_KSCRATCH1, t0, 0($ddc)
+	csc	CHERI_REG_C27, t0, 0($ddc)
 
 	/*
 	 * Create a capability for userspace to seal capabilities with.
 	 */
-	cmove		CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH2
+	cmove		CHERI_REG_C27, CHERI_REG_C28
 	REG_LI	t0, CHERI_SEALCAP_USERSPACE_BASE
-	csetoffset	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI	t0, CHERI_SEALCAP_USERSPACE_LENGTH
-	csetbounds	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
 	REG_LI	t0, CHERI_SEALCAP_USERSPACE_PERMS
-	candperm	CHERI_REG_KSCRATCH1, CHERI_REG_KSCRATCH1, t0
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
 	PTR_LA	t0, _C_LABEL(user_sealcap)
-	csc	CHERI_REG_KSCRATCH1, t0, 0($ddc)
+	csc	CHERI_REG_C27, t0, 0($ddc)
 
 	/*
 	 * Store the omnipotent capability to allow swap to be restored.
 	 */
 	PTR_LA	t0, _C_LABEL(swap_restore_cap)
-	csc	CHERI_REG_KSCRATCH2, t0, 0($ddc)
+	csc	CHERI_REG_C28, t0, 0($ddc)
 
 	/*
 	 * Zero out our temporary registers.
@@ -263,8 +263,8 @@ VECTOR(_locore, unknown)
 	 * XXXRW: Do we want to rely on default initialisation of all CP2
 	 * registers here?
 	 */
-	cmove CHERI_REG_KSCRATCH1, $cnull
-	cmove CHERI_REG_KSCRATCH2, $cnull
+	cmove CHERI_REG_C27, $cnull
+	cmove CHERI_REG_C28, $cnull
 #endif
 
 #if defined(CPU_BERI) || defined(CPU_QEMU_MALTA)
