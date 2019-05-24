@@ -146,7 +146,8 @@
 	/* EPCC is no longer a GPR so load it into KSCRATCH first */	\
 	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);		\
 	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
-	RESTORE_EPCC(CHERI_REG_KSCRATCH, pc_vaddr_tmpreg, tmpreg2)
+	RESTORE_EPCC(CHERI_REG_KSCRATCH, pc_vaddr_tmpreg, tmpreg2);	\
+	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb)
 #else
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, unused_reg, pcb)	\
