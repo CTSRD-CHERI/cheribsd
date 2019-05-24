@@ -429,11 +429,6 @@ SlowFault:
 	csd	reg, treg, 0(cregbase)
 
 #define	SAVE_CHERI(treg0, treg1)				\
-	/* Save C27 (KSCRATCH) before it gets overwritten. */	\
-	SAVE_CREG(CHERI_REG_C27, sp, C27, $ddc);	\
-	/* $ddc should no longer be accessed using $c0 */	\
-	CGetDefault CHERI_REG_KSCRATCH;			\
-	SAVE_CREG(CHERI_REG_KSCRATCH, sp, DDC, $ddc);	\
 	SAVE_CREG(CHERI_REG_C1, sp, C1, $ddc);		\
 	SAVE_CREG(CHERI_REG_C2, sp, C2, $ddc);		\
 	SAVE_CREG(CHERI_REG_C3, sp, C3, $ddc);		\
@@ -460,13 +455,16 @@ SlowFault:
 	SAVE_CREG(CHERI_REG_C24, sp, C24, $ddc);	\
 	SAVE_CREG(CHERI_REG_C25, sp, C25, $ddc);	\
 	SAVE_CREG(CHERI_REG_C26, sp, IDC, $ddc);	\
+	SAVE_CREG(CHERI_REG_C27, sp, C27, $ddc);	\
 	SAVE_CREG(CHERI_REG_C28, sp, C28, $ddc);	\
 	SAVE_CREG(CHERI_REG_C29, sp, C29, $ddc);	\
 	SAVE_CREG(CHERI_REG_C30, sp, C30, $ddc);	\
 	SAVE_CREG(CHERI_REG_C31, sp, C31, $ddc);	\
-	/* EPCC is no longer a GPR so load it into KSCRATCH first */\
+	/* Save special registers after KSCRATCH (C27) */	\
 	CGetEPCC CHERI_REG_KSCRATCH;			\
 	SAVE_CREG(CHERI_REG_KSCRATCH, sp, PCC, $ddc);	\
+	CGetDefault CHERI_REG_KSCRATCH;			\
+	SAVE_CREG(CHERI_REG_KSCRATCH, sp, DDC, $ddc);	\
 	cgetcause	treg0;					\
 	SAVE_CAPCAUSE(treg0, treg1, sp, CAPCAUSE, $ddc)
 #else
@@ -557,7 +555,7 @@ SlowFault:
  * Notice: the capability cause register is saved, but not restored.
  */
 #define	RESTORE_CHERI						\
-	/* $ddc should no longer be accessed using $c0 */	\
+	/* Restore special registers before KSCRATCH (C27) */	\
 	RESTORE_CREG(CHERI_REG_KSCRATCH, sp, DDC, $ddc);	\
 	CSetDefault CHERI_REG_KSCRATCH;		\
 	RESTORE_CREG(CHERI_REG_C1, sp, C1, $ddc);	\
@@ -586,7 +584,7 @@ SlowFault:
 	RESTORE_CREG(CHERI_REG_C24, sp, C24, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C25, sp, C25, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C26, sp, IDC, $ddc);	\
-	/* Explicitly don't restore C27. */		\
+	/* Wait to restore KSCRATCH (C27) until after EPCC */	\
 	RESTORE_CREG(CHERI_REG_C28, sp, C28, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C29, sp, C29, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C30, sp, C30, $ddc);	\
@@ -597,7 +595,8 @@ SlowFault:
 	/* EPCC is no longer a GPR so load it into KSCRATCH first */	\
 	RESTORE_CREG(CHERI_REG_KSCRATCH, sp, PCC, $ddc);		\
 	/* update the address of EPCC to the return pc */ 		\
-	RESTORE_EPCC(CHERI_REG_KSCRATCH, reg, t0);
+	RESTORE_EPCC(CHERI_REG_KSCRATCH, reg, t0);	\
+	RESTORE_CREG(CHERI_REG_C27, sp, C27, $ddc);
 #else
 #define	RESTORE_CHERI
 #define MTC0_EXC_PC(reg) MTC0	reg, MIPS_COP_0_EXC_PC
