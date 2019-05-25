@@ -119,21 +119,25 @@
 
 # define CAPTABLE_LOAD_PTR(capreg, cgp, l)		\
 	clcbi		capreg, %captab20(l)(cgp);
+# define CAPTABLE_LOAD_CALL_PTR(capreg, cgp, l)		\
+	clcbi		capreg, %capcall20(l)(cgp);
 
 # if defined(__CHERI_CAPABILITY_TABLE__) && __CHERI_CAPABILITY_TABLE__ != 3
 /* Cannot derive the target from $pcc with tight code bounds -> use captable: */
 #  define PIC_LOAD_CODE_PTR(capreg, gpr, l) CAPTABLE_LOAD_PTR(capreg, $cgp, l)
+#  define PIC_LOAD_CALL_PTR(capreg, gpr, l) CAPTABLE_LOAD_CALL_PTR(capreg, $cgp, l)
 # else
 /* PC-relative/legacy ABI -> derive the target from $pcc.
  * For the PC-relative ABI this allows us to avoid deriving $cgp from $pcc
  * on function entry. */
 #  define PIC_LOAD_CODE_PTR(capreg, gpr, l) PCREL_LOAD_CODE_PTR(capreg, gpr, l)
+#  define PIC_LOAD_CALL_PTR(capreg, gpr, l) PCREL_LOAD_CODE_PTR(capreg, gpr, l)
 # endif
 # define PIC_TAILCALL(l)				\
-	PIC_LOAD_CODE_PTR($c12, t9, _C_LABEL(l))	\
+	PIC_LOAD_CALL_PTR($c12, t9, _C_LABEL(l))	\
 	cjr $c12;
 # define PIC_CALL(l)					\
-	PIC_LOAD_CODE_PTR($c12, t9, _C_LABEL(l))	\
+	PIC_LOAD_CALL_PTR($c12, t9, _C_LABEL(l))	\
 	cjalr $c12, $c17;				\
 	nop;
 # define PIC_RETURN()		cjr $c17
