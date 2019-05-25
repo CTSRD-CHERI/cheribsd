@@ -472,7 +472,10 @@ __END_DECLS
 #endif
 
 #ifndef make_rtld_function_pointer
-#define make_rtld_function_pointer(target_func, rtld_obj) (dlfunc_t)(target_func)
+#define make_rtld_function_pointer(target_func)	(&target_func)
+#endif
+#ifndef make_rtld_local_function_pointer
+#define make_rtld_local_function_pointer(target_func)	(&target_func)
 #endif
 
 #ifndef __CHERI_PURE_CAPABILITY__
