@@ -104,16 +104,43 @@ allocate_function_pointer_trampoline(dlfunc_t target_func, const Obj_Entry *obj)
 
 /* Create a callable function pointer to a rtld-internal function */
 static inline dlfunc_t
-_make_rtld_function_pointer(dlfunc_t target_func, const Obj_Entry *rtld_obj) {
-	if (can_use_tight_pcc_bounds(rtld_obj)) {
-		return allocate_function_pointer_trampoline(target_func, rtld_obj);
-	}
-	// Otherwise, we are in the pcrel/legacy ABI -> can just return target
+_make_rtld_function_pointer(dlfunc_t target_func) {
+	extern struct Struct_Obj_Entry obj_rtld;
+#if !defined(__CHERI_CAPABILITY_TABLE__) || __CHERI_CAPABILITY_TABLE__ == 3
+	/* PC-rel/legacy */
+	dbg_assert(!can_use_tight_pcc_bounds(&obj_rtld));
 	return target_func;
+#else
+	/* Need a trampoline in PLT ABI */
+	dbg_assert(can_use_tight_pcc_bounds(&obj_rtld));
+	return allocate_function_pointer_trampoline(target_func, &obj_rtld);
+ #endif
 }
+
+#if !defined(__CHERI_CAPABILITY_TABLE__) || __CHERI_CAPABILITY_TABLE__ == 3
+/* Legacy/pc-rel can just use &func since there is no need for a trampoline */
+#define _make_local_only_fn_pointer(func) (dlfunc_t)(&func)
+#else
+/*
+ * In the PLT ABI we need to load the function pointer and pretend that we are
+ * using it for a call only to avoid generating a R_CHERI_CAPABILITY relocation:
+ */
+#define _make_local_only_fn_pointer(func) (dlfunc_t)(__extension__ ({		\
+	void* result = NULL;							\
+	__asm__("clcbi %0, %%capcall20(" #func ")($cgp)" : "=C"(result));	\
+	result;									\
+}))
+#endif
+
 /* Define this as a macro to allow a single definition for non-CHERI architectures */
-#define make_rtld_function_pointer(target_func, rtld_obj)	\
-	_make_rtld_function_pointer(target_func, rtld_obj)
+#define make_rtld_function_pointer(target_func)	\
+	(__typeof__(&target_func))_make_rtld_function_pointer(_make_local_only_fn_pointer(target_func))
+/*
+ * Create a function pointer that can only be called from the context of rtld
+ * (i.e. $cgp is set to the RTLD $cgp)
+ */
+#define make_rtld_local_function_pointer(target_func)	\
+	(__typeof__(&target_func))_make_local_only_fn_pointer(target_func)
 
 /*
  * Create a pointer to a function.

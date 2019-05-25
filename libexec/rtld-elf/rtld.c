@@ -108,7 +108,10 @@ static int do_search_info(const Obj_Entry *obj, int, struct dl_serinfo *);
 static bool donelist_check(DoneList *, const Obj_Entry *);
 static void errmsg_restore(char *);
 static char *errmsg_save(void);
-static void *fill_search_info(const char *, size_t, void *);
+static void *_fill_search_info(const char *, size_t, void *);
+/* Make this a macro to avoid updating all uses of fill_search_info */
+#define fill_search_info make_rtld_local_function_pointer(_fill_search_info)
+
 static char *find_library(const char *, const Obj_Entry *, int *);
 static const char *gethints(bool);
 static void hold_object(Obj_Entry *);
@@ -219,7 +222,7 @@ static char *ld_utrace;		/* Use utrace() to log events. */
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
-static Obj_Entry obj_rtld;	/* The dynamic linker shared object */
+Obj_Entry obj_rtld;	/* The dynamic linker shared object */
 static unsigned int obj_count;	/* Number of objects in obj_list */
 static unsigned int obj_loads;	/* Number of loads of objects (gen count) */
 
@@ -864,8 +867,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     /* Return the exit procedure and the program entry point. */
     if (rtld_exit_ptr == NULL)
-	rtld_exit_ptr =
-	    (func_ptr_type)make_rtld_function_pointer((dlfunc_t)rtld_exit, &obj_rtld);
+	rtld_exit_ptr = make_rtld_function_pointer(rtld_exit);
     *exit_proc = rtld_exit_ptr;
     *objp = obj_main;
 
@@ -2478,7 +2480,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* Replace the path with a dynamically allocated copy. */
     obj_rtld.path = xstrdup(ld_path_rtld);
 
-    r_debug.r_brk = r_debug_state;
+    r_debug.r_brk = make_rtld_local_function_pointer(r_debug_state);
     r_debug.r_state = RT_CONSISTENT;
 }
 
@@ -3031,12 +3033,10 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	}
 	lock_release(rtld_bind_lock, lockstate);
 	if (reg != NULL) {
-		dlfunc_t exit_fn_ptr =
-		    make_rtld_function_pointer((dlfunc_t)rtld_exit, &obj_rtld);
-		dbg("Calling __libc_atexit(rtld_exit (%#p))", (void*)exit_fn_ptr);
-		reg((func_ptr_type)exit_fn_ptr);
-		rtld_exit_ptr = (func_ptr_type)make_rtld_function_pointer(
-		(dlfunc_t)rtld_nop_exit, &obj_rtld);
+		func_ptr_type exit_ptr = make_rtld_function_pointer(rtld_exit);
+		dbg("Calling __libc_atexit(rtld_exit (%#p))", (void*)exit_ptr);
+		reg(exit_ptr);
+		rtld_exit_ptr = make_rtld_function_pointer(rtld_nop_exit);
 	}
 
         /*
@@ -3356,7 +3356,7 @@ initlist_objects_ifunc(Objlist *list, bool bind_now, int flags,
  * Cleanup procedure.  It will be called (by the atexit mechanism) just
  * before the process exits.
  */
-static void
+static __used void
 rtld_exit(void)
 {
     RtldLockState lockstate;
@@ -3370,7 +3370,7 @@ rtld_exit(void)
     lock_release(rtld_bind_lock, &lockstate);
 }
 
-static void
+static __used void
 rtld_nop_exit(void)
 {
 }
@@ -3417,7 +3417,7 @@ struct try_library_args {
     int		 fd;
 };
 
-static void *
+static __used void *
 try_library_path(const char *dir, size_t dirlen, void *param)
 {
     struct try_library_args *arg;
@@ -3467,7 +3467,8 @@ search_library_path(const char *name, const char *path,
     arg.buflen = PATH_MAX;
     arg.fd = -1;
 
-    p = path_enumerate(path, try_library_path, refobj_path, &arg);
+    p = path_enumerate(path, make_rtld_local_function_pointer(try_library_path),
+        refobj_path, &arg);
     *fdp = arg.fd;
 
     free(arg.buffer);
@@ -4193,8 +4194,8 @@ dl_iterate_phdr(__dl_iterate_hdr_callback callback, void *param)
 	return (error);
 }
 
-static void *
-fill_search_info(const char *dir, size_t dirlen, void *param)
+static __used void *
+_fill_search_info(const char *dir, size_t dirlen, void *param)
 {
     struct fill_search_info_args *arg;
 
