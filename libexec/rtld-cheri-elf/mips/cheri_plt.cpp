@@ -283,8 +283,21 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	// plt->captable_entry = where;
 	// For rtld we don't subset $cgp!
 	// TODO: allow building rtld with per-function captable
+
+	/*
+	 * Create a local function pointer for _rtld_bind_start (i.e. one that
+	 * does not have a trampoline that sets $cgp.
+	 *
+	 * We don't need a trampoline here since we already set $cgp inside
+	 * the _rtld_bind_start assembly code.
+	 *
+	 * TODO: Could also make this a pointer to a small trampoline that sets
+	 * $cgp, but that would slow down lazy binding
+	 */
+	dlfunc_t _rtld_bind_start_local_fn_ptr =
+	    (dlfunc_t)make_rtld_local_function_pointer(_rtld_bind_start);
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 && defined(notyet)
-	plt->rtld_cgp = target_cgp_for_func(rtldobj, (dlfunc_t)&_rtld_bind_start);
+	plt->rtld_cgp = target_cgp_for_func(rtldobj, _rtld_bind_start_local_fn_ptr);
 #else
 	plt->rtld_cgp = rtldobj->_target_cgp;
 #endif
@@ -296,7 +309,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	// void* target_cap = cheri_csetbounds(plt, sizeof(CheriPltStub));
 	void* target_cap = plt;
 	// currently use a self-reference (to beginning of struct) as data cap
-	plt->trampoline.init(target_cap, (dlfunc_t)&_rtld_bind_start);
+	plt->trampoline.init(target_cap, _rtld_bind_start_local_fn_ptr);
 	// but the actual target that is written to the PLT should point to the code:
 	target_cap = cheri_incoffset(target_cap, offsetof(CheriPltStub, trampoline.code));
 	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
