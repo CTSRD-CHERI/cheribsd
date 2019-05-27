@@ -120,7 +120,7 @@ private:
 		    mmap_flags, -1, 0);
 		dbg_cheri("Allocated new RWX block: %-#p", result);
 		if (result == MAP_FAILED) {
-			dbg_cheri("mmap failed: %s", strerror(errno));
+			dbg_cheri("mmap failed: %s", rtld_strerror(errno));
 			return nullptr;
 		}
 		current_offset = 0;
