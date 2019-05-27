@@ -52,6 +52,10 @@
  */
 #ifdef __CHERI_PURE_CAPABILITY__
 
+void __hidden __cheriabi_longjmperror(void);
+int __hidden __cheriabi_sigprocmask(int how, const sigset_t *set, sigset_t *oset);
+void __dead2 __hidden __cheriabi_abort(void);
+
 void __hidden
 __cheriabi_longjmperror(void)
 {
