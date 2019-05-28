@@ -1322,8 +1322,8 @@ te_data_get_ptr(void *irtep, u_long cmd)
 #endif
 #ifdef COMPAT_FREEBSD64
 	case sizeof(irteup->irte64):
-		return (__USER_CAP(irteup->irte64.data,
-		    irteup->irte64.data_len));
+		return (__USER_CAP((struct cd_toc_entry *)(uintptr_t)
+		    irteup->irte64.data, irteup->irte64.data_len));
 #endif
 	default:
 		panic("Unhandled ioctl command %ld", cmd);
