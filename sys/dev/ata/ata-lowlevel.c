@@ -850,7 +850,7 @@ ata_pio_read(struct ata_request *request, int length)
 				moff %= PAGE_SIZE;
 				size = min(size, PAGE_SIZE - moff);
 #ifdef CHERI_KERNEL
-				addr = cheri_csetbounds((page + moff), size);
+				addr = cheri_csetbounds((void *)(page + moff), size);
 #else
 				addr = page + moff;
 #endif
@@ -870,9 +870,9 @@ ata_pio_read(struct ata_request *request, int length)
 		/* Process main part of data. */
 		resid = size % 2;
 		if (__predict_false((ch->flags & ATA_USE_16BIT) ||
-		    (size % 4) != 0 || ((uintptr_t)addr % 4) != 0)) {
+		    (size % 4) != 0 || (ptr_to_va(addr) % 4) != 0)) {
 #ifndef __NO_STRICT_ALIGNMENT
-			if (__predict_false((uintptr_t)addr % 2)) {
+			if (__predict_false(ptr_to_va(addr) % 2)) {
 				for (i = 0; i + 1 < size; i += 2) {
 					*(uint16_t *)&buf =
 					    ATA_IDX_INW_STRM(ch, ATA_DATA);
@@ -940,7 +940,7 @@ ata_pio_write(struct ata_request *request, int length)
 				moff %= PAGE_SIZE;
 				size = min(size, PAGE_SIZE - moff);
 #ifdef CHERI_KERNEL
-				addr = cheri_csetbounds((page + moff), size);
+				addr = cheri_csetbounds((void *)(page + moff), size);
 #else
 				addr = page + moff;
 #endif
@@ -961,9 +961,9 @@ ata_pio_write(struct ata_request *request, int length)
 		/* Process main part of data. */
 		resid = size % 2;
 		if (__predict_false((ch->flags & ATA_USE_16BIT) ||
-		    (size % 4) != 0 || ((uintptr_t)addr % 4) != 0)) {
+		    (size % 4) != 0 || (ptr_to_va(addr) % 4) != 0)) {
 #ifndef __NO_STRICT_ALIGNMENT
-			if (__predict_false((uintptr_t)addr % 2)) {
+			if (__predict_false(ptr_to_va(addr) % 2)) {
 				for (i = 0; i + 1 < size; i += 2) {
 					buf[0] = addr[i];
 					buf[1] = addr[i + 1];
