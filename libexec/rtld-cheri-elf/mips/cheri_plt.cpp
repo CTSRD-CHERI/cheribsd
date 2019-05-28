@@ -442,7 +442,7 @@ reloc_plt(Obj_Entry *obj, bool bind_now, int flags __unused, const Obj_Entry *rt
 	    obj->cheri_plt_stubs->count());
 #if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 3
 	for (size_t i = 0; i < obj->captable_size / sizeof(void*); i++) {
-		dbg("%s->captable[%zd]:%p = %#p", obj->path, i,
+		dbg_cheri_plt_verbose("%s->captable[%zd]:%p = %#p", obj->path, i,
 		    &obj->writable_captable[i], obj->writable_captable[i].value);
 	}
 #endif
