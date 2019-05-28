@@ -642,8 +642,9 @@ struct sigaction_c {
 };
 struct sigaction64 {
 	union {
-		void    (*__sa_handler)(int);
-		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+		uint64_t __sa_handler; /* void (*)(int); */
+		/* void (*)(int, struct __siginfo *, void *); */
+		uint64_t __sa_sigaction;
 	} __sigaction_u;		/* signal handler */
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
