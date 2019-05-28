@@ -144,7 +144,7 @@ SipHash_Update(SIPHASH_CTX *ctx, const void *src, size_t len)
 	len >>= 3;
 
 	/* Optimze for 64bit aligned/unaligned access. */
-	if (((uintptr_t)s & 0x7) == 0) {
+	if ((ptr_to_va(s) & 0x7) == 0) {
 		for (p = (const uint64_t *)s; len > 0; len--, p++) {
 			m = le64toh(*p);
 			ctx->v[3] ^= m;
