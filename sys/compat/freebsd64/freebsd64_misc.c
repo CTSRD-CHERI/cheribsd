@@ -230,7 +230,7 @@ freebsd64_kevent_copyout(void *arg, kkevent_t *kevp, int count)
 		ks64[i].flags = kevp[i].flags;
 		ks64[i].fflags = kevp[i].fflags;
 		ks64[i].data = kevp[i].data;
-		ks64[i].udata = (void *)(__cheri_addr vaddr_t)kevp[i].udata;
+		ks64[i].udata = (__cheri_addr vaddr_t)kevp[i].udata;
 		memcpy(&ks64[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
 	}
 	error = copyout(ks64, uap->eventlist, count * sizeof(*ks64));
