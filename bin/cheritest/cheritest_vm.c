@@ -47,6 +47,7 @@
 #include <sys/ucontext.h>
 #include <sys/wait.h>
 
+#include <sys/caprevoke.h>
 #include <sys/event.h>
 
 #include <machine/cpuregs.h>
@@ -168,7 +169,7 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 
 	if (pid == 0) {
 		void * __capability * map;
-		void * __capability c;
+		void * __capability crx;
 		int fd, tag;
 		struct msghdr msg = { 0 };
 		struct cmsghdr * cmsg;
@@ -195,13 +196,11 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		map = CHERITEST_CHECK_SYSCALL(mmap(NULL, getpagesize(),
 						PROT_READ, MAP_SHARED, fd,
 						0));
-		c = *map;
+		crx = *map;
 
-		fprintf(stderr, "rx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			(unsigned long)cheri_gettag(c), cheri_getbase(c),
-			cheri_getlen(c), cheri_getoffset(c));
+		CHERI_FPRINT_PTR(stderr, crx);
 
-		tag = cheri_gettag(c);
+		tag = cheri_gettag(crx);
 		CHERITEST_VERIFY2(tag == 0, "tag read");
 
 		CHERITEST_CHECK_SYSCALL(munmap(map, getpagesize()));
@@ -211,7 +210,7 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 		exit(tag);
 	} else {
 		void * __capability * map;
-		void * __capability c;
+		void * __capability ctx;
 		int fd, res;
 		struct msghdr msg = { 0 };
 		struct cmsghdr * cmsg;
@@ -230,12 +229,10 @@ cheritest_vm_shm_open_anon_unix_surprise(const struct cheri_test *ctp __unused)
 
 		/* Just some pointer */
 		*map = &fd;
-		c = *map;
-		CHERITEST_VERIFY2(cheri_gettag(c) != 0, "tag written");
+		ctx = *map;
+		CHERITEST_VERIFY2(cheri_gettag(ctx) != 0, "tag written");
 
-		fprintf(stderr, "tx cap: v:%lu b:%016jx l:%016zx o:%jx\n",
-			(unsigned long)cheri_gettag(c), cheri_getbase(c),
-			cheri_getlen(c), cheri_getoffset(c));
+		CHERI_FPRINT_PTR(stderr, ctx);
 
 		CHERITEST_CHECK_SYSCALL(munmap(map, getpagesize()));
 
@@ -600,3 +597,175 @@ cheritest_vm_cow_write(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(close(fd));
 	cheritest_success();
 }
+
+/*
+ * Test a mapped and unmapped invocation of cloadtags
+ */
+
+void
+test_cloadtags_mapped(const struct cheri_test *ctp __unused)
+{
+	uint64_t tags = 0;
+	void * __capability * __capability c;
+	void * __capability * p;
+
+	p = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+						MAP_ANON, -1, 0));
+	c = (__cheri_tocap void * __capability * __capability) p;
+
+	CHERITEST_VERIFY2(cheri_gettag(c) != 0, "initial cap not constructed");
+
+	p[1] = c;
+	p[2] = c;
+
+	asm volatile ( "cloadtags %[tags], %[ptr]" : [tags]"+r"(tags) : [ptr]"r"(c) );
+
+	CHERITEST_VERIFY2(tags == 0x6, "incorrect result from cloadtags");
+
+	munmap(p, PAGE_SIZE);
+	cheritest_success();
+}
+
+void
+test_fault_cloadtags_unmapped(const struct cheri_test *ctp __unused)
+{
+	uint64_t tags = 0;
+	void * __capability c;
+	void * p;
+
+	p = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+						MAP_ANON, -1, 0));
+	munmap(p, PAGE_SIZE);
+	c = (__cheri_tocap void * __capability) p;
+	asm volatile ( "cloadtags %[tags], %[ptr]" : [tags]"+r"(tags) : [ptr]"r"(c) );
+}
+
+/*
+ * Revocation tests
+ */
+
+#ifdef CHERIABI_TESTS
+
+static void
+install_kqueue_cap(int kq, void * __capability revme)
+{
+	struct kevent ike;
+
+	EV_SET(&ike, 0x2BAD, EVFILT_USER, EV_ADD|EV_ONESHOT|EV_DISABLE,
+		NOTE_FFNOP, 0, revme);
+	CHERITEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+	EV_SET(&ike, 0x2BAD, EVFILT_USER, EV_KEEPUDATA,
+		NOTE_FFNOP|NOTE_TRIGGER, 0, NULL);
+	CHERITEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+}
+
+static void
+check_kqueue_cap(int kq, unsigned int expected_tag)
+{
+	struct kevent ike, oke = { 0 };
+
+	EV_SET(&ike, 0x2BAD, EVFILT_USER, EV_ENABLE|EV_KEEPUDATA,
+		NOTE_FFNOP, 0, NULL);
+	CHERITEST_CHECK_SYSCALL(kevent(kq, &ike, 1, NULL, 0, NULL));
+	CHERITEST_CHECK_SYSCALL(kevent(kq, NULL, 0, &oke, 1, NULL));
+	CHERITEST_VERIFY2(oke.ident == 0x2BAD, "Bad identifier from kqueue");
+	CHERITEST_VERIFY2(oke.filter == EVFILT_USER, "Bad filter from kqueue");
+	CHERITEST_VERIFY2(cheri_gettag(oke.udata) == expected_tag,
+				"kqueue-held cap tag not as expected");
+}
+
+static void
+fprintf_caprevoke_stats(FILE *f, struct caprevoke_stats crst)
+{
+	fprintf(f, "stats: pscan=%" PRIu64
+		" pfsk=%" PRIu64
+		" pfro=%" PRIu64
+		" pfrw=%" PRIu64 "\n",
+		crst.pages_scanned,
+		crst.pages_fault_skip,
+		crst.pages_faulted_ro,
+		crst.pages_faulted_rw);
+}
+
+void
+test_caprevoke_lightly(const struct cheri_test *ctp __unused)
+{
+	void * __capability * __capability mb;
+	void * __capability sh;
+	void * __capability revme;
+	struct caprevoke_stats crst;
+	int kq;
+	uint64_t oepoch;
+
+	kq = CHERITEST_CHECK_SYSCALL(kqueue());
+	mb = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+					  MAP_ANON, -1, 0));
+	CHERITEST_CHECK_SYSCALL(caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP,
+						 mb, &sh));
+
+	/*
+	 * OK, armed with the shadow mapping... generate a capability to
+	 * the 0th granule of the map, spill it to the 1st granule,
+	 * stash it in the kqueue, and mark it as revoked in the shadow.
+	 */
+	revme = cheri_andperm(mb, ~CHERI_PERM_CHERIABI_VMMAP);
+	((void * __capability *)mb)[1] = revme;
+	install_kqueue_cap(kq, revme);
+
+	((uint8_t * __capability) sh)[0] = 1;
+
+	/*
+	 * First, let's see if we can shoot down just the hoarders and not
+	 * the VM.  We'll put the thing back and do a full pass momentarily.
+	 */
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_JUST_HOARDERS, 0, &crst));
+
+	check_kqueue_cap(kq, 0);
+	CHERITEST_VERIFY2(cheri_gettag(mb[1]) != 0, "JUST cleared memory tag");
+
+	/* OK, full pass */
+	install_kqueue_cap(kq, revme);
+
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_JUST_THE_TIME, 0, &crst));
+	oepoch = crst.epoch;
+
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS, oepoch, &crst));
+	CHERITEST_VERIFY2(crst.epoch >= oepoch + 2, "Bad epoch clock state");
+	fprintf_caprevoke_stats(stderr, crst);
+	oepoch = crst.epoch;
+
+	CHERITEST_VERIFY2(cheri_gettag(mb[1]) == 0, "Memory tag persists");
+	check_kqueue_cap(kq, 0);
+
+	/* Clear the revocation bit and do that again */
+	((uint8_t * __capability) sh)[0] = 0;
+
+	/*
+	 * We don't derive exactly the same thing, to prevent CSE from
+	 * firing.  More specifically, we adjust the offset first, taking
+	 * the path through the commutation diagram that doesn't share an
+	 * edge with the derivation above.
+	 */
+	revme = cheri_andperm(mb+1, ~CHERI_PERM_CHERIABI_VMMAP);
+	CHERITEST_VERIFY2(cheri_gettag(revme) == 1, "Tag clear on 2nd revme?");
+	((void * __capability *)mb)[1] = revme;
+	install_kqueue_cap(kq, revme);
+
+	CHERITEST_CHECK_SYSCALL(caprevoke(0, oepoch, &crst));
+	CHERITEST_VERIFY2(crst.epoch >= oepoch + 1, "Bad epoch clock state");
+	fprintf_caprevoke_stats(stderr, crst);
+
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS, oepoch, &crst));
+	fprintf_caprevoke_stats(stderr, crst);
+
+	CHERITEST_VERIFY2(cheri_gettag(mb[1]) != 0, "Memory tag cleared");
+
+	check_kqueue_cap(kq, 1);
+
+	munmap(mb, PAGE_SIZE);
+	close(kq);
+
+	cheritest_success();
+}
+
+#endif

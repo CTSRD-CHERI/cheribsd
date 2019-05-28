@@ -222,28 +222,36 @@
 /*
  * The CHERI object-type space is split between userspace and kernel,
  * permitting kernel object references to be delegated to userspace (if
- * desired).  Currently, we provide 23 bits of namespace to each, with the top
+ * desired).
+ *
+ * While CHERI define[sd] a 24-bit architectural otype, in practice our
+ * compressed encoding is now 18 bits, so that we no longer have to steal
+ * precision bits from bounds, so we act everywhere as though that were the
+ * limit.
+ *
+ * Currently, we provide 17 bits of namespace to each, with the top
  * bit set for kernel object types, but it is easy to imagine other splits.
  * User and kernel software should be written so as to not place assumptions
  * about the specific values used here, as they may change.
  */
 #define	CHERI_OTYPE_USER_MIN	(0)
-#define	CHERI_OTYPE_USER_MAX	((1 << 23) - 1)
-#define	CHERI_OTYPE_KERN_MIN	(1 << 23)
-#define	CHERI_OTYPE_KERN_MAX	((1 << 24) - 1)
+#define	CHERI_OTYPE_USER_MAX	((1 << 17) - 1)
+#define	CHERI_OTYPE_KERN_MIN	(1 << 17)
+#define	CHERI_OTYPE_KERN_MAX	((1 << 18) - 1)
+#define CHERI_OTYPE_MAX		((1 << 18) - 1)
 
-#define	CHERI_OTYPE_KERN_FLAG	(1 << 23)
+#define	CHERI_OTYPE_KERN_FLAG	(1 << 17)
 #define	CHERI_OTYPE_ISKERN(x)	(((x) & CHERI_OTYPE_KERN_FLAG) != 0)
 #define	CHERI_OTYPE_ISUSER(x)	(!(CHERI_OTYPE_ISKERN(x)))
 
 /*
  * When performing a userspace-to-userspace CCall, capability flow-control
  * checks normally prevent local capabilities from being delegated.  This can
- * be disabled on call (but not return) by using an object type with the 22nd
+ * be disabled on call (but not return) by using an object type with the 16th
  * bit set -- combined with a suitable selector on the CCall instruction to
  * ensure that this behaviour is intended.
  */
-#define	CHERI_OTYPE_LOCALOK_SHIFT	(22)
+#define	CHERI_OTYPE_LOCALOK_SHIFT	(16)
 #define	CHERI_OTYPE_LOCALOK_FLAG	(1 << CHERI_OTYPE_LOCALOK_SHIFT
 #define	CHERI_OTYPE_IS_LOCALOK(x)	(((x) & CHERI_OTYPE_LOCALOK_FLAG) != 0)
 

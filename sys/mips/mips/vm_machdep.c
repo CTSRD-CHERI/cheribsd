@@ -72,6 +72,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef CPU_CHERI
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #endif
 
 #include <vm/vm.h>
@@ -86,6 +87,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/uma_int.h>
 
+#include <sys/stdatomic.h>
 #include <sys/user.h>
 #include <sys/mbuf.h>
 
@@ -604,6 +606,146 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 
 	return (0);
 }
+
+#ifdef CPU_CHERI
+int
+vm_test_caprevoke(const void * __capability cut)
+{
+	uint8_t * __capability bmloc;
+	uint8_t bmbits;
+	vm_offset_t va;
+	int err;
+
+	// XXX? KASSERT(cheri_gettag(cut), ("Detagged in vm_test_caprevoke"));
+
+	/* Load capability, find appropriate bitmap bits.  We use the base
+	 * so that even if the cursor is out of bounds, we find the true
+	 * status of the allocation under test.
+	 */
+
+	va = cheri_getbase(cut);
+
+	/* XXX Right now we only check the NOMAP bitmap */
+
+	bmbits = 0;
+		/*
+		 * XXX This is a very powerful cap; we should intead
+		 * initialize one specifically for this test
+		 */
+	bmloc = cheri_setaddress(cheri_getkdc(),
+				  (((vm_offset_t) VM_CAPREVOKE_BM_MEM_NOMAP)
+				  + (va / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8)));
+
+	err = copyin_c(bmloc, &bmbits, sizeof(bmbits));
+
+	KASSERT(err == 0, ("copyin revoke bitmap va=%lx bmloc=%p err=%d",
+				va, (__cheri_fromcap void *)bmloc, err));
+
+	return (((cheri_getperm(cut) & CHERI_PERM_CHERIABI_VMMAP) == 0) &&
+		(bmbits & (1 << ((va / VM_CAPREVOKE_GSZ_MEM_NOMAP) % 8))));
+}
+
+/*
+ * The Capability Under Test Pointer needs to be a capability because we
+ * don't have a LLC instruction, just a CLLC one.
+ */
+static int
+vm_do_caprevoke(void * __capability * __capability cutp)
+{
+	void * __capability cut;
+	int res = 0;
+
+	cut = *cutp;
+
+	if (vm_test_caprevoke(cut)) {
+		void * __capability cscratch;
+
+		/*
+		 * Load-link the position under test; verify that it matches
+		 * our previous load; clear the tag; store conditionally
+		 * back.  If the verification fails, don't try anything
+		 * fancy, just modify the return value to flag the page as
+		 * dirty.
+		 *
+		 * It's possible that this CAS will fail because the pointer
+		 * has changed during our test.  That's fine, if this is not
+		 * a stop-the-world scan; we'll catch it in the next go
+		 * around.  However, because CAS can fail for reasons other
+		 * than an actual data failure, return an indicator that the
+		 * page should not be considered clean.
+		 */
+		__asm__ __volatile__ (
+			"cllc %[cscratch], %[cutp]\n\t"
+			"cexeq $t0, %[cscratch], %[cut]\n\t"
+			"beqz $t0, 1f\n\t"
+			"ccleartag %[cscratch], %[cscratch]\n\t" // delay slot!
+			"cscc $t0, %[cscratch], %[cutp]\n\t"
+			"beqz $t0, 1f\n\t"
+			"nop\n\t" // delay slot
+			"j 2f\n\t"
+			"1: ori %[res], %[res], %[cdflag]\n\t"
+			"2:\n"
+		  : [res] "+r" (res), [cscratch] "=&C" (cscratch)
+		  : [cut] "C" (cut), [cutp] "C" (cutp),
+		    [cdflag] "i" (VM_CAPREVOKE_PAGE_DIRTY)
+		  : "t0", "memory" );
+	}
+
+	return res;
+}
+
+int
+vm_caprevoke_page(vm_page_t m)
+{
+	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
+	vm_offset_t mva;
+	vm_offset_t mve;
+	/* XXX NWF Is this what we want? */
+	void * __capability kdc = cheri_getkdc();
+	int res = 0;
+
+	/*
+	 * XXX NWF
+	 * Hopefully m being xbusy'd means it's not about to go away on us.
+	 * I don't yet understand all the interlocks in the vm subsystem.
+	 */
+	KASSERT(MIPS_DIRECT_MAPPABLE(mpa),
+		("Revoke not directly map swept page?"));
+	mva = MIPS_PHYS_TO_DIRECT(mpa);
+	mve = mva + pagesizes[m->psind];
+
+
+	/*
+	 * XXX NWF 8 is very uarch specific and should be fixed.
+	 */
+	for( ; mva < mve; mva += 8 * sizeof(void * __capability)) {
+		void * __capability * __capability mvu = cheri_setaddress(kdc,mva);
+		uint64_t tags;
+
+		tags = __builtin_cheri_cap_load_tags(mvu);
+
+		/*
+		 * This is an easily-obtained overestimate: we might be
+		 * about to clear the last cap on this page.  We won't
+		 * detect that until the next revocation pass that touches
+		 * this page.  That's probably fine and probably doesn't
+		 * happen too often, and is a good bit simpler than trying
+		 * to measure afterwards
+		 */
+		if (tags != 0)
+			res |= VM_CAPREVOKE_PAGE_HASCAPS;
+
+		for(; tags != 0; (tags >>= 1), mvu += 1) {
+			if (!(tags & 1))
+				continue;
+			res |= vm_do_caprevoke(mvu);
+		}
+	}
+
+
+	return res;
+}
+#endif
 
 #ifdef DDB
 #include <ddb/ddb.h>

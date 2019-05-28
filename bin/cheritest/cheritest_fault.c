@@ -255,3 +255,15 @@ test_fault_read_epcc(const struct cheri_test *ctp __unused)
 
 	CHERI_CAP_PRINT(cheri_getepcc());
 }
+
+void
+test_fault_cloadtags_misaligned(const struct cheri_test *ctp __unused)
+{
+	uint64_t tags = 0xDEADFEED;
+	void * __capability p[20] __attribute__((aligned(512))) = { 0 } ;
+	void * __capability c = &p[1];
+
+	asm volatile ( "cloadtags %[tags], %[ptr]" : [tags]"+r"(tags) : [ptr]"r"(c) );
+
+	cheritest_success();
+}

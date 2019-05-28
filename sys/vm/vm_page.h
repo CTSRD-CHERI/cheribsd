@@ -232,13 +232,13 @@ struct vm_page {
  * 	 under PV management cannot be paged out via the
  * 	 object/vm_page_t because there is no knowledge of their pte
  * 	 mappings, and such pages are also not on any PQ queue.
- *
  */
 #define	VPO_KMEM_EXEC	0x01		/* kmem mapping allows execution */
 #define	VPO_SWAPSLEEP	0x02		/* waiting for swap to finish */
 #define	VPO_UNMANAGED	0x04		/* no PV management for page */
 #define	VPO_SWAPINPROG	0x08		/* swap I/O in progress on page */
 #define	VPO_NOSYNC	0x10		/* do not collect for syncer */
+#define	VPO_PASTCAPSTORE 0x20	/* This page had capabilities in the past */
 
 /*
  * Busy page implementation details.
@@ -363,6 +363,13 @@ extern struct mtx_padalign pa_lock[];
  * PGA_REQUEUE_HEAD is a special flag for enqueuing pages near the head of
  * the inactive queue, thus bypassing LRU.  The page lock must be held to
  * set this flag, and the queue lock for the page must be held to clear it.
+ *
+ * PGA_CAPSTORED indicates that a capability was written to this page since
+ * the last time this bit (and the underlying architectural permission) was
+ * cleared.  Setting this bit happens without the page lock held, but
+ * clearing it requires the page lock (and the page must have been locked
+ * and held across the duration of whatever operation determined that there
+ * are no capabilities on this page).
  */
 #define	PGA_WRITEABLE	0x01		/* page may be mapped writeable */
 #define	PGA_REFERENCED	0x02		/* page has been referenced */
@@ -371,6 +378,7 @@ extern struct mtx_padalign pa_lock[];
 #define	PGA_DEQUEUE	0x10		/* page is due to be dequeued */
 #define	PGA_REQUEUE	0x20		/* page is due to be requeued */
 #define	PGA_REQUEUE_HEAD 0x40		/* page requeue should bypass LRU */
+#define	PGA_CAPSTORED	0x80
 
 #define	PGA_QUEUE_STATE_MASK	(PGA_ENQUEUED | PGA_DEQUEUE | PGA_REQUEUE | \
 				PGA_REQUEUE_HEAD)
@@ -602,6 +610,12 @@ void vm_page_assert_locked_KBI(vm_page_t m, const char *file, int line);
 void vm_page_lock_assert_KBI(vm_page_t m, int a, const char *file, int line);
 #endif
 
+#ifdef CPU_CHERI
+#define VM_CAPREVOKE_PAGE_HASCAPS	0x01
+#define VM_CAPREVOKE_PAGE_DIRTY		0x02
+int vm_caprevoke_page(vm_page_t m);
+#endif
+
 #define	vm_page_assert_sbusied(m)					\
 	KASSERT(vm_page_sbusied(m),					\
 	    ("vm_page_assert_sbusied: page %p not shared busy @ %s:%d", \
@@ -717,7 +731,40 @@ vm_page_aflag_set(vm_page_t m, uint8_t bits)
 	val <<= 24;
 #endif
 	atomic_set_32(addr, val);
-} 
+}
+
+/*
+ * Atomically read and clear some bits in a page's aflags field.  Unlike
+ * vm_page_aflag_clear, this reports the contents of the aflags field before
+ * mutation, allowing for a race-free observation and reset of status.
+ *
+ * Used, at the moment, solely for PGA_CAPSTORED, allowing the MI revoker
+ * outer loops to decide whether a page is recently capdirtied.  See
+ * sys/vm/vm_caprevoke.c .
+ *
+ * XXX NWF This is horrifying and there must be a better way.
+ */
+static inline int
+vm_page_aflag_xclear_acq(vm_page_t m, uint8_t bits)
+{
+	uint32_t *addr, n, o;
+
+	addr = (void *)&m->aflags;
+	o = *addr;
+	do {
+#if BYTE_ORDER == BIG_ENDIAN
+		n = o & ~(bits << 24);
+#else
+		n = o & ~bits;
+#endif
+	} while (!atomic_fcmpset_acq_32(addr, &o, n));
+
+#if BYTE_ORDER == BIG_ENDIAN
+	return (o >> 24) & 0xFF;
+#else
+	return o & 0xFF;
+#endif
+}
 
 /*
  *	vm_page_dirty:
@@ -739,6 +786,14 @@ vm_page_dirty(vm_page_t m)
 #else
 	m->dirty = VM_PAGE_BITS_ALL;
 #endif
+}
+
+static __inline void
+vm_page_capdirty(vm_page_t m)
+{
+	if ((m->aflags & PGA_CAPSTORED) == 0) {
+		vm_page_aflag_set(m, PGA_CAPSTORED);
+	}
 }
 
 /*

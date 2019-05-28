@@ -1079,6 +1079,20 @@ RestartScan:
 				    pmap_is_referenced(m) ||
 				    (m->aflags & PGA_REFERENCED) != 0)
 					mincoreinfo |= MINCORE_REFERENCED_OTHER;
+
+				/*
+				 * The pmap may have told us that this
+				 * particular mapping is already capdirty,
+				 * and if so don't bother with the more
+				 * elaborate probes and especially not with
+				 * the expensive pmap_tc_capdirty.
+				 */
+				if ((mincoreinfo & MINCORE_MAYHAVECAP) != 0 ||
+					((m->aflags & PGA_CAPSTORED) != 0) ||
+					((m->flags & VPO_PASTCAPSTORE) != 0) ||
+					pmap_tc_capdirty(m) ||
+					((m->aflags & PGA_CAPSTORED) != 0))
+					mincoreinfo |= MINCORE_MAYHAVECAP;
 			}
 			if (object != NULL)
 				VM_OBJECT_WUNLOCK(object);
@@ -1793,3 +1807,15 @@ vm_mmap_to_errno(int rv)
 //   "change_comment": ""
 // }
 // CHERI CHANGES END
+
+/* This is almost surely the wrong place for this */
+int
+sys_caprevoke(struct thread *td, struct caprevoke_args *uap)
+{
+	return ENOSYS;
+}
+int
+sys_caprevoke_shadow(struct thread *td, struct caprevoke_shadow_args *uap)
+{
+	return ENOSYS;
+}

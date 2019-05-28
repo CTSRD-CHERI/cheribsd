@@ -76,6 +76,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef CPU_CHERI
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #endif
 
 #include <ddb/ddb.h>
@@ -711,6 +712,50 @@ ptrace_clear_single_step(struct thread *td)
 	td->td_md.md_ss_addr = 0;
 	return 0;
 }
+
+void
+caprevoke_td_frame(struct thread *td)
+{
+#ifdef CPU_CHERI
+#define CAPREV_REG(r) \
+	do { if (cheri_gettag(r) && vm_test_caprevoke(r)) \
+		{ r = cheri_cleartag(r); }} while(0)
+
+	CAPREV_REG(td->td_frame->ddc);
+	CAPREV_REG(td->td_frame->c1);
+	CAPREV_REG(td->td_frame->c2);
+	CAPREV_REG(td->td_frame->c3);
+	CAPREV_REG(td->td_frame->c4);
+	CAPREV_REG(td->td_frame->c5);
+	CAPREV_REG(td->td_frame->c6);
+	CAPREV_REG(td->td_frame->c7);
+	CAPREV_REG(td->td_frame->c8);
+	CAPREV_REG(td->td_frame->c9);
+	CAPREV_REG(td->td_frame->c10);
+	CAPREV_REG(td->td_frame->csp);
+	CAPREV_REG(td->td_frame->c12);
+	CAPREV_REG(td->td_frame->c13);
+	CAPREV_REG(td->td_frame->c14);
+	CAPREV_REG(td->td_frame->c15);
+	CAPREV_REG(td->td_frame->c16);
+	CAPREV_REG(td->td_frame->c17);
+	CAPREV_REG(td->td_frame->c18);
+	CAPREV_REG(td->td_frame->c19);
+	CAPREV_REG(td->td_frame->c20);
+	CAPREV_REG(td->td_frame->c21);
+	CAPREV_REG(td->td_frame->c22);
+	CAPREV_REG(td->td_frame->c23);
+	CAPREV_REG(td->td_frame->c24);
+	CAPREV_REG(td->td_frame->c25);
+	CAPREV_REG(td->td_frame->idc);
+	CAPREV_REG(td->td_frame->pcc); /* This could be real exciting! */
+
+#undef CAPREV_REG
+#endif
+
+	return;
+}
+
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,

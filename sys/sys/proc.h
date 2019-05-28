@@ -642,6 +642,7 @@ struct proc {
 	int		p_pendingexits; /* (c) Count of pending thread exits. */
 	struct filemon	*p_filemon;	/* (c) filemon-specific data. */
 	int		p_pdeathsig;	/* (c) Signal from parent on exit. */
+	struct cv	p_caprev_cv;	/* (c) Cap. rev. is single file */
 /* End area that is zeroed on creation. */
 #define	p_endzero	p_magic
 
@@ -662,6 +663,7 @@ struct proc {
 					       our subtree. */
 	uint16_t	p_elf_machine;	/* (x) ELF machine type */
 	uint64_t	p_elf_flags;	/* (x) ELF flags */
+	uint64_t	p_caprev_st;	/* (c) Capability revocation state */
 /* End area that is copied on creation. */
 #define	p_endcopy	p_xexit
 

@@ -1161,6 +1161,31 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
 
+#ifdef CPU_CHERI
+	/*
+	 * For CheriABI, create an anonymous, CoW mapping for the revocation
+	 * bitmaps.
+	 *
+	 * XXX This almost surely belongs elsewhere, but I don't immediately
+	 * see a per-sv hook here.
+	 */
+	if (sv->sv_flags & SV_CHERI) {
+		vm_pindex_t size = VM_CAPREVOKE_BM_TOP - VM_CAPREVOKE_BM_BASE;
+		vm_object_t vmo = vm_object_allocate(OBJT_DEFAULT, size);
+
+		vmo->flags |= OBJ_NOLOADTAGS | OBJ_NOSTORETAGS;
+
+		error = vm_map_fixed(map, vmo, 0,
+				VM_CAPREVOKE_BM_BASE,
+				size,
+				VM_PROT_READ | VM_PROT_WRITE,
+				VM_PROT_READ | VM_PROT_WRITE,
+				0);
+		if (error != KERN_SUCCESS)
+			return (vm_mmap_to_errno(error));
+	}
+#endif
+
 	/*
 	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
 	 * are still used to enforce the stack rlimit on the process stack.

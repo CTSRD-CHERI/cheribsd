@@ -83,15 +83,58 @@
 
 #ifdef __mips_n64
 #define	VM_MAXUSER_ADDRESS	(VM_MINUSER_ADDRESS + (NPDEPG * NBSEG))
-#define	VM_MIN_KERNEL_ADDRESS	((vm_offset_t)0xc000000000000000)
-#define	VM_MAX_KERNEL_ADDRESS	(VM_MIN_KERNEL_ADDRESS + (NPDEPG * NBSEG))
-#else
-#define	VM_MAXUSER_ADDRESS	((vm_offset_t)0x80000000)
-#define	VM_MIN_KERNEL_ADDRESS	((vm_offset_t)0xC0000000)
-#define	VM_MAX_KERNEL_ADDRESS	((vm_offset_t)0xFFFFC000)
-#endif
+#ifdef CPU_CHERI
 
-#define	KERNBASE		((vm_offset_t)(intptr_t)(int32_t)0x80000000)
+/*
+ * Lay out some bitmaps for us, ranging from VM_CAPREVOKE_BM_BASE
+ * to VM_CAPREVOKE_BM_TOP:
+ *
+ * TOP:
+ * 	- one bit per otype (BM_OTYPE)
+ * 	- one bit per page, checked for VMMAP-bearing caps (BM_MEM_MAP)
+ * 	- one bit per cap, checked for non-VMMAP-bearing caps (BM_MEM_NOMAP)
+ * BASE:
+ *
+ * The granularities of these bitmaps are specified in the _GSZ_ constants.
+ * For the present settings, a *byte* of these bitmaps spans....
+ * 	- 8 otypes
+ * 	- 8 pages (32KiB of memory)
+ * 	- 128 bytes of memory (on CC and CHERI-128; 256 bytes on CHERI-256)
+ * Requests to access the shadow space must, therefore, be at least that
+ * aligned!
+ *
+ * XXX
+ * For the moment, we use a relatively naive layout that lets us easily vary
+ * the granularity of the different shadow spaces; when we're happy with
+ * these, we should repack the shadow spaces.  It's quite likely, for
+ * example, that BSZ_MEM_MAP and BSZ_OTYPE add up to less than the implicit
+ * and unused shadow of BS_MEM_NOMAP within itself.
+ */
+
+#define VM_CAPREVOKE_GSZ_OTYPE		((vm_offset_t)1)
+#define VM_CAPREVOKE_GSZ_MEM_MAP	((vm_offset_t)PAGE_SIZE)
+#define VM_CAPREVOKE_GSZ_MEM_NOMAP	((vm_offset_t)sizeof (void * __capability))
+
+#define VM_CAPREVOKE_BSZ_MEM_NOMAP	(NPDEPG * NBSEG  / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8)
+#define VM_CAPREVOKE_BSZ_MEM_MAP	(NPDEPG * NBSEG  / VM_CAPREVOKE_GSZ_MEM_MAP   / 8)
+#define VM_CAPREVOKE_BSZ_OTYPE		((CHERI_OTYPE_MAX + 1) / VM_CAPREVOKE_GSZ_OTYPE     / 8)
+/* XXX TODO SetCID revocation? */
+
+#define VM_CAPREVOKE_BM_TOP	VM_MAXUSER_ADDRESS
+#define VM_CAPREVOKE_BM_BASE	( VM_CAPREVOKE_BM_TOP \
+					- VM_CAPREVOKE_BSZ_MEM_NOMAP \
+					- VM_CAPREVOKE_BSZ_MEM_MAP \
+					- VM_CAPREVOKE_BSZ_OTYPE )
+#define VM_CAPREVOKE_BM_MEM_NOMAP	VM_CAPREVOKE_BM_BASE
+#define VM_CAPREVOKE_BM_MEM_MAP		( VM_CAPREVOKE_BM_MEM_NOMAP  \
+					+ VM_CAPREVOKE_BSZ_MEM_NOMAP )
+#define VM_CAPREVOKE_BM_OTYPE		( VM_CAPREVOKE_BM_MEM_MAP  \
+					+ VM_CAPREVOKE_BSZ_MEM_MAP )
+
+#define	SHAREDPAGE		(VM_CAPREVOKE_BM_BASE - PAGE_SIZE)
+#define	USRSTACK		SHAREDPAGE
+
+#else
 /*
  * USRSTACK needs to start a little below 0x8000000 because the R8000
  * and some QED CPUs perform some virtual address checks before the
@@ -99,6 +142,19 @@
  */
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
 #define	USRSTACK		SHAREDPAGE
+#endif
+
+#define	VM_MIN_KERNEL_ADDRESS	((vm_offset_t)0xc000000000000000)
+#define	VM_MAX_KERNEL_ADDRESS	(VM_MIN_KERNEL_ADDRESS + (NPDEPG * NBSEG))
+#else
+#define	VM_MAXUSER_ADDRESS	((vm_offset_t)0x80000000)
+#define	VM_MIN_KERNEL_ADDRESS	((vm_offset_t)0xC0000000)
+#define	VM_MAX_KERNEL_ADDRESS	((vm_offset_t)0xFFFFC000)
+#define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
+#define	USRSTACK		SHAREDPAGE
+#endif
+
+#define	KERNBASE		((vm_offset_t)(intptr_t)(int32_t)0x80000000)
 #ifdef __mips_n64
 #define	FREEBSD32_SHAREDPAGE	(((vm_offset_t)0x80000000) - PAGE_SIZE)
 #define	FREEBSD32_USRSTACK	FREEBSD32_SHAREDPAGE
