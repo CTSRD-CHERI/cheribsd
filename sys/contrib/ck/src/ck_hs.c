@@ -228,8 +228,7 @@ ck_hs_map_create(struct ck_hs *hs, unsigned long entries)
 	map->n_entries = 0;
 
 	/* Align map allocation to cache line. */
-	map->entries = (void *)(((uintptr_t)&map[1] + prefix +
-	    CK_MD_CACHELINE - 1) & ~(CK_MD_CACHELINE - 1));
+	map->entries = (void *)roundup2((uintptr_t)&map[1] + prefix, CK_MD_CACHELINE);
 
 	memset(map->entries, 0, sizeof(void *) * n_entries);
 	memset(map->generation, 0, sizeof map->generation);
@@ -358,7 +357,7 @@ restart:
 		i = probes = 0;
 
 		for (;;) {
-			bucket = (const void **)((uintptr_t)&update->entries[offset] & ~(CK_MD_CACHELINE - 1));
+			bucket = (const void **)rounddown2((uintptr_t)&update->entries[offset], CK_MD_CACHELINE);
 
 			for (j = 0; j < CK_HS_PROBE_L1; j++) {
 				const void **cursor = bucket + ((j + offset) & (CK_HS_PROBE_L1 - 1));
@@ -453,7 +452,7 @@ ck_hs_map_probe(struct ck_hs *hs,
 		probe_limit = ck_hs_map_bound_get(map, h);
 
 	for (;;) {
-		bucket = (const void **)((uintptr_t)&map->entries[offset] & ~(CK_MD_CACHELINE - 1));
+		bucket = (const void **)rounddown2((uintptr_t)&map->entries[offset], CK_MD_CACHELINE);
 
 		for (j = 0; j < CK_HS_PROBE_L1; j++) {
 			cursor = bucket + ((j + offset) & (CK_HS_PROBE_L1 - 1));

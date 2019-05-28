@@ -186,7 +186,7 @@ static inline uint64_t MurmurHash64A ( const void * key, int len, uint64_t seed 
   {
     uint64_t k;
 
-    if (!((uintptr_t)data & 0x7))
+    if (!(ptr_to_va(data) & 0x7))
 	    k = *data++;
     else {
 	    memcpy(&k, data, sizeof(k));
