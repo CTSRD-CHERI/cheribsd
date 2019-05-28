@@ -272,6 +272,7 @@ NESTED(cpu_switch, CALLFRAME_SIZ, ra)
 	cmove	$c1, $c3
 	clc	$c1, zero, TD_PCB($c1)	# load PCB addr of curproc
 	SAVE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_STC, CHERIKFRAME_OFF_STC, $c1)
+	/* XXX-AM: Not really using sp so we can not save it? */
 	SAVE_U_PCB_CONTEXT(sp, PCB_REG_SP, $c1)		# save old sp
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, -CALLFRAME_SIZ
 	csc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
@@ -445,7 +446,6 @@ sw2:
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_STC, CHERIKFRAME_OFF_STC, $c19)
 	RESTORE_U_PCB_CONTEXT(sp, PCB_REG_SP, $c19)
 	// Note we have newthr in c18
-	// XXX-AM: this presumes that our global pointer is sensible
 	CAPCALL_LOAD($c12, pmap_activate)
 	cjalr	$c12, $c17
 	cmove	$c3, $c4
