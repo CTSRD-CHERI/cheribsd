@@ -74,7 +74,6 @@
 #include <machine/regnum.h>
 #include <machine/pte.h>
 #include <machine/pcb.h>
-#include <machine/param.h>
 
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
@@ -477,18 +476,21 @@ sw2:
 	mtc0	v0, MIPS_COP_0_STATUS
 	ITLBNOPFIX
 
-	/* XXX-AM: Note: we assume that CHERI cpu supports the thread's TLS pointer,
-	 * otherwise, the following breaks remove_userlocal_code() in cpu.c
-	*/
-	clc	$c1, zero, TD_MDTLS($c4)		# TLS pointer
-	li	t0, TD_MDTLS_TCB_OFFSET
-	cld	t0, t0, 0($c4)				# TLS/TCB offset
-	cincoffset $c1, $c1, t0
-	/* XXX-AM: should be written to the CHERI TLS reg instead. */
-	cgetbase v0, $c1
-	cgetoffset t0, $c1
-	daddu	v0, v0, t0
-	MTC0	v0, MIPS_COP_0_USERLOCAL, 2		# write TLS pointer to ULR for rdhwr
+/*
+ * Set the new thread's TLS pointer.
+ *
+ * Note that this code is normally removed if the CPU doesn't support ULRI by
+ * remove_userlocal_code() in cpu.c. We assume that CHERI cpu supports the
+ * thread's TLS pointer, otherwise the following breaks remove_userlocal_code()
+ * in cpu.c.
+ */
+	clc	$c3, zero, TD_MDTLS($c4)	# Get TLS pointer
+	PTR_LI	t0, TD_MDTLS_TCB_OFFSET
+	cld	t0, t0, 0($c4)			# Get TLS/TCB offset
+	cincoffset $c3, $c3, t0
+	cwritehwr $c3, $chwr_userlocal
+	cgetaddr t0, $c3
+	MTC0	t0, MIPS_COP_0_USERLOCAL, 2	# write it to ULR for rdhwr
 
 	cjr	$c17
 	nop
