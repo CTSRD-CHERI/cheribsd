@@ -790,7 +790,7 @@ SYSCTL_INT(_kern_geom, OID_AUTO, inflight_transient_maps, CTLFLAG_RD,
 static int
 g_io_transient_map_bio(struct bio *bp)
 {
-	vm_offset_t addr;
+	vm_ptr_t addr;
 	long size;
 	u_int retried;
 
@@ -824,7 +824,7 @@ retry:
 		}
 	}
 	atomic_add_int(&inflight_transient_maps, 1);
-	pmap_qenter((vm_offset_t)addr, bp->bio_ma, OFF_TO_IDX(size));
+	pmap_qenter(ptr_to_va(addr), bp->bio_ma, OFF_TO_IDX(size));
 	bp->bio_data = (caddr_t)addr + bp->bio_ma_offset;
 	bp->bio_flags |= BIO_TRANSIENT_MAPPING;
 	bp->bio_flags &= ~BIO_UNMAPPED;

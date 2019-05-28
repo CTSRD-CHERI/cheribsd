@@ -345,7 +345,8 @@ g_disk_seg_limit(bus_dma_segment_t *seg, off_t *poffset,
 
 	seg_page_base = trunc_page(seg->ds_addr + offset);
 	seg_page_end  = round_page(seg->ds_addr + offset + length);
-	seg_pages = (seg_page_end - seg_page_base) >> PAGE_SHIFT;
+	seg_pages = (ptr_to_va(seg_page_end) -
+	    ptr_to_va(seg_page_base)) >> PAGE_SHIFT;
 
 	if (seg_pages > *ppages) {
 		seg_pages = *ppages;
