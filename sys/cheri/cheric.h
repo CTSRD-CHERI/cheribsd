@@ -282,7 +282,7 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #define CHERI_FPRINT_PTR(f, ptr)					\
 	fprintf(f, _CHERI_PRINT_PTR_FMT(ptr))
-#endif
+#endif /* __has_feature(capabilities) || defined(__CHERI__) */
 
 /* Allow use of some cheri_ptr macros in the purecap kernel
  * without extra ifdefs.
@@ -290,15 +290,13 @@ cheri_bytes_remaining(const void * __capability cap)
  * normal kernel.
  */
 #ifdef CHERI_KERNEL
+
 #define cheri_bound(ptr, size) cheri_ptr((void *)(ptr), size)
 #define cheri_perm(ptr, size, perm) cheri_ptrperm((void *)(ptr), size, perm)
 #define cheri_valid(ptr) (cheri_gettag((void *)(ptr)) == 1)
+
 #else /* ! CHERI_KERNEL */
 
-/* Allow use of some cheri_ptr macros in the purecap kernel
- * without extra ifdefs.
- * These become a no-op when compiling with no capabilities support.
- */
 #define cheri_bound(ptr, size) (ptr)
 #define cheri_perm(ptr, size, perm) (ptr)
 #define cheri_valid(ptr) (1)
