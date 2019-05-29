@@ -15,6 +15,12 @@ DEBUG+=-DDEBUG
 .endif
 .endif
 
+.if empty(DEBUG) && !defined(RTLD_INCLUDE_DEBUG_MESSAGES)
+# Avoid the overhead of all the debug checks now that we have a rtld-debug that
+# can be used instead.
+CFLAGS+=-DNO_LD_DEBUG
+.endif
+
 .include <src.opts.mk>
 PACKAGE=	clibs
 MK_PIE=		no # Always position independent using local rules
