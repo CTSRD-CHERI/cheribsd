@@ -2401,6 +2401,11 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     init_pagesizes(aux_info);
 #endif
 
+#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE > 1
+    /* debug is not initialized yet so dbg() is a no-op -> use printf()*/
+    rtld_fdprintf(STDERR_FILENO, "rtld: %s(%#p, %p)\n", __func__, mapbase, aux_info);
+#endif
+
     /*
      * Conjure up an Obj_Entry structure for the dynamic linker.
      *
@@ -2438,7 +2443,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	    Elf_Addr start_addr = ph->p_vaddr;
 	    objtmp.text_rodata_start = rtld_min(start_addr, objtmp.text_rodata_start);
 	    objtmp.text_rodata_end = rtld_max(start_addr + ph->p_memsz, objtmp.text_rodata_end);
-#if defined(DEBUG_VERBOSE)
+#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE > 3
 	    /* debug is not initialized yet so dbg() is a no-op */
 	    rtld_fdprintf(STDERR_FILENO, "rtld: processing PT_LOAD phdr[%d], "
 		"new text/rodata start  = %zx text/rodata end = %zx\n", i + 1,
@@ -2468,10 +2473,12 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	extern char __start___cap_relocs, __stop___cap_relocs;
 	size_t cap_relocs_size =
 	    ((caddr_t)&__stop___cap_relocs - (caddr_t)&__start___cap_relocs);
+#if DEBUG_VERBOSE > 3
 	rtld_printf("RTLD has DT_CHERI___CAPRELOCS = %#p, __start___cap_relocs"
 	    "= %#p\nDT_CHERI___CAPRELOCSSZ = %zd, difference = %zd\n",
 	    objtmp.cap_relocs, &__start___cap_relocs, cap_relocs_size,
 	    objtmp.cap_relocs_size);
+#endif
 	assert((vaddr_t)objtmp.cap_relocs == (vaddr_t)&__start___cap_relocs);
 	assert(objtmp.cap_relocs_size == cap_relocs_size);
     }

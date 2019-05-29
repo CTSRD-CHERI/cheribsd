@@ -528,7 +528,8 @@ find_external_call_thunk(const Elf_Sym* symbol, const Obj_Entry* obj)
 	void* target_cap = cheri_csetbounds(s->thunk, sizeof(SimpleExternalCallTrampoline));
 	target_cap = cheri_incoffset(target_cap, offsetof(SimpleExternalCallTrampoline, code));
 	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
-	dbg_cheri_plt_verbose("External call thunk resolved to %-#p", target_cap);
+	dbg_cheri_plt_verbose("External call thunk for %s resolved to %-#p (thunk %p)",
+	    strtab_value(obj, symbol->st_name), s->thunk->pcc_value(), target_cap);
 	assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
 	assert(cheri_getlen(target_cap) == sizeof(SimpleExternalCallTrampoline) &&
 	    "stub should have tight bounds");
@@ -635,7 +636,13 @@ CheriExports::getOrAddThunk(const Obj_Entry *defobj, const Elf_Sym *sym)
 	}
 #ifdef DEBUG
 	else {
-		dbg_cheri_plt_verbose("Found thunk for %s in %s: %p", s->name, defobj->path, s);
+		const char* expected_name = strtab_value(obj, sym->st_name);
+		dbg_cheri_plt_verbose("Found thunk for %s in %s: %p",
+		    expected_name, defobj->path, s);
+		if (strcmp(expected_name, s->name) != 0) {
+			rtld_fatal("Error resolving function pointer. Expected "
+			    "name %s, resolved name %s", expected_name, s->name);
+		}
 	}
 	// A second find should return the same value
 	const ExportsTableEntry *s2 = exports_map.find(sym);
