@@ -24,6 +24,12 @@ DEBUG+=-DDEBUG
 .endif
 .endif
 
+.if empty(DEBUG) && !defined(RTLD_INCLUDE_DEBUG_MESSAGES)
+# Avoid the overhead of all the debug checks now that we have a rtld-debug that
+# can be used instead.
+CFLAGS+=-DNO_LD_DEBUG
+.endif
+
 # Make per-file captable opt-in since it slows down normal code that doesn't
 # use it and increases the size of plt stubs.
 # This could be optimized to use different stubs for per-file stubs but for
