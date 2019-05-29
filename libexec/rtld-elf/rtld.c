@@ -457,6 +457,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     /* Initialize and relocate ourselves. */
     assert(aux_info[AT_BASE] != NULL);
+    assert((vaddr_t)aux_info[AT_BASE]->a_un.a_ptr != 0 && "rtld cannot be mapped at address zero!");
     init_rtld((caddr_t) aux_info[AT_BASE]->a_un.a_ptr, aux_info);
 
     __progname = obj_rtld.path;
@@ -502,7 +503,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		 * others x bit is enabled.
 		 * mmap(2) does not allow to mmap with PROT_EXEC if
 		 * binary' file comes from noexec mount.  We cannot
-		 * set VV_TEXT on the binary.
+		 * set a text reference on the binary.
 		 */
 		dir_enable = false;
 		if (st.st_uid == geteuid()) {
@@ -873,7 +874,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     // rtld_start.S $cgp will be set up correctly. We could also pass another
     // reference argument and store obj_main->captable there but this is easier
     // and should have the same effect.
-    const void *entry_cgp = target_cgp_for_func(obj_main, obj_main->entry);
+    const void *entry_cgp = target_cgp_for_func(obj_main, (dlfunc_t)obj_main->entry);
     dbg_cheri("Setting initial $cgp for %s to %-#p", obj_main->path, entry_cgp);
     __asm__ volatile("cmove $cgp, %0" :: "C"(entry_cgp));
     assert(cheri_getperm(obj_main->entry) & CHERI_PERM_EXECUTE);
@@ -1350,6 +1351,10 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	    /* Can't restrict $pcc in legacy mode */
 	    obj->cheri_captable_abi = abi;
 	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
+	    if (flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) {
+		flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
+		obj->relative_cap_relocs = true;
+	    }
 	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
 	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
@@ -3245,15 +3250,19 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 
 	/* Process the PLT relocations. */
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (reloc_plt(obj, rtldobj) == -1)
+	/* No reloc_jmpslots for CHERI since it works differently: if BIND_NOW
+	 * is set, reloc_plt can avoid allocating trampolines for pc-rel code */
+	if (reloc_plt(obj, (obj->bind_now || bind_now), flags, rtldobj,
+	    lockstate) == -1)
+		return (-1);
 #else
 	if (reloc_plt(obj, flags, lockstate) == -1)
-#endif
 		return (-1);
 	/* Relocate the jump slots if we are doing immediate binding. */
 	if ((obj->bind_now || bind_now) && reloc_jmpslots(obj, flags,
 	    lockstate) == -1)
 		return (-1);
+#endif
 
 	if (!obj->mainprog && obj_enforce_relro(obj) == -1)
 		return (-1);

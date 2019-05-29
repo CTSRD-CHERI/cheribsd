@@ -84,7 +84,7 @@ typedef struct	__mcontext {
 #endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	struct chericap	__spare__[8];
+	struct chericap	__spare__[3];
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 } mcontext_t;
 
@@ -184,7 +184,7 @@ typedef struct	__mcontext_c {
 	void * __capability	mc_tls;		/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	void * __capability	__spare__[8];
+	void * __capability	__spare__[3];
 } mcontext_c_t;
 
 typedef struct __ucontext_c {

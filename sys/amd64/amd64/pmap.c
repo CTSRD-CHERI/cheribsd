@@ -107,6 +107,7 @@ __FBSDID("$FreeBSD$");
  *	and to when physical maps must be made correct.
  */
 
+#include "opt_ddb.h"
 #include "opt_pmap.h"
 #include "opt_vm.h"
 
@@ -130,6 +131,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/sched.h>
 #include <sys/sysctl.h>
 #include <sys/smp.h>
+#ifdef DDB
+#include <sys/kdb.h>
+#include <ddb/ddb.h>
+#endif
 
 #include <vm/vm.h>
 #include <vm/vm_param.h>
@@ -461,28 +466,75 @@ pmap_pcid_save_cnt_proc(SYSCTL_HANDLER_ARGS)
 	}
 	return (sysctl_handle_64(oidp, &res, 0, req));
 }
-SYSCTL_PROC(_vm_pmap, OID_AUTO, pcid_save_cnt, CTLTYPE_U64 | CTLFLAG_RW |
+SYSCTL_PROC(_vm_pmap, OID_AUTO, pcid_save_cnt, CTLTYPE_U64 | CTLFLAG_RD |
     CTLFLAG_MPSAFE, NULL, 0, pmap_pcid_save_cnt_proc, "QU",
     "Count of saved TLB context on switch");
 
 static LIST_HEAD(, pmap_invl_gen) pmap_invl_gen_tracker =
     LIST_HEAD_INITIALIZER(&pmap_invl_gen_tracker);
 static struct mtx invl_gen_mtx;
-static u_long pmap_invl_gen = 0;
 /* Fake lock object to satisfy turnstiles interface. */
 static struct lock_object invl_gen_ts = {
 	.lo_name = "invlts",
 };
-
-static bool
-pmap_not_in_di(void)
-{
-
-	return (curthread->td_md.md_invl_gen.gen == 0);
-}
+static struct pmap_invl_gen pmap_invl_gen_head = {
+	.gen = 1,
+	.next = NULL,
+};
+static u_long pmap_invl_gen = 1;
 
 #define	PMAP_ASSERT_NOT_IN_DI() \
     KASSERT(pmap_not_in_di(), ("DI already started"))
+
+static bool
+pmap_di_locked(void)
+{
+	int tun;
+
+	if ((cpu_feature2 & CPUID2_CX16) == 0)
+		return (true);
+	tun = 0;
+	TUNABLE_INT_FETCH("vm.pmap.di_locked", &tun);
+	return (tun != 0);
+}
+
+static int
+sysctl_pmap_di_locked(SYSCTL_HANDLER_ARGS)
+{
+	int locked;
+
+	locked = pmap_di_locked();
+	return (sysctl_handle_int(oidp, &locked, 0, req));
+}
+SYSCTL_PROC(_vm_pmap, OID_AUTO, di_locked, CTLTYPE_INT | CTLFLAG_RDTUN |
+    CTLFLAG_MPSAFE, 0, 0, sysctl_pmap_di_locked, "",
+    "Locked delayed invalidation");
+
+static bool pmap_not_in_di_l(void);
+static bool pmap_not_in_di_u(void);
+DEFINE_IFUNC(, bool, pmap_not_in_di, (void))
+{
+
+	return (pmap_di_locked() ? pmap_not_in_di_l : pmap_not_in_di_u);
+}
+
+static bool
+pmap_not_in_di_l(void)
+{
+	struct pmap_invl_gen *invl_gen;
+
+	invl_gen = &curthread->td_md.md_invl_gen;
+	return (invl_gen->gen == 0);
+}
+
+static void
+pmap_thread_init_invl_gen_l(struct thread *td)
+{
+	struct pmap_invl_gen *invl_gen;
+
+	invl_gen = &td->td_md.md_invl_gen;
+	invl_gen->gen = 0;
+}
 
 /*
  * Start a new Delayed Invalidation (DI) block of code, executed by
@@ -493,7 +545,7 @@ pmap_not_in_di(void)
  * pmap active.
  */
 static void
-pmap_delayed_invl_started(void)
+pmap_delayed_invl_start_l(void)
 {
 	struct pmap_invl_gen *invl_gen;
 	u_long currgen;
@@ -525,13 +577,13 @@ pmap_delayed_invl_started(void)
  * current thread's DI.
  */
 static void
-pmap_delayed_invl_finished(void)
+pmap_delayed_invl_finish_l(void)
 {
 	struct pmap_invl_gen *invl_gen, *next;
 	struct turnstile *ts;
 
 	invl_gen = &curthread->td_md.md_invl_gen;
-	KASSERT(invl_gen->gen != 0, ("missed invl_started"));
+	KASSERT(invl_gen->gen != 0, ("missed invl_start"));
 	mtx_lock(&invl_gen_mtx);
 	next = LIST_NEXT(invl_gen, link);
 	if (next == NULL) {
@@ -550,6 +602,284 @@ pmap_delayed_invl_finished(void)
 	mtx_unlock(&invl_gen_mtx);
 	invl_gen->gen = 0;
 }
+
+static bool
+pmap_not_in_di_u(void)
+{
+	struct pmap_invl_gen *invl_gen;
+
+	invl_gen = &curthread->td_md.md_invl_gen;
+	return (((uintptr_t)invl_gen->next & PMAP_INVL_GEN_NEXT_INVALID) != 0);
+}
+
+static void
+pmap_thread_init_invl_gen_u(struct thread *td)
+{
+	struct pmap_invl_gen *invl_gen;
+
+	invl_gen = &td->td_md.md_invl_gen;
+	invl_gen->gen = 0;
+	invl_gen->next = (void *)PMAP_INVL_GEN_NEXT_INVALID;
+}
+
+static bool
+pmap_di_load_invl(struct pmap_invl_gen *ptr, struct pmap_invl_gen *out)
+{
+	uint64_t new_high, new_low, old_high, old_low;
+	char res;
+
+	old_low = new_low = 0;
+	old_high = new_high = (uintptr_t)0;
+
+	__asm volatile("lock;cmpxchg16b\t%1;sete\t%0"
+	    : "=r" (res), "+m" (*ptr), "+a" (old_low), "+d" (old_high)
+	    : "b"(new_low), "c" (new_high)
+	    : "memory", "cc");
+	if (res == 0) {
+		if ((old_high & PMAP_INVL_GEN_NEXT_INVALID) != 0)
+			return (false);
+		out->gen = old_low;
+		out->next = (void *)old_high;
+	} else {
+		out->gen = new_low;
+		out->next = (void *)new_high;
+	}
+	return (true);
+}
+
+static bool
+pmap_di_store_invl(struct pmap_invl_gen *ptr, struct pmap_invl_gen *old_val,
+    struct pmap_invl_gen *new_val)
+{
+	uint64_t new_high, new_low, old_high, old_low;
+	char res;
+
+	new_low = new_val->gen;
+	new_high = (uintptr_t)new_val->next;
+	old_low = old_val->gen;
+	old_high = (uintptr_t)old_val->next;
+
+	__asm volatile("lock;cmpxchg16b\t%1;sete\t%0"
+	    : "=r" (res), "+m" (*ptr), "+a" (old_low), "+d" (old_high)
+	    : "b"(new_low), "c" (new_high)
+	    : "memory", "cc");
+	return (res);
+}
+
+#ifdef PV_STATS
+static long invl_start_restart;
+SYSCTL_LONG(_vm_pmap, OID_AUTO, invl_start_restart, CTLFLAG_RD,
+    &invl_start_restart, 0,
+    "");
+static long invl_finish_restart;
+SYSCTL_LONG(_vm_pmap, OID_AUTO, invl_finish_restart, CTLFLAG_RD,
+    &invl_finish_restart, 0,
+    "");
+static int invl_max_qlen;
+SYSCTL_INT(_vm_pmap, OID_AUTO, invl_max_qlen, CTLFLAG_RD,
+    &invl_max_qlen, 0,
+    "");
+#endif
+
+static struct lock_delay_config __read_frequently di_delay;
+LOCK_DELAY_SYSINIT_DEFAULT(di_delay);
+
+static void
+pmap_delayed_invl_start_u(void)
+{
+	struct pmap_invl_gen *invl_gen, *p, prev, new_prev;
+	struct thread *td;
+	struct lock_delay_arg lda;
+	uintptr_t prevl;
+	u_char pri;
+#ifdef PV_STATS
+	int i, ii;
+#endif
+
+	td = curthread;
+	invl_gen = &td->td_md.md_invl_gen;
+	PMAP_ASSERT_NOT_IN_DI();
+	lock_delay_arg_init(&lda, &di_delay);
+	thread_lock(td);
+	pri = td->td_base_pri;
+	if (pri < PVM) {
+		invl_gen->saved_pri = 0;
+	} else {
+		invl_gen->saved_pri = pri;
+		sched_prio(td, PVM);
+	}
+	thread_unlock(td);
+
+again:
+	PV_STAT(i = 0);
+	for (p = &pmap_invl_gen_head;; p = prev.next) {
+		PV_STAT(i++);
+		prevl = atomic_load_ptr(&p->next);
+		if ((prevl & PMAP_INVL_GEN_NEXT_INVALID) != 0) {
+			PV_STAT(atomic_add_long(&invl_start_restart, 1));
+			lock_delay(&lda);
+			goto again;
+		}
+		if (prevl == 0)
+			break;
+		prev.next = (void *)prevl;
+	}
+#ifdef PV_STATS
+	if ((ii = invl_max_qlen) < i)
+		atomic_cmpset_int(&invl_max_qlen, ii, i);
+#endif
+
+	if (!pmap_di_load_invl(p, &prev) || prev.next != NULL) {
+		PV_STAT(atomic_add_long(&invl_start_restart, 1));
+		lock_delay(&lda);
+		goto again;
+	}
+
+	new_prev.gen = prev.gen;
+	new_prev.next = invl_gen;
+	invl_gen->gen = prev.gen + 1;
+
+	/* Formal fence between store to invl->gen and updating *p. */
+	atomic_thread_fence_rel();
+
+	/*
+	 * After inserting an invl_gen element with invalid bit set,
+	 * this thread blocks any other thread trying to enter the
+	 * delayed invalidation block.  Do not allow to remove us from
+	 * the CPU, because it causes starvation for other threads.
+	 */
+	critical_enter();
+
+	/*
+	 * ABA for *p is not possible there, since p->gen can only
+	 * increase.  So if the *p thread finished its di, then
+	 * started a new one and got inserted into the list at the
+	 * same place, its gen will appear greater than the previously
+	 * read gen.
+	 */
+	if (!pmap_di_store_invl(p, &prev, &new_prev)) {
+		critical_exit();
+		PV_STAT(atomic_add_long(&invl_start_restart, 1));
+		lock_delay(&lda);
+		goto again;
+	}
+
+	/*
+	 * There we clear PMAP_INVL_GEN_NEXT_INVALID in
+	 * invl_gen->next, allowing other threads to iterate past us.
+	 * pmap_di_store_invl() provides fence between the generation
+	 * write and the update of next.
+	 */
+	invl_gen->next = NULL;
+	critical_exit();
+}
+
+static bool
+pmap_delayed_invl_finish_u_crit(struct pmap_invl_gen *invl_gen,
+    struct pmap_invl_gen *p)
+{
+	struct pmap_invl_gen prev, new_prev;
+	u_long mygen;
+
+	/*
+	 * Load invl_gen->gen after setting invl_gen->next
+	 * PMAP_INVL_GEN_NEXT_INVALID.  This prevents larger
+	 * generations to propagate to our invl_gen->gen.  Lock prefix
+	 * in atomic_set_ptr() worked as seq_cst fence.
+	 */
+	mygen = atomic_load_long(&invl_gen->gen);
+
+	if (!pmap_di_load_invl(p, &prev) || prev.next != invl_gen)
+		return (false);
+
+	KASSERT(prev.gen < mygen,
+	    ("invalid di gen sequence %lu %lu", prev.gen, mygen));
+	new_prev.gen = mygen;
+	new_prev.next = (void *)((uintptr_t)invl_gen->next &
+	    ~PMAP_INVL_GEN_NEXT_INVALID);
+
+	/* Formal fence between load of prev and storing update to it. */
+	atomic_thread_fence_rel();
+
+	return (pmap_di_store_invl(p, &prev, &new_prev));
+}
+
+static void
+pmap_delayed_invl_finish_u(void)
+{
+	struct pmap_invl_gen *invl_gen, *p;
+	struct thread *td;
+	struct lock_delay_arg lda;
+	uintptr_t prevl;
+
+	td = curthread;
+	invl_gen = &td->td_md.md_invl_gen;
+	KASSERT(invl_gen->gen != 0, ("missed invl_start: gen 0"));
+	KASSERT(((uintptr_t)invl_gen->next & PMAP_INVL_GEN_NEXT_INVALID) == 0,
+	    ("missed invl_start: INVALID"));
+	lock_delay_arg_init(&lda, &di_delay);
+
+again:
+	for (p = &pmap_invl_gen_head; p != NULL; p = (void *)prevl) {
+		prevl = atomic_load_ptr(&p->next);
+		if ((prevl & PMAP_INVL_GEN_NEXT_INVALID) != 0) {
+			PV_STAT(atomic_add_long(&invl_finish_restart, 1));
+			lock_delay(&lda);
+			goto again;
+		}
+		if ((void *)prevl == invl_gen)
+			break;
+	}
+
+	/*
+	 * It is legitimate to not find ourself on the list if a
+	 * thread before us finished its DI and started it again.
+	 */
+	if (__predict_false(p == NULL)) {
+		PV_STAT(atomic_add_long(&invl_finish_restart, 1));
+		lock_delay(&lda);
+		goto again;
+	}
+
+	critical_enter();
+	atomic_set_ptr((uintptr_t *)&invl_gen->next,
+	    PMAP_INVL_GEN_NEXT_INVALID);
+	if (!pmap_delayed_invl_finish_u_crit(invl_gen, p)) {
+		atomic_clear_ptr((uintptr_t *)&invl_gen->next,
+		    PMAP_INVL_GEN_NEXT_INVALID);
+		critical_exit();
+		PV_STAT(atomic_add_long(&invl_finish_restart, 1));
+		lock_delay(&lda);
+		goto again;
+	}
+	critical_exit();
+	if (invl_gen->saved_pri != 0) {
+		thread_lock(td);
+		sched_prio(td, invl_gen->saved_pri);
+		thread_unlock(td);
+	}
+}
+
+#ifdef DDB
+DB_SHOW_COMMAND(di_queue, pmap_di_queue)
+{
+	struct pmap_invl_gen *p, *pn;
+	struct thread *td;
+	uintptr_t nextl;
+	bool first;
+
+	for (p = &pmap_invl_gen_head, first = true; p != NULL; p = pn,
+	    first = false) {
+		nextl = atomic_load_ptr(&p->next);
+		pn = (void *)(nextl & ~PMAP_INVL_GEN_NEXT_INVALID);
+		td = first ? NULL : __containerof(p, struct thread,
+		    td_md.md_invl_gen);
+		db_printf("gen %lu inv %d td %p tid %d\n", p->gen,
+		    (nextl & PMAP_INVL_GEN_NEXT_INVALID) != 0, td,
+		    td != NULL ? td->td_tid : -1);
+	}
+}
+#endif
 
 #ifdef PV_STATS
 static long invl_wait;
@@ -579,7 +909,7 @@ pmap_delayed_invl_genp(vm_page_t m)
  * processor.
  */
 static void
-pmap_delayed_invl_wait(vm_page_t m)
+pmap_delayed_invl_wait_l(vm_page_t m)
 {
 	struct turnstile *ts;
 	u_long *m_gen;
@@ -603,6 +933,54 @@ pmap_delayed_invl_wait(vm_page_t m)
 	}
 }
 
+static void
+pmap_delayed_invl_wait_u(vm_page_t m)
+{
+	u_long *m_gen;
+#ifdef PV_STATS
+	bool accounted = false;
+#endif
+
+	m_gen = pmap_delayed_invl_genp(m);
+	while (*m_gen > atomic_load_long(&pmap_invl_gen_head.gen)) {
+#ifdef PV_STATS
+		if (!accounted) {
+			atomic_add_long(&invl_wait, 1);
+			accounted = true;
+		}
+#endif
+		kern_yield(PRI_USER);
+	}
+}
+
+DEFINE_IFUNC(, void, pmap_thread_init_invl_gen, (struct thread *))
+{
+
+	return (pmap_di_locked() ? pmap_thread_init_invl_gen_l :
+	    pmap_thread_init_invl_gen_u);
+}
+
+DEFINE_IFUNC(static, void, pmap_delayed_invl_start, (void))
+{
+
+	return (pmap_di_locked() ? pmap_delayed_invl_start_l :
+	    pmap_delayed_invl_start_u);
+}
+
+DEFINE_IFUNC(static, void, pmap_delayed_invl_finish, (void))
+{
+
+	return (pmap_di_locked() ? pmap_delayed_invl_finish_l :
+	    pmap_delayed_invl_finish_u);
+}
+
+DEFINE_IFUNC(static, void, pmap_delayed_invl_wait, (vm_page_t))
+{
+
+	return (pmap_di_locked() ? pmap_delayed_invl_wait_l :
+	    pmap_delayed_invl_wait_u);
+}
+
 /*
  * Mark the page m's PV list as participating in the current thread's
  * DI block.  Any threads concurrently using m's PV list to remove or
@@ -612,7 +990,7 @@ pmap_delayed_invl_wait(vm_page_t m)
  * The function works by setting the DI generation number for m's PV
  * list to at least the DI generation number of the current thread.
  * This forces a caller of pmap_delayed_invl_wait() to block until
- * current thread calls pmap_delayed_invl_finished().
+ * current thread calls pmap_delayed_invl_finish().
  */
 static void
 pmap_delayed_invl_page(vm_page_t m)
@@ -1819,8 +2197,7 @@ pmap_invalidate_page_nopcid(pmap_t pmap, vm_offset_t va)
 {
 }
 
-DEFINE_IFUNC(static, void, pmap_invalidate_page_mode, (pmap_t, vm_offset_t),
-    static)
+DEFINE_IFUNC(static, void, pmap_invalidate_page_mode, (pmap_t, vm_offset_t))
 {
 
 	if (pmap_pcid_enabled)
@@ -1917,7 +2294,7 @@ pmap_invalidate_range_nopcid(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 }
 
 DEFINE_IFUNC(static, void, pmap_invalidate_range_mode, (pmap_t, vm_offset_t,
-    vm_offset_t), static)
+    vm_offset_t))
 {
 
 	if (pmap_pcid_enabled)
@@ -2034,7 +2411,7 @@ pmap_invalidate_all_nopcid(pmap_t pmap)
 		invltlb();
 }
 
-DEFINE_IFUNC(static, void, pmap_invalidate_all_mode, (pmap_t), static)
+DEFINE_IFUNC(static, void, pmap_invalidate_all_mode, (pmap_t))
 {
 
 	if (pmap_pcid_enabled)
@@ -2313,7 +2690,7 @@ pmap_invalidate_pde_page(pmap_t pmap, vm_offset_t va, pd_entry_t pde)
 }
 
 DEFINE_IFUNC(, void, pmap_invalidate_cache_range,
-    (vm_offset_t sva, vm_offset_t eva), static)
+    (vm_offset_t sva, vm_offset_t eva))
 {
 
 	if ((cpu_feature & CPUID_SS) != 0)
@@ -2854,6 +3231,7 @@ void
 pmap_pinit0(pmap_t pmap)
 {
 	struct proc *p;
+	struct thread *td;
 	int i;
 
 	PMAP_LOCK_INIT(pmap);
@@ -2872,12 +3250,14 @@ pmap_pinit0(pmap_t pmap)
 		pmap->pm_pcids[i].pm_gen = 1;
 	}
 	pmap_activate_boot(pmap);
+	td = curthread;
 	if (pti) {
-		p = curproc;
+		p = td->td_proc;
 		PROC_LOCK(p);
 		p->p_md.md_flags |= P_MD_KPTI;
 		PROC_UNLOCK(p);
 	}
+	pmap_thread_init_invl_gen(td);
 
 	if ((cpu_stdext_feature2 & CPUID_STDEXT2_PKU) != 0) {
 		pmap_pkru_ranges_zone = uma_zcreate("pkru ranges",
@@ -3435,7 +3815,7 @@ reclaim_pv_chunk_leave_pmap(pmap_t pmap, pmap_t locked_pmap, bool start_di)
 	if (pmap != locked_pmap)
 		PMAP_UNLOCK(pmap);
 	if (start_di)
-		pmap_delayed_invl_finished();
+		pmap_delayed_invl_finish();
 }
 
 /*
@@ -3518,13 +3898,13 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 				RELEASE_PV_LIST_LOCK(lockp);
 				PMAP_LOCK(pmap);
 				if (start_di)
-					pmap_delayed_invl_started();
+					pmap_delayed_invl_start();
 				mtx_lock(&pv_chunks_mutex);
 				continue;
 			} else if (pmap != locked_pmap) {
 				if (PMAP_TRYLOCK(pmap)) {
 					if (start_di)
-						pmap_delayed_invl_started();
+						pmap_delayed_invl_start();
 					mtx_lock(&pv_chunks_mutex);
 					continue;
 				} else {
@@ -3537,7 +3917,7 @@ reclaim_pv_chunk(pmap_t locked_pmap, struct rwlock **lockp)
 					goto next_chunk;
 				}
 			} else if (start_di)
-				pmap_delayed_invl_started();
+				pmap_delayed_invl_start();
 			PG_G = pmap_global_bit(pmap);
 			PG_A = pmap_accessed_bit(pmap);
 			PG_M = pmap_modified_bit(pmap);
@@ -4456,7 +4836,7 @@ pmap_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	anyvalid = 0;
 	SLIST_INIT(&free);
 
-	pmap_delayed_invl_started();
+	pmap_delayed_invl_start();
 	PMAP_LOCK(pmap);
 
 	/*
@@ -4553,7 +4933,7 @@ out:
 		pmap_invalidate_all(pmap);
 	pmap_pkru_on_remove(pmap, sva, eva);
 	PMAP_UNLOCK(pmap);
-	pmap_delayed_invl_finished();
+	pmap_delayed_invl_finish();
 	vm_page_free_pages_toq(&free, true);
 }
 
@@ -4737,8 +5117,8 @@ pmap_protect(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 	/*
 	 * Although this function delays and batches the invalidation
 	 * of stale TLB entries, it does not need to call
-	 * pmap_delayed_invl_started() and
-	 * pmap_delayed_invl_finished(), because it does not
+	 * pmap_delayed_invl_start() and
+	 * pmap_delayed_invl_finish(), because it does not
 	 * ordinarily destroy mappings.  Stale TLB entries from
 	 * protection-only changes need only be invalidated before the
 	 * pmap lock is released, because protection-only changes do
@@ -5367,11 +5747,11 @@ pmap_enter_pde(pmap_t pmap, vm_offset_t va, pd_entry_t newpde, u_int flags,
 			if ((oldpde & PG_G) == 0)
 				pmap_invalidate_pde_page(pmap, va, oldpde);
 		} else {
-			pmap_delayed_invl_started();
+			pmap_delayed_invl_start();
 			if (pmap_remove_ptes(pmap, va, va + NBPDR, pde, &free,
 			    lockp))
 		               pmap_invalidate_all(pmap);
-			pmap_delayed_invl_finished();
+			pmap_delayed_invl_finish();
 		}
 		vm_page_free_pages_toq(&free, true);
 		if (va >= VM_MAXUSER_ADDRESS) {
@@ -5727,7 +6107,7 @@ pmap_object_init_pt(pmap_t pmap, vm_offset_t addr, vm_object_t object,
  *	The wired attribute of the page table entry is not a hardware
  *	feature, so there is no need to invalidate any TLB entries.
  *	Since pmap_demote_pde() for the wired entry must never fail,
- *	pmap_delayed_invl_started()/finished() calls around the
+ *	pmap_delayed_invl_start()/finish() calls around the
  *	function are not needed.
  */
 void
@@ -6226,8 +6606,8 @@ pmap_page_is_mapped(vm_page_t m)
  *
  * Although this function destroys all of the pmap's managed,
  * non-wired mappings, it can delay and batch the invalidation of TLB
- * entries without calling pmap_delayed_invl_started() and
- * pmap_delayed_invl_finished().  Because the pmap is not active on
+ * entries without calling pmap_delayed_invl_start() and
+ * pmap_delayed_invl_finish().  Because the pmap is not active on
  * any other processor, none of these TLB entries will ever be used
  * before their eventual invalidation.  Consequently, there is no need
  * for either pmap_remove_all() or pmap_remove_write() to wait for
@@ -6932,7 +7312,7 @@ pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, int advice)
 	PG_V = pmap_valid_bit(pmap);
 	PG_RW = pmap_rw_bit(pmap);
 	anychanged = FALSE;
-	pmap_delayed_invl_started();
+	pmap_delayed_invl_start();
 	PMAP_LOCK(pmap);
 	for (; sva < eva; sva = va_next) {
 		pml4e = pmap_pml4e(pmap, sva);
@@ -7029,7 +7409,7 @@ maybe_invlrng:
 	if (anychanged)
 		pmap_invalidate_all(pmap);
 	PMAP_UNLOCK(pmap);
-	pmap_delayed_invl_finished();
+	pmap_delayed_invl_finish();
 }
 
 /*
@@ -7903,7 +8283,7 @@ pmap_activate_sw_nopcid_pti(struct thread *td, pmap_t pmap,
 }
 
 DEFINE_IFUNC(static, void, pmap_activate_sw_mode, (struct thread *, pmap_t,
-    u_int), static)
+    u_int))
 {
 
 	if (pmap_pcid_enabled && pti && invpcid_works)
@@ -8600,7 +8980,7 @@ pmap_large_map_wb_fence_nop(void)
 {
 }
 
-DEFINE_IFUNC(static, void, pmap_large_map_wb_fence, (void), static)
+DEFINE_IFUNC(static, void, pmap_large_map_wb_fence, (void))
 {
 
 	if (cpu_vendor_id != CPU_VENDOR_INTEL)
@@ -8645,8 +9025,7 @@ pmap_large_map_flush_range_nop(vm_offset_t sva __unused, vm_size_t len __unused)
 {
 }
 
-DEFINE_IFUNC(static, void, pmap_large_map_flush_range, (vm_offset_t, vm_size_t),
-    static)
+DEFINE_IFUNC(static, void, pmap_large_map_flush_range, (vm_offset_t, vm_size_t))
 {
 
 	if ((cpu_stdext_feature & CPUID_STDEXT_CLWB) != 0)
@@ -9327,11 +9706,7 @@ pmap_pkru_clear(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 	return (error);
 }
 
-#include "opt_ddb.h"
 #ifdef DDB
-#include <sys/kdb.h>
-#include <ddb/ddb.h>
-
 DB_SHOW_COMMAND(pte, pmap_print_pte)
 {
 	pmap_t pmap;

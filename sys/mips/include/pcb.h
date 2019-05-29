@@ -187,24 +187,50 @@
 #endif
 
 #else /* CHERI_KERNEL */
+
+/*
+ * Save general purpose register to PCB.
+ *
+ * reg: general purpose register
+ * offs: immediate offset in the PCB
+ * base: capability pointing to the PCB
+ */
 #define	SAVE_U_PCB_REG(reg, offs, base)				\
 	csd	reg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
 
-/* Save pcb reg to an offset that does not fit the immediate in csd */
+/*
+ * Save general purpose register to PCB, with an offset that does
+ * not fit the immediate in the csd instruction.
+ *
+ * reg: general purpose register
+ * treg: temporary general purpose register
+ * offs: immediate offset in the PCB
+ * base: capability pointing to the PCB
+ */
 #define	SAVE_U_PCB_REG_FAR(reg, treg, offs, base)		\
 	REG_LI	treg, (U_PCB_REGS + (SZREG * offs));		\
 	csd	reg, treg, 0(base)
 
+/* See SAVE_U_PCB_REG */
 #define	RESTORE_U_PCB_REG(reg, offs, base)			\
 	cld	reg, zero, (U_PCB_REGS + (SZREG * offs)) (base)
 
+/* See SAVE_U_PCB_REG_FAR */
 #define	RESTORE_U_PCB_REG_FAR(reg, treg, offs, base)		\
 	REG_LI	treg, (U_PCB_REGS + (SZREG * offs));		\
 	cld	reg, treg, 0(base)
 
+/*
+ * Save general purpose capability register to PCB.
+ *
+ * creg: general purpose capability register
+ * offs: immediate offset in the PCB
+ * base: capability pointing to the PCB
+ */
 #define	SAVE_U_PCB_CREG(creg, offs, base) \
 	cscbi	creg, (U_PCB_REGS + (SZREG * offs)) (base)
 
+/* See SAVE_U_PCB_CREG */
 #define	RESTORE_U_PCB_CREG(creg, offs, base)			\
 	clcbi	creg, (U_PCB_REGS + (SZREG * offs)) (base)
 
@@ -240,17 +266,31 @@
  * tmpcreg: this is a capability temporary register.
  * pcb: pointer to the PCB structure.
  */
+#ifdef CHERI_KERNEL
+
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpcreg, pcb)			\
-	/* EPCC is no longer a GPR so load it into KR1C first */	\
+	/* EPCC is no longer a GPR so load it into tmpcreg first */	\
 	RESTORE_U_PCB_CREG(tmpcreg, PCC, pcb);				\
 	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
 	RESTORE_EPCC(tmpcreg, pc_vaddr_tmpreg)
-#else
+
+#else /* ! CHERI_KERNEL */
+
+#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpreg2, pcb)			\
+	/* EPCC is no longer a GPR so load it into KSCRATCH first */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);		\
+	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
+	RESTORE_EPCC(CHERI_REG_KSCRATCH, pc_vaddr_tmpreg, tmpreg2);	\
+	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb)
+
+#endif /* ! CHERI_KERNEL */
+	 
+#else /* ! CPU_CHERI */
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, unused_reg, pcb)	\
 	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);		\
 	MTC0	pc_vaddr_tmpreg, MIPS_COP_0_EXC_PC
-#endif
+#endif /* ! CPU_CHERI */
 
 #ifndef LOCORE
 #include <machine/frame.h>

@@ -178,7 +178,7 @@ do_copy_relocations(Obj_Entry *dstobj)
 }
 #endif  /* !defined(__CHERI_PURE_CAPABILITY) */
 
-void _rtld_relocate_nonplt_self(Elf_Dyn *, caddr_t);
+Elf_Addr _rtld_relocate_nonplt_self(Elf_Dyn *, caddr_t);
 
 /*
  * It is possible for the compiler to emit relocations for unaligned data.
@@ -231,7 +231,7 @@ store_ptr(void *where, Elf_Sxword val, size_t len)
 #endif
 }
 
-void
+Elf_Addr
 _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 {
 	/*
@@ -253,6 +253,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 	Elf_Addr *got = NULL;
 	Elf_Word local_gotno = 0, symtabno = 0, gotsym = 0;
 	size_t i;
+	Elf_Addr cheri_flags = 0;
 
 	for (; dynp->d_tag != DT_NULL; dynp++) {
 		switch (dynp->d_tag) {
@@ -281,6 +282,9 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			break;
 		case DT_MIPS_GOTSYM:
 			gotsym = dynp->d_un.d_val;
+			break;
+		case DT_MIPS_CHERI_FLAGS:
+			cheri_flags = dynp->d_un.d_val;
 			break;
 		}
 	}
@@ -418,6 +422,7 @@ _rtld_relocate_nonplt_self(Elf_Dyn *dynp, caddr_t relocbase)
 			break;
 		}
 	}
+	return cheri_flags;
 }
 
 #ifndef __CHERI_PURE_CAPABILITY__

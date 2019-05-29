@@ -107,6 +107,8 @@ _CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
 .else
 _CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
 .endif
+# Clear software permission bit 2 if the bounds were reduced
+_CHERI_COMMON_FLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
 .endif
 
 .if defined(SYSROOT)

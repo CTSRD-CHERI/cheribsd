@@ -365,6 +365,13 @@ out:
 	return (error);
 }
 
+static bool
+dmar_bus_dma_id_mapped(bus_dma_tag_t dmat, vm_paddr_t buf, bus_size_t buflen)
+{
+
+	return (false);
+}
+
 static int
 dmar_bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 {
@@ -689,7 +696,7 @@ dmar_bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map1,
 			 */
 			if (fma == NULL) {
 				fma = malloc(sizeof(struct vm_page) * ma_cnt,
-				    M_DEVBUF, mflags);
+				    M_DEVBUF, M_ZERO | mflags);
 				if (fma == NULL) {
 					free(ma, M_DEVBUF);
 					return (ENOMEM);
@@ -743,7 +750,7 @@ dmar_bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map1, void *buf,
 			 */
 			if (fma == NULL) {
 				fma = malloc(sizeof(struct vm_page) * ma_cnt,
-				    M_DEVBUF, mflags);
+				    M_DEVBUF, M_ZERO | mflags);
 				if (fma == NULL) {
 					free(ma, M_DEVBUF);
 					return (ENOMEM);
@@ -857,6 +864,7 @@ struct bus_dma_impl bus_dma_dmar_impl = {
 	.tag_create = dmar_bus_dma_tag_create,
 	.tag_destroy = dmar_bus_dma_tag_destroy,
 	.tag_set_domain = dmar_bus_dma_tag_set_domain,
+	.id_mapped = dmar_bus_dma_id_mapped,
 	.map_create = dmar_bus_dmamap_create,
 	.map_destroy = dmar_bus_dmamap_destroy,
 	.mem_alloc = dmar_bus_dmamem_alloc,

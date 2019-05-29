@@ -1732,6 +1732,7 @@ hammer_time(u_int64_t modulep, u_int64_t physfree)
 	TUNABLE_INT_FETCH("hw.spec_store_bypass_disable", &hw_ssb_disable);
 	TUNABLE_INT_FETCH("machdep.syscall_ret_l1d_flush",
 	    &syscall_ret_l1d_flush_mode);
+	TUNABLE_INT_FETCH("hw.mds_disable", &hw_mds_disable);
 
 	finishidentcpu();	/* Final stage of CPU initialization */
 	initializecpu();	/* Initialize CPU registers */
@@ -2652,7 +2653,7 @@ set_pcb_flags_fsgsbase(struct pcb *pcb, const u_int flags)
 	}
 }
 
-DEFINE_IFUNC(, void, set_pcb_flags, (struct pcb *, const u_int), static)
+DEFINE_IFUNC(, void, set_pcb_flags, (struct pcb *, const u_int))
 {
 
 	return ((cpu_stdext_feature & CPUID_STDEXT_FSGSBASE) != 0 ?
@@ -2699,7 +2700,7 @@ outb_(u_short port, u_char data)
 
 void	*memset_std(void *buf, int c, size_t len);
 void	*memset_erms(void *buf, int c, size_t len);
-DEFINE_IFUNC(, void *, memset, (void *, int, size_t), static)
+DEFINE_IFUNC(, void *, memset, (void *, int, size_t))
 {
 
 	return ((cpu_stdext_feature & CPUID_STDEXT_ERMS) != 0 ?
@@ -2711,7 +2712,7 @@ void    *memmove_std(void * _Nonnull dst, const void * _Nonnull src,
 void    *memmove_erms(void * _Nonnull dst, const void * _Nonnull src,
 	    size_t len);
 DEFINE_IFUNC(, void *, memmove, (void * _Nonnull, const void * _Nonnull,
-    size_t), static)
+    size_t))
 {
 
 	return ((cpu_stdext_feature & CPUID_STDEXT_ERMS) != 0 ?
@@ -2722,8 +2723,7 @@ void    *memcpy_std(void * _Nonnull dst, const void * _Nonnull src,
 	    size_t len);
 void    *memcpy_erms(void * _Nonnull dst, const void * _Nonnull src,
 	    size_t len);
-DEFINE_IFUNC(, void *, memcpy, (void * _Nonnull, const void * _Nonnull,size_t),
-    static)
+DEFINE_IFUNC(, void *, memcpy, (void * _Nonnull, const void * _Nonnull,size_t))
 {
 
 	return ((cpu_stdext_feature & CPUID_STDEXT_ERMS) != 0 ?
@@ -2732,7 +2732,7 @@ DEFINE_IFUNC(, void *, memcpy, (void * _Nonnull, const void * _Nonnull,size_t),
 
 void	pagezero_std(void *addr);
 void	pagezero_erms(void *addr);
-DEFINE_IFUNC(, void , pagezero, (void *), static)
+DEFINE_IFUNC(, void , pagezero, (void *))
 {
 
 	return ((cpu_stdext_feature & CPUID_STDEXT_ERMS) != 0 ?

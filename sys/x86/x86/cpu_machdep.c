@@ -61,6 +61,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/cpu.h>
+#include <sys/domainset.h>
 #include <sys/kdb.h>
 #include <sys/kernel.h>
 #include <sys/ktr.h>
@@ -110,6 +111,13 @@ static u_int	cpu_reset_proxyid;
 static volatile u_int	cpu_reset_proxy_active;
 #endif
 
+/*
+ * Automatically initialized per CPU errata in cpu_idle_tun below.
+ */
+bool mwait_cpustop_broken = false;
+SYSCTL_BOOL(_machdep, OID_AUTO, mwait_cpustop_broken, CTLFLAG_RDTUN,
+    &mwait_cpustop_broken, 0,
+    "Can not reliably wake MONITOR/MWAIT cpus without interrupts");
 
 /*
  * Machine dependent boot() routine
@@ -164,7 +172,7 @@ acpi_cpu_idle_mwait(uint32_t mwait_hint)
 	 * but all Intel CPUs provide hardware coordination.
 	 */
 
-	state = (int *)PCPU_PTR(monitorbuf);
+	state = &PCPU_PTR(monitorbuf)->idle_state;
 	KASSERT(atomic_load_int(state) == STATE_SLEEPING,
 	    ("cpu_mwait_cx: wrong monitorbuf state"));
 	atomic_store_int(state, STATE_MWAIT);
@@ -358,6 +366,7 @@ void
 cpu_reset(void)
 {
 #ifdef SMP
+	struct monitorbuf *mb;
 	cpuset_t map;
 	u_int cnt;
 
@@ -378,6 +387,9 @@ cpu_reset(void)
 
 			/* Restart CPU #0. */
 			CPU_SETOF(0, &started_cpus);
+			mb = &pcpu_find(0)->pc_monitorbuf;
+			atomic_store_int(&mb->stop_state,
+			    MONITOR_STOPSTATE_RUNNING);
 			wmb();
 
 			cnt = 0;
@@ -422,7 +434,7 @@ cpu_idle_acpi(sbintime_t sbt)
 {
 	int *state;
 
-	state = (int *)PCPU_PTR(monitorbuf);
+	state = &PCPU_PTR(monitorbuf)->idle_state;
 	atomic_store_int(state, STATE_SLEEPING);
 
 	/* See comments in cpu_idle_hlt(). */
@@ -441,7 +453,7 @@ cpu_idle_hlt(sbintime_t sbt)
 {
 	int *state;
 
-	state = (int *)PCPU_PTR(monitorbuf);
+	state = &PCPU_PTR(monitorbuf)->idle_state;
 	atomic_store_int(state, STATE_SLEEPING);
 
 	/*
@@ -473,7 +485,7 @@ cpu_idle_mwait(sbintime_t sbt)
 {
 	int *state;
 
-	state = (int *)PCPU_PTR(monitorbuf);
+	state = &PCPU_PTR(monitorbuf)->idle_state;
 	atomic_store_int(state, STATE_MWAIT);
 
 	/* See comments in cpu_idle_hlt(). */
@@ -498,7 +510,7 @@ cpu_idle_spin(sbintime_t sbt)
 	int *state;
 	int i;
 
-	state = (int *)PCPU_PTR(monitorbuf);
+	state = &PCPU_PTR(monitorbuf)->idle_state;
 	atomic_store_int(state, STATE_RUNNING);
 
 	/*
@@ -598,9 +610,11 @@ SYSCTL_INT(_machdep, OID_AUTO, idle_apl31, CTLFLAG_RW,
 int
 cpu_idle_wakeup(int cpu)
 {
+	struct monitorbuf *mb;
 	int *state;
 
-	state = (int *)pcpu_find(cpu)->pc_monitorbuf;
+	mb = &pcpu_find(cpu)->pc_monitorbuf;
+	state = &mb->idle_state;
 	switch (atomic_load_int(state)) {
 	case STATE_SLEEPING:
 		return (0);
@@ -714,6 +728,7 @@ cpu_idle_tun(void *unused __unused)
 		/* Ryzen erratas 1057, 1109. */
 		cpu_idle_selector("hlt");
 		idle_mwait = 0;
+		mwait_cpustop_broken = true;
 	}
 
 	if (cpu_vendor_id == CPU_VENDOR_INTEL && cpu_id == 0x506c9) {
@@ -725,6 +740,7 @@ cpu_idle_tun(void *unused __unused)
 		 * sleep states.
 		 */
 		cpu_idle_apl31_workaround = 1;
+		mwait_cpustop_broken = true;
 	}
 	TUNABLE_INT_FETCH("machdep.idle_apl31", &cpu_idle_apl31_workaround);
 }
@@ -914,6 +930,203 @@ SYSCTL_PROC(_hw, OID_AUTO, spec_store_bypass_disable, CTLTYPE_INT |
     CTLFLAG_RWTUN | CTLFLAG_NOFETCH | CTLFLAG_MPSAFE, NULL, 0,
     hw_ssb_disable_handler, "I",
     "Speculative Store Bypass Disable (0 - off, 1 - on, 2 - auto");
+
+int hw_mds_disable;
+
+/*
+ * Handler for Microarchitectural Data Sampling issues.  Really not a
+ * pointer to C function: on amd64 the code must not change any CPU
+ * architectural state except possibly %rflags. Also, it is always
+ * called with interrupts disabled.
+ */
+void (*mds_handler)(void);
+void mds_handler_void(void);
+void mds_handler_verw(void);
+void mds_handler_ivb(void);
+void mds_handler_bdw(void);
+void mds_handler_skl_sse(void);
+void mds_handler_skl_avx(void);
+void mds_handler_skl_avx512(void);
+void mds_handler_silvermont(void);
+
+static int
+sysctl_hw_mds_disable_state_handler(SYSCTL_HANDLER_ARGS)
+{
+	const char *state;
+
+	if (mds_handler == mds_handler_void)
+		state = "inactive";
+	else if (mds_handler == mds_handler_verw)
+		state = "VERW";
+	else if (mds_handler == mds_handler_ivb)
+		state = "software IvyBridge";
+	else if (mds_handler == mds_handler_bdw)
+		state = "software Broadwell";
+	else if (mds_handler == mds_handler_skl_sse)
+		state = "software Skylake SSE";
+	else if (mds_handler == mds_handler_skl_avx)
+		state = "software Skylake AVX";
+	else if (mds_handler == mds_handler_skl_avx512)
+		state = "software Skylake AVX512";
+	else if (mds_handler == mds_handler_silvermont)
+		state = "software Silvermont";
+	else
+		state = "unknown";
+	return (SYSCTL_OUT(req, state, strlen(state)));
+}
+
+SYSCTL_PROC(_hw, OID_AUTO, mds_disable_state,
+    CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
+    sysctl_hw_mds_disable_state_handler, "A",
+    "Microarchitectural Data Sampling Mitigation state");
+
+_Static_assert(__offsetof(struct pcpu, pc_mds_tmp) % 64 == 0, "MDS AVX512");
+
+void
+hw_mds_recalculate(void)
+{
+	struct pcpu *pc;
+	vm_offset_t b64;
+	u_long xcr0;
+	int i;
+
+	/*
+	 * Allow user to force VERW variant even if MD_CLEAR is not
+	 * reported.  For instance, hypervisor might unknowingly
+	 * filter the cap out.
+	 * For the similar reasons, and for testing, allow to enable
+	 * mitigation even for RDCL_NO or MDS_NO caps.
+	 */
+	if (cpu_vendor_id != CPU_VENDOR_INTEL || hw_mds_disable == 0 ||
+	    ((cpu_ia32_arch_caps & (IA32_ARCH_CAP_RDCL_NO |
+	    IA32_ARCH_CAP_MDS_NO)) != 0 && hw_mds_disable == 3)) {
+		mds_handler = mds_handler_void;
+	} else if (((cpu_stdext_feature3 & CPUID_STDEXT3_MD_CLEAR) != 0 &&
+	    hw_mds_disable == 3) || hw_mds_disable == 1) {
+		mds_handler = mds_handler_verw;
+	} else if (CPUID_TO_FAMILY(cpu_id) == 0x6 &&
+	    (CPUID_TO_MODEL(cpu_id) == 0x2e || CPUID_TO_MODEL(cpu_id) == 0x1e ||
+	    CPUID_TO_MODEL(cpu_id) == 0x1f || CPUID_TO_MODEL(cpu_id) == 0x1a ||
+	    CPUID_TO_MODEL(cpu_id) == 0x2f || CPUID_TO_MODEL(cpu_id) == 0x25 ||
+	    CPUID_TO_MODEL(cpu_id) == 0x2c || CPUID_TO_MODEL(cpu_id) == 0x2d ||
+	    CPUID_TO_MODEL(cpu_id) == 0x2a || CPUID_TO_MODEL(cpu_id) == 0x3e ||
+	    CPUID_TO_MODEL(cpu_id) == 0x3a) &&
+	    (hw_mds_disable == 2 || hw_mds_disable == 3)) {
+		/*
+		 * Nehalem, SandyBridge, IvyBridge
+		 */
+		CPU_FOREACH(i) {
+			pc = pcpu_find(i);
+			if (pc->pc_mds_buf == NULL) {
+				pc->pc_mds_buf = malloc_domainset(672, M_TEMP,
+				    DOMAINSET_PREF(pc->pc_domain), M_WAITOK);
+				bzero(pc->pc_mds_buf, 16);
+			}
+		}
+		mds_handler = mds_handler_ivb;
+	} else if (CPUID_TO_FAMILY(cpu_id) == 0x6 &&
+	    (CPUID_TO_MODEL(cpu_id) == 0x3f || CPUID_TO_MODEL(cpu_id) == 0x3c ||
+	    CPUID_TO_MODEL(cpu_id) == 0x45 || CPUID_TO_MODEL(cpu_id) == 0x46 ||
+	    CPUID_TO_MODEL(cpu_id) == 0x56 || CPUID_TO_MODEL(cpu_id) == 0x4f ||
+	    CPUID_TO_MODEL(cpu_id) == 0x47 || CPUID_TO_MODEL(cpu_id) == 0x3d) &&
+	    (hw_mds_disable == 2 || hw_mds_disable == 3)) {
+		/*
+		 * Haswell, Broadwell
+		 */
+		CPU_FOREACH(i) {
+			pc = pcpu_find(i);
+			if (pc->pc_mds_buf == NULL) {
+				pc->pc_mds_buf = malloc_domainset(1536, M_TEMP,
+				    DOMAINSET_PREF(pc->pc_domain), M_WAITOK);
+				bzero(pc->pc_mds_buf, 16);
+			}
+		}
+		mds_handler = mds_handler_bdw;
+	} else if (CPUID_TO_FAMILY(cpu_id) == 0x6 &&
+	    ((CPUID_TO_MODEL(cpu_id) == 0x55 && (cpu_id &
+	    CPUID_STEPPING) <= 5) ||
+	    CPUID_TO_MODEL(cpu_id) == 0x4e || CPUID_TO_MODEL(cpu_id) == 0x5e ||
+	    (CPUID_TO_MODEL(cpu_id) == 0x8e && (cpu_id &
+	    CPUID_STEPPING) <= 0xb) ||
+	    (CPUID_TO_MODEL(cpu_id) == 0x9e && (cpu_id &
+	    CPUID_STEPPING) <= 0xc)) &&
+	    (hw_mds_disable == 2 || hw_mds_disable == 3)) {
+		/*
+		 * Skylake, KabyLake, CoffeeLake, WhiskeyLake,
+		 * CascadeLake
+		 */
+		CPU_FOREACH(i) {
+			pc = pcpu_find(i);
+			if (pc->pc_mds_buf == NULL) {
+				pc->pc_mds_buf = malloc_domainset(6 * 1024,
+				    M_TEMP, DOMAINSET_PREF(pc->pc_domain),
+				    M_WAITOK);
+				b64 = (vm_offset_t)malloc_domainset(64 + 63,
+				    M_TEMP, DOMAINSET_PREF(pc->pc_domain),
+				    M_WAITOK);
+				pc->pc_mds_buf64 = (void *)roundup2(b64, 64);
+				bzero(pc->pc_mds_buf64, 64);
+			}
+		}
+		xcr0 = rxcr(0);
+		if ((xcr0 & XFEATURE_ENABLED_ZMM_HI256) != 0 &&
+		    (cpu_stdext_feature2 & CPUID_STDEXT_AVX512DQ) != 0)
+			mds_handler = mds_handler_skl_avx512;
+		else if ((xcr0 & XFEATURE_ENABLED_AVX) != 0 &&
+		    (cpu_feature2 & CPUID2_AVX) != 0)
+			mds_handler = mds_handler_skl_avx;
+		else
+			mds_handler = mds_handler_skl_sse;
+	} else if (CPUID_TO_FAMILY(cpu_id) == 0x6 &&
+	    ((CPUID_TO_MODEL(cpu_id) == 0x37 ||
+	    CPUID_TO_MODEL(cpu_id) == 0x4a ||
+	    CPUID_TO_MODEL(cpu_id) == 0x4c ||
+	    CPUID_TO_MODEL(cpu_id) == 0x4d ||
+	    CPUID_TO_MODEL(cpu_id) == 0x5a ||
+	    CPUID_TO_MODEL(cpu_id) == 0x5d ||
+	    CPUID_TO_MODEL(cpu_id) == 0x6e ||
+	    CPUID_TO_MODEL(cpu_id) == 0x65 ||
+	    CPUID_TO_MODEL(cpu_id) == 0x75 ||
+	    CPUID_TO_MODEL(cpu_id) == 0x1c ||
+	    CPUID_TO_MODEL(cpu_id) == 0x26 ||
+	    CPUID_TO_MODEL(cpu_id) == 0x27 ||
+	    CPUID_TO_MODEL(cpu_id) == 0x35 ||
+	    CPUID_TO_MODEL(cpu_id) == 0x36 ||
+	    CPUID_TO_MODEL(cpu_id) == 0x7a))) {
+		/* Silvermont, Airmont */
+		CPU_FOREACH(i) {
+			pc = pcpu_find(i);
+			if (pc->pc_mds_buf == NULL)
+				pc->pc_mds_buf = malloc(256, M_TEMP, M_WAITOK);
+		}
+		mds_handler = mds_handler_silvermont;
+	} else {
+		hw_mds_disable = 0;
+		mds_handler = mds_handler_void;
+	}
+}
+
+static int
+sysctl_mds_disable_handler(SYSCTL_HANDLER_ARGS)
+{
+	int error, val;
+
+	val = hw_mds_disable;
+	error = sysctl_handle_int(oidp, &val, 0, req);
+	if (error != 0 || req->newptr == NULL)
+		return (error);
+	if (val < 0 || val > 3)
+		return (EINVAL);
+	hw_mds_disable = val;
+	hw_mds_recalculate();
+	return (0);
+}
+
+SYSCTL_PROC(_hw, OID_AUTO, mds_disable, CTLTYPE_INT |
+    CTLFLAG_RWTUN | CTLFLAG_NOFETCH | CTLFLAG_MPSAFE, NULL, 0,
+    sysctl_mds_disable_handler, "I",
+    "Microarchitectural Data Sampling Mitigation "
+    "(0 - off, 1 - on VERW, 2 - on SW, 3 - on AUTO");
 
 /*
  * Enable and restore kernel text write permissions.

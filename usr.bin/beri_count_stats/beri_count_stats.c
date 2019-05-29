@@ -34,6 +34,8 @@
 #include <sys/wait.h>
 
 #include <err.h>
+#include <getopt.h>
+#include <inttypes.h>
 #include <libgen.h>
 #include <spawn.h>
 #include <statcounters.h>
@@ -45,10 +47,26 @@
 
 extern char **environ;
 
+static const struct option options[] = {
+	{ "archname", required_argument, NULL, 'a' },
+	{ "csv-noheader", no_argument, NULL, 'c' },
+	{ "help", no_argument, NULL, 'h' },
+	{ "format", required_argument, NULL, 'f' },
+	{ "output", required_argument, NULL, 'o' },
+	{ "quiet", no_argument, NULL, 'q' },
+	{ "verbose", no_argument, NULL, 'v' },
+	{ NULL, 0, NULL, 0 }
+};
+
 static void
 usage(int exitcode)
 {
-	warnx("usage: beri_count_stats [-v/--verbose] <command>");
+	warnx("usage: beri_count_stats [-q/--quiet] [-v/--verbose] [-o file] <command>");
+	fprintf(stderr, "options:\n");
+	for (int i = 0; options[i].name != NULL; i++) {
+		fprintf(stderr, "  --%s/-%c\n", options[i].name, options[i].val);
+	}
+
 	exit(exitcode);
 }
 
@@ -58,15 +76,61 @@ main(int argc, char **argv)
 	int status;
 	pid_t pid;
 	bool verbose = false;
+	bool quiet = false;
+	const char* output_filename = NULL;
+	const char* architecture = "unknown";
+	int opt;
+	statcounters_fmt_flag_t statcounters_format = HUMAN_READABLE;
 
-	/* Adjust argc and argv as though we've used getopt. */
-	argc--;
-	argv++;
+	/* Start option string with + to avoid parsing after first non-option */
+	while ((opt = getopt_long(argc, argv, "+a:chf:o:qv", options, NULL)) != -1) {
+		switch (opt) {
+		case 'q':
+			quiet = true;
+			break;
+		case 'v':
+			verbose = true;
+			break;
+		case 'h':
+			usage(0);
+			break;
+		case 'a':
+			architecture = optarg;
+			break;
+		case 'o':
+			output_filename = optarg;
+			break;
+		case 'c':
+			/* Force the use of CSV format without the header: */
+			unsetenv("STATCOUNTERS_FORMAT");
+			statcounters_format = CSV_NOHEADER;
+			break;
+		case 'f':
+			unsetenv("STATCOUNTERS_FORMAT");
+			if (strcmp(optarg, "csv") == 0) {
+				statcounters_format = CSV_HEADER;
+			} else if (strcmp(optarg, "csv-noheader") == 0) {
+				statcounters_format = CSV_NOHEADER;
+			} else {
+				errx(EX_DATAERR, "Invalid format %s", optarg);
+			}
+			break;
+		default:
+			usage(1);
+		}
+	}
+	argc -= optind;
+	argv += optind;
 
 	if (argc == 0)
 		usage(1);
 	if (strcmp("--help", argv[0]) == 0 || strcmp("-h", argv[0]) == 0)
 		usage(0);
+	if (strcmp("-q", argv[0]) == 0 || strcmp("--quiet", argv[0]) == 0) {
+		argc--;
+		argv++;
+		quiet = true;
+	}
 	if (strcmp("-v", argv[0]) == 0 || strcmp("--verbose", argv[0]) == 0) {
 		argc--;
 		argv++;
@@ -77,7 +141,7 @@ main(int argc, char **argv)
 	statcounters_sample(&start_count);
 	status = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
 	if (status != 0)
-		errc(EX_OSERR, status, "posix_spawnp");
+		errc(EX_OSERR, status, "posix_spawnp(%s)", argv[0]);
 
 	waitpid(pid, &status, 0);
 	if (!WIFEXITED(status)) {
@@ -93,6 +157,16 @@ main(int argc, char **argv)
 	 * the beri_count_stats_binary!
 	 */
 	const char* prog_basename = basename(argv[0]);
+	if (quiet) {
+		/* Only print cycles,instructions and TLB misses */
+		printf("cyles:                 %12" PRId64 "\n", diff_count.cycle);
+		printf("instructions:          %12" PRId64 "\n", diff_count.inst);
+		printf("instructions (user):   %12" PRId64 "\n", diff_count.inst_user);
+		printf("instructions (kernel): %12" PRId64 "\n", diff_count.inst_kernel);
+		printf("tlb misses (data):     %12" PRId64 "\n", diff_count.dtlb_miss);
+		printf("tlb misses (instr):    %12" PRId64 "\n", diff_count.itlb_miss);
+		exit(WEXITSTATUS(status));
+	}
 	/* Also dump to stderr when -v was passed */
 	if (verbose) {
 		/* Ensure human readable output: */
@@ -102,6 +176,22 @@ main(int argc, char **argv)
 		    NULL, stderr, HUMAN_READABLE);
 		setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
 	}
-	statcounters_dump_with_args(&diff_count, prog_basename, NULL, NULL, NULL, HUMAN_READABLE);
+	FILE* output_file = NULL;
+	if (!output_filename || strcmp(output_filename, "-") == 0) {
+		output_file = stdout;
+	} else {
+		output_file = fopen(output_filename, "a");
+		/* If we are writing to a regular file and the offset is not
+		 * zero omit the CSV header */
+		if (statcounters_format == CSV_HEADER && ftello(output_file) > 0) {
+			statcounters_format = CSV_NOHEADER;
+		}
+		if (!output_file) {
+			err(EX_OSERR, "fopen(%s)", output_filename);
+		}
+	}
+	// FIXME: find out architecture from executable header e_flags?
+	statcounters_dump_with_args(&diff_count, prog_basename, NULL,
+	    architecture, output_file, statcounters_format);
 	exit(WEXITSTATUS(status));
 }

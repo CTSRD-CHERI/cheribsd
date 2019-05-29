@@ -88,6 +88,7 @@ LEAF(rtld_start)
 	cincoffset	$c3, $c4, a0	/* dynp */
 
 	PIC_CALL(_rtld_relocate_nonplt_self) /* &_DYNAMIC, relocbase */
+	# Returns DT_MIPS_CHERI_FLAGS value in $v0
 
 	/*
 	 * Now that we have processed the self relocations we can do the
@@ -101,7 +102,8 @@ LEAF(rtld_start)
 	PIC_LOAD_CODE_PTR($c3, a0, __start___cap_relocs)
 	PIC_LOAD_CODE_PTR($c4, a1, __stop___cap_relocs)
 	clc		$c5, zero, SFRAME_RELOCBASE($c11) /* relocbase */
-	PIC_CALL(_rtld_do___caprelocs_self) /* (&__start___cap_relocs, &__stop___cap_relocs, relocbase) */
+	move	a0, v0
+	PIC_CALL(_rtld_do___caprelocs_self) /* (&__start___cap_relocs, &__stop___cap_relocs, relocbase, flags) */
 
 
 	clc		$c3, zero, SFRAME_AUXARGS($c11)
@@ -113,7 +115,7 @@ LEAF(rtld_start)
 	dli		t0, SFRAME_OBJP
 	cincoffset	$c5, $c11, t0			/* &objp */
 	csetbounds	$c5, $c5, t1
-	PIC_CALL(_rtld)		/* v0 = _rtld(auxargs, cleanup, objp) */
+	PIC_CALL(_rtld)		/* c3 = _rtld(auxargs, cleanup, objp) */
 
 	cmove		$c12, $c3
 	clc		$c3, zero, SFRAME_AUXARGS($c11)
