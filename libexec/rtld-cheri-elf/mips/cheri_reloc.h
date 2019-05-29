@@ -67,7 +67,7 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 		    ELF_ST_TYPE(def->st_info),
 		    ELF_ST_BIND(def->st_info),
 		    ELF_ST_BIND(src_sym->st_info));
-		assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
+		dbg_assert(ELF_ST_BIND(src_sym->st_info) == STB_WEAK);
 #endif
 		assert(def == &sym_zero && "Undef weak symbol is non-canonical!");
 		is_undef_weak = true;

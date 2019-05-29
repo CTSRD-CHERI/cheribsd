@@ -280,7 +280,7 @@ lock_restart_for_upgrade(RtldLockState *lockstate)
 		siglongjmp(lockstate->env, 1);
 		break;
 	default:
-		assert(0);
+		rtld_fatal("unreachable");
 	}
 }
 

@@ -128,7 +128,7 @@ private:
 	}
 	void* allocate(size_t size) {
 		// Can only allocate multiples of sizeof(void*)
-		assert(__builtin_is_aligned(size, sizeof(void*)));
+		dbg_assert(__builtin_is_aligned(size, sizeof(void*)));
 		if (current_allocation == nullptr ||
 		    current_offset + size > BLOCK_SIZE) {
 			current_allocation = allocate_new_block();
@@ -138,9 +138,9 @@ private:
 			}
 		}
 		uint8_t *next = current_allocation + current_offset;
-		assert(__builtin_is_aligned(next, sizeof(void*)));
+		dbg_assert(__builtin_is_aligned(next, sizeof(void*)));
 		current_offset += size;
-		assert(current_offset <= BLOCK_SIZE);
+		dbg_assert(current_offset <= BLOCK_SIZE);
 		return cheri_csetbounds(next, size);
 	}
 public:
@@ -229,9 +229,9 @@ _mips_rtld_bind(void* _plt_stub)
 	// Should never be unrepresentable but can be NULL if a function doesn't
 	// use any globals
 	// TODO: Should we set $cgp to be zero length instead?
-	assert(!target_cgp || cheri_gettag(target_cgp));
+	dbg_assert(!target_cgp || cheri_gettag(target_cgp));
 #else
-	assert(cheri_gettag(target_cgp));
+	dbg_assert(cheri_gettag(target_cgp));
 #endif
 	dbg_cheri_plt_verbose("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
 	    symname(obj, r_symndx), (intmax_t)r_symndx, obj->path,
@@ -263,7 +263,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 		const_cast<Obj_Entry*>(obj)->cheri_plt_stubs = new (NEW(struct CheriPlt)) CheriPlt(obj);
 	}
 
-	assert(obj->cheri_plt_stubs); // Should be setup be reloc_plt()
+	dbg_assert(obj->cheri_plt_stubs); // Should be setup be reloc_plt()
 
 	// TODO: cheri_setaddr + ctestsubset instead of this check?
 	if ((vaddr_t)where < (vaddr_t)obj->writable_captable ||
@@ -318,7 +318,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
 	dbg_cheri_plt_verbose("where=%p <- plt_code=%#p", where, target_cap);
 	assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
-	assert(cheri_getlen(target_cap) == sizeof(CheriPltStub) &&
+	dbg_assert(cheri_getlen(target_cap) == sizeof(CheriPltStub) &&
 	    "stub should have tight bounds");
 	*where = target_cap;
 	return true;
@@ -422,7 +422,7 @@ reloc_plt(Obj_Entry *obj, bool bind_now, int flags __unused, const Obj_Entry *rt
 		// as part of .rel.dyn
 		obj->cheri_plt_stubs = new (NEW(struct CheriPlt)) CheriPlt(obj);
 	}
-	assert(obj->cheri_plt_stubs);
+	dbg_assert(obj->cheri_plt_stubs);
 
 	// .rel.plt should only ever contain CHERI_CAPABILITY_CALL relocs!
 	const Elf_Rel *pltrellim = (const Elf_Rel *)((const char *)obj->pltrel +
@@ -715,6 +715,7 @@ extern "C" void add_cgp_stub_for_local_function(Obj_Entry *obj, dlfunc_t *dest) 
 	dbg_cheri_plt_verbose("Target cgp is %#-p, trampoline is %#p", target_cgp, (void*)trampoline_func);
 	*dest = trampoline_func;
 	assert((cheri_getperm((void*)*dest) & (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP)) == 0);
+	assert((cheri_getperm((void*)*dest) & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE);
 	return;
 }
 
