@@ -82,6 +82,15 @@ typedef void * (*path_enum_proc) (const char *path, size_t len, void *arg);
 
 
 /* Variables that cannot be static: */
+/* TODO: Support the probes based interface?
+ * { "init_start", DO_NOTHING },
+ * { "init_complete", FULL_RELOAD },
+ * { "map_start", DO_NOTHING },
+ * { "map_failed", DO_NOTHING },
+ * { "reloc_complete", UPDATE_OR_RELOAD },
+ * { "unmap_start", DO_NOTHING },
+ * { "unmap_complete", FULL_RELOAD },
+ */
 extern struct r_debug r_debug; /* For GDB */
 extern int _thread_autoinit_dummy_decl;
 extern char* __progname;
