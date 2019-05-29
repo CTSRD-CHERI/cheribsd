@@ -244,7 +244,10 @@ _mips_rtld_bind(void* _plt_stub)
 	lock_release(rtld_bind_lock, &lockstate);
 	// Setup the target $cgp so that we can actually call the function
 	// TODO: return two values instead (will a 2 cap struct use $c3/$c4?)
-	__asm__ volatile("cmove $cgp, %0"::"C"(target_cgp));
+	// FIXME: memory clobber should ensure that this is moved after the
+	//  restore of $cgp (due to the call to lock_release) but it would be
+	//  much nicer if we could just return (target, $cgp) in $c3,$c4
+	__asm__ volatile("cmove $cgp, %0"::"C"(target_cgp): "$c26", "memory");
 	return target;
 }
 
