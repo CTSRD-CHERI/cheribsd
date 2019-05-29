@@ -513,7 +513,7 @@ find_external_call_thunk(const Elf_Sym* symbol, const Obj_Entry* obj)
 	    strtab_value(obj, symbol->st_name), obj->path, (uintmax_t)symbol->st_value);
 	// PC-relative ABI does not need thunks for function pointers
 	// since $cgp can be derived from $pcc/$c12.
-	assert(obj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
+	dbg_assert(obj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
 	// Otherwise, we need to add a UNIQUE call trampoline (since function
 	// pointers to the same function MUST compare equal).
 	if (!obj->cheri_exports) {
@@ -530,8 +530,8 @@ find_external_call_thunk(const Elf_Sym* symbol, const Obj_Entry* obj)
 	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
 	dbg_cheri_plt_verbose("External call thunk for %s resolved to %-#p (thunk %p)",
 	    strtab_value(obj, symbol->st_name), s->thunk->pcc_value(), target_cap);
-	assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
-	assert(cheri_getlen(target_cap) == sizeof(SimpleExternalCallTrampoline) &&
+	dbg_assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
+	dbg_assert(cheri_getlen(target_cap) == sizeof(SimpleExternalCallTrampoline) &&
 	    "stub should have tight bounds");
 	return (dlfunc_t)target_cap;
 }
@@ -676,7 +676,7 @@ SimpleExternalCallTrampoline::create(const Obj_Entry* defobj, const Elf_Sym *sym
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 extern "C" const void*
 find_per_function_cgp(const Obj_Entry *obj, const void* func) {
-	assert(obj->per_function_captable);
+	dbg_assert(obj->per_function_captable);
 	const auto mapping_end = (const CheriCapTableMappingEntry*)
 	    cheri_incoffset(obj->captable_mapping, obj->captable_mapping_size);
 	uint64_t relative_func_addr = (const char*)func - obj->relocbase;
