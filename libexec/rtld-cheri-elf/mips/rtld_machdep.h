@@ -41,6 +41,7 @@
 #else
 #include <assert.h>
 #define dbg_assert(cond) assert(cond)
+#define dbg_cheri(...)
 #define dbg(...)
 #endif
 
@@ -241,10 +242,26 @@ _call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, vaddr_t target
 	/* Set the target object $cgp when calling the pointer:
 	 * Note: we use target_cgp_for_func() to support per-function captable */
 	const void *init_fini_cgp = target_cgp_for_func(obj, (dlfunc_t)func);
-	__asm__ volatile("cmove $cgp, %0" :: "C"(init_fini_cgp));
-#endif
-	/* FIXME: should probably do this from assembly to ensure that $cgp is correct */
+	dbg_cheri("Setting init function $cgp to %#p for call to %#p. "
+	    "Current $cgp: %#p\n", init_fini_cgp, (void*)func, cheri_getidc());
+	/*
+	 * Invoke the function from assembly to ensure that the $cgp value is
+	 * correct and the compiler can't reorder things.
+	 * When I was calling the function from C, it broke at -O2.
+	 * Note: we need the memory clobber here to ensure that the setting of
+	 * $cgp is not ignored due to reordering of instructions (e.g. by adding
+	 * a $cgp restore after external function calls).
+	 */
+	__asm__ volatile("cmove $cgp, %[cgp_val]\n\t"
+	    :/*out*/
+	    :/*in*/[cgp_val]"C"(init_fini_cgp)
+	    :/*clobber*/"$c26", "memory");
 	func(argc, argv, env);
+	/* Ensure that the function call is not reordered before/after asm */
+	__compiler_membar();
+#else
+	func(argc, argv, env);
+#endif
 }
 
 #define call_init_array_pointer(obj, target)			\
