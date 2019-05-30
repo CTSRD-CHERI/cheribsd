@@ -504,13 +504,12 @@ sw2:
 	PTR_L	t1, TD_MDTLS_TCB_OFFSET(a1)	# Get TLS/TCB offset
 	cincoffset $c3, $c3, t1
 	cwritehwr $c3, $chwr_userlocal
-	cgetoffset t0, $c3
-	cgetbase t1, $c3
+	cgetaddr v0, $c3
 #else
 	PTR_L	t0, TD_MDTLS(a1)		# Get TLS pointer
 	PTR_L	t1, TD_MDTLS_TCB_OFFSET(a1)	# Get TLS/TCB offset
-#endif
 	PTR_ADDU v0, t0, t1
+#endif
 	MTC0	v0, MIPS_COP_0_USERLOCAL, 2	# write it to ULR for rdhwr
 
 	j	ra
