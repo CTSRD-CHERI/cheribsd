@@ -357,6 +357,31 @@ restrict_pcc:
 	cjalr	$c12, $c17
 	nop
 
+	/*
+	 * Process dynamic kernel relocations.
+	 *
+	 * process_kernel_dyn_relocs(reloc_start, reloc_end,
+	 *   code_cap, data_cap)
+	 */
+	PTR_LA	t0, _C_LABEL(_rel_dyn)
+	cgetkdc		$c2
+	csetoffset	$c3, $c2, t0
+	PTR_LA	t1, _C_LABEL(_erel_dyn)
+	PTR_SUBU	t0, t1, t0
+	csetbounds	$c3, $c3, t0
+	csetoffset	$c4, $c3, t0
+	PTR_LA	t0, _C_LABEL(_dynsym)
+	csetoffset	$c5, $c2, t0
+	PTR_LA	t1, _C_LABEL(_edynsym)
+	PTR_SUBU	t0, t1, t0
+	csetbounds	$c5, $c5, t0
+	cgetpccsetoffset	$c6, zero
+	cgetkdc		$c7
+	PTR_LA	t0, _C_LABEL(process_kernel_dyn_relocs)
+	cgetpccsetoffset	$c12, t0
+	cjalr	$c12, $c17
+	nop
+
 	/* Call the platform-specific startup code. */
 	move a0, s0
 	move a1, s1

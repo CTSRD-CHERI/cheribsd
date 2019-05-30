@@ -136,29 +136,68 @@ caddr_t cheri_kall_capability;
  * and other capability relocations.
  */
 void
-process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end)
+process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
+    void *code_cap, void *data_cap)
 {
-	void *pcc = cheri_getpcc();
-	void *gdc = cheri_getdefault();
+	void *rodata_cap = cheri_andperm(data_cap, CHERI_PERMS_KERNEL);
+
+	code_cap = cheri_andperm(code_cap, CHERI_PERMS_KERNEL_CODE);
+	data_cap = cheri_andperm(data_cap, CHERI_PERMS_KERNEL_DATA);
 
 	for (Elf64_Capreloc *reloc = start; reloc < end; reloc++) {
 		void *cap;
-		void **dst = cheri_setoffset(gdc, reloc->location);
+		void **dst = cheri_setoffset(data_cap, reloc->location);
 
-		/* XXX-AM: at some point we should be able to switch to
-		 * the cbuildcap instruction to reconstruct the capability.
-		 */
-		if ((reloc->permissions & ELF64_CAPRELOC_FUNCTION) ==
-		    ELF64_CAPRELOC_FUNCTION) {
-			cap = cheri_setoffset(pcc, reloc->object);
+		if ((reloc->permissions & ELF64_CAPRELOC_FUNCTION) != 0) {
+			cap = cheri_setoffset(code_cap, reloc->object);
 		}
 		else {
-			cap = cheri_setoffset(gdc, reloc->object);
+			if ((reloc->permissions & ELF64_CAPRELOC_RODATA) != 0)
+				cap = rodata_cap;
+			else
+				cap = data_cap;
+			cap = cheri_setoffset(cap, reloc->object);
 			if (reloc->size != 0)
 				cap = cheri_csetbounds(cap, reloc->size);
 		}
 		cap = cheri_incoffset(cap, reloc->offset);
 		*dst = cap;
+	}
+}
+
+/*
+ * This is called from locore to initialize capability function pointers.
+ * In the PLT ABI function pointers use R_MIPS_CHERI_CAPABILITY entries.
+ */
+void
+process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
+    Elf64_Sym *dynsym, void *code_cap, void *data_cap)
+{
+	code_cap = cheri_andperm(code_cap, CHERI_PERMS_KERNEL_CODE);
+	data_cap = cheri_andperm(data_cap, CHERI_PERMS_KERNEL_DATA);
+
+	for (Elf64_Rel *reloc = start; reloc < end; reloc++) {
+		void *cap;
+		Elf64_Sym *symentry;
+		void **dst = cheri_setoffset(data_cap, reloc->r_offset);
+
+		switch (ELF64_R_TYPE(reloc->r_info)) {
+		case R_MIPS_CHERI_CAPABILITY:
+			symentry = &dynsym[ELF64_R_SYM(reloc->r_info)];
+			if (ELF64_ST_TYPE(symentry->st_info) == STT_FUNC) {
+				cap = cheri_setoffset(code_cap,
+				    symentry->st_value);
+			}
+			else {
+				cap = cheri_setoffset(data_cap,
+				    symentry->st_value);
+				cap = cheri_csetbounds(cap, symentry->st_size);
+			}
+			*dst = cap;
+			break;
+		default:
+			panic("Invalid capability relocation");
+		}
 	}
 }
 

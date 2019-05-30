@@ -277,6 +277,7 @@ typedef struct {
 } Elf64_Capreloc;
 
 #define ELF64_CAPRELOC_FUNCTION (1UL << 63)
+#define ELF64_CAPRELOC_RODATA (1UL << 62)
 #endif
 
 #endif /* !_SYS_ELF64_H_ */

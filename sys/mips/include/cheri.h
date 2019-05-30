@@ -684,7 +684,8 @@ struct cheri_kframe {
 #ifdef _KERNEL
 #ifdef CHERI_KERNEL
 /* purecap kernel specific startup */
-void process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end);
+void process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
+    void *code_cap, void *data_cap);
 void cheri_init_capabilities(void);
 #endif
 

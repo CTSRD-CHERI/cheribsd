@@ -58,7 +58,9 @@ SECTIONS
   .rodata1   : { *(.rodata1) }
   .interp     : { *(.interp) 	}
   .hash          : { *(.hash)		}
+  PROVIDE (_dynsym = ALIGN(0x8));
   .dynsym        : { *(.dynsym)		}
+  PROVIDE (_edynsym = .);
   .dynstr        : { *(.dynstr)		}
   .gnu.version   : { *(.gnu.version)	}
   .gnu.version_d   : { *(.gnu.version_d)	}
@@ -171,6 +173,12 @@ SECTIONS
     }
   .rel.plt       : { *(.rel.plt)		}
   .rela.plt      : { *(.rela.plt)		}
+
+  PROVIDE (_rel_dyn = ALIGN(0x8));
+  .rel.dyn	 : { *(.rel.dyn)		}
+  PROVIDE (_erel_dyn = .);
+
+  .rela.dyn	 : { *(.rela.dyn)		}
   .init          : 
   { 
     KEEP (*(.init))
