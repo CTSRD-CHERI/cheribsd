@@ -328,26 +328,40 @@ restrict_pcc:
 	/* XXX-AM: zero out ra so we catch anything that returns improperly */
 	PTR_LA	ra, 0
 
-	/* Process capability relocations.
+	/* Need to preserve a0-a3 for platform start */
+	move s0, a0
+	move s1, a1
+	move s2, a2
+	move s3, a3
+
+	/*
+	 * Process capability relocations.
 	 * This must be done before any PIC global access that uses the cap-table.
 	 * Pointers to the start and end of the __cap_relocs section are created
 	 * here in position-dependant code to avoid accessing the capability table.
+	 *
+	 * process_kernel_cap_relocs(reloc_start, reloc_end,
+	 *    code_cap, data_cap)
 	 */
-	// generate pointer to the __cap_relocs section start
 	PTR_LA	t0, _C_LABEL(__start___cap_relocs)
 	cgetkdc		$c3
 	csetoffset	$c3, $c3, t0
 	PTR_LA	t1, _C_LABEL(__stop___cap_relocs)
 	PTR_SUBU	t0, t1, t0
 	csetbounds	$c3, $c3, t0
-	// generate pointer to the __cap_relocs section end
 	csetoffset	$c4, $c3, t0
+	cgetpccsetoffset	$c5, zero
+	cgetkdc		$c6
 	PTR_LA	t0, _C_LABEL(process_kernel_cap_relocs)
 	cgetpccsetoffset	$c12, t0
 	cjalr	$c12, $c17
 	nop
 
 	/* Call the platform-specific startup code. */
+	move a0, s0
+	move a1, s1
+	move a2, s2
+	move a3, s3
 	cfromddc	$c3, a1
 	dsll		t0, a0, 3
 	csetbounds	$c3, $c3, t0
