@@ -7503,7 +7503,7 @@ main(int argc, char **argv)
 			re->options |= RE_S;
 			break;
 		case 't':
-			re->options |= RE_T;
+			re->options |= RE_SS | RE_T;
 			break;
 		case 'u':
 			re->options |= RE_U;
