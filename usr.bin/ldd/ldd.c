@@ -98,9 +98,9 @@ static void	usage(void);
 #define	TYPE_ELF32	3	/* Explicit 32 bits on architectures >32 bits */
 #endif
 
-#if RTLD_DIRECT_EXEC_TRACE_SUPPORTED == 1
-
 extern char **environ;
+
+#if RTLD_DIRECT_EXEC_TRACE_SUPPORTED == 1
 
 static int
 trace_rtld_direct_exec(pid_t * child, const char *rtld, const char *file)
@@ -313,8 +313,9 @@ main(int argc, char *argv[])
 				break;
 			}
 		}
-
+#if RTLD_DIRECT_EXEC_TRACE_SUPPORTED == 1
 wait_for_child:
+#endif
 		if (child != -1) {
 			if (waitpid(child, &status, 0) < 0) {
 				warn("waitpid(%d)", child);
@@ -464,7 +465,7 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
 #ifdef __mips
 				if ((hdr.elf.e_flags & EF_MIPS_ABI) ==
 				    EF_MIPS_ABI_CHERIABI)
-					*rtld = _CHERIABI_PATH_RTLD;
+					*rtld = _CHERIABI_PATH_RTLD;ma
 
 #endif
 				return (1);
