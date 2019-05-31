@@ -1114,6 +1114,15 @@ __tls_get_addr(tls_index* ti)
 	uintptr_t** tls;
 	char *p;
 
+#if defined(__CHERI_PURE_CAPABILITY__) // && defined(DEBUG)
+	if (cheri_getlen(ti) != sizeof(*ti)) {
+		rtld_fdprintf(STDERR_FILENO, "%s: tls_index (%#p) does not have"
+		    " correct bounds. Please update LLVM!\n", __func__, ti);
+		// TODO: return NULL;
+	}
+#endif
+	dbg_assert(cheri_getlen(ti) == sizeof(*ti) && "tls_index should have bounds!");
+
 #ifdef TLS_USE_SYSARCH
 	sysarch(MIPS_GET_TLS, &tls);
 #else
