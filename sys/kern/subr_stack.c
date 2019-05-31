@@ -103,7 +103,7 @@ stack_print(const struct stack *st)
 	for (i = 0; i < st->depth; i++) {
 		(void)stack_symbol(st->pcs[i], namebuf, sizeof(namebuf),
 		    &offset, M_WAITOK);
-		printf("#%d %p at %s+%#lx\n", i, (void *)st->pcs[i],
+		printf("#%d %p at %s+%#lx\n", i, (void *)(uintptr_t)st->pcs[i],
 		    namebuf, offset);
 	}
 }
@@ -123,7 +123,7 @@ stack_print_short(const struct stack *st)
 		    &offset, M_WAITOK) == 0)
 			printf("%s+%#lx", namebuf, offset);
 		else
-			printf("%p", (void *)st->pcs[i]);
+			printf("%p", (void *)(uintptr_t)st->pcs[i]);
 	}
 	printf("\n");
 }
@@ -138,7 +138,7 @@ stack_print_ddb(const struct stack *st)
 	KASSERT(st->depth <= STACK_MAX, ("bogus stack"));
 	for (i = 0; i < st->depth; i++) {
 		stack_symbol_ddb(st->pcs[i], &name, &offset);
-		printf("#%d %p at %s+%#lx\n", i, (void *)st->pcs[i],
+		printf("#%d %p at %s+%#lx\n", i, (void *)(uintptr_t)st->pcs[i],
 		    name, offset);
 	}
 }
@@ -158,7 +158,7 @@ stack_print_short_ddb(const struct stack *st)
 		if (stack_symbol_ddb(st->pcs[i], &name, &offset) == 0)
 			printf("%s+%#lx", name, offset);
 		else
-			printf("%p", (void *)st->pcs[i]);
+			printf("%p", (void *)(uintptr_t)st->pcs[i]);
 	}
 	printf("\n");
 }
@@ -182,7 +182,7 @@ stack_sbuf_print_flags(struct sbuf *sb, const struct stack *st, int flags)
 		    &offset, flags);
 		if (error == EWOULDBLOCK)
 			return (error);
-		sbuf_printf(sb, "#%d %p at %s+%#lx\n", i, (void *)st->pcs[i],
+		sbuf_printf(sb, "#%d %p at %s+%#lx\n", i, (void *)(uintptr_t)st->pcs[i],
 		    namebuf, offset);
 	}
 	return (0);
@@ -206,7 +206,7 @@ stack_sbuf_print_ddb(struct sbuf *sb, const struct stack *st)
 	KASSERT(st->depth <= STACK_MAX, ("bogus stack"));
 	for (i = 0; i < st->depth; i++) {
 		(void)stack_symbol_ddb(st->pcs[i], &name, &offset);
-		sbuf_printf(sb, "#%d %p at %s+%#lx\n", i, (void *)st->pcs[i],
+		sbuf_printf(sb, "#%d %p at %s+%#lx\n", i, (void *)(uintptr_t)st->pcs[i],
 		    name, offset);
 	}
 }
