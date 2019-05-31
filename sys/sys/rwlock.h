@@ -66,7 +66,7 @@
 	RW_LOCK_WRITE_SPINNER | RW_LOCK_WRITER_RECURSED)
 #define	RW_LOCK_WAITERS		(RW_LOCK_READ_WAITERS | RW_LOCK_WRITE_WAITERS)
 
-#define	RW_OWNER(x)		((x) & ~RW_LOCK_FLAGMASK)
+#define	RW_OWNER(x)		(ptr_clear_flag((x), RW_LOCK_FLAGMASK))
 #define	RW_READERS_SHIFT	5
 #define	RW_READERS(x)							\
 	(ptr_get_flag(x, ~RW_LOCK_FLAGMASK) >> RW_READERS_SHIFT)
