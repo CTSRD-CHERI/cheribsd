@@ -525,7 +525,7 @@ cloneuio(struct uio *uiop)
  * boundary.
  */
 int
-copyout_map(struct thread *td, vm_offset_t *addr, size_t sz)
+copyout_map(struct thread *td, vm_ptr_t *addr, size_t sz)
 {
 	struct vmspace *vms;
 	int error;
@@ -536,7 +536,7 @@ copyout_map(struct thread *td, vm_offset_t *addr, size_t sz)
 	/*
 	 * Map somewhere after heap in process memory.
 	 */
-	*addr = round_page((vm_offset_t)vms->vm_daddr +
+	*addr = round_page((vm_ptr_t)vms->vm_daddr +
 	    lim_max(td, RLIMIT_DATA));
 
 	/* round size up to page boundary */
