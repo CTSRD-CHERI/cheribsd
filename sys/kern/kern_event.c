@@ -624,6 +624,7 @@ static sbintime_t
 timer2sbintime(intptr_t data, int flags)
 {
 	int64_t secs;
+	int64_t tdata = (int64_t)ptr_to_va(data);
 
         /*
          * Macros for converting to the fractional second portion of an
@@ -635,41 +636,41 @@ timer2sbintime(intptr_t data, int flags)
 	switch (flags & NOTE_TIMER_PRECMASK) {
 	case NOTE_SECONDS:
 #ifdef __LP64__
-		if (data > (SBT_MAX / SBT_1S))
+		if (tdata > (SBT_MAX / SBT_1S))
 			return (SBT_MAX);
 #endif
-		return ((sbintime_t)data << 32);
+		return ((sbintime_t)tdata << 32);
 	case NOTE_MSECONDS: /* FALLTHROUGH */
 	case 0:
-		if (data >= 1000) {
-			secs = data / 1000;
+		if (tdata >= 1000) {
+			secs = tdata / 1000;
 #ifdef __LP64__
 			if (secs > (SBT_MAX / SBT_1S))
 				return (SBT_MAX);
 #endif
-			return (secs << 32 | MS_TO_SBT(data % 1000));
+			return (secs << 32 | MS_TO_SBT(tdata % 1000));
 		}
-		return (MS_TO_SBT(data));
+		return (MS_TO_SBT(tdata));
 	case NOTE_USECONDS:
-		if (data >= 1000000) {
-			secs = data / 1000000;
+		if (tdata >= 1000000) {
+			secs = tdata / 1000000;
 #ifdef __LP64__
 			if (secs > (SBT_MAX / SBT_1S))
 				return (SBT_MAX);
 #endif
-			return (secs << 32 | US_TO_SBT(data % 1000000));
+			return (secs << 32 | US_TO_SBT(tdata % 1000000));
 		}
-		return (US_TO_SBT(data));
+		return (US_TO_SBT(tdata));
 	case NOTE_NSECONDS:
-		if (data >= 1000000000) {
-			secs = data / 1000000000;
+		if (tdata >= 1000000000) {
+			secs = tdata / 1000000000;
 #ifdef __LP64__
 			if (secs > (SBT_MAX / SBT_1S))
 				return (SBT_MAX);
 #endif
-			return (secs << 32 | US_TO_SBT(data % 1000000000));
+			return (secs << 32 | US_TO_SBT(tdata % 1000000000));
 		}
-		return (NS_TO_SBT(data));
+		return (NS_TO_SBT(tdata));
 	default:
 		break;
 	}
@@ -1097,7 +1098,8 @@ kevent_copyout(void *arg, kkevent_t *kevp, int count)
 		ks_n[i].flags = kevp[i].flags;
 		ks_n[i].fflags = kevp[i].fflags;
 		ks_n[i].data = kevp[i].data;
-		ks_n[i].udata = (void *)(__cheri_addr vaddr_t)kevp[i].udata;
+		ks_n[i].udata = (void *)(uintptr_t)
+		    (__cheri_addr vaddr_t)kevp[i].udata;
 		memcpy(&ks_n[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
 	}
 	error = copyout(ks_n, __USER_CAP_UNBOUND(uap->eventlist),
@@ -1164,7 +1166,8 @@ kevent11_copyout(void *arg, kkevent_t *kevp, int count)
 		kev11.flags = kevp->flags;
 		kev11.fflags = kevp->fflags;
 		kev11.data = kevp->data;
-		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
+		kev11.udata = (void *)(uintptr_t)
+		    (__cheri_addr vaddr_t)kevp->udata;
 		error = copyout(&kev11, __USER_CAP_OBJ(uap->eventlist),
 		    sizeof(kev11));
 		if (error != 0)
