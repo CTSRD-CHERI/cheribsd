@@ -542,7 +542,7 @@ static inline void
 sx_drop_critical(uintptr_t x, bool *in_critical, int *extra_work)
 {
 
-	if (x & SX_LOCK_WRITE_SPINNER)
+	if (ptr_get_flag(x, SX_LOCK_WRITE_SPINNER))
 		return;
 	if (*in_critical) {
 		critical_exit();
@@ -690,14 +690,14 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, int opts LOCK_FILE_LINE_ARG_DEF)
 			sleep_reason = READERS;
 			if (spintries == asx_retries)
 				goto sleepq;
-			if (!(x & SX_LOCK_WRITE_SPINNER)) {
+			if (!ptr_get_flag(x, SX_LOCK_WRITE_SPINNER)) {
 				if (!in_critical) {
 					critical_enter();
 					in_critical = true;
 					extra_work++;
 				}
 				if (!atomic_fcmpset_ptr(&sx->sx_lock, &x,
-				    x | SX_LOCK_WRITE_SPINNER)) {
+				    ptr_set_flag(x, SX_LOCK_WRITE_SPINNER))) {
 					critical_exit();
 					in_critical = false;
 					extra_work--;
@@ -712,9 +712,9 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, int opts LOCK_FILE_LINE_ARG_DEF)
 			for (i = 0; i < asx_loops; i += n) {
 				lock_delay_spin(n);
 				x = SX_READ_VALUE(sx);
-				if (!(x & SX_LOCK_WRITE_SPINNER))
+				if (!ptr_get_flag(x, SX_LOCK_WRITE_SPINNER))
 					break;
-				if (!(x & SX_LOCK_SHARED))
+				if (!ptr_get_flag(x, SX_LOCK_SHARED))
 					break;
 				n = SX_SHARERS(x);
 				if (n == 0)
@@ -973,10 +973,10 @@ static bool __always_inline
 __sx_can_read(struct thread *td, uintptr_t x, bool fp)
 {
 
-	if ((x & (SX_LOCK_SHARED | SX_LOCK_EXCLUSIVE_WAITERS | SX_LOCK_WRITE_SPINNER))
-			== SX_LOCK_SHARED)
+	if (ptr_get_flag(x, (SX_LOCK_SHARED | SX_LOCK_EXCLUSIVE_WAITERS |
+	    SX_LOCK_WRITE_SPINNER)) == SX_LOCK_SHARED)
 		return (true);
-	if (!fp && td->td_sx_slocks && (x & SX_LOCK_SHARED))
+	if (!fp && td->td_sx_slocks && ptr_get_flag(x, SX_LOCK_SHARED))
 		return (true);
 	return (false);
 }
@@ -1088,7 +1088,7 @@ _sx_slock_hard(struct sx *sx, int opts, uintptr_t x LOCK_FILE_LINE_ARG_DEF)
 		 * the owner stops running or the state of the lock
 		 * changes.
 		 */
-		if ((x & SX_LOCK_SHARED) == 0) {
+		if (ptr_get_flag(x, SX_LOCK_SHARED) == 0) {
 			owner = lv_sx_owner(x);
 			if (TD_IS_RUNNING(owner)) {
 				if (LOCK_LOG_TEST(&sx->lock_object, 0))
@@ -1108,7 +1108,7 @@ _sx_slock_hard(struct sx *sx, int opts, uintptr_t x LOCK_FILE_LINE_ARG_DEF)
 				continue;
 			}
 		} else {
-			if ((x & SX_LOCK_WRITE_SPINNER) && SX_SHARERS(x) == 0) {
+			if (ptr_get_flag(x, SX_LOCK_WRITE_SPINNER) && SX_SHARERS(x) == 0) {
 				MPASS(!__sx_can_read(td, x, false));
 				lock_delay_spin(2);
 				x = SX_READ_VALUE(sx);
@@ -1122,7 +1122,7 @@ _sx_slock_hard(struct sx *sx, int opts, uintptr_t x LOCK_FILE_LINE_ARG_DEF)
 				for (i = 0; i < asx_loops; i += n) {
 					lock_delay_spin(n);
 					x = SX_READ_VALUE(sx);
-					if (!(x & SX_LOCK_SHARED))
+					if (!ptr_get_flag(x, SX_LOCK_SHARED))
 						break;
 					n = SX_SHARERS(x);
 					if (n == 0)
@@ -1333,11 +1333,11 @@ _sx_sunlock_hard(struct sx *sx, struct thread *td, uintptr_t x
 		 */
 		setx = SX_LOCK_UNLOCKED;
 		queue = SQ_SHARED_QUEUE;
-		if (x & SX_LOCK_EXCLUSIVE_WAITERS) {
-			setx |= (x & SX_LOCK_SHARED_WAITERS);
+		if (ptr_get_flag(x, SX_LOCK_EXCLUSIVE_WAITERS)) {
+			setx |= ptr_get_flag(x, SX_LOCK_SHARED_WAITERS);
 			queue = SQ_EXCLUSIVE_QUEUE;
 		}
-		setx |= (x & SX_LOCK_WRITE_SPINNER);
+		setx |= ptr_get_flag(x, SX_LOCK_WRITE_SPINNER);
 		if (!atomic_fcmpset_rel_ptr(&sx->sx_lock, &x, setx))
 			continue;
 		if (LOCK_LOG_TEST(&sx->lock_object, 0))

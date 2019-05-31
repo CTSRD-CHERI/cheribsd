@@ -511,7 +511,7 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 				continue;
 			}
 		} else {
-			if ((v & RW_LOCK_WRITE_SPINNER) && RW_READERS(v) == 0) {
+			if (ptr_get_flag(v, RW_LOCK_WRITE_SPINNER) && RW_READERS(v) == 0) {
 				MPASS(!__rw_can_read(td, v, false));
 				lock_delay_spin(2);
 				v = RW_READ_VALUE(rw);
@@ -526,7 +526,7 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 				for (i = 0; i < rowner_loops; i += n) {
 					lock_delay_spin(n);
 					v = RW_READ_VALUE(rw);
-					if (!(v & RW_LOCK_READ))
+					if (!ptr_get_flag(v, RW_LOCK_READ))
 						break;
 					n = RW_READERS(v);
 					if (n == 0)
@@ -559,7 +559,7 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 		 */
 		v = RW_READ_VALUE(rw);
 retry_ts:
-		if (((v & RW_LOCK_WRITE_SPINNER) && RW_READERS(v) == 0) ||
+		if ((ptr_get_flag(v, RW_LOCK_WRITE_SPINNER) && RW_READERS(v) == 0) ||
 		    __rw_can_read(td, v, false)) {
 			turnstile_cancel(ts);
 			continue;
@@ -740,7 +740,8 @@ __rw_runlock_try(struct rwlock *rw, struct thread *td, uintptr_t *vp)
 {
 
 	for (;;) {
-		if (RW_READERS(*vp) > 1 || !(*vp & RW_LOCK_WAITERS)) {
+		if (RW_READERS(*vp) > 1 ||
+		    !ptr_get_flag(*vp, RW_LOCK_WAITERS)) {
 			if (atomic_fcmpset_rel_ptr(&rw->rw_lock, vp,
 			    *vp - RW_ONE_READER)) {
 				if (LOCK_LOG_TEST(&rw->lock_object, 0))
@@ -868,7 +869,7 @@ static inline void
 rw_drop_critical(uintptr_t v, bool *in_critical, int *extra_work)
 {
 
-	if (v & RW_LOCK_WRITE_SPINNER)
+	if (ptr_get_flag(v, RW_LOCK_WRITE_SPINNER))
 		return;
 	if (*in_critical) {
 		critical_exit();
@@ -1355,7 +1356,8 @@ void
 __rw_downgrade_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 {
 	struct turnstile *ts;
-	uintptr_t tid, v;
+	uintptr_t tid;
+	vaddr_t v;
 	int rwait, wwait;
 
 	if (SCHEDULER_STOPPED())
@@ -1398,7 +1400,7 @@ __rw_downgrade_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 	MPASS(ts != NULL);
 	if (!wwait)
 		v &= ~RW_LOCK_READ_WAITERS;
-	atomic_store_rel_ptr(&rw->rw_lock, RW_READERS_LOCK(1) | v);
+	atomic_store_rel_ptr(&rw->rw_lock, (uintptr_t)(RW_READERS_LOCK(1) | v));
 	/*
 	 * Wake other readers if there are no writers pending.  Otherwise they
 	 * won't be able to acquire the lock anyway.
