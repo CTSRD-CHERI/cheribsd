@@ -872,6 +872,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     lock_release(rtld_bind_lock, &lockstate);
 
+#if defined(__CHERI_PURE_CAPABILITY__) && !defined(__CHERI_CAPABILITY_TABLE__)
+    // In the legacy ABI we don't shrink the bounds at all since
+    // we use cgetsetoffset to call into other libraries ...
+    dbg("Increasing bounds on obj_main->entry in legacy ABI:");
+    dbg("\tbefore: %-#p", obj_main->entry);
+    obj_main->entry = cheri_copyaddress(cheri_getpcc(), obj_main->entry);
+    dbg("\tafter: %-#p", obj_main->entry);
+#endif
     dbg("transferring control to program entry point = %-#p", obj_main->entry);
 
     /* Return the exit procedure and the program entry point. */
