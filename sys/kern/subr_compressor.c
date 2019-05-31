@@ -282,7 +282,7 @@ zstdio_init(size_t maxiosize, int level)
 	owkspc = wkspc = malloc(wkspc_size + 8, M_COMPRESS,
 	    M_WAITOK | M_NODUMP);
 	/* Zstd API requires 8-byte alignment. */
-	if ((uintptr_t)wkspc % 8 != 0)
+	if (ptr_to_va(wkspc) % 8 != 0)
 		wkspc = (void *)roundup2((uintptr_t)wkspc, 8);
 
 	dump_compressor = ZSTD_initStaticCCtx(wkspc, wkspc_size);
