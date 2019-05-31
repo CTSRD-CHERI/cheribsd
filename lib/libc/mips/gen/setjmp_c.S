@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 
 NESTED(setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	.protected _C_LABEL(setjmp)
+	PIC_PROLOGUE(setjmp)
 	/* XXXRW: CFI annotations for debugger. */
 
 	/*
@@ -160,6 +161,7 @@ END(setjmp)
 
 NESTED(longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	.protected _C_LABEL(longjmp)
+	PIC_PROLOGUE(longjmp)
 	/* XXXRW: CFI annotations for debugger. */
 
 	dli		t0, -LONGJMP_FRAME_SIZE
