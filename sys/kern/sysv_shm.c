@@ -290,7 +290,7 @@ shm_deallocate_segment(struct shmid_kernel *shmseg)
 	size = round_page(shmseg->u.shm_segsz);
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
-		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
+		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	shm_committed -= btoc(size);
 	shm_nused--;
@@ -320,7 +320,7 @@ shm_delete_mapping(struct vmspace *vm, struct shmmap_state *shmmap_s)
 	size = round_page(shmseg->u.shm_segsz);
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
-		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
+		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	result = vm_map_remove(&vm->vm_map, shmmap_s->va, shmmap_s->va + size);
 	if (result != KERN_SUCCESS)
@@ -435,7 +435,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 	struct proc *p = td->td_proc;
 	struct shmid_kernel *shmseg;
 	struct shmmap_state *shmmap_s;
-	vm_offset_t attach_va = 0, max_va;
+	vm_ptr_t attach_va = 0;
+	vm_offset_t max_va;
 	vm_prot_t prot;
 	vm_size_t size;
 	int cow, error, find_space, i, rv;
@@ -478,7 +479,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	size = round_page(shmseg->u.shm_segsz);
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
-		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
+		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	prot = VM_PROT_READ;
 	cow = MAP_INHERIT_SHARE | MAP_PREFAULT_PARTIAL;
@@ -513,7 +514,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		else
 			return (EINVAL);
 		shmaddr = (const char * __capability)shmaddr -
-		    ((__cheri_addr vm_offset_t)shmaddr - attach_va);
+		    ((__cheri_addr vm_offset_t)shmaddr - ptr_to_va(attach_va));
 		if ((shmflg & SHM_REMAP) != 0)
 			cow |= MAP_REMAP;
 		find_space = VMFS_NO_SPACE;
@@ -572,7 +573,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		return (ENOMEM);
 	}
 
-	shmmap_s->va = attach_va;
+	shmmap_s->va = ptr_to_va(attach_va);
 	shmmap_s->shmid = shmid;
 	shmseg->u.shm_lpid = p->p_pid;
 	shmseg->u.shm_atime = time_second;
@@ -580,17 +581,16 @@ kern_shmat_locked(struct thread *td, int shmid,
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
 		shmaddr = cheri_setoffset(shmaddr,
-		    attach_va - cheri_getbase(shmaddr));
+		    ptr_to_va(attach_va) - cheri_getbase(shmaddr));
 		if (cheriabi_sysv_shm_setbounds) {
-			shmaddr = cheri_csetbounds(shmaddr, 
-			    roundup2(shmseg->u.shm_segsz,
-			    1 << CHERI_ALIGN_SHIFT(shmseg->u.shm_segsz)));
+			shmaddr = cheri_csetbounds(shmaddr,
+			    CHERI_REPRESENTABLE_LENGTH(shmseg->u.shm_segsz));
 		}
 		/* XXX: set perms */
 		td->td_retcap = __DECONST_CAP(void * __capability, shmaddr);
 	} else
 #endif
-		td->td_retval[0] = attach_va;
+		td->td_retval[0] = ptr_to_va(attach_va);
 	return (error);
 }
 
@@ -871,7 +871,7 @@ shmget_allocate_segment(struct thread *td, struct shmget_args *uap, int mode)
 	size = round_page(uap->size);
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
-		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
+		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	if (shm_committed + btoc(size) > shminfo.shmall)
 		return (ENOMEM);
