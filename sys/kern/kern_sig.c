@@ -904,7 +904,8 @@ sys_sigaction(struct thread *td, struct sigaction_args *uap)
 	if (oactp && !error) {
 #if __has_feature(capabilities)
 		memset(&oact_n, 0, sizeof(oact_n));
-		oact_n.sa_handler = (void *)(__cheri_addr vaddr_t)oactp->sa_handler;
+		oact_n.sa_handler = (void *)(uintptr_t)(__cheri_addr vaddr_t)
+		    oactp->sa_handler;
 		oact_n.sa_flags = oactp->sa_flags;
 		oact_n.sa_mask = oactp->sa_mask;
 #else
