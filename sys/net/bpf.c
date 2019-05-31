@@ -46,15 +46,16 @@ __FBSDID("$FreeBSD$");
 
 #define	EXPLICIT_USER_ACCESS
 
-#include <sys/types.h>
 #include <sys/param.h>
-#include <sys/lock.h>
-#include <sys/systm.h>
 #include <sys/conf.h>
+#include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
+#include <sys/ktr.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/mutex.h>
 #include <sys/time.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
@@ -65,6 +66,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/ttycom.h>
 #include <sys/uio.h>
 #include <sys/sysent.h>
+#include <sys/systm.h>
 
 #include <sys/event.h>
 #include <sys/file.h>
