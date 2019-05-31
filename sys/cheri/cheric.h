@@ -291,9 +291,9 @@ cheri_bytes_remaining(const void * __capability cap)
  */
 #ifdef CHERI_KERNEL
 
-#define cheri_bound(ptr, size) cheri_ptr((void *)(ptr), size)
-#define cheri_perm(ptr, size, perm) cheri_ptrperm((void *)(ptr), size, perm)
-#define cheri_valid(ptr) (cheri_gettag((void *)(ptr)) == 1)
+#define cheri_bound(ptr, size) cheri_ptr((const void *)(ptr), size)
+#define cheri_perm(ptr, size, perm) cheri_ptrperm((const void *)(ptr), size, perm)
+#define cheri_valid(ptr) (cheri_gettag((const void *)(ptr)) == 1)
 
 #else /* ! CHERI_KERNEL */
 
