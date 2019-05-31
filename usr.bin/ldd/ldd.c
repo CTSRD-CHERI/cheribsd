@@ -465,7 +465,7 @@ is_executable(const char *fname, int fd, int *is_shlib, int *type,
 #ifdef __mips
 				if ((hdr.elf.e_flags & EF_MIPS_ABI) ==
 				    EF_MIPS_ABI_CHERIABI)
-					*rtld = _CHERIABI_PATH_RTLD;ma
+					*rtld = _CHERIABI_PATH_RTLD;
 
 #endif
 				return (1);
