@@ -1459,6 +1459,8 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 #else
 		tag_loc = __DECONST(char*, dynp);
 #endif
+		dbg("Setting DT_MIPS_RLD_MAP_REL for %s: %p <- %p", obj->path,
+		    ((Elf_Addr *)(tag_loc + dynp->d_un.d_val)), &r_debug);
 		*((Elf_Addr *)(tag_loc + dynp->d_un.d_val)) = (Elf_Addr) &r_debug;
 		break;
 	}
