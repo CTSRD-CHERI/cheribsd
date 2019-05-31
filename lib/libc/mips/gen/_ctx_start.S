@@ -51,6 +51,10 @@ __FBSDID("$FreeBSD$");
  * stack frame setup by makecontext() for the callback function.
  */
 ENTRY(_ctx_start)
+#ifdef __CHERI_PURE_CAPABILITY__
+	PIC_PROLOGUE(_ctx_start)
+#endif
+
 #ifdef __mips_o32
 	move	s1, gp
 #endif

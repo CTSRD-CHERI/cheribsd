@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 
 NESTED(_setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	.protected _C_LABEL(_setjmp)
+	PIC_PROLOGUE(_setjmp)
 	.set	noreorder
 	/* XXXRW: CFI annotations for debugger. */
 
@@ -134,6 +135,7 @@ END(_setjmp)
 #define LONGJMP_FRAME_SIZE	(CALLFRAME_SIZ + _MIPS_SZCAP/8)
 NESTED(_longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	.protected _C_LABEL(_longjmp)
+	PIC_PROLOGUE(_longjmp)
 	/* XXXRW: CFI annotations for debugger. */
 
 	dli		t0, -LONGJMP_FRAME_SIZE		# allocate stack frame
