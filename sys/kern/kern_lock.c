@@ -537,7 +537,7 @@ lockmgr_sunlock_try(struct lock *lk, uintptr_t *xp)
 {
 
 	for (;;) {
-		if (LK_SHARERS(*xp) > 1 || !(*xp & LK_ALL_WAITERS)) {
+		if (LK_SHARERS(*xp) > 1 || !ptr_get_flag(*xp, LK_ALL_WAITERS)) {
 			if (atomic_fcmpset_rel_ptr(&lk->lk_lock, xp,
 			    *xp - LK_ONE_SHARER))
 				return (true);

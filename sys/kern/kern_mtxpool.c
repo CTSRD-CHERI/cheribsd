@@ -108,8 +108,8 @@ mtx_pool_find(struct mtx_pool *pool, void *ptr)
 	 * Fibonacci hash, see Knuth's
 	 * _Art of Computer Programming, Volume 3 / Sorting and Searching_
 	 */
-	p = ((HASH_MULTIPLIER * (uintptr_t)ptr) >> pool->mtx_pool_shift) &
-	    pool->mtx_pool_mask;
+	p = ((HASH_MULTIPLIER * ptr_to_va((uintptr_t)ptr)) >>
+	    pool->mtx_pool_shift) & pool->mtx_pool_mask;
 	return (&pool->mtx_pool_ary[p]);
 }
 
