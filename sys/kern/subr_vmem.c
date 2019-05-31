@@ -954,13 +954,13 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 		MPASS(align < nocross);
 		start = VMEM_ALIGNUP(start - phase, nocross) + phase;
 	}
-	if (start <= end && end - start >= size - 1) {
+	if (start <= end && ptr_to_va(end) - ptr_to_va(start) >= size - 1) {
 		MPASS((ptr_to_va(start) & (align - 1)) == phase);
 		MPASS(!VMEM_CROSS_P(start, start + size - 1, nocross));
 		MPASS(minaddr <= ptr_to_va(start));
 		MPASS(maxaddr == 0 || ptr_to_va(start) + size - 1 <= maxaddr);
 		MPASS(bt->bt_start <= start);
-		MPASS(BT_END(bt) - start >= size - 1);
+		MPASS(ptr_to_va(BT_END(bt)) - ptr_to_va(start) >= size - 1);
 		*addrp = start;
 
 		return (0);
@@ -985,7 +985,7 @@ vmem_clip(vmem_t *vm, bt_t *bt, vmem_addr_t start, vmem_size_t size)
 		btprev = bt_alloc(vm);
 		btprev->bt_type = BT_TYPE_FREE;
 		btprev->bt_start = bt->bt_start;
-		btprev->bt_size = start - bt->bt_start;
+		btprev->bt_size = ptr_to_va(start) - ptr_to_va(bt->bt_start);
 		bt->bt_start = start;
 		bt->bt_size -= btprev->bt_size;
 #ifdef CHERI_KERNEL
@@ -1486,6 +1486,11 @@ bt_dump(const bt_t *bt, int (*pr)(const char *, ...))
 	    bt->bt_type, bt_type_string(bt->bt_type));
 }
 
+#endif /* defined(DDB) || defined(DIAGNOSTIC) */
+
+#if defined(DDB)
+#include <ddb/ddb.h>
+
 static void
 vmem_dump(const vmem_t *vm , int (*pr)(const char *, ...) __printflike(1, 2))
 {
@@ -1510,11 +1515,6 @@ vmem_dump(const vmem_t *vm , int (*pr)(const char *, ...) __printflike(1, 2))
 		}
 	}
 }
-
-#endif /* defined(DDB) || defined(DIAGNOSTIC) */
-
-#if defined(DDB)
-#include <ddb/ddb.h>
 
 static bt_t *
 vmem_whatis_lookup(vmem_t *vm, vmem_addr_t addr)
