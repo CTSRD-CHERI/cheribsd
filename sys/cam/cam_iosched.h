@@ -69,7 +69,7 @@ cam_iosched_delta_t(uintptr_t then)
 {
 
 	/* Since the types are identical, wrapping works correctly */
-	return (cam_iosched_now() - then);
+	return (ptr_to_va(cam_iosched_now()) - ptr_to_va(then));
 }
 
 static inline sbintime_t
