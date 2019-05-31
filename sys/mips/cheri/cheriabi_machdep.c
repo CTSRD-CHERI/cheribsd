@@ -857,6 +857,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * this by default!
 	 */
 #ifdef CHERIABI_LEGACY_SUPPORT
+#pragma message("Warning: Building kernel with LEGACY ABI support!")
 	/*
 	 * The legacy ABI needs a full address space $pcc (with base == 0)
 	 * to create code capabilities using cgetpccsetoffset
@@ -1021,6 +1022,8 @@ cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 				  : "C" ((char * __capability)td->td_md.md_tls +
 				      td->td_md.md_tls_tcb_offset));
 	}
+#ifdef CHERIABI_LEGACY_SUPPORT
+#pragma message("Warning: Building with support for LEGACY TLS")
 	if (curthread == td && cpuinfo.userlocal_reg == true) {
 		/*
 		 * If there is an user local register implementation
@@ -1038,6 +1041,7 @@ cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 		mips_wr_userlocal((__cheri_addr u_long)td->td_md.md_tls +
 		    td->td_md.md_tls_tcb_offset);
 	}
+#endif
 
 	return (0);
 }
