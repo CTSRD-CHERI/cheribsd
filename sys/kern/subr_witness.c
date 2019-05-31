@@ -3046,6 +3046,7 @@ witness_increment_graph_generation(void)
 	w_generation++;
 }
 
+#ifdef KDB
 static int
 witness_output_drain(void *arg __unused, const char *data, int len)
 {
@@ -3053,13 +3054,16 @@ witness_output_drain(void *arg __unused, const char *data, int len)
 	witness_output("%.*s", len, data);
 	return (len);
 }
+#endif
 
 static void
 witness_debugger(int cond, const char *msg)
 {
+#ifdef KDB
 	char buf[32];
 	struct sbuf sb;
 	struct stack st;
+#endif
 
 	if (!cond)
 		return;
