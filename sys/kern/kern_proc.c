@@ -3214,13 +3214,18 @@ sysctl_kern_proc_sigtramp(SYSCTL_HANDLER_ARGS)
 #endif
 	bzero(&kst, sizeof(kst));
 	if (sv->sv_sigcode_base != 0) {
-		kst.ksigtramp_start = (char *)sv->sv_sigcode_base;
-		kst.ksigtramp_end = (char *)sv->sv_sigcode_base +
+		/*
+		 * XXX-AM: It is unclear whether we are intended to
+		 * return valid pointers. If so we need a cheriabi and freebsd64
+		 * version of kst.
+		 */
+		kst.ksigtramp_start = (char *)(uintptr_t)sv->sv_sigcode_base;
+		kst.ksigtramp_end = (char *)(uintptr_t)sv->sv_sigcode_base +
 		    *sv->sv_szsigcode;
 	} else {
-		kst.ksigtramp_start = (char *)sv->sv_psstrings -
+		kst.ksigtramp_start = (char *)(uintptr_t)sv->sv_psstrings -
 		    *sv->sv_szsigcode;
-		kst.ksigtramp_end = (char *)sv->sv_psstrings;
+		kst.ksigtramp_end = (char *)(uintptr_t)sv->sv_psstrings;
 	}
 	PROC_UNLOCK(p);
 	error = SYSCTL_OUT(req, &kst, sizeof(kst));
