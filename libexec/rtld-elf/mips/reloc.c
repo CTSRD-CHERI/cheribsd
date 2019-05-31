@@ -1120,8 +1120,8 @@ __tls_get_addr(tls_index* ti)
 		    " correct bounds. Please update LLVM!\n", __func__, ti);
 		// TODO: return NULL;
 	}
-#endif
 	dbg_assert(cheri_getlen(ti) == sizeof(*ti) && "tls_index should have bounds!");
+#endif
 
 #ifdef TLS_USE_SYSARCH
 	sysarch(MIPS_GET_TLS, &tls);
