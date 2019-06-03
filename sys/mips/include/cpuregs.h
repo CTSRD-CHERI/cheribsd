@@ -139,16 +139,24 @@ extern caddr_t cheri_kall_capability;
 /*
  * Macros used to create a pointer for each address space segment
  */
-#define MIPS_XKPHYS(x) (cheri_xkphys_capability + ((x) - MIPS_XKPHYS_START))
-#define MIPS_XKSEG(x) (cheri_xkseg_capability + ((x) - MIPS_XKSEG_START))
-#define MIPS_XUSEG(x) (cheri_xuseg_capability + ((x) - MIPS_XUSEG_START))
-#define MIPS_KSEG0(x) (cheri_kseg0_capability + ((x) - MIPS_KSEG0_START))
-#define MIPS_KSEG1(x) (cheri_kseg1_capability + ((x) - MIPS_KSEG1_START))
-#define MIPS_KSEG2(x) (cheri_kseg2_capability + ((x) - MIPS_KSEG2_START))
-/* Special macros used to create pointers in specific kernel address space regions */
-#define MIPS_KCODE(x) (cheri_kcode_capability + ((x) - MIPS_KSEG0_START))
-#define MIPS_KDATA(x) (cheri_kdata_capability +				\
-		       ((x) - __builtin_mips_cheri_get_cap_base(cheri_kdata_capability)))
+#define MIPS_XKPHYS(x)						\
+	(cheri_xkphys_capability + ((x) - MIPS_XKPHYS_START))
+#define MIPS_XKSEG(x)						\
+	(cheri_xkseg_capability + ((x) - MIPS_XKSEG_START))
+#define MIPS_XUSEG(x)						\
+	(cheri_xuseg_capability + ((x) - MIPS_XUSEG_START))
+#define MIPS_KSEG0(x)							\
+	(cheri_kseg0_capability + ((x) - ptr_to_va(MIPS_KSEG0_START)))
+#define MIPS_KSEG1(x)							\
+	(cheri_kseg1_capability + ((x) - ptr_to_va(MIPS_KSEG1_START)))
+#define MIPS_KSEG2(x)							\
+	(cheri_kseg2_capability + ((x) - ptr_to_va(MIPS_KSEG2_START)))
+/* Macros used to create pointers in specific kernel address space regions */
+#define MIPS_KCODE(x)							\
+	(cheri_kcode_capability + ((x) - ptr_to_va(MIPS_KSEG0_START)))
+#define MIPS_KDATA(x)							\
+	(cheri_kdata_capability +					\
+	((x) - __builtin_mips_cheri_get_cap_base(cheri_kdata_capability)))
 #define MIPS_KALL(x) (cheri_kall_capability + (x))
 #else /* ! CHERI_KERNEL */
 #define MIPS_XKPHYS(x) (x)
@@ -162,18 +170,18 @@ extern caddr_t cheri_kall_capability;
 #define MIPS_KALL(x) (x)
 #endif /* ! CHERI_KERNEL */
 
-#define	MIPS_PHYS_TO_KSEG0(x)	MIPS_KSEG0((uintptr_t)(x) | MIPS_KSEG0_START)
-#define	MIPS_PHYS_TO_KSEG1(x)	MIPS_KSEG1((uintptr_t)(x) | MIPS_KSEG1_START)
+#define	MIPS_PHYS_TO_KSEG0(x)	MIPS_KSEG0((uintptr_t)(x) | ptr_to_va(MIPS_KSEG0_START))
+#define	MIPS_PHYS_TO_KSEG1(x)	MIPS_KSEG1((uintptr_t)(x) | ptr_to_va(MIPS_KSEG1_START))
 
 #define	MIPS_KSEG0_TO_PHYS(x)		(ptr_to_va(x) & MIPS_KSEG0_PHYS_MASK)
 #define	MIPS_KSEG1_TO_PHYS(x)		(ptr_to_va(x) & MIPS_KSEG0_PHYS_MASK)
 
 #define	MIPS_IS_KSEG0_ADDR(x)					\
-	(((vm_offset_t)(x) >= MIPS_KSEG0_START) &&		\
-	    ((vm_offset_t)(x) <= MIPS_KSEG0_END))
+	(((vm_offset_t)(x) >= ptr_to_va(MIPS_KSEG0_START)) &&	\
+	    ((vm_offset_t)(x) <= ptr_to_va(MIPS_KSEG0_END)))
 #define	MIPS_IS_KSEG1_ADDR(x)					\
-	(((vm_offset_t)(x) >= MIPS_KSEG1_START) &&		\
-	    ((vm_offset_t)(x) <= MIPS_KSEG1_END))
+	(((vm_offset_t)(x) >= ptr_to_va(MIPS_KSEG1_START)) &&	\
+	    ((vm_offset_t)(x) <= ptr_to_va(MIPS_KSEG1_END)))
 #define	MIPS_IS_VALID_PTR(x)		(MIPS_IS_KSEG0_ADDR(x) || \
 					    MIPS_IS_KSEG1_ADDR(x))
 
