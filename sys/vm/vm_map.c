@@ -1830,7 +1830,7 @@ vm_map_alignspace(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	free_addr = *addr;
 	KASSERT(free_addr == vm_map_findspace(map, free_addr, length),
 	    ("caller failed to provide space %d at address %p",
-	     (int)length, (void*)free_addr));
+	     (int)length, (void*)(uintptr_t)free_addr));
 	for (;;) {
 		/*
 		 * At the start of every iteration, the free space at address

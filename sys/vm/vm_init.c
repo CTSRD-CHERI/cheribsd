@@ -226,8 +226,9 @@ again:
 	 * Allocate the clean map to hold all of I/O virtual memory.
 	 */
 	size = (long)nbuf * BKVASIZE + (long)bio_transient_maxcnt * MAXPHYS;
-	kmi->clean_sva = firstaddr = kva_alloc(size);
-	kmi->clean_eva = firstaddr + size;
+	kmi->clean_sva = kva_alloc(size);
+	kmi->clean_eva = kmi->clean_sva + size;
+	firstaddr = (caddr_t)kmi->clean_sva;
 
 	/*
 	 * Allocate the buffer arena.

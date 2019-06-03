@@ -4157,13 +4157,13 @@ vm_page_clear_dirty_mask(vm_page_t m, vm_page_bits_t pagebits)
 		 * containing aligned word, to not depend on the existence
 		 * of atomic_clear_{8, 16}.
 		 */
-		shift = addr & (sizeof(uint32_t) - 1);
+		shift = ptr_to_va(addr) & (sizeof(uint32_t) - 1);
 #if BYTE_ORDER == BIG_ENDIAN
 		shift = (sizeof(uint32_t) - sizeof(m->dirty) - shift) * NBBY;
 #else
 		shift *= NBBY;
 #endif
-		addr &= ~(sizeof(uint32_t) - 1);
+		addr = rounddown2(addr, sizeof(uint32_t));
 		atomic_clear_32((uint32_t *)addr, pagebits << shift);
 #endif		/* PAGE_SIZE */
 	}

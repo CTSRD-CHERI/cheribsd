@@ -2127,7 +2127,7 @@ uma_startup(void *mem, int npages)
 	masterkeg = (uma_keg_t)m;
 	m += roundup(ksize, CACHE_LINE_SIZE);
 	m = roundup(m, PAGE_SIZE);
-	npages -= (m - (uintptr_t)mem) / PAGE_SIZE;
+	npages -= (ptr_to_va(m) - ptr_to_va(mem)) / PAGE_SIZE;
 	mem = (void *)m;
 
 	/* "manually" create the initial zone */

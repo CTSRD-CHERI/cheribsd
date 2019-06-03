@@ -549,7 +549,7 @@ retry:
 int
 kmem_back(vm_object_t object, vm_ptr_t addr, vm_size_t size, int flags)
 {
-	vm_offset_t end, next, start;
+	vm_ptr_t end, next, start;
 	int domain, rv;
 
 	KASSERT(object == kernel_object,
@@ -561,7 +561,8 @@ kmem_back(vm_object_t object, vm_ptr_t addr, vm_size_t size, int flags)
 		 * all come from the same physical domain.
 		 */
 		if (vm_ndomains > 1) {
-			domain = (addr >> KVA_QUANTUM_SHIFT) % vm_ndomains;
+			domain = (ptr_to_va(addr) >> KVA_QUANTUM_SHIFT) %
+			    vm_ndomains;
 			while (VM_DOMAIN_EMPTY(domain))
 				domain++;
 			next = roundup2(addr + 1, KVA_QUANTUM);
@@ -571,9 +572,11 @@ kmem_back(vm_object_t object, vm_ptr_t addr, vm_size_t size, int flags)
 			domain = 0;
 			next = end;
 		}
-		rv = kmem_back_domain(domain, object, addr, next - addr, flags);
+		rv = kmem_back_domain(domain, object, addr,
+		    ptr_to_va(next) - ptr_to_va(addr), flags);
 		if (rv != KERN_SUCCESS) {
-			kmem_unback(object, start, addr - start);
+			kmem_unback(object, start,
+			    ptr_to_va(addr) - ptr_to_va(start));
 			break;
 		}
 	}
