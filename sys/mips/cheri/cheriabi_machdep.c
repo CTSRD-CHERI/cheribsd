@@ -662,15 +662,16 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs->csp = sfp;
 	regs->c12 = catcher;
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
-	regs->ddc = csigp->csig_ddc;
 	/*
 	 * For now only change IDC if we were sandboxed. This makes cap-table
 	 * binaries work as expected (since they need cgp to remain the same).
 	 *
 	 * TODO: remove csigp->csig_idc
 	 */
-	if (cheri_is_sandboxed)
+	if (cheri_is_sandboxed) {
+		regs->ddc = csigp->csig_ddc;
 		regs->idc = csigp->csig_idc;
+	}
 }
 
 #ifdef CHERIABI_LEGACY_SUPPORT
@@ -934,6 +935,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	csigp = &td->td_pcb->pcb_cherisignal;
 	csigp->csig_csp = td->td_frame->csp;
 	csigp->csig_default_stack = csigp->csig_csp;
+#ifdef CHERIABI_LEGACY_SUPPORT
+	csigp->csig_ddc = frame->ddc;
+#endif
+
 
 	td->td_md.md_flags &= ~MDTD_FPUSED;
 	if (PCPU_GET(fpcurthread) == td)
@@ -1006,6 +1011,11 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	csigp = &td->td_pcb->pcb_cherisignal;
 	csigp->csig_csp = td->td_frame->csp;
 	csigp->csig_default_stack = csigp->csig_csp;
+#ifdef CHERIABI_LEGACY_SUPPORT
+	/* Setup $ddc when targeting the legacy ABI */
+	frame->ddc = td->td_frame->ddc;
+	csigp->csig_ddc = td->td_frame->ddc;
+#endif
 }
 
 int
