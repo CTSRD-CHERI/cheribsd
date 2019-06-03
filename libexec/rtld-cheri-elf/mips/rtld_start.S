@@ -254,7 +254,10 @@ LEAF(_rtld_bind_start)
 	clc	$cgp, zero, 0($c3) #const void* rtld_cgp = plt_stub->rtld_cgp;
 	// Now that the rtld $cgp has been restored we can call functions again
 	// Note: PIC_CALL() may load from $cgp
-	PIC_CALL(_mips_rtld_bind)	# $c3 = _mips_rtld_bind(plt_stub)
+	.set PIC_GLOBALS_POINTER_CHANGED, 0	# $cgp has been restored
+	PIC_LOAD_CALL_PTR($c12, t9, _mips_rtld_bind) # $c3 = _mips_rtld_bind(plt_stub)
+	cjalr $c12, $c17;
+	nop;
 	cmove	$c12, $c3
 
 	cmove	$c11, $cfp
