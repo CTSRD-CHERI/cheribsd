@@ -244,7 +244,7 @@ static inline struct neglist *
 NCP2NEGLIST(struct namecache *ncp)
 {
 
-	return (&neglists[(((uintptr_t)(ncp) >> 8) & ncneghash)]);
+	return (&neglists[((ptr_to_va((uintptr_t)ncp) >> 8) & ncneghash)]);
 }
 
 #define	numbucketlocks (ncbuckethash + 1)
@@ -260,7 +260,7 @@ static inline struct mtx *
 VP2VNODELOCK(struct vnode *vp)
 {
 
-	return (&vnodelocks[(((uintptr_t)(vp) >> 8) & ncvnodehash)]);
+	return (&vnodelocks[((ptr_to_va((uintptr_t)vp) >> 8) & ncvnodehash)]);
 }
 
 /*
