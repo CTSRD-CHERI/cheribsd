@@ -47,8 +47,6 @@ __FBSDID("$FreeBSD$");
 #error Unsupported word size
 #endif
 
-#define	LONGPTR_MASK (sizeof(long) - 1)
-
 #define	TESTBYTE				\
 	do {					\
 		if (*p != (unsigned char)c)	\
@@ -80,11 +78,20 @@ memcchr(const void *begin, int c, size_t n)
 	 * in the first word.  As this word may contain bytes before
 	 * `begin', we may execute this loop spuriously.
 	 */
-	lp = (const unsigned long *)((uintptr_t)begin & ~LONGPTR_MASK);
+	lp = (const unsigned long *)rounddown2(begin, sizeof(long));
 	end = (const unsigned char *)begin + n;
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Avoid performing a load before begin */
+	if (lp < (const unsigned long *)begin) {
+		lp++;
+		for (p = begin; p < (const unsigned char *)lp;)
+			TESTBYTE;
+	}
+#else
 	if (*lp++ != word)
 		for (p = begin; p < (const unsigned char *)lp;)
 			TESTBYTE;
+#endif
 
 	/* Now compare the data one word at a time. */
 	for (; (const unsigned char *)lp < end; lp++) {
