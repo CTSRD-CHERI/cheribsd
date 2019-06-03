@@ -224,7 +224,7 @@ bpf_filter(const struct bpf_insn *pc, u_char *p, u_int wirelen, u_int buflen)
 #endif
 			}
 #ifdef BPF_ALIGN
-			if (((intptr_t)(p + k) & 3) != 0)
+			if (!is_aligned((intptr_t)(p + k), 4))
 				A = EXTRACT_LONG(&p[k]);
 			else
 #endif
@@ -293,7 +293,7 @@ bpf_filter(const struct bpf_insn *pc, u_char *p, u_int wirelen, u_int buflen)
 #endif
 			}
 #ifdef BPF_ALIGN
-			if (((intptr_t)(p + k) & 3) != 0)
+			if (!is_aligned((intptr_t)(p + k), 4))
 				A = EXTRACT_LONG(&p[k]);
 			else
 #endif
