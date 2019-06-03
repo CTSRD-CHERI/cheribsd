@@ -2818,7 +2818,7 @@ ifr_buffer_set_buffer_null(void *data)
 	else
 #endif
 #ifdef COMPAT_FREEBSD64
-		ifrup->ifr64.ifr_ifru.ifru_buffer.buffer = NULL;
+		ifrup->ifr64.ifr_ifru.ifru_buffer.buffer = 0;
 #else
 		ifrup->ifr.ifr_ifru.ifru_buffer.buffer = NULL;
 #endif
@@ -3476,8 +3476,8 @@ _Pragma("pointer_interpretation integer")
 struct ifconf64 {
 	int	ifc_len;
 	union {
-		char		*ifcu_buf;
-		struct ifreq	*ifcu_req;
+		uint64_t	ifcu_buf; /* (char *) */
+		uint64_t	ifcu_req; /* (struct ifreq *) */
 	} ifc_ifcu;
 };
 _Pragma("pointer_interpretation pop")
@@ -3505,7 +3505,7 @@ ifmr_init(struct ifmediareq *ifmr, caddr_t data)
 		ifmr->ifm_active = ifmr64->ifm_active;
 		ifmr->ifm_count = ifmr64->ifm_count;
 		ifmr->ifm_ulist =
-		    __USER_CAP(ifmr64->ifm_ulist,
+			__USER_CAP((int *)(uintptr_t)ifmr64->ifm_ulist,
 			ifmr64->ifm_count * sizeof(int));
 	} else
 #endif
@@ -3608,7 +3608,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCGIFCONF32:
 		ifc32 = (struct ifconf32 *)data;
 		ifc.ifc_len = ifc32->ifc_len;
-		ifc.ifc_buf = __USER_CAP(PTRIN(ifc32->ifc_buf), ifc32->ifc_len);
+		ifc.ifc_buf = __USER_CAP((void *)(uintptr_t)ifc32->ifc_buf,
+		    ifc32->ifc_len);
 
 		error = ifconf(SIOCGIFCONF, (void *)&ifc);
 		CURVNET_RESTORE();
@@ -3621,7 +3622,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCGIFCONF64:
 		ifc64 = (struct ifconf64 *)data;
 		ifc.ifc_len = ifc64->ifc_len;
-		ifc.ifc_buf = __USER_CAP(ifc64->ifc_buf, ifc64->ifc_len);
+		ifc.ifc_buf = __USER_CAP((void *)(uintptr_t)ifc64->ifc_buf,
+		    ifc64->ifc_len);
 
 		error = ifconf(SIOCGIFCONF, (void *)&ifc);
 		CURVNET_RESTORE();
