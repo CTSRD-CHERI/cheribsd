@@ -399,7 +399,7 @@ extern "C" int
 reloc_plt(Obj_Entry *obj, bool bind_now, int flags __unused, const Obj_Entry *rtldobj,
     RtldLockState *lockstate __unused)
 {
-#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 && defined(DEBUG)
 	if (obj->captable_mapping) {
 		const auto mapping_end = (const CheriCapTableMappingEntry*)cheri_incoffset(
 		    obj->captable_mapping, obj->captable_mapping_size);
