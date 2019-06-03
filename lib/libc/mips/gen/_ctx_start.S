@@ -68,7 +68,9 @@ ENTRY(_ctx_start)
 	PTR_LA	t9, _ctx_done
 	jalr	t9
 #else
-	PIC_CALL(_ctx_done)
+	PIC_LOAD_CALL_PTR($c12, t9, _ctx_done)
+	cjalr $c12, $c17;
+	nop;
 #endif
 	break	0
 END(_ctx_start)

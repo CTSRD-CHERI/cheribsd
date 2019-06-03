@@ -68,7 +68,7 @@ NESTED(_setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	/* XXXRW: CFI annotations for debugger. */
 
 	REG_LI		v0, _JB_MAGIC__SETJMP
-	csd		v0, zero, (_JB_MAGIC  * SZREG)($c3)
+	csd		v0, zero, (_JB_MAGIC * SZREG)($c3)
 
 	/*
 	 * From "MIPSpro N32 ABI Handbook", Table 2-1:
@@ -128,18 +128,17 @@ NESTED(_setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	cgetdefault	$c4
 	csc		$c4, zero, _JB_CHERI_OFFSET(DDC)($c3)
 
-	cjr		$c17
 	move		v0, zero
+	PIC_RETURN()
 END(_setjmp)
 
-#define LONGJMP_FRAME_SIZE	(CALLFRAME_SIZ + _MIPS_SZCAP/8)
+#define LONGJMP_FRAME_SIZE	(CALLFRAME_SIZ + 2 * _MIPS_SZCAP/8)
 NESTED(_longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	.protected _C_LABEL(_longjmp)
 	PIC_PROLOGUE(_longjmp)
 	/* XXXRW: CFI annotations for debugger. */
 
-	dli		t0, -LONGJMP_FRAME_SIZE		# allocate stack frame
-	cincoffset	$csp, $csp, t0
+	cincoffset	$csp, $csp, -LONGJMP_FRAME_SIZE	# allocate stack frame
 
 	/*
 	 * Prepare a proper stack frame so that we can call
@@ -224,15 +223,16 @@ NESTED(_longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 
 	/* Install $a0 as the return value from setjmp(). */
 	move		v0, a0
-	cjr		$c17
-	nop
+	PIC_RETURN()
 
 botch:
 	/*
 	 * We know we aren't returning so we don't care about restoring
 	 * our caller's GP.
 	 */
-	ld		v1, 0(zero)
+	// ld		v1, 0(zero)
+	PIC_SAVE_GLOBALS_POINTER(CALLFRAME_CGP)
 	PIC_CALL(longjmperror)
+	PIC_RESTORE_GLOBALS_POINTER(CALLFRAME_CGP)
 	PIC_TAILCALL(abort)
 END(_longjmp)
