@@ -131,7 +131,9 @@ done:
 void
 stack_save_td(struct stack *st, struct thread *td)
 {
+#ifndef CHERI_KERNEL
 	u_register_t pc, sp;
+#endif
 
 	if (TD_IS_SWAPPED(td))
 		panic("stack_save_td: swapped");
@@ -156,7 +158,9 @@ stack_save_td_running(struct stack *st, struct thread *td)
 void
 stack_save(struct stack *st)
 {
+#ifndef CHERI_KERNEL
 	u_register_t pc, sp;
+#endif
 
 	if (curthread == NULL)
 		panic("stack_save: curthread == NULL");
