@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cache.h>
 
 #ifdef __mips_n64
+#ifndef CHERI_KERNEL
 struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
@@ -94,6 +95,26 @@ struct sysentvec elf64_freebsd_sysvec = {
 };
 INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
 
+static Elf64_Brandinfo freebsd_brand_info = {
+	.brand		= ELFOSABI_FREEBSD,
+	.machine	= EM_MIPS,
+	.compat_3_brand	= "FreeBSD",
+	.emul_path	= NULL,
+	.interp_path	= "/libexec/ld-elf.so.1",
+	.sysvec		= &elf64_freebsd_sysvec,
+	.interp_newpath	= NULL,
+	.brand_note	= &elf64_freebsd_brandnote,
+#ifdef CPU_CHERI
+	.header_supported = mips_elf_header_supported,
+#endif
+	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
+};
+
+SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_ANY,
+    (sysinit_cfunc_t) elf64_insert_brand_entry,
+    &freebsd_brand_info);
+#endif /* ! CHERI_KERNEL */
+
 #ifdef CPU_CHERI
 static __inline boolean_t
 mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
@@ -123,25 +144,6 @@ mips_elf_header_supported(struct image_params * imgp)
 	return TRUE;
 }
 #endif
-
-static Elf64_Brandinfo freebsd_brand_info = {
-	.brand		= ELFOSABI_FREEBSD,
-	.machine	= EM_MIPS,
-	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
-	.interp_path	= "/libexec/ld-elf.so.1",
-	.sysvec		= &elf64_freebsd_sysvec,
-	.interp_newpath	= NULL,
-	.brand_note	= &elf64_freebsd_brandnote,
-#ifdef CPU_CHERI
-	.header_supported = mips_elf_header_supported,
-#endif
-	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
-};
-
-SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_ANY,
-    (sysinit_cfunc_t) elf64_insert_brand_entry,
-    &freebsd_brand_info);
 
 void
 elf64_dump_thread(struct thread *td __unused, void *dst __unused,

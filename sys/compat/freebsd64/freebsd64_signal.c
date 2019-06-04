@@ -145,8 +145,8 @@ siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64)
 	si64->si_pid = si->si_pid;
 	si64->si_uid = si->si_uid;
 	si64->si_status = si->si_status;
-	si64->si_addr = (__cheri_fromcap void *)si->si_addr;
-	si64->si_value.sival_ptr_native = si->si_value.sival_ptr_native;
+	si64->si_addr = (__cheri_addr uint64_t)si->si_addr;
+	si64->si_value.sival_ptr = si->si_value.sival_ptr64;
 }
 
 static int
@@ -203,7 +203,7 @@ freebsd64_sigaltstack(struct thread *td,
 		error = copyin(uap->ss, &ss64, sizeof(ss));
 		if (error != 0)
 			return (error);
-		ss.ss_sp = __USER_CAP_UNBOUND(ss64.ss_sp);
+		ss.ss_sp = __USER_CAP_UNBOUND((void *)(uintptr_t)ss64.ss_sp);
 		ss.ss_size = ss64.ss_size;
 		ss.ss_flags = ss64.ss_flags;
 	}
@@ -213,7 +213,7 @@ freebsd64_sigaltstack(struct thread *td,
 		return (error);
 	if (uap->oss != NULL) {
 		memset(&ss64, 0, sizeof(ss64));
-		ss64.ss_sp = (__cheri_fromcap void *)oss.ss_sp;
+		ss64.ss_sp = (__cheri_addr uint64_t)oss.ss_sp;
 		ss64.ss_size = oss.ss_size;
 		ss64.ss_flags = oss.ss_flags;
 		error = copyout(&ss64, uap->oss, sizeof(oss));

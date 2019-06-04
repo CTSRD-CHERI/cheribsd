@@ -65,6 +65,7 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
+#include <machine/abi.h>
 #include <machine/cpuinfo.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
@@ -87,6 +88,9 @@
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 static void	freebsd64_exec_setregs(struct thread *, struct image_params *,
 		    u_long);
+#ifdef CHERI_KERNEL
+static void	freebsd64_do_sendsig(sig_t, ksiginfo_t *, sigset_t *);
+#endif
 
 extern const char *freebsd64_syscallnames[];
 
@@ -168,8 +172,11 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 static void
 freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
-
+#ifdef CHERI_KERNEL
+	freebsd64_do_sendsig(catcher, ksi, mask);
+#else
 	sendsig(catcher, ksi, mask);
+#endif
 }
 
 static void
@@ -203,8 +210,7 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 		return (0);
 
 	case MIPS_GET_TLS:
-		tlsbase =
-		    (int64_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
+		tlsbase = (__cheri_addr int64_t)td->td_md.md_tls;
 		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
 
@@ -237,3 +243,223 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 		return (EINVAL);
 	}
 }
+
+#ifdef CHERI_KERNEL
+static void
+freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
+{
+	struct proc *p;
+	struct thread *td;
+	struct trapframe *regs;
+	struct cheri_frame *cfp;
+	struct sigacts *psp;
+	struct sigframe64 sf, *sfp;
+	vm_ptr_t sp;
+	size_t cp2_len;
+	int cheri_is_sandboxed;
+	int sig;
+	int oonstack;
+
+	td = curthread;
+	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	sig = ksi->ksi_signo;
+	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
+
+	regs = td->td_frame;
+	oonstack = sigonstack(regs->sp);
+
+	/*
+	 * CHERI affects signal delivery in the following ways:
+	 *
+	 * (1) Additional capability-coprocessor state is exposed via
+	 *     extensions to the context frame placed on the stack.
+	 *
+	 * (2) If the user $pcc doesn't include CHERI_PERM_SYSCALL, then we
+	 *     consider user state to be 'sandboxed' and therefore to require
+	 *     special delivery handling which includes a domain-switch to the
+	 *     thread's context-switch domain.  (This is done by
+	 *     hybridabi_sendsig()).
+	 *
+	 * (3) If an alternative signal stack is not defined, and we are in a
+	 *     'sandboxed' state, then we have two choices: (a) if the signal
+	 *     is of type SA_SANDBOX_UNWIND, we will automatically unwind the
+	 *     trusted stack by one frame; (b) otherwise, we will terminate
+	 *     the process unconditionally.
+	 */
+	cheri_is_sandboxed = cheri_signal_sandboxed(td);
+
+	/*
+	 * We provide the ability to drop into the debugger in two different
+	 * circumstances: (1) if the code running is sandboxed; and (2) if the
+	 * fault is a CHERI protection fault.  Handle both here for the
+	 * non-unwind case.  Do this before we rewrite any general-purpose or
+	 * capability register state for the thread.
+	 */
+#if DDB
+	if (cheri_is_sandboxed && security_cheri_debugger_on_sandbox_signal)
+		kdb_enter(KDB_WHY_CHERI, "Signal delivery to CHERI sandbox");
+	else if (sig == SIGPROT && security_cheri_debugger_on_sigprot)
+		kdb_enter(KDB_WHY_CHERI,
+		    "SIGPROT delivered outside sandbox");
+#endif
+
+	/*
+	 * If a thread is running sandboxed, we can't rely on $sp which may
+	 * not point at a valid stack in the ambient context, or even be
+	 * maliciously manipulated.  We must therefore always use the
+	 * alternative stack.  We are also therefore unable to tell whether we
+	 * are on the alternative stack, so must clear 'oonstack' here.
+	 *
+	 * XXXRW: This requires significant further thinking; however, the net
+	 * upshot is that it is not a good idea to do an object-capability
+	 * invoke() from a signal handler, as with so many other things in
+	 * life.
+	 */
+	if (cheri_is_sandboxed != 0)
+		oonstack = 0;
+
+	/* save user context */
+	bzero(&sf, sizeof(sf));
+	sf.sf_uc.uc_sigmask = *mask;
+#if 0
+	/*
+	 * XXX-AM: what to do in this case? stack_t type differs. Do we
+	 * restore the value of this?
+	 */
+	sf.sf_uc.uc_stack = td->td_sigstk;
+#endif
+	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
+	sf.sf_uc.uc_mcontext.mc_pc = regs->pc;
+	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
+	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
+	sf.sf_uc.uc_mcontext.mc_tls = (__cheri_addr uint64_t)td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
+	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
+	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
+	sf.sf_uc.uc_mcontext.mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
+#if defined(CPU_HAVEFPU)
+	if (sf.sf_uc.uc_mcontext.mc_fpused) {
+		/* if FPU has current state, save it first */
+		if (td == PCPU_GET(fpcurthread))
+			MipsSaveCurFPState(td);
+		bcopy((void *)&td->td_frame->f0,
+		    (void *)sf.sf_uc.uc_mcontext.mc_fpregs,
+		    sizeof(sf.sf_uc.uc_mcontext.mc_fpregs));
+	}
+#endif
+	/* XXXRW: sf.sf_uc.uc_mcontext.sr seems never to be set? */
+	sf.sf_uc.uc_mcontext.cause = regs->cause;
+
+	/* Allocate and validate space for the signal handler context. */
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
+	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
+		sp = (vm_ptr_t)td->td_sigstk.ss_sp + td->td_sigstk.ss_size;
+	} else {
+		/*
+		 * Signals delivered when a CHERI sandbox is present must be
+		 * delivered on the alternative stack rather than a local one.
+		 * If an alternative stack isn't present, then terminate or
+		 * risk leaking capabilities (and control) to the sandbox (or
+		 * just crashing the sandbox).
+		 */
+		if (cheri_is_sandboxed) {
+			mtx_unlock(&psp->ps_mtx);
+			printf("pid %d, tid %d: signal in sandbox without "
+			    "alternative stack defined\n", td->td_proc->p_pid,
+			    td->td_tid);
+			sigexit(td, SIGILL);
+			/* NOTREACHED */
+		}
+		sp = (vm_ptr_t)__USER_CAP_UNBOUND((void *)(uintptr_t)regs->sp);
+	}
+
+	cp2_len = sizeof(*cfp);
+	sp -= cp2_len;
+	sp = rounddown2(sp, CHERICAP_SIZE);
+	sf.sf_uc.uc_mcontext.mc_cp2state = (__cheri_addr register_t)sp;
+	sf.sf_uc.uc_mcontext.mc_cp2state_len = cp2_len;
+
+	sp -= sizeof(struct sigframe64);
+	sp = rounddown2(sp, STACK_ALIGN);
+	sfp = (struct sigframe64 *)cheri_csetbounds((void *)sp,
+	    sizeof(struct sigframe64));
+
+	/* Build the argument list for the signal handler. */
+	regs->a0 = sig;
+	regs->a2 = (__cheri_addr register_t)&sfp->sf_uc;
+	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
+		/* Signal handler installed with SA_SIGINFO. */
+		regs->a1 = (__cheri_addr register_t)&sfp->sf_si;
+		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
+
+		/* fill siginfo structure */
+		siginfo_to_siginfo64(&ksi->ksi_info, &sf.sf_si);
+		sf.sf_si.si_signo = sig;
+		sf.sf_si.si_code = ksi->ksi_code;
+		sf.sf_si.si_addr = regs->badvaddr;
+	} else {
+		/* Old FreeBSD-style arguments. */
+		regs->a1 = ksi->ksi_code;
+		regs->a3 = regs->badvaddr;
+		/* sf.sf_ahu.sf_handler = catcher; */
+	}
+
+	mtx_unlock(&psp->ps_mtx);
+	PROC_UNLOCK(p);
+
+	/*
+	 * Copy the sigframe out to the user's stack.
+	 */
+	cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
+	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs, cfp);
+	if (copyoutcap(cfp,
+	    __USER_CAP((void *)(uintptr_t)sf.sf_uc.uc_mcontext.mc_cp2state,
+	    cp2_len), cp2_len) != 0) {
+		free(cfp, M_TEMP);
+		PROC_LOCK(p);
+		printf("pid %d, tid %d: could not copy out cheriframe\n",
+		    td->td_proc->p_pid, td->td_tid);
+		sigexit(td, SIGILL);
+		/* NOTREACHED */
+	}
+	free(cfp, M_TEMP);
+
+	if (copyout(&sf, sfp, sizeof(struct sigframe64)) != 0) {
+		/*
+		 * Something is wrong with the stack pointer.
+		 * ...Kill the process.
+		 */
+		PROC_LOCK(p);
+		printf("pid %d, tid %d: could not copy out sigframe\n",
+		    td->td_proc->p_pid, td->td_tid);
+		sigexit(td, SIGILL);
+		/* NOTREACHED */
+	}
+
+	/*
+	 * Install CHERI signal-delivery register state for handler to run
+	 * in.  As we don't install this in the CHERI frame on the user stack,
+	 * it will be (genrally) be removed automatically on sigreturn().
+	 */
+	hybridabi_sendsig(td);
+
+	regs->pc = (register_t)(__cheri_offset vaddr_t)catcher;
+	// FIXME: should this be an offset relative to PCC or an address?
+	regs->t9 = (register_t)(__cheri_offset vaddr_t)catcher;
+	regs->sp = (__cheri_addr register_t)sfp;
+	if (p->p_sysent->sv_sigcode_base != 0) {
+		/* Signal trampoline code is in the shared page */
+		regs->ra = p->p_sysent->sv_sigcode_base;
+	} else {
+		/* Signal trampoline code is at base of user stack. */
+		/* XXX: GC this code path once shared page is stable */
+		regs->ra = (register_t)(intptr_t)PS_STRINGS -
+		    *(p->p_sysent->sv_szsigcode);
+	}
+	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
+
+}
+#endif /* CHERI_KERNEL */

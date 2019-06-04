@@ -206,6 +206,10 @@ union sigval_c {
 	int	sival_int;
 	void * __capability sival_ptr;
 };
+union sigval64 {
+	int		sival_int;
+	uint64_t	sival_ptr;	/* (void *) */
+};
 #endif
 #endif /* _KERNEL */
 
@@ -227,7 +231,7 @@ typedef union {
 	uint32_t	sival_ptr32;
 #endif
 #if __has_feature(capabilities)
-	void * /* __ptr64 */ sival_ptr64;
+	uint64_t /* __ptr64 */ sival_ptr64;
 	void * __capability sival_ptr_c;
 #endif
 } ksigval_union;
@@ -435,8 +439,8 @@ struct siginfo64 {
 	__pid_t	si_pid;			/* sending process */
 	__uid_t	si_uid;			/* sender's ruid */
 	int	si_status;		/* exit value */
-	void	*si_addr;		/* faulting instruction */
-	union sigval_native si_value;
+	uint64_t	si_addr;	/* (void *) faulting instruction */
+	union sigval64 si_value;
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */

@@ -93,6 +93,7 @@ __FBSDID("$FreeBSD$");
  * frame pointer, it returns to the user
  * specified pc, psl.
  */
+#ifndef CHERI_KERNEL
 void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
@@ -104,7 +105,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 	struct sigacts *psp;
 	struct sigframe sf, *sfp;
-	vm_offset_t sp;
+	vm_ptr_t sp;
 #ifdef CPU_CHERI
 	size_t cp2_len;
 	int cheri_is_sandboxed;
@@ -315,6 +316,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
 }
+#endif /* ! CHERI_KERNEL */
 
 /*
  * System call to cleanup state after a signal
@@ -520,7 +522,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	struct trapframe *tp;
 
 #ifdef CPU_CHERI
-	if ((void *)mcp->mc_cp2state != NULL) {
+	if ((void *)(uintptr_t)mcp->mc_cp2state != NULL) {
 		if (mcp->mc_cp2state_len != sizeof(*cfp)) {
 			printf("%s: invalid cp2 state length "
 			    "(expected %zd, got %zd)\n", __func__,
@@ -528,7 +530,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 			return (EINVAL);
 		}
 		cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
-		error = copyincap(__USER_CAP((void *)mcp->mc_cp2state,
+		error = copyincap(__USER_CAP((void *)(uintptr_t)mcp->mc_cp2state,
 		    mcp->mc_cp2state_len), cfp, sizeof(*cfp));
 		if (error) {
 			free(cfp, M_TEMP);
