@@ -67,6 +67,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
+#ifdef CHERI_KERNEL
+#include <vm/vm_map.h>
+#include <vm/vm_kern.h>
+#endif
 
 #include <machine/memdev.h>
 
@@ -79,6 +83,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 	kiovec_t *iov;
 	int error = 0;
 	vm_offset_t va, eva, off, v;
+	vm_ptr_t kva;
 	vm_prot_t prot;
 	struct vm_page m;
 	vm_page_t marr;
@@ -116,6 +121,15 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			va = trunc_page(uio->uio_offset);
 			eva = round_page(uio->uio_offset
 			    + iov->iov_len);
+			prot = (uio->uio_rw == UIO_READ)
+			    ? VM_PROT_READ : VM_PROT_WRITE;
+
+#ifdef CHERI_KERNEL
+			kva = vm_map_make_ptr(kernel_map, uio->uio_offset,
+			    iov->iov_len, prot);
+#else
+			kva = uio->uio_offset;
+#endif
 
 			/* 
 			 * Make sure that all the pages are currently resident
@@ -127,17 +141,12 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 					if (pmap_extract(kernel_pmap, va) == 0)
 						return (EFAULT);
 
-				prot = (uio->uio_rw == UIO_READ)
-				    ? VM_PROT_READ : VM_PROT_WRITE;
-
-				va = uio->uio_offset;
-				if (kernacc((void *) va, iov->iov_len, prot)
+				if (kernacc((void *)kva, iov->iov_len, prot)
 				    == FALSE)
 					return (EFAULT);
 			}
 
-			va = uio->uio_offset;
-			error = uiomove((void *)va, iov->iov_len, uio);
+			error = uiomove((void *)kva, iov->iov_len, uio);
 			continue;
 		}
 	}
