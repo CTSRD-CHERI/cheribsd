@@ -361,7 +361,7 @@ static void
 tlb_invalidate_one(unsigned i)
 {
 	/* XXX an invalid ASID? */
-	mips_wr_entryhi(TLBHI_ENTRY(MIPS_KSEG0_START + (2 * i * PAGE_SIZE), 0));
+	mips_wr_entryhi(TLBHI_ENTRY(ptr_to_va(MIPS_KSEG0_START) + (2 * i * PAGE_SIZE), 0));
 	mips_wr_entrylo0(0);
 	mips_wr_entrylo1(0);
 	mips_wr_pagemask(0);
