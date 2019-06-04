@@ -434,7 +434,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    "faulting instruction from untagged $pcc %p\n",  __func__,
 		    p->p_pid, (long)td->td_tid, p->p_comm,
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
-		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
+		    (void*)(uintptr_t)(__cheri_addr vaddr_t)(bad_inst_ptr));
 		*instr = -1;
 		return (bad_inst_ptr);
 	}
@@ -451,7 +451,7 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		    "faulting instruction from %p\n",  __func__, p->p_pid,
 		    (long)td->td_tid, p->p_comm,
 		    p->p_ucred ? p->p_ucred->cr_uid : -1,
-		    (void*)(__cheri_addr vaddr_t)(bad_inst_ptr));
+		    (void*)(uintptr_t)(__cheri_addr vaddr_t)(bad_inst_ptr));
 		*instr = -1;
 	}
 	/* Should this be a kerncap instead instead of being indirected by $pcc? */
@@ -2063,6 +2063,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	int op_type = 0;
 	int is_store = 0;
 	int sign_extend = 0;
+	uintptr_t uaddr;
 #ifdef CPU_CHERI
 	/**
 	 * XXX: There is a potential race condition here for CHERI.  We rely on the
@@ -2073,6 +2074,12 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 	 */
 #endif
 	src_regno = MIPS_INST_RT(inst);
+
+#ifdef CHERI_KERNEL
+	uaddr = (uintptr_t)cheri_setoffset(frame->ddc, addr);
+#else
+	uaddr = addr;
+#endif
 
 	/*
 	 * ADDR_ERR faults have higher priority than TLB
@@ -2181,7 +2188,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 		kaddr += sizeof(register_t) - size;
 #endif
 		int err;
-		if ((err = copyout_implicit_cap(kaddr, (void*)addr, size))) {
+		if ((err = copyout_implicit_cap(kaddr, (void*)uaddr, size))) {
 			return (0);
 		}
 		return (op_type);
@@ -2193,7 +2200,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 		kaddr += sizeof(register_t) - size;
 #endif
 		int err;
-		if ((err = copyin_implicit_cap((void*)addr, kaddr, size))) {
+		if ((err = copyin_implicit_cap((void*)uaddr, kaddr, size))) {
 			return (0);
 		}
 		/* If we need to sign extend it, then shift it so that the sign
