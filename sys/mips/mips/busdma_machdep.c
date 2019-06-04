@@ -1185,7 +1185,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 		if (size_cl)
 			mips_dcache_wbinv_range(ptr_to_va(buf_cl), size_cl);
 		if (size_clend && (size_cl == 0 ||
-                    buf_clend - buf_cl > mips_dcache_max_linesize))
+		    ptr_to_va(buf_clend) - ptr_to_va(buf_cl) > mips_dcache_max_linesize))
 			mips_dcache_wbinv_range(ptr_to_va(buf_clend), size_clend);
 		break;
 
@@ -1218,7 +1218,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 		if (size_cl)
 			mips_dcache_wbinv_range(ptr_to_va(buf_cl), size_cl);
 		if (size_clend && (size_cl == 0 ||
-                    buf_clend - buf_cl > mips_dcache_max_linesize))
+		    ptr_to_va(buf_clend) - ptr_to_va(buf_cl) > mips_dcache_max_linesize))
 			mips_dcache_wbinv_range(ptr_to_va(buf_clend), size_clend);
 		break;
 
