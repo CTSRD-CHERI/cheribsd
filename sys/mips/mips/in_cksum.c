@@ -105,15 +105,15 @@ in_cksumdata(const void *buf, int len)
 	int offset;
 	union q_util q_util;
 
-	if ((3 & (long) lw) == 0 && len == 20) {
+	if (is_aligned(lw, 4) && len == 20) {
 		sum = (u_int64_t) lw[0] + lw[1] + lw[2] + lw[3] + lw[4];
 		REDUCE32;
 		return sum;
 	}
 
-	if ((offset = 3 & (long) lw) != 0) {
+	if ((offset = ptr_to_va(lw) & 3) != 0) {
 		const u_int32_t *masks = in_masks + (offset << 2);
-		lw = (u_int32_t *) (((long) lw) - offset);
+		lw = (u_int32_t *) (((uintptr_t) lw) - offset);
 		sum = *lw++ & masks[len >= 3 ? 3 : len];
 		len -= 4 - offset;
 		if (len <= 0) {
@@ -228,7 +228,7 @@ skip_start:
 		if (len < mlen)
 			mlen = len;
 
-		if ((clen ^ (uintptr_t) addr) & 1)
+		if ((clen ^ ptr_to_va((uintptr_t)addr)) & 1)
 			sum += in_cksumdata(addr, mlen) << 8;
 		else
 			sum += in_cksumdata(addr, mlen);
