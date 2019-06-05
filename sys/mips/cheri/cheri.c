@@ -184,7 +184,10 @@ process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
 		switch (ELF64_R_TYPE(reloc->r_info)) {
 		case R_MIPS_CHERI_CAPABILITY:
 			symentry = &dynsym[ELF64_R_SYM(reloc->r_info)];
-			if (ELF64_ST_TYPE(symentry->st_info) == STT_FUNC) {
+			if (symentry->st_value == 0) {
+				cap = NULL;
+			}
+			else if (ELF64_ST_TYPE(symentry->st_info) == STT_FUNC) {
 				cap = cheri_setoffset(code_cap,
 				    symentry->st_value);
 			}
