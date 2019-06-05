@@ -66,7 +66,7 @@ uart_cpu_getdev(int devtype, struct uart_devinfo *di)
 	di->ops = uart_getops(&uart_ns8250_class);
 	di->bas.chan = 0;
 	di->bas.bst = mips_bus_space_generic;
-	di->bas.bsh = MIPS_PHYS_TO_KSEG1(MALTA_UART0ADR);
+	di->bas.bsh = (bus_space_handle_t)MIPS_PHYS_TO_KSEG1(MALTA_UART0ADR);
 	di->bas.regshft = 0;
 	di->bas.rclk = 0;
 	di->baudrate = 0;	/* retain the baudrate configured by YAMON */
