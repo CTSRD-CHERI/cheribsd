@@ -735,8 +735,9 @@ kmem_init_zero_region(void)
 	if ((m->flags & PG_ZERO) == 0)
 		pmap_zero_page(m);
 	for (i = 0; i < ZERO_REGION_SIZE; i += PAGE_SIZE)
-		pmap_qenter(addr + i, &m, 1);
-	pmap_protect(kernel_pmap, addr, addr + ZERO_REGION_SIZE, VM_PROT_READ);
+		pmap_qenter(ptr_to_va(addr) + i, &m, 1);
+	pmap_protect(kernel_pmap, ptr_to_va(addr),
+	    ptr_to_va(addr) + ZERO_REGION_SIZE, VM_PROT_READ);
 
 	zero_region = (const void *)addr;
 }
