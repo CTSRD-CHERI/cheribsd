@@ -66,7 +66,7 @@ struct sockaddr_dl {
 	u_char	sdl_slen;	/* link layer selector length */
 	char	sdl_data[46];	/* minimum work area, can be larger;
 				   contains both if name and ll address */
-};
+} __aligned(sizeof(long));
 
 #define LLADDR(s) ((caddr_t)((s)->sdl_data + (s)->sdl_nlen))
 #define CLLADDR(s) ((c_caddr_t)((s)->sdl_data + (s)->sdl_nlen))
