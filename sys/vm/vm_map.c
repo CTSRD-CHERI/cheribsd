@@ -4040,9 +4040,9 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	vm2 = vmspace_alloc(vm_map_min(old_map), vm_map_max(old_map),
 	    pmap_pinit);	
 #else
-	vm2 = vmspace_alloc((vm_ptr_t)old_map->map_capability,
-	    (vm_ptr_t)old_map->map_capability +
-	    cheri_getlen(old_map->map_capability),
+	vm2 = vmspace_alloc(
+	    (vm_ptr_t)cheri_setaddress(old_map->map_capability, vm_map_min(old_map)),
+	    (vm_ptr_t)cheri_setaddress(old_map->map_capability, vm_map_max(old_map)),
 	    pmap_pinit);
 #endif
 

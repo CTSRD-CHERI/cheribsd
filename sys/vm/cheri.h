@@ -74,7 +74,6 @@
 			 (u_long)cheri_getlen((void *)ptr)));		\
 	} while (0)
 
-
 #else /* ! CHERI_KERNEL */
 #define CHERI_VM_ASSERT_VALID(ptr)
 #define CHERI_VM_ASSERT_FIT_PTR(ptr)
