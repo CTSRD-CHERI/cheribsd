@@ -122,6 +122,7 @@ _LIBRARIES=	\
 		cap_pwd \
 		cap_sysctl \
 		cap_syslog \
+		cheri_caprevoke \
 		com_err \
 		compiler_rt \
 		crypt \
