@@ -268,7 +268,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 	memset(&mr, 0, sizeof(mr));
 	mr.mr_hint = hint;
 	mr.mr_max_addr = cheri_gettop(source_cap);
-	mr.mr_size = uap->len;
+	mr.mr_len = uap->len;
 	mr.mr_prot = uap->prot;
 	mr.mr_flags = flags;
 	mr.mr_fd = uap->fd;
@@ -412,7 +412,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 		newcap = cheri_setoffset(newcap,
 		    rounddown2(addr, PAGE_SIZE) - cap_base);
 		newcap = cheri_csetbounds(newcap,
-		    roundup2(mrp->mr_size + (addr - rounddown2(addr, PAGE_SIZE)),
+		    roundup2(mrp->mr_len + (addr - rounddown2(addr, PAGE_SIZE)),
 		    PAGE_SIZE));
 		/* Shift offset up if required */
 		cap_base = cheri_getbase(newcap);
@@ -421,14 +421,14 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 		cap_base = cheri_getbase(newcap);
 		cap_len = cheri_getlen(newcap);
 		KASSERT(addr >= cap_base &&
-		    addr + mrp->mr_size <= cap_base + cap_len,
+		    addr + mrp->mr_len <= cap_base + cap_len,
 		    ("Allocated range (%zx - %zx) is not within source "
-		    "capability (%zx - %zx)", addr, addr + mrp->mr_size,
+		    "capability (%zx - %zx)", addr, addr + mrp->mr_len,
 		    cap_base, cap_base + cap_len));
 		newcap = cheri_setoffset(newcap, addr - cap_base);
 		if (cheriabi_mmap_setbounds)
 			newcap = cheri_csetbounds(newcap,
-			    roundup2(mrp->mr_size, PAGE_SIZE));
+			    roundup2(mrp->mr_len, PAGE_SIZE));
 	}
 
 	return (newcap);
