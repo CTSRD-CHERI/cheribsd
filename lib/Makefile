@@ -171,6 +171,11 @@ SUBDIR.${MK_BSNMP}+=	libbsnmp
 
 SUBDIR.${MK_CHERI}+=	libsyscalls
 
+.if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
+SUBDIR+=	libcheri_caprevoke
+SUBDIR_DEPEND_libc+=	libcheri_caprevoke
+.endif
+
 .if ${MACHINE_CPU:Mcheri}
 _libcheribsdtest_dynamic=	libcheribsdtest_dynamic
 .endif
