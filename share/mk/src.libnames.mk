@@ -96,6 +96,7 @@ _LIBRARIES=	\
 		cam \
 		casper \
 		cheri \
+		cheri_caprevoke \
 		cheri_support \
 		cheri_syscalls \
 		cap_dns \
