@@ -149,6 +149,7 @@ SUBDIR.${MK_CHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
 SUBDIR.${MK_CHERI}+=	libz-cheri
 SUBDIR.${MK_CHERI}+=	libpng_sb
+SUBDIR.${MK_CHERI}+=	libcheri_caprevoke
 
 .if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
 _libc_cheri=	libc_cheri
