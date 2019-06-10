@@ -167,6 +167,10 @@ SUBDIR.${MK_BSNMP}+=	libbsnmp
 
 SUBDIR.${MK_CHERI}+=	libsyscalls
 
+# We could make this MK_CHERI_CAPREVOKE, but it doesn't hurt to always build it
+# even if the tree isn't configured to engage in revocation.
+SUBDIR.${MK_CHERI}+=	libcheri_caprevoke
+
 .if ${MACHINE_CPU:Mcheri}
 _libcheribsdtest_dynamic=	libcheribsdtest_dynamic
 .endif
