@@ -348,7 +348,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	size = len + pageoff;			/* low end... */
 	size = round_page(size);		/* hi end */
 	/* Check for rounding up to zero. */
-	if (len < size)
+	if (len > size)
 		return (ENOMEM);
 
 	align = flags & MAP_ALIGNMENT_MASK;
