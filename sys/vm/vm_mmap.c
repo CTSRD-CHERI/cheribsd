@@ -346,7 +346,10 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 
 	/* Adjust size for rounding (on both ends). */
 	size += pageoff;			/* low end... */
-	size = (vm_size_t) round_page(size);	/* hi end */
+	/* Check for rounding up to zero. */
+	if (round_page(size) < size)
+		return (EINVAL);
+	size = round_page(size);		/* hi end */
 
 	align = flags & MAP_ALIGNMENT_MASK;
 #ifndef CPU_CHERI
