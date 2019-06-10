@@ -158,6 +158,10 @@ SUBDIR.${MK_BSNMP}+=	libbsnmp
 SUBDIR.${MK_LIBCHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
 
+.if ${MACHINE_ABI:Mpurecap} || ${MK_COMPAT_CHERIABI} == "yes"
+SUBDIR.${MK_CHERI_CAPREVOKE}+=	libcheri_caprevoke
+.endif
+
 .if ${MK_LIBCHERI} == "yes" && ${MACHINE_ARCH} != "mips"
 _libc_cheri=	libc_cheri
 _libcheri=	libcheri
