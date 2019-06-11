@@ -57,11 +57,7 @@
  * macro extentions...
  */
 #define	_ALIGNBYTES	(sizeof(void *) - 1)
-#if !__has_builtin(__builtin_align_up)
-#define	_ALIGN(p)	(((uintptr_t)(p) + _ALIGNBYTES) &~ (uintptr_t)_ALIGNBYTES)
-#else
 #define	_ALIGN(p)	__builtin_align_up((p), _ALIGNBYTES + 1)
-#endif
 
 #endif /* !_MIPS_INCLUDE__ALIGN_H_ */
 // CHERI CHANGES START
