@@ -158,6 +158,8 @@
         ..
         ppbus
         ..
+        pwm
+        ..
         smbus
         ..
         speaker
