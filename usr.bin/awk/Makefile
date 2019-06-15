@@ -27,6 +27,7 @@ ytab.h: awkgram.c awkgram.h .NOMETA
 proctab.c: maketab
 	${BTOOLSPATH:U.}/maketab awkgram.h > proctab.c
 
+DEPENDOBJS+= maketab
 build-tools: maketab
 maketab: maketab.c ytab.h ${BUILD_TOOLS_META}
 	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -I. ${BUILD_TOOLS_LDFLAGS} \
