@@ -57,9 +57,11 @@ CHERI_SUBOBJECT_BOUNDS_MAX:=conservative
 
 .endif
 
-.if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none")
+.if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none" || ${WANT_CHERI} == "variables")
 # When building MIPS code for CHERI ensure 16/32 byte stack alignment
 # for libraries because it could also be used by hybrid code
+# Note: libc sets WANT_CHERI=variables when building for MIPS so we also need to
+# handle that case.
 # TODO: should be only for libraries and not programs
 .if ${COMPILER_TYPE} == "clang"
 # GCC doesn't support -mstack-alignment but I think it has been patched
