@@ -181,8 +181,28 @@ Return a capability derived from
 that has its offset field set to
 .Fa offset .
 .El
-.Ss Capability low bits
-To be added.
+.Ss Capability address low bits
+The following APIs assist in getting, setting, and clearing lower bits in
+capabilities:
+.Bl -tag -width short
+.It Fn cheri_clear_low_ptr_bits "c" "mask"
+Return a capability derived from
+.Fa c ,
+but with the bits of the address indicated by
+.Fa mask
+cleared.
+.It Fn cheri_get_low_ptr_bits "c" "mask"
+Return the lower bits of the address of capability
+.Fa c
+indicated by
+.Fa mask .
+.It Fn cheri_set_low_ptr_bits "c" "mask"
+Return a capability derived from
+.Fa c ,
+but with the bits of the address indicated by
+.Fa mask
+set.
+.El
 .Ss Capability alignment
 To be added.
 .Ss Return special capabilities
