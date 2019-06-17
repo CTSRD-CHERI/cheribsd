@@ -42,13 +42,13 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_ddb.h"
 
-#include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sysent.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
 #include <sys/exec.h>
+#include <sys/ktr.h>
 #include <sys/imgact.h>
 #include <sys/ucontext.h>
 #include <sys/lock.h>

@@ -2,7 +2,7 @@
 # $FreeBSD$
 
 # machine-independent gen sources
-.PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/gen ${LIBC_SRCTOP}/gen
+.PATH: ${LIBC_SRCTOP}/${LIBC_ARCH}/gen ${LIBC_SRCTOP}/gen ${SRCTOP}/etc
 
 .if ${MACHINE_ARCH:Mmips*c*}
 CFLAGS+=	-DNO_COMPAT7

@@ -2792,9 +2792,9 @@ rt2860.fw			optional rt2860fw | ralfw		\
 	clean		"rt2860.fw"
 dev/random/random_infra.c	optional random
 dev/random/random_harvestq.c	optional random
-dev/random/randomdev.c		optional random
+dev/random/randomdev.c		optional random !random_loadable
 dev/random/fortuna.c		optional random !random_loadable
-dev/random/hash.c		optional random
+dev/random/hash.c		optional random !random_loadable
 dev/rc/rc.c			optional rc
 dev/rccgpio/rccgpio.c		optional rccgpio gpio
 dev/re/if_re.c			optional re
@@ -3198,6 +3198,7 @@ dev/uart/uart_bus_pci.c		optional uart pci
 dev/uart/uart_bus_puc.c		optional uart puc
 dev/uart/uart_bus_scc.c		optional uart scc
 dev/uart/uart_core.c		optional uart
+dev/uart/uart_cpu_acpi.c	optional uart acpi
 dev/uart/uart_dbg.c		optional uart gdb
 dev/uart/uart_dev_msm.c		optional uart uart_msm fdt
 dev/uart/uart_dev_mvebu.c	optional uart uart_mvebu
@@ -3249,6 +3250,7 @@ dev/usb/usb_dev.c		optional usb
 dev/usb/usb_device.c		optional usb
 dev/usb/usb_dynamic.c		optional usb
 dev/usb/usb_error.c		optional usb
+dev/usb/usb_fdt_support.c	optional usb fdt
 dev/usb/usb_generic.c		optional usb
 dev/usb/usb_handle_request.c	optional usb
 dev/usb/usb_hid.c		optional usb

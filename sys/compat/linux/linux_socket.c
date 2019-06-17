@@ -797,6 +797,8 @@ linux_send(struct thread *td, struct linux_send_args *args)
 		caddr_t to;
 		int tolen;
 	} */ bsd_args;
+	struct file *fp;
+	int error, fflag;
 
 	bsd_args.s = args->s;
 	bsd_args.buf = (caddr_t)PTRIN(args->msg);
@@ -804,7 +806,21 @@ linux_send(struct thread *td, struct linux_send_args *args)
 	bsd_args.flags = args->flags;
 	bsd_args.to = NULL;
 	bsd_args.tolen = 0;
-	return (sys_sendto(td, &bsd_args));
+	error = sys_sendto(td, &bsd_args);
+	if (error == ENOTCONN) {
+		/*
+		 * Linux doesn't return ENOTCONN for non-blocking sockets.
+		 * Instead it returns the EAGAIN.
+		 */
+		error = getsock_cap(td, args->s, &cap_send_rights, &fp,
+		    &fflag, NULL);
+		if (error == 0) {
+			if (fflag & FNONBLOCK)
+				error = EAGAIN;
+			fdrop(fp, td);
+		}
+	}
+	return (error);
 }
 
 struct linux_recv_args {
@@ -889,7 +905,7 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 
 	error = kern_recvit(td, args->s, &msg, UIO_SYSSPACE, NULL);
 	if (error != 0)
-		return (error);
+		goto out;
 
 	if (PTRIN(args->from) != NULL) {
 		error = bsd_to_linux_sockaddr(sa, &lsa, msg.msg_namelen);
@@ -902,7 +918,7 @@ linux_recvfrom(struct thread *td, struct linux_recvfrom_args *args)
 	if (error == 0 && PTRIN(args->fromlen) != NULL)
 		error = copyout(&msg.msg_namelen, PTRIN(args->fromlen),
 		    sizeof(msg.msg_namelen));
-
+out:
 	free(sa, M_SONAME);
 	return (error);
 }
@@ -920,11 +936,13 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	kiovec_t *iov;
 	socklen_t datalen;
 	struct sockaddr *sa;
+	struct socket *so;
 	sa_family_t sa_family;
+	struct file *fp;
 	void *data;
 	l_size_t len;
 	l_size_t clen;
-	int error;
+	int error, fflag;
 
 	error = copyin(msghdr, &linux_msg, sizeof(linux_msg));
 	if (error != 0)
@@ -955,12 +973,30 @@ linux_sendmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 
 	control = NULL;
 
-	if (linux_msg.msg_controllen >= sizeof(struct l_cmsghdr)) {
-		error = kern_getsockname(td, s, &sa, &datalen);
+	error = kern_getsockname(td, s, &sa, &datalen);
+	if (error != 0)
+		goto bad;
+	sa_family = sa->sa_family;
+	free(sa, M_SONAME);
+
+	if (flags & LINUX_MSG_OOB) {
+		error = EOPNOTSUPP;
+		if (sa_family == AF_UNIX)
+			goto bad;
+
+		error = getsock_cap(td, s, &cap_send_rights, &fp,
+		    &fflag, NULL);
 		if (error != 0)
 			goto bad;
-		sa_family = sa->sa_family;
-		free(sa, M_SONAME);
+		so = fp->f_data;
+		if (so->so_type != SOCK_STREAM)
+			error = EOPNOTSUPP;
+		fdrop(fp, td);
+		if (error != 0)
+			goto bad;
+	}
+
+	if (linux_msg.msg_controllen >= sizeof(struct l_cmsghdr)) {
 
 		error = ENOBUFS;
 		control = m_get(M_WAITOK, MT_CONTROL);
@@ -1136,7 +1172,8 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	if (msg->msg_name) {
 		sa = malloc(msg->msg_namelen, M_SONAME, M_WAITOK);
 		msg->msg_name = sa;
-	}
+	} else
+		sa = NULL;
 
 	uiov = msg->msg_iov;
 	msg->msg_iov = iov;
@@ -1146,14 +1183,13 @@ linux_recvmsg_common(struct thread *td, l_int s, struct l_msghdr *msghdr,
 	if (error != 0)
 		goto bad;
 
-	if (sa) {
+	if (msg->msg_name) {
 		msg->msg_name = PTRIN(linux_msg.msg_name);
 		error = bsd_to_linux_sockaddr(sa, &lsa, msg->msg_namelen);
 		if (error == 0)
 			error = copyout(lsa, PTRIN(msg->msg_name),
 			    msg->msg_namelen);
 		free(lsa, M_SONAME);
-		free(sa, M_SONAME);
 		if (error != 0)
 			goto bad;
 	}
@@ -1273,6 +1309,7 @@ bad:
 	}
 	free(iov, M_IOV);
 	free(linux_cmsg, M_LINUX);
+	free(sa, M_SONAME);
 
 	return (error);
 }
@@ -1479,10 +1516,7 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 			    name, &xu, UIO_SYSSPACE, &xulen);
 			if (error != 0)
 				return (error);
-			/*
-			 * XXX Use 0 for pid as the FreeBSD does not cache peer pid.
-			 */
-			lxu.pid = 0;
+			lxu.pid = xu.cr_pid;
 			lxu.uid = xu.cr_uid;
 			lxu.gid = xu.cr_gid;
 			return (copyout(&lxu, PTRIN(args->optval), sizeof(lxu)));

@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/drm2/drmP.h>
 #include <dev/drm2/ttm/ttm_bo_driver.h>
 #include <dev/drm2/ttm/ttm_page_alloc.h>
+#include <sys/eventhandler.h>
 #include <vm/vm_pageout.h>
 
 #define NUM_PAGES_TO_ALLOC		(PAGE_SIZE/sizeof(vm_page_t))
@@ -136,7 +137,7 @@ ttm_vm_page_free(vm_page_t m)
 	KASSERT((m->oflags & VPO_UNMANAGED) == 0, ("ttm got unmanaged %p", m));
 	m->flags &= ~PG_FICTITIOUS;
 	m->oflags |= VPO_UNMANAGED;
-	vm_page_unwire(m, PQ_NONE);
+	vm_page_unwire_noq(m);
 	vm_page_free(m);
 }
 

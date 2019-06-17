@@ -11,8 +11,8 @@ UNWINDSRCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 UNWINDINCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/include
 UNWINDSRCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 .else
-UNWINDINCDIR=   ${SRCTOP}/contrib/llvm/projects/libunwind/include
-UNWINDSRCDIR=   ${SRCTOP}/contrib/llvm/projects/libunwind/src
+UNWINDINCDIR=   ${SRCTOP}/contrib/libunwind/include
+UNWINDSRCDIR=   ${SRCTOP}/contrib/libunwind/src
 .endif
 
 STATIC_CFLAGS+=${PICFLAG} -fvisibility=hidden -DVISIBILITY_HIDDEN
@@ -44,9 +44,9 @@ STATIC_CXXFLAGS+= -fvisibility=hidden -fPIC
 # Probably need to just move this earlier or use CXXFLAGS
 .if ${MK_DIRDEPS_BUILD} == "yes"
 # Avoid dependency on lib/libc++
-.if ${MK_CHERI} != "no"
+.if ${MK_CHERI} != "no" || ${MACHINE_ARCH:Mmips*}
 CFLAGS+=	-isystem ${SRCTOP}/contrib/subrepo-cheri-libc++/include -nostdinc++
 .else
-CFLAGS+=	-isystem ${SRCTOP}/contrib/subrepo-cheri-libc++/include -nostdinc++
+CFLAGS+=	-isystem ${SRCTOP}/contrib/libc++/include -nostdinc++
 .endif
 .endif

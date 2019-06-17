@@ -559,19 +559,31 @@ vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add)
 		object = object1;
 	}
 
-	/*
-	 * For OBJT_DEAD objects, v_writecount was handled in
-	 * vnode_pager_dealloc().
-	 */
-	if (object->type != OBJT_DEAD) {
-		KASSERT(((object->flags & OBJ_TMPFS) == 0 &&
-		    object->type == OBJT_VNODE) ||
-		    ((object->flags & OBJ_TMPFS) != 0 &&
-		    object->type == OBJT_SWAP),
+	vp = NULL;
+	if (object->type == OBJT_DEAD) {
+		/*
+		 * For OBJT_DEAD objects, v_writecount was handled in
+		 * vnode_pager_dealloc().
+		 */
+	} else if (object->type == OBJT_VNODE) {
+		vp = object->handle;
+	} else if (object->type == OBJT_SWAP) {
+		KASSERT((object->flags & OBJ_TMPFS_NODE) != 0,
+		    ("vm_map_entry_set_vnode_text: swap and !TMPFS "
+		    "entry %p, object %p, add %d", entry, object, add));
+		/*
+		 * Tmpfs VREG node, which was reclaimed, has
+		 * OBJ_TMPFS_NODE flag set, but not OBJ_TMPFS.  In
+		 * this case there is no v_writecount to adjust.
+		 */
+		if ((object->flags & OBJ_TMPFS) != 0)
+			vp = object->un_pager.swp.swp_tmpfs;
+	} else {
+		KASSERT(0,
 		    ("vm_map_entry_set_vnode_text: wrong object type, "
 		    "entry %p, object %p, add %d", entry, object, add));
-		vp = (object->flags & OBJ_TMPFS) == 0 ? object->handle :
-		    object->un_pager.swp.swp_tmpfs;
+	}
+	if (vp != NULL) {
 		if (add)
 			VOP_SET_TEXT_CHECKED(vp);
 		else
@@ -1274,17 +1286,15 @@ vm_map_entry_unlink(vm_map_t map,
 }
 
 /*
- *	vm_map_entry_resize_free:
+ *	vm_map_entry_resize:
  *
- *	Recompute the amount of free space following a modified vm_map_entry
- *	and propagate those values up the tree.  Call this function after
- *	resizing a map entry in-place by changing the end value, without a
- *	call to vm_map_entry_link() or _unlink().
+ *	Resize a vm_map_entry, recompute the amount of free space that
+ *	follows it and propagate that value up the tree.
  *
  *	The map must be locked, and leaves it so.
  */
 static void
-vm_map_entry_resize_free(vm_map_t map, vm_map_entry_t entry)
+vm_map_entry_resize(vm_map_t map, vm_map_entry_t entry, vm_size_t grow_amount)
 {
 	vm_map_entry_t llist, rlist, root;
 
@@ -1292,14 +1302,15 @@ vm_map_entry_resize_free(vm_map_t map, vm_map_entry_t entry)
 	root = map->root;
 	root = vm_map_splay_split(entry->start, 0, root, &llist, &rlist);
 	KASSERT(root != NULL,
-	    ("vm_map_entry_resize_free: resize_free object not mapped"));
+	    ("%s: resize object not mapped", __func__));
 	vm_map_splay_findnext(root, &rlist);
 	root->right = NULL;
+	entry->end += grow_amount;
 	map->root = vm_map_splay_merge(root, llist, rlist,
 	    root->left, root->right);
 	VM_MAP_ASSERT_CONSISTENT(map);
-	CTR3(KTR_VM, "vm_map_entry_resize_free: map %p, nentries %d, entry %p", map,
-	    map->nentries, entry);
+	CTR4(KTR_VM, "%s: map %p, nentries %d, entry %p",
+	    __func__, map, map->nentries, entry);
 }
 
 /*
@@ -1519,8 +1530,8 @@ charged:
 			    prev_entry));
 			if ((prev_entry->eflags & MAP_ENTRY_GUARD) == 0)
 				map->size += end - prev_entry->end;
-			prev_entry->end = end;
-			vm_map_entry_resize_free(map, prev_entry);
+			vm_map_entry_resize(map, prev_entry,
+			    end - prev_entry->end);
 			vm_map_log("resize", prev_entry);
 			vm_map_simplify_entry(map, prev_entry);
 			return (KERN_SUCCESS);
@@ -4310,7 +4321,7 @@ vm_map_growstack(vm_map_t map, vm_offset_t addr, vm_map_entry_t gap_entry)
 	struct vmspace *vm;
 	struct ucred *cred;
 	vm_offset_t gap_end, gap_start, grow_start;
-	size_t grow_amount, guard, max_grow;
+	vm_size_t grow_amount, guard, max_grow;
 	rlim_t lmemlim, stacklim, vmemlim;
 	int rv, rv1;
 	bool gap_deleted, grow_down, is_procstack;
@@ -4456,8 +4467,7 @@ retry:
 			gap_deleted = true;
 		} else {
 			MPASS(gap_entry->start < gap_entry->end - grow_amount);
-			gap_entry->end -= grow_amount;
-			vm_map_entry_resize_free(map, gap_entry);
+			vm_map_entry_resize(map, gap_entry, -grow_amount);
 			gap_deleted = false;
 		}
 		rv = vm_map_insert(map, NULL, 0, grow_start,
@@ -4470,10 +4480,9 @@ retry:
 				    gap_end, VM_PROT_NONE, VM_PROT_NONE,
 				    MAP_CREATE_GUARD | MAP_CREATE_STACK_GAP_DN);
 				MPASS(rv1 == KERN_SUCCESS);
-			} else {
-				gap_entry->end += grow_amount;
-				vm_map_entry_resize_free(map, gap_entry);
-			}
+			} else
+				vm_map_entry_resize(map, gap_entry,
+				    grow_amount);
 		}
 	} else {
 		grow_start = stack_entry->end;
@@ -4487,14 +4496,16 @@ retry:
 		    vm_object_coalesce(stack_entry->object.vm_object,
 		    stack_entry->offset,
 		    (vm_size_t)(stack_entry->end - stack_entry->start),
-		    (vm_size_t)grow_amount, cred != NULL)) {
-			if (gap_entry->start + grow_amount == gap_entry->end)
+		    grow_amount, cred != NULL)) {
+			if (gap_entry->start + grow_amount == gap_entry->end) {
 				vm_map_entry_delete(map, gap_entry);
-			else
+				vm_map_entry_resize(map, stack_entry,
+				    grow_amount);
+			} else {
 				gap_entry->start += grow_amount;
-			stack_entry->end += grow_amount;
+				stack_entry->end += grow_amount;
+			}
 			map->size += grow_amount;
-			vm_map_entry_resize_free(map, stack_entry);
 			rv = KERN_SUCCESS;
 		} else
 			rv = KERN_FAILURE;

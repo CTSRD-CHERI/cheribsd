@@ -134,7 +134,15 @@
 					+ VM_CAPREVOKE_BSZ_MEM_MAP )
 
 #define	SHAREDPAGE		(VM_CAPREVOKE_BM_BASE - PAGE_SIZE)
-#define	USRSTACK		SHAREDPAGE
+/*
+ * To ensure that the stack base address that is sufficiently aligned, we
+ * jump down quite a bit.
+ *
+ * XXX The idea of "the" USRSTACK top/base really should go away; as
+ * rlimits are changed, our alignment requirements change as well, so
+ * there's no one right answer.
+ */
+#define	USRSTACK		(SHAREDPAGE & ~0xFFFFFFF)
 
 #else
 /*
@@ -143,7 +151,11 @@
  * offset is calculated.
  */
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
-#define	USRSTACK		SHAREDPAGE
+/*
+ * To ensure that the stack base address that is sufficiently aligned to create
+ * a bounded capability we must round down by 16 pages to get to 0x7ffbff0000.
+ */
+#define	USRSTACK		(SHAREDPAGE - (15 * PAGE_SIZE))
 #endif
 
 #define	VM_MIN_KERNEL_ADDRESS	((vm_offset_t)0xc000000000000000)

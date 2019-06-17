@@ -539,6 +539,10 @@ typedef struct {
 #define	PT_ARM_EXIDX	0x70000001	/* ARM exception unwind tables. */
 #define	PT_HIPROC	0x7fffffff	/* Last processor-specific type. */
 
+#define	PT_OPENBSD_RANDOMIZE	0x65A3DBE6	/* OpenBSD random data segment */
+#define	PT_OPENBSD_WXNEEDED	0x65A3DBE7	/* OpenBSD EXEC/WRITE pages needed */
+#define	PT_OPENBSD_BOOTDATA	0x65A41BE6	/* OpenBSD section for boot args */
+
 /* Values for p_flags. */
 #define	PF_X		0x1		/* Executable. */
 #define	PF_W		0x2		/* Writable. */
@@ -809,6 +813,21 @@ enum MipsCheriFlags {
 #define	NT_PPC_VSX	0x102	/* PowerPC VSX registers */
 #define	NT_X86_XSTATE	0x202	/* x86 XSAVE extended state. */
 #define	NT_ARM_VFP	0x400	/* ARM VFP registers */
+
+/* GNU note types. */
+#define	NT_GNU_ABI_TAG		1
+#define	NT_GNU_HWCAP		2
+#define	NT_GNU_BUILD_ID		3
+#define	NT_GNU_GOLD_VERSION	4
+#define	NT_GNU_PROPERTY_TYPE_0	5
+
+#define	GNU_PROPERTY_LOPROC			0xc0000000
+#define	GNU_PROPERTY_HIPROC			0xdfffffff
+
+#define	GNU_PROPERTY_X86_FEATURE_1_AND		0xc0000002
+
+#define	GNU_PROPERTY_X86_FEATURE_1_IBT		0x00000001
+#define	GNU_PROPERTY_X86_FEATURE_1_SHSTK	0x00000002
 
 /* Symbol Binding - ELFNN_ST_BIND - st_info */
 #define	STB_LOCAL	0	/* Local symbol */

@@ -205,6 +205,7 @@ SUBDIR=	\
 	libalias \
 	libiconv \
 	libmchain \
+	lindebugfs \
 	${_linux} \
 	${_linux_common} \
 	${_linux64} \
@@ -803,8 +804,8 @@ SUBDIR:= ${SUBDIR:N${reject}}
 .MAKEFLAGS+=	-DNO_XREF
 afterinstall: .PHONY
 	@if type kldxref >/dev/null 2>&1; then \
-		${ECHO} kldxref ${DESTDIR}${KMODDIR}; \
-		kldxref ${DESTDIR}${KMODDIR}; \
+		${ECHO} ${KLDXREF_CMD} ${DESTDIR}${KMODDIR}; \
+		${KLDXREF_CMD} ${DESTDIR}${KMODDIR}; \
 	fi
 .endif
 

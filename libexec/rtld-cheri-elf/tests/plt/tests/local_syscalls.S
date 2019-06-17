@@ -34,12 +34,14 @@
 LEAF(__plt_test_local_write)
 	SYSTRAP(write);
 	PIC_RETURN();
+	nop
 END(__plt_test_local_write)
 # .protected __plt_test_local_write
 
 LEAF(__plt_test_local_exit)
 	SYSTRAP(exit);
 	PIC_RETURN();
+	nop
 END(__plt_test_local_exit)
 # .protected __plt_test_local_exit
 
