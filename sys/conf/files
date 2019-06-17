@@ -366,6 +366,7 @@ compat/freebsd64/freebsd64_jail.c		optional compat_freebsd64
 compat/freebsd64/freebsd64_mac.c		optional compat_freebsd64
 compat/freebsd64/freebsd64_mmap.c		optional compat_freebsd64
 compat/freebsd64/freebsd64_misc.c		optional compat_freebsd64
+compat/freebsd64/freebsd64_process.c	optional compat_freebsd64
 compat/freebsd64/freebsd64_signal.c	optional compat_freebsd64
 compat/freebsd64/freebsd64_syscalls.c	optional compat_freebsd64
 compat/freebsd64/freebsd64_sysent.c	optional compat_freebsd64
