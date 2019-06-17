@@ -114,7 +114,7 @@
 .Fn cheri_unseal "void * __capability c" "void * __capability typecap"
 .Sh DESCRIPTION
 The
-.Nm
+.Nm cheric
 functions provide a C-language interface to inspect and modify capability
 fields.
 When a change is requested, a new capability is returned with the change
@@ -123,31 +123,31 @@ applied.
 The following APIs allow capability fields to be queried:
 .Pp
 .Bl -tag -width short
-.It Fn cap_getaddress "c"
+.It Fn cheri_getaddress "c"
 Return the address field of the capability
 .Fa c .
 This value will normally be the the same as the integer cast of a capability
 pointer.
-.It Fn cap_getbase "c"
+.It Fn cheri_getbase "c"
 Return the base (bottom) address associated with the capability
 .Fa c ;
 this is its lower bound.
-.It Fn cap_getoffset "c"
+.It Fn cheri_getoffset "c"
 Return the offset associated with capability
 .Fa c ;
 this is the difference between its address and its lower bound.
-.It Fn cap_getperm "c"
+.It Fn cheri_getperm "c"
 Return the permissions associated with the capability
 .Fa c .
-.It Fn cap_getsealed "c"
+.It Fn cheri_getsealed "c"
 Return a boolean indicating whether the capability
 .Fa c
 is sealed.
-.It Fn cap_gettag "c"
+.It Fn cheri_gettag "c"
 Return a boolean indicating whether the capability
 .Fa c
 has a valid tag.
-.It Fn cap_gettype "c"
+.It Fn cheri_gettype "c"
 Return the object type of the capability
 .Fa c .
 .El
@@ -156,26 +156,26 @@ The following APIs allow capability fields to be set, with a new capability
 returned:
 .Pp
 .Bl -tag -width short
-.It Fn cap_andperm "c" "mask"
+.It Fn cheri_andperm "c" "mask"
 Return a capability derived from
 .Fa c
 that has its permissions mask bit-wise AND'd with the value of
 .Fa mask .
-.It Fn cap_cleartag "c"
+.It Fn cheri_cleartag "c"
 Return a capability derived from
 .Fa c
 that has its validity tag cleared.
-.It Fn cap_incoffset "c" "offset"
+.It Fn cheri_incoffset "c" "offset"
 Return a capability derived from
 .Fa c
 that has its offset incremented by
 .Fa offset .
-.It Fn cap_seal "c" "typecap"
+.It Fn cheri_seal "c" "typecap"
 Return a capability derived from
 .Fa c
 that is sealed using capability
 .Fa typecap .
-.It Fn cap_setoffset "c" "offset"
+.It Fn cheri_setoffset "c" "offset"
 Return a capability derived from
 .Fa c
 that has its offset field set to
@@ -189,11 +189,11 @@ To be added.
 The following APIs return capability pointers for certain well-defined
 capabilities in the run-time environment:
 .Bl -tag -width short
-.It Fn cap_getdefault
+.It Fn cheri_getdefault
 Return the Default Data Capability (DDC).
-.It Fn cap_getpcc
+.It Fn cheri_getpcc
 Return the Program-Counter Capability (PCC).
-.It Fn cap_getstack
+.It Fn cheri_getstack
 Return the current stack capability.
 .El
 .Sh AUTHORS
