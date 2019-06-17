@@ -459,11 +459,15 @@ typedef	void * __capability	otype_t;
 #endif /* !_SYS_TYPES_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20181205,
 //   "target_type": "header",
 //   "changes": [
 //     "support",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

@@ -272,3 +272,13 @@ again:
 	pipe_map = kmem_suballoc(kernel_map, &minaddr, &maxaddr, maxpipekva,
 	    FALSE);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190603,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

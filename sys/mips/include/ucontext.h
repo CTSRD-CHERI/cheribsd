@@ -248,10 +248,13 @@ typedef struct __ucontext_c {
 #endif	/* !_MACHINE_UCONTEXT_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190604,
 //   "target_type": "header",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

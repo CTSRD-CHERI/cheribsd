@@ -1034,3 +1034,12 @@ ck_ht_destroy(struct ck_ht *table)
 	ck_ht_map_destroy(table->m, table->map, false);
 	return;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

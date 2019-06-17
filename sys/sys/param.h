@@ -381,3 +381,12 @@ __END_DECLS
 #define __PAST_END(array, offset) (((__typeof__(*(array)) *)(array))[offset])
 
 #endif	/* _SYS_PARAM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

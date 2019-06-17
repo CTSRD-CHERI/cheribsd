@@ -1532,3 +1532,12 @@ DB_SHOW_COMMAND(netisr, db_show_netisr)
 	}
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190603,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1076,3 +1076,14 @@ cluster_collectbufs(struct vnode *vp, struct buf *last_bp, int gbflags)
 	buflist->bs_nchildren = i + 1;
 	return (buflist);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190603,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "pointer_provenance",
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

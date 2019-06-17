@@ -69,7 +69,7 @@ typedef	u_int64_t bpf_u_int64;
  */
 struct bpf_program {
 	u_int bf_len;
-	struct bpf_insn * __kerncap bf_insns;
+	struct bpf_insn *bf_insns;
 };
 
 /*
@@ -377,7 +377,7 @@ struct bpf_insn {
  */
 struct bpf_dltlist {
 	u_int	bfl_len;	/* number of bfd_list array */
-	u_int * __kerncap bfl_list;	/* array of DLTs */
+	u_int	*bfl_list;	/* array of DLTs */
 };
 
 #ifdef _KERNEL

@@ -458,3 +458,12 @@
 #define	CHERI_SEAL_ALIGN_MASK(l)	~(~0ULL << CHERI_SEAL_ALIGN_SHIFT(l))
 
 #endif /* _MIPS_INCLUDE_CHERIREG_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190522,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

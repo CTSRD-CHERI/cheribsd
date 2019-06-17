@@ -1382,3 +1382,12 @@ mipsNN_sdcache_wb_range_128(vm_offset_t va, vm_size_t size)
 		va += 128;
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20171208,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

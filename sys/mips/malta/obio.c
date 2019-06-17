@@ -186,3 +186,12 @@ static driver_t obio_driver = {
 static devclass_t obio_devclass;
 
 DRIVER_MODULE(obio, pci, obio_driver, obio_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20180613,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

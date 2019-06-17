@@ -816,3 +816,12 @@ DB_SHOW_COMMAND(radixnode, db_show_radixnode)
 			    rnode->rn_clev);
 }
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20180809,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

@@ -122,3 +122,14 @@ done:
 		return (__DECONST(void *, p));
 	return (NULL);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190603,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "pointer_alignment",
+//     "unsupported"
+//   ]
+// }
+// CHERI CHANGES END

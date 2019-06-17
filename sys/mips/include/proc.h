@@ -132,6 +132,10 @@ struct syscall_args {
 //   "changes": [
 //     "support",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

@@ -104,3 +104,13 @@ uint32_t	yamon_getcpufreq(void);
 extern yamon_env_t *fenvp[];
 
 #endif /* _MALTA_YAMON_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20171215,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

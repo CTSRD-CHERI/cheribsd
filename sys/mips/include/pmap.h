@@ -218,3 +218,13 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 #endif				/* !LOCORE */
 
 #endif				/* !_MACHINE_PMAP_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180129,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

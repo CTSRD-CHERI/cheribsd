@@ -3735,10 +3735,13 @@ SYSCTL_PROC(_debug, OID_AUTO, stop_all_proc, CTLTYPE_INT | CTLFLAG_RW |
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190531,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

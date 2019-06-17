@@ -183,13 +183,11 @@ struct ktr_ccall;
 struct ktr_creturn;
 struct ktr_cexception;
 struct thr_param_c;
-
 void	ktrccall_mdfill(struct pcb *pcb, struct ktr_ccall *kc);
 void	ktrcreturn_mdfill(struct pcb *pcb, struct ktr_creturn *kr);
 void	ktrcexception_mdfill(struct trapframe *frame,
 	    struct ktr_cexception *ke);
 #endif /* !_KERNEL */
-
 
 /*
  * Nested include of machine-dependent definitions, which likely depend on

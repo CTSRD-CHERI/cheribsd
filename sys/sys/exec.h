@@ -60,16 +60,16 @@
  * changes to freebsd32_ps_strings.
  */
 struct ps_strings {
-	char * __kerncap *ps_argvstr;		/* first of 0 or more argument strings */
-	unsigned int ps_nargvstr;		/* the number of argument strings */
-	char * __kerncap *ps_envstr;		/* first of 0 or more environment strings */
-	unsigned int ps_nenvstr;		/* the number of environment strings */
-	void * __kerncap ps_sbclasses;		/* pointer to sandbox class data */
-	size_t	 ps_sbclasseslen;		/* length of sandbox class data */
-	void * __kerncap ps_sbmethods;		/* pointer to sandbox method data */
-	size_t	 ps_sbmethodslen;		/* length of sandbox method data */
-	void * __kerncap ps_sbobjects;		/* pointer to sandbox object data */
-	size_t	 ps_sbobjectslen;		/* length of sandbox object data */
+	char	**ps_argvstr;	/* first of 0 or more argument strings */
+	unsigned int ps_nargvstr; /* the number of argument strings */
+	char	**ps_envstr;	/* first of 0 or more environment strings */
+	unsigned int ps_nenvstr; /* the number of environment strings */
+	void	*ps_sbclasses;		/* pointer to sandbox class data */
+	size_t	 ps_sbclasseslen;	/* length of sandbox class data */
+	void	*ps_sbmethods;		/* pointer to sandbox method data */
+	size_t	 ps_sbmethodslen;	/* length of sandbox method data */
+	void	*ps_sbobjects;		/* pointer to sandbox object data */
+	size_t	 ps_sbobjectslen;	/* length of sandbox object data */
 };
 
 struct image_params;
@@ -91,8 +91,8 @@ struct execsw {
 #define	PS_STRINGS	(USRSTACK - sizeof(struct ps_strings))
 #define	SPARE_USRSPACE	4096
 
-int exec_map_first_page(struct image_params *);
-void exec_unmap_first_page(struct image_params *);
+int exec_map_first_page(struct image_params *);        
+void exec_unmap_first_page(struct image_params *);       
 
 int exec_register(const struct execsw *);
 int exec_unregister(const struct execsw *);

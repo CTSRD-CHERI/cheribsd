@@ -196,3 +196,13 @@ extern counter_u64_t sfstat[sizeof(struct sfstat) / sizeof(uint64_t)];
 #define	SFSTAT_INC(name)	SFSTAT_ADD(name, 1)
 #endif /* _KERNEL */
 #endif /* !_SYS_SF_BUF_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20181228,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

@@ -604,3 +604,12 @@ bpf_validate(const struct bpf_insn *f, int len)
 	return (BPF_CLASS(f[len - 1].code) == BPF_RET);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190603,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

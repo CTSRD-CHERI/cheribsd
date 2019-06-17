@@ -684,3 +684,12 @@ not_valid ## unique ## :
 #define	MIPS3_PGMASK_256M	0x1fffe000
 
 #endif /* !_MACHINE_PTE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180515,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

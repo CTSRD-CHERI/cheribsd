@@ -58,3 +58,12 @@ struct obio_softc {
 extern struct bus_space obio_bs_tag;
 
 #endif /* _MALTA_OBIOVAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180613,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

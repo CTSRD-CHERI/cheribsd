@@ -71,3 +71,13 @@
 #define ptr_clear_flag(p, f) __ptr_clear_flag(p, f)
 
 #endif /* _SYS_PTRBITS_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180809,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

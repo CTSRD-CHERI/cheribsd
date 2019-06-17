@@ -239,11 +239,15 @@
 #endif /* !_MACHINE_VMPARAM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20180817,
 //   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ],
-//   "change_comment": ""
+//   "changes_purecap": [
+//     "support",
+//     "pointer_shape"
+//   ],
+//   "change_comment": "purecap: UMA slab size."
 // }
 // CHERI CHANGES END

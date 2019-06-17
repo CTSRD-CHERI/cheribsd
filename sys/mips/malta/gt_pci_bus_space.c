@@ -409,3 +409,12 @@ gt_pci_bs_sr_4(void *t, bus_space_handle_t bsh,
 	for (; count != 0; count--, addr += 4)
 		wr32(addr, value);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190605,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

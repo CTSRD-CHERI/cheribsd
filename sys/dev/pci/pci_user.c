@@ -1412,6 +1412,10 @@ getconfexit:
 //   "changes": [
 //     "ioctl:misc",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "ioctl:misc",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

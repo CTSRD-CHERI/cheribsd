@@ -79,3 +79,13 @@ sf_buf_unmap(struct sf_buf *sf)
 #endif	/* __mips_n64 */
 
 #endif /* !_MACHINE_SF_BUF_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180917,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

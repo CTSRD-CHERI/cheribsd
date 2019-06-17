@@ -1880,4 +1880,12 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, mbufprofile, CTLTYPE_STRING|CTLFLAG_RD,
 SYSCTL_PROC(_kern_ipc, OID_AUTO, mbufprofileclr, CTLTYPE_INT|CTLFLAG_RW,
 	    NULL, 0, mbprof_clr_handler, "I", "clear mbuf profiling statistics");
 #endif
-
+// CHERI CHANGES START
+// {
+//   "updated": 20171004,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

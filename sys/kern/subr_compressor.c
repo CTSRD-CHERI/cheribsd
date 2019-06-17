@@ -557,3 +557,12 @@ compressor_fini(struct compressor *stream)
 
 	stream->methods->fini(stream->priv);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190531,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

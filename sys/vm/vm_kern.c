@@ -915,3 +915,14 @@ debug_vm_lowmem(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_debug, OID_AUTO, vm_lowmem, CTLTYPE_INT | CTLFLAG_RW, 0, 0,
     debug_vm_lowmem, "I", "set to trigger vm_lowmem event with given flags");
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190606,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

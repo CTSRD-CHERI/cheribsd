@@ -1914,3 +1914,14 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 
 	return (error);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190524,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "other"
+//   ],
+//   "change_comment":
+//     "Readability improvement of representability alignment."
+// }
+// CHERI CHANGES END

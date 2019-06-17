@@ -3893,13 +3893,16 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 #endif /* COMPAT_CHERIABI */
 // CHERI CHANGES START
 // {
-//   "updated": 20181203,
+//   "updated": 20190603,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kernel_sig_types",
 //     "kiovec_t",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

@@ -490,3 +490,12 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 
 	mips_timer_init_params(platform_counter_freq, -1);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190515,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

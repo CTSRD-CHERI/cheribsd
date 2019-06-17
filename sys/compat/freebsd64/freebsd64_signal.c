@@ -231,3 +231,15 @@ freebsd64_sigqueue(struct thread *td, struct freebsd64_sigqueue_args *uap)
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
 }
+
+// CHERI CHANGES START
+// {
+//   "updated": 20190604,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "user_capabilities"
+//   ],
+//   "change_comment":
+//     "struct sigaltstack64, siginfo64, upstreamable"
+// }
+// CHERI CHANGES END

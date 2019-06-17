@@ -452,10 +452,14 @@ void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20181228,
 //   "target_type": "header",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer"
 //   ],
 //   "change_comment": ""
 // }

@@ -879,3 +879,12 @@ pts_init(void *unused)
 }
 
 SYSINIT(pts, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, pts_init, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20190509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "ioctl:misc"
+//   ]
+// }
+// CHERI CHANGES END

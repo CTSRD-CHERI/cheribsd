@@ -245,3 +245,12 @@ mtrash_fini(void *mem, int size)
 {
 	(void)mtrash_ctor(mem, size, NULL, 0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180208,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

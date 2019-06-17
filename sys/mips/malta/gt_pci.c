@@ -767,3 +767,12 @@ static driver_t gt_pci_driver = {
 static devclass_t gt_pci_devclass;
 
 DRIVER_MODULE(gt_pci, gt, gt_pci_driver, gt_pci_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20180613,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

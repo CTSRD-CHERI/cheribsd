@@ -1767,3 +1767,13 @@ link_elf_ireloc(caddr_t kmdp)
 	relocate_file1(ef, elf_lookup_ifunc, elf_reloc, true);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180227,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_provenance",
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

@@ -78,3 +78,12 @@ uart_cpu_getdev(int devtype, struct uart_devinfo *di)
 	uart_bus_space_mem = mips_bus_space_generic;
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190605,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

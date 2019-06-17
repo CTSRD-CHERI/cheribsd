@@ -324,20 +324,20 @@ struct kld_file_stat_1 {
 #endif /* _KERNEL */
 
 struct kld_file_stat {
-    int			version;	/* set to sizeof(struct kld_file_stat) */
-    char        	name[MAXPATHLEN];
-    int			refs;
-    int			id;
-    void * __kerncap	address;	/* load address */
-    size_t		size;		/* size in bytes */
-    char        	pathname[MAXPATHLEN];
+    int		version;	/* set to sizeof(struct kld_file_stat) */
+    char        name[MAXPATHLEN];
+    int		refs;
+    int		id;
+    caddr_t	address;	/* load address */
+    size_t	size;		/* size in bytes */
+    char        pathname[MAXPATHLEN];
 };
 
 struct kld_sym_lookup {
-    int			version;	/* set to sizeof(struct kld_sym_lookup) */
-    char * __kerncap	symname;	/* Symbol name we are looking up */
-    u_long		symvalue;
-    size_t		symsize;
+    int		version;	/* set to sizeof(struct kld_sym_lookup) */
+    char	*symname;	/* Symbol name we are looking up */
+    u_long	symvalue;
+    size_t	symsize;
 };
 #define KLDSYM_LOOKUP	1
 

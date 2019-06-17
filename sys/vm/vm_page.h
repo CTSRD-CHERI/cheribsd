@@ -824,3 +824,13 @@ vm_page_held(vm_page_t m)
 
 #endif				/* _KERNEL */
 #endif				/* !_VM_PAGE_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180202,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

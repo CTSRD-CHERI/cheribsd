@@ -95,6 +95,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_kern.h>
 #include <vm/uma.h>
 
+#ifdef COMPAT_CHERIABI
+#include <cheri/cheri.h>
+#endif
+
 #ifdef DDB
 #include <ddb/ddb.h>
 #endif
@@ -3821,8 +3825,7 @@ vfsconf2x32(struct sysctl_req *req, struct vfsconf *vfsp)
 }
 #endif
 
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
+#ifdef COMPAT_CHERIABI
 struct xvfsconf_c {
 	void * __capability vfc_vfsops;		/* struct vfsops * */
 	char		vfc_name[MFSNAMELEN];
@@ -3864,9 +3867,8 @@ sysctl_vfs_conflist(SYSCTL_HANDLER_ARGS)
 			error = vfsconf2x32(req, vfsp);
 		else
 #endif
-#ifdef COMPAT_FREEBSD64
+#ifdef COMPAT_CHERIABI
 		if (req->flags & SCTL_CHERIABI)
-			/* XXX-AM: fix for freebsd64 */
 			error = vfsconf2x_c(req, vfsp);
 		else
 #endif
@@ -3922,9 +3924,8 @@ vfs_sysctl(SYSCTL_HANDLER_ARGS)
 			return (vfsconf2x32(req, vfsp));
 		else
 #endif
-#ifdef COMPAT_FREEBSD64
+#ifdef COMPAT_CHERIABI
 		if (req->flags & SCTL_CHERIABI)
-			/* XXX-AM: fix for freebsd64 */
 			return (vfsconf2x_c(req, vfsp));
 		else
 #endif
@@ -5608,10 +5609,13 @@ __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *mp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190617,
 //   "target_type": "kernel",
 //   "changes": [
 //     "sysctl"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

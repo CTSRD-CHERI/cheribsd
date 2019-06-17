@@ -302,3 +302,12 @@ __sx_xunlock(struct sx *sx, struct thread *td, const char *file, int line)
 #endif /* _KERNEL */
 
 #endif /* !_SYS_SX_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180823,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

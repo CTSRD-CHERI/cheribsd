@@ -1562,3 +1562,15 @@ busdma_swi(void)
 	}
 	mtx_unlock(&bounce_lock);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190604,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "pointer_alignment",
+//     "uintptr_interp_offset",
+//     "unsupported"
+//   ]
+// }
+// CHERI CHANGES END

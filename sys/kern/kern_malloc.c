@@ -1343,6 +1343,9 @@ SYSCTL_OID(_kern, OID_AUTO, mprof, CTLTYPE_STRING|CTLFLAG_RD,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance"
+//   ],
+//   "changes_purecap": [
+//     "pointer_alignment"
 //   ]
 // }
 // CHERI CHANGES END

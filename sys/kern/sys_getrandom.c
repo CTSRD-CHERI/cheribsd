@@ -83,7 +83,7 @@ kern_getrandom(struct thread *td, void * __capability user_buf, size_t buflen,
 
 #ifndef _SYS_SYSPROTO_H_
 struct getrandom_args {
-	void * __capability buf;
+	void		*buf;
 	size_t		buflen;
 	unsigned int	flags;
 };

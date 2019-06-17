@@ -1550,3 +1550,12 @@ sx_chain(struct thread *td, struct thread **ownerp)
 	return (1);
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190531,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

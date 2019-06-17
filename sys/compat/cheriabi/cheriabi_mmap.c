@@ -465,3 +465,12 @@ cheriabi_munlock(struct thread *td, struct cheriabi_munlock_args *uap)
 
 	return (kern_munlock(td, (__cheri_addr vaddr_t)uap->addr, uap->len));
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190509,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "virtual_address"
+//   ]
+// }
+// CHERI CHANGES END

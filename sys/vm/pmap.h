@@ -203,6 +203,9 @@ void		 pmap_zero_page_area(vm_page_t, int off, int size);
 //   "changes": [
 //     "support"
 //   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ],
 //   "change_comment": ""
 // }
 // CHERI CHANGES END

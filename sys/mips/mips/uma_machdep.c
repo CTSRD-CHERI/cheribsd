@@ -106,6 +106,9 @@ uma_small_free(void *mem, vm_size_t size, u_int8_t flags)
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"
+//   ],
+//   "changes": [
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

@@ -210,3 +210,12 @@ int	pfil_realloc(pfil_packet_t *, int, struct ifnet *);
 
 #endif /* _KERNEL */
 #endif /* _NET_PFIL_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190603,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

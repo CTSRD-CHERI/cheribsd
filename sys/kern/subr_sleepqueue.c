@@ -1451,3 +1451,12 @@ found:
 /* Alias 'show sleepqueue' to 'show sleepq'. */
 DB_SHOW_ALIAS(sleepqueue, db_show_sleepqueue);
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190531,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

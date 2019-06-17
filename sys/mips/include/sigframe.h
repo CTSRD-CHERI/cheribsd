@@ -97,10 +97,14 @@ struct sigframe64 {
 #endif /* !_MACHINE_SIGFRAME_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190604,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
-//   ]
+//   ],
+//   "changes_purecap": [
+//     "user_capabilities"
+//   ],
+//   "change_comment": "struct sigframe64"
 // }
 // CHERI CHANGES END

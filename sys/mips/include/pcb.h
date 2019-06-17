@@ -284,7 +284,7 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb)
 
 #endif /* ! CHERI_KERNEL */
-	 
+
 #else /* ! CPU_CHERI */
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, unused_reg, pcb)	\
@@ -325,9 +325,12 @@ int savectx(struct pcb *) __returns_twice;
 #endif	/* !_MACHINE_PCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190529,
 //   "target_type": "header",
 //   "changes": [
+//     "support"
+//   ],
+//   "changes_purecap": [
 //     "support"
 //   ]
 // }

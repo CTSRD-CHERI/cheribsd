@@ -299,3 +299,12 @@ struct rw_args {
 
 #endif /* _KERNEL */
 #endif /* !_SYS_RWLOCK_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190531,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

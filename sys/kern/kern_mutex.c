@@ -220,7 +220,7 @@ owner_mtx(const struct lock_object *lock, struct thread **owner)
 
 	m = (const struct mtx *)lock;
 	x = m->mtx_lock;
-	*owner = (struct thread *)(x & ~MTX_FLAGMASK);
+	*owner = (struct thread *)ptr_clear_flag(x, MTX_FLAGMASK);
 	return (*owner != NULL);
 }
 #endif
@@ -617,7 +617,8 @@ retry_turnstile:
 		 * or the state of the MTX_RECURSED bit changed.
 		 */
 		if (ptr_get_flag(v, MTX_CONTESTED) == 0 &&
-		    !atomic_fcmpset_ptr(&m->mtx_lock, &v, v | MTX_CONTESTED)) {
+		    !atomic_fcmpset_ptr(&m->mtx_lock, &v,
+		        ptr_set_flag(v, MTX_CONTESTED))) {
 			goto retry_turnstile;
 		}
 
@@ -1290,3 +1291,12 @@ db_show_mtx(const struct lock_object *lock)
 	}
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190617,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

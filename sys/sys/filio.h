@@ -54,7 +54,7 @@
 #define	FIOGETLBA	_IOR('f', 121, int)	/* get start blk # */
 struct fiodgname_arg {
 	int	len;
-	void * __kerncap buf;
+	void	*buf;
 };
 #define	FIODGNAME	_IOW('f', 120, struct fiodgname_arg) /* get dev. name */
 #define	FIONWRITE	_IOR('f', 119, int)	/* get # bytes (yet) to write */
@@ -84,3 +84,12 @@ void * __capability fiodgname_buf_get_ptr(void *fgnp, u_long com);
 #endif
 
 #endif /* !_SYS_FILIO_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190509,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

@@ -1739,9 +1739,12 @@ atomic_swap_long(volatile unsigned long *ptr, const unsigned long value)
 #endif /* ! _MACHINE_ATOMIC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20180919,
 //   "target_type": "header",
 //   "changes": [
+//     "support"
+//   ],
+//   "changes_purecap": [
 //     "support"
 //   ]
 // }

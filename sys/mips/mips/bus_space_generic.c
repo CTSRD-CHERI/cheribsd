@@ -742,3 +742,12 @@ generic_bs_barrier(void *t __unused,
 	if (flags & BUS_SPACE_BARRIER_WRITE)
 		wmb();
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180613,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

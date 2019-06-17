@@ -172,3 +172,12 @@ stack_save(struct stack *st)
 	stack_capture(st, pc, sp);
 #endif
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190604,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "unsupported"
+//   ]
+// }
+// CHERI CHANGES END

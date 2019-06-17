@@ -1370,3 +1370,12 @@ void	netdump_mbuf_reinit(int nmbuf, int nclust, int clsize);
 
 #endif /* _KERNEL */
 #endif /* !_SYS_MBUF_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20171004,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

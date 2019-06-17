@@ -175,7 +175,7 @@ kern_uuidgen(struct uuid *store, size_t count)
 
 #ifndef _SYS_SYSPROTO_H_
 struct uuidgen_args {
-	struct uuid * __capability store;
+	struct uuid *store;
 	int	count;
 };
 #endif

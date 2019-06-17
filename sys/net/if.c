@@ -5222,11 +5222,14 @@ drbr_enqueue_drv(if_t ifh, struct buf_ring *br, struct mbuf *m)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190603,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "ioctl:net"
 //   ]
 // }
 // CHERI CHANGES END

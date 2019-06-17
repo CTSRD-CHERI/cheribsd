@@ -779,3 +779,12 @@ extern caddr_t cheri_kall_capability;
 #define	MIPS_HWRENA_IMPL31	(1<<31)	/* Implementation-dependent 31 */
 
 #endif /* _MIPS_CPUREGS_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190603,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

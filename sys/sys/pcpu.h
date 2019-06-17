@@ -290,3 +290,13 @@ void	pcpu_init(struct pcpu *pcpu, int cpuid, size_t size);
 #endif /* _KERNEL */
 
 #endif /* !_SYS_PCPU_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180418,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

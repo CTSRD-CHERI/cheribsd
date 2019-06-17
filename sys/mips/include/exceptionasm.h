@@ -180,3 +180,12 @@
 	RESTORE_U_PCB_REG(AT, AST, pcb)
 
 #endif /* _MIPS_INCLUDE_EXCEPTIONASM_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190620,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

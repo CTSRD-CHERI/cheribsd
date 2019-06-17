@@ -95,10 +95,13 @@ int	minidumpsys(struct dumperinfo *);
 #endif /* !_MACHINE_MD_VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190501,
 //   "target_type": "header",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ],
 //   "change_comment": "sigcode"
 // }

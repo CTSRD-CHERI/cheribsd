@@ -248,3 +248,13 @@ u_int in_cksum_hdr(const struct ip *ip)
 	REDUCE16;
 	return (~sum & 0xffff);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190604,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment",
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

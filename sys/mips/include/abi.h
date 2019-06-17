@@ -136,3 +136,12 @@
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 #endif /* !_MACHINE_ABI_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180820,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

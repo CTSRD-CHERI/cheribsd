@@ -30,6 +30,7 @@ comments.  The following example shows all the current annotations.
  *     "support",
  *     "subobject_bounds",
  *     "sysctl",
+ *     "uintptr_interp_offset",
  *     "unsupported",
  *     "user_capabilities",
  *     "virtual_address",
@@ -97,6 +98,8 @@ values are:
    as adding opt-out annotations for code that uses `containerof()`, etc.
  * `support` - Adding support for CHERI.
  * `sysctl` - (kernel) Sysctl compatability support for CheriABI.
+ * `uintptr_interp_offset` - Changes required due to the uintptr_t offset
+   interpretation instead of the address interpretation.
  * `unsupported` - Working around unsupported features such as combining
    adjacent `mmap()` allocations, fixed `mmap()` allocations, or `sbrk()`.
  * `user_capabilities` - (kernel) Changes related to userspace pointers

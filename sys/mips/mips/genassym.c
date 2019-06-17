@@ -207,9 +207,12 @@ ASSYM(COP2_HSH_IVW2_PASS1_OFFSET, offsetof(struct octeon_cop2_state, hsh_ivw) + 
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190528,
 //   "target_type": "kernel",
 //   "changes": [
+//     "support"
+//   ],
+//   "changes_purecap": [
 //     "support"
 //   ]
 // }

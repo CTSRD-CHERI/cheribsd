@@ -427,10 +427,13 @@ DB_SHOW_COMMAND(tlb, ddb_dump_tlb)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20190604,
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

@@ -102,7 +102,7 @@ int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
 	    struct uio *uio);
 int	uiomove_nofault(void *cp, int n, struct uio *uio);
 int	uiomove_object(struct vm_object *obj, off_t obj_size, struct uio *uio);
-int	updateiov(const struct uio *uiop, uiovec_t * __capability iovp);
+int	updateiov(const struct uio *uiop, uiovec_t *iovp);
 
 #else /* !_KERNEL */
 
@@ -120,11 +120,14 @@ __END_DECLS
 #endif /* !_SYS_UIO_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190531,
 //   "target_type": "header",
 //   "changes": [
 //     "kiovec_t",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "poiner_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

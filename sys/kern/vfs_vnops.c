@@ -2591,6 +2591,9 @@ loop2:
 //     "iovec-macros",
 //     "kiovec_t",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

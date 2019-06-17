@@ -80,3 +80,13 @@ typedef uintptr_t bus_space_handle_t;
 typedef bus_addr_t bus_space_handle_t;
 #endif /* ! CHERI_KERNEL */
 #endif /* MIPS_INCLUDE__BUS_H */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20180613,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

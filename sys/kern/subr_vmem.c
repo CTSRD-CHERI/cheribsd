@@ -1166,7 +1166,7 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 		 * to return 0.
 		 */
 		qc = &vm->vm_qcache[(size - 1) >> vm->vm_quantum_shift];
-		*addrp = (vmem_addr_t)uma_zalloc(qc->qc_cache,						 
+		*addrp = (vmem_addr_t)uma_zalloc(qc->qc_cache,
 		    (flags & ~M_WAITOK) | M_NOWAIT);
 		if (__predict_true(*addrp != 0)) {
 			CHERI_VM_ASSERT_VALID(*addrp);
@@ -1692,3 +1692,14 @@ vmem_check(vmem_t *vm)
 }
 
 #endif /* defined(DIAGNOSTIC) */
+// CHERI CHANGES START
+// {
+//   "updated": 20190531,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "pointer_shape",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

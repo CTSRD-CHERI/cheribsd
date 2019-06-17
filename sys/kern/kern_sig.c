@@ -4036,12 +4036,15 @@ sigacts_shared(struct sigacts *ps)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20190531,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",
 //     "integer_provenance",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

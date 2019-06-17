@@ -1295,3 +1295,12 @@ sbuf_printf_drain(void *arg, const char *data, int len)
 
 	return (r);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20180228,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

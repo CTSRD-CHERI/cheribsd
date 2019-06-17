@@ -1979,10 +1979,10 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 			mdr.md_file_seg = UIO_SYSSPACE;
 		} else {
 			mdr.md_file = mdio->md_file;
-			mdr.md_file_seg = UIO_USERSPACE;			
+			mdr.md_file_seg = UIO_USERSPACE;
 			mdr.md_file = __USER_CAP_STR(mdio->md_file);
 			mdr.md_file_seg = UIO_USERSPACE;
-		}		
+		}
 		mdr.md_label = mdio->md_label;
 		break;
 	}
@@ -2301,6 +2301,10 @@ g_md_fini(struct g_class *mp __unused)
 //     "ioctl:misc",
 //     "iovec-macros",
 //     "kiovec_t"
+//   ],
+//   "changes_purecap": [
+//     "ioctl:misc",
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

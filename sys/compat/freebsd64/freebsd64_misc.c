@@ -1461,3 +1461,13 @@ int freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 
 	return (ENOSYS);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "user_capabilities"
+//   ],
+//   "change_comment": "struct kevent64, upstreamable"
+// }
+// CHERI CHANGES END

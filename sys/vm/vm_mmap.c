@@ -1798,11 +1798,16 @@ vm_mmap_to_errno(int rv)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190517,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer",
+//     "uintptr_interp_offset"
 //   ],
 //   "change_comment": ""
 // }

@@ -3754,7 +3754,7 @@ uma_zone_exhausted_nolock(uma_zone_t zone)
 void *
 uma_large_malloc_domain(vm_size_t size, int domain, int wait)
 {
-	struct domainset *policy;		
+	struct domainset *policy;
 	vm_ptr_t addr;
 	uma_slab_t slab;
 
@@ -4332,3 +4332,16 @@ DB_SHOW_COMMAND(umacache, db_show_umacache)
 	}
 }
 #endif	/* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20190617,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "pointer_shape",
+//     "pointer_as_integer",
+//     "monotonicity",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

@@ -745,3 +745,14 @@ void cheri_trace_log(void *buf, size_t len, int format);
 #endif /* !_KERNEL */
 
 #endif /* _MIPS_INCLUDE_CHERI_H_ */
+
+// CHERI CHANGES START
+// {
+//   "updated": 20190605,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ],
+//   "change_comment": "purecap caprelocs, kframe."
+// }
+// CHERI CHANGES END

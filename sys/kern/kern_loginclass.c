@@ -180,7 +180,7 @@ loginclass_find(const char *name)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct getloginclass_args {
-	char * __capability namebuf;
+	char	*namebuf;
 	size_t	namelen;
 };
 #endif
@@ -212,7 +212,7 @@ kern_getloginclass(struct thread *td, char * __capability namebuf,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct setloginclass_args {
-	const char * __capability namebuf;
+	const char	*namebuf;
 };
 #endif
 /* ARGSUSED */

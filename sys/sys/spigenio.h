@@ -34,17 +34,9 @@
 #include <sys/_iovec.h>
 
 struct spigen_transfer {
-	struct iovec st_command; /* master to slave */
-	struct iovec st_data;    /* slave to master and/or master to slave */
-};
-
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
-struct spigen_transfer {
 	struct iovec_native st_command; /* master to slave */
 	struct iovec_native st_data;    /* slave to master and/or master to slave */
 };
-#endif /* COMPAT_FREEBSD64 */
 
 struct spigen_transfer_mmapped {
 	size_t stm_command_length; /* at offset 0 in mmap(2) area */

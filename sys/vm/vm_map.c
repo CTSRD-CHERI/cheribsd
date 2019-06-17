@@ -2346,7 +2346,7 @@ vm_map_submap(
 
 	vm_map_lock(submap);
 	submap->flags |= MAP_IS_SUB_MAP;
-	vm_map_unlock(submap);	
+	vm_map_unlock(submap);
 	vm_map_lock(map);
 
 	VM_MAP_RANGE_CHECK(map, start, end);
@@ -4038,7 +4038,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	/* Copy immutable fields of vm1 to vm2. */
 #ifndef CHERI_KERNEL
 	vm2 = vmspace_alloc(vm_map_min(old_map), vm_map_max(old_map),
-	    pmap_pinit);	
+	    pmap_pinit);
 #else
 	vm2 = vmspace_alloc(
 	    (vm_ptr_t)cheri_setaddress(old_map->map_capability, vm_map_min(old_map)),
@@ -5089,10 +5089,14 @@ DB_SHOW_COMMAND(procvm, procvm)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190610,
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

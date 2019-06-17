@@ -66,7 +66,7 @@
  * cheri_memcpy() has inverted source/destination pointers.
  */
 LEAF(cheri_memcpy)
-XLEAF(memcpy_c)	
+XLEAF(memcpy_c)
 	move	v0, a0		/* Note cleverness: v0 will hold original... */
 	move	a0, a1		/* ... value of a0 for cheri_memcpy(). */
 	move	a1, v0
@@ -122,3 +122,13 @@ cstr_return:
 	jr	ra
 	nop
 END(copystr_c)
+
+// CHERI CHANGES START
+// {
+//   "updated": 20180822,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//	"support"
+//   ]
+// }
+// CHERI CHANGES END

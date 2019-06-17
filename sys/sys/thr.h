@@ -47,22 +47,17 @@ typedef __size_t	size_t;
 #define	THR_SYSTEM_SCOPE	0x0002
 
 struct thr_param {
-    void	(* __kerncap start_func)(void *);	/* thread entry function. */
-    void * __kerncap	arg;			/* argument for entry function. */
-    char * __kerncap 	stack_base;		/* stack base address. */
-    size_t		stack_size;		/* stack size. */
-    char * __kerncap 	tls_base;		/* tls base address. */
-    size_t		tls_size;		/* tls size. */
-    long * __kerncap 	child_tid;		/* address to store new TID. */
-    long * __kerncap 	parent_tid;		/* parent accesses the new TID here. */
-    int			flags;			/* thread flags. */
-    struct rtprio * __kerncap rtp;		/* Real-time scheduling priority */
-#if __has_feature(capabilities)
-    void * __kerncap	ddc;
-    void * __kerncap 	spare[2];
-#else
-    void		*spare[3];		/* TODO: cpu affinity mask etc. */
-#endif
+    void	(*start_func)(void *);	/* thread entry function. */
+    void	*arg;			/* argument for entry function. */
+    char	*stack_base;		/* stack base address. */
+    size_t	stack_size;		/* stack size. */
+    char	*tls_base;		/* tls base address. */
+    size_t	tls_size;		/* tls size. */
+    long	*child_tid;		/* address to store new TID. */
+    long	*parent_tid;		/* parent accesses the new TID here. */
+    int		flags;			/* thread flags. */
+    struct rtprio	*rtp;		/* Real-time scheduling priority */
+    void	*spare[3];		/* TODO: cpu affinity mask etc. */
 };
 
 /* 

@@ -428,3 +428,12 @@ DB_SHOW_ALL_COMMAND(pcpu, db_show_cpu_all)
 }
 DB_SHOW_ALIAS(allpcpu, db_show_cpu_all);
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20180228,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_shape"
+//   ]
+// }
+// CHERI CHANGES END

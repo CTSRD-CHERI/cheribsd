@@ -1558,3 +1558,12 @@ db_show_rwlock(const struct lock_object *lock)
 }
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190531,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

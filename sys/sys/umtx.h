@@ -117,9 +117,9 @@
 #define	UMTX_SHM_ALIVE		0x0008
 
 struct umtx_robust_lists_params {
-	kuintcap_t	robust_list_offset;
-	kuintcap_t	robust_priv_list_offset;
-	kuintcap_t	robust_inact_offset;
+	uintptr_t	robust_list_offset;
+	uintptr_t	robust_priv_list_offset;
+	uintptr_t	robust_inact_offset;
 };
 
 #ifndef _KERNEL

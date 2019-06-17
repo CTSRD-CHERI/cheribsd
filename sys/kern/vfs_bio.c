@@ -5505,3 +5505,13 @@ DB_COMMAND(countfreebufs, db_coundfreebufs)
 	db_printf("numfreebuffers is %d\n", numfreebuffers);
 }
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20190517,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

@@ -264,11 +264,15 @@
 #endif /* !_MIPS_INCLUDE_PARAM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20180927,
 //   "target_type": "header",
 //   "changes": [
 //     "support"
 //   ],
-//   "change_comment": "sysv shm"
+//   "changes_purecap": [
+//     "support",
+//     "pointer_alignment"
+//   ],
+//   "change_comment": "sysv shm. purecap: kstack"
 // }
 // CHERI CHANGES END

@@ -98,7 +98,7 @@ struct procctl_reaper_pidinfo {
 struct procctl_reaper_pids {
 	u_int	rp_count;
 	u_int	rp_pad0[15];
-	struct procctl_reaper_pidinfo * __kerncap rp_pids;
+	struct procctl_reaper_pidinfo *rp_pids;
 };
 
 struct procctl_reaper_kill {

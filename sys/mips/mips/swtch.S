@@ -109,7 +109,7 @@ LEAF(fork_trampoline)
 	RESTORE_U_PCB_REG(t1, MULHI, k1)
 	mtlo	t0
 	mthi	t1
-	RESTORE_U_PCB_PC(a0, CHERI_REG_KR1C, k1)	# set return address
+	RESTORE_U_PCB_PC(a0, t0, k1)	# set return address
 	RESTORE_U_PCB_REG(AT, AST, k1)
 	RESTORE_U_PCB_REG(v0, V0, k1)
 
@@ -832,10 +832,10 @@ szsigcode32:
 	.text
 #endif
 
-#if __has_feature(capabilities)
+#ifdef COMPAT_CHERIABI
 	.globl	_C_LABEL(cheri_sigcode)
 _C_LABEL(cheri_sigcode):
-	dli		t0, SIGF_UC
+	dli		t0, SIGF_C_UC
 	cincoffset	$c3, $c11, t0		# In the hybrid ABI named $c11,
 	li		v0, SYS_sigreturn	# but we really mean $csp.
 # sigreturn (ucp)

@@ -3884,10 +3884,16 @@ pmap_is_valid_memattr(pmap_t pmap __unused, vm_memattr_t mode)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20181207,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer",
+//     "pointer_alignment",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

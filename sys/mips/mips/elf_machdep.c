@@ -605,11 +605,14 @@ elf_cpu_unload_file(linker_file_t lf __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190604,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
 //   ],
-//   "change_comment": "shared page"
+//   "changes_purecap": [
+//     "support"
+//   ],
+//   "change_comment": "shared page, purecap freebsd64 brandinfo."
 // }
 // CHERI CHANGES END

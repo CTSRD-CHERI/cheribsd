@@ -232,3 +232,12 @@ sf_buf_process_page(vm_page_t m, void (*cb)(struct sf_buf *))
 	return (FALSE);
 }
 #endif	/* SFBUF_PROCESS_PAGE */
+// CHERI CHANGES START
+// {
+//   "updated": 20181228,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

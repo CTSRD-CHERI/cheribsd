@@ -281,6 +281,7 @@ cheri_cap_print(void* __capability cap)
 void
 cheri_log_cheri_frame(struct trapframe *frame)
 {
+
 	/* C0 - $ddc */
 	printf("$ddc: ");
 	cheri_cap_print(frame->ddc);

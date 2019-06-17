@@ -2594,10 +2594,13 @@ DB_SHOW_COMMAND(vpath, db_show_vpath)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190603,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

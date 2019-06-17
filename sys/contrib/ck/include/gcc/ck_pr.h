@@ -331,3 +331,14 @@ CK_PR_UNARY_S(8, uint8_t)
 #undef CK_PR_UNARY
 #endif /* !CK_F_PR */
 #endif /* CK_PR_GCC_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20181108,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "other"
+//   ],
+//   "change_comment": "c11 atomic"
+// }
+// CHERI CHANGES END

@@ -696,3 +696,12 @@ DB_SHOW_COMMAND(pctrienode, db_show_pctrienode)
 			    node->pn_clev);
 }
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20180919,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

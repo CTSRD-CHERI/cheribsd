@@ -3116,9 +3116,12 @@ DB_SHOW_COMMAND(bpf_if, db_show_bpf_if)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190513,
+//   "updated": 20190522,
 //   "target_type": "kernel",
 //   "changes": [
+//     "ioctl:misc"
+//   ],
+//   "changes_purecap": [
 //     "ioctl:misc"
 //   ]
 // }

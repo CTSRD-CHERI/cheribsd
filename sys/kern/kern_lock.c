@@ -1688,3 +1688,12 @@ db_show_lockmgr(const struct lock_object *lock)
 		db_printf("none\n");
 }
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190531,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

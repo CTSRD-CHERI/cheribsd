@@ -139,3 +139,14 @@ void	mips_pcpu_tlb_init(struct pcpu *pcpu);
 #endif	/* _KERNEL */
 
 #endif	/* !_MACHINE_PCPU_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190523,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "support"
+//   ],
+//   "changes_comment": "pcpu_addr, kstack"
+// }
+// CHERI CHANGES END

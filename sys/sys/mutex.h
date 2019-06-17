@@ -555,3 +555,12 @@ struct mtx_args {
 
 #endif	/* _KERNEL */
 #endif	/* _SYS_MUTEX_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180809,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

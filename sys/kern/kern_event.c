@@ -2793,11 +2793,14 @@ noacquire:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181203,
+//   "updated": 20190531,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

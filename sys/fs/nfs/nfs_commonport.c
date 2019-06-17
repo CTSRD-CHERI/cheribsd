@@ -819,3 +819,12 @@ MODULE_VERSION(nfscommon, 1);
 MODULE_DEPEND(nfscommon, nfssvc, 1, 1, 1);
 MODULE_DEPEND(nfscommon, krpc, 1, 1, 1);
 
+// CHERI CHANGES START
+// {
+//   "updated": 20181022,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END

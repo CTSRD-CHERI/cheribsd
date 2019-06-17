@@ -118,7 +118,7 @@ extern Elf64_Capreloc __stop___cap_relocs;
 /* Defined in linker script, mark the end of .text and kernel image */
 extern char etext[], end[];
 
-/* 
+/*
  * Global capabilities for various address-space segments.
  */
 caddr_t cheri_xuseg_capability;
@@ -430,3 +430,12 @@ cheri_serialize(struct cheri_serial *csp, void * __capability cap)
 	} else
 		memcpy(&csp->cs_data, &cap, CHERICAP_SIZE);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190605,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

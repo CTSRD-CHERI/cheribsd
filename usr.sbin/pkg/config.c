@@ -543,3 +543,12 @@ config_finish(void) {
 	for (i = 0; i < CONFIG_SIZE; i++)
 		free(c[i].value);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20181018,
+//   "target_type": "prog",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

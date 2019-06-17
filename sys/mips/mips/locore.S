@@ -84,7 +84,6 @@ GLOBAL(fenvp)
 	.space 4			# Assumes mips32?  Is that OK?
 #endif
 
-	.option pic0
 	.set noreorder
 
 	.text

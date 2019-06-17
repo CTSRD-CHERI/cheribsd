@@ -90,3 +90,13 @@ __END_DECLS
 #endif /* !_KERNEL */
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190607,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "unsupported"
+//   ],
+//   "change_comment": "underaligned sockaddr_dl causes oob"
+// }
+// CHERI CHANGES END

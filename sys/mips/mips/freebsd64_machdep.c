@@ -463,3 +463,13 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 }
 #endif /* CHERI_KERNEL */
+// CHERI CHANGES START
+// {
+//   "updated": 20190604,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support"
+//   ],
+//   "change_comment": "freebsd64 purecap sendsig"
+// }
+// CHERI CHANGES END

@@ -239,4 +239,12 @@ SipRounds(SIPHASH_CTX *ctx, int final)
 		ctx->v[2] = SIP_ROTL(ctx->v[2], 32);
 	}
 }
-
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//   ]
+// }
+// CHERI CHANGES END

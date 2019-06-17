@@ -44,7 +44,6 @@
 #include <sys/callout.h>
 #include <sys/queue.h>
 #include <sys/stdint.h>		/* for people using printf mainly */
-#include <sys/limits.h>
 
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
@@ -146,7 +145,7 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  */
 #define	ASSERT_ATOMIC_LOAD_PTR(var, msg)				\
 	KASSERT(sizeof(var) == sizeof(void *) &&			\
-	    ((vm_offset_t)&(var) & (sizeof(void *) - 1)) == 0, msg)
+	    ((vaddr_t)&(var) & (sizeof(void *) - 1)) == 0, msg)
 
 /*
  * Assert that a thread is in critical(9) section.
@@ -172,7 +171,7 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * thread's address space and are created from the DDC or PCC of
  * the current PCB.
  */
-
+#if __has_feature(capabilities)
 /*
  * Derive out-of-bounds and small values from NULL.  This allows common
  * sentinel values to work.
@@ -197,6 +196,12 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 	    __builtin_cheri_tag_get(unbound) ?				\
 	    __builtin_cheri_bounds_set(unbound, (len)) : unbound);	\
 })
+
+#else /* !has_feature(capabilities) */
+#define	__USER_CAP_UNBOUND(ptr)	(ptr)
+#define	__USER_CODE_CAP(ptr)	(ptr)
+#define	__USER_CAP(ptr, len)	(ptr)
+#endif /* !has_feature(capabilities) */
 
 #define	__USER_CAP_ADDR(ptr)	__USER_CAP_UNBOUND(ptr)
 #define	__USER_CAP_ARRAY(objp, cnt) \
@@ -575,8 +580,8 @@ int	casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 #define	fuword16_c	fuword16
 #define	fuword32_c	fuword32
 #define	fuword64_c	fuword64
-#define fuecap		fueword
 #define	fueword_c	fueword
+#define fuecap		fueword
 #define	fueword32_c	fueword32
 #define	subyte_c	subyte
 #define	suword_c	suword
@@ -798,10 +803,13 @@ __NULLABILITY_PRAGMA_POP
 #endif /* !_SYS_SYSTM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190617,
 //   "target_type": "header",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "virtual_address"
 //   ]
 // }
 // CHERI CHANGES END

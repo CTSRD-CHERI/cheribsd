@@ -832,9 +832,12 @@ _C_LABEL(x):
 #endif /* !_MACHINE_ASM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190403,
 //   "target_type": "header",
 //   "changes": [
+//     "support"
+//   ],
+//   "changes_purecap": [
 //     "support"
 //   ],
 //   "change_comment": "jmpbuf, call frame, etc"

@@ -703,3 +703,13 @@ mips_exc_cntrs_sysctl_register(void *arg)
 
 SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_ANY, mips_exc_cntrs_sysctl_register, 0);
 #endif /* defined((MIPS_EXC_CNTRS) */
+// CHERI CHANGES START
+// {
+//   "updated": 20181127,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "support",
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

@@ -42,14 +42,14 @@ struct jail_v0 {
 #endif
 
 struct jail {
-	uint32_t			version;
-	char * __kerncap 		path;
-	char * __kerncap 		hostname;
-	char * __kerncap 		jailname;
-	uint32_t			ip4s;
-	uint32_t			ip6s;
-	struct in_addr * __kerncap	ip4;
-	struct in6_addr	* __kerncap	ip6;
+	uint32_t	version;
+	char		*path;
+	char		*hostname;
+	char		*jailname;
+	uint32_t	ip4s;
+	uint32_t	ip6s;
+	struct in_addr	*ip4;
+	struct in6_addr	*ip6;
 };
 #define	JAIL_API_VERSION	2
 

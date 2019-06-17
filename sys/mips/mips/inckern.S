@@ -22,7 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-.option pic0	
+.option pic0
 
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$")

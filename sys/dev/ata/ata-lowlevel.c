@@ -1003,3 +1003,13 @@ ata_pio_write(struct ata_request *request, int length)
 			ATA_IDX_OUTW(ch, ATA_DATA, 0);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

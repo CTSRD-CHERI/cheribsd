@@ -281,3 +281,12 @@ typedef struct {
 #endif
 
 #endif /* !_SYS_ELF64_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190530,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

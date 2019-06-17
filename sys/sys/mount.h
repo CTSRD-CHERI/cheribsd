@@ -524,12 +524,12 @@ struct vfsconf {
 
 /* Userland version of the struct vfsconf. */
 struct xvfsconf {
-	struct	vfsops * __kerncap vfc_vfsops;	/* filesystem operations vector */
+	struct	vfsops *vfc_vfsops;	/* filesystem operations vector */
 	char	vfc_name[MFSNAMELEN];	/* filesystem type name */
 	int	vfc_typenum;		/* historic filesystem type number */
 	int	vfc_refcount;		/* number mounted of this type */
 	int	vfc_flags;		/* permanent flags */
-	struct	vfsconf * __kerncap vfc_next;	/* next in list */
+	struct	vfsconf *vfc_next;	/* next in list */
 };
 
 #ifndef BURN_BRIDGES
@@ -565,7 +565,7 @@ struct vfsidctl {
 	char		vc_fstypename[MFSNAMELEN];
 					/* type of fs 'nfs' or '*' */
 	fsctlop_t	vc_op;		/* operation VFS_CTL_* (below) */
-	void * __kerncap vc_ptr;	/* pointer to data structure */
+	void		*vc_ptr;	/* pointer to data structure */
 	size_t		vc_len;		/* sizeof said structure */
 	u_int32_t	vc_spare[12];	/* spare (must be zero) */
 };

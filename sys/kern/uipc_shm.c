@@ -1145,10 +1145,14 @@ shm_fill_kinfo(struct file *fp, struct kinfo_file *kif, struct filedesc *fdp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20181206,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

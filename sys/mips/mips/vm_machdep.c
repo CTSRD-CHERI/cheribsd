@@ -805,10 +805,15 @@ DB_SHOW_COMMAND(trapframe, ddb_dump_trapframe)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190605,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes": [
+//     "support",
+//     "pointer_alignment",
+//     "uintptr_interp_offset"
 //   ],
 //   "change_comment": ""
 // }

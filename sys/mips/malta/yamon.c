@@ -96,3 +96,13 @@ yamon_getcpufreq(void)
 
 	return (freq);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20171215,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

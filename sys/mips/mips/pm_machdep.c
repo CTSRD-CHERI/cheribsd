@@ -105,7 +105,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 	struct sigacts *psp;
 	struct sigframe sf, *sfp;
-	vm_ptr_t sp;
+	vm_offset_t sp;
 #ifdef CPU_CHERI
 	size_t cp2_len;
 	int cheri_is_sandboxed;
@@ -715,13 +715,17 @@ ptrace_clear_single_step(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190604,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",
 //     "support",
 //     "user_capabilities"
 //   ],
-//   "change_comment": ""
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer"
+//   ],
+//   "change_comment": "freebsd64 purecap sendsig"
 // }
 // CHERI CHANGES END

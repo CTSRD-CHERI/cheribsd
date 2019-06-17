@@ -287,3 +287,12 @@ exec_sysvec_init(void *param)
 #endif
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190426,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

@@ -876,7 +876,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 		break;
 
 	case GIO_KEYMAP:	/* get keyboard translation table */
-#if __has_feature(capabilities)
+#ifdef COMPAT_CHERIABI
 			if (SV_CURPROC_FLAG(SV_CHERI))
 				data = *(void * __capability *)arg;
 			else
@@ -912,7 +912,7 @@ genkbd_commonioctl(keyboard_t *kbd, u_long cmd, caddr_t arg)
 				mapp->key[i].flgs = omapp->key[i].flgs;
 			}
 		} else {
-#if __has_feature(capabilities)
+#ifdef COMPAT_CHERIABI
 			if (SV_CURPROC_FLAG(SV_CHERI))
 				data = *(void * __capability *)arg;
 			else

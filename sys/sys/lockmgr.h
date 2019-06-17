@@ -204,3 +204,12 @@ _lockmgr_args_rw(struct lock *lk, u_int flags, struct rwlock *ilk,
 #endif /* _KERNEL */
 
 #endif /* !_SYS_LOCKMGR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20180917,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_bit_flags"
+//   ]
+// }
+// CHERI CHANGES END

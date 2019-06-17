@@ -445,7 +445,7 @@ ispioctl(struct cdev *dev, u_long c, caddr_t addr, int flags, struct thread *td)
 
 	case ISP_RESCAN:
 		if (IS_FC(isp)) {
-#if __has_feature(capabilities)
+#ifdef COMPAT_CHERIABI
 			if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 				chan =  *(intcap_t *)addr;
 			else
@@ -467,7 +467,7 @@ ispioctl(struct cdev *dev, u_long c, caddr_t addr, int flags, struct thread *td)
 
 	case ISP_FC_LIP:
 		if (IS_FC(isp)) {
-#if __has_feature(capabilities)
+#ifdef COMPAT_CHERIABI
 			if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
 				chan =  *(intcap_t *)addr;
 			else

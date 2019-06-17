@@ -34,8 +34,6 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#define EXPLICIT_USER_ACCESS
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -49,14 +47,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpuregs.h>
 #include <machine/tls.h>
 
-#if __has_feature(capabilities)
-#include <cheri/cheric.h>
-#endif
-
 #ifndef _SYS_SYSPROTO_H_
 struct sysarch_args {
 	int op;
-	char * __capability parms;
+	char *parms;
 };
 #endif
 
@@ -67,12 +61,10 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 #ifdef CPU_QEMU_MALTA
 	int intval;
 #endif
+	void *tlsbase;
 
 	switch (uap->op) {
 	case MIPS_SET_TLS:
-#if __has_feature(capabilities)
-		return (cpu_set_user_tls(td, uap->parms));
-#else
 		td->td_md.md_tls = __USER_CAP_UNBOUND(uap->parms);
 
 		/*
@@ -91,11 +83,10 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 			    td->td_md.md_tls_tcb_offset));
 		}
 		return (0);
-#endif
 
 	case MIPS_GET_TLS:
-		error = copyoutcap(&td->td_md.md_tls, uap->parms,
-		    sizeof(void * __capability));
+		tlsbase = (__cheri_fromcap void *)td->td_md.md_tls;
+		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
 
 	case MIPS_GET_COUNT:
@@ -119,7 +110,7 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 		return (0);
 #endif
 
-#if defined(CPU_CHERI)
+#ifdef CPU_CHERI
 #if 0
 	case CHERI_GET_STACK:
 		return (cheri_sysarch_getstack(td, uap));
@@ -131,101 +122,8 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 	case CHERI_GET_SEALCAP:
 		return (cheri_sysarch_getsealcap(td,
 		    __USER_CAP(uap->parms, sizeof(void * __capability))));
+#endif
 
-#if __has_feature(capabilities)
-	/*
-	 * CheriABI specific operations.
-	 */
-	case CHERI_MMAP_GETBASE: {
-		size_t base;
-
-		base = cheri_getbase(td->td_md.md_cheri_mmap_cap);
-		if (suword(uap->parms, base) != 0)
-			return (EFAULT);
-		return (0);
-	}
-
-	case CHERI_MMAP_GETLEN: {
-		size_t len;
-
-		len = cheri_getlen(td->td_md.md_cheri_mmap_cap);
-		if (suword(uap->parms, len) != 0)
-			return (EFAULT);
-		return (0);
-	}
-
-	case CHERI_MMAP_GETOFFSET: {
-		ssize_t offset;
-
-		offset = cheri_getoffset(td->td_md.md_cheri_mmap_cap);
-		if (suword(uap->parms, offset) != 0)
-			return (EFAULT);
-		return (0);
-	}
-
-	case CHERI_MMAP_GETPERM: {
-		uint64_t perms;
-
-		perms = cheri_getperm(td->td_md.md_cheri_mmap_cap);
-		if (suword64(uap->parms, perms) != 0)
-			return (EFAULT);
-		return (0);
-	}
-
-	case CHERI_MMAP_ANDPERM: {
-		uint64_t perms;
-		perms = fuword64(uap->parms);
-
-		if (perms == -1)
-			return (EINVAL);
-		td->td_md.md_cheri_mmap_cap =
-		    cheri_andperm(td->td_md.md_cheri_mmap_cap, perms);
-		perms = cheri_getperm(td->td_md.md_cheri_mmap_cap);
-		if (suword64(uap->parms, perms) != 0)
-			return (EFAULT);
-		return (0);
-	}
-
-	case CHERI_MMAP_SETOFFSET: {
-		size_t len;
-		ssize_t offset;
-
-		offset = fuword(uap->parms);
-		/* Reject errors and misaligned offsets */
-		if (offset == -1 || (offset & PAGE_MASK) != 0)
-			return (EINVAL);
-		len = cheri_getlen(td->td_md.md_cheri_mmap_cap);
-		/* Don't allow out of bounds offsets, they aren't useful */
-		if (offset < 0 || offset > len) {
-			return (EINVAL);
-		}
-		td->td_md.md_cheri_mmap_cap =
-		    cheri_setoffset(td->td_md.md_cheri_mmap_cap,
-		    (register_t)offset);
-		return (0);
-	}
-
-	case CHERI_MMAP_SETBOUNDS: {
-		size_t len, olen;
-		ssize_t offset;
-
-		len = fuword(uap->parms);
-		/* Reject errors or misaligned lengths */
-		if (len == (size_t)-1 || (len & PAGE_MASK) != 0)
-			return (EINVAL);
-		olen = cheri_getlen(td->td_md.md_cheri_mmap_cap);
-		offset = cheri_getoffset(td->td_md.md_cheri_mmap_cap);
-		/* Don't try to set out of bounds lengths */
-		if (offset > olen || len > olen - offset) {
-			return (EINVAL);
-		}
-		td->td_md.md_cheri_mmap_cap =
-		    cheri_csetbounds(td->td_md.md_cheri_mmap_cap,
-		    (register_t)len);
-		return (0);
-	}
-#endif /* __has_feature(capabilities) */
-#endif /* CPU_CHERI */
 	default:
 		break;
 	}

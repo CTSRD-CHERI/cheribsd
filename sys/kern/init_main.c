@@ -891,6 +891,10 @@ SYSINIT(kickinit, SI_SUB_KTHREAD_INIT, SI_ORDER_MIDDLE, kick_init, NULL);
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "pointer_provenance"
 //   ]
 // }
 // CHERI CHANGES END

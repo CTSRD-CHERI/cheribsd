@@ -1073,3 +1073,13 @@ sysctl_disks(SYSCTL_HANDLER_ARGS)
 SYSCTL_PROC(_kern, OID_AUTO, disks,
     CTLTYPE_STRING | CTLFLAG_RD | CTLFLAG_MPSAFE, NULL, 0,
     sysctl_disks, "A", "names of available disks");
+
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

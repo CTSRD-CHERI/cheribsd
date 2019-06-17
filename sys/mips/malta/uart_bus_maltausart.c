@@ -93,3 +93,12 @@ uart_malta_probe(device_t dev)
 }
 
 DRIVER_MODULE(uart, obio, uart_malta_driver, uart_devclass, 0, 0);
+// CHERI CHANGES START
+// {
+//   "updated": 20190605,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

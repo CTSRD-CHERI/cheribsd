@@ -6791,6 +6791,9 @@ iflib_netdump_poll(if_t ifp, int count)
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

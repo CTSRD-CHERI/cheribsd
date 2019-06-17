@@ -533,3 +533,16 @@ void uma_set_limit(unsigned long limit);
 #endif /* _KERNEL */
 
 #endif /* VM_UMA_INT_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20180822,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "support",
+//     "uintptr_interp_offset",
+//     "pointer_shape",
+//     "pointer_as_integer",
+//     "monotonicity"
+//   ]
+// }
+// CHERI CHANGES END

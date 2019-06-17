@@ -1295,3 +1295,13 @@ CK_PR_FAS_S(8, uint8_t)
 #undef CK_PR_FAS
 
 #endif /* CK_PR_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20181108,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

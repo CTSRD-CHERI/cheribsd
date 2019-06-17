@@ -1093,3 +1093,13 @@ g_print_bio(struct bio *bp)
 	printf("%s[%s(offset=%jd, length=%jd)]", pname, cmd,
 	    (intmax_t)bp->bio_offset, (intmax_t)bp->bio_length);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer",
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

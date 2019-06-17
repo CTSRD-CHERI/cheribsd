@@ -285,3 +285,12 @@ static inline uint64_t MurmurHash64B ( const void * key, int len, uint64_t seed 
 }
 
 #endif /* CK_HT_HASH_H */
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END

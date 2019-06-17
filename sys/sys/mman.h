@@ -333,6 +333,9 @@ __END_DECLS
 //     "support",
 //     "user_capabilities"
 //   ],
+//   "changes_purecap": [
+//     "support"
+//   ],
 //   "change_comment": ""
 // }
 // CHERI CHANGES END

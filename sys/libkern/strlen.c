@@ -31,10 +31,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/libkern.h>
 #include <sys/limits.h>
 
-#ifdef CHERI_KERNEL
-#include <cheri/cheric.h>
-#endif
-
 /*
  * Portable strlen() for 32-bit and 64-bit systems.
  *
@@ -148,3 +144,13 @@ strlen(const char *str)
 	/* NOTREACHED */
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20171211,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_shape",
+//     "unsupported"
+//   ]
+// }
+// CHERI CHANGES END

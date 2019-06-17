@@ -293,3 +293,12 @@ cpu_intr(struct trapframe *tf)
 		pmc_hook(PCPU_GET(curthread), PMC_FN_USER_CALLCHAIN, tf);
 #endif
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190524,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

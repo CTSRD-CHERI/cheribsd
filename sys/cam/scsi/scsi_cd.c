@@ -3781,9 +3781,12 @@ scsi_read_dvd_structure(struct ccb_scsiio *csio, u_int32_t retries,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190528,
 //   "target_type": "kernel",
 //   "changes": [
+//     "ioctl:misc"
+//   ],
+//   "changes_purecap": [
 //     "ioctl:misc"
 //   ]
 // }

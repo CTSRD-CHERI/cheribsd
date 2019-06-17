@@ -4547,3 +4547,15 @@ DB_SHOW_COMMAND(pginfo, vm_page_print_pginfo)
 	    m->flags, m->act_count, m->busy_lock, m->valid, m->dirty);
 }
 #endif /* DDB */
+// CHERI CHANGES START
+// {
+//   "updated": 20190603,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "pointer_alignment",
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

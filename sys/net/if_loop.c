@@ -457,11 +457,14 @@ loioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20190603,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

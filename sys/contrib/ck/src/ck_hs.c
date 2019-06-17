@@ -955,3 +955,12 @@ ck_hs_init(struct ck_hs *hs,
 	hs->map = ck_hs_map_create(hs, n_entries);
 	return hs->map != NULL;
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190528,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//   ]
+// }
+// CHERI CHANGES END

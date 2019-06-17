@@ -362,3 +362,13 @@ END(FUNC_PREFIX(memcpy))
 #else
 END(FUNC_PREFIX(memcpy_c))
 #endif
+
+// CHERI CHANGES START
+// {
+//   "updated": 20190517,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//	"support"
+//   ]
+// }
+// CHERI CHANGES END

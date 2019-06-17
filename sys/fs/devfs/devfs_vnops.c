@@ -2016,6 +2016,10 @@ CTASSERT(O_FSYNC == IO_SYNC);
 //   "changes": [
 //     "ioctl:misc",
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "ioctl:misc",
+//     "pointer_as_integer"
 //   ]
 // }
 // CHERI CHANGES END

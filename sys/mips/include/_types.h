@@ -178,6 +178,9 @@ typedef	int		___wchar_t;
 //   "target_type": "header",
 //   "changes": [
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

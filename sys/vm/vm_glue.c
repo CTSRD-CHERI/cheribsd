@@ -768,6 +768,11 @@ kick_proc0(void)
 //   "changes": [
 //     "support",
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "support",
+//     "pointer_as_integer",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

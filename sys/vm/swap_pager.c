@@ -2270,7 +2270,7 @@ swap_pager_find_least(vm_object_t object, vm_pindex_t pindex)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct swapon_args {
-	char * __capability name;
+	char *name;
 };
 #endif
 
@@ -2442,7 +2442,7 @@ swaponsomething(struct vnode *vp, void *id, u_long nblks,
  */
 #ifndef _SYS_SYSPROTO_H_
 struct swapoff_args {
-	char * __capability name;
+	char *name;
 };
 #endif
 

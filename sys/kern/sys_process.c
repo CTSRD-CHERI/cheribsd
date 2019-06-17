@@ -1601,12 +1601,15 @@ stopevent(struct proc *p, unsigned int event, unsigned int val)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190509,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t",
 //     "support"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END
