@@ -1545,6 +1545,340 @@ CHERIBSDTEST(cheri_revoke_loadside, "Test load-side revoker")
 
 #undef CHERIBSDTEST_VM_CHERI_REVOKE_LOADSIDE_NPG
 }
+
+/*
+ * Repeatedly invoke libcheri_caprevoke logic.
+ * Using a bump the pointer allocator, repeatedly grab rand()-omly sized
+ * objects and fill them with capabilities to themselves, mark them for
+ * revocation, revoke, and validate.
+ *
+ */
+
+#include <cheri/libcaprevoke.h>
+
+static void
+cheribsdtest_cheri_revoke_lib_init(size_t bigblock_caps, void *** obigblock,
+    void ** oshadow, const volatile struct cheri_revoke_info ** ocri)
+{
+	void **bigblock;
+
+	bigblock = CHERIBSDTEST_CHECK_SYSCALL(
+	    mmap(0, bigblock_caps * sizeof(void *), PROT_READ | PROT_WRITE,
+	    MAP_ANON, -1, 0));
+
+	for (size_t ix = 0; ix < bigblock_caps; ix++) {
+		/* Create self-referential VMMAP-free capabilities */
+
+		bigblock[ix] = cheri_andperm(cheri_setbounds(&bigblock[ix], 16),
+		    ~CHERI_PERM_SW_VMEM);
+	}
+	*obigblock = bigblock;
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, bigblock,
+	    oshadow));
+
+	CHERIBSDTEST_CHECK_SYSCALL(
+	    cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT, NULL,
+	    __DEQUALIFY(void **, ocri)));
+}
+
+enum {
+	TCLR_MODE_LOAD_ONCE = 1,
+	TCLR_MODE_LOAD_SPLIT = 2,
+	TCLR_MODE_LOAD_SPLIT_INIT = 3,
+	TCLR_MODE_LOAD_SPLIT_FINI = 4,
+};
+
+static void
+cheribsdtest_cheri_revoke_lib_run(int paranoia, int mode, size_t bigblock_caps,
+    void **bigblock, void *shadow, const volatile struct cheri_revoke_info *cri)
+{
+	size_t bigblock_offset = 0;
+	const ptraddr_t sbase = cri->base_mem_nomap;
+
+	fprintf(stderr, "test_cheri_revoke_lib_run mode %d\n", mode);
+
+	while (bigblock_offset < bigblock_caps) {
+		struct cheri_revoke_syscall_info crsi;
+		size_t csz;
+
+		switch (mode) {
+		case TCLR_MODE_LOAD_SPLIT_INIT:
+		case TCLR_MODE_LOAD_SPLIT_FINI:
+			/*
+			 * Just do one big block so we can
+			 * call this function once to open the
+			 * epoch and once to close it.
+			 */
+			csz = bigblock_caps - bigblock_offset;
+			break;
+		default:
+			csz = rand() % 1024 + 1;
+			csz = MIN(csz, bigblock_caps - bigblock_offset);
+			break;
+		}
+
+		if (verbose > 1) {
+			fprintf(stderr, "left=%zd csz=%zd\n",
+			    bigblock_caps - bigblock_offset, csz);
+		}
+
+		void **chunk = cheri_setbounds(bigblock + bigblock_offset,
+		    csz * sizeof(void *));
+
+		if (verbose > 1) {
+			fprintf(stderr, "chunk: %#.16lp\n", chunk);
+		}
+
+		size_t chunk_offset = bigblock_offset;
+		bigblock_offset += csz;
+
+		if (mode == TCLR_MODE_LOAD_SPLIT_FINI)
+			goto load_split_fini;
+
+		if (verbose > 3) {
+			ptrdiff_t fwo, lwo;
+			uint64_t fwm, lwm;
+			caprev_shadow_nomap_offsets((ptraddr_t)chunk,
+			    csz * sizeof(void *), &fwo, &lwo);
+			caprev_shadow_nomap_masks((ptraddr_t)chunk,
+			    csz * sizeof(void *), &fwm, &lwm);
+
+			fprintf(stderr,
+			    "premrk fwo=%lx lwo=%lx fw=%p *fw=%016lx "
+			    "(fwm=%016lx) *lw=%016lx (lwm=%016lx)\n",
+			    fwo, lwo, cheri_setaddress(shadow, sbase + fwo),
+			    *(uint64_t *)(cheri_setaddress(shadow,
+			    sbase + fwo)), fwm,
+			    *(uint64_t *)(cheri_setaddress(shadow,
+			    sbase + lwo)), lwm);
+		}
+
+		/* Mark the chunk for revocation */
+		CHERIBSDTEST_VERIFY2(caprev_shadow_nomap_set(
+		    cri->base_mem_nomap, shadow, chunk, chunk) == 0,
+		    "Shadow update collision");
+
+		__atomic_thread_fence(__ATOMIC_RELEASE);
+
+		if (verbose > 3) {
+			ptrdiff_t fwo, lwo;
+			caprev_shadow_nomap_offsets((ptraddr_t)chunk,
+			    csz * sizeof(void *), &fwo, &lwo);
+
+			fprintf(stderr,
+			    "marked fwo=%lx lwo=%lx fw=%p *fw=%016lx "
+			    "*lw=%016lx\n",
+			    fwo, lwo, cheri_setaddress(shadow, sbase + fwo),
+			    *(uint64_t *)(cheri_setaddress(shadow,
+			    sbase + fwo)),
+			    *(uint64_t *)(cheri_setaddress(shadow,
+			    sbase + lwo)));
+		}
+
+		{
+			int crflags = CHERI_REVOKE_IGNORE_START |
+			    CHERI_REVOKE_TAKE_STATS;
+
+			switch(mode) {
+			case TCLR_MODE_LOAD_ONCE:
+				crflags |= CHERI_REVOKE_LAST_PASS;
+				break;
+			}
+
+			CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(crflags, 0,
+			    &crsi));
+			CHERIBSDTEST_VERIFY2(cri->epochs.dequeue ==
+			    crsi.epochs.dequeue, "Bad shared clock");
+		}
+
+		/* Check the surroundings */
+		if (paranoia > 1) {
+			for (size_t ix = 0; ix < chunk_offset; ix++) {
+				CHERIBSDTEST_VERIFY2(
+				    !check_revoked(bigblock[ix]),
+				    "Revoked cap incorrectly below object, "
+				    "at ix=%zd", ix);
+			}
+			for (size_t ix = chunk_offset + csz; ix < bigblock_caps;
+			    ix++) {
+				CHERIBSDTEST_VERIFY2(
+				    !check_revoked(bigblock[ix]),
+				    "Revoked cap incorrectly above object, "
+				    "at ix=%zd", ix);
+			}
+		}
+
+		if (paranoia > 0) {
+			for (size_t ix = 0; ix < csz; ix++) {
+				if (!check_revoked(chunk[ix])) {
+					fprintf(stderr, "c %#.16lp\n",
+					    chunk[ix]);
+					cheribsdtest_failure_errx(
+					    "Unrevoked at ix=%zd after revoke",
+					    ix);
+				}
+			}
+		}
+		if (mode == TCLR_MODE_LOAD_SPLIT_INIT)
+			return;
+
+		if (mode == TCLR_MODE_LOAD_SPLIT) {
+load_split_fini:
+			CHERIBSDTEST_CHECK_SYSCALL(cheri_revoke(
+			    CHERI_REVOKE_LAST_PASS | CHERI_REVOKE_IGNORE_START |
+			    CHERI_REVOKE_TAKE_STATS, 0, &crsi));
+			CHERIBSDTEST_VERIFY2(cri->epochs.dequeue ==
+			    crsi.epochs.dequeue, "Bad shared clock");
+		}
+
+		caprev_shadow_nomap_clear(cri->base_mem_nomap, shadow, chunk);
+		__atomic_thread_fence(__ATOMIC_RELEASE);
+
+		for (size_t ix = 0; ix < csz; ix++) {
+			/* Put everything back */
+			chunk[ix] = cheri_andperm(
+			    cheri_setbounds(&chunk[ix], 16),
+			    ~CHERI_PERM_SW_VMEM);
+		}
+	}
+}
+
+CHERIBSDTEST(cheri_revoke_lib, "Test libcheri_caprevoke internals")
+{
+	/*
+	 * Tweaking paranoia can turn this test into more of a
+	 * benchmark than a correctness test.  At 0, no checks
+	 * will be performed; at 1, only the revoked object is
+	 * investigated, and at 2, the entire allocation arena
+	 * is tested.
+	 */
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void **bigblock;
+	void *shadow;
+	const volatile struct cheri_revoke_info *cri;
+
+	srand(1337);
+
+	cheribsdtest_cheri_revoke_lib_init(bigblock_caps, &bigblock, &shadow,
+	    &cri);
+
+	if (verbose > 0) {
+		fprintf(stderr, "bigblock: %#.16lp\n", bigblock);
+		fprintf(stderr, "shadow: %#.16lp\n", shadow);
+	}
+
+	cheribsdtest_cheri_revoke_lib_run(paranoia,
+	    TCLR_MODE_LOAD_ONCE, bigblock_caps, bigblock, shadow, cri);
+
+	cheribsdtest_cheri_revoke_lib_run(paranoia,
+	    TCLR_MODE_LOAD_SPLIT, bigblock_caps, bigblock, shadow, cri);
+
+	munmap(bigblock, bigblock_caps * sizeof(void *));
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheri_revoke_lib_fork,
+    "Test libcheri_caprevoke with fork")
+{
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void **bigblock;
+	void *shadow;
+	const volatile struct cheri_revoke_info *cri;
+
+	int pid;
+
+	srand(1337);
+
+	cheribsdtest_cheri_revoke_lib_init(bigblock_caps, &bigblock, &shadow,
+	    &cri);
+
+	if (verbose > 0) {
+		fprintf(stderr, "bigblock: %#.16lp\n", bigblock);
+		fprintf(stderr, "shadow: %#.16lp\n", shadow);
+	}
+
+	pid = fork();
+	if (pid == 0) {
+		cheribsdtest_cheri_revoke_lib_run(paranoia,
+		    TCLR_MODE_LOAD_ONCE, bigblock_caps, bigblock, shadow, cri);
+
+		cheribsdtest_cheri_revoke_lib_run(paranoia,
+		    TCLR_MODE_LOAD_SPLIT, bigblock_caps, bigblock, shadow, cri);
+	} else {
+		int res;
+
+		CHERIBSDTEST_VERIFY2(pid > 0, "fork failed");
+		waitpid(pid, &res, 0);
+		if (res == 0) {
+			cheribsdtest_success();
+		} else {
+			cheribsdtest_failure_errx("Bad child process exit");
+		}
+	}
+
+	munmap(bigblock, bigblock_caps * sizeof(void *));
+
+	cheribsdtest_success();
+}
+
+CHERIBSDTEST(cheri_revoke_lib_fork_split,
+    "Test libcheri_caprevoke split across fork")
+{
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void **bigblock;
+	void *shadow;
+	const volatile struct cheri_revoke_info *cri;
+
+	int pid;
+
+	srand(1337);
+
+	cheribsdtest_cheri_revoke_lib_init(bigblock_caps, &bigblock, &shadow,
+	    &cri);
+
+	if (verbose > 0) {
+		fprintf(stderr, "bigblock: %#.16lp\n", bigblock);
+		fprintf(stderr, "shadow: %#.16lp\n", shadow);
+	}
+
+	/* Open the epoch and begin revocation */
+	cheribsdtest_cheri_revoke_lib_run(paranoia,
+	    TCLR_MODE_LOAD_SPLIT_INIT, bigblock_caps, bigblock, shadow, cri);
+
+	pid = fork();
+	if (pid == 0) {
+		/* Finish revocation */
+		cheribsdtest_cheri_revoke_lib_run(paranoia,
+		    TCLR_MODE_LOAD_SPLIT_FINI, bigblock_caps, bigblock,
+		    shadow, cri);
+	} else {
+		int res;
+
+		CHERIBSDTEST_VERIFY2(pid > 0, "fork failed");
+		waitpid(pid, &res, 0);
+		if (res == 0) {
+			cheribsdtest_success();
+		} else {
+			cheribsdtest_failure_errx("Bad child process exit");
+		}
+	}
+
+	munmap(bigblock, bigblock_caps * sizeof(void *));
+
+	cheribsdtest_success();
+}
 #endif /* CHERI_REVOKE */
 
 #endif /* __CHERI_PURE_CAPABILITY__ */
