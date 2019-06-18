@@ -99,7 +99,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/tlb.h>
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 #include <machine/cherireg.h>
 #include <cheri/cheric.h>
 #endif
@@ -428,7 +428,7 @@ pmap_steal_memory(vm_size_t size)
 	if (MIPS_DIRECT_MAPPABLE(pa) == 0)
 		panic("Out of memory below 512Meg?");
 	va = (caddr_t)MIPS_PHYS_TO_DIRECT(pa);
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	va = cheri_csetbounds(va, size);
 #endif
 	bzero(va, size);
@@ -964,9 +964,9 @@ pmap_map(vm_ptr_t *virt, vm_paddr_t start, vm_paddr_t end, int prot)
 	vm_ptr_t sva, va;
 
 	if (MIPS_DIRECT_MAPPABLE(end - 1)) {
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 		return (MIPS_PHYS_TO_DIRECT(start));
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 		caddr_t map_addr;
 
 		map_addr = MIPS_PHYS_TO_DIRECT(start);
@@ -1438,11 +1438,11 @@ pv_to_chunk(pv_entry_t pv)
 
 #ifdef __mips_n64
 #define	PC_FREE0_1	0xfffffffffffffffful
-#if defined(CHERI_KERNEL) && defined(CPU_CHERI128)
+#if defined(CHERI_PURECAP_KERNEL) && defined(CPU_CHERI128)
 #define PC_FREE2	0x000000000007fffful
-#else /* ! (CHERI_KERNEL && CPU_CHERI128) */
+#else /* ! (CHERI_PURECAP_KERNEL && CPU_CHERI128) */
 #define	PC_FREE2	0x000000fffffffffful
-#endif /* ! (CHERI_KERNEL && CPU_CHERI128) */
+#endif /* ! (CHERI_PURECAP_KERNEL && CPU_CHERI128) */
 #else
 #define	PC_FREE0_9	0xfffffffful	/* Free values for index 0 through 9 */
 #define	PC_FREE10	0x0000fffful	/* Free values for index 10 */
@@ -1450,15 +1450,15 @@ pv_to_chunk(pv_entry_t pv)
 
 static const u_long pc_freemask[_NPCM] = {
 #ifdef __mips_n64
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 #ifdef CPU_CHERI128
 	PC_FREE0_1, PC_FREE2
 #else /* CPU_CHERI256 */
 	PC_FREE2
 #endif /* CPU_CHERI256 */
-#else  /* ! CHERI_KERNEL */
+#else  /* ! CHERI_PURECAP_KERNEL */
 	PC_FREE0_1, PC_FREE0_1, PC_FREE2
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 #else
 	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
 	PC_FREE0_9, PC_FREE0_9, PC_FREE0_9,
@@ -3363,7 +3363,7 @@ pmap_mapdev_attr(vm_paddr_t pa, vm_size_t size, vm_memattr_t ma)
 	 */
 	if (MIPS_DIRECT_MAPPABLE(pa + size - 1) && ma == VM_MEMATTR_UNCACHEABLE) {
 		va = MIPS_PHYS_TO_DIRECT_UNCACHED(pa);
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 		/* Device memory should never contain capabilities (for now) */
 		va = cheri_csetbounds(va, size);
 		va = cheri_andperm(va, ~(CHERI_PERM_LOAD_CAP |

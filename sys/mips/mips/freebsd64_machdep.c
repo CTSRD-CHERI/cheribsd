@@ -88,7 +88,7 @@
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 static void	freebsd64_exec_setregs(struct thread *, struct image_params *,
 		    u_long);
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 static void	freebsd64_do_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 #endif
 
@@ -172,7 +172,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 static void
 freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	freebsd64_do_sendsig(catcher, ksi, mask);
 #else
 	sendsig(catcher, ksi, mask);
@@ -244,7 +244,7 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 	}
 }
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 static void
 freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
@@ -462,7 +462,7 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	mtx_lock(&psp->ps_mtx);
 
 }
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 // CHERI CHANGES START
 // {
 //   "updated": 20190604,

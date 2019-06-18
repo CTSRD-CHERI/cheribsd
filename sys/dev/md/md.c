@@ -2063,7 +2063,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 #endif
 		error = kern_mdquery(&mdr);
 		break;
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	/* MDIOCLIST is broken by design and not supported in CheriABI */
 	case MDIOCLIST:
 #endif

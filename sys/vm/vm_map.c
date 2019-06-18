@@ -211,7 +211,7 @@ vm_map_log(const char *prefix, vm_map_entry_t entry)
 #define	vm_map_log(prefix, entry)
 #endif
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 /*
  * Convert VM protection flags to CHERI pointer permission bits.
  */
@@ -246,7 +246,7 @@ vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot_t prot)
 
 	return ((vm_ptr_t)mapped);
 }
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 
 /*
  *	vm_map_startup:
@@ -983,7 +983,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 	map->timestamp = 0;
 	map->busy = 0;
 	map->anon_loc = 0;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	map->map_capability = cheri_bound((void *)min,
 	    ((caddr_t)max - (caddr_t)min));
 #endif
@@ -4047,7 +4047,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 
 	old_map = &vm1->vm_map;
 	/* Copy immutable fields of vm1 to vm2. */
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	vm2 = vmspace_alloc(vm_map_min(old_map), vm_map_max(old_map),
 	    pmap_pinit);
 #else
@@ -4614,7 +4614,7 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 {
 	struct vmspace *oldvmspace = p->p_vmspace;
 	struct vmspace *newvmspace;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	vm_ptr_t minuser_cap;
 	vm_ptr_t maxuser_cap;
 	vm_offset_t user_length;
@@ -4622,7 +4622,7 @@ vmspace_exec(struct proc *p, vm_offset_t minuser, vm_offset_t maxuser)
 
 	KASSERT((curthread->td_pflags & TDP_EXECVMSPC) == 0,
 	    ("vmspace_exec recursed"));
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	/* We create a new userspace capability for this map */
 	user_length = MIN(maxuser - minuser,
 	    VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS);

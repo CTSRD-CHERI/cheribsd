@@ -109,7 +109,7 @@
 #define	CHERI_ASM_CMOVE(cd, cb)		cincoffset cd, cb, zero
 #endif
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 
 /*
  * KR2C is used to preserve a second scratch register KSCRATCH2 when
@@ -208,7 +208,7 @@
 	/* Restore $c27. */						\
 	cgetkr1c	CHERI_REG_KSCRATCH;
 
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 
 /*
  * Capcause access to PCB
@@ -218,7 +218,7 @@
 #define RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)	\
 	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 
 /*
  * Capcause offset is too large for CHERI256 in this case and does not
@@ -229,9 +229,9 @@
 #define RESTORE_CAPCAUSE_FROM_PCB(treg, pcb)	\
 	RESTORE_U_PCB_REG_FAR(treg, treg, CAPCAUSE, pcb)
 
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 
 /*
  * Save and restore user CHERI state on an exception.
@@ -341,7 +341,7 @@
 	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb);				\
 	csetcause	treg
 
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 
 /*
  * Save and restore user CHERI state on an exception.  Assumes that $ddc has
@@ -438,13 +438,13 @@
 	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
 	csetcause	treg
 
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 /*
  * Macros saving capability state to, and restoring it from, voluntary kernel
  * context-switch storage in pcb.pcb_cherikframe.
  */
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 #define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
 	csc		creg, base, (U_PCB_CHERIKFRAME +		\
 			    CHERICAP_SIZE * offs)($ddc)
@@ -455,7 +455,7 @@
 
 #define SAVE_CHERIKFRAME_GPC
 #define RESTORE_CHERIKFRAME_GPC
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 #define	SAVE_U_PCB_CHERIKFRAME_CREG(creg, offs, base)			\
 	cscbi		creg, (U_PCB_CHERIKFRAME +			\
 			    CHERICAP_SIZE * offs)(base)
@@ -471,7 +471,7 @@
 #define RESTORE_CHERIKFRAME_GPC(base)					\
 	RESTORE_U_PCB_CHERIKFRAME_CREG(CHERI_REG_GPC,			\
 				       CHERIKFRAME_OFF_GPC, base)
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 
 /*
  * Macros to save (and restore) callee-save capability registers when

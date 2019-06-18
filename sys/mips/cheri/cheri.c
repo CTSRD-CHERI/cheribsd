@@ -90,7 +90,7 @@ CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
  * for the hybrid ABI.
  */
 #ifdef CPU_CHERI128
-#ifndef CHERI_KERNEL /* XXX-AM: change to cheri pure capability check */
+#ifndef CHERI_PURECAP_KERNEL /* XXX-AM: change to cheri pure capability check */
 CTASSERT(sizeof(void *) == 8);
 #else
 CTASSERT(sizeof(void *) == 16);
@@ -99,7 +99,7 @@ CTASSERT(sizeof(void * __capability) == 16);
 CTASSERT(sizeof(struct chericap) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
 #else /* CHERI256 */
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 CTASSERT(sizeof(void *) == 8);
 #else
 CTASSERT(sizeof(void *) == 32);
@@ -109,7 +109,7 @@ CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
 #endif /* CHERI256 */
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 __attribute__((weak))
 extern Elf64_Capreloc __start___cap_relocs;
 __attribute__((weak))
@@ -258,7 +258,7 @@ cheri_init_capabilities()
 	cheri_kall_capability = kdc;
 }
 
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 
 /* Set to -1 to prevent it from being zeroed with the rest of BSS */
 void * __capability userspace_cap = (void * __capability)(intcap_t)-1;

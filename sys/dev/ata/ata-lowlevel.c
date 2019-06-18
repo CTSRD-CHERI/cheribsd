@@ -849,7 +849,7 @@ ata_pio_read(struct ata_request *request, int length)
 				    bio->bio_ma[moff / PAGE_SIZE]);
 				moff %= PAGE_SIZE;
 				size = min(size, PAGE_SIZE - moff);
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 				addr = cheri_csetbounds((void *)(page + moff), size);
 #else
 				addr = page + moff;
@@ -939,7 +939,7 @@ ata_pio_write(struct ata_request *request, int length)
 				    bio->bio_ma[moff / PAGE_SIZE]);
 				moff %= PAGE_SIZE;
 				size = min(size, PAGE_SIZE - moff);
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 				addr = cheri_csetbounds((void *)(page + moff), size);
 #else
 				addr = page + moff;

@@ -52,7 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cache.h>
 
 #ifdef __mips_n64
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
@@ -113,7 +113,7 @@ static Elf64_Brandinfo freebsd_brand_info = {
 SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_brand_info);
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 #ifdef CPU_CHERI
 static __inline boolean_t

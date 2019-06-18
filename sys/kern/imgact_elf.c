@@ -454,7 +454,7 @@ __elfN(copyout)(vm_map_t map, caddr_t kaddr, vm_offset_t uaddr, size_t sz)
 {
 	int error;
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	caddr_t uaddr_cap = cheri_csetbounds(
 	    cheri_setaddress(vm_map_rootcap(map), uaddr), sz);
 	error = copyout(kaddr, uaddr_cap, sz);

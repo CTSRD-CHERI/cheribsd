@@ -650,7 +650,7 @@ _C_LABEL(x):
 #define	USE_ALT_CP(a)		.cplocal a
 #endif	/* __mips_n32 || __mips_n64 */
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 /**
  * XXX-AM: This should become a cap-table load
  * using KDC (which will become GPC at some point)
@@ -674,20 +674,20 @@ _C_LABEL(x):
 	clc	creg, zero, 0(creg);
 #define	GET_CPU_PCPU_NOCAP(reg)		\
 	PTR_L	reg, _C_LABEL(pcpup);
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 #define	GET_CPU_PCPU(reg)		\
 	PTR_L	reg, _C_LABEL(pcpup);
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 #if defined(MIPS_EXC_CNTRS)
 
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 #define	INC_EXCEPTION_CNTR(name)				\
 	PTR_L		k1, _C_LABEL(pcpup);			\
 	PTR_L		k0, PC_ ## name ## (k1);		\
 	PTR_ADDIU	k0, k0, 1;				\
 	PTR_S		k0, PC_ ## name ## (k1)
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 #define	INC_EXCEPTION_CNTR(name)					\
 	PTR_LA		k1, _C_LABEL(pcpup);				\
 	cgetkdc	CHERI_REG_KR1C;						\
@@ -697,7 +697,7 @@ _C_LABEL(x):
 	cld		k1, zero, PC_ ##name## (CHERI_REG_KR1C);	\
 	daddiu		k1, k1, 1;					\
 	csd		k1, zero, PC_ ##name## (CHERI_REG_KR1C)
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 
 #else /* ! defined(MIPS_EXC_CNTRS) */
 

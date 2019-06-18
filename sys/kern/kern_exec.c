@@ -1634,7 +1634,7 @@ exec_copyout_strings(struct image_params *imgp)
 		execpath_len = 0;
 	p = imgp->proc;
 	szsigcode = 0;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	arginfo = (struct ps_strings *)cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
 	    CHERI_CAP_USER_DATA_LENGTH, p->p_sysent->sv_psstrings);

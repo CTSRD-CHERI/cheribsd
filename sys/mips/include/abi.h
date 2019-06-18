@@ -97,7 +97,7 @@
 
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 /*
  * XXX-AM: The purecap kernel is PIC, so we have GP. Ideally it should go
  * away once we have proper non-pic purecap support.
@@ -117,7 +117,7 @@
 #else /* CPU_CHERI256 */
 #define CALLFRAME_GP    CALLFRAME_CGP + 24
 #endif
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 
 /*
  *  cheriabi callframe {
@@ -132,7 +132,7 @@
 #define	CALLFRAME_SIZ	(2*(_MIPS_SZCAP / 8))
 #define	CALLFRAME_CRA	(0*(_MIPS_SZCAP / 8))
 #define	CALLFRAME_S0	(1*(_MIPS_SZCAP / 8))
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 #endif /* !_MACHINE_ABI_H_ */

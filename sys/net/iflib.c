@@ -454,7 +454,7 @@ typedef struct if_rxsd {
 } *if_rxsd_t;
 
 /* multiple of word size */
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 #ifdef CPU_CHERI128
 #define PKT_INFO_SIZE 8
 #define RXD_INFO_SIZE 8

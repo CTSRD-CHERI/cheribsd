@@ -774,7 +774,7 @@ trap(struct trapframe *trapframe)
 		printf("cpuid = %d\n", PCPU_GET(cpuid));
 #endif
 		pid = mips_rd_entryhi() & TLBHI_ASID_MASK;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 		printf("capcause = 0x%x, badaddr = %#jx, pc = %#jx, ra = %p, "
 		    "sp = %p, sr = %jx, pid = %d, ASID = %u\n", trapframe->capcause,
 		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc,
@@ -1390,7 +1390,7 @@ err:
 
 #ifdef TRAP_DEBUG
 		if (trap_debug) {
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 			printf("capcause = 0x%x, badaddr = %#jx, pc = %#jx, ra = %p, "
 			    "sp = %p, sr = %jx\n", trapframe->capcause,
 			    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc,
@@ -2076,7 +2076,7 @@ mips_unaligned_load_store(struct trapframe *frame, int mode, register_t addr, ui
 #endif
 	src_regno = MIPS_INST_RT(inst);
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	uaddr = (uintptr_t)cheri_setoffset(frame->ddc, addr);
 #else
 	uaddr = addr;

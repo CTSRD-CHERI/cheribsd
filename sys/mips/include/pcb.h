@@ -96,7 +96,7 @@
  *
  * XXX Do we really need to disable interrupts?
  */
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 #define DO_AST				             \
 44:				                     \
 	mfc0	t0, MIPS_COP_0_STATUS               ;\
@@ -122,7 +122,7 @@
 	j	44b                                 ;\
 	nop                                         ;\
 4:
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 /*
  * Note: we are forced to load some constants in
  * temporary registers because they do not fit in
@@ -157,9 +157,9 @@
 	j	44b                                 ;\
 	nop                                         ;\
 4:
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 #define	SAVE_U_PCB_REG(reg, offs, base) \
 	REG_S	reg, (U_PCB_REGS + (SZREG * offs)) (base)
 
@@ -186,7 +186,7 @@
 	clc	creg, base, (U_PCB_REGS + (SZREG * offs)) (CHERI_REG_KDC)
 #endif
 
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 
 /*
  * Save general purpose register to PCB.
@@ -252,7 +252,7 @@
  * #define	RESTORE_U_PCB_FPSR(reg, offs, base, treg)
  */
 
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 
 #ifdef CPU_CHERI
 /*
@@ -266,7 +266,7 @@
  * tmpcreg: this is a capability temporary register.
  * pcb: pointer to the PCB structure.
  */
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpcreg, pcb)			\
 	/* EPCC is no longer a GPR so load it into tmpcreg first */	\
@@ -274,7 +274,7 @@
 	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
 	RESTORE_EPCC(tmpcreg, pc_vaddr_tmpreg)
 
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpreg2, pcb)			\
 	/* EPCC is no longer a GPR so load it into KSCRATCH first */	\
@@ -283,7 +283,7 @@
 	RESTORE_EPCC(CHERI_REG_KSCRATCH, pc_vaddr_tmpreg, tmpreg2);	\
 	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb)
 
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 #else /* ! CPU_CHERI */
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */

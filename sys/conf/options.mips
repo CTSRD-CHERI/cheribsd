@@ -141,7 +141,7 @@ CPU_CHERI128			opt_global.h
 #
 # Experimental support for pure capability kernel
 #
-CHERI_KERNEL		opt_global.h
+CHERI_PURECAP_KERNEL		opt_global.h
 
 #
 # Enable debugging output on traps

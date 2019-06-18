@@ -147,15 +147,15 @@
 #endif
 
 #ifdef __mips_n64
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 #define	NPDEPGSHIFT		9               /* LOG2(NPTEPG) */
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 #ifdef CPU_CHERI128
 #define NPDEPGSHIFT		8		/* LOG2(NPDEPG) */
 #else /* CHERI256 */
 #define NPDEPGSHIFT		7		/* LOG2(NPDEPG) */
 #endif /* CHERI256*/
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 #define	SEGSHIFT		(PAGE_SHIFT + NPTEPGSHIFT + NPDEPGSHIFT)
 #define	NBSEG			(1ul << SEGSHIFT)
 #define	PDRSHIFT		(PAGE_SHIFT + NPTEPGSHIFT)
@@ -181,7 +181,7 @@
  * For a large kernel stack page the KSTACK_SIZE needs to be a page size
  * supported by the hardware (e.g. 16K).
  */
-#if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
+#if defined(CHERI_PURECAP_KERNEL) && !defined(CPU_CHERI128)
 /*
  * Cheri-256 uses two 64K pages for the kernel stack, without any guard pages.
  * The stack capability is bounded properly so the stack should never overflow.
@@ -190,7 +190,7 @@
 #define	KSTACK_SIZE		(KSTACK_PAGE_SIZE * 2)
 #define KSTACK_GUARD_PAGES	0
 
-#elif defined(CHERI_KERNEL) && defined(CPU_CHERI128)
+#elif defined(CHERI_PURECAP_KERNEL) && defined(CPU_CHERI128)
 /*
  * Cheri-128 uses two 16K pages for the kernel stack, without any guard pages.
  * The stack capability is bounded propery so the stack should never overflow.
@@ -199,13 +199,13 @@
 #define	KSTACK_SIZE		(KSTACK_PAGE_SIZE * 2)
 #define KSTACK_GUARD_PAGES	0
 
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 
 #define	KSTACK_SIZE		(1 << 14)	/* Single 16K page */
 #define	KSTACK_PAGE_SIZE	KSTACK_SIZE
 #define	KSTACK_GUARD_PAGES	(KSTACK_PAGE_SIZE / PAGE_SIZE)
 
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 #define	KSTACK_PAGE_MASK	(KSTACK_PAGE_SIZE - 1)
 #define	KSTACK_PAGES		(KSTACK_SIZE / PAGE_SIZE)
@@ -234,7 +234,7 @@
 #define	CHERI_SHMLBA	(1 << 20)
 #endif
 
-#if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
+#if defined(CHERI_PURECAP_KERNEL) && !defined(CPU_CHERI128)
 /*
  * Mbufs are larger in the cheri256 purecap kernel.
  */
@@ -244,17 +244,17 @@
 /*
  * Mach derived conversion macros
  */
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 #define	round_page(x)		__builtin_align_down(((x) + PAGE_MASK), PAGE_SIZE)
 #define	trunc_page(x)		__builtin_align_down((x), PAGE_SIZE)
 #define	round_2mpage(x)		__builtin_align_down(((x) + PDRMASK), PDRSIZE)
 #define	trunc_2mpage(x)		__builtin_align_down((x), PDRSIZE)
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 #define	round_page(x)		(((x) + PAGE_MASK) & ~PAGE_MASK)
 #define	trunc_page(x)		((x) & ~PAGE_MASK)
 #define	round_2mpage(x)		(((x) + PDRMASK) & ~PDRMASK)
 #define	trunc_2mpage(x)		((x) & ~PDRMASK)
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 #define	atop(x)			((x) >> PAGE_SHIFT)
 #define	ptoa(x)			((x) << PAGE_SHIFT)

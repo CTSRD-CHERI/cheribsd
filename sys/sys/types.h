@@ -251,7 +251,7 @@ struct cap_rights;
 typedef	struct cap_rights	cap_rights_t;
 #endif
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 typedef __uintptr_t	vm_ptr_t;
 #else
 typedef __vm_offset_t	vm_ptr_t;
@@ -314,7 +314,7 @@ typedef	_Bool	bool;
 
 #define offsetof(type, field) __offsetof(type, field)
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 #define ptr_to_va(p) ((__cheri_addr vm_offset_t)(void *)(uintptr_t)(p))
 #else
 #define ptr_to_va(p) ((vm_offset_t)(p))

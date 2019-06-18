@@ -62,7 +62,7 @@ typedef struct	__mcontext {
 	void		*mc_tls;	/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 
-#if !defined(__CHERI_PURE_CAPABILITY__) || defined(CHERI_KERNEL)
+#if !defined(__CHERI_PURE_CAPABILITY__) || defined(CHERI_PURECAP_KERNEL)
         /*
          * Optional externally referenced storage for coprocessors.  Modeled
          * on the approach taken for extended FPU state on x86, which leaves

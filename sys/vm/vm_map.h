@@ -203,7 +203,7 @@ struct vm_map {
 	pmap_t pmap;			/* (c) Physical map */
 	vm_offset_t anon_loc;
 	int busy;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	void *map_capability;		/* Capability spanning the whole map */
 #endif
 };
@@ -249,7 +249,7 @@ vm_map_modflags(vm_map_t map, vm_flags_t set, vm_flags_t clear)
 	map->flags = (map->flags | set) & ~clear;
 }
 #endif	/* KLD_MODULE */
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 static __inline void *
 vm_map_rootcap(vm_map_t map)
 {
@@ -336,14 +336,14 @@ pmap_t vm_map_pmap_KBI(vm_map_t map);
 
 long vmspace_resident_count(struct vmspace *vmspace);
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 /*
  * Derive a pointer from the map capability.
  */
 vm_ptr_t vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot_t prot);
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 #define vm_map_make_ptr(map, addr, size, prot) (addr)
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 #endif	/* _KERNEL */
 

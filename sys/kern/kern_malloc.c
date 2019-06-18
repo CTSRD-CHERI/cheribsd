@@ -93,7 +93,7 @@ __FBSDID("$FreeBSD$");
 
 #ifdef CPU_CHERI
 #include <machine/cherireg.h>
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 #include <cheri/cheric.h>
 #endif
 #endif
@@ -692,7 +692,7 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 * This code assumes that size is a multiple of 8 bytes for
 	 * 64 bit machines
 	 */
-#if defined(CHERI_KERNEL) && CHERICAP_SIZE > 16
+#if defined(CHERI_PURECAP_KERNEL) && CHERICAP_SIZE > 16
 	/* CHERI-256 pointers do not fit in the smallest kmemzone */
 	if (size >= sizeof(struct malloc_type *))
 #endif

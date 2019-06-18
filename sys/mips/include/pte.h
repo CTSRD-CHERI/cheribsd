@@ -42,7 +42,7 @@ typedef	uint64_t pt_entry_t;
 typedef	uint32_t pt_entry_t;
 #endif
 
-#if defined(_KERNEL) && (defined(CHERI_KERNEL) || !defined(__CHERI_PURE_CAPABILITY__))
+#if defined(_KERNEL) && (defined(CHERI_PURECAP_KERNEL) || !defined(__CHERI_PURE_CAPABILITY__))
 /*
  * The pointer to the second-level page table entry can is a capability
  * in the purecap kernel.
@@ -656,10 +656,10 @@ not_valid ## unique ## :
 
 #endif /* ! defined(__mips_n64) || defined(__mips_n32) */
 
-#if defined(CPU_CHERI) && defined(CHERI_KERNEL)
+#if defined(CPU_CHERI) && defined(CHERI_PURECAP_KERNEL)
 #define PTRSHIFT		CHERICAP_SHIFT
 #define PDEPTRMASK		(0xfff & ~(CHERICAP_SIZE - 1))
-#else /* ! (CPU_HERI && CHERI_KERNEL) */
+#else /* ! (CPU_HERI && CHERI_PURECAP_KERNEL) */
 #if defined(__mips_n64)
 #define	PTRSHIFT		3
 #define	PDEPTRMASK		0xff8
@@ -667,7 +667,7 @@ not_valid ## unique ## :
 #define	PTRSHIFT		2
 #define	PDEPTRMASK		0xffc
 #endif
-#endif /* ! (CPU_CHERI && CHERI_KERNEL) */
+#endif /* ! (CPU_CHERI && CHERI_PURECAP_KERNEL) */
 
 #endif /* LOCORE */
 

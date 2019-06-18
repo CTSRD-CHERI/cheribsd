@@ -212,12 +212,12 @@ static uma_zone_t vmem_zone;
 #define	VMEM_LOCK_DESTROY(vm)	mtx_destroy(&vm->vm_lock)
 #define	VMEM_ASSERT_LOCKED(vm)	mtx_assert(&vm->vm_lock, MA_OWNED);
 
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 #define	VMEM_ALIGNUP(addr, align)	(-(-(addr) & -(align)))
 
 #define	VMEM_CROSS_P(addr1, addr2, boundary) \
     ((((addr1) ^ (addr2)) & -(boundary)) != 0)
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 #define	VMEM_ALIGNUP(addr, align)	__builtin_align_up(addr, align)
 
 #define	VMEM_CROSS_P(addr1, addr2, boundary)				\
@@ -990,7 +990,7 @@ vmem_clip(vmem_t *vm, bt_t *bt, vmem_addr_t start, vmem_size_t size)
 		btprev->bt_size = ptr_to_va(start) - ptr_to_va(bt->bt_start);
 		bt->bt_start = start;
 		bt->bt_size -= btprev->bt_size;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 		btprev->bt_start = (vmem_addr_t)cheri_csetbounds(
 			(void *)btprev->bt_start, btprev->bt_size);
 		bt->bt_start = (vmem_addr_t)cheri_csetbounds(
@@ -1009,7 +1009,7 @@ vmem_clip(vmem_t *vm, bt_t *bt, vmem_addr_t start, vmem_size_t size)
 		btnew->bt_size = size;
 		bt->bt_start = bt->bt_start + size;
 		bt->bt_size -= size;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 		btnew->bt_start = (vmem_addr_t)cheri_csetbounds(
 			(void *)btnew->bt_start, btnew->bt_size);
 		bt->bt_start = (vmem_addr_t)cheri_csetbounds(
@@ -1511,7 +1511,7 @@ vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 	}
 
 	if (!vmem_try_release(vm, bt, false)) {
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 		/*
 		 * Find the SPAN btag and use the capability to generate
 		 * the new bt_start for the coalesced region
@@ -1532,7 +1532,7 @@ vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 		VMEM_CONDVAR_BROADCAST(vm);
 		bt_freetrim(vm, BT_MAXFREE);
 	}
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	MPASS(cheri_getlen((void *)bt->bt_start) == bt->bt_size);
 #endif
 }

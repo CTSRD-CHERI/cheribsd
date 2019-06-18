@@ -132,15 +132,15 @@
 #ifndef VM_UMA_INT_H
 #define VM_UMA_INT_H
 
-#if defined(CHERI_KERNEL) && !defined(CPU_CHERI128)
+#if defined(CHERI_PURECAP_KERNEL) && !defined(CPU_CHERI128)
 #define UMA_SLAB_SIZE	(2*PAGE_SIZE)		/* How big are our slabs? */
 #define UMA_SLAB_MASK	(2*PAGE_SIZE - 1)	/* Mask to get back to the page */
 #define UMA_SLAB_SHIFT	(PAGE_SHIFT + 1)	/* Number of bits PAGE_MASK */
-#else /* ! CHERI_KERNEL or CPU_CHERI128 */
+#else /* ! CHERI_PURECAP_KERNEL or CPU_CHERI128 */
 #define UMA_SLAB_SIZE	PAGE_SIZE	/* How big are our slabs? */
 #define UMA_SLAB_MASK	(PAGE_SIZE - 1)	/* Mask to get back to the page */
 #define UMA_SLAB_SHIFT	PAGE_SHIFT	/* Number of bits PAGE_MASK */
-#endif /* ! CHERI_KERNEL or CPU_CHERI128 */
+#endif /* ! CHERI_PURECAP_KERNEL or CPU_CHERI128 */
 
 /* Max waste percentage before going to off page slab management */
 #define UMA_MAX_WASTE	10
@@ -444,7 +444,7 @@ void uma_large_free(uma_slab_t slab);
 #define	ZONE_LOCK_FINI(z)	mtx_destroy(&(z)->uz_lock)
 #define	ZONE_LOCK_ASSERT(z)	mtx_assert((z)->uz_lockptr, MA_OWNED)
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 extern vm_offset_t uma_bootmem_start;
 extern vm_offset_t uma_bootmem_end;
 extern uma_slab_t *uma_boot_vtoslab;
@@ -481,7 +481,7 @@ vtoslab(vm_offset_t va)
 {
 	vm_page_t p;
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	int page_index;
 
 	if (va >= uma_bootmem_start && va < uma_bootmem_end) {
@@ -502,7 +502,7 @@ vsetslab(vm_offset_t va, uma_slab_t slab)
 {
 	vm_page_t p;
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	int page_index;
 
 	if (va >= uma_bootmem_start && va < uma_bootmem_end) {

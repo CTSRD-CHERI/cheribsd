@@ -142,7 +142,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 		MipsSaveCurFPState(td1);
 #endif
 
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	pcb2->pcb_context[PCB_REG_RA] = (register_t)(intptr_t)fork_trampoline;
 	/* Make sp 64-bit aligned */
 	pcb2->pcb_context[PCB_REG_SP] = (register_t)(((vm_offset_t)td2->td_pcb &
@@ -155,7 +155,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	pcb2->pcb_context[PCB_REG_S0] = (register_t)(intptr_t)fork_return;
 	pcb2->pcb_context[PCB_REG_S1] = (register_t)(intptr_t)td2;
 	pcb2->pcb_context[PCB_REG_S2] = (register_t)(intptr_t)td2->td_frame;
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 	/* Implies CPU_CHERI */
 	size_t kstack_size = td2->td_kstack_pages * PAGE_SIZE -
 	    sizeof(struct pcb);
@@ -175,7 +175,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	 * kernel thread.
 	 */
 	pcb2->pcb_cherikframe.ckf_gpc = cheri_getidc();
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 	pcb2->pcb_context[PCB_REG_SR] = mips_rd_status() &
 	    (MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_INT_MASK);
 	/*
@@ -247,7 +247,7 @@ cpu_fork_kthread_handler(struct thread *td, void (*func)(void *), void *arg)
 	 * Note that the trap frame follows the args, so the function
 	 * is really called like this:	func(arg, frame);
 	 */
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	td->td_pcb->pcb_context[PCB_REG_S0] = (register_t)(intptr_t)func;
 	td->td_pcb->pcb_context[PCB_REG_S1] = (register_t)(intptr_t)arg;
 #else
@@ -307,18 +307,18 @@ cpu_thread_swapin(struct thread *td)
 	 * the pcb struct and kernel stack.
 	 */
 #ifdef KSTACK_LARGE_PAGE
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	pte = pmap_pte(kernel_pmap, ptr_to_va(td->td_kstack));
 	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
 	pte = pmap_pte(kernel_pmap,
 	    ptr_to_va(td->td_kstack + KSTACK_PAGE_SIZE));
 	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 	/* Just one entry for one large kernel page. */
 	pte = pmap_pte(kernel_pmap, td->td_kstack);
 	td->td_md.md_upte[0] = PTE_G;   /* Guard Page */
 	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 #else
 
 	int i;
@@ -347,7 +347,7 @@ cpu_thread_alloc(struct thread *td)
 	KASSERT(is_aligned(td->td_kstack, KSTACK_PAGE_SIZE * 2),
 	    ("kernel stack must be aligned."));
 #endif
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	td->td_pcb = (struct pcb *)(td->td_kstack +
 	    td->td_kstack_pages * PAGE_SIZE) - 1;
 #else
@@ -369,18 +369,18 @@ cpu_thread_alloc(struct thread *td)
 #endif
 	td->td_frame = &td->td_pcb->pcb_regs;
 #ifdef KSTACK_LARGE_PAGE
-#if defined(CHERI_KERNEL)
+#if defined(CHERI_PURECAP_KERNEL)
 	pte = pmap_pte(kernel_pmap, ptr_to_va(td->td_kstack));
 	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
 	pte = pmap_pte(kernel_pmap,
 	    ptr_to_va(td->td_kstack + KSTACK_PAGE_SIZE));
 	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 	/* Just one entry for one large kernel page. */
 	pte = pmap_pte(kernel_pmap, td->td_kstack);
 	td->td_md.md_upte[0] = PTE_G;   /* Guard Page */
 	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 #else
 
 	{
@@ -502,7 +502,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	/*
 	 * Set registers for trampoline to user mode.
 	 */
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	pcb2->pcb_context[PCB_REG_RA] = (register_t)(intptr_t)fork_trampoline;
 	/* Make sp 64-bit aligned */
 	pcb2->pcb_context[PCB_REG_SP] = (register_t)(((vm_offset_t)td->td_pcb &
@@ -515,7 +515,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	pcb2->pcb_context[PCB_REG_S0] = (register_t)(intptr_t)fork_return;
 	pcb2->pcb_context[PCB_REG_S1] = (register_t)(intptr_t)td;
 	pcb2->pcb_context[PCB_REG_S2] = (register_t)(intptr_t)td->td_frame;
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 	/* Implies CPU_CHERI, see cpu_fork() */
 	size_t kstack_size = td->td_kstack_pages * PAGE_SIZE -
 	    sizeof(struct pcb);
@@ -527,7 +527,7 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	pcb2->pcb_cherikframe.ckf_c19 = td;
 	pcb2->pcb_cherikframe.ckf_c20 = td->td_frame;
 	pcb2->pcb_cherikframe.ckf_gpc = cheri_getidc();
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 	/* Dont set IE bit in SR. sched lock release will take care of it */
 	pcb2->pcb_context[PCB_REG_SR] = mips_rd_status() &
 	    (MIPS_SR_PX | MIPS_SR_KX | MIPS_SR_UX | MIPS_SR_INT_MASK);

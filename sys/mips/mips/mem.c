@@ -67,7 +67,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 #include <vm/vm_map.h>
 #include <vm/vm_kern.h>
 #endif
@@ -124,7 +124,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 			prot = (uio->uio_rw == UIO_READ)
 			    ? VM_PROT_READ : VM_PROT_WRITE;
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 			kva = vm_map_make_ptr(kernel_map, uio->uio_offset,
 			    iov->iov_len, prot);
 #else

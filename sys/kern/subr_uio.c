@@ -570,7 +570,7 @@ copyout_unmap(struct thread *td, vm_offset_t addr, size_t sz)
 	return (0);
 }
 
-#if __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC) && !defined(CHERI_KERNEL)
+#if __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC) && !defined(CHERI_PURECAP_KERNEL)
 static inline bool
 allow_implicit_capability_use(void)
 {
@@ -756,7 +756,7 @@ copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
 	    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    (vaddr_t)uaddr, len, 0), len));
 }
-#else /* !( __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC) && !defined(CHERI_KERNEL)) */
+#else /* !( __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC) && !defined(CHERI_PURECAP_KERNEL)) */
 int
 copyin_implicit_cap(const void *uaddr, void *kaddr, size_t len)
 {
@@ -770,7 +770,7 @@ copyout_implicit_cap(const void *kaddr, void *uaddr, size_t len)
 
 	return (copyout(kaddr, uaddr, len));
 }
-#endif /* !( __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC) && !defined(CHERI_KERNEL)) */
+#endif /* !( __has_feature(capabilities) && !defined(CHERI_IMPLICIT_USER_DDC) && !defined(CHERI_PURECAP_KERNEL)) */
 
 #ifdef NO_FUEWORD
 /*

@@ -420,9 +420,9 @@ link_elf_init(void* arg)
 #ifdef __powerpc__
 	ef->address = (caddr_t) (__startkernel - KERNBASE);
 #else
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	ef->address = 0;
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 	/*
 	 * This is the top-level capability used to generate all pointers
 	 * to ELF structures in the kernel image.
@@ -443,7 +443,7 @@ link_elf_init(void* arg)
 	ef->address = cheri_andperm(cheri_kall_capability,
 		(CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP));
 	linker_kernel_file->address = ef->address;
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 #endif
 #ifdef SPARSE_MAPPING
 	ef->object = 0;
@@ -464,7 +464,7 @@ link_elf_init(void* arg)
 		ef->modptr = modptr;
 		baseptr = preload_search_info(modptr, MODINFO_ADDR);
 		if (baseptr != NULL)
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 			linker_kernel_file->address = *(caddr_t *)baseptr;
 #else
 			/* MODINFO_ADDR is really a virtual address,

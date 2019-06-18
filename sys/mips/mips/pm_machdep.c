@@ -93,7 +93,7 @@ __FBSDID("$FreeBSD$");
  * frame pointer, it returns to the user
  * specified pc, psl.
  */
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
@@ -316,7 +316,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
 }
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 /*
  * System call to cleanup state after a signal

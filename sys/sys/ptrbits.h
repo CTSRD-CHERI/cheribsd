@@ -41,7 +41,7 @@
  */
 
 /* Private macros, these should not be used directly */
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 /*
  * XXX-AM:
  * Eventually we should move all the cheri-related things into
@@ -58,11 +58,11 @@
   (vm_offset_t)(cheri_getoffset((void *)(p)) & (f))
 #define __ptr_clear_flag(p, f)			\
   (uintptr_t)(cheri_setoffset((void *)(p), cheri_getoffset((void *)(p)) & ~(vm_offset_t)(f)))
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 #define __ptr_set_flag(p, f) ((uintptr_t)(p) | (uintptr_t)(f))
 #define __ptr_get_flag(p, f) ((uintptr_t)(p) & (uintptr_t)(f))
 #define __ptr_clear_flag(p, f) ((uintptr_t)(p) & ~(uintptr_t)(f))
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 
 /* Public macros */

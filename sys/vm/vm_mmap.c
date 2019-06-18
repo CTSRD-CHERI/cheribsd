@@ -1746,7 +1746,7 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 			return (ENOMEM);
 		rv = vm_map_fixed(map, object, foff, ptr_to_va(*addr), size,
 		    prot, maxprot, docow);
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 		/*
 		 * In this case *addr is not changed by vm_map_fixed but we
 		 * need to return a valid capability for the mapping, so

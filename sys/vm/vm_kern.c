@@ -798,7 +798,7 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 
 	CHERI_VM_ASSERT_VALID(start);
 	CHERI_VM_ASSERT_VALID(end);
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	kern_map_start = VM_MIN_KERNEL_ADDRESS;
 #else
 	kern_map_start = (vm_ptr_t)cheri_setoffset(

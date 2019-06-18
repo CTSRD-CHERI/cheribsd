@@ -131,7 +131,7 @@ done:
 void
 stack_save_td(struct stack *st, struct thread *td)
 {
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	u_register_t pc, sp;
 #endif
 
@@ -140,7 +140,7 @@ stack_save_td(struct stack *st, struct thread *td)
 	if (TD_IS_RUNNING(td))
 		panic("stack_save_td: running");
 
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	/* XXXRW: Should be pcb_context? */
 	pc = td->td_pcb->pcb_regs.pc;
 	sp = td->td_pcb->pcb_regs.sp;
@@ -158,14 +158,14 @@ stack_save_td_running(struct stack *st, struct thread *td)
 void
 stack_save(struct stack *st)
 {
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	u_register_t pc, sp;
 #endif
 
 	if (curthread == NULL)
 		panic("stack_save: curthread == NULL");
 
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	/* XXXRW: Should be pcb_context? */
 	pc = curthread->td_pcb->pcb_regs.pc;
 	sp = curthread->td_pcb->pcb_regs.sp;

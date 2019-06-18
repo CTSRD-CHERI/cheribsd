@@ -1088,7 +1088,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 	vm_ptr_t buf_cl, buf_clend;
 	vm_size_t size_cl, size_clend;
 	int cache_linesize_mask = mips_dcache_max_linesize - 1;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	vm_offset_t tmp_va;
 	char _tmp_cl[mips_dcache_max_linesize] __aligned(sizeof(void *));
 	char _tmp_clend[mips_dcache_max_linesize] __aligned(sizeof(void *));
@@ -1128,7 +1128,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 		size_cl = 0;
 		size_clend = 0;
 	} else {
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 		tmp_va = ptr_to_va(buf) & ~cache_linesize_mask;
 		size_cl = ptr_to_va(buf) & cache_linesize_mask;
 		if (size_cl) {

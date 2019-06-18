@@ -103,7 +103,7 @@ dpcpu_init(void *dpcpu, int cpuid)
 	struct pcpu *pcpu;
 
 	pcpu = pcpu_find(cpuid);
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	pcpu->pc_dynamic = (uintptr_t)dpcpu - DPCPU_START;
 #else
 	/*

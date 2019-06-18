@@ -61,7 +61,7 @@
 #ifndef CPU_CHERI
 #error "purecap kernel context switching compiled for non-CHERI target!"
 #endif
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 #error "purecap kernel context switching compiled for non-purecap kernel!"
 #endif
 
@@ -537,7 +537,7 @@ END(MipsSwitchFPState)
 LEAF(MipsFPID)
 	.set push
 	.set hardfloat
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	li	v0, 0
 	cjr	$c17
 	nop

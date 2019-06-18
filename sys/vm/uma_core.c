@@ -143,7 +143,7 @@ static struct rwlock_padalign __exclusive_cache_line uma_rwlock;
  */
 static char *bootmem;
 static int boot_pages;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 /*
  * Boundaries of the UMA boot memory pool.
  */
@@ -1672,7 +1672,7 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	keg->uk_flags = arg->flags;
 	keg->uk_slabzone = NULL;
 
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	if ((keg->uk_flags & UMA_ZONE_HASH) == 0)
 		keg->uk_flags |= UMA_ZONE_VTOSLAB;
 #endif
@@ -2118,7 +2118,7 @@ uma_startup(void *mem, int npages)
 
 	/* Use bootpages memory for the zone of zones and zone of kegs. */
 	m = (uintptr_t)mem;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	uma_bootmem_start = ptr_to_va(mem);
 	uma_bootmem_end = uma_bootmem_start + (npages * PAGE_SIZE);
 	uma_boot_vtoslab = (uma_slab_t *)m;
@@ -3331,7 +3331,7 @@ zone_release(uma_zone_t zone, void **bucket, int cnt)
 			if (zone->uz_flags & UMA_ZONE_HASH) {
 				slab = hash_sfind(&keg->uk_hash, mem);
 			} else {
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 				slab = vtoslab(ptr_to_va(item));
 #else
 				mem += keg->uk_pgoff;
@@ -4156,7 +4156,7 @@ uma_dbg_getslab(uma_zone_t zone, void *item)
 			slab = hash_sfind(&keg->uk_hash, mem);
 		}
 		else {
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 			slab = vtoslab(ptr_to_va(item));
 #else
 			slab = (uma_slab_t)(mem + keg->uk_pgoff);
@@ -4220,7 +4220,7 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 			    item, zone->uz_name);
 	}
 	keg = slab->us_keg;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	/* Check first that item is a subset of slab->us_data */
 	if (!cheri_is_subset(slab->us_data, item))
 		panic("Item capability %p is not a subset of the"
@@ -4254,7 +4254,7 @@ uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 			    item, zone->uz_name);
 	}
 	keg = slab->us_keg;
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 	/* Check first that item is a subset of slab->us_data */
 	if (!cheri_is_subset(slab->us_data, item))
 		panic("Item capability %p is not a subset of the"

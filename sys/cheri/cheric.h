@@ -289,19 +289,19 @@ cheri_bytes_remaining(const void * __capability cap)
  * These become a no-op when compiling an hybrid kernel or a
  * normal kernel.
  */
-#ifdef CHERI_KERNEL
+#ifdef CHERI_PURECAP_KERNEL
 
 #define cheri_bound(ptr, size) cheri_ptr((const void *)(ptr), size)
 #define cheri_perm(ptr, size, perm) cheri_ptrperm((const void *)(ptr), size, perm)
 #define cheri_valid(ptr) (cheri_gettag((const void *)(ptr)) == 1)
 
-#else /* ! CHERI_KERNEL */
+#else /* ! CHERI_PURECAP_KERNEL */
 
 #define cheri_bound(ptr, size) (ptr)
 #define cheri_perm(ptr, size, perm) (ptr)
 #define cheri_valid(ptr) (1)
 
-#endif /* ! CHERI_KERNEL */
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 /*
  * The cheri_{get,set,clear}_low_pointer_bits() functions work both with and

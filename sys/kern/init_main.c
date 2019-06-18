@@ -601,7 +601,7 @@ proc0_init(void *dummy __unused)
 	 * proc0 is not expected to enter usermode, so there is no special
 	 * handling for sv_minuser here, like is done for exec_new_vmspace().
 	 */
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 	vm_map_init(&vmspace0.vm_map, vmspace_pmap(&vmspace0),
 	    p->p_sysent->sv_minuser, p->p_sysent->sv_maxuser);
 #else

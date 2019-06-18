@@ -181,7 +181,7 @@
  * purecap kernel. The cheri-256 purecap kernel need larger
  * slab sizes and require changes to small alloc.
  */
-#if !defined(CHERI_KERNEL) || defined(CPU_CHERI128)
+#if !defined(CHERI_PURECAP_KERNEL) || defined(CPU_CHERI128)
 #define	UMA_MD_SMALL_ALLOC
 #else
 /* Cheri 256 purecap kernel needs larger slabs */

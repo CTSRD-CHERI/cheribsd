@@ -1622,7 +1622,7 @@ atomic_thread_fence_seq_cst(void)
 
 #endif /* __mips_n64 */
 
-#ifndef CHERI_KERNEL
+#ifndef CHERI_PURECAP_KERNEL
 /* Operations on pointers. */
 #define	atomic_set_ptr		atomic_set_long
 #define	atomic_set_acq_ptr	atomic_set_acq_long
@@ -1645,7 +1645,7 @@ atomic_thread_fence_seq_cst(void)
 #define	atomic_load_acq_ptr	atomic_load_acq_long
 #define	atomic_store_rel_ptr	atomic_store_rel_long
 #define	atomic_readandclear_ptr	atomic_readandclear_long
-#else /* CHERI_KERNEL */
+#else /* CHERI_PURECAP_KERNEL */
 #define	atomic_set_ptr		atomic_set_cap
 #define	atomic_set_acq_ptr	atomic_set_acq_cap
 #define	atomic_set_rel_ptr	atomic_set_rel_cap
@@ -1667,7 +1667,7 @@ atomic_thread_fence_seq_cst(void)
 #define	atomic_load_acq_ptr	atomic_load_acq_cap
 #define	atomic_store_rel_ptr	atomic_store_rel_cap
 #define	atomic_readandclear_ptr	atomic_readandclear_cap
-#endif /* CHERI_KERNEL */
+#endif /* CHERI_PURECAP_KERNEL */
 
 static __inline unsigned int
 atomic_swap_int(volatile unsigned int *ptr, const unsigned int value)
