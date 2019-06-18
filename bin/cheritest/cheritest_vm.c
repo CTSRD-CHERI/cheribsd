@@ -840,4 +840,220 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 
 	cheritest_success();
 }
+
+/*
+ * Repeatedly invoke libcheri_caprevoke logic.
+ * Using a bump the pointer allocator, repeatedly grab rand()-omly sized
+ * objects and fill them with capabilities to themselves, mark them for
+ * revocation, revoke, and validate.
+ *
+ */
+
+#include <cheri/libcaprevoke.h>
+
+/* Just for debugging printouts */
+#ifndef CPU_CHERI
+#define CPU_CHERI
+#include <machine/pte.h>
+#include <machine/vmparam.h>
+#undef CPU_CHERI
+#else
+#include <machine/pte.h>
+#include <machine/vmparam.h>
+#endif
+
+static void
+test_caprevoke_lib_init(
+	size_t bigblock_caps,
+	void * __capability * __capability * obigblock,
+	void * __capability * oshadow,
+	const volatile struct caprevoke_info * __capability * ocri
+)
+{
+	void * __capability * __capability bigblock;
+
+	bigblock = CHERITEST_CHECK_SYSCALL(
+			mmap(0, bigblock_caps * sizeof(void * __capability),
+				PROT_READ | PROT_WRITE,
+				MAP_ANON, -1, 0));
+
+	for (size_t ix = 0; ix < bigblock_caps; ix++) {
+		/* Create self-referential VMMAP-free capabilities */
+
+		bigblock[ix] = cheri_andperm(
+				cheri_setbounds(&bigblock[ix], 16),
+				~CHERI_PERM_CHERIABI_VMMAP);
+	}
+	*obigblock = bigblock;
+
+	CHERITEST_CHECK_SYSCALL(
+		caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, bigblock, oshadow));
+
+	CHERITEST_CHECK_SYSCALL(
+		caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+			__DEQUALIFY_CAP(void * __capability *,ocri)));
+}
+
+static void
+test_caprevoke_lib_run(
+	int verbose,
+	int paranoia,
+	size_t bigblock_caps,
+	void * __capability * __capability bigblock,
+	void * __capability shadow,
+	const volatile struct caprevoke_info * __capability cri
+)
+{
+	size_t bigblock_offset = 0;
+
+	while (bigblock_offset < bigblock_caps) {
+		struct caprevoke_stats crst;
+		uint32_t cyc_start, cyc_end;
+
+		size_t csz = rand() % 1024 + 1;
+		csz = MIN(csz, bigblock_caps - bigblock_offset);
+
+		if (verbose > 1) {
+			fprintf(stderr, "left=%zd csz=%zd\n",
+					bigblock_caps - bigblock_offset,
+					csz);
+		}
+
+		void * __capability * __capability chunk =
+			cheri_setbounds(bigblock + bigblock_offset,
+					 csz * sizeof(void * __capability));
+
+		if (verbose > 1) {
+			CHERI_FPRINT_PTR(stderr, chunk);
+		}
+
+		size_t chunk_offset = bigblock_offset;
+		bigblock_offset += csz;
+
+		if (verbose > 3) {
+			ptrdiff_t fwo, lwo;
+			uint64_t fwm, lwm;
+			caprev_shadow_nomap_offsets((vaddr_t)chunk,
+				csz * sizeof(void * __capability), &fwo, &lwo);
+			caprev_shadow_nomap_masks((vaddr_t)chunk,
+				csz * sizeof(void * __capability), &fwm, &lwm);
+
+			fprintf(stderr,
+				"premrk fwo=%lx lwo=%lx fw=%p "
+				"*fw=%016lx (fwm=%016lx) *lw=%016lx (lwm=%016lx)\n",
+				fwo, lwo,
+				cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + fwo),
+				*(uint64_t *)(cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + fwo)),
+				fwm,
+				*(uint64_t *)(cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + lwo)),
+				lwm);
+		}
+
+		/* Mark the chunk for revocation */
+		CHERITEST_VERIFY2(caprev_shadow_nomap_set(shadow, chunk, chunk) == 0,
+				  "Shadow update collision");
+
+		__atomic_thread_fence(__ATOMIC_RELEASE);
+
+		if (verbose > 3) {
+			ptrdiff_t fwo, lwo;
+			caprev_shadow_nomap_offsets((vaddr_t)chunk,
+				csz * sizeof(void * __capability), &fwo, &lwo);
+
+			fprintf(stderr,
+				"marked fwo=%lx lwo=%lx fw=%p "
+				"*fw=%016lx *lw=%016lx\n",
+				fwo, lwo,
+				cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + fwo),
+				*(uint64_t *)(cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + fwo)),
+				*(uint64_t *)(cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + lwo)));
+		}
+
+		cyc_start = get_cyclecount();
+		CHERITEST_CHECK_SYSCALL(
+			caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_IGNORE_START,
+					0, &crst));
+		cyc_end = get_cyclecount();
+		if (verbose > 2) {
+			fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+		}
+		CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
+
+		/* Check the surroundings */
+		if (paranoia > 1) {
+			for (size_t ix = 0; ix < chunk_offset; ix++) {
+				CHERITEST_VERIFY2(!check_revoked(bigblock[ix]),
+						"Revoked cap incorrectly below object, at ix=%zd", ix);
+			}
+			for (size_t ix = chunk_offset + csz; ix < bigblock_caps; ix++) {
+				CHERITEST_VERIFY2(!check_revoked(bigblock[ix]),
+						"Revoked cap incorrectly above object, at ix=%zd", ix);
+			}
+		}
+
+		for (size_t ix = 0; ix < csz; ix++) {
+			if (paranoia > 0) {
+				if (!check_revoked(chunk[ix])) {
+					CHERI_FPRINT_PTR(stderr, chunk[ix]);
+					cheritest_failure_errx("Unrevoked at ix=%zd after revoke", ix);
+				}
+			}
+
+			/* Put it back */
+			chunk[ix] = cheri_andperm(
+					cheri_setbounds(&chunk[ix], 16),
+					~CHERI_PERM_CHERIABI_VMMAP);
+		}
+
+		caprev_shadow_nomap_clear(shadow, chunk);
+
+		__atomic_thread_fence(__ATOMIC_RELEASE);
+
+	}
+}
+
+void
+test_caprevoke_lib(const struct cheri_test *ctp __unused)
+{
+		/* If debugging the revoker, some verbosity can help. 0 - 4. */
+	static const int verbose = 0;
+
+		/*
+		 * Tweaking paranoia can turn this test into more of a
+		 * benchmark than a correctness test.  At 0, no checks
+		 * will be performed; at 1, only the revoked object is
+		 * investigated, and at 2, the entire allocaton arena
+		 * is tested.
+		 */
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void * __capability * __capability bigblock;
+	void * __capability shadow;
+	const volatile struct caprevoke_info * __capability cri;
+
+	srand(1337);
+
+	test_caprevoke_lib_init(bigblock_caps, &bigblock, &shadow, &cri);
+
+	if (verbose > 0) {
+		CHERI_FPRINT_PTR(stderr, bigblock);
+		CHERI_FPRINT_PTR(stderr, shadow);
+	}
+
+	test_caprevoke_lib_run(verbose, paranoia, bigblock_caps,
+		bigblock, shadow, cri);
+
+	munmap(bigblock, bigblock_caps * sizeof(void * __capability));
+
+	cheritest_success();
+}
+
 #endif

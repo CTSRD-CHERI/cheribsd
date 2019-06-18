@@ -47,6 +47,7 @@ CHERITEST_DIR:=	${.PARSEDIR}
 SRCS+=	cheritest_cheriabi.c
 SRCS+=	cheritest_cheriabi_open.c
 .if ${MK_CHERI_CAPREVOKE} == "yes"
+LIBADD+=cheri_caprevoke
 CFLAGS+=-DCAPREVOKE
 .endif
 .endif
@@ -95,7 +96,7 @@ CFLAGS+=	-DCHERITHREAD_TESTS
 
 MAN=
 
-LIBADD= 	z
+LIBADD+= 	z
 LIBADD+=	xo util
 
 .if ${MK_LIBCHERI} == "yes"
