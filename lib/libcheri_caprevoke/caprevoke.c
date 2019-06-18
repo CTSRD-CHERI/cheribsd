@@ -362,9 +362,9 @@ caprev_shadow_nomap_clear(uint64_t * __capability sb, void * __capability obj)
      * Any words between the first and last we can just clear all at once.
      */
 
-    ptrdiff_t wo = fwo + 1;
+    ptrdiff_t wo = fwo + sizeof(uint64_t);
     uint64_t * __capability sbo = fw + 1;
-    for (; wo < lwo; wo++, sbo++) {
+    for (; wo < lwo; wo += sizeof(uint64_t), sbo++) {
       *sbo = (uint64_t)0;
     }
   }
