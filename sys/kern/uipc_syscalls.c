@@ -74,7 +74,6 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
-static int sendit(struct thread *td, int s, kmsghdr_t *mp, int flags);
 static int recvit(struct thread *td, int s, kmsghdr_t *mp,
     socklen_t * __capability namelenp);
 
@@ -679,8 +678,8 @@ user_socketpair(struct thread *td, int domain, int type, int protocol,
 	return (error);
 }
 
-static int
-sendit(struct thread *td, int s, kmsghdr_t *mp, int flags)
+int
+user_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags)
 {
 	struct mbuf *control;
 	struct sockaddr *to;
@@ -858,7 +857,7 @@ user_sendto(struct thread *td, int s, const char * __capability buf,
 	msg.msg_flags = 0;
 #endif
 	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), len);
-	return (sendit(td, s, &msg, flags));
+	return (user_sendit(td, s, &msg, flags));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -875,7 +874,7 @@ osend(struct thread *td, struct osend_args *uap)
 	IOVEC_INIT(&aiov, uap->buf, uap->len);
 	msg.msg_control = 0;
 	msg.msg_flags = 0;
-	return (sendit(td, uap->s, &msg, uap->flags));
+	return (user_sendit(td, uap->s, &msg, uap->flags));
 }
 
 int
@@ -899,7 +898,7 @@ osendmsg(struct thread *td, struct osendmsg_args *uap)
 	msg.msg_control = __USER_CAP(umsg.msg_accrights, umsg.msg_accrightslen);
 	msg.msg_controllen = umsg.msg_accrightslen;
 	msg.msg_flags = MSG_COMPAT;
-	error = sendit(td, uap->s, &msg, uap->flags);
+	error = user_sendit(td, uap->s, &msg, uap->flags);
 	free(iov, M_IOV);
 	return (error);
 }
@@ -931,7 +930,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 #else
 	msg.msg_flags = umsg.msg_flags;
 #endif
-	error = sendit(td, uap->s, &msg, uap->flags);
+	error = user_sendit(td, uap->s, &msg, uap->flags);
 	free(iov, M_IOV);
 	return (error);
 }

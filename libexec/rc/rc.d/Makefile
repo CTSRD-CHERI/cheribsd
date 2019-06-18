@@ -328,9 +328,6 @@ ZFS+=		zfsbe
 ZFS+=		zfsd
 ZFS+=		zvol
 ZFSPACKAGE=	zfs
-DIRS+=	ETC_ZFS
-ETC_ZFS=	/etc/zfs
-ETC_ZFSPACKAGE=	zfs
 .endif
 
 .for fg in ${CONFGROUPS}

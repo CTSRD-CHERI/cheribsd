@@ -601,6 +601,7 @@ int	user_sched_setscheduler(struct thread *td, pid_t pid, int policy,
 int	user_select(struct thread *td, int nd, fd_set * __capability in,
 	    fd_set * __capability ou, fd_set * __capability ex,
 	    struct timeval * __capability utv);
+int	user_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags);
 int	user_sendto(struct thread *td, int s, const char * __capability buf,
 	    size_t len, int flags, const struct sockaddr * __capability to,
 	    socklen_t tolen);

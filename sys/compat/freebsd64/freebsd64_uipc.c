@@ -331,48 +331,25 @@ freebsd64_sendmsg(struct thread *td, struct freebsd64_sendmsg_args *uap)
 	kmsghdr_t msg;
 	struct msghdr64 m64;
 	kiovec_t *iov;
-	struct mbuf *control = NULL;
-	struct sockaddr *to = NULL;
 	int error;
 
 	error = copyin(uap->msg, &m64, sizeof(m64));
 	if (error != 0)
 		return (error);
+	msg.msg_name = __USER_CAP(m64.msg_name, m64.msg_namelen);
+	msg.msg_namelen = m64.msg_namelen;
 	error = freebsd64_copyiniov(__USER_CAP_ARRAY(m64.msg_iov,
 	    m64.msg_iovlen), m64.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
 	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
-	if (msg.msg_name != NULL) {
-		error = getsockaddr(&to, msg.msg_name, msg.msg_namelen);
-		if (error != 0) {
-			to = NULL;
-			goto out;
-		}
-		msg.msg_name = (__cheri_tocap struct sockaddr * __capability)to;
-	}
-
-	if (msg.msg_control) {
-		if (msg.msg_controllen < sizeof(struct cmsghdr)) {
-			error = EINVAL;
-			goto out;
-		}
-
-		error = freebsd64_copyin_control(&control, msg.msg_control,
-		    msg.msg_controllen);
-		if (error)
-			goto out;
-
-		msg.msg_control = NULL;
-		msg.msg_controllen = 0;
-	}
-
-	error = kern_sendit(td, uap->s, &msg, uap->flags, control,
-	    UIO_USERSPACE);
-
-out:
+	msg.msg_iovlen = m64.msg_iovlen;
+	msg.msg_control = __USER_CAP(m64.msg_control, m64.msg_controllen);
+	msg.msg_controllen = m64.msg_controllen;
+	/* No COMPAT_OLDSOCK support, no 64-bit 43BSD binaries should exist. */
+	msg.msg_flags = m64.msg_flags;
+	error = user_sendit(td, uap->s, &msg, uap->flags);
 	free(iov, M_IOV);
-	free(to, M_SONAME);
 	return (error);
 }
 

@@ -53,6 +53,7 @@ static const struct option options[] = {
 	{ "help", no_argument, NULL, 'h' },
 	{ "format", required_argument, NULL, 'f' },
 	{ "output", required_argument, NULL, 'o' },
+	{ "progname", required_argument, NULL, 'p' },
 	{ "quiet", no_argument, NULL, 'q' },
 	{ "verbose", no_argument, NULL, 'v' },
 	{ NULL, 0, NULL, 0 }
@@ -78,12 +79,13 @@ main(int argc, char **argv)
 	bool verbose = false;
 	bool quiet = false;
 	const char* output_filename = NULL;
+	const char* progname = NULL;
 	const char* architecture = "unknown";
 	int opt;
 	statcounters_fmt_flag_t statcounters_format = HUMAN_READABLE;
 
 	/* Start option string with + to avoid parsing after first non-option */
-	while ((opt = getopt_long(argc, argv, "+a:chf:o:qv", options, NULL)) != -1) {
+	while ((opt = getopt_long(argc, argv, "+a:chf:o:p:qv", options, NULL)) != -1) {
 		switch (opt) {
 		case 'q':
 			quiet = true;
@@ -99,6 +101,9 @@ main(int argc, char **argv)
 			break;
 		case 'o':
 			output_filename = optarg;
+			break;
+		case 'p':
+			progname = optarg;
 			break;
 		case 'c':
 			/* Force the use of CSV format without the header: */
@@ -156,7 +161,9 @@ main(int argc, char **argv)
 	 * TODO: arch will be wrong since we are using the architecture of
 	 * the beri_count_stats_binary!
 	 */
-	const char* prog_basename = basename(argv[0]);
+	if (!progname) {
+		progname = basename(argv[0]);
+	}
 	if (quiet) {
 		/* Only print cycles,instructions and TLB misses */
 		printf("cyles:                 %12" PRId64 "\n", diff_count.cycle);
@@ -172,8 +179,8 @@ main(int argc, char **argv)
 		/* Ensure human readable output: */
 		const char* original_fmt = getenv("STATCOUNTERS_FORMAT");
 		unsetenv("STATCOUNTERS_FORMAT");
-		statcounters_dump_with_args(&diff_count, prog_basename, NULL,
-		    NULL, stderr, HUMAN_READABLE);
+		statcounters_dump_with_args(&diff_count, progname, NULL,
+		    architecture, stderr, HUMAN_READABLE);
 		setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
 	}
 	FILE* output_file = NULL;
@@ -191,7 +198,7 @@ main(int argc, char **argv)
 		}
 	}
 	// FIXME: find out architecture from executable header e_flags?
-	statcounters_dump_with_args(&diff_count, prog_basename, NULL,
+	statcounters_dump_with_args(&diff_count, progname, NULL,
 	    architecture, output_file, statcounters_format);
 	exit(WEXITSTATUS(status));
 }

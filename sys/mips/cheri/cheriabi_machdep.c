@@ -784,8 +784,8 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 */
 	stacklen = rounddown2(stacklen, 1ULL << CHERI_ALIGN_SHIFT(stacklen));
 	td->td_frame->csp = cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, 0);
-	td->td_frame->sp = stacklen;
+	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, stacklen);
+
 
 	/* Using addr as length means ddc base must be 0. */
 	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
@@ -920,19 +920,6 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 		td->td_frame->c4 = cheri_capability_build_user_data(
 		    CHERI_CAP_USER_DATA_PERMS, rtld_base, rtld_len, 0);
 	}
-	/*
-	 * Restrict the stack capability to the maximum region allowed for
-	 * this process and adjust sp accordingly.
-	 *
-	 * XXXBD: 8MB should be the process stack limit.
-	 */
-	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
-	stackbase = USRSTACK - (1024 * 1024 * 8);
-	KASSERT(stack > stackbase,
-	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
-	stacklen = stack - stackbase;
-	td->td_frame->csp = cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, stacklen);
 
 	/*
 	 * Update privileged signal-delivery environment for actual stack.

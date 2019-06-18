@@ -196,9 +196,9 @@ build_tree()
 		# Build a limited tree that only contains files that are
 		# crucial to installworld.
 		for file in $PREWORLD_FILES; do
-			dir=`dirname /$file`
-			mkdir -p $1/$dir >&3 2>&1 || return 1
-			cp -p $SRCDIR/$file $1/$file || return 1
+			name=$(basename $file)
+			mkdir -p $1/etc >&3 2>&1 || return 1
+			cp -p $SRCDIR/$file $1/etc/$name || return 1
 		done
 	elif ! [ -n "$nobuild" ]; then
 		(cd $SRCDIR; $make DESTDIR=$destdir distrib-dirs &&
@@ -1737,9 +1737,7 @@ WARNINGS=$WORKDIR/warnings
 EDITOR=${EDITOR:-/usr/bin/vi}
 
 # Files that need to be updated before installworld.
-PREWORLD_FILES="lib/libc/gen/master.passwd lib/libc/gen/group"
-# If on an older tree, use it instead.  Delete after 13.0.
-[ -f ${SRCDIR}/etc/master.passwd ] && PREWORLD_FILES="etc/master.passwd etc/group"
+PREWORLD_FILES="etc/master.passwd etc/group"
 
 # Handle command-specific argument processing such as complaining
 # about unsupported options.  Since the configuration file is always

@@ -3434,7 +3434,7 @@ xlate_fflags(int fflags)
 }
 
 /* Trim unused data from kf_path by truncating the structure size. */
-static void
+void
 pack_kinfo(struct kinfo_file *kif)
 {
 

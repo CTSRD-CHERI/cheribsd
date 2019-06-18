@@ -335,10 +335,18 @@
 #define	CHERI_CR_C26	26
 #define	CHERI_CR_IDC	CHERI_CR_C26
 #define	CHERI_CR_C27	27
+#define	CHERI_CR_KR1C	CHERI_CR_C27
 #define	CHERI_CR_C28	28
+#define	CHERI_CR_KR2C	CHERI_CR_C28
 #define	CHERI_CR_C29	29
+#define	CHERI_CR_KCC	CHERI_CR_C29
 #define	CHERI_CR_C30	30
+#define	CHERI_CR_KDC	CHERI_CR_C30
 #define	CHERI_CR_C31	31
+#define	CHERI_CR_EPCC	CHERI_CR_C31
+
+#define	CHERI_CR_CTEMP0	CHERI_CR_C13	/* C capability manipulation. */
+#define	CHERI_CR_CTEMP1	CHERI_CR_C14	/* C capability manipulation. */
 
 /*
  * Offsets of registers in struct cheri_kframe -- must match the definition in
