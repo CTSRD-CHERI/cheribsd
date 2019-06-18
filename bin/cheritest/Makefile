@@ -33,6 +33,7 @@ SRCS+=	cheritest_cheriabi.c
 SRCS+=	cheritest_cheriabi_open.c
 .endif
 CFLAGS+=	-DCHERIABI_TESTS
+LIBADD+=	cheri_caprevoke
 .endif
 
 .ifndef BOOTSTRAPPING
@@ -97,7 +98,7 @@ WANT_CHERI=	pure
 .else
 .error Unknown cheritest variant ${PROG}
 .endif
-LIBADD= 	z
+LIBADD+= 	z
 .endif
 
 LIBADD+=	xo util

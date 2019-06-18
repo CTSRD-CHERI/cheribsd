@@ -768,4 +768,180 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+/*
+ * Repeatedly invoke libcheri_caprevoke logic.
+ * Using a bump the pointer allocator, repeatedly grab rand()-omly sized
+ * objects and fill them with capabilities to themselves, mark them for
+ * revocation, revoke, and validate.
+ *
+ */
+
+#include <caprevoke.h>
+
+/* Just for debugging printouts */
+#ifndef CPU_CHERI
+#define CPU_CHERI
+#include <machine/pte.h>
+#include <machine/vmparam.h>
+#undef CPU_CHERI
+#else
+#include <machine/pte.h>
+#include <machine/vmparam.h>
+#endif
+
+void
+test_caprevoke_lib(const struct cheri_test *ctp __unused)
+{
+		/* If debugging the revoker, some verbosity can help. 0 - 4. */
+	static const unsigned int verbose = 0;
+
+		/*
+		 * Tweaking paranoia can turn this test into more of a
+		 * benchmark than a correctness test.  At 0, no checks
+		 * will be performed; at 1, only the revoked object is
+		 * investigated, and at 2, the entire allocaton arena
+		 * is tested.
+		 */
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void * __capability * __capability bigblock;
+	void * __capability shadow;
+
+	size_t bigblock_offset = 0;
+
+	srand(1337);
+
+	bigblock = CHERITEST_CHECK_SYSCALL(
+			mmap(0, bigblock_caps * sizeof(void * __capability),
+				PROT_READ | PROT_WRITE,
+				MAP_ANON, -1, 0));
+
+	for (size_t ix = 0; ix < bigblock_caps; ix++) {
+		/* Create self-referential VMMAP-free capabilities */
+
+		bigblock[ix] = cheri_andperm(
+				cheri_csetbounds(&bigblock[ix], 16),
+				~CHERI_PERM_CHERIABI_VMMAP);
+	}
+
+	CHERITEST_CHECK_SYSCALL(
+			caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP,
+					 bigblock, &shadow));
+
+	if (verbose > 0) {
+		CHERI_FPRINT_PTR(stderr, bigblock);
+		CHERI_FPRINT_PTR(stderr, shadow);
+	}
+
+	while (bigblock_offset < bigblock_caps) {
+		struct caprevoke_stats crst;
+
+		size_t csz = rand() % 1024 + 1;
+		csz = MIN(csz, bigblock_caps - bigblock_offset);
+
+		if (verbose > 1) {
+			fprintf(stderr, "left=%zd csz=%zd\n",
+					bigblock_caps - bigblock_offset,
+					csz);
+		}
+
+		void * __capability * __capability chunk =
+			cheri_csetbounds(bigblock + bigblock_offset,
+					 csz * sizeof(void * __capability));
+
+		if (verbose > 1) {
+			CHERI_FPRINT_PTR(stderr, chunk);
+		}
+
+		size_t chunk_offset = bigblock_offset;
+		bigblock_offset += csz;
+
+		if (verbose > 3) {
+			ptrdiff_t fwo, lwo;
+			caprev_shadow_nomap_offsets((vaddr_t)chunk,
+				csz * sizeof(void * __capability), &fwo, &lwo);
+
+			fprintf(stderr,
+				"premrk fwo=%lx lwo=%lx fw=%p "
+				"*fw=%016lx *lw=%016lx\n",
+				fwo, lwo,
+				cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + fwo),
+				*(uint64_t *)(cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + fwo)),
+				*(uint64_t *)(cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + lwo)));
+		}
+
+		/* Mark the chunk for revocation */
+		CHERITEST_VERIFY2(caprev_shadow_nomap_set(shadow, chunk) == 0,
+				  "Shadow update collision");
+
+		__atomic_thread_fence(__ATOMIC_RELEASE);
+
+		if (verbose > 3) {
+			ptrdiff_t fwo, lwo;
+			caprev_shadow_nomap_offsets((vaddr_t)chunk,
+				csz * sizeof(void * __capability), &fwo, &lwo);
+
+			fprintf(stderr,
+				"marked fwo=%lx lwo=%lx fw=%p "
+				"*fw=%016lx *lw=%016lx\n",
+				fwo, lwo,
+				cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + fwo),
+				*(uint64_t *)(cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + fwo)),
+				*(uint64_t *)(cheri_setaddress(shadow,
+					VM_CAPREVOKE_BM_MEM_NOMAP + lwo)));
+		}
+
+		CHERITEST_CHECK_SYSCALL(
+			caprevoke(CAPREVOKE_JUST_THE_TIME, 0, &crst));
+
+		CHERITEST_CHECK_SYSCALL(
+			caprevoke(CAPREVOKE_LAST_PASS, crst.epoch, &crst));
+		if (verbose > 2) {
+			fprintf_caprevoke_stats(stderr, crst);
+		}
+
+		/* Check the surroundings */
+		if (paranoia > 1) {
+			for (size_t ix = 0; ix < chunk_offset; ix++) {
+				CHERITEST_VERIFY2(cheri_gettag(bigblock[ix]) == 1,
+						"Cleared cap incorrectly below object, at ix=%zd\n", ix);
+			}
+			for (size_t ix = chunk_offset + csz; ix < bigblock_caps; ix++) {
+				CHERITEST_VERIFY2(cheri_gettag(bigblock[ix]) == 1,
+						"Cleared cap incorrectly above object, at ix=%zd\n", ix);
+			}
+		}
+
+		for (size_t ix = 0; ix < csz; ix++) {
+			if (paranoia > 0) {
+				if (cheri_gettag(chunk[ix]) == 1) {
+					CHERI_FPRINT_PTR(stderr, chunk[ix]);
+					cheritest_failure_errx("Tag remains at ix=%zd after revoke\n", ix);
+				}
+			}
+
+			/* Put it back */
+			chunk[ix] = cheri_andperm(
+					cheri_csetbounds(&chunk[ix], 16),
+					~CHERI_PERM_CHERIABI_VMMAP);
+		}
+
+		caprev_shadow_nomap_clear(shadow, chunk);
+
+		__atomic_thread_fence(__ATOMIC_RELEASE);
+
+	}
+
+	munmap(bigblock, bigblock_caps * sizeof(void * __capability));
+
+	cheritest_success();
+}
+
 #endif
