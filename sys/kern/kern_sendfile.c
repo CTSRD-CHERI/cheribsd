@@ -60,6 +60,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
 
+#include <cheri/cheric.h>
+
 #define	EXT_FLAG_SYNC		EXT_FLAG_VENDOR1
 #define	EXT_FLAG_NOCACHE	EXT_FLAG_VENDOR2
 
@@ -792,7 +794,8 @@ retry_space:
 			}
 
 			m0 = m_get(M_WAITOK, MT_DATA);
-			m0->m_ext.ext_buf = (char *)sf_buf_kva(sf);
+			m0->m_ext.ext_buf = cheri_csetbounds(
+			    (char *)sf_buf_kva(sf), PAGE_SIZE);
 			m0->m_ext.ext_size = PAGE_SIZE;
 			m0->m_ext.ext_arg1 = sf;
 			m0->m_ext.ext_type = EXT_SFBUF;

@@ -82,6 +82,7 @@
 #endif
 
 #if defined(__FreeBSD__)
+#include <cheri/cheric.h>
 #include <sys/selinfo.h>
 
 #define likely(x)	__builtin_expect((long)!!(x), 1L)
@@ -2308,6 +2309,7 @@ static int
 void_mbuf_dtor(struct mbuf *m, void *arg1, void *arg2)
 {
 	/* restore original mbuf */
+	/* XXXRW: CHERI -- what length to pass to cheri_csetbounds() here? */
 	m->m_ext.ext_buf = m->m_data = m->m_ext.ext_arg1;
 	m->m_ext.ext_arg1 = NULL;
 	m->m_ext.ext_type = EXT_PACKET;
