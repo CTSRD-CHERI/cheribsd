@@ -1355,7 +1355,8 @@ _cheri_libs=lib/csu lib/libgcc_eh lib/libcompiler_rt lib/libc \
 	    lib/liblzma lib/libexpat secure/lib/libcrypto lib/libsbuf \
 	    lib/libelf lib/libkvm lib/ncurses/ncurses lib/ncurses/ncursesw \
 	    secure/lib/libssl lib/libmd lib/libutil lib/libprocstat \
-	    lib/librtld_db
+	    lib/librtld_db \
+	    lib/libcheri_caprevoke
 .if ${MK_CDDL} != "no"
 _cheri_libs+=cddl/lib/libctf
 .endif
