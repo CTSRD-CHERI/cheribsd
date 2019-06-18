@@ -1452,12 +1452,3 @@ freebsd64_pdgetpid(struct thread *td, struct freebsd64_pdgetpid_args *uap)
 
 	return (user_pdgetpid(td, uap->fd, __USER_CAP_OBJ(uap->pidp)));
 }
-
-/*
- * sys_process.c
- */
-int freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
-{
-
-	return (ENOSYS);
-}

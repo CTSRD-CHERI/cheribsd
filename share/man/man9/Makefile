@@ -59,6 +59,7 @@ MAN=	accept_filter.9 \
 	byteorder.9 \
 	casuword.9 \
 	cd.9 \
+	cheric.9 \
 	cnv.9 \
 	condvar.9 \
 	config_intrhook.9 \
