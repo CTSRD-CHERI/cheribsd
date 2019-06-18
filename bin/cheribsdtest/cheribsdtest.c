@@ -894,6 +894,14 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "cheribsdtest_caprevoke_loadside",
 	  .ct_desc = "Test load-side revoker",
 	  .ct_func = cheribsdtest_caprevoke_loadside, },
+
+	{ .ct_name = "cheribsdtest_caprevoke_lib",
+	  .ct_desc = "Test libcheri_caprevoke internals",
+	  .ct_func = cheribsdtest_caprevoke_lib, },
+
+	{ .ct_name = "cheribsdtest_caprevoke_lib_fork",
+	  .ct_desc = "Test libcheri_caprevoke with fork",
+	  .ct_func = cheribsdtest_caprevoke_lib_fork, },
 #endif
 
 #if 0
