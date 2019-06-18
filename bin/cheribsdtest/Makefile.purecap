@@ -7,10 +7,11 @@ NEED_COMPAT=	CHERI
 .include <bsd.compat.mk>
 .endif
 
+CHERI_C_TESTS=	yes
+
 .if ${MK_CHERI_CAPREVOKE} == "yes"
+LIBADD+=cheri_caprevoke
 CFLAGS+=-DCHERI_REVOKE
 .endif
-
-CHERI_C_TESTS=	yes
 
 .include "${.PARSEDIR}/Makefile.cheribsdtest"
