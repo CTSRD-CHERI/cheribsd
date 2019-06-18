@@ -165,6 +165,13 @@ that has its permissions mask bit-wise AND'd with the value of
 Return a capability derived from
 .Fa c
 that has its validity tag cleared.
+.It Fn cheri_csetbounds "c" "length"
+Return a capability derived from
+.Fa c
+that has its base set to the current address of
+.Fa c ,
+and length set to
+.Fa length .
 .It Fn cheri_incoffset "c" "offset"
 Return a capability derived from
 .Fa c
