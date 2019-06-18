@@ -46,6 +46,7 @@ CHERITEST_DIR:=	${.PARSEDIR}
 .if ${MACHINE_ABI:Mpurecap}
 SRCS+=	cheritest_cheriabi.c
 SRCS+=	cheritest_cheriabi_open.c
+LIBADD+=	cheri_caprevoke
 .endif
 
 # This test is broken as written
@@ -92,7 +93,7 @@ CFLAGS+=	-DCHERITHREAD_TESTS
 
 MAN=
 
-LIBADD= 	z
+LIBADD+= 	z
 LIBADD+=	xo util
 
 .if ${MK_LIBCHERI} == "yes"
