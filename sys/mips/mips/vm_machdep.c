@@ -608,6 +608,10 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 }
 
 #ifdef CPU_CHERI
+
+/* Constructed in sys/mips/mips/locore.S */
+uint8_t * __capability caprev_shadow_cap = (void * __capability)(intcap_t) -1;
+
 int
 vm_test_caprevoke(const void * __capability cut)
 {
@@ -632,15 +636,15 @@ vm_test_caprevoke(const void * __capability cut)
 		uint8_t bmbits = 0;
 		uint8_t * __capability bmloc;
 
-		bmloc = cheri_setaddress(cheri_getkdc(),
+		bmloc = cheri_setaddress(caprev_shadow_cap,
 				  (((vm_offset_t) VM_CAPREVOKE_BM_MEM_MAP)
 				  + (va / VM_CAPREVOKE_GSZ_MEM_MAP / 8)));
 
 		err = copyin_c(bmloc, &bmbits, sizeof(bmbits));
 
 		KASSERT(err == 0,
-			("copyin revoke bitmap va=%lx bmloc=%p err=%d",
-				va, (__cheri_fromcap void *)bmloc, err));
+			("copyin revoke bitmap va=%lx bmloc=%lx err=%d",
+				va, cheri_getaddress(bmloc), err));
 
 		if (bmbits & (1 << ((va / VM_CAPREVOKE_GSZ_MEM_NOMAP) % 8))) {
 			return 1;
@@ -656,19 +660,15 @@ vm_test_caprevoke(const void * __capability cut)
 		uint8_t bmbits = 0;
 		uint8_t * __capability bmloc;
 
-		/*
-		 * XXX This is a very powerful cap; we should intead
-		 * initialize one specifically for this test
-		 */
-		bmloc = cheri_setaddress(cheri_getkdc(),
+		bmloc = cheri_setaddress(caprev_shadow_cap,
 				  (((vm_offset_t) VM_CAPREVOKE_BM_MEM_NOMAP)
 				  + (va / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8)));
 
 		err = copyin_c(bmloc, &bmbits, sizeof(bmbits));
 
 		KASSERT(err == 0,
-			("copyin revoke bitmap va=%lx bmloc=%p err=%d",
-				va, (__cheri_fromcap void *)bmloc, err));
+			("copyin revoke bitmap va=%lx bmloc=%lx err=%d",
+				va, cheri_getaddress(bmloc), err));
 
 		if (bmbits & (1 << ((va / VM_CAPREVOKE_GSZ_MEM_NOMAP) % 8))) {
 			return 1;

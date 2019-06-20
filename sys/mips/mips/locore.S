@@ -252,6 +252,19 @@ VECTOR(_locore, unknown)
 	csc	CHERI_REG_C27, t0, 0($ddc)
 
 	/*
+	 * And one more, this time for access to the caprev shadow space
+	 */
+	cmove		CHERI_REG_C27, CHERI_REG_C28
+	REG_LI	t0, VM_CAPREVOKE_BM_BASE
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
+	REG_LI	t0, (VM_CAPREVOKE_BM_TOP - VM_CAPREVOKE_BM_BASE)
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
+	REG_LI	t0, (CHERI_PERM_LOAD | CHERI_PERM_STORE)
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
+	PTR_LA	t0, _C_LABEL(caprev_shadow_cap)
+	csc	CHERI_REG_C27, t0, 0($ddc)
+
+	/*
 	 * Store the omnipotent capability to allow swap to be restored.
 	 */
 	PTR_LA	t0, _C_LABEL(swap_restore_cap)
