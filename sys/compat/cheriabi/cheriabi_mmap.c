@@ -404,7 +404,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 		 * range of access subject to page permissions.
 		 */
 		newcap = cheri_andperm(newcap, ~PERM_RWX |
-		    cheriabi_mmap_prot2perms(EXTRACT_PROT_MAX(mrp->mr_prot)));
+		    cheriabi_mmap_prot2perms(PROT_MAX_EXTRACT(mrp->mr_prot)));
 	}
 
 	if (mrp->mr_flags & MAP_FIXED) {

@@ -116,7 +116,7 @@ private:
 		// need to update the data capability and calling mprotect()
 		// every time would be expensive. Only rtld will ever hold a
 		// writable capability to this region so this should be safe
-		void* result = mmap(nullptr, BLOCK_SIZE, PROT_ALL | PROT_MAX(PROT_ALL),
+		void* result = mmap(nullptr, BLOCK_SIZE, _PROT_ALL | PROT_MAX(_PROT_ALL),
 		    mmap_flags, -1, 0);
 		dbg_cheri("Allocated new RWX block: %-#p", result);
 		if (result == MAP_FAILED) {
