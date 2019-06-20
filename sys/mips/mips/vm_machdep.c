@@ -752,7 +752,7 @@ vm_caprevoke_page(vm_page_t m)
 	 * XXX NWF 8 is very uarch specific and should be fixed.
 	 */
 	for( ; mva < mve; mva += 8 * sizeof(void * __capability)) {
-		void * __capability * __capability mvu = cheri_setaddress(kdc,mva);
+		void * __capability * __capability mvu = cheri_setoffset(kdc,mva);
 		uint64_t tags;
 
 		tags = __builtin_cheri_cap_load_tags(mvu);
