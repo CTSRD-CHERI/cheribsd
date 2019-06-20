@@ -899,6 +899,7 @@ vmem_import(vmem_t *vm, vmem_size_t size, vmem_size_t align, int flags)
 	if (error)
 		return (ENOMEM);
 	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_VM_ASSERT_EXACT(addr, size);
 
 	vmem_add1(vm, addr, size, BT_TYPE_SPAN);
 
@@ -990,12 +991,6 @@ vmem_clip(vmem_t *vm, bt_t *bt, vmem_addr_t start, vmem_size_t size)
 		btprev->bt_size = ptr_to_va(start) - ptr_to_va(bt->bt_start);
 		bt->bt_start = start;
 		bt->bt_size -= btprev->bt_size;
-#ifdef CHERI_PURECAP_KERNEL
-		btprev->bt_start = (vmem_addr_t)cheri_csetbounds(
-			(void *)btprev->bt_start, btprev->bt_size);
-		bt->bt_start = (vmem_addr_t)cheri_csetbounds(
-			(void *)bt->bt_start, bt->bt_size);
-#endif
 		bt_insfree(vm, btprev);
 		bt_insseg(vm, btprev,
 		    TAILQ_PREV(bt, vmem_seglist, bt_seglist));
@@ -1009,12 +1004,6 @@ vmem_clip(vmem_t *vm, bt_t *bt, vmem_addr_t start, vmem_size_t size)
 		btnew->bt_size = size;
 		bt->bt_start = bt->bt_start + size;
 		bt->bt_size -= size;
-#ifdef CHERI_PURECAP_KERNEL
-		btnew->bt_start = (vmem_addr_t)cheri_csetbounds(
-			(void *)btnew->bt_start, btnew->bt_size);
-		bt->bt_start = (vmem_addr_t)cheri_csetbounds(
-			(void *)bt->bt_start, bt->bt_size);
-#endif
 		bt_insfree(vm, bt);
 		bt_insseg(vm, btnew,
 		    TAILQ_PREV(bt, vmem_seglist, bt_seglist));
@@ -1180,6 +1169,9 @@ retry:
 
 out:
 	VMEM_UNLOCK(vm);
+	CHERI_VM_ASSERT_VALID(*addrp);
+	*addrp = (vmem_addr_t)cheri_bound((void *)*addrp, size);
+	CHERI_VM_ASSERT_EXACT(*addrp, size);
 	return (error);
 }
 
@@ -1315,6 +1307,8 @@ vmem_alloc(vmem_t *vm, vmem_size_t size, int flags, vmem_addr_t *addrp)
 	const int strat __unused = flags & VMEM_FITMASK;
 	qcache_t *qc;
 
+	size = cheri_vm_representable_len(size);
+
 	flags &= VMEM_FLAGS;
 	MPASS(size > 0);
 	MPASS(strat == M_BESTFIT || strat == M_FIRSTFIT || strat == M_NEXTFIT);
@@ -1347,7 +1341,8 @@ vmem_xalloc(vmem_t *vm, const vmem_size_t size0, vmem_size_t align,
     const vmem_addr_t minaddr, const vmem_addr_t maxaddr, int flags,
     vmem_addr_t *addrp)
 {
-	const vmem_size_t size = vmem_roundup_size(vm, size0);
+	const vmem_size_t size = vmem_roundup_size(
+	    vm, cheri_vm_representable_len(size0));
 	struct vmem_freelist *list;
 	struct vmem_freelist *first;
 	struct vmem_freelist *end;
@@ -1453,6 +1448,7 @@ out:
 		panic("failed to allocate waiting allocation\n");
 	CHERI_VM_ASSERT_VALID(*addrp);
 	*addrp = (vm_ptr_t)cheri_bound((void *)*addrp, size);
+	CHERI_VM_ASSERT_EXACT(*addrp, size);
 
 	return (error);
 }
@@ -1511,29 +1507,12 @@ vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 	}
 
 	if (!vmem_try_release(vm, bt, false)) {
-#ifdef CHERI_PURECAP_KERNEL
-		/*
-		 * Find the SPAN btag and use the capability to generate
-		 * the new bt_start for the coalesced region
-		 */
-		vm_offset_t spanoffset;
-		TAILQ_FOREACH_REVERSE_FROM(t, &vm->vm_seglist, vmem_seglist,
-		    bt_seglist)
-			if (BT_ISSPAN_P(t))
-				break;
-		MPASS(cheri_is_subset((void *)t->bt_start, (void *)bt->bt_start));
-		MPASS(cheri_getlen((void *)t->bt_start) >= bt->bt_size);
-		spanoffset = ptr_to_va(bt->bt_start) -
-		    cheri_getbase((void *)t->bt_start);
-		bt->bt_start = (vmem_addr_t)cheri_csetbounds(
-		    (void *)(t->bt_start + spanoffset), bt->bt_size);
-#endif
 		bt_insfree(vm, bt);
 		VMEM_CONDVAR_BROADCAST(vm);
 		bt_freetrim(vm, BT_MAXFREE);
 	}
 #ifdef CHERI_PURECAP_KERNEL
-	MPASS(cheri_getlen((void *)bt->bt_start) == bt->bt_size);
+	MPASS(cheri_getlen((void *)t->bt_start) >= bt->bt_size);
 #endif
 }
 
@@ -1545,6 +1524,8 @@ int
 vmem_add(vmem_t *vm, vmem_addr_t addr, vmem_size_t size, int flags)
 {
 	int error;
+
+	CHERI_VM_ASSERT_EXACT(addr, size);
 
 	error = 0;
 	flags &= VMEM_FLAGS;
@@ -1844,7 +1825,7 @@ vmem_check(vmem_t *vm)
 #endif /* defined(DIAGNOSTIC) */
 // CHERI CHANGES START
 // {
-//   "updated": 20190618,
+//   "updated": 20190619,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",

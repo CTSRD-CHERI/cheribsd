@@ -203,6 +203,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	vm_prot_t prot;
 
 	size = round_page(size);
+	size = cheri_vm_representable_len(size);
 	vmem = vm_dom[domain].vmd_kernel_arena;
 	if (vmem_alloc(vmem, size, M_BESTFIT | flags, &addr))
 		return (0);
@@ -243,6 +244,7 @@ retry:
 	}
 	VM_OBJECT_WUNLOCK(object);
 	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_VM_ASSERT_EXACT(addr, size);
 	return (addr);
 }
 
@@ -296,6 +298,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	int pflags, tries;
  
 	size = round_page(size);
+	size = cheri_vm_representable_len(size);
 	vmem = vm_dom[domain].vmd_kernel_arena;
 	if (vmem_alloc(vmem, size, flags | M_BESTFIT, &addr))
 		return (0);
@@ -338,6 +341,7 @@ retry:
 	}
 	VM_OBJECT_WUNLOCK(object);
 	CHERI_VM_ASSERT_VALID(addr);
+	CHERI_VM_ASSERT_EXACT(addr, size);
 	return (addr);
 }
 

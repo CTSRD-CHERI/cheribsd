@@ -85,6 +85,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmmeter.h>
 
 #include <vm/vm.h>
+#include <vm/cheri.h>
 #include <vm/vm_param.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_object.h>
@@ -163,7 +164,7 @@ void
 vm_ksubmap_init(struct kva_md_info *kmi)
 {
 	caddr_t firstaddr;
-	caddr_t v;
+	caddr_t v, tmpaddr;
 	vm_size_t size = 0;
 	long physmem_est;
 	vm_ptr_t minaddr;
@@ -224,11 +225,14 @@ again:
 
 	/*
 	 * Allocate the clean map to hold all of I/O virtual memory.
+	 * Note that on CHERI we need to separately align each region
+	 * for representability.
 	 */
-	size = (long)nbuf * BKVASIZE + (long)bio_transient_maxcnt * MAXPHYS;
-	kmi->clean_sva = kva_alloc(size);
+	size = cheri_vm_representable_len((long)nbuf * BKVASIZE) +
+	    cheri_vm_representable_len((long)bio_transient_maxcnt * MAXPHYS);
+	firstaddr = (caddr_t)kva_alloc(size);
+	kmi->clean_sva = (vm_offset_t)firstaddr;
 	kmi->clean_eva = kmi->clean_sva + size;
-	firstaddr = (caddr_t)kmi->clean_sva;
 
 	/*
 	 * Allocate the buffer arena.
@@ -236,10 +240,12 @@ again:
 	 * Enable the quantum cache if we have more than 4 cpus.  This
 	 * avoids lock contention at the expense of some fragmentation.
 	 */
-	size = (long)nbuf * BKVASIZE;
-	kmi->buffer_sva = (vm_ptr_t)cheri_bound(firstaddr, size);
+	size = cheri_vm_representable_len((long)nbuf * BKVASIZE);
+	tmpaddr = cheri_bound(firstaddr, size);
+	CHERI_VM_ASSERT_EXACT(tmpaddr, size);
+	kmi->buffer_sva = (vm_offset_t)tmpaddr;
 	kmi->buffer_eva = kmi->buffer_sva + size;
-	vmem_init(buffer_arena, "buffer arena", kmi->buffer_sva, size,
+	vmem_init(buffer_arena, "buffer arena", (vm_ptr_t)tmpaddr, size,
 	    PAGE_SIZE, (mp_ncpus > 4) ? BKVASIZE * 8 : 0, 0);
 	firstaddr += size;
 
@@ -247,12 +253,15 @@ again:
 	 * And optionally transient bio space.
 	 */
 	if (bio_transient_maxcnt != 0) {
-		size = (long)bio_transient_maxcnt * MAXPHYS;
+		size = cheri_vm_representable_len(
+		    (long)bio_transient_maxcnt * MAXPHYS);
+		tmpaddr = cheri_bound(firstaddr, size);
+		CHERI_VM_ASSERT_EXACT(tmpaddr, size);
 		vmem_init(transient_arena, "transient arena",
-		    (vm_ptr_t)cheri_bound(firstaddr, size), size, PAGE_SIZE, 0, 0);
+		    (vm_ptr_t)tmpaddr, size, PAGE_SIZE, 0, 0);
 		firstaddr += size;
 	}
-	if (firstaddr != (caddr_t)kmi->clean_eva)
+	if ((vm_offset_t)firstaddr != kmi->clean_eva)
 		panic("Clean map calculation incorrect");
 
 	/*

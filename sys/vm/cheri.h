@@ -41,6 +41,8 @@
 #include <sys/systm.h>
 #include <cheri/cheric.h>
 
+#include <machine/cherireg.h>
+
 /* Check that a capability is dereferenceable */
 #define CHERI_VM_ASSERT_VALID(ptr)					\
 	KASSERT(cheri_gettag((void *)(ptr)),				\
@@ -74,16 +76,32 @@
 			 (u_long)cheri_getlen((void *)ptr)));		\
 	} while (0)
 
+/*
+ * Check that the bounds on a pointers are matching the expected length.
+ * This is used to ensure exact bounds.
+ */
+#define CHERI_VM_ASSERT_EXACT(ptr, len) do {				\
+		KASSERT(cheri_getlen((void *)ptr) == len,		\
+			("Inexact bounds on pointer in %s %s:%d "	\
+			"expected %lx, found %lx",			\
+			__func__, __FILE__, __LINE__,			\
+			(u_long)len, cheri_getlen((void *)ptr)));	\
+	} while (0)
+
+#define cheri_vm_representable_len(l)		\
+	CHERI_REPRESENTABLE_LENGTH(l)
+
 #else /* ! CHERI_PURECAP_KERNEL */
 #define CHERI_VM_ASSERT_VALID(ptr)
 #define CHERI_VM_ASSERT_FIT_PTR(ptr)
 #define CHERI_VM_ASSERT_BOUNDS(ptr, expect)
+#define cheri_vm_representable_len(l) (l)
 #endif /* ! CHERI_PURECAP_KERNEL*/
 
 #endif /* _VM_CHERI_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190610,
+//   "updated": 20190619,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support"
