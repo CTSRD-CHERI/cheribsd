@@ -446,7 +446,6 @@ freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
 int
 freebsd64_getcontext(struct thread *td, struct freebsd64_getcontext_args *uap)
 {
-
 	ucontext64_t uc;
 
 	if (uap->ucp == NULL)
