@@ -82,6 +82,8 @@
 #include <netgraph/netgraph.h>
 #include <netgraph/ng_tty.h>
 
+#include <cheri/cheric.h>
+
 /* Per-node private info */
 struct ngt_softc {
 	struct tty	*tp;		/* Terminal device */
@@ -439,7 +441,7 @@ ngt_rint_bypass(struct tty *tp, const void *buf, size_t len)
 		 * Odd, we have changed from non-bypass to bypass. It is
 		 * unlikely but not impossible, flush the data first.
 		 */
-		sc->m->m_data = sc->m->m_pktdat;
+		sc->m->m_data = cheri_csetbounds(sc->m->m_pktdat, MHLEN);
 		NG_SEND_DATA_ONLY(error, sc->hook, sc->m);
 		sc->m = NULL;
 	}
@@ -495,7 +497,7 @@ ngt_rint(struct tty *tp, char c, int flags)
 
 	/* Ship off mbuf if it's time */
 	if (sc->hotchar == -1 || c == sc->hotchar || m->m_len >= MHLEN) {
-		m->m_data = m->m_pktdat;
+		m->m_data = cheri_csetbounds(m->m_pktdat, MHLEN);
 		sc->m = NULL;
 		NG_SEND_DATA_ONLY(error, sc->hook, m);	/* Will queue */
 	}

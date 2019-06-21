@@ -69,6 +69,8 @@
 #include <netinet/in.h>		/* in6_cksum_pseudo() */
 #include <machine/in_cksum.h>  /* in_pseudo(), in_cksum_hdr() */
 
+#include <cheri/cheric.h>
+
 #include <net/netmap.h>
 #include <dev/netmap/netmap_kern.h>
 #include <net/netmap_virt.h>
@@ -440,7 +442,7 @@ nm_os_generic_xmit_frame(struct nm_os_gen_arg *a)
 #else  /* __FreeBSD_version >= 1100000 */
 	/* New FreeBSD versions. Link the external storage to
 	 * the netmap buffer, so that no copy is necessary. */
-	m->m_ext.ext_buf = m->m_data = a->addr;
+	m->m_ext.ext_buf = m->m_data = cheri_csetbounds(a->addr, len);
 	m->m_ext.ext_size = len;
 #endif /* __FreeBSD_version >= 1100000 */
 
