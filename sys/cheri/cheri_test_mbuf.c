@@ -65,7 +65,7 @@ sysctl_cheri_test_mbuf_mdat(SYSCTL_HANDLER_ARGS)
 
 	val = 0;
 	error = sysctl_handle_int(oidp, &val,0, req);
-	if (error == 0|| req->newptr == NULL)
+	if (error != 0|| req->newptr == NULL)
 		return (error);
 	if (val != 1)
 		return (EINVAL);
@@ -93,7 +93,7 @@ sysctl_cheri_test_mbuf_mpktdat(SYSCTL_HANDLER_ARGS)
 
 	val = 0;
 	error = sysctl_handle_int(oidp, &val,0, req);
-	if (error == 0|| req->newptr == NULL)
+	if (error != 0 || req->newptr == NULL)
 		return (error);
 	if (val != 1)
 		return (EINVAL);
@@ -125,7 +125,7 @@ sysctl_cheri_test_mbuf_mcl(SYSCTL_HANDLER_ARGS)
 
 	val = 0;
 	error = sysctl_handle_int(oidp, &val,0, req);
-	if (error == 0|| req->newptr == NULL)
+	if (error != 0|| req->newptr == NULL)
 		return (error);
 	if (val != 1)
 		return (EINVAL);
@@ -156,7 +156,7 @@ sysctl_cheri_test_mbuf_mdat_lowerbound(SYSCTL_HANDLER_ARGS)
 
 	val = 0;
 	error = sysctl_handle_int(oidp, &val,0, req);
-	if (error == 0|| req->newptr == NULL)
+	if (error != 0|| req->newptr == NULL)
 		return (error);
 	if (val != 1)
 		return (EINVAL);
@@ -179,7 +179,7 @@ sysctl_cheri_test_mbuf_mdat_upperbound(SYSCTL_HANDLER_ARGS)
 
 	val = 0;
 	error = sysctl_handle_int(oidp, &val,0, req);
-	if (error == 0|| req->newptr == NULL)
+	if (error != 0|| req->newptr == NULL)
 		return (error);
 	if (val != 1)
 		return (EINVAL);
@@ -204,7 +204,7 @@ sysctl_cheri_test_mbuf_mpktdat_lowerbound(SYSCTL_HANDLER_ARGS)
 
 	val = 0;
 	error = sysctl_handle_int(oidp, &val,0, req);
-	if (error == 0|| req->newptr == NULL)
+	if (error != 0|| req->newptr == NULL)
 		return (error);
 	if (val != 1)
 		return (EINVAL);
@@ -227,7 +227,7 @@ sysctl_cheri_test_mbuf_mpktdat_upperbound(SYSCTL_HANDLER_ARGS)
 
 	val = 0;
 	error = sysctl_handle_int(oidp, &val,0, req);
-	if (error == 0|| req->newptr == NULL)
+	if (error != 0|| req->newptr == NULL)
 		return (error);
 	if (val != 1)
 		return (EINVAL);
@@ -255,7 +255,7 @@ sysctl_cheri_test_mbuf_mcl_lowerbound(SYSCTL_HANDLER_ARGS)
 
 	val = 0;
 	error = sysctl_handle_int(oidp, &val,0, req);
-	if (error == 0|| req->newptr == NULL)
+	if (error != 0|| req->newptr == NULL)
 		return (error);
 	if (val != 1)
 		return (EINVAL);
@@ -278,13 +278,13 @@ sysctl_cheri_test_mbuf_mcl_upperbound(SYSCTL_HANDLER_ARGS)
 
 	val = 0;
 	error = sysctl_handle_int(oidp, &val,0, req);
-	if (error == 0|| req->newptr == NULL)
+	if (error != 0 || req->newptr == NULL)
 		return (error);
 	if (val != 1)
 		return (EINVAL);
 
 	m = m_getcl(M_WAITOK, MT_DATA, 0);
-	mtod(m, char *)[-1] = 0;
+	mtod(m, char *)[MCLBYTES] = 0;
 	m_free(m);
 	return (0);
 }
