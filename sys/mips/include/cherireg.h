@@ -440,6 +440,7 @@
 #else
 #define	_flsll(x)	flsll(x)
 #endif
+/* TODO: replace with __builtin_cheri_representable_alignment_mask() */
 #define	CHERI_ALIGN_SHIFT(l)						\
     ((_flsll(l) <= CHERI_BASELEN_BITS) ? 0ULL :				\
     (_flsll(l) - CHERI_BASELEN_BITS))
@@ -453,6 +454,10 @@
 
 #define	CHERI_ALIGN_MASK(l)		~(~0ULL << CHERI_ALIGN_SHIFT(l))
 #define	CHERI_SEAL_ALIGN_MASK(l)	~(~0ULL << CHERI_SEAL_ALIGN_SHIFT(l))
+
+#if !__has_builtin(__builtin_cheri_round_representable_length)
+#error "__builtin_cheri_round_representable_length() missing. Please update LLVM"
+#endif
 
 #define CHERI_REPRESENTABLE_LENGTH(len) \
 	__builtin_cheri_round_representable_length(len)
