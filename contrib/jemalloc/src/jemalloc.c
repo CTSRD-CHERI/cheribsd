@@ -213,8 +213,7 @@ typedef struct {
  * handling is probalby needed in each individual function, returning
  * an appropriate error value.
  */
-#define	ROUND_SIZE(size)						\
-    roundup2((size), (1ULL << CHERI_ALIGN_SHIFT(size)))
+#define	ROUND_SIZE(size)	CHERI_REPRESENTABLE_LENGTH(size)
 #endif
 
 /* Whether encountered any invalid config options. */

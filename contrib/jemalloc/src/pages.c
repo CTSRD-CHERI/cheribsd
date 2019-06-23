@@ -211,7 +211,7 @@ pages_map(void *addr, size_t size, size_t alignment, bool *commit) {
 	 */
 	{
 #ifdef __CHERI_PURE_CAPABILITY__
-		if (size & CHERI_ALIGN_MASK(size))
+		if (size & ~CHERI_REPRESENTABLE_ALIGNMENT_MASK(size))
 			abort();
 #endif
 

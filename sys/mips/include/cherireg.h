@@ -454,10 +454,13 @@
 #define	CHERI_ALIGN_MASK(l)		~(~0ULL << CHERI_ALIGN_SHIFT(l))
 #define	CHERI_SEAL_ALIGN_MASK(l)	~(~0ULL << CHERI_SEAL_ALIGN_SHIFT(l))
 
-/* TODO: use compiler builtins */
 #define CHERI_REPRESENTABLE_LENGTH(len) \
-	roundup2((len), 1ULL << CHERI_ALIGN_SHIFT(len))
-#define CHERI_REPRESENTABLE_BASE(addr) \
-	rounddown2((addr), 1ULL << CHERI_ALIGN_SHIFT(addr))
+	__builtin_cheri_round_representable_length(len)
+#define CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
+	__builtin_cheri_representable_alignment_mask(len)
+#define CHERI_REPRESENTABLE_ALIGNMENT(len) \
+	(CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) + 1)
+#define CHERI_REPRESENTABLE_BASE(base, len) \
+	((base) & CHERI_REPRESENTABLE_ALIGNMENT_MASK(len))
 
 #endif /* _MIPS_INCLUDE_CHERIREG_H_ */
