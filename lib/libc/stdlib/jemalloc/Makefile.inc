@@ -17,7 +17,7 @@ CLEANFILES+=jemalloc_${src}
 jemalloc_${src}: ${SRCTOP}/contrib/jemalloc/src/${src} .NOMETA
 	ln -sf ${.ALLSRC} ${.TARGET}
 .ifdef LIBCHERI
-CFLAGS.jemalloc_${src}+=	-Werror=cheri-bitwise-operations
+CFLAGS.jemalloc_${src}+=	-Werror=cheri-bitwise-operations -Werror=cheri
 .endif
 .endfor
 
