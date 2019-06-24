@@ -30,6 +30,11 @@
 #include "jemalloc/internal/ticker.h"
 #include "jemalloc/internal/util.h"
 
+
+/* Check that we are using je_assert instead of assert(): */
+_Static_assert(__CONCAT(_assert_macro_expansion_is_, assert) == 1,
+    "Should be using je_assert and not assert() from assert.h");
+
 /******************************************************************************/
 /* Data. */
 

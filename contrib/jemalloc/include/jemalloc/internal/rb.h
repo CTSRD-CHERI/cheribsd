@@ -21,7 +21,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181121,
+ *   "updated": 20190624,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_bit_flags",
