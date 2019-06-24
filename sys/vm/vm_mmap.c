@@ -365,14 +365,14 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	 */
 	if (align == MAP_ALIGNED_CHERI) {
 		flags &= ~MAP_ALIGNMENT_MASK;
-		if (CHERI_ALIGN_SHIFT(size) > PAGE_SHIFT) {
+		if (CHERI_REPRESENTABLE_ALIGNMENT(size) > (1UL << PAGE_SHIFT)) {
 			flags |= MAP_ALIGNED(CHERI_ALIGN_SHIFT(size));
 
 			if (size & CHERI_ALIGN_MASK(size) &&
 			    cheriabi_mmap_precise_bounds) {
 				SYSERRCAUSE("%s: MAP_ALIGNED_CHERI and size "
 				    "(0x%zx) is insufficently rounded (mask "
-				    "0x%llx)", __func__, size,
+				    "0x%lx)", __func__, size,
 				    CHERI_ALIGN_MASK(size));
 				return (ERANGE);
 			}
@@ -383,19 +383,19 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		align = flags & MAP_ALIGNMENT_MASK;
 	} else if (align == MAP_ALIGNED_CHERI_SEAL) {
 		flags &= ~MAP_ALIGNMENT_MASK;
-		if (CHERI_SEAL_ALIGN_SHIFT(size) > PAGE_SHIFT) {
+		if (CHERI_SEALABLE_ALIGNMENT(size) > (1UL << PAGE_SHIFT)) {
 			flags |= MAP_ALIGNED(CHERI_SEAL_ALIGN_SHIFT(size));
 
-			if (size & CHERI_SEAL_ALIGN_MASK(size) &&
+			if (size != CHERI_SEALABLE_LENGTH(size) &&
 			    cheriabi_mmap_precise_bounds) {
 				SYSERRCAUSE("%s: MAP_ALIGNED_CHERI_SEAL and "
 				    "size (0x%zx) is insufficently rounded "
-				    "(mask 0x%llx)", __func__, size,
+				    "(mask 0x%lx)", __func__, size,
 				    CHERI_SEAL_ALIGN_MASK(size));
 				return (ERANGE);
 			}
 
-			if (CHERI_ALIGN_MASK(size) != 0)
+			if (CHERI_SEAL_ALIGN_MASK(size) != 0)
 				addr_mask = CHERI_SEAL_ALIGN_MASK(size);
 		}
 		align = flags & MAP_ALIGNMENT_MASK;

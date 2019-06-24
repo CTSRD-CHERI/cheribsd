@@ -753,19 +753,25 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 
 	/* printf("%s: start=%#lx, end=%#lx, base=%#lx, interp_end=%#lx\n", __func__,
 		imgp->start_addr, imgp->end_addr, args->base, imgp->interp_end); */
-	prog_base = rounddown2(imgp->start_addr,
-	    1ULL << CHERI_ALIGN_SHIFT(imgp->start_addr));
-	prog_len = roundup2(imgp->end_addr - prog_base,
-	    1ULL << CHERI_ALIGN_SHIFT(imgp->end_addr - prog_base));
+	prog_base = imgp->start_addr;
+	prog_len = imgp->end_addr - prog_base;
+	/* Ensure program base and length are representable: */
+	prog_base = CHERI_REPRESENTABLE_BASE(prog_base, prog_len);
+	prog_len = CHERI_REPRESENTABLE_LENGTH(prog_len);
+	KASSERT(prog_len != 0, ("prog_len overflowed: %ld",
+	    (long)(imgp->end_addr - imgp->start_addr)));
 
 
 	if (!imgp->interp_end) {
 		imgp->interp_end = imgp->end_addr;
 	}
-	rtld_base = rounddown2(args->base,
-	    1ULL << CHERI_ALIGN_SHIFT(args->base));
-	rtld_len = roundup2(imgp->interp_end - rtld_base,
-	    1ULL << CHERI_ALIGN_SHIFT(imgp->interp_end - rtld_base));
+	rtld_base = args->base;
+	rtld_len = imgp->interp_end - rtld_base;
+	/* Ensure rtld base and length are representable: */
+	rtld_base = CHERI_REPRESENTABLE_BASE(rtld_base, rtld_len);
+	rtld_len = CHERI_REPRESENTABLE_LENGTH(rtld_len);
+	KASSERT(rtld_len != 0, ("rtld_len overflowed: %ld",
+	    (long)(imgp->interp_end - args->base)));
 
 	if (args->execfd != -1)
 		AUXARGS_ENTRY_NOCAP(pos, AT_EXECFD, args->execfd);

@@ -290,7 +290,7 @@ shm_deallocate_segment(struct shmid_kernel *shmseg)
 	size = round_page(shmseg->u.shm_segsz);
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
-		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
+		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	shm_committed -= btoc(size);
 	shm_nused--;
@@ -320,7 +320,7 @@ shm_delete_mapping(struct vmspace *vm, struct shmmap_state *shmmap_s)
 	size = round_page(shmseg->u.shm_segsz);
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
-		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
+		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	result = vm_map_remove(&vm->vm_map, shmmap_s->va, shmmap_s->va + size);
 	if (result != KERN_SUCCESS)
@@ -478,7 +478,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 	size = round_page(shmseg->u.shm_segsz);
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
-		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
+		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	prot = VM_PROT_READ;
 	cow = MAP_INHERIT_SHARE | MAP_PREFAULT_PARTIAL;
@@ -541,7 +541,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			 *
 			 * XXX: 12 should probably be the superpage shift.
 			 */
-			find_space = CHERI_ALIGN_SHIFT(size) < 12 ?
+			find_space = CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
 			shmaddr = td->td_md.md_cheri_mmap_cap;
@@ -583,8 +583,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		    attach_va - cheri_getbase(shmaddr));
 		if (cheriabi_sysv_shm_setbounds) {
 			shmaddr = cheri_csetbounds(shmaddr, 
-			    roundup2(shmseg->u.shm_segsz,
-			    1 << CHERI_ALIGN_SHIFT(shmseg->u.shm_segsz)));
+			    CHERI_REPRESENTABLE_LENGTH(shmseg->u.shm_segsz));
 		}
 		/* XXX: set perms */
 		td->td_retcap = __DECONST_CAP(void * __capability, shmaddr);
@@ -871,7 +870,7 @@ shmget_allocate_segment(struct thread *td, struct shmget_args *uap, int mode)
 	size = round_page(uap->size);
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI))
-		size = roundup2(size, 1 << CHERI_ALIGN_SHIFT(size));
+		size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 	if (shm_committed + btoc(size) > shminfo.shmall)
 		return (ENOMEM);
