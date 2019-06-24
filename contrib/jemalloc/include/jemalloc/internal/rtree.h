@@ -69,6 +69,17 @@ struct rtree_leaf_elm_s {
 	 * b: slab
 	 *
 	 *   00000000 xxxxxxxx eeeeeeee [...] eeeeeeee eeee000b
+	 *
+	 * On CHERI, where manipulation of the high bits is tricky, we are
+	 * nevertheless able to squeeze all metadata into a capability pointing
+	 * to the extent.  We always mean to point to the base (i.e., a zero
+	 * offset relative to the start) of an extent, and so can safely abuse
+	 * the CHERI capability offset field to store at least 9 bits, even in
+	 * the CHERI Concentrate architectural encoding.  Conveniently, 9 bits
+	 * are exactly what we need. The extent pointer (e) is recovered by
+	 * setting the offset to 0, while the slab flag (b) is the LSB of the
+	 * offset and the size index (x) is the next 8 bits above that; all
+	 * further bits of the offset are maintained 0.
 	 */
 	atomic_p_t	le_bits;
 // #pragma message("Using packed rtree leaf encoding")
