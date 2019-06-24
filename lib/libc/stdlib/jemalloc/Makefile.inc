@@ -47,6 +47,8 @@ MLINKS+= \
 	jemalloc.3 nallocx.3 \
 	jemalloc.3 malloc.conf.5
 
-.if defined(MALLOC_PRODUCTION)
+.if defined(MALLOC_DEBUG)
+CFLAGS+=	-DMALLOC_DEBUG
+.elif defined(MALLOC_PRODUCTION)
 CFLAGS+=	-DMALLOC_PRODUCTION
 .endif
