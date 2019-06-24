@@ -207,12 +207,16 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 	 */
 	switch (flags & MAP_ALIGNMENT_MASK) {
 	case MAP_ALIGNED(0):
-		/*
-		 * Request CHERI data alignment when no other request
-		 * is made.
-		 */
 		flags &= ~MAP_ALIGNMENT_MASK;
-		flags |= MAP_ALIGNED_CHERI;
+		/*
+		 * Request CHERI data alignment when no other request is made.
+		 * However, do not request alignment if both MAP_FIXED and
+		 * MAP_CHERI_NOSETBOUNDS is set since that means we are filling
+		 * in reserved address space from a file or MAP_ANON memory.
+		 */
+		if (!((flags & MAP_FIXED) && (flags & MAP_CHERI_NOSETBOUNDS))) {
+			flags |= MAP_ALIGNED_CHERI;
+		}
 		break;
 	case MAP_ALIGNED_CHERI:
 	case MAP_ALIGNED_CHERI_SEAL:
@@ -248,15 +252,21 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		 * it is too small.  If is, promote the request to
 		 * MAP_ALIGNED_CHERI.
 		 *
+		 * However, do not request alignment if both MAP_FIXED and
+		 * MAP_CHERI_NOSETBOUNDS is set since that means we are filling
+		 * in reserved address space from a file or MAP_ANON memory.
+		 *
 		 * XXX: It seems likely a user passing too small an
 		 * alignment will have also passed an invalid length,
 		 * but upgrading the alignment is always safe and
 		 * we'll catch the length later.
 		 */
-		if ((1UL << (flags >> MAP_ALIGNMENT_SHIFT)) <
-		    CHERI_REPRESENTABLE_ALIGNMENT(uap->len)) {
-			flags &= ~MAP_ALIGNMENT_MASK;
-			flags |= MAP_ALIGNED_CHERI;
+		if (!((flags & MAP_FIXED) && (flags & MAP_CHERI_NOSETBOUNDS))) {
+			if ((1UL << (flags >> MAP_ALIGNMENT_SHIFT)) <
+			    CHERI_REPRESENTABLE_ALIGNMENT(uap->len)) {
+				flags &= ~MAP_ALIGNMENT_MASK;
+				flags |= MAP_ALIGNED_CHERI;
+			}
 		}
 		break;
 	}
