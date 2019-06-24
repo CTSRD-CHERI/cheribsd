@@ -385,11 +385,11 @@ extents_fit_alignment(extents_t *extents, size_t min_size, size_t max_size,
 		assert(i < NPSIZES);
 		assert(!extent_heap_empty(&extents->heaps[i]));
 		extent_t *extent = extent_heap_first(&extents->heaps[i]);
-		uintptr_t base = (uintptr_t)extent_base_get(extent);
+		vaddr_t base = (vaddr_t)extent_base_get(extent);
 		size_t candidate_size = extent_size_get(extent);
 		assert(candidate_size >= min_size);
 
-		uintptr_t next_align = ALIGNMENT_CEILING((uintptr_t)base,
+		vaddr_t next_align = ALIGNMENT_CEILING(base,
 		    PAGE_CEILING(alignment));
 		if (base > next_align || base + candidate_size <= next_align) {
 			/* Overflow or not crossing the next alignment. */
