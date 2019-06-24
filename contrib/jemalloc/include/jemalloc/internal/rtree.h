@@ -230,7 +230,9 @@ JEMALLOC_ALWAYS_INLINE szind_t
 rtree_leaf_elm_bits_szind_get(uintptr_t bits) {
 #    ifdef __CHERI_PURE_CAPABILITY__
 	/* Lowest bit of offset is the boolean flag -> shift by one for szind */
-	return (szind_t)(cheri_getoffset((void*)bits) >> 1);
+	vaddr_t szind_raw = (vaddr_t)cheri_getoffset((void*)bits) >> 1;
+	assert((szind_raw >> 8) == 0 && "All offset bits above szind should be zero!");
+	return (szind_t)szind_raw;
 #    else
 	return (szind_t)(bits >> LG_VADDR);
 #    endif
