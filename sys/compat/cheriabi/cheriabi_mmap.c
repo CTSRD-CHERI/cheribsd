@@ -228,7 +228,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		 * precisely representable.
 		 */
 		if (uap->len < PDRSIZE &&
-		    CHERI_ALIGN_SHIFT(uap->len) > PAGE_SHIFT) {
+		    CHERI_REPRESENTABLE_ALIGNMENT(uap->len) > (1UL << PAGE_SHIFT)) {
 			flags &= ~MAP_ALIGNMENT_MASK;
 			flags |= MAP_ALIGNED_CHERI;
 		}
@@ -253,8 +253,8 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		 * but upgrading the alignment is always safe and
 		 * we'll catch the length later.
 		 */
-		if ((flags >> MAP_ALIGNMENT_SHIFT) <
-		    CHERI_ALIGN_SHIFT(uap->len)) {
+		if ((1UL << (flags >> MAP_ALIGNMENT_SHIFT)) <
+		    CHERI_REPRESENTABLE_ALIGNMENT(uap->len)) {
 			flags &= ~MAP_ALIGNMENT_MASK;
 			flags |= MAP_ALIGNED_CHERI;
 		}
