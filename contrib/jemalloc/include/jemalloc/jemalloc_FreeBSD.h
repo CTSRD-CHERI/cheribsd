@@ -16,11 +16,13 @@
 
 #undef JEMALLOC_OVERRIDE_VALLOC
 
-#ifndef MALLOC_PRODUCTION
+#if !defined(MALLOC_PRODUCTION) && !defined(MALLOC_DEBUG)
 #define	MALLOC_PRODUCTION
 #endif
+
 #ifndef MALLOC_PRODUCTION
 #define	JEMALLOC_DEBUG
+#pragma message("JEMALLOC_DEBUG enabled!")
 #endif
 
 #undef JEMALLOC_DSS
