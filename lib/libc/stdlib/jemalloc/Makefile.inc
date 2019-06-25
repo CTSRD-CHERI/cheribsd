@@ -16,6 +16,9 @@ MISRCS+=jemalloc_${src}
 CLEANFILES+=jemalloc_${src}
 jemalloc_${src}: ${SRCTOP}/contrib/jemalloc/src/${src} .NOMETA
 	ln -sf ${.ALLSRC} ${.TARGET}
+.ifdef LIBCHERI
+CFLAGS.jemalloc_${src}+=	-Werror=cheri-bitwise-operations -Werror=cheri
+.endif
 .endfor
 
 MAN+=jemalloc.3
@@ -44,6 +47,8 @@ MLINKS+= \
 	jemalloc.3 nallocx.3 \
 	jemalloc.3 malloc.conf.5
 
-.if defined(MALLOC_PRODUCTION)
+.if defined(MALLOC_DEBUG)
+CFLAGS+=	-DMALLOC_DEBUG
+.elif defined(MALLOC_PRODUCTION)
 CFLAGS+=	-DMALLOC_PRODUCTION
 .endif

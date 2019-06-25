@@ -16,11 +16,13 @@
 
 #undef JEMALLOC_OVERRIDE_VALLOC
 
-#ifndef MALLOC_PRODUCTION
+#if !defined(MALLOC_PRODUCTION) && !defined(MALLOC_DEBUG)
 #define	MALLOC_PRODUCTION
 #endif
+
 #ifndef MALLOC_PRODUCTION
 #define	JEMALLOC_DEBUG
+#pragma message("JEMALLOC_DEBUG enabled!")
 #endif
 
 #undef JEMALLOC_DSS
@@ -73,7 +75,7 @@
 #endif
 #ifdef __mips__
 #ifdef __mips_n64
-#  define LG_VADDR		64
+#  define LG_VADDR		48
 #  define LG_SIZEOF_PTR		3
 #else
 #  define LG_VADDR		32

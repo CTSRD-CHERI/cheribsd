@@ -232,7 +232,7 @@ typedef	__size_t	size_t;
 struct mmap_req {
 	vm_offset_t	mr_hint;
 	vm_offset_t	mr_max_addr;
-	vm_size_t	mr_size;
+	vm_size_t	mr_len;
 	int		mr_prot;
 	int		mr_flags;
 	int		mr_fd;

@@ -193,7 +193,7 @@ process___cap_relocs(Obj_Entry* obj)
 			if (!isFunction)
 				continue;
 			// TODO: write location as a relative value
-			const dlfunc_t *dest = (dlfunc_t*)cheri_setaddress(obj->relocbase, reloc->capability_location);
+			dlfunc_t *dest = (dlfunc_t*)cheri_setaddress(obj->relocbase, reloc->capability_location);
 			add_cgp_stub_for_local_function(obj, dest);
 		}
 	}

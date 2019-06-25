@@ -27,6 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+#include <sys/cdefs.h>
 #include <err.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -49,30 +50,28 @@ static inline void resetStatCounters (void)
 
 static int statcounter_names_len = 0;
 
+/* Declare all the statcounters accessor functions: */
+#ifdef __mips__
+#include "statcounters_mips.h"
+#else
+#error "Unsupported architecture!"
+#endif
+
+/* Build an array of statcounters without using __attribute__((constructor)): */
 static struct {
 	const char	*counter_name;
 	uint64_t	(*counter_get)(void);
-} statcounter_names[STATCOUNTER_NAMES_MAX];
+} statcounter_names[STATCOUNTER_NAMES_MAX] = {
+#define STATCOUNTER_ITEM(name, X, Y)	\
+    { __XSTRING(name), &statcounters_get_##name##_count },
+#ifdef __mips__
+#include "statcounters_mips.inc"
+#else
+#error "Unsupported architecture!"
+#endif
+#undef STATCOUNTER_ITEM
+};
 
-/*
- * XXX: The "_foo" below is inexplicably required for this to build;
- * 	I'm refusing to dwelve into its cause, as I'm already running
- * 	low on sanity points.
- */
-#define DEFINE_GET_STAT_COUNTER(name,X,Y)   \
-static inline uint64_t get_##name##_count (void)   \
-{                                           \
-    uint64_t ret;                           \
-    __asm __volatile(".word (0x1f << 26) | (0x0 << 21) | (12 << 16) | ("#X" << 11) | ( "#Y"  << 6) | 0x3b\n\tmove %0,$12" : "=r" (ret) :: "$12"); \
-    return ret;                             \
-}                                           \
-__attribute__((constructor))                \
-static void register_##name##_foo (void)    \
-{                                           \
-    statcounter_names[statcounter_names_len].counter_name = #name;		\
-    statcounter_names[statcounter_names_len].counter_get = get_##name##_count;	\
-    statcounter_names_len++;               \
-}
 
 // available modules, module type, associated rdhw primary selector
 //----------------------------------------------------------------------------
@@ -159,63 +158,6 @@ enum
     STATCOUNTERS_WRITE_RSP      = 5
 };
 
-DEFINE_GET_STAT_COUNTER(cycle,2,0);
-DEFINE_GET_STAT_COUNTER(inst,4,0);
-DEFINE_GET_STAT_COUNTER(inst_user,4,1);
-DEFINE_GET_STAT_COUNTER(inst_kernel,4,2);
-DEFINE_GET_STAT_COUNTER(imprecise_setbounds,4,3);
-DEFINE_GET_STAT_COUNTER(unrepresentable_caps,4,4);
-DEFINE_GET_STAT_COUNTER(itlb_miss,5,0);
-DEFINE_GET_STAT_COUNTER(dtlb_miss,6,0);
-DEFINE_GET_STAT_COUNTER(icache_write_hit,8,0);
-DEFINE_GET_STAT_COUNTER(icache_write_miss,8,1);
-DEFINE_GET_STAT_COUNTER(icache_read_hit,8,2);
-DEFINE_GET_STAT_COUNTER(icache_read_miss,8,3);
-DEFINE_GET_STAT_COUNTER(icache_evict,8,6);
-DEFINE_GET_STAT_COUNTER(dcache_write_hit,9,0);
-DEFINE_GET_STAT_COUNTER(dcache_write_miss,9,1);
-DEFINE_GET_STAT_COUNTER(dcache_read_hit,9,2);
-DEFINE_GET_STAT_COUNTER(dcache_read_miss,9,3);
-DEFINE_GET_STAT_COUNTER(dcache_evict,9,6);
-DEFINE_GET_STAT_COUNTER(dcache_set_tag_write,9,8);
-DEFINE_GET_STAT_COUNTER(dcache_set_tag_read,9,9);
-DEFINE_GET_STAT_COUNTER(l2cache_write_hit,10,0);
-DEFINE_GET_STAT_COUNTER(l2cache_write_miss,10,1);
-DEFINE_GET_STAT_COUNTER(l2cache_read_hit,10,2);
-DEFINE_GET_STAT_COUNTER(l2cache_read_miss,10,3);
-DEFINE_GET_STAT_COUNTER(l2cache_evict,10,6);
-DEFINE_GET_STAT_COUNTER(l2cache_set_tag_write,10,8);
-DEFINE_GET_STAT_COUNTER(l2cache_set_tag_read,10,9);
-DEFINE_GET_STAT_COUNTER(mem_byte_read,11,0);
-DEFINE_GET_STAT_COUNTER(mem_byte_write,11,1);
-DEFINE_GET_STAT_COUNTER(mem_hword_read,11,2);
-DEFINE_GET_STAT_COUNTER(mem_hword_write,11,3);
-DEFINE_GET_STAT_COUNTER(mem_word_read,11,4);
-DEFINE_GET_STAT_COUNTER(mem_word_write,11,5);
-DEFINE_GET_STAT_COUNTER(mem_dword_read,11,6);
-DEFINE_GET_STAT_COUNTER(mem_dword_write,11,7);
-DEFINE_GET_STAT_COUNTER(mem_cap_read,11,8);
-DEFINE_GET_STAT_COUNTER(mem_cap_write,11,9);
-DEFINE_GET_STAT_COUNTER(mem_cap_read_tag_set,11,10);
-DEFINE_GET_STAT_COUNTER(mem_cap_write_tag_set,11,11);
-DEFINE_GET_STAT_COUNTER(tagcache_write_hit,12,0);
-DEFINE_GET_STAT_COUNTER(tagcache_write_miss,12,1);
-DEFINE_GET_STAT_COUNTER(tagcache_read_hit,12,2);
-DEFINE_GET_STAT_COUNTER(tagcache_read_miss,12,3);
-DEFINE_GET_STAT_COUNTER(tagcache_evict,12,6);
-DEFINE_GET_STAT_COUNTER(l2cachemaster_read_req,13,0);
-DEFINE_GET_STAT_COUNTER(l2cachemaster_write_req,13,1);
-DEFINE_GET_STAT_COUNTER(l2cachemaster_write_req_flit,13,2);
-DEFINE_GET_STAT_COUNTER(l2cachemaster_read_rsp,13,3);
-DEFINE_GET_STAT_COUNTER(l2cachemaster_read_rsp_flit,13,4);
-DEFINE_GET_STAT_COUNTER(l2cachemaster_write_rsp,13,5);
-DEFINE_GET_STAT_COUNTER(tagcachemaster_read_req,14,0);
-DEFINE_GET_STAT_COUNTER(tagcachemaster_write_req,14,1);
-DEFINE_GET_STAT_COUNTER(tagcachemaster_write_req_flit,14,2);
-DEFINE_GET_STAT_COUNTER(tagcachemaster_read_rsp,14,3);
-DEFINE_GET_STAT_COUNTER(tagcachemaster_read_rsp_flit,14,4);
-DEFINE_GET_STAT_COUNTER(tagcachemaster_write_rsp,14,5);
-
 // helper functions
 
 #define ARCHNAME_BUFF_SZ 32
@@ -283,62 +225,62 @@ int statcounters_sample (statcounters_bank_t * const cnt_bank)
 {
     if (cnt_bank == NULL)
         return -1;
-    cnt_bank->icache[STATCOUNTERS_WRITE_HIT]              = get_icache_write_hit_count();
-    cnt_bank->icache[STATCOUNTERS_WRITE_MISS]             = get_icache_write_miss_count();
-    cnt_bank->icache[STATCOUNTERS_READ_HIT]               = get_icache_read_hit_count();
-    cnt_bank->icache[STATCOUNTERS_READ_MISS]              = get_icache_read_miss_count();
-    cnt_bank->icache[STATCOUNTERS_EVICT]                  = get_icache_evict_count();
-    cnt_bank->dcache[STATCOUNTERS_WRITE_HIT]              = get_dcache_write_hit_count();
-    cnt_bank->dcache[STATCOUNTERS_WRITE_MISS]             = get_dcache_write_miss_count();
-    cnt_bank->dcache[STATCOUNTERS_READ_HIT]               = get_dcache_read_hit_count();
-    cnt_bank->dcache[STATCOUNTERS_READ_MISS]              = get_dcache_read_miss_count();
-    cnt_bank->dcache[STATCOUNTERS_EVICT]                  = get_dcache_evict_count();
-    cnt_bank->dcache[STATCOUNTERS_SET_TAG_WRITE]          = get_dcache_set_tag_write_count();
-    cnt_bank->dcache[STATCOUNTERS_SET_TAG_READ]           = get_dcache_set_tag_read_count();
-    cnt_bank->l2cache[STATCOUNTERS_WRITE_HIT]             = get_l2cache_write_hit_count();
-    cnt_bank->l2cache[STATCOUNTERS_WRITE_MISS]            = get_l2cache_write_miss_count();
-    cnt_bank->l2cache[STATCOUNTERS_READ_HIT]              = get_l2cache_read_hit_count();
-    cnt_bank->l2cache[STATCOUNTERS_READ_MISS]             = get_l2cache_read_miss_count();
-    cnt_bank->l2cache[STATCOUNTERS_EVICT]                 = get_l2cache_evict_count();
-    cnt_bank->l2cache[STATCOUNTERS_SET_TAG_WRITE]         = get_l2cache_set_tag_write_count();
-    cnt_bank->l2cache[STATCOUNTERS_SET_TAG_READ]          = get_l2cache_set_tag_read_count();
-    cnt_bank->l2cachemaster[STATCOUNTERS_READ_REQ]        = get_l2cachemaster_read_req_count();
-    cnt_bank->l2cachemaster[STATCOUNTERS_WRITE_REQ]       = get_l2cachemaster_write_req_count();
-    cnt_bank->l2cachemaster[STATCOUNTERS_WRITE_REQ_FLIT]  = get_l2cachemaster_write_req_flit_count();
-    cnt_bank->l2cachemaster[STATCOUNTERS_READ_RSP]        = get_l2cachemaster_read_rsp_count();
-    cnt_bank->l2cachemaster[STATCOUNTERS_READ_RSP_FLIT]   = get_l2cachemaster_read_rsp_flit_count();
-    cnt_bank->l2cachemaster[STATCOUNTERS_WRITE_RSP]       = get_l2cachemaster_write_rsp_count();
-    cnt_bank->tagcache[STATCOUNTERS_WRITE_HIT]            = get_tagcache_write_hit_count();
-    cnt_bank->tagcache[STATCOUNTERS_WRITE_MISS]           = get_tagcache_write_miss_count();
-    cnt_bank->tagcache[STATCOUNTERS_READ_HIT]             = get_tagcache_read_hit_count();
-    cnt_bank->tagcache[STATCOUNTERS_READ_MISS]            = get_tagcache_read_miss_count();
-    cnt_bank->tagcache[STATCOUNTERS_EVICT]                = get_tagcache_evict_count();
-    cnt_bank->tagcachemaster[STATCOUNTERS_READ_REQ]       = get_tagcachemaster_read_req_count();
-    cnt_bank->tagcachemaster[STATCOUNTERS_WRITE_REQ]      = get_tagcachemaster_write_req_count();
-    cnt_bank->tagcachemaster[STATCOUNTERS_WRITE_REQ_FLIT] = get_tagcachemaster_write_req_flit_count();
-    cnt_bank->tagcachemaster[STATCOUNTERS_READ_RSP]       = get_tagcachemaster_read_rsp_count();
-    cnt_bank->tagcachemaster[STATCOUNTERS_READ_RSP_FLIT]  = get_tagcachemaster_read_rsp_flit_count();
-    cnt_bank->tagcachemaster[STATCOUNTERS_WRITE_RSP]      = get_tagcachemaster_write_rsp_count();
-    cnt_bank->mipsmem[STATCOUNTERS_BYTE_READ]             = get_mem_byte_read_count();
-    cnt_bank->mipsmem[STATCOUNTERS_BYTE_WRITE]            = get_mem_byte_write_count();
-    cnt_bank->mipsmem[STATCOUNTERS_HWORD_READ]            = get_mem_hword_read_count();
-    cnt_bank->mipsmem[STATCOUNTERS_HWORD_WRITE]           = get_mem_hword_write_count();
-    cnt_bank->mipsmem[STATCOUNTERS_WORD_READ]             = get_mem_word_read_count();
-    cnt_bank->mipsmem[STATCOUNTERS_WORD_WRITE]            = get_mem_word_write_count();
-    cnt_bank->mipsmem[STATCOUNTERS_DWORD_READ]            = get_mem_dword_read_count();
-    cnt_bank->mipsmem[STATCOUNTERS_DWORD_WRITE]           = get_mem_dword_write_count();
-    cnt_bank->mipsmem[STATCOUNTERS_CAP_READ]              = get_mem_cap_read_count();
-    cnt_bank->mipsmem[STATCOUNTERS_CAP_WRITE]             = get_mem_cap_write_count();
-    cnt_bank->mipsmem[STATCOUNTERS_CAP_READ_TAG_SET]      = get_mem_cap_read_tag_set_count();
-    cnt_bank->mipsmem[STATCOUNTERS_CAP_WRITE_TAG_SET]     = get_mem_cap_write_tag_set_count();
-    cnt_bank->dtlb_miss                                   = get_dtlb_miss_count();
-    cnt_bank->itlb_miss                                   = get_itlb_miss_count();
-    cnt_bank->inst                                        = get_inst_count();
-    cnt_bank->inst_user                                   = get_inst_user_count();
-    cnt_bank->inst_kernel                                 = get_inst_kernel_count();
-    cnt_bank->imprecise_setbounds                         = get_imprecise_setbounds_count();
-    cnt_bank->unrepresentable_caps                        = get_unrepresentable_caps_count();
-    cnt_bank->cycle                                       = get_cycle_count();
+    cnt_bank->icache[STATCOUNTERS_WRITE_HIT]              = statcounters_get_icache_write_hit_count();
+    cnt_bank->icache[STATCOUNTERS_WRITE_MISS]             = statcounters_get_icache_write_miss_count();
+    cnt_bank->icache[STATCOUNTERS_READ_HIT]               = statcounters_get_icache_read_hit_count();
+    cnt_bank->icache[STATCOUNTERS_READ_MISS]              = statcounters_get_icache_read_miss_count();
+    cnt_bank->icache[STATCOUNTERS_EVICT]                  = statcounters_get_icache_evict_count();
+    cnt_bank->dcache[STATCOUNTERS_WRITE_HIT]              = statcounters_get_dcache_write_hit_count();
+    cnt_bank->dcache[STATCOUNTERS_WRITE_MISS]             = statcounters_get_dcache_write_miss_count();
+    cnt_bank->dcache[STATCOUNTERS_READ_HIT]               = statcounters_get_dcache_read_hit_count();
+    cnt_bank->dcache[STATCOUNTERS_READ_MISS]              = statcounters_get_dcache_read_miss_count();
+    cnt_bank->dcache[STATCOUNTERS_EVICT]                  = statcounters_get_dcache_evict_count();
+    cnt_bank->dcache[STATCOUNTERS_SET_TAG_WRITE]          = statcounters_get_dcache_set_tag_write_count();
+    cnt_bank->dcache[STATCOUNTERS_SET_TAG_READ]           = statcounters_get_dcache_set_tag_read_count();
+    cnt_bank->l2cache[STATCOUNTERS_WRITE_HIT]             = statcounters_get_l2cache_write_hit_count();
+    cnt_bank->l2cache[STATCOUNTERS_WRITE_MISS]            = statcounters_get_l2cache_write_miss_count();
+    cnt_bank->l2cache[STATCOUNTERS_READ_HIT]              = statcounters_get_l2cache_read_hit_count();
+    cnt_bank->l2cache[STATCOUNTERS_READ_MISS]             = statcounters_get_l2cache_read_miss_count();
+    cnt_bank->l2cache[STATCOUNTERS_EVICT]                 = statcounters_get_l2cache_evict_count();
+    cnt_bank->l2cache[STATCOUNTERS_SET_TAG_WRITE]         = statcounters_get_l2cache_set_tag_write_count();
+    cnt_bank->l2cache[STATCOUNTERS_SET_TAG_READ]          = statcounters_get_l2cache_set_tag_read_count();
+    cnt_bank->l2cachemaster[STATCOUNTERS_READ_REQ]        = statcounters_get_l2cachemaster_read_req_count();
+    cnt_bank->l2cachemaster[STATCOUNTERS_WRITE_REQ]       = statcounters_get_l2cachemaster_write_req_count();
+    cnt_bank->l2cachemaster[STATCOUNTERS_WRITE_REQ_FLIT]  = statcounters_get_l2cachemaster_write_req_flit_count();
+    cnt_bank->l2cachemaster[STATCOUNTERS_READ_RSP]        = statcounters_get_l2cachemaster_read_rsp_count();
+    cnt_bank->l2cachemaster[STATCOUNTERS_READ_RSP_FLIT]   = statcounters_get_l2cachemaster_read_rsp_flit_count();
+    cnt_bank->l2cachemaster[STATCOUNTERS_WRITE_RSP]       = statcounters_get_l2cachemaster_write_rsp_count();
+    cnt_bank->tagcache[STATCOUNTERS_WRITE_HIT]            = statcounters_get_tagcache_write_hit_count();
+    cnt_bank->tagcache[STATCOUNTERS_WRITE_MISS]           = statcounters_get_tagcache_write_miss_count();
+    cnt_bank->tagcache[STATCOUNTERS_READ_HIT]             = statcounters_get_tagcache_read_hit_count();
+    cnt_bank->tagcache[STATCOUNTERS_READ_MISS]            = statcounters_get_tagcache_read_miss_count();
+    cnt_bank->tagcache[STATCOUNTERS_EVICT]                = statcounters_get_tagcache_evict_count();
+    cnt_bank->tagcachemaster[STATCOUNTERS_READ_REQ]       = statcounters_get_tagcachemaster_read_req_count();
+    cnt_bank->tagcachemaster[STATCOUNTERS_WRITE_REQ]      = statcounters_get_tagcachemaster_write_req_count();
+    cnt_bank->tagcachemaster[STATCOUNTERS_WRITE_REQ_FLIT] = statcounters_get_tagcachemaster_write_req_flit_count();
+    cnt_bank->tagcachemaster[STATCOUNTERS_READ_RSP]       = statcounters_get_tagcachemaster_read_rsp_count();
+    cnt_bank->tagcachemaster[STATCOUNTERS_READ_RSP_FLIT]  = statcounters_get_tagcachemaster_read_rsp_flit_count();
+    cnt_bank->tagcachemaster[STATCOUNTERS_WRITE_RSP]      = statcounters_get_tagcachemaster_write_rsp_count();
+    cnt_bank->mipsmem[STATCOUNTERS_BYTE_READ]             = statcounters_get_mem_byte_read_count();
+    cnt_bank->mipsmem[STATCOUNTERS_BYTE_WRITE]            = statcounters_get_mem_byte_write_count();
+    cnt_bank->mipsmem[STATCOUNTERS_HWORD_READ]            = statcounters_get_mem_hword_read_count();
+    cnt_bank->mipsmem[STATCOUNTERS_HWORD_WRITE]           = statcounters_get_mem_hword_write_count();
+    cnt_bank->mipsmem[STATCOUNTERS_WORD_READ]             = statcounters_get_mem_word_read_count();
+    cnt_bank->mipsmem[STATCOUNTERS_WORD_WRITE]            = statcounters_get_mem_word_write_count();
+    cnt_bank->mipsmem[STATCOUNTERS_DWORD_READ]            = statcounters_get_mem_dword_read_count();
+    cnt_bank->mipsmem[STATCOUNTERS_DWORD_WRITE]           = statcounters_get_mem_dword_write_count();
+    cnt_bank->mipsmem[STATCOUNTERS_CAP_READ]              = statcounters_get_mem_cap_read_count();
+    cnt_bank->mipsmem[STATCOUNTERS_CAP_WRITE]             = statcounters_get_mem_cap_write_count();
+    cnt_bank->mipsmem[STATCOUNTERS_CAP_READ_TAG_SET]      = statcounters_get_mem_cap_read_tag_set_count();
+    cnt_bank->mipsmem[STATCOUNTERS_CAP_WRITE_TAG_SET]     = statcounters_get_mem_cap_write_tag_set_count();
+    cnt_bank->dtlb_miss                                   = statcounters_get_dtlb_miss_count();
+    cnt_bank->itlb_miss                                   = statcounters_get_itlb_miss_count();
+    cnt_bank->inst                                        = statcounters_get_inst_count();
+    cnt_bank->inst_user                                   = statcounters_get_inst_user_count();
+    cnt_bank->inst_kernel                                 = statcounters_get_inst_kernel_count();
+    cnt_bank->imprecise_setbounds                         = statcounters_get_imprecise_setbounds_count();
+    cnt_bank->unrepresentable_caps                        = statcounters_get_unrepresentable_caps_count();
+    cnt_bank->cycle                                       = statcounters_get_cycle_count();
     return 0;
 }
 

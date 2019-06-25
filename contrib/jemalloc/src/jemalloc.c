@@ -30,6 +30,11 @@
 #include "jemalloc/internal/ticker.h"
 #include "jemalloc/internal/util.h"
 
+
+/* Check that we are using je_assert instead of assert(): */
+_Static_assert(__CONCAT(_assert_macro_expansion_is_, assert) == 1,
+    "Should be using je_assert and not assert() from assert.h");
+
 /******************************************************************************/
 /* Data. */
 
@@ -213,8 +218,7 @@ typedef struct {
  * handling is probalby needed in each individual function, returning
  * an appropriate error value.
  */
-#define	ROUND_SIZE(size)						\
-    roundup2((size), (1ULL << CHERI_ALIGN_SHIFT(size)))
+#define	ROUND_SIZE(size)	CHERI_REPRESENTABLE_LENGTH(size)
 #endif
 
 /* Whether encountered any invalid config options. */
@@ -798,6 +802,11 @@ init_opt_stats_print_opts(const char *v, size_t vlen) {
 	assert(opts_len == strlen(opt_stats_print_opts));
 }
 
+static inline ptrdiff_t
+pointer_distance(const void* end, const void* start) {
+	return (const uint8_t*)end - (const uint8_t*)start;
+}
+
 static bool
 malloc_conf_next(char const **opts_p, char const **k_p, size_t *klen_p,
     char const **v_p, size_t *vlen_p) {
@@ -825,7 +834,7 @@ malloc_conf_next(char const **opts_p, char const **k_p, size_t *klen_p,
 			break;
 		case ':':
 			opts++;
-			*klen_p = (uintptr_t)opts - 1 - (uintptr_t)*k_p;
+			*klen_p = pointer_distance(opts, *k_p) - 1;
 			*v_p = opts;
 			accept = true;
 			break;
@@ -856,11 +865,11 @@ malloc_conf_next(char const **opts_p, char const **k_p, size_t *klen_p,
 				malloc_write("<jemalloc>: Conf string ends "
 				    "with comma\n");
 			}
-			*vlen_p = (uintptr_t)opts - 1 - (uintptr_t)*v_p;
+			*vlen_p = pointer_distance(opts, *v_p) - 1;
 			accept = true;
 			break;
 		case '\0':
-			*vlen_p = (uintptr_t)opts - (uintptr_t)*v_p;
+			*vlen_p = pointer_distance(opts, *v_p);
 			accept = true;
 			break;
 		default:
@@ -1015,8 +1024,8 @@ malloc_conf_init(void) {
 									\
 				set_errno(0);				\
 				um = malloc_strtoumax(v, &end, 0);	\
-				if (get_errno() != 0 || (uintptr_t)end -\
-				    (uintptr_t)v != vlen) {		\
+				if (get_errno() != 0 || 		\
+				    pointer_distance(end, v) != vlen) {	\
 					malloc_conf_error(		\
 					    "Invalid conf value",	\
 					    k, klen, v, vlen);		\
@@ -1060,8 +1069,8 @@ malloc_conf_init(void) {
 									\
 				set_errno(0);				\
 				l = strtol(v, &end, 0);			\
-				if (get_errno() != 0 || (uintptr_t)end -\
-				    (uintptr_t)v != vlen) {		\
+				if (get_errno() != 0 || 		\
+				    pointer_distance(end, v) != vlen) {	\
 					malloc_conf_error(		\
 					    "Invalid conf value",	\
 					    k, klen, v, vlen);		\

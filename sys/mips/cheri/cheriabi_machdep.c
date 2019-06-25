@@ -743,7 +743,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
 	u_long auxv, stackbase, stacklen;
-	size_t map_base, map_length, text_end, code_end;
+	size_t map_base, map_length, text_end, code_end, code_length;
 #ifdef CHERIABI_LEGACY_SUPPORT
 	size_t data_length;
 #else
@@ -781,7 +781,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	/*
 	 * Round the stack down as required to make it representable.
 	 */
-	stacklen = rounddown2(stacklen, 1ULL << CHERI_ALIGN_SHIFT(stacklen));
+	stacklen = rounddown2(stacklen, CHERI_REPRESENTABLE_ALIGNMENT(stacklen));
 	td->td_frame->csp = cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, stacklen);
 
@@ -790,7 +790,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
 	if (imgp->end_addr != 0) {
 		text_end = roundup2(imgp->end_addr,
-		    1ULL << CHERI_SEAL_ALIGN_SHIFT(imgp->end_addr));
+		    CHERI_SEALABLE_ALIGNMENT(imgp->end_addr - imgp->start_addr));
 		/*
 		 * Less confusing rounded up to a page and 256-bit
 		 * requires no other rounding.
@@ -798,19 +798,19 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 		text_end = roundup2(text_end, PAGE_SIZE);
 	} else {
 		text_end = rounddown2(stackbase,
-		    1ULL << CHERI_SEAL_ALIGN_SHIFT(stackbase));
+		    CHERI_SEALABLE_ALIGNMENT(stackbase));
 	}
 	KASSERT(text_end <= stackbase,
 	    ("text_end 0x%zx > stackbase 0x%lx", text_end, stackbase));
 
 	map_base = (text_end == stackbase) ?
 	    CHERI_CAP_USER_MMAP_BASE :
-	    roundup2(text_end, 1ULL << CHERI_ALIGN_SHIFT(stackbase - text_end));
+	    roundup2(text_end, CHERI_REPRESENTABLE_ALIGNMENT(stackbase - text_end));
 	KASSERT(map_base < stackbase,
 	    ("map_base 0x%zx >= stackbase 0x%lx", map_base, stackbase));
 	map_length = stackbase - map_base;
 	map_length = rounddown2(map_length,
-	    1ULL << CHERI_ALIGN_SHIFT(map_length));
+	    CHERI_REPRESENTABLE_ALIGNMENT(map_length));
 	/*
 	 * Use cheri_capability_build_user_rwx so mmap() can return
 	 * appropriate permissions derived from a single capability.
@@ -878,8 +878,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 */
 	code_start = imgp->interp_end ? imgp->reloc_base : 0;
 	/* Ensure CHERI128 representability */
-	code_end = roundup2(code_end, 1ULL << CHERI_ALIGN_SHIFT(code_end));
-	code_start = rounddown2(code_start, 1ULL << CHERI_ALIGN_SHIFT(code_end));
+	code_length = code_end - code_start;
+	code_start = CHERI_REPRESENTABLE_BASE(code_start, code_length);
+	code_length = CHERI_REPRESENTABLE_LENGTH(code_length);
+	code_end = code_start + code_length;
 	frame->pcc = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
 	    code_start, code_end - code_start, imgp->entry_addr - code_start);
 	/* Ensure that frame->pc is the offset of frame->pcc (needed for eret) */
@@ -912,10 +914,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 */
 	if (imgp->reloc_base) {
 		vaddr_t rtld_base = imgp->reloc_base;
-		rtld_base = rounddown2(rtld_base, 1ULL << CHERI_ALIGN_SHIFT(rtld_base));
 		vaddr_t rtld_end = imgp->interp_end ? imgp->interp_end : imgp->end_addr;
 		vaddr_t rtld_len = rtld_end - rtld_base;
-		rtld_len = roundup2(rtld_len, 1ULL << CHERI_ALIGN_SHIFT(rtld_len));
+		rtld_base = CHERI_REPRESENTABLE_BASE(rtld_base, rtld_len);
+		rtld_len = CHERI_REPRESENTABLE_LENGTH(rtld_len);
 		td->td_frame->c4 = cheri_capability_build_user_data(
 		    CHERI_CAP_USER_DATA_PERMS, rtld_base, rtld_len, 0);
 	}
