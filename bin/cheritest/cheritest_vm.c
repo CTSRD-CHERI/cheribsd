@@ -675,16 +675,20 @@ check_kqueue_cap(int kq, unsigned int expected_tag)
 }
 
 static void
-fprintf_caprevoke_stats(FILE *f, struct caprevoke_stats crst)
+fprintf_caprevoke_stats(FILE *f, struct caprevoke_stats crst, uint32_t cycsum)
 {
 	fprintf(f, "stats: pscan=%" PRIu64
+		" scanc=%" PRIu64
 		" pfsk=%" PRIu64
 		" pfro=%" PRIu64
-		" pfrw=%" PRIu64 "\n",
+		" pfrw=%" PRIu64
+		" totc=%" PRIu32 "\n",
 		crst.pages_scanned,
+		crst.page_scan_cycles,
 		crst.pages_fault_skip,
 		crst.pages_faulted_ro,
-		crst.pages_faulted_rw);
+		crst.pages_faulted_rw,
+		cycsum);
 }
 
 void
@@ -695,6 +699,7 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	void * __capability revme;
 	struct caprevoke_stats crst;
 	int kq;
+	uint32_t cyc_start, cyc_end;
 	uint64_t oepoch;
 
 	kq = CHERITEST_CHECK_SYSCALL(kqueue());
@@ -729,10 +734,14 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_JUST_THE_TIME, 0, &crst));
 	oepoch = crst.epoch;
 
+	cyc_start = cheri_get_cyclecount();
 	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS, oepoch, &crst));
+	cyc_end = cheri_get_cyclecount();
+
 	CHERITEST_VERIFY2(crst.epoch >= oepoch + 2, "Bad epoch clock state");
-	fprintf_caprevoke_stats(stderr, crst);
 	oepoch = crst.epoch;
+
+	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
 	CHERITEST_VERIFY2(cheri_gettag(mb[1]) == 0, "Memory tag persists");
 	check_kqueue_cap(kq, 0);
@@ -751,12 +760,18 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	((void * __capability *)mb)[1] = revme;
 	install_kqueue_cap(kq, revme);
 
+	cyc_start = cheri_get_cyclecount();
 	CHERITEST_CHECK_SYSCALL(caprevoke(0, oepoch, &crst));
-	CHERITEST_VERIFY2(crst.epoch >= oepoch + 1, "Bad epoch clock state");
-	fprintf_caprevoke_stats(stderr, crst);
+	cyc_end = cheri_get_cyclecount();
 
+	CHERITEST_VERIFY2(crst.epoch >= oepoch + 1, "Bad epoch clock state");
+	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+
+	cyc_start = cheri_get_cyclecount();
 	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS, oepoch, &crst));
-	fprintf_caprevoke_stats(stderr, crst);
+	cyc_end = cheri_get_cyclecount();
+
+	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
 	CHERITEST_VERIFY2(cheri_gettag(mb[1]) != 0, "Memory tag cleared");
 
@@ -810,6 +825,7 @@ test_caprevoke_lib(const struct cheri_test *ctp __unused)
 	void * __capability shadow;
 
 	size_t bigblock_offset = 0;
+	uint32_t cyc_start, cyc_end;
 
 	srand(1337);
 
@@ -901,10 +917,12 @@ test_caprevoke_lib(const struct cheri_test *ctp __unused)
 		CHERITEST_CHECK_SYSCALL(
 			caprevoke(CAPREVOKE_JUST_THE_TIME, 0, &crst));
 
+		cyc_start = cheri_get_cyclecount();
 		CHERITEST_CHECK_SYSCALL(
 			caprevoke(CAPREVOKE_LAST_PASS, crst.epoch, &crst));
+		cyc_end = cheri_get_cyclecount();
 		if (verbose > 2) {
-			fprintf_caprevoke_stats(stderr, crst);
+			fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 		}
 
 		/* Check the surroundings */
