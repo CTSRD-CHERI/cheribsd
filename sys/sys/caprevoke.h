@@ -151,7 +151,10 @@ static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
  */
 struct caprevoke_stats {
 	uint64_t	epoch;
+
 	uint64_t	pages_scanned;
+	uint64_t	page_scan_cycles;
+
 	uint64_t	pages_faulted_ro;
 	uint64_t	pages_faulted_rw;
 	uint64_t	pages_fault_skip;

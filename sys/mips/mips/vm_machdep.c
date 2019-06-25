@@ -728,8 +728,10 @@ vm_do_caprevoke(void * __capability * __capability cutp)
 }
 
 int
-vm_caprevoke_page(vm_page_t m)
+vm_caprevoke_page(vm_page_t m, uint64_t *cyclesum)
 {
+	uint32_t cyc_start = cyclesum ? cheri_get_cyclecount() : 0;
+
 	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
 	vm_offset_t mva;
 	vm_offset_t mve;
@@ -775,6 +777,10 @@ vm_caprevoke_page(vm_page_t m)
 		}
 	}
 
+	uint32_t cyc_end = cyclesum ? cheri_get_cyclecount() : 0;
+
+	if (cyclesum)
+		*cyclesum += cyc_end - cyc_start;
 
 	return res;
 }

@@ -613,7 +613,7 @@ void vm_page_lock_assert_KBI(vm_page_t m, int a, const char *file, int line);
 #ifdef CPU_CHERI
 #define VM_CAPREVOKE_PAGE_HASCAPS	0x01
 #define VM_CAPREVOKE_PAGE_DIRTY		0x02
-int vm_caprevoke_page(vm_page_t m);
+int vm_caprevoke_page(vm_page_t m, uint64_t *cyclesum);
 #endif
 
 #define	vm_page_assert_sbusied(m)					\

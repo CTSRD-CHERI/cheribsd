@@ -126,7 +126,7 @@ vm_caprevoke_object(vm_object_t obj, vm_offset_t eo, int flags,
 
 retry:
 			stat->pages_scanned++;
-			hascaps = vm_caprevoke_page(m);
+			hascaps = vm_caprevoke_page(m, &stat->page_scan_cycles);
 
 			/* CAS failures cause us to revisit */
 			if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
