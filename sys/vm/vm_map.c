@@ -2508,11 +2508,8 @@ again:
 
 	VM_MAP_RANGE_CHECK(map, start, end);
 
-	if (vm_map_lookup_entry(map, start, &entry)) {
-		vm_map_clip_start(map, entry, start);
-	} else {
+	if (!vm_map_lookup_entry(map, start, &entry))
 		entry = entry->next;
-	}
 
 	/*
 	 * Make a first pass to check for protection violations.
@@ -2551,6 +2548,7 @@ again:
 	 * now will do cow due to allowed write (e.g. debugger sets
 	 * breakpoint on text segment)
 	 */
+	vm_map_clip_start(map, entry, start);
 	for (current = entry; current->start < end; current = current->next) {
 
 		vm_map_clip_end(map, current, end);
