@@ -82,6 +82,7 @@
 #define	cheri_local(c)		cheri_andperm((c), ~CHERI_PERM_GLOBAL)
 
 #define	cheri_csetbounds(x, y)	__builtin_cheri_bounds_set((x), (y))
+#define	cheri_csetboundsexact(x, y)	__builtin_cheri_bounds_set_exact((x), (y))
 /* XXXAR: shouldn't this be the default and we add cheri_csetbounds_untyped? */
 #define	cheri_csetbounds_changetype(type, x, y)	\
 	(type)cheri_csetbounds((x), (y)))

@@ -3,7 +3,7 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181121,
+ *   "updated": 201906024,
  *   "target_type": "lib",
  *   "changes": [
  *     "pointer_bit_flags",
@@ -44,10 +44,8 @@
 #  error Unsupported number of significant virtual address bits
 #endif
 /* Use compact leaf representation if virtual address encoding allows. */
-#ifndef __CHERI_PURE_CAPABILITY__
 #if RTREE_NHIB >= LG_CEIL_NSIZES
 #  define RTREE_LEAF_COMPACT
-#endif
 #endif
 
 /* Needed for initialization only. */
@@ -71,9 +69,22 @@ struct rtree_leaf_elm_s {
 	 * b: slab
 	 *
 	 *   00000000 xxxxxxxx eeeeeeee [...] eeeeeeee eeee000b
+	 *
+	 * On CHERI, where manipulation of the high bits is tricky, we are
+	 * nevertheless able to squeeze all metadata into a capability pointing
+	 * to the extent.  We always mean to point to the base (i.e., a zero
+	 * offset relative to the start) of an extent, and so can safely abuse
+	 * the CHERI capability offset field to store at least 9 bits, even in
+	 * the CHERI Concentrate architectural encoding.  Conveniently, 9 bits
+	 * are exactly what we need. The extent pointer (e) is recovered by
+	 * setting the offset to 0, while the slab flag (b) is the LSB of the
+	 * offset and the size index (x) is the next 8 bits above that; all
+	 * further bits of the offset are maintained 0.
 	 */
 	atomic_p_t	le_bits;
+// #pragma message("Using packed rtree leaf encoding")
 #else
+#pragma message("Using inefficient rtree leaf encoding")
 	atomic_p_t	le_extent; /* (extent_t *) */
 	atomic_u_t	le_szind; /* (szind_t) */
 	atomic_b_t	le_slab; /* (bool) */
@@ -184,16 +195,21 @@ rtree_subkey(vaddr_t key, unsigned level) {
  *             could result if synchronization were omitted here.
  */
 #  ifdef RTREE_LEAF_COMPACT
-JEMALLOC_ALWAYS_INLINE vaddr_t
+JEMALLOC_ALWAYS_INLINE uintptr_t
 rtree_leaf_elm_bits_read(tsdn_t *tsdn, rtree_t *rtree, rtree_leaf_elm_t *elm,
     bool dependent) {
-	return (vaddr_t)atomic_load_p(&elm->le_bits, dependent
+	return (uintptr_t)atomic_load_p(&elm->le_bits, dependent
 	    ? ATOMIC_RELAXED : ATOMIC_ACQUIRE);
 }
 
 JEMALLOC_ALWAYS_INLINE extent_t *
 rtree_leaf_elm_bits_extent_get(uintptr_t bits) {
-#    ifdef __aarch64__
+#    ifdef __CHERI_PURE_CAPABILITY__
+	/* We use the offset to store the other bits -> set offset to zero */
+	assert((vaddr_t)cheri_getoffset((void*)bits) < (1 << 10) &&
+	    "Should store at most 9 bits in the offset field!");
+	return (extent_t *)cheri_setoffset((void*)bits, 0);
+#    elif defined(__aarch64__)
 	/*
 	 * aarch64 doesn't sign extend the highest virtual address bit to set
 	 * the higher ones.  Instead, the high bits gets zeroed.
@@ -211,13 +227,25 @@ rtree_leaf_elm_bits_extent_get(uintptr_t bits) {
 }
 
 JEMALLOC_ALWAYS_INLINE szind_t
-rtree_leaf_elm_bits_szind_get(vaddr_t bits) {
+rtree_leaf_elm_bits_szind_get(uintptr_t bits) {
+#    ifdef __CHERI_PURE_CAPABILITY__
+	/* Lowest bit of offset is the boolean flag -> shift by one for szind */
+	vaddr_t szind_raw = (vaddr_t)cheri_getoffset((void*)bits) >> 1;
+	assert((szind_raw >> 8) == 0 && "All offset bits above szind should be zero!");
+	return (szind_t)szind_raw;
+#    else
 	return (szind_t)(bits >> LG_VADDR);
+#    endif
 }
 
 JEMALLOC_ALWAYS_INLINE bool
-rtree_leaf_elm_bits_slab_get(vaddr_t bits) {
+rtree_leaf_elm_bits_slab_get(uintptr_t bits) {
+#    ifdef __CHERI_PURE_CAPABILITY__
+	/* Lowest bit of offset is the boolean flag */
+	return (bool)(cheri_getoffset((void*)bits) & 0x1);
+#    else
 	return (bool)(bits & (vaddr_t)0x1);
+#    endif
 }
 
 #  endif
@@ -226,11 +254,14 @@ JEMALLOC_ALWAYS_INLINE extent_t *
 rtree_leaf_elm_extent_read(UNUSED tsdn_t *tsdn, UNUSED rtree_t *rtree,
     rtree_leaf_elm_t *elm, bool dependent) {
 #ifdef RTREE_LEAF_COMPACT
-	vaddr_t bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm, dependent);
+	uintptr_t bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm, dependent);
 	return rtree_leaf_elm_bits_extent_get(bits);
 #else
 	extent_t *extent = (extent_t *)atomic_load_p(&elm->le_extent, dependent
 	    ? ATOMIC_RELAXED : ATOMIC_ACQUIRE);
+#ifdef __CHERI_PURE_CAPABILITY__
+	assert(cheri_getoffset(extent) == 0 && "Offset must be zero for packing");
+#endif
 	return extent;
 #endif
 }
@@ -239,7 +270,7 @@ JEMALLOC_ALWAYS_INLINE szind_t
 rtree_leaf_elm_szind_read(UNUSED tsdn_t *tsdn, UNUSED rtree_t *rtree,
     rtree_leaf_elm_t *elm, bool dependent) {
 #ifdef RTREE_LEAF_COMPACT
-	vaddr_t bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm, dependent);
+	uintptr_t bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm, dependent);
 	return rtree_leaf_elm_bits_szind_get(bits);
 #else
 	return (szind_t)atomic_load_u(&elm->le_szind, dependent ? ATOMIC_RELAXED
@@ -251,7 +282,7 @@ JEMALLOC_ALWAYS_INLINE bool
 rtree_leaf_elm_slab_read(UNUSED tsdn_t *tsdn, UNUSED rtree_t *rtree,
     rtree_leaf_elm_t *elm, bool dependent) {
 #ifdef RTREE_LEAF_COMPACT
-	vaddr_t bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm, dependent);
+	uintptr_t bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm, dependent);
 	return rtree_leaf_elm_bits_slab_get(bits);
 #else
 	return atomic_load_b(&elm->le_slab, dependent ? ATOMIC_RELAXED :
@@ -263,10 +294,17 @@ static inline void
 rtree_leaf_elm_extent_write(UNUSED tsdn_t *tsdn, UNUSED rtree_t *rtree,
     rtree_leaf_elm_t *elm, extent_t *extent) {
 #ifdef RTREE_LEAF_COMPACT
-	vaddr_t old_bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm, true);
-	vaddr_t bits = ((vaddr_t)rtree_leaf_elm_bits_szind_get(old_bits) <<
-	    LG_VADDR) | ((vaddr_t)extent & (((vaddr_t)0x1 << LG_VADDR) - 1))
-	    | ((vaddr_t)rtree_leaf_elm_bits_slab_get(old_bits));
+	uintptr_t old_bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm, true);
+#ifdef __CHERI_PURE_CAPABILITY__
+	assert(cheri_getoffset(extent) == 0 && "Offset must be zero for packing");
+	/* Copying the old offset to the new pointer copies szind and slab information */
+	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)extent,
+	    cheri_getoffset((void*)old_bits));
+#else
+	uintptr_t bits = ((uintptr_t)rtree_leaf_elm_bits_szind_get(old_bits) <<
+	    LG_VADDR) | ((uintptr_t)extent & (((vaddr_t)0x1 << LG_VADDR) - 1))
+	    | ((uintptr_t)rtree_leaf_elm_bits_slab_get(old_bits));
+#endif
 	atomic_store_p(&elm->le_bits, (void *)bits, ATOMIC_RELEASE);
 #else
 	atomic_store_p(&elm->le_extent, extent, ATOMIC_RELEASE);
@@ -279,12 +317,17 @@ rtree_leaf_elm_szind_write(UNUSED tsdn_t *tsdn, UNUSED rtree_t *rtree,
 	assert(szind <= NSIZES);
 
 #ifdef RTREE_LEAF_COMPACT
-	vaddr_t old_bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm,
+	uintptr_t old_bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm,
 	    true);
-	vaddr_t bits = ((vaddr_t)szind << LG_VADDR) |
-	    ((vaddr_t)rtree_leaf_elm_bits_extent_get(old_bits) &
-	    (((vaddr_t)0x1 << LG_VADDR) - 1)) |
-	    ((vaddr_t)rtree_leaf_elm_bits_slab_get(old_bits));
+#ifdef __CHERI_PURE_CAPABILITY__
+	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)old_bits,
+	    (vaddr_t)szind << 1 | (vaddr_t)rtree_leaf_elm_bits_slab_get(old_bits));
+#else
+	uintptr_t bits = ((uintptr_t)szind << LG_VADDR) |
+	    ((uintptr_t)rtree_leaf_elm_bits_extent_get(old_bits) &
+	    (((uintptr_t)0x1 << LG_VADDR) - 1)) |
+	    ((uintptr_t)rtree_leaf_elm_bits_slab_get(old_bits));
+#endif
 	atomic_store_p(&elm->le_bits, (void *)bits, ATOMIC_RELEASE);
 #else
 	atomic_store_u(&elm->le_szind, szind, ATOMIC_RELEASE);
@@ -295,11 +338,16 @@ static inline void
 rtree_leaf_elm_slab_write(UNUSED tsdn_t *tsdn, UNUSED rtree_t *rtree,
     rtree_leaf_elm_t *elm, bool slab) {
 #ifdef RTREE_LEAF_COMPACT
-	vaddr_t old_bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm,
+	uintptr_t old_bits = rtree_leaf_elm_bits_read(tsdn, rtree, elm,
 	    true);
-	vaddr_t bits = ((vaddr_t)rtree_leaf_elm_bits_szind_get(old_bits) <<
-	    LG_VADDR) | ((vaddr_t)rtree_leaf_elm_bits_extent_get(old_bits) &
-	    (((vaddr_t)0x1 << LG_VADDR) - 1)) | ((vaddr_t)slab);
+#ifdef __CHERI_PURE_CAPABILITY__
+	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)old_bits,
+	    (vaddr_t)rtree_leaf_elm_bits_szind_get(old_bits) << 1 | (vaddr_t)slab);
+#else
+	uintptr_t bits = ((uintptr_t)rtree_leaf_elm_bits_szind_get(old_bits) <<
+	    LG_VADDR) | ((uintptr_t)rtree_leaf_elm_bits_extent_get(old_bits) &
+	    (((uintptr_t)0x1 << LG_VADDR) - 1)) | ((uintptr_t)slab);
+#endif
 	atomic_store_p(&elm->le_bits, (void *)bits, ATOMIC_RELEASE);
 #else
 	atomic_store_b(&elm->le_slab, slab, ATOMIC_RELEASE);
@@ -310,9 +358,15 @@ static inline void
 rtree_leaf_elm_write(tsdn_t *tsdn, rtree_t *rtree, rtree_leaf_elm_t *elm,
     extent_t *extent, szind_t szind, bool slab) {
 #ifdef RTREE_LEAF_COMPACT
-	vaddr_t bits = ((vaddr_t)szind << LG_VADDR) |
-	    ((vaddr_t)extent & (((vaddr_t)0x1 << LG_VADDR) - 1)) |
-	    ((vaddr_t)slab);
+#ifdef __CHERI_PURE_CAPABILITY__
+	assert(cheri_getoffset(extent) == 0 && "Offset must be zero for packing");
+	uintptr_t bits = (uintptr_t)cheri_setoffset((void*)extent,
+	    szind << 1 | (vaddr_t)slab);
+#else
+	uintptr_t bits = ((uintptr_t)szind << LG_VADDR) |
+	    ((uintptr_t)extent & (((uintptr_t)0x1 << LG_VADDR) - 1)) |
+	    ((uintptr_t)slab);
+#endif
 	atomic_store_p(&elm->le_bits, (void *)bits, ATOMIC_RELEASE);
 #else
 	rtree_leaf_elm_slab_write(tsdn, rtree, elm, slab);
@@ -337,6 +391,24 @@ rtree_leaf_elm_szind_slab_update(tsdn_t *tsdn, rtree_t *rtree,
 	rtree_leaf_elm_slab_write(tsdn, rtree, elm, slab);
 	rtree_leaf_elm_szind_write(tsdn, rtree, elm, szind);
 }
+
+
+/* Work around a clang false positive in -Warray-bounds */
+#if defined(__clang__) && defined(__has_warning)
+# if __has_warning("-Warray-bounds")
+#  define DISABLE_ARRAY_BOUNDS_WARNING() \
+    _Pragma("clang diagnostic push")  \
+    _Pragma("clang diagnostic ignored \"-Warray-bounds\"")
+#  define ENABLE_ARRAY_BOUNDS_WARNING() \
+    _Pragma("clang diagnostic pop")
+# endif
+#endif
+#ifndef DISABLE_ARRAY_BOUNDS_WARNING
+# define DISABLE_ARRAY_BOUNDS_WARNING()
+#endif
+#ifndef ENABLE_ARRAY_BOUNDS_WARNING
+# define ENABLE_ARRAY_BOUNDS_WARNING()
+#endif
 
 JEMALLOC_ALWAYS_INLINE rtree_leaf_elm_t *
 rtree_leaf_elm_lookup(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
@@ -365,6 +437,7 @@ rtree_leaf_elm_lookup(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 		assert(leaf != NULL);					\
 		if (i > 0) {						\
 			/* Bubble up by one. */				\
+			DISABLE_ARRAY_BOUNDS_WARNING() /* i > 1, safe */	\
 			rtree_ctx->l2_cache[i].leafkey =		\
 				rtree_ctx->l2_cache[i - 1].leafkey;	\
 			rtree_ctx->l2_cache[i].leaf =			\
@@ -373,6 +446,7 @@ rtree_leaf_elm_lookup(tsdn_t *tsdn, rtree_t *rtree, rtree_ctx_t *rtree_ctx,
 			    rtree_ctx->cache[slot].leafkey;		\
 			rtree_ctx->l2_cache[i - 1].leaf =		\
 			    rtree_ctx->cache[slot].leaf;		\
+			ENABLE_ARRAY_BOUNDS_WARNING()			\
 		} else {						\
 			rtree_ctx->l2_cache[0].leafkey =		\
 			    rtree_ctx->cache[slot].leafkey;		\

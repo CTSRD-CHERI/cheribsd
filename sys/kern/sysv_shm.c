@@ -542,7 +542,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			 *
 			 * XXX: 12 should probably be the superpage shift.
 			 */
-			find_space = CHERI_ALIGN_SHIFT(size) < 12 ?
+			find_space = CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
 			shmaddr = td->td_md.md_cheri_mmap_cap;
@@ -583,7 +583,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		shmaddr = cheri_setoffset(shmaddr,
 		    ptr_to_va(attach_va) - cheri_getbase(shmaddr));
 		if (cheriabi_sysv_shm_setbounds) {
-			shmaddr = cheri_csetbounds(shmaddr,
+			shmaddr = cheri_csetbounds(shmaddr, 
 			    CHERI_REPRESENTABLE_LENGTH(shmseg->u.shm_segsz));
 		}
 		/* XXX: set perms */

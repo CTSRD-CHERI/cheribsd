@@ -208,12 +208,12 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 }
 
 int
-kern_mmap(struct thread *td, uintptr_t addr0, size_t size, int prot,
+kern_mmap(struct thread *td, uintptr_t addr0, size_t len, int prot,
     int flags, int fd, off_t pos)
 {
 	struct mmap_req	mr = {
 		.mr_hint = ptr_to_va(addr0),
-		.mr_size = size,
+		.mr_len = len,
 		.mr_prot = prot,
 		.mr_flags = flags,
 		.mr_fd = fd,
@@ -230,7 +230,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	struct file *fp;
 	off_t pos;
 	vm_offset_t addr_mask = PAGE_MASK;
-	vm_size_t pageoff, size;
+	vm_size_t len, pageoff, size;
 	vm_ptr_t addr;
 	vm_offset_t max_addr;
 	vm_prot_t cap_maxprot;
@@ -239,7 +239,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 
 	addr = mrp->mr_hint;
 	max_addr = mrp->mr_max_addr;
-	size = mrp->mr_size;
+	len = mrp->mr_len;
 	max_prot = EXTRACT_PROT_MAX(mrp->mr_prot);
 	prot = EXTRACT_PROT(mrp->mr_prot);
 	flags = mrp->mr_flags;
@@ -276,9 +276,9 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	 * pos.
 	 */
 	if (!SV_CURPROC_FLAG(SV_AOUT)) {
-		if ((size == 0 && curproc->p_osrel >= P_OSREL_MAP_ANON) ||
+		if ((len == 0 && curproc->p_osrel >= P_OSREL_MAP_ANON) ||
 		    ((flags & MAP_ANON) != 0 && (fd != -1 || pos != 0))) {
-			SYSERRCAUSE("%s: size == 0", __func__);
+			SYSERRCAUSE("%s: len == 0", __func__);
 			return (EINVAL);
 		}
 	} else {
@@ -346,9 +346,12 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	pageoff = (pos & PAGE_MASK);
 	pos -= pageoff;
 
-	/* Adjust size for rounding (on both ends). */
-	size += pageoff;			/* low end... */
-	size = (vm_size_t) round_page(size);	/* hi end */
+	/* Compute size from len by rounding (on both ends). */
+	size = len + pageoff;			/* low end... */
+	size = round_page(size);		/* hi end */
+	/* Check for rounding up to zero. */
+	if (len > size)
+		return (ENOMEM);
 
 	align = flags & MAP_ALIGNMENT_MASK;
 #ifndef CPU_CHERI
@@ -364,14 +367,14 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	 */
 	if (align == MAP_ALIGNED_CHERI) {
 		flags &= ~MAP_ALIGNMENT_MASK;
-		if (CHERI_ALIGN_SHIFT(size) > PAGE_SHIFT) {
+		if (CHERI_REPRESENTABLE_ALIGNMENT(size) > (1UL << PAGE_SHIFT)) {
 			flags |= MAP_ALIGNED(CHERI_ALIGN_SHIFT(size));
 
-			if (size & CHERI_ALIGN_MASK(size) &&
-			    cheriabi_mmap_precise_bounds) {
+			if (size != CHERI_REPRESENTABLE_LENGTH(size) &&
+			    (cheriabi_mmap_precise_bounds || (flags & MAP_FIXED))) {
 				SYSERRCAUSE("%s: MAP_ALIGNED_CHERI and size "
 				    "(0x%zx) is insufficently rounded (mask "
-				    "0x%llx)", __func__, size,
+				    "0x%lx)", __func__, size,
 				    CHERI_ALIGN_MASK(size));
 				return (ERANGE);
 			}
@@ -382,19 +385,19 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		align = flags & MAP_ALIGNMENT_MASK;
 	} else if (align == MAP_ALIGNED_CHERI_SEAL) {
 		flags &= ~MAP_ALIGNMENT_MASK;
-		if (CHERI_SEAL_ALIGN_SHIFT(size) > PAGE_SHIFT) {
+		if (CHERI_SEALABLE_ALIGNMENT(size) > (1UL << PAGE_SHIFT)) {
 			flags |= MAP_ALIGNED(CHERI_SEAL_ALIGN_SHIFT(size));
 
-			if (size & CHERI_SEAL_ALIGN_MASK(size) &&
-			    cheriabi_mmap_precise_bounds) {
+			if (size != CHERI_SEALABLE_LENGTH(size) &&
+			    (cheriabi_mmap_precise_bounds || (flags & MAP_FIXED))) {
 				SYSERRCAUSE("%s: MAP_ALIGNED_CHERI_SEAL and "
 				    "size (0x%zx) is insufficently rounded "
-				    "(mask 0x%llx)", __func__, size,
+				    "(mask 0x%lx)", __func__, size,
 				    CHERI_SEAL_ALIGN_MASK(size));
 				return (ERANGE);
 			}
 
-			if (CHERI_ALIGN_MASK(size) != 0)
+			if (CHERI_SEAL_ALIGN_MASK(size) != 0)
 				addr_mask = CHERI_SEAL_ALIGN_MASK(size);
 		}
 		align = flags & MAP_ALIGNMENT_MASK;
@@ -428,8 +431,8 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		}
 
 		/* Address range must be all in user VM space. */
-		if (addr < vm_map_min(&vms->vm_map) ||
-		    addr + size > vm_map_max(&vms->vm_map)) {
+		if (ptr_to_va(addr) < vm_map_min(&vms->vm_map) ||
+		    ptr_to_va(addr) + size > vm_map_max(&vms->vm_map)) {
 			SYSERRCAUSE("%s: range (%p-%p) is outside user "
 			    "address range (%p-%p)", __func__, (void *)addr,
 			    (void *)(addr + size),
@@ -437,7 +440,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 			    (void *)(uintptr_t)vm_map_max(&vms->vm_map));
 			return (EINVAL);
 		}
-		if (addr + size < addr) {
+		if (ptr_to_va(addr) + size < ptr_to_va(addr)) {
 			SYSERRCAUSE("%s: addr (%p) + size (0x%zx) overflows",
 			    __func__, (void *)addr, size);
 			return (EINVAL);
@@ -447,7 +450,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 			KASSERT(!SV_CURPROC_FLAG(SV_CHERI),
 			    ("MAP_32BIT on a CheriABI process"));
 			max_addr = MAP_32BIT_MAX_ADDR;
-			if (addr + size > MAP_32BIT_MAX_ADDR) {
+			if (ptr_to_va(addr) + size > MAP_32BIT_MAX_ADDR) {
 				SYSERRCAUSE("%s: addr (%p) + size (0x%zx) is "
 				    "> 0x%zx (MAP_32BIT_MAX_ADDR)", __func__,
 				    (void *)addr, size, MAP_32BIT_MAX_ADDR);
@@ -463,7 +466,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		 * do not bother moving the mapping past the heap (since
 		 * the heap is usually above 2GB).
 		 */
-		if (addr + size > MAP_32BIT_MAX_ADDR)
+		if (ptr_to_va(addr) + size > MAP_32BIT_MAX_ADDR)
 			addr = 0;
 #endif
 	} else {
@@ -475,14 +478,14 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		 * There should really be a pmap call to determine a reasonable
 		 * location.
 		 */
-		if (addr == 0 ||
-		    (addr >= round_page((vm_offset_t)vms->vm_taddr) &&
-		    addr < round_page((vm_offset_t)vms->vm_daddr +
+		if (ptr_to_va(addr) == 0 ||
+		    (ptr_to_va(addr) >= round_page((vm_offset_t)vms->vm_taddr) &&
+		    ptr_to_va(addr) < round_page((vm_offset_t)vms->vm_daddr +
 		    lim_max(td, RLIMIT_DATA))))
 			addr = round_page((vm_offset_t)vms->vm_daddr +
 			    lim_max(td, RLIMIT_DATA));
 	}
-	if (size == 0) {
+	if (len == 0) {
 		/*
 		 * Return success without mapping anything for old
 		 * binaries that request a page-aligned mapping of
@@ -543,7 +546,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 			     ptr_to_va(addr) + pageoff,  mrp);
 		/* Unconditionaly return the VA in td_retval[0] for ktrace */
 #endif
-		td->td_retval[0] = (register_t) (addr + pageoff);
+		td->td_retval[0] = (register_t) (ptr_to_va(addr) + pageoff);
 	}
 done:
 	if (fp)

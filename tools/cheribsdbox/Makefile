@@ -83,7 +83,9 @@ CRUNCH_LIBS+= -lfetch
 # devinfo
 CRUNCH_LIBS+= -ldevinfo
 # usbconfig
+.if ${MK_USB} != "no"
 CRUNCH_LIBS+= -lusb
+.endif
 
 # netstat needs libkvm (which needs libelf)
 CRUNCH_LIBS+= -lkvm -lelf -lmemstat
@@ -322,8 +324,12 @@ CRUNCH_PROGS_usr.sbin+= \
 		tcpdump \
 		traceroute \
 		traceroute6 \
-		usbconfig \
 		watch
+
+.if ${MK_USB} != "no"
+CRUNCH_PROGS_usr.sbin+= \
+		usbconfig
+.endif
 
 
 # Also build mount_smb for QEMU user-mode smb shares:

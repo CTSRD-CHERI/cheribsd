@@ -87,7 +87,7 @@ typedef struct {
 	struct osigcontext si_sc;
 	int		si_signo;
 	int		si_code;
-	union sigval	si_value;
+	ksigval_union	si_value;
 } osiginfo_t;
 
 struct osigaction {
@@ -215,7 +215,7 @@ struct osigevent {
 		int	__sigev_signo;	/* Signal number */
 		int	__sigev_notify_kqueue;
 	} __sigev_u;
-	union sigval sigev_value;	/* Signal value */
+	ksigval_union sigev_value;	/* Signal value */
 };
 #endif
 

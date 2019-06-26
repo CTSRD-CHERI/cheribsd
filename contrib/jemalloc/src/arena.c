@@ -385,6 +385,9 @@ arena_extent_alloc_large(tsdn_t *tsdn, arena_t *arena, size_t usize,
 		arena_nactive_add(arena, size >> LG_PAGE);
 	}
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	assert(cheri_getoffset(extent) == 0 && "extent offset must be zero for packing in rtree");
+#endif
 	return extent;
 }
 

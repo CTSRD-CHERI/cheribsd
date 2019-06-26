@@ -270,15 +270,16 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	data_vlimit = round_page(segs[i]->p_vaddr + segs[i]->p_filesz);
 	data_addr = mapbase + (data_vaddr - base_vaddr);
 	data_prot = convert_prot(segs[i]->p_flags);
-	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED;
+	/*
+	 * Set MAP_CHERI_NOSETBOUNDS to avoid the need for a precisely
+	 * representable region. We already have a valid capability and only
+	 * want to check if mapping from the file (MAP_ANON for bss) succeeded.
+	 */
+	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED | MAP_CHERI_NOSETBOUNDS;
 	dbg("Mapping %s PT_LOAD(%d) with flags 0x%x at %p", path, i,
 	    segs[i]->p_flags, data_addr, data_vlimit);
 
-	/* Map a bit more than required for CheriABI if it is not representable. */
 	size_t data_len = data_vlimit - data_vaddr;
-#ifdef __CHERI_PURE_CAPABILITY__
-	data_len = CHERI_REPRESENTABLE_LENGTH(data_len);
-#endif
 	if (mmap(data_addr, data_len, data_prot,
 	  data_flags | MAP_PREFAULT_READ, fd, data_offset) == (caddr_t) -1) {
 	    _rtld_error("%s: mmap of data failed: %s", path,
@@ -313,12 +314,9 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    /* Overlay the BSS segment onto the proper region. */
 	    bss_vaddr = data_vlimit;
 	    bss_vlimit = round_page(segs[i]->p_vaddr + segs[i]->p_memsz);
-	    bss_addr = mapbase +  (bss_vaddr - base_vaddr);
+	    bss_addr = mapbase + (bss_vaddr - base_vaddr);
 	    /* Map a bit more than required for CheriABI if it is not representable. */
 	    size_t bss_len = bss_vlimit - bss_vaddr;
-#ifdef __CHERI_PURE_CAPABILITY__
-	    bss_len = CHERI_REPRESENTABLE_LENGTH(bss_len);
-#endif
 	    if (bss_vlimit > bss_vaddr) {	/* There is something to do */
 		if (mmap(bss_addr, bss_len, data_prot,
 		    data_flags | MAP_ANON, -1, 0) == (caddr_t)-1) {

@@ -315,7 +315,9 @@ MACHINE_CPU = v9 ultrasparc ultrasparc3
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS += -G0
 # Hack for CheriBSD because clang targets a much newer CPU
-CFLAGS += -mcpu=mips4
+# -mcpu=beri ensures that instructions are scheduled so that they can execute
+# without excessive pipeline bubbles on BERI FPGAs (whereas -mcpu=mips4 doesn't)
+CFLAGS += -mcpu=beri
 . if ${MACHINE_ARCH:Mmips*el*} != ""
 AFLAGS += -EL
 CFLAGS += -EL

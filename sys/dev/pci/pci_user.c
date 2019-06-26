@@ -406,7 +406,7 @@ struct pci_match_conf_old32 {
 	pci_getconf_flags_old flags;	/* Matching expression */
 };
 
-struct pci_conf_io32 {
+struct pci_conf_io_old32 {
 	uint32_t	pat_buf_len;	/* pattern buffer length */
 	uint32_t	num_patterns;	/* number of patterns */
 	uint32_t	patterns;	/* pattern buffer
@@ -420,7 +420,7 @@ struct pci_conf_io32 {
 	pci_getconf_status status;	/* request status */
 };
 
-#define	PCIOCGETCONF_OLD32	_IOWR('p', 1, struct pci_conf_io32)
+#define	PCIOCGETCONF_OLD32	_IOWR('p', 1, struct pci_conf_io_old32)
 #endif	/* COMPAT_FREEBSD32 */
 
 #define	PCIOCGETCONF_OLD	_IOWR('p', 1, struct pci_conf_io)

@@ -684,8 +684,16 @@ moea64_setup_direct_map(mmu_t mmup, vm_offset_t kernelstart,
 	 * without a direct map or on which the kernel is not already executing
 	 * out of the direct-mapped region.
 	 */
-
-	if (!hw_direct_map || kernelstart < DMAP_BASE_ADDRESS) {
+	if (kernelstart < DMAP_BASE_ADDRESS) {
+		/*
+		 * For pre-dmap execution, we need to use identity mapping
+		 * because we will be operating with the mmu on but in the
+		 * wrong address configuration until we __restartkernel().
+		 */
+		for (pa = kernelstart & ~PAGE_MASK; pa < kernelend;
+		    pa += PAGE_SIZE)
+			moea64_kenter(mmup, pa, pa);
+	} else if (!hw_direct_map) {
 		pkernelstart = kernelstart & ~DMAP_BASE_ADDRESS;
 		pkernelend = kernelend & ~DMAP_BASE_ADDRESS;
 		for (pa = pkernelstart & ~PAGE_MASK; pa < pkernelend;
@@ -768,7 +776,7 @@ moea64_early_bootstrap(mmu_t mmup, vm_offset_t kernelstart, vm_offset_t kernelen
 	mem_regions(&pregions, &pregions_sz, &regions, &regions_sz);
 	CTR0(KTR_PMAP, "moea64_bootstrap: physical memory");
 
-	if (sizeof(phys_avail)/sizeof(phys_avail[0]) < regions_sz)
+	if (nitems(phys_avail) < regions_sz)
 		panic("moea64_bootstrap: phys_avail too small");
 
 	phys_avail_count = 0;
