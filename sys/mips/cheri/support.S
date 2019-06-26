@@ -657,8 +657,9 @@ XLEAF(suword)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csd	a0, zero, 0($c3)	# store word
 	CHERI_NULL($c2)
-	cjr	$c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	cjr	$c17
+	move	v0, zero
 1:
 	cjr	$c2	# fswberr
 	nop
@@ -678,8 +679,9 @@ XLEAF(suword32_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csw	a0, zero, 0($c3)	# store word
 	CHERI_NULL($c2)
-	cjr	$c17
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
+	cjr	$c17
+	move	v0, zero
 1:
 	cjr	$c2	# fswberr
 	nop
