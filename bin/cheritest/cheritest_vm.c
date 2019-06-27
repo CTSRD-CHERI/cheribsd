@@ -1042,4 +1042,48 @@ test_caprevoke_lib(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+void
+test_caprevoke_lib_fork(const struct cheri_test *ctp __unused)
+{
+	static const int verbose = 0;
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void * __capability * __capability bigblock;
+	void * __capability shadow;
+	const volatile struct caprevoke_info * __capability cri;
+
+	int pid;
+
+	srand(1337);
+
+	test_caprevoke_lib_init(bigblock_caps, &bigblock, &shadow, &cri);
+
+	if (verbose > 0) {
+		CHERI_FPRINT_PTR(stderr, bigblock);
+		CHERI_FPRINT_PTR(stderr, shadow);
+	}
+
+	pid = fork();
+	if (pid == 0) {
+		test_caprevoke_lib_run(verbose, paranoia, bigblock_caps,
+			bigblock, shadow, cri);
+	} else {
+		int res;
+
+		CHERITEST_VERIFY2(pid > 0, "fork failed");
+		waitpid(pid, &res, 0);
+		if (res == 0) {
+			cheritest_success();
+		} else {
+			cheritest_failure_errx("Bad child process exit");
+		}
+	}
+
+	munmap(bigblock, bigblock_caps * sizeof(void * __capability));
+
+	cheritest_success();
+}
+
 #endif
