@@ -870,7 +870,7 @@ interpret:
 #endif
 
 	/* Set values passed into the program in registers. */
-	(*p->p_sysent->sv_setregs)(td, imgp, (u_long)(uintptr_t)stack_base);
+	(*p->p_sysent->sv_setregs)(td, imgp, (u_long)ptr_to_va(stack_base));
 
 	vfs_mark_atime(imgp->vp, td->td_ucred);
 
