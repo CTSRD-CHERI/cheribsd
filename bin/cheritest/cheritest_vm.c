@@ -804,30 +804,15 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 #include <machine/vmparam.h>
 #endif
 
-void
-test_caprevoke_lib(const struct cheri_test *ctp __unused)
+static void
+test_caprevoke_lib_init(
+	size_t bigblock_caps,
+	void * __capability * __capability * obigblock,
+	void * __capability * oshadow
+)
 {
-		/* If debugging the revoker, some verbosity can help. 0 - 4. */
-	static const unsigned int verbose = 0;
-
-		/*
-		 * Tweaking paranoia can turn this test into more of a
-		 * benchmark than a correctness test.  At 0, no checks
-		 * will be performed; at 1, only the revoked object is
-		 * investigated, and at 2, the entire allocaton arena
-		 * is tested.
-		 */
-	static const int paranoia = 2;
-
-	static const size_t bigblock_caps = 4096;
-
 	void * __capability * __capability bigblock;
 	void * __capability shadow;
-
-	size_t bigblock_offset = 0;
-	uint32_t cyc_start, cyc_end;
-
-	srand(1337);
 
 	bigblock = CHERITEST_CHECK_SYSCALL(
 			mmap(0, bigblock_caps * sizeof(void * __capability),
@@ -846,13 +831,24 @@ test_caprevoke_lib(const struct cheri_test *ctp __unused)
 			caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP,
 					 bigblock, &shadow));
 
-	if (verbose > 0) {
-		CHERI_FPRINT_PTR(stderr, bigblock);
-		CHERI_FPRINT_PTR(stderr, shadow);
-	}
+	*obigblock = bigblock;
+	*oshadow = shadow;
+}
+
+static void
+test_caprevoke_lib_run(
+	int verbose,
+	int paranoia,
+	size_t bigblock_caps,
+	void * __capability * __capability bigblock,
+	void * __capability shadow
+)
+{
+	size_t bigblock_offset = 0;
 
 	while (bigblock_offset < bigblock_caps) {
 		struct caprevoke_stats crst;
+		uint32_t cyc_start, cyc_end;
 
 		size_t csz = rand() % 1024 + 1;
 		csz = MIN(csz, bigblock_caps - bigblock_offset);
@@ -955,6 +951,82 @@ test_caprevoke_lib(const struct cheri_test *ctp __unused)
 
 		__atomic_thread_fence(__ATOMIC_RELEASE);
 
+	}
+}
+
+void
+test_caprevoke_lib(const struct cheri_test *ctp __unused)
+{
+		/* If debugging the revoker, some verbosity can help. 0 - 4. */
+	static const int verbose = 0;
+
+		/*
+		 * Tweaking paranoia can turn this test into more of a
+		 * benchmark than a correctness test.  At 0, no checks
+		 * will be performed; at 1, only the revoked object is
+		 * investigated, and at 2, the entire allocaton arena
+		 * is tested.
+		 */
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void * __capability * __capability bigblock;
+	void * __capability shadow;
+
+	srand(1337);
+
+	test_caprevoke_lib_init(bigblock_caps, &bigblock, &shadow);
+
+	if (verbose > 0) {
+		CHERI_FPRINT_PTR(stderr, bigblock);
+		CHERI_FPRINT_PTR(stderr, shadow);
+	}
+
+	test_caprevoke_lib_run(verbose, paranoia, bigblock_caps,
+		bigblock, shadow);
+
+	munmap(bigblock, bigblock_caps * sizeof(void * __capability));
+
+	cheritest_success();
+}
+
+void
+test_caprevoke_lib_fork(const struct cheri_test *ctp __unused)
+{
+	static const int verbose = 0;
+	static const int paranoia = 2;
+
+	static const size_t bigblock_caps = 4096;
+
+	void * __capability * __capability bigblock;
+	void * __capability shadow;
+
+	int pid;
+
+	srand(1337);
+
+	test_caprevoke_lib_init(bigblock_caps, &bigblock, &shadow);
+
+	if (verbose > 0) {
+		CHERI_FPRINT_PTR(stderr, bigblock);
+		CHERI_FPRINT_PTR(stderr, shadow);
+	}
+
+	pid = fork();
+	if (pid == 0) {
+		test_caprevoke_lib_run(verbose, paranoia, bigblock_caps,
+			bigblock, shadow);
+	} else {
+		int res;
+
+		CHERITEST_VERIFY2(pid > 0, "fork failed");
+		waitpid(pid, &res, 0);
+		if (res == 0) {
+			cheritest_success();
+		} else {
+			cheritest_failure_errx("Bad child process exit");
+		}
 	}
 
 	munmap(bigblock, bigblock_caps * sizeof(void * __capability));

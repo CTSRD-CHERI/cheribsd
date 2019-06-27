@@ -1068,6 +1068,10 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "test_caprevoke_lib",
 	  .ct_desc = "Test libcheri_caprevoke internals",
 	  .ct_func = test_caprevoke_lib, },
+
+	{ .ct_name = "test_caprevoke_lib_fork",
+	  .ct_desc = "Test libcheri_caprevoke with fork",
+	  .ct_func = test_caprevoke_lib_fork, },
 #endif
 
 #ifdef CHERI_LIBCHERI_TESTS
