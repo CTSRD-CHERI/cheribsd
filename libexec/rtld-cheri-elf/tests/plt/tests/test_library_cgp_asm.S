@@ -65,6 +65,7 @@
 	.Lmsg_\@:
 	.asciiz "\msg"
 	.Lmsg_\@_end:
+	.size .Lmsg_\@, .Lmsg_\@_end - .Lmsg_\@
 	.text
 	.set pop
 .endm
@@ -73,6 +74,7 @@ LEAF(_get_library_cgp_with_null_caller_cgp)
 	.set	noreorder
 	.set	nomacro
 	.set	noat
+	PIC_PROLOGUE(_get_library_cgp_with_null_caller_cgp)
 	# save important registers in callee-save registers:
 	# FIXME: this breaks everything, we need to actually save to the stack
 	cmove	$c18, $cra

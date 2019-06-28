@@ -260,6 +260,7 @@ LEAF(__sys_ ## x);							\
 	_C_LABEL(x) = _C_LABEL(__CONCAT(__sys_,x));			\
 	.weak _C_LABEL(__CONCAT(_,x));					\
 	_C_LABEL(__CONCAT(_,x)) = _C_LABEL(__CONCAT(__sys_,x));		\
+	PIC_PROLOGUE(__sys_ ## x);					\
 	SYSTRAP(x);							\
 	PIC_RETURN();							\
 END(__sys_ ## x)
