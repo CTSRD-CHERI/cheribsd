@@ -1085,7 +1085,7 @@ bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 static void
 bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 {
-	vm_ptr_t buf_cl, buf_clend;
+	vm_ptr_t buf_cl = 0, buf_clend = 0;
 	vm_size_t size_cl, size_clend;
 	int cache_linesize_mask = mips_dcache_max_linesize - 1;
 #ifdef CHERI_PURECAP_KERNEL
@@ -1132,21 +1132,36 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 		tmp_va = ptr_to_va(buf) & ~cache_linesize_mask;
 		size_cl = ptr_to_va(buf) & cache_linesize_mask;
 		if (size_cl) {
-			buf_cl = (vm_ptr_t)cheri_bound(
+			/*
+			 * Note that buf_cl and tmp_cl will have the same
+			 * misalignment since buf_cl is aligned to cache line.
+			 */			
+			buf_cl = (vm_ptr_t)cheri_ptrperm(
 			    cheri_setoffset(cheri_kall_capability, tmp_va),
-			    size_cl);
-			/* Enforce the same misalignment as in buf */
-			tmp_cl += mips_dcache_max_linesize - size_cl;
+			    size_cl, CHERI_PERMS_KERNEL_DATA);
+			KASSERT(is_aligned(buf_cl, sizeof(void *)),
+			    ("dmamap cacheline head source buffer is not"
+			     " pointer aligned %p", (void *)buf_cl));
+			KASSERT(is_aligned(tmp_cl, sizeof(void *)),
+			    ("dmamap cacheline head temp buffer is not"
+			     " pointer aligned %p", tmp_cl));
 		}
+
 		tmp_va = ptr_to_va(buf + len);
 		size_clend = (mips_dcache_max_linesize -
 		    (tmp_va & cache_linesize_mask)) & cache_linesize_mask;
 		if (size_clend) {
-			buf_clend = (vm_ptr_t)cheri_bound(
+			buf_clend = (vm_ptr_t)cheri_ptrperm(
 			    cheri_setoffset(cheri_kall_capability, tmp_va),
-			    size_clend);
-			/* Enforce the same misalignment as in buf */
+			    size_clend, CHERI_PERMS_KERNEL_DATA);
+			/* Enforce the same misalignment as in buf_clend */
 			tmp_clend += mips_dcache_max_linesize - size_clend;
+
+			KASSERT((ptr_to_va(buf_clend) & cache_linesize_mask) ==
+			    (ptr_to_va(tmp_clend) & cache_linesize_mask),
+			    ("dmamap cacheline tail source and temp buffers"
+			     "have different misalignment source=%p temp=%p",
+			     (void *)buf_clend, tmp_clend));
 		}
 #else
 		buf_cl = buf & ~cache_linesize_mask;
