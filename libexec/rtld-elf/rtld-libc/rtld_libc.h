@@ -46,12 +46,9 @@
 
 int	__sys_close(int);
 void	__sys_exit(int) __dead2;
-int	__sys_fcntl(int, int, ...);
 int	__sys_fstat(int fd, struct stat *);
 int	__sys_fstatat(int, const char *, struct stat *, int);
 int	__sys___getcwd(char *, size_t);
-int	__sys_open(const char *, int, ...);
-int	__sys_openat(int, const char *, int, ...);
 int	__sys_sigprocmask(int, const sigset_t *, sigset_t *);
 int	__sys_thr_kill(long, int);
 int	__sys_thr_self(long *);
@@ -73,15 +70,41 @@ int __getosreldate(void);
 #define _close(fd)	__sys_close(fd)
 #define exit(status)	__sys_exit(status)
 #define _exit(status)	__sys_exit(status)
-#define fcntl(fd, cmd, arg)	__sys_fcntl(fd, cmd, arg)
-#define _fcntl(fd, cmd, arg)	__sys_fcntl(fd, cmd, arg)
 #define _fstat(fd, sb)	__sys_fstat(fd, sb)
-#define open(path, ...)	__sys_open(path, __VA_ARGS__)
 #define pread(fd, buf, nbytes, offset)	__sys_pread(fd, buf, nbytes, offset)
 #define read(fd, buf, nbytes)	__sys_read(fd, buf, nbytes)
 #define sigprocmask(how, set, oset)	__sys_sigprocmask(how, set, oset)
 #define strerror(errno)	rtld_strerror(errno)
 #define _write(fd, buf, nbytes)	__sys_write(fd, buf, nbytes)
 #define write(fd, buf, nbytes)	__sys_write(fd, buf, nbytes)
+
+
+// For CHERI with optional syscall args do not using the varargs calling
+// convention. Work around this by using macros with default arguments:
+#ifdef __CHERI_PURE_CAPABILITY__
+int	__sys_fcntl(int, int, intptr_t);
+int	__sys_open(const char *, int, int);
+int	__sys_openat(int, const char *, int, int);
+#else
+int	__sys_fcntl(int, int, ...);
+int	__sys_open(const char *, int, ...);
+int	__sys_openat(int, const char *, int, ...);
+#endif
+
+#define GET_FOURTH_ARG(_1,_2,_3,NAME,...) NAME
+#define GET_FIFTH_ARG(_1,_2,_3, _4, NAME,...) NAME
+#define open_2_args(path, oflag) __sys_open(path, oflag, 0)
+#define open_3_args(path, oflag, mode) __sys_open(path, oflag, mode)
+#define open(...) GET_FOURTH_ARG(__VA_ARGS__, open_3_args, open_2_args)(__VA_ARGS__)
+#define fcntl_2_args(fd, cmd)   __sys_fcntl(fd, cmd, 0)
+#define fcntl_3_args(fd, cmd, arg)  __sys_fcntl(fd, cmd, arg)
+#define fcntl(...) GET_FOURTH_ARG(__VA_ARGS__, fcntl_3_args, fcntl_2_args)(__VA_ARGS__)
+#define openat_3_args(dirfd, path, oflag) __sys_openat(dirfd, path, oflag, 0)
+#define openat_4_args(dirfd, path, oflag, mode) __sys_openat(dirfd, path, oflag, mode)
+#define openat(...) GET_FIFTH_ARG(__VA_ARGS__, openat_4_args, openat_3_args)(__VA_ARGS__)
+
+#define _fcntl(...) fcntl(__VA_ARGS__)
+#define _open(...) open(__VA_ARGS__)
+#define _openat(...) openat(__VA_ARGS__)
 
 #endif /* _RTLD_AVOID_LIBC_DEPS_H_ */

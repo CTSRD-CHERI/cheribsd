@@ -41,6 +41,7 @@
 #include <algorithm>
 
 #include "rtld.h"
+#include "rtld_libc.h"
 #include "rtld_small_vector.h"
 
 static constexpr uint8_t simple_plt_code[] = {

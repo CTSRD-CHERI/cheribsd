@@ -30,7 +30,7 @@ SRCS+=	rtld_libc.c
 SRCS+=	reallocf.c realpath.c getenv.c merge.c reallocarray.c
 # TODO: fix merge.c to build with WARNS=6
 .if ${COMPILER_TYPE} == "clang"
-CFLAGS.merge.c+=-Wno-error=null-pointer-arithmetic
+CFLAGS.merge.c+=-Wno-error=null-pointer-arithmetic -Wno-error=unused-function
 .endif
 .PATH: ${LIBC_SRCTOP}/gen
 SRCS+=	errlst.c getcwd.c getprogname.c raise.c sigsetops.c sysctlnametomib.c \
@@ -72,6 +72,18 @@ _libc_other_objects+=syncicache
 .if ${MACHINE_ARCH:Mmipsn32*} == "" && ${MACHINE_ARCH:Mmips64*} == ""
 _libc_other_objects+=umoddi3 udivdi3 qdivrem
 .endif
+# For CHERI we also use sysctlbyname
+_libc_other_objects+=sysctlbyname
+# And apparently bcmp
+_libc_other_objects+=bcmp
+.ifdef BUILDING_RTLD_CHERI_ELF
+# In purecap, mergesort uses timsort
+_libc_other_objects+=timsort
+# And setjmp is defined in setjmp_c.S
+_libc_other_objects+=setjmp_c _setjmp_c
+.endif
+
+
 .elif ${LIBC_ARCH} == "sparc64"
 # reloc.c uses __sparc_utrap which needs a lot of other object files
 _libc_other_objects+=__sparc_utrap __sparc_utrap_fp_disabled __sparc_utrap_gen \
@@ -80,21 +92,30 @@ _libc_other_objects+=__sparc_utrap __sparc_utrap_fp_disabled __sparc_utrap_gen \
     fpu_compare fpu_mul
 .endif
 
+
+.ifdef BUILDING_RTLD_CHERI_ELF
+_libc_obj_suffix=pico
+_libc_pic_path=${LIBC_PIC}
+.else
+_libc_obj_suffix=nossppico
+_libc_pic_path=${LIBC_NOSSP_PIC}
+.endif
+
 # Extract all the .o files from libc_nossp_pic.a. This ensures that
 # we don't accidentally pull in the interposing table or similar by linking
 # directly against libc_nossp_pic.a
 _rtld_libc_objs=
 .for _obj in ${_libc_other_objects} ${_libc_string_objects}
-_rtld_libc_objs+=${_obj}.nossppico
-CLEANFILES+=${_obj}.nossppico
+_rtld_libc_objs+=${_obj}.${_libc_obj_suffix}
+CLEANFILES+=${_obj}.${_libc_obj_suffix}
 # LDFLAGS+=	-Wl,--trace-symbol=${_obj}
 .endfor
 # LDFLAGS+=	-Wl,--trace
 
 # We insert all the .o files from libc_nossp_pic.a into a new rtld_libc.a file
 # to ensure that only .o files that are actually used end up being included.
-rtld_libc.a: ${LIBC_NOSSP_PIC} ${SRCTOP}/libexec/rtld-elf/rtld-libc/Makefile.inc
-	${AR} x ${LIBC_NOSSP_PIC} ${_rtld_libc_objs}
+rtld_libc.a: ${_libc_pic_path} ${SRCTOP}/libexec/rtld-elf/rtld-libc/Makefile.inc
+	${AR} x ${_libc_pic_path} ${_rtld_libc_objs}
 	${AR} cr ${.OBJDIR}/${.TARGET} ${_rtld_libc_objs}
 CLEANFILES+=rtld_libc.a
 LDADD+=${.OBJDIR}/rtld_libc.a

@@ -83,7 +83,9 @@ LDFLAGS+=	-Wl,-no-undefined
 .if ${COMPILER_VERSION} > 100000
 LDFLAGS+=	-Wl,--building-freebsd-rtld
 .endif
-LIBADD=		c_pic
+# Add all the dependencies from libc:
+BUILDING_RTLD_CHERI_ELF=yes
+.include "${SRCTOP}/libexec/rtld-elf/rtld-libc/Makefile.inc"
 
 # For floating-point functions used by gdtoa.
 LIBADD+=	compiler_rt
