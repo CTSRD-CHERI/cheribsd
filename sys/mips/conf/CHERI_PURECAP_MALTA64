@@ -25,7 +25,7 @@ nooptions	DDB
 # NOTE we run without any root filesystem driver for now
 nooptions	MSDOSFS
 nooptions	NFSD, NFSCL
-nooptions	FFS
+options		FFS
 options		CD9660
 # disable raid, we don't need it
 nooptions	GEOM_RAID

@@ -19,14 +19,16 @@ makeoptions 	KERNLOADADDR=0xffffffff80100000
 
 options		CHERI_PURECAP_KERNEL
 nooptions	CHERI_IMPLICIT_USER_DDC
+
 options 	KTRACE
 nooptions	KDB
 nooptions	DDB
-# NOTE we run without any root filesystem driver for now
+
 nooptions	MSDOSFS
 nooptions	NFSD, NFSCL
-nooptions	FFS
+options		FFS
 options		CD9660
+
 # disable raid, we don't need it
 nooptions	GEOM_RAID
 
