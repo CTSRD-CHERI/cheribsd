@@ -75,6 +75,7 @@ __FBSDID("$FreeBSD$");
 #include "rtld_malloc.h"
 #include "rtld_utrace.h"
 #include "notes.h"
+#include "rtld_libc.h"
 
 /* Types. */
 typedef void (*func_ptr_type)(void);
@@ -93,7 +94,6 @@ typedef void * (*path_enum_proc) (const char *path, size_t len, void *arg);
  */
 extern struct r_debug r_debug; /* For GDB */
 extern int _thread_autoinit_dummy_decl;
-extern char* __progname;
 extern void (*__cleanup)(void);
 
 
@@ -268,7 +268,6 @@ void _rtld_error(const char *, ...) __exported __printflike(1, 2);
 
 /* Only here to fix -Wmissing-prototypes warnings */
 int __getosreldate(void);
-void __pthread_cxa_finalize(struct dl_phdr_info *a);
 #ifdef __CHERI_PURE_CAPABILITY__
 func_ptr_type _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp);
 #else
@@ -6066,35 +6065,6 @@ __getosreldate(void)
 	return (osreldate);
 }
 
-void
-exit(int status)
-{
-
-	_exit(status);
-}
-
-void (*__cleanup)(void);
-int __isthreaded = 0;
-int _thread_autoinit_dummy_decl = 1;
-
-#ifdef __CHERI_PURE_CAPABILITY__
-/* FIXME: abort() will crash inside sigprocmask, let's just use raise() here */
-void
-abort(void)
-{
-	raise(SIGABRT);
-	 __builtin_trap();
-}
-#endif
-
-/*
- * No unresolved symbols for rtld.
- */
-void
-__pthread_cxa_finalize(struct dl_phdr_info *a __unused)
-{
-}
-
 const char *
 rtld_strerror(int errnum)
 {
@@ -6154,31 +6124,3 @@ realloc(void *cp, size_t nbytes)
 
 	return (__crt_realloc(cp, nbytes));
 }
-
-#if defined DEBUG || !defined(NDEBUG)
-/* Provide an implementation of __assert that does not pull in fprintf() */
-void
-__assert(const char *func, const char *file, int line, const char *failedexpr)
-{
-	if (func == NULL)
-		(void)rtld_fdprintf(STDERR_FILENO,
-		     "Assertion failed: (%s), file %s, line %d.\n", failedexpr,
-		     file, line);
-	else
-		(void)rtld_fdprintf(STDERR_FILENO,
-		     "Assertion failed: (%s), function %s, file %s, line %d.\n",
-		     failedexpr, func, file, line);
-	abort();
-	/* NOTREACHED */
-}
-#endif
-
-#ifdef __CHERI_PURE_CAPABILITY__
-/*
- * Hack to avoid a relocation against __auxargs from libc/gen/auxv.c.
- * This symbol is actually provided by crt1.c but we need a definition in
- * rtld to avoid a R_MIPS_CHERI_CAPBILITY relocation in rtld
- */
-extern Elf_Auxinfo *__auxargs;
-__attribute__((visibility("hidden"))) Elf_Auxinfo *__auxargs = NULL;
-#endif

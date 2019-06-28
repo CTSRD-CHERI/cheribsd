@@ -88,7 +88,8 @@ CFLAGS.reloc.c+=-fno-jump-tables
 # Since we pass -shared, we shouldn't also pass -pie
 MK_PIE:=	no
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
-LIBADD=		c_nossp_pic
+# Pull in the dependencies that we use from libc
+.include "rtld-libc/Makefile.inc"
 .if ${MK_TOOLCHAIN} == "no"
 LDFLAGS+=	-L${LIBCDIR}
 .endif
