@@ -87,9 +87,6 @@ LDFLAGS+=	-Wl,--building-freebsd-rtld
 BUILDING_RTLD_CHERI_ELF=yes
 .include "${SRCTOP}/libexec/rtld-elf/rtld-libc/Makefile.inc"
 
-# For floating-point functions used by gdtoa.
-LIBADD+=	compiler_rt
-
 # for the rtld_printf functions:
 SIMPLE_PRINTF_PREFIX=rtld
 .include "${SRCTOP}/lib/libsimple_printf/Makefile.inc"
