@@ -6392,6 +6392,7 @@ complete_trunc_indir(freework)
 	struct ufsmount *ump;
 	struct buf *bp;
 	uintptr_t start;
+	size_t len;
 	int count;
 
 	ump = VFSTOUFS(freework->fw_list.wk_mp);
@@ -6415,14 +6416,13 @@ complete_trunc_indir(freework)
 	/*
 	 * Zero the pointers in the saved copy.
 	 */
+	start = (uintptr_t)indirdep->ir_savebp->b_data;
 	if (indirdep->ir_state & UFS1FMT)
-		start = sizeof(ufs1_daddr_t);
+		len = sizeof(ufs1_daddr_t) * freework->fw_start;
 	else
-		start = sizeof(ufs2_daddr_t);
-	start *= freework->fw_start;
-	count = indirdep->ir_savebp->b_bcount - start;
-	start += (uintptr_t)indirdep->ir_savebp->b_data;
-	bzero((char *)start, count);
+		len = sizeof(ufs2_daddr_t) * freework->fw_start;
+	count = indirdep->ir_savebp->b_bcount - len;
+	bzero((char *)(start + len), count);
 	/*
 	 * We need to start the next truncation in the list if it has not
 	 * been started yet.
@@ -14690,3 +14690,12 @@ DB_SHOW_COMMAND(sd_allocindir, db_show_sd_allocindir)
 #endif /* DDB */
 
 #endif /* SOFTUPDATES */
+// CHERI CHANGES START
+// {
+//   "updated": 20190628,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_provenance"
+//   ]
+// }
+// CHERI CHANGES END

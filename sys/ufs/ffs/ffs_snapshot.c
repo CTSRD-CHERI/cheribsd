@@ -381,7 +381,7 @@ restart:
 	len = howmany(fs->fs_ncg, NBBY);
 	space = malloc(len, M_DEVBUF, M_WAITOK|M_ZERO);
 	UFS_LOCK(ump);
-	fs->fs_active = space;
+	fs->fs_si->fs_active = space;
 	UFS_UNLOCK(ump);
 	for (cg = 0; cg < fs->fs_ncg; cg++) {
 		error = UFS_BALLOC(vp, lfragtosize(fs, cgtod(fs, cg)),
@@ -479,6 +479,8 @@ restart:
 	 */
 	copy_fs = malloc((u_long)fs->fs_bsize, M_UFSMNT, M_WAITOK);
 	bcopy(fs, copy_fs, fs->fs_sbsize);
+	copy_fs->fs_si = malloc(sizeof(struct fs_summary_info), M_UFSMNT, M_WAITOK);
+	bcopy(fs->fs_si, copy_fs->fs_si, sizeof(struct fs_summary_info));
 	if ((fs->fs_flags & (FS_UNCLEAN | FS_NEEDSFSCK)) == 0)
 		copy_fs->fs_clean = 1;
 	size = fs->fs_bsize < SBLOCKSIZE ? fs->fs_bsize : SBLOCKSIZE;
@@ -489,8 +491,8 @@ restart:
 	if (fs->fs_contigsumsize > 0)
 		size += fs->fs_ncg * sizeof(int32_t);
 	space = malloc((u_long)size, M_UFSMNT, M_WAITOK);
-	copy_fs->fs_csp = space;
-	bcopy(fs->fs_csp, copy_fs->fs_csp, fs->fs_cssize);
+	copy_fs->fs_si->fs_csp = space;
+	bcopy(fs->fs_si->fs_csp, copy_fs->fs_si->fs_csp, fs->fs_cssize);
 	space = (char *)space + fs->fs_cssize;
 	loc = howmany(fs->fs_cssize, fs->fs_fsize);
 	i = fs->fs_frag - loc % fs->fs_frag;
@@ -499,7 +501,8 @@ restart:
 		if ((error = bread(devvp, fsbtodb(fs, fs->fs_csaddr + loc),
 		    len, KERNCRED, &bp)) != 0) {
 			brelse(bp);
-			free(copy_fs->fs_csp, M_UFSMNT);
+			free(copy_fs->fs_si->fs_csp, M_UFSMNT);
+			free(copy_fs->fs_si, M_UFSMNT);
 			free(copy_fs, M_UFSMNT);
 			copy_fs = NULL;
 			goto out1;
@@ -510,7 +513,7 @@ restart:
 		brelse(bp);
 	}
 	if (fs->fs_contigsumsize > 0) {
-		copy_fs->fs_maxcluster = lp = space;
+		copy_fs->fs_si->fs_maxcluster = lp = space;
 		for (i = 0; i < fs->fs_ncg; i++)
 			*lp++ = fs->fs_contigsumsize;
 	}
@@ -609,7 +612,8 @@ loop:
 		VOP_UNLOCK(xvp, 0);
 		vdrop(xvp);
 		if (error) {
-			free(copy_fs->fs_csp, M_UFSMNT);
+			free(copy_fs->fs_si->fs_csp, M_UFSMNT);
+			free(copy_fs->fs_si, M_UFSMNT);
 			free(copy_fs, M_UFSMNT);
 			copy_fs = NULL;
 			MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);
@@ -622,7 +626,8 @@ loop:
 	if (fs->fs_flags & FS_SUJ) {
 		error = softdep_journal_lookup(mp, &xvp);
 		if (error) {
-			free(copy_fs->fs_csp, M_UFSMNT);
+			free(copy_fs->fs_si->fs_csp, M_UFSMNT);
+			free(copy_fs->fs_si, M_UFSMNT);
 			free(copy_fs, M_UFSMNT);
 			copy_fs = NULL;
 			goto out1;
@@ -783,7 +788,7 @@ out1:
 	 */
 	blkno = fragstoblks(fs, fs->fs_csaddr);
 	len = howmany(fs->fs_cssize, fs->fs_bsize);
-	space = copy_fs->fs_csp;
+	space = copy_fs->fs_si->fs_csp;
 	for (loc = 0; loc < len; loc++) {
 		error = bread(vp, blkno + loc, fs->fs_bsize, KERNCRED, &nbp);
 		if (error) {
@@ -839,7 +844,8 @@ out1:
 			break;
 	}
 done:
-	free(copy_fs->fs_csp, M_UFSMNT);
+	free(copy_fs->fs_si->fs_csp, M_UFSMNT);
+	free(copy_fs->fs_si, M_UFSMNT);
 	free(copy_fs, M_UFSMNT);
 	copy_fs = NULL;
 out:
@@ -853,9 +859,9 @@ out:
 		PROC_UNLOCK(td->td_proc);
 	}
 	UFS_LOCK(ump);
-	if (fs->fs_active != 0) {
-		free(fs->fs_active, M_DEVBUF);
-		fs->fs_active = 0;
+	if (fs->fs_si->fs_active != NULL) {
+		free(fs->fs_si->fs_active, M_DEVBUF);
+		fs->fs_si->fs_active = NULL;
 	}
 	UFS_UNLOCK(ump);
 	MNT_ILOCK(mp);
@@ -2720,11 +2726,14 @@ ffs_snapdata_acquire(struct vnode *devvp)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 2019028,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t"
+//   ],
+//   "changes_purecap": [
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END

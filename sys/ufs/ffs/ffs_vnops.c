@@ -103,7 +103,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_ffs.h"
 
 #define	ALIGNED_TO(ptr, s)	\
-	(((uintptr_t)(ptr) & (_Alignof(s) - 1)) == 0)
+	is_aligned(ptr, _Alignof(s))
 
 #ifdef DIRECTIO
 extern int	ffs_rawread(struct vnode *vp, struct uio *uio, int *workdone);
@@ -1765,11 +1765,15 @@ ffs_getpages_async(struct vop_getpages_async_args *ap)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20190307,
+//   "updated": 20190628,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "kiovec_t"
+//   ],
+//   "changes_purecap": [
+//     "pointer_alignment",
+//     "pointer_shape"
 //   ]
 // }
 // CHERI CHANGES END
