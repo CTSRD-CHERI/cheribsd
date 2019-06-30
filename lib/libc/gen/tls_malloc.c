@@ -137,6 +137,10 @@ __morepages(int n)
 		    max_pagepools * sizeof(char *), PROT_READ|PROT_WRITE,
 		    MAP_ANON, fd, 0)) == MAP_FAILED)
 			return (0);
+#ifdef __CHERI_PURE_CAPABILITY__
+		/* Check that the result is writable */
+		assert(cheri_getperm(new_pagepool_list) & CHERI_PERM_STORE);
+#endif
 		memcpy(new_pagepool_list, pagepool_list,
 		    sizeof(char *) * n_pagepools);
 		if (pagepool_list != NULL) {
