@@ -82,8 +82,6 @@ _libc_other_objects+=timsort
 # And setjmp is defined in setjmp_c.S
 _libc_other_objects+=setjmp_c _setjmp_c
 .endif
-
-
 .elif ${LIBC_ARCH} == "sparc64"
 # reloc.c uses __sparc_utrap which needs a lot of other object files
 _libc_other_objects+=__sparc_utrap __sparc_utrap_fp_disabled __sparc_utrap_gen \
@@ -91,7 +89,6 @@ _libc_other_objects+=__sparc_utrap __sparc_utrap_fp_disabled __sparc_utrap_gen \
     fpu fpu_explode fpu_div fpu_reg fpu_sqrt fpu_implode fpu_subr fpu_add \
     fpu_compare fpu_mul
 .endif
-
 
 .ifdef BUILDING_RTLD_CHERI_ELF
 _libc_obj_suffix=pico
@@ -114,13 +111,12 @@ CLEANFILES+=${_obj}.${_libc_obj_suffix}
 
 # We insert all the .o files from libc_nossp_pic.a into a new rtld_libc.a file
 # to ensure that only .o files that are actually used end up being included.
-rtld_libc.a: ${_libc_pic_path} ${SRCTOP}/libexec/rtld-elf/rtld-libc/Makefile.inc
-	${AR} x ${_libc_pic_path} ${_rtld_libc_objs}
+rtld_libc.a: ${LIBC_NOSSP_PIC} ${SRCTOP}/libexec/rtld-elf/rtld-libc/Makefile.inc
+	${AR} x ${LIBC_NOSSP_PIC} ${_rtld_libc_objs}
 	${AR} cr ${.OBJDIR}/${.TARGET} ${_rtld_libc_objs}
 CLEANFILES+=rtld_libc.a
 LDADD+=${.OBJDIR}/rtld_libc.a
 beforelinking: rtld_libc.a
-
 
 # Ensure that we don't end up using unsupported relocations
 .if make(all)
