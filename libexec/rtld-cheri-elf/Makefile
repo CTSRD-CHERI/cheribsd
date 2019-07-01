@@ -79,10 +79,6 @@ LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
 # avoid accidentally depending on non-existent symbols
 LDFLAGS+=	-Wl,-no-undefined
 
-# Add this flag once everyone has a new-enough toolchain
-.if ${COMPILER_VERSION} > 100000
-LDFLAGS+=	-Wl,--building-freebsd-rtld
-.endif
 # Add all the dependencies from libc:
 BUILDING_RTLD_CHERI_ELF=yes
 .include "${SRCTOP}/libexec/rtld-elf/rtld-libc/Makefile.inc"
