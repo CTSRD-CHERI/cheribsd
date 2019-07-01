@@ -95,13 +95,20 @@ __opendir2(const char *name, int flags)
 	return (dir);
 }
 
-static int
-opendir_compar(const void *p1, const void *p2)
+static __used int
+_opendir_compar(const void *p1, const void *p2)
 {
 
 	return (strcmp((*(const struct dirent * const *)p1)->d_name,
 	    (*(const struct dirent * const *)p2)->d_name));
 }
+
+#ifndef IN_RTLD
+#define opendir_compar_ptr &_opendir_compar
+#else
+#include "rtld.h"
+#define opendir_compar_ptr make_rtld_local_function_pointer(_opendir_compar)
+#endif
 
 /*
  * For a directory at the top of a unionfs stack, the entire directory's
@@ -235,7 +242,7 @@ _filldir(DIR *dirp, bool use_current_pos)
 			/*
 			 * This sort must be stable.
 			 */
-			mergesort(dpv, n, sizeof(*dpv), opendir_compar);
+			mergesort(dpv, n, sizeof(*dpv), opendir_compar_ptr);
 
 			dpv[n] = NULL;
 			xp = NULL;
