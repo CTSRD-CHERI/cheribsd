@@ -2,7 +2,9 @@
 
 PROG=	libpng_sb_test
 
-LDFLAGS+=	-Wl,-z,notext
+# Cannot use R_MIPS_LO16, etc. relocations in text segment
+# They are not supported by RTLD
+NO_SHARED=     yes
 
 MAN=
 
