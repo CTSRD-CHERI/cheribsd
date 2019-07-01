@@ -109,6 +109,15 @@ CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
 #endif /* CHERI256 */
 
+/*
+ * Global capabilities for machine-independent manipulations.
+ * Set to -1 to prevent it from being zeroed with the rest of BSS.
+ */
+extern void * __capability kernel_sealcap;
+extern void * __capability swap_restore_cap;
+void * __capability userspace_cap = (void * __capability)(intcap_t)-1;
+void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
+
 #ifdef CHERI_PURECAP_KERNEL
 __attribute__((weak))
 extern Elf64_Capreloc __start___cap_relocs;
@@ -121,15 +130,15 @@ extern char etext[], end[];
 /*
  * Global capabilities for various address-space segments.
  */
-caddr_t cheri_xuseg_capability;
-caddr_t cheri_xkphys_capability;
-caddr_t cheri_xkseg_capability;
-caddr_t cheri_kseg0_capability;
-caddr_t cheri_kseg1_capability;
-caddr_t cheri_kseg2_capability;
-caddr_t cheri_kcode_capability;
-caddr_t cheri_kdata_capability;
-caddr_t cheri_kall_capability;
+caddr_t cheri_xuseg_capability = (void *)(intcap_t)-1;
+caddr_t cheri_xkphys_capability = (void *)(intcap_t)-1;
+caddr_t cheri_xkseg_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kseg0_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kseg1_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kseg2_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kcode_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kdata_capability = (void *)(intcap_t)-1;
+caddr_t cheri_kall_capability = (void *)(intcap_t)-1;
 
 /*
  * This is called from locore to initialise the cap table entries
@@ -149,14 +158,14 @@ process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
 		void **dst = cheri_setoffset(data_cap, reloc->location);
 
 		if ((reloc->permissions & ELF64_CAPRELOC_FUNCTION) != 0) {
-			cap = cheri_setoffset(code_cap, reloc->object);
+			cap = cheri_setaddress(code_cap, reloc->object);
 		}
 		else {
 			if ((reloc->permissions & ELF64_CAPRELOC_RODATA) != 0)
 				cap = rodata_cap;
 			else
 				cap = data_cap;
-			cap = cheri_setoffset(cap, reloc->object);
+			cap = cheri_setaddress(cap, reloc->object);
 			if (reloc->size != 0)
 				cap = cheri_csetbounds(cap, reloc->size);
 		}
@@ -179,7 +188,7 @@ process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
 	for (Elf64_Rel *reloc = start; reloc < end; reloc++) {
 		void *cap;
 		Elf64_Sym *symentry;
-		void **dst = cheri_setoffset(data_cap, reloc->r_offset);
+		void **dst = cheri_setaddress(data_cap, reloc->r_offset);
 
 		switch (ELF64_R_TYPE(reloc->r_info)) {
 		case R_MIPS_CHERI_CAPABILITY:
@@ -188,11 +197,11 @@ process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
 				cap = NULL;
 			}
 			else if (ELF64_ST_TYPE(symentry->st_info) == STT_FUNC) {
-				cap = cheri_setoffset(code_cap,
+				cap = cheri_setaddress(code_cap,
 				    symentry->st_value);
 			}
 			else {
-				cap = cheri_setoffset(data_cap,
+				cap = cheri_setaddress(data_cap,
 				    symentry->st_value);
 				cap = cheri_csetbounds(cap, symentry->st_size);
 			}
@@ -203,6 +212,7 @@ process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
 		}
 	}
 }
+#endif /* CHERI_PURECAP_KERNEL */
 
 /*
  * Early capability initialization.
@@ -214,55 +224,90 @@ process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
  * it stores data in those sections.
  */
 void
-cheri_init_capabilities()
+cheri_init_capabilities(void * __capability kroot)
 {
-	void *kdc = cheri_getkdc();
+#ifdef CHERI_PURECAP_KERNEL
+	void * ctemp;
+#endif
 
+	/* Parent kernel sealing capability */
+	kernel_sealcap = cheri_ptrperm(
+	    cheri_setoffset(kroot, CHERI_SEALCAP_KERNEL_BASE),
+	    CHERI_SEALCAP_KERNEL_LENGTH,
+	    CHERI_SEALCAP_KERNEL_PERMS);
 	/*
-	 * Split kdc and generate a capability for each memory segment.
+	 * Create a capability covering all of userspace from which to
+	 * derive new capabilities in execve(), etc.
+	 *
+	 * XXX-BD: A hardline, no-exceptions W^X implementation would split
+	 * the userspace capability here.
+	 *
+	 * XXX-BD: This is actually an ABI property and should probably
+	 * per sysent.
+	 */
+	userspace_cap = cheri_ptrperm(
+	    cheri_setoffset(kroot, CHERI_CAP_USER_DATA_BASE),
+	    CHERI_CAP_USER_DATA_LENGTH,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	/* Create a capability for userspace to seal capabilities with. */
+	user_sealcap = cheri_ptrperm(
+	    cheri_setoffset(kroot, CHERI_SEALCAP_USERSPACE_BASE),
+	    CHERI_SEALCAP_USERSPACE_LENGTH,
+	    CHERI_SEALCAP_USERSPACE_PERMS);
+	/* Store the omnipotent capability to allow swap to be restored. */
+	swap_restore_cap = kroot;
+
+#ifdef CHERI_PURECAP_KERNEL
+	/*
+	 * Split kroot and generate a capability for each memory segment.
 	 * XXX-AM: we should also have a separate capability for
 	 * KCC that covers only kernel .text and exception vectors
-	 * KDC that covers only kernel .data/.rodata/.bss etc.
+	 * KROOT that covers only kernel .data/.rodata/.bss etc.
 	 * Those should fall both into kseg0.
 	 */
-	cheri_xuseg_capability = cheri_csetbounds(
-	    cheri_setoffset(kdc, MIPS_XUSEG_START),
-	    MIPS_XUSEG_END - MIPS_XUSEG_START);
-	cheri_xkphys_capability = cheri_andperm(
-	    cheri_csetbounds(cheri_setoffset(kdc, MIPS_XKPHYS_START),
-		MIPS_XKPHYS_END - MIPS_XKPHYS_START),
+	cheri_xuseg_capability = cheri_ptrperm(
+	    cheri_setoffset(kroot, MIPS_XUSEG_START),
+	    MIPS_XUSEG_END - MIPS_XUSEG_START,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	cheri_xkphys_capability = cheri_ptrperm(
+	    cheri_setoffset(kroot, MIPS_XKPHYS_START),
+	    MIPS_XKPHYS_END - MIPS_XKPHYS_START,
 	    (CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_LOAD_CAP |
-	    CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP));
-	cheri_xkseg_capability = cheri_csetbounds(
-	    cheri_setoffset(kdc, MIPS_XKSEG_START),
-	    MIPS_XKSEG_END - MIPS_XKSEG_START);
-	cheri_kseg0_capability = cheri_csetbounds(
-	    cheri_setoffset(kdc, MIPS_KSEG0_START),
-	    (vm_offset_t)MIPS_KSEG0_END - (vm_offset_t)MIPS_KSEG0_START);
-	cheri_kseg1_capability = cheri_csetbounds(
-	    cheri_setoffset(kdc, MIPS_KSEG1_START),
-	    (vm_offset_t)MIPS_KSEG1_END - (vm_offset_t)MIPS_KSEG1_START);
-	cheri_kseg2_capability = cheri_csetbounds(
-	    cheri_setoffset(kdc, MIPS_KSEG2_START),
-	    (vm_offset_t)MIPS_KSEG2_END - (vm_offset_t)MIPS_KSEG2_START);
-	cheri_kcode_capability = cheri_andperm(
-	    cheri_csetbounds(cheri_setoffset(kdc, MIPS_KSEG0_START),
-	    (vm_offset_t)&etext - (vm_offset_t)MIPS_KSEG0_START),
+	     CHERI_PERM_STORE_CAP | CHERI_PERM_STORE_LOCAL_CAP));
+	cheri_xkseg_capability = cheri_ptrperm(
+	    cheri_setoffset(kroot, MIPS_XKSEG_START),
+	    MIPS_XKSEG_END - MIPS_XKSEG_START,
+	    CHERI_CAP_KERN_PERMS);
+	cheri_kseg0_capability = cheri_ptrperm(
+	    cheri_setoffset(kroot, MIPS_KSEG0_START),
+	    (vaddr_t)MIPS_KSEG0_END - (vaddr_t)MIPS_KSEG0_START,
+	    CHERI_CAP_KERN_PERMS);
+	cheri_kseg1_capability = cheri_ptrperm(
+	    cheri_setoffset(kroot, MIPS_KSEG1_START),
+	    (vaddr_t)MIPS_KSEG1_END - (vaddr_t)MIPS_KSEG1_START,
+	    CHERI_CAP_KERN_PERMS);
+	cheri_kseg2_capability = cheri_ptrperm(
+	    cheri_setoffset(kroot, MIPS_KSEG2_START),
+	    (vaddr_t)MIPS_KSEG2_END - (vaddr_t)MIPS_KSEG2_START,
+	    CHERI_CAP_KERN_PERMS);
+
+	ctemp = cheri_setoffset(kroot, MIPS_KSEG0_START);
+	ctemp = cheri_csetboundsexact(ctemp,
+	    (vaddr_t)&etext - (vaddr_t)MIPS_KSEG0_START);
+	cheri_kcode_capability = cheri_andperm(ctemp,
 	    (CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_CCALL |
-	    CHERI_PERM_SYSTEM_REGS));
-	cheri_kdata_capability = cheri_andperm(
-	    cheri_csetbounds(cheri_setoffset(kdc, (vm_offset_t)&etext),
-	        (vm_offset_t)&end - (vm_offset_t)&etext),
+	     CHERI_PERM_SYSTEM_REGS));
+
+	ctemp = cheri_setoffset(kroot, (vaddr_t)&etext);
+	ctemp = cheri_csetboundsexact(ctemp,
+	    (vaddr_t)&end - (vaddr_t)&etext);
+	cheri_kdata_capability = cheri_andperm(ctemp,
 	    ~(CHERI_PERM_EXECUTE | CHERI_PERM_CCALL | CHERI_PERM_SEAL |
-	    CHERI_PERM_SYSTEM_REGS));
-	cheri_kall_capability = kdc;
+	      CHERI_PERM_SYSTEM_REGS));
+
+	cheri_kall_capability = kroot;
+#endif
 }
-
-#endif /* CHERI_PURECAP_KERNEL */
-
-/* Set to -1 to prevent it from being zeroed with the rest of BSS */
-void * __capability userspace_cap = (void * __capability)(intcap_t)-1;
-void * __capability user_sealcap = (void * __capability)(intcap_t)-1;
 
 /*
  * For now, all we do is declare what we support, as most initialisation took
@@ -433,7 +478,7 @@ cheri_serialize(struct cheri_serial *csp, void * __capability cap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190605,
+//   "updated": 20190702,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support"

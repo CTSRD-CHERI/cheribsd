@@ -82,7 +82,7 @@
  */
 #if !defined(CHERI_PURECAP_KERNEL) || !defined(CPU_CHERI) || !defined(__CHERI_PURE_CAPABILITY__)
 #error CHERI kernel requires CPU_CHERI and CHERI_PURECAP_KERNEL
-#endif	
+#endif
 
 	.data
 #ifdef YAMON
@@ -90,7 +90,6 @@ GLOBAL(fenvp)
 	.space 4			# Assumes mips32?  Is that OK?
 #endif
 
-	.option pic0
 	.set noreorder
 
 	.text
@@ -100,10 +99,10 @@ ASM_ENTRY(_start)
 VECTOR(_locore, unknown)
 	/* UNSAFE TO USE a0..a3, need to preserve the args from boot loader */
 	mtc0	zero, MIPS_COP_0_CAUSE	# Clear soft interrupts
-	
+
 	/*
 	 * t0: Bits to preserve if set:
-	 * 	Soft reset
+	 *	Soft reset
 	 *	Boot exception vectors (firmware-provided)
 	 */
 	li	t0, (MIPS_SR_BEV | MIPS_SR_SR)
@@ -165,27 +164,25 @@ VECTOR(_locore, unknown)
 	/*
 	 * Grab the initial omnipotent capability
 	 */
-	cgetdefault	CHERI_REG_C28
+	cgetdefault	$c28
 
 	/*
-	 * Create a reduced DDC.
-	 *
-	 * XXX-BD: Actually changing base/length requires changes in
-	 * linkage.
+	 * Set up global pointer.
+	 * XXX-AM: Note that when we change linkage this will need rebasing.
 	 */
-	cmove		CHERI_REG_C27, CHERI_REG_C28
-	REG_LI		t0, CHERI_CAP_KERN_BASE
-	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI		t0, CHERI_CAP_KERN_LENGTH
-	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI		t0, CHERI_PERMS_KERNEL_DATA
-	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
+	ABSRELOC_LA(t0, _C_LABEL(_captable))
+	csetoffset CHERI_REG_GPC, $c28, t0
+	ABSRELOC_LA(t1, _C_LABEL(_ecaptable))
+	PTR_SUBU t0, t1, t0
+	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0
+	REG_LI	t0, (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+	candperm CHERI_REG_GPC, CHERI_REG_GPC, t0
 
 	/* Preserve a copy in KDC for exception handlers. */
-	csetkdc		CHERI_REG_C27
+	csetkdc		CHERI_REG_GPC
 
-	/* Install the new DDC. */
-	csetdefault	CHERI_REG_C27
+	/* Clear DDC */
+	csetdefault	$cnull
 
 	/*
 	 * Create a reduced PCC.
@@ -193,17 +190,17 @@ VECTOR(_locore, unknown)
 	 * XXX-BD: Actually changing base/length requires changes in
 	 * linkage.
 	 */
-	cgetpcc		CHERI_REG_C27
+	cgetpcc		$c27
 	REG_LI		t0, CHERI_CAP_KERN_BASE
-	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
+	csetoffset	$c27, $c27, t0
 	REG_LI		t0, CHERI_CAP_KERN_LENGTH
-	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
+	csetbounds	$c27, $c27, t0
 	REG_LI		t0, CHERI_PERMS_KERNEL_CODE
-	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
+	candperm	$c27, $c27, t0
 
 	/* Preserve a copy in KCC for exception handlers.  */
 
-	csetkcc		CHERI_REG_C27
+	csetkcc		$c27
 
 	/* Install the new PCC. */
 	REG_LI		t0, CHERI_CAP_KERN_BASE
@@ -211,87 +208,16 @@ VECTOR(_locore, unknown)
 	cgetoffset	t1, CHERI_REG_C29			# 1
 	PTR_SUBU	t1, t1, t0				# 2
 	PTR_ADDIU	t1, t1, (4 * 7)				# 3
-	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t1	# 4
-	cjr		CHERI_REG_C27				# 5
+	csetoffset	$c27, $c27, t1	# 4
+	cjr		$c27				# 5
 	nop							# 6
 	# 7 (land here)
-#if 0
-	/* Restrict kernel KCC and KDC */
-	/*
-	 * XXX-AM: Currently disabled because I have to understand
-	 * how it plays out with relocations
-	 */
-	cgetpcc $c12
-	PTR_LA t1, MIPS_XKSEG_COMPAT32_START # Exception vector start
-	csetoffset $c12, $c12, t1
-	PTR_LA t0, _C_LABEL(etext)	# Kernel .text end
-	PTR_SUBU t0, t0, t1
-	csetbounds $c12, $c12, t0
-	PTR_LA t0, restrict_pcc
-	PTR_SUBU t0, t0, t1
-	csetoffset $c12, $c12, t0
-	cjr $c12
-	nop
-restrict_pcc:
-#endif
-
-	/*
-	 * Create the parent kernel sealing capablity.
-	 */
-	cmove		CHERI_REG_C27, CHERI_REG_C28
-	REG_LI	t0, CHERI_SEALCAP_KERNEL_BASE
-	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI	t0, CHERI_SEALCAP_KERNEL_LENGTH
-	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI	t0, CHERI_SEALCAP_KERNEL_PERMS
-	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
-	PTR_LA	t0, _C_LABEL(kernel_sealcap)
-	csc	CHERI_REG_C27, t0, 0($ddc)
-
-	/*
-	 * Create a capability covering all of userspace from which to
-	 * derive new capabilities in execve(), etc.
-	 *
-	 * XXX-BD: A hardline, no-exceptions W^X implementation would split
-	 * the userspace capability here.
-	 *
-	 * XXX-BD: This is actually an ABI property and should probably
-	 * per sysent.
-	 */
-	cmove		CHERI_REG_C27, CHERI_REG_C28
-	REG_LI	t0, CHERI_CAP_USER_DATA_BASE
-	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI	t0, CHERI_CAP_USER_DATA_LENGTH
-	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI	t0, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS
-	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
-	PTR_LA	t0, _C_LABEL(userspace_cap)
-	csc	CHERI_REG_C27, t0, 0($ddc)
-
-	/*
-	 * Create a capability for userspace to seal capabilities with.
-	 */
-	cmove		CHERI_REG_C27, CHERI_REG_C28
-	REG_LI	t0, CHERI_SEALCAP_USERSPACE_BASE
-	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI	t0, CHERI_SEALCAP_USERSPACE_LENGTH
-	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI	t0, CHERI_SEALCAP_USERSPACE_PERMS
-	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
-	PTR_LA	t0, _C_LABEL(user_sealcap)
-	csc	CHERI_REG_C27, t0, 0($ddc)
-
-	/*
-	 * Store the omnipotent capability to allow swap to be restored.
-	 */
-	PTR_LA	t0, _C_LABEL(swap_restore_cap)
-	csc	CHERI_REG_C28, t0, 0($ddc)
 
 	/*
 	 * Initialize stack and call machine startup.
 	 */
-	cgetkdc		CHERI_REG_STC
-	PTR_LA		t0, _C_LABEL(pcpu_space)
+	cmove		CHERI_REG_STC, $c28
+	ABSRELOC_LA(t0, _C_LABEL(pcpu_space))
 	csetoffset	CHERI_REG_STC, CHERI_REG_STC, t0
 	REG_LI		t0, PCPU_SIZE
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, t0
@@ -305,28 +231,8 @@ restrict_pcc:
 	csc		$c1, zero, CALLFRAME_CGP(CHERI_REG_STC)
 	csc		$c1, zero, CALLFRAME_CSP(CHERI_REG_STC)
 	csc		$c1, zero, CALLFRAME_CRA(CHERI_REG_STC)
-
-	/* set up global pointer */
-	// PTR_LA	gp, _C_LABEL(_gp)
-	PTR_LA	gp, _C_LABEL(_captable)
-	cgetkdc		CHERI_REG_GPC
-	csetoffset CHERI_REG_GPC, CHERI_REG_GPC, gp
-	PTR_LA	t0, _C_LABEL(_ecaptable)
-	PTR_SUBU t0, t0, gp
-	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0
-	REG_LI	t0, (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
-	candperm CHERI_REG_GPC, CHERI_REG_GPC, t0
-
-	/* Clear all remaining capabilities */
-	cclearlo	0xf7fe 	# keep c0, c11 /* XXX-AM c0 will eventually be cleared */
-	cclearhi	0x9bff	# keep c26, c29, c30
-
-	/* Zero out our temporary registers. */
-	cmove CHERI_REG_C27, $cnull
-	cmove CHERI_REG_C28, $cnull
-
 	/* XXX-AM: zero out ra so we catch anything that returns improperly */
-	PTR_LA	ra, 0
+	move	ra, zero
 
 	/* Need to preserve a0-a3 for platform start */
 	move s0, a0
@@ -343,17 +249,18 @@ restrict_pcc:
 	 * process_kernel_cap_relocs(reloc_start, reloc_end,
 	 *    code_cap, data_cap)
 	 */
-	PTR_LA	t0, _C_LABEL(__start___cap_relocs)
-	cgetkdc		$c3
+	ABSRELOC_LA(t0, _C_LABEL(__start___cap_relocs))
+	cmove		$c3, $c28
 	csetoffset	$c3, $c3, t0
-	PTR_LA	t1, _C_LABEL(__stop___cap_relocs)
+	ABSRELOC_LA(t1, _C_LABEL(__stop___cap_relocs))
 	PTR_SUBU	t0, t1, t0
 	csetbounds	$c3, $c3, t0
 	csetoffset	$c4, $c3, t0
 	cgetpccsetoffset	$c5, zero
-	cgetkdc		$c6
-	PTR_LA	t0, _C_LABEL(process_kernel_cap_relocs)
-	cgetpccsetoffset	$c12, t0
+	cmove		$c6, $c28
+	ABSRELOC_LA(t0, _C_LABEL(process_kernel_cap_relocs))
+	cgetpcc		$c12
+	csetaddr	$c12, $c12, t0
 	cjalr	$c12, $c17
 	nop
 
@@ -363,39 +270,53 @@ restrict_pcc:
 	 * process_kernel_dyn_relocs(reloc_start, reloc_end,
 	 *   code_cap, data_cap)
 	 */
-	PTR_LA	t0, _C_LABEL(_rel_dyn)
-	cgetkdc		$c2
+	ABSRELOC_LA(t0, _C_LABEL(_rel_dyn))
+	cmove		$c2, $c28
 	csetoffset	$c3, $c2, t0
-	PTR_LA	t1, _C_LABEL(_erel_dyn)
+	ABSRELOC_LA(t1, _C_LABEL(_erel_dyn))
 	PTR_SUBU	t0, t1, t0
 	csetbounds	$c3, $c3, t0
 	csetoffset	$c4, $c3, t0
-	PTR_LA	t0, _C_LABEL(_dynsym)
+	ABSRELOC_LA(t0, _C_LABEL(_dynsym))
 	csetoffset	$c5, $c2, t0
-	PTR_LA	t1, _C_LABEL(_edynsym)
+	ABSRELOC_LA(t1, _C_LABEL(_edynsym))
 	PTR_SUBU	t0, t1, t0
 	csetbounds	$c5, $c5, t0
 	cgetpccsetoffset	$c6, zero
-	cgetkdc		$c7
-	PTR_LA	t0, _C_LABEL(process_kernel_dyn_relocs)
-	cgetpccsetoffset	$c12, t0
+	cmove		$c7, $c28
+	ABSRELOC_LA(t0, _C_LABEL(process_kernel_dyn_relocs))
+	cgetpcc		$c12
+	csetaddr	$c12, $c12, t0
 	cjalr	$c12, $c17
 	nop
+
+	/* Now we can use cap-table relocations safely */
+	cmove	$c3, $c28
+	CAPCALL_LOAD($c12, _C_LABEL(cheri_init_capabilities))
+	cjalr	$c12, $c17
+	nop
+
+	/* Clear all remaining capabilities */
+	cclearlo	0xf7fe	# keep c0, c11 /* XXX-AM c0 will eventually be cleared */
+	cclearhi	0x9bff	# keep c26, c29, c30
 
 	/* Call the platform-specific startup code. */
 	move a0, s0
 	move a1, s1
 	move a2, s2
 	move a3, s3
-	cfromddc	$c3, a1
+
+	/* Reconstruct platform_start arguments */
+	CAPTABLE_LOAD($c28, _C_LABEL(cheri_kseg0_capability))
+	clc		$c28, zero, 0($c28)
+	csetaddr	$c3, $c28, a1
 	dsll		t0, a0, 3
 	csetbounds	$c3, $c3, t0
 	/* do not bound envp because we do not have
-	 * reliable length information */
-	cfromddc	$c4, a2
+	* reliable length information */
+	csetaddr	$c4, $c28, a2
 	move	a1, a3
-	PTR_LA	t0, _C_LABEL(platform_start)
-	cgetpccsetoffset $c12, t0
+	CAPCALL_LOAD($c12, _C_LABEL(platform_start))
 	cjalr	$c12, $c17
 	nop
 
@@ -403,17 +324,15 @@ restrict_pcc:
 	 * thread0 set thread0 kstack to the bottom of the stack
 	 * page, realign thread0 kstack and start using it.
 	 */
-	cgetdefault	$c3
-	PTR_LA	sp, _C_LABEL(thread0_st)
-	clc	CHERI_REG_STC, sp, TD_KSTACK($c3)
+	CAPTABLE_LOAD($c3, _C_LABEL(thread0_st))
+	clc	CHERI_REG_STC, zero, TD_KSTACK($c3)
 	cgetlen	a0, CHERI_REG_STC
 	REG_LI	t0, ~7
 	and	a0, a0, t0
 	PTR_SUBU	a0, a0, CALLFRAME_SIZ
 	csetoffset	CHERI_REG_STC, CHERI_REG_STC, a0
-	
-	PTR_LA	t0, _C_LABEL(mi_startup)
-	cgetpccsetoffset $c12, t0
+
+	CAPCALL_LOAD($c12, _C_LABEL(mi_startup))
 	cjalr	$c12, $c17
 	cmove	$c3, $cnull
 

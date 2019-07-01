@@ -263,26 +263,21 @@ _C_LABEL(x):
 /*
  * Macros to panic and printf from assembly language.
  */
-#ifdef __CHERI_PURE_CAPABILITY__
-#define	PANIC(msg)			\
-	PTR_LA	a0, 9f;			\
-	cgetkdc $c3;			\
-	csetoffset $c3, $c3, a0;	\
-	PTR_LA	t9, _C_LABEL(panic);	\
-	cgetpccsetoffset $c12, t9;	\
-	cjalr $c12, $c17;		\
-	nop;				\
-	.data;				\
-9:	.asciiz msg;			\
-	.text
-#else
+#ifdef CHERI_PURECAP_KERNEL
+#define	PANIC(msg)				\
+	CAPTABLE_LOAD($c3, 9f);			\
+	CAPCALL_LOAD($c12, _C_LABEL(panic));	\
+	cjalr $c12, $c17;			\
+	nop;					\
+	MSG(msg)
+#else /* ! CHERI_PURECAP_KERNEL */
 #define	PANIC(msg)			\
 	PTR_LA	a0, 9f;			\
 	PTR_LA	t9, _C_LABEL(panic);	\
 	jalr	t9;			\
 	nop;				\
 	MSG(msg)
-#endif
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 #define	PANIC_KSEG0(msg, reg)	PANIC(msg)
 
@@ -651,32 +646,12 @@ _C_LABEL(x):
 #endif	/* __mips_n32 || __mips_n64 */
 
 #ifdef CHERI_PURECAP_KERNEL
-/**
- * XXX-AM: This should become a cap-table load
- * using KDC (which will become GPC at some point)
- * For now we force a static relocation here because this
- * is used in places where the kernel GPC is not yet installed.
- * once KDC is kernel GPC, CHERI_EXCEPTION_ENTER can install GPC
- * and save the old GPC to KR2C?
- */
-#define	GET_CPU_PCPU(creg, treg)			\
-	/* PTR_LA	treg, _C_LABEL(pcpup);*/	\
-	/* we can only afford to use a single tmp register here */\
-	lui	treg, %highest(pcpup);			\
-	daddiu	treg, treg, %higher(pcpup);		\
-	dsll	treg, treg, 16;				\
-	daddiu	treg, treg, %hi(pcpup);			\
-	dsll	treg, treg, 16;				\
-	daddiu	treg, treg, %lo(pcpup);			\
-	cgetkdc		creg;				\
-	cfromptr	creg, creg, treg;		\
-	csetbounds	creg, creg, CHERICAP_SIZE;	\
-	clc	creg, zero, 0(creg);
-#define	GET_CPU_PCPU_NOCAP(reg)		\
-	PTR_L	reg, _C_LABEL(pcpup);
+#define	GET_CPU_PCPU(creg)			\
+	CAPTABLE_LOAD(creg, _C_LABEL(pcpup));	\
+	clc creg, zero, 0(creg)
 #else /* ! CHERI_PURECAP_KERNEL */
-#define	GET_CPU_PCPU(reg)		\
-	PTR_L	reg, _C_LABEL(pcpup);
+#define	GET_CPU_PCPU(reg)			\
+	PTR_L	reg, _C_LABEL(pcpup)
 #endif /* ! CHERI_PURECAP_KERNEL */
 
 #if defined(MIPS_EXC_CNTRS)
@@ -689,14 +664,10 @@ _C_LABEL(x):
 	PTR_S		k0, PC_ ## name ## (k1)
 #else /* CHERI_PURECAP_KERNEL */
 #define	INC_EXCEPTION_CNTR(name)					\
-	PTR_LA		k1, _C_LABEL(pcpup);				\
-	cgetkdc	CHERI_REG_KR1C;						\
-	csetoffset	CHERI_REG_KR1C, CHERI_REG_KR1C, k1;		\
-	csetbounds	CHERI_REG_KR1C, CHERI_REG_KR1C, CHERICAP_SIZE;	\
-	clc		CHERI_REG_KR1C, zero, 0(CHERI_REG_KR1C);	\
-	cld		k1, zero, PC_ ##name## (CHERI_REG_KR1C);	\
+	CAPTABLE_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(pcpup));		\
+	cld		k1, zero, PC_ ##name## (CHERI_REG_KSCRATCH);	\
 	daddiu		k1, k1, 1;					\
-	csd		k1, zero, PC_ ##name## (CHERI_REG_KR1C)
+	csd		k1, zero, PC_ ##name## (CHERI_REG_KSCRATCH)
 #endif /* CHERI_PURECAP_KERNEL */
 
 #else /* ! defined(MIPS_EXC_CNTRS) */

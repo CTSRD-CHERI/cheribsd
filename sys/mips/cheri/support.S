@@ -326,7 +326,7 @@ XNESTED(copyinstr_c)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1, t0)	# clobbers at
+	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
 	CAPCALL_LOAD($c12, copystr)
@@ -334,7 +334,7 @@ XNESTED(copyinstr_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -364,7 +364,7 @@ XNESTED(copyoutstr_c)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1, t0)	# clobbers at
+	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
 	CAPCALL_LOAD($c12, copystr)
@@ -372,7 +372,7 @@ XNESTED(copyoutstr_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -399,7 +399,7 @@ XNESTED(copyin_c)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1, t0)	# clobbers at
+	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
 	CAPCALL_LOAD($c12, bcopy)
@@ -407,7 +407,7 @@ XNESTED(copyin_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -436,7 +436,7 @@ XNESTED(copyincap_c)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1, t0)	# clobbers at
+	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
 	CAPCALL_LOAD($c12, cheri_bcopy)
@@ -444,7 +444,7 @@ XNESTED(copyincap_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -472,7 +472,7 @@ XNESTED(copyout_c)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1, t0)	# clobbers at
+	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
 	CAPCALL_LOAD($c12, bcopy)
@@ -480,7 +480,7 @@ XNESTED(copyout_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -509,7 +509,7 @@ XNESTED(copyoutcap_c)
 	cjr	$c12
 	nop
 1:
-	GET_CPU_PCPU($c1, t0)	# clobbers at
+	GET_CPU_PCPU($c1)	# clobbers at
 	clc	$c1, zero, PC_CURPCB($c1)
 	CAPTABLE_LOAD($c2, copyerr)	# prepare the onfault jump point
 	CAPCALL_LOAD($c12, cheri_bcopy)
@@ -517,7 +517,7 @@ XNESTED(copyoutcap_c)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1) # bcopy modified v1, so reload
 	CHERI_NULL($c2)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
@@ -550,7 +550,7 @@ XLEAF(fueword)
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	cld	v0, zero, 0($c3)	# fetch word
@@ -572,7 +572,7 @@ XLEAF(fueword32_c)
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clw	v0, zero, 0($c3)	# fetch word
@@ -592,7 +592,7 @@ XLEAF(fuesword_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clhu	v0, zero, 0($c3)	# fetch short
@@ -612,7 +612,7 @@ XLEAF(fubyte_c)
 	cgetaddr t0, $c3	# make sure source is in userspace
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clbu	v0, zero, 0($c3)	# fetch byte
@@ -630,7 +630,7 @@ LEAF(fuecap)
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f	# make sure address is in user space
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)
 	clc	$c3, zero, 0($c3)	# fetch capability
@@ -652,7 +652,7 @@ XLEAF(suword)
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csd	a0, zero, 0($c3)	# store word
@@ -674,7 +674,7 @@ XLEAF(suword32_c)
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csw	a0, zero, 0($c3)	# store word
@@ -704,7 +704,7 @@ XLEAF(casueword32_c)
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 2:
@@ -737,7 +737,7 @@ XLEAF(casueword)
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 2:
@@ -773,7 +773,7 @@ XLEAF(susword_c)
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csh	a0, zero, 0($c3)	# store short
@@ -793,7 +793,7 @@ XLEAF(subyte_c)
 	CAPTABLE_LOAD($c2, fswberr)
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csb	a0, zero, 0($c3)	# store short
@@ -823,7 +823,7 @@ LEAF(fuswintr)
 	CAPTABLE_LOAD($c2, fswintrberr)
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	clhu	v0, zero, 0($c3)	# fetch short
@@ -840,7 +840,7 @@ LEAF(suswintr)
 	CAPTABLE_LOAD($c2, fswintrberr)
 	blt	t0, zero, 1f
 	nop
-	GET_CPU_PCPU($c1, t0)
+	GET_CPU_PCPU($c1)
 	clc	$c1, zero, PC_CURPCB($c1)
 	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
 	csh	a0, zero, 0($c3)	# store short

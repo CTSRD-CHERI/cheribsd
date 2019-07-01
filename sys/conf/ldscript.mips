@@ -51,6 +51,7 @@ SECTIONS
   {
     KEEP (*(.fini))
   } =0x1000000
+  . = ALIGN(0x100000);
   PROVIDE (__etext = .);
   PROVIDE (_etext = .);
   PROVIDE (etext = .);
@@ -273,6 +274,7 @@ SECTIONS
    . = ALIGN(64 / 8);
   }
   . = ALIGN(64 / 8);
+  . = ALIGN(0x100000);
   _end = .;
   PROVIDE (end = .);
   /* Stabs debugging sections.  */

@@ -688,8 +688,8 @@ void process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
     void *code_cap, void *data_cap);
 void process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
     Elf64_Sym *dynsym, void *code_cap, void *data_cap);
-void cheri_init_capabilities(void);
 #endif
+void cheri_init_capabilities(void * __capability kroot);
 
 struct sysentvec;
 void	cheri_capability_set_user_sealcap(void * __capability *);

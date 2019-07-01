@@ -254,9 +254,15 @@
  */
 #define	CHERI_CAP_KERN_PERMS						\
 	(CHERI_PERMS_SWALL | CHERI_PERMS_HWALL)
+#define	CHERI_CAP_KERN_OFFSET		0x0
+
+#ifdef CHERI_PURECAP_KERNEL
+#define	CHERI_CAP_KERN_BASE		0xffffffff80000000
+#define	CHERI_CAP_KERN_LENGTH		(0xffffffffffffffff - CHERI_CAP_KERN_BASE)
+#else /* ! CHERI_PURECAP_KERNEL */
 #define	CHERI_CAP_KERN_BASE		0x0
 #define	CHERI_CAP_KERN_LENGTH		0xffffffffffffffff
-#define	CHERI_CAP_KERN_OFFSET		0x0
+#endif /* ! CHERI_PURECAP_KERNEL */
 
 /*
  * Definition for userspace "unprivileged" capability able to name the user

@@ -45,6 +45,11 @@ _yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size)
 {
 	long yamon_syscon_read = (long)*((int32_t *)YAMON_FUNC_OFFSET(YAMON_SYSCON_READ_OFS));
 	int value;
+
+#ifdef CHERI_PURECAP_KERNEL
+	/* The yamon syscon read function must be made relative to PCC */
+	yamon_syscon_read = yamon_syscon_read - cheri_getbase(cheri_getpcc());
+#endif
 	__asm__ __volatile__ (
 		".set push\n"
 		".set noreorder\n"
@@ -98,7 +103,7 @@ yamon_getcpufreq(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20171215,
+//   "updated": 20190702,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

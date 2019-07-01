@@ -320,7 +320,7 @@ malta_cpu_freq(void)
 
 #ifdef CHERI_PURECAP_KERNEL
 static void
-platform_clear_bss()
+platform_clear_bss(void *kroot)
 {
 	/*
 	 * We need to hand-craft a capability for edata because it is defined
@@ -330,8 +330,9 @@ platform_clear_bss()
 	size_t edata_siz = (__cheri_addr size_t)(&end) -
 	    (__cheri_addr size_t)(&edata);
 
-	edata_start = cheri_ptrpermoff((caddr_t)cheri_getkdc() +
-	    (__cheri_addr vm_offset_t)(&edata), edata_siz, CHERI_PERM_STORE, 0);
+	edata_start = cheri_ptrperm(
+	    cheri_setaddress(kroot, (__cheri_addr vaddr_t)(&edata)),
+	    edata_siz, CHERI_PERM_STORE);
 	memset(edata_start, 0, edata_siz);
 }
 
@@ -344,15 +345,16 @@ platform_argv_ptr(int32_t argv)
 	 * Trust that YAMON initialized the strings correctly and
 	 * do not try to get the precise string length.
 	 */
-	arg = cheri_ptrpermoff((caddr_t)cheri_getkdc() + (vm_offset_t)(argv),
-	    4096, CHERI_PERM_LOAD, 0);
+	arg = cheri_ptrperm(
+	    cheri_setaddress(cheri_kseg0_capability, (vm_offset_t)(argv)),
+	    4096, CHERI_PERM_LOAD);
 
 	return (arg);
 }
 
 #else
 static void
-platform_clear_bss()
+platform_clear_bss(void * __capability kroot)
 {
 	vm_offset_t kernend;
 
@@ -379,13 +381,8 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	uint64_t ememsize = 0;
 	int i;
 
-	/* clear the BSS and SBSS segments */
-	platform_clear_bss();
-
-#ifdef CHERI_PURECAP_KERNEL
-	/* early capability-related initialization */
-	cheri_init_capabilities();
-#endif
+	/* Clear the BSS and SBSS segments */
+	platform_clear_bss(cheri_kdata_capability);
 
 	mips_postboot_fixup();
 
@@ -493,10 +490,11 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190515,
+//   "updated": 20190702,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "support"
 //   ]
 // }
 // CHERI CHANGES END

@@ -14,20 +14,25 @@ machine		mips mips64	# Malta supports both, so it isn't in std.malta
 nomakeoptions 	ARCH_FLAGS
 makeoptions	ARCH_PIC_FLAGS="-fpic"
 makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=128 -cheri-cap-table-abi=plt -mxcaptable -cheri-uintcap=offset"
+makeoptions	CFLAGS+="-gdwarf-5"
 makeoptions	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 
+# purecap kernel options
 options		CHERI_PURECAP_KERNEL
+options 	KSTACK_LARGE_PAGE
 nooptions	CHERI_IMPLICIT_USER_DDC
 
+# kernel modules
 options 	KTRACE
 nooptions	KDB
 nooptions	DDB
 
-nooptions	MSDOSFS
-nooptions	NFSD, NFSCL
+options 	TMPFS
 options		FFS
 options		CD9660
+nooptions	MSDOSFS
+nooptions	NFSD, NFSCL
 
 # disable raid, we don't need it
 nooptions	GEOM_RAID
@@ -47,17 +52,6 @@ options		DEBUG_VFS_LOCKS
 # nooptions	KTR_ALQ
 # should enable witness and invariants?
 # options	LOCK_DEBUG
-
-# XXX TODO
-# nodevice ata
-# nodevice vga
-# disable nfs
-
-#
-# Features required for CHERI CPU and CheriBSD support.
-#
-options 	KSTACK_LARGE_PAGE
-options 	TMPFS
 
 #
 # Qemu-CHERI tracing is permitted per thread, not just globally.

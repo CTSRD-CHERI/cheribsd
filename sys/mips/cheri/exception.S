@@ -134,7 +134,6 @@
 
 #include "assym.inc"
 
-	.option pic0
 	.set	noreorder		# Noreorder is default style!
 
 #ifdef KDTRACE_HOOKS
@@ -149,23 +148,6 @@ dtrace_invop_calltrap_addr:
 
 	.text
 #endif
-
-/*
- * Load the kerge GP pointer in the appropriate register
- * CHERI for now regenerates GPC from KDC, in future KDC will become
- * GPC and this macro will become cmove GPC, KDC
- * XXX-AM: This may be appropriate in an header file?
- * Note: this assumes that t0 can be used as scracth.
- */
-#define LOAD_KERNEL_GP	\
-	PTR_LA gp, _C_LABEL(_captable) ;\
-	cgetkdc	CHERI_REG_GPC ;\
-	csetoffset CHERI_REG_GPC, CHERI_REG_GPC, gp ;\
-	PTR_LA t0, _C_LABEL(_ecaptable)		    ;\
-	PTR_SUBU t0, t0, gp			    ;\
-	csetbounds CHERI_REG_GPC, CHERI_REG_GPC, t0 ;\
-	REG_LI	t0, (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP) ;\
-	candperm CHERI_REG_GPC, CHERI_REG_GPC, t0
 
 /*
  *----------------------------------------------------------------------------
@@ -187,7 +169,8 @@ VECTOR(MipsTLBMiss, unknown)
 	CHERI_EXCEPTION_ENTER(k0)
 	# Increment exception counter, if enabled.
 	INC_EXCEPTION_CNTR(TLB_MISS_CNT)
-	j	MipsDoTLBMiss
+	CAPCALL_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(MipsDoTLBMiss))
+	cjr	CHERI_REG_KSCRATCH
 	MFC0	k0, MIPS_COP_0_BAD_VADDR	# get the fault address
 	.set pop
 VECTOR_END(MipsTLBMiss)
@@ -220,13 +203,13 @@ VECTOR_END(MipsTLBMiss)
  */
 	.set push
 	.set noat
-MipsDoTLBMiss:
+LEAF(MipsDoTLBMiss)
 	/* Save c27 for use as KSCRATCH, this can be either the user or kernel c27. */
 	csetkr1c	CHERI_REG_KSCRATCH
 	bltz		k0, 1f				#02: k0<0 -> 1f (kernel fault)
 	PTR_SRL		k0, k0, SEGSHIFT - PTRSHIFT	#03: k0=seg offset (almost)
 	/* CHERI_PURECAP_KERNEL - assumes __mips64 and ! MIPS64_NEW_PMAP */
-	GET_CPU_PCPU(CHERI_REG_KSCRATCH, k1)
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH)
 	clc		CHERI_REG_KSCRATCH, zero, PC_SEGBASE(CHERI_REG_KSCRATCH)
 	cbez		CHERI_REG_KSCRATCH, 2f			# == NULL no segbase
 	andi		k0, k0, PDEPTRMASK			# k0 = seg offset
@@ -269,6 +252,7 @@ MipsDoTLBMiss:
 2:	j		SlowFault			#22: no page table present
 	nop						#23: branch delay slot
 	.set pop
+END(MipsDoTLBMiss)
 
 /*
  * This code is copied to the general exception vector address to
@@ -302,13 +286,7 @@ VECTOR(MipsException, unknown)
 	or	k1, k1, k0			# change index to user table
 	PTR_SLL	k1, k1, 1			# shift to get 8-byte offset
 1:
-	PTR_LA		k0, _C_LABEL(machExceptionTable)
-	cgetkdc		CHERI_REG_KSCRATCH
-	csetoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0
-	/* XXX-AM: For some reason the compiler does not generate the size symbol */
-	/* PTR_LA		k0, _C_LABEL(.size.machExcEptiontable) */
-	REG_LI		k0, 64 * CHERICAP_SIZE		# hardcoded exceptionTable size
-	csetbounds	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0
+	CAPTABLE_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(machExceptionTable))
 	PTR_SLL		k1, CHERICAP_SHIFT - 3		# cause is already shifted by 3
 	clc		CHERI_REG_KSCRATCH, k1, 0(CHERI_REG_KSCRATCH) # get function address
 	cjr		CHERI_REG_KSCRATCH			# Jump to the function
@@ -390,16 +368,10 @@ SlowFault:
  * Trashing KSCRATCH is fine since we will panic anyway.
  */
 #define CHERI_KSTACK_OVERFLOW_PANIC					\
-	GET_CPU_PCPU(CHERI_REG_KSCRATCH, k1);				\
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH);				\
 	clw	k1, zero, PC_CPUID(CHERI_REG_KSCRATCH);			\
 	sll	k1, k1, PAGE_SHIFT + 1 /* curcpu pcpu offset */;	\
-	PTR_LA	k0, _C_LABEL(pcpu_space) ;				\
-	cgetkdc	CHERI_REG_KSCRATCH ;					\
-	/* pcpu_space */						\
-	csetoffset CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0;		\
-	REG_LI		k0, MAXCPU * PAGE_SIZE * 2 ;			\
-	/* set pcpu space bounds */					\
-	csetbounds	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0;	\
+	CAPTABLE_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(pcpu_space)) ;	\
 	/* go to beginning of curcpu pcpu space */			\
 	cincoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k1;	\
 	REG_LI		k1, PCPU_SIZE;					\
@@ -744,7 +716,6 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	/*
 	 * Call the exception handler (c3 set by SAVE_CPU).
 	 */
-	LOAD_KERNEL_GP /* XXX-AM: can we assume that GP is correct? */
 	CAPCALL_LOAD($c12, trap)
 	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU,
 	 * find it a place once ddb is ported
@@ -809,12 +780,12 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	.set	noat
 	.mask	0x80000000, (CALLFRAME_RA - CALLFRAME_SIZ)
 
-	GET_CPU_PCPU(CHERI_REG_KSCRATCH, k1)	# get pcpu pointer
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH)	# get pcpu pointer
 	clc	CHERI_REG_KSCRATCH, zero, PC_CURPCB(CHERI_REG_KSCRATCH)
 	SAVE_REGS_TO_PCB(CHERI_REG_KSCRATCH)
 	SAVE_CREGS_TO_PCB(CHERI_REG_KSCRATCH, t0, t1)
 	/* Switch to kernel stack, use c3 as scratch reg */
-	GET_CPU_PCPU($c3, k1)
+	GET_CPU_PCPU($c3)
 	/* get top of the stack from pcpu */
 	clc CHERI_REG_STC, zero, PC_KSTACK_CAP($c3)
 	/* start with kstack at bottom */
@@ -824,8 +795,6 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU, find it a place once ddb is ported */
 	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC) # for debugging
 
-	/* XXX-AM: this may need to be moved before loading pcpu, if we load it GP relative */
-	LOAD_KERNEL_GP
 	/* Turn off fpu and enter kernel mode */
 	and	t0, a0, ~(MIPS_SR_COP_1_BIT | MIPS_SR_EXL | MIPS_SR_KSU_MASK | MIPS_SR_INT_IE)
 	mtc0	t0, MIPS_COP_0_STATUS
@@ -852,7 +821,7 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	 * after interrupts are disabled.  Otherwise it will get overwritten
 	 * by the interrupt code.
 	 */
-	GET_CPU_PCPU(CHERI_REG_KSCRATCH, k1)
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH)
 	clc	CHERI_REG_KSCRATCH, zero, PC_CURPCB(CHERI_REG_KSCRATCH)
 
 	/*
@@ -899,8 +868,7 @@ NESTED(mips_wait, CALLFRAME_SIZ, ra)
 	xori	t1, t0, MIPS_SR_INT_IE
 	mtc0	t1, MIPS_COP_0_STATUS
 	COP0_SYNC
-	PTR_LA	t9, sched_runnable
-	cgetpccsetoffset $c12, t9
+	CAPCALL_LOAD($c12, sched_runnable)
 	cjalr	$c12, $c17
 	nop
 	clc	$c17, zero, CALLFRAME_RA(CHERI_REG_STC)
@@ -957,7 +925,8 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	MFC0	k0, MIPS_COP_0_EXC_PC
 	ori	k0, 0xf
 	xori	k0, 0xf			# 16 byte align
-	PTR_LA	k1, MipsWaitStart
+	CAPTABLE_LOAD(CHERI_REG_KSCRATCH, MipsWaitStart)
+	cgetaddr k1, CHERI_REG_KSCRATCH
 	bne	k0, k1, 1f
 	nop
 	PTR_ADDU k1, 16			# skip over wait
@@ -980,8 +949,6 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
  * Call the interrupt handler.   SAVE_CPU has left a0 pointing at the saved
  * frame.
  */
-	/* XXX-AM: This is probably useless since we are coming from the kernel */
-	LOAD_KERNEL_GP
 #ifdef INTRNG
 	CAPCALL_LOAD($c12, intr_irq_handler)
 #else
@@ -1139,18 +1106,16 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	 * Save the relevant user registers into the u.u_pcb struct.
 	 * We don't need to save s0 - s8 because the compiler does it for us.
 	 */
-	GET_CPU_PCPU(CHERI_REG_KSCRATCH, k1)
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH)
 	clc CHERI_REG_KSCRATCH, zero, PC_CURPCB(CHERI_REG_KSCRATCH)
 	SAVE_UINTR_PCB_REGS(CHERI_REG_KSCRATCH)
 	SAVE_CREGS_TO_PCB(CHERI_REG_KSCRATCH, t0, t1)
 	/* Switch to kernel stack from pcpu, use c3 as scratch reg */
-	GET_CPU_PCPU($c3, k1)
+	GET_CPU_PCPU($c3)
 	clc CHERI_REG_STC, zero, PC_KSTACK_CAP($c3)
 	/* start with kstack at bottom */
 	REG_LI t0, (CHERI_KSTACK_OFFSET - CALLFRAME_SIZ)
 	cincoffset CHERI_REG_STC, CHERI_REG_STC, t0
-
-	LOAD_KERNEL_GP
 
 	// Turn off fpu, disable interrupts, set kernel mode, clear exception level.
 	and	t0, a0, ~(MIPS_SR_COP_1_BIT | MIPS_SR_EXL | MIPS_SR_INT_IE | MIPS_SR_KSU_MASK)
@@ -1193,7 +1158,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	 */
 	CLEAR_STATUS
 
-	GET_CPU_PCPU(CHERI_REG_KSCRATCH, k1)
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH)
 	clc	CHERI_REG_KSCRATCH, zero, PC_CURPCB(CHERI_REG_KSCRATCH)
 
 	/*
@@ -1258,15 +1223,12 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	nop
 
 	/* Kernel address. */
-	PTR_LA		k1, _C_LABEL(kernel_segmap)
-	cgetkdc		CHERI_REG_KSCRATCH
-	csetoffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k1
-	csetbounds	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, CHERICAP_SIZE	# kernel_segmap capability
+	CAPTABLE_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(kernel_segmap))
 	b		2f
 	clc		CHERI_REG_KSCRATCH, zero, 0(CHERI_REG_KSCRATCH)		# load from kernel_segmap
 
 1:	/* User address.  */
-	GET_CPU_PCPU(CHERI_REG_KSCRATCH, k1)
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH)
 	clc	CHERI_REG_KSCRATCH, zero, PC_SEGBASE(CHERI_REG_KSCRATCH)
 
 2:	/* Validate page directory pointer. If no seg tab go to exception processing */
@@ -1376,7 +1338,7 @@ tlb_insert_random:
 	 * Check for kernel stack overflow.
 	 * This can happen if we are using guard pages for our kernel stack.
 	 */
-	GET_CPU_PCPU(CHERI_REG_KSCRATCH, k1)
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH)
 	clc	CHERI_REG_KSCRATCH, zero, PC_CURTHREAD(CHERI_REG_KSCRATCH)
 	clc	CHERI_REG_KSCRATCH, zero, TD_KSTACK(CHERI_REG_KSCRATCH)
 	cltu	k0, CHERI_REG_KSCRATCH, CHERI_REG_STC
@@ -1434,12 +1396,10 @@ LEAF_NOPROFILE(MipsTLBMissException)
 	 * to me so I'll leave it for now.
 	 * PTR_LA		k1, _C_LABEL(cheri_xkseg_capability)
 	*/
-	cgetkdc		CHERI_REG_KSCRATCH			# grab kdc
 	PTR_LI		k1, VM_MAX_KERNEL_ADDRESS	# check fault address against
 	sltu		k1, k1, k0			# upper bound of kernel_segmap
 	bnez		k1, MipsKernGenException	# out of bound
-	/* XXX-AM: This can be a cap-table load when KDC= kernel GPC */
-	PTR_LA		k1, _C_LABEL(kernel_segmap)	# k1 = segbase ptr (should not use $at)	
+	CAPTABLE_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(kernel_segmap)) # k1c = segbase ptr
 	PTR_SRL		k0, SEGSHIFT - PTRSHIFT		# k0 = seg offset (almost)
 	/* XXX-AM: MUST set bounds on kernel_segmap, also readonly */
 	clc		CHERI_REG_KSCRATCH, k1, 0(CHERI_REG_KSCRATCH) # kr1c = segbase
@@ -1510,7 +1470,8 @@ END(MipsTLBMissException)
 VECTOR(MipsCache, unknown)
 	CHERI_EXCEPTION_ENTER(k0)
 
-	PTR_LA	k0, _C_LABEL(MipsCacheException)
+	CAPCALL_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(MipsCacheException))
+	cgetaddr k0, CHERI_REG_KSCRATCH
 	li	k1, MIPS_KSEG0_PHYS_MASK
 	and	k0, k1
 	PTR_LI	k1, MIPS_KSEG1_START
@@ -1525,16 +1486,22 @@ VECTOR_END(MipsCache)
 /*
  * Panic on cache errors.  A lot more could be done to recover
  * from some types of errors but it is tricky.
+ *
+ * XXX-AM: Note that variadic functions in CHERI are different and this is
+ * partially broken.
  */
 NESTED_NOPROFILE(MipsCacheException, KERN_EXC_FRAME_SIZE, ra)
 	.set	noat
 	.mask	0x80000000, -4
-	PTR_LA	k0, _C_LABEL(panic)		# return to panic
-	PTR_LA	a0, 9f				# panicstr
+	CAPCALL_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(panic)) # return to panic
+	cgetaddr k0, CHERI_REG_KSCRATCH
+	CAPTABLE_LOAD($c3, 9f)			# panicstr
 	MFC0	a1, MIPS_COP_0_ERROR_PC
 	mfc0	a2, MIPS_COP_0_CACHE_ERR	# 3rd arg cache error
 
 	MTC0	k0, MIPS_COP_0_ERROR_PC		# set return address
+	/* XXX-AM: It seems that we need to set EXC_PC in CHERI */
+	MTC0	k0, MIPS_COP_0_EXC_PC		# set return address
 
 	mfc0	k0, MIPS_COP_0_STATUS		# restore status
 	li	k1, MIPS_SR_DIAG_PE		# ignore further errors

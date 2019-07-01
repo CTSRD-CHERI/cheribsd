@@ -72,7 +72,7 @@
 #define	CHERI_REG_C27	$c27
 #define	CHERI_REG_KSCRATCH CHERI_REG_C27 /* Kernel scratch capability. */
 #define	CHERI_REG_C28	$c28
-#define CHERI_REG_KSCRATCH2 CHERI_REG_C28 /* Second kernel scratch capability */
+#define CHERI_REG_KSCRATCH2 CHERI_REG_GPC /* Second kernel scratch capability */
 #define	CHERI_REG_C29	$c29	/* Former Kernel code capability. */
 #define	CHERI_REG_C30	$c30	/* Former Kernel data capability. */
 #define	CHERI_REG_C31	$c31	/* Former Exception program counter cap. */
@@ -114,9 +114,12 @@
 /*
  * KR2C is used to preserve a second scratch register KSCRATCH2 when
  * the exception occurs in user mode.
+ * Note that KSCRATCH2 is aliased to GPC so we install the kernel GP
+ * here as well.
  */
-#define CHERI_EXCEPTION_KR2C_ENTER		\
-	csetkr2c	CHERI_REG_KSCRATCH2
+#define CHERI_EXCEPTION_KR2C_ENTER					\
+	csetkr2c	CHERI_REG_KSCRATCH2;				\
+	cgetkdc		CHERI_REG_KSCRATCH2
 
 #define CHERI_EXCEPTION_KR2C_RETURN		\
 	cgetkr2c	CHERI_REG_KSCRATCH2
@@ -153,6 +156,10 @@
  *
  * kr1c is clobbered.
  * kr2c is used to save the user ddc.
+ *
+ * In the pure capability kernel instead
+ * kr1c is clobbered.
+ * kr2c is used to save the user gpc and the kernel gpc is installed.
  */
 #define	CHERI_EXCEPTION_ENTER(reg)					\
 	mfc0	reg, MIPS_COP_0_STATUS;					\
@@ -181,6 +188,10 @@
  *
  * kr1c is clobbered.
  * kr2c is assumed to hold the user ddc.
+ *
+ * In the pure capability kernel instead
+ * kr1c is clobbered.
+ * kr2c is assumed to hold the user gpc.
  */
 #define	CHERI_EXCEPTION_RETURN(reg)					\
 	/* Save $c27 in $kr1c. */					\
@@ -238,9 +249,8 @@
  * In the purecap kernel the pcb pointer is in KSCRATCH, so we can not use
  * it as another scratch register.
  * KR1C holds the saved KSCRATCH value so we can not use it either.
- * We use KR2C to save KSCRATCH2 and free a second scratch register, the kernel
- * DDC is not installed yet here but it should not be used anyway in the purecap
- * kernel.
+ * KR2C holds the saved GPC and KSCRATCH2 holds the kernel GP.
+ * We use C1 as an extra scratch register.
  * Unlike kernel context switches, we both save and restore
  * the capability cause register.
  */
@@ -270,22 +280,24 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C23, C23, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
-	SAVE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
+	/* c26 was saved in kr2c */					\
+	cgetkr2c	CHERI_REG_C1;					\
+	SAVE_U_PCB_CREG(CHERI_REG_C1, IDC, pcb);			\
 	/* c27 was saved in kr1c */					\
-	cgetkr1c	CHERI_REG_KSCRATCH2;				\
-	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH2, C27, pcb);			\
-	/* c28 was saved in kr2c */					\
-	cgetkr2c	CHERI_REG_KSCRATCH2;				\
-	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH2, C28, pcb);			\
+	cgetkr1c	CHERI_REG_C1;					\
+	SAVE_U_PCB_CREG(CHERI_REG_C1, C27, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C1, C28, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
 	/* Save special registers after KSCRATCH regs */		\
-	CGetEPCC	CHERI_REG_KSCRATCH2;				\
-	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH2, PCC, pcb);			\
+	CGetEPCC	CHERI_REG_C1;					\
+	SAVE_U_PCB_CREG(CHERI_REG_C1, PCC, pcb);			\
 	/* User DDC is still installed. */				\
-	cgetdefault	CHERI_REG_KSCRATCH2;				\
-	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH2, DDC, pcb);			\
+	cgetdefault	CHERI_REG_C1;					\
+	SAVE_U_PCB_CREG(CHERI_REG_C1, DDC, pcb);			\
+	csetdefault	$cnull;						\
 	cgetcause	treg;						\
 	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)
 
@@ -295,15 +307,15 @@
 	CSetEPCC capreg;
 
 /*
+ * Restore state from PCB. Assume that pcb is pointed to by KSCRATCH
+ * and KSCRATCH2 is the kernel GP. We use C1 as an extra scratch register.
  * pcb: capability register pointing to the pcb
  * treg: scratch register (non capability)
  */
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
 	/* Restore special registers before KSCRATCH (C27) */		\
-	/* User DDC is installed here immediately */			\
-	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH2, DDC, pcb);		\
-	csetdefault	CHERI_REG_KSCRATCH2;				\
-	RESTORE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C1, DDC, pcb);			\
+	csetdefault	CHERI_REG_C1;					\
 	RESTORE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C4, C4, pcb);			\
@@ -328,18 +340,19 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C23, C23, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
-	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
-	/* Restore KSCRATCH in kr1c for EXCEPTION_RETURN */		\
-	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH2, C27, pcb);		\
-	csetkr1c	CHERI_REG_KSCRATCH2;				\
 	/* Restore KSCRATCH2 value in kr2c for EXCEPTION_RETURN */	\
-	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH2, C28, pcb);		\
-	csetkr2c	CHERI_REG_KSCRATCH2;				\
+	RESTORE_U_PCB_CREG(CHERI_REG_C1, IDC, pcb);			\
+	csetkr2c	CHERI_REG_C1;					\
+	/* Restore KSCRATCH in kr1c for EXCEPTION_RETURN */		\
+	RESTORE_U_PCB_CREG(CHERI_REG_C1, C27, pcb);			\
+	csetkr1c	CHERI_REG_C1;					\
+	RESTORE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
 	RESTORE_CAPCAUSE_FROM_PCB(treg, pcb);				\
-	csetcause	treg
+	csetcause	treg;						\
+	RESTORE_U_PCB_CREG(CHERI_REG_C1, C1, pcb)
 
 #else /* ! CHERI_PURECAP_KERNEL */
 
@@ -591,6 +604,15 @@
 #define CAPCALL_LOAD(dst, sym)				\
 	clcbi dst, %capcall20(sym)(CHERI_REG_GPC)
 
+#define ABSRELOC_LA(dst, sym)				\
+	lui	dst, %highest(sym);			\
+	daddiu	dst, dst, %higher(sym);			\
+	dsll	dst, dst, 16;				\
+	daddiu	dst, dst, %hi(sym);			\
+	dsll	dst, dst, 16;				\
+	daddiu	dst, dst, %lo(sym)
+
+
 /*
  * The CCall (selector 1) branch delay slot has been removed but in order to
  * run on older hardware we use this macro ensure it is followed by a nop
@@ -607,7 +629,7 @@
 #endif /* _MIPS_INCLUDE_CHERIASM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190529,
+//   "updated": 20190702,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support"

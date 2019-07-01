@@ -135,7 +135,7 @@
 	xor	t0, a0, t0                          ;\
 	mtc0	t0, MIPS_COP_0_STATUS               ;\
 	COP0_SYNC                                   ;\
-	GET_CPU_PCPU($c4, s1)                       ;\
+	GET_CPU_PCPU($c4)			    ;\
 	clc	$c3, zero, PC_CURPCB($c4)           ;\
 	REG_LI	s2, TD_FLAGS                        ;\
 	clc	$c4, zero, PC_CURTHREAD($c4)        ;\
@@ -148,8 +148,7 @@
 	COP0_SYNC                                   ;\
 	beq	s2, zero, 4f                        ;\
 	nop                                         ;\
-	PTR_LA	t9, _C_LABEL(ast)                   ;\
-	cgetpccsetoffset	$c12, t9            ;\
+	CAPCALL_LOAD($c12, _C_LABEL(ast))	    ;\
 	cincoffset	$c3, $c3, U_PCB_REGS        ;\
 	REG_LI	t0, TRAPFRAME_SIZE                  ;\
 	cjalr	$c12, $c17                          ;\
@@ -325,7 +324,7 @@ int savectx(struct pcb *) __returns_twice;
 #endif	/* !_MACHINE_PCB_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190529,
+//   "updated": 20190702,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

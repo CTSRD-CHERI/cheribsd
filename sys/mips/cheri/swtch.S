@@ -81,7 +81,6 @@
 
 #include "assym.inc"
 
-	.option pic0
 	.set	noreorder			# Noreorder is default style!
 
 /*
@@ -94,10 +93,7 @@ LEAF(fork_trampoline)
 	 */
 	cmove	$c3, $c18
 	cmove	$c4, $c19
-	/* Globals pointer should have been set in cpu_fork() */
 	CAPCALL_LOAD($c12, fork_exit)
-	// PTR_LA	t9, _C_LABEL(fork_exit)
-	// cgetpccsetoffset $c12, t9
 	cjalr	$c12, $c17
 	cmove	$c5, $c20
 
@@ -113,15 +109,15 @@ LEAF(fork_trampoline)
  * by the interrupt code.
  */
 	.set	noat
-	GET_CPU_PCPU(CHERI_REG_KSCRATCH, k1)
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH)
 	clc CHERI_REG_KSCRATCH, zero, PC_CURPCB(CHERI_REG_KSCRATCH)
 
 	RESTORE_U_PCB_REG(t0, MULLO, CHERI_REG_KSCRATCH)
 	RESTORE_U_PCB_REG(t1, MULHI, CHERI_REG_KSCRATCH)
 	mtlo	t0
 	mthi	t1
-	/* Note: this trashes KSCRATCH2. */
-	RESTORE_U_PCB_PC(a0, CHERI_REG_KSCRATCH2, CHERI_REG_KSCRATCH) # set return address
+	/* Note: this uses $c1 as scratch register. */
+	RESTORE_U_PCB_PC(a0, CHERI_REG_C1, CHERI_REG_KSCRATCH) # set return address
 	RESTORE_U_PCB_REG(a0, PC, CHERI_REG_KSCRATCH)
 	RESTORE_U_PCB_REG(AT, AST, CHERI_REG_KSCRATCH)
 	RESTORE_U_PCB_REG(v0, V0, CHERI_REG_KSCRATCH)
@@ -352,7 +348,7 @@ blocked_loop:
 /*
  * Switch to new context.
  */
-	GET_CPU_PCPU($c2, t0)
+	GET_CPU_PCPU($c2)
 	csc	$c4, zero, PC_CURTHREAD($c2)
 	clc	$c1, zero, TD_PCB($c4)
 	csc	$c1, zero, PC_CURPCB($c2)
