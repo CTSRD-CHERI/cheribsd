@@ -378,7 +378,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 {
 	void * __capability newcap;
 	size_t cap_base, cap_len;
-	register_t perms;
+	register_t perms, cap_prot;
 
 	/*
 	 * In the strong case (cheriabi_mmap_setbounds), return the original
@@ -400,11 +400,18 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 	if (cheriabi_mmap_honor_prot) {
 		perms = cheri_getperm(newcap);
 		/*
+		 * If PROT_MAX() was not passed, use the prot value to derive
+		 * capability permissions.
+		 */
+		cap_prot = PROT_MAX_EXTRACT(mrp->mr_prot);
+		if (cap_prot == 0)
+			cap_prot = PROT_EXTRACT(mrp->mr_prot);
+		/*
 		 * Set the permissions to PROT_MAX to allow a full
 		 * range of access subject to page permissions.
 		 */
 		newcap = cheri_andperm(newcap, ~PERM_RWX |
-		    cheriabi_mmap_prot2perms(EXTRACT_PROT_MAX(mrp->mr_prot)));
+		    cheriabi_mmap_prot2perms(cap_prot));
 	}
 
 	if (mrp->mr_flags & MAP_FIXED) {

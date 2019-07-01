@@ -271,7 +271,6 @@ MAN=	accept_filter.9 \
 	proc_rwmem.9 \
 	pseudofs.9 \
 	psignal.9 \
-	pwm.9 \
 	pwmbus.9 \
 	random.9 \
 	random_harvest.9 \
@@ -400,6 +399,7 @@ MAN=	accept_filter.9 \
 	VOP_ADVLOCK.9 \
 	VOP_ALLOCATE.9 \
 	VOP_ATTRIB.9 \
+	VOP_BMAP.9 \
 	VOP_BWRITE.9 \
 	VOP_CREATE.9 \
 	VOP_FSYNC.9 \
@@ -1670,6 +1670,7 @@ MLINKS+=proc_rwmem.9 proc_readmem.9 \
 MLINKS+=psignal.9 gsignal.9 \
 	psignal.9 pgsignal.9 \
 	psignal.9 tdsignal.9
+MLINKS+=pwmbus.9 pwm.9
 MLINKS+=random.9 arc4rand.9 \
 	random.9 arc4random.9 \
 	random.9 is_random_seeded.9 \
@@ -1881,7 +1882,8 @@ MLINKS+=sleep.9 msleep.9 \
 	sleep.9 tsleep.9 \
 	sleep.9 tsleep_sbt.9 \
 	sleep.9 wakeup.9 \
-	sleep.9 wakeup_one.9
+	sleep.9 wakeup_one.9 \
+	sleep.9 wakeup_any.9
 MLINKS+=sleepqueue.9 init_sleepqueues.9 \
 	sleepqueue.9 sleepq_abort.9 \
 	sleepqueue.9 sleepq_add.9 \

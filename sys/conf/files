@@ -719,14 +719,14 @@ crypto/des/des_ecb.c		optional crypto | ipsec | ipsec_support | netsmb
 crypto/des/des_setkey.c		optional crypto | ipsec | ipsec_support | netsmb
 crypto/rc4/rc4.c		optional netgraph_mppc_encryption | kgssapi
 crypto/rijndael/rijndael-alg-fst.c optional crypto | ekcd | geom_bde | \
-	ipsec | ipsec_support | random !random_loadable | wlan_ccmp
-crypto/rijndael/rijndael-api-fst.c optional ekcd | geom_bde | random !random_loadable
+	ipsec | ipsec_support | !random_loadable | wlan_ccmp
+crypto/rijndael/rijndael-api-fst.c optional ekcd | geom_bde | !random_loadable
 crypto/rijndael/rijndael-api.c	optional crypto | ipsec | ipsec_support | \
 	wlan_ccmp
 crypto/sha1.c			optional carp | crypto | ether | ipsec | \
 	ipsec_support | netgraph_mppc_encryption | sctp
 crypto/sha2/sha256c.c		optional crypto | ekcd | geom_bde | ipsec | \
-	ipsec_support | random !random_loadable | sctp | zfs
+	ipsec_support | !random_loadable | sctp | zfs
 crypto/sha2/sha512c.c		optional crypto | geom_bde | ipsec | \
 	ipsec_support | zfs
 crypto/skein/skein.c		optional crypto | zfs
@@ -2735,11 +2735,11 @@ dev/puc/puc.c			optional puc
 dev/puc/puc_cfg.c		optional puc
 dev/puc/puc_pccard.c		optional puc pccard
 dev/puc/puc_pci.c		optional puc pci
-dev/pwm/pwmc.c			optional pwm
-dev/pwm/pwmbus.c		optional pwm
-dev/pwm/pwm_if.m		optional pwm
-dev/pwm/pwmbus_if.m		optional pwm
-dev/pwm/ofw_pwm.c		optional pwm fdt
+dev/pwm/pwmc.c			optional pwm | pwmc
+dev/pwm/pwmbus.c		optional pwm | pwmbus
+dev/pwm/pwmbus_if.m		optional pwm | pwmbus
+dev/pwm/ofw_pwm.c		optional pwm fdt | pwmbus fdt
+dev/pwm/ofw_pwmbus.c		optional pwm fdt | pwmbus fdt
 dev/quicc/quicc_core.c		optional quicc
 dev/ral/rt2560.c		optional ral
 dev/ral/rt2661.c		optional ral
@@ -2801,11 +2801,11 @@ rt2860.fw			optional rt2860fw | ralfw		\
 	compile-with	"${NORMAL_FW}"					\
 	no-obj no-implicit-rule						\
 	clean		"rt2860.fw"
-dev/random/random_infra.c	optional random
-dev/random/random_harvestq.c	optional random
-dev/random/randomdev.c		optional random !random_loadable
-dev/random/fortuna.c		optional random !random_loadable
-dev/random/hash.c		optional random !random_loadable
+dev/random/random_infra.c	standard
+dev/random/random_harvestq.c	standard
+dev/random/randomdev.c		optional !random_loadable
+dev/random/fortuna.c		optional !random_loadable
+dev/random/hash.c		optional !random_loadable
 dev/rc/rc.c			optional rc
 dev/rccgpio/rccgpio.c		optional rccgpio gpio
 dev/re/if_re.c			optional re
@@ -3269,6 +3269,7 @@ dev/usb/usb_generic.c		optional usb
 dev/usb/usb_handle_request.c	optional usb
 dev/usb/usb_hid.c		optional usb
 dev/usb/usb_hub.c		optional usb
+dev/usb/usb_hub_acpi.c		optional usb acpi
 dev/usb/usb_if.m		optional usb
 dev/usb/usb_lookup.c		optional usb
 dev/usb/usb_mbuf.c		optional usb
@@ -4018,9 +4019,9 @@ crypto/chacha20/chacha.c	standard
 libkern/asprintf.c		standard
 libkern/bcd.c			standard
 libkern/bsearch.c		standard
-libkern/crc32.c			standard
 libkern/explicit_bzero.c	standard
 libkern/fnmatch.c		standard
+libkern/gsb_crc32.c		standard
 libkern/iconv.c			optional libiconv
 libkern/iconv_converter_if.m	optional libiconv
 libkern/iconv_ucs.c		optional libiconv

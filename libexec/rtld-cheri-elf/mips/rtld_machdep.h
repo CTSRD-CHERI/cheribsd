@@ -41,6 +41,7 @@
 #else
 #include <assert.h>
 #define dbg_assert(cond) assert(cond)
+#define dbg_cheri(...)
 #define dbg(...)
 #endif
 
@@ -77,33 +78,124 @@ get_codesegment(const struct Struct_Obj_Entry *obj) {
 	return obj->text_rodata_cap;
 }
 
-static inline dlfunc_t
-make_function_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
-{
-	const void* ret = get_codesegment(defobj) + def->st_value;
+extern dlfunc_t find_external_call_thunk(const Elf_Sym* def, const Obj_Entry* defobj);
 
+static inline bool
+can_use_tight_pcc_bounds(const struct Struct_Obj_Entry *defobj)
+{
+	switch (defobj->cheri_captable_abi) {
+	case DF_MIPS_CHERI_ABI_PLT:
+	case DF_MIPS_CHERI_ABI_FNDESC:
+		return true;
+#ifndef __CHERI_CAPABILITY_TABLE__
+	case DF_MIPS_CHERI_ABI_LEGACY:
+#endif
+	case DF_MIPS_CHERI_ABI_PCREL:
+		return false;
+	default:
+		dbg_assert(false && "Invalid abi");
+		__builtin_unreachable();
+		__builtin_trap();
+	}
+}
+
+/* Create a callable function pointer (needed for PLT ABI)  */
+extern dlfunc_t
+allocate_function_pointer_trampoline(dlfunc_t target_func, const Obj_Entry *obj);
+
+/* Create a callable function pointer to a rtld-internal function */
+static inline dlfunc_t
+_make_rtld_function_pointer(dlfunc_t target_func) {
+	extern struct Struct_Obj_Entry obj_rtld;
+#if !defined(__CHERI_CAPABILITY_TABLE__) || __CHERI_CAPABILITY_TABLE__ == 3
+	/* PC-rel/legacy */
+	dbg_assert(!can_use_tight_pcc_bounds(&obj_rtld));
+	return target_func;
+#else
+	/* Need a trampoline in PLT ABI */
+	dbg_assert(can_use_tight_pcc_bounds(&obj_rtld));
+	return allocate_function_pointer_trampoline(target_func, &obj_rtld);
+ #endif
+}
+
+#if !defined(__CHERI_CAPABILITY_TABLE__) || __CHERI_CAPABILITY_TABLE__ == 3
+/* Legacy/pc-rel can just use &func since there is no need for a trampoline */
+#define _make_local_only_fn_pointer(func) (dlfunc_t)(&func)
+#else
+/*
+ * In the PLT ABI we need to load the function pointer and pretend that we are
+ * using it for a call only to avoid generating a R_CHERI_CAPABILITY relocation:
+ */
+#define _make_local_only_fn_pointer(func) (dlfunc_t)(__extension__ ({		\
+	void* result = NULL;							\
+	__asm__("clcbi %0, %%capcall20(" #func ")($cgp)" : "=C"(result));	\
+	result;									\
+}))
+#endif
+
+/* Define this as a macro to allow a single definition for non-CHERI architectures */
+#define make_rtld_function_pointer(target_func)	\
+	(__typeof__(&target_func))_make_rtld_function_pointer(_make_local_only_fn_pointer(target_func))
+/*
+ * Create a function pointer that can only be called from the context of rtld
+ * (i.e. $cgp is set to the RTLD $cgp)
+ */
+#define make_rtld_local_function_pointer(target_func)	\
+	(__typeof__(&target_func))_make_local_only_fn_pointer(target_func)
+
+/*
+ * Create a pointer to a function.
+ * Important: this is not necessarily callable! For the PLT ABI we need a
+ * to load $cgp first -> use make_function_pointer() instead.
+ */
+static inline dlfunc_t
+make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
+    bool tight_bounds)
+{
+	const void *ret = get_codesegment(defobj) + def->st_value;
+#ifndef __CHERI_CAPABILITY_TABLE__
+	if (defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_LEGACY) {
+		/*
+		 * Legacy abi: we need to give it full address space range
+		 * (including the full permissions mask) to support legacy binaries.
+		 */
+		assert(cheri_getbase(cheri_getpcc()) == 0);
+		return (dlfunc_t)cheri_setaddress(cheri_getpcc(), (vaddr_t)ret);
+	}
+#endif
 	/* Remove store and seal permissions */
 	ret = cheri_clearperm(ret, FUNC_PTR_REMOVE_PERMS);
-	if (defobj->restrict_pcc_strict)
+	dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_LEGACY);
+	if (tight_bounds) {
+		dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
 		return (dlfunc_t)cheri_csetbounds(ret, def->st_size);
-	if (defobj->restrict_pcc_basic)
-		return __DECONST(dlfunc_t, ret); /* Shouldn't a function pointer be const implicitly? */
+	} else {
+		/* PC-relative ABI needs full DSO bounds */
+		dbg_assert(defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL);
+		return __DECONST(dlfunc_t, ret);
+	}
+}
 
-	/*
-	 * Otherwise we need to give it full address space range (including
-	 * the full permissions mask) to support legacy binaries.
-	 *
-	 * TODO: remove once we have decided on a sane(r) ABI
-	 */
-	assert(cheri_getbase(cheri_getpcc()) == 0);
-	return (dlfunc_t)cheri_setaddress(cheri_getpcc(), (vaddr_t)ret);
+/*
+ * Create a function pointer that can be called anywhere (i.e. for the PLT ABI
+ * this will be a pointer to a trampoline that loads the correct $cgp.
+ */
+static inline dlfunc_t
+make_function_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
+{
+	// Add a trampoline if the target ABI is not PCREL
+	if (can_use_tight_pcc_bounds(defobj)) {
+		return find_external_call_thunk(def, defobj);
+	} else {
+		/* No need for a function pointer trampoline in the legacy/pcrel ABI */
+		return make_code_pointer(def, defobj, /*tight_bounds=*/false);
+	}
 }
 
 static inline void*
 make_data_pointer(const Elf_Sym* def, const struct Struct_Obj_Entry *defobj)
 {
 	void* ret = defobj->relocbase + def->st_value;
-
 	/* Remove execute and seal permissions */
 	ret = cheri_clearperm(ret, DATA_PTR_REMOVE_PERMS);
 	/* TODO: can we always set bounds here or does it break compat? */
@@ -142,12 +234,40 @@ vaddr_to_code_pointer(const struct Struct_Obj_Entry *obj, vaddr_t code_addr) {
 // ignore _init/_fini
 #define call_initfini_pointer(obj, target) rtld_fatal("%s: _init or _fini used!", obj->path)
 
+static inline void
+_call_init_fini_array_pointer(const struct Struct_Obj_Entry *obj, vaddr_t target, int argc, char** argv, char** env) {
+
+	InitArrFunc func = (InitArrFunc)vaddr_to_code_pointer(obj, target);
+#if defined(__CHERI_CAPABILITY_TABLE__)
+	/* Set the target object $cgp when calling the pointer:
+	 * Note: we use target_cgp_for_func() to support per-function captable */
+	const void *init_fini_cgp = target_cgp_for_func(obj, (dlfunc_t)func);
+	dbg_cheri("Setting init function $cgp to %#p for call to %#p. "
+	    "Current $cgp: %#p\n", init_fini_cgp, (void*)func, cheri_getidc());
+	/*
+	 * Invoke the function from assembly to ensure that the $cgp value is
+	 * correct and the compiler can't reorder things.
+	 * When I was calling the function from C, it broke at -O2.
+	 * Note: we need the memory clobber here to ensure that the setting of
+	 * $cgp is not ignored due to reordering of instructions (e.g. by adding
+	 * a $cgp restore after external function calls).
+	 */
+	__asm__ volatile("cmove $cgp, %[cgp_val]\n\t"
+	    :/*out*/
+	    :/*in*/[cgp_val]"C"(init_fini_cgp)
+	    :/*clobber*/"$c26", "memory");
+	func(argc, argv, env);
+	/* Ensure that the function call is not reordered before/after asm */
+	__compiler_membar();
+#else
+	func(argc, argv, env);
+#endif
+}
+
 #define call_init_array_pointer(obj, target)			\
-	(((InitArrFunc)(vaddr_to_code_pointer(obj, (target))))	\
-	    (main_argc, main_argv, environ))
+	_call_init_fini_array_pointer(obj, (target), main_argc, main_argv, environ)
 #define call_fini_array_pointer(obj, target)			\
-	(((InitArrFunc)(vaddr_to_code_pointer(obj, (target))))	\
-	    (main_argc, main_argv, environ))
+	_call_init_fini_array_pointer(obj, (target), main_argc, main_argv, environ)
 
 // Not implemented for CHERI:
 // #define	call_ifunc_resolver(ptr) \

@@ -661,15 +661,16 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs->csp = sfp;
 	regs->c12 = catcher;
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
-	regs->ddc = csigp->csig_ddc;
 	/*
 	 * For now only change IDC if we were sandboxed. This makes cap-table
 	 * binaries work as expected (since they need cgp to remain the same).
 	 *
 	 * TODO: remove csigp->csig_idc
 	 */
-	if (cheri_is_sandboxed)
+	if (cheri_is_sandboxed) {
+		regs->ddc = csigp->csig_ddc;
 		regs->idc = csigp->csig_idc;
+	}
 }
 
 #ifdef CHERIABI_LEGACY_SUPPORT
@@ -856,6 +857,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * this by default!
 	 */
 #ifdef CHERIABI_LEGACY_SUPPORT
+#pragma message("Warning: Building kernel with LEGACY ABI support!")
 	/*
 	 * The legacy ABI needs a full address space $pcc (with base == 0)
 	 * to create code capabilities using cgetpccsetoffset
@@ -932,6 +934,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	csigp = &td->td_pcb->pcb_cherisignal;
 	csigp->csig_csp = td->td_frame->csp;
 	csigp->csig_default_stack = csigp->csig_csp;
+#ifdef CHERIABI_LEGACY_SUPPORT
+	csigp->csig_ddc = frame->ddc;
+#endif
+
 
 	td->td_md.md_flags &= ~MDTD_FPUSED;
 	if (PCPU_GET(fpcurthread) == td)
@@ -1004,6 +1010,11 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	csigp = &td->td_pcb->pcb_cherisignal;
 	csigp->csig_csp = td->td_frame->csp;
 	csigp->csig_default_stack = csigp->csig_csp;
+#ifdef CHERIABI_LEGACY_SUPPORT
+	/* Setup $ddc when targeting the legacy ABI */
+	frame->ddc = td->td_frame->ddc;
+	csigp->csig_ddc = td->td_frame->ddc;
+#endif
 }
 
 int
@@ -1020,6 +1031,8 @@ cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 				  : "C" ((char * __capability)td->td_md.md_tls +
 				      td->td_md.md_tls_tcb_offset));
 	}
+#ifdef CHERIABI_LEGACY_SUPPORT
+#pragma message("Warning: Building with support for LEGACY TLS")
 	if (curthread == td && cpuinfo.userlocal_reg == true) {
 		/*
 		 * If there is an user local register implementation
@@ -1037,6 +1050,7 @@ cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 		mips_wr_userlocal((__cheri_addr u_long)td->td_md.md_tls +
 		    td->td_md.md_tls_tcb_offset);
 	}
+#endif
 
 	return (0);
 }

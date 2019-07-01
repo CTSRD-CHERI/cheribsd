@@ -80,15 +80,18 @@ LEAF(rtld_start)
 	cmove		$c24, $c11
 
 	csc		$c4, zero, SFRAME_RELOCBASE($c11) /* relocbase */
-	PIC_LOAD_CODE_PTR($c3, a0, _DYNAMIC)
+	/* $pcc still has large bounds here -> load _DYNAMIC from $pcc */
+	PCREL_LOAD_CODE_PTR($c3, a0, _DYNAMIC)
 	/* XXXAR: this assumes relocbase is R/W */
+	/* TODO: Could also use cgetaddr+csetaddr to rederive from relocbase */
 	csub		a0, $c3, $c4	/* get difference between relocbase and
 					 * &_DYNAMIC (needed since they don't
 					 * have the same base) */
-	cincoffset	$c3, $c4, a0	/* dynp */
 
-	PIC_CALL(_rtld_relocate_nonplt_self) /* &_DYNAMIC, relocbase */
-	# Returns DT_MIPS_CHERI_FLAGS value in $v0
+	PCREL_LOAD_CODE_PTR($c12, t9, _rtld_relocate_nonplt_self)
+	cjalr $c12, $c17; /* (&_DYNAMIC, relocbase) */
+	cincoffset	$c3, $c4, a0	/* dynp (in delay slot) */
+	/* Returns DT_MIPS_CHERI_FLAGS value in $v0 */
 
 	/*
 	 * Now that we have processed the self relocations we can do the
@@ -99,12 +102,25 @@ LEAF(rtld_start)
 	 * add the relocabase value to all targets and sources instead of the
 	 * more expensive ELF_REL processing.
 	 */
-	PIC_LOAD_CODE_PTR($c3, a0, __start___cap_relocs)
-	PIC_LOAD_CODE_PTR($c4, a1, __stop___cap_relocs)
+	PCREL_LOAD_CODE_PTR($c3, a0, __start___cap_relocs)
+	PCREL_LOAD_CODE_PTR($c4, a1, __stop___cap_relocs)
 	clc		$c5, zero, SFRAME_RELOCBASE($c11) /* relocbase */
-	move	a0, v0
-	PIC_CALL(_rtld_do___caprelocs_self) /* (&__start___cap_relocs, &__stop___cap_relocs, relocbase, flags) */
 
+	PCREL_LOAD_CODE_PTR($c12, t9, _rtld_do___caprelocs_self)
+	cjalr $c12, $c17; /* _rtld_do___caprelocs_self(&__start___cap_relocs, &__stop___cap_relocs, relocbase, flags) */
+	move	a0, v0 /* move flags to argument registers (delay slot) */
+
+#if defined(__CHERI_CAPABILITY_TABLE__) && __CHERI_CAPABILITY_TABLE__ != 3
+	/* For the non-pc-relative case set up $cgp now */
+	PCREL_LOAD_CODE_PTR($cgp, t0, __cap_table_start)
+	/* Use $c3 as the temporary register to get size of .captable */
+	PCREL_LOAD_CODE_PTR($c3, t0, __cap_table_end)
+	csub t0, $c3, $cgp
+	csetbounds $cgp, $cgp, t0
+	/* Clear all permissions except LOAD+LOAD_CAP */
+	dli t0, (CHERI_PERM_LOAD | CHERI_PERM_LOAD_CAP)
+	candperm $cgp, $cgp, t0
+#endif
 
 	clc		$c3, zero, SFRAME_AUXARGS($c11)
 	/* XXX-BD: Should allocate cleanup and objp outside stack. */
@@ -115,7 +131,14 @@ LEAF(rtld_start)
 	dli		t0, SFRAME_OBJP
 	cincoffset	$c5, $c11, t0			/* &objp */
 	csetbounds	$c5, $c5, t1
-	PIC_CALL(_rtld)		/* c3 = _rtld(auxargs, cleanup, objp) */
+	/*
+	 * Note: we could use PIC_CALL() here since $cgp is set up correctly
+	 * by now, but since we have a large $pcc anyway, using a pc-relative
+	 * call here avoids allocating a slot in the captable
+	 */
+	PCREL_LOAD_CODE_PTR($c12, t9, _rtld)
+	cjalr $c12, $c17; /* c3 = _rtld(auxargs, cleanup, objp) */
+	nop
 
 	cmove		$c12, $c3
 	clc		$c3, zero, SFRAME_AUXARGS($c11)
@@ -146,7 +169,7 @@ END(rtld_start)
 #define	XCALLFRAME_CFP		(10*CHERICAP_SIZE)
 /*
  * We need to save $c13 for varidics and on-stack arguments since the any calls
- * calls with variadic args in rtld (e.g.g debug printfs) will clobber it
+ * calls with variadic args in rtld (e.g. debug printfs) will clobber it
  */
 #define	XCALLFRAME_C13		(9*CHERICAP_SIZE)
 #define	XCALLFRAME_C3		(8*CHERICAP_SIZE)
@@ -230,7 +253,11 @@ LEAF(_rtld_bind_start)
 	// TODO: load this from privileged $chwr instead
 	clc	$cgp, zero, 0($c3) #const void* rtld_cgp = plt_stub->rtld_cgp;
 	// Now that the rtld $cgp has been restored we can call functions again
-	PIC_CALL(_mips_rtld_bind)	# $c3 = _mips_rtld_bind(plt_stub)
+	// Note: PIC_CALL() may load from $cgp
+	.set PIC_GLOBALS_POINTER_CHANGED, 0	# $cgp has been restored
+	PIC_LOAD_CALL_PTR($c12, t9, _mips_rtld_bind) # $c3 = _mips_rtld_bind(plt_stub)
+	cjalr $c12, $c17;
+	nop;
 	cmove	$c12, $c3
 
 	cmove	$c11, $cfp

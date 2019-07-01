@@ -38,6 +38,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 static FILE __sF[3];
 FILE *__stdinp = &__sF[0];
@@ -96,6 +97,28 @@ fprintf(FILE * restrict stream, const char * restrict format, ...)
 {
 	int ret;
 	va_list ap;
+
+	va_start(ap, format);
+	ret = vfprintf(stream, format, ap);
+	va_end(ap);
+	return (ret);
+}
+
+int
+dprintf(int fd, const char * restrict format, ...)
+{
+	int ret;
+	va_list ap;
+	FILE* stream;
+
+	if (fd == STDIN_FILENO)
+		stream = stdin;
+	else if (fd == STDOUT_FILENO)
+		stream = stdout;
+	else if (fd == STDERR_FILENO)
+		stream = stderr;
+	else
+		stream = NULL;
 
 	va_start(ap, format);
 	ret = vfprintf(stream, format, ap);

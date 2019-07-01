@@ -63,44 +63,7 @@ void _do___caprelocs(const struct capreloc *start_relocs,
 	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
 	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
 #else
-#pragma message("LLVM cheri_init_globals.h is too old, please update LLVM")
-	(void)base_addr;
-	/*
-	 * XXX: Aux args capabilities have base 0, but mmap gives us a tight
-	 * base. Since reloc->object and (currently) reloc->capability_location
-	 * are now absolute addresses, we must subtract the absolute address of
-	 * gdc to avoid including mapbase twice.
-	 */
-	// vaddr_t mapbase = __builtin_cheri_address_get(gdc);
-	gdc = cheri_clearperm(gdc, DATA_PTR_REMOVE_PERMS);
-	pcc = cheri_clearperm(pcc, FUNC_PTR_REMOVE_PERMS);
-	for (const struct capreloc *reloc = start_relocs; reloc < stop_relocs; reloc++) {
-		_Bool isFunction = (reloc->permissions & function_reloc_flag) ==
-		    function_reloc_flag;
-		void **dest = __builtin_cheri_address_set(
-		    gdc, reloc->capability_location);
-		if (reloc->object == 0) {
-			/*
-			 * XXXAR: clang fills uninitialized capabilities with
-			 * 0xcacaca..., so we we need to explicitly write NUL
-			 * here.
-			 */
-			*dest = (void*)0;
-			continue;
-		}
-		void *src;
-		if (isFunction) {
-			src = cheri_setaddress(pcc, reloc->object);
-			if (tight_pcc_bounds)
-				src = __builtin_cheri_bounds_set(src, reloc->size);
-		} else {
-			src = cheri_setaddress(gdc, reloc->object);
-			if (reloc->size != 0)
-				src = __builtin_cheri_bounds_set(src, reloc->size);
-		}
-		src = __builtin_cheri_offset_increment(src, reloc->offset);
-		*dest = src;
-	}
+#error "LLVM cheri_init_globals.h is too old, please update LLVM"
 #endif
 }
 
@@ -183,13 +146,13 @@ process___cap_relocs(Obj_Entry* obj)
 	vaddr_t base_addr = obj->relative_cap_relocs ? cheri_getaddress(obj->relocbase) : 0;
 
 	_do___caprelocs(start_relocs, end_relocs, data_base, code_base, base_addr,
-	    obj->restrict_pcc_strict);
+	    can_use_tight_pcc_bounds(obj));
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	// TODO: do this later
 	if (obj->per_function_captable) {
 		dbg_cheri_plt("Adding per-function plt stubs for %s", obj->path);
 		for (const struct capreloc *reloc = start_relocs; reloc < end_relocs; reloc++) {
-			_Bool isFunction = (reloc->permissions & function_reloc_flag) == function_reloc_flag;
+			bool isFunction = (reloc->permissions & function_reloc_flag) == function_reloc_flag;
 			if (!isFunction)
 				continue;
 			// TODO: write location as a relative value

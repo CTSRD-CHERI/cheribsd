@@ -99,17 +99,21 @@
 
 /*
  *  cheriabi callframe {
+ *	intcap_t	cf_cra;		return address
  *	intcap_t	cf_cgp;		global pointer
  *	intcap_t	cf_csp;		frame pointer
- *	intcap_t	cf_cra;		return address
- *	int32_t		cf_s0;		misc
+ *	int32_t		cf_s0;		misc1
+ *	int32_t		cf_s1;		misc2
  * };
  *
  * XXX-BD: This is unstable and will certainly change.
  */
-#define	CALLFRAME_SIZ	(2*(_MIPS_SZCAP / 8))
 #define	CALLFRAME_CRA	(0*(_MIPS_SZCAP / 8))
-#define	CALLFRAME_S0	(1*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_CGP	(1*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_CSP	(2*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_S0	(3*(_MIPS_SZCAP / 8))
+#define	CALLFRAME_S1	(3*(_MIPS_SZCAP / 8) + SZREG)
+#define	CALLFRAME_SIZ	(4*(_MIPS_SZCAP / 8))
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 
 #endif /* !_MACHINE_ABI_H_ */

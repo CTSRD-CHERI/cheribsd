@@ -63,6 +63,7 @@ __FBSDID("$FreeBSD$");
 
 NESTED(setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	.protected _C_LABEL(setjmp)
+	PIC_PROLOGUE(setjmp)
 	/* XXXRW: CFI annotations for debugger. */
 
 	/*
@@ -83,7 +84,7 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	csetoffset	$c3, $c3, t0			# oset
 	cfromptr	$c4, $c3, zero			# set == NULL
 	li		a0, 1				# SIG_SETBLOCK
-	PIC_CALL(__cheriabi_sigprocmask)			# get current signal mask
+	PIC_CALL_LOCAL(__libc_sigprocmask)		# get current signal mask
 
 	clc		$c3, zero, CALLFRAME_SIZ($csp)	# restore env pointer
 	clc		$c17, zero, CALLFRAME_CRA($csp)	# restore return cap
@@ -160,6 +161,7 @@ END(setjmp)
 
 NESTED(longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	.protected _C_LABEL(longjmp)
+	PIC_PROLOGUE(longjmp)
 	/* XXXRW: CFI annotations for debugger. */
 
 	dli		t0, -LONGJMP_FRAME_SIZE
@@ -183,7 +185,7 @@ NESTED(longjmp, LONGJMP_FRAME_SIZE, _FRAME_RETURN_REG)
 	csetoffset	$c3, $c3, t0			# set
 	cfromptr	$c4, $c3, zero			# oset == NULL
 	li		a0, 3				# SIG_SETMASK
-	PIC_CALL(__cheriabi_sigprocmask)		# set current signal mask
+	PIC_CALL_LOCAL(__libc_sigprocmask)		# set current signal mask
 
 	clc		$c3, zero, CALLFRAME_SIZ($csp)
 	cld		a0, zero, CALLFRAME_S0($csp)	# restore return value
@@ -255,6 +257,8 @@ botch:
 	 * our caller's GP.
 	 */
 	ld		v1, 0(zero)
-	PIC_CALL(__cheriabi_longjmperror)
-	PIC_TAILCALL(__cheriabi_abort)
+	PIC_SAVE_GLOBALS_POINTER(CALLFRAME_CGP)
+	PIC_CALL(longjmperror)
+	PIC_RESTORE_GLOBALS_POINTER(CALLFRAME_CGP)
+	PIC_TAILCALL(abort)
 END(longjmp)
