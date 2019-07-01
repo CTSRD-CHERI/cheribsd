@@ -119,7 +119,7 @@ rtld_libc.a: ${_libc_pic_path} ${SRCTOP}/libexec/rtld-elf/rtld-libc/Makefile.inc
 	${AR} cr ${.OBJDIR}/${.TARGET} ${_rtld_libc_objs}
 CLEANFILES+=rtld_libc.a
 LDADD+=${.OBJDIR}/rtld_libc.a
-${PROG}: rtld_libc.a
+beforelinking: rtld_libc.a
 
 
 # Ensure that we don't end up using unsupported relocations
