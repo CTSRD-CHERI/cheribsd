@@ -791,7 +791,7 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
  *
  */
 
-#include <caprevoke.h>
+#include <cheri/caprevoke.h>
 
 /* Just for debugging printouts */
 #ifndef CPU_CHERI
