@@ -230,6 +230,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 {
 	struct vmspace *vms;
 	struct file *fp;
+	struct proc *p;
 	off_t pos;
 	vm_offset_t addr_mask = PAGE_MASK;
 	vm_size_t len, pageoff, size;
@@ -246,6 +247,8 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	fd = mrp->mr_fd;
 	pos = mrp->mr_pos;
 
+	p = td->td_proc;
+
 	if ((prot & ~(_PROT_ALL | PROT_MAX(_PROT_ALL))) != 0) {
 		SYSERRCAUSE(
 		    "%s: invalid bits in prot %x", __func__,
@@ -261,8 +264,9 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		return (EINVAL);
 	}
 	if ((prot & (PROT_WRITE | PROT_EXEC)) == (PROT_WRITE | PROT_EXEC) &&
-	    (error = vm_wxcheck(td->td_proc, "mmap")))
+	    (error = vm_wxcheck(p, "mmap")))
 		return (error);
+
 	/*
 	 * Always honor PROT_MAX if set.  If not, default to all
 	 * permissions unless we're implying maximum permissions.
@@ -273,7 +277,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		max_prot = (imply_prot_max && prot != PROT_NONE) ||
 		    SV_CURPROC_FLAG(SV_CHERI) ? prot : _PROT_ALL;
 
-	vms = td->td_proc->p_vmspace;
+	vms = p->p_vmspace;
 	fp = NULL;
 	AUDIT_ARG_FD(fd);
 
@@ -293,7 +297,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	 * pos.
 	 */
 	if (!SV_CURPROC_FLAG(SV_AOUT)) {
-		if ((len == 0 && curproc->p_osrel >= P_OSREL_MAP_ANON) ||
+		if ((len == 0 && p->p_osrel >= P_OSREL_MAP_ANON) ||
 		    ((flags & MAP_ANON) != 0 && (fd != -1 || pos != 0))) {
 			SYSERRCAUSE("%s: len == 0", __func__);
 			return (EINVAL);
@@ -541,7 +545,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		if (error != 0)
 			goto done;
 		if ((flags & (MAP_SHARED | MAP_PRIVATE)) == 0 &&
-		    td->td_proc->p_osrel >= P_OSREL_MAP_FSTRICT) {
+		    p->p_osrel >= P_OSREL_MAP_FSTRICT) {
 			error = EINVAL;
 			goto done;
 		}
