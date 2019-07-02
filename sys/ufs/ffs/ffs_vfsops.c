@@ -668,7 +668,7 @@ ffs_reload(struct mount *mp, struct thread *td, int flags)
 	 * new superblock. These should really be in the ufsmount.	XXX
 	 * Note that important parameters (eg fs_ncg) are unchanged.
 	 */
-	bcopy(fs->fs_si, newfs->fs_si, sizeof(*fs->fs_si));
+	newfs->fs_si = fs->fs_si;
 	newfs->fs_ronly = fs->fs_ronly;
 	sblockloc = fs->fs_sblockloc;
 	bcopy(newfs, fs, (u_int)fs->fs_sbsize);
