@@ -2935,7 +2935,8 @@ do_rw_wrlock(struct thread *td, struct urwlock * __capability rwlock,
 			break;
 		}
 
-		if (!(state & URWLOCK_WRITE_OWNER) && URWLOCK_READER_COUNT(state) == 0) {
+		if ((state & URWLOCK_WRITE_OWNER) == 0 &&
+		    URWLOCK_READER_COUNT(state) == 0) {
 			umtxq_unbusy_unlocked(&uq->uq_key);
 			error = umtxq_check_susp(td);
 			if (error != 0)
@@ -2950,9 +2951,10 @@ sleep:
 			error = EFAULT;
 			break;
 		}
-		suword32(&rwlock->rw_blocked_writers, blocked_writers+1);
+		suword32(&rwlock->rw_blocked_writers, blocked_writers + 1);
 
-		while ((state & URWLOCK_WRITE_OWNER) || URWLOCK_READER_COUNT(state) != 0) {
+		while ((state & URWLOCK_WRITE_OWNER) ||
+		    URWLOCK_READER_COUNT(state) != 0) {
 			umtxq_lock(&uq->uq_key);
 			umtxq_insert_queue(uq, UMTX_EXCLUSIVE_QUEUE);
 			umtxq_unbusy(&uq->uq_key);
