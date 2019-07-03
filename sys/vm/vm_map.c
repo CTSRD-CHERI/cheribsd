@@ -3207,9 +3207,7 @@ vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 				rv = KERN_INVALID_ADDRESS;
 				goto done;
 			}
-			goto next_entry;
-		}
-		if (entry->wired_count == 0) {
+		} else if (entry->wired_count == 0) {
 			entry->wired_count++;
 
 			npages = atop(entry->end - entry->start);
@@ -3287,7 +3285,6 @@ vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 		 * Check the map for holes in the specified region.
 		 * If VM_MAP_WIRE_HOLESOK was specified, skip this check.
 		 */
-	next_entry:
 		if ((flags & VM_MAP_WIRE_HOLESOK) == 0 &&
 		    entry->end < end && entry->next->start > entry->end) {
 			end = entry->end;
