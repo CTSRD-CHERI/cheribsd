@@ -3317,10 +3317,9 @@ done:
 			continue;
 		}
 
-		if ((entry->eflags & MAP_ENTRY_WIRE_SKIPPED) != 0)
-			goto next_entry_done;
-
-		if (rv == KERN_SUCCESS) {
+		if ((entry->eflags & MAP_ENTRY_WIRE_SKIPPED) != 0) {
+			/* do nothing */
+		} else if (rv == KERN_SUCCESS) {
 			if (user_wire)
 				entry->eflags |= MAP_ENTRY_USER_WIRED;
 		} else if (entry->wired_count == -1) {
@@ -3343,7 +3342,6 @@ done:
 			} else
 				entry->wired_count--;
 		}
-	next_entry_done:
 		KASSERT((entry->eflags & MAP_ENTRY_IN_TRANSITION) != 0,
 		    ("vm_map_wire: in-transition flag missing %p", entry));
 		KASSERT(entry->wiring_thread == curthread,
