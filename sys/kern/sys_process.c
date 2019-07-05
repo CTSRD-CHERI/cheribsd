@@ -582,6 +582,19 @@ ptrace_sc_ret_to32(const struct ptrace_sc_ret *psr,
 }
 #endif /* COMPAT_FREEBSD32 */
 
+#if __has_feature(capabilities)
+static void
+ptrace_sc_ret_to64(const struct ptrace_sc_ret * __capability psr,
+    struct ptrace_sc_ret64 * __capability psr64)
+{
+
+	bzero((__cheri_fromcap void *)psr64, sizeof(*psr64));
+	psr64->sr_retval[0] = (__cheri_addr uint64_t)psr->sr_retval[0];
+	psr64->sr_retval[1] = (__cheri_addr uint64_t)psr->sr_retval[1];
+	psr64->sr_error = psr->sr_error;
+}
+#endif
+
 /*
  * Process debugging system call.
  */
@@ -644,7 +657,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		struct ptrace_lwpinfo32 pl32;
 		struct ptrace_vm_entry32 pve32;
 #endif
-		char args[sizeof(td->td_sa.args)];
+		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r;
@@ -829,11 +842,17 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	int error, num, tmp;
 	int proctree_locked = 0;
 	lwpid_t tid = 0, *buf;
+#if __has_feature(capabilities)
+	int wrap64 = 0;
+	struct ptrace_sc_ret64 * __capability psr64 = NULL;
+#endif
 #ifdef COMPAT_FREEBSD32
 	int wrap32 = 0, safe = 0;
 	struct ptrace_io_desc32 *piod32 = NULL;
 	struct ptrace_lwpinfo32 *pl32 = NULL;
 	struct ptrace_sc_ret32 *psr32 = NULL;
+#endif
+#if defined(COMPAT_FREEBSD32) || __has_feature(capabilities)
 	union {
 		struct ptrace_lwpinfo pl;
 		struct ptrace_sc_ret psr;
@@ -916,6 +935,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		tid = td2->td_tid;
 	}
 
+#if __has_feature(capabilities)
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		wrap64 = 1;
+#endif
 #ifdef COMPAT_FREEBSD32
 	/*
 	 * Test if we're a 32 bit client and what the target is.
@@ -1150,6 +1173,13 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			break;
 		}
 		bzero((__cheri_fromcap void *)addr, sizeof(td2->td_sa.args));
+#if __has_feature(capabilities)
+		if (wrap64)
+			for (num = 0; num < td2->td_sa.narg; num++)
+				((uint64_t * __capability)addr)[num] =
+				    (__cheri_addr uint64_t)td2->td_sa.args[num];
+		else
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32)
 			for (num = 0; num < nitems(td2->td_sa.args); num++)
@@ -1158,7 +1188,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		else
 #endif
 			bcopy_c((__cheri_tocap void * __capability)td2->td_sa.args,
-				addr, td2->td_sa.narg * sizeof(register_t));
+				addr, td2->td_sa.narg * sizeof(syscallarg_t));
 		break;
 
 	case PT_GET_SC_RET:
@@ -1170,6 +1200,12 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = EINVAL;
 			break;
 		}
+#if __has_feature(capabilities)
+		if (wrap64) {
+			psr = &r.psr;
+			psr64 = addr;
+		} else
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32) {
 			psr = &r.psr;
@@ -1183,6 +1219,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			psr->sr_retval[0] = td2->td_retval[0];
 			psr->sr_retval[1] = td2->td_retval[1];
 		}
+#if __has_feature(capabilities)
+		if (wrap64)
+			ptrace_sc_ret_to64(psr, psr64);
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32)
 			ptrace_sc_ret_to32(psr, psr32);

@@ -1767,7 +1767,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		struct dbreg dbreg;
 		struct fpreg fpreg;
 		struct reg reg;
-		char args[nitems(td->td_sa.args) * sizeof(register_t)];
+		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r = { 0 };
@@ -1930,7 +1930,6 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 
 		error = copyout(&c.pl, uap->addr, uap->data);
 		break;
-#if 0
 	case PT_GET_SC_ARGS:
 		error = copyout(r.args, uap->addr, MIN(uap->data,
 		    sizeof(r.args)));
@@ -1939,7 +1938,6 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		error = copyout(&r.psr, uap->addr, MIN(uap->data,
 		    sizeof(r.psr)));
 		break;
-#endif
 	default:
 		break;
 	}

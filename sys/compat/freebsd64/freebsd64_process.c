@@ -99,8 +99,8 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		struct dbreg dbreg;
 		struct fpreg fpreg;
 		struct reg reg;
-		char args[sizeof(td->td_sa.args)];
-		struct ptrace_sc_ret *psr;
+		uint64_t args[nitems(td->td_sa.args)];
+		struct ptrace_sc_ret64 psr;
 		int ptevents;
 	} r;
 	void * __capability addr;

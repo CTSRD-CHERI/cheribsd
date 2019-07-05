@@ -188,9 +188,16 @@ struct ptrace_lwpinfo32 {
 
 /* Argument structure for PT_GET_SC_RET. */
 struct ptrace_sc_ret {
-	register_t	sr_retval[2];	/* Only valid if sr_error == 0. */
+	syscallarg_t	sr_retval[2];	/* Only valid if sr_error == 0. */
 	int		sr_error;
 };
+
+#if defined(_KERNEL) && __has_feature(capabilities)
+struct ptrace_sc_ret64 {
+	uint64_t	sr_retval[2];	/* Only valid if sr_error == 0. */
+	int		sr_error;
+};
+#endif
 
 /* Argument structure for PT_VM_ENTRY. */
 struct ptrace_vm_entry {
