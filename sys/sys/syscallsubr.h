@@ -252,7 +252,7 @@ int	kern_getfhat(struct thread *td, int flags, int fd,
 	    fhandle_t * __capability fhp, enum uio_seg fhseg);
 int	kern_getfsstat(struct thread *td, struct statfs * __capability *buf,
 	    size_t bufsize, size_t *countp, enum uio_seg bufseg, int mode);
-int	kern_getgroups(struct thread *td, u_int gidsetsize,
+int	kern_getgroups(struct thread *td, int gidsetsize,
 	    gid_t * __capability gidset);
 int	kern_getitimer(struct thread *, u_int, struct itimerval *);
 int	kern_getlogin(struct thread *td, char * __capability namebuf,
@@ -654,7 +654,7 @@ int	user_sendit(struct thread *td, int s, struct msghdr *mp, int flags);
 int	user_sendto(struct thread *td, int s, const char * __capability buf,
 	    size_t len, int flags, const struct sockaddr * __capability to,
 	    socklen_t tolen);
-int	user_setgroups(struct thread *td, u_int gidsetsize,
+int	user_setgroups(struct thread *td, int gidsetsize,
 	    const gid_t * __capability gidset);
 int	user_settimeofday(struct thread *td,
 	    const struct timeval * __capability tp,
