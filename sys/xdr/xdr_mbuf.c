@@ -295,7 +295,7 @@ xdrmbuf_inline(XDR *xdrs, u_int len)
 
 	if (available >= len) {
 		p = mtod(m, char *) + xdrs->x_handy;
-		if (((uintptr_t) p) & (sizeof(int32_t) - 1))
+		if (is_aligned(p, sizeof(int32_t)))
 			return (0);
 		xdrs->x_handy += len;
 		if (xdrs->x_handy > m->m_len)
@@ -305,3 +305,13 @@ xdrmbuf_inline(XDR *xdrs, u_int len)
 
 	return (0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190709,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment",
+//     "uintptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END
