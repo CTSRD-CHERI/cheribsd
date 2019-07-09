@@ -560,7 +560,7 @@ m_copypacket(struct mbuf *m, int how)
 		n->m_data = m->m_data;
 		mb_dupcl(n, m);
 	} else {
-		n->m_data = cheri_csetbounds(n->m_pktdat, MHLEN) +
+		n->m_data = (char *)cheri_csetbounds(n->m_pktdat, MHLEN) +
 		    (m->m_data - m->m_pktdat );
 		bcopy(mtod(m, char *), mtod(n, char *), n->m_len);
 	}
