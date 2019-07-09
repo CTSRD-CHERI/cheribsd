@@ -48,30 +48,42 @@ work()
 		parent = substr($3, match($3, "_parenttype_") + length("_parenttype_"))
 	}
 	/ C .*sign$/ {
-		sign = substr($1, length($1) - 3, 4)
+		sign = substr($1, length($1) - 1, 2)
 		sub("^0*", "", sign)
 		if (sign != "")
 			sign = "-"
 	}
-	/ C .*w0$/ {
-		w0 = substr($1, length($1) - 3, 4)
+	/ C .*y0$/ {
+		y0 = substr($1, length($1) - 1, 2)
 	}
-	/ C .*w1$/ {
-		w1 = substr($1, length($1) - 3, 4)
+	/ C .*y1$/ {
+		y1 = substr($1, length($1) - 1, 2)
 	}
-	/ C .*w2$/ {
-		w2 = substr($1, length($1) - 3, 4)
+	/ C .*y2$/ {
+		y2 = substr($1, length($1) - 1, 2)
 	}
-	/ C .*w3$/ {
-		w3 = substr($1, length($1) - 3, 4)
-		w = w3 w2 w1 w0
+	/ C .*y3$/ {
+		y3 = substr($1, length($1) - 1, 2)
+	}
+	/ C .*y4$/ {
+		y4 = substr($1, length($1) - 1, 2)
+	}
+	/ C .*y5$/ {
+		y5 = substr($1, length($1) - 1, 2)
+	}
+	/ C .*y6$/ {
+		y6 = substr($1, length($1) - 1, 2)
+	}
+	/ C .*y7$/ {
+		y7 = substr($1, length($1) - 1, 2)
+		w = y7 y6 y5 y4 y3 y2 y1 y0
 		sub("^0*", "", w)
 		if (w == "")
 			w = "0"
 		hex = ""
 		if (w != "0")
 			hex = "0x"
-		sub("w3$", "", $3)
+		sub("y7$", "", $3)
 		member = tolower($3)
 		# This still has minor problems representing INT_MIN, etc. 
 		# E.g.,
