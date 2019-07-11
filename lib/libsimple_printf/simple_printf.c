@@ -44,7 +44,6 @@
 #include <unistd.h>
 #include "simple_printf.h"
 
-#include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
 #define MAXNBUF	(sizeof(intmax_t) * NBBY + 1)

@@ -33,8 +33,6 @@
 
 #include <sys/cdefs.h>
 
-#include <cheri/cheri.h>
-
 #if !defined(_KERNEL) && __has_feature(capabilities)
 #define	cheri_getreg(x) ({						\
 	void * __capability _cap;					\
