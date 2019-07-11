@@ -49,17 +49,12 @@
  */
 struct cheri_frame {
 	/* DDC has special properties for MIPS load/store instructions. */
-#if __has_feature(capabilities)
 	void * __capability	cf_ddc;
-#else
-	struct chericap	cf_ddc;
-#endif
 
 	/*
 	 * General-purpose capabilities -- note, numbering is from v1.17 of
 	 * the CHERI ISA spec (ISAv5 draft).
 	 */
-#if __has_feature(capabilities)
 	void * __capability	cf_c1;
 	void * __capability	cf_c2;
 	void * __capability	cf_c3;
@@ -91,24 +86,11 @@ struct cheri_frame {
 	void * __capability	cf_c29;
 	void * __capability	cf_c30;
 	void * __capability	cf_c31;
-#else
-	struct chericap	cf_c1, cf_c2, cf_c3, cf_c4;
-	struct chericap	cf_c5, cf_c6, cf_c7;
-	struct chericap	cf_c8, cf_c9, cf_c10, cf_csp, cf_c12;
-	struct chericap	cf_c13, cf_c14, cf_c15, cf_c16, cf_c17;
-	struct chericap	cf_c18, cf_c19, cf_c20, cf_c21, cf_c22;
-	struct chericap cf_c23, cf_c24, cf_c25, cf_idc;
-	struct chericap	cf_c27, cf_c28, cf_c29, cf_c30, cf_c31;
-#endif
 
 	/*
 	 * Program counter capability -- extracted from exception frame EPCC.
 	 */
-#if __has_feature(capabilities)
 	void * __capability	cf_pcc;
-#else
-	struct chericap	cf_pcc;
-#endif
 
 	/*
 	 * Padded out non-capability registers.

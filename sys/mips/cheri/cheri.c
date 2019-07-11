@@ -90,12 +90,10 @@ CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
 #ifdef CPU_CHERI128
 CTASSERT(sizeof(void *) == 8);
 CTASSERT(sizeof(void * __capability) == 16);
-CTASSERT(sizeof(struct chericap) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
 #else
 CTASSERT(sizeof(void *) == 8);
 CTASSERT(sizeof(void * __capability) == 32);
-CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
 #endif
 
@@ -225,7 +223,7 @@ cheri_capability_set_user_sigcode(void * __capability *cp,
 		 * support...
 		 */
 		base = (uintptr_t)se->sv_psstrings - szsigcode;
-		base = rounddown2(base, sizeof(struct chericap));
+		base = rounddown2(base, sizeof(void * __capability));
 	}
 
 	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
