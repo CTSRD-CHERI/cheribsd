@@ -73,6 +73,7 @@ __FBSDID("$FreeBSD$");
 #ifdef CPU_CHERI
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <sys/caprevoke.h>
 #endif
 
 #include <vm/vm.h>
@@ -728,9 +729,9 @@ vm_do_caprevoke(void * __capability * __capability cutp)
 }
 
 int
-vm_caprevoke_page(vm_page_t m, uint64_t *cyclesum)
+vm_caprevoke_page(vm_page_t m, struct caprevoke_stats *stat)
 {
-	uint32_t cyc_start = cyclesum ? cheri_get_cyclecount() : 0;
+	uint32_t cyc_start = cheri_get_cyclecount();
 
 	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
 	vm_offset_t mva;
@@ -771,16 +772,23 @@ vm_caprevoke_page(vm_page_t m, uint64_t *cyclesum)
 			res |= VM_CAPREVOKE_PAGE_HASCAPS;
 
 		for(; tags != 0; (tags >>= 1), mvu += 1) {
+			int res2;
+
 			if (!(tags & 1))
 				continue;
-			res |= vm_do_caprevoke(mvu);
+			stat->caps_found++;
+
+			res2 = vm_do_caprevoke(mvu);
+			if ((res2 & VM_CAPREVOKE_PAGE_DIRTY) == 0)
+				stat->caps_cleared++;
+
+			res |= res2;
 		}
 	}
 
-	uint32_t cyc_end = cyclesum ? cheri_get_cyclecount() : 0;
+	uint32_t cyc_end = cheri_get_cyclecount();
 
-	if (cyclesum)
-		*cyclesum += cyc_end - cyc_start;
+	stat->page_scan_cycles += cyc_end - cyc_start;
 
 	return res;
 }

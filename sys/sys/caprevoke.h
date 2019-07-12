@@ -166,6 +166,9 @@ struct caprevoke_stats {
 	uint64_t	pages_faulted_ro;
 	uint64_t	pages_faulted_rw;
 	uint64_t	pages_fault_skip;
+
+	uint64_t	caps_found;
+	uint64_t	caps_cleared;
 };
 
 #define	CAPREVOKE_SHADOW_NOVMMAP	0x00	/* The ordinary shadow space */
