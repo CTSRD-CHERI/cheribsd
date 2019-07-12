@@ -499,10 +499,8 @@ sequential_heuristic(struct uio *uio, struct file *fp)
 		 * closely related to the best I/O size for real disks than
 		 * to any block size used by software.
 		 */
-		fp->f_seqcount += MIN(IO_SEQMAX,
+		fp->f_seqcount += lmin(IO_SEQMAX,
 		    howmany(uio->uio_resid, 16384));
-		if (fp->f_seqcount > IO_SEQMAX)
-			fp->f_seqcount = IO_SEQMAX;
 		return (fp->f_seqcount << IO_SEQSHIFT);
 	}
 
@@ -1288,7 +1286,6 @@ static int
 vn_truncate(struct file *fp, off_t length, struct ucred *active_cred,
     struct thread *td)
 {
-	struct vattr vattr;
 	struct mount *mp;
 	struct vnode *vp;
 	void *rl_cookie;
@@ -1315,20 +1312,35 @@ vn_truncate(struct file *fp, off_t length, struct ucred *active_cred,
 	if (error)
 		goto out;
 #endif
-	error = VOP_ADD_WRITECOUNT(vp, 1);
-	if (error == 0) {
-		VATTR_NULL(&vattr);
-		vattr.va_size = length;
-		if ((fp->f_flag & O_FSYNC) != 0)
-			vattr.va_vaflags |= VA_SYNC;
-		error = VOP_SETATTR(vp, &vattr, fp->f_cred);
-		VOP_ADD_WRITECOUNT_CHECKED(vp, -1);
-	}
+	error = vn_truncate_locked(vp, length, (fp->f_flag & O_FSYNC) != 0,
+	    fp->f_cred);
 out:
 	VOP_UNLOCK(vp, 0);
 	vn_finished_write(mp);
 out1:
 	vn_rangelock_unlock(vp, rl_cookie);
+	return (error);
+}
+
+/*
+ * Truncate a file that is already locked.
+ */
+int
+vn_truncate_locked(struct vnode *vp, off_t length, bool sync,
+    struct ucred *cred)
+{
+	struct vattr vattr;
+	int error;
+
+	error = VOP_ADD_WRITECOUNT(vp, 1);
+	if (error == 0) {
+		VATTR_NULL(&vattr);
+		vattr.va_size = length;
+		if (sync)
+			vattr.va_vaflags |= VA_SYNC;
+		error = VOP_SETATTR(vp, &vattr, cred);
+		VOP_ADD_WRITECOUNT_CHECKED(vp, -1);
+	}
 	return (error);
 }
 
@@ -1456,25 +1468,6 @@ vn_stat(struct vnode *vp, struct stat *sb, struct ucred *active_cred,
 	return (0);
 }
 
-/* generic FIOBMAP2 implementation */
-static int
-vn_ioc_bmap2(struct file *fp, struct fiobmap2_arg *arg, struct ucred *cred)
-{
-	struct vnode *vp = fp->f_vnode;
-	daddr_t lbn = arg->bn;
-	int error;
-
-	vn_lock(vp, LK_SHARED | LK_RETRY);
-#ifdef MAC
-	error = mac_vnode_check_read(cred, fp->f_cred, vp);
-	if (error == 0)
-#endif
-		error = VOP_BMAP(vp, lbn, NULL, &arg->bn, &arg->runp,
-			&arg->runb);
-	VOP_UNLOCK(vp, 0);
-	return (error);
-}
-
 /*
  * File table vnode ioctl routine.
  */
@@ -1484,6 +1477,7 @@ vn_ioctl(struct file *fp, u_long com, void *data, struct ucred *active_cred,
 {
 	struct vattr vattr;
 	struct vnode *vp;
+	struct fiobmap2_arg *bmarg;
 	int error;
 
 	vp = fp->f_vnode;
@@ -1499,8 +1493,17 @@ vn_ioctl(struct file *fp, u_long com, void *data, struct ucred *active_cred,
 				*(int *)data = vattr.va_size - fp->f_offset;
 			return (error);
 		case FIOBMAP2:
-			return (vn_ioc_bmap2(fp, (struct fiobmap2_arg*)data,
-				active_cred));
+			bmarg = (struct fiobmap2_arg *)data;
+			vn_lock(vp, LK_SHARED | LK_RETRY);
+#ifdef MAC
+			error = mac_vnode_check_read(active_cred, fp->f_cred,
+			    vp);
+			if (error == 0)
+#endif
+				error = VOP_BMAP(vp, bmarg->bn, NULL,
+				    &bmarg->bn, &bmarg->runp, &bmarg->runb);
+			VOP_UNLOCK(vp, 0);
+			return (error);
 		case FIONBIO:
 		case FIOASYNC:
 			return (0);

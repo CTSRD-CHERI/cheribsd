@@ -70,7 +70,7 @@ struct dbreg {
 
 #ifdef CPU_CHERI
 struct capreg {
-	struct chericap r_regs[NUMCHERISAVEREGS];
+	void * __capability r_regs[NUMCHERISAVEREGS];
 };
 #endif
 

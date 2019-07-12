@@ -38,30 +38,14 @@
 
 #include <sys/types.h>
 
-#include <machine/cherireg.h>	/* CHERICAP_SIZE. */
-
-/*
- * Canonical C-language representation of a capability for compilers that
- * don't support capabilities directly.  The in-memory layout is sensitive to
- * the microarchitecture, and hence treated as opaque.  Fields must be
- * accessed via the ISA.
- */
-struct chericap {
-	uint8_t		c_data[CHERICAP_SIZE];
-} __packed __aligned(CHERICAP_SIZE);
 
 /*
  * Canonical C-language representation of a CHERI object capability -- code and
  * data capabilities in registers or memory.
  */
 struct cheri_object {
-#if !defined(_KERNEL) && __has_feature(capabilities)
 	void * __capability	co_codecap;
 	void * __capability	co_datacap;
-#else
-	struct chericap		 co_codecap;
-	struct chericap		 co_datacap;
-#endif
 };
 
 #if !defined(_KERNEL) && __has_feature(capabilities)
@@ -78,21 +62,12 @@ struct cheri_object {
  * pointer should (presumably) be relative to the $ddc/$csp defined here.
  */
 struct cheri_signal {
-#if __has_feature(capabilities)
 	void * __capability	csig_pcc;
 	void * __capability	csig_ddc;
 	void * __capability	csig_csp;
 	void * __capability	csig_idc;
 	void * __capability	csig_default_stack;
 	void * __capability	csig_sigcode;
-#else
-	struct chericap		 csig_pcc;
-	struct chericap		 csig_ddc;
-	struct chericap		 csig_csp;
-	struct chericap		 csig_idc;
-	struct chericap		 csig_default_stack;
-	struct chericap		 csig_sigcode;
-#endif
 };
 
 /*

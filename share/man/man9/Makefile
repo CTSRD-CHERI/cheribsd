@@ -946,6 +946,15 @@ MLINKS+=drbr.9 drbr_free.9 \
 MLINKS+=DRIVER_MODULE.9 DRIVER_MODULE_ORDERED.9 \
 	DRIVER_MODULE.9 EARLY_DRIVER_MODULE.9 \
 	DRIVER_MODULE.9 EARLY_DRIVER_MODULE_ORDERED.9
+MLINKS+=epoch.9 epoch_context.9 \
+	epoch.9 epoch_alloc.9 \
+	epoch.9 epoch_free.9 \
+	epoch.9 epoch_enter.9 \
+	epoch.9 epoch_exit.9 \
+	epoch.9 epoch_wait.9 \
+	epoch.9 epoch_call.9 \
+	epoch.9 epoch_drain_callbacks.9 \
+	epoch.9 in_epoch.9
 MLINKS+=EVENTHANDLER.9 EVENTHANDLER_DECLARE.9 \
 	EVENTHANDLER.9 EVENTHANDLER_DEFINE.9 \
 	EVENTHANDLER.9 EVENTHANDLER_DEREGISTER.9 \
@@ -1826,6 +1835,8 @@ MLINKS+=sf_buf.9 sf_buf_alloc.9 \
 MLINKS+=sglist.9 sglist_alloc.9 \
 	sglist.9 sglist_append.9 \
 	sglist.9 sglist_append_bio.9 \
+	sglist.9 sglist_append_ext_pgs.9 \
+	sglist.9 sglist_append_mb_ext_pgs.9 \
 	sglist.9 sglist_append_mbuf.9 \
 	sglist.9 sglist_append_phys.9 \
 	sglist.9 sglist_append_sglist.9 \
@@ -1836,6 +1847,8 @@ MLINKS+=sglist.9 sglist_alloc.9 \
 	sglist.9 sglist_clone.9 \
 	sglist.9 sglist_consume_uio.9 \
 	sglist.9 sglist_count.9 \
+	sglist.9 sglist_count_ext_pgs.9 \
+	sglist.9 sglist_count_mb_ext_pgs.9 \
 	sglist.9 sglist_count_vmpages.9 \
 	sglist.9 sglist_free.9 \
 	sglist.9 sglist_hold.9 \

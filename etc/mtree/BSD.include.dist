@@ -144,8 +144,6 @@
             mpilib
             ..
         ..
-        nand
-        ..
         nvme
         ..
         ofw
@@ -189,8 +187,6 @@
         fdescfs
         ..
         msdosfs
-        ..
-        nandfs
         ..
         nfs
         ..

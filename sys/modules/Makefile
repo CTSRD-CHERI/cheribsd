@@ -255,8 +255,6 @@ SUBDIR=	\
 	${_mwlfw} \
 	mxge \
 	my \
-	${_nandfs} \
-	${_nandsim} \
 	${_nctgpio} \
 	${_ndis} \
 	${_netgraph} \
@@ -346,6 +344,7 @@ SUBDIR=	\
 	${_sppp} \
 	ste \
 	stge \
+	${_superio} \
 	${_sym} \
 	${_syscons} \
 	sysvipc \
@@ -492,11 +491,6 @@ _mthca=		mthca
 _mlx4ib=	mlx4ib
 _mlx5ib=	mlx5ib
 .endif
-.endif
-
-.if ${MK_NAND} != "no" || defined(ALL_MODULES)
-_nandfs=	nandfs
-_nandsim=	nandsim
 .endif
 
 .if ${MK_NETGRAPH} != "no" || defined(ALL_MODULES)
@@ -684,6 +678,7 @@ _rdrand_rng=	rdrand_rng
 .endif
 _s3=		s3
 _sdhci_acpi=	sdhci_acpi
+_superio=	superio
 _tpm=		tpm
 _twa=		twa
 _vesa=		vesa

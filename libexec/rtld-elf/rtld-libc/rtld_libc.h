@@ -1,7 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause
  *
- * Copyright 2019 Alex Richadson <arichardson@FreeBSD.org>
+ * Copyright 2019 Alex Richardson <arichardson@FreeBSD.org>
  *
  * This software was developed by SRI International and the University of
  * Cambridge Computer Laboratory (Department of Computer Science and
@@ -28,6 +28,8 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
+ *
+ * $FreeBSD$
  */
 #ifndef _RTLD_AVOID_LIBC_DEPS_H_
 #define _RTLD_AVOID_LIBC_DEPS_H_
@@ -77,7 +79,6 @@ int __getosreldate(void);
 #define strerror(errno)	rtld_strerror(errno)
 #define _write(fd, buf, nbytes)	__sys_write(fd, buf, nbytes)
 #define write(fd, buf, nbytes)	__sys_write(fd, buf, nbytes)
-
 
 // For CHERI with optional syscall args do not using the varargs calling
 // convention. Work around this by using macros with default arguments:
