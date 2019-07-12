@@ -140,6 +140,13 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	}
 	/* Engaging the full state machine; here we go! */
 
+	if ((uap->flags & CAPREVOKE_MUST_ADVANCE) != 0) {
+		/* XXX An unlocked read should be OK? */
+		uap->start_epoch =
+			td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
+		uap->flags &= ~CAPREVOKE_MUST_ADVANCE;
+	}
+
 	/* Serialize and figure out what we're supposed to do */
 	PROC_LOCK(td->td_proc);
 reentry:

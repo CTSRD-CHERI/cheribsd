@@ -126,6 +126,14 @@ static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
 #define	CAPREVOKE_NO_WAIT_OK	0x002
 
 	/*
+	 * Ignore the given epoch argument and always attempt to advance the
+	 * epoch clock relative to its value "at the time of the call".
+	 * This is most useful for when we don't know the time and don't
+	 * have the resources to wait around.
+	 */
+#define CAPREVOKE_MUST_ADVANCE	0x004
+
+	/*
 	 * Some flags indicate that we are to engage in a blocking
 	 * capability revocation sweep on a subset of the entire address
 	 * space.  If any of these are set, we bypass the above state
