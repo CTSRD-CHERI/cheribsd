@@ -617,7 +617,6 @@ int
 vm_test_caprevoke(const void * __capability cut)
 {
 	vm_offset_t va;
-	int err;
 
 	// XXX? KASSERT(cheri_gettag(cut), ("Detagged in vm_test_caprevoke"));
 
@@ -634,18 +633,14 @@ vm_test_caprevoke(const void * __capability cut)
 	 * XXX Unless they have no memory-access permissions
 	 */
 	{
-		uint8_t bmbits = 0;
+		uint8_t bmbits;
 		uint8_t * __capability bmloc;
 
 		bmloc = cheri_setaddress(caprev_shadow_cap,
 				  (((vm_offset_t) VM_CAPREVOKE_BM_MEM_MAP)
 				  + (va / VM_CAPREVOKE_GSZ_MEM_MAP / 8)));
 
-		err = copyin_c(bmloc, &bmbits, sizeof(bmbits));
-
-		KASSERT(err == 0,
-			("copyin revoke bitmap va=%lx bmloc=%lx err=%d",
-				va, cheri_getaddress(bmloc), err));
+		bmbits = fubyte_c(bmloc);
 
 		if (bmbits & (1 << ((va / VM_CAPREVOKE_GSZ_MEM_NOMAP) % 8))) {
 			return 1;
@@ -658,18 +653,14 @@ vm_test_caprevoke(const void * __capability cut)
 		 * NOMAP bitmap
 		 */
 
-		uint8_t bmbits = 0;
+		uint8_t bmbits;
 		uint8_t * __capability bmloc;
 
 		bmloc = cheri_setaddress(caprev_shadow_cap,
 				  (((vm_offset_t) VM_CAPREVOKE_BM_MEM_NOMAP)
 				  + (va / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8)));
 
-		err = copyin_c(bmloc, &bmbits, sizeof(bmbits));
-
-		KASSERT(err == 0,
-			("copyin revoke bitmap va=%lx bmloc=%lx err=%d",
-				va, cheri_getaddress(bmloc), err));
+		bmbits = fubyte_c(bmloc);
 
 		if (bmbits & (1 << ((va / VM_CAPREVOKE_GSZ_MEM_NOMAP) % 8))) {
 			return 1;
