@@ -5,7 +5,8 @@
 #include <sys/caprevoke.h>
 
 int caprev_shadow_nomap_set(uint64_t * __capability sb,
-                            void * __capability obj);
+                            void * __capability priv_obj,
+                            void * __capability user_obj);
 
 void caprev_shadow_nomap_clear(uint64_t * __capability sb,
                                void * __capability obj);

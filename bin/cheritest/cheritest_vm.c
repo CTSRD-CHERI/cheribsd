@@ -888,8 +888,8 @@ test_caprevoke_lib_run(
 		}
 
 		/* Mark the chunk for revocation */
-		CHERITEST_VERIFY2(caprev_shadow_nomap_set(shadow, chunk) == 0,
-				  "Shadow update collision");
+		CHERITEST_VERIFY2(caprev_shadow_nomap_set(shadow, chunk, chunk)
+				  == 0, "Shadow update collision");
 
 		__atomic_thread_fence(__ATOMIC_RELEASE);
 
