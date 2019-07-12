@@ -332,7 +332,13 @@ struct socket;
 
 #ifdef __LP64__
 #define	MBUF_PEXT_MAX_PGS	(152 / sizeof(vm_paddr_t))
-#else
+#elif defined(CHERI_PURECAP_KERNEL)
+#ifdef CPU_CHERI128
+#define MBUF_PEXT_MAX_PGS	(144 / sizeof(vm_paddr_t))
+#else /* CHERI256 */
+#define MBUF_PEXT_MAX_PGS	(64 / sizeof(vm_paddr_t))
+#endif /* CHERI256 */
+#else /* ! defined(CHERI_PURECAP_KERNEL) */
 #define	MBUF_PEXT_MAX_PGS	(156 / sizeof(vm_paddr_t))
 #endif
 
@@ -1518,7 +1524,7 @@ void	netdump_mbuf_reinit(int nmbuf, int nclust, int clsize);
 #endif /* !_SYS_MBUF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20171004,
+//   "updated": 20190712,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_shape"
