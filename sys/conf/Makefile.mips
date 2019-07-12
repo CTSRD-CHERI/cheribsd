@@ -73,11 +73,11 @@ ${KERNEL_KO}.tramp.bin: ${KERNEL_KO} $S/$M/$M/elf_trampoline.c \
 		--strip-debug --strip-symbol '$$t' ${FULLKERNEL} ${KERNEL_KO}.tmp
 	sed -e s/${KERNLOADADDR}/${TRAMPLOADADDR}/ -e s/" + SIZEOF_HEADERS"// \
 		 ${LDSCRIPT_NAME} > ${LDSCRIPT_NAME}.tramp.noheader
-	${CC} -O -nostdlib -I. -I$S ${TRAMP_EXTRA_FLAGS} ${TRAMP_LDFLAGS} -Xlinker \
-		-T -Xlinker ${LDSCRIPT_NAME}.tramp.noheader \
+	${CC} -O -nostdlib -I. -I$S ${TRAMP_EXTRA_FLAGS} \
 		-DKERNNAME="\"${KERNEL_KO}.tmp\"" -DELFSIZE=${TRAMP_ELFSIZE} \
-		$S/$M/$M/inckern.S $S/$M/$M/elf_trampoline.c \
-		-o ${KERNEL_KO}.tramp.elf -Wl,-z,notext
+		-c $S/$M/$M/inckern.S $S/$M/$M/elf_trampoline.c
+	${LD} ${TRAMP_LDFLAGS} -T ${LDSCRIPT_NAME}.tramp.noheader \
+		-o ${KERNEL_KO}.tramp.elf inckern.o elf_trampoline.o
 	${OBJCOPY} -S -O binary ${KERNEL_KO}.tramp.elf \
 		${KERNEL_KO}.tramp.bin
 .endif
