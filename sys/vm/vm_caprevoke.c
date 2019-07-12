@@ -21,6 +21,11 @@ __FBSDID("$FreeBSD$");
 
 // XXX This is very much a work in progress!
 
+static int caprevoke_avoid_faults = 1;
+SYSCTL_INT(_vm, OID_AUTO, caprevoke_avoid_faults, CTLFLAG_RW,
+    &caprevoke_avoid_faults, 0,
+    "XXX");
+
 static int
 vm_caprevoke_should_visit_page(vm_page_t m, int flags)
 {
@@ -188,6 +193,7 @@ vm_caprevoke_map_entry(vm_map_t map, vm_map_entry_t entry, const int flags,
 	vm_offset_t eoffset;
 	vm_offset_t ooffset;
 	vm_object_t obj;
+	bool obj_has_backing_caps;
 
 	// XXX NWF ?
 	if (entry->eflags & MAP_ENTRY_IS_SUB_MAP)
@@ -204,6 +210,33 @@ vm_caprevoke_map_entry(vm_map_t map, vm_map_entry_t entry, const int flags,
 	    (OBJ_NOLOADTAGS | OBJ_NOSTORETAGS))
 		goto fini;
 
+	if (caprevoke_avoid_faults) {
+		/*
+		 * Look to see if this object's backing stores are not tag-capable.
+		 * If so, this allows us to immediately advance to the next page
+		 * in this object whenever we find something unmapped.
+		 *
+		 * XXX There is an intermediate "faster" path we haven't yet
+		 * explored, which is to have a "next possible tag-capable pindex"
+		 * operation on the stack of vm objects that we might find we need.
+		 */
+
+		vm_object_t tobj;
+
+		obj_has_backing_caps = false;
+
+		for (tobj = obj->backing_object; tobj != NULL;
+		    tobj = tobj->backing_object) {
+			if ((tobj->flags & OBJ_NOLOADTAGS) == 0 ||
+			    (tobj->flags & OBJ_NOSTORETAGS) == 0) {
+				obj_has_backing_caps = true;
+				break;
+			}
+		}
+	} else {
+		obj_has_backing_caps = true;
+	}
+
 	KASSERT(*addr < entry->end, ("vm_caprevoke at=%lx past entry end=%lx", *addr, entry->end));
 
 	eoffset = entry->end - entry->start + entry->offset;
@@ -219,6 +252,43 @@ again:
 	*addr = ooffset - entry->offset + entry->start;
 
 	KASSERT(*addr <= entry->end, ("vm_caprevoke post past entry end"));
+
+	if (res == VM_CROBJ_UNMAPPED && !obj_has_backing_caps) {
+		/*
+		 * If we found a hole and the object does not have backing objects
+		 * with capabilities, then we can skip directly to the next page in
+		 * this object.
+		 */
+
+		vm_offset_t naddr;
+
+		VM_OBJECT_RLOCK(obj);
+		{
+			vm_page_t obj_next_pg =
+				vm_page_find_least(obj, OFF_TO_IDX(ooffset));
+
+			if (obj_next_pg == NULL) {
+no_back_caps_out:
+				/* There isn't one, so just return */
+				stat->pages_fault_skip += (entry->end - *addr) >> PAGE_SHIFT;
+				VM_OBJECT_RUNLOCK(obj);
+				goto fini;
+			}
+
+			naddr = IDX_TO_OFF(obj_next_pg->pindex) + entry->start;
+
+			if (naddr >= entry->end) {
+				/* At object end, so skip out */
+				goto no_back_caps_out;
+			}
+		}
+		VM_OBJECT_RUNLOCK(obj);
+
+		stat->pages_fault_skip += (naddr - *addr) >> PAGE_SHIFT;
+		*addr = naddr;
+
+		goto again;
+	}
 
 	switch(res) {
 	case VM_CROBJ_ROMAPPED :
