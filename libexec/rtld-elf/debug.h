@@ -84,9 +84,7 @@ __END_DECLS
 #define _MYNAME	"ld-elf32.so.1"
 #endif
 
-/* assert() is always enabled. For expensive checks use dbg_assert() instead. */
-
-#define msg(s)		rtld_write(STDERR_FILENO, s, strlen(s))
+#define msg(s)		rtld_putstr(s)
 #define trace()		msg(_MYNAME ": " __XSTRING(__LINE__) "\n")
 
 

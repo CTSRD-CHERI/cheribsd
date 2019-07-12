@@ -322,7 +322,8 @@ __simple_realloc(void *cp, size_t nbytes)
 	 * than the size of the original allocation.  This risks surprise
 	 * for some programmers, but to do otherwise risks information leaks.
 	 */
-	memcpy(res, cp, (nbytes <= cheri_getlen(cp)) ? nbytes : cheri_getlen(cp));
+	memcpy(res, cp, (nbytes <= cheri_bytes_remaining(cp)) ?
+	    nbytes : cheri_bytes_remaining(cp));
 	res = cheri_andperm(res, cheri_getperm(cp));
 	free(cp);
 	return (res);

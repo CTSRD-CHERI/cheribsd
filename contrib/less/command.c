@@ -1,6 +1,6 @@
 /* $FreeBSD$ */
 /*
- * Copyright (C) 1984-2017  Mark Nudelman
+ * Copyright (C) 1984-2019  Mark Nudelman
  *
  * You may distribute under the terms of either the GNU General Public
  * License or the Less License, as specified in the README file.
@@ -60,6 +60,7 @@ extern struct scrpos initial_scrpos;
 extern IFILE curr_ifile;
 extern void *ml_search;
 extern void *ml_examine;
+extern int wheel_lines;
 #if SHELL_ESCAPE || PIPEC
 extern void *ml_shell;
 #endif
@@ -71,6 +72,9 @@ extern int screen_trashed;	/* The screen has been overwritten */
 extern int shift_count;
 extern int oldbot;
 extern int forw_prompt;
+#if MSDOS_COMPILER==WIN32C
+extern int utf_mode;
+#endif
 
 #if SHELL_ESCAPE
 static char *shellcmd = NULL;	/* For holding last shell command for "!!" */
@@ -105,11 +109,36 @@ static void multi_search(char *pattern, int n, int silent);
  * updating the screen.
  */
 	static void
-cmd_exec()
+cmd_exec(VOID_PARAM)
 {
-    clear_attn();
+	clear_attn();
 	clear_bot();
 	flush();
+}
+
+/*
+ * Indicate we are reading a multi-character command.
+ */
+	static void
+set_mca(action)
+	int action;
+{
+	mca = action;
+	deinit_mouse(); /* we don't want mouse events while entering a cmd */
+	clear_bot();
+	clear_cmd();
+}
+
+/*
+ * Indicate we are not reading a multi-character command.
+ */
+	static void
+clear_mca(VOID_PARAM)
+{
+	if (mca == 0)
+		return;
+	mca = 0;
+	init_mouse();
 }
 
 /*
@@ -122,15 +151,13 @@ start_mca(action, prompt, mlist, cmdflags)
 	void *mlist;
 	int cmdflags;
 {
-	mca = action;
-	clear_bot();
-	clear_cmd();
+	set_mca(action);
 	cmd_putstr(prompt);
 	set_mlist(mlist, cmdflags);
 }
 
 	public int
-in_mca()
+in_mca(VOID_PARAM)
 {
 	return (mca != 0 && mca != A_PREFIX);
 }
@@ -139,20 +166,17 @@ in_mca()
  * Set up the display to start a new search command.
  */
 	static void
-mca_search()
+mca_search(VOID_PARAM)
 {
 #if HILITE_SEARCH
 	if (search_type & SRCH_FILTER)
-		mca = A_FILTER;
+		set_mca(A_FILTER);
 	else 
 #endif
 	if (search_type & SRCH_FORW)
-		mca = A_F_SEARCH;
+		set_mca(A_F_SEARCH);
 	else
-		mca = A_B_SEARCH;
-
-	clear_bot();
-	clear_cmd();
+		set_mca(A_B_SEARCH);
 
 	if (search_type & SRCH_NO_MATCH)
 		cmd_putstr("Non-match ");
@@ -182,7 +206,7 @@ mca_search()
  * Set up the display to start a new toggle-option command.
  */
 	static void
-mca_opt_toggle()
+mca_opt_toggle(VOID_PARAM)
 {
 	int no_prompt;
 	int flag;
@@ -192,9 +216,7 @@ mca_opt_toggle()
 	flag = (optflag & ~OPT_NO_PROMPT);
 	dash = (flag == OPT_NO_TOGGLE) ? "_" : "-";
 
-	mca = A_OPT_TOGGLE;
-	clear_bot();
-	clear_cmd();
+	set_mca(A_OPT_TOGGLE);
 	cmd_putstr(dash);
 	if (optgetname)
 		cmd_putstr(dash);
@@ -217,7 +239,7 @@ mca_opt_toggle()
  * Execute a multicharacter command.
  */
 	static void
-exec_mca()
+exec_mca(VOID_PARAM)
 {
 	char *cbuf;
 
@@ -384,6 +406,7 @@ mca_opt_nonfirst_char(c)
 {
 	char *p;
 	char *oname;
+	int err;
 
 	if (curropt != NULL)
 	{
@@ -403,7 +426,8 @@ mca_opt_nonfirst_char(c)
 		return (MCA_DONE);
 	p = get_cmdbuf();
 	opt_lower = ASCII_IS_LOWER(p[0]);
-	curropt = findopt_name(&p, &oname, NULL);
+	err = 0;
+	curropt = findopt_name(&p, &oname, &err);
 	if (curropt != NULL)
 	{
 		/*
@@ -421,6 +445,9 @@ mca_opt_nonfirst_char(c)
 			if (cmd_char(c) != CC_OK)
 				return (MCA_DONE);
 		}
+	} else if (err != OPT_AMBIG)
+	{
+		bell();
 	}
 	return (MCA_MORE);
 }
@@ -472,6 +499,7 @@ mca_opt_char(c)
 			error("There is no %s option", &parg);
 			return (MCA_DONE);
 		}
+		opt_lower = ASCII_IS_LOWER(c);
 	}
 	/*
 	 * If the option which was entered does not take a 
@@ -481,7 +509,7 @@ mca_opt_char(c)
 	if ((optflag & ~OPT_NO_PROMPT) != OPT_TOGGLE ||
 	    !opt_has_param(curropt))
 	{
-		toggle_option(curropt, ASCII_IS_LOWER(c), "", optflag);
+		toggle_option(curropt, opt_lower, "", optflag);
 		return (MCA_DONE);
 	}
 	/*
@@ -588,7 +616,7 @@ mca_char(c)
 			 * as a normal command character.
 			 */
 			number = cmd_int(&fraction);
-			mca = 0;
+			clear_mca();
 			cmd_accept();
 			return (NO_MCA);
 		}
@@ -655,7 +683,7 @@ mca_char(c)
  * Discard any buffered file data.
  */
 	static void
-clear_buffers()
+clear_buffers(VOID_PARAM)
 {
 	if (!(ch_getflags() & CH_CANSEEK))
 		return;
@@ -670,7 +698,7 @@ clear_buffers()
  * Make sure the screen is displayed.
  */
 	static void
-make_display()
+make_display(VOID_PARAM)
 {
 	/*
 	 * If nothing is displayed yet, display starting from initial_scrpos.
@@ -710,7 +738,7 @@ make_display()
  * Display the appropriate prompt.
  */
 	static void
-prompt()
+prompt(VOID_PARAM)
 {
 	constant char *p;
 
@@ -750,8 +778,14 @@ prompt()
 	 * In Win32, display the file name in the window title.
 	 */
 	if (!(ch_getflags() & CH_HELPFILE))
-		SetConsoleTitle(pr_expand("Less?f - %f.", 0));
+	{
+		WCHAR w[MAX_PATH+16];
+		p = pr_expand("Less?f - %f.", 0);
+		MultiByteToWideChar(CP_ACP, 0, p, -1, w, sizeof(w)/sizeof(*w));
+		SetConsoleTitleW(w);
+	}
 #endif
+
 	/*
 	 * Select the proper prompt and display it.
 	 */
@@ -776,6 +810,14 @@ prompt()
 		putchr(':');
 	else
 	{
+#if MSDOS_COMPILER==WIN32C
+		WCHAR w[MAX_PATH*2];
+		char  a[MAX_PATH*2];
+		MultiByteToWideChar(CP_ACP, 0, p, -1, w, sizeof(w)/sizeof(*w));
+		WideCharToMultiByte(utf_mode ? CP_UTF8 : GetConsoleOutputCP(),
+		                    0, w, -1, a, sizeof(a), NULL, NULL);
+		p = a;
+#endif
 		at_enter(AT_STANDOUT);
 		putstr(p);
 		at_exit();
@@ -787,7 +829,7 @@ prompt()
  * Display the less version message.
  */
 	public void
-dispversion()
+dispversion(VOID_PARAM)
 {
 	PARG parg;
 
@@ -799,7 +841,7 @@ dispversion()
  * Return a character to complete a partial command, if possible.
  */
 	static LWCHAR
-getcc_end_command()
+getcc_end_command(VOID_PARAM)
 {
 	switch (mca)
 	{
@@ -895,10 +937,10 @@ getcc_repl(orig, repl, gr_getc, gr_ungetc)
  * Get command character.
  */
 	public int
-getcc()
+getcc(VOID_PARAM)
 {
-    /* Replace kent (keypad Enter) with a newline. */
-    return getcc_repl(kent, "\n", getccu, ungetcc);
+	/* Replace kent (keypad Enter) with a newline. */
+	return getcc_repl(kent, "\n", getccu, ungetcc);
 }
 
 /*
@@ -934,7 +976,7 @@ ungetsc(s)
  * Peek the next command character, without consuming it.
  */
 	public LWCHAR
-peekcc()
+peekcc(VOID_PARAM)
 {
 	LWCHAR c = getcc();
 	ungetcc(c);
@@ -1085,7 +1127,7 @@ forw_loop(until_hilite)
  * Accept and execute commands until a quit command.
  */
 	public void
-commands()
+commands(VOID_PARAM)
 {
 	int c;
 	int action;
@@ -1105,7 +1147,7 @@ commands()
 
 	for (;;)
 	{
-		mca = 0;
+		clear_mca();
 		cmd_accept();
 		number = 0;
 		curropt = NULL;
@@ -1287,6 +1329,22 @@ commands()
 			backward((int) number, 0, 0);
 			break;
 
+		case A_F_MOUSE:
+			/*
+			 * Forward wheel_lines lines.
+			 */
+			cmd_exec();
+			forward(wheel_lines, 0, 0);
+			break;
+
+		case A_B_MOUSE:
+			/*
+			 * Backward wheel_lines lines.
+			 */
+			cmd_exec();
+			backward(wheel_lines, 0, 0);
+			break;
+
 		case A_FF_LINE:
 			/*
 			 * Force forward N (default 1) line.
@@ -1392,7 +1450,7 @@ commands()
 				number = 0;
 				fraction = 0;
 			}
-			if (number > 100)
+			if (number > 100 || (number == 100 && fraction != 0))
 			{
 				number = 100;
 				fraction = 0;

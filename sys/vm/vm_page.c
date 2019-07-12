@@ -1459,20 +1459,21 @@ vm_page_insert_radixdone(vm_page_t m, vm_object_t object, vm_page_t mpred)
  *	vm_page_remove:
  *
  *	Removes the specified page from its containing object, but does not
- *	invalidate any backing storage.
+ *	invalidate any backing storage.  Return true if the page may be safely
+ *	freed and false otherwise.
  *
  *	The object must be locked.  The page must be locked if it is managed.
  */
-void
+bool
 vm_page_remove(vm_page_t m)
 {
 	vm_object_t object;
 	vm_page_t mrem;
 
+	object = m->object;
+
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		vm_page_assert_locked(m);
-	if ((object = m->object) == NULL)
-		return;
 	VM_OBJECT_ASSERT_WLOCKED(object);
 	if (vm_page_xbusied(m))
 		vm_page_xunbusy_maybelocked(m);
@@ -1496,6 +1497,7 @@ vm_page_remove(vm_page_t m)
 		vdrop(object->handle);
 
 	m->object = NULL;
+	return (!vm_page_wired(m));
 }
 
 /*
@@ -1666,7 +1668,7 @@ vm_page_rename(vm_page_t m, vm_object_t new_object, vm_pindex_t new_pindex)
 	 */
 	m->pindex = opidx;
 	vm_page_lock(m);
-	vm_page_remove(m);
+	(void)vm_page_remove(m);
 
 	/* Return back to the new pindex to complete vm_page_insert(). */
 	m->pindex = new_pindex;
@@ -1811,8 +1813,9 @@ vm_page_alloc_domain_after(vm_object_t object, vm_pindex_t pindex, int domain,
 	if (object != NULL)
 		VM_OBJECT_ASSERT_WLOCKED(object);
 
-again:
+	flags = 0;
 	m = NULL;
+again:
 #if VM_NRESERVLEVEL > 0
 	/*
 	 * Can we allocate the page from a reservation?
@@ -1828,8 +1831,10 @@ again:
 	vmd = VM_DOMAIN(domain);
 	if (object != NULL && vmd->vmd_pgcache != NULL) {
 		m = uma_zalloc(vmd->vmd_pgcache, M_NOWAIT);
-		if (m != NULL)
+		if (m != NULL) {
+			flags |= PG_PCPU_CACHE;
 			goto found;
+		}
 	}
 	if (vm_domain_allocate(vmd, req, 1)) {
 		/*
@@ -1857,10 +1862,8 @@ again:
 	}
 
 	/*
-	 *  At this point we had better have found a good page.
+	 * At this point we had better have found a good page.
 	 */
-	KASSERT(m != NULL, ("missing page"));
-
 found:
 	vm_page_dequeue(m);
 	vm_page_alloc_check(m);
@@ -1868,10 +1871,8 @@ found:
 	/*
 	 * Initialize the page.  Only the PG_ZERO flag is inherited.
 	 */
-	flags = 0;
 	if ((req & VM_ALLOC_ZERO) != 0)
-		flags = PG_ZERO;
-	flags &= m->flags;
+		flags |= (m->flags & PG_ZERO);
 	if ((req & VM_ALLOC_NODUMP) != 0)
 		flags |= PG_NODUMP;
 	m->flags = flags;
@@ -2017,6 +2018,7 @@ vm_page_alloc_contig_domain(vm_object_t object, vm_pindex_t pindex, int domain,
 	 * Can we allocate the pages without the number of free pages falling
 	 * below the lower bound for the allocation class?
 	 */
+	m_ret = NULL;
 again:
 #if VM_NRESERVLEVEL > 0
 	/*
@@ -2030,7 +2032,6 @@ again:
 		goto found;
 	}
 #endif
-	m_ret = NULL;
 	vmd = VM_DOMAIN(domain);
 	if (vm_domain_allocate(vmd, req, npages)) {
 		/*
@@ -3402,35 +3403,6 @@ vm_page_requeue(vm_page_t m)
 }
 
 /*
- *	vm_page_activate:
- *
- *	Put the specified page on the active list (if appropriate).
- *	Ensure that act_count is at least ACT_INIT but do not otherwise
- *	mess with it.
- *
- *	The page must be locked.
- */
-void
-vm_page_activate(vm_page_t m)
-{
-
-	vm_page_assert_locked(m);
-
-	if (vm_page_wired(m) || (m->oflags & VPO_UNMANAGED) != 0)
-		return;
-	if (vm_page_queue(m) == PQ_ACTIVE) {
-		if (m->act_count < ACT_INIT)
-			m->act_count = ACT_INIT;
-		return;
-	}
-
-	vm_page_dequeue(m);
-	if (m->act_count < ACT_INIT)
-		m->act_count = ACT_INIT;
-	vm_page_enqueue(m, PQ_ACTIVE);
-}
-
-/*
  *	vm_page_free_prep:
  *
  *	Prepares the given page to be put on the free list,
@@ -3466,7 +3438,8 @@ vm_page_free_prep(vm_page_t m)
 	if (vm_page_sbusied(m))
 		panic("vm_page_free_prep: freeing busy page %p", m);
 
-	vm_page_remove(m);
+	if (m->object != NULL)
+		(void)vm_page_remove(m);
 
 	/*
 	 * If fictitious remove object association and
@@ -3533,7 +3506,7 @@ vm_page_free_toq(vm_page_t m)
 		return;
 
 	vmd = vm_pagequeue_domain(m);
-	if (m->pool == VM_FREEPOOL_DEFAULT && vmd->vmd_pgcache != NULL) {
+	if ((m->flags & PG_PCPU_CACHE) != 0 && vmd->vmd_pgcache != NULL) {
 		uma_zfree(vmd->vmd_pgcache, m);
 		return;
 	}
@@ -3678,6 +3651,35 @@ vm_page_unwire_noq(vm_page_t m)
 		return (true);
 	} else
 		return (false);
+}
+
+/*
+ *	vm_page_activate:
+ *
+ *	Put the specified page on the active list (if appropriate).
+ *	Ensure that act_count is at least ACT_INIT but do not otherwise
+ *	mess with it.
+ *
+ *	The page must be locked.
+ */
+void
+vm_page_activate(vm_page_t m)
+{
+
+	vm_page_assert_locked(m);
+
+	if (vm_page_wired(m) || (m->oflags & VPO_UNMANAGED) != 0)
+		return;
+	if (vm_page_queue(m) == PQ_ACTIVE) {
+		if (m->act_count < ACT_INIT)
+			m->act_count = ACT_INIT;
+		return;
+	}
+
+	vm_page_dequeue(m);
+	if (m->act_count < ACT_INIT)
+		m->act_count = ACT_INIT;
+	vm_page_enqueue(m, PQ_ACTIVE);
 }
 
 /*

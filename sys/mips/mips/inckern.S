@@ -22,17 +22,15 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-.option pic0
-
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$")
 
 ENTRY(_start)
-	PTR_LA	t0, kernel_end
+	ABSRELOC_LA(t0, kernel_end)
 	move	sp, t0
 	add	sp, 0x2000
 	and	sp, ~0x7
-	PTR_LA	t0, _startC
+	ABSRELOC_LA(t0, _startC)
 	j	t0
 	nop
 END(_start)

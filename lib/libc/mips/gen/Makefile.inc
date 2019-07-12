@@ -11,7 +11,7 @@ SRCS+=	_ctx_start.S _set_tp.c makecontext.c \
 	trivial-getcontextx.c
 
 .if ${MACHINE_ARCH:Mmips*c*}
-SRCS+=	_setjmp_c.S setjmp_c.S cheriabi_pic_wrappers.c
+SRCS+=	_setjmp_c.S setjmp_c.S
 .else
 SRCS+=	_setjmp.S setjmp.S
 .endif

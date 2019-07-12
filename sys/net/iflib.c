@@ -378,7 +378,6 @@ struct iflib_fl {
 	uint64_t	ifl_cl_dequeued;
 #endif
 	/* implicit pad */
-
 	bitstr_t 	*ifl_rx_bitmap;
 	qidx_t		ifl_fragidx;
 	/* constant */
@@ -1262,7 +1261,6 @@ iflib_netmap_timer_adjust(if_ctx_t ctx, iflib_txq_t txq, uint32_t *reset_on)
 #define netmap_rx_irq(ifp, qid, budget) (0)
 #define netmap_tx_irq(ifp, qid) do {} while (0)
 #define iflib_netmap_timer_adjust(ctx, txq, reset_on)
-
 #endif
 
 #if defined(__i386__) || defined(__amd64__)
@@ -1549,17 +1547,17 @@ _iflib_irq_alloc(if_ctx_t ctx, if_irq_t irq, int rid,
 		 driver_filter_t filter, driver_intr_t handler, void *arg,
 		 const char *name)
 {
-	int rc, flags;
 	struct resource *res;
 	void *tag = NULL;
 	device_t dev = ctx->ifc_dev;
+	int flags, i, rc;
 
 	flags = RF_ACTIVE;
 	if (ctx->ifc_flags & IFC_LEGACY)
 		flags |= RF_SHAREABLE;
 	MPASS(rid < 512);
-	irq->ii_rid = rid;
-	res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &irq->ii_rid, flags);
+	i = rid;
+	res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &i, flags);
 	if (res == NULL) {
 		device_printf(dev,
 		    "failed to allocate IRQ for rid %d, name %s.\n", rid, name);
@@ -1580,7 +1578,6 @@ _iflib_irq_alloc(if_ctx_t ctx, if_irq_t irq, int rid,
 	irq->ii_tag = tag;
 	return (0);
 }
-
 
 /*********************************************************************
  *
@@ -2703,10 +2700,10 @@ iflib_get_ip_forwarding(struct lro_ctrl *lc, bool *v4, bool *v6)
 {
 	CURVNET_SET(lc->ifp->if_vnet);
 #if defined(INET6)
-	*v6 = VNET(ip6_forwarding);
+	*v6 = V_ip6_forwarding;
 #endif
 #if defined(INET)
-	*v4 = VNET(ipforwarding);
+	*v4 = V_ipforwarding;
 #endif
 	CURVNET_RESTORE();
 }
@@ -2720,18 +2717,16 @@ static bool
 iflib_check_lro_possible(struct mbuf *m, bool v4_forwarding, bool v6_forwarding)
 {
 	struct ether_header *eh;
-	uint16_t eh_type;
 
 	eh = mtod(m, struct ether_header *);
-	eh_type = ntohs(eh->ether_type);
-	switch (eh_type) {
+	switch (eh->ether_type) {
 #if defined(INET6)
-		case ETHERTYPE_IPV6:
-			return !v6_forwarding;
+		case htons(ETHERTYPE_IPV6):
+			return (!v6_forwarding);
 #endif
 #if defined (INET)
-		case ETHERTYPE_IP:
-			return !v4_forwarding;
+		case htons(ETHERTYPE_IP):
+			return (!v4_forwarding);
 #endif
 	}
 
@@ -3597,10 +3592,10 @@ iflib_txq_drain(struct ifmp_ring *r, uint32_t cidx, uint32_t pidx)
 	iflib_txq_t txq = r->cookie;
 	if_ctx_t ctx = txq->ift_ctx;
 	if_t ifp = ctx->ifc_ifp;
-	struct mbuf **mp, *m;
-	int i, count, consumed, pkt_sent, bytes_sent, mcast_sent, avail;
-	int reclaimed, err, in_use_prev, desc_used;
-	bool do_prefetch, ring, rang;
+	struct mbuf *m, **mp;
+	int avail, bytes_sent, consumed, count, err, i, in_use_prev;
+	int mcast_sent, pkt_sent, reclaimed, txq_avail;
+	bool do_prefetch, rang, ring;
 
 	if (__predict_false(!(if_getdrvflags(ifp) & IFF_DRV_RUNNING) ||
 			    !LINK_ACTIVE(ctx))) {
@@ -3638,16 +3633,15 @@ iflib_txq_drain(struct ifmp_ring *r, uint32_t cidx, uint32_t pidx)
 		       avail, ctx->ifc_flags, TXQ_AVAIL(txq));
 #endif
 	do_prefetch = (ctx->ifc_flags & IFC_PREFETCH);
-	avail = TXQ_AVAIL(txq);
+	txq_avail = TXQ_AVAIL(txq);
 	err = 0;
-	for (desc_used = i = 0; i < count && avail > MAX_TX_DESC(ctx) + 2; i++) {
+	for (i = 0; i < count && txq_avail > MAX_TX_DESC(ctx) + 2; i++) {
 		int rem = do_prefetch ? count - i : 0;
 
 		mp = _ring_peek_one(r, cidx, i, rem);
 		MPASS(mp != NULL && *mp != NULL);
 		if (__predict_false(*mp == (struct mbuf *)txq)) {
 			consumed++;
-			reclaimed++;
 			continue;
 		}
 		in_use_prev = txq->ift_in_use;
@@ -3666,10 +3660,9 @@ iflib_txq_drain(struct ifmp_ring *r, uint32_t cidx, uint32_t pidx)
 		DBG_COUNTER_INC(tx_sent);
 		bytes_sent += m->m_pkthdr.len;
 		mcast_sent += !!(m->m_flags & M_MCAST);
-		avail = TXQ_AVAIL(txq);
+		txq_avail = TXQ_AVAIL(txq);
 
 		txq->ift_db_pending += (txq->ift_in_use - in_use_prev);
-		desc_used += (txq->ift_in_use - in_use_prev);
 		ETHER_BPF_MTAP(ifp, m);
 		if (__predict_false(!(ifp->if_drv_flags & IFF_DRV_RUNNING)))
 			break;
@@ -4344,12 +4337,10 @@ iflib_led_func(void *arg, int onoff)
 int
 iflib_device_probe(device_t dev)
 {
-	pci_vendor_info_t *ent;
-
-	uint16_t	pci_vendor_id, pci_device_id;
-	uint16_t	pci_subvendor_id, pci_subdevice_id;
-	uint16_t	pci_rev_id;
+	const pci_vendor_info_t *ent;
 	if_shared_ctx_t sctx;
+	uint16_t pci_device_id, pci_rev_id, pci_subdevice_id, pci_subvendor_id;
+	uint16_t pci_vendor_id;
 
 	if ((sctx = DEVICE_REGISTER(dev)) == NULL || sctx->isc_magic != IFLIB_MAGIC)
 		return (ENOTSUP);
@@ -4409,8 +4400,6 @@ iflib_reset_qvalues(if_ctx_t ctx)
 	device_t dev = ctx->ifc_dev;
 	int i;
 
-	scctx->isc_txrx_budget_bytes_max = IFLIB_MAX_TX_BYTES;
-	scctx->isc_tx_qdepth = IFLIB_DEFAULT_TX_QDEPTH;
 	if (ctx->ifc_sysctl_ntxqs != 0)
 		scctx->isc_ntxqsets = ctx->ifc_sysctl_ntxqs;
 	if (ctx->ifc_sysctl_nrxqs != 0)
@@ -6049,15 +6038,14 @@ iflib_legacy_setup(if_ctx_t ctx, driver_filter_t filter, void *filter_arg, int *
 	struct resource *res;
 	struct taskqgroup *tqg;
 	gtask_fn_t *fn;
-	int tqrid;
 	void *q;
-	int err;
+	int err, tqrid;
 
 	q = &ctx->ifc_rxqs[0];
 	info = &rxq[0].ifr_filter_info;
 	gtask = &rxq[0].ifr_task;
 	tqg = qgroup_if_io_tqg;
-	tqrid = irq->ii_rid = *rid;
+	tqrid = *rid;
 	fn = _task_fn_rx;
 
 	ctx->ifc_flags |= IFC_LEGACY;
@@ -6124,7 +6112,7 @@ iflib_iov_intr_deferred(if_ctx_t ctx)
 }
 
 void
-iflib_io_tqg_attach(struct grouptask *gt, void *uniq, int cpu, char *name)
+iflib_io_tqg_attach(struct grouptask *gt, void *uniq, int cpu, const char *name)
 {
 
 	taskqgroup_attach_cpu(qgroup_if_io_tqg, gt, uniq, cpu, NULL, NULL,
@@ -6176,9 +6164,6 @@ iflib_tx_credits_update(if_ctx_t ctx, iflib_txq_t txq)
 #ifdef INVARIANTS
 	int credits_pre = txq->ift_cidx_processed;
 #endif
-
-	if (ctx->isc_txd_credits_update == NULL)
-		return (0);
 
 	bus_dmamap_sync(txq->ift_ifdi->idi_tag, txq->ift_ifdi->idi_map,
 	    BUS_DMASYNC_POSTREAD);

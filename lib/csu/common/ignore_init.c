@@ -61,12 +61,32 @@ typedef void (*init_function_ptr)(int, char**, char**);
 #define array_entry_to_function_ptr(type, entry) \
 	((type)entry)
 #else
+
+#if !defined(__CHERI_CAPABILITY_TABLE__)
+/* PC-Relative ABI, $pcc has large bounds -> can use $pcc */
+#define get_init_fini_base_cap() cheri_getpcc()
+#pragma message("Legacy ABI")
+
+#elif __CHERI_CAPABILITY_TABLE__ != 3
+/* PLT ABI -> need to store the original $pcc to rederive function pointers.
+ * TODO: could just use capabilities for the __init_array/__fini_array entries.
+ */
+static void* __initfini_base_cap;
+#define get_init_fini_base_cap() __initfini_base_cap
+#pragma message("Using __init_array/__fini_array workaround for PLT ABI")
+
+#else
+/* PC-Relative ABI, $pcc has large bounds -> can use $pcc */
+#define get_init_fini_base_cap() cheri_getpcc()
+#pragma message("PCREL ABI")
+#endif
+
 #ifdef CRT_INIT_ARRAY_ENTRIES_ARE_OFFSETS
 #define array_entry_to_function_ptr(type, entry) \
-	((type)cheri_setoffset(cheri_getpcc(), entry));
+	((type)cheri_setoffset(get_init_fini_base_cap(), entry));
 #else
 #define array_entry_to_function_ptr(type, entry) \
-	((type)cheri_setaddress(cheri_getpcc(), entry));
+	((type)cheri_setaddress(get_init_fini_base_cap(), entry));
 #endif
 #endif
 

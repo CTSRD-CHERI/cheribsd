@@ -800,10 +800,19 @@ _C_LABEL(x):
 #define	HAZARD_DELAY	nop;nop;nop;nop;sll $0,$0,3;
 #endif
 
+/* Force an absolute relocation for the given symbol */
+#define ABSRELOC_LA(dst, sym)				\
+	lui	dst, %highest(sym);			\
+	daddiu	dst, dst, %higher(sym);			\
+	dsll	dst, dst, 16;				\
+	daddiu	dst, dst, %hi(sym);			\
+	dsll	dst, dst, 16;				\
+	daddiu	dst, dst, %lo(sym)
+
 #endif /* !_MACHINE_ASM_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190403,
+//   "updated": 20190712,
 //   "target_type": "header",
 //   "changes": [
 //     "support"

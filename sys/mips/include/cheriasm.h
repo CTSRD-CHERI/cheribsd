@@ -604,15 +604,6 @@
 #define CAPCALL_LOAD(dst, sym)				\
 	clcbi dst, %capcall20(sym)(CHERI_REG_GPC)
 
-#define ABSRELOC_LA(dst, sym)				\
-	lui	dst, %highest(sym);			\
-	daddiu	dst, dst, %higher(sym);			\
-	dsll	dst, dst, 16;				\
-	daddiu	dst, dst, %hi(sym);			\
-	dsll	dst, dst, 16;				\
-	daddiu	dst, dst, %lo(sym)
-
-
 /*
  * The CCall (selector 1) branch delay slot has been removed but in order to
  * run on older hardware we use this macro ensure it is followed by a nop

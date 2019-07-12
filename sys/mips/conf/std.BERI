@@ -69,5 +69,4 @@ device		ether
 device		geom_map
 device		loop
 device		md
-device		random
 device		snp

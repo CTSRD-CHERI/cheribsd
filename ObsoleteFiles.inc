@@ -38,6 +38,10 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20190618: sys/capability.h removed (sys/capsicum.h is the one to use)
+OLD_FILES+=usr/include/sys/capability.h
+# 20190615: sys/pwm.h renamed to dev/pwmc.h
+OLD_FILES+=usr/include/sys/pwm.h
 # 20190612: new clang import which bumps version from 8.0.0 to 8.0.1.
 OLD_FILES+=usr/lib/clang/8.0.0/include/sanitizer/allocator_interface.h
 OLD_FILES+=usr/lib/clang/8.0.0/include/sanitizer/asan_interface.h
@@ -384,6 +388,8 @@ OLD_FILES+=usr/include/sys/seq.h
 # 20190222: libifconfig made INTERNALLIB
 OLD_FILES+=usr/lib/libprivateifconfig.a
 OLD_FILES+=usr/lib/libprivateifconfig_p.a
+OLD_FILES+=usr/lib32/libprivateifconfig.a
+OLD_FILES+=usr/lib32/libprivateifconfig_p.a
 # 20190131: pfil(9) changed
 OLD_FILES+=usr/share/man/man9/pfil_hook_get.9.gz
 OLD_FILES+=usr/share/man/man9/pfil_rlock.9.gz
@@ -819,6 +825,7 @@ OLD_FILES+=usr/share/man/man3/arc4random_stir.3.gz
 OLD_FILES+=usr/bin/send-pr
 # 20180725: Cleanup old libcasper.so.0
 OLD_LIBS+=lib/libcasper.so.0
+OLD_LIBS+=usr/lib32/libcasper.so.0
 # 20180722: indent(1) option renamed, test files follow
 OLD_FILES+=usr/bin/indent/tests/nsac.0
 OLD_FILES+=usr/bin/indent/tests/nsac.0.pro
@@ -1560,6 +1567,8 @@ OLD_DIRS+=usr/share/openssl/man/en.ISO8859-1/cat1
 OLD_DIRS+=usr/share/openssl/man/en.ISO8859-1/cat3
 # 20170802: ksyms(4) ioctl interface was removed
 OLD_FILES+=usr/include/sys/ksyms.h
+# 20170729: the iicbus/pcf8563 driver is replaced with iicbus/nxprtc
+OLD_FILES+=usr/include/dev/iicbus/pcf8563reg.h
 # 20170722: new clang import which bumps version from 4.0.0 to 5.0.0.
 OLD_FILES+=usr/lib/clang/4.0.0/include/sanitizer/allocator_interface.h
 OLD_FILES+=usr/lib/clang/4.0.0/include/sanitizer/asan_interface.h

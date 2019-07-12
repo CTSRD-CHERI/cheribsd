@@ -254,8 +254,12 @@ typedef struct Struct_Obj_Entry {
     Elf_Word gotsym;		/* First dynamic symbol in GOT */
     Elf_Addr *mips_pltgot;	/* Second PLT GOT */
 #endif /* defined(__mips__) */
+#ifdef __powerpc__
 #ifdef __powerpc64__
     Elf_Addr glink;		/* GLINK PLT call stub section */
+#else
+    Elf_Addr *gotptr;		/* GOT pointer (secure-plt only) */
+#endif
 #endif
 
     const Elf_Verneed *verneed; /* Required versions. */
@@ -341,16 +345,6 @@ typedef struct Struct_Obj_Entry {
 #ifdef __CHERI_PURE_CAPABILITY__
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
     bool relative_cap_relocs : 1; /* __cap_relocs section has been processed */
-    /*
-     * If restrict_pcc_basic is true we can restricted $pcc to the object's
-     * executable segment, if restrict_pcc_strict is true we can restrict it
-     * to just the functions bounds in dlsym()/dlfunc(). Otherwise we need to
-     * fall back to giving the full address space bounds in $pcc.
-     *
-     * TODO: remove these options once we have decided on the correct ABI
-     */
-    bool restrict_pcc_basic : 1;
-    bool restrict_pcc_strict : 1;
     unsigned cheri_captable_abi : 3;
     /*
      * If we linked the DSO with the per-file or per-function captable flag we
@@ -479,6 +473,13 @@ __END_DECLS
 
 #ifndef call_fini_array_pointer
 #define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, target)
+#endif
+
+#ifndef make_rtld_function_pointer
+#define make_rtld_function_pointer(target_func)	(&target_func)
+#endif
+#ifndef make_rtld_local_function_pointer
+#define make_rtld_local_function_pointer(target_func)	(&target_func)
 #endif
 
 #ifndef __CHERI_PURE_CAPABILITY__

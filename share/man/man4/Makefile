@@ -304,8 +304,6 @@ MAN=	aac.4 \
 	mx25l.4 \
 	mxge.4 \
 	my.4 \
-	nand.4 \
-	nandsim.4 \
 	${_ndis.4} \
 	net80211.4 \
 	netdump.4 \
@@ -419,6 +417,7 @@ MAN=	aac.4 \
 	pts.4 \
 	pty.4 \
 	puc.4 \
+	pwmc.4 \
 	${_qlxge.4} \
 	${_qlxgb.4} \
 	${_qlxgbe.4} \

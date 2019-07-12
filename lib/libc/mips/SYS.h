@@ -109,21 +109,131 @@
 #endif /* __ABICALLS__ */
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 #ifdef __PIC__
-# define PIC_PROLOGUE(x)
-# define PIC_LOAD_CODE_PTR(capreg, gpr, l)		\
+# define PIC_CHECK_GLOBALS_POINTER_VALID()			\
+	.if PIC_GLOBALS_POINTER_CHANGED != 0;			\
+	.error "must restore globals pointer before use";	\
+	.endif
+# if !defined(__CHERI_CAPABILITY_TABLE__)
+#  undef t3
+#  define t3 error dont use me
+#  define GLOBALS_REG $15
+
+/*
+ * Legacy ABI: need to setup $t9 and $gp from $c12.
+ * Note: since $gp is callee-save, we use $t3 instead
+ */
+#  define PIC_PROLOGUE(x)					\
+	.abicalls;						\
+	.set PIC_GLOBALS_POINTER_CHANGED, 0;			\
+	.set PIC_GLOBALS_POINTER_SAVED, 0;			\
+	cgetoffset	t9, $c12;				\
+	lui	GLOBALS_REG, %hi(%neg(%gp_rel(x)));		\
+	daddu	GLOBALS_REG, GLOBALS_REG, t9;			\
+	daddiu	GLOBALS_REG, GLOBALS_REG, %lo(%neg(%gp_rel(x)))
+#  define LEGACY_LOAD_DATA_CAP(capreg, gpr, l)		\
+	PIC_CHECK_GLOBALS_POINTER_VALID();		\
+	ld	gpr, %got_disp(l)(GLOBALS_REG);		\
+	cfromddc	capreg, gpr;			\
+	ld	gpr, %got_disp(.size.##l)(GLOBALS_REG);	\
+	ld	gpr, 0(gpr)				\
+	csetbounds	capreg, capreg, gpr
+#  define LEGACY_LOAD_CODE_CAP(capreg, gpr, l)		\
+	PIC_CHECK_GLOBALS_POINTER_VALID();		\
+	ld	gpr, %got_disp(l)(GLOBALS_REG);		\
+	cgetpccsetoffset	capreg, gpr
+# elif __CHERI_CAPABILITY_TABLE__ == 3
+#define GLOBALS_REG $cgp
+/*
+ * PC-relative: derive $cgp from $pcc.
+ * Note: $cgp is caller-save so no need to save it.
+ */
+#  define PIC_PROLOGUE(x)				\
+	.set push; .set noat;				\
+	lui	$1, %hi(%neg(%captab_rel(x)));		\
+	daddiu	$1, $1, %lo(%neg(%captab_rel(x)));	\
+	cincoffset	GLOBALS_REG, $c12, $1;		\
+	.set pop;					\
+	.set PIC_GLOBALS_POINTER_CHANGED, 0;		\
+	.set PIC_GLOBALS_POINTER_SAVED, 0;
+# else
+/*
+ * PLT ABI: $cgp is live-in -> nothing to do in PIC_PROLOGUE()
+ * However, for non-local calls we need to save/restore $cgp
+ */
+#  define GLOBALS_REG $cgp
+#  define PIC_PROLOGUE(x)			\
+	.set PIC_GLOBALS_POINTER_CHANGED, 0;	\
+	.set PIC_GLOBALS_POINTER_SAVED, 0;
+# endif /* !defined(__CHERI_CAPABILITY_TABLE__) */
+# define PCREL_LOAD_CODE_PTR(capreg, gpr, l)		\
 	lui		gpr, %pcrel_hi(l - 8);		\
 	daddiu		gpr, gpr, %pcrel_lo(l - 4);	\
 	cgetpcc		capreg;				\
-	cincoffset	capreg, capreg, gpr;
+	cincoffset	capreg, capreg, gpr
+
+# define CAPTABLE_LOAD_PTR(capreg, cgp, l)		\
+	PIC_CHECK_GLOBALS_POINTER_VALID();		\
+	clcbi		capreg, %captab20(l)(cgp)
+# define CAPTABLE_LOAD_CALL_PTR(capreg, cgp, l)		\
+	PIC_CHECK_GLOBALS_POINTER_VALID();		\
+	clcbi		capreg, %capcall20(l)(cgp)
+
+# if defined(__CHERI_CAPABILITY_TABLE__)
+/*
+ * In the PLT ABI we cannot derive the target from $pcc with tight code bounds
+ * so we have to use use captable. We could use pc-relative addresses in the
+ * pc-relative ABI, but the breaks calls to preemptible symbols so we also use
+ * the captable there
+ */
+#  define PIC_LOAD_CODE_PTR(capreg, gpr, l) CAPTABLE_LOAD_PTR(capreg, GLOBALS_REG, l)
+#  define PIC_LOAD_CALL_PTR(capreg, gpr, l) CAPTABLE_LOAD_CALL_PTR(capreg, GLOBALS_REG, l)
+#  define PIC_SAVE_GLOBALS_POINTER(offset) PIC_SAVE_GLOBALS_POINTER_IMPL(csc, offset)
+#  define PIC_RESTORE_GLOBALS_POINTER(offset) PIC_RESTORE_GLOBALS_POINTER_IMPL(clc, offset)
+/* TODO: remove this once we drop the legacy ABI: */
+#  define PIC_SAVE_LEGACY_GP(offset)
+#  define PIC_RESTORE_LEGACY_GP(offset)
+# else
+/* Legacy ABI -> Load from the GOT (assuming that $gp points there) */
+#  define PIC_LOAD_CODE_PTR(capreg, gpr, l) LEGACY_LOAD_CODE_CAP(capreg, gpr, l)
+#  define PIC_LOAD_CALL_PTR(capreg, gpr, l) LEGACY_LOAD_CODE_CAP(capreg, gpr, l)
+#  define PIC_SAVE_GLOBALS_POINTER(offset) PIC_SAVE_GLOBALS_POINTER_IMPL(csd, offset)
+#  define PIC_RESTORE_GLOBALS_POINTER(offset) PIC_RESTORE_GLOBALS_POINTER_IMPL(cld, offset)
+#  define PIC_SAVE_LEGACY_GP(offset) PIC_SAVE_GLOBALS_POINTER_IMPL(csd, offset)
+#  define PIC_RESTORE_LEGACY_GP(offset) PIC_RESTORE_GLOBALS_POINTER_IMPL(cld, offset)
+# endif
+# define PIC_SAVE_GLOBALS_POINTER_IMPL(op, offset)	\
+	op GLOBALS_REG, zero, (offset)($csp);		\
+	.set PIC_GLOBALS_POINTER_SAVED, 1;
+# define PIC_RESTORE_GLOBALS_POINTER_IMPL(op, offset)				\
+	.if PIC_GLOBALS_POINTER_SAVED == 0;					\
+	.error "PIC_RESTORE_GLOBALS_POINTER without PIC_SAVE_GLOBALS_POINTER";	\
+	.endif;									\
+	op GLOBALS_REG, zero, (offset)($csp);					\
+	.set PIC_GLOBALS_POINTER_CHANGED, 0;
+
 # define PIC_TAILCALL(l)				\
-	PIC_LOAD_CODE_PTR($c12, t9, _C_LABEL(l))	\
-	cjr $c12;
+	PIC_CHECK_GLOBALS_POINTER_VALID();		\
+	PIC_LOAD_CALL_PTR($c12, t9, _C_LABEL(l));	\
+	cjr $c12; nop
 # define PIC_CALL(l)					\
-	PIC_LOAD_CODE_PTR($c12, t9, _C_LABEL(l))	\
+	_PIC_CALL_IMPL(l)				\
+	.set PIC_GLOBALS_POINTER_CHANGED, 1;
+# define PIC_CALL_LOCAL(l)	\
+	.protected _C_LABEL(l);	\
+	_PIC_CALL_IMPL(l)
+# define _PIC_CALL_IMPL(l)				\
+	PIC_SAVE_LEGACY_GP(CALLFRAME_CGP)		\
+	PIC_LOAD_CALL_PTR($c12, t9, _C_LABEL(l));	\
 	cjalr $c12, $c17;				\
-	nop;
-# define PIC_RETURN()		cjr $c17
+	nop;						\
+	PIC_RESTORE_LEGACY_GP(CALLFRAME_CGP)
+
+# define PIC_RETURN()						\
+	PIC_CHECK_GLOBALS_POINTER_VALID(); cjr $c17; nop
 #else
+#ifdef __CHERI_CAPABILITY_TABLE
+#error THIS IS WRONG
+#endif
 # define PIC_PROLOGUE(x)
 # define PIC_TAILCALL(l)	j _C_LABEL(l)
 # define PIC_CALL(l)				\
@@ -134,6 +244,10 @@
 # define PIC_RETURN()		cjr $c17
 #endif
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
+
+#ifndef PIC_CALL_LOCAL
+#define PIC_CALL_LOCAL(l) PIC_CALL(l)
+#endif
 
 # define SYSTRAP(x)	li v0,SYS_ ## x; syscall;
 
@@ -146,6 +260,7 @@ LEAF(__sys_ ## x);							\
 	_C_LABEL(x) = _C_LABEL(__CONCAT(__sys_,x));			\
 	.weak _C_LABEL(__CONCAT(_,x));					\
 	_C_LABEL(__CONCAT(_,x)) = _C_LABEL(__CONCAT(__sys_,x));		\
+	PIC_PROLOGUE(__sys_ ## x);					\
 	SYSTRAP(x);							\
 	PIC_RETURN();							\
 END(__sys_ ## x)
@@ -192,7 +307,7 @@ err:									\
 END(__sys_ ## x)
 
 /* Do a system call where the _ioctl() is also custom */
-#define NO_UNDERSCORE(x)							\
+#define NO_UNDERSCORE(x)						\
 LEAF(__sys_ ## x);							\
 	PIC_PROLOGUE(__sys_ ## x);					\
 	SYSTRAP(x);							\

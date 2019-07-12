@@ -231,7 +231,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     /* round up the requested size so that the kernel can represent the mmap result */
     mapsize = CHERI_REPRESENTABLE_LENGTH(mapsize);
     base_vlimit = base_vaddr + mapsize;
-    assert(round_page(base_vlimit) == base_vlimit);
+    dbg_assert(round_page(base_vlimit) == base_vlimit);
 #endif
     base_addr = (caddr_t)(uintptr_t)base_vaddr;
     base_flags = __getosreldate() >= P_OSREL_MAP_GUARD ? MAP_GUARD :
@@ -249,8 +249,8 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     }
 
     dbg("Allocating entire object: mmap(%#p, 0x%lx, 0x%x, 0x%x, -1, 0)",
-	    base_addr, mapsize, PROT_NONE | PROT_MAX(PROT_ALL), base_flags);
-    mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(PROT_ALL),
+	    base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL), base_flags);
+    mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	base_flags, -1, 0);
     if (mapbase == MAP_FAILED) {
 	_rtld_error("%s: mmap of entire address space failed: %s",
@@ -453,6 +453,7 @@ get_elf_header(int fd, const char *path, const struct stat *sbp, const char* mai
 
 #ifndef rtld_validate_target_eflags
 #define rtld_validate_target_eflags(path, hdr, main_path) true
+	(void)main_path;
 #endif
 	if (!rtld_validate_target_eflags(path, hdr, main_path)) {
 		goto error;
