@@ -132,10 +132,11 @@ u_int vm_laundry_count(void);
 u_int vm_wait_count(void);
 
 #ifdef CPU_CHERI
-int vm_test_caprevoke(const void * __capability);
-void caprevoke_td_frame(struct thread *td); /* MD; XXX prototype elsewhere? */
-
 struct caprevoke_stats;
+
+int vm_test_caprevoke(const void * __capability);
+void caprevoke_td_frame(struct thread *td, struct caprevoke_stats *); /* MD; XXX prototype elsewhere? */
+
 #define VM_CAPREVOKE_INCREMENTAL	0x01
 #define VM_CAPREVOKE_LAST_INIT		0x02
 #define VM_CAPREVOKE_LAST_FINI		0x04

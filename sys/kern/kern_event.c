@@ -83,6 +83,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 
 #include <cheri/cheric.h>
+#include <sys/caprevoke.h>
 
 MALLOC_DEFINE(M_KQUEUE, "kqueue", "memory for kqueue system");
 
@@ -2795,7 +2796,7 @@ noacquire:
 #if __has_feature(capabilities)
 
 int
-kqueue_caprevoke(struct file *fp)
+kqueue_caprevoke(struct file *fp, struct caprevoke_stats *stat)
 {
 	struct kqueue *kq;
 	struct knote *kn;
@@ -2809,15 +2810,25 @@ kqueue_caprevoke(struct file *fp)
 	for (ix = 0; ix < kq->kq_knlistsize; ix++) {
 		SLIST_FOREACH(kn, &kq->kq_knlist[ix], kn_link) {
 			void * __capability ud = kn->kn_kevent.udata;
-			if (vm_test_caprevoke(ud))
+			if (!cheri_gettag(ud))
+				continue;
+			stat->caps_found++;
+			if (vm_test_caprevoke(ud)) {
 				kn->kn_kevent.udata = cheri_cleartag(ud);
+				stat->caps_cleared++;
+			}
 		}
 	}
 	for (ix = 0; ix <= kq->kq_knhashmask; ix++) {
 		SLIST_FOREACH(kn, &kq->kq_knhash[ix], kn_link) {
 			void * __capability ud = kn->kn_kevent.udata;
-			if (vm_test_caprevoke(ud))
+			if (!cheri_gettag(ud))
+				continue;
+			stat->caps_found++;
+			if (vm_test_caprevoke(ud)) {
 				kn->kn_kevent.udata = cheri_cleartag(ud);
+				stat->caps_cleared++;
+			}
 		}
 	}
 

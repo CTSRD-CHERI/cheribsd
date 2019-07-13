@@ -137,6 +137,7 @@ retry:
 			if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
 				/* If the world is stopped, do that now */
 				if (flags & VM_CAPREVOKE_LAST_FINI) {
+					stat->pages_retried++;
 					goto retry;
 				}
 				vm_page_capdirty(m);

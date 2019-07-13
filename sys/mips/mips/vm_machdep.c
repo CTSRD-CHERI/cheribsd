@@ -675,7 +675,7 @@ vm_test_caprevoke(const void * __capability cut)
  * don't have a LLC instruction, just a CLLC one.
  */
 static int
-vm_do_caprevoke(void * __capability * __capability cutp)
+vm_do_caprevoke(void * __capability * __capability cutp, struct caprevoke_stats *stat)
 {
 	void * __capability cut;
 	int res = 0;
@@ -714,6 +714,9 @@ vm_do_caprevoke(void * __capability * __capability cutp)
 		  : [cut] "C" (cut), [cutp] "C" (cutp),
 		    [cdflag] "i" (VM_CAPREVOKE_PAGE_DIRTY)
 		  : "t0", "memory" );
+
+		if ((res & VM_CAPREVOKE_PAGE_DIRTY) == 0)
+			stat->caps_cleared++;
 	}
 
 	return res;
@@ -763,17 +766,11 @@ vm_caprevoke_page(vm_page_t m, struct caprevoke_stats *stat)
 			res |= VM_CAPREVOKE_PAGE_HASCAPS;
 
 		for(; tags != 0; (tags >>= 1), mvu += 1) {
-			int res2;
-
 			if (!(tags & 1))
 				continue;
 			stat->caps_found++;
 
-			res2 = vm_do_caprevoke(mvu);
-			if ((res2 & VM_CAPREVOKE_PAGE_DIRTY) == 0)
-				stat->caps_cleared++;
-
-			res |= res2;
+			res |= vm_do_caprevoke(mvu, stat);
 		}
 	}
 

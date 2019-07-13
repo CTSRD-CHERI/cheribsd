@@ -44,7 +44,7 @@ __FBSDID("$FreeBSD$");
  * hold some locks for uncomfortably long.
  */
 static void
-caprevoke_hoarders(struct proc *p)
+caprevoke_hoarders(struct proc *p, struct caprevoke_stats *stat)
 {
 	/* kqueue */
 	{
@@ -61,14 +61,14 @@ caprevoke_hoarders(struct proc *p)
 				 * born or that it's dying, and in either
 				 * case, that should be fine.
 				 */
-				kqueue_caprevoke(fp);
+				kqueue_caprevoke(fp, stat);
 			}
 		}
 		FILEDESC_SUNLOCK(fdp);
 	}
 
 	/* aio */
-	aio_caprevoke(p);
+	aio_caprevoke(p, stat);
 }
 
 static int
@@ -98,7 +98,7 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	st.epoch_init = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
 	if (uap->flags & CAPREVOKE_JUST_MY_REGS) {
-		caprevoke_td_frame(td);
+		caprevoke_td_frame(td, &st);
 	}
 	if (uap->flags & CAPREVOKE_JUST_MY_STACK) {
 #if defined(CPU_CHERI)
@@ -110,7 +110,7 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 #endif
 	}
 	if (uap->flags & CAPREVOKE_JUST_HOARDERS) {
-		caprevoke_hoarders(td->td_proc);
+		caprevoke_hoarders(td->td_proc, &st);
 	}
 
 	/* XXX unlocked read OK? */
@@ -262,12 +262,12 @@ reentry:
 		struct thread *ptd;
 
 		/* Kernel hoarders */
-		caprevoke_hoarders(td->td_proc);
+		caprevoke_hoarders(td->td_proc, &stat);
 
 		/* And thread register files */
 		PROC_LOCK(td->td_proc);
 		FOREACH_THREAD_IN_PROC(td->td_proc, ptd) {
-			caprevoke_td_frame(ptd);
+			caprevoke_td_frame(ptd, &stat);
 		}
 		PROC_UNLOCK(td->td_proc);
 	}

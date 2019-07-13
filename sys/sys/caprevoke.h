@@ -162,6 +162,7 @@ struct caprevoke_stats {
 	uint64_t	epoch_fini;
 
 	uint64_t	pages_scanned;
+	uint64_t	pages_retried;
 	uint64_t	page_scan_cycles;
 
 	uint64_t	pages_faulted_ro;
@@ -186,7 +187,7 @@ struct caprevoke_stats {
 
 #ifdef _KERNEL
 	/* XXX This probably belongs elsewhere */
-void caprevoke_td_frame(struct thread *td);
+void caprevoke_td_frame(struct thread *td, struct caprevoke_stats *);
 #endif
 
 #ifndef _KERNEL

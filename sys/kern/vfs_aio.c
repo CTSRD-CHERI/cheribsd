@@ -2727,10 +2727,14 @@ filt_lio(struct knote *kn, long hint)
 #ifdef COMPAT_CHERIABI
 
 void
-aio_caprevoke(struct proc * p)
+aio_caprevoke(struct proc * p, struct caprevoke_stats *stat)
 {
 	struct kaioinfo *ki;
 	struct kaiocb *job, *jobn;
+
+	/*
+	 * XXX Does not yet count caps into stats
+	 */
 
 	ki = p->p_aioinfo;
 	if (ki == NULL)

@@ -77,6 +77,7 @@ __FBSDID("$FreeBSD$");
 #ifdef CPU_CHERI
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <sys/caprevoke.h>
 #endif
 
 #include <ddb/ddb.h>
@@ -714,12 +715,17 @@ ptrace_clear_single_step(struct thread *td)
 }
 
 void
-caprevoke_td_frame(struct thread *td)
+caprevoke_td_frame(struct thread *td, struct caprevoke_stats *stat)
 {
 #ifdef CPU_CHERI
 #define CAPREV_REG(r) \
-	do { if (cheri_gettag(r) && vm_test_caprevoke(r)) \
-		{ r = cheri_cleartag(r); }} while(0)
+	do { if (cheri_gettag(r)) { \
+		stat->caps_found++; \
+		if (vm_test_caprevoke(r)) { \
+			r = cheri_cleartag(r); \
+			stat->caps_cleared++; \
+		} \
+	    }} while(0)
 
 	CAPREV_REG(td->td_frame->ddc);
 	CAPREV_REG(td->td_frame->c1);
