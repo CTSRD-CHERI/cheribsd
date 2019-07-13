@@ -677,17 +677,26 @@ check_kqueue_cap(int kq, unsigned int expected_tag)
 static void
 fprintf_caprevoke_stats(FILE *f, struct caprevoke_stats crst, uint32_t cycsum)
 {
-	fprintf(f, "stats: pscan=%" PRIu64
+	fprintf(f, "revoke:"
+		" efini=%" PRIu64
+		" pscan=%" PRIu64
 		" scanc=%" PRIu64
 		" pfsk=%" PRIu64
 		" pfro=%" PRIu64
 		" pfrw=%" PRIu64
+		" prty=%" PRIu64
+		" caps=%" PRIu64
+		" crev=%" PRIu64
 		" totc=%" PRIu32 "\n",
+		crst.epoch_fini,
 		crst.pages_scanned,
 		crst.page_scan_cycles,
 		crst.pages_fault_skip,
 		crst.pages_faulted_ro,
 		crst.pages_faulted_rw,
+		crst.pages_retried,
+		crst.caps_found,
+		crst.caps_cleared,
 		cycsum);
 }
 
@@ -779,6 +788,75 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 
 	munmap(mb, PAGE_SIZE);
 	close(kq);
+
+	cheritest_success();
+}
+
+void
+test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
+{
+	void * __capability * __capability mb;
+	void * __capability sh;
+	void * __capability revme;
+	struct caprevoke_stats crst;
+	uint32_t cyc_start, cyc_end;
+
+	mb = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+					  MAP_ANON, -1, 0));
+	CHERITEST_CHECK_SYSCALL(caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP,
+						 mb, &sh));
+
+	revme = cheri_andperm(cheri_csetbounds(mb, 0x10),
+			      ~CHERI_PERM_CHERIABI_VMMAP);
+	mb[0] = revme;
+
+	/* Mark the start of the arena as subject to revocation */
+	((uint8_t * __capability) sh)[0] = 1;
+
+	cyc_start = cheri_get_cyclecount();
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_MUST_ADVANCE, 0, &crst));
+	cyc_end = cheri_get_cyclecount();
+	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+
+	CHERI_FPRINT_PTR(stderr, revme);
+	CHERI_FPRINT_PTR(stderr, mb[0]);
+
+	/* Between revocation sweeps, derive another cap and store */
+	revme = cheri_andperm(cheri_csetbounds(mb, 0x11),
+			      ~CHERI_PERM_CHERIABI_VMMAP);
+	mb[1] = revme;
+
+	cyc_start = cheri_get_cyclecount();
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_MUST_ADVANCE, 0, &crst));
+	cyc_end = cheri_get_cyclecount();
+	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+
+	CHERI_FPRINT_PTR(stderr, revme);
+	CHERI_FPRINT_PTR(stderr, mb[0]);
+	CHERI_FPRINT_PTR(stderr, mb[1]);
+
+	/* Between revocation sweeps, derive another cap and store */
+	revme = cheri_andperm(cheri_csetbounds(mb, 0x12),
+			      ~CHERI_PERM_CHERIABI_VMMAP);
+	mb[2] = revme;
+
+	cyc_start = cheri_get_cyclecount();
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_MUST_ADVANCE, 0, &crst));
+	cyc_end = cheri_get_cyclecount();
+	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+
+	CHERI_FPRINT_PTR(stderr, revme);
+	CHERI_FPRINT_PTR(stderr, mb[0]);
+	CHERI_FPRINT_PTR(stderr, mb[1]);
+	CHERI_FPRINT_PTR(stderr, mb[2]);
+
+	CHERITEST_VERIFY2(cheri_gettag(mb) == 1, "Arena tagged");
+	CHERITEST_VERIFY2(cheri_gettag(revme) == 0, "Register tag cleared");
+	CHERITEST_VERIFY2(cheri_gettag(mb[0]) == 0, "Memory tag 0 cleared");
+	CHERITEST_VERIFY2(cheri_gettag(mb[1]) == 0, "Memory tag 1 cleared");
+	CHERITEST_VERIFY2(cheri_gettag(mb[2]) == 0, "Memory tag 2 cleared");
+
+	munmap(mb, PAGE_SIZE);
 
 	cheritest_success();
 }
