@@ -61,7 +61,7 @@ vm_caprevoke_should_visit_page(vm_page_t m, int flags)
  * Sweep through a subset of a particular object, from `*oo` to `eo`.
  * Return how far we got before failing in `oo`.  Pages between the initial
  * value of `*oo` and the value of `*oo` at return will have had their
- * PGA_CAPSTORED bits updated to reflect the true measured presence of
+ * VPO_PASTCAPSTORED bits updated to reflect the true measured presence of
  * capabilities on this page, and will have had `pmap_tc_capdirty` called on
  * them prior to revocation; as such, a page will only become
  * `pmap_is_capdirty` after this function if a capstore happened after the
@@ -110,6 +110,22 @@ vm_caprevoke_object(vm_object_t obj, vm_offset_t eo, int flags,
 		KASSERT((m == NULL) || (m->valid == VM_PAGE_BITS_ALL),
 			("Revocation invalid page"));
 		if ((m == NULL) || !pmap_page_is_write_mapped(m)) {
+
+			/*
+			 * XXX Rather than this, we should take a RO page
+			 * shared-ly and scan over it before deciding that
+			 * the caller needs to upgrade our copy to
+			 * read-write.  That will be friendlier in the
+			 * case of fork() and only rarely will we need to
+			 * return VM_CROBJ_ROMAPPED, since shared pages
+			 * probably do not hold capabilities to be revoked?
+			 *
+			 * At the very least, we could look at
+			 * vm_caprevoke_should_visit_page for RO mappings,
+			 * but it's probably best to loop over them and
+			 * probe for revocation.
+			 */
+
 			VM_OBJECT_WUNLOCK(obj);
 			*oo = co;
 			return (m == NULL) ? VM_CROBJ_UNMAPPED
@@ -123,8 +139,7 @@ vm_caprevoke_object(vm_object_t obj, vm_offset_t eo, int flags,
 			 * Exclusive busy the page and, soon, drop the object lock
 			 * around the actual revocation.  This lets the world make
 			 * progress, but prevents concurrent revocation of this
-			 * page, in particular, so our dance with PGA_CAPSTORED
-			 * below is reasonable.
+			 * page, in particular.
 			 */
 			vm_page_xbusy(m);
 			VM_OBJECT_WUNLOCK(obj);
@@ -435,8 +450,8 @@ fini:
  * For simplicity, the proc must be held on entry and will be held
  * throughout.  XXX Would we rather do something else?
  *
- * XXX Right now, CAPREVOKE_LAST_INIT is ignored.  We should, instead,
- * take the flags to imply...
+ * XXX Right now, CAPREVOKE_LAST_INIT and _FINI are probably not correctly
+ * used.  We should, instead, take the flags to imply...
  *
  *   LAST_INIT by itself: enter into the load-side story
  *   LAST_FINI by itself: clean pages in the background
@@ -473,6 +488,10 @@ vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 		/*
 		 * The world is thread-singled; now is a great time to go
 		 * flush out all the MD capdirty bits to the MI layer.
+		 *
+		 * XXX Do we really want to do this only in LAST_INIT?
+		 * Should we have a separate flag to optionally do this for
+		 * incremental passes or something?
 		 */
 		pmap_sync_capdirty(map->pmap);
 	}
@@ -517,7 +536,7 @@ vm_caprevoke_one(struct proc *p, int flags, vm_offset_t oneaddr,
 	vm_map_entry_t entry;
 	vm_offset_t addr;
 
-    KASSERT(!!(flags & VM_CAPREVOKE_LAST_INIT)
+	KASSERT(!!(flags & VM_CAPREVOKE_LAST_INIT)
 		 == !!(flags & VM_CAPREVOKE_LAST_FINI),
 			("vm_caprevoke_one bad LAST flags"));
 

@@ -3807,7 +3807,7 @@ pmap_sync_capdirty(pmap_t pmap)
 
 				if (pte_test(&tpte, PTE_SC) == 0) {
 					vm_page_t m;
-	
+
 					m = PHYS_TO_VM_PAGE(
 					      TLBLO_PTE_TO_PA(tpte));
 					KASSERT(m != NULL,
