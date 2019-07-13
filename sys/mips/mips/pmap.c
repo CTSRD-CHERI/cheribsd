@@ -3799,6 +3799,12 @@ pmap_sync_capdirty(pmap_t pmap)
 					panic("pmap_remove_pages: bad pte");
 				tpte = *pte;
 
+				if (pte_test(&tpte, PTE_MANAGED) == 0)
+					continue;
+
+				if (pte_test(&tpte, PTE_RO) == 1)
+					continue;
+
 				if (pte_test(&tpte, PTE_SC) == 0) {
 					vm_page_t m;
 	
@@ -3808,8 +3814,11 @@ pmap_sync_capdirty(pmap_t pmap)
 					  ("pmap_sync_capdirty: bad tpte %#jx",
 					   (uintmax_t)(tpte)));
 
+					KASSERT(pte_test(&tpte, PTE_CRO) == 0,
+					 ("cap-read-only without inhibit?"));
+
 					vm_page_capdirty(m);
-					pte_clear(pte, PTE_SC);
+					pte_set(pte, PTE_SC);
 				}
 			}
 		}
