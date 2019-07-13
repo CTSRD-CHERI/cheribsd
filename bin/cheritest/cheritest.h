@@ -563,6 +563,7 @@ DECLARE_CHERI_TEST(test_fault_cloadtags_unmapped);
 DECLARE_CHERI_TEST(cheritest_vm_capdirty);
 #ifdef __CHERI_PURE_CAPABILITY__
 DECLARE_CHERI_TEST(test_caprevoke_lightly);
+DECLARE_CHERI_TEST(test_caprevoke_capdirty);
 DECLARE_CHERI_TEST(test_caprevoke_lib);
 DECLARE_CHERI_TEST(test_caprevoke_lib_fork);
 #endif
