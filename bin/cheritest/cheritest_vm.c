@@ -841,6 +841,86 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	cheritest_success();
 }
 
+void
+test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
+{
+	void * __capability * __capability mb;
+	void * __capability sh;
+	const volatile struct caprevoke_info * __capability cri;
+	void * __capability revme;
+	struct caprevoke_stats crst;
+	uint32_t cyc_start, cyc_end;
+
+	mb = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
+					  MAP_ANON, -1, 0));
+	CHERITEST_CHECK_SYSCALL(caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP,
+						 mb, &sh));
+
+	CHERITEST_CHECK_SYSCALL(
+		caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+				 __DEQUALIFY_CAP(void * __capability *,&cri)));
+
+	revme = cheri_andperm(cheri_setbounds(mb, 0x10),
+			      ~CHERI_PERM_CHERIABI_VMMAP);
+	mb[0] = revme;
+
+	/* Mark the start of the arena as subject to revocation */
+	((uint8_t * __capability) sh)[0] = 1;
+
+	cyc_start = get_cyclecount();
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_IGNORE_START, 0, &crst));
+	cyc_end = get_cyclecount();
+	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+
+	CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
+
+	CHERI_FPRINT_PTR(stderr, revme);
+	CHERI_FPRINT_PTR(stderr, mb[0]);
+
+	/* Between revocation sweeps, derive another cap and store */
+	revme = cheri_andperm(cheri_setbounds(mb, 0x11),
+			      ~CHERI_PERM_CHERIABI_VMMAP);
+	mb[1] = revme;
+
+	cyc_start = get_cyclecount();
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_IGNORE_START, 0, &crst));
+	cyc_end = get_cyclecount();
+	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+
+	CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
+
+	CHERI_FPRINT_PTR(stderr, revme);
+	CHERI_FPRINT_PTR(stderr, mb[0]);
+	CHERI_FPRINT_PTR(stderr, mb[1]);
+
+	/* Between revocation sweeps, derive another cap and store */
+	revme = cheri_andperm(cheri_setbounds(mb, 0x12),
+			      ~CHERI_PERM_CHERIABI_VMMAP);
+	mb[2] = revme;
+
+	cyc_start = get_cyclecount();
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_IGNORE_START, 0, &crst));
+	cyc_end = get_cyclecount();
+	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+
+	CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
+
+	CHERI_FPRINT_PTR(stderr, revme);
+	CHERI_FPRINT_PTR(stderr, mb[0]);
+	CHERI_FPRINT_PTR(stderr, mb[1]);
+	CHERI_FPRINT_PTR(stderr, mb[2]);
+
+	CHERITEST_VERIFY2(!check_revoked(mb), "Arena revoked");
+	CHERITEST_VERIFY2(check_revoked(revme), "Register tag cleared");
+	CHERITEST_VERIFY2(check_revoked(mb[0]), "Memory tag 0 cleared");
+	CHERITEST_VERIFY2(check_revoked(mb[1]), "Memory tag 1 cleared");
+	CHERITEST_VERIFY2(check_revoked(mb[2]), "Memory tag 2 cleared");
+
+	munmap(mb, PAGE_SIZE);
+
+	cheritest_success();
+}
+
 /*
  * Repeatedly invoke libcheri_caprevoke logic.
  * Using a bump the pointer allocator, repeatedly grab rand()-omly sized

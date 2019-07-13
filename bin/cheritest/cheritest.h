@@ -558,6 +558,7 @@ DECLARE_CHERI_TEST(cheritest_vm_cow_write);
 DECLARE_CHERI_TEST(cheritest_vm_capdirty);
 #ifdef CAPREVOKE
 DECLARE_CHERI_TEST(test_caprevoke_lightly);
+DECLARE_CHERI_TEST(test_caprevoke_capdirty);
 DECLARE_CHERI_TEST(test_caprevoke_lib);
 DECLARE_CHERI_TEST(test_caprevoke_lib_fork);
 #endif
