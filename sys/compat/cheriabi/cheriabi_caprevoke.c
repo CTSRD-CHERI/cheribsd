@@ -275,7 +275,7 @@ reentry:
 	/* Walk the VM */
 	vm_caprevoke(td->td_proc,
 		/* If not first pass, only recently capdirty pages */
-	   (entryst == CAPREVST_INIT_DONE) ? VM_CAPREVOKE_INCREMENTAL : 0
+	   ((entryst == CAPREVST_INIT_DONE) ? VM_CAPREVOKE_INCREMENTAL : 0)
 		/*
 		 * If last pass, loop until actually done.
 		 *
@@ -283,8 +283,8 @@ reentry:
 		 * opposite sides of the thread_single_end call, for when
 		 * we want to do the load-side story.
 		 */
-	 | (myst == CAPREVST_LAST_PASS) ?
-		(VM_CAPREVOKE_LAST_INIT | VM_CAPREVOKE_LAST_FINI) : 0,
+	 | ((myst == CAPREVST_LAST_PASS) ?
+		(VM_CAPREVOKE_LAST_INIT | VM_CAPREVOKE_LAST_FINI) : 0),
 	 &stat
 	);
 
