@@ -652,6 +652,7 @@ DECLARE_CHERIBSD_TEST(cheribsdtest_vm_cow_write);
 DECLARE_CHERIBSD_TEST(cheribsdtest_vm_capdirty);
 #ifdef CAPREVOKE
 DECLARE_CHERIBSD_TEST(cheribsdtest_caprevoke_lightly);
+DECLARE_CHERIBSD_TEST(cheribsdtest_caprevoke_capdirty);
 #endif
 const char	*xfail_need_writable_tmp(const char *name);
 

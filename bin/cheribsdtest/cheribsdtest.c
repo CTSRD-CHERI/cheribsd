@@ -886,6 +886,10 @@ static const struct cheri_test cheri_tests[] = {
 	{ .ct_name = "cheribsdtest_caprevoke_lightly",
 	  .ct_desc = "A gentle test of capability revocation",
 	  .ct_func = cheribsdtest_caprevoke_lightly, },
+
+	{ .ct_name = "cheribsdtest_caprevoke_capdirty",
+	  .ct_desc = "Probe the interaction of revocation and capdirty",
+	  .ct_func = cheribsdtest_caprevoke_capdirty, },
 #endif
 
 #if 0
