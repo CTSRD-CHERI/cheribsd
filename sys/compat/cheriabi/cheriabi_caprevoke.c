@@ -84,13 +84,18 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	struct caprevoke_stats st = { 0 };
 
 	/*
-	 * XXX Should we do an unlocked epoch clock check?  A locked one?
-	 * Only if we've been given a flag?
+	 * Unlocked access is fine; this is advisory and, when it is
+	 * relevant to userland, we expect that userland has already
+	 * arranged for the bitmasks to carry the state it wants and
+	 * wants to *now* wait for the clock to advance to be sure
+	 * that time has elapsed.
 	 *
-	 * At the moment we don't do any such thing because it seems like
-	 * the common case will be that userland isn't accurately tracking
-	 * the epoch where it wants to do partial scans like this.
+	 * XXX But on ALPHA, we might need to explicitly add a read
+	 * barrier, unless we've already done something that's
+	 * implied a suitable one on syscall entry, which seems
+	 * unlikely.
 	 */
+	st.epoch_init = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
 	if (uap->flags & CAPREVOKE_JUST_MY_REGS) {
 		caprevoke_td_frame(td);
@@ -108,19 +113,8 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 		caprevoke_hoarders(td->td_proc);
 	}
 
-	/*
-	 * Unlocked access is fine; this is advisory and, when it is
-	 * relevant to userland, we expect that userland has already
-	 * arranged for the bitmasks to carry the state it wants and
-	 * wants to *now* wait for the clock to advance to be sure
-	 * that time has elapsed.
-	 *
-	 * XXX But on ALPHA, we might need to explicitly add a read
-	 * barrier, unless we've already done something that's
-	 * implied a suitable one on syscall entry, which seems
-	 * unlikely.
-	 */
-	st.epoch = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
+	/* XXX unlocked read OK? */
+	st.epoch_fini = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
 	return cheriabi_caprevoke_fini(td, uap, &st);
 }
@@ -140,10 +134,12 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	}
 	/* Engaging the full state machine; here we go! */
 
+	/* XXX An unlocked read should be OK? */
+	stat.epoch_init =
+		td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
+
 	if ((uap->flags & CAPREVOKE_MUST_ADVANCE) != 0) {
-		/* XXX An unlocked read should be OK? */
-		uap->start_epoch =
-			td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
+		uap->start_epoch = stat.epoch_init;
 		uap->flags &= ~CAPREVOKE_MUST_ADVANCE;
 	}
 
@@ -327,13 +323,14 @@ reentry:
 	/* Wake one would-be revoker to avoid thundering herds. */
 	cv_signal(&td->td_proc->p_caprev_cv);
 
-	stat.epoch = epoch;
 	/*
 	 * Return the epoch as it was at the end of the run above,
 	 * not necessarily as it is now.  This value is useful only
 	 * for retroactive comparisons, i.e., to answer if
 	 * particular epochs are in the past.
 	 */
+	stat.epoch_fini = epoch;
+
 	return cheriabi_caprevoke_fini(td, uap, &stat);
 }
 

@@ -732,14 +732,14 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	install_kqueue_cap(kq, revme);
 
 	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_JUST_THE_TIME, 0, &crst));
-	oepoch = crst.epoch;
+	oepoch = crst.epoch_fini;
 
 	cyc_start = cheri_get_cyclecount();
 	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS, oepoch, &crst));
 	cyc_end = cheri_get_cyclecount();
 
-	CHERITEST_VERIFY2(crst.epoch >= oepoch + 2, "Bad epoch clock state");
-	oepoch = crst.epoch;
+	CHERITEST_VERIFY2(crst.epoch_fini >= oepoch + 2, "Bad epoch clock state");
+	oepoch = crst.epoch_fini;
 
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
@@ -764,7 +764,7 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(caprevoke(0, oepoch, &crst));
 	cyc_end = cheri_get_cyclecount();
 
-	CHERITEST_VERIFY2(crst.epoch >= oepoch + 1, "Bad epoch clock state");
+	CHERITEST_VERIFY2(crst.epoch_fini >= oepoch + 1, "Bad epoch clock state");
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
 	cyc_start = cheri_get_cyclecount();
@@ -915,7 +915,7 @@ test_caprevoke_lib_run(
 
 		cyc_start = cheri_get_cyclecount();
 		CHERITEST_CHECK_SYSCALL(
-			caprevoke(CAPREVOKE_LAST_PASS, crst.epoch, &crst));
+			caprevoke(CAPREVOKE_LAST_PASS, crst.epoch_fini, &crst));
 		cyc_end = cheri_get_cyclecount();
 		if (verbose > 2) {
 			fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);

@@ -158,7 +158,8 @@ static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
  * Information conveyed to userland about a given caprevoke scan.
  */
 struct caprevoke_stats {
-	uint64_t	epoch;
+	uint64_t	epoch_init;
+	uint64_t	epoch_fini;
 
 	uint64_t	pages_scanned;
 	uint64_t	page_scan_cycles;
