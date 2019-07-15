@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/resource.h>
 #include <sys/rman.h>
 
+#include <machine/cache.h>
 #include <machine/bus.h>
 
 #ifdef FDT
@@ -421,7 +422,21 @@ softdma_process_rx(struct softdma_channel *chan, struct softdma_desc *desc)
 	sop_rcvd = 0;
 	while (fill_level) {
 		empty = 0;
+#ifndef SMP
 		data = bus_read_4(sc->res[0], A_ONCHIP_FIFO_MEM_CORE_DATA);
+#else
+		/*
+		 * A workaround for the hardware bug.
+		 * RX FIFO packet counter belives we fetched twice, but we
+		 * did that once only. In result we have truncated packet.
+		 * The workaround is to use cached access to the FIFO register
+		 * and invalidate the address of the register in cache.
+		 */
+		uint64_t addr;
+		addr = MIPS_PHYS_TO_XKPHYS_CACHED(rman_get_start(sc->res[0]));
+		data = *(uint32_t *)addr;
+		mipsNN_pdcache_inv_range_128(addr, 4);
+#endif
 		meta = softdma_mem_read(sc, A_ONCHIP_FIFO_MEM_CORE_METADATA);
 
 		if (meta & A_ONCHIP_FIFO_MEM_CORE_ERROR_MASK) {
