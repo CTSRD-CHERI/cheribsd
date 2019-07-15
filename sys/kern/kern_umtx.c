@@ -3359,14 +3359,13 @@ do_sem2_wait(struct thread *td, struct _usem2 * __capability sem,
 
 	uq = td->td_umtxq;
 	flags = fuword32(&sem->_flags);
-	error = umtx_key_get(sem, TYPE_SEM, GET_SHARE(flags), &uq->uq_key);
-	if (error != 0)
-		return (error);
-
 	if (timeout != NULL)
 		abs_timeout_init2(&timo, timeout);
 
 again:
+	error = umtx_key_get(sem, TYPE_SEM, GET_SHARE(flags), &uq->uq_key);
+	if (error != 0)
+		return (error);
 	umtxq_lock(&uq->uq_key);
 	umtxq_busy(&uq->uq_key);
 	umtxq_insert(uq);
