@@ -98,7 +98,7 @@ enum caprevoke_state {
 
 static inline int caprevoke_epoch_gt(uint64_t a, uint64_t b) {
 	return ((a < b) && ((b - a) > (1ULL << (CAPREVST_EPOCH_WIDTH-1))))
-	    || ((b > a) && ((a - b) < (1ULL << (CAPREVST_EPOCH_WIDTH-1))));
+	    || ((a > b) && ((a - b) < (1ULL << (CAPREVST_EPOCH_WIDTH-1))));
 }
 static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
 	return (a == b) || caprevoke_epoch_gt(a, b);
