@@ -58,7 +58,7 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheri.h>
 #endif
 
-static inline int
+static inline void
 syscallenter(struct thread *td)
 {
 	struct proc *p;
@@ -181,11 +181,10 @@ syscallenter(struct thread *td)
 		PROC_UNLOCK(p);
 	}
 	(p->p_sysent->sv_set_syscall_retval)(td, error);
-	return (error);
 }
 
 static inline void
-syscallret(struct thread *td, int error __unused)
+syscallret(struct thread *td)
 {
 	struct proc *p;
 	struct syscall_args *sa;
