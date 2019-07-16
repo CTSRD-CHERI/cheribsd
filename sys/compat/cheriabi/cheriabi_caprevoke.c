@@ -162,8 +162,8 @@ reentry:
 			PROC_UNLOCK(td->td_proc);
 			cv_signal(&td->td_proc->p_caprev_cv);
 			{
-				struct caprevoke_stats st = { epoch, 0 };
-				return cheriabi_caprevoke_fini(td, uap, &st);
+				stat.epoch_fini = epoch;
+				return cheriabi_caprevoke_fini(td, uap, &stat);
 			}
 		}
 
