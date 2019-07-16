@@ -671,7 +671,7 @@ cpu_fetch_syscall_args(struct thread *td)
 
 #ifdef CPU_CHERI
 static inline int
-try_emulate_capdirty(struct trapframe *trapframe, struct proc *p)
+try_emulate_capdirty(struct trapframe *trapframe, pmap_t kpmap, pmap_t upmap)
 {
 	register_t cause = trapframe->capcause;
 
@@ -685,8 +685,16 @@ try_emulate_capdirty(struct trapframe *trapframe, struct proc *p)
 		 * store capabilities.  That is, all CoW will have already
 		 * been handled for us, thank goodness.
 		 */
-		return pmap_emulate_capdirty(&p->p_vmspace->vm_pmap,
-				trapframe->badvaddr);
+
+		vm_offset_t va = trapframe->badvaddr;
+
+		if (KERNLAND(va)) {
+			if (kpmap) {
+				return pmap_emulate_capdirty(kpmap, va);
+			}
+		} else {
+			return pmap_emulate_capdirty(upmap, va);
+		}
 	}
 	return 1;
 }
@@ -1186,7 +1194,8 @@ dofault:
 		break;
 #ifdef CPU_CHERI
 	case T_C2E:
-		if (try_emulate_capdirty(trapframe, p) == 0) {
+		if(try_emulate_capdirty(trapframe, kernel_pmap,
+					&p->p_vmspace->vm_pmap) == 0) {
 			return trapframe->pc;
 		}
 
@@ -1206,7 +1215,8 @@ dofault:
 			ktrcexception(trapframe);
 #endif
 
-		if (try_emulate_capdirty(trapframe, p) == 0) {
+		if (try_emulate_capdirty(trapframe, NULL,
+					 &p->p_vmspace->vm_pmap) == 0) {
 			if (!usermode) {
 				return (trapframe->pc);
 			}
