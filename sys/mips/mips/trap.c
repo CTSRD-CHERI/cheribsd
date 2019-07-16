@@ -1095,8 +1095,8 @@ dofault:
 			}
 
 			CTR3(KTR_PTRACE,
-			    "trap: tid %d, single step at %#lx: %#08x",
-			    td->td_tid, (long)(intptr_t)va, instr);
+			    "trap: tid %d, single step at %p: %#08x",
+			    td->td_tid, (__cheri_fromcap void *)va, instr);
 			PROC_LOCK(p);
 			_PHOLD(p);
 			error = ptrace_clear_single_step(td);
