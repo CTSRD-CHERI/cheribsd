@@ -125,6 +125,7 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 int
 cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 {
+	int res;
 	uint64_t epoch;
 	enum caprevoke_state entryst, myst;
 	struct caprevoke_stats stat = { 0 };
@@ -161,10 +162,8 @@ reentry:
 			 */
 			PROC_UNLOCK(td->td_proc);
 			cv_signal(&td->td_proc->p_caprev_cv);
-			{
-				stat.epoch_fini = epoch;
-				return cheriabi_caprevoke_fini(td, uap, &stat);
-			}
+			stat.epoch_fini = epoch;
+			return cheriabi_caprevoke_fini(td, uap, &stat);
 		}
 
 		/*
@@ -235,18 +234,10 @@ reentry:
 		}
 
 		/*
-		 * At long last, we are in position to commit to being the
-		 * next revocation pass.  This might mean opening a new
-		 * epoch, but in either case update the state flag, hold the
-		 * process, and drop the process lock.
+		 * Don't bump the epoch count here!  Wait until we're
+		 * certain it's actually open, which we can only do below.
 		 */
-
-		if (entryst == CAPREVST_NONE) {
-			epoch++;
-			SET_ST(td->td_proc, epoch, myst);
-		} else {
-			SET_ST(td->td_proc, epoch, myst);
-		}
+		SET_ST(td->td_proc, epoch, myst);
 
 		/* XXX This hold might be superfluous? */
 		_PHOLD(td->td_proc);
@@ -273,7 +264,7 @@ reentry:
 	}
 
 	/* Walk the VM */
-	vm_caprevoke(td->td_proc,
+	res = vm_caprevoke(td->td_proc,
 		/* If not first pass, only recently capdirty pages */
 	   ((entryst == CAPREVST_INIT_DONE) ? VM_CAPREVOKE_INCREMENTAL : 0)
 		/*
@@ -297,24 +288,32 @@ reentry:
 			 == epoch,
 			("Epoch value changed while revoking"));
 
-		if (myst == CAPREVST_LAST_PASS) {
-			if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
-				/* Un-single-thread the world */
-				thread_single_end(td->td_proc, SINGLE_BOUNDARY);
+		if ((myst == CAPREVST_LAST_PASS)
+		    && ((td->td_proc->p_flag & P_HADTHREADS) != 0)) {
+			/* Un-single-thread the world */
+			thread_single_end(td->td_proc, SINGLE_BOUNDARY);
+		}
+
+		if (res == KERN_SUCCESS) {
+			if (entryst == CAPREVST_NONE) {
+				epoch++;
 			}
 
-			/*
-			 * Advance the epoch clock and indicate that no
-			 * revocation is pending.
-			 */
-			epoch++;
-			SET_ST(td->td_proc, epoch, CAPREVST_NONE);
+			if (myst == CAPREVST_LAST_PASS) {
+				/* Signal the end of this revocation epoch */
+				epoch++;
+				SET_ST(td->td_proc, epoch, CAPREVST_NONE);
+			} else {
+				/* We have done at least one good pass. */
+				SET_ST(td->td_proc, epoch, CAPREVST_INIT_DONE);
+			}
 		} else {
 			/*
-			 * Do not advance the clock, but we have done at
-			 * least one pass.
+			 * Put the state back how we found it: if we were
+			 * trying to open an epoch, we can't really claim
+			 * that the initial pass is done.
 			 */
-			SET_ST(td->td_proc, epoch, CAPREVST_INIT_DONE);
+			SET_ST(td->td_proc, epoch, entryst);
 		}
 
 	}

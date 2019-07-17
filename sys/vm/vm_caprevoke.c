@@ -201,7 +201,7 @@ retry:
  * the lock may be dropped internally.  The map must, therefore, also be
  * held across invocation.
  */
-static void
+static int
 vm_caprevoke_map_entry(vm_map_t map, vm_map_entry_t entry, const int flags,
 			vm_offset_t *addr, struct caprevoke_stats *stat)
 {
@@ -362,7 +362,7 @@ no_back_caps_out:
 						VM_FAULT_NORMAL, &mh);
 			vm_map_lock_read(map);
 			if (res != KERN_SUCCESS)
-				return;
+				return res;
 			if (last_timestamp != map->timestamp) {
 				/*
 				 * The map has changed out from under us;
@@ -373,7 +373,7 @@ no_back_caps_out:
 				vm_page_lock(mh);
 				vm_page_unhold(mh);
 				vm_page_unlock(mh);
-				return;
+				return KERN_SUCCESS;
 			}
 
 			/*
@@ -394,7 +394,7 @@ no_back_caps_out:
 				mh = NULL;
 				stat->pages_faulted_ro++;
 				if (*addr == entry->end)
-					return;
+					return KERN_SUCCESS;
 				goto again;
 			} else {
 				VM_OBJECT_RUNLOCK(mh->object);
@@ -422,7 +422,7 @@ no_back_caps_out:
 			 * The map has changed out from under us; bail and
 			 * the caller will look up the new map entry.
 			 */
-			return;
+			return res;
 		}
 
 		/*
@@ -433,7 +433,7 @@ no_back_caps_out:
 	}
 	case VM_CROBJ_DONE :
 		KASSERT(*addr == entry->end, ("caprevoke obj not done? %lx vs %lx", *addr, entry->end));
-		return;
+		return KERN_SUCCESS;
 	default :
 		panic("vm_caprevoke_object bad return %d\n", res);
 	}
@@ -441,6 +441,8 @@ no_back_caps_out:
 fini:
 	/* We make it here only if the entire object is done */
 	*addr = entry->end;
+
+	return KERN_SUCCESS;
 }
 
 /*
@@ -460,6 +462,7 @@ fini:
 int
 vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 {
+	int res = KERN_SUCCESS;
 	struct vmspace *vm;
 	vm_map_t map;
 	vm_map_entry_t entry;
@@ -506,7 +509,14 @@ vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 		addr = entry->start;
 
 	while (entry != &map->header) {
-		vm_caprevoke_map_entry(map, entry, flags, &addr, st);
+		res = vm_caprevoke_map_entry(map, entry, flags, &addr, st);
+
+		/*
+		 * We might be bailing out because a page fault failed for
+		 * catastrophic reasons (or polite ones like ptrace()).
+		 */
+		if (res != KERN_SUCCESS)
+			goto out;
 
 		if (!vm_map_lookup_entry(map, addr, &entry)) {
 			entry = entry->next;
@@ -515,13 +525,14 @@ vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 		}
 	}
 
+out:
 	vm_map_unlock_read(map);
 	vm_map_lock(map);
 	vm_map_unbusy(map);
 	vm_map_unlock(map);
 	vmspace_free(vm);
 
-	return 0;
+	return res;
 }
 
 /*
@@ -531,6 +542,7 @@ int
 vm_caprevoke_one(struct proc *p, int flags, vm_offset_t oneaddr,
 		 struct caprevoke_stats *st)
 {
+	int res = KERN_SUCCESS;
 	struct vmspace *vm;
 	vm_map_t map;
 	vm_map_entry_t entry;
@@ -551,6 +563,10 @@ vm_caprevoke_one(struct proc *p, int flags, vm_offset_t oneaddr,
 	addr = entry->start;
 	while (addr < entry->end) {
 		vm_caprevoke_map_entry(map, entry, flags, &addr, st);
+
+		if (res != KERN_SUCCESS)
+			goto out;
+
 		if (!vm_map_lookup_entry(map, addr, &entry))
 			break;
 		if (oneaddr < entry->start)
@@ -560,5 +576,5 @@ vm_caprevoke_one(struct proc *p, int flags, vm_offset_t oneaddr,
 out:
 	vm_map_unlock_read(map);
 	vmspace_free(vm);
-	return 0;
+	return res;
 }
