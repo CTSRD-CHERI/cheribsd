@@ -66,15 +66,6 @@ static void
 cheri_read_row_callback(png_structp png_ptr __unused, png_uint_32 row __unused,
     int pass __unused)
 {
-#if 0
-	struct ibox_decode_state *ids;
-
-	ids = png_get_io_ptr(png_ptr);
-
-	memcpy_tocap(3, ids->buffer + (pngwidth * (row - 1)),
-	    sizeof(uint32_t) * pngwidth * (row - 1),
-	    sizeof(uint32_t) * pngwidth);
-#endif
 }
 
 /*
