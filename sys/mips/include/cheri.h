@@ -32,10 +32,6 @@
 #ifndef _MIPS_INCLUDE_CHERI_H_
 #define	_MIPS_INCLUDE_CHERI_H_
 
-#ifdef _KERNEL
-#include <sys/sysctl.h>		/* SYSCTL_DECL() */
-#endif
-
 #include <machine/cherireg.h>
 
 #include <sys/types.h>
