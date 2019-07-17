@@ -2230,7 +2230,7 @@ cheritest_run_test(const struct cheri_test *ctp)
 			ccsp->ccs_testresult_str[
 			    sizeof(ccsp->ccs_testresult_str) - 1] = '\0';
 			memcpy(reason, ccsp->ccs_testresult_str,
-			    sizeof(reason));
+			    sizeof(ccsp->ccs_testresult_str));
 			goto fail;
 		}
 		if (ccsp->ccs_testresult != TESTRESULT_SUCCESS) {
