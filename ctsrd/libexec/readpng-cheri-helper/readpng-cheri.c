@@ -36,7 +36,6 @@
 #include <machine/sysarch.h>
 
 #include <cheri/cheri.h>
-#include <cheri/libcheri_memcpy.h>
 #include <cheri/libcheri_system.h>
 
 #include <errno.h>

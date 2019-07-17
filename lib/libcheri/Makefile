@@ -33,7 +33,6 @@ INCS=	libcheri_ccall.h		\
 	libcheri_errno.h		\
 	libcheri_fd.h			\
 	libcheri_invoke.h		\
-	libcheri_memcpy.h		\
 	libcheri_stack.h		\
 	libcheri_system.h		\
 	libcheri_system_md.h		\
