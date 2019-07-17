@@ -49,7 +49,9 @@ const char SmExcTypeMagic[] = "sm_exc_type";
 */
 
 void
-sm_etype_printf(SM_EXC_T *exc, SM_FILE_T *stream)
+sm_etype_printf(exc, stream)
+	SM_EXC_T *exc;
+	SM_FILE_T *stream;
 {
 	size_t n = strlen(exc->exc_type->etype_argformat);
 	const char *p, *s;
@@ -150,7 +152,9 @@ sm_etype_os_print __P((
 	SM_FILE_T *stream));
 
 static void
-sm_etype_os_print(SM_EXC_T *exc, SM_FILE_T *stream)
+sm_etype_os_print(exc, stream)
+	SM_EXC_T *exc;
+	SM_FILE_T *stream;
 {
 	int err = exc->exc_argv[0].v_int;
 	char *syscall = exc->exc_argv[1].v_str;
