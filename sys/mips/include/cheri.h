@@ -32,9 +32,8 @@
 #ifndef _MIPS_INCLUDE_CHERI_H_
 #define	_MIPS_INCLUDE_CHERI_H_
 
-#include <machine/cherireg.h>
-
 #include <sys/types.h>
+#include <machine/cherireg.h>
 
 /*
  * In the past, struct cheri_frame was the in-kernel and kernel<->user
