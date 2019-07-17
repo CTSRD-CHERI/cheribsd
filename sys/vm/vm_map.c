@@ -3538,13 +3538,14 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 				if (!vm_map_pageout_range(map, entry,
 				    start, start + size, &size))
 					failed = TRUE;
+				vm_map_unlock_read(map);
 			} else if (object->type == OBJT_VNODE /* also COW */) {
 				vm_map_unlock_read(map);
 				if (!vm_object_sync(object, offset, size,
 				    FALSE, TRUE))
 					failed = TRUE;
-				vm_map_lock_read(map);
 			} else {
+				vm_map_unlock_read(map);
 				failed = TRUE;
 			}
 		} else {
@@ -3552,7 +3553,6 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			if (!vm_object_sync(object, offset, size, syncio,
 			    invalidate))
 				failed = TRUE;
-			vm_map_lock_read(map);
 		}
 		start += size;
 		vm_object_deallocate(object);
