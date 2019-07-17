@@ -88,7 +88,7 @@ DB_SHOW_COMMAND(cp2, ddb_dump_cp2)
 	register_t cause;
 	uint8_t exccode, regnum;
 
-	CHERI_CGETCAUSE(cause);
+	cause = cheri_getcause();
 	exccode = (cause & CHERI_CAPCAUSE_EXCCODE_MASK) >>
 	    CHERI_CAPCAUSE_EXCCODE_SHIFT;
 	regnum = cause & CHERI_CAPCAUSE_REGNUM_MASK;
