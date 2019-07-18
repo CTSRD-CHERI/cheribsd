@@ -88,21 +88,21 @@ ATF_TC_WITHOUT_HEAD(nul);
 ATF_TC_BODY(nul, tc)
 {
 
-	test_wcsnlen(L"\0\0\0\0\0\0\0\0\0\0");
+	test_wcsnlen(L"");
 }
 
 ATF_TC_WITHOUT_HEAD(foo);
 ATF_TC_BODY(foo, tc)
 {
 
-	test_wcsnlen(L"foo\0\0\0\0\0\0\0\0\0\0");
+	test_wcsnlen(L"foo");
 }
 
 ATF_TC_WITHOUT_HEAD(glorp);
 ATF_TC_BODY(glorp, tc)
 {
 
-	test_wcsnlen(L"glorp\0\0\0\0\0\0\0\0\0\0");
+	test_wcsnlen(L"glorp");
 }
 
 ATF_TP_ADD_TCS(tp)
