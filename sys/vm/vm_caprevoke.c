@@ -294,7 +294,7 @@ no_back_caps_out:
 			naddr = IDX_TO_OFF(obj_next_pg->pindex) + entry->start;
 
 			if (naddr >= entry->end) {
-				/* At object end, so skip out */
+				/* At mapping end, so skip out */
 				goto no_back_caps_out;
 			}
 		}

@@ -141,7 +141,6 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 
 	if ((uap->flags & CAPREVOKE_MUST_ADVANCE) != 0) {
 		uap->start_epoch = stat.epoch_init;
-		uap->flags &= ~CAPREVOKE_MUST_ADVANCE;
 	}
 
 	/*
@@ -339,8 +338,8 @@ fast_out:
 	}
 	PROC_UNLOCK(td->td_proc);
 
-	/* Wake one would-be revoker to avoid thundering herds. */
-	cv_signal(&td->td_proc->p_caprev_cv);
+	/* Broadcast here: some sleepers may be able to take the fast out */
+	cv_broadcast(&td->td_proc->p_caprev_cv);
 
 	/*
 	 * Return the epoch as it was at the end of the run above,
