@@ -601,6 +601,7 @@ io_user_cap(volatile const void * uaddr, size_t len)
 	inexec = ((curproc->p_flag & P_INEXEC) != 0);
 	PROC_UNLOCK(curproc);
 
+	len = CHERI_REPRESENTABLE_LENGTH(len);
 	if (inexec)
 		return (cheri_capability_build_user_data(
 		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)uaddr, len, 0));
