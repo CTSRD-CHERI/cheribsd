@@ -134,6 +134,14 @@ static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
 #define CAPREVOKE_MUST_ADVANCE	0x004
 
 	/*
+	 * Do a pass only if an epoch is open.  Otherwise, it acts like
+	 * CAPREVOKE_JUST_THE_TIME.  This is most useful when we want to
+	 * get to the end of an epoch as quickly as possible; if we're
+	 * already past the end, then we should just stay there.
+	 */
+#define CAPREVOKE_ONLY_IF_OPEN	0x008
+
+	/*
 	 * Some flags indicate that we are to engage in a blocking
 	 * capability revocation sweep on a subset of the entire address
 	 * space.  If any of these are set, we bypass the above state

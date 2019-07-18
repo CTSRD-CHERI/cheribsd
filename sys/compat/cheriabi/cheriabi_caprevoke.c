@@ -144,6 +144,16 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 		uap->flags &= ~CAPREVOKE_MUST_ADVANCE;
 	}
 
+	/*
+	 * This might seem like a silly test, but in conjunction with
+	 * CAPREVOKE_MUST_ADVANCE, it avoids taking the proc lock.
+	 */
+	if (((uap->flags & CAPREVOKE_ONLY_IF_OPEN) != 0)
+	    && ((uap->start_epoch & 1) == 0)) {
+		stat.epoch_fini = stat.epoch_init;
+		return cheriabi_caprevoke_fini(td, uap, &stat);
+	}
+
 	/* Serialize and figure out what we're supposed to do */
 	PROC_LOCK(td->td_proc);
 reentry:
@@ -160,10 +170,20 @@ reentry:
 			 * In case we queued, tho', go ahead and wake up the
 			 * next would-be revoker first.
 			 */
+fast_out:
 			PROC_UNLOCK(td->td_proc);
 			cv_signal(&td->td_proc->p_caprev_cv);
 			stat.epoch_fini = epoch;
 			return cheriabi_caprevoke_fini(td, uap, &stat);
+		}
+
+		if (((uap->flags & CAPREVOKE_ONLY_IF_OPEN) != 0)
+		    && ((epoch & 1) == 0)) {
+			/*
+			 * If we're requesting work only if an epoch is open
+			 * and one isn't, then there's only one thing to do!
+			 */
+			goto fast_out;
 		}
 
 		/*
