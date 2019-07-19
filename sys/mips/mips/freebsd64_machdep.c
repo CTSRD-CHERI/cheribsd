@@ -151,6 +151,8 @@ SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_freebsd64_brand_info);
 
+_Static_assert(sizeof(mcontext64_t) == sizeof(mcontext_t),
+    "mcontext_t and mcontext64_t aren't compatiable");
 int
 freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 {

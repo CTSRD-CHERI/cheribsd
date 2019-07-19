@@ -1293,7 +1293,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_WRITE: pid %d: %p <= %#x",
-			    p->p_pid, addr, data);
+			    p->p_pid, (__cheri_addr uintptr_t)addr, data);
 		PROC_LOCK(p);
 		break;
 
@@ -1306,7 +1306,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_READ: pid %d: %p >= %#x",
-			    p->p_pid, addr, tmp);
+			    p->p_pid, (__cheri_addr uintptr_t)addr, tmp);
 		td->td_retval[0] = tmp;
 		PROC_LOCK(p);
 		break;

@@ -441,12 +441,11 @@ freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
 	return (EJUSTRETURN);
 }
 
-#define UCC_COPY_SIZE	offsetof(ucontext_c_t, uc_link)
+#define UCC_COPY_SIZE	offsetof(ucontext64_t, uc_link)
 
 int
 freebsd64_getcontext(struct thread *td, struct freebsd64_getcontext_args *uap)
 {
-
 	ucontext64_t uc;
 
 	if (uap->ucp == NULL)
