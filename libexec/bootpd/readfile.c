@@ -1350,7 +1350,8 @@ nullcmp(d1, d2)
  */
 
 boolean
-nmcmp(hash_datum *d1, hash_datum *d2)
+nmcmp(d1, d2)
+	hash_datum *d1, *d2;
 {
 	char *name = (char *) d1;	/* XXX - OK? */
 	struct host *hp = (struct host *) d2;
