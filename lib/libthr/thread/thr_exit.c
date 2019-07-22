@@ -223,7 +223,7 @@ thread_unwind_stop(int version __unused, _Unwind_Action actions,
 _Static_assert(sizeof(struct _Unwind_Exception) == 0x40, "");
 #else
 _Static_assert(__SIZEOF_CHERI_CAPABILITY__ == 32, "");
-_Static_assert(sizeof(struct _Unwind_Exception) == 0x50, "");
+_Static_assert(sizeof(struct _Unwind_Exception) == 0x80, "");
 #endif
 #endif
 
