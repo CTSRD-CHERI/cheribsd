@@ -1752,6 +1752,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		struct fpreg fpreg;
 		struct reg reg;
 		char args[nitems(td->td_sa.args) * sizeof(register_t)];
+		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r = { 0 };
 
@@ -1790,6 +1791,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 #endif
 	case PT_GETNUMLWPS:
 	case PT_GET_SC_ARGS:
+	case PT_GET_SC_RET:
 	case PT_LWP_EVENTS:
 	case PT_SUSPEND:
 		break;
@@ -1916,6 +1918,10 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_GET_SC_ARGS:
 		error = copyout(r.args, uap->addr, MIN(uap->data,
 		    sizeof(r.args)));
+		break;
+	case PT_GET_SC_RET:
+		error = copyout(&r.psr, uap->addr, MIN(uap->data,
+		    sizeof(r.psr)));
 		break;
 #endif
 	default:
