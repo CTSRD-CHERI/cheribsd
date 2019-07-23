@@ -369,9 +369,13 @@ no_back_caps_out:
 				 * bail and the caller will look up the new
 				 * map entry.  First, though, it's important
 				 * to release the page we're holding!
+				 *
+				 * If we're the sole wiring holder, consider
+				 * this page active because we're most likely
+				 * about to come right back.
 				 */
 				vm_page_lock(mh);
-				vm_page_unhold(mh);
+				vm_page_unwire(mh, PQ_ACTIVE);
 				vm_page_unlock(mh);
 				return KERN_SUCCESS;
 			}
@@ -389,7 +393,9 @@ no_back_caps_out:
 				VM_OBJECT_RUNLOCK(mh->object);
 				*addr += pagesizes[mh->psind];
 				vm_page_lock(mh);
-				vm_page_unhold(mh);
+				/* Unwire this page w/o perturbing its active state */
+				vm_page_unwire(mh,
+					vm_page_active(mh) ? PQ_ACTIVE : PQ_INACTIVE);
 				vm_page_unlock(mh);
 				mh = NULL;
 				stat->pages_faulted_ro++;
@@ -408,7 +414,8 @@ no_back_caps_out:
 
 		if (mh) {
 			vm_page_lock(mh);
-			vm_page_unhold(mh);
+			/* Consider this page active since we're about to go scan it */
+			vm_page_unwire(mh, PQ_ACTIVE);
 			vm_page_unlock(mh);
 			mh = NULL;
 		}
