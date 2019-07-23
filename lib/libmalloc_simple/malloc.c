@@ -180,7 +180,7 @@ __simple_calloc(size_t num, size_t size)
 		return (NULL);
 	}
 
-	if ((ret = malloc(num * size)) != NULL)
+	if ((ret = __simple_malloc(num * size)) != NULL)
 		memset(ret, 0, num * size);
 
 	return (ret);
@@ -290,7 +290,7 @@ __simple_realloc(void *cp, size_t nbytes)
 	char *res;
 
 	if (cp == NULL)
-		return (malloc(nbytes));
+		return (__simple_malloc(nbytes));
 	op = find_overhead(cp);
 	if (op == NULL)
 		return (NULL);
@@ -315,7 +315,7 @@ __simple_realloc(void *cp, size_t nbytes)
 		return (cheri_andperm(cheri_csetbounds(op + 1, nbytes),
 		    cheri_getperm(cp)));
 
-	if ((res = malloc(nbytes)) == NULL)
+	if ((res = __simple_malloc(nbytes)) == NULL)
 		return (NULL);
 	/*
 	 * Only copy data the caller had access to even if this is less
@@ -325,7 +325,7 @@ __simple_realloc(void *cp, size_t nbytes)
 	memcpy(res, cp, (nbytes <= cheri_bytes_remaining(cp)) ?
 	    nbytes : cheri_bytes_remaining(cp));
 	res = cheri_andperm(res, cheri_getperm(cp));
-	free(cp);
+	__simple_free(cp);
 	return (res);
 }
 

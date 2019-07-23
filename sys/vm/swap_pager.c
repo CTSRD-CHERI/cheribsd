@@ -562,8 +562,8 @@ swap_pager_swap_init(void)
 	 * but it isn't very efficient).
 	 *
 	 * The nsw_cluster_max is constrained by the bp->b_pages[]
-	 * array (MAXPHYS/PAGE_SIZE) and our locally defined
-	 * MAX_PAGEOUT_CLUSTER.   Also be aware that swap ops are
+	 * array, which has MAXPHYS / PAGE_SIZE entries, and our locally
+	 * defined MAX_PAGEOUT_CLUSTER.   Also be aware that swap ops are
 	 * constrained by the swap device interleave stripe size.
 	 *
 	 * Currently we hardwire nsw_wcount_async to 4.  This limit is
@@ -577,7 +577,7 @@ swap_pager_swap_init(void)
 	 * have one NFS swap device due to the command/ack latency over NFS.
 	 * So it all works out pretty well.
 	 */
-	nsw_cluster_max = min((MAXPHYS/PAGE_SIZE), MAX_PAGEOUT_CLUSTER);
+	nsw_cluster_max = min(MAXPHYS / PAGE_SIZE, MAX_PAGEOUT_CLUSTER);
 
 	nsw_wcount_async = 4;
 	nsw_wcount_async_max = nsw_wcount_async;
@@ -768,7 +768,8 @@ swp_pager_getswapspace(int *io_npages, int limit)
 	int mpages, npages;
 
 	blk = SWAPBLK_NONE;
-	npages = mpages = *io_npages;
+	mpages = *io_npages;
+	npages = imin(BLIST_MAX_ALLOC, mpages);
 	mtx_lock(&sw_dev_mtx);
 	sp = swdevhd;
 	while (!TAILQ_EMPTY(&swtailq)) {
@@ -942,7 +943,7 @@ swap_pager_reserve(vm_object_t object, vm_pindex_t start, vm_size_t size)
 	swp_pager_init_freerange(&s_free, &n_free);
 	VM_OBJECT_WLOCK(object);
 	for (i = 0; i < size; i += n) {
-		n = min(BLIST_MAX_ALLOC, size - i);
+		n = size - i;
 		blk = swp_pager_getswapspace(&n, 1);
 		if (blk == SWAPBLK_NONE) {
 			swp_pager_meta_free(object, start, i);
@@ -1421,11 +1422,8 @@ swap_pager_putpages(vm_object_t object, vm_page_t *ma, int count,
 		struct buf *bp;
 		daddr_t blk;
 
-		/*
-		 * Maximum I/O size is limited by a number of factors.
-		 */
-		n = min(BLIST_MAX_ALLOC, count - i);
-		n = min(n, nsw_cluster_max);
+		/* Maximum I/O size is limited by maximum swap block size. */
+		n = min(count - i, nsw_cluster_max);
 
 		/* Get a block of swap of size up to size n. */
 		blk = swp_pager_getswapspace(&n, 4);

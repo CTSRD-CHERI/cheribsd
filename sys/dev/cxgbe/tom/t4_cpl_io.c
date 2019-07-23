@@ -1944,7 +1944,7 @@ aiotx_free_pgs(struct mbuf *m)
 	for (int i = 0; i < ext_pgs->npgs; i++) {
 		pg = PHYS_TO_VM_PAGE(ext_pgs->pa[i]);
 		vm_page_change_lock(pg, &mtx);
-		vm_page_unhold(pg);
+		vm_page_unwire(pg, PQ_ACTIVE);
 	}
 	if (mtx != NULL)
 		mtx_unlock(mtx);
@@ -1985,7 +1985,7 @@ alloc_aiotx_mbuf(struct kaiocb *job, int len)
 	last = NULL;
 	while (len > 0) {
 		mlen = imin(len, MBUF_PEXT_MAX_PGS * PAGE_SIZE - pgoff);
-		KASSERT(mlen == len || (start + mlen & PAGE_MASK) == 0,
+		KASSERT(mlen == len || ((start + mlen) & PAGE_MASK) == 0,
 		    ("%s: next start (%#jx + %#x) is not page aligned",
 		    __func__, (uintmax_t)start, mlen));
 
