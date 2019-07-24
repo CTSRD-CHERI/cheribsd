@@ -30,6 +30,12 @@
 #include <machine/cpu.h>
 #include <machine/cpuregs.h>
 
+#if defined(CPU_CHERI)
+#include <machine/cheriasm.h>
+#include <machine/cherireg.h>
+.set cheri_sysregs_accessible	# Don't warn about uses of c27-c30
+#endif
+
 #include "assym.inc"
 
 	.text
@@ -59,9 +65,37 @@ GLOBAL(mpentry)
 
 	mtc0	zero, MIPS_COP_0_CAUSE	/* clear soft interrupts */
 
+	/* Turn on all coprocessors */
+	mfc0	t2, MIPS_COP_0_STATUS
+#if defined(CPU_BERI)
+#  if defined(CPU_CHERI)
+	li	t0, MIPS_SR_COP_0_BIT | MIPS_SR_COP_1_BIT | MIPS_SR_COP_2_BIT
+#  else
+	li	t0, MIPS_SR_COP_0_BIT | MIPS_SR_COP_1_BIT
+#  endif
+#elif defined(CPU_MALTA)
+#  if defined(CPU_CHERI)
+	li	t0, MIPS_SR_COP_0_BIT | MIPS_SR_COP_2_BIT
+#  else
+	li	t0, MIPS_SR_COP_0_BIT
+#  endif
+#else
+	li	t0, MIPS_SR_COP_0_BIT
+#endif
+	or	t0, t0, t2
+	mtc0	t0, MIPS_COP_0_STATUS
+	COP0_SYNC
+
 	li	t0, MIPS_CCA_CACHED	/* make sure kseg0 is cached */
 	mtc0	t0, MIPS_COP_0_CONFIG
 	COP0_SYNC
+
+#if defined(CPU_CHERI)
+	CHERI_LOCORE_ROOT_CAPS
+
+	cmove CHERI_REG_C27, $cnull
+	cmove CHERI_REG_C28, $cnull
+#endif
 
 	PTR_LA	t9, platform_processor_id	/* get the processor number */
 	jalr	t9

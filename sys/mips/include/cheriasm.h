@@ -395,4 +395,57 @@
 	nop; /* Fill branch delay slot for old harware*/	\
 	.set pop;
 
+/* Derive the initial DDC/KDC and PCC/KCC from an omnipotent boot
+ * capability, presumed to be in DDC.  Clobbers C27 and C28, which surely
+ * want to be cleared before handing off control.  (We don't do so here
+ * because in locore.S we have more privileged caps to derive, and we'll
+ * clean up later.)
+ *
+ * TODO: The capabilities derived for DDC/KDC and for PCC/KCC cover the
+ * entirety of the kernel.  Acutally changing base/length requires changes
+ * in linkage.
+ */
+#define CHERI_LOCORE_ROOT_CAPS \
+	/* Grab the initial omnipotent capability */                 \
+	cgetdefault	CHERI_REG_C28;                               \
+	                                                             \
+	/* Create a reduced DDC.  */                                 \
+	cmove		CHERI_REG_C27, CHERI_REG_C28;                \
+	REG_LI		t0, CHERI_CAP_KERN_BASE;                     \
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	REG_LI		t0, CHERI_CAP_KERN_LENGTH;                   \
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	REG_LI		t0, CHERI_PERMS_KERNEL_DATA;                 \
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	                                                             \
+	/* Preserve a copy in KDC for exception handlers. */         \
+	csetkdc		CHERI_REG_C27;                               \
+	                                                             \
+	/* Install the new DDC. */                                   \
+	csetdefault	CHERI_REG_C27;                               \
+	                                                             \
+	/* Create a reduced PCC.  */                                 \
+	cgetpcc		CHERI_REG_C27;                               \
+	REG_LI		t0, CHERI_CAP_KERN_BASE;                     \
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	REG_LI		t0, CHERI_CAP_KERN_LENGTH;                   \
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	REG_LI		t0, CHERI_PERMS_KERNEL_CODE;                 \
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	                                                             \
+	/* Preserve a copy in KCC for exception handlers.  */        \
+	                                                             \
+	csetkcc		CHERI_REG_C27;                               \
+	                                                             \
+	/* Install the new PCC. */                                   \
+	REG_LI		t0, CHERI_CAP_KERN_BASE;                     \
+	cgetpcc		CHERI_REG_C28;                               \
+	cgetoffset	t1, CHERI_REG_C28;                   /* 1 */ \
+	PTR_SUBU	t1, t1, t0;                          /* 2 */ \
+	PTR_ADDIU	t1, t1, (4 * 7);                     /* 3 */ \
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t1;    /* 4 */ \
+	cjr		CHERI_REG_C27;                       /* 5 */ \
+	nop;                                                 /* 6 */ \
+	/* 7 (land here) */
+
 #endif /* _MIPS_INCLUDE_CHERIASM_H_ */
