@@ -1965,7 +1965,7 @@ do_lock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
 				if (error == 0) {
 					error = umtxq_check_susp(td, true);
 					if (error != 0)
-						return (error);
+						break;
 				}
 
 				/*
@@ -2497,7 +2497,8 @@ do_set_ceiling(struct thread *td, struct umutex * __capability m,
 			break;
 		}
 
-		if (owner == UMUTEX_CONTESTED) {
+		if (rv == 0) {
+			MPASS(owner == UMUTEX_CONTESTED);
 			rv = suword32(&m->m_ceilings[0], ceiling);
 			rv1 = suword32(&m->m_owner, UMUTEX_CONTESTED);
 			error = (rv == 0 && rv1 == 0) ? 0: EFAULT;
@@ -3358,14 +3359,13 @@ do_sem2_wait(struct thread *td, struct _usem2 * __capability sem,
 
 	uq = td->td_umtxq;
 	flags = fuword32(&sem->_flags);
-	error = umtx_key_get(sem, TYPE_SEM, GET_SHARE(flags), &uq->uq_key);
-	if (error != 0)
-		return (error);
-
 	if (timeout != NULL)
 		abs_timeout_init2(&timo, timeout);
 
 again:
+	error = umtx_key_get(sem, TYPE_SEM, GET_SHARE(flags), &uq->uq_key);
+	if (error != 0)
+		return (error);
 	umtxq_lock(&uq->uq_key);
 	umtxq_busy(&uq->uq_key);
 	umtxq_insert(uq);

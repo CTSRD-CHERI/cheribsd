@@ -1,5 +1,7 @@
 /*-
- * Copyright (c) 2015 Nuxi, https://nuxi.nl/
+ * SPDX-License-Identifier: BSD-2-Clause
+ *
+ * Copyright (c) 2019 Ian Lepore <ian@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,63 +28,17 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
-#include <sys/param.h>
-#include <sys/ptrace.h>
+#include <sys/types.h>
+#include <machine/sysarch.h>
+#include <stddef.h>
 
-#include <machine/armreg.h>
-
-#include <stdbool.h>
-#include <stdio.h>
-#include <sysdecode.h>
-
-#include "truss.h"
-
-static int
-aarch64_cloudabi64_fetch_args(struct trussinfo *trussinfo, unsigned int narg)
+int
+arm_sync_icache(u_int addr, int len)
 {
-	struct current_syscall *cs;
-	struct reg regs;
-	lwpid_t tid;
-	unsigned int i;
-
-	tid = trussinfo->curthread->tid;
-	if (ptrace(PT_GETREGS, tid, (caddr_t)&regs, 0) == -1) {
-		fprintf(trussinfo->outfile, "-- CANNOT READ REGISTERS --\n");
-		return (-1);
-	}
-
-	cs = &trussinfo->curthread->cs;
-	for (i = 0; i < narg && i < 8; i++)
-		cs->args[i] = regs.x[i];
+	struct arm_sync_icache_args args;
+	
+	args.addr = addr;
+	args.len  = len;
+	sysarch(ARM_SYNC_ICACHE, &args);
 	return (0);
 }
-
-static int
-aarch64_cloudabi64_fetch_retval(struct trussinfo *trussinfo, long *retval,
-    int *errorp)
-{
-	struct reg regs;
-	lwpid_t tid;
-
-	tid = trussinfo->curthread->tid;
-	if (ptrace(PT_GETREGS, tid, (caddr_t)&regs, 0) == -1) {
-		fprintf(trussinfo->outfile, "-- CANNOT READ REGISTERS --\n");
-		return (-1);
-	}
-
-	retval[0] = regs.x[0];
-	retval[1] = regs.x[1];
-	*errorp = (regs.spsr & PSR_C) != 0;
-	return (0);
-}
-
-static struct procabi aarch64_cloudabi64 = {
-	"CloudABI ELF64",
-	SYSDECODE_ABI_CLOUDABI64,
-	aarch64_cloudabi64_fetch_args,
-	aarch64_cloudabi64_fetch_retval,
-	STAILQ_HEAD_INITIALIZER(aarch64_cloudabi64.extra_syscalls),
-	{ NULL }
-};
-
-PROCABI(aarch64_cloudabi64);

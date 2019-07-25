@@ -109,6 +109,8 @@ typedef enum {
 	CAM_CMD_TIMESTAMP	= 0x00000028,
 	CAM_CMD_MMCSD_CMD	= 0x00000029,
 	CAM_CMD_POWER_MODE	= 0x0000002a,
+	CAM_CMD_DEVTYPE		= 0x0000002b,
+	CAM_CMD_AMA	= 0x0000002c,
 } cam_cmdmask;
 
 typedef enum {
@@ -217,6 +219,7 @@ static struct camcontrol_opts option_table[] = {
 	{"defects", CAM_CMD_READ_DEFECTS, CAM_ARG_NONE, readdefect_opts},
 	{"defectlist", CAM_CMD_READ_DEFECTS, CAM_ARG_NONE, readdefect_opts},
 	{"devlist", CAM_CMD_DEVTREE, CAM_ARG_NONE, "-b"},
+	{"devtype", CAM_CMD_DEVTYPE, CAM_ARG_NONE, ""},
 	{"periphlist", CAM_CMD_DEVLIST, CAM_ARG_NONE, NULL},
 	{"modepage", CAM_CMD_MODE_PAGE, CAM_ARG_NONE, "bdelm:P:"},
 	{"tags", CAM_CMD_TAG, CAM_ARG_NONE, "N:q"},
@@ -234,6 +237,7 @@ static struct camcontrol_opts option_table[] = {
 	{"fwdownload", CAM_CMD_DOWNLOAD_FW, CAM_ARG_NONE, "f:qsy"},
 	{"security", CAM_CMD_SECURITY, CAM_ARG_NONE, "d:e:fh:k:l:qs:T:U:y"},
 	{"hpa", CAM_CMD_HPA, CAM_ARG_NONE, "Pflp:qs:U:y"},
+	{"ama", CAM_CMD_AMA, CAM_ARG_NONE, "fqs:"},
 	{"persist", CAM_CMD_PERSIST, CAM_ARG_NONE, "ai:I:k:K:o:ps:ST:U"},
 	{"attrib", CAM_CMD_ATTRIB, CAM_ARG_NONE, "a:ce:F:p:r:s:T:w:V:"},
 	{"opcodes", CAM_CMD_OPCODES, CAM_ARG_NONE, "No:s:T"},
@@ -263,11 +267,22 @@ struct cam_devlist {
 static cam_cmdmask cmdlist;
 static cam_argmask arglist;
 
+static const char *devtype_names[] = {
+	"none",
+	"scsi",
+	"satl",
+	"ata",
+	"nvme",
+	"mmcsd",
+	"unknown",
+};
+
 camcontrol_optret getoption(struct camcontrol_opts *table, char *arg,
 			    uint32_t *cmdnum, cam_argmask *argnum,
 			    const char **subopt);
 static int getdevlist(struct cam_device *device);
 static int getdevtree(int argc, char **argv, char *combinedopt);
+static int getdevtype(struct cam_device *device);
 static int print_dev_scsi(struct device_match_result *dev_result, char *tmpstr);
 static int print_dev_ata(struct device_match_result *dev_result, char *tmpstr);
 static int print_dev_semb(struct device_match_result *dev_result, char *tmpstr);
@@ -345,6 +360,8 @@ static int atapm(struct cam_device *device, int argc, char **argv,
 static int atasecurity(struct cam_device *device, int retry_count, int timeout,
 		       int argc, char **argv, char *combinedopt);
 static int atahpa(struct cam_device *device, int retry_count, int timeout,
+		  int argc, char **argv, char *combinedopt);
+static int ataama(struct cam_device *device, int retry_count, int timeout,
 		  int argc, char **argv, char *combinedopt);
 static int scsiprintoneopcode(struct cam_device *device, int req_opcode,
 			      int sa_set, int req_sa, uint8_t *buf,
@@ -651,6 +668,24 @@ getdevtree(int argc, char **argv, char *combinedopt)
 	close(fd);
 
 	return (error);
+}
+
+static int
+getdevtype(struct cam_device *cam_dev)
+{
+	camcontrol_devtype dt;
+	int error;
+
+	/*
+	 * Get the device type and report it, request no I/O be done to do this.
+	 */
+	error = get_device_type(cam_dev, -1, 0, 0, &dt);
+	if (error != 0 || (unsigned)dt > CC_DT_UNKNOWN) {
+		fprintf(stdout, "illegal\n");
+		return (1);
+	}
+	fprintf(stdout, "%s\n", devtype_names[dt]);
+	return (0);
 }
 
 static int
@@ -1392,10 +1427,37 @@ atahpa_print(struct ata_params *parm, u_int64_t hpasize, int header)
 			lba, hpasize);
 
 		printf("HPA - Security                 ");
-		if (parm->support.command1 & ATA_SUPPORT_MAXSECURITY)
-			printf("yes\n");
+		if (parm->support.command2 & ATA_SUPPORT_MAXSECURITY)
+			printf("yes      %s\n", (parm->enabled.command2 &
+			    ATA_SUPPORT_MAXSECURITY) ? "yes" : "no ");
 		else
 			printf("no\n");
+	} else {
+		printf("no\n");
+	}
+}
+
+static void
+ataama_print(struct ata_params *parm, u_int64_t nativesize, int header)
+{
+	u_int32_t lbasize = (u_int32_t)parm->lba_size_1 |
+				((u_int32_t)parm->lba_size_2 << 16);
+
+	u_int64_t lbasize48 = ((u_int64_t)parm->lba_size48_1) |
+				((u_int64_t)parm->lba_size48_2 << 16) |
+				((u_int64_t)parm->lba_size48_3 << 32) |
+				((u_int64_t)parm->lba_size48_4 << 48);
+
+	if (header) {
+		printf("\nFeature                      "
+		       "Support  Enabled   Value\n");
+	}
+
+	printf("Accessible Max Address Config  ");
+	if (parm->support2 & ATA_SUPPORT_AMAX_ADDR) {
+		u_int64_t lba = lbasize48 ? lbasize48 : lbasize;
+		printf("yes      %s     %ju/%ju\n",
+		    (nativesize > lba) ? "yes" : "no ", lba, nativesize);
 	} else {
 		printf("no\n");
 	}
@@ -1416,6 +1478,7 @@ atasata(struct ata_params *parm)
 static void
 atacapprint(struct ata_params *parm)
 {
+	const char *proto;
 	u_int32_t lbasize = (u_int32_t)parm->lba_size_1 |
 				((u_int32_t)parm->lba_size_2 << 16);
 
@@ -1426,7 +1489,19 @@ atacapprint(struct ata_params *parm)
 
 	printf("\n");
 	printf("protocol              ");
-	printf("ATA/ATAPI-%d", ata_version(parm->version_major));
+	proto = (parm->config == ATA_PROTO_CFA) ? "CFA" :
+		(parm->config & ATA_PROTO_ATAPI) ? "ATAPI" : "ATA";
+	if (ata_version(parm->version_major) == 0) {
+		printf("%s", proto);
+	} else if (ata_version(parm->version_major) <= 7) {
+		printf("%s-%d", proto,
+		    ata_version(parm->version_major));
+	} else if (ata_version(parm->version_major) == 8) {
+		printf("%s8-ACS", proto);
+	} else {
+		printf("ACS-%d %s",
+		    ata_version(parm->version_major) - 7, proto);
+	}
 	if (parm->satacapabilities && parm->satacapabilities != 0xffff) {
 		if (parm->satacapabilities & ATA_SATA_GEN3)
 			printf(" SATA 3.x\n");
@@ -2227,6 +2302,94 @@ atahpa_freeze_lock(struct cam_device *device, int retry_count,
 	return atahpa_proc_resp(device, ccb, is48bit, NULL);
 }
 
+static int
+ata_get_native_max(struct cam_device *device, int retry_count,
+		      u_int32_t timeout, union ccb *ccb,
+		      u_int64_t *nativesize)
+{
+	int error;
+
+	error = ata_do_cmd(device,
+			   ccb,
+			   retry_count,
+			   /*flags*/CAM_DIR_NONE,
+			   /*protocol*/AP_PROTO_NON_DATA | AP_EXTEND,
+			   /*ata_flags*/AP_FLAG_CHK_COND,
+			   /*tag_action*/MSG_SIMPLE_Q_TAG,
+			   /*command*/ATA_AMAX_ADDR,
+			   /*features*/ATA_AMAX_ADDR_GET,
+			   /*lba*/0,
+			   /*sector_count*/0,
+			   /*data_ptr*/NULL,
+			   /*dxfer_len*/0,
+			   timeout ? timeout : 30 * 1000,
+			   /*force48bit*/1);
+
+	if (error)
+		return (error);
+
+	return atahpa_proc_resp(device, ccb, /*is48bit*/1, nativesize);
+}
+
+static int
+ataama_set(struct cam_device *device, int retry_count,
+	      u_int32_t timeout, union ccb *ccb, u_int64_t maxsize)
+{
+	int error;
+
+	/* lba's are zero indexed so the max lba is requested max - 1 */
+	if (maxsize)
+		maxsize--;
+
+	error = ata_do_cmd(device,
+			   ccb,
+			   retry_count,
+			   /*flags*/CAM_DIR_NONE,
+			   /*protocol*/AP_PROTO_NON_DATA | AP_EXTEND,
+			   /*ata_flags*/AP_FLAG_CHK_COND,
+			   /*tag_action*/MSG_SIMPLE_Q_TAG,
+			   /*command*/ATA_AMAX_ADDR,
+			   /*features*/ATA_AMAX_ADDR_SET,
+			   /*lba*/maxsize,
+			   /*sector_count*/0,
+			   /*data_ptr*/NULL,
+			   /*dxfer_len*/0,
+			   timeout ? timeout : 30 * 1000,
+			   /*force48bit*/1);
+
+	if (error)
+		return (error);
+
+	return atahpa_proc_resp(device, ccb, /*is48bit*/1, NULL);
+}
+
+static int
+ataama_freeze(struct cam_device *device, int retry_count,
+		   u_int32_t timeout, union ccb *ccb)
+{
+	int error;
+
+	error = ata_do_cmd(device,
+			   ccb,
+			   retry_count,
+			   /*flags*/CAM_DIR_NONE,
+			   /*protocol*/AP_PROTO_NON_DATA | AP_EXTEND,
+			   /*ata_flags*/AP_FLAG_CHK_COND,
+			   /*tag_action*/MSG_SIMPLE_Q_TAG,
+			   /*command*/ATA_AMAX_ADDR,
+			   /*features*/ATA_AMAX_ADDR_FREEZE,
+			   /*lba*/0,
+			   /*sector_count*/0,
+			   /*data_ptr*/NULL,
+			   /*dxfer_len*/0,
+			   timeout ? timeout : 30 * 1000,
+			   /*force48bit*/1);
+
+	if (error)
+		return (error);
+
+	return atahpa_proc_resp(device, ccb, /*is48bit*/1, NULL);
+}
 
 int
 ata_do_identify(struct cam_device *device, int retry_count, int timeout,
@@ -2340,7 +2503,7 @@ ataidentify(struct cam_device *device, int retry_count, int timeout)
 {
 	union ccb *ccb;
 	struct ata_params *ident_buf;
-	u_int64_t hpasize;
+	u_int64_t hpasize, nativesize;
 
 	if ((ccb = cam_getccb(device)) == NULL) {
 		warnx("couldn't allocate CCB");
@@ -2361,12 +2524,22 @@ ataidentify(struct cam_device *device, int retry_count, int timeout)
 	} else {
 		hpasize = 0;
 	}
+	if (ident_buf->support2 & ATA_SUPPORT_AMAX_ADDR) {
+		if (ata_get_native_max(device, retry_count, timeout, ccb,
+					&nativesize) != 0) {
+			cam_freeccb(ccb);
+			return (1);
+		}
+	} else {
+		nativesize = 0;
+	}
 
 	printf("%s%d: ", device->device_name, device->dev_unit_num);
 	ata_print_ident(ident_buf);
 	camxferrate(device);
 	atacapprint(ident_buf);
 	atahpa_print(ident_buf, hpasize, 0);
+	ataama_print(ident_buf, nativesize, 0);
 
 	free(ident_buf);
 	cam_freeccb(ccb);
@@ -2886,7 +3059,7 @@ atahpa(struct cam_device *device, int retry_count, int timeout,
 		return (1);
 	}
 
-	if (security && !(ident_buf->support.command1 & ATA_SUPPORT_MAXSECURITY)) {
+	if (security && !(ident_buf->support.command2 & ATA_SUPPORT_MAXSECURITY)) {
 		warnx("HPA Security is not supported by this device");
 		cam_freeccb(ccb);
 		free(ident_buf);
@@ -2915,7 +3088,7 @@ atahpa(struct cam_device *device, int retry_count, int timeout,
 		if (error == 0) {
 			error = atahpa_set_max(device, retry_count, timeout,
 					       ccb, is48bit, maxsize, persist);
-			if (error == 0) {
+			if (error == 0 && quiet == 0) {
 				/* redo identify to get new lba values */
 				error = ata_do_identify(device, retry_count,
 							timeout, ccb,
@@ -2928,29 +3101,150 @@ atahpa(struct cam_device *device, int retry_count, int timeout,
 	case ATA_HPA_ACTION_SET_PWD:
 		error = atahpa_password(device, retry_count, timeout,
 					ccb, is48bit, &pwd);
-		if (error == 0)
+		if (error == 0 && quiet == 0)
 			printf("HPA password has been set\n");
 		break;
 
 	case ATA_HPA_ACTION_LOCK:
 		error = atahpa_lock(device, retry_count, timeout,
 				    ccb, is48bit);
-		if (error == 0)
+		if (error == 0 && quiet == 0)
 			printf("HPA has been locked\n");
 		break;
 
 	case ATA_HPA_ACTION_UNLOCK:
 		error = atahpa_unlock(device, retry_count, timeout,
 				      ccb, is48bit, &pwd);
-		if (error == 0)
+		if (error == 0 && quiet == 0)
 			printf("HPA has been unlocked\n");
 		break;
 
 	case ATA_HPA_ACTION_FREEZE_LOCK:
 		error = atahpa_freeze_lock(device, retry_count, timeout,
 					   ccb, is48bit);
-		if (error == 0)
+		if (error == 0 && quiet == 0)
 			printf("HPA has been frozen\n");
+		break;
+
+	default:
+		errx(1, "Option currently not supported");
+	}
+
+	cam_freeccb(ccb);
+	free(ident_buf);
+
+	return (error);
+}
+
+enum {
+	ATA_AMA_ACTION_PRINT,
+	ATA_AMA_ACTION_SET_MAX,
+	ATA_AMA_ACTION_FREEZE_LOCK
+};
+
+static int
+ataama(struct cam_device *device, int retry_count, int timeout,
+       int argc, char **argv, char *combinedopt)
+{
+	union ccb *ccb;
+	struct ata_params *ident_buf;
+	struct ccb_getdev cgd;
+	int error, quiet, c, action, actions;
+	u_int64_t nativesize, maxsize;
+
+	actions = 0;
+	quiet = 0;
+	maxsize = 0;
+
+	/* default action is to print AMA information */
+	action = ATA_AMA_ACTION_PRINT;
+
+	while ((c = getopt(argc, argv, combinedopt)) != -1) {
+		switch(c){
+		case 's':
+			action = ATA_AMA_ACTION_SET_MAX;
+			maxsize = strtoumax(optarg, NULL, 0);
+			actions++;
+			break;
+
+		case 'f':
+			action = ATA_AMA_ACTION_FREEZE_LOCK;
+			actions++;
+			break;
+
+		case 'q':
+			quiet++;
+			break;
+		}
+	}
+
+	if (actions > 1) {
+		warnx("too many AMA actions specified");
+		return (1);
+	}
+
+	if (get_cgd(device, &cgd) != 0) {
+		warnx("couldn't get CGD");
+		return (1);
+	}
+
+	ccb = cam_getccb(device);
+	if (ccb == NULL) {
+		warnx("couldn't allocate CCB");
+		return (1);
+	}
+
+	error = ata_do_identify(device, retry_count, timeout, ccb, &ident_buf);
+	if (error != 0) {
+		cam_freeccb(ccb);
+		return (1);
+	}
+
+	if (quiet == 0) {
+		printf("%s%d: ", device->device_name, device->dev_unit_num);
+		ata_print_ident(ident_buf);
+		camxferrate(device);
+	}
+
+	if (action == ATA_AMA_ACTION_PRINT) {
+		error = ata_get_native_max(device, retry_count, timeout, ccb,
+					   &nativesize);
+		if (error == 0)
+			ataama_print(ident_buf, nativesize, 1);
+
+		cam_freeccb(ccb);
+		free(ident_buf);
+		return (error);
+	}
+
+	if (!(ident_buf->support2 & ATA_SUPPORT_AMAX_ADDR)) {
+		warnx("Accessible Max Address is not supported by this device");
+		cam_freeccb(ccb);
+		free(ident_buf);
+		return (1);
+	}
+
+	switch(action) {
+	case ATA_AMA_ACTION_SET_MAX:
+		error = ata_get_native_max(device, retry_count, timeout, ccb,
+					   &nativesize);
+		if (error == 0) {
+			error = ataama_set(device, retry_count, timeout,
+				       ccb, maxsize);
+			if (error == 0 && quiet == 0) {
+				/* redo identify to get new lba values */
+				error = ata_do_identify(device, retry_count,
+				    timeout, ccb, &ident_buf);
+				ataama_print(ident_buf, nativesize, 1);
+			}
+		}
+		break;
+
+	case ATA_AMA_ACTION_FREEZE_LOCK:
+		error = ataama_freeze(device, retry_count, timeout,
+					   ccb);
+		if (error == 0 && quiet == 0)
+			printf("Accessible Max Address has been frozen\n");
 		break;
 
 	default:
@@ -5351,7 +5645,7 @@ get_device_type(struct cam_device *dev, int retry_count, int timeout,
 		    int verbosemode, camcontrol_devtype *devtype)
 {
 	struct ccb_getdev cgd;
-	int retval = 0;
+	int retval;
 
 	retval = get_cgd(dev, &cgd);
 	if (retval != 0)
@@ -5366,27 +5660,48 @@ get_device_type(struct cam_device *dev, int retry_count, int timeout,
 		*devtype = CC_DT_ATA;
 		goto bailout;
 		break; /*NOTREACHED*/
+	case PROTO_NVME:
+		*devtype = CC_DT_NVME;
+		goto bailout;
+		break; /*NOTREACHED*/
+	case PROTO_MMCSD:
+		*devtype = CC_DT_MMCSD;
+		goto bailout;
+		break; /*NOTREACHED*/
 	default:
 		*devtype = CC_DT_UNKNOWN;
 		goto bailout;
 		break; /*NOTREACHED*/
 	}
 
-	/*
-	 * Check for the ATA Information VPD page (0x89).  If this is an
-	 * ATA device behind a SCSI to ATA translation layer, this VPD page
-	 * should be present.
-	 *
-	 * If that VPD page isn't present, or we get an error back from the
-	 * INQUIRY command, we'll just treat it as a normal SCSI device.
-	 */
-	retval = dev_has_vpd_page(dev, SVPD_ATA_INFORMATION, retry_count,
-				  timeout, verbosemode);
-	if (retval == 1)
-		*devtype = CC_DT_ATA_BEHIND_SCSI;
-	else
-		*devtype = CC_DT_SCSI;
-
+	if (retry_count == -1) {
+		/*
+		 * For a retry count of -1, used only the cached data to avoid
+		 * I/O to the drive. Sending the identify command to the drive
+		 * can cause issues for SATL attachaed drives since identify is
+		 * not an NCQ command.
+		 */
+		if (cgd.ident_data.config != 0)
+			*devtype = CC_DT_SATL;
+		else
+			*devtype = CC_DT_SCSI;
+	} else {
+		/*
+		 * Check for the ATA Information VPD page (0x89).  If this is an
+		 * ATA device behind a SCSI to ATA translation layer (SATL),
+		 * this VPD page should be present.
+		 *
+		 * If that VPD page isn't present, or we get an error back from
+		 * the INQUIRY command, we'll just treat it as a normal SCSI
+		 * device.
+		 */
+		retval = dev_has_vpd_page(dev, SVPD_ATA_INFORMATION, retry_count,
+		    timeout, verbosemode);
+		if (retval == 1)
+			*devtype = CC_DT_SATL;
+		else
+			*devtype = CC_DT_SCSI;
+	}
 	retval = 0;
 
 bailout:
@@ -9597,6 +9912,7 @@ usage(int printlong)
 "                              [-U <user|master>] [-y]\n"
 "        camcontrol hpa        [dev_id][generic args] [-f] [-l] [-P] [-p pwd]\n"
 "                              [-q] [-s max_sectors] [-U pwd] [-y]\n"
+"        camcontrol ama        [dev_id][generic args] [-f] [-q] [-s max_sectors]\n"
 "        camcontrol persist    [dev_id][generic args] <-i action|-o action>\n"
 "                              [-a][-I tid][-k key][-K sa_key][-p][-R rtp]\n"
 "                              [-s scope][-S][-T type][-U]\n"
@@ -9612,6 +9928,7 @@ usage(int printlong)
 "                              [-S power_src] [-T timer]\n"
 "        camcontrol timestamp  [dev_id][generic_args] <-r [-f format|-m|-U]>|\n"
 "                              <-s <-f format -T time | -U >>\n"
+"        camcontrol devtype    [dev_id]\n"
 "                              \n"
 "        camcontrol help\n");
 	if (!printlong)
@@ -9657,6 +9974,7 @@ usage(int printlong)
 "zone        manage Zoned Block (Shingled) devices\n"
 "epc         send ATA Extended Power Conditions commands\n"
 "timestamp   report or set the device's timestamp\n"
+"devtype     report the type of device\n"
 "help        this message\n"
 "Device Identifiers:\n"
 "bus:target        specify the bus and target, lun defaults to 0\n"
@@ -9793,6 +10111,11 @@ usage(int printlong)
 "                  device\n"
 "-U pwd            unlock the HPA configuration of the device\n"
 "-y                don't ask any questions\n"
+"ama arguments:\n"
+"-f                freeze the AMA configuration of the device\n"
+"-q                be quiet, do not print any status messages\n"
+"-s sectors        configures the maximum user accessible sectors of the\n"
+"                  device\n"
 "persist arguments:\n"
 "-i action         specify read_keys, read_reservation, report_cap, or\n"
 "                  read_full_status\n"
@@ -10117,8 +10440,15 @@ main(int argc, char **argv)
 		error = atahpa(cam_dev, retry_count, timeout,
 			       argc, argv, combinedopt);
 		break;
+	case CAM_CMD_AMA:
+		error = ataama(cam_dev, retry_count, timeout,
+			       argc, argv, combinedopt);
+		break;
 	case CAM_CMD_DEVTREE:
 		error = getdevtree(argc, argv, combinedopt);
+		break;
+	case CAM_CMD_DEVTYPE:
+		error = getdevtype(cam_dev);
 		break;
 	case CAM_CMD_TUR:
 		error = testunitready(cam_dev, task_attr, retry_count,

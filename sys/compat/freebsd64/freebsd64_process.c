@@ -67,6 +67,7 @@ __FBSDID("$FreeBSD$");
 
 #include <compat/freebsd64/freebsd64_proto.h>
 
+
 static ssize_t
 proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
     size_t len, enum uio_rw rw)
@@ -247,6 +248,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		struct fpreg fpreg;
 		struct reg reg;
 		char args[sizeof(td->td_sa.args)];
+		struct ptrace_sc_ret *psr;
 		int ptevents;
 	} r;
 	void * __capability addr;
@@ -259,6 +261,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	case PT_GET_EVENT_MASK:
 	case PT_LWPINFO:
 	case PT_GET_SC_ARGS:
+	case PT_GET_SC_RET:
 		break;
 	case PT_GETREGS:
 		BZERO(&r.reg, sizeof r.reg);
@@ -363,6 +366,10 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	case PT_GET_SC_ARGS:
 		error = copyout(r.args, uap->addr, MIN(uap->data,
 		    sizeof(r.args)));
+		break;
+	case PT_GET_SC_RET:
+		error = copyout(&r.psr, uap->addr, MIN(uap->data,
+		    sizeof(r.psr)));
 		break;
 	}
 

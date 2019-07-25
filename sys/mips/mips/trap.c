@@ -1061,10 +1061,8 @@ dofault:
 
 	case T_SYSCALL + T_USER:
 		{
-			int error;
-
 			td->td_sa.trapframe = trapframe;
-			error = syscallenter(td);
+			syscallenter(td);
 
 #if !defined(SMP) && (defined(DDB) || defined(DEBUG))
 			if (trp == trapdebug)
@@ -1080,7 +1078,7 @@ dofault:
 			 * instead of being done here under a special check
 			 * for SYS_ptrace().
 			 */
-			syscallret(td, error);
+			syscallret(td);
 			return (trapframe->pc);
 		}
 
