@@ -575,4 +575,5 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_fhlinkat",			/* 566 = cheriabi_fhlinkat */
 	"cheriabi_fhreadlink",			/* 567 = cheriabi_fhreadlink */
 	"cheriabi_funlinkat",			/* 568 = cheriabi_funlinkat */
+	"cheriabi_copy_file_range",			/* 569 = cheriabi_copy_file_range */
 };

@@ -3709,3 +3709,13 @@ SYS_STUB(568, int, funlinkat,
     /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(569, ssize_t, copy_file_range,
+    /* _protoargs */ (int infd, off_t *  inoffp, int outfd, off_t *  outoffp, size_t len, unsigned int flags),
+    /* _protoargs_chk */ (ssize_t *retp , int * __capability stub_errno, int infd, off_t * __capability   inoffp, int outfd, off_t * __capability   outoffp, size_t len, unsigned int flags),
+    /* _protoargs_err */ (int * __capability stub_errno, int infd, off_t * __capability   inoffp, int outfd, off_t * __capability   outoffp, size_t len, unsigned int flags),
+    /* _callargs */ (infd, (__cheri_fromcap off_t * )inoffp, outfd, (__cheri_fromcap off_t * )outoffp, len, flags),
+    /* _callargs_chk */ (&ret, stub_errno, infd, inoffp, outfd, outoffp, len, flags),
+    /* _callargs_err */ (&errno, infd, (off_t * )inoffp, outfd, (off_t * )outoffp, len, flags),
+    /* _localcheck */ {if (!(cheri_getperm(inoffp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} if (!(cheri_getperm(outoffp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} }
+)
+

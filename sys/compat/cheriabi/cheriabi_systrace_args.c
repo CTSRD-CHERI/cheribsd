@@ -3268,6 +3268,18 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* cheriabi_copy_file_range */
+	case 569: {
+		struct cheriabi_copy_file_range_args *p = params;
+		iarg[0] = p->infd; /* int */
+		uarg[1] = (__cheri_addr intptr_t) p->inoffp; /* off_t * __capability */
+		iarg[2] = p->outfd; /* int */
+		uarg[3] = (__cheri_addr intptr_t) p->outoffp; /* off_t * __capability */
+		uarg[4] = p->len; /* size_t */
+		uarg[5] = p->flags; /* unsigned int */
+		*n_args = 6;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8718,6 +8730,31 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* cheriabi_copy_file_range */
+	case 569:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland off_t * __capability";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "userland off_t * __capability";
+			break;
+		case 4:
+			p = "size_t";
+			break;
+		case 5:
+			p = "unsigned int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10593,6 +10630,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 568:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
+		break;
+	/* cheriabi_copy_file_range */
+	case 569:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
 		break;
 	default:
 		break;

@@ -505,4 +505,5 @@
 #define	FREEBSD64_SYS_freebsd64_fhlinkat	566
 #define	FREEBSD64_SYS_freebsd64_fhreadlink	567
 #define	FREEBSD64_SYS_freebsd64_funlinkat	568
-#define	FREEBSD64_SYS_MAXSYSCALL	569
+#define	FREEBSD64_SYS_freebsd64_copy_file_range	569
+#define	FREEBSD64_SYS_MAXSYSCALL	570
