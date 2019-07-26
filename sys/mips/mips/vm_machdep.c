@@ -703,7 +703,8 @@ vm_do_caprevoke(void * __capability * __capability cutp, struct caprevoke_stats 
 			"cllc %[cscratch], %[cutp]\n\t"
 			"cexeq $t0, %[cscratch], %[cut]\n\t"
 			"beqz $t0, 1f\n\t"
-			"ccleartag %[cscratch], %[cscratch]\n\t" // delay slot!
+			"candperm %[cscratch], %[cscratch], $zero\n\t" // delay slot!
+			"ccleartag %[cscratch], %[cscratch]\n\t"
 			"cscc $t0, %[cscratch], %[cutp]\n\t"
 			"beqz $t0, 1f\n\t"
 			"nop\n\t" // delay slot
