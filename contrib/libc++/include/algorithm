@@ -7,18 +7,6 @@
 // Source Licenses. See LICENSE.TXT for details.
 //
 //===----------------------------------------------------------------------===//
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180629,
- *   "target_type": "lib",
- *   "changes": [
- *     "other"
- *   ],
- *   "change_comment": "Conflict with __output qualifier"
- * }
- * CHERI CHANGES END
- */
 
 #ifndef _LIBCPP_ALGORITHM
 #define _LIBCPP_ALGORITHM

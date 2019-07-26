@@ -10,6 +10,7 @@ SVNLITE?=	lite
 .if ${MK_PIE} != "no"
 PIE_SUFFIX=		_pie
 .endif
+WANT_CHERI=	none
 
 PACKAGE=	svn
 

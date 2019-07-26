@@ -28,6 +28,12 @@
 # SUCH DAMAGE.
 #
 
+.if defined(__BSD_PROG_MK)
+.if ${MK_CHERI_PURE} == "yes" && !defined(TESTSDIR)
+WANT_CHERI?=	pure
+.endif
+.endif
+
 .if ! ${MACHINE_ARCH:Mmips*c*} || defined(LIBCHERI)
 .if !${.TARGETS:Mbuild-tools} && !defined(BOOTSTRAPPING)
 .if defined(NEED_CHERI)

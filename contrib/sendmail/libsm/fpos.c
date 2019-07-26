@@ -48,7 +48,8 @@ static jmp_buf TellTimeOut;
 
 /* ARGSUSED0 */
 static void
-tellalrm(int sig)
+tellalrm(sig)
+	int sig;
 {
 	longjmp(TellTimeOut, 1);
 }
