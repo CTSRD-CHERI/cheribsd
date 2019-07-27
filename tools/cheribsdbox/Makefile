@@ -178,7 +178,6 @@ CRUNCH_PROGS_sbin+= dhclient \
 		rtsol \
 		shutdown \
 		sysctl \
-		touch \
 		umount
 CRUNCH_ALIAS_md5=	sha256
 CRUNCH_ALIAS_shutdown= poweroff
@@ -248,6 +247,7 @@ CRUNCH_PROGS_usr.bin+= \
 		tftp \
 		time \
 		top \
+		touch \
 		tput \
 		tr \
 		true \
