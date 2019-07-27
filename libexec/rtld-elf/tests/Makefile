@@ -1,5 +1,6 @@
 # $FreeBSD$
 
+WANT_CHERI=	none
 SUBDIR+=	libpythagoras target
 
 SUBDIR_DEPEND_target=	libpythagoras

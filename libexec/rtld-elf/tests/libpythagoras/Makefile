@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 .include <bsd.own.mk>
-
+WANT_CHERI=	none
 LIB=		pythagoras
 SHLIB_MAJOR=	0
 
