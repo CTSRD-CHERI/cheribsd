@@ -47,6 +47,8 @@ class LibcxxTestFormat(object):
                                         initial_value=False),
             IntegratedTestKeywordParser('LINK_CXX_ABI_LIBRARY.',
                                         ParserKind.TAG, initial_value=False),
+            IntegratedTestKeywordParser('LINK_PTHREADS_LIBRARY.',
+                                        ParserKind.TAG, initial_value=False),
             IntegratedTestKeywordParser('MODULES_DEFINES:', ParserKind.LIST,
                                         initial_value=[])
         ]
@@ -150,6 +152,12 @@ class LibcxxTestFormat(object):
                 test_cxx.compile_flags += ['-fno-objc-arc']
             test_cxx.link_flags += ['-framework', 'Foundation']
 
+        if self._get_parser('LINK_PTHREADS_LIBRARY.', parsers).getValue():
+            # one of the libunwind tests uses pthreads -> link it here
+            # For FreeBSD -pthreads must come before -lc:
+            test_cxx.link_flags = ["-lpthread"] + test_cxx.link_flags
+            lit_config.note('Adding -lpthread flag for: ' + test.getSourcePath() +
+                            ': ' + str(test_cxx.link_flags))
         if self._get_parser('LINK_CXX_ABI_LIBRARY.', parsers).getValue():
             # For the libunwind exception test we need to add the C++ ABI
             # library to the link flags (but not the standard library

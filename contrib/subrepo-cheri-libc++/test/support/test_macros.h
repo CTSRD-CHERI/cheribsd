@@ -28,6 +28,12 @@
 #pragma GCC diagnostic ignored "-Wvariadic-macros"
 #endif
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define TEST_CHERI_NO_SUBOBJECT_WARNING _Pragma("clang diagnostic ignored \"-Wcheri-subobject-bounds\"")
+#else
+#define TEST_CHERI_NO_SUBOBJECT_WARNING
+#endif
+
 #define TEST_CONCAT1(X, Y) X##Y
 #define TEST_CONCAT(X, Y) TEST_CONCAT1(X, Y)
 
@@ -148,7 +154,7 @@
 //  Specifically, FreeBSD does NOT have timespec_get, even though they have all
 //  the rest of C11 - this is PR#38495
 #    define TEST_HAS_C11_FEATURES
-#  elif defined(__Fuchsia__)
+#  elif defined(__Fuchsia__) || defined(__wasi__)
 #    define TEST_HAS_C11_FEATURES
 #    define TEST_HAS_TIMESPEC_GET
 #  elif defined(__linux__)

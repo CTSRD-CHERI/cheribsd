@@ -14,6 +14,8 @@
 #include <cstring>
 #include <cassert>
 
+#include "test_macros.h"
+
 bool test_constructor_explicit(std::type_info const&) { return false; }
 bool test_constructor_explicit(std::string const&) { return true; }
 

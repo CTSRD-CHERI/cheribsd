@@ -20,11 +20,17 @@
 #include <future>
 #include <cassert>
 
+#include "test_macros.h"
+
 typedef std::chrono::milliseconds ms;
+
+static ms DelayShort = ms(TEST_SLOW_HOST() ? 600 : 300);
+static ms DelayLong = ms(TEST_SLOW_HOST() ? 1000 : 500);
+static ms Tolerance = ms(TEST_SLOW_HOST() ? 200 : 50);
 
 void func1(std::promise<int> p)
 {
-    std::this_thread::sleep_for(ms(500));
+    std::this_thread::sleep_for(DelayLong);
     p.set_value(3);
 }
 
@@ -32,14 +38,14 @@ int j = 0;
 
 void func3(std::promise<int&> p)
 {
-    std::this_thread::sleep_for(ms(500));
+    std::this_thread::sleep_for(DelayLong);
     j = 5;
     p.set_value(j);
 }
 
 void func5(std::promise<void> p)
 {
-    std::this_thread::sleep_for(ms(500));
+    std::this_thread::sleep_for(DelayLong);
     p.set_value();
 }
 
@@ -52,15 +58,15 @@ int main(int, char**)
         std::future<T> f = p.get_future();
         std::thread(func1, std::move(p)).detach();
         assert(f.valid());
-        assert(f.wait_for(ms(300)) == std::future_status::timeout);
+        assert(f.wait_for(DelayShort) == std::future_status::timeout);
         assert(f.valid());
-        assert(f.wait_for(ms(300)) == std::future_status::ready);
+        assert(f.wait_for(DelayShort) == std::future_status::ready);
         assert(f.valid());
         Clock::time_point t0 = Clock::now();
         f.wait();
         Clock::time_point t1 = Clock::now();
         assert(f.valid());
-        assert(t1-t0 < ms(50));
+        assert(t1-t0 < Tolerance);
     }
     {
         typedef int& T;
@@ -68,15 +74,15 @@ int main(int, char**)
         std::future<T> f = p.get_future();
         std::thread(func3, std::move(p)).detach();
         assert(f.valid());
-        assert(f.wait_for(ms(300)) == std::future_status::timeout);
+        assert(f.wait_for(DelayShort) == std::future_status::timeout);
         assert(f.valid());
-        assert(f.wait_for(ms(300)) == std::future_status::ready);
+        assert(f.wait_for(DelayShort) == std::future_status::ready);
         assert(f.valid());
         Clock::time_point t0 = Clock::now();
         f.wait();
         Clock::time_point t1 = Clock::now();
         assert(f.valid());
-        assert(t1-t0 < ms(50));
+        assert(t1-t0 < Tolerance);
     }
     {
         typedef void T;
@@ -84,15 +90,15 @@ int main(int, char**)
         std::future<T> f = p.get_future();
         std::thread(func5, std::move(p)).detach();
         assert(f.valid());
-        assert(f.wait_for(ms(300)) == std::future_status::timeout);
+        assert(f.wait_for(DelayShort) == std::future_status::timeout);
         assert(f.valid());
-        assert(f.wait_for(ms(300)) == std::future_status::ready);
+        assert(f.wait_for(DelayShort) == std::future_status::ready);
         assert(f.valid());
         Clock::time_point t0 = Clock::now();
         f.wait();
         Clock::time_point t1 = Clock::now();
         assert(f.valid());
-        assert(t1-t0 < ms(50));
+        assert(t1-t0 < Tolerance);
     }
 
   return 0;

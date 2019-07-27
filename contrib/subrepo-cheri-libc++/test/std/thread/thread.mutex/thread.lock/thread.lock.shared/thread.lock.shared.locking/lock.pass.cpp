@@ -42,8 +42,8 @@ typedef std::chrono::nanoseconds ns;
 ms WaitTime = ms(250);
 ms Tolerance = ms(25);
 #else
-ms WaitTime = ms(500);
-ms Tolerance = ms(25 * 5);
+ms WaitTime = ms(750);
+ms Tolerance = ms(200);
 #endif
 
 

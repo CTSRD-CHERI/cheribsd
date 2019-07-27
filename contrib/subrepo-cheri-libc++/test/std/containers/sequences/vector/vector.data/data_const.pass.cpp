@@ -13,8 +13,10 @@
 #include <vector>
 #include <cassert>
 
+#include "test_macros.h"
 #include "min_allocator.h"
 #include "asan_testing.h"
+TEST_CHERI_NO_SUBOBJECT_WARNING
 
 struct Nasty {
     Nasty() : i_(0) {}
