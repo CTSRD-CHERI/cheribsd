@@ -3393,13 +3393,14 @@ public:
 
   uintptr_t getSP() const { return _registers.__c[11]; }
   void      setSP(uintptr_t value) { _registers.__c[11] = value; }
-  uintptr_t getIP() const { CHERI_DBG("getIP(%#p)\n", (void*)_registers.__c[32]); return _registers.__c[32]; }
+  uintptr_t getIP() const {
+    CHERI_DBG("getIP(%#p)\n", (void *)_registers.__c[32]);
+    return _registers.__c[32];
+  }
   void setIP(uintptr_t value) {
-    if (!__builtin_cheri_tag_get((void *)value)) {
-      fprintf(
-          stderr,
-          "WARNING: Registers_mips_cheri::setIP() with untagged value %#p\n",
-          (void *)value);
+    if (!__builtin_cheri_tag_get((void *)value) && (void *)value != nullptr) {
+      fprintf(stderr, "WARNING: Registers_mips_cheri::setIP() with untagged, "
+                      "non-null value %#p\n", (void *)value);
     }
     CHERI_DBG("setIP(%#p)\n", (void *)value);
     _registers.__c[32] = value;
@@ -3459,7 +3460,7 @@ inline Registers_mips_cheri::Registers_mips_cheri(const void *registers) {
 inline uintcap_t Registers_mips_cheri::getCapabilityRegister(int regNum) const {
   assert(validCapabilityRegister(regNum));
   if (regNum == UNW_REG_IP)
-    return _registers.__c[32];
+    return getIP();
   if (regNum == UNW_REG_SP)
     return _registers.__c[11];
   return _registers.__c[regNum - UNW_MIPS_DDC];
@@ -3468,7 +3469,7 @@ inline uintcap_t Registers_mips_cheri::getCapabilityRegister(int regNum) const {
 inline void Registers_mips_cheri::setCapabilityRegister(int regNum, uintcap_t value) {
   assert(validCapabilityRegister(regNum));
   if (regNum == UNW_REG_IP) {
-    _registers.__c[32] = value;
+    setIP(value);
     return;
   }
   if (regNum == UNW_REG_SP) {
