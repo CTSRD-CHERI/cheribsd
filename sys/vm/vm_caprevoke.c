@@ -475,9 +475,14 @@ vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 	vm_map_entry_t entry;
 	vm_offset_t addr;
 
-	KASSERT(!!(flags & VM_CAPREVOKE_LAST_INIT)
-		 == !!(flags & VM_CAPREVOKE_LAST_FINI),
-			("vm_caprevoke_one bad LAST flags"));
+	if ((flags & (VM_CAPREVOKE_LAST_INIT|VM_CAPREVOKE_LAST_FINI))
+	    == VM_CAPREVOKE_LAST_FINI) {
+		/*
+		 * XXX We don't do the load-side story; instead, we do all our work
+		 * in LAST_INIT.  There's nothing to do in this second pass.
+		 */
+		return KERN_SUCCESS;
+	}
 
 	PROC_ASSERT_HELD(p);
 	vm = vmspace_acquire_ref(p);
@@ -485,14 +490,10 @@ vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 	addr = 0;
 	map = &vm->vm_map;
 
-	/*
-	 * Acquire the address space map in read-locked and busy state, to
-	 * fence against a concurrent fork (in vmspace_fork, in particular).
-	 */
+	/* Acquire the address space map write-locked and not busy */
 	vm_map_lock(map);
 	if(map->busy)
 		vm_map_wait_busy(map);
-	vm_map_busy(map);
 
 	if (flags & VM_CAPREVOKE_LAST_INIT) {
 		/*
@@ -501,13 +502,15 @@ vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 		 *
 		 * XXX Do we really want to do this only in LAST_INIT?
 		 * Should we have a separate flag to optionally do this for
-		 * incremental passes or something?
+		 * incremental passes or something?  The world might not be
+		 * single-threaded for those, but maybe that's OK?
 		 */
 		pmap_sync_capdirty(map->pmap);
 	}
 
-	/* XXX The rest of this is LAST_FINI-style work */
+	/* Downgrade VM map locks to read-locked but busy */
 
+	vm_map_busy(map);
 	vm_map_lock_downgrade(map);
 
 	entry = map->header.next;
@@ -516,6 +519,11 @@ vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 		addr = entry->start;
 
 	while (entry != &map->header) {
+		/*
+		 * XXX Somewhere around here we should be resetting
+		 * MPROT_QUARANTINE'd map entries to be usable again, yes?
+		 */
+
 		res = vm_caprevoke_map_entry(map, entry, flags, &addr, st);
 
 		/*

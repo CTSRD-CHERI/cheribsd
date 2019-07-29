@@ -142,6 +142,33 @@ static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
 #define CAPREVOKE_ONLY_IF_OPEN	0x008
 
 	/*
+	 * Ordinarily, caprevoke with CAPREVOKE_LAST_PASS attempts to
+	 * minimize the amount of work it does with the world held in
+	 * single-threaded state.  It will do up to three passes:
+	 *
+	 *   * an opening/incremental pass with the world running
+	 *
+	 *   * a pass with the world stopped, which visits kernel hoarders
+	 *     and recently-dirty pages (since the above pass)
+	 *
+	 *   * another pass with the world resumed, again visiting
+	 *     recently-dirty pages.  (XXX Not yet!)
+	 *
+	 * The first and/or last of these may be disabled by passing
+	 * CAPREVOKE_LAST_NO_EARLY and/or CAPREVOKE_LAST_NO_LATE flags,
+	 * causing more work to be pushed into the world-stopped phase.
+	 *
+	 * Setting CAPREVOKE_LAST_NO_EARLY when not setting
+	 * CAPREVOKE_LAST_PASS will cause no passes to be performed.
+	 *
+	 * XXX CAPREVOKE_LAST_NO_LATE is currently implied because our VM
+	 * does not actually take advantage of the split.  This is
+	 * post-ASPLOS work at the earliest.
+	 */
+#define CAPREVOKE_LAST_NO_EARLY	0x010
+#define CAPREVOKE_LAST_NO_LATE	0x020
+
+	/*
 	 * Some flags indicate that we are to engage in a blocking
 	 * capability revocation sweep on a subset of the entire address
 	 * space.  If any of these are set, we bypass the above state

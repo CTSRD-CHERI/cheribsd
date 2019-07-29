@@ -153,6 +153,12 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 		return cheriabi_caprevoke_fini(td, uap, &stat);
 	}
 
+	/*
+	 * XXX We don't support late phases anyway, except as a placeholder,
+	 * so act like the user asked us not to do one.
+	 */
+	uap->flags |= CAPREVOKE_LAST_NO_LATE;
+
 	/* Serialize and figure out what we're supposed to do */
 	PROC_LOCK(td->td_proc);
 reentry:
@@ -237,21 +243,6 @@ fast_out:
 			 || (myst == CAPREVST_LAST_PASS),
 			("Beginning revocation with bad current state"));
 
-		if (((td->td_proc->p_flag & P_HADTHREADS) != 0) &&
-			(myst == CAPREVST_LAST_PASS)) {
-			/*
-			 * Single-thread the world, or at least the
-			 * userland-visible parts of it.  In the current
-			 * implementation, we will stay here for the
-			 * duration of this last pass.
-			 */
-			if (thread_single(td->td_proc, SINGLE_BOUNDARY)) {
-				PROC_UNLOCK(td->td_proc);
-				cv_signal(&td->td_proc->p_caprev_cv);
-				return ERESTART;
-			}
-		}
-
 		/*
 		 * Don't bump the epoch count here!  Wait until we're
 		 * certain it's actually open, which we can only do below.
@@ -263,49 +254,115 @@ fast_out:
 	}
 	PROC_UNLOCK(td->td_proc);
 
+	/* Walk the VM unless told not to */
+	if ((uap->flags & CAPREVOKE_LAST_NO_EARLY) == 0) {
+		res = vm_caprevoke(td->td_proc,
+			/* If not first pass, only recently capdirty pages */
+		   ((entryst == CAPREVST_INIT_DONE)
+			? VM_CAPREVOKE_INCREMENTAL : 0),
+		 &stat
+		);
+
+		if (res == KERN_SUCCESS) {
+			/*
+			 * That worked; the epoch is certainly open; when we
+			 * set the state below, it's fine to advance the
+			 * clock rather than revert it, even if something
+			 * else goes wrong.
+			 */
+			if (entryst == CAPREVST_NONE) {
+				epoch++;
+				entryst = CAPREVST_INIT_DONE;
+			}
+		} else {
+			goto skip_last_pass;
+		}
+	}
+
 	/*
-	 * If we are beginning the last pass (and so, presently, are
-	 * single-threaded), expunge state that we want to ensure does not
-	 * become visible during the body of the last pass.
+	 * If we are beginning the last pass, single-thread the world and
+	 * expunge state that we want to ensure does not become visible
+	 * during the body of the last pass.
 	 */
 	if (myst == CAPREVST_LAST_PASS) {
 		struct thread *ptd;
 
-		/* Kernel hoarders */
-		caprevoke_hoarders(td->td_proc, &stat);
-
-		/* And thread register files */
 		PROC_LOCK(td->td_proc);
+		if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
+			if (thread_single(td->td_proc, SINGLE_BOUNDARY)) {
+				_PRELE(td->td_proc);
+				SET_ST(td->td_proc, epoch, entryst);
+				PROC_UNLOCK(td->td_proc);
+				/* XXX Don't signal other would-be revokers? */
+				return ERESTART;
+			}
+		}
+
+		/* Register file */
 		FOREACH_THREAD_IN_PROC(td->td_proc, ptd) {
 			caprevoke_td_frame(ptd, &stat);
 		}
 		PROC_UNLOCK(td->td_proc);
+
+		/* Kernel hoarders */
+		caprevoke_hoarders(td->td_proc, &stat);
+
+		/*
+		 * The world is stopped; do another pass through the VM.
+		 *
+		 * This pass can be incremental if we had previously done an
+		 * init pass, either just now or earlier.  In either case,
+		 * we'll have entryst == CAPREVST_INIT_DONE; there's no need
+		 * to look at CAPREVOKE_NO_EARLY_PASS.
+		 */
+		res = vm_caprevoke(td->td_proc,
+			((entryst == CAPREVST_INIT_DONE)
+				? VM_CAPREVOKE_INCREMENTAL : 0)
+			| VM_CAPREVOKE_LAST_INIT
+			| (((uap->flags & CAPREVOKE_LAST_NO_LATE) != 0)
+				? VM_CAPREVOKE_LAST_FINI : 0),
+			&stat);
+
+		if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
+			/* Un-single-thread the world */
+			thread_single_end(td->td_proc, SINGLE_BOUNDARY);
+		}
+
+		if (res != KERN_SUCCESS) {
+			PROC_LOCK(td->td_proc);
+			_PRELE(td->td_proc);
+			SET_ST(td->td_proc, epoch, entryst);
+			PROC_UNLOCK(td->td_proc);
+
+			cv_signal(&td->td_proc->p_caprev_cv);
+			stat.epoch_fini = epoch;
+			return cheriabi_caprevoke_fini(td, uap, &stat);
+		}
+
+		if (entryst == CAPREVST_NONE) {
+			/* That counts as our initial pass */
+			epoch++;
+			entryst = CAPREVST_INIT_DONE;
+		}
+
+		if ((uap->flags & CAPREVOKE_LAST_NO_LATE) == 0) {
+			/*
+			 * Walk the VM again, now with the world running;
+			 * as we must have done a pass before here, this is
+			 * certain to be an incremental pass.
+			 */
+			res = vm_caprevoke(td->td_proc,
+				VM_CAPREVOKE_INCREMENTAL
+				| VM_CAPREVOKE_LAST_FINI,
+				&stat);
+		}
 	}
 
-	/* Walk the VM */
-	res = vm_caprevoke(td->td_proc,
-		/* If not first pass, only recently capdirty pages */
-	   ((entryst == CAPREVST_INIT_DONE) ? VM_CAPREVOKE_INCREMENTAL : 0)
-		/*
-		 * If last pass, loop until actually done.
-		 *
-		 * XXX Eventually _LAST_INIT and _LAST_FINI end up on
-		 * opposite sides of the thread_single_end call, for when
-		 * we want to do the load-side story.
-		 */
-	 | ((myst == CAPREVST_LAST_PASS) ?
-		(VM_CAPREVOKE_LAST_INIT | VM_CAPREVOKE_LAST_FINI) : 0),
-	 &stat
-	);
-
+skip_last_pass:
 	/* OK, that's that.  Where do we stand now? */
 	PROC_LOCK(td->td_proc);
 	{
 		_PRELE(td->td_proc);
-
-		KASSERT(td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT
-			 == epoch,
-			("Epoch value changed while revoking"));
 
 		if ((myst == CAPREVST_LAST_PASS)
 		    && ((td->td_proc->p_flag & P_HADTHREADS) != 0)) {
@@ -313,28 +370,17 @@ fast_out:
 			thread_single_end(td->td_proc, SINGLE_BOUNDARY);
 		}
 
-		if (res == KERN_SUCCESS) {
-			if (entryst == CAPREVST_NONE) {
-				epoch++;
-			}
-
-			if (myst == CAPREVST_LAST_PASS) {
-				/* Signal the end of this revocation epoch */
-				epoch++;
-				SET_ST(td->td_proc, epoch, CAPREVST_NONE);
-			} else {
-				/* We have done at least one good pass. */
-				SET_ST(td->td_proc, epoch, CAPREVST_INIT_DONE);
-			}
+		if ((res == KERN_SUCCESS) && (myst == CAPREVST_LAST_PASS)) {
+			/* Signal the end of this revocation epoch */
+			epoch++;
+			SET_ST(td->td_proc, epoch, CAPREVST_NONE);
 		} else {
 			/*
-			 * Put the state back how we found it: if we were
-			 * trying to open an epoch, we can't really claim
-			 * that the initial pass is done.
+			 * Put the state back how we found it, modulo
+			 * having perhaps finished the first pass.
 			 */
 			SET_ST(td->td_proc, epoch, entryst);
 		}
-
 	}
 	PROC_UNLOCK(td->td_proc);
 
