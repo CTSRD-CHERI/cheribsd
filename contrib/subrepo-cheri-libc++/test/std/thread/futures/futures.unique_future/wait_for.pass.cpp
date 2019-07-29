@@ -8,7 +8,7 @@
 //
 // UNSUPPORTED: libcpp-has-no-threads
 // UNSUPPORTED: c++98, c++03
-
+// FLAKY_TEST.
 // <future>
 
 // class future<R>
