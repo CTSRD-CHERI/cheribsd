@@ -143,7 +143,7 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	 * to be too picky about it.  This value is not reported to
 	 * userland, just used to guide the interlocking below.
 	 */
-	if ((uap->flags & CAPREVOKE_MUST_ADVANCE) != 0) {
+	if ((uap->flags & CAPREVOKE_IGNORE_START) != 0) {
 		uap->start_epoch = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
 	}
 
@@ -156,6 +156,9 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	/* Serialize and figure out what we're supposed to do */
 	PROC_LOCK(td->td_proc);
 	{
+		static const int fast_out_flags = CAPREVOKE_NO_WAIT_OK
+						| CAPREVOKE_IGNORE_START
+						| CAPREVOKE_LAST_NO_EARLY;
 		int ires = 0;
 		uint64_t first_epoch;
 
@@ -209,6 +212,12 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 			break;
 		}
 
+		if ((uap->flags & (fast_out_flags|CAPREVOKE_LAST_PASS))
+		    == fast_out_flags) {
+			/* Apparently they really just wanted the time. */
+			goto fast_out;
+		}
+
 reentry:
 		if (caprevoke_epoch_ge(epoch,
 		      uap->start_epoch + (uap->start_epoch & 1) + 2)) {
@@ -256,6 +265,10 @@ fast_out:
 			break;
 		case CAPREVST_INIT_PASS:
 		case CAPREVST_LAST_PASS:
+			if ((uap->flags & CAPREVOKE_NO_WAIT_OK) != 0) {
+				goto fast_out;
+			}
+
 			/* There is another revoker in progress.  Wait. */
 			ires = cv_wait_sig(&td->td_proc->p_caprev_cv,
 				&td->td_proc->p_mtx);

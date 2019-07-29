@@ -116,27 +116,31 @@ static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
 #define CAPREVOKE_LAST_PASS	0x001
 
 	/*
-	 * If this bit is set, the kernel is free to background this bit
-	 * of revocation work, if possible.  The returned clock will
-	 * describe any transitions that take place as a result of this
-	 * request, but not any that result due to backgrounded work.
+	 * If this bit is set, the kernel is free to return without making
+	 * progress.
 	 *
-	 * XXX Unimplemented, and I'm not sure it's exactly what we want?
+	 * The returned statistics describe any transitions that take place
+	 * as a result of this request, but not any that result due to
+	 * backgrounded work.
+	 *
+	 * If set without CAPREVOKE_IGNORE_START, the kernel may treat this
+	 * as a hint that background revocation may be useful (XXX but we
+	 * don't implement that yet).
+	 *
 	 */
 #define	CAPREVOKE_NO_WAIT_OK	0x002
 
 	/*
 	 * Ignore the given epoch argument and always attempt to advance the
 	 * epoch clock relative to its value "at the time of the call".
-	 * This is most useful for enqueueing objects to quarantine.
 	 */
-#define CAPREVOKE_MUST_ADVANCE	0x004
+#define CAPREVOKE_IGNORE_START	0x004
 
 	/*
-	 * Do a pass only if an epoch is open.  Otherwise, it acts like
-	 * CAPREVOKE_JUST_THE_TIME.  This is most useful when we want to
-	 * get to the end of an epoch as quickly as possible; if we're
-	 * already past the end, then we should just stay there.
+	 * Do a pass only if an epoch is open after synchronization.  This
+	 * is most useful when we want to get to the end of an epoch as
+	 * quickly as possible; if we're already past the end, then we
+	 * should just stay there.
 	 */
 #define CAPREVOKE_ONLY_IF_OPEN	0x008
 
@@ -180,14 +184,18 @@ static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
 	 * retrospective question ("Is it certain that enough time has
 	 * elapsed?").  It's not OK to use CAPREVOKE_JUST_THE_TIME when
 	 * putting things *into* quarantine, as that's a forward-looking
-	 * question and so requires some degree of synchronization.  If
-	 * absolutely critical that no revocation take place while labeling
-	 * objects going into quarantine, use
-	 *   CAPREVOKE_MUST_ADVANCE|CAPREVOKE_LAST_NO_EARLY
-	 * to carry out synchronization without advancing the sate machine.
+	 * question and so requires some degree of synchronization: a
+	 * too-early answer will suggest that things have been revoked when
+	 * they have not.  If absolutely critical that no revocation take
+	 * place while labeling objects going into quarantine, use instead
+	 *
+	 *   CAPREVOKE_NO_WAIT_OK
+	 *   | CAPREVOKE_IGNORE_START
+	 *   | CAPREVOKE_LAST_NO_EARLY
+	 *
+	 * to carry out synchronization without advancing the state machine.
 	 * (As CAPREVOKE_LAST_PASS is clear, CAPREVOKE_LAST_NO_LATE is not
-	 * necessary.)  In general, however,
-	 *   CAPREVOKE_MUST_ADVANCE|CAPREVOKE_
+	 * necessary.)
 	 */
 #define CAPREVOKE_JUST_THE_TIME	0x100	/* Nothing, just report epoch */
 #define CAPREVOKE_JUST_MY_REGS  0x200	/* Calling thread register file */

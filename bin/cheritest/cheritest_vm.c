@@ -814,7 +814,7 @@ test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
 	((uint8_t * __capability) sh)[0] = 1;
 
 	cyc_start = cheri_get_cyclecount();
-	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_MUST_ADVANCE, 0, &crst));
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_IGNORE_START, 0, &crst));
 	cyc_end = cheri_get_cyclecount();
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
@@ -827,7 +827,7 @@ test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
 	mb[1] = revme;
 
 	cyc_start = cheri_get_cyclecount();
-	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_MUST_ADVANCE, 0, &crst));
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_IGNORE_START, 0, &crst));
 	cyc_end = cheri_get_cyclecount();
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
@@ -841,7 +841,7 @@ test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
 	mb[2] = revme;
 
 	cyc_start = cheri_get_cyclecount();
-	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_MUST_ADVANCE, 0, &crst));
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_IGNORE_START, 0, &crst));
 	cyc_end = cheri_get_cyclecount();
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
