@@ -362,6 +362,7 @@ __END_DECLS
  * Access a variable length array that has been declared as a fixed
  * length array.
  */
-#define __PAST_END(array, offset) (((__typeof__(*(array)) *)(array))[offset])
+#define __PAST_END(array, offset)	\
+    (((__typeof__(*(array)) *)__builtin_no_change_bounds(array))[offset])
 
 #endif	/* _SYS_PARAM_H_ */
