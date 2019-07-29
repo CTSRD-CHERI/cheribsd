@@ -175,12 +175,12 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind20Registers_mips_cheri6jumptoEv)
   RESTORE_GPR(30)
   RESTORE_GPR(31)
 
-#ifndef  _MIPS_SZCAP
-#error _MIPS_SZCAP must be defined!
+#ifndef __SIZEOF_UINTCAP__
+#error __SIZEOF_UINTCAP__ must be defined!
 #endif
-  CIncOffset $c3, $c3, _LIBUNWIND_CAPREG_START*8+2*(_MIPS_SZCAP/8)
+  CIncOffset $c3, $c3, _LIBUNWIND_CAPREG_START*8
 
-#define RESTORE_CAP_REG(reg, idx) clc $c ## reg, $zero, ((idx-2)*(_MIPS_SZCAP/8))($c3)
+#define RESTORE_CAP_REG(reg, idx) clc $c ## reg, $zero, ((idx)*(__SIZEOF_UINTCAP__))($c3)
 #define RESTORE_CAP(x) RESTORE_CAP_REG(x, x)
   // Use $c17 as the temporary when restoring $ddc since it is loaded last
   RESTORE_CAP_REG(17, 0)
@@ -209,6 +209,12 @@ DEFINE_LIBUNWIND_FUNCTION(_ZN9libunwind20Registers_mips_cheri6jumptoEv)
   RESTORE_CAP(24)
   RESTORE_CAP(25)
   RESTORE_CAP(26)
+  // Also restore 27-31 even though they should be null
+  RESTORE_CAP(27)
+  RESTORE_CAP(28)
+  RESTORE_CAP(29)
+  RESTORE_CAP(30)
+  RESTORE_CAP(31)
 
   // Load the new PC into $cra
   RESTORE_CAP_REG(17, 32)

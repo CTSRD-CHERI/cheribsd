@@ -106,8 +106,8 @@ unwind_phase1(unw_context_t *uc, unw_cursor_t *cursor, _Unwind_Exception *except
         __unw_get_reg(cursor, UNW_REG_SP, &sp);
         exception_object->private_2 = (uintptr_t)sp;
         _LIBUNWIND_TRACE_UNWINDING(
-            "unwind_phase1(ex_ojb=%p): _URC_HANDLER_FOUND",
-            (void *)exception_object);
+            "unwind_phase1(ex_ojb=%p): _URC_HANDLER_FOUND sp=%p",
+            (void *)exception_object, (void*)sp);
         return _URC_NO_REASON;
 
       case _URC_CONTINUE_UNWIND:
@@ -128,6 +128,12 @@ unwind_phase1(unw_context_t *uc, unw_cursor_t *cursor, _Unwind_Exception *except
   }
   return _URC_NO_REASON;
 }
+#ifdef __CHERI_PURE_CAPABILITY__
+#define PRINT_PTR_V "%#p"
+#else
+#define PRINT_PTR_V "%p"
+#endif
+#define PRINT_PTR "%p"
 
 
 static _Unwind_Reason_Code
@@ -158,7 +164,7 @@ unwind_phase2(unw_context_t *uc, unw_cursor_t *cursor, _Unwind_Exception *except
     }
 
     // Get info about this frame.
-    unw_word_t sp;
+    unw_word_t sp = 0;
     unw_proc_info_t frameInfo;
     __unw_get_reg(cursor, UNW_REG_SP, &sp);
     if (__unw_get_proc_info(cursor, &frameInfo) != UNW_ESUCCESS) {
@@ -178,12 +184,12 @@ unwind_phase2(unw_context_t *uc, unw_cursor_t *cursor, _Unwind_Exception *except
                                &offset) != UNW_ESUCCESS) ||
           (frameInfo.start_ip + offset > frameInfo.end_ip))
         functionName = ".anonymous.";
-      _LIBUNWIND_TRACE_UNWINDING("unwind_phase2(ex_ojb=%p): start_ip=0x%" PRIxPTR
-                                 ", func=%s, sp=0x%" PRIxPTR ", lsda=0x%" PRIxPTR
-                                 ", personality=0x%" PRIxPTR,
-                                 (void *)exception_object, frameInfo.start_ip,
-                                 functionName, sp, frameInfo.lsda,
-                                 frameInfo.handler);
+      _LIBUNWIND_TRACE_UNWINDING("unwind_phase2(ex_ojb=%p): start_ip=" PRINT_PTR
+                                 ", func=%s, sp=" PRINT_PTR_V ", lsda=" PRINT_PTR
+                                 ", personality=" PRINT_PTR,
+                                 (void *)exception_object, (void *)frameInfo.start_ip,
+                                 functionName, (void *)sp, (void *)frameInfo.lsda,
+                                 (void *)frameInfo.handler);
     }
 
     // If there is a personality routine, tell it we are unwinding.

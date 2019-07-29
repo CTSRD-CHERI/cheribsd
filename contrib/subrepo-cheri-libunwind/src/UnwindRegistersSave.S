@@ -291,7 +291,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
 #endif
   /* Add the offset of the start of the capability register set to $at */
   daddiu $1, $zero, _LIBUNWIND_CAPREG_START*8
-#define SAVE_CAP_REG(src, x) csc $c ## src, $1, (x * _MIPS_SZCAP/8)($c3)
+#define SAVE_CAP_REG(src, x) csc $c ## src, $1, (x * __SIZEOF_UINTCAP__)($c3)
 #define SAVE_CAP(x) SAVE_CAP_REG(x, x)
   SAVE_CAP(1)
   SAVE_CAP(2)
@@ -326,7 +326,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   SAVE_CAP_REG(null, 30)
   SAVE_CAP_REG(null, 31)
 
-  // Use $c12 as a temp register in order to save it $ddc since $c12 will hold
+  // Use $c12 as a temp register in order to save $ddc since $c12 will hold
   // the cap for __unw_getcontext and it doesn't make sense to save it
   cgetdefault $c12
   SAVE_CAP_REG(12, 0)
@@ -334,7 +334,7 @@ DEFINE_LIBUNWIND_FUNCTION(__unw_getcontext)
   // return UNW_ESUCCESS
   daddiu $v0, $zero, 0
   # Store the return address where we expect the current PC
-  daddiu $1, $1, 32*_MIPS_SZCAP/8
+  daddiu $1, $1, 32*__SIZEOF_UINTCAP__
   cjr $c17
   csc $c17, $1, 0($c3)
 END_LIBUNWIND_FUNCTION(__unw_getcontext)
