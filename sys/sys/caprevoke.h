@@ -128,8 +128,7 @@ static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
 	/*
 	 * Ignore the given epoch argument and always attempt to advance the
 	 * epoch clock relative to its value "at the time of the call".
-	 * This is most useful for when we don't know the time and don't
-	 * have the resources to wait around.
+	 * This is most useful for enqueueing objects to quarantine.
 	 */
 #define CAPREVOKE_MUST_ADVANCE	0x004
 
@@ -175,6 +174,20 @@ static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
 	 * machine and visit only the indicated locations.  This is an
 	 * expermental feature to see if this kind of mitigation, while
 	 * unsound, is still a useful thing to do.
+	 *
+	 * CAPREVOKE_JUST_THE_TIME deserves some discussion.  It's fine to
+	 * use it to pull things *out* of quarantine, because that's a
+	 * retrospective question ("Is it certain that enough time has
+	 * elapsed?").  It's not OK to use CAPREVOKE_JUST_THE_TIME when
+	 * putting things *into* quarantine, as that's a forward-looking
+	 * question and so requires some degree of synchronization.  If
+	 * absolutely critical that no revocation take place while labeling
+	 * objects going into quarantine, use
+	 *   CAPREVOKE_MUST_ADVANCE|CAPREVOKE_LAST_NO_EARLY
+	 * to carry out synchronization without advancing the sate machine.
+	 * (As CAPREVOKE_LAST_PASS is clear, CAPREVOKE_LAST_NO_LATE is not
+	 * necessary.)  In general, however,
+	 *   CAPREVOKE_MUST_ADVANCE|CAPREVOKE_
 	 */
 #define CAPREVOKE_JUST_THE_TIME	0x100	/* Nothing, just report epoch */
 #define CAPREVOKE_JUST_MY_REGS  0x200	/* Calling thread register file */
@@ -193,8 +206,36 @@ static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
  * Information conveyed to userland about a given caprevoke scan.
  */
 struct caprevoke_stats {
+
+		/*
+		 * The synchronized time at the start of the call.  This
+		 * value is useful for *enqueueing* objects to quarantine:
+		 * all bitmap writes prior to the system call certainly
+		 * happened in or before epoch_init, and so waiting for the
+		 * epoch to advance sufficiently far relative to epoch_init
+		 * will ensure that those objects have been revoked.
+		 */
 	uint64_t	epoch_init;
+
+		/*
+		 * The synchronized time at the end of the call.  This value
+		 * is useful for *dequeueing* objects from quarantine: if
+		 * this value clears the recorded epoch_init, then those
+		 * objects have been revoked.
+		 *
+		 * It may be the case that epoch_fini < epoch_init.  This
+		 * implies that an epoch transition is in progress but that
+		 * the requested "start_epoch" given to caprevoke() has been
+		 * cleared by the reported value of epoch_fini, and so there
+		 * is no reason to wait for the transition to finish.
+		 */
 	uint64_t	epoch_fini;
+
+		/*
+		 * The remainder of the fields of this structure are purely
+		 * informative; they may be of slight interest to policies,
+		 * but shouldn't influence correctness.
+		 */
 
 	uint64_t	pages_scanned;
 	uint64_t	pages_retried;

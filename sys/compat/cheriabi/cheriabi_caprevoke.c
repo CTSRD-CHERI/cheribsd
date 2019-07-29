@@ -73,9 +73,12 @@ caprevoke_hoarders(struct proc *p, struct caprevoke_stats *stat)
 
 static int
 cheriabi_caprevoke_fini(struct thread *td, struct cheriabi_caprevoke_args *uap,
-			struct caprevoke_stats *crst)
+			int res, struct caprevoke_stats *crst)
 {
-	return copyout(crst, uap->statout, sizeof (*crst));
+	int res2 = copyout(crst, uap->statout, sizeof (*crst));
+	if (res != 0)
+		return res;
+	return res2;
 }
 
 static int
@@ -116,7 +119,7 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	/* XXX unlocked read OK? */
 	st.epoch_fini = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
-	return cheriabi_caprevoke_fini(td, uap, &st);
+	return cheriabi_caprevoke_fini(td, uap, 0, &st);
 }
 
 #define SET_ST(p, e, st) \
@@ -135,22 +138,13 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	}
 	/* Engaging the full state machine; here we go! */
 
-	/* XXX An unlocked read should be OK? */
-	stat.epoch_init =
-		td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
-
-	if ((uap->flags & CAPREVOKE_MUST_ADVANCE) != 0) {
-		uap->start_epoch = stat.epoch_init;
-	}
-
 	/*
-	 * This might seem like a silly test, but in conjunction with
-	 * CAPREVOKE_MUST_ADVANCE, it avoids taking the proc lock.
+	 * We need some value that's more or less "now", but we don't have
+	 * to be too picky about it.  This value is not reported to
+	 * userland, just used to guide the interlocking below.
 	 */
-	if (((uap->flags & CAPREVOKE_ONLY_IF_OPEN) != 0)
-	    && ((uap->start_epoch & 1) == 0)) {
-		stat.epoch_fini = stat.epoch_init;
-		return cheriabi_caprevoke_fini(td, uap, &stat);
+	if ((uap->flags & CAPREVOKE_MUST_ADVANCE) != 0) {
+		uap->start_epoch = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
 	}
 
 	/*
@@ -161,10 +155,61 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 
 	/* Serialize and figure out what we're supposed to do */
 	PROC_LOCK(td->td_proc);
-reentry:
 	{
-		epoch = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
+		int ires = 0;
+		uint64_t first_epoch;
 
+		epoch = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
+		first_epoch = epoch;
+
+		/*
+		 * Be optimistic about the outcome of any worker currently
+		 * in progress.  We cannot truly claim that all writes to
+		 * the revocation bitmap began prior to the epoch clock's
+		 * current value if that value is in the process of being
+		 * advanced by another thread: the writes may have happened
+		 * after that thread began its work.  Therefore, bump the
+		 * counter reported to userland appropriately.
+		 *
+		 * If the current epoch already clears the given
+		 * start_epoch, this may result in epoch_init > epoch_fini!
+		 *
+		 * Similarly, if the thread advancing the clock fails to do
+		 * so, we may find that our reported epoch_init is greater
+		 * than the epoch clock and so we may end up attempting to
+		 * advance only up to this report.  This is compensated for
+		 * below, when we wake up from sleep and notice that the
+		 * epoch has not advanced.
+		 */
+
+		switch(td->td_proc->p_caprev_st & CAPREVST_ST_MASK) {
+		case CAPREVST_INIT_PASS:
+			/*
+			 * A revoker intends to open, but not close, this
+			 * epoch.
+			 */
+			stat.epoch_init = epoch + 1;
+			break;
+		case CAPREVST_LAST_PASS:
+			/*
+			 * A revoker intends to close an epoch, which may
+			 * be the one now open or the next one.  In either
+			 * case, the resulting epoch is closed and advanced
+			 * from its present value.
+			 */
+			stat.epoch_init = (epoch & ~1) + 2;
+			break;
+		case CAPREVST_NONE:
+		case CAPREVST_INIT_DONE:
+			/*
+			 * There is no active worker; the epoch clock is
+			 * a true reflection of the time.
+			 */
+			stat.epoch_init = epoch;
+			break;
+		}
+
+reentry:
 		if (caprevoke_epoch_ge(epoch,
 		      uap->start_epoch + (uap->start_epoch & 1) + 2)) {
 			/*
@@ -179,16 +224,7 @@ fast_out:
 			PROC_UNLOCK(td->td_proc);
 			cv_signal(&td->td_proc->p_caprev_cv);
 			stat.epoch_fini = epoch;
-			return cheriabi_caprevoke_fini(td, uap, &stat);
-		}
-
-		if (((uap->flags & CAPREVOKE_ONLY_IF_OPEN) != 0)
-		    && ((epoch & 1) == 0)) {
-			/*
-			 * If we're requesting work only if an epoch is open
-			 * and one isn't, then there's only one thing to do!
-			 */
-			goto fast_out;
+			return cheriabi_caprevoke_fini(td, uap, ires, &stat);
 		}
 
 		/*
@@ -221,19 +257,18 @@ fast_out:
 		case CAPREVST_INIT_PASS:
 		case CAPREVST_LAST_PASS:
 			/* There is another revoker in progress.  Wait. */
-			KASSERT((epoch & 1) == 1, ("Even epoch PASS"));
-			{
-				int res;
-
-				res = cv_wait_sig(&td->td_proc->p_caprev_cv,
-					&td->td_proc->p_mtx);
-				if (res != 0) {
-					PROC_UNLOCK(td->td_proc);
-					cv_signal(&td->td_proc->p_caprev_cv);
-					return res;
-				}
-				goto reentry;
+			ires = cv_wait_sig(&td->td_proc->p_caprev_cv,
+				&td->td_proc->p_mtx);
+			if (ires != 0) {
+				goto fast_out;
 			}
+
+			epoch = td->td_proc->p_caprev_st
+				>> CAPREVST_EPOCH_SHIFT;
+			if (epoch == first_epoch) {
+				stat.epoch_init = epoch;
+			}
+			goto reentry;
 		}
 
 		KASSERT((entryst == CAPREVST_NONE)
@@ -242,6 +277,15 @@ fast_out:
 		KASSERT((myst == CAPREVST_INIT_PASS)
 			 || (myst == CAPREVST_LAST_PASS),
 			("Beginning revocation with bad current state"));
+
+		if (((uap->flags & CAPREVOKE_ONLY_IF_OPEN) != 0)
+		    && ((epoch & 1) == 0)) {
+			/*
+			 * If we're requesting work only if an epoch is open
+			 * and one isn't, then there's only one thing to do!
+			 */
+			goto fast_out;
+		}
 
 		/*
 		 * Don't bump the epoch count here!  Wait until we're
@@ -269,6 +313,11 @@ fast_out:
 			 * set the state below, it's fine to advance the
 			 * clock rather than revert it, even if something
 			 * else goes wrong.
+			 *
+			 * Note that this is a purely local change even so;
+			 * JUST_THE_TIME will not report it and threads
+			 * interlocking against us will not see it either,
+			 * until we next publish the state below.
 			 */
 			if (entryst == CAPREVST_NONE) {
 				epoch++;
@@ -336,7 +385,7 @@ fast_out:
 
 			cv_signal(&td->td_proc->p_caprev_cv);
 			stat.epoch_fini = epoch;
-			return cheriabi_caprevoke_fini(td, uap, &stat);
+			return cheriabi_caprevoke_fini(td, uap, 0, &stat);
 		}
 
 		if (entryst == CAPREVST_NONE) {
@@ -395,7 +444,7 @@ skip_last_pass:
 	 */
 	stat.epoch_fini = epoch;
 
-	return cheriabi_caprevoke_fini(td, uap, &stat);
+	return cheriabi_caprevoke_fini(td, uap, 0, &stat);
 }
 
 int
