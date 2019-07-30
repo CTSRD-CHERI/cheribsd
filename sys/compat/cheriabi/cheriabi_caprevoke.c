@@ -129,7 +129,7 @@ int
 cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 {
 	int res;
-	uint64_t epoch;
+	caprevoke_epoch epoch;
 	enum caprevoke_state entryst, myst;
 	struct caprevoke_stats stat = { 0 };
 
@@ -160,7 +160,7 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 						| CAPREVOKE_IGNORE_START
 						| CAPREVOKE_LAST_NO_EARLY;
 		int ires = 0;
-		uint64_t first_epoch;
+		caprevoke_epoch first_epoch;
 
 		epoch = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
 		first_epoch = epoch;
@@ -219,8 +219,7 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 		}
 
 reentry:
-		if (caprevoke_epoch_ge(epoch,
-		      uap->start_epoch + (uap->start_epoch & 1) + 2)) {
+		if (caprevoke_epoch_clears(epoch, uap->start_epoch)) {
 			/*
 			 * An entire epoch has come and gone since the
 			 * starting point of this request.  It is safe to

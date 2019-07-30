@@ -82,6 +82,8 @@ enum caprevoke_state {
 #define CAPREVST_EPOCH_SHIFT	2
 #define CAPREVST_EPOCH_WIDTH	62
 
+typedef uint64_t caprevoke_epoch;
+
 /*
  * Epoch greater than orderings: a > b, a >= b.
  *
@@ -96,12 +98,17 @@ enum caprevoke_state {
  * XXX this almost surely belongs somewhere else.
  */
 
-static inline int caprevoke_epoch_gt(uint64_t a, uint64_t b) {
+static inline int caprevoke_epoch_gt(caprevoke_epoch a, caprevoke_epoch b) {
 	return ((a < b) && ((b - a) > (1ULL << (CAPREVST_EPOCH_WIDTH-1))))
 	    || ((a > b) && ((a - b) < (1ULL << (CAPREVST_EPOCH_WIDTH-1))));
 }
-static inline int caprevoke_epoch_ge(uint64_t a, uint64_t b) {
+static inline int caprevoke_epoch_ge(caprevoke_epoch a, caprevoke_epoch b) {
 	return (a == b) || caprevoke_epoch_gt(a, b);
+}
+
+static inline int caprevoke_epoch_clears(caprevoke_epoch now,
+                                         caprevoke_epoch then) {
+	return caprevoke_epoch_ge(now, then + (then & 1) + 2);
 }
 
 	/*
@@ -223,7 +230,7 @@ struct caprevoke_stats {
 		 * epoch to advance sufficiently far relative to epoch_init
 		 * will ensure that those objects have been revoked.
 		 */
-	uint64_t	epoch_init;
+	caprevoke_epoch	epoch_init;
 
 		/*
 		 * The synchronized time at the end of the call.  This value
@@ -237,7 +244,7 @@ struct caprevoke_stats {
 		 * cleared by the reported value of epoch_fini, and so there
 		 * is no reason to wait for the transition to finish.
 		 */
-	uint64_t	epoch_fini;
+	caprevoke_epoch	epoch_fini;
 
 		/*
 		 * The remainder of the fields of this structure are purely
@@ -279,11 +286,15 @@ void caprevoke_td_frame(struct thread *td, struct caprevoke_stats *);
 	/*
 	 * Drive the revocation state machine.
 	 *
-	 * If the current epoch clock is caprvoke_epoch_gt than start_epoch,
-	 * this call returns immediately, populating statout->epoch with the
-	 * current clock's value.
+	 * If the current epoch clock is sufficient to caprvoke_epoch_clears
+	 * start_epoch, this call returns immediately, populating
+	 * statout->epoch_{init,fini} with the current clock's value.
+	 *
+	 * XXX if caprevoke_epoch becomes more complex than a scalar type,
+	 * this prototype will need to change or we'll need to be more
+	 * explicit about it being a hint or something.
 	 */
-int caprevoke(int flags, uint64_t start_epoch,
+int caprevoke(int flags, caprevoke_epoch start_epoch,
 		struct caprevoke_stats *statout);
 
 	/*
