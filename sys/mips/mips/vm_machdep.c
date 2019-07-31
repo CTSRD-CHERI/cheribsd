@@ -685,6 +685,7 @@ vm_do_caprevoke(void * __capability * __capability cutp, struct caprevoke_stats 
 
 	if (vm_test_caprevoke(cut)) {
 		void * __capability cscratch;
+		int ok;
 
 		/*
 		 * Load-link the position under test; verify that it matches
@@ -702,23 +703,21 @@ vm_do_caprevoke(void * __capability * __capability cutp, struct caprevoke_stats 
 		 */
 		__asm__ __volatile__ (
 			"cllc %[cscratch], %[cutp]\n\t"
-			"cexeq $t0, %[cscratch], %[cut]\n\t"
-			"beqz $t0, 1f\n\t"
-			"candperm %[cscratch], %[cscratch], $zero\n\t" // delay slot!
+			"cexeq %[ok], %[cscratch], %[cut]\n\t"
+			"beqz %[ok], 1f\n\t"
+			"candperm %[cscratch], %[cscratch], $zero\n\t"
 			"ccleartag %[cscratch], %[cscratch]\n\t"
-			"cscc $t0, %[cscratch], %[cutp]\n\t"
-			"beqz $t0, 1f\n\t"
-			"nop\n\t" // delay slot
-			"j 2f\n\t"
-			"1: ori %[res], %[res], %[cdflag]\n\t"
-			"2:\n"
-		  : [res] "+r" (res), [cscratch] "=&C" (cscratch)
-		  : [cut] "C" (cut), [cutp] "C" (cutp),
-		    [cdflag] "i" (VM_CAPREVOKE_PAGE_DIRTY)
-		  : "t0", "memory" );
+			"cscc %[ok], %[cscratch], %[cutp]\n\t"
+			"1:\n\t"
+		  : [ok] "=r" (ok), [cscratch] "=&C" (cscratch)
+		  : [cut] "C" (cut), [cutp] "C" (cutp)
+		  : "memory");
 
-		if ((res & VM_CAPREVOKE_PAGE_DIRTY) == 0)
+		if (__builtin_expect(ok,1)) {
 			stat->caps_cleared++;
+		} else {
+			res = VM_CAPREVOKE_PAGE_DIRTY;
+		}
 	}
 
 	return res;
