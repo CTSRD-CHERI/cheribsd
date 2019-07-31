@@ -60,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/unistd.h>
 #include <sys/vmem.h>
 
+#include <machine/_inttypes.h>
 #include <machine/abi.h>
 #include <machine/cache.h>
 #include <machine/clock.h>
@@ -723,6 +724,41 @@ vm_do_caprevoke(void * __capability * __capability cutp, struct caprevoke_stats 
 	return res;
 }
 
+static bool caprevoke_use_cloadtags = 1;
+SYSCTL_BOOL(_vm, OID_AUTO, caprevoke_use_cloadtags, CTLFLAG_RW,
+    &caprevoke_use_cloadtags, 0,
+    "XXX");
+
+uint8_t cloadtags_stride;
+SYSCTL_U8(_vm, OID_AUTO, cloadtags_stride, 0, &cloadtags_stride, 0, "XXX");
+
+static void
+measure_cloadtags_stride(void *ignored)
+{
+	(void)ignored;
+
+	void * __capability buf[64] __attribute__((aligned(PAGE_SIZE)));
+	int i;
+	
+	/* Fill with capabilities */
+	for (i = 0; i < 64; i++) {
+	        buf[i] = cheri_getkdc();
+	}
+
+	uint64_t tags = __builtin_cheri_cap_load_tags(buf);
+	switch(tags) {
+	case 0x0001:  cloadtags_stride = 1;  break;
+	case 0x0003:  cloadtags_stride = 2;  break;
+	case 0x000F:  cloadtags_stride = 4;  break;
+	case 0x00FF:  cloadtags_stride = 8;  break;
+	case 0xFFFF:  cloadtags_stride = 16; break;
+	default:
+		panic("Bad cloadtags result 0x%" PRIx64, tags);
+	}
+}
+SYSINIT(cloadtags_stride, SI_SUB_VM, SI_ORDER_ANY,
+        measure_cloadtags_stride, NULL);
+
 int
 vm_caprevoke_page(vm_page_t m, struct caprevoke_stats *stat)
 {
@@ -731,6 +767,7 @@ vm_caprevoke_page(vm_page_t m, struct caprevoke_stats *stat)
 	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
 	vm_offset_t mva;
 	vm_offset_t mve;
+	void * __capability * __capability mvu;
 	/* XXX NWF Is this what we want? */
 	void * __capability kdc = cheri_getkdc();
 	int res = 0;
@@ -745,33 +782,42 @@ vm_caprevoke_page(vm_page_t m, struct caprevoke_stats *stat)
 	mva = MIPS_PHYS_TO_DIRECT(mpa);
 	mve = mva + pagesizes[m->psind];
 
+	mvu = cheri_setaddress(kdc, mva);
 
-	/*
-	 * XXX NWF 8 is very uarch specific and should be fixed.
-	 */
-	for( ; mva < mve; mva += 8 * sizeof(void * __capability)) {
-		void * __capability * __capability mvu = cheri_setoffset(kdc,mva);
-		uint64_t tags;
+	if (caprevoke_use_cloadtags) {
+		for( ; cheri_getaddress(mvu) < mve; mvu += cloadtags_stride ) {
+			void * __capability * __capability mvt = mvu;
+			uint64_t tags;
 
-		tags = __builtin_cheri_cap_load_tags(mvu);
+			tags = __builtin_cheri_cap_load_tags(mvt);
 
-		/*
-		 * This is an easily-obtained overestimate: we might be
-		 * about to clear the last cap on this page.  We won't
-		 * detect that until the next revocation pass that touches
-		 * this page.  That's probably fine and probably doesn't
-		 * happen too often, and is a good bit simpler than trying
-		 * to measure afterwards
-		 */
-		if (tags != 0)
-			res |= VM_CAPREVOKE_PAGE_HASCAPS;
+			/*
+			 * This is an easily-obtained overestimate: we might
+			 * be about to clear the last cap on this page.  We
+			 * won't detect that until the next revocation pass
+			 * that touches this page.  That's probably fine and
+			 * probably doesn't happen too often, and is a good
+			 * bit simpler than trying to measure afterwards
+			 */
+			if (tags != 0)
+				res |= VM_CAPREVOKE_PAGE_HASCAPS;
 
-		for(; tags != 0; (tags >>= 1), mvu += 1) {
-			if (!(tags & 1))
-				continue;
-			stat->caps_found++;
+			for(; tags != 0; (tags >>= 1), mvt += 1) {
+				if (!(tags & 1))
+					continue;
+				stat->caps_found++;
 
-			res |= vm_do_caprevoke(mvu, stat);
+				res |= vm_do_caprevoke(mvt, stat);
+			}
+		}
+	} else {
+		for( ; cheri_getaddress(mvu) < mve; mvu++) {
+			void * __capability cut = *mvu;
+			if (cheri_gettag(cut)) {
+				stat->caps_found++;
+				res |= VM_CAPREVOKE_PAGE_HASCAPS;
+				res |= vm_do_caprevoke(mvu, stat);
+			}
 		}
 	}
 
