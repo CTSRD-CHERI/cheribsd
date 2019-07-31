@@ -21,8 +21,8 @@ __FBSDID("$FreeBSD$");
 
 // XXX This is very much a work in progress!
 
-static int caprevoke_avoid_faults = 1;
-SYSCTL_INT(_vm, OID_AUTO, caprevoke_avoid_faults, CTLFLAG_RW,
+static bool caprevoke_avoid_faults = 1;
+SYSCTL_BOOL(_vm, OID_AUTO, caprevoke_avoid_faults, CTLFLAG_RW,
     &caprevoke_avoid_faults, 0,
     "XXX");
 
