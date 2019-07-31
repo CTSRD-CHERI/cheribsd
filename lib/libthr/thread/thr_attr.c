@@ -121,10 +121,11 @@ __FBSDID("$FreeBSD$");
 
 static size_t	_get_kern_cpuset_size(void);
 
-__weak_reference(_pthread_attr_destroy, pthread_attr_destroy);
+__weak_reference(_thr_attr_destroy, _pthread_attr_destroy);
+__weak_reference(_thr_attr_destroy, pthread_attr_destroy);
 
 int
-_pthread_attr_destroy(pthread_attr_t *attr)
+_thr_attr_destroy(pthread_attr_t *attr)
 {
 	int	ret;
 
@@ -148,10 +149,11 @@ _pthread_attr_destroy(pthread_attr_t *attr)
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_get_np, pthread_attr_get_np);
+__weak_reference(_thr_attr_get_np, pthread_attr_get_np);
+__weak_reference(_thr_attr_get_np, _pthread_attr_get_np);
 
 int
-_pthread_attr_get_np(pthread_t pthread, pthread_attr_t *dstattr)
+_thr_attr_get_np(pthread_t pthread, pthread_attr_t *dstattr)
 {
 	struct pthread *curthread;
 	struct pthread_attr attr, *dst;
@@ -185,10 +187,11 @@ _pthread_attr_get_np(pthread_t pthread, pthread_attr_t *dstattr)
 	return (ret);
 }
 
-__weak_reference(_pthread_attr_getdetachstate, pthread_attr_getdetachstate);
+__weak_reference(_thr_attr_getdetachstate, pthread_attr_getdetachstate);
+__weak_reference(_thr_attr_getdetachstate, _pthread_attr_getdetachstate);
 
 int
-_pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
+_thr_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
 {
 	int	ret;
 
@@ -208,10 +211,11 @@ _pthread_attr_getdetachstate(const pthread_attr_t *attr, int *detachstate)
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_getguardsize, pthread_attr_getguardsize);
+__weak_reference(_thr_attr_getguardsize, pthread_attr_getguardsize);
+__weak_reference(_thr_attr_getguardsize, _pthread_attr_getguardsize);
 
 int
-_pthread_attr_getguardsize(const pthread_attr_t * __restrict attr,
+_thr_attr_getguardsize(const pthread_attr_t * __restrict attr,
     size_t * __restrict guardsize)
 {
 	int	ret;
@@ -227,10 +231,11 @@ _pthread_attr_getguardsize(const pthread_attr_t * __restrict attr,
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_getinheritsched, pthread_attr_getinheritsched);
+__weak_reference(_thr_attr_getinheritsched, pthread_attr_getinheritsched);
+__weak_reference(_thr_attr_getinheritsched, _pthread_attr_getinheritsched);
 
 int
-_pthread_attr_getinheritsched(const pthread_attr_t * __restrict attr,
+_thr_attr_getinheritsched(const pthread_attr_t * __restrict attr,
     int * __restrict sched_inherit)
 {
 	int ret = 0;
@@ -243,10 +248,11 @@ _pthread_attr_getinheritsched(const pthread_attr_t * __restrict attr,
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_getschedparam, pthread_attr_getschedparam);
+__weak_reference(_thr_attr_getschedparam, pthread_attr_getschedparam);
+__weak_reference(_thr_attr_getschedparam, _pthread_attr_getschedparam);
 
 int
-_pthread_attr_getschedparam(const pthread_attr_t * __restrict attr,
+_thr_attr_getschedparam(const pthread_attr_t * __restrict attr,
     struct sched_param * __restrict param)
 {
 	int ret = 0;
@@ -259,10 +265,11 @@ _pthread_attr_getschedparam(const pthread_attr_t * __restrict attr,
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_getschedpolicy, pthread_attr_getschedpolicy);
+__weak_reference(_thr_attr_getschedpolicy, pthread_attr_getschedpolicy);
+__weak_reference(_thr_attr_getschedpolicy, _pthread_attr_getschedpolicy);
 
 int
-_pthread_attr_getschedpolicy(const pthread_attr_t * __restrict attr,
+_thr_attr_getschedpolicy(const pthread_attr_t * __restrict attr,
     int * __restrict policy)
 {
 	int ret = 0;
@@ -275,10 +282,11 @@ _pthread_attr_getschedpolicy(const pthread_attr_t * __restrict attr,
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_getscope, pthread_attr_getscope);
+__weak_reference(_thr_attr_getscope, pthread_attr_getscope);
+__weak_reference(_thr_attr_getscope, _pthread_attr_getscope);
 
 int
-_pthread_attr_getscope(const pthread_attr_t * __restrict attr,
+_thr_attr_getscope(const pthread_attr_t * __restrict attr,
     int * __restrict contentionscope)
 {
 	int ret = 0;
@@ -298,8 +306,7 @@ __weak_reference(_pthread_attr_getstack, pthread_attr_getstack);
 
 int
 _pthread_attr_getstack(const pthread_attr_t * __restrict attr,
-                        void ** __restrict stackaddr,
-                        size_t * __restrict stacksize)
+    void ** __restrict stackaddr, size_t * __restrict stacksize)
 {
 	int     ret;
 
@@ -329,10 +336,11 @@ _pthread_attr_getstack(const pthread_attr_t * __restrict attr,
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_getstackaddr, pthread_attr_getstackaddr);
+__weak_reference(_thr_attr_getstackaddr, pthread_attr_getstackaddr);
+__weak_reference(_thr_attr_getstackaddr, _pthread_attr_getstackaddr);
 
 int
-_pthread_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
+_thr_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
 {
 	int	ret;
 
@@ -360,10 +368,11 @@ _pthread_attr_getstackaddr(const pthread_attr_t *attr, void **stackaddr)
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_getstacksize, pthread_attr_getstacksize);
+__weak_reference(_thr_attr_getstacksize, pthread_attr_getstacksize);
+__weak_reference(_thr_attr_getstacksize, _pthread_attr_getstacksize);
 
 int
-_pthread_attr_getstacksize(const pthread_attr_t * __restrict attr,
+_thr_attr_getstacksize(const pthread_attr_t * __restrict attr,
     size_t * __restrict stacksize)
 {
 	int	ret;
@@ -379,10 +388,11 @@ _pthread_attr_getstacksize(const pthread_attr_t * __restrict attr,
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_init, pthread_attr_init);
+__weak_reference(_thr_attr_init, pthread_attr_init);
+__weak_reference(_thr_attr_init, _pthread_attr_init);
 
 int
-_pthread_attr_init(pthread_attr_t *attr)
+_thr_attr_init(pthread_attr_t *attr)
 {
 	int	ret;
 	pthread_attr_t	pattr;
@@ -420,10 +430,11 @@ _pthread_attr_setcreatesuspend_np(pthread_attr_t *attr)
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_setdetachstate, pthread_attr_setdetachstate);
+__weak_reference(_thr_attr_setdetachstate, pthread_attr_setdetachstate);
+__weak_reference(_thr_attr_setdetachstate, _pthread_attr_setdetachstate);
 
 int
-_pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate)
+_thr_attr_setdetachstate(pthread_attr_t *attr, int detachstate)
 {
 	int	ret;
 
@@ -445,10 +456,11 @@ _pthread_attr_setdetachstate(pthread_attr_t *attr, int detachstate)
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_setguardsize, pthread_attr_setguardsize);
+__weak_reference(_thr_attr_setguardsize, pthread_attr_setguardsize);
+__weak_reference(_thr_attr_setguardsize, _pthread_attr_setguardsize);
 
 int
-_pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
+_thr_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
 {
 	int	ret;
 
@@ -463,10 +475,11 @@ _pthread_attr_setguardsize(pthread_attr_t *attr, size_t guardsize)
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_setinheritsched, pthread_attr_setinheritsched);
+__weak_reference(_thr_attr_setinheritsched, pthread_attr_setinheritsched);
+__weak_reference(_thr_attr_setinheritsched, _pthread_attr_setinheritsched);
 
 int
-_pthread_attr_setinheritsched(pthread_attr_t *attr, int sched_inherit)
+_thr_attr_setinheritsched(pthread_attr_t *attr, int sched_inherit)
 {
 	int ret = 0;
 
@@ -481,10 +494,11 @@ _pthread_attr_setinheritsched(pthread_attr_t *attr, int sched_inherit)
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_setschedparam, pthread_attr_setschedparam);
+__weak_reference(_thr_attr_setschedparam, pthread_attr_setschedparam);
+__weak_reference(_thr_attr_setschedparam, _pthread_attr_setschedparam);
 
 int
-_pthread_attr_setschedparam(pthread_attr_t * __restrict attr,
+_thr_attr_setschedparam(pthread_attr_t * __restrict attr,
     const struct sched_param * __restrict param)
 {
 	int policy;
@@ -514,10 +528,11 @@ _pthread_attr_setschedparam(pthread_attr_t * __restrict attr,
 	return (0);
 }
 
-__weak_reference(_pthread_attr_setschedpolicy, pthread_attr_setschedpolicy);
+__weak_reference(_thr_attr_setschedpolicy, pthread_attr_setschedpolicy);
+__weak_reference(_thr_attr_setschedpolicy, _pthread_attr_setschedpolicy);
 
 int
-_pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)
+_thr_attr_setschedpolicy(pthread_attr_t *attr, int policy)
 {
 	int ret = 0;
 
@@ -532,10 +547,11 @@ _pthread_attr_setschedpolicy(pthread_attr_t *attr, int policy)
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_setscope, pthread_attr_setscope);
+__weak_reference(_thr_attr_setscope, pthread_attr_setscope);
+__weak_reference(_thr_attr_setscope, _pthread_attr_setscope);
 
 int
-_pthread_attr_setscope(pthread_attr_t *attr, int contentionscope)
+_thr_attr_setscope(pthread_attr_t *attr, int contentionscope)
 {
 	int ret = 0;
 
@@ -574,10 +590,11 @@ _pthread_attr_setstack(pthread_attr_t *attr, void *stackaddr,
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_setstackaddr, pthread_attr_setstackaddr);
+__weak_reference(_thr_attr_setstackaddr, pthread_attr_setstackaddr);
+__weak_reference(_thr_attr_setstackaddr, _pthread_attr_setstackaddr);
 
 int
-_pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr)
+_thr_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr)
 {
 	int	ret;
 
@@ -592,10 +609,11 @@ _pthread_attr_setstackaddr(pthread_attr_t *attr, void *stackaddr)
 	return(ret);
 }
 
-__weak_reference(_pthread_attr_setstacksize, pthread_attr_setstacksize);
+__weak_reference(_thr_attr_setstacksize, pthread_attr_setstacksize);
+__weak_reference(_thr_attr_setstacksize, _pthread_attr_setstacksize);
 
 int
-_pthread_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
+_thr_attr_setstacksize(pthread_attr_t *attr, size_t stacksize)
 {
 	int	ret;
 
