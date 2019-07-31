@@ -177,7 +177,7 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * sentinel values to work.
  */
 #define ___USER_CFROMPTR(ptr, cap)					\
-    ((ptr) == NULL ? NULL :						\
+     ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
      ((vm_offset_t)(ptr) < 4096 ||					\
       (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
 	__builtin_cheri_offset_set(NULL, (vaddr_t)(ptr)) :		\
@@ -213,6 +213,26 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * XXX: We should probably have a __USER_CAP_PATH() with a MAXPATH limit.
  */
 #define	__USER_CAP_STR(strp)	__USER_CAP_UNBOUND(strp)
+
+#ifdef CHERI_PURECAP_KERNEL
+/*
+ * Convert userspace pointers to capabilities only when the kernel
+ * uses the pure capability ABI.
+ */
+#define PURECAP_KERNEL_USER_CAP(ptr, len)	\
+	__USER_CAP(ptr, len)
+#define PURECAP_KERNEL_USER_CAP_OBJ(objp)	\
+	__USER_CAP_OBJ(objp)
+#define PURECAP_KERNEL_USER_CODE_CAP(ptr)	\
+	__USER_CODE_CAP(ptr)
+#define PURECAP_KERNEL_USER_CAP_UNBOUND(ptr)	\
+	__USER_CAP_UNBOUND(ptr)
+#else
+#define PURECAP_KERNEL_USER_CAP(ptr, len) (void *)(uintptr_t)(ptr)
+#define PURECAP_KERNEL_USER_CAP_OBJ(objp) (void *)(uintptr_t)(objp)
+#define PURECAP_KERNEL_USER_CODE_CAP(ptr) (void *)(uintptr_t)(ptr)
+#define PURECAP_KERNEL_USER_CAP_UNBOUND(ptr) (void *)(uintptr_t)(ptr)
+#endif
 
 /*
  * Align variables.

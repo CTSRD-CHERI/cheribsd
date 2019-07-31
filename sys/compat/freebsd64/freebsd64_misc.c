@@ -312,7 +312,9 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 			free(uio, M_IOV);
 			return (error);
 		}
-		IOVEC_INIT(&iov[i], iov64.iov_base, iov64.iov_len);
+		IOVEC_INIT(&iov[i],
+		    PURECAP_KERNEL_USER_CAP(iov64.iov_base, iov64.iov_len),
+		    iov64.iov_len);
 	}
 	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
@@ -849,7 +851,7 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
         bcopy(&stat.name[0], &stat64.name[0], sizeof(stat.name));
         CP(stat, stat64, refs);
         CP(stat, stat64, id);
-	stat64.address = stat.address;
+	stat64.address = (__cheri_addr uint64_t)stat.address;
         CP(stat, stat64, size);
         bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
         return (copyout(&stat64, uap->stat, version));
@@ -1204,16 +1206,20 @@ freebsd64_thr_new_initthr(struct thread *td, void *thunk)
 {
 	stack_t stack;
 	struct thr_param64 *param = thunk;
+	long *child_tid = PURECAP_KERNEL_USER_CAP(param->child_tid,
+	    sizeof(long));
+	long *parent_tid = PURECAP_KERNEL_USER_CAP(param->parent_tid,
+	    sizeof(long));
 
-	if ((param->child_tid != NULL &&
-	    suword(param->child_tid, td->td_tid)) ||
-	    (param->parent_tid != NULL &&
-	    suword(param->parent_tid, td->td_tid)))
+	if ((child_tid != NULL && suword(child_tid, td->td_tid)) ||
+	    (parent_tid != NULL && suword(parent_tid, td->td_tid)))
 		return (EFAULT);
 	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
 	stack.ss_size = param->stack_size;
-	cpu_set_upcall(td, param->start_func, param->arg, &stack);
-	return (cpu_set_user_tls(td, param->tls_base));
+	cpu_set_upcall(td, PURECAP_KERNEL_USER_CODE_CAP(param->start_func),
+	    PURECAP_KERNEL_USER_CAP_UNBOUND(param->arg), &stack);
+	return (cpu_set_user_tls(td,
+	    PURECAP_KERNEL_USER_CAP_UNBOUND(param->tls_base)));
 }
 
 int
@@ -1226,12 +1232,15 @@ freebsd64_thr_new(struct thread *td, struct freebsd64_thr_new_args *uap)
 	if (uap->param_size != sizeof(struct thr_param64))
 		return (EINVAL);
 
-	error = copyin(uap->param, &param64, uap->param_size);
+	error = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->param),
+	    &param64, uap->param_size);
 	if (error != 0)
 		return (error);
 
-	if (param64.rtp != NULL) {
-		error = copyin(param64.rtp, &rtp, sizeof(struct rtprio));
+	if ((void *)(uintptr_t)param64.rtp != NULL) {
+		error = copyin(
+		    PURECAP_KERNEL_USER_CAP(param64.rtp, sizeof(struct rtprio)),
+		    &rtp, sizeof(struct rtprio));
 		if (error)
 			return (error);
 		rtpp = &rtp;

@@ -96,7 +96,8 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 	actp = (uap->act != NULL) ? &act : NULL;
 	oactp = (uap->oact != NULL) ? &oact : NULL;
 	if (actp) {
-		error = copyin(uap->act, &act64, sizeof(act64));
+		error = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->act),
+		    &act64, sizeof(act64));
 		if (error)
 			return (error);
 		if (is_magic_sighandler_constant((void *)
@@ -115,7 +116,8 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 		oact64.sa_handler = (__cheri_addr vaddr_t)oactp->sa_handler;
 		oact64.sa_flags = oactp->sa_flags;
 		oact64.sa_mask = oactp->sa_mask;
-		error = copyout(&oact64, uap->oact, sizeof(oact64));
+		error = copyout(&oact64, PURECAP_KERNEL_USER_CAP_OBJ(uap->oact),
+		    sizeof(oact64));
 	}
 	return (error);
 }
@@ -138,7 +140,7 @@ freebsd64_sigwait(struct thread *td, struct freebsd64_sigwait_args *uap)
 void
 siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64)
 {
-	memset(&si64, 0, sizeof(si64));
+	memset(si64, 0, sizeof(*si64));
 	si64->si_signo = si->si_signo;
 	si64->si_errno = si->si_errno;
 	si64->si_code = si->si_code;
@@ -200,7 +202,8 @@ freebsd64_sigaltstack(struct thread *td,
 	int error;
 
 	if (uap->ss != NULL) {
-		error = copyin(uap->ss, &ss64, sizeof(ss));
+		error = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->ss),
+		    &ss64, sizeof(ss64));
 		if (error != 0)
 			return (error);
 		ss.ss_sp = __USER_CAP_UNBOUND((void *)(uintptr_t)ss64.ss_sp);
@@ -216,7 +219,8 @@ freebsd64_sigaltstack(struct thread *td,
 		ss64.ss_sp = (__cheri_addr uint64_t)oss.ss_sp;
 		ss64.ss_size = oss.ss_size;
 		ss64.ss_flags = oss.ss_flags;
-		error = copyout(&ss64, uap->oss, sizeof(oss));
+		error = copyout(&ss64, PURECAP_KERNEL_USER_CAP_OBJ(uap->oss),
+		    sizeof(ss64));
 	}
 	return (error);
 }
