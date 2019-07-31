@@ -378,8 +378,8 @@ int
 freebsd64_shm_open(struct thread *td, struct freebsd64_shm_open_args *uap)
 {
 
-	return (kern_shm_open(td, __USER_CAP_STR(uap->path), uap->flags,
-	    uap->mode, NULL));
+	return (kern_shm_open(td, __USER_CAP_STR(uap->path),
+	    uap->flags | O_CLOEXEC, uap->mode, NULL));
 }
 
 int
