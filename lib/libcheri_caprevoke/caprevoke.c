@@ -387,3 +387,64 @@ caprev_shadow_nomap_clear(uint64_t * __capability sb, void * __capability obj)
    * the shadow, before those objects may be released to the application.
    */
 }
+
+/*
+ * The "raw" interfaces presume that all interlocking has already been
+ * managed by the caller and so contain no atomics or such!
+ */
+
+void
+caprev_shadow_nomap_set_raw(uint64_t * __capability sb,
+                            vaddr_t heap_start, vaddr_t heap_end)
+{
+  ptrdiff_t fwo, lwo;
+  uint64_t fwm;
+  uint64_t * __capability fw;
+  size_t len = heap_end - heap_start;
+
+  caprev_shadow_nomap_offsets(heap_start, len, &fwo, &lwo);
+
+  fw = cheri_setaddress(sb, VM_CAPREVOKE_BM_MEM_NOMAP + fwo);
+  *fw |= caprev_shadow_nomap_first_word_mask(heap_start, len);
+
+  if (lwo != fwo) {
+    uint64_t lwm;
+    uint64_t * __capability w = fw + 1;
+    ptrdiff_t wo = fwo + sizeof(uint64_t);
+    w = fw + 1;
+    for (; wo < lwo; wo += sizeof(uint64_t), w++) {
+		*w = ~(uint64_t)0;
+	}
+
+    w = cheri_setaddress(sb, VM_CAPREVOKE_BM_MEM_NOMAP + lwo);
+    *w |= caprev_shadow_nomap_last_word_mask(heap_start, len);
+  }
+}
+
+void
+caprev_shadow_nomap_clear_raw(uint64_t * __capability sb,
+                              vaddr_t heap_start, vaddr_t heap_end)
+{
+  ptrdiff_t fwo, lwo;
+  uint64_t fwm;
+  uint64_t * __capability fw;
+  size_t len = heap_end - heap_start;
+
+  caprev_shadow_nomap_offsets(heap_start, len, &fwo, &lwo);
+
+  fw = cheri_setaddress(sb, VM_CAPREVOKE_BM_MEM_NOMAP + fwo);
+  *fw &= ~caprev_shadow_nomap_first_word_mask(heap_start, len);
+
+  if (lwo != fwo) {
+    uint64_t lwm;
+    uint64_t * __capability w = fw + 1;
+    ptrdiff_t wo = fwo + sizeof(uint64_t);
+    w = fw + 1;
+    for (; wo < lwo; wo += sizeof(uint64_t), w++) {
+		*w = 0;
+	}
+
+    w = cheri_setaddress(sb, VM_CAPREVOKE_BM_MEM_NOMAP + lwo);
+    *w &= ~caprev_shadow_nomap_last_word_mask(heap_start, len);
+  }
+}
