@@ -104,8 +104,17 @@ CHERI_CXX=${CHERI_CC:H}/${CHERI_CC:T:S/clang/clang++/}
 
 _CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
 			-msoft-float -cheri-uintcap=offset
+.ifdef WANT_AFL_FUZZ
+# Build binaries static when fuzzing
+.if defined(__BSD_PROG_MK)
+NO_SHARED=yes
+.endif
+_CHERI_CC=		AFL_PATH=${CHERI_CC:H}/../afl/usr/local/lib/afl/ ${CHERI_CC:H}/../afl/usr/local/bin/afl-clang-fast ${_CHERI_COMMON_FLAGS}
+_CHERI_CXX=		AFL_PATH=${CHERI_CC:H}/../afl/usr/local/lib/afl/ ${CHERI_CXX:H}/../afl/usr/local/bin/afl-clang-fast++ ${_CHERI_COMMON_FLAGS}
+.else
 _CHERI_CC=		${CHERI_CC} ${_CHERI_COMMON_FLAGS}
 _CHERI_CXX=		${CHERI_CXX} ${_CHERI_COMMON_FLAGS}
+.endif
 _CHERI_CPP=		${CHERI_CPP} ${_CHERI_COMMON_FLAGS}
 
 .if defined(CHERI_SUBOBJECT_BOUNDS)
