@@ -20,7 +20,18 @@ LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190421,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds"
+ *   ],
+ *   "change_comment": "subobject-bounds containerof()-like pattern"
+ * }
+ * CHERI CHANGES END
+ */
 #ifndef UTHASH_H
 #define UTHASH_H
 
@@ -142,6 +153,7 @@ typedef unsigned char uint8_t;
 #define HASH_BKT_CAPACITY_THRESH 10U     /* expand when bucket count reaches */
 
 /* calculate the element whose hash handle address is hhp */
+/* XXXAR: this is like using containerof() -> no subobject bounds on hhp */
 #define ELMT_FROM_HH(tbl,hhp) ((void*)(((char*)(hhp)) - ((tbl)->hho)))
 /* calculate the hash handle from element address elp */
 #define HH_FROM_ELMT(tbl,elp) ((UT_hash_handle *)(void *)(((char*)(elp)) + ((tbl)->hho)))
@@ -1225,6 +1237,6 @@ typedef struct UT_hash_handle {
    void *key;                        /* ptr to enclosing struct's key  */
    unsigned keylen;                  /* enclosing struct's key len     */
    unsigned hashv;                   /* result of hash-fcn(key)        */
-} UT_hash_handle;
+} UT_hash_handle __no_subobject_bounds;
 
 #endif /* UTHASH_H */
