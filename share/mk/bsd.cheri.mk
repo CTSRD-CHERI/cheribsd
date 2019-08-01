@@ -55,12 +55,6 @@ WANT_CHERI?=	hybrid
 LDFLAGS+=	-stdlib=libc++
 .endif
 
-# Seems like subobject bounds on references are too aggressive:
-# Implementations of vector/string take refernces to internal storage arrays and
-# then use address-of operator and assume the result will be unbounded.
-# TODO: fix this assumption in clang
-CHERI_SUBOBJECT_BOUNDS_MAX:=conservative
-
 .endif
 
 .if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none" || ${WANT_CHERI} == "variables")
