@@ -247,6 +247,7 @@ CRUNCH_PROGS_usr.bin+= \
 		tftp \
 		time \
 		top \
+		touch \
 		tput \
 		tr \
 		true \

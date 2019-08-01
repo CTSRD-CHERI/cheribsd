@@ -67,153 +67,6 @@ __FBSDID("$FreeBSD$");
 
 #include <compat/freebsd64/freebsd64_proto.h>
 
-static ssize_t
-proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
-    size_t len, enum uio_rw rw)
-{
-	kiovec_t iov;
-	struct uio uio;
-	ssize_t slen;
-
-	MPASS(len < SSIZE_MAX);
-	slen = (ssize_t)len;
-
-	IOVEC_INIT(&iov, buf, len);
-	uio.uio_iov = &iov;
-	uio.uio_iovcnt = 1;
-	uio.uio_offset = va;
-	uio.uio_resid = slen;
-	uio.uio_segflg = UIO_SYSSPACE;
-	uio.uio_rw = rw;
-	uio.uio_td = td;
-	proc_rwmem(p, &uio);
-	if (uio.uio_resid == slen)
-		return (-1);
-	return (slen - uio.uio_resid);
-}
-
-static int
-ptrace_vm_entry(struct thread *td, struct proc *p,
-		kptrace_vm_entry_t * __capability pve)
-{
-	struct vattr vattr;
-	vm_map_t map;
-	vm_map_entry_t entry;
-	vm_object_t obj, tobj, lobj;
-	struct vmspace *vm;
-	struct vnode *vp;
-	char *freepath, *fullpath;
-	u_int pathlen;
-	int error, index;
-
-	error = 0;
-	obj = NULL;
-
-	vm = vmspace_acquire_ref(p);
-	map = &vm->vm_map;
-	vm_map_lock_read(map);
-
-	do {
-		entry = map->header.next;
-		index = 0;
-		while (index < pve->pve_entry && entry != &map->header) {
-			entry = entry->next;
-			index++;
-		}
-		if (index != pve->pve_entry) {
-			error = EINVAL;
-			break;
-		}
-		KASSERT((map->header.eflags & MAP_ENTRY_IS_SUB_MAP) == 0,
-		    ("Submap in map header"));
-		while ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0) {
-			entry = entry->next;
-			index++;
-		}
-		if (entry == &map->header) {
-			error = ENOENT;
-			break;
-		}
-
-		/* We got an entry. */
-		pve->pve_entry = index + 1;
-		pve->pve_timestamp = map->timestamp;
-		pve->pve_start = entry->start;
-		pve->pve_end = entry->end - 1;
-		pve->pve_offset = entry->offset;
-		pve->pve_prot = entry->protection;
-
-		/* Backing object's path needed? */
-		if (pve->pve_pathlen == 0)
-			break;
-
-		pathlen = pve->pve_pathlen;
-		pve->pve_pathlen = 0;
-
-		obj = entry->object.vm_object;
-		if (obj != NULL)
-			VM_OBJECT_RLOCK(obj);
-	} while (0);
-
-	vm_map_unlock_read(map);
-
-	pve->pve_fsid = VNOVAL;
-	pve->pve_fileid = VNOVAL;
-
-	if (error == 0 && obj != NULL) {
-		lobj = obj;
-		for (tobj = obj; tobj != NULL; tobj = tobj->backing_object) {
-			if (tobj != obj)
-				VM_OBJECT_RLOCK(tobj);
-			if (lobj != obj)
-				VM_OBJECT_RUNLOCK(lobj);
-			lobj = tobj;
-			pve->pve_offset += tobj->backing_object_offset;
-		}
-		vp = vm_object_vnode(lobj);
-		if (vp != NULL)
-			vref(vp);
-		if (lobj != obj)
-			VM_OBJECT_RUNLOCK(lobj);
-		VM_OBJECT_RUNLOCK(obj);
-
-		if (vp != NULL) {
-			freepath = NULL;
-			fullpath = NULL;
-			vn_fullpath(td, vp, &fullpath, &freepath);
-			vn_lock(vp, LK_SHARED | LK_RETRY);
-			if (VOP_GETATTR(vp, &vattr, td->td_ucred) == 0) {
-				pve->pve_fileid = vattr.va_fileid;
-				pve->pve_fsid = vattr.va_fsid;
-			}
-			vput(vp);
-
-			if (fullpath != NULL) {
-				pve->pve_pathlen = strlen(fullpath) + 1;
-				if (pve->pve_pathlen <= pathlen) {
-#if __has_feature(capabilities)
-					error = copyout_c(fullpath,
-						pve->pve_path,
-						pve->pve_pathlen);
-#else
-					error = copyout(fullpath, pve->pve_path,
-					    pve->pve_pathlen);
-#endif
-				} else
-					error = ENAMETOOLONG;
-			}
-			if (freepath != NULL)
-				free(freepath, M_TEMP);
-		}
-	}
-	vmspace_free(vm);
-	if (error == 0)
-		CTR3(KTR_PTRACE, "PT_VM_ENTRY: pid %d, entry %d, start %p",
-		    p->p_pid, pve->pve_entry, pve->pve_start);
-
-	return (error);
-}
-
 /*
  * Process debugging system call.
  */
@@ -247,6 +100,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		struct fpreg fpreg;
 		struct reg reg;
 		char args[sizeof(td->td_sa.args)];
+		struct ptrace_sc_ret *psr;
 		int ptevents;
 	} r;
 	void * __capability addr;
@@ -259,6 +113,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	case PT_GET_EVENT_MASK:
 	case PT_LWPINFO:
 	case PT_GET_SC_ARGS:
+	case PT_GET_SC_RET:
 		break;
 	case PT_GETREGS:
 		BZERO(&r.reg, sizeof r.reg);
@@ -363,6 +218,10 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	case PT_GET_SC_ARGS:
 		error = copyout(r.args, uap->addr, MIN(uap->data,
 		    sizeof(r.args)));
+		break;
+	case PT_GET_SC_RET:
+		error = copyout(&r.psr, uap->addr, MIN(uap->data,
+		    sizeof(r.psr)));
 		break;
 	}
 

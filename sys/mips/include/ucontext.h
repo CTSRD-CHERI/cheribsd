@@ -84,7 +84,7 @@ typedef struct	__mcontext {
 #endif
 #else /* defined(__CHERI_PURE_CAPABILITY__) */
 	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	struct chericap	__spare__[3];
+	void * __capability __spare__[3];
 #endif /* defined(__CHERI_PURE_CAPABILITY__) */
 } mcontext_t;
 

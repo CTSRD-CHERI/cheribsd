@@ -96,7 +96,6 @@ CTASSERT(sizeof(void *) == 8);
 CTASSERT(sizeof(void *) == 16);
 #endif
 CTASSERT(sizeof(void * __capability) == 16);
-CTASSERT(sizeof(struct chericap) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
 #else /* CHERI256 */
 #ifndef CHERI_PURECAP_KERNEL
@@ -105,7 +104,6 @@ CTASSERT(sizeof(void *) == 8);
 CTASSERT(sizeof(void *) == 32);
 #endif
 CTASSERT(sizeof(void * __capability) == 32);
-CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
 #endif /* CHERI256 */
 
@@ -431,7 +429,7 @@ cheri_capability_set_user_sigcode(void * __capability *cp,
 		 * support...
 		 */
 		base = (uintptr_t)se->sv_psstrings - szsigcode;
-		base = rounddown2(base, sizeof(struct chericap));
+		base = rounddown2(base, sizeof(void * __capability));
 	}
 
 	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,

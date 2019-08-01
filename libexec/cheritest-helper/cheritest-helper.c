@@ -37,7 +37,6 @@
 #include <cheri/libcheri_enter.h>
 #include <cheri/libcheri_fd.h>
 #include <cheri/libcheri_invoke.h>
-#include <cheri/libcheri_memcpy.h>
 #include <cheri/libcheri_system.h>
 
 #include <inttypes.h>

@@ -2928,6 +2928,55 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 }
 
 /*
+ *	vm_map_entry_in_transition:
+ *
+ *	Release the map lock, and sleep until the entry is no longer in
+ *	transition.  Awake and acquire the map lock.  If the map changed while
+ *	another held the lock, lookup a possibly-changed entry at or after the
+ *	'start' position of the old entry.
+ */
+static vm_map_entry_t
+vm_map_entry_in_transition(vm_map_t map, vm_offset_t in_start,
+    vm_offset_t *io_end, bool holes_ok, vm_map_entry_t in_entry)
+{
+	vm_map_entry_t entry;
+	vm_offset_t start;
+	u_int last_timestamp;
+
+	VM_MAP_ASSERT_LOCKED(map);
+	KASSERT((in_entry->eflags & MAP_ENTRY_IN_TRANSITION) != 0,
+	    ("not in-tranition map entry %p", in_entry));
+	/*
+	 * We have not yet clipped the entry.
+	 */
+	start = MAX(in_start, in_entry->start);
+	in_entry->eflags |= MAP_ENTRY_NEEDS_WAKEUP;
+	last_timestamp = map->timestamp;
+	if (vm_map_unlock_and_wait(map, 0)) {
+		/*
+		 * Allow interruption of user wiring/unwiring?
+		 */
+	}
+	vm_map_lock(map);
+	if (last_timestamp + 1 == map->timestamp)
+		return (in_entry);
+
+	/*
+	 * Look again for the entry because the map was modified while it was
+	 * unlocked.  Specifically, the entry may have been clipped, merged, or
+	 * deleted.
+	 */
+	if (!vm_map_lookup_entry(map, start, &entry)) {
+		if (!holes_ok) {
+			*io_end = start;
+			return (NULL);
+		}
+		entry = entry->next;
+	}
+	return (entry);
+}
+
+/*
  *	vm_map_unwire:
  *
  *	Implements both kernel and user unwiring.
@@ -2936,11 +2985,9 @@ int
 vm_map_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
     int flags)
 {
-	vm_map_entry_t entry, first_entry, tmp_entry;
-	vm_offset_t saved_start;
-	unsigned int last_timestamp;
+	vm_map_entry_t entry, first_entry;
 	int rv;
-	bool holes_ok, need_wakeup, user_unwire;
+	bool first_iteration, holes_ok, need_wakeup, user_unwire;
 
 	if (start == end)
 		return (KERN_SUCCESS);
@@ -2956,7 +3003,7 @@ vm_map_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			return (KERN_INVALID_ADDRESS);
 		}
 	}
-	last_timestamp = map->timestamp;
+	first_iteration = true;
 	entry = first_entry;
 	rv = KERN_SUCCESS;
 	while (entry->start < end) {
@@ -2964,48 +3011,20 @@ vm_map_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			/*
 			 * We have not yet clipped the entry.
 			 */
-			saved_start = (start >= entry->start) ? start :
-			    entry->start;
-			entry->eflags |= MAP_ENTRY_NEEDS_WAKEUP;
-			if (vm_map_unlock_and_wait(map, 0)) {
-				/*
-				 * Allow interruption of user unwiring?
-				 */
-			}
-			vm_map_lock(map);
-			if (last_timestamp+1 != map->timestamp) {
-				/*
-				 * Look again for the entry because the map was
-				 * modified while it was unlocked.
-				 * Specifically, the entry may have been
-				 * clipped, merged, or deleted.
-				 */
-				if (!vm_map_lookup_entry(map, saved_start,
-				    &tmp_entry)) {
-					if (holes_ok)
-						tmp_entry = tmp_entry->next;
-					else {
-						if (saved_start == start) {
-							/*
-							 * First_entry has been deleted.
-							 */
-							vm_map_unlock(map);
-							return (KERN_INVALID_ADDRESS);
-						}
-						end = saved_start;
-						rv = KERN_INVALID_ADDRESS;
-						break;
-					}
+			entry = vm_map_entry_in_transition(map, start, &end,
+			    holes_ok, entry);
+			if (entry == NULL) {
+				if (first_iteration) {
+					vm_map_unlock(map);
+					return (KERN_INVALID_ADDRESS);
 				}
-				if (entry == first_entry)
-					first_entry = tmp_entry;
-				else
-					first_entry = NULL;
-				entry = tmp_entry;
+				rv = KERN_INVALID_ADDRESS;
+				break;
 			}
-			last_timestamp = map->timestamp;
+			first_entry = first_iteration ? entry : NULL;
 			continue;
 		}
+		first_iteration = false;
 		vm_map_clip_start(map, entry, start);
 		vm_map_clip_end(map, entry, end);
 		/*
@@ -3172,7 +3191,7 @@ vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 	u_long npages;
 	u_int last_timestamp;
 	int rv;
-	bool holes_ok, need_wakeup, user_wire;
+	bool first_iteration, holes_ok, need_wakeup, user_wire;
 	vm_prot_t prot;
 
 	VM_MAP_ASSERT_LOCKED(map);
@@ -3191,54 +3210,25 @@ vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 		else
 			return (KERN_INVALID_ADDRESS);
 	}
-	last_timestamp = map->timestamp;
+	first_iteration = true;
 	entry = first_entry;
 	while (entry->start < end) {
 		if (entry->eflags & MAP_ENTRY_IN_TRANSITION) {
 			/*
 			 * We have not yet clipped the entry.
 			 */
-			saved_start = (start >= entry->start) ? start :
-			    entry->start;
-			entry->eflags |= MAP_ENTRY_NEEDS_WAKEUP;
-			if (vm_map_unlock_and_wait(map, 0)) {
-				/*
-				 * Allow interruption of user wiring?
-				 */
+			entry = vm_map_entry_in_transition(map, start, &end,
+			    holes_ok, entry);
+			if (entry == NULL) {
+				if (first_iteration)
+					return (KERN_INVALID_ADDRESS);
+				rv = KERN_INVALID_ADDRESS;
+				goto done;
 			}
-			vm_map_lock(map);
-			if (last_timestamp + 1 != map->timestamp) {
-				/*
-				 * Look again for the entry because the map was
-				 * modified while it was unlocked.
-				 * Specifically, the entry may have been
-				 * clipped, merged, or deleted.
-				 */
-				if (!vm_map_lookup_entry(map, saved_start,
-				    &tmp_entry)) {
-					if (holes_ok)
-						tmp_entry = tmp_entry->next;
-					else {
-						if (saved_start == start) {
-							/*
-							 * first_entry has been deleted.
-							 */
-							return (KERN_INVALID_ADDRESS);
-						}
-						end = saved_start;
-						rv = KERN_INVALID_ADDRESS;
-						goto done;
-					}
-				}
-				if (entry == first_entry)
-					first_entry = tmp_entry;
-				else
-					first_entry = NULL;
-				entry = tmp_entry;
-			}
-			last_timestamp = map->timestamp;
+			first_entry = first_iteration ? entry : NULL;
 			continue;
 		}
+		first_iteration = false;
 		vm_map_clip_start(map, entry, start);
 		vm_map_clip_end(map, entry, end);
 		/*
@@ -3276,6 +3266,7 @@ vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 			 */
 			saved_start = entry->start;
 			saved_end = entry->end;
+			last_timestamp = map->timestamp;
 			vm_map_busy(map);
 			vm_map_unlock(map);
 
@@ -3321,7 +3312,6 @@ vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags)
 					entry = entry->next;
 				}
 			}
-			last_timestamp = map->timestamp;
 			if (rv != KERN_SUCCESS) {
 				vm_map_wire_entry_failure(map, entry, faddr);
 				if (user_wire)
@@ -3447,7 +3437,7 @@ retry:
 		}
 		if (m == NULL)
 			continue;
-		if (m->wire_count != 0 || m->hold_count != 0) {
+		if (m->wire_count != 0) {
 			VM_OBJECT_WUNLOCK(object);
 			ret = FALSE;
 			continue;
@@ -3592,13 +3582,14 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 				if (!vm_map_pageout_range(map, entry,
 				    start, start + size, &size))
 					failed = TRUE;
+				vm_map_unlock_read(map);
 			} else if (object->type == OBJT_VNODE /* also COW */) {
 				vm_map_unlock_read(map);
 				if (!vm_object_sync(object, offset, size,
 				    FALSE, TRUE))
 					failed = TRUE;
-				vm_map_lock_read(map);
 			} else {
+				vm_map_unlock_read(map);
 				failed = TRUE;
 			}
 		} else {
@@ -3606,7 +3597,6 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 			if (!vm_object_sync(object, offset, size, syncio,
 			    invalidate))
 				failed = TRUE;
-			vm_map_lock_read(map);
 		}
 		start += size;
 		vm_object_deallocate(object);

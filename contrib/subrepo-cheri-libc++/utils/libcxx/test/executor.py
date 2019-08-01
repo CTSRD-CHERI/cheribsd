@@ -13,6 +13,7 @@ import errno
 import tempfile
 import datetime
 import shutil
+import pipes
 import sys
 
 from libcxx.test import tracing
@@ -188,7 +189,10 @@ class RemoteExecutor(Executor):
                 cmd = [target_exe_path]
 
             if self.config and self.config.lit_config.run_with_debugger:
-                cmd = "gdb --quiet --batch --return-child-result -ex=r -ex=bt --args".split() + cmd
+                # Use "thread apply all bt" instead of "bt" to ensure a successful exit doesn't
+                # result in GDB returning a non-zero exit code due to missing stack
+                cmd = ["gdb", "--quiet", "--batch", "--return-child-result", "-ex=r",
+                       "-ex=thread apply all bt", "--args"] + cmd
 
             srcs = [exe_path]
             dsts = [target_exe_path]
@@ -267,12 +271,12 @@ class SSHExecutor(RemoteExecutor):
         ssh_cmd = self.ssh_command + ['-tt', '-oBatchMode=yes', remote]
         # FIXME: doesn't handle spaces... and Py2.7 doesn't have shlex.quote()
         if env:
-            env_cmd = ['env'] + ['\'%s=%s\'' % (k, v) for k, v in env.items()]
+            env_cmd = ['env'] + ['%s=%s' % (k, v) for k, v in env.items()]
         else:
             env_cmd = []
-        remote_cmd = ' '.join(env_cmd + cmd)  # TODO: shlex.quote()
+        remote_cmd = ' '.join(map(pipes.quote, env_cmd + cmd))
         if remote_work_dir != '.':
-            remote_cmd = 'cd \'' + remote_work_dir + '\' && ' + remote_cmd
+            remote_cmd = 'cd ' + pipes.quote(remote_work_dir) + ' && ' + remote_cmd
         if self.config and self.config.lit_config.debug:
             print('{}: About to run {}'.format(datetime.datetime.now(), remote_cmd), file=sys.stderr)
         out, err, rc = self.local_run(ssh_cmd + [remote_cmd], timeout=self.config.lit_config.maxIndividualTestTime)
@@ -332,6 +336,8 @@ class SSHExecutorWithNFSMount(SSHExecutor):
         if not dst.startswith(self.nfs_dir):
             raise NotImplementedError('Cannot copy file %s to directory that is not below %s: %s'
                                       % (src, self.nfs_dir, dst))
+        if self.config and self.config.lit_config.debug:
+            print('{}: About to run cp \'{}\' \'{}\''.format(datetime.datetime.now(), src, dst), file=sys.stderr)
         shutil.copy(src, dst)
 
     def delete_remote(self, remote):
@@ -340,6 +346,8 @@ class SSHExecutorWithNFSMount(SSHExecutor):
             raise NotImplementedError('Cannot delete file that is not below %s: %s'
                                       % (self.nfs_dir, remote))
         else:
+            if self.config and self.config.lit_config.debug:
+                print('{}: About to run rm -rf {}'.format(datetime.datetime.now(), remote), file=sys.stderr)
             shutil.rmtree(remote)
 
     def _remote_temp(self, is_dir, is_retry=False):

@@ -84,22 +84,26 @@ struct _Unwind_Exception
   {
     __int64_t exception_class;
     _Unwind_Exception_Cleanup_Fn exception_cleanup;
-    unsigned long private_1;
-    unsigned long private_2;
-  };
+    __uintptr_t private_1;
+    __uintptr_t private_2;
+    /* XXXAR: Layout compatibility with LLVM libunwind: */
+#if __SIZEOF_POINTER__ == 4
+    uint32_t reserved[3];
+#endif
+  } __attribute__((__aligned__));
 
 extern _Unwind_Reason_Code _Unwind_RaiseException (struct _Unwind_Exception *);
 extern _Unwind_Reason_Code _Unwind_ForcedUnwind (struct _Unwind_Exception *,
 						 _Unwind_Stop_Fn, void *);
 extern void _Unwind_Resume (struct _Unwind_Exception *);
 extern void _Unwind_DeleteException (struct _Unwind_Exception *);
-extern unsigned long _Unwind_GetGR (struct _Unwind_Context *, int);
-extern void _Unwind_SetGR (struct _Unwind_Context *, int, unsigned long);
-extern unsigned long _Unwind_GetIP (struct _Unwind_Context *);
-extern unsigned long _Unwind_GetIPInfo (struct _Unwind_Context *, int *);
-extern void _Unwind_SetIP (struct _Unwind_Context *, unsigned long);
-extern unsigned long _Unwind_GetLanguageSpecificData (struct _Unwind_Context*);
-extern unsigned long _Unwind_GetRegionStart (struct _Unwind_Context *);
+extern __uintptr_t _Unwind_GetGR (struct _Unwind_Context *, int);
+extern void _Unwind_SetGR (struct _Unwind_Context *, int, __uintptr_t);
+extern __uintptr_t _Unwind_GetIP (struct _Unwind_Context *);
+extern __uintptr_t _Unwind_GetIPInfo (struct _Unwind_Context *, int *);
+extern void _Unwind_SetIP (struct _Unwind_Context *, __uintptr_t);
+extern __uintptr_t _Unwind_GetLanguageSpecificData (struct _Unwind_Context*);
+extern __uintptr_t _Unwind_GetRegionStart (struct _Unwind_Context *);
 
 #if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
 

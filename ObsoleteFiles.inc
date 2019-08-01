@@ -38,10 +38,12 @@
 #   xargs -n1 | sort | uniq -d;
 # done
 
+# 20190708: vm_page_hold() and _unhold() removed
+OLD_FILES+=usr/share/man/man9/vm_page_hold.9.gz
 # 20190618: sys/capability.h removed (sys/capsicum.h is the one to use)
 OLD_FILES+=usr/include/sys/capability.h
-# 20190615: sys/pwm.h renamed to dev/pwmc.h
-OLD_FILES+=usr/include/sys/pwm.h
+# 20190615: sys/pwm.h renamed to dev/pwmc.h and pwm(9) removed
+OLD_FILES+=usr/include/sys/pwm.h usr/share/man/man9/pwm.9.gz
 # 20190612: new clang import which bumps version from 8.0.0 to 8.0.1.
 OLD_FILES+=usr/lib/clang/8.0.0/include/sanitizer/allocator_interface.h
 OLD_FILES+=usr/lib/clang/8.0.0/include/sanitizer/asan_interface.h
@@ -2372,9 +2374,6 @@ OLD_FILES+=usr/tests/usr.sbin/pw/pw_useradd
 OLD_FILES+=usr/tests/usr.sbin/pw/pw_userdel
 OLD_FILES+=usr/tests/usr.sbin/pw/pw_usermod
 OLD_FILES+=usr/tests/usr.sbin/pw/pw_usernext
-# 20170322: garbage collect old references to igb(4)
-OLD_FILES+=usr/share/man/man4/if_igb.4.gz
-OLD_FILES+=usr/share/man/man4/igb.4.gz
 # 20170319: io_test requires zh_TW.Big5 locale.
 OLD_FILES+=usr/tests/lib/libc/locale/io_test
 # 20170319: remove nls for non supported Big5* locales

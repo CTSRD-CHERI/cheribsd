@@ -8,12 +8,12 @@
 
 #define fprintf(...)
 
-void log(void* ignored)
+void log_cleanup(void* ignored)
 {
-	//printf("Cleanup called on %s\n", *(char**)ignored);
+	printf("Cleanup called on %s\n", *(char**)ignored);
 }
 #define CLEANUP\
-	__attribute__((cleanup(log))) __attribute__((unused))\
+	__attribute__((cleanup(log_cleanup))) __attribute__((unused))\
 		const char *f = __func__;
 
 /**

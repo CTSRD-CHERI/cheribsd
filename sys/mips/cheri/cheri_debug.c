@@ -48,27 +48,6 @@
 
 #ifdef DDB
 
-#define	DB_CHERI_CAP_PRINT(crn) do {					\
-	uintmax_t c_perms, c_otype, c_base, c_length, c_offset;		\
-	u_int ctag, c_sealed;						\
-									\
-	CHERI_CGETTAG(ctag, (crn));					\
-	CHERI_CGETSEALED(c_sealed, (crn));				\
-	CHERI_CGETPERM(c_perms, (crn));					\
-	CHERI_CGETTYPE(c_otype, (crn));					\
-	CHERI_CGETBASE(c_base, (crn));					\
-	CHERI_CGETLEN(c_length, (crn));					\
-	CHERI_CGETOFFSET(c_offset, (crn));				\
-	db_printf("v:%u s:%u p:%08jx b:%016jx l:%016jx o:%jx t:%ld\n",	\
-	    ctag, c_sealed, c_perms, c_base, c_length, c_offset,	\
-	    (long)c_otype);						\
-} while (0)
-
-#define	DB_CHERI_REG_PRINT(crn, num) do {				\
-	db_printf("$c%02u: ", num);					\
-	DB_CHERI_CAP_PRINT(crn);					\
-} while (0)
-
 static inline void
 db_print_cap(const char* msg, void * __capability cap)
 {
@@ -76,19 +55,37 @@ db_print_cap(const char* msg, void * __capability cap)
 	    _CHERI_PRINTF_CAP_ARG(cap));
 }
 
+static void * __capability
+cheri_getculr(void)
+{
+	void * __capability cap;
+
+	__asm__ __volatile__ (
+	    "creadhwr\t%0, $chwr_userlocal"
+		: "=C" (cap));
+	return (cap);
+}
+
+static void * __capability
+cheri_getcplr(void)
+{
+	void * __capability cap;
+
+	__asm__ __volatile__ (
+	    "creadhwr\t%0, $chwr_priv_userlocal"
+		: "=C" (cap));
+	return (cap);
+}
+
 /*
- * Variation that prints live register state from the capability coprocessor.
- *
- * NB: Over time we will shift towards special registers holding values such
- * as $ddc.  As a result, we must move those values through a temporary
- * register that is hence overwritten.
+ * Show the special capability registers that aren't GPRs.
  */
 DB_SHOW_COMMAND(cp2, ddb_dump_cp2)
 {
 	register_t cause;
 	uint8_t exccode, regnum;
 
-	CHERI_CGETCAUSE(cause);
+	cause = cheri_getcause();
 	exccode = (cause & CHERI_CAPCAUSE_EXCCODE_MASK) >>
 	    CHERI_CAPCAUSE_EXCCODE_SHIFT;
 	regnum = cause & CHERI_CAPCAUSE_REGNUM_MASK;
@@ -101,46 +98,10 @@ DB_SHOW_COMMAND(cp2, ddb_dump_cp2)
 		db_printf("RegNum: invalid (%d) ", regnum);
 	db_printf("(%s)\n", cheri_exccode_string(exccode));
 
-	/* DDC is printed later: DB_CHERI_REG_PRINT(0, 0); */
-	DB_CHERI_REG_PRINT(1, 1);
-	DB_CHERI_REG_PRINT(2, 2);
-	DB_CHERI_REG_PRINT(3, 3);
-	DB_CHERI_REG_PRINT(4, 4);
-	DB_CHERI_REG_PRINT(5, 5);
-	DB_CHERI_REG_PRINT(6, 6);
-	DB_CHERI_REG_PRINT(7, 7);
-	DB_CHERI_REG_PRINT(8, 8);
-	DB_CHERI_REG_PRINT(9, 9);
-	DB_CHERI_REG_PRINT(10, 10);
-	DB_CHERI_REG_PRINT(11, 11);
-	DB_CHERI_REG_PRINT(12, 12);
-	DB_CHERI_REG_PRINT(13, 13);
-	DB_CHERI_REG_PRINT(14, 14);
-	DB_CHERI_REG_PRINT(15, 15);
-	DB_CHERI_REG_PRINT(16, 16);
-	DB_CHERI_REG_PRINT(17, 17);
-	DB_CHERI_REG_PRINT(18, 18);
-	DB_CHERI_REG_PRINT(19, 19);
-	DB_CHERI_REG_PRINT(20, 20);
-	DB_CHERI_REG_PRINT(21, 21);
-	DB_CHERI_REG_PRINT(22, 22);
-	DB_CHERI_REG_PRINT(23, 23);
-	DB_CHERI_REG_PRINT(24, 24);
-	DB_CHERI_REG_PRINT(25, 25);
-	DB_CHERI_REG_PRINT(26, 26);
-	DB_CHERI_REG_PRINT(27, 27);
-	DB_CHERI_REG_PRINT(28, 28);
-	DB_CHERI_REG_PRINT(29, 29);
-	DB_CHERI_REG_PRINT(30, 30);
-	DB_CHERI_REG_PRINT(31, 31);
-
-	/*
-	 * The following are special hw registers so make sure that we have
-	 * printed all the GPRs first since we need to move them into a GPR
-	 * for printing.
-	 */
 	db_print_cap("$ddc: ",  cheri_getdefault());
 	db_print_cap("$pcc: ",  cheri_getpcc());
+	db_print_cap("$culr: ", cheri_getculr());
+	db_print_cap("$cplr: ", cheri_getcplr());
 	db_print_cap("$kcc: ",  cheri_getkcc());
 	db_print_cap("$kdc: ",  cheri_getkdc());
 	db_print_cap("$epcc: ",  cheri_getepcc());

@@ -158,7 +158,7 @@ struct scoped_test_env
     // off_t). On a 32-bit system this allows us to create a file larger than
     // 2GB.
     std::string create_file(std::string filename, uintmax_t size = 0) {
-#if defined(__LP64__)
+#if defined(__LP64__) || defined(__CHERI_PURE_CAPABILITY__)
         auto large_file_fopen = fopen;
         auto large_file_ftruncate = ftruncate;
         using large_file_offset_t = off_t;

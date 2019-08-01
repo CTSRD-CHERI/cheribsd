@@ -151,59 +151,7 @@ VECTOR(_locore, unknown)
 	COP0_SYNC
 
 #if defined(CPU_CHERI)
-	/*
-	 * Grab the initial omnipotent capability
-	 */
-	cgetdefault	CHERI_REG_C28
-
-	/*
-	 * Create a reduced DDC.
-	 *
-	 * XXX-BD: Actually changing base/length requires changes in
-	 * linkage.
-	 */
-	cmove		CHERI_REG_C27, CHERI_REG_C28
-	REG_LI		t0, CHERI_CAP_KERN_BASE
-	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI		t0, CHERI_CAP_KERN_LENGTH
-	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI		t0, CHERI_PERMS_KERNEL_DATA
-	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
-
-	/* Preserve a copy in KDC for exception handlers. */
-	csetkdc		CHERI_REG_C27
-
-	/* Install the new DDC. */
-	csetdefault	CHERI_REG_C27
-
-	/*
-	 * Create a reduced PCC.
-	 *
-	 * XXX-BD: Actually changing base/length requires changes in
-	 * linkage.
-	 */
-	cgetpcc		CHERI_REG_C27
-	REG_LI		t0, CHERI_CAP_KERN_BASE
-	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI		t0, CHERI_CAP_KERN_LENGTH
-	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0
-	REG_LI		t0, CHERI_PERMS_KERNEL_CODE
-	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
-
-	/* Preserve a copy in KCC for exception handlers.  */
-
-	csetkcc		CHERI_REG_C27
-
-	/* Install the new PCC. */
-	REG_LI		t0, CHERI_CAP_KERN_BASE
-	cgetpcc		CHERI_REG_C29
-	cgetoffset	t1, CHERI_REG_C29			# 1
-	PTR_SUBU	t1, t1, t0				# 2
-	PTR_ADDIU	t1, t1, (4 * 7)				# 3
-	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t1	# 4
-	cjr		CHERI_REG_C27				# 5
-	nop							# 6
-	# 7 (land here)
+	CHERI_LOCORE_ROOT_CAPS
 
 	/*
 	 * Create the parent kernel sealing capablity.
@@ -275,7 +223,7 @@ VECTOR(_locore, unknown)
 	 */
 	MFC0	t0, MIPS_COP_0_HWRENA
 	or	t0, MIPS_HWRENA_CC | MIPS_HWRENA_CCRES | MIPS_HWRENA_CPUNUM | \
-	    (7 << 4) | MIPS_HWRENA_BERI_STATCOUNTERS_MASK
+	    MIPS_HWRENA_BERI_STATCOUNTERS_MASK
 	MTC0	t0, MIPS_COP_0_HWRENA
 #endif
 

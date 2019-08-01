@@ -1,7 +1,7 @@
 # $FreeBSD$
 
 .include <bsd.own.mk>
-
+WANT_CHERI=	none
 PROG=		target
 BINDIR=		${TESTSBASE}/libexec/rtld-elf
 

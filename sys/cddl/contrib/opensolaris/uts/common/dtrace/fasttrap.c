@@ -2335,10 +2335,8 @@ err:
 		int ret;
 #endif
 
-#ifdef illumos
 		if (copyin((void *)arg, &instr, sizeof (instr)) != 0)
 			return (EFAULT);
-#endif
 
 #ifdef notyet
 		if (!PRIV_POLICY_CHOICE(cr, PRIV_ALL, B_FALSE)) {

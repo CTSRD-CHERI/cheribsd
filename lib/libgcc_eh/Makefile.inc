@@ -5,14 +5,14 @@
 COMPILERRTDIR=	${SRCTOP}/contrib/compiler-rt
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
-UNWINDINCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/include
-UNWINDSRCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/src
+UNWINDINCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/include
+UNWINDSRCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 .elif ${MACHINE_ARCH:Mmips*}
-UNWINDINCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/include
-UNWINDSRCDIR=   ${SRCTOP}/contrib/subrepo-cheri-libunwind/src
+UNWINDINCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/include
+UNWINDSRCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 .else
-UNWINDINCDIR=   ${SRCTOP}/contrib/libunwind/include
-UNWINDSRCDIR=   ${SRCTOP}/contrib/libunwind/src
+UNWINDINCDIR=	${SRCTOP}/contrib/libunwind/include
+UNWINDSRCDIR=	${SRCTOP}/contrib/libunwind/src
 .endif
 
 STATIC_CFLAGS+=${PICFLAG} -fvisibility=hidden -DVISIBILITY_HIDDEN

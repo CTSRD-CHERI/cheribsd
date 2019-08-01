@@ -15,6 +15,7 @@
 #include <cassert>
 
 #include "test_macros.h"
+TEST_CHERI_NO_SUBOBJECT_WARNING
 
 template <typename CharT>
 bool test ( const CharT *s, size_t len ) {

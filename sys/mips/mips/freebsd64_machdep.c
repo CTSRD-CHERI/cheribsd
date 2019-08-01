@@ -158,15 +158,83 @@ SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
 int
 freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 {
+  	struct trapframe *tp;
 
-	return (get_mcontext(td, (mcontext_t *)mcp, flags));
+	tp = td->td_frame;
+	PROC_LOCK(curthread->td_proc);
+	mcp->mc_onstack = sigonstack(tp->sp);
+	PROC_UNLOCK(curthread->td_proc);
+	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
+	    sizeof(mcp->mc_regs));
+
+	mcp->mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
+	if (mcp->mc_fpused) {
+		bcopy((void *)&td->td_frame->f0, (void *)&mcp->mc_fpregs,
+		    sizeof(mcp->mc_fpregs));
+	}
+	if (flags & GET_MC_CLEAR_RET) {
+		mcp->mc_regs[V0] = 0;
+		mcp->mc_regs[V1] = 0;
+		mcp->mc_regs[A3] = 0;
+	}
+
+	mcp->mc_pc = td->td_frame->pc;
+	mcp->mullo = td->td_frame->mullo;
+	mcp->mulhi = td->td_frame->mulhi;
+	mcp->mc_tls = (__cheri_addr vaddr_t)td->td_md.md_tls;
+	mcp->mc_cp2state = 0;
+	mcp->mc_cp2state_len = 0;
+
+	return (0);
 }
 
 int
 freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 {
+	struct cheri_frame *cfp;
+	int error;
+	struct trapframe *tp;
 
-	return (set_mcontext(td, (mcontext_t *)mcp));
+	if ((void *)(uintptr_t)mcp->mc_cp2state != NULL) {
+		if (mcp->mc_cp2state_len != sizeof(*cfp)) {
+			printf("%s: invalid cp2 state length "
+			    "(expected %zd, got %zd)\n", __func__,
+			    sizeof(*cfp), mcp->mc_cp2state_len);
+			return (EINVAL);
+		}
+		cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
+		error = copyincap(__USER_CAP(mcp->mc_cp2state, mcp->mc_cp2state_len),
+		    cfp, sizeof(*cfp));
+		if (error) {
+			free(cfp, M_TEMP);
+			printf("%s: invalid pointer\n", __func__);
+			return (EINVAL);
+		}
+		cheri_trapframe_from_cheriframe(&td->td_pcb->pcb_regs, cfp);
+		free(cfp, M_TEMP);
+		td->td_pcb->pcb_regs.capcause = 0;
+	}
+
+	tp = td->td_frame;
+	bcopy((void *)&mcp->mc_regs, (void *)&td->td_frame->zero,
+	    sizeof(mcp->mc_regs));
+
+	td->td_md.md_flags = (mcp->mc_fpused & MDTD_FPUSED)
+#ifdef CPU_QEMU_MALTA
+	    | (td->td_md.md_flags & MDTD_QTRACE)
+#endif
+	    ;
+	if (mcp->mc_fpused) {
+		bcopy((void *)&mcp->mc_fpregs, (void *)&td->td_frame->f0,
+		    sizeof(mcp->mc_fpregs));
+	}
+	td->td_frame->pc = mcp->mc_pc;
+	td->td_frame->mullo = mcp->mullo;
+	td->td_frame->mulhi = mcp->mulhi;
+	td->td_md.md_tls = __USER_CAP_UNBOUND(mcp->mc_tls);
+	/* Dont let user to set any bits in status and cause registers. */
+
+	return (0);
 }
 
 static void

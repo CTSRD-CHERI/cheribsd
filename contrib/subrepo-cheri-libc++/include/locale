@@ -12,12 +12,12 @@
 
 // CHERI CHANGES START
 // {
-//   "updated": 20190509,
+//   "updated": 20190722,
 //   "target_type": "header"
 //   "changes": [
 //     "subobject_bounds",
 //   ],
-//   "change_comment": "address of std::string::operator[]: `std::string buf; &buf[0] -> __unwrap_iter(buf.begin())`",
+//   "change_comment": "address of std::string::operator[]: `std::string buf; &buf[0] -> __buf.begin().base()`",
 // }
 // CHERI CHANGES END
 
@@ -137,7 +137,7 @@ public:
     wbuffer_convert(const wbuffer_convert&) = delete;               // C++14
     wbuffer_convert & operator=(const wbuffer_convert &) = delete;  // C++14
     ~wbuffer_convert();                                             // C++14
-    
+
     streambuf* rdbuf() const;
     streambuf* rdbuf(streambuf* bytebuf);
 
@@ -1400,10 +1400,6 @@ __pad_and_output(_OutputIterator __s,
     return __s;
 }
 
-#if !defined(__APPLE__) || \
-    (defined(__MAC_OS_X_VERSION_MIN_REQUIRED) && __MAC_OS_X_VERSION_MIN_REQUIRED > __MAC_10_8) || \
-    (defined(__IPHONE_OS_VERSION_MIN_REQUIRED) && __IPHONE_OS_VERSION_MIN_REQUIRED > __IPHONE_6_0)
-
 template <class _CharT, class _Traits>
 _LIBCPP_HIDDEN
 ostreambuf_iterator<_CharT, _Traits>
@@ -1449,8 +1445,6 @@ __pad_and_output(ostreambuf_iterator<_CharT, _Traits> __s,
     __iob.width(0);
     return __s;
 }
-
-#endif
 
 template <class _CharT, class _OutputIterator>
 _OutputIterator
@@ -3799,7 +3793,7 @@ wstring_convert<_Codecvt, _Elem, _Wide_alloc, _Byte_alloc>::
         state_type __st = __cvtstate_;
         if (__frm != __frm_end)
         {
-            _Elem* __to = &__ws[0];
+            _Elem* __to = /*&__ws[0]*/__ws.begin().base();
             _Elem* __to_end = __to + __ws.size();
             const char* __frm_nxt;
             do
@@ -3814,7 +3808,7 @@ wstring_convert<_Codecvt, _Elem, _Wide_alloc, _Byte_alloc>::
                 }
                 else if (__r == codecvt_base::noconv)
                 {
-                    __ws.resize(__to - &__ws[0]);
+                    __ws.resize(__to - /*&__ws[0]*/__ws.begin().base());
                     // This only gets executed if _Elem is char
                     __ws.append((const _Elem*)__frm, (const _Elem*)__frm_end);
                     __frm = __frm_nxt;
@@ -3822,15 +3816,15 @@ wstring_convert<_Codecvt, _Elem, _Wide_alloc, _Byte_alloc>::
                 }
                 else if (__r == codecvt_base::ok)
                 {
-                    __ws.resize(__to_nxt - &__ws[0]);
+                    __ws.resize(__to_nxt - /*&__ws[0]*/__ws.begin().base());
                     __frm = __frm_nxt;
                 }
                 else if (__r == codecvt_base::partial)
                 {
-                    ptrdiff_t __s = __to_nxt - &__ws[0];
+                    ptrdiff_t __s = __to_nxt - /*&__ws[0]*/__ws.begin().base();
                     __ws.resize(2 * __s);
-                    __to = &__ws[0] + __s;
-                    __to_end = &__ws[0] + __ws.size();
+                    __to = /*&__ws[0]*/__ws.begin().base() + __s;
+                    __to_end = /*&__ws[0]*/__ws.begin().base() + __ws.size();
                     __frm = __frm_nxt;
                 }
             } while (__r == codecvt_base::partial && __frm_nxt < __frm_end);
@@ -3860,7 +3854,7 @@ wstring_convert<_Codecvt, _Elem, _Wide_alloc, _Byte_alloc>::
         state_type __st = __cvtstate_;
         if (__frm != __frm_end)
         {
-            char* __to = &__bs[0];
+            char* __to = /*&__bs[0]*/__bs.begin().base();
             char* __to_end = __to + __bs.size();
             const _Elem* __frm_nxt;
             do
@@ -3875,7 +3869,7 @@ wstring_convert<_Codecvt, _Elem, _Wide_alloc, _Byte_alloc>::
                 }
                 else if (__r == codecvt_base::noconv)
                 {
-                    __bs.resize(__to - &__bs[0]);
+                    __bs.resize(__to - /*&__bs[0]*/__bs.begin().base());
                     // This only gets executed if _Elem is char
                     __bs.append((const char*)__frm, (const char*)__frm_end);
                     __frm = __frm_nxt;
@@ -3883,15 +3877,15 @@ wstring_convert<_Codecvt, _Elem, _Wide_alloc, _Byte_alloc>::
                 }
                 else if (__r == codecvt_base::ok)
                 {
-                    __bs.resize(__to_nxt - &__bs[0]);
+                    __bs.resize(__to_nxt - /*&__bs[0]*/__bs.begin().base());
                     __frm = __frm_nxt;
                 }
                 else if (__r == codecvt_base::partial)
                 {
-                    ptrdiff_t __s = __to_nxt - &__bs[0];
+                    ptrdiff_t __s = __to_nxt - /*&__bs[0]*/__bs.begin().base();
                     __bs.resize(2 * __s);
-                    __to = &__bs[0] + __s;
-                    __to_end = &__bs[0] + __bs.size();
+                    __to = /*&__bs[0]*/__bs.begin().base() + __s;
+                    __to_end = /*&__bs[0]*/__bs.begin().base() + __bs.size();
                     __frm = __frm_nxt;
                 }
             } while (__r == codecvt_base::partial && __frm_nxt < __frm_end);
@@ -3900,7 +3894,7 @@ wstring_convert<_Codecvt, _Elem, _Wide_alloc, _Byte_alloc>::
         {
             size_t __s = __bs.size();
             __bs.resize(__bs.capacity());
-            char* __to = &__bs[0] + __s;
+            char* __to = /*&__bs[0]*/__bs.begin().base() + __s;
             char* __to_end = __to + __bs.size();
             do
             {
@@ -3908,19 +3902,19 @@ wstring_convert<_Codecvt, _Elem, _Wide_alloc, _Byte_alloc>::
                 __r = __cvtptr_->unshift(__st, __to, __to_end, __to_nxt);
                 if (__r == codecvt_base::noconv)
                 {
-                    __bs.resize(__to - &__bs[0]);
+                    __bs.resize(__to - /*&__bs[0]*/__bs.begin().base());
                     __r = codecvt_base::ok;
                 }
                 else if (__r == codecvt_base::ok)
                 {
-                    __bs.resize(__to_nxt - &__bs[0]);
+                    __bs.resize(__to_nxt - /*&__bs[0]*/__bs.begin().base());
                 }
                 else if (__r == codecvt_base::partial)
                 {
-                    ptrdiff_t __sp = __to_nxt - &__bs[0];
+                    ptrdiff_t __sp = __to_nxt - /*&__bs[0]*/__bs.begin().base();
                     __bs.resize(2 * __sp);
-                    __to = &__bs[0] + __sp;
-                    __to_end = &__bs[0] + __bs.size();
+                    __to = /*&__bs[0]*/__bs.begin().base() + __sp;
+                    __to_end = /*&__bs[0]*/__bs.begin().base() + __bs.size();
                 }
             } while (__r == codecvt_base::partial);
             if (__r == codecvt_base::ok)
@@ -3966,7 +3960,7 @@ private:
     wbuffer_convert(const wbuffer_convert&);
     wbuffer_convert& operator=(const wbuffer_convert&);
 public:
-    _LIBCPP_EXPLICIT_AFTER_CXX11 wbuffer_convert(streambuf* __bytebuf = 0, 
+    _LIBCPP_EXPLICIT_AFTER_CXX11 wbuffer_convert(streambuf* __bytebuf = 0,
             _Codecvt* __pcvt = new _Codecvt, state_type __state = state_type());
     ~wbuffer_convert();
 
@@ -4081,7 +4075,7 @@ wbuffer_convert<_Codecvt, _Elem, _Tr>::underflow()
                                        this->egptr(), __inext);
                 if (__r == codecvt_base::noconv)
                 {
-                    this->setg((char_type*)__extbuf_, (char_type*)__extbuf_, 
+                    this->setg((char_type*)__extbuf_, (char_type*)__extbuf_,
                                (char_type*) const_cast<char *>(__extbufend_));
                     __c = *this->gptr();
                 }

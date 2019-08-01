@@ -148,10 +148,6 @@ NESTED(setjmp, SETJMP_FRAME_SIZE, ra)
 #endif
 #endif	/* ! __mips_soft_float */
 #if defined(__CHERI__)
-	/*
-	 * XXX-BD: Should we be saving $c0 and $pcc or just assuming they
-	 * are untouched?
-	 */
 	cgetdefault	$c4
 	csc		$c11, a0, _JB_CHERI_OFFSET(C11)($c4)
 	csc		$c12, a0, _JB_CHERI_OFFSET(C12)($c4)
