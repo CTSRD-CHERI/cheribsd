@@ -161,9 +161,8 @@ typedef struct {
   char normalized;
 } ATTRIBUTE;
 
-/* No subobject bounds here since this is used like a C++ class with inheritance */
-struct __no_subobject_bounds encoding;
-typedef __no_subobject_bounds struct encoding ENCODING;
+struct encoding;
+typedef struct encoding ENCODING;
 
 typedef int (PTRCALL *SCANNER)(const ENCODING *,
                                const char *,
