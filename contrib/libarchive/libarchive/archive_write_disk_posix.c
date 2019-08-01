@@ -24,7 +24,18 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190730,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds"
+ *   ],
+ *   "change_comment": "C inheritance addrof first member (archive_write_disk)"
+ * }
+ * CHERI CHANGES END
+ */
 #include "archive_platform.h"
 __FBSDID("$FreeBSD$");
 
@@ -218,7 +229,7 @@ struct fixup_entry {
 #define	TODO_HFS_COMPRESSION	ARCHIVE_EXTRACT_HFS_COMPRESSION_FORCED
 
 struct archive_write_disk {
-	struct archive	archive;
+	struct archive	archive __subobject_member_used_for_c_inheritance;
 
 	mode_t			 user_umask;
 	struct fixup_entry	*fixup_list;

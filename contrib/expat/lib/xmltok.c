@@ -29,7 +29,18 @@
    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
    USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190124,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds",
+ *   ],
+ *   "change_comment": "C inheritance addrof first member (ENCODING)"
+ * }
+ * CHERI CHANGES END
+ */
 #include <stddef.h>
 #include <string.h>  /* memcpy */
 
@@ -206,7 +217,7 @@ utf8_isInvalid4(const ENCODING *UNUSED_P(enc), const char *p)
 }
 
 struct normal_encoding {
-  ENCODING enc;
+  ENCODING enc __subobject_member_used_for_c_inheritance;
   unsigned char type[256];
 #ifdef XML_MIN_SIZE
   int (PTRFASTCALL *byteType)(const ENCODING *, const char *);
@@ -1393,7 +1404,7 @@ XmlUtf16Encode(int charNum, unsigned short *buf)
 }
 
 struct unknown_encoding {
-  struct normal_encoding normal __no_subobject_bounds;
+  struct normal_encoding normal __subobject_member_used_for_c_inheritance;
   CONVERTER convert;
   void *userData;
   unsigned short utf16[256];
