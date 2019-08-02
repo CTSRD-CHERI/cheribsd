@@ -2,8 +2,6 @@
 
 .include <src.opts.mk>
 
-CXXFLAGS+=-O2
-
 WARNS?= 3
 PACKAGE=runtime
 CONFGROUPS=	CONFS DEVD

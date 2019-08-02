@@ -23,7 +23,18 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190730,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds"
+ *   ],
+ *   "change_comment": "C inheritance addrof first member (archive_match)"
+ * }
+ * CHERI CHANGES END
+ */
 #include "archive_platform.h"
 __FBSDID("$FreeBSD$");
 
@@ -88,7 +99,7 @@ struct id_array {
 #define ID_IS_SET		4
 
 struct archive_match {
-	struct archive		 archive;
+	struct archive		 archive __subobject_member_used_for_c_inheritance;
 
 	/* exclusion/inclusion set flag. */
 	int			 setflag;
