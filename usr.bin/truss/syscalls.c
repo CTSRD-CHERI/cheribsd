@@ -1559,7 +1559,7 @@ print_cmsgs(FILE *fp, pid_t pid, bool receive, struct msghdr *msghdr)
  * an array of all of the system call arguments.
  */
 char *
-print_arg(struct syscall_args *sc, unsigned long *args, register_t *retval,
+print_arg(struct syscall_args *sc, syscallarg_t *args, syscallarg_t *retval,
     struct trussinfo *trussinfo)
 {
 	FILE *fp;
@@ -2638,7 +2638,7 @@ print_syscall(struct trussinfo *trussinfo)
 }
 
 void
-print_syscall_ret(struct trussinfo *trussinfo, int error, register_t *retval)
+print_syscall_ret(struct trussinfo *trussinfo, int error, syscallarg_t *retval)
 {
 	struct timespec timediff;
 	struct threadinfo *t;
