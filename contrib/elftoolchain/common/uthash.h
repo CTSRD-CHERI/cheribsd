@@ -1228,6 +1228,11 @@ typedef struct UT_hash_table {
 
 } UT_hash_table;
 
+#ifndef __no_subobject_bounds
+/* XXXAR: needed for bootstrapping */
+#define __no_subobject_bounds
+#endif
+
 typedef struct UT_hash_handle {
    struct UT_hash_table *tbl;
    void *prev;                       /* prev element in app order      */
