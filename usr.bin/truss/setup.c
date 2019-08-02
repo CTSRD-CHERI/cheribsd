@@ -143,6 +143,13 @@ static struct procabi_table abis[] = {
 #else
 	{ "Linux ELF", &linux },
 #endif
+	/*
+	 * XXX: Temporary hack for CheriABI.  If CheriABI were going
+	 * to stay around longer we might add a sysdecode enum, etc.
+	 *
+	 * Eventually we will have to handle freebsd64 though.
+	 */
+	{ "CheriABI ELF64", &freebsd },
 };
 
 /*
