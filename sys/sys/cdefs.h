@@ -591,6 +591,18 @@
 #define	__rangeof(type, start, end) \
 	(__offsetof(type, end) - __offsetof(type, start))
 
+
+#if defined(__CHERI_SUBOBJECT_BOUNDS__) && __has_builtin(__builtin_marked_no_subobject_bounds)
+#define __check_safe_type_for_containerof(type, member)				\
+    _Static_assert(__builtin_marked_no_subobject_bounds(type) ||		\
+	__builtin_marked_no_subobject_bounds(__typeof(((type *)0)->member)),	\
+	"this type is unsafe for use in containerof() with sub-object"		\
+	"bounds. Please mark the member/type with __no_subobject_bounds")
+#else
+/* No checks without sub-object bounds */
+#define __check_safe_type_for_containerof(type, member) ((void)0)
+#endif
+
 /*
  * Given the pointer x to the member m of the struct s, return
  * a pointer to the containing structure.  When using GCC, we first
@@ -600,6 +612,7 @@
 #if __GNUC_PREREQ__(3, 1)
 #define	__containerof(x, s, m) ({					\
 	const volatile __typeof(((s *)0)->m) *__x = (x);		\
+	__check_safe_type_for_containerof(s, m);			\
 	__DEQUALIFY(s *, (const volatile char *)__x - __offsetof(s, m));\
 })
 #else
