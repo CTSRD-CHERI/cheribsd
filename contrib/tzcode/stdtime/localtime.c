@@ -2,7 +2,18 @@
 ** This file is in the public domain, so clarified as of
 ** 1996-06-05 by Arthur David Olson.
 */
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190801,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds"
+ *   ],
+ *   "change_comment": "trailing array after struct not declared"
+ * }
+ * CHERI CHANGES END
+ */
 #include <sys/cdefs.h>
 #ifndef lint
 #ifndef NOID
@@ -455,7 +466,14 @@ register const int	doextend;
 		sp->timecnt = (int) detzcode(u->tzhead.tzh_timecnt);
 		sp->typecnt = (int) detzcode(u->tzhead.tzh_typecnt);
 		sp->charcnt = (int) detzcode(u->tzhead.tzh_charcnt);
-		p = u->tzhead.tzh_charcnt + sizeof u->tzhead.tzh_charcnt;
+		/*
+		 * XXXAR: subobject-bounds: p should point to trailing data.
+		 * original code (bounded to 4 bytes):
+		 * p = u->tzhead.tzh_charcnt + sizeof u->tzhead.tzh_charcnt;
+		 * Could do __builtin_no_change_bounds(u->tzhead.tzh_charcnt),
+		 * but just adding to the buffer seems more sensible.
+		 */
+		p = u->buf + sizeof u->tzhead;
 		if (sp->leapcnt < 0 || sp->leapcnt > TZ_MAX_LEAPS ||
 			sp->typecnt <= 0 || sp->typecnt > TZ_MAX_TYPES ||
 			sp->timecnt < 0 || sp->timecnt > TZ_MAX_TIMES ||
