@@ -559,7 +559,7 @@ exit_syscall(struct trussinfo *info, struct ptrace_lwpinfo *pl)
 			 */
 			if (psr.sr_error != 0) {
 				asprintf(&temp, "0x%lx",
-				    t->cs.args[sc->args[i].offset]);
+				    (unsigned long)t->cs.args[sc->args[i].offset]);
 			} else {
 				temp = print_arg(&sc->args[i],
 				    t->cs.args, psr.sr_retval, info);
