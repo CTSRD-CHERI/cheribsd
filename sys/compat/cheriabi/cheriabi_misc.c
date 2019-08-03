@@ -1828,6 +1828,11 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		addr = cheri_cleartag(uap->addr);
 		break;
 
+	/* Pass along 'addr' unmodified. */
+	case PT_GETLWPLIST:
+		addr = uap->addr;
+		break;
+
 #ifdef CPU_CHERI
 	/*
 	 * XXXNWF Prohibited at the moment, because we have no sane way of
