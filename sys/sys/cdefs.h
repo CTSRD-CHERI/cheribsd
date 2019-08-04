@@ -340,7 +340,7 @@
 #define __bounded_addressof(obj, size) \
   ((__typeof__(obj)*)__builtin_cheri_bounds_set(__unbounded_addressof(obj), size))
 #else
-#define __bounded_addressof(obj, size) (&obj)
+#define __bounded_addressof(obj, size) (&(obj))
 #endif
 
 

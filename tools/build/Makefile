@@ -68,6 +68,11 @@ SYSINCS+=	stat.h
 SRCS+=		futimens.c utimensat.c
 .endif
 
+_WITH_NO_SUBOBJECT_BOUNDS!= grep -c __no_subobject_bounds ${HOST_INCLUDE_ROOT}/sys/cdefs.h || true
+.if ${_WITH_NO_SUBOBJECT_BOUNDS} == 0
+SYSINCS+=	cdefs.h
+.endif
+
 _WITH_EXPLICIT_BZERO!= grep -c explicit_bzero ${HOST_INCLUDE_ROOT}/strings.h || true
 .if ${_WITH_EXPLICIT_BZERO} == 0
 .PATH: ${SRCTOP}/sys/libkern

@@ -173,11 +173,6 @@ struct qm_trace {
 #define	QUEUE_TYPEOF(type) struct type
 #endif
 
-/* This file is used for bootstrapping so __no_subobject_bounds
- * might not be defined in the host cdefs.h */
-#ifndef __no_subobject_bounds
-#define __no_subobject_bounds
-#endif
 /*
  * The _Static_assert in __containerof() is too aggressive so we also need
  * to add some false-positive __no_subobject_bounds annotations even though
