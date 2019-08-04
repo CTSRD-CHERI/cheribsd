@@ -26,6 +26,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/aio.h>
 #include <sys/event.h>
+#include <sys/timers.h>
 
 #include <sys/caprevoke.h>
 #include <vm/vm_caprevoke.h>
@@ -55,6 +56,9 @@ caprevoke_hoarders(struct proc *p, struct vm_caprevoke_cookie *crc)
 {
 	/* aio */
 	aio_caprevoke(p, crc);
+
+	/* timers */
+	ktimer_caprevoke(p, crc);
 
 	/* kqueue: run last, because other systems might post here */
 	kqueue_caprevoke(p->p_fd, crc);
