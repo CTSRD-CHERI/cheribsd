@@ -67,6 +67,9 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 
+#include <cheri/cheric.h>
+#include <sys/caprevoke.h>
+
 #define MAX_CLOCKS 	(CLOCK_MONOTONIC+1)
 #define CPUCLOCK_BIT		0x80000000
 #define CPUCLOCK_PROCESS_BIT	0x40000000
@@ -1418,6 +1421,35 @@ kern_ktimer_delete(struct thread *td, int timerid)
 	PROC_UNLOCK(p);
 	uma_zfree(itimer_zone, it);
 	return (0);
+}
+
+void
+ktimer_caprevoke(struct proc *p, struct caprevoke_stats *stat)
+{
+	int i;
+
+	if (p->p_itimers == NULL)
+		return;
+
+	PROC_LOCK(p);
+	for (i = 0; i < TIMER_MAX; i++) {
+		struct itimer *it = p->p_itimers->its_timers[i];
+		if (it == NULL)
+			continue;
+
+		void * __capability v = it->it_sigev.sigev_value.sival_ptr_c;
+
+		if (!cheri_gettag(v))
+			continue;
+
+		stat->caps_found++;
+		if (vm_test_caprevoke(v)) {
+			it->it_sigev.sigev_value.sival_ptr_c
+				= cheri_cleartag(v);
+			stat->caps_cleared++;
+		}
+	}
+	PROC_UNLOCK(p);
 }
 
 #ifndef _SYS_SYSPROTO_H_

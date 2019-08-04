@@ -28,6 +28,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/aio.h>
 #include <sys/file.h>
 #include <sys/filedesc.h>
+#include <sys/timers.h>
 #include <sys/caprevoke.h>
 
 /*
@@ -69,6 +70,9 @@ caprevoke_hoarders(struct proc *p, struct caprevoke_stats *stat)
 
 	/* aio */
 	aio_caprevoke(p, stat);
+
+	/* timers */
+	ktimer_caprevoke(p, stat);
 }
 
 static int
