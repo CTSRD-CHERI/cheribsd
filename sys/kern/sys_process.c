@@ -846,6 +846,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 #if __has_feature(capabilities)
 	int wrap64 = 0;
 	struct ptrace_sc_ret64 * __capability psr64 = NULL;
+	struct ptrace_io_desc_c * __capability piodc = NULL;
 #endif
 #ifdef COMPAT_FREEBSD32
 	int wrap32 = 0, safe = 0;
@@ -1426,6 +1427,16 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		break;
 
 	case PT_IO:
+#if __has_feature(capabilities)
+		if (SV_CURPROC_FLAG(SV_CHERI)) {
+			piodc = addr;
+			IOVEC_INIT_C(&iov, piodc->piod_addr, piodc->piod_len);
+			uio.uio_offset =
+			    (off_t)(__cheri_addr uintptr_t)piodc->piod_offs;
+			uio.uio_resid = piodc->piod_len;
+			tmp = piodc->piod_op;
+		} else
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32) {
 			piod32 = addr;
@@ -1433,6 +1444,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			    piod32->piod_len);
 			uio.uio_offset = (off_t)(uintptr_t)piod32->piod_offs;
 			uio.uio_resid = piod32->piod_len;
+			tmp = piod32->piod_op;
 		} else
 #endif
 		{
@@ -1440,16 +1452,12 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			IOVEC_INIT(&iov, piod->piod_addr, piod->piod_len);
 			uio.uio_offset = (off_t)(uintptr_t)piod->piod_offs;
 			uio.uio_resid = piod->piod_len;
+			tmp = piod->piod_op;
 		}
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
 		uio.uio_segflg = UIO_USERSPACE;
 		uio.uio_td = td;
-#ifdef COMPAT_FREEBSD32
-		tmp = wrap32 ? piod32->piod_op : piod->piod_op;
-#else
-		tmp = piod->piod_op;
-#endif
 		switch (tmp) {
 		case PIOD_READ_D:
 		case PIOD_READ_I:
@@ -1470,6 +1478,11 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		}
 		PROC_UNLOCK(p);
 		error = proc_rwmem(p, &uio);
+#if __has_feature(capabilities)
+		if (SV_CURPROC_FLAG(SV_CHERI))
+			piodc->piod_len -= uio.uio_resid;
+		else
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32)
 			piod32->piod_len -= uio.uio_resid;

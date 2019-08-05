@@ -108,13 +108,14 @@ struct ptrace_io_desc {
 	size_t	piod_len;	/* request length */
 };
 
+#if defined(_KERNEL) && __has_feature(capabilities)
 struct ptrace_io_desc_c {
 	int	piod_op;	/* I/O operation */
-	vm_offset_t piod_offs;	/* child offset; not capability! */
+	void	* __capability piod_offs;	/* child offset */
 	void	* __capability piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
-
+#endif
 
 /*
  * Operations in piod_op.

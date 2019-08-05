@@ -1758,7 +1758,7 @@ int
 cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 {
 	union {
-		struct ptrace_io_desc piod;
+		struct ptrace_io_desc_c piod;
 		struct ptrace_lwpinfo pl;
 		struct ptrace_vm_entry_c pve;
 #ifdef CPU_CHERI
@@ -1773,7 +1773,6 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	} r = { 0 };
 
 	union {
-		struct ptrace_io_desc_c piod;
 		struct ptrace_lwpinfo_c pl;
 	} c = { 0 };
 
@@ -1860,11 +1859,11 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 			error = copyin(uap->addr, &r.ptevents, uap->data);
 		break;
 
+	case PT_IO:
+		error = copyincap(uap->addr, (char *)&r.piod, sizeof(r.piod));
+		break;
 	case PT_VM_ENTRY:
 		error = copyincap(uap->addr, (char *)&r.pve, sizeof r.pve);
-		if (error)
-			break;
-
 		break;
 
 #if 0
@@ -1872,7 +1871,6 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_READ_D:
 	case PT_WRITE_I:
 	case PT_WRITE_D:
-	case PT_IO:
 		// XXX TODO
 		break;
 	default:
@@ -1897,9 +1895,17 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_VM_ENTRY:
 		error = COPYOUT(&r.pve, uap->addr, sizeof r.pve);
 		break;
+#endif
 	case PT_IO:
-		error = COPYOUT(&r.piod, uap->addr, sizeof r.piod);
+		/*
+		 * Only copy out the updated piod_len to avoid the use
+		 * of copyoutcap.
+		 */
+		error = copyout(&r.piod.piod_len, uap->addr +
+		    offsetof(struct ptrace_io_desc_c, piod_len),
+		    sizeof(r.piod.piod_len));
 		break;
+#if 0
 	case PT_GETREGS:
 		error = COPYOUT(&r.reg, uap->addr, sizeof r.reg);
 		break;
