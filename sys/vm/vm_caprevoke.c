@@ -26,6 +26,11 @@ SYSCTL_BOOL(_vm, OID_AUTO, caprevoke_avoid_faults, CTLFLAG_RW,
     &caprevoke_avoid_faults, 0,
     "XXX");
 
+static bool caprevoke_last_redirty = 1;
+SYSCTL_BOOL(_vm, OID_AUTO, caprevoke_last_redirty, CTLFLAG_RW,
+    &caprevoke_last_redirty, 0,
+    "XXX");
+
 static int
 vm_caprevoke_should_visit_page(vm_page_t m, int flags)
 {
@@ -180,11 +185,27 @@ retry:
 
 		/*
 		 * If this is a stop the world pass, there should be
-		 * absolutely no way for this page to be capdirty again.
+		 * absolutely no way for this page to be capdirty again
+		 * here.  (But see below!)
 		 */
-		KASSERT(((flags & VM_CAPREVOKE_LAST_FINI) == 0) ||
+		KASSERT(((flags & VM_CAPREVOKE_LAST_INIT) == 0) ||
 				((m->aflags & PGA_CAPSTORED) == 0),
 			("Capdirty page in STW revocation pass"));
+
+		/*
+		 * When we are closing a revocation epoch, we transfer
+		 * VPO_PASTCAPSTORED to PGA_CAPSTORED so that we don't take
+		 * as many faults in the inter-epoch period.  We know that
+		 * we're going to visit all the VPO_PASTCAPSTORED-bearing
+		 * pages when we open the next epoch anyway, so there's no
+		 * point in lazily setting their PGA_CAPSTORED flags.
+		 */
+		if (caprevoke_last_redirty
+		    && (flags & VM_CAPREVOKE_LAST_INIT)) {
+			if (m->oflags & VPO_PASTCAPSTORE) {
+				vm_page_capdirty(m);
+			}
+		}
 	}
 
 	VM_OBJECT_WUNLOCK(obj);
