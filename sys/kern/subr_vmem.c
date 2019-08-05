@@ -416,7 +416,7 @@ bt_freehead_toalloc(vmem_t *vm, vmem_size_t size, int strat)
 /* ---- boundary tag hash */
 
 static struct vmem_hashlist *
-bt_hashhead(vmem_t *vm, vmem_addr_t addr)
+bt_hashhead(vmem_t *vm, vaddr_t addr)
 {
 	struct vmem_hashlist *list;
 	unsigned int hash;
@@ -434,7 +434,7 @@ bt_lookupbusy(vmem_t *vm, vmem_addr_t addr)
 	bt_t *bt;
 
 	VMEM_ASSERT_LOCKED(vm);
-	list = bt_hashhead(vm, addr); 
+	list = bt_hashhead(vm, (__cheri_addr vaddr_t)addr);
 	LIST_FOREACH(bt, list, bt_hashlist) {
 		if (bt->bt_start == addr) {
 			break;
@@ -463,7 +463,7 @@ bt_insbusy(vmem_t *vm, bt_t *bt)
 	VMEM_ASSERT_LOCKED(vm);
 	MPASS(bt->bt_type == BT_TYPE_BUSY);
 
-	list = bt_hashhead(vm, bt->bt_start);
+	list = bt_hashhead(vm, (__cheri_addr vaddr_t)bt->bt_start);
 	LIST_INSERT_HEAD(list, bt, bt_hashlist);
 	vm->vm_nbusytag++;
 	vm->vm_inuse += bt->bt_size;
@@ -1825,7 +1825,7 @@ vmem_check(vmem_t *vm)
 #endif /* defined(DIAGNOSTIC) */
 // CHERI CHANGES START
 // {
-//   "updated": 20190619,
+//   "updated": 20190805,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",
