@@ -114,38 +114,47 @@ vm_caprevoke_object(vm_object_t obj, vm_offset_t eo, int flags,
 		m = vm_page_lookup(obj, pindex);
 		KASSERT((m == NULL) || (m->valid == VM_PAGE_BITS_ALL),
 			("Revocation invalid page"));
-		if ((m == NULL) || !pmap_page_is_write_mapped(m)) {
-
-			/*
-			 * XXX Rather than this, we should take a RO page
-			 * shared-ly and scan over it before deciding that
-			 * the caller needs to upgrade our copy to
-			 * read-write.  That will be friendlier in the
-			 * case of fork() and only rarely will we need to
-			 * return VM_CROBJ_ROMAPPED, since shared pages
-			 * probably do not hold capabilities to be revoked?
-			 *
-			 * At the very least, we could look at
-			 * vm_caprevoke_should_visit_page for RO mappings,
-			 * but it's probably best to loop over them and
-			 * probe for revocation.
-			 */
-
+		if (m == NULL) {
 			VM_OBJECT_WUNLOCK(obj);
 			*oo = co;
-			return (m == NULL) ? VM_CROBJ_UNMAPPED
-			                   : VM_CROBJ_ROMAPPED;
+			return VM_CROBJ_UNMAPPED;
 		}
 
 		if (vm_caprevoke_should_visit_page(m, flags)) {
 			int hascaps;
 
+			if (!pmap_page_is_write_mapped(m)) {
+
+				/*
+				 * XXX Rather than this, we should take a RO
+				 * page shared-ly and scan over it before
+				 * deciding that the caller needs to upgrade
+				 * our copy to read-write.  That will be
+				 * friendlier in the case of fork() and only
+				 * rarely will we need to return
+				 * VM_CROBJ_ROMAPPED, since shared pages
+				 * probably do not hold capabilities to be
+				 * revoked?
+				 *
+				 * At the very least, we could look at
+				 * vm_caprevoke_should_visit_page for RO
+				 * mappings, but it's probably best to loop
+				 * over them and probe for revocation.
+				 */
+
+				VM_OBJECT_WUNLOCK(obj);
+				*oo = co;
+				return VM_CROBJ_ROMAPPED;
+			}
+
 			/*
-			 * Exclusive busy the page and, soon, drop the object lock
-			 * around the actual revocation.  This lets the world make
-			 * progress, but prevents concurrent revocation of this
-			 * page, in particular.
+			 * Exclusive busy the page and, soon, drop the
+			 * object lock around the actual revocation.  This
+			 * lets the world make progress, but prevents
+			 * concurrent revocation of this page, in
+			 * particular.
 			 */
+
 			vm_page_xbusy(m);
 			VM_OBJECT_WUNLOCK(obj);
 
