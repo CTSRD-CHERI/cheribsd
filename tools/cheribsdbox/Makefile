@@ -214,6 +214,7 @@ CRUNCH_PROGS_usr.bin+= \
 		basename \
 		bmake \
 		bzip2 \
+		cpuset \
 		diff \
 		dirname \
 		du \
