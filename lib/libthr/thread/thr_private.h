@@ -180,7 +180,7 @@ struct pthread_mutex {
 	/*
 	 * Lock for accesses to this structure.
 	 */
-	struct umutex			m_lock;
+	struct umutex			m_lock __subobject_use_container_bounds;
 	int				m_flags;
 	int				m_count;
 	int				m_spinloops;

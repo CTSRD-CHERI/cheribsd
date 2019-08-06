@@ -68,6 +68,9 @@ union ibv_gid {
 };
 
 #ifndef container_of
+#ifdef __containerof
+#define container_of(ptr, type, member) __containerof(ptr, type, member)
+#else
 /**
   * container_of - cast a member of a structure out to the containing structure
   * @ptr:        the pointer to the member.
@@ -77,6 +80,7 @@ union ibv_gid {
  */
 #define container_of(ptr, type, member) \
 	((type *) ((uint8_t *)(ptr) - offsetof(type, member)))
+#endif
 #endif
 
 #define vext_field_avail(type, fld, sz) (offsetof(type, fld) < (sz))

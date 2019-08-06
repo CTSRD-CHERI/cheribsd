@@ -1756,6 +1756,13 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	case PT_GNU_RELRO:
 	    obj->relro_page = obj->relocbase + trunc_page(ph->p_vaddr);
 	    obj->relro_size = round_page(ph->p_memsz);
+#ifdef __CHERI_PURE_CAPABILITY__
+	    obj->text_rodata_start = rtld_min(ph->p_vaddr, obj->text_rodata_start);
+	    obj->text_rodata_end = rtld_max(ph->p_vaddr + ph->p_memsz, obj->text_rodata_end);
+	    dbg("%s: Adding PT_GNU_RELRO, new text/rodata start "
+		" = %zx text/rodata end = %zx", path,
+		(size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end);
+#endif
 	    break;
 
 	case PT_NOTE:

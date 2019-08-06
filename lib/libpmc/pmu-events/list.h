@@ -31,11 +31,16 @@
 #ifndef _LINUX_LIST_H_
 #define _LINUX_LIST_H_
 
+#if 0
 #define container_of(ptr, type, member)                         \
 ({                                                              \
         const __typeof(((type *)0)->member) *__p = (ptr);       \
         (type *)((uintptr_t)__p - offsetof(type, member));      \
 })
+#else
+#include <sys/cdefs.h>
+#define container_of(ptr, type, member) __containerof(ptr, type, member)
+#endif
 
 #define LINUX_LIST_HEAD_INIT(name) { &(name), &(name) }
 
@@ -44,7 +49,7 @@
 
 #ifndef LIST_HEAD_DEF
 #define	LIST_HEAD_DEF
-struct list_head {
+__subobject_use_container_bounds struct list_head {
 	struct list_head *next;
 	struct list_head *prev;
 };

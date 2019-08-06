@@ -688,7 +688,7 @@ public:
                    regex_constants::match_flag_type m = regex_constants::match_default);
     regex_iterator(_BidirectionalIterator __a, _BidirectionalIterator __b,
                    const regex_type&& __re,
-                   regex_constants::match_flag_type __m 
+                   regex_constants::match_flag_type __m
                                      = regex_constants::match_default) = delete; // C++14
     regex_iterator(const regex_iterator&);
     regex_iterator& operator=(const regex_iterator&);
@@ -2317,7 +2317,7 @@ public:
             else
             {
                 if (__b.size() != 1 || __e.size() != 1)
-                    __throw_regex_error<regex_constants::error_collate>();
+                    __throw_regex_error<regex_constants::error_range>();
                 if (__icase_)
                 {
                     __b[0] = __traits_.translate_nocase(__b[0]);
@@ -3421,7 +3421,7 @@ basic_regex<_CharT, _Traits>::__parse_BACKREF(_ForwardIterator __first,
         if (__temp != __last)
         {
             if (*__first == '\\')
-            { 
+            {
                 int __val = __traits_.value(*__temp, 10);
                 if (__val >= 1 && __val <= 9)
                 {
@@ -4118,7 +4118,7 @@ basic_regex<_CharT, _Traits>::__parse_DUP_COUNT(_ForwardIterator __first,
         if ( __val != -1 )
         {
             __c = __val;
-            for (++__first; 
+            for (++__first;
                  __first != __last && ( __val = __traits_.value(*__first, 10)) != -1;
                  ++__first)
             {
@@ -4498,7 +4498,7 @@ basic_regex<_CharT, _Traits>::__parse_character_escape(_ForwardIterator __first,
         case 'c':
             if ((__t = _VSTD::next(__first)) != __last)
             {
-                if (('A' <= *__t && *__t <= 'Z') || 
+                if (('A' <= *__t && *__t <= 'Z') ||
                     ('a' <= *__t && *__t <= 'z'))
                 {
                     if (__str)
@@ -4507,7 +4507,7 @@ basic_regex<_CharT, _Traits>::__parse_character_escape(_ForwardIterator __first,
                         __push_char(_CharT(*__t % 32));
                     __first = ++__t;
                 }
-                else 
+                else
                     __throw_regex_error<regex_constants::error_escape>();
             }
             else
@@ -5307,21 +5307,41 @@ public:
     // element access:
     _LIBCPP_INLINE_VISIBILITY
     difference_type length(size_type __sub = 0) const
-        {return (*this)[__sub].length();}
+        {
+        _LIBCPP_ASSERT(ready(), "match_results::length() called when not ready");
+        return (*this)[__sub].length();
+        }
     _LIBCPP_INLINE_VISIBILITY
     difference_type position(size_type __sub = 0) const
-        {return _VSTD::distance(__position_start_, (*this)[__sub].first);}
+        {
+        _LIBCPP_ASSERT(ready(), "match_results::position() called when not ready");
+        return _VSTD::distance(__position_start_, (*this)[__sub].first);
+        }
     _LIBCPP_INLINE_VISIBILITY
     string_type str(size_type __sub = 0) const
-        {return (*this)[__sub].str();}
+        {
+        _LIBCPP_ASSERT(ready(), "match_results::str() called when not ready");
+        return (*this)[__sub].str();
+        }
     _LIBCPP_INLINE_VISIBILITY
     const_reference operator[](size_type __n) const
-        {return __n < __matches_.size() ? __matches_[__n] : __unmatched_;}
+        {
+        _LIBCPP_ASSERT(ready(), "match_results::operator[]() called when not ready");
+        return __n < __matches_.size() ? __matches_[__n] : __unmatched_;
+        }
 
     _LIBCPP_INLINE_VISIBILITY
-    const_reference prefix() const {return __prefix_;}
+    const_reference prefix() const
+        {
+        _LIBCPP_ASSERT(ready(), "match_results::prefix() called when not ready");
+        return __prefix_;
+        }
     _LIBCPP_INLINE_VISIBILITY
-    const_reference suffix() const {return __suffix_;}
+    const_reference suffix() const
+        {
+        _LIBCPP_ASSERT(ready(), "match_results::suffix() called when not ready");
+        return __suffix_;
+        }
 
     _LIBCPP_INLINE_VISIBILITY
     const_iterator begin() const {return empty() ? __matches_.end() : __matches_.begin();}
@@ -5459,6 +5479,7 @@ match_results<_BidirectionalIterator, _Allocator>::format(_OutputIter __output_i
         const char_type* __fmt_first, const char_type* __fmt_last,
         regex_constants::match_flag_type __flags) const
 {
+    _LIBCPP_ASSERT(ready(), "match_results::format() called when not ready");
     if (__flags & regex_constants::format_sed)
     {
         for (; __fmt_first != __fmt_last; ++__fmt_first)
@@ -5908,7 +5929,7 @@ basic_regex<_CharT, _Traits>::__search(
 {
     __m.__init(1 + mark_count(), __first, __last,
                                     __flags & regex_constants::__no_update_pos);
-    if (__match_at_start(__first, __last, __m, __flags, 
+    if (__match_at_start(__first, __last, __m, __flags,
                                     !(__flags & regex_constants::__no_update_pos)))
     {
         __m.__prefix_.second = __m[0].first;
@@ -6054,7 +6075,7 @@ bool
 regex_search(const basic_string<_Cp, _ST, _SA>&& __s,
              match_results<typename basic_string<_Cp, _ST, _SA>::const_iterator, _Ap>&,
              const basic_regex<_Cp, _Tp>& __e,
-             regex_constants::match_flag_type __flags = regex_constants::match_default) = delete; 
+             regex_constants::match_flag_type __flags = regex_constants::match_default) = delete;
 #endif
 
 // regex_match
@@ -6118,7 +6139,7 @@ bool
 regex_match(const basic_string<_CharT, _ST, _SA>&& __s,
             match_results<typename basic_string<_CharT, _ST, _SA>::const_iterator, _Allocator>& __m,
             const basic_regex<_CharT, _Traits>& __e,
-            regex_constants::match_flag_type __flags = regex_constants::match_default) = delete; 
+            regex_constants::match_flag_type __flags = regex_constants::match_default) = delete;
 #endif
 
 template <class _CharT, class _Traits>
@@ -6171,7 +6192,7 @@ public:
 #if _LIBCPP_STD_VER > 11
     regex_iterator(_BidirectionalIterator __a, _BidirectionalIterator __b,
                    const regex_type&& __re,
-                   regex_constants::match_flag_type __m 
+                   regex_constants::match_flag_type __m
                                      = regex_constants::match_default) = delete;
 #endif
 
@@ -6365,9 +6386,13 @@ private:
     void __establish_result () {
         if (__subs_[__n_] == -1)
             __result_ = &__position_->prefix();
-        else
-            __result_ = &(*__position_)[__subs_[__n_]];
-        }       
+        else {
+            // XXXAR: this appears to be fine for sub-object purposes.
+            // Use std::addressof to silence the warning
+            // __result_ = &(*__position_)[__subs_[__n_]];
+            __result_ = std::addressof((*__position_)[__subs_[__n_]]);
+        }
+      }
 };
 
 template <class _BidirectionalIterator, class _CharT, class _Traits>

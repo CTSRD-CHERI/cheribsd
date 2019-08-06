@@ -18,6 +18,7 @@
 
 #include "test_macros.h"
 #include "min_allocator.h"
+TEST_CHERI_NO_SUBOBJECT_WARNING
 
 class A
 {

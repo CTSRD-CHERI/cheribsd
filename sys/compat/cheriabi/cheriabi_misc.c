@@ -574,18 +574,33 @@ cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd)
  * create both types of capabilities (and currently creates W|X caps).
  * Its use should be replaced.
  */
-#define sucap(uaddr, base, offset, length, perms)			\
-	do {								\
-		void * __capability _tmpcap;				\
-		_tmpcap = cheri_capability_build_user_rwx((perms),	\
-		    (base), (length), (offset));			\
-		KASSERT(cheri_gettag(_tmpcap), ("%s:%d: Created "	\
-		     "invalid cap from base=%zx, offset=%#zx, "		\
-		     "length=%#zx, perms=%#zx", __func__, __LINE__,	\
-		     (size_t)(base), (size_t)(offset),			\
-		     (size_t)(length), (size_t)(perms)));		\
-		copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));		\
-	} while(0)
+#define sucap(uaddr, base, offset, length, what, perms)	\
+    _sucap(uaddr, (base), (offset), (length), (perms), what, __func__, __LINE__)
+
+static void
+_sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
+    uint64_t perms, const char *what, const char *func, int line)
+{
+	void *__capability _tmpcap;
+	size_t rounded_length = CHERI_REPRESENTABLE_LENGTH(length);
+	vaddr_t rounded_base = CHERI_REPRESENTABLE_BASE(base, length);
+	if (rounded_length != length)
+		printf("%s:%d rounding size of unrepresentable %s from %zd to "
+		    "%zd\n", func, line, what, length, rounded_length);
+	if (rounded_base != base) {
+		printf("%s:%d aligning base of unrepresentable %s from"
+		       " 0x%zx to 0x%zx and adjusting offset by %zd\n", func,
+		       line, what, base, rounded_base, base - rounded_base);
+		/* We have to adjust the offset by the difference */
+		offset += base - rounded_base;
+	}
+	_tmpcap = cheri_capability_build_user_rwx(
+	    perms, rounded_base, rounded_length, offset);
+	KASSERT(cheri_gettag(_tmpcap),("%s:%d: Created invalid cap "
+	     "from base=%zx, offset=%#zx, length=%#zx, perms=%#zx", func,
+	     line, base, offset, length, (size_t)(perms)));
+	copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));
+}
 
 register_t *
 cheriabi_copyout_strings(struct image_params *imgp)
@@ -693,7 +708,8 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	sucap(&arginfo->ps_argvstr, cheri_getaddress(vectp), 0,
-	    argc * sizeof(void * __capability), CHERI_CAP_USER_DATA_PERMS);
+	    argc * sizeof(void * __capability), "argv",
+	    CHERI_CAP_USER_DATA_PERMS);
 	suword32(&arginfo->ps_nargvstr, argc);
 
 	/*
@@ -702,7 +718,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	imgp->args->argv = (__cheri_fromcap void *)vectp;
 	for (; argc > 0; --argc) {
 		sucap(vectp++, cheri_getaddress(destp), 0, strlen(stringp) + 1,
-		    CHERI_CAP_USER_DATA_PERMS);
+		    "command line argument", CHERI_CAP_USER_DATA_PERMS);
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
@@ -713,7 +729,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	suword(vectp++, 0);
 
 	sucap(&arginfo->ps_envstr, cheri_getaddress(vectp), 0,
-	    arginfo->ps_nenvstr * sizeof(void * __capability),
+	    arginfo->ps_nenvstr * sizeof(void * __capability), "envv",
 	    CHERI_CAP_USER_DATA_PERMS);
 	suword32(&arginfo->ps_nenvstr, envc);
 
@@ -723,7 +739,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	imgp->args->envv = (__cheri_fromcap void *)vectp;
 	for (; envc > 0; --envc) {
 		sucap(vectp++, cheri_getaddress(destp), 0, strlen(stringp) + 1,
-		    CHERI_CAP_USER_DATA_PERMS);
+		    "environment variable", CHERI_CAP_USER_DATA_PERMS);
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
@@ -740,7 +756,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	{suword(pos++, id); suword(pos++, val);}
 #define	AUXARGS_ENTRY_CAP(pos, id, base, offset, len, perm) do {	\
 		suword(pos++, id);					\
-		sucap(pos++, base, offset, len, perm);			\
+		sucap(pos++, base, offset, len, #id, perm);		\
 	} while(0)
 
 static void

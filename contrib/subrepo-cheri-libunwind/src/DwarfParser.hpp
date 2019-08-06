@@ -199,6 +199,7 @@ const char *CFI_Parser<A>::decodeFDE(A &addressSpace, pint_t pc, pint_t fdeStart
   fdeInfo->pcStart = assert_pointer_in_bounds((pint_t)__builtin_cheri_address_set((void*)pc, pcStart));
   fdeInfo->pcEnd = assert_pointer_in_bounds(fdeInfo->pcStart + pcRange);
 #else
+  (void)pc;
   fdeInfo->pcStart = pcStart;
   fdeInfo->pcEnd = pcStart + pcRange;
 #endif

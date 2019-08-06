@@ -246,7 +246,9 @@ CRUNCH_PROGS_usr.bin+= \
 		tee \
 		tftp \
 		time \
+		timeout \
 		top \
+		touch \
 		tput \
 		tr \
 		true \

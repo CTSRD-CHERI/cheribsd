@@ -17,6 +17,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <sys/param.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 
@@ -443,18 +444,28 @@ find_op_2char(const struct t_op *op, const struct t_op *end, const char *s)
 	return OPERAND;
 }
 
+/* Use this instead of the strange (&ops1)[1] to get a one-past-end pointer */
+#define array_one_past_end(array) (array + nitems(array))
+
 static int
 find_op(const char *s)
 {
+	/* FIXME: subobject bounds should warn about (&ops1)[1] */
 	if (s[0] == '\0')
 		return OPERAND;
 	else if (s[1] == '\0')
-		return find_op_1char(ops1, (&ops1)[1], s);
+		return find_op_1char(
+		    ops1, /*(&ops1)[1]*/ array_one_past_end(ops1), s);
 	else if (s[2] == '\0')
-		return s[0] == '-' ? find_op_1char(opsm1, (&opsm1)[1], s + 1) :
-		    find_op_2char(ops2, (&ops2)[1], s);
+		return s[0] == '-' ?
+		    find_op_1char(opsm1,
+			/*(&opsm1)[1]*/ array_one_past_end(opsm1), s + 1) :
+		    find_op_2char(
+			ops2, /*(&ops2)[1]*/ array_one_past_end(ops2), s);
 	else if (s[3] == '\0')
-		return s[0] == '-' ? find_op_2char(opsm2, (&opsm2)[1], s + 1) :
+		return s[0] == '-' ?
+		    find_op_2char(opsm2,
+			/*(&opsm2)[1]*/ array_one_past_end(opsm2), s + 1) :
 		    OPERAND;
 	else
 		return OPERAND;

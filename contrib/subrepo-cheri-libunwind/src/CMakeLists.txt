@@ -3,20 +3,23 @@
 set(LIBUNWIND_CXX_SOURCES
     libunwind.cpp
     Unwind-EHABI.cpp
-    Unwind-seh.cpp)
+    Unwind-seh.cpp
+    )
 unwind_append_if(LIBUNWIND_CXX_SOURCES APPLE Unwind_AppleExtras.cpp)
 
 set(LIBUNWIND_C_SOURCES
     UnwindLevel1.c
     UnwindLevel1-gcc-ext.c
-    Unwind-sjlj.c)
+    Unwind-sjlj.c
+    )
 set_source_files_properties(${LIBUNWIND_C_SOURCES}
                             PROPERTIES
                               COMPILE_FLAGS "-std=c99")
 
 set(LIBUNWIND_ASM_SOURCES
     UnwindRegistersRestore.S
-    UnwindRegistersSave.S)
+    UnwindRegistersSave.S
+    )
 set_source_files_properties(${LIBUNWIND_ASM_SOURCES}
                             PROPERTIES
                               LANGUAGE C)
@@ -33,11 +36,13 @@ set(LIBUNWIND_HEADERS
     Registers.hpp
     RWMutex.hpp
     UnwindCursor.hpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include/libunwind.h
-    ${CMAKE_CURRENT_SOURCE_DIR}/../include/unwind.h)
+    ../include/libunwind.h
+    ../include/unwind.h
+    )
 
 unwind_append_if(LIBUNWIND_HEADERS APPLE
-          "${CMAKE_CURRENT_SOURCE_DIR}/../include/mach-o/compact_unwind_encoding.h")
+    ../include/mach-o/compact_unwind_encoding.h
+    )
 
 if (MSVC_IDE)
   # Force them all into the headers dir on MSVC, otherwise they end up at
@@ -62,6 +67,7 @@ endif()
 unwind_append_if(libraries LIBUNWIND_HAS_DL_LIB dl)
 if (LIBUNWIND_ENABLE_THREADS)
   unwind_append_if(libraries LIBUNWIND_HAS_PTHREAD_LIB pthread)
+  unwind_append_if(LIBUNWIND_COMPILE_FLAGS LIBUNWIND_WEAK_PTHREAD_LIB -DLIBUNWIND_USE_WEAK_PTHREAD=1)
 endif()
 
 # Setup flags.
@@ -157,8 +163,8 @@ add_custom_target(unwind DEPENDS ${LIBUNWIND_BUILD_TARGETS})
 
 if (LIBUNWIND_INSTALL_LIBRARY)
   install(TARGETS ${LIBUNWIND_INSTALL_TARGETS}
-    LIBRARY DESTINATION ${LIBUNWIND_INSTALL_PREFIX}lib${LIBUNWIND_LIBDIR_SUFFIX} COMPONENT unwind
-    ARCHIVE DESTINATION ${LIBUNWIND_INSTALL_PREFIX}lib${LIBUNWIND_LIBDIR_SUFFIX} COMPONENT unwind)
+    LIBRARY DESTINATION ${LIBUNWIND_INSTALL_PREFIX}${LIBUNWIND_INSTALL_LIBRARY_DIR} COMPONENT unwind
+    ARCHIVE DESTINATION ${LIBUNWIND_INSTALL_PREFIX}${LIBUNWIND_INSTALL_LIBRARY_DIR} COMPONENT unwind)
 endif()
 
 if (NOT CMAKE_CONFIGURATION_TYPES AND LIBUNWIND_INSTALL_LIBRARY)

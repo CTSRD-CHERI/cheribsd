@@ -17,6 +17,7 @@
 #include <cassert>
 
 #include "test_macros.h"
+TEST_CHERI_NO_SUBOBJECT_WARNING
 
 #include "../../../Emplaceable.h"
 #include "min_allocator.h"

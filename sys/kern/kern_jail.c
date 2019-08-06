@@ -372,7 +372,7 @@ kern_jail(struct thread *td, const char * __capability path,
 	optstr = "path";
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	error = copyinstr(path, u_path, MAXPATHLEN, NULL);
+	error = copyinstr(path, u_path, MAXPATHLEN, &tmplen);
 	if (error)
 		goto done;
 	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_path, tmplen);
@@ -381,7 +381,7 @@ kern_jail(struct thread *td, const char * __capability path,
 	optstr = "host.hostname";
 	IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 	opt.uio_iovcnt++;
-	error = copyinstr(hostname, u_hostname, MAXHOSTNAMELEN, NULL);
+	error = copyinstr(hostname, u_hostname, MAXHOSTNAMELEN, &tmplen);
 	if (error)
 		goto done;
 	IOVEC_INIT(&optiov[opt.uio_iovcnt], u_hostname, tmplen);
@@ -391,7 +391,7 @@ kern_jail(struct thread *td, const char * __capability path,
 		optstr = "name";
 		IOVEC_INIT_STR(&optiov[opt.uio_iovcnt], optstr);
 		opt.uio_iovcnt++;
-		error = copyinstr(jailname, u_name, MAXHOSTNAMELEN, NULL);
+		error = copyinstr(jailname, u_name, MAXHOSTNAMELEN, &tmplen);
 		if (error)
 			goto done;
 		IOVEC_INIT(&optiov[opt.uio_iovcnt], u_name, tmplen);

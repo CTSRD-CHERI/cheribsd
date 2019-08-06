@@ -18,7 +18,9 @@
 #include <string>
 #include <cassert>
 
+#include "test_macros.h"
 #include "min_allocator.h"
+TEST_CHERI_NO_SUBOBJECT_WARNING
 
 template <class S>
 void
@@ -52,7 +54,7 @@ int main(int, char**)
 #ifdef _LIBCPP_DEBUG
     {
         std::string s;
-        char c = s.front();
+        (void) s.front();
         assert(false);
     }
 #endif

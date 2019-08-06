@@ -22,12 +22,10 @@ class Configuration(LibcxxConfiguration):
         self.default_cxx_abi_library = None  # set later
 
     def configure_src_root(self):
-        self.libunwind_src_root = self.get_lit_conf(
-            'libunwind_src_root',
-            os.path.dirname(self.config.test_source_root))
-        self.libcxx_src_root = self.get_lit_conf(
-            'libcxx_src_root',
-            os.path.join(self.libunwind_src_root, '/../libcxx'))
+        self.libunwind_src_root = (self.get_lit_conf('libunwind_src_root')
+            or os.path.dirname(self.config.test_source_root))
+        self.libcxx_src_root = (self.get_lit_conf('libcxx_src_root')
+            or os.path.join(self.libunwind_src_root, '..', 'libcxx'))
 
     def configure_obj_root(self):
         self.libunwind_obj_root = self.get_lit_conf('libunwind_obj_root')

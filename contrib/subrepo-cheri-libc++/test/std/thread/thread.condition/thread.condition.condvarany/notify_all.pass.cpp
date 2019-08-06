@@ -19,6 +19,8 @@
 #include <thread>
 #include <cassert>
 
+#include "test_macros.h"
+
 std::condition_variable_any cv;
 
 typedef std::timed_mutex L0;
@@ -54,7 +56,7 @@ int main(int, char**)
 {
     std::thread t1(f1);
     std::thread t2(f2);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(TEST_SLOW_HOST() ? 300 : 100));
     {
         L1 lk(m0);
         test1 = 1;
@@ -62,7 +64,7 @@ int main(int, char**)
     }
     cv.notify_all();
     {
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        std::this_thread::sleep_for(std::chrono::milliseconds(TEST_SLOW_HOST() ? 300 : 100));
         L1 lk(m0);
     }
     t1.join();
