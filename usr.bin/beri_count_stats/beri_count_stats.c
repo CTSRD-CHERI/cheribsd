@@ -107,11 +107,9 @@ main(int argc, char **argv)
 			break;
 		case 'c':
 			/* Force the use of CSV format without the header: */
-			unsetenv("STATCOUNTERS_FORMAT");
 			statcounters_format = CSV_NOHEADER;
 			break;
 		case 'f':
-			unsetenv("STATCOUNTERS_FORMAT");
 			if (strcmp(optarg, "csv") == 0) {
 				statcounters_format = CSV_HEADER;
 			} else if (strcmp(optarg, "csv-noheader") == 0) {
@@ -198,7 +196,18 @@ main(int argc, char **argv)
 		}
 	}
 	// FIXME: find out architecture from executable header e_flags?
-	statcounters_dump_with_args(&diff_count, progname, NULL,
-	    architecture, output_file, statcounters_format);
+	// FIXME: change libstatcounters instead of using this hack
+	if (statcounters_format != HUMAN_READABLE) {
+		// Unset statcounters format for the dump so that the explicit
+		// argument is used instead of the environment variable
+		const char* original_fmt = getenv("STATCOUNTERS_FORMAT");
+		unsetenv("STATCOUNTERS_FORMAT");
+		statcounters_dump_with_args(&diff_count, progname, NULL,
+		    architecture, output_file, statcounters_format);
+		setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
+	} else {
+		statcounters_dump_with_args(&diff_count, progname, NULL,
+		    architecture, output_file, statcounters_format);
+	}
 	exit(WEXITSTATUS(status));
 }
