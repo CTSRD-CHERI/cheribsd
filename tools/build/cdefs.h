@@ -53,6 +53,9 @@
 #endif
 #define __unbounded_addressof(obj)	(&__builtin_no_change_bounds(obj))
 #define __bounded_addressof(obj, size)	(&(obj))
+/* Work around bug in sub-object bounds */
+#define __array2d_unbounded_pointer(array, idx1, idx2)	\
+    &__builtin_no_change_bounds(__builtin_no_change_bounds(array[idx1])[idx2])
 
 /* TODO: what about __builtin_align* ? */
 
