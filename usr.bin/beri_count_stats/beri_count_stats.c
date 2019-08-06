@@ -128,18 +128,6 @@ main(int argc, char **argv)
 
 	if (argc == 0)
 		usage(1);
-	if (strcmp("--help", argv[0]) == 0 || strcmp("-h", argv[0]) == 0)
-		usage(0);
-	if (strcmp("-q", argv[0]) == 0 || strcmp("--quiet", argv[0]) == 0) {
-		argc--;
-		argv++;
-		quiet = true;
-	}
-	if (strcmp("-v", argv[0]) == 0 || strcmp("--verbose", argv[0]) == 0) {
-		argc--;
-		argv++;
-		verbose = true;
-	}
 
 	statcounters_bank_t start_count;
 	statcounters_bank_t end_count;
