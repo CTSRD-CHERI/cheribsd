@@ -82,7 +82,7 @@ main(int argc, char **argv)
 	const char* progname = NULL;
 	const char* architecture = "unknown";
 	int opt;
-	statcounters_fmt_flag_t statcounters_format = HUMAN_READABLE;
+	statcounters_fmt_flag_t statcounters_format = (statcounters_fmt_flag_t)-1;
 
 	/* Start option string with + to avoid parsing after first non-option */
 	while ((opt = getopt_long(argc, argv, "+a:chf:o:p:qv", options, NULL)) != -1) {
@@ -97,6 +97,7 @@ main(int argc, char **argv)
 			usage(0);
 			break;
 		case 'a':
+			// FIXME: find out architecture from ELF header e_flags?
 			architecture = optarg;
 			break;
 		case 'o':
@@ -141,6 +142,8 @@ main(int argc, char **argv)
 	}
 
 	statcounters_bank_t start_count;
+	statcounters_bank_t end_count;
+	statcounters_bank_t diff_count;
 	statcounters_sample(&start_count);
 	status = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
 	if (status != 0)
@@ -150,8 +153,6 @@ main(int argc, char **argv)
 	if (!WIFEXITED(status)) {
 		warnx("child exited abnormally");
 	}
-	statcounters_bank_t end_count;
-	statcounters_bank_t diff_count;
 	statcounters_sample(&end_count);
 	statcounters_diff(&diff_count, &end_count, &start_count);
 	/*
@@ -172,10 +173,22 @@ main(int argc, char **argv)
 		printf("tlb misses (instr):    %12" PRId64 "\n", diff_count.itlb_miss);
 		exit(WEXITSTATUS(status));
 	}
+	// Infer default value for statcounters_format from environment
+	const char* original_fmt = getenv("STATCOUNTERS_FORMAT");
+	if (statcounters_format == (statcounters_fmt_flag_t)-1) {
+		if (original_fmt && strcmp(original_fmt,"csv") == 0) {
+			// If the file already exists, we use CSV_NOHEADER later
+			statcounters_format = CSV_HEADER;
+		}
+		else {
+			statcounters_format = HUMAN_READABLE;
+		}
+	}
+
 	/* Also dump to stderr when -v was passed */
+	// FIXME: should change libstatcounters to have a better API
 	if (verbose) {
-		/* Ensure human readable output: */
-		const char* original_fmt = getenv("STATCOUNTERS_FORMAT");
+		// Ensure human readable output:
 		unsetenv("STATCOUNTERS_FORMAT");
 		statcounters_dump_with_args(&diff_count, progname, NULL,
 		    architecture, stderr, HUMAN_READABLE);
@@ -188,26 +201,19 @@ main(int argc, char **argv)
 		output_file = fopen(output_filename, "a");
 		/* If we are writing to a regular file and the offset is not
 		 * zero omit the CSV header */
-		if (statcounters_format == CSV_HEADER && ftello(output_file) > 0) {
-			statcounters_format = CSV_NOHEADER;
-		}
 		if (!output_file) {
 			err(EX_OSERR, "fopen(%s)", output_filename);
 		}
+		if (statcounters_format == CSV_HEADER && ftello(output_file) > 0) {
+			statcounters_format = CSV_NOHEADER;
+		}
 	}
-	// FIXME: find out architecture from executable header e_flags?
+	// Unset statcounters format for the dump so that the explicit
+	// argument is used instead of the environment variable
 	// FIXME: change libstatcounters instead of using this hack
-	if (statcounters_format != HUMAN_READABLE) {
-		// Unset statcounters format for the dump so that the explicit
-		// argument is used instead of the environment variable
-		const char* original_fmt = getenv("STATCOUNTERS_FORMAT");
-		unsetenv("STATCOUNTERS_FORMAT");
-		statcounters_dump_with_args(&diff_count, progname, NULL,
-		    architecture, output_file, statcounters_format);
-		setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
-	} else {
-		statcounters_dump_with_args(&diff_count, progname, NULL,
-		    architecture, output_file, statcounters_format);
-	}
+	unsetenv("STATCOUNTERS_FORMAT");
+	statcounters_dump_with_args(&diff_count, progname, NULL,
+	    architecture, output_file, statcounters_format);
+	setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
 	exit(WEXITSTATUS(status));
 }
