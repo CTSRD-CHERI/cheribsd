@@ -192,7 +192,8 @@ main(int argc, char **argv)
 		unsetenv("STATCOUNTERS_FORMAT");
 		statcounters_dump_with_args(&diff_count, progname, NULL,
 		    architecture, stderr, HUMAN_READABLE);
-		setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
+		if (original_fmt)
+			setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
 	}
 	FILE* output_file = NULL;
 	if (!output_filename || strcmp(output_filename, "-") == 0) {
@@ -214,6 +215,7 @@ main(int argc, char **argv)
 	unsetenv("STATCOUNTERS_FORMAT");
 	statcounters_dump_with_args(&diff_count, progname, NULL,
 	    architecture, output_file, statcounters_format);
-	setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
+	if (original_fmt)
+		setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
 	exit(WEXITSTATUS(status));
 }
