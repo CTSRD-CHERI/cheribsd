@@ -97,7 +97,8 @@ CHERI_CXX=${CHERI_CC:H}/${CHERI_CC:T:S/clang/clang++/}
 .endif
 
 _CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
-			-msoft-float -cheri-uintcap=offset
+			-msoft-float \
+			-cheri-uintcap=${CHERI_UINTCAP_MODE:Uoffset}
 .ifdef WANT_AFL_FUZZ
 # Build binaries static when fuzzing
 .if defined(__BSD_PROG_MK)
