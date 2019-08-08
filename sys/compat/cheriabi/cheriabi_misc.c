@@ -574,24 +574,33 @@ cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd)
  * create both types of capabilities (and currently creates W|X caps).
  * Its use should be replaced.
  */
-#define sucap(uaddr, base, offset, length, what, perms)				\
-	do {									\
-		void * __capability _tmpcap;					\
-		size_t cap_len = (length);					\
-		size_t rounded_cap_len = CHERI_REPRESENTABLE_LENGTH(cap_len);	\
-		if (rounded_cap_len != cap_len)					\
-			printf("%s:%d rounding size of unrepresentable %s from"	\
-			    " %zd to %zd\n", __func__, __LINE__, what, cap_len,	\
-			    rounded_cap_len);					\
-		_tmpcap = cheri_capability_build_user_rwx((perms),		\
-		    (base), rounded_cap_len, (offset));				\
-		KASSERT(cheri_gettag(_tmpcap), ("%s:%d: Created "		\
-		     "invalid cap from base=%zx, offset=%#zx, "			\
-		     "length=%#zx, perms=%#zx", __func__, __LINE__,		\
-		     (size_t)(base), (size_t)(offset),				\
-		     (size_t)(rounded_cap_len), (size_t)(perms)));		\
-		copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));			\
-	} while(0)
+#define sucap(uaddr, base, offset, length, what, perms)	\
+    _sucap(uaddr, (base), (offset), (length), (perms), what, __func__, __LINE__)
+
+static void
+_sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
+    uint64_t perms, const char *what, const char *func, int line)
+{
+	void *__capability _tmpcap;
+	size_t rounded_length = CHERI_REPRESENTABLE_LENGTH(length);
+	vaddr_t rounded_base = CHERI_REPRESENTABLE_BASE(base, length);
+	if (rounded_length != length)
+		printf("%s:%d rounding size of unrepresentable %s from %zd to "
+		    "%zd\n", func, line, what, length, rounded_length);
+	if (rounded_base != base) {
+		printf("%s:%d aligning base of unrepresentable %s from"
+		       " 0x%zx to 0x%zx and adjusting offset by %zd\n", func,
+		       line, what, base, rounded_base, base - rounded_base);
+		/* We have to adjust the offset by the difference */
+		offset += base - rounded_base;
+	}
+	_tmpcap = cheri_capability_build_user_rwx(
+	    perms, rounded_base, rounded_length, offset);
+	KASSERT(cheri_gettag(_tmpcap),("%s:%d: Created invalid cap "
+	     "from base=%zx, offset=%#zx, length=%#zx, perms=%#zx", func,
+	     line, base, offset, length, (size_t)(perms)));
+	copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));
+}
 
 register_t *
 cheriabi_copyout_strings(struct image_params *imgp)

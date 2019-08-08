@@ -138,7 +138,7 @@ struct _Elf {
  * The internal descriptor wrapping the "Elf_Data" type.
  */
 struct _Libelf_Data {
-	Elf_Data	d_data;		/* The exported descriptor. */
+	Elf_Data	d_data __subobject_member_used_for_c_inheritance;	/* The exported descriptor. */
 	Elf_Scn		*d_scn;		/* The containing section */
 	unsigned int	d_flags;
 	STAILQ_ENTRY(_Libelf_Data) d_next;

@@ -186,6 +186,13 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	case PT_GNU_RELRO:
 	    relro_page = phdr->p_vaddr;
 	    relro_size = phdr->p_memsz;
+#ifdef __CHERI_PURE_CAPABILITY__
+	    text_rodata_start = rtld_min(phdr->p_vaddr, text_rodata_start);
+	    text_rodata_end = rtld_max(phdr->p_vaddr + phdr->p_memsz, text_rodata_end);
+	    dbg("%s: Adding PT_GNU_RELRO, new text/rodata start "
+		" = %zx text/rodata end = %zx", path,
+		(size_t)text_rodata_start, (size_t)text_rodata_end);
+#endif
 	    break;
 
 	case PT_NOTE:

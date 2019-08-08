@@ -174,15 +174,25 @@ struct qm_trace {
 #endif
 
 /*
+ * The _Static_assert in __containerof() is too aggressive so we also need
+ * to add some false-positive __no_subobject_bounds annotations even though
+ * the containing type already has __no_subobject_bounds.
+ * This is non-trivial to change in the builtin/__containerof so just
+ * add the extra unnecessary annotations here.
+ */
+#define __no_subobject_bounds_fp __no_subobject_bounds
+
+
+/*
  * Singly-linked List declarations.
  */
 #define	SLIST_HEAD(name, type)						\
-struct __no_subobject_bounds name {					\
+struct name {				\
 	struct type *slh_first;	/* first element */			\
 }
 
 #define	SLIST_CLASS_HEAD(name, type)					\
-struct __no_subobject_bounds name {					\
+struct name {				\
 	class type *slh_first;	/* first element */			\
 }
 
@@ -190,13 +200,13 @@ struct __no_subobject_bounds name {					\
 	{ NULL }
 
 #define	SLIST_ENTRY(type)						\
-struct __no_subobject_bounds {						\
-	struct type *sle_next;	/* next element */			\
+struct {				\
+	struct type *sle_next;	/* next element */	\
 }
 
 #define	SLIST_CLASS_ENTRY(type)						\
-struct __no_subobject_bounds {						\
-	class type *sle_next;		/* next element */		\
+struct {								\
+	class type *sle_next;	/* next element */			\
 }
 
 /*
@@ -309,13 +319,13 @@ struct __no_subobject_bounds {						\
  * Singly-linked Tail queue declarations.
  */
 #define	STAILQ_HEAD(name, type)						\
-struct __no_subobject_bounds name {					\
+struct __no_subobject_bounds name {				\
 	struct type *stqh_first;/* first element */			\
 	struct type **stqh_last;/* addr of last next element */		\
 }
 
 #define	STAILQ_CLASS_HEAD(name, type)					\
-struct __no_subobject_bounds name {					\
+struct __no_subobject_bounds name {				\
 	class type *stqh_first;	/* first element */			\
 	class type **stqh_last;	/* addr of last next element */		\
 }
@@ -324,13 +334,13 @@ struct __no_subobject_bounds name {					\
 	{ NULL, &(head).stqh_first }
 
 #define	STAILQ_ENTRY(type)						\
-struct __no_subobject_bounds {						\
-	struct type *stqe_next;	/* next element */			\
+struct __no_subobject_bounds {				\
+	struct type *stqe_next __no_subobject_bounds_fp;	/* next element */	\
 }
 
 #define	STAILQ_CLASS_ENTRY(type)					\
-struct __no_subobject_bounds {						\
-	class type *stqe_next;	/* next element */			\
+struct __no_subobject_bounds {				\
+	class type *stqe_next __no_subobject_bounds_fp;	/* next element */	\
 }
 
 /*
@@ -442,12 +452,12 @@ struct __no_subobject_bounds {						\
  * List declarations.
  */
 #define	LIST_HEAD(name, type)						\
-struct __no_subobject_bounds name {					\
+struct __no_subobject_bounds name {				\
 	struct type *lh_first;	/* first element */			\
 }
 
 #define	LIST_CLASS_HEAD(name, type)					\
-struct __no_subobject_bounds name {					\
+struct __no_subobject_bounds name {				\
 	class type *lh_first;	/* first element */			\
 }
 
@@ -455,15 +465,15 @@ struct __no_subobject_bounds name {					\
 	{ NULL }
 
 #define	LIST_ENTRY(type)						\
-struct __no_subobject_bounds {						\
-	struct type *le_next;	/* next element */			\
-	struct type **le_prev;	/* address of previous next element */	\
+struct __no_subobject_bounds {				\
+	struct type *le_next __no_subobject_bounds_fp;	/* next element */			\
+	struct type **le_prev __no_subobject_bounds_fp;	/* address of previous next element */	\
 }
 
 #define	LIST_CLASS_ENTRY(type)						\
-struct __no_subobject_bounds {						\
-	class type *le_next;	/* next element */			\
-	class type **le_prev;	/* address of previous next element */	\
+struct __no_subobject_bounds {				\
+	class type *le_next __no_subobject_bounds_fp;	/* next element */			\
+	class type **le_prev __no_subobject_bounds_fp;	/* address of previous next element */	\
 }
 
 /*
@@ -616,14 +626,14 @@ struct __no_subobject_bounds {						\
  * Tail queue declarations.
  */
 #define	TAILQ_HEAD(name, type)						\
-struct __no_subobject_bounds name {					\
+struct __no_subobject_bounds name {				\
 	struct type *tqh_first;	/* first element */			\
 	struct type **tqh_last;	/* addr of last next element */		\
 	TRACEBUF							\
 }
 
 #define	TAILQ_CLASS_HEAD(name, type)					\
-struct __no_subobject_bounds name {					\
+struct __no_subobject_bounds name {				\
 	class type *tqh_first;	/* first element */			\
 	class type **tqh_last;	/* addr of last next element */		\
 	TRACEBUF							\
@@ -633,16 +643,16 @@ struct __no_subobject_bounds name {					\
 	{ NULL, &(head).tqh_first, TRACEBUF_INITIALIZER }
 
 #define	TAILQ_ENTRY(type)						\
-struct __no_subobject_bounds {						\
-	struct type *tqe_next;	/* next element */			\
-	struct type **tqe_prev;	/* address of previous next element */	\
+struct __no_subobject_bounds {				\
+	struct type *tqe_next __no_subobject_bounds_fp;	/* next element */			\
+	struct type **tqe_prev __no_subobject_bounds_fp;	/* address of previous next element */	\
 	TRACEBUF							\
 }
 
 #define	TAILQ_CLASS_ENTRY(type)						\
-struct __no_subobject_bounds {						\
-	class type *tqe_next;	/* next element */			\
-	class type **tqe_prev;	/* address of previous next element */	\
+struct __no_subobject_bounds {				\
+	class type *tqe_next __no_subobject_bounds_fp;	/* next element */			\
+	class type **tqe_prev __no_subobject_bounds_fp;	/* address of previous next element */	\
 	TRACEBUF							\
 }
 
