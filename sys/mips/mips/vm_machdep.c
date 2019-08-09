@@ -614,8 +614,8 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 /* Constructed in sys/mips/mips/locore.S */
 uint8_t * __capability caprev_shadow_cap = (void * __capability)(intcap_t) -1;
 
-int
-vm_test_caprevoke(const void * __capability cut)
+static int
+vm_test_caprevoke_int(const void * __capability cut, int flags)
 {
 	vm_offset_t va;
 
@@ -629,10 +629,14 @@ vm_test_caprevoke(const void * __capability cut)
 	va = cheri_getbase(cut);
 
 	/*
-	 * All capabilities are checked against the MAP bitmap
+	 * All capabilities are checked against the coarse MAP bitmap, unless
+	 * we're instructed not to, as we might be if we know that there are
+	 * no bits set anywhere in that map.  Since this map is under the
+	 * kernel's control, this is a reasonable possibility.
 	 *
 	 * XXX Unless they have no memory-access permissions
 	 */
+	if (flags & VM_CAPREVOKE_NO_COARSE)
 	{
 		uint8_t bmbits;
 		uint8_t * __capability bmloc;
@@ -671,19 +675,34 @@ vm_test_caprevoke(const void * __capability cut)
 	return 0;
 }
 
+/* External interface */
+int
+vm_test_caprevoke(const void * __capability cut)
+{
+	/*
+	 * XXX Right now, we know that there are no coarse-grain bits
+	 * getting set, since we don't do MPROT_QUARANTINE or anything of
+	 * that sort.  So we just always assert VM_CAPREVOKE_NO_COARSE.
+	 * In the future, we should count the number of pages held in
+	 * MPROT_QUARANTINE or munmap()'s quarantine or other such to decide
+	 * whether to set this!
+	 */
+	return vm_test_caprevoke_int(cut, VM_CAPREVOKE_NO_COARSE);
+}
+
 /*
  * The Capability Under Test Pointer needs to be a capability because we
  * don't have a LLC instruction, just a CLLC one.
  */
 static int
-vm_do_caprevoke(void * __capability * __capability cutp, struct caprevoke_stats *stat)
+vm_do_caprevoke(void * __capability * __capability cutp, int flags, struct caprevoke_stats *stat)
 {
 	void * __capability cut;
 	int res = 0;
 
 	cut = *cutp;
 
-	if (vm_test_caprevoke(cut)) {
+	if (vm_test_caprevoke_int(cut, flags)) {
 		void * __capability cscratch;
 		int ok;
 
@@ -759,7 +778,7 @@ SYSINIT(cloadtags_stride, SI_SUB_VM, SI_ORDER_ANY,
         measure_cloadtags_stride, NULL);
 
 int
-vm_caprevoke_page(vm_page_t m, struct caprevoke_stats *stat)
+vm_caprevoke_page(vm_page_t m, int flags, struct caprevoke_stats *stat)
 {
 	uint32_t cyc_start = cheri_get_cyclecount();
 
@@ -806,7 +825,7 @@ vm_caprevoke_page(vm_page_t m, struct caprevoke_stats *stat)
 					continue;
 				stat->caps_found++;
 
-				res |= vm_do_caprevoke(mvt, stat);
+				res |= vm_do_caprevoke(mvt, flags, stat);
 			}
 		}
 	} else {
@@ -815,7 +834,7 @@ vm_caprevoke_page(vm_page_t m, struct caprevoke_stats *stat)
 			if (cheri_gettag(cut)) {
 				stat->caps_found++;
 				res |= VM_CAPREVOKE_PAGE_HASCAPS;
-				res |= vm_do_caprevoke(mvu, stat);
+				res |= vm_do_caprevoke(mvu, flags, stat);
 			}
 		}
 	}

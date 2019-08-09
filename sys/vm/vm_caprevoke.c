@@ -160,7 +160,7 @@ vm_caprevoke_object(vm_object_t obj, vm_offset_t eo, int flags,
 
 retry:
 			stat->pages_scanned++;
-			hascaps = vm_caprevoke_page(m, stat);
+			hascaps = vm_caprevoke_page(m, flags, stat);
 
 			/* CAS failures cause us to revisit */
 			if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
@@ -513,6 +513,16 @@ vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 		 */
 		return KERN_SUCCESS;
 	}
+
+	/*
+	 * XXX Right now, we know that there are no coarse-grain bits
+	 * getting set, since we don't do MPROT_QUARANTINE or anything of
+	 * that sort.  So we just always assert VM_CAPREVOKE_NO_COARSE.
+	 * In the future, we should count the number of pages held in
+	 * MPROT_QUARANTINE or munmap()'s quarantine or other such to decide
+	 * whether to set this!
+	 */
+	flags |= VM_CAPREVOKE_NO_COARSE;
 
 	PROC_ASSERT_HELD(p);
 	vm = vmspace_acquire_ref(p);

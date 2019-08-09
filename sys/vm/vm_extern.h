@@ -140,6 +140,7 @@ void caprevoke_td_frame(struct thread *td, struct caprevoke_stats *); /* MD; XXX
 #define VM_CAPREVOKE_INCREMENTAL	0x01
 #define VM_CAPREVOKE_LAST_INIT		0x02
 #define VM_CAPREVOKE_LAST_FINI		0x04
+#define VM_CAPREVOKE_NO_COARSE		0x08
 int vm_caprevoke(struct proc*, int, struct caprevoke_stats *);
 int vm_caprevoke_one(struct proc*, int, vm_offset_t, struct caprevoke_stats *);
 #endif
