@@ -616,6 +616,7 @@ void vm_page_lock_assert_KBI(vm_page_t m, int a, const char *file, int line);
 #define VM_CAPREVOKE_PAGE_DIRTY		0x02
 struct caprevoke_stats;
 int vm_caprevoke_page(vm_page_t m, int, struct caprevoke_stats *);
+int vm_caprevoke_page_ro(vm_page_t m, int, struct caprevoke_stats *);
 #endif
 
 #define	vm_page_assert_sbusied(m)					\

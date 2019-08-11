@@ -845,6 +845,77 @@ vm_caprevoke_page(vm_page_t m, int flags, struct caprevoke_stats *stat)
 
 	return res;
 }
+
+/*
+ * Like vm_caprevoke_page, but does not write to the page in question
+ *
+ * VM_CAPREVOKE_PAGE_DIRTY in the result means that we would like to store
+ * back, but can't, rather than that we lost a LL/SC race.  We will return
+ * early if this becomes set: there's no reason to continue probing once we
+ * know the answer.
+ *
+ * VM_CAPREVOKE_PAGE_HASCAPS continues to mean what it meant before: we
+ * saw at least one capability on this page.
+ */
+int
+vm_caprevoke_page_ro(vm_page_t m, int flags, struct caprevoke_stats *stat)
+{
+	uint32_t cyc_start = cheri_get_cyclecount();
+
+	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
+	vm_offset_t mva;
+	vm_offset_t mve;
+	void * __capability * __capability mvu;
+	void * __capability kdc = cheri_getkdc();
+	int res = 0;
+
+	KASSERT(MIPS_DIRECT_MAPPABLE(mpa),
+		("Revoke not directly map swept page?"));
+	mva = MIPS_PHYS_TO_DIRECT(mpa);
+	mve = mva + pagesizes[m->psind];
+
+	mvu = cheri_setaddress(kdc, mva);
+
+	if (caprevoke_use_cloadtags) {
+		for( ; cheri_getaddress(mvu) < mve; mvu += cloadtags_stride ) {
+			void * __capability * __capability mvt = mvu;
+			uint64_t tags;
+
+			tags = __builtin_cheri_cap_load_tags(mvt);
+
+			if (tags != 0)
+				res |= VM_CAPREVOKE_PAGE_HASCAPS;
+
+			for(; tags != 0; (tags >>= 1), mvt += 1) {
+				if (!(tags & 1))
+					continue;
+				stat->caps_found++;
+				if (vm_test_caprevoke_int(*mvt, flags)) {
+					return VM_CAPREVOKE_PAGE_DIRTY
+						| VM_CAPREVOKE_PAGE_HASCAPS;
+				}
+			}
+		}
+	} else {
+		for( ; cheri_getaddress(mvu) < mve; mvu++) {
+			void * __capability cut = *mvu;
+			if (cheri_gettag(cut)) {
+				stat->caps_found++;
+				res |= VM_CAPREVOKE_PAGE_HASCAPS;
+				if (vm_test_caprevoke_int(cut, flags)) {
+					return VM_CAPREVOKE_PAGE_DIRTY
+						| VM_CAPREVOKE_PAGE_HASCAPS;
+				}
+			}
+		}
+	}
+
+	uint32_t cyc_end = cheri_get_cyclecount();
+
+	stat->page_scan_cycles += cyc_end - cyc_start;
+
+	return res;
+}
 #endif
 
 #ifdef DDB

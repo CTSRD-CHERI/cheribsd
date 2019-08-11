@@ -58,169 +58,260 @@ vm_caprevoke_should_visit_page(vm_page_t m, int flags)
 	return 0;
 }
 
-#define VM_CROBJ_DONE		0
-#define VM_CROBJ_ROMAPPED	1
-#define VM_CROBJ_UNMAPPED	2
+enum vm_cro_visit {
+	VM_CAPREVOKE_VIS_DONE  = 0,
+	VM_CAPREVOKE_VIS_DIRTY = 1,
+	VM_CAPREVOKE_VIS_BUSY  = 2
+};
 
 /*
- * Sweep through a subset of a particular object, from `*oo` to `eo`.
- * Return how far we got before failing in `oo`.  Pages between the initial
- * value of `*oo` and the value of `*oo` at return will have had their
- * VPO_PASTCAPSTORED bits updated to reflect the true measured presence of
- * capabilities on this page, and will have had `pmap_tc_capdirty` called on
- * them prior to revocation; as such, a page will only become
- * `pmap_is_capdirty` after this function if a capstore happened after the
- * start of revocation.
- *
- * `obj` must be unlocked at entry, but the map containing the entry whence
- * it came must be held read-locked across the duration of this call.  At
- * points internally, `obj` will be locked.
- *
- * `flags` adjust the behavior of this function:
- *
- *   VM_CAPREVOKE_INCREMENTAL: examine only pages which the pmap considers
- *   "recently" capability dirty.  In the typical use case of the capdirty
- *   logic, that will mean "since the last invocation of this function".
- *
- *   VM_CAPREVOKE_STOPTHEWORLD: the world is stopped for our attention, so
- *   we can more aggressively assert.
- *
- * Result codes are
- *
- *   VM_CROBJ_DONE     - finished and *oo == eo.
- *
- *   VM_CROBJ_ROMAPPED - just past *oo, a page we intend to visit is RO
- *                       mapped; fault handling is required to upgrade to a
- *                       writable mapping, but the caller can skip any
- *                       fast-path testing
- *
- *   VM_CROBJ_UNMAPPED - just past *oo, a page is in swap and fault handling
- *                       is required.
+ * Given a writable, wired page in a wlocked object, visit it.
  */
 static int
-vm_caprevoke_object(vm_object_t obj, vm_offset_t eo, int flags,
-		    vm_offset_t *oo, struct caprevoke_stats *stat)
+vm_caprevoke_visit_rw(vm_object_t obj, vm_page_t m, int flags,
+			struct caprevoke_stats *stat)
 {
-	vm_offset_t co = *oo;
+	int hascaps;
 
-	VM_OBJECT_WLOCK(obj);
-
-	while (co < eo) {
-		vm_page_t m;
-		vm_pindex_t pindex;
-
-		/* Find the page for this offset within the object. */
-		pindex = OFF_TO_IDX(co);
-		m = vm_page_lookup(obj, pindex);
-		KASSERT((m == NULL) || (m->valid == VM_PAGE_BITS_ALL),
-			("Revocation invalid page"));
-		if (m == NULL) {
-			VM_OBJECT_WUNLOCK(obj);
-			*oo = co;
-			return VM_CROBJ_UNMAPPED;
-		}
-
-		if (vm_caprevoke_should_visit_page(m, flags)) {
-			int hascaps;
-
-			if (!pmap_page_is_write_mapped(m)) {
-
-				/*
-				 * XXX Rather than this, we should take a RO
-				 * page shared-ly and scan over it before
-				 * deciding that the caller needs to upgrade
-				 * our copy to read-write.  That will be
-				 * friendlier in the case of fork() and only
-				 * rarely will we need to return
-				 * VM_CROBJ_ROMAPPED, since shared pages
-				 * probably do not hold capabilities to be
-				 * revoked?
-				 *
-				 * At the very least, we could look at
-				 * vm_caprevoke_should_visit_page for RO
-				 * mappings, but it's probably best to loop
-				 * over them and probe for revocation.
-				 */
-
-				VM_OBJECT_WUNLOCK(obj);
-				*oo = co;
-				return VM_CROBJ_ROMAPPED;
-			}
-
-			/*
-			 * Exclusive busy the page and, soon, drop the
-			 * object lock around the actual revocation.  This
-			 * lets the world make progress, but prevents
-			 * concurrent revocation of this page, in
-			 * particular.
-			 */
-
-			vm_page_xbusy(m);
-			VM_OBJECT_WUNLOCK(obj);
-
-retry:
-			stat->pages_scanned++;
-			hascaps = vm_caprevoke_page(m, flags, stat);
-
-			/* CAS failures cause us to revisit */
-			if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
-				/* If the world is stopped, do that now */
-				if (flags & VM_CAPREVOKE_LAST_FINI) {
-					stat->pages_retried++;
-					goto retry;
-				}
-				vm_page_capdirty(m);
-			}
-
-			VM_OBJECT_WLOCK(obj);
-			vm_page_xunbusy(m);
-
-			/*
-			 * Update VPO_PASTCAPSTORE to record the results of
-			 * this sweep.  Even if we clear it here, it's
-			 * entirely possible that PGA_CAPSTORED has become
-			 * set again in the interim.
-			 */
-			if (hascaps & VM_CAPREVOKE_PAGE_HASCAPS) {
-				m->oflags |= VPO_PASTCAPSTORE;
-			} else {
-				m->oflags &= ~VPO_PASTCAPSTORE;
-			}
-		} else {
-			/* Incremental scans cannot update VPO_PASTCAPSTORE */
-		}
-
-		co += pagesizes[m->psind];
-
-		/*
-		 * If this is a stop the world pass, there should be
-		 * absolutely no way for this page to be capdirty again
-		 * here.  (But see below!)
-		 */
-		KASSERT(((flags & VM_CAPREVOKE_LAST_INIT) == 0) ||
-				((m->aflags & PGA_CAPSTORED) == 0),
-			("Capdirty page in STW revocation pass"));
-
-		/*
-		 * When we are closing a revocation epoch, we transfer
-		 * VPO_PASTCAPSTORED to PGA_CAPSTORED so that we don't take
-		 * as many faults in the inter-epoch period.  We know that
-		 * we're going to visit all the VPO_PASTCAPSTORED-bearing
-		 * pages when we open the next epoch anyway, so there's no
-		 * point in lazily setting their PGA_CAPSTORED flags.
-		 */
-		if (caprevoke_last_redirty
-		    && (flags & VM_CAPREVOKE_LAST_INIT)) {
-			if (m->oflags & VPO_PASTCAPSTORE) {
-				vm_page_capdirty(m);
-			}
-		}
-	}
-
+	if (!vm_page_tryxbusy(m))
+		return VM_CAPREVOKE_VIS_BUSY;
 	VM_OBJECT_WUNLOCK(obj);
 
-	*oo = eo;
-	return VM_CROBJ_DONE;
+retry:
+	stat->pages_scanned++;
+	hascaps = vm_caprevoke_page(m, flags, stat);
+
+	/* CAS failures cause us to revisit */
+	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
+		/* If the world is stopped, do that now */
+		if (flags & VM_CAPREVOKE_LAST_FINI) {
+			stat->pages_retried++;
+			goto retry;
+		}
+		vm_page_capdirty(m);
+	}
+
+	VM_OBJECT_WLOCK(obj);
+	vm_page_xunbusy(m);
+
+	/*
+	 * Update VPO_PASTCAPSTORE to record the results of
+	 * this sweep.  Even if we clear it here, it's
+	 * entirely possible that PGA_CAPSTORED has become
+	 * set again in the interim.
+	 */
+	if (hascaps & VM_CAPREVOKE_PAGE_HASCAPS) {
+		m->oflags |= VPO_PASTCAPSTORE;
+	} else {
+		m->oflags &= ~VPO_PASTCAPSTORE;
+	}
+
+	return VM_CAPREVOKE_VIS_DONE;
+}
+
+/*
+ * The same thing, but for a *readable*, wired page.
+ *
+ * Returns 1 if the page must be visited read-write, 0 if it is clear to
+ * advance and carry on.
+ */
+static int
+vm_caprevoke_visit_ro(vm_object_t obj, vm_page_t m, int flags,
+			struct caprevoke_stats *stat)
+{
+	int hascaps;
+
+	if (!vm_page_tryxbusy(m))
+		return VM_CAPREVOKE_VIS_BUSY;
+	VM_OBJECT_WUNLOCK(obj);
+
+	stat->pages_scanned++;
+	hascaps = vm_caprevoke_page_ro(m, flags, stat);
+
+	VM_OBJECT_WLOCK(obj);
+	vm_page_xunbusy(m);
+
+	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
+		return VM_CAPREVOKE_VIS_DIRTY;
+	}
+
+	if (hascaps & VM_CAPREVOKE_PAGE_HASCAPS) {
+		m->oflags |= VPO_PASTCAPSTORE;
+	} else {
+		m->oflags &= ~VPO_PASTCAPSTORE;
+	}
+
+	return VM_CAPREVOKE_VIS_DONE;
+}
+
+static void
+vm_caprevoke_unwire_in_situ(vm_page_t m)
+{
+	vm_page_lock(m);
+	vm_page_unwire(m, vm_page_active(m) ? PQ_ACTIVE : PQ_INACTIVE);
+	vm_page_unlock(m);
+}
+
+enum vm_cro_at {
+	VM_CAPREVOKE_AT_OK    = 0,
+	VM_CAPREVOKE_AT_TICK  = 1,
+	VM_CAPREVOKE_AT_VMERR = 2
+};
+
+/*
+ * Given a map, map entry, and page index within that entry, visit that page
+ * for revocation.  The entry must have an object.
+ *
+ * The map must be read-locked on entry and will be read-locked on return,
+ * but this lock may be dropped in the interim.
+ *
+ * The entry's object must be wlocked on entry and will be returned
+ * wlocked on success and unlocked on failure.  Even on success, the lock
+ * may have been dropped and reacquired.
+ *
+ * If gaze_shadows is false, we restrict our attention to this object's own
+ * pages, while if it is set we will fault around in the shadow hierarchy to
+ * find and copy deeper pages.
+ *
+ * On success, *ooff will be updated to the next offset to probe (which may
+ * be past the end of the object; the caller should test).  This next offset
+ * may equal ioff if the world has shifted; this is probably fine as the
+ * caller should just repeat the call.  On failure, *ooff will not be modified.
+ */
+static enum vm_cro_at
+vm_caprevoke_object_at(vm_map_t map, vm_map_entry_t entry, vm_offset_t ioff,
+			bool gaze_shadows, int flags, vm_offset_t *ooff,
+			struct caprevoke_stats *stat, int *vmres)
+{
+	vm_object_t obj = entry->object.vm_object;
+	vm_pindex_t ipi = OFF_TO_IDX(ioff);
+
+	vm_page_t m = vm_page_lookup(obj, ipi);
+
+	KASSERT((m == NULL) || (m->valid == VM_PAGE_BITS_ALL),
+		("Revocation invalid page"));
+
+	if (m == NULL) {
+		vm_offset_t addr = ioff - entry->offset + entry->start;
+
+		if (!gaze_shadows) {
+			/* Look forward in the object map */
+			vm_page_t obj_next_pg = vm_page_find_least(obj, ipi);
+
+			if (obj_next_pg == NULL) {
+				stat->pages_fault_skip += (entry->end - addr) >> PAGE_SHIFT;
+				*ooff = entry->end - entry->start + entry->offset;
+			} else {
+				*ooff = IDX_TO_OFF(obj_next_pg->pindex);
+			}
+			return VM_CAPREVOKE_AT_OK;
+		}
+
+		stat->pages_faulted_ro++;
+
+		int res;
+		unsigned int last_timestamp = map->timestamp;
+
+		VM_OBJECT_WUNLOCK(obj);
+
+		vm_map_unlock_read(map);
+		res = vm_fault_hold(map, addr, VM_PROT_READ, VM_FAULT_NORMAL,
+				    &m);
+		vm_map_lock_read(map);
+
+		if (res != KERN_SUCCESS) {
+			*vmres = res;
+			return VM_CAPREVOKE_AT_VMERR;
+		}
+		if (last_timestamp != map->timestamp) {
+			/*
+			 * The map has changed out from under us; bail and
+			 * the caller will look up the new map entry.
+			 * First, though, it's important to release the page
+			 * we're holding!
+			 *
+			 * If we're the sole wiring holder, consider this
+			 * page active because we're most likely about to
+			 * come right back.
+			 */
+			vm_page_lock(m);
+			vm_page_unwire(m, PQ_ACTIVE);
+			vm_page_unlock(m);
+			return VM_CAPREVOKE_AT_TICK;
+		}
+
+		VM_OBJECT_WLOCK(obj);
+		vm_caprevoke_unwire_in_situ(m);
+	}
+
+	if (!vm_caprevoke_should_visit_page(m, flags)) {
+		*ooff = ioff + pagesizes[m->psind];
+		return VM_CAPREVOKE_AT_OK;
+	}
+
+	if (pmap_page_is_write_mapped(m)) {
+		/* The page is writable; just go do the revocation in place */
+		vm_caprevoke_visit_rw(obj, m, flags, stat);
+		*ooff = ioff + pagesizes[m->psind];
+		return VM_CAPREVOKE_AT_OK;
+	}
+
+	switch(vm_caprevoke_visit_ro(obj, m, flags, stat))
+	{
+	case VM_CAPREVOKE_VIS_DONE:
+		/* We were able to conclude that the page was clean */
+		*ooff = ioff + pagesizes[m->psind];
+		return VM_CAPREVOKE_AT_OK;
+	case VM_CAPREVOKE_VIS_BUSY:
+		/*
+		 * This is kind of awkward; the page is busy and it's
+		 * not clear by whom.  But whoever it is needs our
+		 * object lock to unbusy.  So handle this like the
+		 * map stepping forward.
+		 */
+		VM_OBJECT_WUNLOCK(obj);
+		return VM_CAPREVOKE_AT_TICK;
+	case VM_CAPREVOKE_VIS_DIRTY:
+		break;
+	default:
+		panic("bad result from vm_caprevoke_visit_ro");
+	}
+
+	stat->pages_faulted_rw++;
+
+	int res;
+	unsigned int last_timestamp = map->timestamp;
+
+	vm_offset_t addr = ioff - entry->offset + entry->start;
+
+	VM_OBJECT_WUNLOCK(obj);
+	vm_map_unlock_read(map);
+	res = vm_fault_hold(map, addr, VM_PROT_WRITE, VM_FAULT_NORMAL, &m);
+	vm_map_lock_read(map);
+	if (res != KERN_SUCCESS) {
+		*vmres = res;
+		return VM_CAPREVOKE_AT_VMERR;
+	}
+	if (last_timestamp != map->timestamp) {
+		vm_page_lock(m);
+		vm_page_unwire(m, PQ_ACTIVE);
+		vm_page_unlock(m);
+		return VM_CAPREVOKE_AT_TICK;
+	}
+
+	VM_OBJECT_WLOCK(obj);
+	vm_caprevoke_unwire_in_situ(m);
+	switch(vm_caprevoke_visit_rw(obj, m, flags, stat))
+	{
+	case VM_CAPREVOKE_VIS_DONE:
+		*ooff = ioff + pagesizes[m->psind];
+		return VM_CAPREVOKE_AT_OK;
+	case VM_CAPREVOKE_VIS_BUSY:
+		VM_OBJECT_WUNLOCK(obj);
+		return VM_CAPREVOKE_AT_TICK;
+	default:
+		panic("bad result from vm_caprevoke_visit_rw");
+	}
 }
 
 /*
@@ -236,7 +327,6 @@ vm_caprevoke_map_entry(vm_map_t map, vm_map_entry_t entry, const int flags,
 			vm_offset_t *addr, struct caprevoke_stats *stat)
 {
 	int res;
-	vm_offset_t eoffset;
 	vm_offset_t ooffset;
 	vm_object_t obj;
 	bool obj_has_backing_caps;
@@ -256,6 +346,8 @@ vm_caprevoke_map_entry(vm_map_t map, vm_map_entry_t entry, const int flags,
 	    (OBJ_NOLOADTAGS | OBJ_NOSTORETAGS))
 		goto fini;
 
+	VM_OBJECT_WLOCK(obj);
+
 	if (caprevoke_avoid_faults) {
 		/*
 		 * Look to see if this object's backing stores are not tag-capable.
@@ -265,6 +357,9 @@ vm_caprevoke_map_entry(vm_map_t map, vm_map_entry_t entry, const int flags,
 		 * XXX There is an intermediate "faster" path we haven't yet
 		 * explored, which is to have a "next possible tag-capable pindex"
 		 * operation on the stack of vm objects that we might find we need.
+		 *
+		 * XXX Do we really have to look recursively like this or is
+		 * it enough to just glance at the immediate backing object?
 		 */
 
 		vm_object_t tobj;
@@ -283,202 +378,36 @@ vm_caprevoke_map_entry(vm_map_t map, vm_map_entry_t entry, const int flags,
 		obj_has_backing_caps = true;
 	}
 
-	KASSERT(*addr < entry->end, ("vm_caprevoke at=%lx past entry end=%lx", *addr, entry->end));
+	while (*addr < entry->end) {
+		int vmres;
 
-	eoffset = entry->end - entry->start + entry->offset;
+		/* Find ourselves in this object */
+		ooffset = *addr      - entry->start + entry->offset;
 
-again:	
-	/* Find ourselves in this object */
-	ooffset = *addr      - entry->start + entry->offset;
+		res = vm_caprevoke_object_at(map, entry, ooffset,
+						obj_has_backing_caps, flags,
+						&ooffset, stat, &vmres);
 
-	/* Make some progress */
-	res = vm_caprevoke_object(obj, eoffset, flags, &ooffset, stat);
+		/* How far did we get? */
+		*addr = ooffset - entry->offset + entry->start;
+		KASSERT(*addr <= entry->end, ("vm_caprevoke post past entry end"));
 
-	/* How far did we get? */
-	*addr = ooffset - entry->offset + entry->start;
-
-	KASSERT(*addr <= entry->end, ("vm_caprevoke post past entry end"));
-
-	if (res == VM_CROBJ_UNMAPPED && !obj_has_backing_caps) {
-		/*
-		 * If we found a hole and the object does not have backing objects
-		 * with capabilities, then we can skip directly to the next page in
-		 * this object.
-		 */
-
-		vm_offset_t naddr;
-
-		VM_OBJECT_RLOCK(obj);
-		{
-			vm_page_t obj_next_pg =
-				vm_page_find_least(obj, OFF_TO_IDX(ooffset));
-
-			if (obj_next_pg == NULL) {
-no_back_caps_out:
-				/* There isn't one, so just return */
-				stat->pages_fault_skip += (entry->end - *addr) >> PAGE_SHIFT;
-				VM_OBJECT_RUNLOCK(obj);
-				goto fini;
-			}
-
-			naddr = IDX_TO_OFF(obj_next_pg->pindex) + entry->start;
-
-			if (naddr >= entry->end) {
-				/* At mapping end, so skip out */
-				goto no_back_caps_out;
-			}
+		switch (res) {
+		case VM_CAPREVOKE_AT_VMERR:
+			return vmres;
+		case VM_CAPREVOKE_AT_TICK:
+			/* Have the caller retranslate the map */
+			return KERN_SUCCESS;
+		case VM_CAPREVOKE_AT_OK:
+			break;
 		}
-		VM_OBJECT_RUNLOCK(obj);
 
-		stat->pages_fault_skip += (naddr - *addr) >> PAGE_SHIFT;
-		*addr = naddr;
-
-		goto again;
 	}
 
-	switch(res) {
-	case VM_CROBJ_ROMAPPED :
-	case VM_CROBJ_UNMAPPED : {
-
-		/*
-		 * Missing page; fault it back in and go again.  We drop our
-		 * read lock on the map (but not our ref to it) to take the
-		 * fault.  This means that it could be quite different by
-		 * the time we get back, but the timestamp guides the way.
-		 *
-		 * In fact, we do this dance twice(ish).  We drop the lock
-		 * to take a *read* fault, holding the resulting page, so
-		 * that we can look at it.  If the page doesn't merit
-		 * visiting, then skip it.  Otherwise, go take a write fault
-		 * and re-enter vm_caprevoke_object.
-		 *
-		 * XXX deferred revocation?
-		 */
-
-		unsigned int last_timestamp;
-		vm_page_t mh = NULL;
-
-		last_timestamp = map->timestamp;
-		vm_map_unlock_read(map);
-
-		if (res == VM_CROBJ_UNMAPPED) {
-			/*
-			 * XXX This is more expensive, but probably faster
-			 * and less memory intensive, than just immediately
-			 * leaping to the write fault.  We'll still force
-			 * the ZFOD mappings, the first time through, but
-			 * won't actually upgrade them to writagble here.
-			 * We won't necessarily dirty swapped pages, even if
-			 * we haul them back in, either.
-			 *
-			 * XXX We'd much rather ask a relatively complex
-			 * question: what is the pindex of the next page in
-			 * the shadow chain that plausibly contains a
-			 * capability?  Consider the case where we've got a
-			 * .data with only some pages copied up: the
-			 * OBJT_DEFAULT shadowing the OBJT_VNODE contains
-			 * all the pages we care about, but page faults will
-			 * dive deeper and pull the inherently-tagless pages
-			 * up into core, which is pointless.
-			 *
-			 * Unfortunately, to answer that question I think
-			 * requires knowledge of various OBJT_*-associated
-			 * internals, since the pages do not exist for
-			 * paged-out regions of OBJT_SWAP and perhaps also
-			 * for OBJT_VNODE?
-			 */
-
-			res = vm_fault_hold(map, *addr, VM_PROT_READ,
-						VM_FAULT_NORMAL, &mh);
-			vm_map_lock_read(map);
-			if (res != KERN_SUCCESS)
-				return res;
-			if (last_timestamp != map->timestamp) {
-				/*
-				 * The map has changed out from under us;
-				 * bail and the caller will look up the new
-				 * map entry.  First, though, it's important
-				 * to release the page we're holding!
-				 *
-				 * If we're the sole wiring holder, consider
-				 * this page active because we're most likely
-				 * about to come right back.
-				 */
-				vm_page_lock(mh);
-				vm_page_unwire(mh, PQ_ACTIVE);
-				vm_page_unlock(mh);
-				return KERN_SUCCESS;
-			}
-
-			/*
-			 * This page might belong to a shadowed object and
-			 * not be installed in our obj until we write fault!
-			 * Lock this object, not ours!  We don't hold our
-			 * obj locked at this point, so there's no risk of
-			 * deadlock in object acquisition order.
-			 */
-			VM_OBJECT_RLOCK(mh->object);
-
-			if (!vm_caprevoke_should_visit_page(mh, flags)) {
-				VM_OBJECT_RUNLOCK(mh->object);
-				*addr += pagesizes[mh->psind];
-				vm_page_lock(mh);
-				/* Unwire this page w/o perturbing its active state */
-				vm_page_unwire(mh,
-					vm_page_active(mh) ? PQ_ACTIVE : PQ_INACTIVE);
-				vm_page_unlock(mh);
-				mh = NULL;
-				stat->pages_faulted_ro++;
-				if (*addr == entry->end)
-					return KERN_SUCCESS;
-				goto again;
-			} else {
-				VM_OBJECT_RUNLOCK(mh->object);
-			}
-
-			vm_map_unlock_read(map);
-		}
-
-		res = vm_fault_hold(map, *addr, VM_PROT_WRITE,
-					VM_FAULT_NORMAL, NULL);
-
-		if (mh) {
-			vm_page_lock(mh);
-			/* Consider this page active since we're about to go scan it */
-			vm_page_unwire(mh, PQ_ACTIVE);
-			vm_page_unlock(mh);
-			mh = NULL;
-		}
-
-		stat->pages_faulted_rw++;
-
-		vm_map_lock_read(map);
-		if ((res != KERN_SUCCESS)
-		    || (last_timestamp != map->timestamp)) {
-			/*
-			 * The map has changed out from under us; bail and
-			 * the caller will look up the new map entry.
-			 */
-			return res;
-		}
-
-		/*
-		 * Avoid a lookup in the map since we know the current entry
-		 * has not changed.
-		 */
-		goto again;
-	}
-	case VM_CROBJ_DONE :
-		KASSERT(*addr == entry->end, ("caprevoke obj not done? %lx vs %lx", *addr, entry->end));
-		return KERN_SUCCESS;
-	default :
-		panic("vm_caprevoke_object bad return %d\n", res);
-	}
+	VM_OBJECT_WUNLOCK(obj);
 
 fini:
-	/* We make it here only if the entire object is done */
 	*addr = entry->end;
-
 	return KERN_SUCCESS;
 }
 
@@ -548,8 +477,10 @@ vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 		pmap_sync_capdirty(map->pmap);
 	}
 
-	/* Downgrade VM map locks to read-locked but busy */
-
+	/*
+	 * Downgrade VM map locks to read-locked but busy to guard against
+	 * a racing fork (see vmspace_fork).
+	 */
 	vm_map_busy(map);
 	vm_map_lock_downgrade(map);
 
