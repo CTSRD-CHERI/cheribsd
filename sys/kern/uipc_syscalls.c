@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/syscallsubr.h>
+#include <sys/sysent.h>
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <sys/unpcb.h>
@@ -297,7 +298,8 @@ user_accept(struct thread *td, int s, struct sockaddr * __capability uname,
 
 	if (error == 0 && uname != NULL) {
 #ifdef COMPAT_OLDSOCK
-		if (flags & ACCEPT4_COMPAT)
+		if (SV_PROC_FLAG(td->td_proc, SV_AOUT) &&
+		    (flags & ACCEPT4_COMPAT) != 0)
 			((struct osockaddr *)name)->sa_family =
 			    name->sa_family;
 #endif
@@ -704,7 +706,8 @@ user_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags)
 	if (mp->msg_control) {
 		if (mp->msg_controllen < sizeof(struct cmsghdr)
 #ifdef COMPAT_OLDSOCK
-		    && mp->msg_flags != MSG_COMPAT
+		    && (mp->msg_flags != MSG_COMPAT ||
+		    !SV_PROC_FLAG(td->td_proc, SV_AOUT))
 #endif
 		) {
 			error = EINVAL;
@@ -715,7 +718,8 @@ user_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags)
 		if (error != 0)
 			goto bad;
 #ifdef COMPAT_OLDSOCK
-		if (mp->msg_flags == MSG_COMPAT) {
+		if (mp->msg_flags == MSG_COMPAT &&
+		    SV_PROC_FLAG(td->td_proc, SV_AOUT)) {
 			struct cmsghdr *cm;
 
 			M_PREPEND(control, sizeof(*cm), M_WAITOK);
@@ -854,7 +858,8 @@ user_sendto(struct thread *td, int s, const char * __capability buf,
 	msg.msg_iovlen = 1;
 	msg.msg_control = 0;
 #ifdef COMPAT_OLDSOCK
-	msg.msg_flags = 0;
+	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
+		msg.msg_flags = 0;
 #endif
 	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), len);
 	return (user_sendit(td, s, &msg, flags));
@@ -925,10 +930,10 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	msg.msg_iovlen = umsg.msg_iovlen;
 	msg.msg_control = __USER_CAP(umsg.msg_control, umsg.msg_controllen);
 	msg.msg_controllen = umsg.msg_controllen;
-#ifdef COMPAT_OLDSOCK
-	msg.msg_flags = 0;
-#else
 	msg.msg_flags = umsg.msg_flags;
+#ifdef COMPAT_OLDSOCK
+	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
+		msg.msg_flags = 0;
 #endif
 	error = user_sendit(td, uap->s, &msg, uap->flags);
 	free(iov, M_IOV);
@@ -1017,7 +1022,8 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 			/* save sa_len before it is destroyed by MSG_COMPAT */
 			len = MIN(len, fromsa->sa_len);
 #ifdef COMPAT_OLDSOCK
-			if (mp->msg_flags & MSG_COMPAT)
+			if ((mp->msg_flags & MSG_COMPAT) != 0 &&
+			    SV_PROC_FLAG(td->td_proc, SV_AOUT))
 				((struct osockaddr *)fromsa)->sa_family =
 				    fromsa->sa_family;
 #endif
@@ -1042,7 +1048,8 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 		 * If we receive rights, trim the cmsghdr; anything else
 		 * is tossed.
 		 */
-		if (control && mp->msg_flags & MSG_COMPAT) {
+		if (control && (mp->msg_flags & MSG_COMPAT) != 0 &&
+		    SV_PROC_FLAG(td->td_proc, SV_AOUT)) {
 			if (mtod(control, struct cmsghdr *)->cmsg_level !=
 			    SOL_SOCKET ||
 			    mtod(control, struct cmsghdr *)->cmsg_type !=
@@ -1103,7 +1110,8 @@ recvit(struct thread *td, int s, kmsghdr_t *mp,
 		error = copyout(&mp->msg_namelen, namelenp,
 		    sizeof (socklen_t));
 #ifdef COMPAT_OLDSOCK
-		if (mp->msg_flags & MSG_COMPAT)
+		if ((mp->msg_flags & MSG_COMPAT) != 0 &&
+		    SV_PROC_FLAG(td->td_proc, SV_AOUT))
 			error = 0;	/* old recvfrom didn't check */
 #endif
 	}
@@ -1232,7 +1240,8 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	msg.msg_controllen = umsg.msg_controllen;
 	msg.msg_flags = uap->flags;
 #ifdef COMPAT_OLDSOCK
-	msg.msg_flags &= ~MSG_COMPAT;
+	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
+		msg.msg_flags &= ~MSG_COMPAT;
 #endif
 	error = recvit(td, uap->s, &msg, NULL);
 	if (error == 0) {
@@ -1427,7 +1436,7 @@ user_getsockname(struct thread *td, int fdes,
 
 	if (len != 0) {
 #ifdef COMPAT_OLDSOCK
-		if (compat)
+		if (compat && SV_PROC_FLAG(td->td_proc, SV_AOUT))
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
 		error = copyout(sa, asa, len);
@@ -1514,7 +1523,7 @@ user_getpeername(struct thread *td, int fdes,
 
 	if (len != 0) {
 #ifdef COMPAT_OLDSOCK
-		if (compat)
+		if (compat && SV_PROC_FLAG(td->td_proc, SV_AOUT))
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
 		error = copyout(sa, asa, len);
@@ -1596,7 +1605,8 @@ sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen, int type)
 
 	if (buflen > MLEN) {
 #ifdef COMPAT_OLDSOCK
-		if (type == MT_SONAME && buflen <= 112)
+		if (type == MT_SONAME && buflen <= 112 &&
+		    SV_CURPROC_FLAG(SV_AOUT))
 			buflen = MLEN;		/* unix domain compat. hack */
 		else
 #endif
@@ -1614,7 +1624,8 @@ sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen, int type)
 			sa = mtod(m, struct sockaddr *);
 
 #if defined(COMPAT_OLDSOCK) && BYTE_ORDER != BIG_ENDIAN
-			if (sa->sa_family == 0 && sa->sa_len < AF_MAX)
+			if (sa->sa_family == 0 && sa->sa_len < AF_MAX &&
+			    SV_CURPROC_FLAG(SV_AOUT))
 				sa->sa_family = sa->sa_len;
 #endif
 			sa->sa_len = buflen;
@@ -1640,7 +1651,8 @@ getsockaddr(struct sockaddr **namp, const struct sockaddr * __capability uaddr,
 		free(sa, M_SONAME);
 	} else {
 #if defined(COMPAT_OLDSOCK) && BYTE_ORDER != BIG_ENDIAN
-		if (sa->sa_family == 0 && sa->sa_len < AF_MAX)
+		if (sa->sa_family == 0 && sa->sa_len < AF_MAX &&
+		    SV_CURPROC_FLAG(SV_AOUT))
 			sa->sa_family = sa->sa_len;
 #endif
 		sa->sa_len = len;
