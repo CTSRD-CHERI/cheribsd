@@ -548,7 +548,7 @@ vm_caprevoke_one(struct proc *p, int flags, vm_offset_t oneaddr,
 
 	addr = entry->start;
 	while (addr < entry->end) {
-		vm_caprevoke_map_entry(map, entry, flags, &addr, st);
+		res = vm_caprevoke_map_entry(map, entry, flags, &addr, st);
 
 		if (res != KERN_SUCCESS)
 			goto out;
