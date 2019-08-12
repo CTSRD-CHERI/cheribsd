@@ -382,7 +382,7 @@ struct ifnet {
 	 * Netdump hooks to be called while dumping.
 	 */
 	struct netdump_methods *if_netdump_methods;
-	struct epoch_context	if_epoch_ctx;
+	struct epoch_context	if_epoch_ctx __subobject_use_container_bounds;
 
 	/*
 	 * Spare fields to be added before branching a stable branch, so
@@ -535,7 +535,7 @@ struct ifaddr {
 	counter_u64_t	ifa_opackets;	 
 	counter_u64_t	ifa_ibytes;
 	counter_u64_t	ifa_obytes;
-	struct	epoch_context	ifa_epoch_ctx;
+	struct	epoch_context	ifa_epoch_ctx __subobject_use_container_bounds;
 };
 
 struct ifaddr *	ifa_alloc(size_t size, int flags);
@@ -556,7 +556,7 @@ struct ifmultiaddr {
 	int	ifma_flags;
 	void	*ifma_protospec;	/* protocol-specific state, if any */
 	struct	ifmultiaddr *ifma_llifma; /* pointer to ifma for ifma_lladdr */
-	struct	epoch_context	ifma_epoch_ctx;
+	struct	epoch_context	ifma_epoch_ctx __subobject_use_container_bounds;
 };
 
 extern	struct rwlock ifnet_rwlock;
@@ -798,13 +798,14 @@ int    ether_poll_deregister(if_t ifp);
 #endif /* !_NET_IF_VAR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190509,
+//   "updated": 20190812,
 //   "target_type": "header",
 //   "changes": [
 //     "ioctl:net"
 //   ],
 //   "changes_purecap": [
-//     "ioctl:net"
+//     "ioctl:net",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

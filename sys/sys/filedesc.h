@@ -66,7 +66,7 @@ struct filedescent {
 
 struct fdescenttbl {
 	int	fdt_nfiles;		/* number of open files allocated */
-	struct	filedescent fdt_ofiles[0];	/* open files */
+	struct	filedescent fdt_ofiles[0] __subobject_variable_length; /* open files */
 };
 #define	fd_seqc(fdt, fd)	(&(fdt)->fdt_ofiles[(fd)].fde_seqc)
 
@@ -254,3 +254,12 @@ void	pwd_ensure_dirs(void);
 #endif /* _KERNEL */
 
 #endif /* !_SYS_FILEDESC_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

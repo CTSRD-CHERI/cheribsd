@@ -137,7 +137,8 @@ VNET_DECLARE(u_int, rt_add_addr_allfibs); /* Announce interfaces to all fibs */
 
 #if defined(_KERNEL)
 struct rtentry {
-	struct	radix_node rt_nodes[2];	/* tree glue, and other values */
+	struct	radix_node rt_nodes[2] __subobject_use_container_bounds;
+					/* tree glue, and other values */
 	/*
 	 * XXX struct rtentry must begin with a struct radix_node (or two!)
 	 * because the code does some casts of a 'struct radix_node *'
@@ -504,3 +505,12 @@ void	rib_free_info(struct rt_addrinfo *info);
 #endif
 
 #endif
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

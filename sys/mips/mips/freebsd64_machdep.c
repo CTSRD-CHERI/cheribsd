@@ -164,13 +164,13 @@ freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 	PROC_LOCK(curthread->td_proc);
 	mcp->mc_onstack = sigonstack(tp->sp);
 	PROC_UNLOCK(curthread->td_proc);
-	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
-	    sizeof(mcp->mc_regs));
+	bcopy((void *)__unbounded_addressof(td->td_frame->zero),
+	    (void *)&mcp->mc_regs, sizeof(mcp->mc_regs));
 
 	mcp->mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 	if (mcp->mc_fpused) {
-		bcopy((void *)&td->td_frame->f0, (void *)&mcp->mc_fpregs,
-		    sizeof(mcp->mc_fpregs));
+		bcopy((void *)__unbounded_addressof(td->td_frame->f0),
+		    (void *)&mcp->mc_fpregs, sizeof(mcp->mc_fpregs));
 	}
 	if (flags & GET_MC_CLEAR_RET) {
 		mcp->mc_regs[V0] = 0;
@@ -216,7 +216,8 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 	}
 
 	tp = td->td_frame;
-	bcopy((void *)&mcp->mc_regs, (void *)&td->td_frame->zero,
+	bcopy((void *)&mcp->mc_regs,
+	    (void *)__unbounded_addressof(td->td_frame->zero),
 	    sizeof(mcp->mc_regs));
 
 	td->td_md.md_flags = (mcp->mc_fpused & MDTD_FPUSED)
@@ -225,7 +226,8 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 #endif
 	    ;
 	if (mcp->mc_fpused) {
-		bcopy((void *)&mcp->mc_fpregs, (void *)&td->td_frame->f0,
+		bcopy((void *)&mcp->mc_fpregs,
+		    (void *)__unbounded_addressof(td->td_frame->f0),
 		    sizeof(mcp->mc_fpregs));
 	}
 	td->td_frame->pc = mcp->mc_pc;
@@ -404,7 +406,8 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls = (__cheri_addr uint64_t)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
-	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
+	bcopy((void *)__unbounded_addressof(regs->ast),
+	    (void *)__unbounded_addressof(sf.sf_uc.uc_mcontext.mc_regs[1]),
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
 	sf.sf_uc.uc_mcontext.mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 #if defined(CPU_HAVEFPU)
@@ -412,7 +415,7 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* if FPU has current state, save it first */
 		if (td == PCPU_GET(fpcurthread))
 			MipsSaveCurFPState(td);
-		bcopy((void *)&td->td_frame->f0,
+		bcopy((void *)__unbounded_addressof(td->td_frame->f0),
 		    (void *)sf.sf_uc.uc_mcontext.mc_fpregs,
 		    sizeof(sf.sf_uc.uc_mcontext.mc_fpregs));
 	}
@@ -533,10 +536,11 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif /* CHERI_PURECAP_KERNEL */
 // CHERI CHANGES START
 // {
-//   "updated": 20190604,
+//   "updated": 20190812,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "support"
+//     "support",
+//     "subobject_bounds"
 //   ],
 //   "change_comment": "freebsd64 purecap sendsig"
 // }

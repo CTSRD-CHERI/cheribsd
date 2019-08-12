@@ -94,10 +94,14 @@ struct pmap {
 	pd_entry_t *pm_segtab;	/* KVA of segment table */
 	TAILQ_HEAD(, pv_chunk)	pm_pvchunk;	/* list of mappings in pmap */
 	cpuset_t	pm_active;		/* active on cpus */
+	/*
+	 * XXX-AM: pm_asid has no subobject bounds to work around a compiler
+	 * bug that reorders a setbounds before a NULL check.
+	 */
 	struct {
 		u_int32_t asid:ASID_BITS;	/* TLB address space tag */
 		u_int32_t gen:ASIDGEN_BITS;	/* its generation number */
-	}      pm_asid[MAXSMPCPU];
+	}      pm_asid[MAXSMPCPU] __no_subobject_bounds;
 	struct pmap_statistics pm_stats;	/* pmap statistics */
 	struct mtx pm_mtx;
 #ifdef MIPS64_NEW_PMAP
@@ -135,7 +139,7 @@ extern struct pmap	kernel_pmap_store;
 typedef struct pv_entry {
 	vm_offset_t pv_va;	/* virtual address for mapping */
 	TAILQ_ENTRY(pv_entry) pv_next;
-}       *pv_entry_t;
+} *pv_entry_t;
 
 /*
  * pv_entries are allocated in chunks per-process.  This avoids the
@@ -161,7 +165,7 @@ struct pv_chunk {
 	TAILQ_ENTRY(pv_chunk)	pc_list;
 	TAILQ_ENTRY(pv_chunk)	pc_lru;
 	u_long			pc_map[_NPCM];	/* bitmap; 1 = free */
-	struct pv_entry		pc_pventry[_NPCPV];
+	struct pv_entry		pc_pventry[_NPCPV] __subobject_use_container_bounds;
 } __aligned(PAGE_SIZE);
 
 /*
@@ -220,11 +224,12 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 #endif				/* !_MACHINE_PMAP_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180129,
+//   "updated": 20190812,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_shape",
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

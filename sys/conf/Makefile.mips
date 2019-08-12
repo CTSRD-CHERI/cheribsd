@@ -19,6 +19,8 @@
 
 STD8X16FONT?=	iso
 
+#CFLAGS.machdep.c=-Xclang -cheri-bounds=conservative
+
 .if !defined(S)
 .if exists(./@/.)
 S=	./@

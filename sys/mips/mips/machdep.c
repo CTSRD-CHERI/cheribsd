@@ -162,18 +162,22 @@ int cpucfg;			/* Value of processor config register */
 int num_tlbentries = 64;	/* Size of the CPU tlb */
 int cputype;
 
-extern char MipsException[], MipsExceptionEnd[];
+extern char MipsException[0x80] __no_subobject_bounds;
+extern char MipsExceptionEnd[0] __no_subobject_bounds;
 
 /* TLB miss handler address and end */
-extern char MipsTLBMiss[], MipsTLBMissEnd[];
+extern char MipsTLBMiss[0x80] __no_subobject_bounds;
+extern char MipsTLBMissEnd[0] __no_subobject_bounds;
 
 /* Cache error handler */
-extern char MipsCache[], MipsCacheEnd[];
+extern char MipsCache[0x80] __no_subobject_bounds;
+extern char MipsCacheEnd[0] __no_subobject_bounds;
 
 /* MIPS wait skip region */
-extern char MipsWaitStart[], MipsWaitEnd[];
+extern char MipsWaitStart[16] __no_subobject_bounds;
+extern char MipsWaitEnd[0] __no_subobject_bounds;
 
-extern char edata[], end[];
+extern char end[] __no_subobject_bounds;
 
 u_int32_t bootdev;
 struct bootinfo bootinfo;
@@ -707,11 +711,12 @@ SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_ANY, mips_exc_cntrs_sysctl_register, 0);
 #endif /* defined((MIPS_EXC_CNTRS) */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190812,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "support",
-//     "pointer_alignment"
+//     "pointer_alignment",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

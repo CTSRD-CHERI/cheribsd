@@ -352,13 +352,13 @@ cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
 	PROC_LOCK(curthread->td_proc);
 	mcp->mc_onstack = sigonstack((__cheri_addr vaddr_t)tp->csp);
 	PROC_UNLOCK(curthread->td_proc);
-	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
-	    sizeof(mcp->mc_regs));
+	bcopy((void *)__unbounded_addressof(td->td_frame->zero),
+	    (void *)&mcp->mc_regs, sizeof(mcp->mc_regs));
 
 	mcp->mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 	if (mcp->mc_fpused) {
-		bcopy((void *)&td->td_frame->f0, (void *)&mcp->mc_fpregs,
-		    sizeof(mcp->mc_fpregs));
+		bcopy((void *)__unbounded_addressof(td->td_frame->f0),
+		    (void *)&mcp->mc_fpregs, sizeof(mcp->mc_fpregs));
 	}
 	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
 	    &mcp->mc_cheriframe);
@@ -385,7 +385,8 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 
 	tp = td->td_frame;
 	cheri_trapframe_from_cheriframe(tp, &mcp->mc_cheriframe);
-	bcopy((void *)&mcp->mc_regs, (void *)&td->td_frame->zero,
+	bcopy((void *)&mcp->mc_regs,
+	    (void *)__unbounded_addressof(td->td_frame->zero),
 	    sizeof(mcp->mc_regs));
 	td->td_md.md_flags = (mcp->mc_fpused & MDTD_FPUSED)
 #ifdef CPU_QEMU_MALTA
@@ -393,7 +394,8 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 #endif
 	    ;
 	if (mcp->mc_fpused)
-		bcopy((void *)&mcp->mc_fpregs, (void *)&td->td_frame->f0,
+		bcopy((void *)&mcp->mc_fpregs,
+		    (void *)__unbounded_addressof(td->td_frame->f0),
 		    sizeof(mcp->mc_fpregs));
 	td->td_frame->pc = mcp->mc_pc;
 	td->td_frame->mullo = mcp->mullo;
@@ -522,7 +524,8 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
-	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
+	bcopy((void *)__unbounded_addressof(regs->ast),
+	    (void *)__unbounded_addressof(sf.sf_uc.uc_mcontext.mc_regs[1]),
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
 	sf.sf_uc.uc_mcontext.mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 #if defined(CPU_HAVEFPU)
@@ -530,7 +533,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* if FPU has current state, save it first */
 		if (td == PCPU_GET(fpcurthread))
 			MipsSaveCurFPState(td);
-		bcopy((void *)&td->td_frame->f0,
+		bcopy((void *)__unbounded_addressof(td->td_frame->f0),
 		    (void *)sf.sf_uc.uc_mcontext.mc_fpregs,
 		    sizeof(sf.sf_uc.uc_mcontext.mc_fpregs));
 	}
@@ -1172,3 +1175,12 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		return (EINVAL);
 	}
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

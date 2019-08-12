@@ -384,7 +384,7 @@ struct thread {
 struct thread0_storage {
 	struct thread t0st_thread;
 	char t0st_sched[T0ST_SCHED_SIZE];
-};
+} __no_subobject_bounds;
 
 struct mtx *thread_lock_block(struct thread *);
 void thread_lock_unblock(struct thread *, struct mtx *);
@@ -1219,7 +1219,7 @@ EVENTHANDLER_LIST_DECLARE(thread_init);
 #endif	/* !_SYS_PROC_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20190812,
 //   "target_type": "header",
 //   "changes": [
 //     "kernel_sig_types",
@@ -1227,7 +1227,8 @@ EVENTHANDLER_LIST_DECLARE(thread_init);
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "pointer_shape"
+//     "pointer_shape",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

@@ -57,9 +57,9 @@
 /*
  * Define a set for pcpu data.
  */
-extern uintptr_t *__start_set_pcpu;
+extern uintptr_t *__start_set_pcpu __no_subobject_bounds;
 __GLOBL(__start_set_pcpu);
-extern uintptr_t *__stop_set_pcpu;
+extern uintptr_t *__stop_set_pcpu __no_subobject_bounds;
 __GLOBL(__stop_set_pcpu);
 
 /*
@@ -294,11 +294,12 @@ void	pcpu_init(struct pcpu *pcpu, int cpuid, size_t size);
 #endif /* !_SYS_PCPU_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180418,
+//   "updated": 20190812,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",
-//     "pointer_shape"
+//     "pointer_shape",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

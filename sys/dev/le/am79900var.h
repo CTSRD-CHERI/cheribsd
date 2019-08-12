@@ -48,10 +48,19 @@
  */
 struct am79900_softc {
 	struct lance_softc lsc;
-};
+} __no_subobject_bounds;
 
 int	am79900_config(struct am79900_softc *, const char*, int);
 void	am79900_detach(struct am79900_softc *);
 void	am79900_intr(void *);
 
 #endif /* _DEV_LE_AM79900VAR_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

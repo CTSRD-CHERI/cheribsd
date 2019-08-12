@@ -130,7 +130,7 @@ struct	namecache_ts {
 	struct	timespec nc_time;	/* timespec provided by fs */
 	struct	timespec nc_dotdottime;	/* dotdot timespec provided by fs */
 	int	nc_ticks;		/* ticks value when entry was added */
-	struct namecache nc_nc;
+	struct namecache nc_nc __subobject_use_container_bounds;
 };
 
 #define	nc_vp		n_un.nu_vp
@@ -2595,13 +2595,14 @@ DB_SHOW_COMMAND(vpath, db_show_vpath)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190603,
+//   "updated": 20190812,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "uintptr_interp_offset"
+//     "uintptr_interp_offset",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

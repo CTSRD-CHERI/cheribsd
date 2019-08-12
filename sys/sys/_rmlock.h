@@ -61,7 +61,8 @@ struct rmlock {
 #define	rm_lock_sx	_rm_lock._rm_lock_sx
 
 struct rm_priotracker {
-	struct rm_queue rmp_cpuQueue; /* Must be first */
+	/* Must be first */
+	struct rm_queue rmp_cpuQueue __subobject_use_container_bounds;
 	struct rmlock *rmp_rmlock;
 	struct thread *rmp_thread;
 	int rmp_flags;
@@ -69,3 +70,12 @@ struct rm_priotracker {
 };
 
 #endif /* !_SYS__RMLOCK_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

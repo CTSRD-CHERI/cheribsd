@@ -201,7 +201,8 @@ struct vm_page {
 	vm_object_t object;		/* which object am I in (O,P) */
 	vm_pindex_t pindex;		/* offset into object (O,P) */
 	vm_paddr_t phys_addr;		/* physical address of page (C) */
-	struct md_page md;		/* machine dependent stuff */
+	struct md_page md __subobject_use_container_bounds;
+					/* machine dependent stuff */
 	u_int wire_count;		/* wired down maps refs (P) */
 	volatile u_int busy_lock;	/* busy owners lock */
 	uint16_t flags;			/* page PG_* flags (P) */
@@ -685,7 +686,7 @@ vm_page_aflag_clear(vm_page_t m, uint8_t bits)
 	 * atomic update.  Parallel non-atomic updates to the other fields
 	 * within this word are handled properly by the atomic update.
 	 */
-	addr = (void *)&m->aflags;
+	addr = (void *)__bounded_addressof(m->aflags, sizeof(uint32_t));
 	KASSERT((ptr_to_va(addr) & (sizeof(uint32_t) - 1)) == 0,
 	    ("vm_page_aflag_clear: aflags is misaligned"));
 	val = bits;
@@ -710,7 +711,7 @@ vm_page_aflag_set(vm_page_t m, uint8_t bits)
 	 * atomic update.  Parallel non-atomic updates to the other fields
 	 * within this word are handled properly by the atomic update.
 	 */
-	addr = (void *)&m->aflags;
+	addr = (void *)__bounded_addressof(m->aflags, sizeof(uint32_t));
 	KASSERT((ptr_to_va(addr) & (sizeof(uint32_t) - 1)) == 0,
 	    ("vm_page_aflag_set: aflags is misaligned"));
 	val = bits;
@@ -827,11 +828,12 @@ vm_page_wired(vm_page_t m)
 #endif				/* !_VM_PAGE_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180202,
+//   "updated": 20190812,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "uintptr_interp_offset"
+//     "uintptr_interp_offset",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END

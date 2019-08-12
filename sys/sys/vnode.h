@@ -146,7 +146,7 @@ struct vnode {
 	 * The machinery of being a vnode
 	 */
 	TAILQ_ENTRY(vnode) v_actfreelist;	/* l vnode active/free lists */
-	struct bufobj	v_bufobj;		/* * Buffer cache object */
+	struct bufobj v_bufobj __subobject_use_container_bounds; /* * Buffer cache object */
 
 	/*
 	 * Hooks for various subsystems and features.
@@ -924,3 +924,12 @@ void vn_fsid(struct vnode *vp, struct vattr *va);
 #endif /* _KERNEL */
 
 #endif /* !_SYS_VNODE_H_ */
+// CHERI CHANGES START
+// {
+//   "updated": 20190812,
+//   "target_type": "header",
+//   "changes_purecap": [
+//     "subobject_bounds"
+//   ]
+// }
+// CHERI CHANGES END

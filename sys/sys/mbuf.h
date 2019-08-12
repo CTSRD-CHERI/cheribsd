@@ -231,8 +231,8 @@ struct m_ext {
 		 * and its arguments.  They aren't copied into shadows in
 		 * mb_dupcl() to avoid dereferencing next cachelines.
 		 */
-		volatile u_int	 ext_count;
-		volatile u_int	*ext_cnt;
+		volatile u_int	 ext_count __no_subobject_bounds;
+		volatile u_int	*ext_cnt __no_subobject_bounds;
 	};
 	union {
 		/*
@@ -304,9 +304,9 @@ struct mbuf {
 			union {
 				struct m_ext	m_ext;	/* M_EXT set */
 				char		m_pktdat[0];
-			};
+			} __no_subobject_bounds;
 		};
-		char	m_dat[0];			/* !M_PKTHDR, !M_EXT */
+		char	m_dat[0] __no_subobject_bounds;	/* !M_PKTHDR, !M_EXT */
 	};
 };
 
@@ -1525,10 +1525,11 @@ void	netdump_mbuf_reinit(int nmbuf, int nclust, int clsize);
 #endif /* !_SYS_MBUF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190712,
+//   "updated": 20190812,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "pointer_shape"
+//     "pointer_shape",
+//     "subobject_bounds"
 //   ]
 // }
 // CHERI CHANGES END
