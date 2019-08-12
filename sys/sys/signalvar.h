@@ -314,7 +314,7 @@ static __inline void
 ksiginfo_set_sigev(ksiginfo_t *dst, ksigevent_t *sigev)
 {
 	dst->ksi_signo = sigev->sigev_signo;
-	dst->ksi_value = sigev->sigev_value;
+	memcpy(&dst->ksi_value, &sigev->sigev_value, sizeof(dst->ksi_value));
 }
 
 struct pgrp;
