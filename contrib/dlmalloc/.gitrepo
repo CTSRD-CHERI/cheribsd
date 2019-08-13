@@ -1,0 +1,12 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/CTSRD-CHERI/dlmalloc_nonreuse.git
+	branch = newscheme
+	commit = 3d1c469345983b27907e8994e4f918d62776c614
+	parent = c06fb7c5a7f045a4168eacd9ef171f5913230232
+	method = merge
+	cmdver = 0.4.0
