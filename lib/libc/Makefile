@@ -108,7 +108,11 @@ NOASM=
 .include "${LIBC_SRCTOP}/resolv/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdio/Makefile.inc"
 .include "${LIBC_SRCTOP}/stdlib/Makefile.inc"
+.if ${MK_DLMALLOC} == "no" || !defined(LIBCHERI)
 .include "${LIBC_SRCTOP}/stdlib/jemalloc/Makefile.inc"
+.else
+.include "${LIBC_SRCTOP}/stdlib/dlmalloc/Makefile.inc"
+.endif
 .include "${LIBC_SRCTOP}/stdtime/Makefile.inc"
 .include "${LIBC_SRCTOP}/string/Makefile.inc"
 .if !defined(NO_SYSCALLS)
