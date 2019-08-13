@@ -1,0 +1,23 @@
+# A minimal makefile, designed to be piloted externally rather than set
+# preferences here.
+
+SRCDIR?=.
+CPPFLAGS+=-I$(SRCDIR)
+
+# XXX NWF?
+CFLAGS+= -DINSECURE=1
+
+CFLAGS+=-g
+ifeq ($(DEBUG),1)
+CFLAGS+=-DDEBUG=1 -DABORT_ON_ASSERT_FAILURE=1
+endif
+
+ifeq ($(CAPREVOKE),1)
+CFLAGS+=-DCAPREVOKE
+LDFLAGS+=-lcheri_caprevoke
+endif
+
+all: libdlmalloc_nonreuse.so
+
+libdlmalloc_nonreuse.so: $(SRCDIR)/dlmalloc_nonreuse.c $(SRCDIR)/dlmalloc_nonreuse.h
+	$(CC) $(CPPFLAGS) $(CFLAGS) $(LDFLAGS) -shared -o $@ $<
