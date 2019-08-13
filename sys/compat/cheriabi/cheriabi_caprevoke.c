@@ -388,13 +388,13 @@ fast_out:
 				? VM_CAPREVOKE_LAST_FINI : 0),
 			&stat);
 
+		PROC_LOCK(td->td_proc);
 		if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
 			/* Un-single-thread the world */
 			thread_single_end(td->td_proc, SINGLE_BOUNDARY);
 		}
 
 		if (res != KERN_SUCCESS) {
-			PROC_LOCK(td->td_proc);
 			_PRELE(td->td_proc);
 			SET_ST(td->td_proc, epoch, entryst);
 			PROC_UNLOCK(td->td_proc);
@@ -403,6 +403,7 @@ fast_out:
 			stat.epoch_fini = epoch;
 			return cheriabi_caprevoke_fini(td, uap, 0, &stat);
 		}
+		PROC_UNLOCK(td->td_proc);
 
 		if (entryst == CAPREVST_NONE) {
 			/* That counts as our initial pass */
@@ -428,12 +429,6 @@ skip_last_pass:
 	PROC_LOCK(td->td_proc);
 	{
 		_PRELE(td->td_proc);
-
-		if ((myst == CAPREVST_LAST_PASS)
-		    && ((td->td_proc->p_flag & P_HADTHREADS) != 0)) {
-			/* Un-single-thread the world */
-			thread_single_end(td->td_proc, SINGLE_BOUNDARY);
-		}
 
 		if ((res == KERN_SUCCESS) && (myst == CAPREVST_LAST_PASS)) {
 			/* Signal the end of this revocation epoch */
