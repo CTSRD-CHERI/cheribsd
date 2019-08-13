@@ -198,11 +198,15 @@ vm_caprevoke_object_at(vm_map_t map, vm_map_entry_t entry, vm_offset_t ioff,
 			/* Look forward in the object map */
 			vm_page_t obj_next_pg = vm_page_find_least(obj, ipi);
 
-			if (obj_next_pg == NULL) {
+			vm_offset_t lastoff = entry->end - entry->start + entry->offset;
+
+			if ((obj_next_pg == NULL)
+			    || (obj_next_pg->pindex >= OFF_TO_IDX(lastoff))) {
 				stat->pages_fault_skip += (entry->end - addr) >> PAGE_SHIFT;
-				*ooff = entry->end - entry->start + entry->offset;
+				*ooff = lastoff;
 			} else {
 				*ooff = IDX_TO_OFF(obj_next_pg->pindex);
+				stat->pages_fault_skip += obj_next_pg->pindex - ipi;
 			}
 			return VM_CAPREVOKE_AT_OK;
 		}
