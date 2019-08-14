@@ -92,6 +92,7 @@ CRUNCH_SHLIBS+=	-pthread
 
 # ktrace:
 CRUNCH_LIBS+=	-lsysdecode
+CRUNCH_LIBS+= -lprocstat -lelf
 
 # needed by ifconfig
 CRUNCH_LIBS+=	-l80211
@@ -254,6 +255,7 @@ CRUNCH_PROGS_usr.bin+= \
 		mktemp \
 		nc \
 		passwd \
+		procstat \
 		resizewin \
 		sed \
 		seq \
