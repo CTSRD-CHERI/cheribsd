@@ -83,10 +83,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/elf.h>
 #include <machine/md_var.h>
 
-#ifdef CPU_CHERI
-#include <cheri/cheri.h>
-#endif
-
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_util.h>
@@ -1461,7 +1457,7 @@ static void __elfN(note_prstatus)(void *, struct sbuf *, size_t *);
 static void __elfN(note_threadmd)(void *, struct sbuf *, size_t *);
 static void __elfN(note_thrmisc)(void *, struct sbuf *, size_t *);
 static void __elfN(note_ptlwpinfo)(void *, struct sbuf *, size_t *);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 static void __elfN(note_capregs)(void *, struct sbuf *, size_t *);
 #endif
 static void __elfN(note_procstat_auxv)(void *, struct sbuf *, size_t *);
@@ -1859,7 +1855,7 @@ __elfN(prepare_notes)(struct thread *td, struct note_info_list *list,
 		    __elfN(note_thrmisc), thr);
 		size += register_note(list, NT_PTLWPINFO,
 		    __elfN(note_ptlwpinfo), thr);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		size += register_note(list, NT_CAPREGS,
 		    __elfN(note_capregs), thr);
 #endif
@@ -2127,7 +2123,7 @@ typedef thrmisc_t elf_thrmisc_t;
 typedef struct kinfo_proc elf_kinfo_proc_t;
 typedef vm_offset_t elf_ps_strings_t;
 #endif
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 typedef capregset_t elf_capregs_t;
 #endif
 
@@ -2257,7 +2253,7 @@ __elfN(note_thrmisc)(void *arg, struct sbuf *sb, size_t *sizep)
 	*sizep = sizeof(thrmisc);
 }
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 static void
 __elfN(note_capregs)(void *arg, struct sbuf *sb, size_t *sizep)
 {

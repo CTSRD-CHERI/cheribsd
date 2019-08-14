@@ -273,7 +273,7 @@ _vm_object_allocate(objtype_t type, vm_pindex_t size, vm_object_t object)
 	default:
 		panic("_vm_object_allocate: type %d is undefined", type);
 	}
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	/*
 	 * XXXRW: For now, allow tags to be associated only with words stored
 	 * in anonymously backed pages.  There's also an argument that they
