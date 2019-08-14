@@ -61,6 +61,7 @@ CLEANFILES+= nextboot_FIXED
 # We need libcrypto anyway for sshd and it's massive so don't embed it here
 CRUNCH_SHLIBS+= -lcrypto -lssl
 CRUNCH_SHLIBS+=	-lc -lutil -lcrypt -lxo
+CRUNCH_SHLIBS+= -lprocstat
 # libm is also needed by other tools so let's link dynamically
 CRUNCH_SHLIBS+=	-lm
 # libz is needed by libprivatessh so we might as well link dynamically
@@ -237,6 +238,7 @@ CRUNCH_PROGS_usr.bin+= \
 		mktemp \
 		nc \
 		passwd \
+		procstat \
 		resizewin \
 		sed \
 		seq \
