@@ -310,7 +310,7 @@ struct thread {
 	int		td_errno;	/* (k) Error from last syscall. */
 	size_t		td_vslock_sz;	/* (k) amount of vslock-ed space */
 	struct kcov_info *td_kcov_info;	/* (*) Kernel code coverage data */
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	void * __capability	td_retcap; /* (k) Syscall cap return . */
 #endif
 #define	td_endzero td_sigmask

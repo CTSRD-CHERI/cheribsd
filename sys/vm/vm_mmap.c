@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #include <sys/cheriabi.h>
 #endif
 #include <sys/capsicum.h>
@@ -391,13 +391,13 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		return (ENOMEM);
 
 	align = flags & MAP_ALIGNMENT_MASK;
-#ifndef CPU_CHERI
+#if !__has_feature(capabilities)
 	/* In the non-CHERI case, remove the alignment request. */
 	if (align == MAP_ALIGNED_CHERI || align == MAP_ALIGNED_CHERI_SEAL) {
 		flags &= ~MAP_ALIGNMENT_MASK;
 		align = 0;
 	}
-#else /* CPU_CHERI */
+#else /* __has_feature(capabilities) */
 	/*
 	 * Convert MAP_ALIGNED_CHERI(_SEAL) into explicit alignment
 	 * requests and check lengths.
@@ -439,7 +439,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		}
 		align = flags & MAP_ALIGNMENT_MASK;
 	}
-#endif /* CPU_CHERI */
+#endif /* __has_feature(capabilities) */
 
 	/* Ensure alignment is at least a page and fits in a pointer. */
 	if (align != 0 && align != MAP_ALIGNED_SUPER &&

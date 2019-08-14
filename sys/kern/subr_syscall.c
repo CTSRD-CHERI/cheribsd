@@ -54,7 +54,7 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <security/audit/audit.h>
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #endif
 
@@ -94,7 +94,7 @@ syscallenter(struct thread *td)
 		goto retval;
 	}
 
-#if defined(CPU_CHERI) && !defined(CPU_CHERI_NO_SYSCALL_AUTHORIZE) 
+#if __has_feature(capabilities) && !defined(CPU_CHERI_NO_SYSCALL_AUTHORIZE)
 	/*
 	 * Constrain code that can originate system calls if
 	 * userspace sandboxing is available.
