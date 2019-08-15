@@ -266,8 +266,12 @@ fast_out:
 			}
 			KASSERT((epoch & 1) == 1, ("Even epoch INIT"));
 			break;
-		case CAPREVST_INIT_PASS:
 		case CAPREVST_LAST_PASS:
+			if ((uap->flags & CAPREVOKE_ONLY_IF_OPEN) != 0) {
+				goto fast_out;
+			}
+			/* FALLTHROUGH */
+		case CAPREVST_INIT_PASS:
 			if ((uap->flags & CAPREVOKE_NO_WAIT_OK) != 0) {
 				goto fast_out;
 			}
