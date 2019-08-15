@@ -121,10 +121,14 @@ static size_t	_pagesz;
 static int
 __morepages(int n)
 {
-	int	fd = -1;
+	size_t	size;
 	char **new_pagepool_list;
 
 	n += NPOOLPAGES;	/* round up allocation. */
+	size = n * _pagesz;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size = __builtin_cheri_round_representable_length(size);
+#endif
 
 	if (n_pagepools >= max_pagepools) {
 		if (max_pagepools == 0)
@@ -133,7 +137,7 @@ __morepages(int n)
 		max_pagepools *= 2;
 		if ((new_pagepool_list = mmap(0,
 		    max_pagepools * sizeof(char *), PROT_READ|PROT_WRITE,
-		    MAP_ANON, fd, 0)) == MAP_FAILED)
+		    MAP_ANON, -1, 0)) == MAP_FAILED)
 			return (0);
 #ifdef __CHERI_PURE_CAPABILITY__
 		/* Check that the result is writable */
@@ -151,38 +155,36 @@ __morepages(int n)
 	}
 
 	if (pagepool_end - pagepool_start > (ssize_t)_pagesz) {
+		caddr_t extra_start = __builtin_align_up(pagepool_start,
+		    _pagesz);
+		size_t extra_bytes = pagepool_end - extra_start;
 #ifndef __CHERI_PURE_CAPABILITY__
-		caddr_t addr = (caddr_t)roundup2((vaddr_t)pagepool_start, _pagesz);
+		if (munmap(extra_start, extra_bytes) != 0)
+			abort();
 #else
 		/*
-		 * XXX: CHERI128: Need to avoid rounding down to an imprecise
-		 * capability.
+		 * In many cases we could safely unmap part of the end
+		 * (since there's only one pointer to the allocation in
+		 * pagepool_list to be updated), but we need to be careful
+		 * to avoid making the result unrepresentable.  For now,
+		 * just leak the virtual addresses and MAP_GUARD the
+		 * unused pages.
 		 */
-		caddr_t	addr = cheri_setoffset(pagepool_start,
-		    roundup2(cheri_getoffset(pagepool_start), _pagesz));
-#endif
-		if (munmap(addr, pagepool_end - addr) != 0) {
+		if (mmap(extra_start, extra_bytes, PROT_NONE,
+		    MAP_FIXED | MAP_GUARD | MAP_CHERI_NOSETBOUNDS, -1, 0)
+		    == MAP_FAILED)
 			abort();
-#ifdef __CHERI_PURE_CAPABILITY__
-		} else {
-			/* Shrink the pool */
-			pagepool_list[n_pagepools - 1] =
-			    cheri_csetbounds(pagepool_list[n_pagepools - 1],
-			    cheri_getlen(pagepool_list[n_pagepools - 1]) -
-			    (pagepool_end - addr));
 #endif
-		}
 	}
 
-	if ((pagepool_start = mmap(0, n * _pagesz,
-			PROT_READ|PROT_WRITE,
-			MAP_ANON, fd, 0)) == (caddr_t)-1) {
-		return 0;
-	}
-	pagepool_end = pagepool_start + n * _pagesz;
+	if ((pagepool_start = mmap(0, size, PROT_READ|PROT_WRITE,
+	    MAP_ANON, -1, 0)) == MAP_FAILED)
+		return (0);
+
+	pagepool_end = pagepool_start + size;
 	pagepool_list[n_pagepools++] = pagepool_start;
 
-	return n;
+	return (size / pagesz);
 }
 
 static void
