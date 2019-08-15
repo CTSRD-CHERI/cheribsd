@@ -4,12 +4,13 @@
 SRCDIR?=.
 CPPFLAGS+=-I$(SRCDIR)
 
-# XXX NWF?
-CFLAGS+= -DINSECURE=1
-
 CFLAGS+=-g
 ifeq ($(DEBUG),1)
-CFLAGS+=-DDEBUG=1 -DABORT_ON_ASSERT_FAILURE=1
+# -O2 can't be debugged and -O0 is quite slow so default to -O1
+CFLAGS+=-DDEBUG=1 -DABORT_ON_ASSERT_FAILURE=1 -ggdb -DVERBOSE=1 -DINSECURE=0 -O1
+else
+# XXX NWF?
+CFLAGS+= -DINSECURE=1
 endif
 
 ifeq ($(CAPREVOKE),1)

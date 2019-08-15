@@ -714,7 +714,7 @@ typedef unsigned int flag_t;           /* The type of various bit flag sets */
 #define pdirty(p)           ((p)->head & PDIRTY_BIT)
 #define cunmapped(p)        ((p)->head & CUNMAPPED_BIT)
 #define dirtybits(p)        ((p)->head & (PDIRTY_BIT|CDIRTY_BIT))
-#define inusebits(p)        ((p)->head & (PINUSE_BIT|CINUSE_BIT))
+#define inusebits(p)        ((p)->head & (PINUSE_BIT|CINUSE_BIT|CUNMAPPED_BIT))
 #define is_inuse(p)         ((((p)->head & INUSE_BITS) != PINUSE_BIT))
 #define is_mmapped(p)       (((p)->head & INUSE_BITS) == 0)
 
@@ -1067,6 +1067,8 @@ struct malloc_state {
   size_t     footprint;
   size_t     max_footprint;
   size_t     footprint_limit; /* zero means no limit */
+  size_t     allocated;
+  size_t     max_allocated;
 #if SWEEP_STATS
   size_t     sweepTimes;
   size_t     sweptBytes;
@@ -1241,12 +1243,31 @@ static int has_segment_link(mstate m, msegmentptr ss) {
   useful in custom actions that try to help diagnose errors.
 */
 
+// Hopefully snprintf() won't call malloc().
+#define malloc_printf(...) do { \
+    char buf[1024]; \
+    snprintf(buf, sizeof(buf), __VA_ARGS__); \
+    write(STDERR_FILENO, buf, strlen(buf)); \
+} while(0);
+
+__attribute((optnone))
+static inline void usage_error(mstate m, void *mem) {
+    malloc_printf("USAGE ERROR: mstate=%p, mem=%#p\n", m, mem);
+    abort();
+}
+
+__attribute((optnone))
+static inline void corruption_error(mstate m) {
+    malloc_printf("CORRUPTION ERROR: mstate=%#p\n", m);
+    abort();
+}
+
 #ifndef CORRUPTION_ERROR_ACTION
-#define CORRUPTION_ERROR_ACTION(m) ABORT
+#define CORRUPTION_ERROR_ACTION(m) corruption_error(m)
 #endif /* CORRUPTION_ERROR_ACTION */
 
 #ifndef USAGE_ERROR_ACTION
-#define USAGE_ERROR_ACTION(m,p) ABORT
+#define USAGE_ERROR_ACTION(m,p) usage_error(m, p)
 #endif /* USAGE_ERROR_ACTION */
 
 /* --------------------------- CHERI support ----------------------------- */
@@ -1991,6 +2012,8 @@ static struct mallinfo internal_mallinfo(mstate m) {
 static void internal_malloc_stats(mstate m) {
   ensure_initialization();
   if (!PREACTION(m)) {
+    size_t allocated = 0;
+    size_t max_allocated = 0;
     size_t maxfp = 0;
     size_t fp = 0;
     size_t used = 0;
@@ -1998,6 +2021,8 @@ static void internal_malloc_stats(mstate m) {
     if (is_initialized(m)) {
       msegmentptr s = &m->seg;
       maxfp = m->max_footprint;
+      allocated = m->allocated;
+      max_allocated = m->max_allocated;
       fp = m->footprint;
       used = fp - (m->topsize + TOP_FOOT_SIZE);
 
@@ -2007,17 +2032,26 @@ static void internal_malloc_stats(mstate m) {
                q != m->top && q->head != FENCEPOST_HEAD) {
           if (!is_inuse(q))
             used -= chunksize(q);
-          q = next_chunk(q);
+          mchunkptr next = next_chunk(q);
+          // FIXME: work around infinite loop
+          if (next == q) {
+            malloc_printf("ERROR: Infinite loop in %s: q=%#p, head=0x%zx, m->top=%#p\n",
+                          __func__, q, q->head, m->top);
+            break;
+          }
+          q = next;
         }
         s = s->next;
       }
     }
     POSTACTION(m); /* drop lock */
-    fprintf(stderr, "max system bytes      = %10zu\n", maxfp);
-    fprintf(stderr, "system bytes          = %10zu\n", fp);
-    fprintf(stderr, "in use bytes          = %10zu\n", used);
+    malloc_printf("max system bytes      = %10zu\n", maxfp);
+    malloc_printf("system bytes          = %10zu\n", fp);
+    malloc_printf("in use bytes          = %10zu\n", used);
+    malloc_printf("allocated bytes       = %10zu\n", allocated);
+    malloc_printf("max allocated bytes   = %10zu\n", max_allocated);
 #if USE_LOCKS && USE_SPIN_LOCKS && (!defined(USE_RECURSIVE_LOCKS) || USE_RECURSIVE_LOCKS==0)
-    fprintf(stderr, "global lock contended = %10zu\n", lockContended);
+    malloc_printf("global lock contended = %10zu\n", lockContended);
 #endif // USE_LOCKS
   }
 }
@@ -2514,14 +2548,17 @@ static void add_segment(mstate m, char* tbase, size_t tsize, flag_t mmapped) {
 }
 
 #if SWEEP_STATS
+// atexit() calls malloc, try using __attribute__((destructor)) instead.
+__attribute__((destructor))
 static void
 print_sweep_stats() {
-  fprintf(stderr, "Sweeps: %zd.\n", gm->sweepTimes);
-  fprintf(stderr, "Swept bytes: %zd.\n", gm->sweptBytes);
-  fprintf(stderr, "Frees: %zd.\n", gm->freeTimes);
-  fprintf(stderr, "Free bytes: %zd.\n", gm->freeBytes);
-  fprintf(stderr, "Bits painted: %zd.\n", gm->bitsPainted);
-  fprintf(stderr, "Bits cleared: %zd.\n", gm->bitsCleared);
+  malloc_printf("Sweeps: %zd.\n", gm->sweepTimes);
+  malloc_printf("Swept bytes: %zd.\n", gm->sweptBytes);
+  malloc_printf("Frees: %zd.\n", gm->freeTimes);
+  malloc_printf("Free bytes: %zd.\n", gm->freeBytes);
+  malloc_printf("Bits painted: %zd.\n", gm->bitsPainted);
+  malloc_printf("Bits cleared: %zd.\n", gm->bitsCleared);
+  dlmalloc_stats();
 }
 #endif // SWEEP_STATS
 
@@ -2583,10 +2620,6 @@ static void* sys_alloc(mstate m, size_t nb) {
       m->max_footprint = m->footprint;
 
     if (!is_initialized(m)) { /* first-time initialization */
-#if SWEEP_STATS
-      atexit(print_sweep_stats);
-      atexit(dlmalloc_stats);
-#endif // SWEEP_STATS
       if (m->least_addr == 0 || tbase < m->least_addr)
         m->least_addr = tbase;
       m->seg.base = tbase;
@@ -3097,13 +3130,16 @@ static void* internal_malloc(mstate m, size_t bytes) {
     }
     POSTACTION(m);
     UTRACE(0, bytes, mem);
+    m->allocated += chunksize(mem2chunk(mem));
+    if (m->allocated > m->max_allocated)
+      m->max_allocated = m->allocated;
     return mem;
   }
 
   return 0;
 }
 
-void* dlmalloc(size_t bytes) {
+static void* dlmalloc_internal_unbounded(size_t bytes) {
   void *mem;
 #ifdef __CHERI_PURE_CAPABILITY__
   bytes = __builtin_cheri_round_representable_length(bytes);
@@ -3119,7 +3155,11 @@ void* dlmalloc(size_t bytes) {
 
   assert(chunksize(mem2chunk(mem)) >= bytes + CHUNK_HEADER_OFFSET);
 
-  return bound_ptr(mem, bytes);
+  return mem;
+}
+
+void* dlmalloc(size_t bytes) {
+    return bound_ptr(dlmalloc_internal_unbounded(bytes), bytes);
 }
 
 /* ---------------------------- free --------------------------- */
@@ -3140,7 +3180,7 @@ dlfree_internal(void* mem) {
 #define fm gm
 
 #if SUPPORT_UNMAP
-    char *remap_base, *remap_end;
+    char *remap_base = NULL, *remap_end = NULL;
     if (cunmapped(p)) {
       remap_base = __builtin_align_up(chunk2mem(p), mparams.page_size);
       remap_end = __builtin_align_down((char *)p + chunksize(p),
@@ -3148,7 +3188,7 @@ dlfree_internal(void* mem) {
       ptrdiff_t remap_len = remap_end - remap_base;
       assert(remap_len > 0 && remap_len % mparams.page_size == 0);
 #ifdef VERBOSE
-      printf("%s: remapping %ti from %#p\n", __func__, remap_len, remap_base);
+      malloc_printf("%s: remapping %ti from %#p\n", __func__, remap_len, remap_base);
 #endif
       if (mmap(remap_base, remap_len, PROT_READ|PROT_WRITE,
 	       MAP_FIXED | MAP_ANON | MAP_CHERI_NOSETBOUNDS, -1, 0) ==
@@ -3168,12 +3208,25 @@ dlfree_internal(void* mem) {
    */
 #if SUPPORT_UNMAP
     if (cunmapped(p)) {
-      memset(mem, 0, remap_base - (char *)mem);
-      memset(remap_end, 0, (char *)mem + chunksize(p) - remap_end);
-    } else
-#else
-      memset(mem, 0, chunksize(p) - CHUNK_HEADER_OFFSET);
+      assert(remap_base && remap_end);
+      size_t leading_size = remap_base - (char *)mem;
+      // XXXAR: I'm not sure I understand this code correctly but it seems we
+      // need to subtract CHUNK_HEADER_OFFSET to avoid zeroing the next chunk
+      size_t trailing_size = (char *)mem + chunksize(p) - remap_end - CHUNK_HEADER_OFFSET;
+#ifdef VERBOSE
+      malloc_printf("%s: cunmapped: zeroing %ti from %#p\n", __func__, leading_size, mem);
+      malloc_printf("%s: cunmapped: zeroing %ti from %#p\n", __func__, trailing_size, remap_end);
 #endif
+      memset(mem, 0, leading_size);
+      memset(remap_end, 0, trailing_size);
+    } else
+#endif /* SUPPORT_UNMAP */
+    {
+#ifdef VERBOSE
+      malloc_printf("%s: zeroing %ti from %#p\n", __func__, chunksize(p) - CHUNK_HEADER_OFFSET, mem);
+#endif
+      memset(mem, 0, chunksize(p) - CHUNK_HEADER_OFFSET);
+    }
 #endif /* ZERO_MEMORY */
 
 #if SUPPORT_UNMAP
@@ -3216,8 +3269,10 @@ dlfree_internal(void* mem) {
                 goto postaction;
               }
             }
-            else
+            else {
+              malloc_printf("fail: (%#p) >= (M)->least_addr(%#p)\n", prev, fm->least_addr);
               goto erroraction;
+            }
           }
         }
 
@@ -3364,6 +3419,7 @@ dlfree(void* mem) {
   if(mem != 0) {
     msegmentptr sp;
     mchunkptr p  = mem2chunk(unbound_ptr(gm, &sp, mem));
+    gm->allocated -= chunksize(p);
 #if SUPPORT_UNMAP
     void *unmap_base = NULL;
     void *unmap_end = NULL;
@@ -3458,7 +3514,7 @@ dlfree(void* mem) {
       }
       if (cunmapped(p) && unmap_end > unmap_base) {
 #ifdef VERBOSE
-	printf("%s: unmapping %ti from %#p\n", __func__, unmap_len, unmap_base);
+	malloc_printf("%s: unmapping %ti from %#p\n", __func__, unmap_len, unmap_base);
 #endif
 	/*
 	 * We'd like to unmap the memory, but that could lead to reuse.
@@ -3486,7 +3542,7 @@ dlfree(void* mem) {
 static void
 malloc_revoke_internal(const char *reason) {
 #ifdef VERBOSE
-  printf("%s: %s\n", __func__, reason);
+  malloc_printf("%s: %s\n", __func__, reason);
 #endif
 #if SWEEP_STATS
   gm->sweepTimes++;
@@ -3560,12 +3616,12 @@ void* dlcalloc(size_t n_elements, size_t elem_size) {
         (req / n_elements != elem_size))
       req = MAX_SIZE_T; /* force downstream failure on overflow */
   }
-  mem = dlmalloc(req);
+  mem = dlmalloc_internal_unbounded(req);
 #ifndef CAPREVOKE
   if (mem != 0 && calloc_must_clear(mem2chunk(mem)))
     memset(mem, 0, req);
 #endif
-  return mem;
+  return bound_ptr(mem, req);
 }
 
 /* ------------ Internal support for realloc, memalign, etc -------------- */
@@ -3722,11 +3778,14 @@ static void* internal_memalign(mstate m, size_t alignment, size_t bytes) {
 
       mem = chunk2mem(p);
       assert (chunksize(p) >= nb);
-      assert(((size_t)mem & (alignment - 1)) == 0);
+      assert(__builtin_is_aligned(mem, alignment));
       check_inuse_chunk(m, p);
       POSTACTION(m);
     }
   }
+  m->allocated += chunksize(mem2chunk(mem));
+  if (m->allocated > m->max_allocated)
+    m->max_allocated = m->allocated;
   return mem;
 }
 
@@ -3851,7 +3910,7 @@ int dlposix_memalign(void** pp, size_t alignment, size_t bytes) {
   bytes = __builtin_cheri_round_representable_length(bytes);
 #endif
   if (alignment == MALLOC_ALIGNMENT)
-    mem = dlmalloc(bytes);
+    mem = dlmalloc_internal_unbounded(bytes);
   else {
     size_t d = alignment / sizeof(void*);
     size_t r = alignment % sizeof(void*);
@@ -3926,7 +3985,7 @@ struct mallinfo dlmallinfo(void) {
 #endif /* NO_MALLINFO */
 
 #if !NO_MALLOC_STATS
-void dlmalloc_stats() {
+void dlmalloc_stats(void) {
   internal_malloc_stats(gm);
 }
 #endif /* NO_MALLOC_STATS */

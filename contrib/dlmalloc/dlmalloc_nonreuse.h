@@ -488,13 +488,11 @@ DEFAULT_UNMAP_THRESHOLD	default: MAX_SIZE_T / PAGESIZE
 #endif
 #endif
 
-// Some platforms depend on malloc when doing atexit, so disable it by default.
-#define SWEEP_STATS 0
-
 //-----------------------------------------------------------------------------
 
 // Enable the report of sweeping statistics.
 #ifndef SWEEP_STATS
+// Some platforms depend on malloc when doing atexit, so disable it by default.
 #define SWEEP_STATS 0
 #endif // SWEEP_STATS
 
