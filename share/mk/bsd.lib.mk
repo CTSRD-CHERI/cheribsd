@@ -3,6 +3,8 @@
 #
 
 .include <bsd.init.mk>
+.include <bsd.compiler.mk>
+.include <bsd.linker.mk>
 
 .include <bsd.cheri.mk>
 
@@ -78,9 +80,13 @@ TAG_ARGS=	-T ${TAGS:[*]:S/ /,/g}
 LDFLAGS+= -Wl,-znow
 .endif
 .if ${MK_RETPOLINE} != "no"
+.if ${COMPILER_FEATURES:Mretpoline} && ${LINKER_FEATURES:Mretpoline}
 CFLAGS+= -mretpoline
 CXXFLAGS+= -mretpoline
 LDFLAGS+= -Wl,-zretpolineplt
+.else
+.warning Retpoline requested but not supported by compiler or linker
+.endif
 .endif
 
 .if ${MK_DEBUG_FILES} != "no" && empty(DEBUG_FLAGS:M-g) && \
