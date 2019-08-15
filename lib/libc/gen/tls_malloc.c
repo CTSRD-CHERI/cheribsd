@@ -81,7 +81,6 @@ static spinlock_t tls_malloc_lock = _SPINLOCK_INITIALIZER;
 #define	TLS_MALLOC_UNLOCK	_SPINUNLOCK(&tls_malloc_lock)
 union overhead;
 static void morecore(int);
-static void init_pagebucket(void);
 
 /*
  * The overhead on a block is one pointer. When free, this space
@@ -96,21 +95,20 @@ union	overhead {
 	} ovu;
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
-#define	ov_size		ovu.ovu_size
 };
 
 #define	MAGIC		0xef		/* magic # on accounting info */
 
 /*
- * nextf[i] is the pointer to the next free block of size 2^(i+3).  The
- * smallest allocatable block is 8 bytes.  The overhead information
- * precedes the data area returned to the user.
+ * nextf[i] is the pointer to the next free block of size
+ * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the
+ * data area returned to the user.
  */
+#define	FIRST_BUCKET_SIZE	32
 #define	NBUCKETS 30
 static	union overhead *nextf[NBUCKETS];
 
 static	size_t pagesz;			/* page size */
-static	int pagebucket;			/* page size bucket */
 
 
 #define	NPOOLPAGES	(32*1024/_pagesz)
@@ -230,7 +228,6 @@ tls_malloc(size_t nbytes)
 	TLS_MALLOC_LOCK;
 	if (pagesz == 0) {
 		pagesz = PAGE_SIZE;
-		init_pagebucket();
 		__init_heap(pagesz);
 	}
 	TLS_MALLOC_UNLOCK;
@@ -240,19 +237,16 @@ tls_malloc(size_t nbytes)
 	 * stored in hash buckets which satisfies request.
 	 * Account for space used per block for accounting.
 	 */
-	if (nbytes <= pagesz - sizeof (*op)) {
-		amt = 32;	/* size of first bucket */
-		bucket = 2;
-	} else {
-		amt = pagesz;
-		bucket = pagebucket;
-	}
+	amt = FIRST_BUCKET_SIZE;
+	bucket = 0;
 	while (nbytes > (size_t)amt - sizeof(*op)) {
 		amt <<= 1;
 		if (amt == 0)
 			return (NULL);
 		bucket++;
 	}
+	if (bucket >= NBUCKETS)
+		return (NULL);
 	/*
 	 * If nothing in hash bucket right now,
 	 * request more memory from the system.
@@ -299,17 +293,13 @@ morecore(int bucket)
 	int amt;			/* amount to allocate */
 	int nblks;			/* how many blocks we get */
 
-	/*
-	 * sbrk_size <= 0 only for big, FLUFFY, requests (about
-	 * 2^30 bytes on a VAX, I think) or for a negative arg.
-	 */
-	sz = 1 << (bucket + 3);
+	sz = FIRST_BUCKET_SIZE << bucket;
 	assert(sz > 0);
 	if (sz < pagesz) {
 		amt = pagesz;
 		nblks = amt / sz;
 	} else {
-		amt = sz + pagesz;
+		amt = sz; /* XXX: round up */
 		nblks = 1;
 	}
 	if (amt > pagepool_end - pagepool_start)
@@ -375,21 +365,6 @@ tls_free(void *cp)
 	op->ov_next = nextf[bucket];	/* also clobbers ov_magic */
 	nextf[bucket] = op;
 	TLS_MALLOC_UNLOCK;
-}
-
-static void
-init_pagebucket(void)
-{
-	int bucket;
-	size_t amt;
-
-	bucket = 0;
-	amt = 8;
-	while ((unsigned)pagesz > amt) {
-		amt <<= 1;
-		bucket++;
-	}
-	pagebucket = bucket;
 }
 
 void *
