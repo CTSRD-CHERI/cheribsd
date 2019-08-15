@@ -2814,7 +2814,7 @@ kqueue_caprevoke(struct file *fp, struct caprevoke_stats *stat)
 				continue;
 			stat->caps_found++;
 			if (vm_test_caprevoke(ud)) {
-				kn->kn_kevent.udata = cheri_cleartag(ud);
+				kn->kn_kevent.udata = cheri_revoke(ud);
 				stat->caps_cleared++;
 			}
 		}
@@ -2826,7 +2826,7 @@ kqueue_caprevoke(struct file *fp, struct caprevoke_stats *stat)
 				continue;
 			stat->caps_found++;
 			if (vm_test_caprevoke(ud)) {
-				kn->kn_kevent.udata = cheri_cleartag(ud);
+				kn->kn_kevent.udata = cheri_revoke(ud);
 				stat->caps_cleared++;
 			}
 		}

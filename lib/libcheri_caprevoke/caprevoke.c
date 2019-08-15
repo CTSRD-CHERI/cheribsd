@@ -104,7 +104,7 @@ caprev_shadow_nomap_last_word_mask(vaddr_t base, size_t len)
   if (caprev_shadow_nomap_first_word_offset(base) ==
       caprev_shadow_nomap_last_word_offset(base, len)) {
 
-    /* 
+    /*
      * There are no more bits to set that haven't been taken care of by the the
      * first word, so just return 0.
      */
@@ -212,21 +212,23 @@ caprev_shadow_nomap_set(uint64_t * __capability sb,
 
   /*
    * The first word is tricky to handle, since we use it to gate frees,
-   * ensuring that double-frees are idempotent.  There are two reasons we might
-   * bail out:
+   * ensuring that double-frees are idempotent.  There are three reasons we
+   * might bail out:
    *
    *   - another thread has quarantined this object (bits already set)
    *
-   *   - this object has been revoked while we held a pointer to it in free()
-   *   (and so its tag has been stripped)
+   *   - this object is detagged
    *
-   * We have to check the tag stripping inside the ll/sc we use to update the
-   * shadow bitmask so that we interlock against the stop-the-world (and maybe
-   * read-side) phases of revocation.
+   *   - this object has been revoked while we held a pointer to it in
+   *   free() (and so its permissions have been stripped; see cheri_revoke)
+   *
+   * We have to check the permissions inside the ll/sc we use to update the
+   * shadow bitmask so that we interlock against the stop-the-world (and
+   * maybe read-side) phases of revocation.
    *
    * It's possible the SC fails for neither of the above reasons, of course,
-   * not the least of which is that a concurrent thread might be mutating the
-   * shadow.  In that case, just go around again.
+   * not the least of which is that a concurrent thread might be mutating
+   * the shadow.  In that case, just go around again.
    *
    * We're going to do this dance with some inline assembler (sigh), because
    * it's a little much to expect C to understand!
@@ -247,6 +249,11 @@ caprev_shadow_nomap_set(uint64_t * __capability sb,
       "nop\n\t"                         // [delay]
 
       "cbtu %[obj], 2f\n\t"             // Jump out if object detagged
+	// no delay slot OK
+
+      "cgetperm $t1, %[obj]\n\t"        // Jump out if zero perms
+      "beqz $t1, 2f\n\t"
+      "nop\n\t"                         // [delay]
 
       "or $t0, $t0, %[fwm]\n\t"         // bitwise or in the mask [delay]
 

@@ -42,6 +42,8 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/cherireg.h>
 
+#include <sys/caprevoke.h>
+
 static struct mtx cheri_otype_lock;
 static struct unrhdr *cheri_otypes;
 /* Initialized in _start() */
@@ -81,4 +83,13 @@ cheri_otype_free(otype_t cap)
 
 	type = cheri_getbase(cap);
 	free_unr(cheri_otypes, type);
+}
+
+/* If this changes, make the comment in sys/sys/caprevoke.h match! */
+void * __capability
+cheri_revoke_sealed(void * __capability c)
+{
+	c = cheri_unseal(c, kernel_sealcap);
+	c = cheri_andperm(c, 0);
+	return c;
 }

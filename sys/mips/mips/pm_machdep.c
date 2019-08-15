@@ -722,7 +722,7 @@ caprevoke_td_frame(struct thread *td, struct caprevoke_stats *stat)
 	do { if (cheri_gettag(r)) { \
 		stat->caps_found++; \
 		if (vm_test_caprevoke(r)) { \
-			r = cheri_cleartag(r); \
+			r = cheri_revoke(r); \
 			stat->caps_cleared++; \
 		} \
 	    }} while(0)

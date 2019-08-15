@@ -80,6 +80,7 @@ __FBSDID("$FreeBSD$");
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi_util.h>
 #endif
+#include <sys/caprevoke.h>
 
 /*
  * Counter for allocating reference ids to new jobs.  Wrapped to 1 on
@@ -2756,7 +2757,7 @@ restart:
 		 */
 		if (vm_test_caprevoke(uc)) {
 			job->uaiocb.aio_sigevent.sigev_value.sival_ptr_c =
-				cheri_cleartag(uc);
+				cheri_revoke(uc);
 		}
 
 		/* Cancel and finish jobs whose userland metadata

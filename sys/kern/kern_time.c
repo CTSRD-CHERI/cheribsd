@@ -1444,8 +1444,7 @@ ktimer_caprevoke(struct proc *p, struct caprevoke_stats *stat)
 
 		stat->caps_found++;
 		if (vm_test_caprevoke(v)) {
-			it->it_sigev.sigev_value.sival_ptr_c
-				= cheri_cleartag(v);
+			it->it_sigev.sigev_value.sival_ptr_c = cheri_revoke(v);
 			stat->caps_cleared++;
 		}
 	}

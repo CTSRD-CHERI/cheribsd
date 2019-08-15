@@ -9,6 +9,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/proc.h>
 #include <sys/rwlock.h>
 #include <sys/cheriabi.h>
+
+#include <cheri/cheric.h>
 #include <sys/caprevoke.h>
 
 #include <vm/vm.h>

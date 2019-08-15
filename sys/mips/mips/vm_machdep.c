@@ -706,12 +706,14 @@ vm_do_caprevoke(void * __capability * __capability cutp, int flags, struct capre
 		void * __capability cscratch;
 		int ok;
 
+		void * __capability cutr = cheri_revoke(cut);
+
 		/*
 		 * Load-link the position under test; verify that it matches
-		 * our previous load; clear the tag; store conditionally
-		 * back.  If the verification fails, don't try anything
-		 * fancy, just modify the return value to flag the page as
-		 * dirty.
+		 * our previous load; store conditionally the revoked
+		 * version back.  If the verification fails, don't try
+		 * anything fancy, just modify the return value to flag the
+		 * page as dirty.
 		 *
 		 * It's possible that this CAS will fail because the pointer
 		 * has changed during our test.  That's fine, if this is not
@@ -724,12 +726,11 @@ vm_do_caprevoke(void * __capability * __capability cutp, int flags, struct capre
 			"cllc %[cscratch], %[cutp]\n\t"
 			"cexeq %[ok], %[cscratch], %[cut]\n\t"
 			"beqz %[ok], 1f\n\t"
-			"candperm %[cscratch], %[cscratch], $zero\n\t"
-			"ccleartag %[cscratch], %[cscratch]\n\t"
-			"cscc %[ok], %[cscratch], %[cutp]\n\t"
+			"nop\n\t"
+			"cscc %[ok], %[cutr], %[cutp]\n\t"
 			"1:\n\t"
 		  : [ok] "=r" (ok), [cscratch] "=&C" (cscratch)
-		  : [cut] "C" (cut), [cutp] "C" (cutp)
+		  : [cut] "C" (cut), [cutp] "C" (cutp), [cutr] "C" (cutr)
 		  : "memory");
 
 		if (__builtin_expect(ok,1)) {
