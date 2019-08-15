@@ -79,6 +79,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/disk.h>
+#include <sys/disklabel.h>
 #include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/lock.h>
@@ -2462,10 +2463,11 @@ swaponsomething(struct vnode *vp, void *id, u_long nblks,
 
 	sp->sw_blist = blist_create(nblks, M_WAITOK);
 	/*
-	 * Do not free the first two block in order to avoid overwriting
+	 * Do not free the first blocks in order to avoid overwriting
 	 * any bsd label at the front of the partition
 	 */
-	blist_free(sp->sw_blist, 2, nblks - 2);
+	blist_free(sp->sw_blist, howmany(BBSIZE, PAGE_SIZE),
+	    nblks - howmany(BBSIZE, PAGE_SIZE));
 
 	dvbase = 0;
 	mtx_lock(&sw_dev_mtx);
@@ -2483,7 +2485,7 @@ swaponsomething(struct vnode *vp, void *id, u_long nblks,
 	sp->sw_end = dvbase + nblks;
 	TAILQ_INSERT_TAIL(&swtailq, sp, sw_list);
 	nswapdev++;
-	swap_pager_avail += nblks - 2;
+	swap_pager_avail += nblks - howmany(BBSIZE, PAGE_SIZE);
 	swap_total += nblks;
 	swapon_check_swzone();
 	swp_sizecheck();
