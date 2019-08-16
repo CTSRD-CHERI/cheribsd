@@ -33,14 +33,14 @@ SYSCTL_BOOL(_vm, OID_AUTO, caprevoke_last_redirty, CTLFLAG_RW,
     &caprevoke_last_redirty, 0,
     "XXX");
 
-static int
+static inline int
 vm_caprevoke_should_visit_page(vm_page_t m, int flags)
 {
 	/*
-	 * Always visit recently-capdirty pages.  As a side effect,
-	 * clear the PGA_CAPSTORED flag on this page.
+	 * Always visit recently-capdirty pages, but without the side-effect
+	 * of clearing what might be a shared bit.
 	 */
-	if (vm_page_aflag_xclear_acq(m, PGA_CAPSTORED) & PGA_CAPSTORED)
+	if (m->aflags & PGA_CAPSTORED)
 		return 1;
 
 	/*
@@ -130,17 +130,18 @@ vm_caprevoke_visit_ro(vm_object_t obj, vm_page_t m, int flags,
 	stat->pages_scanned++;
 	hascaps = vm_caprevoke_page_ro(m, flags, stat);
 
+	KASSERT(!(hascaps & VM_CAPREVOKE_PAGE_HASCAPS)
+		|| ((m->oflags & VPO_PASTCAPSTORE)
+		    || (m->aflags & PGA_CAPSTORED)),
+		("cap-bearing RO page without h/r capdirty?"
+			" hc=%x m=%p, m->of=%x, m->af=%x",
+			hascaps, m, m->oflags, m->aflags));
+
 	VM_OBJECT_WLOCK(obj);
 	vm_page_xunbusy(m);
 
 	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
 		return VM_CAPREVOKE_VIS_DIRTY;
-	}
-
-	if (hascaps & VM_CAPREVOKE_PAGE_HASCAPS) {
-		m->oflags |= VPO_PASTCAPSTORE;
-	} else {
-		m->oflags &= ~VPO_PASTCAPSTORE;
 	}
 
 	return VM_CAPREVOKE_VIS_DONE;
@@ -250,14 +251,15 @@ vm_caprevoke_object_at(vm_map_t map, vm_map_entry_t entry, vm_offset_t ioff,
 		vm_caprevoke_unwire_in_situ(m);
 	}
 
-	if (!vm_caprevoke_should_visit_page(m, flags)) {
-		*ooff = ioff + pagesizes[m->psind];
-		return VM_CAPREVOKE_AT_OK;
+	if (pmap_page_is_write_mapped(m)) {
+		if (!vm_caprevoke_should_visit_page(m, flags))
+			goto visit_rw_ok;
+
+		/* The page is writable; just go do the revocation in place */
+		goto visit_rw;
 	}
 
-	if (pmap_page_is_write_mapped(m)) {
-		/* The page is writable; just go do the revocation in place */
-		vm_caprevoke_visit_rw(obj, m, flags, stat);
+	if (!vm_caprevoke_should_visit_page(m, flags)) {
 		*ooff = ioff + pagesizes[m->psind];
 		return VM_CAPREVOKE_AT_OK;
 	}
@@ -307,9 +309,27 @@ vm_caprevoke_object_at(vm_map_t map, vm_map_entry_t entry, vm_offset_t ioff,
 
 	VM_OBJECT_WLOCK(obj);
 	vm_caprevoke_unwire_in_situ(m);
+
+visit_rw:
+	vm_page_aflag_clear(m, PGA_CAPSTORED);
 	switch(vm_caprevoke_visit_rw(obj, m, flags, stat))
 	{
 	case VM_CAPREVOKE_VIS_DONE:
+visit_rw_ok:
+		/*
+		 * When we are closing a revocation epoch, we transfer
+		 * VPO_PASTCAPSTORED to PGA_CAPSTORED so that we don't take
+		 * as many faults in the inter-epoch period.  We know that
+		 * we're going to visit all the VPO_PASTCAPSTORED-bearing
+		 * pages when we open the next epoch anyway, so there's no
+		 * point in lazily setting their PGA_CAPSTORED flags.
+		 */
+		if (caprevoke_last_redirty
+		    && (flags & VM_CAPREVOKE_LAST_INIT)) {
+			if (m->oflags & VPO_PASTCAPSTORE) {
+				vm_page_capdirty(m);
+			}
+		}
 		*ooff = ioff + pagesizes[m->psind];
 		return VM_CAPREVOKE_AT_OK;
 	case VM_CAPREVOKE_VIS_BUSY:
