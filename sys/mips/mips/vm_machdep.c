@@ -721,6 +721,11 @@ vm_do_caprevoke(void * __capability * __capability cutp, int flags, struct capre
 		 * around.  However, because CAS can fail for reasons other
 		 * than an actual data failure, return an indicator that the
 		 * page should not be considered clean.
+		 *
+		 * Because revoked capabilities are still tagged, one might
+		 * worry that this would reset the capdirty bits.  That's
+		 * not true, tho', because we're storing via the direct
+		 * mapping of physical memory.
 		 */
 		__asm__ __volatile__ (
 			"cllc %[cscratch], %[cutp]\n\t"

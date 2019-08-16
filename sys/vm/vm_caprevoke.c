@@ -316,6 +316,11 @@ visit_rw:
 	{
 	case VM_CAPREVOKE_VIS_DONE:
 visit_rw_ok:
+
+		KASSERT(((m->aflags & PGA_CAPSTORED) == 0)
+			|| !(flags & VM_CAPREVOKE_LAST_INIT),
+			("Capdirty page after visit with world stopped?"));
+
 		/*
 		 * When we are closing a revocation epoch, we transfer
 		 * VPO_PASTCAPSTORED to PGA_CAPSTORED so that we don't take
@@ -330,6 +335,7 @@ visit_rw_ok:
 				vm_page_capdirty(m);
 			}
 		}
+
 		*ooff = ioff + pagesizes[m->psind];
 		return VM_CAPREVOKE_AT_OK;
 	case VM_CAPREVOKE_VIS_BUSY:
