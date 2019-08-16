@@ -108,15 +108,13 @@ union	overhead {
 #define	NBUCKETS 30
 static	union overhead *nextf[NBUCKETS];
 
-static	size_t pagesz;			/* page size */
+static const size_t pagesz = PAGE_SIZE;			/* page size */
 
-
-#define	NPOOLPAGES	(32*1024/_pagesz)
+#define	NPOOLPAGES	(32*1024/pagesz)
 
 static caddr_t	pagepool_start, pagepool_end;
 static size_t	n_pagepools, max_pagepools;
 static char	**pagepool_list;
-static size_t	_pagesz;
 
 static int
 __morepages(int n)
@@ -125,14 +123,14 @@ __morepages(int n)
 	char **new_pagepool_list;
 
 	n += NPOOLPAGES;	/* round up allocation. */
-	size = n * _pagesz;
+	size = n * pagesz;
 #ifdef __CHERI_PURE_CAPABILITY__
 	size = __builtin_cheri_round_representable_length(size);
 #endif
 
 	if (n_pagepools >= max_pagepools) {
 		if (max_pagepools == 0)
-			max_pagepools = _pagesz / (sizeof(char *) * 2);
+			max_pagepools = pagesz / (sizeof(char *) * 2);
 
 		max_pagepools *= 2;
 		if ((new_pagepool_list = mmap(0,
@@ -154,9 +152,9 @@ __morepages(int n)
 		pagepool_list = new_pagepool_list;
 	}
 
-	if (pagepool_end - pagepool_start > (ssize_t)_pagesz) {
+	if (pagepool_end - pagepool_start > (ssize_t)pagesz) {
 		caddr_t extra_start = __builtin_align_up(pagepool_start,
-		    _pagesz);
+		    pagesz);
 		size_t extra_bytes = pagepool_end - extra_start;
 #ifndef __CHERI_PURE_CAPABILITY__
 		if (munmap(extra_start, extra_bytes) != 0)
@@ -185,13 +183,6 @@ __morepages(int n)
 	pagepool_list[n_pagepools++] = pagepool_start;
 
 	return (size / pagesz);
-}
-
-static void
-__init_heap(size_t pagesz)
-{
-
-	_pagesz = pagesz;
 }
 
 static void *
@@ -223,17 +214,6 @@ tls_malloc(size_t nbytes)
 	int bucket;
 	size_t amt;
 
-	/*
-	 * First time malloc is called, setup page size and
-	 * align break pointer so all data will be page aligned.
-	 */
-	TLS_MALLOC_LOCK;
-	if (pagesz == 0) {
-		pagesz = PAGE_SIZE;
-		__init_heap(pagesz);
-	}
-	TLS_MALLOC_UNLOCK;
-	assert(pagesz != 0);
 	/*
 	 * Convert amount of memory requested into closest block size
 	 * stored in hash buckets which satisfies request.
