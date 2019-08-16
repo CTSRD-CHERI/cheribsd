@@ -646,6 +646,14 @@ test_fault_cloadtags_unmapped(const struct cheri_test *ctp __unused)
 
 #ifdef CHERIABI_TESTS
 
+static int
+check_revoked(void * __capability r)
+{
+	return ((cheri_gettag(r) == 1)
+		&& (cheri_gettype(r) == (uint64_t)(-1))
+		&& (cheri_getperm(r) == 0));
+}
+
 static void
 install_kqueue_cap(int kq, void * __capability revme)
 {
@@ -660,7 +668,7 @@ install_kqueue_cap(int kq, void * __capability revme)
 }
 
 static void
-check_kqueue_cap(int kq, unsigned int expected_tag)
+check_kqueue_cap(int kq, unsigned int valid)
 {
 	struct kevent ike, oke = { 0 };
 
@@ -670,8 +678,8 @@ check_kqueue_cap(int kq, unsigned int expected_tag)
 	CHERITEST_CHECK_SYSCALL(kevent(kq, NULL, 0, &oke, 1, NULL));
 	CHERITEST_VERIFY2(oke.ident == 0x2BAD, "Bad identifier from kqueue");
 	CHERITEST_VERIFY2(oke.filter == EVFILT_USER, "Bad filter from kqueue");
-	CHERITEST_VERIFY2(cheri_gettag(oke.udata) == expected_tag,
-				"kqueue-held cap tag not as expected");
+	CHERITEST_VERIFY2(check_revoked(oke.udata) == !valid,
+				"kqueue-held cap not as expected");
 }
 
 static void
@@ -735,7 +743,7 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_JUST_HOARDERS, 0, &crst));
 
 	check_kqueue_cap(kq, 0);
-	CHERITEST_VERIFY2(cheri_gettag(mb[1]) != 0, "JUST cleared memory tag");
+	CHERITEST_VERIFY2(!check_revoked(mb[1]), "JUST cleared memory tag");
 
 	/* OK, full pass */
 	install_kqueue_cap(kq, revme);
@@ -752,7 +760,7 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
-	CHERITEST_VERIFY2(cheri_gettag(mb[1]) == 0, "Memory tag persists");
+	CHERITEST_VERIFY2(check_revoked(mb[1]), "Memory tag persists");
 	check_kqueue_cap(kq, 0);
 
 	/* Clear the revocation bit and do that again */
@@ -765,7 +773,7 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	 * edge with the derivation above.
 	 */
 	revme = cheri_andperm(mb+1, ~CHERI_PERM_CHERIABI_VMMAP);
-	CHERITEST_VERIFY2(cheri_gettag(revme) == 1, "Tag clear on 2nd revme?");
+	CHERITEST_VERIFY2(!check_revoked(revme), "Tag clear on 2nd revme?");
 	((void * __capability *)mb)[1] = revme;
 	install_kqueue_cap(kq, revme);
 
@@ -782,7 +790,7 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
-	CHERITEST_VERIFY2(cheri_gettag(mb[1]) != 0, "Memory tag cleared");
+	CHERITEST_VERIFY2(!check_revoked(mb[1]), "Memory tag cleared");
 
 	check_kqueue_cap(kq, 1);
 
@@ -850,11 +858,11 @@ test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
 	CHERI_FPRINT_PTR(stderr, mb[1]);
 	CHERI_FPRINT_PTR(stderr, mb[2]);
 
-	CHERITEST_VERIFY2(cheri_gettag(mb) == 1, "Arena tagged");
-	CHERITEST_VERIFY2(cheri_gettag(revme) == 0, "Register tag cleared");
-	CHERITEST_VERIFY2(cheri_gettag(mb[0]) == 0, "Memory tag 0 cleared");
-	CHERITEST_VERIFY2(cheri_gettag(mb[1]) == 0, "Memory tag 1 cleared");
-	CHERITEST_VERIFY2(cheri_gettag(mb[2]) == 0, "Memory tag 2 cleared");
+	CHERITEST_VERIFY2(!check_revoked(mb), "Arena revoked");
+	CHERITEST_VERIFY2(check_revoked(revme), "Register tag cleared");
+	CHERITEST_VERIFY2(check_revoked(mb[0]), "Memory tag 0 cleared");
+	CHERITEST_VERIFY2(check_revoked(mb[1]), "Memory tag 1 cleared");
+	CHERITEST_VERIFY2(check_revoked(mb[2]), "Memory tag 2 cleared");
 
 	munmap(mb, PAGE_SIZE);
 
@@ -1002,20 +1010,20 @@ test_caprevoke_lib_run(
 		/* Check the surroundings */
 		if (paranoia > 1) {
 			for (size_t ix = 0; ix < chunk_offset; ix++) {
-				CHERITEST_VERIFY2(cheri_gettag(bigblock[ix]) == 1,
-						"Cleared cap incorrectly below object, at ix=%zd\n", ix);
+				CHERITEST_VERIFY2(!check_revoked(bigblock[ix]),
+						"Revoked cap incorrectly below object, at ix=%zd\n", ix);
 			}
 			for (size_t ix = chunk_offset + csz; ix < bigblock_caps; ix++) {
-				CHERITEST_VERIFY2(cheri_gettag(bigblock[ix]) == 1,
-						"Cleared cap incorrectly above object, at ix=%zd\n", ix);
+				CHERITEST_VERIFY2(!check_revoked(bigblock[ix]),
+						"Revoked cap incorrectly above object, at ix=%zd\n", ix);
 			}
 		}
 
 		for (size_t ix = 0; ix < csz; ix++) {
 			if (paranoia > 0) {
-				if (cheri_gettag(chunk[ix]) == 1) {
+				if (!check_revoked(chunk[ix])) {
 					CHERI_FPRINT_PTR(stderr, chunk[ix]);
-					cheritest_failure_errx("Tag remains at ix=%zd after revoke\n", ix);
+					cheritest_failure_errx("Unrevoked at ix=%zd after revoke\n", ix);
 				}
 			}
 
