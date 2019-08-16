@@ -365,10 +365,10 @@ extern struct mtx_padalign pa_lock[];
  *
  * PGA_CAPSTORED indicates that a capability was written to this page since
  * the last time this bit (and the underlying architectural permission) was
- * cleared.  Setting this bit happens without the page lock held, but
- * clearing it requires the page lock (and the page must have been locked
- * and held across the duration of whatever operation determined that there
- * are no capabilities on this page).
+ * cleared.  No locks are required to update this bit; it may be set by the
+ * MD layer arbitrarily and cleared by the MI layer as desired.  The MI
+ * layer must call pmap_sync_capdirty with threads stopped if it expects an
+ * accurate view.
  */
 #define	PGA_WRITEABLE	0x01		/* page may be mapped writeable */
 #define	PGA_REFERENCED	0x02		/* page has been referenced */

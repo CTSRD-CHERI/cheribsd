@@ -2110,7 +2110,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	 * (so determine PTE_SC entirely from NOSTORETAGS).  On the other
 	 * hand, if it's already capdirty, avoid the overhead of faulting,
 	 * since all we'd do is set the bit again (eventually, in
-	 * pmap_tc_capdirty).
+	 * pmap_emulate_capdirty).
 	 *
 	 * Transfer NOSTORETAGS to PTE_CRO.
 	 *
