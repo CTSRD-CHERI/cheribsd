@@ -1758,7 +1758,7 @@ int
 cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 {
 	union {
-		struct ptrace_io_desc piod;
+		struct ptrace_io_desc_c piod;
 		struct ptrace_lwpinfo pl;
 		struct ptrace_vm_entry_c pve;
 #ifdef CPU_CHERI
@@ -1767,13 +1767,12 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		struct dbreg dbreg;
 		struct fpreg fpreg;
 		struct reg reg;
-		char args[nitems(td->td_sa.args) * sizeof(register_t)];
+		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r = { 0 };
 
 	union {
-		struct ptrace_io_desc_c piod;
 		struct ptrace_lwpinfo_c pl;
 	} c = { 0 };
 
@@ -1828,6 +1827,11 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		addr = cheri_cleartag(uap->addr);
 		break;
 
+	/* Pass along 'addr' unmodified. */
+	case PT_GETLWPLIST:
+		addr = uap->addr;
+		break;
+
 #ifdef CPU_CHERI
 	/*
 	 * XXXNWF Prohibited at the moment, because we have no sane way of
@@ -1855,11 +1859,11 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 			error = copyin(uap->addr, &r.ptevents, uap->data);
 		break;
 
+	case PT_IO:
+		error = copyincap(uap->addr, (char *)&r.piod, sizeof(r.piod));
+		break;
 	case PT_VM_ENTRY:
 		error = copyincap(uap->addr, (char *)&r.pve, sizeof r.pve);
-		if (error)
-			break;
-
 		break;
 
 #if 0
@@ -1867,7 +1871,6 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_READ_D:
 	case PT_WRITE_I:
 	case PT_WRITE_D:
-	case PT_IO:
 		// XXX TODO
 		break;
 	default:
@@ -1892,9 +1895,17 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_VM_ENTRY:
 		error = COPYOUT(&r.pve, uap->addr, sizeof r.pve);
 		break;
+#endif
 	case PT_IO:
-		error = COPYOUT(&r.piod, uap->addr, sizeof r.piod);
+		/*
+		 * Only copy out the updated piod_len to avoid the use
+		 * of copyoutcap.
+		 */
+		error = copyout(&r.piod.piod_len, uap->addr +
+		    offsetof(struct ptrace_io_desc_c, piod_len),
+		    sizeof(r.piod.piod_len));
 		break;
+#if 0
 	case PT_GETREGS:
 		error = COPYOUT(&r.reg, uap->addr, sizeof r.reg);
 		break;
@@ -1930,7 +1941,6 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 
 		error = copyout(&c.pl, uap->addr, uap->data);
 		break;
-#if 0
 	case PT_GET_SC_ARGS:
 		error = copyout(r.args, uap->addr, MIN(uap->data,
 		    sizeof(r.args)));
@@ -1939,7 +1949,6 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		error = copyout(&r.psr, uap->addr, MIN(uap->data,
 		    sizeof(r.psr)));
 		break;
-#endif
 	default:
 		break;
 	}

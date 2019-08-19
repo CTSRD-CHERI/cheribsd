@@ -108,13 +108,14 @@ struct ptrace_io_desc {
 	size_t	piod_len;	/* request length */
 };
 
+#if defined(_KERNEL) && __has_feature(capabilities)
 struct ptrace_io_desc_c {
 	int	piod_op;	/* I/O operation */
-	vm_offset_t piod_offs;	/* child offset; not capability! */
+	void	* __capability piod_offs;	/* child offset */
 	void	* __capability piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
-
+#endif
 
 /*
  * Operations in piod_op.
@@ -188,9 +189,16 @@ struct ptrace_lwpinfo32 {
 
 /* Argument structure for PT_GET_SC_RET. */
 struct ptrace_sc_ret {
-	register_t	sr_retval[2];	/* Only valid if sr_error == 0. */
+	syscallarg_t	sr_retval[2];	/* Only valid if sr_error == 0. */
 	int		sr_error;
 };
+
+#if defined(_KERNEL) && __has_feature(capabilities)
+struct ptrace_sc_ret64 {
+	uint64_t	sr_retval[2];	/* Only valid if sr_error == 0. */
+	int		sr_error;
+};
+#endif
 
 /* Argument structure for PT_VM_ENTRY. */
 struct ptrace_vm_entry {
