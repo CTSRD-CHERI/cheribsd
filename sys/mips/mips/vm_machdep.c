@@ -614,27 +614,22 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 /* Constructed in sys/mips/mips/locore.S */
 uint8_t * __capability caprev_shadow_cap = (void * __capability)(intcap_t) -1;
 
-static int
-vm_test_caprevoke_int(const void * __capability cut, int flags)
+static inline int
+vm_test_caprevoke_mem(const void * __capability cut, int flags)
 {
-	vm_offset_t va;
-
-	// XXX? KASSERT(cheri_gettag(cut), ("Detagged in vm_test_caprevoke"));
-
-	/* Load capability, find appropriate bitmap bits.  We use the base
-	 * so that even if the cursor is out of bounds, we find the true
-	 * status of the allocation under test.
+	/*
+	 * Find appropriate bitmap bits.  We use the base so that even if
+	 * the cursor is out of bounds, we find the true status of the
+	 * allocation under test.
 	 */
 
-	va = cheri_getbase(cut);
+	vm_offset_t va = cheri_getbase(cut);
 
 	/*
 	 * All capabilities are checked against the coarse MAP bitmap, unless
 	 * we're instructed not to, as we might be if we know that there are
 	 * no bits set anywhere in that map.  Since this map is under the
 	 * kernel's control, this is a reasonable possibility.
-	 *
-	 * XXX Unless they have no memory-access permissions
 	 */
 	if ((flags & VM_CAPREVOKE_NO_COARSE) == 0)
 	{
@@ -673,6 +668,24 @@ vm_test_caprevoke_int(const void * __capability cut, int flags)
 	}
 
 	return 0;
+}
+
+static int
+vm_test_caprevoke_int(const void * __capability cut, int flags)
+{
+	int res = 0;
+	int perms = cheri_getperm(cut);
+
+	if ((perms & (CHERI_PERMS_HWALL_MEMORY | CHERI_PERM_CHERIABI_VMMAP))
+	    != 0) {
+		res |= vm_test_caprevoke_mem(cut, flags);
+	}
+
+	// TODO: if ((perms & CHERI_PERMS_HWALL_OTYPE) != 0)
+
+	// TODO: if ((perms & CHERI_PERMS_HWALL_CID) != 0)
+
+	return res;
 }
 
 /* External interface */
