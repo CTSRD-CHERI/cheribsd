@@ -15,10 +15,12 @@
 #include <sys/wait.h>
 
 #include <compat/cheriabi/cheriabi_signal.h>
+struct __ucontext;
+struct __wrusage;
 struct acl;
 struct aiocb;
-struct auditinfo;
 struct auditinfo_addr;
+struct auditinfo;
 struct caprevoke_stats;
 struct ffclock_estimate;
 struct fhandle;
@@ -29,15 +31,15 @@ struct iovec;
 struct itimerspec;
 struct itimerval;
 struct jail;
-struct kevent;
 struct kevent_freebsd11;
+struct kevent;
 struct kld_file_stat;
 struct mac;
 struct module_stat;
 struct mq_attr;
 struct msghdr;
-struct msqid_ds;
 struct msqid_ds_old;
+struct msqid_ds;
 struct nstat;
 struct ntptimeval;
 struct oaiocb;
@@ -56,8 +58,8 @@ struct sched_param;
 struct sctp_sndrcvinfo;
 struct sembuf;
 struct sf_hdtr;
-struct shmid_ds;
 struct shmid_ds_old;
+struct shmid_ds;
 struct sigaction;
 struct sigaltstack;
 struct sigevent;
@@ -72,12 +74,10 @@ struct timespec;
 struct timeval;
 struct timex;
 struct timezone;
-struct __ucontext;
 struct utsname;
 struct uuid;
-struct __wrusage;
-union semun;
 union semun_old;
+union semun;
 SYS_STUB(2, int, fork,
     /* _protoargs */ (void),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno),
