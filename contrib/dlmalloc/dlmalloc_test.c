@@ -112,7 +112,7 @@ main(int argc, char **argv)
 #ifdef CAPREVOKE
 	dlmalloc_revoke();
 	for (i = 0; i < nitems(sizes); i++)
-		if (!cheri_gettag(ptrs[i]))
+		if (cheri_getperm(ptrs[i]) == 0)
 			bad_ptr(ptrs[i],
 			    "ptrs[%d] is revoked before being freed", i);
 #endif
@@ -126,10 +126,10 @@ main(int argc, char **argv)
 	 * freeing odd ones.
 	 */
 	for (i = 0; i < nitems(sizes); i += 2)
-		if (cheri_gettag(ptrs[i]))
+		if (cheri_getperm(ptrs[i]) != 0)
 			bad_ptr(ptrs[i], "ptrs[%d] was not revoked", i);
 	for (i = 1; i < nitems(sizes); i += 2)
-		if (!cheri_gettag(ptrs[i]))
+		if (cheri_getperm(ptrs[i]) == 0)
 			bad_ptr(ptrs[i],
 			    "ptrs[%d] is revoked before being freed", i);
 	dlmalloc_revoke();
@@ -144,7 +144,7 @@ main(int argc, char **argv)
 #ifdef CAPREVOKE
 	dlmalloc_revoke();
 	for (i = 0; i < nitems(sizes); i++)
-		if (!cheri_gettag(ptrs[i]))
+		if (cheri_getperm(ptrs[i]) == 0)
 			bad_ptr(ptrs[i],
 			    "ptrs[%d] is revoked before being freed", i);
 #endif
@@ -158,10 +158,10 @@ main(int argc, char **argv)
 	 * freeing odd ones.
 	 */
 	for (i = 0; i < nitems(sizes); i += 2)
-		if (cheri_gettag(ptrs[i]))
+		if (cheri_getperm(ptrs[i]) != 0)
 			bad_ptr(ptrs[i], "ptrs[%d] was not revoked", i);
 	for (i = 1; i < nitems(sizes); i += 2)
-		if (!cheri_gettag(ptrs[i]))
+		if (cheri_getperm(ptrs[i]) == 0)
 			bad_ptr(ptrs[i],
 			    "ptrs[%d] is revoked before being freed", i);
 	dlmalloc_revoke();
@@ -178,7 +178,7 @@ main(int argc, char **argv)
 #ifdef CAPREVOKE
 	dlmalloc_revoke();
 	for (i = 0; i < nitems(sizes); i++)
-		if (cheri_gettag(ptrs[i]))
+		if (cheri_getperm(ptrs[i]) != 0)
 			bad_ptr(ptrs[i], "ptrs[%d] was not revoked", i);
 #endif
 
