@@ -1,4 +1,4 @@
-SRCS= caprevoke.c
+SRCS= libcheri_caprevoke.c
 
 INCS= libcaprevoke.h
 INCSDIR=	${INCLUDEDIR}/cheri
