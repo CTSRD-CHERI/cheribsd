@@ -274,6 +274,7 @@ vm_map_zinit(void *mem, int size, int flags)
 	memset(map, 0, sizeof(*map));
 	mtx_init(&map->system_mtx, "vm map (system)", NULL, MTX_DEF | MTX_DUPOK);
 	sx_init(&map->lock, "vm map (user)");
+	cv_init(&map->vm_caprev_cv, "vmcaprev");
 	return (0);
 }
 

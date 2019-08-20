@@ -458,11 +458,9 @@ fini:
  *   both: as now, a world-stopped cleaning pass
  */
 int
-vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
+vm_caprevoke(vm_map_t map, int flags, struct caprevoke_stats *st)
 {
 	int res = KERN_SUCCESS;
-	struct vmspace *vm;
-	vm_map_t map;
 	vm_map_entry_t entry;
 	vm_offset_t addr;
 
@@ -485,11 +483,7 @@ vm_caprevoke(struct proc *p, int flags, struct caprevoke_stats *st)
 	 */
 	flags |= VM_CAPREVOKE_NO_COARSE;
 
-	PROC_ASSERT_HELD(p);
-	vm = vmspace_acquire_ref(p);
-
 	addr = 0;
-	map = &vm->vm_map;
 
 	/* Acquire the address space map write-locked and not busy */
 	vm_map_lock(map);
@@ -548,7 +542,6 @@ out:
 	vm_map_lock(map);
 	vm_map_unbusy(map);
 	vm_map_unlock(map);
-	vmspace_free(vm);
 
 	return res;
 }
@@ -557,12 +550,10 @@ out:
  * Do a sweep across the single map entry containing the given address.
  */
 int
-vm_caprevoke_one(struct proc *p, int flags, vm_offset_t oneaddr,
+vm_caprevoke_one(vm_map_t map, int flags, vm_offset_t oneaddr,
 		 struct caprevoke_stats *st)
 {
 	int res = KERN_SUCCESS;
-	struct vmspace *vm;
-	vm_map_t map;
 	vm_map_entry_t entry;
 	vm_offset_t addr;
 
@@ -570,9 +561,6 @@ vm_caprevoke_one(struct proc *p, int flags, vm_offset_t oneaddr,
 		 == !!(flags & VM_CAPREVOKE_LAST_FINI),
 			("vm_caprevoke_one bad LAST flags"));
 
-	PROC_ASSERT_HELD(p);
-	vm = vmspace_acquire_ref(p);
-	map = &vm->vm_map;
 	vm_map_lock_read(map);
 
 	if (!vm_map_lookup_entry(map, oneaddr, &entry))
@@ -593,6 +581,5 @@ vm_caprevoke_one(struct proc *p, int flags, vm_offset_t oneaddr,
 
 out:
 	vm_map_unlock_read(map);
-	vmspace_free(vm);
 	return res;
 }

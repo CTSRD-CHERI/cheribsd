@@ -67,7 +67,7 @@
  *   we have to consider *all* capdirty pages, not just recently-capdirty.
  *
  * The state and epoch counter are stored in the same per-process word,
- * p_caprev_st.  There is, at present, at most one thread actively engaged
+ * vm_caprev_st.  There is, at present, at most one thread actively engaged
  * in revocation per process.
  */
 

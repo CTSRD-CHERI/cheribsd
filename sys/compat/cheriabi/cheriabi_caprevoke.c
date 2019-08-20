@@ -17,6 +17,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_param.h>
+#include <vm/pmap.h>
+#include <vm/vm_map.h>
 
 #include <cheri/cheric.h>
 
@@ -89,6 +91,8 @@ static int
 cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 {
 	struct caprevoke_stats st = { 0 };
+	struct vmspace *vm = vmspace_acquire_ref(td->td_proc);
+	vm_map_t vmm = &vm->vm_map;
 
 	/*
 	 * Unlocked access is fine; this is advisory and, when it is
@@ -102,18 +106,18 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	 * implied a suitable one on syscall entry, which seems
 	 * unlikely.
 	 */
-	st.epoch_init = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
+	st.epoch_init = vmm->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
 	if (uap->flags & CAPREVOKE_JUST_MY_REGS) {
 		caprevoke_td_frame(td, &st);
 	}
 	if (uap->flags & CAPREVOKE_JUST_MY_STACK) {
 #if defined(CPU_CHERI)
-		vm_caprevoke_one(td->td_proc, 0,
+		vm_caprevoke_one(vmm, 0,
 			(vm_offset_t)(__cheri_fromcap void *)
 			(td->td_frame->csp), &st);
 #else
-		vm_caprevoke_one(td->td_proc, 0, td->td_frame.sp, &st);
+		vm_caprevoke_one(vmm, 0, td->td_frame.sp, &st);
 #endif
 	}
 	if (uap->flags & CAPREVOKE_JUST_HOARDERS) {
@@ -121,13 +125,14 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	}
 
 	/* XXX unlocked read OK? */
-	st.epoch_fini = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
+	st.epoch_fini = vmm->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
+	vmspace_free(vm);
 	return cheriabi_caprevoke_fini(td, uap, 0, &st);
 }
 
-#define SET_ST(p, e, st) \
-	(p)->p_caprev_st = (((e) << CAPREVST_EPOCH_SHIFT) | (st))
+#define SET_ST(vp, e, st) \
+	(vp)->vm_caprev_st = (((e) << CAPREVST_EPOCH_SHIFT) | (st))
 
 int
 cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
@@ -136,11 +141,16 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	caprevoke_epoch epoch;
 	enum caprevoke_state entryst, myst;
 	struct caprevoke_stats stat = { 0 };
+	struct vmspace *vm;
+	vm_map_t vmm;
 
 	if ((uap->flags & CAPREVOKE_JUST_MASK) != 0) {
 		return cheriabi_caprevoke_just(td, uap);
 	}
 	/* Engaging the full state machine; here we go! */
+
+	vm = vmspace_acquire_ref(td->td_proc);
+	vmm = &vm->vm_map;
 
 	/*
 	 * We need some value that's more or less "now", but we don't have
@@ -148,7 +158,7 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	 * userland, just used to guide the interlocking below.
 	 */
 	if ((uap->flags & CAPREVOKE_IGNORE_START) != 0) {
-		uap->start_epoch = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
+		uap->start_epoch = vmm->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 	}
 
 	/*
@@ -158,7 +168,7 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	uap->flags |= CAPREVOKE_LAST_NO_LATE;
 
 	/* Serialize and figure out what we're supposed to do */
-	PROC_LOCK(td->td_proc);
+	vm_map_lock(vmm);
 	{
 		static const int fast_out_flags = CAPREVOKE_NO_WAIT_OK
 						| CAPREVOKE_IGNORE_START
@@ -166,7 +176,7 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 		int ires = 0;
 		caprevoke_epoch first_epoch;
 
-		epoch = td->td_proc->p_caprev_st >> CAPREVST_EPOCH_SHIFT;
+		epoch = vmm->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 		first_epoch = epoch;
 
 		/*
@@ -189,7 +199,7 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 		 * epoch has not advanced.
 		 */
 
-		switch(td->td_proc->p_caprev_st & CAPREVST_ST_MASK) {
+		switch(vmm->vm_caprev_st & CAPREVST_ST_MASK) {
 		case CAPREVST_INIT_PASS:
 			/*
 			 * A revoker intends to open, but not close, this
@@ -233,8 +243,9 @@ reentry:
 			 * next would-be revoker first.
 			 */
 fast_out:
-			PROC_UNLOCK(td->td_proc);
-			cv_signal(&td->td_proc->p_caprev_cv);
+			vm_map_unlock(vmm);
+			cv_signal(&vmm->vm_caprev_cv);
+			vmspace_free(vm);
 			stat.epoch_fini = epoch;
 			return cheriabi_caprevoke_fini(td, uap, ires, &stat);
 		}
@@ -243,7 +254,7 @@ fast_out:
 		 * OK, the initial epoch clock isn't in the past.  Let's see
 		 * what state we're in and what we can accomplish.
 		 */
-		entryst = td->td_proc->p_caprev_st & CAPREVST_ST_MASK;
+		entryst = vmm->vm_caprev_st & CAPREVST_ST_MASK;
 		switch(entryst) {
 		case CAPREVST_NONE:
 			/*
@@ -277,13 +288,13 @@ fast_out:
 			}
 
 			/* There is another revoker in progress.  Wait. */
-			ires = cv_wait_sig(&td->td_proc->p_caprev_cv,
+			ires = cv_wait_sig(&vmm->vm_caprev_cv,
 				&td->td_proc->p_mtx);
 			if (ires != 0) {
 				goto fast_out;
 			}
 
-			epoch = td->td_proc->p_caprev_st
+			epoch = vmm->vm_caprev_st
 				>> CAPREVST_EPOCH_SHIFT;
 			if (epoch == first_epoch) {
 				stat.epoch_init = epoch;
@@ -308,19 +319,17 @@ fast_out:
 		}
 
 		/*
-		 * Don't bump the epoch count here!  Wait until we're
-		 * certain it's actually open, which we can only do below.
+		 * Don't bump the epoch count here, just the state!  Wait
+		 * until we're certain it's actually open, which we can only
+		 * do below.
 		 */
-		SET_ST(td->td_proc, epoch, myst);
-
-		/* XXX This hold might be superfluous? */
-		_PHOLD(td->td_proc);
+		SET_ST(vmm, epoch, myst);
 	}
-	PROC_UNLOCK(td->td_proc);
+	vm_map_unlock(vmm);
 
 	/* Walk the VM unless told not to */
 	if ((uap->flags & CAPREVOKE_LAST_NO_EARLY) == 0) {
-		res = vm_caprevoke(td->td_proc,
+		res = vm_caprevoke(vmm,
 			/* If not first pass, only recently capdirty pages */
 		   ((entryst == CAPREVST_INIT_DONE)
 			? VM_CAPREVOKE_INCREMENTAL : 0),
@@ -358,10 +367,18 @@ fast_out:
 		PROC_LOCK(td->td_proc);
 		if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
 			if (thread_single(td->td_proc, SINGLE_BOUNDARY)) {
-				_PRELE(td->td_proc);
-				SET_ST(td->td_proc, epoch, entryst);
 				PROC_UNLOCK(td->td_proc);
+
+				vm_map_lock(vmm);
+				SET_ST(vmm, epoch, entryst);
+				vm_map_unlock(vmm);
+
 				/* XXX Don't signal other would-be revokers? */
+
+				vmspace_free(vm);
+
+				/* XXX Don't copy out the stat structure? */
+
 				return ERESTART;
 			}
 		}
@@ -383,7 +400,7 @@ fast_out:
 		 * we'll have entryst == CAPREVST_INIT_DONE; there's no need
 		 * to look at CAPREVOKE_NO_EARLY_PASS.
 		 */
-		res = vm_caprevoke(td->td_proc,
+		res = vm_caprevoke(vmm,
 			((entryst == CAPREVST_INIT_DONE)
 				? VM_CAPREVOKE_INCREMENTAL : 0)
 			| VM_CAPREVOKE_LAST_INIT
@@ -398,11 +415,16 @@ fast_out:
 		}
 
 		if (res != KERN_SUCCESS) {
-			_PRELE(td->td_proc);
-			SET_ST(td->td_proc, epoch, entryst);
 			PROC_UNLOCK(td->td_proc);
 
-			cv_signal(&td->td_proc->p_caprev_cv);
+			vm_map_lock(vmm);
+			SET_ST(vmm, epoch, entryst);
+			vm_map_unlock(vmm);
+
+			cv_signal(&vmm->vm_caprev_cv);
+
+			vmspace_free(vm);
+
 			stat.epoch_fini = epoch;
 			return cheriabi_caprevoke_fini(td, uap, 0, &stat);
 		}
@@ -420,7 +442,7 @@ fast_out:
 			 * as we must have done a pass before here, this is
 			 * certain to be an incremental pass.
 			 */
-			res = vm_caprevoke(td->td_proc,
+			res = vm_caprevoke(vmm,
 				VM_CAPREVOKE_INCREMENTAL
 				| VM_CAPREVOKE_LAST_FINI,
 				&stat);
@@ -429,26 +451,28 @@ fast_out:
 
 skip_last_pass:
 	/* OK, that's that.  Where do we stand now? */
-	PROC_LOCK(td->td_proc);
 	{
-		_PRELE(td->td_proc);
-
 		if ((res == KERN_SUCCESS) && (myst == CAPREVST_LAST_PASS)) {
 			/* Signal the end of this revocation epoch */
 			epoch++;
-			SET_ST(td->td_proc, epoch, CAPREVST_NONE);
+			vm_map_lock(vmm);
+			SET_ST(vmm, epoch, CAPREVST_NONE);
+			vm_map_unlock(vmm);
 		} else {
 			/*
 			 * Put the state back how we found it, modulo
 			 * having perhaps finished the first pass.
 			 */
-			SET_ST(td->td_proc, epoch, entryst);
+			vm_map_lock(vmm);
+			SET_ST(vmm, epoch, entryst);
+			vm_map_unlock(vmm);
 		}
 	}
-	PROC_UNLOCK(td->td_proc);
 
 	/* Broadcast here: some sleepers may be able to take the fast out */
-	cv_broadcast(&td->td_proc->p_caprev_cv);
+	cv_broadcast(&vmm->vm_caprev_cv);
+
+	vmspace_free(vm);
 
 	/*
 	 * Return the epoch as it was at the end of the run above,
