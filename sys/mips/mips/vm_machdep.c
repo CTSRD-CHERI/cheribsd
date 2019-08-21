@@ -636,7 +636,7 @@ vm_test_caprevoke_int(const void * __capability cut, int flags)
 	 *
 	 * XXX Unless they have no memory-access permissions
 	 */
-	if (flags & VM_CAPREVOKE_NO_COARSE)
+	if ((flags & VM_CAPREVOKE_NO_COARSE) == 0)
 	{
 		uint8_t bmbits;
 		uint8_t * __capability bmloc;
