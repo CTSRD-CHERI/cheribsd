@@ -198,8 +198,12 @@ struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
 	struct sx lock;			/* Lock for map data */
 	struct mtx system_mtx;
+#ifdef CPU_CHERI
 	struct cv vm_caprev_cv;         /* (c) Cap. rev. is single file */
 	uint64_t vm_caprev_st;          /* Capability revocation state */
+	vm_object_t vm_caprev_sh;       /* My caprevoke shadow object */
+	vm_offset_t vm_caprev_shva;     /* caprevoke shadow posn. in map */
+#endif
 	int nentries;			/* Number of entries */
 	vm_size_t size;			/* virtual size */
 	u_int timestamp;		/* Version number */
@@ -435,6 +439,10 @@ int vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end,
     int flags);
 long vmspace_swap_count(struct vmspace *vmspace);
 void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
+
+#ifdef CPU_CHERI
+int vm_map_install_caprevoke_shadow (vm_map_t);
+#endif
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START

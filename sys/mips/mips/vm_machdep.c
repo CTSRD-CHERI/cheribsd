@@ -935,6 +935,49 @@ vm_caprevoke_page_ro(vm_page_t m, int flags, struct caprevoke_stats *stat)
 
 	return res;
 }
+
+/*
+ * Map a capability revocation shadow
+ */
+int
+vm_map_install_caprevoke_shadow(vm_map_t map)
+{
+	int error = KERN_SUCCESS;
+	vm_object_t vmo;
+	vm_offset_t start = VM_CAPREVOKE_BM_BASE;
+	vm_offset_t end = VM_CAPREVOKE_BM_TOP;
+
+	vmo = vm_object_allocate(OBJT_DEFAULT, end - start);
+	vmo->flags |= OBJ_NOLOADTAGS | OBJ_NOSTORETAGS;
+
+	vm_map_lock(map);
+
+	if (map->vm_caprev_sh != NULL) {
+		error = KERN_PROTECTION_FAILURE;
+		goto out;
+	}
+
+	error = vm_map_insert(map, vmo, 0, start, end,
+				VM_PROT_READ | VM_PROT_WRITE,
+				VM_PROT_READ | VM_PROT_WRITE,
+				0);
+
+	if (error != KERN_SUCCESS) {
+		goto out;
+	}
+
+	map->vm_caprev_sh = vmo;
+	map->vm_caprev_shva = start;
+
+out:
+	vm_map_unlock(map);
+
+	if (error) {
+		vm_object_deallocate(vmo);
+	}
+	return error;
+}
+
 #endif
 
 #ifdef DDB
