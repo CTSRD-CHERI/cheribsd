@@ -2796,11 +2796,12 @@ noacquire:
 #if __has_feature(capabilities)
 
 int
-kqueue_caprevoke(struct file *fp, struct caprevoke_stats *stat)
+kqueue_caprevoke(struct file *fp, struct vm_caprevoke_cookie *crc)
 {
 	struct kqueue *kq;
 	struct knote *kn;
 	int error, ix;
+        struct caprevoke_stats *stat = crc->stats;
 
 	error = kqueue_acquire(fp, &kq);
 	if (error != 0)
@@ -2813,7 +2814,7 @@ kqueue_caprevoke(struct file *fp, struct caprevoke_stats *stat)
 			if (!cheri_gettag(ud))
 				continue;
 			stat->caps_found++;
-			if (vm_test_caprevoke(ud)) {
+			if (vm_test_caprevoke(crc, ud)) {
 				kn->kn_kevent.udata = cheri_revoke(ud);
 				stat->caps_cleared++;
 			}
@@ -2825,7 +2826,7 @@ kqueue_caprevoke(struct file *fp, struct caprevoke_stats *stat)
 			if (!cheri_gettag(ud))
 				continue;
 			stat->caps_found++;
-			if (vm_test_caprevoke(ud)) {
+			if (vm_test_caprevoke(crc, ud)) {
 				kn->kn_kevent.udata = cheri_revoke(ud);
 				stat->caps_cleared++;
 			}

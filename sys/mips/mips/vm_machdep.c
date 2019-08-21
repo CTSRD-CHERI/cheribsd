@@ -612,10 +612,10 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 #ifdef CPU_CHERI
 
 /* Constructed in sys/mips/mips/locore.S */
-uint8_t * __capability caprev_shadow_cap = (void * __capability)(intcap_t) -1;
+extern uint8_t * __capability caprev_shadow_cap;
 
 static inline int
-vm_test_caprevoke_mem(const void * __capability cut, int flags)
+vm_test_caprevoke_mem(struct vm_caprevoke_cookie *crc, const void * __capability cut)
 {
 	/*
 	 * Find appropriate bitmap bits.  We use the base so that even if
@@ -631,14 +631,14 @@ vm_test_caprevoke_mem(const void * __capability cut, int flags)
 	 * no bits set anywhere in that map.  Since this map is under the
 	 * kernel's control, this is a reasonable possibility.
 	 */
-	if ((flags & VM_CAPREVOKE_NO_COARSE) == 0)
+	if ((crc->flags & VM_CAPREVOKE_CF_NO_COARSE) == 0)
 	{
 		uint8_t bmbits;
-		uint8_t * __capability bmloc;
+		const uint8_t * __capability bmloc;
 
-		bmloc = cheri_setaddress(caprev_shadow_cap,
-				  (((vm_offset_t) VM_CAPREVOKE_BM_MEM_MAP)
-				  + (va / VM_CAPREVOKE_GSZ_MEM_MAP / 8)));
+		bmloc = crc->crshadow
+			+ (VM_CAPREVOKE_BM_MEM_MAP - VM_CAPREVOKE_BM_BASE)
+			+ (va / VM_CAPREVOKE_GSZ_MEM_MAP / 8);
 
 		bmbits = fubyte_c(bmloc);
 
@@ -654,11 +654,11 @@ vm_test_caprevoke_mem(const void * __capability cut, int flags)
 		 */
 
 		uint8_t bmbits;
-		uint8_t * __capability bmloc;
+		const uint8_t * __capability bmloc;
 
-		bmloc = cheri_setaddress(caprev_shadow_cap,
-				  (((vm_offset_t) VM_CAPREVOKE_BM_MEM_NOMAP)
-				  + (va / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8)));
+		bmloc = crc->crshadow
+			+ (VM_CAPREVOKE_BM_MEM_NOMAP - VM_CAPREVOKE_BM_BASE)
+			+ (va / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8);
 
 		bmbits = fubyte_c(bmloc);
 
@@ -670,15 +670,15 @@ vm_test_caprevoke_mem(const void * __capability cut, int flags)
 	return 0;
 }
 
-static int
-vm_test_caprevoke_int(const void * __capability cut, int flags)
+int
+vm_test_caprevoke(struct vm_caprevoke_cookie *crc, const void * __capability cut)
 {
 	int res = 0;
 	int perms = cheri_getperm(cut);
 
 	if ((perms & (CHERI_PERMS_HWALL_MEMORY | CHERI_PERM_CHERIABI_VMMAP))
 	    != 0) {
-		res |= vm_test_caprevoke_mem(cut, flags);
+		res |= vm_test_caprevoke_mem(crc, cut);
 	}
 
 	// TODO: if ((perms & CHERI_PERMS_HWALL_OTYPE) != 0)
@@ -688,34 +688,22 @@ vm_test_caprevoke_int(const void * __capability cut, int flags)
 	return res;
 }
 
-/* External interface */
-int
-vm_test_caprevoke(const void * __capability cut)
-{
-	/*
-	 * XXX Right now, we know that there are no coarse-grain bits
-	 * getting set, since we don't do MPROT_QUARANTINE or anything of
-	 * that sort.  So we just always assert VM_CAPREVOKE_NO_COARSE.
-	 * In the future, we should count the number of pages held in
-	 * MPROT_QUARANTINE or munmap()'s quarantine or other such to decide
-	 * whether to set this!
-	 */
-	return vm_test_caprevoke_int(cut, VM_CAPREVOKE_NO_COARSE);
-}
-
 /*
  * The Capability Under Test Pointer needs to be a capability because we
  * don't have a LLC instruction, just a CLLC one.
  */
 static int
-vm_do_caprevoke(void * __capability * __capability cutp, int flags, struct caprevoke_stats *stat)
+vm_do_caprevoke(struct vm_caprevoke_cookie *crc,
+		void * __capability * __capability cutp)
 {
 	void * __capability cut;
 	int res = 0;
 
 	cut = *cutp;
 
-	if (vm_test_caprevoke_int(cut, flags)) {
+	KASSERT(cheri_gettag(cut), ("untagged in vm_do_caprevoke"));
+
+	if (vm_test_caprevoke(crc, cut)) {
 		void * __capability cscratch;
 		int ok;
 
@@ -752,7 +740,7 @@ vm_do_caprevoke(void * __capability * __capability cutp, int flags, struct capre
 		  : "memory");
 
 		if (__builtin_expect(ok,1)) {
-			stat->caps_cleared++;
+			crc->stats->caps_cleared++;
 		} else {
 			res = VM_CAPREVOKE_PAGE_DIRTY;
 		}
@@ -797,7 +785,7 @@ SYSINIT(cloadtags_stride, SI_SUB_VM, SI_ORDER_ANY,
         measure_cloadtags_stride, NULL);
 
 int
-vm_caprevoke_page(vm_page_t m, int flags, struct caprevoke_stats *stat)
+vm_caprevoke_page(struct vm_caprevoke_cookie *crc, vm_page_t m)
 {
 	uint32_t cyc_start = cheri_get_cyclecount();
 
@@ -842,25 +830,25 @@ vm_caprevoke_page(vm_page_t m, int flags, struct caprevoke_stats *stat)
 			for(; tags != 0; (tags >>= 1), mvt += 1) {
 				if (!(tags & 1))
 					continue;
-				stat->caps_found++;
+				crc->stats->caps_found++;
 
-				res |= vm_do_caprevoke(mvt, flags, stat);
+				res |= vm_do_caprevoke(crc, mvt);
 			}
 		}
 	} else {
 		for( ; cheri_getaddress(mvu) < mve; mvu++) {
 			void * __capability cut = *mvu;
 			if (cheri_gettag(cut)) {
-				stat->caps_found++;
+				crc->stats->caps_found++;
 				res |= VM_CAPREVOKE_PAGE_HASCAPS;
-				res |= vm_do_caprevoke(mvu, flags, stat);
+				res |= vm_do_caprevoke(crc, mvu);
 			}
 		}
 	}
 
 	uint32_t cyc_end = cheri_get_cyclecount();
 
-	stat->page_scan_cycles += cyc_end - cyc_start;
+	crc->stats->page_scan_cycles += cyc_end - cyc_start;
 
 	return res;
 }
@@ -877,7 +865,7 @@ vm_caprevoke_page(vm_page_t m, int flags, struct caprevoke_stats *stat)
  * saw at least one capability on this page.
  */
 int
-vm_caprevoke_page_ro(vm_page_t m, int flags, struct caprevoke_stats *stat)
+vm_caprevoke_page_ro(struct vm_caprevoke_cookie *crc, vm_page_t m)
 {
 	uint32_t cyc_start = cheri_get_cyclecount();
 
@@ -908,8 +896,8 @@ vm_caprevoke_page_ro(vm_page_t m, int flags, struct caprevoke_stats *stat)
 			for(; tags != 0; (tags >>= 1), mvt += 1) {
 				if (!(tags & 1))
 					continue;
-				stat->caps_found++;
-				if (vm_test_caprevoke_int(*mvt, flags)) {
+				crc->stats->caps_found++;
+				if (vm_test_caprevoke(crc, *mvt)) {
 					return VM_CAPREVOKE_PAGE_DIRTY
 						| VM_CAPREVOKE_PAGE_HASCAPS;
 				}
@@ -919,9 +907,9 @@ vm_caprevoke_page_ro(vm_page_t m, int flags, struct caprevoke_stats *stat)
 		for( ; cheri_getaddress(mvu) < mve; mvu++) {
 			void * __capability cut = *mvu;
 			if (cheri_gettag(cut)) {
-				stat->caps_found++;
+				crc->stats->caps_found++;
 				res |= VM_CAPREVOKE_PAGE_HASCAPS;
-				if (vm_test_caprevoke_int(cut, flags)) {
+				if (vm_test_caprevoke(crc, cut)) {
 					return VM_CAPREVOKE_PAGE_DIRTY
 						| VM_CAPREVOKE_PAGE_HASCAPS;
 				}
@@ -931,7 +919,7 @@ vm_caprevoke_page_ro(vm_page_t m, int flags, struct caprevoke_stats *stat)
 
 	uint32_t cyc_end = cheri_get_cyclecount();
 
-	stat->page_scan_cycles += cyc_end - cyc_start;
+	crc->stats->page_scan_cycles += cyc_end - cyc_start;
 
 	return res;
 }

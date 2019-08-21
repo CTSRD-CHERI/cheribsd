@@ -116,7 +116,8 @@ struct	kclock {
 
 int	itimer_accept(struct proc *p, int tid, ksiginfo_t *ksi);
 
-void ktimer_caprevoke(struct proc *, struct caprevoke_stats *);
+struct vm_caprevoke_cookie;
+void ktimer_caprevoke(struct proc *, struct vm_caprevoke_cookie *);
 #endif
 #endif /* !_SYS_TIMERS_H_ */
 // CHERI CHANGES START

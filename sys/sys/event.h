@@ -391,8 +391,8 @@ int 	kqfd_register(int fd, kkevent_t *kev, struct thread *p,
 int	kqueue_add_filteropts(int filt, struct filterops *filtops);
 int	kqueue_del_filteropts(int filt);
 
-struct caprevoke_stats;
-int	kqueue_caprevoke(struct file *fp, struct caprevoke_stats *stat);
+struct vm_caprevoke_cookie;
+int	kqueue_caprevoke(struct file *fp, struct vm_caprevoke_cookie *);
 
 #else 	/* !_KERNEL */
 

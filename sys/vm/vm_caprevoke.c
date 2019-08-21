@@ -70,8 +70,8 @@ enum vm_cro_visit {
  * Given a writable, wired page in a wlocked object, visit it.
  */
 static int
-vm_caprevoke_visit_rw(vm_object_t obj, vm_page_t m, int flags,
-			struct caprevoke_stats *stat)
+vm_caprevoke_visit_rw(struct vm_caprevoke_cookie *crc, int flags,
+		      vm_object_t obj, vm_page_t m)
 {
 	int hascaps;
 
@@ -80,14 +80,14 @@ vm_caprevoke_visit_rw(vm_object_t obj, vm_page_t m, int flags,
 	VM_OBJECT_WUNLOCK(obj);
 
 retry:
-	stat->pages_scanned++;
-	hascaps = vm_caprevoke_page(m, flags, stat);
+	crc->stats->pages_scanned++;
+	hascaps = vm_caprevoke_page(crc, m);
 
 	/* CAS failures cause us to revisit */
 	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
 		/* If the world is stopped, do that now */
 		if (flags & VM_CAPREVOKE_LAST_FINI) {
-			stat->pages_retried++;
+			crc->stats->pages_retried++;
 			goto retry;
 		}
 		vm_page_capdirty(m);
@@ -118,8 +118,8 @@ retry:
  * advance and carry on.
  */
 static int
-vm_caprevoke_visit_ro(vm_object_t obj, vm_page_t m, int flags,
-			struct caprevoke_stats *stat)
+vm_caprevoke_visit_ro(struct vm_caprevoke_cookie *crc, int flags,
+		      vm_object_t obj, vm_page_t m)
 {
 	int hascaps;
 
@@ -127,8 +127,8 @@ vm_caprevoke_visit_ro(vm_object_t obj, vm_page_t m, int flags,
 		return VM_CAPREVOKE_VIS_BUSY;
 	VM_OBJECT_WUNLOCK(obj);
 
-	stat->pages_scanned++;
-	hascaps = vm_caprevoke_page_ro(m, flags, stat);
+	crc->stats->pages_scanned++;
+	hascaps = vm_caprevoke_page_ro(crc, m);
 
 	KASSERT(!(hascaps & VM_CAPREVOKE_PAGE_HASCAPS)
 		|| ((m->oflags & VPO_PASTCAPSTORE)
@@ -172,20 +172,17 @@ enum vm_cro_at {
  * wlocked on success and unlocked on failure.  Even on success, the lock
  * may have been dropped and reacquired.
  *
- * If gaze_shadows is false, we restrict our attention to this object's own
- * pages, while if it is set we will fault around in the shadow hierarchy to
- * find and copy deeper pages.
- *
  * On success, *ooff will be updated to the next offset to probe (which may
  * be past the end of the object; the caller should test).  This next offset
  * may equal ioff if the world has shifted; this is probably fine as the
  * caller should just repeat the call.  On failure, *ooff will not be modified.
  */
 static enum vm_cro_at
-vm_caprevoke_object_at(vm_map_t map, vm_map_entry_t entry, vm_offset_t ioff,
-			bool gaze_shadows, int flags, vm_offset_t *ooff,
-			struct caprevoke_stats *stat, int *vmres)
+vm_caprevoke_object_at(struct vm_caprevoke_cookie *crc, int flags,
+			vm_map_entry_t entry, vm_offset_t ioff,
+			vm_offset_t *ooff, int *vmres)
 {
+	vm_map_t    map = crc->map;
 	vm_object_t obj = entry->object.vm_object;
 	vm_pindex_t ipi = OFF_TO_IDX(ioff);
 
@@ -197,7 +194,7 @@ vm_caprevoke_object_at(vm_map_t map, vm_map_entry_t entry, vm_offset_t ioff,
 	if (m == NULL) {
 		vm_offset_t addr = ioff - entry->offset + entry->start;
 
-		if (!gaze_shadows) {
+		if (flags & VM_CAPREVOKE_QUICK_SUCCESSOR) {
 			/* Look forward in the object map */
 			vm_page_t obj_next_pg = vm_page_find_least(obj, ipi);
 
@@ -205,16 +202,18 @@ vm_caprevoke_object_at(vm_map_t map, vm_map_entry_t entry, vm_offset_t ioff,
 
 			if ((obj_next_pg == NULL)
 			    || (obj_next_pg->pindex >= OFF_TO_IDX(lastoff))) {
-				stat->pages_fault_skip += (entry->end - addr) >> PAGE_SHIFT;
+				crc->stats->pages_fault_skip +=
+					(entry->end - addr) >> PAGE_SHIFT;
 				*ooff = lastoff;
 			} else {
 				*ooff = IDX_TO_OFF(obj_next_pg->pindex);
-				stat->pages_fault_skip += obj_next_pg->pindex - ipi;
+				crc->stats->pages_fault_skip +=
+					obj_next_pg->pindex - ipi;
 			}
 			return VM_CAPREVOKE_AT_OK;
 		}
 
-		stat->pages_faulted_ro++;
+		crc->stats->pages_faulted_ro++;
 
 		int res;
 		unsigned int last_timestamp = map->timestamp;
@@ -264,7 +263,7 @@ vm_caprevoke_object_at(vm_map_t map, vm_map_entry_t entry, vm_offset_t ioff,
 		return VM_CAPREVOKE_AT_OK;
 	}
 
-	switch(vm_caprevoke_visit_ro(obj, m, flags, stat))
+	switch(vm_caprevoke_visit_ro(crc, flags, obj, m))
 	{
 	case VM_CAPREVOKE_VIS_DONE:
 		/* We were able to conclude that the page was clean */
@@ -285,7 +284,7 @@ vm_caprevoke_object_at(vm_map_t map, vm_map_entry_t entry, vm_offset_t ioff,
 		panic("bad result from vm_caprevoke_visit_ro");
 	}
 
-	stat->pages_faulted_rw++;
+	crc->stats->pages_faulted_rw++;
 
 	int res;
 	unsigned int last_timestamp = map->timestamp;
@@ -312,7 +311,7 @@ vm_caprevoke_object_at(vm_map_t map, vm_map_entry_t entry, vm_offset_t ioff,
 
 visit_rw:
 	vm_page_aflag_clear(m, PGA_CAPSTORED);
-	switch(vm_caprevoke_visit_rw(obj, m, flags, stat))
+	switch(vm_caprevoke_visit_rw(crc, flags, obj, m))
 	{
 	case VM_CAPREVOKE_VIS_DONE:
 visit_rw_ok:
@@ -355,8 +354,8 @@ visit_rw_ok:
  * held across invocation.
  */
 static int
-vm_caprevoke_map_entry(vm_map_t map, vm_map_entry_t entry, const int flags,
-			vm_offset_t *addr, struct caprevoke_stats *stat)
+vm_caprevoke_map_entry(struct vm_caprevoke_cookie *crc, int flags,
+		       vm_map_entry_t entry, vm_offset_t *addr)
 {
 	int res;
 	vm_offset_t ooffset;
@@ -409,6 +408,8 @@ vm_caprevoke_map_entry(vm_map_t map, vm_map_entry_t entry, const int flags,
 	} else {
 		obj_has_backing_caps = true;
 	}
+	if (!obj_has_backing_caps)
+		flags |= VM_CAPREVOKE_QUICK_SUCCESSOR;
 
 	while (*addr < entry->end) {
 		int vmres;
@@ -416,9 +417,8 @@ vm_caprevoke_map_entry(vm_map_t map, vm_map_entry_t entry, const int flags,
 		/* Find ourselves in this object */
 		ooffset = *addr      - entry->start + entry->offset;
 
-		res = vm_caprevoke_object_at(map, entry, ooffset,
-						obj_has_backing_caps, flags,
-						&ooffset, stat, &vmres);
+		res = vm_caprevoke_object_at(crc, flags, entry, ooffset,
+					     &ooffset, &vmres);
 
 		/* How far did we get? */
 		*addr = ooffset - entry->offset + entry->start;
@@ -458,9 +458,10 @@ fini:
  *   both: as now, a world-stopped cleaning pass
  */
 int
-vm_caprevoke(vm_map_t map, int flags, struct caprevoke_stats *st)
+vm_caprevoke(struct vm_caprevoke_cookie *crc, int flags)
 {
 	int res = KERN_SUCCESS;
+	const vm_map_t map = crc->map;
 	vm_map_entry_t entry;
 	vm_offset_t addr;
 
@@ -472,16 +473,6 @@ vm_caprevoke(vm_map_t map, int flags, struct caprevoke_stats *st)
 		 */
 		return KERN_SUCCESS;
 	}
-
-	/*
-	 * XXX Right now, we know that there are no coarse-grain bits
-	 * getting set, since we don't do MPROT_QUARANTINE or anything of
-	 * that sort.  So we just always assert VM_CAPREVOKE_NO_COARSE.
-	 * In the future, we should count the number of pages held in
-	 * MPROT_QUARANTINE or munmap()'s quarantine or other such to decide
-	 * whether to set this!
-	 */
-	flags |= VM_CAPREVOKE_NO_COARSE;
 
 	addr = 0;
 
@@ -521,7 +512,7 @@ vm_caprevoke(vm_map_t map, int flags, struct caprevoke_stats *st)
 		 * MPROT_QUARANTINE'd map entries to be usable again, yes?
 		 */
 
-		res = vm_caprevoke_map_entry(map, entry, flags, &addr, st);
+		res = vm_caprevoke_map_entry(crc, flags, entry, &addr);
 
 		/*
 		 * We might be bailing out because a page fault failed for
@@ -550,10 +541,11 @@ out:
  * Do a sweep across the single map entry containing the given address.
  */
 int
-vm_caprevoke_one(vm_map_t map, int flags, vm_offset_t oneaddr,
-		 struct caprevoke_stats *st)
+vm_caprevoke_one(struct vm_caprevoke_cookie *crc, int flags,
+		 vm_offset_t oneaddr)
 {
 	int res = KERN_SUCCESS;
+	const vm_map_t map = crc->map;
 	vm_map_entry_t entry;
 	vm_offset_t addr;
 
@@ -568,7 +560,7 @@ vm_caprevoke_one(vm_map_t map, int flags, vm_offset_t oneaddr,
 
 	addr = entry->start;
 	while (addr < entry->end) {
-		res = vm_caprevoke_map_entry(map, entry, flags, &addr, st);
+		res = vm_caprevoke_map_entry(crc, flags, entry, &addr);
 
 		if (res != KERN_SUCCESS)
 			goto out;
@@ -582,4 +574,51 @@ vm_caprevoke_one(vm_map_t map, int flags, vm_offset_t oneaddr,
 out:
 	vm_map_unlock_read(map);
 	return res;
+}
+
+extern void * __capability caprev_shadow_cap; // XXX	
+
+int
+vm_caprevoke_cookie_init(vm_map_t map,
+			 struct caprevoke_stats *stats,
+			 struct vm_caprevoke_cookie *crc)
+{
+	KASSERT(map == &curproc->p_vmspace->vm_map,
+		("caprev does not support foreign maps (yet)"));
+	KASSERT(map->vm_caprev_shva == cheri_getaddress(caprev_shadow_cap),
+		("caprev shadow does not match capability"));
+	KASSERT(map->vm_caprev_shva == VM_CAPREVOKE_BM_BASE,
+		("caprev shadow does not match definition"));
+
+	if (map->vm_caprev_sh == NULL)
+		return KERN_INVALID_ARGUMENT;
+
+	crc->map = map;
+	crc->stats = stats;
+
+	/*
+	 * XXX Right now, we know that there are no coarse-grain bits
+	 * getting set, since we don't do MPROT_QUARANTINE or anything of
+	 * that sort.  So we just always assert VM_CAPREVOKE_NO_COARSE.
+	 * In the future, we should count the number of pages held in
+	 * MPROT_QUARANTINE or munmap()'s quarantine or other such to decide
+	 * whether to set this!
+	 */
+	crc->flags = VM_CAPREVOKE_CF_NO_COARSE;
+
+	/*
+	 * For foreign maps, we should take advantage of map->vm_caprev_sh
+	 * and construct a mapping in the local address space to manipulate
+	 * the remote one!
+	 */
+	crc->crshadow = caprev_shadow_cap;
+
+	return KERN_SUCCESS;
+}
+
+void
+vm_caprevoke_cookie_rele(struct vm_caprevoke_cookie *crc)
+{
+	(void)crc;
+	return;
 }

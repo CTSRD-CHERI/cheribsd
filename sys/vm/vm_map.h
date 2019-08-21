@@ -442,6 +442,22 @@ void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
 
 #ifdef CPU_CHERI
 int vm_map_install_caprevoke_shadow (vm_map_t);
+
+/*
+ * These are map-wide status flags, not to be confused with
+ * capability-revocation state-machine flags, which evolve within the
+ * lifetime of one cookie.
+ */
+enum {
+  VM_CAPREVOKE_CF_NO_COARSE = 0x01,
+};
+struct vm_caprevoke_cookie;
+struct caprevoke_stats;
+
+int vm_caprevoke_cookie_init(vm_map_t, struct caprevoke_stats *,
+				struct vm_caprevoke_cookie *);
+void vm_caprevoke_cookie_rele(struct vm_caprevoke_cookie *);
+
 #endif
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */

@@ -2728,7 +2728,7 @@ filt_lio(struct knote *kn, long hint)
 #ifdef COMPAT_CHERIABI
 
 void
-aio_caprevoke(struct proc * p, struct caprevoke_stats *stat)
+aio_caprevoke(struct proc *p, struct vm_caprevoke_cookie *crc)
 {
 	struct kaioinfo *ki;
 	struct kaiocb *job, *jobn;
@@ -2755,7 +2755,7 @@ restart:
 		 * aio_sigevent.sigev_value.sival_ptr) we assume will be
 		 * scrubbed by userland.
 		 */
-		if (vm_test_caprevoke(uc)) {
+		if (vm_test_caprevoke(crc, uc)) {
 			job->uaiocb.aio_sigevent.sigev_value.sival_ptr_c =
 				cheri_revoke(uc);
 		}
@@ -2766,10 +2766,12 @@ restart:
 		 * buffer itself is in the region being revoked or
 		 * the mysterious "kernelinfo" capability.
 		 */
-		if (   vm_test_caprevoke(job->ujob)
-		    || vm_test_caprevoke(__DEQUALIFY_CAP(void * __capability,
+		if (   vm_test_caprevoke(crc, job->ujob)
+		    || vm_test_caprevoke(crc,
+					 __DEQUALIFY_CAP(void * __capability,
 					 job->uaiocb.aio_buf))
-		    || vm_test_caprevoke(job->uaiocb._aiocb_private.kernelinfo)
+		    || vm_test_caprevoke(crc,
+					 job->uaiocb._aiocb_private.kernelinfo)
 		   ) {
 			aio_cancel_job(p, ki, job);
 			ki->kaio_flags |= KAIO_WAKEUP;

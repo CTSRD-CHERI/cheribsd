@@ -47,7 +47,7 @@ __FBSDID("$FreeBSD$");
  * hold some locks for uncomfortably long.
  */
 static void
-caprevoke_hoarders(struct proc *p, struct caprevoke_stats *stat)
+caprevoke_hoarders(struct proc *p, struct vm_caprevoke_cookie *crc)
 {
 	/* kqueue */
 	{
@@ -64,17 +64,17 @@ caprevoke_hoarders(struct proc *p, struct caprevoke_stats *stat)
 				 * born or that it's dying, and in either
 				 * case, that should be fine.
 				 */
-				kqueue_caprevoke(fp, stat);
+				kqueue_caprevoke(fp, crc);
 			}
 		}
 		FILEDESC_SUNLOCK(fdp);
 	}
 
 	/* aio */
-	aio_caprevoke(p, stat);
+	aio_caprevoke(p, crc);
 
 	/* timers */
-	ktimer_caprevoke(p, stat);
+	ktimer_caprevoke(p, crc);
 }
 
 static int
@@ -87,12 +87,21 @@ cheriabi_caprevoke_fini(struct thread *td, struct cheriabi_caprevoke_args *uap,
 	return res2;
 }
 
-static int
-cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
+/*
+ * XXX Constructed for us by the MD layer
+ *
+ * We ought to do the construction ourselves, but we can't use
+ * cheri_capability_build_user_data because the shadow space isn't
+ * sufficiently padded.  We can fix that and go from there, but this is a
+ * convenient workaround since we already had it.
+ */
+void * __capability caprev_shadow_cap = (void * __capability)(intcap_t) -1;
+
+static void
+cheriabi_caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
+			struct cheriabi_caprevoke_args *uap)
 {
 	struct caprevoke_stats st = { 0 };
-	struct vmspace *vm = vmspace_acquire_ref(td->td_proc);
-	vm_map_t vmm = &vm->vm_map;
 
 	/*
 	 * Unlocked access is fine; this is advisory and, when it is
@@ -106,29 +115,22 @@ cheriabi_caprevoke_just(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	 * implied a suitable one on syscall entry, which seems
 	 * unlikely.
 	 */
-	st.epoch_init = vmm->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
+	st.epoch_init = vmcrc->map->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
 	if (uap->flags & CAPREVOKE_JUST_MY_REGS) {
-		caprevoke_td_frame(td, &st);
+		caprevoke_td_frame(td, vmcrc);
 	}
 	if (uap->flags & CAPREVOKE_JUST_MY_STACK) {
-#if defined(CPU_CHERI)
-		vm_caprevoke_one(vmm, 0,
+		vm_caprevoke_one(vmcrc, 0,
 			(vm_offset_t)(__cheri_fromcap void *)
-			(td->td_frame->csp), &st);
-#else
-		vm_caprevoke_one(vmm, 0, td->td_frame.sp, &st);
-#endif
+				(td->td_frame->csp));
 	}
 	if (uap->flags & CAPREVOKE_JUST_HOARDERS) {
-		caprevoke_hoarders(td->td_proc, &st);
+		caprevoke_hoarders(td->td_proc, vmcrc);
 	}
 
 	/* XXX unlocked read OK? */
-	st.epoch_fini = vmm->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
-
-	vmspace_free(vm);
-	return cheriabi_caprevoke_fini(td, uap, 0, &st);
+	st.epoch_fini = vmcrc->map->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 }
 
 #define SET_ST(vp, e, st) \
@@ -143,14 +145,24 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	struct caprevoke_stats stat = { 0 };
 	struct vmspace *vm;
 	vm_map_t vmm;
+	struct vm_caprevoke_cookie vmcrc;
 
+	vm = vmspace_acquire_ref(td->td_proc);
+	res = vm_caprevoke_cookie_init(&vm->vm_map, &stat, &vmcrc);
+	if (res != KERN_SUCCESS) {
+		vmspace_free(vm);
+		return cheriabi_caprevoke_fini(td, uap, vm_mmap_to_errno(res),
+					       &stat);
+	}
 	if ((uap->flags & CAPREVOKE_JUST_MASK) != 0) {
-		return cheriabi_caprevoke_just(td, uap);
+		cheriabi_caprevoke_just(td, &vmcrc, uap);
+		vm_caprevoke_cookie_rele(&vmcrc);
+		vmspace_free(vm);
+		return cheriabi_caprevoke_fini(td, uap, 0, &stat);
 	}
 	/* Engaging the full state machine; here we go! */
 
-	vm = vmspace_acquire_ref(td->td_proc);
-	vmm = &vm->vm_map;
+	vmm = vmcrc.map;
 
 	/*
 	 * We need some value that's more or less "now", but we don't have
@@ -244,6 +256,7 @@ reentry:
 			 */
 fast_out:
 			vm_map_unlock(vmm);
+			vm_caprevoke_cookie_rele(&vmcrc);
 			cv_signal(&vmm->vm_caprev_cv);
 			vmspace_free(vm);
 			stat.epoch_fini = epoch;
@@ -329,12 +342,10 @@ fast_out:
 
 	/* Walk the VM unless told not to */
 	if ((uap->flags & CAPREVOKE_LAST_NO_EARLY) == 0) {
-		res = vm_caprevoke(vmm,
+		res = vm_caprevoke(&vmcrc,
 			/* If not first pass, only recently capdirty pages */
 		   ((entryst == CAPREVST_INIT_DONE)
-			? VM_CAPREVOKE_INCREMENTAL : 0),
-		 &stat
-		);
+			? VM_CAPREVOKE_INCREMENTAL : 0));
 
 		if (res == KERN_SUCCESS) {
 			/*
@@ -375,6 +386,7 @@ fast_out:
 
 				/* XXX Don't signal other would-be revokers? */
 
+				vm_caprevoke_cookie_rele(&vmcrc);
 				vmspace_free(vm);
 
 				/* XXX Don't copy out the stat structure? */
@@ -385,12 +397,12 @@ fast_out:
 
 		/* Register file */
 		FOREACH_THREAD_IN_PROC(td->td_proc, ptd) {
-			caprevoke_td_frame(ptd, &stat);
+			caprevoke_td_frame(ptd, &vmcrc);
 		}
 		PROC_UNLOCK(td->td_proc);
 
 		/* Kernel hoarders */
-		caprevoke_hoarders(td->td_proc, &stat);
+		caprevoke_hoarders(td->td_proc, &vmcrc);
 
 		/*
 		 * The world is stopped; do another pass through the VM.
@@ -400,13 +412,12 @@ fast_out:
 		 * we'll have entryst == CAPREVST_INIT_DONE; there's no need
 		 * to look at CAPREVOKE_NO_EARLY_PASS.
 		 */
-		res = vm_caprevoke(vmm,
+		res = vm_caprevoke(&vmcrc,
 			((entryst == CAPREVST_INIT_DONE)
 				? VM_CAPREVOKE_INCREMENTAL : 0)
 			| VM_CAPREVOKE_LAST_INIT
 			| (((uap->flags & CAPREVOKE_LAST_NO_LATE) != 0)
-				? VM_CAPREVOKE_LAST_FINI : 0),
-			&stat);
+				? VM_CAPREVOKE_LAST_FINI : 0));
 
 		PROC_LOCK(td->td_proc);
 		if ((td->td_proc->p_flag & P_HADTHREADS) != 0) {
@@ -423,6 +434,7 @@ fast_out:
 
 			cv_signal(&vmm->vm_caprev_cv);
 
+			vm_caprevoke_cookie_rele(&vmcrc);
 			vmspace_free(vm);
 
 			stat.epoch_fini = epoch;
@@ -442,10 +454,9 @@ fast_out:
 			 * as we must have done a pass before here, this is
 			 * certain to be an incremental pass.
 			 */
-			res = vm_caprevoke(vmm,
+			res = vm_caprevoke(&vmcrc,
 				VM_CAPREVOKE_INCREMENTAL
-				| VM_CAPREVOKE_LAST_FINI,
-				&stat);
+				| VM_CAPREVOKE_LAST_FINI);
 		}
 	}
 
@@ -472,6 +483,7 @@ skip_last_pass:
 	/* Broadcast here: some sleepers may be able to take the fast out */
 	cv_broadcast(&vmm->vm_caprev_cv);
 
+	vm_caprevoke_cookie_rele(&vmcrc);
 	vmspace_free(vm);
 
 	/*

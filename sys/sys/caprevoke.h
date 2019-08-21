@@ -261,9 +261,6 @@ struct caprevoke_stats {
 
 #ifdef _KERNEL
 
-	/* XXX This probably belongs elsewhere */
-void caprevoke_td_frame(struct thread *td, struct caprevoke_stats *);
-
 void * __capability cheri_revoke_sealed(void * __capability);
 
 /*

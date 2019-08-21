@@ -715,13 +715,15 @@ ptrace_clear_single_step(struct thread *td)
 }
 
 void
-caprevoke_td_frame(struct thread *td, struct caprevoke_stats *stat)
+caprevoke_td_frame(struct thread *td, struct vm_caprevoke_cookie *crc)
 {
+	struct caprevoke_stats *stat = crc->stats;
+
 #ifdef CPU_CHERI
 #define CAPREV_REG(r) \
 	do { if (cheri_gettag(r)) { \
 		stat->caps_found++; \
-		if (vm_test_caprevoke(r)) { \
+		if (vm_test_caprevoke(crc, r)) { \
 			r = cheri_revoke(r); \
 			stat->caps_cleared++; \
 		} \
