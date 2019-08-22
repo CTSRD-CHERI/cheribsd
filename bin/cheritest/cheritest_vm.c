@@ -717,7 +717,6 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	struct caprevoke_stats crst;
 	int kq;
 	uint32_t cyc_start, cyc_end;
-	uint64_t oepoch;
 
 	kq = CHERITEST_CHECK_SYSCALL(kqueue());
 	mb = CHERITEST_CHECK_SYSCALL(mmap(0, PAGE_SIZE, PROT_READ | PROT_WRITE,
@@ -748,15 +747,9 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	/* OK, full pass */
 	install_kqueue_cap(kq, revme);
 
-	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_JUST_THE_TIME, 0, &crst));
-	oepoch = crst.epoch_fini;
-
 	cyc_start = cheri_get_cyclecount();
-	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS, oepoch, &crst));
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_IGNORE_START, 0, &crst));
 	cyc_end = cheri_get_cyclecount();
-
-	CHERITEST_VERIFY2(crst.epoch_fini >= oepoch + 2, "Bad epoch clock state");
-	oepoch = crst.epoch_fini;
 
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
@@ -778,14 +771,14 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	install_kqueue_cap(kq, revme);
 
 	cyc_start = cheri_get_cyclecount();
-	CHERITEST_CHECK_SYSCALL(caprevoke(0, oepoch, &crst));
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_IGNORE_START, 0, &crst));
 	cyc_end = cheri_get_cyclecount();
 
-	CHERITEST_VERIFY2(crst.epoch_fini >= oepoch + 1, "Bad epoch clock state");
+	CHERITEST_VERIFY2(crst.epoch_fini >= crst.epoch_init + 1, "Bad epoch clock state");
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
 	cyc_start = cheri_get_cyclecount();
-	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS, oepoch, &crst));
+	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS, crst.epoch_init, &crst));
 	cyc_end = cheri_get_cyclecount();
 
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
@@ -996,12 +989,10 @@ test_caprevoke_lib_run(
 					VM_CAPREVOKE_BM_MEM_NOMAP + lwo)));
 		}
 
-		CHERITEST_CHECK_SYSCALL(
-			caprevoke(CAPREVOKE_JUST_THE_TIME, 0, &crst));
-
 		cyc_start = cheri_get_cyclecount();
 		CHERITEST_CHECK_SYSCALL(
-			caprevoke(CAPREVOKE_LAST_PASS, crst.epoch_fini, &crst));
+			caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_IGNORE_START,
+					0, &crst));
 		cyc_end = cheri_get_cyclecount();
 		if (verbose > 2) {
 			fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);

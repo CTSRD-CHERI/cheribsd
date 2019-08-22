@@ -335,8 +335,7 @@ fast_out:
 			 * else goes wrong.
 			 *
 			 * Note that this is a purely local change even so;
-			 * JUST_THE_TIME will not report it and threads
-			 * interlocking against us will not see it either,
+			 * threads interlocking against us will not see it
 			 * until we next publish the state below.
 			 */
 			if (entryst == CAPREVST_NONE) {

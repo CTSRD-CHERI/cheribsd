@@ -186,25 +186,8 @@ static inline int caprevoke_epoch_clears(caprevoke_epoch now,
 	 * expermental feature to see if this kind of mitigation, while
 	 * unsound, is still a useful thing to do.
 	 *
-	 * CAPREVOKE_JUST_THE_TIME deserves some discussion.  It's fine to
-	 * use it to pull things *out* of quarantine, because that's a
-	 * retrospective question ("Is it certain that enough time has
-	 * elapsed?").  It's not OK to use CAPREVOKE_JUST_THE_TIME when
-	 * putting things *into* quarantine, as that's a forward-looking
-	 * question and so requires some degree of synchronization: a
-	 * too-early answer will suggest that things have been revoked when
-	 * they have not.  If absolutely critical that no revocation take
-	 * place while labeling objects going into quarantine, use instead
-	 *
-	 *   CAPREVOKE_NO_WAIT_OK
-	 *   | CAPREVOKE_IGNORE_START
-	 *   | CAPREVOKE_LAST_NO_EARLY
-	 *
-	 * to carry out synchronization without advancing the state machine.
-	 * (As CAPREVOKE_LAST_PASS is clear, CAPREVOKE_LAST_NO_LATE is not
-	 * necessary.)
 	 */
-#define CAPREVOKE_JUST_THE_TIME	0x100	/* Nothing, just report epoch */
+/* CAPREVOKE_JUST_THE_TIME was 0x100; it is removed for being unsafe */
 #define CAPREVOKE_JUST_MY_REGS  0x200	/* Calling thread register file */
 #define CAPREVOKE_JUST_MY_STACK	0x400	/* Calling thread stack */
 #define CAPREVOKE_JUST_HOARDERS 0x800	/* Kernel hoarders */
