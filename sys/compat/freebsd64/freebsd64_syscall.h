@@ -47,7 +47,7 @@
 #define	FREEBSD64_SYS_getppid	39
 				/* 40 is obsolete olstat */
 #define	FREEBSD64_SYS_dup	41
-				/* 42 is obsolete freebsd10_pipe */
+#define	FREEBSD64_SYS_freebsd10_pipe	42
 #define	FREEBSD64_SYS_getegid	43
 #define	FREEBSD64_SYS_freebsd64_profil	44
 #define	FREEBSD64_SYS_freebsd64_ktrace	45

@@ -38,6 +38,7 @@ MIASM =  \
 	kill.o \
 	getppid.o \
 	dup.o \
+	freebsd10_pipe.o \
 	getegid.o \
 	freebsd64_profil.o \
 	freebsd64_ktrace.o \

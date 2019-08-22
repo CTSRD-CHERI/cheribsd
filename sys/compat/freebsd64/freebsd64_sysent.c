@@ -12,6 +12,12 @@
 
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))
 
+#ifdef COMPAT_FREEBSD10
+#define compat10(n, name) n, (sy_call_t *)__CONCAT(freebsd10_,name)
+#else
+#define compat10(n, name) 0, (sy_call_t *)nosys
+#endif
+
 #ifdef COMPAT_FREEBSD11
 #define compat11(n, name) n, (sy_call_t *)__CONCAT(freebsd11_,name)
 #else
@@ -62,7 +68,7 @@ struct sysent freebsd64_sysent[] = {
 	{ 0, (sy_call_t *)sys_getppid, AUE_GETPPID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 39 = getppid */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 40 = obsolete olstat */
 	{ AS(dup_args), (sy_call_t *)sys_dup, AUE_DUP, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 41 = dup */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 42 = obsolete freebsd10_pipe */
+	{ compat10(0,pipe), AUE_PIPE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 42 = freebsd10 pipe */
 	{ 0, (sy_call_t *)sys_getegid, AUE_GETEGID, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 43 = getegid */
 	{ AS(freebsd64_profil_args), (sy_call_t *)freebsd64_profil, AUE_PROFILE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 44 = freebsd64_profil */
 	{ AS(freebsd64_ktrace_args), (sy_call_t *)freebsd64_ktrace, AUE_KTRACE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 45 = freebsd64_ktrace */
