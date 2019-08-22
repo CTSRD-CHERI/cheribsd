@@ -274,7 +274,7 @@ vm_map_zinit(void *mem, int size, int flags)
 	memset(map, 0, sizeof(*map));
 	mtx_init(&map->system_mtx, "vm map (system)", NULL, MTX_DEF | MTX_DUPOK);
 	sx_init(&map->lock, "vm map (user)");
-#ifdef CPU_CHERI
+#ifdef CHERI_CAPREVOKE
 	cv_init(&map->vm_caprev_cv, "vmcaprev");
 #endif
 	return (0);
@@ -363,7 +363,7 @@ vmspace_dofree(struct vmspace *vm)
 	 */
 	shmexit(vm);
 
-#ifdef CPU_CHERI
+#ifdef CHERI_CAPREVOKE
 	/* Drop our explicit handle to the caprevoke shadow object */
 	vm->vm_map.vm_caprev_sh = NULL;
 #endif
@@ -4039,7 +4039,7 @@ vmspace_fork(struct vmspace *vm1, vm_ooffset_t *fork_charge)
 	vm2->vm_daddr = vm1->vm_daddr;
 	vm2->vm_maxsaddr = vm1->vm_maxsaddr;
 
-#ifdef CPU_CHERI
+#ifdef CHERI_CAPREVOKE
 	vm2->vm_map.vm_caprev_st   = vm1->vm_map.vm_caprev_st;
 	vm2->vm_map.vm_caprev_sh   = vm1->vm_map.vm_caprev_sh;
 	vm2->vm_map.vm_caprev_shva = vm1->vm_map.vm_caprev_shva;

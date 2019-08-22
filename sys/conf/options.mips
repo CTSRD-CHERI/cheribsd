@@ -144,6 +144,11 @@ CPU_CHERI128			opt_global.h
 CPU_CHERI_NO_SYSCALL_AUTHORIZE opt_global.h
 
 #
+# Capability revocation
+#
+CHERI_CAPREVOKE			opt_global.h
+
+#
 # Options that control the NetFPGA-10G Embedded CPU Ethernet Core.
 #
 NF10BMAC_64BIT			opt_netfpga.h

@@ -10,6 +10,15 @@ __FBSDID("$FreeBSD$");
 #include <sys/signal.h>
 #include <sys/user.h>
 
+#include <compat/cheriabi/cheriabi.h>
+#include <compat/cheriabi/cheriabi_util.h>
+#include <compat/cheriabi/cheriabi_proto.h>
+#include <compat/cheriabi/cheriabi_syscall.h>
+
+#include <sys/caprevoke.h>
+
+#ifdef CHERI_CAPREVOKE
+
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
@@ -22,16 +31,9 @@ __FBSDID("$FreeBSD$");
 
 #include <cheri/cheric.h>
 
-#include <compat/cheriabi/cheriabi.h>
-#include <compat/cheriabi/cheriabi_util.h>
-#include <compat/cheriabi/cheriabi_proto.h>
-#include <compat/cheriabi/cheriabi_syscall.h>
-
-#include <sys/aio.h>
 #include <sys/file.h>
 #include <sys/filedesc.h>
-#include <sys/timers.h>
-#include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
 
 /*
  * When revoking capabilities, we have to visit several kernel hoarders.
@@ -86,16 +88,6 @@ cheriabi_caprevoke_fini(struct thread *td, struct cheriabi_caprevoke_args *uap,
 		return res;
 	return res2;
 }
-
-/*
- * XXX Constructed for us by the MD layer
- *
- * We ought to do the construction ourselves, but we can't use
- * cheri_capability_build_user_data because the shadow space isn't
- * sufficiently padded.  We can fix that and go from there, but this is a
- * convenient workaround since we already had it.
- */
-void * __capability caprev_shadow_cap = (void * __capability)(intcap_t) -1;
 
 static void
 cheriabi_caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
@@ -574,3 +566,28 @@ cheriabi_caprevoke_shadow(struct thread *td,
 
 	return error;
 }
+
+#else /* CHERI_CAPREVOKE */
+
+int
+cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
+{
+	struct caprevoke_stats stat = { 0 };
+
+	copyout(&stat, uap->statout, sizeof (stat));
+
+	return ENOSYS;
+}
+
+int
+cheriabi_caprevoke_shadow(struct thread *td,
+			    struct cheriabi_caprevoke_shadow_args *uap)
+{
+	void * __capability cres = NULL;
+
+	copyoutcap(&cres, uap->shadow, sizeof(cres));
+
+	return ENOSYS;
+}
+
+#endif /* CHERI_CAPREVOKE */

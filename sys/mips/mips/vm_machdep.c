@@ -74,7 +74,6 @@ __FBSDID("$FreeBSD$");
 #ifdef CPU_CHERI
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
-#include <sys/caprevoke.h>
 #endif
 
 #include <vm/vm.h>
@@ -92,6 +91,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/stdatomic.h>
 #include <sys/user.h>
 #include <sys/mbuf.h>
+
+#ifdef CHERI_CAPREVOKE
+#include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
+#endif
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -609,10 +613,7 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 	return (0);
 }
 
-#ifdef CPU_CHERI
-
-/* Constructed in sys/mips/mips/locore.S */
-extern uint8_t * __capability caprev_shadow_cap;
+#ifdef CHERI_CAPREVOKE
 
 static inline int
 vm_test_caprevoke_mem(struct vm_caprevoke_cookie *crc, const void * __capability cut)
@@ -966,7 +967,7 @@ out:
 	return error;
 }
 
-#endif
+#endif /* CHERI_CAPREVOKE */
 
 #ifdef DDB
 #include <ddb/ddb.h>

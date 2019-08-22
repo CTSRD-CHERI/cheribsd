@@ -11,4 +11,6 @@ options 	COMPAT_CHERIABI
 options 	COMPAT_FREEBSD64
 #options 	CHERI_IMPLICIT_USER_DDC
 
+options	CHERI_CAPREVOKE
+
 options 	TMPFS

@@ -82,8 +82,12 @@ __FBSDID("$FreeBSD$");
 #include <vm/uma.h>
 #include <vm/vm_extern.h>
 
+
+#ifdef CHERI_CAPREVOKE
 #include <cheri/cheric.h>
 #include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
+#endif
 
 MALLOC_DEFINE(M_KQUEUE, "kqueue", "memory for kqueue system");
 
@@ -2793,7 +2797,7 @@ noacquire:
 	return (error);
 }
 
-#if __has_feature(capabilities)
+#ifdef CHERI_CAPREVOKE
 
 int
 kqueue_caprevoke(struct file *fp, struct vm_caprevoke_cookie *crc)

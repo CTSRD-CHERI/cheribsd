@@ -259,30 +259,6 @@ struct caprevoke_stats {
  */
 #define CAPREVOKE_SHADOW_SPACE_MASK	0x03	/* Flag bits for shadow index */
 
-#ifdef _KERNEL
-
-void * __capability cheri_revoke_sealed(void * __capability);
-
-/*
- * The revoked image of a capability is a *tagged* quantity with zero
- * permissions.
- *
- * If the input is sealed, the revoked image is, at present, the unsealed,
- * zero-permission variant, so that software that uses sealing types for
- * tokens will notice the type mismatch and architectural usage will fail.
- * This is almost certainly a sufficiently subtle point that this is not
- * entirely the right answer, though I hope it's not entirely wrong, either.
- */
-static __always_inline inline void * __capability
-cheri_revoke(void * __capability c)
-{
-	if (__builtin_expect(cheri_gettype(c) == -1, 1)) {
-		return cheri_andperm(c, 0);
-	}
-	return cheri_revoke_sealed(c);
-}
-#endif
-
 #ifndef _KERNEL
 
 	/*

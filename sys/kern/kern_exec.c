@@ -84,6 +84,11 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
 
+#ifdef CHERI_CAPREVOKE
+#include <cheri/cheric.h>
+#include <vm/vm_caprevoke.h>
+#endif
+
 #ifdef	HWPMC_HOOKS
 #include <sys/pmckern.h>
 #endif
@@ -1158,7 +1163,7 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
 
-#ifdef CPU_CHERI
+#ifdef CHERI_CAPREVOKE
 	/*
 	 * For CheriABI, create an anonymous, CoW mapping for the revocation
 	 * bitmaps.

@@ -74,10 +74,11 @@ __FBSDID("$FreeBSD$");
 #include <fs/pseudofs/pseudofs.h>
 #include <fs/procfs/procfs.h>
 
-#ifdef CPU_CHERI
+#ifdef CHERI_CAPREVOKE
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 #include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
 #endif
 
 #include <ddb/ddb.h>
@@ -714,12 +715,13 @@ ptrace_clear_single_step(struct thread *td)
 	return 0;
 }
 
+#ifdef CHERI_CAPREVOKE
+
 void
 caprevoke_td_frame(struct thread *td, struct vm_caprevoke_cookie *crc)
 {
 	struct caprevoke_stats *stat = crc->stats;
 
-#ifdef CPU_CHERI
 #define CAPREV_REG(r) \
 	do { if (cheri_gettag(r)) { \
 		stat->caps_found++; \
@@ -759,10 +761,11 @@ caprevoke_td_frame(struct thread *td, struct vm_caprevoke_cookie *crc)
 	CAPREV_REG(td->td_frame->pcc); /* This could be real exciting! */
 
 #undef CAPREV_REG
-#endif
 
 	return;
 }
+
+#endif
 
 // CHERI CHANGES START
 // {

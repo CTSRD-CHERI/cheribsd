@@ -10,9 +10,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/rwlock.h>
 #include <sys/cheriabi.h>
 
-#include <cheri/cheric.h>
-#include <sys/caprevoke.h>
-
 #include <vm/vm.h>
 #include <vm/vm_param.h>
 #include <vm/pmap.h>
@@ -20,6 +17,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
 #include <vm/vm_page.h>
+
+#include <cheri/cheric.h>
+#include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
 
 // XXX This is very much a work in progress!
 
@@ -576,7 +577,15 @@ out:
 	return res;
 }
 
-extern void * __capability caprev_shadow_cap; // XXX	
+/*
+ * XXX Constructed for us by the MD layer
+ *
+ * We ought to do the construction ourselves, but we can't use
+ * cheri_capability_build_user_data because the shadow space isn't
+ * sufficiently padded.  We can fix that and go from there, but this is a
+ * convenient workaround since we already had it.
+ */
+void * __capability caprev_shadow_cap = (void * __capability)(intcap_t) -1;
 
 int
 vm_caprevoke_cookie_init(vm_map_t map,

@@ -131,34 +131,6 @@ u_int vm_inactive_count(void);
 u_int vm_laundry_count(void);
 u_int vm_wait_count(void);
 
-#ifdef CPU_CHERI
-struct caprevoke_stats;
-struct vm_caprevoke_cookie {
-	vm_map_t map;				/* The map itself */
-	const uint8_t * __capability crshadow;	/* Access to the shadow space */
-	struct caprevoke_stats *stats;		/* Statistics */
-	int flags;				/* VM_CAPREVOKE_CF_* */
-};
-
-int vm_test_caprevoke(struct vm_caprevoke_cookie *, const void * __capability);
-
-  /* MD; XXX prototype elsewhere? */
-void caprevoke_td_frame(struct thread *td, struct vm_caprevoke_cookie *);
-
-enum {
-	/* Set externally */
-	VM_CAPREVOKE_INCREMENTAL=0x01,
-	VM_CAPREVOKE_LAST_INIT=0x02,
-	VM_CAPREVOKE_LAST_FINI=0x04,
-
-	/* Set internally */
-	VM_CAPREVOKE_QUICK_SUCCESSOR=0x10,
-};
-
-int vm_caprevoke(struct vm_caprevoke_cookie *, int);
-int vm_caprevoke_one(struct vm_caprevoke_cookie *, int, vm_offset_t);
-#endif
-
 #endif				/* _KERNEL */
 #endif				/* !_VM_EXTERN_H_ */
 // CHERI CHANGES START

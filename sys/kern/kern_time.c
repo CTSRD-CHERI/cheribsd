@@ -67,8 +67,11 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm.h>
 #include <vm/vm_extern.h>
 
+#ifdef CHERI_CAPREVOKE
 #include <cheri/cheric.h>
 #include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
+#endif
 
 #define MAX_CLOCKS 	(CLOCK_MONOTONIC+1)
 #define CPUCLOCK_BIT		0x80000000
@@ -1423,6 +1426,8 @@ kern_ktimer_delete(struct thread *td, int timerid)
 	return (0);
 }
 
+#ifdef CHERI_CAPREVOKE
+
 void
 ktimer_caprevoke(struct proc *p, struct vm_caprevoke_cookie *crc)
 {
@@ -1450,6 +1455,8 @@ ktimer_caprevoke(struct proc *p, struct vm_caprevoke_cookie *crc)
 	}
 	PROC_UNLOCK(p);
 }
+
+#endif
 
 #ifndef _SYS_SYSPROTO_H_
 struct ktimer_settime_args {

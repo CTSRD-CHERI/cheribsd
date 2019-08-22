@@ -199,6 +199,7 @@ VECTOR(_locore, unknown)
 	PTR_LA	t0, _C_LABEL(user_sealcap)
 	csc	CHERI_REG_C27, t0, 0($ddc)
 
+#ifdef CHERI_CAPREVOKE
 	/*
 	 * And one more, this time for access to the caprev shadow space
 	 */
@@ -211,6 +212,7 @@ VECTOR(_locore, unknown)
 	candperm	CHERI_REG_C27, CHERI_REG_C27, t0
 	PTR_LA	t0, _C_LABEL(caprev_shadow_cap)
 	csc	CHERI_REG_C27, t0, 0($ddc)
+#endif
 
 	/*
 	 * Store the omnipotent capability to allow swap to be restored.

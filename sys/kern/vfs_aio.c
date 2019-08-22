@@ -80,7 +80,11 @@ __FBSDID("$FreeBSD$");
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi_util.h>
 #endif
+
+#ifdef CHERI_CAPREVOKE
 #include <sys/caprevoke.h>
+#include <vm/vm_caprevoke.h>
+#endif
 
 /*
  * Counter for allocating reference ids to new jobs.  Wrapped to 1 on
@@ -2725,7 +2729,7 @@ filt_lio(struct knote *kn, long hint)
 	return (lj->lioj_flags & LIOJ_KEVENT_POSTED);
 }
 
-#ifdef COMPAT_CHERIABI
+#ifdef CHERI_CAPREVOKE
 
 void
 aio_caprevoke(struct proc *p, struct vm_caprevoke_cookie *crc)

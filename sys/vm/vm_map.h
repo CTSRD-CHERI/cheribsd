@@ -198,7 +198,7 @@ struct vm_map {
 	struct vm_map_entry header;	/* List of entries */
 	struct sx lock;			/* Lock for map data */
 	struct mtx system_mtx;
-#ifdef CPU_CHERI
+#ifdef CHERI_CAPREVOKE
 	struct cv vm_caprev_cv;         /* (c) Cap. rev. is single file */
 	uint64_t vm_caprev_st;          /* Capability revocation state */
 	vm_object_t vm_caprev_sh;       /* My caprevoke shadow object */
@@ -440,25 +440,6 @@ int vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end,
 long vmspace_swap_count(struct vmspace *vmspace);
 void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
 
-#ifdef CPU_CHERI
-int vm_map_install_caprevoke_shadow (vm_map_t);
-
-/*
- * These are map-wide status flags, not to be confused with
- * capability-revocation state-machine flags, which evolve within the
- * lifetime of one cookie.
- */
-enum {
-  VM_CAPREVOKE_CF_NO_COARSE = 0x01,
-};
-struct vm_caprevoke_cookie;
-struct caprevoke_stats;
-
-int vm_caprevoke_cookie_init(vm_map_t, struct caprevoke_stats *,
-				struct vm_caprevoke_cookie *);
-void vm_caprevoke_cookie_rele(struct vm_caprevoke_cookie *);
-
-#endif
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START
