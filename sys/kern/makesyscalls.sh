@@ -988,7 +988,8 @@ sed -e '
 			next
 		}
 
-		if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF")) {
+		if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF") && \
+		    !(abi_flags != "" && ptrargs == 0)) {
 			if (argc != 0) {
 				printf("struct %s {\n", argalias) > out
 				for (i = 1; i <= argc; i++)
@@ -1002,7 +1003,8 @@ sed -e '
 				printf("struct %s {\n\tregister_t dummy;\n};\n",
 				    argalias) > sysarg
 		}
-		if (!flag("NOPROTO") && !flag("NODEF")) {
+		if (!flag("NOPROTO") && !flag("NODEF") && \
+		    !(abi_flags != "" && ptrargs == 0)) {
 			printf("%s\t%s%s(struct thread *, struct %s *);\n",
 			    rettype, prefix, funcname, argalias) > outdcl
 			printf("#define\t%sAUE_%s%s\t%s\n", syscallprefix,
