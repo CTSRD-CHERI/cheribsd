@@ -14,6 +14,7 @@ MIASM =  \
 	freebsd64_unlink.o \
 	freebsd64_chdir.o \
 	fchdir.o \
+	freebsd11_freebsd64_mknod.o \
 	freebsd64_chmod.o \
 	freebsd64_chown.o \
 	freebsd64_break.o \
@@ -57,6 +58,7 @@ MIASM =  \
 	vfork.o \
 	sbrk.o \
 	sstk.o \
+	freebsd11_vadvise.o \
 	freebsd64_munmap.o \
 	freebsd64_mprotect.o \
 	freebsd64_madvise.o \
@@ -116,10 +118,14 @@ MIASM =  \
 	setgid.o \
 	setegid.o \
 	seteuid.o \
+	freebsd11_freebsd64_stat.o \
+	freebsd11_freebsd64_fstat.o \
+	freebsd11_freebsd64_lstat.o \
 	freebsd64_pathconf.o \
 	fpathconf.o \
 	getrlimit.o \
 	setrlimit.o \
+	freebsd11_freebsd64_getdirentries.o \
 	__syscall.o \
 	freebsd64___sysctl.o \
 	freebsd64_mlock.o \
@@ -159,11 +165,16 @@ MIASM =  \
 	freebsd64_aio_write.o \
 	freebsd64_lio_listio.o \
 	freebsd64_kbounce.o \
+	freebsd11_freebsd64_getdents.o \
 	freebsd64_lchmod.o \
 	freebsd64_lutimes.o \
+	freebsd11_freebsd64_nstat.o \
+	freebsd11_freebsd64_nfstat.o \
+	freebsd11_freebsd64_nlstat.o \
 	freebsd64_preadv.o \
 	freebsd64_pwritev.o \
 	freebsd64_fhopen.o \
+	freebsd11_freebsd64_fhstat.o \
 	modnext.o \
 	freebsd64_modstat.o \
 	modfnext.o \
@@ -218,6 +229,7 @@ MIASM =  \
 	freebsd64_getresuid.o \
 	freebsd64_getresgid.o \
 	kqueue.o \
+	freebsd11_freebsd64_kevent.o \
 	freebsd64_extattr_set_fd.o \
 	freebsd64_extattr_get_fd.o \
 	freebsd64_extattr_delete_fd.o \
@@ -236,6 +248,10 @@ MIASM =  \
 	freebsd64_uuidgen.o \
 	freebsd64_sendfile.o \
 	freebsd64_mac_syscall.o \
+	freebsd11_freebsd64_getfsstat.o \
+	freebsd11_freebsd64_statfs.o \
+	freebsd11_freebsd64_fstatfs.o \
+	freebsd11_freebsd64_fhstatfs.o \
 	ksem_close.o \
 	ksem_post.o \
 	ksem_wait.o \
@@ -319,10 +335,12 @@ MIASM =  \
 	freebsd64_fchmodat.o \
 	freebsd64_fchownat.o \
 	freebsd64_fexecve.o \
+	freebsd11_freebsd64_fstatat.o \
 	freebsd64_futimesat.o \
 	freebsd64_linkat.o \
 	freebsd64_mkdirat.o \
 	freebsd64_mkfifoat.o \
+	freebsd11_freebsd64_mknodat.o \
 	freebsd64_openat.o \
 	freebsd64_readlinkat.o \
 	freebsd64_renameat.o \

@@ -290,6 +290,98 @@ freebsd64_kevent(struct thread *td, struct freebsd64_kevent_args *uap)
 	return (error);
 }
 
+#ifdef COMPAT_FREEBSD11
+struct kevent_freebsd1164 {
+	__uintptr_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	unsigned short	flags;
+	unsigned int	fflags;
+	__intptr_t	data;
+	void		*udata;		/* opaque user data identifier */
+};
+
+static int
+kevent11_freebsd64_copyout(void *arg, kkevent_t *kevp, int count)
+{
+	struct freebsd11_freebsd64_kevent_args *uap;
+	struct kevent_freebsd1164 kev11;
+	int error, i;
+
+	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
+	uap = (struct freebsd11_freebsd64_kevent_args *)arg;
+
+	for (i = 0; i < count; i++) {
+		kev11.ident = kevp->ident;
+		kev11.filter = kevp->filter;
+		kev11.flags = kevp->flags;
+		kev11.fflags = kevp->fflags;
+		kev11.data = kevp->data;
+		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
+		error = copyout_c(&kev11, __USER_CAP_OBJ(uap->eventlist),
+		    sizeof(kev11));
+		if (error != 0)
+			break;
+		uap->eventlist++;
+		kevp++;
+	}
+	return (error);
+}
+
+/*
+ * Copy 'count' items from the list pointed to by uap->changelist.
+ */
+static int
+kevent11_freebsd64_copyin(void *arg, kkevent_t *kevp, int count)
+{
+	struct freebsd11_freebsd64_kevent_args *uap;
+	struct kevent_freebsd1164 kev11;
+	int error, i;
+
+	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
+	uap = (struct freebsd11_freebsd64_kevent_args *)arg;
+
+	for (i = 0; i < count; i++) {
+		error = copyin_c(__USER_CAP_OBJ(uap->changelist), &kev11,
+		    sizeof(kev11));
+		if (error != 0)
+			break;
+		kevp->ident = kev11.ident;
+		kevp->filter = kev11.filter;
+		kevp->flags = kev11.flags;
+		kevp->fflags = kev11.fflags;
+		kevp->data = (uintptr_t)kev11.data;
+		kevp->udata = (void * __capability)(uintcap_t)kev11.udata;
+		bzero(&kevp->ext, sizeof(kevp->ext));
+		uap->changelist++;
+		kevp++;
+	}
+	return (error);
+}
+
+int
+freebsd11_freebsd64_kevent(struct thread *td,
+    struct freebsd11_freebsd64_kevent_args *uap)
+{
+	struct kevent_copyops k_ops = {
+		.arg = uap,
+		.k_copyout = kevent11_freebsd64_copyout,
+		.k_copyin = kevent11_freebsd64_copyin,
+		.kevent_size = sizeof(struct kevent_freebsd1164),
+	};
+	struct g_kevent_args gk_args = {
+		.fd = uap->fd,
+		.changelist = __USER_CAP_UNBOUND(uap->changelist),
+		.nchanges = uap->nchanges,
+		.eventlist = __USER_CAP_UNBOUND(uap->eventlist),
+		.nevents = uap->nevents,
+		.timeout = __USER_CAP_OBJ(uap->timeout),
+	};
+
+	return (kern_kevent_generic(td, &gk_args, &k_ops,
+	    "kevent_freebsd1164"));
+}
+#endif
+
 int
 freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
     struct uio **uiop)

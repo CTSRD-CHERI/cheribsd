@@ -44,6 +44,7 @@ struct __wrusage;
 struct ffclock_estimate;
 struct file;
 struct filecaps;
+struct g_kevent_args;
 enum idtype;
 struct itimerval;
 struct image_args;
@@ -259,6 +260,8 @@ int	kern_kenv(struct thread *td, int what, const char * __capability namep,
 	    char * __capability val, int vallen);
 int	kern_kevent(struct thread *td, int fd, int nchanges, int nevents,
 	    struct kevent_copyops *k_ops, const struct timespec *timeout);
+int	kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
+	    struct kevent_copyops *k_ops, const char *struct_name);
 int	kern_kevent_anonymous(struct thread *td, int nevents,
 	    struct kevent_copyops *k_ops);
 int	kern_kevent_fp(struct thread *td, struct file *fp, int nchanges,
