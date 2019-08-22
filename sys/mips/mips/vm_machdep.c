@@ -742,9 +742,17 @@ vm_do_caprevoke(struct vm_caprevoke_cookie *crc,
 
 		if (__builtin_expect(ok,1)) {
 			crc->stats->caps_cleared++;
+			/* Don't count a revoked cap as HASCAPS */
 		} else {
-			res = VM_CAPREVOKE_PAGE_DIRTY;
+			res = VM_CAPREVOKE_PAGE_DIRTY
+				| VM_CAPREVOKE_PAGE_HASCAPS ;
 		}
+	} else {
+		/* Again, don't count a revoked cap as HASCAPS */
+		if ((cheri_getperm(cut) != 0) || (cheri_getsealed(cut) != 0)) {
+			res = VM_CAPREVOKE_PAGE_HASCAPS;
+		}
+		// XXX else crc->stats->caps_found_revoked++;
 	}
 
 	return res;
@@ -817,17 +825,6 @@ vm_caprevoke_page(struct vm_caprevoke_cookie *crc, vm_page_t m)
 
 			tags = __builtin_cheri_cap_load_tags(mvt);
 
-			/*
-			 * This is an easily-obtained overestimate: we might
-			 * be about to clear the last cap on this page.  We
-			 * won't detect that until the next revocation pass
-			 * that touches this page.  That's probably fine and
-			 * probably doesn't happen too often, and is a good
-			 * bit simpler than trying to measure afterwards
-			 */
-			if (tags != 0)
-				res |= VM_CAPREVOKE_PAGE_HASCAPS;
-
 			for(; tags != 0; (tags >>= 1), mvt += 1) {
 				if (!(tags & 1))
 					continue;
@@ -841,7 +838,6 @@ vm_caprevoke_page(struct vm_caprevoke_cookie *crc, vm_page_t m)
 			void * __capability cut = *mvu;
 			if (cheri_gettag(cut)) {
 				crc->stats->caps_found++;
-				res |= VM_CAPREVOKE_PAGE_HASCAPS;
 				res |= vm_do_caprevoke(crc, mvu);
 			}
 		}
