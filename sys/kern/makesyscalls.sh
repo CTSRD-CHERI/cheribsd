@@ -988,20 +988,20 @@ sed -e '
 			next
 		}
 
-		if (argc != 0 && !flag("NOARGS") && !flag("NOPROTO") && \
-		    !flag("NODEF")) {
-			printf("struct %s {\n", argalias) > out
-			for (i = 1; i <= argc; i++)
-				printf("\tchar %s_l_[PADL_(%s)]; %s %s; " \
-				    "char %s_r_[PADR_(%s)];\n",
-				    argname[i], argtype[i],
-				    argtype[i], argname[i],
-				    argname[i], argtype[i]) > out
-			printf("};\n") > out
+		if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF")) {
+			if (argc != 0) {
+				printf("struct %s {\n", argalias) > out
+				for (i = 1; i <= argc; i++)
+					printf("\tchar %s_l_[PADL_(%s)]; " \
+					    "%s %s; char %s_r_[PADR_(%s)];\n",
+					    argname[i], argtype[i],
+					    argtype[i], argname[i],
+					    argname[i], argtype[i]) > out
+				printf("};\n") > out
+			} else
+				printf("struct %s {\n\tregister_t dummy;\n};\n",
+				    argalias) > sysarg
 		}
-		else if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF"))
-			printf("struct %s {\n\tregister_t dummy;\n};\n",
-			    argalias) > sysarg
 		if (!flag("NOPROTO") && !flag("NODEF")) {
 			printf("%s\t%s%s(struct thread *, struct %s *);\n",
 			    rettype, prefix, funcname, argalias) > outdcl
