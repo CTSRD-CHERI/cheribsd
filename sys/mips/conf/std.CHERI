@@ -9,4 +9,8 @@ makeoptions	ARCH_FLAGS="-target mips64-unknown-freebsd -march=beri -mabi=64 -mcp
 options 	CPU_CHERI
 options 	COMPAT_FREEBSD64
 
+options	CHERI_CAPREVOKE
+options	CHERI_CAPREVOKE_CLOADTAGS
+options	CHERI_CAPREVOKE_STATS
+
 options 	TMPFS
