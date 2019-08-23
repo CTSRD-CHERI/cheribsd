@@ -67,6 +67,17 @@ freebsd64_pread(struct thread *td, struct freebsd64_pread_args *uap)
 	    uap->nbyte, uap->offset));
 }
 
+#if defined(COMPAT_FREEBSD6)
+int
+freebsd6_freebsd64_pread(struct thread *td,
+    struct freebsd6_freebsd64_pread_args *uap)
+{
+
+	return (kern_pread(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, uap->offset));
+}
+#endif
+
 int
 freebsd64_readv(struct thread *td, struct freebsd64_readv_args *uap)
 {
@@ -99,6 +110,17 @@ freebsd64_pwrite(struct thread *td, struct freebsd64_pwrite_args *uap)
 	return (kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
 	    uap->nbyte, uap->offset));
 }
+
+#if defined(COMPAT_FREEBSD6)
+int
+freebsd6_freebsd64_pwrite(struct thread *td,
+    struct freebsd6_freebsd64_pwrite_args *uap)
+{
+
+	return (kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
+	    uap->nbyte, uap->offset));
+}
+#endif
 
 int
 freebsd64_writev(struct thread *td, struct freebsd64_writev_args *uap)

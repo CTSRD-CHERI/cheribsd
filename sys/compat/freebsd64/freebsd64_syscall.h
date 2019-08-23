@@ -168,8 +168,8 @@
 #define	FREEBSD64_SYS_freebsd64_semsys	169
 #define	FREEBSD64_SYS_freebsd64_msgsys	170
 #define	FREEBSD64_SYS_freebsd64_shmsys	171
-				/* 173 is obsolete freebsd6_pread */
-				/* 174 is obsolete freebsd6_pwrite */
+				/* 173 is freebsd6 freebsd64_pread */
+				/* 174 is freebsd6 freebsd64_pwrite */
 #define	FREEBSD64_SYS_setfib	175
 #define	FREEBSD64_SYS_freebsd64_ntp_adjtime	176
 #define	FREEBSD64_SYS_setgid	181
@@ -187,11 +187,11 @@
 #define	FREEBSD64_SYS_getrlimit	194
 #define	FREEBSD64_SYS_setrlimit	195
 #define	FREEBSD64_SYS_freebsd11_freebsd64_getdirentries	196
-				/* 197 is obsolete freebsd6_mmap */
+				/* 197 is freebsd6 freebsd64_mmap */
 #define	FREEBSD64_SYS___syscall	198
-				/* 199 is obsolete freebsd6_lseek */
-				/* 200 is obsolete freebsd6_truncate */
-				/* 201 is obsolete freebsd6_ftruncate */
+				/* 199 is freebsd6 lseek */
+				/* 200 is freebsd6 freebsd64_truncate */
+				/* 201 is freebsd6 ftruncate */
 #define	FREEBSD64_SYS_freebsd64___sysctl	202
 #define	FREEBSD64_SYS_freebsd64_mlock	203
 #define	FREEBSD64_SYS_freebsd64_munlock	204
@@ -266,9 +266,9 @@
 #define	FREEBSD64_SYS_freebsd64_aio_suspend	315
 #define	FREEBSD64_SYS_freebsd64_aio_cancel	316
 #define	FREEBSD64_SYS_freebsd64_aio_error	317
-				/* 318 is obsolete freebsd6_aio_read */
-				/* 319 is obsolete freebsd6_aio_write */
-				/* 320 is obsolete freebsd6_lio_listio */
+				/* 318 is freebsd6 freebsd64_aio_read */
+				/* 319 is freebsd6 freebsd64_aio_write */
+				/* 320 is freebsd6 freebsd64_lio_listio */
 #define	FREEBSD64_SYS_yield	321
 				/* 322 is obsolete thr_sleep */
 				/* 323 is obsolete thr_wakeup */

@@ -12,6 +12,12 @@
 
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))
 
+#ifdef COMPAT_FREEBSD6
+#define compat6(n, name) n, (sy_call_t *)__CONCAT(freebsd6_,name)
+#else
+#define compat6(n, name) 0, (sy_call_t *)nosys
+#endif
+
 #ifdef COMPAT_FREEBSD7
 #define compat7(n, name) n, (sy_call_t *)__CONCAT(freebsd7_,name)
 #else
@@ -205,8 +211,8 @@ struct sysent freebsd64_sysent[] = {
 	{ AS(freebsd64_msgsys_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 170 = freebsd64_msgsys */
 	{ AS(freebsd64_shmsys_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 171 = freebsd64_shmsys */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 172 = nosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 173 = obsolete freebsd6_pread */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 174 = obsolete freebsd6_pwrite */
+	{ compat6(AS(freebsd6_freebsd64_pread_args),freebsd64_pread), AUE_PREAD, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 173 = freebsd6 freebsd64_pread */
+	{ compat6(AS(freebsd6_freebsd64_pwrite_args),freebsd64_pwrite), AUE_PWRITE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 174 = freebsd6 freebsd64_pwrite */
 	{ AS(setfib_args), (sy_call_t *)sys_setfib, AUE_SETFIB, NULL, 0, 0, 0, SY_THR_STATIC },	/* 175 = setfib */
 	{ AS(freebsd64_ntp_adjtime_args), (sy_call_t *)freebsd64_ntp_adjtime, AUE_NTP_ADJTIME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 176 = freebsd64_ntp_adjtime */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 177 = sfork */
@@ -229,11 +235,11 @@ struct sysent freebsd64_sysent[] = {
 	{ AS(freebsd64___getrlimit_args), (sy_call_t *)freebsd64_getrlimit, AUE_GETRLIMIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 194 = getrlimit */
 	{ AS(freebsd64___setrlimit_args), (sy_call_t *)freebsd64_setrlimit, AUE_SETRLIMIT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 195 = setrlimit */
 	{ compat11(AS(freebsd11_freebsd64_getdirentries_args),freebsd64_getdirentries), AUE_GETDIRENTRIES, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 196 = freebsd11 freebsd64_getdirentries */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 197 = obsolete freebsd6_mmap */
+	{ compat6(AS(freebsd6_freebsd64_mmap_args),freebsd64_mmap), AUE_MMAP, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 197 = freebsd6 freebsd64_mmap */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },		/* 198 = __syscall */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 199 = obsolete freebsd6_lseek */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 200 = obsolete freebsd6_truncate */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 201 = obsolete freebsd6_ftruncate */
+	{ compat6(AS(freebsd6_lseek_args),lseek), AUE_LSEEK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 199 = freebsd6 lseek */
+	{ compat6(AS(freebsd6_freebsd64_truncate_args),freebsd64_truncate), AUE_TRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 200 = freebsd6 freebsd64_truncate */
+	{ compat6(AS(freebsd6_ftruncate_args),ftruncate), AUE_FTRUNCATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 201 = freebsd6 ftruncate */
 	{ AS(freebsd64___sysctl_args), (sy_call_t *)freebsd64___sysctl, AUE_SYSCTL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 202 = freebsd64___sysctl */
 	{ AS(freebsd64_mlock_args), (sy_call_t *)freebsd64_mlock, AUE_MLOCK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 203 = freebsd64_mlock */
 	{ AS(freebsd64_munlock_args), (sy_call_t *)freebsd64_munlock, AUE_MUNLOCK, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 204 = freebsd64_munlock */
@@ -350,9 +356,9 @@ struct sysent freebsd64_sysent[] = {
 	{ AS(freebsd64_aio_suspend_args), (sy_call_t *)freebsd64_aio_suspend, AUE_AIO_SUSPEND, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 315 = freebsd64_aio_suspend */
 	{ AS(freebsd64_aio_cancel_args), (sy_call_t *)freebsd64_aio_cancel, AUE_AIO_CANCEL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 316 = freebsd64_aio_cancel */
 	{ AS(freebsd64_aio_error_args), (sy_call_t *)freebsd64_aio_error, AUE_AIO_ERROR, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 317 = freebsd64_aio_error */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 318 = obsolete freebsd6_aio_read */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 319 = obsolete freebsd6_aio_write */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 320 = obsolete freebsd6_lio_listio */
+	{ compat6(AS(freebsd6_freebsd64_aio_read_args),freebsd64_aio_read), AUE_AIO_READ, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 318 = freebsd6 freebsd64_aio_read */
+	{ compat6(AS(freebsd6_freebsd64_aio_write_args),freebsd64_aio_write), AUE_AIO_WRITE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 319 = freebsd6 freebsd64_aio_write */
+	{ compat6(AS(freebsd6_freebsd64_lio_listio_args),freebsd64_lio_listio), AUE_LIO_LISTIO, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 320 = freebsd6 freebsd64_lio_listio */
 	{ 0, (sy_call_t *)sys_yield, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 321 = yield */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 322 = obsolete thr_sleep */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 323 = obsolete thr_wakeup */

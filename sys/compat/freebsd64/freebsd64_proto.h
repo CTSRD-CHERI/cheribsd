@@ -1776,6 +1776,53 @@ int	freebsd64_funlinkat(struct thread *, struct freebsd64_funlinkat_args *);
 
 #ifdef COMPAT_FREEBSD6
 
+struct freebsd6_freebsd64_pread_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char buf_l_[PADL_(void *)]; void * buf; char buf_r_[PADR_(void *)];
+	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
+	char pad_l_[PADL_(int)]; int pad; char pad_r_[PADR_(int)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+};
+struct freebsd6_freebsd64_pwrite_args {
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char buf_l_[PADL_(const void *)]; const void * buf; char buf_r_[PADR_(const void *)];
+	char nbyte_l_[PADL_(size_t)]; size_t nbyte; char nbyte_r_[PADR_(size_t)];
+	char pad_l_[PADL_(int)]; int pad; char pad_r_[PADR_(int)];
+	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
+};
+struct freebsd6_freebsd64_mmap_args {
+	char addr_l_[PADL_(void *)]; void * addr; char addr_r_[PADR_(void *)];
+	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
+	char prot_l_[PADL_(int)]; int prot; char prot_r_[PADR_(int)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
+	char pad_l_[PADL_(int)]; int pad; char pad_r_[PADR_(int)];
+	char pos_l_[PADL_(off_t)]; off_t pos; char pos_r_[PADR_(off_t)];
+};
+struct freebsd6_freebsd64_truncate_args {
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char pad_l_[PADL_(int)]; int pad; char pad_r_[PADR_(int)];
+	char length_l_[PADL_(off_t)]; off_t length; char length_r_[PADR_(off_t)];
+};
+struct freebsd6_freebsd64_aio_read_args {
+	char aiocbp_l_[PADL_(struct oaiocb64 *)]; struct oaiocb64 * aiocbp; char aiocbp_r_[PADR_(struct oaiocb64 *)];
+};
+struct freebsd6_freebsd64_aio_write_args {
+	char aiocbp_l_[PADL_(struct oaiocb64 *)]; struct oaiocb64 * aiocbp; char aiocbp_r_[PADR_(struct oaiocb64 *)];
+};
+struct freebsd6_freebsd64_lio_listio_args {
+	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
+	char acb_list_l_[PADL_(struct oaiocb64 *const *)]; struct oaiocb64 *const * acb_list; char acb_list_r_[PADR_(struct oaiocb64 *const *)];
+	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
+	char sig_l_[PADL_(struct osigevent64 *)]; struct osigevent64 * sig; char sig_r_[PADR_(struct osigevent64 *)];
+};
+int	freebsd6_freebsd64_pread(struct thread *, struct freebsd6_freebsd64_pread_args *);
+int	freebsd6_freebsd64_pwrite(struct thread *, struct freebsd6_freebsd64_pwrite_args *);
+int	freebsd6_freebsd64_mmap(struct thread *, struct freebsd6_freebsd64_mmap_args *);
+int	freebsd6_freebsd64_truncate(struct thread *, struct freebsd6_freebsd64_truncate_args *);
+int	freebsd6_freebsd64_aio_read(struct thread *, struct freebsd6_freebsd64_aio_read_args *);
+int	freebsd6_freebsd64_aio_write(struct thread *, struct freebsd6_freebsd64_aio_write_args *);
+int	freebsd6_freebsd64_lio_listio(struct thread *, struct freebsd6_freebsd64_lio_listio_args *);
 
 #endif /* COMPAT_FREEBSD6 */
 
@@ -1987,6 +2034,8 @@ int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mkno
 #define	FREEBSD64_SYS_AUE_freebsd64_semsys	AUE_SEMSYS
 #define	FREEBSD64_SYS_AUE_freebsd64_msgsys	AUE_MSGSYS
 #define	FREEBSD64_SYS_AUE_freebsd64_shmsys	AUE_SHMSYS
+#define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_pread	AUE_PREAD
+#define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_pwrite	AUE_PWRITE
 #define	FREEBSD64_SYS_AUE_freebsd64_ntp_adjtime	AUE_NTP_ADJTIME
 #define	FREEBSD64_SYS_AUE_freebsd11_freebsd64_stat	AUE_STAT
 #define	FREEBSD64_SYS_AUE_freebsd11_freebsd64_fstat	AUE_FSTAT
@@ -1995,6 +2044,8 @@ int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mkno
 #define	FREEBSD64_SYS_AUE_getrlimit	AUE_GETRLIMIT
 #define	FREEBSD64_SYS_AUE_setrlimit	AUE_SETRLIMIT
 #define	FREEBSD64_SYS_AUE_freebsd11_freebsd64_getdirentries	AUE_GETDIRENTRIES
+#define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_mmap	AUE_MMAP
+#define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_truncate	AUE_TRUNCATE
 #define	FREEBSD64_SYS_AUE_freebsd64___sysctl	AUE_SYSCTL
 #define	FREEBSD64_SYS_AUE_freebsd64_mlock	AUE_MLOCK
 #define	FREEBSD64_SYS_AUE_freebsd64_munlock	AUE_MUNLOCK
@@ -2047,6 +2098,9 @@ int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mkno
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_suspend	AUE_AIO_SUSPEND
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_cancel	AUE_AIO_CANCEL
 #define	FREEBSD64_SYS_AUE_freebsd64_aio_error	AUE_AIO_ERROR
+#define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_aio_read	AUE_AIO_READ
+#define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_aio_write	AUE_AIO_WRITE
+#define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_lio_listio	AUE_LIO_LISTIO
 #define	FREEBSD64_SYS_AUE_freebsd64___getcwd	AUE_GETCWD
 #define	FREEBSD64_SYS_AUE_freebsd64_sched_setparam	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_sched_getparam	AUE_NULL

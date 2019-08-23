@@ -1181,6 +1181,17 @@ freebsd64_truncate(struct thread *td, struct freebsd64_truncate_args *uap)
 	    uap->length));
 }
 
+#if defined(COMPAT_FREEBSD6)
+/* Versions with the pad argument */
+int
+freebsd6_truncate(struct thread *td, struct freebsd6_truncate_args *uap)
+{
+
+	return (kern_truncate(td, __USER_CAP_STR(uap->path), UIO_USERSPACE,
+	    uap->length));
+}
+#endif
+
 int
 freebsd64_rename(struct thread *td, struct freebsd64_rename_args *uap)
 {
