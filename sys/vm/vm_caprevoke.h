@@ -91,8 +91,8 @@ enum {
 	VM_CAPREVOKE_QUICK_SUCCESSOR=0x10,
 };
 
-int vm_caprevoke(struct vm_caprevoke_cookie *, int);
-int vm_caprevoke_one(struct vm_caprevoke_cookie *, int, vm_offset_t);
+int vm_caprevoke(const struct vm_caprevoke_cookie *, int);
+int vm_caprevoke_one(const struct vm_caprevoke_cookie *, int, vm_offset_t);
 
 /***************************** KERNEL MD LAYER ******************************/
 
@@ -105,7 +105,8 @@ enum {
   VM_CAPREVOKE_CF_NO_COARSE = 0x01,
 };
 
-int vm_test_caprevoke(struct vm_caprevoke_cookie *, const void * __capability);
+int vm_test_caprevoke(const struct vm_caprevoke_cookie *,
+		      const void * __capability);
 
 /*  Shadow region installation into vm map */
 int vm_map_install_caprevoke_shadow (struct vm_map * map);
@@ -113,22 +114,24 @@ int vm_map_install_caprevoke_shadow (struct vm_map * map);
 /*  Walking a particular page */
 #define VM_CAPREVOKE_PAGE_HASCAPS	0x01
 #define VM_CAPREVOKE_PAGE_DIRTY		0x02
-int vm_caprevoke_page(struct vm_caprevoke_cookie * c, struct vm_page * m);
-int vm_caprevoke_page_ro(struct vm_caprevoke_cookie * c, struct vm_page * m);
+int vm_caprevoke_page(const struct vm_caprevoke_cookie * c,
+		      struct vm_page * m);
+int vm_caprevoke_page_ro(const struct vm_caprevoke_cookie * c,
+		      struct vm_page * m);
 
 /***************************** HOARDER CALLBACKS ******************************/
 
 /*  sys/kern/vfs_aio.c */
-void aio_caprevoke(struct proc *, struct vm_caprevoke_cookie *);
+void aio_caprevoke(struct proc *, const struct vm_caprevoke_cookie *);
 
 /*  sys/kern/kern_event.c */
-int kqueue_caprevoke(struct file *fp, struct vm_caprevoke_cookie *);
+int kqueue_caprevoke(struct file *fp, const struct vm_caprevoke_cookie *);
 
 /*  sys/kern/kern_time.c */
-void ktimer_caprevoke(struct proc *, struct vm_caprevoke_cookie *);
+void ktimer_caprevoke(struct proc *, const struct vm_caprevoke_cookie *);
 
 /*  MD */
-void caprevoke_td_frame(struct thread *td, struct vm_caprevoke_cookie *);
+void caprevoke_td_frame(struct thread *td, const struct vm_caprevoke_cookie *);
 
 /**************************** STATISTICS COUNTING *****************************/
 

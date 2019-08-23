@@ -2800,7 +2800,7 @@ noacquire:
 #ifdef CHERI_CAPREVOKE
 
 int
-kqueue_caprevoke(struct file *fp, struct vm_caprevoke_cookie *crc)
+kqueue_caprevoke(struct file *fp, const struct vm_caprevoke_cookie *crc)
 {
 	struct kqueue *kq;
 	struct knote *kn;

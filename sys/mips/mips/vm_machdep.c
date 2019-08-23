@@ -616,7 +616,8 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 #ifdef CHERI_CAPREVOKE
 
 static inline int
-vm_test_caprevoke_mem(struct vm_caprevoke_cookie *crc, const void * __capability cut)
+vm_test_caprevoke_mem(const struct vm_caprevoke_cookie *crc,
+		      const void * __capability cut)
 {
 	/*
 	 * Find appropriate bitmap bits.  We use the base so that even if
@@ -672,7 +673,8 @@ vm_test_caprevoke_mem(struct vm_caprevoke_cookie *crc, const void * __capability
 }
 
 int
-vm_test_caprevoke(struct vm_caprevoke_cookie *crc, const void * __capability cut)
+vm_test_caprevoke(const struct vm_caprevoke_cookie *crc,
+		  const void * __capability cut)
 {
 	int res = 0;
 	int perms = cheri_getperm(cut);
@@ -694,7 +696,7 @@ vm_test_caprevoke(struct vm_caprevoke_cookie *crc, const void * __capability cut
  * don't have a LLC instruction, just a CLLC one.
  */
 static int
-vm_do_caprevoke(struct vm_caprevoke_cookie *crc,
+vm_do_caprevoke(const struct vm_caprevoke_cookie *crc,
 		void * __capability * __capability cutp)
 {
 	CAPREVOKE_STATS_FOR(crst, crc);
@@ -798,7 +800,7 @@ SYSINIT(cloadtags_stride, SI_SUB_VM, SI_ORDER_ANY,
         measure_cloadtags_stride, NULL);
 
 int
-vm_caprevoke_page(struct vm_caprevoke_cookie *crc, vm_page_t m)
+vm_caprevoke_page(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 {
 #ifdef CHERI_CAPREVOKE_STATS
 	CAPREVOKE_STATS_FOR(crst, crc);
@@ -868,7 +870,7 @@ vm_caprevoke_page(struct vm_caprevoke_cookie *crc, vm_page_t m)
  * saw at least one capability on this page.
  */
 int
-vm_caprevoke_page_ro(struct vm_caprevoke_cookie *crc, vm_page_t m)
+vm_caprevoke_page_ro(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 {
 #ifdef CHERI_CAPREVOKE_STATS
 	uint32_t cyc_start = cheri_get_cyclecount();

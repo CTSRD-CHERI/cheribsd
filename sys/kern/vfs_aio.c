@@ -2732,7 +2732,7 @@ filt_lio(struct knote *kn, long hint)
 #ifdef CHERI_CAPREVOKE
 
 void
-aio_caprevoke(struct proc *p, struct vm_caprevoke_cookie *crc)
+aio_caprevoke(struct proc *p, const struct vm_caprevoke_cookie *crc)
 {
 	struct kaioinfo *ki;
 	struct kaiocb *job, *jobn;

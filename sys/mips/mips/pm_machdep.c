@@ -718,7 +718,7 @@ ptrace_clear_single_step(struct thread *td)
 #ifdef CHERI_CAPREVOKE
 
 void
-caprevoke_td_frame(struct thread *td, struct vm_caprevoke_cookie *crc)
+caprevoke_td_frame(struct thread *td, const struct vm_caprevoke_cookie *crc)
 {
 	CAPREVOKE_STATS_FOR(crst, crc);
 

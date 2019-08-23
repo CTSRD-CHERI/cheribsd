@@ -71,7 +71,7 @@ enum vm_cro_visit {
  * Given a writable, wired page in a wlocked object, visit it.
  */
 static int
-vm_caprevoke_visit_rw(struct vm_caprevoke_cookie *crc, int flags,
+vm_caprevoke_visit_rw(const struct vm_caprevoke_cookie *crc, int flags,
 		      vm_object_t obj, vm_page_t m)
 {
 	int hascaps;
@@ -120,7 +120,7 @@ retry:
  * advance and carry on.
  */
 static int
-vm_caprevoke_visit_ro(struct vm_caprevoke_cookie *crc, int flags,
+vm_caprevoke_visit_ro(const struct vm_caprevoke_cookie *crc, int flags,
 		      vm_object_t obj, vm_page_t m)
 {
 	CAPREVOKE_STATS_FOR(crst, crc);
@@ -181,7 +181,7 @@ enum vm_cro_at {
  * caller should just repeat the call.  On failure, *ooff will not be modified.
  */
 static enum vm_cro_at
-vm_caprevoke_object_at(struct vm_caprevoke_cookie *crc, int flags,
+vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 			vm_map_entry_t entry, vm_offset_t ioff,
 			vm_offset_t *ooff, int *vmres)
 {
@@ -358,7 +358,7 @@ visit_rw_ok:
  * held across invocation.
  */
 static int
-vm_caprevoke_map_entry(struct vm_caprevoke_cookie *crc, int flags,
+vm_caprevoke_map_entry(const struct vm_caprevoke_cookie *crc, int flags,
 		       vm_map_entry_t entry, vm_offset_t *addr)
 {
 	int res;
@@ -462,7 +462,7 @@ fini:
  *   both: as now, a world-stopped cleaning pass
  */
 int
-vm_caprevoke(struct vm_caprevoke_cookie *crc, int flags)
+vm_caprevoke(const struct vm_caprevoke_cookie *crc, int flags)
 {
 	int res = KERN_SUCCESS;
 	const vm_map_t map = crc->map;
@@ -545,7 +545,7 @@ out:
  * Do a sweep across the single map entry containing the given address.
  */
 int
-vm_caprevoke_one(struct vm_caprevoke_cookie *crc, int flags,
+vm_caprevoke_one(const struct vm_caprevoke_cookie *crc, int flags,
 		 vm_offset_t oneaddr)
 {
 	int res = KERN_SUCCESS;

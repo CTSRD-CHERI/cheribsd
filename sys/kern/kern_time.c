@@ -1429,7 +1429,7 @@ kern_ktimer_delete(struct thread *td, int timerid)
 #ifdef CHERI_CAPREVOKE
 
 void
-ktimer_caprevoke(struct proc *p, struct vm_caprevoke_cookie *crc)
+ktimer_caprevoke(struct proc *p, const struct vm_caprevoke_cookie *crc)
 {
 	int i;
 
