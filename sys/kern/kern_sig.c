@@ -944,7 +944,7 @@ freebsd4_sigaction(struct thread *td, struct freebsd4_sigaction_args *uap)
 		else
 			actp->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
 		actp->sa_flags = act_n.sa_flags;
-		actp->a_mask = act_n.sa_mask;
+		actp->sa_mask = act_n.sa_mask;
 #else
 		*actp = act_n;
 #endif
@@ -953,7 +953,7 @@ freebsd4_sigaction(struct thread *td, struct freebsd4_sigaction_args *uap)
 	if (oactp && !error) {
 #if __has_feature(capabilities)
 		memset(&oact_n, 0, sizeof(oact_n));
-		oact_n.sa_handler = (void *)(uintptr_t)oactp->sa_handler;
+		oact_n.sa_handler = (void *)(__cheri_addr vaddr_t)oactp->sa_handler;
 		oact_n.sa_flags = oactp->sa_flags;
 		oact_n.sa_mask = oactp->sa_mask;
 #else
