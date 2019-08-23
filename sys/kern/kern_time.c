@@ -1433,6 +1433,8 @@ ktimer_caprevoke(struct proc *p, struct vm_caprevoke_cookie *crc)
 {
 	int i;
 
+	CAPREVOKE_STATS_FOR(crst, crc);
+
 	if (p->p_itimers == NULL)
 		return;
 
@@ -1447,10 +1449,10 @@ ktimer_caprevoke(struct proc *p, struct vm_caprevoke_cookie *crc)
 		if (!cheri_gettag(v))
 			continue;
 
-		crc->stats->caps_found++;
+		CAPREVOKE_STATS_BUMP(crst, caps_found);
 		if (vm_test_caprevoke(crc, v)) {
 			it->it_sigev.sigev_value.sival_ptr_c = cheri_revoke(v);
-			crc->stats->caps_cleared++;
+			CAPREVOKE_STATS_BUMP(crst, caps_cleared);
 		}
 	}
 	PROC_UNLOCK(p);

@@ -2805,7 +2805,7 @@ kqueue_caprevoke(struct file *fp, struct vm_caprevoke_cookie *crc)
 	struct kqueue *kq;
 	struct knote *kn;
 	int error, ix;
-        struct caprevoke_stats *stat = crc->stats;
+	CAPREVOKE_STATS_FOR(crst, crc);
 
 	error = kqueue_acquire(fp, &kq);
 	if (error != 0)
@@ -2817,10 +2817,10 @@ kqueue_caprevoke(struct file *fp, struct vm_caprevoke_cookie *crc)
 			void * __capability ud = kn->kn_kevent.udata;
 			if (!cheri_gettag(ud))
 				continue;
-			stat->caps_found++;
+	                CAPREVOKE_STATS_BUMP(crst, caps_found);
 			if (vm_test_caprevoke(crc, ud)) {
 				kn->kn_kevent.udata = cheri_revoke(ud);
-				stat->caps_cleared++;
+	                        CAPREVOKE_STATS_BUMP(crst, caps_cleared);
 			}
 		}
 	}
@@ -2829,10 +2829,10 @@ kqueue_caprevoke(struct file *fp, struct vm_caprevoke_cookie *crc)
 			void * __capability ud = kn->kn_kevent.udata;
 			if (!cheri_gettag(ud))
 				continue;
-			stat->caps_found++;
+	                CAPREVOKE_STATS_BUMP(crst, caps_found);
 			if (vm_test_caprevoke(crc, ud)) {
 				kn->kn_kevent.udata = cheri_revoke(ud);
-				stat->caps_cleared++;
+	                        CAPREVOKE_STATS_BUMP(crst, caps_cleared);
 			}
 		}
 	}

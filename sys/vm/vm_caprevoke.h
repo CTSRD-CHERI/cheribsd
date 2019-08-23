@@ -130,5 +130,16 @@ void ktimer_caprevoke(struct proc *, struct vm_caprevoke_cookie *);
 /*  MD */
 void caprevoke_td_frame(struct thread *td, struct vm_caprevoke_cookie *);
 
+/**************************** STATISTICS COUNTING *****************************/
+
+#ifdef CHERI_CAPREVOKE_STATS
+#define CAPREVOKE_STATS_FOR(st, crc)	struct caprevoke_stats *st = crc->stats
+#define CAPREVOKE_STATS_INC(st, ctr, d)	do { (st)->ctr += (d); } while(0)
+#else
+#define CAPREVOKE_STATS_FOR(st, crc)	do { } while(0)
+#define CAPREVOKE_STATS_INC(st, ctr, d)	do { } while(0)
+#endif
+#define CAPREVOKE_STATS_BUMP(st, ctr)	CAPREVOKE_STATS_INC(st, ctr, 1)
+
 #endif
 #endif

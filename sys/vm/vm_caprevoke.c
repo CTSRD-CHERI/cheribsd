@@ -75,20 +75,21 @@ vm_caprevoke_visit_rw(struct vm_caprevoke_cookie *crc, int flags,
 		      vm_object_t obj, vm_page_t m)
 {
 	int hascaps;
+	CAPREVOKE_STATS_FOR(crst, crc);
 
 	if (!vm_page_tryxbusy(m))
 		return VM_CAPREVOKE_VIS_BUSY;
 	VM_OBJECT_WUNLOCK(obj);
 
 retry:
-	crc->stats->pages_scanned++;
+	CAPREVOKE_STATS_BUMP(crst, pages_scanned);
 	hascaps = vm_caprevoke_page(crc, m);
 
 	/* CAS failures cause us to revisit */
 	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
 		/* If the world is stopped, do that now */
 		if (flags & VM_CAPREVOKE_LAST_FINI) {
-			crc->stats->pages_retried++;
+			CAPREVOKE_STATS_BUMP(crst, pages_retried);
 			goto retry;
 		}
 		vm_page_capdirty(m);
@@ -122,13 +123,14 @@ static int
 vm_caprevoke_visit_ro(struct vm_caprevoke_cookie *crc, int flags,
 		      vm_object_t obj, vm_page_t m)
 {
+	CAPREVOKE_STATS_FOR(crst, crc);
 	int hascaps;
 
 	if (!vm_page_tryxbusy(m))
 		return VM_CAPREVOKE_VIS_BUSY;
 	VM_OBJECT_WUNLOCK(obj);
 
-	crc->stats->pages_scanned++;
+	CAPREVOKE_STATS_BUMP(crst, pages_scanned);
 	hascaps = vm_caprevoke_page_ro(crc, m);
 
 	KASSERT(!(hascaps & VM_CAPREVOKE_PAGE_HASCAPS)
@@ -183,6 +185,7 @@ vm_caprevoke_object_at(struct vm_caprevoke_cookie *crc, int flags,
 			vm_map_entry_t entry, vm_offset_t ioff,
 			vm_offset_t *ooff, int *vmres)
 {
+	CAPREVOKE_STATS_FOR(crst, crc);
 	vm_map_t    map = crc->map;
 	vm_object_t obj = entry->object.vm_object;
 	vm_pindex_t ipi = OFF_TO_IDX(ioff);
@@ -203,18 +206,18 @@ vm_caprevoke_object_at(struct vm_caprevoke_cookie *crc, int flags,
 
 			if ((obj_next_pg == NULL)
 			    || (obj_next_pg->pindex >= OFF_TO_IDX(lastoff))) {
-				crc->stats->pages_fault_skip +=
-					(entry->end - addr) >> PAGE_SHIFT;
+				CAPREVOKE_STATS_INC(crst, pages_fault_skip,
+					(entry->end - addr) >> PAGE_SHIFT);
 				*ooff = lastoff;
 			} else {
 				*ooff = IDX_TO_OFF(obj_next_pg->pindex);
-				crc->stats->pages_fault_skip +=
-					obj_next_pg->pindex - ipi;
+				CAPREVOKE_STATS_INC(crst, pages_fault_skip,
+					obj_next_pg->pindex - ipi);
 			}
 			return VM_CAPREVOKE_AT_OK;
 		}
 
-		crc->stats->pages_faulted_ro++;
+		CAPREVOKE_STATS_BUMP(crst, pages_faulted_ro);
 
 		int res;
 		unsigned int last_timestamp = map->timestamp;
@@ -285,7 +288,7 @@ vm_caprevoke_object_at(struct vm_caprevoke_cookie *crc, int flags,
 		panic("bad result from vm_caprevoke_visit_ro");
 	}
 
-	crc->stats->pages_faulted_rw++;
+	CAPREVOKE_STATS_BUMP(crst, pages_faulted_rw);
 
 	int res;
 	unsigned int last_timestamp = map->timestamp;
@@ -603,7 +606,9 @@ vm_caprevoke_cookie_init(vm_map_t map,
 		return KERN_INVALID_ARGUMENT;
 
 	crc->map = map;
+#ifdef CHERI_CAPREVOKE_STATS
 	crc->stats = stats;
+#endif
 
 	/*
 	 * XXX Right now, we know that there are no coarse-grain bits

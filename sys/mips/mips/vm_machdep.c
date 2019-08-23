@@ -697,6 +697,7 @@ static int
 vm_do_caprevoke(struct vm_caprevoke_cookie *crc,
 		void * __capability * __capability cutp)
 {
+	CAPREVOKE_STATS_FOR(crst, crc);
 	void * __capability cut;
 	int res = 0;
 
@@ -709,6 +710,8 @@ vm_do_caprevoke(struct vm_caprevoke_cookie *crc,
 		int ok;
 
 		void * __capability cutr = cheri_revoke(cut);
+
+		CAPREVOKE_STATS_BUMP(crst, caps_found);
 
 		/*
 		 * Load-link the position under test; verify that it matches
@@ -741,7 +744,7 @@ vm_do_caprevoke(struct vm_caprevoke_cookie *crc,
 		  : "memory");
 
 		if (__builtin_expect(ok,1)) {
-			crc->stats->caps_cleared++;
+			CAPREVOKE_STATS_BUMP(crst, caps_cleared);
 			/* Don't count a revoked cap as HASCAPS */
 		} else {
 			res = VM_CAPREVOKE_PAGE_DIRTY
@@ -750,6 +753,7 @@ vm_do_caprevoke(struct vm_caprevoke_cookie *crc,
 	} else {
 		/* Again, don't count a revoked cap as HASCAPS */
 		if ((cheri_getperm(cut) != 0) || (cheri_getsealed(cut) != 0)) {
+			CAPREVOKE_STATS_BUMP(crst, caps_found);
 			res = VM_CAPREVOKE_PAGE_HASCAPS;
 		}
 		// XXX else crc->stats->caps_found_revoked++;
@@ -796,7 +800,10 @@ SYSINIT(cloadtags_stride, SI_SUB_VM, SI_ORDER_ANY,
 int
 vm_caprevoke_page(struct vm_caprevoke_cookie *crc, vm_page_t m)
 {
+#ifdef CHERI_CAPREVOKE_STATS
+	CAPREVOKE_STATS_FOR(crst, crc);
 	uint32_t cyc_start = cheri_get_cyclecount();
+#endif
 
 	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
 	vm_offset_t mva;
@@ -828,7 +835,6 @@ vm_caprevoke_page(struct vm_caprevoke_cookie *crc, vm_page_t m)
 			for(; tags != 0; (tags >>= 1), mvt += 1) {
 				if (!(tags & 1))
 					continue;
-				crc->stats->caps_found++;
 
 				res |= vm_do_caprevoke(crc, mvt);
 			}
@@ -837,15 +843,15 @@ vm_caprevoke_page(struct vm_caprevoke_cookie *crc, vm_page_t m)
 		for( ; cheri_getaddress(mvu) < mve; mvu++) {
 			void * __capability cut = *mvu;
 			if (cheri_gettag(cut)) {
-				crc->stats->caps_found++;
 				res |= vm_do_caprevoke(crc, mvu);
 			}
 		}
 	}
 
+#ifdef CHERI_CAPREVOKE_STATS
 	uint32_t cyc_end = cheri_get_cyclecount();
-
-	crc->stats->page_scan_cycles += cyc_end - cyc_start;
+	CAPREVOKE_STATS_INC(crst, page_scan_cycles, cyc_end - cyc_start);
+#endif
 
 	return res;
 }
@@ -864,7 +870,10 @@ vm_caprevoke_page(struct vm_caprevoke_cookie *crc, vm_page_t m)
 int
 vm_caprevoke_page_ro(struct vm_caprevoke_cookie *crc, vm_page_t m)
 {
+#ifdef CHERI_CAPREVOKE_STATS
 	uint32_t cyc_start = cheri_get_cyclecount();
+	CAPREVOKE_STATS_FOR(crst, crc);
+#endif
 
 	vm_paddr_t mpa = VM_PAGE_TO_PHYS(m);
 	vm_offset_t mva;
@@ -893,7 +902,6 @@ vm_caprevoke_page_ro(struct vm_caprevoke_cookie *crc, vm_page_t m)
 			for(; tags != 0; (tags >>= 1), mvt += 1) {
 				if (!(tags & 1))
 					continue;
-				crc->stats->caps_found++;
 				if (vm_test_caprevoke(crc, *mvt)) {
 					return VM_CAPREVOKE_PAGE_DIRTY
 						| VM_CAPREVOKE_PAGE_HASCAPS;
@@ -904,7 +912,6 @@ vm_caprevoke_page_ro(struct vm_caprevoke_cookie *crc, vm_page_t m)
 		for( ; cheri_getaddress(mvu) < mve; mvu++) {
 			void * __capability cut = *mvu;
 			if (cheri_gettag(cut)) {
-				crc->stats->caps_found++;
 				res |= VM_CAPREVOKE_PAGE_HASCAPS;
 				if (vm_test_caprevoke(crc, cut)) {
 					return VM_CAPREVOKE_PAGE_DIRTY
@@ -914,9 +921,10 @@ vm_caprevoke_page_ro(struct vm_caprevoke_cookie *crc, vm_page_t m)
 		}
 	}
 
+#ifdef CHERI_CAPREVOKE_STATS
 	uint32_t cyc_end = cheri_get_cyclecount();
-
-	crc->stats->page_scan_cycles += cyc_end - cyc_start;
+	crst->page_scan_cycles += cyc_end - cyc_start;
+#endif
 
 	return res;
 }
