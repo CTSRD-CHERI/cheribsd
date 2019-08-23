@@ -933,7 +933,7 @@ sed -e '
 			prefix = "freebsd4_"
 			descr = "freebsd4"
 		} else if (flag("COMPAT6")) {
-			if (mincompat > 5)
+			if (mincompat > 6)
 				is_obsol = 1
 			else
 				ncompat6++
