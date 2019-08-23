@@ -111,9 +111,9 @@ MIASM =  \
 	freebsd64_getfh.o \
 	freebsd64_sysarch.o \
 	freebsd64_rtprio.o \
-	semsys.o \
-	msgsys.o \
-	shmsys.o \
+	freebsd64_semsys.o \
+	freebsd64_msgsys.o \
+	freebsd64_shmsys.o \
 	setfib.o \
 	freebsd64_ntp_adjtime.o \
 	setgid.o \
