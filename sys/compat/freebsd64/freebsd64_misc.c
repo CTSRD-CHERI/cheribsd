@@ -1562,3 +1562,21 @@ freebsd64_pdgetpid(struct thread *td, struct freebsd64_pdgetpid_args *uap)
 
 	return (user_pdgetpid(td, uap->fd, __USER_CAP_OBJ(uap->pidp)));
 }
+
+/*
+ * System call registration helpers.
+ */
+
+int
+freebsd64_syscall_helper_register(struct syscall_helper_data *sd, int flags)
+{
+
+	return (kern_syscall_helper_register(freebsd64_sysent, sd, flags));
+}
+
+int
+freebsd64_syscall_helper_unregister(struct syscall_helper_data *sd)
+{
+
+	return (kern_syscall_helper_unregister(freebsd64_sysent, sd));
+}
