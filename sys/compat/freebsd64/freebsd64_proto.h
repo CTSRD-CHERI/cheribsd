@@ -1782,6 +1782,25 @@ int	freebsd64_funlinkat(struct thread *, struct freebsd64_funlinkat_args *);
 
 #ifdef COMPAT_FREEBSD7
 
+struct freebsd7_freebsd64___semctl_args {
+	char semid_l_[PADL_(int)]; int semid; char semid_r_[PADR_(int)];
+	char semnum_l_[PADL_(int)]; int semnum; char semnum_r_[PADR_(int)];
+	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
+	char arg_l_[PADL_(union semun_old64 *)]; union semun_old64 * arg; char arg_r_[PADR_(union semun_old64 *)];
+};
+struct freebsd7_freebsd64_msgctl_args {
+	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];
+	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
+	char buf_l_[PADL_(struct msqid_ds_old64 *)]; struct msqid_ds_old64 * buf; char buf_r_[PADR_(struct msqid_ds_old64 *)];
+};
+struct freebsd7_freebsd64_shmctl_args {
+	char shmid_l_[PADL_(int)]; int shmid; char shmid_r_[PADR_(int)];
+	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
+	char buf_l_[PADL_(struct shmid_ds_old64 *)]; struct shmid_ds_old64 * buf; char buf_r_[PADR_(struct shmid_ds_old64 *)];
+};
+int	freebsd7_freebsd64___semctl(struct thread *, struct freebsd7_freebsd64___semctl_args *);
+int	freebsd7_freebsd64_msgctl(struct thread *, struct freebsd7_freebsd64_msgctl_args *);
+int	freebsd7_freebsd64_shmctl(struct thread *, struct freebsd7_freebsd64_shmctl_args *);
 
 #endif /* COMPAT_FREEBSD7 */
 
@@ -1982,10 +2001,13 @@ int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mkno
 #define	FREEBSD64_SYS_AUE_freebsd64_undelete	AUE_UNDELETE
 #define	FREEBSD64_SYS_AUE_freebsd64_futimes	AUE_FUTIMES
 #define	FREEBSD64_SYS_AUE_freebsd64_poll	AUE_POLL
+#define	FREEBSD64_SYS_AUE_freebsd7_freebsd64___semctl	AUE_SEMCTL
 #define	FREEBSD64_SYS_AUE_freebsd64_semop	AUE_SEMOP
+#define	FREEBSD64_SYS_AUE_freebsd7_freebsd64_msgctl	AUE_MSGCTL
 #define	FREEBSD64_SYS_AUE_freebsd64_msgsnd	AUE_MSGSND
 #define	FREEBSD64_SYS_AUE_freebsd64_msgrcv	AUE_MSGRCV
 #define	FREEBSD64_SYS_AUE_freebsd64_shmat	AUE_SHMAT
+#define	FREEBSD64_SYS_AUE_freebsd7_freebsd64_shmctl	AUE_SHMCTL
 #define	FREEBSD64_SYS_AUE_freebsd64_shmdt	AUE_SHMDT
 #define	FREEBSD64_SYS_AUE_freebsd64_clock_gettime	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_clock_settime	AUE_CLOCK_SETTIME

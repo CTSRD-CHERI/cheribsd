@@ -135,12 +135,15 @@ MIASM =  \
 	freebsd64_futimes.o \
 	getpgid.o \
 	freebsd64_poll.o \
+	freebsd7_freebsd64___semctl.o \
 	semget.o \
 	freebsd64_semop.o \
+	freebsd7_freebsd64_msgctl.o \
 	msgget.o \
 	freebsd64_msgsnd.o \
 	freebsd64_msgrcv.o \
 	freebsd64_shmat.o \
+	freebsd7_freebsd64_shmctl.o \
 	freebsd64_shmdt.o \
 	shmget.o \
 	freebsd64_clock_gettime.o \

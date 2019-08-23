@@ -199,16 +199,16 @@
 #define	FREEBSD64_SYS_freebsd64_futimes	206
 #define	FREEBSD64_SYS_getpgid	207
 #define	FREEBSD64_SYS_freebsd64_poll	209
-				/* 220 is obsolete freebsd7___semctl */
+#define	FREEBSD64_SYS_freebsd7_freebsd64___semctl	220
 #define	FREEBSD64_SYS_semget	221
 #define	FREEBSD64_SYS_freebsd64_semop	222
 				/* 223 is obsolete semconfig */
-				/* 224 is obsolete freebsd7_msgctl */
+#define	FREEBSD64_SYS_freebsd7_freebsd64_msgctl	224
 #define	FREEBSD64_SYS_msgget	225
 #define	FREEBSD64_SYS_freebsd64_msgsnd	226
 #define	FREEBSD64_SYS_freebsd64_msgrcv	227
 #define	FREEBSD64_SYS_freebsd64_shmat	228
-				/* 229 is obsolete freebsd7_shmctl */
+#define	FREEBSD64_SYS_freebsd7_freebsd64_shmctl	229
 #define	FREEBSD64_SYS_freebsd64_shmdt	230
 #define	FREEBSD64_SYS_shmget	231
 #define	FREEBSD64_SYS_freebsd64_clock_gettime	232

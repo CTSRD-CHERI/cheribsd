@@ -12,6 +12,12 @@
 
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))
 
+#ifdef COMPAT_FREEBSD7
+#define compat7(n, name) n, (sy_call_t *)__CONCAT(freebsd7_,name)
+#else
+#define compat7(n, name) 0, (sy_call_t *)nosys
+#endif
+
 #ifdef COMPAT_FREEBSD10
 #define compat10(n, name) n, (sy_call_t *)__CONCAT(freebsd10_,name)
 #else
@@ -246,16 +252,16 @@ struct sysent freebsd64_sysent[] = {
 	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 217 = lkmnosys */
 	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 218 = lkmnosys */
 	{ AS(nosys_args), (sy_call_t *)lkmnosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 219 = lkmnosys */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 220 = obsolete freebsd7___semctl */
+	{ 0, (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },		/* 220 = freebsd7 freebsd64___semctl */
 	{ AS(semget_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 221 = semget */
 	{ AS(freebsd64_semop_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 222 = freebsd64_semop */
 	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 223 = obsolete semconfig */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 224 = obsolete freebsd7_msgctl */
+	{ 0, (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },		/* 224 = freebsd7 freebsd64_msgctl */
 	{ AS(msgget_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 225 = msgget */
 	{ AS(freebsd64_msgsnd_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 226 = freebsd64_msgsnd */
 	{ AS(freebsd64_msgrcv_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 227 = freebsd64_msgrcv */
 	{ AS(freebsd64_shmat_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 228 = freebsd64_shmat */
-	{ 0, (sy_call_t *)nosys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },			/* 229 = obsolete freebsd7_shmctl */
+	{ 0, (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },		/* 229 = freebsd7 freebsd64_shmctl */
 	{ AS(freebsd64_shmdt_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 230 = freebsd64_shmdt */
 	{ AS(shmget_args), (sy_call_t *)lkmressys, AUE_NULL, NULL, 0, 0, 0, SY_THR_ABSENT },	/* 231 = shmget */
 	{ AS(freebsd64_clock_gettime_args), (sy_call_t *)freebsd64_clock_gettime, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 232 = freebsd64_clock_gettime */

@@ -304,6 +304,66 @@ static struct syscall_helper_data sem32_syscalls[] = {
 };
 #endif
 
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64_proto.h>
+#include <compat/freebsd64/freebsd64_syscall.h>
+#include <compat/freebsd64/freebsd64_util.h>
+
+struct semid_ds64 {
+	struct ipc_perm	sem_perm;
+	void		*__sem_base;
+	unsigned short	sem_nsems;
+	time_t		sem_otime;
+	time_t		sem_ctime;
+};
+
+#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
+    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
+struct semid_ds64_old {
+	struct ipc_perm_old sem_perm;
+	void		*__sem_base;
+	unsigned short	sem_nsems;
+	time_t		sem_otime;
+	long		sem_pad1;
+	time_t		sem_ctime;
+	long		sem_pad2;
+	long		sem_pad3[4];
+};
+#endif
+
+struct semid_kernel64 {
+	/* Data structure exposed to user space. */
+	struct semid_ds64	u;
+
+	/* Kernel-private components of the semaphore. */
+	void			*label;
+	void			*cred;
+};
+
+union semun64 {
+	int			val;
+	struct semid_ds64	*buf;
+	unsigned short		*array;
+};
+
+union semun_old64 {
+	int			val;
+	struct semid_ds_old64	*buf;
+	unsigned short		*array;
+};
+
+static struct syscall_helper_data sem64_syscalls[] = {
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64___semctl),
+	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(semget),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_semop),
+#if defined(COMPAT_FREEBSD7)
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_semsys),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd7_freebsd64___semctl),
+#endif
+	SYSCALL_INIT_LAST
+};
+#endif /* COMPAT_FREEBSDE64 */
+
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
@@ -406,6 +466,11 @@ seminit(void)
 	if (error != 0)
 		return (error);
 #endif
+#ifdef COMPAT_FREEBSD64
+	error = freebsd64_syscall_helper_register(sem64_syscalls, SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
+#endif
 #ifdef COMPAT_CHERIABI
 	error = cheriabi_syscall_helper_register(cheriabi_sem_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
@@ -425,6 +490,9 @@ semunload(void)
 
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(sem32_syscalls);
+#endif
+#ifdef COMPAT_FREEBSD64
+	freebsd64_syscall_helper_unregister(sem64_syscalls);
 #endif
 #ifdef COMPAT_CHERIABI
 	cheriabi_syscall_helper_unregister(cheriabi_sem_syscalls);
@@ -1658,6 +1726,9 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD32
 	struct semid_kernel32 tsemak32;
 #endif
+#ifdef COMPAT_FREEBSD64
+	struct semid_kernel64 tsemak64;
+#endif
 #ifdef COMPAT_CHERIABI
 	struct semid_kernel_c tsemak_c;
 #endif
@@ -1693,8 +1764,21 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 			outsize = sizeof(tsemak32);
 		} else
 #endif
+#ifdef COMPAT_FREEBSD64
+		if (!SV_CURPROC_FLAG(SV_CHERI)) {
+			bzero(&tsemak64, sizeof(tsemak64));
+			CP(tsemak, tsemak64, u.sem_perm);
+			/* Don't copy u.sem_base */
+			CP(tsemak, tsemak64, u.sem_nsems);
+			CP(tsemak, tsemak64, u.sem_otime);
+			CP(tsemak, tsemak64, u.sem_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tsemak64;
+			outsize = sizeof(tsemak64);
+		} else
+#endif
 #ifdef COMPAT_CHERIABI
-		if (SV_CURPROC_FLAG(SV_CHERI)) {
+		{
 			bzero(&tsemak_c, sizeof(tsemak_c));
 			CP(tsemak, tsemak_c, u.sem_perm);
 			/* Don't copy u.sem_base */
@@ -1704,8 +1788,8 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 			/* Don't copy label or cred */
 			outaddr = &tsemak_c;
 			outsize = sizeof(tsemak_c);
-		} else
-#endif
+		}
+#else
 		{
 			tsemak.u.__sem_base = NULL;
 			tsemak.label = NULL;
@@ -1713,6 +1797,7 @@ sysctl_sema(SYSCTL_HANDLER_ARGS)
 			outaddr = &tsemak;
 			outsize = sizeof(tsemak);
 		}
+#endif
 		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
 			break;
@@ -1958,7 +2043,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 	case GETALL:
 	case SETVAL:
 	case SETALL:
-		error = copyin(uap->arg, &arg, sizeof(arg));
+		error = copyin(__USER_CAP_OBJ(uap->arg), &arg, sizeof(arg));
 		if (error)
 			return (error);
 		break;
@@ -1970,7 +2055,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin(arg.buf, &dsold, sizeof(dsold));
+		error = copyin(__USER_CAP_OBJ(arg.buf), &dsold, sizeof(dsold));
 		if (error)
 			return (error);
 		ipcperm_old2new(&dsold.sem_perm, &dsbuf.sem_perm);
@@ -1982,7 +2067,8 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 		break;
 	case GETALL:
 	case SETALL:
-		semun.array = arg.array;
+		/* Longer than ideal, but better than nothing */
+		semun.array = __USER_CAP_ARRAY(arg.array, SHRT_MAX);
 		break;
 	case SETVAL:
 		semun.val = arg.val;
@@ -2003,7 +2089,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 		CP(dsbuf, dsold, sem_nsems);
 		CP(dsbuf, dsold, sem_otime);
 		CP(dsbuf, dsold, sem_ctime);
-		error = copyout(&dsold, arg.buf, sizeof(dsold));
+		error = copyout(&dsold, __USER_CAP_OBJ(arg.buf), sizeof(dsold));
 		break;
 	}
 
@@ -2182,6 +2268,179 @@ freebsd32_semctl(struct thread *td, struct freebsd32_semctl_args *uap)
 }
 
 #endif /* COMPAT_FREEBSD32 */
+
+#ifdef COMPAT_FREEBSD64
+
+int
+freebsd64_semsys(struct thread *td, struct freebsd64_semsys_args *uap)
+{
+
+	AUDIT_ARG_SVIPC_WHICH(uap->which);
+	switch (uap->which) {
+	case 0:
+		return (freebsd7_freebsd64___semctl(td,
+		    (struct freebsd7_freebsd64___semctl_args *)&uap->a2));
+	default:
+		return (sys_semsys(td, (struct semsys_args *)uap));
+	}
+}
+
+#if defined(COMPAT_FREEBSD7)
+int
+freebsd7_freebsd64___semctl(struct thread *td,
+    struct freebsd7_freebsd64___semctl_args *uap)
+{
+	struct semid_ds64_old dsbuf64;
+	struct semid_ds dsbuf;
+	ksemun_t semun;
+	union semun64 arg;
+	register_t rval;
+	int error;
+
+	switch (uap->cmd) {
+	case SEM_STAT:
+	case IPC_SET:
+	case IPC_STAT:
+	case GETALL:
+	case SETVAL:
+	case SETALL:
+		error = copyin(__USER_CAP_OBJ(uap->arg), &arg, sizeof(arg));
+		if (error)
+			return (error);
+		break;
+	}
+
+	switch (uap->cmd) {
+	case SEM_STAT:
+	case IPC_STAT:
+		semun.buf = &dsbuf;
+		break;
+	case IPC_SET:
+		error = copyin(__USER_CAP_OBJ(arg.buf), &dsbuf64,
+		    sizeof(dsbuf64));
+		if (error)
+			return (error);
+		ipcperm_old2new(&dsbuf64.sem_perm, &dsbuf.sem_perm);
+		CP(dsbuf64, dsbuf, __sem_base);
+		CP(dsbuf64, dsbuf, sem_nsems);
+		CP(dsbuf64, dsbuf, sem_otime);
+		CP(dsbuf64, dsbuf, sem_ctime);
+		semun.buf = &dsbuf;
+		break;
+	case GETALL:
+	case SETALL:
+		semun.array = __USER_CAP_ARRAY(arg.array, SHRT_MAX);
+		break;
+	case SETVAL:
+		semun.val = arg.val;
+		break;
+	}
+
+	error = kern_semctl(td, uap->semid, uap->semnum, uap->cmd, &semun,
+	    &rval);
+	if (error)
+		return (error);
+
+	switch (uap->cmd) {
+	case SEM_STAT:
+	case IPC_STAT:
+		bzero(&dsbuf64, sizeof(dsbuf64));
+		ipcperm_new2old(&dsbuf.sem_perm, &dsbuf64.sem_perm);
+		CP(dsbuf, dsbuf64, __sem_base);
+		CP(dsbuf, dsbuf64, sem_nsems);
+		CP(dsbuf, dsbuf64, sem_otime);
+		CP(dsbuf, dsbuf64, sem_ctime);
+		error = copyout(&dsbuf64, __USER_CAP_OBJ(arg.buf),
+		    sizeof(dsbuf64));
+		break;
+	}
+
+	if (error == 0)
+		td->td_retval[0] = rval;
+	return (error);
+}
+#endif
+
+int
+freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
+{
+	struct semid_ds64 dsbuf64;
+	struct semid_ds dsbuf;
+	ksemun_t semun;
+	union semun64 arg;
+	register_t rval;
+	int error;
+
+	switch (uap->cmd) {
+	case SEM_STAT:
+	case IPC_SET:
+	case IPC_STAT:
+	case GETALL:
+	case SETVAL:
+	case SETALL:
+		error = copyin(__USER_CAP_OBJ(uap->arg), &arg, sizeof(arg));
+		if (error)
+			return (error);
+		break;
+	}
+
+	switch (uap->cmd) {
+	case SEM_STAT:
+	case IPC_STAT:
+		semun.buf = &dsbuf;
+		break;
+	case IPC_SET:
+		error = copyin(__USER_CAP_OBJ(arg.buf), &dsbuf64,
+		    sizeof(dsbuf64));
+		if (error)
+			return (error);
+		CP(dsbuf64, dsbuf, sem_perm);
+		CP(dsbuf64, dsbuf, __sem_base);
+		CP(dsbuf64, dsbuf, sem_nsems);
+		CP(dsbuf64, dsbuf, sem_otime);
+		CP(dsbuf64, dsbuf, sem_ctime);
+		semun.buf = &dsbuf;
+		break;
+	case GETALL:
+	case SETALL:
+		semun.array = __USER_CAP_UNBOUND(arg.array);
+		break;
+	case SETVAL:
+		semun.val = arg.val;
+		break;
+	}
+
+	error = kern_semctl(td, uap->semid, uap->semnum, uap->cmd, &semun,
+	    &rval);
+	if (error)
+		return (error);
+
+	switch (uap->cmd) {
+	case SEM_STAT:
+	case IPC_STAT:
+		bzero(&dsbuf64, sizeof(dsbuf64));
+		CP(dsbuf, dsbuf64, sem_perm);
+		CP(dsbuf, dsbuf64, __sem_base);
+		CP(dsbuf, dsbuf64, sem_nsems);
+		CP(dsbuf, dsbuf64, sem_otime);
+		CP(dsbuf, dsbuf64, sem_ctime);
+		error = copyout(&dsbuf64, __USER_CAP_OBJ(arg.buf), sizeof(dsbuf64));
+		break;
+	}
+
+	if (error == 0)
+		td->td_retval[0] = rval;
+	return (error);
+}
+
+int
+freebsd64_semop(struct thread *td, struct freebsd64_semop_args *uap)
+{
+
+	return (kern_semop(td, uap->semid,
+	    __USER_CAP_ARRAY(uap->sops, uap->nsops), uap->nsops));
+}
+#endif /* COMPAT_FREEBSD64 */
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,
