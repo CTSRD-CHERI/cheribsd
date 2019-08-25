@@ -495,7 +495,8 @@ cheriabi_caprevoke_shadow(struct thread *td,
 {
 	int arena_perms, error;
 	void * __capability cres;
-	vm_offset_t base, size, shadow_base, shadow_size;
+	vm_offset_t base, size;
+	int sel = uap->flags & CAPREVOKE_SHADOW_SPACE_MASK;
 
 	if (!SV_CURPROC_FLAG(SV_CHERI))
 		return ENOSYS;
@@ -503,30 +504,18 @@ cheriabi_caprevoke_shadow(struct thread *td,
 	if (cheri_gettag(uap->arena) == 0)
 		return EINVAL;
 
-	switch (uap->flags & CAPREVOKE_SHADOW_SPACE_MASK) {
+	switch (sel) {
 	case CAPREVOKE_SHADOW_NOVMMAP:
 
 		arena_perms = cheri_getperm(uap->arena);
 
 		if ((arena_perms & CHERI_PERM_CHERIABI_VMMAP) == 0)
-			return EINVAL;
+			return EPERM;
 
-		/* Require at least byte granularity in the shadow space */
 		base = cheri_getbase(uap->arena);
-		if ((base & ((VM_CAPREVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
-			return EINVAL;
 		size = cheri_getlen(uap->arena);
-		if ((size & ((VM_CAPREVOKE_GSZ_MEM_NOMAP * 8) - 1)) != 0)
-			return EINVAL;
 
-		shadow_base = VM_CAPREVOKE_BM_MEM_NOMAP
-		            + (base / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8);
-		shadow_size = size / VM_CAPREVOKE_GSZ_MEM_NOMAP / 8;
-
-		cres = cheri_capability_build_user_data(
-			arena_perms & (CHERI_PERM_LOAD | CHERI_PERM_STORE)
-				| CHERI_PERM_GLOBAL ,
-			shadow_base, shadow_size, 0);
+		cres = vm_caprevoke_shadow_cap(sel, base, size, arena_perms);
 
 		break;
 
@@ -538,23 +527,12 @@ cheriabi_caprevoke_shadow(struct thread *td,
 			     | CHERI_PERM_CHERIABI_VMMAP;
 		arena_perms = cheri_getperm(uap->arena);
 		if ((arena_perms & reqperms) != reqperms)
-			return EINVAL;
+			return EPERM;
 
-		/* Require at least byte granularity in the shadow space */
 		base = cheri_getbase(uap->arena);
-		if ((base & ((VM_CAPREVOKE_GSZ_OTYPE * 8) - 1)) != 0)
-			return EINVAL;
 		size = cheri_getlen(uap->arena);
-		if ((size & ((VM_CAPREVOKE_GSZ_OTYPE * 8) - 1)) != 0)
-			return EINVAL;
 
-		shadow_base = VM_CAPREVOKE_BM_OTYPE
-		            + (base / VM_CAPREVOKE_GSZ_OTYPE / 8);
-		shadow_size = size / VM_CAPREVOKE_GSZ_OTYPE / 8;
-
-		cres = cheri_capability_build_user_data(
-			CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_GLOBAL,
-			shadow_base, shadow_size, 0);
+		cres = vm_caprevoke_shadow_cap(sel, base, size, 0);
 
 		}
 		break;
@@ -562,7 +540,10 @@ cheriabi_caprevoke_shadow(struct thread *td,
 		return EINVAL;
 	}
 
-	error = copyoutcap(&cres, uap->shadow, sizeof(cres));
+	if (cheri_gettag(cres))
+		error = copyoutcap(&cres, uap->shadow, sizeof(cres));
+	else
+		error = (__cheri_addr uintptr_t)cres;
 
 	return error;
 }

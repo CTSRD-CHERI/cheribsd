@@ -111,6 +111,10 @@ int vm_test_caprevoke(const struct vm_caprevoke_cookie *,
 /*  Shadow region installation into vm map */
 int vm_map_install_caprevoke_shadow (struct vm_map * map);
 
+/*  Shadow map capability constructor */
+void * __capability vm_caprevoke_shadow_cap(int sel, vm_offset_t base,
+					    vm_offset_t size, int perm_mask);
+
 /*  Walking a particular page */
 #define VM_CAPREVOKE_PAGE_HASCAPS	0x01
 #define VM_CAPREVOKE_PAGE_DIRTY		0x02
