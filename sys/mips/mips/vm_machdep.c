@@ -644,7 +644,7 @@ vm_test_caprevoke_mem(const struct vm_caprevoke_cookie *crc,
 
 		bmbits = fubyte_c(bmloc);
 
-		if (bmbits & (1 << ((va / VM_CAPREVOKE_GSZ_MEM_NOMAP) % 8))) {
+		if (bmbits & (1 << ((va / VM_CAPREVOKE_GSZ_MEM_MAP) % 8))) {
 			return 1;
 		}
 	}
