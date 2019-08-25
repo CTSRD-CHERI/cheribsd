@@ -686,6 +686,7 @@ static void
 fprintf_caprevoke_stats(FILE *f, struct caprevoke_stats crst, uint32_t cycsum)
 {
 	fprintf(f, "revoke:"
+		" einit=%" PRIu64
 		" efini=%" PRIu64
 		" pscan=%" PRIu64
 		" scanc=%" PRIu64
@@ -696,6 +697,7 @@ fprintf_caprevoke_stats(FILE *f, struct caprevoke_stats crst, uint32_t cycsum)
 		" caps=%" PRIu64
 		" crev=%" PRIu64
 		" totc=%" PRIu32 "\n",
+		crst.epoch_init,
 		crst.epoch_fini,
 		crst.pages_scanned,
 		crst.page_scan_cycles,
@@ -713,6 +715,7 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 {
 	void * __capability * __capability mb;
 	void * __capability sh;
+	const volatile struct caprevoke_info * __capability cri;
 	void * __capability revme;
 	struct caprevoke_stats crst;
 	int kq;
@@ -723,6 +726,10 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 					  MAP_ANON, -1, 0));
 	CHERITEST_CHECK_SYSCALL(caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP,
 						 mb, &sh));
+
+	CHERITEST_CHECK_SYSCALL(
+		caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+				 __DEQUALIFY_CAP(void * __capability *,&cri)));
 
 	/*
 	 * OK, armed with the shadow mapping... generate a capability to
@@ -753,6 +760,8 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
+	CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
+
 	CHERITEST_VERIFY2(check_revoked(mb[1]), "Memory tag persists");
 	check_kqueue_cap(kq, 0);
 
@@ -777,11 +786,15 @@ test_caprevoke_lightly(const struct cheri_test *ctp __unused)
 	CHERITEST_VERIFY2(crst.epoch_fini >= crst.epoch_init + 1, "Bad epoch clock state");
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
+	CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
+
 	cyc_start = cheri_get_cyclecount();
 	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS, crst.epoch_init, &crst));
 	cyc_end = cheri_get_cyclecount();
 
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+
+	CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
 
 	CHERITEST_VERIFY2(!check_revoked(mb[1]), "Memory tag cleared");
 
@@ -798,6 +811,7 @@ test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
 {
 	void * __capability * __capability mb;
 	void * __capability sh;
+	const volatile struct caprevoke_info * __capability cri;
 	void * __capability revme;
 	struct caprevoke_stats crst;
 	uint32_t cyc_start, cyc_end;
@@ -806,6 +820,10 @@ test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
 					  MAP_ANON, -1, 0));
 	CHERITEST_CHECK_SYSCALL(caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP,
 						 mb, &sh));
+
+	CHERITEST_CHECK_SYSCALL(
+		caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+				 __DEQUALIFY_CAP(void * __capability *,&cri)));
 
 	revme = cheri_andperm(cheri_csetbounds(mb, 0x10),
 			      ~CHERI_PERM_CHERIABI_VMMAP);
@@ -818,6 +836,8 @@ test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_IGNORE_START, 0, &crst));
 	cyc_end = cheri_get_cyclecount();
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+
+	CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
 
 	CHERI_FPRINT_PTR(stderr, revme);
 	CHERI_FPRINT_PTR(stderr, mb[0]);
@@ -832,6 +852,8 @@ test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
 	cyc_end = cheri_get_cyclecount();
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 
+	CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
+
 	CHERI_FPRINT_PTR(stderr, revme);
 	CHERI_FPRINT_PTR(stderr, mb[0]);
 	CHERI_FPRINT_PTR(stderr, mb[1]);
@@ -845,6 +867,8 @@ test_caprevoke_capdirty(const struct cheri_test *ctp __unused)
 	CHERITEST_CHECK_SYSCALL(caprevoke(CAPREVOKE_LAST_PASS|CAPREVOKE_IGNORE_START, 0, &crst));
 	cyc_end = cheri_get_cyclecount();
 	fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
+
+	CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
 
 	CHERI_FPRINT_PTR(stderr, revme);
 	CHERI_FPRINT_PTR(stderr, mb[0]);
@@ -887,11 +911,11 @@ static void
 test_caprevoke_lib_init(
 	size_t bigblock_caps,
 	void * __capability * __capability * obigblock,
-	void * __capability * oshadow
+	void * __capability * oshadow,
+	const volatile struct caprevoke_info * __capability * ocri
 )
 {
 	void * __capability * __capability bigblock;
-	void * __capability shadow;
 
 	bigblock = CHERITEST_CHECK_SYSCALL(
 			mmap(0, bigblock_caps * sizeof(void * __capability),
@@ -905,13 +929,14 @@ test_caprevoke_lib_init(
 				cheri_csetbounds(&bigblock[ix], 16),
 				~CHERI_PERM_CHERIABI_VMMAP);
 	}
+	*obigblock = bigblock;
 
 	CHERITEST_CHECK_SYSCALL(
-			caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP,
-					 bigblock, &shadow));
+		caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, bigblock, oshadow));
 
-	*obigblock = bigblock;
-	*oshadow = shadow;
+	CHERITEST_CHECK_SYSCALL(
+		caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+			__DEQUALIFY_CAP(void * __capability *,ocri)));
 }
 
 static void
@@ -920,7 +945,8 @@ test_caprevoke_lib_run(
 	int paranoia,
 	size_t bigblock_caps,
 	void * __capability * __capability bigblock,
-	void * __capability shadow
+	void * __capability shadow,
+	const volatile struct caprevoke_info * __capability cri
 )
 {
 	size_t bigblock_offset = 0;
@@ -997,6 +1023,7 @@ test_caprevoke_lib_run(
 		if (verbose > 2) {
 			fprintf_caprevoke_stats(stderr, crst, cyc_end - cyc_start);
 		}
+		CHERITEST_VERIFY2(cri->epoch_dequeue == crst.epoch_fini, "Bad shared clock");
 
 		/* Check the surroundings */
 		if (paranoia > 1) {
@@ -1050,10 +1077,11 @@ test_caprevoke_lib(const struct cheri_test *ctp __unused)
 
 	void * __capability * __capability bigblock;
 	void * __capability shadow;
+	const volatile struct caprevoke_info * __capability cri;
 
 	srand(1337);
 
-	test_caprevoke_lib_init(bigblock_caps, &bigblock, &shadow);
+	test_caprevoke_lib_init(bigblock_caps, &bigblock, &shadow, &cri);
 
 	if (verbose > 0) {
 		CHERI_FPRINT_PTR(stderr, bigblock);
@@ -1061,7 +1089,7 @@ test_caprevoke_lib(const struct cheri_test *ctp __unused)
 	}
 
 	test_caprevoke_lib_run(verbose, paranoia, bigblock_caps,
-		bigblock, shadow);
+		bigblock, shadow, cri);
 
 	munmap(bigblock, bigblock_caps * sizeof(void * __capability));
 
@@ -1078,12 +1106,13 @@ test_caprevoke_lib_fork(const struct cheri_test *ctp __unused)
 
 	void * __capability * __capability bigblock;
 	void * __capability shadow;
+	const volatile struct caprevoke_info * __capability cri;
 
 	int pid;
 
 	srand(1337);
 
-	test_caprevoke_lib_init(bigblock_caps, &bigblock, &shadow);
+	test_caprevoke_lib_init(bigblock_caps, &bigblock, &shadow, &cri);
 
 	if (verbose > 0) {
 		CHERI_FPRINT_PTR(stderr, bigblock);
@@ -1093,7 +1122,7 @@ test_caprevoke_lib_fork(const struct cheri_test *ctp __unused)
 	pid = fork();
 	if (pid == 0) {
 		test_caprevoke_lib_run(verbose, paranoia, bigblock_caps,
-			bigblock, shadow);
+			bigblock, shadow, cri);
 	} else {
 		int res;
 

@@ -134,6 +134,7 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 	int res;
 	caprevoke_epoch epoch;
 	enum caprevoke_state entryst, myst;
+	struct caprevoke_info cri;
 	struct caprevoke_stats stat = { 0 };
 	struct vmspace *vm;
 	vm_map_t vmm;
@@ -332,6 +333,21 @@ fast_out:
 	}
 	vm_map_unlock(vmm);
 
+	/*
+	 * I am the revoker; expose an incremented epoch to userland
+	 * for its enqueue side.  Use a store fence to ensure that this
+	 * is visible before any of our subsequent loads (we can't use
+	 * vm map lock to do this, because copyout might need the map).
+	 */
+	if ((entryst == CAPREVST_NONE) && (myst == CAPREVST_LAST_PASS)) {
+		cri.epoch_enqueue = epoch + 2;
+	} else {
+		cri.epoch_enqueue = epoch + 1;
+	}
+	cri.epoch_dequeue = epoch;
+	vm_caprevoke_publish(&vmcrc, &cri);
+	wmb();
+
 	/* Walk the VM unless told not to */
 	if ((uap->flags & CAPREVOKE_LAST_NO_EARLY) == 0) {
 		res = vm_caprevoke(&vmcrc,
@@ -458,6 +474,8 @@ skip_last_pass:
 		if ((res == KERN_SUCCESS) && (myst == CAPREVST_LAST_PASS)) {
 			/* Signal the end of this revocation epoch */
 			epoch++;
+			cri.epoch_dequeue = epoch;
+			vm_caprevoke_publish(&vmcrc, &cri);
 			vm_map_lock(vmm);
 			SET_ST(vmm, epoch, CAPREVST_NONE);
 			vm_map_unlock(vmm);
@@ -466,6 +484,8 @@ skip_last_pass:
 			 * Put the state back how we found it, modulo
 			 * having perhaps finished the first pass.
 			 */
+			cri.epoch_dequeue = epoch;
+			vm_caprevoke_publish(&vmcrc, &cri);
 			vm_map_lock(vmm);
 			SET_ST(vmm, epoch, entryst);
 			vm_map_unlock(vmm);
@@ -501,11 +521,11 @@ cheriabi_caprevoke_shadow(struct thread *td,
 	if (!SV_CURPROC_FLAG(SV_CHERI))
 		return ENOSYS;
 
-	if (cheri_gettag(uap->arena) == 0)
-		return EINVAL;
-
 	switch (sel) {
 	case CAPREVOKE_SHADOW_NOVMMAP:
+
+		if (cheri_gettag(uap->arena) == 0)
+			return EINVAL;
 
 		arena_perms = cheri_getperm(uap->arena);
 
@@ -522,6 +542,9 @@ cheriabi_caprevoke_shadow(struct thread *td,
 	case CAPREVOKE_SHADOW_OTYPE: {
 		int reqperms;
 
+		if (cheri_gettag(uap->arena) == 0)
+			return EINVAL;
+
 		/* XXX Require all of VMMAP, SEAL, and UNSEAL permissions? */
 		reqperms = CHERI_PERM_SEAL | CHERI_PERM_UNSEAL
 			     | CHERI_PERM_CHERIABI_VMMAP;
@@ -536,6 +559,13 @@ cheriabi_caprevoke_shadow(struct thread *td,
 
 		}
 		break;
+
+	case CAPREVOKE_SHADOW_INFO_STRUCT: {
+		/* Anyone's allowed to ask, I guess; ->arena ignored. */
+		cres = vm_caprevoke_shadow_cap(sel, 0, 0, 0);
+
+		break;
+	}
 	default:
 		return EINVAL;
 	}

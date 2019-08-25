@@ -627,6 +627,17 @@ vm_caprevoke_cookie_init(vm_map_t map,
 	 */
 	crc->crshadow = caprev_shadow_cap;
 
+	/* XXX This is awfully MD for a MI file like this one... */
+	crc->info_page = cheri_capability_build_user_data(
+		CHERI_PERM_LOAD
+		| CHERI_PERM_LOAD_CAP
+		| CHERI_PERM_STORE
+		| CHERI_PERM_STORE_CAP
+		| CHERI_PERM_GLOBAL,
+		VM_CAPREVOKE_INFO_PAGE,
+		PAGE_SIZE,
+		0);
+
 	return KERN_SUCCESS;
 }
 

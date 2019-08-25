@@ -1018,12 +1018,30 @@ vm_caprevoke_shadow_cap(int sel, vm_offset_t base, vm_offset_t size, int pmask)
 			CHERI_PERM_LOAD | CHERI_PERM_STORE | CHERI_PERM_GLOBAL,
 			shadow_base, shadow_size, 0);
 	}
+	case CAPREVOKE_SHADOW_INFO_STRUCT: {
+		return cheri_capability_build_user_data(
+			CHERI_PERM_LOAD
+			| CHERI_PERM_LOAD_CAP
+			| CHERI_PERM_GLOBAL,
+			VM_CAPREVOKE_INFO_PAGE,
+			sizeof(struct caprevoke_info),
+			0);
+	}
 	/* Kernel-only */
 	// XXX CAPREVOKE_SHADOW_MAP:
 	//
 	default:
 		return ERRNO_CAP(EINVAL);
 	}
+}
+
+void
+vm_caprevoke_publish(const struct vm_caprevoke_cookie *vmcrc,
+			 const struct caprevoke_info *ip)
+{
+	int res = copyout_c(ip, &vmcrc->info_page->pub, sizeof(*ip));
+	KASSERT(res == 0, ("vm_caprevoke_publish: bad copyout %d\n", res));
+	(void)res;
 }
 
 #endif /* CHERI_CAPREVOKE */

@@ -37,6 +37,8 @@
 
 /**************************** FORWARD DECLARATIONS ***************************/
 
+struct caprevoke_info;
+struct caprevoke_info_page;
 struct caprevoke_stats;
 struct file;
 struct vm_caprevoke_cookie;
@@ -72,6 +74,7 @@ cheri_revoke(void * __capability c)
 struct vm_caprevoke_cookie {
 	struct vm_map * map;			/* The map itself */
 	const uint8_t * __capability crshadow;	/* Access to the shadow space */
+	struct caprevoke_info_page * __capability info_page;
 	struct caprevoke_stats *stats;		/* Statistics */
 	int flags;				/* VM_CAPREVOKE_CF_* */
 };
@@ -114,6 +117,9 @@ int vm_map_install_caprevoke_shadow (struct vm_map * map);
 /*  Shadow map capability constructor */
 void * __capability vm_caprevoke_shadow_cap(int sel, vm_offset_t base,
 					    vm_offset_t size, int perm_mask);
+/*  Publish state to shared page */
+void vm_caprevoke_publish(const struct vm_caprevoke_cookie *,
+			  const struct caprevoke_info *);
 
 /*  Walking a particular page */
 #define VM_CAPREVOKE_PAGE_HASCAPS	0x01
