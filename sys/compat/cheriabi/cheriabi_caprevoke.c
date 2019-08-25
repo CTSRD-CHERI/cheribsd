@@ -93,8 +93,6 @@ static void
 cheriabi_caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
 			struct cheriabi_caprevoke_args *uap)
 {
-	struct caprevoke_stats st = { 0 };
-
 	/*
 	 * Unlocked access is fine; this is advisory and, when it is
 	 * relevant to userland, we expect that userland has already
@@ -107,7 +105,8 @@ cheriabi_caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
 	 * implied a suitable one on syscall entry, which seems
 	 * unlikely.
 	 */
-	st.epoch_init = vmcrc->map->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
+	vmcrc->stats->epoch_init =
+		vmcrc->map->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
 	if (uap->flags & CAPREVOKE_JUST_MY_REGS) {
 		caprevoke_td_frame(td, vmcrc);
@@ -122,7 +121,8 @@ cheriabi_caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
 	}
 
 	/* XXX unlocked read OK? */
-	st.epoch_fini = vmcrc->map->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
+	vmcrc->stats->epoch_fini =
+		vmcrc->map->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 }
 
 #define SET_ST(vp, e, st) \
