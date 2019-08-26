@@ -38,11 +38,19 @@ static inline int
 vm_caprevoke_should_visit_page(vm_page_t m, int flags)
 {
 	/*
-	 * Always visit recently-capdirty pages, but without the side-effect
-	 * of clearing what might be a shared bit.
+	 * If a page is capdirty and we're opening the epoch, visit this
+	 * page.  Otherwise, if the sweep is incemental, this dirtiness
+	 * isn't relevant unless we cleared the dirty flag the last pass
+	 * through or we have never seen caps on this page before.
 	 */
-	if (m->aflags & PGA_CAPSTORED)
+	if (m->aflags & PGA_CAPSTORED) {
+		if (flags & VM_CAPREVOKE_INCREMENTAL) {
+			if ((m->oflags & VPO_PASTCAPSTORE) == 0)
+				return 1;
+			return (m->oflags & VPO_CAPREVSECOND);
+		}
 		return 1;
+	}
 
 	/*
 	 * If this is an incremental scan, we only care about
@@ -158,6 +166,22 @@ vm_caprevoke_unwire_in_situ(vm_page_t m)
 	vm_page_unlock(m);
 }
 
+static void
+vm_caprevoke_unshared_clear_caprevsecond(vm_object_t obj, vm_page_t m)
+{
+	if ((obj->shadow_count != 0) || (m->object != obj))
+		return;
+
+	/*
+	 * This is a non-shared page; we might have set VPO_CAPREVSECOND in
+	 * an earlier pass and now not be visiting the page again.  Clear
+	 * the flag.
+	 */
+
+	if (m->oflags & VPO_CAPREVSECOND)
+		m->oflags &= ~VPO_CAPREVSECOND;
+}
+
 enum vm_cro_at {
 	VM_CAPREVOKE_AT_OK    = 0,
 	VM_CAPREVOKE_AT_TICK  = 1,
@@ -264,6 +288,7 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 
 	if (!vm_caprevoke_should_visit_page(m, flags)) {
 		*ooff = ioff + pagesizes[m->psind];
+		vm_caprevoke_unshared_clear_caprevsecond(obj, m);
 		return VM_CAPREVOKE_AT_OK;
 	}
 
@@ -272,6 +297,7 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 	case VM_CAPREVOKE_VIS_DONE:
 		/* We were able to conclude that the page was clean */
 		*ooff = ioff + pagesizes[m->psind];
+		vm_caprevoke_unshared_clear_caprevsecond(obj, m);
 		return VM_CAPREVOKE_AT_OK;
 	case VM_CAPREVOKE_VIS_BUSY:
 		/*
@@ -280,6 +306,7 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 		 * object lock to unbusy.  So handle this like the
 		 * map stepping forward.
 		 */
+		vm_caprevoke_unshared_clear_caprevsecond(obj, m);
 		VM_OBJECT_WUNLOCK(obj);
 		return VM_CAPREVOKE_AT_TICK;
 	case VM_CAPREVOKE_VIS_DIRTY:
@@ -314,6 +341,10 @@ vm_caprevoke_object_at(const struct vm_caprevoke_cookie *crc, int flags,
 	vm_caprevoke_unwire_in_situ(m);
 
 visit_rw:
+	if ((flags & VM_CAPREVOKE_LAST_INIT) == 0)
+		m->oflags |= VPO_CAPREVSECOND;
+	else
+		m->oflags &= ~VPO_CAPREVSECOND;
 	vm_page_aflag_clear(m, PGA_CAPSTORED);
 	switch(vm_caprevoke_visit_rw(crc, flags, obj, m))
 	{

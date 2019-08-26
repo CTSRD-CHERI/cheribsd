@@ -238,6 +238,7 @@ struct vm_page {
 #define	VPO_SWAPINPROG	0x08		/* swap I/O in progress on page */
 #define	VPO_NOSYNC	0x10		/* do not collect for syncer */
 #define	VPO_PASTCAPSTORE 0x20	/* This page had capabilities in the past */
+#define VPO_CAPREVSECOND 0x40	/* If dirty, may need revoker's attention */
 
 /*
  * Busy page implementation details.
