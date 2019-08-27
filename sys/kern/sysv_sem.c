@@ -2275,6 +2275,7 @@ int
 freebsd64_semsys(struct thread *td, struct freebsd64_semsys_args *uap)
 {
 
+#ifdef COMPAT_FREEBSD7
 	AUDIT_ARG_SVIPC_WHICH(uap->which);
 	switch (uap->which) {
 	case 0:
@@ -2283,6 +2284,9 @@ freebsd64_semsys(struct thread *td, struct freebsd64_semsys_args *uap)
 	default:
 		return (sys_semsys(td, (struct semsys_args *)uap));
 	}
+#else
+	return (nosys(td, (struct nosys_args *)uap));
+#endif
 }
 
 #if defined(COMPAT_FREEBSD7)

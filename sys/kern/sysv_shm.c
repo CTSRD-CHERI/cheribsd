@@ -1955,11 +1955,11 @@ freebsd64_shmdt(struct thread *td, struct freebsd64_shmdt_args *uap)
 	return (kern_shmdt(td, __USER_CAP_UNBOUND(uap->shmaddr)));
 }
 
-#ifdef COMPAT_FREEBSD7
 int
 freebsd64_shmsys(struct thread *td, struct freebsd64_shmsys_args *uap)
 {
 
+#ifdef COMPAT_FREEBSD7
 	AUDIT_ARG_SVIPC_WHICH(uap->which);
 	switch (uap->which) {
 	case 0:	{	/* shmat */
@@ -2001,6 +2001,7 @@ freebsd64_shmsys(struct thread *td, struct freebsd64_shmsys_args *uap)
 #endif
 }
 
+#ifdef COMPAT_FREEBSD7
 int
 freebsd7_freebsd64_shmctl(struct thread *td,
     struct freebsd7_freebsd64_shmctl_args *uap)
@@ -2134,6 +2135,7 @@ done:
 	}
 	return (error);
 }
+#endif /* COMPAT_FREEBSD64 */
 
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)

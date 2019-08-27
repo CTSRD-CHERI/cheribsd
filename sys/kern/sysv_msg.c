@@ -2033,6 +2033,7 @@ int
 freebsd64_msgsys(struct thread *td, struct freebsd64_msgsys_args *uap)
 {
 
+#ifdef COMPAT_FREEBSD7
 	AUDIT_ARG_SVIPC_WHICH(uap->which);
 	switch (uap->which) {
 	case 0:
@@ -2047,6 +2048,9 @@ freebsd64_msgsys(struct thread *td, struct freebsd64_msgsys_args *uap)
 	default:
 		return (sys_msgsys(td, (struct msgsys_args *)uap));
 	}
+#else
+	return (nosys(td, (struct nosys_args *)uap));
+#endif
 }
 
 #if defined(COMPAT_FREEBSD7)
