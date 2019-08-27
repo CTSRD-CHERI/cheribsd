@@ -1523,28 +1523,6 @@ freebsd64_getrandom(struct thread *td, struct freebsd64_getrandom_args *uap)
 	    uap->buflen, uap->flags));
 }
 
-/*
- * sys_pipe.c
- */
-#ifdef COMPAT_FREEBSD10
-int
-freebsd10_freebsd64_pipe(struct thread *td,
-    struct freebsd10_freebsd64_pipe_args *uap __unused)
-{
-	int error;
-	int fildes[2];
-
-	error = kern_pipe(td, fildes, 0, NULL, NULL);
-	if (error)
-		return (error);
-
-	td->td_retval[0] = fildes[0];
-	td->td_retval[1] = fildes[1];
-
-	return (0);
-}
-#endif
-
 int
 freebsd64_pipe2(struct thread *td, struct freebsd64_pipe2_args *uap)
 {
