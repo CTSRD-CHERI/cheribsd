@@ -147,6 +147,7 @@ CPU_CHERI_NO_SYSCALL_AUTHORIZE opt_global.h
 # Capability revocation
 #
 CHERI_CAPREVOKE			opt_global.h
+CHERI_CAPREVOKE_CLOADTAGS	opt_global.h
 CHERI_CAPREVOKE_STATS		opt_global.h
 
 #
