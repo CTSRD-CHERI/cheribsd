@@ -1307,7 +1307,8 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 	    (copyout_siginfo_t *)copyout_siginfo_native));
 }
 
-int user_sigtimedwait(struct thread *td, const sigset_t * __capability uset,
+int
+user_sigtimedwait(struct thread *td, const sigset_t * __capability uset,
     void * __capability info, const struct timespec * __capability utimeout,
     copyout_siginfo_t *copyout_siginfop)
 {
