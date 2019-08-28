@@ -151,6 +151,11 @@ vm_caprevoke_visit_ro(const struct vm_caprevoke_cookie *crc, int flags,
 	VM_OBJECT_WLOCK(obj);
 	vm_page_xunbusy(m);
 
+	/*
+	 * Don't update PASTCAPSTORE here!  I know it's tempting, but the
+	 * page might be shared!
+	 */
+
 	if (hascaps & VM_CAPREVOKE_PAGE_DIRTY) {
 		return VM_CAPREVOKE_VIS_DIRTY;
 	}

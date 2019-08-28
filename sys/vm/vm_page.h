@@ -734,9 +734,7 @@ vm_page_aflag_set(vm_page_t m, uint8_t bits)
  * vm_page_aflag_clear, this reports the contents of the aflags field before
  * mutation, allowing for a race-free observation and reset of status.
  *
- * Used, at the moment, solely for PGA_CAPSTORED, allowing the MI revoker
- * outer loops to decide whether a page is recently capdirtied.  See
- * sys/vm/vm_caprevoke.c .
+ * This used to be used with capability revocation, but is now unused.
  *
  * XXX NWF This is horrifying and there must be a better way.
  */
