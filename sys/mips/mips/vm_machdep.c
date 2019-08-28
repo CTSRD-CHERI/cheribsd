@@ -697,13 +697,11 @@ vm_test_caprevoke(const struct vm_caprevoke_cookie *crc,
  */
 static int
 vm_do_caprevoke(const struct vm_caprevoke_cookie *crc,
-		void * __capability * __capability cutp)
+		void * __capability * __capability cutp,
+		void * __capability cut)
 {
 	CAPREVOKE_STATS_FOR(crst, crc);
-	void * __capability cut;
 	int res = 0;
-
-	cut = *cutp;
 
 	KASSERT(cheri_gettag(cut), ("untagged in vm_do_caprevoke"));
 
@@ -796,6 +794,46 @@ SYSINIT(cloadtags_stride, SI_SUB_VM, SI_ORDER_ANY,
         measure_cloadtags_stride, NULL);
 #endif
 
+static inline int
+vm_caprevoke_page_iter(const struct vm_caprevoke_cookie *crc,
+		       int (*cb)(const struct vm_caprevoke_cookie *,
+				 void * __capability * __capability,
+				 void * __capability),
+		       void * __capability * __capability mvu,
+		       vm_offset_t mve)
+{
+	int res = 0;
+
+#ifdef CHERI_CAPREVOKE_CLOADTAGS
+	for( ; cheri_getaddress(mvu) < mve; mvu += cloadtags_stride ) {
+		void * __capability * __capability mvt = mvu;
+		uint64_t tags;
+
+		tags = __builtin_cheri_cap_load_tags(mvt);
+
+		for(; tags != 0; (tags >>= 1), mvt += 1) {
+			if (!(tags & 1))
+				continue;
+
+			res |= cb(crc, mvt, *mvt);
+			if (res & VM_CAPREVOKE_PAGE_EARLY_OUT)
+				return res;
+		}
+	}
+#else
+	for( ; cheri_getaddress(mvu) < mve; mvu++) {
+		void * __capability cut = *mvu;
+		if (cheri_gettag(cut)) {
+			res |= cb(crc, mvu, cut);
+			if (res & VM_CAPREVOKE_PAGE_EARLY_OUT)
+				return res;
+		}
+	}
+#endif
+
+	return res;
+}
+
 int
 vm_caprevoke_page(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 {
@@ -824,33 +862,27 @@ vm_caprevoke_page(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 
 	mvu = cheri_setaddress(kdc, mva);
 
-#ifdef CHERI_CAPREVOKE_CLOADTAGS
-	for( ; cheri_getaddress(mvu) < mve; mvu += cloadtags_stride ) {
-		void * __capability * __capability mvt = mvu;
-		uint64_t tags;
-
-		tags = __builtin_cheri_cap_load_tags(mvt);
-
-		for(; tags != 0; (tags >>= 1), mvt += 1) {
-			if (!(tags & 1))
-				continue;
-
-			res |= vm_do_caprevoke(crc, mvt);
-		}
-	}
-#else
-	for( ; cheri_getaddress(mvu) < mve; mvu++) {
-		void * __capability cut = *mvu;
-		if (cheri_gettag(cut)) {
-			res |= vm_do_caprevoke(crc, mvu);
-		}
-	}
-#endif
+	res = vm_caprevoke_page_iter(crc, vm_do_caprevoke, mvu, mve);
 
 #ifdef CHERI_CAPREVOKE_STATS
 	uint32_t cyc_end = cheri_get_cyclecount();
 	CAPREVOKE_STATS_INC(crst, page_scan_cycles, cyc_end - cyc_start);
 #endif
+
+	return res;
+}
+
+static inline int
+vm_caprevoke_page_ro_adapt(const struct vm_caprevoke_cookie *vmcrc,
+			   void * __capability * __capability cutp,
+			   void * __capability cut)
+{
+	(void)cutp;
+
+	int res = vm_test_caprevoke(vmcrc, cut);
+
+	if (res & VM_CAPREVOKE_PAGE_DIRTY)
+		return res | VM_CAPREVOKE_PAGE_EARLY_OUT;
 
 	return res;
 }
@@ -888,37 +920,7 @@ vm_caprevoke_page_ro(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 
 	mvu = cheri_setaddress(kdc, mva);
 
-#ifdef CHERI_CAPREVOKE_CLOADTAGS
-	for( ; cheri_getaddress(mvu) < mve; mvu += cloadtags_stride ) {
-		void * __capability * __capability mvt = mvu;
-		uint64_t tags;
-
-		tags = __builtin_cheri_cap_load_tags(mvt);
-
-		if (tags != 0)
-			res |= VM_CAPREVOKE_PAGE_HASCAPS;
-
-		for(; tags != 0; (tags >>= 1), mvt += 1) {
-			if (!(tags & 1))
-				continue;
-			if (vm_test_caprevoke(crc, *mvt)) {
-				return VM_CAPREVOKE_PAGE_DIRTY
-					| VM_CAPREVOKE_PAGE_HASCAPS;
-			}
-		}
-	}
-#else
-	for( ; cheri_getaddress(mvu) < mve; mvu++) {
-		void * __capability cut = *mvu;
-		if (cheri_gettag(cut)) {
-			res |= VM_CAPREVOKE_PAGE_HASCAPS;
-			if (vm_test_caprevoke(crc, cut)) {
-				return VM_CAPREVOKE_PAGE_DIRTY
-					| VM_CAPREVOKE_PAGE_HASCAPS;
-			}
-		}
-	}
-#endif
+	res = vm_caprevoke_page_iter(crc, vm_caprevoke_page_ro_adapt, mvu, mve);
 
 #ifdef CHERI_CAPREVOKE_STATS
 	uint32_t cyc_end = cheri_get_cyclecount();
