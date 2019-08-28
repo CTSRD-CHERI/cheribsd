@@ -75,7 +75,9 @@ struct vm_caprevoke_cookie {
 	struct vm_map * map;			/* The map itself */
 	const uint8_t * __capability crshadow;	/* Access to the shadow space */
 	struct caprevoke_info_page * __capability info_page;
+#ifdef CHERI_CAPREVOKE_STATS
 	struct caprevoke_stats *stats;		/* Statistics */
+#endif
 	int flags;				/* VM_CAPREVOKE_CF_* */
 };
 

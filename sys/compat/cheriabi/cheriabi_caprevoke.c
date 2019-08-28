@@ -91,6 +91,7 @@ cheriabi_caprevoke_fini(struct thread *td, struct cheriabi_caprevoke_args *uap,
 
 static void
 cheriabi_caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
+			struct caprevoke_stats *stats,
 			struct cheriabi_caprevoke_args *uap)
 {
 	/*
@@ -105,7 +106,7 @@ cheriabi_caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
 	 * implied a suitable one on syscall entry, which seems
 	 * unlikely.
 	 */
-	vmcrc->stats->epoch_init =
+	stats->epoch_init =
 		vmcrc->map->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 
 	if (uap->flags & CAPREVOKE_JUST_MY_REGS) {
@@ -121,7 +122,7 @@ cheriabi_caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
 	}
 
 	/* XXX unlocked read OK? */
-	vmcrc->stats->epoch_fini =
+	stats->epoch_fini =
 		vmcrc->map->vm_caprev_st >> CAPREVST_EPOCH_SHIFT;
 }
 
@@ -148,7 +149,7 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 					       &stat);
 	}
 	if ((uap->flags & CAPREVOKE_JUST_MASK) != 0) {
-		cheriabi_caprevoke_just(td, &vmcrc, uap);
+		cheriabi_caprevoke_just(td, &vmcrc, &stat, uap);
 		vm_caprevoke_cookie_rele(&vmcrc);
 		vmspace_free(vm);
 		return cheriabi_caprevoke_fini(td, uap, 0, &stat);
