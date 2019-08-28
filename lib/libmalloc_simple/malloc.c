@@ -51,6 +51,7 @@ static char *rcsid = "$FreeBSD$";
 #include <cheri/cheric.h>
 
 #include <assert.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -88,6 +89,8 @@ union	overhead {
 #define	ov_index	ovu.ovu_index
 };
 
+#define	MALLOC_ALIGNMENT	sizeof(union overhead)
+
 #define	MAGIC		0xef		/* magic # on accounting info */
 
 /*
@@ -118,7 +121,18 @@ botch(const char *s)
 #endif
 
 static void *
-__simple_malloc(size_t nbytes)
+bound_ptr(void *mem, size_t nbytes)
+{
+	void *ptr;
+
+	ptr = cheri_csetbounds(mem, nbytes);
+	ptr = cheri_andperm(ptr,
+	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP);
+	return (ptr);
+}
+
+static void *
+__simple_malloc_unaligned(size_t nbytes)
 {
 	union overhead *op;
 	int bucket;
@@ -161,7 +175,45 @@ __simple_malloc(size_t nbytes)
 	nextf[bucket] = op->ov_next;
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
-	return (cheri_csetbounds(op + 1, nbytes));
+	return (op + 1);
+}
+
+static void *
+__simple_malloc_aligned(size_t nbytes, size_t align)
+{
+	vaddr_t memshift;
+	void *mem, *res;
+	if (align < sizeof(void *))
+		align = sizeof(void *);
+
+	mem = __simple_malloc_unaligned(nbytes + sizeof(void *) + align - 1);
+	memshift = roundup2((vaddr_t)mem + sizeof(void *), align) -
+	    (vaddr_t)mem;
+
+	res = (void *)((uintptr_t)mem + memshift);
+	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
+	return (res);
+}
+
+static void *
+__simple_malloc(size_t nbytes)
+{
+	void *mem;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t align, mask;
+
+	nbytes = __builtin_cheri_round_representable_length(nbytes);
+	mask = __builtin_cheri_representable_alignment_mask(nbytes);
+	align = 1 + ~mask;
+
+	if (mask != SIZE_MAX && align > MALLOC_ALIGNMENT)
+		mem = __simple_malloc_aligned(nbytes, align);
+	else
+#endif
+	mem = __simple_malloc_unaligned(nbytes);
+
+	return (bound_ptr(mem, nbytes));
 }
 
 static void *
@@ -239,6 +291,25 @@ find_overhead(void * cp)
 	}
 	op--;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * In pure-capability mode our allocation might have come from
+	 * __simple_malloc_aligned.  In that case we need to get back to the
+	 * real overhead pointer.  To make sure we aren't tricked, the
+	 * pointer must:
+	 *  - Be an internal allocator pointer (have the VMMAP permision).
+	 *  - Point somewhere before us and within the current pagepool.
+	 */
+	if (cheri_gettag(op->ov_next) &&
+	    (cheri_getperm(op->ov_next) & CHERI_PERM_CHERIABI_VMMAP) != 0) {
+		vaddr_t base, pp_base;
+
+		pp_base = cheri_getbase(op);
+		base = cheri_getbase(op->ov_next);
+		if (base >= pp_base && base < cheri_getaddress(op))
+			op = op->ov_next;
+	}
+#endif
 	if (op->ov_magic == MAGIC)
 		return (op);
 
@@ -279,14 +350,18 @@ __simple_realloc(void *cp, size_t nbytes)
 	union overhead *op;
 	char *res;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Round up here because we might need to set bounds... */
+	nbytes = __builtin_cheri_round_representable_length(nbytes);
+#endif
+
 	if (cp == NULL)
 		return (__simple_malloc(nbytes));
 	op = find_overhead(cp);
 	if (op == NULL)
 		return (NULL);
-	cur_space = (1 << (op->ov_index + 3)) - sizeof(*op);
+	cur_space = (FIRST_BUCKET_SIZE << op->ov_index) - sizeof(*op);
 
-	/* avoid the copy if same size block */
 	/*
 	 * XXX-BD: Arguably we should be tracking the actual allocation
 	 * not just the bucket size so that we can do a full malloc+memcpy
@@ -300,12 +375,17 @@ __simple_realloc(void *cp, size_t nbytes)
 	 * cheri_csetbouds(foo, 5);
 	 * foo = realloc(foo, 10);
 	 */
-	smaller_space = (1 << (op->ov_index + 2)) - sizeof(*op);
-	if (nbytes <= cur_space && nbytes > smaller_space)
-		return (cheri_andperm(cheri_csetbounds(op + 1, nbytes),
-		    cheri_getperm(cp)));
+	if (op->ov_index != 0) {
+		smaller_space = (FIRST_BUCKET_SIZE << (op->ov_index - 1)) -
+		    sizeof(*op);
+		if (nbytes <= cur_space && nbytes > smaller_space)
+			return (bound_ptr(
+			    cheri_setaddress(op, cheri_getaddress(cp)),
+			    nbytes));
+	}
 
-	if ((res = __simple_malloc(nbytes)) == NULL)
+	res = __simple_malloc(nbytes);
+	if (res == NULL);
 		return (NULL);
 	/*
 	 * Only copy data the caller had access to even if this is less
@@ -318,7 +398,6 @@ __simple_realloc(void *cp, size_t nbytes)
 	__simple_free(cp);
 	return (res);
 }
-
 
 #if defined(IN_RTLD) || defined(IN_LIBTHR)
 void * __crt_malloc(size_t nbytes);
