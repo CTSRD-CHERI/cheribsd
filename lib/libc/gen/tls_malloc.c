@@ -122,11 +122,32 @@ static caddr_t	pagepool_start, pagepool_end;
 static size_t	n_pagepools, max_pagepools;
 static char	**pagepool_list;
 
+static void
+__morepools(void)
+{
+	size_t osize, nsize;
+	char **new_pagepool_list;
+
+	osize = max_pagepools * sizeof(char *);
+	if (max_pagepools == 0)
+		max_pagepools = pagesz / (sizeof(char *) * 2);
+	max_pagepools *= 2;
+	nsize = max_pagepools * sizeof(char *);
+	if ((new_pagepool_list = mmap(0, nsize, PROT_READ|PROT_WRITE,
+	    MAP_ANON, -1, 0)) == MAP_FAILED)
+		abort();
+	memcpy(new_pagepool_list, pagepool_list, osize);
+	if (pagepool_list != NULL) {
+		if (munmap(pagepool_list, osize) != 0)
+			abort();
+	}
+	pagepool_list = new_pagepool_list;
+}
+
 static int
 __morepages(int n)
 {
 	size_t	size;
-	char **new_pagepool_list;
 
 	n += NPOOLPAGES;	/* round up allocation. */
 	size = n * pagesz;
@@ -134,29 +155,8 @@ __morepages(int n)
 	size = __builtin_cheri_round_representable_length(size);
 #endif
 
-	if (n_pagepools >= max_pagepools) {
-		if (max_pagepools == 0)
-			max_pagepools = pagesz / (sizeof(char *) * 2);
-
-		max_pagepools *= 2;
-		if ((new_pagepool_list = mmap(0,
-		    max_pagepools * sizeof(char *), PROT_READ|PROT_WRITE,
-		    MAP_ANON, -1, 0)) == MAP_FAILED)
-			return (0);
-#ifdef __CHERI_PURE_CAPABILITY__
-		/* Check that the result is writable */
-		assert(cheri_getperm(new_pagepool_list) & CHERI_PERM_STORE);
-#endif
-		memcpy(new_pagepool_list, pagepool_list,
-		    sizeof(char *) * n_pagepools);
-		if (pagepool_list != NULL) {
-			if (munmap(pagepool_list,
-			    max_pagepools * sizeof(char *) / 2) != 0) {
-				abort();
-			}
-		}
-		pagepool_list = new_pagepool_list;
-	}
+	if (n_pagepools >= max_pagepools)
+		__morepools();
 
 	if (pagepool_end - pagepool_start > (ssize_t)pagesz) {
 		caddr_t extra_start = __builtin_align_up(pagepool_start,
