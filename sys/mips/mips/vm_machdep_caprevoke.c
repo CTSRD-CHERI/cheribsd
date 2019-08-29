@@ -298,7 +298,7 @@ vm_caprevoke_page(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 	mva = MIPS_PHYS_TO_DIRECT(mpa);
 	mve = mva + pagesizes[m->psind];
 
-	mvu = cheri_setaddress(kdc, mva);
+	mvu = cheri_csetbounds(cheri_setaddress(kdc, mva), pagesizes[m->psind]);
 
 	res = vm_caprevoke_page_iter(crc, vm_do_caprevoke, mvu, mve);
 
@@ -356,7 +356,7 @@ vm_caprevoke_page_ro(const struct vm_caprevoke_cookie *crc, vm_page_t m)
 	mva = MIPS_PHYS_TO_DIRECT(mpa);
 	mve = mva + pagesizes[m->psind];
 
-	mvu = cheri_setaddress(kdc, mva);
+	mvu = cheri_csetbounds(cheri_setaddress(kdc, mva), pagesizes[m->psind]);
 
 	res = vm_caprevoke_page_iter(crc, vm_caprevoke_page_ro_adapt, mvu, mve);
 
