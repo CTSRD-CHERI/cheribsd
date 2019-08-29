@@ -10,7 +10,7 @@ ${PACKAGE}FILES+=		README
 
 KYUAFILE= yes
 
-SUBDIR.${MK_CHERI_PURE}+=	cheri
+SUBDIR.${MK_CHERI}+=	cheri
 SUBDIR+= etc
 SUBDIR+= sys
 
