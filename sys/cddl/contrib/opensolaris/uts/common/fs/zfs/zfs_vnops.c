@@ -5374,9 +5374,6 @@ zfs_freebsd_reclaim(ap)
 
 	ASSERT(zp != NULL);
 
-	/* Destroy the vm object and flush associated pages. */
-	vnode_destroy_vobject(vp);
-
 	/*
 	 * z_teardown_inactive_lock protects from a race with
 	 * zfs_znode_dmu_fini in zfsvfs_teardown during
