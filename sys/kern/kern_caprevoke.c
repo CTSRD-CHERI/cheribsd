@@ -413,6 +413,7 @@ fast_out:
 		/* Register files */
 		FOREACH_THREAD_IN_PROC(td->td_proc, ptd) {
 			caprevoke_td_frame(ptd, &vmcrc);
+			sigaltstack_caprevoke(td, &vmcrc);
 		}
 		PROC_UNLOCK(td->td_proc);
 
