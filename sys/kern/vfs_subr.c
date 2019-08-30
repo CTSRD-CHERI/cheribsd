@@ -2645,6 +2645,7 @@ v_incr_usecount_locked(struct vnode *vp)
 		VNASSERT(vp->v_usecount == 0, vp,
 		    ("vnode with usecount and VI_OWEINACT set"));
 		vp->v_iflag &= ~VI_OWEINACT;
+		VNODE_REFCOUNT_FENCE_REL();
 	}
 	refcount_acquire(&vp->v_usecount);
 	v_incr_devcount(vp);
