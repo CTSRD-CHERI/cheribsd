@@ -92,11 +92,13 @@ __FBSDID("$FreeBSD$");
 #include <cheri/cheric.h>
 #endif
 
-#ifdef DDB
+#ifdef KDB
 #include <machine/db_machdep.h>
+#include <sys/kdb.h>
+#ifdef DDB
 #include <ddb/db_sym.h>
 #include <ddb/ddb.h>
-#include <sys/kdb.h>
+#endif
 #endif
 
 _Static_assert(F0 * sizeof(register_t) == __offsetof(struct trapframe, f0),
@@ -2293,6 +2295,7 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 //   ],
 //   "changes_purecap": [
 //     "support",
+//     "kdb",
 //     "uintptr_interp_offset"
 //   ],
 //   "change_comment": ""

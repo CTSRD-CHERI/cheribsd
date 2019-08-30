@@ -174,18 +174,18 @@ linker_file_t linker_make_file(const char* _filename, linker_class_t _cls);
  * DDB Helpers, tuned specifically for ddb/db_kld.c
  */
 int linker_ddb_lookup(const char *_symstr, c_linker_sym_t *_sym);
-int linker_ddb_search_symbol(caddr_t _value, c_linker_sym_t *_sym,
+int linker_ddb_search_symbol(vaddr_t _value, c_linker_sym_t *_sym,
 			     long *_diffp);
 int linker_ddb_symbol_values(c_linker_sym_t _sym, linker_symval_t *_symval);
-int linker_ddb_search_symbol_name(caddr_t value, char *buf, u_int buflen,
+int linker_ddb_search_symbol_name(vaddr_t value, char *buf, u_int buflen,
 				  long *offset);
 
 /*
  * stack(9) helper for situations where kernel locking is required.
  */
-int linker_search_symbol_name_flags(caddr_t value, char *buf, u_int buflen,
+int linker_search_symbol_name_flags(vaddr_t value, char *buf, u_int buflen,
     long *offset, int flags);
-int linker_search_symbol_name(caddr_t value, char *buf, u_int buflen,
+int linker_search_symbol_name(vaddr_t value, char *buf, u_int buflen,
     long *offset);
 
 
@@ -367,10 +367,13 @@ __END_DECLS
 #endif /* !_SYS_LINKER_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20190830,
 //   "target_type": "header",
 //   "changes": [
 //     "pointer_shape"
+//   ],
+//   "changes_purecap": [
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

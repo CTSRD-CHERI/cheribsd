@@ -118,6 +118,7 @@
 */
 
 #include "opt_ddb.h"
+#include "opt_stack.h"
 
 #include <machine/asm.h>
 #include <machine/cpu.h>
@@ -704,17 +705,30 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	/* XXX-AM: Can we use .mask/.frame in cheriabi? */
 	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
 	/*
-	 * For CHERI_PURECAP_KERNEL, CHERI_REG_STC holds the location of the trap frame,
-	 * KSCRATCH holds the value of STC to save in the trap frame.
+	 * For CHERI_PURECAP_KERNEL, CHERI_REG_STC holds the location of the
+	 * trap frame, KSCRATCH holds the value of STC to save in the trap frame.
 	 * Will leave the trap frame address in c3.
 	 */
 	SAVE_CPU
+
+#ifdef STACK
+	/*
+	 * Inform stack backtrace to continue from the correct place by
+	 * simulating function prologue.
+	 */
+	RESTORE_CREG($c24, STC)
+	csc $c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
+	RESTORE_CREG($c17, PCC)
+	csc $c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
+	cmove $c24, CHERI_REG_STC
+#endif
+
 	/*
 	 * Call the exception handler (c3 set by SAVE_CPU).
 	 */
 	CAPCALL_LOAD($c12, trap)
 	cjalr	$c12, $c17
-	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC)	# for debugging
+	nop
 
 	/*
 	 * Update interrupt and CPU mask in saved status register
@@ -781,8 +795,16 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	REG_LI t0, (CHERI_KSTACK_OFFSET - CALLFRAME_SIZ)
 	cincoffset CHERI_REG_STC, CHERI_REG_STC, t0
 
-	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU, find it a place once ddb is ported */
-	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC) # for debugging
+#ifdef STACK
+	/*
+	 * Inform kernel stack backtrace to stop by simulating empty prologue.
+	 */
+	cmove $c24, $cnull
+	csc $c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
+	cmove $c17, $cnull
+	csc $c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
+	cmove $c24, CHERI_REG_STC
+#endif
 
 	/* Turn off fpu and enter kernel mode */
 	and	t0, a0, ~(MIPS_SR_COP_1_BIT | MIPS_SR_EXL | MIPS_SR_KSU_MASK | MIPS_SR_INT_IE)
@@ -930,15 +952,27 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	CHERI_ADJUST_STC(k0)
 	.mask	0x80000000, (CALLFRAME_RA - KERN_EXC_FRAME_SIZE)
 
-/*
- * Save CPU state, building 'frame'.  sp holds the location to save the trap
- * frame, whereas k1 holds the value of sp to save in the trap frame.
- */
+	/*
+	 * Save CPU state, building 'frame'.  sp holds the location to save the trap
+	 * frame, whereas k1 holds the value of sp to save in the trap frame.
+	 */
 	SAVE_CPU
-/*
- * Call the interrupt handler.   SAVE_CPU has left a0 pointing at the saved
- * frame.
- */
+
+#ifdef STACK
+	/*
+	 * Inform kernel stack backtrace to stop by simulating empty prologue.
+	 */
+	cmove $c24, $cnull
+	csc $c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
+	cmove $c17, $cnull
+	csc $c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
+	cmove $c24, CHERI_REG_STC
+#endif
+
+	/*
+	 * Call the interrupt handler. SAVE_CPU has left a0 pointing at the saved
+	 * frame.
+	 */
 #ifdef INTRNG
 	CAPCALL_LOAD($c12, intr_irq_handler)
 #else
@@ -946,7 +980,7 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 #endif
 	/* XXX-AM: we should rely on EPCC instead of COP0_EXC_PC in a3 */
 	cjalr	$c12, $c17
-	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC)	# for debugging
+	nop
 
 	/*
 	 * Update interrupt and CPU mask in saved status register
@@ -1112,6 +1146,17 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	mtc0	t0, MIPS_COP_0_STATUS
 	ITLBNOPFIX
 
+#ifdef STACK
+	/*
+	 * Stop kernel stack backtrace here by simulating function prologue.
+	 */
+	cmove $c24, $cnull
+	csc $c24, zero, CALLFRAME_CSP(CHERI_REG_STC)
+	cmove $c17, $cnull
+	csc $c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
+	cmove $c24, CHERI_REG_STC
+#endif
+
 	/*
 	 * Call the interrupt handler.
 	 * Assume CURPCB left in KSCRATCH
@@ -1123,8 +1168,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	CAPCALL_LOAD($c12, cpu_intr)
 #endif
 	cjalr	$c12, $c17
-	/* XXX-AM: we should use EPCC here, once ddb is in place we should find a place for it */
-	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC)	# for debugging
+	nop
 
 	/*
 	 * Enable interrupts before doing ast().

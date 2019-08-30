@@ -25,10 +25,6 @@ options 	KSTACK_LARGE_PAGE
 nooptions	CHERI_IMPLICIT_USER_DDC
 
 # kernel modules
-options 	KTRACE
-nooptions	KDB
-nooptions	DDB
-
 options 	TMPFS
 options		FFS
 options		CD9660
@@ -39,17 +35,22 @@ nooptions	NFSD, NFSCL
 nooptions	GEOM_RAID
 
 # debugging
+options 	KTRACE
+options 	KDB
+options		KDB_TRACE # stacktrace on panic
+nooptions	DDB
+
 options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
-#options		BUS_DEBUG
-#options		CAMDEBUG
-#options		CAM_DEBUG_FLAGS=3
-options		STACK # needed for witness
+# options	BUS_DEBUG
+# options	CAMDEBUG
+# options	CAM_DEBUG_FLAGS=3
+options		STACK
 options		WITNESS
 options		DEBUG_VFS_LOCKS
-#options		TRAP_DEBUG
-# options		KTR
-# options		KTR_VERBOSE=2
+# options	TRAP_DEBUG
+# options	KTR
+# options	KTR_VERBOSE=2
 # nooptions	KTR_ALQ
 # should enable witness and invariants?
 # options	LOCK_DEBUG

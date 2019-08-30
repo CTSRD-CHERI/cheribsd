@@ -146,7 +146,7 @@ static int	link_elf_lookup_symbol(linker_file_t, const char *,
 		    c_linker_sym_t *);
 static int	link_elf_symbol_values(linker_file_t, c_linker_sym_t,
 		    linker_symval_t *);
-static int	link_elf_search_symbol(linker_file_t, caddr_t,
+static int	link_elf_search_symbol(linker_file_t, vaddr_t,
 		    c_linker_sym_t *, long *);
 
 static void	link_elf_unload_file(linker_file_t);
@@ -1488,7 +1488,7 @@ link_elf_symbol_values(linker_file_t lf, c_linker_sym_t sym,
 }
 
 static int
-link_elf_search_symbol(linker_file_t lf, caddr_t value,
+link_elf_search_symbol(linker_file_t lf, vaddr_t value,
     c_linker_sym_t *sym, long *diffp)
 {
 	elf_file_t ef = (elf_file_t) lf;
@@ -1817,11 +1817,12 @@ link_elf_ireloc(caddr_t kmdp)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180227,
+//   "updated": 20180830,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_provenance",
-//     "uintptr_interp_offset"
+//     "uintptr_interp_offset",
+//     "kdb"
 //   ]
 // }
 // CHERI CHANGES END

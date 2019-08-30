@@ -34,7 +34,8 @@ comments.  The following example shows all the current annotations.
  *     "unsupported",
  *     "user_capabilities",
  *     "virtual_address",
- *     "other"
+ *     "other",
+ *     "kdb"
  *   ],
  *   "change_comment": "",
  *   "hybrid_specific": false
@@ -107,6 +108,7 @@ values are:
    types and changes to copyin/out calls etc.
  * `virtual_address` - Need to work with the virtual address (not the
    offset) of capabilities.
+ * `kdb` - Changes required for kernel debugging.
  * `other` - Other unrelated changes.
 
 `change_comment`: Optional comment describing changes.

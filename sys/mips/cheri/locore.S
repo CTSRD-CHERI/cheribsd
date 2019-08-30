@@ -72,6 +72,8 @@
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
 
+#include "opt_stack.h"
+
 #include "assym.inc"
 
 	/* Don't warn about uses of c27-c30 */
@@ -226,11 +228,6 @@ VECTOR(_locore, unknown)
 	PTR_SUBU	t0, t0, CALLFRAME_SIZ
 	cincoffset	CHERI_REG_STC, CHERI_REG_STC, t0	# Make room for initial callframe
 
-	/* Zero out old callframe fields for debugger */
-	cfromptr	$c1, $c1, zero
-	csc		$c1, zero, CALLFRAME_CGP(CHERI_REG_STC)
-	csc		$c1, zero, CALLFRAME_CSP(CHERI_REG_STC)
-	csc		$c1, zero, CALLFRAME_CRA(CHERI_REG_STC)
 	/* XXX-AM: zero out ra so we catch anything that returns improperly */
 	move	ra, zero
 
@@ -331,6 +328,11 @@ VECTOR(_locore, unknown)
 	and	a0, a0, t0
 	PTR_SUBU	a0, a0, CALLFRAME_SIZ
 	csetoffset	CHERI_REG_STC, CHERI_REG_STC, a0
+#ifdef STACK
+	/* Stop stack backtrace here */
+	cmove	$c17, $cnull
+	csc	$c17, zero, CALLFRAME_CRA(CHERI_REG_STC)
+#endif
 
 	CAPCALL_LOAD($c12, _C_LABEL(mi_startup))
 	cjalr	$c12, $c17

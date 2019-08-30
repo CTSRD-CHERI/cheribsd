@@ -36,7 +36,7 @@ mips/mips/pmap.c			optional	!mips64_new_pmap
 mips/mips/pmap_mips64.c			optional	mips64_new_pmap
 mips/mips/ptrace_machdep.c		standard
 mips/mips/sc_machdep.c			standard
-mips/mips/stack_machdep.c		optional	ddb | stack
+mips/mips/stack_machdep.c		optional	!cheri_purecap_kernel (ddb | stack)
 mips/mips/stdatomic.c			standard \
 	compile-with "${NORMAL_C:N-Wmissing-prototypes}"
 mips/mips/support.S			optional	!cheri_purecap_kernel
@@ -54,6 +54,7 @@ mips/cheri/locore.S			optional	no-obj cheri_purecap_kernel
 mips/cheri/support.S			optional	cheri_purecap_kernel
 mips/cheri/swtch.S			optional	cheri_purecap_kernel
 mips/cheri/exception.S			optional	cheri_purecap_kernel
+mips/cheri/stack_machdep.c		optional	cheri_purecap_kernel ddb | stack
 
 # misc opt-in bits
 kern/kern_clocksource.c			standard
