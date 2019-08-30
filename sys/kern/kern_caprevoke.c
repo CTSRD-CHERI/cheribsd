@@ -94,6 +94,7 @@ caprevoke_just(struct thread *td, struct vm_caprevoke_cookie *vmcrc,
 
 	if (flags & CAPREVOKE_JUST_MY_REGS) {
 		caprevoke_td_frame(td, vmcrc);
+		sigaltstack_caprevoke(td, vmcrc);
 	}
 	if (flags & CAPREVOKE_JUST_MY_STACK) {
 		uintcap_t sp;
@@ -412,6 +413,7 @@ fast_out:
 		/* Per-thread kernel hoarders */
 		FOREACH_THREAD_IN_PROC (td->td_proc, ptd) {
 			caprevoke_td_frame(ptd, &vmcrc);
+			sigaltstack_caprevoke(ptd, &vmcrc);
 		}
 
 		/* Per-process kernel hoarders */
