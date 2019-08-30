@@ -140,6 +140,9 @@ void aio_caprevoke(struct proc *, const struct vm_caprevoke_cookie *);
 /*  sys/kern/kern_event.c */
 int kqueue_caprevoke(struct file *fp, const struct vm_caprevoke_cookie *);
 
+/*  sys/kern/kern_sig.c */
+void sigaltstack_caprevoke(struct thread *, const struct vm_caprevoke_cookie *);
+
 /*  sys/kern/kern_time.c */
 void ktimer_caprevoke(struct proc *, const struct vm_caprevoke_cookie *);
 
