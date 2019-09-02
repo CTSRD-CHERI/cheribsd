@@ -112,15 +112,13 @@ __crt_malloc(size_t nbytes)
 {
 	union overhead *op;
 	int bucket;
-	ssize_t n;
 	size_t amt;
 
 	/*
-	 * First time malloc is called, setup page size and
-	 * align break pointer so all data will be page aligned.
+	 * First time malloc is called, setup page size.
 	 */
 	if (pagesz == 0)
-		pagesz = n = pagesizes[0];
+		pagesz = pagesizes[0];
 	/*
 	 * Convert amount of memory requested into closest block size
 	 * stored in hash buckets which satisfies request.
@@ -130,9 +128,9 @@ __crt_malloc(size_t nbytes)
 	bucket = 0;
 	while (nbytes > amt - sizeof(*op)) {
 		amt <<= 1;
-		if (amt == 0)
-			return (NULL);
 		bucket++;
+		if (amt == 0 || bucket >= NBUCKETS)
+			return (NULL);
 	}
 	if (bucket >= NBUCKETS)
 		return (NULL);
@@ -179,8 +177,6 @@ morecore(int bucket)
   	int amt;			/* amount to allocate */
   	int nblks;			/* how many blocks we get */
 
-	if ((unsigned)bucket >= NBUCKETS)
-		return;
 	sz = FIRST_BUCKET_SIZE << bucket;
 	if (sz < pagesz) {
 		amt = pagesz;
