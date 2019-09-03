@@ -371,6 +371,7 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_fhreadlink] = (0x0 | 0x1 | 0x2),
  [CHERIABI_SYS_cheriabi_funlinkat] = (0x0 | 0x2),
  [CHERIABI_SYS_cheriabi_copy_file_range] = (0x0 | 0x2 | 0x8),
+ [CHERIABI_SYS_cheriabi___sysctlbyname] = (0x0 | 0x1 | 0x4 | 0x8 | 0x10),
 };
 
 #endif /* !_CHERIABI_SYSARGMAP_H_ */

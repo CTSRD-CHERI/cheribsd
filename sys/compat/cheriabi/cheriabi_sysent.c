@@ -584,4 +584,5 @@ struct sysent cheriabi_sysent[] = {
 	{ AS(cheriabi_fhreadlink_args), (sy_call_t *)cheriabi_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = cheriabi_fhreadlink */
 	{ AS(cheriabi_funlinkat_args), (sy_call_t *)cheriabi_funlinkat, AUE_UNLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 568 = cheriabi_funlinkat */
 	{ AS(cheriabi_copy_file_range_args), (sy_call_t *)cheriabi_copy_file_range, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 569 = cheriabi_copy_file_range */
+	{ AS(cheriabi___sysctlbyname_args), (sy_call_t *)cheriabi___sysctlbyname, AUE_SYSCTL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 570 = cheriabi___sysctlbyname */
 };

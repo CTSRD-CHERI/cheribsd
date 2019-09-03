@@ -3719,3 +3719,13 @@ SYS_STUB(569, ssize_t, copy_file_range,
     /* _localcheck */ {if (!(cheri_getperm(inoffp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} if (!(cheri_getperm(outoffp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((ssize_t)-1);} }
 )
 
+SYS_STUB(570, int, __sysctlbyname,
+    /* _protoargs */ (const char *  name, size_t namelen, void *  old, size_t *  oldlenp, void *  new, size_t newlen),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   name, size_t namelen, void * __capability   old, size_t * __capability   oldlenp, void * __capability   new, size_t newlen),
+    /* _protoargs_err */ (int * __capability stub_errno, const char * __capability   name, size_t namelen, void * __capability   old, size_t * __capability   oldlenp, void * __capability   new, size_t newlen),
+    /* _callargs */ ((__cheri_fromcap const char * )name, namelen, (__cheri_fromcap void * )old, (__cheri_fromcap size_t * )oldlenp, (__cheri_fromcap void * )new, newlen),
+    /* _callargs_chk */ (&ret, stub_errno, name, namelen, old, oldlenp, new, newlen),
+    /* _callargs_err */ (&errno, (const char * )name, namelen, (void * )old, (size_t * )oldlenp, (void * )new, newlen),
+    /* _localcheck */ {if (!(cheri_getperm(name) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(old) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(oldlenp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(new) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+

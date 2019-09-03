@@ -1206,6 +1206,25 @@ freebsd64___sysctl(struct thread *td, struct freebsd64___sysctl_args *uap)
 	    uap->newlen, 0));
 }
 
+int
+freebsd64___sysctlbyname(struct thread *td, struct
+    freebsd64___sysctlbyname_args *uap)
+{
+	size_t rv;
+	int error;
+
+	error = kern___sysctlbyname(td, __USER_CAP(uap->name, uap->namelen),
+	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
+	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
+	    uap->newlen, &rv, 0, 0);
+	if (error != 0)
+		return (error);
+	if (uap->oldlenp != NULL)
+		error = copyout(&rv, uap->oldlenp, sizeof(rv));
+
+	return (error);
+}
+
 /*
  * kern_thr.c
  */

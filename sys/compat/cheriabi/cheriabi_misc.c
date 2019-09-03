@@ -1425,6 +1425,23 @@ cheriabi___sysctl(struct thread *td, struct cheriabi___sysctl_args *uap)
 	    uap->oldlenp, uap->new, uap->newlen, SCTL_CHERIABI));
 }
 
+int
+cheriabi___sysctlbyname(struct thread *td,
+    struct cheriabi___sysctlbyname_args *uap)
+{
+	size_t rv;
+	int error;
+
+	error = kern___sysctlbyname(td, uap->name, uap->namelen, uap->old,
+	    uap->oldlenp, uap->new, uap->newlen, &rv, 0, 0);
+	if (error != 0)
+		return (error);
+	if (uap->oldlenp != NULL)
+		error = copyout(&rv, uap->oldlenp, sizeof(rv));
+
+	return (error);
+}
+
 /*
  * kern_thr.c
  */

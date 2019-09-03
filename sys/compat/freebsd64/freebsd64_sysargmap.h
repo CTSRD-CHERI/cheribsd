@@ -377,6 +377,7 @@ int freebsd64_sysargmask[] = {
  [FREEBSD64_SYS_freebsd64_fhreadlink] = (0x0 | 0x1 | 0x2),
  [FREEBSD64_SYS_freebsd64_funlinkat] = (0x0 | 0x2),
  [FREEBSD64_SYS_freebsd64_copy_file_range] = (0x0 | 0x2 | 0x8),
+ [FREEBSD64_SYS_freebsd64___sysctlbyname] = (0x0 | 0x1 | 0x4 | 0x8 | 0x10),
 };
 
 #endif /* !_FREEBSD64_SYSARGMAP_H_ */

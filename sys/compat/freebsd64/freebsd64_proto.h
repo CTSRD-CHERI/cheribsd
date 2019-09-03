@@ -1474,6 +1474,14 @@ struct freebsd64_copy_file_range_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
 };
+struct freebsd64___sysctlbyname_args {
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+	char namelen_l_[PADL_(size_t)]; size_t namelen; char namelen_r_[PADR_(size_t)];
+	char old_l_[PADL_(void *)]; void * old; char old_r_[PADR_(void *)];
+	char oldlenp_l_[PADL_(size_t *)]; size_t * oldlenp; char oldlenp_r_[PADR_(size_t *)];
+	char new_l_[PADL_(void *)]; void * new; char new_r_[PADR_(void *)];
+	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1769,6 +1777,7 @@ int	freebsd64_fhlinkat(struct thread *, struct freebsd64_fhlinkat_args *);
 int	freebsd64_fhreadlink(struct thread *, struct freebsd64_fhreadlink_args *);
 int	freebsd64_funlinkat(struct thread *, struct freebsd64_funlinkat_args *);
 int	freebsd64_copy_file_range(struct thread *, struct freebsd64_copy_file_range_args *);
+int	freebsd64___sysctlbyname(struct thread *, struct freebsd64___sysctlbyname_args *);
 
 #ifdef COMPAT_43
 
@@ -2291,6 +2300,7 @@ int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mkno
 #define	FREEBSD64_SYS_AUE_freebsd64_fhreadlink	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_funlinkat	AUE_UNLINKAT
 #define	FREEBSD64_SYS_AUE_freebsd64_copy_file_range	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd64___sysctlbyname	AUE_SYSCTL
 
 #undef PAD_
 #undef PADL_
