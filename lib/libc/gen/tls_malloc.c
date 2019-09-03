@@ -105,6 +105,14 @@ struct overhead {
 };
 SLIST_HEAD(ov_listhead, overhead);
 
+struct pagepool_header {
+	size_t			 ph_size;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t			 ph_pad1;
+#endif
+	SLIST_ENTRY(pagepool_header) ph_next;
+};
+
 #define	MALLOC_ALIGNMENT	sizeof(struct overhead)
 
 #define	MAGIC		0xef		/* magic # on accounting info */
@@ -123,44 +131,19 @@ static const size_t pagesz = PAGE_SIZE;			/* page size */
 #define	NPOOLPAGES	(32*1024/pagesz)
 
 static caddr_t	pagepool_start, pagepool_end;
-static size_t	n_pagepools, max_pagepools;
-static char	**pagepool_list;
-
-static void
-__morepools(void)
-{
-	size_t osize, nsize;
-	char **new_pagepool_list;
-
-	osize = max_pagepools * sizeof(char *);
-	if (max_pagepools == 0)
-		max_pagepools = pagesz / (sizeof(char *) * 2);
-	max_pagepools *= 2;
-	nsize = max_pagepools * sizeof(char *);
-	if ((new_pagepool_list = mmap(0, nsize, PROT_READ|PROT_WRITE,
-	    MAP_ANON, -1, 0)) == MAP_FAILED)
-		abort();
-	memcpy(new_pagepool_list, pagepool_list, osize);
-	if (pagepool_list != NULL) {
-		if (munmap(pagepool_list, osize) != 0)
-			abort();
-	}
-	pagepool_list = new_pagepool_list;
-}
+static SLIST_HEAD(, pagepool_header) curpp = SLIST_HEAD_INITIALIZER(curpp);
 
 static int
 __morepages(int n)
 {
 	size_t	size;
+	struct pagepool_header *newpp;
 
 	n += NPOOLPAGES;	/* round up allocation. */
 	size = n * pagesz;
 #ifdef __CHERI_PURE_CAPABILITY__
 	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
-
-	if (n_pagepools >= max_pagepools)
-		__morepools();
 
 	if (pagepool_end - pagepool_start > (ssize_t)pagesz) {
 		caddr_t extra_start = __builtin_align_up(pagepool_start,
@@ -185,12 +168,14 @@ __morepages(int n)
 #endif
 	}
 
-	if ((pagepool_start = mmap(0, size, PROT_READ|PROT_WRITE,
-	    MAP_ANON, -1, 0)) == MAP_FAILED)
+	if ((newpp = mmap(0, size, PROT_READ|PROT_WRITE, MAP_ANON, -1,
+	    0)) == MAP_FAILED)
 		return (0);
 
-	pagepool_end = pagepool_start + size;
-	pagepool_list[n_pagepools++] = pagepool_start;
+	newpp->ph_size = size;
+	SLIST_INSERT_HEAD(&curpp, newpp, ph_next);
+	pagepool_start = (char *)(newpp + 1);
+	pagepool_end = pagepool_start + (size - sizeof(*newpp));
 
 	return (size / pagesz);
 }
@@ -201,18 +186,17 @@ __rederive_pointer(void *ptr)
 #ifndef __CHERI_PURE_CAPABILITY__
 	return (ptr);
 #else
-	size_t i;
+	struct pagepool_header *pp;
 
 	TLS_MALLOC_LOCK;
-	for (i = 0; i < n_pagepools; i++) {
-		char *pool = pagepool_list[i];
-		if (cheri_is_address_inbounds(pool, cheri_getbase(ptr))) {
+	SLIST_FOREACH(pp, &curpp, ph_next) {
+		if (cheri_is_address_inbounds(pp, cheri_getbase(ptr))) {
 			TLS_MALLOC_UNLOCK;
-			return (cheri_setaddress(pool, cheri_getaddress(ptr)));
+			return (cheri_setaddress(pp, cheri_getaddress(ptr)));
 		}
 	}
-	TLS_MALLOC_UNLOCK;
 
+	TLS_MALLOC_UNLOCK;
 	return (NULL);
 #endif
 }
