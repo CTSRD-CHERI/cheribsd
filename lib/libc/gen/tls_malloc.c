@@ -62,8 +62,14 @@
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
 #endif
+#ifdef CAPREVOKE
+#include <cheri/revoke.h>
+#include <sys/stdatomic.h>
+#include <cheri/libcaprevoke.h>
+#endif
 
 #include <assert.h>
+#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -111,6 +117,10 @@ struct pagepool_header {
 	size_t			 ph_pad1;
 #endif
 	SLIST_ENTRY(pagepool_header) ph_next;
+#ifdef CAPREVOKE
+	void			*ph_shadow;
+	void			*ph_pad2; /* align to 4 * sizeof(void *) */
+#endif
 };
 
 #define	MALLOC_ALIGNMENT	sizeof(struct overhead)
@@ -122,9 +132,16 @@ struct pagepool_header {
  * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the
  * data area returned to the user.
  */
-#define	FIRST_BUCKET_SIZE	32
+#define	FIRST_BUCKET_SHIFT	5
+#define	FIRST_BUCKET_SIZE	(1 << FIRST_BUCKET_SHIFT)
 #define	NBUCKETS 30
 static struct ov_listhead nextf[NBUCKETS];
+
+#ifdef CAPREVOKE
+#define	MAX_QUARANTINE	(1024 * 1024)
+static struct ov_listhead quarantine_bufs[NBUCKETS];
+static size_t quarantine_size;
+#endif
 
 static const size_t pagesz = PAGE_SIZE;			/* page size */
 
@@ -132,6 +149,14 @@ static const size_t pagesz = PAGE_SIZE;			/* page size */
 
 static caddr_t	pagepool_start, pagepool_end;
 static SLIST_HEAD(, pagepool_header) curpp = SLIST_HEAD_INITIALIZER(curpp);
+
+#ifdef CAPREVOKE
+volatile const struct cheri_revoke_info *cri;
+
+static void paint_shadow(void *mem, size_t size);
+static void clear_shadow(void *mem, size_t size);
+static void do_revoke();
+#endif
 
 static int
 __morepages(int n)
@@ -195,7 +220,6 @@ __rederive_pointer(void *ptr)
 			return (cheri_setaddress(pp, cheri_getaddress(ptr)));
 		}
 	}
-
 	TLS_MALLOC_UNLOCK;
 	return (NULL);
 #endif
@@ -211,6 +235,62 @@ bound_ptr(void *mem, size_t nbytes)
 	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_SW_VMEM);
 	return (ptr);
 }
+
+#ifdef CAPREVOKE
+static void
+try_revoke(int target_bucket)
+{
+	int bucket;
+	struct overhead *op;
+
+	/*
+	 * Don't revoke unless there is enough in quarantine and some of
+	 * it would be returned to the bucket we want to refill.
+	 */
+	if (quarantine_size < MAX_QUARANTINE ||
+	    SLIST_EMPTY(&quarantine_bufs[target_bucket]))
+		return;
+
+	if (cri == NULL) {
+		int error;
+
+		error = cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_INFO_STRUCT,
+		    NULL, (void **)&cri);
+
+		if (error == ENOSYS) {
+			/*
+			 * Revocation is not supported; this is the baseline.
+			 * Just pretend like it worked.
+			 */
+			goto dequarantine;
+		}
+
+		assert(error == 0);
+	}
+
+
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		SLIST_FOREACH(op, &quarantine_bufs[bucket], ov_next)
+			paint_shadow(op, FIRST_BUCKET_SIZE << bucket);
+	}
+	atomic_thread_fence(memory_order_acq_rel);
+
+	do_revoke();
+
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		SLIST_FOREACH(op, &quarantine_bufs[bucket], ov_next)
+			clear_shadow(op, FIRST_BUCKET_SIZE << bucket);
+	}
+	atomic_thread_fence(memory_order_acq_rel);
+
+dequarantine:
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		while (!SLIST_EMPTY(&quarantine_bufs[bucket]))
+			SLIST_REMOVE_HEAD(&quarantine_bufs[bucket], ov_next);
+	}
+	quarantine_size = 0;
+}
+#endif
 
 static void *
 __tls_malloc(size_t nbytes)
@@ -241,6 +321,10 @@ __tls_malloc(size_t nbytes)
 	 * request more memory from the system.
 	 */
 	TLS_MALLOC_LOCK;
+#ifdef CAPREVOKE
+	if (SLIST_EMPTY(bucketp))
+		try_revoke(bucket);
+#endif
 	if (SLIST_EMPTY(bucketp)) {
 		morecore(bucket);
 		if (SLIST_EMPTY(bucketp)) {
@@ -394,6 +478,49 @@ find_overhead(void * cp)
 	return (NULL);
 }
 
+#ifdef CAPREVOKE
+static void
+paint_shadow(void *mem, size_t size)
+{
+	struct pagepool_header *pp;
+
+	pp = cheri_setoffset(pp, 0);
+	/*
+	 * Defer initializing ph_shadow since odds are good we'll never
+	 * need it.
+	 */
+	if (pp->ph_shadow == NULL)
+		if (cheri_revoke_get_shadow(CHERI_REVOKE_SHADOW_NOVMMAP, pp,
+		    &pp->ph_shadow) != 0)
+			abort();
+	caprev_shadow_nomap_set_raw(cri->base_mem_nomap, pp->ph_shadow,
+	    (vaddr_t)mem, size);
+}
+
+static void
+clear_shadow(void *mem, size_t size)
+{
+	struct pagepool_header *pp;
+
+	pp = cheri_setoffset(pp, 0);
+	caprev_shadow_nomap_clear_raw(cri->base_mem_nomap, pp->ph_shadow,
+	    (vaddr_t)mem, size);
+}
+
+static void
+do_revoke(void)
+{
+	int error;
+
+	atomic_thread_fence(memory_order_acq_rel);
+	cheri_revoke_epoch_t start_epoch = cri->epochs.enqueue;
+	while (!cheri_revoke_epoch_clears(cri->epochs.dequeue, start_epoch)) {
+		error = cheri_revoke(CHERI_REVOKE_LAST_PASS, start_epoch, NULL);
+		assert(error == 0);
+	}
+}
+#endif /* CAPREVOKE */
+
 void
 tls_free(void *cp)
 {
@@ -408,7 +535,12 @@ tls_free(void *cp)
 	TLS_MALLOC_LOCK;
 	bucket = op->ov_index;
 	assert(bucket < NBUCKETS);
+#ifdef CAPREVOKE
+	SLIST_INSERT_HEAD(&quarantine_bufs[bucket], op, ov_next);
+	quarantine_size += FIRST_BUCKET_SIZE << bucket;
+#else
 	SLIST_INSERT_HEAD(&nextf[bucket], op, ov_next);
+#endif
 	TLS_MALLOC_UNLOCK;
 }
 

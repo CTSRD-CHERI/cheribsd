@@ -181,6 +181,13 @@ SRCS+=	devname-compat11.c \
 	unvis-compat.c
 .endif
 
+.if ${MACHINE_ABI:Mpurecap} && ${MK_CHERI_CAPREVOKE} == "yes"
+CFLAGS.tls_malloc.c+=	-DCAPREVOKE
+CFLAGS.libcheri_caprevoke.c+=-I${SRCTOP}/lib/libcheri_caprevoke/${MACHINE_CPUARCH}
+.PATH:	${SRCTOP}/lib/libcheri_caprevoke
+SRCS+=	libcheri_caprevoke.c
+.endif
+
 CFLAGS.arc4random.c= -I${SRCTOP}/sys -I${SRCTOP}/sys/crypto/chacha20
 
 CFLAGS.dlfcn.c= ${RTLD_HDRS}
