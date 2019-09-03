@@ -2771,6 +2771,17 @@ vm_map_madvise(
 			if (current->eflags & MAP_ENTRY_IS_SUB_MAP)
 				continue;
 
+			/*
+			 * MADV_FREE would otherwise rewind time to the
+			 * creation of the shadow object.  This is a
+			 * temporary fix to
+			 * https://bugs.freebsd.org/bugzilla/show_bug.cgi?id=240061
+			 */
+			if (behav == MADV_FREE &&
+			    current->object.vm_object != NULL &&
+			    current->object.vm_object->backing_object != NULL)
+				continue;
+
 			pstart = OFF_TO_IDX(current->offset);
 			pend = pstart + atop(current->end - current->start);
 			useStart = current->start;
