@@ -263,7 +263,7 @@ ssize_t	proc_readmem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
 ssize_t	proc_writemem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 int	proc_read_capregs(struct thread *_td, struct capreg *_capregs);
 int	proc_write_capregs(struct thread *_td, struct capreg *_capregs);
 #endif

@@ -179,7 +179,7 @@ proc_write_fpregs(struct thread *td, struct fpreg *fpregs)
 	PROC_ACTION(set_fpregs(td, fpregs));
 }
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 int
 proc_read_capregs(struct thread *td, struct capreg *capregs)
 {
@@ -237,7 +237,7 @@ proc_write_fpregs32(struct thread *td, struct fpreg32 *fpregs32)
 	PROC_ACTION(set_fpregs32(td, fpregs32));
 }
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 int
 proc_read_capregs32(struct thread *td, struct capreg *capregs)
 {
@@ -644,7 +644,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		struct ptrace_io_desc piod;
 		struct ptrace_lwpinfo pl;
 		kptrace_vm_entry_t pve;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
 		struct dbreg dbreg;
@@ -686,7 +686,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_GETFPREGS:
 		BZERO(&r.fpreg, sizeof r.fpreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_GETCAPREGS:
 		BZERO(&r.capreg, sizeof r.capreg);
 		break;
@@ -703,7 +703,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_SETDBREGS:
 		error = COPYIN(uap->addr, &r.dbreg, sizeof r.dbreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_SETCAPREGS:
 		error = COPYIN(uap->addr, &r.capreg, sizeof r.capreg);
 		break;
@@ -767,7 +767,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_GETDBREGS:
 		error = COPYOUT(&r.dbreg, uap->addr, sizeof r.dbreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_GETCAPREGS:
 		error = COPYOUT(&r.capreg, uap->addr, sizeof r.capreg);
 		break;
@@ -1536,7 +1536,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		error = PROC_READ(dbregs, td2, (__cheri_fromcap void *)addr);
 		break;
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_SETCAPREGS:
 		CTR2(KTR_PTRACE, "PT_SETCAPREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);

@@ -128,10 +128,6 @@ static int	kqueue_scan(struct kqueue *kq, int maxevents,
 static void 	kqueue_wakeup(struct kqueue *kq);
 static struct filterops *kqueue_fo_find(int filt);
 static void	kqueue_fo_release(int filt);
-struct g_kevent_args;
-static int	kern_kevent_generic(struct thread *td,
-		    struct g_kevent_args *uap,
-		    struct kevent_copyops *k_ops, const char *struct_name);
 
 static fo_ioctl_t	kqueue_ioctl;
 static fo_poll_t	kqueue_poll;
@@ -1016,15 +1012,6 @@ kern_kqueue(struct thread *td, int flags, struct filecaps *fcaps)
 	return (0);
 }
 
-struct g_kevent_args {
-	int	fd;
-	const void * __capability changelist;
-	int	nchanges;
-	void	* __capability eventlist;
-	int	nevents;
-	const struct timespec * __capability timeout;
-};
-
 int
 sys_kevent(struct thread *td, struct kevent_args *uap)
 {
@@ -1046,7 +1033,7 @@ sys_kevent(struct thread *td, struct kevent_args *uap)
 	return (kern_kevent_generic(td, &gk_args, &k_ops, "kevent"));
 }
 
-static int
+int
 kern_kevent_generic(struct thread *td, struct g_kevent_args *uap,
     struct kevent_copyops *k_ops, const char *struct_name)
 {
