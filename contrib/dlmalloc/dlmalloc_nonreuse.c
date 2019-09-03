@@ -1588,6 +1588,10 @@ static void post_fork_child(void)  { INITIAL_LOCK(&(gm)->mutex); }
 
 /* Initialize mparams */
 static int init_mparams(void) {
+  const char *valuestr;
+  char *endp;
+  ssize_t value;
+
   ACQUIRE_MALLOC_GLOBAL_LOCK();
   if (mparams.magic == 0) {
     size_t magic;
@@ -1617,10 +1621,37 @@ static int init_mparams(void) {
     mparams.mmap_threshold = DEFAULT_MMAP_THRESHOLD;
     mparams.trim_threshold = DEFAULT_TRIM_THRESHOLD;
     mparams.default_mflags = USE_LOCK_BIT|USE_MMAP_BIT|USE_NONCONTIGUOUS_BIT;
-    mparams.max_freebufbytes = DEFAULT_MAX_FREEBUFBYTES;
-    mparams.max_freebuf_percent = DEFAULT_FREEBUF_PERCENT;
+
+    if ((valuestr = getenv("MALLOC_MAX_FREEBUF_BYTES")) != NULL) {
+      value = strtol(valuestr, &endp, 0);
+      if (value == 0 && *endp != '\0')
+        value = DEFAULT_MAX_FREEBUFBYTES;
+      if (value < 0)
+        value = MAX_SIZE_T;
+      mparams.max_freebufbytes = value;
+    } else
+      mparams.max_freebufbytes = DEFAULT_MAX_FREEBUFBYTES;
+
+    if ((valuestr = getenv("MALLOC_MAX_FREEBUF_PERCENT")) != NULL) {
+      value = strtol(valuestr, &endp, 0);
+      if (value == 0 && *endp != '\0')
+	value = DEFAULT_FREEBUF_PERCENT;
+      if (value < 0)
+	value = MAX_SIZE_T;
+      mparams.max_freebuf_percent = (double)value / 100.0;
+    } else
+      mparams.max_freebuf_percent = DEFAULT_FREEBUF_PERCENT;
+
 #if SUPPORT_UNMAP
-    mparams.unmap_threshold = psize * DEFAULT_UNMAP_THRESHOLD;
+    if ((valuestr = getenv("MALLOC_UNMAP_THRESHOLD")) != NULL) {
+      value = strtol(valuestr, &endp, 0);
+      if (value == 0 && *endp != '\0')
+	value = DEFAULT_UNMAP_THRESHOLD;
+      if (value < 0 || value > MAX_UNMAP_THRESHOLD)
+	value = MAX_UNMAP_THRESHOLD;
+      mparams.unmap_threshold = psize * value;
+    } else
+      mparams.unmap_threshold = psize * DEFAULT_UNMAP_THRESHOLD;
 #endif
 
     /* Set up lock for main malloc area */
@@ -1659,7 +1690,7 @@ static int init_mparams(void) {
 }
 
 /* support for mallopt */
-static int change_mparam(int param_number, int value) {
+static int change_mparam(int param_number, ssize_t value) {
   size_t val;
   ensure_initialization();
   val = (value == -1)? MAX_SIZE_T : (size_t)value;
@@ -1677,6 +1708,18 @@ static int change_mparam(int param_number, int value) {
   case M_MMAP_THRESHOLD:
     mparams.mmap_threshold = val;
     return 1;
+  case M_MAX_FREEBUFBYTES:
+    mparams.max_freebufbytes = val;
+    return 1;
+  case M_MAX_FREEBUF_PERCENT:
+    /* Values over 100 are all infinity */
+    mparams.max_freebuf_percent = val / 100.0;
+    return 1;
+#ifdef SUPPORT_UNMAP
+  case M_UNMAP_THRESHOLD:
+    mparams.unmap_threshold = value < 0 || value > MAX_UNMAP_THRESHOLD ?
+	MAX_UNMAP_THRESHOLD : (size_t)value;
+#endif
   default:
     return 0;
   }

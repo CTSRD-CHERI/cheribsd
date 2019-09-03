@@ -626,6 +626,9 @@ DEFAULT_UNMAP_THRESHOLD	default: MAX_SIZE_T / PAGESIZE
 #define M_TRIM_THRESHOLD     (-1)
 #define M_GRANULARITY        (-2)
 #define M_MMAP_THRESHOLD     (-3)
+#define M_MAX_FREEBUFBYTES   (-4)
+#define M_MAX_FREEBUF_PERCENT (-5)
+#define M_UNMAP_THRESHOLD    (-6)
 
 /* ------------------------ Mallinfo declarations ------------------------ */
 

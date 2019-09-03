@@ -6,7 +6,7 @@
 [subrepo]
 	remote = https://github.com/CTSRD-CHERI/dlmalloc_nonreuse.git
 	branch = newscheme
-	commit = 5ac7b51dca2bdfb809c746eb91c407facdd6ce3f
-	parent = 4cf1bc0106ea1494ea4424ea0489599fd3a9c317
+	commit = 3d1c469345983b27907e8994e4f918d62776c614
+	parent = c06fb7c5a7f045a4168eacd9ef171f5913230232
 	method = merge
 	cmdver = 0.4.0
