@@ -60,6 +60,11 @@
 
 #ifdef __CHERI_PURE_CAPABILITY__
 #include <cheri/cheric.h>
+#ifdef CAPREVOKE
+#include <sys/caprevoke.h>
+#include <sys/stdatomic.h>
+#include <cheri/libcaprevoke.h>
+#endif
 #endif
 
 #include <assert.h>
@@ -92,7 +97,9 @@ static void *__tls_malloc_aligned(size_t size, size_t align);
  * byte is set to MAGIC, and the second byte is the size index.
  */
 union	overhead {
+	struct {
 	union	overhead *ov_next;	/* when free */
+	};
 	struct {
 		u_char	ovu_magic;	/* magic number */
 		u_char	ovu_index;	/* bucket # */
@@ -108,6 +115,10 @@ struct pagepool_header {
 	/* XXXBD: more padding on 256-bit... */
 #endif
 	struct pagepool_header	*ph_next;
+#ifdef CAPREVOKE
+	void			*ph_shadow;
+	void			*ph_pad2; /* Align strongly */
+#endif
 };
 
 #define	MALLOC_ALIGNMENT	sizeof(union overhead)
@@ -119,9 +130,23 @@ struct pagepool_header {
  * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the
  * data area returned to the user.
  */
-#define	FIRST_BUCKET_SIZE	32
+#define	FIRST_BUCKET_SHIFT	5
+#define	FIRST_BUCKET_SIZE	(1 << FIRST_BUCKET_SHIFT)
 #define	NBUCKETS 30
 static	union overhead *nextf[NBUCKETS];
+
+#ifdef CAPREVOKE
+/*
+ * In the CAPREVOKE case, we encode the bucket in the next pointer's low
+ * bit in the quarantine pool.  The static assert ensures that remains
+ * possible.
+ */
+_Static_assert(NBUCKETS < FIRST_BUCKET_SIZE,
+    "Not enough alignment to encode bucket in pointer bits");
+#define	MAX_QUARANTINE	(1024 * 1024)
+static union overhead *quarantine_bufs[NBUCKETS];
+static size_t quarantine_size;
+#endif
 
 static const size_t pagesz = PAGE_SIZE;			/* page size */
 
@@ -129,6 +154,14 @@ static const size_t pagesz = PAGE_SIZE;			/* page size */
 
 static caddr_t	pagepool_start, pagepool_end;
 static struct pagepool_header	*curpp;
+
+#ifdef CAPREVOKE
+volatile const struct caprevoke_info *cri;
+
+static void paint_shadow(void *mem, size_t size);
+static void clear_shadow(void *mem, size_t size);
+static void do_revoke();
+#endif
 
 static int
 __morepages(int n)
@@ -217,6 +250,49 @@ bound_ptr(void *mem, size_t nbytes)
 	return (ptr);
 }
 
+#ifdef CAPREVOKE
+static void
+try_revoke(int target_bucket)
+{
+	int bucket;
+	union overhead *op, *next_op;
+
+	/*
+	 * Don't revoke unless there is enough in quarantine and some of
+	 * it would be returned to the bucket we want to refill.
+	 */
+	 if (quarantine_bufs[target_bucket] == NULL ||
+	     quarantine_size < MAX_QUARANTINE)
+	     return;
+
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		for (op = quarantine_bufs[bucket]; op != NULL;
+		    op = op->ov_next)
+			paint_shadow(op, FIRST_BUCKET_SIZE << bucket);
+	}
+	atomic_thread_fence(memory_order_acq_rel);
+
+	do_revoke();
+
+	 for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		for (op = quarantine_bufs[bucket]; op != NULL;
+		    op = op->ov_next)
+			clear_shadow(op, FIRST_BUCKET_SIZE << bucket);
+	}
+	atomic_thread_fence(memory_order_acq_rel);
+
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		op = quarantine_bufs[bucket];
+		while (op != NULL) {
+			next_op = op->ov_next;
+			op->ov_next = nextf[bucket];
+			nextf[bucket] = op;
+		}
+	}
+	quarantine_size = 0;
+}
+#endif
+
 static void *
 __tls_malloc(size_t nbytes)
 {
@@ -244,6 +320,10 @@ __tls_malloc(size_t nbytes)
 	 * request more memory from the system.
 	 */
 	TLS_MALLOC_LOCK;
+#ifdef CAPREVOKE
+	if ((op = nextf[bucket]) == NULL)
+		try_revoke(bucket);
+#endif
 	if ((op = nextf[bucket]) == NULL) {
 		morecore(bucket);
 		if ((op = nextf[bucket]) == NULL) {
@@ -393,6 +473,53 @@ nextf_insert(void *mem, size_t size, int xbucket)
 	nextf[bucket] = op;
 }
 
+#ifdef CAPREVOKE
+static void
+paint_shadow(void *mem, size_t size)
+{
+	struct pagepool_header *pp;
+
+	pp = cheri_setoffset(pp, 0);
+	/*
+	 * Defer initializing ph_shadow since odds are good we'll never
+	 * need it.
+	 */
+	if (pp->ph_shadow == NULL)
+		if (caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, pp,
+		    &pp->ph_shadow) != 0)
+			abort();
+	caprev_shadow_nomap_set_raw(pp->ph_shadow, (vaddr_t)mem, size);
+}
+
+static void
+clear_shadow(void *mem, size_t size)
+{
+	struct pagepool_header *pp;
+
+	pp = cheri_setoffset(pp, 0);
+	caprev_shadow_nomap_clear_raw(pp->ph_shadow, (vaddr_t)mem, size);
+}
+
+static void
+do_revoke(void)
+{
+	int error;
+
+	if (cri == NULL) {
+		error = caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+		    (void **)&cri);
+		assert(error == 0);
+	}
+
+	caprevoke_epoch start_epoch = cri->epoch_enqueue;
+	while (!caprevoke_epoch_clears(cri->epoch_dequeue, start_epoch)) {
+		struct caprevoke_stats crst;
+		error = caprevoke(CAPREVOKE_LAST_PASS, start_epoch, &crst);
+		assert(error == 0);
+	}
+}
+#endif /* CAPREVOKE */
+
 void
 tls_free(void *cp)
 {
@@ -408,7 +535,13 @@ tls_free(void *cp)
 	bucket = op->ov_index;
 	if (bucket < NBUCKETS)
 		abort();
+#ifdef CAPREVOKE
+	op->ov_next = quarantine_bufs[bucket];
+	quarantine_bufs[bucket] = op;
+	quarantine_size += FIRST_BUCKET_SIZE << bucket;
+#else
 	nextf_insert(op, FIRST_BUCKET_SIZE << bucket, bucket);
+#endif
 	TLS_MALLOC_UNLOCK;
 }
 
