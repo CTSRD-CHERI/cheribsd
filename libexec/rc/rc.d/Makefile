@@ -4,7 +4,7 @@
 
 CONFDIR=	/etc/rc.d
 CONFGROUPS=	CONFS
-#PACKAGE=rc
+CONFSPACKAGE=	rc
 
 CONFS=	DAEMON \
 	FILESYSTEMS \
@@ -325,7 +325,6 @@ ZFS+=		zfs
 ZFS+=		zfsbe
 ZFS+=		zfsd
 ZFS+=		zvol
-ZFSPACKAGE=	zfs
 .endif
 
 .for fg in ${CONFGROUPS}
