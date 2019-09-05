@@ -147,6 +147,7 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_kbounce] = (0x0 | 0x1 | 0x2),
  [CHERIABI_SYS_cheriabi_caprevoke_shadow] = (0x0 | 0x2 | 0x4),
  [CHERIABI_SYS_cheriabi_caprevoke] = (0x0 | 0x4),
+ [CHERIABI_SYS_cheriabi_caprevoke_entire_shadow_cap] = (0x0 | 0x1),
  [CHERIABI_SYS_cheriabi_lchmod] = (0x0 | 0x1),
  [CHERIABI_SYS_cheriabi_lutimes] = (0x0 | 0x1 | 0x2),
  [CHERIABI_SYS_cheriabi_preadv] = (0x0 | 0x2),

@@ -740,6 +740,9 @@ struct caprevoke_args {
 	char start_epoch_l_[PADL_(uint64_t)]; uint64_t start_epoch; char start_epoch_r_[PADR_(uint64_t)];
 	char statout_l_[PADL_(struct caprevoke_stats *)]; struct caprevoke_stats * statout; char statout_r_[PADR_(struct caprevoke_stats *)];
 };
+struct caprevoke_entire_shadow_cap_args {
+	char shadow_l_[PADL_(void *)]; void * shadow; char shadow_r_[PADR_(void *)];
+};
 struct lchmod_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -1980,6 +1983,7 @@ int	sys_lio_listio(struct thread *, struct lio_listio_args *);
 int	sys_kbounce(struct thread *, struct kbounce_args *);
 int	sys_caprevoke_shadow(struct thread *, struct caprevoke_shadow_args *);
 int	sys_caprevoke(struct thread *, struct caprevoke_args *);
+int	sys_caprevoke_entire_shadow_cap(struct thread *, struct caprevoke_entire_shadow_cap_args *);
 int	sys_lchmod(struct thread *, struct lchmod_args *);
 int	sys_lutimes(struct thread *, struct lutimes_args *);
 int	sys_preadv(struct thread *, struct preadv_args *);
@@ -2871,6 +2875,7 @@ int	freebsd11_mknodat(struct thread *, struct freebsd11_mknodat_args *);
 #define	SYS_AUE_kbounce	AUE_NULL
 #define	SYS_AUE_caprevoke_shadow	AUE_NULL
 #define	SYS_AUE_caprevoke	AUE_NULL
+#define	SYS_AUE_caprevoke_entire_shadow_cap	AUE_NULL
 #define	SYS_AUE_freebsd11_getdents	AUE_O_GETDENTS
 #define	SYS_AUE_lchmod	AUE_LCHMOD
 #define	SYS_AUE_lutimes	AUE_LUTIMES

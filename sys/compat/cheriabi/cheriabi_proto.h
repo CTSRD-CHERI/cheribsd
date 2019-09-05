@@ -525,6 +525,9 @@ struct cheriabi_caprevoke_args {
 	char start_epoch_l_[PADL_(uint64_t)]; uint64_t start_epoch; char start_epoch_r_[PADR_(uint64_t)];
 	char statout_l_[PADL_(struct caprevoke_stats * __capability)]; struct caprevoke_stats * __capability statout; char statout_r_[PADR_(struct caprevoke_stats * __capability)];
 };
+struct cheriabi_caprevoke_entire_shadow_cap_args {
+	char shadow_l_[PADL_(void * __capability)]; void * __capability shadow; char shadow_r_[PADR_(void * __capability)];
+};
 struct cheriabi_lchmod_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
@@ -1557,6 +1560,7 @@ int	cheriabi_lio_listio(struct thread *, struct cheriabi_lio_listio_args *);
 int	cheriabi_kbounce(struct thread *, struct cheriabi_kbounce_args *);
 int	cheriabi_caprevoke_shadow(struct thread *, struct cheriabi_caprevoke_shadow_args *);
 int	cheriabi_caprevoke(struct thread *, struct cheriabi_caprevoke_args *);
+int	cheriabi_caprevoke_entire_shadow_cap(struct thread *, struct cheriabi_caprevoke_entire_shadow_cap_args *);
 int	cheriabi_lchmod(struct thread *, struct cheriabi_lchmod_args *);
 int	cheriabi_lutimes(struct thread *, struct cheriabi_lutimes_args *);
 int	cheriabi_preadv(struct thread *, struct cheriabi_preadv_args *);
@@ -1885,6 +1889,7 @@ int	cheriabi_funlinkat(struct thread *, struct cheriabi_funlinkat_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_kbounce	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_caprevoke_shadow	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_caprevoke	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_caprevoke_entire_shadow_cap	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_lchmod	AUE_LCHMOD
 #define	CHERIABI_SYS_AUE_cheriabi_lutimes	AUE_LUTIMES
 #define	CHERIABI_SYS_AUE_cheriabi_preadv	AUE_PREADV

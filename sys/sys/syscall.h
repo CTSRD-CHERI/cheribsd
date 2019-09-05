@@ -237,6 +237,7 @@
 #define	SYS_kbounce	258
 #define	SYS_caprevoke_shadow	259
 #define	SYS_caprevoke	260
+#define	SYS_caprevoke_entire_shadow_cap	261
 #define	SYS_freebsd11_getdents	272
 #define	SYS_lchmod	274
 				/* 275 is obsolete netbsd_lchown */

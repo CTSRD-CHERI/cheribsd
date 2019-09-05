@@ -1539,6 +1539,16 @@ SYS_STUB(260, void*, caprevoke,
     /* _localcheck */ {if (!(cheri_getperm(statout) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((void*)-1);} }
 )
 
+SYS_STUB(261, void*, caprevoke_entire_shadow_cap,
+    /* _protoargs */ (void *  shadow),
+    /* _protoargs_chk */ (void* *retp , int * __capability stub_errno, void * __capability   shadow),
+    /* _protoargs_err */ (int * __capability stub_errno, void * __capability   shadow),
+    /* _callargs */ ((__cheri_fromcap void * )shadow),
+    /* _callargs_chk */ (&ret, stub_errno, shadow),
+    /* _callargs_err */ (&errno, (void * )shadow),
+    /* _localcheck */ {if (!(cheri_getperm(shadow) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((void*)-1);} }
+)
+
 SYS_STUB(274, int, lchmod,
     /* _protoargs */ (const char *  path, mode_t mode),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   path, mode_t mode),

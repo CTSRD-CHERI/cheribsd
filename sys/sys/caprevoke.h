@@ -305,6 +305,8 @@ int caprevoke(int flags, caprevoke_epoch start_epoch,
 int caprevoke_shadow(int flags,
 	void * __capability arena,
 	void * __capability * shadow);
+
+int caprevoke_entire_shadow_cap(void * __capability *shadow);
 #endif
 
 #endif /* !__SYS_CAPREVOKE_H__ */

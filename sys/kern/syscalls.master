@@ -1493,7 +1493,10 @@
 		    _Out_ struct caprevoke_stats *statout,
 		);
 	}
-261-271	AUE_NULL	UNIMPL	nosys
+	261	AUE_NULL	STD {
+		void *caprevoke_entire_shadow_cap(_Out_ void *shadow);
+	}
+262-271	AUE_NULL	UNIMPL	nosys
 272	AUE_O_GETDENTS	COMPAT11 {
 		int getdents(
 		    int fd,

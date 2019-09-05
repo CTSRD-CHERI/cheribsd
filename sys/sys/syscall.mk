@@ -171,6 +171,7 @@ MIASM =  \
 	kbounce.o \
 	caprevoke_shadow.o \
 	caprevoke.o \
+	caprevoke_entire_shadow_cap.o \
 	freebsd11_getdents.o \
 	lchmod.o \
 	lutimes.o \

@@ -237,6 +237,7 @@
 #define	CHERIABI_SYS_cheriabi_kbounce	258
 #define	CHERIABI_SYS_cheriabi_caprevoke_shadow	259
 #define	CHERIABI_SYS_cheriabi_caprevoke	260
+#define	CHERIABI_SYS_cheriabi_caprevoke_entire_shadow_cap	261
 				/* 272 is obsolete freebsd11_getdents */
 #define	CHERIABI_SYS_cheriabi_lchmod	274
 				/* 275 is obsolete netbsd_lchown */

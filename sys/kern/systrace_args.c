@@ -1348,6 +1348,13 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
+	/* caprevoke_entire_shadow_cap */
+	case 261: {
+		struct caprevoke_entire_shadow_cap_args *p = params;
+		uarg[0] = (intptr_t) p->shadow; /* void * */
+		*n_args = 1;
+		break;
+	}
 	/* lchmod */
 	case 274: {
 		struct lchmod_args *p = params;
@@ -5472,6 +5479,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 2:
 			p = "userland struct caprevoke_stats *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* caprevoke_entire_shadow_cap */
+	case 261:
+		switch(ndx) {
+		case 0:
+			p = "userland void *";
 			break;
 		default:
 			break;
@@ -9696,6 +9713,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* caprevoke */
 	case 260:
+		if (ndx == 0 || ndx == 1)
+			p = "void *";
+		break;
+	/* caprevoke_entire_shadow_cap */
+	case 261:
 		if (ndx == 0 || ndx == 1)
 			p = "void *";
 		break;

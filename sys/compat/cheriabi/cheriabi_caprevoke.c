@@ -580,6 +580,14 @@ cheriabi_caprevoke_shadow(struct thread *td,
 	return error;
 }
 
+void * __capability caprev_shadow_cap;
+int
+cheriabi_caprevoke_entire_shadow_cap(struct thread *td,
+			    struct cheriabi_caprevoke_entire_shadow_cap_args *uap)
+{
+	return copyoutcap(&caprev_shadow_cap, uap->shadow, sizeof(caprev_shadow_cap));
+}
+
 #else /* CHERI_CAPREVOKE */
 
 int
@@ -595,6 +603,17 @@ cheriabi_caprevoke(struct thread *td, struct cheriabi_caprevoke_args *uap)
 int
 cheriabi_caprevoke_shadow(struct thread *td,
 			    struct cheriabi_caprevoke_shadow_args *uap)
+{
+	void * __capability cres = NULL;
+
+	copyoutcap(&cres, uap->shadow, sizeof(cres));
+
+	return ENOSYS;
+}
+
+int
+cheriabi_caprevoke_entire_shadow_cap(struct thread *td,
+			    struct cheriabi_caprevoke_entire_shadow_cap_args *uap)
 {
 	void * __capability cres = NULL;
 

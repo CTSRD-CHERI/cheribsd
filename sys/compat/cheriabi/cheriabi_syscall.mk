@@ -155,6 +155,7 @@ MIASM =  \
 	cheriabi_kbounce.o \
 	cheriabi_caprevoke_shadow.o \
 	cheriabi_caprevoke.o \
+	cheriabi_caprevoke_entire_shadow_cap.o \
 	cheriabi_lchmod.o \
 	cheriabi_lutimes.o \
 	cheriabi_preadv.o \
