@@ -160,9 +160,11 @@ compare_servent(struct servent *serv1, struct servent *serv2, void *mdata)
 
 errfin:
 	if (mdata == NULL) {
+#ifdef DEBUG
 		printf("following structures are not equal:\n");
 		dump_servent(serv1);
 		dump_servent(serv2);
+#endif
 	}
 
 	return (-1);
@@ -302,8 +304,11 @@ servent_fill_test_data(struct servent_test_data *td)
 static int
 servent_test_correctness(struct servent *serv, void *mdata __unused)
 {
+
+#ifdef DEBUG
 	printf("testing correctness with the following data:\n");
 	dump_servent(serv);
+#endif
 
 	if (serv == NULL)
 		goto errfin;
@@ -320,11 +325,14 @@ servent_test_correctness(struct servent *serv, void *mdata __unused)
 	if (serv->s_aliases == NULL)
 		goto errfin;
 
+#ifdef DEBUG
 	printf("correct\n");
+#endif
 
 	return (0);
 errfin:
-	printf("incorrect\n");
+	printf("testing servent correctness failed with the following data:\n");
+	dump_servent(serv);
 
 	return (-1);
 }
@@ -348,8 +356,10 @@ servent_test_getservbyname(struct servent *serv_model, void *mdata)
 	char **alias;
 	struct servent *serv;
 
+#ifdef DEBUG
 	printf("testing getservbyname() with the following data:\n");
 	dump_servent(serv_model);
+#endif
 
 	serv = getservbyname(serv_model->s_name, serv_model->s_proto);
 	if (servent_test_correctness(serv, NULL) != 0)
@@ -371,12 +381,14 @@ servent_test_getservbyname(struct servent *serv_model, void *mdata)
 		    (struct servent_test_data *)mdata, serv) != 0))
 		    goto errfin;
 	}
-
+#ifdef DEBUG
 	printf("ok\n");
+#endif
 	return (0);
 
 errfin:
-	printf("not ok\n");
+	printf("testing getservbyname() failed with the following data:\n");
+	dump_servent(serv_model);
 
 	return (-1);
 }
@@ -386,18 +398,23 @@ servent_test_getservbyport(struct servent *serv_model, void *mdata)
 {
 	struct servent *serv;
 
+#ifdef DEBUG
 	printf("testing getservbyport() with the following data...\n");
 	dump_servent(serv_model);
+#endif
 
 	serv = getservbyport(serv_model->s_port, serv_model->s_proto);
 	if ((servent_test_correctness(serv, NULL) != 0) ||
 	    ((compare_servent(serv, serv_model, NULL) != 0) &&
 	    (servent_check_ambiguity((struct servent_test_data *)mdata, serv)
 	    != 0))) {
-		printf("not ok\n");
+		printf("testing getservbyport() failed with the following data:\n");
+		dump_servent(serv_model);
 		return (-1);
 	} else {
+#ifdef DEBUG
 		printf("ok\n");
+#endif
 		return (0);
 	}
 }
