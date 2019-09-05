@@ -39,5 +39,8 @@ extern caddr_t pagepool_end __hidden;
 int	__morepages(int n) __hidden;
 void	__init_heap(size_t pagesz) __hidden;
 void	*__rederive_pointer(void *ptr) __hidden;
+void	__paint_shadow(void *mem, size_t size) __hidden;
+void	__clear_shadow(void *mem, size_t size) __hidden;
+void	__do_revoke(void);
 
 #endif /* __MALLOC_HEAP_H__ */
