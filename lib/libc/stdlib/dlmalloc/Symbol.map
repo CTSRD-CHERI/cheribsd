@@ -3,6 +3,7 @@
  */
 
 FBSD_1.0 {
+	aligned_alloc;
 	malloc;
 	posix_memalign;
 	calloc;
