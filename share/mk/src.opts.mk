@@ -377,6 +377,7 @@ BROKEN_OPTIONS+=MLX5TOOL
 .if (${__C} != "cheri" && ${__C} != "morello" && \
     !${__T:Maarch64*c*} && !${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=CHERI
+BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .endif
 
 # We'd really like this to be:
