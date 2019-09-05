@@ -9,7 +9,7 @@ SYM_MAPS+=${LIBC_SRCTOP}/stdlib/dlmalloc/Symbol.map
 
 CFLAGS+=-I${SRCTOP}/contrib/dlmalloc
 
-.if ${MK_CHERI} == "yes"
+.if ${MK_CHERI_CAPREVOKE} == "yes"
 .PATH: ${SRCTOP}/lib/libcheri_caprevoke
 DLMALLOCSRCS+=		libcheri_caprevoke.c
 DLMALLOC_CFLAGS+=	-DCHERI_SET_BOUNDS -DSAFE_FREEBUF

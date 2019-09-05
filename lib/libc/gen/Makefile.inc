@@ -175,6 +175,12 @@ SRCS+=	devname-compat11.c \
 	unvis-compat.c
 .endif
 
+.if ${MACHINE_ARCH:Mmips*c*} && ${MK_CHERI_CAPREVOKE}
+CFLAGS.tls_malloc.c+=	-DCAPREVOKE
+.PATH:	${SRCTOP}/lib/libcheri_caprevoke
+SRCS+=	libcheri_caprevoke.c
+.endif
+
 CFLAGS.arc4random.c= -I${SRCTOP}/sys -I${SRCTOP}/sys/crypto/chacha20
 
 .PATH: ${SRCTOP}/contrib/libc-pwcache
