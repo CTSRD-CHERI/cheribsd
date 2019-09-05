@@ -462,6 +462,9 @@ DEFAULT_UNMAP_THRESHOLD	default: MAX_SIZE_T / PAGESIZE
 #ifndef DEFAULT_MAX_FREEBUFBYTES
 #define DEFAULT_MAX_FREEBUFBYTES MAX_SIZE_T
 #endif
+#ifndef DEFAULT_MIN_FREEBUFBYTES
+#define DEFAULT_MIN_FREEBUFBYTES (2 * 1024 * 1024)
+#endif
 
 #define MAX_UNMAP_THRESHOLD (MAX_SIZE_T >> PAGE_SHIFT)
 #ifndef DEFAULT_UNMAP_THRESHOLD
@@ -626,9 +629,10 @@ DEFAULT_UNMAP_THRESHOLD	default: MAX_SIZE_T / PAGESIZE
 #define M_TRIM_THRESHOLD     (-1)
 #define M_GRANULARITY        (-2)
 #define M_MMAP_THRESHOLD     (-3)
-#define M_MAX_FREEBUFBYTES   (-4)
-#define M_MAX_FREEBUF_PERCENT (-5)
-#define M_UNMAP_THRESHOLD    (-6)
+#define M_MIN_FREEBUFBYTES   (-4)
+#define M_MAX_FREEBUFBYTES   (-5)
+#define M_MAX_FREEBUF_PERCENT (-6)
+#define M_UNMAP_THRESHOLD    (-7)
 
 /* ------------------------ Mallinfo declarations ------------------------ */
 
@@ -715,6 +719,7 @@ extern "C" {
 #define dlfree                 free
 #define dlmalloc               malloc
 #define dlposix_memalign       posix_memalign
+#define dlaligned_alloc        aligned_alloc
 #define dlrealloc              realloc
 #define dlmallinfo             mallinfo
 #define dlmallopt              mallopt
@@ -794,6 +799,12 @@ DLMALLOC_EXPORT void* dlrealloc(void*, size_t);
   returns ENOMEM if memory cannot be allocated.
 */
 DLMALLOC_EXPORT int dlposix_memalign(void**, size_t, size_t);
+
+/*
+  void *aligned_alloc(size_t alignment, size_t size);
+  C11 interface to allocate aligned memory.
+*/
+DLMALLOC_EXPORT void *aligned_alloc(size_t, size_t);
 
 /*
   mallopt(int parameter_number, int parameter_value)
