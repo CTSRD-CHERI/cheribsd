@@ -225,6 +225,7 @@ __DEFAULT_NO_OPTIONS+= \
 
 __DEFAULT_YES_OPTIONS+=	\
 	COMPAT_CHERIABI \
+	CHERI_CAPREVOKE \
 	CHERIBSDBOX
 
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
@@ -235,6 +236,7 @@ __DEFAULT_DEPENDENT_OPTIONS= \
 	LOADER_EFI_SECUREBOOT/LOADER_VERIEXEC \
 	LOADER_VERIEXEC_VECTX/LOADER_VERIEXEC \
 	VERIEXEC/BEARSSL \
+	DLMALLOC/CHERI_CAPREVOKE
 
 # MK_*_SUPPORT options which default to "yes" unless their corresponding
 # MK_* variable is set to "no".
@@ -419,6 +421,10 @@ __DEFAULT_NO_OPTIONS+=PIE
 # but that logic doesn't work in Makefile.inc1...
 .if ${__C} != "cheri" || (${__T:Mmips64*c*} || ${__T:Mriscv64*c*})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
+.endif
+
+.if ${__C} != "cheri"
+BROKEN_OPTIONS+=CHERI_CAPREVOKE
 .endif
 
 .if ${.MAKE.OS} != "FreeBSD"
