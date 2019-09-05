@@ -420,6 +420,10 @@ BROKEN_OPTIONS+=MLX5TOOL
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
+.if ${__C} != "cheri"
+BROKEN_OPTIONS+=CHERI_CAPREVOKE
+.endif
+
 .if ${.MAKE.OS} != "FreeBSD"
 # tablegen will not build on non-FreeBSD so also disable target clang and lld
 BROKEN_OPTIONS+=CLANG LLD
