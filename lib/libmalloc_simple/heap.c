@@ -46,8 +46,17 @@ static char *rcsid = "$FreeBSD$";
 
 #include <sys/param.h>
 #include <sys/types.h>
+#ifdef CAPREVOKE
+#include <sys/caprevoke.h>
+#endif
 #include <sys/mman.h>
+#ifdef CAPREVOKE
+#include <sys/stdatomic.h>
+#endif
 
+#ifdef CAPREVOKE
+#include <cheri/libcaprevoke.h>
+#endif
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
@@ -75,7 +84,11 @@ struct pagepool_header {
 	/* XXXBD: more padding on 256-bit... */
 #endif
 	struct pagepool_header	*ph_next;
+#ifdef CAPREVOKE
+	void			*ph_shadow;
+#else
 	void			*ph_pad2;
+#endif
 };
 
 #define	NPOOLPAGES	(32*1024/_pagesz)
@@ -84,6 +97,10 @@ caddr_t		pagepool_start, pagepool_end;
 static struct pagepool_header	*curpp;
 
 static size_t _pagesz;
+
+#ifdef CAPREVOKE
+static volatile const struct caprevoke_info *cri;
+#endif
 
 int
 __morepages(int n)
@@ -161,3 +178,52 @@ __rederive_pointer(void *ptr)
 
 	return (NULL);
 }
+
+
+#ifdef CAPREVOKE
+void
+__paint_shadow(void *mem, size_t size)
+{
+	struct pagepool_header *pp;
+
+	pp = cheri_setoffset(mem, 0);
+	/*
+	 * Defer initializing ph_shadow since odds are good we'll never
+	 * need it.
+	 */
+	if (pp->ph_shadow == NULL)
+		if (caprevoke_shadow(CAPREVOKE_SHADOW_NOVMMAP, pp,
+		    &pp->ph_shadow) != 0)
+			abort();
+	caprev_shadow_nomap_set_raw(pp->ph_shadow, (vaddr_t)mem, size);
+}
+
+void
+__clear_shadow(void *mem, size_t size)
+{
+	struct pagepool_header *pp;
+
+	pp = cheri_setoffset(mem, 0);
+	caprev_shadow_nomap_clear_raw(pp->ph_shadow, (vaddr_t)mem, size);
+}
+
+void
+__do_revoke(void)
+{
+	int error;
+
+	if (cri == NULL) {
+		error = caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+		    __DECONST(void **, &cri));
+		assert(error == 0);
+	}
+
+	caprevoke_epoch start_epoch = cri->epoch_enqueue;
+	while (!caprevoke_epoch_clears(cri->epoch_dequeue, start_epoch)) {
+		struct caprevoke_stats crst;
+		error = caprevoke(CAPREVOKE_LAST_PASS, start_epoch, &crst);
+		assert(error == 0);
+	}
+}
+
+#endif /* CAPREVOKE */
