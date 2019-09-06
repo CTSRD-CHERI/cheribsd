@@ -688,7 +688,6 @@ cd9660_readlink(ap)
 		      (imp->im_bshift - DEV_BSHIFT),
 		      imp->logical_block_size, NOCRED, &bp);
 	if (error) {
-		brelse(bp);
 		return (EINVAL);
 	}
 
