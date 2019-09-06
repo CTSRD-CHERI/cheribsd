@@ -119,8 +119,12 @@ static	union overhead *nextf[NBUCKETS];
 _Static_assert(NBUCKETS < FIRST_BUCKET_SIZE,
     "Not enough alignment to encode bucket in pointer bits");
 #define	MAX_QUARANTINE	(1024 * 1024)
+#define	MAX_PAINTED	(4 * MAX_QUARANTINE)
 static	union overhead *quarantine_bufs[NBUCKETS];
-static	size_t quarantine_size;
+static	union overhead *painted_bufs[NBUCKETS];
+static	size_t quarantine_size, painted_size;
+static	volatile const struct caprevoke_info *cri;
+static	caprevoke_epoch painted_epoch;
 #endif
 
 static	size_t pagesz;			/* page size */
@@ -154,41 +158,87 @@ bound_ptr(void *mem, size_t nbytes)
 
 #ifdef CAPREVOKE
 static void
-try_revoke(int target_bucket)
+free_painted(void)
 {
 	int bucket;
-	union overhead *op, *next_op;
-
-	/*
-	 * Don't revoke unless there is enough in quarantine and some of
-	 * it would be returned to the bucket we want to refill.
-	 */
-	if (quarantine_bufs[target_bucket] == NULL ||
-	    quarantine_size < MAX_QUARANTINE)
-	    return;
+	union overhead *op, *next_op;;
 
 	for (bucket = 0; bucket < NBUCKETS; bucket++)
-		for (op = quarantine_bufs[bucket]; op != NULL;
-		    op = op->ov_next)
-			__paint_shadow(op, FIRST_BUCKET_SIZE << bucket);
-	atomic_thread_fence(memory_order_acq_rel);
-
-	__do_revoke();
-
-	for (bucket = 0; bucket < NBUCKETS; bucket++)
-		for (op = quarantine_bufs[bucket]; op != NULL;
-		    op = op->ov_next)
+		for (op = painted_bufs[bucket]; op != NULL; op = op->ov_next)
 			__clear_shadow(op, FIRST_BUCKET_SIZE << bucket);
+
+	/* XXX: how do we know that no thread is revoking? */
 	atomic_thread_fence(memory_order_acq_rel);
 
 	for (bucket = 0; bucket < NBUCKETS; bucket++) {
-		op = quarantine_bufs[bucket];
+		op = painted_bufs[bucket];
 		while (op != NULL) {
 			next_op = op->ov_next;
 			op->ov_next = nextf[bucket];
 			nextf[bucket] = op;
+			op = next_op;
 		}
 	}
+	painted_size = 0;
+}
+
+static void
+try_revoke(int target_bucket)
+{
+	int bucket, error;
+	union overhead *op, *next_op;
+
+	/* See if prior painting has resulted in revoked pointers. */
+	/*
+	 * NB: despite the NULL check below, cri is always non-NULL if
+	 * used here.  We defer initilization as long as possible to
+	 * avoid the extra syscall in the common case.
+	 */
+	if (painted_size > 0 &&
+	    caprevoke_epoch_clears(cri->epoch_dequeue, painted_epoch))
+		free_painted();
+
+	if (quarantine_size < MAX_QUARANTINE && painted_size < MAX_PAINTED)
+		return;
+
+	if (cri == NULL) {
+		error = caprevoke_shadow(CAPREVOKE_SHADOW_INFO_STRUCT, NULL,
+		    __DECONST(void **, &cri));
+		assert(error == 0);
+	}
+
+	/* Paint all buffers in quarantine */
+	for (bucket = 0; bucket < NBUCKETS; bucket++) {
+		op = quarantine_bufs[bucket];
+		while (op != NULL) {
+			next_op = op->ov_next;
+			__paint_shadow(op, FIRST_BUCKET_SIZE << bucket);
+			op->ov_next = painted_bufs[bucket];
+			painted_bufs[bucket] = op;
+			op = next_op;
+		}
+	}
+	painted_size += quarantine_size;
+	quarantine_size = 0;
+	atomic_thread_fence(memory_order_acq_rel);
+	painted_epoch = cri->epoch_enqueue;
+
+	/*
+	 * Don't force revocation unless we've exceeded MAX_PAINTED and
+	 * it would return memory we actually want.  Otherwise, just
+	 * hope the base malloc does the job for us.
+	 */
+	if (painted_size < MAX_PAINTED || painted_bufs[target_bucket] == NULL)
+		return;
+
+	while (!caprevoke_epoch_clears(cri->epoch_dequeue, painted_epoch)) {
+		struct caprevoke_stats crst;
+		error = caprevoke(CAPREVOKE_LAST_PASS, painted_epoch, &crst);
+		assert(error == 0);
+	}
+
+	free_painted();
+
 }
 #endif
 
