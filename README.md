@@ -19,19 +19,19 @@ More information about BERI and CHERI can be found on
 http://beri-cpu.org, http://cheri-cpu.org, in the following
 Technical Reports:
 
+Capability Hardware Enhanced RISC Instructions: CHERI Instruction-Set
+Architecture
+https://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-927.pdf
+
+Capability Hardware Enhanced RISC Instructions: CHERI Programmer's Guide (outdated, new version coming soon)
+http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-877.pdf
+
 
 Bluespec Extensible RISC Implementation: BERI Hardware reference
 http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-868.pdf
 
 Bluespec Extensible RISC Implementation: BERI Software reference
 http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-869.pdf
-
-Capability Hardware Enhanced RISC Instructions: CHERI Programmer's Guide
-http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-877.pdf
-
-Capability Hardware Enhanced RISC Instructions: CHERI Instruction-Set
-Architecture
-http://www.cl.cam.ac.uk/techreports/UCAM-CL-TR-876.pdf
 
 FreeBSD Source:
 ---------------
