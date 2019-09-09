@@ -155,7 +155,7 @@ libcheri_fd_destroy(struct sandbox_object *sbop)
 {
 	struct libcheri_fd * __capability lcfp;
 
-	lcfp = sandbox_object_getsandboxdata(sbop);
+	lcfp = sandbox_object_private_get(sbop);
 	sandbox_object_destroy(sbop);
 	free((__cheri_fromcap struct libcheri_fd *)lcfp);
 }
