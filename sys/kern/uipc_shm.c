@@ -200,10 +200,8 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 				printf(
 	    "uiomove_object: vm_obj %p idx %jd valid %x pager error %d\n",
 				    obj, idx, m->valid, rv);
-				vm_page_lock(m);
 				vm_page_unwire_noq(m);
 				vm_page_free(m);
-				vm_page_unlock(m);
 				VM_OBJECT_WUNLOCK(obj);
 				return (EIO);
 			}
@@ -219,9 +217,7 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 		vm_pager_page_unswapped(m);
 		VM_OBJECT_WUNLOCK(obj);
 	}
-	vm_page_lock(m);
 	vm_page_unwire(m, PQ_ACTIVE);
-	vm_page_unlock(m);
 
 	return (error);
 }
@@ -476,7 +472,6 @@ retry:
 					goto retry;
 				rv = vm_pager_get_pages(object, &m, 1, NULL,
 				    NULL);
-				vm_page_lock(m);
 				if (rv == VM_PAGER_OK) {
 					/*
 					 * Since the page was not resident,
@@ -487,11 +482,9 @@ retry:
 					 * as an access.
 					 */
 					vm_page_launder(m);
-					vm_page_unlock(m);
 					vm_page_xunbusy(m);
 				} else {
 					vm_page_free(m);
-					vm_page_unlock(m);
 					VM_OBJECT_WUNLOCK(object);
 					return (EIO);
 				}
