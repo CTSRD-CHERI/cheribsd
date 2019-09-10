@@ -56,9 +56,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#if __has_feature(capabilities)
-#include <sys/cheriabi.h>
-#endif
 #include <sys/capsicum.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -127,6 +124,13 @@ SYSCTL_INT(_vm, OID_AUTO, imply_prot_max, CTLFLAG_RWTUN, &imply_prot_max, 0,
 static int log_wxrequests = 0;
 SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
     "Log requests for PROT_WRITE and PROT_EXEC");
+#if __has_feature(capabilities)
+SYSCTL_DECL(_compat_cheriabi_mmap);
+static int cheriabi_mmap_precise_bounds = 1;
+SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
+    CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
+    "Require that bounds on returned capabilities be precise.");
+#endif
 
 #ifdef MAP_32BIT
 #define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)

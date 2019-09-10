@@ -74,8 +74,6 @@
 #include <machine/sysarch.h>
 #include <machine/tls.h>
 
-#include <sys/cheriabi.h>
-
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>

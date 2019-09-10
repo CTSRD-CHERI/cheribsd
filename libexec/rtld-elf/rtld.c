@@ -51,7 +51,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktrace.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <sys/cheriabi.h>
 #include <cheri/cheric.h>
 #endif
 

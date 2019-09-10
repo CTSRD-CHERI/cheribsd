@@ -129,8 +129,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 
-#include <sys/cheriabi.h>
-
 MALLOC_DECLARE(M_KQUEUE);
 
 FEATURE(compat_cheri_abi, "Compatible CHERI system call ABI");

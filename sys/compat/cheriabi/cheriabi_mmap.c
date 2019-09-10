@@ -53,10 +53,8 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 
-#include <sys/cheriabi.h>
-
 SYSCTL_NODE(_compat, OID_AUTO, cheriabi, CTLFLAG_RW, 0, "CheriABI mode");
-static SYSCTL_NODE(_compat_cheriabi, OID_AUTO, mmap, CTLFLAG_RW, 0, "mmap");
+SYSCTL_NODE(_compat_cheriabi, OID_AUTO, mmap, CTLFLAG_RW, 0, "mmap");
 
 static int	cheriabi_mmap_honor_prot = 1;
 SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, honor_prot,
@@ -66,10 +64,6 @@ static int	cheriabi_mmap_setbounds = 1;
 SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, setbounds,
     CTLFLAG_RWTUN, &cheriabi_mmap_setbounds, 0,
     "Set bounds on returned capabilities.");
-int	cheriabi_mmap_precise_bounds = 1;
-SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
-    CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
-    "Require that bounds on returned capabilities be precise.");
 
 static register_t cheriabi_mmap_prot2perms(int prot);
 
