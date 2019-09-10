@@ -549,7 +549,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		csp = csigp->csig_csp;
+		csp = (char * __capability)td->td_sigstk.ss_sp + td->td_sigstk.ss_size;
 	} else {
 		/*
 		 * Signals delivered when a CHERI sandbox is present must be
