@@ -203,8 +203,8 @@ __simple_malloc(size_t nbytes)
 #ifdef __CHERI_PURE_CAPABILITY__
 	size_t align, mask;
 
-	nbytes = __builtin_cheri_round_representable_length(nbytes);
-	mask = __builtin_cheri_representable_alignment_mask(nbytes);
+	nbytes = CHERI_REPRESENTABLE_LENGTH(nbytes);
+	mask = CHERI_REPRESENTABLE_ALIGNMENT_MASK(nbytes);
 	align = 1 + ~mask;
 
 	if (mask != SIZE_MAX && align > MALLOC_ALIGNMENT)
@@ -352,7 +352,7 @@ __simple_realloc(void *cp, size_t nbytes)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Round up here because we might need to set bounds... */
-	nbytes = __builtin_cheri_round_representable_length(nbytes);
+	nbytes = CHERI_REPRESENTABLE_LENGTH(nbytes);
 #endif
 
 	if (cp == NULL)

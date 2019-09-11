@@ -85,7 +85,7 @@ __morepages(int n)
 	n += NPOOLPAGES;	/* round up allocation. */
 	size = n * _pagesz;
 #ifdef __CHERI_PURE_CAPABILITY__
-	size = __builtin_cheri_round_representable_length(size);
+	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 
 	if (n_pagepools >= max_pagepools) {
