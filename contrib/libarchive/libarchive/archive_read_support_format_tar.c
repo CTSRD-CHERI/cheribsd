@@ -2633,12 +2633,20 @@ tar_atol_base_n(const char *p, size_t char_cnt, int base)
 	l = 0;
 	if (char_cnt != 0) {
 		digit = *p - '0';
-		while (digit >= 0 && digit < base  && char_cnt != 0) {
+		while (digit >= 0 && digit < base && char_cnt != 0) {
+			digit = *p - '0';
 			if (l>limit || (l == limit && digit > last_digit_limit)) {
 				return maxval; /* Truncate on overflow. */
 			}
 			l = (l * base) + digit;
-			digit = *++p - '0';
+			/*
+			 * XXXAR: This code was previously loading one past the
+			 * end here. Fixed by moving the dereference to the top
+			 * of the loop. Better fix would be to change the
+			 * toplevel if to a while loop and break if the digit
+			 * is outside the range.
+			 */
+			p++;
 			char_cnt--;
 		}
 	}
