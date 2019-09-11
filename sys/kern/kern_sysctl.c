@@ -1777,7 +1777,7 @@ sysctl_old_kernel(struct sysctl_req *req, const void *p, size_t l)
 			if (i > req->oldlen - req->oldidx)
 				i = req->oldlen - req->oldidx;
 		if (i > 0) {
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 			if (req->flags & SCTL_PTROUT)
 				memcpy_c((char * __capability)req->oldptr +
 				    req->oldidx,
@@ -1802,7 +1802,7 @@ sysctl_new_kernel(struct sysctl_req *req, void *p, size_t l)
 		return (0);
 	if (req->newlen - req->newidx < l)
 		return (EINVAL);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	if (req->flags & SCTL_PTRIN)
 		memcpy_c((__cheri_tocap char * __capability)p,
 		    (const char * __capability)req->newptr + req->newidx, l);
