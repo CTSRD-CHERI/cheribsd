@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/proc.h>
 #include <sys/kernel.h>
+#include <sys/ktr.h>
 #include <sys/signalvar.h>
 #include <sys/syscall.h>
 #include <sys/lock.h>
@@ -1030,10 +1031,8 @@ dofault:
 
 	case T_SYSCALL + T_USER:
 		{
-			int error;
-
 			td->td_sa.trapframe = trapframe;
-			error = syscallenter(td);
+			syscallenter(td);
 
 #if !defined(SMP) && (defined(DDB) || defined(DEBUG))
 			if (trp == trapdebug)
@@ -1049,7 +1048,7 @@ dofault:
 			 * instead of being done here under a special check
 			 * for SYS_ptrace().
 			 */
-			syscallret(td, error);
+			syscallret(td);
 			return (trapframe->pc);
 		}
 
@@ -1094,8 +1093,8 @@ dofault:
 			}
 
 			CTR3(KTR_PTRACE,
-			    "trap: tid %d, single step at %#lx: %#08x",
-			    td->td_tid, (long)(intptr_t)va, instr);
+			    "trap: tid %d, single step at %p: %#08x",
+			    td->td_tid, (__cheri_fromcap void *)va, instr);
 			PROC_LOCK(p);
 			_PHOLD(p);
 			error = ptrace_clear_single_step(td);

@@ -560,7 +560,6 @@ typedef	struct	frdest	{
 	addrfamily_t	fd_addr;
 	fr_dtypes_t	fd_type;
 	int		fd_name;
-	int		fd_local;
 } frdest_t;
 
 #define	fd_ip6	fd_addr.adf_addr
@@ -585,20 +584,20 @@ typedef enum fr_ctypes_e {
  */
 typedef	struct	frpcmp	{
 	fr_ctypes_t	frp_cmp;	/* data for port comparisons */
-	u_32_t		frp_port;	/* top port for <> and >< */
-	u_32_t		frp_top;	/* top port for <> and >< */
+	u_32_t		frp_port;	/* low port for <> and >< */
+	u_32_t		frp_top;	/* high port for <> and >< */
 } frpcmp_t;
 
 
 /*
- * Structure containing all the relevant TCP things that can be checked in
+ * Structure containing all the relevant TCP/UDP things that can be checked in
  * a filter rule.
  */
 typedef	struct	frtuc	{
 	u_char		ftu_tcpfm;	/* tcp flags mask */
 	u_char		ftu_tcpf;	/* tcp flags */
-	frpcmp_t	ftu_src;
-	frpcmp_t	ftu_dst;
+	frpcmp_t	ftu_src;	/* source port */
+	frpcmp_t	ftu_dst;	/* destination port */
 } frtuc_t;
 
 #define	ftu_scmp	ftu_src.frp_cmp
@@ -828,7 +827,7 @@ typedef	struct	frentry {
 
 #define	FR_NOLOGTAG	0
 
-#define	FR_CMPSIZ	(sizeof(struct frentry) - \
+#define	FR_CMPSIZ(_f)	((_f)->fr_size - \
 			 offsetof(struct frentry, fr_func))
 #define	FR_NAME(_f, _n)	(_f)->fr_names + (_f)->_n
 
@@ -1655,7 +1654,7 @@ typedef struct ipf_main_softc_s {
 			} while (0)
 
 #ifndef	_KERNEL
-extern	int	ipf_check __P((void *, struct ip *, int, void *, int, mb_t **));
+extern	int	ipf_check __P((void *, struct ip *, int, struct ifnet *, int, mb_t **));
 extern	struct	ifnet *get_unit __P((char *, int));
 extern	char	*get_ifname __P((struct ifnet *));
 extern	int	ipfioctl __P((ipf_main_softc_t *, int, ioctlcmd_t,
@@ -1672,7 +1671,7 @@ extern	int	ipl_enable __P((void));
 extern	int	ipl_disable __P((void));
 # ifdef MENTAT
 /* XXX MENTAT is always defined for Solaris */
-extern	int	ipf_check __P((void *, struct ip *, int, void *, int, void *,
+extern	int	ipf_check __P((void *, struct ip *, int, struct ifnet *, int, void *,
 			       mblk_t **));
 #  if SOLARIS
 extern	void	ipf_prependmbt(fr_info_t *, mblk_t *);
@@ -1681,7 +1680,7 @@ extern	int	ipfioctl __P((dev_t, int, intptr_t, int, cred_t *, int *));
 extern	int	ipf_qout __P((queue_t *, mblk_t *));
 # else /* MENTAT */
 /* XXX MENTAT is never defined for FreeBSD & NetBSD */
-extern	int	ipf_check __P((void *, struct ip *, int, void *, int, mb_t **));
+extern	int	ipf_check __P((void *, struct ip *, int, struct ifnet *, int, mb_t **));
 extern	int	(*fr_checkp) __P((ip_t *, int, void *, int, mb_t **));
 extern	size_t	mbufchainlen __P((mb_t *));
 #   ifdef	IPFILTER_LKM

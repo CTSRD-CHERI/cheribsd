@@ -99,11 +99,35 @@ bectl_create_body()
 	mount=${cwd}/mnt
 
 	bectl_create_setup ${zpool} ${disk} ${mount}
+
+	# Create a child dataset that will be used to test creation
+	# of recursive and non-recursive boot environments.
+	atf_check zfs create -o mountpoint=/usr -o canmount=noauto \
+	    ${zpool}/ROOT/default/usr
+
 	# Test standard creation, creation of a snapshot, and creation from a
 	# snapshot.
 	atf_check bectl -r ${zpool}/ROOT create -e default default2
 	atf_check bectl -r ${zpool}/ROOT create default2@test_snap
 	atf_check bectl -r ${zpool}/ROOT create -e default2@test_snap default3
+
+	# Test standard creation, creation of a snapshot, and creation from a
+	# snapshot for recursive boot environments.
+	atf_check bectl -r ${zpool}/ROOT create -r -e default recursive
+	atf_check bectl -r ${zpool}/ROOT create -r recursive@test_snap
+	atf_check bectl -r ${zpool}/ROOT create -r -e recursive@test_snap recursive-snap
+
+	# Test that non-recursive boot environments have no child datasets.
+	atf_check -e not-empty -s not-exit:0 \
+		zfs list "${zpool}/ROOT/default2/usr"
+	atf_check -e not-empty -s not-exit:0 \
+		zfs list "${zpool}/ROOT/default3/usr"
+
+	# Test that recursive boot environments have child datasets.
+	atf_check -o not-empty \
+		zfs list "${zpool}/ROOT/recursive/usr"
+	atf_check -o not-empty \
+		zfs list "${zpool}/ROOT/recursive-snap/usr"
 }
 bectl_create_cleanup()
 {
@@ -294,8 +318,15 @@ bectl_jail_body()
 	atf_check cp /rescue/rescue ${root}/rescue/rescue
 	atf_check bectl -r ${zpool}/ROOT umount default
 
-	# Prepare a second boot environment
+	# Prepare some more boot environments
 	atf_check -o empty -s exit:0 bectl -r ${zpool}/ROOT create -e default target
+	atf_check -o empty -s exit:0 bectl -r ${zpool}/ROOT create -e default 1234
+
+	# Attempt to unjail a BE with numeric name; jail_getid at one point
+	# did not validate that the input was a valid jid before returning the
+	# jid.
+	atf_check -o empty -s exit:0 bectl -r ${zpool}/ROOT jail -b 1234
+	atf_check -o empty -s exit:0 bectl -r ${zpool}/ROOT unjail 1234
 
 	# When a jail name is not explicit, it should match the jail id.
 	atf_check -o empty -s exit:0 bectl -r ${zpool}/ROOT jail -b -o jid=233637 default
@@ -340,9 +371,10 @@ bectl_jail_body()
 # attempts to destroy the zpool.
 bectl_jail_cleanup()
 {
-	for bootenv in "default" "target"; do
+	zpool=$(get_zpool_name)
+	for bootenv in "default" "target" "1234"; do
 		# mountpoint of the boot environment
-		mountpoint="$(bectl -r bectl_test/ROOT list -H | grep ${bootenv} | awk '{print $3}')"
+		mountpoint="$(bectl -r ${zpool}/ROOT list -H | grep ${bootenv} | awk '{print $3}')"
 
 		# see if any jail paths match the boot environment mountpoint
 		jailid="$(jls | grep ${mountpoint} | awk '{print $1}')"
@@ -353,7 +385,7 @@ bectl_jail_cleanup()
 		jail -r ${jailid}
 	done;
 
-	bectl_cleanup $(get_zpool_name)
+	bectl_cleanup ${zpool}
 }
 
 atf_init_test_cases()

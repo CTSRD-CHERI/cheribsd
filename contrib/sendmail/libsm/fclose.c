@@ -50,7 +50,8 @@ static jmp_buf CloseTimeOut;
 
 /* ARGSUSED0 */
 static void
-closealrm(int sig)
+closealrm(sig)
+	int sig;
 {
 	longjmp(CloseTimeOut, 1);
 }

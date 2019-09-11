@@ -798,7 +798,9 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		}
 		if (arg >= 0) {
 			bsize = fp->f_vnode->v_mount->mnt_stat.f_iosize;
-			fp->f_seqcount = (arg + bsize - 1) / bsize;
+			arg = MIN(arg, INT_MAX - bsize + 1);
+			fp->f_seqcount = MIN(IO_SEQMAX,
+			    (arg + bsize - 1) / bsize);
 			atomic_set_int(&fp->f_flag, FRDAHEAD);
 		} else {
 			atomic_clear_int(&fp->f_flag, FRDAHEAD);
@@ -2784,6 +2786,7 @@ fget_mmap(struct thread *td, int fd, cap_rights_t *rightsp, u_char *maxprotp,
 	if (maxprotp != NULL)
 		*maxprotp = VM_PROT_ALL;
 #else
+	cap_rights_t fdrights;
 	struct filedesc *fdp = td->td_proc->p_fd;
 	seqc_t seq;
 
@@ -2792,15 +2795,18 @@ fget_mmap(struct thread *td, int fd, cap_rights_t *rightsp, u_char *maxprotp,
 		error = _fget(td, fd, fpp, 0, rightsp, &seq);
 		if (error != 0)
 			return (error);
-		/*
-		 * If requested, convert capability rights to access flags.
-		 */
 		if (maxprotp != NULL)
-			*maxprotp = cap_rights_to_vmprot(cap_rights(fdp, fd));
+			fdrights = *cap_rights(fdp, fd);
 		if (!fd_modified(fdp, fd, seq))
 			break;
 		fdrop(*fpp, td);
 	}
+
+	/*
+	 * If requested, convert capability rights to access flags.
+	 */
+	if (maxprotp != NULL)
+		*maxprotp = cap_rights_to_vmprot(&fdrights);
 #endif
 	return (error);
 }
@@ -3434,7 +3440,7 @@ xlate_fflags(int fflags)
 }
 
 /* Trim unused data from kf_path by truncating the structure size. */
-static void
+void
 pack_kinfo(struct kinfo_file *kif)
 {
 

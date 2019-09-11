@@ -71,6 +71,7 @@ static const char rcsid[] =
 #ifdef JAIL
 #include <jail.h>
 #endif
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -129,6 +130,39 @@ struct ifa_order_elt {
 };
 
 TAILQ_HEAD(ifa_queue, ifa_order_elt);
+
+static struct module_map_entry {
+	const char *ifname;
+	const char *kldname;
+} module_map[] = {
+	{
+		.ifname = "tun",
+		.kldname = "if_tuntap",
+	},
+	{
+		.ifname = "tap",
+		.kldname = "if_tuntap",
+	},
+	{
+		.ifname = "vmnet",
+		.kldname = "if_tuntap",
+	},
+	{
+		.ifname = "ipsec",
+		.kldname = "ipsec",
+	},
+	{
+		/*
+		 * This mapping exists because there is a conflicting enc module
+		 * in CAM.  ifconfig's guessing behavior will attempt to match
+		 * the ifname to a module as well as if_${ifname} and clash with
+		 * CAM enc.  This is an assertion of the correct module to load.
+		 */
+		.ifname = "enc",
+		.kldname = "if_enc",
+	},
+};
+
 
 void
 opt_register(struct option *p)
@@ -1223,7 +1257,7 @@ unsetifdescr(const char *val, int value, int s, const struct afswtch *afp)
 "\020\1RXCSUM\2TXCSUM\3NETCONS\4VLAN_MTU\5VLAN_HWTAGGING\6JUMBO_MTU\7POLLING" \
 "\10VLAN_HWCSUM\11TSO4\12TSO6\13LRO\14WOL_UCAST\15WOL_MCAST\16WOL_MAGIC" \
 "\17TOE4\20TOE6\21VLAN_HWFILTER\23VLAN_HWTSO\24LINKSTATE\25NETMAP" \
-"\26RXCSUM_IPV6\27TXCSUM_IPV6\31TXRTLMT\32HWRXTSTMP"
+"\26RXCSUM_IPV6\27TXCSUM_IPV6\31TXRTLMT\32HWRXTSTMP\33NOMAP"
 
 /*
  * Print the status of the interface.  If an address family was
@@ -1413,9 +1447,11 @@ ifmaybeload(const char *name)
 {
 #define MOD_PREFIX_LEN		3	/* "if_" */
 	struct module_stat mstat;
-	int fileid, modid;
+	int i, fileid, modid;
 	char ifkind[IFNAMSIZ + MOD_PREFIX_LEN], ifname[IFNAMSIZ], *dp;
 	const char *cp;
+	struct module_map_entry *mme;
+	bool found;
 
 	/* loading suppressed by the user */
 	if (noload)
@@ -1429,9 +1465,24 @@ ifmaybeload(const char *name)
 			break;
 		}
 
-	/* turn interface and unit into module name */
-	strlcpy(ifkind, "if_", sizeof(ifkind));
-	strlcat(ifkind, ifname, sizeof(ifkind));
+	/* Either derive it from the map or guess otherwise */
+	*ifkind = '\0';
+	found = false;
+	for (i = 0; i < nitems(module_map); ++i) {
+		mme = &module_map[i];
+		if (strcmp(mme->ifname, ifname) == 0) {
+			strlcpy(ifkind, mme->kldname, sizeof(ifkind));
+			found = true;
+			break;
+		}
+	}
+
+	/* We didn't have an alias for it... we'll guess. */
+	if (!found) {
+	    /* turn interface and unit into module name */
+	    strlcpy(ifkind, "if_", sizeof(ifkind));
+	    strlcat(ifkind, ifname, sizeof(ifkind));
+	}
 
 	/* scan files in kernel */
 	mstat.version = sizeof(struct module_stat);
@@ -1447,8 +1498,12 @@ ifmaybeload(const char *name)
 			} else {
 				cp = mstat.name;
 			}
-			/* already loaded? */
-			if (strcmp(ifname, cp) == 0 ||
+			/*
+			 * Is it already loaded?  Don't compare with ifname if
+			 * we were specifically told which kld to use.  Doing
+			 * so could lead to conflicts not trivially solved.
+			 */
+			if ((!found && strcmp(ifname, cp) == 0) ||
 			    strcmp(ifkind, cp) == 0)
 				return;
 		}
@@ -1502,6 +1557,8 @@ static struct cmd basic_cmds[] = {
 	DEF_CMD("-link2",	-IFF_LINK2,	setifflags),
 	DEF_CMD("monitor",	IFF_MONITOR,	setifflags),
 	DEF_CMD("-monitor",	-IFF_MONITOR,	setifflags),
+	DEF_CMD("nomap",	IFCAP_NOMAP,	setifcap),
+	DEF_CMD("-nomap",	-IFCAP_NOMAP,	setifcap),
 	DEF_CMD("staticarp",	IFF_STATICARP,	setifflags),
 	DEF_CMD("-staticarp",	-IFF_STATICARP,	setifflags),
 	DEF_CMD("rxcsum6",	IFCAP_RXCSUM_IPV6,	setifcap),

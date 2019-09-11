@@ -91,8 +91,6 @@
 #ifdef CHERIABI_LEGACY_SUPPORT
 static void	cheriabi_capability_set_user_ddc(void * __capability *,
 		    size_t);
-static void	cheriabi_capability_set_user_entry(void * __capability *,
-		    unsigned long, size_t);
 #endif
 static int	cheriabi_fetch_syscall_args(struct thread *td);
 static void	cheriabi_set_syscall_retval(struct thread *td, int error);
@@ -551,7 +549,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		csp = csigp->csig_csp;
+		csp = (char * __capability)td->td_sigstk.ss_sp + td->td_sigstk.ss_size;
 	} else {
 		/*
 		 * Signals delivered when a CHERI sandbox is present must be
@@ -662,19 +660,19 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs->csp = sfp;
 	regs->c12 = catcher;
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
-	regs->ddc = csigp->csig_ddc;
 	/*
 	 * For now only change IDC if we were sandboxed. This makes cap-table
 	 * binaries work as expected (since they need cgp to remain the same).
 	 *
 	 * TODO: remove csigp->csig_idc
 	 */
-	if (cheri_is_sandboxed)
+	if (cheri_is_sandboxed) {
+		regs->ddc = csigp->csig_ddc;
 		regs->idc = csigp->csig_idc;
+	}
 }
 
 #ifdef CHERIABI_LEGACY_SUPPORT
-
 static void
 cheriabi_capability_set_user_ddc(void * __capability *cp, size_t length)
 {
@@ -682,20 +680,6 @@ cheriabi_capability_set_user_ddc(void * __capability *cp, size_t length)
 	*cp = cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
 	    CHERI_CAP_USER_DATA_BASE, length, CHERI_CAP_USER_DATA_OFFSET);
 }
-
-static void
-cheriabi_capability_set_user_entry(void * __capability *cp,
-    unsigned long entry_addr, size_t length)
-{
-
-	/*
-	 * Set the jump target register for the pure capability calling
-	 * convention.
-	 */
-	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
-	    CHERI_CAP_USER_CODE_BASE, length, entry_addr);
-}
-
 #endif
 
 /*
@@ -744,11 +728,9 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
 	u_long auxv, stackbase, stacklen;
-	size_t map_base, map_length, text_end, code_end;
+	size_t map_base, map_length, text_end, code_start, code_end, code_length;
 #ifdef CHERIABI_LEGACY_SUPPORT
 	size_t data_length;
-#else
-	size_t code_start;
 #endif
 	struct rlimit rlim_stack;
 	/* const bool is_dynamic_binary = imgp->interp_end != 0; */
@@ -783,16 +765,16 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	/*
 	 * Round the stack down as required to make it representable.
 	 */
-	stacklen = rounddown2(stacklen, 1ULL << CHERI_ALIGN_SHIFT(stacklen));
+	stacklen = rounddown2(stacklen, CHERI_REPRESENTABLE_ALIGNMENT(stacklen));
 	td->td_frame->csp = cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, 0);
-	td->td_frame->sp = stacklen;
+	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, stacklen);
+
 
 	/* Using addr as length means ddc base must be 0. */
 	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
 	if (imgp->end_addr != 0) {
 		text_end = roundup2(imgp->end_addr,
-		    1ULL << CHERI_SEAL_ALIGN_SHIFT(imgp->end_addr));
+		    CHERI_SEALABLE_ALIGNMENT(imgp->end_addr - imgp->start_addr));
 		/*
 		 * Less confusing rounded up to a page and 256-bit
 		 * requires no other rounding.
@@ -800,19 +782,19 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 		text_end = roundup2(text_end, PAGE_SIZE);
 	} else {
 		text_end = rounddown2(stackbase,
-		    1ULL << CHERI_SEAL_ALIGN_SHIFT(stackbase));
+		    CHERI_SEALABLE_ALIGNMENT(stackbase));
 	}
 	KASSERT(text_end <= stackbase,
 	    ("text_end 0x%zx > stackbase 0x%lx", text_end, stackbase));
 
 	map_base = (text_end == stackbase) ?
 	    CHERI_CAP_USER_MMAP_BASE :
-	    roundup2(text_end, 1ULL << CHERI_ALIGN_SHIFT(stackbase - text_end));
+	    roundup2(text_end, CHERI_REPRESENTABLE_ALIGNMENT(stackbase - text_end));
 	KASSERT(map_base < stackbase,
 	    ("map_base 0x%zx >= stackbase 0x%lx", map_base, stackbase));
 	map_length = stackbase - map_base;
 	map_length = rounddown2(map_length,
-	    1ULL << CHERI_ALIGN_SHIFT(map_length));
+	    CHERI_REPRESENTABLE_ALIGNMENT(map_length));
 	/*
 	 * Use cheri_capability_build_user_rwx so mmap() can return
 	 * appropriate permissions derived from a single capability.
@@ -851,20 +833,15 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 * broad bounds, but in the future, limited as appropriate to the
 	 * run-time linker or statically linked binary?
 	 *
-	 * TODO: restrict $pcc to the mapped binary once we no longer support
-	 * the legacy ABI.
-	 *
-	 * TODO: add a kernel config option for legacy ABI so we can shrink
-	 * this by default!
 	 */
 #ifdef CHERIABI_LEGACY_SUPPORT
+#pragma message("Warning: Building kernel with LEGACY ABI support!")
 	/*
 	 * The legacy ABI needs a full address space $pcc (with base == 0)
 	 * to create code capabilities using cgetpccsetoffset
 	 */
+	code_start = CHERI_CAP_USER_CODE_BASE;
 	code_end = CHERI_CAP_USER_CODE_LENGTH;
-	cheriabi_capability_set_user_entry(&frame->pcc, imgp->entry_addr,
-	    code_end);
 #else
 	/*
 	 * If we are executing a static binary we use text_end as the end of
@@ -876,17 +853,20 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	/*
 	 * Statically linked binaries need a base 0 code capability since
 	 * otherwise crt_init_globals_will fail.
-	 * TODO: use set-address macro instead of csetoffset
+	 *
+	 * XXXAR: TODO: is this still true??
 	 */
 	code_start = imgp->interp_end ? imgp->reloc_base : 0;
+#endif
 	/* Ensure CHERI128 representability */
-	code_end = roundup2(code_end, 1ULL << CHERI_ALIGN_SHIFT(code_end));
-	code_start = rounddown2(code_start, 1ULL << CHERI_ALIGN_SHIFT(code_end));
+	code_length = code_end - code_start;
+	code_start = CHERI_REPRESENTABLE_BASE(code_start, code_length);
+	code_length = CHERI_REPRESENTABLE_LENGTH(code_length);
+	code_end = code_start + code_length;
 	frame->pcc = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
 	    code_start, code_end - code_start, imgp->entry_addr - code_start);
 	/* Ensure that frame->pc is the offset of frame->pcc (needed for eret) */
 	frame->pc = cheri_getoffset(frame->pcc);
-#endif
 	frame->c12 = frame->pcc;
 
 	/*
@@ -914,27 +894,13 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	 */
 	if (imgp->reloc_base) {
 		vaddr_t rtld_base = imgp->reloc_base;
-		rtld_base = rounddown2(rtld_base, 1ULL << CHERI_ALIGN_SHIFT(rtld_base));
 		vaddr_t rtld_end = imgp->interp_end ? imgp->interp_end : imgp->end_addr;
 		vaddr_t rtld_len = rtld_end - rtld_base;
-		rtld_len = roundup2(rtld_len, 1ULL << CHERI_ALIGN_SHIFT(rtld_len));
+		rtld_base = CHERI_REPRESENTABLE_BASE(rtld_base, rtld_len);
+		rtld_len = CHERI_REPRESENTABLE_LENGTH(rtld_len);
 		td->td_frame->c4 = cheri_capability_build_user_data(
 		    CHERI_CAP_USER_DATA_PERMS, rtld_base, rtld_len, 0);
 	}
-	/*
-	 * Restrict the stack capability to the maximum region allowed for
-	 * this process and adjust sp accordingly.
-	 *
-	 * XXXBD: 8MB should be the process stack limit.
-	 */
-	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
-	stackbase = td->td_proc->p_usrstack - (1024 * 1024 * 8);
-	KASSERT(stack > stackbase,
-	    ("top of stack 0x%lx is below stack base 0x%lx; p_usrstack 0x%lx",
-	     stack, stackbase, td->td_proc->p_usrstack));
-	stacklen = stack - stackbase;
-	td->td_frame->csp = cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, stacklen);
 
 	/*
 	 * Update privileged signal-delivery environment for actual stack.
@@ -946,6 +912,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	csigp = &td->td_pcb->pcb_cherisignal;
 	csigp->csig_csp = td->td_frame->csp;
 	csigp->csig_default_stack = csigp->csig_csp;
+#ifdef CHERIABI_LEGACY_SUPPORT
+	csigp->csig_ddc = frame->ddc;
+#endif
+
 
 	td->td_md.md_flags &= ~MDTD_FPUSED;
 	if (PCPU_GET(fpcurthread) == td)
@@ -1018,6 +988,11 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	csigp = &td->td_pcb->pcb_cherisignal;
 	csigp->csig_csp = td->td_frame->csp;
 	csigp->csig_default_stack = csigp->csig_csp;
+#ifdef CHERIABI_LEGACY_SUPPORT
+	/* Setup $ddc when targeting the legacy ABI */
+	frame->ddc = td->td_frame->ddc;
+	csigp->csig_ddc = td->td_frame->ddc;
+#endif
 }
 
 int
@@ -1034,6 +1009,8 @@ cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 				  : "C" ((char * __capability)td->td_md.md_tls +
 				      td->td_md.md_tls_tcb_offset));
 	}
+#ifdef CHERIABI_LEGACY_SUPPORT
+#pragma message("Warning: Building with support for LEGACY TLS")
 	if (curthread == td && cpuinfo.userlocal_reg == true) {
 		/*
 		 * If there is an user local register implementation
@@ -1051,6 +1028,7 @@ cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
 		mips_wr_userlocal((__cheri_addr u_long)td->td_md.md_tls +
 		    td->td_md.md_tls_tcb_offset);
 	}
+#endif
 
 	return (0);
 }

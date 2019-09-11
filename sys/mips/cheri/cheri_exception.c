@@ -112,7 +112,7 @@ cheri_copy_and_validate(void * __capability *dst, void * __capability *src,
     register_t *capvalid, int which, bool strip_tags)
 {
 
-	*capvalid |= cheri_gettag(*src) << which;
+	*capvalid |= (register_t)cheri_gettag(*src) << which;
 	if (strip_tags)
 		*dst = cheri_cleartag(*src);
 	else
@@ -188,7 +188,17 @@ _cheri_trapframe_to_cheriframe(struct trapframe *frame,
 	    strip_tags);
 	cheri_copy_and_validate(&cfp->cf_idc, &frame->idc, &cfp->cf_capvalid, 26,
 	    strip_tags);
-	cheri_copy_and_validate(&cfp->cf_pcc, &frame->pcc, &cfp->cf_capvalid, 27,
+	cheri_copy_and_validate(&cfp->cf_c27, &frame->c27, &cfp->cf_capvalid, 27,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c28, &frame->c28, &cfp->cf_capvalid, 28,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c29, &frame->c29, &cfp->cf_capvalid, 29,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c30, &frame->c30, &cfp->cf_capvalid, 30,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_c31, &frame->c31, &cfp->cf_capvalid, 31,
+	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_pcc, &frame->pcc, &cfp->cf_capvalid, 32,
 	    strip_tags);
 	cfp->cf_capcause = frame->capcause;
 }
@@ -229,6 +239,11 @@ cheri_trapframe_from_cheriframe(struct trapframe *frame,
 	frame->c24 = cfp->cf_c24;
 	frame->c25 = cfp->cf_c25;
 	frame->idc = cfp->cf_idc;
+	frame->c27 = cfp->cf_c27;
+	frame->c28 = cfp->cf_c28;
+	frame->c29 = cfp->cf_c29;
+	frame->c30 = cfp->cf_c30;
+	frame->c31 = cfp->cf_c31;
 	frame->pcc = cfp->cf_pcc;
 	frame->capcause = cfp->cf_capcause;
 }
@@ -322,7 +337,17 @@ cheri_log_cheri_frame(struct trapframe *frame)
 	CHERI_REG_PRINT(frame->c25, 25);
 	/* C26 - $idc / $cgp */
 	CHERI_REG_PRINT(frame->idc, 26);
-	/* C31 - saved $pcc */
+	/* C27 */
+	CHERI_REG_PRINT(frame->c27, 27);
+	/* C28 */
+	CHERI_REG_PRINT(frame->c28, 28);
+	/* C29 */
+	CHERI_REG_PRINT(frame->c29, 29);
+	/* C30 */
+	CHERI_REG_PRINT(frame->c30, 30);
+	/* C31 */
+	CHERI_REG_PRINT(frame->c31, 31);
+	/* saved $pcc */
 	printf("$pcc: ");
 	cheri_cap_print(frame->pcc);
 }

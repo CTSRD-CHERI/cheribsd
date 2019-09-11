@@ -130,7 +130,7 @@ debugfs_fill(PFS_FILL_ARGS)
 	if ((rc = linux_set_current_flags(curthread, M_NOWAIT)))
 		return (rc);
 	vn.v_data = d->dm_data;
-	buf = uio->uio_iov[0].iov_base;
+	buf = (__cheri_fromcap void *)uio->uio_iov[0].iov_base;
 	len = min(uio->uio_iov[0].iov_len, uio->uio_resid);
 	off = 0;
 	lf.private_data = NULL;
@@ -143,10 +143,17 @@ debugfs_fill(PFS_FILL_ARGS)
 	}
 	sf = lf.private_data;
 	sf->buf = sb;
-	if (uio->uio_rw == UIO_READ)
-		rc = d->dm_fops->read(&lf, NULL, len, &off);
-	else
-		rc = d->dm_fops->write(&lf, buf, len, &off);
+	if (uio->uio_rw == UIO_READ) {
+		if (d->dm_fops->read)
+			rc = d->dm_fops->read(&lf, NULL, len, &off);
+		else
+			rc = ENODEV;
+	} else {
+		if (d->dm_fops->write)
+			rc = d->dm_fops->write(&lf, buf, len, &off);
+		else
+			rc = ENODEV;
+	}
 	if (d->dm_fops->release)
 		d->dm_fops->release(&vn, &lf);
 	else
@@ -307,3 +314,4 @@ PSEUDOFS(debugfs, 1, PR_ALLOW_MOUNT_LINSYSFS);
 #else
 PSEUDOFS(debugfs, 1, VFCF_JAIL);
 #endif
+MODULE_DEPEND(lindebugfs, linuxkpi, 1, 1, 1);

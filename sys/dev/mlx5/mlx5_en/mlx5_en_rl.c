@@ -156,6 +156,7 @@ mlx5e_rl_destroy_sq(struct mlx5e_sq *sq)
 
 	mlx5e_free_sq_db(sq);
 	mlx5_wq_destroy(&sq->wq_ctrl);
+	bus_dma_tag_destroy(sq->dma_tag);
 }
 
 static int
@@ -175,6 +176,8 @@ mlx5e_rl_open_sq(struct mlx5e_priv *priv, struct mlx5e_sq *sq,
 	err = mlx5e_modify_sq(sq, MLX5_SQC_STATE_RST, MLX5_SQC_STATE_RDY);
 	if (err)
 		goto err_disable_sq;
+
+	WRITE_ONCE(sq->running, 1);
 
 	return (0);
 
@@ -841,7 +844,6 @@ mlx5e_rl_init(struct mlx5e_priv *priv)
 		for (i = 0; i < rl->param.tx_channels_per_worker_def; i++) {
 			struct mlx5e_rl_channel *channel = rlw->channels + i;
 			channel->worker = rlw;
-			channel->tag.m_snd_tag.ifp = priv->ifp;
 			channel->tag.type = IF_SND_TAG_TYPE_RATE_LIMIT;
 			STAILQ_INSERT_TAIL(&rlw->index_list_head, channel, entry);
 		}
@@ -1125,6 +1127,8 @@ mlx5e_rl_snd_tag_alloc(struct ifnet *ifp,
 	}
 
 	/* store pointer to mbuf tag */
+	MPASS(channel->tag.m_snd_tag.refcount == 0);
+	m_snd_tag_init(&channel->tag.m_snd_tag, ifp);
 	*ppmt = &channel->tag.m_snd_tag;
 done:
 	return (error);

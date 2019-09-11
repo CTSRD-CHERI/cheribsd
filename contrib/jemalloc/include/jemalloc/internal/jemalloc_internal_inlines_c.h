@@ -35,8 +35,7 @@ unbound_ptr(tsdn_t *tsdn, void *ptr) {
 	extent = rtree_extent_read(tsdn, &extents_rtree,
 	    rtree_ctx, (vaddr_t)ptr, true);
 	assert(extent != NULL);
-	ubptr = cheri_incoffset(extent->e_addr,
-	    (vaddr_t)ptr - (vaddr_t)extent->e_addr);
+	ubptr = cheri_setaddress(extent->e_addr, (vaddr_t)ptr);
 	assert((vaddr_t)ptr == (vaddr_t)ubptr);
 	assert(cheri_getbase(ubptr) == cheri_getbase(extent->e_addr));
 	assert(cheri_getlen(ubptr) == cheri_getlen(extent->e_addr));

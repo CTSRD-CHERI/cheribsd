@@ -68,6 +68,9 @@ union ibv_gid {
 };
 
 #ifndef container_of
+#ifdef __containerof
+#define container_of(ptr, type, member) __containerof(ptr, type, member)
+#else
 /**
   * container_of - cast a member of a structure out to the containing structure
   * @ptr:        the pointer to the member.
@@ -77,6 +80,7 @@ union ibv_gid {
  */
 #define container_of(ptr, type, member) \
 	((type *) ((uint8_t *)(ptr) - offsetof(type, member)))
+#endif
 #endif
 
 #define vext_field_avail(type, fld, sz) (offsetof(type, fld) < (sz))
@@ -590,7 +594,11 @@ enum ibv_rate {
 	IBV_RATE_25_GBPS  = 15,
 	IBV_RATE_100_GBPS = 16,
 	IBV_RATE_200_GBPS = 17,
-	IBV_RATE_300_GBPS = 18
+	IBV_RATE_300_GBPS = 18,
+	IBV_RATE_28_GBPS  = 19,
+	IBV_RATE_50_GBPS  = 20,
+	IBV_RATE_400_GBPS = 21,
+	IBV_RATE_600_GBPS = 22,
 };
 
 /**

@@ -48,6 +48,7 @@
 #ifdef _KERNEL
 
 struct fpu_kern_ctx;
+struct thread;
 
 #define	PCB_USER_FPU(pcb) (((pcb)->pcb_flags & PCB_KERNFPU) == 0)
 

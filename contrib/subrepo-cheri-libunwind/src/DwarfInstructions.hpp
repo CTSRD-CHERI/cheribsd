@@ -65,8 +65,9 @@ private:
   static v128 getSavedVectorRegister(A &addressSpace, const R &registers,
                                   pint_t cfa, const RegisterLocation &savedReg);
 
-  static pint_t getCFA(A &addressSpace, const PrologInfo &prolog,
-                       const R &registers) {
+  static pint_t getCFA(A &addressSpace, const PrologInfo &prolog, pint_t pc,
+                       const R &registers, bool *success) {
+    *success = true;
     if (prolog.cfaRegister != 0) {
 #if defined(__mips__) && defined(__CHERI_PURE_CAPABILITY__)
       // Ugly hack for old binaries that report SP instead of C11
@@ -83,8 +84,13 @@ private:
     if (prolog.cfaExpression != 0)
       return evaluateExpression((pint_t)prolog.cfaExpression, addressSpace, 
                                 registers, 0);
+    fprintf(stderr, "WARNING: libunwind got broken prolog for pc %#p\n", (void*)pc);
+    *success = false;
+#if 0
     assert(0 && "getCFA(): unknown location");
     __builtin_unreachable();
+#endif
+    return (pint_t)-1;
   }
 };
 
@@ -201,13 +207,16 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pint_t pc,
                                            pint_t fdeStart, R &registers) {
   FDE_Info fdeInfo;
   CIE_Info cieInfo;
-  if (CFI_Parser<A>::decodeFDE(addressSpace, fdeStart, &fdeInfo,
+  if (CFI_Parser<A>::decodeFDE(addressSpace, pc, fdeStart, &fdeInfo,
                                &cieInfo) == NULL) {
     PrologInfo prolog;
     if (CFI_Parser<A>::parseFDEInstructions(addressSpace, fdeInfo, cieInfo, pc,
                                             R::getArch(), &prolog)) {
       // get pointer to cfa (architecture specific)
-      pint_t cfa = getCFA(addressSpace, prolog, registers);
+      bool cfa_valid = false;
+      pint_t cfa = getCFA(addressSpace, prolog, pc, registers, &cfa_valid);
+      if (!cfa_valid)
+        return UNW_EBADFRAME;
 
        // restore registers that DWARF says were saved
       R newRegisters = registers;
@@ -286,6 +295,31 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pint_t pc,
         // Skip unimp instruction if function returns a struct
         if ((addressSpace.get32(returnAddress) & 0xC1C00000) == 0)
           returnAddress += 4;
+      }
+#endif
+
+#if defined(_LIBUNWIND_TARGET_PPC64)
+#define PPC64_ELFV1_R2_LOAD_INST_ENCODING 0xe8410028u // ld r2,40(r1)
+#define PPC64_ELFV1_R2_OFFSET 40
+#define PPC64_ELFV2_R2_LOAD_INST_ENCODING 0xe8410018u // ld r2,24(r1)
+#define PPC64_ELFV2_R2_OFFSET 24
+      // If the instruction at return address is a TOC (r2) restore,
+      // then r2 was saved and needs to be restored.
+      // ELFv2 ABI specifies that the TOC Pointer must be saved at SP + 24,
+      // while in ELFv1 ABI it is saved at SP + 40.
+      if (R::getArch() == REGISTERS_PPC64 && returnAddress != 0) {
+        pint_t sp = newRegisters.getRegister(UNW_REG_SP);
+        pint_t r2 = 0;
+        switch (addressSpace.get32(returnAddress)) {
+        case PPC64_ELFV1_R2_LOAD_INST_ENCODING:
+          r2 = addressSpace.get64(sp + PPC64_ELFV1_R2_OFFSET);
+          break;
+        case PPC64_ELFV2_R2_LOAD_INST_ENCODING:
+          r2 = addressSpace.get64(sp + PPC64_ELFV2_R2_OFFSET);
+          break;
+        }
+        if (r2)
+          newRegisters.setRegister(UNW_PPC64_R2, r2);
       }
 #endif
 

@@ -128,6 +128,13 @@ struct sockaddr_nb {
 	u_char		snb_len;
 	u_char		snb_family;
 	union nb_tran	snb_tran;		/* transport */
+	/*
+	 * XXXAR: this could actually be up to NB_MAXLABLEN+1(64) and not just
+	 * 1 + NB_ENCNAMELEN + 1 (34). However, it could also be less.
+	 * Therefore we need to use __subobject_variable_length and since we
+	 * know the maximum size, limit it to 64.
+	 */
+	__subobject_variable_length_maxsize(NB_MAXLABLEN + 1)
 	u_char		snb_name[1 + NB_ENCNAMELEN + 1];	/* encoded */
 };
 

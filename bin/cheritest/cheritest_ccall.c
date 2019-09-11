@@ -165,7 +165,7 @@ void
 test_fault_creturn(const struct cheri_test *ctp __unused)
 {
 
-	CHERI_CRETURN();
+	__asm__ __volatile__("creturn" : : : "memory");
 }
 
 /*

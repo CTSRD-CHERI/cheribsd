@@ -143,7 +143,9 @@ const int linux_errtbl[ELAST + 1] = {
 	-131,	/* ENOTRECOVERABLE */
 	-130,	/* EOWNERDEAD */
 	-22,	/* EINTEGRITY -> EINVAL */
+	-98	/* EPROT */
+	-99	/* ENOMETHOD */
 };
 
-_Static_assert(ELAST == 97,
+_Static_assert(ELAST == 99,
     "missing errno entries in linux_errtbl");

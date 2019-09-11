@@ -42,6 +42,7 @@ extern EFI_RUNTIME_SERVICES	*RS;
 extern struct devsw efipart_fddev;
 extern struct devsw efipart_cddev;
 extern struct devsw efipart_hddev;
+extern struct devsw efihttp_dev;
 extern struct devsw efinet_dev;
 extern struct netif_driver efinetif;
 
@@ -90,11 +91,13 @@ bool efi_devpath_match_node(EFI_DEVICE_PATH *, EFI_DEVICE_PATH *);
 bool efi_devpath_is_prefix(EFI_DEVICE_PATH *, EFI_DEVICE_PATH *);
 CHAR16 *efi_devpath_name(EFI_DEVICE_PATH *);
 void efi_free_devpath_name(CHAR16 *);
+bool efi_devpath_same_disk(EFI_DEVICE_PATH *, EFI_DEVICE_PATH *);
 EFI_DEVICE_PATH *efi_devpath_to_media_path(EFI_DEVICE_PATH *);
 UINTN efi_devpath_length(EFI_DEVICE_PATH *);
 EFI_DEVICE_PATH *efi_name_to_devpath(const char *path);
 EFI_DEVICE_PATH *efi_name_to_devpath16(CHAR16 *path);
 void efi_devpath_free(EFI_DEVICE_PATH *dp);
+EFI_HANDLE efi_devpath_to_handle(EFI_DEVICE_PATH *path, EFI_HANDLE *handles, unsigned nhandles);
 
 int efi_status_to_errno(EFI_STATUS);
 EFI_STATUS errno_to_efi_status(int errno);

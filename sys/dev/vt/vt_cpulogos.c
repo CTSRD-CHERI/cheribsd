@@ -30,7 +30,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/callout.h>
 #include <sys/cons.h>
+#include <sys/lock.h>
 #include <sys/kernel.h>
+#include <sys/mutex.h>
 #include <sys/smp.h>
 #include <sys/systm.h>
 #include <sys/terminal.h>
@@ -227,9 +229,8 @@ vt_init_logos(void *dummy)
 		return;
 
 	VT_LOCK(vd);
-	KASSERT((vd->vd_flags & VDF_INITIALIZED) != 0,
-	    ("vd %p not initialized", vd));
-
+	if ((vd->vd_flags & VDF_INITIALIZED) == 0)
+		goto out;
 	if ((vd->vd_flags & (VDF_DEAD | VDF_TEXTMODE)) != 0)
 		goto out;
 	if (vd->vd_height <= vt_logo_sprite_height)

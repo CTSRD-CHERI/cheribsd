@@ -127,6 +127,11 @@ aesni_ghash.o			optional aesni				\
 	compile-with	"${CC} -c ${CFLAGS:C/^-O2$/-O3/:N-nostdinc} ${WERROR} ${NO_WCAST_QUAL} ${PROF} -mmmx -msse -msse4 -maes -mpclmul ${.IMPSRC}" \
 	no-implicit-rule						\
 	clean		"aesni_ghash.o"
+aesni_ccm.o			optional aesni				\
+	dependency	"$S/crypto/aesni/aesni_ccm.c"			\
+	compile-with	"${CC} -c ${CFLAGS:C/^-O2$/-O3/:N-nostdinc} ${WERROR} ${NO_WCAST_QUAL} ${PROF} -mmmx -msse -msse4 -maes -mpclmul ${.IMPSRC}" \
+	no-implicit-rule						\
+	clean		"aesni_ccm.o"
 aesni_wrap.o			optional aesni				\
 	dependency	"$S/crypto/aesni/aesni_wrap.c"			\
 	compile-with	"${CC} -c ${CFLAGS:C/^-O2$/-O3/:N-nostdinc} ${WERROR} ${NO_WCAST_QUAL} ${PROF} -mmmx -msse -msse4 -maes ${.IMPSRC}" \
@@ -199,7 +204,6 @@ dev/ed/if_ed_isa.c		optional ed isa
 dev/ed/if_ed_wd80x3.c		optional ed isa
 dev/ed/if_ed_hpp.c		optional ed isa ed_hpp
 dev/ed/if_ed_sic.c		optional ed isa ed_sic
-dev/ep/elink.c			optional ep
 dev/fb/fb.c			optional fb | vga
 dev/fb/s3_pci.c			optional s3pci
 dev/fb/vesa.c			optional vga vesa
@@ -280,8 +284,9 @@ dev/nctgpio/nctgpio.c		optional nctgpio
 dev/nfe/if_nfe.c		optional nfe pci
 dev/ntb/if_ntb/if_ntb.c		optional if_ntb
 dev/ntb/ntb_transport.c		optional ntb_transport | if_ntb
-dev/ntb/ntb.c			optional ntb | ntb_transport | if_ntb | ntb_hw_intel | ntb_hw_plx | ntb_hw
-dev/ntb/ntb_if.m		optional ntb | ntb_transport | if_ntb | ntb_hw_intel | ntb_hw_plx | ntb_hw
+dev/ntb/ntb.c			optional ntb | ntb_transport | if_ntb | ntb_hw_amd | ntb_hw_intel | ntb_hw_plx | ntb_hw
+dev/ntb/ntb_if.m		optional ntb | ntb_transport | if_ntb | ntb_hw_amd | ntb_hw_intel | ntb_hw_plx | ntb_hw
+dev/ntb/ntb_hw/ntb_hw_amd.c	optional ntb_hw_amd | ntb_hw
 dev/ntb/ntb_hw/ntb_hw_intel.c	optional ntb_hw_intel | ntb_hw
 dev/ntb/ntb_hw/ntb_hw_plx.c	optional ntb_hw_plx | ntb_hw
 dev/nvd/nvd.c			optional nvd nvme
@@ -297,8 +302,8 @@ dev/nvme/nvme_util.c		optional nvme
 dev/nvram/nvram.c		optional nvram isa
 dev/ofw/ofwpci.c		optional fdt pci
 dev/pcf/pcf_isa.c		optional pcf
-dev/random/ivy.c		optional rdrand_rng
-dev/random/nehemiah.c		optional padlock_rng
+dev/random/ivy.c		optional rdrand_rng !random_loadable
+dev/random/nehemiah.c		optional padlock_rng !random_loadable
 dev/sbni/if_sbni.c		optional sbni
 dev/sbni/if_sbni_isa.c		optional sbni isa
 dev/sbni/if_sbni_pci.c		optional sbni pci
@@ -308,6 +313,7 @@ dev/sio/sio_pccard.c		optional sio pccard
 dev/sio/sio_pci.c		optional sio pci
 dev/sio/sio_puc.c		optional sio puc
 dev/speaker/spkr.c		optional speaker
+dev/superio/superio.c		optional superio isa
 dev/syscons/apm/apm_saver.c	optional apm_saver apm
 dev/syscons/scvesactl.c		optional sc vga vesa
 dev/syscons/scvgarndr.c		optional sc vga

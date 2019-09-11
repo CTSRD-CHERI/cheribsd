@@ -137,7 +137,7 @@ freebsd64_sigwait(struct thread *td, struct freebsd64_sigwait_args *uap)
 void
 siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64)
 {
-	memset(&si64, 0, sizeof(si64));
+	memset(si64, 0, sizeof(*si64));
 	si64->si_signo = si->si_signo;
 	si64->si_errno = si->si_errno;
 	si64->si_code = si->si_code;

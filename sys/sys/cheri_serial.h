@@ -121,8 +121,6 @@ struct cheri_serial {
 	CHERI_SERIAL_PERM_USER14 | CHERI_SERIAL_PERM_USER15)
 
 #if defined(_KERNEL) && defined(CPU_CHERI)
-struct chericap;
-
 void	cheri_serialize(struct cheri_serial *csp, void * __capability cap);
 #endif
 

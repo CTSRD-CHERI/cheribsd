@@ -55,6 +55,20 @@ static anchor_list trust_anchors = VEC_INIT;
 static anchor_list forbidden_anchors = VEC_INIT;
 static digest_list forbidden_digests = VEC_INIT;
 
+static int anchor_verbose = 0;
+
+void
+ve_anchor_verbose_set(int n)
+{
+	anchor_verbose = n;
+}
+
+int
+ve_anchor_verbose_get(void)
+{
+	return (anchor_verbose);
+}
+
 void
 ve_debug_set(int n)
 {
@@ -114,6 +128,47 @@ static void
 free_cert_contents(br_x509_certificate *xc)
 {
 	xfree(xc->data);
+}
+
+/*
+ * a bit of a dance to get commonName from a certificate
+ */
+static char *
+x509_cn_get(br_x509_certificate *xc, char *buf, size_t len)
+{
+	br_x509_minimal_context mc;
+	br_name_element cn;
+	unsigned char cn_oid[4];
+	int err;
+
+	if (buf == NULL)
+		return (buf);
+	/*
+	 * We want the commonName field
+	 * the OID we want is 2,5,4,3 - but DER encoded
+	 */
+	cn_oid[0] = 3;
+	cn_oid[1] = 0x55;
+	cn_oid[2] = 4;
+	cn_oid[3] = 3;
+	cn.oid = cn_oid;
+	cn.buf = buf;
+	cn.len = len;
+	cn.buf[0] = '\0';
+
+	br_x509_minimal_init(&mc, &br_sha256_vtable, NULL, 0);
+	br_x509_minimal_set_name_elements(&mc, &cn, 1);
+	/* the below actually does the work - updates cn.status */
+	mc.vtable->start_chain(&mc.vtable, NULL);
+	mc.vtable->start_cert(&mc.vtable, xc->data_len);
+	mc.vtable->append(&mc.vtable, xc->data, xc->data_len);
+	mc.vtable->end_cert(&mc.vtable);
+	/* we don' actually care about cert status - just its name */
+	err = mc.vtable->end_chain(&mc.vtable);
+
+	if (!cn.status)
+		buf = NULL;
+	return (buf);
 }
 
 /* ASN parsing related defines */
@@ -184,7 +239,8 @@ ve_forbidden_digest_add(hash_data *digest, size_t num)
 }
 
 static size_t
-ve_anchors_add(br_x509_certificate *xcs, size_t num, anchor_list *anchors)
+ve_anchors_add(br_x509_certificate *xcs, size_t num, anchor_list *anchors,
+    char *anchors_name)
 {
 	br_x509_trust_anchor ta;
 	size_t u;
@@ -194,6 +250,15 @@ ve_anchors_add(br_x509_certificate *xcs, size_t num, anchor_list *anchors)
 			break;
 		}
 		VEC_ADD(*anchors, ta);
+		if (anchor_verbose && anchors_name) {
+			char buf[64];
+			char *cp;
+
+			cp = x509_cn_get(&xcs[u], buf, sizeof(buf));
+			if (cp) {
+				printf("x509_anchor(%s) %s\n", cp, anchors_name);
+			}
+		}
 	}
 	return (u);
 }
@@ -205,13 +270,68 @@ ve_anchors_add(br_x509_certificate *xcs, size_t num, anchor_list *anchors)
 size_t
 ve_trust_anchors_add(br_x509_certificate *xcs, size_t num)
 {
-	return (ve_anchors_add(xcs, num, &trust_anchors));
+	return (ve_anchors_add(xcs, num, &trust_anchors, "trusted"));
 }
 
 size_t
 ve_forbidden_anchors_add(br_x509_certificate *xcs, size_t num)
 {
-	return (ve_anchors_add(xcs, num, &forbidden_anchors));
+	return (ve_anchors_add(xcs, num, &forbidden_anchors, "forbidden"));
+}
+
+
+/**
+ * @brief add trust anchors in buf
+ *
+ * Assume buf contains x509 certificates, but if not and
+ * we support OpenPGP try adding as that.
+ *
+ * @return number of anchors added
+ */
+size_t
+ve_trust_anchors_add_buf(unsigned char *buf, size_t len)
+{
+	br_x509_certificate *xcs;
+	size_t num;
+
+	num = 0;
+	xcs = parse_certificates(buf, len, &num);
+	if (xcs != NULL) {
+		num = ve_trust_anchors_add(xcs, num);
+#ifdef VE_OPENPGP_SUPPORT
+	} else {
+		num = openpgp_trust_add_buf(buf, len);
+#endif
+	}
+	return (num);
+}
+
+/**
+ * @brief revoke trust anchors in buf
+ *
+ * Assume buf contains x509 certificates, but if not and
+ * we support OpenPGP try revoking keyId
+ *
+ * @return number of anchors revoked
+ */
+size_t
+ve_trust_anchors_revoke(unsigned char *buf, size_t len)
+{
+	br_x509_certificate *xcs;
+	size_t num;
+
+	num = 0;
+	xcs = parse_certificates(buf, len, &num);
+	if (xcs != NULL) {
+		num = ve_forbidden_anchors_add(xcs, num);
+#ifdef VE_OPENPGP_SUPPORT
+	} else {
+		if (buf[len - 1] == '\n')
+			buf[len - 1] = '\0';
+		num = openpgp_trust_revoke((char *)buf);
+#endif
+	}
+	return (num);
 }
 
 /**
@@ -221,15 +341,11 @@ ve_forbidden_anchors_add(br_x509_certificate *xcs, size_t num)
 int
 ve_trust_init(void)
 {
-#ifdef TRUST_ANCHOR_STR
-	br_x509_certificate *xcs;
-#endif
 	static int once = -1;
-	size_t num;
 
 	if (once >= 0)
 		return (once);
-
+	once = 0;			/* to be sure */
 	ve_utc_set(time(NULL));
 #ifdef BUILD_UTC
 	ve_utc_set(BUILD_UTC);		/* just in case */
@@ -240,13 +356,13 @@ ve_trust_init(void)
 #endif
 
 #ifdef TRUST_ANCHOR_STR
-	xcs = parse_certificates(__DECONST(unsigned char *, TRUST_ANCHOR_STR),
-	    sizeof(TRUST_ANCHOR_STR), &num);
-	if (xcs != NULL)
-		num = ve_trust_anchors_add(xcs, num);
+	ve_trust_anchors_add_buf(__DECONST(unsigned char *, TRUST_ANCHOR_STR),
+	    sizeof(TRUST_ANCHOR_STR));
 #endif
 	once = (int) VEC_LEN(trust_anchors);
-
+#ifdef VE_OPENPGP_SUPPORT
+	once += openpgp_trust_init();
+#endif
 	return (once);
 }
 
@@ -550,6 +666,7 @@ verify_ec(br_x509_pkey *pk, const char *file, const char *sigfile)
 	br_sha256_init(&ctx);
 	br_sha256_update(&ctx, fcp, flen);
 	br_sha256_out(&ctx, rhbuf);
+#ifdef VE_ECDSA_HASH_AGAIN
 	hex = hexdigest(hexbuf, sizeof(hexbuf), rhbuf, br_sha256_SIZE);
 	/* now hash that */
 	if (hex) {
@@ -557,6 +674,7 @@ verify_ec(br_x509_pkey *pk, const char *file, const char *sigfile)
 		br_sha256_update(&ctx, hex, strlen(hex));
 		br_sha256_out(&ctx, rhbuf);
 	}
+#endif
 	ec = br_ec_get_default();
 	vrfy = br_ecdsa_vrfy_asn1_get_default();
 	if (!vrfy(ec, rhbuf, br_sha256_SIZE, &pk->key.ec, po->data,
@@ -814,7 +932,7 @@ test_hash(const br_hash_class *md, size_t hlen,
 #define ve_test_hash(n, N) \
 	printf("Testing hash: " #n "\t\t\t\t%s\n", \
 	    test_hash(&br_ ## n ## _vtable, br_ ## n ## _SIZE, #n, \
-	    VE_HASH_KAT_STR, sizeof(VE_HASH_KAT_STR), \
+	    VE_HASH_KAT_STR, VE_HASH_KAT_STRLEN(VE_HASH_KAT_STR), \
 	    vh_ ## N) ? "Failed" : "Passed")
 
 /**
@@ -863,34 +981,32 @@ ve_self_tests(void)
 #ifdef VERIFY_CERTS_STR
 	xcs = parse_certificates(__DECONST(unsigned char *, VERIFY_CERTS_STR),
 	    sizeof(VERIFY_CERTS_STR), &num);
-	if (xcs == NULL)
-		return (0);
-	/*
-	 * We want the commonName field
-	 * the OID we want is 2,5,4,3 - but DER encoded
-	 */
-	cn_oid[0] = 3;
-	cn_oid[1] = 0x55;
-	cn_oid[2] = 4;
-	cn_oid[3] = 3;
-	cn.oid = cn_oid;
-	cn.buf = cn_buf;
+	if (xcs != NULL) {
+		/*
+		 * We want the commonName field
+		 * the OID we want is 2,5,4,3 - but DER encoded
+		 */
+		cn_oid[0] = 3;
+		cn_oid[1] = 0x55;
+		cn_oid[2] = 4;
+		cn_oid[3] = 3;
+		cn.oid = cn_oid;
+		cn.buf = cn_buf;
 
-	for (u = 0; u < num; u ++) {
-		cn.len = sizeof(cn_buf);
-		if ((pk = verify_signer_xcs(&xcs[u], 1, &cn, 1, &trust_anchors)) != NULL) {
-			free_cert_contents(&xcs[u]);
-			once++;
-			printf("Testing verify certificate: %s\tPassed\n",
-			    cn.status ? cn_buf : "");
-			xfreepkey(pk);
+		for (u = 0; u < num; u ++) {
+			cn.len = sizeof(cn_buf);
+			if ((pk = verify_signer_xcs(&xcs[u], 1, &cn, 1, &trust_anchors)) != NULL) {
+				free_cert_contents(&xcs[u]);
+				once++;
+				printf("Testing verify certificate: %s\tPassed\n",
+				    cn.status ? cn_buf : "");
+				xfreepkey(pk);
+			}
 		}
+		if (!once)
+			printf("Testing verify certificate:\t\t\tFailed\n");
+		xfree(xcs);
 	}
-	if (!once)
-		printf("Testing verify certificate:\t\t\tFailed\n");
-	xfree(xcs);
-#else
-	printf("No X.509 self tests\n");
 #endif	/* VERIFY_CERTS_STR */
 #ifdef VE_OPENPGP_SUPPORT
 	if (!openpgp_self_tests())

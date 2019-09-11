@@ -64,6 +64,7 @@
 #include "debug.h"
 #include "rtld.h"
 #include "rtld_machdep.h"
+#include "rtld_libc.h"
 
 void _rtld_thread_init(struct RtldLockInfo *) __exported;
 void _rtld_atfork_pre(int *) __exported;
@@ -80,7 +81,7 @@ typedef struct Struct_Lock {
 static sigset_t fullsigmask, oldsigmask;
 static int thread_flag, wnested;
 
-static void *
+static __used void *
 def_lock_create(void)
 {
     void *base;
@@ -107,7 +108,7 @@ def_lock_create(void)
     return l;
 }
 
-static void
+static __used void
 def_lock_destroy(void *lock)
 {
     Lock *l = (Lock *)lock;
@@ -115,7 +116,7 @@ def_lock_destroy(void *lock)
     free(l->base);
 }
 
-static void
+static __used void
 def_rlock_acquire(void *lock)
 {
     Lock *l = (Lock *)lock;
@@ -125,7 +126,7 @@ def_rlock_acquire(void *lock)
 	    ;	/* Spin */
 }
 
-static void
+static __used void
 def_wlock_acquire(void *lock)
 {
 	Lock *l;
@@ -133,16 +134,16 @@ def_wlock_acquire(void *lock)
 
 	l = (Lock *)lock;
 	for (;;) {
-		sigprocmask(SIG_BLOCK, &fullsigmask, &tmp_oldsigmask);
+		__sys_sigprocmask(SIG_BLOCK, &fullsigmask, &tmp_oldsigmask);
 		if (atomic_cmpset_acq_int(&l->lock, 0, WAFLAG))
 			break;
-		sigprocmask(SIG_SETMASK, &tmp_oldsigmask, NULL);
+		__sys_sigprocmask(SIG_SETMASK, &tmp_oldsigmask, NULL);
 	}
 	if (atomic_fetchadd_int(&wnested, 1) == 0)
 		oldsigmask = tmp_oldsigmask;
 }
 
-static void
+static __used void
 def_lock_release(void *lock)
 {
 	Lock *l;
@@ -154,11 +155,11 @@ def_lock_release(void *lock)
 		assert(wnested > 0);
 		atomic_add_rel_int(&l->lock, -WAFLAG);
 		if (atomic_fetchadd_int(&wnested, -1) == 1)
-			sigprocmask(SIG_SETMASK, &oldsigmask, NULL);
+			__sys_sigprocmask(SIG_SETMASK, &oldsigmask, NULL);
 	}
 }
 
-static int
+static __used int
 def_thread_set_flag(int mask)
 {
 	int old_val = thread_flag;
@@ -166,7 +167,7 @@ def_thread_set_flag(int mask)
 	return (old_val);
 }
 
-static int
+static __used int
 def_thread_clr_flag(int mask)
 {
 	int old_val = thread_flag;
@@ -280,9 +281,11 @@ lock_restart_for_upgrade(RtldLockState *lockstate)
 		siglongjmp(lockstate->env, 1);
 		break;
 	default:
-		assert(0);
+		rtld_fatal("unreachable");
 	}
 }
+
+#define local_rtld_function_pointer(func) &func
 
 void
 lockdflt_init(void)
@@ -290,13 +293,13 @@ lockdflt_init(void)
     int i;
 
     deflockinfo.rtli_version  = RTLI_VERSION;
-    deflockinfo.lock_create   = def_lock_create;
-    deflockinfo.lock_destroy  = def_lock_destroy;
-    deflockinfo.rlock_acquire = def_rlock_acquire;
-    deflockinfo.wlock_acquire = def_wlock_acquire;
-    deflockinfo.lock_release  = def_lock_release;
-    deflockinfo.thread_set_flag = def_thread_set_flag;
-    deflockinfo.thread_clr_flag = def_thread_clr_flag;
+    deflockinfo.lock_create   = make_rtld_function_pointer(def_lock_create);
+    deflockinfo.lock_destroy  = make_rtld_function_pointer(def_lock_destroy);
+    deflockinfo.rlock_acquire = make_rtld_function_pointer(def_rlock_acquire);
+    deflockinfo.wlock_acquire = make_rtld_function_pointer(def_wlock_acquire);
+    deflockinfo.lock_release  = make_rtld_function_pointer(def_lock_release);
+    deflockinfo.thread_set_flag = make_rtld_function_pointer(def_thread_set_flag);
+    deflockinfo.thread_clr_flag = make_rtld_function_pointer(def_thread_clr_flag);
     deflockinfo.at_fork = NULL;
 
     for (i = 0; i < RTLD_LOCK_CNT; i++) {

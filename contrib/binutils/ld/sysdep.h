@@ -55,6 +55,7 @@ extern char *strrchr ();
 #ifdef HAVE_SYS_PARAM_H
 #include <sys/param.h>
 #ifndef __PAST_END
+# error "__PAST_END Should be provided by sys/param.h"
 # define __PAST_END(array, offset) (((typeof(*(array)) *)(array))[offset])
 #endif
 #endif

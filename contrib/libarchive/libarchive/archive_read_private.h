@@ -24,7 +24,18 @@
  *
  * $FreeBSD$
  */
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190730,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds"
+ *   ],
+ *   "change_comment": "C inheritance addrof first member (archive_read)"
+ * }
+ * CHERI CHANGES END
+ */
 #ifndef __LIBARCHIVE_BUILD
 #ifndef __LIBARCHIVE_TEST
 #error This header is only to be used internally to libarchive.
@@ -98,6 +109,8 @@ struct archive_read_filter {
 	int (*close)(struct archive_read_filter *self);
 	/* Function that handles switching from reading one block to the next/prev */
 	int (*sswitch)(struct archive_read_filter *self, unsigned int iindex);
+	/* Read any header metadata if available. */
+	int (*read_header)(struct archive_read_filter *self, struct archive_entry *entry);
 	/* My private data. */
 	void *data;
 
@@ -157,7 +170,7 @@ struct archive_read_extract {
 };
 
 struct archive_read {
-	struct archive	archive;
+	struct archive	archive __subobject_member_used_for_c_inheritance;
 
 	struct archive_entry	*entry;
 
@@ -250,6 +263,7 @@ int64_t	__archive_read_seek(struct archive_read*, int64_t, int);
 int64_t	__archive_read_filter_seek(struct archive_read_filter *, int64_t, int);
 int64_t	__archive_read_consume(struct archive_read *, int64_t);
 int64_t	__archive_read_filter_consume(struct archive_read_filter *, int64_t);
+int __archive_read_header(struct archive_read *, struct archive_entry *);
 int __archive_read_program(struct archive_read_filter *, const char *);
 void __archive_read_free_filters(struct archive_read *);
 struct archive_read_extract *__archive_read_get_extract(struct archive_read *);

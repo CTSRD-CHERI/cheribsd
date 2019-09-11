@@ -184,11 +184,6 @@ linux_newstat(struct thread *td, struct linux_newstat_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-#ifdef DEBUG
-	if (ldebug(newstat))
-		printf(ARGS(newstat, "%s, *"), path);
-#endif
-
 	error = linux_kern_stat(td, path, &buf);
 	LFREEPATH(path);
 	if (error)
@@ -205,11 +200,6 @@ linux_newlstat(struct thread *td, struct linux_newlstat_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-#ifdef DEBUG
-	if (ldebug(newlstat))
-		printf(ARGS(newlstat, "%s, *"), path);
-#endif
-
 	error = linux_kern_lstat(td, path, &sb);
 	LFREEPATH(path);
 	if (error)
@@ -223,11 +213,6 @@ linux_newfstat(struct thread *td, struct linux_newfstat_args *args)
 {
 	struct stat buf;
 	int error;
-
-#ifdef DEBUG
-	if (ldebug(newfstat))
-		printf(ARGS(newfstat, "%d, *"), args->fd);
-#endif
 
 	error = kern_fstat(td, args->fd, &buf);
 	translate_fd_major_minor(td, args->fd, &buf);
@@ -275,10 +260,6 @@ linux_stat(struct thread *td, struct linux_stat_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-#ifdef DEBUG
-	if (ldebug(stat))
-		printf(ARGS(stat, "%s, *"), path);
-#endif
 	error = linux_kern_stat(td, path, &buf);
 	if (error) {
 		LFREEPATH(path);
@@ -297,10 +278,6 @@ linux_lstat(struct thread *td, struct linux_lstat_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-#ifdef DEBUG
-	if (ldebug(lstat))
-		printf(ARGS(lstat, "%s, *"), path);
-#endif
 	error = linux_kern_lstat(td, path, &buf);
 	if (error) {
 		LFREEPATH(path);
@@ -410,10 +387,6 @@ linux_statfs(struct thread *td, struct linux_statfs_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-#ifdef DEBUG
-	if (ldebug(statfs))
-		printf(ARGS(statfs, "%s, *"), path);
-#endif
 	bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_statfs(td, (__cheri_tocap char * __capability)path,
 	    UIO_SYSSPACE, bsd_statfs);
@@ -459,10 +432,6 @@ linux_statfs64(struct thread *td, struct linux_statfs64_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-#ifdef DEBUG
-	if (ldebug(statfs64))
-		printf(ARGS(statfs64, "%s, *"), path);
-#endif
 	bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_statfs(td, (__cheri_tocap char * __capability)path,
 	    UIO_SYSSPACE, bsd_statfs);
@@ -482,10 +451,6 @@ linux_fstatfs64(struct thread *td, struct linux_fstatfs64_args *args)
 	struct statfs *bsd_statfs;
 	int error;
 
-#ifdef DEBUG
-	if (ldebug(fstatfs64))
-		printf(ARGS(fstatfs64, "%d, *"), args->fd);
-#endif
 	if (args->bufsize != sizeof(struct l_statfs64))
 		return (EINVAL);
 
@@ -507,10 +472,6 @@ linux_fstatfs(struct thread *td, struct linux_fstatfs_args *args)
 	struct statfs *bsd_statfs;
 	int error;
 
-#ifdef DEBUG
-	if (ldebug(fstatfs))
-		printf(ARGS(fstatfs, "%d, *"), args->fd);
-#endif
 	bsd_statfs = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fstatfs(td, args->fd, bsd_statfs);
 	if (error == 0)
@@ -533,10 +494,6 @@ struct l_ustat
 int
 linux_ustat(struct thread *td, struct linux_ustat_args *args)
 {
-#ifdef DEBUG
-	if (ldebug(ustat))
-		printf(ARGS(ustat, "%ju, *"), (uintmax_t)args->dev);
-#endif
 
 	return (EOPNOTSUPP);
 }
@@ -587,11 +544,6 @@ linux_stat64(struct thread *td, struct linux_stat64_args *args)
 
 	LCONVPATHEXIST(td, args->filename, &filename);
 
-#ifdef DEBUG
-	if (ldebug(stat64))
-		printf(ARGS(stat64, "%s, *"), filename);
-#endif
-
 	error = linux_kern_stat(td, filename, &buf);
 	LFREEPATH(filename);
 	if (error)
@@ -608,11 +560,6 @@ linux_lstat64(struct thread *td, struct linux_lstat64_args *args)
 
 	LCONVPATHEXIST(td, args->filename, &filename);
 
-#ifdef DEBUG
-	if (ldebug(lstat64))
-		printf(ARGS(lstat64, "%s, *"), args->filename);
-#endif
-
 	error = linux_kern_lstat(td, filename, &sb);
 	LFREEPATH(filename);
 	if (error)
@@ -625,11 +572,6 @@ linux_fstat64(struct thread *td, struct linux_fstat64_args *args)
 {
 	struct stat buf;
 	int error;
-
-#ifdef DEBUG
-	if (ldebug(fstat64))
-		printf(ARGS(fstat64, "%d, *"), args->fd);
-#endif
 
 	error = kern_fstat(td, args->fd, &buf);
 	translate_fd_major_minor(td, args->fd, &buf);
@@ -653,11 +595,6 @@ linux_fstatat64(struct thread *td, struct linux_fstatat64_args *args)
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	LCONVPATHEXIST_AT(td, args->pathname, &path, dfd);
-
-#ifdef DEBUG
-	if (ldebug(fstatat64))
-		printf(ARGS(fstatat64, "%i, %s, %i"), args->dfd, path, args->flag);
-#endif
 
 	error = linux_kern_statat(td, flag, dfd, path, &buf);
 	if (!error)
@@ -683,11 +620,6 @@ linux_newfstatat(struct thread *td, struct linux_newfstatat_args *args)
 
 	dfd = (args->dfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->dfd;
 	LCONVPATHEXIST_AT(td, args->pathname, &path, dfd);
-
-#ifdef DEBUG
-	if (ldebug(newfstatat))
-		printf(ARGS(newfstatat, "%i, %s, %i"), args->dfd, path, args->flag);
-#endif
 
 	error = linux_kern_statat(td, flag, dfd, path, &buf);
 	if (error == 0)

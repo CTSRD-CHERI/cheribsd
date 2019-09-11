@@ -81,28 +81,24 @@ union	overhead {
 	} ovu;
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
-#define	ov_rmagic	ovu.ovu_rmagic
-#define	ov_size		ovu.ovu_size
 };
 
 static void morecore(int bucket);
 static int morepages(int n);
 static int findbucket(union overhead *freep, int srchlen);
 
-
 #define	MAGIC		0xef		/* magic # on accounting info */
-#define RMAGIC		0x5555		/* magic # on range info */
 
 /*
- * nextf[i] is the pointer to the next free block of size 2^(i+3).  The
- * smallest allocatable block is 8 bytes.  The overhead information
- * precedes the data area returned to the user.
+ * nextf[i] is the pointer to the next free block of size
+ * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the data
+ * area returned to the user.
  */
+#define	FIRST_BUCKET_SIZE	8
 #define	NBUCKETS 30
 static	union overhead *nextf[NBUCKETS];
 
 static	int pagesz;			/* page size */
-static	int pagebucket;			/* page size bucket */
 
 /*
  * The array of supported page sizes is provided by the user, i.e., the
@@ -124,44 +120,23 @@ __crt_malloc(size_t nbytes)
 	 * First time malloc is called, setup page size and
 	 * align break pointer so all data will be page aligned.
 	 */
-	if (pagesz == 0) {
+	if (pagesz == 0)
 		pagesz = n = pagesizes[0];
-		if (morepages(NPOOLPAGES) == 0)
-			return NULL;
-		op = (union overhead *)(void *)(pagepool_start);
-  		n = n - sizeof (*op) - ((long)op & (n - 1));
-		if (n < 0)
-			n += pagesz;
-  		if (n) {
-			pagepool_start += n;
-		}
-		bucket = 0;
-		amt = 8;
-		while ((unsigned)pagesz > amt) {
-			amt <<= 1;
-			bucket++;
-		}
-		pagebucket = bucket;
-	}
 	/*
 	 * Convert amount of memory requested into closest block size
 	 * stored in hash buckets which satisfies request.
 	 * Account for space used per block for accounting.
 	 */
-	if (nbytes <= (unsigned long)(n = pagesz - sizeof(*op))) {
-		amt = 8;	/* size of first bucket */
-		bucket = 0;
-		n = -sizeof(*op);
-	} else {
-		amt = pagesz;
-		bucket = pagebucket;
-	}
-	while (nbytes > (size_t)amt + n) {
+	amt = FIRST_BUCKET_SIZE;
+	bucket = 0;
+	while (nbytes > amt - sizeof(*op)) {
 		amt <<= 1;
 		if (amt == 0)
 			return (NULL);
 		bucket++;
 	}
+	if (bucket >= NBUCKETS)
+		return (NULL);
 	/*
 	 * If nothing in hash bucket right now,
 	 * request more memory from the system.
@@ -205,18 +180,14 @@ morecore(int bucket)
   	int amt;			/* amount to allocate */
   	int nblks;			/* how many blocks we get */
 
-	/*
-	 * sbrk_size <= 0 only for big, FLUFFY, requests (about
-	 * 2^30 bytes on a VAX, I think) or for a negative arg.
-	 */
-	if ((unsigned)bucket >= NBBY * sizeof(int) - 4)
+	if ((unsigned)bucket >= NBUCKETS)
 		return;
-	sz = 1 << (bucket + 3);
+	sz = FIRST_BUCKET_SIZE << bucket;
 	if (sz < pagesz) {
 		amt = pagesz;
   		nblks = amt / sz;
 	} else {
-		amt = sz + pagesz;
+		amt = sz;
 		nblks = 1;
 	}
 	if (amt > pagepool_end - pagepool_start)
@@ -349,12 +320,11 @@ findbucket(union overhead *freep, int srchlen)
 static int
 morepages(int n)
 {
-	int	fd = -1;
-	int	offset;
+	caddr_t	addr;
+	int offset;
 
 	if (pagepool_end - pagepool_start > pagesz) {
-		caddr_t	addr = (caddr_t)
-			(((long)pagepool_start + pagesz - 1) & ~(pagesz - 1));
+		addr = (caddr_t)roundup2((long)pagepool_start, pagesz);
 		if (munmap(addr, pagepool_end - addr) != 0) {
 #ifdef IN_RTLD
 			rtld_fdprintf(STDERR_FILENO, _BASENAME_RTLD ": "
@@ -364,20 +334,21 @@ morepages(int n)
 		}
 	}
 
-	offset = (long)pagepool_start - ((long)pagepool_start & ~(pagesz - 1));
+	offset = (long)pagepool_start - rounddown2((long)pagepool_start,
+	    pagesz);
 
-	if ((pagepool_start = mmap(0, n * pagesz,
-			PROT_READ|PROT_WRITE,
-			MAP_ANON|MAP_PRIVATE, fd, 0)) == (caddr_t)-1) {
+	pagepool_start = mmap(0, n * pagesz, PROT_READ | PROT_WRITE,
+	    MAP_ANON | MAP_PRIVATE, -1, 0);
+	if (pagepool_start == MAP_FAILED) {
 #ifdef IN_RTLD
 		rtld_fdprintf(STDERR_FILENO, _BASENAME_RTLD ": morepages: "
 		    "cannot mmap anonymous memory: %s\n",
 		    rtld_strerror(errno));
 #endif
-		return 0;
+		return (0);
 	}
 	pagepool_end = pagepool_start + n * pagesz;
 	pagepool_start += offset;
 
-	return n;
+	return (n);
 }

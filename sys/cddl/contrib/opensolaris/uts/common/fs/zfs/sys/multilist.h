@@ -44,11 +44,10 @@ struct multilist_sublist {
 	 */
 	list_t		mls_list;
 	/*
-	 * Pad to cache line (64 bytes), in an effort to try and prevent
-	 * cache line contention.
+	 * Pad to cache line, in an effort to try and prevent cache line
+	 * contention.
 	 */
-	uint8_t		mls_pad[24];
-};
+} __aligned(CACHE_LINE_SIZE);
 
 struct multilist {
 	/*
@@ -90,6 +89,8 @@ void multilist_sublist_insert_head(multilist_sublist_t *, void *);
 void multilist_sublist_insert_tail(multilist_sublist_t *, void *);
 void multilist_sublist_move_forward(multilist_sublist_t *mls, void *obj);
 void multilist_sublist_remove(multilist_sublist_t *, void *);
+int  multilist_sublist_is_empty(multilist_sublist_t *);
+int  multilist_sublist_is_empty_idx(multilist_t *, unsigned int);
 
 void *multilist_sublist_head(multilist_sublist_t *);
 void *multilist_sublist_tail(multilist_sublist_t *);

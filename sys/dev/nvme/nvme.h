@@ -69,6 +69,14 @@
 #define NVME_CAP_LO_REG_AMS_MASK			(0x3)
 #define NVME_CAP_LO_REG_TO_SHIFT			(24)
 #define NVME_CAP_LO_REG_TO_MASK				(0xFF)
+#define NVME_CAP_LO_MQES(x) \
+	(((x) >> NVME_CAP_LO_REG_MQES_SHIFT) & NVME_CAP_LO_REG_MQES_MASK)
+#define NVME_CAP_LO_CQR(x) \
+	(((x) >> NVME_CAP_LO_REG_CQR_SHIFT) & NVME_CAP_LO_REG_CQR_MASK)
+#define NVME_CAP_LO_AMS(x) \
+	(((x) >> NVME_CAP_LO_REG_AMS_SHIFT) & NVME_CAP_LO_REG_AMS_MASK)
+#define NVME_CAP_LO_TO(x) \
+	(((x) >> NVME_CAP_LO_REG_TO_SHIFT) & NVME_CAP_LO_REG_TO_MASK)
 
 #define NVME_CAP_HI_REG_DSTRD_SHIFT			(0)
 #define NVME_CAP_HI_REG_DSTRD_MASK			(0xF)
@@ -78,6 +86,14 @@
 #define NVME_CAP_HI_REG_MPSMIN_MASK			(0xF)
 #define NVME_CAP_HI_REG_MPSMAX_SHIFT			(20)
 #define NVME_CAP_HI_REG_MPSMAX_MASK			(0xF)
+#define NVME_CAP_HI_DSTRD(x) \
+	(((x) >> NVME_CAP_HI_REG_DSTRD_SHIFT) & NVME_CAP_HI_REG_DSTRD_MASK)
+#define NVME_CAP_HI_CSS_NVM(x) \
+	(((x) >> NVME_CAP_HI_REG_CSS_NVM_SHIFT) & NVME_CAP_HI_REG_CSS_NVM_MASK)
+#define NVME_CAP_HI_MPSMIN(x) \
+	(((x) >> NVME_CAP_HI_REG_MPSMIN_SHIFT) & NVME_CAP_HI_REG_MPSMIN_MASK)
+#define NVME_CAP_HI_MPSMAX(x) \
+	(((x) >> NVME_CAP_HI_REG_MPSMAX_SHIFT) & NVME_CAP_HI_REG_MPSMAX_MASK)
 
 #define NVME_CC_REG_EN_SHIFT				(0)
 #define NVME_CC_REG_EN_MASK				(0x1)
@@ -348,6 +364,20 @@
 /* namespace supports the Format Progress Indicator */
 #define NVME_NS_DATA_FPI_SUPP_SHIFT		(7)
 #define NVME_NS_DATA_FPI_SUPP_MASK		(0x1)
+
+/** Deallocate Logical Block Features */
+/* deallocated logical block read behavior */
+#define NVME_NS_DATA_DLFEAT_READ_SHIFT		(0)
+#define NVME_NS_DATA_DLFEAT_READ_MASK		(0x07)
+#define NVME_NS_DATA_DLFEAT_READ_NR		(0x00)
+#define NVME_NS_DATA_DLFEAT_READ_00		(0x01)
+#define NVME_NS_DATA_DLFEAT_READ_FF		(0x02)
+/* supports the Deallocate bit in the Write Zeroes */
+#define NVME_NS_DATA_DLFEAT_DWZ_SHIFT		(3)
+#define NVME_NS_DATA_DLFEAT_DWZ_MASK		(0x01)
+/* Guard field for deallocated logical blocks is set to the CRC  */
+#define NVME_NS_DATA_DLFEAT_GCRC_SHIFT		(4)
+#define NVME_NS_DATA_DLFEAT_GCRC_MASK		(0x01)
 
 /** lba format support */
 /* metadata size */

@@ -749,7 +749,7 @@ moea_bootstrap(mmu_t mmup, vm_offset_t kernelstart, vm_offset_t kernelend)
 		} while (pa < end);
 	}
 
-	if (sizeof(phys_avail)/sizeof(phys_avail[0]) < regions_sz)
+	if (nitems(phys_avail) < regions_sz)
 		panic("moea_bootstrap: phys_avail too small");
 
 	phys_avail_count = 0;
@@ -1275,7 +1275,7 @@ retry:
 		if (vm_page_pa_tryrelock(pmap, pvo->pvo_pte.pte.pte_lo & PTE_RPGN, &pa))
 			goto retry;
 		m = PHYS_TO_VM_PAGE(pvo->pvo_pte.pte.pte_lo & PTE_RPGN);
-		vm_page_hold(m);
+		vm_page_wire(m);
 	}
 	PA_UNLOCK_COND(pa);
 	PMAP_UNLOCK(pmap);

@@ -42,6 +42,7 @@
 
 #include <bearssl.h>
 
+unsigned char * read_fd(int, size_t);
 #ifndef NEED_BRSSL_H
 unsigned char * read_file(const char *, size_t *);
 #endif
@@ -51,8 +52,12 @@ extern int DebugVe;
 #define DEBUG_PRINTF(n, x) if (DebugVe >= n) printf x
 
 int ve_trust_init(void);
+size_t ve_trust_anchors_add_buf(unsigned char *, size_t);
+size_t ve_trust_anchors_revoke(unsigned char *, size_t);
 int ve_trust_add(const char *);
 void ve_debug_set(int);
+void ve_anchor_verbose_set(int);
+int ve_anchor_verbose_get(void);
 void ve_utc_set(time_t utc);
 char *ve_error_get(void);
 int ve_error_set(const char *, ...) __printflike(1,2);
@@ -81,6 +86,8 @@ unsigned char *verify_asc(const char *, int); /* OpenPGP */
 void ve_pcr_init(void);
 void ve_pcr_update(unsigned char *, size_t);
 ssize_t ve_pcr_get(unsigned char *, size_t);
+int ve_pcr_updating_get(void);
+void ve_pcr_updating_set(int);
 
 /* flags for verify_{asc,sig,signed} */
 #define VEF_VERBOSE		1

@@ -101,7 +101,6 @@ _LIBRARIES=	\
 		compiler_rt \
 		crypt \
 		crypto \
-		css \
 		ctf \
 		curl \
 		cuse \
@@ -111,7 +110,6 @@ _LIBRARIES=	\
 		devinfo \
 		devstat \
 		dialog \
-		dom \
 		dl \
 		dpv \
 		dtrace \
@@ -132,7 +130,6 @@ _LIBRARIES=	\
 		heimbase \
 		heimntlm \
 		heimsqlite \
-		hubbub \
 		hx509 \
 		ipsec \
 		ipt \
@@ -154,14 +151,10 @@ _LIBRARIES=	\
 		memstat \
 		mp \
 		mt \
-		nandfs \
 		ncurses \
 		ncursesw \
 		netgraph \
 		ngatm \
-		nsbmp \
-		nsfb \
-		nsgif \
 		nv \
 		nvpair \
 		opencsd \
@@ -169,7 +162,6 @@ _LIBRARIES=	\
 		pam \
 		panel \
 		panelw \
-		parserutils \
 		pcap \
 		pcsclite \
 		pjdlog \
@@ -181,7 +173,6 @@ _LIBRARIES=	\
 		radius \
 		regex \
 		roken \
-		rosprite \
 		rpcsec_gss \
 		rpcsvc \
 		rt \
@@ -195,7 +186,6 @@ _LIBRARIES=	\
 		statcounters \
 		stdthreads \
 		supcplusplus \
-		svgtiny \
 		syscalls \
 		sysdecode \
 		tacplus \
@@ -210,7 +200,6 @@ _LIBRARIES=	\
 		util \
 		uutil \
 		vmmapi \
-		wapcaplet \
 		wind \
 		wrap \
 		xo \

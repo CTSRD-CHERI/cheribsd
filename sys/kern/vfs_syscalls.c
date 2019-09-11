@@ -586,7 +586,7 @@ freebsd4_statfs(struct thread *td, struct freebsd4_statfs_args *uap)
 	error = kern_statfs(td, __USER_CAP_STR(uap->path), UIO_USERSPACE, sfp);
 	if (error == 0) {
 		freebsd4_cvtstatfs(sfp, &osb);
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	}
 	free(sfp, M_STATFS);
 	return (error);
@@ -612,7 +612,7 @@ freebsd4_fstatfs(struct thread *td, struct freebsd4_fstatfs_args *uap)
 	error = kern_fstatfs(td, uap->fd, sfp);
 	if (error == 0) {
 		freebsd4_cvtstatfs(sfp, &osb);
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	}
 	free(sfp, M_STATFS);
 	return (error);
@@ -631,7 +631,7 @@ struct freebsd4_getfsstat_args {
 int
 freebsd4_getfsstat(struct thread *td, struct freebsd4_getfsstat_args *uap)
 {
-	struct statfs * __capbility buf
+	struct statfs * __capability buf;
 	struct statfs *sp;
 	struct ostatfs osb;
 	size_t count, size;
@@ -651,7 +651,8 @@ freebsd4_getfsstat(struct thread *td, struct freebsd4_getfsstat_args *uap)
 		sp = (__cheri_fromcap struct statfs *)buf;
 		while (count != 0 && error == 0) {
 			freebsd4_cvtstatfs(sp, &osb);
-			error = copyout(&osb, uap->buf, sizeof(osb));
+			error = copyout(&osb, __USER_CAP_OBJ(uap->buf),
+			    sizeof(osb));
 			sp++;
 			uap->buf++;
 			count--;
@@ -678,14 +679,14 @@ freebsd4_fhstatfs(struct thread *td, struct freebsd4_fhstatfs_args *uap)
 	fhandle_t fh;
 	int error;
 
-	error = copyin(uap->u_fhp, &fh, sizeof(fhandle_t));
+	error = copyin(__USER_CAP_OBJ(uap->u_fhp), &fh, sizeof(fhandle_t));
 	if (error != 0)
 		return (error);
 	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
 	error = kern_fhstatfs(td, fh, sfp);
 	if (error == 0) {
 		freebsd4_cvtstatfs(sfp, &osb);
-		error = copyout(&osb, uap->buf, sizeof(osb));
+		error = copyout(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
 	}
 	free(sfp, M_STATFS);
 	return (error);

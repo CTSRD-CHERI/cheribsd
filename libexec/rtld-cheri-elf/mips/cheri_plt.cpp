@@ -41,6 +41,7 @@
 #include <algorithm>
 
 #include "rtld.h"
+#include "rtld_libc.h"
 #include "rtld_small_vector.h"
 
 static constexpr uint8_t simple_plt_code[] = {
@@ -68,11 +69,13 @@ struct SimpleExternalCallTrampoline {
 		static_assert(sizeof(this->code) == sizeof(simple_plt_code), "");
 		__builtin_memcpy(code, simple_plt_code, sizeof(simple_plt_code));
 	}
-	static const SimpleExternalCallTrampoline*
+	static SimpleExternalCallTrampoline*
 	create(const void* target_cgp, dlfunc_t target_func);
-	inline const void* pcc_value() const {
+	static SimpleExternalCallTrampoline*
+	create(const Obj_Entry* defobj, const Elf_Sym *sym, bool tight_bounds);
+	inline dlfunc_t pcc_value() const {
 		const void* result = cheri_incoffset(this, offsetof(SimpleExternalCallTrampoline, code));
-		return cheri_clearperm(result, FUNC_PTR_REMOVE_PERMS);
+		return (dlfunc_t)cheri_clearperm(result, FUNC_PTR_REMOVE_PERMS);
 	}
 };
 
@@ -114,11 +117,11 @@ private:
 		// need to update the data capability and calling mprotect()
 		// every time would be expensive. Only rtld will ever hold a
 		// writable capability to this region so this should be safe
-		void* result = mmap(nullptr, BLOCK_SIZE, PROT_ALL | PROT_MAX(PROT_ALL),
+		void* result = mmap(nullptr, BLOCK_SIZE, _PROT_ALL | PROT_MAX(_PROT_ALL),
 		    mmap_flags, -1, 0);
 		dbg_cheri("Allocated new RWX block: %-#p", result);
 		if (result == MAP_FAILED) {
-			dbg_cheri("mmap failed: %s", strerror(errno));
+			dbg_cheri("mmap failed: %s", rtld_strerror(errno));
 			return nullptr;
 		}
 		current_offset = 0;
@@ -126,7 +129,7 @@ private:
 	}
 	void* allocate(size_t size) {
 		// Can only allocate multiples of sizeof(void*)
-		assert(__builtin_is_aligned(size, sizeof(void*)));
+		dbg_assert(__builtin_is_aligned(size, sizeof(void*)));
 		if (current_allocation == nullptr ||
 		    current_offset + size > BLOCK_SIZE) {
 			current_allocation = allocate_new_block();
@@ -136,9 +139,9 @@ private:
 			}
 		}
 		uint8_t *next = current_allocation + current_offset;
-		assert(__builtin_is_aligned(next, sizeof(void*)));
+		dbg_assert(__builtin_is_aligned(next, sizeof(void*)));
 		current_offset += size;
-		assert(current_offset <= BLOCK_SIZE);
+		dbg_assert(current_offset <= BLOCK_SIZE);
 		return cheri_csetbounds(next, size);
 	}
 public:
@@ -209,19 +212,30 @@ _mips_rtld_bind(void* _plt_stub)
 		rtld_fatal("Could not find symbol definition for PLT symbol %s"
 		    " in %s", symname(obj, r_symndx), obj->path);
 	}
-
-	dlfunc_t target = make_function_pointer(def, defobj);
-	const void* target_cgp = target_cgp_for_func(defobj, (void*)target);
+	dlfunc_t target;
+	if (can_use_tight_pcc_bounds(defobj)) {
+		// We can use tight bounds (but can't update .captable to point
+		// to the target function directly)
+		// TODO: actually we should be able to for local calls!
+		target = make_code_pointer(def, defobj, /*tight_bounds=*/true);
+	} else {
+		// PC-relative/legacy does not need any trampolines and uses the
+		// full DSO bounds (or full addrspace for legacy)
+		target = make_code_pointer(def, defobj, /*tight_bounds=*/false);
+		// TODO: update .captable entry to avoid future trampoline jumps
+		// TODO: could also free the stub, but that probably just wastes time
+	}
+	const void* target_cgp = target_cgp_for_func(defobj, target);
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	// Should never be unrepresentable but can be NULL if a function doesn't
 	// use any globals
 	// TODO: Should we set $cgp to be zero length instead?
-	assert(!target_cgp || cheri_gettag(target_cgp));
+	dbg_assert(!target_cgp || cheri_gettag(target_cgp));
 #else
-	assert(cheri_gettag(target_cgp));
+	dbg_assert(cheri_gettag(target_cgp));
 #endif
 	dbg_cheri_plt_verbose("bind now/fixup at %s (sym #%jd) in %s --> was=%p new=%p",
-	    defobj->strtab + def->st_name, (intmax_t)r_symndx, obj->path,
+	    symname(obj, r_symndx), (intmax_t)r_symndx, obj->path,
 	    (void *)plt_stub->trampoline.target, (void *)target);
 
 	if (!ld_bind_not) {
@@ -231,7 +245,10 @@ _mips_rtld_bind(void* _plt_stub)
 	lock_release(rtld_bind_lock, &lockstate);
 	// Setup the target $cgp so that we can actually call the function
 	// TODO: return two values instead (will a 2 cap struct use $c3/$c4?)
-	__asm__ volatile("cmove $cgp, %0"::"C"(target_cgp));
+	// FIXME: memory clobber should ensure that this is moved after the
+	//  restore of $cgp (due to the call to lock_release) but it would be
+	//  much nicer if we could just return (target, $cgp) in $c3,$c4
+	__asm__ volatile("cmove $cgp, %0"::"C"(target_cgp): "$c26", "memory");
 	return target;
 }
 
@@ -247,7 +264,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 		const_cast<Obj_Entry*>(obj)->cheri_plt_stubs = new (NEW(struct CheriPlt)) CheriPlt(obj);
 	}
 
-	assert(obj->cheri_plt_stubs); // Should be setup be reloc_plt()
+	dbg_assert(obj->cheri_plt_stubs); // Should be setup be reloc_plt()
 
 	// TODO: cheri_setaddr + ctestsubset instead of this check?
 	if ((vaddr_t)where < (vaddr_t)obj->writable_captable ||
@@ -270,8 +287,21 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	// plt->captable_entry = where;
 	// For rtld we don't subset $cgp!
 	// TODO: allow building rtld with per-function captable
+
+	/*
+	 * Create a local function pointer for _rtld_bind_start (i.e. one that
+	 * does not have a trampoline that sets $cgp.
+	 *
+	 * We don't need a trampoline here since we already set $cgp inside
+	 * the _rtld_bind_start assembly code.
+	 *
+	 * TODO: Could also make this a pointer to a small trampoline that sets
+	 * $cgp, but that would slow down lazy binding
+	 */
+	dlfunc_t _rtld_bind_start_local_fn_ptr =
+	    (dlfunc_t)make_rtld_local_function_pointer(_rtld_bind_start);
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 && defined(notyet)
-	plt->rtld_cgp = target_cgp_for_func(rtldobj, (void*)&_rtld_bind_start);
+	plt->rtld_cgp = target_cgp_for_func(rtldobj, _rtld_bind_start_local_fn_ptr);
 #else
 	plt->rtld_cgp = rtldobj->_target_cgp;
 #endif
@@ -283,27 +313,82 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	// void* target_cap = cheri_csetbounds(plt, sizeof(CheriPltStub));
 	void* target_cap = plt;
 	// currently use a self-reference (to beginning of struct) as data cap
-	plt->trampoline.init(target_cap, (dlfunc_t)&_rtld_bind_start);
+	plt->trampoline.init(target_cap, _rtld_bind_start_local_fn_ptr);
 	// but the actual target that is written to the PLT should point to the code:
 	target_cap = cheri_incoffset(target_cap, offsetof(CheriPltStub, trampoline.code));
 	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
 	dbg_cheri_plt_verbose("where=%p <- plt_code=%#p", where, target_cap);
 	assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
-	assert(cheri_getlen(target_cap) == sizeof(CheriPltStub) &&
+	dbg_assert(cheri_getlen(target_cap) == sizeof(CheriPltStub) &&
 	    "stub should have tight bounds");
 	*where = target_cap;
 	return true;
 }
 
-
-/*
- * LD_BIND_NOW was set - force relocation for all jump slots
- */
-extern "C" int
-reloc_jmpslots(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __unused)
+static int
+reloc_plt_bind_now(Obj_Entry *obj, int flags, const Obj_Entry *rtldobj __unused,
+    RtldLockState *lockstate)
 {
-	// FIXME: this needs changes in LLD to emit DT_PLTRELSZ/DT_JMPREL
-	/* Do nothing. TODO: needed once we have lazy binding */
+	dbg_cat(PLT, "BIND_NOW PLT relocation processing for %s", obj->path);
+	// Trampolines are only needed if we reference a non-pcrel DSO.
+	// Otherwise we can just write the target function pointer to the
+	// captable directly.
+	const Elf_Rel *pltrellim =
+	    (const Elf_Rel *)((const char *)obj->pltrel + obj->pltrelsize);
+	for (const Elf_Rel *rel = obj->pltrel; rel < pltrellim; rel++) {
+		dlfunc_t *where = (dlfunc_t *)(obj->relocbase + rel->r_offset);
+		// Target should be inside the captable:
+		dbg_assert(cheri_is_address_inbounds(
+		    obj->writable_captable, cheri_getaddress(where)));
+
+		Elf_Word r_symndx = ELF_R_SYM(rel->r_info);
+		Elf_Word r_type = ELF_R_TYPE(rel->r_info);
+		// .rel.plt should only ever contain CHERI_CAPABILITY_CALL!
+		if ((r_type & 0xff) != R_TYPE(CHERI_CAPABILITY_CALL)) {
+			_rtld_error("Unknown relocation type %x in PLT",
+			    (unsigned int)r_type);
+			return (-1);
+		}
+		const Obj_Entry *defobj;
+		const Elf_Sym *def = find_symdef(r_symndx, obj, &defobj,
+		    SYMLOOK_IN_PLT | flags, NULL, lockstate);
+		if (__predict_false(def == NULL)) {
+			_rtld_error("Could not resolve symbol %s in PLT",
+			    symname(obj, r_symndx));
+			return (-1);
+		}
+		if (__predict_false(ELF_ST_TYPE(def->st_info) != STT_FUNC)) {
+			if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
+				obj->gnu_ifunc = true;
+				_rtld_error("IFUNC not suported yet! Symbol %s "
+				    "in PLT", symname(obj, r_symndx));
+			} else {
+				_rtld_error("Unsupported type %x! Symbol %s "
+				    "in PLT", ELF_ST_TYPE(def->st_info),
+				    symname(obj, r_symndx));
+			}
+			return (-1);
+		}
+		dlfunc_t target;
+		if (__predict_false(can_use_tight_pcc_bounds(defobj))) {
+			// PLT ABI needs a thunk that loads the right $cgp
+			// TODO: could skip this thunk if defobj == obj since
+			// they will only ever be invoked from a context where
+			// we have the correct $cgp for this DSO.
+			auto thunk = SimpleExternalCallTrampoline::create(defobj, def, /*tight_bounds=*/true);
+			target = thunk->pcc_value();
+		} else {
+			// No trampoline needed for PCREL or legacy
+			// TODO: can we have any addends for plt relocations?
+			target = make_code_pointer(def, defobj, /*tight_bounds=*/false);
+		}
+		dbg_cheri_plt_verbose("BIND_NOW: %p <-- %#p (%s)", where, target,
+		    symname(obj, r_symndx));
+		*where = target;
+	}
+	dbg_cheri_plt("%s: done relocating %zd PLT entries.", obj->path,
+	    (size_t)(pltrellim - obj->pltrel));
+
 	obj->jmpslots_done = true;
 	return (0);
 }
@@ -312,9 +397,10 @@ reloc_jmpslots(Obj_Entry *obj, int flags __unused, RtldLockState *lockstate __un
  *  Process the PLT relocations.
  */
 extern "C" int
-reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
+reloc_plt(Obj_Entry *obj, bool bind_now, int flags __unused, const Obj_Entry *rtldobj,
+    RtldLockState *lockstate __unused)
 {
-#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
+#if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 && defined(DEBUG)
 	if (obj->captable_mapping) {
 		const auto mapping_end = (const CheriCapTableMappingEntry*)cheri_incoffset(
 		    obj->captable_mapping, obj->captable_mapping_size);
@@ -325,6 +411,10 @@ reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 	}
 #endif
 
+	if (bind_now) {
+		return reloc_plt_bind_now(obj, flags, rtldobj, lockstate);
+	}
+
 	// FIXME: this needs changes in LLD to emit DT_PLTRELSZ/DT_JMPREL
 	// TODO: assert(!obj->cheri_plt_stubs)
 	if (!obj->cheri_plt_stubs) {
@@ -333,7 +423,7 @@ reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 		// as part of .rel.dyn
 		obj->cheri_plt_stubs = new (NEW(struct CheriPlt)) CheriPlt(obj);
 	}
-	assert(obj->cheri_plt_stubs);
+	dbg_assert(obj->cheri_plt_stubs);
 
 	// .rel.plt should only ever contain CHERI_CAPABILITY_CALL relocs!
 	const Elf_Rel *pltrellim = (const Elf_Rel *)((const char *)obj->pltrel +
@@ -352,14 +442,15 @@ reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj)
 			return (-1);
 		}
 	}
-	dbg_cheri_plt("%s: done relocating %zd PLT entries: ", obj->path,
+	dbg_cheri_plt("%s: done relocating %zd PLT entries.", obj->path,
 	    obj->cheri_plt_stubs->count());
 #if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE >= 3
 	for (size_t i = 0; i < obj->captable_size / sizeof(void*); i++) {
-		dbg("%s->captable[%zd]:%p = %#p", obj->path, i,
+		dbg_cheri_plt_verbose("%s->captable[%zd]:%p = %#p", obj->path, i,
 		    &obj->writable_captable[i], obj->writable_captable[i].value);
 	}
 #endif
+
 	return (0);
 }
 
@@ -414,13 +505,18 @@ private:
 };
 
 extern "C" dlfunc_t
-find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
+find_external_call_thunk(const Elf_Sym* symbol, const Obj_Entry* obj)
 {
 	// This should be called with a global RTLD lock held so there should
 	// not be any races.
 	// FIXME: verify that this assumption is correct
-	dbg_cheri_plt_verbose("Looking for %s thunk (found in obj %s): %-#p",
-	    strtab_value(obj, symbol->st_name), obj->path, symbol);
+	dbg_cheri_plt_verbose("Looking for %s() thunk (found in obj %s): 0x%jx",
+	    strtab_value(obj, symbol->st_name), obj->path, (uintmax_t)symbol->st_value);
+	// PC-relative ABI does not need thunks for function pointers
+	// since $cgp can be derived from $pcc/$c12.
+	dbg_assert(obj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
+	// Otherwise, we need to add a UNIQUE call trampoline (since function
+	// pointers to the same function MUST compare equal).
 	if (!obj->cheri_exports) {
 		// Use placement-new here to use rtld xmalloc() instead of malloc
 		// FIXME: const_cast should not be needed
@@ -433,9 +529,10 @@ find_external_call_thunk(const Obj_Entry* obj, const Elf_Sym* symbol)
 	void* target_cap = cheri_csetbounds(s->thunk, sizeof(SimpleExternalCallTrampoline));
 	target_cap = cheri_incoffset(target_cap, offsetof(SimpleExternalCallTrampoline, code));
 	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
-	dbg_cheri_plt_verbose("External call thunk resolved to %-#p", target_cap);
-	assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
-	assert(cheri_getlen(target_cap) == sizeof(SimpleExternalCallTrampoline) &&
+	dbg_cheri_plt_verbose("External call thunk for %s resolved to %-#p (thunk %p)",
+	    strtab_value(obj, symbol->st_name), s->thunk->pcc_value(), target_cap);
+	dbg_assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
+	dbg_assert(cheri_getlen(target_cap) == sizeof(SimpleExternalCallTrampoline) &&
 	    "stub should have tight bounds");
 	return (dlfunc_t)target_cap;
 }
@@ -525,10 +622,8 @@ CheriExports::addThunk(const Obj_Entry* defobj, const Elf_Sym *sym)
 	s->name = strtab_value(obj, sym->st_name);
 #endif
 	dbg_assert(s->key == sym);
-	s->thunk = globalRwxAllocator.allocate<SimpleExternalCallTrampoline>();
-	dlfunc_t target_func = make_function_pointer(sym, defobj);
-	const void *target_cgp = target_cgp_for_func(defobj, (void*)target_func);
-	s->thunk->init(target_cgp, target_func);
+	s->thunk = SimpleExternalCallTrampoline::create(defobj, sym,
+	    can_use_tight_pcc_bounds(defobj));
 	return s;
 };
 
@@ -542,7 +637,13 @@ CheriExports::getOrAddThunk(const Obj_Entry *defobj, const Elf_Sym *sym)
 	}
 #ifdef DEBUG
 	else {
-		dbg_cheri_plt_verbose("Found thunk for %s in %s: %p", s->name, defobj->path, s);
+		const char* expected_name = strtab_value(obj, sym->st_name);
+		dbg_cheri_plt_verbose("Found thunk for %s in %s: %p",
+		    expected_name, defobj->path, s);
+		if (strcmp(expected_name, s->name) != 0) {
+			rtld_fatal("Error resolving function pointer. Expected "
+			    "name %s, resolved name %s", expected_name, s->name);
+		}
 	}
 	// A second find should return the same value
 	const ExportsTableEntry *s2 = exports_map.find(sym);
@@ -552,17 +653,31 @@ CheriExports::getOrAddThunk(const Obj_Entry *defobj, const Elf_Sym *sym)
 	return s;
 }
 
-const SimpleExternalCallTrampoline*
+SimpleExternalCallTrampoline*
 SimpleExternalCallTrampoline::create(const void* target_cgp, dlfunc_t target_func) {
 	auto ret = globalRwxAllocator.allocate<SimpleExternalCallTrampoline>();
 	ret->init(target_cgp, target_func);
 	return ret;
 }
 
+extern "C" dlfunc_t
+allocate_function_pointer_trampoline(dlfunc_t target_func, const Obj_Entry *obj)
+{
+	dbg_assert(can_use_tight_pcc_bounds(obj));
+	return SimpleExternalCallTrampoline::create(obj->_target_cgp, target_func)->pcc_value();
+}
+
+SimpleExternalCallTrampoline*
+SimpleExternalCallTrampoline::create(const Obj_Entry* defobj, const Elf_Sym *sym, bool tight_bounds) {
+	dlfunc_t target_func = make_code_pointer(sym, defobj, tight_bounds);
+	const void *target_cgp = target_cgp_for_func(defobj, target_func);
+	return create(target_cgp, target_func);
+}
+
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 extern "C" const void*
 find_per_function_cgp(const Obj_Entry *obj, const void* func) {
-	assert(obj->per_function_captable);
+	dbg_assert(obj->per_function_captable);
 	const auto mapping_end = (const CheriCapTableMappingEntry*)
 	    cheri_incoffset(obj->captable_mapping, obj->captable_mapping_size);
 	uint64_t relative_func_addr = (const char*)func - obj->relocbase;
@@ -592,17 +707,16 @@ find_per_function_cgp(const Obj_Entry *obj, const void* func) {
 	return captable_subset; // FIXME: this is wrong!
 }
 
-extern "C" void add_cgp_stub_for_local_function(Obj_Entry *obj, const void** dest) {
-	const void* func = *dest;
-	dbg_cheri_plt_verbose("Replacing call to %-#p with trampoline.", func);
+extern "C" void add_cgp_stub_for_local_function(Obj_Entry *obj, dlfunc_t *dest) {
+	const dlfunc_t func = *dest;
+	dbg_cheri_plt_verbose("Replacing call to %-#p with trampoline.", (void*)func);
 	const void* target_cgp = target_cgp_for_func(obj, func);
-	auto trampoline = SimpleExternalCallTrampoline::create(target_cgp,
-	    (dlfunc_t)const_cast<void*>(func));
-	const void* trampoline_func = trampoline->pcc_value();
-	dbg_cheri_plt_verbose("Target cgp is %#-p, trampoline is %#p", target_cgp, trampoline_func);
+	auto trampoline = SimpleExternalCallTrampoline::create(target_cgp, func);
+	const dlfunc_t trampoline_func = trampoline->pcc_value();
+	dbg_cheri_plt_verbose("Target cgp is %#-p, trampoline is %#p", target_cgp, (void*)trampoline_func);
 	*dest = trampoline_func;
-	assert((cheri_getperm(*dest) & (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP)) == 0);
-
+	assert((cheri_getperm((void*)*dest) & (CHERI_PERM_STORE | CHERI_PERM_STORE_CAP)) == 0);
+	assert((cheri_getperm((void*)*dest) & CHERI_PERM_EXECUTE) == CHERI_PERM_EXECUTE);
 	return;
 }
 

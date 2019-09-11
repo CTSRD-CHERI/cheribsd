@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/memdesc.h>
 #include <sys/module.h>
+#include <sys/mutex.h>
 #include <sys/rman.h>
 #include <sys/rwlock.h>
 #include <sys/smp.h>
@@ -768,6 +769,13 @@ dmar_find(device_t dev, bool verbose)
 	struct dmar_unit *unit;
 	const char *banner;
 	int i, dev_domain, dev_busno, dev_path_len;
+
+	/*
+	 * This function can only handle PCI(e) devices.
+	 */
+	if (device_get_devclass(device_get_parent(dev)) !=
+	    devclass_find("pci"))
+		return (NULL);
 
 	dmar_dev = NULL;
 	dev_domain = pci_get_domain(dev);

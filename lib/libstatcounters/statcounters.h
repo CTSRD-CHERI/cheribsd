@@ -51,6 +51,10 @@ typedef struct statcounters_bank
     uint64_t dtlb_miss;
     uint64_t cycle;
     uint64_t inst;
+    uint64_t inst_user;
+    uint64_t inst_kernel;
+    uint64_t imprecise_setbounds;
+    uint64_t unrepresentable_caps;
     uint64_t icache[STATCOUNTERS_MAX_MOD_CNT];
     uint64_t dcache[STATCOUNTERS_MAX_MOD_CNT];
     uint64_t l2cache[STATCOUNTERS_MAX_MOD_CNT];

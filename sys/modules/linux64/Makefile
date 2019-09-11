@@ -21,7 +21,8 @@ SRCS+=  opt_kstack_pages.h opt_nfs.h opt_hwpmc_hooks.h
 SRCS+=	opt_apic.h
 .endif
 
-CLEANFILES=	linux_assym.h linux_genassym.o linux_locore.o
+CLEANFILES=	linux_assym.h linux_genassym.o linux_locore.o \
+		genassym.o
 
 OBJS=	${VDSO}.so
 
@@ -55,12 +56,7 @@ linux_genassym.o: offset.inc
 	${CC} -c ${CFLAGS:N-flto:N-fno-common} ${.IMPSRC}
 
 .if !defined(KERNBUILDDIR)
-.if defined(DEBUG)
-CFLAGS+=-DDEBUG
-.endif
-.if defined(KTR)
-CFLAGS+=-DKTR
-.endif
+.warning Building Linuxulator outside of a kernel does not make sense
 .endif
 
 .include <bsd.kmod.mk>

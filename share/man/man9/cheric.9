@@ -1,0 +1,235 @@
+.\"-
+.\" SPDX-Fncense-Identifier: BSD-2-Clause
+.\"
+.\" Copyright (c) 2019 Robert N. M. Watson
+.\" All rights reserved.
+.\"
+.\" This software was developed by SRI International and the University of
+.\" Cambridge Computer Laboratory under DARPA/AFRL contract FA8750-10-C-0237
+.\" ("CTSRD"), as part of the DARPA CRASH research programme.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd June 17, 2019
+.Dt CHERIC 9
+.Os
+.Sh NAME
+.Nm cheri_andperm
+.Nm cheri_clear_low_ptr_bits
+.Nm cheri_csetbounds
+.Nm cheri_fromint
+.Nm cheri_get_low_ptr_bits
+.Nm cheri_getaddress
+.Nm cheri_getbase
+.Nm cheri_getdefault
+.Nm cheri_getlen
+.Nm cheri_getoffset
+.Nm cheri_getpcc
+.Nm cheri_getperm
+.Nm cheri_getsealed
+.Nm cheri_getstack
+.Nm cheri_gettop
+.Nm cheri_gettag
+.Nm cheri_gettype
+.Nm cheri_clearperm
+.Nm cheri_cleartag
+.Nm cheri_incoffset
+.Nm cheri_seal
+.Nm cheri_set_low_ptr_bits
+.Nm cheri_setaddress
+.Nm cheri_setoffset
+.Nm cheri_unseal
+.Nd CHERI C built-in functions
+.Sh SYNOPSIS
+.In cheri/cheri.h
+.In cheri/cheric.h
+.Ft void * __capability
+.Fn cheri_andperm "void * __capability c" "size_t mask"
+.Ft void * __capability
+.Fn cheri_clear_low_ptr_bits "void * __capability c" "size_t mask"
+.Ft void * __capability
+.Fn cheri_csetbounds "void * __capability c" "size_t length"
+.Ft void * __capability
+.Fn cheri_fromint "vaddr_t"
+.Ft size_t
+.Fn cheri_get_low_ptr_bits "void * __capability c" "size_t mask"
+.Ft vaddr_t
+.Fn cheri_getaddress "void * __capability c"
+.Ft vaddr_t
+.Fn cheri_getbase "void * __capability c"
+.Ft void * __capability
+.Fn cheri_getdefault "void"
+.Ft size_t
+.Fn cheri_getlen "void * __capability c"
+.Ft size_t
+.Fn cheri_getoffset "void * __capability c"
+.Ft void * __capability
+.Fn cheri_getpcc "void"
+.Ft size_t
+.Fn cheri_getperm "void * __capability c"
+.Ft _Bool
+.Fn cheri_getsealed "void * __capability c"
+.Ft void * __capability
+.Fn cheri_getstack "void"
+.Ft vaddr_t
+.Fn cheri_gettop "void * __capability c"
+.Ft _Bool
+.Fn cheri_gettag "void * __capability c"
+.Ft vaddr_t
+.Fn cheri_gettype "void * __capability c"
+.Ft void * __capability
+.Fn cheri_clearperm "void * __capability c" "size_t mask"
+.Ft void * __capability
+.Fn cheri_cleartag "void * __capability c"
+.Ft void * __capability
+.Fn cheri_incoffset "void * __capability c" "size_t offset"
+.Ft void * __capability
+.Fn cheri_seal "void * __capability c" "void * __capability typecap"
+.Ft void * __capability
+.Fn cheri_set_low_ptr_bits "void * __capability c" "size_t mask"
+.Ft void * __capability
+.Fn cheri_setaddress "void * __capability c" "vaddr_t address"
+.Ft void * __capability
+.Fn cheri_setoffset "void * __capability c" "size_t offset"
+.Ft void * __capability
+.Fn cheri_unseal "void * __capability c" "void * __capability typecap"
+.Sh DESCRIPTION
+The
+.Xr cheric 9
+functions provide a C-language interface to inspect and modify capability
+fields.
+When a change is requested, a new capability is returned with the change
+applied.
+.Ss Querying capability fields
+The following APIs allow capability fields to be queried:
+.Pp
+.Bl -tag -width short
+.It Fn cheri_getaddress "c"
+Return the address field of the capability
+.Fa c .
+This value will normally be the the same as the integer cast of a capability
+pointer.
+.It Fn cheri_getbase "c"
+Return the base (bottom) address associated with the capability
+.Fa c ;
+this is its lower bound.
+.It Fn cheri_getoffset "c"
+Return the offset associated with capability
+.Fa c ;
+this is the difference between its address and its lower bound.
+.It Fn cheri_getperm "c"
+Return the permissions associated with the capability
+.Fa c .
+.It Fn cheri_getsealed "c"
+Return a boolean indicating whether the capability
+.Fa c
+is sealed.
+.It Fn cheri_gettag "c"
+Return a boolean indicating whether the capability
+.Fa c
+has a valid tag.
+.It Fn cheri_gettype "c"
+Return the object type of the capability
+.Fa c .
+.El
+.Ss Setting capability fields
+The following APIs allow capability fields to be set, with a new capability
+returned:
+.Pp
+.Bl -tag -width short
+.It Fn cheri_andperm "c" "mask"
+Return a capability derived from
+.Fa c
+that has its permissions mask bit-wise AND'd with the value of
+.Fa mask .
+.It Fn cheri_cleartag "c"
+Return a capability derived from
+.Fa c
+that has its validity tag cleared.
+.It Fn cheri_csetbounds "c" "length"
+Return a capability derived from
+.Fa c
+that has its base set to the current address of
+.Fa c ,
+and length set to
+.Fa length .
+.It Fn cheri_incoffset "c" "offset"
+Return a capability derived from
+.Fa c
+that has its offset incremented by
+.Fa offset .
+.It Fn cheri_seal "c" "typecap"
+Return a capability derived from
+.Fa c
+that is sealed using capability
+.Fa typecap .
+.It Fn cheri_setoffset "c" "offset"
+Return a capability derived from
+.Fa c
+that has its offset field set to
+.Fa offset .
+.El
+.Ss Capability address low bits
+The following APIs assist in getting, setting, and clearing lower bits in
+capabilities:
+.Bl -tag -width short
+.It Fn cheri_clear_low_ptr_bits "c" "mask"
+Return a capability derived from
+.Fa c ,
+but with the bits of the address indicated by
+.Fa mask
+cleared.
+.It Fn cheri_get_low_ptr_bits "c" "mask"
+Return the lower bits of the address of capability
+.Fa c
+indicated by
+.Fa mask .
+.It Fn cheri_set_low_ptr_bits "c" "mask"
+Return a capability derived from
+.Fa c ,
+but with the bits of the address indicated by
+.Fa mask
+set.
+.El
+.Ss Capability alignment
+To be added.
+.Ss Return special capabilities
+The following APIs return capability pointers for certain well-defined
+capabilities in the run-time environment:
+.Bl -tag -width short
+.It Fn cheri_getdefault "void"
+Return the Default Data Capability (DDC).
+.It Fn cheri_getpcc "void"
+Return the Program-Counter Capability (PCC).
+.It Fn cheri_getstack "void"
+Return the current stack capability.
+.El
+.Sh AUTHORS
+This manual page was written by
+.An Robert N. M. Watson Aq Mt rwatson@FreeBSD.org .
+.Pp
+This software and this manual page were
+developed by SRI International and the University of Cambridge Computer
+Laboratory under DARPA/AFRL contract
+.Pq FA8750-10-C-0237
+.Pq Do CTSRD Dc ,
+as part of the DARPA CRASH research programme.

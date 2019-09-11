@@ -611,6 +611,15 @@ choose_filters(struct archive_read *a)
 	return (ARCHIVE_FATAL);
 }
 
+int
+__archive_read_header(struct archive_read *a, struct archive_entry *entry)
+{
+	if (a->filter->read_header)
+		return a->filter->read_header(a->filter, entry);
+	else
+		return (ARCHIVE_OK);
+}
+
 /*
  * Read header of next entry.
  */
@@ -835,7 +844,8 @@ archive_read_data(struct archive *_a, void *buff, size_t s)
 	dest = (char *)buff;
 
 	while (s > 0) {
-		if (a->read_data_remaining == 0) {
+		if (a->read_data_offset == a->read_data_output_offset &&
+		    a->read_data_remaining == 0) {
 			read_buf = a->read_data_block;
 			a->read_data_is_posix_read = 1;
 			a->read_data_requested = s;

@@ -61,6 +61,8 @@ __FBSDID("$FreeBSD$");
 #include <assert.h>
 #include <ctype.h>
 #include <err.h>
+#define _WANT_KERNEL_ERRNO
+#include <errno.h>
 #include <fcntl.h>
 #include <poll.h>
 #include <sched.h>
@@ -1172,6 +1174,13 @@ print_utrace(FILE *fp, void *utrace_addr, size_t len)
 }
 
 static void
+print_pointer(FILE *fp, uintptr_t arg)
+{
+
+	fprintf(fp, "%p", (void *)arg);
+}
+
+static void
 print_sockaddr(FILE *fp, struct trussinfo *trussinfo, uintptr_t arg,
     socklen_t len)
 {
@@ -1189,14 +1198,14 @@ print_sockaddr(FILE *fp, struct trussinfo *trussinfo, uintptr_t arg,
 	}
 	/* If the length is too small, just bail. */
 	if (len < sizeof(*sa)) {
-		fprintf(fp, "%p", (void *)arg);
+		print_pointer(fp, arg);
 		return;
 	}
 
 	sa = calloc(1, len);
 	if (get_struct(pid, arg, sa, len) == -1) {
 		free(sa);
-		fprintf(fp, "%p", (void *)arg);
+		print_pointer(fp, arg);
 		return;
 	}
 
@@ -1253,7 +1262,7 @@ print_iovec(FILE *fp, struct trussinfo *trussinfo, uintptr_t arg, int iovcnt)
 	bool buf_truncated, iov_truncated;
 
 	if (iovcnt <= 0) {
-		fprintf(fp, "%p", (void *)arg);
+		print_pointer(fp, arg);
 		return;
 	}
 	if (iovcnt > IOV_LIMIT) {
@@ -1263,7 +1272,7 @@ print_iovec(FILE *fp, struct trussinfo *trussinfo, uintptr_t arg, int iovcnt)
 		iov_truncated = false;
 	}
 	if (get_struct(pid, arg, &iov, iovcnt * sizeof(struct iovec)) == -1) {
-		fprintf(fp, "%p", (void *)arg);
+		print_pointer(fp, arg);
 		return;
 	}
 
@@ -1291,7 +1300,7 @@ print_iovec(FILE *fp, struct trussinfo *trussinfo, uintptr_t arg, int iovcnt)
 			    buf_truncated ? "..." : "");
 			free(tmp3);
 		} else {
-			fprintf(fp, "%p", iov[i].iov_base);
+			print_pointer(fp, (uintptr_t)iov[i].iov_base);
 		}
 		fprintf(fp, ",%zu}", iov[i].iov_len);
 	}
@@ -1512,7 +1521,7 @@ print_cmsgs(FILE *fp, pid_t pid, bool receive, struct msghdr *msghdr)
 	}
 	cmsgbuf = calloc(1, len);
 	if (get_struct(pid, (uintptr_t)msghdr->msg_control, cmsgbuf, len) == -1) {
-		fprintf(fp, "%p", msghdr->msg_control);
+		print_pointer(fp, (uintptr_t)msghdr->msg_control);
 		free(cmsgbuf);
 		return;
 	}
@@ -1557,7 +1566,7 @@ print_cmsgs(FILE *fp, pid_t pid, bool receive, struct msghdr *msghdr)
  * an array of all of the system call arguments.
  */
 char *
-print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
+print_arg(struct syscall_args *sc, syscallarg_t *args, syscallarg_t *retval,
     struct trussinfo *trussinfo)
 {
 	FILE *fp;
@@ -1587,14 +1596,14 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		    sizeof(val)) == 0) 
 			fprintf(fp, "{ %u }", val);
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case LongHex:
-		fprintf(fp, "0x%lx", args[sc->offset]);
+		fprintf(fp, "0x%lx", (unsigned long)args[sc->offset]);
 		break;
 	case Long:
-		fprintf(fp, "%ld", args[sc->offset]);
+		fprintf(fp, "%ld", (long)args[sc->offset]);
 		break;
 	case Sizet:
 		fprintf(fp, "%zu", (size_t)args[sc->offset]);
@@ -1654,7 +1663,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			    "..." : "");
 			free(tmp3);
 		} else {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		}
 		break;
 	}
@@ -1678,7 +1687,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		    (trussinfo->flags & EXECVEARGS) == 0) ||
 		    ((sc->type & ARG_MASK) == ExecEnv &&
 		    (trussinfo->flags & EXECVEENVS) == 0)) {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 			break;
 		}
 
@@ -1689,17 +1698,14 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		 */
 		addr = args[sc->offset];
 		if ((vaddr_t)addr % sizeof(char *) != 0) {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 			break;
 		}
 
-#if __has_builtin(__builtin_align_up)
-		len = __builtin_align_up(addr, PAGE_SIZE) - addr;
-#else
-		len = PAGE_SIZE - (addr & (uintptr_t)PAGE_MASK);
-#endif
+		len = (char *)__builtin_align_up(addr, PAGE_SIZE) -
+		    (char *)addr;
 		if (get_struct(pid, addr, u.buf, len) == -1) {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 			break;
 		}
 
@@ -1729,10 +1735,10 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 	}
 #ifdef __LP64__
 	case Quad:
-		fprintf(fp, "%ld", args[sc->offset]);
+		fprintf(fp, "%ld", (long)args[sc->offset]);
 		break;
 	case QuadHex:
-		fprintf(fp, "0x%lx", args[sc->offset]);
+		fprintf(fp, "0x%lx", (unsigned long)args[sc->offset]);
 		break;
 #else
 	case Quad:
@@ -1760,11 +1766,11 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		    sizeof(val)) == 0) 
 			fprintf(fp, "{ 0x%jx }", (uintmax_t)val);
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Ptr:
-		fprintf(fp, "0x%lx", args[sc->offset]);
+		print_pointer(fp, args[sc->offset]);
 		break;
 	case Readlinkres: {
 		char *tmp2;
@@ -1800,7 +1806,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			fprintf(fp, "{ %jd.%09ld }", (intmax_t)ts.tv_sec,
 			    ts.tv_nsec);
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Timespec2: {
@@ -1830,7 +1836,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			}
 			fputs(" }", fp);
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Timeval: {
@@ -1840,7 +1846,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			fprintf(fp, "{ %jd.%06ld }", (intmax_t)tv.tv_sec,
 			    tv.tv_usec);
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Timeval2: {
@@ -1851,7 +1857,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			    (intmax_t)tv[0].tv_sec, tv[0].tv_usec,
 			    (intmax_t)tv[1].tv_sec, tv[1].tv_usec);
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Itimerval: {
@@ -1864,7 +1870,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			    (intmax_t)itv.it_value.tv_sec,
 			    itv.it_value.tv_usec);
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case LinuxSockArgs:
@@ -1877,7 +1883,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			    lookup(linux_socketcall_ops, largs.what, 10),
 			    (long unsigned int)largs.args);
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Pollfd: {
@@ -1902,7 +1908,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			}
 			fputs(" }", fp);
 		} else {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		}
 		free(pfd);
 		break;
@@ -1929,7 +1935,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			}
 			fputs(" }", fp);
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		free(fds);
 		break;
 	}
@@ -1944,7 +1950,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		sig = args[sc->offset];
 		if (get_struct(pid, args[sc->offset], (void *)&ss,
 		    sizeof(ss)) == -1) {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 			break;
 		}
 		fputs("{ ", fp);
@@ -2024,7 +2030,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		if (sc->type & OUT) {
 			if (get_struct(pid, args[sc->offset + 1], &len,
 			    sizeof(len)) == -1) {
-				fprintf(fp, "0x%lx", args[sc->offset]);
+				print_pointer(fp, args[sc->offset]);
 				break;
 			}
 		} else
@@ -2047,7 +2053,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			fprintf(fp, " %s ss_t }",
 			    xlookup_bits(sigaction_flags, sa.sa_flags));
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Kevent: {
@@ -2085,7 +2091,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			}
 			fputs(" }", fp);
 		} else {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		}
 		free(ke);
 		break;
@@ -2126,7 +2132,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			}
 			fputs(" }", fp);
 		} else {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		}
 		free(ke11);
 		break;
@@ -2144,7 +2150,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			    (uintmax_t)st.st_ino, (intmax_t)st.st_size,
 			    (long)st.st_blksize);
 		} else {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		}
 		break;
 	}
@@ -2161,7 +2167,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			    (uintmax_t)st.st_ino, (intmax_t)st.st_size,
 			    (long)st.st_blksize);
 		} else {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		}
 		break;
 	}
@@ -2185,7 +2191,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			    "fsid=%s }", buf.f_fstypename, buf.f_mntonname,
 			    buf.f_mntfromname, fsid);
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 
@@ -2200,7 +2206,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			    (intmax_t)ru.ru_stime.tv_sec, ru.ru_stime.tv_usec,
 			    ru.ru_inblock, ru.ru_oublock);
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Rlimit: {
@@ -2211,7 +2217,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			fprintf(fp, "{ cur=%ju,max=%ju }",
 			    rl.rlim_cur, rl.rlim_max);
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case ExitStatus: {
@@ -2234,7 +2240,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 				    strsig2(WTERMSIG(status)));
 			fputs(" }", fp);
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Waitoptions:
@@ -2274,7 +2280,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		 * Overwrite the first retval to signal a successful
 		 * return as well.
 		 */
-		fprintf(fp, "{ %ld, %ld }", retval[0], retval[1]);
+		fprintf(fp, "{ %d, %d }", (int)retval[0], (int)retval[1]);
 		retval[0] = 0;
 		break;
 	case Utrace: {
@@ -2287,7 +2293,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		    (void *)utrace_addr, len) != -1)
 			print_utrace(fp, utrace_addr, len);
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		free(utrace_addr);
 		break;
 	}
@@ -2310,7 +2316,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 				    descriptors[i]);
 			fprintf(fp, truncated ? ", ... }" : " }");
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Pipe2:
@@ -2322,7 +2328,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		if (sc->type & OUT) {
 			if (get_struct(pid, args[sc->offset], &rights,
 			    sizeof(rights)) == -1) {
-				fprintf(fp, "0x%lx", args[sc->offset]);
+				print_pointer(fp, args[sc->offset]);
 				break;
 			}
 		} else
@@ -2410,7 +2416,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			sysdecode_cap_rights(fp, &rights);
 			fputs(" }", fp);
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Acltype:
@@ -2461,7 +2467,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		if (get_struct(pid, args[sc->offset], &sp, sizeof(sp)) != -1)
 			fprintf(fp, "{ %d }", sp.sched_priority);
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case PSig: {
@@ -2470,7 +2476,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		if (get_struct(pid, args[sc->offset], &sig, sizeof(sig)) == 0)
 			fprintf(fp, "{ %s }", strsig2(sig));
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Siginfo: {
@@ -2481,7 +2487,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			decode_siginfo(fp, &si);
 			fprintf(fp, " }");
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case Iovec:
@@ -2498,7 +2504,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 
 		if (get_struct(pid, args[sc->offset],
 		    &info, sizeof(struct sctp_sndrcvinfo)) == -1) {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 			break;
 		}
 		print_sctp_sndrcvinfo(fp, sc->type & OUT, &info);
@@ -2509,7 +2515,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 
 		if (get_struct(pid, args[sc->offset],
 		    &msghdr, sizeof(struct msghdr)) == -1) {
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 			break;
 		}
 		fputs("{", fp);
@@ -2542,7 +2548,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			fprintf(fp, "%s, ... }",
 			    xlookup_bits(cloudabi_fdflags, fds.fs_flags));
 		} else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case CloudABIFileStat: {
@@ -2553,7 +2559,7 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 			    xlookup(cloudabi_filetype, fsb.st_filetype),
 			    (uintmax_t)fsb.st_size);
 		else
-			fprintf(fp, "0x%lx", args[sc->offset]);
+			print_pointer(fp, args[sc->offset]);
 		break;
 	}
 	case CloudABIFileType:
@@ -2562,13 +2568,17 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 	case CloudABIFSFlags:
 		fputs(xlookup_bits(cloudabi_fsflags, args[sc->offset]), fp);
 		break;
-	case CloudABILookup:
-		if ((args[sc->offset] & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) != 0)
+	case CloudABILookup: {
+		int flags;
+
+		flags = args[sc->offset];
+		if ((flags & CLOUDABI_LOOKUP_SYMLINK_FOLLOW) != 0)
 			fprintf(fp, "%d|LOOKUP_SYMLINK_FOLLOW",
-			    (int)args[sc->offset]);
+			    flags & ~(CLOUDABI_LOOKUP_SYMLINK_FOLLOW));
 		else
-			fprintf(fp, "%d", (int)args[sc->offset]);
+			fprintf(fp, "%d", flags);
 		break;
+	}
 	case CloudABIMFlags:
 		fputs(xlookup_bits(cloudabi_mflags, args[sc->offset]), fp);
 		break;
@@ -2588,8 +2598,9 @@ print_arg(struct syscall_args *sc, unsigned long *args, long *retval,
 		fputs(xlookup(cloudabi_signal, args[sc->offset]), fp);
 		break;
 	case CloudABITimestamp:
-		fprintf(fp, "%lu.%09lus", args[sc->offset] / 1000000000,
-		    args[sc->offset] % 1000000000);
+		fprintf(fp, "%lu.%09lus",
+		    (unsigned long)args[sc->offset] / 1000000000,
+		    (unsigned long)args[sc->offset] % 1000000000);
 		break;
 	case CloudABIULFlags:
 		fputs(xlookup_bits(cloudabi_ulflags, args[sc->offset]), fp);
@@ -2640,12 +2651,11 @@ print_syscall(struct trussinfo *trussinfo)
 }
 
 void
-print_syscall_ret(struct trussinfo *trussinfo, int errorp, long *retval)
+print_syscall_ret(struct trussinfo *trussinfo, int error, syscallarg_t *retval)
 {
 	struct timespec timediff;
 	struct threadinfo *t;
 	struct syscall *sc;
-	int error;
 
 	t = trussinfo->curthread;
 	sc = t->cs.sc;
@@ -2653,7 +2663,7 @@ print_syscall_ret(struct trussinfo *trussinfo, int errorp, long *retval)
 		timespecsub(&t->after, &t->before, &timediff);
 		timespecadd(&sc->time, &timediff, &sc->time);
 		sc->ncalls++;
-		if (errorp)
+		if (error != 0)
 			sc->nerror++;
 		return;
 	}
@@ -2670,11 +2680,14 @@ print_syscall_ret(struct trussinfo *trussinfo, int errorp, long *retval)
 		return;
 	}
 
-	if (errorp) {
-		error = sysdecode_abi_to_freebsd_errno(t->proc->abi->abi,
-		    retval[0]);
-		fprintf(trussinfo->outfile, " ERR#%ld '%s'\n", retval[0],
-		    error == INT_MAX ? "Unknown error" : strerror(error));
+	if (error == ERESTART)
+		fprintf(trussinfo->outfile, " ERESTART\n");
+	else if (error == EJUSTRETURN)
+		fprintf(trussinfo->outfile, " EJUSTRETURN\n");
+	else if (error != 0) {
+		fprintf(trussinfo->outfile, " ERR#%d '%s'\n",
+		    sysdecode_freebsd_to_abi_errno(t->proc->abi->abi, error),
+		    strerror(error));
 	}
 #ifndef __LP64__
 	else if (sc->ret_type == 2) {
@@ -2690,8 +2703,8 @@ print_syscall_ret(struct trussinfo *trussinfo, int errorp, long *retval)
 	}
 #endif
 	else
-		fprintf(trussinfo->outfile, " = %ld (0x%lx)\n", retval[0],
-		    retval[0]);
+		fprintf(trussinfo->outfile, " = %jd (0x%jx)\n",
+		    (intmax_t)retval[0], (intmax_t)retval[0]);
 }
 
 void

@@ -119,13 +119,13 @@ extern struct fs_ops ufs_fsops;
 extern struct fs_ops tftp_fsops;
 extern struct fs_ops nfs_fsops;
 extern struct fs_ops cd9660_fsops;
-extern struct fs_ops nandfs_fsops;
 extern struct fs_ops gzipfs_fsops;
 extern struct fs_ops bzipfs_fsops;
 extern struct fs_ops dosfs_fsops;
 extern struct fs_ops ext2fs_fsops;
 extern struct fs_ops splitfs_fsops;
 extern struct fs_ops pkgfs_fsops;
+extern struct fs_ops efihttp_fsops;
 
 /* where values for lseek(2) */
 #define	SEEK_SET	0	/* set file offset to offset */
@@ -286,6 +286,7 @@ extern int	open(const char *, int);
 #define	O_RDONLY	0x0
 #define O_WRONLY	0x1
 #define O_RDWR		0x2
+#define O_ACCMODE	0x3
 /* NOT IMPLEMENTED */
 #define	O_CREAT		0x0200		/* create if nonexistent */
 #define	O_TRUNC		0x0400		/* truncate to zero length */

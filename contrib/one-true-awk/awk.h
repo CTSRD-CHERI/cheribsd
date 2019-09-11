@@ -81,7 +81,8 @@ typedef struct Cell {
 	char	*nval;		/* name, for variables only */
 	char	*sval;		/* string value */
 	Awkfloat fval;		/* value as number */
-	int	 tval;		/* type info: STR|NUM|ARR|FCN|FLD|CON|DONTFREE */
+	int	 tval;		/* type info: STR|NUM|ARR|FCN|FLD|CON|DONTFREE|CONVC|CONVO */
+	char	*fmt;		/* CONVFMT/OFMT value used to convert from number */
 	struct Cell *cnext;	/* ptr to next if chained */
 } Cell;
 
@@ -96,9 +97,14 @@ extern Array	*symtab;
 
 extern Cell	*nrloc;		/* NR */
 extern Cell	*fnrloc;	/* FNR */
+extern Cell	*fsloc;		/* FS */
 extern Cell	*nfloc;		/* NF */
+extern Cell	*ofsloc;	/* OFS */
+extern Cell	*orsloc;	/* ORS */
+extern Cell	*rsloc;		/* RS */
 extern Cell	*rstartloc;	/* RSTART */
 extern Cell	*rlengthloc;	/* RLENGTH */
+extern Cell	*subseploc;	/* SUBSEP */
 
 /* Cell.tval values: */
 #define	NUM	01	/* number value is valid */
@@ -109,6 +115,8 @@ extern Cell	*rlengthloc;	/* RLENGTH */
 #define	FCN	040	/* this is a function name */
 #define FLD	0100	/* this is a field $1, $2, ... */
 #define	REC	0200	/* this is $0 */
+#define CONVC	0400	/* string was converted from number via CONVFMT */
+#define CONVO	01000	/* string was converted from number via OFMT */
 
 
 /* function types */
@@ -210,6 +218,8 @@ extern	int	pairstack[], paircnt;
 #define NCHARS	(256+3)		/* 256 handles 8-bit chars; 128 does 7-bit */
 				/* watch out in match(), etc. */
 #define NSTATES	32
+#define	HAT	(NCHARS+2)	/* matches ^ in regular expr */
+				/* NCHARS is 2**n */
 
 typedef struct rrow {
 	long	ltype;	/* long avoids pointer warnings on 64-bit */
@@ -222,7 +232,14 @@ typedef struct rrow {
 } rrow;
 
 typedef struct fa {
-	uschar	gototab[NSTATES][NCHARS];
+	/*
+	 * XXXAR: There was a sub-object bounds overflow here, the 2d array
+	 * was previously defined as uschar	gototab[NSTATES][NCHARS];.
+	 * When matching a regex with ^, it would attempt to access
+	 * gototab[NSTATES][NCHARS+2], and therefore access the state for the
+	 * \002 character instead.
+	 */
+	uschar	gototab[NSTATES][HAT + 1];
 	uschar	out[NSTATES];
 	uschar	*restr;
 	int	*posns[NSTATES];

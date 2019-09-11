@@ -9,6 +9,7 @@
 
 // UNSUPPORTED: libcpp-no-rtti
 
+#include "test_macros.h"
 #include "demangle.h"
 #include <typeinfo>
 #include <cassert>

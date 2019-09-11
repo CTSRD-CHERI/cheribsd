@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 #else
 #ifndef _VADDR_T_DECLARED
 typedef __attribute((memory_address)) __UINT64_TYPE__ vaddr_t;
@@ -114,7 +115,7 @@ check_no_tagged_capabilities_in_copy(
 		error_logged = 1;
 		/* Got a tagged value, this is always an error! */
 		/* XXXAR: can we safely use printf here? */
-		fprintf(stderr,
+		dprintf(STDERR_FILENO,
 		    "Attempting to copy a tagged capability"
 		    " (%#p) from 0x%jx to underaligned destination 0x%jx."
 		    /* XXXAR: These functions do not exist yet... */
@@ -134,7 +135,7 @@ check_no_tagged_capabilities_in_copy(
 			size_t olen = sizeof(abort_on_tag_loss);
 			if (sysctlbyname("security.cheri.abort_on_memcpy_tag_loss",
 			    &abort_on_tag_loss, &olen, NULL, 0) == -1) {
-				fprintf(stderr,
+				dprintf(STDERR_FILENO,
 				    "ERROR: could not determine whether tag "
 				    "stripping is fatal. Assuming it isn't.\n");
 				abort_on_tag_loss = 0;

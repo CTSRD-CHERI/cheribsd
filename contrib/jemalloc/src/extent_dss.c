@@ -150,8 +150,8 @@ extent_alloc_dss(tsdn_t *tsdn, arena_t *arena, void *new_addr, size_t size,
 			    (uintptr_t)max_cur));
 			void *ret = (void *)ALIGNMENT_CEILING(
 			    (uintptr_t)gap_addr_page, alignment);
-			size_t gap_size_page = (uintptr_t)ret -
-			    (uintptr_t)gap_addr_page;
+			size_t gap_size_page = (const char*)ret -
+			    (const char*)gap_addr_page;
 			if (gap_size_page != 0) {
 				extent_init(gap, arena, gap_addr_page,
 				    gap_size_page, false, NSIZES,
@@ -169,8 +169,8 @@ extent_alloc_dss(tsdn_t *tsdn, arena_t *arena, void *new_addr, size_t size,
 			}
 			/* Compute the increment, including subpage bytes. */
 			void *gap_addr_subpage = max_cur;
-			size_t gap_size_subpage = (uintptr_t)ret -
-			    (uintptr_t)gap_addr_subpage;
+			size_t gap_size_subpage = (const char*)ret -
+			    (const char*)gap_addr_subpage;
 			intptr_t incr = gap_size_subpage + size;
 
 			assert((uintptr_t)max_cur + incr == (uintptr_t)ret +

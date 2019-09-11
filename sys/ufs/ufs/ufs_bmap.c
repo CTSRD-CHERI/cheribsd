@@ -200,12 +200,15 @@ ufs_bmaparray(vp, bn, bnp, nbp, runp, runb)
 			*bnp = blkptrtodb(ump, ip->i_din2->di_extb[-1 - bn]);
 			if (*bnp == 0)
 				*bnp = -1;
-			if (nbp == NULL)
-				panic("ufs_bmaparray: mapping ext data");
+			if (nbp == NULL) {
+				/* indirect block not found */
+				return (EINVAL);
+			}
 			nbp->b_xflags |= BX_ALTDATA;
 			return (0);
 		} else {
-			panic("ufs_bmaparray: blkno out of range");
+			/* blkno out of range */
+			return (EINVAL);
 		}
 		/*
 		 * Since this is FFS independent code, we are out of
@@ -264,8 +267,16 @@ ufs_bmaparray(vp, bn, bnp, nbp, runp, runb)
 		if (error != 0)
 			return (error);
 
-		if (I_IS_UFS1(ip)) {
+		if (I_IS_UFS1(ip))
 			daddr = ((ufs1_daddr_t *)bp->b_data)[ap->in_off];
+		else
+			daddr = ((ufs2_daddr_t *)bp->b_data)[ap->in_off];
+		if ((error = UFS_CHECK_BLKNO(mp, ip->i_number, daddr,
+		     mp->mnt_stat.f_iosize)) != 0) {
+			bqrelse(bp);
+			return (error);
+		}
+		if (I_IS_UFS1(ip)) {
 			if (num == 1 && daddr && runp) {
 				for (bn = ap->in_off + 1;
 				    bn < MNINDIR(ump) && *runp < maxrun &&
@@ -284,7 +295,6 @@ ufs_bmaparray(vp, bn, bnp, nbp, runp, runb)
 			}
 			continue;
 		}
-		daddr = ((ufs2_daddr_t *)bp->b_data)[ap->in_off];
 		if (num == 1 && daddr && runp) {
 			for (bn = ap->in_off + 1;
 			    bn < MNINDIR(ump) && *runp < maxrun &&
@@ -354,6 +364,7 @@ ufs_bmap_seekdata(vp, offp)
 	int error, num, num1, off;
 
 	bp = NULL;
+	error = 0;
 	ip = VTOI(vp);
 	mp = vp->v_mount;
 	ump = VFSTOUFS(mp);

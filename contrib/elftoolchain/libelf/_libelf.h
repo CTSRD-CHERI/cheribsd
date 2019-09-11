@@ -30,6 +30,7 @@
 #define	__LIBELF_H_
 
 #include <sys/queue.h>
+#include <sys/tree.h>
 
 #include "_libelf_config.h"
 
@@ -80,6 +81,9 @@ extern struct _libelf_globals _libelf;
 #define	LIBELF_F_SHDRS_LOADED	0x200000U /* whether all shdrs were read in */
 #define	LIBELF_F_SPECIAL_FILE	0x400000U /* non-regular file */
 
+RB_HEAD(scntree, _Elf_Scn);
+RB_PROTOTYPE(scntree, _Elf_Scn, e_scn, elfscn_cmp);
+
 struct _Elf {
 	int		e_activations;	/* activation count */
 	unsigned int	e_byteorder;	/* ELFDATA* */
@@ -122,7 +126,7 @@ struct _Elf {
 				Elf32_Phdr *e_phdr32;
 				Elf64_Phdr *e_phdr64;
 			} e_phdr;
-			STAILQ_HEAD(, _Elf_Scn)	e_scn;	/* section list */
+			struct scntree	e_scn;	/* sections */
 			size_t	e_nphdr;	/* number of Phdr entries */
 			size_t	e_nscn;		/* number of sections */
 			size_t	e_strndx;	/* string table section index */
@@ -134,7 +138,7 @@ struct _Elf {
  * The internal descriptor wrapping the "Elf_Data" type.
  */
 struct _Libelf_Data {
-	Elf_Data	d_data;		/* The exported descriptor. */
+	Elf_Data	d_data __subobject_member_used_for_c_inheritance;	/* The exported descriptor. */
 	Elf_Scn		*d_scn;		/* The containing section */
 	unsigned int	d_flags;
 	STAILQ_ENTRY(_Libelf_Data) d_next;
@@ -147,7 +151,7 @@ struct _Elf_Scn {
 	} s_shdr;
 	STAILQ_HEAD(, _Libelf_Data) s_data;	/* translated data */
 	STAILQ_HEAD(, _Libelf_Data) s_rawdata;	/* raw data */
-	STAILQ_ENTRY(_Elf_Scn) s_next;
+	RB_ENTRY(_Elf_Scn) s_tree;
 	struct _Elf	*s_elf;		/* parent ELF descriptor */
 	unsigned int	s_flags;	/* flags for the section as a whole */
 	size_t		s_ndx;		/* index# for this section */

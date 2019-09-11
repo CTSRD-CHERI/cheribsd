@@ -197,14 +197,19 @@ efi_devpath_match_node(EFI_DEVICE_PATH *devpath1, EFI_DEVICE_PATH *devpath2)
 	return (true);
 }
 
-bool
-efi_devpath_match(EFI_DEVICE_PATH *devpath1, EFI_DEVICE_PATH *devpath2)
+static bool
+_efi_devpath_match(EFI_DEVICE_PATH *devpath1, EFI_DEVICE_PATH *devpath2,
+    bool ignore_media)
 {
 
 	if (devpath1 == NULL || devpath2 == NULL)
 		return (false);
 
 	while (true) {
+		if (ignore_media &&
+		    IsDevicePathType(devpath1, MEDIA_DEVICE_PATH) &&
+		    IsDevicePathType(devpath2, MEDIA_DEVICE_PATH))
+			return (true);
 		if (!efi_devpath_match_node(devpath1, devpath2))
 			return false;
 		if (IsDevicePathEnd(devpath1))
@@ -213,6 +218,25 @@ efi_devpath_match(EFI_DEVICE_PATH *devpath1, EFI_DEVICE_PATH *devpath2)
 		devpath2 = NextDevicePathNode(devpath2);
 	}
 	return (true);
+}
+/*
+ * Are two devpaths identical?
+ */
+bool
+efi_devpath_match(EFI_DEVICE_PATH *devpath1, EFI_DEVICE_PATH *devpath2)
+{
+	return _efi_devpath_match(devpath1, devpath2, false);
+}
+
+/*
+ * Like efi_devpath_match, but stops at when we hit the media device
+ * path node that specifies the partition information. If we match
+ * up to that point, then we're on the same disk.
+ */
+bool
+efi_devpath_same_disk(EFI_DEVICE_PATH *devpath1, EFI_DEVICE_PATH *devpath2)
+{
+	return _efi_devpath_match(devpath1, devpath2, true);
 }
 
 bool
@@ -268,4 +292,26 @@ efi_devpath_length(EFI_DEVICE_PATH  *path)
 	while (!IsDevicePathEnd(path))
 		path = NextDevicePathNode(path);
 	return ((UINTN)path - (UINTN)start) + DevicePathNodeLength(path);
+}
+
+EFI_HANDLE
+efi_devpath_to_handle(EFI_DEVICE_PATH *path, EFI_HANDLE *handles, unsigned nhandles)
+{
+	unsigned i;
+	EFI_DEVICE_PATH *media, *devpath;
+	EFI_HANDLE h;
+
+	media = efi_devpath_to_media_path(path);
+	if (media == NULL)
+		return (NULL);
+	for (i = 0; i < nhandles; i++) {
+		h = handles[i];
+		devpath = efi_lookup_devpath(h);
+		if (devpath == NULL)
+			continue;
+		if (!efi_devpath_match_node(media, efi_devpath_to_media_path(devpath)))
+			continue;
+		return (h);
+	}
+	return (NULL);
 }

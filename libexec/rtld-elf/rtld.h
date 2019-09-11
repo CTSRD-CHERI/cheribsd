@@ -254,8 +254,12 @@ typedef struct Struct_Obj_Entry {
     Elf_Word gotsym;		/* First dynamic symbol in GOT */
     Elf_Addr *mips_pltgot;	/* Second PLT GOT */
 #endif /* defined(__mips__) */
+#ifdef __powerpc__
 #ifdef __powerpc64__
     Elf_Addr glink;		/* GLINK PLT call stub section */
+#else
+    Elf_Addr *gotptr;		/* GOT pointer (secure-plt only) */
+#endif
 #endif
 
     const Elf_Verneed *verneed; /* Required versions. */
@@ -340,16 +344,7 @@ typedef struct Struct_Obj_Entry {
     bool doomed : 1;		/* Object cannot be referenced */
 #ifdef __CHERI_PURE_CAPABILITY__
     bool cap_relocs_processed : 1; /* __cap_relocs section has been processed */
-    /*
-     * If restrict_pcc_basic is true we can restricted $pcc to the object's
-     * executable segment, if restrict_pcc_strict is true we can restrict it
-     * to just the functions bounds in dlsym()/dlfunc(). Otherwise we need to
-     * fall back to giving the full address space bounds in $pcc.
-     *
-     * TODO: remove these options once we have decided on the correct ABI
-     */
-    bool restrict_pcc_basic : 1;
-    bool restrict_pcc_strict : 1;
+    bool relative_cap_relocs : 1; /* __cap_relocs section has been processed */
     unsigned cheri_captable_abi : 3;
     /*
      * If we linked the DSO with the per-file or per-function captable flag we
@@ -480,6 +475,13 @@ __END_DECLS
 #define call_fini_array_pointer(obj, target) call_initfini_pointer(obj, target)
 #endif
 
+#ifndef make_rtld_function_pointer
+#define make_rtld_function_pointer(target_func)	(&target_func)
+#endif
+#ifndef make_rtld_local_function_pointer
+#define make_rtld_local_function_pointer(target_func)	(&target_func)
+#endif
+
 #ifndef __CHERI_PURE_CAPABILITY__
 /* For CHERI we also set bounds (see rtld_machdep in rtld-cheri-elf) */
 #define make_data_pointer(def, defobj)	(defobj->relocbase + def->st_value)
@@ -519,7 +521,8 @@ int do_copy_relocations(Obj_Entry *);
 int reloc_non_plt(Obj_Entry *, Obj_Entry *, int flags,
     struct Struct_RtldLockState *);
 #ifdef __CHERI_PURE_CAPABILITY__
-int reloc_plt(Obj_Entry *obj, const Obj_Entry *rtldobj);
+int reloc_plt(Obj_Entry *obj, bool bind_now, int flags, const Obj_Entry *rtldobj,
+    struct Struct_RtldLockState *lockstate);
 #else
 int reloc_plt(Obj_Entry *, int flags, struct Struct_RtldLockState *);
 #endif

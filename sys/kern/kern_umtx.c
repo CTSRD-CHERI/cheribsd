@@ -718,8 +718,26 @@ umtxq_count_pi(struct umtx_key *key, struct umtx_q **first)
 	return (0);
 }
 
+/*
+ * Check for possible stops and suspensions while executing a umtx
+ * locking operation.
+ *
+ * The sleep argument controls whether the function can handle a stop
+ * request itself or it should return ERESTART and the request is
+ * proceed at the kernel/user boundary in ast.
+ *
+ * Typically, when retrying due to casueword(9) failure (rv == 1), we
+ * should handle the stop requests there, with exception of cases when
+ * the thread busied the umtx key, or when functions return
+ * immediately if umtxq_check_susp() returned non-zero.  On the other
+ * hand, retrying the whole lock operation, we better not stop there
+ * but delegate the handling to ast.
+ *
+ * If the request is for thread termination P_SINGLE_EXIT, we cannot
+ * handle it at all, and simply return EINTR.
+ */
 static int
-umtxq_check_susp(struct thread *td)
+umtxq_check_susp(struct thread *td, bool sleep)
 {
 	struct proc *p;
 	int error;
@@ -738,7 +756,7 @@ umtxq_check_susp(struct thread *td)
 		if (p->p_flag & P_SINGLE_EXIT)
 			error = EINTR;
 		else
-			error = ERESTART;
+			error = sleep ? thread_suspend_check(0) : ERESTART;
 	}
 	PROC_UNLOCK(p);
 	return (error);
@@ -1086,16 +1104,18 @@ do_lock_normal(struct thread *td, struct umutex * __capability m,
 				    id | UMUTEX_CONTESTED);
 				if (rv == -1)
 					return (EFAULT);
-				if (owner == UMUTEX_RB_OWNERDEAD)
+				if (rv == 0) {
+					MPASS(owner == UMUTEX_RB_OWNERDEAD);
 					return (EOWNERDEAD); /* success */
-				rv = umtxq_check_susp(td);
+				}
+				MPASS(rv == 1);
+				rv = umtxq_check_susp(td, false);
 				if (rv != 0)
 					return (rv);
 				continue;
 			}
 			if (owner == UMUTEX_RB_NOTRECOV)
 				return (ENOTRECOVERABLE);
-
 
 			/*
 			 * Try the uncontested case.  This should be
@@ -1108,13 +1128,16 @@ do_lock_normal(struct thread *td, struct umutex * __capability m,
 				return (EFAULT);
 
 			/* The acquire succeeded. */
-			if (owner == UMUTEX_UNOWNED)
+			if (rv == 0) {
+				MPASS(owner == UMUTEX_UNOWNED);
 				return (0);
+			}
 
 			/*
 			 * If no one owns it but it is contested try
 			 * to acquire it.
 			 */
+			MPASS(rv == 1);
 			if (owner == UMUTEX_CONTESTED) {
 				rv = casueword32(&m->m_owner,
 				    UMUTEX_CONTESTED, &owner,
@@ -1122,13 +1145,15 @@ do_lock_normal(struct thread *td, struct umutex * __capability m,
 				/* The address was invalid. */
 				if (rv == -1)
 					return (EFAULT);
-
-				if (owner == UMUTEX_CONTESTED)
+				if (rv == 0) {
+					MPASS(owner == UMUTEX_CONTESTED);
 					return (0);
-
-				rv = umtxq_check_susp(td);
-				if (rv != 0)
-					return (rv);
+				}
+				if (rv == 1) {
+					rv = umtxq_check_susp(td, false);
+					if (rv != 0)
+						return (rv);
+				}
 
 				/*
 				 * If this failed the lock has
@@ -1136,6 +1161,11 @@ do_lock_normal(struct thread *td, struct umutex * __capability m,
 				 */
 				continue;
 			}
+
+			/* rv == 1 but not contested, likely store failure */
+			rv = umtxq_check_susp(td, false);
+			if (rv != 0)
+				return (rv);
 		}
 
 		if (mode == _UMUTEX_TRY)
@@ -1166,14 +1196,21 @@ do_lock_normal(struct thread *td, struct umutex * __capability m,
 		rv = casueword32(&m->m_owner, owner, &old,
 		    owner | UMUTEX_CONTESTED);
 
-		/* The address was invalid. */
-		if (rv == -1) {
+		/* The address was invalid or casueword failed to store. */
+		if (rv == -1 || rv == 1) {
 			umtxq_lock(&uq->uq_key);
 			umtxq_remove(uq);
 			umtxq_unbusy(&uq->uq_key);
 			umtxq_unlock(&uq->uq_key);
 			umtx_key_release(&uq->uq_key);
-			return (EFAULT);
+			if (rv == -1)
+				return (EFAULT);
+			if (rv == 1) {
+				rv = umtxq_check_susp(td, false);
+				if (rv != 0)
+					return (rv);
+			}
+			continue;
 		}
 
 		/*
@@ -1183,15 +1220,15 @@ do_lock_normal(struct thread *td, struct umutex * __capability m,
 		 */
 		umtxq_lock(&uq->uq_key);
 		umtxq_unbusy(&uq->uq_key);
-		if (old == owner)
-			error = umtxq_sleep(uq, "umtxn", timeout == NULL ?
-			    NULL : &timo);
+		MPASS(old == owner);
+		error = umtxq_sleep(uq, "umtxn", timeout == NULL ?
+		    NULL : &timo);
 		umtxq_remove(uq);
 		umtxq_unlock(&uq->uq_key);
 		umtx_key_release(&uq->uq_key);
 
 		if (error == 0)
-			error = umtxq_check_susp(td);
+			error = umtxq_check_susp(td, false);
 	}
 
 	return (0);
@@ -1209,6 +1246,8 @@ do_unlock_normal(struct thread *td, struct umutex * __capability m,
 	int error, count;
 
 	id = td->td_tid;
+
+again:
 	/*
 	 * Make sure we own this mtx.
 	 */
@@ -1224,9 +1263,14 @@ do_unlock_normal(struct thread *td, struct umutex * __capability m,
 		error = casueword32(&m->m_owner, owner, &old, newlock);
 		if (error == -1)
 			return (EFAULT);
-		if (old == owner)
-			return (0);
-		owner = old;
+		if (error == 1) {
+			error = umtxq_check_susp(td, false);
+			if (error != 0)
+				return (error);
+			goto again;
+		}
+		MPASS(old == owner);
+		return (0);
 	}
 
 	/* We should only ever be in here for contested locks */
@@ -1254,8 +1298,14 @@ do_unlock_normal(struct thread *td, struct umutex * __capability m,
 	umtx_key_release(&key);
 	if (error == -1)
 		return (EFAULT);
-	if (old != owner)
-		return (EINVAL);
+	if (error == 1) {
+		if (old != owner)
+			return (EINVAL);
+		error = umtxq_check_susp(td, false);
+		if (error != 0)
+			return (error);
+		goto again;
+	}
 	return (0);
 }
 
@@ -1272,6 +1322,7 @@ do_wake_umutex(struct thread *td, struct umutex * __capability m)
 	int error;
 	int count;
 
+again:
 	error = fueword32(&m->m_owner, &owner);
 	if (error == -1)
 		return (EFAULT);
@@ -1298,14 +1349,27 @@ do_wake_umutex(struct thread *td, struct umutex * __capability m)
 	    owner != UMUTEX_RB_NOTRECOV) {
 		error = casueword32(&m->m_owner, UMUTEX_CONTESTED, &owner,
 		    UMUTEX_UNOWNED);
-		if (error == -1)
+		if (error == -1) {
 			error = EFAULT;
+		} else if (error == 1) {
+			umtxq_lock(&key);
+			umtxq_unbusy(&key);
+			umtxq_unlock(&key);
+			umtx_key_release(&key);
+			error = umtxq_check_susp(td, false);
+			if (error != 0)
+				return (error);
+			goto again;
+		}
 	}
 
 	umtxq_lock(&key);
-	if (error == 0 && count != 0 && ((owner & ~UMUTEX_CONTESTED) == 0 ||
-	    owner == UMUTEX_RB_OWNERDEAD || owner == UMUTEX_RB_NOTRECOV))
+	if (error == 0 && count != 0) {
+		MPASS((owner & ~UMUTEX_CONTESTED) == 0 ||
+		    owner == UMUTEX_RB_OWNERDEAD ||
+		    owner == UMUTEX_RB_NOTRECOV);
 		umtxq_signal(&key, 1);
+	}
 	umtxq_unbusy(&key);
 	umtxq_unlock(&key);
 	umtx_key_release(&key);
@@ -1354,49 +1418,32 @@ do_wake2_umutex(struct thread *td, struct umutex * __capability m,
 	umtxq_busy(&key);
 	count = umtxq_count(&key);
 	umtxq_unlock(&key);
+
+	error = fueword32(&m->m_owner, &owner);
+	if (error == -1)
+		error = EFAULT;
+
 	/*
-	 * Only repair contention bit if there is a waiter, this means the mutex
-	 * is still being referenced by userland code, otherwise don't update
-	 * any memory.
+	 * Only repair contention bit if there is a waiter, this means
+	 * the mutex is still being referenced by userland code,
+	 * otherwise don't update any memory.
 	 */
-	if (count > 1) {
-		error = fueword32(&m->m_owner, &owner);
-		if (error == -1)
+	while (error == 0 && (owner & UMUTEX_CONTESTED) == 0 &&
+	    (count > 1 || (count == 1 && (owner & ~UMUTEX_CONTESTED) != 0))) {
+		error = casueword32(&m->m_owner, owner, &old,
+		    owner | UMUTEX_CONTESTED);
+		if (error == -1) {
 			error = EFAULT;
-		while (error == 0 && (owner & UMUTEX_CONTESTED) == 0) {
-			error = casueword32(&m->m_owner, owner, &old,
-			    owner | UMUTEX_CONTESTED);
-			if (error == -1) {
-				error = EFAULT;
-				break;
-			}
-			if (old == owner)
-				break;
-			owner = old;
-			error = umtxq_check_susp(td);
-			if (error != 0)
-				break;
+			break;
 		}
-	} else if (count == 1) {
-		error = fueword32(&m->m_owner, &owner);
-		if (error == -1)
-			error = EFAULT;
-		while (error == 0 && (owner & ~UMUTEX_CONTESTED) != 0 &&
-		    (owner & UMUTEX_CONTESTED) == 0) {
-			error = casueword32(&m->m_owner, owner, &old,
-			    owner | UMUTEX_CONTESTED);
-			if (error == -1) {
-				error = EFAULT;
-				break;
-			}
-			if (old == owner)
-				break;
-			owner = old;
-			error = umtxq_check_susp(td);
-			if (error != 0)
-				break;
+		if (error == 0) {
+			MPASS(old == owner);
+			break;
 		}
+		owner = old;
+		error = umtxq_check_susp(td, false);
 	}
+
 	umtxq_lock(&key);
 	if (error == EFAULT) {
 		umtxq_signal(&key, INT_MAX);
@@ -1882,9 +1929,9 @@ do_lock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
 			error = EFAULT;
 			break;
 		}
-
 		/* The acquire succeeded. */
-		if (owner == UMUTEX_UNOWNED) {
+		if (rv == 0) {
+			MPASS(owner == UMUTEX_UNOWNED);
 			error = 0;
 			break;
 		}
@@ -1892,6 +1939,16 @@ do_lock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
 		if (owner == UMUTEX_RB_NOTRECOV) {
 			error = ENOTRECOVERABLE;
 			break;
+		}
+
+		/*
+		 * Avoid overwriting a possible error from sleep due
+		 * to the pending signal with suspension check result.
+		 */
+		if (error == 0) {
+			error = umtxq_check_susp(td, true);
+			if (error != 0)
+				break;
 		}
 
 		/* If no one owns it but it is contested try to acquire it. */
@@ -1904,36 +1961,40 @@ do_lock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
 				error = EFAULT;
 				break;
 			}
-
-			if (owner == old_owner) {
-				umtxq_lock(&uq->uq_key);
-				umtxq_busy(&uq->uq_key);
-				error = umtx_pi_claim(pi, td);
-				umtxq_unbusy(&uq->uq_key);
-				umtxq_unlock(&uq->uq_key);
-				if (error != 0) {
-					/*
-					 * Since we're going to return an
-					 * error, restore the m_owner to its
-					 * previous, unowned state to avoid
-					 * compounding the problem.
-					 */
-					(void)casuword32(&m->m_owner,
-					    id | UMUTEX_CONTESTED,
-					    old_owner);
+			if (rv == 1) {
+				if (error == 0) {
+					error = umtxq_check_susp(td, true);
+					if (error != 0)
+						break;
 				}
-				if (error == 0 &&
-				    old_owner == UMUTEX_RB_OWNERDEAD)
-					error = EOWNERDEAD;
-				break;
+
+				/*
+				 * If this failed the lock could
+				 * changed, restart.
+				 */
+				continue;
 			}
 
-			error = umtxq_check_susp(td);
-			if (error != 0)
-				break;
-
-			/* If this failed the lock has changed, restart. */
-			continue;
+			MPASS(rv == 0);
+			MPASS(owner == old_owner);
+			umtxq_lock(&uq->uq_key);
+			umtxq_busy(&uq->uq_key);
+			error = umtx_pi_claim(pi, td);
+			umtxq_unbusy(&uq->uq_key);
+			umtxq_unlock(&uq->uq_key);
+			if (error != 0) {
+				/*
+				 * Since we're going to return an
+				 * error, restore the m_owner to its
+				 * previous, unowned state to avoid
+				 * compounding the problem.
+				 */
+				(void)casuword32(&m->m_owner,
+				    id | UMUTEX_CONTESTED, old_owner);
+			}
+			if (error == 0 && old_owner == UMUTEX_RB_OWNERDEAD)
+				error = EOWNERDEAD;
+			break;
 		}
 
 		if ((owner & ~UMUTEX_CONTESTED) == id) {
@@ -1972,27 +2033,32 @@ do_lock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
 			error = EFAULT;
 			break;
 		}
-
-		umtxq_lock(&uq->uq_key);
-		/*
-		 * We set the contested bit, sleep. Otherwise the lock changed
-		 * and we need to retry or we lost a race to the thread
-		 * unlocking the umtx.  Note that the UMUTEX_RB_OWNERDEAD
-		 * value for owner is impossible there.
-		 */
-		if (old == owner) {
-			error = umtxq_sleep_pi(uq, pi,
-			    owner & ~UMUTEX_CONTESTED,
-			    "umtxpi", timeout == NULL ? NULL : &timo,
-			    (flags & USYNC_PROCESS_SHARED) != 0);
+		if (rv == 1) {
+			umtxq_unbusy_unlocked(&uq->uq_key);
+			error = umtxq_check_susp(td, true);
 			if (error != 0)
-				continue;
-		} else {
-			umtxq_unbusy(&uq->uq_key);
-			umtxq_unlock(&uq->uq_key);
+				break;
+
+			/*
+			 * The lock changed and we need to retry or we
+			 * lost a race to the thread unlocking the
+			 * umtx.  Note that the UMUTEX_RB_OWNERDEAD
+			 * value for owner is impossible there.
+			 */
+			continue;
 		}
 
-		error = umtxq_check_susp(td);
+		umtxq_lock(&uq->uq_key);
+
+		/* We set the contested bit, sleep. */
+		MPASS(old == owner);
+		error = umtxq_sleep_pi(uq, pi, owner & ~UMUTEX_CONTESTED,
+		    "umtxpi", timeout == NULL ? NULL : &timo,
+		    (flags & USYNC_PROCESS_SHARED) != 0);
+		if (error != 0)
+			continue;
+
+		error = umtxq_check_susp(td, false);
 		if (error != 0)
 			break;
 	}
@@ -2019,6 +2085,8 @@ do_unlock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
 	int count, error, pri;
 
 	id = td->td_tid;
+
+usrloop:
 	/*
 	 * Make sure we own this mtx.
 	 */
@@ -2036,6 +2104,12 @@ do_unlock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
 		error = casueword32(&m->m_owner, owner, &old, new_owner);
 		if (error == -1)
 			return (EFAULT);
+		if (error == 1) {
+			error = umtxq_check_susp(td, true);
+			if (error != 0)
+				return (error);
+			goto usrloop;
+		}
 		if (old == owner)
 			return (0);
 		owner = old;
@@ -2115,15 +2189,20 @@ do_unlock_pi(struct thread *td, struct umutex * __capability m, uint32_t flags,
 
 	if (count > 1)
 		new_owner |= UMUTEX_CONTESTED;
+again:
 	error = casueword32(&m->m_owner, owner, &old, new_owner);
-
+	if (error == 1) {
+		error = umtxq_check_susp(td, false);
+		if (error == 0)
+			goto again;
+	}
 	umtxq_unbusy_unlocked(&key);
 	umtx_key_release(&key);
 	if (error == -1)
 		return (EFAULT);
-	if (old != owner)
+	if (error == 0 && old != owner)
 		return (EINVAL);
-	return (0);
+	return (error);
 }
 
 /*
@@ -2190,31 +2269,49 @@ do_lock_pp(struct thread *td, struct umutex * __capability m, uint32_t flags,
 			error = EFAULT;
 			break;
 		}
-
-		if (owner == UMUTEX_CONTESTED) {
+		if (rv == 0) {
+			MPASS(owner == UMUTEX_CONTESTED);
 			error = 0;
 			break;
-		} else if (owner == UMUTEX_RB_OWNERDEAD) {
+		}
+		/* rv == 1 */
+		if (owner == UMUTEX_RB_OWNERDEAD) {
 			rv = casueword32(&m->m_owner, UMUTEX_RB_OWNERDEAD,
 			    &owner, id | UMUTEX_CONTESTED);
 			if (rv == -1) {
 				error = EFAULT;
 				break;
 			}
-			if (owner == UMUTEX_RB_OWNERDEAD) {
+			if (rv == 0) {
+				MPASS(owner == UMUTEX_RB_OWNERDEAD);
 				error = EOWNERDEAD; /* success */
 				break;
 			}
-			error = 0;
+
+			/*
+			 *  rv == 1, only check for suspension if we
+			 *  did not already catched a signal.  If we
+			 *  get an error from the check, the same
+			 *  condition is checked by the umtxq_sleep()
+			 *  call below, so we should obliterate the
+			 *  error to not skip the last loop iteration.
+			 */
+			if (error == 0) {
+				error = umtxq_check_susp(td, false);
+				if (error == 0) {
+					if (try != 0)
+						error = EBUSY;
+					else
+						continue;
+				}
+				error = 0;
+			}
 		} else if (owner == UMUTEX_RB_NOTRECOV) {
 			error = ENOTRECOVERABLE;
-			break;
 		}
 
-		if (try != 0) {
+		if (try != 0)
 			error = EBUSY;
-			break;
-		}
 
 		/*
 		 * If we caught a signal, we have retried and now
@@ -2400,7 +2497,8 @@ do_set_ceiling(struct thread *td, struct umutex * __capability m,
 			break;
 		}
 
-		if (owner == UMUTEX_CONTESTED) {
+		if (rv == 0) {
+			MPASS(owner == UMUTEX_CONTESTED);
 			rv = suword32(&m->m_ceilings[0], ceiling);
 			rv1 = suword32(&m->m_owner, UMUTEX_CONTESTED);
 			error = (rv == 0 && rv1 == 0) ? 0: EFAULT;
@@ -2699,7 +2797,8 @@ do_rw_rdlock(struct thread *td, struct urwlock * __capability rwlock,
 
 		/* try to lock it */
 		while (!(state & wrflags)) {
-			if (__predict_false(URWLOCK_READER_COUNT(state) == URWLOCK_MAX_READERS)) {
+			if (__predict_false(URWLOCK_READER_COUNT(state) ==
+			    URWLOCK_MAX_READERS)) {
 				umtx_key_release(&uq->uq_key);
 				return (EAGAIN);
 			}
@@ -2709,11 +2808,12 @@ do_rw_rdlock(struct thread *td, struct urwlock * __capability rwlock,
 				umtx_key_release(&uq->uq_key);
 				return (EFAULT);
 			}
-			if (oldstate == state) {
+			if (rv == 0) {
+				MPASS(oldstate == state);
 				umtx_key_release(&uq->uq_key);
 				return (0);
 			}
-			error = umtxq_check_susp(td);
+			error = umtxq_check_susp(td, true);
 			if (error != 0)
 				break;
 			state = oldstate;
@@ -2744,10 +2844,12 @@ do_rw_rdlock(struct thread *td, struct urwlock * __capability rwlock,
 				error = EFAULT;
 				break;
 			}
-			if (oldstate == state)
+			if (rv == 0) {
+				MPASS(oldstate == state);
 				goto sleep;
+			}
 			state = oldstate;
-			error = umtxq_check_susp(td);
+			error = umtxq_check_susp(td, false);
 			if (error != 0)
 				break;
 		}
@@ -2759,14 +2861,17 @@ do_rw_rdlock(struct thread *td, struct urwlock * __capability rwlock,
 		/* state is changed while setting flags, restart */
 		if (!(state & wrflags)) {
 			umtxq_unbusy_unlocked(&uq->uq_key);
-			error = umtxq_check_susp(td);
+			error = umtxq_check_susp(td, true);
 			if (error != 0)
 				break;
 			continue;
 		}
 
 sleep:
-		/* contention bit is set, before sleeping, increase read waiter count */
+		/*
+		 * Contention bit is set, before sleeping, increase
+		 * read waiter count.
+		 */
 		rv = fueword32(&rwlock->rw_blocked_readers,
 		    &blocked_readers);
 		if (rv == -1) {
@@ -2819,10 +2924,12 @@ sleep:
 					error = EFAULT;
 					break;
 				}
-				if (oldstate == state)
+				if (rv == 0) {
+					MPASS(oldstate == state);
 					break;
+				}
 				state = oldstate;
-				error1 = umtxq_check_susp(td);
+				error1 = umtxq_check_susp(td, false);
 				if (error1 != 0) {
 					if (error == 0)
 						error = error1;
@@ -2871,29 +2978,33 @@ do_rw_wrlock(struct thread *td, struct urwlock * __capability rwlock,
 			umtx_key_release(&uq->uq_key);
 			return (EFAULT);
 		}
-		while (!(state & URWLOCK_WRITE_OWNER) && URWLOCK_READER_COUNT(state) == 0) {
+		while ((state & URWLOCK_WRITE_OWNER) == 0 &&
+		    URWLOCK_READER_COUNT(state) == 0) {
 			rv = casueword32(&rwlock->rw_state, state,
 			    &oldstate, state | URWLOCK_WRITE_OWNER);
 			if (rv == -1) {
 				umtx_key_release(&uq->uq_key);
 				return (EFAULT);
 			}
-			if (oldstate == state) {
+			if (rv == 0) {
+				MPASS(oldstate == state);
 				umtx_key_release(&uq->uq_key);
 				return (0);
 			}
 			state = oldstate;
-			error = umtxq_check_susp(td);
+			error = umtxq_check_susp(td, true);
 			if (error != 0)
 				break;
 		}
 
 		if (error) {
-			if (!(state & (URWLOCK_WRITE_OWNER|URWLOCK_WRITE_WAITERS)) &&
+			if ((state & (URWLOCK_WRITE_OWNER |
+			    URWLOCK_WRITE_WAITERS)) == 0 &&
 			    blocked_readers != 0) {
 				umtxq_lock(&uq->uq_key);
 				umtxq_busy(&uq->uq_key);
-				umtxq_signal_queue(&uq->uq_key, INT_MAX, UMTX_SHARED_QUEUE);
+				umtxq_signal_queue(&uq->uq_key, INT_MAX,
+				    UMTX_SHARED_QUEUE);
 				umtxq_unbusy(&uq->uq_key);
 				umtxq_unlock(&uq->uq_key);
 			}
@@ -2907,8 +3018,8 @@ do_rw_wrlock(struct thread *td, struct urwlock * __capability rwlock,
 		umtxq_unlock(&uq->uq_key);
 
 		/*
-		 * re-read the state, in case it changed between the try-lock above
-		 * and the check below
+		 * Re-read the state, in case it changed between the
+		 * try-lock above and the check below.
 		 */
 		rv = fueword32(&rwlock->rw_state, &state);
 		if (rv == -1)
@@ -2923,10 +3034,12 @@ do_rw_wrlock(struct thread *td, struct urwlock * __capability rwlock,
 				error = EFAULT;
 				break;
 			}
-			if (oldstate == state)
+			if (rv == 0) {
+				MPASS(oldstate == state);
 				goto sleep;
+			}
 			state = oldstate;
-			error = umtxq_check_susp(td);
+			error = umtxq_check_susp(td, false);
 			if (error != 0)
 				break;
 		}
@@ -2935,9 +3048,10 @@ do_rw_wrlock(struct thread *td, struct urwlock * __capability rwlock,
 			break;
 		}
 
-		if (!(state & URWLOCK_WRITE_OWNER) && URWLOCK_READER_COUNT(state) == 0) {
+		if ((state & URWLOCK_WRITE_OWNER) == 0 &&
+		    URWLOCK_READER_COUNT(state) == 0) {
 			umtxq_unbusy_unlocked(&uq->uq_key);
-			error = umtxq_check_susp(td);
+			error = umtxq_check_susp(td, false);
 			if (error != 0)
 				break;
 			continue;
@@ -2950,9 +3064,10 @@ sleep:
 			error = EFAULT;
 			break;
 		}
-		suword32(&rwlock->rw_blocked_writers, blocked_writers+1);
+		suword32(&rwlock->rw_blocked_writers, blocked_writers + 1);
 
-		while ((state & URWLOCK_WRITE_OWNER) || URWLOCK_READER_COUNT(state) != 0) {
+		while ((state & URWLOCK_WRITE_OWNER) ||
+		    URWLOCK_READER_COUNT(state) != 0) {
 			umtxq_lock(&uq->uq_key);
 			umtxq_insert_queue(uq, UMTX_EXCLUSIVE_QUEUE);
 			umtxq_unbusy(&uq->uq_key);
@@ -2994,10 +3109,12 @@ sleep:
 					error = EFAULT;
 					break;
 				}
-				if (oldstate == state)
+				if (rv == 0) {
+					MPASS(oldstate == state);
 					break;
+				}
 				state = oldstate;
-				error1 = umtxq_check_susp(td);
+				error1 = umtxq_check_susp(td, false);
 				/*
 				 * We are leaving the URWLOCK_WRITE_WAITERS
 				 * behind, but this should not harm the
@@ -3057,13 +3174,13 @@ do_rw_unlock(struct thread *td, struct urwlock * __capability rwlock)
 				error = EFAULT;
 				goto out;
 			}
-			if (oldstate != state) {
+			if (rv == 1) {
 				state = oldstate;
 				if (!(oldstate & URWLOCK_WRITE_OWNER)) {
 					error = EPERM;
 					goto out;
 				}
-				error = umtxq_check_susp(td);
+				error = umtxq_check_susp(td, true);
 				if (error != 0)
 					goto out;
 			} else
@@ -3077,13 +3194,13 @@ do_rw_unlock(struct thread *td, struct urwlock * __capability rwlock)
 				error = EFAULT;
 				goto out;
 			}
-			if (oldstate != state) {
+			if (rv == 1) {
 				state = oldstate;
 				if (URWLOCK_READER_COUNT(oldstate) == 0) {
 					error = EPERM;
 					goto out;
 				}
-				error = umtxq_check_susp(td);
+				error = umtxq_check_susp(td, true);
 				if (error != 0)
 					goto out;
 			} else
@@ -3133,7 +3250,7 @@ do_sem_wait(struct thread *td, struct _usem * __capability sem, struct _umtx_tim
 	struct abs_timeout timo;
 	struct umtx_q *uq;
 	uint32_t flags, count, count1;
-	int error, rv;
+	int error, rv, rv1;
 
 	uq = td->td_umtxq;
 	error = fueword32(&sem->_flags, &flags);
@@ -3146,20 +3263,30 @@ do_sem_wait(struct thread *td, struct _usem * __capability sem, struct _umtx_tim
 	if (timeout != NULL)
 		abs_timeout_init2(&timo, timeout);
 
+again:
 	umtxq_lock(&uq->uq_key);
 	umtxq_busy(&uq->uq_key);
 	umtxq_insert(uq);
 	umtxq_unlock(&uq->uq_key);
 	rv = casueword32(&sem->_has_waiters, 0, &count1, 1);
 	if (rv == 0)
-		rv = fueword32(&sem->_count, &count);
-	if (rv == -1 || count != 0) {
+		rv1 = fueword32(&sem->_count, &count);
+	if (rv == -1 || (rv == 0 && (rv1 == -1 || count != 0)) || rv == 1) {
 		umtxq_lock(&uq->uq_key);
 		umtxq_unbusy(&uq->uq_key);
 		umtxq_remove(uq);
 		umtxq_unlock(&uq->uq_key);
-		umtx_key_release(&uq->uq_key);
-		return (rv == -1 ? EFAULT : 0);
+		if (rv == 1) {
+			rv = umtxq_check_susp(td, true);
+			if (rv == 0)
+				goto again;
+			error = rv;
+			goto out;
+		}
+		if (rv == 0)
+			rv = rv1;
+		error = rv == -1 ? EFAULT : 0;
+		goto out;
 	}
 	umtxq_lock(&uq->uq_key);
 	umtxq_unbusy(&uq->uq_key);
@@ -3176,6 +3303,7 @@ do_sem_wait(struct thread *td, struct _usem * __capability sem, struct _umtx_tim
 			error = EINTR;
 	}
 	umtxq_unlock(&uq->uq_key);
+out:
 	umtx_key_release(&uq->uq_key);
 	return (error);
 }
@@ -3231,13 +3359,13 @@ do_sem2_wait(struct thread *td, struct _usem2 * __capability sem,
 
 	uq = td->td_umtxq;
 	flags = fuword32(&sem->_flags);
-	error = umtx_key_get(sem, TYPE_SEM, GET_SHARE(flags), &uq->uq_key);
-	if (error != 0)
-		return (error);
-
 	if (timeout != NULL)
 		abs_timeout_init2(&timo, timeout);
 
+again:
+	error = umtx_key_get(sem, TYPE_SEM, GET_SHARE(flags), &uq->uq_key);
+	if (error != 0)
+		return (error);
 	umtxq_lock(&uq->uq_key);
 	umtxq_busy(&uq->uq_key);
 	umtxq_insert(uq);
@@ -3263,16 +3391,19 @@ do_sem2_wait(struct thread *td, struct _usem2 * __capability sem,
 		if (count == USEM_HAS_WAITERS)
 			break;
 		rv = casueword32(&sem->_count, 0, &count, USEM_HAS_WAITERS);
-		if (rv == -1) {
-			umtxq_lock(&uq->uq_key);
-			umtxq_unbusy(&uq->uq_key);
-			umtxq_remove(uq);
-			umtxq_unlock(&uq->uq_key);
-			umtx_key_release(&uq->uq_key);
-			return (EFAULT);
-		}
-		if (count == 0)
+		if (rv == 0)
 			break;
+		umtxq_lock(&uq->uq_key);
+		umtxq_unbusy(&uq->uq_key);
+		umtxq_remove(uq);
+		umtxq_unlock(&uq->uq_key);
+		umtx_key_release(&uq->uq_key);
+		if (rv == -1)
+			return (EFAULT);
+		rv = umtxq_check_susp(td, true);
+		if (rv != 0)
+			return (rv);
+		goto again;
 	}
 	umtxq_lock(&uq->uq_key);
 	umtxq_unbusy(&uq->uq_key);
@@ -3325,11 +3456,20 @@ do_sem2_wake(struct thread *td, struct _usem2 * __capability sem)
 		if (cnt == 1) {
 			umtxq_unlock(&key);
 			rv = fueword32(&sem->_count, &count);
-			while (rv != -1 && count & USEM_HAS_WAITERS)
+			while (rv != -1 && count & USEM_HAS_WAITERS) {
 				rv = casueword32(&sem->_count, count, &count,
 				    count & ~USEM_HAS_WAITERS);
+				if (rv == 1) {
+					rv = umtxq_check_susp(td, true);
+					if (rv != 0)
+						break;
+				}
+			}
 			if (rv == -1)
 				error = EFAULT;
+			else if (rv > 0) {
+				error = rv;
+			}
 			umtxq_lock(&key);
 		}
 
@@ -5269,20 +5409,20 @@ umtx_exec_hook(void *arg __unused, struct proc *p,
 	struct thread *td;
 
 	KASSERT(p == curproc, ("need curproc"));
-	PROC_LOCK(p);
 	KASSERT((p->p_flag & P_HADTHREADS) == 0 ||
 	    (p->p_flag & P_STOPPED_SINGLE) != 0,
 	    ("curproc must be single-threaded"));
+	/*
+	 * There is no need to lock the list as only this thread can be
+	 * running.
+	 */
 	FOREACH_THREAD_IN_PROC(p, td) {
 		KASSERT(td == curthread ||
 		    ((td->td_flags & TDF_BOUNDARY) != 0 && TD_IS_SUSPENDED(td)),
 		    ("running thread %p %p", p, td));
-		PROC_UNLOCK(p);
 		umtx_thread_cleanup(td);
-		PROC_LOCK(p);
 		td->td_rb_list = td->td_rbp_list = td->td_rb_inact = 0;
 	}
-	PROC_UNLOCK(p);
 }
 
 /*
@@ -5429,17 +5569,21 @@ umtx_thread_cleanup(struct thread *td)
 	 */
 	uq = td->td_umtxq;
 	if (uq != NULL) {
-		mtx_lock(&umtx_lock);
-		uq->uq_inherited_pri = PRI_MAX;
-		while ((pi = TAILQ_FIRST(&uq->uq_pi_contested)) != NULL) {
-			pi->pi_owner = NULL;
-			TAILQ_REMOVE(&uq->uq_pi_contested, pi, pi_link);
+		if (uq->uq_inherited_pri != PRI_MAX ||
+		    !TAILQ_EMPTY(&uq->uq_pi_contested)) {
+			mtx_lock(&umtx_lock);
+			uq->uq_inherited_pri = PRI_MAX;
+			while ((pi = TAILQ_FIRST(&uq->uq_pi_contested)) != NULL) {
+				pi->pi_owner = NULL;
+				TAILQ_REMOVE(&uq->uq_pi_contested, pi, pi_link);
+			}
+			mtx_unlock(&umtx_lock);
 		}
-		mtx_unlock(&umtx_lock);
-		thread_lock(td);
-		sched_lend_user_prio(td, PRI_MAX);
-		thread_unlock(td);
+		sched_lend_user_prio_cond(td, PRI_MAX);
 	}
+
+	if (td->td_rb_inact == 0 && td->td_rb_list == 0 && td->td_rbp_list == 0)
+		return;
 
 	/*
 	 * Handle terminated robust mutexes.  Must be done after

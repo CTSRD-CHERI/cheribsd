@@ -772,15 +772,6 @@ DIRDEPS+= \
 DIRDEPS+=	usr.sbin/efidp
 .endif
 
-.if ${MK_NAND} != "no"
-DIRDEPS+= \
-	sbin/nandfs \
-	sbin/newfs_nandfs \
-	usr.sbin/nandsim \
-	usr.sbin/nandtool \
-
-.endif
-
 DIRDEPS.amd64= \
 	sbin/bsdlabel \
 	sbin/fdisk \
@@ -827,7 +818,6 @@ DIRDEPS.i386= \
 	usr.sbin/hyperv/tools/kvp \
 	usr.sbin/hyperv/tools/vss \
 	usr.sbin/kgmon \
-	usr.sbin/kgzip \
 	usr.sbin/lptcontrol \
 	usr.sbin/mptable \
 	usr.sbin/ndiscvt \

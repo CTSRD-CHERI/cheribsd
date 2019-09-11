@@ -36,7 +36,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/mutex.h>
 #include <sys/smp.h>
 
 #include <vm/vm.h>
@@ -322,7 +324,7 @@ xicp_bind(device_t dev, u_int irq, cpuset_t cpumask, void **priv)
 	struct xicp_softc *sc = device_get_softc(dev);
 	struct xicp_intvec *iv;
 	cell_t status, cpu;
-	int ncpus, i, error;
+	int ncpus, i, error = -1;
 
 	/* Ignore IPIs */
 	if (irq == MAX_XICP_IRQS)

@@ -1,5 +1,7 @@
 # $FreeBSD$
 
+.include <src.opts.mk>
+
 PACKAGE= tests
 
 TESTSDIR= ${TESTSBASE}
@@ -8,6 +10,7 @@ ${PACKAGE}FILES+=		README
 
 KYUAFILE= yes
 
+SUBDIR.${MK_CHERI}+=	cheri
 SUBDIR+= etc
 SUBDIR+= sys
 

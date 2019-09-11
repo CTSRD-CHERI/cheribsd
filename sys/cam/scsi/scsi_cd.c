@@ -1336,7 +1336,7 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 
 	struct 	cam_periph *periph;
 	struct	cd_softc *softc;
-	int	nocopyout, error = 0;
+	int	error = 0;
 
 	periph = (struct cam_periph *)dp->d_drv1;
 	cam_periph_lock(periph);
@@ -1378,7 +1378,6 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 	 */
 	cam_periph_unlock(periph);
 
-	nocopyout = 0;
 	switch (cmd) {
 
 	case CDIOCPLAYTRACKS:
@@ -1554,9 +1553,6 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 			cam_periph_unlock(periph);
 		}
 		break;
-	case CDIOCREADSUBCHANNEL_SYSSPACE:
-		nocopyout = 1;
-		/* Fallthrough */
 	case CDIOCREADSUBCHANNEL:
 		{
 			struct ioc_read_subchannel *args
@@ -1601,14 +1597,8 @@ cdioctl(struct disk *dp, u_long cmd, void *addr, int flag, struct thread *td)
 				data->header.data_len[1] +
 				sizeof(struct cd_sub_channel_header)));
 			cam_periph_unlock(periph);
-			if (nocopyout == 0) {
-				if (copyout(data,
-				    __USER_CAP_UNBOUND(args->data), len) != 0) {
-					error = EFAULT;
-				}
-			} else {
-				bcopy(data, args->data, len);
-			}
+			error = copyout(data, __USER_CAP_UNBOUND(args->data),
+			    len);
 			free(data, M_SCSICD);
 		}
 		break;

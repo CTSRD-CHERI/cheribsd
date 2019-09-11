@@ -240,14 +240,6 @@ AcpiEvEnableGpe (
     ACPI_FUNCTION_TRACE (EvEnableGpe);
 
 
-    /* Clear the GPE (of stale events) */
-
-    Status = AcpiHwClearGpe(GpeEventInfo);
-    if (ACPI_FAILURE(Status))
-    {
-        return_ACPI_STATUS(Status);
-    }
-
     /* Enable the requested GPE */
 
     Status = AcpiHwLowSetGpe (GpeEventInfo, ACPI_GPE_ENABLE);
@@ -324,6 +316,7 @@ AcpiEvMaskGpe (
  * FUNCTION:    AcpiEvAddGpeReference
  *
  * PARAMETERS:  GpeEventInfo            - Add a reference to this GPE
+ *              ClearOnEnable           - Clear GPE status before enabling it
  *
  * RETURN:      Status
  *
@@ -334,7 +327,8 @@ AcpiEvMaskGpe (
 
 ACPI_STATUS
 AcpiEvAddGpeReference (
-    ACPI_GPE_EVENT_INFO     *GpeEventInfo)
+    ACPI_GPE_EVENT_INFO     *GpeEventInfo,
+    BOOLEAN                 ClearOnEnable)
 {
     ACPI_STATUS             Status = AE_OK;
 
@@ -351,6 +345,11 @@ AcpiEvAddGpeReference (
     if (GpeEventInfo->RuntimeCount == 1)
     {
         /* Enable on first reference */
+
+        if (ClearOnEnable)
+        {
+            (void) AcpiHwClearGpe (GpeEventInfo);
+        }
 
         Status = AcpiEvUpdateGpeEnableMask (GpeEventInfo);
         if (ACPI_SUCCESS (Status))

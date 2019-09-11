@@ -754,7 +754,8 @@ vm_mmap_memseg(struct vm *vm, vm_paddr_t gpa, int segid, vm_ooffset_t first,
 		    VM_MAP_WIRE_USER | VM_MAP_WIRE_NOHOLES);
 		if (error != KERN_SUCCESS) {
 			vm_map_remove(&vm->vmspace->vm_map, gpa, gpa + len);
-			return (EFAULT);
+			return (error == KERN_RESOURCE_SHORTAGE ? ENOMEM :
+			    EFAULT);
 		}
 	}
 
@@ -1002,7 +1003,7 @@ vm_gpa_release(void *cookie)
 	vm_page_t m = cookie;
 
 	vm_page_lock(m);
-	vm_page_unhold(m);
+	vm_page_unwire(m, PQ_ACTIVE);
 	vm_page_unlock(m);
 }
 

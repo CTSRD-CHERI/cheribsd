@@ -50,7 +50,7 @@ struct cdev_privdata {
 };
 
 struct cdev_priv {
-	struct cdev		cdp_c;
+	struct cdev		cdp_c __subobject_use_container_bounds;
 	TAILQ_ENTRY(cdev_priv)	cdp_list;
 
 	u_int			cdp_inode;

@@ -194,9 +194,10 @@ SYSCTL_UINT(_vm, OID_AUTO, background_launder_max, CTLFLAG_RWTUN,
 
 int vm_pageout_page_count = 32;
 
-int vm_page_max_wired;		/* XXX max # of wired pages system-wide */
-SYSCTL_INT(_vm, OID_AUTO, max_wired,
-	CTLFLAG_RW, &vm_page_max_wired, 0, "System-wide limit to wired page count");
+u_long vm_page_max_user_wired;
+SYSCTL_ULONG(_vm, OID_AUTO, max_user_wired, CTLFLAG_RW,
+    &vm_page_max_user_wired, 0,
+    "system-wide limit to user-wired page count");
 
 static u_int isqrt(u_int num);
 static int vm_pageout_launder(struct vm_domain *vmd, int launder,
@@ -265,7 +266,7 @@ static __always_inline void
 vm_pageout_collect_batch(struct scan_state *ss, const bool dequeue)
 {
 	struct vm_pagequeue *pq;
-	vm_page_t m, marker;
+	vm_page_t m, marker, n;
 
 	marker = ss->marker;
 	pq = ss->pq;
@@ -276,7 +277,8 @@ vm_pageout_collect_batch(struct scan_state *ss, const bool dequeue)
 	vm_pagequeue_lock(pq);
 	for (m = TAILQ_NEXT(marker, plinks.q); m != NULL &&
 	    ss->scanned < ss->maxscan && ss->bq.bq_cnt < VM_BATCHQUEUE_SIZE;
-	    m = TAILQ_NEXT(m, plinks.q), ss->scanned++) {
+	    m = n, ss->scanned++) {
+		n = TAILQ_NEXT(m, plinks.q);
 		if ((m->flags & PG_MARKER) == 0) {
 			KASSERT((m->aflags & PGA_ENQUEUED) != 0,
 			    ("page %p not enqueued", m));
@@ -332,7 +334,7 @@ vm_pageout_cluster(vm_page_t m)
 	pindex = m->pindex;
 
 	vm_page_assert_unbusied(m);
-	KASSERT(!vm_page_held(m), ("page %p is held", m));
+	KASSERT(!vm_page_wired(m), ("page %p is wired", m));
 
 	pmap_remove_write(m);
 	vm_page_unlock(m);
@@ -371,7 +373,7 @@ more:
 			break;
 		}
 		vm_page_lock(p);
-		if (vm_page_held(p) || !vm_page_in_laundry(p)) {
+		if (vm_page_wired(p) || !vm_page_in_laundry(p)) {
 			vm_page_unlock(p);
 			ib = 0;
 			break;
@@ -397,7 +399,7 @@ more:
 		if (p->dirty == 0)
 			break;
 		vm_page_lock(p);
-		if (vm_page_held(p) || !vm_page_in_laundry(p)) {
+		if (vm_page_wired(p) || !vm_page_in_laundry(p)) {
 			vm_page_unlock(p);
 			break;
 		}
@@ -649,7 +651,7 @@ vm_pageout_clean(vm_page_t m, int *numpagedout)
 		 * The page may have been busied or referenced while the object
 		 * and page locks were released.
 		 */
-		if (vm_page_busied(m) || vm_page_held(m)) {
+		if (vm_page_busied(m) || vm_page_wired(m)) {
 			vm_page_unlock(m);
 			error = EBUSY;
 			goto unlock_all;
@@ -745,15 +747,11 @@ recheck:
 		}
 
 		/*
-		 * Held pages are essentially stuck in the queue.
-		 *
 		 * Wired pages may not be freed.  Complete their removal
 		 * from the queue now to avoid needless revisits during
 		 * future scans.
 		 */
-		if (m->hold_count != 0)
-			continue;
-		if (m->wire_count != 0) {
+		if (vm_page_wired(m)) {
 			vm_page_dequeue_deferred(m);
 			continue;
 		}
@@ -1202,7 +1200,7 @@ act_scan:
 		/*
 		 * Wired pages are dequeued lazily.
 		 */
-		if (m->wire_count != 0) {
+		if (vm_page_wired(m)) {
 			vm_page_dequeue_deferred(m);
 			continue;
 		}
@@ -1417,19 +1415,11 @@ recheck:
 			goto reinsert;
 
 		/*
-		 * Held pages are essentially stuck in the queue.  So,
-		 * they ought to be discounted from the inactive count.
-		 * See the description of addl_page_shortage above.
-		 *
 		 * Wired pages may not be freed.  Complete their removal
 		 * from the queue now to avoid needless revisits during
 		 * future scans.
 		 */
-		if (m->hold_count != 0) {
-			addl_page_shortage++;
-			goto reinsert;
-		}
-		if (m->wire_count != 0) {
+		if (vm_page_wired(m)) {
 			vm_page_dequeue_deferred(m);
 			continue;
 		}
@@ -1970,7 +1960,7 @@ vm_pageout_init_domain(int domain)
 		vmd->vmd_free_min = 4 + (vmd->vmd_page_count - 1024) / 200;
 	else
 		vmd->vmd_free_min = 4;
-	vmd->vmd_pageout_free_min = (2*MAXBSIZE)/PAGE_SIZE +
+	vmd->vmd_pageout_free_min = 2 * MAXBSIZE / PAGE_SIZE +
 	    vmd->vmd_interrupt_free_min;
 	vmd->vmd_free_reserved = vm_pageout_page_count +
 	    vmd->vmd_pageout_free_min + (vmd->vmd_page_count / 768);
@@ -2041,8 +2031,8 @@ vm_pageout_init(void)
 	if (vm_pageout_update_period == 0)
 		vm_pageout_update_period = 600;
 
-	if (vm_page_max_wired == 0)
-		vm_page_max_wired = freecount / 3;
+	if (vm_page_max_user_wired == 0)
+		vm_page_max_user_wired = freecount / 3;
 }
 
 /*

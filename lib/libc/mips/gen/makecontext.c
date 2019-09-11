@@ -90,11 +90,7 @@ __makecontext(ucontext_t *ucp, void (*func)(void), int argc, ...)
 #elif defined(__mips_n32) || defined(__mips_n64)
 	sp -= (argc > 8 ? argc - 8 : 0); /* Make room for > 8 arguments. */
 #endif
-#if __has_builtin(__builtin_align_down)
 	sp = __builtin_align_down(sp, STACK_ALIGN);
-#else
-	sp  = (register_t *)((uintptr_t)sp & ~(STACK_ALIGN - 1));
-#endif
 
 	mc->mc_regs[SP] = (intptr_t)sp;
 	mc->mc_regs[S0] = (intptr_t)ucp;

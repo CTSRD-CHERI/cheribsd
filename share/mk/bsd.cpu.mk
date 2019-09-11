@@ -315,19 +315,17 @@ MACHINE_CPU = v9 ultrasparc ultrasparc3
 .if ${MACHINE_CPUARCH} == "mips"
 CFLAGS += -G0
 # Hack for CheriBSD because clang targets a much newer CPU
-CFLAGS += -mcpu=mips4
+# -mcpu=beri ensures that instructions are scheduled so that they can execute
+# without excessive pipeline bubbles on BERI FPGAs (whereas -mcpu=mips4 doesn't)
+CFLAGS += -mcpu=beri
+AFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
+CFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
+LDFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
 . if ${MACHINE_ARCH:Mmips*el*} != ""
-AFLAGS += -EL
-CFLAGS += -EL
-LDFLAGS += -EL
+MIPS_ENDIAN=	EL
 . else
-AFLAGS += -EB
-CFLAGS += -EB
-LDFLAGS += -EB
+MIPS_ENDIAN=	EB
 . endif
-AFLAGS+= -mabi=${MIPS_ABI}
-CFLAGS+= -mabi=${MIPS_ABI}
-LDFLAGS+= -mabi=${MIPS_ABI}
 . if ${MACHINE_ARCH:Mmips*c*}
 MIPS_ABI?=	purecap
 . elif ${MACHINE_ARCH:Mmips64*} != ""
@@ -414,6 +412,10 @@ MACHINE_CPU += softfp
 # not a nice optimization.
 CFLAGS += -mfloat-abi=softfp
 .endif
+.endif
+
+.if ${MACHINE_ARCH} == "powerpc" || ${MACHINE_ARCH} == "powerpcspe"
+LDFLAGS+= -Wl,--secure-plt
 .endif
 
 .if ${MACHINE_ARCH} == "powerpcspe"

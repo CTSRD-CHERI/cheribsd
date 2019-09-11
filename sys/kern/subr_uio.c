@@ -595,15 +595,19 @@ static inline void * __capability
 io_user_cap(volatile const void * uaddr, size_t len)
 {
 	bool inexec;
+	vaddr_t base;
 
 	/* XXX: this is rather expensive... */
 	PROC_LOCK(curproc);
 	inexec = ((curproc->p_flag & P_INEXEC) != 0);
 	PROC_UNLOCK(curproc);
 
-	if (inexec)
+	if (inexec) {
+		base = CHERI_REPRESENTABLE_BASE((vaddr_t)uaddr, len);
+		len = CHERI_REPRESENTABLE_LENGTH(len);
 		return (cheri_capability_build_user_data(
-		    CHERI_CAP_USER_DATA_PERMS, (vaddr_t)uaddr, len, 0));
+		    CHERI_CAP_USER_DATA_PERMS, base, len, (vaddr_t)uaddr - base));
+	}
 	return (__USER_CAP(uaddr, len));
 }
 

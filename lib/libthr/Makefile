@@ -70,6 +70,7 @@ PRECIOUSLIB=
 .if ${MACHINE_ARCH:Mmips*c*}
 SRCS+=	malloc.c heap.c
 CFLAGS.malloc.c+=	-DIN_LIBTHR
+CFLAGS.heap.c+=	-DIN_LIBTHR
 .else
 SRCS+= rtld_malloc.c
 .endif

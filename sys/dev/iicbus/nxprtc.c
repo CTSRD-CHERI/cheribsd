@@ -33,8 +33,8 @@ __FBSDID("$FreeBSD$");
  *  - PCA8565 = like PCF8563, automotive temperature range
  *  - PCF8523 = low power, countdown timer, oscillator freq tuning, 2 timers
  *  - PCF2127 = like PCF8523, industrial, tcxo, tamper/ts, i2c & spi, 512B ram
- *  - PCA2129 = like PCF8523, automotive, tcxo, tamper/ts, i2c & spi, no timer
- *  - PCF2129 = like PCF8523, industrial, tcxo, tamper/ts, i2c & spi, no timer
+ *  - PCA2129 = like PCF8523, automotive, tcxo, tamper/ts, i2c & spi, (note 1)
+ *  - PCF2129 = like PCF8523, industrial, tcxo, tamper/ts, i2c & spi, (note 1)
  *
  *  Most chips have a countdown timer, ostensibly intended to generate periodic
  *  interrupt signals on an output pin.  The timer is driven from the same
@@ -42,6 +42,13 @@ __FBSDID("$FreeBSD$");
  *  in sync when the STOP bit is cleared after the time and timer registers are
  *  set.  The timer register can also be read on the fly, so we use it to count
  *  fractional seconds and get a resolution of ~15ms.
+ *
+ *  [1] Note that the datasheets for the PCx2129 chips state that they have only
+ *  a watchdog timer, not a countdown timer.  Empirical testing shows that the
+ *  countdown timer is actually there and it works fine, except that it can't
+ *  trigger an interrupt or toggle an output pin like it can on other chips.  We
+ *  don't care about interrupts and output pins, we just read the timer register
+ *  to get better resolution.
  */
 
 #include "opt_platform.h"
@@ -236,10 +243,43 @@ static nxprtc_compat_data compat_data[] = {
 };
 
 static int
+nxprtc_readfrom(device_t slavedev, uint8_t regaddr, void *buffer,
+    uint16_t buflen, int waithow)
+{
+	struct iic_msg msg;
+	int err;
+	uint8_t slaveaddr;
+
+	/*
+	 * Two transfers back to back with a stop and start between them; first we
+	 * write the address-within-device, then we read from the device.  This
+	 * is used instead of the standard iicdev_readfrom() because some of the
+	 * chips we service don't support i2c repeat-start operations (grrrrr)
+	 * so we do two completely separate transfers with a full stop between.
+	 */
+	slaveaddr = iicbus_get_addr(slavedev);
+
+	msg.slave = slaveaddr;
+	msg.flags = IIC_M_WR;
+	msg.len   = 1;
+	msg.buf   = &regaddr;
+
+	if ((err = iicbus_transfer_excl(slavedev, &msg, 1, waithow)) != 0)
+		return (err);
+
+	msg.slave = slaveaddr;
+	msg.flags = IIC_M_RD;
+	msg.len   = buflen;
+	msg.buf   = buffer;
+
+	return (iicbus_transfer_excl(slavedev, &msg, 1, waithow));
+}
+
+static int
 read_reg(struct nxprtc_softc *sc, uint8_t reg, uint8_t *val)
 {
 
-	return (iicdev_readfrom(sc->dev, reg, val, sizeof(*val), WAITFLAGS));
+	return (nxprtc_readfrom(sc->dev, reg, val, sizeof(*val), WAITFLAGS));
 }
 
 static int
@@ -272,7 +312,7 @@ read_timeregs(struct nxprtc_softc *sc, struct time_regs *tregs, uint8_t *tmr)
 			if (tmr1 != tmr2)
 				continue;
 		}
-		if ((err = iicdev_readfrom(sc->dev, sc->secaddr, tregs,
+		if ((err = nxprtc_readfrom(sc->dev, sc->secaddr, tregs,
 		    sizeof(*tregs), WAITFLAGS)) != 0)
 			break;
 	} while (sc->use_timer && tregs->sec != sec);
@@ -311,9 +351,18 @@ pcf8523_start(struct nxprtc_softc *sc)
 {
 	int err;
 	uint8_t cs1, cs3, clkout;
-	bool is2129;
+	bool is212x;
 
-	is2129 = (sc->chiptype == TYPE_PCA2129 || sc->chiptype == TYPE_PCF2129);
+	switch (sc->chiptype) {
+	case TYPE_PCF2127:
+	case TYPE_PCA2129:
+	case TYPE_PCF2129:
+		is212x = true;
+		break;
+	default:
+		is212x = false;
+		break;
+	}
 
 	/* Read and sanity-check the control registers. */
 	if ((err = read_reg(sc, PCF85xx_R_CS1, &cs1)) != 0) {
@@ -349,7 +398,7 @@ pcf8523_start(struct nxprtc_softc *sc)
 		 * to zero then back to 1, then wait 100ms for the refresh, and
 		 * finally set the bit back to zero with the COF_HIGHZ write.
 		 */
-		if (is2129) {
+		if (is212x) {
 			clkout = PCF2129_B_CLKOUT_HIGHZ;
 			if ((err = write_reg(sc, PCF8523_R_TMR_CLKOUT,
 			    clkout)) != 0) {
@@ -389,7 +438,7 @@ pcf8523_start(struct nxprtc_softc *sc)
 		device_printf(sc->dev, "WARNING: RTC battery is low\n");
 
 	/* Remember whether we're running in AM/PM mode. */
-	if (is2129) {
+	if (is212x) {
 		if (cs1 & PCF2129_B_CS1_12HR)
 			sc->use_ampm = true;
 	} else {
@@ -438,7 +487,13 @@ pcf2127_start_timer(struct nxprtc_softc *sc)
 	int err;
 	uint8_t stdctl, tmrctl;
 
-	/* See comment in pcf8523_start_timer().  */
+	/*
+	 * Set up timer if it's not already in the mode we normally run it.  See
+	 * the comment in pcf8523_start_timer() for more details.
+	 *
+	 * Note that the PCF2129 datasheet says it has no countdown timer, but
+	 * empirical testing shows that it works just fine for our purposes.
+	 */
 	if ((err = read_reg(sc, PCF2127_R_TMR_CTL, &tmrctl)) != 0)
 		return (err);
 
@@ -488,10 +543,6 @@ nxprtc_start(void *dev)
 	switch (sc->chiptype) {
 	case TYPE_PCA2129:
 	case TYPE_PCF2129:
-		if (pcf8523_start(sc) != 0)
-			return;
-		/* No timer to start */
-		break;
 	case TYPE_PCF2127:
 		if (pcf8523_start(sc) != 0)
 			return;
@@ -763,10 +814,6 @@ nxprtc_attach(device_t dev)
 	switch (sc->chiptype) {
 	case TYPE_PCA2129:
 	case TYPE_PCF2129:
-		sc->secaddr = PCF8523_R_SECOND;
-		sc->tmcaddr = 0;
-		sc->use_timer = false;
-		break;
 	case TYPE_PCF2127:
 	case TYPE_PCF8523:
 		sc->secaddr = PCF8523_R_SECOND;
@@ -826,3 +873,4 @@ static devclass_t nxprtc_devclass;
 DRIVER_MODULE(nxprtc, iicbus, nxprtc_driver, nxprtc_devclass, NULL, NULL);
 MODULE_VERSION(nxprtc, 1);
 MODULE_DEPEND(nxprtc, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
+IICBUS_FDT_PNP_INFO(compat_data);

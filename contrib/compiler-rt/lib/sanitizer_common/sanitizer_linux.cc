@@ -784,9 +784,17 @@ int internal_sysctl(const int *name, unsigned int namelen, void *oldp,
 }
 
 #if SANITIZER_FREEBSD
+typedef int (*syctlbyname_ptr)(const char *sname, void *oldp, size_t *oldlenp,
+                          const void *newp, size_t newlen);
 int internal_sysctlbyname(const char *sname, void *oldp, uptr *oldlenp,
                           const void *newp, uptr newlen) {
-  return sysctlbyname(sname, oldp, (size_t *)oldlenp, newp, (size_t)newlen);
+  static syctlbyname_ptr real_sysctlbyname = nullptr;
+  if (!real_sysctlbyname)
+    real_sysctlbyname = (syctlbyname_ptr)dlfunc(RTLD_NEXT, "sysctlbyname");
+  if (!real_sysctlbyname)
+    real_sysctlbyname = (syctlbyname_ptr)dlfunc(RTLD_DEFAULT, "sysctlbyname");
+  CHECK(real_sysctlbyname);
+  return real_sysctlbyname(sname, oldp, (size_t *)oldlenp, newp, (size_t)newlen);
 }
 #endif
 #endif

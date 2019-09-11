@@ -54,6 +54,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/fcntl.h>
 #include <sys/file.h>
 #include <sys/kdb.h>
+#include <sys/ktr.h>
 #include <sys/stat.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
@@ -294,6 +295,39 @@ bad:
 	return (error);
 }
 
+static int
+vn_open_vnode_advlock(struct vnode *vp, int fmode, struct file *fp)
+{
+	struct flock lf;
+	int error, lock_flags, type;
+
+	ASSERT_VOP_LOCKED(vp, "vn_open_vnode_advlock");
+	if ((fmode & (O_EXLOCK | O_SHLOCK)) == 0)
+		return (0);
+	KASSERT(fp != NULL, ("open with flock requires fp"));
+	if (fp->f_type != DTYPE_NONE && fp->f_type != DTYPE_VNODE)
+		return (EOPNOTSUPP);
+
+	lock_flags = VOP_ISLOCKED(vp);
+	VOP_UNLOCK(vp, 0);
+
+	lf.l_whence = SEEK_SET;
+	lf.l_start = 0;
+	lf.l_len = 0;
+	lf.l_type = (fmode & O_EXLOCK) != 0 ? F_WRLCK : F_RDLCK;
+	type = F_FLOCK;
+	if ((fmode & FNONBLOCK) == 0)
+		type |= F_WAIT;
+	error = VOP_ADVLOCK(vp, (caddr_t)fp, F_SETLK, &lf, type);
+	if (error == 0)
+		fp->f_flag |= FHASLOCK;
+
+	vn_lock(vp, lock_flags | LK_RETRY);
+	if (error == 0 && (vp->v_iflag & VI_DOOMED) != 0)
+		error = ENOENT;
+	return (error);
+}
+
 /*
  * Common code for vnode open operations once a vnode is located.
  * Check permissions, and call the VOP_OPEN routine.
@@ -303,8 +337,7 @@ vn_open_vnode(struct vnode *vp, int fmode, struct ucred *cred,
     struct thread *td, struct file *fp)
 {
 	accmode_t accmode;
-	struct flock lf;
-	int error, lock_flags, type;
+	int error;
 
 	if (vp->v_type == VLNK)
 		return (EMLINK);
@@ -335,63 +368,31 @@ vn_open_vnode(struct vnode *vp, int fmode, struct ucred *cred,
 
 	accmode &= ~(VCREAT | VVERIFY);
 #endif
-	if ((fmode & O_CREAT) == 0) {
-		if (accmode & VWRITE) {
-			error = vn_writechk(vp);
-			if (error)
-				return (error);
-		}
-		if (accmode) {
-		        error = VOP_ACCESS(vp, accmode, cred, td);
-			if (error)
-				return (error);
-		}
+	if ((fmode & O_CREAT) == 0 && accmode != 0) {
+		error = VOP_ACCESS(vp, accmode, cred, td);
+		if (error != 0)
+			return (error);
 	}
 	if (vp->v_type == VFIFO && VOP_ISLOCKED(vp) != LK_EXCLUSIVE)
 		vn_lock(vp, LK_UPGRADE | LK_RETRY);
-	if ((error = VOP_OPEN(vp, fmode, cred, td, fp)) != 0)
+	error = VOP_OPEN(vp, fmode, cred, td, fp);
+	if (error != 0)
 		return (error);
 
-	while ((fmode & (O_EXLOCK | O_SHLOCK)) != 0) {
-		KASSERT(fp != NULL, ("open with flock requires fp"));
-		if (fp->f_type != DTYPE_NONE && fp->f_type != DTYPE_VNODE) {
-			error = EOPNOTSUPP;
-			break;
+	error = vn_open_vnode_advlock(vp, fmode, fp);
+	if (error == 0 && (fmode & FWRITE) != 0) {
+		error = VOP_ADD_WRITECOUNT(vp, 1);
+		if (error == 0) {
+			CTR3(KTR_VFS, "%s: vp %p v_writecount increased to %d",
+			     __func__, vp, vp->v_writecount);
 		}
-		lock_flags = VOP_ISLOCKED(vp);
-		VOP_UNLOCK(vp, 0);
-		lf.l_whence = SEEK_SET;
-		lf.l_start = 0;
-		lf.l_len = 0;
-		if (fmode & O_EXLOCK)
-			lf.l_type = F_WRLCK;
-		else
-			lf.l_type = F_RDLCK;
-		type = F_FLOCK;
-		if ((fmode & FNONBLOCK) == 0)
-			type |= F_WAIT;
-		error = VOP_ADVLOCK(vp, (caddr_t)fp, F_SETLK, &lf, type);
-		if (error == 0)
-			fp->f_flag |= FHASLOCK;
-		vn_lock(vp, lock_flags | LK_RETRY);
-		if (error != 0)
-			break;
-		if ((vp->v_iflag & VI_DOOMED) != 0) {
-			error = ENOENT;
-			break;
-		}
-
-		/*
-		 * Another thread might have used this vnode as an
-		 * executable while the vnode lock was dropped.
-		 * Ensure the vnode is still able to be opened for
-		 * writing after the lock has been obtained.
-		 */
-		if ((accmode & VWRITE) != 0)
-			error = vn_writechk(vp);
-		break;
 	}
 
+	/*
+	 * Error from advlock or VOP_ADD_WRITECOUNT() still requires
+	 * calling VOP_CLOSE() to pair with earlier VOP_OPEN().
+	 * Arrange for that by having fdrop() to use vn_closefile().
+	 */
 	if (error != 0) {
 		fp->f_flag |= FOPENFAILED;
 		fp->f_vnode = vp;
@@ -400,18 +401,17 @@ vn_open_vnode(struct vnode *vp, int fmode, struct ucred *cred,
 			fp->f_ops = &vnops;
 		}
 		vref(vp);
-	} else if  ((fmode & FWRITE) != 0) {
-		VOP_ADD_WRITECOUNT(vp, 1);
-		CTR3(KTR_VFS, "%s: vp %p v_writecount increased to %d",
-		    __func__, vp, vp->v_writecount);
 	}
+
 	ASSERT_VOP_LOCKED(vp, "vn_open_vnode");
 	return (error);
+
 }
 
 /*
  * Check for write permissions on the specified vnode.
  * Prototype text segments cannot be written.
+ * It is racy.
  */
 int
 vn_writechk(struct vnode *vp)
@@ -449,9 +449,7 @@ vn_close1(struct vnode *vp, int flags, struct ucred *file_cred,
 	vn_lock(vp, lock_flags | LK_RETRY);
 	AUDIT_ARG_VNODE1(vp);
 	if ((flags & (FWRITE | FOPENFAILED)) == FWRITE) {
-		VNASSERT(vp->v_writecount > 0, vp, 
-		    ("vn_close: negative writecount"));
-		VOP_ADD_WRITECOUNT(vp, -1);
+		VOP_ADD_WRITECOUNT_CHECKED(vp, -1);
 		CTR3(KTR_VFS, "%s: vp %p v_writecount decreased to %d",
 		    __func__, vp, vp->v_writecount);
 	}
@@ -501,9 +499,13 @@ sequential_heuristic(struct uio *uio, struct file *fp)
 		 * closely related to the best I/O size for real disks than
 		 * to any block size used by software.
 		 */
-		fp->f_seqcount += howmany(uio->uio_resid, 16384);
-		if (fp->f_seqcount > IO_SEQMAX)
+		if (uio->uio_resid >= IO_SEQMAX * 16384)
 			fp->f_seqcount = IO_SEQMAX;
+		else {
+			fp->f_seqcount += howmany(uio->uio_resid, 16384);
+			if (fp->f_seqcount > IO_SEQMAX)
+				fp->f_seqcount = IO_SEQMAX;
+		}
 		return (fp->f_seqcount << IO_SEQSHIFT);
 	}
 
@@ -1289,7 +1291,6 @@ static int
 vn_truncate(struct file *fp, off_t length, struct ucred *active_cred,
     struct thread *td)
 {
-	struct vattr vattr;
 	struct mount *mp;
 	struct vnode *vp;
 	void *rl_cookie;
@@ -1316,19 +1317,35 @@ vn_truncate(struct file *fp, off_t length, struct ucred *active_cred,
 	if (error)
 		goto out;
 #endif
-	error = vn_writechk(vp);
-	if (error == 0) {
-		VATTR_NULL(&vattr);
-		vattr.va_size = length;
-		if ((fp->f_flag & O_FSYNC) != 0)
-			vattr.va_vaflags |= VA_SYNC;
-		error = VOP_SETATTR(vp, &vattr, fp->f_cred);
-	}
+	error = vn_truncate_locked(vp, length, (fp->f_flag & O_FSYNC) != 0,
+	    fp->f_cred);
 out:
 	VOP_UNLOCK(vp, 0);
 	vn_finished_write(mp);
 out1:
 	vn_rangelock_unlock(vp, rl_cookie);
+	return (error);
+}
+
+/*
+ * Truncate a file that is already locked.
+ */
+int
+vn_truncate_locked(struct vnode *vp, off_t length, bool sync,
+    struct ucred *cred)
+{
+	struct vattr vattr;
+	int error;
+
+	error = VOP_ADD_WRITECOUNT(vp, 1);
+	if (error == 0) {
+		VATTR_NULL(&vattr);
+		vattr.va_size = length;
+		if (sync)
+			vattr.va_vaflags |= VA_SYNC;
+		error = VOP_SETATTR(vp, &vattr, cred);
+		VOP_ADD_WRITECOUNT_CHECKED(vp, -1);
+	}
 	return (error);
 }
 
@@ -1465,6 +1482,7 @@ vn_ioctl(struct file *fp, u_long com, void *data, struct ucred *active_cred,
 {
 	struct vattr vattr;
 	struct vnode *vp;
+	struct fiobmap2_arg *bmarg;
 	int error;
 
 	vp = fp->f_vnode;
@@ -1478,6 +1496,18 @@ vn_ioctl(struct file *fp, u_long com, void *data, struct ucred *active_cred,
 			VOP_UNLOCK(vp, 0);
 			if (error == 0)
 				*(int *)data = vattr.va_size - fp->f_offset;
+			return (error);
+		case FIOBMAP2:
+			bmarg = (struct fiobmap2_arg *)data;
+			vn_lock(vp, LK_SHARED | LK_RETRY);
+#ifdef MAC
+			error = mac_vnode_check_read(active_cred, fp->f_cred,
+			    vp);
+			if (error == 0)
+#endif
+				error = VOP_BMAP(vp, bmarg->bn, NULL,
+				    &bmarg->bn, &bmarg->runp, &bmarg->runb);
+			VOP_UNLOCK(vp, 0);
 			return (error);
 		case FIONBIO:
 		case FIOASYNC:

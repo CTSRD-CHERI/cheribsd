@@ -86,6 +86,9 @@ __FBSDID("$FreeBSD$");
 #if defined(INET) || defined(INET6)
 #include <netinet/in.h>
 #include <netinet/in_pcb.h>
+#ifdef INET
+#include <netinet/in_var.h>
+#endif
 #include <netinet/ip_var.h>
 #include <netinet/tcp_var.h>
 #ifdef TCPHPTS
@@ -93,16 +96,13 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
-#endif
-#ifdef INET
-#include <netinet/in_var.h>
-#endif
 #ifdef INET6
 #include <netinet/ip6.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
 #endif /* INET6 */
+#endif
 
 #include <netipsec/ipsec_support.h>
 
@@ -1779,8 +1779,9 @@ void
 in_pcbpurgeif0(struct inpcbinfo *pcbinfo, struct ifnet *ifp)
 {
 	struct inpcb *inp;
+	struct in_multi *inm;
+	struct in_mfilter *imf;
 	struct ip_moptions *imo;
-	int i, gap;
 
 	INP_INFO_WLOCK(pcbinfo);
 	CK_LIST_FOREACH(inp, pcbinfo->ipi_listhead, inp_list) {
@@ -1801,17 +1802,18 @@ in_pcbpurgeif0(struct inpcbinfo *pcbinfo, struct ifnet *ifp)
 			 *
 			 * XXX This can all be deferred to an epoch_call
 			 */
-			for (i = 0, gap = 0; i < imo->imo_num_memberships;
-			    i++) {
-				if (imo->imo_membership[i]->inm_ifp == ifp) {
-					IN_MULTI_LOCK_ASSERT();
-					in_leavegroup_locked(imo->imo_membership[i], NULL);
-					gap++;
-				} else if (gap != 0)
-					imo->imo_membership[i - gap] =
-					    imo->imo_membership[i];
+restart:
+			IP_MFILTER_FOREACH(imf, &imo->imo_head) {
+				if ((inm = imf->imf_inm) == NULL)
+					continue;
+				if (inm->inm_ifp != ifp)
+					continue;
+				ip_mfilter_remove(&imo->imo_head, imf);
+				IN_MULTI_LOCK_ASSERT();
+				in_leavegroup_locked(inm, NULL);
+				ip_mfilter_free(imf);
+				goto restart;
 			}
-			imo->imo_num_memberships -= gap;
 		}
 		INP_WUNLOCK(inp);
 	}
@@ -3274,13 +3276,6 @@ in_pcbattach_txrtlmt(struct inpcb *inp, struct ifnet *ifp,
 		error = EOPNOTSUPP;
 	} else {
 		error = ifp->if_snd_tag_alloc(ifp, &params, &inp->inp_snd_tag);
-
-		/*
-		 * At success increment the refcount on
-		 * the send tag's network interface:
-		 */
-		if (error == 0)
-			if_ref(inp->inp_snd_tag->ifp);
 	}
 	return (error);
 }
@@ -3293,7 +3288,6 @@ void
 in_pcbdetach_txrtlmt(struct inpcb *inp)
 {
 	struct m_snd_tag *mst;
-	struct ifnet *ifp;
 
 	INP_WLOCK_ASSERT(inp);
 
@@ -3303,19 +3297,7 @@ in_pcbdetach_txrtlmt(struct inpcb *inp)
 	if (mst == NULL)
 		return;
 
-	ifp = mst->ifp;
-	if (ifp == NULL)
-		return;
-
-	/*
-	 * If the device was detached while we still had reference(s)
-	 * on the ifp, we assume if_snd_tag_free() was replaced with
-	 * stubs.
-	 */
-	ifp->if_snd_tag_free(mst);
-
-	/* release reference count on network interface */
-	if_rele(ifp);
+	m_snd_tag_rele(mst);
 }
 
 /*
@@ -3359,6 +3341,17 @@ in_pcboutput_txrtlmt(struct inpcb *inp, struct ifnet *ifp, struct mbuf *mb)
 	 * variable read itself will be atomic.
 	 */
 	max_pacing_rate = socket->so_max_pacing_rate;
+
+	/*
+	 * If the existing send tag is for the wrong interface due to
+	 * a route change, first drop the existing tag.  Set the
+	 * CHANGED flag so that we will keep trying to allocate a new
+	 * tag if we fail to allocate one this time.
+	 */
+	if (inp->inp_snd_tag != NULL && inp->inp_snd_tag->ifp != ifp) {
+		in_pcbdetach_txrtlmt(inp);
+		inp->inp_flags2 |= INP_RATE_LIMIT_CHANGED;
+	}
 
 	/*
 	 * NOTE: When attaching to a network interface a reference is

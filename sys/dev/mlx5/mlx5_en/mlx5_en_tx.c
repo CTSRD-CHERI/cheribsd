@@ -83,10 +83,6 @@ mlx5e_select_queue_by_send_tag(struct ifnet *ifp, struct mbuf *mb)
 	struct mlx5e_snd_tag *ptag;
 	struct mlx5e_sq *sq;
 
-	/* check for route change */
-	if (mb->m_pkthdr.snd_tag->ifp != ifp)
-		return (NULL);
-
 	/* get pointer to sendqueue */
 	ptag = container_of(mb->m_pkthdr.snd_tag,
 	    struct mlx5e_snd_tag, m_snd_tag);
@@ -537,7 +533,7 @@ mlx5e_poll_tx_cq(struct mlx5e_sq *sq, int budget)
 		for (x = 0; x != sq->cev_factor; x++) {
 			ci = sqcc & sq->wq.sz_m1;
 			mb = sq->mbuf[ci].mbuf;
-			sq->mbuf[ci].mbuf = NULL;	/* Safety clear */
+			sq->mbuf[ci].mbuf = NULL;
 
 			if (mb == NULL) {
 				if (sq->mbuf[ci].num_bytes == 0) {
@@ -609,21 +605,10 @@ mlx5e_xmit(struct ifnet *ifp, struct mbuf *mb)
 	struct mlx5e_sq *sq;
 	int ret;
 
-	if (mb->m_pkthdr.snd_tag != NULL) {
+	if (mb->m_pkthdr.csum_flags & CSUM_SND_TAG) {
+		MPASS(mb->m_pkthdr.snd_tag->ifp == ifp);
 		sq = mlx5e_select_queue_by_send_tag(ifp, mb);
 		if (unlikely(sq == NULL)) {
-			/* Check for route change */
-			if (mb->m_pkthdr.snd_tag->ifp != ifp) {
-				/* Free mbuf */
-				m_freem(mb);
-
-				/*
-				 * Tell upper layers about route
-				 * change and to re-transmit this
-				 * packet:
-				 */
-				return (EAGAIN);
-			}
 			goto select_queue;
 		}
 	} else {

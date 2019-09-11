@@ -33,6 +33,10 @@ VE_SIGNATURE_EXT_LIST+= \
 	sig
 .endif
 
+# add OpenPGP support - possibly dormant
+VE_SIGNATURE_LIST+= OPENPGP
+VE_SIGNATURE_EXT_LIST+= asc
+
 SIGNER ?= ${SB_TOOLS_PATH:U/volume/buildtools/bin}/sign.py
 
 .if exists(${SIGNER})
@@ -42,7 +46,12 @@ SIGN_ECDSA= ${PYTHON} ${SIGNER} -u ${SIGN_HOST}:${ECDSA_PORT} -h sha256
 RSA2_PORT:= ${163%y:L:gmtime}
 SIGN_RSA2=   ${PYTHON} ${SIGNER} -u ${SIGN_HOST}:${RSA2_PORT} -h sha256
 
+# deal with quirk of our .esig format
+XCFLAGS.vets+= -DVE_ECDSA_HASH_AGAIN
+
 .if !empty(OPENPGP_SIGN_URL)
+XCFLAGS.opgp_key+= -DHAVE_TA_ASC_H
+
 VE_SIGNATURE_LIST+= OPENPGP
 VE_SIGNATURE_EXT_LIST+= asc
 
@@ -51,7 +60,7 @@ SIGN_OPENPGP= ${PYTHON} ${SIGNER:H}/openpgp-sign.py -a -u ${OPENPGP_SIGN_URL}
 ta_openpgp.asc:
 	${SIGN_OPENPGP} -C ${.TARGET}
 
-ta.h: ta_openpgp.asc
+ta_asc.h: ta_openpgp.asc
 
 .if ${VE_SELF_TESTS} != "no"
 # for self test
@@ -59,7 +68,7 @@ vc_openpgp.asc: ta_openpgp.asc
 	${SIGN_OPENPGP} ${.ALLSRC:M*.asc}
 	mv ta_openpgp.asc.asc ${.TARGET}
 
-ta.h: vc_openpgp.asc
+ta_asc.h: vc_openpgp.asc
 .endif
 .endif
 
@@ -72,17 +81,20 @@ ecerts.pem:
 .if ${VE_SIGNATURE_LIST:tu:MECDSA} != ""
 # the last cert in the chain is the one we want
 ta_ec.pem: ecerts.pem _LAST_PEM_USE
-
+ta.h: ta_ec.pem
 .if ${VE_SELF_TESTS} != "no"
 # these are for verification self test
 vc_ec.pem: ecerts.pem _2ndLAST_PEM_USE
+ta.h: vc_ec.pem
 .endif
 .endif
 
 .if ${VE_SIGNATURE_LIST:tu:MRSA} != ""
 ta_rsa.pem: rcerts.pem _LAST_PEM_USE
+ta.h: ta_rsa.pem
 .if ${VE_SELF_TESTS} != "no"
 vc_rsa.pem: rcerts.pem _2ndLAST_PEM_USE
+ta.h: vc_rsa.pem
 .endif
 .endif
 

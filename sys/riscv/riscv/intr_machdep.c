@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/ktr.h>
 #include <sys/module.h>
 #include <sys/cpuset.h>
 #include <sys/interrupt.h>
@@ -207,7 +208,7 @@ ipi_send(struct pcpu *pc, int ipi)
 	CTR3(KTR_SMP, "%s: cpu=%d, ipi=%x", __func__, pc->pc_cpuid, ipi);
 
 	atomic_set_32(&pc->pc_pending_ipis, ipi);
-	mask = (1 << (pc->pc_cpuid));
+	mask = (1 << pc->pc_hart);
 
 	sbi_send_ipi(&mask);
 
@@ -252,7 +253,7 @@ ipi_selected(cpuset_t cpus, u_int ipi)
 			CTR3(KTR_SMP, "%s: pc: %p, ipi: %x\n", __func__, pc,
 			    ipi);
 			atomic_set_32(&pc->pc_pending_ipis, ipi);
-			mask |= (1 << (pc->pc_cpuid));
+			mask |= (1 << pc->pc_hart);
 		}
 	}
 	sbi_send_ipi(&mask);

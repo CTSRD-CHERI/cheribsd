@@ -225,6 +225,17 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 	} else {
 		bootinfop = NULL;
 		memsize = a3;
+#ifdef CPU_CHERI
+		/* Ensure that we don't write to the tag memory */
+		if (memsize > 2ul * 1024 * 1024 * 1024)
+			panic("invalid memsize 0x%lx", memsize);
+		/*
+		 * The memory size reported by miniboot is wrong for CHERI:
+		 * The tag memory always starts at 3EFFC000, so we mustn't
+		 * write to any addresses higher than 3EFFC000.
+		 */
+		memsize = MIN(memsize, 0x3EFFC000);
+#endif
 	}
 
 	kmdp = preload_search_by_type("elf kernel");

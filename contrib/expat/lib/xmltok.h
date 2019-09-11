@@ -29,7 +29,18 @@
    OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE
    USE OR OTHER DEALINGS IN THE SOFTWARE.
 */
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190124,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds",
+ *   ],
+ *   "change_comment": "C inheritance addrof first member (ENCODING)"
+ * }
+ * CHERI CHANGES END
+ */
 #ifndef XmlTok_INCLUDED
 #define XmlTok_INCLUDED 1
 
@@ -150,9 +161,8 @@ typedef struct {
   char normalized;
 } ATTRIBUTE;
 
-/* No subobject bounds here since this is used like a C++ class with inheritance */
-struct __no_subobject_bounds encoding;
-typedef __no_subobject_bounds struct encoding ENCODING;
+struct encoding;
+typedef struct encoding ENCODING;
 
 typedef int (PTRCALL *SCANNER)(const ENCODING *,
                                const char *,
@@ -165,7 +175,7 @@ enum XML_Convert_Result {
   XML_CONVERT_OUTPUT_EXHAUSTED = 2  /* and therefore potentially input remaining as well */
 };
 
-struct encoding {
+__subobject_type_used_for_c_inheritance struct encoding {
   SCANNER scanners[XML_N_STATES];
   SCANNER literalScanners[XML_N_LITERAL_TYPES];
   int (PTRCALL *nameMatchesAscii)(const ENCODING *,
@@ -289,7 +299,7 @@ struct encoding {
   (((enc)->utf16Convert)(enc, fromP, fromLim, toP, toLim))
 
 typedef struct {
-  ENCODING initEnc;
+  ENCODING initEnc __subobject_member_used_for_c_inheritance;
   const ENCODING **encPtr;
 } INIT_ENCODING;
 

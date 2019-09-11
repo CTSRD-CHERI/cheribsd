@@ -577,7 +577,8 @@ mi_milteropen(conn, backlog, rmsocket, name)
 */
 
 static void *
-mi_thread_handle_wrapper(void *arg)
+mi_thread_handle_wrapper(arg)
+	void *arg;
 {
 	/*
 	**  Note: on some systems this generates a compiler warning:

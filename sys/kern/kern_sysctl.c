@@ -326,13 +326,6 @@ sysctl_load_tunable_by_oid_locked(struct sysctl_oid *oidp)
 		freeenv(penv);
 }
 
-static int
-sbuf_printf_drain(void *arg __unused, const char *data, int len)
-{
-
-	return (printf("%.*s", len, data));
-}
-
 /*
  * Locate the path to a given oid.  Returns the length of the resulting path,
  * or -1 if the oid was not found.  nodes must have room for CTL_MAXNAME
@@ -1743,6 +1736,29 @@ sysctl_msec_to_sbintime(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
+/*
+ * Convert seconds to a struct timeval.  Intended for use with
+ * intervals and thus does not permit negative seconds.
+ */
+int
+sysctl_sec_to_timeval(SYSCTL_HANDLER_ARGS)
+{
+	struct timeval *tv;
+	int error, secs;
+
+	tv = arg1;
+	secs = tv->tv_sec;
+
+	error = sysctl_handle_int(oidp, &secs, 0, req);
+	if (error || req->newptr == NULL)
+		return (error);
+
+	if (secs < 0)
+		return (EINVAL);
+	tv->tv_sec = secs;
+
+	return (0);
+}
 
 /*
  * Transfer functions to/from kernel space.

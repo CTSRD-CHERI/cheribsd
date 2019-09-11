@@ -34,12 +34,14 @@
 #ifndef RTLD_MALLOC_H
 #define	RTLD_MALLOC_H
 
-void *__crt_calloc(size_t num, size_t size);
-void __crt_free(void *cp);
-void *__crt_malloc(size_t nbytes);
-void *__crt_realloc(void *cp, size_t nbytes);
+#include <sys/cdefs.h>
 
-extern int npagesizes;
-extern size_t *pagesizes;
+void *__crt_calloc(size_t num, size_t size) __hidden;
+void __crt_free(void *cp) __hidden;
+void *__crt_malloc(size_t nbytes) __hidden;
+void *__crt_realloc(void *cp, size_t nbytes) __hidden;
+
+extern int npagesizes __hidden;
+extern size_t *pagesizes __hidden;
 
 #endif

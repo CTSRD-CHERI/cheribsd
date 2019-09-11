@@ -311,8 +311,8 @@ SYSCTL_PROC(_debug_ktr, OID_AUTO, alq_enable,
 
 void
 ktr_tracepoint(uint64_t mask, const char *file, int line, const char *format,
-    u_long arg1, u_long arg2, u_long arg3, u_long arg4, u_long arg5,
-    u_long arg6)
+    uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t arg4,
+    uintptr_t arg5, uintptr_t arg6)
 {
 	struct ktr_entry *entry;
 #ifdef KTR_ALQ

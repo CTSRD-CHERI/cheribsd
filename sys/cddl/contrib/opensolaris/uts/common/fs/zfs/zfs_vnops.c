@@ -455,7 +455,7 @@ page_unbusy(vm_page_t pp)
 }
 
 static vm_page_t
-page_hold(vnode_t *vp, int64_t start)
+page_wire(vnode_t *vp, int64_t start)
 {
 	vm_object_t obj;
 	vm_page_t pp;
@@ -482,9 +482,8 @@ page_hold(vnode_t *vp, int64_t start)
 
 			ASSERT3U(pp->valid, ==, VM_PAGE_BITS_ALL);
 			vm_page_lock(pp);
-			vm_page_hold(pp);
+			vm_page_wire(pp);
 			vm_page_unlock(pp);
-
 		} else
 			pp = NULL;
 		break;
@@ -493,11 +492,11 @@ page_hold(vnode_t *vp, int64_t start)
 }
 
 static void
-page_unhold(vm_page_t pp)
+page_unwire(vm_page_t pp)
 {
 
 	vm_page_lock(pp);
-	vm_page_unhold(pp);
+	vm_page_unwire(pp, PQ_ACTIVE);
 	vm_page_unlock(pp);
 }
 
@@ -647,7 +646,7 @@ mappedread(vnode_t *vp, int nbytes, uio_t *uio)
 		vm_page_t pp;
 		uint64_t bytes = MIN(PAGESIZE - off, len);
 
-		if (pp = page_hold(vp, start)) {
+		if (pp = page_wire(vp, start)) {
 			struct sf_buf *sf;
 			caddr_t va;
 
@@ -660,7 +659,7 @@ mappedread(vnode_t *vp, int nbytes, uio_t *uio)
 #endif
 			zfs_unmap_page(sf);
 			zfs_vmobject_wlock(obj);
-			page_unhold(pp);
+			page_unwire(pp);
 		} else {
 			zfs_vmobject_wunlock(obj);
 			error = dmu_read_uio_dbuf(sa_get_db(zp->z_sa_hdl),
@@ -1244,6 +1243,7 @@ zfs_write(vnode_t *vp, uio_t *uio, int ioflag, cred_t *cr, caller_context_t *ct)
 	return (0);
 }
 
+/* ARGSUSED */
 void
 zfs_get_done(zgd_t *zgd, int error)
 {
@@ -1260,9 +1260,6 @@ zfs_get_done(zgd_t *zgd, int error)
 	 * txg stopped from syncing.
 	 */
 	VN_RELE_ASYNC(ZTOV(zp), dsl_pool_vnrele_taskq(dmu_objset_pool(os)));
-
-	if (error == 0 && zgd->zgd_bp)
-		zil_lwb_add_block(zgd->zgd_lwb, zgd->zgd_bp);
 
 	kmem_free(zgd, sizeof (zgd_t));
 }
@@ -1387,11 +1384,7 @@ zfs_get_data(void *arg, lr_write_t *lr, char *buf, struct lwb *lwb, zio_t *zio)
 				 * TX_WRITE2 relies on the data previously
 				 * written by the TX_WRITE that caused
 				 * EALREADY.  We zero out the BP because
-				 * it is the old, currently-on-disk BP,
-				 * so there's no need to zio_flush() its
-				 * vdevs (flushing would needlesly hurt
-				 * performance, and doesn't work on
-				 * indirect vdevs).
+				 * it is the old, currently-on-disk BP.
 				 */
 				zgd->zgd_bp = NULL;
 				BP_ZERO(bp);

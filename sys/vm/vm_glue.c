@@ -205,21 +205,8 @@ vslock(void * __capability addr, size_t len)
 	if (last < vaddr || end < vaddr)
 		return (EINVAL);
 	npages = atop(end - start);
-	if (npages > vm_page_max_wired)
+	if (npages > vm_page_max_user_wired)
 		return (ENOMEM);
-#if 0
-	/*
-	 * XXX - not yet
-	 *
-	 * The limit for transient usage of wired pages should be
-	 * larger than for "permanent" wired pages (mlock()).
-	 *
-	 * Also, the sysctl code, which is the only present user
-	 * of vslock(), does a hard loop on EAGAIN.
-	 */
-	if (npages + vm_wire_count() > vm_page_max_wired)
-		return (EAGAIN);
-#endif
 	error = vm_map_wire(&curproc->p_vmspace->vm_map, start, end,
 	    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);
 	if (error == KERN_SUCCESS) {
@@ -262,12 +249,14 @@ vm_imgact_hold_page(vm_object_t object, vm_ooffset_t offset)
 
 	VM_OBJECT_WLOCK(object);
 	pindex = OFF_TO_IDX(offset);
-	m = vm_page_grab(object, pindex, VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY);
+	m = vm_page_grab(object, pindex, VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY |
+	    VM_ALLOC_WIRED);
 	if (m->valid != VM_PAGE_BITS_ALL) {
 		vm_page_xbusy(m);
 		rv = vm_pager_get_pages(object, &m, 1, NULL, NULL);
 		if (rv != VM_PAGER_OK) {
 			vm_page_lock(m);
+			vm_page_unwire(m, PQ_NONE);
 			vm_page_free(m);
 			vm_page_unlock(m);
 			m = NULL;
@@ -275,10 +264,6 @@ vm_imgact_hold_page(vm_object_t object, vm_ooffset_t offset)
 		}
 		vm_page_xunbusy(m);
 	}
-	vm_page_lock(m);
-	vm_page_hold(m);
-	vm_page_activate(m);
-	vm_page_unlock(m);
 out:
 	VM_OBJECT_WUNLOCK(object);
 	return (m);
@@ -312,7 +297,7 @@ vm_imgact_unmap_page(struct sf_buf *sf)
 	sf_buf_free(sf);
 	sched_unpin();
 	vm_page_lock(m);
-	vm_page_unhold(m);
+	vm_page_unwire(m, PQ_ACTIVE);
 	vm_page_unlock(m);
 }
 
@@ -586,7 +571,7 @@ vm_thread_stack_dispose(vm_object_t ksobj, vm_offset_t ks, int pages)
 		if (m == NULL)
 			panic("vm_thread_dispose: kstack already missing?");
 		vm_page_lock(m);
-		vm_page_unwire(m, PQ_NONE);
+		vm_page_unwire_noq(m);
 		vm_page_free(m);
 		vm_page_unlock(m);
 	}

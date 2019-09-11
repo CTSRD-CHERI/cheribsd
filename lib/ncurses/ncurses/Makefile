@@ -389,6 +389,7 @@ keys.list: MKkeys_list.sh Caps
 	    ${NCURSES_DIR}/include/Caps | LC_ALL=C sort > keys.list
 
 # Build tools
+DEPENDOBJS+= make_hash make_keys
 build-tools: make_hash make_keys
 BUILD_TOOLS_CFLAGS+=	-I. -I${.CURDIR}/../ncurses
 BUILD_TOOLS_CFLAGS+=	-I${NCURSES_DIR}/ncurses -I${NCURSES_DIR}/include
