@@ -210,10 +210,6 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
 
-	case MIPS_GET_COUNT:
-		td->td_retval[0] = mips_rd_count();
-		return (0);
-
 #ifdef CPU_QEMU_MALTA
 	case QEMU_GET_QTRACE:
 		intval = (td->td_md.md_flags & MDTD_QTRACE) ? 1 : 0;

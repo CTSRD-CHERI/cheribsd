@@ -39,7 +39,6 @@
 
 #define	MIPS_SET_TLS	1
 #define	MIPS_GET_TLS	2
-#define	MIPS_GET_COUNT	3
 
 /*
  * CHERI sysarch()s to get and set the trusted stack.
