@@ -2633,8 +2633,7 @@ tar_atol_base_n(const char *p, size_t char_cnt, int base)
 	l = 0;
 	if (char_cnt != 0) {
 		digit = *p - '0';
-		while (digit >= 0 && digit < base && char_cnt != 0) {
-			digit = *p - '0';
+		while (digit >= 0 && digit < base  && char_cnt != 0) {
 			if (l>limit || (l == limit && digit > last_digit_limit)) {
 				return maxval; /* Truncate on overflow. */
 			}
@@ -2646,8 +2645,10 @@ tar_atol_base_n(const char *p, size_t char_cnt, int base)
 			 * toplevel if to a while loop and break if the digit
 			 * is outside the range.
 			 */
-			p++;
 			char_cnt--;
+			if (char_cnt != 0) {
+				digit = *++p - '0';
+			}
 		}
 	}
 	return (sign < 0) ? -l : l;
