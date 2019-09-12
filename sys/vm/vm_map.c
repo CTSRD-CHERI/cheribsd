@@ -99,6 +99,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/swap_pager.h>
 #include <vm/uma.h>
 
+#ifdef CHERI_CAPREVOKE
+#include <sys/caprevoke.h>
+#endif
+
 /*
  *	Virtual memory maps provide for the mapping, protection,
  *	and sharing of virtual memory objects.  In addition,
@@ -946,6 +950,10 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min, vm_offset_t max)
 	map->timestamp = 0;
 	map->busy = 0;
 	map->anon_loc = 0;
+
+#ifdef CHERI_CAPREVOKE
+	map->vm_caprev_st = CAPREVST_NONE;	/* and epoch 0 */
+#endif
 }
 
 void
