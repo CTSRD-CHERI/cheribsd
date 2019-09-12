@@ -31,7 +31,7 @@
 #ifndef ARCHIVE_RB_H_
 #define	ARCHIVE_RB_H_
 
-struct archive_rb_node {
+__subobject_type_used_for_c_inheritance struct archive_rb_node {
 	struct archive_rb_node *rb_nodes[2];
 	/*
 	 * rb_info contains the two flags and the parent back pointer.
