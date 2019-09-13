@@ -111,6 +111,11 @@ static inline int caprevoke_epoch_clears(caprevoke_epoch now,
 	return caprevoke_epoch_ge(now, then + (then & 1) + 2);
 }
 
+/* Returns 1 if cap is revoked, 0 otherwise. */
+static inline int caprevoke_is_revoked(const void * __capability cap) {
+	return (__builtin_cheri_perms_get(cap) == 0);
+}
+
 	/*
 	 * Finish the current revocation epoch this pass.
 	 * If there is no current revocation epoch, start one and then
@@ -269,6 +274,7 @@ struct caprevoke_stats {
 
 	uint32_t	__spare[2];
 };
+
 #define	CAPREVOKE_SHADOW_NOVMMAP	0x00	/* The ordinary shadow space */
 #define CAPREVOKE_SHADOW_OTYPE		0x01	/* The otype shadow space */
 /*
@@ -308,6 +314,7 @@ int caprevoke(int flags, caprevoke_epoch start_epoch,
 int caprevoke_shadow(int flags,
 	void * __capability arena,
 	void * __capability * shadow);
+
 #endif
 
 #endif /* !__SYS_CAPREVOKE_H__ */
