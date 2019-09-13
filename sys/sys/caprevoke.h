@@ -252,6 +252,11 @@ struct caprevoke_info {
 	caprevoke_epoch epoch_dequeue;	/* Gates removal from quarantine */
 };
 
+/* Returns 1 if cap is revoked, 0 otherwise. */
+static inline int caprevoke_is_revoked(void * __capability cap) {
+	return (__builtin_cheri_perms_get(cap) == 0);
+}
+
 #ifdef _KERNEL
 struct caprevoke_info_page {
 		/* Userland will come to hold RO caps to this bit */
@@ -306,6 +311,7 @@ int caprevoke_shadow(int flags,
 	void * __capability arena,
 	void * __capability * shadow);
 
+/* Set *shadow to a capability granting access to the entire shadow space. */
 int caprevoke_entire_shadow_cap(void * __capability *shadow);
 #endif
 
