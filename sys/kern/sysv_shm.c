@@ -559,7 +559,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			    lim_max(td, RLIMIT_DATA));
 		}
 	}
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	max_va = cheri_getbase(shmaddr) + cheri_getlen(shmaddr);
 #else
 	max_va = 0;
