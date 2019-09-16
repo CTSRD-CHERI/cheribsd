@@ -696,9 +696,22 @@ int
 vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
     struct vmspace *vm2, int flags)
 {
+	vm_map_t map2;
+	vm_map_entry_t entry;
 	struct proc *p1 = td->td_proc;
 	struct domainset *dset;
 	int error;
+
+	if ((flags & RFMEM) == 0 && (flags & RFPROC) != 0) {
+		map2 = &vm2->vm_map;
+		vm_map_lock(map2);
+		for (entry = map2->header.next; entry != &map2->header;
+		    entry = entry->next) {
+			if (entry->owner == p1->p_pid)
+				entry->owner = p2->p_pid;
+		}
+		vm_map_unlock(map2);
+	}
 
 	if ((flags & RFPROC) == 0) {
 		/*
