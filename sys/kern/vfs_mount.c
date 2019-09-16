@@ -128,6 +128,12 @@ mount_init(void *mem, int size, int flags)
 	lockinit(&mp->mnt_explock, PVFS, "explock", 0, 0);
 	mp->mnt_thread_in_ops_pcpu = uma_zalloc_pcpu(pcpu_zone_int,
 	    M_WAITOK | M_ZERO);
+	mp->mnt_ref_pcpu = uma_zalloc_pcpu(pcpu_zone_int,
+	    M_WAITOK | M_ZERO);
+	mp->mnt_lockref_pcpu = uma_zalloc_pcpu(pcpu_zone_int,
+	    M_WAITOK | M_ZERO);
+	mp->mnt_writeopcount_pcpu = uma_zalloc_pcpu(pcpu_zone_int,
+	    M_WAITOK | M_ZERO);
 	mp->mnt_ref = 0;
 	mp->mnt_vfs_ops = 1;
 	return (0);
@@ -139,6 +145,9 @@ mount_fini(void *mem, int size)
 	struct mount *mp;
 
 	mp = (struct mount *)mem;
+	uma_zfree_pcpu(pcpu_zone_int, mp->mnt_writeopcount_pcpu);
+	uma_zfree_pcpu(pcpu_zone_int, mp->mnt_lockref_pcpu);
+	uma_zfree_pcpu(pcpu_zone_int, mp->mnt_ref_pcpu);
 	uma_zfree_pcpu(pcpu_zone_int, mp->mnt_thread_in_ops_pcpu);
 	lockdestroy(&mp->mnt_explock);
 	mtx_destroy(&mp->mnt_listmtx);
@@ -463,7 +472,7 @@ vfs_ref(struct mount *mp)
 
 	CTR2(KTR_VFS, "%s: mp %p", __func__, mp);
 	if (vfs_op_thread_enter(mp)) {
-		MNT_REF_UNLOCKED(mp);
+		vfs_mp_count_add_pcpu(mp, ref, 1);
 		vfs_op_thread_exit(mp);
 		return;
 	}
@@ -479,7 +488,7 @@ vfs_rel(struct mount *mp)
 
 	CTR2(KTR_VFS, "%s: mp %p", __func__, mp);
 	if (vfs_op_thread_enter(mp)) {
-		MNT_REL_UNLOCKED(mp);
+		vfs_mp_count_sub_pcpu(mp, ref, 1);
 		vfs_op_thread_exit(mp);
 		return;
 	}
@@ -543,6 +552,8 @@ vfs_mount_destroy(struct mount *mp)
 
 	if (mp->mnt_vfs_ops == 0)
 		panic("%s: entered with zero vfs_ops\n", __func__);
+
+	vfs_assert_mount_counters(mp);
 
 	MNT_ILOCK(mp);
 	mp->mnt_kern_flag |= MNTK_REFEXPIRE;
@@ -1401,6 +1412,7 @@ dounmount_cleanup(struct mount *mp, struct vnode *coveredvp, int mntkflags)
 void
 vfs_op_enter(struct mount *mp)
 {
+	int cpu;
 
 	MNT_ILOCK(mp);
 	mp->mnt_vfs_ops++;
@@ -1414,7 +1426,20 @@ vfs_op_enter(struct mount *mp)
 	 */
 	atomic_thread_fence_seq_cst();
 	vfs_op_barrier_wait(mp);
+	/*
+	 * Paired with a fence in vfs_op_thread_exit().
+	 */
+	atomic_thread_fence_acq();
+	CPU_FOREACH(cpu) {
+		mp->mnt_ref +=
+		    zpcpu_replace_cpu(mp->mnt_ref_pcpu, 0, cpu);
+		mp->mnt_lockref +=
+		    zpcpu_replace_cpu(mp->mnt_lockref_pcpu, 0, cpu);
+		mp->mnt_writeopcount +=
+		    zpcpu_replace_cpu(mp->mnt_writeopcount_pcpu, 0, cpu);
+	}
 	MNT_IUNLOCK(mp);
+	vfs_assert_mount_counters(mp);
 }
 
 void
@@ -1452,6 +1477,93 @@ vfs_op_barrier_wait(struct mount *mp)
 		while (atomic_load_int(in_op))
 			cpu_spinwait();
 	}
+}
+
+#ifdef DIAGNOSTIC
+void
+vfs_assert_mount_counters(struct mount *mp)
+{
+	int cpu;
+
+	if (mp->mnt_vfs_ops == 0)
+		return;
+
+	CPU_FOREACH(cpu) {
+		if (*(int *)zpcpu_get_cpu(mp->mnt_ref_pcpu, cpu) != 0 ||
+		    *(int *)zpcpu_get_cpu(mp->mnt_lockref_pcpu, cpu) != 0 ||
+		    *(int *)zpcpu_get_cpu(mp->mnt_writeopcount_pcpu, cpu) != 0)
+			vfs_dump_mount_counters(mp);
+	}
+}
+
+void
+vfs_dump_mount_counters(struct mount *mp)
+{
+	int cpu, *count;
+	int ref, lockref, writeopcount;
+
+	printf("%s: mp %p vfs_ops %d\n", __func__, mp, mp->mnt_vfs_ops);
+
+	printf("        ref : ");
+	ref = mp->mnt_ref;
+	CPU_FOREACH(cpu) {
+		count = zpcpu_get_cpu(mp->mnt_ref_pcpu, cpu);
+		printf("%d ", *count);
+		ref += *count;
+	}
+	printf("\n");
+	printf("    lockref : ");
+	lockref = mp->mnt_lockref;
+	CPU_FOREACH(cpu) {
+		count = zpcpu_get_cpu(mp->mnt_lockref_pcpu, cpu);
+		printf("%d ", *count);
+		lockref += *count;
+	}
+	printf("\n");
+	printf("writeopcount: ");
+	writeopcount = mp->mnt_writeopcount;
+	CPU_FOREACH(cpu) {
+		count = zpcpu_get_cpu(mp->mnt_writeopcount_pcpu, cpu);
+		printf("%d ", *count);
+		writeopcount += *count;
+	}
+	printf("\n");
+
+	printf("counter       struct total\n");
+	printf("ref             %-5d  %-5d\n", mp->mnt_ref, ref);
+	printf("lockref         %-5d  %-5d\n", mp->mnt_lockref, lockref);
+	printf("writeopcount    %-5d  %-5d\n", mp->mnt_writeopcount, writeopcount);
+
+	panic("invalid counts on struct mount");
+}
+#endif
+
+int
+vfs_mount_fetch_counter(struct mount *mp, enum mount_counter which)
+{
+	int *base, *pcpu;
+	int cpu, sum;
+
+	switch (which) {
+	case MNT_COUNT_REF:
+		base = &mp->mnt_ref;
+		pcpu = mp->mnt_ref_pcpu;
+		break;
+	case MNT_COUNT_LOCKREF:
+		base = &mp->mnt_lockref;
+		pcpu = mp->mnt_lockref_pcpu;
+		break;
+	case MNT_COUNT_WRITEOPCOUNT:
+		base = &mp->mnt_writeopcount;
+		pcpu = mp->mnt_writeopcount_pcpu;
+		break;
+	}
+
+	sum = *base;
+	CPU_FOREACH(cpu) {
+		sum += *(int *)zpcpu_get_cpu(pcpu, cpu);
+	}
+	return (sum);
 }
 
 /*
