@@ -183,6 +183,9 @@ const char *openpam_module_path[] = {
 #elif COMPAT_32BIT
 	"/usr/lib32",
 	"/usr/local/lib32",
+#elif COMPAT_64BIT
+	"/usr/lib32",
+	"/usr/local/lib32",
 #else
 	"/usr/lib",
 	"/usr/local/lib",

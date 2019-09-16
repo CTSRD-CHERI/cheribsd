@@ -76,12 +76,14 @@ __END_DECLS
 #define dbg_cheri_plt_verbose(...)	dbg_cat(CHERI_PLT_VERBOSE, __VA_ARGS__)
 
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#define _MYNAME	"ld-cheri-elf.so.1"
-#elif !defined(COMPAT_32BIT)
-#define _MYNAME	"ld-elf.so.1"
-#else
+#if defined(COMPAT_32BIT)
 #define _MYNAME	"ld-elf32.so.1"
+#elif defined(COMPAT_64BIT)
+#define _MYNAME	"ld-elf64.so.1"
+#elif defined(__CHERI_PURE_CAPABILITY__)
+#define _MYNAME	"ld-cheri-elf.so.1"
+#else
+#define _MYNAME	"ld-elf.so.1"
 #endif
 
 #define msg(s)		rtld_putstr(s)

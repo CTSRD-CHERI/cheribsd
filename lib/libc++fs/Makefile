@@ -3,7 +3,7 @@
 .include <src.opts.mk>
 
 PACKAGE=	clibs
-.if ${MK_CHERI} == "yes"
+.if ${MK_CHERI} == "yes" || ${TARGET_ARCH:Mmips64*c*}
 WANT_CHERI?=	hybrid
 SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++
 .else
