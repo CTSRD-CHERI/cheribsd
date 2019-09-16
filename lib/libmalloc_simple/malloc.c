@@ -306,8 +306,10 @@ find_overhead(void * cp)
 
 		pp_base = cheri_getbase(op);
 		base = cheri_getbase(op->ov_next);
-		if (base >= pp_base && base < cheri_getaddress(op))
+		if (base >= pp_base && base < cheri_getaddress(op)) {
 			op = op->ov_next;
+			op--;
+		}
 	}
 #endif
 	if (op->ov_magic == MAGIC)
