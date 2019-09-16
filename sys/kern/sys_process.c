@@ -1220,19 +1220,6 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		if (psr->sr_error == 0) {
 			psr->sr_retval[0] = td2->td_retval[0];
 			psr->sr_retval[1] = td2->td_retval[1];
-#if __has_feature(capabilities)
-			/* XXX: Gross hack. */
-			if (SV_PROC_FLAG(td2->td_proc, SV_CHERI)) {
-				switch (td2->td_sa.code) {
-				case SYS_mmap:
-				case SYS_shmat:
-					psr->sr_retval[0] =
-					    (uintcap_t)td2->td_retcap;
-					psr->sr_retval[1] = 0;
-					break;
-				}
-			}
-#endif
 		}
 #if __has_feature(capabilities)
 		if (wrap64)

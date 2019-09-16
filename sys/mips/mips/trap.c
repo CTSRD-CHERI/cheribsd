@@ -657,9 +657,6 @@ cpu_fetch_syscall_args(struct thread *td)
 	if (error == 0) {
 		td->td_retval[0] = 0;
 		td->td_retval[1] = locr0->v1;
-#ifdef CPU_CHERI
-		td->td_retcap = locr0->c3;
-#endif
 	}
 
 	return (error);

@@ -579,11 +579,11 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	if (error == 0) {
 #ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI))
-			td->td_retcap = cheriabi_mmap_retcap(td,
+			td->td_retval[0] = (uintcap_t)cheriabi_mmap_retcap(td,
 			    addr + pageoff,  mrp);
-		/* Unconditionaly return the VA in td_retval[0] for ktrace */
+		else
 #endif
-		td->td_retval[0] = (register_t) (addr + pageoff);
+			td->td_retval[0] = (syscallarg_t)(addr + pageoff);
 	}
 done:
 	if (fp)

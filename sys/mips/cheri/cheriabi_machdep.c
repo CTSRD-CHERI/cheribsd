@@ -287,7 +287,6 @@ cheriabi_fetch_syscall_args(struct thread *td)
 
 	td->td_retval[0] = 0;
 	td->td_retval[1] = locr0->v1;
-	td->td_retcap = locr0->c3;
 
 	return (error);
 }
@@ -317,7 +316,7 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 	switch (error) {
 	case 0:
 		KASSERT(error != 0 ||
-		    td->td_retcap == locr0->c3 || td->td_retcap == NULL ||
+		    cheri_gettag((void * __capability)td->td_retval[0]) == 0 ||
 		    code == CHERIABI_SYS_cheriabi_mmap ||
 		    code == CHERIABI_SYS_cheriabi_shmat,
 		    ("trying to return capability from integer returning "
@@ -325,7 +324,7 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 
 		locr0->v0 = td->td_retval[0];
 		locr0->v1 = td->td_retval[1];
-		locr0->c3 = td->td_retcap;
+		locr0->c3 = (void * __capability)td->td_retval[0];
 		locr0->a3 = 0;
 		break;
 
@@ -737,14 +736,6 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	/* const bool is_rtld_direct_exec = imgp->reloc_base == imgp->start_addr; */
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
-	/*
-	 * Ensure we don't have an old retcap value laying around.  In
-	 * principle we won't ever return it wrongly, but better safe
-	 * then sorry.
-	 *
-	 * XXXBD: This doesn't feel like the right place to do this...
-	 */
-	td->td_retcap = NULL;
 
 	KASSERT(stack % sizeof(void * __capability) == 0,
 	    ("CheriABI stack pointer not properly aligned"));
