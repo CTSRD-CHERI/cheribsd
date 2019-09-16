@@ -294,7 +294,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	size_t data_len = data_vlimit - data_vaddr;
 	if (mmap(data_addr, data_len, data_prot,
 	  data_flags | MAP_PREFAULT_READ, fd, data_offset) == (caddr_t) -1) {
-	    _rtld_error("%s: mmap of data at %p, size %zd failed (base_addr %p, mapbase %p, mapsize %zd: %s", path, data_addr, data_vlimit - data_vaddr, base_addr, mapbase, mapsize,
+	    _rtld_error("%s: mmap of data failed: %s", path,
 		rtld_strerror(errno));
 	    goto error1;
 	}
