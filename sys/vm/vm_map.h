@@ -118,6 +118,7 @@ struct vm_map_entry {
 	int wired_count;		/* can be paged if = 0 */
 	struct ucred *cred;		/* tmp storage for creator ref */
 	struct thread *wiring_thread;
+	pid_t owner;
 };
 
 #define	MAP_ENTRY_NOSYNC		0x00000001
@@ -404,6 +405,8 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define VM_MAP_WIRE_WRITE	4	/* Validate writable. */
 
 #ifdef _KERNEL
+int vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end, struct proc *p);
+int vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end);
 boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t);
 vm_map_t vm_map_create(pmap_t, vm_offset_t, vm_offset_t);
 int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t);

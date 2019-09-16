@@ -153,6 +153,7 @@ static int vm_map_stack_locked(vm_map_t map, vm_offset_t addrbos,
     int cow);
 static void vm_map_wire_entry_failure(vm_map_t map, vm_map_entry_t entry,
     vm_offset_t failed_addr);
+static vm_map_entry_t vm_map_entry_create(vm_map_t map);
 
 #define	ENTRY_CHARGED(e) ((e)->cred != NULL || \
     ((e)->object.vm_object != NULL && (e)->object.vm_object->cred != NULL && \
@@ -410,6 +411,85 @@ vmspace_exitfree(struct proc *p)
 	PROC_VMSPACE_UNLOCK(p);
 	KASSERT(vm == &vmspace0, ("vmspace_exitfree: wrong vmspace"));
 	vmspace_free(vm);
+}
+
+static int coexecve_cleanup_margin_up = 0x10000;
+SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_up, CTLFLAG_RWTUN,
+    &coexecve_cleanup_margin_up, 0,
+    "Maximum hole size for segments growing up when cleaning up after colocated processes");
+static int coexecve_cleanup_margin_down = MAXSSIZ;
+SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
+    &coexecve_cleanup_margin_down, 0,
+    "Maximum hole size for segments growing down when cleaning up after colocated processes");
+
+static void
+vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
+{
+	vm_map_entry_t entry, prev, next;
+	vm_offset_t start, end;
+	boolean_t found, grown_down;
+	int rv;
+
+	prev = old_entry->prev;
+	next = old_entry->next;
+	start = old_entry->start;
+	end = old_entry->end;
+	grown_down = old_entry->eflags & MAP_ENTRY_GROWS_DOWN;
+	vm_map_delete(map, old_entry->start, old_entry->end);
+
+	/*
+	 * Try to cover the "holes" between abandoned entries, so that
+	 * vm_map_simplify_entry() can coalesce them.  Use much larger
+	 * threshold for stacks.
+	 */
+	if (prev != &map->header && prev->object.vm_object == NULL &&
+	    prev->protection == PROT_NONE && prev->owner == 0 &&
+	    start > prev->end && start - prev->end <=
+	    ((grown_down != 0) ?
+	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
+		start = prev->end;
+	}
+
+	if (next != &map->header && next->object.vm_object == NULL &&
+	    next->protection == PROT_NONE && next->owner == 0 &&
+	    end < next->start && next->start - end <=
+	    (((next->eflags & MAP_ENTRY_GROWS_DOWN) != 0) ?
+	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
+		end = next->start;
+	}
+
+	rv = vm_map_insert(map, NULL, 0, start, end,
+	    PROT_NONE, PROT_NONE, MAP_NOFAULT | MAP_DISABLE_SYNCER | MAP_DISABLE_COREDUMP);
+	KASSERT(rv == KERN_SUCCESS,
+	    ("%s: vm_map_insert() failed with error %d\n", __func__, rv));
+
+	found = vm_map_lookup_entry(map, start, &entry);
+	KASSERT(found == TRUE,
+	    ("%s: vm_map_insert() returned false\n", __func__));
+
+	KASSERT(entry->protection == PROT_NONE,
+	    ("%s: protection %d\n", __func__, entry->protection));
+	KASSERT(entry->max_protection == PROT_NONE,
+	    ("%s: max_protection %d\n", __func__, entry->max_protection));
+	KASSERT(entry->inheritance == VM_INHERIT_DEFAULT,
+	    ("%s: inheritance %d\n", __func__, entry->inheritance));
+	KASSERT(entry->wired_count == 0,
+	    ("%s: wired_count %d\n", __func__, entry->wired_count));
+	KASSERT(entry->cred == NULL,
+	    ("%s: cred %p\n", __func__, entry->cred));
+
+	/*
+	 * Preserve this particular flag for the purpose of future coalescing
+	 * by another vm_map_entry_abandon() run.
+	 */
+	if (grown_down)
+		entry->eflags |= MAP_ENTRY_GROWS_DOWN;
+	entry->owner = 0;
+
+	/*
+	 * We need to call it again after setting the owner to 0.
+	 */
+	vm_map_simplify_entry(map, entry);
 }
 
 void
@@ -1574,6 +1654,7 @@ charged:
 	    prev_entry->end == start && (prev_entry->cred == cred ||
 	    (prev_entry->object.vm_object != NULL &&
 	    prev_entry->object.vm_object->cred == cred)) &&
+	    prev_entry->owner == curproc->p_pid &&
 	    vm_object_coalesce(prev_entry->object.vm_object,
 	    prev_entry->offset,
 	    (vm_size_t)(prev_entry->end - prev_entry->start),
@@ -1638,6 +1719,7 @@ charged:
 	new_entry->wiring_thread = NULL;
 	new_entry->read_ahead = VM_FAULT_READ_AHEAD_INIT;
 	new_entry->next_read = start;
+	new_entry->owner = curproc->p_pid;
 
 	KASSERT(cred == NULL || !ENTRY_CHARGED(new_entry),
 	    ("overcommit: vm_map_insert leaks vm_map %p", new_entry));
@@ -1782,8 +1864,16 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    ("vm_map_fixed: non-NULL backing object for stack"));
 	vm_map_lock(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
-	if ((cow & MAP_CHECK_EXCL) == 0)
+	if ((cow & MAP_CHECK_EXCL) == 0) {
+		result = vm_map_check_owner(map, start, end);
+		if (result != KERN_SUCCESS) {
+			printf("%s: vm_map_check_owner returned %d\n",
+			    __func__, result);
+			vm_map_unlock(map);
+			return (result);
+		}
 		vm_map_delete(map, start, end);
+	}
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
 		result = vm_map_stack_locked(map, start, length, sgrowsiz,
 		    prot, max, cow);
@@ -2089,10 +2179,16 @@ static bool
 vm_map_mergeable_neighbors(vm_map_entry_t prev, vm_map_entry_t entry)
 {
 
+#ifdef notyet
 	KASSERT((prev->eflags & MAP_ENTRY_NOMERGE_MASK) == 0 ||
 	    (entry->eflags & MAP_ENTRY_NOMERGE_MASK) == 0,
 	    ("vm_map_mergeable_neighbors: neither %p nor %p are mergeable",
 	    prev, entry));
+#else
+	if ((prev->eflags & MAP_ENTRY_NOMERGE_MASK) != 0 &&
+	    (entry->eflags & MAP_ENTRY_NOMERGE_MASK) != 0)
+	    return (false);
+#endif
 	return (prev->end == entry->start &&
 	    prev->object.vm_object == entry->object.vm_object &&
 	    (prev->object.vm_object == NULL ||
@@ -2102,7 +2198,8 @@ vm_map_mergeable_neighbors(vm_map_entry_t prev, vm_map_entry_t entry)
 	    prev->max_protection == entry->max_protection &&
 	    prev->inheritance == entry->inheritance &&
 	    prev->wired_count == entry->wired_count &&
-	    prev->cred == entry->cred);
+	    prev->cred == entry->cred &&
+	    prev->owner == entry->owner);
 }
 
 static void
@@ -2143,8 +2240,16 @@ vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry)
 {
 	vm_map_entry_t next, prev;
 
-	if ((entry->eflags & MAP_ENTRY_NOMERGE_MASK) != 0)
+	if ((entry->eflags & (MAP_ENTRY_GROWS_UP |
+	    MAP_ENTRY_IN_TRANSITION | MAP_ENTRY_IS_SUB_MAP)) != 0)
 		return;
+
+	if ((entry->eflags & MAP_ENTRY_GROWS_DOWN) != 0 &&
+           (entry->object.vm_object != NULL ||
+	    entry->protection != PROT_NONE ||
+	    entry->owner != 0))
+		return;
+
 	prev = entry->prev;
 	if (vm_map_mergeable_neighbors(prev, entry)) {
 		vm_map_entry_unlink(map, prev, UNLINK_MERGE_NEXT);
@@ -2487,6 +2592,42 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 	VM_OBJECT_RUNLOCK(object);
 }
 
+int
+vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end,
+    struct proc *p)
+{
+	vm_map_entry_t entry;
+	bool found;
+
+	VM_MAP_RANGE_CHECK(map, start, end);
+
+	found = vm_map_lookup_entry(map, start, &entry);
+	if (!found)
+		return (KERN_SUCCESS);
+
+	for (; entry != &map->header && entry->start < end;
+	    entry = entry->next) {
+		if (entry->owner != p->p_pid) {
+			printf("%s: requested range [%#lx, %#lx], "
+			    "owner %d (%s), map %#p, would overlap with "
+			    "existing entry [%#lx, %#lx], owner %d\n",
+			    __func__, start, end,
+			    p->p_pid, p->p_comm, &p->p_vmspace->vm_map,
+			    entry->start, entry->end, entry->owner);
+			return (KERN_PROTECTION_FAILURE);
+		}
+	}
+
+	return (KERN_SUCCESS);
+}
+
+int
+vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end)
+{
+
+	return (vm_map_check_owner_proc(map, start, end, curproc));
+}
+
 /*
  *	vm_map_protect:
  *
@@ -2503,6 +2644,7 @@ vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	vm_object_t obj;
 	struct ucred *cred;
 	vm_prot_t old_prot;
+	int result;
 	int rv;
 
 	if (start == end)
@@ -2522,8 +2664,19 @@ again:
 
 	VM_MAP_RANGE_CHECK(map, start, end);
 
-	if (!vm_map_lookup_entry(map, start, &entry))
+	result = vm_map_check_owner(map, start, end);
+	if (result != KERN_SUCCESS) {
+		printf("%s: vm_map_check_owner returned %d\n",
+		    __func__, result);
+		vm_map_unlock(map);
+		return (result);
+	}
+
+	if (vm_map_lookup_entry(map, start, &entry)) {
+		vm_map_clip_start(map, entry, start);
+	} else {
 		entry = entry->next;
+	}
 
 	/*
 	 * Make a first pass to check for protection violations.
@@ -2684,6 +2837,7 @@ vm_map_madvise(
 {
 	vm_map_entry_t current, entry;
 	bool modify_map;
+	int result;
 
 	/*
 	 * Some madvise calls directly modify the vm_map_entry, in which case
@@ -2714,6 +2868,17 @@ vm_map_madvise(
 		break;
 	default:
 		return (EINVAL);
+	}
+
+	result = vm_map_check_owner(map, start, end);
+	if (result != KERN_SUCCESS) {
+		printf("%s: vm_map_check_owner returned %d\n",
+		    __func__, result);
+		if (modify_map)
+			vm_map_unlock(map);
+		else
+			vm_map_unlock_read(map);
+		return (result);
 	}
 
 	/*
@@ -2870,6 +3035,7 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 {
 	vm_map_entry_t entry;
 	vm_map_entry_t temp_entry;
+	int result;
 
 	switch (new_inheritance) {
 	case VM_INHERIT_NONE:
@@ -2883,6 +3049,13 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	if (start == end)
 		return (KERN_SUCCESS);
 	vm_map_lock(map);
+	result = vm_map_check_owner(map, start, end);
+	if (result != KERN_SUCCESS) {
+		printf("%s: vm_map_check_owner returned %d\n",
+		    __func__, result);
+		vm_map_unlock(map);
+		return (result);
+	}
 	VM_MAP_RANGE_CHECK(map, start, end);
 	if (vm_map_lookup_entry(map, start, &temp_entry)) {
 		entry = temp_entry;
@@ -3494,8 +3667,16 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	vm_ooffset_t offset;
 	unsigned int last_timestamp;
 	boolean_t failed;
+	int result;
 
 	vm_map_lock_read(map);
+	result = vm_map_check_owner(map, start, end);
+	if (result != KERN_SUCCESS) {
+		printf("%s: vm_map_check_owner returned %d\n",
+		    __func__, result);
+		vm_map_unlock(map);
+		return (result);
+	}
 	VM_MAP_RANGE_CHECK(map, start, end);
 	if (!vm_map_lookup_entry(map, start, &entry)) {
 		vm_map_unlock_read(map);
