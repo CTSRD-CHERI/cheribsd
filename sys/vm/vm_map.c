@@ -134,6 +134,7 @@ static int vm_map_zinit(void *mem, int ize, int flags);
 static void _vm_map_init(vm_map_t map, pmap_t pmap, vm_offset_t min,
     vm_offset_t max);
 static void vm_map_entry_deallocate(vm_map_entry_t entry, boolean_t system_map);
+static void vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_dispose(vm_map_t map, vm_map_entry_t entry);
 static void vm_map_entry_unwire(vm_map_t map, vm_map_entry_t entry);
 static int vm_map_growstack(vm_map_t map, vm_offset_t addr,
@@ -431,7 +432,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	start = old_entry->start;
 	end = old_entry->end;
 	grown_down = old_entry->eflags & MAP_ENTRY_GROWS_DOWN;
-	vm_map_delete(map, old_entry->start, old_entry->end);
+	vm_map_entry_delete(map, old_entry);
 
 	/*
 	 * Try to cover the "holes" between abandoned entries, so that
@@ -3884,8 +3885,8 @@ vm_map_entry_delete(vm_map_t map, vm_map_entry_t entry)
  *	Deallocates the given address range from the target
  *	map.
  */
-int
-vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end)
+static int
+_vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end, bool abandon)
 {
 	vm_map_entry_t entry;
 	vm_map_entry_t first_entry;
@@ -3975,12 +3976,28 @@ vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end)
 		 * will be set in the wrong object!)
 		 */
 		vm_map_log("remove", entry);
-		vm_map_entry_delete(map, entry);
+		if (abandon)
+			vm_map_entry_abandon(map, entry);
+		else
+			vm_map_entry_delete(map, entry);
 		entry = next;
 	}
 	return (KERN_SUCCESS);
 }
 
+int
+vm_map_abandon_and_delete(vm_map_t map, vm_offset_t start, vm_offset_t end)
+{
+
+	return (_vm_map_delete(map, start, end, true));
+}
+
+int
+vm_map_delete(vm_map_t map, vm_offset_t start, vm_offset_t end)
+{
+
+	return (_vm_map_delete(map, start, end, false));
+}
 /*
  *	vm_map_remove:
  *
