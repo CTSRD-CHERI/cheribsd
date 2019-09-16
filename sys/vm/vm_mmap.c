@@ -789,7 +789,7 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 		}
 	}
 #endif
-	vm_map_delete(map, addr, addr + size);
+	vm_map_abandon_and_delete(map, addr, addr + size);
 
 #ifdef HWPMC_HOOKS
 	if (__predict_false(pmc_handled)) {
