@@ -381,9 +381,7 @@ __simple_realloc(void *cp, size_t nbytes)
 		smaller_space = (FIRST_BUCKET_SIZE << (op->ov_index - 1)) -
 		    sizeof(*op);
 		if (nbytes <= cur_space && nbytes > smaller_space)
-			return (bound_ptr(
-			    cheri_setaddress(op, cheri_getaddress(cp)),
-			    nbytes));
+			return (bound_ptr(op + 1, nbytes));
 	}
 
 	res = __simple_malloc(nbytes);
