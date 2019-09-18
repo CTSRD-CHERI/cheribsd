@@ -1866,9 +1866,9 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	vm_map_lock(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
 	if ((cow & MAP_CHECK_EXCL) == 0) {
-		result = vm_map_check_owner(map, start, end);
+		result = vm_map_abandonment_check(map, start, end);
 		if (result != KERN_SUCCESS) {
-			printf("%s: vm_map_check_owner returned %d\n",
+			printf("%s: vm_map_abandonment_check returned %d\n",
 			    __func__, result);
 			vm_map_unlock(map);
 			return (result);
@@ -2594,7 +2594,7 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 }
 
 int
-vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end,
+vm_map_abandonment_check_proc(vm_map_t map, vm_offset_t start, vm_offset_t end,
     struct proc *p)
 {
 	vm_map_entry_t entry;
@@ -2623,10 +2623,10 @@ vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end,
 }
 
 int
-vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end)
+vm_map_abandonment_check(vm_map_t map, vm_offset_t start, vm_offset_t end)
 {
 
-	return (vm_map_check_owner_proc(map, start, end, curproc));
+	return (vm_map_abandonment_check_proc(map, start, end, curproc));
 }
 
 /*
@@ -2665,9 +2665,9 @@ again:
 
 	VM_MAP_RANGE_CHECK(map, start, end);
 
-	result = vm_map_check_owner(map, start, end);
+	result = vm_map_abandonment_check(map, start, end);
 	if (result != KERN_SUCCESS) {
-		printf("%s: vm_map_check_owner returned %d\n",
+		printf("%s: vm_map_abandonment_check returned %d\n",
 		    __func__, result);
 		vm_map_unlock(map);
 		return (result);
@@ -2871,9 +2871,9 @@ vm_map_madvise(
 		return (EINVAL);
 	}
 
-	result = vm_map_check_owner(map, start, end);
+	result = vm_map_abandonment_check(map, start, end);
 	if (result != KERN_SUCCESS) {
-		printf("%s: vm_map_check_owner returned %d\n",
+		printf("%s: vm_map_abandonment_check returned %d\n",
 		    __func__, result);
 		if (modify_map)
 			vm_map_unlock(map);
@@ -3050,9 +3050,9 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	if (start == end)
 		return (KERN_SUCCESS);
 	vm_map_lock(map);
-	result = vm_map_check_owner(map, start, end);
+	result = vm_map_abandonment_check(map, start, end);
 	if (result != KERN_SUCCESS) {
-		printf("%s: vm_map_check_owner returned %d\n",
+		printf("%s: vm_map_abandonment_check returned %d\n",
 		    __func__, result);
 		vm_map_unlock(map);
 		return (result);
@@ -3671,9 +3671,9 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	int result;
 
 	vm_map_lock_read(map);
-	result = vm_map_check_owner(map, start, end);
+	result = vm_map_abandonment_check(map, start, end);
 	if (result != KERN_SUCCESS) {
-		printf("%s: vm_map_check_owner returned %d\n",
+		printf("%s: vm_map_abandonment_check returned %d\n",
 		    __func__, result);
 		vm_map_unlock(map);
 		return (result);

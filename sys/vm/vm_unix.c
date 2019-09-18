@@ -211,9 +211,9 @@ kern_break(struct thread *td, uintptr_t *addr)
 		}
 		vm->vm_dsize += btoc(new - old);
 	} else if (new < old) {
-		rv = vm_map_check_owner(map, new, old);
+		rv = vm_map_abandonment_check(map, new, old);
 		if (rv != KERN_SUCCESS) {
-			printf("%s: vm_map_check_owner returned %d\n",
+			printf("%s: vm_map_abandonment_check returned %d\n",
 			    __func__, rv);
 			error = ENOMEM;
 			goto done;

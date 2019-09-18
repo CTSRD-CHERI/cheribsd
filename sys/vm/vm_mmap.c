@@ -759,9 +759,9 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 		return (EINVAL);
 	vm_map_lock(map);
 
-	result = vm_map_check_owner(map, addr, addr + size);
+	result = vm_map_abandonment_check(map, addr, addr + size);
 	if (result != KERN_SUCCESS) {
-		printf("%s: vm_map_check_owner returned %d\n",
+		printf("%s: vm_map_abandonment_check returned %d\n",
 		    __func__, result);
 		vm_map_unlock(map);
 		return (result);
