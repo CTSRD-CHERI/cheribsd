@@ -916,7 +916,7 @@ XCFLAGS+=	${BFLAGS}
     ${TARGET_ARCH} == "powerpc64" || ${TARGET_ARCH:Mmips64*} != "")
 LIBCOMPAT= 32
 .include "Makefile.libcompat"
-.elif ${MK_LIB64} != no" && ${TARGET_ARCH:Mmips64*c*}
+.elif ${MK_LIB64} != "no" && ${TARGET_ARCH:Mmips64*c*}
 LIBCOMPAT=64
 .include "Makefile.libcompat"
 .elif ${MK_LIBSOFT} != "no" && ${TARGET_ARCH:Marmv[67]*} != ""
