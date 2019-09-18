@@ -311,14 +311,6 @@ proc_rwmem(struct proc *p, struct uio *uio)
 		 */
 		len = min(PAGE_SIZE - page_offset, uio->uio_resid);
 
-		vm_map_lock(map);
-		error = vm_map_abandonment_check_proc(map, pageno, pageno + len, p);
-		vm_map_unlock(map);
-		if (error != KERN_SUCCESS) {
-			error = EFAULT;
-			break;
-		}
-
 		/*
 		 * Fault and hold the page on behalf of the process.
 		 */

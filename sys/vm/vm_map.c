@@ -1865,16 +1865,8 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    ("vm_map_fixed: non-NULL backing object for stack"));
 	vm_map_lock(map);
 	VM_MAP_RANGE_CHECK(map, start, end);
-	if ((cow & MAP_CHECK_EXCL) == 0) {
-		result = vm_map_abandonment_check(map, start, end);
-		if (result != KERN_SUCCESS) {
-			printf("%s: vm_map_abandonment_check returned %d\n",
-			    __func__, result);
-			vm_map_unlock(map);
-			return (result);
-		}
+	if ((cow & MAP_CHECK_EXCL) == 0)
 		vm_map_delete(map, start, end);
-	}
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
 		result = vm_map_stack_locked(map, start, length, sgrowsiz,
 		    prot, max, cow);
@@ -2645,7 +2637,6 @@ vm_map_protect(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	vm_object_t obj;
 	struct ucred *cred;
 	vm_prot_t old_prot;
-	int result;
 	int rv;
 
 	if (start == end)
@@ -2665,19 +2656,8 @@ again:
 
 	VM_MAP_RANGE_CHECK(map, start, end);
 
-	result = vm_map_abandonment_check(map, start, end);
-	if (result != KERN_SUCCESS) {
-		printf("%s: vm_map_abandonment_check returned %d\n",
-		    __func__, result);
-		vm_map_unlock(map);
-		return (result);
-	}
-
-	if (vm_map_lookup_entry(map, start, &entry)) {
-		vm_map_clip_start(map, entry, start);
-	} else {
+	if (!vm_map_lookup_entry(map, start, &entry))
 		entry = entry->next;
-	}
 
 	/*
 	 * Make a first pass to check for protection violations.
@@ -2838,7 +2818,6 @@ vm_map_madvise(
 {
 	vm_map_entry_t current, entry;
 	bool modify_map;
-	int result;
 
 	/*
 	 * Some madvise calls directly modify the vm_map_entry, in which case
@@ -2869,17 +2848,6 @@ vm_map_madvise(
 		break;
 	default:
 		return (EINVAL);
-	}
-
-	result = vm_map_abandonment_check(map, start, end);
-	if (result != KERN_SUCCESS) {
-		printf("%s: vm_map_abandonment_check returned %d\n",
-		    __func__, result);
-		if (modify_map)
-			vm_map_unlock(map);
-		else
-			vm_map_unlock_read(map);
-		return (result);
 	}
 
 	/*
@@ -3036,7 +3004,6 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 {
 	vm_map_entry_t entry;
 	vm_map_entry_t temp_entry;
-	int result;
 
 	switch (new_inheritance) {
 	case VM_INHERIT_NONE:
@@ -3050,13 +3017,6 @@ vm_map_inherit(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	if (start == end)
 		return (KERN_SUCCESS);
 	vm_map_lock(map);
-	result = vm_map_abandonment_check(map, start, end);
-	if (result != KERN_SUCCESS) {
-		printf("%s: vm_map_abandonment_check returned %d\n",
-		    __func__, result);
-		vm_map_unlock(map);
-		return (result);
-	}
 	VM_MAP_RANGE_CHECK(map, start, end);
 	if (vm_map_lookup_entry(map, start, &temp_entry)) {
 		entry = temp_entry;
@@ -3668,16 +3628,8 @@ vm_map_sync(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	vm_ooffset_t offset;
 	unsigned int last_timestamp;
 	boolean_t failed;
-	int result;
 
 	vm_map_lock_read(map);
-	result = vm_map_abandonment_check(map, start, end);
-	if (result != KERN_SUCCESS) {
-		printf("%s: vm_map_abandonment_check returned %d\n",
-		    __func__, result);
-		vm_map_unlock(map);
-		return (result);
-	}
 	VM_MAP_RANGE_CHECK(map, start, end);
 	if (!vm_map_lookup_entry(map, start, &entry)) {
 		vm_map_unlock_read(map);
