@@ -32,7 +32,6 @@ LDIRS=	BSD_daemon \
 	scsi_target \
 	sunrpc \
 	ypldap
-
 SE_DIRS+=	BSD_daemon
 SE_BSD_DAEMON= \
 	FreeBSD.pfa \

@@ -150,8 +150,6 @@ SYSCTL_INT(_kern, OID_AUTO, opportunistic_coexecve, CTLFLAG_RW,
     &opportunistic_coexecve, 0,
     "Try to colocate binaries on execve(2)");
 
-EVENTHANDLER_LIST_DECLARE(process_exec);
-
 static int
 sysctl_kern_ps_strings(SYSCTL_HANDLER_ARGS)
 {
