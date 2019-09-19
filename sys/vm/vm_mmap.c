@@ -760,7 +760,6 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 	if (addr < vm_map_min(map) || addr + size > vm_map_max(map))
 		return (EINVAL);
 	vm_map_lock(map);
-
 #ifdef HWPMC_HOOKS
 	pmc_handled = false;
 	if (PMC_HOOK_INSTALLED(PMC_FN_MUNMAP)) {
