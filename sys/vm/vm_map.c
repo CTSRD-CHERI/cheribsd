@@ -2195,10 +2195,16 @@ static bool
 vm_map_mergeable_neighbors(vm_map_entry_t prev, vm_map_entry_t entry)
 {
 
+#ifdef notyet
 	KASSERT((prev->eflags & MAP_ENTRY_NOMERGE_MASK) == 0 ||
 	    (entry->eflags & MAP_ENTRY_NOMERGE_MASK) == 0,
 	    ("vm_map_mergeable_neighbors: neither %p nor %p are mergeable",
 	    prev, entry));
+#else
+	if ((prev->eflags & MAP_ENTRY_NOMERGE_MASK) != 0 &&
+	    (entry->eflags & MAP_ENTRY_NOMERGE_MASK) != 0)
+		return (false);
+#endif
 	return (prev->end == entry->start &&
 	    prev->object.vm_object == entry->object.vm_object &&
 	    (prev->object.vm_object == NULL ||
