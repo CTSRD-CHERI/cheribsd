@@ -36,7 +36,8 @@
 #define _SYS_KTRACE_H_
 
 #include <sys/caprights.h>
-#include <sys/cheri_serial.h>
+
+#include <cheri/cheri_serial.h>
 
 /*
  * operations to ktrace system call  (KTROP(op))

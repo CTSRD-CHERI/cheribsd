@@ -51,7 +51,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktrace.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <sys/cheriabi.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -696,7 +695,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
       aux_info[AT_STACKPROT]->a_un.a_val != 0)
 	    stack_prot = aux_info[AT_STACKPROT]->a_un.a_val;
 
-#ifndef COMPAT_32BIT
+#if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT)
     /*
      * Get the actual dynamic linker pathname from the executable if
      * possible.  (It should always be possible.)  That ensures that

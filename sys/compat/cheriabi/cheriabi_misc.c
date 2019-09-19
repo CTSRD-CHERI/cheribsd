@@ -129,8 +129,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 
-#include <sys/cheriabi.h>
-
 MALLOC_DECLARE(M_KQUEUE);
 
 FEATURE(compat_cheri_abi, "Compatible CHERI system call ABI");
@@ -1800,7 +1798,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		struct ptrace_io_desc_c piod;
 		struct ptrace_lwpinfo pl;
 		struct ptrace_vm_entry_c pve;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
 		struct dbreg dbreg;
@@ -1840,7 +1838,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_GETREGS:
 	case PT_GETFPREGS:
 	case PT_GETDBREGS:
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_GETCAPREGS:
 #endif
 	case PT_GETNUMLWPS:
@@ -1871,7 +1869,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		addr = uap->addr;
 		break;
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	/*
 	 * XXXNWF Prohibited at the moment, because we have no sane way of
 	 * conveying tags through the kernel.
@@ -1954,7 +1952,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_GETDBREGS:
 		error = COPYOUT(&r.dbreg, uap->addr, sizeof r.dbreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_GETCAPREGS:
 		error = COPYOUT(&r.capreg, uap->addr, sizeof r.capreg);
 		break;

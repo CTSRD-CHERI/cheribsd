@@ -310,9 +310,6 @@ struct thread {
 	int		td_errno;	/* (k) Error from last syscall. */
 	size_t		td_vslock_sz;	/* (k) amount of vslock-ed space */
 	struct kcov_info *td_kcov_info;	/* (*) Kernel code coverage data */
-#if __has_feature(capabilities)
-	void * __capability	td_retcap; /* (k) Syscall cap return . */
-#endif
 #define	td_endzero td_sigmask
 
 /* Copied during fork1() or create_thread(). */
@@ -345,8 +342,12 @@ struct thread {
 		TDS_RUNNING
 	} td_state;			/* (t) thread state */
 	union {
-		register_t	tdu_retval[2];
+		syscallarg_t	tdu_retval[2];
+#if __has_feature(capabilities)
+#define	tdu_off tdu_retval[0]
+#else
 		off_t		tdu_off;
+#endif
 	} td_uretoff;			/* (k) Syscall aux returns. */
 #define td_retval	td_uretoff.tdu_retval
 	u_int		td_cowgen;	/* (k) Generation of COW pointers. */

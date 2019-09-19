@@ -68,6 +68,8 @@
 #define	_PATH_I18NMODULE	"/usr/libcheri/i18n"
 #elif defined(COMPAT_32BIT)
 #define	_PATH_I18NMODULE	"/usr/lib32/i18n"
+#elif defined(COMPAT_64BIT)
+#define	_PATH_I18NMODULE	"/usr/lib64/i18n"
 #else
 #define	_PATH_I18NMODULE	"/usr/lib/i18n"
 #endif

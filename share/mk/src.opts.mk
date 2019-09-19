@@ -127,6 +127,7 @@ __DEFAULT_YES_OPTIONS = \
     LDNS_UTILS \
     LEGACY_CONSOLE \
     LIB32 \
+    LIB64 \
     LIBPTHREAD \
     LIBTHR \
     LLVM_COV \
@@ -326,6 +327,7 @@ BROKEN_OPTIONS+=RESCUE
 # ofed needs work
 BROKEN_OPTIONS+=OFED
 # lib32 could probalby be made to work, but makes little sense
+# Must be broken for LIB64 to work while we can have only one LIBCOMPAT
 BROKEN_OPTIONS+=LIB32
 .else
 # Everything else disables Clang, and uses GCC instead.

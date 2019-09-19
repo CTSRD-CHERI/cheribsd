@@ -152,7 +152,7 @@ __morepages(int n)
 	n += NPOOLPAGES;	/* round up allocation. */
 	size = n * pagesz;
 #ifdef __CHERI_PURE_CAPABILITY__
-	size = __builtin_cheri_round_representable_length(size);
+	size = CHERI_REPRESENTABLE_LENGTH(size);
 #endif
 
 	if (n_pagepools >= max_pagepools)
@@ -271,8 +271,8 @@ tls_malloc(size_t nbytes)
 #ifdef __CHERI_PURE_CAPABILITY__
 	size_t align, mask;
 
-	nbytes = __builtin_cheri_round_representable_length(nbytes);
-	mask = __builtin_cheri_representable_alignment_mask(nbytes);
+	nbytes = CHERI_REPRESENTABLE_LENGTH(nbytes);
+	mask = CHERI_REPRESENTABLE_ALIGNMENT_MASK(nbytes);
 	align = 1 + ~mask;
 
 	if (mask != SIZE_MAX && align > MALLOC_ALIGNMENT)
@@ -438,8 +438,8 @@ tls_malloc_aligned(size_t nbytes, size_t align)
 #ifdef __CHERI_PURE_CAPABILITY__
 	size_t mask;
 
-	nbytes = __builtin_cheri_round_representable_length(nbytes);
-	mask = __builtin_cheri_representable_alignment_mask(nbytes);
+	nbytes = CHERI_REPRESENTABLE_LENGTH(nbytes);
+	mask = CHERI_REPRESENTABLE_ALIGNMENT_MASK(nbytes);
 	if (align < 1 + ~mask)
 		align = 1 + ~mask;
 #endif

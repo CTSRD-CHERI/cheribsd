@@ -56,9 +56,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#if __has_feature(capabilities)
-#include <sys/cheriabi.h>
-#endif
 #include <sys/capsicum.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -130,6 +127,13 @@ SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
 static int abandon_on_munmap = 1;
 SYSCTL_INT(_debug, OID_AUTO, abandon_on_munmap, CTLFLAG_RWTUN, &abandon_on_munmap, 0,
     "Add abandoned vm entries on munmap(2)");
+#if __has_feature(capabilities)
+SYSCTL_DECL(_compat_cheriabi_mmap);
+static int cheriabi_mmap_precise_bounds = 1;
+SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
+    CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
+    "Require that bounds on returned capabilities be precise.");
+#endif
 
 #ifdef MAP_32BIT
 #define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
@@ -582,11 +586,11 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	if (error == 0) {
 #ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI))
-			td->td_retcap = cheriabi_mmap_retcap(td,
+			td->td_retval[0] = (uintcap_t)cheriabi_mmap_retcap(td,
 			    addr + pageoff,  mrp);
-		/* Unconditionaly return the VA in td_retval[0] for ktrace */
+		else
 #endif
-		td->td_retval[0] = (register_t) (addr + pageoff);
+			td->td_retval[0] = (syscallarg_t)(addr + pageoff);
 	}
 done:
 	if (fp)

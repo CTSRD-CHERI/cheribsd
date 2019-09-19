@@ -34,6 +34,7 @@
 #define	_DEFAULT_BASENAME_RTLD		"ld-elf.so.1"
 #define	_CHERIABI_BASENAME_RTLD		"ld-cheri-elf.so.1"
 #define	_COMPAT32_BASENAME_RTLD		"ld-elf32.so.1"
+#define	_COMPAT64_BASENAME_RTLD		"ld-elf64.so.1"
 
 
 #ifdef __CHERI_PURE_CAPABILITY__
@@ -50,6 +51,14 @@
 #define	_BASENAME_RTLD		_COMPAT32_BASENAME_RTLD
 #define	STANDARD_LIBRARY_PATH	"/lib32:/usr/lib32"
 #define	LD_			"LD_32_"
+#endif
+
+#ifdef COMPAT_64BIT
+#define	_PATH_ELF_HINTS		"/var/run/ld-elf64.so.hints"
+#define	_PATH_LIBMAP_CONF	"/etc/libmap64.conf"
+#define	_BASENAME_RTLD		_COMPAT64_BASENAME_RTLD
+#define	STANDARD_LIBRARY_PATH	"/lib64:/usr/lib64"
+#define	LD_			"LD_64_"
 #endif
 
 #ifndef _PATH_ELF_HINTS
@@ -72,6 +81,7 @@
 #define _DEFAULT_PATH_RTLD "/libexec/" _DEFAULT_BASENAME_RTLD
 #define _CHERIABI_PATH_RTLD "/libexec/" _CHERIABI_BASENAME_RTLD
 #define _COMPAT32_PATH_RTLD "/libexec/" _COMPAT32_BASENAME_RTLD
+#define _COMPAT64_PATH_RTLD "/libexec/" _COMPAT64_BASENAME_RTLD
 
 #ifndef STANDARD_LIBRARY_PATH
 #define	STANDARD_LIBRARY_PATH	"/lib/casper:/lib:/usr/lib"

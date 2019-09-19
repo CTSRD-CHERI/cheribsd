@@ -212,7 +212,7 @@ struct isofile {
 
 struct isoent {
 	/* Keep `rbnode' at the first member of struct isoent. */
-	struct archive_rb_node	 rbnode;
+	struct archive_rb_node	 rbnode __subobject_member_used_for_c_inheritance;
 
 	struct isofile		*file;
 
@@ -298,7 +298,7 @@ struct isoent {
 };
 
 struct hardlink {
-	struct archive_rb_node	 rbnode;
+	struct archive_rb_node	 rbnode __subobject_member_used_for_c_inheritance;
 	int			 nlink;
 	struct {
 		struct isofile	*first;
@@ -869,7 +869,7 @@ enum vdc {
  */
 struct idr {
 	struct idrent {
-		struct archive_rb_node	rbnode;
+		struct archive_rb_node	rbnode __subobject_member_used_for_c_inheritance;
 		/* Used in wait_list. */
 		struct idrent		*wnext;
 		struct idrent		*avail;

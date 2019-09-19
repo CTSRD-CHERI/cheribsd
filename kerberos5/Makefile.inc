@@ -12,7 +12,7 @@ WARNS?=		1
 CWARNFLAGS.clang+=	-Wno-absolute-value
 CWARNFLAGS+=	-Wno-error=deprecated-declarations
 
-.if ${MK_OPENLDAP} != "no" && !defined(COMPAT_32BIT)
+.if ${MK_OPENLDAP} != "no" && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT)
 OPENLDAPBASE?=	/usr/local
 LDAPLDADD=	-lldap -llber
 LDAPDPADD=	${LDAPLDADD:C;^-l(.*)$;${OPENLDAPBASE}/lib/lib\1.a;}

@@ -177,7 +177,7 @@ struct heap_data {
 };
 
 struct file {
-	struct archive_rb_node	 rbnode;
+	struct archive_rb_node	 rbnode __subobject_member_used_for_c_inheritance;
 
 	int			 id;
 	struct archive_entry	*entry;
@@ -217,7 +217,7 @@ struct file {
 };
 
 struct hardlink {
-	struct archive_rb_node	 rbnode;
+	struct archive_rb_node	 rbnode __subobject_member_used_for_c_inheritance;
 	int			 nlink;
 	struct {
 		struct file	*first;

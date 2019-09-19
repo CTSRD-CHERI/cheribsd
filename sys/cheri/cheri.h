@@ -165,8 +165,7 @@ void	ktrcexception_mdfill(struct trapframe *frame,
 #endif /* !_KERNEL */
 
 /*
- * Nested include of machine-dependent definitions, which likely depend on
- * first having defined chericap.h.
+ * Nested include of machine-dependent definitions.
  */
 #include <machine/cheri.h>
 

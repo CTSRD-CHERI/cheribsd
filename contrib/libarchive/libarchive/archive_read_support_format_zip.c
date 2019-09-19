@@ -76,7 +76,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 struct zip_entry {
-	struct archive_rb_node	node;
+	struct archive_rb_node	node __subobject_member_used_for_c_inheritance;
 	struct zip_entry	*next;
 	int64_t			local_header_offset;
 	int64_t			compressed_size;

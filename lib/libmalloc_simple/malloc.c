@@ -203,8 +203,8 @@ __simple_malloc(size_t nbytes)
 #ifdef __CHERI_PURE_CAPABILITY__
 	size_t align, mask;
 
-	nbytes = __builtin_cheri_round_representable_length(nbytes);
-	mask = __builtin_cheri_representable_alignment_mask(nbytes);
+	nbytes = CHERI_REPRESENTABLE_LENGTH(nbytes);
+	mask = CHERI_REPRESENTABLE_ALIGNMENT_MASK(nbytes);
 	align = 1 + ~mask;
 
 	if (mask != SIZE_MAX && align > MALLOC_ALIGNMENT)
@@ -306,8 +306,10 @@ find_overhead(void * cp)
 
 		pp_base = cheri_getbase(op);
 		base = cheri_getbase(op->ov_next);
-		if (base >= pp_base && base < cheri_getaddress(op))
+		if (base >= pp_base && base < cheri_getaddress(op)) {
 			op = op->ov_next;
+			op--;
+		}
 	}
 #endif
 	if (op->ov_magic == MAGIC)
@@ -352,7 +354,7 @@ __simple_realloc(void *cp, size_t nbytes)
 
 #ifdef __CHERI_PURE_CAPABILITY__
 	/* Round up here because we might need to set bounds... */
-	nbytes = __builtin_cheri_round_representable_length(nbytes);
+	nbytes = CHERI_REPRESENTABLE_LENGTH(nbytes);
 #endif
 
 	if (cp == NULL)
@@ -379,9 +381,7 @@ __simple_realloc(void *cp, size_t nbytes)
 		smaller_space = (FIRST_BUCKET_SIZE << (op->ov_index - 1)) -
 		    sizeof(*op);
 		if (nbytes <= cur_space && nbytes > smaller_space)
-			return (bound_ptr(
-			    cheri_setaddress(op, cheri_getaddress(cp)),
-			    nbytes));
+			return (bound_ptr(op + 1, nbytes));
 	}
 
 	res = __simple_malloc(nbytes);

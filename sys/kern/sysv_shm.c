@@ -559,7 +559,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			    lim_max(td, RLIMIT_DATA));
 		}
 	}
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	max_va = cheri_getbase(shmaddr) + cheri_getlen(shmaddr);
 #else
 	max_va = 0;
@@ -586,7 +586,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 			    CHERI_REPRESENTABLE_LENGTH(shmseg->u.shm_segsz));
 		}
 		/* XXX: set perms */
-		td->td_retcap = __DECONST_CAP(void * __capability, shmaddr);
+		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
+		    shmaddr);
 	} else
 #endif
 		td->td_retval[0] = attach_va;

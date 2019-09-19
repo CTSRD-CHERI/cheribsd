@@ -578,13 +578,20 @@ struct sockcred {
 #define	CMSG_DATA(cmsg)		((unsigned char *)(cmsg) + \
 				 _CMSG_ALIGN(sizeof(struct cmsghdr)))
 
+#ifdef _KERNEL
+#define __cmsg_cheri_fromcap __cheri_fromcap
+#else
+#define __cmsg_cheri_fromcap
+#endif
+
+
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
 	((char *)(cmsg) == (char *)0 ? CMSG_FIRSTHDR(mhdr) : \
 	    ((char *)(cmsg) + \
 	    _CMSG_ALIGN(((struct cmsghdr *)(cmsg))->cmsg_len) + \
 	    _CMSG_ALIGN(sizeof(struct cmsghdr)) > \
-	    (__cheri_fromcap char *)(mhdr)->msg_control + (mhdr)->msg_controllen) ? \
+	    (__cmsg_cheri_fromcap char *)(mhdr)->msg_control + (mhdr)->msg_controllen) ? \
 	    (struct cmsghdr *)0 : \
 	    (struct cmsghdr *)(void *)((char *)(cmsg) + \
 	    _CMSG_ALIGN(((struct cmsghdr *)(cmsg))->cmsg_len)))
@@ -595,7 +602,7 @@ struct sockcred {
  */
 #define	CMSG_FIRSTHDR(mhdr) \
 	((mhdr)->msg_controllen >= sizeof(struct cmsghdr) ? \
-	 (__cheri_fromcap struct cmsghdr *)(mhdr)->msg_control : \
+	 (__cmsg_cheri_fromcap struct cmsghdr *)(mhdr)->msg_control : \
 	 (struct cmsghdr *)0)
 
 #if __BSD_VISIBLE

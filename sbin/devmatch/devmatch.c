@@ -398,7 +398,7 @@ search_hints(const char *bus, const char *dev, const char *pnpinfo)
 				printf("Unknown Type %d len %d\n", ival, len);
 			break;
 		}
-		walker = (void *)(len - sizeof(int) + (intptr_t)walker);
+		walker = (void *)((intptr_t)walker + len - sizeof(int));
 	}
 	if (unbound_flag && found == 0 && *pnpinfo) {
 		if (verbose_flag)

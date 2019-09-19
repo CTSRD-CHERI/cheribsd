@@ -105,7 +105,7 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/cpu.h>
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #include <cheri/cheric.h>
 #endif
 
@@ -157,14 +157,14 @@ useracc(void * __capability cap, int len, int rw)
 	boolean_t rv;
 	vm_prot_t prot;
 	vm_map_t map;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	register_t reqperm;
 #endif
 
 	KASSERT((rw & ~VM_PROT_ALL) == 0,
 	    ("illegal ``rw'' argument to useracc (%x)\n", rw));
 	prot = rw;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	if (!__CAP_CHECK(cap, len))
 		return (FALSE);
 	reqperm = CHERI_PERM_GLOBAL;

@@ -90,7 +90,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #endif
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #include <machine/cherireg.h>
 #endif
 
@@ -853,7 +853,7 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 		return (NULL);
 
 	/* Copy over original contents */
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	if (size >= CHERICAP_SIZE && alloc >= CHERICAP_SIZE &&
 	    ((uintptr_t)addr & (CHERICAP_SIZE-1)) == 0 &&
 	    ((uintptr_t)newaddr & (CHERICAP_SIZE-1)) == 0)
