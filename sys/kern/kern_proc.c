@@ -2762,7 +2762,6 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen,
 		kve->kve_start = entry->start;
 		kve->kve_end = entry->end;
 		kve->kve_offset += entry->offset;
-		kve->kve_pid = entry->owner;
 
 		if (entry->protection & VM_PROT_READ)
 			kve->kve_protection |= KVME_PROT_READ;

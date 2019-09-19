@@ -444,7 +444,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	 * threshold for stacks.
 	 */
 	if (prev != &map->header && prev->object.vm_object == NULL &&
-	    prev->protection == PROT_NONE && prev->owner == 0 &&
+	    prev->protection == PROT_NONE &&
 	    start > prev->end && start - prev->end <=
 	    ((grown_down != 0) ?
 	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
@@ -452,7 +452,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	}
 
 	if (next != &map->header && next->object.vm_object == NULL &&
-	    next->protection == PROT_NONE && next->owner == 0 &&
+	    next->protection == PROT_NONE &&
 	    end < next->start && next->start - end <=
 	    (((next->eflags & MAP_ENTRY_GROWS_DOWN) != 0) ?
 	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
@@ -485,11 +485,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	 */
 	if (grown_down)
 		entry->eflags |= MAP_ENTRY_GROWS_DOWN;
-	entry->owner = 0;
 
-	/*
-	 * We need to call it again after setting the owner to 0.
-	 */
 	vm_map_simplify_entry(map, entry);
 }
 
@@ -1655,7 +1651,6 @@ charged:
 	    prev_entry->end == start && (prev_entry->cred == cred ||
 	    (prev_entry->object.vm_object != NULL &&
 	    prev_entry->object.vm_object->cred == cred)) &&
-	    prev_entry->owner == curproc->p_pid &&
 	    vm_object_coalesce(prev_entry->object.vm_object,
 	    prev_entry->offset,
 	    (vm_size_t)(prev_entry->end - prev_entry->start),
@@ -1720,7 +1715,6 @@ charged:
 	new_entry->wiring_thread = NULL;
 	new_entry->read_ahead = VM_FAULT_READ_AHEAD_INIT;
 	new_entry->next_read = start;
-	new_entry->owner = curproc->p_pid;
 
 	KASSERT(cred == NULL || !ENTRY_CHARGED(new_entry),
 	    ("overcommit: vm_map_insert leaks vm_map %p", new_entry));
@@ -2191,8 +2185,7 @@ vm_map_mergeable_neighbors(vm_map_entry_t prev, vm_map_entry_t entry)
 	    prev->max_protection == entry->max_protection &&
 	    prev->inheritance == entry->inheritance &&
 	    prev->wired_count == entry->wired_count &&
-	    prev->cred == entry->cred &&
-	    prev->owner == entry->owner);
+	    prev->cred == entry->cred);
 }
 
 static void
@@ -2239,8 +2232,7 @@ vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry)
 
 	if ((entry->eflags & MAP_ENTRY_GROWS_DOWN) != 0 &&
            (entry->object.vm_object != NULL ||
-	    entry->protection != PROT_NONE ||
-	    entry->owner != 0))
+	    entry->protection != PROT_NONE))
 		return;
 
 	prev = entry->prev;
@@ -2583,42 +2575,6 @@ vm_map_pmap_enter(vm_map_t map, vm_offset_t addr, vm_prot_t prot,
 		pmap_enter_object(map->pmap, start, addr + ptoa(psize),
 		    p_start, prot);
 	VM_OBJECT_RUNLOCK(object);
-}
-
-int
-vm_map_abandonment_check_proc(vm_map_t map, vm_offset_t start, vm_offset_t end,
-    struct proc *p)
-{
-	vm_map_entry_t entry;
-	bool found;
-
-	VM_MAP_RANGE_CHECK(map, start, end);
-
-	found = vm_map_lookup_entry(map, start, &entry);
-	if (!found)
-		return (KERN_SUCCESS);
-
-	for (; entry != &map->header && entry->start < end;
-	    entry = entry->next) {
-		if (entry->owner != p->p_pid) {
-			printf("%s: requested range [%#lx, %#lx], "
-			    "owner %d (%s), map %#p, would overlap with "
-			    "existing entry [%#lx, %#lx], owner %d\n",
-			    __func__, start, end,
-			    p->p_pid, p->p_comm, &p->p_vmspace->vm_map,
-			    entry->start, entry->end, entry->owner);
-			return (KERN_PROTECTION_FAILURE);
-		}
-	}
-
-	return (KERN_SUCCESS);
-}
-
-int
-vm_map_abandonment_check(vm_map_t map, vm_offset_t start, vm_offset_t end)
-{
-
-	return (vm_map_abandonment_check_proc(map, start, end, curproc));
 }
 
 /*
