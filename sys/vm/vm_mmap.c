@@ -127,6 +127,9 @@ SYSCTL_INT(_vm, OID_AUTO, imply_prot_max, CTLFLAG_RWTUN, &imply_prot_max, 0,
 static int log_wxrequests = 0;
 SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
     "Log requests for PROT_WRITE and PROT_EXEC");
+static int abandon_on_munmap = 1;
+SYSCTL_INT(_vm, OID_AUTO, abandon_on_munmap, CTLFLAG_RWTUN, &abandon_on_munmap, 0,
+    "Add abandoned entries on munmap(2)");
 
 #ifdef MAP_32BIT
 #define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
@@ -780,7 +783,10 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 		}
 	}
 #endif
-	vm_map_abandon_and_delete(map, addr, addr + size);
+	if (abandon_on_munmap)
+		vm_map_abandon_and_delete(map, addr, addr + size);
+	else
+		vm_map_delete(map, addr, addr + size);
 
 #ifdef HWPMC_HOOKS
 	if (__predict_false(pmc_handled)) {
