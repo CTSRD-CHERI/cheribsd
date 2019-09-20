@@ -162,22 +162,22 @@ int cpucfg;			/* Value of processor config register */
 int num_tlbentries = 64;	/* Size of the CPU tlb */
 int cputype;
 
-extern char MipsException[0x80] __no_subobject_bounds;
-extern char MipsExceptionEnd[0] __no_subobject_bounds;
+extern char MipsException[];
+extern char MipsExceptionEnd[];
 
 /* TLB miss handler address and end */
-extern char MipsTLBMiss[0x80] __no_subobject_bounds;
-extern char MipsTLBMissEnd[0] __no_subobject_bounds;
+extern char MipsTLBMiss[];
+extern char MipsTLBMissEnd[];
 
 /* Cache error handler */
-extern char MipsCache[0x80] __no_subobject_bounds;
-extern char MipsCacheEnd[0] __no_subobject_bounds;
+extern char MipsCache[];
+extern char MipsCacheEnd[];
 
 /* MIPS wait skip region */
-extern char MipsWaitStart[16] __no_subobject_bounds;
-extern char MipsWaitEnd[0] __no_subobject_bounds;
+extern char MipsWaitStart[];
+extern char MipsWaitEnd[];
 
-extern char end[] __no_subobject_bounds;
+extern char end[];
 
 u_int32_t bootdev;
 struct bootinfo bootinfo;
