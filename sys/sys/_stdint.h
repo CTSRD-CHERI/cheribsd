@@ -103,11 +103,19 @@ typedef	__uintmax_t		uintmax_t;
 #define	_UINTMAX_T_DECLARED
 #endif
 #ifndef _KINTCAP_T_DECLARED
+#ifndef __kintcap_t
+typedef __intptr_t	kintcap_t;
+#else
 typedef __kintcap_t	kintcap_t;
+#endif
 #define _KINTCAP_T_DECLARED
 #endif
 #ifndef _KUINTCAP_T_DECLARED
+#ifndef __kuintcap_t
+typedef __uintptr_t	kuintcap_t;
+#else
 typedef __kuintcap_t	kuintcap_t;
+#endif
 #define _KUINTCAP_T_DECLARED
 #endif
 
