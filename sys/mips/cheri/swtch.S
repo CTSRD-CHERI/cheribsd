@@ -221,6 +221,12 @@ NESTED(cpu_throw, CALLFRAME_SIZ, ra)
 						# right to action
 	nop					# BDSLOT
 END(cpu_throw)
+/*
+ * Force size 0 so that we do not set the capability bounds in relocations.
+ * this is needed to allow the branch to mips_sw1.
+ * XXX-AM: This could be replaced with an indirect jump through the captable.
+ */
+.size _C_LABEL(cpu_throw), 0
 
 
 /*

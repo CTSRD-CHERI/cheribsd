@@ -675,8 +675,9 @@ cpu_fetch_syscall_args(struct thread *td)
  * when a processor trap occurs.
  * In the case of a kernel trap, we return the pc where to resume if
  * p->p_addr->u_pcb.pcb_onfault is set, otherwise, return old pc.
+ * In the pure capability kernel, trap returns the full pcc to return to.
  */
-register_t
+trap_return_t
 trap(struct trapframe *trapframe)
 {
 	int type, usermode;
@@ -690,7 +691,7 @@ trap(struct trapframe *trapframe)
 	ksiginfo_t ksi;
 	char *msg = NULL;
 	char * __capability addr;
-	register_t pc;
+	trap_return_t pc;
 	int cop, error;
 	register_t *frame_regs;
 
@@ -835,7 +836,7 @@ trap(struct trapframe *trapframe)
 	if (!usermode) {
 		if (dtrace_trap_func != NULL &&
 		    (*dtrace_trap_func)(trapframe, type) != 0)
-			return (trapframe->pc);
+			return (trap_return(trapframe));
 	}
 #endif
 
@@ -869,7 +870,7 @@ trap(struct trapframe *trapframe)
 				tlb_invalidate_all_user(pmap);
 				mips_wr_status(status & ~MIPS_SR_TS);
 
-				return (trapframe->pc);
+				return (trap_return(trapframe));
 			} else {
 #ifdef DDB
 				kdb_trap(type, 0, trapframe);
@@ -886,7 +887,7 @@ trap(struct trapframe *trapframe)
 				ftype = VM_PROT_WRITE;
 				goto kernel_fault;
 			}
-			return (trapframe->pc);
+			return (trap_return(trapframe));
 		}
 		/* FALLTHROUGH */
 
@@ -897,7 +898,7 @@ trap(struct trapframe *trapframe)
 			goto dofault;
 		}
 		if (!usermode)
-			return (trapframe->pc);
+			return (trap_return(trapframe));
 		goto out;
 
 	case T_TLB_LD_MISS:
@@ -909,12 +910,13 @@ trap(struct trapframe *trapframe)
 			int rv;
 
 	kernel_fault:
+
 			va = trunc_page((vm_offset_t)trapframe->badvaddr);
 			rv = vm_fault(kernel_map, va, ftype, VM_FAULT_NORMAL);
 			if (rv == KERN_SUCCESS)
-				return (trapframe->pc);
+				return (trap_return(trapframe));
 			if (td->td_pcb->pcb_onfault != NULL) {
-				pc = (register_t)(intptr_t)td->td_pcb->pcb_onfault;
+				pc = (trap_return_t)(intptr_t)td->td_pcb->pcb_onfault;
 				td->td_pcb->pcb_onfault = NULL;
 				return (pc);
 			}
@@ -943,9 +945,8 @@ checkrefbit:
 		 */
 		if (pmap_emulate_referenced(&p->p_vmspace->vm_pmap,
 		    trapframe->badvaddr) == 0) {
-			if (!usermode) {
-				return (trapframe->pc);
-			}
+			if (!usermode)
+				return (trap_return(trapframe));
 			goto out;
 		}
 
@@ -976,17 +977,16 @@ dofault:
 			    map, &vm->vm_pmap, (void *)va, (void *)(intptr_t)trapframe->badvaddr,
 			    ftype, VM_FAULT_NORMAL, rv, (void *)(intptr_t)trapframe->pc);
 #endif
-
 			if (rv == KERN_SUCCESS) {
 				if (!usermode) {
-					return (trapframe->pc);
+					return (trap_return(trapframe));
 				}
 				goto out;
 			}
 	nogo:
 			if (!usermode) {
 				if (td->td_pcb->pcb_onfault != NULL) {
-					pc = (register_t)(intptr_t)td->td_pcb->pcb_onfault;
+					pc = (trap_return_t)(intptr_t)td->td_pcb->pcb_onfault;
 					td->td_pcb->pcb_onfault = NULL;
 					return (pc);
 				}
@@ -1056,7 +1056,7 @@ dofault:
 			 * for SYS_ptrace().
 			 */
 			syscallret(td);
-			return (trapframe->pc);
+			return (trap_return(trapframe));
 		}
 
 #if defined(KDTRACE_HOOKS) || defined(DDB)
@@ -1064,12 +1064,12 @@ dofault:
 #ifdef KDTRACE_HOOKS
 		if (!usermode && dtrace_invop_jump_addr != 0) {
 			dtrace_invop_jump_addr(trapframe);
-			return (trapframe->pc);
+			return (trap_return(trapframe));
 		}
 #endif
 #ifdef DDB
 		kdb_trap(type, 0, trapframe);
-		return (trapframe->pc);
+		return (trap_return(trapframe));
 #endif
 #endif
 
@@ -1170,7 +1170,7 @@ dofault:
 #ifdef CPU_CHERI
 	case T_C2E:
 		if (td->td_pcb->pcb_onfault != NULL) {
-			pc = (register_t)(intptr_t)td->td_pcb->pcb_onfault;
+			pc = (trap_return_t)(intptr_t)td->td_pcb->pcb_onfault;
 			td->td_pcb->pcb_onfault = NULL;
 			return (pc);
 		}
@@ -1214,7 +1214,7 @@ dofault:
 			printf("%s: reenabling COP_2 for kernel\n", __func__);
 			mips_wr_status(mips_rd_status() | MIPS_SR_COP_2_BIT);
 			td->td_frame->sr |= MIPS_SR_COP_2_BIT;
-			return (trapframe->pc);
+			return (trap_return(trapframe));
 		}
 #endif
 #ifdef	CPU_CNMIPS
@@ -1247,7 +1247,7 @@ dofault:
 		td->td_md.md_cop2owner = COP2_OWNER_KERNEL;
 		/* Enable COP2, it will be disabled in cpu_switch */
 		mips_wr_status(mips_rd_status() | MIPS_SR_COP_2_BIT);
-		return (trapframe->pc);
+		return (trap_return(trapframe));
 #else
 		goto err;
 		break;
@@ -1356,13 +1356,13 @@ dofault:
 
 			access_type = emulate_unaligned_access(trapframe, mode);
 			if (access_type != 0)
-				return (trapframe->pc);
+				return (trap_return(trapframe));
 		}
 		/* FALLTHROUGH */
 
 	case T_BUS_ERR_LD_ST:	/* BERR asserted to cpu */
 		if (td->td_pcb->pcb_onfault != NULL) {
-			pc = (register_t)(intptr_t)td->td_pcb->pcb_onfault;
+			pc = (trap_return_t)(intptr_t)td->td_pcb->pcb_onfault;
 			td->td_pcb->pcb_onfault = NULL;
 			return (pc);
 		}
@@ -1386,12 +1386,17 @@ err:
 		else
 			printf("kernel mode)\n");
 
+		printf("capcause = 0x%x, badaddr = %#jx, pc = %p, ra = %p, "
+		       "sp = %p, sr = %jx\n", trapframe->capcause,
+		       (intmax_t)trapframe->badvaddr, trapframe->pcc,
+		       trapframe->c17, trapframe->csp, (intmax_t)trapframe->sr);
+
 #ifdef TRAP_DEBUG
 		if (trap_debug) {
 #ifdef CHERI_PURECAP_KERNEL
-			printf("capcause = 0x%x, badaddr = %#jx, pc = %#jx, ra = %p, "
+			printf("capcause = 0x%x, badaddr = %#jx, pc = %p, ra = %p, "
 			    "sp = %p, sr = %jx\n", trapframe->capcause,
-			    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc,
+			    (intmax_t)trapframe->badvaddr, trapframe->pcc,
 			    trapframe->c17, trapframe->csp, (intmax_t)trapframe->sr);
 #else
 			printf("badvaddr = %#jx, pc = %#jx, ra = %#jx, sr = %#jxx\n",
@@ -1447,7 +1452,7 @@ out:
 	 *    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
 	 */
 #endif
-	return (trapframe->pc);
+	return (trap_return(trapframe));
 }
 
 #if !defined(SMP) && (defined(DDB) || defined(DEBUG))

@@ -43,30 +43,10 @@ __FBSDID("$FreeBSD$");
 inline int
 _yamon_syscon_read(t_yamon_syscon_id id, void *param, uint32_t size)
 {
-	long yamon_syscon_read = (long)*((int32_t *)YAMON_FUNC_OFFSET(YAMON_SYSCON_READ_OFS));
-	int value;
+	/* Build a PCC that we can use to call yamon. */
+	vaddr_t yamon_syscon_read = YAMON_FUNC(YAMON_SYSCON_READ_OFS);
 
-#ifdef CHERI_PURECAP_KERNEL
-	/* The yamon syscon read function must be made relative to PCC */
-	yamon_syscon_read = yamon_syscon_read - cheri_getbase(cheri_getpcc());
-#endif
-	__asm__ __volatile__ (
-		".set push\n"
-		".set noreorder\n"
-		"move $a0, %1\n"
-		"cgetbase $a1, %2\n"
-		"cgetoffset $t0, %2\n"
-		"daddu $a1, $a1, $t0\n"
-		"jalr %4\n"
-		"move $a2, %3\n"
-		"move %0, $v0\n"
-		/* XXX-AM keep ra zeroed so we can catch anything that returns improperly */
-		"move $ra, $zero\n"
-		".set pop\n"
-		: "=r" (value)
-		: "r" (id), "r" (param), "r" (size), "r" (yamon_syscon_read)
-		: "memory");
-	return value;
+	return _yamon_cheri_syscon_read(yamon_syscon_read, id, param, size);
 }
 #endif
 

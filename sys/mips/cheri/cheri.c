@@ -164,9 +164,14 @@ process_kernel_cap_relocs(Elf64_Capreloc *start, Elf64_Capreloc *end,
 			else
 				cap = data_cap;
 			cap = cheri_setaddress(cap, reloc->object);
-			if (reloc->size != 0)
-				cap = cheri_csetbounds(cap, reloc->size);
 		}
+		/*
+		 * XXX-AM: do not set 0 bounds, this is a workaround to make
+		 * branches across exception handlers work without changes.
+		 * Should probably go away at some point.
+		 */
+		if (reloc->size != 0)
+			cap = cheri_csetbounds(cap, reloc->size);
 		cap = cheri_incoffset(cap, reloc->offset);
 		*dst = cap;
 	}
@@ -197,6 +202,13 @@ process_kernel_dyn_relocs(Elf64_Rel *start, Elf64_Rel *end,
 			else if (ELF64_ST_TYPE(symentry->st_info) == STT_FUNC) {
 				cap = cheri_setaddress(code_cap,
 				    symentry->st_value);
+				/*
+				 * XXX-AM: do not set 0 bounds, this is a workaround to make
+				 * branches across exception handlers work without changes.
+				 * Should probably go away at some point.
+				 */
+				if (symentry->st_size != 0)
+				  cap = cheri_csetbounds(cap, symentry->st_size);
 			}
 			else {
 				cap = cheri_setaddress(data_cap,
@@ -294,7 +306,7 @@ cheri_init_capabilities(void * __capability kroot)
 	    (vaddr_t)&etext - (vaddr_t)MIPS_KSEG0_START);
 	cheri_kcode_capability = cheri_andperm(ctemp,
 	    (CHERI_PERM_EXECUTE | CHERI_PERM_LOAD | CHERI_PERM_CCALL |
-	     CHERI_PERM_SYSTEM_REGS));
+	     CHERI_PERM_SYSTEM_REGS | CHERI_PERM_GLOBAL));
 
 	ctemp = cheri_setoffset(kroot, (vaddr_t)&etext);
 	ctemp = cheri_csetboundsexact(ctemp,

@@ -127,7 +127,17 @@ void MipsUserIntr(void);
 extern int trap_debug;
 #endif
 
-register_t trap(struct trapframe *);
+#ifdef CHERI_PURECAP_KERNEL
+typedef uintptr_t trap_return_t;
+
+#define trap_return(frame) (trap_return_t)cheri_setoffset(frame->pcc, frame->pc)
+#else
+typedef register_t trap_return_t;
+
+#define trap_return(frame) frame->pc
+#endif
+
+trap_return_t trap(struct trapframe *);
 
 #endif /* ! _LOCORE */
 

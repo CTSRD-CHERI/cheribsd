@@ -255,7 +255,7 @@ VECTOR(_locore, unknown)
 	ABSRELOC_LA(t1, _C_LABEL(__stop___cap_relocs))
 	PTR_SUBU	t0, t1, t0
 	csetbounds	$c3, $c3, t0
-	csetoffset	$c4, $c3, t0
+	cincoffset	$c4, $c3, t0
 	cgetpccsetoffset	$c5, zero
 	cmove		$c6, $c28
 	ABSRELOC_LA(t0, _C_LABEL(process_kernel_cap_relocs))

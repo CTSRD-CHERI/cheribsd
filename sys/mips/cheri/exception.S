@@ -169,9 +169,11 @@ VECTOR(MipsTLBMiss, unknown)
 	CHERI_EXCEPTION_ENTER(k0)
 	# Increment exception counter, if enabled.
 	INC_EXCEPTION_CNTR(TLB_MISS_CNT)
+	csetkr1c CHERI_REG_KSCRATCH
 	CAPCALL_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(MipsDoTLBMiss))
-	cjr	CHERI_REG_KSCRATCH
 	MFC0	k0, MIPS_COP_0_BAD_VADDR	# get the fault address
+	cjr	CHERI_REG_KSCRATCH
+	cgetkr1c CHERI_REG_KSCRATCH
 	.set pop
 VECTOR_END(MipsTLBMiss)
 
@@ -247,12 +249,16 @@ LEAF(MipsDoTLBMiss)
 	CHERI_EXCEPTION_RETURN(k0)
 	eret						#1f: retUrn from exception
 
-1:	j		MipsTLBMissException		#20: kernel exception
-	nop						#21: branch delay slot
-2:	j		SlowFault			#22: no page table present
-	nop						#23: branch delay slot
+1:	/* kernel exception */
+	j	MipsTLBMissException
+	nop
+2:	/* no page table present */
+	j	SlowFault
+	nop
 	.set pop
 END(MipsDoTLBMiss)
+/* Force size 0 so that we do not set the capability bounds in relocations */
+.size _C_LABEL(MipsDoTLBMiss), 0
 
 /*
  * This code is copied to the general exception vector address to
@@ -584,18 +590,17 @@ SlowFault:
  * Restore CHERI registers from the on-stack kernel trap frame.
  * Note that this is only used for kernel-generated exceptions.
  *
+ * EPCC is expected to be given in the epcc parameter register with the offset
+ * already set.
  * STC must be restored later in the cheri kernel, otherwise we can not
- * restore the the rest (EPCC).
- * c27 is restored to KR1C and must be restored later in KSCRATCH for
- * CHERI_EXCEPTION_RETURN.
- * EPCC is restored later in SAVE_CPU, when we have the pc offset.
- *
- * Both STC and KSCRATCH are restored outside SAVE/RESTORE_CHERI macros.
+ * restore the the rest of the registers. Here we restore KSCRATCH in KR1C and
+ * STC in KSCRATCH for later use. XXX-AM: Could restore capregs last?
  *
  * Notice: the capability cause register is saved, but not restored.
  */
-#define	RESTORE_CHERI						\
+#define	RESTORE_CHERI(epcc_reg)					\
 	/* Restore special registers before KSCRATCH (C27) */	\
+	csetepcc epcc_reg;			\
 	RESTORE_CREG(CHERI_REG_KSCRATCH, DDC);	\
 	CSetDefault CHERI_REG_KSCRATCH;		\
 	RESTORE_CREG(CHERI_REG_C1, C1);		\
@@ -630,15 +635,7 @@ SlowFault:
 	RESTORE_CREG(CHERI_REG_C28, C28);	\
 	RESTORE_CREG(CHERI_REG_C29, C29);	\
 	RESTORE_CREG(CHERI_REG_C30, C30);	\
-	RESTORE_CREG(CHERI_REG_C31, C31)
-
-/* For CHERI we don't move $v0 to EPC since it is already updated by CSetEPCC */
-#define MTC0_EXC_PC(reg) \
-	/* EPCC is no longer a GPR so load it into KSCRATCH first */	\
-	RESTORE_CREG(CHERI_REG_KSCRATCH, PCC);				\
-	/* update the address of EPCC to the return pc */		\
-	RESTORE_EPCC(CHERI_REG_KSCRATCH, reg);				\
-	/* Restore STC in KSCRATCH, will be fully restored later */	\
+	RESTORE_CREG(CHERI_REG_C31, C31) ;	\
 	RESTORE_CREG(CHERI_REG_KSCRATCH, STC)
 
 /*
@@ -648,15 +645,14 @@ SlowFault:
 #define	RESTORE_REG(reg, offs) \
 	cld	reg, zero, (CALLFRAME_SIZ + (SZREG * offs)) (CHERI_REG_STC)
 
-#define	RESTORE_CPU \
+#define	RESTORE_CPU(epcc_reg) \
 	CLEAR_STATUS			;\
-	RESTORE_CHERI			;\
+	RESTORE_CHERI(epcc_reg)		;\
 	RESTORE_REG(k0, SR)		;\
 	RESTORE_REG(t0, MULLO)	;\
 	RESTORE_REG(t1, MULHI)	;\
 	mtlo	t0			;\
 	mthi	t1			;\
-	MTC0_EXC_PC(v0)			;\
 	.set noat			;\
 	RESTORE_REG(AT, AST)	;\
 	RESTORE_REG(v0, V0)		;\
@@ -717,9 +713,6 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	 * Call the exception handler (c3 set by SAVE_CPU).
 	 */
 	CAPCALL_LOAD($c12, trap)
-	/* XXX-AM: a3 this holds the exception PC from SAVE_CPU,
-	 * find it a place once ddb is ported
-	 */
 	cjalr	$c12, $c17
 	csd	a3, zero, CALLFRAME_RA(CHERI_REG_STC)	# for debugging
 
@@ -736,15 +729,11 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	or	a1, a1, a0
 	SAVE_REG(a1, SR)
 
-	/* c3 holds the trap() return address, we need to fill v0 so that RESTORE_CPU
-	 * will restore the correct PC.
+	/*
+	 * c3 holds the trap() return address, RESTORE_CPU will look in c3
+	 * for the PCC to be installed in EPCC.
 	 */
-	/* XXX-AM: NOTYET need to modify trap() to return a capability
-	cgetbase	v0, $c3
-	cgetoffset	t0, $c3
-	PTR_ADDU	v0, v0, t0
-	*/
-	RESTORE_CPU
+	RESTORE_CPU($c3)
 	/* Restore preempted stc from kr1c now we are done with the stack. */
 	cmove	CHERI_REG_STC, CHERI_REG_KSCRATCH
 	sync
@@ -805,6 +794,7 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	REG_LI	t0, TRAPFRAME_SIZE
 	csetbounds	$c3, $c3, t0
 	CAPCALL_LOAD($c12, trap)
+	/* Note the return EPCC in c3 is not used for userspace return. */
 	cjalr	$c12, $c17
 	nop
 
@@ -971,9 +961,9 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	or	a1, a1, a0
 	SAVE_REG(a1, SR)
 
-	/* XXX-AM: we should load a capability here */
-	cld	v0, zero, CALLFRAME_RA(CHERI_REG_STC)
-	RESTORE_CPU			# v0 contains the return address.
+	/* Set pc in c3 for RESTORE_CPU */
+	RESTORE_CREG($c3, PCC)
+	RESTORE_CPU($c3)
 
 	/* Restore preempted stc from kscratch now we are done with the stack. */
 	cmove	CHERI_REG_STC, CHERI_REG_KSCRATCH
@@ -1204,6 +1194,8 @@ LEAF_NOPROFILE(MipsTLBModException)
 	nop
 	.set pop
 END(MipsTLBModException)
+/* Force size 0 so that we do not set the capability bounds in relocations */
+.size _C_LABEL(MipsTLBModException), 0
 #endif /* defined(MIPS_EXC_CNTRS) */
 
 
@@ -1364,6 +1356,8 @@ MipsKStackOverflow:
 
 	.set pop
 END(MipsTLBInvalidException)
+/* Force size 0 so that we do not set the capability bounds in relocations */
+.size _C_LABEL(MipsTLBInvalidException), 0
 
 /*----------------------------------------------------------------------------
  *
@@ -1439,6 +1433,8 @@ LEAF_NOPROFILE(MipsTLBMissException)
 	eret					# return from exception
 	.set	at
 END(MipsTLBMissException)
+/* Force size 0 so that we do not set the capability bounds in relocations */
+.size _C_LABEL(MipsTLBMissException), 0
 
 /*----------------------------------------------------------------------------
  *
@@ -1471,12 +1467,12 @@ VECTOR(MipsCache, unknown)
 	CHERI_EXCEPTION_ENTER(k0)
 
 	CAPCALL_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(MipsCacheException))
+	clc	CHERI_REG_KSCRATCH, zero, 0(CHERI_REG_KSCRATCH)
 	cgetaddr k0, CHERI_REG_KSCRATCH
-	li	k1, MIPS_KSEG0_PHYS_MASK
-	and	k0, k1
-	PTR_LI	k1, MIPS_KSEG1_START
-	or	k0, k1
-	j	k0
+	CAPCALL_LOAD(CHERI_REG_KSCRATCH, _C_LABEL(cheri_kseg1_capability))
+	clc	CHERI_REG_KSCRATCH, zero, 0(CHERI_REG_KSCRATCH)
+	csetaddr CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k0
+	cjr	CHERI_REG_KSCRATCH
 	nop
 VECTOR_END(MipsCache)
 
