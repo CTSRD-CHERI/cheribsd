@@ -224,7 +224,7 @@ sed -e '
 		printf "#define\tPADL_(t)\t(sizeof (t) > sizeof(register_t) ? \\\n" > sysarg
 		printf "\t\t0 : 2 * sizeof(register_t) - sizeof(t))\n" > sysarg
 		printf "#define\tPADR_(t)\t(sizeof (t) > sizeof(register_t) ? \\\n" > sysarg
-		printf "\t\t0 : 2 * sizeof(register_t)))\n" > sysarg
+		printf "\t\t0 : 2 * sizeof(register_t))\n" > sysarg
 		printf "#else\n" > sysarg
 		printf "#define\tPADL_(t)\tPAD_(t)\n" > sysarg
 		printf "#define\tPADR_(t)\t0\n" > sysarg

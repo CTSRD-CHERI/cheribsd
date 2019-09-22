@@ -37,7 +37,7 @@ struct thread;
 #define	PADL_(t)	(sizeof (t) > sizeof(register_t) ? \
 		0 : 2 * sizeof(register_t) - sizeof(t))
 #define	PADR_(t)	(sizeof (t) > sizeof(register_t) ? \
-		0 : 2 * sizeof(register_t)))
+		0 : 2 * sizeof(register_t))
 #else
 #define	PADL_(t)	PAD_(t)
 #define	PADR_(t)	0
