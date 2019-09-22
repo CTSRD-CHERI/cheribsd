@@ -216,7 +216,7 @@ sed -e '
 		printf "#define\tPADL_(t)\t0\n" > sysarg
 		printf "#define\tPADR_(t)\tPAD_(t)\n" > sysarg
 
-		printf "#elif _MIPS_SZCAP == 256\n" > sysarg
+		printf "#elif defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256\n" > sysarg
 		printf "/*\n" > sysarg
 		printf " * For non-capability arguments, the syscall argument is stored in the\n" > sysarg
 		printf " * cursor field in the second word.\n" > sysarg

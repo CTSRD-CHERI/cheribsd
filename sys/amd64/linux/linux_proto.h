@@ -29,7 +29,7 @@ struct thread;
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define	PADL_(t)	0
 #define	PADR_(t)	PAD_(t)
-#elif _MIPS_SZCAP == 256
+#elif defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
 /*
  * For non-capability arguments, the syscall argument is stored in the
  * cursor field in the second word.
