@@ -796,6 +796,10 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 		}
 	}
 #endif
+	/*
+	 * XXX: This is suboptimal; it makes it impossible for the application
+	 *	to reuse the address range it just munmapped.
+	 */
 	if (abandon_on_munmap)
 		vm_map_abandon_and_delete(map, addr, addr + size);
 	else
