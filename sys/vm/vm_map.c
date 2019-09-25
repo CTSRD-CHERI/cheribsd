@@ -3390,7 +3390,7 @@ retry:
 		}
 		if (m == NULL)
 			continue;
-		if (m->wire_count != 0) {
+		if (m->ref_count != 0) {
 			VM_OBJECT_WUNLOCK(object);
 			ret = FALSE;
 			continue;
