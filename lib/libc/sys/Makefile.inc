@@ -44,6 +44,7 @@ SRCS+= getdents.c lstat.c mknod.c stat.c
 SRCS+= brk.c
 .endif
 SRCS+= pipe.c
+SRCS+= shm_open.c
 SRCS+= vadvise.c
 
 SRCS+=	compat-stub.c
@@ -492,7 +493,8 @@ MLINKS+=setuid.2 setegid.2 \
 	setuid.2 seteuid.2 \
 	setuid.2 setgid.2
 MLINKS+=shmat.2 shmdt.2
-MLINKS+=shm_open.2 shm_unlink.2
+MLINKS+=shm_open.2 memfd_create.3 \
+	shm_open.2 shm_unlink.2
 MLINKS+=sigwaitinfo.2 sigtimedwait.2
 MLINKS+=stat.2 fstat.2 \
 	stat.2 fstatat.2 \
