@@ -609,4 +609,5 @@ struct sysent freebsd64_sysent[] = {
 	{ AS(freebsd64_funlinkat_args), (sy_call_t *)freebsd64_funlinkat, AUE_UNLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 568 = freebsd64_funlinkat */
 	{ AS(freebsd64_copy_file_range_args), (sy_call_t *)freebsd64_copy_file_range, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 569 = freebsd64_copy_file_range */
 	{ AS(freebsd64___sysctlbyname_args), (sy_call_t *)freebsd64___sysctlbyname, AUE_SYSCTL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 570 = freebsd64___sysctlbyname */
+	{ AS(freebsd64_shm_open2_args), (sy_call_t *)freebsd64_shm_open2, AUE_SHMOPEN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 571 = freebsd64_shm_open2 */
 };

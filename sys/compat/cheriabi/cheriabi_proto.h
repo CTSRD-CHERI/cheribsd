@@ -1458,6 +1458,13 @@ struct cheriabi___sysctlbyname_args {
 	char new_l_[PADL_(void * __capability)]; void * __capability new; char new_r_[PADR_(void * __capability)];
 	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
 };
+struct cheriabi_shm_open2_args {
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+	char shmflags_l_[PADL_(int)]; int shmflags; char shmflags_r_[PADR_(int)];
+	char name_l_[PADL_(const char * __capability)]; const char * __capability name; char name_r_[PADR_(const char * __capability)];
+};
 int	cheriabi_read(struct thread *, struct cheriabi_read_args *);
 int	cheriabi_write(struct thread *, struct cheriabi_write_args *);
 int	cheriabi_open(struct thread *, struct cheriabi_open_args *);
@@ -1750,6 +1757,7 @@ int	cheriabi_fhreadlink(struct thread *, struct cheriabi_fhreadlink_args *);
 int	cheriabi_funlinkat(struct thread *, struct cheriabi_funlinkat_args *);
 int	cheriabi_copy_file_range(struct thread *, struct cheriabi_copy_file_range_args *);
 int	cheriabi___sysctlbyname(struct thread *, struct cheriabi___sysctlbyname_args *);
+int	cheriabi_shm_open2(struct thread *, struct cheriabi_shm_open2_args *);
 
 #ifdef COMPAT_43
 
@@ -2084,6 +2092,7 @@ int	cheriabi___sysctlbyname(struct thread *, struct cheriabi___sysctlbyname_args
 #define	CHERIABI_SYS_AUE_cheriabi_funlinkat	AUE_UNLINKAT
 #define	CHERIABI_SYS_AUE_cheriabi_copy_file_range	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___sysctlbyname	AUE_SYSCTL
+#define	CHERIABI_SYS_AUE_cheriabi_shm_open2	AUE_SHMOPEN
 
 #undef PAD_
 #undef PADL_

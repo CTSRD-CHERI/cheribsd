@@ -507,4 +507,5 @@
 #define	CHERIABI_SYS_cheriabi_funlinkat	568
 #define	CHERIABI_SYS_cheriabi_copy_file_range	569
 #define	CHERIABI_SYS_cheriabi___sysctlbyname	570
-#define	CHERIABI_SYS_MAXSYSCALL	571
+#define	CHERIABI_SYS_cheriabi_shm_open2	571
+#define	CHERIABI_SYS_MAXSYSCALL	572
