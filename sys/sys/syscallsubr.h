@@ -447,7 +447,7 @@ int	kern_setsockopt(struct thread *td, int s, int level, int name,
 int	kern_settimeofday(struct thread *td, struct timeval *tv,
 	    struct timezone *tzp);
 int	kern_shm_open(struct thread *td, const char * __capability userpath,
-	    int flags, mode_t mode, struct filecaps *fcaps);
+	    int flags, mode_t mode, struct filecaps *fcaps, int initial_seals);
 int	kern_shm_unlink(struct thread *td, const char * __capability userpath);
 int	kern_shmctl(struct thread *td, int shmid, int cmd, void *buf,
 	    size_t *bufsz);

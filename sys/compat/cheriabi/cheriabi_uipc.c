@@ -241,7 +241,7 @@ cheriabi_shm_open(struct thread *td, struct cheriabi_shm_open_args *uap)
 {
 
 	return (kern_shm_open(td, uap->path, uap->flags | O_CLOEXEC,
-	    uap->mode, NULL));
+	    uap->mode, NULL, F_SEAL_SEAL));
 }
 
 int
