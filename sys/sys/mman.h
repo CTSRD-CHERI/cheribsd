@@ -275,6 +275,8 @@ struct shmfd {
 
 	struct rangelock shm_rl;
 	struct mtx	shm_mtx;
+
+	int		shm_seals;
 };
 #endif
 
