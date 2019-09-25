@@ -1978,6 +1978,12 @@ int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mkno
 
 #endif /* COMPAT_FREEBSD11 */
 
+
+#ifdef COMPAT_FREEBSD12
+
+
+#endif /* COMPAT_FREEBSD12 */
+
 #define	FREEBSD64_SYS_AUE_freebsd64_read	AUE_READ
 #define	FREEBSD64_SYS_AUE_freebsd64_write	AUE_WRITE
 #define	FREEBSD64_SYS_AUE_freebsd64_open	AUE_OPEN_RWTC

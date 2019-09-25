@@ -1786,6 +1786,12 @@ int	cheriabi___sysctlbyname(struct thread *, struct cheriabi___sysctlbyname_args
 
 #endif /* COMPAT_FREEBSD11 */
 
+
+#ifdef COMPAT_FREEBSD12
+
+
+#endif /* COMPAT_FREEBSD12 */
+
 #define	CHERIABI_SYS_AUE_cheriabi_read	AUE_READ
 #define	CHERIABI_SYS_AUE_cheriabi_write	AUE_WRITE
 #define	CHERIABI_SYS_AUE_cheriabi_open	AUE_OPEN_RWTC
