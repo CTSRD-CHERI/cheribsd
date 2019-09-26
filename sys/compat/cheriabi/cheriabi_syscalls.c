@@ -578,4 +578,5 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_copy_file_range",			/* 569 = cheriabi_copy_file_range */
 	"cheriabi___sysctlbyname",			/* 570 = cheriabi___sysctlbyname */
 	"cheriabi_shm_open2",			/* 571 = cheriabi_shm_open2 */
+	"cheriabi_shm_rename",			/* 572 = cheriabi_shm_rename */
 };

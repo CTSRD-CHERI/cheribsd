@@ -3294,6 +3294,15 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 5;
 		break;
 	}
+	/* cheriabi_shm_rename */
+	case 572: {
+		struct cheriabi_shm_rename_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->path_from; /* const char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path_to; /* const char * __capability */
+		iarg[2] = p->flags; /* int */
+		*n_args = 3;
+		break;
+	}
 	default:
 		*n_args = 0;
 		break;
@@ -8800,6 +8809,22 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* cheriabi_shm_rename */
+	case 572:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		case 2:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10683,6 +10708,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* cheriabi_shm_open2 */
 	case 571:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_shm_rename */
+	case 572:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

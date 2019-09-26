@@ -3719,3 +3719,13 @@ SYS_STUB(570, int, __sysctlbyname,
     /* _localcheck */ {if (!(cheri_getperm(name) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(old) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(oldlenp) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(new) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
+SYS_STUB(572, int, shm_rename,
+    /* _protoargs */ (const char *  path_from, const char *  path_to, int flags),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   path_from, const char * __capability   path_to, int flags),
+    /* _protoargs_err */ (int * __capability stub_errno, const char * __capability   path_from, const char * __capability   path_to, int flags),
+    /* _callargs */ ((__cheri_fromcap const char * )path_from, (__cheri_fromcap const char * )path_to, flags),
+    /* _callargs_chk */ (&ret, stub_errno, path_from, path_to, flags),
+    /* _callargs_err */ (&errno, (const char * )path_from, (const char * )path_to, flags),
+    /* _localcheck */ {if (!(cheri_getperm(path_from) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(path_to) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
+)
+

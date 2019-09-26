@@ -578,4 +578,5 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_copy_file_range",			/* 569 = freebsd64_copy_file_range */
 	"freebsd64___sysctlbyname",			/* 570 = freebsd64___sysctlbyname */
 	"freebsd64_shm_open2",			/* 571 = freebsd64_shm_open2 */
+	"freebsd64_shm_rename",			/* 572 = freebsd64_shm_rename */
 };
