@@ -442,7 +442,7 @@ la_opendirat(int fd, const char *path) {
 		errno = ENOTSUP;
 		return (-1);
 	} else
-		return (open(fd, path, flags));
+		return (open(path, flags));
 #else
 	return (openat(fd, path, flags));
 #endif
