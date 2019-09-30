@@ -60,6 +60,8 @@ TRAMP_ELFSIZE=64
 .else
 TRAMP_ELFSIZE=32
 .endif
+# XXX-AM: Hack to clear trampoline flags
+TRAMP_EXTRA_LDFLAGS=${TRAMP_LDFLAGS:N-fuse-ld*}
 
 ASM_CFLAGS+=${CFLAGS} -D_LOCORE -DLOCORE
 
@@ -76,7 +78,7 @@ ${KERNEL_KO}.tramp.bin: ${KERNEL_KO} $S/$M/$M/elf_trampoline.c \
 	${CC} -O -nostdlib -I. -I$S ${TRAMP_EXTRA_FLAGS} \
 		-DKERNNAME="\"${KERNEL_KO}.tmp\"" -DELFSIZE=${TRAMP_ELFSIZE} \
 		-c $S/$M/$M/inckern.S $S/$M/$M/elf_trampoline.c
-	${LD} ${TRAMP_LDFLAGS} -T ${LDSCRIPT_NAME}.tramp.noheader \
+	${LD} ${TRAMP_EXTRA_LDFLAGS} -T ${LDSCRIPT_NAME}.tramp.noheader \
 		-o ${KERNEL_KO}.tramp.elf inckern.o elf_trampoline.o
 	${OBJCOPY} -S -O binary ${KERNEL_KO}.tramp.elf \
 		${KERNEL_KO}.tramp.bin
