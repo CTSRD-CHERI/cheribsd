@@ -347,7 +347,7 @@ platform_argv_ptr(int32_t argv)
 	 */
 	arg = cheri_ptrperm(
 	    cheri_setaddress(cheri_kseg0_capability, (vm_offset_t)(argv)),
-	    4096, CHERI_PERM_LOAD);
+	    4096, CHERI_PERM_LOAD | CHERI_PERM_STORE);
 
 	return (arg);
 }
