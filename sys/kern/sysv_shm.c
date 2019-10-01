@@ -560,7 +560,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			    lim_max(td, RLIMIT_DATA));
 		}
 	}
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	max_va = cheri_getbase(shmaddr) + cheri_getlen(shmaddr);
 #else
 	max_va = 0;
@@ -587,7 +587,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 			    CHERI_REPRESENTABLE_LENGTH(shmseg->u.shm_segsz));
 		}
 		/* XXX: set perms */
-		td->td_retcap = __DECONST_CAP(void * __capability, shmaddr);
+		td->td_retval[0] = (uintcap_t)__DECONST_CAP(void * __capability,
+		    shmaddr);
 	} else
 #endif
 		td->td_retval[0] = ptr_to_va(attach_va);
@@ -1151,6 +1152,57 @@ static struct syscall_helper_data shm32_syscalls[] = {
 };
 #endif
 
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64_proto.h>
+#include <compat/freebsd64/freebsd64_syscall.h>
+#include <compat/freebsd64/freebsd64_util.h>
+
+struct shmid_ds64 {
+	struct ipc_perm	shm_perm;
+	size_t		shm_segsz;
+	pid_t		shm_lpid;
+	pid_t		shm_cpid;
+	shmatt_t	shm_nattch;
+	time_t		shm_atime;
+	time_t		shm_dtime;
+	time_t		shm_ctime;
+};
+
+#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
+    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
+struct shmid_ds_old64 {
+	struct ipc_perm_old shm_perm;
+	int		shm_segsz;
+	pid_t		shm_lpid;
+	pid_t		shm_cpid;
+	short		shm_nattch;
+	time_t		shm_atime;
+	time_t		shm_dtime;
+	time_t		shm_ctime;
+	void		*shm_internal;
+};
+#endif
+
+struct shmid_kernel64 {
+	struct shmid_ds64	 u;
+	struct vm_object	*object;
+	struct label		*label;
+	struct ucred		*cred;
+};
+
+static struct syscall_helper_data shm64_syscalls[] = {
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_shmat),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_shmdt),
+	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(shmget),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_shmsys),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_shmctl),
+#if defined(COMPAT_FREEBSD7)
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd7_freebsd64_shmctl),
+#endif
+	SYSCALL_INIT_LAST
+};
+#endif /* COMPAT_FREEBSD64 */
+
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
@@ -1240,6 +1292,12 @@ shminit(void)
 	if (error != 0)
 		return (error);
 #endif
+#ifdef COMPAT_FREEBSD64
+	error = freebsd64_syscall_helper_register(shm64_syscalls,
+	    SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
+#endif
 #ifdef COMPAT_CHERIABI
 	error = cheriabi_syscall_helper_register(cheriabi_shm_syscalls, SY_THR_STATIC_KLD);
 	if (error != 0)
@@ -1258,6 +1316,9 @@ shmunload(void)
 
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(shm32_syscalls);
+#endif
+#ifdef COMPAT_FREEBSD64
+	freebsd64_syscall_helper_unregister(shm64_syscalls);
 #endif
 #ifdef COMPAT_CHERIABI
 	cheriabi_syscall_helper_unregister(cheriabi_shm_syscalls);
@@ -1293,6 +1354,9 @@ sysctl_shmsegs(SYSCTL_HANDLER_ARGS)
 	struct shmid_kernel tshmseg;
 #ifdef COMPAT_FREEBSD32
 	struct shmid_kernel32 tshmseg32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct shmid_kernel64 tshmseg64;
 #endif
 #ifdef COMPAT_CHERIABI
 	struct shmid_kernel_c tshmseg_c;
@@ -1333,8 +1397,24 @@ sysctl_shmsegs(SYSCTL_HANDLER_ARGS)
 			outsize = sizeof(tshmseg32);
 		} else
 #endif
+#ifdef COMPAT_FREEBSD64
+		if (!SV_CURPROC_FLAG(SV_CHERI)) {
+			bzero(&tshmseg64, sizeof(tshmseg64));
+			CP(tshmseg, tshmseg64, u.shm_perm);
+			CP(tshmseg, tshmseg64, u.shm_segsz);
+			CP(tshmseg, tshmseg64, u.shm_lpid);
+			CP(tshmseg, tshmseg64, u.shm_cpid);
+			CP(tshmseg, tshmseg64, u.shm_nattch);
+			CP(tshmseg, tshmseg64, u.shm_atime);
+			CP(tshmseg, tshmseg64, u.shm_dtime);
+			CP(tshmseg, tshmseg64, u.shm_ctime);
+			/* Don't copy object, label, or cred */
+			outaddr = &tshmseg64;
+			outsize = sizeof(tshmseg64);
+		} else
+#endif
 #ifdef COMPAT_CHERIABI
-		if (SV_CURPROC_FLAG(SV_CHERI)) {
+		{
 			bzero(&tshmseg_c, sizeof(tshmseg_c));
 			CP(tshmseg, tshmseg_c, u.shm_perm);
 			CP(tshmseg, tshmseg_c, u.shm_segsz);
@@ -1347,8 +1427,8 @@ sysctl_shmsegs(SYSCTL_HANDLER_ARGS)
 			/* Don't copy object, label, or cred */
 			outaddr = &tshmseg_c;
 			outsize = sizeof(tshmseg_c);
-		} else
-#endif
+		}
+#else
 		{
 			tshmseg.object = NULL;
 			tshmseg.label = NULL;
@@ -1356,6 +1436,7 @@ sysctl_shmsegs(SYSCTL_HANDLER_ARGS)
 			outaddr = &tshmseg;
 			outsize = sizeof(tshmseg);
 		}
+#endif
 		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
 			break;
@@ -1860,6 +1941,204 @@ done:
 }
 #endif
 
+#ifdef COMPAT_FREEBSD64
+int
+freebsd64_shmat(struct thread *td, struct freebsd64_shmat_args *uap)
+{
+
+	return (kern_shmat(td, uap->shmid, __USER_CAP_UNBOUND(uap->shmaddr),
+	    uap->shmflg));
+}
+
+int
+freebsd64_shmdt(struct thread *td, struct freebsd64_shmdt_args *uap)
+{
+
+	return (kern_shmdt(td, __USER_CAP_UNBOUND(uap->shmaddr)));
+}
+
+int
+freebsd64_shmsys(struct thread *td, struct freebsd64_shmsys_args *uap)
+{
+
+#ifdef COMPAT_FREEBSD7
+	AUDIT_ARG_SVIPC_WHICH(uap->which);
+	switch (uap->which) {
+	case 0:	{	/* shmat */
+		struct shmat_args ap;
+
+		ap.shmid = uap->a2;
+		ap.shmaddr = (void *)uap->a3;
+		ap.shmflg = uap->a4;
+		return (sysent[SYS_shmat].sy_call(td, &ap));
+	}
+	case 2: {	/* shmdt */
+		struct shmdt_args ap;
+
+		ap.shmaddr = (void *)uap->a2;
+		return (sysent[SYS_shmdt].sy_call(td, &ap));
+	}
+	case 3: {	/* shmget */
+		struct shmget_args ap;
+
+		ap.key = uap->a2;
+		ap.size = uap->a3;
+		ap.shmflg = uap->a4;
+		return (sysent[SYS_shmget].sy_call(td, &ap));
+	}
+	case 4: {	/* shmctl */
+		struct freebsd7_freebsd64_shmctl_args ap;
+
+		ap.shmid = uap->a2;
+		ap.cmd = uap->a3;
+		ap.buf = (void *)uap->a4;
+		return (freebsd7_freebsd64_shmctl(td, &ap));
+	}
+	case 1:		/* oshmctl */
+	default:
+		return (EINVAL);
+	}
+#else
+	return (nosys(td, NULL));
+#endif
+}
+
+#ifdef COMPAT_FREEBSD7
+int
+freebsd7_freebsd64_shmctl(struct thread *td,
+    struct freebsd7_freebsd64_shmctl_args *uap)
+{
+	int error;
+	union {
+		struct shmid_ds shmid_ds;
+		struct shm_info shm_info;
+		struct shminfo shminfo;
+	} u;
+	struct shmid_ds_old64 shmid_ds64;
+	size_t sz;
+
+	if (uap->cmd == IPC_SET) {
+		if ((error = copyin(__USER_CAP_OBJ(uap->buf), &shmid_ds64,
+		    sizeof(shmid_ds64))))
+			goto done;
+		ipcperm_old2new(&shmid_ds64.shm_perm, &u.shmid_ds.shm_perm);
+		CP(shmid_ds64, u.shmid_ds, shm_segsz);
+		CP(shmid_ds64, u.shmid_ds, shm_lpid);
+		CP(shmid_ds64, u.shmid_ds, shm_cpid);
+		CP(shmid_ds64, u.shmid_ds, shm_nattch);
+		CP(shmid_ds64, u.shmid_ds, shm_atime);
+		CP(shmid_ds64, u.shmid_ds, shm_dtime);
+		CP(shmid_ds64, u.shmid_ds, shm_ctime);
+	}
+
+	error = kern_shmctl(td, uap->shmid, uap->cmd, (void *)&u, &sz);
+	if (error)
+		goto done;
+
+	/* Cases in which we need to copyout */
+	switch (uap->cmd) {
+	case IPC_INFO:
+		error = copyout(&u.shminfo,
+		    __USER_CAP(uap->buf, sizeof(u.shminfo)),
+		    sizeof(u.shminfo));
+		break;
+	case SHM_INFO:
+		error = copyout(&u.shm_info,
+		    __USER_CAP(uap->buf, sizeof(u.shm_info)),
+		    sizeof(u.shm_info));
+		break;
+	case SHM_STAT:
+	case IPC_STAT:
+		memset(&shmid_ds64, 0, sizeof(shmid_ds64));
+		ipcperm_new2old(&u.shmid_ds.shm_perm, &shmid_ds64.shm_perm);
+		CP(u.shmid_ds, shmid_ds64, shm_segsz);
+		CP(u.shmid_ds, shmid_ds64, shm_lpid);
+		CP(u.shmid_ds, shmid_ds64, shm_cpid);
+		CP(u.shmid_ds, shmid_ds64, shm_nattch);
+		CP(u.shmid_ds, shmid_ds64, shm_atime);
+		CP(u.shmid_ds, shmid_ds64, shm_dtime);
+		CP(u.shmid_ds, shmid_ds64, shm_ctime);
+		shmid_ds64.shm_internal = 0;
+		error = copyout(&shmid_ds64, __USER_CAP_OBJ(uap->buf),
+		    sizeof(shmid_ds64));
+		break;
+	}
+
+done:
+	if (error) {
+		/* Invalidate the return value */
+		td->td_retval[0] = -1;
+	}
+	return (error);
+}
+#endif /* COMPAT_FREEBSD7 */
+
+int
+freebsd64_shmctl(struct thread *td, struct freebsd64_shmctl_args *uap)
+{
+	int error;
+	union {
+		struct shmid_ds shmid_ds;
+		struct shm_info shm_info;
+		struct shminfo shminfo;
+	} u;
+	struct shmid_ds64 shmid_ds64;
+	size_t sz;
+
+	if (uap->cmd == IPC_SET) {
+		if ((error = copyin(__USER_CAP_OBJ(uap->buf), &shmid_ds64,
+		    sizeof(shmid_ds64))))
+			goto done;
+		CP(shmid_ds64, u.shmid_ds, shm_perm);
+		CP(shmid_ds64, u.shmid_ds, shm_segsz);
+		CP(shmid_ds64, u.shmid_ds, shm_lpid);
+		CP(shmid_ds64, u.shmid_ds, shm_cpid);
+		CP(shmid_ds64, u.shmid_ds, shm_nattch);
+		CP(shmid_ds64, u.shmid_ds, shm_atime);
+		CP(shmid_ds64, u.shmid_ds, shm_dtime);
+		CP(shmid_ds64, u.shmid_ds, shm_ctime);
+	}
+
+	error = kern_shmctl(td, uap->shmid, uap->cmd, (void *)&u, &sz);
+	if (error)
+		goto done;
+
+	/* Cases in which we need to copyout */
+	switch (uap->cmd) {
+	case IPC_INFO:
+		error = copyout(&u.shminfo,
+		    __USER_CAP(uap->buf, sizeof(u.shminfo)),
+		    sizeof(u.shminfo));
+		break;
+	case SHM_INFO:
+		error = copyout(&u.shm_info,
+		    __USER_CAP(uap->buf, sizeof(u.shm_info)),
+		    sizeof(u.shm_info));
+		break;
+	case SHM_STAT:
+	case IPC_STAT:
+		CP(u.shmid_ds, shmid_ds64, shm_perm);
+		CP(u.shmid_ds, shmid_ds64, shm_segsz);
+		CP(u.shmid_ds, shmid_ds64, shm_lpid);
+		CP(u.shmid_ds, shmid_ds64, shm_cpid);
+		CP(u.shmid_ds, shmid_ds64, shm_nattch);
+		CP(u.shmid_ds, shmid_ds64, shm_atime);
+		CP(u.shmid_ds, shmid_ds64, shm_dtime);
+		CP(u.shmid_ds, shmid_ds64, shm_ctime);
+		error = copyout(&shmid_ds64, __USER_CAP_OBJ(uap->buf),
+		    sizeof(shmid_ds64));
+		break;
+	}
+
+done:
+	if (error) {
+		/* Invalidate the return value */
+		td->td_retval[0] = -1;
+	}
+	return (error);
+}
+#endif /* COMPAT_FREEBSD64 */
+
 #if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
 
@@ -1893,7 +2172,8 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 
 	/* IPC_SET needs to copyin the buffer before calling kern_shmctl */
 	if (uap->cmd == IPC_SET) {
-		if ((error = copyin(uap->buf, &old, sizeof(old))))
+		if ((error = copyin(__USER_CAP_OBJ(uap->buf), &old,
+		    sizeof(old))))
 			goto done;
 		ipcperm_old2new(&old.shm_perm, &buf.shm_perm);
 		CP(old, buf, shm_segsz);
@@ -1928,7 +2208,7 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 		CP(buf, old, shm_dtime);
 		CP(buf, old, shm_ctime);
 		old.shm_internal = NULL;
-		error = copyout(&old, uap->buf, sizeof(old));
+		error = copyout(&old, __USER_CAP_OBJ(uap->buf), sizeof(old));
 		break;
 	}
 

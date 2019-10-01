@@ -32,7 +32,6 @@
 
 #include <sys/param.h>
 #include <sys/kernel.h>
-#include <sys/cheri_serial.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 #include <sys/sysent.h>
@@ -42,6 +41,7 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <cheri/cheri_serial.h>
 
 #include <machine/atomic.h>
 #include <machine/cherireg.h>

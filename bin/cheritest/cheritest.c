@@ -1603,6 +1603,22 @@ static const struct cheri_test cheri_tests[] = {
 	  .ct_func = cheritest_setjmp_longjmp, },
 
 	/*
+	 * Signal handler/signal stack tests.
+	 */
+	{ .ct_name = "test_signal_handler_usr1",
+	  .ct_desc = "Install a signal handler (sa_handler) for SIGUSR1 and check it works",
+	  .ct_func = test_signal_handler_usr1 },
+	{ .ct_name = "test_signal_sigaction_usr1",
+	  .ct_desc = "Install a signal handler (sa_sigaction) for SIGUSR1 and check it works",
+	  .ct_func = test_signal_sigaction_usr1 },
+	{ .ct_name = "test_signal_sigaltstack",
+	  .ct_desc = "Check signal handlers use the alternate stack when enabled",
+	  .ct_func = test_signal_sigaltstack },
+	{ .ct_name = "test_signal_sigaltstack_disable",
+	  .ct_desc = "Check signal handlers don't use a given alternate stack when re-disabled",
+	  .ct_func = test_signal_sigaltstack_disable },
+
+	/*
 	 * Standard library string tests.
 	 */
 #ifdef KERNEL_MEMCPY_TESTS

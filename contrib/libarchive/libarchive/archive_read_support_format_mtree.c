@@ -87,7 +87,7 @@ struct mtree_option {
 };
 
 struct mtree_entry {
-	struct archive_rb_node rbnode;
+	struct archive_rb_node rbnode __subobject_member_used_for_c_inheritance;
 	struct mtree_entry *next_dup;
 	struct mtree_entry *next;
 	struct mtree_option *options;

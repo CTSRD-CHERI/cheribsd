@@ -111,6 +111,8 @@ CLEANFILES= ioctl.c ioctl.c.tmp tables.h tables.h.tmp
 
 .if defined(COMPAT_32BIT)
 CPP+=	-m32
+.elfif defined(COMPAT_64BIT)
+CPP+=	-m64
 .endif
 
 .if ${MK_CHERI} != "no" && !defined(NEED_CHERI)

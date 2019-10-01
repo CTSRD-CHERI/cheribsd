@@ -97,7 +97,8 @@ CHERI_CXX=${CHERI_CC:H}/${CHERI_CC:T:S/clang/clang++/}
 .endif
 
 _CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
-			-msoft-float -cheri-uintcap=offset
+			-msoft-float \
+			-cheri-uintcap=${CHERI_UINTCAP_MODE:Uoffset}
 .ifdef WANT_AFL_FUZZ
 # Build binaries static when fuzzing
 .if defined(__BSD_PROG_MK)
@@ -117,10 +118,13 @@ _CHERI_CPP=		${CHERI_CPP} ${_CHERI_COMMON_FLAGS}
 _CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
 .else
 _CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
-.endif
-# Clear software permission bit 2 if the bounds were reduced
+.endif # CHERI_SUBOBJECT_BOUNDS_MAX
+CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
+.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
+# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
 _CHERI_COMMON_FLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
-.endif
+.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
+.endif # CHERI_SUBOBJECT_BOUNDS
 
 .if defined(SYSROOT)
 _CHERI_COMMON_FLAGS+=	--sysroot=${SYSROOT}

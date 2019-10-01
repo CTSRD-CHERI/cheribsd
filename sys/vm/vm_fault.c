@@ -320,7 +320,7 @@ vm_fault_soft_fast(struct faultstate *fs, vm_offset_t vaddr, vm_prot_t prot,
 		}
 	}
 #endif
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	if (fs->first_object->flags & OBJ_NOLOADTAGS)
 		fault_type |= PMAP_ENTER_NOLOADTAGS;
 	if (fs->first_object->flags & OBJ_NOSTORETAGS)
@@ -1338,7 +1338,7 @@ readrest:
 	flags = fault_type;
 	if (wired)
 		flags |= PMAP_ENTER_WIRED;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	if (fs.object->flags & OBJ_NOLOADTAGS)
 		flags |= PMAP_ENTER_NOLOADTAGS;
 	if (fs.object->flags & OBJ_NOSTORETAGS)
@@ -1836,7 +1836,7 @@ again:
 		flags = access;
 		if (upgrade)
 			access |= PMAP_ENTER_WIRED;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		if (dst_object->flags & OBJ_NOLOADTAGS)
 			flags |= PMAP_ENTER_NOLOADTAGS;
 		if (dst_object->flags & OBJ_NOSTORETAGS)

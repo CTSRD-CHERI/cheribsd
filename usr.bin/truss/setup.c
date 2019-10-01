@@ -143,6 +143,13 @@ static struct procabi_table abis[] = {
 #else
 	{ "Linux ELF", &linux },
 #endif
+	/*
+	 * XXX: Temporary hack for CheriABI.  If CheriABI were going
+	 * to stay around longer we might add a sysdecode enum, etc.
+	 *
+	 * Eventually we will have to handle freebsd64 though.
+	 */
+	{ "CheriABI ELF64", &freebsd },
 };
 
 /*
@@ -552,7 +559,7 @@ exit_syscall(struct trussinfo *info, struct ptrace_lwpinfo *pl)
 			 */
 			if (psr.sr_error != 0) {
 				asprintf(&temp, "0x%lx",
-				    t->cs.args[sc->args[i].offset]);
+				    (unsigned long)t->cs.args[sc->args[i].offset]);
 			} else {
 				temp = print_arg(&sc->args[i],
 				    t->cs.args, psr.sr_retval, info);

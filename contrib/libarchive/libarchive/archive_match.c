@@ -72,7 +72,7 @@ struct match_list {
 };
 
 struct match_file {
-	struct archive_rb_node	 node;
+	struct archive_rb_node	 node __subobject_member_used_for_c_inheritance;
 	struct match_file	*next;
 	struct archive_mstring	 pathname;
 	int			 flag;

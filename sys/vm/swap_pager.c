@@ -104,7 +104,7 @@ __FBSDID("$FreeBSD$");
 
 #include <security/mac/mac_framework.h>
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #include <cheri/cheric.h>
 #endif
 
@@ -129,7 +129,7 @@ __FBSDID("$FreeBSD$");
  * the machine-independent swap pager.  However, that will have to follow
  * another day.
  */
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #endif
 
@@ -146,7 +146,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #define	SWAP_META_PAGES		PCTRIE_COUNT
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #define	BITS_PER_TAGS_PER_PAGE					\
 	((PAGE_SIZE / CHERICAP_SIZE) / (8 * sizeof(uint64_t)))
 
@@ -161,7 +161,7 @@ CTASSERT((PAGE_SIZE / CHERICAP_SIZE) % (8 * sizeof(uint64_t)) == 0);
  */
 struct swblk {
 	vm_pindex_t	p;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	uint64_t	swb_tags[SWAP_META_PAGES * BITS_PER_TAGS_PER_PAGE];
 #endif
 	daddr_t		d[SWAP_META_PAGES];
@@ -175,7 +175,7 @@ static int nswapdev;		/* Number of swap devices */
 int swap_pager_avail;
 static struct sx swdev_syscall_lock;	/* serialize swap(on|off) */
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 /*
  * Omnipotent capability for restoring swapped capabilities.
  *
@@ -448,7 +448,7 @@ static daddr_t	swp_pager_getswapspace(int *npages, int limit);
  * Metadata functions
  */
 static daddr_t swp_pager_meta_build(vm_object_t, vm_pindex_t, daddr_t);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 static void cheri_restore_tag(void * __capability *);
 static void swp_pager_meta_cheri_get_tags(vm_page_t);
 static void swp_pager_meta_cheri_put_tags(vm_page_t);
@@ -1466,7 +1466,7 @@ swap_pager_putpages(vm_object_t object, vm_page_t *ma, int count,
 			if (addr != SWAPBLK_NONE)
 				swp_pager_update_freerange(&s_free, &n_free,
 				    addr);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 			swp_pager_meta_cheri_put_tags(mreq);
 #endif
 			MPASS(mreq->dirty == VM_PAGE_BITS_ALL);
@@ -1628,7 +1628,7 @@ swp_pager_async_iodone(struct buf *bp)
 			    ("swp_pager_async_iodone: page %p is mapped", m));
 			KASSERT(m->dirty == 0,
 			    ("swp_pager_async_iodone: page %p is dirty", m));
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 			swp_pager_meta_cheri_get_tags(m);
 #endif
 
@@ -2050,7 +2050,7 @@ allocated:
 	return (prev_swapblk);
 }
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 /*
  *	cheri_restore_tag:
  *
@@ -2112,7 +2112,7 @@ swp_pager_meta_cheri_get_tags(vm_page_t page)
 	vm_pindex_t swidx;
 
 	swidx = rounddown(page->pindex, SWAP_META_PAGES);
-	scan = (void *)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(page));
+	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
 	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks, swidx);
 
 	for (i = swidx * BITS_PER_TAGS_PER_PAGE;
@@ -2143,7 +2143,7 @@ swp_pager_meta_cheri_put_tags(vm_page_t page)
 	int tag;
 
 	swidx = rounddown(page->pindex, SWAP_META_PAGES);
-	scan = (void *)MIPS_PHYS_TO_DIRECT(VM_PAGE_TO_PHYS(page));
+	scan = (void *)PHYS_TO_DMAP(VM_PAGE_TO_PHYS(page));
 	sb = SWAP_PCTRIE_LOOKUP(&page->object->un_pager.swp.swp_blks, swidx);
 
 	for (i = swidx * BITS_PER_TAGS_PER_PAGE;

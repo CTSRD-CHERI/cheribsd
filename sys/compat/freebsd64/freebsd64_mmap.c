@@ -96,6 +96,17 @@ freebsd64_mmap(struct thread *td, struct freebsd64_mmap_args *uap)
 	    uap->flags, uap->fd, uap->pos));
 }
 
+#if defined(COMPAT_FREEBSD6)
+int
+freebsd6_freebsd64_mmap(struct thread *td,
+    struct freebsd6_freebsd64_mmap_args *uap)
+{
+
+	return (kern_mmap(td, (uintptr_t)uap->addr, 0, uap->len, uap->prot,
+	    uap->flags, uap->fd, uap->pos));
+}
+#endif
+
 int
 freebsd64_msync(struct thread *td, struct freebsd64_msync_args *uap)
 {

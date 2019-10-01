@@ -93,14 +93,14 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 		struct ptrace_io_desc piod;
 		struct ptrace_lwpinfo pl;
 		kptrace_vm_entry_t pve;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
 		struct dbreg dbreg;
 		struct fpreg fpreg;
 		struct reg reg;
-		char args[sizeof(td->td_sa.args)];
-		struct ptrace_sc_ret *psr;
+		uint64_t args[nitems(td->td_sa.args)];
+		struct ptrace_sc_ret64 psr;
 		int ptevents;
 	} r;
 	void * __capability addr;
@@ -121,7 +121,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	case PT_GETFPREGS:
 		BZERO(&r.fpreg, sizeof r.fpreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_GETCAPREGS:
 		BZERO(&r.capreg, sizeof r.capreg);
 		break;
@@ -138,7 +138,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	case PT_SETDBREGS:
 		error = COPYIN(uap->addr, &r.dbreg, sizeof r.dbreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_SETCAPREGS:
 		error = COPYIN(uap->addr, &r.capreg, sizeof r.capreg);
 		break;
@@ -202,7 +202,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	case PT_GETDBREGS:
 		error = COPYOUT(&r.dbreg, uap->addr, sizeof r.dbreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_GETCAPREGS:
 		error = COPYOUT(&r.capreg, uap->addr, sizeof r.capreg);
 		break;

@@ -916,6 +916,9 @@ XCFLAGS+=	${BFLAGS}
     ${TARGET_ARCH} == "powerpc64" || ${TARGET_ARCH:Mmips64*} != "")
 LIBCOMPAT= 32
 .include "Makefile.libcompat"
+.elif ${MK_LIB64} != "no" && ${TARGET_ARCH:Mmips64*c*}
+LIBCOMPAT=64
+.include "Makefile.libcompat"
 .elif ${MK_LIBSOFT} != "no" && ${TARGET_ARCH:Marmv[67]*} != ""
 LIBCOMPAT= SOFT
 .include "Makefile.libcompat"
@@ -1854,6 +1857,8 @@ _sysent_dirs=	sys/kern
 _sysent_dirs+=	sys/compat/freebsd32
 _sysent_dirs+=	sys/compat/freebsd64
 _sysent_dirs+=	sys/compat/cheriabi
+_sysent_dirs+=	sys/compat/cloudabi32	\
+		sys/compat/cloudabi64
 _sysent_dirs+=	sys/amd64/linux		\
 		sys/amd64/linux32	\
 		sys/arm64/linux		\

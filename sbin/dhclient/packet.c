@@ -124,7 +124,12 @@ void
 assemble_udp_ip_header(unsigned char *buf, int *bufix, u_int32_t from,
     u_int32_t to, unsigned int port, unsigned char *data, int len)
 {
-	struct ip ip;
+	/* XXXAR: this __no_subobject bounds is required since
+	 * otherwise we fail to get a DCHP lease.
+	 * FIXME: debug the difference in generated code that could cause
+	 * an invalid checksum result
+	 */
+	struct ip ip __no_subobject_bounds;
 	struct udphdr udp;
 
 	ip.ip_v = 4;

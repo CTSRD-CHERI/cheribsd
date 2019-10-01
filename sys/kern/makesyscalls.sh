@@ -210,21 +210,24 @@ sed -e '
 		printf "#include <bsm/audit_kevents.h>\n\n" > sysarg
 		printf "struct proc;\n\n" > sysarg
 		printf "struct thread;\n\n" > sysarg
-		printf "#ifdef CPU_CHERI\n" > sysarg
-		printf "#define\tCHERI_PADL_(t)\t(sizeof (t) > sizeof(register_t) ? \\\n\t\t0 : sizeof(register_t))\n" > sysarg
-		printf "#define\tCHERI_PADR_(t)\t(sizeof (t) > sizeof(register_t ) ? \\\n\t\t0 : sizeof(__intcap_t) - (CHERI_PADL_(t) + sizeof(register_t)))\n" > sysarg
-		printf "#else\n" > sysarg
-		printf "#define\tCHERI_PADL_(t)\t0\n" > sysarg
-		printf "#define\tCHERI_PADR_(t)\t0\n" > sysarg
-		printf "#endif\n\n" > sysarg
-		printf "#define\tPAD_(t)\t(sizeof(register_t) <= sizeof(t) ? \\\n" > sysarg
-		printf "\t\t0 : sizeof(register_t) - sizeof(t))\n\n" > sysarg
-		printf "#if BYTE_ORDER == LITTLE_ENDIAN\n"> sysarg
+		printf "#define\tPAD_(t)\t(sizeof(syscallarg_t) <= sizeof(t) ? \\\n" > sysarg
+		printf "\t\t0 : sizeof(syscallarg_t) - sizeof(t))\n\n" > sysarg
+		printf "#if BYTE_ORDER == LITTLE_ENDIAN\n" > sysarg
 		printf "#define\tPADL_(t)\t0\n" > sysarg
 		printf "#define\tPADR_(t)\tPAD_(t)\n" > sysarg
+
+		printf "#elif defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256\n" > sysarg
+		printf "/*\n" > sysarg
+		printf " * For non-capability arguments, the syscall argument is stored in the\n" > sysarg
+		printf " * cursor field in the second word.\n" > sysarg
+		printf " */\n" > sysarg
+		printf "#define\tPADL_(t)\t(sizeof (t) > sizeof(register_t) ? \\\n" > sysarg
+		printf "\t\t0 : 2 * sizeof(register_t) - sizeof(t))\n" > sysarg
+		printf "#define\tPADR_(t)\t(sizeof (t) > sizeof(register_t) ? \\\n" > sysarg
+		printf "\t\t0 : 2 * sizeof(register_t))\n" > sysarg
 		printf "#else\n" > sysarg
-		printf "#define\tPADL_(t)\t(CHERI_PADL_(t) + PAD_(t))\n" > sysarg
-		printf "#define\tPADR_(t)\tCHERI_PADR_(t)\n" > sysarg
+		printf "#define\tPADL_(t)\tPAD_(t)\n" > sysarg
+		printf "#define\tPADR_(t)\t0\n" > sysarg
 		printf "#endif\n\n" > sysarg
 
 		printf "#ifndef %s\n", sysargmap_h > sysargmap
@@ -936,7 +939,7 @@ sed -e '
 			prefix = "freebsd4_"
 			descr = "freebsd4"
 		} else if (flag("COMPAT6")) {
-			if (mincompat > 5)
+			if (mincompat > 6)
 				is_obsol = 1
 			else
 				ncompat6++
@@ -991,21 +994,23 @@ sed -e '
 			next
 		}
 
-		if (argc != 0 && !flag("NOARGS") && !flag("NOPROTO") && \
-		    !flag("NODEF")) {
-			printf("struct %s {\n", argalias) > out
-			for (i = 1; i <= argc; i++)
-				printf("\tchar %s_l_[PADL_(%s)]; %s %s; " \
-				    "char %s_r_[PADR_(%s)];\n",
-				    argname[i], argtype[i],
-				    argtype[i], argname[i],
-				    argname[i], argtype[i]) > out
-			printf("};\n") > out
+		if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF") && \
+		    !(abi_flags != "" && ptrargs == 0)) {
+			if (argc != 0) {
+				printf("struct %s {\n", argalias) > out
+				for (i = 1; i <= argc; i++)
+					printf("\tchar %s_l_[PADL_(%s)]; " \
+					    "%s %s; char %s_r_[PADR_(%s)];\n",
+					    argname[i], argtype[i],
+					    argtype[i], argname[i],
+					    argname[i], argtype[i]) > out
+				printf("};\n") > out
+			} else
+				printf("struct %s {\n\tregister_t dummy;\n};\n",
+				    argalias) > sysarg
 		}
-		else if (!flag("NOARGS") && !flag("NOPROTO") && !flag("NODEF"))
-			printf("struct %s {\n\tregister_t dummy;\n};\n",
-			    argalias) > sysarg
-		if (!flag("NOPROTO") && !flag("NODEF")) {
+		if (!flag("NOPROTO") && !flag("NODEF") && \
+		    !(abi_flags != "" && ptrargs == 0)) {
 			printf("%s\t%s%s(struct thread *, struct %s *);\n",
 			    rettype, prefix, funcname, argalias) > outdcl
 			printf("#define\t%sAUE_%s%s\t%s\n", syscallprefix,

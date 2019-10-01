@@ -255,7 +255,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 #endif
     }
 
-    dbg("Allocating entire object: mmap(%#p, 0x%lx, 0x%x, 0x%x, -1, 0)",
+    dbg("Allocating entire object: mmap(" PTR_FMT ", 0x%lx, 0x%x, 0x%x, -1, 0)",
 	    base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL), base_flags);
     mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	base_flags, -1, 0);
@@ -265,8 +265,13 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	goto error;
     }
     if (base_addr != NULL && (vaddr_t)mapbase != (vaddr_t)base_addr) {
+#ifdef __CHERI_PURE_CAPABILITY__
 	_rtld_error("%s: mmap returned wrong address: wanted %#p, got %#p",
 	  path, base_addr, mapbase);
+#else
+	_rtld_error("%s: mmap returned wrong address: wanted %p, got %p",
+	  path, base_addr, mapbase);
+#endif
 	goto error1;
     }
 

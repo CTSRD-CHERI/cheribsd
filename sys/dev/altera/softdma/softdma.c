@@ -47,7 +47,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/resource.h>
 #include <sys/rman.h>
 
-#include <machine/cache.h>
 #include <machine/bus.h>
 
 #ifdef FDT
@@ -307,10 +306,11 @@ softdma_process_tx(struct softdma_channel *chan, struct softdma_desc *desc)
 	uint32_t reg;
 	int got_bits;
 	int len;
+	uint32_t fifo_depth;
 
 	sc = chan->sc;
 
-	fifo_fill_level_wait(sc);
+	fifo_depth = fifo_fill_level_wait(sc);
 
 	/* Set start of packet. */
 	if (desc->control & CONTROL_GEN_SOP)
@@ -343,12 +343,15 @@ softdma_process_tx(struct softdma_channel *chan, struct softdma_desc *desc)
 		len -= 4;
 		word = (uint32_t)((buf >> got_bits) & 0xffffffff);
 
-		fifo_fill_level_wait(sc);
+		if (fifo_depth == AVALON_FIFO_TX_BASIC_OPTS_DEPTH)
+			fifo_depth = fifo_fill_level_wait(sc);
+
 		if (len == 0 && got_bits == 0 &&
 		    (desc->control & CONTROL_GEN_EOP) != 0)
 			softdma_mem_write(sc, A_ONCHIP_FIFO_MEM_CORE_METADATA,
 			    A_ONCHIP_FIFO_MEM_CORE_EOP);
 		bus_write_4(sc->res[0], A_ONCHIP_FIFO_MEM_CORE_DATA, word);
+		fifo_depth++;
 	}
 
 	if (len & 2) {
@@ -369,24 +372,28 @@ softdma_process_tx(struct softdma_channel *chan, struct softdma_desc *desc)
 		got_bits -= 32;
 		word = (uint32_t)((buf >> got_bits) & 0xffffffff);
 
-		fifo_fill_level_wait(sc);
+		if (fifo_depth == AVALON_FIFO_TX_BASIC_OPTS_DEPTH)
+			fifo_depth = fifo_fill_level_wait(sc);
 		if (len == 0 && got_bits == 0 &&
 		    (desc->control & CONTROL_GEN_EOP) != 0)
 			softdma_mem_write(sc, A_ONCHIP_FIFO_MEM_CORE_METADATA,
 			    A_ONCHIP_FIFO_MEM_CORE_EOP);
 		bus_write_4(sc->res[0], A_ONCHIP_FIFO_MEM_CORE_DATA, word);
+		fifo_depth++;
 	}
 
 	if (got_bits) {
 		missing = 32 - got_bits;
 		got_bits /= 8;
 
-		fifo_fill_level_wait(sc);
+		if (fifo_depth == AVALON_FIFO_TX_BASIC_OPTS_DEPTH)
+			fifo_depth = fifo_fill_level_wait(sc);
 		reg = A_ONCHIP_FIFO_MEM_CORE_EOP |
 		    ((4 - got_bits) << A_ONCHIP_FIFO_MEM_CORE_EMPTY_SHIFT);
 		softdma_mem_write(sc, A_ONCHIP_FIFO_MEM_CORE_METADATA, reg);
 		word = (uint32_t)((buf << missing) & 0xffffffff);
 		bus_write_4(sc->res[0], A_ONCHIP_FIFO_MEM_CORE_DATA, word);
+		fifo_depth++;
 	}
 
 	return (desc->len);
@@ -422,22 +429,10 @@ softdma_process_rx(struct softdma_channel *chan, struct softdma_desc *desc)
 	sop_rcvd = 0;
 	while (fill_level) {
 		empty = 0;
-#ifndef SMP
 		data = bus_read_4(sc->res[0], A_ONCHIP_FIFO_MEM_CORE_DATA);
-#else
-		/*
-		 * A workaround for the hardware bug.
-		 * RX FIFO packet counter belives we fetched twice, but we
-		 * did that once only. In result we have truncated packet.
-		 * The workaround is to use cached access to the FIFO register
-		 * and invalidate the address of the register in cache.
-		 */
-		uint64_t addr;
-		addr = MIPS_PHYS_TO_XKPHYS_CACHED(rman_get_start(sc->res[0]));
-		data = *(uint32_t *)addr;
-		mipsNN_pdcache_inv_range_128(addr, 4);
-#endif
 		meta = softdma_mem_read(sc, A_ONCHIP_FIFO_MEM_CORE_METADATA);
+
+		fill_level--;
 
 		if (meta & A_ONCHIP_FIFO_MEM_CORE_ERROR_MASK) {
 			error = 1;
@@ -481,7 +476,6 @@ softdma_process_rx(struct softdma_channel *chan, struct softdma_desc *desc)
 		if (meta & A_ONCHIP_FIFO_MEM_CORE_EOP)
 			break;
 
-		fill_level = softdma_fill_level(sc);
 		timeout = 100;
 		while (fill_level == 0 && timeout--)
 			fill_level = softdma_fill_level(sc);

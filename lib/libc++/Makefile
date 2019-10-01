@@ -92,7 +92,7 @@ CFLAGS+=	-nostdinc++
 CFLAGS+=	-nostdlib
 CFLAGS+=	-D_LIBCPP_BUILDING_LIBRARY
 CFLAGS+=	-DLIBCXXRT
-CXXSTD?=	c++14
+CXXSTD?=	c++11
 
 LIBADD+=	cxxrt
 
@@ -167,6 +167,7 @@ STD_HEADERS+=	cwctype
 STD_HEADERS+=	deque
 STD_HEADERS+=	errno.h
 STD_HEADERS+=	exception
+STD_HEADERS+=	fenv.h
 STD_HEADERS+=	filesystem
 STD_HEADERS+=	float.h
 STD_HEADERS+=	forward_list

@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/ptrace.h>
 #include <sys/rwlock.h>
 #include <sys/sx.h>
+#include <sys/syscall.h>
 #include <sys/malloc.h>
 #include <sys/signalvar.h>
 
@@ -178,7 +179,7 @@ proc_write_fpregs(struct thread *td, struct fpreg *fpregs)
 	PROC_ACTION(set_fpregs(td, fpregs));
 }
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 int
 proc_read_capregs(struct thread *td, struct capreg *capregs)
 {
@@ -236,7 +237,7 @@ proc_write_fpregs32(struct thread *td, struct fpreg32 *fpregs32)
 	PROC_ACTION(set_fpregs32(td, fpregs32));
 }
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 int
 proc_read_capregs32(struct thread *td, struct capreg *capregs)
 {
@@ -582,6 +583,19 @@ ptrace_sc_ret_to32(const struct ptrace_sc_ret *psr,
 }
 #endif /* COMPAT_FREEBSD32 */
 
+#if __has_feature(capabilities)
+static void
+ptrace_sc_ret_to64(const struct ptrace_sc_ret * __capability psr,
+    struct ptrace_sc_ret64 * __capability psr64)
+{
+
+	bzero((__cheri_fromcap void *)psr64, sizeof(*psr64));
+	psr64->sr_retval[0] = (__cheri_addr uint64_t)psr->sr_retval[0];
+	psr64->sr_retval[1] = (__cheri_addr uint64_t)psr->sr_retval[1];
+	psr64->sr_error = psr->sr_error;
+}
+#endif
+
 /*
  * Process debugging system call.
  */
@@ -630,7 +644,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		struct ptrace_io_desc piod;
 		struct ptrace_lwpinfo pl;
 		kptrace_vm_entry_t pve;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
 		struct dbreg dbreg;
@@ -644,7 +658,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 		struct ptrace_lwpinfo32 pl32;
 		struct ptrace_vm_entry32 pve32;
 #endif
-		char args[sizeof(td->td_sa.args)];
+		syscallarg_t args[nitems(td->td_sa.args)];
 		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r;
@@ -672,7 +686,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_GETFPREGS:
 		BZERO(&r.fpreg, sizeof r.fpreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_GETCAPREGS:
 		BZERO(&r.capreg, sizeof r.capreg);
 		break;
@@ -689,7 +703,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_SETDBREGS:
 		error = COPYIN(uap->addr, &r.dbreg, sizeof r.dbreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_SETCAPREGS:
 		error = COPYIN(uap->addr, &r.capreg, sizeof r.capreg);
 		break;
@@ -753,7 +767,7 @@ sys_ptrace(struct thread *td, struct ptrace_args *uap)
 	case PT_GETDBREGS:
 		error = COPYOUT(&r.dbreg, uap->addr, sizeof r.dbreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_GETCAPREGS:
 		error = COPYOUT(&r.capreg, uap->addr, sizeof r.capreg);
 		break;
@@ -829,11 +843,18 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	int error, num, tmp;
 	int proctree_locked = 0;
 	lwpid_t tid = 0, *buf;
+#if __has_feature(capabilities)
+	int wrap64 = 0;
+	struct ptrace_sc_ret64 * __capability psr64 = NULL;
+	struct ptrace_io_desc_c * __capability piodc = NULL;
+#endif
 #ifdef COMPAT_FREEBSD32
 	int wrap32 = 0, safe = 0;
 	struct ptrace_io_desc32 *piod32 = NULL;
 	struct ptrace_lwpinfo32 *pl32 = NULL;
 	struct ptrace_sc_ret32 *psr32 = NULL;
+#endif
+#if defined(COMPAT_FREEBSD32) || __has_feature(capabilities)
 	union {
 		struct ptrace_lwpinfo pl;
 		struct ptrace_sc_ret psr;
@@ -916,6 +937,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		tid = td2->td_tid;
 	}
 
+#if __has_feature(capabilities)
+	if (!SV_CURPROC_FLAG(SV_CHERI))
+		wrap64 = 1;
+#endif
 #ifdef COMPAT_FREEBSD32
 	/*
 	 * Test if we're a 32 bit client and what the target is.
@@ -1150,6 +1175,13 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			break;
 		}
 		bzero((__cheri_fromcap void *)addr, sizeof(td2->td_sa.args));
+#if __has_feature(capabilities)
+		if (wrap64)
+			for (num = 0; num < td2->td_sa.narg; num++)
+				((uint64_t * __capability)addr)[num] =
+				    (__cheri_addr uint64_t)td2->td_sa.args[num];
+		else
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32)
 			for (num = 0; num < nitems(td2->td_sa.args); num++)
@@ -1158,7 +1190,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		else
 #endif
 			bcopy_c((__cheri_tocap void * __capability)td2->td_sa.args,
-				addr, td2->td_sa.narg * sizeof(register_t));
+				addr, td2->td_sa.narg * sizeof(syscallarg_t));
 		break;
 
 	case PT_GET_SC_RET:
@@ -1170,6 +1202,12 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = EINVAL;
 			break;
 		}
+#if __has_feature(capabilities)
+		if (wrap64) {
+			psr = &r.psr;
+			psr64 = addr;
+		} else
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32) {
 			psr = &r.psr;
@@ -1183,6 +1221,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			psr->sr_retval[0] = td2->td_retval[0];
 			psr->sr_retval[1] = td2->td_retval[1];
 		}
+#if __has_feature(capabilities)
+		if (wrap64)
+			ptrace_sc_ret_to64(psr, psr64);
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32)
 			ptrace_sc_ret_to32(psr, psr32);
@@ -1353,7 +1395,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_WRITE: pid %d: %p <= %#x",
-			    p->p_pid, (__cheri_addr uintptr_t)addr, data);
+			    p->p_pid, addr, data);
 		PROC_LOCK(p);
 		break;
 
@@ -1366,12 +1408,22 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = ENOMEM;
 		else
 			CTR3(KTR_PTRACE, "PT_READ: pid %d: %p >= %#x",
-			    p->p_pid, (__cheri_addr uintptr_t)addr, tmp);
+			    p->p_pid, addr, tmp);
 		td->td_retval[0] = tmp;
 		PROC_LOCK(p);
 		break;
 
 	case PT_IO:
+#if __has_feature(capabilities)
+		if (SV_CURPROC_FLAG(SV_CHERI)) {
+			piodc = addr;
+			IOVEC_INIT_C(&iov, piodc->piod_addr, piodc->piod_len);
+			uio.uio_offset =
+			    (off_t)(__cheri_addr vaddr_t)piodc->piod_offs;
+			uio.uio_resid = piodc->piod_len;
+			tmp = piodc->piod_op;
+		} else
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32) {
 			piod32 = addr;
@@ -1379,6 +1431,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			    piod32->piod_len);
 			uio.uio_offset = (off_t)(uintptr_t)piod32->piod_offs;
 			uio.uio_resid = piod32->piod_len;
+			tmp = piod32->piod_op;
 		} else
 #endif
 		{
@@ -1386,16 +1439,12 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			IOVEC_INIT(&iov, piod->piod_addr, piod->piod_len);
 			uio.uio_offset = (off_t)(uintptr_t)piod->piod_offs;
 			uio.uio_resid = piod->piod_len;
+			tmp = piod->piod_op;
 		}
 		uio.uio_iov = &iov;
 		uio.uio_iovcnt = 1;
 		uio.uio_segflg = UIO_USERSPACE;
 		uio.uio_td = td;
-#ifdef COMPAT_FREEBSD32
-		tmp = wrap32 ? piod32->piod_op : piod->piod_op;
-#else
-		tmp = piod->piod_op;
-#endif
 		switch (tmp) {
 		case PIOD_READ_D:
 		case PIOD_READ_I:
@@ -1416,6 +1465,11 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		}
 		PROC_UNLOCK(p);
 		error = proc_rwmem(p, &uio);
+#if __has_feature(capabilities)
+		if (SV_CURPROC_FLAG(SV_CHERI))
+			piodc->piod_len -= uio.uio_resid;
+		else
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32)
 			piod32->piod_len -= uio.uio_resid;
@@ -1469,7 +1523,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		error = PROC_READ(dbregs, td2, (__cheri_fromcap void *)addr);
 		break;
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_SETCAPREGS:
 		CTR2(KTR_PTRACE, "PT_SETCAPREGS: tid %d (pid %d)", td2->td_tid,
 		    p->p_pid);

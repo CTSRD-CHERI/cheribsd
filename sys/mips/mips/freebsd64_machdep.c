@@ -103,7 +103,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_sendsig	= freebsd64_sendsig,
 	.sv_sigcode	= freebsd64_sigcode,
 	.sv_szsigcode	= &freebsd64_szsigcode,
-	.sv_name	= "FreeBSD ELF64 (compat/freebsd64)",
+	.sv_name	= "FreeBSD ELF64",
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
@@ -283,10 +283,6 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 		tlsbase = (__cheri_addr int64_t)td->td_md.md_tls;
 		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
-
-	case MIPS_GET_COUNT:
-		td->td_retval[0] = mips_rd_count();
-		return (0);
 
 #ifdef CPU_QEMU_MALTA
 	case QEMU_GET_QTRACE:

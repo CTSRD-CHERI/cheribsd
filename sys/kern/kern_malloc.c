@@ -91,7 +91,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #endif
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #include <machine/cherireg.h>
 #ifdef CHERI_PURECAP_KERNEL
 #include <cheri/cheric.h>
@@ -868,7 +868,7 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 		return (NULL);
 
 	/* Copy over original contents */
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	if (size >= CHERICAP_SIZE && alloc >= CHERICAP_SIZE &&
 	    is_aligned(addr, CHERICAP_SIZE) &&
 	    is_aligned(newaddr, CHERICAP_SIZE))

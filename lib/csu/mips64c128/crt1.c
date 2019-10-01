@@ -47,7 +47,6 @@ __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
 #endif
 
 #include <sys/types.h>
-#include <sys/cheriabi.h>
 
 #include <machine/elf.h>
 

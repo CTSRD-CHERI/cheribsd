@@ -23,25 +23,24 @@ struct proc;
 
 struct thread;
 
-#ifdef CPU_CHERI
-#define	CHERI_PADL_(t)	(sizeof (t) > sizeof(register_t) ? \
-		0 : sizeof(register_t))
-#define	CHERI_PADR_(t)	(sizeof (t) > sizeof(register_t ) ? \
-		0 : sizeof(__intcap_t) - (CHERI_PADL_(t) + sizeof(register_t)))
-#else
-#define	CHERI_PADL_(t)	0
-#define	CHERI_PADR_(t)	0
-#endif
-
-#define	PAD_(t)	(sizeof(register_t) <= sizeof(t) ? \
-		0 : sizeof(register_t) - sizeof(t))
+#define	PAD_(t)	(sizeof(syscallarg_t) <= sizeof(t) ? \
+		0 : sizeof(syscallarg_t) - sizeof(t))
 
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define	PADL_(t)	0
 #define	PADR_(t)	PAD_(t)
+#elif defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
+/*
+ * For non-capability arguments, the syscall argument is stored in the
+ * cursor field in the second word.
+ */
+#define	PADL_(t)	(sizeof (t) > sizeof(register_t) ? \
+		0 : 2 * sizeof(register_t) - sizeof(t))
+#define	PADR_(t)	(sizeof (t) > sizeof(register_t) ? \
+		0 : 2 * sizeof(register_t))
 #else
-#define	PADL_(t)	(CHERI_PADL_(t) + PAD_(t))
-#define	PADR_(t)	CHERI_PADR_(t)
+#define	PADL_(t)	PAD_(t)
+#define	PADR_(t)	0
 #endif
 
 struct nosys_args {
@@ -515,24 +514,24 @@ struct rtprio_args {
 };
 struct semsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(int)]; int a2; char a2_r_[PADR_(int)];
-	char a3_l_[PADL_(int)]; int a3; char a3_r_[PADR_(int)];
-	char a4_l_[PADL_(int)]; int a4; char a4_r_[PADR_(int)];
-	char a5_l_[PADL_(int)]; int a5; char a5_r_[PADR_(int)];
+	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
+	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
+	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
+	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
 };
 struct msgsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(int)]; int a2; char a2_r_[PADR_(int)];
-	char a3_l_[PADL_(int)]; int a3; char a3_r_[PADR_(int)];
-	char a4_l_[PADL_(int)]; int a4; char a4_r_[PADR_(int)];
-	char a5_l_[PADL_(int)]; int a5; char a5_r_[PADR_(int)];
-	char a6_l_[PADL_(int)]; int a6; char a6_r_[PADR_(int)];
+	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
+	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
+	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
+	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
+	char a6_l_[PADL_(intptr_t)]; intptr_t a6; char a6_r_[PADR_(intptr_t)];
 };
 struct shmsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(int)]; int a2; char a2_r_[PADR_(int)];
-	char a3_l_[PADL_(int)]; int a3; char a3_r_[PADR_(int)];
-	char a4_l_[PADL_(int)]; int a4; char a4_r_[PADR_(int)];
+	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
+	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
+	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
 };
 struct setfib_args {
 	char fibnum_l_[PADL_(int)]; int fibnum; char fibnum_r_[PADR_(int)];

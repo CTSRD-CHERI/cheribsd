@@ -1074,7 +1074,7 @@
 	_Static_assert(__builtin_choose_expr(__builtin_constant_p(val), \
 	    expr, 1), message)
 #define __static_assert_power_of_two(val) \
-	__static_assert_if_constant(val, (val & (val-1)) == 0, \
+	__static_assert_if_constant(val, (val & ((val)-1)) == 0, \
 	     "Alignment must be a power-of-two")
 
 /* Allow use of __builtin_is_aligned/align_up/align_down unconditionally */
@@ -1086,14 +1086,14 @@
 #if !__has_builtin(__builtin_align_up)
 #define __builtin_align_up(addr, align) \
 	({ __static_assert_power_of_two(align);					\
-	vaddr_t unaligned_bits = (vaddr_t)addr & (align - 1);			\
+	vaddr_t unaligned_bits = (vaddr_t)addr & ((align) - 1);			\
 	unaligned_bits == 0 ? addr :						\
-	    (__typeof__(addr))((uintptr_t)addr + (align - unaligned_bits)); })
+	    (__typeof__(addr))((uintptr_t)addr + ((align) - unaligned_bits)); })
 #endif
 #if !__has_builtin(__builtin_align_down)
 #define __builtin_align_down(addr, align) ({					\
 	__static_assert_power_of_two(align);					\
-	vaddr_t unaligned_bits = (vaddr_t)addr & (align - 1);			\
+	vaddr_t unaligned_bits = (vaddr_t)addr & ((align) - 1);			\
 	(__typeof__(addr))((uintptr_t)addr - unaligned_bits); })
 #endif
 

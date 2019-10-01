@@ -56,9 +56,6 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#ifdef CPU_CHERI
-#include <sys/cheriabi.h>
-#endif
 #include <sys/capsicum.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
@@ -128,6 +125,13 @@ SYSCTL_INT(_vm, OID_AUTO, imply_prot_max, CTLFLAG_RWTUN, &imply_prot_max, 0,
 static int log_wxrequests = 0;
 SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
     "Log requests for PROT_WRITE and PROT_EXEC");
+#if __has_feature(capabilities)
+SYSCTL_DECL(_compat_cheriabi_mmap);
+static int cheriabi_mmap_precise_bounds = 1;
+SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
+    CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
+    "Require that bounds on returned capabilities be precise.");
+#endif
 
 #ifdef MAP_32BIT
 #define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
@@ -369,6 +373,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	}
 	if ((flags & MAP_GUARD) != 0 && (prot != PROT_NONE || fd != -1 ||
 	    pos != 0 || (flags & ~(MAP_FIXED | MAP_GUARD | MAP_EXCL |
+	    MAP_CHERI_NOSETBOUNDS |
 #ifdef MAP_32BIT
 	    MAP_32BIT |
 #endif
@@ -392,13 +397,13 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		return (ENOMEM);
 
 	align = flags & MAP_ALIGNMENT_MASK;
-#ifndef CPU_CHERI
+#if !__has_feature(capabilities)
 	/* In the non-CHERI case, remove the alignment request. */
 	if (align == MAP_ALIGNED_CHERI || align == MAP_ALIGNED_CHERI_SEAL) {
 		flags &= ~MAP_ALIGNMENT_MASK;
 		align = 0;
 	}
-#else /* CPU_CHERI */
+#else /* __has_feature(capabilities) */
 	/*
 	 * Convert MAP_ALIGNED_CHERI(_SEAL) into explicit alignment
 	 * requests and check lengths.
@@ -440,7 +445,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		}
 		align = flags & MAP_ALIGNMENT_MASK;
 	}
-#endif /* CPU_CHERI */
+#endif /* __has_feature(capabilities) */
 
 	/* Ensure alignment is at least a page and fits in a pointer. */
 	if (align != 0 && align != MAP_ALIGNED_SUPER &&
@@ -580,11 +585,11 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	if (error == 0) {
 #ifdef COMPAT_CHERIABI
 		if (SV_CURPROC_FLAG(SV_CHERI))
-			td->td_retcap = cheriabi_mmap_retcap(td,
-			     ptr_to_va(addr) + pageoff,  mrp);
-		/* Unconditionaly return the VA in td_retval[0] for ktrace */
+			td->td_retval[0] = (uintcap_t)cheriabi_mmap_retcap(td,
+			    ptr_to_va(addr) + pageoff,  mrp);
+		else
 #endif
-		td->td_retval[0] = (register_t) (ptr_to_va(addr) + pageoff);
+			td->td_retval[0] = (syscallarg_t)(ptr_to_va(addr) + pageoff);
 	}
 done:
 	if (fp)
