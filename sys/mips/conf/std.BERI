@@ -28,6 +28,7 @@ options 	DDB
 options 	KDB
 options 	ALT_BREAK_TO_DEBUGGER
 options 	KTRACE
+options 	_KPOSIX_PRIORITY_SCHEDULING
 
 options 	CAPABILITY_MODE
 options 	CAPABILITIES
