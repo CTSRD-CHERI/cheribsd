@@ -13,50 +13,46 @@ machine		mips mips64	# Malta supports both, so it isn't in std.malta
 
 nomakeoptions 	ARCH_FLAGS
 makeoptions	ARCH_PIC_FLAGS="-fpic"
-makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=256 -cheri-cap-table-abi=plt -mxcaptable -cheri-uintcap=offset"
+makeoptions	ARCH_FLAGS="-target cheri-unknown-freebsd -march=mips64 -mabi=purecap -cheri=256 -cheri-cap-table-abi=plt -mxcaptable -Xclang -cheri-bounds=subobject-safe -cheri-uintcap=offset"
+makeoptions	CFLAGS+="-gdwarf-5"
 makeoptions	WERROR="-Wno-error"
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 
+# purecap kernel options
 options		CHERI_PURECAP_KERNEL
+options 	KSTACK_LARGE_PAGE
 nooptions	CHERI_IMPLICIT_USER_DDC
-options 	KTRACE
-nooptions	KDB
-nooptions	DDB
-# NOTE we run without any root filesystem driver for now
-nooptions	MSDOSFS
-nooptions	NFSD, NFSCL
+
+# kernel modules
+options 	TMPFS
 options		FFS
 options		CD9660
+nooptions	MSDOSFS
+nooptions	NFSD, NFSCL
+
 # disable raid, we don't need it
 nooptions	GEOM_RAID
 
 # debugging
+options 	KTRACE
+options 	KDB
+options		KDB_TRACE # stacktrace on panic
+nooptions	DDB
+
 options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
 options		BOOTVERBOSE
-#options		BUS_DEBUG
-#options		CAMDEBUG
-#options		CAM_DEBUG_FLAGS=3
-options		STACK # needed for witness
+# options	BUS_DEBUG
+# options	CAMDEBUG
+# options	CAM_DEBUG_FLAGS=3
+options		STACK
 options		WITNESS
 options		DEBUG_VFS_LOCKS
-# options		TRAP_DEBUG
-# options		KTR
-# options		KTR_VERBOSE=2
+# options	TRAP_DEBUG
+# options	KTR
+# options	KTR_VERBOSE=2
 # nooptions	KTR_ALQ
-# should enable witness and invariants?
 # options	LOCK_DEBUG
-
-# XXX TODO
-# nodevice ata
-# nodevice vga
-# disable nfs
-
-#
-# Features required for CHERI CPU and CheriBSD support.
-#
-options 	KSTACK_LARGE_PAGE
-options 	TMPFS
 
 #
 # Qemu-CHERI tracing is permitted per thread, not just globally.
