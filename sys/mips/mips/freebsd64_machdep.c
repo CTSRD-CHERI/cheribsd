@@ -255,6 +255,24 @@ freebsd64_exec_setregs(struct thread *td, struct image_params *imgp,
 {
 
 	exec_setregs(td, imgp, stack);
+
+#ifdef CHERI_PURECAP_KERNEL
+	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET64 + TLS_TCB_SIZE64;
+#endif
+}
+
+int
+freebsd64_set_user_tls(struct thread *td, void *tls_base)
+{
+
+	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET64 + TLS_TCB_SIZE64;
+	td->td_md.md_tls = __USER_CAP_UNBOUND(tls_base);
+	if (td == curthread && cpuinfo.userlocal_reg == true) {
+		mips_wr_userlocal((unsigned long)tls_base +
+		    td->td_md.md_tls_tcb_offset);
+	}
+
+	return (0);
 }
 
 int

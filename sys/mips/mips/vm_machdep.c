@@ -667,6 +667,11 @@ cpu_set_user_tls(struct thread *td, void *tls_base)
 		panic("cpu_set_user_tls(%p) should not be called from CHERIABI\n", td);
 	else
 #endif
+#if defined (COMPAT_FREEBSD64)
+	if (td->td_proc && SV_PROC_FLAG(td->td_proc, SV_LP64))
+		panic("cpu_set_user_tls(%p) should not be called from FREEBSD64\n", td);
+	else
+#endif
 	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
 	td->td_md.md_tls = __USER_CAP_UNBOUND(tls_base);
 	if (td == curthread && cpuinfo.userlocal_reg == true) {

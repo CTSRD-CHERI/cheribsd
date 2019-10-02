@@ -1449,7 +1449,7 @@ freebsd64_thr_new_initthr(struct thread *td, void *thunk)
 	stack.ss_size = param->stack_size;
 	cpu_set_upcall(td, PURECAP_KERNEL_USER_CODE_CAP(param->start_func),
 	    PURECAP_KERNEL_USER_CAP_UNBOUND(param->arg), &stack);
-	return (cpu_set_user_tls(td,
+	return (freebsd64_set_user_tls(td,
 	    PURECAP_KERNEL_USER_CAP_UNBOUND(param->tls_base)));
 }
 
