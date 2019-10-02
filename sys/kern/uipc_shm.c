@@ -1500,7 +1500,7 @@ kern_shm_open2(struct thread *td, const char * __capability path, int flags,
 	initial_seals = F_SEAL_SEAL;
 	if ((shmflags & SHM_ALLOW_SEALING) != 0)
 		initial_seals &= ~F_SEAL_SEAL;
-	return (kern_shm_open(td, path, flags, 0, NULL, initial_seals));
+	return (kern_shm_open(td, path, flags, mode, NULL, initial_seals));
 }
 
 /*
