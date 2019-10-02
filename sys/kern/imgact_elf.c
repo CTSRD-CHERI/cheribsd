@@ -1358,7 +1358,11 @@ int
 __elfN(freebsd_fixup)(register_t **stack_base, struct image_params *imgp)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
+#ifdef COMPAT_FREEBSD64
+	Elf_Auxinfo_fbsd64 *argarray, *pos;
+#else
 	Elf_Auxinfo *argarray, *pos;
+#endif
 	Elf_Addr *base, *auxbase;
 	int error;
 

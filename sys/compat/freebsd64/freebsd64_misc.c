@@ -615,9 +615,149 @@ freebsd64_nmount(struct thread *td, struct freebsd64_nmount_args *uap)
 register_t *
 freebsd64_copyout_strings(struct image_params *imgp)
 {
-
+#ifndef CHERI_PURECAP_KERNEL
 	/* XXX: works while exec_copyout_strings isn't cheriabi aware */
 	return (exec_copyout_strings(imgp));
+#else /* CHERI_PURECAP_KERNEL */
+	int argc, envc;
+	vaddr_t *vectp;
+	char *stringp;
+	uintptr_t destp;
+	register_t *stack_base;
+	struct ps_strings *arginfo;
+	struct proc *p;
+	size_t execpath_len;
+	int szsigcode, szps;
+	char canary[sizeof(long) * 8];
+
+	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
+	/*
+	 * Calculate string base and vector table pointers.
+	 * Also deal with signal trampoline code for this exec type.
+	 */
+	if (imgp->execpath != NULL && imgp->auxargs != NULL)
+		execpath_len = strlen(imgp->execpath) + 1;
+	else
+		execpath_len = 0;
+	p = imgp->proc;
+	szsigcode = 0;
+	arginfo = (struct ps_strings *)cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
+	    CHERI_CAP_USER_DATA_LENGTH, p->p_sysent->sv_psstrings);
+
+	if (p->p_sysent->sv_sigcode_base == 0) {
+		if (p->p_sysent->sv_szsigcode != NULL)
+			szsigcode = *(p->p_sysent->sv_szsigcode);
+	}
+	destp =	(uintptr_t)arginfo;
+
+	/*
+	 * install sigcode
+	 */
+	if (szsigcode != 0) {
+		destp -= szsigcode;
+		destp = rounddown2(destp, sizeof(vaddr_t));
+		copyout(p->p_sysent->sv_sigcode, (void *)destp, szsigcode);
+	}
+
+	/*
+	 * Copy the image path for the rtld.
+	 */
+	if (execpath_len != 0) {
+		destp -= execpath_len;
+		destp = rounddown2(destp, sizeof(vaddr_t));
+		imgp->execpathp = (__cheri_addr unsigned long)destp;
+		copyout(imgp->execpath, (void *)destp, execpath_len);
+	}
+
+	/*
+	 * Prepare the canary for SSP.
+	 */
+	arc4rand(canary, sizeof(canary), 0);
+	destp -= sizeof(canary);
+	imgp->canary = destp;
+	copyout(canary, (void *)destp, sizeof(canary));
+	imgp->canarylen = sizeof(canary);
+
+	/*
+	 * Prepare the pagesizes array.
+	 */
+	destp -= szps;
+	destp = rounddown2(destp, sizeof(vaddr_t));
+	imgp->pagesizes = destp;
+	copyout(pagesizes, (void *)destp, szps);
+	imgp->pagesizeslen = szps;
+
+	destp -= ARG_MAX - imgp->args->stringspace;
+	destp = rounddown2(destp, sizeof(vaddr_t));
+
+	vectp = (vaddr_t *)destp;
+	if (imgp->auxargs) {
+		/*
+		 * Allocate room on the stack for the ELF auxargs
+		 * array.  It has up to AT_COUNT entries.
+		 */
+		vectp -= howmany(AT_COUNT * sizeof(Elf_Auxinfo),
+		    sizeof(vaddr_t));
+	}
+
+	/*
+	 * Allocate room for the argv[] and env vectors including the
+	 * terminating NULL pointers.
+	 */
+	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
+
+	/*
+	 * vectp also becomes our initial stack base
+	 */
+	stack_base = (register_t *)vectp;
+
+	stringp = imgp->args->begin_argv;
+	argc = imgp->args->argc;
+	envc = imgp->args->envc;
+
+	/*
+	 * Copy out strings - arguments and environment.
+	 */
+	copyout(stringp, (void *)destp, ARG_MAX - imgp->args->stringspace);
+
+	/*
+	 * Fill in "ps_strings" struct for ps, w, etc.
+	 */
+	suword(&arginfo->ps_argvstr, (__cheri_addr vaddr_t)vectp);
+	suword32(&arginfo->ps_nargvstr, argc);
+
+	/*
+	 * Fill in argument portion of vector table.
+	 */
+	for (; argc > 0; --argc) {
+		suword(vectp++, (__cheri_addr vaddr_t)destp);
+		while (*stringp++ != 0)
+			destp++;
+		destp++;
+	}
+
+	/* a null vector table pointer separates the argp's from the envp's */
+	suword(vectp++, 0);
+
+	suword(&arginfo->ps_envstr, (__cheri_addr vaddr_t)vectp);
+	suword32(&arginfo->ps_nenvstr, envc);
+
+	/*
+	 * Fill in environment portion of vector table.
+	 */
+	for (; envc > 0; --envc) {
+		suword(vectp++, (__cheri_addr vaddr_t)destp);
+		while (*stringp++ != 0)
+			destp++;
+		destp++;
+	}
+
+	/* end of vector table is a null pointer */
+	suword(vectp, 0);
+
+	return (stack_base);
+#endif /* CHERI_PURECAP_KERNEL */
 }
 
 int
@@ -1569,10 +1709,11 @@ freebsd64_syscall_helper_unregister(struct syscall_helper_data *sd)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20190802,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "user_capabilities"
+//     "user_capabilities",
+//     "pointer_shape"
 //   ],
 //   "change_comment": "struct kevent64, upstreamable"
 // }
