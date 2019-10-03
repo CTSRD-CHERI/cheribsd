@@ -108,9 +108,6 @@ _CHERI_COMMON_FLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
 .if defined(SYSROOT)
 _CHERI_COMMON_FLAGS+=	--sysroot=${SYSROOT}
 .endif
-.if ${MK_CHERI_EXACT_EQUALS} == "yes"
-_CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
-.endif
 
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
 MIPS_ABI:=	purecap

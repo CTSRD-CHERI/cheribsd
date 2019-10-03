@@ -352,9 +352,6 @@ CFLAGS+=	-Werror=implicit-function-declaration
 # Turn off deprecated warnings
 # XXXBD: is this still needed?
 CFLAGS+=	-Wno-deprecated-declarations
-. if ${MK_CHERI_EXACT_EQUALS} == "yes"
-CFLAGS+=	-mllvm -cheri-exact-equals
-. endif
 # XXXBD: is -mstack-alignment needed here?
 . if ${MACHINE_ARCH:Mmips*c128}
 CFLAGS+=	-cheri=128
