@@ -756,3 +756,11 @@ cheriabi_fhstatfs(struct thread *td, struct cheriabi_fhstatfs_args *uap)
 
 	return (user_fhstatfs(td, uap->u_fhp, uap->buf));
 }
+
+int cheriabi_copy_file_range(struct thread *td,
+    struct cheriabi_copy_file_range_args *uap)
+{
+
+	return (user_copy_file_range(td, uap->infd, uap->inoffp, uap->outfd,
+	    uap->outoffp, uap->len, uap->flags));
+}
