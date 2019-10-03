@@ -2,7 +2,7 @@
 
 .include <src.opts.mk>
 
-.if ${MK_CHERI256} && (defined(CHERI_NO_SHARED) || ${MK_CHERI_SHARED} == "no" || ${MK_CHERI_SHARED_PROG} == "no")
+.if ${MK_CHERI256} && (defined(CHERI_NO_SHARED) || ${MK_CHERI_SHARED_PROG} == "no")
 CFLAGS+=	-mxcaptable
 .endif
 

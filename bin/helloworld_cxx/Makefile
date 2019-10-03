@@ -9,9 +9,7 @@ NEED_CHERI=	pure
 
 CXXFLAGS+=	-std=c++11
 
-.if ${MK_CHERI_SHARED} == "yes"
-# Always build shared if we're building shared libs.
+# Always build shared
 MK_CHERI_SHARED_PROG=yes
-.endif
 
 .include <bsd.prog.mk>
