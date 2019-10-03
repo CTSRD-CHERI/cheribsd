@@ -522,7 +522,8 @@ freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
 	ucontext64_t uc;
 	int error;
 
-	error = copyin(uap->sigcntxp, &uc, sizeof(uc));
+	error = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->sigcntxp), &uc,
+	    sizeof(uc));
 	if (error != 0)
 		return (error);
 
@@ -550,7 +551,8 @@ freebsd64_getcontext(struct thread *td, struct freebsd64_getcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	return (copyout(&uc, uap->ucp, UCC_COPY_SIZE));
+	return (copyout(&uc, PURECAP_KERNEL_USER_CAP_OBJ(uap->ucp),
+	    UCC_COPY_SIZE));
 }
 
 int
@@ -561,7 +563,8 @@ freebsd64_setcontext(struct thread *td, struct freebsd64_setcontext_args *uap)
 
 	if (uap->ucp == NULL)
 		return (EINVAL);
-	if ((ret = copyin(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->ucp),
+	    &uc, UCC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = freebsd64_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -585,9 +588,11 @@ freebsd64_swapcontext(struct thread *td, struct freebsd64_swapcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	if ((ret = copyout(&uc, uap->oucp, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyout(&uc, PURECAP_KERNEL_USER_CAP_OBJ(uap->oucp),
+	    UCC_COPY_SIZE)) != 0)
 		return (ret);
-	if ((ret = copyin(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->ucp), &uc,
+	    UCC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = freebsd64_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -780,8 +785,8 @@ int
 freebsd64_kbounce(struct thread *td, struct freebsd64_kbounce_args *uap)
 {
 	void * bounce;
-	void * dst = uap->dst;
-	const void * src = uap->src;
+	void * dst = PURECAP_KERNEL_USER_CAP(uap->dst, uap->len);
+	const void * src = PURECAP_KERNEL_USER_CAP(uap->src, uap->len);
 	size_t len = uap->len;
 	int flags = uap->flags;
 	int error;
@@ -1069,7 +1074,9 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
         struct kld_file_stat64 stat64;
         int error, version;
 
-        error = copyin(&uap->stat->version, &version, sizeof(version));
+	/* XXX-AM: is this safe? uap->stat fetched without copyin/fuword */
+        error = copyin(PURECAP_KERNEL_USER_CAP_OBJ(&uap->stat->version),
+	    &version, sizeof(version));
 	if (error != 0)
                 return (error);
         if (version != sizeof(struct kld_file_stat64))
@@ -1085,7 +1092,8 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
 	stat64.address = (__cheri_addr uint64_t)stat.address;
         CP(stat, stat64, size);
         bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
-        return (copyout(&stat64, uap->stat, version));
+        return (copyout(&stat64, PURECAP_KERNEL_USER_CAP_OBJ(uap->stat),
+	    version));
 }
 
 int
@@ -1093,8 +1101,9 @@ freebsd64_kldsym(struct thread *td, struct freebsd64_kldsym_args *uap)
 {
 	struct kld_sym_lookup64 lookup;
 	int error;
+	void *data = PURECAP_KERNEL_USER_CAP(uap->data, sizeof(lookup));
 
-	error = copyin(uap->data, &lookup, sizeof(lookup));
+	error = copyin(data, &lookup, sizeof(lookup));
 	if (error != 0)
 		return (error);
 	if (lookup.version != sizeof(lookup) ||
@@ -1104,7 +1113,7 @@ freebsd64_kldsym(struct thread *td, struct freebsd64_kldsym_args *uap)
 	    __USER_CAP_STR(lookup.symname), &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
 		return (error);
-	error = copyout(&lookup, uap->data, sizeof(lookup));
+	error = copyout(&lookup, data, sizeof(lookup));
 
 	return (error);
 }
@@ -1303,7 +1312,8 @@ freebsd64_setrlimit(struct thread *td, struct freebsd64___setrlimit_args *uap)
 	struct rlimit alim;
 	int error;
 
-	error = copyin(uap->rlp, &alim, sizeof(struct rlimit));
+	error = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->rlp), &alim,
+	    sizeof(struct rlimit));
 	if (error != 0)
 		return (error);
 	return (kern_setrlimit(td, uap->which, &alim));
@@ -1318,7 +1328,8 @@ freebsd64_getrlimit(struct thread *td, struct freebsd64___getrlimit_args *uap)
 	if (uap->which >= RLIM_NLIMITS)
 		return (EINVAL);
 	lim_rlimit(td, uap->which, &rlim);
-	error = copyout(&rlim, uap->rlp, sizeof(struct rlimit));
+	error = copyout(&rlim, PURECAP_KERNEL_USER_CAP_OBJ(uap->rlp),
+	    sizeof(struct rlimit));
 	return (error);
 }
 
@@ -1330,7 +1341,8 @@ freebsd64_getrusage(struct thread *td, struct freebsd64_getrusage_args *uap)
 
 	error = kern_getrusage(td, uap->who, &ru);
 	if (error == 0)
-		error = copyout(&ru, uap->rusage, sizeof(struct rusage));
+		error = copyout(&ru, PURECAP_KERNEL_USER_CAP_OBJ(uap->rusage),
+		    sizeof(struct rusage));
 	return (error);
 }
 
@@ -1375,7 +1387,8 @@ freebsd64_thr_create(struct thread *td, struct freebsd64_thr_create_args *uap)
 	struct thr_create_initthr_args64 args;
 	int error;
 
-	if ((error = copyin(uap->ctx, &args.ctx, sizeof(args.ctx))))
+	if ((error = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->ctx), &args.ctx,
+	    sizeof(args.ctx))))
 		return (error);
 	args.tid = uap->id;
 	return (thread_create(td, NULL, freebsd64_thr_create_initthr, &args));
@@ -1463,15 +1476,14 @@ freebsd64_thr_new(struct thread *td, struct freebsd64_thr_new_args *uap)
 	if (uap->param_size != sizeof(struct thr_param64))
 		return (EINVAL);
 
-	error = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->param),
-	    &param64, uap->param_size);
+	error = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->param), &param64,
+	    uap->param_size);
 	if (error != 0)
 		return (error);
 
 	if ((void *)(uintptr_t)param64.rtp != NULL) {
-		error = copyin(
-		    PURECAP_KERNEL_USER_CAP(param64.rtp, sizeof(struct rtprio)),
-		    &rtp, sizeof(struct rtprio));
+		error = copyin(PURECAP_KERNEL_USER_CAP(param64.rtp,
+		    sizeof(struct rtprio)), &rtp, sizeof(struct rtprio));
 		if (error)
 			return (error);
 		rtpp = &rtp;
@@ -1709,7 +1721,7 @@ freebsd64_syscall_helper_unregister(struct syscall_helper_data *sd)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190802,
+//   "updated": 20191003,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "user_capabilities",
