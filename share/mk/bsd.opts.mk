@@ -69,9 +69,6 @@ __DEFAULT_YES_OPTIONS = \
     TOOLCHAIN \
     WARNS
 
-__DEFAULT_YES_OPTIONS+= \
-    CHERI_SHARED_PROG
-
 __DEFAULT_NO_OPTIONS = \
     BIND_NOW \
     CCACHE_BUILD \
@@ -126,10 +123,6 @@ MK_CHERIBSDBOX:=	yes
 .endif
 .else
 MK_CHERI:=	no
-.endif
-
-.if ${MK_CHERI_SHARED_PROG} == no
-MK_CASPER:=	no
 .endif
 
 #

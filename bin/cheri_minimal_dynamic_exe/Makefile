@@ -26,7 +26,5 @@ CFLAGS+=	-I${SRCTOP}/lib/libc/${MACHINE_CPUARCH}
 .endif # ${USE_LIBSYSCALLS} == "yes"
 
 NO_WERROR=	yes
-# Always build shared
-MK_CHERI_SHARED_PROG=yes
 
 .include <bsd.prog.mk>

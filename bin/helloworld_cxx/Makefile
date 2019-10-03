@@ -9,7 +9,4 @@ NEED_CHERI=	pure
 
 CXXFLAGS+=	-std=c++11
 
-# Always build shared
-MK_CHERI_SHARED_PROG=yes
-
 .include <bsd.prog.mk>

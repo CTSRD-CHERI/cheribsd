@@ -166,11 +166,7 @@ _CHERI_CFLAGS+=	-Qunused-arguments
 _CHERI_CFLAGS+=	-Werror=cheri-bitwise-operations
 
 .if ${WANT_CHERI} != "variables"
-.if defined(CHERI_NO_SHARED)
-NO_SHARED=	yes
-.elif defined(__BSD_PROG_MK) && ${MK_CHERI_SHARED_PROG} == "no"
-NO_SHARED=	yes
-.elif ${WANT_CHERI} == "sandbox"
+.if ${WANT_CHERI} == "sandbox"
 # Force position-dependent sandboxes; PIEs aren't supported
 NO_SHARED=	yes
 .endif

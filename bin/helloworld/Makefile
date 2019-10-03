@@ -9,7 +9,4 @@ NEED_CHERI=	pure
 
 NO_WERROR=	YES
 
-# Always build shared.
-MK_CHERI_SHARED_PROG=yes
-
 .include <bsd.prog.mk>

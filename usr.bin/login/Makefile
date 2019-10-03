@@ -3,11 +3,6 @@
 
 .include <src.opts.mk>
 
-.if ${MK_CHERI_SHARED_PROG} == "no"
-# can't be static (missing pam_self)
-WANT_CHERI=none
-.endif
-
 CONFS=	fbtab login.conf motd.template login.access
 PROG=	login
 SRCS=	login.c login_fbtab.c

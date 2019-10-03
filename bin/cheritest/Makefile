@@ -105,7 +105,6 @@ LIBADD+=	xo util
 
 .ifdef CHERI_DYNAMIC_TESTS
 CFLAGS+=	-DCHERI_DYNAMIC_TESTS
-MK_CHERI_SHARED_PROG=	yes
 .else
 NO_SHARED?=	YES
 # XXX-JC: Enable unconditionally once we have a dynamic libcheri

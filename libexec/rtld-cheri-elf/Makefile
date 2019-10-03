@@ -6,8 +6,6 @@
 
 .include <src.opts.mk>
 MK_SSP=		no
-MK_CHERI_SHARED_PROG:=yes
-
 
 RTLD_CHERI_ELF_DIR=${SRCTOP}/libexec/rtld-cheri-elf
 RTLD_ELF_DIR=${SRCTOP}/libexec/rtld-elf
