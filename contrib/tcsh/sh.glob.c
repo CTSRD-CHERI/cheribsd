@@ -307,7 +307,7 @@ globexpand(Char **v, int noglob)
     /*
      * Step 1: expand backquotes.
      */
-    while ((s = *v++) != '\0') {
+    while ((s = *v++) != NULL) {
 	if (Strchr(s, '`')) {
 	    int     i;
 	    Char **expanded;
@@ -405,7 +405,7 @@ handleone(Char *str, Char **vl, int action)
 	for (t = vl; (p = *t++) != NULL; chars++)
 	    chars += Strlen(p);
 	str = xmalloc(chars * sizeof(Char));
-	for (t = vl, strp = str; (p = *t++) != '\0'; chars++) {
+	for (t = vl, strp = str; (p = *t++) != NULL; chars++) {
 	    while (*p)
 		 *strp++ = *p++ & TRIM;
 	    *strp++ = ' ';
@@ -583,7 +583,7 @@ rscan(Char **t, void (*f) (Char))
 {
     Char *p;
 
-    while ((p = *t++) != '\0')
+    while ((p = *t++) != NULL)
 	while (*p)
 	    (*f) (*p++);
 }
@@ -593,7 +593,7 @@ trim(Char **t)
 {
     Char *p;
 
-    while ((p = *t++) != '\0')
+    while ((p = *t++) != NULL)
 	while (*p) {
 #if INVALID_BYTE != 0
 	    if ((*p & INVALID_BYTE) != INVALID_BYTE)	/* *p < INVALID_BYTE */
@@ -610,7 +610,7 @@ tglob(Char **t)
     const Char *p;
 
     gflag = 0;
-    while ((p = *t++) != '\0') {
+    while ((p = *t++) != NULL) {
 	if (*p == '~' || *p == '=')
 	    gflag |= G_CSH;
 	else if (*p == '{' &&
