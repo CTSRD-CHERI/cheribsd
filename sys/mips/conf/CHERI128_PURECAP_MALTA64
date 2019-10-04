@@ -41,6 +41,7 @@ nooptions	DDB
 
 options		DIAGNOSTIC
 options		VERBOSE_SYSINIT
+options		BOOTVERBOSE=1
 # options	BUS_DEBUG
 # options	CAMDEBUG
 # options	CAM_DEBUG_FLAGS=3
@@ -51,7 +52,6 @@ options		DEBUG_VFS_LOCKS
 # options	KTR
 # options	KTR_VERBOSE=2
 # nooptions	KTR_ALQ
-# should enable witness and invariants?
 # options	LOCK_DEBUG
 
 #
