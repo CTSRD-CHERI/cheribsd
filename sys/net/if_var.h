@@ -754,13 +754,28 @@ void if_hw_tsomax_common(if_t ifp, struct ifnet_hw_tsomax *);
 int if_hw_tsomax_update(if_t ifp, struct ifnet_hw_tsomax *);
 
 /* Helper macro for struct ifreq ioctls */
-#if __has_feature(capabilities) && !defined(CHERI_PURECAP_KERNEL)
-#define	CASE_IOC_IFREQ(cmd)					\
-    (cmd):							\
-    case _IOC_NEWTYPE((cmd), struct ifreq_c)
+#ifdef COMPAT_FREEBSD64
+#define CASE_IOC_IFREQ64(cmd)				\
+	case _IOC_NEWTYPE((cmd), struct ifreq64)
 #else
-#define	CASE_IOC_IFREQ(cmd)					\
-    (cmd)
+#define CASE_IOC_IFREQ64(cmd)
+#endif
+
+#ifdef COMPAT_CHERIABI
+#define CASE_IOC_IFREQ_C(cmd)				\
+	case _IOC_NEWTYPE((cmd), struct ifreq_c)
+#else
+#define CASE_IOC_IFREQ_C(cmd)
+#endif
+
+#ifdef CHERI_PURECAP_KERNEL
+#define CASE_IOC_IFREQ(cmd)				\
+	(cmd):						\
+	CASE_IOC_IFREQ64(cmd)
+#else
+#define CASE_IOC_IFREQ(cmd)				\
+	(cmd):						\
+	CASE_IOC_IFREQ_C(cmd)
 #endif
 
 /* accessors for struct ifreq */

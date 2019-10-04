@@ -428,7 +428,7 @@ int
 freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
     kiovec_t **iovp, int error)
 {
-	uiovec_t useriov;
+	struct iovec64 useriov;
 	kiovec_t *iovs;
 	size_t iovlen;
 	int i;
@@ -444,7 +444,9 @@ freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
 			free(iovs, M_IOV);
 			return (error);
 		}
-		IOVEC_INIT(iovs + i, useriov.iov_base, useriov.iov_len);
+		IOVEC_INIT(iovs + i,
+		    PURECAP_KERNEL_USER_CAP(useriov.iov_base, useriov.iov_len),
+		    useriov.iov_len);
 	}
 	*iovp = iovs;
 	return (0);
