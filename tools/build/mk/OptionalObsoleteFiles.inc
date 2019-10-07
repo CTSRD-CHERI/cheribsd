@@ -4470,6 +4470,35 @@ OLD_LIBS+=${DEBUG_LIB32_LIBS}
 .  endif
 .endif
 
+.if ${MK_LIB64} == no
+OLD_FILES+=etc/mtree/BSD.lib64.dist
+OLD_FILES+=libexec/ld-elf64.so.1
+.  if exists(${DESTDIR}/usr/lib64)
+LIB64_DIRS!=find ${DESTDIR}/usr/lib64 -type d \
+    | sed -e 's,^${DESTDIR}/,,'; echo
+LIB64_FILES!=find ${DESTDIR}/usr/lib64 \! -type d \
+    \! -name "lib*.so*" | sed -e 's,^${DESTDIR}/,,'; echo
+LIB64_LIBS!=find ${DESTDIR}/usr/lib64 \! -type d \
+    -name "lib*.so*" | sed -e 's,^${DESTDIR}/,,'; echo
+OLD_DIRS+=${LIB64_DIRS}
+OLD_FILES+=${LIB64_FILES}
+OLD_LIBS+=${LIB64_LIBS}
+.  endif
+.  if ${MK_DEBUG_FILES} == no
+.    if exists(${DESTDIR}/usr/lib/debug/usr/lib64)
+DEBUG_LIB64_DIRS!=find ${DESTDIR}/usr/lib/debug/usr/lib64 -type d \
+    | sed -e 's,^${DESTDIR}/,,'; echo
+DEBUG_LIB64_FILES!=find ${DESTDIR}/usr/lib/debug/usr/lib64 \! -type d \
+    \! -name "lib*.so*" | sed -e 's,^${DESTDIR}/,,'; echo
+DEBUG_LIB64_LIBS!=find ${DESTDIR}/usr/lib/debug/usr/lib64 \! -type d \
+    -name "lib*.so*" | sed -e 's,^${DESTDIR}/,,'; echo
+OLD_DIRS+=${DEBUG_LIB64_DIRS}
+OLD_FILES+=${DEBUG_LIB64_FILES}
+OLD_LIBS+=${DEBUG_LIB64_LIBS}
+.    endif
+.  endif
+.endif
+
 .if ${MK_LIBCPLUSPLUS} == no
 OLD_LIBS+=lib/libcxxrt.so.1
 OLD_FILES+=usr/lib/libc++.a
