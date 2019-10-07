@@ -678,7 +678,7 @@ tcp_default_fb_fini(struct tcpcb *tp, int tcb_is_purged)
  * parsing purposes, which do not know about callouts.
  */
 struct tcpcb_mem {
-	struct	tcpcb		tcb;
+	struct	tcpcb		tcb __subobject_use_container_bounds;
 	struct	tcp_timer	tt;
 	struct	cc_var		ccv;
 #ifdef TCP_HHOOK
