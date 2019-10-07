@@ -1125,10 +1125,9 @@ if_detach_internal(struct ifnet *ifp, int vmove, struct if_clone **ifcp)
  	struct ifnet *iter;
  	int found = 0;
 #ifdef VIMAGE
-	int shutdown;
+	bool shutdown;
 
-	shutdown = (ifp->if_vnet->vnet_state > SI_SUB_VNET &&
-		 ifp->if_vnet->vnet_state < SI_SUB_VNET_DONE) ? 1 : 0;
+	shutdown = ifp->if_vnet->vnet_shutdown;
 #endif
 	IFNET_WLOCK();
 	CK_STAILQ_FOREACH(iter, &V_ifnet, if_link)
@@ -1378,7 +1377,6 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 {
 	struct prison *pr;
 	struct ifnet *difp;
-	int shutdown;
 
 	/* Try to find the prison within our visibility. */
 	sx_slock(&allprison_lock);
@@ -1406,9 +1404,7 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 	}
 
 	/* Make sure the VNET is stable. */
-	shutdown = (ifp->if_vnet->vnet_state > SI_SUB_VNET &&
-		 ifp->if_vnet->vnet_state < SI_SUB_VNET_DONE) ? 1 : 0;
-	if (shutdown) {
+	if (ifp->if_vnet->vnet_shutdown) {
 		CURVNET_RESTORE();
 		prison_free(pr);
 		return (EBUSY);
@@ -1431,7 +1427,6 @@ if_vmove_reclaim(struct thread *td, char *ifname, int jid)
 	struct prison *pr;
 	struct vnet *vnet_dst;
 	struct ifnet *ifp;
- 	int shutdown;
 
 	/* Try to find the prison within our visibility. */
 	sx_slock(&allprison_lock);
@@ -1460,9 +1455,7 @@ if_vmove_reclaim(struct thread *td, char *ifname, int jid)
 	}
 
 	/* Make sure the VNET is stable. */
-	shutdown = (ifp->if_vnet->vnet_state > SI_SUB_VNET &&
-		 ifp->if_vnet->vnet_state < SI_SUB_VNET_DONE) ? 1 : 0;
-	if (shutdown) {
+	if (ifp->if_vnet->vnet_shutdown) {
 		CURVNET_RESTORE();
 		prison_free(pr);
 		return (EBUSY);
@@ -3493,16 +3486,11 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	struct ifreq *ifr;
 	int error;
 	int oif_flags;
-#ifdef VIMAGE
-	int shutdown;
-#endif
 
 	CURVNET_SET(so->so_vnet);
 #ifdef VIMAGE
 	/* Make sure the VNET is stable. */
-	shutdown = (so->so_vnet->vnet_state > SI_SUB_VNET &&
-		 so->so_vnet->vnet_state < SI_SUB_VNET_DONE) ? 1 : 0;
-	if (shutdown) {
+	if (so->so_vnet->vnet_shutdown) {
 		CURVNET_RESTORE();
 		return (EBUSY);
 	}
