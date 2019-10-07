@@ -2176,6 +2176,39 @@ cheritest_run_test(const struct cheri_test *ctp)
 	}
 
 	/*
+	 * Next, we are concerned with whether the test itself reports a
+	 * success.  This is based not on whether the test experiences a
+	 * fault, but whether its semantics are correct -- e.g., did code in a
+	 * sandbox run as expected.  Tests that have successfully experienced
+	 * an expected/desired fault don't undergo these checks.
+	 */
+	if (!(ctp->ct_flags & CT_FLAG_SIGNAL)) {
+		if (ccsp->ccs_testresult == TESTRESULT_UNKNOWN) {
+			snprintf(reason, sizeof(reason),
+			    "Test failed to set a success/failure status");
+			goto fail;
+		}
+		if (ccsp->ccs_testresult == TESTRESULT_FAILURE) {
+			/*
+			 * Ensure string is nul-terminated, as we will print
+			 * it in due course, and a failed test might have left
+			 * a corrupted string.
+			 */
+			ccsp->ccs_testresult_str[
+			    sizeof(ccsp->ccs_testresult_str) - 1] = '\0';
+			memcpy(reason, ccsp->ccs_testresult_str,
+			    sizeof(ccsp->ccs_testresult_str));
+			goto fail;
+		}
+		if (ccsp->ccs_testresult != TESTRESULT_SUCCESS) {
+			snprintf(reason, sizeof(reason),
+			    "Test returned unexpected result (%d)",
+			    ccsp->ccs_testresult);
+			goto fail;
+		}
+	}
+
+	/*
 	 * Next, see whether any expected output was present.
 	 */
 	len = read(pipefd_stdout[0], buffer, sizeof(buffer) - 1);
@@ -2220,39 +2253,6 @@ cheritest_run_test(const struct cheri_test *ctp)
 				snprintf(reason, sizeof(reason),
 				    "read() on test stdout produced "
 				    "unexpected output");
-			goto fail;
-		}
-	}
-
-	/*
-	 * Next, we are concerned with whether the test itself reports a
-	 * success.  This is based not on whether the test experiences a
-	 * fault, but whether its semantics are correct -- e.g., did code in a
-	 * sandbox run as expected.  Tests that have successfully experienced
-	 * an expected/desired fault don't undergo these checks.
-	 */
-	if (!(ctp->ct_flags & CT_FLAG_SIGNAL)) {
-		if (ccsp->ccs_testresult == TESTRESULT_UNKNOWN) {
-			snprintf(reason, sizeof(reason),
-			    "Test failed to set a success/failure status");
-			goto fail;
-		}
-		if (ccsp->ccs_testresult == TESTRESULT_FAILURE) {
-			/*
-			 * Ensure string is nul-terminated, as we will print
-			 * it in due course, and a failed test might have left
-			 * a corrupted string.
-			 */
-			ccsp->ccs_testresult_str[
-			    sizeof(ccsp->ccs_testresult_str) - 1] = '\0';
-			memcpy(reason, ccsp->ccs_testresult_str,
-			    sizeof(ccsp->ccs_testresult_str));
-			goto fail;
-		}
-		if (ccsp->ccs_testresult != TESTRESULT_SUCCESS) {
-			snprintf(reason, sizeof(reason),
-			    "Test returned unexpected result (%d)",
-			    ccsp->ccs_testresult);
 			goto fail;
 		}
 	}
