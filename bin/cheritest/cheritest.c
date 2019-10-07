@@ -1952,6 +1952,11 @@ set_thread_tracing(void)
 	error = sysarch(QEMU_SET_QTRACE, &intval);
 	if (error)
 		err(EX_OSERR, "QEMU_SET_QTRACE");
+	/*
+	 * Change won't take affect until next context switch; make sure we have
+	 * tracing on right from the start.
+	 */
+	CHERI_START_TRACE;
 }
 
 /* Maximum size of stdout data we will check if called for by a test. */
