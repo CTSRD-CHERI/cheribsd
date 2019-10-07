@@ -140,10 +140,6 @@ _cc_vars=CC $${_empty_var_}
 # makefiles can save a noticeable amount of time when walking the whole source
 # tree (e.g. during make includes, etc.).
 _cc_vars+=XCC X_
-# Also get version information from CHERI_CC (if it is set)
-.ifdef CHERI_CC
-_cc_vars+=CHERI_CC CHERI_
-.endif
 .endif
 
 .for cc X_ in ${_cc_vars}

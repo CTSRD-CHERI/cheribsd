@@ -849,10 +849,6 @@ WMAKEENV=	${CROSSENV} \
 		PATH=${TMPPATH} \
 		SYSROOT=${WORLDTMP}
 
-.if defined(CHERI_CC)
-WMAKEENV+=	CHERI_CC=${CHERI_CC:Q} CHERI_CXX=${CHERI_CXX:Q}
-.endif
-
 # make hierarchy
 HMAKE=		PATH=${TMPPATH} ${MAKE} LOCAL_MTREE=${LOCAL_MTREE:Q}
 .if defined(NO_ROOT)
@@ -1006,8 +1002,7 @@ LIBCHERIWMAKEENV= \
 		LIBDIR=/usr/libcheri \
 		SHLIBDIR=/usr/libcheri \
 		TESTSBASE=${LIBCHERI_TESTSBASE} \
-		CC="${CHERI_CC}" \
-		LD=${CHERI_LD:U${XLD}} \
+		CC="${XCC}" CXX="${XCXX}" CPP="${XCPP}" \
 		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
 		AS="${XAS}" AR="${XAR}" LD="${XLD}" LLVM_LINK="${XLLVM_LINK}" \
 		NM=${XNM} OBJCOPY="${XOBJCOPY}" \
@@ -1449,8 +1444,6 @@ buildcheri:
 	${_+_}cd ${.CURDIR}; ${LIBCHERIWMAKE} -f Makefile.inc1 _buildcheri_impl
 
 _buildcheri_impl:
-	@echo CHERI_CC=${CHERI_CC}, COMPILER_TYPE=${COMPILER_TYPE} \
-		COMPILER_VERSION=${COMPILER_VERSION} "COMPILER_FEATURES=${COMPILER_FEATURES}"
 .for _lib in ${_cheri_libs}
 	${_+_}@${ECHODIR} "===> ${_lib} (obj,all,install)"; \
 		cd ${.CURDIR}/${_lib} && \
