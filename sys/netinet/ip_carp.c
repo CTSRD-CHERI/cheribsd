@@ -646,8 +646,9 @@ carp_input_c(struct mbuf *m, struct carp_header *ch, sa_family_t af)
 	struct carp_softc *sc;
 	uint64_t tmp_counter;
 	struct timeval sc_tv, ch_tv;
-	struct epoch_tracker et;
 	int error;
+
+	NET_EPOCH_ASSERT();
 
 	/*
 	 * Verify that the VHID is valid on the receiving interface.
@@ -660,7 +661,6 @@ carp_input_c(struct mbuf *m, struct carp_header *ch, sa_family_t af)
 	 * (these should never happen, and as noted above, we may
 	 * miss real loops; this is just a double-check).
 	 */
-	NET_EPOCH_ENTER(et);
 	error = 0;
 	match = NULL;
 	IFNET_FOREACH_IFA(ifp, ifa) {
@@ -674,7 +674,6 @@ carp_input_c(struct mbuf *m, struct carp_header *ch, sa_family_t af)
 	ifa = error ? NULL : match;
 	if (ifa != NULL)
 		ifa_ref(ifa);
-	NET_EPOCH_EXIT(et);
 
 	if (ifa == NULL) {
 		if (error == ELOOP) {
@@ -882,19 +881,18 @@ carp_send_ad_error(struct carp_softc *sc, int error)
 static struct ifaddr *
 carp_best_ifa(int af, struct ifnet *ifp)
 {
-	struct epoch_tracker et;
 	struct ifaddr *ifa, *best;
+
+	NET_EPOCH_ASSERT();
 
 	if (af >= AF_MAX)
 		return (NULL);
 	best = NULL;
-	NET_EPOCH_ENTER(et);
 	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family == af &&
 		    (best == NULL || ifa_preferred(best, ifa)))
 			best = ifa;
 	}
-	NET_EPOCH_EXIT(et);
 	if (best != NULL)
 		ifa_ref(best);
 	return (best);
@@ -1171,11 +1169,11 @@ carp_send_na(struct carp_softc *sc)
 struct ifaddr *
 carp_iamatch6(struct ifnet *ifp, struct in6_addr *taddr)
 {
-	struct epoch_tracker et;
 	struct ifaddr *ifa;
 
+	NET_EPOCH_ASSERT();
+
 	ifa = NULL;
-	NET_EPOCH_ENTER(et);
 	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
@@ -1187,7 +1185,6 @@ carp_iamatch6(struct ifnet *ifp, struct in6_addr *taddr)
 			ifa_ref(ifa);
 		break;
 	}
-	NET_EPOCH_EXIT(et);
 
 	return (ifa);
 }
@@ -1195,17 +1192,15 @@ carp_iamatch6(struct ifnet *ifp, struct in6_addr *taddr)
 caddr_t
 carp_macmatch6(struct ifnet *ifp, struct mbuf *m, const struct in6_addr *taddr)
 {
-	struct epoch_tracker et;
 	struct ifaddr *ifa;
 
-	NET_EPOCH_ENTER(et);
+	NET_EPOCH_ASSERT();
+
 	IFNET_FOREACH_IFA(ifp, ifa)
 		if (ifa->ifa_addr->sa_family == AF_INET6 &&
 		    IN6_ARE_ADDR_EQUAL(taddr, IFA_IN6(ifa))) {
 			struct carp_softc *sc = ifa->ifa_carp;
 			struct m_tag *mtag;
-
-			NET_EPOCH_EXIT(et);
 
 			mtag = m_tag_get(PACKET_TAG_CARP,
 			    sizeof(struct carp_softc *), M_NOWAIT);
@@ -1218,7 +1213,6 @@ carp_macmatch6(struct ifnet *ifp, struct mbuf *m, const struct in6_addr *taddr)
 
 			return (LLADDR(&sc->sc_addr));
 		}
-	NET_EPOCH_EXIT(et);
 
 	return (NULL);
 }
