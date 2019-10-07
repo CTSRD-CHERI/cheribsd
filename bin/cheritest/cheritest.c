@@ -1778,6 +1778,7 @@ static int list;
 static int run_all;
 static int fast_tests_only;
 static int qtrace;
+static int qtrace_user_mode_only;
 static int sleep_after_test;
 static int unsandboxed_tests_only;
 static int verbose;
@@ -1804,6 +1805,7 @@ usage(void)
 "    -d  -- Attach debugger before running test\n"
 "    -s  -- Sleep one second after each test\n"
 "    -q  -- Enable qemu tracing in test process\n"
+"    -Q  -- Enable qemu tracing in test process (user-mode only)\n"
 #endif
 "    -u  -- Only include unsandboxed tests\n"
 "    -v  -- Increase verbosity\n"
@@ -1957,6 +1959,8 @@ set_thread_tracing(void)
 	 * tracing on right from the start.
 	 */
 	CHERI_START_TRACE;
+	if (qtrace_user_mode_only)
+		__asm__ __volatile__("li $0, 0xdeaf");
 }
 
 /* Maximum size of stdout data we will check if called for by a test. */
@@ -2347,7 +2351,7 @@ main(int argc, char *argv[])
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "acdfglqsuv")) != -1) {
+	while ((opt = getopt(argc, argv, "acdfglQqsuv")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
@@ -2367,6 +2371,9 @@ main(int argc, char *argv[])
 		case 'l':
 			list = 1;
 			break;
+		case 'Q':
+			qtrace_user_mode_only = 1;
+			/* FALLTHROUGH */
 		case 'q':
 			len = sizeof(qemu_trace_perthread);
 			if (sysctlbyname("hw.qemu_trace_perthread",
@@ -2375,8 +2382,8 @@ main(int argc, char *argv[])
 				err(EX_OSERR,
 				    "sysctlbyname(\"hw.qemu_trace_perthread\")");
 			if (!qemu_trace_perthread)
-				errx(EX_USAGE, "-q requires sysctl "
-				    "hw.qemu_trace_perthread=1");
+				errx(EX_USAGE, "-%c requires sysctl "
+				    "hw.qemu_trace_perthread=1", opt);
 			qtrace = 1;
 			break;
 		case 's':
