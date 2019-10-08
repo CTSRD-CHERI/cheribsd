@@ -163,6 +163,9 @@ CFLAGS+= -DHAVE_FDLOPEN=1
 CFLAGS+= -DHAVE_FPURGE=1
 CFLAGS+= -DHAVE_STRLCAT=1
 CFLAGS+= -DHAVE_STRLCPY=1
+.ifdef LIBCHERI
+CFLAGS+= -DCOMPAT_CHERI=1
+.endif
 
 HEADERS=	security/openpam.h \
 		security/openpam_attr.h \
