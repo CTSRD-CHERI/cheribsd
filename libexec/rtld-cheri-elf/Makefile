@@ -48,6 +48,9 @@ MAN=
 NEED_CHERI=	pure
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
+.if !${MACHINE_ARCH:Mmips64*c*}
+CFLAGS+=	-DCOMPAT_CHERI
+.endif
 CFLAGS+=	-I${SRCTOP}/lib/csu/common \
 		-I${SRCTOP}/lib/libc/${RTLD_ARCH}
 .if exists(${RTLD_CHERI_ELF_DIR}/${MACHINE_ARCH})
