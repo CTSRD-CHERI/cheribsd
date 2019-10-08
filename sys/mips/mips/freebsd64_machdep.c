@@ -136,10 +136,9 @@ static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 	.machine	= EM_MIPS,
 	.compat_3_brand	= "FreeBSD",
 	.emul_path	= NULL,
-	/* XXX-BD: should probably become ld-elf64.so.1 */
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf_freebsd_freebsd64_sysvec,
-	.interp_newpath = NULL,
+	.interp_newpath = "/libexec/ld-elf64.so.1",
 	.brand_note	= &elf64_freebsd_brandnote,
 #ifdef CPU_CHERI
 	.header_supported = mips_elf_header_supported,
