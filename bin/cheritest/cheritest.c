@@ -1778,6 +1778,7 @@ static int list;
 static int run_all;
 static int fast_tests_only;
 static int qtrace;
+static int qtrace_user_mode_only;
 static int sleep_after_test;
 static int unsandboxed_tests_only;
 static int verbose;
@@ -1804,6 +1805,7 @@ usage(void)
 "    -d  -- Attach debugger before running test\n"
 "    -s  -- Sleep one second after each test\n"
 "    -q  -- Enable qemu tracing in test process\n"
+"    -Q  -- Enable qemu tracing in test process (user-mode only)\n"
 #endif
 "    -u  -- Only include unsandboxed tests\n"
 "    -v  -- Increase verbosity\n"
@@ -1952,6 +1954,13 @@ set_thread_tracing(void)
 	error = sysarch(QEMU_SET_QTRACE, &intval);
 	if (error)
 		err(EX_OSERR, "QEMU_SET_QTRACE");
+	/*
+	 * Change won't take affect until next context switch; make sure we have
+	 * tracing on right from the start.
+	 */
+	CHERI_START_TRACE;
+	if (qtrace_user_mode_only)
+		__asm__ __volatile__("li $0, 0xdeaf");
 }
 
 /* Maximum size of stdout data we will check if called for by a test. */
@@ -2176,6 +2185,39 @@ cheritest_run_test(const struct cheri_test *ctp)
 	}
 
 	/*
+	 * Next, we are concerned with whether the test itself reports a
+	 * success.  This is based not on whether the test experiences a
+	 * fault, but whether its semantics are correct -- e.g., did code in a
+	 * sandbox run as expected.  Tests that have successfully experienced
+	 * an expected/desired fault don't undergo these checks.
+	 */
+	if (!(ctp->ct_flags & CT_FLAG_SIGNAL)) {
+		if (ccsp->ccs_testresult == TESTRESULT_UNKNOWN) {
+			snprintf(reason, sizeof(reason),
+			    "Test failed to set a success/failure status");
+			goto fail;
+		}
+		if (ccsp->ccs_testresult == TESTRESULT_FAILURE) {
+			/*
+			 * Ensure string is nul-terminated, as we will print
+			 * it in due course, and a failed test might have left
+			 * a corrupted string.
+			 */
+			ccsp->ccs_testresult_str[
+			    sizeof(ccsp->ccs_testresult_str) - 1] = '\0';
+			memcpy(reason, ccsp->ccs_testresult_str,
+			    sizeof(ccsp->ccs_testresult_str));
+			goto fail;
+		}
+		if (ccsp->ccs_testresult != TESTRESULT_SUCCESS) {
+			snprintf(reason, sizeof(reason),
+			    "Test returned unexpected result (%d)",
+			    ccsp->ccs_testresult);
+			goto fail;
+		}
+	}
+
+	/*
 	 * Next, see whether any expected output was present.
 	 */
 	len = read(pipefd_stdout[0], buffer, sizeof(buffer) - 1);
@@ -2220,39 +2262,6 @@ cheritest_run_test(const struct cheri_test *ctp)
 				snprintf(reason, sizeof(reason),
 				    "read() on test stdout produced "
 				    "unexpected output");
-			goto fail;
-		}
-	}
-
-	/*
-	 * Next, we are concerned with whether the test itself reports a
-	 * success.  This is based not on whether the test experiences a
-	 * fault, but whether its semantics are correct -- e.g., did code in a
-	 * sandbox run as expected.  Tests that have successfully experienced
-	 * an expected/desired fault don't undergo these checks.
-	 */
-	if (!(ctp->ct_flags & CT_FLAG_SIGNAL)) {
-		if (ccsp->ccs_testresult == TESTRESULT_UNKNOWN) {
-			snprintf(reason, sizeof(reason),
-			    "Test failed to set a success/failure status");
-			goto fail;
-		}
-		if (ccsp->ccs_testresult == TESTRESULT_FAILURE) {
-			/*
-			 * Ensure string is nul-terminated, as we will print
-			 * it in due course, and a failed test might have left
-			 * a corrupted string.
-			 */
-			ccsp->ccs_testresult_str[
-			    sizeof(ccsp->ccs_testresult_str) - 1] = '\0';
-			memcpy(reason, ccsp->ccs_testresult_str,
-			    sizeof(ccsp->ccs_testresult_str));
-			goto fail;
-		}
-		if (ccsp->ccs_testresult != TESTRESULT_SUCCESS) {
-			snprintf(reason, sizeof(reason),
-			    "Test returned unexpected result (%d)",
-			    ccsp->ccs_testresult);
 			goto fail;
 		}
 	}
@@ -2342,7 +2351,7 @@ main(int argc, char *argv[])
 	argc = xo_parse_args(argc, argv);
 	if (argc < 0)
 		errx(1, "xo_parse_args failed\n");
-	while ((opt = getopt(argc, argv, "acdfglqsuv")) != -1) {
+	while ((opt = getopt(argc, argv, "acdfglQqsuv")) != -1) {
 		switch (opt) {
 		case 'a':
 			run_all = 1;
@@ -2362,6 +2371,9 @@ main(int argc, char *argv[])
 		case 'l':
 			list = 1;
 			break;
+		case 'Q':
+			qtrace_user_mode_only = 1;
+			/* FALLTHROUGH */
 		case 'q':
 			len = sizeof(qemu_trace_perthread);
 			if (sysctlbyname("hw.qemu_trace_perthread",
@@ -2370,8 +2382,8 @@ main(int argc, char *argv[])
 				err(EX_OSERR,
 				    "sysctlbyname(\"hw.qemu_trace_perthread\")");
 			if (!qemu_trace_perthread)
-				errx(EX_USAGE, "-q requires sysctl "
-				    "hw.qemu_trace_perthread=1");
+				errx(EX_USAGE, "-%c requires sysctl "
+				    "hw.qemu_trace_perthread=1", opt);
 			qtrace = 1;
 			break;
 		case 's':

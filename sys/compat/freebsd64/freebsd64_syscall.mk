@@ -410,4 +410,5 @@ MIASM =  \
 	freebsd64_fhlink.o \
 	freebsd64_fhlinkat.o \
 	freebsd64_fhreadlink.o \
-	freebsd64_funlinkat.o
+	freebsd64_funlinkat.o \
+	freebsd64_copy_file_range.o

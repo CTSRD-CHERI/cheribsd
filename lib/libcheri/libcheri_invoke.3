@@ -39,11 +39,10 @@
 .In cheri/cheri.h
 .In cheri/cheric.h
 .In cheri/libcheri_invoke.h
-#if __has_feature(capabilities)
 .Ft register_t
 .Fo libcheri_invoke
-.Fa "void * __capability c1"
-.Fa "void * __capability c2"
+.Fa "struct cheri_object co"
+.Fa "register_t v0"
 .Fa "register_t a0"
 .Fa "register_t a1"
 .Fa "register_t a2"
@@ -61,19 +60,6 @@
 .Fa "void * __capability c9"
 .Fa "void * __capability c10"
 .Fc
-#else
-.Ft register_t
-.Fo libcheri_invoke
-.Fa "register_t a0"
-.Fa "register_t a1"
-.Fa "register_t a2"
-.Fa "register_t a3"
-.Fa "register_t a4"
-.Fa "register_t a5"
-.Fa "register_t a6"
-.Fa "register_t a7"
-.Fc
-#endif
 .Sh DESCRIPTION
 .Fn libcheri_invoke
 is a C-language wrapper for the CHERI
@@ -88,7 +74,7 @@ appropriate hardware registers.
 Without compiler support, explicit assembly instructions must be used to
 implement the CHERI ABI.
 By convention,
-.Li $a0
+.Li $v0
 will contain a method number.
 .Pp
 Most programmers will prefer to employ the

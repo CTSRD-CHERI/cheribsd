@@ -144,7 +144,8 @@ VECTOR(_locore, unknown)
 
 #ifdef YAMON
 	/* Save YAMON boot environment pointer */
-	sw	a2, _C_LABEL(fenvp)
+	ABSRELOC_LA(t0, _C_LABEL(fenvp))
+	sw	a2, 0(t0)
 #endif
 
 #if defined(CPU_MALTA) && defined(SMP)

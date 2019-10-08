@@ -134,8 +134,10 @@ CFLAGS.ioctl.c+=	-Wno-error-cheri-capability-misuse
 .endif
 
 DEPENDOBJS+=	tables.h
-tables.h: mktables
-	sh ${.CURDIR}/mktables ${SYSROOT:U${DESTDIR}}${INCLUDEDIR} ${.TARGET}.tmp && \
+incdir=${SYSROOT:U${DESTDIR}}${INCLUDEDIR}
+tables.h: mktables ${incdir}/netinet/in.h ${incdir}/netinet/tcp.h \
+    ${incdir}/netinet6/in6.h
+	sh ${.CURDIR}/mktables ${incdir} ${.TARGET}.tmp && \
 	    mv -f ${.TARGET}.tmp ${.TARGET}
 
 # mkioctls runs find(1) for headers so needs to rebuild every time.  This used

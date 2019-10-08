@@ -138,6 +138,8 @@ int	kern_clock_settime(struct thread *td, clockid_t clock_id,
 int	kern_close(struct thread *td, int fd);
 int	kern_connectat(struct thread *td, int dirfd, int fd,
 	    struct sockaddr *sa);
+int	kern_copy_file_range(struct thread *td, int infd, off_t *inoffp,
+	    int outfd, off_t *outoffp, size_t len, unsigned int flags);
 int	kern_cpuset(struct thread *td, cpusetid_t * __capability setid);
 int	kern_cpuset_getaffinity(struct thread *td, cpulevel_t level,
 	    cpuwhich_t which, id_t id, size_t cpusetsize,
@@ -543,6 +545,10 @@ int	user_clock_nanosleep(struct thread *td, clockid_t clock_id,
 	    struct timespec * __capability ua_rmtp);
 int	user_connectat(struct thread *td, int fd, int s,
 		const struct sockaddr * __capability name, socklen_t namelen);
+int	user_copy_file_range(struct thread *td,
+	    int infd, off_t * __capability inoffp,
+	    int outfd, off_t * __capability outoffp,
+	    size_t len, unsigned int flags);
 int	user_fhstat(struct thread *td,
 	    const struct fhandle * __capability u_fhp,
 	    struct stat * __capability sb);

@@ -575,4 +575,5 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_fhlinkat",			/* 566 = freebsd64_fhlinkat */
 	"freebsd64_fhreadlink",			/* 567 = freebsd64_fhreadlink */
 	"freebsd64_funlinkat",			/* 568 = freebsd64_funlinkat */
+	"freebsd64_copy_file_range",			/* 569 = freebsd64_copy_file_range */
 };

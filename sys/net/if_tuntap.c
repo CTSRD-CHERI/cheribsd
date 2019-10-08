@@ -1240,12 +1240,6 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 	if (l2tun) {
 		/* tap specific ioctls */
 		switch(cmd) {
-		case CASE_IOC_IFREQ(TAPGIFNAME):
-			ifrp = (struct ifreq *)data;
-			strlcpy(ifrp->ifr_name, TUN2IFP(tp)->if_xname,
-			    IFNAMSIZ);
-
-			return (0);
 		/* VMware/VMnet port ioctl's */
 #if defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD5) || \
     defined(COMPAT_FREEBSD4)
@@ -1342,6 +1336,11 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag,
 	}
 
 	switch (cmd) {
+	case CASE_IOC_IFREQ(TUNGIFNAME):
+		ifrp = (struct ifreq *)data;
+		strlcpy(ifrp->ifr_name, TUN2IFP(tp)->if_xname, IFNAMSIZ);
+
+		return (0);
 	case TUNSIFINFO:
 		tunp = (struct tuninfo *)data;
 		if (TUN2IFP(tp)->if_type != tunp->type)
