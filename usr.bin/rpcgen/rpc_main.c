@@ -99,7 +99,7 @@ static void checkfiles(const char *, const char *);
 
 
 
-#define	ARGLISTLEN	20
+#define	ARGLISTLEN	50 /* XXXAR: Dynamically allocate (e.g. utarray?) */
 #define	FIXEDARGS	0
 
 static char *arglist[ARGLISTLEN];
