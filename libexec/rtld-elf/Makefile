@@ -31,6 +31,9 @@ PROG?=		ld-elf.so.1
 .if (${PROG:M*ld-elf32*} != "")
 TAGS+=		lib32
 .endif
+.if (${PROG:M*ld-elf64*} != "")
+TAGS+=		lib64
+.endif
 .PATH: ${RTLD_ELF_DIR}
 SRCS= \
 	rtld_start.S \
