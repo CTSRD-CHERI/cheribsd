@@ -1,4 +1,3 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/sh.glob.c,v 3.95 2016/08/01 16:21:09 christos Exp $ */
 /*
  * sh.glob.c: Regular expression expansion
  */
@@ -31,9 +30,6 @@
  * SUCH DAMAGE.
  */
 #include "sh.h"
-
-RCSID("$tcsh: sh.glob.c,v 3.95 2016/08/01 16:21:09 christos Exp $")
-
 #include "tc.h"
 #include "tw.h"
 
