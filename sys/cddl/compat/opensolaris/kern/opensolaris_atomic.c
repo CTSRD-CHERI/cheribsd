@@ -120,15 +120,9 @@ atomic_cas_64(volatile uint64_t *target, uint64_t cmp, uint64_t newval)
 	return (oldval);
 }
 #endif
-
-void
-membar_producer(void)
-{
-	/* nothing */
-}
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191029,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
