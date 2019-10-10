@@ -39,7 +39,11 @@ CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1
 CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=0
 .endif
 
+.if ${MACHINE_ARCH:Mmips*c*}
+PROG?=		ld-elf.so.1
+.else
 PROG?=		ld-cheri-elf.so.1
+.endif
 SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c cheri_reloc.c
 .PATH: ${RTLD_ELF_DIR}
 SRCS+=	rtld_lock.c map_object.c xmalloc.c debug.c libmap.c
