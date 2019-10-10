@@ -1090,8 +1090,8 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 	int cache_linesize_mask = mips_dcache_max_linesize - 1;
 #ifdef CHERI_PURECAP_KERNEL
 	vm_offset_t tmp_va;
-	char _tmp_cl[mips_dcache_max_linesize] __aligned(sizeof(void *));
-	char _tmp_clend[mips_dcache_max_linesize] __aligned(sizeof(void *));
+	char _tmp_cl[mips_dcache_max_linesize] __aligned(CACHE_LINE_SIZE);
+	char _tmp_clend[mips_dcache_max_linesize] __aligned(CACHE_LINE_SIZE);
 	char *tmp_cl = _tmp_cl;
 	char *tmp_clend = _tmp_clend;
 #else
@@ -1156,11 +1156,10 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 			    size_clend, CHERI_PERMS_KERNEL_DATA);
 			/* Enforce the same misalignment as in buf_clend */
 			tmp_clend += mips_dcache_max_linesize - size_clend;
-
 			KASSERT((ptr_to_va(buf_clend) & cache_linesize_mask) ==
 			    (ptr_to_va(tmp_clend) & cache_linesize_mask),
 			    ("dmamap cacheline tail source and temp buffers"
-			     "have different misalignment source=%p temp=%p",
+			     " have different misalignment source=%p temp=%p",
 			     (void *)buf_clend, tmp_clend));
 		}
 #else
