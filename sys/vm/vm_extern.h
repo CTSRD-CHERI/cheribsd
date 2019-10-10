@@ -69,7 +69,7 @@ vm_ptr_t kmem_alloc_contig_domainset(struct domainset *ds, vm_size_t size,
 vm_ptr_t kmem_malloc(vm_size_t size, int flags);
 vm_ptr_t kmem_malloc_domainset(struct domainset *ds, vm_size_t size,
     int flags, vm_size_t align);
-void kmem_free(vm_offset_t addr, vm_size_t size);
+void kmem_free(vm_ptr_t addr, vm_size_t size);
 
 /* This provides memory for previously allocated address space. */
 int kmem_back(vm_object_t, vm_ptr_t, vm_size_t, int);

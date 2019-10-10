@@ -1478,6 +1478,7 @@ vmem_xfree(vmem_t *vm, vmem_addr_t addr, vmem_size_t size)
 	bt_t *t;
 
 	MPASS(size > 0);
+	CHERI_VM_ASSERT_VALID(addr);
 
 	VMEM_LOCK(vm);
 	bt = bt_lookupbusy(vm, addr);

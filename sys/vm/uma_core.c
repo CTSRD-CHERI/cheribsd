@@ -1420,7 +1420,7 @@ page_free(void *mem, vm_size_t size, uint8_t flags)
 	if ((flags & UMA_SLAB_KERNEL) == 0)
 		panic("UMA: page_free used with invalid flags %x", flags);
 
-	kmem_free((vm_offset_t)mem, size);
+	kmem_free((vm_ptr_t)mem, size);
 }
 
 /*
@@ -3802,7 +3802,7 @@ uma_large_free(uma_slab_t slab)
 
 	KASSERT((slab->us_flags & UMA_SLAB_KERNEL) != 0,
 	    ("uma_large_free:  Memory not allocated with uma_large_malloc."));
-	kmem_free((vm_offset_t)slab->us_data, slab->us_size);
+	kmem_free((vm_ptr_t)slab->us_data, slab->us_size);
 	uma_total_dec(slab->us_size);
 	zone_free_item(slabzone, slab, NULL, SKIP_NONE);
 }

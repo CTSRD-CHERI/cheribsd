@@ -647,12 +647,12 @@ kmem_unback(vm_object_t object, vm_offset_t addr, vm_size_t size)
  *	original allocation.
  */
 void
-kmem_free(vm_offset_t addr, vm_size_t size)
+kmem_free(vm_ptr_t addr, vm_size_t size)
 {
 	struct vmem *arena;
 
 	size = round_page(size);
-	arena = _kmem_unback(kernel_object, addr, size);
+	arena = _kmem_unback(kernel_object, ptr_to_va(addr), size);
 	if (arena != NULL)
 		vmem_free(arena, addr, size);
 }
