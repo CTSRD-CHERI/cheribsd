@@ -682,7 +682,11 @@ mallocarray(size_t nmemb, size_t size, struct malloc_type *type, int flags)
 static void
 free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 {
+#ifdef CHERI_PURECAP_KERNEL
+	vaddr_t *mtpp = addr;
+#else
 	struct malloc_type **mtpp = addr;
+#endif
 
 	/*
 	 * Cache a pointer to the malloc_type that most recently freed
@@ -692,17 +696,19 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 * This code assumes that size is a multiple of 8 bytes for
 	 * 64 bit machines
 	 */
-#if defined(CHERI_PURECAP_KERNEL) && CHERICAP_SIZE > 16
-	/* CHERI-256 pointers do not fit in the smallest kmemzone */
-	if (size >= sizeof(struct malloc_type *))
+#ifdef CHERI_PURECAP_KERNEL
+	/*
+	 * This is for debugging only, so we just store the va of the
+	 * malloc_type, not a capability to it.
+	 */
+	mtpp = (vaddr_t *)roundup2(mtpp, sizeof(vaddr_t));
+	if (cheri_getlen(mtpp) - cheri_getoffset(mtpp) >= sizeof(vaddr_t))
+		*mtpp = ptr_to_va(mtp);
+#else
+	mtpp = (struct malloc_type **)rounddown2(mtpp, sizeof(struct malloc_type *));
+	mtpp += (size - sizeof(struct malloc_type *)) / sizeof(struct malloc_type *);
+	*mtpp = mtp;
 #endif
-	{
-		mtpp = (struct malloc_type **)
-		    rounddown2(mtpp, sizeof(struct malloc_type *));
-		mtpp += (size - sizeof(struct malloc_type *)) /
-		    sizeof(struct malloc_type *);
-		*mtpp = mtp;
-	}
 }
 #endif
 
