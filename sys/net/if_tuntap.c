@@ -1156,6 +1156,7 @@ tuninit(struct ifnet *ifp)
 {
 	struct tuntap_softc *tp = ifp->if_softc;
 #ifdef INET
+	struct epoch_tracker et;
 	struct ifaddr *ifa;
 #endif
 
@@ -1167,7 +1168,7 @@ tuninit(struct ifnet *ifp)
 		ifp->if_flags |= IFF_UP;
 		getmicrotime(&ifp->if_lastchange);
 #ifdef INET
-		if_addr_rlock(ifp);
+		NET_EPOCH_ENTER(et);
 		CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 			if (ifa->ifa_addr->sa_family == AF_INET) {
 				struct sockaddr_in *si;
@@ -1181,7 +1182,7 @@ tuninit(struct ifnet *ifp)
 					tp->tun_flags |= TUN_DSTADDR;
 			}
 		}
-		if_addr_runlock(ifp);
+		NET_EPOCH_EXIT(et);
 #endif
 		TUN_UNLOCK(tp);
 	} else {
