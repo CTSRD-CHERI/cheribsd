@@ -113,9 +113,6 @@ MK_GNUCXX:=	no
 MK_LIBCPLUSPLUS:=yes
 # LLVM libunwind is needed for libc++
 MK_LLVM_LIBUNWIND:=	yes
-# GROFF is broken when building WITH_CHERI_PURE and it will be removed
-# soon anyway
-MK_GROFF:=	no
 # Build cheribsdbox by default so that we have a emergency MIPS tool if the
 # CHERI world is broken
 .if !defined(WITHOUT_CHERIBSDBOX)
