@@ -44,6 +44,9 @@ PROG?=		ld-elf.so.1
 .else
 PROG?=		ld-cheri-elf.so.1
 .endif
+.if ${MACHINE_ARCH:Mmips*c*} && ${PROG} == ld-elf.so.1
+LINKS=		${BINDIR}/ld-elf.so.1 ${BINDIR}/ld-cheri-elf.so.1
+.endif
 SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c cheri_reloc.c
 .PATH: ${RTLD_ELF_DIR}
 SRCS+=	rtld_lock.c map_object.c xmalloc.c debug.c libmap.c
