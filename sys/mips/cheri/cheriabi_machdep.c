@@ -137,9 +137,9 @@ static Elf64_Brandinfo freebsd_cheriabi_brand_info = {
 	.machine	= EM_MIPS,
 	.compat_3_brand	= "FreeBSD",
 	.emul_path	= NULL,
-	.interp_path	= "/libexec/ld-cheri-elf.so.1",
+	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf_freebsd_cheriabi_sysvec,
-	.interp_newpath = NULL,
+	.interp_newpath	= "/libexec/ld-cheri-elf.so.1",
 	.flags		= BI_CAN_EXEC_DYN,
 	.header_supported = cheriabi_elf_header_supported
 };
