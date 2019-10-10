@@ -871,12 +871,7 @@ HMAKE+=		PATH=${TMPPATH} METALOG=${METALOG} -DNO_ROOT
 
 # cross-building -> add -target flag to clang command line
 .if ${MACHINE:Nhost:Ncommon} != "" && ${TARGET_MACHINE} != ${HOST_MACHINE} && ${X_COMPILER_TYPE} == "clang"
-.if ${TARGET_ARCH} == "amd64"
-_triple_arch=x86_64
-.else
-_triple_arch=${TARGET_ARCH}
-.endif
-CROSS_TARGET_FLAGS=-target ${_triple_arch}-unknown-freebsd${_REVISION}
+CROSS_TARGET_FLAGS=-target ${TARGET_TRIPLE}
 .endif
 
 CROSSENV+=	CC="${XCC} ${CROSS_TARGET_FLAGS} ${XCFLAGS}"\
