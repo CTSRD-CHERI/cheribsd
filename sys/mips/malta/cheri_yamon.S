@@ -44,9 +44,9 @@
  * 	void *param, uint32_t size);
  */
 NESTED(_yamon_cheri_syscon_read, 32, $c17)
-	cincoffset	$c11, $c11, -32
+	cincoffset	$c11, $c11, -(2 * CHERICAP_SIZE)
 	csc	$c24, zero, 0($c11)
-	csc	$c17, zero, 16($c11)
+	csc	$c17, zero, CHERICAP_SIZE($c11)
 	cincoffset	$c24, $c11, 0
 
 	/* Switch to an unbounded kernel PCC */
@@ -76,8 +76,8 @@ yamon_pc:
 	nop
 	/* return already in v0 */
 
-	clc	$c17, zero, 16($c11)
+	clc	$c17, zero, CHERICAP_SIZE($c11)
 	clc	$c24, zero, 0($c11)
 	cjr	$c17
-	cincoffset $c11, $c11, 32
+	cincoffset $c11, $c11, (2 * CHERICAP_SIZE)
 END(_yamon_cheri_syscon_read)
