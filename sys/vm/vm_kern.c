@@ -522,7 +522,7 @@ retry:
 			if ((flags & M_NOWAIT) == 0)
 				goto retry;
 			VM_OBJECT_WUNLOCK(object);
-			kmem_unback(object, addr, i);
+			kmem_unback(object, ptr_to_va(addr), i);
 			return (KERN_NO_SPACE);
 		}
 		KASSERT(vm_phys_domain(m) == domain,

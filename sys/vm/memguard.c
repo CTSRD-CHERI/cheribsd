@@ -208,12 +208,12 @@ memguard_fudge(unsigned long km_size, const struct vm_map *parent_map)
 void
 memguard_init(vmem_t *parent)
 {
-	vm_offset_t base;
+	vmem_addr_t base;
 
 	vmem_alloc(parent, memguard_mapsize, M_BESTFIT | M_WAITOK, &base);
 	vmem_init(memguard_arena, "memguard arena", base, memguard_mapsize,
 	    PAGE_SIZE, 0, M_WAITOK);
-	memguard_base = base;
+	memguard_base = ptr_to_va(base);
 
 	printf("MEMGUARD DEBUGGING ALLOCATOR INITIALIZED:\n");
 	printf("\tMEMGUARD map base: 0x%lx\n", (u_long)base);
@@ -289,7 +289,7 @@ v2sizev(vm_offset_t va)
 void *
 memguard_alloc(unsigned long req_size, int flags)
 {
-	vm_offset_t addr, origaddr;
+	vm_ptr_t addr, origaddr;
 	u_long size_p, size_v;
 	int do_guard, error, rv;
 
@@ -328,21 +328,21 @@ memguard_alloc(unsigned long req_size, int flags)
 	    &origaddr);
 	if (error != 0) {
 		memguard_fail_kva++;
-		addr = (vm_offset_t)NULL;
+		addr = (vm_ptr_t)NULL;
 		goto out;
 	}
 	addr = origaddr;
 	if (do_guard)
 		addr += PAGE_SIZE;
-	rv = kmem_back(kernel_object, addr, size_p, flags);
+	rv = kmem_back(kernel_object, ptr_to_va(addr), size_p, flags);
 	if (rv != KERN_SUCCESS) {
 		vmem_xfree(memguard_arena, origaddr, size_v);
 		memguard_fail_pgs++;
-		addr = (vm_offset_t)NULL;
+		addr = (vm_ptr_t)NULL;
 		goto out;
 	}
-	*v2sizep(trunc_page(addr)) = req_size;
-	*v2sizev(trunc_page(addr)) = size_v;
+	*v2sizep(trunc_page(ptr_to_va(addr))) = req_size;
+	*v2sizev(trunc_page(ptr_to_va(addr))) = size_v;
 	memguard_succ++;
 	if (req_size < PAGE_SIZE) {
 		memguard_wasted += (PAGE_SIZE - req_size);
@@ -363,7 +363,11 @@ out:
 int
 is_memguard_addr(void *addr)
 {
+#ifndef CHERI_PURECAP_KERNEL
 	vm_offset_t a = (vm_offset_t)(uintptr_t)addr;
+#else
+	vm_offset_t a = ptr_to_va(addr);
+#endif
 
 	return (a >= memguard_base && a < memguard_base + memguard_mapsize);
 }
@@ -374,14 +378,14 @@ is_memguard_addr(void *addr)
 void
 memguard_free(void *ptr)
 {
-	vm_offset_t addr;
+	vm_ptr_t addr;
 	u_long req_size, size, sizev;
 	char *temp;
 	int i;
 
 	addr = trunc_page((uintptr_t)ptr);
-	req_size = *v2sizep(addr);
-	sizev = *v2sizev(addr);
+	req_size = *v2sizep(ptr_to_va(addr));
+	sizev = *v2sizev(ptr_to_va(addr));
 	size = round_page(req_size);
 
 	/*
@@ -403,7 +407,7 @@ memguard_free(void *ptr)
 	 * vm_map lock to serialize updates to memguard_wasted, since
 	 * we had the lock at increment.
 	 */
-	kmem_unback(kernel_object, addr, size);
+	kmem_unback(kernel_object, ptr_to_va(addr), size);
 	if (sizev > size)
 		addr -= PAGE_SIZE;
 	vmem_xfree(memguard_arena, addr, sizev);
@@ -430,7 +434,7 @@ memguard_realloc(void *addr, unsigned long size, struct malloc_type *mtp,
 		return (NULL);
 
 	/* Copy over original contents. */
-	old_size = *v2sizep(trunc_page((uintptr_t)addr));
+	old_size = *v2sizep(trunc_page(ptr_to_va(addr)));
 	bcopy(addr, newaddr, min(size, old_size));
 	memguard_free(addr);
 	return (newaddr);
@@ -503,3 +507,13 @@ memguard_cmp_zone(uma_zone_t zone)
 	 */
 	return (strcmp(zone->uz_name, vm_memguard_desc) == 0);
 }
+// CHERI CHANGES START
+// {
+//   "updated": 20191011,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_alignment"
+//     "uniptr_interp_offset"
+//   ]
+// }
+// CHERI CHANGES END
