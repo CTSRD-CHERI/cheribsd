@@ -46,7 +46,7 @@ static uintptr_t
 stack_register_fetch(uintptr_t sp, u_register_t stack_pos)
 {
 	uintptr_t * stack =
-	    ((uintptr_t *)sp + (size_t)stack_pos);
+	    ((uintptr_t *)sp + (size_t)stack_pos / sizeof(uintptr_t));
 
 	return (*stack);
 }
@@ -131,13 +131,13 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 			    insn.CCMType.cs == OP_CHERI_RAC_REGNO &&
 			    insn.CCMType.cb == OP_CHERI_STC_REGNO) {
 				exc_saved_ra = 0;
-				ra_stack_pos = (short)insn.CCMType.offset;
+				ra_stack_pos = (short)insn.CCMType.offset * 16;
 			}
 			else if (op_is_cheri_csc(insn) &&
 			    insn.CCMType.cs == OP_CHERI_FPC_REGNO &&
 			    insn.CCMType.cb == OP_CHERI_STC_REGNO) {
 				next_sp = stack_register_fetch(sp,
-				    (short)insn.CCMType.offset);
+				    (short)insn.CCMType.offset * 16);
 				break;
 			}
 		}
@@ -175,7 +175,7 @@ stack_capture(struct stack *st, uintptr_t pc, uintptr_t sp)
 
 		if (is_exc_handler) {
 			exc_saved_ra = stack_register_fetch(sp,
-			    (CALLFRAME_SIZ + SZREG * C17) / sizeof(uintptr_t));
+			    (CALLFRAME_SIZ + SZREG * C17));
 			pc = stack_register_fetch(sp, ra_stack_pos);
 		}
 		else {
