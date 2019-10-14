@@ -1725,7 +1725,7 @@ hn_xpnt_vf_setready(struct hn_softc *sc)
 		 */
 		memset(&ifr, 0, sizeof(ifr));
 		strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-		ifr.ifr_mtu = ifp->if_mtu;
+		ifr_mtu_set(&ifr, ifp->if_mtu);
 		error = vf_ifp->if_ioctl(vf_ifp, SIOCSIFMTU, (caddr_t)&ifr);
 		if (error) {
 			if_printf(ifp, "%s SIOCSIFMTU %u failed\n",
@@ -3734,7 +3734,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			if (error) {
 				HN_UNLOCK(sc);
 				if_printf(ifp, "%s SIOCSIFMTU %d failed: %d\n",
-				    vf_ifp->if_xname, ifr->ifr_mtu, error);
+				    vf_ifp->if_xname, ifr_mtu_get(ifr), error);
 				break;
 			}
 		}
@@ -3762,7 +3762,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		error = hn_rndis_get_mtu(sc, &mtu);
 		if (error)
-			mtu = ifr->ifr_mtu;
+			mtu = ifr_mtu_get(ifr);
 		else if (bootverbose)
 			if_printf(ifp, "RNDIS mtu %u\n", mtu);
 
