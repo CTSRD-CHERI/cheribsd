@@ -2520,7 +2520,7 @@ sysctl_new_ddb(struct sysctl_req *req, void *p, size_t l)
  */
 static int
 db_sysctl(struct sysctl_oid *oidp, int *name, u_int namelen,
-    void *old, size_t *oldlenp, size_t *retval, int flags)
+    void * __capability old, size_t *oldlenp, size_t *retval, int flags)
 {
 	struct sysctl_req req;
 	int error;
@@ -2642,7 +2642,7 @@ db_show_oid(struct sysctl_oid *oidp, int *oid, size_t nlen, int flags)
 	if (!g_ddb_sysctl_printed)
 		/* Lie about the size */
 		error = db_sysctl(oidp, oid, nlen,
-		    (void *) 1, &len, NULL, flags);
+		    (void * __capability)(uintptr_t)1, &len, NULL, flags);
 
 out:
 	db_printf("\n");
