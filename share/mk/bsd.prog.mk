@@ -5,6 +5,7 @@ __BSD_PROG_MK=yes
 
 .include <bsd.init.mk>
 .include <bsd.cheri.mk>
+.include <bsd.compat.mk>
 .include <bsd.compiler.mk>
 .include <bsd.linker.mk>
 
