@@ -1596,7 +1596,7 @@ swp_pager_async_iodone(struct buf *bp)
 				 * be overridden by the original caller of
 				 * getpages so don't play cute tricks here.
 				 */
-				m->valid = 0;
+				vm_page_invalid(m);
 			} else {
 				/*
 				 * If a write error occurs, reactivate page
@@ -1627,7 +1627,7 @@ swp_pager_async_iodone(struct buf *bp)
 			swp_pager_meta_cheri_get_tags(m);
 #endif
 
-			m->valid = VM_PAGE_BITS_ALL;
+			vm_page_valid(m);
 			if (i < bp->b_pgbefore ||
 			    i >= bp->b_npages - bp->b_pgafter)
 				vm_page_readahead_finish(m);
