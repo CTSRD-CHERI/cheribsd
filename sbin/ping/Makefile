@@ -23,7 +23,8 @@ CFLAGS+=-DWITH_CASPER
 CFLAGS+=-DIPSEC
 LIBADD+=	ipsec
 
-HAS_TESTS=
-SUBDIR.${MK_TESTS}+= tests
+# Doesn't link reliably with CheriABI
+#HAS_TESTS=
+#SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>
