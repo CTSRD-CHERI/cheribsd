@@ -198,9 +198,9 @@ winChkName(const u_char *un, size_t unlen, struct winentry *wep, int chksum)
 	 */
 	p = &buf[0];
 	memcpy(p, wep->wePart1, sizeof(wep->wePart1));
-	p += sizeof(wep->wePart1) / sizeof(*p);
+	p += nitems(wep->wePart1) / (sizeof(*p) / sizeof(wep->wePart1[0]));
 	memcpy(p, wep->wePart2, sizeof(wep->wePart2));
-	p += sizeof(wep->wePart2) / sizeof(*p);
+	p += nitems(wep->wePart2) / (sizeof(*p) / sizeof(wep->wePart2[0]));
 	memcpy(p, wep->wePart3, sizeof(wep->wePart3));
 
 	/*
@@ -272,9 +272,9 @@ unix2winfn(const u_char *un, size_t unlen, struct winentry *wep, int cnt,
 	 */
 	p = &wn[i];
 	memcpy(wep->wePart1, p, sizeof(wep->wePart1));
-	p += sizeof(wep->wePart1) / sizeof(*p);
+	p += nitems(wep->wePart1) / (sizeof(*p) / sizeof(wep->wePart1[0]));
 	memcpy(wep->wePart2, p, sizeof(wep->wePart2));
-	p += sizeof(wep->wePart2) / sizeof(*p);
+	p += nitems(wep->wePart2) / (sizeof(*p) / sizeof(wep->wePart2[0]));
 	memcpy(wep->wePart3, p, sizeof(wep->wePart3));
 
 	if (len > i + WIN_CHARS)
