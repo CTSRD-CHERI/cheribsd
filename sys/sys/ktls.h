@@ -30,6 +30,7 @@
 #define	_SYS_KTLS_H_
 
 #include <sys/refcount.h>
+#include <sys/_iovec.h>
 #include <sys/_task.h>
 
 struct tls_record_layer {
@@ -123,7 +124,6 @@ struct tls_session_params {
 
 #define	KTLS_API_VERSION 5
 
-struct iovec;
 struct ktls_session;
 struct m_snd_tag;
 struct mbuf;
@@ -143,7 +143,7 @@ struct ktls_crypto_backend {
 struct ktls_session {
 	int	(*sw_encrypt)(struct ktls_session *tls,
 	    const struct tls_record_layer *hdr, uint8_t *trailer,
-	    struct iovec *src, struct iovec *dst, int iovcnt,
+	    kiovec_t *src, kiovec_t *dst, int iovcnt,
 	    uint64_t seqno);
 	union {
 		void *cipher;

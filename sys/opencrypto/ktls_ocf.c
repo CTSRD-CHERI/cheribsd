@@ -52,7 +52,7 @@ struct ocf_session {
 struct ocf_operation {
 	struct ocf_session *os;
 	bool done;
-	struct iovec iov[0];
+	kiovec_t iov[0];
 };
 
 static MALLOC_DEFINE(M_KTLS_OCF, "ktls_ocf", "OCF KTLS");
@@ -85,7 +85,7 @@ ktls_ocf_callback(struct cryptop *crp)
 
 static int
 ktls_ocf_encrypt(struct ktls_session *tls, const struct tls_record_layer *hdr,
-    uint8_t *trailer, struct iovec *iniov, struct iovec *outiov, int iovcnt,
+    uint8_t *trailer, kiovec_t *iniov, kiovec_t *outiov, int iovcnt,
     uint64_t seqno)
 {
 	struct uio uio;
@@ -95,7 +95,7 @@ ktls_ocf_encrypt(struct ktls_session *tls, const struct tls_record_layer *hdr,
 	struct cryptop *crp;
 	struct ocf_session *os;
 	struct ocf_operation *oo;
-	struct iovec *iov;
+	kiovec_t *iov;
 	int i, error;
 	uint16_t tls_comp_len;
 
@@ -124,8 +124,7 @@ ktls_ocf_encrypt(struct ktls_session *tls, const struct tls_record_layer *hdr,
 	ad.tls_vmajor = hdr->tls_vmajor;
 	ad.tls_vminor = hdr->tls_vminor;
 	ad.tls_length = htons(tls_comp_len);
-	iov[0].iov_base = &ad;
-	iov[0].iov_len = sizeof(ad);
+	IOVEC_INIT_OBJ(&iov[0], ad);
 	uio.uio_resid = sizeof(ad);
 	
 	/*
@@ -135,13 +134,12 @@ ktls_ocf_encrypt(struct ktls_session *tls, const struct tls_record_layer *hdr,
 	for (i = 0; i < iovcnt; i++) {
 		iov[i + 1] = outiov[i];
 		if (iniov[i].iov_base != outiov[i].iov_base)
-			memcpy(outiov[i].iov_base, iniov[i].iov_base,
+			memcpy_c(outiov[i].iov_base, iniov[i].iov_base,
 			    outiov[i].iov_len);
 		uio.uio_resid += outiov[i].iov_len;
 	}
 
-	iov[iovcnt + 1].iov_base = trailer;
-	iov[iovcnt + 1].iov_len = AES_GMAC_HASH_LEN;
+	IOVEC_INIT(&iov[iovcnt + 1], trailer, AES_GMAC_HASH_LEN);
 	uio.uio_resid += AES_GMAC_HASH_LEN;
 
 	uio.uio_iov = iov;
