@@ -568,11 +568,14 @@ struct sockcred {
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	_CMSG_ALIGN(n)	_ALIGN(n)
 #else
+
 /*
- * Don't align for capabilities in CheriABI.  Sending them makes little
+ * We should not align for capabilities in CheriABI.  Sending them makes little
  * sense and would be a major potential security hole.
+ * Within the kernel control messages may contain pointers (see SCM_RIGHTS),
+ * therefore we need to align to pointer size for capability kernels.
  */
-#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(u_long))
+#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(void *))
 #endif
 
 /* given pointer to struct cmsghdr, return pointer to data */
