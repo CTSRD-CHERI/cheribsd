@@ -5,7 +5,7 @@
 LIB=		egacy
 SRC=
 INCSGROUPS=	INCS SYSINCS CASPERINC
-INCSGROUPS+=	MACHINESYSINCS UFSINCS FFSINCS X86INCS RPCINCS
+INCSGROUPS+=	MACHINESYSINCS UFSINCS FFSINCS MSDOSFSINCS X86INCS RPCINCS
 INCS=
 
 SYSINCSDIR=	${INCLUDEDIR}/sys
@@ -13,6 +13,8 @@ CASPERINCDIR=	${INCLUDEDIR}/casper
 MACHINESYSINCSDIR=	${INCLUDEDIR}/machine
 UFSINCSDIR=	${INCLUDEDIR}/ufs/ufs
 FFSINCSDIR=	${INCLUDEDIR}/ufs/ffs
+# Also add msdosfs headers to allow building makefs as a bootstrap tool
+MSDOSFSINCSDIR=	${INCLUDEDIR}/fs/msdosfs
 X86INCSDIR=	${INCLUDEDIR}/x86
 
 BOOTSTRAPPING?=	0
@@ -163,6 +165,12 @@ SUBDIR+=		cross-build
 UFSINCS+=	${SRCTOP}/sys/ufs/ufs/dinode.h
 UFSINCS+=	${SRCTOP}/sys/ufs/ufs/dir.h
 FFSINCS+=	${SRCTOP}/sys/ufs/ffs/fs.h
+
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/bootsect.h
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/bpb.h
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/denode.h
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/direntry.h
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/fat.h
 
 # Needed to build config (since it uses libnv)
 SYSINCS+=	${SRCTOP}/sys/sys/nv.h ${SRCTOP}/sys/sys/cnv.h \

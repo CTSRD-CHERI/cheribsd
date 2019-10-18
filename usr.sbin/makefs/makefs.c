@@ -76,7 +76,9 @@ static fstype_t fstypes[] = {
 }
 	ENTRY(cd9660),
 	ENTRY(ffs),
+#ifndef WITHOUT_MSDOSFS
 	ENTRY(msdos),
+#endif
 	{ .type = NULL	},
 };
 
