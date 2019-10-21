@@ -48,7 +48,7 @@ _libc_other_objects= sigsetjmp lstat stat fstat fstatat fstatfs syscall \
     cerror geteuid getegid munmap mprotect sysarch __sysctl issetugid __getcwd \
     utrace thr_self thr_kill pread mmap lseek _exit _fstat _fstatat _fstatfs \
     getdirentries _getdirentries _close _fcntl _open _openat _read \
-    _sigprocmask _write readlink _setjmp setjmp setjmperr
+    __sysctlbyname _sigprocmask _write readlink _setjmp setjmp setjmperr
 
 
 # Finally add additional architecture-dependent libc dependencies
