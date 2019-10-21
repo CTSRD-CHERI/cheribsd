@@ -3374,7 +3374,7 @@ vm_map_pageout_range(vm_map_t map, vm_map_entry_t entry,
 	vm_page_t m;
 	vm_pindex_t pi;
 	vm_offset_t offset, offset1;
-	int rtval, last_timestamp;
+	int last_timestamp;
 	boolean_t ret;
 
 	ret = TRUE;
@@ -3428,6 +3428,8 @@ retry:
 			    object->type == OBJT_SWAP,
 			    ("XXX"));
 			if (m->valid != 0) {
+#if 0
+				int rtval;
 				vm_page_sbusy(m);
 				vm_page_sbusy(m);
 				pmap_remove_all(m);
@@ -3445,6 +3447,9 @@ retry:
 					vm_page_free(m);
 				}
 				vm_page_unlock(m);
+#else
+				ret = FALSE;
+#endif
 			} else {
 				vm_page_lock(m);
 				vm_page_free(m);
