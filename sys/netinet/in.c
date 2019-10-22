@@ -1052,7 +1052,7 @@ in_purgemaddrs(struct ifnet *ifp)
 }
 
 struct in_llentry {
-	struct llentry		base;
+	struct llentry base __subobject_use_container_bounds;
 };
 
 #define	IN_LLTBL_DEFAULT_HSIZE	32
