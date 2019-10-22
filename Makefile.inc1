@@ -2513,7 +2513,7 @@ _vtfontcvt=	usr.bin/vtfontcvt
 # TODO: add a _bootstrap_lex and then build the real lex afterwards
 _lex=		usr.bin/lex
 _m4=		tools/build/bootstrap-m4 usr.bin/m4
-${_bt}-tools/build/bootstrap-m4: ${_bt}-lib/liby ${_bt}-usr.bin/lex ${_bt}-lib/libopenbsd
+${_bt}-tools/build/bootstrap-m4: ${_bt}-usr.bin/lex ${_bt}-lib/libopenbsd ${_bt}-usr.bin/yacc
 ${_bt}-usr.bin/m4: ${_bt}-lib/libopenbsd ${_bt}-usr.bin/yacc ${_bt}-usr.bin/lex ${_bt}-tools/build/bootstrap-m4
 _bt_m4_depend=${_bt}-${_m4}
 _bt_lex_depend=${_bt}-${_lex} ${_bt_m4_depend}
