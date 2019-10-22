@@ -846,7 +846,7 @@ static inline void
 abs_timeout_update(struct abs_timeout *timo)
 {
 
-	kern_clock_gettime(curthread, timo->clockid, &timo->cur);
+	kern_clock_gettime(curthread, timo->clockid, __unbounded_addressof(timo->cur));
 }
 
 static int
