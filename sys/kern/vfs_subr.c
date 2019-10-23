@@ -1277,7 +1277,7 @@ vnlru_proc(void)
 {
 	struct mount *mp, *nmp;
 	unsigned long onumvnodes;
-	int done, force, trigger, usevnodes;
+	int done, force, trigger, usevnodes, vsp;
 	bool reclaim_nc_src;
 
 	EVENTHANDLER_REGISTER(shutdown_pre_sync, kproc_shutdown, vnlruproc,
@@ -1305,7 +1305,8 @@ vnlru_proc(void)
 			force = 1;
 			vstir = 0;
 		}
-		if (vspace() >= vlowat && force == 0) {
+		vsp = vspace();
+		if (vsp >= vlowat && force == 0) {
 			vnlruproc_sig = 0;
 			wakeup(&vnlruproc_sig);
 			msleep(vnlruproc, &vnode_free_list_mtx,
@@ -1372,7 +1373,8 @@ vnlru_proc(void)
 		 * After becoming active to expand above low water, keep
 		 * active until above high water.
 		 */
-		force = vspace() < vhiwat;
+		vsp = vspace();
+		force = vsp < vhiwat;
 	}
 }
 
@@ -1451,8 +1453,10 @@ vtryrecycle(struct vnode *vp)
 static void
 vcheckspace(void)
 {
+	int vsp;
 
-	if (vspace() < vlowat && vnlruproc_sig == 0) {
+	vsp = vspace();
+	if (vsp < vlowat && vnlruproc_sig == 0) {
 		vnlruproc_sig = 1;
 		wakeup(vnlruproc);
 	}
