@@ -399,3 +399,11 @@ freebsd64_shm_unlink(struct thread *td, struct freebsd64_shm_unlink_args *uap)
 
 	return (kern_shm_unlink(td, __USER_CAP_STR(uap->path)));
 }
+
+int
+freebsd64_shm_rename(struct thread *td, struct freebsd64_shm_rename_args *uap)
+{
+
+	return (kern_shm_rename(td, __USER_CAP_STR(uap->path_from),
+	    __USER_CAP_STR(uap->path_to), uap->flags));
+}

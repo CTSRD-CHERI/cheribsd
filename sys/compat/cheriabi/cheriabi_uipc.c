@@ -250,3 +250,11 @@ cheriabi_shm_unlink(struct thread *td, struct cheriabi_shm_unlink_args *uap)
 
 	return (kern_shm_unlink(td, uap->path));
 }
+
+int
+cheriabi_shm_rename(struct thread *td, struct cheriabi_shm_rename_args *uap)
+{
+
+	return (kern_shm_rename(td, uap->path_from, uap->path_to,
+	    uap->flags));
+}
