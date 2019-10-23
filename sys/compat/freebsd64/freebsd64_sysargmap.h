@@ -296,7 +296,6 @@ int freebsd64_sysargmask[] = {
  [FREEBSD64_SYS_freebsd64_truncate] = (0x0 | 0x1),
  [FREEBSD64_SYS_ftruncate] = (0x0),
  [FREEBSD64_SYS_thr_kill2] = (0x0),
- [FREEBSD64_SYS_freebsd64_shm_open] = (0x0 | 0x1),
  [FREEBSD64_SYS_freebsd64_shm_unlink] = (0x0 | 0x1),
  [FREEBSD64_SYS_freebsd64_cpuset] = (0x0 | 0x1),
  [FREEBSD64_SYS_cpuset_setid] = (0x0),

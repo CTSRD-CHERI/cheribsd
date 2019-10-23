@@ -2918,16 +2918,6 @@ SYS_STUB(481, int, thr_kill2,
     /* _localcheck */ {}
 )
 
-SYS_STUB(482, int, shm_open,
-    /* _protoargs */ (const char *  path, int flags, mode_t mode),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   path, int flags, mode_t mode),
-    /* _protoargs_err */ (int * __capability stub_errno, const char * __capability   path, int flags, mode_t mode),
-    /* _callargs */ ((__cheri_fromcap const char * )path, flags, mode),
-    /* _callargs_chk */ (&ret, stub_errno, path, flags, mode),
-    /* _callargs_err */ (&errno, (const char * )path, flags, mode),
-    /* _localcheck */ {if (!(cheri_getperm(path) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
-)
-
 SYS_STUB(483, int, shm_unlink,
     /* _protoargs */ (const char *  path),
     /* _protoargs_chk */ (int *retp , int * __capability stub_errno, const char * __capability   path),

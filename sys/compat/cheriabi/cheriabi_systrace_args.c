@@ -2531,15 +2531,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* cheriabi_shm_open */
-	case 482: {
-		struct cheriabi_shm_open_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
-		iarg[1] = p->flags; /* int */
-		iarg[2] = p->mode; /* mode_t */
-		*n_args = 3;
-		break;
-	}
 	/* cheriabi_shm_unlink */
 	case 483: {
 		struct cheriabi_shm_unlink_args *p = params;
@@ -7434,22 +7425,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cheriabi_shm_open */
-	case 482:
-		switch(ndx) {
-		case 0:
-			p = "userland const char * __capability";
-			break;
-		case 1:
-			p = "int";
-			break;
-		case 2:
-			p = "mode_t";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* cheriabi_shm_unlink */
 	case 483:
 		switch(ndx) {
@@ -10296,11 +10271,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* thr_kill2 */
 	case 481:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
-	/* cheriabi_shm_open */
-	case 482:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

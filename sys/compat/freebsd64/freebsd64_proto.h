@@ -1090,11 +1090,6 @@ struct freebsd64_truncate_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 	char length_l_[PADL_(off_t)]; off_t length; char length_r_[PADR_(off_t)];
 };
-struct freebsd64_shm_open_args {
-	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
-	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
-};
 struct freebsd64_shm_unlink_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 };
@@ -1712,7 +1707,6 @@ int	freebsd64_pread(struct thread *, struct freebsd64_pread_args *);
 int	freebsd64_pwrite(struct thread *, struct freebsd64_pwrite_args *);
 int	freebsd64_mmap(struct thread *, struct freebsd64_mmap_args *);
 int	freebsd64_truncate(struct thread *, struct freebsd64_truncate_args *);
-int	freebsd64_shm_open(struct thread *, struct freebsd64_shm_open_args *);
 int	freebsd64_shm_unlink(struct thread *, struct freebsd64_shm_unlink_args *);
 int	freebsd64_cpuset(struct thread *, struct freebsd64_cpuset_args *);
 int	freebsd64_cpuset_getid(struct thread *, struct freebsd64_cpuset_getid_args *);
@@ -1989,6 +1983,12 @@ int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mkno
 
 #ifdef COMPAT_FREEBSD12
 
+struct freebsd12_freebsd64_shm_open_args {
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm_open_args *);
 
 #endif /* COMPAT_FREEBSD12 */
 
@@ -2240,7 +2240,7 @@ int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mkno
 #define	FREEBSD64_SYS_AUE_freebsd64_pwrite	AUE_PWRITE
 #define	FREEBSD64_SYS_AUE_freebsd64_mmap	AUE_MMAP
 #define	FREEBSD64_SYS_AUE_freebsd64_truncate	AUE_TRUNCATE
-#define	FREEBSD64_SYS_AUE_freebsd64_shm_open	AUE_SHMOPEN
+#define	FREEBSD64_SYS_AUE_freebsd12_freebsd64_shm_open	AUE_SHMOPEN
 #define	FREEBSD64_SYS_AUE_freebsd64_shm_unlink	AUE_SHMUNLINK
 #define	FREEBSD64_SYS_AUE_freebsd64_cpuset	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_cpuset_getid	AUE_NULL

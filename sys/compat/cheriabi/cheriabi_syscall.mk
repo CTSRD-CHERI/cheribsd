@@ -302,7 +302,7 @@ MIASM =  \
 	cheriabi_truncate.o \
 	ftruncate.o \
 	thr_kill2.o \
-	cheriabi_shm_open.o \
+	freebsd12_cheriabi_shm_open.o \
 	cheriabi_shm_unlink.o \
 	cheriabi_cpuset.o \
 	cpuset_setid.o \

@@ -419,7 +419,7 @@
 #define	FREEBSD64_SYS_freebsd64_truncate	479
 #define	FREEBSD64_SYS_ftruncate	480
 #define	FREEBSD64_SYS_thr_kill2	481
-#define	FREEBSD64_SYS_freebsd64_shm_open	482
+#define	FREEBSD64_SYS_freebsd12_freebsd64_shm_open	482
 #define	FREEBSD64_SYS_freebsd64_shm_unlink	483
 #define	FREEBSD64_SYS_freebsd64_cpuset	484
 #define	FREEBSD64_SYS_cpuset_setid	485

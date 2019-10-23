@@ -374,13 +374,16 @@ freebsd64_getpeername(struct thread *td, struct freebsd64_getpeername_args *uap)
  * uipc_shm.c
  */
 
+#ifdef COMPAT_FREEBSD12
 int
-freebsd64_shm_open(struct thread *td, struct freebsd64_shm_open_args *uap)
+freebsd12_freebsd64_shm_open(struct thread *td,
+    struct freebsd12_freebsd64_shm_open_args *uap)
 {
 
 	return (kern_shm_open(td, __USER_CAP_STR(uap->path),
 	    uap->flags | O_CLOEXEC, uap->mode, NULL, F_SEAL_SEAL));
 }
+#endif
 
 int
 freebsd64_shm_open2(struct thread *td, struct freebsd64_shm_open2_args *uap)

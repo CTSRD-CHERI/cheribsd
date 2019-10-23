@@ -1066,11 +1066,6 @@ struct cheriabi_truncate_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 	char length_l_[PADL_(off_t)]; off_t length; char length_r_[PADR_(off_t)];
 };
-struct cheriabi_shm_open_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
-};
 struct cheriabi_shm_unlink_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
@@ -1684,7 +1679,6 @@ int	cheriabi_pread(struct thread *, struct cheriabi_pread_args *);
 int	cheriabi_pwrite(struct thread *, struct cheriabi_pwrite_args *);
 int	cheriabi_mmap(struct thread *, struct cheriabi_mmap_args *);
 int	cheriabi_truncate(struct thread *, struct cheriabi_truncate_args *);
-int	cheriabi_shm_open(struct thread *, struct cheriabi_shm_open_args *);
 int	cheriabi_shm_unlink(struct thread *, struct cheriabi_shm_unlink_args *);
 int	cheriabi_cpuset(struct thread *, struct cheriabi_cpuset_args *);
 int	cheriabi_cpuset_getid(struct thread *, struct cheriabi_cpuset_getid_args *);
@@ -1797,6 +1791,12 @@ int	cheriabi_shm_open2(struct thread *, struct cheriabi_shm_open2_args *);
 
 #ifdef COMPAT_FREEBSD12
 
+struct freebsd12_cheriabi_shm_open_args {
+	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+int	freebsd12_cheriabi_shm_open(struct thread *, struct freebsd12_cheriabi_shm_open_args *);
 
 #endif /* COMPAT_FREEBSD12 */
 
@@ -2019,7 +2019,7 @@ int	cheriabi_shm_open2(struct thread *, struct cheriabi_shm_open2_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_pwrite	AUE_PWRITE
 #define	CHERIABI_SYS_AUE_cheriabi_mmap	AUE_MMAP
 #define	CHERIABI_SYS_AUE_cheriabi_truncate	AUE_TRUNCATE
-#define	CHERIABI_SYS_AUE_cheriabi_shm_open	AUE_SHMOPEN
+#define	CHERIABI_SYS_AUE_freebsd12_cheriabi_shm_open	AUE_SHMOPEN
 #define	CHERIABI_SYS_AUE_cheriabi_shm_unlink	AUE_SHMUNLINK
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset_getid	AUE_NULL

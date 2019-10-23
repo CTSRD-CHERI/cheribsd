@@ -290,7 +290,6 @@ int cheriabi_sysargmask[] = {
  [CHERIABI_SYS_cheriabi_truncate] = (0x0 | 0x1),
  [CHERIABI_SYS_ftruncate] = (0x0),
  [CHERIABI_SYS_thr_kill2] = (0x0),
- [CHERIABI_SYS_cheriabi_shm_open] = (0x0 | 0x1),
  [CHERIABI_SYS_cheriabi_shm_unlink] = (0x0 | 0x1),
  [CHERIABI_SYS_cheriabi_cpuset] = (0x0 | 0x1),
  [CHERIABI_SYS_cpuset_setid] = (0x0),
