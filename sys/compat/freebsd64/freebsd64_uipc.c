@@ -383,6 +383,14 @@ freebsd64_shm_open(struct thread *td, struct freebsd64_shm_open_args *uap)
 }
 
 int
+freebsd64_shm_open2(struct thread *td, struct freebsd64_shm_open2_args *uap)
+{
+
+	return (kern_shm_open2(td, __USER_CAP_STR(uap->path), uap->flags,
+	    uap->mode, uap->shmflags, __USER_CAP_STR(uap->name)));
+}
+
+int
 freebsd64_shm_unlink(struct thread *td, struct freebsd64_shm_unlink_args *uap)
 {
 

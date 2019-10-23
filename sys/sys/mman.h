@@ -197,6 +197,12 @@
 #else
 #define	SHM_ANON		((char * __capability)(intcap_t)1)
 #endif
+
+/*
+ * shmflags for shm_open2()
+ */
+#define	SHM_ALLOW_SEALING		0x00000001
+
 #endif /* __BSD_VISIBLE */
 
 /*
