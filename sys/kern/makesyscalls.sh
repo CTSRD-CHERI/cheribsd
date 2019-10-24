@@ -989,7 +989,10 @@ sed -e '
 			prefix = "freebsd11_"
 			descr = "freebsd11"
 		} else if (flag("COMPAT12")) {
-			ncompat12++
+			if (mincompat > 12)
+				is_obsol = 1
+			else
+				ncompat12++
 			out = syscompat12
 			outdcl = syscompat12dcl
 			wrap = "compat12"

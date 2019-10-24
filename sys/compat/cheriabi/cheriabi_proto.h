@@ -1797,12 +1797,6 @@ int	cheriabi_shm_rename(struct thread *, struct cheriabi_shm_rename_args *);
 
 #ifdef COMPAT_FREEBSD12
 
-struct freebsd12_cheriabi_shm_open_args {
-	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
-	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
-};
-int	freebsd12_cheriabi_shm_open(struct thread *, struct freebsd12_cheriabi_shm_open_args *);
 
 #endif /* COMPAT_FREEBSD12 */
 
@@ -2025,7 +2019,6 @@ int	freebsd12_cheriabi_shm_open(struct thread *, struct freebsd12_cheriabi_shm_o
 #define	CHERIABI_SYS_AUE_cheriabi_pwrite	AUE_PWRITE
 #define	CHERIABI_SYS_AUE_cheriabi_mmap	AUE_MMAP
 #define	CHERIABI_SYS_AUE_cheriabi_truncate	AUE_TRUNCATE
-#define	CHERIABI_SYS_AUE_freebsd12_cheriabi_shm_open	AUE_SHMOPEN
 #define	CHERIABI_SYS_AUE_cheriabi_shm_unlink	AUE_SHMUNLINK
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi_cpuset_getid	AUE_NULL
