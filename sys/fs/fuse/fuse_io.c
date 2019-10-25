@@ -940,7 +940,7 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
 	struct ucred *cred;
 	struct uio *uiop;
 	struct uio uio;
-	kiovec_t io;
+	struct iovec io;
 	off_t filesize;
 	int error = 0;
 	int fflag;

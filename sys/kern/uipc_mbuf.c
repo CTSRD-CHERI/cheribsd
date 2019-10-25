@@ -589,7 +589,7 @@ nospace:
 static void
 m_copyfromunmapped(const struct mbuf *m, int off, int len, caddr_t cp)
 {
-	kiovec_t iov;
+	struct iovec iov;
 	struct uio uio;
 	int error;
 

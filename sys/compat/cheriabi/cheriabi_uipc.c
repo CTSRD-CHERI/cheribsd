@@ -106,8 +106,8 @@ cheriabi_sendto(struct thread *td, struct cheriabi_sendto_args *uap)
 int
 cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 {
-	kmsghdr_t msg;
-	kiovec_t *iov;
+	struct msghdr_c msg;
+	struct iovec_c *iov;
 	struct mbuf *control = NULL;
 	struct sockaddr *to = NULL;
 	int error;
@@ -115,10 +115,11 @@ cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 	error = copyincap(uap->msg, &msg, sizeof(msg));
 	if (error)
 		return (error);
-	error = cheriabi_copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
+	error = cheriabi_copyiniov(msg.msg_iov, msg.msg_iovlen,
+	    (struct iovec **)&iov, EMSGSIZE);
 	if (error)
 		return (error);
-	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
+	msg.msg_iov = (__cheri_tocap struct iovec_c * __capability)iov;
 	if (msg.msg_name != NULL) {
 		error = getsockaddr(&to, msg.msg_name, msg.msg_namelen);
 		if (error) {
@@ -150,8 +151,8 @@ cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 			goto out;
 	}
 
-	error = kern_sendit(td, uap->s, &msg, uap->flags, control,
-	    UIO_USERSPACE);
+	error = kern_sendit(td, uap->s, (struct msghdr *)&msg, uap->flags,
+	    control, UIO_USERSPACE);
 
 out:
 	free(iov, M_IOV);
@@ -171,9 +172,9 @@ cheriabi_recvfrom(struct thread *td, struct cheriabi_recvfrom_args *uap)
 int
 cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 {
-	kmsghdr_t msg;
+	struct msghdr_c msg;
 	struct iovec_c *__capability uiov;
-	kiovec_t *iov;
+	struct iovec_c *iov;
 
 	int error;
 
@@ -181,15 +182,17 @@ cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 	if (error)
 		return (error);
 	uiov = msg.msg_iov;
-	error = cheriabi_copyiniov(uiov, msg.msg_iovlen, &iov, EMSGSIZE);
+	error = cheriabi_copyiniov(uiov, msg.msg_iovlen,
+	    (struct iovec **)&iov, EMSGSIZE);
 	if (error)
 		return (error);
 	msg.msg_flags = uap->flags;
-	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
+	msg.msg_iov = (__cheri_tocap struct iovec_c * __capability)iov;
 
-	error = kern_recvit(td, uap->s, &msg, UIO_USERSPACE, NULL);
+	error = kern_recvit(td, uap->s, (struct msghdr *)&msg, UIO_USERSPACE,
+	    NULL);
 	if (error == 0) {
-		msg.msg_iov = (kiovec_t * __capability)uiov;
+		msg.msg_iov = uiov;
 
 		/*
 		 * Message contents have already been copied out, update

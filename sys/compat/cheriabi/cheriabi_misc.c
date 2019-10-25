@@ -267,7 +267,7 @@ int
 cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
     struct uio **uiop)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	struct uio *uio;
 	size_t iovlen;
 	int error, i;
@@ -275,9 +275,9 @@ cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(kiovec_t);
+	iovlen = iovcnt * sizeof(struct iovec);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (kiovec_t *)(uio + 1);
+	iov = (struct iovec *)(uio + 1);
 	error = copyincap(iovp, iov, iovlen);
 	if (error) {
 		free(uio, M_IOV);
@@ -301,15 +301,15 @@ cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
 
 int
 cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
-    kiovec_t **iovp, int error)
+    struct iovec **iovp, int error)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	u_int iovlen;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof(kiovec_t);
+	iovlen = iovcnt * sizeof(struct iovec);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
 	error = copyincap(iovp_c, iov, iovlen);
 	if (error) {
@@ -322,7 +322,7 @@ cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
 
 static int
 cheriabi_copyin_hdtr(const struct sf_hdtr_c * __capability uhdtr,
-    ksf_hdtr_t *hdtr)
+    struct sf_hdtr *hdtr)
 {
 
 	return(copyincap(uhdtr, hdtr, sizeof(*hdtr)));

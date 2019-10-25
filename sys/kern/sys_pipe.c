@@ -888,7 +888,7 @@ static void
 pipe_clone_write_buffer(struct pipe *wpipe)
 {
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	int size;
 	int pos;
 

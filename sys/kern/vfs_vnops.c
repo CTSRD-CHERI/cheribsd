@@ -530,7 +530,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
     struct ucred *file_cred, ssize_t *aresid, struct thread *td)
 {
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct mount *mp;
 	struct ucred *cred;
 	void *rl_cookie;
@@ -988,7 +988,7 @@ static int
 vn_io_fault_prefault_user(const struct uio *uio)
 {
 	char * __capability base;
-	kiovec_t *iov;
+	struct iovec *iov;
 	size_t len;
 	ssize_t resid;
 	int error, i;
@@ -1039,7 +1039,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 {
 	vm_page_t ma[io_hold_cnt + 2];
 	struct uio *uio_clone, short_uio;
-	kiovec_t short_iovec[1];
+	struct iovec short_iovec[1];
 	vm_page_t *prev_td_ma;
 	vm_prot_t prot;
 	vm_offset_t addr, end;
@@ -1199,7 +1199,7 @@ int
 vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 {
 	struct uio transp_uio;
-	kiovec_t transp_iov[1];
+	struct iovec transp_iov[1];
 	struct thread *td;
 	size_t adv;
 	int error, pgadv;
@@ -1983,7 +1983,7 @@ vn_extattr_get(struct vnode *vp, int ioflg, int attrnamespace,
     const char *attrname, int *buflen, char *buf, struct thread *td)
 {
 	struct uio	auio;
-	kiovec_t	iov;
+	struct iovec	iov;
 	int	error;
 
 	IOVEC_INIT(&iov, buf, *buflen);
@@ -2023,7 +2023,7 @@ vn_extattr_set(struct vnode *vp, int ioflg, int attrnamespace,
     const char *attrname, int buflen, char *buf, struct thread *td)
 {
 	struct uio	auio;
-	kiovec_t	iov;
+	struct iovec	iov;
 	struct mount	*mp;
 	int	error;
 

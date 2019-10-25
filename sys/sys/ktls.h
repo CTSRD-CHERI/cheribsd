@@ -145,7 +145,7 @@ struct ktls_crypto_backend {
 struct ktls_session {
 	int	(*sw_encrypt)(struct ktls_session *tls,
 	    const struct tls_record_layer *hdr, uint8_t *trailer,
-	    kiovec_t *src, kiovec_t *dst, int iovcnt,
+	    struct iovec *src, struct iovec *dst, int iovcnt,
 	    uint64_t seqno, uint8_t record_type);
 	union {
 		void *cipher;

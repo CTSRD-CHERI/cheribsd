@@ -561,7 +561,7 @@ extern	int cuio_apply(struct uio *uio, int off, int len,
 	    int (*f)(void *, void *, u_int), void *arg);
 
 struct mbuf;
-extern	int crypto_mbuftoiov(struct mbuf *mbuf, kiovec_t **iovptr,
+extern	int crypto_mbuftoiov(struct mbuf *mbuf, struct iovec **iovptr,
 	    int *cnt, int *allocated);
 
 extern	void crypto_copyback(int flags, caddr_t buf, int off, int size,

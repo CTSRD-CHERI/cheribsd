@@ -254,7 +254,7 @@ struct fw_xfer {
 struct fw_rcv_buf {
 	struct firewire_comm *fc;
 	struct fw_xfer *xfer;
-	kiovec_t *vec;
+	struct iovec *vec;
 	u_int nvec;
 	uint8_t spd;
 };

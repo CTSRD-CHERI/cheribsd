@@ -1158,7 +1158,7 @@ ffs_rdextattr(u_char **p, struct vnode *vp, struct thread *td, int extra)
 	struct ufs2_dinode *dp;
 	struct fs *fs;
 	struct uio luio;
-	kiovec_t liovec;
+	struct iovec liovec;
 	u_int easize;
 	int error;
 	u_char *eae;
@@ -1255,7 +1255,7 @@ ffs_close_ea(struct vnode *vp, int commit, struct ucred *cred, struct thread *td
 {
 	struct inode *ip;
 	struct uio luio;
-	kiovec_t liovec;
+	struct iovec liovec;
 	int error;
 	struct ufs2_dinode *dp;
 

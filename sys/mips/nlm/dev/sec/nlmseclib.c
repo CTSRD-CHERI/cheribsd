@@ -126,11 +126,11 @@ nlm_crypto_form_srcdst_segs(struct xlp_sec_command *cmd)
 		}
 	} else if (crp->crp_flags & CRYPTO_F_IOV) {
 		struct uio *uio = NULL;
-		kiovec_t *iov = NULL;
+		struct iovec *iov = NULL;
 	        int iol = 0;
 
 		uio = (struct uio *)crp->crp_buf;
-		iov = (kiovec_t *)uio->uio_iov;
+		iov = (struct iovec *)uio->uio_iov;
 		iol = uio->uio_iovcnt;
 
 		while (iol > 0) {

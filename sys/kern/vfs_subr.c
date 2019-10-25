@@ -5584,7 +5584,7 @@ int
 vfs_emptydir(struct vnode *vp)
 {
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	struct dirent *dirent, *dp, *endp;
 	int error, eof;
 

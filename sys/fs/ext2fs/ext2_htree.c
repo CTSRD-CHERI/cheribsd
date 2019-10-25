@@ -412,7 +412,7 @@ static int
 ext2_htree_append_block(struct vnode *vp, char *data,
     struct componentname *cnp, uint32_t blksize)
 {
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct uio auio;
 	struct inode *dp = VTOI(vp);
 	uint64_t cursize, newsize;

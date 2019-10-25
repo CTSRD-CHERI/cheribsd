@@ -392,7 +392,7 @@ int	kern_recvfrom(struct thread *td, int s, void * __capability buf,
 	    size_t len, int flags,
 	    struct sockaddr * __capability __restrict from,
 	    socklen_t * __capability __restrict fromlenaddr);
-int	kern_recvit(struct thread *td, int s, kmsghdr_t *mp,
+int	kern_recvit(struct thread *td, int s, struct msghdr *mp,
 	    enum uio_seg fromseg, struct mbuf **controlp);
 int	kern_renameat(struct thread *td, int oldfd,
 	    const char * __capability old, int newfd,
@@ -435,7 +435,7 @@ int	kern_setloginclass(struct thread *td,
 int	kern_select(struct thread *td, int nd, fd_set * __capability fd_in,
 	    fd_set * __capability fd_ou, fd_set * __capability fd_ex,
 	    struct timeval *tvp, int abi_nfdbits);
-int	kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
+int	kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 	    struct mbuf *control, enum uio_seg segflg);
 int	kern_setgroups(struct thread *td, u_int ngrp, gid_t *groups);
 int	kern_setitimer(struct thread *, u_int, struct itimerval *,
@@ -617,7 +617,7 @@ int	user_sched_setscheduler(struct thread *td, pid_t pid, int policy,
 int	user_select(struct thread *td, int nd, fd_set * __capability in,
 	    fd_set * __capability ou, fd_set * __capability ex,
 	    struct timeval * __capability utv);
-int	user_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags);
+int	user_sendit(struct thread *td, int s, struct msghdr *mp, int flags);
 int	user_sendto(struct thread *td, int s, const char * __capability buf,
 	    size_t len, int flags, const struct sockaddr * __capability to,
 	    socklen_t tolen);

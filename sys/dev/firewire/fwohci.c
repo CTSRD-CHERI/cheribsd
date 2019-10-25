@@ -2734,7 +2734,7 @@ static void
 fwohci_arcv(struct fwohci_softc *sc, struct fwohci_dbch *dbch, int count)
 {
 	struct fwohcidb_tr *db_tr;
-	kiovec_t vec[2];
+	struct iovec vec[2];
 	struct fw_pkt pktbuf;
 	int nvec;
 	struct fw_pkt *fp;

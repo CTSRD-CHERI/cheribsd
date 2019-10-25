@@ -1598,7 +1598,7 @@ sbcopy:
 	KASSERT(m == NULL || toep->ddp.active_count == 0,
 	    ("%s: sockbuf data with active DDP", __func__));
 	while (m != NULL && resid > 0) {
-		kiovec_t iov[1];
+		struct iovec iov[1];
 		struct uio uio;
 		int error;
 

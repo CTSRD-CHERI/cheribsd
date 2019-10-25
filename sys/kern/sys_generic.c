@@ -201,7 +201,7 @@ int
 user_read(struct thread *td, int fd, void * __capability buf, size_t nbyte)
 {
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
@@ -238,7 +238,7 @@ kern_pread(struct thread *td, int fd, void * __capability buf, size_t nbyte,
     off_t offset)
 {
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 
 	if (nbyte > IOSIZE_MAX)
 		return (EINVAL);
@@ -425,7 +425,7 @@ kern_write(struct thread *td, int fd, const void * __capability buf,
     size_t nbyte)
 {
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	int error;
 
 	if (nbyte > IOSIZE_MAX)
@@ -464,7 +464,7 @@ kern_pwrite(struct thread *td, int fd, const void * __capability buf,
     size_t nbyte, off_t offset)
 {
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	int error;
 
 	if (nbyte > IOSIZE_MAX)

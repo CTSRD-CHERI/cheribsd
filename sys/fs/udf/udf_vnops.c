@@ -908,7 +908,7 @@ udf_readlink(struct vop_readlink_args *ap)
 	struct path_component *pc, *end;
 	struct vnode *vp;
 	struct uio uio;
-	kiovec_t iov[1];
+	struct iovec iov[1];
 	struct udf_node *node;
 	void *buf;
 	char *cp;
