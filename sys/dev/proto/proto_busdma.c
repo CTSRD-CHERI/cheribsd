@@ -280,7 +280,7 @@ proto_busdma_md_load(struct proto_busdma *busdma, struct proto_md *md,
     struct proto_ioc_busdma *ioc, struct thread *td)
 {
 	struct proto_callback_bundle pcb;
-	kiovec_t iov;
+	struct iovec iov;
 	struct uio uio;
 	pmap_t pmap;
 	int error;

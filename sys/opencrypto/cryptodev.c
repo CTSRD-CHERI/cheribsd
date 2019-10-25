@@ -285,7 +285,7 @@ struct csession {
 struct cryptop_data {
 	struct csession *cse;
 
-	kiovec_t	iovec[1];
+	struct iovec	iovec[1];
 	struct uio	uio;
 	bool		done;
 };

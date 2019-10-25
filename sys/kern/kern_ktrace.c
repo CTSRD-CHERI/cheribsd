@@ -1306,7 +1306,7 @@ ktr_writerequest(struct thread *td, struct ktr_request *req)
 	struct proc *p;
 	struct ucred *cred;
 	struct uio auio;
-	kiovec_t aiov[3];
+	struct iovec aiov[3];
 	struct mount *mp;
 	int datalen, buflen, vrele_count;
 	int error;

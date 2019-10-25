@@ -1112,7 +1112,7 @@ out:
 }
 
 static int
-copyin_hdtr(const struct sf_hdtr_native * __capability uhdtr, ksf_hdtr_t *hdtr)
+copyin_hdtr(const struct sf_hdtr_native * __capability uhdtr, struct sf_hdtr *hdtr)
 {
 	struct sf_hdtr_native hdtr_n;
 	int error;
@@ -1133,7 +1133,7 @@ kern_sendfile(struct thread *td, int fd, int s, off_t offset, size_t nbytes,
     void * __capability uhdtr, off_t * __capability usbytes, int flags,
     int compat, copyin_hdtr_t *copyin_hdtr_f, copyinuio_t *copyinuio_f)
 {
-	ksf_hdtr_t hdtr;
+	struct sf_hdtr hdtr;
 	struct uio *hdr_uio, *trl_uio;
 	struct file *fp;
 	off_t sbytes;

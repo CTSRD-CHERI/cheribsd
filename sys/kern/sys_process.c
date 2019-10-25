@@ -352,7 +352,7 @@ static ssize_t
 proc_iop(struct thread *td, struct proc *p, vm_offset_t va, void *buf,
     size_t len, enum uio_rw rw)
 {
-	kiovec_t iov;
+	struct iovec iov;
 	struct uio uio;
 	ssize_t slen;
 
@@ -831,7 +831,7 @@ proc_set_traced(struct proc *p, bool stop)
 int
 kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int data)
 {
-	kiovec_t iov;
+	struct iovec iov;
 	struct uio uio;
 	struct proc *curp, *p, *pp;
 	struct thread *td2 = NULL, *td3;

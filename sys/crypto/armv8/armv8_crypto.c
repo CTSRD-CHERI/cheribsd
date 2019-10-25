@@ -342,7 +342,7 @@ armv8_crypto_cipher_alloc(struct cryptodesc *enccrd, struct cryptop *crp,
 {
 	struct mbuf *m;
 	struct uio *uio;
-	kiovec_t *iov;
+	struct iovec *iov;
 	uint8_t *addr;
 
 	if (crp->crp_flags & CRYPTO_F_IMBUF) {

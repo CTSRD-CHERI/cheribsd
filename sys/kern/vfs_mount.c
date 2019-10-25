@@ -2135,7 +2135,7 @@ struct mntaarg {
 
 /* The header for the mount arguments */
 struct mntarg {
-	kiovec_t *v;
+	struct iovec *v;
 	int len;
 	int error;
 	SLIST_HEAD(, mntaarg)	list;

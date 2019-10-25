@@ -52,7 +52,7 @@ struct ocf_session {
 struct ocf_operation {
 	struct ocf_session *os;
 	bool done;
-	kiovec_t iov[0];
+	struct iovec iov[0];
 };
 
 static MALLOC_DEFINE(M_KTLS_OCF, "ktls_ocf", "OCF KTLS");
@@ -85,7 +85,7 @@ ktls_ocf_callback(struct cryptop *crp)
 
 static int
 ktls_ocf_encrypt(struct ktls_session *tls, const struct tls_record_layer *hdr,
-    uint8_t *trailer, kiovec_t *iniov, kiovec_t *outiov, int iovcnt,
+    uint8_t *trailer, struct iovec *iniov, struct iovec *outiov, int iovcnt,
     uint64_t seqno, uint8_t record_type __unused)
 {
 	struct uio uio;
@@ -95,7 +95,7 @@ ktls_ocf_encrypt(struct ktls_session *tls, const struct tls_record_layer *hdr,
 	struct cryptop *crp;
 	struct ocf_session *os;
 	struct ocf_operation *oo;
-	kiovec_t *iov;
+	struct iovec *iov;
 	int i, error;
 	uint16_t tls_comp_len;
 

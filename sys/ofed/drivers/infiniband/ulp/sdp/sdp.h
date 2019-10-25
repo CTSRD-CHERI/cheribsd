@@ -664,7 +664,7 @@ void sdp_rx_comp_full(struct sdp_sock *ssk);
 
 /* sdp_zcopy.c */
 struct kiocb;
-int sdp_sendmsg_zcopy(struct kiocb *iocb, struct socket *sk, kiovec_t *iov);
+int sdp_sendmsg_zcopy(struct kiocb *iocb, struct socket *sk, struct iovec *iov);
 int sdp_handle_srcavail(struct sdp_sock *ssk, struct sdp_srcah *srcah);
 void sdp_handle_sendsm(struct sdp_sock *ssk, u32 mseq_ack);
 void sdp_handle_rdma_read_compl(struct sdp_sock *ssk, u32 mseq_ack,

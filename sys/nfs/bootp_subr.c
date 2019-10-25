@@ -587,7 +587,7 @@ bootpc_call(struct bootpc_globalcontext *gctx, struct thread *td)
 	struct sockaddr_in *sin, dst;
 	struct uio auio;
 	struct sockopt sopt;
-	kiovec_t aio;
+	struct iovec aio;
 	int error, on, rcvflg, timo, len;
 	time_t atimo;
 	time_t rtimo;
