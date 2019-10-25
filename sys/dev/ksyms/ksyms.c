@@ -520,11 +520,10 @@ DEV_MODULE(ksyms, ksyms_modevent, NULL);
 MODULE_VERSION(ksyms, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

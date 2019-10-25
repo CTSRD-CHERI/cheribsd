@@ -826,10 +826,9 @@ void so_unlock(struct socket *so);
 #endif /* !_SYS_SOCKET_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "header",
 //   "changes": [
-//     "kiovec_t",
 //     "pointer_alignment"
 //   ]
 // }

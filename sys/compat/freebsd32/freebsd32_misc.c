@@ -3318,11 +3318,10 @@ freebsd32_sched_rr_get_interval(struct thread *td,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "kernel_sig_types",
 //     "integer_provenance",
 //     "user_capabilities",

@@ -6,7 +6,6 @@
   "ioctl:net",
   "iovec-macros",
   "kernel_sig_types",
-  "kiovec_t",
   "monotonicity",
   "platform",
   "pointer_alignment",

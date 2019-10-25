@@ -2119,14 +2119,3 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, mbufprofile, CTLTYPE_STRING|CTLFLAG_RD,
 SYSCTL_PROC(_kern_ipc, OID_AUTO, mbufprofileclr, CTLTYPE_INT|CTLFLAG_RW,
 	    NULL, 0, mbprof_clr_handler, "I", "clear mbuf profiling statistics");
 #endif
-
-// CHERI CHANGES START
-// {
-//   "updated": 20190610,
-//   "changes": [
-//     "kiovec_t"
-//   ],
-//   "change_comment": "",
-//   "hybrid_specific": false
-// }
-// CHERI CHANGES END

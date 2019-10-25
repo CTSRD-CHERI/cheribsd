@@ -120,10 +120,9 @@ __END_DECLS
 #endif /* !_SYS_UIO_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "header",
 //   "changes": [
-//     "kiovec_t",
 //     "user_capabilities"
 //   ]
 // }
