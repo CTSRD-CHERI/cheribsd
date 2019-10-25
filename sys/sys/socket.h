@@ -565,17 +565,18 @@ struct sockcred {
 
 #endif /* __BSD_VISIBLE */
 
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	_CMSG_ALIGN(n)	_ALIGN(n)
-#else
-
 /*
- * We should not align for capabilities in CheriABI.  Sending them makes little
+ * We should not need to align align for capabilities in CheriABI. Sending them makes little
  * sense and would be a major potential security hole.
- * Within the kernel control messages may contain pointers (see SCM_RIGHTS),
- * therefore we need to align to pointer size for capability kernels.
+ * However within the kernel control messages may contain pointers (see SCM_RIGHTS),
+ * therefore we need to align to pointer size within the kernel.
+ * Aligning to capability size should remove the need for realignment in the hybrid kernel/
+ * purecap userspace combination.
  */
-#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(void *))
+#if __has_feature(capabilities)
+#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(void * __capability))
+#else
+#define	_CMSG_ALIGN(n)	_ALIGN(n)
 #endif
 
 /* given pointer to struct cmsghdr, return pointer to data */
