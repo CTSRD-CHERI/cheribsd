@@ -681,12 +681,3 @@ void sdp_abort_rdma_read(struct socket *sk);
 int sdp_process_rx(struct sdp_sock *ssk);
 
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "header",
-//   "changes": [
-//     "kiovec_t"
-//   ]
-// }
-// CHERI CHANGES END

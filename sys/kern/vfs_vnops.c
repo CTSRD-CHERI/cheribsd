@@ -3128,11 +3128,10 @@ out:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191003,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities"
 //   ]
 // }

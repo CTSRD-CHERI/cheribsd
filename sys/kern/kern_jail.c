@@ -4253,11 +4253,10 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities"
 //   ]
 // }

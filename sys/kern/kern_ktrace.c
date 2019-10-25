@@ -1444,11 +1444,10 @@ ktrcanset(struct thread *td, struct proc *targetp)
 #endif /* KTRACE */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "support",
 //     "user_capabilities"
 //   ]
