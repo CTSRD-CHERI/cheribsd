@@ -123,8 +123,8 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_util.h>
 #if 0
 #include <compat/cheriabi/cheriabi_ipc.h>
-#include <compat/cheriabi/cheriabi_misc.h>
 #endif
+#include <compat/cheriabi/cheriabi_misc.h>
 #include <compat/cheriabi/cheriabi_signal.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
@@ -132,6 +132,13 @@ __FBSDID("$FreeBSD$");
 MALLOC_DECLARE(M_KQUEUE);
 
 FEATURE(compat_cheri_abi, "Compatible CHERI system call ABI");
+
+struct sf_hdtr_c {
+	struct iovec_c * __capability headers;	/* pointer to an array of header struct iovec's */
+	int hdr_cnt;		/* number of header iovec's */
+	struct iovec_c * __capability trailers;	/* pointer to an array of trailer struct iovec's */
+	int trl_cnt;		/* number of trailer iovec's */
+};
 
 #ifdef CHERIABI_NEEDS_UPDATE
 CTASSERT(sizeof(struct kevent32) == 20);

@@ -37,8 +37,19 @@ __FBSDID("$FreeBSD$");
 #include <sys/socketvar.h>
 #include <sys/syscallsubr.h>
 
+#include <compat/cheriabi/cheriabi_misc.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_util.h>
+
+struct msghdr_c {
+	void		* __capability msg_name;		/* optional address */
+	socklen_t	 msg_namelen;		/* size of address */
+	struct iovec_c	* __capability msg_iov;		/* scatter/gather array */
+	int		 msg_iovlen;		/* # elements in msg_iov */
+	void		* __capability msg_control;		/* ancillary data, see below */
+	socklen_t	 msg_controllen;	/* ancillary data buffer len */
+	int		 msg_flags;		/* flags on received message */
+};
 
 /*
  * kern_uipc.c

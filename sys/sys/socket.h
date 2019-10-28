@@ -438,15 +438,6 @@ struct msghdr {
 };
 #ifdef _KERNEL
 #if __has_feature(capabilities)
-struct msghdr_c {
-	void		* __capability msg_name;		/* optional address */
-	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec_c	* __capability msg_iov;		/* scatter/gather array */
-	int		 msg_iovlen;		/* # elements in msg_iov */
-	void		* __capability msg_control;		/* ancillary data, see below */
-	socklen_t	 msg_controllen;	/* ancillary data buffer len */
-	int		 msg_flags;		/* flags on received message */
-};
 struct msghdr64 {
 	void		*msg_name;		/* optional address */
 	socklen_t	 msg_namelen;		/* size of address */
@@ -680,12 +671,6 @@ struct sf_hdtr {
 	int trl_cnt;		/* number of trailer iovec's */
 };
 #ifdef _KERNEL
-struct sf_hdtr_c {
-	struct iovec_c * __capability headers;	/* pointer to an array of header struct iovec's */
-	int hdr_cnt;		/* number of header iovec's */
-	struct iovec_c * __capability trailers;	/* pointer to an array of trailer struct iovec's */
-	int trl_cnt;		/* number of trailer iovec's */
-};
 struct sf_hdtr_native {
 	struct iovec_native *headers;	/* pointer to an array of header struct iovec's */
 	int hdr_cnt;		/* number of header iovec's */
@@ -718,12 +703,6 @@ struct mmsghdr {
 	ssize_t		msg_len;		/* message length */
 };
 #ifdef _KERNEL
-#if __has_feature(capabilities)
-struct mmsghdr_c {
-	struct msghdr_c	msg_hdr;		/* message header */
-	ssize_t		msg_len;		/* message length */
-};
-#endif
 struct mmsghdr_native {
 	struct msghdr_native	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */
