@@ -46,12 +46,6 @@ struct iovec {
 	void * __kerncap	iov_base;	/* Base address. */
 	size_t			iov_len;	/* Length. */
 };
-#if __has_feature(capabilities)
-struct iovec_c {
-	void * __capability	iov_base;	/* Base address. */
-	size_t			iov_len;	/* Length. */
-};
-#endif
 struct iovec_native {
 	void *	iov_base;	/* Base address. */
 	size_t			iov_len;	/* Length. */
