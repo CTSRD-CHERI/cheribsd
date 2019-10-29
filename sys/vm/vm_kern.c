@@ -175,7 +175,7 @@ kva_alloc_aligned(vm_size_t size, vm_offset_t align)
  *	This routine may not block on kernel maps.
  */
 void
-kva_free(vm_offset_t addr, vm_size_t size)
+kva_free(vm_ptr_t addr, vm_size_t size)
 {
 
 	size = round_page(size);
