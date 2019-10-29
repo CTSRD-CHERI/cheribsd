@@ -2353,7 +2353,7 @@ int
 sys_swapon(struct thread *td, struct swapon_args *uap)
 {
 
-	return (kern_swapon(td, __USER_CAP_STR(uap->name)));
+	return (kern_swapon(td, uap->name));
 }
 
 int
@@ -2520,7 +2520,7 @@ int
 sys_swapoff(struct thread *td, struct swapoff_args *uap)
 {
 
-	return (kern_swapoff(td, __USER_CAP_STR(uap->name)));
+	return (kern_swapoff(td, uap->name));
 }
 
 int

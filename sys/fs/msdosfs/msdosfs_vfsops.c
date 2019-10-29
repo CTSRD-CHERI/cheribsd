@@ -50,6 +50,8 @@
  * October 1992
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -187,7 +189,7 @@ update_mp(struct mount *mp, struct thread *td)
 }
 
 static int
-msdosfs_cmount(struct mntarg *ma, void *data, uint64_t flags)
+msdosfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	struct msdosfs_args args;
 	struct export_args exp;

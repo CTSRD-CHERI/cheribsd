@@ -408,8 +408,8 @@ int
 sys_nmount(struct thread *td, struct nmount_args *uap)
 {
 
-	return (kern_nmount(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
-	    uap->iovcnt, uap->flags, (copyinuio_t *)copyinuio));
+	return (kern_nmount(td, uap->iovp, uap->iovcnt, uap->flags,
+	    (copyinuio_t *)copyinuio));
 }
 
 int
@@ -873,7 +873,7 @@ sys_mount(struct thread *td, struct mount_args *uap)
 	flags &= ~MNT_ROOTFS;
 
 	fstype = malloc(MFSNAMELEN, M_TEMP, M_WAITOK);
-	error = copyinstr(__USER_CAP_STR(uap->type), fstype, MFSNAMELEN, NULL);
+	error = copyinstr(uap->type, fstype, MFSNAMELEN, NULL);
 	if (error) {
 		free(fstype, M_TEMP);
 		return (error);
@@ -1311,7 +1311,7 @@ int
 sys_unmount(struct thread *td, struct unmount_args *uap)
 {
 
-	return (kern_unmount(td, __USER_CAP_STR(uap->path), uap->flags));
+	return (kern_unmount(td, uap->path, uap->flags));
 }
 
 int
@@ -2216,7 +2216,8 @@ mount_argf(struct mntarg *ma, const char *name, const char *fmt, ...)
  * Add an argument which is a userland string.
  */
 struct mntarg *
-mount_argsu(struct mntarg *ma, const char *name, const void *val, int len)
+mount_argsu(struct mntarg *ma, const char *name, const void * __capability val,
+    int len)
 {
 	struct mntaarg *maa;
 	char *tbuf;
@@ -2232,7 +2233,7 @@ mount_argsu(struct mntarg *ma, const char *name, const void *val, int len)
 	maa = malloc(sizeof *maa + len, M_MOUNT, M_WAITOK | M_ZERO);
 	SLIST_INSERT_HEAD(&ma->list, maa, next);
 	tbuf = (void *)(maa + 1);
-	ma->error = copyinstr(__USER_CAP_STR(val), tbuf, len, NULL);
+	ma->error = copyinstr(val, tbuf, len, NULL);
 	return (mount_arg(ma, name, tbuf, -1));
 }
 

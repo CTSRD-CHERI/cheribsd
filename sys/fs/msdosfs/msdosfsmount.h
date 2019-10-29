@@ -229,7 +229,7 @@ struct msdosfs_fileno {
  *  Arguments to mount MSDOS filesystems.
  */
 struct msdosfs_args {
-	char	*fspec;		/* blocks special holding the fs to mount */
+	char * __kerncap fspec;	/* blocks special holding the fs to mount */
 	struct	oexport_args export;	/* network export information */
 	uid_t	uid;		/* uid that owns msdosfs files */
 	gid_t	gid;		/* gid that owns msdosfs files */
@@ -237,9 +237,9 @@ struct msdosfs_args {
 	int	flags;		/* see below */
 	int	unused1;	/* unused, was version number */
 	uint16_t unused2[128];	/* no longer used, was Local->Unicode table */
-	char	*cs_win;	/* Windows(Unicode) Charset */
-	char	*cs_dos;	/* DOS Charset */
-	char	*cs_local;	/* Local Charset */
+	char * __kerncap cs_win;	/* Windows(Unicode) Charset */
+	char * __kerncap cs_dos;	/* DOS Charset */
+	char * __kerncap cs_local;	/* Local Charset */
 	mode_t	dirmask;	/* dir  mask to be applied for msdosfs perms */
 };
 #endif /* MAKEFS */

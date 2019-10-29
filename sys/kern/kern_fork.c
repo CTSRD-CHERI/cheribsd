@@ -125,7 +125,7 @@ int
 sys_pdfork(struct thread *td, struct pdfork_args *uap)
 {
 
-	return (kern_pdfork(td, __USER_CAP_OBJ(uap->fdp), uap->flags));
+	return (kern_pdfork(td, uap->fdp, uap->flags));
 }
 
 int

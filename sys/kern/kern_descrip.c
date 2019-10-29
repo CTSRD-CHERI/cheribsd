@@ -1356,7 +1356,7 @@ ofstat(struct thread *td, struct ofstat_args *uap)
 	error = kern_fstat(td, uap->fd, &ub);
 	if (error == 0) {
 		cvtstat(&ub, &oub);
-		error = copyout(&oub, __USER_CAP_OBJ(uap->sb), sizeof(oub));
+		error = copyout(&oub, uap->sb, sizeof(oub));
 	}
 	return (error);
 }
@@ -1375,7 +1375,7 @@ freebsd11_fstat(struct thread *td, struct freebsd11_fstat_args *uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, __USER_CAP_OBJ(uap->sb), sizeof(osb));
+		error = copyout(&osb, uap->sb, sizeof(osb));
 	return (error);
 }
 #endif	/* COMPAT_FREEBSD11 */
@@ -1394,7 +1394,7 @@ int
 sys_fstat(struct thread *td, struct fstat_args *uap)
 {
 
-	return (user_fstat(td, uap->fd, __USER_CAP_OBJ(uap->sb)));
+	return (user_fstat(td, uap->fd, uap->sb));
 }
 
 int
@@ -1461,7 +1461,7 @@ freebsd11_nfstat(struct thread *td, struct freebsd11_nfstat_args *uap)
 	error = kern_fstat(td, uap->fd, &ub);
 	if (error == 0) {
 		freebsd11_cvtnstat(&ub, &nub);
-		error = copyout(&nub, __USER_CAP_OBJ(uap->sb), sizeof(nub));
+		error = copyout(&nub, uap->sb, sizeof(nub));
 	}
 	return (error);
 }

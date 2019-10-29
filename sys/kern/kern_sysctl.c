@@ -2171,10 +2171,8 @@ int
 sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 {
 
-	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
-	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
-	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
-	    uap->newlen, 0));
+	return (kern_sysctl(td, uap->name, uap->namelen, uap->old,
+	    uap->oldlenp, uap->new, uap->newlen, 0));
 }
 
 int
@@ -2257,14 +2255,12 @@ sys___sysctlbyname(struct thread *td, struct __sysctlbyname_args *uap)
 	size_t rv;
 	int error;
 
-	error = kern___sysctlbyname(td, __USER_CAP(uap->name, uap->namelen),
-	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
-	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
-	    uap->newlen, &rv, 0, 0);
+	error = kern___sysctlbyname(td, uap->name, uap->namelen, uap->old,
+	    uap->oldlenp, uap->new, uap->newlen, &rv, 0, 0);
 	if (error != 0)
 		return (error);
 	if (uap->oldlenp != NULL)
-		error = copyout(&rv, __USER_CAP_OBJ(uap->oldlenp), sizeof(rv));
+		error = copyout(&rv, uap->oldlenp, sizeof(rv));
 
 	return (error);
 }

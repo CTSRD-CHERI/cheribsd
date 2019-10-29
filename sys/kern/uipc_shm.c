@@ -911,7 +911,7 @@ int
 freebsd12_shm_open(struct thread *td, struct freebsd12_shm_open_args *uap)
 {
 
-	return (kern_shm_open(td, __USER_CAP_STR(uap->path),
+	return (kern_shm_open(td, uap->path,
 	    uap->flags | O_CLOEXEC, uap->mode, NULL, F_SEAL_SEAL));
 }
 #endif
@@ -920,7 +920,7 @@ int
 sys_shm_unlink(struct thread *td, struct shm_unlink_args *uap)
 {
 
-	return (kern_shm_unlink(td, __USER_CAP_STR(uap->path)));
+	return (kern_shm_unlink(td, uap->path));
 }
 
 int
@@ -960,8 +960,8 @@ int
 sys_shm_rename(struct thread *td, struct shm_rename_args *uap)
 {
 
-	return (kern_shm_rename(td, __USER_CAP_STR(uap->path_from),
-	    __USER_CAP_STR(uap->path_to), uap->flags));
+	return (kern_shm_rename(td, uap->path_from,
+	    uap->path_to, uap->flags));
 }
 
 int
@@ -1516,8 +1516,8 @@ int
 sys_shm_open2(struct thread *td, struct shm_open2_args *uap)
 {
 
-	return (kern_shm_open2(td, __USER_CAP_STR(uap->path), uap->flags,
-	    uap->mode, uap->shmflags, __USER_CAP_STR(uap->name)));
+	return (kern_shm_open2(td, uap->path, uap->flags,
+	    uap->mode, uap->shmflags, uap->name));
 }
 // CHERI CHANGES START
 // {

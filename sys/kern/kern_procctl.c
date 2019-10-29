@@ -593,8 +593,7 @@ int
 sys_procctl(struct thread *td, struct procctl_args *uap)
 {
 
-	return (user_procctl(td, uap->idtype, uap->id, uap->com,
-	    __USER_CAP_UNBOUND(uap->data)));
+	return (user_procctl(td, uap->idtype, uap->id, uap->com, uap->data));
 }
 
 int

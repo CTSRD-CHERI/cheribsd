@@ -217,9 +217,8 @@ sys_execve(struct thread *td, struct execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = exec_copyin_args(&args, __USER_CAP_STR(uap->fname),
-	    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argv),
-	    __USER_CAP_UNBOUND(uap->envv));
+	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
+	    uap->argv, uap->envv);
 	if (error == 0)
 		error = kern_execve(td, &args, NULL);
 	post_execve(td, error, oldvmspace);
@@ -244,7 +243,7 @@ sys_fexecve(struct thread *td, struct fexecve_args *uap)
 	if (error != 0)
 		return (error);
 	error = exec_copyin_args(&args, NULL, UIO_SYSSPACE,
-	    __USER_CAP_UNBOUND(uap->argv), __USER_CAP_UNBOUND(uap->envv));
+	    uap->argv, uap->envv);
 	if (error == 0) {
 		args.fd = uap->fd;
 		error = kern_execve(td, &args, NULL);
@@ -273,11 +272,10 @@ sys___mac_execve(struct thread *td, struct __mac_execve_args *uap)
 	error = pre_execve(td, &oldvmspace);
 	if (error != 0)
 		return (error);
-	error = exec_copyin_args(&args, __USER_CAP_STR(uap->fname),
-	    UIO_USERSPACE, __USER_CAP_UNBOUND(uap->argv),
-	    __USER_CAP_UNBOUND(uap->envv));
+	error = exec_copyin_args(&args, uap->fname, UIO_USERSPACE,
+	    uap->argv, uap->envv);
 	if (error == 0)
-		error = kern_execve(td, &args, __USER_CAP_OBJ(uap->mac_p));
+		error = kern_execve(td, &args, uap->mac_p);
 	post_execve(td, error, oldvmspace);
 	return (error);
 #else

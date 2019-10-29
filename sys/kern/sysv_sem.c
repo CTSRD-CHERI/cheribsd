@@ -772,7 +772,7 @@ int
 sys___semctl(struct thread *td, struct __semctl_args *uap)
 {
 	struct semid_ds dsbuf;
-	usemun_t arg;
+	union semun_c arg;
 	ksemun_t semun;
 	register_t rval;
 	int error;
@@ -784,7 +784,7 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 	case GETALL:
 	case SETVAL:
 	case SETALL:
-		error = copyin(__USER_CAP_OBJ(uap->arg), &arg, sizeof(arg));
+		error = copyincap(uap->arg, &arg, sizeof(arg));
 		if (error)
 			return (error);
 		break;
@@ -796,18 +796,14 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin(__USER_CAP_OBJ(arg.buf), &dsbuf, sizeof(dsbuf));
+		error = copyin(arg.buf, &dsbuf, sizeof(dsbuf));
 		if (error)
 			return (error);
 		semun.buf = &dsbuf;
 		break;
 	case GETALL:
 	case SETALL:
-		/*
-		 * No easy way to set a better bound.  See comment in
-		 * kern_semctl().
-		 */
-		semun.array = __USER_CAP_UNBOUND(arg.array);
+		semun.array = arg.array;
 		break;
 	case SETVAL:
 		semun.val = arg.val;
@@ -822,7 +818,7 @@ sys___semctl(struct thread *td, struct __semctl_args *uap)
 	switch (uap->cmd) {
 	case SEM_STAT:
 	case IPC_STAT:
-		error = copyout(&dsbuf, __USER_CAP_OBJ(arg.buf), sizeof(dsbuf));
+		error = copyout(&dsbuf, arg.buf, sizeof(dsbuf));
 		break;
 	}
 
@@ -1312,8 +1308,7 @@ int
 sys_semop(struct thread *td, struct semop_args *uap)
 {
 
-	return (kern_semop(td, uap->semid,
-	    __USER_CAP_ARRAY(uap->sops, uap->nsops), uap->nsops));
+	return (kern_semop(td, uap->semid, uap->sops, uap->nsops));
 }
 
 static int
@@ -2043,7 +2038,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 	case GETALL:
 	case SETVAL:
 	case SETALL:
-		error = copyin(__USER_CAP_OBJ(uap->arg), &arg, sizeof(arg));
+		error = copyin(uap->arg, &arg, sizeof(arg));
 		if (error)
 			return (error);
 		break;

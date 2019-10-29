@@ -1219,8 +1219,7 @@ sys_sendfile(struct thread *td, struct sendfile_args *uap)
 {
  
 	return (kern_sendfile(td, uap->fd, uap->s, uap->offset,
-	    uap->nbytes, __USER_CAP_OBJ(uap->hdtr),
-	    __USER_CAP_OBJ(uap->sbytes), uap->flags, 0,
+	    uap->nbytes, uap->hdtr, uap->sbytes, uap->flags, 0,
 	    (copyin_hdtr_t *)copyin_hdtr, (copyinuio_t *)copyinuio));
 }
 
@@ -1230,8 +1229,7 @@ freebsd4_sendfile(struct thread *td, struct freebsd4_sendfile_args *uap)
 {
 
 	return (kern_sendfile(td, uap->fd, uap->s, uap->offset,
-	    uap->nbytes, __USER_CAP_OBJ(uap->hdtr),
-	    __USER_CAP_OBJ(uap->sbytes), uap->flags, 1,
+	    uap->nbytes, uap->hdtr, uap->sbytes, uap->flags, 1,
 	    (copyin_hdtr_t *)copyin_hdtr, (copyinuio_t *)copyinuio));
 }
 #endif /* COMPAT_FREEBSD4 */

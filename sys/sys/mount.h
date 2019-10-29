@@ -674,7 +674,8 @@ struct mntarg;
  * implement vfs_cmount.  Hopefully a future cleanup can remove vfs_cmount and
  * mount(2) entirely.
  */
-typedef int vfs_cmount_t(struct mntarg *ma, void *data, uint64_t flags);
+typedef int vfs_cmount_t(struct mntarg *ma, void * __capability data,
+		    uint64_t flags);
 typedef int vfs_unmount_t(struct mount *mp, int mntflags);
 typedef int vfs_root_t(struct mount *mp, int flags, struct vnode **vpp);
 typedef	int vfs_quotactl_t(struct mount *mp, int cmds, uid_t uid,
@@ -875,7 +876,7 @@ int	kernel_vmount(int flags, ...);
 struct mntarg *mount_arg(struct mntarg *ma, const char *name, const void *val, int len);
 struct mntarg *mount_argb(struct mntarg *ma, int flag, const char *name);
 struct mntarg *mount_argf(struct mntarg *ma, const char *name, const char *fmt, ...);
-struct mntarg *mount_argsu(struct mntarg *ma, const char *name, const void *val, int len);
+struct mntarg *mount_argsu(struct mntarg *ma, const char *name, const void * __capability val, int len);
 void	statfs_scale_blocks(struct statfs *sf, long max_size);
 struct vfsconf *vfs_byname(const char *);
 struct vfsconf *vfs_byname_kld(const char *, struct thread *td, int *);

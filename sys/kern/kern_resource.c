@@ -290,8 +290,7 @@ int
 sys_rtprio_thread(struct thread *td, struct rtprio_thread_args *uap)
 {
 
-	return (kern_rtprio_thread(td, uap->function, uap->lwpid,
-	    __USER_CAP_OBJ(uap->rtp)));
+	return (kern_rtprio_thread(td, uap->function, uap->lwpid, uap->rtp));
 }
 
 int
@@ -381,8 +380,7 @@ int
 sys_rtprio(struct thread *td, struct rtprio_args *uap)
 {
 
-	return (kern_rtprio(td, uap->function, uap->pid,
-	    __USER_CAP_OBJ(uap->rtp)));
+	return (kern_rtprio(td, uap->function, uap->pid, uap->rtp));
 }
 
 int
@@ -612,7 +610,7 @@ sys_setrlimit(struct thread *td, struct __setrlimit_args *uap)
 	struct rlimit alim;
 	int error;
 
-	if ((error = copyin(__USER_CAP_OBJ(uap->rlp), &alim, sizeof(struct rlimit))))
+	if ((error = copyin(uap->rlp, &alim, sizeof(struct rlimit))))
 		return (error);
 	error = kern_setrlimit(td, uap->which, &alim);
 	return (error);
@@ -803,7 +801,7 @@ sys_getrlimit(struct thread *td, struct __getrlimit_args *uap)
 	if (uap->which >= RLIM_NLIMITS)
 		return (EINVAL);
 	lim_rlimit(td, uap->which, &rlim);
-	error = copyout(&rlim, __USER_CAP_OBJ(uap->rlp), sizeof(struct rlimit));
+	error = copyout(&rlim, uap->rlp, sizeof(struct rlimit));
 	return (error);
 }
 
@@ -1062,8 +1060,7 @@ sys_getrusage(struct thread *td, struct getrusage_args *uap)
 
 	error = kern_getrusage(td, uap->who, &ru);
 	if (error == 0)
-		error = copyout(&ru, __USER_CAP_OBJ(uap->rusage),
-		    sizeof(struct rusage));
+		error = copyout(&ru, uap->rusage, sizeof(struct rusage));
 	return (error);
 }
 

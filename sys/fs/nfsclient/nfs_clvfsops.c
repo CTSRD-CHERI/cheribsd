@@ -34,6 +34,8 @@
  *	from nfs_vfsops.c	8.12 (Berkeley) 5/20/95
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1229,11 +1231,12 @@ nfs_mount(struct mount *mp)
 			error = EINVAL;
 			goto out;
 		}
-		error = copyin((caddr_t)args.fh, (caddr_t)nfh,
+		error = copyin(__USER_CAP(args.fh, args.fhsize), nfh,
 		    args.fhsize);
 		if (error != 0)
 			goto out;
-		error = copyinstr(args.hostname, hst, MNAMELEN - 1, &hstlen);
+		error = copyinstr(__USER_CAP(args.hostname, MNAMELEN), hst,
+		    MNAMELEN - 1, &hstlen);
 		if (error != 0)
 			goto out;
 		bzero(&hst[hstlen], MNAMELEN - hstlen);
@@ -1355,7 +1358,7 @@ out:
  */
 /* ARGSUSED */
 static int
-nfs_cmount(struct mntarg *ma, void *data, uint64_t flags)
+nfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	int error;
 	struct nfs_args args;

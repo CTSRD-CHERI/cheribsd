@@ -1593,7 +1593,7 @@ int
 sys_cpuset(struct thread *td, struct cpuset_args *uap)
 {
 
-	return (kern_cpuset(td, __USER_CAP_OBJ(uap->setid)));
+	return (kern_cpuset(td, uap->setid));
 }
 
 int
@@ -1664,7 +1664,7 @@ sys_cpuset_getid(struct thread *td, struct cpuset_getid_args *uap)
 {
 
 	return (kern_cpuset_getid(td, uap->level, uap->which, uap->id,
-	    __USER_CAP_OBJ(uap->setid)));
+	    uap->setid));
 }
 
 int
@@ -1731,7 +1731,7 @@ sys_cpuset_getaffinity(struct thread *td, struct cpuset_getaffinity_args *uap)
 {
 
 	return (kern_cpuset_getaffinity(td, uap->level, uap->which,
-	    uap->id, uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize)));
+	    uap->id, uap->cpusetsize, uap->mask));
 }
 
 int
@@ -1849,7 +1849,7 @@ sys_cpuset_setaffinity(struct thread *td, struct cpuset_setaffinity_args *uap)
 {
 
 	return (kern_cpuset_setaffinity(td, uap->level, uap->which,
-	    uap->id, uap->cpusetsize, __USER_CAP(uap->mask, uap->cpusetsize)));
+	    uap->id, uap->cpusetsize, uap->mask));
 }
 
 int
@@ -1977,9 +1977,7 @@ sys_cpuset_getdomain(struct thread *td, struct cpuset_getdomain_args *uap)
 {
 
 	return (kern_cpuset_getdomain(td, uap->level, uap->which,
-	    uap->id, uap->domainsetsize,
-	    __USER_CAP(uap->mask, uap->domainsetsize),
-	    __USER_CAP_OBJ(uap->policy)));
+	    uap->id, uap->domainsetsize, uap->mask, uap->policy));
 }
 
 int
@@ -2113,8 +2111,7 @@ sys_cpuset_setdomain(struct thread *td, struct cpuset_setdomain_args *uap)
 {
 
 	return (kern_cpuset_setdomain(td, uap->level, uap->which,
-	    uap->id, uap->domainsetsize,
-	    __USER_CAP(uap->mask, uap->domainsetsize), uap->policy));
+	    uap->id, uap->domainsetsize, uap->mask, uap->policy));
 }
 
 int

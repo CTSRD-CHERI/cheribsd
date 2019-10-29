@@ -33,6 +33,8 @@
  *
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -3456,37 +3458,43 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 				goto out;
 			}
 			cp[nfsdarg.addrlen] = '\0';	/* Ensure nul term. */
-			nfsdarg.addr = cp;
+			nfsdarg.addr = (__cheri_tocap char * __capability)cp;
 			cp = malloc(nfsdarg.dnshostlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.dnshost, cp, nfsdarg.dnshostlen);
 			if (error != 0) {
-				free(nfsdarg.addr, M_TEMP);
+				free((__cheri_fromcap char *)nfsdarg.addr,
+				    M_TEMP);
 				free(cp, M_TEMP);
 				goto out;
 			}
 			cp[nfsdarg.dnshostlen] = '\0';	/* Ensure nul term. */
-			nfsdarg.dnshost = cp;
+			nfsdarg.dnshost = (__cheri_tocap char * __capability)cp;
 			cp = malloc(nfsdarg.dspathlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.dspath, cp, nfsdarg.dspathlen);
 			if (error != 0) {
-				free(nfsdarg.addr, M_TEMP);
-				free(nfsdarg.dnshost, M_TEMP);
+				free((__cheri_fromcap char *)nfsdarg.addr,
+				    M_TEMP);
+				free((__cheri_fromcap char *)nfsdarg.dnshost,
+				    M_TEMP);
 				free(cp, M_TEMP);
 				goto out;
 			}
 			cp[nfsdarg.dspathlen] = '\0';	/* Ensure nul term. */
-			nfsdarg.dspath = cp;
+			nfsdarg.dspath = (__cheri_tocap char * __capability)cp;
 			cp = malloc(nfsdarg.mdspathlen + 1, M_TEMP, M_WAITOK);
 			error = copyin(nfsdarg.mdspath, cp, nfsdarg.mdspathlen);
 			if (error != 0) {
-				free(nfsdarg.addr, M_TEMP);
-				free(nfsdarg.dnshost, M_TEMP);
-				free(nfsdarg.dspath, M_TEMP);
+				free((__cheri_fromcap char *)nfsdarg.addr,
+				    M_TEMP);
+				free((__cheri_fromcap char *)nfsdarg.dnshost,
+				    M_TEMP);
+				free((__cheri_fromcap char *)nfsdarg.dspath,
+				    M_TEMP);
 				free(cp, M_TEMP);
 				goto out;
 			}
 			cp[nfsdarg.mdspathlen] = '\0';	/* Ensure nul term. */
-			nfsdarg.mdspath = cp;
+			nfsdarg.mdspath = (__cheri_tocap char * __capability)cp;
 		} else {
 			nfsdarg.addr = NULL;
 			nfsdarg.addrlen = 0;
@@ -3499,10 +3507,10 @@ nfssvc_nfsd(struct thread *td, struct nfssvc_args *uap)
 			nfsdarg.mirrorcnt = 1;
 		}
 		error = nfsrvd_nfsd(td, &nfsdarg);
-		free(nfsdarg.addr, M_TEMP);
-		free(nfsdarg.dnshost, M_TEMP);
-		free(nfsdarg.dspath, M_TEMP);
-		free(nfsdarg.mdspath, M_TEMP);
+		free((__cheri_fromcap char *)nfsdarg.addr, M_TEMP);
+		free((__cheri_fromcap char *)nfsdarg.dnshost, M_TEMP);
+		free((__cheri_fromcap char *)nfsdarg.dspath, M_TEMP);
+		free((__cheri_fromcap char *)nfsdarg.mdspath, M_TEMP);
 	} else if (uap->flag & NFSSVC_PNFSDS) {
 		error = copyin(uap->argp, &pnfsdarg, sizeof(pnfsdarg));
 		if (error == 0 && (pnfsdarg.op == PNFSDOP_DELDSSERVER ||

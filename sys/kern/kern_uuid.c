@@ -183,8 +183,7 @@ int
 sys_uuidgen(struct thread *td, struct uuidgen_args *uap)
 {
 
-	return (user_uuidgen(td, __USER_CAP_ARRAY(uap->store, uap->count),
-	    uap->count));
+	return (user_uuidgen(td, uap->store, uap->count));
 }
 
 int

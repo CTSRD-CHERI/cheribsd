@@ -166,8 +166,7 @@ int
 sys_bind(struct thread *td, struct bind_args *uap)
 {
 
-	return (user_bind(td, uap->s, __USER_CAP(uap->name, uap->namelen),
-	    uap->namelen));
+	return (user_bind(td, uap->s, uap->name, uap->namelen));
 }
 
 int
@@ -227,8 +226,7 @@ int
 sys_bindat(struct thread *td, struct bindat_args *uap)
 {
 
-	return(user_bindat(td, uap->fd, uap->s,
-	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
+	return(user_bindat(td, uap->fd, uap->s, uap->name, uap->namelen));
 }
 
 int
@@ -442,8 +440,8 @@ int
 sys_accept(struct thread *td, struct accept_args *uap)
 {
 
-	return (user_accept(td, uap->s, __USER_CAP_UNBOUND(uap->name),
-	    __USER_CAP_OBJ(uap->anamelen), ACCEPT4_INHERIT));
+	return (user_accept(td, uap->s, uap->name, uap->anamelen,
+	    ACCEPT4_INHERIT));
 }
 
 int
@@ -453,8 +451,7 @@ sys_accept4(struct thread *td, struct accept4_args *uap)
 	if (uap->flags & ~(SOCK_CLOEXEC | SOCK_NONBLOCK))
 		return (EINVAL);
 
-	return (user_accept(td, uap->s, __USER_CAP_UNBOUND(uap->name),
-	    __USER_CAP_OBJ(uap->anamelen), uap->flags));
+	return (user_accept(td, uap->s, uap->name, uap->anamelen, uap->flags));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -462,8 +459,8 @@ int
 oaccept(struct thread *td, struct oaccept_args *uap)
 {
 
-	return (user_accept(td, uap->s, __USER_CAP_UNBCOUND(uap->name),
-	    __USER_CAP_OBJ(uap->anamelen), ACCEPT4_INHERIT | ACCEPT4_COMPAT));
+	return (user_accept(td, uap->s, uap->name, uap->anamelen,
+	    ACCEPT4_INHERIT | ACCEPT4_COMPAT));
 }
 #endif /* COMPAT_OLDSOCK */
 
@@ -471,8 +468,7 @@ int
 sys_connect(struct thread *td, struct connect_args *uap)
 {
 
-	return (user_connectat(td, AT_FDCWD, uap->s,
-	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
+	return (user_connectat(td, AT_FDCWD, uap->s, uap->name, uap->namelen));
 }
 
 int
@@ -561,8 +557,7 @@ int
 sys_connectat(struct thread *td, struct connectat_args *uap)
 {
 
-	return (user_connectat(td, uap->fd, uap->s,
-	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
+	return (user_connectat(td, uap->fd, uap->s, uap->name, uap->namelen));
 }
 
 int
@@ -660,7 +655,7 @@ sys_socketpair(struct thread *td, struct socketpair_args *uap)
 {
 
 	return (user_socketpair(td, uap->domain, uap->type, uap->protocol,
-	    __USER_CAP(uap->rsv, 2 * sizeof(int))));
+	    uap->rsv));
 }
 
 int
@@ -840,8 +835,8 @@ int
 sys_sendto(struct thread *td, struct sendto_args *uap)
 {
 
-	return (user_sendto(td, uap->s, __USER_CAP(uap->buf, uap->len),
-	    uap->len, uap->flags, __USER_CAP(uap->to, uap->tolen), uap->tolen));
+	return (user_sendto(td, uap->s, uap->buf,
+	    uap->len, uap->flags, uap->to, uap->tolen));
 }
 
 int
@@ -885,7 +880,7 @@ osend(struct thread *td, struct osend_args *uap)
 int
 osendmsg(struct thread *td, struct osendmsg_args *uap)
 {
-	kmsthdr_t msg;
+	struct msghdr msg;
 	struct omsghdr umsg;
 	struct iovec *iov;
 	int error;
@@ -917,7 +912,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	struct iovec *iov;
 	int error;
 
-	error = copyin(__USER_CAP_OBJ(uap->msg), &umsg, sizeof(umsg));
+	error = copyin(uap->msg, &umsg, sizeof(umsg));
 	if (error != 0)
 		return (error);
 	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
@@ -1122,9 +1117,8 @@ int
 sys_recvfrom(struct thread *td, struct recvfrom_args *uap)
 {
 
-	return (kern_recvfrom(td, uap->s, __USER_CAP(uap->buf, uap->len),
-	    uap->len, uap->flags, __USER_CAP_UNBOUND(uap->from),
-	    __USER_CAP_OBJ(uap->fromlenaddr)));
+	return (kern_recvfrom(td, uap->s, uap->buf,
+	    uap->len, uap->flags, uap->from, uap->fromlenaddr));
 }
 
 int
@@ -1225,7 +1219,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	struct iovec *iov;
 	int error;
 
-	error = copyin(__USER_CAP_OBJ(uap->msg), &umsg, sizeof(umsg));
+	error = copyin(uap->msg, &umsg, sizeof(umsg));
 	if (error != 0)
 		return (error);
 	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
@@ -1253,7 +1247,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 		umsg.msg_namelen = msg.msg_namelen;
 		umsg.msg_iovlen = msg.msg_iovlen;
 		umsg.msg_controllen = msg.msg_controllen;
-		error = copyout(&umsg, __USER_CAP_OBJ(uap->msg), sizeof(umsg));
+		error = copyout(&umsg, uap->msg, sizeof(umsg));
 	}
 	free(iov, M_IOV);
 	return (error);
@@ -1298,7 +1292,7 @@ sys_setsockopt(struct thread *td, struct setsockopt_args *uap)
 {
 
 	return (kern_setsockopt(td, uap->s, uap->level, uap->name,
-	    __USER_CAP(uap->val, uap->valsize), UIO_USERSPACE, uap->valsize));
+	    uap->val, UIO_USERSPACE, uap->valsize));
 }
 
 int
@@ -1347,7 +1341,7 @@ sys_getsockopt(struct thread *td, struct getsockopt_args *uap)
 {
 
 	return (user_getsockopt(td, uap->s, uap->level, uap->name,
-	    __USER_CAP_UNBOUND(uap->val), __USER_CAP_OBJ(uap->avalsize)));
+	    uap->val, uap->avalsize));
 }
 
 int
@@ -1490,8 +1484,7 @@ int
 sys_getsockname(struct thread *td, struct getsockname_args *uap)
 {
 
-	return (user_getsockname(td, uap->fdes,
-	    __USER_CAP_UNBOUND(uap->asa), __USER_CAP_OBJ(uap->alen), 0));
+	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, 0));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -1499,8 +1492,7 @@ int
 ogetsockname(struct thread *td, struct getsockname_args *uap)
 {
 
-	return (user_getsockname(td, uap->fdes,
-	    __USER_CAP_UNBOUND(uap->asa), __USER_CAP_OBJ(uap->alen), 1));
+	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, 1));
 }
 #endif /* COMPAT_OLDSOCK */
 
@@ -1582,8 +1574,7 @@ int
 sys_getpeername(struct thread *td, struct getpeername_args *uap)
 {
 
-	return (user_getpeername(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
-	    __USER_CAP_OBJ(uap->alen), 0));
+	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, 0));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -1591,8 +1582,7 @@ int
 ogetpeername(struct thread *td, struct ogetpeername_args *uap)
 {
 
-	return (user_getpeername(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
-	    __USER_CAP_OBJ(uap->alen), 1));
+	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, 1));
 }
 #endif /* COMPAT_OLDSOCK */
 

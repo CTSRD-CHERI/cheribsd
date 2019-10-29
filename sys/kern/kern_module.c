@@ -373,7 +373,7 @@ int
 sys_modstat(struct thread *td, struct modstat_args *uap)
 {
 
-	return (kern_modstat(td, uap->modid, __USER_CAP_OBJ(uap->stat)));
+	return (kern_modstat(td, uap->modid, uap->stat));
 }
 
 int
@@ -431,7 +431,7 @@ int
 sys_modfind(struct thread *td, struct modfind_args *uap)
 {
 
-	return (kern_modfind(td, __USER_CAP_STR(uap->name)));
+	return (kern_modfind(td, uap->name));
 }
 
 int

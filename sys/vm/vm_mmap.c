@@ -210,8 +210,8 @@ int
 sys_mmap(struct thread *td, struct mmap_args *uap)
 {
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len, uap->prot,
-	    uap->flags, uap->fd, uap->pos));
+	return (kern_mmap(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	    uap->prot, uap->flags, uap->fd, uap->pos));
 }
 
 int
@@ -671,7 +671,8 @@ int
 sys_msync(struct thread *td, struct msync_args *uap)
 {
 
-	return (kern_msync(td, (uintptr_t)uap->addr, uap->len, uap->flags));
+	return (kern_msync(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	    uap->flags));
 }
 
 int
@@ -728,7 +729,7 @@ int
 sys_munmap(struct thread *td, struct munmap_args *uap)
 {
 
-	return (kern_munmap(td, (uintptr_t)uap->addr, uap->len));
+	return (kern_munmap(td, (__cheri_addr uintptr_t)uap->addr, uap->len));
 }
 
 int
@@ -811,7 +812,8 @@ int
 sys_mprotect(struct thread *td, struct mprotect_args *uap)
 {
 
-	return (kern_mprotect(td, (uintptr_t)uap->addr, uap->len, uap->prot));
+	return (kern_mprotect(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	    uap->prot));
 }
 
 int
@@ -877,7 +879,7 @@ int
 sys_minherit(struct thread *td, struct minherit_args *uap)
 {
 
-	return (kern_minherit(td, (vm_offset_t)uap->addr, uap->len,
+	return (kern_minherit(td, (__cheri_addr vm_offset_t)uap->addr, uap->len,
 	    uap->inherit));
 }
 
@@ -915,7 +917,8 @@ int
 sys_madvise(struct thread *td, struct madvise_args *uap)
 {
 
-	return (kern_madvise(td, (uintptr_t)uap->addr, uap->len, uap->behav));
+	return (kern_madvise(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	    uap->behav));
 }
 
 int
@@ -971,8 +974,8 @@ int
 sys_mincore(struct thread *td, struct mincore_args *uap)
 {
 
-	return (kern_mincore(td, (uintptr_t)uap->addr, uap->len,
-	    __USER_CAP(uap->vec, uap->len)));
+	return (kern_mincore(td, (__cheri_addr uintptr_t)uap->addr, uap->len,
+	    uap->vec));
 }
 
 int
@@ -1223,7 +1226,7 @@ sys_mlock(struct thread *td, struct mlock_args *uap)
 {
 
 	return (kern_mlock(td->td_proc, td->td_ucred,
-	    __DECONST(uintptr_t, uap->addr), uap->len));
+	    __DECONST_CAP(__cheri_addr uintptr_t, uap->addr), uap->len));
 }
 
 int
@@ -1397,7 +1400,7 @@ int
 sys_munlock(struct thread *td, struct munlock_args *uap)
 {
 
-	return (kern_munlock(td, (uintptr_t)uap->addr, uap->len));
+	return (kern_munlock(td, (__cheri_addr uintptr_t)uap->addr, uap->len));
 }
 
 int

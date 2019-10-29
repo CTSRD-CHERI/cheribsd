@@ -36,6 +36,8 @@
  *	@(#)kern_sig.c	8.7 (Berkeley) 4/18/94
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1202,8 +1204,7 @@ int
 sys_sigprocmask(struct thread *td, struct sigprocmask_args *uap)
 {
 
-	return (user_sigprocmask(td, uap->how, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->oset)));
+	return (user_sigprocmask(td, uap->how, uap->set, uap->oset));
 }
 
 int
@@ -1252,8 +1253,7 @@ int
 sys_sigwait(struct thread *td, struct sigwait_args *uap)
 {
 
-	return (user_sigwait(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->sig)));
+	return (user_sigwait(td, uap->set, uap->sig));
 }
 
 int
@@ -1298,8 +1298,7 @@ int
 sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 {
 
-	return (user_sigtimedwait(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->info), __USER_CAP_OBJ(uap->timeout),
+	return (user_sigtimedwait(td, uap->set, uap->info, uap->timeout,
 	    (copyout_siginfo_t *)copyout_siginfo_native));
 }
 
@@ -1343,8 +1342,7 @@ int
 sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 {
 
-	return (user_sigwaitinfo(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->info),
+	return (user_sigwaitinfo(td, uap->set, uap->info,
 	    (copyout_siginfo_t *)copyout_siginfo_native));
 }
 
@@ -1509,7 +1507,7 @@ int
 sys_sigpending(struct thread *td, struct sigpending_args *uap)
 {
 
-	return (kern_sigpending(td, __USER_CAP_OBJ(uap->set)));
+	return (kern_sigpending(td, uap->set));
 }
 
 int
@@ -1638,7 +1636,7 @@ int
 sys_sigsuspend(struct thread *td, struct sigsuspend_args *uap)
 {
 
-	return (user_sigsuspend(td, __USER_CAP_OBJ(uap->sigmask)));
+	return (user_sigsuspend(td, uap->sigmask));
 }
 
 int
@@ -2009,7 +2007,11 @@ sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 	ksigval_union sv;
 
 	memset(&sv, 0, sizeof(sv));
+#if __has_feature(capabilities)
+	sv.sival_ptr_c = uap->value;
+#else
 	sv.sival_ptr_native = uap->value;
+#endif
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
 }

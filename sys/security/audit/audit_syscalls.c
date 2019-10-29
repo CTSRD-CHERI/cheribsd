@@ -74,8 +74,7 @@ int
 sys_audit(struct thread *td, struct audit_args *uap)
 {
 
-	return (kern_audit(td, __USER_CAP(uap->record, uap->length),
-	    uap->length));
+	return (kern_audit(td, uap->record, uap->length));
 }
 
 int
@@ -176,8 +175,7 @@ int
 sys_auditon(struct thread *td, struct auditon_args *uap)
 {
 
-	return (kern_auditon(td, uap->cmd, __USER_CAP(uap->data, uap->length),
-	    uap->length));
+	return (kern_auditon(td, uap->cmd, uap->data, uap->length));
 }
 
 int
@@ -615,7 +613,7 @@ int
 sys_getauid(struct thread *td, struct getauid_args *uap)
 {
 
-	return (kern_getauid(td, __USER_CAP_OBJ(uap->auid)));
+	return (kern_getauid(td, uap->auid));
 }
 
 int
@@ -637,7 +635,7 @@ int
 sys_setauid(struct thread *td, struct setauid_args *uap)
 {
 
-	return (kern_setauid(td, __USER_CAP_OBJ(uap->auid)));
+	return (kern_setauid(td, uap->auid));
 }
 
 int
@@ -684,7 +682,7 @@ int
 sys_getaudit(struct thread *td, struct getaudit_args *uap)
 {
 
-	return (kern_getaudit(td, __USER_CAP_OBJ(uap->auditinfo)));
+	return (kern_getaudit(td, uap->auditinfo));
 }
 
 int
@@ -716,7 +714,7 @@ int
 sys_setaudit(struct thread *td, struct setaudit_args *uap)
 {
 
-	return (kern_setaudit(td, __USER_CAP_OBJ(uap->auditinfo)));
+	return (kern_setaudit(td, uap->auditinfo));
 }
 
 int
@@ -766,8 +764,7 @@ int
 sys_getaudit_addr(struct thread *td, struct getaudit_addr_args *uap)
 {
 
-	return (kern_getaudit_addr(td,
-	    __USER_CAP(uap->auditinfo_addr, uap->length), uap->length));
+	return (kern_getaudit_addr(td, uap->auditinfo_addr, uap->length));
 }
 
 int
@@ -792,8 +789,7 @@ int
 sys_setaudit_addr(struct thread *td, struct setaudit_addr_args *uap)
 {
 
-	return (kern_setaudit_addr(td,
-	    __USER_CAP(uap->auditinfo_addr, uap->length), uap->length));
+	return (kern_setaudit_addr(td, uap->auditinfo_addr, uap->length));
 }
 
 int
@@ -844,7 +840,7 @@ int
 sys_auditctl(struct thread *td, struct auditctl_args *uap)
 {
 
-	return (kern_auditctl(td, __USER_CAP_STR(uap->path)));
+	return (kern_auditctl(td, uap->path));
 }
 
 int

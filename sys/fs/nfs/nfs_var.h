@@ -393,7 +393,7 @@ void nfsd_getminorvers(struct nfsrv_descript *, u_char *, u_char **, int *,
 void nfscl_retopts(struct nfsmount *, char *, size_t);
 
 /* nfs_commonport.c */
-int nfsrv_lookupfilename(struct nameidata *, char *, NFSPROC_T *);
+int nfsrv_lookupfilename(struct nameidata *, char * __capability, NFSPROC_T *);
 void nfsrv_object_create(vnode_t, NFSPROC_T *);
 int nfsrv_mallocmget_limit(void);
 int nfsvno_v4rootexport(struct nfsrv_descript *);

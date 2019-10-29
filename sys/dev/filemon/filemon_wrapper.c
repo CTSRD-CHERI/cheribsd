@@ -28,6 +28,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -147,8 +149,8 @@ filemon_event_process_exec(void *arg __unused, struct proc *p,
 }
 
 static void
-_filemon_wrapper_openat(struct thread *td, const char *upath, int flags,
-    int fd)
+_filemon_wrapper_openat(struct thread *td, const char * __capability upath,
+    int flags, int fd)
 {
 	int error;
 	struct file *fp;
@@ -261,8 +263,8 @@ copyfail:
 }
 
 static void
-_filemon_wrapper_link(struct thread *td, const char *upath1,
-    const char *upath2)
+_filemon_wrapper_link(struct thread *td, const char * __capability upath1,
+    const char * __capability upath2)
 {
 	struct filemon *filemon;
 	int error;

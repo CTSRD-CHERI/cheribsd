@@ -700,8 +700,8 @@ struct abort2_args {
 int
 sys_abort2(struct thread *td, struct abort2_args *uap)
 {
-	void *uargs[16];
-	void *uargsp;
+	void * __capability uargs[16];
+	void * __capability *uargsp;
 	int error, nargs;
 
 	nargs = uap->nargs;
@@ -710,27 +710,28 @@ sys_abort2(struct thread *td, struct abort2_args *uap)
 	uargsp = NULL;
 	if (nargs > 0) {
 		if (uap->args != NULL) {
-			error = copyin(__USER_CAP_UNBOUND(uap->args), uargs,
-			    uap->nargs * sizeof(void *));
+			error = copyin(uap->args, uargs,
+			    nargs * sizeof(void * __capability));
 			if (error != 0)
 				nargs = -1;
 			else
-				uargsp = &uargs;
+				uargsp = uargs;
 		} else
 			nargs = -1;
 	}
-	return (kern_abort2(td, __USER_CAP_STR(uap->why), nargs, uargsp));
+	return (kern_abort2(td, uap->why, nargs, uargsp));
 }
+
 /*
  * kern_abort2()
  * Arguments:
- *  why - user point to why
+ *  why - user pointer to why
  *  nargs - number of arguments copied or -1 if an error occured in copying
- *  args - pointer to an array of points in kernel format
+ *  args - pointer to an array of pointers in kernel format
  */
 int
 kern_abort2(struct thread *td, const char * __capability why, int nargs,
-    void **uargs)
+    void * __capability *uargs)
 {
 	struct proc *p = td->td_proc;
 	struct sbuf *sb;
@@ -768,7 +769,8 @@ kern_abort2(struct thread *td, const char * __capability why, int nargs,
 	if (nargs > 0) {
 		sbuf_printf(sb, "(");
 		for (i = 0;i < nargs; i++)
-			sbuf_printf(sb, "%s%p", i == 0 ? "" : ", ", uargs[i]);
+			sbuf_printf(sb, "%s%p", i == 0 ? "" : ", ",
+			    (__cheri_fromcap void *)uargs[i]);
 		sbuf_printf(sb, ")");
 	}
 	/*
@@ -814,8 +816,8 @@ int
 sys_wait4(struct thread *td, struct wait4_args *uap)
 {
 
-	return (kern_wait4(td, uap->pid, __USER_CAP_OBJ(uap->status),
-	    uap->options, __USER_CAP_OBJ(uap->rusage)));
+	return (kern_wait4(td, uap->pid, uap->status,
+	    uap->options, uap->rusage));
 }
 
 int
@@ -849,12 +851,11 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 		bzero(sip, sizeof(*sip));
 	} else
 		sip = NULL;
-	error = user_wait6(td, uap->idtype, uap->id,
-	    __USER_CAP_OBJ(uap->status), uap->options,
-	    __USER_CAP_OBJ(uap->wrusage), sip);
+	error = user_wait6(td, uap->idtype, uap->id, uap->status, uap->options,
+	    uap->wrusage, sip);
 	if (uap->info != NULL && error == 0) {
 		siginfo_to_siginfo_native(&si, &si_n);
-		error = copyout(&si_n, __USER_CAP_OBJ(uap->info), sizeof(si_n));
+		error = copyout(&si_n, uap->info, sizeof(si_n));
 	}
 	return (error);
 }

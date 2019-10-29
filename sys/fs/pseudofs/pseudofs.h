@@ -245,7 +245,8 @@ struct pfs_node {
  * VFS interface
  */
 int		 pfs_mount	(struct pfs_info *pi, struct mount *mp);
-int		 pfs_cmount	(struct mntarg *ma, void *data, uint64_t flags);
+int		 pfs_cmount	(struct mntarg *ma, void * __capability data,
+				 uint64_t flags);
 int		 pfs_unmount	(struct mount *mp, int mntflags);
 int		 pfs_root	(struct mount *mp, int flags,
 				 struct vnode **vpp);

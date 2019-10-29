@@ -2228,8 +2228,8 @@ int
 sys___getcwd(struct thread *td, struct __getcwd_args *uap)
 {
 
-	return (kern___getcwd(td, __USER_CAP(uap->buf, uap->buflen),
-	    UIO_USERSPACE, uap->buflen, MAXPATHLEN));
+	return (kern___getcwd(td, uap->buf, UIO_USERSPACE, uap->buflen,
+	    MAXPATHLEN));
 }
 
 int

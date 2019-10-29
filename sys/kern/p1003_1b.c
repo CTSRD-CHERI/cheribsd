@@ -115,8 +115,7 @@ int
 sys_sched_setparam(struct thread *td, struct sched_setparam_args *uap)
 {
 
-	return (user_sched_setparam(td, uap->pid,
-	    __USER_CAP_OBJ(uap->param)));
+	return (user_sched_setparam(td, uap->pid, uap->param));
 }
 
 int
@@ -169,7 +168,7 @@ int
 sys_sched_getparam(struct thread *td, struct sched_getparam_args *uap)
 {
 
-	return (user_sched_getparam(td, uap->pid, __USER_CAP_OBJ(uap->param)));
+	return (user_sched_getparam(td, uap->pid, uap->param));
 }
 
 int
@@ -220,8 +219,7 @@ int
 sys_sched_setscheduler(struct thread *td, struct sched_setscheduler_args *uap)
 {
 
-	return (user_sched_setscheduler(td, uap->pid, uap->policy,
-	    __USER_CAP_OBJ(uap->param)));
+	return (user_sched_setscheduler(td, uap->pid, uap->policy, uap->param));
 }
 
 int
@@ -352,8 +350,7 @@ sys_sched_rr_get_interval(struct thread *td,
     struct sched_rr_get_interval_args *uap)
 {
 
-	return (user_sched_rr_get_interval(td, uap->pid,
-	    __USER_CAP_OBJ(uap->interval)));
+	return (user_sched_rr_get_interval(td, uap->pid, uap->interval));
 }
 
 int

@@ -28,6 +28,8 @@
  * $FreeBSD$
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -91,7 +93,7 @@ MODULE_DEPEND(smbfs, libmchain, 1, 1, 1);
 uma_zone_t smbfs_pbuf_zone;
 
 static int
-smbfs_cmount(struct mntarg *ma, void * data, uint64_t flags)
+smbfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	struct smbfs_args args;
 	int error;
