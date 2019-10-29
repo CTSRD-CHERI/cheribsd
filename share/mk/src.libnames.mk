@@ -182,6 +182,7 @@ _LIBRARIES=	\
 		smb \
 		ssl \
 		ssp_nonshared \
+		stats \
 		statcounters \
 		stdthreads \
 		supcplusplus \
@@ -368,6 +369,7 @@ _DP_c_nosyscalls=		compiler_rt
 _DP_c+=		ssp_nonshared
 _DP_c_nosyscalls+=		ssp_nonshared
 .endif
+_DP_stats=	sbuf pthread
 _DP_stdthreads=	pthread
 _DP_tacplus=	md
 _DP_panel=	ncurses
