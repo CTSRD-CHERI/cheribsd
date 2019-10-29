@@ -123,7 +123,7 @@ typedef enum {
 struct kcov_info {
 	struct thread	*thread;	/* (l) */
 	vm_object_t	bufobj;		/* (o) */
-	vm_offset_t	kvaddr;		/* (o) */
+	vm_ptr_t	kvaddr;		/* (o) */
 	size_t		entries;	/* (o) */
 	size_t		bufsize;	/* (o) */
 	kcov_state_t	state;		/* (s) */
@@ -385,7 +385,7 @@ kcov_alloc(struct kcov_info *info, size_t entries)
 		m = vm_page_grab(info->bufobj, n,
 		    VM_ALLOC_NOBUSY | VM_ALLOC_ZERO | VM_ALLOC_WIRED);
 		m->valid = VM_PAGE_BITS_ALL;
-		pmap_qenter(info->kvaddr + n * PAGE_SIZE, &m, 1);
+		pmap_qenter(ptr_to_va(info->kvaddr) + n * PAGE_SIZE, &m, 1);
 	}
 	VM_OBJECT_WUNLOCK(info->bufobj);
 
@@ -401,7 +401,7 @@ kcov_free(struct kcov_info *info)
 	size_t i;
 
 	if (info->kvaddr != 0) {
-		pmap_qremove(info->kvaddr, info->bufsize / PAGE_SIZE);
+		pmap_qremove(ptr_to_va(info->kvaddr), info->bufsize / PAGE_SIZE);
 		kva_free(info->kvaddr, info->bufsize);
 	}
 	if (info->bufobj != NULL) {
