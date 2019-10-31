@@ -302,9 +302,9 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 #endif
 
 	if (OF_install(OFW_FDT, 0) == FALSE)
-		while (1);
+		panic("OF_install failed.");
 	if (OF_init((void *)dtbp) != 0)
-		while (1);
+		panic("OF_init failed.");
 
 	/*
 	 * Get bootargs from FDT if specified.
