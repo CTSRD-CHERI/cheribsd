@@ -1384,7 +1384,7 @@ tunifioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 	case SIOCSIFCAP:
 		TUN_LOCK(tp);
-		ifp->if_capenable = ifr->ifr_reqcap;
+		ifp->if_capenable = ifr_reqcap_get(ifr);
 		tun_caps_changed(ifp);
 		TUN_UNLOCK(tp);
 		VLAN_CAPABILITIES(ifp);
