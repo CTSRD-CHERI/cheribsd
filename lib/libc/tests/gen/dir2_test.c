@@ -25,18 +25,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "test",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "Missing mode to open with O_CREAT"
- * }
- * CHERI CHANGES END
- */
 
 /*
  * Test cases for operations on DIR objects:
