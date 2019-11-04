@@ -3754,8 +3754,7 @@ ipfw_ctl3(struct sockopt *sopt)
 
 			if (size < valsize) {
 				/* We have to wire user buffer */
-				error = vslock(sopt->sopt_val,
-				    valsize);
+				error = vslock(sopt->sopt_val, valsize);
 				if (error != 0)
 					return (error);
 				locked = 1;
