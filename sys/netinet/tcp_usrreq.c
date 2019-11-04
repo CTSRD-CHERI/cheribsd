@@ -2767,10 +2767,10 @@ DB_SHOW_COMMAND(tcpcb, db_show_tcpcb)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181115,
+//   "updated": 20191104,
 //   "target_type": "kernel",
 //   "changes": [
-//     "ioctl:net"
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

@@ -1856,3 +1856,12 @@ struct pr_usrreqs udp_usrreqs = {
 	.pru_close =		udp_close,
 };
 #endif /* INET */
+// CHERI CHANGES START
+// {
+//   "updated": 20191104,
+//   "target_type": "kernel",
+//   "changes": [
+//     "user_capabilities"
+//   ]
+// }
+// CHERI CHANGES END
