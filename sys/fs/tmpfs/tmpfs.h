@@ -541,12 +541,3 @@ tmpfs_use_nc(struct vnode *vp)
 }
 
 #endif /* _FS_TMPFS_TMPFS_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20181127,
-//   "target_type": "header",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END
