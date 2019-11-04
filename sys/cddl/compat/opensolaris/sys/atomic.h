@@ -39,6 +39,7 @@
 #if defined(__i386__) || defined(__amd64__) || defined(__arm__)
 /* No spurious failures from fcmpset. */
 #define	STRONG_FCMPSET
+#endif
 
 #if !defined(__LP64__) && !defined(__mips_n32) && !defined(__mips_n64) && \
     !defined(ARM_HAVE_ATOMIC64) && !defined(I386_HAVE_ATOMIC64)
