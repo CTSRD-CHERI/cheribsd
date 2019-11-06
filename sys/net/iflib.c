@@ -268,9 +268,9 @@ iflib_get_sctx(if_ctx_t ctx)
 	return (ctx->ifc_sctx);
 }
 
-#define IP_ALIGNED(m) ((((uintptr_t)(m)->m_data) & 0x3) == 0x2)
+#define IP_ALIGNED(m) ((ptr_to_va((uintptr_t)(m)->m_data) & 0x3) == 0x2)
 #define CACHE_PTR_INCREMENT (CACHE_LINE_SIZE/sizeof(void*))
-#define CACHE_PTR_NEXT(ptr) ((void *)(((uintptr_t)(ptr)+CACHE_LINE_SIZE-1) & (CACHE_LINE_SIZE-1)))
+#define CACHE_PTR_NEXT(ptr) ((void *)(roundup2(ptr, CACHE_LINE_SIZE)))
 
 #define LINK_ACTIVE(ctx) ((ctx)->ifc_link_state == LINK_STATE_UP)
 #define CTX_IS_VF(ctx) ((ctx)->ifc_sctx->isc_flags & IFLIB_IS_VF)
@@ -494,10 +494,16 @@ pkt_info_zero(if_pkt_info_t pi)
 	pi_pad = (if_pkt_info_pad_t)pi;
 	pi_pad->pkt_val[0] = 0; pi_pad->pkt_val[1] = 0; pi_pad->pkt_val[2] = 0;
 	pi_pad->pkt_val[3] = 0; pi_pad->pkt_val[4] = 0; pi_pad->pkt_val[5] = 0;
-#ifndef __LP64__
+#ifdef CHERI_PURECAP_KERNEL
+	pi_pad->pkt_val[6] = 0; pi_pad->pkt_val[7] = 0;
+#ifndef CPU_CHERI128
+	pi_pad->pkt_val[8] = 0;	pi_pad->pkt_val[9] = 0; pi_pad->pkt_val[10] = 0;
+	pi_pad->pkt_val[11] = 0;
+#endif
+#elif !defined(__LP64__)
 	pi_pad->pkt_val[6] = 0; pi_pad->pkt_val[7] = 0; pi_pad->pkt_val[8] = 0;
 	pi_pad->pkt_val[9] = 0; pi_pad->pkt_val[10] = 0;
-#endif	
+#endif
 }
 
 static device_method_t iflib_pseudo_methods[] = {
