@@ -3568,7 +3568,6 @@ iwm_tx(struct iwm_softc *sc, struct mbuf *m, struct ieee80211_node *ni, int ac)
 	tid = 0;
 	ring = &sc->txq[ac];
 	desc = &ring->desc[ring->cur];
-	memset(desc, 0, sizeof(*desc));
 	data = &ring->data[ring->cur];
 
 	/* Fill out iwm_tx_cmd to send to the firmware */
@@ -3607,17 +3606,15 @@ iwm_tx(struct iwm_softc *sc, struct mbuf *m, struct ieee80211_node *ni, int ac)
 		ieee80211_radiotap_tx(vap, m);
 	}
 
-
-	totlen = m->m_pkthdr.len;
-
 	flags = 0;
+	totlen = m->m_pkthdr.len;
 	if (!IEEE80211_IS_MULTICAST(wh->i_addr1)) {
 		flags |= IWM_TX_CMD_FLG_ACK;
 	}
 
-	if (type == IEEE80211_FC0_TYPE_DATA
-	    && (totlen + IEEE80211_CRC_LEN > vap->iv_rtsthreshold)
-	    && !IEEE80211_IS_MULTICAST(wh->i_addr1)) {
+	if (type == IEEE80211_FC0_TYPE_DATA &&
+	    totlen + IEEE80211_CRC_LEN > vap->iv_rtsthreshold &&
+	    !IEEE80211_IS_MULTICAST(wh->i_addr1)) {
 		flags |= IWM_TX_CMD_FLG_PROT_REQUIRE;
 	}
 
@@ -3661,7 +3658,7 @@ iwm_tx(struct iwm_softc *sc, struct mbuf *m, struct ieee80211_node *ni, int ac)
 	tx->dram_msb_ptr = iwm_get_dma_hi_addr(data->scratch_paddr);
 
 	/* Copy 802.11 header in TX command. */
-	memcpy(((uint8_t *)tx) + sizeof(*tx), wh, hdrlen);
+	memcpy((uint8_t *)tx + sizeof(*tx), wh, hdrlen);
 
 	flags |= IWM_TX_CMD_FLG_BT_DIS | IWM_TX_CMD_FLG_SEQ_CTL;
 
@@ -3715,23 +3712,24 @@ iwm_tx(struct iwm_softc *sc, struct mbuf *m, struct ieee80211_node *ni, int ac)
 	    );
 
 	/* Fill TX descriptor. */
+	memset(desc, 0, sizeof(*desc));
 	desc->num_tbs = 2 + nsegs;
 
 	desc->tbs[0].lo = htole32(data->cmd_paddr);
-	desc->tbs[0].hi_n_len = htole16(iwm_get_dma_hi_addr(data->cmd_paddr)) |
-	    (TB0_SIZE << 4);
+	desc->tbs[0].hi_n_len = htole16(iwm_get_dma_hi_addr(data->cmd_paddr) |
+	    (TB0_SIZE << 4));
 	desc->tbs[1].lo = htole32(data->cmd_paddr + TB0_SIZE);
-	desc->tbs[1].hi_n_len = htole16(iwm_get_dma_hi_addr(data->cmd_paddr)) |
-	    ((sizeof(struct iwm_cmd_header) + sizeof(*tx)
-	      + hdrlen + pad - TB0_SIZE) << 4);
+	desc->tbs[1].hi_n_len = htole16(iwm_get_dma_hi_addr(data->cmd_paddr) |
+	    ((sizeof(struct iwm_cmd_header) + sizeof(*tx) +
+	    hdrlen + pad - TB0_SIZE) << 4));
 
 	/* Other DMA segments are for data payload. */
 	for (i = 0; i < nsegs; i++) {
 		seg = &segs[i];
-		desc->tbs[i+2].lo = htole32(seg->ds_addr);
-		desc->tbs[i+2].hi_n_len = \
-		    htole16(iwm_get_dma_hi_addr(seg->ds_addr))
-		    | ((seg->ds_len) << 4);
+		desc->tbs[i + 2].lo = htole32(seg->ds_addr);
+		desc->tbs[i + 2].hi_n_len =
+		    htole16(iwm_get_dma_hi_addr(seg->ds_addr)) |
+		    (seg->ds_len << 4);
 	}
 
 	bus_dmamap_sync(ring->data_dmat, data->map,
@@ -4444,8 +4442,7 @@ static boolean_t
 iwm_mvm_is_lar_supported(struct iwm_softc *sc)
 {
 	boolean_t nvm_lar = sc->nvm_data->lar_enabled;
-	boolean_t tlv_lar = fw_has_capa(&sc->sc_fw.ucode_capa,
-					IWM_UCODE_TLV_CAPA_LAR_SUPPORT);
+	boolean_t tlv_lar = iwm_fw_has_capa(sc, IWM_UCODE_TLV_CAPA_LAR_SUPPORT);
 
 	if (iwm_lar_disable)
 		return FALSE;
@@ -4463,10 +4460,8 @@ iwm_mvm_is_lar_supported(struct iwm_softc *sc)
 static boolean_t
 iwm_mvm_is_wifi_mcc_supported(struct iwm_softc *sc)
 {
-	return fw_has_api(&sc->sc_fw.ucode_capa,
-			  IWM_UCODE_TLV_API_WIFI_MCC_UPDATE) ||
-	       fw_has_capa(&sc->sc_fw.ucode_capa,
-			   IWM_UCODE_TLV_CAPA_LAR_MULTI_MCC);
+	return iwm_fw_has_api(sc, IWM_UCODE_TLV_API_WIFI_MCC_UPDATE) ||
+	    iwm_fw_has_capa(sc, IWM_UCODE_TLV_CAPA_LAR_MULTI_MCC);
 }
 
 static int
@@ -4486,8 +4481,7 @@ iwm_send_update_mcc_cmd(struct iwm_softc *sc, const char *alpha2)
 	int n_channels;
 	uint16_t mcc;
 #endif
-	int resp_v2 = fw_has_capa(&sc->sc_fw.ucode_capa,
-	    IWM_UCODE_TLV_CAPA_LAR_SUPPORT_V2);
+	int resp_v2 = iwm_fw_has_capa(sc, IWM_UCODE_TLV_CAPA_LAR_SUPPORT_V2);
 
 	if (!iwm_mvm_is_lar_supported(sc)) {
 		IWM_DPRINTF(sc, IWM_DEBUG_LAR, "%s: no LAR support\n",
@@ -4648,7 +4642,7 @@ iwm_init_hw(struct iwm_softc *sc)
 	if ((error = iwm_send_update_mcc_cmd(sc, "ZZ")) != 0)
 		goto error;
 
-	if (fw_has_capa(&sc->sc_fw.ucode_capa, IWM_UCODE_TLV_CAPA_UMAC_SCAN)) {
+	if (iwm_fw_has_capa(sc, IWM_UCODE_TLV_CAPA_UMAC_SCAN)) {
 		if ((error = iwm_mvm_config_umac_scan(sc)) != 0)
 			goto error;
 	}
@@ -6185,7 +6179,7 @@ iwm_scan_start(struct ieee80211com *ic)
 		device_printf(sc->sc_dev,
 		    "%s: Previous scan not completed yet\n", __func__);
 	}
-	if (fw_has_capa(&sc->sc_fw.ucode_capa, IWM_UCODE_TLV_CAPA_UMAC_SCAN))
+	if (iwm_fw_has_capa(sc, IWM_UCODE_TLV_CAPA_UMAC_SCAN))
 		error = iwm_mvm_umac_scan(sc);
 	else
 		error = iwm_mvm_lmac_scan(sc);
