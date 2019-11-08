@@ -631,11 +631,11 @@ atomic_fcmpset_32(__volatile uint32_t *p, uint32_t *cmpval, uint32_t newval)
 
 	__asm __volatile (
 		__INLINE_ASM_PUSH_NOAT
-		"1:\n\t"
 		"cllw	%[tmp], %[ptr]\n\t"		/* load old value */
 		"bne	%[tmp], %[expected], 1f\n\t"	/* compare */
+		"nop\n\t"
 		"cscw	%[ret], %[newval], %[ptr]\n\t"	/* attempt to store */
-		"j	3f\n\t"			/* exit regardless of success */
+		"j	2f\n\t"			/* exit regardless of success */
 		"nop\n\t"			/* avoid delay slot accident */
 		"1:\n\t"
 		"csw	%[tmp], $0, 0(%[cmpval])\n\t"	/* store loaded value */
@@ -812,6 +812,7 @@ atomic_fcmpset_64(__volatile uint64_t *p, uint64_t *cmpval, uint64_t newval)
 		__INLINE_ASM_PUSH_NOAT
 		"clld	%[tmp], %[ptr]\n\t"		/* load old value */
 		"bne	%[tmp], %[expected], 1f\n\t"	/* compare */
+		"nop\n\t"			/* avoid delay slot accident */
 		"cscd	%[ret], %[newval], %[ptr]\n\t"	/* attempt to store */
 		"j	2f\n\t"			/* exit regardless of success */
 		"nop\n\t"			/* avoid delay slot accident */
