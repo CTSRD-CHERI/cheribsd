@@ -2675,7 +2675,6 @@ vn_copy_file_range(struct vnode *invp, off_t *inoffp, struct vnode *outvp,
     off_t *outoffp, size_t *lenp, unsigned int flags, struct ucred *incred,
     struct ucred *outcred, struct thread *fsize_td)
 {
-	struct vattr va;
 	int error;
 	size_t len;
 	uint64_t uvalin, uvalout;
@@ -2698,17 +2697,6 @@ vn_copy_file_range(struct vnode *invp, off_t *inoffp, struct vnode *outvp,
 		error = EINVAL;
 	else if (invp == outvp)
 		error = EBADF;
-	if (error != 0)
-		goto out;
-
-	error = vn_lock(invp, LK_SHARED);
-	if (error != 0)
-		goto out;
-	/* Check that the offset + len does not go past EOF of invp. */
-	error = VOP_GETATTR(invp, &va, incred);
-	if (error == 0 && va.va_size < *inoffp + len)
-		error = EINVAL;
-	VOP_UNLOCK(invp, 0);
 	if (error != 0)
 		goto out;
 
@@ -2913,7 +2901,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 	off_t startoff, endoff, xfer, xfer2;
 	u_long blksize;
 	int error;
-	bool cantseek, readzeros;
+	bool cantseek, readzeros, eof, lastblock;
 	ssize_t aresid;
 	size_t copylen, len, savlen;
 	char *dat;
@@ -3000,7 +2988,8 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 	 * Note that some file systems such as NFSv3, NFSv4.0 and NFSv4.1 may
 	 * support holes on the server, but do not support FIOSEEKHOLE.
 	 */
-	while (len > 0 && error == 0) {
+	eof = false;
+	while (len > 0 && error == 0 && !eof) {
 		endoff = 0;			/* To shut up compilers. */
 		cantseek = true;
 		startoff = *inoffp;
@@ -3082,7 +3071,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 			xfer -= (*inoffp % blksize);
 		}
 		/* Loop copying the data block. */
-		while (copylen > 0 && error == 0) {
+		while (copylen > 0 && error == 0 && !eof) {
 			if (copylen < xfer)
 				xfer = copylen;
 			error = vn_lock(invp, LK_SHARED);
@@ -3093,12 +3082,13 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 			    curthread->td_ucred, incred, &aresid,
 			    curthread);
 			VOP_UNLOCK(invp, 0);
-			/*
-			 * Linux considers a range that exceeds EOF to
-			 * be an error, so we will too.
-			 */
-			if (error == 0 && aresid > 0)
-				error = EINVAL;
+			lastblock = false;
+			if (error == 0 && aresid > 0) {
+				/* Stop the copy at EOF on the input file. */
+				xfer -= aresid;
+				eof = true;
+				lastblock = true;
+			}
 			if (error == 0) {
 				/*
 				 * Skip the write for holes past the initial EOF
@@ -3107,11 +3097,13 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 				 */
 				readzeros = cantseek ? mem_iszero(dat, xfer) :
 				    false;
+				if (xfer == len)
+					lastblock = true;
 				if (!cantseek || *outoffp < va.va_size ||
-				    xfer == len || !readzeros)
+				    lastblock || !readzeros)
 					error = vn_write_outvp(outvp, dat,
 					    *outoffp, xfer, blksize,
-					    readzeros && xfer == len &&
+					    readzeros && lastblock &&
 					    *outoffp >= va.va_size, false,
 					    outcred);
 				if (error == 0) {
