@@ -166,8 +166,8 @@ sys_quotactl(struct thread *td, struct quotactl_args *uap)
 }
 
 int
-kern_quotactl(struct thread *td, const char * __CAPABILITY path, int cmd,
-    int uid, void * __CAPABILITY arg)
+kern_quotactl(struct thread *td, const char * __capability path, int cmd,
+    int uid, void * __capability arg)
 {
 	struct mount *mp;
 	struct nameidata nd;
@@ -900,7 +900,7 @@ sys_chdir(struct thread *td, struct chdir_args *uap)
 }
 
 int
-kern_chdir(struct thread *td, const char * __CAPABILITY path,
+kern_chdir(struct thread *td, const char * __capability path,
     enum uio_seg pathseg)
 {
 	struct nameidata nd;

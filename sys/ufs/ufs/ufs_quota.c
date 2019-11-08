@@ -494,7 +494,7 @@ chkdquot(struct inode *ip)
  * Q_QUOTAON - set up a quota file for a particular filesystem.
  */
 int
-quotaon(struct thread *td, struct mount *mp, int type, void * __CAPABILITY fname)
+quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname)
 {
 	struct ufsmount *ump;
 	struct vnode *vp, **vpp;
@@ -1001,7 +1001,7 @@ setuse32(struct thread *td, struct mount *mp, u_long id, int type,
 
 int
 getquota(struct thread *td, struct mount *mp, u_long id, int type,
-    void * __CAPABILITY addr)
+    void * __capability addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1015,7 +1015,7 @@ getquota(struct thread *td, struct mount *mp, u_long id, int type,
 
 int
 setquota(struct thread *td, struct mount *mp, u_long id, int type,
-    void * __CAPABILITY addr)
+    void * __capability addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1029,7 +1029,7 @@ setquota(struct thread *td, struct mount *mp, u_long id, int type,
 
 int
 setuse(struct thread *td, struct mount *mp, u_long id, int type,
-    void * __CAPABILITY addr)
+    void * __capability addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1046,7 +1046,7 @@ setuse(struct thread *td, struct mount *mp, u_long id, int type,
  */
 int
 getquotasize(struct thread *td, struct mount *mp, u_long id, int type,
-    void * __CAPABILITY sizep)
+    void * __capability sizep)
 {
 	struct ufsmount *ump = VFSTOUFS(mp);
 	int bitsize;

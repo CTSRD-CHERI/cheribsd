@@ -101,13 +101,13 @@ sys_kenv(struct thread *td, struct kenv_args *uap)
 {
 
 	return (kern_kenv(td, uap->what,
-	    (__cheri_tocap const char * __CAPABILITY)uap->name,
-	    (__cheri_tocap char * __CAPABILITY)uap->value, uap->len));
+	    (__cheri_tocap const char * __capability)uap->name,
+	    (__cheri_tocap char * __capability)uap->value, uap->len));
 }
 
 int
-kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
-    char * __CAPABILITY val, int vallen)
+kern_kenv(struct thread *td, int what, const char * __capability namep,
+    char * __capability val, int vallen)
 {
 	char *name, *value, *buffer = NULL;
 	size_t len, done, needed, buflen;

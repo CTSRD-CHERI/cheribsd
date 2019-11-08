@@ -1240,7 +1240,7 @@ vfs_stdstatfs (mp, sbp)
 }
 
 int
-vfs_stdquotactl(struct mount *mp, int cmds, uid_t uid, void * __CAPABILITY arg)
+vfs_stdquotactl(struct mount *mp, int cmds, uid_t uid, void * __capability arg)
 {
 
 	return (EOPNOTSUPP);

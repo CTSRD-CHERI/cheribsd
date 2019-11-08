@@ -589,7 +589,7 @@ linux_chdir(struct thread *td, struct linux_chdir_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_chdir(td, (char * __CAPABILITY)path, UIO_SYSSPACE);
+	error = kern_chdir(td, (char * __capability)path, UIO_SYSSPACE);
 	LFREEPATH(path);
 	return (error);
 }
