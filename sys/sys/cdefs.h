@@ -1050,14 +1050,12 @@
 #endif
 
 #if __has_feature(capabilities)
-#define	__CAPABILITY	__capability
 #ifdef _KERNEL
 #define	__kerncap	__capability
 #else
 #define	__kerncap
 #endif
 #else
-#define	__CAPABILITY
 #define	__capability
 #define	__kerncap
 #endif
