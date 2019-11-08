@@ -186,7 +186,7 @@ SUBDIR.${MK_STATS}+=	libstats
     ${MACHINE_ARCH:Mmips64*}) && \
     ! ${MACHINE_ARCH:Mmips*c*}
 _libclang_rt=	libclang_rt
-.elif ! ${MACHINE_ARCH:Mmips*c*}
+.elif ! ${MACHINE_ARCH:Mmips*c*} && ${MACHINE_ARCH} != "mips"
 .error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
 .endif
 .endif # ${COMPILER_TYPE} == "clang"
