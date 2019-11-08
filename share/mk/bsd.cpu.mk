@@ -317,7 +317,9 @@ CFLAGS += -G0
 # Hack for CheriBSD because clang targets a much newer CPU
 # -mcpu=beri ensures that instructions are scheduled so that they can execute
 # without excessive pipeline bubbles on BERI FPGAs (whereas -mcpu=mips4 doesn't)
+.if ${MACHINE_ARCH} != mips
 CFLAGS += -mcpu=beri
+.endif
 AFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
 CFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
 LDFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
