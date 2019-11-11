@@ -772,7 +772,11 @@ int
 sys___semctl(struct thread *td, struct __semctl_args *uap)
 {
 	struct semid_ds dsbuf;
+#if __has_feature(capabilities)
 	union semun_c arg;
+#else
+	union semun_native arg;
+#endif
 	ksemun_t semun;
 	register_t rval;
 	int error;
