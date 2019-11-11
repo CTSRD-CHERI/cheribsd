@@ -108,6 +108,7 @@ typedef struct {
 #ifndef _STANDALONE
 	long double __max_align2 __aligned(_Alignof(long double));
 #endif
+	void * __max_align3 __aligned(_Alignof(void *));
 } __max_align_t;
 
 typedef	__uint64_t	__dev_t;	/* device number */
