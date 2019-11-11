@@ -6,9 +6,17 @@ __<${_this:T}>__:
 .if defined(_LIBCOMPAT)
 COMPAT_ARCH=	${TARGET_ARCH}
 COMPAT_CPUTYPE=	${TARGET_CPUTYPE}
+.if (defined(WANT_COMPILER_TYPE) && ${WANT_COMPILER_TYPE} == gcc) || \
+    (defined(X_COMPILER_TYPE) && ${X_COMPILER_TYPE} == gcc)
+COMPAT_COMPILER_TYPE=	gcc
+.else
+COMPAT_COMPILER_TYPE=	clang
+.endif
 .else
 COMPAT_ARCH=	${MACHINE_ARCH}
 COMPAT_CPUTYPE=	${CPUTYPE}
+.include <bsd.compiler.mk>
+COMPAT_COMPILER_TYPE=${COMPILER_TYPE}
 .endif
 
 # -------------------------------------------------------------------
@@ -20,14 +28,14 @@ LIB32CPUFLAGS=	-march=i686 -mmmx -msse -msse2
 .else
 LIB32CPUFLAGS=	-march=${COMPAT_CPUTYPE}
 .endif
-.if (defined(WANT_COMPILER_TYPE) && ${WANT_COMPILER_TYPE} == gcc) || \
-    (defined(X_COMPILER_TYPE) && ${X_COMPILER_TYPE} == gcc)
+.if ${COMPAT_COMPILER_TYPE} == gcc
 .else
 LIB32CPUFLAGS+=	-target x86_64-unknown-freebsd13.0
 .endif
 LIB32CPUFLAGS+=	-m32
-LIB32WMAKEENV=	MACHINE=i386 MACHINE_ARCH=i386 \
-		MACHINE_CPU="i686 mmx sse sse2"
+LIB32_MACHINE=	i386
+LIB32_MACHINE_ARCH=	i386
+LIB32WMAKEENV=	MACHINE_CPU="i686 mmx sse sse2"
 LIB32WMAKEFLAGS=	\
 		AS="${XAS} --32" \
 		LD="${XLD} -m elf_i386_fbsd -L${LIBCOMPATTMP}/usr/lib32"
@@ -40,14 +48,14 @@ LIB32CPUFLAGS=	-mcpu=powerpc
 LIB32CPUFLAGS=	-mcpu=${COMPAT_CPUTYPE}
 .endif
 LIB32CPUFLAGS+=	-m32
-LIB32WMAKEENV=	MACHINE=powerpc MACHINE_ARCH=powerpc
+LIB32_MACHINE=	powerpc
+LIB32_MACHINE_ARCH=	powerpc
 LIB32WMAKEFLAGS=	\
 		LD="${XLD} -m elf32ppc_fbsd"
 
 .elif ${COMPAT_ARCH:Mmips64*} != ""
 HAS_COMPAT=32
-.if (defined(WANT_COMPILER_TYPE) && ${WANT_COMPILER_TYPE} == gcc) || \
-    (defined(X_COMPILER_TYPE) && ${X_COMPILER_TYPE} == gcc)
+.if ${COMPAT_COMPILER_TYPE} == gcc
 .if empty(COMPAT_CPUTYPE)
 LIB32CPUFLAGS=	-march=mips3
 .else
@@ -61,12 +69,15 @@ LIB32CPUFLAGS=  -target mips-unknown-freebsd13.0
 .endif
 .endif
 LIB32CPUFLAGS+= -mabi=32
-LIB32WMAKEENV=	MACHINE=mips MACHINE_ARCH=mips
+LIB32_MACHINE=	mips
+LIB32_MACHINE_ARCH=	mips
 .if ${COMPAT_ARCH:Mmips64el*} != ""
-LIB32WMAKEFLAGS= LD="${XLD} -m elf32ltsmip_fbsd"
+_EMULATION=	elf32ltsmip_fbsd
 .else
-LIB32WMAKEFLAGS= LD="${XLD} -m elf32btsmip_fbsd"
+_EMULATION=	elf32btsmip_fbsd
 .endif
+LIB32WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}"
+LIB32LDFLAGS=	-Wl,-m${_EMULATION}
 .endif
 
 LIB32WMAKEFLAGS+= NM="${XNM}"
@@ -78,20 +89,24 @@ LIB32WMAKEFLAGS+=	-DCOMPAT_32BIT
 
 # -------------------------------------------------------------------
 # 64 bit world
-.if ${TARGET_ARCH:Mmips64*c*}
+.if ${COMPAT_ARCH:Mmips64*c*}
+HAS_COMPAT=64
 # XXX: clang specific
-.if ${TARGET_ARCH:Mmips64el*} != ""
+.if ${COMPAT_ARCH:Mmips64el*} != ""
 LIB64CPUFLAGS=  -target mipsel-unknown-freebsd13.0
 .else
 LIB64CPUFLAGS=  -target mips-unknown-freebsd13.0
 .endif
 LIB64CPUFLAGS+=	-mabi=64
-LIB64WMAKEENV=	MACHINE=mips MACHINE_ARCH=mips64
-.if ${TARGET_ARCH:Mmips64el*} != ""
-LIB64WMAKEFLAGS= LD="${XLD} -m elf64ltsmip_fbsd"
+LIB64_MACHINE=	mips
+LIB64_MACHINE_ARCH=	mips64
+.if ${COMPAT_ARCH:Mmips64el*}
+_EMULATION=	elf64ltsmip_fbsd
 .else
-LIB64WMAKEFLAGS= LD="${XLD} -m elf64btsmip_fbsd"
+_EMULATION=	elf64btsmip_fbsd
 .endif
+LIB64WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}"
+LIB64LDFLAGS=	-Wl,-m${_EMULATION}
 .endif
 
 LIB64WMAKEFLAGS+= NM="${XNM}" OBJCOPY="${XOBJCOPY}"
@@ -106,7 +121,9 @@ LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
 HAS_COMPAT=SOFT
 LIBSOFTCFLAGS=        -DCOMPAT_SOFTFP
 LIBSOFTCPUFLAGS= -mfloat-abi=softfp
-LIBSOFTWMAKEENV= CPUTYPE=soft MACHINE=arm MACHINE_ARCH=${COMPAT_ARCH}
+LIBSOFT_MACHINE=	arm
+LIBSOFT_MACHINE_ARCH=	${COMPAT_ARCH}
+LIBSOFTWMAKEENV= CPUTYPE=soft
 LIBSOFTWMAKEFLAGS=        -DCOMPAT_SOFTFP
 .endif
 
@@ -137,8 +154,8 @@ _LIBCOMPAT:=	${WANT_COMPAT}
 # Generic code for each type.
 # Set defaults based on type.
 libcompat=	${_LIBCOMPAT:tl}
-_LIBCOMPAT_MAKEVARS=	_OBJTOP TMP CPUFLAGS CFLAGS CXXFLAGS WMAKEENV \
-			WMAKEFLAGS WMAKE
+_LIBCOMPAT_MAKEVARS=	_OBJTOP TMP CPUFLAGS CFLAGS CXXFLAGS LDFLAGS \
+			_MACHINE _MACHINE_ARCH WMAKEENV WMAKEFLAGS WMAKE
 .for _var in ${_LIBCOMPAT_MAKEVARS}
 .if !empty(LIB${_LIBCOMPAT}${_var})
 LIBCOMPAT${_var}?=	${LIB${_LIBCOMPAT}${_var}}
@@ -154,6 +171,9 @@ LIBCOMPATCFLAGS+=	${LIBCOMPATCPUFLAGS} \
 			--sysroot=${LIBCOMPATTMP} \
 			${BFLAGS}
 
+LIBCOMPATWMAKEENV+=	MACHINE=${LIBCOMPAT_MACHINE}
+LIBCOMPATWMAKEENV+=	MACHINE_ARCH=${LIBCOMPAT_MACHINE_ARCH}
+
 # -B is needed to find /usr/lib32/crti.o for GCC and /usr/libsoft/crti.o for
 # Clang/GCC.
 LIBCOMPATCFLAGS+=	-B${LIBCOMPATTMP}/usr/lib${libcompat}
@@ -162,6 +182,9 @@ LIBCOMPATCFLAGS+=	-B${LIBCOMPATTMP}/usr/lib${libcompat}
 LIBDIR_BASE:=	/usr/lib${libcompat}
 _LIB_OBJTOP=	${LIBCOMPAT_OBJTOP}
 CFLAGS+=	${LIBCOMPATCFLAGS}
+LDFLAGS+=	${CFLAGS} ${LIBCOMPATLDFLAGS}
+MACHINE=	${LIBCOMPAT_MACHINE}
+MACHINE_ARCH=	${LIBCOMPAT_MACHINE_ARCH}
 .endif
 
 .endif

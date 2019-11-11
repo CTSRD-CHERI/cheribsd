@@ -4,8 +4,10 @@
 # linker:
 # make DEBUG_FLAGS=-g WITHOUT_TESTS=yes all
 # Not adapted for CHERI
+
 WANT_CHERI=none
-RTLD_ELF_DIR=${SRCTOP}/libexec/rtld-elf
+
+RTLD_ELF_DIR:=	${.PARSEDIR}
 
 .ifdef BUILD_RTLD_DEBUG
 .ifdef RTLD_DEBUG_VERBOSE
@@ -46,7 +48,7 @@ SRCS= \
 	xmalloc.c \
 	debug.c \
 	libmap.c
-MAN=		rtld.1
+MAN?=		rtld.1
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
 CFLAGS+=	-I${SRCTOP}/lib/csu/common
@@ -129,8 +131,10 @@ beforeinstall:
 
 .PATH: ${RTLD_ELF_DIR}/${RTLD_ARCH}
 
+.if ${.CURDIR} == ${RTLD_ELF_DIR} || defined(RTLD_CHERI_ELF_DIR)
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
+.endif
 
 .include <bsd.prog.mk>
 ${PROG_FULL}:	${VERSION_MAP}

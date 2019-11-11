@@ -87,6 +87,10 @@ _tftp-proxy=	tftp-proxy
 
 .if !defined(NO_PIC) && !defined(NO_RTLD) && !${MACHINE_ARCH:Mmips*c*}
 _rtld-elf=	rtld-elf rtld-elf-debug
+SUBDIR.${MK_LIB32}+=	rtld-elf32
+.endif
+.if !defined(NO_PIC) && !defined(NO_RTLD)
+SUBDIR.${MK_LIB64}+=	rtld-elf64
 .endif
 
 .if ${MK_RBOOTD} != "no"

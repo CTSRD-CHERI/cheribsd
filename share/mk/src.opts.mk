@@ -126,7 +126,6 @@ __DEFAULT_YES_OPTIONS = \
     LDNS \
     LDNS_UTILS \
     LEGACY_CONSOLE \
-    LIB32 \
     LIB64 \
     LIBPTHREAD \
     LIBTHR \
@@ -379,6 +378,22 @@ BROKEN_OPTIONS+=LLDB
 __DEFAULT_NO_OPTIONS+=GDB_LIBEXEC
 .else
 __DEFAULT_YES_OPTIONS+=GDB_LIBEXEC
+.endif
+# LIB32 is supported on amd64, mips64, and powerpc64
+.if (${MACHINE_ARCH} == "amd64" || ${MACHINE_ARCH:Mmips64*} || \
+    ${MACHINE_ARCH} == "powerpc64")
+__DEFAULT_YES_OPTIONS+=LIB32
+.else
+BROKEN_OPTIONS+=LIB32
+.endif
+# LIB64 on mips64*c*
+.if ${MACHINE_ARCH:Mmips64*c*}
+__DEFAULT_YES_OPTIONS+=LIB64
+# In principal, LIB32 could work, but Makefile.libcompat only supports
+# one compat layer.
+BROKEN_OPTIONS+=LIB32
+.else
+BROKEN_OPTIONS+=LIB64
 .endif
 # Only doing soft float API stuff on armv6 and armv7
 .if ${__T} != "armv6" && ${__T} != "armv7"
