@@ -381,7 +381,7 @@ mips_vector_init(void)
 	 * be that we do want a specialised vector here at some point.
 	 */
 	bcopy(MipsException, (void *)CHERI_CCALL_EXC_VEC,
-	      MipsCacheEnd - MipsCache);
+	      MipsExceptionEnd - MipsException);
 #endif
 
 	/*
