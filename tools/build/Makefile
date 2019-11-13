@@ -171,6 +171,7 @@ MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/bpb.h
 MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/denode.h
 MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/direntry.h
 MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/fat.h
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/msdosfsmount.h
 
 # Needed to build config (since it uses libnv)
 SYSINCS+=	${SRCTOP}/sys/sys/nv.h ${SRCTOP}/sys/sys/cnv.h \
