@@ -288,6 +288,20 @@ cpu_thread_free(struct thread *td)
 	td->td_md.md_cop2 = NULL;
 	td->td_md.md_ucop2 = NULL;
 #endif
+#ifdef CHERI_PURECAP_KERNEL
+	/*
+	 * We need to recover the full capability to the stack, including the
+	 * pcb region.
+	 * XXX-AM: The ideal solution would be to avoid rederivation altogheter
+	 * and cache the pcb capability along the kstack. Maybe add a hook in
+	 * vm_glue to allow cpu_* to do different things with a new and
+	 * recycled stack?
+	 */
+	td->td_kstack = (vm_ptr_t)cheri_ptrperm(
+	    cheri_setaddress(cheri_kall_capability,
+	        cheri_getbase((void *)td->td_kstack)),
+	    td->td_kstack_pages * PAGE_SIZE, CHERI_PERMS_KERNEL_DATA);
+#endif
 }
 
 void
