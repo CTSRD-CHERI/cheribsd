@@ -31,7 +31,10 @@ static const char rcsid[] =
 #endif /* not lint */
 
 #include <sys/param.h>
-#ifndef MAKEFS
+#ifdef MAKEFS
+/* In the makefs case we only want struct disklabel */
+#include <sys/disk/bsd.h>
+#else
 #include <sys/fdcio.h>
 #include <sys/disk.h>
 #include <sys/disklabel.h>
@@ -285,11 +288,7 @@ mkfs_msdos(const char *fname, const char *dtype, const struct msdos_options *op)
     }
     if (o.create_size) {
 	if (!S_ISREG(sb.st_mode)) {
-#ifdef MAKEFS
-	    errx(1, "%s is not a regular file", fname);
-#else
 	    warnx("warning, %s is not a regular file", fname);
-#endif
 	}
     } else {
 #ifdef MAKEFS
@@ -329,9 +328,6 @@ mkfs_msdos(const char *fname, const char *dtype, const struct msdos_options *op)
 	bpb.bpbHiddenSecs = o.hidden_sectors;
     if (!(o.floppy || (o.drive_heads && o.sectors_per_track &&
 	o.bytes_per_sector && o.size && o.hidden_sectors_set))) {
-#ifdef MAKEFS
-	errx(1, "Should not take this branch in makefs!");
-#else
 	getdiskinfo(fd, fname, dtype, o.hidden_sectors_set, &bpb);
 	bpb.bpbHugeSectors -= (o.offset / bpb.bpbBytesPerSec);
 	if (bpb.bpbSecPerClust == 0) {	/* set defaults */
@@ -346,7 +342,6 @@ mkfs_msdos(const char *fname, const char *dtype, const struct msdos_options *op)
 	    else
 		bpb.bpbSecPerClust = 64;		/* otherwise 32k */
 	}
-#endif
     }
     if (!powerof2(bpb.bpbBytesPerSec)) {
 	warnx("bytes/sector (%u) is not a power of 2", bpb.bpbBytesPerSec);
@@ -556,7 +551,7 @@ mkfs_msdos(const char *fname, const char *dtype, const struct msdos_options *op)
 	x1 = bpb.bpbResSectors + rds;
 	x = bpb.bpbBigFATsecs ? bpb.bpbBigFATsecs : 1;
 	if (x1 + (u_int64_t)x * bpb.bpbFATs > bpb.bpbHugeSectors) {
-	    warnx("meta data exceeds file system size");
+	    errx(1, "meta data exceeds file system size");
 	    goto done;
 	}
 	x1 += x * bpb.bpbFATs;
@@ -836,7 +831,23 @@ getstdfmt(const char *fmt, struct bpb *bpb)
     return 0;
 }
 
-#ifndef MAKEFS
+static void
+compute_geometry_from_file(int fd, const char *fname, struct disklabel *lp)
+{
+	struct stat st;
+	off_t ms;
+
+	if (fstat(fd, &st))
+		err(1, "cannot get disk size");
+	if (!S_ISREG(st.st_mode))
+		errx(1, "%s is not a regular file", fname);
+	ms = st.st_size;
+	lp->d_secsize = 512;
+	lp->d_nsectors = 63;
+	lp->d_ntracks = 255;
+	lp->d_secperunit = ms / lp->d_secsize;
+}
+
 /*
  * Get disk slice, partition, and geometry information.
  */
@@ -844,9 +855,11 @@ static int
 getdiskinfo(int fd, const char *fname, const char *dtype, __unused int oflag,
 	    struct bpb *bpb)
 {
+
     struct disklabel *lp, dlp;
-    struct fd_type type;
     off_t ms, hs = 0;
+#ifndef MAKEFS
+    struct fd_type type;
 
     lp = NULL;
 
@@ -858,16 +871,8 @@ getdiskinfo(int fd, const char *fname, const char *dtype, __unused int oflag,
     /* Maybe it's a floppy drive */
     if (lp == NULL) {
 	if (ioctl(fd, DIOCGMEDIASIZE, &ms) == -1) {
-	    struct stat st;
-
-	    if (fstat(fd, &st))
-		err(1, "cannot get disk size");
 	    /* create a fake geometry for a file image */
-	    ms = st.st_size;
-	    dlp.d_secsize = 512;
-	    dlp.d_nsectors = 63;
-	    dlp.d_ntracks = 255;
-	    dlp.d_secperunit = ms / dlp.d_secsize;
+	    compute_geometry_from_file(fd, fname, &dlp);
 	    lp = &dlp;
 	} else if (ioctl(fd, FD_GTYPE, &type) != -1) {
 	    dlp.d_secsize = 128 << type.secsize;
@@ -907,6 +912,11 @@ getdiskinfo(int fd, const char *fname, const char *dtype, __unused int oflag,
 	hs = (ms / dlp.d_secsize) - dlp.d_secperunit;
 	lp = &dlp;
     }
+#else
+    /* In the makefs case we only support image files: */
+    compute_geometry_from_file(fd, fname, &dlp);
+    lp = &dlp;
+#endif
 
     if (bpb->bpbBytesPerSec == 0) {
 	if (ckgeom(fname, lp->d_secsize, "bytes/sector") == -1)
@@ -929,7 +939,6 @@ getdiskinfo(int fd, const char *fname, const char *dtype, __unused int oflag,
 	bpb->bpbHiddenSecs = hs;
     return 0;
 }
-#endif /* !defined(MAKEFS) */
 
 /*
  * Print out BPB values.
