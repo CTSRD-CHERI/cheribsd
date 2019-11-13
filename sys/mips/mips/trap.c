@@ -923,22 +923,10 @@ trap(struct trapframe *trapframe)
 
 	case T_TLB_LD_MISS + T_USER:
 		ftype = VM_PROT_READ;
-		goto checkrefbit;
+		goto dofault;
 
 	case T_TLB_ST_MISS + T_USER:
 		ftype = VM_PROT_WRITE;
-
-checkrefbit:
-		/*
-		 * Was this trap caused by the PTE_VR bit not being set?
-		 */
-		if (pmap_emulate_referenced(&p->p_vmspace->vm_pmap,
-		    trapframe->badvaddr) == 0) {
-			if (!usermode) {
-				return (trapframe->pc);
-			}
-			goto out;
-		}
 
 dofault:
 		{
@@ -1815,16 +1803,9 @@ get_mapping_info(vm_offset_t va, pd_entry_t **pdepp, pt_entry_t **ptepp)
 	struct proc *p = curproc;
 
 	pdep = (&(p->p_vmspace->vm_pmap.pm_segtab[(va >> SEGSHIFT) & (NPDEPG - 1)]));
-	if (*pdep) {
-#if VM_NRESERVLEVEL > 0
-		pd_entry_t *pde = &pdep[(va >> PDRSHIFT) & (NPDEPG - 1)];
-
-		if (pde_is_superpage(pde))
-			ptep = (pt_entry_t *)pde;
-		else
-#endif /* VM_NRESERVLEVEL > 0 */
-			ptep = pmap_pte(&p->p_vmspace->vm_pmap, va);
-	} else
+	if (*pdep)
+		ptep = pmap_pte(&p->p_vmspace->vm_pmap, va);
+	else
 		ptep = (pt_entry_t *)0;
 
 	*pdepp = pdep;

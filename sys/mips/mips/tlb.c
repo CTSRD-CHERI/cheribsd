@@ -338,14 +338,14 @@ tlb_update(struct pmap *pmap, vm_offset_t va, pt_entry_t pte)
 			mips_wr_entrylo0(pte);
 			if (pagemask & ~PAGE_MASK) {
 				/* Superpage */
-				pte1 = (pte1 & ~(PTE_VR | PTE_D)) | (pte & (PTE_VR | PTE_D));
+				pte1 = (pte1 & ~(PTE_V | PTE_D)) | (pte & (PTE_V | PTE_D));
 				mips_wr_entrylo1(pte1);
 			}
 		} else {
 			mips_wr_entrylo1(pte);
 			if (pagemask & ~PAGE_MASK) {
 				/* Superpage */
-				pte0 = (pte0 & ~(PTE_VR | PTE_D)) | (pte & (PTE_VR | PTE_D));
+				pte0 = (pte0 & ~(PTE_V | PTE_D)) | (pte & (PTE_V | PTE_D));
 				mips_wr_entrylo0(pte0);
 			}
 		}

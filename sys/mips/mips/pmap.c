@@ -253,7 +253,7 @@ pmap_lmem_map1(vm_paddr_t phys)
 {
 	critical_enter();
 	*PCPU_GET(cmap1_ptep) =
-	    TLBLO_PA_TO_PFN(phys) | PTE_C_CACHE | PTE_D | PTE_VALID | PTE_G;
+	    TLBLO_PA_TO_PFN(phys) | PTE_C_CACHE | PTE_D | PTE_V | PTE_G;
 	return (PCPU_GET(cmap1_addr));
 }
 
@@ -262,9 +262,9 @@ pmap_lmem_map2(vm_paddr_t phys1, vm_paddr_t phys2)
 {
 	critical_enter();
 	*PCPU_GET(cmap1_ptep) =
-	    TLBLO_PA_TO_PFN(phys1) | PTE_C_CACHE | PTE_D | PTE_VALID | PTE_G;
+	    TLBLO_PA_TO_PFN(phys1) | PTE_C_CACHE | PTE_D | PTE_V | PTE_G;
 	*PCPU_GET(cmap2_ptep) =
-	    TLBLO_PA_TO_PFN(phys2) | PTE_C_CACHE | PTE_D | PTE_VALID | PTE_G;
+	    TLBLO_PA_TO_PFN(phys2) | PTE_C_CACHE | PTE_D | PTE_V | PTE_G;
 	return (PCPU_GET(cmap1_addr));
 }
 
@@ -811,7 +811,7 @@ pmap_extract_and_hold(pmap_t pmap, vm_offset_t va, vm_prot_t prot)
 	ptep = pmap_pte(pmap, va);
 	if (ptep != NULL) {
 		pte = *ptep;
-		if (pte_test(&pte, PTE_VALID) && (!pte_test(&pte, PTE_RO) ||
+		if (pte_test(&pte, PTE_V) && (!pte_test(&pte, PTE_RO) ||
 		    (prot & VM_PROT_WRITE) == 0)) {
 			pa = TLBLO_PTE_TO_PA(pte);
 			m = PHYS_TO_VM_PAGE(pa);
@@ -842,9 +842,9 @@ pmap_kenter_attr(vm_offset_t va, vm_paddr_t pa, vm_memattr_t ma)
 
 	pte = pmap_pte(kernel_pmap, va);
 	opte = *pte;
-	npte = TLBLO_PA_TO_PFN(pa) | PTE_C(ma) | PTE_D | PTE_VALID | PTE_G;
+	npte = TLBLO_PA_TO_PFN(pa) | PTE_C(ma) | PTE_D | PTE_V | PTE_G;
 	*pte = npte;
-	if (pte_test(&opte, PTE_VALID) && opte != npte)
+	if (pte_test(&opte, PTE_V) && opte != npte)
 		pmap_update_page(kernel_pmap, va, npte);
 }
 
@@ -1493,7 +1493,7 @@ pmap_pv_reclaim(pmap_t locked_pmap)
 				if (m->md.pv_flags & PV_TABLE_REF)
 					vm_page_aflag_set(m, PGA_REFERENCED);
 				m->md.pv_flags &= ~PV_TABLE_REF;
-				TAILQ_REMOVE(&m->md.pv_list, pv, pv_next);
+				TAILQ_REMOVE(&m->md.pv_list, pv, pv_list);
 				if (TAILQ_EMPTY(&m->md.pv_list))
 					vm_page_aflag_clear(m, PGA_WRITEABLE);
 				pc->pc_map[field] |= 1UL << bit;
@@ -1674,9 +1674,9 @@ pmap_pvh_remove(struct md_page *pvh, pmap_t pmap, vm_offset_t va)
 	pv_entry_t pv;
 
 	rw_assert(&pvh_global_lock, RA_WLOCKED);
-	TAILQ_FOREACH(pv, &pvh->pv_list, pv_next) {
+	TAILQ_FOREACH(pv, &pvh->pv_list, pv_list) {
 		if (pmap == PV_PMAP(pv) && va == pv->pv_va) {
-			TAILQ_REMOVE(&pvh->pv_list, pv, pv_next);
+			TAILQ_REMOVE(&pvh->pv_list, pv, pv_list);
 			break;
 		}
 	}
@@ -1718,7 +1718,7 @@ pmap_try_insert_pv_entry(pmap_t pmap, vm_page_t mpte, vm_offset_t va,
 	PMAP_LOCK_ASSERT(pmap, MA_OWNED);
 	if ((pv = get_pv_entry(pmap, TRUE)) != NULL) {
 		pv->pv_va = va;
-		TAILQ_INSERT_TAIL(&m->md.pv_list, pv, pv_next);
+		TAILQ_INSERT_TAIL(&m->md.pv_list, pv, pv_list);
 		return (TRUE);
 	} else
 		return (FALSE);
@@ -1791,7 +1791,7 @@ pmap_remove_page(struct pmap *pmap, vm_offset_t va)
 	/*
 	 * If there is no pte for this address, just skip it!
 	 */
-	if (!pte_test(ptq, PTE_VALID))
+	if (!pte_test(ptq, PTE_V))
 		return;
 
 	(void)pmap_remove_pte(pmap, ptq, va, *pde);
@@ -1857,7 +1857,7 @@ pmap_remove(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 		va = va_next;
 		for (pte = pmap_pde_to_pte(pde, sva); sva != va_next; pte++,
 		    sva += PAGE_SIZE) {
-			if (!pte_test(pte, PTE_VALID)) {
+			if (!pte_test(pte, PTE_V)) {
 				if (va != va_next) {
 					pmap_invalidate_range(pmap, va, sva);
 					va = va_next;
@@ -1915,7 +1915,7 @@ pmap_remove_all(vm_page_t m)
 		 * If it's last mapping writeback all caches from
 		 * the page being destroyed
 	 	 */
-		if (TAILQ_NEXT(pv, pv_next) == NULL)
+		if (TAILQ_NEXT(pv, pv_list) == NULL)
 			mips_dcache_wbinv_range_index(pv->pv_va, PAGE_SIZE);
 
 		pmap->pm_stats.resident_count--;
@@ -1944,7 +1944,7 @@ pmap_remove_all(vm_page_t m)
 		}
 		pmap_invalidate_page(pmap, pv->pv_va);
 
-		TAILQ_REMOVE(&m->md.pv_list, pv, pv_next);
+		TAILQ_REMOVE(&m->md.pv_list, pv, pv_list);
 		pmap_unuse_pt(pmap, pv->pv_va, *pde);
 		free_pv_entry(pmap, pv);
 		PMAP_UNLOCK(pmap);
@@ -2006,7 +2006,7 @@ pmap_protect(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, vm_prot_t prot)
 		for (pte = pmap_pde_to_pte(pde, sva); sva != va_next; pte++,
 		    sva += PAGE_SIZE) {
 			pbits = *pte;
-			if (!pte_test(&pbits, PTE_VALID) || pte_test(&pbits,
+			if (!pte_test(&pbits, PTE_V) || pte_test(&pbits,
 			    PTE_RO)) {
 				if (va != va_next) {
 					pmap_invalidate_range(pmap, va, sva);
@@ -2118,7 +2118,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	}
 
 	origpte = *pte;
-	KASSERT(!pte_test(&origpte, PTE_D | PTE_RO | PTE_VALID),
+	KASSERT(!pte_test(&origpte, PTE_D | PTE_RO | PTE_V),
 	    ("pmap_enter: modified page not writable: va: %p, pte: %#jx",
 	    (void *)va, (uintmax_t)origpte));
 	opa = TLBLO_PTE_TO_PA(origpte);
@@ -2126,7 +2126,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	/*
 	 * Mapping has not changed, must be protection or wiring change.
 	 */
-	if (pte_test(&origpte, PTE_VALID) && opa == pa) {
+	if (pte_test(&origpte, PTE_V) && opa == pa) {
 		/*
 		 * Wiring change, just update stats. We don't worry about
 		 * wiring PT pages as they remain resident as long as there
@@ -2201,7 +2201,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 			pv = get_pv_entry(pmap, FALSE);
 			pv->pv_va = va;
 		}
-		TAILQ_INSERT_TAIL(&m->md.pv_list, pv, pv_next);
+		TAILQ_INSERT_TAIL(&m->md.pv_list, pv, pv_list);
 		if (!pte_test(&newpte, PTE_RO))
 			vm_page_aflag_set(m, PGA_WRITEABLE);
 	}
@@ -2224,7 +2224,7 @@ validate:
 	 */
 	if (origpte != newpte) {
 		*pte = newpte;
-		if (pte_test(&origpte, PTE_VALID)) {
+		if (pte_test(&origpte, PTE_V)) {
 			KASSERT(opa == pa, ("pmap_enter: invalid update"));
 			if (pte_test(&origpte, PTE_MANAGED) && opa != pa) {
 				if (om->md.pv_flags & PV_TABLE_REF)
@@ -2327,7 +2327,7 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	}
 
 	pte = pmap_pte(pmap, va);
-	if (pte_test(pte, PTE_VALID)) {
+	if (pte_test(pte, PTE_V)) {
 		if (mpte != NULL) {
 			mpte->ref_count--;
 			mpte = NULL;
@@ -2357,7 +2357,7 @@ pmap_enter_quick_locked(pmap_t pmap, vm_offset_t va, vm_page_t m,
 	/*
 	 * Now validate mapping with RO protection
 	 */
-	npte = PTE_RO | TLBLO_PA_TO_PFN(pa) | PTE_VALID;
+	npte = PTE_RO | TLBLO_PA_TO_PFN(pa) | PTE_V;
 	if ((m->oflags & VPO_UNMANAGED) == 0)
 		npte |= PTE_MANAGED;
 
@@ -2404,7 +2404,7 @@ pmap_kenter_temporary(vm_paddr_t pa, int i)
 		pte = pmap_pte(kernel_pmap, crashdumpva); 
 
 		/* Since this is for the debugger, no locks or any other fun */
-		npte = TLBLO_PA_TO_PFN(pa) | PTE_C_CACHE | PTE_D | PTE_VALID |
+		npte = TLBLO_PA_TO_PFN(pa) | PTE_C_CACHE | PTE_D | PTE_V |
 		    PTE_G;
 		*pte = npte;
 		pmap_update_page(kernel_pmap, crashdumpva, npte);
@@ -2517,7 +2517,7 @@ pmap_unwire(pmap_t pmap, vm_offset_t sva, vm_offset_t eva)
 			va_next = eva;
 		for (pte = pmap_pde_to_pte(pde, sva); sva != va_next; pte++,
 		    sva += PAGE_SIZE) {
-			if (!pte_test(pte, PTE_VALID))
+			if (!pte_test(pte, PTE_V))
 				continue;
 			if (!pte_test(pte, PTE_W))
 				panic("pmap_unwire: pte %#jx is missing PG_W",
@@ -2762,7 +2762,7 @@ pmap_quick_enter_page(vm_page_t m)
 
 	KASSERT(*pte == PTE_G, ("pmap_quick_enter_page: PTE busy"));
 
-	npte = TLBLO_PA_TO_PFN(pa) | PTE_D | PTE_VALID | PTE_G;
+	npte = TLBLO_PA_TO_PFN(pa) | PTE_D | PTE_V | PTE_G;
 	PMAP_PTE_SET_CACHE_BITS(npte, pa, m);
 	*pte = npte;
 
@@ -2812,7 +2812,7 @@ pmap_page_exists_quick(pmap_t pmap, vm_page_t m)
 	    ("pmap_page_exists_quick: page %p is not managed", m));
 	rv = FALSE;
 	rw_wlock(&pvh_global_lock);
-	TAILQ_FOREACH(pv, &m->md.pv_list, pv_next) {
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
 		if (PV_PMAP(pv) == pmap) {
 			rv = TRUE;
 			break;
@@ -2875,7 +2875,7 @@ pmap_remove_pages(pmap_t pmap)
 				KASSERT(pde != NULL && *pde != 0,
 				    ("pmap_remove_pages: pde"));
 				pte = pmap_pde_to_pte(pde, pv->pv_va);
-				if (!pte_test(pte, PTE_VALID))
+				if (!pte_test(pte, PTE_V))
 					panic("pmap_remove_pages: bad pte");
 				tpte = *pte;
 
@@ -2905,7 +2905,7 @@ pmap_remove_pages(pmap_t pmap)
 				pv_entry_count--;
 				pc->pc_map[field] |= bitmask;
 				pmap->pm_stats.resident_count--;
-				TAILQ_REMOVE(&m->md.pv_list, pv, pv_next);
+				TAILQ_REMOVE(&m->md.pv_list, pv, pv_list);
 				if (TAILQ_EMPTY(&m->md.pv_list))
 					vm_page_aflag_clear(m, PGA_WRITEABLE);
 				pmap_unuse_pt(pmap, pv->pv_va, *pde);
@@ -2936,7 +2936,7 @@ pmap_testbit(vm_page_t m, int bit)
 		return (rv);
 
 	rw_assert(&pvh_global_lock, RA_WLOCKED);
-	TAILQ_FOREACH(pv, &m->md.pv_list, pv_next) {
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
 		pmap = PV_PMAP(pv);
 		PMAP_LOCK(pmap);
 		pte = pmap_pte(pmap, pv->pv_va);
@@ -2966,7 +2966,7 @@ pmap_page_wired_mappings(vm_page_t m)
 	if ((m->oflags & VPO_UNMANAGED) != 0)
 		return (count);
 	rw_wlock(&pvh_global_lock);
-	TAILQ_FOREACH(pv, &m->md.pv_list, pv_next) {
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
 		pmap = PV_PMAP(pv);
 		PMAP_LOCK(pmap);
 		pte = pmap_pte(pmap, pv->pv_va);
@@ -2995,11 +2995,11 @@ pmap_remove_write(vm_page_t m)
 	if (!pmap_page_is_write_mapped(m))
 		return;
 	rw_wlock(&pvh_global_lock);
-	TAILQ_FOREACH(pv, &m->md.pv_list, pv_next) {
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
 		pmap = PV_PMAP(pv);
 		PMAP_LOCK(pmap);
 		pte = pmap_pte(pmap, pv->pv_va);
-		KASSERT(pte != NULL && pte_test(pte, PTE_VALID),
+		KASSERT(pte != NULL && pte_test(pte, PTE_V),
 		    ("page on pv_list has no pte"));
 		pbits = *pte;
 		if (pte_test(&pbits, PTE_D)) {
@@ -3136,7 +3136,7 @@ pmap_advise(pmap_t pmap, vm_offset_t sva, vm_offset_t eva, int advice)
 		va = va_next;
 		for (pte = pmap_pde_to_pte(pde, sva); sva != va_next; pte++,
 		    sva += PAGE_SIZE) {
-			if (!pte_test(pte, PTE_MANAGED | PTE_VALID)) {
+			if (!pte_test(pte, PTE_MANAGED | PTE_V)) {
 				if (va != va_next) {
 					pmap_invalidate_range(pmap, va, sva);
 					va = va_next;
@@ -3195,7 +3195,7 @@ pmap_clear_modify(vm_page_t m)
 	if (!pmap_page_is_write_mapped(m))
 		return;
 	rw_wlock(&pvh_global_lock);
-	TAILQ_FOREACH(pv, &m->md.pv_list, pv_next) {
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
 		pmap = PV_PMAP(pv);
 		PMAP_LOCK(pmap);
 		pte = pmap_pte(pmap, pv->pv_va);
@@ -3304,7 +3304,7 @@ pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 	PMAP_LOCK(pmap);
 	ptep = pmap_pte(pmap, addr);
 	pte = (ptep != NULL) ? *ptep : 0;
-	if (!pte_test(&pte, PTE_VALID)) {
+	if (!pte_test(&pte, PTE_V)) {
 		PMAP_UNLOCK(pmap);
 		return (0);
 	}
@@ -3447,7 +3447,7 @@ DB_SHOW_COMMAND(ptable, ddb_pid_dump)
 #endif
 			for (k = 0; k < NPTEPG; k++) {
 				pte = pde[k];
-				if (pte == 0 || !pte_test(&pte, PTE_VALID))
+				if (pte == 0 || !pte_test(&pte, PTE_V))
 					continue;
 				pa = TLBLO_PTE_TO_PA(pte);
 				va = ((u_long)i << SEGSHIFT) | (j << PDRSHIFT) | (k << PAGE_SHIFT);
@@ -3495,15 +3495,15 @@ init_pte_prot(vm_page_t m, vm_prot_t access, vm_prot_t prot)
 	pt_entry_t rw;
 
 	if (!(prot & VM_PROT_WRITE))
-		rw = PTE_VALID | PTE_RO;
+		rw = PTE_V | PTE_RO;
 	else if ((m->oflags & VPO_UNMANAGED) == 0) {
 		if ((access & VM_PROT_WRITE) != 0)
-			rw = PTE_VALID | PTE_D;
+			rw = PTE_V | PTE_D;
 		else
-			rw = PTE_VALID;
+			rw = PTE_V;
 	} else
 		/* Needn't emulate a modified bit for unmanaged pages. */
-		rw = PTE_VALID | PTE_D;
+		rw = PTE_V | PTE_D;
 	return (rw);
 }
 
@@ -3526,13 +3526,13 @@ pmap_emulate_modified(pmap_t pmap, vm_offset_t va)
 		panic("pmap_emulate_modified: can't find PTE");
 #ifdef SMP
 	/* It is possible that some other CPU changed m-bit */
-	if (!pte_test(pte, PTE_VALID) || pte_test(pte, PTE_D)) {
+	if (!pte_test(pte, PTE_V) || pte_test(pte, PTE_D)) {
 		tlb_update(pmap, va, *pte);
 		PMAP_UNLOCK(pmap);
 		return (0);
 	}
 #else
-	if (!pte_test(pte, PTE_VALID) || pte_test(pte, PTE_D))
+	if (!pte_test(pte, PTE_V) || pte_test(pte, PTE_D))
 		panic("pmap_emulate_modified: invalid pte");
 #endif
 	if (pte_test(pte, PTE_RO)) {
@@ -3545,18 +3545,6 @@ pmap_emulate_modified(pmap_t pmap, vm_offset_t va)
 		panic("pmap_emulate_modified: unmanaged page");
 	PMAP_UNLOCK(pmap);
 	return (0);
-}
-
-/*
- * pmap_emulate_referenced
- *
- * Reference bit emulation is not suppored in this pmap implementation.
- */
-int
-pmap_emulate_referenced(pmap_t pmap, vm_offset_t va)
-{
-
-	return (1);
 }
 
 /*
@@ -3636,7 +3624,7 @@ pmap_flush_pvcache(vm_page_t m)
 
 	if (m != NULL) {
 		for (pv = TAILQ_FIRST(&m->md.pv_list); pv;
-		    pv = TAILQ_NEXT(pv, pv_next)) {
+		    pv = TAILQ_NEXT(pv, pv_list)) {
 			mips_dcache_wbinv_range_index(pv->pv_va, PAGE_SIZE);
 		}
 	}
@@ -3717,7 +3705,7 @@ pmap_change_attr(vm_offset_t sva, vm_size_t size, vm_memattr_t ma)
 		va = va_next;
 		for (pte = pmap_pde_to_pte(pde, sva); sva != va_next; pte++,
 		    sva += PAGE_SIZE) {
-			if (!pte_test(pte, PTE_VALID) || pte_cache_bits(pte) == ma) {
+			if (!pte_test(pte, PTE_V) || pte_cache_bits(pte) == ma) {
 				if (va != va_next) {
 					pmap_invalidate_range(pmap, va, sva);
 					va = va_next;
