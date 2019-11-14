@@ -221,7 +221,7 @@ ${PROGNAME}.debug: ${PROG_FULL}
 
 .if ${PROG_INSTALL} != ${PROG}
 ${PROG_INSTALL}: ${PROG}
-	strip -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
+	${STRIP} -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
 .endif
 
 .if defined(LLVM_LINK)
