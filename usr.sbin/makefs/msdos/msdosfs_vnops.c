@@ -468,7 +468,7 @@ msdosfs_wfile(const char *path, struct denode *dep, fsnode *node)
 
 	if ((fd = open(path, O_RDONLY)) == -1) {
 		error = errno;
-		MSDOSFS_DPRINTF(("open %s: %s", path, strerror(error)));
+		fprintf(stderr, "open %s: %s\n", path, strerror(error));
 		return error;
 	}
 
