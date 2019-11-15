@@ -179,8 +179,6 @@ cheriabi_elf_header_supported(struct image_params *imgp)
 
 	if (!use_cheriabi)
 		return FALSE;
-	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI)
-		return FALSE;
 
 	/* TODO: add a sysctl to allow loading old binaries */
 	if (hdr->e_ident[EI_ABIVERSION] != ELF_CHERIABI_ABIVERSION) {
