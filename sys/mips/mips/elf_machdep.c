@@ -189,23 +189,12 @@ mips_elf_header_supported(struct image_params * imgp)
 
 	if (use_cheriabi)
 		return FALSE;
-	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI)
-		return FALSE;
 
 	if (machine == EF_MIPS_MACH_CHERI128)
 		return cheriabi_check_cpu_compatible(128, imgp->execpath);
 	else if (machine == EF_MIPS_MACH_CHERI256)
 		return cheriabi_check_cpu_compatible(256, imgp->execpath);
 	return FALSE;
-}
-#elif defined(__mips_n64)
-static boolean_t
-mips_elf_header_supported(struct image_params * imgp)
-{
-	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
-	if ((hdr->e_flags & EF_MIPS_ABI) == EF_MIPS_ABI_CHERIABI)
-		return FALSE;
-	return TRUE;
 }
 #endif
 
@@ -217,15 +206,11 @@ static __ElfN(Brandinfo) freebsd_brand_info = {
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf_freebsd_sysvec,
 	.interp_newpath	= NULL,
-#if !__has_feature(capabilities)
-	.brand_note	= &__elfN(freebsd_brandnote),
-#endif
-#if defined(__mips_n64) || __has_feature(capabilities)
-	.header_supported = mips_elf_header_supported,
-#endif
 #if __has_feature(capabilities)
+	.header_supported = mips_elf_header_supported,
 	.flags		= BI_CAN_EXEC_DYN
 #else
+	.brand_note	= &__elfN(freebsd_brandnote),
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
 #endif
 };
