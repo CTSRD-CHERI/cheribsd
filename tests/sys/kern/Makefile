@@ -8,6 +8,8 @@ TESTSDIR=	${TESTSBASE}/sys/kern
 #ATF_TESTS_C+=	kcov
 ATF_TESTS_C+=	kern_copyin
 ATF_TESTS_C+=	kern_descrip_test
+ATF_TESTS_C+=	kill_zombie
+ATF_TESTS_C+=	memfd_test
 ATF_TESTS_C+=	ptrace_test
 TEST_METADATA.ptrace_test+=		timeout="15"
 ATF_TESTS_C+=	reaper
@@ -46,7 +48,6 @@ LIBADD.mqueue_test+=	rt
     ${MACHINE_ARCH} == "i386" || \
     ${MACHINE_ARCH} == "aarch64"
 ATF_TESTS_C+=	libkern_crc32
-CFLAGS.libkern_crc32+=	-DUSERSPACE_TESTING
 .if ${MACHINE_ARCH} == "amd64" || ${MACHINE_ARCH} == "i386"
 LDADD.libkern_crc32+=	${SRCTOP}/sys/libkern/x86/crc32_sse42.c
 .else

@@ -23,18 +23,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180719,
- *   "target_type": "test",
- *   "changes": [
- *     "other"
- *   ],
- *   "change_comment": "Pad strings so we don't read past the end"
- * }
- * CHERI CHANGES END
- */
 
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
@@ -77,7 +65,7 @@ test_wcsnlen(const wchar_t *s)
 	for (i = 0; i <= 1; i++) {
 		for (bufsize = 0; bufsize <= size + 10; bufsize++) {
 			s1 = makebuf(bufsize * sizeof(wchar_t), i);
-			wmemcpy(s1, s, bufsize);
+			wmemcpy(s1, s, bufsize <= size ? bufsize : size);
 			len = (size > bufsize) ? bufsize : size - 1;
 			ATF_CHECK(wcsnlen(s1, bufsize) == len);
 		}
@@ -88,21 +76,21 @@ ATF_TC_WITHOUT_HEAD(nul);
 ATF_TC_BODY(nul, tc)
 {
 
-	test_wcsnlen(L"\0\0\0\0\0\0\0\0\0\0");
+	test_wcsnlen(L"");
 }
 
 ATF_TC_WITHOUT_HEAD(foo);
 ATF_TC_BODY(foo, tc)
 {
 
-	test_wcsnlen(L"foo\0\0\0\0\0\0\0\0\0\0");
+	test_wcsnlen(L"foo");
 }
 
 ATF_TC_WITHOUT_HEAD(glorp);
 ATF_TC_BODY(glorp, tc)
 {
 
-	test_wcsnlen(L"glorp\0\0\0\0\0\0\0\0\0\0");
+	test_wcsnlen(L"glorp");
 }
 
 ATF_TP_ADD_TCS(tp)

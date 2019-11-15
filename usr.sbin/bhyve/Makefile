@@ -16,6 +16,7 @@ BHYVE_SYSDIR?=${SRCTOP}
 SRCS=	\
 	atkbdc.c		\
 	acpi.c			\
+	audio.c			\
 	bhyvegc.c		\
 	bhyverun.c		\
 	block_if.c		\
@@ -27,14 +28,18 @@ SRCS=	\
 	dbgport.c		\
 	fwctl.c			\
 	gdb.c			\
+	hda_codec.c		\
 	inout.c			\
 	ioapic.c		\
 	mem.c			\
 	mevent.c		\
 	mptbl.c			\
+	net_backends.c		\
+	net_utils.c		\
 	pci_ahci.c		\
 	pci_e82545.c		\
 	pci_emul.c		\
+	pci_hda.c		\
 	pci_fbuf.c		\
 	pci_hostbridge.c	\
 	pci_irq.c		\

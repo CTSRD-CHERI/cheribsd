@@ -874,18 +874,13 @@ add_vif(struct vifctl *vifcp)
 	 */
 	ifp = NULL;
     } else {
-	struct epoch_tracker et;
-
 	sin.sin_addr = vifcp->vifc_lcl_addr;
-	NET_EPOCH_ENTER(et);
 	ifa = ifa_ifwithaddr((struct sockaddr *)&sin);
 	if (ifa == NULL) {
-		NET_EPOCH_EXIT(et);
 	    VIF_UNLOCK();
 	    return EADDRNOTAVAIL;
 	}
 	ifp = ifa->ifa_ifp;
-	NET_EPOCH_EXIT(et);
     }
 
     if ((vifcp->vifc_flags & VIFF_TUNNEL) != 0) {
@@ -1680,7 +1675,6 @@ static void
 send_packet(struct vif *vifp, struct mbuf *m)
 {
 	struct ip_moptions imo;
-	struct in_multi *imm[2];
 	int error __unused;
 
 	VIF_LOCK_ASSERT();
@@ -1689,9 +1683,7 @@ send_packet(struct vif *vifp, struct mbuf *m)
 	imo.imo_multicast_ttl  = mtod(m, struct ip *)->ip_ttl - 1;
 	imo.imo_multicast_loop = 1;
 	imo.imo_multicast_vif  = -1;
-	imo.imo_num_memberships = 0;
-	imo.imo_max_memberships = 2;
-	imo.imo_membership  = &imm[0];
+	STAILQ_INIT(&imo.imo_head);
 
 	/*
 	 * Re-entrancy should not be a problem here, because

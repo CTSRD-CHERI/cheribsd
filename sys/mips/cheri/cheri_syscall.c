@@ -60,15 +60,6 @@ cheri_syscall_authorize(struct thread *td, u_int code, int nargs,
 	uintmax_t c_perms;
 
 	/*
-	 * Allow the cycle counter to be read via sysarch.
-	 *
-	 * XXXRW: Now that we support a userspace cycle counter, we should
-	 * remove this.
-	 */
-	if (code == SYS_sysarch && (vaddr_t)args[0] == MIPS_GET_COUNT)
-		return (0);
-
-	/*
 	 * Check whether userspace holds the rights defined in
 	 * cheri_capability_set_user() in $pcc.  Note that object type doesn't
 	 * come into play here.

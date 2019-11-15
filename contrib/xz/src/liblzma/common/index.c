@@ -9,7 +9,18 @@
 //  You can do whatever you want with this file.
 //
 ///////////////////////////////////////////////////////////////////////////////
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190910,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds"
+ *   ],
+ *   "change_comment": "C inheritance addrof first member (index_tree_node)"
+ * }
+ * CHERI CHANGES END
+ */
 #include "index.h"
 #include "stream_flags_common.h"
 
@@ -27,7 +38,7 @@
 
 /// \brief      Base structure for index_stream and index_group structures
 typedef struct index_tree_node_s index_tree_node;
-struct index_tree_node_s {
+__subobject_type_used_for_c_inheritance struct index_tree_node_s {
 	/// Uncompressed start offset of this Stream (relative to the
 	/// beginning of the file) or Block (relative to the beginning
 	/// of the Stream)
@@ -70,7 +81,7 @@ typedef struct {
 
 typedef struct {
 	/// Every Record group is part of index_stream.groups tree.
-	index_tree_node node;
+	index_tree_node node __subobject_member_used_for_c_inheritance;
 
 	/// Number of Blocks in this Stream before this group.
 	lzma_vli number_base;
@@ -106,7 +117,7 @@ typedef struct {
 
 typedef struct {
 	/// Every index_stream is a node in the tree of Sreams.
-	index_tree_node node;
+	index_tree_node node __subobject_member_used_for_c_inheritance;
 
 	/// Number of this Stream (first one is 1)
 	uint32_t number;

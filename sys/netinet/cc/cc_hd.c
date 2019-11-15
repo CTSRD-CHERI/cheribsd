@@ -250,12 +250,3 @@ SYSCTL_PROC(_net_inet_tcp_cc_hd, OID_AUTO, queue_min,
 
 DECLARE_CC_MODULE(hd, &hd_cc_algo);
 MODULE_DEPEND(hd, ertt, 1, 1, 1);
-// CHERI CHANGES START
-// {
-//   "updated": 20181121,
-//   "target_type": "kernel",
-//   "changes": [
-//     "integer_provenance"
-//   ]
-// }
-// CHERI CHANGES END

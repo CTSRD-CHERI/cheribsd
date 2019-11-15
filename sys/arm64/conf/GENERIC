@@ -25,11 +25,11 @@ makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
 makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
 
 options 	SCHED_ULE		# ULE scheduler
+options 	NUMA			# Non-Uniform Memory Architecture support
 options 	PREEMPTION		# Enable kernel thread preemption
 options 	VIMAGE			# Subsystem virtualization, e.g. VNET
 options 	INET			# InterNETworking
 options 	INET6			# IPv6 communications protocols
-options 	IPSEC			# IP (v4/v6) security
 options 	IPSEC_SUPPORT		# Allow kldload of ipsec and tcpmd5
 options 	TCP_HHOOK		# hhook(9) framework for TCP
 options 	TCP_OFFLOAD		# TCP offload
@@ -104,13 +104,16 @@ options 	VERBOSE_SYSINIT=0	# Support debug.verbose_sysinit, off by default
 options 	EKCD			# Support for encrypted kernel dumps
 options 	GZIO			# gzip-compressed kernel and user dumps
 options 	ZSTDIO			# zstd-compressed kernel and user dumps
+options 	DEBUGNET		# debugnet networking
 options 	NETDUMP			# netdump(4) client support
 
 # SoC support
 options 	SOC_ALLWINNER_A64
 options 	SOC_ALLWINNER_H5
+options 	SOC_ALLWINNER_H6
 options 	SOC_CAVM_THUNDERX
 options 	SOC_HISI_HI6220
+options 	SOC_INTEL_STRATIX10
 options 	SOC_BRCM_BCM2837
 options 	SOC_MARVELL_8K
 options 	SOC_ROCKCHIP_RK3328
@@ -163,6 +166,7 @@ device  	smc		# SMSC LAN91C111
 device		vnic		# Cavium ThunderX NIC
 device		al_eth		# Annapurna Alpine Ethernet NIC
 device		dwc_rk		# Rockchip Designware
+device		dwc_socfpga	# Altera SOCFPGA Ethernet MAC
 
 # Etherswitch devices
 device		etherswitch	# Enable etherswitch support
@@ -189,6 +193,8 @@ device		aw_mmc			# Allwinner SD/MMC controller
 device		mmc			# mmc/sd bus
 device		mmcsd			# mmc/sd flash cards
 device		dwmmc
+device		dwmmc_altera
+device		rk_emmcphy
 
 # Serial (COM) ports
 device		uart		# Generic UART driver
@@ -200,13 +206,17 @@ device		uart_snps
 device		pl011
 
 # USB support
-device		aw_ehci			# Allwinner EHCI USB interface (USB 2.0)
 device		aw_usbphy		# Allwinner USB PHY
+device		rk_usb2phy		# Rockchip USB2PHY
+device		rk_typec_phy		# Rockchip TypeC PHY
 device		dwcotg			# DWC OTG controller
 device		ohci			# OHCI USB interface
 device		ehci			# EHCI USB interface (USB 2.0)
 device		ehci_mv			# Marvell EHCI USB interface
-device		xhci			# XHCI PCI->USB interface (USB 3.0)
+device		xhci			# XHCI USB interface (USB 3.0)
+device		dwc3			# Synopsys DWC controller
+device		aw_dwc3			# Allwinner DWC3 controller
+device		rk_dwc3			# Rockchip DWC3 controller
 device		usb			# USB Bus (required)
 device		ukbd			# Keyboard
 device		umass			# Disks/Mass storage - Requires scbus and da
@@ -224,7 +234,9 @@ device a10_codec
 device		a31_dmac
 
 # GPIO / PINCTRL
+device		a37x0_gpio	# Marvell Armada 37x0 GPIO controller
 device		aw_gpio		# Allwinner GPIO controller
+device		dwgpio		# Synopsys DesignWare APB GPIO Controller
 device		gpio
 device		gpioled
 device		fdt_pinctrl
@@ -251,6 +263,7 @@ device		aw_ccu		# Allwinner clock controller
 device		aw_nmi		# Allwinner NMI support
 device		mv_cp110_icu	# Marvell CP110 ICU
 device		mv_ap806_gicp	# Marvell AP806 GICP
+device		mv_ap806_sei	# Marvell AP806 SEI
 
 # Real-time clock support
 device		aw_rtc		# Allwinner Real-time Clock
@@ -273,6 +286,7 @@ device		mv_thermal	# Marvell Thermal Sensor Controller
 # SPI
 device		spibus
 device		bcm2835_spi	# Broadcom BCM283x SPI bus
+device		rk_spi		# RockChip SPI controller
 
 # PWM
 device		pwm
@@ -293,10 +307,9 @@ device		aw_cir
 # Pseudo devices.
 device		crypto		# core crypto support
 device		loop		# Network loopback
-device		random		# Entropy device
 device		ether		# Ethernet support
 device		vlan		# 802.1Q VLAN support
-device		tun		# Packet tunnel.
+device		tuntap		# Packet tunnel.
 device		md		# Memory "disks"
 device		gif		# IPv6 and IPv4 tunneling
 device		firmware	# firmware assist module
@@ -324,4 +337,4 @@ options 	FDT
 device		acpi
 
 # DTBs
-makeoptions	MODULES_EXTRA="dtb/allwinner dtb/rockchip dtb/rpi"
+makeoptions	MODULES_EXTRA="dtb/allwinner dtb/mv dtb/rockchip dtb/rpi"

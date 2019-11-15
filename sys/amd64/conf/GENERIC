@@ -30,7 +30,6 @@ options 	PREEMPTION		# Enable kernel thread preemption
 options 	VIMAGE			# Subsystem virtualization, e.g. VNET
 options 	INET			# InterNETworking
 options 	INET6			# IPv6 communications protocols
-options 	IPSEC			# IP (v4/v6) security
 options 	IPSEC_SUPPORT		# Allow kldload of ipsec and tcpmd5
 options 	TCP_OFFLOAD		# TCP offload
 options 	TCP_BLACKBOX		# Enhanced TCP event logging
@@ -112,7 +111,9 @@ options 	VERBOSE_SYSINIT=0	# Support debug.verbose_sysinit, off by default
 options 	EKCD			# Support for encrypted kernel dumps
 options 	GZIO			# gzip-compressed kernel and user dumps
 options 	ZSTDIO			# zstd-compressed kernel and user dumps
+options 	DEBUGNET		# debugnet networking
 options 	NETDUMP			# netdump(4) client support
+options 	NETGDB			# netgdb(4) client support
 
 # Make an SMP-capable kernel by default
 options 	SMP			# Symmetric MultiProcessor Kernel
@@ -166,10 +167,6 @@ device		ses			# Enclosure Services (SES and SAF-TE)
 device		amr			# AMI MegaRAID
 device		arcmsr			# Areca SATA II RAID
 device		ciss			# Compaq Smart RAID 5*
-device		hptmv			# Highpoint RocketRAID 182x
-device		hptnr			# Highpoint DC7280, R750
-device		hptrr			# Highpoint RocketRAID 17xx, 22xx, 23xx, 25xx
-device		hpt27xx			# Highpoint RocketRAID 27xx
 device		iir			# Intel Integrated RAID
 device		ips			# IBM (Adaptec) ServeRAID
 device		mly			# Mylex AcceleRAID/eXtremeRAID
@@ -193,6 +190,10 @@ device		twe			# 3ware ATA RAID
 # NVM Express (NVMe) support
 device		nvme			# base NVMe driver
 device		nvd			# expose NVMe namespaces as disks, depends on nvme
+
+# Intel Volume Management Device (VMD) support
+device		vmd			# base VMD device
+device		vmd_bus			# bus for VMD children
 
 # atkbdc0 controls both the keyboard and the PS/2 mouse
 device		atkbdc			# AT keyboard controller
@@ -246,11 +247,8 @@ device		vmx			# VMware VMXNET3 Ethernet
 
 # PCI Ethernet NICs.
 device		bxe			# Broadcom NetXtreme II BCM5771X/BCM578XX 10GbE
-device		de			# DEC/Intel DC21x4x (``Tulip'')
 device		le			# AMD Am7900 LANCE and Am79C9xx PCnet
 device		ti			# Alteon Networks Tigon I/II gigabit Ethernet
-device		txp			# 3Com 3cR990 (``Typhoon'')
-device		vx			# 3Com 3c590, 3c595 (``Vortex'')
 
 # PCI Ethernet NICs that use the common MII bus controller code.
 # NOTE: Be sure to keep the 'device miibus' line in order to use these NICs!
@@ -273,20 +271,15 @@ device		lge			# Level 1 LXT1001 gigabit Ethernet
 device		msk			# Marvell/SysKonnect Yukon II Gigabit Ethernet
 device		nfe			# nVidia nForce MCP on-board Ethernet
 device		nge			# NatSemi DP83820 gigabit Ethernet
-device		pcn			# AMD Am79C97x PCI 10/100 (precedence over 'le')
 device		re			# RealTek 8139C+/8169/8169S/8110S
 device		rl			# RealTek 8129/8139
-device		sf			# Adaptec AIC-6915 (``Starfire'')
 device		sge			# Silicon Integrated Systems SiS190/191
 device		sis			# Silicon Integrated Systems SiS 900/SiS 7016
 device		sk			# SysKonnect SK-984x & SK-982x gigabit Ethernet
 device		ste			# Sundance ST201 (D-Link DFE-550TX)
 device		stge			# Sundance/Tamarack TC9021 gigabit Ethernet
-device		tl			# Texas Instruments ThunderLAN
-device		tx			# SMC EtherPower II (83c170 ``EPIC'')
 device		vge			# VIA VT612x gigabit Ethernet
 device		vr			# VIA Rhine, Rhine II
-device		wb			# Winbond W89C840F
 device		xl			# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 
 # Wireless NIC cards
@@ -318,12 +311,11 @@ device		wpi			# Intel 3945ABG wireless NICs.
 # Pseudo devices.
 device		crypto			# core crypto support
 device		loop			# Network loopback
-device		random			# Entropy device
 device		padlock_rng		# VIA Padlock RNG
 device		rdrand_rng		# Intel Bull Mountain RNG
 device		ether			# Ethernet support
 device		vlan			# 802.1Q VLAN support
-device		tun			# Packet tunnel.
+device		tuntap			# Packet tunnel.
 device		md			# Memory "disks"
 device		gif			# IPv6 and IPv4 tunneling
 device		firmware		# firmware assist module

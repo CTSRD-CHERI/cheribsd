@@ -375,7 +375,7 @@ unionfs_root(struct mount *mp, int flags, struct vnode **vpp)
 }
 
 static int
-unionfs_quotactl(struct mount *mp, int cmd, uid_t uid, void * __CAPABILITY arg)
+unionfs_quotactl(struct mount *mp, int cmd, uid_t uid, void * __capability arg)
 {
 	struct unionfs_mount *ump;
 

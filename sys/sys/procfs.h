@@ -36,7 +36,7 @@
 
 typedef struct reg gregset_t;
 typedef struct fpreg fpregset_t;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 typedef struct capreg capregset_t;
 #endif
 

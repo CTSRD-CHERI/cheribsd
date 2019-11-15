@@ -35,17 +35,18 @@ __FBSDID("$FreeBSD$");
 #include "opt_bus.h"
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
-#include <sys/module.h>
+#include <sys/conf.h>
+#include <sys/endian.h>
+#include <sys/eventhandler.h>
+#include <sys/fcntl.h>
+#include <sys/kernel.h>
 #include <sys/limits.h>
 #include <sys/linker.h>
-#include <sys/fcntl.h>
-#include <sys/conf.h>
-#include <sys/kernel.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/queue.h>
 #include <sys/sysctl.h>
-#include <sys/endian.h>
+#include <sys/systm.h>
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
@@ -99,8 +100,6 @@ static void		pci_assign_interrupt(device_t bus, device_t dev,
 static int		pci_add_map(device_t bus, device_t dev, int reg,
 			    struct resource_list *rl, int force, int prefetch);
 static int		pci_probe(device_t dev);
-static int		pci_attach(device_t dev);
-static int		pci_detach(device_t dev);
 static void		pci_load_vendor_data(void);
 static int		pci_describe_parse_line(char **ptr, int *vendor,
 			    int *device, char **desc);
@@ -1670,10 +1669,13 @@ pci_mask_msix(device_t dev, u_int index)
 	KASSERT(msix->msix_msgnum > index, ("bogus index"));
 	offset = msix->msix_table_offset + index * 16 + 12;
 	val = bus_read_4(msix->msix_table_res, offset);
-	if (!(val & PCIM_MSIX_VCTRL_MASK)) {
-		val |= PCIM_MSIX_VCTRL_MASK;
-		bus_write_4(msix->msix_table_res, offset, val);
-	}
+	val |= PCIM_MSIX_VCTRL_MASK;
+
+	/*
+	 * Some devices (e.g. Samsung PM961) do not support reads of this
+	 * register, so always write the new value.
+	 */
+	bus_write_4(msix->msix_table_res, offset, val);
 }
 
 void
@@ -1686,10 +1688,13 @@ pci_unmask_msix(device_t dev, u_int index)
 	KASSERT(msix->msix_table_len > index, ("bogus index"));
 	offset = msix->msix_table_offset + index * 16 + 12;
 	val = bus_read_4(msix->msix_table_res, offset);
-	if (val & PCIM_MSIX_VCTRL_MASK) {
-		val &= ~PCIM_MSIX_VCTRL_MASK;
-		bus_write_4(msix->msix_table_res, offset, val);
-	}
+	val &= ~PCIM_MSIX_VCTRL_MASK;
+
+	/*
+	 * Some devices (e.g. Samsung PM961) do not support reads of this
+	 * register, so always write the new value.
+	 */
+	bus_write_4(msix->msix_table_res, offset, val);
 }
 
 int
@@ -4366,7 +4371,7 @@ pci_attach_common(device_t dev)
 	return (0);
 }
 
-static int
+int
 pci_attach(device_t dev)
 {
 	int busno, domain, error;
@@ -4387,7 +4392,7 @@ pci_attach(device_t dev)
 	return (bus_generic_attach(dev));
 }
 
-static int
+int
 pci_detach(device_t dev)
 {
 #ifdef PCI_RES_BUS

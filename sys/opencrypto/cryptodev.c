@@ -285,7 +285,7 @@ struct csession {
 struct cryptop_data {
 	struct csession *cse;
 
-	kiovec_t	iovec[1];
+	struct iovec	iovec[1];
 	struct uio	uio;
 	bool		done;
 };
@@ -294,6 +294,11 @@ struct fcrypt {
 	TAILQ_HEAD(csessionlist, csession) csessions;
 	int		sesn;
 };
+
+static struct timeval warninterval = { .tv_sec = 60, .tv_usec = 0 };
+SYSCTL_TIMEVAL_SEC(_kern, OID_AUTO, cryptodev_warn_interval, CTLFLAG_RW,
+    &warninterval,
+    "Delay in seconds between warnings of deprecated /dev/crypto algorithms");
 
 static	int cryptof_ioctl(struct file *, u_long, void *,
 		    struct ucred *, struct thread *);
@@ -793,6 +798,47 @@ cod_free(struct cryptop_data *cod)
 	free(cod, M_XDATA);
 }
 
+static void
+cryptodev_warn(struct csession *cse)
+{
+	static struct timeval arc4warn, blfwarn, castwarn, deswarn, md5warn;
+	static struct timeval skipwarn, tdeswarn;
+
+	switch (cse->cipher) {
+	case CRYPTO_DES_CBC:
+		if (ratecheck(&deswarn, &warninterval))
+			gone_in(13, "DES cipher via /dev/crypto");
+		break;
+	case CRYPTO_3DES_CBC:
+		if (ratecheck(&tdeswarn, &warninterval))
+			gone_in(13, "3DES cipher via /dev/crypto");
+		break;
+	case CRYPTO_BLF_CBC:
+		if (ratecheck(&blfwarn, &warninterval))
+			gone_in(13, "Blowfish cipher via /dev/crypto");
+		break;
+	case CRYPTO_CAST_CBC:
+		if (ratecheck(&castwarn, &warninterval))
+			gone_in(13, "CAST128 cipher via /dev/crypto");
+		break;
+	case CRYPTO_SKIPJACK_CBC:
+		if (ratecheck(&skipwarn, &warninterval))
+			gone_in(13, "Skipjack cipher via /dev/crypto");
+		break;
+	case CRYPTO_ARC4:
+		if (ratecheck(&arc4warn, &warninterval))
+			gone_in(13, "ARC4 cipher via /dev/crypto");
+		break;
+	}
+
+	switch (cse->mac) {
+	case CRYPTO_MD5_HMAC:
+		if (ratecheck(&md5warn, &warninterval))
+			gone_in(13, "MD5-HMAC authenticator via /dev/crypto");
+		break;
+	}
+}
+
 static int
 cryptodev_op(
 	struct csession *cse,
@@ -915,6 +961,7 @@ cryptodev_op(
 		error = EINVAL;
 		goto bail;
 	}
+	cryptodev_warn(cse);
 
 again:
 	/*
@@ -1092,6 +1139,7 @@ cryptodev_aead(
 		SDT_PROBE1(opencrypto, dev, ioctl, error, __LINE__);
 		goto bail;
 	}
+	cryptodev_warn(cse);
 again:
 	/*
 	 * Let the dispatch run unlocked, then, interlock against the
@@ -1523,11 +1571,10 @@ MODULE_DEPEND(cryptodev, crypto, 1, 1, 1);
 MODULE_DEPEND(cryptodev, zlib, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities"
 //   ]
 // }

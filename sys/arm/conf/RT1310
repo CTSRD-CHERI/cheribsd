@@ -16,7 +16,6 @@ makeoptions	FDT_DTS_FILE=wzr2-g300n.dts
 makeoptions	MODULES_OVERRIDE=""
 
 #makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
-makeoptions	WERROR="-Werror"
 
 options 	SCHED_4BSD		# 4BSD scheduler
 options 	INET			# InterNETworking
@@ -51,7 +50,6 @@ options 	WITNESS_SKIPSPIN	# Don't run witness on spinlocks for speed
 device		loop
 device		md
 device		pty
-device		random
 
 # Serial ports
 device		uart

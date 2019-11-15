@@ -91,7 +91,7 @@ struct proc *intrproc;
 
 static MALLOC_DEFINE(M_ITHREAD, "ithread", "Interrupt Threads");
 
-static int intr_storm_threshold = 1000;
+static int intr_storm_threshold = 0;
 SYSCTL_INT(_hw, OID_AUTO, intr_storm_threshold, CTLFLAG_RWTUN,
     &intr_storm_threshold, 0,
     "Number of consecutive interrupts before storm protection is enabled");
@@ -378,6 +378,25 @@ intr_event_bind_ithread(struct intr_event *ie, int cpu)
 {
 
 	return (_intr_event_bind(ie, cpu, false, true));
+}
+
+/*
+ * Bind an interrupt event's ithread to the specified cpuset.
+ */
+int
+intr_event_bind_ithread_cpuset(struct intr_event *ie, cpuset_t *cs)
+{
+	lwpid_t id;
+
+	mtx_lock(&ie->ie_lock);
+	if (ie->ie_thread != NULL) {
+		id = ie->ie_thread->it_thread->td_tid;
+		mtx_unlock(&ie->ie_lock);
+		return (cpuset_setthread(id, cs));
+	} else {
+		mtx_unlock(&ie->ie_lock);
+	}
+	return (ENODEV);
 }
 
 static struct intr_event *

@@ -27,6 +27,8 @@
 		ethernet1 = &cp0_eth2;
 		ethernet2 = &cp1_eth0;
 		ethernet3 = &cp1_eth1;
+		i2c1 = &cp0_i2c0;
+		i2c2 = &cp1_i2c0;
 	};
 
 	cp0_reg_usb3_0_vbus: cp0-usb3-0-vbus {
@@ -72,17 +74,10 @@
 	};
 };
 
-&i2c0 {
-	status = "okay";
-	clock-frequency = <100000>;
-};
-
 &spi0 {
 	status = "okay";
 
 	spi-flash@0 {
-		#address-cells = <1>;
-		#size-cells = <1>;
 		compatible = "jedec,spi-nor";
 		reg = <0>;
 		spi-max-frequency = <10000000>;
@@ -214,8 +209,6 @@
 	status = "okay";
 
 	spi-flash@0 {
-		#address-cells = <0x1>;
-		#size-cells = <0x1>;
 		compatible = "jedec,spi-nor";
 		reg = <0x0>;
 		spi-max-frequency = <20000000>;

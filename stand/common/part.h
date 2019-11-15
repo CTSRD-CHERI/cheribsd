@@ -45,7 +45,6 @@ enum partition_type {
 	PART_EFI,
 	PART_FREEBSD,
 	PART_FREEBSD_BOOT,
-	PART_FREEBSD_NANDFS,
 	PART_FREEBSD_UFS,
 	PART_FREEBSD_ZFS,
 	PART_FREEBSD_SWAP,
@@ -53,7 +52,8 @@ enum partition_type {
 	PART_LINUX,
 	PART_LINUX_SWAP,
 	PART_DOS,
-	PART_ISO9660
+	PART_ISO9660,
+	PART_APFS
 };
 
 struct ptable_entry {

@@ -51,12 +51,12 @@ __FBSDID("$FreeBSD$");
 #include <netinet/sctp_auth.h>
 #include <netinet/sctp_asconf.h>
 #include <netinet/sctp_bsd_addr.h>
+#include <netinet/sctp_kdtrace.h>
 #if defined(INET6) || defined(INET)
 #include <netinet/tcp_var.h>
 #endif
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
-#include <netinet/in_kdtrace.h>
 #include <sys/proc.h>
 #ifdef INET6
 #include <netinet/icmp6.h>
@@ -2469,25 +2469,24 @@ sctp_mtu_size_reset(struct sctp_inpcb *inp,
 
 
 /*
- * given an association and starting time of the current RTT period return
- * RTO in number of msecs net should point to the current network
+ * Given an association and starting time of the current RTT period, update
+ * RTO in number of msecs. net should point to the current network.
+ * Return 1, if an RTO update was performed, return 0 if no update was
+ * performed due to invalid starting point.
  */
 
-uint32_t
+int
 sctp_calculate_rto(struct sctp_tcb *stcb,
     struct sctp_association *asoc,
     struct sctp_nets *net,
     struct timeval *old,
     int rtt_from_sack)
 {
-	/*-
-	 * given an association and the starting time of the current RTT
-	 * period (in value1/value2) return RTO in number of msecs.
-	 */
+	struct timeval now;
+	uint64_t rtt_us;	/* RTT in us */
 	int32_t rtt;		/* RTT in ms */
 	uint32_t new_rto;
 	int first_measure = 0;
-	struct timeval now;
 
 	/************************/
 	/* 1. calculate new RTT */
@@ -2498,10 +2497,19 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 	} else {
 		(void)SCTP_GETTIME_TIMEVAL(&now);
 	}
+	if ((old->tv_sec > now.tv_sec) ||
+	    ((old->tv_sec == now.tv_sec) && (old->tv_sec > now.tv_sec))) {
+		/* The starting point is in the future. */
+		return (0);
+	}
 	timevalsub(&now, old);
+	rtt_us = (uint64_t)1000000 * (uint64_t)now.tv_sec + (uint64_t)now.tv_usec;
+	if (rtt_us > SCTP_RTO_UPPER_BOUND * 1000) {
+		/* The RTT is larger than a sane value. */
+		return (0);
+	}
 	/* store the current RTT in us */
-	net->rtt = (uint64_t)1000000 * (uint64_t)now.tv_sec +
-	    (uint64_t)now.tv_usec;
+	net->rtt = rtt_us;
 	/* compute rtt in ms */
 	rtt = (int32_t)(net->rtt / 1000);
 	if ((asoc->cc_functions.sctp_rtt_calculated) && (rtt_from_sack == SCTP_RTT_FROM_DATA)) {
@@ -2533,7 +2541,7 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 	 * Paper "Congestion Avoidance and Control", Annex A.
 	 *
 	 * (net->lastsa >> SCTP_RTT_SHIFT) is the srtt
-	 * (net->lastsa >> SCTP_RTT_VAR_SHIFT) is the rttvar
+	 * (net->lastsv >> SCTP_RTT_VAR_SHIFT) is the rttvar
 	 */
 	if (net->RTO_measured) {
 		rtt -= (net->lastsa >> SCTP_RTT_SHIFT);
@@ -2574,8 +2582,8 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 	if (new_rto > stcb->asoc.maxrto) {
 		new_rto = stcb->asoc.maxrto;
 	}
-	/* we are now returning the RTO */
-	return (new_rto);
+	net->RTO = new_rto;
+	return (1);
 }
 
 /*
@@ -4567,12 +4575,14 @@ sctp_add_to_readq(struct sctp_inpcb *inp,
 	if (inp_read_lock_held == 0)
 		SCTP_INP_READ_LOCK(inp);
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_SOCKET_CANT_READ) {
-		sctp_free_remote_addr(control->whoFrom);
-		if (control->data) {
-			sctp_m_freem(control->data);
-			control->data = NULL;
+		if (!control->on_strm_q) {
+			sctp_free_remote_addr(control->whoFrom);
+			if (control->data) {
+				sctp_m_freem(control->data);
+				control->data = NULL;
+			}
+			sctp_free_a_readq(stcb, control);
 		}
-		sctp_free_a_readq(stcb, control);
 		if (inp_read_lock_held == 0)
 			SCTP_INP_READ_UNLOCK(inp);
 		return;
@@ -4617,8 +4627,10 @@ sctp_add_to_readq(struct sctp_inpcb *inp,
 		control->tail_mbuf = prev;
 	} else {
 		/* Everything got collapsed out?? */
-		sctp_free_remote_addr(control->whoFrom);
-		sctp_free_a_readq(stcb, control);
+		if (!control->on_strm_q) {
+			sctp_free_remote_addr(control->whoFrom);
+			sctp_free_a_readq(stcb, control);
+		}
 		if (inp_read_lock_held == 0)
 			SCTP_INP_READ_UNLOCK(inp);
 		return;
@@ -5926,7 +5938,7 @@ get_more_data:
 		}
 		if ((uio->uio_resid == 0) ||
 		    ((in_eeor_mode) &&
-		    (copied_so_far >= (uint32_t)max(so->so_rcv.sb_lowat, 1)))) {
+		    (copied_so_far >= max(so->so_rcv.sb_lowat, 1)))) {
 			goto release;
 		}
 		/*
@@ -6391,30 +6403,33 @@ out_now:
 	return (added);
 }
 
-struct sctp_tcb *
+int
 sctp_connectx_helper_find(struct sctp_inpcb *inp, struct sockaddr *addr,
-    unsigned int *totaddr,
-    unsigned int *num_v4, unsigned int *num_v6, int *error,
-    unsigned int limit, int *bad_addr)
+    unsigned int totaddr,
+    unsigned int *num_v4, unsigned int *num_v6,
+    unsigned int limit)
 {
 	struct sockaddr *sa;
-	struct sctp_tcb *stcb = NULL;
+	struct sctp_tcb *stcb;
 	unsigned int incr, at, i;
 
 	at = 0;
 	sa = addr;
-	*error = *num_v6 = *num_v4 = 0;
+	*num_v6 = *num_v4 = 0;
 	/* account and validate addresses */
-	for (i = 0; i < *totaddr; i++) {
+	if (totaddr == 0) {
+		return (EINVAL);
+	}
+	for (i = 0; i < totaddr; i++) {
+		if (at + sizeof(struct sockaddr) > limit) {
+			return (EINVAL);
+		}
 		switch (sa->sa_family) {
 #ifdef INET
 		case AF_INET:
 			incr = (unsigned int)sizeof(struct sockaddr_in);
 			if (sa->sa_len != incr) {
-				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTPUTIL, EINVAL);
-				*error = EINVAL;
-				*bad_addr = 1;
-				return (NULL);
+				return (EINVAL);
 			}
 			(*num_v4) += 1;
 			break;
@@ -6427,46 +6442,34 @@ sctp_connectx_helper_find(struct sctp_inpcb *inp, struct sockaddr *addr,
 				sin6 = (struct sockaddr_in6 *)sa;
 				if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
 					/* Must be non-mapped for connectx */
-					SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTPUTIL, EINVAL);
-					*error = EINVAL;
-					*bad_addr = 1;
-					return (NULL);
+					return (EINVAL);
 				}
 				incr = (unsigned int)sizeof(struct sockaddr_in6);
 				if (sa->sa_len != incr) {
-					SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTPUTIL, EINVAL);
-					*error = EINVAL;
-					*bad_addr = 1;
-					return (NULL);
+					return (EINVAL);
 				}
 				(*num_v6) += 1;
 				break;
 			}
 #endif
 		default:
-			*totaddr = i;
-			incr = 0;
-			/* we are done */
-			break;
+			return (EINVAL);
 		}
-		if (i == *totaddr) {
-			break;
+		if ((at + incr) > limit) {
+			return (EINVAL);
 		}
 		SCTP_INP_INCR_REF(inp);
 		stcb = sctp_findassociation_ep_addr(&inp, sa, NULL, NULL, NULL);
 		if (stcb != NULL) {
-			/* Already have or am bring up an association */
-			return (stcb);
+			SCTP_TCB_UNLOCK(stcb);
+			return (EALREADY);
 		} else {
 			SCTP_INP_DECR_REF(inp);
 		}
-		if ((at + incr) > limit) {
-			*totaddr = i;
-			break;
-		}
+		at += incr;
 		sa = (struct sockaddr *)((caddr_t)sa + incr);
 	}
-	return ((struct sctp_tcb *)NULL);
+	return (0);
 }
 
 /*

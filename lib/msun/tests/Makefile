@@ -49,7 +49,7 @@ NETBSD_ATF_TESTS_C+=	tanh_test
 TAP_TESTS_C+=	cexp_test
 .endif
 TAP_TESTS_C+=	conj_test
-.if ${MACHINE_ARCH} != "aarch64"
+.if ${MACHINE_CPUARCH} != "aarch64"
 # Hits an assert in llvm when building for arm64:
 # https://llvm.org/bugs/show_bug.cgi?id=26081
 TAP_TESTS_C+=	csqrt_test
@@ -105,6 +105,8 @@ ARCH_SUBDIR= ${MACHINE_CPUARCH}
 # XXX: for some odd reason float.h doesn't tell the full story about what the
 # precision is.
 CFLAGS+=	-DLDBL_PREC=${LDBL_PREC}
+
+CFLAGS.fe_round_test+=	-D__HAVE_FENV
 
 .include <netbsd-tests.test.mk>
 

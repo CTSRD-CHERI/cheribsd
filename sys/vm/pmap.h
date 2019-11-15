@@ -106,7 +106,7 @@ extern vm_offset_t kernel_vm_end;
  */
 #define	PMAP_ENTER_NOSLEEP	0x00000100
 #define	PMAP_ENTER_WIRED	0x00000200
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #define	PMAP_ENTER_NOLOADTAGS	0x00000400
 #define	PMAP_ENTER_NOSTORETAGS	0x00000800
 #endif
@@ -130,12 +130,12 @@ void		 pmap_align_superpage(vm_object_t, vm_ooffset_t, vm_offset_t *,
 void		 pmap_clear_modify(vm_page_t m);
 void		 pmap_copy(pmap_t, pmap_t, vm_offset_t, vm_size_t, vm_offset_t);
 void		 pmap_copy_page(vm_page_t, vm_page_t);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 void		 pmap_copy_page_tags(vm_page_t, vm_page_t);
 #endif
 void		 pmap_copy_pages(vm_page_t ma[], vm_offset_t a_offset,
 		    vm_page_t mb[], vm_offset_t b_offset, int xfersize);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 void		 pmap_copy_pages_tags(vm_page_t ma[], vm_offset_t a_offset,
 		    vm_page_t mb[], vm_offset_t b_offset, int xfersize);
 #endif
@@ -155,8 +155,7 @@ boolean_t	 pmap_is_prefaultable(pmap_t pmap, vm_offset_t va);
 boolean_t	 pmap_is_referenced(vm_page_t m);
 boolean_t	 pmap_is_valid_memattr(pmap_t, vm_memattr_t);
 vm_offset_t	 pmap_map(vm_offset_t *, vm_paddr_t, vm_paddr_t, int);
-int		 pmap_mincore(pmap_t pmap, vm_offset_t addr,
-		    vm_paddr_t *locked_pa);
+int		 pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap);
 void		 pmap_object_init_pt(pmap_t pmap, vm_offset_t addr,
 		    vm_object_t object, vm_pindex_t pindex, vm_size_t size);
 boolean_t	 pmap_page_exists_quick(pmap_t pmap, vm_page_t m);
@@ -175,7 +174,7 @@ void		 pmap_remove_all(vm_page_t m);
 void		 pmap_remove_pages(pmap_t);
 void		 pmap_remove_write(vm_page_t m);
 void		 pmap_sync_icache(pmap_t, vm_offset_t, vm_size_t);
-boolean_t	 pmap_ts_referenced(vm_page_t m);
+int		 pmap_ts_referenced(vm_page_t m);
 void		 pmap_unwire(pmap_t pmap, vm_offset_t start, vm_offset_t end);
 void		 pmap_zero_page(vm_page_t);
 void		 pmap_zero_page_area(vm_page_t, int off, int size);
@@ -188,7 +187,7 @@ void		 pmap_zero_page_area(vm_page_t, int off, int size);
  * every architecture.  If tags become more widely used, we might need to do
  * so.
  */
-#ifndef CPU_CHERI
+#if !__has_feature(capabilities)
 #define	pmap_copy_page_tags(src, dst)	pmap_copy_page((src), (dst))
 #define	pmap_copy_pages_tags(ma, a_offset, mb, b_offset, xfersize)	\
 	    pmap_copy_pages(ma, a_offset, mb, b_offset, xfersize)

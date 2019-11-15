@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2018, Intel Corporation
+ * Copyright (c) 2013-2019, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are met:
@@ -32,9 +32,9 @@
 struct pt_version pt_library_version(void)
 {
 	struct pt_version v = {
-		/* .major  = */ PT_VERSION_MAJOR,
+		/* .major = */ PT_VERSION_MAJOR,
 		/* .minor = */ PT_VERSION_MINOR,
-		/* .reserved = */ 0,
+		/* .patch = */ PT_VERSION_PATCH,
 		/* .build = */ PT_VERSION_BUILD,
 		/* .ext = */ PT_VERSION_EXT
 	};

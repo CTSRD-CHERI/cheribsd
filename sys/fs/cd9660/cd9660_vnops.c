@@ -210,7 +210,7 @@ cd9660_getattr(ap)
 	vap->va_size	= (u_quad_t) ip->i_size;
 	if (ip->i_size == 0 && (vap->va_mode & S_IFMT) == S_IFLNK) {
 		struct vop_readlink_args rdlnk;
-		kiovec_t aiov;
+		struct iovec aiov;
 		struct uio auio;
 		char *cp;
 
@@ -688,7 +688,6 @@ cd9660_readlink(ap)
 		      (imp->im_bshift - DEV_BSHIFT),
 		      imp->logical_block_size, NOCRED, &bp);
 	if (error) {
-		brelse(bp);
 		return (EINVAL);
 	}
 
@@ -921,11 +920,10 @@ struct vop_vector cd9660_fifoops = {
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

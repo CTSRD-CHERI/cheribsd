@@ -24,7 +24,9 @@ DTS=	\
 	sun8i-h3-orangepi-plus2e.dts
 
 DTSO=	sun8i-a83t-sid.dtso \
-	sun8i-h3-sid.dtso
+	sun8i-h3-i2c0.dtso \
+	sun8i-h3-sid.dtso \
+	sun8i-h3-ths.dtso
 
 LINKS= \
 	${DTBDIR}/sun4i-a10-cubieboard.dtb ${DTBDIR}/cubieboard.dtb \
@@ -43,6 +45,7 @@ DTS=	\
 	allwinner/sun50i-a64-pine64-lts.dts \
 	allwinner/sun50i-a64-pine64-plus.dts \
 	allwinner/sun50i-a64-pine64.dts \
+	allwinner/sun50i-a64-pinebook.dts \
 	allwinner/sun50i-a64-sopine-baseboard.dts \
 	allwinner/sun50i-h5-orangepi-pc2.dts \
 	allwinner/sun50i-h5-nanopi-neo2.dts

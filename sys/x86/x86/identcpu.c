@@ -118,6 +118,10 @@ u_int	cpu_mon_mwait_flags;	/* MONITOR/MWAIT flags (CPUID.05H.ECX) */
 u_int	cpu_mon_min_size;	/* MONITOR minimum range size, bytes */
 u_int	cpu_mon_max_size;	/* MONITOR minimum range size, bytes */
 u_int	cpu_maxphyaddr;		/* Max phys addr width in bits */
+u_int	cpu_power_eax;		/* 06H: Power management leaf, %eax */
+u_int	cpu_power_ebx;		/* 06H: Power management leaf, %eax */
+u_int	cpu_power_ecx;		/* 06H: Power management leaf, %eax */
+u_int	cpu_power_edx;		/* 06H: Power management leaf, %eax */
 char machine[] = MACHINE;
 
 SYSCTL_UINT(_hw, OID_AUTO, via_feature_rng, CTLFLAG_RD,
@@ -164,6 +168,7 @@ static int hw_clockrate;
 SYSCTL_INT(_hw, OID_AUTO, clockrate, CTLFLAG_RD,
     &hw_clockrate, 0, "CPU instruction clock rate");
 
+u_int hv_base;
 u_int hv_high;
 char hv_vendor[16];
 SYSCTL_STRING(_hw, OID_AUTO, hv_vendor, CTLFLAG_RD | CTLFLAG_MPSAFE, hv_vendor,
@@ -959,7 +964,8 @@ printcpuinfo(void)
 				       /* Supervisor Mode Access Prevention */
 				       "\025SMAP"
 				       "\026AVX512IFMA"
-				       "\027PCOMMIT"
+				       /* Formerly PCOMMIT */
+				       "\027<b22>"
 				       "\030CLFLUSHOPT"
 				       "\031CLWB"
 				       "\032PROCTRACE"
@@ -982,11 +988,18 @@ printcpuinfo(void)
 				       "\004PKU"
 				       "\005OSPKE"
 				       "\006WAITPKG"
+				       "\007AVX512VBMI2"
 				       "\011GFNI"
+				       "\012VAES"
+				       "\013VPCLMULQDQ"
+				       "\014AVX512VNNI"
+				       "\015AVX512BITALG"
+				       "\016AVX512VPOPCNTDQ"
 				       "\027RDPID"
 				       "\032CLDEMOTE"
 				       "\034MOVDIRI"
-				       "\035MOVDIRI64B"
+				       "\035MOVDIR64B"
+				       "\036ENQCMD"
 				       "\037SGXLC"
 				       );
 			}
@@ -995,7 +1008,12 @@ printcpuinfo(void)
 				printf("\n  Structured Extended Features3=0x%b",
 				    cpu_stdext_feature3,
 				       "\020"
+				       "\003AVX512_4VNNIW"
+				       "\004AVX512_4FMAPS"
+				       "\011AVX512VP2INTERSECT"
+				       "\013MD_CLEAR"
 				       "\016TSXFA"
+				       "\023PCONFIG"
 				       "\033IBPB"
 				       "\034STIBP"
 				       "\035L1DFL"
@@ -1049,6 +1067,9 @@ printcpuinfo(void)
 				    "\001CLZERO"
 				    "\002IRPerf"
 				    "\003XSaveErPtr"
+				    "\005RDPRU"
+				    "\011MCOMMIT"
+				    "\012WBNOINVD"
 				    "\015IBPB"
 				    "\017IBRS"
 				    "\020STIBP"
@@ -1303,30 +1324,45 @@ hook_tsc_freq(void *arg __unused)
 
 SYSINIT(hook_tsc_freq, SI_SUB_CONFIGURE, SI_ORDER_ANY, hook_tsc_freq, NULL);
 
-static const char *const vm_bnames[] = {
-	"QEMU",				/* QEMU */
-	"Plex86",			/* Plex86 */
-	"Bochs",			/* Bochs */
-	"Xen",				/* Xen */
-	"BHYVE",			/* bhyve */
-	"Seabios",			/* KVM */
-	NULL
+static const struct {
+	const char *	vm_bname;
+	int		vm_guest;
+} vm_bnames[] = {
+	{ "QEMU",	VM_GUEST_VM },		/* QEMU */
+	{ "Plex86",	VM_GUEST_VM },		/* Plex86 */
+	{ "Bochs",	VM_GUEST_VM },		/* Bochs */
+	{ "Xen",	VM_GUEST_XEN },		/* Xen */
+	{ "BHYVE",	VM_GUEST_BHYVE },	/* bhyve */
+	{ "Seabios",	VM_GUEST_KVM },		/* KVM */
 };
 
-static const char *const vm_pnames[] = {
-	"VMware Virtual Platform",	/* VMWare VM */
-	"Virtual Machine",		/* Microsoft VirtualPC */
-	"VirtualBox",			/* Sun xVM VirtualBox */
-	"Parallels Virtual Platform",	/* Parallels VM */
-	"KVM",				/* KVM */
-	NULL
+static const struct {
+	const char *	vm_pname;
+	int		vm_guest;
+} vm_pnames[] = {
+	{ "VMware Virtual Platform",	VM_GUEST_VMWARE },
+	{ "Virtual Machine",		VM_GUEST_VM }, /* Microsoft VirtualPC */
+	{ "VirtualBox",			VM_GUEST_VBOX },
+	{ "Parallels Virtual Platform",	VM_GUEST_PARALLELS },
+	{ "KVM",			VM_GUEST_KVM },
 };
 
-void
-identify_hypervisor(void)
+static struct {
+	const char	*vm_cpuid;
+	int		vm_guest;
+} vm_cpuids[] = {
+	{ "XENXENXEN",		VM_GUEST_XEN },		/* XEN */
+	{ "Microsoft Hv",	VM_GUEST_HV },		/* Microsoft Hyper-V */
+	{ "VMwareVMware",	VM_GUEST_VMWARE },	/* VMware VM */
+	{ "KVMKVMKVM",		VM_GUEST_KVM },		/* KVM */
+	{ "bhyve bhyve ",	VM_GUEST_BHYVE },	/* bhyve */
+	{ "VBoxVBoxVBox",	VM_GUEST_VBOX },	/* VirtualBox */
+};
+
+static void
+identify_hypervisor_cpuid_base(void)
 {
-	u_int regs[4];
-	char *p;
+	u_int leaf, regs[4];
 	int i;
 
 	/*
@@ -1336,10 +1372,13 @@ identify_hypervisor(void)
 	 * KB1009458: Mechanisms to determine if software is running in
 	 * a VMware virtual machine
 	 * http://kb.vmware.com/kb/1009458
+	 *
+	 * Search for a hypervisor that we recognize. If we cannot find
+	 * a specific hypervisor, return the first information about the
+	 * hypervisor that we found, as others may be able to use.
 	 */
-	if (cpu_feature2 & CPUID2_HV) {
-		vm_guest = VM_GUEST_VM;
-		do_cpuid(0x40000000, regs);
+	for (leaf = 0x40000000; leaf < 0x40010000; leaf += 0x100) {
+		do_cpuid(leaf, regs);
 
 		/*
 		 * KVM from Linux kernels prior to commit
@@ -1350,24 +1389,57 @@ identify_hypervisor(void)
 		 */
 		if (regs[0] == 0 && regs[1] == 0x4b4d564b &&
 		    regs[2] == 0x564b4d56 && regs[3] == 0x0000004d)
-			regs[0] = 0x40000001;
+			regs[0] = leaf + 1;
 			
-		if (regs[0] >= 0x40000000) {
-			hv_high = regs[0];
-			((u_int *)&hv_vendor)[0] = regs[1];
-			((u_int *)&hv_vendor)[1] = regs[2];
-			((u_int *)&hv_vendor)[2] = regs[3];
-			hv_vendor[12] = '\0';
-			if (strcmp(hv_vendor, "VMwareVMware") == 0)
-				vm_guest = VM_GUEST_VMWARE;
-			else if (strcmp(hv_vendor, "Microsoft Hv") == 0)
-				vm_guest = VM_GUEST_HV;
-			else if (strcmp(hv_vendor, "KVMKVMKVM") == 0)
-				vm_guest = VM_GUEST_KVM;
-			else if (strcmp(hv_vendor, "bhyve bhyve") == 0)
-				vm_guest = VM_GUEST_BHYVE;
+		if (regs[0] >= leaf) {
+			for (i = 0; i < nitems(vm_cpuids); i++)
+				if (strncmp((const char *)&regs[1],
+				    vm_cpuids[i].vm_cpuid, 12) == 0) {
+					vm_guest = vm_cpuids[i].vm_guest;
+					break;
+				}
+
+			/*
+			 * If this is the first entry or we found a
+			 * specific hypervisor, record the base, high value,
+			 * and vendor identifier.
+			 */
+			if (vm_guest != VM_GUEST_VM || leaf == 0x40000000) {
+				hv_base = leaf;
+				hv_high = regs[0];
+				((u_int *)&hv_vendor)[0] = regs[1];
+				((u_int *)&hv_vendor)[1] = regs[2];
+				((u_int *)&hv_vendor)[2] = regs[3];
+				hv_vendor[12] = '\0';
+
+				/*
+				 * If we found a specific hypervisor, then
+				 * we are finished.
+				 */
+				if (vm_guest != VM_GUEST_VM)
+					return;
+			}
 		}
-		return;
+	}
+}
+
+void
+identify_hypervisor(void)
+{
+	u_int regs[4];
+	char *p;
+	int i;
+
+	/*
+	 * If CPUID2_HV is set, we are running in a hypervisor environment.
+	 */
+	if (cpu_feature2 & CPUID2_HV) {
+		vm_guest = VM_GUEST_VM;
+		identify_hypervisor_cpuid_base();
+
+		/* If we have a definitive vendor, we can return now. */
+		if (*hv_vendor != '\0')
+			return;
 	}
 
 	/*
@@ -1392,19 +1464,27 @@ identify_hypervisor(void)
 	 */
 	p = kern_getenv("smbios.bios.vendor");
 	if (p != NULL) {
-		for (i = 0; vm_bnames[i] != NULL; i++)
-			if (strcmp(p, vm_bnames[i]) == 0) {
-				vm_guest = VM_GUEST_VM;
-				freeenv(p);
-				return;
+		for (i = 0; i < nitems(vm_bnames); i++)
+			if (strcmp(p, vm_bnames[i].vm_bname) == 0) {
+				vm_guest = vm_bnames[i].vm_guest;
+				/* If we have a specific match, return */
+				if (vm_guest != VM_GUEST_VM) {
+					freeenv(p);
+					return;
+				}
+				/*
+				 * We are done with bnames, but there might be
+				 * a more specific match in the pnames
+				 */
+				break;
 			}
 		freeenv(p);
 	}
 	p = kern_getenv("smbios.system.product");
 	if (p != NULL) {
-		for (i = 0; vm_pnames[i] != NULL; i++)
-			if (strcmp(p, vm_pnames[i]) == 0) {
-				vm_guest = VM_GUEST_VM;
+		for (i = 0; i < nitems(vm_pnames); i++)
+			if (strcmp(p, vm_pnames[i].vm_pname) == 0) {
+				vm_guest = vm_pnames[i].vm_guest;
 				freeenv(p);
 				return;
 			}
@@ -1478,6 +1558,14 @@ void
 identify_cpu2(void)
 {
 	u_int regs[4], cpu_stdext_disable;
+
+	if (cpu_high >= 6) {
+		cpuid_count(6, 0, regs);
+		cpu_power_eax = regs[0];
+		cpu_power_ebx = regs[1];
+		cpu_power_ecx = regs[2];
+		cpu_power_edx = regs[3];
+	}
 
 	if (cpu_high >= 7) {
 		cpuid_count(7, 0, regs);
@@ -2270,7 +2358,7 @@ print_svm_info(void)
 	       "\017<b14>"
 	       "\020V_VMSAVE_VMLOAD"
 	       "\021vGIF"
-	       "\022<b17>"
+	       "\022GMET"		/* Guest Mode Execute Trap */
 	       "\023<b18>"
 	       "\024<b19>"
 	       "\025<b20>"
@@ -2540,7 +2628,7 @@ static void
 print_hypervisor_info(void)
 {
 
-	if (*hv_vendor)
+	if (*hv_vendor != '\0')
 		printf("Hypervisor: Origin = \"%s\"\n", hv_vendor);
 }
 

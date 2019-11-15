@@ -87,7 +87,8 @@ extern int vm_guest;		/* Running as virtual machine guest? */
  * Keep in sync with vm_guest_sysctl_names[].
  */
 enum VM_GUEST { VM_GUEST_NO = 0, VM_GUEST_VM, VM_GUEST_XEN, VM_GUEST_HV,
-		VM_GUEST_VMWARE, VM_GUEST_KVM, VM_GUEST_BHYVE, VM_LAST };
+		VM_GUEST_VMWARE, VM_GUEST_KVM, VM_GUEST_BHYVE, VM_GUEST_VBOX,
+		VM_GUEST_PARALLELS, VM_LAST };
 
 /*
  * These functions need to be declared before the KASSERT macro is invoked in
@@ -404,6 +405,7 @@ void	*memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #else
+#define	memcpy_c	memcpy
 #define	cheri_memcpy	memcpy
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
@@ -708,6 +710,7 @@ int	pause_sbt(const char *wmesg, sbintime_t sbt, sbintime_t pr,
 	_sleep((chan), NULL, (pri), (wmesg), (bt), (pr), (flags))
 void	wakeup(void * chan);
 void	wakeup_one(void * chan);
+void	wakeup_any(void * chan);
 
 /*
  * Common `struct cdev *' stuff are declared here to avoid #include poisoning
@@ -795,9 +798,6 @@ void _gone_in_dev(struct device *dev, int major, const char *msg);
 #endif
 #define gone_in(major, msg)		__gone_ok(major, msg) _gone_in(major, msg)
 #define gone_in_dev(dev, major, msg)	__gone_ok(major, msg) _gone_in_dev(dev, major, msg)
-#define	gone_by_fcp101_dev(dev)						\
-	gone_in_dev((dev), 13,						\
-	    "see https://github.com/freebsd/fcp/blob/master/fcp-0101.md")
 
 __NULLABILITY_PRAGMA_POP
 

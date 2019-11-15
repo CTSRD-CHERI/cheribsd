@@ -467,7 +467,7 @@ int
 sys_pipe2(struct thread *td, struct pipe2_args *uap)
 {
 
-	return (kern_pipe2(td, __USER_CAP_ARRAY(uap->fildes, 2), uap->flags));
+	return (kern_pipe2(td, uap->fildes, uap->flags));
 }
 
 int
@@ -718,11 +718,9 @@ pipe_read(struct file *fp, struct uio *uio, struct ucred *active_cred,
 		/*
 		 * Direct copy, bypassing a kernel buffer.
 		 */
-		} else if ((size = rpipe->pipe_map.cnt) &&
-			   (rpipe->pipe_state & PIPE_DIRECTW)) {
+		} else if ((size = rpipe->pipe_map.cnt) != 0) {
 			if (size > uio->uio_resid)
 				size = (u_int) uio->uio_resid;
-
 			PIPE_UNLOCK(rpipe);
 			error = uiomove_fromphys(rpipe->pipe_map.ms,
 			    rpipe->pipe_map.pos, size, uio);
@@ -733,7 +731,7 @@ pipe_read(struct file *fp, struct uio *uio, struct ucred *active_cred,
 			rpipe->pipe_map.pos += size;
 			rpipe->pipe_map.cnt -= size;
 			if (rpipe->pipe_map.cnt == 0) {
-				rpipe->pipe_state &= ~(PIPE_DIRECTW|PIPE_WANTW);
+				rpipe->pipe_state &= ~PIPE_WANTW;
 				wakeup(rpipe);
 			}
 #endif
@@ -828,31 +826,32 @@ pipe_build_write_buffer(struct pipe *wpipe, struct uio *uio)
 	u_int size;
 	int i;
 
-	PIPE_LOCK_ASSERT(wpipe, MA_NOTOWNED);
-	KASSERT(wpipe->pipe_state & PIPE_DIRECTW,
-		("Clone attempt on non-direct write pipe!"));
+	PIPE_LOCK_ASSERT(wpipe, MA_OWNED);
+	KASSERT((wpipe->pipe_state & PIPE_DIRECTW) == 0,
+	    ("%s: PIPE_DIRECTW set on %p", __func__, wpipe));
+	KASSERT(wpipe->pipe_map.cnt == 0,
+	    ("%s: pipe map for %p contains residual data", __func__, wpipe));
 
 	if (uio->uio_iov->iov_len > wpipe->pipe_buffer.size)
                 size = wpipe->pipe_buffer.size;
 	else
                 size = uio->uio_iov->iov_len;
 
-	if ((i = vm_fault_quick_hold_pages(&curproc->p_vmspace->vm_map,
+	wpipe->pipe_state |= PIPE_DIRECTW;
+	PIPE_UNLOCK(wpipe);
+	i = vm_fault_quick_hold_pages(&curproc->p_vmspace->vm_map,
 	    (__cheri_addr vm_offset_t)uio->uio_iov->iov_base, size, VM_PROT_READ,
-	    wpipe->pipe_map.ms, PIPENPAGES)) < 0)
+	    wpipe->pipe_map.ms, PIPENPAGES);
+	PIPE_LOCK(wpipe);
+	if (i < 0) {
+		wpipe->pipe_state &= ~PIPE_DIRECTW;
 		return (EFAULT);
+	}
 
-/*
- * set up the control block
- */
 	wpipe->pipe_map.npages = i;
 	wpipe->pipe_map.pos =
 	    ((__cheri_addr vm_offset_t) uio->uio_iov->iov_base) & PAGE_MASK;
 	wpipe->pipe_map.cnt = size;
-
-/*
- * and update the uio data
- */
 
 	IOVEC_ADVANCE(uio->uio_iov, size);
 	if (uio->uio_iov->iov_len == 0)
@@ -863,13 +862,19 @@ pipe_build_write_buffer(struct pipe *wpipe, struct uio *uio)
 }
 
 /*
- * unmap and unwire the process buffer
+ * Unwire the process buffer.
  */
 static void
 pipe_destroy_write_buffer(struct pipe *wpipe)
 {
 
 	PIPE_LOCK_ASSERT(wpipe, MA_OWNED);
+	KASSERT((wpipe->pipe_state & PIPE_DIRECTW) != 0,
+	    ("%s: PIPE_DIRECTW not set on %p", __func__, wpipe));
+	KASSERT(wpipe->pipe_map.cnt == 0,
+	    ("%s: pipe map for %p contains residual data", __func__, wpipe));
+
+	wpipe->pipe_state &= ~PIPE_DIRECTW;
 	vm_page_unhold_pages(wpipe->pipe_map.ms, wpipe->pipe_map.npages);
 	wpipe->pipe_map.npages = 0;
 }
@@ -883,18 +888,21 @@ static void
 pipe_clone_write_buffer(struct pipe *wpipe)
 {
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	int size;
 	int pos;
 
 	PIPE_LOCK_ASSERT(wpipe, MA_OWNED);
+	KASSERT((wpipe->pipe_state & PIPE_DIRECTW) != 0,
+	    ("%s: PIPE_DIRECTW not set on %p", __func__, wpipe));
+
 	size = wpipe->pipe_map.cnt;
 	pos = wpipe->pipe_map.pos;
+	wpipe->pipe_map.cnt = 0;
 
 	wpipe->pipe_buffer.in = size;
 	wpipe->pipe_buffer.out = 0;
 	wpipe->pipe_buffer.cnt = size;
-	wpipe->pipe_state &= ~PIPE_DIRECTW;
 
 	PIPE_UNLOCK(wpipe);
 	IOVEC_INIT(&iov, wpipe->pipe_buffer.buffer, size);
@@ -932,7 +940,7 @@ retry:
 		pipeunlock(wpipe);
 		goto error1;
 	}
-	while (wpipe->pipe_state & PIPE_DIRECTW) {
+	if (wpipe->pipe_state & PIPE_DIRECTW) {
 		if (wpipe->pipe_state & PIPE_WANTR) {
 			wpipe->pipe_state &= ~PIPE_WANTR;
 			wakeup(wpipe);
@@ -947,7 +955,6 @@ retry:
 		else
 			goto retry;
 	}
-	wpipe->pipe_map.cnt = 0;	/* transfer not ready yet */
 	if (wpipe->pipe_buffer.cnt > 0) {
 		if (wpipe->pipe_state & PIPE_WANTR) {
 			wpipe->pipe_state &= ~PIPE_WANTR;
@@ -964,20 +971,15 @@ retry:
 			goto retry;
 	}
 
-	wpipe->pipe_state |= PIPE_DIRECTW;
-
-	PIPE_UNLOCK(wpipe);
 	error = pipe_build_write_buffer(wpipe, uio);
-	PIPE_LOCK(wpipe);
 	if (error) {
-		wpipe->pipe_state &= ~PIPE_DIRECTW;
 		pipeunlock(wpipe);
 		goto error1;
 	}
 
-	error = 0;
-	while (!error && (wpipe->pipe_state & PIPE_DIRECTW)) {
+	while (wpipe->pipe_map.cnt != 0) {
 		if (wpipe->pipe_state & PIPE_EOF) {
+			wpipe->pipe_map.cnt = 0;
 			pipe_destroy_write_buffer(wpipe);
 			pipeselwakeup(wpipe);
 			pipeunlock(wpipe);
@@ -994,20 +996,19 @@ retry:
 		error = msleep(wpipe, PIPE_MTX(wpipe), PRIBIO | PCATCH,
 		    "pipdwt", 0);
 		pipelock(wpipe, 0);
+		if (error != 0)
+			break;
 	}
 
 	if (wpipe->pipe_state & PIPE_EOF)
 		error = EPIPE;
-	if (wpipe->pipe_state & PIPE_DIRECTW) {
-		/*
-		 * this bit of trickery substitutes a kernel buffer for
-		 * the process that might be going away.
-		 */
+	if (error == EINTR || error == ERESTART)
 		pipe_clone_write_buffer(wpipe);
-	} else {
+	else
 		pipe_destroy_write_buffer(wpipe);
-	}
 	pipeunlock(wpipe);
+	KASSERT((wpipe->pipe_state & PIPE_DIRECTW) == 0,
+	    ("pipe %p leaked PIPE_DIRECTW", wpipe));
 	return (error);
 
 error1:
@@ -1132,7 +1133,7 @@ pipe_write(struct file *fp, struct uio *uio, struct ucred *active_cred,
 		 * pipe buffer.  We break out if a signal occurs or the
 		 * reader goes away.
 		 */
-		if (wpipe->pipe_state & PIPE_DIRECTW) {
+		if (wpipe->pipe_map.cnt != 0) {
 			if (wpipe->pipe_state & PIPE_WANTR) {
 				wpipe->pipe_state &= ~PIPE_WANTR;
 				wakeup(wpipe);
@@ -1350,7 +1351,7 @@ pipe_ioctl(struct file *fp, u_long cmd, void *data, struct ucred *active_cred,
 			PIPE_UNLOCK(mpipe);
 			return (0);
 		}
-		if (mpipe->pipe_state & PIPE_DIRECTW)
+		if (mpipe->pipe_map.cnt != 0)
 			*(int *)data = mpipe->pipe_map.cnt;
 		else
 			*(int *)data = mpipe->pipe_buffer.cnt;
@@ -1406,14 +1407,13 @@ pipe_poll(struct file *fp, int events, struct ucred *active_cred,
 		goto locked_error;
 #endif
 	if (fp->f_flag & FREAD && events & (POLLIN | POLLRDNORM))
-		if ((rpipe->pipe_state & PIPE_DIRECTW) ||
-		    (rpipe->pipe_buffer.cnt > 0))
+		if (rpipe->pipe_map.cnt > 0 || rpipe->pipe_buffer.cnt > 0)
 			revents |= events & (POLLIN | POLLRDNORM);
 
 	if (fp->f_flag & FWRITE && events & (POLLOUT | POLLWRNORM))
 		if (wpipe->pipe_present != PIPE_ACTIVE ||
 		    (wpipe->pipe_state & PIPE_EOF) ||
-		    (((wpipe->pipe_state & PIPE_DIRECTW) == 0) &&
+		    ((wpipe->pipe_state & PIPE_DIRECTW) == 0 &&
 		     ((wpipe->pipe_buffer.size - wpipe->pipe_buffer.cnt) >= PIPE_BUF ||
 			 wpipe->pipe_buffer.size == 0)))
 			revents |= events & (POLLOUT | POLLWRNORM);
@@ -1421,7 +1421,7 @@ pipe_poll(struct file *fp, int events, struct ucred *active_cred,
 	levents = events &
 	    (POLLIN | POLLINIGNEOF | POLLPRI | POLLRDNORM | POLLRDBAND);
 	if (rpipe->pipe_state & PIPE_NAMED && fp->f_flag & FREAD && levents &&
-	    fp->f_seqcount == rpipe->pipe_wgen)
+	    fp->f_pipegen == rpipe->pipe_wgen)
 		events |= POLLINIGNEOF;
 
 	if ((events & POLLINIGNEOF) == 0) {
@@ -1488,7 +1488,7 @@ pipe_stat(struct file *fp, struct stat *ub, struct ucred *active_cred,
 	bzero(ub, sizeof(*ub));
 	ub->st_mode = S_IFIFO;
 	ub->st_blksize = PAGE_SIZE;
-	if (pipe->pipe_state & PIPE_DIRECTW)
+	if (pipe->pipe_map.cnt != 0)
 		ub->st_size = pipe->pipe_map.cnt;
 	else
 		ub->st_size = pipe->pipe_buffer.cnt;
@@ -1730,7 +1730,7 @@ filt_piperead(struct knote *kn, long hint)
 
 	PIPE_LOCK_ASSERT(rpipe, MA_OWNED);
 	kn->kn_data = rpipe->pipe_buffer.cnt;
-	if ((kn->kn_data == 0) && (rpipe->pipe_state & PIPE_DIRECTW))
+	if (kn->kn_data == 0)
 		kn->kn_data = rpipe->pipe_map.cnt;
 
 	if ((rpipe->pipe_state & PIPE_EOF) ||
@@ -1783,11 +1783,10 @@ filt_pipenotsup(struct knote *kn, long hint)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities"
 //   ]
 // }

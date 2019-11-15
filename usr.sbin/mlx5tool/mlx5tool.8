@@ -1,5 +1,5 @@
 .\"
-.\" Copyright (c) 2018 Mellanox Technologies
+.\" Copyright (c) 2018, 2019 Mellanox Technologies
 .\" All rights reserved.
 .\"
 .\" Redistribution and use in source and binary forms, with or without
@@ -25,27 +25,36 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd March 8, 2018
+.Dd May 7, 2019
 .Dt mlx5tool 8
 .Os
 .Sh NAME
 .Nm mlx5tool
-.Nd Utility for managing Connect-X 4/5 Mellanox network adapters
+.Nd Utility for managing Connect-X 4/5/6 Mellanox network adapters
 .Sh SYNOPSIS
+.Nm
+.Fl d Ar domain:bus:slot:func
+.Fl E
 .Nm
 .Fl d Ar domain:bus:slot:func
 .Fl e
 .Nm
 .Fl d Ar domain:bus:slot:func
-.Fl r
+.Fl f Ar file.mfa2
 .Nm
 .Fl d Ar domain:bus:slot:func
 .Fl o Ar file
 .Fl w
+.Nm
+.Fl d Ar domain:bus:slot:func
+.Fl r
+.Nm
+.Fl d Ar domain:bus:slot:func
+.Fl z
 .Sh DESCRIPTION
 The
 .Nm
-utility is provided for management of the Connect-X 4 and 5 network adapters
+utility is provided for management of the Connect-X4, 5 and 6 network adapters
 in the aspects not covered by the generic
 .Xr ifconfig 8
 command, mostly related to the PCIe attachment and internal card working.
@@ -67,21 +76,37 @@ analysis of the failure by the Mellanox support team.
 .Pp
 The following commands are currently implemented:
 .Bl -tag -width indent
+.It Fl E
+Print EEPROM information
 .It Fl e
 Take the snapshot of the firmware registers state and store it in the
 kernel buffer.
 The buffer must be empty, in other words, no dumps should be written so
 far, or existing dump cleared with the
+.It Fl f
+Flashes the firmware image
+.Fa file.mfa2
+to the specified adapter.
+Image must be in MFA2 pack format and contain a component suitable
+for the adapter hardware.
+.Pp
+Typically, PCIe link-level reset is required to activate the
+newly flashed image, which can be performed by the system reboot
+or using the
+.Fl z
+option.
 .Fl r
 command for the specified device.
 .It Fl r
 Clear the stored firmware dump, preparing the kernel buffer for
 the next dump.
 .It Fl w
-Fetche the stored firmware dump and writes it into the file specified
+Fetches the stored firmware dump and writes it into the file specified
 by the
 .Fl o
 option argument.
+.It Fl z
+Performs PCIe link-level reset on the specified device.
 .El
 .Sh FILES
 The

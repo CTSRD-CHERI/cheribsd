@@ -98,37 +98,16 @@
  * offset is calculated.
  */
 #define	SHAREDPAGE		(VM_MAXUSER_ADDRESS - PAGE_SIZE)
-#define	USRSTACK		SHAREDPAGE
+/*
+ * To ensure that the stack base address that is sufficiently aligned to create
+ * a bounded capability we must round down by 16 pages to get to 0x7ffbff0000.
+ */
+#define	USRSTACK		(SHAREDPAGE - (15 * PAGE_SIZE))
 #ifdef __mips_n64
 #define	FREEBSD32_SHAREDPAGE	(((vm_offset_t)0x80000000) - PAGE_SIZE)
 #define	FREEBSD32_USRSTACK	FREEBSD32_SHAREDPAGE
 #endif
 
-#ifdef MIPS64_NEW_PMAP
-/*
- * Enable superpage reservations: 1 level.
- *
- * VM_NRESERVLEVEL specifies a number of promotion levels enabled.
- * Currently mips64 only supports one size or level (VM_LEVEL_0_ORDER) of
- * superpages (2MB)
- */
-#ifndef	VM_NRESERVLEVEL
-#define	VM_NRESERVLEVEL			1
-#endif
-
-/*
- * Level 0 reservations consist of 512 (2^9) pages (2MB).
- */
-#ifndef	VM_LEVEL_0_ORDER
-#define	VM_LEVEL_0_ORDER		9
-#endif
-
-/*
- * The largest allocation size is 4MB.
- */
-#define	VM_NFREEORDER			11
-
-#else /* ! MIPS64_NEW_PMAP */
 
 /*
  * Disable superpage reservations.
@@ -142,7 +121,6 @@
  */
 #define	VM_NFREEORDER		9
 
-#endif /* ! MIPS64_NEW_PMAP */
 
 /*
  * How many physical pages per kmem arena virtual page.

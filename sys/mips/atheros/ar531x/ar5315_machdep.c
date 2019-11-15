@@ -42,7 +42,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/boot.h>
 
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 
 #include <net/ethernet.h>
 
@@ -52,7 +54,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/hwfunc.h>
 #include <machine/md_var.h>
 #include <machine/trap.h>
-#include <machine/vmparam.h>
 
 #include <mips/atheros/ar531x/ar5315reg.h>
 
@@ -145,6 +146,8 @@ static char hw_device_revision[] = DEVICE_REV;
 SYSCTL_STRING(_hw_device, OID_AUTO, revision, CTLFLAG_RD, hw_device_revision, 0,
 	   "Board revision");
 #endif
+
+extern char cpu_model[];
 
 void
 platform_start(__register_t a0 __unused, __register_t a1 __unused, 
@@ -259,6 +262,8 @@ platform_start(__register_t a0 __unused, __register_t a1 __unused,
 	printf("  a1 = %08x\n", a1);
 	printf("  a2 = %08x\n", a2);
 	printf("  a3 = %08x\n", a3);
+
+	strcpy(cpu_model, ar5315_get_system_type());
 
 	/*
 	 * XXX this code is very redboot specific.

@@ -694,10 +694,12 @@ tar_read_header(struct archive_read *a, struct tar *tar,
     struct archive_entry *entry, size_t *unconsumed)
 {
 	ssize_t bytes;
-	int err;
+	int err, eof_vol_header;
 	const char *h;
 	const struct archive_entry_header_ustar *header;
 	const struct archive_entry_header_gnutar *gnuheader;
+
+	eof_vol_header = 0;
 
 	/* Loop until we find a workable header record. */
 	for (;;) {
@@ -788,6 +790,8 @@ tar_read_header(struct archive_read *a, struct tar *tar,
 		break;
 	case 'V': /* GNU volume header */
 		err = header_volume(a, tar, entry, h, unconsumed);
+		if (err == ARCHIVE_EOF)
+			eof_vol_header = 1;
 		break;
 	case 'X': /* Used by SUN tar; same as 'x'. */
 		a->archive.archive_format = ARCHIVE_FORMAT_TAR_PAX_INTERCHANGE;
@@ -862,9 +866,17 @@ tar_read_header(struct archive_read *a, struct tar *tar,
 		}
 		return (err);
 	}
-	if (err == ARCHIVE_EOF)
-		/* EOF when recursively reading a header is bad. */
-		archive_set_error(&a->archive, EINVAL, "Damaged tar archive");
+	if (err == ARCHIVE_EOF) {
+		if (!eof_vol_header) {
+			/* EOF when recursively reading a header is bad. */
+			archive_set_error(&a->archive, EINVAL,
+			    "Damaged tar archive");
+		} else {
+			/* If we encounter just a GNU volume header treat
+			 * this situation as an empty archive */
+			return (ARCHIVE_EOF);
+		}
+	}
 	return (ARCHIVE_FATAL);
 }
 
@@ -1944,6 +1956,15 @@ pax_attribute(struct archive_read *a, struct tar *tar,
 			pax_time(value, &s, &n);
 			archive_entry_set_birthtime(entry, s, n);
 		}
+		if (strcmp(key, "LIBARCHIVE.symlinktype") == 0) {
+			if (strcmp(value, "file") == 0) {
+				archive_entry_set_symlink_type(entry,
+				    AE_SYMLINK_TYPE_FILE);
+			} else if (strcmp(value, "dir") == 0) {
+				archive_entry_set_symlink_type(entry,
+				    AE_SYMLINK_TYPE_DIRECTORY);
+			}
+		}
 		if (memcmp(key, "LIBARCHIVE.xattr.", 17) == 0)
 			pax_attribute_xattr(entry, key, value);
 		break;
@@ -2617,8 +2638,17 @@ tar_atol_base_n(const char *p, size_t char_cnt, int base)
 				return maxval; /* Truncate on overflow. */
 			}
 			l = (l * base) + digit;
-			digit = *++p - '0';
+			/*
+			 * XXXAR: This code was previously loading one past the
+			 * end here. Fixed by moving the dereference to the top
+			 * of the loop. Better fix would be to change the
+			 * toplevel if to a while loop and break if the digit
+			 * is outside the range.
+			 */
 			char_cnt--;
+			if (char_cnt != 0) {
+				digit = *++p - '0';
+			}
 		}
 	}
 	return (sign < 0) ? -l : l;

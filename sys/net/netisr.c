@@ -839,6 +839,7 @@ netisr_select_cpuid(struct netisr_proto *npp, u_int dispatch_policy,
 	    ("%s: invalid policy %u for %s", __func__, npp->np_policy,
 	    npp->np_name));
 
+	MPASS((m->m_pkthdr.csum_flags & CSUM_SND_TAG) == 0);
 	ifp = m->m_pkthdr.rcvif;
 	if (ifp != NULL)
 		*cpuidp = nws_array[(ifp->if_index + source) % nws_count];
@@ -860,6 +861,7 @@ static u_int
 netisr_process_workstream_proto(struct netisr_workstream *nwsp, u_int proto)
 {
 	struct netisr_work local_npw, *npwp;
+	struct epoch_tracker et;
 	u_int handled;
 	struct mbuf *m;
 
@@ -889,6 +891,7 @@ netisr_process_workstream_proto(struct netisr_workstream *nwsp, u_int proto)
 	npwp->nw_len = 0;
 	nwsp->nws_pendingbits &= ~(1 << proto);
 	NWS_UNLOCK(nwsp);
+	NET_EPOCH_ENTER(et);
 	while ((m = local_npw.nw_head) != NULL) {
 		local_npw.nw_head = m->m_nextpkt;
 		m->m_nextpkt = NULL;
@@ -901,6 +904,7 @@ netisr_process_workstream_proto(struct netisr_workstream *nwsp, u_int proto)
 		netisr_proto[proto].np_handler(m);
 		CURVNET_RESTORE();
 	}
+	NET_EPOCH_EXIT(et);
 	KASSERT(local_npw.nw_len == 0,
 	    ("%s(%u): len %u", __func__, proto, local_npw.nw_len));
 	if (netisr_proto[proto].np_drainedcpu)
@@ -1087,6 +1091,7 @@ netisr_dispatch_src(u_int proto, uintptr_t source, struct mbuf *m)
 	int dosignal, error;
 	u_int cpuid, dispatch_policy;
 
+	NET_EPOCH_ASSERT();
 	KASSERT(proto < NETISR_MAXPROT,
 	    ("%s: invalid proto %u", __func__, proto));
 #ifdef NETISR_LOCKING

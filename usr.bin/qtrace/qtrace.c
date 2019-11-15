@@ -33,8 +33,7 @@
 #include <sys/sysctl.h>
 #include <sys/wait.h>
 
-#include <cheri/cheri.h>
-
+#include <machine/cheri.h>
 #include <machine/sysarch.h>
 
 #include <err.h>

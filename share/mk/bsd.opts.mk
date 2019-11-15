@@ -69,9 +69,6 @@ __DEFAULT_YES_OPTIONS = \
     TOOLCHAIN \
     WARNS
 
-__DEFAULT_YES_OPTIONS+= \
-    CHERI_SHARED
-
 __DEFAULT_NO_OPTIONS = \
     BIND_NOW \
     CCACHE_BUILD \
@@ -82,7 +79,6 @@ __DEFAULT_NO_OPTIONS = \
     STALE_STAGED
 
 __DEFAULT_NO_OPTIONS+= \
-    CHERI_EXACT_EQUALS \
     CHERI_PURE \
     CHERI128 \
     CHERI256 \
@@ -94,9 +90,6 @@ __DEFAULT_DEPENDENT_OPTIONS = \
     STAGING_MAN/STAGING \
     STAGING_PROG/STAGING \
     STALE_STAGED/STAGING \
-
-__DEFAULT_DEPENDENT_OPTIONS += \
-    CHERI_SHARED_PROG/CHERI_SHARED
 
 .if defined(WITH_CHERI)
 .warning WITH_CHERI should not be set directly.
@@ -120,9 +113,6 @@ MK_GNUCXX:=	no
 MK_LIBCPLUSPLUS:=yes
 # LLVM libunwind is needed for libc++
 MK_LLVM_LIBUNWIND:=	yes
-# GROFF is broken when building WITH_CHERI_PURE and it will be removed
-# soon anyway
-MK_GROFF:=	no
 # Build cheribsdbox by default so that we have a emergency MIPS tool if the
 # CHERI world is broken
 .if !defined(WITHOUT_CHERIBSDBOX)
@@ -130,13 +120,6 @@ MK_CHERIBSDBOX:=	yes
 .endif
 .else
 MK_CHERI:=	no
-.endif
-
-.if ${MK_CHERI_SHARED} == no
-MK_CHERI_SHARED_PROG:=	no
-.endif
-.if ${MK_CHERI_SHARED_PROG} == no
-MK_CASPER:=	no
 .endif
 
 #

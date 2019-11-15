@@ -18,6 +18,7 @@ SUBDIR_BOOTSTRAP= \
 	${_libc_cheri} \
 	${_libcheri} \
 	${_libclang_rt} \
+	${_libunwind} \
 	${_libcplusplus} \
 	${_libcxxrt} \
 	libelf \
@@ -108,7 +109,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 # libraries, those libraries should be listed as build order dependencies here.
 
 SUBDIR_DEPEND_geom=	libufs
-SUBDIR_DEPEND_libarchive= libz libbz2 libexpat liblzma libmd
+SUBDIR_DEPEND_libarchive= libz libbz2 libexpat liblzma libmd libzstd
 SUBDIR_DEPEND_libauditdm= libbsm
 SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
 SUBDIR_DEPEND_libc++:= libcxxrt
@@ -149,7 +150,7 @@ SUBDIR.${MK_CHERI}+=	libsyscalls
 SUBDIR.${MK_CHERI}+=	libz-cheri
 SUBDIR.${MK_CHERI}+=	libpng_sb
 
-.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
+.if (${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no") && ${MACHINE_ARCH} != "mips"
 _libc_cheri=	libc_cheri
 _libcheri=	libcheri
 .endif
@@ -158,7 +159,7 @@ _libcheri=	libcheri
 SUBDIR+= libsimple_printf
 .endif
 
-.if !defined(COMPAT_32BIT) && !defined(COMPAT_SOFTFP)
+.if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !defined(COMPAT_SOFTFP)
 SUBDIR.${MK_CLANG}+=	clang
 .endif
 
@@ -172,6 +173,7 @@ SUBDIR.${MK_GSSAPI}+=	libgssapi librpcsec_gss
 SUBDIR.${MK_ICONV}+=	libiconv_modules
 SUBDIR.${MK_KERBEROS_SUPPORT}+=	libcom_err
 SUBDIR.${MK_LDNS}+=	libldns
+SUBDIR.${MK_STATS}+=	libstats
 
 # The libraries under libclang_rt can only be built by clang, and only make
 # sense to build when clang is enabled at all.  Furthermore, they can only be
@@ -184,7 +186,7 @@ SUBDIR.${MK_LDNS}+=	libldns
     ${MACHINE_ARCH:Mmips64*}) && \
     ! ${MACHINE_ARCH:Mmips*c*}
 _libclang_rt=	libclang_rt
-.elif ! ${MACHINE_ARCH:Mmips*c*}
+.elif ! ${MACHINE_ARCH:Mmips*c*} && ${MACHINE_ARCH} != "mips"
 .error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
 .endif
 .endif # ${COMPILER_TYPE} == "clang"
@@ -193,17 +195,18 @@ _libclang_rt=	libclang_rt
 _libcxxrt=	libcxxrt
 _libcplusplus=	libc++
 _libcplusplus+=	libc++experimental
-.if ${MK_CHERI} == no
-_libcplusplus+=	libc++fs
 .endif
+
+.if ${MK_LLVM_LIBUNWIND} != "no"
+# When building with LLVM libunwind we must build libgcc_s/libgcc_eh as part
+# of SUBDIR_BOOTSTRAP to avoid build failures due to other libraries linking
+# against -lgcc_s
+_libunwind=	libgcc_s libgcc_eh
 .endif
 
 SUBDIR.${MK_EFI}+=	libefivar
 SUBDIR.${MK_GOOGLETEST}+=	googletest
 SUBDIR.${MK_LIBTHR}+=	libthr
-SUBDIR.${MK_LLVM_LIBUNWIND}+=	libgcc_eh
-SUBDIR.${MK_LLVM_LIBUNWIND}+=	libgcc_s
-SUBDIR.${MK_NAND}+=	libnandfs
 SUBDIR.${MK_NETGRAPH}+=	libnetgraph
 SUBDIR.${MK_NIS}+=	libypclnt
 
@@ -229,7 +232,9 @@ _libproc=	libproc
 _librtld_db=	librtld_db
 .endif
 
+.if ${MACHINE_ARCH} != "powerpc"
 SUBDIR.${MK_OPENMP}+=	libomp
+.endif
 SUBDIR.${MK_OPENSSL}+=	libmp
 SUBDIR.${MK_PMC}+=	libpmc libpmcstat
 SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius
@@ -260,7 +265,6 @@ SUBDIR:=	${SUBDIR:Nlibc++experimental}
 SUBDIR+=	libmalloc_simple
 SUBDIR+=	libcheri_syscalls
 SUBDIR+=	libcheri_support
-SUBDIR_BOOTSTRAP:=	libgcc_s libgcc_eh ${SUBDIR_BOOTSTRAP}
 .endif
 
 .include <bsd.subdir.mk>

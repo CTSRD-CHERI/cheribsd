@@ -43,10 +43,11 @@ magic.mgc: mkmagic magic
 	${BTOOLSPATH:U.}/mkmagic magic
 
 CLEANFILES+=	mkmagic
+DEPENDOBJS+=	mkmagic
 build-tools: mkmagic
 mkmagic: apprentice.c cdf_time.c encoding.c funcs.c magic.c print.c ${INCS} ${BUILD_TOOLS_META}
 	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -DCOMPILE_ONLY \
-	    ${BUILD_TOOLS_LDFLAGS} -o ${.TARGET} ${.ALLSRC:N*.h} ${LDADD}
+	    ${BUILD_TOOLS_LDFLAGS} -o ${.TARGET} ${.ALLSRC:N*.h:O:u} ${LDADD}
 
 FILEVER!= awk '$$1 == "\#define" && $$2 == "VERSION" { print $$3; exit }' \
 			${.CURDIR}/config.h

@@ -58,7 +58,6 @@ SRCF+=		fixunsxfti
 SRCF+=		fixxfdi
 SRCF+=		fixxfti
 SRCF+=		floatditf
-SRCF+=		floatsitf
 SRCF+=		floattidf
 SRCF+=		floattisf
 SRCF+=		floattixf
@@ -68,7 +67,7 @@ SRCF+=		floatunsisf
 SRCF+=		floatuntidf
 SRCF+=		floatuntisf
 SRCF+=		floatuntixf
-SRCF+=		gcc_personality_v0
+SRCF+=		gcc_personality_v0	# not in upstream
 SRCF+=		int_util
 SRCF+=		lshrdi3
 SRCF+=		lshrti3
@@ -160,7 +159,10 @@ SRCF+=		fixtfti
 SRCF+=		fixunstfdi
 SRCF+=		fixunstfsi
 SRCF+=		fixunstfti
+SRCF+=		floatsitf
+SRCF+=		floattitf
 SRCF+=		floatunsitf
+SRCF+=		floatuntitf
 SRCF+=		multf3
 SRCF+=		subtf3
 SRCF+=		trunctfdf2
@@ -244,7 +246,8 @@ SRCS+=		sync_synchronize.S
 .endif
 
 # On some archs GCC-6.3 requires bswap32 built-in.
-.if ${MACHINE_CPUARCH} == "mips" || ${MACHINE_CPUARCH} == "sparc64"
+.if ${MACHINE_CPUARCH} == "mips" || ${MACHINE_CPUARCH} == "riscv" || \
+    ${MACHINE_CPUARCH} == "sparc64"
 SRCS+=		bswapdi2.c
 SRCS+=		bswapsi2.c
 .endif

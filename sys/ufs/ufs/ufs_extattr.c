@@ -47,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/ktr.h>
 #include <sys/namei.h>
 #include <sys/malloc.h>
 #include <sys/fcntl.h>
@@ -338,7 +339,12 @@ ufs_extattr_enable_with_open(struct ufsmount *ump, struct vnode *vp,
 		return (error);
 	}
 
-	VOP_ADD_WRITECOUNT(vp, 1);
+	error = VOP_ADD_WRITECOUNT(vp, 1);
+	if (error != 0) {
+		VOP_CLOSE(vp, FREAD | FWRITE, td->td_ucred, td);
+		VOP_UNLOCK(vp, 0);
+		return (error);
+	}
 	CTR3(KTR_VFS, "%s: vp %p v_writecount increased to %d", __func__, vp,
 	    vp->v_writecount);
 
@@ -368,7 +374,7 @@ ufs_extattr_iterate_directory(struct ufsmount *ump, struct vnode *dvp,
 	struct dirent *dp, *edp;
 	struct vnode *attr_vp;
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	char *dirbuf;
 	int error, eofflag = 0;
 
@@ -589,7 +595,7 @@ ufs_extattr_enable(struct ufsmount *ump, int attrnamespace,
     const char *attrname, struct vnode *backing_vnode, struct thread *td)
 {
 	struct ufs_extattr_list_entry *attribute;
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct uio auio;
 	int error = 0;
 
@@ -840,7 +846,7 @@ ufs_extattr_get(struct vnode *vp, int attrnamespace, const char *name,
 {
 	struct ufs_extattr_list_entry *attribute;
 	struct ufs_extattr_header ueh;
-	kiovec_t local_aiov;
+	struct iovec local_aiov;
 	struct uio local_aio;
 	struct mount *mp = vp->v_mount;
 	struct ufsmount *ump = VFSTOUFS(mp);
@@ -1046,7 +1052,7 @@ ufs_extattr_set(struct vnode *vp, int attrnamespace, const char *name,
 {
 	struct ufs_extattr_list_entry *attribute;
 	struct ufs_extattr_header ueh;
-	kiovec_t local_aiov;
+	struct iovec local_aiov;
 	struct uio local_aio;
 	struct mount *mp = vp->v_mount;
 	struct ufsmount *ump = VFSTOUFS(mp);
@@ -1153,7 +1159,7 @@ ufs_extattr_rm(struct vnode *vp, int attrnamespace, const char *name,
 {
 	struct ufs_extattr_list_entry *attribute;
 	struct ufs_extattr_header ueh;
-	kiovec_t local_aiov;
+	struct iovec local_aiov;
 	struct uio local_aio;
 	struct mount *mp = vp->v_mount;
 	struct ufsmount *ump = VFSTOUFS(mp);
@@ -1296,11 +1302,10 @@ ufs_extattr_vnode_inactive(struct vnode *vp, struct thread *td)
 #endif /* !UFS_EXTATTR */
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

@@ -38,16 +38,15 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/types.h>
-
+#include <sys/conf.h>
+#include <sys/eventhandler.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
-#include <sys/module.h>
-#include <sys/malloc.h>
-#include <sys/conf.h>
-#include <sys/sysctl.h>
 #include <sys/kthread.h>
+#include <sys/malloc.h>
+#include <sys/module.h>
+#include <sys/sysctl.h>
+#include <sys/systm.h>
 
 #include <sys/kdb.h>
 #include <sys/bus.h>		/* used by smbus and newbus */
@@ -2385,11 +2384,10 @@ DRIVER_MODULE(firewire, fwohci, firewire_driver, firewire_devclass,
 MODULE_VERSION(firewire, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

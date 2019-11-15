@@ -54,11 +54,14 @@ struct des3_state {
 static void
 des3_init(struct krb5_key_state *ks)
 {
+	static struct timeval lastwarn;
 	struct des3_state *ds;
 
 	ds = malloc(sizeof(struct des3_state), M_GSSAPI, M_WAITOK|M_ZERO);
 	mtx_init(&ds->ds_lock, "gss des3 lock", NULL, MTX_DEF);
 	ks->ks_priv = ds;
+	if (ratecheck(&lastwarn, &krb5_warn_interval))
+		gone_in(13, "DES3 cipher for Kerberos GSS");
 }
 
 static void
@@ -141,8 +144,8 @@ des3_random_to_key(struct krb5_key_state *ks, const void *in)
 		    | ((inkey[4] & 1) << 5)
 		    | ((inkey[5] & 1) << 6)
 		    | ((inkey[6] & 1) << 7));
-		des_set_odd_parity((des_cblock *) outkey);
-		if (des_is_weak_key((des_cblock *) outkey))
+		des_set_odd_parity(outkey);
+		if (des_is_weak_key(outkey))
 			outkey[7] ^= 0xf0;
 	}
 

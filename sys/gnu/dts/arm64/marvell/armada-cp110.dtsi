@@ -28,12 +28,19 @@
 	 */
 	thermal-zones {
 		CP110_LABEL(thermal_ic): CP110_NODE_NAME(thermal-ic) {
-			polling-delay-passive = <1000>;
-			polling-delay = <1000>;
+			polling-delay-passive = <0>; /* Interrupt driven */
+			polling-delay = <0>; /* Interrupt driven */
 
 			thermal-sensors = <&CP110_LABEL(thermal) 0>;
 
-			trips {	};
+			trips {
+				CP110_LABEL(crit): crit {
+					temperature = <100000>; /* mC degrees */
+					hysteresis = <2000>; /* mC degrees */
+					type = "critical";
+				};
+			};
+
 			cooling-maps { };
 		};
 	};
@@ -231,6 +238,7 @@
 					<85 IRQ_TYPE_LEVEL_HIGH>,
 					<84 IRQ_TYPE_LEVEL_HIGH>,
 					<83 IRQ_TYPE_LEVEL_HIGH>;
+				#interrupt-cells = <2>;
 				status = "disabled";
 			};
 
@@ -246,6 +254,7 @@
 					<81 IRQ_TYPE_LEVEL_HIGH>,
 					<80 IRQ_TYPE_LEVEL_HIGH>,
 					<79 IRQ_TYPE_LEVEL_HIGH>;
+				#interrupt-cells = <2>;
 				status = "disabled";
 			};
 		};
@@ -259,6 +268,8 @@
 			CP110_LABEL(thermal): thermal-sensor@70 {
 				compatible = "marvell,armada-cp110-thermal";
 				reg = <0x70 0x10>;
+				interrupts-extended =
+					<&CP110_LABEL(icu_sei) 116 IRQ_TYPE_LEVEL_HIGH>;
 				#thermal-sensor-cells = <1>;
 			};
 		};

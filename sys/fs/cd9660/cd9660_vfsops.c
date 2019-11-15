@@ -36,6 +36,8 @@
  *	@(#)cd9660_vfsops.c	8.18 (Berkeley) 5/22/95
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -98,7 +100,7 @@ static int iso_mountfs(struct vnode *devvp, struct mount *mp);
  */
 
 static int
-cd9660_cmount(struct mntarg *ma, void *data, uint64_t flags)
+cd9660_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	struct iso_args args;
 	struct export_args exp;
@@ -753,7 +755,6 @@ cd9660_vget_internal(mp, ino, flags, vpp, relocated, isodir)
 			      imp->logical_block_size, NOCRED, &bp);
 		if (error) {
 			vput(vp);
-			brelse(bp);
 			printf("fhtovp: bread error %d\n",error);
 			return (error);
 		}

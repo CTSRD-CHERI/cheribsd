@@ -1725,7 +1725,7 @@ hn_xpnt_vf_setready(struct hn_softc *sc)
 		 */
 		memset(&ifr, 0, sizeof(ifr));
 		strlcpy(ifr.ifr_name, vf_ifp->if_xname, sizeof(ifr.ifr_name));
-		ifr.ifr_mtu = ifp->if_mtu;
+		ifr_mtu_set(&ifr, ifp->if_mtu);
 		error = vf_ifp->if_ioctl(vf_ifp, SIOCSIFMTU, (caddr_t)&ifr);
 		if (error) {
 			if_printf(ifp, "%s SIOCSIFMTU %u failed\n",
@@ -3734,7 +3734,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 			if (error) {
 				HN_UNLOCK(sc);
 				if_printf(ifp, "%s SIOCSIFMTU %d failed: %d\n",
-				    vf_ifp->if_xname, ifr->ifr_mtu, error);
+				    vf_ifp->if_xname, ifr_mtu_get(ifr), error);
 				break;
 			}
 		}
@@ -3762,7 +3762,7 @@ hn_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 		error = hn_rndis_get_mtu(sc, &mtu);
 		if (error)
-			mtu = ifr->ifr_mtu;
+			mtu = ifr_mtu_get(ifr);
 		else if (bootverbose)
 			if_printf(ifp, "RNDIS mtu %u\n", mtu);
 
@@ -6630,6 +6630,38 @@ hn_synth_detach(struct hn_softc *sc)
 	/* Detach all of the channels. */
 	hn_detach_allchans(sc);
 
+	if (vmbus_current_version >= VMBUS_VERSION_WIN10 && sc->hn_rxbuf_gpadl != 0) {
+		/*
+		 * Host is post-Win2016, disconnect RXBUF from primary channel here.
+		 */
+		int error;
+
+		error = vmbus_chan_gpadl_disconnect(sc->hn_prichan,
+		    sc->hn_rxbuf_gpadl);
+		if (error) {
+			if_printf(sc->hn_ifp,
+			    "rxbuf gpadl disconn failed: %d\n", error);
+			sc->hn_flags |= HN_FLAG_RXBUF_REF;
+		}
+		sc->hn_rxbuf_gpadl = 0;
+	}
+
+	if (vmbus_current_version >= VMBUS_VERSION_WIN10 && sc->hn_chim_gpadl != 0) {
+		/*
+		 * Host is post-Win2016, disconnect chimney sending buffer from
+		 * primary channel here.
+		 */
+		int error;
+
+		error = vmbus_chan_gpadl_disconnect(sc->hn_prichan,
+		    sc->hn_chim_gpadl);
+		if (error) {
+			if_printf(sc->hn_ifp,
+			    "chim gpadl disconn failed: %d\n", error);
+			sc->hn_flags |= HN_FLAG_CHIM_REF;
+		}
+		sc->hn_chim_gpadl = 0;
+	}
 	sc->hn_flags &= ~HN_FLAG_SYNTH_ATTACHED;
 }
 

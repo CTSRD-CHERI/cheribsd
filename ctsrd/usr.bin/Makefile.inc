@@ -6,4 +6,6 @@ MK_PIE:=	no
 BINDIR?=	/usr/bin
 WARNS?=		6
 
+WANT_CHERI=	none
+
 .include "${.PARSEDIR}/../Makefile.inc"

@@ -11,6 +11,7 @@ SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 .endif
 SHLIB_MAJOR=	1
 SHLIBDIR?=	/lib
+ALLOW_MIPS_SHARED_TEXTREL=
 
 .PATH: ${SRCDIR}
 
@@ -28,7 +29,7 @@ SRCS+=		libelftc_dem_gnu3.c\
 
 WARNS=		0
 CFLAGS+=	-isystem ${SRCDIR} -nostdinc++
-CXXSTD?=	c++11
+CXXSTD?=	c++14
 VERSION_MAP=	${.CURDIR}/Version.map
 
 .include <bsd.lib.mk>

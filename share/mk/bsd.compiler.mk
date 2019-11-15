@@ -19,6 +19,8 @@
 # COMPILER_FEATURES will contain one or more of the following, based on
 # compiler support for that feature:
 #
+# - c++17:     supports full (or nearly full) C++17 programming environment.
+# - c++14:     supports full (or nearly full) C++14 programming environment.
 # - c++11:     supports full (or nearly full) C++11 programming environment.
 # - retpoline: supports the retpoline speculative execution vulnerability
 #              mitigation.
@@ -138,10 +140,6 @@ _cc_vars=CC $${_empty_var_}
 # makefiles can save a noticeable amount of time when walking the whole source
 # tree (e.g. during make includes, etc.).
 _cc_vars+=XCC X_
-# Also get version information from CHERI_CC (if it is set)
-.ifdef CHERI_CC
-_cc_vars+=CHERI_CC CHERI_
-.endif
 .endif
 
 .for cc X_ in ${_cc_vars}
@@ -184,7 +182,7 @@ ${X_}COMPILER_FREEBSD_VERSION= 0
 # this only amounts to one executing ${CC}, echo and awk this adds to quite a
 # lot of unccessary fork()+exec() when building world
 # walking the entire object tree
-.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT)
 .error "${.CURDIR}: Rerunning ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. This value should be cached!"
 .else
 # .info "${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. ${cc}=${${cc}}"
@@ -207,12 +205,12 @@ ${X_}COMPILER_TYPE:=	clang
 . endif
 .endif
 .if !defined(${X_}COMPILER_VERSION)
-${X_}COMPILER_VERSION!=echo "${_v:M[1-9].[0-9]*}" | awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;}'
+${X_}COMPILER_VERSION!=echo "${_v:M[1-9]*.[0-9]*}" | awk -F. '{print $$1 * 10000 + $$2 * 100 + $$3;}'
 .endif
 .undef _v
 .endif
 .if !defined(${X_}COMPILER_FREEBSD_VERSION)
-.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT)
 .error "${.CURDIR}: Recomputing ${X_}COMPILER_FREEBSD_VERSION. This value should be cached!"
 .else
 # .info "${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION. ${cc}=${${cc}}"
@@ -231,9 +229,17 @@ ${X_}COMPILER_RESOURCE_DIR!=	${${cc}:N${CCACHE_BIN}} -print-resource-dir 2>/dev/
 .endif
 
 ${X_}COMPILER_FEATURES=
-.if ${${X_}COMPILER_TYPE} == "clang" || \
+.if (${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 30300) || \
 	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 40800)
 ${X_}COMPILER_FEATURES+=	c++11
+.endif
+.if (${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 30400) || \
+	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 50000)
+${X_}COMPILER_FEATURES+=	c++14
+.endif
+.if (${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 50000) || \
+	(${${X_}COMPILER_TYPE} == "gcc" && ${${X_}COMPILER_VERSION} >= 70000)
+${X_}COMPILER_FEATURES+=	c++17
 .endif
 .if ${${X_}COMPILER_TYPE} == "clang" && ${${X_}COMPILER_VERSION} >= 60000
 ${X_}COMPILER_FEATURES+=	retpoline

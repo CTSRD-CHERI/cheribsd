@@ -110,6 +110,11 @@ ktrcexception_mdfill(struct trapframe *frame,
 	    ke->ktr_regnum == CHERI_CR_C24 ? &frame->c24 :
 	    ke->ktr_regnum == CHERI_CR_C25 ? &frame->c25 :
 	    ke->ktr_regnum == CHERI_CR_IDC ? &frame->idc :
+	    ke->ktr_regnum == CHERI_CR_C27 ? &frame->c27 :
+	    ke->ktr_regnum == CHERI_CR_C28 ? &frame->c28 :
+	    ke->ktr_regnum == CHERI_CR_C29 ? &frame->c29 :
+	    ke->ktr_regnum == CHERI_CR_C30 ? &frame->c30 :
+	    ke->ktr_regnum == CHERI_CR_C31 ? &frame->c31 :
 	    ke->ktr_regnum == 0xff ? &frame->pcc :
 	    NULL;
 	if (cp != NULL)

@@ -127,7 +127,6 @@ device		nvram		# Access to rtc cmos via /dev/nvram
 device		speaker		#Play IBM BASIC-style noises out your speaker
 hint.speaker.0.at="isa"
 hint.speaker.0.port="0x61"
-device		gzip		#Exec gzipped a.out's.  REQUIRES COMPAT_AOUT!
 
 
 #####################################################################
@@ -292,9 +291,6 @@ device		cpufreq
 
 # bxe:  Broadcom NetXtreme II (BCM5771X/BCM578XX) PCIe 10Gb Ethernet
 #       adapters.
-# ed:   Western Digital and SMC 80xx; Novell NE1000 and NE2000; 3Com 3C503
-#       HP PC Lan+, various PC Card devices
-#       (requires miibus)
 # ipw:	Intel PRO/Wireless 2100 IEEE 802.11 adapter
 #	Requires the ipw firmware module
 # iwi:	Intel PRO/Wireless 2200BG/2225BG/2915ABG IEEE 802.11 adapters
@@ -312,7 +308,6 @@ device		cpufreq
 #	Requires the wpi firmware module
 
 device		bxe		# Broadcom NetXtreme II BCM5771X/BCM578XX 10GbE
-device		ed		# NE[12]000, SMC Ultra, 3c503, DS8390 cards
 options 	ED_3C503
 options 	ED_HPP
 options 	ED_SIC
@@ -387,6 +382,7 @@ device		wpifw
 device		if_ntb		# Virtual NTB network interface
 device		ntb_transport	# NTB packet transport driver
 device		ntb		# NTB hardware interface
+device		ntb_hw_amd	# AMD NTB hardware driver
 device		ntb_hw_intel	# Intel NTB hardware driver
 device		ntb_hw_plx	# PLX NTB hardware driver
 
@@ -463,6 +459,11 @@ options 	ISCI_LOGGING	# enable debugging in isci HAL
 # NVM Express (NVMe) support
 device         nvme    # base NVMe driver
 device         nvd     # expose NVMe namespaces as disks, depends on nvme
+
+#
+# Intel Volume Management Device (VMD) support
+device		vmd		# base VMD device
+device		vmd_bus		# bus for VMD children
 
 #
 # PMC-Sierra SAS/SATA controller
@@ -549,11 +550,13 @@ device		ioat		# Intel I/OAT DMA engine
 # amdsbwd: AMD SB7xx watchdog timer
 # viawd: VIA south bridge watchdog timer
 # wbwd: Winbond watchdog timer
+# itwd: ITE Super I/O watchdog timer
 #
 device		ichwd
 device		amdsbwd
 device		viawd
 device		wbwd
+device		itwd
 
 #
 # Temperature sensors:
@@ -569,6 +572,11 @@ device		amdtemp
 # microcode update feature.
 #
 device		cpuctl
+
+#
+# SuperIO driver.
+#
+device		superio
 
 #
 # System Management Bus (SMB)

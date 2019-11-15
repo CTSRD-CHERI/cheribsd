@@ -209,7 +209,7 @@ txg_sync_start(dsl_pool_t *dp)
 	tx->tx_threads = 2;
 
 	tx->tx_quiesce_thread = thread_create(NULL, 0, txg_quiesce_thread,
-	    dp, 0, &p0, TS_RUN, minclsyspri);
+	    dp, 0, spa_proc(dp->dp_spa), TS_RUN, minclsyspri);
 
 	/*
 	 * The sync thread can need a larger-than-default stack size on
@@ -217,7 +217,7 @@ txg_sync_start(dsl_pool_t *dp)
 	 * scrub_visitbp() recursion.
 	 */
 	tx->tx_sync_thread = thread_create(NULL, 32<<10, txg_sync_thread,
-	    dp, 0, &p0, TS_RUN, minclsyspri);
+	    dp, 0, spa_proc(dp->dp_spa), TS_RUN, minclsyspri);
 
 	mutex_exit(&tx->tx_sync_lock);
 }
@@ -490,6 +490,8 @@ txg_sync_thread(void *arg)
 		uint64_t timeout = zfs_txg_timeout * hz;
 		uint64_t timer;
 		uint64_t txg;
+		uint64_t dirty_min_bytes =
+		    zfs_dirty_data_max * zfs_dirty_data_sync_pct / 100;
 
 		/*
 		 * We sync when we're scanning, there's someone waiting
@@ -501,7 +503,7 @@ txg_sync_thread(void *arg)
 		    !tx->tx_exiting && timer > 0 &&
 		    tx->tx_synced_txg >= tx->tx_sync_txg_waiting &&
 		    !txg_has_quiesced_to_sync(dp) &&
-		    dp->dp_dirty_total < zfs_dirty_data_sync) {
+		    dp->dp_dirty_total < dirty_min_bytes) {
 			dprintf("waiting; tx_synced=%llu waiting=%llu dp=%p\n",
 			    tx->tx_synced_txg, tx->tx_sync_txg_waiting, dp);
 			txg_thread_wait(tx, &cpr, &tx->tx_sync_more_cv, timer);
@@ -636,8 +638,8 @@ txg_delay(dsl_pool_t *dp, uint64_t txg, hrtime_t delay, hrtime_t resolution)
 	mutex_exit(&tx->tx_sync_lock);
 }
 
-void
-txg_wait_synced(dsl_pool_t *dp, uint64_t txg)
+static boolean_t
+txg_wait_synced_impl(dsl_pool_t *dp, uint64_t txg, boolean_t wait_sig)
 {
 	tx_state_t *tx = &dp->dp_tx;
 
@@ -656,9 +658,51 @@ txg_wait_synced(dsl_pool_t *dp, uint64_t txg)
 		    "tx_synced=%llu waiting=%llu dp=%p\n",
 		    tx->tx_synced_txg, tx->tx_sync_txg_waiting, dp);
 		cv_broadcast(&tx->tx_sync_more_cv);
-		cv_wait(&tx->tx_sync_done_cv, &tx->tx_sync_lock);
+		if (wait_sig) {
+			/*
+			 * Condition wait here but stop if the thread receives a
+			 * signal. The caller may call txg_wait_synced*() again
+			 * to resume waiting for this txg.
+			 */
+#ifdef __FreeBSD__
+			/*
+			 * FreeBSD returns EINTR or ERESTART if there is
+			 * a pending signal, zero if the conditional variable
+			 * is signaled.  illumos returns zero in the former case
+			 * and >0 in the latter.
+			 */
+			if (cv_wait_sig(&tx->tx_sync_done_cv,
+			    &tx->tx_sync_lock) != 0) {
+#else
+			if (cv_wait_sig(&tx->tx_sync_done_cv,
+			    &tx->tx_sync_lock) == 0) {
+#endif
+
+				mutex_exit(&tx->tx_sync_lock);
+				return (B_TRUE);
+			}
+		} else {
+			cv_wait(&tx->tx_sync_done_cv, &tx->tx_sync_lock);
+		}
 	}
 	mutex_exit(&tx->tx_sync_lock);
+	return (B_FALSE);
+}
+
+void
+txg_wait_synced(dsl_pool_t *dp, uint64_t txg)
+{
+	VERIFY0(txg_wait_synced_impl(dp, txg, B_FALSE));
+}
+
+/*
+ * Similar to a txg_wait_synced but it can be interrupted from a signal.
+ * Returns B_TRUE if the thread was signaled while waiting.
+ */
+boolean_t
+txg_wait_synced_sig(dsl_pool_t *dp, uint64_t txg)
+{
+	return (txg_wait_synced_impl(dp, txg, B_TRUE));
 }
 
 void

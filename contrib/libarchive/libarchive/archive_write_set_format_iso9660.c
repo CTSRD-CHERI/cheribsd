@@ -212,7 +212,7 @@ struct isofile {
 
 struct isoent {
 	/* Keep `rbnode' at the first member of struct isoent. */
-	struct archive_rb_node	 rbnode;
+	struct archive_rb_node	 rbnode __subobject_member_used_for_c_inheritance;
 
 	struct isofile		*file;
 
@@ -298,7 +298,7 @@ struct isoent {
 };
 
 struct hardlink {
-	struct archive_rb_node	 rbnode;
+	struct archive_rb_node	 rbnode __subobject_member_used_for_c_inheritance;
 	int			 nlink;
 	struct {
 		struct isofile	*first;
@@ -869,7 +869,7 @@ enum vdc {
  */
 struct idr {
 	struct idrent {
-		struct archive_rb_node	rbnode;
+		struct archive_rb_node	rbnode __subobject_member_used_for_c_inheritance;
 		/* Used in wait_list. */
 		struct idrent		*wnext;
 		struct idrent		*avail;
@@ -3650,7 +3650,7 @@ wb_consume(struct archive_write *a, size_t size)
 	if (size > iso9660->wbuff_remaining ||
 	    iso9660->wbuff_remaining == 0) {
 		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-		    "Internal Programing error: iso9660:wb_consume()"
+		    "Internal Programming error: iso9660:wb_consume()"
 		    " size=%jd, wbuff_remaining=%jd",
 		    (intmax_t)size, (intmax_t)iso9660->wbuff_remaining);
 		return (ARCHIVE_FATAL);
@@ -3671,7 +3671,7 @@ wb_set_offset(struct archive_write *a, int64_t off)
 
 	if (iso9660->wbuff_type != WB_TO_TEMP) {
 		archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC,
-		    "Internal Programing error: iso9660:wb_set_offset()");
+		    "Internal Programming error: iso9660:wb_set_offset()");
 		return (ARCHIVE_FATAL);
 	}
 
@@ -8128,7 +8128,7 @@ zisofs_write_to_temp(struct archive_write *a, const void *buff, size_t s)
 {
 	(void)buff; /* UNUSED */
 	(void)s; /* UNUSED */
-	archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC, "Programing error");
+	archive_set_error(&a->archive, ARCHIVE_ERRNO_MISC, "Programming error");
 	return (ARCHIVE_FATAL);
 }
 

@@ -150,6 +150,7 @@ static struct mx25l_flash_ident flash_devices[] = {
 
 	/* GigaDevice */
 	{ "gd25q64",	0xc8, 0x4017, 64 * 1024, 128, FL_ERASE_4K },
+	{ "gd25q128",	0xc8, 0x4018, 64 * 1024, 256, FL_ERASE_4K },
 };
 
 static int
@@ -686,5 +687,5 @@ DRIVER_MODULE(mx25l, spibus, mx25l_driver, mx25l_devclass, 0, 0);
 MODULE_DEPEND(mx25l, spibus, 1, 1, 1);
 #ifdef	FDT
 MODULE_DEPEND(mx25l, fdt_slicer, 1, 1, 1);
-SPIBUS_PNP_INFO(compat_data);
+SPIBUS_FDT_PNP_INFO(compat_data);
 #endif

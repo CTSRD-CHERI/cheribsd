@@ -34,6 +34,8 @@
 #include <sys/wait.h>
 
 #include <err.h>
+#include <getopt.h>
+#include <inttypes.h>
 #include <libgen.h>
 #include <spawn.h>
 #include <statcounters.h>
@@ -45,10 +47,27 @@
 
 extern char **environ;
 
+static const struct option options[] = {
+	{ "archname", required_argument, NULL, 'a' },
+	{ "csv-noheader", no_argument, NULL, 'c' },
+	{ "help", no_argument, NULL, 'h' },
+	{ "format", required_argument, NULL, 'f' },
+	{ "output", required_argument, NULL, 'o' },
+	{ "progname", required_argument, NULL, 'p' },
+	{ "quiet", no_argument, NULL, 'q' },
+	{ "verbose", no_argument, NULL, 'v' },
+	{ NULL, 0, NULL, 0 }
+};
+
 static void
 usage(int exitcode)
 {
-	warnx("usage: beri_count_stats [-v/--verbose] <command>");
+	warnx("usage: beri_count_stats [-q/--quiet] [-v/--verbose] [-o file] <command>");
+	fprintf(stderr, "options:\n");
+	for (int i = 0; options[i].name != NULL; i++) {
+		fprintf(stderr, "  --%s/-%c\n", options[i].name, options[i].val);
+	}
+
 	exit(exitcode);
 }
 
@@ -58,33 +77,70 @@ main(int argc, char **argv)
 	int status;
 	pid_t pid;
 	bool verbose = false;
+	bool quiet = false;
+	const char* output_filename = NULL;
+	const char* progname = NULL;
+	const char* architecture = "unknown";
+	int opt;
+	statcounters_fmt_flag_t statcounters_format = (statcounters_fmt_flag_t)-1;
 
-	/* Adjust argc and argv as though we've used getopt. */
-	argc--;
-	argv++;
+	/* Start option string with + to avoid parsing after first non-option */
+	while ((opt = getopt_long(argc, argv, "+a:chf:o:p:qv", options, NULL)) != -1) {
+		switch (opt) {
+		case 'q':
+			quiet = true;
+			break;
+		case 'v':
+			verbose = true;
+			break;
+		case 'h':
+			usage(0);
+			break;
+		case 'a':
+			// FIXME: find out architecture from ELF header e_flags?
+			architecture = optarg;
+			break;
+		case 'o':
+			output_filename = optarg;
+			break;
+		case 'p':
+			progname = optarg;
+			break;
+		case 'c':
+			/* Force the use of CSV format without the header: */
+			statcounters_format = CSV_NOHEADER;
+			break;
+		case 'f':
+			if (strcmp(optarg, "csv") == 0) {
+				statcounters_format = CSV_HEADER;
+			} else if (strcmp(optarg, "csv-noheader") == 0) {
+				statcounters_format = CSV_NOHEADER;
+			} else {
+				errx(EX_DATAERR, "Invalid format %s", optarg);
+			}
+			break;
+		default:
+			usage(1);
+		}
+	}
+	argc -= optind;
+	argv += optind;
 
 	if (argc == 0)
 		usage(1);
-	if (strcmp("--help", argv[0]) == 0 || strcmp("-h", argv[0]) == 0)
-		usage(0);
-	if (strcmp("-v", argv[0]) == 0 || strcmp("--verbose", argv[0]) == 0) {
-		argc--;
-		argv++;
-		verbose = true;
-	}
 
 	statcounters_bank_t start_count;
+	statcounters_bank_t end_count;
+	statcounters_bank_t diff_count;
 	statcounters_sample(&start_count);
 	status = posix_spawnp(&pid, argv[0], NULL, NULL, argv, environ);
 	if (status != 0)
-		errc(EX_OSERR, status, "posix_spawnp");
+		errc(EX_OSERR, status, "posix_spawnp(%s)", argv[0]);
 
 	waitpid(pid, &status, 0);
 	if (!WIFEXITED(status)) {
 		warnx("child exited abnormally");
 	}
-	statcounters_bank_t end_count;
-	statcounters_bank_t diff_count;
 	statcounters_sample(&end_count);
 	statcounters_diff(&diff_count, &end_count, &start_count);
 	/*
@@ -92,16 +148,62 @@ main(int argc, char **argv)
 	 * TODO: arch will be wrong since we are using the architecture of
 	 * the beri_count_stats_binary!
 	 */
-	const char* prog_basename = basename(argv[0]);
-	/* Also dump to stderr when -v was passed */
-	if (verbose) {
-		/* Ensure human readable output: */
-		const char* original_fmt = getenv("STATCOUNTERS_FORMAT");
-		unsetenv("STATCOUNTERS_FORMAT");
-		statcounters_dump_with_args(&diff_count, prog_basename, NULL,
-		    NULL, stderr, HUMAN_READABLE);
-		setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
+	if (!progname) {
+		progname = basename(argv[0]);
 	}
-	statcounters_dump_with_args(&diff_count, prog_basename, NULL, NULL, NULL, HUMAN_READABLE);
+	if (quiet) {
+		/* Only print cycles,instructions and TLB misses */
+		printf("cyles:                 %12" PRId64 "\n", diff_count.cycle);
+		printf("instructions:          %12" PRId64 "\n", diff_count.inst);
+		printf("instructions (user):   %12" PRId64 "\n", diff_count.inst_user);
+		printf("instructions (kernel): %12" PRId64 "\n", diff_count.inst_kernel);
+		printf("tlb misses (data):     %12" PRId64 "\n", diff_count.dtlb_miss);
+		printf("tlb misses (instr):    %12" PRId64 "\n", diff_count.itlb_miss);
+		exit(WEXITSTATUS(status));
+	}
+	// Infer default value for statcounters_format from environment
+	const char* original_fmt = getenv("STATCOUNTERS_FORMAT");
+	if (statcounters_format == (statcounters_fmt_flag_t)-1) {
+		if (original_fmt && strcmp(original_fmt,"csv") == 0) {
+			// If the file already exists, we use CSV_NOHEADER later
+			statcounters_format = CSV_HEADER;
+		}
+		else {
+			statcounters_format = HUMAN_READABLE;
+		}
+	}
+
+	/* Also dump to stderr when -v was passed */
+	// FIXME: should change libstatcounters to have a better API
+	if (verbose) {
+		// Ensure human readable output:
+		unsetenv("STATCOUNTERS_FORMAT");
+		statcounters_dump_with_args(&diff_count, progname, NULL,
+		    architecture, stderr, HUMAN_READABLE);
+		if (original_fmt)
+			setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
+	}
+	FILE* output_file = NULL;
+	if (!output_filename || strcmp(output_filename, "-") == 0) {
+		output_file = stdout;
+	} else {
+		output_file = fopen(output_filename, "a");
+		/* If we are writing to a regular file and the offset is not
+		 * zero omit the CSV header */
+		if (!output_file) {
+			err(EX_OSERR, "fopen(%s)", output_filename);
+		}
+		if (statcounters_format == CSV_HEADER && ftello(output_file) > 0) {
+			statcounters_format = CSV_NOHEADER;
+		}
+	}
+	// Unset statcounters format for the dump so that the explicit
+	// argument is used instead of the environment variable
+	// FIXME: change libstatcounters instead of using this hack
+	unsetenv("STATCOUNTERS_FORMAT");
+	statcounters_dump_with_args(&diff_count, progname, NULL,
+	    architecture, output_file, statcounters_format);
+	if (original_fmt)
+		setenv("STATCOUNTERS_FORMAT", original_fmt, 1);
 	exit(WEXITSTATUS(status));
 }

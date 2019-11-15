@@ -75,7 +75,6 @@ __FBSDID("$FreeBSD$");
 #include <amd64/linux/linux.h>
 #include <amd64/linux/linux_proto.h>
 #include <compat/linux/linux_emul.h>
-#include <compat/linux/linux_futex.h>
 #include <compat/linux/linux_ioctl.h>
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_misc.h>
@@ -85,20 +84,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/linux/linux_vdso.h>
 
 MODULE_VERSION(linux64, 1);
-
-#if defined(DEBUG)
-SYSCTL_PROC(_compat_linux, OID_AUTO, debug,
-	    CTLTYPE_STRING | CTLFLAG_RW,
-	    0, 0, linux_sysctl_debug, "A",
-	    "Linux 64 debugging control");
-#endif
-
-/*
- * Allow the sendsig functions to use the ldebug() facility even though they
- * are not syscalls themselves.  Map them to syscall 0.  This is slightly less
- * bogus than using ldebug(sigreturn).
- */
-#define	LINUX_SYS_linux_rt_sendsig	0
 
 const char *linux_kplatform;
 static int linux_szsigcode;
@@ -356,6 +341,12 @@ linux_copyout_strings(struct image_params *imgp)
 	 * terminating NULL pointers.
 	 */
 	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
+
+	/*
+	 * Starting with 2.24, glibc depends on a 16-byte stack alignment.
+	 * One "long argc" will be prepended later.
+	 */
+	vectp = (char **)((((uintptr_t)vectp + 8) & ~0xF) - 8);
 
 	/* vectp also becomes our initial stack base. */
 	stack_base = (register_t *)vectp;
@@ -645,9 +636,6 @@ linux_rt_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 	/* Copy the sigframe out to the user's stack. */
 	if (copyout(&sf, sfp, sizeof(*sfp)) != 0) {
-#ifdef DEBUG
-		printf("process %ld has trashed its stack\n", (long)p->p_pid);
-#endif
 		PROC_LOCK(p);
 		sigexit(td, SIGILL);
 	}
@@ -876,8 +864,6 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
 				linux_ioctl_register_handler(*lihp);
-			LIST_INIT(&futex_list);
-			mtx_init(&futex_mtx, "ftllk64", NULL, MTX_DEF);
 			stclohz = (stathz ? stathz : hz);
 			if (bootverbose)
 				printf("Linux x86-64 ELF exec handler installed\n");
@@ -898,7 +884,6 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
 				linux_ioctl_unregister_handler(*lihp);
-			mtx_destroy(&futex_mtx);
 			if (bootverbose)
 				printf("Linux ELF exec handler removed\n");
 		} else

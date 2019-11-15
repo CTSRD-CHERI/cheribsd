@@ -30,23 +30,23 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-#include <sys/systm.h>
+#include <sys/condvar.h>
+#include <sys/conf.h>
+#include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
-#include <sys/types.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
-#include <sys/module.h>
-#include <sys/mutex.h>
-#include <sys/condvar.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/module.h>
+#include <sys/mutex.h>
 #include <sys/proc.h>
-#include <sys/conf.h>
 #include <sys/queue.h>
-#include <sys/sysctl.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/sysctl.h>
+#include <sys/systm.h>
 #include <sys/uio.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
@@ -273,7 +273,7 @@ ctl_ha_rx_thread(void *arg)
 	struct socket *so = softc->ha_so;
 	struct ha_msg_wire wire_hdr;
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	int error, flags, next;
 
 	bzero(&wire_hdr, sizeof(wire_hdr));
@@ -698,7 +698,7 @@ ctl_ha_msg_recv(ctl_ha_channel channel, void *addr, size_t len,
 {
 	struct ha_softc *softc = &ha_softc;
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	int error, flags;
 
 	if (!softc->ha_connected)
@@ -1006,11 +1006,10 @@ ctl_ha_msg_destroy(struct ctl_softc *ctl_softc)
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

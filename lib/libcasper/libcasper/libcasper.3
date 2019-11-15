@@ -28,7 +28,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd November 5, 2018
+.Dd July 29, 2019
 .Dt LIBCASPER 3
 .Os
 .Sh NAME
@@ -212,9 +212,6 @@ compatible API
 provides
 .Xr getpwent 3
 compatible API
-.It system.random
-allows to obtain entropy from
-.Pa /dev/random
 .It system.sysctl
 provides
 .Xr sysctlbyname 3
@@ -264,7 +261,6 @@ functions always succeed.
 .Xr cap_dns 3 ,
 .Xr cap_grp 3 ,
 .Xr cap_pwd 3 ,
-.Xr cap_random 3 ,
 .Xr cap_sysctl 3 ,
 .Xr cap_syslog 3 ,
 .Xr libcasper_service 3 ,

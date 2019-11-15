@@ -1228,7 +1228,6 @@ typedef UINTN RETURN_STATUS;
   **/
   #define RETURN_ADDRESS(L)     ((L == 0) ? _ReturnAddress() : (VOID *) 0)
 #elif defined(__GNUC__)
-  void * __builtin_return_address (unsigned int level);
   /**
     Get the return address of the calling function.
 

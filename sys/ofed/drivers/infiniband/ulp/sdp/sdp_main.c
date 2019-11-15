@@ -66,6 +66,7 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
+#include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 
@@ -1880,7 +1881,7 @@ next:
 	return (error);
 }
 
-static SYSCTL_NODE(_net_inet, -1,  sdp,    CTLFLAG_RW, 0,  "SDP");
+SYSCTL_NODE(_net_inet, -1,  sdp,    CTLFLAG_RW, 0,  "SDP");
 
 SYSCTL_PROC(_net_inet_sdp, TCPCTL_PCBLIST, pcblist,
     CTLFLAG_RD | CTLTYPE_STRUCT, 0, 0, sdp_pcblist, "S,xtcpcb",

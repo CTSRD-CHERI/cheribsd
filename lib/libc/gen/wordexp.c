@@ -255,15 +255,22 @@ we_askshell(const char *words, wordexp_t *we, int flags)
 		goto cleanup;
 	}
 	we->we_wordv = nwv;
-	if ((nstrings = realloc(we->we_strings, we->we_nbytes)) == NULL) {
+	/*
+	 * Use malloc/memcpy/free rather than using realloc() here,
+	 * avoid undefined behavior around the use of pointers to
+	 * regions which have been deallocated.
+	 */
+	if ((nstrings = malloc(we->we_nbytes)) == NULL) {
 		error = WRDE_NOSPACE;
 		goto cleanup;
 	}
+	memcpy(nstrings, we->we_strings, sofs);
 	for (i = 0; i < vofs; i++)
 		if (we->we_wordv[i] != NULL) {
 			we->we_wordv[i] = nstrings +
 			    (we->we_wordv[i] - we->we_strings);
 		}
+	free(we->we_strings);
 	we->we_strings = nstrings;
 
 	if (we_read_fully(pdes[0], we->we_strings + sofs, nbytes) != nbytes) {

@@ -676,6 +676,9 @@ i_swap(int *stats)
 {
     swap_buffer = setup_buffer(swap_buffer, 0);
 
+    if (swap_names == NULL)
+	    return;
+
     fputs("\nSwap: ", stdout);
     lastline++;
 
@@ -690,6 +693,9 @@ u_swap(int *stats)
     static char *new = NULL;
 
     new = setup_buffer(new, 0);
+
+    if (swap_names == NULL)
+	    return;
 
     /* format the new line */
     summary_format(new, stats, swap_names);
@@ -1284,31 +1290,6 @@ line_update(char *old, char *new, int start, int line)
     {
 	lastline = line;
     }
-}
-
-/*
- *  printable(str) - make the string pointed to by "str" into one that is
- *	printable (i.e.: all ascii), by converting all non-printable
- *	characters into '?'.  Replacements are done in place and a pointer
- *	to the original buffer is returned.
- */
-
-char *
-printable(char str[])
-{
-    char *ptr;
-    char ch;
-
-    ptr = str;
-    while ((ch = *ptr) != '\0')
-    {
-	if (!isprint(ch))
-	{
-	    *ptr = '?';
-	}
-	ptr++;
-    }
-    return(str);
 }
 
 void

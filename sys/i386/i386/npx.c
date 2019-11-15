@@ -352,7 +352,7 @@ init_xsave(void)
 	TUNABLE_INT_FETCH("hw.use_xsave", &use_xsave);
 }
 
-DEFINE_IFUNC(, void, fpusave, (union savefpu *), static)
+DEFINE_IFUNC(, void, fpusave, (union savefpu *))
 {
 
 	init_xsave();
@@ -1473,7 +1473,7 @@ union savefpu *
 fpu_save_area_alloc(void)
 {
 
-	return (uma_zalloc(fpu_save_area_zone, 0));
+	return (uma_zalloc(fpu_save_area_zone, M_WAITOK));
 }
 
 void

@@ -52,7 +52,7 @@ SUBDIR+=	bootpd
 _cheri_bench_helper=	cheri_bench-helper
 _cheritest_helper=	cheritest-helper
 _libpng_sb_helper=	libpng_sb-helper
-_rtld-cheri-elf=	rtld-cheri-elf
+_rtld-cheri-elf=	rtld-cheri-elf rtld-cheri-elf-debug
 _tcpdump_helper=	tcpdump-helper # Currently broken with the new compiler
 .endif
 
@@ -86,7 +86,11 @@ _tftp-proxy=	tftp-proxy
 .endif
 
 .if !defined(NO_PIC) && !defined(NO_RTLD) && !${MACHINE_ARCH:Mmips*c*}
-_rtld-elf=	rtld-elf
+_rtld-elf=	rtld-elf rtld-elf-debug
+SUBDIR.${MK_LIB32}+=	rtld-elf32
+.endif
+.if !defined(NO_PIC) && !defined(NO_RTLD)
+SUBDIR.${MK_LIB64}+=	rtld-elf64
 .endif
 
 .if ${MK_RBOOTD} != "no"

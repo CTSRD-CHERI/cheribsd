@@ -81,6 +81,7 @@ static void	vtscsi_read_config(struct vtscsi_softc *,
 		    struct virtio_scsi_config *);
 static int	vtscsi_maximum_segments(struct vtscsi_softc *, int);
 static int	vtscsi_alloc_virtqueues(struct vtscsi_softc *);
+static void	vtscsi_check_sizes(struct vtscsi_softc *);
 static void	vtscsi_write_device_config(struct vtscsi_softc *);
 static int	vtscsi_reinit(struct vtscsi_softc *);
 
@@ -233,6 +234,9 @@ MODULE_VERSION(virtio_scsi, 1);
 MODULE_DEPEND(virtio_scsi, virtio, 1, 1, 1);
 MODULE_DEPEND(virtio_scsi, cam, 1, 1, 1);
 
+VIRTIO_SIMPLE_PNPTABLE(virtio_scsi, VIRTIO_ID_SCSI, "VirtIO SCSI Adapter");
+VIRTIO_SIMPLE_PNPINFO(virtio_pci, virtio_scsi);
+
 static int
 vtscsi_modevent(module_t mod, int type, void *unused)
 {
@@ -256,13 +260,7 @@ vtscsi_modevent(module_t mod, int type, void *unused)
 static int
 vtscsi_probe(device_t dev)
 {
-
-	if (virtio_get_device_type(dev) != VIRTIO_ID_SCSI)
-		return (ENXIO);
-
-	device_set_desc(dev, "VirtIO SCSI Adapter");
-
-	return (BUS_PROBE_DEFAULT);
+	return (VIRTIO_SIMPLE_PROBE(dev, virtio_scsi));
 }
 
 static int
@@ -313,6 +311,8 @@ vtscsi_attach(device_t dev)
 		device_printf(dev, "cannot allocate virtqueues\n");
 		goto fail;
 	}
+
+	vtscsi_check_sizes(sc);
 
 	error = vtscsi_init_event_vq(sc);
 	if (error) {
@@ -478,6 +478,26 @@ vtscsi_alloc_virtqueues(struct vtscsi_softc *sc)
 	    "%s request", device_get_nameunit(dev));
 
 	return (virtio_alloc_virtqueues(dev, 0, nvqs, vq_info));
+}
+
+static void
+vtscsi_check_sizes(struct vtscsi_softc *sc)
+{
+	int rqsize;
+
+	if ((sc->vtscsi_flags & VTSCSI_FLAG_INDIRECT) == 0) {
+		/*
+		 * Ensure the assertions in virtqueue_enqueue(),
+		 * even if the hypervisor reports a bad seg_max.
+		 */
+		rqsize = virtqueue_size(sc->vtscsi_request_vq);
+		if (sc->vtscsi_max_nsegs > rqsize) {
+			device_printf(sc->vtscsi_dev,
+			    "clamping seg_max (%d %d)\n", sc->vtscsi_max_nsegs,
+			    rqsize);
+			sc->vtscsi_max_nsegs = rqsize;
+		}
+	}
 }
 
 static void

@@ -66,12 +66,17 @@ void
 test_copyregs(const struct cheri_test *ctp __unused)
 {
 
-	CHERI_CGETDEFAULT(2);
-	CHERI_CGETDEFAULT(3);
-	CHERI_CGETDEFAULT(4);
-	CHERI_CGETDEFAULT(5);
-	CHERI_CGETDEFAULT(6);
-	CHERI_CGETDEFAULT(7);
+	__asm__ __volatile__(
+	    ".set push\n"
+	    ".set noreorder\n"
+	    "cgetdefault $c2\n"
+	    "cmove $c3, $c2\n"
+	    "cmove $c4, $c2\n"
+	    "cmove $c5, $c2\n"
+	    "cmove $c6, $c2\n"
+	    "cmove $c7, $c2\n"
+	    ".set pop\n"
+	    : : : "$c2", "$c3", "$c4", "$c5", "$c6", "$c7");
 	cheritest_success();
 }
 

@@ -40,6 +40,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/msgbuf.h>
 #include <sys/watchdog.h>
 #include <vm/vm.h>
+#include <vm/vm_param.h>
+#include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 #include <vm/pmap.h>
 #include <machine/atomic.h>
 #include <machine/elf.h>
@@ -348,9 +351,10 @@ minidumpsys(struct dumperinfo *di)
 
 	if (error == ECANCELED)
 		printf("\nDump aborted\n");
-	else if (error == E2BIG || error == ENOSPC)
-		printf("\nDump failed. Partition too small.\n");
-	else
+	else if (error == E2BIG || error == ENOSPC) {
+		printf("\nDump failed. Partition too small (about %lluMB were "
+		    "needed this time).\n", (long long)dumpsize >> 20);
+	} else
 		printf("\n** DUMP FAILED (ERROR %d) **\n", error);
 	return (error);
 }

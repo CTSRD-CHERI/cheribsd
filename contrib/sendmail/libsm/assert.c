@@ -69,7 +69,10 @@ sm_abort_defaulthandler __P((
 	const char *msg));
 
 static void
-sm_abort_defaulthandler(const char *filename, int lineno, const char * msg)
+sm_abort_defaulthandler(filename, lineno, msg)
+	const char *filename;
+	int lineno;
+	const char *msg;
 {
 	if (filename != NULL)
 		sm_io_fprintf(smioerr, SM_TIME_DEFAULT, "%s:%d: %s\n", filename,

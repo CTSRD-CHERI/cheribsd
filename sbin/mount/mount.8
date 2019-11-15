@@ -28,7 +28,7 @@
 .\"     @(#)mount.8	8.8 (Berkeley) 6/16/94
 .\" $FreeBSD$
 .\"
-.Dd March 22, 2017
+.Dd August 28, 2019
 .Dt MOUNT 8
 .Os
 .Sh NAME
@@ -162,6 +162,8 @@ When used with the
 .Fl u
 flag, this is the same as specifying the options currently in effect for
 the mounted file system.
+.It Cm emptydir
+Require that the mount point directory be empty.
 .It Cm force
 The same as
 .Fl f ;
@@ -237,6 +239,9 @@ flag.
 Disable read clustering.
 .It Cm noclusterw
 Disable write clustering.
+.It Cm nocover
+Do not mount if the requested mount point is already
+the root of a mount point.
 .It Cm noexec
 Do not allow execution of any binaries on the mounted file system.
 This option is useful for a server that has file systems containing
@@ -355,6 +360,12 @@ Lookups will be done in the mounted file system first.
 If those operations fail due to a non-existent file the underlying
 directory is then accessed.
 All creates are done in the mounted file system.
+.It Cm untrusted
+The file system is untrusted and the kernel should use more
+extensive checks on the file-system's metadata before using it.
+This option is intended to be used when mounting file systems
+from untrusted media such as USB memory sticks or other
+externally-provided media.
 .El
 .Pp
 Any additional options specific to a file system type that is not

@@ -114,6 +114,15 @@ typedef	struct kevent_c		kkevent_t;
 #else
 typedef	struct kevent_native	kkevent_t;
 #endif
+
+struct g_kevent_args {
+	int	fd;
+	const void * __capability changelist;
+	int	nchanges;
+	void	* __capability eventlist;
+	int	nevents;
+	const struct timespec * __capability timeout;
+};
 #endif /* _KERNEL */
 
 #if defined(_WANT_FREEBSD11_KEVENT)

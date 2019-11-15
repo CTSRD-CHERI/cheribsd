@@ -185,6 +185,11 @@ fileargs_create_limit(int argc, const char * const *argv, int flags,
 		nvlist_add_number(limits, "mode", (uint64_t)mode);
 
 	for (i = 0; i < argc; i++) {
+		if (strlen(argv[i]) >= MAXPATHLEN) {
+			nvlist_destroy(limits);
+			errno = ENAMETOOLONG;
+			return (NULL);
+		}
 		nvlist_add_null(limits, argv[i]);
 	}
 
@@ -422,6 +427,39 @@ fileargs_free(fileargs_t *fa)
 	}
 	explicit_bzero(&fa->fa_magic, sizeof(fa->fa_magic));
 	free(fa);
+}
+
+cap_channel_t *
+fileargs_unwrap(fileargs_t *fa, int *flags)
+{
+	cap_channel_t *chan;
+
+	if (fa == NULL)
+		return (NULL);
+
+	assert(fa->fa_magic == FILEARGS_MAGIC);
+
+	chan = fa->fa_chann;
+	if (flags != NULL) {
+		*flags = fa->fa_fdflags;
+	}
+
+	nvlist_destroy(fa->fa_cache);
+	explicit_bzero(&fa->fa_magic, sizeof(fa->fa_magic));
+	free(fa);
+
+	return (chan);
+}
+
+fileargs_t *
+fileargs_wrap(cap_channel_t *chan, int fdflags)
+{
+
+	if (chan == NULL) {
+		return (NULL);
+	}
+
+	return (fileargs_create(chan, fdflags));
 }
 
 /*

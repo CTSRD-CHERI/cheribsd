@@ -34,6 +34,8 @@
  *	from nfs_vfsops.c	8.12 (Berkeley) 5/20/95
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -136,7 +138,8 @@ static struct vfsops nfs_vfsops = {
 	.vfs_init =		ncl_init,
 	.vfs_mount =		nfs_mount,
 	.vfs_cmount =		nfs_cmount,
-	.vfs_root =		nfs_root,
+	.vfs_root =		vfs_cache_root,
+	.vfs_cachedroot =	nfs_root,
 	.vfs_statfs =		nfs_statfs,
 	.vfs_sync =		nfs_sync,
 	.vfs_uninit =		ncl_uninit,
@@ -1228,11 +1231,12 @@ nfs_mount(struct mount *mp)
 			error = EINVAL;
 			goto out;
 		}
-		error = copyin((caddr_t)args.fh, (caddr_t)nfh,
+		error = copyin(__USER_CAP(args.fh, args.fhsize), nfh,
 		    args.fhsize);
 		if (error != 0)
 			goto out;
-		error = copyinstr(args.hostname, hst, MNAMELEN - 1, &hstlen);
+		error = copyinstr(__USER_CAP(args.hostname, MNAMELEN), hst,
+		    MNAMELEN - 1, &hstlen);
 		if (error != 0)
 			goto out;
 		bzero(&hst[hstlen], MNAMELEN - hstlen);
@@ -1354,7 +1358,7 @@ out:
  */
 /* ARGSUSED */
 static int
-nfs_cmount(struct mntarg *ma, void *data, uint64_t flags)
+nfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	int error;
 	struct nfs_args args;
@@ -1627,6 +1631,7 @@ mountnfs(struct nfs_args *argp, struct mount *mp, struct sockaddr *nam,
 		 * Lose the lock but keep the ref.
 		 */
 		NFSVOPUNLOCK(*vpp, 0);
+		vfs_cache_root_set(mp, *vpp);
 		return (0);
 	}
 	error = EIO;
@@ -1714,13 +1719,13 @@ nfs_unmount(struct mount *mp, int mntflags)
 		mtx_unlock(&nmp->nm_mtx);
 	}
 	/* Make sure no nfsiods are assigned to this mount. */
-	mtx_lock(&ncl_iod_mutex);
+	NFSLOCKIOD();
 	for (i = 0; i < NFS_MAXASYNCDAEMON; i++)
 		if (ncl_iodmount[i] == nmp) {
 			ncl_iodwant[i] = NFSIOD_AVAILABLE;
 			ncl_iodmount[i] = NULL;
 		}
-	mtx_unlock(&ncl_iod_mutex);
+	NFSUNLOCKIOD();
 
 	/*
 	 * We can now set mnt_data to NULL and wait for

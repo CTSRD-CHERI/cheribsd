@@ -63,7 +63,8 @@ __FBSDID("$FreeBSD$");
 
 static void	exit_thread(void) __dead2;
 
-__weak_reference(_pthread_exit, pthread_exit);
+__weak_reference(_Tthr_exit, pthread_exit);
+__weak_reference(_Tthr_exit, _pthread_exit);
 
 #ifdef _PTHREAD_FORCED_UNWIND
 static int message_printed;
@@ -214,6 +215,19 @@ thread_unwind_stop(int version __unused, _Unwind_Action actions,
 	return (_URC_NO_REASON);
 }
 
+/*
+ * Check that the _Unwind_Exception structure from include/unwind.h is
+ * compatible with LLVM libunwind. This was causing crashes before.
+ */
+#ifdef __CHERI_PURE_CAPABILITY__
+#if __SIZEOF_CHERI_CAPABILITY__ == 16
+_Static_assert(sizeof(struct _Unwind_Exception) == 0x40, "");
+#else
+_Static_assert(__SIZEOF_CHERI_CAPABILITY__ == 32, "");
+_Static_assert(sizeof(struct _Unwind_Exception) == 0x80, "");
+#endif
+#endif
+
 static void
 thread_unwind(void)
 {
@@ -253,7 +267,7 @@ _thread_exit(const char *fname, int lineno, const char *msg)
 }
 
 void
-_pthread_exit(void *status)
+_Tthr_exit(void *status)
 {
 	_pthread_exit_mask(status, NULL);
 }

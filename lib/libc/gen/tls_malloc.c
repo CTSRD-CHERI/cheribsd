@@ -74,6 +74,9 @@
 
 #ifndef __CHERI_PURE_CAPABILITY__
 #define	cheri_csetbounds(ptr, size)	((void *)(ptr))
+#define	cheri_andperm(ptr, size)	((void *)(ptr))
+#define	CHERI_PERMS_USERSPACE_DATA	0
+#define	CHERI_PERM_CHERIABI_VMMAP	0
 #endif
 
 static spinlock_t tls_malloc_lock = _SPINLOCK_INITIALIZER;
@@ -81,7 +84,7 @@ static spinlock_t tls_malloc_lock = _SPINLOCK_INITIALIZER;
 #define	TLS_MALLOC_UNLOCK	_SPINUNLOCK(&tls_malloc_lock)
 union overhead;
 static void morecore(int);
-static void init_pagebucket(void);
+static void *__tls_malloc_aligned(size_t size, size_t align);
 
 /*
  * The overhead on a block is one pointer. When free, this space
@@ -96,98 +99,96 @@ union	overhead {
 	} ovu;
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
-#define	ov_size		ovu.ovu_size
 };
+
+#define	MALLOC_ALIGNMENT	sizeof(union overhead)
 
 #define	MAGIC		0xef		/* magic # on accounting info */
 
 /*
- * nextf[i] is the pointer to the next free block of size 2^(i+3).  The
- * smallest allocatable block is 8 bytes.  The overhead information
- * precedes the data area returned to the user.
+ * nextf[i] is the pointer to the next free block of size
+ * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the
+ * data area returned to the user.
  */
+#define	FIRST_BUCKET_SIZE	32
 #define	NBUCKETS 30
 static	union overhead *nextf[NBUCKETS];
 
-static	size_t pagesz;			/* page size */
-static	int pagebucket;			/* page size bucket */
+static const size_t pagesz = PAGE_SIZE;			/* page size */
 
-
-#define	NPOOLPAGES	(32*1024/_pagesz)
+#define	NPOOLPAGES	(32*1024/pagesz)
 
 static caddr_t	pagepool_start, pagepool_end;
 static size_t	n_pagepools, max_pagepools;
 static char	**pagepool_list;
-static size_t	_pagesz;
+
+static void
+__morepools(void)
+{
+	size_t osize, nsize;
+	char **new_pagepool_list;
+
+	osize = max_pagepools * sizeof(char *);
+	if (max_pagepools == 0)
+		max_pagepools = pagesz / (sizeof(char *) * 2);
+	max_pagepools *= 2;
+	nsize = max_pagepools * sizeof(char *);
+	if ((new_pagepool_list = mmap(0, nsize, PROT_READ|PROT_WRITE,
+	    MAP_ANON, -1, 0)) == MAP_FAILED)
+		abort();
+	memcpy(new_pagepool_list, pagepool_list, osize);
+	if (pagepool_list != NULL) {
+		if (munmap(pagepool_list, osize) != 0)
+			abort();
+	}
+	pagepool_list = new_pagepool_list;
+}
 
 static int
 __morepages(int n)
 {
-	int	fd = -1;
-	char **new_pagepool_list;
+	size_t	size;
 
 	n += NPOOLPAGES;	/* round up allocation. */
+	size = n * pagesz;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size = CHERI_REPRESENTABLE_LENGTH(size);
+#endif
 
-	if (n_pagepools >= max_pagepools) {
-		if (max_pagepools == 0)
-			max_pagepools = _pagesz / (sizeof(char *) * 2);
+	if (n_pagepools >= max_pagepools)
+		__morepools();
 
-		max_pagepools *= 2;
-		if ((new_pagepool_list = mmap(0,
-		    max_pagepools * sizeof(char *), PROT_READ|PROT_WRITE,
-		    MAP_ANON, fd, 0)) == MAP_FAILED)
-			return (0);
-		memcpy(new_pagepool_list, pagepool_list,
-		    sizeof(char *) * n_pagepools);
-		if (pagepool_list != NULL) {
-			if (munmap(pagepool_list,
-			    max_pagepools * sizeof(char *) / 2) != 0) {
-				abort();
-			}
-		}
-		pagepool_list = new_pagepool_list;
-	}
-
-	if (pagepool_end - pagepool_start > (ssize_t)_pagesz) {
+	if (pagepool_end - pagepool_start > (ssize_t)pagesz) {
+		caddr_t extra_start = __builtin_align_up(pagepool_start,
+		    pagesz);
+		size_t extra_bytes = pagepool_end - extra_start;
 #ifndef __CHERI_PURE_CAPABILITY__
-		caddr_t addr = (caddr_t)roundup2((vaddr_t)pagepool_start, _pagesz);
+		if (munmap(extra_start, extra_bytes) != 0)
+			abort();
 #else
 		/*
-		 * XXX: CHERI128: Need to avoid rounding down to an imprecise
-		 * capability.
+		 * In many cases we could safely unmap part of the end
+		 * (since there's only one pointer to the allocation in
+		 * pagepool_list to be updated), but we need to be careful
+		 * to avoid making the result unrepresentable.  For now,
+		 * just leak the virtual addresses and MAP_GUARD the
+		 * unused pages.
 		 */
-		caddr_t	addr = cheri_setoffset(pagepool_start,
-		    roundup2(cheri_getoffset(pagepool_start), _pagesz));
-#endif
-		if (munmap(addr, pagepool_end - addr) != 0) {
+		if (mmap(extra_start, extra_bytes, PROT_NONE,
+		    MAP_FIXED | MAP_GUARD | MAP_CHERI_NOSETBOUNDS, -1, 0)
+		    == MAP_FAILED)
 			abort();
-#ifdef __CHERI_PURE_CAPABILITY__
-		} else {
-			/* Shrink the pool */
-			pagepool_list[n_pagepools - 1] =
-			    cheri_csetbounds(pagepool_list[n_pagepools - 1],
-			    cheri_getlen(pagepool_list[n_pagepools - 1]) -
-			    (pagepool_end - addr));
 #endif
-		}
 	}
 
-	if ((pagepool_start = mmap(0, n * _pagesz,
-			PROT_READ|PROT_WRITE,
-			MAP_ANON, fd, 0)) == (caddr_t)-1) {
-		return 0;
-	}
-	pagepool_end = pagepool_start + n * _pagesz;
+	if ((pagepool_start = mmap(0, size, PROT_READ|PROT_WRITE,
+	    MAP_ANON, -1, 0)) == MAP_FAILED)
+		return (0);
+
+	pagepool_end = pagepool_start + size;
 	pagepool_list[n_pagepools++] = pagepool_start;
 
-	return n;
-}
-
-static void
-__init_heap(size_t pagesz)
-{
-
-	_pagesz = pagesz;
+	return (size / pagesz);
 }
 
 static void *
@@ -212,43 +213,39 @@ __rederive_pointer(void *ptr)
 #endif
 }
 
-void *
-tls_malloc(size_t nbytes)
+static void *
+bound_ptr(void *mem, size_t nbytes)
+{
+	void *ptr;
+
+	ptr = cheri_csetbounds(mem, nbytes);
+	ptr = cheri_andperm(ptr,
+	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP);
+	return (ptr);
+}
+
+static void *
+__tls_malloc(size_t nbytes)
 {
 	union overhead *op;
 	int bucket;
 	size_t amt;
 
 	/*
-	 * First time malloc is called, setup page size and
-	 * align break pointer so all data will be page aligned.
-	 */
-	TLS_MALLOC_LOCK;
-	if (pagesz == 0) {
-		pagesz = PAGE_SIZE;
-		init_pagebucket();
-		__init_heap(pagesz);
-	}
-	TLS_MALLOC_UNLOCK;
-	assert(pagesz != 0);
-	/*
 	 * Convert amount of memory requested into closest block size
 	 * stored in hash buckets which satisfies request.
 	 * Account for space used per block for accounting.
 	 */
-	if (nbytes <= pagesz - sizeof (*op)) {
-		amt = 32;	/* size of first bucket */
-		bucket = 2;
-	} else {
-		amt = pagesz;
-		bucket = pagebucket;
-	}
+	amt = FIRST_BUCKET_SIZE;
+	bucket = 0;
 	while (nbytes > (size_t)amt - sizeof(*op)) {
 		amt <<= 1;
 		if (amt == 0)
 			return (NULL);
 		bucket++;
 	}
+	if (bucket >= NBUCKETS)
+		return (NULL);
 	/*
 	 * If nothing in hash bucket right now,
 	 * request more memory from the system.
@@ -264,7 +261,26 @@ tls_malloc(size_t nbytes)
 	TLS_MALLOC_UNLOCK;
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
-	return (cheri_csetbounds(op + 1, nbytes));
+	return (op + 1);
+}
+
+void *
+tls_malloc(size_t nbytes)
+{
+	void *mem;
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t align, mask;
+
+	nbytes = CHERI_REPRESENTABLE_LENGTH(nbytes);
+	mask = CHERI_REPRESENTABLE_ALIGNMENT_MASK(nbytes);
+	align = 1 + ~mask;
+
+	if (mask != SIZE_MAX && align > MALLOC_ALIGNMENT)
+		mem = __tls_malloc_aligned(nbytes, align);
+	else
+#endif
+		mem = __tls_malloc(nbytes);
+	return (bound_ptr(mem, nbytes));
 }
 
 void *
@@ -295,17 +311,13 @@ morecore(int bucket)
 	int amt;			/* amount to allocate */
 	int nblks;			/* how many blocks we get */
 
-	/*
-	 * sbrk_size <= 0 only for big, FLUFFY, requests (about
-	 * 2^30 bytes on a VAX, I think) or for a negative arg.
-	 */
-	sz = 1 << (bucket + 3);
+	sz = FIRST_BUCKET_SIZE << bucket;
 	assert(sz > 0);
 	if (sz < pagesz) {
 		amt = pagesz;
 		nblks = amt / sz;
 	} else {
-		amt = sz + pagesz;
+		amt = sz; /* XXX: round up */
 		nblks = 1;
 	}
 	if (amt > pagepool_end - pagepool_start)
@@ -341,6 +353,25 @@ find_overhead(void * cp)
 		return (NULL);
 	op--;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * In pure-capability mode our allocation might have come from
+	 * __tls_malloc_aligned.  In that case we need to get back to the
+	 * real overhead pointer.  To make sure we aren't tricked, the
+	 * pointer must:
+	 *  - Be an internal allocator pointer (have the VMMAP permision).
+	 *  - Point somewhere before us and within the current pagepool.
+	 */
+	if (cheri_gettag(op->ov_next) &&
+	    (cheri_getperm(op->ov_next) & CHERI_PERM_CHERIABI_VMMAP) != 0) {
+		vaddr_t base, pp_base;
+
+		pp_base = cheri_getbase(op);
+		base = cheri_getbase(op->ov_next);
+		if (base >= pp_base && base < cheri_getaddress(op))
+			op = op->ov_next;
+	}
+#endif
 	if (op->ov_magic == MAGIC)
 		return (op);
 
@@ -352,6 +383,19 @@ find_overhead(void * cp)
 	 */
 	abort();
 	return (NULL);
+}
+
+static void
+nextf_insert(void *mem, size_t size, int xbucket)
+{
+	union overhead *op;
+	int bucket;
+
+	bucket = __builtin_ctzl(size) - __builtin_ctzl(FIRST_BUCKET_SIZE);
+	if (bucket != xbucket) abort();
+	op = mem;
+	op->ov_next = nextf[bucket];
+	nextf[bucket] = op;
 }
 
 void
@@ -367,40 +411,40 @@ tls_free(void *cp)
 		return;
 	TLS_MALLOC_LOCK;
 	bucket = op->ov_index;
-	assert(bucket < NBUCKETS);
-	op->ov_next = nextf[bucket];	/* also clobbers ov_magic */
-	nextf[bucket] = op;
+	if (bucket < NBUCKETS)
+		abort();
+	nextf_insert(op, FIRST_BUCKET_SIZE << bucket, bucket);
 	TLS_MALLOC_UNLOCK;
 }
 
-static void
-init_pagebucket(void)
-{
-	int bucket;
-	size_t amt;
-
-	bucket = 0;
-	amt = 8;
-	while ((unsigned)pagesz > amt) {
-		amt <<= 1;
-		bucket++;
-	}
-	pagebucket = bucket;
-}
-
-void *
-tls_malloc_aligned(size_t size, size_t align)
+static void *
+__tls_malloc_aligned(size_t size, size_t align)
 {
 	vaddr_t memshift;
 	void *mem, *res;
 	if (align < sizeof(void *))
 		align = sizeof(void *);
 
-	mem = tls_malloc(size + sizeof(void *) + align - 1);
+	mem = __tls_malloc(size + sizeof(void *) + align - 1);
 	memshift = roundup2((vaddr_t)mem + sizeof(void *), align) - (vaddr_t)mem;
 	res = (void *)((uintptr_t)mem + memshift);
 	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
 	return (res);
+}
+
+void *
+tls_malloc_aligned(size_t nbytes, size_t align)
+{
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t mask;
+
+	nbytes = CHERI_REPRESENTABLE_LENGTH(nbytes);
+	mask = CHERI_REPRESENTABLE_ALIGNMENT_MASK(nbytes);
+	if (align < 1 + ~mask)
+		align = 1 + ~mask;
+#endif
+	return (bound_ptr(__tls_malloc_aligned(nbytes, align), nbytes));
+
 }
 
 void *
@@ -419,13 +463,16 @@ void
 tls_free_aligned(void *ptr)
 {
 	void *mem;
+#ifndef __CHERI_PURE_CAPABILITY__
 	uintptr_t x;
 
 	if (ptr == NULL)
 		return;
-
 	x = (uintptr_t)ptr;
 	x -= sizeof(void *);
 	mem = *(void **)x;
+#else
+	mem = ptr;
+#endif
 	tls_free(mem);
 }

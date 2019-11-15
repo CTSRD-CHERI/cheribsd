@@ -137,7 +137,7 @@ freebsd64_sigwait(struct thread *td, struct freebsd64_sigwait_args *uap)
 void
 siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64)
 {
-	memset(&si64, 0, sizeof(si64));
+	memset(si64, 0, sizeof(*si64));
 	si64->si_signo = si->si_signo;
 	si64->si_errno = si->si_errno;
 	si64->si_code = si->si_code;
@@ -199,7 +199,7 @@ freebsd64_sigaltstack(struct thread *td,
 	int error;
 
 	if (uap->ss != NULL) {
-		error = copyin(uap->ss, &ss64, sizeof(ss));
+		error = copyin(uap->ss, &ss64, sizeof(ss64));
 		if (error != 0)
 			return (error);
 		ss.ss_sp = __USER_CAP_UNBOUND(ss64.ss_sp);
@@ -215,7 +215,7 @@ freebsd64_sigaltstack(struct thread *td,
 		ss64.ss_sp = (__cheri_fromcap void *)oss.ss_sp;
 		ss64.ss_size = oss.ss_size;
 		ss64.ss_flags = oss.ss_flags;
-		error = copyout(&ss64, uap->oss, sizeof(oss));
+		error = copyout(&ss64, uap->oss, sizeof(ss64));
 	}
 	return (error);
 }

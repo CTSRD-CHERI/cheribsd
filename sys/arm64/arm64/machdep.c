@@ -42,8 +42,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/efi.h>
 #include <sys/exec.h>
 #include <sys/imgact.h>
-#include <sys/kdb.h> 
+#include <sys/kdb.h>
 #include <sys/kernel.h>
+#include <sys/ktr.h>
 #include <sys/limits.h>
 #include <sys/linker.h>
 #include <sys/msgbuf.h>
@@ -133,7 +134,7 @@ pan_setup(void)
 	uint64_t id_aa64mfr1;
 
 	id_aa64mfr1 = READ_SPECIALREG(id_aa64mmfr1_el1);
-	if (ID_AA64MMFR1_PAN(id_aa64mfr1) != ID_AA64MMFR1_PAN_NONE)
+	if (ID_AA64MMFR1_PAN_VAL(id_aa64mfr1) != ID_AA64MMFR1_PAN_NONE)
 		has_pan = 1;
 }
 
@@ -193,6 +194,16 @@ fill_regs(struct thread *td, struct reg *regs)
 
 	memcpy(regs->x, frame->tf_x, sizeof(regs->x));
 
+#ifdef COMPAT_FREEBSD32
+	/*
+	 * We may be called here for a 32bits process, if we're using a
+	 * 64bits debugger. If so, put PC and SPSR where it expects it.
+	 */
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
+		regs->x[15] = frame->tf_elr;
+		regs->x[16] = frame->tf_spsr;
+	}
+#endif
 	return (0);
 }
 
@@ -210,6 +221,17 @@ set_regs(struct thread *td, struct reg *regs)
 
 	memcpy(frame->tf_x, regs->x, sizeof(frame->tf_x));
 
+#ifdef COMPAT_FREEBSD32
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32)) {
+		/*
+		 * We may be called for a 32bits process if we're using
+		 * a 64bits debugger. If so, get PC and SPSR from where
+		 * it put it.
+		 */
+		frame->tf_elr = regs->x[15];
+		frame->tf_spsr = regs->x[16] & PSR_FLAGS;
+	}
+#endif
 	return (0);
 }
 
@@ -259,17 +281,60 @@ set_fpregs(struct thread *td, struct fpreg *regs)
 int
 fill_dbregs(struct thread *td, struct dbreg *regs)
 {
+	struct debug_monitor_state *monitor;
+	int count, i;
+	uint8_t debug_ver, nbkpts;
 
-	printf("ARM64TODO: fill_dbregs");
-	return (EDOOFUS);
+	memset(regs, 0, sizeof(*regs));
+
+	extract_user_id_field(ID_AA64DFR0_EL1, ID_AA64DFR0_DebugVer_SHIFT,
+	    &debug_ver);
+	extract_user_id_field(ID_AA64DFR0_EL1, ID_AA64DFR0_BRPs_SHIFT,
+	    &nbkpts);
+
+	/*
+	 * The BRPs field contains the number of breakpoints - 1. Armv8-A
+	 * allows the hardware to provide 2-16 breakpoints so this won't
+	 * overflow an 8 bit value.
+	 */
+	count = nbkpts + 1;
+
+	regs->db_info = debug_ver;
+	regs->db_info <<= 8;
+	regs->db_info |= count;
+
+	monitor = &td->td_pcb->pcb_dbg_regs;
+	if ((monitor->dbg_flags & DBGMON_ENABLED) != 0) {
+		for (i = 0; i < count; i++) {
+			regs->db_regs[i].dbr_addr = monitor->dbg_bvr[i];
+			regs->db_regs[i].dbr_ctrl = monitor->dbg_bcr[i];
+		}
+	}
+
+	return (0);
 }
 
 int
 set_dbregs(struct thread *td, struct dbreg *regs)
 {
+	struct debug_monitor_state *monitor;
+	int count;
+	int i;
 
-	printf("ARM64TODO: set_dbregs");
-	return (EDOOFUS);
+	monitor = &td->td_pcb->pcb_dbg_regs;
+	count = 0;
+	monitor->dbg_enable_count = 0;
+	for (i = 0; i < DBG_BRP_MAX; i++) {
+		/* TODO: Check these values */
+		monitor->dbg_bvr[i] = regs->db_regs[i].dbr_addr;
+		monitor->dbg_bcr[i] = regs->db_regs[i].dbr_ctrl;
+		if ((monitor->dbg_bcr[i] & 1) != 0)
+			monitor->dbg_enable_count++;
+	}
+	if (monitor->dbg_enable_count > 0)
+		monitor->dbg_flags |= DBGMON_ENABLED;
+
+	return (0);
 }
 
 #ifdef COMPAT_FREEBSD32
@@ -282,8 +347,9 @@ fill_regs32(struct thread *td, struct reg32 *regs)
 	tf = td->td_frame;
 	for (i = 0; i < 13; i++)
 		regs->r[i] = tf->tf_x[i];
-	regs->r_sp = tf->tf_sp;
-	regs->r_lr = tf->tf_lr;
+	/* For arm32, SP is r13 and LR is r14 */
+	regs->r_sp = tf->tf_x[13];
+	regs->r_lr = tf->tf_x[14];
 	regs->r_pc = tf->tf_elr;
 	regs->r_cpsr = tf->tf_spsr;
 
@@ -299,8 +365,9 @@ set_regs32(struct thread *td, struct reg32 *regs)
 	tf = td->td_frame;
 	for (i = 0; i < 13; i++)
 		tf->tf_x[i] = regs->r[i];
-	tf->tf_sp = regs->r_sp;
-	tf->tf_lr = regs->r_lr;
+	/* For arm 32, SP is r13 an LR is r14 */
+	tf->tf_x[13] = regs->r_sp;
+	tf->tf_x[14] = regs->r_lr;
 	tf->tf_elr = regs->r_pc;
 	tf->tf_spsr = regs->r_cpsr;
 
@@ -417,7 +484,8 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 
 	spsr = mcp->mc_gpregs.gp_spsr;
 	if ((spsr & PSR_M_MASK) != PSR_M_EL0t ||
-	    (spsr & (PSR_AARCH32 | PSR_F | PSR_I | PSR_A | PSR_D)) != 0)
+	    (spsr & PSR_AARCH32) != 0 ||
+	    (spsr & PSR_DAIF) != (td->td_frame->tf_spsr & PSR_DAIF))
 		return (EINVAL); 
 
 	memcpy(tf->tf_x, mcp->mc_gpregs.gp_x, sizeof(tf->tf_x));
@@ -721,15 +789,14 @@ init_proc0(vm_offset_t kstack)
 
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = kstack;
-	thread0.td_pcb = (struct pcb *)(thread0.td_kstack) - 1;
+	thread0.td_kstack_pages = KSTACK_PAGES;
+	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
+	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
 	thread0.td_pcb->pcb_fpflags = 0;
 	thread0.td_pcb->pcb_fpusaved = &thread0.td_pcb->pcb_fpustate;
 	thread0.td_pcb->pcb_vfpcpu = UINT_MAX;
 	thread0.td_frame = &proc0_tf;
 	pcpup->pc_curpcb = thread0.td_pcb;
-
-	/* Set the base address of translation table 0. */
-	thread0.td_proc->p_md.md_l0addr = READ_SPECIALREG(ttbr0_el1);
 }
 
 typedef struct {
@@ -1124,7 +1191,7 @@ dbg_init(void)
 {
 
 	/* Clear OS lock */
-	WRITE_SPECIALREG(OSLAR_EL1, 0);
+	WRITE_SPECIALREG(oslar_el1, 0);
 
 	/* This permits DDB to use debug registers for watchpoints. */
 	dbg_monitor_init();

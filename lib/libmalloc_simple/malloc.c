@@ -51,6 +51,7 @@ static char *rcsid = "$FreeBSD$";
 #include <cheri/cheric.h>
 
 #include <assert.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -61,17 +62,17 @@ static char *rcsid = "$FreeBSD$";
 
 #undef assert
 #define	assert	ASSERT
-#define	printf	rtld_printf
+#define	error_printf(...)	rtld_fdprintf(STDERR_FILENO, __VA_ARGS__)
 #elif defined(IN_LIBTHR)
 #include "thr_private.h"
-#define	printf(...)	_thread_printf(STDOUT_FILENO, __VA_ARGS__)
+#define	error_printf(...)	_thread_printf(STDERR_FILENO, __VA_ARGS__)
 #else
 #include <stdio.h>
+#define	error_printf(...)	fprintf(stderr, __VA_ARGS__)
 #endif
 
 union overhead;
 static void morecore(int);
-static void init_pagebucket(void);
 
 /*
  * The overhead on a block is one pointer. When free, this space
@@ -86,34 +87,31 @@ union	overhead {
 	} ovu;
 #define	ov_magic	ovu.ovu_magic
 #define	ov_index	ovu.ovu_index
-#define	ov_size		ovu.ovu_size
 };
+
+#define	MALLOC_ALIGNMENT	sizeof(union overhead)
 
 #define	MAGIC		0xef		/* magic # on accounting info */
 
 /*
- * nextf[i] is the pointer to the next free block of size 2^(i+3).  The
- * smallest allocatable block is 8 bytes.  The overhead information
- * precedes the data area returned to the user.
+ * nextf[i] is the pointer to the next free block of size
+ * (FIRST_BUCKET_SIZE << i).  The overhead information precedes the
+ * data area returned to the user.
  */
+#define	FIRST_BUCKET_SIZE	32
 #define	NBUCKETS 30
 static	union overhead *nextf[NBUCKETS];
 
 static	size_t pagesz;			/* page size */
-static	int pagebucket;			/* page size bucket */
 
 
-#if defined(MALLOC_DEBUG) || defined(RCHECK) || defined(IN_RTLD)
+#if defined(MALLOC_DEBUG) || defined(RCHECK) || defined(IN_RTLD) || defined(IN_LIBTHR)
 #define	ASSERT(p)   if (!(p)) botch(#p)
 static void
 botch(const char *s)
 {
-#ifdef IN_RTLD
-	rtld_fdprintf(STDERR_FILENO, "\r\nassertion botched: %s\r\n", s);
-#elif defined(IN_LIBTHR)
-	_thread_printf(STDERR_FILENO, "\r\nassertion botched: %s\r\n", s);
-#else
-	fprintf(stderr, "\r\nassertion botched: %s\r\n", s);
+	error_printf("\r\nassertion botched: %s\r\n", s);
+#if !defined(IN_RTLD) && !defined(IN_LIBTHR)
 	(void) fflush(stderr);		/* just in case user buffered it */
 #endif
 	abort();
@@ -123,7 +121,18 @@ botch(const char *s)
 #endif
 
 static void *
-__simple_malloc(size_t nbytes)
+bound_ptr(void *mem, size_t nbytes)
+{
+	void *ptr;
+
+	ptr = cheri_csetbounds(mem, nbytes);
+	ptr = cheri_andperm(ptr,
+	    CHERI_PERMS_USERSPACE_DATA & ~CHERI_PERM_CHERIABI_VMMAP);
+	return (ptr);
+}
+
+static void *
+__simple_malloc_unaligned(size_t nbytes)
 {
 	union overhead *op;
 	int bucket;
@@ -135,7 +144,6 @@ __simple_malloc(size_t nbytes)
 	 */
 	if (pagesz == 0) {
 		pagesz = PAGE_SIZE;
-		init_pagebucket();
 		__init_heap(pagesz);
 	}
 	assert(pagesz != 0);
@@ -144,19 +152,16 @@ __simple_malloc(size_t nbytes)
 	 * stored in hash buckets which satisfies request.
 	 * Account for space used per block for accounting.
 	 */
-	if (nbytes <= pagesz - sizeof (*op)) {
-		amt = 32;	/* size of first bucket */
-		bucket = 2;
-	} else {
-		amt = pagesz;
-		bucket = pagebucket;
-	}
+	amt = FIRST_BUCKET_SIZE;
+	bucket = 0;
 	while (nbytes > (size_t)amt - sizeof(*op)) {
 		amt <<= 1;
 		if (amt == 0)
 			return (NULL);
 		bucket++;
 	}
+	if (bucket >= NBUCKETS)
+		return (NULL);
 	/*
 	 * If nothing in hash bucket right now,
 	 * request more memory from the system.
@@ -170,7 +175,45 @@ __simple_malloc(size_t nbytes)
 	nextf[bucket] = op->ov_next;
 	op->ov_magic = MAGIC;
 	op->ov_index = bucket;
-	return (cheri_csetbounds(op + 1, nbytes));
+	return (op + 1);
+}
+
+static void *
+__simple_malloc_aligned(size_t nbytes, size_t align)
+{
+	vaddr_t memshift;
+	void *mem, *res;
+	if (align < sizeof(void *))
+		align = sizeof(void *);
+
+	mem = __simple_malloc_unaligned(nbytes + sizeof(void *) + align - 1);
+	memshift = roundup2((vaddr_t)mem + sizeof(void *), align) -
+	    (vaddr_t)mem;
+
+	res = (void *)((uintptr_t)mem + memshift);
+	*(void **)((uintptr_t)res - sizeof(void *)) = mem;
+	return (res);
+}
+
+static void *
+__simple_malloc(size_t nbytes)
+{
+	void *mem;
+
+#ifdef __CHERI_PURE_CAPABILITY__
+	size_t align, mask;
+
+	nbytes = CHERI_REPRESENTABLE_LENGTH(nbytes);
+	mask = CHERI_REPRESENTABLE_ALIGNMENT_MASK(nbytes);
+	align = 1 + ~mask;
+
+	if (mask != SIZE_MAX && align > MALLOC_ALIGNMENT)
+		mem = __simple_malloc_aligned(nbytes, align);
+	else
+#endif
+	mem = __simple_malloc_unaligned(nbytes);
+
+	return (bound_ptr(mem, nbytes));
 }
 
 static void *
@@ -183,7 +226,7 @@ __simple_calloc(size_t num, size_t size)
 		return (NULL);
 	}
 
-	if ((ret = malloc(num * size)) != NULL)
+	if ((ret = __simple_malloc(num * size)) != NULL)
 		memset(ret, 0, num * size);
 
 	return (ret);
@@ -201,11 +244,7 @@ morecore(int bucket)
 	int amt;			/* amount to allocate */
 	int nblks;			/* how many blocks we get */
 
-	/*
-	 * sbrk_size <= 0 only for big, FLUFFY, requests (about
-	 * 2^30 bytes on a VAX, I think) or for a negative arg.
-	 */
-	sz = 1 << (bucket + 3);
+	sz = FIRST_BUCKET_SIZE << bucket;
 #ifdef MALLOC_DEBUG
 	ASSERT(sz > 0);
 #else
@@ -216,7 +255,7 @@ morecore(int bucket)
 		amt = pagesz;
 		nblks = amt / sz;
 	} else {
-		amt = sz + pagesz;
+		amt = sz;
 		nblks = 1;
 	}
 	if (amt > pagepool_end - pagepool_start)
@@ -247,11 +286,32 @@ find_overhead(void * cp)
 		return (NULL);
 	op = __rederive_pointer(cp);
 	if (op == NULL) {
-		printf("%s: no region found for %#p\n", __func__, cp);
+		error_printf("%s: no region found for %#p\n", __func__, cp);
 		return (NULL);
 	}
 	op--;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/*
+	 * In pure-capability mode our allocation might have come from
+	 * __simple_malloc_aligned.  In that case we need to get back to the
+	 * real overhead pointer.  To make sure we aren't tricked, the
+	 * pointer must:
+	 *  - Be an internal allocator pointer (have the VMMAP permision).
+	 *  - Point somewhere before us and within the current pagepool.
+	 */
+	if (cheri_gettag(op->ov_next) &&
+	    (cheri_getperm(op->ov_next) & CHERI_PERM_CHERIABI_VMMAP) != 0) {
+		vaddr_t base, pp_base;
+
+		pp_base = cheri_getbase(op);
+		base = cheri_getbase(op->ov_next);
+		if (base >= pp_base && base < cheri_getaddress(op)) {
+			op = op->ov_next;
+			op--;
+		}
+	}
+#endif
 	if (op->ov_magic == MAGIC)
 		return (op);
 
@@ -261,9 +321,9 @@ find_overhead(void * cp)
 	 * should save all allocation ranges to allow us to find the
 	 * metadata.
 	 */
-	printf("%s: Attempting to free or realloc unallocated memory\n",
+	error_printf("%s: Attempting to free or realloc unallocated memory\n",
 	    __func__);
-	CHERI_PRINT_PTR(cp);
+	error_printf(_CHERI_PRINT_PTR_FMT(cp));
 	return (NULL);
 }
 
@@ -292,14 +352,18 @@ __simple_realloc(void *cp, size_t nbytes)
 	union overhead *op;
 	char *res;
 
+#ifdef __CHERI_PURE_CAPABILITY__
+	/* Round up here because we might need to set bounds... */
+	nbytes = CHERI_REPRESENTABLE_LENGTH(nbytes);
+#endif
+
 	if (cp == NULL)
-		return (malloc(nbytes));
+		return (__simple_malloc(nbytes));
 	op = find_overhead(cp);
 	if (op == NULL)
 		return (NULL);
-	cur_space = (1 << (op->ov_index + 3)) - sizeof(*op);
+	cur_space = (FIRST_BUCKET_SIZE << op->ov_index) - sizeof(*op);
 
-	/* avoid the copy if same size block */
 	/*
 	 * XXX-BD: Arguably we should be tracking the actual allocation
 	 * not just the bucket size so that we can do a full malloc+memcpy
@@ -313,38 +377,26 @@ __simple_realloc(void *cp, size_t nbytes)
 	 * cheri_csetbouds(foo, 5);
 	 * foo = realloc(foo, 10);
 	 */
-	smaller_space = (1 << (op->ov_index + 2)) - sizeof(*op);
-	if (nbytes <= cur_space && nbytes > smaller_space)
-		return (cheri_andperm(cheri_csetbounds(op + 1, nbytes),
-		    cheri_getperm(cp)));
+	if (op->ov_index != 0) {
+		smaller_space = (FIRST_BUCKET_SIZE << (op->ov_index - 1)) -
+		    sizeof(*op);
+		if (nbytes <= cur_space && nbytes > smaller_space)
+			return (bound_ptr(op + 1, nbytes));
+	}
 
-	if ((res = malloc(nbytes)) == NULL)
+	res = __simple_malloc(nbytes);
+	if (res == NULL);
 		return (NULL);
 	/*
 	 * Only copy data the caller had access to even if this is less
 	 * than the size of the original allocation.  This risks surprise
 	 * for some programmers, but to do otherwise risks information leaks.
 	 */
-	memcpy(res, cp, (nbytes <= cheri_getlen(cp)) ? nbytes : cheri_getlen(cp));
+	memcpy(res, cp, (nbytes <= cheri_bytes_remaining(cp)) ?
+	    nbytes : cheri_bytes_remaining(cp));
 	res = cheri_andperm(res, cheri_getperm(cp));
-	free(cp);
+	__simple_free(cp);
 	return (res);
-}
-
-
-static void
-init_pagebucket(void)
-{
-	int bucket;
-	size_t amt;
-
-	bucket = 0;
-	amt = 8;
-	while ((unsigned)pagesz > amt) {
-		amt <<= 1;
-		bucket++;
-	}
-	pagebucket = bucket;
 }
 
 #if defined(IN_RTLD) || defined(IN_LIBTHR)

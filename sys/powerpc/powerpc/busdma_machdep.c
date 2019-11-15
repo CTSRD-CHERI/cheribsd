@@ -73,8 +73,8 @@ struct bus_dma_tag {
 	bus_dma_filter_t *filter;
 	void		 *filterarg;
 	bus_size_t	  maxsize;
-	u_int		  nsegments;
 	bus_size_t	  maxsegsz;
+	u_int		  nsegments;
 	int		  flags;
 	int		  ref_count;
 	int		  map_count;
@@ -350,7 +350,7 @@ bus_dma_tag_set_domain(bus_dma_tag_t dmat, int domain)
 int
 bus_dma_tag_destroy(bus_dma_tag_t dmat)
 {
-	bus_dma_tag_t dmat_copy;
+	bus_dma_tag_t dmat_copy __unused;
 	int error;
 
 	error = 0;
@@ -515,11 +515,9 @@ bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddr, int flags,
 
 	if (flags & BUS_DMA_ZERO)
 		mflags |= M_ZERO;
-#ifdef NOTYET
 	if (flags & BUS_DMA_NOCACHE)
 		attr = VM_MEMATTR_UNCACHEABLE;
 	else
-#endif
 		attr = VM_MEMATTR_DEFAULT;
 
 	/* 

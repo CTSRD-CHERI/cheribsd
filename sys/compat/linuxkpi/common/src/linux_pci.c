@@ -29,12 +29,12 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/bus.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
-#include <sys/bus.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
 #include <sys/filio.h>
@@ -89,6 +89,7 @@ static int
 linux_pdev_dma_init(struct pci_dev *pdev)
 {
 	struct linux_dma_priv *priv;
+	int error;
 
 	priv = malloc(sizeof(*priv), M_DEVBUF, M_WAITOK | M_ZERO);
 	pdev->dev.dma_priv = priv;
@@ -97,7 +98,14 @@ linux_pdev_dma_init(struct pci_dev *pdev)
 
 	pctrie_init(&priv->ptree);
 
-	return (0);
+	/* create a default DMA tag */
+	error = linux_dma_tag_init(&pdev->dev, DMA_BIT_MASK(64));
+	if (error) {
+		mtx_destroy(&priv->lock);
+		free(priv, M_DEVBUF);
+		pdev->dev.dma_priv = NULL;
+	}
+	return (error);
 }
 
 static int
@@ -201,7 +209,6 @@ linux_pci_attach(device_t dev)
 	struct pci_driver *pdrv;
 	const struct pci_device_id *id;
 	device_t parent;
-	devclass_t devclass;
 	int error;
 
 	linux_set_current(curthread);
@@ -210,7 +217,6 @@ linux_pci_attach(device_t dev)
 	pdev = device_get_softc(dev);
 
 	parent = device_get_parent(dev);
-	devclass = device_get_devclass(parent);
 	if (pdrv->isdrm) {
 		dinfo = device_get_ivars(parent);
 		device_set_ivars(dev, dinfo);
@@ -241,29 +247,32 @@ linux_pci_attach(device_t dev)
 	pdev->irq = pdev->dev.irq;
 	error = linux_pdev_dma_init(pdev);
 	if (error)
-		goto out;
+		goto out_dma_init;
 
-	if (pdev->bus == NULL) {
-		pbus = malloc(sizeof(*pbus), M_DEVBUF, M_WAITOK | M_ZERO);
-		pbus->self = pdev;
-		pbus->number = pci_get_bus(dev);
-		pdev->bus = pbus;
-	}
+	pbus = malloc(sizeof(*pbus), M_DEVBUF, M_WAITOK | M_ZERO);
+	pbus->self = pdev;
+	pbus->number = pci_get_bus(dev);
+	pbus->domain = pci_get_domain(dev);
+	pdev->bus = pbus;
 
 	spin_lock(&pci_lock);
 	list_add(&pdev->links, &pci_devices);
 	spin_unlock(&pci_lock);
 
 	error = pdrv->probe(pdev, id);
-out:
-	if (error) {
-		spin_lock(&pci_lock);
-		list_del(&pdev->links);
-		spin_unlock(&pci_lock);
-		put_device(&pdev->dev);
-		error = -error;
-	}
-	return (error);
+	if (error)
+		goto out_probe;
+	return (0);
+
+out_probe:
+	free(pdev->bus, M_DEVBUF);
+	linux_pdev_dma_uninit(pdev);
+out_dma_init:
+	spin_lock(&pci_lock);
+	list_del(&pdev->links);
+	spin_unlock(&pci_lock);
+	put_device(&pdev->dev);
+	return (-error);
 }
 
 static int
@@ -275,6 +284,8 @@ linux_pci_detach(device_t dev)
 	pdev = device_get_softc(dev);
 
 	pdev->pdrv->remove(pdev);
+
+	free(pdev->bus, M_DEVBUF);
 	linux_pdev_dma_uninit(pdev);
 
 	spin_lock(&pci_lock);
@@ -376,6 +387,36 @@ linux_pci_register_driver(struct pci_driver *pdrv)
 	return (_linux_pci_register_driver(pdrv, dc));
 }
 
+unsigned long
+pci_resource_start(struct pci_dev *pdev, int bar)
+{
+	struct resource_list_entry *rle;
+	rman_res_t newstart;
+	device_t dev;
+
+	if ((rle = linux_pci_get_bar(pdev, bar)) == NULL)
+		return (0);
+	dev = pci_find_dbsf(pdev->bus->domain, pdev->bus->number,
+	    PCI_SLOT(pdev->devfn), PCI_FUNC(pdev->devfn));
+	MPASS(dev != NULL);
+	if (BUS_TRANSLATE_RESOURCE(dev, rle->type, rle->start, &newstart)) {
+		device_printf(pdev->dev.bsddev, "translate of %#jx failed\n",
+		    (uintmax_t)rle->start);
+		return (0);
+	}
+	return (newstart);
+}
+
+unsigned long
+pci_resource_len(struct pci_dev *pdev, int bar)
+{
+	struct resource_list_entry *rle;
+
+	if ((rle = linux_pci_get_bar(pdev, bar)) == NULL)
+		return (0);
+	return (rle->count);
+}
+
 int
 linux_pci_register_drm_driver(struct pci_driver *pdrv)
 {
@@ -395,6 +436,22 @@ linux_pci_unregister_driver(struct pci_driver *pdrv)
 	devclass_t bus;
 
 	bus = devclass_find("pci");
+
+	spin_lock(&pci_lock);
+	list_del(&pdrv->links);
+	spin_unlock(&pci_lock);
+	mtx_lock(&Giant);
+	if (bus != NULL)
+		devclass_delete_driver(bus, &pdrv->bsddriver);
+	mtx_unlock(&Giant);
+}
+
+void
+linux_pci_unregister_drm_driver(struct pci_driver *pdrv)
+{
+	devclass_t bus;
+
+	bus = devclass_find("vgapci");
 
 	spin_lock(&pci_lock);
 	list_del(&pdrv->links);
@@ -443,7 +500,7 @@ static void *
 linux_dma_trie_alloc(struct pctrie *ptree)
 {
 
-	return (uma_zalloc(linux_dma_trie_zone, 0));
+	return (uma_zalloc(linux_dma_trie_zone, M_NOWAIT));
 }
 
 static void
@@ -480,13 +537,19 @@ linux_dma_alloc_coherent(struct device *dev, size_t size,
 	align = PAGE_SIZE << get_order(size);
 	mem = (void *)kmem_alloc_contig(size, flag, 0, high, align, 0,
 	    VM_MEMATTR_DEFAULT);
-	if (mem)
+	if (mem != NULL) {
 		*dma_handle = linux_dma_map_phys(dev, vtophys(mem), size);
-	else
+		if (*dma_handle == 0) {
+			kmem_free((vm_offset_t)mem, size);
+			mem = NULL;
+		}
+	} else {
 		*dma_handle = 0;
+	}
 	return (mem);
 }
 
+#if defined(__i386__) || defined(__amd64__) || defined(__aarch64__)
 dma_addr_t
 linux_dma_map_phys(struct device *dev, vm_paddr_t phys, size_t len)
 {
@@ -497,7 +560,19 @@ linux_dma_map_phys(struct device *dev, vm_paddr_t phys, size_t len)
 
 	priv = dev->dma_priv;
 
-	obj = uma_zalloc(linux_dma_obj_zone, 0);
+	/*
+	 * If the resultant mapping will be entirely 1:1 with the
+	 * physical address, short-circuit the remainder of the
+	 * bus_dma API.  This avoids tracking collisions in the pctrie
+	 * with the additional benefit of reducing overhead.
+	 */
+	if (bus_dma_id_mapped(priv->dmat, phys, len))
+		return (phys);
+
+	obj = uma_zalloc(linux_dma_obj_zone, M_NOWAIT);
+	if (obj == NULL) {
+		return (0);
+	}
 
 	DMA_PRIV_LOCK(priv);
 	if (bus_dmamap_create(priv->dmat, 0, &obj->dmamap) != 0) {
@@ -529,7 +604,15 @@ linux_dma_map_phys(struct device *dev, vm_paddr_t phys, size_t len)
 	DMA_PRIV_UNLOCK(priv);
 	return (obj->dma_addr);
 }
+#else
+dma_addr_t
+linux_dma_map_phys(struct device *dev, vm_paddr_t phys, size_t len)
+{
+	return (phys);
+}
+#endif
 
+#if defined(__i386__) || defined(__amd64__) || defined(__aarch64__)
 void
 linux_dma_unmap(struct device *dev, dma_addr_t dma_addr, size_t len)
 {
@@ -537,6 +620,9 @@ linux_dma_unmap(struct device *dev, dma_addr_t dma_addr, size_t len)
 	struct linux_dma_obj *obj;
 
 	priv = dev->dma_priv;
+
+	if (pctrie_is_empty(&priv->ptree))
+		return;
 
 	DMA_PRIV_LOCK(priv);
 	obj = LINUX_DMA_PCTRIE_LOOKUP(&priv->ptree, dma_addr);
@@ -551,76 +637,51 @@ linux_dma_unmap(struct device *dev, dma_addr_t dma_addr, size_t len)
 
 	uma_zfree(linux_dma_obj_zone, obj);
 }
+#else
+void
+linux_dma_unmap(struct device *dev, dma_addr_t dma_addr, size_t len)
+{
+}
+#endif
 
 int
 linux_dma_map_sg_attrs(struct device *dev, struct scatterlist *sgl, int nents,
     enum dma_data_direction dir, struct dma_attrs *attrs)
 {
 	struct linux_dma_priv *priv;
-	struct linux_dma_obj *obj;
-	struct scatterlist *dma_sg, *sg;
-	int dma_nents, error, nseg;
-	size_t seg_len;
-	vm_paddr_t seg_phys, prev_phys_end;
+	struct scatterlist *sg;
+	int i, nseg;
 	bus_dma_segment_t seg;
 
 	priv = dev->dma_priv;
 
-	obj = uma_zalloc(linux_dma_obj_zone, 0);
-
 	DMA_PRIV_LOCK(priv);
-	if (bus_dmamap_create(priv->dmat, 0, &obj->dmamap) != 0) {
+
+	/* create common DMA map in the first S/G entry */
+	if (bus_dmamap_create(priv->dmat, 0, &sgl->dma_map) != 0) {
 		DMA_PRIV_UNLOCK(priv);
-		uma_zfree(linux_dma_obj_zone, obj);
 		return (0);
 	}
 
-	sg = sgl;
-	dma_sg = sg;
-	dma_nents = 0;
-
-	while (nents > 0) {
-		seg_phys = sg_phys(sg);
-		seg_len = sg->length;
-		while (--nents > 0) {
-			prev_phys_end = sg_phys(sg) + sg->length;
-			sg = sg_next(sg);
-			if (prev_phys_end != sg_phys(sg))
-				break;
-			seg_len += sg->length;
-		}
-
+	/* load all S/G list entries */
+	for_each_sg(sgl, sg, nents, i) {
 		nseg = -1;
-		if (_bus_dmamap_load_phys(priv->dmat, obj->dmamap,
-		    seg_phys, seg_len, BUS_DMA_NOWAIT,
+		if (_bus_dmamap_load_phys(priv->dmat, sgl->dma_map,
+		    sg_phys(sg), sg->length, BUS_DMA_NOWAIT,
 		    &seg, &nseg) != 0) {
-			bus_dmamap_unload(priv->dmat, obj->dmamap);
-			bus_dmamap_destroy(priv->dmat, obj->dmamap);
+			bus_dmamap_unload(priv->dmat, sgl->dma_map);
+			bus_dmamap_destroy(priv->dmat, sgl->dma_map);
 			DMA_PRIV_UNLOCK(priv);
-			uma_zfree(linux_dma_obj_zone, obj);
 			return (0);
 		}
-		KASSERT(++nseg == 1, ("More than one segment (nseg=%d)", nseg));
+		KASSERT(nseg == 0,
+		    ("More than one segment (nseg=%d)", nseg + 1));
 
-		sg_dma_address(dma_sg) = seg.ds_addr;
-		sg_dma_len(dma_sg) = seg.ds_len;
-
-		dma_sg = sg_next(dma_sg);
-		dma_nents++;
-        }
-
-	obj->dma_addr = sg_dma_address(sgl);
-
-	error = LINUX_DMA_PCTRIE_INSERT(&priv->ptree, obj);
-	if (error != 0) {
-		bus_dmamap_unload(priv->dmat, obj->dmamap);
-		bus_dmamap_destroy(priv->dmat, obj->dmamap);
-		DMA_PRIV_UNLOCK(priv);
-		uma_zfree(linux_dma_obj_zone, obj);
-		return (0);
+		sg_dma_address(sg) = seg.ds_addr;
 	}
 	DMA_PRIV_UNLOCK(priv);
-	return (dma_nents);
+
+	return (nents);
 }
 
 void
@@ -628,22 +689,13 @@ linux_dma_unmap_sg_attrs(struct device *dev, struct scatterlist *sgl,
     int nents, enum dma_data_direction dir, struct dma_attrs *attrs)
 {
 	struct linux_dma_priv *priv;
-	struct linux_dma_obj *obj;
 
 	priv = dev->dma_priv;
 
 	DMA_PRIV_LOCK(priv);
-	obj = LINUX_DMA_PCTRIE_LOOKUP(&priv->ptree, sg_dma_address(sgl));
-	if (obj == NULL) {
-		DMA_PRIV_UNLOCK(priv);
-		return;
-	}
-	LINUX_DMA_PCTRIE_REMOVE(&priv->ptree, sg_dma_address(sgl));
-	bus_dmamap_unload(priv->dmat, obj->dmamap);
-	bus_dmamap_destroy(priv->dmat, obj->dmamap);
+	bus_dmamap_unload(priv->dmat, sgl->dma_map);
+	bus_dmamap_destroy(priv->dmat, sgl->dma_map);
 	DMA_PRIV_UNLOCK(priv);
-
-	uma_zfree(linux_dma_obj_zone, obj);
 }
 
 struct dma_pool {

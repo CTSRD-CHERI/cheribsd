@@ -47,7 +47,6 @@ __FBSDID("$FreeBSD: head/lib/csu/mips/crt1_c.c 245133 2013-01-07 17:58:27Z kib $
 #endif
 
 #include <sys/types.h>
-#include <sys/cheriabi.h>
 
 #include <machine/elf.h>
 
@@ -220,6 +219,13 @@ do_crt_init_globals(const Elf_Phdr *phdr, long phnum)
 		/* TODO: should we use exact setbounds? */
 		data_cap =
 		    cheri_csetbounds(data_cap, writable_end - writable_start);
+
+		if (!cheri_gettag(data_cap))
+			__builtin_trap();
+		if (!cheri_gettag(rodata_cap))
+			__builtin_trap();
+		if (!cheri_gettag(code_cap))
+			__builtin_trap();
 	}
 	crt_init_globals_3(data_cap, code_cap, rodata_cap);
 }
@@ -310,6 +316,10 @@ _start(void *auxv,
 __asm__("eprol:");
 #endif
 
+#if defined(__CHERI_CAPABILITY_TABLE__) && __CHERI_CAPABILITY_TABLE__ != 3
+	/* Store the $pcc with large bounds for __init_array/__fini_array */
+	__initfini_base_cap = cheri_getpcc();
+#endif
 	handle_static_init(argc, argv, env);
 
 	exit(main(argc, argv, env));

@@ -91,9 +91,10 @@ linux_alloc_pages(gfp_t flags, unsigned int order)
 
 	if (PMAP_HAS_DMAP) {
 		unsigned long npages = 1UL << order;
-		int req = (flags & M_ZERO) ? (VM_ALLOC_ZERO | VM_ALLOC_NOOBJ |
-		    VM_ALLOC_NORMAL) : (VM_ALLOC_NOOBJ | VM_ALLOC_NORMAL);
+		int req = VM_ALLOC_NOOBJ | VM_ALLOC_WIRED | VM_ALLOC_NORMAL;
 
+		if ((flags & M_ZERO) != 0)
+			req |= VM_ALLOC_ZERO;
 		if (order == 0 && (flags & GFP_DMA32) == 0) {
 			page = vm_page_alloc(NULL, 0, req);
 			if (page == NULL)
@@ -153,9 +154,8 @@ linux_free_pages(vm_page_t page, unsigned int order)
 		for (x = 0; x != npages; x++) {
 			vm_page_t pgo = page + x;
 
-			vm_page_lock(pgo);
-			vm_page_free(pgo);
-			vm_page_unlock(pgo);
+			if (vm_page_unwire_noq(pgo))
+				vm_page_free(pgo);
 		}
 	} else {
 		vm_offset_t vaddr;
@@ -196,23 +196,11 @@ linux_get_user_pages_internal(vm_map_t map, unsigned long start, int nr_pages,
 	vm_prot_t prot;
 	size_t len;
 	int count;
-	int i;
 
 	prot = write ? (VM_PROT_READ | VM_PROT_WRITE) : VM_PROT_READ;
 	len = ((size_t)nr_pages) << PAGE_SHIFT;
 	count = vm_fault_quick_hold_pages(map, start, len, prot, pages, nr_pages);
-	if (count == -1)
-		return (-EFAULT);
-
-	for (i = 0; i != nr_pages; i++) {
-		struct page *pg = pages[i];
-
-		vm_page_lock(pg);
-		vm_page_wire(pg);
-		vm_page_unhold(pg);
-		vm_page_unlock(pg);
-	}
-	return (nr_pages);
+	return (count == -1 ? -EFAULT : nr_pages);
 }
 
 int
@@ -241,11 +229,6 @@ __get_user_pages_fast(unsigned long start, int nr_pages, int write,
 		*mp = pmap_extract_and_hold(map->pmap, va, prot);
 		if (*mp == NULL)
 			break;
-
-		vm_page_lock(*mp);
-		vm_page_wire(*mp);
-		vm_page_unhold(*mp);
-		vm_page_unlock(*mp);
 
 		if ((prot & VM_PROT_WRITE) != 0 &&
 		    (*mp)->dirty != VM_PAGE_BITS_ALL) {
@@ -303,29 +286,11 @@ linux_shmem_read_mapping_page_gfp(vm_object_t obj, int pindex, gfp_t gfp)
 		panic("GFP_NOWAIT is unimplemented");
 
 	VM_OBJECT_WLOCK(obj);
-	page = vm_page_grab(obj, pindex, VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY |
-	    VM_ALLOC_WIRED);
-	if (page->valid != VM_PAGE_BITS_ALL) {
-		vm_page_xbusy(page);
-		if (vm_pager_has_page(obj, pindex, NULL, NULL)) {
-			rv = vm_pager_get_pages(obj, &page, 1, NULL, NULL);
-			if (rv != VM_PAGER_OK) {
-				vm_page_lock(page);
-				vm_page_unwire(page, PQ_NONE);
-				vm_page_free(page);
-				vm_page_unlock(page);
-				VM_OBJECT_WUNLOCK(obj);
-				return (ERR_PTR(-EINVAL));
-			}
-			MPASS(page->valid == VM_PAGE_BITS_ALL);
-		} else {
-			pmap_zero_page(page);
-			page->valid = VM_PAGE_BITS_ALL;
-			page->dirty = 0;
-		}
-		vm_page_xunbusy(page);
-	}
+	rv = vm_page_grab_valid(&page, obj, pindex, VM_ALLOC_NORMAL |
+	    VM_ALLOC_NOBUSY | VM_ALLOC_WIRED);
 	VM_OBJECT_WUNLOCK(obj);
+	if (rv != VM_PAGER_OK)
+		return (ERR_PTR(-EINVAL));
 	return (page);
 }
 

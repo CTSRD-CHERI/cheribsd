@@ -311,7 +311,7 @@ namei(struct nameidata *ndp)
 	struct filedesc *fdp;	/* pointer to file descriptor state */
 	char *cp;		/* pointer into pathname argument */
 	struct vnode *dp;	/* the directory we are searching */
-	kiovec_t aiov;		/* uio for reading symbolic links */
+	struct iovec aiov;		/* uio for reading symbolic links */
 	struct componentname *cnp;
 	struct thread *td;
 	struct proc *p;
@@ -1348,6 +1348,10 @@ NDFREE(struct nameidata *ndp, const u_int flags)
 	if (!(flags & NDF_NO_VP_UNLOCK) &&
 	    (ndp->ni_cnd.cn_flags & LOCKLEAF) && ndp->ni_vp)
 		unlock_vp = 1;
+	if (!(flags & NDF_NO_DVP_UNLOCK) &&
+	    (ndp->ni_cnd.cn_flags & LOCKPARENT) &&
+	    ndp->ni_dvp != ndp->ni_vp)
+		unlock_dvp = 1;
 	if (!(flags & NDF_NO_VP_RELE) && ndp->ni_vp) {
 		if (unlock_vp) {
 			vput(ndp->ni_vp);
@@ -1358,10 +1362,6 @@ NDFREE(struct nameidata *ndp, const u_int flags)
 	}
 	if (unlock_vp)
 		VOP_UNLOCK(ndp->ni_vp, 0);
-	if (!(flags & NDF_NO_DVP_UNLOCK) &&
-	    (ndp->ni_cnd.cn_flags & LOCKPARENT) &&
-	    ndp->ni_dvp != ndp->ni_vp)
-		unlock_dvp = 1;
 	if (!(flags & NDF_NO_DVP_RELE) &&
 	    (ndp->ni_cnd.cn_flags & (LOCKPARENT|WANTPARENT))) {
 		if (unlock_dvp) {
@@ -1498,11 +1498,10 @@ keeporig:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities"
 //   ]
 // }

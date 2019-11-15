@@ -36,6 +36,8 @@
  *	@(#)kern_sig.c	8.7 (Berkeley) 4/18/94
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -57,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/ktrace.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
@@ -88,7 +91,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/jail.h>
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 /*
  * XXXRW: We're not quite doing this in the right place, hence the header;
  * need to work on that.
@@ -674,7 +677,7 @@ sigonstack(size_t sp)
 	if ((td->td_pflags & TDP_ALTSTACK) == 0)
 		return (0);
 #if defined(COMPAT_43)
-	if (td->td_sigstk.ss_size == 0)
+	if (SV_PROC_FLAG(td->td_proc, SV_AOUT) && td->td_sigstk.ss_size == 0)
 		return ((td->td_sigstk.ss_flags & SS_ONSTACK) != 0);
 #endif
 	return (sp >= (__cheri_addr size_t)td->td_sigstk.ss_sp &&
@@ -944,7 +947,7 @@ freebsd4_sigaction(struct thread *td, struct freebsd4_sigaction_args *uap)
 		else
 			actp->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
 		actp->sa_flags = act_n.sa_flags;
-		actp->a_mask = act_n.sa_mask;
+		actp->sa_mask = act_n.sa_mask;
 #else
 		*actp = act_n;
 #endif
@@ -953,7 +956,7 @@ freebsd4_sigaction(struct thread *td, struct freebsd4_sigaction_args *uap)
 	if (oactp && !error) {
 #if __has_feature(capabilities)
 		memset(&oact_n, 0, sizeof(oact_n));
-		oact_n.sa_handler = (void *)(uintptr_t)oactp->sa_handler;
+		oact_n.sa_handler = (void *)(__cheri_addr vaddr_t)oactp->sa_handler;
 		oact_n.sa_flags = oactp->sa_flags;
 		oact_n.sa_mask = oactp->sa_mask;
 #else
@@ -1080,12 +1083,7 @@ execsigs(struct proc *p)
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
-	while (SIGNOTEMPTY(ps->ps_sigcatch)) {
-		sig = sig_ffs(&ps->ps_sigcatch);
-		sigdflt(ps, sig);
-		if ((sigprop(sig) & SIGPROP_IGNORE) != 0)
-			sigqueue_delete_proc(p, sig);
-	}
+	sig_drop_caught(p);
 
 	/*
 	 * As CloudABI processes cannot modify signal handlers, fully
@@ -1206,8 +1204,7 @@ int
 sys_sigprocmask(struct thread *td, struct sigprocmask_args *uap)
 {
 
-	return (user_sigprocmask(td, uap->how, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->oset)));
+	return (user_sigprocmask(td, uap->how, uap->set, uap->oset));
 }
 
 int
@@ -1256,8 +1253,7 @@ int
 sys_sigwait(struct thread *td, struct sigwait_args *uap)
 {
 
-	return (user_sigwait(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->sig)));
+	return (user_sigwait(td, uap->set, uap->sig));
 }
 
 int
@@ -1302,12 +1298,12 @@ int
 sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 {
 
-	return (user_sigtimedwait(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->info), __USER_CAP_OBJ(uap->timeout),
+	return (user_sigtimedwait(td, uap->set, uap->info, uap->timeout,
 	    (copyout_siginfo_t *)copyout_siginfo_native));
 }
 
-int user_sigtimedwait(struct thread *td, const sigset_t * __capability uset,
+int
+user_sigtimedwait(struct thread *td, const sigset_t * __capability uset,
     void * __capability info, const struct timespec * __capability utimeout,
     copyout_siginfo_t *copyout_siginfop)
 {
@@ -1346,8 +1342,7 @@ int
 sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 {
 
-	return (user_sigwaitinfo(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->info),
+	return (user_sigwaitinfo(td, uap->set, uap->info,
 	    (copyout_siginfo_t *)copyout_siginfo_native));
 }
 
@@ -1512,7 +1507,7 @@ int
 sys_sigpending(struct thread *td, struct sigpending_args *uap)
 {
 
-	return (kern_sigpending(td, __USER_CAP_OBJ(uap->set)));
+	return (kern_sigpending(td, uap->set));
 }
 
 int
@@ -1641,7 +1636,7 @@ int
 sys_sigsuspend(struct thread *td, struct sigsuspend_args *uap)
 {
 
-	return (user_sigsuspend(td, __USER_CAP_OBJ(uap->sigmask)));
+	return (user_sigsuspend(td, uap->sigmask));
 }
 
 int
@@ -2012,7 +2007,11 @@ sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 	ksigval_union sv;
 
 	memset(&sv, 0, sizeof(sv));
+#if __has_feature(capabilities)
+	sv.sival_ptr_c = uap->value;
+#else
 	sv.sival_ptr_native = uap->value;
+#endif
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
 }
@@ -2771,7 +2770,15 @@ ptracestop(struct thread *td, int sig, ksiginfo_t *si)
 			    p->p_xthread == NULL)) {
 				p->p_xsig = sig;
 				p->p_xthread = td;
-				td->td_dbgflags &= ~TDB_FSTP;
+
+				/*
+				 * If we are on sleepqueue already,
+				 * let sleepqueue code decide if it
+				 * needs to go sleep after attach.
+				 */
+				if (td->td_wchan == NULL)
+					td->td_dbgflags &= ~TDB_FSTP;
+
 				p->p_flag2 &= ~P2_PTRACE_FSTP;
 				p->p_flag |= P_STOPPED_SIG | P_STOPPED_TRACE;
 				sig_suspend_threads(td, p, 0);
@@ -3593,10 +3600,16 @@ corefile_open_last(struct thread *td, char *name, int indexpos,
 	}
 
 	if (oldvp != NULL) {
-		if (nextvp == NULL)
-			nextvp = oldvp;
-		else
+		if (nextvp == NULL) {
+			if ((td->td_proc->p_flag & P_SUGID) != 0) {
+				error = EFAULT;
+				vnode_close_locked(td, oldvp);
+			} else {
+				nextvp = oldvp;
+			}
+		} else {
 			vnode_close_locked(td, oldvp);
+		}
 	}
 	if (error != 0) {
 		if (nextvp != NULL)
@@ -3622,7 +3635,7 @@ corefile_open_last(struct thread *td, char *name, int indexpos,
  */
 static int
 corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
-    int compress, struct vnode **vpp, char **namep)
+    int compress, int signum, struct vnode **vpp, char **namep)
 {
 	struct sbuf sb;
 	struct nameidata nd;
@@ -3674,6 +3687,9 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 			case 'P':	/* process id */
 				sbuf_printf(&sb, "%u", pid);
 				break;
+			case 'S':	/* signal number */
+				sbuf_printf(&sb, "%i", signum);
+				break;
 			case 'U':	/* user id */
 				sbuf_printf(&sb, "%u", uid);
 				break;
@@ -3719,6 +3735,8 @@ corefile_open(const char *comm, uid_t uid, pid_t pid, struct thread *td,
 		oflags = VN_OPEN_NOAUDIT | VN_OPEN_NAMECACHE |
 		    (capmode_coredump ? VN_OPEN_NOCAPCHECK : 0);
 		flags = O_CREAT | FWRITE | O_NOFOLLOW;
+		if ((td->td_proc->p_flag & P_SUGID) != 0)
+			flags |= O_EXCL;
 
 		NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_SYSSPACE, name, td);
 		error = vn_open_cred(&nd, &flags, cmode, oflags, td->td_ucred,
@@ -3794,16 +3812,17 @@ coredump(struct thread *td)
 	PROC_UNLOCK(p);
 
 	error = corefile_open(p->p_comm, cred->cr_uid, p->p_pid, td,
-	    compress_user_cores, &vp, &name);
+	    compress_user_cores, p->p_sig, &vp, &name);
 	if (error != 0)
 		return (error);
 
 	/*
 	 * Don't dump to non-regular files or files with links.
-	 * Do not dump into system files.
+	 * Do not dump into system files. Effective user must own the corefile.
 	 */
 	if (vp->v_type != VREG || VOP_GETATTR(vp, &vattr, cred) != 0 ||
-	    vattr.va_nlink != 1 || (vp->v_vflag & VV_SYSTEM) != 0) {
+	    vattr.va_nlink != 1 || (vp->v_vflag & VV_SYSTEM) != 0 ||
+	    vattr.va_uid != cred->cr_uid) {
 		VOP_UNLOCK(vp, 0);
 		error = EFAULT;
 		goto out;
@@ -4049,9 +4068,26 @@ sigacts_shared(struct sigacts *ps)
 
 	return (ps->ps_refcnt > 1);
 }
+
+void
+sig_drop_caught(struct proc *p)
+{
+	int sig;
+	struct sigacts *ps;
+
+	ps = p->p_sigacts;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	mtx_assert(&ps->ps_mtx, MA_OWNED);
+	while (SIGNOTEMPTY(ps->ps_sigcatch)) {
+		sig = sig_ffs(&ps->ps_sigcatch);
+		sigdflt(ps, sig);
+		if ((sigprop(sig) & SIGPROP_IGNORE) != 0)
+			sigqueue_delete_proc(p, sig);
+	}
+}
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20191022,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",

@@ -87,7 +87,7 @@ typedef struct {
 	struct osigcontext si_sc;
 	int		si_signo;
 	int		si_code;
-	union sigval	si_value;
+	ksigval_union	si_value;
 } osiginfo_t;
 
 struct osigaction {
@@ -215,7 +215,7 @@ struct osigevent {
 		int	__sigev_signo;	/* Signal number */
 		int	__sigev_notify_kqueue;
 	} __sigev_u;
-	union sigval sigev_value;	/* Signal value */
+	ksigval_union sigev_value;	/* Signal value */
 };
 #endif
 
@@ -314,12 +314,8 @@ static __inline void
 ksiginfo_set_sigev(ksiginfo_t *dst, ksigevent_t *sigev)
 {
 	dst->ksi_signo = sigev->sigev_signo;
-	__builtin_memset(&dst->ksi_value, 0, sizeof(dst->ksi_value));
-#if __has_feature(capability)
-	dst->ksi_value.sival_ptr_c = sigev->sigev_value.siavl_ptr_c;
-#else
-	dst->ksi_value.sival_ptr_native = sigev->sigev_value.sival_ptr_native;
-#endif
+	__builtin_memcpy(&dst->ksi_value, &sigev->sigev_value,
+	    sizeof(dst->ksi_value));
 }
 
 struct pgrp;
@@ -406,6 +402,7 @@ void	sigacts_copy(struct sigacts *dest, struct sigacts *src);
 void	sigacts_free(struct sigacts *ps);
 struct sigacts *sigacts_hold(struct sigacts *ps);
 int	sigacts_shared(struct sigacts *ps);
+void	sig_drop_caught(struct proc *p);
 void	sigexit(struct thread *td, int sig) __dead2;
 int	sigev_findtd(struct proc *p, ksigevent_t *sigev, struct thread **);
 int	sig_ffs(sigset_t *set);

@@ -42,15 +42,15 @@ void f()
     std::lock_guard<std::mutex> lg(m);
     t1 = Clock::now();
     }
-    ns d = t1 - t0 - ms(250);
-    assert(d < ms(200));  // within 200ms
+    ns d = t1 - t0 - ms(TEST_SLOW_HOST() ? 750 : 250);
+    assert(d < ms(TEST_SLOW_HOST() ? 400 : 200));  // within 200ms
 }
 
 int main(int, char**)
 {
     m.lock();
     std::thread t(f);
-    std::this_thread::sleep_for(ms(250));
+    std::this_thread::sleep_for(ms(TEST_SLOW_HOST() ? 750 : 250));
     m.unlock();
     t.join();
 

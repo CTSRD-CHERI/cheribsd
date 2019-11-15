@@ -566,6 +566,9 @@ dmu_objset_open_impl(spa_t *spa, dsl_dataset_t *ds, blkptr_t *bp,
 	mutex_init(&os->os_userused_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&os->os_obj_lock, NULL, MUTEX_DEFAULT, NULL);
 	mutex_init(&os->os_user_ptr_lock, NULL, MUTEX_DEFAULT, NULL);
+	os->os_obj_next_percpu_len = boot_ncpus;
+	os->os_obj_next_percpu = kmem_zalloc(os->os_obj_next_percpu_len *
+	    sizeof (os->os_obj_next_percpu[0]), KM_SLEEP);
 
 	dnode_special_open(os, &os->os_phys->os_meta_dnode,
 	    DMU_META_DNODE_OBJECT, &os->os_meta_dnode);
@@ -843,6 +846,9 @@ dmu_objset_evict_done(objset_t *os)
 	 */
 	rw_enter(&os_lock, RW_READER);
 	rw_exit(&os_lock);
+
+	kmem_free(os->os_obj_next_percpu,
+	    os->os_obj_next_percpu_len * sizeof (os->os_obj_next_percpu[0]));
 
 	mutex_destroy(&os->os_lock);
 	mutex_destroy(&os->os_userused_lock);
@@ -1243,10 +1249,23 @@ dmu_objset_sync_dnodes(multilist_sublist_t *list, dmu_tx_t *tx)
 		ASSERT3U(dn->dn_nlevels, <=, DN_MAX_LEVELS);
 		multilist_sublist_remove(list, dn);
 
+		/*
+		 * If we are not doing useraccounting (os_synced_dnodes == NULL)
+		 * we are done with this dnode for this txg. Unset dn_dirty_txg
+		 * if later txgs aren't dirtying it so that future holders do
+		 * not get a stale value. Otherwise, we will do this in
+		 * userquota_updates_task() when processing has completely
+		 * finished for this txg.
+		 */
 		multilist_t *newlist = dn->dn_objset->os_synced_dnodes;
 		if (newlist != NULL) {
 			(void) dnode_add_ref(dn, newlist);
 			multilist_insert(newlist, dn);
+		} else {
+			mutex_enter(&dn->dn_mtx);
+			if (dn->dn_dirty_txg == tx->tx_txg)
+				dn->dn_dirty_txg = 0;
+			mutex_exit(&dn->dn_mtx);
 		}
 
 		dnode_sync(dn, tx);
@@ -1334,6 +1353,8 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 	zio_t *zio;
 	list_t *list;
 	dbuf_dirty_record_t *dr;
+	int num_sublists;
+	multilist_t *ml;
 	blkptr_t *blkptr_copy = kmem_alloc(sizeof (*os->os_rootbp), KM_SLEEP);
 	*blkptr_copy = *os->os_rootbp;
 
@@ -1402,10 +1423,13 @@ dmu_objset_sync(objset_t *os, zio_t *pio, dmu_tx_t *tx)
 		}
 	}
 
-	for (int i = 0;
-	    i < multilist_get_num_sublists(os->os_dirty_dnodes[txgoff]); i++) {
+	ml = os->os_dirty_dnodes[txgoff];
+	num_sublists = multilist_get_num_sublists(ml);
+	for (int i = 0; i < num_sublists; i++) {
+		if (multilist_sublist_is_empty_idx(ml, i))
+			continue;
 		sync_dnodes_arg_t *sda = kmem_alloc(sizeof (*sda), KM_SLEEP);
-		sda->sda_list = os->os_dirty_dnodes[txgoff];
+		sda->sda_list = ml;
 		sda->sda_sublist_idx = i;
 		sda->sda_tx = tx;
 		(void) taskq_dispatch(dmu_objset_pool(os)->dp_sync_taskq,
@@ -1606,6 +1630,8 @@ userquota_updates_task(void *arg)
 				dn->dn_id_flags |= DN_ID_CHKED_BONUS;
 		}
 		dn->dn_id_flags &= ~(DN_ID_NEW_EXIST);
+		if (dn->dn_dirty_txg == spa_syncing_txg(os->os_spa))
+			dn->dn_dirty_txg = 0;
 		mutex_exit(&dn->dn_mtx);
 
 		multilist_sublist_remove(list, dn);
@@ -1619,6 +1645,8 @@ userquota_updates_task(void *arg)
 void
 dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx)
 {
+	int num_sublists;
+
 	if (!dmu_objset_userused_enabled(os))
 		return;
 
@@ -1632,8 +1660,10 @@ dmu_objset_do_userquota_updates(objset_t *os, dmu_tx_t *tx)
 		    DMU_OT_USERGROUP_USED, DMU_OT_NONE, 0, tx));
 	}
 
-	for (int i = 0;
-	    i < multilist_get_num_sublists(os->os_synced_dnodes); i++) {
+	num_sublists = multilist_get_num_sublists(os->os_synced_dnodes);
+	for (int i = 0; i < num_sublists; i++) {
+		if (multilist_sublist_is_empty_idx(os->os_synced_dnodes, i))
+			continue;
 		userquota_updates_arg_t *uua =
 		    kmem_alloc(sizeof (*uua), KM_SLEEP);
 		uua->uua_os = os;

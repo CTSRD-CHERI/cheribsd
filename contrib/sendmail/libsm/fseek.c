@@ -53,7 +53,8 @@ static jmp_buf SeekTimeOut;
 
 /* ARGSUSED0 */
 static void
-seekalrm(int sig)
+seekalrm(sig)
+	int sig;
 {
 	longjmp(SeekTimeOut, 1);
 }

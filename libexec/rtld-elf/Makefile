@@ -3,11 +3,25 @@
 # Use the following command to build local debug version of dynamic
 # linker:
 # make DEBUG_FLAGS=-g WITHOUT_TESTS=yes all
-.ifdef RTLD_DEBUG_VERBOSE
-CFLAGS+=-DDEBUG_VERBOSE=${RTLD_DEBUG_VERBOSE}
-.endif
 # Not adapted for CHERI
+
 WANT_CHERI=none
+
+RTLD_ELF_DIR:=	${.PARSEDIR}
+
+.ifdef BUILD_RTLD_DEBUG
+.ifdef RTLD_DEBUG_VERBOSE
+DEBUG+=-DDEBUG -DDEBUG_VERBOSE=${RTLD_DEBUG_VERBOSE}
+.else
+DEBUG+=-DDEBUG
+.endif
+.endif
+
+.if empty(DEBUG) && !defined(RTLD_INCLUDE_DEBUG_MESSAGES)
+# Avoid the overhead of all the debug checks now that we have a rtld-debug that
+# can be used instead.
+CFLAGS+=-DNO_LD_DEBUG
+.endif
 
 .include <src.opts.mk>
 PACKAGE=	clibs
@@ -19,6 +33,10 @@ PROG?=		ld-elf.so.1
 .if (${PROG:M*ld-elf32*} != "")
 TAGS+=		lib32
 .endif
+.if (${PROG:M*ld-elf64*} != "")
+TAGS+=		lib64
+.endif
+.PATH: ${RTLD_ELF_DIR}
 SRCS= \
 	rtld_start.S \
 	reloc.c \
@@ -30,19 +48,19 @@ SRCS= \
 	xmalloc.c \
 	debug.c \
 	libmap.c
-MAN=		rtld.1
+MAN?=		rtld.1
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
 CFLAGS+=	-I${SRCTOP}/lib/csu/common
 .if ${MK_CHERI} != "no"
 CFLAGS+=	-DCHERI
 .endif
-.if exists(${.CURDIR}/${MACHINE_ARCH})
+.if exists(${RTLD_ELF_DIR}/${MACHINE_ARCH})
 RTLD_ARCH=	${MACHINE_ARCH}
 .else
 RTLD_ARCH=	${MACHINE_CPUARCH}
 .endif
-CFLAGS+=	-I${.CURDIR}/${RTLD_ARCH} -I${.CURDIR}
+CFLAGS+=	-I${RTLD_ELF_DIR}/${RTLD_ARCH} -I${RTLD_ELF_DIR}
 .if ${MACHINE_ARCH} == "powerpc64"
 LDFLAGS+=	-nostdlib -e _rtld_start
 .elif ${MACHINE_CPUARCH} == "mips"
@@ -76,7 +94,8 @@ CFLAGS+=	-DTLS_USE_SYSARCH=1
 # Since we pass -shared, we shouldn't also pass -pie
 MK_PIE:=	no
 LDFLAGS+=	-shared -Wl,-Bsymbolic -Wl,-z,defs
-LIBADD=		c_nossp_pic
+# Pull in the dependencies that we use from libc
+.include "rtld-libc/Makefile.inc"
 .if ${MK_TOOLCHAIN} == "no"
 LDFLAGS+=	-L${LIBCDIR}
 .endif
@@ -93,16 +112,16 @@ LIBADD+=	compiler_rt
 
 .if ${MK_SYMVER} == "yes"
 VERSION_DEF=	${LIBCSRCDIR}/Versions.def
-SYMBOL_MAPS=	${.CURDIR}/Symbol.map
+SYMBOL_MAPS=	${RTLD_ELF_DIR}/Symbol.map
 VERSION_MAP=	Version.map
 LDFLAGS+=	-Wl,--version-script=${VERSION_MAP}
 
-.if exists(${.CURDIR}/${RTLD_ARCH}/Symbol.map)
-SYMBOL_MAPS+=	${.CURDIR}/${RTLD_ARCH}/Symbol.map
+.if exists(${RTLD_ELF_DIR}/${RTLD_ARCH}/Symbol.map)
+SYMBOL_MAPS+=	${RTLD_ELF_DIR}/${RTLD_ARCH}/Symbol.map
 .endif
 .endif
 
-.sinclude "${.CURDIR}/${RTLD_ARCH}/Makefile.inc"
+.sinclude "${RTLD_ELF_DIR}/${RTLD_ARCH}/Makefile.inc"
 
 # Since moving rtld-elf to /libexec, we need to create a symlink.
 # Fixup the existing binary that's there so we can symlink over it.
@@ -111,10 +130,12 @@ beforeinstall:
 	-chflags -h noschg ${DESTDIR}/usr/libexec/${PROG}
 .endif
 
-.PATH: ${.CURDIR}/${RTLD_ARCH}
+.PATH: ${RTLD_ELF_DIR}/${RTLD_ARCH}
 
+.if ${.CURDIR} == ${RTLD_ELF_DIR} || defined(RTLD_CHERI_ELF_DIR)
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
+.endif
 
 .include <bsd.prog.mk>
 ${PROG_FULL}:	${VERSION_MAP}

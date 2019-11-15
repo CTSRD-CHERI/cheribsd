@@ -31,6 +31,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/bio.h>
+#include <sys/gsb_crc32.h>
 #include <sys/endian.h>
 #include <sys/kernel.h>
 #include <sys/kobj.h>
@@ -43,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/clock.h>
 #include <sys/disk.h>
 #include <geom/geom.h>
+#include <geom/geom_dbg.h>
 #include "geom/raid/g_raid.h"
 #include "geom/raid/md_ddf.h"
 #include "g_raid_md_if.h"

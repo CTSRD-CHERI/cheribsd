@@ -87,6 +87,10 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_media.h>
+
+#include <dev/mii/mii.h>
+#include <dev/mii/miivar.h>
 
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -97,6 +101,7 @@ __FBSDID("$FreeBSD$");
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/usb/usb_fdt_support.h>
 #endif
 
 #include <dev/usb/usb.h>
@@ -111,6 +116,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/usb/net/usb_ethernet.h>
 
 #include <dev/usb/net/if_smscreg.h>
+
+#include "miibus_if.h"
 
 #ifdef USB_DEBUG
 static int smsc_debug = 0;
@@ -164,9 +171,6 @@ static const struct usb_device_id smsc_devs[] = {
 	device_printf((sc)->sc_ue.ue_dev, "error: " fmt, ##args)
 	
 
-#define ETHER_IS_ZERO(addr) \
-	(!(addr[0] | addr[1] | addr[2] | addr[3] | addr[4] | addr[5]))
-	
 #define ETHER_IS_VALID(addr) \
 	(!ETHER_IS_MULTICAST(addr) && !ETHER_IS_ZERO(addr))
 	
@@ -684,6 +688,18 @@ smsc_hash(uint8_t addr[ETHER_ADDR_LEN])
 	return (ether_crc32_be(addr, ETHER_ADDR_LEN) >> 26) & 0x3f;
 }
 
+static u_int
+smsc_hash_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
+{
+	uint32_t hash, *hashtbl = arg;
+
+	hash = smsc_hash(LLADDR(sdl));
+	hashtbl[hash >> 5] |= 1 << (hash & 0x1F);
+
+	return (1);
+}
+
+
 /**
  *	smsc_setmulti - Setup multicast
  *	@ue: usb ethernet device context
@@ -699,9 +715,7 @@ smsc_setmulti(struct usb_ether *ue)
 {
 	struct smsc_softc *sc = uether_getsc(ue);
 	struct ifnet *ifp = uether_getifp(ue);
-	struct ifmultiaddr *ifma;
 	uint32_t hashtbl[2] = { 0, 0 };
-	uint32_t hash;
 
 	SMSC_LOCK_ASSERT(sc, MA_OWNED);
 
@@ -711,29 +725,19 @@ smsc_setmulti(struct usb_ether *ue)
 		sc->sc_mac_csr &= ~SMSC_MAC_CSR_HPFILT;
 		
 	} else {
-		/* Take the lock of the mac address list before hashing each of them */
-		if_maddr_rlock(ifp);
-
-		if (!CK_STAILQ_EMPTY(&ifp->if_multiaddrs)) {
-			/* We are filtering on a set of address so calculate hashes of each
-			 * of the address and set the corresponding bits in the register.
+		if (if_foreach_llmaddr(ifp, smsc_hash_maddr, &hashtbl) > 0) {
+			/* We are filtering on a set of address so calculate
+			 * hashes of each of the address and set the
+			 * corresponding bits in the register.
 			 */
 			sc->sc_mac_csr |= SMSC_MAC_CSR_HPFILT;
 			sc->sc_mac_csr &= ~(SMSC_MAC_CSR_PRMS | SMSC_MAC_CSR_MCPAS);
-		
-			CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-				if (ifma->ifma_addr->sa_family != AF_LINK)
-					continue;
-
-				hash = smsc_hash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
-				hashtbl[hash >> 5] |= 1 << (hash & 0x1F);
-			}
 		} else {
-			/* Only receive packets with destination set to our mac address */
+			/* Only receive packets with destination set to
+			 * our mac address
+			 */
 			sc->sc_mac_csr &= ~(SMSC_MAC_CSR_MCPAS | SMSC_MAC_CSR_HPFILT);
 		}
-
-		if_maddr_runlock(ifp);
 		
 		/* Debug */
 		if (sc->sc_mac_csr & SMSC_MAC_CSR_HPFILT)
@@ -1560,147 +1564,6 @@ smsc_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	return (rc);
 }
 
-#ifdef FDT
-/*
- * This is FreeBSD-specific compatibility strings for RPi/RPi2
- */
-static phandle_t
-smsc_fdt_find_eth_node(phandle_t start)
-{
-	phandle_t child, node;
-
-	/* Traverse through entire tree to find usb ethernet nodes. */
-	for (node = OF_child(start); node != 0; node = OF_peer(node)) {
-		if ((ofw_bus_node_is_compatible(node, "net,ethernet") &&
-		    ofw_bus_node_is_compatible(node, "usb,device")) ||
-		    ofw_bus_node_is_compatible(node, "usb424,ec00"))
-			return (node);
-		child = smsc_fdt_find_eth_node(node);
-		if (child != -1)
-			return (child);
-	}
-
-	return (-1);
-}
-
-/*
- * Check if node's path is <*>/usb/hub/ethernet
- */
-static int
-smsc_fdt_is_usb_eth(phandle_t node)
-{
-	char name[16];
-	int len;
-
-	memset(name, 0, sizeof(name));
-	len = OF_getprop(node, "name", name, sizeof(name));
-	if (len <= 0)
-		return (0);
-
-	if (strcmp(name, "ethernet"))
-		return (0);
-
-	node = OF_parent(node);
-	if (node == -1)
-		return (0);
-	len = OF_getprop(node, "name", name, sizeof(name));
-	if (len <= 0)
-		return (0);
-
-	if (strcmp(name, "hub"))
-		return (0);
-
-	node = OF_parent(node);
-	if (node == -1)
-		return (0);
-	len = OF_getprop(node, "name", name, sizeof(name));
-	if (len <= 0)
-		return (0);
-
-	if (strcmp(name, "usb"))
-		return (0);
-
-	return (1);
-}
-
-static phandle_t
-smsc_fdt_find_eth_node_by_path(phandle_t start)
-{
-	phandle_t child, node;
-
-	/* Traverse through entire tree to find usb ethernet nodes. */
-	for (node = OF_child(start); node != 0; node = OF_peer(node)) {
-		if (smsc_fdt_is_usb_eth(node))
-			return (node);
-		child = smsc_fdt_find_eth_node_by_path(node);
-		if (child != -1)
-			return (child);
-	}
-
-	return (-1);
-}
-
-/*
- * Look through known names that can contain mac address
- * return 0 if valid MAC address has been found
- */
-static int
-smsc_fdt_read_mac_property(phandle_t node, unsigned char *mac)
-{
-	int len;
-
-	/* Check if there is property */
-	if ((len = OF_getproplen(node, "local-mac-address")) > 0) {
-		if (len != ETHER_ADDR_LEN)
-			return (EINVAL);
-
-		OF_getprop(node, "local-mac-address", mac,
-		    ETHER_ADDR_LEN);
-		return (0);
-	}
-
-	if ((len = OF_getproplen(node, "mac-address")) > 0) {
-		if (len != ETHER_ADDR_LEN)
-			return (EINVAL);
-
-		OF_getprop(node, "mac-address", mac,
-		    ETHER_ADDR_LEN);
-		return (0);
-	}
-
-	return (ENXIO);
-}
-
-/**
- * Get MAC address from FDT blob.  Firmware or loader should fill
- * mac-address or local-mac-address property.  Returns 0 if MAC address
- * obtained, error code otherwise.
- */
-static int
-smsc_fdt_find_mac(unsigned char *mac)
-{
-	phandle_t node, root;
-
-	root = OF_finddevice("/");
-	node = smsc_fdt_find_eth_node(root);
-	if (node != -1) {
-		if (smsc_fdt_read_mac_property(node, mac) == 0)
-			return (0);
-	}
-
-	/*
-	 * If it's not FreeBSD FDT blob for RPi, try more
-	 *     generic .../usb/hub/ethernet
-	 */
-	node = smsc_fdt_find_eth_node_by_path(root);
-
-	if (node != -1)
-		return smsc_fdt_read_mac_property(node, mac);
-
-	return (ENXIO);
-}
-#endif
-
 /**
  *	smsc_attach_post - Called after the driver attached to the USB interface
  *	@ue: the USB ethernet device
@@ -1749,7 +1612,7 @@ smsc_attach_post(struct usb_ether *ue)
 		err = smsc_eeprom_read(sc, 0x01, sc->sc_ue.ue_eaddr, ETHER_ADDR_LEN);
 #ifdef FDT
 		if ((err != 0) || (!ETHER_IS_VALID(sc->sc_ue.ue_eaddr)))
-			err = smsc_fdt_find_mac(sc->sc_ue.ue_eaddr);
+			err = usb_fdt_get_mac_addr(sc->sc_ue.ue_dev, &sc->sc_ue);
 #endif
 		if ((err != 0) || (!ETHER_IS_VALID(sc->sc_ue.ue_eaddr))) {
 			read_random(sc->sc_ue.ue_eaddr, ETHER_ADDR_LEN);

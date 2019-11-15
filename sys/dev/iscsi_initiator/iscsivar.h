@@ -31,6 +31,9 @@
 /*
  | $Id: iscsivar.h 743 2009-08-08 10:54:53Z danny $
  */
+#include <sys/lock.h>
+#include <sys/mutex.h>
+
 #define ISCSI_MAX_LUNS		128	// don't touch this
 #if ISCSI_MAX_LUNS > 8
 /*
@@ -164,7 +167,7 @@ typedef struct isc_session {
      struct i_stats	stats;
      bhs_t		bhs;
      struct uio		uio;
-     kiovec_t		iov;
+     struct iovec		iov;
      /*
       | cam stuff
       */
@@ -188,7 +191,7 @@ typedef struct pduq {
      union ccb		*ccb;
 
      struct uio		uio;
-     kiovec_t		iov[5];	// XXX: careful ...
+     struct iovec		iov[5];	// XXX: careful ...
      struct mbuf	*mp;
      struct bintime	ts;
      queue_t		*pduq;		
@@ -601,11 +604,10 @@ i_mbufcopy(struct mbuf *mp, caddr_t dp, int len)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "header",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

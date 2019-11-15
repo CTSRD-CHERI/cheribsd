@@ -208,6 +208,9 @@ static struct cheri_operand_info cheri_three_op_info[64] = {
 
 	/* 0x20 */ {"ctestsubset", COPT_GPR, COPT_CAP, COPT_CAP },
 	/* 0x21 */ {"cnexeq", COPT_GPR, COPT_CAP, COPT_CAP },
+	/* 0x22 */ {"csetaddr", COPT_CAP, COPT_CAP, COPT_GPR },
+	/* 0x23 */ {"cgetandaddr", COPT_GPR, COPT_CAP, COPT_GPR },
+	/* 0x24 */ {"candddr", COPT_CAP, COPT_CAP, COPT_GPR },
 };
 
 static struct cheri_operand_info cheri_two_op_info[32] = {
@@ -406,8 +409,8 @@ md_printins(int ins, int mdbdot)
 
 #ifdef CPU_CHERI
 	case OP_JALX:
-		db_printf("clcbi\t%s, %d(%s)", c2_reg[i.IType.rt],
-			(short)i.IType.imm * 16, c2_reg[i.IType.rs]);
+		db_printf("clcbi\t%s, %d(%s)", c2_reg[i.IType.rs],
+			(short)i.IType.imm * 16, c2_reg[i.IType.rt]);
 		break;
 	case OP_COP2: {
 		int ops = -1;

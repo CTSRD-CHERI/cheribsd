@@ -335,7 +335,7 @@ static void
 vt_switch_timer(void *arg)
 {
 
-	vt_late_window_switch((struct vt_window *)arg);
+	(void)vt_late_window_switch((struct vt_window *)arg);
 }
 
 static int
@@ -457,13 +457,22 @@ vt_window_postswitch(struct vt_window *vw)
 static int
 vt_late_window_switch(struct vt_window *vw)
 {
+	struct vt_window *curvw;
 	int ret;
 
 	callout_stop(&vw->vw_proc_dead_timer);
 
 	ret = vt_window_switch(vw);
-	if (ret)
+	if (ret != 0) {
+		/*
+		 * If the switch hasn't happened, then return the VT
+		 * to the current owner, if any.
+		 */
+		curvw = vw->vw_device->vd_curwindow;
+		if (curvw->vw_smode.mode == VT_PROCESS)
+			(void)vt_window_postswitch(curvw);
 		return (ret);
+	}
 
 	/* Notify owner process about terminal availability. */
 	if (vw->vw_smode.mode == VT_PROCESS) {
@@ -508,6 +517,19 @@ vt_proc_window_switch(struct vt_window *vw)
 		DPRINTF(30, "%s: Cannot switch: vw == curvw.", __func__);
 		return (0);	/* success */
 	}
+
+	/*
+	 * Early check for an attempt to switch to a non-functional VT.
+	 * The same check is done in vt_window_switch(), but it's better
+	 * to fail as early as possible to avoid needless pre-switch
+	 * actions.
+	 */
+	VT_LOCK(vd);
+	if ((vw->vw_flags & (VWF_OPENED|VWF_CONSOLE)) == 0) {
+		VT_UNLOCK(vd);
+		return (EINVAL);
+	}
+	VT_UNLOCK(vd);
 
 	/* Ask current process permission to switch away. */
 	if (curvw->vw_smode.mode == VT_PROCESS) {
@@ -1219,7 +1241,7 @@ vt_mark_mouse_position_as_dirty(struct vt_device *vd, int locked)
 
 static void
 vt_set_border(struct vt_device *vd, const term_rect_t *area,
-    const term_color_t c)
+    term_color_t c)
 {
 	vd_drawrect_t *drawrect = vd->vd_driver->vd_drawrect;
 
@@ -1312,9 +1334,12 @@ vt_flush(struct vt_device *vd)
 
 	/* Force a full redraw when the screen contents might be invalid. */
 	if (vd->vd_flags & (VDF_INVALID | VDF_SUSPENDED)) {
+		const teken_attr_t *a;
+
 		vd->vd_flags &= ~VDF_INVALID;
 
-		vt_set_border(vd, &vw->vw_draw_area, TC_BLACK);
+		a = teken_get_curattr(&vw->vw_terminal->tm_emulator);
+		vt_set_border(vd, &vw->vw_draw_area, a->ta_bgcolor);
 		vt_termrect(vd, vf, &tarea);
 		if (vd->vd_driver->vd_invalidate_text)
 			vd->vd_driver->vd_invalidate_text(vd, &tarea);
@@ -1418,8 +1443,7 @@ vtterm_cnprobe(struct terminal *tm, struct consdev *cp)
 	struct vt_window *vw = tm->tm_softc;
 	struct vt_device *vd = vw->vw_device;
 	struct winsize wsz;
-	term_attr_t attr;
-	term_char_t c;
+	const term_attr_t *a;
 
 	if (!vty_enabled(VTY_VT))
 		return;
@@ -1472,14 +1496,12 @@ vtterm_cnprobe(struct terminal *tm, struct consdev *cp)
 	if (vd->vd_width != 0 && vd->vd_height != 0)
 		vt_termsize(vd, vw->vw_font, &vw->vw_buf.vb_scr_size);
 
+	/* We need to access terminal attributes from vtbuf */
+	vw->vw_buf.vb_terminal = tm;
 	vtbuf_init_early(&vw->vw_buf);
 	vt_winsize(vd, vw->vw_font, &wsz);
-	c = (boothowto & RB_MUTE) == 0 ? TERMINAL_KERN_ATTR :
-	    TERMINAL_NORM_ATTR;
-	attr.ta_format = TCHAR_FORMAT(c);
-	attr.ta_fgcolor = TCHAR_FGCOLOR(c);
-	attr.ta_bgcolor = TCHAR_BGCOLOR(c);
-	terminal_set_winsize_blank(tm, &wsz, 1, &attr);
+	a = teken_get_curattr(&tm->tm_emulator);
+	terminal_set_winsize_blank(tm, &wsz, 1, a);
 
 	if (vtdbest != NULL) {
 #ifdef DEV_SPLASH
@@ -1792,7 +1814,7 @@ finish_vt_rel(struct vt_window *vw, int release, int *s)
 		vw->vw_flags &= ~VWF_SWWAIT_REL;
 		if (release) {
 			callout_drain(&vw->vw_proc_dead_timer);
-			vt_late_window_switch(vw->vw_switch_to);
+			(void)vt_late_window_switch(vw->vw_switch_to);
 		}
 		return (0);
 	}
@@ -2669,9 +2691,10 @@ vt_allocate_window(struct vt_device *vd, unsigned int window)
 
 	vt_termsize(vd, vw->vw_font, &size);
 	vt_winsize(vd, vw->vw_font, &wsz);
+	tm = vw->vw_terminal = terminal_alloc(&vt_termclass, vw);
+	vw->vw_buf.vb_terminal = tm;	/* must be set before vtbuf_init() */
 	vtbuf_init(&vw->vw_buf, &size);
 
-	tm = vw->vw_terminal = terminal_alloc(&vt_termclass, vw);
 	terminal_set_winsize(tm, &wsz);
 	vd->vd_windows[window] = vw;
 	callout_init(&vw->vw_proc_dead_timer, 0);

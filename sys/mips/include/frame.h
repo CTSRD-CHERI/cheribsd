@@ -187,6 +187,11 @@ struct trapframe {
 	void * __capability	c24;
 	void * __capability	c25;
 	void * __capability	idc;
+	void * __capability	c27;
+	void * __capability	c28;
+	void * __capability	c29;
+	void * __capability	c30;
+	void * __capability	c31;
 	void * __capability	pcc;
 	register_t		capcause;  /* NB: Saved but not restored. */
 	register_t		_pad0;

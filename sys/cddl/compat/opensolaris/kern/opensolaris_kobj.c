@@ -155,7 +155,7 @@ kobj_read_file_vnode(struct _buf *file, char *buf, unsigned size, unsigned off)
 	struct vnode *vp = file->ptr;
 	struct thread *td = curthread;
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	int error;
 
 	bzero(&aiov, sizeof(aiov));
@@ -209,11 +209,10 @@ kobj_close_file(struct _buf *file)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

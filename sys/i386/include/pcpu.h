@@ -41,6 +41,13 @@
 #include <sys/_lock.h>
 #include <sys/_mutex.h>
 
+struct monitorbuf {
+	int idle_state;		/* Used by cpu_idle_mwait. */
+	int stop_state;		/* Used by cpustop_handler. */
+	char padding[128 - (2 * sizeof(int))];
+};
+_Static_assert(sizeof(struct monitorbuf) == 128, "2x cache line");
+
 /*
  * The SMP parts are setup in pmap.c and machdep.c for the BSP, and
  * pmap.c and mp_machdep.c sets up the data for the AP's to "see" when
@@ -50,7 +57,7 @@
  */
 
 #define	PCPU_MD_FIELDS							\
-	char	pc_monitorbuf[128] __aligned(128); /* cache line */	\
+	struct monitorbuf pc_monitorbuf __aligned(128);	/* cache line */\
 	struct	pcpu *pc_prvspace;	/* Self-reference */		\
 	struct	pmap *pc_curpmap;					\
 	struct	segment_descriptor pc_common_tssd;			\
@@ -77,12 +84,20 @@
 	struct	sx pc_copyout_slock;					\
 	char	*pc_copyout_buf;					\
 	vm_offset_t pc_pmap_eh_va;					\
-	caddr_t pc_pmap_eh_ptep;						\
+	caddr_t pc_pmap_eh_ptep;					\
 	uint32_t pc_smp_tlb_done;	/* TLB op acknowledgement */	\
 	uint32_t pc_ibpb_set;						\
-	char	__pad[3610]
+	void	*pc_mds_buf;						\
+	void	*pc_mds_buf64;						\
+	uint32_t pc_pad[4];						\
+	uint8_t	pc_mds_tmp[64];						\
+	u_int	pc_ipi_bitmap;						\
+	char	__pad[3518]
 
 #ifdef _KERNEL
+
+#define MONITOR_STOPSTATE_RUNNING	0
+#define MONITOR_STOPSTATE_STOPPED	1
 
 #if defined(__GNUCLIKE_ASM) && defined(__GNUCLIKE___TYPEOF)
 
@@ -212,36 +227,6 @@
 #define	PCPU_INC(member)	__PCPU_INC(pc_ ## member)
 #define	PCPU_PTR(member)	__PCPU_PTR(pc_ ## member)
 #define	PCPU_SET(member, val)	__PCPU_SET(pc_ ## member, val)
-
-#define	OFFSETOF_CURTHREAD	0
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wnull-dereference"
-#endif
-static __inline __pure2 struct thread *
-__curthread(void)
-{
-	struct thread *td;
-
-	__asm("movl %%fs:%1,%0" : "=r" (td)
-	    : "m" (*(char *)OFFSETOF_CURTHREAD));
-	return (td);
-}
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-#define	curthread		(__curthread())
-
-#define	OFFSETOF_CURPCB		16
-static __inline __pure2 struct pcb *
-__curpcb(void)
-{
-	struct pcb *pcb;
-
-	__asm("movl %%fs:%1,%0" : "=r" (pcb) : "m" (*(char *)OFFSETOF_CURPCB));
-	return (pcb);
-}
-#define	curpcb		(__curpcb())
 
 #define	IS_BSP()	(PCPU_GET(cpuid) == 0)
 

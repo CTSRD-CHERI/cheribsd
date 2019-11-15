@@ -87,6 +87,8 @@ ASSYM(TD_PFLAGS, offsetof(struct thread, td_pflags));
 ASSYM(TD_PROC, offsetof(struct thread, td_proc));
 ASSYM(TD_FRAME, offsetof(struct thread, td_frame));
 ASSYM(TD_MD, offsetof(struct thread, td_md));
+ASSYM(TD_MD_PCB, offsetof(struct thread, td_md.md_pcb));
+ASSYM(TD_MD_STACK_BASE, offsetof(struct thread, td_md.md_stack_base));
 
 ASSYM(TDF_ASTPENDING, TDF_ASTPENDING);
 ASSYM(TDF_NEEDRESCHED, TDF_NEEDRESCHED);
@@ -233,6 +235,9 @@ ASSYM(PC_PTI_STACK, offsetof(struct pcpu, pc_pti_stack));
 ASSYM(PC_PTI_STACK_SZ, PC_PTI_STACK_SZ);
 ASSYM(PC_PTI_RSP0, offsetof(struct pcpu, pc_pti_rsp0));
 ASSYM(PC_IBPB_SET, offsetof(struct pcpu, pc_ibpb_set));
+ASSYM(PC_MDS_TMP, offsetof(struct pcpu, pc_mds_tmp));
+ASSYM(PC_MDS_BUF, offsetof(struct pcpu, pc_mds_buf));
+ASSYM(PC_MDS_BUF64, offsetof(struct pcpu, pc_mds_buf64));
  
 ASSYM(LA_EOI, LAPIC_EOI * LAPIC_MEM_MUL);
 ASSYM(LA_ISR, LAPIC_ISR0 * LAPIC_MEM_MUL);
@@ -269,3 +274,4 @@ ASSYM(EC_R12, offsetof(struct efirt_callinfo, ec_r12));
 ASSYM(EC_R13, offsetof(struct efirt_callinfo, ec_r13));
 ASSYM(EC_R14, offsetof(struct efirt_callinfo, ec_r14));
 ASSYM(EC_R15, offsetof(struct efirt_callinfo, ec_r15));
+ASSYM(EC_RFLAGS, offsetof(struct efirt_callinfo, ec_rflags));

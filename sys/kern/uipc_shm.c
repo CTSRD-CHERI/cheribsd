@@ -33,19 +33,14 @@
 
 /*
  * Support for shared swap-backed anonymous memory objects via
- * shm_open(2) and shm_unlink(2).  While most of the implementation is
- * here, vm_mmap.c contains mapping logic changes.
+ * shm_open(2), shm_rename(2), and shm_unlink(2).
+ * While most of the implementation is here, vm_mmap.c contains
+ * mapping logic changes.
  *
- * TODO:
- *
- * (1) Need to export data to a userland tool via a sysctl.  Should ipcs(1)
- *     and ipcrm(1) be expanded or should new tools to manage both POSIX
- *     kernel semaphores and POSIX shared memory be written?
- *
- * (2) Add support for this file type to fstat(1).
- *
- * (3) Resource limits?  Does this need its own resource limits or are the
- *     existing limits in mmap(2) sufficient?
+ * posixshmcontrol(1) allows users to inspect the state of the memory
+ * objects.  Per-uid swap resource limit controls total amount of
+ * memory that user can consume for anonymous objects, including
+ * shared.
  */
 
 #include <sys/cdefs.h>
@@ -65,6 +60,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/filio.h>
 #include <sys/fnv_hash.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/uio.h>
 #include <sys/signal.h>
 #include <sys/jail.h>
@@ -78,6 +74,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/refcount.h>
 #include <sys/resourcevar.h>
 #include <sys/rwlock.h>
+#include <sys/sbuf.h>
 #include <sys/stat.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
@@ -125,6 +122,8 @@ static void	shm_init(void *arg);
 static void	shm_insert(char *path, Fnv32_t fnv, struct shmfd *shmfd);
 static struct shmfd *shm_lookup(char *path, Fnv32_t fnv);
 static int	shm_remove(char *path, Fnv32_t fnv, struct ucred *ucred);
+static int	shm_dotruncate_locked(struct shmfd *shmfd, off_t length,
+    void *rl_cookie);
 
 static fo_rdwr_t	shm_read;
 static fo_rdwr_t	shm_write;
@@ -137,6 +136,8 @@ static fo_chown_t	shm_chown;
 static fo_seek_t	shm_seek;
 static fo_fill_kinfo_t	shm_fill_kinfo;
 static fo_mmap_t	shm_mmap;
+static fo_get_seals_t	shm_get_seals;
+static fo_add_seals_t	shm_add_seals;
 
 /* File descriptor operations. */
 struct fileops shm_ops = {
@@ -154,6 +155,8 @@ struct fileops shm_ops = {
 	.fo_seek = shm_seek,
 	.fo_fill_kinfo = shm_fill_kinfo,
 	.fo_mmap = shm_mmap,
+	.fo_get_seals = shm_get_seals,
+	.fo_add_seals = shm_add_seals,
 	.fo_flags = DFLAG_PASSABLE | DFLAG_SEEKABLE
 };
 
@@ -194,32 +197,14 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 	 * lock to page out tobj's pages because tobj is a OBJT_SWAP
 	 * type object.
 	 */
-	m = vm_page_grab(obj, idx, VM_ALLOC_NORMAL | VM_ALLOC_NOBUSY);
-	if (m->valid != VM_PAGE_BITS_ALL) {
-		vm_page_xbusy(m);
-		if (vm_pager_has_page(obj, idx, NULL, NULL)) {
-			rv = vm_pager_get_pages(obj, &m, 1, NULL, NULL);
-			if (rv != VM_PAGER_OK) {
-				printf(
-	    "uiomove_object: vm_obj %p idx %jd valid %x pager error %d\n",
-				    obj, idx, m->valid, rv);
-				vm_page_lock(m);
-				vm_page_free(m);
-				vm_page_unlock(m);
-				VM_OBJECT_WUNLOCK(obj);
-				return (EIO);
-			}
-		} else
-			vm_page_zero_invalid(m, TRUE);
-		vm_page_xunbusy(m);
+	rv = vm_page_grab_valid(&m, obj, idx,
+	    VM_ALLOC_NORMAL | VM_ALLOC_WIRED | VM_ALLOC_NOBUSY);
+	if (rv != VM_PAGER_OK) {
+		VM_OBJECT_WUNLOCK(obj);
+		printf("uiomove_object: vm_obj %p idx %jd pager error %d\n",
+		    obj, idx, rv);
+		return (EIO);
 	}
-	vm_page_lock(m);
-	vm_page_hold(m);
-	if (vm_page_active(m))
-		vm_page_reference(m);
-	else
-		vm_page_activate(m);
-	vm_page_unlock(m);
 	VM_OBJECT_WUNLOCK(obj);
 	error = uiomove_fromphys(&m, offset, tlen, uio);
 	if (uio->uio_rw == UIO_WRITE && error == 0) {
@@ -228,9 +213,7 @@ uiomove_object_page(vm_object_t obj, size_t len, struct uio *uio)
 		vm_pager_page_unswapped(m);
 		VM_OBJECT_WUNLOCK(obj);
 	}
-	vm_page_lock(m);
-	vm_page_unhold(m);
-	vm_page_unlock(m);
+	vm_page_unwire(m, PQ_ACTIVE);
 
 	return (error);
 }
@@ -342,8 +325,10 @@ shm_write(struct file *fp, struct uio *uio, struct ucred *active_cred,
 		rl_cookie = rangelock_wlock(&shmfd->shm_rl, uio->uio_offset,
 		    uio->uio_offset + uio->uio_resid, &shmfd->shm_mtx);
 	}
-
-	error = uiomove_object(shmfd->shm_object, shmfd->shm_size, uio);
+	if ((shmfd->shm_seals & F_SEAL_WRITE) != 0)
+		error = EPERM;
+	else
+		error = uiomove_object(shmfd->shm_object, shmfd->shm_size, uio);
 	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
 	foffset_unlock_uio(fp, uio, flags);
 	return (error);
@@ -421,6 +406,7 @@ shm_stat(struct file *fp, struct stat *sb, struct ucred *active_cred,
 	mtx_unlock(&shm_timestamp_lock);
 	sb->st_dev = shm_dev_ino;
 	sb->st_ino = shmfd->shm_ino;
+	sb->st_nlink = shmfd->shm_object->ref_count;
 
 	return (0);
 }
@@ -437,8 +423,8 @@ shm_close(struct file *fp, struct thread *td)
 	return (0);
 }
 
-int
-shm_dotruncate(struct shmfd *shmfd, off_t length)
+static int
+shm_dotruncate_locked(struct shmfd *shmfd, off_t length, void *rl_cookie)
 {
 	vm_object_t object;
 	vm_page_t m;
@@ -448,23 +434,23 @@ shm_dotruncate(struct shmfd *shmfd, off_t length)
 
 	KASSERT(length >= 0, ("shm_dotruncate: length < 0"));
 	object = shmfd->shm_object;
-	VM_OBJECT_WLOCK(object);
-	if (length == shmfd->shm_size) {
-		VM_OBJECT_WUNLOCK(object);
+	VM_OBJECT_ASSERT_WLOCKED(object);
+	rangelock_cookie_assert(rl_cookie, RA_WLOCKED);
+	if (length == shmfd->shm_size)
 		return (0);
-	}
 	nobjsize = OFF_TO_IDX(length + PAGE_MASK);
 
 	/* Are we shrinking?  If so, trim the end. */
 	if (length < shmfd->shm_size) {
+		if ((shmfd->shm_seals & F_SEAL_SHRINK) != 0)
+			return (EPERM);
+
 		/*
 		 * Disallow any requests to shrink the size if this
 		 * object is mapped into the kernel.
 		 */
-		if (shmfd->shm_kmappings > 0) {
-			VM_OBJECT_WUNLOCK(object);
+		if (shmfd->shm_kmappings > 0)
 			return (EBUSY);
-		}
 
 		/*
 		 * Zero the truncated part of the last page.
@@ -473,10 +459,9 @@ shm_dotruncate(struct shmfd *shmfd, off_t length)
 		if (base != 0) {
 			idx = OFF_TO_IDX(length);
 retry:
-			m = vm_page_lookup(object, idx);
+			m = vm_page_grab(object, idx, VM_ALLOC_NOCREAT);
 			if (m != NULL) {
-				if (vm_page_sleep_if_busy(m, "shmtrc"))
-					goto retry;
+				MPASS(vm_page_all_valid(m));
 			} else if (vm_pager_has_page(object, idx, NULL, NULL)) {
 				m = vm_page_alloc(object, idx,
 				    VM_ALLOC_NORMAL | VM_ALLOC_WAITFAIL);
@@ -484,7 +469,6 @@ retry:
 					goto retry;
 				rv = vm_pager_get_pages(object, &m, 1, NULL,
 				    NULL);
-				vm_page_lock(m);
 				if (rv == VM_PAGER_OK) {
 					/*
 					 * Since the page was not resident,
@@ -495,20 +479,18 @@ retry:
 					 * as an access.
 					 */
 					vm_page_launder(m);
-					vm_page_unlock(m);
-					vm_page_xunbusy(m);
 				} else {
 					vm_page_free(m);
-					vm_page_unlock(m);
 					VM_OBJECT_WUNLOCK(object);
 					return (EIO);
 				}
 			}
 			if (m != NULL) {
 				pmap_zero_page_area(m, base, PAGE_SIZE - base);
-				KASSERT(m->valid == VM_PAGE_BITS_ALL,
+				KASSERT(vm_page_all_valid(m),
 				    ("shm_dotruncate: page %p is invalid", m));
 				vm_page_dirty(m);
+				vm_page_xunbusy(m);
 				vm_pager_page_unswapped(m);
 			}
 		}
@@ -527,12 +509,13 @@ retry:
 		swap_release_by_cred(delta, object->cred);
 		object->charge -= delta;
 	} else {
+		if ((shmfd->shm_seals & F_SEAL_GROW) != 0)
+			return (EPERM);
+
 		/* Try to reserve additional swap space. */
 		delta = IDX_TO_OFF(nobjsize - object->size);
-		if (!swap_reserve_by_cred(delta, object->cred)) {
-			VM_OBJECT_WUNLOCK(object);
+		if (!swap_reserve_by_cred(delta, object->cred))
 			return (ENOMEM);
-		}
 		object->charge += delta;
 	}
 	shmfd->shm_size = length;
@@ -541,8 +524,22 @@ retry:
 	shmfd->shm_mtime = shmfd->shm_ctime;
 	mtx_unlock(&shm_timestamp_lock);
 	object->size = nobjsize;
-	VM_OBJECT_WUNLOCK(object);
 	return (0);
+}
+
+int
+shm_dotruncate(struct shmfd *shmfd, off_t length)
+{
+	void *rl_cookie;
+	int error;
+
+	rl_cookie = rangelock_wlock(&shmfd->shm_rl, 0, OFF_MAX,
+	    &shmfd->shm_mtx);
+	VM_OBJECT_WLOCK(shmfd->shm_object);
+	error = shm_dotruncate_locked(shmfd, length, rl_cookie);
+	VM_OBJECT_WUNLOCK(shmfd->shm_object);
+	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+	return (error);
 }
 
 /*
@@ -559,7 +556,7 @@ shm_alloc(struct ucred *ucred, mode_t mode)
 	shmfd->shm_uid = ucred->cr_uid;
 	shmfd->shm_gid = ucred->cr_gid;
 	shmfd->shm_mode = mode;
-	shmfd->shm_object = vm_pager_allocate(OBJT_DEFAULT, NULL,
+	shmfd->shm_object = vm_pager_allocate(OBJT_SWAP, NULL,
 	    shmfd->shm_size, VM_PROT_DEFAULT, 0, ucred);
 	KASSERT(shmfd->shm_object != NULL, ("shm_create: vm_pager_allocate"));
 	shmfd->shm_object->pg_color = 0;
@@ -706,13 +703,14 @@ shm_remove(char *path, Fnv32_t fnv, struct ucred *ucred)
 
 int
 kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
-    mode_t mode, struct filecaps *fcaps)
+    mode_t mode, struct filecaps *fcaps, int initial_seals)
 {
 	struct filedesc *fdp;
 	struct shmfd *shmfd;
 	struct file *fp;
 	char *path;
 	const char *pr_path;
+	void *rl_cookie;
 	size_t pr_pathlen;
 	Fnv32_t fnv;
 	mode_t cmode;
@@ -735,10 +733,28 @@ kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
 	if ((flags & ~(O_ACCMODE | O_CREAT | O_EXCL | O_TRUNC | O_CLOEXEC)) != 0)
 		return (EINVAL);
 
+	/*
+	 * Currently only F_SEAL_SEAL may be set when creating or opening shmfd.
+	 * If the decision is made later to allow additional seals, care must be
+	 * taken below to ensure that the seals are properly set if the shmfd
+	 * already existed -- this currently assumes that only F_SEAL_SEAL can
+	 * be set and doesn't take further precautions to ensure the validity of
+	 * the seals being added with respect to current mappings.
+	 */
+	if ((initial_seals & ~F_SEAL_SEAL) != 0)
+		return (EINVAL);
+
 	fdp = td->td_proc->p_fd;
 	cmode = (mode & ~fdp->fd_cmask) & ACCESSPERMS;
 
-	error = falloc_caps(td, &fp, &fd, O_CLOEXEC, fcaps);
+	/*
+	 * shm_open(2) created shm should always have O_CLOEXEC set, as mandated
+	 * by POSIX.  We allow it to be unset here so that an in-kernel
+	 * interface may be written as a thin layer around shm, optionally not
+	 * setting CLOEXEC.  For shm_open(2), O_CLOEXEC is set unconditionally
+	 * in sys_shm_open() to keep this implementation compliant.
+	 */
+	error = falloc_caps(td, &fp, &fd, flags & O_CLOEXEC, fcaps);
 	if (error)
 		return (error);
 
@@ -751,6 +767,7 @@ kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
 			return (EINVAL);
 		}
 		shmfd = shm_alloc(td->td_ucred, cmode);
+		shmfd->shm_seals = initial_seals;
 	} else {
 		path = malloc(MAXPATHLEN, M_SHMFD, M_WAITOK);
 		pr_path = td->td_ucred->cr_prison->pr_path;
@@ -787,6 +804,7 @@ kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
 				if (error == 0) {
 #endif
 					shmfd = shm_alloc(td->td_ucred, cmode);
+					shmfd->shm_seals = initial_seals;
 					shm_insert(path, fnv, shmfd);
 #ifdef MAC
 				}
@@ -796,12 +814,39 @@ kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
 				error = ENOENT;
 			}
 		} else {
+			rl_cookie = rangelock_wlock(&shmfd->shm_rl, 0, OFF_MAX,
+			    &shmfd->shm_mtx);
+
+			/*
+			 * kern_shm_open() likely shouldn't ever error out on
+			 * trying to set a seal that already exists, unlike
+			 * F_ADD_SEALS.  This would break terribly as
+			 * shm_open(2) actually sets F_SEAL_SEAL to maintain
+			 * historical behavior where the underlying file could
+			 * not be sealed.
+			 */
+			initial_seals &= ~shmfd->shm_seals;
+
 			/*
 			 * Object already exists, obtain a new
 			 * reference if requested and permitted.
 			 */
 			free(path, M_SHMFD);
-			if ((flags & (O_CREAT | O_EXCL)) == (O_CREAT | O_EXCL))
+
+			/*
+			 * initial_seals can't set additional seals if we've
+			 * already been set F_SEAL_SEAL.  If F_SEAL_SEAL is set,
+			 * then we've already removed that one from
+			 * initial_seals.  This is currently redundant as we
+			 * only allow setting F_SEAL_SEAL at creation time, but
+			 * it's cheap to check and decreases the effort required
+			 * to allow additional seals.
+			 */
+			if ((shmfd->shm_seals & F_SEAL_SEAL) != 0 &&
+			    initial_seals != 0)
+				error = EPERM;
+			else if ((flags & (O_CREAT | O_EXCL)) ==
+			    (O_CREAT | O_EXCL))
 				error = EEXIST;
 			else {
 #ifdef MAC
@@ -821,15 +866,27 @@ kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
 			if (error == 0 &&
 			    (flags & (O_ACCMODE | O_TRUNC)) ==
 			    (O_RDWR | O_TRUNC)) {
+				VM_OBJECT_WLOCK(shmfd->shm_object);
 #ifdef MAC
 				error = mac_posixshm_check_truncate(
 					td->td_ucred, fp->f_cred, shmfd);
 				if (error == 0)
 #endif
-					shm_dotruncate(shmfd, 0);
+					error = shm_dotruncate_locked(shmfd, 0,
+					    rl_cookie);
+				VM_OBJECT_WUNLOCK(shmfd->shm_object);
 			}
-			if (error == 0)
+			if (error == 0) {
+				/*
+				 * Currently we only allow F_SEAL_SEAL to be
+				 * set initially.  As noted above, this would
+				 * need to be reworked should that change.
+				 */
+				shmfd->shm_seals |= initial_seals;
 				shm_hold(shmfd);
+			}
+			rangelock_unlock(&shmfd->shm_rl, rl_cookie,
+			    &shmfd->shm_mtx);
 		}
 		sx_xunlock(&shm_dict_lock);
 
@@ -849,19 +906,21 @@ kern_shm_open(struct thread *td, const char * __capability userpath, int flags,
 }
 
 /* System calls. */
+#ifdef COMPAT_FREEBSD12
 int
-sys_shm_open(struct thread *td, struct shm_open_args *uap)
+freebsd12_shm_open(struct thread *td, struct freebsd12_shm_open_args *uap)
 {
 
-	return (kern_shm_open(td, __USER_CAP_STR(uap->path), uap->flags,
-	    uap->mode, NULL));
+	return (kern_shm_open(td, uap->path,
+	    uap->flags | O_CLOEXEC, uap->mode, NULL, F_SEAL_SEAL));
 }
+#endif
 
 int
 sys_shm_unlink(struct thread *td, struct shm_unlink_args *uap)
 {
 
-	return (kern_shm_unlink(td, __USER_CAP_STR(uap->path)));
+	return (kern_shm_unlink(td, uap->path));
 }
 
 int
@@ -898,6 +957,164 @@ kern_shm_unlink(struct thread *td, const char * __capability userpath)
 }
 
 int
+sys_shm_rename(struct thread *td, struct shm_rename_args *uap)
+{
+
+	return (kern_shm_rename(td, uap->path_from,
+	    uap->path_to, uap->flags));
+}
+
+int
+kern_shm_rename(struct thread *td, const char * __capability path_from_p,
+    const char * __capability path_to_p, int flags)
+{
+	char *path_from = NULL, *path_to = NULL;
+	Fnv32_t fnv_from, fnv_to;
+	struct shmfd *fd_from;
+	struct shmfd *fd_to;
+	int error;
+
+	/*
+	 * Make sure the user passed only valid flags.
+	 * If you add a new flag, please add a new term here.
+	 */
+	if ((flags & ~(
+	    SHM_RENAME_NOREPLACE |
+	    SHM_RENAME_EXCHANGE
+	    )) != 0) {
+		error = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * EXCHANGE and NOREPLACE don't quite make sense together. Let's
+	 * force the user to choose one or the other.
+	 */
+	if ((flags & SHM_RENAME_NOREPLACE) != 0 &&
+	    (flags & SHM_RENAME_EXCHANGE) != 0) {
+		error = EINVAL;
+		goto out;
+	}
+
+	/*
+	 * Malloc zone M_SHMFD, since this path may end up freed later from
+	 * M_SHMFD if we end up doing an insert.
+	 */
+	path_from = malloc(MAXPATHLEN, M_SHMFD, M_WAITOK);
+	error = copyinstr(path_from_p, path_from, MAXPATHLEN, NULL);
+	if (error)
+		goto out;
+
+	path_to = malloc(MAXPATHLEN, M_SHMFD, M_WAITOK);
+	error = copyinstr(path_to_p, path_to, MAXPATHLEN, NULL);
+	if (error)
+		goto out;
+
+	/* Rename with from/to equal is a no-op */
+	if (strncmp(path_from, path_to, MAXPATHLEN) == 0)
+		goto out;
+
+	fnv_from = fnv_32_str(path_from, FNV1_32_INIT);
+	fnv_to = fnv_32_str(path_to, FNV1_32_INIT);
+
+	sx_xlock(&shm_dict_lock);
+
+	fd_from = shm_lookup(path_from, fnv_from);
+	if (fd_from == NULL) {
+		sx_xunlock(&shm_dict_lock);
+		error = ENOENT;
+		goto out;
+	}
+
+	fd_to = shm_lookup(path_to, fnv_to);
+	if ((flags & SHM_RENAME_NOREPLACE) != 0 && fd_to != NULL) {
+		sx_xunlock(&shm_dict_lock);
+		error = EEXIST;
+		goto out;
+	}
+
+	/*
+	 * Unconditionally prevents shm_remove from invalidating the 'from'
+	 * shm's state.
+	 */
+	shm_hold(fd_from);
+	error = shm_remove(path_from, fnv_from, td->td_ucred);
+
+	/*
+	 * One of my assumptions failed if ENOENT (e.g. locking didn't
+	 * protect us)
+	 */
+	KASSERT(error != ENOENT, ("Our shm disappeared during shm_rename: %s",
+	    path_from));
+	if (error) {
+		shm_drop(fd_from);
+		sx_xunlock(&shm_dict_lock);
+		goto out;
+	}
+
+	/*
+	 * If we are exchanging, we need to ensure the shm_remove below
+	 * doesn't invalidate the dest shm's state.
+	 */
+	if ((flags & SHM_RENAME_EXCHANGE) != 0 && fd_to != NULL)
+		shm_hold(fd_to);
+
+	/*
+	 * NOTE: if path_to is not already in the hash, c'est la vie;
+	 * it simply means we have nothing already at path_to to unlink.
+	 * That is the ENOENT case.
+	 *
+	 * If we somehow don't have access to unlink this guy, but
+	 * did for the shm at path_from, then relink the shm to path_from
+	 * and abort with EACCES.
+	 *
+	 * All other errors: that is weird; let's relink and abort the
+	 * operation.
+	 */
+	error = shm_remove(path_to, fnv_to, td->td_ucred);
+	if (error && error != ENOENT) {
+		shm_insert(path_from, fnv_from, fd_from);
+		shm_drop(fd_from);
+		/* Don't free path_from now, since the hash references it */
+		path_from = NULL;
+		sx_xunlock(&shm_dict_lock);
+		goto out;
+	}
+
+	shm_insert(path_to, fnv_to, fd_from);
+
+	/* Don't free path_to now, since the hash references it */
+	path_to = NULL;
+
+	/* We kept a ref when we removed, and incremented again in insert */
+	shm_drop(fd_from);
+#ifdef DEBUG
+	KASSERT(fd_from->shm_refs > 0, ("Expected >0 refs; got: %d\n",
+	    fd_from->shm_refs));
+#endif
+
+	if ((flags & SHM_RENAME_EXCHANGE) != 0 && fd_to != NULL) {
+		shm_insert(path_from, fnv_from, fd_to);
+		path_from = NULL;
+		shm_drop(fd_to);
+#ifdef DEBUG
+		KASSERT(fd_to->shm_refs > 0, ("Expected >0 refs; got: %d\n",
+		    fd_to->shm_refs));
+#endif
+	}
+
+	error = 0;
+	sx_xunlock(&shm_dict_lock);
+
+out:
+	if (path_from != NULL)
+		free(path_from, M_SHMFD);
+	if (path_to != NULL)
+		free(path_to, M_SHMFD);
+	return(error);
+}
+
+int
 shm_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
     vm_offset_t max_addr, vm_size_t objsize,
     vm_prot_t prot, vm_prot_t cap_maxprot, int flags,
@@ -906,21 +1123,32 @@ shm_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 	struct shmfd *shmfd;
 	vm_prot_t maxprot;
 	int error;
+	bool writecnt;
+	void *rl_cookie;
 
 	shmfd = fp->f_data;
 	maxprot = VM_PROT_NONE;
 
+	rl_cookie = rangelock_rlock(&shmfd->shm_rl, 0, objsize,
+	    &shmfd->shm_mtx);
 	/* FREAD should always be set. */
 	if ((fp->f_flag & FREAD) != 0)
 		maxprot |= VM_PROT_EXECUTE | VM_PROT_READ;
 	if ((fp->f_flag & FWRITE) != 0)
 		maxprot |= VM_PROT_WRITE;
 
+	writecnt = (flags & MAP_SHARED) != 0 && (prot & VM_PROT_WRITE) != 0;
+
+	if (writecnt && (shmfd->shm_seals & F_SEAL_WRITE) != 0) {
+		error = EPERM;
+		goto out;
+	}
+
 	/* Don't permit shared writable mappings on read-only descriptors. */
-	if ((flags & MAP_SHARED) != 0 &&
-	    (maxprot & VM_PROT_WRITE) == 0 &&
-	    (prot & VM_PROT_WRITE) != 0)
-		return (EACCES);
+	if (writecnt && (maxprot & VM_PROT_WRITE) == 0) {
+		error = EACCES;
+		goto out;
+	}
 	maxprot &= cap_maxprot;
 
 	/* See comment in vn_mmap(). */
@@ -928,13 +1156,15 @@ shm_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 #ifdef _LP64
 	    objsize > OFF_MAX ||
 #endif
-	    foff < 0 || foff > OFF_MAX - objsize)
-		return (EINVAL);
+	    foff < 0 || foff > OFF_MAX - objsize) {
+		error = EINVAL;
+		goto out;
+	}
 
 #ifdef MAC
 	error = mac_posixshm_check_mmap(td->td_ucred, shmfd, prot, flags);
 	if (error != 0)
-		return (error);
+		goto out;
 #endif
 	
 	mtx_lock(&shm_timestamp_lock);
@@ -942,10 +1172,18 @@ shm_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 	mtx_unlock(&shm_timestamp_lock);
 	vm_object_reference(shmfd->shm_object);
 
+	if (writecnt)
+		vm_pager_update_writecount(shmfd->shm_object, 0, objsize);
 	error = vm_mmap_object(map, addr, max_addr, objsize, prot, maxprot,
 	    flags, shmfd->shm_object, foff, FALSE, td);
-	if (error != 0)
+	if (error != 0) {
+		if (writecnt)
+			vm_pager_release_writecount(shmfd->shm_object, 0,
+			    objsize);
 		vm_object_deallocate(shmfd->shm_object);
+	}
+out:
+	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
 	return (error);
 }
 
@@ -1111,40 +1349,179 @@ shm_unmap(struct file *fp, void *mem, size_t size)
 }
 
 static int
-shm_fill_kinfo(struct file *fp, struct kinfo_file *kif, struct filedesc *fdp)
+shm_fill_kinfo_locked(struct shmfd *shmfd, struct kinfo_file *kif, bool list)
 {
 	const char *path, *pr_path;
-	struct shmfd *shmfd;
 	size_t pr_pathlen;
+	bool visible;
 
+	sx_assert(&shm_dict_lock, SA_LOCKED);
 	kif->kf_type = KF_TYPE_SHM;
-	shmfd = fp->f_data;
-
-	mtx_lock(&shm_timestamp_lock);
-	kif->kf_un.kf_file.kf_file_mode = S_IFREG | shmfd->shm_mode;	/* XXX */
-	mtx_unlock(&shm_timestamp_lock);
+	kif->kf_un.kf_file.kf_file_mode = S_IFREG | shmfd->shm_mode;
 	kif->kf_un.kf_file.kf_file_size = shmfd->shm_size;
 	if (shmfd->shm_path != NULL) {
-		sx_slock(&shm_dict_lock);
 		if (shmfd->shm_path != NULL) {
 			path = shmfd->shm_path;
 			pr_path = curthread->td_ucred->cr_prison->pr_path;
 			if (strcmp(pr_path, "/") != 0) {
 				/* Return the jail-rooted pathname. */
 				pr_pathlen = strlen(pr_path);
-				if (strncmp(path, pr_path, pr_pathlen) == 0 &&
-				    path[pr_pathlen] == '/')
+				visible = strncmp(path, pr_path, pr_pathlen)
+				    == 0 && path[pr_pathlen] == '/';
+				if (list && !visible)
+					return (EPERM);
+				if (visible)
 					path += pr_pathlen;
 			}
 			strlcpy(kif->kf_path, path, sizeof(kif->kf_path));
 		}
-		sx_sunlock(&shm_dict_lock);
 	}
 	return (0);
 }
+
+static int
+shm_fill_kinfo(struct file *fp, struct kinfo_file *kif,
+    struct filedesc *fdp __unused)
+{
+	int res;
+
+	sx_slock(&shm_dict_lock);
+	res = shm_fill_kinfo_locked(fp->f_data, kif, false);
+	sx_sunlock(&shm_dict_lock);
+	return (res);
+}
+
+static int
+shm_add_seals(struct file *fp, int seals)
+{
+	struct shmfd *shmfd;
+	void *rl_cookie;
+	vm_ooffset_t writemappings;
+	int error, nseals;
+
+	error = 0;
+	shmfd = fp->f_data;
+	rl_cookie = rangelock_wlock(&shmfd->shm_rl, 0, OFF_MAX,
+	    &shmfd->shm_mtx);
+
+	/* Even already-set seals should result in EPERM. */
+	if ((shmfd->shm_seals & F_SEAL_SEAL) != 0) {
+		error = EPERM;
+		goto out;
+	}
+	nseals = seals & ~shmfd->shm_seals;
+	if ((nseals & F_SEAL_WRITE) != 0) {
+		/*
+		 * The rangelock above prevents writable mappings from being
+		 * added after we've started applying seals.  The RLOCK here
+		 * is to avoid torn reads on ILP32 arches as unmapping/reducing
+		 * writemappings will be done without a rangelock.
+		 */
+		VM_OBJECT_RLOCK(shmfd->shm_object);
+		writemappings = shmfd->shm_object->un_pager.swp.writemappings;
+		VM_OBJECT_RUNLOCK(shmfd->shm_object);
+		/* kmappings are also writable */
+		if (writemappings > 0) {
+			error = EBUSY;
+			goto out;
+		}
+	}
+	shmfd->shm_seals |= nseals;
+out:
+	rangelock_unlock(&shmfd->shm_rl, rl_cookie, &shmfd->shm_mtx);
+	return (error);
+}
+
+static int
+shm_get_seals(struct file *fp, int *seals)
+{
+	struct shmfd *shmfd;
+
+	shmfd = fp->f_data;
+	*seals = shmfd->shm_seals;
+	return (0);
+}
+
+static int
+sysctl_posix_shm_list(SYSCTL_HANDLER_ARGS)
+{
+	struct shm_mapping *shmm;
+	struct sbuf sb;
+	struct kinfo_file kif;
+	u_long i;
+	ssize_t curlen;
+	int error, error2;
+
+	sbuf_new_for_sysctl(&sb, NULL, sizeof(struct kinfo_file) * 5, req);
+	sbuf_clear_flags(&sb, SBUF_INCLUDENUL);
+	curlen = 0;
+	error = 0;
+	sx_slock(&shm_dict_lock);
+	for (i = 0; i < shm_hash + 1; i++) {
+		LIST_FOREACH(shmm, &shm_dictionary[i], sm_link) {
+			error = shm_fill_kinfo_locked(shmm->sm_shmfd,
+			    &kif, true);
+			if (error == EPERM)
+				continue;
+			if (error != 0)
+				break;
+			pack_kinfo(&kif);
+			if (req->oldptr != NULL &&
+			    kif.kf_structsize + curlen > req->oldlen)
+				break;
+			error = sbuf_bcat(&sb, &kif, kif.kf_structsize) == 0 ?
+			    0 : ENOMEM;
+			if (error != 0)
+				break;
+			curlen += kif.kf_structsize;
+		}
+	}
+	sx_sunlock(&shm_dict_lock);
+	error2 = sbuf_finish(&sb);
+	sbuf_delete(&sb);
+	return (error != 0 ? error : error2);
+}
+
+SYSCTL_PROC(_kern_ipc, OID_AUTO, posix_shm_list,
+    CTLFLAG_RD | CTLFLAG_MPSAFE | CTLTYPE_OPAQUE,
+    NULL, 0, sysctl_posix_shm_list, "",
+    "POSIX SHM list");
+
+int
+kern_shm_open2(struct thread *td, const char * __capability path, int flags,
+    mode_t mode, int shmflags, const char * __capability name __unused)
+{
+	int initial_seals;
+
+	if ((shmflags & ~SHM_ALLOW_SEALING) != 0)
+		return (EINVAL);
+
+	initial_seals = F_SEAL_SEAL;
+	if ((shmflags & SHM_ALLOW_SEALING) != 0)
+		initial_seals &= ~F_SEAL_SEAL;
+	return (kern_shm_open(td, path, flags, mode, NULL, initial_seals));
+}
+
+/*
+ * This version of the shm_open() interface leaves CLOEXEC behavior up to the
+ * caller, and libc will enforce it for the traditional shm_open() call.  This
+ * allows other consumers, like memfd_create(), to opt-in for CLOEXEC.  This
+ * interface also includes a 'name' argument that is currently unused, but could
+ * potentially be exported later via some interface for debugging purposes.
+ * From the kernel's perspective, it is optional.  Individual consumers like
+ * memfd_create() may require it in order to be compatible with other systems
+ * implementing the same function.
+ */
+int
+sys_shm_open2(struct thread *td, struct shm_open2_args *uap)
+{
+
+	return (kern_shm_open2(td, uap->path, uap->flags,
+	    uap->mode, uap->shmflags, uap->name));
+}
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20191022,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

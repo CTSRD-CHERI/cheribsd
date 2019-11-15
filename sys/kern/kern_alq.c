@@ -314,7 +314,7 @@ alq_doio(struct alq *alq)
 	struct vnode *vp;
 	void *write_start;
 	struct uio auio;
-	kiovec_t aiov[2];
+	struct iovec aiov[2];
 	int totlen;
 	int iov;
 	int wrapearly;
@@ -978,11 +978,10 @@ DECLARE_MODULE(alq, alq_mod, SI_SUB_LAST, SI_ORDER_ANY);
 MODULE_VERSION(alq, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

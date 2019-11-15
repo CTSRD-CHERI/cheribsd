@@ -85,7 +85,7 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
-#if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32)
+#if defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 #define CP(src,dst,fld) do { (dst).fld = (src).fld; } while (0)
 #endif
 
@@ -260,6 +260,66 @@ static struct syscall_helper_data msg32_syscalls[] = {
 };
 #endif
 
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64_proto.h>
+#include <compat/freebsd64/freebsd64_syscall.h>
+#include <compat/freebsd64/freebsd64_util.h>
+
+struct msqid_ds64 {
+	struct ipc_perm	msg_perm;
+	void		*__msg_first;
+	void		*__msg_last;
+	msglen_t	msg_cbytes;
+	msgqnum_t	msg_qnum;
+	msglen_t	msg_qbytes;
+	pid_t		msg_lspid;
+	pid_t		msg_lrpid;
+	time_t		msg_stime;
+	time_t		msg_rtime;
+	time_t		msg_ctime;
+};
+
+#if defined(COMPAT_FREEBSD4) || defined(COMPAT_FREEBSD5) || \
+    defined(COMPAT_FREEBSD6) || defined(COMPAT_FREEBSD7)
+struct msqid_ds_old64 {
+	struct ipc_perm_old	msg_perm;
+	int64_t			__msg_first;
+	int64_t			__msg_last;
+	msglen_t		msg_cbytes;
+	msgqnum_t		msg_qnum;
+	msglen_t		msg_qbytes;
+	pid_t			msg_lspid;
+	pid_t			msg_lrpid;
+	time_t			msg_stime;
+	long			msg_pad1;
+	time_t			msg_rtime;
+	long			msg_pad2;
+	time_t			msg_ctime;
+	long			msg_pad3;
+	long			msg_pad4[4];
+
+};
+#endif
+
+struct msqid_kernel64 {
+	struct msqid_ds64	u;
+	struct label		*label;
+	struct ucred		*cred;
+};
+
+static struct syscall_helper_data msg64_syscalls[] = {
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_msgctl),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_msgsnd),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_msgrcv),
+	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(msgget),
+#if defined(COMPAT_FREEBSD7)
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_msgsys),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd7_freebsd64_msgctl),
+#endif
+	SYSCALL_INIT_LAST
+};
+#endif /* COMPAT_FREEBSD64 */
+
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
@@ -397,6 +457,12 @@ msginit()
 	if (error != 0)
 		return (error);
 #endif
+#ifdef COMPAT_FREEBSD64
+	error = freebsd64_syscall_helper_register(msg64_syscalls,
+	    SY_THR_STATIC_KLD);
+	if (error != 0)
+		return (error);
+#endif
 #ifdef COMPAT_CHERIABI
 	error = cheriabi_syscall_helper_register(cheriabi_msg_syscalls,
 	    SY_THR_STATIC_KLD);
@@ -418,6 +484,9 @@ msgunload()
 	syscall_helper_unregister(msg_syscalls);
 #ifdef COMPAT_FREEBSD32
 	syscall32_helper_unregister(msg32_syscalls);
+#endif
+#ifdef COMPAT_FREEBSD64
+	freebsd64_syscall_helper_unregister(msg64_syscalls);
 #endif
 #ifdef COMPAT_CHERIABI
 	cheriabi_syscall_helper_unregister(cheriabi_msg_syscalls);
@@ -582,15 +651,14 @@ sys_msgctl(struct thread *td, struct msgctl_args *uap)
 	int cmd = uap->cmd;
 	struct msqid_ds msqbuf;
 	int error;
-	struct msqid_ds * __capability buf = __USER_CAP_OBJ(uap->buf);
 
 	DPRINTF(("call to msgctl(%d, %d, %p)\n", msqid, cmd, uap->buf));
 	if (cmd == IPC_SET &&
-	    (error = copyin(buf, &msqbuf, sizeof(msqbuf))) != 0)
+	    (error = copyin(uap->buf, &msqbuf, sizeof(msqbuf))) != 0)
 		return (error);
 	error = kern_msgctl(td, msqid, cmd, &msqbuf);
 	if (cmd == IPC_STAT && error == 0)
-		error = copyout(&msqbuf, buf, sizeof(struct msqid_ds));
+		error = copyout(&msqbuf, uap->buf, sizeof(struct msqid_ds));
 	return (error);
 }
 
@@ -1205,17 +1273,17 @@ sys_msgsnd(struct thread *td, struct msgsnd_args *uap)
 {
 	int error;
 	long mtype;
-	const char * __capability msgp = __USER_CAP(uap->msgp, uap->msgsz);
 
 	DPRINTF(("call to msgsnd(%d, %p, %zu, %d)\n", uap->msqid, uap->msgp,
 	    uap->msgsz, uap->msgflg));
 
-	if ((error = copyin(msgp, &mtype, sizeof(mtype))) != 0) {
+	if ((error = copyin(uap->msgp, &mtype, sizeof(mtype))) != 0) {
 		DPRINTF(("error %d copying the message type\n", error));
 		return (error);
 	}
-	return (kern_msgsnd(td, uap->msqid, msgp + sizeof(mtype), uap->msgsz,
-	    uap->msgflg, mtype));
+	return (kern_msgsnd(td, uap->msqid,
+	    (const char * __capability)uap->msgp + sizeof(mtype),
+	    uap->msgsz, uap->msgflg, mtype));
 }
 
 /* XXX msgp is actually mtext. */
@@ -1493,15 +1561,15 @@ sys_msgrcv(struct thread *td, struct msgrcv_args *uap)
 {
 	int error;
 	long mtype;
-	char * __capability msgp = __USER_CAP(uap->msgp, uap->msgsz);
 
 	DPRINTF(("call to msgrcv(%d, %p, %zu, %ld, %d)\n", uap->msqid,
 	    uap->msgp, uap->msgsz, uap->msgtyp, uap->msgflg));
 
-	if ((error = kern_msgrcv(td, uap->msqid, msgp + sizeof(mtype),
-	    uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
+	if ((error = kern_msgrcv(td, uap->msqid,
+	    (char * __capability)uap->msgp + sizeof(mtype), uap->msgsz,
+	    uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
-	if ((error = copyout(&mtype, msgp, sizeof(mtype))) != 0)
+	if ((error = copyout(&mtype, uap->msgp, sizeof(mtype))) != 0)
 		DPRINTF(("error %d copying the message type\n", error));
 	return (error);
 }
@@ -1512,6 +1580,9 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 	struct msqid_kernel tmsqk;
 #ifdef COMPAT_FREEBSD32
 	struct msqid_kernel32 tmsqk32;
+#endif
+#ifdef COMPAT_FREEBSD64
+	struct msqid_kernel64 tmsqk64;
 #endif
 #ifdef COMPAT_CHERIABI
 	struct msqid_kernel_c tmsqk_c;
@@ -1554,8 +1625,26 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 			outsize = sizeof(tmsqk32);
 		} else
 #endif
+#ifdef COMPAT_FREEBSD64
+		if (!SV_CURPROC_FLAG(SV_CHERI)) {
+			bzero(&tmsqk64, sizeof(tmsqk64));
+			CP(tmsqk, tmsqk_c, u.msg_perm);
+			/* Don't copy u.msg_first or u.msg_last */
+			CP(tmsqk, tmsqk64, u.msg_cbytes);
+			CP(tmsqk, tmsqk64, u.msg_qnum);
+			CP(tmsqk, tmsqk64, u.msg_qbytes);
+			CP(tmsqk, tmsqk64, u.msg_lspid);
+			CP(tmsqk, tmsqk64, u.msg_lrpid);
+			CP(tmsqk, tmsqk64, u.msg_stime);
+			CP(tmsqk, tmsqk64, u.msg_rtime);
+			CP(tmsqk, tmsqk64, u.msg_ctime);
+			/* Don't copy label or cred */
+			outaddr = &tmsqk64;
+			outsize = sizeof(tmsqk64);
+		} else
+#endif
 #ifdef COMPAT_CHERIABI
-		if (SV_CURPROC_FLAG(SV_CHERI)) {
+		{
 			bzero(&tmsqk_c, sizeof(tmsqk_c));
 			CP(tmsqk, tmsqk_c, u.msg_perm);
 			/* Don't copy u.msg_first or u.msg_last */
@@ -1570,8 +1659,8 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 			/* Don't copy label or cred */
 			outaddr = &tmsqk_c;
 			outsize = sizeof(tmsqk_c);
-		} else
-#endif
+		}
+#else
 		{
 			/* Don't leak kernel pointers */
 			tmsqk.u.__msg_first = NULL;
@@ -1586,6 +1675,7 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 			outaddr = &tmsqk;
 			outsize = sizeof(tmsqk);
 		}
+#endif
 		error = SYSCTL_OUT(req, outaddr, outsize);
 		if (error != 0)
 			break;
@@ -1937,6 +2027,153 @@ freebsd32_msgrcv(struct thread *td, struct freebsd32_msgrcv_args *uap)
 }
 #endif
 
+#ifdef COMPAT_FREEBSD64
+int
+freebsd64_msgsys(struct thread *td, struct freebsd64_msgsys_args *uap)
+{
+
+#ifdef COMPAT_FREEBSD7
+	AUDIT_ARG_SVIPC_WHICH(uap->which);
+	switch (uap->which) {
+	case 0:
+		return (freebsd7_freebsd64_msgctl(td,
+		    (struct freebsd7_freebsd64_msgctl_args *)&uap->a2));
+	case 2:
+		return (freebsd64_msgsnd(td,
+		    (struct freebsd64_msgsnd_args *)&uap->a2));
+	case 3:
+		return (freebsd64_msgrcv(td,
+		    (struct freebsd64_msgrcv_args *)&uap->a2));
+	default:
+		return (sys_msgsys(td, (struct msgsys_args *)uap));
+	}
+#else
+	return (nosys(td, (struct nosys_args *)uap));
+#endif
+}
+
+#if defined(COMPAT_FREEBSD7)
+int
+freebsd7_freebsd64_msgctl(struct thread *td,
+    struct freebsd7_freebsd64_msgctl_args *uap)
+{
+	struct msqid_ds msqbuf;
+	struct msqid_ds_old64 msqbuf64;
+	int error;
+
+	if (uap->cmd == IPC_SET) {
+		error = copyin(__USER_CAP_OBJ(uap->buf), &msqbuf64,
+		    sizeof(msqbuf64));
+		if (error)
+			return (error);
+		ipcperm_old2new(&msqbuf64.msg_perm, &msqbuf.msg_perm);
+		msqbuf.__msg_first = NULL;	/* Unused */
+		msqbuf.__msg_last = NULL;	/* Unused */
+		CP(msqbuf64, msqbuf, msg_cbytes);
+		CP(msqbuf64, msqbuf, msg_qnum);
+		CP(msqbuf64, msqbuf, msg_qbytes);
+		CP(msqbuf64, msqbuf, msg_lspid);
+		CP(msqbuf64, msqbuf, msg_lrpid);
+		CP(msqbuf64, msqbuf, msg_stime);
+		CP(msqbuf64, msqbuf, msg_rtime);
+		CP(msqbuf64, msqbuf, msg_ctime);
+	}
+	error = kern_msgctl(td, uap->msqid, uap->cmd, &msqbuf);
+	if (error)
+		return (error);
+	if (uap->cmd == IPC_STAT) {
+		bzero(&msqbuf64, sizeof(msqbuf64));
+		ipcperm_new2old(&msqbuf.msg_perm, &msqbuf64.msg_perm);
+		/* Don't leak kernel points in __msg_* */
+		CP(msqbuf, msqbuf64, msg_cbytes);
+		CP(msqbuf, msqbuf64, msg_qnum);
+		CP(msqbuf, msqbuf64, msg_qbytes);
+		CP(msqbuf, msqbuf64, msg_lspid);
+		CP(msqbuf, msqbuf64, msg_lrpid);
+		CP(msqbuf, msqbuf64, msg_stime);
+		CP(msqbuf, msqbuf64, msg_rtime);
+		CP(msqbuf, msqbuf64, msg_ctime);
+		error = copyout(&msqbuf64, __USER_CAP_OBJ(uap->buf),
+		    sizeof(struct msqid_ds64));
+	}
+	return (error);
+}
+#endif
+
+int
+freebsd64_msgctl(struct thread *td, struct freebsd64_msgctl_args *uap)
+{
+	struct msqid_ds msqbuf;
+	struct msqid_ds64 msqbuf64;
+	int error;
+
+	if (uap->cmd == IPC_SET) {
+		error = copyin(__USER_CAP_OBJ(uap->buf), &msqbuf64,
+		    sizeof(msqbuf64));
+		if (error)
+			return (error);
+		CP(msqbuf64, msqbuf, msg_perm);
+		msqbuf.__msg_first = NULL;	/* Unused */
+		msqbuf.__msg_last = NULL;	/* Unused */
+		CP(msqbuf64, msqbuf, msg_cbytes);
+		CP(msqbuf64, msqbuf, msg_qnum);
+		CP(msqbuf64, msqbuf, msg_qbytes);
+		CP(msqbuf64, msqbuf, msg_lspid);
+		CP(msqbuf64, msqbuf, msg_lrpid);
+		CP(msqbuf64, msqbuf, msg_stime);
+		CP(msqbuf64, msqbuf, msg_rtime);
+		CP(msqbuf64, msqbuf, msg_ctime);
+	}
+	error = kern_msgctl(td, uap->msqid, uap->cmd, &msqbuf);
+	if (error)
+		return (error);
+	if (uap->cmd == IPC_STAT) {
+		bzero(&msqbuf64, sizeof(msqbuf64));
+		/* Don't leak kernel points in __msg_* */
+		CP(msqbuf, msqbuf64, msg_perm);
+		CP(msqbuf, msqbuf64, msg_cbytes);
+		CP(msqbuf, msqbuf64, msg_qnum);
+		CP(msqbuf, msqbuf64, msg_qbytes);
+		CP(msqbuf, msqbuf64, msg_lspid);
+		CP(msqbuf, msqbuf64, msg_lrpid);
+		CP(msqbuf, msqbuf64, msg_stime);
+		CP(msqbuf, msqbuf64, msg_rtime);
+		CP(msqbuf, msqbuf64, msg_ctime);
+		error = copyout(&msqbuf64, __USER_CAP_OBJ(uap->buf),
+		    sizeof(struct msqid_ds64));
+	}
+	return (error);
+}
+
+int
+freebsd64_msgsnd(struct thread *td, struct freebsd64_msgsnd_args *uap)
+{
+	long mtype;
+	int error;
+
+	if ((error = copyin(__USER_CAP(uap->msgp, sizeof(mtype)),
+	    &mtype, sizeof(mtype))) != 0)
+		return (error);
+	return (kern_msgsnd(td, uap->msqid,
+	    (const char * __capability)__USER_CAP(uap->msgp, uap->msgsz) +
+	    sizeof(mtype), uap->msgsz, uap->msgflg, mtype));
+}
+
+int
+freebsd64_msgrcv(struct thread *td, struct freebsd64_msgrcv_args *uap)
+{
+	long mtype;
+	int error;
+
+	if ((error = kern_msgrcv(td, uap->msqid,
+	    (char * __capability)__USER_CAP(uap->msgp, uap->msgsz) +
+	    sizeof(mtype), uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
+		return (error);
+	return (copyout(&mtype, __USER_CAP(uap->msgp, sizeof(mtype)),
+	    sizeof(mtype)));
+}
+#endif /* COMPAT_FREEBSD64 */
+
 #ifdef COMPAT_CHERIABI
 int
 cheriabi_msgctl(struct thread *td, struct cheriabi_msgctl_args *uap)
@@ -2074,7 +2311,8 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 	DPRINTF(("call to freebsd7_msgctl(%d, %d, %p)\n", uap->msqid, uap->cmd,
 	    uap->buf));
 	if (uap->cmd == IPC_SET) {
-		error = copyin(uap->buf, &msqold, sizeof(msqold));
+		error = copyin(__USER_CAP_OBJ(uap->buf), &msqold,
+		    sizeof(msqold));
 		if (error)
 			return (error);
 		ipcperm_old2new(&msqold.msg_perm, &msqbuf.msg_perm);
@@ -2105,7 +2343,8 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 		CP(msqbuf, msqold, msg_stime);
 		CP(msqbuf, msqold, msg_rtime);
 		CP(msqbuf, msqold, msg_ctime);
-		error = copyout(&msqold, uap->buf, sizeof(struct msqid_ds_old));
+		error = copyout(&msqold, __USER_CAP_OBJ(uap->buf),
+		    sizeof(struct msqid_ds_old));
 	}
 	return (error);
 }

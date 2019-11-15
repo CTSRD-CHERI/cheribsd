@@ -92,6 +92,8 @@ fsl_pcib_rc_probe(device_t dev)
 	if (pci_get_subclass(dev) != PCIS_PROCESSOR_POWERPC)
 		return (ENXIO);
 
+	device_set_desc(dev, "MPC85xx Root Complex bridge");
+
 	return (BUS_PROBE_DEFAULT);
 }
 
@@ -103,4 +105,5 @@ static device_method_t fsl_pcib_rc_methods[] = {
 static devclass_t fsl_pcib_rc_devclass;
 DEFINE_CLASS_1(pcib, fsl_pcib_rc_driver, fsl_pcib_rc_methods,
     sizeof(struct fsl_pcib_softc), ofw_pcib_pci_driver);
-DRIVER_MODULE(rcpcib, pci, fsl_pcib_rc_driver, fsl_pcib_rc_devclass, 0, 0);
+EARLY_DRIVER_MODULE(rcpcib, pci, fsl_pcib_rc_driver, fsl_pcib_rc_devclass, 0, 0,
+    BUS_PASS_BUS);

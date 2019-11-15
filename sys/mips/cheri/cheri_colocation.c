@@ -333,9 +333,7 @@ int
 sys_cosetup(struct thread *td, struct cosetup_args *uap)
 {
 
-	return (kern_cosetup(td, uap->what,
-	    __USER_CAP(uap->code, sizeof(void * __capability)),
-	    __USER_CAP(uap->data, sizeof(void * __capability))));
+	return (kern_cosetup(td, uap->what, uap->code, uap->data));
 }
 
 int
@@ -399,8 +397,7 @@ int
 sys_coregister(struct thread *td, struct coregister_args *uap)
 {
 
-	return (kern_coregister(td, __USER_CAP_STR(uap->name),
-	    __USER_CAP(uap->cap, sizeof(void * __capability))));
+	return (kern_coregister(td, uap->name, uap->cap));
 }
 
 int
@@ -467,8 +464,7 @@ int
 sys_colookup(struct thread *td, struct colookup_args *uap)
 {
 
-	return (kern_colookup(td, __USER_CAP_STR(uap->name),
-	    __USER_CAP(uap->cap, sizeof(void * __capability))));
+	return (kern_colookup(td, uap->name, uap->cap));
 }
 
 int
@@ -506,7 +502,7 @@ int
 sys_cogetpid(struct thread *td, struct cogetpid_args *uap)
 {
 
-	return (kern_cogetpid(td, __USER_CAP(uap->pidp, sizeof(pid_t))));
+	return (kern_cogetpid(td, uap->pidp));
 }
 
 int

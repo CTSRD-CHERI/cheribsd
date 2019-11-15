@@ -31,6 +31,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/ktr.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/pioctl.h>
@@ -82,6 +83,26 @@ void unhandled_exception(struct trapframe *);
 static void print_registers(struct trapframe *frame);
 
 int (*dtrace_invop_jump_addr)(struct trapframe *);
+
+typedef void (abort_handler)(struct thread *, struct trapframe *, uint64_t,
+    uint64_t, int);
+
+static abort_handler align_abort;
+static abort_handler data_abort;
+
+static abort_handler *abort_handlers[] = {
+	[ISS_DATA_DFSC_TF_L0] = data_abort,
+	[ISS_DATA_DFSC_TF_L1] = data_abort,
+	[ISS_DATA_DFSC_TF_L2] = data_abort,
+	[ISS_DATA_DFSC_TF_L3] = data_abort,
+	[ISS_DATA_DFSC_AFF_L1] = data_abort,
+	[ISS_DATA_DFSC_AFF_L2] = data_abort,
+	[ISS_DATA_DFSC_AFF_L3] = data_abort,
+	[ISS_DATA_DFSC_PF_L1] = data_abort,
+	[ISS_DATA_DFSC_PF_L2] = data_abort,
+	[ISS_DATA_DFSC_PF_L3] = data_abort,
+	[ISS_DATA_DFSC_ALIGN] = align_abort,
+};
 
 static __inline void
 call_trapsignal(struct thread *td, int sig, int code, void *addr)
@@ -136,11 +157,10 @@ cpu_fetch_syscall_args(struct thread *td)
 static void
 svc_handler(struct thread *td, struct trapframe *frame)
 {
-	int error;
 
 	if ((frame->tf_esr & ESR_ELx_ISS_MASK) == 0) {
-		error = syscallenter(td);
-		syscallret(td, error);
+		syscallenter(td);
+		syscallret(td);
 	} else {
 		call_trapsignal(td, SIGILL, ILL_ILLOPN, (void *)frame->tf_elr);
 		userret(td, frame);
@@ -148,14 +168,24 @@ svc_handler(struct thread *td, struct trapframe *frame)
 }
 
 static void
+align_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
+    uint64_t far, int lower)
+{
+	if (!lower)
+		panic("Misaligned access from kernel space!");
+
+	call_trapsignal(td, SIGBUS, BUS_ADRALN, (void *)frame->tf_elr);
+	userret(td, frame);
+}
+
+static void
 data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
-    uint64_t far, int lower, int exec)
+    uint64_t far, int lower)
 {
 	struct vm_map *map;
 	struct proc *p;
 	struct pcb *pcb;
 	vm_prot_t ftype;
-	vm_offset_t va;
 	int error, sig, ucode;
 #ifdef KDB
 	bool handled;
@@ -180,6 +210,8 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	if (lower)
 		map = &p->p_vmspace->vm_map;
 	else {
+		intr_enable();
+
 		/* The top bit tells us which range to use */
 		if (far >= VM_MAXUSER_ADDRESS) {
 			map = kernel_map;
@@ -191,32 +223,16 @@ data_abort(struct thread *td, struct trapframe *frame, uint64_t esr,
 	}
 
 	/*
-	 * The call to pmap_fault can be dangerous when coming from the
-	 * kernel as it may be not be able to lock the pmap to check if
-	 * the address is now valid. Because of this we filter the cases
-	 * when we are not going to see superpage activity.
+	 * Try to handle translation, access flag, and permission faults.
+	 * Translation faults may occur as a result of the required
+	 * break-before-make sequence used when promoting or demoting
+	 * superpages.  Such faults must not occur while holding the pmap lock,
+	 * or pmap_fault() will recurse on that lock.
 	 */
-	if (!lower) {
-		/*
-		 * We may fault in a DMAP region due to a superpage being
-		 * unmapped when the access took place.
-		 */
-		if (map == kernel_map && !VIRT_IN_DMAP(far))
-			goto no_pmap_fault;
-		/*
-		 * We can also fault in the userspace handling functions,
-		 * e.g. copyin. In these cases we will have set a fault
-		 * handler so we can check if this is set before calling
-		 * pmap_fault.
-		 */
-		if (map != kernel_map && pcb->pcb_onfault == 0)
-			goto no_pmap_fault;
-	}
-
-	if (pmap_fault(map->pmap, esr, far) == KERN_SUCCESS)
+	if ((lower || map == kernel_map || pcb->pcb_onfault != 0) &&
+	    pmap_fault(map->pmap, esr, far) == KERN_SUCCESS)
 		return;
 
-no_pmap_fault:
 	KASSERT(td->td_md.md_spinlock_count == 0,
 	    ("data abort with spinlock held"));
 	if (td->td_critnest != 0 || WITNESS_CHECK(WARN_SLEEPOK |
@@ -227,20 +243,21 @@ no_pmap_fault:
 		panic("data abort in critical section or under mutex");
 	}
 
-	va = trunc_page(far);
-	ftype = ((esr >> 6) & 1) ? VM_PROT_READ | VM_PROT_WRITE : VM_PROT_READ;
-	if (exec)
-		ftype |= VM_PROT_EXECUTE;
+	switch (ESR_ELx_EXCEPTION(esr)) {
+	case EXCP_INSN_ABORT:
+	case EXCP_INSN_ABORT_L:
+		ftype = VM_PROT_EXECUTE;
+		break;
+	default:
+		ftype = (esr & ISS_DATA_WnR) == 0 ? VM_PROT_READ :
+		    VM_PROT_READ | VM_PROT_WRITE;
+		break;
+	}
 
 	/* Fault in the page. */
-	error = vm_fault(map, va, ftype, VM_FAULT_NORMAL);
+	error = vm_fault_trap(map, far, ftype, VM_FAULT_NORMAL, &sig, &ucode);
 	if (error != KERN_SUCCESS) {
 		if (lower) {
-			sig = SIGSEGV;
-			if (error == KERN_PROTECTION_FAILURE)
-				ucode = SEGV_ACCERR;
-			else
-				ucode = SEGV_MAPERR;
 			call_trapsignal(td, sig, ucode, (void *)far);
 		} else {
 			if (td->td_intr_nesting_level == 0 &&
@@ -294,6 +311,7 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	struct trapframe *oframe;
 	uint32_t exception;
 	uint64_t esr, far;
+	int dfsc;
 
 	/* Read the esr register to get the exception details */
 	esr = frame->tf_esr;
@@ -337,9 +355,14 @@ do_el1h_sync(struct thread *td, struct trapframe *frame)
 	case EXCP_INSN_ABORT:
 	case EXCP_DATA_ABORT:
 		far = READ_SPECIALREG(far_el1);
-		intr_enable();
-		data_abort(td, frame, esr, far, 0,
-		    exception == EXCP_INSN_ABORT);
+		dfsc = esr & ISS_DATA_DFSC_MASK;
+		if (dfsc < nitems(abort_handlers) &&
+		    abort_handlers[dfsc] != NULL)
+			abort_handlers[dfsc](td, frame, esr, far, 0);
+		else
+			panic("Unhandled EL1 %s abort: %x",
+			    exception == EXCP_INSN_ABORT ? "instruction" :
+			    "data", dfsc);
 		break;
 	case EXCP_BRK:
 #ifdef KDTRACE_HOOKS
@@ -385,6 +408,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	pcpu_bp_harden bp_harden;
 	uint32_t exception;
 	uint64_t esr, far;
+	int dfsc;
 
 	/* Check we have a sane environment when entering from userland */
 	KASSERT((uintptr_t)get_pcpu() >= VM_MIN_KERNEL_ADDRESS,
@@ -436,8 +460,14 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	case EXCP_INSN_ABORT_L:
 	case EXCP_DATA_ABORT_L:
 	case EXCP_DATA_ABORT:
-		data_abort(td, frame, esr, far, 1,
-		    exception == EXCP_INSN_ABORT_L);
+		dfsc = esr & ISS_DATA_DFSC_MASK;
+		if (dfsc < nitems(abort_handlers) &&
+		    abort_handlers[dfsc] != NULL)
+			abort_handlers[dfsc](td, frame, esr, far, 1);
+		else
+			panic("Unhandled EL0 %s abort: %x",
+			    exception == EXCP_INSN_ABORT_L ? "instruction" :
+			    "data", dfsc);
 		break;
 	case EXCP_UNKNOWN:
 		if (!undef_insn(0, frame))
@@ -452,6 +482,7 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 		call_trapsignal(td, SIGBUS, BUS_ADRALN, (void *)frame->tf_elr);
 		userret(td, frame);
 		break;
+	case EXCP_BRKPT_EL0:
 	case EXCP_BRK:
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, (void *)frame->tf_elr);
 		userret(td, frame);
@@ -463,8 +494,8 @@ do_el0_sync(struct thread *td, struct trapframe *frame)
 	case EXCP_SOFTSTP_EL0:
 		td->td_frame->tf_spsr &= ~PSR_SS;
 		td->td_pcb->pcb_flags &= ~PCB_SINGLE_STEP;
-		WRITE_SPECIALREG(MDSCR_EL1,
-		    READ_SPECIALREG(MDSCR_EL1) & ~DBG_MDSCR_SS);
+		WRITE_SPECIALREG(mdscr_el1,
+		    READ_SPECIALREG(mdscr_el1) & ~DBG_MDSCR_SS);
 		call_trapsignal(td, SIGTRAP, TRAP_TRACE,
 		    (void *)frame->tf_elr);
 		userret(td, frame);

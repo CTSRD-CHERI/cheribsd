@@ -321,6 +321,14 @@
 			};
 		};
 
+		ptp-timer@8b95000 {
+			compatible = "fsl,dpaa2-ptp";
+			reg = <0x0 0x8b95000 0x0 0x100>;
+			clocks = <&clockgen 4 1>;
+			little-endian;
+			fsl,extts-fifo;
+		};
+
 		fsl_mc: fsl-mc@80c000000 {
 			compatible = "fsl,qoriq-mc";
 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
@@ -627,6 +635,7 @@
 			device_type = "pci";
 			dma-coherent;
 			num-lanes = <4>;
+			num-viewport = <6>;
 			bus-range = <0x0 0xff>;
 			msi-parent = <&its>;
 			#interrupt-cells = <1>;
@@ -648,6 +657,7 @@
 			device_type = "pci";
 			dma-coherent;
 			num-lanes = <4>;
+			num-viewport = <6>;
 			bus-range = <0x0 0xff>;
 			msi-parent = <&its>;
 			#interrupt-cells = <1>;
@@ -669,6 +679,7 @@
 			device_type = "pci";
 			dma-coherent;
 			num-lanes = <8>;
+			num-viewport = <256>;
 			bus-range = <0x0 0xff>;
 			msi-parent = <&its>;
 			#interrupt-cells = <1>;
@@ -690,6 +701,7 @@
 			device_type = "pci";
 			dma-coherent;
 			num-lanes = <4>;
+			num-viewport = <6>;
 			bus-range = <0x0 0xff>;
 			msi-parent = <&its>;
 			#interrupt-cells = <1>;
@@ -727,6 +739,7 @@
 			dr_mode = "host";
 			snps,quirk-frame-length-adjustment = <0x20>;
 			snps,dis_rxdet_inp3_quirk;
+			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
 		};
 
 		usb1: usb3@3110000 {
@@ -737,6 +750,7 @@
 			dr_mode = "host";
 			snps,quirk-frame-length-adjustment = <0x20>;
 			snps,dis_rxdet_inp3_quirk;
+			snps,incr-burst-type-adjustment = <1>, <4>, <8>, <16>;
 		};
 
 		ccn@4000000 {

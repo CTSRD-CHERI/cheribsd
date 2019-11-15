@@ -99,7 +99,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_sendsig	= freebsd64_sendsig,
 	.sv_sigcode	= freebsd64_sigcode,
 	.sv_szsigcode	= &freebsd64_szsigcode,
-	.sv_name	= "FreeBSD ELF64 (compat/freebsd64)",
+	.sv_name	= "FreeBSD ELF64",
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,
@@ -136,10 +136,9 @@ static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 	.machine	= EM_MIPS,
 	.compat_3_brand	= "FreeBSD",
 	.emul_path	= NULL,
-	/* XXX-BD: should probably become ld-elf64.so.1 */
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf_freebsd_freebsd64_sysvec,
-	.interp_newpath = NULL,
+	.interp_newpath = "/libexec/ld-elf64.so.1",
 	.brand_note	= &elf64_freebsd_brandnote,
 #ifdef CPU_CHERI
 	.header_supported = mips_elf_header_supported,
@@ -151,6 +150,8 @@ SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_freebsd64_brand_info);
 
+_Static_assert(sizeof(mcontext64_t) == sizeof(mcontext_t),
+    "mcontext_t and mcontext64_t aren't compatiable");
 int
 freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 {
@@ -207,10 +208,6 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 		    (int64_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
 		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
-
-	case MIPS_GET_COUNT:
-		td->td_retval[0] = mips_rd_count();
-		return (0);
 
 #ifdef CPU_QEMU_MALTA
 	case QEMU_GET_QTRACE:

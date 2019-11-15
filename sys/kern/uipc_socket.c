@@ -107,6 +107,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_kern_tls.h"
 #include "opt_sctp.h"
 
 #define	EXPLICIT_USER_ACCESS
@@ -125,6 +126,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/hhook.h>
 #include <sys/kernel.h>
 #include <sys/khelp.h>
+#include <sys/ktls.h>
 #include <sys/event.h>
 #include <sys/eventhandler.h>
 #include <sys/poll.h>
@@ -144,6 +146,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/jail.h>
 #include <sys/syslog.h>
 #include <netinet/in.h>
+#include <netinet/tcp.h>
 
 #include <net/vnet.h>
 
@@ -1047,7 +1050,7 @@ sofree(struct socket *so)
 	 *
 	 * We used to do a lot of socket buffer and socket locking here, as
 	 * well as invoke sorflush() and perform wakeups.  The direct call to
-	 * dom_dispose() and sbrelease_internal() are an inlining of what was
+	 * dom_dispose() and sbdestroy() are an inlining of what was
 	 * necessary from sorflush().
 	 *
 	 * Notice that the socket buffer and kqueue state are torn down
@@ -1134,9 +1137,9 @@ drop:
 	so->so_state |= SS_NOFDREF;
 	sorele(so);
 	if (listening) {
-		struct socket *sp;
+		struct socket *sp, *tsp;
 
-		TAILQ_FOREACH(sp, &lqueue, so_list) {
+		TAILQ_FOREACH_SAFE(sp, &lqueue, so_list, tsp) {
 			SOCK_LOCK(sp);
 			if (sp->so_count == 0) {
 				SOCK_UNLOCK(sp);
@@ -1445,7 +1448,15 @@ sosend_generic(struct socket *so, struct sockaddr *addr, struct uio *uio,
 	ssize_t resid;
 	int clen = 0, error, dontroute;
 	int atomic = sosendallatonce(so) || top;
+	int pru_flag;
+#ifdef KERN_TLS
+	struct ktls_session *tls;
+	int tls_enq_cnt, tls_pruflag;
+	uint8_t tls_rtype;
 
+	tls = NULL;
+	tls_rtype = TLS_RLTYPE_APP;
+#endif
 	if (uio != NULL)
 		resid = uio->uio_resid;
 	else
@@ -1476,6 +1487,28 @@ sosend_generic(struct socket *so, struct sockaddr *addr, struct uio *uio,
 	error = sblock(&so->so_snd, SBLOCKWAIT(flags));
 	if (error)
 		goto out;
+
+#ifdef KERN_TLS
+	tls_pruflag = 0;
+	tls = ktls_hold(so->so_snd.sb_tls_info);
+	if (tls != NULL) {
+		if (tls->mode == TCP_TLS_MODE_SW)
+			tls_pruflag = PRUS_NOTREADY;
+
+		if (control != NULL) {
+			struct cmsghdr *cm = mtod(control, struct cmsghdr *);
+
+			if (clen >= sizeof(*cm) &&
+			    cm->cmsg_type == TLS_SET_RECORD_TYPE) {
+				tls_rtype = *((uint8_t *)CMSG_DATA(cm));
+				clen = 0;
+				m_freem(control);
+				control = NULL;
+				atomic = 1;
+			}
+		}
+	}
+#endif
 
 restart:
 	do {
@@ -1554,10 +1587,27 @@ restart:
 				 * is a workaround to prevent protocol send
 				 * methods to panic.
 				 */
-				top = m_uiotombuf(uio, M_WAITOK, space,
-				    (atomic ? max_hdr : 0),
-				    (atomic ? M_PKTHDR : 0) |
-				    ((flags & MSG_EOR) ? M_EOR : 0));
+#ifdef KERN_TLS
+				if (tls != NULL) {
+					top = m_uiotombuf(uio, M_WAITOK, space,
+					    tls->params.max_frame_len,
+					    M_NOMAP |
+					    ((flags & MSG_EOR) ? M_EOR : 0));
+					if (top != NULL) {
+						error = ktls_frame(top, tls,
+						    &tls_enq_cnt, tls_rtype);
+						if (error) {
+							m_freem(top);
+							goto release;
+						}
+					}
+					tls_rtype = TLS_RLTYPE_APP;
+				} else
+#endif
+					top = m_uiotombuf(uio, M_WAITOK, space,
+					    (atomic ? max_hdr : 0),
+					    (atomic ? M_PKTHDR : 0) |
+					    ((flags & MSG_EOR) ? M_EOR : 0));
 				if (top == NULL) {
 					error = EFAULT; /* only possible error */
 					goto release;
@@ -1581,8 +1631,8 @@ restart:
 			 * this.
 			 */
 			VNET_SO_ASSERT(so);
-			error = (*so->so_proto->pr_usrreqs->pru_send)(so,
-			    (flags & MSG_OOB) ? PRUS_OOB :
+
+			pru_flag = (flags & MSG_OOB) ? PRUS_OOB :
 			/*
 			 * If the user set MSG_EOF, the protocol understands
 			 * this flag and nothing left to send then use
@@ -1594,13 +1644,37 @@ restart:
 				PRUS_EOF :
 			/* If there is more to send set PRUS_MORETOCOME. */
 			    (flags & MSG_MORETOCOME) ||
-			    (resid > 0 && space > 0) ? PRUS_MORETOCOME : 0,
-			    top, addr, control, td);
+			    (resid > 0 && space > 0) ? PRUS_MORETOCOME : 0;
+
+#ifdef KERN_TLS
+			pru_flag |= tls_pruflag;
+#endif
+
+			error = (*so->so_proto->pr_usrreqs->pru_send)(so,
+			    pru_flag, top, addr, control, td);
+
 			if (dontroute) {
 				SOCK_LOCK(so);
 				so->so_options &= ~SO_DONTROUTE;
 				SOCK_UNLOCK(so);
 			}
+
+#ifdef KERN_TLS
+			if (tls != NULL && tls->mode == TCP_TLS_MODE_SW) {
+				/*
+				 * Note that error is intentionally
+				 * ignored.
+				 *
+				 * Like sendfile(), we rely on the
+				 * completion routine (pru_ready())
+				 * to free the mbufs in the event that
+				 * pru_send() encountered an error and
+				 * did not append them to the sockbuf.
+				 */
+				soref(so);
+				ktls_enqueue(top, so, tls_enq_cnt);
+			}
+#endif
 			clen = 0;
 			control = NULL;
 			top = NULL;
@@ -1612,6 +1686,10 @@ restart:
 release:
 	sbunlock(&so->so_snd);
 out:
+#ifdef KERN_TLS
+	if (tls != NULL)
+		ktls_free(tls);
+#endif
 	if (top != NULL)
 		m_freem(top);
 	if (control != NULL)
@@ -1985,7 +2063,11 @@ dontblock:
 			SBLASTRECORDCHK(&so->so_rcv);
 			SBLASTMBUFCHK(&so->so_rcv);
 			SOCKBUF_UNLOCK(&so->so_rcv);
-			error = uiomove(mtod(m, char *) + moff, (int)len, uio);
+			if ((m->m_flags & M_NOMAP) != 0)
+				error = m_unmappedtouio(m, moff, uio, (int)len);
+			else
+				error = uiomove(mtod(m, char *) + moff,
+				    (int)len, uio);
 			SOCKBUF_LOCK(&so->so_rcv);
 			if (error) {
 				/*
@@ -2199,7 +2281,7 @@ soreceive_stream(struct socket *so, struct sockaddr **psa, struct uio *uio,
 	/* Prevent other readers from entering the socket. */
 	error = sblock(sb, SBLOCKWAIT(flags));
 	if (error)
-		goto out;
+		return (error);
 	SOCKBUF_LOCK(sb);
 
 	/* Easy one, no space to copyout anything. */
@@ -2780,7 +2862,12 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 			error = sooptcopyin(sopt, &l, sizeof l, sizeof l);
 			if (error)
 				goto bad;
-
+			if (l.l_linger < 0 ||
+			    l.l_linger > USHRT_MAX ||
+			    l.l_linger > (INT_MAX / hz)) {
+				error = EDOM;
+				goto bad;
+			}
 			SOCK_LOCK(so);
 			so->so_linger = l.l_linger;
 			if (l.l_onoff)
@@ -4172,6 +4259,9 @@ so_linger_get(const struct socket *so)
 void
 so_linger_set(struct socket *so, int val)
 {
+
+	KASSERT(val >= 0 && val <= USHRT_MAX && val <= (INT_MAX / hz),
+	    ("%s: val %d out of range", __func__, val));
 
 	so->so_linger = val;
 }

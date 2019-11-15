@@ -31,6 +31,8 @@
 #ifndef	_VIRTIO_H_
 #define	_VIRTIO_H_
 
+#include <machine/atomic.h>
+
 /*
  * These are derived from several virtio specifications.
  *
@@ -390,6 +392,7 @@ struct vqueue_info {
 
 	uint16_t vq_flags;	/* flags (see above) */
 	uint16_t vq_last_avail;	/* a recent value of vq_avail->va_idx */
+	uint16_t vq_next_used;	/* index of the next used slot to be filled */
 	uint16_t vq_save_used;	/* saved vq_used->vu_idx; see vq_endchains */
 	uint16_t vq_msix_idx;	/* MSI-X index, or VIRTIO_MSI_NO_VECTOR */
 
@@ -447,6 +450,26 @@ vq_interrupt(struct virtio_softc *vs, struct vqueue_info *vq)
 	}
 }
 
+static inline void
+vq_kick_enable(struct vqueue_info *vq)
+{
+
+	vq->vq_used->vu_flags &= ~VRING_USED_F_NO_NOTIFY;
+	/*
+	 * Full memory barrier to make sure the store to vu_flags
+	 * happens before the load from va_idx, which results from
+	 * a subsequent call to vq_has_descs().
+	 */
+	atomic_thread_fence_seq_cst();
+}
+
+static inline void
+vq_kick_disable(struct vqueue_info *vq)
+{
+
+	vq->vq_used->vu_flags |= VRING_USED_F_NO_NOTIFY;
+}
+
 struct iovec;
 void	vi_softc_linkup(struct virtio_softc *vs, struct virtio_consts *vc,
 			void *dev_softc, struct pci_devinst *pi,
@@ -457,7 +480,10 @@ void	vi_set_io_bar(struct virtio_softc *, int);
 
 int	vq_getchain(struct vqueue_info *vq, uint16_t *pidx,
 		    struct iovec *iov, int n_iov, uint16_t *flags);
-void	vq_retchain(struct vqueue_info *vq);
+void	vq_retchains(struct vqueue_info *vq, uint16_t n_chains);
+void	vq_relchain_prepare(struct vqueue_info *vq, uint16_t idx,
+			    uint32_t iolen);
+void	vq_relchain_publish(struct vqueue_info *vq);
 void	vq_relchain(struct vqueue_info *vq, uint16_t idx, uint32_t iolen);
 void	vq_endchains(struct vqueue_info *vq, int used_all_avail);
 

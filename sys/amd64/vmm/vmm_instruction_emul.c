@@ -78,6 +78,7 @@ enum {
 	VIE_OP_TYPE_BITTEST,
 	VIE_OP_TYPE_TWOB_GRP15,
 	VIE_OP_TYPE_ADD,
+	VIE_OP_TYPE_TEST,
 	VIE_OP_TYPE_LAST
 };
 
@@ -220,6 +221,12 @@ static const struct vie_op one_byte_opcodes[256] = {
 		/* XXX Group 1A extended opcode - not just POP */
 		.op_byte = 0x8F,
 		.op_type = VIE_OP_TYPE_POP,
+	},
+	[0xF7] = {
+		/* XXX Group 3 extended opcode - not just TEST */
+		.op_byte = 0xF7,
+		.op_type = VIE_OP_TYPE_TEST,
+		.op_flags = VIE_OP_F_IMM,
 	},
 	[0xFF] = {
 		/* XXX Group 5 extended opcode - not just PUSH */
@@ -448,6 +455,41 @@ getaddflags(int opsize, uint64_t x, uint64_t y)
 		return (getaddflags32(x, y));
 	else
 		return (getaddflags64(x, y));
+}
+
+/*
+ * Return the status flags that would result from doing (x & y).
+ */
+#define	GETANDFLAGS(sz)							\
+static u_long								\
+getandflags##sz(uint##sz##_t x, uint##sz##_t y)				\
+{									\
+	u_long rflags;							\
+									\
+	__asm __volatile("and %2,%1; pushfq; popq %0" :			\
+	    "=r" (rflags), "+r" (x) : "m" (y));				\
+	return (rflags);						\
+} struct __hack
+
+GETANDFLAGS(8);
+GETANDFLAGS(16);
+GETANDFLAGS(32);
+GETANDFLAGS(64);
+
+static u_long
+getandflags(int opsize, uint64_t x, uint64_t y)
+{
+	KASSERT(opsize == 1 || opsize == 2 || opsize == 4 || opsize == 8,
+	    ("getandflags: invalid operand size %d", opsize));
+
+	if (opsize == 1)
+		return (getandflags8(x, y));
+	else if (opsize == 2)
+		return (getandflags16(x, y));
+	else if (opsize == 4)
+		return (getandflags32(x, y));
+	else
+		return (getandflags64(x, y));
 }
 
 static int
@@ -714,7 +756,7 @@ emulate_movs(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
 #ifdef _KERNEL
 	struct vm_copyinfo copyinfo[2];
 #else
-	kiovec_t copyinfo[2];
+	struct iovec copyinfo[2];
 #endif
 	uint64_t dstaddr, srcaddr, dstgpa, srcgpa, val;
 	uint64_t rcx, rdi, rsi, rflags;
@@ -1219,6 +1261,55 @@ emulate_cmp(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
 }
 
 static int
+emulate_test(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
+    mem_region_read_t memread, mem_region_write_t memwrite, void *arg)
+{
+	int error, size;
+	uint64_t op1, rflags, rflags2;
+
+	size = vie->opsize;
+	error = EINVAL;
+
+	switch (vie->op.op_byte) {
+	case 0xF7:
+		/*
+		 * F7 /0		test r/m16, imm16
+		 * F7 /0		test r/m32, imm32
+		 * REX.W + F7 /0	test r/m64, imm32 sign-extended to 64
+		 *
+		 * Test mem (ModRM:r/m) with immediate and set status
+		 * flags according to the results.  The comparison is
+		 * performed by anding the immediate from the first
+		 * operand and then setting the status flags.
+		 */
+		if ((vie->reg & 7) != 0)
+			return (EINVAL);
+
+		error = memread(vm, vcpuid, gpa, &op1, size, arg);
+		if (error)
+			return (error);
+
+		rflags2 = getandflags(size, op1, vie->immediate);
+		break;
+	default:
+		return (EINVAL);
+	}
+	error = vie_read_register(vm, vcpuid, VM_REG_GUEST_RFLAGS, &rflags);
+	if (error)
+		return (error);
+
+	/*
+	 * OF and CF are cleared; the SF, ZF and PF flags are set according
+	 * to the result; AF is undefined.
+	 */
+	rflags &= ~RFLAGS_STATUS_BITS;
+	rflags |= rflags2 & (PSL_PF | PSL_Z | PSL_N);
+
+	error = vie_update_register(vm, vcpuid, VM_REG_GUEST_RFLAGS, rflags, 8);
+	return (error);
+}
+
+static int
 emulate_add(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
 	    mem_region_read_t memread, mem_region_write_t memwrite, void *arg)
 {
@@ -1338,7 +1429,7 @@ emulate_stack_op(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie,
 #ifdef _KERNEL
 	struct vm_copyinfo copyinfo[2];
 #else
-	kiovec_t copyinfo[2];
+	struct iovec copyinfo[2];
 #endif
 	struct seg_desc ss_desc;
 	uint64_t cr0, rflags, rsp, stack_gla, val;
@@ -1642,6 +1733,10 @@ vmm_emulate_instruction(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
 	case VIE_OP_TYPE_ADD:
 		error = emulate_add(vm, vcpuid, gpa, vie, memread,
 		    memwrite, memarg);
+		break;
+	case VIE_OP_TYPE_TEST:
+		error = emulate_test(vm, vcpuid, gpa, vie,
+		    memread, memwrite, memarg);
 		break;
 	default:
 		error = EINVAL;
@@ -2644,12 +2739,3 @@ vmm_decode_instruction(struct vm *vm, int cpuid, uint64_t gla,
 	return (0);
 }
 #endif	/* _KERNEL */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "kiovec_t"
-//   ]
-// }
-// CHERI CHANGES END

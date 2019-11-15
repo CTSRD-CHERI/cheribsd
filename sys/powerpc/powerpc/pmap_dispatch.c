@@ -75,9 +75,9 @@ struct pmap kernel_pmap_store;
 vm_offset_t    msgbuf_phys;
 
 vm_offset_t kernel_vm_end;
-vm_paddr_t phys_avail[PHYS_AVAIL_SZ];
 vm_offset_t virtual_avail;
 vm_offset_t virtual_end;
+caddr_t crashdumpmap;
 
 int pmap_bootstrapped;
 
@@ -145,7 +145,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t p, vm_prot_t prot,
     u_int flags, int8_t psind)
 {
 
-	CTR6(KTR_PMAP, "pmap_enter(%p, %#x, %p, %#x, %x, %d)", pmap, va,
+	CTR6(KTR_PMAP, "pmap_enter(%p, %#x, %p, %#x, %#x, %d)", pmap, va,
 	    p, prot, flags, psind);
 	return (MMU_ENTER(mmu_obj, pmap, va, p, prot, flags, psind));
 }
@@ -382,11 +382,11 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
 }
 
 int
-pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *locked_pa)
+pmap_mincore(pmap_t pmap, vm_offset_t addr, vm_paddr_t *pap)
 {
 
 	CTR3(KTR_PMAP, "%s(%p, %#x)", __func__, pmap, addr);
-	return (MMU_MINCORE(mmu_obj, pmap, addr, locked_pa));
+	return (MMU_MINCORE(mmu_obj, pmap, addr, pap));
 }
 
 void
@@ -568,6 +568,27 @@ dumpsys_pa_init(void)
 	return (MMU_SCAN_INIT(mmu_obj));
 }
 
+size_t
+dumpsys_scan_pmap(void)
+{
+	CTR1(KTR_PMAP, "%s()", __func__);
+	return (MMU_SCAN_PMAP(mmu_obj));
+}
+
+void *
+dumpsys_dump_pmap_init(unsigned blkpgs)
+{
+	CTR1(KTR_PMAP, "%s()", __func__);
+	return (MMU_DUMP_PMAP_INIT(mmu_obj, blkpgs));
+}
+
+void *
+dumpsys_dump_pmap(void *ctx, void *buf, u_long *nbytes)
+{
+	CTR1(KTR_PMAP, "%s()", __func__);
+	return (MMU_DUMP_PMAP(mmu_obj, ctx, buf, nbytes));
+}
+
 vm_offset_t
 pmap_quick_enter_page(vm_page_t m)
 {
@@ -617,6 +638,12 @@ pmap_mmu_install(char *name, int prio)
 	}
 
 	return (FALSE);
+}
+
+const char *
+pmap_mmu_name(void)
+{
+	return (mmu_obj->ops->cls->name);
 }
 
 int unmapped_buf_allowed;

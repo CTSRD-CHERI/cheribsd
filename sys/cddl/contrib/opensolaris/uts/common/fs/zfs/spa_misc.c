@@ -85,7 +85,7 @@
  *	definition they must have an existing reference, and will never need
  *	to lookup a spa_t by name.
  *
- * spa_refcount (per-spa refcount_t protected by mutex)
+ * spa_refcount (per-spa zfs_refcount_t protected by mutex)
  *
  *	This reference count keep track of any active users of the spa_t.  The
  *	spa_t cannot be destroyed or freed while this is non-zero.  Internally,
@@ -229,9 +229,6 @@
  * vdev state is protected by spa_vdev_state_enter() / spa_vdev_state_exit().
  * Like spa_vdev_enter/exit, these are convenience wrappers -- the actual
  * locking is, always, based on spa_namespace_lock and spa_config_lock[].
- *
- * spa_rename() is also implemented within this file since it requires
- * manipulation of the namespace.
  */
 
 static avl_tree_t spa_namespace_avl;
@@ -363,13 +360,13 @@ SYSCTL_PROC(_vfs_zfs, OID_AUTO, debugflags,
     CTLTYPE_UINT | CTLFLAG_MPSAFE | CTLFLAG_RWTUN, 0, sizeof(int),
     sysctl_vfs_zfs_debug_flags, "IU", "Debug flags for ZFS testing.");
 
-SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, deadman_synctime_ms, CTLFLAG_RDTUN,
+SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, deadman_synctime_ms, CTLFLAG_RWTUN,
     &zfs_deadman_synctime_ms, 0,
     "Stalled ZFS I/O expiration time in milliseconds");
-SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, deadman_checktime_ms, CTLFLAG_RDTUN,
+SYSCTL_UQUAD(_vfs_zfs, OID_AUTO, deadman_checktime_ms, CTLFLAG_RWTUN,
     &zfs_deadman_checktime_ms, 0,
     "Period of checks for stalled ZFS I/O in milliseconds");
-SYSCTL_INT(_vfs_zfs, OID_AUTO, deadman_enabled, CTLFLAG_RDTUN,
+SYSCTL_INT(_vfs_zfs, OID_AUTO, deadman_enabled, CTLFLAG_RWTUN,
     &zfs_deadman_enabled, 0, "Kernel panic on stalled ZFS I/O");
 SYSCTL_INT(_vfs_zfs, OID_AUTO, spa_asize_inflation, CTLFLAG_RWTUN,
     &spa_asize_inflation, 0, "Worst case inflation factor for single sector writes");
@@ -483,7 +480,7 @@ spa_config_lock_init(spa_t *spa)
 		spa_config_lock_t *scl = &spa->spa_config_lock[i];
 		mutex_init(&scl->scl_lock, NULL, MUTEX_DEFAULT, NULL);
 		cv_init(&scl->scl_cv, NULL, CV_DEFAULT, NULL);
-		refcount_create_untracked(&scl->scl_count);
+		zfs_refcount_create_untracked(&scl->scl_count);
 		scl->scl_writer = NULL;
 		scl->scl_write_wanted = 0;
 	}
@@ -496,7 +493,7 @@ spa_config_lock_destroy(spa_t *spa)
 		spa_config_lock_t *scl = &spa->spa_config_lock[i];
 		mutex_destroy(&scl->scl_lock);
 		cv_destroy(&scl->scl_cv);
-		refcount_destroy(&scl->scl_count);
+		zfs_refcount_destroy(&scl->scl_count);
 		ASSERT(scl->scl_writer == NULL);
 		ASSERT(scl->scl_write_wanted == 0);
 	}
@@ -519,7 +516,7 @@ spa_config_tryenter(spa_t *spa, int locks, void *tag, krw_t rw)
 			}
 		} else {
 			ASSERT(scl->scl_writer != curthread);
-			if (!refcount_is_zero(&scl->scl_count)) {
+			if (!zfs_refcount_is_zero(&scl->scl_count)) {
 				mutex_exit(&scl->scl_lock);
 				spa_config_exit(spa, locks & ((1 << i) - 1),
 				    tag);
@@ -527,7 +524,7 @@ spa_config_tryenter(spa_t *spa, int locks, void *tag, krw_t rw)
 			}
 			scl->scl_writer = curthread;
 		}
-		(void) refcount_add(&scl->scl_count, tag);
+		(void) zfs_refcount_add(&scl->scl_count, tag);
 		mutex_exit(&scl->scl_lock);
 	}
 	return (1);
@@ -553,14 +550,14 @@ spa_config_enter(spa_t *spa, int locks, void *tag, krw_t rw)
 			}
 		} else {
 			ASSERT(scl->scl_writer != curthread);
-			while (!refcount_is_zero(&scl->scl_count)) {
+			while (!zfs_refcount_is_zero(&scl->scl_count)) {
 				scl->scl_write_wanted++;
 				cv_wait(&scl->scl_cv, &scl->scl_lock);
 				scl->scl_write_wanted--;
 			}
 			scl->scl_writer = curthread;
 		}
-		(void) refcount_add(&scl->scl_count, tag);
+		(void) zfs_refcount_add(&scl->scl_count, tag);
 		mutex_exit(&scl->scl_lock);
 	}
 	ASSERT3U(wlocks_held, <=, locks);
@@ -574,8 +571,8 @@ spa_config_exit(spa_t *spa, int locks, void *tag)
 		if (!(locks & (1 << i)))
 			continue;
 		mutex_enter(&scl->scl_lock);
-		ASSERT(!refcount_is_zero(&scl->scl_count));
-		if (refcount_remove(&scl->scl_count, tag) == 0) {
+		ASSERT(!zfs_refcount_is_zero(&scl->scl_count));
+		if (zfs_refcount_remove(&scl->scl_count, tag) == 0) {
 			ASSERT(scl->scl_writer == NULL ||
 			    scl->scl_writer == curthread);
 			scl->scl_writer = NULL;	/* OK in either case */
@@ -594,7 +591,8 @@ spa_config_held(spa_t *spa, int locks, krw_t rw)
 		spa_config_lock_t *scl = &spa->spa_config_lock[i];
 		if (!(locks & (1 << i)))
 			continue;
-		if ((rw == RW_READER && !refcount_is_zero(&scl->scl_count)) ||
+		if ((rw == RW_READER &&
+		    !zfs_refcount_is_zero(&scl->scl_count)) ||
 		    (rw == RW_WRITER && scl->scl_writer == curthread))
 			locks_held |= 1 << i;
 	}
@@ -773,7 +771,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	    spa_deadman_timeout, spa, 0);
 #endif
 #endif
-	refcount_create(&spa->spa_refcount);
+	zfs_refcount_create(&spa->spa_refcount);
 	spa_config_lock_init(spa);
 
 	avl_add(&spa_namespace_avl, spa);
@@ -854,7 +852,7 @@ spa_remove(spa_t *spa)
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 	ASSERT(spa->spa_state == POOL_STATE_UNINITIALIZED);
-	ASSERT3U(refcount_count(&spa->spa_refcount), ==, 0);
+	ASSERT3U(zfs_refcount_count(&spa->spa_refcount), ==, 0);
 
 	nvlist_free(spa->spa_config_splitting);
 
@@ -902,7 +900,7 @@ spa_remove(spa_t *spa)
 #endif
 #endif
 
-	refcount_destroy(&spa->spa_refcount);
+	zfs_refcount_destroy(&spa->spa_refcount);
 
 	spa_config_lock_destroy(spa);
 
@@ -961,9 +959,9 @@ spa_next(spa_t *prev)
 void
 spa_open_ref(spa_t *spa, void *tag)
 {
-	ASSERT(refcount_count(&spa->spa_refcount) >= spa->spa_minref ||
+	ASSERT(zfs_refcount_count(&spa->spa_refcount) >= spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
-	(void) refcount_add(&spa->spa_refcount, tag);
+	(void) zfs_refcount_add(&spa->spa_refcount, tag);
 }
 
 /*
@@ -973,9 +971,9 @@ spa_open_ref(spa_t *spa, void *tag)
 void
 spa_close(spa_t *spa, void *tag)
 {
-	ASSERT(refcount_count(&spa->spa_refcount) > spa->spa_minref ||
+	ASSERT(zfs_refcount_count(&spa->spa_refcount) > spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
-	(void) refcount_remove(&spa->spa_refcount, tag);
+	(void) zfs_refcount_remove(&spa->spa_refcount, tag);
 }
 
 /*
@@ -989,7 +987,7 @@ spa_close(spa_t *spa, void *tag)
 void
 spa_async_close(spa_t *spa, void *tag)
 {
-	(void) refcount_remove(&spa->spa_refcount, tag);
+	(void) zfs_refcount_remove(&spa->spa_refcount, tag);
 }
 
 /*
@@ -1002,7 +1000,7 @@ spa_refcount_zero(spa_t *spa)
 {
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
-	return (refcount_count(&spa->spa_refcount) == spa->spa_minref);
+	return (zfs_refcount_count(&spa->spa_refcount) == spa->spa_minref);
 }
 
 /*
@@ -1112,10 +1110,10 @@ spa_aux_activate(vdev_t *vd, avl_tree_t *avl)
 /*
  * Spares are tracked globally due to the following constraints:
  *
- * 	- A spare may be part of multiple pools.
- * 	- A spare may be added to a pool even if it's actively in use within
+ *	- A spare may be part of multiple pools.
+ *	- A spare may be added to a pool even if it's actively in use within
  *	  another pool.
- * 	- A spare in use in any pool can only be the source of a replacement if
+ *	- A spare in use in any pool can only be the source of a replacement if
  *	  the target is a spare in the same pool.
  *
  * We keep track of all spares on the system through the use of a reference
@@ -1450,56 +1448,6 @@ spa_deactivate_mos_feature(spa_t *spa, const char *feature)
 {
 	if (nvlist_remove_all(spa->spa_label_features, feature) == 0)
 		vdev_config_dirty(spa->spa_root_vdev);
-}
-
-/*
- * Rename a spa_t.
- */
-int
-spa_rename(const char *name, const char *newname)
-{
-	spa_t *spa;
-	int err;
-
-	/*
-	 * Lookup the spa_t and grab the config lock for writing.  We need to
-	 * actually open the pool so that we can sync out the necessary labels.
-	 * It's OK to call spa_open() with the namespace lock held because we
-	 * allow recursive calls for other reasons.
-	 */
-	mutex_enter(&spa_namespace_lock);
-	if ((err = spa_open(name, &spa, FTAG)) != 0) {
-		mutex_exit(&spa_namespace_lock);
-		return (err);
-	}
-
-	spa_config_enter(spa, SCL_ALL, FTAG, RW_WRITER);
-
-	avl_remove(&spa_namespace_avl, spa);
-	(void) strlcpy(spa->spa_name, newname, sizeof (spa->spa_name));
-	avl_add(&spa_namespace_avl, spa);
-
-	/*
-	 * Sync all labels to disk with the new names by marking the root vdev
-	 * dirty and waiting for it to sync.  It will pick up the new pool name
-	 * during the sync.
-	 */
-	vdev_config_dirty(spa->spa_root_vdev);
-
-	spa_config_exit(spa, SCL_ALL, FTAG);
-
-	txg_wait_synced(spa->spa_dsl_pool, 0);
-
-	/*
-	 * Sync the updated config cache.
-	 */
-	spa_write_cachefile(spa, B_FALSE, B_TRUE);
-
-	spa_close(spa, FTAG);
-
-	mutex_exit(&spa_namespace_lock);
-
-	return (0);
 }
 
 /*
@@ -1987,6 +1935,12 @@ spa_deadman_synctime(spa_t *spa)
 	return (spa->spa_deadman_synctime);
 }
 
+struct proc *
+spa_proc(spa_t *spa)
+{
+	return (spa->spa_proc);
+}
+
 uint64_t
 dva_get_dsize_sync(spa_t *spa, const dva_t *dva)
 {
@@ -2109,7 +2063,8 @@ spa_init(int mode)
 	}
 #endif
 #endif /* illumos */
-	refcount_sysinit();
+
+	zfs_refcount_init();
 	unique_init();
 	range_tree_init();
 	metaslab_alloc_trace_init();
@@ -2149,7 +2104,7 @@ spa_fini(void)
 	metaslab_alloc_trace_fini();
 	range_tree_fini();
 	unique_fini();
-	refcount_fini();
+	zfs_refcount_fini();
 	scan_fini();
 	
 	avl_destroy(&spa_namespace_avl);
@@ -2307,7 +2262,6 @@ spa_maxdnodesize(spa_t *spa)
 	else
 		return (DNODE_MIN_SIZE);
 }
-
 
 /*
  * Returns the txg that the last device removal completed. No indirect mappings

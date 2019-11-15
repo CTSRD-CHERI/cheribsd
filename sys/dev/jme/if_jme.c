@@ -559,7 +559,7 @@ jme_map_intr_vector(struct jme_softc *sc)
 	bzero(map, sizeof(map));
 
 	/* Map Tx interrupts source to MSI/MSIX vector 2. */
-	map[MSINUM_REG_INDEX(N_INTR_TXQ0_COMP)] |=
+	map[MSINUM_REG_INDEX(N_INTR_TXQ0_COMP)] =
 	    MSINUM_INTR_SOURCE(2, N_INTR_TXQ0_COMP);
 	map[MSINUM_REG_INDEX(N_INTR_TXQ1_COMP)] |=
 	    MSINUM_INTR_SOURCE(2, N_INTR_TXQ1_COMP);
@@ -569,7 +569,7 @@ jme_map_intr_vector(struct jme_softc *sc)
 	    MSINUM_INTR_SOURCE(2, N_INTR_TXQ3_COMP);
 	map[MSINUM_REG_INDEX(N_INTR_TXQ4_COMP)] |=
 	    MSINUM_INTR_SOURCE(2, N_INTR_TXQ4_COMP);
-	map[MSINUM_REG_INDEX(N_INTR_TXQ4_COMP)] |=
+	map[MSINUM_REG_INDEX(N_INTR_TXQ5_COMP)] |=
 	    MSINUM_INTR_SOURCE(2, N_INTR_TXQ5_COMP);
 	map[MSINUM_REG_INDEX(N_INTR_TXQ6_COMP)] |=
 	    MSINUM_INTR_SOURCE(2, N_INTR_TXQ6_COMP);
@@ -581,37 +581,37 @@ jme_map_intr_vector(struct jme_softc *sc)
 	    MSINUM_INTR_SOURCE(2, N_INTR_TXQ_COAL_TO);
 
 	/* Map Rx interrupts source to MSI/MSIX vector 1. */
-	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COMP)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COMP)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ0_COMP);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COMP)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COMP)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ1_COMP);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COMP)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COMP)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ2_COMP);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COMP)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COMP)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ3_COMP);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ0_DESC_EMPTY)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ0_DESC_EMPTY)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ0_DESC_EMPTY);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ1_DESC_EMPTY)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ1_DESC_EMPTY)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ1_DESC_EMPTY);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ2_DESC_EMPTY)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ2_DESC_EMPTY)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ2_DESC_EMPTY);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ3_DESC_EMPTY)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ3_DESC_EMPTY)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ3_DESC_EMPTY);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COAL)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COAL)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ0_COAL);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COAL)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COAL)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ1_COAL);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COAL)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COAL)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ2_COAL);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COAL)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COAL)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ3_COAL);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COAL_TO)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ0_COAL_TO)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ0_COAL_TO);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COAL_TO)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ1_COAL_TO)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ1_COAL_TO);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COAL_TO)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ2_COAL_TO)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ2_COAL_TO);
-	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COAL_TO)] |=
+	map[MSINUM_REG_INDEX(N_INTR_RXQ3_COAL_TO)] =
 	    MSINUM_INTR_SOURCE(1, N_INTR_RXQ3_COAL_TO);
 
 	/* Map all other interrupts source to MSI/MSIX vector 0. */
@@ -3236,12 +3236,26 @@ jme_set_vlan(struct jme_softc *sc)
 	CSR_WRITE_4(sc, JME_RXMAC, reg);
 }
 
+static u_int
+jme_hash_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
+{
+	uint32_t crc, *mchash = arg;
+
+	crc = ether_crc32_be(LLADDR(sdl), ETHER_ADDR_LEN);
+
+	/* Just want the 6 least significant bits. */
+	crc &= 0x3f;
+
+	/* Set the corresponding bit in the hash table. */
+	mchash[crc >> 5] |= 1 << (crc & 0x1f);
+
+	return (1);
+}
+
 static void
 jme_set_filter(struct jme_softc *sc)
 {
 	struct ifnet *ifp;
-	struct ifmultiaddr *ifma;
-	uint32_t crc;
 	uint32_t mchash[2];
 	uint32_t rxcfg;
 
@@ -3276,21 +3290,7 @@ jme_set_filter(struct jme_softc *sc)
 	 */
 	rxcfg |= RXMAC_MULTICAST;
 	bzero(mchash, sizeof(mchash));
-
-	if_maddr_rlock(ifp);
-	CK_STAILQ_FOREACH(ifma, &sc->jme_ifp->if_multiaddrs, ifma_link) {
-		if (ifma->ifma_addr->sa_family != AF_LINK)
-			continue;
-		crc = ether_crc32_be(LLADDR((struct sockaddr_dl *)
-		    ifma->ifma_addr), ETHER_ADDR_LEN);
-
-		/* Just want the 6 least significant bits. */
-		crc &= 0x3f;
-
-		/* Set the corresponding bit in the hash table. */
-		mchash[crc >> 5] |= 1 << (crc & 0x1f);
-	}
-	if_maddr_runlock(ifp);
+	if_foreach_llmaddr(ifp, jme_hash_maddr, &mchash);
 
 	CSR_WRITE_4(sc, JME_MAR0, mchash[0]);
 	CSR_WRITE_4(sc, JME_MAR1, mchash[1]);

@@ -62,6 +62,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/uio.h>
 
 #include <vm/vm.h>
+#include <vm/vm_param.h>
+#include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 #include <vm/pmap.h>
 #include <vm/vm_extern.h>
 
@@ -84,7 +87,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 {
 	int o;
 	u_int c = 0, v;
-	kiovec_t *iov;
+	struct iovec *iov;
 	int error = 0;
 	vm_offset_t addr, eaddr;
 
@@ -169,12 +172,3 @@ memmmap(struct cdev *dev, vm_ooffset_t offset, vm_paddr_t *paddr,
 	}
 	return (-1);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "kiovec_t"
-//   ]
-// }
-// CHERI CHANGES END

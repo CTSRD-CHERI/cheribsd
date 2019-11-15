@@ -3,15 +3,12 @@
 
 .include <src.opts.mk>
 
-PACKAGE=runtime-manuals
-
 MAN=	\
 	beinstall.8 \
 	crash.8 \
 	diskless.8 \
 	intro.8 \
 	nanobsd.8 \
-	picobsd.8 \
 	rc.8 \
 	rc.sendmail.8 \
 	rc.subr.8 \

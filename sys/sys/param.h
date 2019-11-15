@@ -60,7 +60,7 @@
  *		in the range 5 to 9.
  */
 #undef __FreeBSD_version
-#define __FreeBSD_version 1300021	/* Master, propagated to newvers */
+#define __FreeBSD_version 1300056	/* Master, propagated to newvers */
 
 /*
  * __FreeBSD_kernel__ indicates that this system uses the kernel of FreeBSD,
@@ -362,6 +362,7 @@ __END_DECLS
  * Access a variable length array that has been declared as a fixed
  * length array.
  */
-#define __PAST_END(array, offset) (((__typeof__(*(array)) *)(array))[offset])
+#define __PAST_END(array, offset)	\
+    (((__typeof__(*(array)) *)__builtin_no_change_bounds(array))[offset])
 
 #endif	/* _SYS_PARAM_H_ */

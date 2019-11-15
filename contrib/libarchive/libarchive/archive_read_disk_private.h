@@ -25,7 +25,18 @@
  *
  * $FreeBSD$
  */
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190730,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds"
+ *   ],
+ *   "change_comment": "C inheritance addrof first member (archive_read_disk)"
+ * }
+ * CHERI CHANGES END
+ */
 #ifndef __LIBARCHIVE_BUILD
 #error This header is only to be used internally to libarchive.
 #endif
@@ -39,7 +50,7 @@ struct tree;
 struct archive_entry;
 
 struct archive_read_disk {
-	struct archive	archive;
+	struct archive	archive __subobject_member_used_for_c_inheritance;
 
 	/* Reused by archive_read_next_header() */
 	struct archive_entry *entry;

@@ -31,7 +31,7 @@
 #ifndef ARCHIVE_RB_H_
 #define	ARCHIVE_RB_H_
 
-struct archive_rb_node {
+__subobject_type_used_for_c_inheritance struct archive_rb_node {
 	struct archive_rb_node *rb_nodes[2];
 	/*
 	 * rb_info contains the two flags and the parent back pointer.
@@ -78,7 +78,18 @@ struct archive_rb_tree_ops {
 };
 
 struct archive_rb_tree {
-	struct archive_rb_node *rbt_root;
+	struct {
+		/*
+		 * XXXAR: the rb code expects that it can cast &rbt_root to
+		 * a archive_rb_node. With subobject bounds, setting the
+		 * bounds on the array decay will attempt to set bounds to
+		 * 2*sizeof(void*) which doesn't work with rbt_root.
+		 * Instead, use the container bounds for rbt_root and insert
+		 * some padding
+		 */
+		struct archive_rb_node *rbt_root __subobject_use_container_bounds;
+		struct archive_rb_node *rbt_padding;
+	};
 	const struct archive_rb_tree_ops *rbt_ops;
 };
 

@@ -46,16 +46,16 @@ cloudabi32_copyinuio(const cloudabi32_iovec_t *iovp, size_t iovcnt,
 {
 	cloudabi32_iovec_t iovobj;
 	struct uio *uio;
-	kiovec_t *iov;
+	struct iovec *iov;
 	size_t i;
 	int error;
 
 	/* Allocate uio and iovecs. */
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	uio = malloc(sizeof(struct uio) + iovcnt * sizeof(kiovec_t),
+	uio = malloc(sizeof(struct uio) + iovcnt * sizeof(struct iovec),
 	    M_IOV, M_WAITOK);
-	iov = (kiovec_t *)(uio + 1);
+	iov = (struct iovec *)(uio + 1);
 
 	/* Initialize uio. */
 	uio->uio_iov = iov;
@@ -144,11 +144,10 @@ cloudabi32_sys_fd_write(struct thread *td,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

@@ -58,13 +58,15 @@ struct mntopt {
 #define MOPT_ACLS		{ "acls",	0, MNT_ACLS, 0 }
 #define MOPT_NFS4ACLS		{ "nfsv4acls",	0, MNT_NFS4ACLS, 0 }
 #define MOPT_AUTOMOUNTED	{ "automounted",0, MNT_AUTOMOUNTED, 0 }
+#define MOPT_UNTRUSTED		{ "untrusted",  0, MNT_UNTRUSTED, 0 }
 
 /* Control flags. */
 #define MOPT_FORCE		{ "force",	0, MNT_FORCE, 0 }
 #define MOPT_UPDATE		{ "update",	0, MNT_UPDATE, 0 }
 #define MOPT_RO			{ "ro",		0, MNT_RDONLY, 0 }
 #define MOPT_RW			{ "rw",		1, MNT_RDONLY, 0 }
-
+#define	MOPT_NOCOVER		{ "cover",	1, MNT_NOCOVER, 0 }
+#define	MOPT_EMPTYDIR		{ "emptydir",	0, MNT_EMPTYDIR, 0 }
 /* This is parsed by mount(8), but is ignored by specific mount_*(8)s. */
 #define MOPT_AUTO		{ "auto",	0, 0, 0 }
 
@@ -93,7 +95,10 @@ struct mntopt {
 	MOPT_MULTILABEL,						\
 	MOPT_ACLS,							\
 	MOPT_NFS4ACLS,							\
-	MOPT_AUTOMOUNTED
+	MOPT_AUTOMOUNTED,						\
+	MOPT_UNTRUSTED,							\
+	MOPT_NOCOVER,							\
+	MOPT_EMPTYDIR
 
 void getmntopts(const char *, const struct mntopt *, int *, int *);
 void rmslashes(char *, char *);

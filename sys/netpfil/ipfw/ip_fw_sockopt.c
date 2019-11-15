@@ -1178,7 +1178,9 @@ move_objects(struct ip_fw_chain *ch, ipfw_range_tlv *rt)
 		}
 	}
 	return (c);
-}/*
+}
+
+/*
  * Changes set of given rule rannge @rt
  * with each other.
  *
@@ -1215,6 +1217,35 @@ move_range(struct ip_fw_chain *chain, ipfw_range_tlv *rt)
 	IPFW_UH_WUNLOCK(chain);
 
 	return (0);
+}
+
+/*
+ * Returns pointer to action instruction, skips all possible rule
+ * modifiers like O_LOG, O_TAG, O_ALTQ.
+ */
+ipfw_insn *
+ipfw_get_action(struct ip_fw *rule)
+{
+	ipfw_insn *cmd;
+	int l, cmdlen;
+
+	cmd = ACTION_PTR(rule);
+	l = rule->cmd_len - rule->act_ofs;
+	while (l > 0) {
+		switch (cmd->opcode) {
+		case O_ALTQ:
+		case O_LOG:
+		case O_TAG:
+			break;
+		default:
+			return (cmd);
+		}
+		cmdlen = F_LEN(cmd);
+		l -= cmdlen;
+		cmd += cmdlen;
+	}
+	panic("%s: rule (%p) has not action opcode", __func__, rule);
+	return (NULL);
 }
 
 /*
@@ -1909,6 +1940,7 @@ check_ipfw_rule_body(ipfw_insn *cmd, int cmd_len, struct rule_check_info *ci)
 		case O_IPTTL:
 		case O_IPLEN:
 		case O_TCPDATALEN:
+		case O_TCPMSS:
 		case O_TCPWIN:
 		case O_TAGGED:
 			if (cmdlen < 1 || cmdlen > 31)
@@ -3722,8 +3754,7 @@ ipfw_ctl3(struct sockopt *sopt)
 
 			if (size < valsize) {
 				/* We have to wire user buffer */
-				error = vslock(sopt->sopt_val,
-				    valsize);
+				error = vslock(sopt->sopt_val, valsize);
 				if (error != 0)
 					return (error);
 				locked = 1;

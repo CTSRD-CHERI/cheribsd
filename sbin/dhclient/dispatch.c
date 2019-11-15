@@ -55,11 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <poll.h>
 
 /* Assert that pointer p is aligned to at least align bytes */
-#if __has_builtin(__builtin_is_aligned)
 #define assert_aligned(p, align) assert(__builtin_is_aligned((p), (align)))
-#else
-#define assert_aligned(p, align) assert((((uintptr_t)p) & ((align) - 1)) == 0)
-#endif
 
 static struct protocol *protocols;
 static struct timeout *timeouts;

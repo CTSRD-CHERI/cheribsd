@@ -32,6 +32,7 @@
 #include <sys/param.h>
 #include <sys/module.h>
 #include <sys/errno.h>
+#include <sys/eventhandler.h>
 #include <sys/jail.h>
 #include <sys/poll.h>  /* POLLIN, POLLOUT */
 #include <sys/kernel.h> /* types used in module initialization */
@@ -443,6 +444,7 @@ nm_os_generic_xmit_frame(struct nm_os_gen_arg *a)
 	m->m_ext.ext_size = len;
 #endif /* __FreeBSD_version >= 1100000 */
 
+	m->m_flags |= M_PKTHDR;
 	m->m_len = m->m_pkthdr.len = len;
 
 	/* mbuf refcnt is not contended, no need to use atomic
@@ -451,7 +453,9 @@ nm_os_generic_xmit_frame(struct nm_os_gen_arg *a)
 	M_HASHTYPE_SET(m, M_HASHTYPE_OPAQUE);
 	m->m_pkthdr.flowid = a->ring_nr;
 	m->m_pkthdr.rcvif = ifp; /* used for tx notification */
+	CURVNET_SET(ifp->if_vnet);
 	ret = NA(ifp)->if_transmit(ifp, m);
+	CURVNET_RESTORE();
 	return ret ? -1 : 0;
 }
 
@@ -1048,13 +1052,11 @@ netmap_dev_pager_fault(vm_object_t object, vm_ooffset_t offset,
 		VM_OBJECT_WUNLOCK(object);
 		page = vm_page_getfake(paddr, memattr);
 		VM_OBJECT_WLOCK(object);
-		vm_page_lock(*mres);
 		vm_page_free(*mres);
-		vm_page_unlock(*mres);
 		*mres = page;
 		vm_page_insert(page, object, pidx);
 	}
-	page->valid = VM_PAGE_BITS_ALL;
+	vm_page_valid(page);
 	return (VM_PAGER_OK);
 }
 

@@ -272,6 +272,10 @@ AcpiEvDeleteGpeBlock (
     /* Disable all GPEs in this block */
 
     Status = AcpiHwDisableGpeBlock (GpeBlock->XruptBlock, GpeBlock, NULL);
+    if (ACPI_FAILURE (Status))
+    {
+        return_ACPI_STATUS (Status);
+    }
 
     if (!GpeBlock->Previous && !GpeBlock->Next)
     {
@@ -542,7 +546,7 @@ AcpiEvCreateGpeBlock (
     WalkInfo.GpeDevice = GpeDevice;
     WalkInfo.ExecuteByOwnerId = FALSE;
 
-    Status = AcpiNsWalkNamespace (ACPI_TYPE_METHOD, GpeDevice,
+    (void) AcpiNsWalkNamespace (ACPI_TYPE_METHOD, GpeDevice,
         ACPI_UINT32_MAX, ACPI_NS_WALK_NO_UNLOCK,
         AcpiEvMatchGpeMethod, NULL, &WalkInfo, NULL);
 
@@ -637,7 +641,7 @@ AcpiEvInitializeGpeBlock (
                 continue;
             }
 
-            Status = AcpiEvAddGpeReference (GpeEventInfo);
+            Status = AcpiEvAddGpeReference (GpeEventInfo, FALSE);
             if (ACPI_FAILURE (Status))
             {
                 ACPI_EXCEPTION ((AE_INFO, Status,

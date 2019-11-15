@@ -89,28 +89,6 @@
 	SET_SIZE(atomic_add_64_nv)
 	SET_SIZE(atomic_add_64)
 
-	ENTRY(atomic_or_8_nv)
-	movl	4(%esp), %edx	// %edx = target address
-	movb	(%edx), %al	// %al = old value
-1:
-	movl	8(%esp), %ecx	// %ecx = delta
-	orb	%al, %cl	// %cl = new value
-	lock
-	cmpxchgb %cl, (%edx)	// try to stick it in
-	jne	1b
-	movzbl	%cl, %eax	// return new value
-	ret
-	SET_SIZE(atomic_or_8_nv)
-
-	ENTRY(atomic_cas_32)
-	movl	4(%esp), %edx
-	movl	8(%esp), %eax
-	movl	12(%esp), %ecx
-	lock
-	cmpxchgl %ecx, (%edx)
-	ret
-	SET_SIZE(atomic_cas_32)
-
 	ENTRY(atomic_cas_64)
 	pushl	%ebx
 	pushl	%esi
@@ -126,8 +104,30 @@
 	ret
 	SET_SIZE(atomic_cas_64)
 
-	ENTRY(membar_producer)
+	ENTRY(atomic_swap_64)
+	pushl	%esi
+	pushl	%ebx
+	movl	12(%esp), %esi
+	movl	16(%esp), %ebx
+	movl	20(%esp), %ecx
+	movl	(%esi), %eax
+	movl	4(%esi), %edx	// %edx:%eax = old value
+1:
 	lock
-	xorl	$0, (%esp)
+	cmpxchg8b (%esi)
+	jne	1b
+	popl	%ebx
+	popl	%esi
 	ret
-	SET_SIZE(membar_producer)
+	SET_SIZE(atomic_swap_64)
+
+	ENTRY(atomic_load_64)
+	pushl	%esi
+	movl	8(%esp), %esi
+	movl	%ebx, %eax	// make old and new values equal, so that
+	movl	%ecx, %edx	// destination is never changed
+	lock
+	cmpxchg8b (%esi)
+	popl	%esi
+	ret
+	SET_SIZE(atomic_load_64)

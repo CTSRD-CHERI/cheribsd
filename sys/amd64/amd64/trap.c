@@ -111,50 +111,50 @@ void __noinline trap(struct trapframe *frame);
 void trap_check(struct trapframe *frame);
 void dblfault_handler(struct trapframe *frame);
 
-static int trap_pfault(struct trapframe *, int);
+static int trap_pfault(struct trapframe *, bool, int *, int *);
 static void trap_fatal(struct trapframe *, vm_offset_t);
+#ifdef KDTRACE_HOOKS
+static bool trap_user_dtrace(struct trapframe *,
+    int (**hook)(struct trapframe *));
+#endif
 
-#define MAX_TRAP_MSG		32
-static char *trap_msg[] = {
-	"",					/*  0 unused */
-	"privileged instruction fault",		/*  1 T_PRIVINFLT */
-	"",					/*  2 unused */
-	"breakpoint instruction fault",		/*  3 T_BPTFLT */
-	"",					/*  4 unused */
-	"",					/*  5 unused */
-	"arithmetic trap",			/*  6 T_ARITHTRAP */
-	"",					/*  7 unused */
-	"",					/*  8 unused */
-	"general protection fault",		/*  9 T_PROTFLT */
-	"debug exception",			/* 10 T_TRCTRAP */
-	"",					/* 11 unused */
-	"page fault",				/* 12 T_PAGEFLT */
-	"",					/* 13 unused */
-	"alignment fault",			/* 14 T_ALIGNFLT */
-	"",					/* 15 unused */
-	"",					/* 16 unused */
-	"",					/* 17 unused */
-	"integer divide fault",			/* 18 T_DIVIDE */
-	"non-maskable interrupt trap",		/* 19 T_NMI */
-	"overflow trap",			/* 20 T_OFLOW */
-	"FPU bounds check fault",		/* 21 T_BOUND */
-	"FPU device not available",		/* 22 T_DNA */
-	"double fault",				/* 23 T_DOUBLEFLT */
-	"FPU operand fetch fault",		/* 24 T_FPOPFLT */
-	"invalid TSS fault",			/* 25 T_TSSFLT */
-	"segment not present fault",		/* 26 T_SEGNPFLT */
-	"stack fault",				/* 27 T_STKFLT */
-	"machine check trap",			/* 28 T_MCHK */
-	"SIMD floating-point exception",	/* 29 T_XMMFLT */
-	"reserved (unknown) fault",		/* 30 T_RESERVED */
-	"",					/* 31 unused (reserved) */
-	"DTrace pid return trap",		/* 32 T_DTRACE_RET */
+static const char UNKNOWN[] = "unknown";
+static const char *const trap_msg[] = {
+	[0] =			UNKNOWN,			/* unused */
+	[T_PRIVINFLT] =		"privileged instruction fault",
+	[2] =			UNKNOWN,			/* unused */
+	[T_BPTFLT] =		"breakpoint instruction fault",
+	[4] =			UNKNOWN,			/* unused */
+	[5] =			UNKNOWN,			/* unused */
+	[T_ARITHTRAP] =		"arithmetic trap",
+	[7] =			UNKNOWN,			/* unused */
+	[8] =			UNKNOWN,			/* unused */
+	[T_PROTFLT] =		"general protection fault",
+	[T_TRCTRAP] =		"debug exception",
+	[11] =			UNKNOWN,			/* unused */
+	[T_PAGEFLT] =		"page fault",
+	[13] =			UNKNOWN,			/* unused */
+	[T_ALIGNFLT] =		"alignment fault",
+	[15] =			UNKNOWN,			/* unused */
+	[16] =			UNKNOWN,			/* unused */
+	[17] =			UNKNOWN,			/* unused */
+	[T_DIVIDE] =		"integer divide fault",
+	[T_NMI] =		"non-maskable interrupt trap",
+	[T_OFLOW] =		"overflow trap",
+	[T_BOUND] =		"FPU bounds check fault",
+	[T_DNA] =		"FPU device not available",
+	[T_DOUBLEFLT] =		"double fault",
+	[T_FPOPFLT] =		"FPU operand fetch fault",
+	[T_TSSFLT] =		"invalid TSS fault",
+	[T_SEGNPFLT] =		"segment not present fault",
+	[T_STKFLT] =		"stack fault",
+	[T_MCHK] =		"machine check trap",
+	[T_XMMFLT] =		"SIMD floating-point exception",
+	[T_RESERVED] =		"reserved (unknown) fault",
+	[31] =			UNKNOWN,			/* reserved */
+	[T_DTRACE_RET] =	"DTrace pid return trap",
 };
 
-static int prot_fault_translation;
-SYSCTL_INT(_machdep, OID_AUTO, prot_fault_translation, CTLFLAG_RWTUN,
-    &prot_fault_translation, 0,
-    "Select signal to deliver on protection fault");
 static int uprintf_signal;
 SYSCTL_INT(_machdep, OID_AUTO, uprintf_signal, CTLFLAG_RWTUN,
     &uprintf_signal, 0,
@@ -188,14 +188,11 @@ trap(struct trapframe *frame)
 	struct thread *td;
 	struct proc *p;
 	register_t addr, dr6;
-	int signo, ucode;
+	int pf, signo, ucode;
 	u_int type;
 
 	td = curthread;
 	p = td->td_proc;
-	signo = 0;
-	ucode = 0;
-	addr = 0;
 	dr6 = 0;
 
 	VM_CNT_INC(v_trap);
@@ -284,11 +281,11 @@ trap(struct trapframe *frame)
 			break;
 
 		case T_BPTFLT:		/* bpt instruction fault */
-			enable_intr();
 #ifdef KDTRACE_HOOKS
-			if (dtrace_pid_probe_ptr != NULL &&
-			    dtrace_pid_probe_ptr(frame) == 0)
+			if (trap_user_dtrace(frame, &dtrace_pid_probe_ptr))
 				return;
+#else
+			enable_intr();
 #endif
 			signo = SIGTRAP;
 			ucode = TRAP_BRKPT;
@@ -341,47 +338,18 @@ trap(struct trapframe *frame)
 
 		case T_PAGEFLT:		/* page fault */
 			/*
-			 * Emulator can take care about this trap?
+			 * Can emulator handle this trap?
 			 */
 			if (*p->p_sysent->sv_trap != NULL &&
 			    (*p->p_sysent->sv_trap)(td) == 0)
 				return;
 
-			addr = frame->tf_addr;
-			signo = trap_pfault(frame, TRUE);
-			if (signo == -1)
+			pf = trap_pfault(frame, true, &signo, &ucode);
+			if (pf == -1)
 				return;
-			if (signo == 0)
+			if (pf == 0)
 				goto userret;
-			if (signo == SIGSEGV) {
-				ucode = SEGV_MAPERR;
-			} else if (prot_fault_translation == 0) {
-				/*
-				 * Autodetect.  This check also covers
-				 * the images without the ABI-tag ELF
-				 * note.
-				 */
-				if (SV_CURPROC_ABI() == SV_ABI_FREEBSD &&
-				    p->p_osrel >= P_OSREL_SIGSEGV) {
-					signo = SIGSEGV;
-					ucode = SEGV_ACCERR;
-				} else {
-					signo = SIGBUS;
-					ucode = T_PAGEFLT;
-				}
-			} else if (prot_fault_translation == 1) {
-				/*
-				 * Always compat mode.
-				 */
-				signo = SIGBUS;
-				ucode = T_PAGEFLT;
-			} else {
-				/*
-				 * Always SIGSEGV mode.
-				 */
-				signo = SIGSEGV;
-				ucode = SEGV_ACCERR;
-			}
+			addr = frame->tf_addr;
 			break;
 
 		case T_DIVIDE:		/* integer divide fault */
@@ -425,9 +393,7 @@ trap(struct trapframe *frame)
 			break;
 #ifdef KDTRACE_HOOKS
 		case T_DTRACE_RET:
-			enable_intr();
-			if (dtrace_return_probe_ptr != NULL)
-				dtrace_return_probe_ptr(frame);
+			(void)trap_user_dtrace(frame, &dtrace_return_probe_ptr);
 			return;
 #endif
 		}
@@ -438,7 +404,7 @@ trap(struct trapframe *frame)
 		    ("kernel trap doesn't have ucred"));
 		switch (type) {
 		case T_PAGEFLT:			/* page fault */
-			(void) trap_pfault(frame, FALSE);
+			(void)trap_pfault(frame, false, NULL, NULL);
 			return;
 
 		case T_DNA:
@@ -710,16 +676,28 @@ trap_is_pti(struct trapframe *frame)
 	    (PCPU_GET(curpmap)->pm_cr3 & ~CR3_PCID_MASK));
 }
 
+/*
+ * Handle all details of a page fault.
+ * Returns:
+ * -1 if this fault was fatal, typically from kernel mode
+ *    (cannot happen, but we need to return something).
+ * 0  if this fault was handled by updating either the user or kernel
+ *    page table, execution can continue.
+ * 1  if this fault was from usermode and it was not handled, a synchronous
+ *    signal should be delivered to the thread.  *signo returns the signal
+ *    number, *ucode gives si_code.
+ */
 static int
-trap_pfault(struct trapframe *frame, int usermode)
+trap_pfault(struct trapframe *frame, bool usermode, int *signo, int *ucode)
 {
 	struct thread *td;
 	struct proc *p;
 	vm_map_t map;
-	vm_offset_t va;
+	vm_offset_t eva;
 	int rv;
 	vm_prot_t ftype;
-	vm_offset_t eva;
+
+	MPASS(!usermode || (signo != NULL && ucode != NULL));
 
 	td = curthread;
 	p = td->td_proc;
@@ -769,13 +747,15 @@ trap_pfault(struct trapframe *frame, int usermode)
 			return (-1);
 		}
 	}
-	va = trunc_page(eva);
-	if (va >= VM_MIN_KERNEL_ADDRESS) {
+	if (eva >= VM_MIN_KERNEL_ADDRESS) {
 		/*
 		 * Don't allow user-mode faults in kernel address space.
 		 */
-		if (usermode)
-			return (SIGSEGV);
+		if (usermode) {
+			*signo = SIGSEGV;
+			*ucode = SEGV_MAPERR;
+			return (1);
+		}
 
 		map = kernel_map;
 	} else {
@@ -817,7 +797,11 @@ trap_pfault(struct trapframe *frame, int usermode)
 			trap_fatal(frame, eva);
 			return (-1);
 		}
-		rv = KERN_PROTECTION_FAILURE;
+		if (usermode) {
+			*signo = SIGSEGV;
+			*ucode = SEGV_PKUERR;
+			return (1);
+		}
 		goto after_vmfault;
 	}
 
@@ -841,7 +825,7 @@ trap_pfault(struct trapframe *frame, int usermode)
 		ftype = VM_PROT_READ;
 
 	/* Fault in the page. */
-	rv = vm_fault(map, va, ftype, VM_FAULT_NORMAL);
+	rv = vm_fault_trap(map, eva, ftype, VM_FAULT_NORMAL, signo, ucode);
 	if (rv == KERN_SUCCESS) {
 #ifdef HWPMC_HOOKS
 		if (ftype == VM_PROT_READ || ftype == VM_PROT_WRITE) {
@@ -856,17 +840,17 @@ trap_pfault(struct trapframe *frame, int usermode)
 #endif
 		return (0);
 	}
+
+	if (usermode)
+		return (1);
 after_vmfault:
-	if (!usermode) {
-		if (td->td_intr_nesting_level == 0 &&
-		    curpcb->pcb_onfault != NULL) {
-			frame->tf_rip = (long)curpcb->pcb_onfault;
-			return (0);
-		}
-		trap_fatal(frame, eva);
-		return (-1);
+	if (td->td_intr_nesting_level == 0 &&
+	    curpcb->pcb_onfault != NULL) {
+		frame->tf_rip = (long)curpcb->pcb_onfault;
+		return (0);
 	}
-	return ((rv == KERN_PROTECTION_FAILURE) ? SIGBUS : SIGSEGV);
+	trap_fatal(frame, eva);
+	return (-1);
 }
 
 static void
@@ -877,7 +861,6 @@ trap_fatal(frame, eva)
 	int code, ss;
 	u_int type;
 	struct soft_segment_descriptor softseg;
-	char *msg;
 #ifdef KDB
 	bool handled;
 #endif
@@ -887,11 +870,8 @@ trap_fatal(frame, eva)
 	sdtossd(&gdt[NGDT * PCPU_GET(cpuid) + IDXSEL(frame->tf_cs & 0xffff)],
 	    &softseg);
 
-	if (type <= MAX_TRAP_MSG)
-		msg = trap_msg[type];
-	else
-		msg = "UNKNOWN";
-	printf("\n\nFatal trap %d: %s while in %s mode\n", type, msg,
+	printf("\n\nFatal trap %d: %s while in %s mode\n", type,
+	    type < nitems(trap_msg) ? trap_msg[type] : UNKNOWN,
 	    TRAPF_USERMODE(frame) ? "user" : "kernel");
 #ifdef SMP
 	/* two separate prints in case of a trap on an unmapped page */
@@ -904,8 +884,8 @@ trap_fatal(frame, eva)
 			code & PGEX_U ? "user" : "supervisor",
 			code & PGEX_W ? "write" : "read",
 			code & PGEX_I ? "instruction" : "data",
-			code & PGEX_PK ? " prot key" : " ",
-			code & PGEX_SGX ? " SGX" : " ",
+			code & PGEX_PK ? " prot key" : "",
+			code & PGEX_SGX ? " SGX" : "",
 			code & PGEX_RSV ? "reserved bits in PTE" :
 			code & PGEX_P ? "protection violation" : "page not present");
 	}
@@ -942,11 +922,28 @@ trap_fatal(frame, eva)
 	}
 #endif
 	printf("trap number		= %d\n", type);
-	if (type <= MAX_TRAP_MSG)
-		panic("%s", trap_msg[type]);
-	else
-		panic("unknown/reserved trap");
+	panic("%s", type < nitems(trap_msg) ? trap_msg[type] :
+	    "unknown/reserved trap");
 }
+
+#ifdef KDTRACE_HOOKS
+/*
+ * Invoke a userspace DTrace hook.  The hook pointer is cleared when no
+ * userspace probes are enabled, so we must synchronize with DTrace to ensure
+ * that a trapping thread is able to call the hook before it is cleared.
+ */
+static bool
+trap_user_dtrace(struct trapframe *frame, int (**hookp)(struct trapframe *))
+{
+	int (*hook)(struct trapframe *);
+
+	hook = (int (*)(struct trapframe *))atomic_load_ptr(hookp);
+	enable_intr();
+	if (hook != NULL)
+		return ((hook)(frame) == 0);
+	return (false);
+}
+#endif
 
 /*
  * Double fault handler. Called when a fault occurs while writing
@@ -1154,7 +1151,6 @@ SYSCTL_PROC(_machdep, OID_AUTO, syscall_ret_flush_l1d, CTLTYPE_INT |
 void
 amd64_syscall(struct thread *td, int traced)
 {
-	int error;
 	ksiginfo_t ksi;
 
 #ifdef DIAGNOSTIC
@@ -1163,7 +1159,7 @@ amd64_syscall(struct thread *td, int traced)
 		/* NOT REACHED */
 	}
 #endif
-	error = syscallenter(td);
+	syscallenter(td);
 
 	/*
 	 * Traced syscall.
@@ -1183,12 +1179,12 @@ amd64_syscall(struct thread *td, int traced)
 	KASSERT(td->td_pcb->pcb_save == get_pcb_user_save_td(td),
 	    ("System call %s returning with mangled pcb_save",
 	     syscallname(td->td_proc, td->td_sa.code)));
-	KASSERT(td->td_md.md_invl_gen.gen == 0,
+	KASSERT(pmap_not_in_di(),
 	    ("System call %s returning with leaked invl_gen %lu",
 	    syscallname(td->td_proc, td->td_sa.code),
 	    td->td_md.md_invl_gen.gen));
 
-	syscallret(td, error);
+	syscallret(td);
 
 	/*
 	 * If the user-supplied value of %rip is not a canonical
@@ -1201,5 +1197,5 @@ amd64_syscall(struct thread *td, int traced)
 	if (__predict_false(td->td_frame->tf_rip >= VM_MAXUSER_ADDRESS))
 		set_pcb_flags(td->td_pcb, PCB_FULL_IRET);
 
-	amd64_syscall_ret_flush_l1d_inline(error);
+	amd64_syscall_ret_flush_l1d_inline(td->td_errno);
 }

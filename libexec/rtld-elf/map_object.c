@@ -186,6 +186,13 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	case PT_GNU_RELRO:
 	    relro_page = phdr->p_vaddr;
 	    relro_size = phdr->p_memsz;
+#ifdef __CHERI_PURE_CAPABILITY__
+	    text_rodata_start = rtld_min(phdr->p_vaddr, text_rodata_start);
+	    text_rodata_end = rtld_max(phdr->p_vaddr + phdr->p_memsz, text_rodata_end);
+	    dbg("%s: Adding PT_GNU_RELRO, new text/rodata start "
+		" = %zx text/rodata end = %zx", path,
+		(size_t)text_rodata_start, (size_t)text_rodata_end);
+#endif
 	    break;
 
 	case PT_NOTE:
@@ -231,7 +238,7 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
     /* round up the requested size so that the kernel can represent the mmap result */
     mapsize = CHERI_REPRESENTABLE_LENGTH(mapsize);
     base_vlimit = base_vaddr + mapsize;
-    assert(round_page(base_vlimit) == base_vlimit);
+    dbg_assert(round_page(base_vlimit) == base_vlimit);
 #endif
     base_addr = (caddr_t)(uintptr_t)base_vaddr;
     base_flags = __getosreldate() >= P_OSREL_MAP_GUARD ? MAP_GUARD :
@@ -248,9 +255,9 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 #endif
     }
 
-    dbg("Allocating entire object: mmap(%#p, 0x%lx, 0x%x, 0x%x, -1, 0)",
-	    base_addr, mapsize, PROT_NONE | PROT_MAX(PROT_ALL), base_flags);
-    mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(PROT_ALL),
+    dbg("Allocating entire object: mmap(" PTR_FMT ", 0x%lx, 0x%x, 0x%x, -1, 0)",
+	    base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL), base_flags);
+    mapbase = mmap(base_addr, mapsize, PROT_NONE | PROT_MAX(_PROT_ALL),
 	base_flags, -1, 0);
     if (mapbase == MAP_FAILED) {
 	_rtld_error("%s: mmap of entire address space failed: %s",
@@ -258,8 +265,13 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	goto error;
     }
     if (base_addr != NULL && (vaddr_t)mapbase != (vaddr_t)base_addr) {
+#ifdef __CHERI_PURE_CAPABILITY__
 	_rtld_error("%s: mmap returned wrong address: wanted %#p, got %#p",
 	  path, base_addr, mapbase);
+#else
+	_rtld_error("%s: mmap returned wrong address: wanted %p, got %p",
+	  path, base_addr, mapbase);
+#endif
 	goto error1;
     }
 
@@ -270,18 +282,19 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	data_vlimit = round_page(segs[i]->p_vaddr + segs[i]->p_filesz);
 	data_addr = mapbase + (data_vaddr - base_vaddr);
 	data_prot = convert_prot(segs[i]->p_flags);
-	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED;
+	/*
+	 * Set MAP_CHERI_NOSETBOUNDS to avoid the need for a precisely
+	 * representable region. We already have a valid capability and only
+	 * want to check if mapping from the file (MAP_ANON for bss) succeeded.
+	 */
+	data_flags = convert_flags(segs[i]->p_flags) | MAP_FIXED | MAP_CHERI_NOSETBOUNDS;
 	dbg("Mapping %s PT_LOAD(%d) with flags 0x%x at %p", path, i,
 	    segs[i]->p_flags, data_addr, data_vlimit);
 
-	/* Map a bit more than required for CheriABI if it is not representable. */
 	size_t data_len = data_vlimit - data_vaddr;
-#ifdef __CHERI_PURE_CAPABILITY__
-	data_len = CHERI_REPRESENTABLE_LENGTH(data_len);
-#endif
 	if (mmap(data_addr, data_len, data_prot,
 	  data_flags | MAP_PREFAULT_READ, fd, data_offset) == (caddr_t) -1) {
-	    _rtld_error("%s: mmap of data at %p, size %zd failed (base_addr %p, mapbase %p, mapsize %zd: %s", path, data_addr, data_vlimit - data_vaddr, base_addr, mapbase, mapsize,
+	    _rtld_error("%s: mmap of data failed: %s", path,
 		rtld_strerror(errno));
 	    goto error1;
 	}
@@ -313,12 +326,9 @@ map_object(int fd, const char *path, const struct stat *sb, const char* main_pat
 	    /* Overlay the BSS segment onto the proper region. */
 	    bss_vaddr = data_vlimit;
 	    bss_vlimit = round_page(segs[i]->p_vaddr + segs[i]->p_memsz);
-	    bss_addr = mapbase +  (bss_vaddr - base_vaddr);
+	    bss_addr = mapbase + (bss_vaddr - base_vaddr);
 	    /* Map a bit more than required for CheriABI if it is not representable. */
 	    size_t bss_len = bss_vlimit - bss_vaddr;
-#ifdef __CHERI_PURE_CAPABILITY__
-	    bss_len = CHERI_REPRESENTABLE_LENGTH(bss_len);
-#endif
 	    if (bss_vlimit > bss_vaddr) {	/* There is something to do */
 		if (mmap(bss_addr, bss_len, data_prot,
 		    data_flags | MAP_ANON, -1, 0) == (caddr_t)-1) {
@@ -455,6 +465,7 @@ get_elf_header(int fd, const char *path, const struct stat *sbp, const char* mai
 
 #ifndef rtld_validate_target_eflags
 #define rtld_validate_target_eflags(path, hdr, main_path) true
+	(void)main_path;
 #endif
 	if (!rtld_validate_target_eflags(path, hdr, main_path)) {
 		goto error;

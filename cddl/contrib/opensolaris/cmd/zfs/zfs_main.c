@@ -30,6 +30,7 @@
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2016 Igor Kozhukhov <ikozhukhov@gmail.com>.
  * Copyright 2016 Nexenta Systems, Inc.
+ * Copyright (c) 2019 Datto Inc.
  */
 
 #include <assert.h>
@@ -283,13 +284,14 @@ get_usage(zfs_help_t idx)
 		    "<filesystem|volume|snapshot>\n"
 		    "\trename [-f] -p <filesystem|volume> <filesystem|volume>\n"
 		    "\trename -r <snapshot> <snapshot>\n"
+		    "\trename <bookmark> <bookmark>\n"
 		    "\trename -u [-p] <filesystem> <filesystem>"));
 	case HELP_ROLLBACK:
 		return (gettext("\trollback [-rRf] <snapshot>\n"));
 	case HELP_SEND:
 		return (gettext("\tsend [-DnPpRvLec] [-[iI] snapshot] "
 		    "<snapshot>\n"
-		    "\tsend [-Le] [-i snapshot|bookmark] "
+		    "\tsend [-LPcenv] [-i snapshot|bookmark] "
 		    "<filesystem|volume|snapshot>\n"
 		    "\tsend [-nvPe] -t <receive_resume_token>\n"));
 	case HELP_SET:
@@ -351,7 +353,7 @@ get_usage(zfs_help_t idx)
 	case HELP_BOOKMARK:
 		return (gettext("\tbookmark <snapshot> <bookmark>\n"));
 	case HELP_CHANNEL_PROGRAM:
-		return (gettext("\tprogram [-n] [-t <instruction limit>] "
+		return (gettext("\tprogram [-jn] [-t <instruction limit>] "
 		    "[-m <memory limit (b)>] <pool> <program file> "
 		    "[lua args...]\n"));
 	}
@@ -1172,7 +1174,7 @@ destroy_print_snapshots(zfs_handle_t *fs_zhp, destroy_cbdata_t *cb)
 	int err = 0;
 	assert(cb->cb_firstsnap == NULL);
 	assert(cb->cb_prevsnap == NULL);
-	err = zfs_iter_snapshots_sorted(fs_zhp, destroy_print_cb, cb);
+	err = zfs_iter_snapshots_sorted(fs_zhp, destroy_print_cb, cb, 0, 0);
 	if (cb->cb_firstsnap != NULL) {
 		uint64_t used = 0;
 		if (err == 0) {
@@ -2361,6 +2363,7 @@ us_compare(const void *larg, const void *rarg, void *unused)
 		case ZFS_PROP_NAME:
 			propname = "name";
 			if (numname) {
+compare_nums:
 				(void) nvlist_lookup_uint64(lnvl, propname,
 				    &lv64);
 				(void) nvlist_lookup_uint64(rnvl, propname,
@@ -2368,10 +2371,12 @@ us_compare(const void *larg, const void *rarg, void *unused)
 				if (rv64 != lv64)
 					rc = (rv64 < lv64) ? 1 : -1;
 			} else {
-				(void) nvlist_lookup_string(lnvl, propname,
-				    &lvstr);
-				(void) nvlist_lookup_string(rnvl, propname,
-				    &rvstr);
+				if ((nvlist_lookup_string(lnvl, propname,
+						&lvstr) == ENOENT) ||
+				    (nvlist_lookup_string(rnvl, propname,
+						&rvstr) == ENOENT)) {
+					goto compare_nums;
+				}
 				rc = strcmp(lvstr, rvstr);
 			}
 			break;
@@ -3250,6 +3255,7 @@ zfs_do_list(int argc, char **argv)
  * zfs rename [-f] <fs | snap | vol> <fs | snap | vol>
  * zfs rename [-f] -p <fs | vol> <fs | vol>
  * zfs rename -r <snap> <snap>
+ * zfs rename <bmark> <bmark>
  * zfs rename -u [-p] <fs> <fs>
  *
  * Renames the given dataset to another of the same type.
@@ -3266,6 +3272,7 @@ zfs_do_rename(int argc, char **argv)
 	int ret = 0;
 	int types;
 	boolean_t parents = B_FALSE;
+	boolean_t bookmarks = B_FALSE;
 	char *snapshot = NULL;
 
 	/* check options */
@@ -3316,7 +3323,7 @@ zfs_do_rename(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
-	if (flags.recurse && strchr(argv[0], '@') == 0) {
+	if (flags.recurse && strchr(argv[0], '@') == NULL) {
 		(void) fprintf(stderr, gettext("source dataset for recursive "
 		    "rename must be a snapshot\n"));
 		usage(B_FALSE);
@@ -3328,10 +3335,22 @@ zfs_do_rename(int argc, char **argv)
 		usage(B_FALSE);
 	}
 
+	if (strchr(argv[0], '#') != NULL)
+		bookmarks = B_TRUE;
+
+	if (bookmarks && (flags.nounmount || flags.recurse ||
+	    flags.forceunmount || parents)) {
+		(void) fprintf(stderr, gettext("options are not supported "
+		    "for renaming bookmarks\n"));
+		usage(B_FALSE);
+	}
+
 	if (flags.nounmount)
 		types = ZFS_TYPE_FILESYSTEM;
 	else if (parents)
 		types = ZFS_TYPE_FILESYSTEM | ZFS_TYPE_VOLUME;
+	else if (bookmarks)
+		types = ZFS_TYPE_BOOKMARK;
 	else
 		types = ZFS_TYPE_DATASET;
 
@@ -3418,6 +3437,7 @@ zfs_do_promote(int argc, char **argv)
  */
 typedef struct rollback_cbdata {
 	uint64_t	cb_create;
+	uint8_t		cb_younger_ds_printed;
 	boolean_t	cb_first;
 	int		cb_doclones;
 	char		*cb_target;
@@ -3448,15 +3468,20 @@ rollback_check_dependent(zfs_handle_t *zhp, void *data)
 }
 
 /*
- * Report any snapshots more recent than the one specified.  Used when '-r' is
- * not specified.  We reuse this same callback for the snapshot dependents - if
- * 'cb_dependent' is set, then this is a dependent and we should report it
- * without checking the transaction group.
+ * Report some snapshots/bookmarks more recent than the one specified.
+ * Used when '-r' is not specified. We reuse this same callback for the
+ * snapshot dependents - if 'cb_dependent' is set, then this is a
+ * dependent and we should report it without checking the transaction group.
  */
 static int
 rollback_check(zfs_handle_t *zhp, void *data)
 {
 	rollback_cbdata_t *cbp = data;
+	/*
+	 * Max number of younger snapshots and/or bookmarks to display before
+	 * we stop the iteration.
+	 */
+	const uint8_t max_younger = 32;
 
 	if (cbp->cb_doclones) {
 		zfs_close(zhp);
@@ -3485,9 +3510,24 @@ rollback_check(zfs_handle_t *zhp, void *data)
 		} else {
 			(void) fprintf(stderr, "%s\n",
 			    zfs_get_name(zhp));
+			cbp->cb_younger_ds_printed++;
 		}
 	}
 	zfs_close(zhp);
+
+	if (cbp->cb_younger_ds_printed == max_younger) {
+		/*
+		 * This non-recursive rollback is going to fail due to the
+		 * presence of snapshots and/or bookmarks that are younger than
+		 * the rollback target.
+		 * We printed some of the offending objects, now we stop
+		 * zfs_iter_snapshot/bookmark iteration so we can fail fast and
+		 * avoid iterating over the rest of the younger objects
+		 */
+		(void) fprintf(stderr, gettext("Output limited to %d "
+		    "snapshots/bookmarks\n"), max_younger);
+		return (-1);
+	}
 	return (0);
 }
 
@@ -3501,6 +3541,7 @@ zfs_do_rollback(int argc, char **argv)
 	zfs_handle_t *zhp, *snap;
 	char parentname[ZFS_MAX_DATASET_NAME_LEN];
 	char *delim;
+	uint64_t min_txg = 0;
 
 	/* check options */
 	while ((c = getopt(argc, argv, "rRf")) != -1) {
@@ -3556,7 +3597,12 @@ zfs_do_rollback(int argc, char **argv)
 	cb.cb_create = zfs_prop_get_int(snap, ZFS_PROP_CREATETXG);
 	cb.cb_first = B_TRUE;
 	cb.cb_error = 0;
-	if ((ret = zfs_iter_snapshots(zhp, B_FALSE, rollback_check, &cb)) != 0)
+
+	if (cb.cb_create > 0)
+		min_txg = cb.cb_create;
+
+	if ((ret = zfs_iter_snapshots(zhp, B_FALSE, rollback_check, &cb,
+	    min_txg, 0)) != 0)
 		goto out;
 	if ((ret = zfs_iter_bookmarks(zhp, rollback_check, &cb)) != 0)
 		goto out;
@@ -3924,13 +3970,11 @@ zfs_do_send(int argc, char **argv)
 	if (strchr(argv[0], '@') == NULL ||
 	    (fromname && strchr(fromname, '#') != NULL)) {
 		char frombuf[ZFS_MAX_DATASET_NAME_LEN];
-		enum lzc_send_flags lzc_flags = 0;
 
 		if (flags.replicate || flags.doall || flags.props ||
-		    flags.dedup || flags.dryrun || flags.verbose ||
-		    flags.progress) {
-			(void) fprintf(stderr,
-			    gettext("Error: "
+		    flags.dedup || (strchr(argv[0], '@') == NULL &&
+		    (flags.dryrun || flags.verbose || flags.progress))) {
+			(void) fprintf(stderr, gettext("Error: "
 			    "Unsupported flag with filesystem or bookmark.\n"));
 			return (1);
 		}
@@ -3938,13 +3982,6 @@ zfs_do_send(int argc, char **argv)
 		zhp = zfs_open(g_zfs, argv[0], ZFS_TYPE_DATASET);
 		if (zhp == NULL)
 			return (1);
-
-		if (flags.largeblock)
-			lzc_flags |= LZC_SEND_FLAG_LARGE_BLOCK;
-		if (flags.embed_data)
-			lzc_flags |= LZC_SEND_FLAG_EMBED_DATA;
-		if (flags.compress)
-			lzc_flags |= LZC_SEND_FLAG_COMPRESS;
 
 		if (fromname != NULL &&
 		    (fromname[0] == '#' || fromname[0] == '@')) {
@@ -3959,7 +3996,7 @@ zfs_do_send(int argc, char **argv)
 			(void) strlcat(frombuf, fromname, sizeof (frombuf));
 			fromname = frombuf;
 		}
-		err = zfs_send_one(zhp, fromname, STDOUT_FILENO, lzc_flags);
+		err = zfs_send_one(zhp, fromname, STDOUT_FILENO, flags);
 		zfs_close(zhp);
 		return (err != 0);
 	}
@@ -7235,12 +7272,12 @@ zfs_do_channel_program(int argc, char **argv)
 	nvlist_t *outnvl;
 	uint64_t instrlimit = ZCP_DEFAULT_INSTRLIMIT;
 	uint64_t memlimit = ZCP_DEFAULT_MEMLIMIT;
-	boolean_t sync_flag = B_TRUE;
+	boolean_t sync_flag = B_TRUE, json_output = B_FALSE;
 	zpool_handle_t *zhp;
 
 	/* check options */
 	while (-1 !=
-	    (c = getopt(argc, argv, "nt:(instr-limit)m:(memory-limit)"))) {
+	    (c = getopt(argc, argv, "jnt:(instr-limit)m:(memory-limit)"))) {
 		switch (c) {
 		case 't':
 		case 'm': {
@@ -7280,6 +7317,10 @@ zfs_do_channel_program(int argc, char **argv)
 		}
 		case 'n': {
 			sync_flag = B_FALSE;
+			break;
+		}
+		case 'j': {
+			json_output = B_TRUE;
 			break;
 		}
 		case '?':
@@ -7404,11 +7445,14 @@ zfs_do_channel_program(int argc, char **argv)
 		    gettext("Channel program execution failed:\n%s\n"),
 		    errstring);
 	} else {
-		(void) printf("Channel program fully executed ");
-		if (nvlist_empty(outnvl)) {
-			(void) printf("with no return value.\n");
+		if (json_output) {
+			(void) nvlist_print_json(stdout, outnvl);
+		} else if (nvlist_empty(outnvl)) {
+			(void) fprintf(stdout, gettext("Channel program fully "
+			    "executed and did not produce output.\n"));
 		} else {
-			(void) printf("with return value:\n");
+			(void) fprintf(stdout, gettext("Channel program fully "
+			    "executed and produced output:\n"));
 			dump_nvlist(outnvl, 4);
 		}
 	}

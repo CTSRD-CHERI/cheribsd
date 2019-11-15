@@ -261,7 +261,7 @@ mac_proc_vm_revoke_recurse(struct thread *td, struct ucred *cred,
 		return;
 
 	vm_map_lock(map);
-	for (vme = map->header.next; vme != &map->header; vme = vme->next) {
+	VM_MAP_ENTRY_FOREACH(vme, map) {
 		if (vme->eflags & MAP_ENTRY_IS_SUB_MAP) {
 			mac_proc_vm_revoke_recurse(td, cred,
 			    vme->object.sub_map);
@@ -360,7 +360,7 @@ mac_proc_vm_revoke_recurse(struct thread *td, struct ucred *cred,
 			}
 			pmap_protect(map->pmap, vme->start, vme->end,
 			    vme->protection & ~revokeperms);
-			vm_map_simplify_entry(map, vme);
+			vm_map_try_merge_entries(map, vme->prev, vme);
 		}
 	}
 	vm_map_unlock(map);

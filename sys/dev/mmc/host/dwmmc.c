@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2014 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2014-2019 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * This software was developed by SRI International and the University of
@@ -40,8 +40,10 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
 #include <sys/module.h>
 #include <sys/malloc.h>
+#include <sys/mutex.h>
 #include <sys/rman.h>
 
 #include <dev/mmc/bridge.h>
@@ -452,8 +454,54 @@ parse_fdt(struct dwmmc_softc *sc)
 	}
 
 #ifdef EXT_RESOURCES
+
+	/* IP block reset is optional */
+	error = hwreset_get_by_ofw_name(sc->dev, 0, "reset", &sc->hwreset);
+	if (error != 0 &&
+	    error != ENOENT &&
+	    error != ENODEV) {
+		device_printf(sc->dev, "Cannot get reset\n");
+		goto fail;
+	}
+
+	/* vmmc regulator is optional */
+	error = regulator_get_by_ofw_property(sc->dev, 0, "vmmc-supply",
+	     &sc->vmmc);
+	if (error != 0 &&
+	    error != ENOENT &&
+	    error != ENODEV) {
+		device_printf(sc->dev, "Cannot get regulator 'vmmc-supply'\n");
+		goto fail;
+	}
+
+	/* vqmmc regulator is optional */
+	error = regulator_get_by_ofw_property(sc->dev, 0, "vqmmc-supply",
+	     &sc->vqmmc);
+	if (error != 0 &&
+	    error != ENOENT &&
+	    error != ENODEV) {
+		device_printf(sc->dev, "Cannot get regulator 'vqmmc-supply'\n");
+		goto fail;
+	}
+
+	/* Assert reset first */
+	if (sc->hwreset != NULL) {
+		error = hwreset_assert(sc->hwreset);
+		if (error != 0) {
+			device_printf(sc->dev, "Cannot assert reset\n");
+			goto fail;
+		}
+	}
+
 	/* BIU (Bus Interface Unit clock) is optional */
 	error = clk_get_by_ofw_name(sc->dev, 0, "biu", &sc->biu);
+	if (error != 0 &&
+	    error != ENOENT &&
+	    error != ENODEV) {
+		device_printf(sc->dev, "Cannot get 'biu' clock\n");
+		goto fail;
+	}
+
 	if (sc->biu) {
 		error = clk_enable(sc->biu);
 		if (error != 0) {
@@ -467,19 +515,35 @@ parse_fdt(struct dwmmc_softc *sc)
 	 * if no clock-frequency property is given
 	 */
 	error = clk_get_by_ofw_name(sc->dev, 0, "ciu", &sc->ciu);
+	if (error != 0 &&
+	    error != ENOENT &&
+	    error != ENODEV) {
+		device_printf(sc->dev, "Cannot get 'ciu' clock\n");
+		goto fail;
+	}
+
 	if (sc->ciu) {
-		error = clk_enable(sc->ciu);
-		if (error != 0) {
-			device_printf(sc->dev, "cannot enable ciu clock\n");
-			goto fail;
-		}
 		if (bus_hz != 0) {
 			error = clk_set_freq(sc->ciu, bus_hz, 0);
 			if (error != 0)
 				device_printf(sc->dev,
 				    "cannot set ciu clock to %u\n", bus_hz);
 		}
+		error = clk_enable(sc->ciu);
+		if (error != 0) {
+			device_printf(sc->dev, "cannot enable ciu clock\n");
+			goto fail;
+		}
 		clk_get_freq(sc->ciu, &sc->bus_hz);
+	}
+
+	/* Take dwmmc out of reset */
+	if (sc->hwreset != NULL) {
+		error = hwreset_deassert(sc->hwreset);
+		if (error != 0) {
+			device_printf(sc->dev, "Cannot deassert reset\n");
+			goto fail;
+		}
 	}
 #endif /* EXT_RESOURCES */
 
@@ -559,6 +623,7 @@ dwmmc_attach(device_t dev)
 	}
 
 	if (!sc->use_pio) {
+		dma_stop(sc);
 		if (dma_setup(sc))
 			return (ENXIO);
 
@@ -1089,11 +1154,18 @@ dwmmc_read_ivar(device_t bus, device_t child, int which, uintptr_t *result)
 	case MMCBR_IVAR_VDD:
 		*(int *)result = sc->host.ios.vdd;
 		break;
+	case MMCBR_IVAR_VCCQ:
+		*(int *)result = sc->host.ios.vccq;
+		break;
 	case MMCBR_IVAR_CAPS:
 		*(int *)result = sc->host.caps;
 		break;
 	case MMCBR_IVAR_MAX_DATA:
 		*(int *)result = sc->desc_count;
+		break;
+	case MMCBR_IVAR_TIMING:
+		*(int *)result = sc->host.ios.timing;
+		break;
 	}
 	return (0);
 }
@@ -1131,6 +1203,12 @@ dwmmc_write_ivar(device_t bus, device_t child, int which, uintptr_t value)
 		break;
 	case MMCBR_IVAR_VDD:
 		sc->host.ios.vdd = value;
+		break;
+	case MMCBR_IVAR_TIMING:
+		sc->host.ios.timing = value;
+		break;
+	case MMCBR_IVAR_VCCQ:
+		sc->host.ios.vccq = value;
 		break;
 	/* These are read-only */
 	case MMCBR_IVAR_CAPS:

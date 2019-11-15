@@ -62,6 +62,7 @@ SRCS+=	interp_lua.c
 .include "${BOOTSRC}/lua.mk"
 LDR_INTERP=	${LIBLUA}
 LDR_INTERP32=	${LIBLUA32}
+CFLAGS+= -DLUA_PATH=\"${LUAPATH}\"
 .elif ${LOADER_INTERP} == "4th"
 SRCS+=	interp_forth.c
 .include "${BOOTSRC}/ficl.mk"
@@ -98,9 +99,6 @@ CFLAGS+=	-DLOADER_EXT2FS_SUPPORT
 .endif
 .if ${LOADER_MSDOS_SUPPORT:Uno} == "yes"
 CFLAGS+=	-DLOADER_MSDOS_SUPPORT
-.endif
-.if ${LOADER_NANDFS_SUPPORT:U${MK_NAND}} == "yes"
-CFLAGS+=	-DLOADER_NANDFS_SUPPORT
 .endif
 .if ${LOADER_UFS_SUPPORT:Uyes} == "yes"
 CFLAGS+=	-DLOADER_UFS_SUPPORT

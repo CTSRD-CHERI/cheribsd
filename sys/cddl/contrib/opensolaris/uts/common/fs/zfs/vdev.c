@@ -163,34 +163,34 @@ static vdev_ops_t *vdev_ops_table[] = {
 };
 
 
-/* target number of metaslabs per top-level vdev */
-int vdev_max_ms_count = 200;
-SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, max_ms_count, CTLFLAG_RWTUN,
-    &vdev_max_ms_count, 0,
+/* default target for number of metaslabs per top-level vdev */
+int zfs_vdev_default_ms_count = 200;
+SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, default_ms_count, CTLFLAG_RWTUN,
+    &zfs_vdev_default_ms_count, 0,
     "Target number of metaslabs per top-level vdev");
 
 /* minimum number of metaslabs per top-level vdev */
-int vdev_min_ms_count = 16;
+int zfs_vdev_min_ms_count = 16;
 SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, min_ms_count, CTLFLAG_RWTUN,
-    &vdev_min_ms_count, 0,
+    &zfs_vdev_min_ms_count, 0,
     "Minimum number of metaslabs per top-level vdev");
 
 /* practical upper limit of total metaslabs per top-level vdev */
-int vdev_ms_count_limit = 1ULL << 17;
+int zfs_vdev_ms_count_limit = 1ULL << 17;
 SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, max_ms_count_limit, CTLFLAG_RWTUN,
-    &vdev_ms_count_limit, 0,
+    &zfs_vdev_ms_count_limit, 0,
     "Maximum number of metaslabs per top-level vdev");
 
 /* lower limit for metaslab size (512M) */
-int vdev_default_ms_shift = 29;
+int zfs_vdev_default_ms_shift = 29;
 SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, default_ms_shift, CTLFLAG_RWTUN,
-    &vdev_default_ms_shift, 0,
+    &zfs_vdev_default_ms_shift, 0,
     "Default shift between vdev size and number of metaslabs");
 
-/* upper limit for metaslab size (256G) */
-int vdev_max_ms_shift = 38;
+/* upper limit for metaslab size (16G) */
+int zfs_vdev_max_ms_shift = 34;
 SYSCTL_INT(_vfs_zfs_vdev, OID_AUTO, max_ms_shift, CTLFLAG_RWTUN,
-    &vdev_max_ms_shift, 0,
+    &zfs_vdev_max_ms_shift, 0,
     "Maximum shift between vdev size and number of metaslabs");
 
 boolean_t vdev_validate_skip = B_FALSE;
@@ -216,6 +216,15 @@ int vdev_standard_sm_blksz = (1 << 17);
 SYSCTL_INT(_vfs_zfs, OID_AUTO, standard_sm_blksz, CTLFLAG_RDTUN,
     &vdev_standard_sm_blksz, 0,
     "Block size for standard space map.  Power of 2 and greater than 4096.");
+
+/*
+ * Tunable parameter for debugging or performance analysis. Setting this
+ * will cause pool corruption on power loss if a volatile out-of-order
+ * write cache is enabled.
+ */
+boolean_t zfs_nocacheflush = B_FALSE;
+SYSCTL_INT(_vfs_zfs, OID_AUTO, cache_flush_disable, CTLFLAG_RWTUN,
+    &zfs_nocacheflush, 0, "Disable cache flush");
 
 /*PRINTFLIKE2*/
 void
@@ -2196,16 +2205,24 @@ void
 vdev_metaslab_set_size(vdev_t *vd)
 {
 	uint64_t asize = vd->vdev_asize;
-	uint64_t ms_count = asize >> vdev_default_ms_shift;
+	uint64_t ms_count = asize >> zfs_vdev_default_ms_shift;
 	uint64_t ms_shift;
 
 	/*
 	 * There are two dimensions to the metaslab sizing calculation:
 	 * the size of the metaslab and the count of metaslabs per vdev.
-	 * In general, we aim for vdev_max_ms_count (200) metaslabs. The
-	 * range of the dimensions are as follows:
 	 *
-	 *	2^29 <= ms_size  <= 2^38
+	 * The default values used below are a good balance between memory
+	 * usage (larger metaslab size means more memory needed for loaded
+	 * metaslabs; more metaslabs means more memory needed for the
+	 * metaslab_t structs), metaslab load time (larger metaslabs take
+	 * longer to load), and metaslab sync time (more metaslabs means
+	 * more time spent syncing all of them).
+	 *
+	 * In general, we aim for zfs_vdev_default_ms_count (200) metaslabs.
+	 * The range of the dimensions are as follows:
+	 *
+	 *	2^29 <= ms_size  <= 2^34
 	 *	  16 <= ms_count <= 131,072
 	 *
 	 * On the lower end of vdev sizes, we aim for metaslabs sizes of
@@ -2214,35 +2231,41 @@ vdev_metaslab_set_size(vdev_t *vd)
 	 * of at least 16 metaslabs will override this minimum size goal.
 	 *
 	 * On the upper end of vdev sizes, we aim for a maximum metaslab
-	 * size of 256GB.  However, we will cap the total count to 2^17
-	 * metaslabs to keep our memory footprint in check.
+	 * size of 16GB.  However, we will cap the total count to 2^17
+	 * metaslabs to keep our memory footprint in check and let the
+	 * metaslab size grow from there if that limit is hit.
 	 *
 	 * The net effect of applying above constrains is summarized below.
 	 *
-	 *	vdev size	metaslab count
-	 *	-------------|-----------------
-	 *	< 8GB		~16
-	 *	8GB - 100GB	one per 512MB
-	 *	100GB - 50TB	~200
-	 *	50TB - 32PB	one per 256GB
-	 *	> 32PB		~131,072
-	 *	-------------------------------
+	 *   vdev size       metaslab count
+	 *  --------------|-----------------
+	 *      < 8GB        ~16
+	 *  8GB   - 100GB   one per 512MB
+	 *  100GB - 3TB     ~200
+	 *  3TB   - 2PB     one per 16GB
+	 *      > 2PB       ~131,072
+	 *  --------------------------------
+	 *
+	 *  Finally, note that all of the above calculate the initial
+	 *  number of metaslabs. Expanding a top-level vdev will result
+	 *  in additional metaslabs being allocated making it possible
+	 *  to exceed the zfs_vdev_ms_count_limit.
 	 */
 
-	if (ms_count < vdev_min_ms_count)
-		ms_shift = highbit64(asize / vdev_min_ms_count);
-	else if (ms_count > vdev_max_ms_count)
-		ms_shift = highbit64(asize / vdev_max_ms_count);
+	if (ms_count < zfs_vdev_min_ms_count)
+		ms_shift = highbit64(asize / zfs_vdev_min_ms_count);
+	else if (ms_count > zfs_vdev_default_ms_count)
+		ms_shift = highbit64(asize / zfs_vdev_default_ms_count);
 	else
-		ms_shift = vdev_default_ms_shift;
+		ms_shift = zfs_vdev_default_ms_shift;
 
 	if (ms_shift < SPA_MAXBLOCKSHIFT) {
 		ms_shift = SPA_MAXBLOCKSHIFT;
-	} else if (ms_shift > vdev_max_ms_shift) {
-		ms_shift = vdev_max_ms_shift;
+	} else if (ms_shift > zfs_vdev_max_ms_shift) {
+		ms_shift = zfs_vdev_max_ms_shift;
 		/* cap the total count to constrain memory footprint */
-		if ((asize >> ms_shift) > vdev_ms_count_limit)
-			ms_shift = highbit64(asize / vdev_ms_count_limit);
+		if ((asize >> ms_shift) > zfs_vdev_ms_count_limit)
+			ms_shift = highbit64(asize / zfs_vdev_ms_count_limit);
 	}
 
 	vd->vdev_ms_shift = ms_shift;
@@ -3031,11 +3054,11 @@ vdev_destroy_spacemaps(vdev_t *vd, dmu_tx_t *tx)
 }
 
 static void
-vdev_remove_empty(vdev_t *vd, uint64_t txg)
+vdev_remove_empty_log(vdev_t *vd, uint64_t txg)
 {
 	spa_t *spa = vd->vdev_spa;
-	dmu_tx_t *tx;
 
+	ASSERT(vd->vdev_islog);
 	ASSERT(vd == vd->vdev_top);
 	ASSERT3U(txg, ==, spa_syncing_txg(spa));
 
@@ -3079,13 +3102,14 @@ vdev_remove_empty(vdev_t *vd, uint64_t txg)
 			ASSERT0(mg->mg_histogram[i]);
 	}
 
-	tx = dmu_tx_create_assigned(spa_get_dsl(spa), txg);
-	vdev_destroy_spacemaps(vd, tx);
+	dmu_tx_t *tx = dmu_tx_create_assigned(spa_get_dsl(spa), txg);
 
-	if (vd->vdev_islog && vd->vdev_top_zap != 0) {
+	vdev_destroy_spacemaps(vd, tx);
+	if (vd->vdev_top_zap != 0) {
 		vdev_destroy_unlink_zap(vd, vd->vdev_top_zap, tx);
 		vd->vdev_top_zap = 0;
 	}
+
 	dmu_tx_commit(tx);
 }
 
@@ -3157,14 +3181,11 @@ vdev_sync(vdev_t *vd, uint64_t txg)
 		vdev_dtl_sync(lvd, txg);
 
 	/*
-	 * Remove the metadata associated with this vdev once it's empty.
-	 * Note that this is typically used for log/cache device removal;
-	 * we don't empty toplevel vdevs when removing them.  But if
-	 * a toplevel happens to be emptied, this is not harmful.
+	 * If this is an empty log device being removed, destroy the
+	 * metadata associated with it.
 	 */
-	if (vd->vdev_stat.vs_alloc == 0 && vd->vdev_removing) {
-		vdev_remove_empty(vd, txg);
-	}
+	if (vd->vdev_islog && vd->vdev_stat.vs_alloc == 0 && vd->vdev_removing)
+		vdev_remove_empty_log(vd, txg);
 
 	(void) txg_list_add(&spa->spa_vdev_txg_list, vd, TXG_CLEAN(txg));
 }
@@ -3604,13 +3625,17 @@ vdev_accessible(vdev_t *vd, zio_t *zio)
 boolean_t
 vdev_is_spacemap_addressable(vdev_t *vd)
 {
+	if (spa_feature_is_active(vd->vdev_spa, SPA_FEATURE_SPACEMAP_V2))
+		return (B_TRUE);
+
 	/*
-	 * Assuming 47 bits of the space map entry dedicated for the entry's
-	 * offset (see description in space_map.h), we calculate the maximum
-	 * address that can be described by a space map entry for the given
-	 * device.
+	 * If double-word space map entries are not enabled we assume
+	 * 47 bits of the space map entry are dedicated to the entry's
+	 * offset (see SM_OFFSET_BITS in space_map.h). We then use that
+	 * to calculate the maximum address that can be described by a
+	 * space map entry for the given device.
 	 */
-	uint64_t shift = vd->vdev_ashift + 47;
+	uint64_t shift = vd->vdev_ashift + SM_OFFSET_BITS;
 
 	if (shift >= 63) /* detect potential overflow */
 		return (B_TRUE);

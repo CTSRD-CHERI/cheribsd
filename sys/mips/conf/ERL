@@ -21,7 +21,7 @@
 
 ident		ERL
 
-makeoptions	ARCH_FLAGS="-march=octeon+ -mabi=64"
+makeoptions	ARCH_FLAGS="-march=octeon+"
 makeoptions	LDSCRIPT_NAME=ldscript.mips.octeon1
 
 makeoptions	KERNLOADADDR=0xffffffff80100000
@@ -149,10 +149,9 @@ device		wlan_amrr	# AMRR transmit rate control algorithm
 
 # Pseudo devices.
 device		loop		# Network loopback
-device		random		# Entropy device
 device		ether		# Ethernet support
 device		vlan		# 802.1Q VLAN support
-device		tun		# Packet tunnel.
+device		tuntap		# Packet tunnel.
 device		md		# Memory "disks"
 device		gif		# IPv6 and IPv4 tunneling
 device		firmware	# firmware assist module

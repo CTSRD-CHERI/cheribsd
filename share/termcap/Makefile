@@ -7,9 +7,11 @@
 #
 MAN=	termcap.5
 
+PACKAGE=	runtime
 FILES=		termcap termcap.db
 FILESDIR=	${BINDIR}/misc
 CLEANFILES+=	termcap.db
+CONFS=		termcap.small
 
 .include <bsd.endian.mk>
 

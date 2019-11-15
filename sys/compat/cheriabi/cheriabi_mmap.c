@@ -53,10 +53,8 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 
-#include <sys/cheriabi.h>
-
 SYSCTL_NODE(_compat, OID_AUTO, cheriabi, CTLFLAG_RW, 0, "CheriABI mode");
-static SYSCTL_NODE(_compat_cheriabi, OID_AUTO, mmap, CTLFLAG_RW, 0, "mmap");
+SYSCTL_NODE(_compat_cheriabi, OID_AUTO, mmap, CTLFLAG_RW, 0, "mmap");
 
 static int	cheriabi_mmap_honor_prot = 1;
 SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, honor_prot,
@@ -66,10 +64,6 @@ static int	cheriabi_mmap_setbounds = 1;
 SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, setbounds,
     CTLFLAG_RWTUN, &cheriabi_mmap_setbounds, 0,
     "Set bounds on returned capabilities.");
-int	cheriabi_mmap_precise_bounds = 1;
-SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
-    CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
-    "Require that bounds on returned capabilities be precise.");
 
 static register_t cheriabi_mmap_prot2perms(int prot);
 
@@ -207,12 +201,16 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 	 */
 	switch (flags & MAP_ALIGNMENT_MASK) {
 	case MAP_ALIGNED(0):
-		/*
-		 * Request CHERI data alignment when no other request
-		 * is made.
-		 */
 		flags &= ~MAP_ALIGNMENT_MASK;
-		flags |= MAP_ALIGNED_CHERI;
+		/*
+		 * Request CHERI data alignment when no other request is made.
+		 * However, do not request alignment if both MAP_FIXED and
+		 * MAP_CHERI_NOSETBOUNDS is set since that means we are filling
+		 * in reserved address space from a file or MAP_ANON memory.
+		 */
+		if (!((flags & MAP_FIXED) && (flags & MAP_CHERI_NOSETBOUNDS))) {
+			flags |= MAP_ALIGNED_CHERI;
+		}
 		break;
 	case MAP_ALIGNED_CHERI:
 	case MAP_ALIGNED_CHERI_SEAL:
@@ -228,7 +226,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		 * precisely representable.
 		 */
 		if (uap->len < PDRSIZE &&
-		    CHERI_ALIGN_SHIFT(uap->len) > PAGE_SHIFT) {
+		    CHERI_REPRESENTABLE_ALIGNMENT(uap->len) > (1UL << PAGE_SHIFT)) {
 			flags &= ~MAP_ALIGNMENT_MASK;
 			flags |= MAP_ALIGNED_CHERI;
 		}
@@ -248,15 +246,21 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		 * it is too small.  If is, promote the request to
 		 * MAP_ALIGNED_CHERI.
 		 *
+		 * However, do not request alignment if both MAP_FIXED and
+		 * MAP_CHERI_NOSETBOUNDS is set since that means we are filling
+		 * in reserved address space from a file or MAP_ANON memory.
+		 *
 		 * XXX: It seems likely a user passing too small an
 		 * alignment will have also passed an invalid length,
 		 * but upgrading the alignment is always safe and
 		 * we'll catch the length later.
 		 */
-		if ((flags >> MAP_ALIGNMENT_SHIFT) <
-		    CHERI_ALIGN_SHIFT(uap->len)) {
-			flags &= ~MAP_ALIGNMENT_MASK;
-			flags |= MAP_ALIGNED_CHERI;
+		if (!((flags & MAP_FIXED) && (flags & MAP_CHERI_NOSETBOUNDS))) {
+			if ((1UL << (flags >> MAP_ALIGNMENT_SHIFT)) <
+			    CHERI_REPRESENTABLE_ALIGNMENT(uap->len)) {
+				flags &= ~MAP_ALIGNMENT_MASK;
+				flags |= MAP_ALIGNED_CHERI;
+			}
 		}
 		break;
 	}
@@ -268,7 +272,7 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 	memset(&mr, 0, sizeof(mr));
 	mr.mr_hint = hint;
 	mr.mr_max_addr = cheri_gettop(source_cap);
-	mr.mr_size = uap->len;
+	mr.mr_len = uap->len;
 	mr.mr_prot = uap->prot;
 	mr.mr_flags = flags;
 	mr.mr_fd = uap->fd;
@@ -368,7 +372,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 {
 	void * __capability newcap;
 	size_t cap_base, cap_len;
-	register_t perms;
+	register_t perms, cap_prot;
 
 	/*
 	 * In the strong case (cheriabi_mmap_setbounds), return the original
@@ -390,11 +394,18 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 	if (cheriabi_mmap_honor_prot) {
 		perms = cheri_getperm(newcap);
 		/*
+		 * If PROT_MAX() was not passed, use the prot value to derive
+		 * capability permissions.
+		 */
+		cap_prot = PROT_MAX_EXTRACT(mrp->mr_prot);
+		if (cap_prot == 0)
+			cap_prot = PROT_EXTRACT(mrp->mr_prot);
+		/*
 		 * Set the permissions to PROT_MAX to allow a full
 		 * range of access subject to page permissions.
 		 */
 		newcap = cheri_andperm(newcap, ~PERM_RWX |
-		    cheriabi_mmap_prot2perms(EXTRACT_PROT_MAX(mrp->mr_prot)));
+		    cheriabi_mmap_prot2perms(cap_prot));
 	}
 
 	if (mrp->mr_flags & MAP_FIXED) {
@@ -412,7 +423,7 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 		newcap = cheri_setoffset(newcap,
 		    rounddown2(addr, PAGE_SIZE) - cap_base);
 		newcap = cheri_csetbounds(newcap,
-		    roundup2(mrp->mr_size + (addr - rounddown2(addr, PAGE_SIZE)),
+		    roundup2(mrp->mr_len + (addr - rounddown2(addr, PAGE_SIZE)),
 		    PAGE_SIZE));
 		/* Shift offset up if required */
 		cap_base = cheri_getbase(newcap);
@@ -421,14 +432,14 @@ cheriabi_mmap_retcap(struct thread *td, vm_offset_t addr,
 		cap_base = cheri_getbase(newcap);
 		cap_len = cheri_getlen(newcap);
 		KASSERT(addr >= cap_base &&
-		    addr + mrp->mr_size <= cap_base + cap_len,
+		    addr + mrp->mr_len <= cap_base + cap_len,
 		    ("Allocated range (%zx - %zx) is not within source "
-		    "capability (%zx - %zx)", addr, addr + mrp->mr_size,
+		    "capability (%zx - %zx)", addr, addr + mrp->mr_len,
 		    cap_base, cap_base + cap_len));
 		newcap = cheri_setoffset(newcap, addr - cap_base);
 		if (cheriabi_mmap_setbounds)
 			newcap = cheri_csetbounds(newcap,
-			    roundup2(mrp->mr_size, PAGE_SIZE));
+			    roundup2(mrp->mr_len, PAGE_SIZE));
 	}
 
 	return (newcap);

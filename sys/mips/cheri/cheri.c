@@ -32,8 +32,6 @@
 
 #include <sys/param.h>
 #include <sys/kernel.h>
-#include <sys/cheri_serial.h>
-#include <sys/mman.h>
 #include <sys/proc.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysctl.h>
@@ -46,6 +44,7 @@
 
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <cheri/cheri_serial.h>
 
 #include <machine/atomic.h>
 #include <machine/cherireg.h>
@@ -62,8 +61,8 @@
 #include <vm/vm_map.h>
 
 CTASSERT(sizeof(void * __capability) == CHERICAP_SIZE);
-/* 28 capability registers + capcause + padding. */
-CTASSERT(sizeof(struct cheri_frame) == (29 * CHERICAP_SIZE));
+/* 33 capability registers + capcause + capvalid + padding. */
+CTASSERT(sizeof(struct cheri_frame) == (34 * CHERICAP_SIZE));
 
 /*
  * Beginnings of a programming interface for explicitly managing capability
@@ -101,12 +100,10 @@ CTASSERT(offsetof(struct mdthread, md_cheri_mmap_cap) % CHERICAP_SIZE == 0);
 #ifdef CPU_CHERI128
 CTASSERT(sizeof(void *) == 8);
 CTASSERT(sizeof(void * __capability) == 16);
-CTASSERT(sizeof(struct chericap) == 16);
 CTASSERT(sizeof(struct cheri_object) == 32);
 #else
 CTASSERT(sizeof(void *) == 8);
 CTASSERT(sizeof(void * __capability) == 32);
-CTASSERT(sizeof(struct chericap) == 32);
 CTASSERT(sizeof(struct cheri_object) == 64);
 #endif
 
@@ -214,8 +211,9 @@ _cheri_capability_build_user_rwx(uint32_t perms, vaddr_t basep, size_t length,
 	    cheri_setoffset(userspace_cap, basep), length), perms), off);
 
 	KASSERT(cheri_getlen(tmpcap) == length,
-	    ("%s:%d: Constructed capability has wrong length 0x%zx != 0x%zx",
-	    func, line, cheri_getlen(tmpcap), length));
+	    ("%s:%d: Constructed capability has wrong length 0x%zx != 0x%zx: "
+	    _CHERI_PRINTF_CAP_FMT, func, line, cheri_getlen(tmpcap), length,
+	    _CHERI_PRINTF_CAP_ARG(tmpcap)));
 
 	return (tmpcap);
 }
@@ -235,7 +233,7 @@ cheri_capability_set_user_sigcode(void * __capability *cp,
 		 * support...
 		 */
 		base = (uintptr_t)se->sv_psstrings - szsigcode;
-		base = rounddown2(base, sizeof(struct chericap));
+		base = rounddown2(base, sizeof(void * __capability));
 	}
 
 	*cp = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,

@@ -156,17 +156,14 @@ options 	BOOT_TAG=\"\"
 options 	BOOT_TAG_SZ=32
 
 options 	GEOM_BDE		# Disk encryption.
-options 	GEOM_BSD		# BSD disklabels (obsolete, gone in 12)
 options 	GEOM_CACHE		# Disk cache.
 options 	GEOM_CONCAT		# Disk concatenation.
 options 	GEOM_ELI		# Disk encryption.
-options 	GEOM_FOX		# Redundant path mitigation (obsolete, gone in 12)
 options 	GEOM_GATE		# Userland services.
 options 	GEOM_JOURNAL		# Journaling.
 options 	GEOM_LABEL		# Providers labelization.
 options 	GEOM_LINUX_LVM		# Linux LVM2 volumes
 options 	GEOM_MAP		# Map based partitioning
-options 	GEOM_MBR		# DOS/MBR partitioning (obsolete, gone in 12)
 options 	GEOM_MIRROR		# Disk mirroring.
 options 	GEOM_MULTIPATH		# Disk multipath
 options 	GEOM_NOP		# Test class.
@@ -183,11 +180,9 @@ options 	GEOM_RAID		# Soft RAID functionality.
 options 	GEOM_RAID3		# RAID3 functionality.
 options 	GEOM_SHSEC		# Shared secret.
 options 	GEOM_STRIPE		# Disk striping.
-options 	GEOM_SUNLABEL		# Sun/Solaris partitioning (obsolete, gone in 12)
 options 	GEOM_UZIP		# Read-only compressed disks
 options 	GEOM_VINUM		# Vinum logical volume manager
 options 	GEOM_VIRSTOR		# Virtual storage.
-options 	GEOM_VOL		# Volume names from UFS superblock (obsolete, gone in 12)
 options 	GEOM_ZERO		# Performance testing helper.
 
 #
@@ -338,16 +333,6 @@ options 	UMTX_PROFILING
 
 #####################################################################
 # COMPATIBILITY OPTIONS
-
-#
-# Implement system calls compatible with 4.3BSD and older versions of
-# FreeBSD.  You probably do NOT want to remove this as much current code
-# still relies on the 4.3 emulation.  Note that some architectures that
-# are supported by FreeBSD do not include support for certain important
-# aspects of this compatibility option, namely those related to the
-# signal delivery mechanism.
-#
-options 	COMPAT_43
 
 # Old tty interface.
 options 	COMPAT_43TTY
@@ -655,6 +640,7 @@ options 	ROUTETABLES=2		# allocated fibs up to 65536. default is 1.
 					# but that would be a bad idea as they are large.
 
 options 	TCP_OFFLOAD		# TCP offload support.
+options		TCP_RFC7413		# TCP Fast Open
 
 options		TCPHPTS
 
@@ -667,6 +653,10 @@ options 	IPSEC			#IP security (requires device crypto)
 # configuration.
 options		IPSEC_SUPPORT
 #options 	IPSEC_DEBUG		#debug for IP security
+
+
+# TLS framing and encryption of data transmitted over TCP sockets.
+options		KERN_TLS		# TLS transmit offload
 
 #
 # SMB/CIFS requester
@@ -898,11 +888,9 @@ device		epair
 #  which discards all packets sent and receives none.
 device		edsc
 
-#  The `tap' device is a pty-like virtual Ethernet interface
-device		tap
-
-#  The `tun' device implements (user-)ppp and nos-tun(8)
-device		tun
+#  The `tuntap' device implements (user-)ppp, nos-tun(8) and a pty-like virtual
+#  Ethernet interface
+device		tuntap
 
 #  The `gif' device implements IPv6 over IP4 tunneling,
 #  IPv4 over IPv6 tunneling, IPv4 over IPv4 tunneling and
@@ -1050,9 +1038,17 @@ options 	TCP_SIGNATURE		#include support for RFC 2385
 # a smooth scheduling of the traffic.
 options 	DUMMYNET
 
+# The DEBUGNET option enables a basic debug/panic-time networking API.  It
+# is used by NETDUMP and NETGDB.
+options 	DEBUGNET
+
 # The NETDUMP option enables netdump(4) client support in the kernel.
 # This allows a panicking kernel to transmit a kernel dump to a remote host.
 options 	NETDUMP
+
+# The NETGDB option enables netgdb(4) support in the kernel.  This allows a
+# panicking kernel to be debugged as a GDB remote over the network.
+options 	NETGDB
 
 #####################################################################
 # FILESYSTEM OPTIONS
@@ -1172,9 +1168,6 @@ options 	NFS_DEBUG		# Enable NFS Debugging
 #
 options 	EXT2FS
 
-# Cryptographically secure random number generator; /dev/random
-device		random
-
 # The system memory devices; /dev/mem, /dev/kmem
 device		mem
 
@@ -1274,8 +1267,7 @@ options 	FFCLOCK
 # removed a disk drive, you may have had to rewrite your /etc/fstab
 # file, and also that you had to be careful when adding a new disk
 # as it may have been probed earlier and moved your device configuration
-# around.  (See also option GEOM_VOL for a different solution to this
-# problem.)
+# around.
 
 # This old behavior is maintained as the default behavior.  The unit
 # assignment begins with the first non-wired down unit for a device
@@ -1470,67 +1462,6 @@ options		KBDMUX_DFLT_KEYMAP	# specify the built-in keymap
 makeoptions	KBDMUX_DFLT_KEYMAP=it.iso
 
 options 	FB_DEBUG		# Frame buffer debugging
-
-device		splash			# Splash screen and screen saver support
-
-# Various screen savers.
-device		blank_saver
-device		daemon_saver
-device		dragon_saver
-device		fade_saver
-device		fire_saver
-device		green_saver
-device		logo_saver
-device		rain_saver
-device		snake_saver
-device		star_saver
-device		warp_saver
-
-# The syscons console driver (SCO color console compatible).
-device		sc
-hint.sc.0.at="isa"
-options 	MAXCONS=16		# number of virtual consoles
-options 	SC_ALT_MOUSE_IMAGE	# simplified mouse cursor in text mode
-options 	SC_DFLT_FONT		# compile font in
-makeoptions	SC_DFLT_FONT=cp850
-options 	SC_DFLT_TERM=\"sc\"	# default terminal emulator
-options 	SC_DISABLE_KDBKEY	# disable `debug' key
-options 	SC_DISABLE_REBOOT	# disable reboot key sequence
-options 	SC_HISTORY_SIZE=200	# number of history buffer lines
-options 	SC_MOUSE_CHAR=0x3	# char code for text mode mouse cursor
-options 	SC_PIXEL_MODE		# add support for the raster text mode
-
-# The following options will let you change the default colors of syscons.
-options 	SC_NORM_ATTR=(FG_GREEN|BG_BLACK)
-options 	SC_NORM_REV_ATTR=(FG_YELLOW|BG_GREEN)
-options 	SC_KERNEL_CONS_ATTR=(FG_RED|BG_BLACK)
-options 	SC_KERNEL_CONS_ATTRS=\"\x0c\x0d\x0e\x0f\x02\x09\x0a\x0b\"
-options 	SC_KERNEL_CONS_REV_ATTR=(FG_BLACK|BG_RED)
-
-# The following options will let you change the default behavior of
-# cut-n-paste feature
-options 	SC_CUT_SPACES2TABS	# convert leading spaces into tabs
-options 	SC_CUT_SEPCHARS=\"x09\"	# set of characters that delimit words
-					# (default is single space - \"x20\")
-
-# If you have a two button mouse, you may want to add the following option
-# to use the right button of the mouse to paste text.
-options 	SC_TWOBUTTON_MOUSE
-
-# You can selectively disable features in syscons.
-options 	SC_NO_CUTPASTE
-options 	SC_NO_FONT_LOADING
-options 	SC_NO_HISTORY
-options 	SC_NO_MODE_CHANGE
-options 	SC_NO_SYSMOUSE
-options 	SC_NO_SUSPEND_VTYSWITCH
-#!options 	SC_NO_TERM_DUMB
-#!options 	SC_NO_TERM_SC
-#!options 	SC_NO_TERM_SCTEKEN
-
-# `flags' for sc
-#	0x80	Put the video card in the VESA 800x600 dots, 16 color mode
-#	0x100	Probe for a keyboard device periodically if one is not present
 
 # Enable experimental features of the syscons terminal emulator (teken).
 options 	TEKEN_CONS25		# cons25-style terminal emulation
@@ -1773,32 +1704,6 @@ hint.ata.1.port="0x170"
 hint.ata.1.irq="15"
 
 #
-# Standard floppy disk controllers and floppy tapes, supports
-# the Y-E DATA External FDD (PC Card)
-#
-device		fdc
-hint.fdc.0.at="isa"
-hint.fdc.0.port="0x3F0"
-hint.fdc.0.irq="6"
-hint.fdc.0.drq="2"
-#
-# FDC_DEBUG enables floppy debugging.  Since the debug output is huge, you
-# gotta turn it actually on by setting the variable fd_debug with DDB,
-# however.
-options 	FDC_DEBUG
-#
-# Activate this line if you happen to have an Insight floppy tape.
-# Probing them proved to be dangerous for people with floppy disks only,
-# so it's "hidden" behind a flag:
-#hint.fdc.0.flags="1"
-
-# Specify floppy devices
-hint.fd.0.at="fdc0"
-hint.fd.0.drive="0"
-hint.fd.1.at="fdc0"
-hint.fd.1.drive="1"
-
-#
 # uart: newbusified driver for serial interfaces.  It consolidates the sio(4),
 #	sab(4) and zs(4) drivers.
 #
@@ -1938,13 +1843,7 @@ device		xmphy		# XaQti XMAC II
 #       SVEC PN102-TX, CNet Pro110B, 120A, and 120B, Compex RL100-TX,
 #       LinkSys LNE100TX, LNE100TX V2.0, Jaton XpressNet, Alfa Inc GFC2204,
 #       KNE110TX.
-# de:   Digital Equipment DC21040
 # em:   Intel Pro/1000 Gigabit Ethernet 82542, 82543, 82544 based adapters.
-# ep:   3Com 3C509, 3C529, 3C556, 3C562D, 3C563D, 3C572, 3C574X, 3C579, 3C589
-#       and PC Card devices using these chipsets.
-# ex:   Intel EtherExpress Pro/10 and other i82595-based adapters,
-#       Olicom Ethernet PC Card devices.
-# fe:   Fujitsu MB86960A/MB86965A Ethernet
 # fxp:  Intel EtherExpress Pro/100B
 #	(hint of prefer_iomap can be done to prefer I/O instead of Mem mapping)
 # gem:  Apple GMAC/Sun ERI/Sun GEM
@@ -1963,6 +1862,7 @@ device		xmphy		# XaQti XMAC II
 #	Yukon II Gigabit controllers, including 88E8021, 88E8022, 88E8061,
 #	88E8062, 88E8035, 88E8036, 88E8038, 88E8050, 88E8052, 88E8053,
 #	88E8055, 88E8056 and D-Link 560T/550SX.
+# mlxfw: Mellanox firmware update module.
 # mlx5:	Mellanox ConnectX-4 and ConnectX-4 LX IB and Eth shared code module.
 # mlx5en:Mellanox ConnectX-4 and ConnectX-4 LX PCIe Ethernet adapters.
 # my:	Myson Fast Ethernet (MTD80X, MTD89X)
@@ -1972,12 +1872,6 @@ device		xmphy		# XaQti XMAC II
 #	GigaNIX 1000TA and 1000TPC, the Addtron AEG320T, the Surecom
 #	EP-320G-TX and the Netgear GA622T.
 # oce:	Emulex 10 Gbit adapters (OneConnect Ethernet)
-# pcn:	Support for PCI fast ethernet adapters based on the AMD Am79c97x
-#	PCnet-FAST, PCnet-FAST+, PCnet-FAST III, PCnet-PRO and PCnet-Home
-#	chipsets. These can also be handled by the le(4) driver if the
-#	pcn(4) driver is left out of the kernel. The le(4) driver does not
-#	support the additional features like the MII bus and burst mode of
-#	the PCnet-FAST and greater chipsets though.
 # ral:	Ralink Technology IEEE 802.11 wireless adapter
 # re:   RealTek 8139C+/8169/816xS/811xS/8101E PCI/PCIe Ethernet adapter
 # rl:   Support for PCI fast ethernet adapters based on the RealTek 8129/8139
@@ -1990,11 +1884,6 @@ device		xmphy		# XaQti XMAC II
 #       chipset and is supported by this driver, not the 'vr' driver.
 # rtwn: RealTek wireless adapters.
 # rtwnfw: RealTek wireless firmware.
-# sf:   Support for Adaptec Duralink PCI fast ethernet adapters based on the
-#       Adaptec AIC-6915 "starfire" controller.
-#       This includes dual and quad port cards, as well as one 100baseFX card.
-#       Most of these are 64-bit PCI devices, except for one single port
-#       card which is 32-bit.
 # sge:  Silicon Integrated Systems SiS190/191 Fast/Gigabit Ethernet adapter
 # sis:  Support for NICs based on the Silicon Integrated Systems SiS 900,
 #       SiS 7016 and NS DP83815 PCI fast ethernet controller chips.
@@ -2004,8 +1893,6 @@ device		xmphy		# XaQti XMAC II
 #       (also single mode and multimode).
 #       The driver will autodetect the number of ports on the card and
 #       attach each one as a separate network interface.
-# sn:   Support for ISA and PC Card Ethernet devices using the
-#       SMC91C90/92/94/95 chips.
 # ste:  Sundance Technologies ST201 PCI fast ethernet controller, includes
 #       the D-Link DFE-550TX.
 # stge: Support for gigabit ethernet adapters based on the Sundance/Tamarack
@@ -2015,28 +1902,14 @@ device		xmphy		# XaQti XMAC II
 #       Tigon 1 and Tigon 2 chipsets.  This includes the Alteon AceNIC, the
 #       3Com 3c985, the Netgear GA620 and various others.  Note that you will
 #       probably want to bump up kern.ipc.nmbclusters a lot to use this driver.
-# tl:   Support for the Texas Instruments TNETE100 series 'ThunderLAN'
-#       cards and integrated ethernet controllers.  This includes several
-#       Compaq Netelligent 10/100 cards and the built-in ethernet controllers
-#       in several Compaq Prosignia, Proliant and Deskpro systems.  It also
-#       supports several Olicom 10Mbps and 10/100 boards.
-# tx:   SMC 9432 TX, BTX and FTX cards. (SMC EtherPower II series)
-# txp:	Support for 3Com 3cR990 cards with the "Typhoon" chipset
 # vr:   Support for various fast ethernet adapters based on the VIA
 #       Technologies VT3043 `Rhine I' and VT86C100A `Rhine II' chips,
 #       including the D-Link DFE520TX and D-Link DFE530TX (see 'rl' for
 #       DFE530TX+), the Hawking Technologies PN102TX, and the AOpen/Acer ALN-320.
 # vte:  DM&P Vortex86 RDC R6040 Fast Ethernet
-# vx:   3Com 3C590 and 3C595
-# wb:   Support for fast ethernet adapters based on the Winbond W89C840F chip.
-#       Note: this is not the same as the Winbond W89C940F, which is a
-#       NE2000 clone.
 # wi:   Lucent WaveLAN/IEEE 802.11 PCMCIA adapters. Note: this supports both
 #       the PCMCIA and ISA cards: the ISA card is really a PCMCIA to ISA
 #       bridge with a PCMCIA adapter plugged into it.
-# xe:   Xircom/Intel EtherExpress Pro100/16 PC Card ethernet controller,
-#       Accton Fast EtherCard-16, Compaq Netelligent 10/100 PC Card,
-#       Toshiba 10/100 Ethernet PC Card, Xircom 16-bit Ethernet + Modem 56
 # xl:   Support for the 3Com 3c900, 3c905, 3c905B and 3c905C (Fast)
 #       Etherlink XL cards and integrated controllers.  This includes the
 #       integrated 3c905B-TX chips in certain Dell Optiplex and Dell
@@ -2046,18 +1919,8 @@ device		xmphy		# XaQti XMAC II
 
 # Order for ISA devices is important here
 
-device		ep
-device		ex
-device		fe
-hint.fe.0.at="isa"
-hint.fe.0.port="0x300"
-device		sn
-hint.sn.0.at="isa"
-hint.sn.0.port="0x300"
-hint.sn.0.irq="10"
 device		an
 device		wi
-device		xe
 
 # PCI Ethernet NICs that use the common MII bus controller code.
 device		ae		# Attansic/Atheros L2 FastEthernet
@@ -2076,6 +1939,7 @@ device		gem		# Apple GMAC/Sun ERI/Sun GEM
 device		hme		# Sun HME (Happy Meal Ethernet)
 device		jme		# JMicron JMC250 Gigabit/JMC260 Fast Ethernet
 device		lge		# Level 1 LXT1001 gigabit Ethernet
+device		mlxfw		# Mellanox firmware update module
 device		mlx5		# Shared code module between IB and Ethernet
 device		mlx5en		# Mellanox ConnectX-4 and ConnectX-4 LX
 device		msk		# Marvell/SysKonnect Yukon II Gigabit Ethernet
@@ -2083,18 +1947,13 @@ device		my		# Myson Fast Ethernet (MTD80X, MTD89X)
 device		nge		# NatSemi DP83820 gigabit Ethernet
 device		re		# RealTek 8139C+/8169/8169S/8110S
 device		rl		# RealTek 8129/8139
-device		pcn		# AMD Am79C97x PCI 10/100 NICs
-device		sf		# Adaptec AIC-6915 (``Starfire'')
 device		sge		# Silicon Integrated Systems SiS190/191
 device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
 device		sk		# SysKonnect SK-984x & SK-982x gigabit Ethernet
 device		ste		# Sundance ST201 (D-Link DFE-550TX)
 device		stge		# Sundance/Tamarack TC9021 gigabit Ethernet
-device		tl		# Texas Instruments ThunderLAN
-device		tx		# SMC EtherPower II (83c170 ``EPIC'')
 device		vr		# VIA Rhine, Rhine II
 device		vte		# DM&P Vortex86 RDC R6040 Fast Ethernet
-device		wb		# Winbond W89C840F
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 
 # PCI/PCI-X/PCIe Ethernet NICs that use iflib infrastructure
@@ -2108,13 +1967,10 @@ device		cxgb		# Chelsio T3 10 Gigabit Ethernet
 device		cxgb_t3fw	# Chelsio T3 10 Gigabit Ethernet firmware
 device		cxgbe		# Chelsio T4-T6 1/10/25/40/100 Gigabit Ethernet
 device		cxgbev		# Chelsio T4-T6 Virtual Functions
-device		de		# DEC/Intel DC21x4x (``Tulip'')
 device		le		# AMD Am7900 LANCE and Am79C9xx PCnet
 device		mxge		# Myricom Myri-10G 10GbE NIC
 device		oce		# Emulex 10 GbE (OneConnect Ethernet)
 device		ti		# Alteon Networks Tigon I/II gigabit Ethernet
-device		txp		# 3Com 3cR990 (``Typhoon'')
-device		vx		# 3Com 3c590, 3c595 (``Vortex'')
 
 # PCI IEEE 802.11 Wireless NICs
 device		ath		# Atheros pci/cardbus NIC's
@@ -2475,14 +2331,20 @@ device		iicoc		# OpenCores I2C controller support
 
 # I2C peripheral devices
 #
+device		ad7418		# Analog Devices temp and voltage sensor
+device		ads111x		# Texas Instruments ADS101x and ADS111x ADCs
 device		ds1307		# Dallas DS1307 RTC and compatible
 device		ds13rtc		# All Dallas/Maxim ds13xx chips
 device		ds1672		# Dallas DS1672 RTC
 device		ds3231		# Dallas DS3231 RTC + temperature
 device		icee		# AT24Cxxx and compatible EEPROMs
+device		isl12xx		# Intersil ISL12xx RTC
 device		lm75		# LM75 compatible temperature sensor
 device		nxprtc		# NXP RTCs: PCA/PFC212x PCA/PCF85xx
+device		rtc8583		# Epson RTC-8583
 device		s35390a		# Seiko Instruments S-35390A RTC
+device		sy8106a		# Silergy Corp. SY8106A buck regulator
+device		syr827		# Silergy Corp. DC/DC regulator
 
 # Parallel-Port Bus
 #
@@ -2529,6 +2391,23 @@ device		ppi
 device		pps
 device		lpbb
 device		pcfclock
+
+# General Purpose I/O pins
+device		dwgpio		# Synopsys DesignWare APB GPIO Controller
+device  	gpio		# gpio interfaces and bus support
+device  	gpiobacklight	# sysctl control of gpio-based backlight
+device  	gpioiic		# i2c via gpio bitbang
+device  	gpiokeys	# kbd(4) glue for gpio-based key input
+device  	gpioled		# led(4) gpio glue
+device  	gpiopower	# event handler for gpio-based powerdown
+device  	gpiopps		# Pulse per second input from gpio pin
+device  	gpioregulator	# extres/regulator glue for gpio pin
+device  	gpiospi		# SPI via gpio bitbang
+device  	gpioths		# 1-wire temp/humidity sensor on gpio pin
+
+# Pulse width modulation
+device  	pwmbus		# pwm interface and bus support
+device  	pwmc		# userland control access to pwm outputs
 
 #
 # Etherswitch framework and drivers
@@ -2987,8 +2866,8 @@ options         IMAGACT_BINMISC
 # This enables support for compressed core dumps.
 options 	GZIO
 
-# zstd I/O stream support
-# This enables support for Zstd compressed core dumps.
+# zstd support
+# This enables support for Zstd compressed core dumps and GEOM_UZIP images.
 options 	ZSTDIO
 
 # BHND(4) drivers
@@ -3014,4 +2893,9 @@ device		spigen		# Generic access to SPI devices from userland.
 # Enable legacy /dev/spigenN name aliases for /dev/spigenX.Y devices.
 options 	SPIGEN_LEGACY_CDEVNAME # legacy device names for spigen
 
+# Compression supports.
+device		zlib		# gzip/zlib compression/decompression library
 device		xz		# xz_embedded LZMA de-compression library
+
+# Kernel support for stats(3).
+options 	STATS

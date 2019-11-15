@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/ktr.h>
 #include <sys/module.h>
 #include <sys/systm.h>
 
@@ -397,7 +398,6 @@ do_rx_iscsi_ddp(struct sge_iq *iq, const struct rss_header *rss, struct mbuf *m)
 	tp->t_rcvtime = ticks;
 
 	/* update rx credits */
-	toep->rx_credits += pdu_len;
 	t4_rcvd(&toep->td->tod, tp);	/* XXX: sc->tom_softc.tod */
 
 	so = inp->inp_socket;
@@ -412,12 +412,12 @@ do_rx_iscsi_ddp(struct sge_iq *iq, const struct rss_header *rss, struct mbuf *m)
 		SOCKBUF_UNLOCK(sb);
 		INP_WUNLOCK(inp);
 
-		INP_INFO_RLOCK_ET(&V_tcbinfo, et);
+		NET_EPOCH_ENTER(et);
 		INP_WLOCK(inp);
 		tp = tcp_drop(tp, ECONNRESET);
 		if (tp)
 			INP_WUNLOCK(inp);
-		INP_INFO_RUNLOCK_ET(&V_tcbinfo, et);
+		NET_EPOCH_EXIT(et);
 
 		icl_cxgbei_conn_pdu_free(NULL, ip);
 #ifdef INVARIANTS

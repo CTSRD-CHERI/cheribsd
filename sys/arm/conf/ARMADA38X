@@ -11,7 +11,6 @@ ident 	ARMADA38X
 
 options 	SOC_MV_ARMADA38X
 
-makeoptions 	WERROR="-Werror"
 makeoptions 	MODULES_EXTRA="dtb/mv"
 
 #options 	MD_ROOT
@@ -25,7 +24,6 @@ options 	SMP
 options		VM_KMEM_SIZE_MAX=0x9CCD000
 
 # Pseudo devices
-device		random
 device		pty
 device		loop
 device		md

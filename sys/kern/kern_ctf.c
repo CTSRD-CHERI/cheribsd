@@ -40,21 +40,7 @@
 #define CTF_HDR_STRLEN_U32	8
 
 #ifdef DDB_CTF
-static void *
-z_alloc(void *nil, u_int items, u_int size)
-{
-	void *ptr;
-
-	ptr = malloc(items * size, M_TEMP, M_NOWAIT);
-	return ptr;
-}
-
-static void
-z_free(void *nil, void *ptr)
-{
-	free(ptr, M_TEMP);
-}
-
+#include <contrib/zlib/zlib.h>
 #endif
 
 static int
@@ -193,8 +179,12 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 	    NOCRED, NULL, td)) != 0)
 		goto out;
 
-	/* Check the CTF magic number. (XXX check for big endian!) */
+	/* Check the CTF magic number. */
+#ifdef __LITTLE_ENDIAN__
 	if (ctf_hdr[0] != 0xf1 || ctf_hdr[1] != 0xcf) {
+#else
+	if (ctf_hdr[0] != 0xcf || ctf_hdr[1] != 0xf1) {
+#endif
 		printf("%s(%d): module %s has invalid format\n",
 		    __func__, __LINE__, lf->pathname);
 		error = EFTYPE;
@@ -265,8 +255,6 @@ link_elf_ctf_get(linker_file_t lf, linker_ctf_t *lc)
 
 		/* Initialise the zlib structure. */
 		bzero(&zs, sizeof(zs));
-		zs.zalloc = z_alloc;
-		zs.zfree = z_free;
 
 		if (inflateInit(&zs) != Z_OK) {
 			error = EIO;

@@ -157,7 +157,7 @@ bool checkKeyMgrRegisteredFDEs(uintptr_t pc, void *&fde) {
       CFI_Parser<LocalAddressSpace>::FDE_Info fdeInfo;
       CFI_Parser<LocalAddressSpace>::CIE_Info cieInfo;
       const char *msg = CFI_Parser<LocalAddressSpace>::decodeFDE(
-                                      LocalAddressSpace::sThisAddressSpace,
+                                      LocalAddressSpace::sThisAddressSpace, pc,
                                       (uintptr_t)ob->fde, &fdeInfo, &cieInfo);
       if (msg == NULL) {
         // Check if this FDE is for a function that includes the pc

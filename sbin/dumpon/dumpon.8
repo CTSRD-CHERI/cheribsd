@@ -28,7 +28,7 @@
 .\"     From: @(#)swapon.8	8.1 (Berkeley) 6/5/93
 .\" $FreeBSD$
 .\"
-.Dd November 17, 2018
+.Dd May 23, 2019
 .Dt DUMPON 8
 .Os
 .Sh NAME
@@ -36,13 +36,19 @@
 .Nd "specify a device for crash dumps"
 .Sh SYNOPSIS
 .Nm
+.Op Fl i Ar index
+.Op Fl r
 .Op Fl v
+.Op Fl C Ar cipher
 .Op Fl k Ar pubkey
 .Op Fl Z
 .Op Fl z
 .Ar device
 .Nm
+.Op Fl i Ar index
+.Op Fl r
 .Op Fl v
+.Op Fl C Ar cipher
 .Op Fl k Ar pubkey
 .Op Fl Z
 .Op Fl z
@@ -72,8 +78,38 @@ and
 .Va dumpon_flags .
 For more information on this usage, see
 .Xr rc.conf 5 .
+.Pp
+Starting in
+.Fx 13.0 ,
+.Nm
+can configure a series of fallback dump devices.
+For example, an administrator may prefer
+.Xr netdump 4
+by default, but if the
+.Xr netdump 4
+service cannot be reached or some other failure occurs, they might choose a
+local disk dump as a second choice option.
 .Ss General options
 .Bl -tag -width _k_pubkey
+.It Fl i Ar index
+Insert the specified dump configuration into the prioritized fallback dump
+device list at the specified index, starting at zero.
+.Pp
+If
+.Fl i
+is not specified, the configured dump device is appended to the prioritized
+list.
+.It Fl r
+Remove the specified dump device configuration or configurations from the
+fallback dump device list rather than inserting or appending it.
+In contrast,
+.Do
+.Nm
+off
+.Dc
+removes all configured devices.
+Conflicts with
+.Fl i .
 .It Fl k Ar pubkey
 Configure encrypted kernel dumps.
 .Pp
@@ -95,8 +131,16 @@ The goal of the mechanism is to provide confidentiality.
 The
 .Va pubkey
 file should be a PEM-formatted RSA key of at least 1024 bits.
+.It Fl C Ar cipher
+Select the symmetric algorithm used for encrypted kernel crash dump.
+The default is
+.Dq chacha20
+but
+.Dq aes256-cbc
+is also available.
+(AES256-CBC mode does not work in conjunction with compression.)
 .It Fl l
-List the currently configured dump device, or /dev/null if no device is
+List the currently configured dump device(s), or /dev/null if no devices are
 configured.
 .It Fl v
 Enable verbose mode.
@@ -283,6 +327,45 @@ Note that the live kernel might be at a different path
 which can be examined by looking at the
 .Va kern.bootfile
 .Xr sysctl 8 .
+.Pp
+The
+.Nm
+.Xr rc 8
+script runs early during boot, typically before networking is configured.
+This makes it unsuitable for configuring
+.Xr netdump
+when the client address is dynamic.
+To configure
+.Xr netdump
+when
+.Xr dhclient
+binds to a server,
+.Xr dhclient-script
+can be used to run
+.Xr dumpon .
+For example, to automatically configure
+.Xr netdump
+on the vtnet0 interface, add the following to
+.Pa /etc/dhclient-exit-hooks .
+.Bd -literal
+case $reason in
+BOUND|REBIND|REBOOT|RENEW)
+	if [ "$interface" != vtnet0 ] || [ -n "$old_ip_address" -a \\
+	     "$old_ip_address" = "$new_ip_address" ]; then
+		break
+	fi
+	if [ -n "$new_routers" ]; then
+		# Take the first router in the list.
+		gateway_flag="-g ${new_routers%% *}"
+	fi
+	# Configure as the highest-priority dump device.
+	dumpon -i 0 -c $new_ip_address -s $server $gateway_flag vtnet0
+	;;
+esac
+.Ed
+.Pp
+Be sure to fill in the server IP address and change the interface name if
+needed.
 .Sh SEE ALSO
 .Xr gzip 1 ,
 .Xr kgdb 1 ,
@@ -347,10 +430,6 @@ requires the
 .Dv GZIO
 option.
 .Sh BUGS
-It is currently not possible to configure both compression and encryption.
-The encrypted dump format assumes that the kernel dump size is a multiple
-of the cipher block size, which may not be true when the dump is compressed.
-.Pp
 Netdump only supports IPv4 at this time.
 .Sh SECURITY CONSIDERATIONS
 The current encrypted kernel core dump scheme does not provide integrity nor

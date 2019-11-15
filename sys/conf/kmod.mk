@@ -107,7 +107,12 @@ __KLD_SHARED=no
 .if !empty(CFLAGS:M-O[23s]) && empty(CFLAGS:M-fno-strict-aliasing)
 CFLAGS+=	-fno-strict-aliasing
 .endif
+.if ${COMPILER_TYPE} == "gcc" && ${COMPILER_VERSION} < 50000
+WERROR?=	-Wno-error
+.else
 WERROR?=	-Werror
+.endif
+
 CFLAGS+=	${WERROR}
 CFLAGS+=	-D_KERNEL
 CFLAGS+=	-DKLD_MODULE
@@ -138,7 +143,7 @@ CFLAGS+=	-fno-common
 LDFLAGS+=	-d -warn-common
 
 .if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mbuild-id}
-LDFLAGS+=	-Wl,--build-id=sha1
+LDFLAGS+=	--build-id=sha1
 .endif
 
 CFLAGS+=	${DEBUG_FLAGS}
@@ -226,7 +231,7 @@ ${PROG}.debug: ${FULLPROG}
 
 .if ${__KLD_SHARED} == yes
 ${FULLPROG}: ${KMOD}.kld
-	${LD} -m ${LD_EMULATION} -Bshareable -znotext ${_LDFLAGS} \
+	${LD} -m ${LD_EMULATION} -Bshareable -znotext -znorelro ${_LDFLAGS} \
 	    -o ${.TARGET} ${KMOD}.kld
 .if !defined(DEBUG_FLAGS)
 	${OBJCOPY} --strip-debug ${.TARGET}
@@ -238,12 +243,17 @@ EXPORT_SYMS?=	NO
 CLEANFILES+=	export_syms
 .endif
 
+.if exists(${SYSDIR}/conf/ldscript.kmod.${MACHINE_ARCH})
+LDSCRIPT_FLAGS?= -T ${SYSDIR}/conf/ldscript.kmod.${MACHINE_ARCH}
+.endif
+
 .if ${__KLD_SHARED} == yes
 ${KMOD}.kld: ${OBJS}
 .else
 ${FULLPROG}: ${OBJS}
 .endif
-	${LD} -m ${LD_EMULATION} ${_LDFLAGS} -r -d -o ${.TARGET} ${OBJS}
+	${LD} -m ${LD_EMULATION} ${_LDFLAGS} ${LDSCRIPT_FLAGS} -r -d \
+	    -o ${.TARGET} ${OBJS}
 .if ${MK_CTF} != "no"
 	${CTFMERGE} ${CTFFLAGS} -o ${.TARGET} ${OBJS}
 .endif
@@ -274,9 +284,6 @@ _MAP_DEBUG_PREFIX= yes
 .endif
 
 _ILINKS=machine
-.if ${MACHINE} != ${MACHINE_CPUARCH} && ${MACHINE} != "arm64"
-_ILINKS+=${MACHINE_CPUARCH}
-.endif
 .if ${MACHINE_CPUARCH} == "i386" || ${MACHINE_CPUARCH} == "amd64"
 _ILINKS+=x86
 .endif
@@ -349,8 +356,8 @@ afterinstall: _kldxref
 .ORDER: _installlinks _kldxref
 _kldxref: .PHONY
 	@if type kldxref >/dev/null 2>&1; then \
-		${ECHO} kldxref ${DESTDIR}${KMODDIR}; \
-		kldxref ${DESTDIR}${KMODDIR}; \
+		${ECHO} ${KLDXREF_CMD} ${DESTDIR}${KMODDIR}; \
+		${KLDXREF_CMD} ${DESTDIR}${KMODDIR}; \
 	fi
 .endif
 .endif # !target(realinstall)
@@ -476,6 +483,18 @@ usbdevs_data.h: ${SYSDIR}/tools/usbdevs2h.awk ${SYSDIR}/dev/usb/usbdevs
 	${AWK} -f ${SYSDIR}/tools/usbdevs2h.awk ${SYSDIR}/dev/usb/usbdevs -d
 .endif
 
+.if !empty(SRCS:Msdiodevs.h)
+CLEANFILES+=	sdiodevs.h
+sdiodevs.h: ${SYSDIR}/tools/sdiodevs2h.awk ${SYSDIR}/dev/sdio/sdiodevs
+	${AWK} -f ${SYSDIR}/tools/sdiodevs2h.awk ${SYSDIR}/dev/sdio/sdiodevs -h
+.endif
+
+.if !empty(SRCS:Msdiodevs_data.h)
+CLEANFILES+=	sdiodevs_data.h
+sdiodevs_data.h: ${SYSDIR}/tools/sdiodevs2h.awk ${SYSDIR}/dev/sdio/sdiodevs
+	${AWK} -f ${SYSDIR}/tools/sdiodevs2h.awk ${SYSDIR}/dev/sdio/sdiodevs -d
+.endif
+
 .if !empty(SRCS:Macpi_quirks.h)
 CLEANFILES+=	acpi_quirks.h
 acpi_quirks.h: ${SYSDIR}/tools/acpi_quirks2h.awk ${SYSDIR}/dev/acpica/acpi_quirks
@@ -483,7 +502,7 @@ acpi_quirks.h: ${SYSDIR}/tools/acpi_quirks2h.awk ${SYSDIR}/dev/acpica/acpi_quirk
 .endif
 
 .if !empty(SRCS:Massym.inc) || !empty(DPSRCS:Massym.inc)
-CLEANFILES+=	assym.inc
+CLEANFILES+=	assym.inc genassym.o
 DEPENDOBJS+=	genassym.o
 DPSRCS+=	offset.inc
 .endif

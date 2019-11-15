@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/bus.h>
+#include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
 #include <sys/filio.h>
@@ -91,6 +92,10 @@ __FBSDID("$FreeBSD$");
 #endif
 
 SYSCTL_NODE(_compat, OID_AUTO, linuxkpi, CTLFLAG_RW, 0, "LinuxKPI parameters");
+
+int linuxkpi_debug;
+SYSCTL_INT(_compat_linuxkpi, OID_AUTO, debug, CTLFLAG_RWTUN,
+    &linuxkpi_debug, 0, "Set to enable pr_debug() prints. Clear to disable.");
 
 MALLOC_DEFINE(M_KMALLOC, "linux", "Linux kmalloc compat");
 
@@ -506,12 +511,10 @@ linux_cdev_pager_fault(vm_object_t vm_obj, vm_ooffset_t offset, int prot,
 			vm_page_replace_checked(page, vm_obj,
 			    (*mres)->pindex, *mres);
 
-			vm_page_lock(*mres);
 			vm_page_free(*mres);
-			vm_page_unlock(*mres);
 			*mres = page;
 		}
-		page->valid = VM_PAGE_BITS_ALL;
+		vm_page_valid(page);
 		return (VM_PAGER_OK);
 	}
 	return (VM_PAGER_FAIL);
@@ -893,7 +896,7 @@ linux_clear_user(void *_uaddr, size_t _len)
 }
 
 int
-linux_access_ok(int rw, const void *uaddr, size_t len)
+linux_access_ok(const void *uaddr, size_t len)
 {
 	uintptr_t saddr;
 	uintptr_t eaddr;
@@ -1900,6 +1903,15 @@ add_timer_on(struct timer_list *timer, int cpu)
 	    &linux_timer_callback_wrapper, timer, cpu);
 }
 
+int
+del_timer(struct timer_list *timer)
+{
+
+	if (callout_stop(&(timer)->callout) == -1)
+		return (0);
+	return (1);
+}
+
 static void
 linux_timer_init(void *arg)
 {
@@ -2444,11 +2456,10 @@ SYSUNINIT(linux_compat, SI_SUB_DRIVERS, SI_ORDER_SECOND, linux_compat_uninit, NU
 CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities"
 //   ]
 // }

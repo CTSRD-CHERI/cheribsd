@@ -2,13 +2,11 @@
 # $FreeBSD$
 #
 
-PACKAGE=lib${LIB}
 SHLIBDIR?=	/lib
 
-# Debugging init is annoying, let's not do that yet...
-CHERI_SUBOBJECT_BOUNDS_MAX=conservative
-
 .include <src.opts.mk>
+
+PACKAGE=	runtime
 
 SHLIB_MAJOR=	5
 LIB=		crypt

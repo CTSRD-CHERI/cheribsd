@@ -40,7 +40,6 @@ options 	PREEMPTION		#Enable kernel thread preemption
 options 	VIMAGE			# Subsystem virtualization, e.g. VNET
 options 	INET			#InterNETworking
 options 	INET6			#IPv6 communications protocols
-options 	IPSEC			# IP (v4/v6) security
 options 	IPSEC_SUPPORT		# Allow kldload of ipsec and tcpmd5
 options 	TCP_OFFLOAD		# TCP offload
 options 	TCP_BLACKBOX		# Enhanced TCP event logging
@@ -54,6 +53,7 @@ options 	UFS_DIRHASH		#Improve performance on big directories
 options 	UFS_GJOURNAL		#Enable gjournal-based UFS journaling
 options 	QUOTA			#Enable disk quotas for UFS
 options 	MD_ROOT			#MD is a potential root device
+options 	MD_ROOT_MEM		#Enable use of initrd as MD root
 options 	NFSCL			#Network Filesystem Client
 options 	NFSD			#Network Filesystem Server
 options 	NFSLOCKD		#Network Lock Manager
@@ -110,6 +110,7 @@ options 	VERBOSE_SYSINIT=0	# Support debug.verbose_sysinit, off by default
 options 	EKCD			# Support for encrypted kernel dumps
 options 	GZIO			# gzip-compressed kernel and user dumps
 options 	ZSTDIO			# zstd-compressed kernel and user dumps
+options 	DEBUGNET		# debugnet networking
 options 	NETDUMP			# netdump(4) client support
 
 # Make an SMP-capable kernel by default
@@ -183,10 +184,9 @@ device		rl		# RealTek 8129/8139
 # Pseudo devices.
 device		crypto		# core crypto support
 device		loop		# Network loopback
-device		random		# Entropy device
 device		ether		# Ethernet support
 device		vlan		# 802.1Q VLAN support
-device		tun		# Packet tunnel.
+device		tuntap		# Packet tunnel.
 device		md		# Memory "disks"
 device		ofwd		# Open Firmware disks
 device		gif		# IPv6 and IPv4 tunneling
@@ -246,6 +246,7 @@ device		pmu
 # Sound support
 device		sound		# Generic sound driver (required)
 device		snd_ai2s	# Apple I2S audio
+device		snd_hda		# Intel High Definition Audio
 device		snd_uaudio	# USB Audio
 
 # Netmap provides direct access to TX/RX rings on supported NICs

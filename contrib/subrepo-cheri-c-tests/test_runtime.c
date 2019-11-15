@@ -29,6 +29,7 @@
  */
 #include <sys/types.h>
 #include <machine/cheri.h>
+#include <machine/regnum.h>
 #include <assert.h>
 #include <errno.h>
 #include <signal.h>
@@ -38,6 +39,10 @@
 #include <stdlib.h>
 #include <ucontext.h>
 #include "cheri_c_test.h"
+
+#ifndef NUMCHERISAVEREGS
+#define	NUMCHERISAVEREGS	29
+#endif
 
 static const size_t cap_size = sizeof(void*);
 
@@ -157,9 +162,10 @@ getCapRegAtIndex(mcontext_t *context, int idx)
 	}
 	_Static_assert(offsetof(struct cheri_frame, cf_ddc) == 0,
 			"Layout of struct cheri_frame has changed!");
-	_Static_assert(offsetof(struct cheri_frame, cf_pcc) == 27*sizeof(void * __capability),
+	_Static_assert(offsetof(struct cheri_frame, cf_pcc) ==
+			(NUMCHERISAVEREGS - 2)*sizeof(void * __capability),
 			"Layout of struct cheri_frame has changed!");
-	assert((idx < 26) && (idx >= 0) &&
+	assert((idx < NUMCHERISAVEREGS - 3) && (idx >= 0) &&
 	       "Invalid capability register index");
 	return (((void * __capability*)frame)[idx]);
 }

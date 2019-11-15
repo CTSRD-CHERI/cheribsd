@@ -69,8 +69,10 @@ __FBSDID("$FreeBSD$");
 #include "opt_bpf.h"
 
 #include <sys/param.h>
+#include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/mutex.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <sys/kernel.h>
@@ -117,19 +119,10 @@ bpf_buffer_append_mbuf(struct bpf_d *d, caddr_t buf, u_int offset, void *src,
 {
 	const struct mbuf *m;
 	u_char *dst;
-	u_int count;
 
 	m = (struct mbuf *)src;
 	dst = (u_char *)buf + offset;
-	while (len > 0) {
-		if (m == NULL)
-			panic("bpf_mcopy");
-		count = min(m->m_len, len);
-		bcopy(mtod(m, void *), dst, count);
-		m = m->m_next;
-		dst += count;
-		len -= count;
-	}
+	m_copydata(m, 0, len, dst);
 }
 
 /*

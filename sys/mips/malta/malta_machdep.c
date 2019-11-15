@@ -53,10 +53,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/user.h>
+#include <sys/eventhandler.h>
 
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 
 #include <machine/clock.h>
 #include <machine/cpu.h>

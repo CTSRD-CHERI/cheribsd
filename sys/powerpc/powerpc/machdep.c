@@ -100,6 +100,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_extern.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_pager.h>
@@ -595,3 +596,16 @@ bzero(void *buf, size_t len)
 		len--;
 	}
 }
+
+/* __stack_chk_fail_local() is called in secure-plt (32-bit). */
+#if !defined(__powerpc64__)
+extern void __stack_chk_fail(void);
+void __stack_chk_fail_local(void);
+
+void
+__stack_chk_fail_local(void)
+{
+
+	__stack_chk_fail();
+}
+#endif

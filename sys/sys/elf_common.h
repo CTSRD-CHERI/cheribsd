@@ -373,6 +373,15 @@ typedef struct {
 #define	EF_PPC_RELOCATABLE	0x00010000
 #define	EF_PPC_RELOCATABLE_LIB	0x00008000
 
+#define	EF_RISCV_RVC		0x00000001
+#define	EF_RISCV_FLOAT_ABI_MASK	0x00000006
+#define	EF_RISCV_FLOAT_ABI_SOFT	0x00000000
+#define	EF_RISCV_FLOAT_ABI_SINGLE 0x000002
+#define	EF_RISCV_FLOAT_ABI_DOUBLE 0x000004
+#define	EF_RISCV_FLOAT_ABI_QUAD	0x00000006
+#define	EF_RISCV_RVE		0x00000008
+#define	EF_RISCV_TSO		0x00000010
+
 #define	EF_SPARC_EXT_MASK	0x00ffff00
 #define	EF_SPARC_32PLUS		0x00000100
 #define	EF_SPARC_SUN_US1	0x00000200
@@ -538,6 +547,10 @@ typedef struct {
 #define	PT_ARM_ARCHEXT	0x70000000	/* ARM arch compat information. */
 #define	PT_ARM_EXIDX	0x70000001	/* ARM exception unwind tables. */
 #define	PT_HIPROC	0x7fffffff	/* Last processor-specific type. */
+
+#define	PT_OPENBSD_RANDOMIZE	0x65A3DBE6	/* OpenBSD random data segment */
+#define	PT_OPENBSD_WXNEEDED	0x65A3DBE7	/* OpenBSD EXEC/WRITE pages needed */
+#define	PT_OPENBSD_BOOTDATA	0x65A41BE6	/* OpenBSD section for boot args */
 
 /* Values for p_flags. */
 #define	PF_X		0x1		/* Executable. */
@@ -729,7 +742,8 @@ enum MipsCheriFlags {
 	DF_MIPS_CHERI_ABI_PLT		= 0x00000002,
 	DF_MIPS_CHERI_ABI_FNDESC	= 0x00000003,
 	DF_MIPS_CHERI_CAPTABLE_PER_FILE = 0x00000008,
-	DF_MIPS_CHERI_CAPTABLE_PER_FUNC = 0x00000010
+	DF_MIPS_CHERI_CAPTABLE_PER_FUNC = 0x00000010,
+	DF_MIPS_CHERI_RELATIVE_CAPRELOCS = 0x00000020
 };
 
 #define	DT_PPC_GOT			0x70000000
@@ -779,6 +793,12 @@ enum MipsCheriFlags {
 #define	LL_DELAY_LOAD		0x10
 #define	LL_DELTA		0x20
 
+/* Note section names */
+#define	ELF_NOTE_FREEBSD	"FreeBSD"
+#define	ELF_NOTE_NETBSD		"NetBSD"
+#define	ELF_NOTE_SOLARIS	"SUNW Solaris"
+#define	ELF_NOTE_GNU		"GNU"
+
 /* Values for n_type used in executables. */
 #define	NT_FREEBSD_ABI_TAG	1
 #define	NT_FREEBSD_NOINIT_TAG	2
@@ -787,6 +807,7 @@ enum MipsCheriFlags {
 
 /* NT_FREEBSD_FEATURE_CTL desc[0] bits */
 #define	NT_FREEBSD_FCTL_ASLR_DISABLE	0x00000001
+#define	NT_FREEBSD_FCTL_PROTMAX_DISABLE	0x00000002
 
 /* Values for n_type.  Used in core files. */
 #define	NT_PRSTATUS	1	/* Process status. */
@@ -808,6 +829,21 @@ enum MipsCheriFlags {
 #define	NT_PPC_VSX	0x102	/* PowerPC VSX registers */
 #define	NT_X86_XSTATE	0x202	/* x86 XSAVE extended state. */
 #define	NT_ARM_VFP	0x400	/* ARM VFP registers */
+
+/* GNU note types. */
+#define	NT_GNU_ABI_TAG		1
+#define	NT_GNU_HWCAP		2
+#define	NT_GNU_BUILD_ID		3
+#define	NT_GNU_GOLD_VERSION	4
+#define	NT_GNU_PROPERTY_TYPE_0	5
+
+#define	GNU_PROPERTY_LOPROC			0xc0000000
+#define	GNU_PROPERTY_HIPROC			0xdfffffff
+
+#define	GNU_PROPERTY_X86_FEATURE_1_AND		0xc0000002
+
+#define	GNU_PROPERTY_X86_FEATURE_1_IBT		0x00000001
+#define	GNU_PROPERTY_X86_FEATURE_1_SHSTK	0x00000002
 
 /* Symbol Binding - ELFNN_ST_BIND - st_info */
 #define	STB_LOCAL	0	/* Local symbol */
@@ -1199,6 +1235,7 @@ enum MipsCheriFlags {
 #define	R_PPC_SECTOFF_LO	34
 #define	R_PPC_SECTOFF_HI	35
 #define	R_PPC_SECTOFF_HA	36
+#define	R_PPC_IRELATIVE		248
 
 /*
  * 64-bit relocations
@@ -1320,6 +1357,17 @@ enum MipsCheriFlags {
 #define	R_RISCV_ALIGN		43
 #define	R_RISCV_RVC_BRANCH	44
 #define	R_RISCV_RVC_JUMP	45
+#define	R_RISCV_RVC_LUI		46
+#define	R_RISCV_GPREL_I		47
+#define	R_RISCV_GPREL_S		48
+#define	R_RISCV_TPREL_I		49
+#define	R_RISCV_TPREL_S		50
+#define	R_RISCV_RELAX		51
+#define	R_RISCV_SUB6		52
+#define	R_RISCV_SET6		53
+#define	R_RISCV_SET8		54
+#define	R_RISCV_SET16		55
+#define	R_RISCV_SET32		56
 
 #define	R_SPARC_NONE		0
 #define	R_SPARC_8		1

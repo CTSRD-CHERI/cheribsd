@@ -38,5 +38,6 @@
     "exit $?\n"
 #define DEFAULT_SUFX_LZMA   ".ulzma"
 
-void *mkuz_lzma_init(uint32_t);
-struct mkuz_blk *mkuz_lzma_compress(void *, const struct mkuz_blk *);
+size_t mkuz_lzma_cbound(size_t);
+void *mkuz_lzma_init(int *);
+void mkuz_lzma_compress(void *, const struct mkuz_blk *, struct mkuz_blk *);

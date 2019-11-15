@@ -118,6 +118,7 @@ int bcm2835_mbox_set_power_state(uint32_t, boolean_t);
 #define BCM2835_MBOX_CLOCK_ID_SDRAM		0x00000008
 #define BCM2835_MBOX_CLOCK_ID_PIXEL		0x00000009
 #define BCM2835_MBOX_CLOCK_ID_PWM		0x0000000a
+#define BCM2838_MBOX_CLOCK_ID_EMMC2		0x0000000c
 
 #define BCM2835_MBOX_TAG_GET_CLOCK_RATE		0x00030002
 #define BCM2835_MBOX_TAG_SET_CLOCK_RATE		0x00038002
@@ -473,6 +474,14 @@ struct msg_fb_get_w_h {
 };
 
 int bcm2835_mbox_fb_get_w_h(struct bcm2835_fb_config *);
+
+struct msg_fb_get_bpp {
+	struct bcm2835_mbox_hdr hdr;
+	struct bcm2835_mbox_tag_depth bpp;
+	uint32_t end_tag;
+};
+
+int bcm2835_mbox_fb_get_bpp(struct bcm2835_fb_config *);
 
 struct msg_fb_setup {
 	struct bcm2835_mbox_hdr hdr;

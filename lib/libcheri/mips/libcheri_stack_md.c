@@ -39,6 +39,7 @@
 #include <cheri/cheric.h>
 
 #include <machine/cpuregs.h>
+#define	_WANT_MIPS_REGNUM
 #include <machine/regnum.h>
 #include <machine/sysarch.h>
 

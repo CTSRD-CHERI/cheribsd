@@ -25,7 +25,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd May 23, 2018
+.Dd August 7, 2019
 .Dt SBUF 9
 .Os
 .Sh NAME
@@ -44,6 +44,7 @@
 .Nm sbuf_cat ,
 .Nm sbuf_copyin ,
 .Nm sbuf_cpy ,
+.Nm sbuf_nl_terminate ,
 .Nm sbuf_printf ,
 .Nm sbuf_vprintf ,
 .Nm sbuf_putc ,
@@ -58,12 +59,18 @@
 .Nm sbuf_start_section ,
 .Nm sbuf_end_section ,
 .Nm sbuf_hexdump ,
+.Nm sbuf_printf_drain ,
 .Nm sbuf_putbuf
 .Nd safe string composition
 .Sh SYNOPSIS
 .In sys/types.h
 .In sys/sbuf.h
-.Ft typedef\ int ( sbuf_drain_func ) ( void\ *arg, const\ char\ *data, int\ len ) ;
+.Ft typedef int
+.Fo (sbuf_drain_func)
+.Fa "void *arg"
+.Fa "const char *data"
+.Fa "int len"
+.Fc
 .Pp
 .Ft struct sbuf *
 .Fo sbuf_new
@@ -121,6 +128,8 @@
 .Fa "struct sbuf *s"
 .Fa "const char *str"
 .Fc
+.Ft int
+.Fn sbuf_nl_terminate "struct sbuf *"
 .Ft int
 .Fo sbuf_printf
 .Fa "struct sbuf *s"
@@ -190,6 +199,12 @@
 .Fa "int length"
 .Fa "const char *hdr"
 .Fa "int flags"
+.Fc
+.Ft int
+.Fo sbuf_printf_drain
+.Fa "void *arg"
+.Fa "const char *data"
+.Fa "int len"
 .Fc
 .Ft void
 .Fo sbuf_putbuf
@@ -278,7 +293,14 @@ as a record boundary marker that will be used during drain operations to avoid
 records being split.
 If a record grows sufficiently large such that it fills the
 .Fa sbuf
-and therefore cannot be drained without being split, an error of EDEADLK is set.
+and therefore cannot be drained without being split, an error of
+.Er EDEADLK
+is set.
+.It Dv SBUF_NOWAIT
+Indicates that attempts to extend the storage buffer should fail in low memory
+conditions, like
+.Xr malloc 9
+.Dv M_NOWAIT .
 .El
 .Pp
 Note that if
@@ -419,15 +441,21 @@ many bytes were drained.
 If negative, the return value indicates the negative error code which
 will be returned from this or a later call to
 .Fn sbuf_finish .
-The returned drained length cannot be zero.
+If the returned drained length is 0, an error of
+.Er EDEADLK
+is set.
 To do unbuffered draining, initialize the sbuf with a two-byte buffer.
 The drain will be called for every byte added to the sbuf.
 The
 .Fn sbuf_bcopyin ,
+.Fn sbuf_bcpy ,
+.Fn sbuf_clear ,
 .Fn sbuf_copyin ,
+.Fn sbuf_cpy ,
 .Fn sbuf_trim ,
+.Fn sbuf_data ,
 and
-.Fn sbuf_data
+.Fn sbuf_len
 functions cannot be used on an sbuf with a drain.
 .Pp
 The
@@ -458,6 +486,11 @@ or one which position has been reset to zero with
 .Fn sbuf_clear
 or
 .Fn sbuf_setpos .
+.Pp
+The
+.Fn sbuf_nl_terminate
+function appends a trailing newline character, if the current line is non-empty
+and not already terminated by a newline character.
 .Pp
 The
 .Fn sbuf_printf
@@ -492,7 +525,9 @@ The
 .Fn sbuf_error
 function returns any error value that the
 .Fa sbuf
-may have accumulated, either from the drain function, or ENOMEM if the
+may have accumulated, either from the drain function, or
+.Er ENOMEM
+if the
 .Fa sbuf
 overflowed.
 This function is generally not needed and instead the error code from
@@ -574,9 +609,29 @@ See the
 man page for more details on the interface.
 .Pp
 The
+.Fn sbuf_printf_drain
+function is a drain function that will call printf, or log to the console.
+The argument
+.Fa arg
+must be either
+.Dv NULL ,
+or a valid pointer to a
+.Vt size_t .
+If
+.Fa arg
+is not
+.Dv NULL ,
+the total bytes drained will be added to the value pointed to by
+.Fa arg .
+.Pp
+The
 .Fn sbuf_putbuf
 function printfs the sbuf to stdout if in userland, and to the console
 and log if in the kernel.
+The
+.Fa sbuf
+must be finished before calling
+.Fn sbuf_putbuf .
 It does not drain the buffer or update any pointers.
 .Sh NOTES
 If an operation caused an
@@ -655,8 +710,9 @@ function returns the section length or \-1 if the buffer has an error.
 .Pp
 The
 .Fn sbuf_finish 9
-function (the kernel version) returns ENOMEM if the sbuf overflowed before
-being finished,
+function (the kernel version) returns
+.Er ENOMEM
+if the sbuf overflowed before being finished,
 or returns the error code from the drain if one is attached.
 .Pp
 The

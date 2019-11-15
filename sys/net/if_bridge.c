@@ -2001,7 +2001,7 @@ bridge_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *sa,
     struct rtentry *rt)
 {
 	struct ether_header *eh;
-	struct ifnet *dst_if;
+	struct ifnet *bifp, *dst_if;
 	struct bridge_softc *sc;
 	uint16_t vlan;
 
@@ -2016,13 +2016,14 @@ bridge_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *sa,
 	vlan = VLANTAGOF(m);
 
 	BRIDGE_LOCK(sc);
+	bifp = sc->sc_ifp;
 
 	/*
 	 * If bridge is down, but the original output interface is up,
 	 * go ahead and send out that interface.  Otherwise, the packet
 	 * is dropped below.
 	 */
-	if ((sc->sc_ifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
+	if ((bifp->if_drv_flags & IFF_DRV_RUNNING) == 0) {
 		dst_if = ifp;
 		goto sendunicast;
 	}
@@ -2035,6 +2036,9 @@ bridge_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *sa,
 		dst_if = NULL;
 	else
 		dst_if = bridge_rtlookup(sc, eh->ether_dhost, vlan);
+	/* Tap any traffic not passing back out the originating interface */
+	if (dst_if != ifp)
+		ETHER_BPF_MTAP(bifp, m);
 	if (dst_if == NULL) {
 		struct bridge_iflist *bif;
 		struct mbuf *mc;
@@ -2072,7 +2076,7 @@ bridge_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *sa,
 			} else {
 				mc = m_copypacket(m, M_NOWAIT);
 				if (mc == NULL) {
-					if_inc_counter(sc->sc_ifp, IFCOUNTER_OERRORS, 1);
+					if_inc_counter(bifp, IFCOUNTER_OERRORS, 1);
 					continue;
 				}
 			}
@@ -2451,6 +2455,8 @@ bridge_input(struct ifnet *ifp, struct mbuf *m)
 				return (NULL);				\
 			}						\
 		}							\
+		if ((iface) != bifp)					\
+			ETHER_BPF_MTAP(iface, m);			\
 		BRIDGE_UNLOCK(sc);					\
 		return (m);						\
 	}								\

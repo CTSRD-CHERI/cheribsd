@@ -51,7 +51,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktrace.h>
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#include <sys/cheriabi.h>
 #include <cheri/cheric.h>
 #endif
 
@@ -75,6 +74,7 @@ __FBSDID("$FreeBSD$");
 #include "rtld_malloc.h"
 #include "rtld_utrace.h"
 #include "notes.h"
+#include "rtld_libc.h"
 
 /* Types. */
 typedef void (*func_ptr_type)(void);
@@ -82,11 +82,18 @@ typedef void * (*path_enum_proc) (const char *path, size_t len, void *arg);
 
 
 /* Variables that cannot be static: */
+/* TODO: Support the probes based interface?
+ * { "init_start", DO_NOTHING },
+ * { "init_complete", FULL_RELOAD },
+ * { "map_start", DO_NOTHING },
+ * { "map_failed", DO_NOTHING },
+ * { "reloc_complete", UPDATE_OR_RELOAD },
+ * { "unmap_start", DO_NOTHING },
+ * { "unmap_complete", FULL_RELOAD },
+ */
 extern struct r_debug r_debug; /* For GDB */
 extern int _thread_autoinit_dummy_decl;
-extern char* __progname;
 extern void (*__cleanup)(void);
-
 
 /*
  * Function declarations.
@@ -108,7 +115,10 @@ static int do_search_info(const Obj_Entry *obj, int, struct dl_serinfo *);
 static bool donelist_check(DoneList *, const Obj_Entry *);
 static void errmsg_restore(char *);
 static char *errmsg_save(void);
-static void *fill_search_info(const char *, size_t, void *);
+static void *_fill_search_info(const char *, size_t, void *);
+/* Make this a macro to avoid updating all uses of fill_search_info */
+#define fill_search_info make_rtld_local_function_pointer(_fill_search_info)
+
 static char *find_library(const char *, const Obj_Entry *, int *);
 static const char *gethints(bool);
 static void hold_object(Obj_Entry *);
@@ -194,8 +204,6 @@ static bool matched_symbol(SymLook *, const Obj_Entry *, Sym_Match_Result *,
 void r_debug_state(struct r_debug *, struct link_map *) __noinline __exported;
 void _r_debug_postinit(struct link_map *) __noinline __exported;
 
-int __sys_openat(int, const char *, int, ...);
-
 /*
  * Data declarations.
  */
@@ -219,7 +227,10 @@ static char *ld_utrace;		/* Use utrace() to log events. */
 static bool ld_skip_init_funcs = false;	/* XXXAR: debug environment variable to verify relocation processing */
 static struct obj_entry_q obj_list;	/* Queue of all loaded objects */
 static Obj_Entry *obj_main;	/* The main program shared object */
-static Obj_Entry obj_rtld;	/* The dynamic linker shared object */
+#ifndef __CHERI_PURE_CAPABILITY__
+static
+#endif
+Obj_Entry obj_rtld;	/* The dynamic linker shared object */
 static unsigned int obj_count;	/* Number of objects in obj_list */
 static unsigned int obj_loads;	/* Number of loads of objects (gen count) */
 
@@ -256,7 +267,6 @@ void _rtld_error(const char *, ...) __exported __printflike(1, 2);
 
 /* Only here to fix -Wmissing-prototypes warnings */
 int __getosreldate(void);
-void __pthread_cxa_finalize(struct dl_phdr_info *a);
 #ifdef __CHERI_PURE_CAPABILITY__
 func_ptr_type _rtld(Elf_Auxinfo *aux, func_ptr_type *exit_proc, Obj_Entry **objp);
 #else
@@ -457,6 +467,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     /* Initialize and relocate ourselves. */
     assert(aux_info[AT_BASE] != NULL);
+    assert((vaddr_t)aux_info[AT_BASE]->a_un.a_ptr != 0 && "rtld cannot be mapped at address zero!");
     init_rtld((caddr_t) aux_info[AT_BASE]->a_un.a_ptr, aux_info);
 
     __progname = obj_rtld.path;
@@ -502,7 +513,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		 * others x bit is enabled.
 		 * mmap(2) does not allow to mmap with PROT_EXEC if
 		 * binary' file comes from noexec mount.  We cannot
-		 * set VV_TEXT on the binary.
+		 * set a text reference on the binary.
 		 */
 		dir_enable = false;
 		if (st.st_uid == geteuid()) {
@@ -545,7 +556,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 		for (;; auxp++, auxpf++) {
 		    *auxp = *auxpf;
 		    if (auxp->a_type == AT_NULL)
-			    break;
+			break;
+		}
+		/* Since the auxiliary vector has moved, redigest it. */
+		for (i = 0;  i < AT_COUNT;  i++)
+		    aux_info[i] = NULL;
+		for (auxp = aux;  auxp->a_type != AT_NULL;  auxp++) {
+		    if (auxp->a_type < AT_COUNT)
+			aux_info[auxp->a_type] = auxp;
 		}
 #endif
 	    } else {
@@ -615,10 +633,10 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     if (getenv(_LD("DEBUG_CATEGORIES")))
 	debug |= parse_integer(getenv(_LD("DEBUG_CATEGORIES")));
 #endif
-    dbg("%s is initialized, base address = %-#p", __progname,
+    dbg("%s is initialized, base address = " PTR_FMT, __progname,
 	(caddr_t) aux_info[AT_BASE]->a_un.a_ptr);
-    dbg("RTLD dynamic = %-#p", obj_rtld.dynamic);
-    dbg("RTLD pltgot  = %-#p", obj_rtld.pltgot);
+    dbg("RTLD dynamic = " PTR_FMT, obj_rtld.dynamic);
+    dbg("RTLD pltgot  = " PTR_FMT, obj_rtld.pltgot);
 
     dbg("initializing thread locks");
     lockdflt_init();
@@ -644,16 +662,17 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 	assert(aux_info[AT_PHENT]->a_un.a_val == sizeof(Elf_Phdr));
 	assert(aux_info[AT_ENTRY] != NULL);
 	imgentry = (dlfunc_t) aux_info[AT_ENTRY]->a_un.a_ptr;
-	dbg("Values from kernel:\n\tAT_PHDR=%-#p\n\tAT_BASE=%-#p\n\tAT_ENTRY=%-#p\n",
+	dbg("Values from kernel:\n\tAT_PHDR=" PTR_FMT "\n"
+	    "\tAT_BASE=" PTR_FMT "\n\tAT_ENTRY=" PTR_FMT "\n",
 		phdr, aux_info[AT_BASE]->a_un.a_ptr, (const void *)imgentry);
 	if ((obj_main = digest_phdr(phdr, phnum, imgentry, argv0)) ==
 	    NULL)
 		rtld_die();
-	dbg("Parsed values:\n\tmapbase=%-#p\n\tmapsize=%#zx"
+	dbg("Parsed values:\n\tmapbase=" PTR_FMT "\n\tmapsize=%#zx"
 #ifdef __CHERI_PURE_CAPABILITY__
-	    "\n\ttext_rodata=%#p"
+	    "\n\ttext_rodata=" PTR_FMT
 #endif
-	    "\n\tvaddrbase=%#zx\n\trelocbase=%-#p\n",
+	    "\n\tvaddrbase=%#zx\n\trelocbase=" PTR_FMT "\n",
 	    obj_main->mapbase, obj_main->mapsize,
 #ifdef __CHERI_PURE_CAPABILITY__
 	    obj_main->text_rodata_cap,
@@ -683,7 +702,7 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
       aux_info[AT_STACKPROT]->a_un.a_val != 0)
 	    stack_prot = aux_info[AT_STACKPROT]->a_un.a_val;
 
-#ifndef COMPAT_32BIT
+#if !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT)
     /*
      * Get the actual dynamic linker pathname from the executable if
      * possible.  (It should always be possible.)  That ensures that
@@ -840,7 +859,6 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
       *ld_bind_now != '\0', SYMLOOK_EARLY, &lockstate) == -1)
 	rtld_die();
 
-    rtld_exit_ptr = rtld_exit;
     if (obj_main->crt_no_init)
 	preinit_main();
     objlist_call_init(&initlist, &lockstate);
@@ -860,9 +878,19 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
 
     lock_release(rtld_bind_lock, &lockstate);
 
-    dbg("transferring control to program entry point = %-#p", obj_main->entry);
+#if defined(__CHERI_PURE_CAPABILITY__) && !defined(__CHERI_CAPABILITY_TABLE__)
+    // In the legacy ABI we don't shrink the bounds at all since
+    // we use cgetsetoffset to call into other libraries ...
+    dbg("Increasing bounds on obj_main->entry in legacy ABI:");
+    dbg("\tbefore: " PTR_FMT, obj_main->entry);
+    obj_main->entry = cheri_copyaddress(cheri_getpcc(), obj_main->entry);
+    dbg("\tafter: " PTR_FMT, obj_main->entry);
+#endif
+    dbg("transferring control to program entry point = " PTR_FMT, obj_main->entry);
 
     /* Return the exit procedure and the program entry point. */
+    if (rtld_exit_ptr == NULL)
+	rtld_exit_ptr = make_rtld_function_pointer(rtld_exit);
     *exit_proc = rtld_exit_ptr;
     *objp = obj_main;
 
@@ -873,10 +901,14 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     // rtld_start.S $cgp will be set up correctly. We could also pass another
     // reference argument and store obj_main->captable there but this is easier
     // and should have the same effect.
-    const void *entry_cgp = target_cgp_for_func(obj_main, obj_main->entry);
-    dbg_cheri("Setting initial $cgp for %s to %-#p", obj_main->path, entry_cgp);
-    __asm__ volatile("cmove $cgp, %0" :: "C"(entry_cgp));
+    const void *entry_cgp = target_cgp_for_func(obj_main, (dlfunc_t)obj_main->entry);
+    dbg_cheri("Setting initial $cgp for %s to " PTR_FMT, obj_main->path, entry_cgp);
     assert(cheri_getperm(obj_main->entry) & CHERI_PERM_EXECUTE);
+    /* Add memory clobber to ensure that it is done last thing before return
+     *
+     * TODO: would be nice if we could return pairs in $c3/$c4
+     */
+    __asm__ volatile("cmove $cgp, %0" :: "C"(entry_cgp): "$c26", "memory");
 #endif
     return (func_ptr_type) obj_main->entry;
 }
@@ -1343,13 +1375,12 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 	case DT_MIPS_CHERI_FLAGS: {
 	    size_t flags = dynp->d_un.d_val;
 	    unsigned abi = flags & DF_MIPS_CHERI_ABI_MASK;
-	    if (abi == DF_MIPS_CHERI_ABI_PCREL)
-		obj->restrict_pcc_basic = 1;
-	    else if (abi == DF_MIPS_CHERI_ABI_PLT || abi == DF_MIPS_CHERI_ABI_FNDESC)
-		obj->restrict_pcc_strict = 1;
-	    /* Can't restrict $pcc in legacy mode */
 	    obj->cheri_captable_abi = abi;
 	    flags &= ~DF_MIPS_CHERI_ABI_MASK;
+	    if (flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS) {
+		flags &= ~DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
+		obj->relative_cap_relocs = true;
+	    }
 	    if ((flags & DF_MIPS_CHERI_CAPTABLE_PER_FILE) ||
 	        (flags & DF_MIPS_CHERI_CAPTABLE_PER_FUNC)) {
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
@@ -1442,6 +1473,8 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 #else
 		tag_loc = __DECONST(char*, dynp);
 #endif
+		dbg("Setting DT_MIPS_RLD_MAP_REL for %s: %p <- %p", obj->path,
+		    ((Elf_Addr *)(tag_loc + dynp->d_un.d_val)), &r_debug);
 		*((Elf_Addr *)(tag_loc + dynp->d_un.d_val)) = (Elf_Addr) &r_debug;
 		break;
 	}
@@ -1453,10 +1486,16 @@ digest_dynamic1(Obj_Entry *obj, int early, const Elf_Dyn **dyn_rpath,
 
 #endif
 
+#ifdef __powerpc__
 #ifdef __powerpc64__
 	case DT_PPC64_GLINK:
 		obj->glink = (Elf_Addr)(obj->relocbase + dynp->d_un.d_ptr);
 		break;
+#else
+	case DT_PPC_GOT:
+		obj->gotptr = (Elf_Addr *)(obj->relocbase + dynp->d_un.d_ptr);
+		break;
+#endif
 #endif
 
 	case DT_FLAGS_1:
@@ -1569,7 +1608,7 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL) {
 		// For pcrel ABI we need to include captable as well
 		dbg("%s: text/rodata start = %#zx, text/rodata end = %#zx, "
-		    "captable = %-#p (relative to start %#zx)", obj->path,
+		    "captable = " PTR_FMT " (relative to start %#zx)", obj->path,
 		    (size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end,
 		    obj->writable_captable, (char*)obj->writable_captable - obj->text_rodata_cap);
 		if (obj->writable_captable) {
@@ -1584,7 +1623,7 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		} else {
 			dbg("%s: missing DT_CHERI_CAPTABLE so can't set "
 			    "sensible bounds on text/rodata -> using full DSO"
-			    ": %-#p", obj->path, obj->text_rodata_cap);
+			    ": " PTR_FMT, obj->path, obj->text_rodata_cap);
 		}
 	} else if (obj->cheri_captable_abi == DF_MIPS_CHERI_ABI_LEGACY) {
 #ifdef __CHERI_CAPABILITY_TABLE__
@@ -1597,10 +1636,10 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		// In the legacy ABI we don't shrink the bounds at all since
 		// we use cgetsetoffset to call into other libraries ...
 		dbg("Increasing bounds text_rodata_cap in legacy ABI:");
-		dbg("\tbefore: %-#p", obj->text_rodata_cap);
+		dbg("\tbefore: " PTR_FMT, obj->text_rodata_cap);
 		obj->text_rodata_cap = cheri_copyaddress(cheri_getpcc(),
 		    obj->text_rodata_cap);
-		dbg("\tafter: %-#p", obj->text_rodata_cap);
+		dbg("\tafter: " PTR_FMT, obj->text_rodata_cap);
 	} else {
 		// tight bounds on text_rodata possible since $cgp is live-in
 		obj->text_rodata_cap += obj->text_rodata_start;
@@ -1610,7 +1649,7 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 		obj->text_rodata_cap = cheri_csetbounds_sametype(
 		   obj->text_rodata_cap, obj->text_rodata_end - obj->text_rodata_start);
 	}
-	dbg("%s: tightened bounds of text/rodata cap: %-#p", obj->path,
+	dbg("%s: tightened bounds of text/rodata cap: " PTR_FMT, obj->path,
 	    obj->text_rodata_cap);
 #endif
 }
@@ -1635,7 +1674,7 @@ digest_dynamic(Obj_Entry *obj, int early)
 static Obj_Entry *
 digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 {
-    dbg("%s(0, entry=%-#p, phdr=%-#p, path=%s)\n", __func__, entry, phdr, path);
+    dbg("%s(0, entry=" PTR_FMT ", phdr=" PTR_FMT ", path=%s)\n", __func__, entry, phdr, path);
     Obj_Entry *obj;
     const Elf_Phdr *phlimit = phdr + phnum;
     const Elf_Phdr *ph;
@@ -1669,7 +1708,7 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	return NULL;
     } else if (!cheri_gettag(obj->relocbase)) {
 	_rtld_error("%s: Cannot load CheriABI binary with unrepresentable"
-	    "relocation base (%-#p)", path, obj->relocbase);
+	    "relocation base (" PTR_FMT ")", path, obj->relocbase);
 	return NULL;
     }
 #endif
@@ -1723,6 +1762,13 @@ digest_phdr(const Elf_Phdr *phdr, int phnum, dlfunc_t entry, const char *path)
 	case PT_GNU_RELRO:
 	    obj->relro_page = obj->relocbase + trunc_page(ph->p_vaddr);
 	    obj->relro_size = round_page(ph->p_memsz);
+#ifdef __CHERI_PURE_CAPABILITY__
+	    obj->text_rodata_start = rtld_min(ph->p_vaddr, obj->text_rodata_start);
+	    obj->text_rodata_end = rtld_max(ph->p_vaddr + ph->p_memsz, obj->text_rodata_end);
+	    dbg("%s: Adding PT_GNU_RELRO, new text/rodata start "
+		" = %zx text/rodata end = %zx", path,
+		(size_t)obj->text_rodata_start, (size_t)obj->text_rodata_end);
+#endif
 	    break;
 
 	case PT_NOTE:
@@ -2384,6 +2430,11 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     init_pagesizes(aux_info);
 #endif
 
+#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE > 1
+    /* debug is not initialized yet so dbg() is a no-op -> use printf()*/
+    rtld_fdprintf(STDERR_FILENO, "rtld: %s(" PTR_FMT ", %p)\n", __func__, mapbase, aux_info);
+#endif
+
     /*
      * Conjure up an Obj_Entry structure for the dynamic linker.
      *
@@ -2421,7 +2472,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	    Elf_Addr start_addr = ph->p_vaddr;
 	    objtmp.text_rodata_start = rtld_min(start_addr, objtmp.text_rodata_start);
 	    objtmp.text_rodata_end = rtld_max(start_addr + ph->p_memsz, objtmp.text_rodata_end);
-#if defined(DEBUG_VERBOSE)
+#if defined(DEBUG_VERBOSE) && DEBUG_VERBOSE > 3
 	    /* debug is not initialized yet so dbg() is a no-op */
 	    rtld_fdprintf(STDERR_FILENO, "rtld: processing PT_LOAD phdr[%d], "
 		"new text/rodata start  = %zx text/rodata end = %zx\n", i + 1,
@@ -2451,10 +2502,12 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
 	extern char __start___cap_relocs, __stop___cap_relocs;
 	size_t cap_relocs_size =
 	    ((caddr_t)&__stop___cap_relocs - (caddr_t)&__start___cap_relocs);
-	rtld_printf("RTLD has DT_CHERI___CAPRELOCS = %#p, __start___cap_relocs"
-	    "= %#p\nDT_CHERI___CAPRELOCSSZ = %zd, difference = %zd",
+#if DEBUG_VERBOSE > 3
+	rtld_printf("RTLD has DT_CHERI___CAPRELOCS = " PTR_FMT ", __start___cap_relocs"
+	    "= " PTR_FMT "\nDT_CHERI___CAPRELOCSSZ = %zd, difference = %zd\n",
 	    objtmp.cap_relocs, &__start___cap_relocs, cap_relocs_size,
 	    objtmp.cap_relocs_size);
+#endif
 	assert((vaddr_t)objtmp.cap_relocs == (vaddr_t)&__start___cap_relocs);
 	assert(objtmp.cap_relocs_size == cap_relocs_size);
     }
@@ -2476,7 +2529,7 @@ init_rtld(caddr_t mapbase, Elf_Auxinfo **aux_info)
     /* Replace the path with a dynamically allocated copy. */
     obj_rtld.path = xstrdup(ld_path_rtld);
 
-    r_debug.r_brk = r_debug_state;
+    r_debug.r_brk = make_rtld_local_function_pointer(r_debug_state);
     r_debug.r_state = RT_CONSISTENT;
 }
 
@@ -2959,7 +3012,7 @@ objlist_call_fini(Objlist *list, Obj_Entry *root, RtldLockState *lockstate)
 		}
 	    }
 	    if (elm->obj->fini_ptr != NULL) {
-		dbg("calling fini function for %s at %#p", elm->obj->path,
+		dbg("calling fini function for %s at " PTR_FMT, elm->obj->path,
 		    (void *)(uintptr_t)elm->obj->fini_ptr);
 		LD_UTRACE(UTRACE_FINI_CALL, elm->obj, (void *)(intptr_t)elm->obj->fini_ptr,
 		    0, 0, elm->obj->path);
@@ -3029,8 +3082,10 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	}
 	lock_release(rtld_bind_lock, lockstate);
 	if (reg != NULL) {
-		reg(rtld_exit);
-		rtld_exit_ptr = rtld_nop_exit;
+		func_ptr_type exit_ptr = make_rtld_function_pointer(rtld_exit);
+		dbg("Calling __libc_atexit(rtld_exit (" PTR_FMT "))", (void*)exit_ptr);
+		reg(exit_ptr);
+		rtld_exit_ptr = make_rtld_function_pointer(rtld_nop_exit);
 	}
 
         /*
@@ -3038,7 +3093,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
          * When this happens, DT_INIT is processed first.
          */
 	if (elm->obj->init_ptr != NULL) {
-	    dbg("calling init function for %s at %#p", elm->obj->path,
+	    dbg("calling init function for %s at " PTR_FMT, elm->obj->path,
 	        (void *)(uintptr_t)elm->obj->init_ptr);
 	    LD_UTRACE(UTRACE_INIT_CALL, elm->obj, (void *)(intptr_t)elm->obj->init_ptr,
 	        0, 0, elm->obj->path);
@@ -3048,7 +3103,6 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 	     */
 	    call_initfini_pointer(elm->obj, elm->obj->init_ptr);
 	}
-	/* TODO: we should do a CSetBounds after parsing .dynamic */
 	init_addr = elm->obj->init_array_ptr;
 	if (init_addr != NULL) {
 	    for (index = 0; index < elm->obj->init_array_num; index++) {
@@ -3061,6 +3115,7 @@ objlist_call_init(Objlist *list, RtldLockState *lockstate)
 		}
 	    }
 	}
+	dbg("Done calling init functions for %s", elm->obj->path);
 	wlock_acquire(rtld_bind_lock, lockstate);
 	unhold_object(elm->obj);
     }
@@ -3245,15 +3300,19 @@ relocate_object(Obj_Entry *obj, bool bind_now, Obj_Entry *rtldobj,
 
 	/* Process the PLT relocations. */
 #ifdef __CHERI_PURE_CAPABILITY__
-	if (reloc_plt(obj, rtldobj) == -1)
+	/* No reloc_jmpslots for CHERI since it works differently: if BIND_NOW
+	 * is set, reloc_plt can avoid allocating trampolines for pc-rel code */
+	if (reloc_plt(obj, (obj->bind_now || bind_now), flags, rtldobj,
+	    lockstate) == -1)
+		return (-1);
 #else
 	if (reloc_plt(obj, flags, lockstate) == -1)
-#endif
 		return (-1);
 	/* Relocate the jump slots if we are doing immediate binding. */
 	if ((obj->bind_now || bind_now) && reloc_jmpslots(obj, flags,
 	    lockstate) == -1)
 		return (-1);
+#endif
 
 	if (!obj->mainprog && obj_enforce_relro(obj) == -1)
 		return (-1);
@@ -3346,7 +3405,7 @@ initlist_objects_ifunc(Objlist *list, bool bind_now, int flags,
  * Cleanup procedure.  It will be called (by the atexit mechanism) just
  * before the process exits.
  */
-static void
+static __used void
 rtld_exit(void)
 {
     RtldLockState lockstate;
@@ -3360,7 +3419,7 @@ rtld_exit(void)
     lock_release(rtld_bind_lock, &lockstate);
 }
 
-static void
+static __used void
 rtld_nop_exit(void)
 {
 }
@@ -3407,7 +3466,7 @@ struct try_library_args {
     int		 fd;
 };
 
-static void *
+static __used void *
 try_library_path(const char *dir, size_t dirlen, void *param)
 {
     struct try_library_args *arg;
@@ -3457,7 +3516,8 @@ search_library_path(const char *name, const char *path,
     arg.buflen = PATH_MAX;
     arg.fd = -1;
 
-    p = path_enumerate(path, try_library_path, refobj_path, &arg);
+    p = path_enumerate(path, make_rtld_local_function_pointer(try_library_path),
+        refobj_path, &arg);
     *fdp = arg.fd;
 
     free(arg.buffer);
@@ -3511,7 +3571,7 @@ search_library_pathfds(const char *name, const char *path, int *fdp)
 				fdstr);
 			break;
 		}
-		fd = __sys_openat(dirfd, name, O_RDONLY | O_CLOEXEC | O_VERIFY);
+		fd = openat(dirfd, name, O_RDONLY | O_CLOEXEC | O_VERIFY);
 		if (fd >= 0) {
 			*fdp = fd;
 			len = strlen(fdstr) + strlen(name) + 3;
@@ -3917,18 +3977,18 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	 */
 	if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
 	    sym = __DECONST(void*, make_function_pointer(def, defobj));
-	    dbg("dlsym(%s) is function: %-#p", name, sym);
+	    dbg("dlsym(%s) is function: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_GNU_IFUNC) {
 	    sym = rtld_resolve_ifunc(defobj, def);
-	    dbg("dlsym(%s) is ifunc. Resolved to: %-#p", name, sym);
+	    dbg("dlsym(%s) is ifunc. Resolved to: " PTR_FMT, name, sym);
 	} else if (ELF_ST_TYPE(def->st_info) == STT_TLS) {
 	    ti.ti_module = defobj->tlsindex;
 	    ti.ti_offset = def->st_value;
 	    sym = __tls_get_addr(&ti);
-	    dbg("dlsym(%s) is TLS. Resolved to: %-#p", name, sym);
+	    dbg("dlsym(%s) is TLS. Resolved to: " PTR_FMT, name, sym);
 	} else {
 	    sym = make_data_pointer(def, defobj);
-	    dbg("dlsym(%s) is type %d. Resolved to: %-#p",
+	    dbg("dlsym(%s) is type %d. Resolved to: " PTR_FMT,
 		name, ELF_ST_TYPE(def->st_info), sym);
 	}
 #if defined(__CHERI_PURE_CAPABILITY__) && defined(DEBUG)
@@ -3936,7 +3996,7 @@ do_dlsym(void *handle, const char *name, void *retaddr, const Ver_Entry *ve,
 	// FIXME: See https://github.com/CTSRD-CHERI/cheribsd/issues/257
 	if (cheri_getlen(sym) <= 0) {
 		rtld_fdprintf(STDERR_FILENO, "Warning: created zero length "
-		    "capability for %s (in %s): %-#p\n", name, defobj->path, sym);
+		    "capability for %s (in %s): " PTR_FMT "\n", name, defobj->path, sym);
 	}
 #endif
 	LD_UTRACE(UTRACE_DLSYM_STOP, handle, sym, 0, 0, name);
@@ -4026,7 +4086,7 @@ dladdr(const void *addr, Dl_info *info)
     info->dli_saddr = (void *)0;
     info->dli_sname = NULL;
 
-    dbg_cat(SYMLOOKUP, "%s: finding name for %#p\n", __func__, addr);
+    dbg_cat(SYMLOOKUP, "%s: finding name for " PTR_FMT "\n", __func__, addr);
     /*
      * Walk the symbol list looking for the symbol whose address is
      * closest to the address sent in.
@@ -4039,7 +4099,7 @@ dladdr(const void *addr, Dl_info *info)
          * SHN_COMMON.
          */
         if (def->st_shndx == SHN_UNDEF || def->st_shndx == SHN_COMMON) {
-            dbg_cat(SYMLOOKUP, "%s: skipping %s/%p (%#p)\n", __func__,
+            dbg_cat(SYMLOOKUP, "%s: skipping %s/%p (" PTR_FMT ")\n", __func__,
                 obj->strtab + def->st_name, symbol_addr, symbol_addr);
             continue;
         }
@@ -4057,7 +4117,7 @@ dladdr(const void *addr, Dl_info *info)
         if ((vaddr_t)symbol_addr > (vaddr_t)addr || (vaddr_t)symbol_addr < (vaddr_t)info->dli_saddr)
             continue;
 
-        dbg_cat(SYMLOOKUP, "%s: Found partial match for %s (%#p)\n", __func__,
+        dbg_cat(SYMLOOKUP, "%s: Found partial match for %s (" PTR_FMT ")\n", __func__,
             obj->strtab + def->st_name, symbol_addr);
         /* Update our idea of the nearest symbol. */
         info->dli_sname = obj->strtab + def->st_name;
@@ -4065,7 +4125,7 @@ dladdr(const void *addr, Dl_info *info)
 
         /* Exact match? */
         if ((vaddr_t)info->dli_saddr == (vaddr_t)addr) {
-            dbg_cat(SYMLOOKUP, "%s: Found exact match for %s (%#p)\n", __func__,
+            dbg_cat(SYMLOOKUP, "%s: Found exact match for %s (" PTR_FMT ")\n", __func__,
                 obj->strtab + def->st_name, symbol_addr);
             break;
         }
@@ -4183,8 +4243,8 @@ dl_iterate_phdr(__dl_iterate_hdr_callback callback, void *param)
 	return (error);
 }
 
-static void *
-fill_search_info(const char *dir, size_t dirlen, void *param)
+static __used void *
+_fill_search_info(const char *dir, size_t dirlen, void *param)
 {
     struct fill_search_info_args *arg;
 
@@ -4454,8 +4514,7 @@ get_program_var_addr(const char *name, RtldLockState *lockstate)
     else if (ELF_ST_TYPE(req.sym_out->st_info) == STT_GNU_IFUNC)
 	return ((const void **)rtld_resolve_ifunc(req.defobj_out, req.sym_out));
     else
-	return ((const void **)(req.defobj_out->relocbase +
-	  req.sym_out->st_value));
+	return (const void **)make_data_pointer(req.sym_out, req.defobj_out);
 }
 
 /*
@@ -6026,35 +6085,6 @@ __getosreldate(void)
 	return (osreldate);
 }
 
-void
-exit(int status)
-{
-
-	_exit(status);
-}
-
-void (*__cleanup)(void);
-int __isthreaded = 0;
-int _thread_autoinit_dummy_decl = 1;
-
-#ifdef __CHERI_PURE_CAPABILITY__
-/* FIXME: abort() will crash inside sigprocmask, let's just use raise() here */
-void
-abort(void)
-{
-	raise(SIGABRT);
-	 __builtin_trap();
-}
-#endif
-
-/*
- * No unresolved symbols for rtld.
- */
-void
-__pthread_cxa_finalize(struct dl_phdr_info *a __unused)
-{
-}
-
 const char *
 rtld_strerror(int errnum)
 {
@@ -6114,31 +6144,3 @@ realloc(void *cp, size_t nbytes)
 
 	return (__crt_realloc(cp, nbytes));
 }
-
-#if defined DEBUG || !defined(NDEBUG)
-/* Provide an implementation of __assert that does not pull in fprintf() */
-void
-__assert(const char *func, const char *file, int line, const char *failedexpr)
-{
-	if (func == NULL)
-		(void)rtld_fdprintf(STDERR_FILENO,
-		     "Assertion failed: (%s), file %s, line %d.\n", failedexpr,
-		     file, line);
-	else
-		(void)rtld_fdprintf(STDERR_FILENO,
-		     "Assertion failed: (%s), function %s, file %s, line %d.\n",
-		     failedexpr, func, file, line);
-	abort();
-	/* NOTREACHED */
-}
-#endif
-
-#ifdef __CHERI_PURE_CAPABILITY__
-/*
- * Hack to avoid a relocation against __auxargs from libc/gen/auxv.c.
- * This symbol is actually provided by crt1.c but we need a definition in
- * rtld to avoid a R_MIPS_CHERI_CAPBILITY relocation in rtld
- */
-extern Elf_Auxinfo *__auxargs;
-__attribute__((visibility("hidden"))) Elf_Auxinfo *__auxargs = NULL;
-#endif

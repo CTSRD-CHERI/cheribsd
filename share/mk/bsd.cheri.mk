@@ -28,6 +28,12 @@
 # SUCH DAMAGE.
 #
 
+.if defined(__BSD_PROG_MK)
+.if ${MK_CHERI_PURE} == "yes" && !defined(TESTSDIR)
+WANT_CHERI?=	pure
+.endif
+.endif
+
 .if ! ${MACHINE_ARCH:Mmips*c*} || defined(LIBCHERI)
 .if !${.TARGETS:Mbuild-tools} && !defined(BOOTSTRAPPING)
 .if defined(NEED_CHERI)
@@ -49,17 +55,13 @@ WANT_CHERI?=	hybrid
 LDFLAGS+=	-stdlib=libc++
 .endif
 
-# Seems like subobject bounds on references are too aggressive:
-# Implementations of vector/string take refernces to internal storage arrays and
-# then use address-of operator and assume the result will be unbounded.
-# TODO: fix this assumption in clang
-CHERI_SUBOBJECT_BOUNDS_MAX:=conservative
-
 .endif
 
-.if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none")
+.if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none" || ${WANT_CHERI} == "variables")
 # When building MIPS code for CHERI ensure 16/32 byte stack alignment
 # for libraries because it could also be used by hybrid code
+# Note: libc sets WANT_CHERI=variables when building for MIPS so we also need to
+# handle that case.
 # TODO: should be only for libraries and not programs
 .if ${COMPILER_TYPE} == "clang"
 # GCC doesn't support -mstack-alignment but I think it has been patched
@@ -73,32 +75,21 @@ CFLAGS+=	-mstack-alignment=16
 .endif # MIPS, not hybrid (adjust stack alignment)
 
 .if ${MK_CHERI} != "no" && defined(WANT_CHERI) && ${WANT_CHERI} != "none"
-.if !defined(CHERI_CC)
-.error CHERI is enabled and request, but CHERI_CC is undefined
-.endif
-.if !exists(${CHERI_CC})
-.error CHERI_CC is defined to ${CHERI_CC} which does not exist
-.endif
-
-.if !defined(CHERI_CPP) || empty(CHERI_CPP)
-CHERI_CPP=${CHERI_CC:H}/${CHERI_CC:T:S/clang/clang-cpp/}
-.endif
-.if !exists(${CHERI_CPP})
-.error CHERI_CPP is defined to ${CHERI_CPP} which does not exist
-.endif
-
-.if !defined(CHERI_CXX) || empty(CHERI_CXX)
-CHERI_CXX=${CHERI_CC:H}/${CHERI_CC:T:S/clang/clang++/}
-.endif
-.if !exists(${CHERI_CXX})
-.error CHERI_CXX is defined to ${CHERI_CXX} which does not exist
-.endif
-
 _CHERI_COMMON_FLAGS=	-integrated-as --target=cheri-unknown-freebsd \
-			-msoft-float -cheri-uintcap=offset
-_CHERI_CC=		${CHERI_CC} ${_CHERI_COMMON_FLAGS}
-_CHERI_CXX=		${CHERI_CXX} ${_CHERI_COMMON_FLAGS}
-_CHERI_CPP=		${CHERI_CPP} ${_CHERI_COMMON_FLAGS}
+			-msoft-float \
+			-cheri-uintcap=${CHERI_UINTCAP_MODE:Uoffset}
+.ifdef WANT_AFL_FUZZ
+# Build binaries static when fuzzing
+.if defined(__BSD_PROG_MK)
+NO_SHARED=yes
+.endif
+_CHERI_CC=		AFL_PATH=${CC:H}/../afl/usr/local/lib/afl/ ${CC:H}/../afl/usr/local/bin/afl-clang-fast ${_CHERI_COMMON_FLAGS}
+_CHERI_CXX=		AFL_PATH=${CC:H}/../afl/usr/local/lib/afl/ ${CXX:H}/../afl/usr/local/bin/afl-clang-fast++ ${_CHERI_COMMON_FLAGS}
+.else
+_CHERI_CC=		${CC} ${_CHERI_COMMON_FLAGS}
+_CHERI_CXX=		${CXX} ${_CHERI_COMMON_FLAGS}
+.endif
+_CHERI_CPP=		${CPP} ${_CHERI_COMMON_FLAGS}
 
 .if defined(CHERI_SUBOBJECT_BOUNDS)
 # Allow per-subdirectory overrides if we know that there is maximum that works
@@ -106,14 +97,16 @@ _CHERI_CPP=		${CHERI_CPP} ${_CHERI_COMMON_FLAGS}
 _CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS_MAX}
 .else
 _CHERI_COMMON_FLAGS+=	-Xclang -cheri-bounds=${CHERI_SUBOBJECT_BOUNDS}
-.endif
-.endif
+.endif # CHERI_SUBOBJECT_BOUNDS_MAX
+CHERI_SUBOBJECT_BOUNDS_DEBUG?=yes
+.if ${CHERI_SUBOBJECT_BOUNDS_DEBUG} == "yes"
+# If debugging is enabled, clear SW permission bit 2 when the bounds are reduced
+_CHERI_COMMON_FLAGS+=	-mllvm -cheri-subobject-bounds-clear-swperm=2
+.endif # CHERI_SUBOBJECT_BOUNDS_DEBUG
+.endif # CHERI_SUBOBJECT_BOUNDS
 
 .if defined(SYSROOT)
 _CHERI_COMMON_FLAGS+=	--sysroot=${SYSROOT}
-.endif
-.if ${MK_CHERI_EXACT_EQUALS} == "yes"
-_CHERI_COMMON_FLAGS+=	-mllvm -cheri-exact-equals
 .endif
 
 .if ${WANT_CHERI} == "pure" || ${WANT_CHERI} == "sandbox"
@@ -173,18 +166,13 @@ _CHERI_CFLAGS+=	-Qunused-arguments
 _CHERI_CFLAGS+=	-Werror=cheri-bitwise-operations
 
 .if ${WANT_CHERI} != "variables"
-.if ${MK_CHERI_SHARED} == "no" || defined(CHERI_NO_SHARED)
-NO_SHARED=	yes
-.elif defined(__BSD_PROG_MK) && ${MK_CHERI_SHARED_PROG} == "no"
-NO_SHARED=	yes
-.elif ${WANT_CHERI} == "sandbox"
+.if ${WANT_CHERI} == "sandbox"
 # Force position-dependent sandboxes; PIEs aren't supported
 NO_SHARED=	yes
 .endif
 CC:=	${_CHERI_CC}
 CXX:=   ${_CHERI_CXX}
 CPP:=	${_CHERI_CPP}
-COMPILER_TYPE=	clang
 CFLAGS+=	${_CHERI_CFLAGS}
 CXXFLAGS+=	${_CHERI_CFLAGS}
 # XXXAR: leave this for a while until everyone has updated clang to

@@ -311,7 +311,7 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 	struct smbmount *smp = VFSTOSMBFS(vp->v_mount);
 	struct smbnode *np = VTOSMB(vp);
 	struct uio *uiop;
-	kiovec_t io;
+	struct iovec io;
 	struct smb_cred *scred;
 	int error = 0;
 
@@ -375,9 +375,6 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 		 */
 		if (error == EINTR
 		    || (!error && (bp->b_flags & B_NEEDCOMMIT))) {
-			int s;
-
-			s = splbio();
 			bp->b_flags &= ~(B_INVAL|B_NOCACHE);
 			if ((bp->b_flags & B_ASYNC) == 0)
 			    bp->b_flags |= B_EINTR;
@@ -387,7 +384,6 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 			}
 			if ((bp->b_flags & B_ASYNC) == 0)
 			    bp->b_flags |= B_EINTR;
-			splx(s);
 		} else {
 			if (error) {
 				bp->b_ioflags |= BIO_ERROR;
@@ -428,7 +424,7 @@ smbfs_getpages(ap)
 #else
 	int i, error, nextoff, size, toff, npages, count;
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	struct vnode *vp;
@@ -461,7 +457,7 @@ smbfs_getpages(ap)
 	 * XXXGL: is that true for SMB filesystem?
 	 */
 	VM_OBJECT_WLOCK(object);
-	if (pages[npages - 1]->valid != 0 && --npages == 0)
+	if (!vm_page_none_valid(pages[npages - 1]) && --npages == 0)
 		goto out;
 	VM_OBJECT_WUNLOCK(object);
 
@@ -508,14 +504,14 @@ smbfs_getpages(ap)
 			/*
 			 * Read operation filled an entire page
 			 */
-			m->valid = VM_PAGE_BITS_ALL;
+			vm_page_valid(m);
 			KASSERT(m->dirty == 0,
 			    ("smbfs_getpages: page %p is dirty", m));
 		} else if (size > toff) {
 			/*
 			 * Read operation filled a partial page.
 			 */
-			m->valid = 0;
+			vm_page_invalid(m);
 			vm_page_set_valid_range(m, 0, size - toff);
 			KASSERT(m->dirty == 0,
 			    ("smbfs_getpages: page %p is dirty", m));
@@ -568,7 +564,7 @@ smbfs_putpages(ap)
 	return error;
 #else
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	int i, npages, count;
@@ -678,11 +674,10 @@ smbfs_vinvalbuf(struct vnode *vp, struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

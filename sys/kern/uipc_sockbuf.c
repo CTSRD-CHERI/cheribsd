@@ -34,11 +34,13 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_kern_tls.h"
 #include "opt_param.h"
 
 #include <sys/param.h>
 #include <sys/aio.h> /* for aio_swake proto */
 #include <sys/kernel.h>
+#include <sys/ktls.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -89,28 +91,133 @@ sbm_clrprotoflags(struct mbuf *m, int flags)
 }
 
 /*
- * Mark ready "count" mbufs starting with "m".
+ * Compress M_NOTREADY mbufs after they have been readied by sbready().
+ *
+ * sbcompress() skips M_NOTREADY mbufs since the data is not available to
+ * be copied at the time of sbcompress().  This function combines small
+ * mbufs similar to sbcompress() once mbufs are ready.  'm0' is the first
+ * mbuf sbready() marked ready, and 'end' is the first mbuf still not
+ * ready.
+ */
+static void
+sbready_compress(struct sockbuf *sb, struct mbuf *m0, struct mbuf *end)
+{
+	struct mbuf *m, *n;
+	int ext_size;
+
+	SOCKBUF_LOCK_ASSERT(sb);
+
+	if ((sb->sb_flags & SB_NOCOALESCE) != 0)
+		return;
+
+	for (m = m0; m != end; m = m->m_next) {
+		MPASS((m->m_flags & M_NOTREADY) == 0);
+
+		/* Compress small unmapped mbufs into plain mbufs. */
+		if ((m->m_flags & M_NOMAP) && m->m_len <= MLEN &&
+		    !mbuf_has_tls_session(m)) {
+			MPASS(m->m_flags & M_EXT);
+			ext_size = m->m_ext.ext_size;
+			if (mb_unmapped_compress(m) == 0) {
+				sb->sb_mbcnt -= ext_size;
+				sb->sb_ccnt -= 1;
+			}
+		}
+
+		/*
+		 * NB: In sbcompress(), 'n' is the last mbuf in the
+		 * socket buffer and 'm' is the new mbuf being copied
+		 * into the trailing space of 'n'.  Here, the roles
+		 * are reversed and 'n' is the next mbuf after 'm'
+		 * that is being copied into the trailing space of
+		 * 'm'.
+		 */
+		n = m->m_next;
+		while ((n != NULL) && (n != end) && (m->m_flags & M_EOR) == 0 &&
+		    M_WRITABLE(m) &&
+		    (m->m_flags & M_NOMAP) == 0 &&
+		    !mbuf_has_tls_session(n) &&
+		    !mbuf_has_tls_session(m) &&
+		    n->m_len <= MCLBYTES / 4 && /* XXX: Don't copy too much */
+		    n->m_len <= M_TRAILINGSPACE(m) &&
+		    m->m_type == n->m_type) {
+			KASSERT(sb->sb_lastrecord != n,
+		    ("%s: merging start of record (%p) into previous mbuf (%p)",
+			    __func__, n, m));
+			m_copydata(n, 0, n->m_len, mtodo(m, m->m_len));
+			m->m_len += n->m_len;
+			m->m_next = n->m_next;
+			m->m_flags |= n->m_flags & M_EOR;
+			if (sb->sb_mbtail == n)
+				sb->sb_mbtail = m;
+
+			sb->sb_mbcnt -= MSIZE;
+			sb->sb_mcnt -= 1;
+			if (n->m_flags & M_EXT) {
+				sb->sb_mbcnt -= n->m_ext.ext_size;
+				sb->sb_ccnt -= 1;
+			}
+			m_free(n);
+			n = m->m_next;
+		}
+	}
+	SBLASTRECORDCHK(sb);
+	SBLASTMBUFCHK(sb);
+}
+
+/*
+ * Mark ready "count" units of I/O starting with "m".  Most mbufs
+ * count as a single unit of I/O except for EXT_PGS-backed mbufs which
+ * can be backed by multiple pages.
  */
 int
-sbready(struct sockbuf *sb, struct mbuf *m, int count)
+sbready(struct sockbuf *sb, struct mbuf *m0, int count)
 {
+	struct mbuf *m;
 	u_int blocker;
 
 	SOCKBUF_LOCK_ASSERT(sb);
 	KASSERT(sb->sb_fnrdy != NULL, ("%s: sb %p NULL fnrdy", __func__, sb));
+	KASSERT(count > 0, ("%s: invalid count %d", __func__, count));
 
+	m = m0;
 	blocker = (sb->sb_fnrdy == m) ? M_BLOCKED : 0;
 
-	for (int i = 0; i < count; i++, m = m->m_next) {
+	while (count > 0) {
 		KASSERT(m->m_flags & M_NOTREADY,
 		    ("%s: m %p !M_NOTREADY", __func__, m));
+		if ((m->m_flags & M_EXT) != 0 &&
+		    m->m_ext.ext_type == EXT_PGS) {
+			if (count < m->m_ext.ext_pgs->nrdy) {
+				m->m_ext.ext_pgs->nrdy -= count;
+				count = 0;
+				break;
+			}
+			count -= m->m_ext.ext_pgs->nrdy;
+			m->m_ext.ext_pgs->nrdy = 0;
+		} else
+			count--;
+
 		m->m_flags &= ~(M_NOTREADY | blocker);
 		if (blocker)
 			sb->sb_acc += m->m_len;
+		m = m->m_next;
 	}
 
-	if (!blocker)
+	/*
+	 * If the first mbuf is still not fully ready because only
+	 * some of its backing pages were readied, no further progress
+	 * can be made.
+	 */
+	if (m0 == m) {
+		MPASS(m->m_flags & M_NOTREADY);
 		return (EINPROGRESS);
+	}
+
+	if (!blocker) {
+		sbready_compress(sb, m0, m);
+		return (EINPROGRESS);
+	}
 
 	/* This one was blocking all the queue. */
 	for (; m && (m->m_flags & M_NOTREADY) == 0; m = m->m_next) {
@@ -121,6 +228,7 @@ sbready(struct sockbuf *sb, struct mbuf *m, int count)
 	}
 
 	sb->sb_fnrdy = m;
+	sbready_compress(sb, m0, m);
 
 	return (0);
 }
@@ -565,6 +673,11 @@ sbdestroy(struct sockbuf *sb, struct socket *so)
 {
 
 	sbrelease_internal(sb, so);
+#ifdef KERN_TLS
+	if (sb->sb_tls_info != NULL)
+		ktls_free(sb->sb_tls_info);
+	sb->sb_tls_info = NULL;
+#endif
 }
 
 /*
@@ -727,6 +840,11 @@ sbappendstream_locked(struct sockbuf *sb, struct mbuf *m, int flags)
 	KASSERT(sb->sb_mb == sb->sb_lastrecord,("sbappendstream 1"));
 
 	SBLASTMBUFCHK(sb);
+
+#ifdef KERN_TLS
+	if (sb->sb_tls_info != NULL)
+		ktls_seq(sb, m);
+#endif
 
 	/* Remove all packet headers and mbuf tags to get a pure data chain. */
 	m_demote(m, 1, flags & PRUS_NOTREADY ? M_NOTREADY : 0);
@@ -1030,12 +1148,13 @@ sbcompress(struct sockbuf *sb, struct mbuf *m, struct mbuf *n)
 		    M_WRITABLE(n) &&
 		    ((sb->sb_flags & SB_NOCOALESCE) == 0) &&
 		    !(m->m_flags & M_NOTREADY) &&
-		    !(n->m_flags & M_NOTREADY) &&
+		    !(n->m_flags & (M_NOTREADY | M_NOMAP)) &&
+		    !mbuf_has_tls_session(m) &&
+		    !mbuf_has_tls_session(n) &&
 		    m->m_len <= MCLBYTES / 4 && /* XXX: Don't copy too much */
 		    m->m_len <= M_TRAILINGSPACE(n) &&
 		    n->m_type == m->m_type) {
-			bcopy(mtod(m, caddr_t), mtod(n, caddr_t) + n->m_len,
-			    (unsigned)m->m_len);
+			m_copydata(m, 0, m->m_len, mtodo(n, n->m_len));
 			n->m_len += m->m_len;
 			sb->sb_ccc += m->m_len;
 			if (sb->sb_fnrdy == NULL)
@@ -1046,6 +1165,10 @@ sbcompress(struct sockbuf *sb, struct mbuf *m, struct mbuf *n)
 			m = m_free(m);
 			continue;
 		}
+		if (m->m_len <= MLEN && (m->m_flags & M_NOMAP) &&
+		    (m->m_flags & M_NOTREADY) == 0 &&
+		    !mbuf_has_tls_session(m))
+			(void)mb_unmapped_compress(m);
 		if (n)
 			n->m_next = m;
 		else

@@ -45,7 +45,7 @@ public:
 private:
   static bool decodeTableEntry(A &addressSpace, pint_t &tableEntry,
                                pint_t ehHdrStart, pint_t ehHdrEnd,
-                               uint8_t tableEnc,
+                               uint8_t tableEnc, pint_t pc,
                                typename CFI_Parser<A>::FDE_Info *fdeInfo,
                                typename CFI_Parser<A>::CIE_Info *cieInfo);
   static size_t getTableEntrySize(uint8_t tableEnc);
@@ -80,7 +80,7 @@ bool EHHeaderParser<A>::decodeEHHdr(A &addressSpace, pint_t ehHdrStart,
 template <typename A>
 bool EHHeaderParser<A>::decodeTableEntry(
     A &addressSpace, pint_t &tableEntry, pint_t ehHdrStart, pint_t ehHdrEnd,
-    uint8_t tableEnc, typename CFI_Parser<A>::FDE_Info *fdeInfo,
+    uint8_t tableEnc, pint_t pc, typename CFI_Parser<A>::FDE_Info *fdeInfo,
     typename CFI_Parser<A>::CIE_Info *cieInfo) {
   // Have to decode the whole FDE for the PC range anyway, so just throw away
   // the PC start.
@@ -88,7 +88,7 @@ bool EHHeaderParser<A>::decodeTableEntry(
   pint_t fde =
       addressSpace.getEncodedP(tableEntry, ehHdrEnd, tableEnc, ehHdrStart);
   const char *message =
-      CFI_Parser<A>::decodeFDE(addressSpace, fde, fdeInfo, cieInfo);
+      CFI_Parser<A>::decodeFDE(addressSpace, pc, fde, fdeInfo, cieInfo);
   if (message != NULL) {
     _LIBUNWIND_DEBUG_LOG("EHHeaderParser::decodeTableEntry: bad fde: %s",
                          message);
@@ -133,7 +133,7 @@ bool EHHeaderParser<A>::findFDE(A &addressSpace, pint_t pc, pint_t ehHdrStart,
 
   tableEntry = hdrInfo.table + low * tableEntrySize;
   if (decodeTableEntry(addressSpace, tableEntry, ehHdrStart, ehHdrEnd,
-                       hdrInfo.table_enc, fdeInfo, cieInfo)) {
+                       hdrInfo.table_enc, pc, fdeInfo, cieInfo)) {
     if (pc >= fdeInfo->pcStart && pc < fdeInfo->pcEnd)
       return true;
   }

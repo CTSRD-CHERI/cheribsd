@@ -138,11 +138,7 @@ getint(void **ptr)
 	int *p = *ptr;
 	int rv;
 
-#if __has_builtin(__builtin_align_up)
 	p = (int *)__builtin_align_up(p, sizeof(int));
-#else
-	p = (int *)roundup2((intptr_t)p, sizeof(int));
-#endif
 	rv = *p++;
 	*ptr = p;
 	return rv;
@@ -402,7 +398,7 @@ search_hints(const char *bus, const char *dev, const char *pnpinfo)
 				printf("Unknown Type %d len %d\n", ival, len);
 			break;
 		}
-		walker = (void *)(len - sizeof(int) + (intptr_t)walker);
+		walker = (void *)((intptr_t)walker + len - sizeof(int));
 	}
 	if (unbound_flag && found == 0 && *pnpinfo) {
 		if (verbose_flag)

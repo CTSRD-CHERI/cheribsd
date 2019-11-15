@@ -211,8 +211,8 @@ test_nofault_cfromptr(const struct cheri_test *ctp __unused)
 	int rt;
 
 	/*
-	 * XXXRW: Could we be using CHERI_CFROMPTR() here to avoid explicit
-	 * inline assembly?
+	 * XXX: Could we be using cheri_cap_from_pointer() here to
+	 * avoid explicit inline assembly?
 	 */
 	cb = cheri_ptr(buf, 256);
 	rt = 10;

@@ -26,7 +26,7 @@
  * Copyright (c) 2012, Martin Matuska <mm@FreeBSD.org>. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright 2017 Joyent, Inc.
- * Copyright (c) 2017 Datto Inc.
+ * Copyright (c) 2019 Datto Inc.
  */
 
 /* Portions Copyright 2010 Robert Milkowski */
@@ -1016,6 +1016,7 @@ typedef enum zfs_ioc {
 	ZFS_IOC_POOL_CHECKPOINT,
 	ZFS_IOC_POOL_DISCARD_CHECKPOINT,
 	ZFS_IOC_POOL_INITIALIZE,
+	ZFS_IOC_POOL_SYNC,
 	ZFS_IOC_LAST
 } zfs_ioc_t;
 
@@ -1122,6 +1123,13 @@ typedef enum {
 #define	ZCP_MAX_INSTRLIMIT	(10 * ZCP_DEFAULT_INSTRLIMIT)
 #define	ZCP_DEFAULT_MEMLIMIT	(10 * 1024 * 1024)
 #define	ZCP_MAX_MEMLIMIT	(10 * ZCP_DEFAULT_MEMLIMIT)
+
+/*
+ * nvlist name constants. Facilitate restricting snapshot iteration range for
+ * the "list next snapshot" ioctl
+ */
+#define	SNAP_ITER_MIN_TXG	"snap_iter_min_txg"
+#define	SNAP_ITER_MAX_TXG	"snap_iter_max_txg"
 
 /*
  * Sysevent payload members.  ZFS will generate the following sysevents with the

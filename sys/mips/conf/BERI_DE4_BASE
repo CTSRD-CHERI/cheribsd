@@ -12,7 +12,6 @@
 include "std.BERI"
 
 options	KSTACK_LARGE_PAGE	# Use a 16K page for kernel stack
-#options	MIPS64_NEW_PMAP		# Use new pmap code
 
 options 	NFSCL			# Network Filesystem Client
 options 	NFSLOCKD		# Network Lock Manager
@@ -51,6 +50,7 @@ options 	DEVICE_POLLING
 #
 # DMA support
 #
+options		ALTERA_MSGDMA_DESC_PF_STD
 device		xdma
 device		altera_softdma
 device		altera_msgdma

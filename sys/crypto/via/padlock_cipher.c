@@ -176,7 +176,7 @@ padlock_cipher_alloc(struct cryptodesc *enccrd, struct cryptop *crp,
 	else {
 		if (crp->crp_flags & CRYPTO_F_IOV) {
 			struct uio *uio;
-			kiovec_t *iov;
+			struct iovec *iov;
 
 			uio = (struct uio *)crp->crp_buf;
 			if (uio->uio_iovcnt != 1)
@@ -273,12 +273,3 @@ padlock_cipher_process(struct padlock_session *ses, struct cryptodesc *enccrd,
 	}
 	return (0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "kiovec_t"
-//   ]
-// }
-// CHERI CHANGES END

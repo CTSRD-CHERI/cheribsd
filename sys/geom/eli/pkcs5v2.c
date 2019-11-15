@@ -97,7 +97,7 @@ static int
 pkcs5v2_probe(int iterations)
 {
 	uint8_t	key[G_ELI_USERKEYLEN], salt[G_ELI_SALTLEN];
-	uint8_t passphrase[] = "passphrase";
+	const char passphrase[] = "passphrase";
 	struct rusage start, end;
 	int usecs;
 

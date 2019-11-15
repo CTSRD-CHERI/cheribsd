@@ -75,13 +75,15 @@ test_bounds_precise(void * __capability c, size_t expected_len)
 	/* Confirm precise lower bound: offset of zero. */
 	offset = cheri_getoffset(c);
 	if (offset != 0)
-		cheritest_failure_errx("offset (%jd) not zero", offset);
+		cheritest_failure_errx("offset (%jd) not zero: "
+		    _CHERI_PRINTF_CAP_FMT, offset, _CHERI_PRINTF_CAP_ARG(c));
 
 	/* Confirm precise upper bound: length of expected size for type. */
 	len = cheri_getlen(c);
 	if (len != expected_len)
-		cheritest_failure_errx("length (%jd) not expected %jd", len,
-		    expected_len);
+		cheritest_failure_errx("length (%jd) not expected %jd: "
+		    _CHERI_PRINTF_CAP_FMT, len, expected_len,
+		    _CHERI_PRINTF_CAP_ARG(c));
 	cheritest_success();
 }
 

@@ -20,6 +20,7 @@
 #include "min_allocator.h"
 #include "test_allocator.h"
 #include "asan_testing.h"
+TEST_CHERI_NO_SUBOBJECT_WARNING
 
 class A
 {
@@ -145,5 +146,16 @@ int main(int, char**)
         assert(is_contiguous_container_asan_correct(c));
     }
 
+    { // LWG 2164
+        int arr[] = {0, 1, 2, 3, 4};
+        int sz = 5;
+        std::vector<int> c(arr, arr+sz);
+        while (c.size() < c.capacity())
+            c.push_back(sz++);
+        c.emplace_back(c.front());
+        assert(c.back() == 0);
+        for (int i = 0; i < sz; ++i)
+            assert(c[i] == i);
+    }
   return 0;
 }

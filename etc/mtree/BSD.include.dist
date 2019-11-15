@@ -144,8 +144,6 @@
             mpilib
             ..
         ..
-        nand
-        ..
         nvme
         ..
         ofw
@@ -157,6 +155,8 @@
         powermac_nvram
         ..
         ppbus
+        ..
+        pwm
         ..
         smbus
         ..
@@ -187,8 +187,6 @@
         fdescfs
         ..
         msdosfs
-        ..
-        nandfs
         ..
         nfs
         ..

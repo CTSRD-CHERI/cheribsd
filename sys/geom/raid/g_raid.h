@@ -61,39 +61,13 @@ extern int g_raid_read_err_thresh;
 extern u_int g_raid_start_timeout;
 extern struct g_class g_raid_class;
 
-#define	G_RAID_DEBUG(lvl, fmt, ...)	do {				\
-	if (g_raid_debug >= (lvl)) {					\
-		if (g_raid_debug > 0) {					\
-			printf("GEOM_RAID[%u]: " fmt "\n",		\
-			    lvl, ## __VA_ARGS__);			\
-		} else {						\
-			printf("GEOM_RAID: " fmt "\n",			\
-			    ## __VA_ARGS__);				\
-		}							\
-	}								\
-} while (0)
-#define	G_RAID_DEBUG1(lvl, sc, fmt, ...)	do {			\
-	if (g_raid_debug >= (lvl)) {					\
-		if (g_raid_debug > 0) {					\
-			printf("GEOM_RAID[%u]: %s: " fmt "\n",		\
-			    lvl, (sc)->sc_name, ## __VA_ARGS__);	\
-		} else {						\
-			printf("GEOM_RAID: %s: " fmt "\n",		\
-			    (sc)->sc_name, ## __VA_ARGS__);		\
-		}							\
-	}								\
-} while (0)
-#define	G_RAID_LOGREQ(lvl, bp, fmt, ...)	do {			\
-	if (g_raid_debug >= (lvl)) {					\
-		if (g_raid_debug > 0) {					\
-			printf("GEOM_RAID[%u]: " fmt " ",		\
-			    lvl, ## __VA_ARGS__);			\
-		} else							\
-			printf("GEOM_RAID: " fmt " ", ## __VA_ARGS__);	\
-		g_print_bio(bp);					\
-		printf("\n");						\
-	}								\
-} while (0)
+#define	G_RAID_DEBUG(lvl, ...) \
+    _GEOM_DEBUG("GEOM_RAID", g_raid_debug, (lvl), NULL, __VA_ARGS__)
+#define	G_RAID_DEBUG1(lvl, sc, fmt, ...)				\
+    _GEOM_DEBUG("GEOM_RAID", g_raid_debug, (lvl), NULL, "%s: " fmt,	\
+	(sc)->sc_name, ## __VA_ARGS__)
+#define	G_RAID_LOGREQ(lvl, bp, ...) \
+    _GEOM_DEBUG("GEOM_RAID", g_raid_debug, (lvl), (bp), __VA_ARGS__)
 
 /*
  * Flags we use to distinguish I/O initiated by the TR layer to maintain
@@ -155,7 +129,6 @@ struct g_raid_disk {
 	struct g_raid_softc	*d_softc;	/* Back-pointer to softc. */
 	struct g_consumer	*d_consumer;	/* GEOM disk consumer. */
 	void			*d_md_data;	/* Disk's metadata storage. */
-	struct g_kerneldump	 d_kd;		/* Kernel dumping method/args. */
 	int			 d_candelete;	/* BIO_DELETE supported. */
 	uint64_t		 d_flags;	/* Additional flags. */
 	u_int			 d_state;	/* Disk state. */
@@ -164,6 +137,7 @@ struct g_raid_disk {
 	int			 d_read_errs;	/* Count of the read errors */
 	TAILQ_HEAD(, g_raid_subdisk)	 d_subdisks; /* List of subdisks. */
 	TAILQ_ENTRY(g_raid_disk)	 d_next;	/* Next disk in the node. */
+	struct g_kerneldump	 d_kd;		/* Kernel dumping method/args. */
 };
 
 #define G_RAID_SUBDISK_S_NONE		0x00	/* Absent. */

@@ -82,7 +82,7 @@ static int	 fts_ufslinks(FTS *, const FTSENT *);
  * ftsp_fts member (and can be cast to an _fts_private as required)
  */
 struct _fts_private {
-	FTS		ftsp_fts;
+	FTS		ftsp_fts /*__subobject_member_used_for_c_inheritance -- annotated callsite instead*/;
 	struct statfs	ftsp_statfs;
 	dev_t		ftsp_dev;
 	int		ftsp_linksreliable;
@@ -130,7 +130,7 @@ fts_open(char * const *argv, int options,
 	/* Allocate/initialize the stream. */
 	if ((priv = calloc(1, sizeof(*priv))) == NULL)
 		return (NULL);
-	sp = &priv->ftsp_fts;
+	sp = __unbounded_addressof(priv->ftsp_fts);
 	sp->fts_compar = compar;
 	sp->fts_options = options;
 

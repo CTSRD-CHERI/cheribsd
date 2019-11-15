@@ -72,8 +72,9 @@ nvdimm_create_namespaces(struct SPA_mapping *spa, ACPI_TABLE_NFIT *nfitbl)
 		    (e->label.dimm_phys_addr - regions[0]->Address);
 		ns->dev.spa_len = num_regions * e->label.raw_size;
 		ns->dev.spa_efi_mem_flags = spa->dev.spa_efi_mem_flags;
+		ns->dev.spa_memattr = spa->dev.spa_memattr;
 		asprintf(&name, M_NVDIMM, "spa%dns%d", spa->spa_nfit_idx, i);
-		error = nvdimm_spa_dev_init(&ns->dev, name);
+		error = nvdimm_spa_dev_init(&ns->dev, name, i);
 		free(name, M_NVDIMM);
 		if (error != 0)
 			break;

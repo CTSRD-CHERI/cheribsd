@@ -192,7 +192,11 @@ struct __res_state {
 	u_int	_pad;			/*%< make _u 64 bit aligned */
 	union {
 		/* On an 32-bit arch this means 512b total. */
-		/* Evil nonsensical padding that breaks CHERI sandbox mode... */
+		/*
+		 * XXX: This padding is nonsense and breaks with
+		 * pointers larger than 8 bytes.  Unfortunatly, it is
+		 * part of existing ABIs.
+		 */
 #ifndef __CHERI_PURE_CAPABILITY__
 		char    pad[72 - 4*sizeof (int) - 3*sizeof (void *)];
 #endif

@@ -76,18 +76,23 @@ __END_DECLS
 #define dbg_cheri_plt_verbose(...)	dbg_cat(CHERI_PLT_VERBOSE, __VA_ARGS__)
 
 
-#ifdef __CHERI_PURE_CAPABILITY__
-#define _MYNAME	"ld-cheri-elf.so.1"
-#elif !defined(COMPAT_32BIT)
-#define _MYNAME	"ld-elf.so.1"
-#else
+#if defined(COMPAT_32BIT)
 #define _MYNAME	"ld-elf32.so.1"
+#elif defined(COMPAT_64BIT)
+#define _MYNAME	"ld-elf64.so.1"
+#elif defined(__CHERI_PURE_CAPABILITY__)
+#define _MYNAME	"ld-cheri-elf.so.1"
+#else
+#define _MYNAME	"ld-elf.so.1"
 #endif
 
-/* assert() is always enabled. For expensive checks use dbg_assert() instead. */
-
-#define msg(s)		rtld_write(STDERR_FILENO, s, strlen(s))
+#define msg(s)		rtld_putstr(s)
 #define trace()		msg(_MYNAME ": " __XSTRING(__LINE__) "\n")
 
+#ifdef __CHERI_PURE_CAPABILITY__
+#define	PTR_FMT	"%-#p"
+#else
+#define	PTR_FMT	"%-p"
+#endif
 
 #endif /* DEBUG_H */

@@ -101,7 +101,7 @@ typedef	__clockid_t	clockid_t;
 #endif
 
 typedef	__critical_t	critical_t;	/* Critical section value */
-typedef	__int64_t	daddr_t;	/* disk address */
+typedef	__daddr_t	daddr_t;	/* disk address */
 
 #ifndef _DEV_T_DECLARED
 typedef	__dev_t		dev_t;		/* device number or struct cdev */
@@ -252,11 +252,12 @@ typedef	struct cap_rights	cap_rights_t;
 #endif
 
 /*
- * Types suitable for exporting size and pointers (as virtual addresses)
- * from the kernel independent of native word size.  These should be
- * used in place of size_t and (u)intptr_t in structs which contain such
- * types that are shared with userspace.
+ * Types suitable for exporting physical addresses, virtual addresses
+ * (pointers), and memory object sizes from the kernel independent of native
+ * word size.  These should be used in place of vm_paddr_t, (u)intptr_t, and
+ * size_t in structs which contain such types that are shared with userspace.
  */
+typedef	__uint64_t	kpaddr_t;
 typedef	__uint64_t	kvaddr_t;
 typedef	__uint64_t	ksize_t;
 

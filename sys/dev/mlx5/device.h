@@ -32,8 +32,10 @@
 #include <rdma/ib_verbs.h>
 #include <dev/mlx5/mlx5_ifc.h>
 
-#define FW_INIT_TIMEOUT_MILI 2000
-#define FW_INIT_WAIT_MS 2
+#define	FW_INIT_TIMEOUT_MILI		2000
+#define	FW_INIT_WAIT_MS			2
+#define	FW_PRE_INIT_TIMEOUT_MILI	120000
+#define	FW_INIT_WARN_MESSAGE_INTERVAL	20000
 
 #if defined(__LITTLE_ENDIAN)
 #define MLX5_SET_HOST_ENDIANNESS	0
@@ -537,7 +539,7 @@ enum {
 	MLX5_MODULE_STATUS_PLUGGED_ENABLED      = 0x1,
 	MLX5_MODULE_STATUS_UNPLUGGED            = 0x2,
 	MLX5_MODULE_STATUS_ERROR                = 0x3,
-	MLX5_MODULE_STATUS_PLUGGED_DISABLED     = 0x4,
+	MLX5_MODULE_STATUS_NUM			,
 };
 
 enum {
@@ -549,7 +551,7 @@ enum {
 	MLX5_MODULE_EVENT_ERROR_UNSUPPORTED_CABLE                     = 0x5,
 	MLX5_MODULE_EVENT_ERROR_HIGH_TEMPERATURE                      = 0x6,
 	MLX5_MODULE_EVENT_ERROR_CABLE_IS_SHORTED                      = 0x7,
-	MLX5_MODULE_EVENT_ERROR_PCIE_SYSTEM_POWER_SLOT_EXCEEDED       = 0xc,
+	MLX5_MODULE_EVENT_ERROR_NUM		                      ,
 };
 
 struct mlx5_eqe_port_module_event {
@@ -566,6 +568,11 @@ struct mlx5_eqe_general_notification_event {
 	u32       rsvd0[6];
 };
 
+struct mlx5_eqe_temp_warning {
+	__be64 sensor_warning_msb;
+	__be64 sensor_warning_lsb;
+} __packed;
+
 union ev_data {
 	__be32				raw[7];
 	struct mlx5_eqe_cmd		cmd;
@@ -580,6 +587,7 @@ union ev_data {
 	struct mlx5_eqe_port_module_event port_module_event;
 	struct mlx5_eqe_vport_change	vport_change;
 	struct mlx5_eqe_general_notification_event general_notifications;
+	struct mlx5_eqe_temp_warning	temp_warning;
 } __packed;
 
 struct mlx5_eqe {
@@ -923,6 +931,22 @@ enum mlx5_qcam_feature_groups {
 	MLX5_QCAM_FEATURE_ENHANCED_FEATURES = 0x0,
 };
 
+enum mlx5_pcam_reg_groups {
+	MLX5_PCAM_REGS_5000_TO_507F = 0x0,
+};
+
+enum mlx5_pcam_feature_groups {
+	MLX5_PCAM_FEATURE_ENHANCED_FEATURES = 0x0,
+};
+
+enum mlx5_mcam_reg_groups {
+	MLX5_MCAM_REGS_FIRST_128 = 0x0,
+};
+
+enum mlx5_mcam_feature_groups {
+	MLX5_MCAM_FEATURE_ENHANCED_FEATURES = 0x0,
+};
+
 /* GET Dev Caps macros */
 #define MLX5_CAP_GEN(mdev, cap) \
 	MLX5_GET(cmd_hca_cap, mdev->hca_caps_cur[MLX5_CAP_GENERAL], cap)
@@ -1027,6 +1051,18 @@ enum mlx5_qcam_feature_groups {
 #define MLX5_CAP_QOS_MAX(mdev, cap) \
 	MLX5_GET(qos_cap,\
 		 mdev->hca_caps_max[MLX5_CAP_QOS], cap)
+
+#define MLX5_CAP_PCAM_FEATURE(mdev, fld) \
+	MLX5_GET(pcam_reg, (mdev)->caps.pcam, feature_cap_mask.enhanced_features.fld)
+
+#define	MLX5_CAP_PCAM_REG(mdev, reg) \
+	MLX5_GET(pcam_reg, (mdev)->caps.pcam, port_access_reg_cap_mask.regs_5000_to_507f.reg)
+
+#define MLX5_CAP_MCAM_FEATURE(mdev, fld) \
+	MLX5_GET(mcam_reg, (mdev)->caps.mcam, mng_feature_cap_mask.enhanced_features.fld)
+
+#define	MLX5_CAP_MCAM_REG(mdev, reg) \
+	MLX5_GET(mcam_reg, (mdev)->caps.mcam, mng_access_reg_cap_mask.access_regs.reg)
 
 #define	MLX5_CAP_QCAM_REG(mdev, fld) \
 	MLX5_GET(qcam_reg, (mdev)->caps.qcam, qos_access_reg_cap_mask.reg_cap.fld)
@@ -1184,6 +1220,12 @@ static inline int mlx5_get_cqe_format(const struct mlx5_cqe64 *cqe)
 
 enum {
 	MLX5_GEN_EVENT_SUBTYPE_DELAY_DROP_TIMEOUT = 0x1,
+	MLX5_GEN_EVENT_SUBTYPE_PCI_POWER_CHANGE_EVENT = 0x5,
+};
+
+enum {
+	MLX5_FRL_LEVEL3 = 0x8,
+	MLX5_FRL_LEVEL6 = 0x40,
 };
 
 /* 8 regular priorities + 1 for multicast */

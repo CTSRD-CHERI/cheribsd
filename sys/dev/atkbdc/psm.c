@@ -72,6 +72,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/conf.h>
 #include <sys/filio.h>
+#include <sys/mutex.h>
 #include <sys/poll.h>
 #include <sys/sigio.h>
 #include <sys/signalvar.h>
@@ -235,6 +236,8 @@ typedef struct synapticsinfo {
 	int			 softbutton3_x;
 	int			 max_x;
 	int			 max_y;
+	int			 three_finger_drag;
+	int			 natural_scroll;
 } synapticsinfo_t;
 
 typedef struct synapticspacket {
@@ -511,9 +514,9 @@ static devclass_t psm_devclass;
 /* Tunables */
 static int tap_enabled = -1;
 static int verbose = PSM_DEBUG;
-static int synaptics_support = 0;
-static int trackpoint_support = 0;
-static int elantech_support = 0;
+static int synaptics_support = 1;
+static int trackpoint_support = 1;
+static int elantech_support = 1;
 
 /* for backward compatibility */
 #define	OLD_MOUSE_GETHWINFO	_IOR('M', 1, old_mousehw_t)
@@ -570,6 +573,9 @@ enum {
 	SYNAPTICS_SYSCTL_SOFTBUTTONS_Y =	SYN_OFFSET(softbuttons_y),
 	SYNAPTICS_SYSCTL_SOFTBUTTON2_X =	SYN_OFFSET(softbutton2_x),
 	SYNAPTICS_SYSCTL_SOFTBUTTON3_X =	SYN_OFFSET(softbutton3_x),
+	SYNAPTICS_SYSCTL_THREE_FINGER_DRAG = 	SYN_OFFSET(three_finger_drag),
+	SYNAPTICS_SYSCTL_NATURAL_SCROLL =	SYN_OFFSET(natural_scroll),
+#define	SYNAPTICS_SYSCTL_LAST	SYNAPTICS_SYSCTL_NATURAL_SCROLL
 };
 
 /* packet formatting function */
@@ -3781,6 +3787,7 @@ psmgestures(struct psm_softc *sc, finger_t *fingers, int nfingers,
 		int vscroll_hor_area, vscroll_ver_area;
 		int two_finger_scroll;
 		int max_x, max_y;
+		int three_finger_drag;
 
 		/* Read sysctl. */
 		/* XXX Verify values? */
@@ -3795,7 +3802,7 @@ psmgestures(struct psm_softc *sc, finger_t *fingers, int nfingers,
 		two_finger_scroll = sc->syninfo.two_finger_scroll;
 		max_x = sc->syninfo.max_x;
 		max_y = sc->syninfo.max_y;
-
+		three_finger_drag = sc->syninfo.three_finger_drag;
 		/* Read current absolute position. */
 		x0 = f->x;
 		y0 = f->y;
@@ -3884,8 +3891,8 @@ psmgestures(struct psm_softc *sc, finger_t *fingers, int nfingers,
 				    ~MOUSE_BUTTON1DOWN) | center_button;
 		}
 
-		/* If in tap-hold, add the recorded button. */
-		if (gest->in_taphold)
+		/* If in tap-hold or three fingers, add the recorded button. */
+		if (gest->in_taphold || (nfingers == 3 && three_finger_drag))
 			ms->button |= gest->tap_button;
 
 		/*
@@ -4133,6 +4140,7 @@ psmsmoother(struct psm_softc *sc, finger_t *f, int smoother_id,
 		int len, weight_prev_x, weight_prev_y;
 		int div_max_x, div_max_y, div_x, div_y;
 		int is_fuzzy;
+		int natural_scroll;
 
 		/* Read sysctl. */
 		/* XXX Verify values? */
@@ -4160,6 +4168,7 @@ psmsmoother(struct psm_softc *sc, finger_t *f, int smoother_id,
 		two_finger_scroll = sc->syninfo.two_finger_scroll;
 		max_x = sc->syninfo.max_x;
 		max_y = sc->syninfo.max_y;
+		natural_scroll = sc->syninfo.natural_scroll;
 
 		is_fuzzy = (f->flags & PSM_FINGER_FUZZY) != 0;
 
@@ -4321,14 +4330,24 @@ psmsmoother(struct psm_softc *sc, finger_t *f, int smoother_id,
 			    smoother_id, dx, dy, dxp, dyp));
 			break;
 		case 1: /* Vertical scrolling. */
-			if (dyp != 0)
-				ms->button |= (dyp > 0) ?
-				    MOUSE_BUTTON4DOWN : MOUSE_BUTTON5DOWN;
+			if (dyp != 0) {
+				if (two_finger_scroll && natural_scroll)
+					ms->button |= (dyp > 0) ?
+					    MOUSE_BUTTON5DOWN : MOUSE_BUTTON4DOWN;
+				else
+					ms->button |= (dyp > 0) ?
+					    MOUSE_BUTTON4DOWN : MOUSE_BUTTON5DOWN;
+			}
 			break;
 		case 2: /* Horizontal scrolling. */
-			if (dxp != 0)
-				ms->button |= (dxp > 0) ?
-				    MOUSE_BUTTON7DOWN : MOUSE_BUTTON6DOWN;
+			if (dxp != 0) {
+				if (two_finger_scroll && natural_scroll)
+					ms->button |= (dxp > 0) ?
+					    MOUSE_BUTTON6DOWN : MOUSE_BUTTON7DOWN;
+				else
+					ms->button |= (dxp > 0) ?
+					    MOUSE_BUTTON7DOWN : MOUSE_BUTTON6DOWN;
+			}
 			break;
 		}
 
@@ -4660,7 +4679,7 @@ proc_elantech(struct psm_softc *sc, packetbuf_t *pb, mousestatus_t *ms,
 	case ELANTECH_PKT_TRACKPOINT:
 		/*               7   6   5   4   3   2   1   0 (LSB)
 		 * -------------------------------------------
-		 * ipacket[0]:   0   0  SX  SY   0   M   R   L
+		 * ipacket[0]:   0   0  SY  SX   0   M   R   L
 		 * ipacket[1]: ~SX   0   0   0   0   0   0   0
 		 * ipacket[2]: ~SY   0   0   0   0   0   0   0
 		 * ipacket[3]:   0   0 ~SY ~SX   0   1   1   0
@@ -4671,22 +4690,32 @@ proc_elantech(struct psm_softc *sc, packetbuf_t *pb, mousestatus_t *ms,
 		 * over 9 bits with SX/SY the relative top bit and
 		 * X7..X0 and Y7..Y0 the lower bits.
 		 */
-		*x = (pb->ipacket[0] & 0x20) ?
-		    pb->ipacket[4] - 256 : pb->ipacket[4];
-		*y = (pb->ipacket[0] & 0x10) ?
-		    pb->ipacket[5] - 256 : pb->ipacket[5];
+		if (!(pb->ipacket[0] & 0xC8) && !(pb->ipacket[1] & 0x7F) &&
+		    !(pb->ipacket[2] & 0x7F) && !(pb->ipacket[3] & 0xC9) &&
+		    !(pb->ipacket[0] & 0x10) != !(pb->ipacket[1] & 0x80) &&
+		    !(pb->ipacket[0] & 0x10) != !(pb->ipacket[3] & 0x10) &&
+		    !(pb->ipacket[0] & 0x20) != !(pb->ipacket[2] & 0x80) &&
+		    !(pb->ipacket[0] & 0x20) != !(pb->ipacket[3] & 0x20)) {
 
-		trackpoint_button =
-		    ((pb->ipacket[0] & 0x01) ? MOUSE_BUTTON1DOWN : 0) |
-		    ((pb->ipacket[0] & 0x02) ? MOUSE_BUTTON3DOWN : 0) |
-		    ((pb->ipacket[0] & 0x04) ? MOUSE_BUTTON2DOWN : 0);
+			*x = (pb->ipacket[0] & MOUSE_PS2_XNEG) ?
+			    pb->ipacket[4] - 256 : pb->ipacket[4];
+			*y = (pb->ipacket[0] & MOUSE_PS2_YNEG) ?
+			    pb->ipacket[5] - 256 : pb->ipacket[5];
+
+			trackpoint_button =
+			    ((pb->ipacket[0] & 0x01) ? MOUSE_BUTTON1DOWN : 0) |
+			    ((pb->ipacket[0] & 0x02) ? MOUSE_BUTTON3DOWN : 0) |
+			    ((pb->ipacket[0] & 0x04) ? MOUSE_BUTTON2DOWN : 0);
 #ifdef EVDEV_SUPPORT
-		evdev_push_rel(sc->evdev_r, REL_X, *x);
-		evdev_push_rel(sc->evdev_r, REL_Y, -*y);
-		evdev_push_mouse_btn(sc->evdev_r, trackpoint_button);
-		evdev_sync(sc->evdev_r);
+			evdev_push_rel(sc->evdev_r, REL_X, *x);
+			evdev_push_rel(sc->evdev_r, REL_Y, -*y);
+			evdev_push_mouse_btn(sc->evdev_r, trackpoint_button);
+			evdev_sync(sc->evdev_r);
 #endif
-		ms->button = touchpad_button | trackpoint_button;
+			ms->button = touchpad_button | trackpoint_button;
+		} else
+			VLOG(3, (LOG_DEBUG, "elantech: "
+			    "unexpected trackpoint packet skipped\n"));
 		return (0);
 
 	case ELANTECH_PKT_NOP:
@@ -5640,7 +5669,7 @@ synaptics_sysctl(SYSCTL_HANDLER_ARGS)
 	int error, arg;
 
 	if (oidp->oid_arg1 == NULL || oidp->oid_arg2 < 0 ||
-	    oidp->oid_arg2 > SYNAPTICS_SYSCTL_SOFTBUTTON3_X)
+	    oidp->oid_arg2 > SYNAPTICS_SYSCTL_LAST)
 		return (EINVAL);
 
 	sc = oidp->oid_arg1;
@@ -5729,6 +5758,8 @@ synaptics_sysctl(SYSCTL_HANDLER_ARGS)
 			return (EINVAL);
 		break;
         case SYNAPTICS_SYSCTL_TOUCHPAD_OFF:
+	case SYNAPTICS_SYSCTL_THREE_FINGER_DRAG:
+	case SYNAPTICS_SYSCTL_NATURAL_SCROLL:
 		if (arg < 0 || arg > 1)
 			return (EINVAL);
 		break;
@@ -6120,6 +6151,23 @@ synaptics_sysctl_create_tree(struct psm_softc *sc, const char *name,
 	    sc, SYNAPTICS_SYSCTL_TOUCHPAD_OFF,
 	    synaptics_sysctl, "I",
 	    "Turn off touchpad");
+
+	sc->syninfo.three_finger_drag = 0;
+	SYSCTL_ADD_PROC(&sc->syninfo.sysctl_ctx,
+	    SYSCTL_CHILDREN(sc->syninfo.sysctl_tree), OID_AUTO,
+	    "three_finger_drag", CTLTYPE_INT|CTLFLAG_RW|CTLFLAG_ANYBODY,
+	    sc, SYNAPTICS_SYSCTL_THREE_FINGER_DRAG,
+	    synaptics_sysctl, "I",
+	    "Enable dragging with three fingers");
+
+	/* hw.psm.synaptics.natural_scroll. */
+	sc->syninfo.natural_scroll = 0;
+	SYSCTL_ADD_PROC(&sc->syninfo.sysctl_ctx,
+	    SYSCTL_CHILDREN(sc->syninfo.sysctl_tree), OID_AUTO,
+	    "natural_scroll", CTLTYPE_INT|CTLFLAG_RW|CTLFLAG_ANYBODY,
+	    sc, SYNAPTICS_SYSCTL_NATURAL_SCROLL,
+	    synaptics_sysctl, "I",
+	    "Enable natural scrolling");
 
 	sc->syninfo.softbuttons_y = 0;
 	sc->syninfo.softbutton2_x = 0;
@@ -7113,7 +7161,7 @@ enable_elantech(struct psm_softc *sc, enum probearg arg)
 {
 	static const int ic2hw[] =
 	/*IC: 0  1  2  3  4  5  6  7  8  9  a  b  c  d  e  f */
-	    { 0, 0, 2, 0, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 0 };
+	    { 0, 0, 2, 0, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4 };
 	static const int fw_sizes[][3] = {
 		/* FW.vers  MaxX  MaxY */
 		{ 0x020030, 1152,  768 },

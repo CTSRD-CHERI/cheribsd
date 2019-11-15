@@ -68,9 +68,9 @@ struct dbreg {
 	unsigned long junk;
 };
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 struct capreg {
-	struct chericap r_regs[NUMCHERISAVEREGS];
+	void * __capability r_regs[NUMCHERISAVEREGS];
 };
 #endif
 
@@ -98,7 +98,7 @@ int	set_fpregs(struct thread *, struct fpreg *);
 int	set_regs(struct thread *, struct reg *);
 int	fill_dbregs(struct thread *, struct dbreg *);
 int	set_dbregs(struct thread *, struct dbreg *);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 int	fill_capregs(struct thread *, struct capreg *);
 int	set_capregs(struct thread *, struct capreg *);
 #endif

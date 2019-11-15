@@ -32,7 +32,7 @@
 #include <sys/capsicum.h>
 #include <sys/mman.h>
 
-#include <machine/sysarch.h>
+#include <machine/cheri.h>
 
 #include <err.h>
 #include <png.h>
@@ -65,6 +65,6 @@ main(int argc, char **argv __unused)
 		err(1, "mmap buffer");
 
 	decode_png(&ids, NULL, NULL);
-	ids.is->times[3] = sysarch(MIPS_GET_COUNT, NULL);
+	ids.is->times[3] = cheri_get_cyclecount();
 	return (0);
 }

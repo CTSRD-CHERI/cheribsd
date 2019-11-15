@@ -67,9 +67,7 @@ __FBSDID("$FreeBSD$");
 void
 initialize (void)
 {
-#ifdef _STANDALONE
-    ve_trust_init();
-#endif
+	openpgp_trust_init();
 }
 
 #else
@@ -318,6 +316,7 @@ openpgp_verify(const char *filename,
 		sdata = ddata = dearmor((char *)sdata, sbytes, &sbytes);
 	ptr = sdata;
 	rc = decode_packet(2, &ptr, sbytes, (decoder_t)decode_sig, sig);
+	DEBUG_PRINTF(2, ("rc=%d keyID=%s\n", rc, sig->key_id ? sig->key_id : "?"));
 	if (rc == 0 && sig->key_id) {
 		key = load_key_id(sig->key_id);
 		if (!key) {

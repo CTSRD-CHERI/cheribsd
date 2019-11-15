@@ -1099,7 +1099,7 @@ ctl_lookup(tsdn_t *tsdn, const char *name, ctl_node_t const **nodesp,
 	elm = name;
 	/* Equivalent to strchrnul(). */
 	dot = ((tdot = strchr(elm, '.')) != NULL) ? tdot : strchr(elm, '\0');
-	elen = (size_t)((uintptr_t)dot - (uintptr_t)elm);
+	elen = (size_t)((const char*)dot - (const char*)elm);
 	if (elen == 0) {
 		ret = ENOENT;
 		goto label_return;
@@ -1178,7 +1178,7 @@ ctl_lookup(tsdn_t *tsdn, const char *name, ctl_node_t const **nodesp,
 		elm = &dot[1];
 		dot = ((tdot = strchr(elm, '.')) != NULL) ? tdot :
 		    strchr(elm, '\0');
-		elen = (size_t)((uintptr_t)dot - (uintptr_t)elm);
+		elen = (size_t)((const char*)dot - (const char*)elm);
 	}
 
 	ret = 0;

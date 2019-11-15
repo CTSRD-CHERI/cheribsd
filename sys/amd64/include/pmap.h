@@ -119,6 +119,7 @@
 #define	PG_PROMOTED	X86_PG_AVAIL(54)	/* PDE only */
 #define	PG_FRAME	(0x000ffffffffff000ul)
 #define	PG_PS_FRAME	(0x000fffffffe00000ul)
+#define	PG_PS_PDP_FRAME	(0x000fffffc0000000ul)
 
 /*
  * Promotion to a 2MB (PDE) page mapping requires that the corresponding 4KB
@@ -137,7 +138,7 @@
 #define PGEX_RSV	0x08	/* reserved PTE field is non-zero */
 #define PGEX_I		0x10	/* during an instruction fetch */
 #define	PGEX_PK		0x20	/* protection key violation */
-#define	PGEX_SGX	0x40	/* SGX-related */
+#define	PGEX_SGX	0x8000	/* SGX-related */
 
 /* 
  * undef the PG_xx macros that define bits in the regular x86 PTEs that
@@ -407,8 +408,6 @@ struct pv_chunk {
 
 extern caddr_t	CADDR1;
 extern pt_entry_t *CMAP1;
-extern vm_paddr_t phys_avail[];
-extern vm_paddr_t dump_avail[];
 extern vm_offset_t virtual_avail;
 extern vm_offset_t virtual_end;
 extern vm_paddr_t dmaplimit;
@@ -426,6 +425,7 @@ void	pmap_activate_sw(struct thread *);
 void	pmap_bootstrap(vm_paddr_t *);
 int	pmap_cache_bits(pmap_t pmap, int mode, boolean_t is_pde);
 int	pmap_change_attr(vm_offset_t, vm_size_t, int);
+int	pmap_change_prot(vm_offset_t, vm_size_t, vm_prot_t);
 void	pmap_demote_DMAP(vm_paddr_t base, vm_size_t len, boolean_t invalidate);
 void	pmap_flush_cache_range(vm_offset_t, vm_offset_t);
 void	pmap_flush_cache_phys_range(vm_paddr_t, vm_paddr_t, vm_memattr_t);
@@ -441,6 +441,7 @@ void	*pmap_mapbios(vm_paddr_t, vm_size_t);
 void	*pmap_mapdev(vm_paddr_t, vm_size_t);
 void	*pmap_mapdev_attr(vm_paddr_t, vm_size_t, int);
 void	*pmap_mapdev_pciecfg(vm_paddr_t pa, vm_size_t size);
+bool	pmap_not_in_di(void);
 boolean_t pmap_page_is_mapped(vm_page_t m);
 void	pmap_page_set_memattr(vm_page_t m, vm_memattr_t ma);
 void	pmap_pinit_pml4(vm_page_t);
@@ -465,7 +466,9 @@ void	pmap_pti_pcid_invlrng(uint64_t ucr3, uint64_t kcr3, vm_offset_t sva,
 int	pmap_pkru_clear(pmap_t pmap, vm_offset_t sva, vm_offset_t eva);
 int	pmap_pkru_set(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 	    u_int keyidx, int flags);
+void	pmap_thread_init_invl_gen(struct thread *td);
 int	pmap_vmspace_copy(pmap_t dst_pmap, pmap_t src_pmap);
+void	pmap_page_array_startup(long count);
 #endif /* _KERNEL */
 
 /* Return various clipped indexes for a given VA */

@@ -28,6 +28,8 @@ CFLAGS+=-DBOOTPROG=\"gptzfsboot\" \
 	-I${ZFSSRC} \
 	-I${SYSDIR}/crypto/skein \
 	-I${SYSDIR}/cddl/boot/zfs \
+	-I${SYSDIR}/cddl/contrib/opensolaris/uts/common \
+	-I${SYSDIR}/cddl/contrib/opensolaris/common/lz4 \
 	-I${BOOTSRC}/i386/btx/lib \
 	-I${BOOTSRC}/i386/boot2 \
 	-Wall -Waggregate-return -Wbad-function-cast \
@@ -70,6 +72,3 @@ gptzfsboot.out: ${BTXCRT} zfsboot.o sio.o gpt.o drv.o cons.o \
 zfsboot.o: ${ZFSSRC}/zfsimpl.c
 
 .include <bsd.prog.mk>
-
-# XXX: clang integrated-as doesn't grok .codeNN directives yet
-CFLAGS.gptldr.S=	${CLANG_NO_IAS}

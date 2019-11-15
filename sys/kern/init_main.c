@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/epoch.h>
+#include <sys/eventhandler.h>
 #include <sys/exec.h>
 #include <sys/file.h>
 #include <sys/filedesc.h>
@@ -159,11 +160,6 @@ SYSINIT(placeholder, SI_SUB_DUMMY, SI_ORDER_ANY, NULL, NULL);
 SET_DECLARE(sysinit_set, struct sysinit);
 struct sysinit **sysinit, **sysinit_end;
 struct sysinit **newsysinit, **newsysinit_end;
-
-EVENTHANDLER_LIST_DECLARE(process_init);
-EVENTHANDLER_LIST_DECLARE(thread_init);
-EVENTHANDLER_LIST_DECLARE(process_ctor);
-EVENTHANDLER_LIST_DECLARE(thread_ctor);
 
 /*
  * Merge a new sysinit set into the current set, reallocating it if
@@ -518,7 +514,6 @@ proc0_init(void *dummy __unused)
 	td->td_pflags = TDP_KTHREAD;
 	td->td_cpuset = cpuset_thread0();
 	td->td_domain.dr_policy = td->td_cpuset->cs_domain;
-	epoch_thread_init(td);
 	prison0_init();
 	p->p_peers = 0;
 	p->p_leader = p;
@@ -803,11 +798,9 @@ start_init(void *dummy)
 }
 
 /*
- * Like kproc_create(), but runs in its own address space.
- * We do this early to reserve pid 1.
- *
- * Note special case - do not make it runnable yet.  Other work
- * in progress will change this more.
+ * Like kproc_create(), but runs in its own address space.  We do this
+ * early to reserve pid 1.  Note special case - do not make it
+ * runnable yet, init execution is started when userspace can be served.
  */
 static void
 create_init(const void *udata __unused)

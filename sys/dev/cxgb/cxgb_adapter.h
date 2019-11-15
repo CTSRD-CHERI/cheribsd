@@ -463,30 +463,6 @@ t3_os_pci_write_config_2(adapter_t *adapter, int reg, uint16_t val)
 	pci_write_config(adapter->dev, reg, val, 2);
 }
 
-static __inline uint8_t *
-t3_get_next_mcaddr(struct t3_rx_mode *rm)
-{
-	uint8_t *macaddr = NULL;
-	struct ifnet *ifp = rm->port->ifp;
-	struct ifmultiaddr *ifma;
-	int i = 0;
-
-	if_maddr_rlock(ifp);
-	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-		if (ifma->ifma_addr->sa_family != AF_LINK)
-			continue;
-		if (i == rm->idx) {
-			macaddr = LLADDR((struct sockaddr_dl *)ifma->ifma_addr);
-			break;
-		}
-		i++;
-	}
-	if_maddr_runlock(ifp);
-	
-	rm->idx++;
-	return (macaddr);
-}
-
 static __inline void
 t3_init_rx_mode(struct t3_rx_mode *rm, struct port_info *port)
 {
@@ -578,10 +554,10 @@ void cxgb_qflush(struct ifnet *ifp);
 void t3_iterate(void (*)(struct adapter *, void *), void *);
 void cxgb_refresh_stats(struct port_info *);
 
-#ifdef NETDUMP
-int cxgb_netdump_encap(struct sge_qset *qs, struct mbuf **m);
-int cxgb_netdump_poll_rx(adapter_t *adap, struct sge_qset *qs);
-int cxgb_netdump_poll_tx(struct sge_qset *qs);
+#ifdef DEBUGNET
+int cxgb_debugnet_encap(struct sge_qset *qs, struct mbuf **m);
+int cxgb_debugnet_poll_rx(adapter_t *adap, struct sge_qset *qs);
+int cxgb_debugnet_poll_tx(struct sge_qset *qs);
 #endif
 
 #endif

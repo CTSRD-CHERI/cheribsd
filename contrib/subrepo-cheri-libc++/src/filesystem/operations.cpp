@@ -9,11 +9,11 @@
 // CHERI CHANGES START
 // {
 //   "updated": 20190429,
-//   "target_type": "lib"
+//   "target_type": "lib",
 //   "changes": [
-//     "subobject_bounds",
+//     "subobject_bounds"
 //   ],
-//   "change_comment": "std::string: &str[N] -> str.data()/str.end()",
+//   "change_comment": "std::string: &str[N] -> str.data()/str.end()"
 // }
 // CHERI CHANGES END
 
@@ -54,6 +54,10 @@
 #if !defined(CLOCK_REALTIME) || !defined(_LIBCPP_USE_CLOCK_GETTIME)
 #include <sys/time.h> // for gettimeofday and timeval
 #endif                // !defined(CLOCK_REALTIME)
+
+#if defined(__unix__) &&  defined(__ELF__) && defined(_LIBCPP_HAS_COMMENT_LIB_PRAGMA)
+#pragma comment(lib, "rt")
+#endif
 
 #if defined(_LIBCPP_COMPILER_GCC)
 #if _GNUC_VER < 500

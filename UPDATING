@@ -11,11 +11,6 @@ handbook:
 Items affecting the ports and packages system can be found in
 /usr/ports/UPDATING.  Please read that file before running portupgrade.
 
-NOTE: FreeBSD has switched from gcc to clang. If you have trouble bootstrapping
-from older versions of FreeBSD, try WITHOUT_CLANG and WITH_GCC to bootstrap to
-the tip of head, and then rebuild without this option. The bootstrap process
-from older version of current across the gcc/clang cutover is a bit fragile.
-
 NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	FreeBSD 13.x has many debugging features turned on, in both the kernel
 	and userland.  These features attempt to detect incorrect use of
@@ -30,6 +25,115 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	debugging, define MALLOC_PRODUCTION in /etc/make.conf, or to merely
 	disable the most expensive debugging functionality run
 	"ln -s 'abort:false,junk:false' /etc/malloc.conf".)
+
+20191107:
+	The nctgpio and wbwd drivers have been moved to the superio bus.
+	If you have one of these drivers in a kernel configuration, then
+	you should add device superio to it.  If you use one of these drivers
+	as a module and you compile a custom set of modules, then you should
+	add superio to the set.
+
+20191021:
+	KPIs for network drivers to access interface addresses have changed.
+	Users need to recompile NIC driver modules together with kernel.
+
+20191021:
+	The net.link.tap.user_open sysctl no longer prevents user opening of
+	already created /dev/tapNN devices.  Access is still controlled by
+	node permissions, just like tun devices.  The net.link.tap.user_open
+	sysctl is now used only to allow users to perform devfs cloning of
+	tap devices, and the subsequent open may not succeed if the user is not
+	in the appropriate group.  This sysctl may be deprecated/removed
+	completely in the future.
+
+20191009:
+	mips, powerpc, and sparc64 are no longer built as part of
+	universe / tinderbox unless MAKE_OBSOLETE_GCC is defined. If
+	not defined, mips, powerpc, and sparc64 builds will look for
+	the xtoolchain binaries and if installed use them for universe
+	builds. As llvm 9.0 becomes vetted for these architectures, they
+	will be removed from the list.
+
+20191009:
+	Clang, llvm, lld, lldb, compiler-rt, libc++, libunwind and openmp have
+	been upgraded to 9.0.0.  Please see the 20141231 entry below for
+	information about prerequisites and upgrading, if you are not already
+	using clang 3.5.0 or higher.
+
+20191003:
+	The hpt27xx, hptmv, hptnr, and hptrr drivers have been removed from
+	GENERIC.  They are available as modules and can be loaded by adding
+	to /boot/loader.conf hpt27xx_load="YES", hptmv_load="YES",
+	hptnr_load="YES", or hptrr_load="YES", respectively.
+
+20190913:
+	ntpd no longer by default locks its pages in memory, allowing them
+	to be paged out by the kernel. Use rlimit memlock to restore
+	historic BSD behaviour. For example, add "rlimit memlock 32"
+	to ntp.conf to lock up to 32 MB of ntpd address space in memory.
+
+20190823:
+	Several of ping6's options have been renamed for better consistency
+	with ping.  If you use any of -ARWXaghmrtwx, you must update your
+	scripts.  See ping6(8) for details.
+
+20190727:
+	The vfs.fusefs.sync_unmount and vfs.fusefs.init_backgrounded sysctls
+	and the "-o sync_unmount" and "-o init_backgrounded" mount options have
+	been removed from mount_fusefs(8).  You can safely remove them from
+	your scripts, because they had no effect.
+
+	The vfs.fusefs.fix_broken_io, vfs.fusefs.sync_resize,
+	vfs.fusefs.refresh_size, vfs.fusefs.mmap_enable,
+	vfs.fusefs.reclaim_revoked, and vfs.fusefs.data_cache_invalidate
+	sysctls have been removed.  If you felt the need to set any of them to
+	a non-default value, please tell asomers@FreeBSD.org why.
+
+20190713:
+	Default permissions on the /var/account/acct file (and copies of it
+	rotated by periodic daily scripts) are changed from 0644 to 0640
+	because the file contains sensitive information that should not be
+	world-readable.  If the /var/account directory must be created by
+	rc.d/accounting, the mode used is now 0750.  Admins who use the
+	accounting feature are encouraged to change the mode of an existing
+	/var/account directory to 0750 or 0700.
+
+20190620:
+	Entropy collection and the /dev/random device are no longer optional
+	components.  The "device random" option has been removed.
+	Implementations of distilling algorithms can still be made loadable
+	with "options RANDOM_LOADABLE" (e.g., random_fortuna.ko).
+
+20190612:
+	Clang, llvm, lld, lldb, compiler-rt, libc++, libunwind and openmp have
+	been upgraded to 8.0.1.  Please see the 20141231 entry below for
+	information about prerequisites and upgrading, if you are not already
+	using clang 3.5.0 or higher.
+
+20190608:
+	A fix was applied to i386 kernel modules to avoid panics with
+	dpcpu or vnet.  Users need to recompile i386 kernel modules
+	having pcpu or vnet sections or they will refuse to load.
+
+20190513:
+	User-wired pages now have their own counter,
+	vm.stats.vm.v_user_wire_count.  The vm.max_wired sysctl was renamed
+	to vm.max_user_wired and changed from an unsigned int to an unsigned
+	long.  bhyve VMs wired with the -S are now subject to the user
+	wiring limit; the vm.max_user_wired sysctl may need to be tuned to
+	avoid running into the limit.
+
+20190507:
+	The IPSEC option has been removed from GENERIC.  Users requiring
+	ipsec(4) must now load the ipsec(4) kernel module.
+
+20190507:
+	The tap(4) driver has been folded into tun(4), and the module has been
+	renamed to tuntap.  You should update any kld_list="if_tap" or
+	kld_list="if_tun" entries in /etc/rc.conf, if_tap_load="YES" or
+	if_tun_load="YES" entries in /boot/loader.conf to load the if_tuntap
+	module instead, and "device tap" or "device tun" entries in kernel
+	config files to select the tuntap device instead.
 
 20190418:
 	The following knobs have been added related to tradeoffs between
@@ -56,13 +160,6 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	produce warnings in dmesg when the conditions are met.
 
 20190416:
-	The tunable "security.stack_protect.permit_nonrandom_cookies" may be
-	set to a non-zero value to boot systems that do not provide early
-	entropy.  Otherwise, such systems may see the panic message:
-	"cannot initialize stack cookies because random device is not yet
-	seeded."
-
-20190416:
 	The loadable random module KPI has changed; the random_infra_init()
 	routine now requires a 3rd function pointer for a bool (*)(void)
 	method that returns true if the random device is seeded (and
@@ -80,7 +177,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	The fuse(4) module has been renamed to fusefs(4) for consistency with
 	other filesystems.  You should update any kld_load="fuse" entries in
 	/etc/rc.conf, fuse_load="YES" entries in /boot/loader.conf, and
-	"options FUSE" enties in kernel config files.
+	"options FUSE" entries in kernel config files.
 
 20190304:
 	Clang, llvm, lld, lldb, compiler-rt and libc++ have been upgraded to
@@ -144,7 +241,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 
 20181211:
 	Remove the timed and netdate programs from the base tree.  Setting
-	the time with these deamons has been obsolete for over a decade.
+	the time with these daemons has been obsolete for over a decade.
 
 20181126:
 	On amd64, arm64 and armv7 (architectures that install LLVM's ld.lld
@@ -207,7 +304,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 
 20181009:
 	OpenSSL has been updated to version 1.1.1.  This update included
-	additional various API changes througout the base system.  It is
+	additional various API changes throughout the base system.  It is
 	important to rebuild third-party software after upgrading.  The value
 	of __FreeBSD_version has been bumped accordingly.
 
@@ -304,13 +401,13 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 20180719:
 	ARM64 now have efifb support, if you want to have serial console
 	on your arm64 board when an screen is connected and the bootloader
-	setup a framebuffer for us to use, just add :
+	setup a frame buffer for us to use, just add :
 	boot_serial=YES
 	boot_multicons=YES
 	in /boot/loader.conf
 	For Raspberry Pi 3 (RPI) users, this is needed even if you don't have
-	an screen connected as the firmware will setup a framebuffer are that
-	u-boot will expose as an EFI framebuffer.
+	an screen connected as the firmware will setup a frame buffer are that
+	u-boot will expose as an EFI frame buffer.
 
 20180719:
 	New uid:gid added, ntpd:ntpd (123:123).  Be sure to run mergemaster
@@ -409,7 +506,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 
 20180508:
 	The nxge(4) driver has been removed.  This driver was for PCI-X 10g
-	cards made by s2io/Neterion.  The company was aquired by Exar and
+	cards made by s2io/Neterion.  The company was acquired by Exar and
 	no longer sells or supports Ethernet products.  If you have device
 	nxge in your kernel config file it must be removed.
 
@@ -500,7 +597,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 20180212:
 	FreeBSD boot loader enhanced with Lua scripting. It's purely opt-in for
 	now by building WITH_LOADER_LUA and WITHOUT_FORTH in /etc/src.conf.
-	Co-existance for the transition period will come shortly. Booting is a
+	Co-existence for the transition period will come shortly. Booting is a
 	complex environment and test coverage for Lua-enabled loaders has been
 	thin, so it would be prudent to assume it might not work and make
 	provisions for backup boot methods.
@@ -523,7 +620,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	executables, but is not yet installed as /usr/bin/ld by default.
 
 	To revert to ld.bfd as the bootstrap linker, in /etc/src.conf set
-        WITHOUT_LLD_BOOTSTRAP=yes
+	WITHOUT_LLD_BOOTSTRAP=yes
 
 20180110:
 	On i386, pmtimer has been removed. Its functionality has been folded

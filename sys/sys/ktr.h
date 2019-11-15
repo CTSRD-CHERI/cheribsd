@@ -60,7 +60,7 @@ struct ktr_entry {
 	const	char *ktr_file;
 	const	char *ktr_desc;
 	struct	thread *ktr_thread;
-	u_long	ktr_parms[KTR_PARMS];
+	uintptr_t ktr_parms[KTR_PARMS];
 };
 
 extern cpuset_t ktr_cpumask;
@@ -74,14 +74,14 @@ extern struct ktr_entry *ktr_buf;
 #ifdef KTR
 
 void	ktr_tracepoint(uint64_t mask, const char *file, int line,
-	    const char *format, u_long arg1, u_long arg2, u_long arg3,
-	    u_long arg4, u_long arg5, u_long arg6);
+	    const char *format, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3,
+	    uintptr_t arg4, uintptr_t arg5, uintptr_t arg6);
 
 #define CTR6(m, format, p1, p2, p3, p4, p5, p6) do {			\
 	if (KTR_COMPILE & (m))						\
 		ktr_tracepoint((m), __FILE__, __LINE__, format,		\
-		    (u_long)(p1), (u_long)(p2), (u_long)(p3),		\
-		    (u_long)(p4), (u_long)(p5), (u_long)(p6));		\
+		    (uintptr_t)(p1), (uintptr_t)(p2), (uintptr_t)(p3),	\
+		    (uintptr_t)(p4), (uintptr_t)(p5), (uintptr_t)(p6));	\
 	} while(0)
 #define CTR0(m, format)			CTR6(m, format, 0, 0, 0, 0, 0, 0)
 #define CTR1(m, format, p1)		CTR6(m, format, p1, 0, 0, 0, 0, 0)

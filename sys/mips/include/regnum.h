@@ -73,11 +73,17 @@
 #ifndef _MACHINE_REGNUM_H_
 #define	_MACHINE_REGNUM_H_
 
+#define	NUMSAVEREGS	40
+#define	NUMFPREGS	34
+
+#define	NUMCHERISAVEREGS	34	/* Plenty of alignment already. */
+
 /*
  * Location of the saved registers relative to ZERO.
  * This must match struct trapframe defined in frame.h exactly.
  * This must also match regdef.h.
  */
+#if defined(_KERNEL) || defined(_WANT_MIPS_REGNUM)
 #define	ZERO	0
 #define	AST	1
 #define	V0	2
@@ -142,9 +148,6 @@
 #define	BADINSTR_P	39
 #endif
 
-
-#define	NUMSAVEREGS 40
-
 /*
  * Pseudo registers so we save a complete set of registers regardless of
  * the ABI. See regdef.h for a more complete explanation.
@@ -161,7 +164,6 @@
 #define	TA3	15
 #endif
 
-#ifdef CPU_CHERI
 /*
  * Load/store offsets for saved registers are with respect to the basic
  * register size (8 bytes on CHERI), not the CHERI capability register size
@@ -198,11 +200,13 @@
 #define	C24		(CHERIBASE + 24 * CHERIREGOFFSIZE)
 #define	C25		(CHERIBASE + 25 * CHERIREGOFFSIZE)
 #define	IDC		(CHERIBASE + 26 * CHERIREGOFFSIZE)
-#define	PCC		(CHERIBASE + 27 * CHERIREGOFFSIZE)
-#define	CAPCAUSE	(CHERIBASE + 28 * CHERIREGOFFSIZE)
-
-#define	NUMCHERISAVEREGS	29	/* Plenty of alignment already. */
-#endif
+#define	C27		(CHERIBASE + 27 * CHERIREGOFFSIZE)
+#define	C28		(CHERIBASE + 28 * CHERIREGOFFSIZE)
+#define	C29		(CHERIBASE + 29 * CHERIREGOFFSIZE)
+#define	C30		(CHERIBASE + 30 * CHERIREGOFFSIZE)
+#define	C31		(CHERIBASE + 31 * CHERIREGOFFSIZE)
+#define	PCC		(CHERIBASE + 32 * CHERIREGOFFSIZE)
+#define	CAPCAUSE	(CHERIBASE + 33 * CHERIREGOFFSIZE)
 
 /*
  * Index of FP registers in 'struct frame', counting from the beginning
@@ -250,10 +254,6 @@
 #define	FSR	(FPBASE+32)
 #define FIR	(FPBASE+33)
 
-#define	NUMFPREGS	34
-
-#define	NREGS	(NUMSAVEREGS + NUMFPREGS)
-
 /*
  * Index of FP registers in 'struct frame', relative to the base
  * of the FP registers in frame (i.e., *not* including the general
@@ -293,5 +293,7 @@
 #define	F31_NUM	(31)
 #define	FSR_NUM	(32)
 #define	FIR_NUM	(33)
+
+#endif	/* _KERNEL || _WANT_MIPS_REGNUM */
 
 #endif /* !_MACHINE_REGNUM_H_ */

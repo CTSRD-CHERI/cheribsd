@@ -22,11 +22,7 @@ cpu		RISCV
 ident		GENERIC
 
 makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
-# makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
-
-# FIXME: linker error. "--relax and -r may not be used together"
-makeoptions	WITHOUT_MODULES="usb otusfw mwlfw ispfw mwlfw ralfw rtwnfw"
-# makeoptions	NO_MODULES
+makeoptions	WITH_CTF=1		# Run ctfconvert(1) for DTrace support
 
 options 	SCHED_ULE		# ULE scheduler
 options 	PREEMPTION		# Enable kernel thread preemption
@@ -34,7 +30,6 @@ options 	VIMAGE			# Subsystem virtualization, e.g. VNET
 options 	INET			# InterNETworking
 options 	INET6			# IPv6 communications protocols
 options 	TCP_HHOOK		# hhook(9) framework for TCP
-options 	IPSEC			# IP (v4/v6) security
 options 	IPSEC_SUPPORT		# Allow kldload of ipsec and tcpmd5
 options 	TCP_OFFLOAD		# TCP offload
 options 	SCTP			# Stream Control Transmission Protocol
@@ -53,11 +48,11 @@ options 	CD9660			# ISO 9660 Filesystem
 options 	PROCFS			# Process filesystem (requires PSEUDOFS)
 options 	PSEUDOFS		# Pseudo-filesystem framework
 options 	GEOM_PART_GPT		# GUID Partition Tables.
-# options 	GEOM_RAID		# Soft RAID functionality.
+options 	GEOM_RAID		# Soft RAID functionality.
 options 	GEOM_LABEL		# Provides labelization
 options 	SCSI_DELAY=5000		# Delay (in ms) before probing SCSI
 options 	KTRACE			# ktrace(1) support
-# options 	STACK			# stack(9) support
+options 	STACK			# stack(9) support
 options 	SYSVSHM			# SYSV-style shared memory
 options 	SYSVMSG			# SYSV-style message queues
 options 	SYSVSEM			# SYSV-style semaphores
@@ -102,6 +97,16 @@ device		uart		# Generic UART driver
 device		uart_lowrisc	# lowRISC UART driver
 device		uart_ns8250	# ns8250-type UART driver
 
+
+# Ethernet drivers
+device		miibus		# MII bus support
+device		cgem		# Cadence Gigabit Ethernet MAC
+device		xae		# Xilinx AXI Ethernet MAC
+
+# DMA support
+device		xdma		# DMA interface
+device		axidma		# Xilinx AXI DMA Controller
+
 # Uncomment for memory disk
 # options 	MD_ROOT
 # options 	MD_ROOT_SIZE=32768	# 32MB ram disk
@@ -132,10 +137,9 @@ options		ZSTDIO			# zstd-compressed kernel and user dumps
 # Pseudo devices.
 device		crypto		# core crypto support
 device		loop		# Network loopback
-device		random		# Entropy device
 device		ether		# Ethernet support
 device		vlan		# 802.1Q VLAN support
-device		tun		# Packet tunnel.
+device		tuntap		# Packet tunnel.
 device		md		# Memory "disks"
 device		gif		# IPv6 and IPv4 tunneling
 device		firmware	# firmware assist module

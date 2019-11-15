@@ -24,7 +24,18 @@
  *
  * $FreeBSD$
  */
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190730,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds"
+ *   ],
+ *   "change_comment": "C inheritance addrof first member (archive_write)"
+ * }
+ * CHERI CHANGES END
+ */
 #ifndef __LIBARCHIVE_BUILD
 #ifndef __LIBARCHIVE_TEST
 #error This header is only to be used internally to libarchive.
@@ -70,7 +81,7 @@ int __archive_write_open_filter(struct archive_write_filter *);
 int __archive_write_close_filter(struct archive_write_filter *);
 
 struct archive_write {
-	struct archive	archive;
+	struct archive	archive __subobject_member_used_for_c_inheritance;
 
 	/* Dev/ino of the archive being written. */
 	int		  skip_file_set;

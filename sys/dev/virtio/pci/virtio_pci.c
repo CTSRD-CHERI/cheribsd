@@ -200,6 +200,7 @@ static device_method_t vtpci_methods[] = {
 	/* Bus interface. */
 	DEVMETHOD(bus_driver_added,		  vtpci_driver_added),
 	DEVMETHOD(bus_child_detached,		  vtpci_child_detached),
+	DEVMETHOD(bus_child_pnpinfo_str,	  virtio_child_pnpinfo_str),
 	DEVMETHOD(bus_read_ivar,		  vtpci_read_ivar),
 	DEVMETHOD(bus_write_ivar,		  vtpci_write_ivar),
 
@@ -408,7 +409,7 @@ vtpci_read_ivar(device_t dev, device_t child, int index, uintptr_t *result)
 		*result = pci_get_device(dev);
 		break;
 	case VIRTIO_IVAR_SUBVENDOR:
-		*result = pci_get_subdevice(dev);
+		*result = pci_get_subvendor(dev);
 		break;
 	default:
 		return (ENOENT);
@@ -504,7 +505,7 @@ vtpci_alloc_virtqueues(device_t dev, int flags, int nvqs,
 		size = vtpci_read_config_2(sc, VIRTIO_PCI_QUEUE_NUM);
 
 		error = virtqueue_alloc(dev, idx, size, VIRTIO_PCI_VRING_ALIGN,
-		    0xFFFFFFFFUL, info, &vq);
+		    ~(vm_paddr_t)0, info, &vq);
 		if (error) {
 			device_printf(dev,
 			    "cannot allocate virtqueue %d: %d\n", idx, error);

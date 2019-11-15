@@ -742,7 +742,6 @@ sandbox_object_destroy(struct sandbox_object *sbop)
 		assert(sbop->sbo_stackmem == NULL);
 		assert(sbop->sbo_sandbox_system_objectp == NULL);
 	}
-	free_c(sbop->sbo_vtable);
 	bzero(sbop, sizeof(*sbop));		/* Clears tags. */
 	free(sbop);
 }

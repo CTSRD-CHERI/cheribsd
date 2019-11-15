@@ -120,33 +120,37 @@ struct vm_map_entry {
 	pid_t owner;
 };
 
-#define MAP_ENTRY_NOSYNC		0x0001
-#define MAP_ENTRY_IS_SUB_MAP		0x0002
-#define MAP_ENTRY_COW			0x0004
-#define MAP_ENTRY_NEEDS_COPY		0x0008
-#define MAP_ENTRY_NOFAULT		0x0010
-#define MAP_ENTRY_USER_WIRED		0x0020
+#define	MAP_ENTRY_NOSYNC		0x00000001
+#define	MAP_ENTRY_IS_SUB_MAP		0x00000002
+#define	MAP_ENTRY_COW			0x00000004
+#define	MAP_ENTRY_NEEDS_COPY		0x00000008
+#define	MAP_ENTRY_NOFAULT		0x00000010
+#define	MAP_ENTRY_USER_WIRED		0x00000020
 
-#define MAP_ENTRY_BEHAV_NORMAL		0x0000	/* default behavior */
-#define MAP_ENTRY_BEHAV_SEQUENTIAL	0x0040	/* expect sequential access */
-#define MAP_ENTRY_BEHAV_RANDOM		0x0080	/* expect random access */
-#define MAP_ENTRY_BEHAV_RESERVED	0x00C0	/* future use */
+#define	MAP_ENTRY_BEHAV_NORMAL		0x00000000	/* default behavior */
+#define	MAP_ENTRY_BEHAV_SEQUENTIAL	0x00000040	/* expect sequential
+							   access */
+#define	MAP_ENTRY_BEHAV_RANDOM		0x00000080	/* expect random
+							   access */
+#define	MAP_ENTRY_BEHAV_RESERVED	0x000000c0	/* future use */
+#define	MAP_ENTRY_BEHAV_MASK		0x000000c0
+#define	MAP_ENTRY_IN_TRANSITION		0x00000100	/* entry being
+							   changed */
+#define	MAP_ENTRY_NEEDS_WAKEUP		0x00000200	/* waiters in
+							   transition */
+#define	MAP_ENTRY_NOCOREDUMP		0x00000400	/* don't include in
+							   a core */
+#define	MAP_ENTRY_VN_EXEC		0x00000800	/* text vnode mapping */
+#define	MAP_ENTRY_GROWS_DOWN		0x00001000	/* top-down stacks */
+#define	MAP_ENTRY_GROWS_UP		0x00002000	/* bottom-up stacks */
 
-#define MAP_ENTRY_BEHAV_MASK		0x00C0
-
-#define MAP_ENTRY_IN_TRANSITION		0x0100	/* entry being changed */
-#define MAP_ENTRY_NEEDS_WAKEUP		0x0200	/* waiters in transition */
-#define MAP_ENTRY_NOCOREDUMP		0x0400	/* don't include in a core */
-
-#define	MAP_ENTRY_GROWS_DOWN		0x1000	/* Top-down stacks */
-#define	MAP_ENTRY_GROWS_UP		0x2000	/* Bottom-up stacks */
-
-#define	MAP_ENTRY_WIRE_SKIPPED		0x4000
-#define	MAP_ENTRY_VN_WRITECNT		0x8000	/* writeable vnode mapping */
-#define	MAP_ENTRY_GUARD			0x10000
-#define	MAP_ENTRY_STACK_GAP_DN		0x20000
-#define	MAP_ENTRY_STACK_GAP_UP		0x40000
-#define	MAP_ENTRY_HEADER		0x80000
+#define	MAP_ENTRY_WIRE_SKIPPED		0x00004000
+#define	MAP_ENTRY_WRITECNT		0x00008000	/* tracked writeable
+							   mapping */
+#define	MAP_ENTRY_GUARD			0x00010000
+#define	MAP_ENTRY_STACK_GAP_DN		0x00020000
+#define	MAP_ENTRY_STACK_GAP_UP		0x00040000
+#define	MAP_ENTRY_HEADER		0x00080000
 
 #ifdef	_KERNEL
 static __inline u_char
@@ -344,24 +348,25 @@ long vmspace_resident_count(struct vmspace *vmspace);
 /*
  * Copy-on-write flags for vm_map operations
  */
-#define MAP_INHERIT_SHARE	0x0001
-#define MAP_COPY_ON_WRITE	0x0002
-#define MAP_NOFAULT		0x0004
-#define MAP_PREFAULT		0x0008
-#define MAP_PREFAULT_PARTIAL	0x0010
-#define MAP_DISABLE_SYNCER	0x0020
-#define	MAP_CHECK_EXCL		0x0040
-#define	MAP_CREATE_GUARD	0x0080
-#define MAP_DISABLE_COREDUMP	0x0100
-#define MAP_PREFAULT_MADVISE	0x0200	/* from (user) madvise request */
-#define	MAP_VN_WRITECOUNT	0x0400
-#define	MAP_REMAP		0x0800
-#define	MAP_STACK_GROWS_DOWN	0x1000
-#define	MAP_STACK_GROWS_UP	0x2000
-#define	MAP_ACC_CHARGED		0x4000
-#define	MAP_ACC_NO_CHARGE	0x8000
-#define	MAP_CREATE_STACK_GAP_UP	0x10000
-#define	MAP_CREATE_STACK_GAP_DN	0x20000
+#define	MAP_INHERIT_SHARE	0x00000001
+#define	MAP_COPY_ON_WRITE	0x00000002
+#define	MAP_NOFAULT		0x00000004
+#define	MAP_PREFAULT		0x00000008
+#define	MAP_PREFAULT_PARTIAL	0x00000010
+#define	MAP_DISABLE_SYNCER	0x00000020
+#define	MAP_CHECK_EXCL		0x00000040
+#define	MAP_CREATE_GUARD	0x00000080
+#define	MAP_DISABLE_COREDUMP	0x00000100
+#define	MAP_PREFAULT_MADVISE	0x00000200    /* from (user) madvise request */
+#define	MAP_WRITECOUNT		0x00000400
+#define	MAP_REMAP		0x00000800
+#define	MAP_STACK_GROWS_DOWN	0x00001000
+#define	MAP_STACK_GROWS_UP	0x00002000
+#define	MAP_ACC_CHARGED		0x00004000
+#define	MAP_ACC_NO_CHARGE	0x00008000
+#define	MAP_CREATE_STACK_GAP_UP	0x00010000
+#define	MAP_CREATE_STACK_GAP_DN	0x00020000
+#define	MAP_VN_EXEC		0x00040000
 
 /*
  * vm_fault option flags
@@ -406,6 +411,7 @@ int vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end, st
 int vm_map_check_owner(vm_map_t map, vm_offset_t start, vm_offset_t end);
 boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t);
 vm_map_t vm_map_create(pmap_t, vm_offset_t, vm_offset_t);
+int vm_map_abandon_and_delete(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_delete(vm_map_t, vm_offset_t, vm_offset_t);
 int vm_map_find(vm_map_t, vm_object_t, vm_ooffset_t, vm_offset_t *, vm_size_t,
     vm_offset_t, int, vm_prot_t, vm_prot_t, int);
@@ -423,9 +429,14 @@ int vm_map_lookup_locked(vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, v
     vm_pindex_t *, vm_prot_t *, boolean_t *);
 void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
+#define VM_MAP_ENTRY_FOREACH(it, map)			\
+	for ((it) = (map)->header.next;		\
+	    (it) != &(map)->header;		\
+	    (it) = (it)->next)
 int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
-void vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry);
+void vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev,
+    vm_map_entry_t entry);
 void vm_map_startup (void);
 int vm_map_submap (vm_map_t, vm_offset_t, vm_offset_t, vm_map_t);
 int vm_map_sync(vm_map_t, vm_offset_t, vm_offset_t, boolean_t, boolean_t,
@@ -434,9 +445,11 @@ int vm_map_madvise (vm_map_t, vm_offset_t, vm_offset_t, int);
 int vm_map_stack (vm_map_t, vm_offset_t, vm_size_t, vm_prot_t, vm_prot_t, int);
 int vm_map_unwire(vm_map_t map, vm_offset_t start, vm_offset_t end,
     int flags);
-int vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end,
+int vm_map_wire(vm_map_t map, vm_offset_t start, vm_offset_t end, int flags);
+int vm_map_wire_locked(vm_map_t map, vm_offset_t start, vm_offset_t end,
     int flags);
 long vmspace_swap_count(struct vmspace *vmspace);
+void vm_map_entry_set_vnode_text(vm_map_entry_t entry, bool add);
 #endif				/* _KERNEL */
 #endif				/* _VM_MAP_ */
 // CHERI CHANGES START

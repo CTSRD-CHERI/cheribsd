@@ -47,7 +47,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/sx.h>
 #include <sys/taskqueue.h>
-#include <sys/zlib.h>
+#include <contrib/zlib/zlib.h>
+#include <dev/zlib/zcalloc.h>
 
 #include <net/if.h>
 #include <net/if_var.h>
@@ -683,22 +684,6 @@ mxge_validate_firmware(mxge_softc_t *sc, const mcp_gen_header_t *hdr)
 
 }
 
-static void *
-z_alloc(void *nil, u_int items, u_int size)
-{
-	void *ptr;
-
-	ptr = malloc(items * size, M_TEMP, M_NOWAIT);
-	return ptr;
-}
-
-static void
-z_free(void *nil, void *ptr)
-{
-	free(ptr, M_TEMP);
-}
-
-
 static int
 mxge_load_firmware_helper(mxge_softc_t *sc, uint32_t *limit)
 {
@@ -723,8 +708,8 @@ mxge_load_firmware_helper(mxge_softc_t *sc, uint32_t *limit)
 
 	/* setup zlib and decompress f/w */
 	bzero(&zs, sizeof (zs));
-	zs.zalloc = z_alloc;
-	zs.zfree = z_free;
+	zs.zalloc = zcalloc_nowait;
+	zs.zfree = zcfree;
 	status = inflateInit(&zs);
 	if (status != Z_OK) {
 		status = EIO;
@@ -1106,12 +1091,35 @@ mxge_change_promisc(mxge_softc_t *sc, int promisc)
 	}
 }
 
+struct mxge_add_maddr_ctx {
+	mxge_softc_t *sc;
+	int error;
+};
+
+static u_int
+mxge_add_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
+{
+	struct mxge_add_maddr_ctx *ctx = arg;
+	mxge_cmd_t cmd;
+
+	if (ctx->error != 0)
+		return (0);
+	bcopy(LLADDR(sdl), &cmd.data0, 4);
+	bcopy(LLADDR(sdl) + 4, &cmd.data1, 2);
+	cmd.data0 = htonl(cmd.data0);
+	cmd.data1 = htonl(cmd.data1);
+
+	ctx->error = mxge_send_cmd(ctx->sc, MXGEFW_JOIN_MULTICAST_GROUP, &cmd);
+
+	return (1);
+}
+
 static void
 mxge_set_multicast_list(mxge_softc_t *sc)
 {
-	mxge_cmd_t cmd;
-	struct ifmultiaddr *ifma;
+	struct mxge_add_maddr_ctx ctx;
 	struct ifnet *ifp = sc->ifp;
+	mxge_cmd_t cmd;
 	int err;
 
 	/* This firmware is known to not support multicast */
@@ -1144,28 +1152,16 @@ mxge_set_multicast_list(mxge_softc_t *sc)
 	}
 
 	/* Walk the multicast list, and add each address */
-
-	if_maddr_rlock(ifp);
-	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-		if (ifma->ifma_addr->sa_family != AF_LINK)
-			continue;
-		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr),
-		      &cmd.data0, 4);
-		bcopy(LLADDR((struct sockaddr_dl *)ifma->ifma_addr) + 4,
-		      &cmd.data1, 2);
-		cmd.data0 = htonl(cmd.data0);
-		cmd.data1 = htonl(cmd.data1);
-		err = mxge_send_cmd(sc, MXGEFW_JOIN_MULTICAST_GROUP, &cmd);
-		if (err != 0) {
-			device_printf(sc->dev, "Failed "
-			       "MXGEFW_JOIN_MULTICAST_GROUP, error status:"
-			       "%d\t", err);
-			/* abort, leaving multicast filtering off */
-			if_maddr_runlock(ifp);
-			return;
-		}
+	ctx.sc = sc;
+	ctx.error = 0;
+	if_foreach_llmaddr(ifp, mxge_add_maddr, &ctx);
+	if (ctx.error != 0) {
+		device_printf(sc->dev, "Failed MXGEFW_JOIN_MULTICAST_GROUP, "
+		    "error status:" "%d\t", ctx.error);
+		/* abort, leaving multicast filtering off */
+		return;
 	}
-	if_maddr_runlock(ifp);
+
 	/* Enable multicast filtering */
 	err = mxge_send_cmd(sc, MXGEFW_DISABLE_ALLMULTI, &cmd);
 	if (err != 0) {

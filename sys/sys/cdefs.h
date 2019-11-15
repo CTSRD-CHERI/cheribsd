@@ -242,11 +242,110 @@
 #endif
 
 #if __has_attribute(cheri_no_subobject_bounds)
+/*
+ * Never add sub-object bounds for this field/type.
+ *
+ * TODO: this should rarely be used and instead we should opt out of specific
+ *  subobject bounds kinds.
+ */
 #define __no_subobject_bounds	__attribute__((cheri_no_subobject_bounds))
+/*
+ * Use the bounds of the surrounding struct rather than the size of the field.
+ * This is useful for code that relies on the container_of/__containerof macro.
+ * TODO: make this use the containing struct's size rather than no tightening
+ * bounds at all.
+ */
+#define __subobject_use_container_bounds	\
+    __attribute__((cheri_no_subobject_bounds))
+/*
+ * For use with flexible array members arrays or pre-C99 fixed size "VLAs":
+ * When creating a bounded capability for array[n], set bounds to be from start
+ * of array up to the end of the current capability.
+ * This is the same as __subobject_use_remaining_size but in the future will be
+ * limited to annotating arrays.
+ * Note: if possible, the better fix is to use a C99 flexible array member.
+ */
+#define __subobject_variable_length	\
+    __attribute__((cheri_subobject_bounds_use_remaining_size))
+/*
+ * Similar to __subobject_bounds_vla_like but use the minimum of n and the
+ * the remaining size. This can be used for e.g. struct dirent to limit the size
+ * of the field to at most 255 chars rather than using the full allocation.
+ */
+#define __subobject_variable_length_maxsize(n) \
+    __attribute__((cheri_subobject_bounds_use_remaining_size(n)))
+/*
+ * These two are the same as the variable length annotations but could also be
+ * applied to non-array members.
+ * TODO: do I actually ever need these?
+ */
+#define __subobject_use_remaining_size	\
+    __attribute__((cheri_subobject_bounds_use_remaining_size))
+#define __subobject_use_remaining_size_max(n)	\
+    __attribute__((cheri_subobject_bounds_use_remaining_size(n)))
+
+/* FIXME: the following are currently the same as __no_subobject_bounds but will
+ * be different attributes in the future that perform less bounds narrowing */
+/*
+ * When applied to an array, always use the full array bounds for &array[n]
+ * instead of bounding it to the single object.
+ */
+#define __subobject_use_full_array_bounds \
+	__no_subobject_bounds
+/*
+ * The same as above but only for C++ references
+ */
+#define __subobject_cxx_reference_use_full_array_bounds \
+	__subobject_use_full_array_bounds
+
+/*
+ * For use in cases like expat/libarchive that use composition to simulate C++
+ * inheritance in C and return a pointer to the nested member when upcasting.
+ *
+ * In the future we could also warn about this and suggest casting to the parent
+ * type rather than taking the address of the member.
+ */
+#define __subobject_member_used_for_c_inheritance __no_subobject_bounds
+/*
+ * Similar to the above, but this annotation is applied to the base type.
+ * This annotation can be applied to a type (e.g. struct archive) to avoid
+ * narrowing bounds whenever this type is used as the first field in a struct
+ * and the address is taken.
+ *
+ * In the future we could also warn about this and suggest casting to the parent
+ * type rather than taking the address of the member.
+ *
+ * FIXME: add an attribute to clang. Can we make it apply recursively?
+ */
+#define __subobject_type_used_for_c_inheritance /* Not implemented yet */
 #else
+/* Not compiling with sub-object bounds -> define these to be no-ops */
 #define __no_subobject_bounds
-#warning "NO SUBOBJECT BOUNDS MISSING"
+#define __subobject_use_container_bounds
+#define __subobject_variable_length
+#define __subobject_variable_length_maxsize(n)
+#define __subobject_use_remaining_size
+#define __subobject_use_remaining_size_max(n)
+#define __subobject_use_full_array_bounds
+#define __subobject_cxx_reference_use_full_array_bounds
+#define __subobject_member_used_for_c_inheritance
+#define __subobject_type_used_for_c_inheritance
 #endif
+
+#if !__has_builtin(__builtin_no_change_bounds)
+#define __builtin_no_change_bounds(expr) (expr)
+#endif
+#define __unbounded_addressof(obj) (&__builtin_no_change_bounds(obj))
+#ifdef __CHERI_PURE_CAPABILITY__
+#define __bounded_addressof(obj, size) \
+  ((__typeof__(obj)*)__builtin_cheri_bounds_set(__unbounded_addressof(obj), size))
+#else
+#define __bounded_addressof(obj, size) (&(obj))
+#endif
+/* Work around bug in sub-object bounds */
+#define __array2d_unbounded_pointer(array, idx1, idx2)	\
+    &__builtin_no_change_bounds(__builtin_no_change_bounds(array[idx1])[idx2])
+
 
 #if !__GNUC_PREREQ__(2, 95)
 #define	__alignof(x)	__offsetof(struct { char __a; x __b; }, __b)
@@ -495,6 +594,18 @@
 #define	__rangeof(type, start, end) \
 	(__offsetof(type, end) - __offsetof(type, start))
 
+
+#if defined(__CHERI_SUBOBJECT_BOUNDS__) && __has_builtin(__builtin_marked_no_subobject_bounds)
+#define __check_safe_type_for_containerof(type, member)				\
+    _Static_assert(__builtin_marked_no_subobject_bounds(type) ||		\
+	__builtin_marked_no_subobject_bounds(__typeof(((type *)0)->member)),	\
+	"this type is unsafe for use in containerof() with sub-object"		\
+	"bounds. Please mark the member/type with __no_subobject_bounds")
+#else
+/* No checks without sub-object bounds */
+#define __check_safe_type_for_containerof(type, member) ((void)0)
+#endif
+
 /*
  * Given the pointer x to the member m of the struct s, return
  * a pointer to the containing structure.  When using GCC, we first
@@ -504,6 +615,7 @@
 #if __GNUC_PREREQ__(3, 1)
 #define	__containerof(x, s, m) ({					\
 	const volatile __typeof(((s *)0)->m) *__x = (x);		\
+	__check_safe_type_for_containerof(s, m);			\
 	__DEQUALIFY(s *, (const volatile char *)__x - __offsetof(s, m));\
 })
 #else
@@ -937,16 +1049,19 @@
 	_Pragma("GCC error \"This file requires a capability-aware compiler\"")
 #endif
 
-#if __has_feature(capabilities)
-#define	__CAPABILITY	__capability
+/* Disable CHERI capability annotations for non-CHERI architectures. */
+#if !__has_feature(capabilities)
+#define	__capability
+#endif
+
+/*
+ * Used to tag pointer variables (typically structure members) shared
+ * with userspace that should always use capabilities in the kernel,
+ * but honor the default pointer ABI in userspace.
+ */
 #ifdef _KERNEL
 #define	__kerncap	__capability
 #else
-#define	__kerncap
-#endif
-#else
-#define	__CAPABILITY
-#define	__capability
 #define	__kerncap
 #endif
 
@@ -962,7 +1077,7 @@
 	_Static_assert(__builtin_choose_expr(__builtin_constant_p(val), \
 	    expr, 1), message)
 #define __static_assert_power_of_two(val) \
-	__static_assert_if_constant(val, (val & (val-1)) == 0, \
+	__static_assert_if_constant(val, (val & ((val)-1)) == 0, \
 	     "Alignment must be a power-of-two")
 
 /* Allow use of __builtin_is_aligned/align_up/align_down unconditionally */
@@ -974,14 +1089,14 @@
 #if !__has_builtin(__builtin_align_up)
 #define __builtin_align_up(addr, align) \
 	({ __static_assert_power_of_two(align);					\
-	vaddr_t unaligned_bits = (vaddr_t)addr & (align - 1);			\
+	vaddr_t unaligned_bits = (vaddr_t)addr & ((align) - 1);			\
 	unaligned_bits == 0 ? addr :						\
-	    (__typeof__(addr))((uintptr_t)addr + (align - unaligned_bits)); })
+	    (__typeof__(addr))((uintptr_t)addr + ((align) - unaligned_bits)); })
 #endif
 #if !__has_builtin(__builtin_align_down)
 #define __builtin_align_down(addr, align) ({					\
 	__static_assert_power_of_two(align);					\
-	vaddr_t unaligned_bits = (vaddr_t)addr & (align - 1);			\
+	vaddr_t unaligned_bits = (vaddr_t)addr & ((align) - 1);			\
 	(__typeof__(addr))((uintptr_t)addr - unaligned_bits); })
 #endif
 

@@ -59,6 +59,16 @@ __FBSDID("$FreeBSD$");
 
 #include "phyp-hvcall.h"
 
+#define MMU_PHYP_DEBUG 0
+#define MMU_PHYP_ID "mmu_phyp: "
+#if MMU_PHYP_DEBUG
+#define dprintf(fmt, ...) printf(fmt, ## __VA_ARGS__)
+#define dprintf0(fmt, ...) dprintf(MMU_PHYP_ID fmt, ## __VA_ARGS__)
+#else
+#define dprintf(fmt, args...) do { ; } while(0)
+#define dprintf0(fmt, args...) do { ; } while(0)
+#endif
+
 static struct rmlock mphyp_eviction_lock;
 
 /*
@@ -68,6 +78,8 @@ static struct rmlock mphyp_eviction_lock;
 static void	mphyp_bootstrap(mmu_t mmup, vm_offset_t kernelstart,
 		    vm_offset_t kernelend);
 static void	mphyp_cpu_bootstrap(mmu_t mmup, int ap);
+static void	*mphyp_dump_pmap(mmu_t mmu, void *ctx, void *buf,
+		    u_long *nbytes);
 static int64_t	mphyp_pte_synch(mmu_t, struct pvo_entry *pvo);
 static int64_t	mphyp_pte_clear(mmu_t, struct pvo_entry *pvo, uint64_t ptebit);
 static int64_t	mphyp_pte_unset(mmu_t, struct pvo_entry *pvo);
@@ -76,6 +88,7 @@ static int	mphyp_pte_insert(mmu_t, struct pvo_entry *pvo);
 static mmu_method_t mphyp_methods[] = {
         MMUMETHOD(mmu_bootstrap,        mphyp_bootstrap),
         MMUMETHOD(mmu_cpu_bootstrap,    mphyp_cpu_bootstrap),
+        MMUMETHOD(mmu_dump_pmap,        mphyp_dump_pmap),
 
 	MMUMETHOD(moea64_pte_synch,     mphyp_pte_synch),
         MMUMETHOD(moea64_pte_clear,     mphyp_pte_clear),
@@ -149,6 +162,7 @@ mphyp_bootstrap(mmu_t mmup, vm_offset_t kernelstart, vm_offset_t kernelend)
 	res = OF_getencprop(node, "ibm,slb-size", prop, sizeof(prop[0]));
 	if (res > 0)
 		n_slbs = prop[0];
+	dprintf0("slb-size=%i\n", n_slbs);
 
 	moea64_pteg_count = final_pteg_count / sizeof(struct lpteg);
 
@@ -185,11 +199,22 @@ mphyp_bootstrap(mmu_t mmup, vm_offset_t kernelstart, vm_offset_t kernelend)
 			shift = arr[idx];
 			slb_encoding = arr[idx + 1];
 			nptlp = arr[idx + 2];
+
+			dprintf0("Segment Page Size: "
+			    "%uKB, slb_enc=0x%X: {size, encoding}[%u] =",
+			    shift > 10? 1 << (shift-10) : 0,
+			    slb_encoding, nptlp);
+
 			idx += 3;
 			len -= 3;
 			while (len > 0 && nptlp) {
 				lp_size = arr[idx];
 				lp_encoding = arr[idx+1];
+
+				dprintf(" {%uKB, 0x%X}",
+				    lp_size > 10? 1 << (lp_size-10) : 0,
+				    lp_encoding);
+
 				if (slb_encoding == SLBV_L && lp_encoding == 0)
 					break;
 
@@ -197,17 +222,28 @@ mphyp_bootstrap(mmu_t mmup, vm_offset_t kernelstart, vm_offset_t kernelend)
 				len -= 2;
 				nptlp--;
 			}
+			dprintf("\n");
 			if (nptlp && slb_encoding == SLBV_L && lp_encoding == 0)
 				break;
 		}
 
-		if (len == 0)
-			panic("Standard large pages (SLB[L] = 1, PTE[LP] = 0) "
-			    "not supported by this system. Please enable huge "
-			    "page backing if running under PowerKVM.");
-
-		moea64_large_page_shift = shift;
-		moea64_large_page_size = 1ULL << lp_size;
+		if (len > 0) {
+			moea64_large_page_shift = shift;
+			moea64_large_page_size = 1ULL << lp_size;
+			moea64_large_page_mask = moea64_large_page_size - 1;
+			hw_direct_map = 1;
+			printf(MMU_PHYP_ID
+			    "Support for hugepages of %uKB detected\n",
+			    moea64_large_page_shift > 10?
+				1 << (moea64_large_page_shift-10) : 0);
+		} else {
+			moea64_large_page_size = 0;
+			moea64_large_page_shift = 0;
+			moea64_large_page_mask = 0;
+			hw_direct_map = 0;
+			printf(MMU_PHYP_ID
+			    "Support for hugepages not found\n");
+		}
 	}
 
 	moea64_mid_bootstrap(mmup, kernelstart, kernelend);
@@ -331,7 +367,7 @@ mphyp_pte_unset(mmu_t mmu, struct pvo_entry *pvo)
 	    ("Error removing page: %d", err));
 
 	if (err == H_NOT_FOUND) {
-		moea64_pte_overflow--;
+		STAT_MOEA64(moea64_pte_overflow--);
 		return (-1);
 	}
 
@@ -452,7 +488,7 @@ mphyp_pte_insert(mmu_t mmu, struct pvo_entry *pvo)
 		result = phyp_pft_hcall(H_REMOVE, H_AVPN, index,
 		    evicted.pte_hi & LPTE_AVPN_MASK, 0, &junk, &lastptelo,
 		    &junk);
-		moea64_pte_overflow++;
+		STAT_MOEA64(moea64_pte_overflow++);
 		KASSERT(result == H_SUCCESS || result == H_NOT_FOUND,
 		    ("Error evicting page: %d", (int)result));
 	}
@@ -472,3 +508,32 @@ mphyp_pte_insert(mmu_t mmu, struct pvo_entry *pvo)
 	return (result);
 }
 
+static void *
+mphyp_dump_pmap(mmu_t mmu, void *ctx, void *buf, u_long *nbytes)
+{
+	struct dump_context *dctx;
+	struct lpte p, *pbuf;
+	int bufidx;
+	uint64_t junk;
+	u_long ptex, ptex_end;
+
+	dctx = (struct dump_context *)ctx;
+	pbuf = (struct lpte *)buf;
+	bufidx = 0;
+	ptex = dctx->ptex;
+	ptex_end = ptex + dctx->blksz / sizeof(struct lpte);
+	ptex_end = MIN(ptex_end, dctx->ptex_end);
+	*nbytes = (ptex_end - ptex) * sizeof(struct lpte);
+
+	if (*nbytes == 0)
+		return (NULL);
+
+	for (; ptex < ptex_end; ptex++) {
+		phyp_pft_hcall(H_READ, 0, ptex, 0, 0,
+			&p.pte_hi, &p.pte_lo, &junk);
+		pbuf[bufidx++] = p;
+	}
+
+	dctx->ptex = ptex;
+	return (buf);
+}

@@ -33,16 +33,25 @@
 #ifndef _SYS_ASSYM_H_
 #define	_SYS_ASSYM_H_
 
-#define	ASSYM_BIAS		0x10000	/* avoid zero-length arrays */
+#define	ASSYM_BIAS		0x100	/* avoid zero-length arrays */
 #define	ASSYM_ABS(value)	((value) < 0 ? -((value) + 1) + 1ULL : (value))
 
-#define	ASSYM(name, value)						      \
-char name ## sign[((value) < 0 ? 1 : 0) + ASSYM_BIAS];			      \
-char name ## w0[(ASSYM_ABS(value) & 0xFFFFU) + ASSYM_BIAS];		      \
-char name ## w1[((ASSYM_ABS(value) & 0xFFFF0000UL) >> 16) + ASSYM_BIAS];      \
-char name ## w2[((ASSYM_ABS(value) & 0xFFFF00000000ULL) >> 32) + ASSYM_BIAS]; \
-char name ## w3[((ASSYM_ABS(value) & 0xFFFF000000000000ULL) >> 48) + ASSYM_BIAS]
+/*
+ * The choice of "y" is to ensure that it sorts after "sign" like the "w"
+ * that was once here, when we exported 16 bits at a time, did.  I'm so
+ * sorry you're having to think about this.
+ */
 
+#define	ASSYM(name, value)                                                        \
+char name ## sign[((value) < 0 ? 1 : 0) + ASSYM_BIAS];                            \
+char name ## y0[((ASSYM_ABS(value) & 0x00000000000000FFULL)      ) + ASSYM_BIAS]; \
+char name ## y1[((ASSYM_ABS(value) & 0x000000000000FF00ULL) >>  8) + ASSYM_BIAS]; \
+char name ## y2[((ASSYM_ABS(value) & 0x0000000000FF0000ULL) >> 16) + ASSYM_BIAS]; \
+char name ## y3[((ASSYM_ABS(value) & 0x00000000FF000000ULL) >> 24) + ASSYM_BIAS]; \
+char name ## y4[((ASSYM_ABS(value) & 0x000000FF00000000ULL) >> 32) + ASSYM_BIAS]; \
+char name ## y5[((ASSYM_ABS(value) & 0x0000FF0000000000ULL) >> 40) + ASSYM_BIAS]; \
+char name ## y6[((ASSYM_ABS(value) & 0x00FF000000000000ULL) >> 48) + ASSYM_BIAS]; \
+char name ## y7[((ASSYM_ABS(value) & 0xFF00000000000000ULL) >> 56) + ASSYM_BIAS]
 
 /* char name ## _datatype_ ## STRINGIFY(typeof(((struct parenttype *)(0x0))-> name)) [1]; */
 #ifdef OFFSET_TEST

@@ -34,6 +34,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/conf.h>
+#include <sys/domainset.h>
 #include <sys/eventhandler.h>
 #include <sys/filio.h>
 #include <sys/lock.h>
@@ -2431,13 +2432,31 @@ device_print_prettyname(device_t dev)
 int
 device_printf(device_t dev, const char * fmt, ...)
 {
+	char buf[128];
+	struct sbuf sb;
+	const char *name;
 	va_list ap;
-	int retval;
+	size_t retval;
 
-	retval = device_print_prettyname(dev);
+	retval = 0;
+
+	sbuf_new(&sb, buf, sizeof(buf), SBUF_FIXEDLEN);
+	sbuf_set_drain(&sb, sbuf_printf_drain, &retval);
+
+	name = device_get_name(dev);
+
+	if (name == NULL)
+		sbuf_cat(&sb, "unknown: ");
+	else
+		sbuf_printf(&sb, "%s%d: ", name, device_get_unit(dev));
+
 	va_start(ap, fmt);
-	retval += vprintf(fmt, ap);
+	sbuf_vprintf(&sb, fmt, ap);
 	va_end(ap);
+
+	sbuf_finish(&sb);
+	sbuf_delete(&sb);
+
 	return (retval);
 }
 
@@ -2523,7 +2542,7 @@ void
 device_set_softc(device_t dev, void *softc)
 {
 	if (dev->softc && !(dev->flags & DF_EXTERNALSOFTC))
-		free(dev->softc, M_BUS_SC);
+		free_domain(dev->softc, M_BUS_SC);
 	dev->softc = softc;
 	if (dev->softc)
 		dev->flags |= DF_EXTERNALSOFTC;
@@ -2540,7 +2559,7 @@ device_set_softc(device_t dev, void *softc)
 void
 device_free_softc(void *softc)
 {
-	free(softc, M_BUS_SC);
+	free_domain(softc, M_BUS_SC);
 }
 
 /**
@@ -2799,6 +2818,9 @@ device_is_devclass_fixed(device_t dev)
 int
 device_set_driver(device_t dev, driver_t *driver)
 {
+	int domain;
+	struct domainset *policy;
+
 	if (dev->state >= DS_ATTACHED)
 		return (EBUSY);
 
@@ -2806,7 +2828,7 @@ device_set_driver(device_t dev, driver_t *driver)
 		return (0);
 
 	if (dev->softc && !(dev->flags & DF_EXTERNALSOFTC)) {
-		free(dev->softc, M_BUS_SC);
+		free_domain(dev->softc, M_BUS_SC);
 		dev->softc = NULL;
 	}
 	device_set_desc(dev, NULL);
@@ -2815,8 +2837,12 @@ device_set_driver(device_t dev, driver_t *driver)
 	if (driver) {
 		kobj_init((kobj_t) dev, (kobj_class_t) driver);
 		if (!(dev->flags & DF_EXTERNALSOFTC) && driver->size > 0) {
-			dev->softc = malloc(driver->size, M_BUS_SC,
-			    M_NOWAIT | M_ZERO);
+			if (bus_get_domain(dev, &domain) == 0)
+				policy = DOMAINSET_PREF(domain);
+			else
+				policy = DOMAINSET_RR();
+			dev->softc = malloc_domainset(driver->size, M_BUS_SC,
+			    policy, M_NOWAIT | M_ZERO);
 			if (!dev->softc) {
 				kobj_delete((kobj_t) dev, NULL);
 				kobj_init((kobj_t) dev, &null_class);
@@ -3952,7 +3978,6 @@ bus_helper_reset_prepare(device_t dev, int flags)
 	}
 	return (0);
 }
-
 
 /**
  * @brief Helper function for implementing BUS_PRINT_CHILD().
@@ -5904,8 +5929,9 @@ devctl2_init(void)
  */
 static int obsolete_panic = 0;
 SYSCTL_INT(_debug, OID_AUTO, obsolete_panic, CTLFLAG_RWTUN, &obsolete_panic, 0,
-    "Bus debug level");
-/* 0 - don't panic, 1 - panic if already obsolete, 2 - panic if deprecated */
+    "Panic when obsolete features are used (0 = never, 1 = if osbolete, "
+    "2 = if deprecated)");
+
 static void
 gone_panic(int major, int running, const char *msg)
 {
@@ -5930,7 +5956,7 @@ _gone_in(int major, const char *msg)
 	gone_panic(major, P_OSREL_MAJOR(__FreeBSD_version), msg);
 	if (P_OSREL_MAJOR(__FreeBSD_version) >= major)
 		printf("Obsolete code will removed soon: %s\n", msg);
-	else if (P_OSREL_MAJOR(__FreeBSD_version) + 1 == major)
+	else
 		printf("Deprecated code (to be removed in FreeBSD %d): %s\n",
 		    major, msg);
 }
@@ -5943,7 +5969,7 @@ _gone_in_dev(device_t dev, int major, const char *msg)
 	if (P_OSREL_MAJOR(__FreeBSD_version) >= major)
 		device_printf(dev,
 		    "Obsolete code will removed soon: %s\n", msg);
-	else if (P_OSREL_MAJOR(__FreeBSD_version) + 1 == major)
+	else
 		device_printf(dev,
 		    "Deprecated code (to be removed in FreeBSD %d): %s\n",
 		    major, msg);

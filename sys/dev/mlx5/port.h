@@ -50,15 +50,36 @@ enum mlx5_an_status {
 	MLX5_AN_LINK_DOWN   = 4,
 };
 
+/* EEPROM I2C Addresses */
+#define	MLX5_I2C_ADDR_LOW			0x50
+#define	MLX5_I2C_ADDR_HIGH			0x51
+#define	MLX5_EEPROM_PAGE_LENGTH			256
 #define	MLX5_EEPROM_MAX_BYTES			32
 #define	MLX5_EEPROM_IDENTIFIER_BYTE_MASK	0x000000ff
 #define	MLX5_EEPROM_REVISION_ID_BYTE_MASK       0x0000ff00
 #define	MLX5_EEPROM_PAGE_3_VALID_BIT_MASK       0x00040000
-#define	MLX5_I2C_ADDR_LOW		0x50
-#define	MLX5_I2C_ADDR_HIGH		0x51
-#define	MLX5_EEPROM_PAGE_LENGTH		256
+#define	MLX5_EEPROM_LOW_PAGE			0x0
+#define	MLX5_EEPROM_HIGH_PAGE			0x3
+#define	MLX5_EEPROM_HIGH_PAGE_OFFSET		128
+#define	MLX5_EEPROM_INFO_BYTES			0x3
 
-enum mlx5e_link_mode {
+/* EEPROM Standards for plug in modules */
+#ifndef MLX5_ETH_MODULE_SFF_8472
+#define	MLX5_ETH_MODULE_SFF_8472	0x1
+#define	MLX5_ETH_MODULE_SFF_8472_LEN	128
+#endif
+
+#ifndef MLX5_ETH_MODULE_SFF_8636
+#define	MLX5_ETH_MODULE_SFF_8636	0x2
+#define	MLX5_ETH_MODULE_SFF_8636_LEN	256
+#endif
+
+#ifndef MLX5_ETH_MODULE_SFF_8436
+#define	MLX5_ETH_MODULE_SFF_8436	0x3
+#define	MLX5_ETH_MODULE_SFF_8436_LEN	256
+#endif
+
+enum mlx5e_link_speed {
 	MLX5E_1000BASE_CX_SGMII	 = 0,
 	MLX5E_1000BASE_KX	 = 1,
 	MLX5E_10GBASE_CX4	 = 2,
@@ -70,9 +91,9 @@ enum mlx5e_link_mode {
 	MLX5E_56GBASE_R4	 = 8,
 	MLX5E_10GBASE_CR	 = 12,
 	MLX5E_10GBASE_SR	 = 13,
-	MLX5E_10GBASE_ER	 = 14,
+	MLX5E_10GBASE_ER_LR	 = 14,
 	MLX5E_40GBASE_SR4	 = 15,
-	MLX5E_40GBASE_LR4	 = 16,
+	MLX5E_40GBASE_LR4_ER4	 = 16,
 	MLX5E_50GBASE_SR2	 = 18,
 	MLX5E_100GBASE_CR4	 = 20,
 	MLX5E_100GBASE_SR4	 = 21,
@@ -86,6 +107,78 @@ enum mlx5e_link_mode {
 	MLX5E_25GBASE_SR	 = 29,
 	MLX5E_50GBASE_CR2	 = 30,
 	MLX5E_50GBASE_KR2	 = 31,
+	MLX5E_LINK_SPEEDS_NUMBER,
+};
+
+enum mlx5e_ext_link_speed {
+	MLX5E_SGMII_100M			= 0,
+	MLX5E_1000BASE_X_SGMII			= 1,
+	MLX5E_5GBASE_R				= 3,
+	MLX5E_10GBASE_XFI_XAUI_1		= 4,
+	MLX5E_40GBASE_XLAUI_4_XLPPI_4		= 5,
+	MLX5E_25GAUI_1_25GBASE_CR_KR		= 6,
+	MLX5E_50GAUI_2_LAUI_2_50GBASE_CR2_KR2	= 7,
+	MLX5E_50GAUI_1_LAUI_1_50GBASE_CR_KR	= 8,
+	MLX5E_CAUI_4_100GBASE_CR4_KR4		= 9,
+	MLX5E_100GAUI_2_100GBASE_CR2_KR2	= 10,
+	MLX5E_200GAUI_4_200GBASE_CR4_KR4	= 12,
+	MLX5E_400GAUI_8				= 15,
+	MLX5E_EXT_LINK_SPEEDS_NUMBER,
+};
+
+enum mlx5e_link_mode {
+	MLX5E_ACC,
+	MLX5E_AOC,
+	MLX5E_AUI,
+	MLX5E_AUI_AC,
+	MLX5E_AUI2,
+	MLX5E_AUI2_AC,
+	MLX5E_AUI4,
+	MLX5E_AUI4_AC,
+	MLX5E_CAUI2,
+	MLX5E_CAUI2_AC,
+	MLX5E_CAUI4,
+	MLX5E_CAUI4_AC,
+	MLX5E_CP,
+	MLX5E_CP2,
+	MLX5E_CR,
+	MLX5E_CR_S,
+	MLX5E_CR1,
+	MLX5E_CR2,
+	MLX5E_CR4,
+	MLX5E_CR_PAM4,
+	MLX5E_CR4_PAM4,
+	MLX5E_CX4,
+	MLX5E_CX,
+	MLX5E_CX_SGMII,
+	MLX5E_DR,
+	MLX5E_DR4,
+	MLX5E_ER,
+	MLX5E_ER4,
+	MLX5E_FR,
+	MLX5E_FR4,
+	MLX5E_KR,
+	MLX5E_KR1,
+	MLX5E_KR_PAM4,
+	MLX5E_KR_S,
+	MLX5E_KR2,
+	MLX5E_KR2_PAM4,
+	MLX5E_KR4,
+	MLX5E_KR4_PAM4,
+	MLX5E_KX,
+	MLX5E_KX4,
+	MLX5E_LR,
+	MLX5E_LR2,
+	MLX5E_LR4,
+	MLX5E_LX,
+	MLX5E_R,
+	MLX5E_SGMII,
+	MLX5E_SR,
+	MLX5E_SR2,
+	MLX5E_SR4,
+	MLX5E_SX,
+	MLX5E_T,
+	MLX5E_TX,
 	MLX5E_LINK_MODES_NUMBER,
 };
 
@@ -107,11 +200,24 @@ enum mlx5_qpts_trust_state {
 	MLX5_QPTS_TRUST_DSCP = 2,
 	MLX5_QPTS_TRUST_BOTH = 3,
 };
+struct mlx5e_port_eth_proto {
+	u32 cap;
+	u32 admin;
+	u32 oper;
+};
+
+#ifndef SPEED_40000
+#define SPEED_40000 40000
+#endif
 
 #define	MLX5E_PROT_MASK(link_mode) (1 << (link_mode))
 
 #define	PORT_MODULE_EVENT_MODULE_STATUS_MASK 0xF
 #define	PORT_MODULE_EVENT_ERROR_TYPE_MASK 0xF
+
+#define MLX5_GET_ETH_PROTO(reg, out, ext, field)    \
+    ((ext) ? MLX5_GET(reg, out, ext_##field) :        \
+    MLX5_GET(reg, out, field))
 
 int mlx5_set_port_caps(struct mlx5_core_dev *dev, u8 port_num, u32 caps);
 int mlx5_query_port_ptys(struct mlx5_core_dev *dev, u32 *ptys,
@@ -127,7 +233,7 @@ int mlx5_query_port_proto_admin(struct mlx5_core_dev *dev,
 int mlx5_query_port_eth_proto_oper(struct mlx5_core_dev *dev,
 				   u32 *proto_oper, u8 local_port);
 int mlx5_set_port_proto(struct mlx5_core_dev *dev, u32 proto_admin,
-			int proto_mask);
+			int proto_mask, bool ext);
 int mlx5_set_port_status(struct mlx5_core_dev *dev,
 			 enum mlx5_port_status status);
 int mlx5_query_port_status(struct mlx5_core_dev *dev, u8 *status);
@@ -175,5 +281,15 @@ int mlx5_set_dscp2prio(struct mlx5_core_dev *mdev, const u8 *dscp2prio);
 int mlx5_query_dscp2prio(struct mlx5_core_dev *mdev, u8 *dscp2prio);
 
 int mlx5_query_pddr_range_info(struct mlx5_core_dev *mdev, u8 local_port, u8 *is_er_type);
+
+u32 mlx5e_port_ptys2speed(struct mlx5_core_dev *mdev, u32 eth_proto_oper);
+int mlx5e_port_linkspeed(struct mlx5_core_dev *mdev, u32 *speed);
+int mlx5_port_query_eth_proto(struct mlx5_core_dev *dev, u8 port, bool ext,
+			      struct mlx5e_port_eth_proto *eproto);
+
+int mlx5e_port_query_pbmc(struct mlx5_core_dev *mdev, void *out);
+int mlx5e_port_set_pbmc(struct mlx5_core_dev *mdev, void *in);
+int mlx5e_port_query_priority2buffer(struct mlx5_core_dev *mdev, u8 *buffer);
+int mlx5e_port_set_priority2buffer(struct mlx5_core_dev *mdev, u8 *buffer);
 
 #endif /* __MLX5_PORT_H__ */

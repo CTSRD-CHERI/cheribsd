@@ -290,12 +290,104 @@ freebsd64_kevent(struct thread *td, struct freebsd64_kevent_args *uap)
 	return (error);
 }
 
+#ifdef COMPAT_FREEBSD11
+struct kevent_freebsd1164 {
+	__uintptr_t	ident;		/* identifier for this event */
+	short		filter;		/* filter for event */
+	unsigned short	flags;
+	unsigned int	fflags;
+	__intptr_t	data;
+	void		*udata;		/* opaque user data identifier */
+};
+
+static int
+kevent11_freebsd64_copyout(void *arg, kkevent_t *kevp, int count)
+{
+	struct freebsd11_freebsd64_kevent_args *uap;
+	struct kevent_freebsd1164 kev11;
+	int error, i;
+
+	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
+	uap = (struct freebsd11_freebsd64_kevent_args *)arg;
+
+	for (i = 0; i < count; i++) {
+		kev11.ident = kevp->ident;
+		kev11.filter = kevp->filter;
+		kev11.flags = kevp->flags;
+		kev11.fflags = kevp->fflags;
+		kev11.data = kevp->data;
+		kev11.udata = (void *)(__cheri_addr vaddr_t)kevp->udata;
+		error = copyout_c(&kev11, __USER_CAP_OBJ(uap->eventlist),
+		    sizeof(kev11));
+		if (error != 0)
+			break;
+		uap->eventlist++;
+		kevp++;
+	}
+	return (error);
+}
+
+/*
+ * Copy 'count' items from the list pointed to by uap->changelist.
+ */
+static int
+kevent11_freebsd64_copyin(void *arg, kkevent_t *kevp, int count)
+{
+	struct freebsd11_freebsd64_kevent_args *uap;
+	struct kevent_freebsd1164 kev11;
+	int error, i;
+
+	KASSERT(count <= KQ_NEVENTS, ("count (%d) > KQ_NEVENTS", count));
+	uap = (struct freebsd11_freebsd64_kevent_args *)arg;
+
+	for (i = 0; i < count; i++) {
+		error = copyin_c(__USER_CAP_OBJ(uap->changelist), &kev11,
+		    sizeof(kev11));
+		if (error != 0)
+			break;
+		kevp->ident = kev11.ident;
+		kevp->filter = kev11.filter;
+		kevp->flags = kev11.flags;
+		kevp->fflags = kev11.fflags;
+		kevp->data = (uintptr_t)kev11.data;
+		kevp->udata = (void * __capability)(uintcap_t)kev11.udata;
+		bzero(&kevp->ext, sizeof(kevp->ext));
+		uap->changelist++;
+		kevp++;
+	}
+	return (error);
+}
+
+int
+freebsd11_freebsd64_kevent(struct thread *td,
+    struct freebsd11_freebsd64_kevent_args *uap)
+{
+	struct kevent_copyops k_ops = {
+		.arg = uap,
+		.k_copyout = kevent11_freebsd64_copyout,
+		.k_copyin = kevent11_freebsd64_copyin,
+		.kevent_size = sizeof(struct kevent_freebsd1164),
+	};
+	struct g_kevent_args gk_args = {
+		.fd = uap->fd,
+		.changelist = __USER_CAP_UNBOUND(uap->changelist),
+		.nchanges = uap->nchanges,
+		.eventlist = __USER_CAP_UNBOUND(uap->eventlist),
+		.nevents = uap->nevents,
+		.timeout = __USER_CAP_OBJ(uap->timeout),
+	};
+
+	return (kern_kevent_generic(td, &gk_args, &k_ops,
+	    "kevent_freebsd1164"));
+}
+#endif
+
 int
 freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
     struct uio **uiop)
 {
 	struct iovec64 iov64;
-	kiovec_t *iov;
+	struct iovec *iov;
 	struct uio *uio;
 	size_t iovlen;
 	int error, i;
@@ -303,9 +395,9 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(kiovec_t);
+	iovlen = iovcnt * sizeof(struct iovec);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (kiovec_t *)(uio + 1);
+	iov = (struct iovec *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin_c(&iovp[i], &iov64, sizeof(iov64));
 		if (error) {
@@ -332,17 +424,17 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 
 int
 freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
-    kiovec_t **iovp, int error)
+    struct iovec **iovp, int error)
 {
-	uiovec_t useriov;
-	kiovec_t *iovs;
+	struct iovec_native useriov;
+	struct iovec *iovs;
 	size_t iovlen;
 	int i;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof(kiovec_t);
+	iovlen = iovcnt * sizeof(struct iovec);
 	iovs = malloc(iovlen, M_IOV, M_WAITOK);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin_c(iov64 + i, &useriov, sizeof(useriov));
@@ -358,7 +450,7 @@ freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
 
 static int
 freebsd64_copyin_hdtr(const struct sf_hdtr64 * __capability uhdtr,
-    ksf_hdtr_t *hdtr)
+    struct sf_hdtr *hdtr)
 {
 	struct sf_hdtr64 hdtr64;
 	int error;
@@ -441,12 +533,11 @@ freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
 	return (EJUSTRETURN);
 }
 
-#define UCC_COPY_SIZE	offsetof(ucontext_c_t, uc_link)
+#define UCC_COPY_SIZE	offsetof(ucontext64_t, uc_link)
 
 int
 freebsd64_getcontext(struct thread *td, struct freebsd64_getcontext_args *uap)
 {
-
 	ucontext64_t uc;
 
 	if (uap->ucp == NULL)
@@ -1115,6 +1206,25 @@ freebsd64___sysctl(struct thread *td, struct freebsd64___sysctl_args *uap)
 	    uap->newlen, 0));
 }
 
+int
+freebsd64___sysctlbyname(struct thread *td, struct
+    freebsd64___sysctlbyname_args *uap)
+{
+	size_t rv;
+	int error;
+
+	error = kern___sysctlbyname(td, __USER_CAP(uap->name, uap->namelen),
+	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
+	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
+	    uap->newlen, &rv, 0, 0);
+	if (error != 0)
+		return (error);
+	if (uap->oldlenp != NULL)
+		error = copyout(&rv, uap->oldlenp, sizeof(rv));
+
+	return (error);
+}
+
 /*
  * kern_thr.c
  */
@@ -1432,9 +1542,6 @@ freebsd64_getrandom(struct thread *td, struct freebsd64_getrandom_args *uap)
 	    uap->buflen, uap->flags));
 }
 
-/*
- * sys_pipe.c
- */
 int
 freebsd64_pipe2(struct thread *td, struct freebsd64_pipe2_args *uap)
 {
@@ -1454,10 +1561,19 @@ freebsd64_pdgetpid(struct thread *td, struct freebsd64_pdgetpid_args *uap)
 }
 
 /*
- * sys_process.c
+ * System call registration helpers.
  */
-int freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
+
+int
+freebsd64_syscall_helper_register(struct syscall_helper_data *sd, int flags)
 {
 
-	return (ENOSYS);
+	return (kern_syscall_helper_register(freebsd64_sysent, sd, flags));
+}
+
+int
+freebsd64_syscall_helper_unregister(struct syscall_helper_data *sd)
+{
+
+	return (kern_syscall_helper_unregister(freebsd64_sysent, sd));
 }

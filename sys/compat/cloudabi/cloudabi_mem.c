@@ -110,8 +110,8 @@ cloudabi_sys_mem_map(struct thread *td, struct cloudabi_sys_mem_map_args *uap)
 	if (error != 0)
 		return (error);
 
-	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len,
-	    PROT_MAX(PROT_ALL) | prot, flags, uap->fd, uap->off));
+	return (kern_mmap(td, (uintptr_t)uap->addr, uap->len, prot, flags,
+	    uap->fd, uap->off));
 }
 
 int
@@ -159,12 +159,3 @@ cloudabi_sys_mem_unmap(struct thread *td,
 
 	return (kern_munmap(td, (uintptr_t)uap->mapping, uap->mapping_len));
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "user_capabilities"
-//   ]
-// }
-// CHERI CHANGES END

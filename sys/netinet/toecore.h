@@ -35,10 +35,13 @@
 #error "no user-serviceable parts inside"
 #endif
 
+#include <sys/_eventhandler.h>
+
 struct tcpopt;
 struct tcphdr;
 struct in_conninfo;
 struct tcp_info;
+struct ktls_session;
 
 struct toedev {
 	TAILQ_ENTRY(toedev) link;	/* glue for toedev_list */
@@ -106,9 +109,12 @@ struct toedev {
 	/* Update software state */
 	void (*tod_tcp_info)(struct toedev *, struct tcpcb *,
 	    struct tcp_info *);
+
+	/* Create a TLS session */
+	int (*tod_alloc_tls_session)(struct toedev *, struct tcpcb *,
+	    struct ktls_session *);
 };
 
-#include <sys/eventhandler.h>
 typedef	void (*tcp_offload_listen_start_fn)(void *, struct tcpcb *);
 typedef	void (*tcp_offload_listen_stop_fn)(void *, struct tcpcb *);
 EVENTHANDLER_DECLARE(tcp_offload_listen_start, tcp_offload_listen_start_fn);

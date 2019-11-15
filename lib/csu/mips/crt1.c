@@ -32,11 +32,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: head/lib/csu/mips/crt1.c 326219 2017-11-26 02:00:33Z pfg $
+ * $FreeBSD$
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/lib/csu/mips/crt1.c 326219 2017-11-26 02:00:33Z pfg $");
+__FBSDID("$FreeBSD$");
 
 #include <stdlib.h>
 #include "libc_private.h"

@@ -36,7 +36,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/cpuset.h>
 #include <sys/kernel.h>
+#include <sys/lock.h>
 #include <sys/module.h>
+#include <sys/mutex.h>
 #include <sys/proc.h>
 #include <sys/rman.h>
 #ifdef SMP
@@ -657,6 +659,8 @@ bcm_lintc_probe(device_t dev)
 		return (ENXIO);
 
 	if (!ofw_bus_is_compatible(dev, "brcm,bcm2836-l1-intc"))
+		return (ENXIO);
+	if (!ofw_bus_has_prop(dev, "interrupt-controller"))
 		return (ENXIO);
 	device_set_desc(dev, "BCM2836 Interrupt Controller");
 	return (BUS_PROBE_DEFAULT);

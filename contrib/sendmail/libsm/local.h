@@ -112,7 +112,7 @@ extern const char SmFileMagic[];
 #if __has_builtin(__builtin_align_up)
 #define	SM_ALIGN(p)	__builtin_align_up((p), SM_ALIGN_BITS + 1)
 #else
-#define SM_ALIGN(p)	(((uintptr_t)(p) + SM_ALIGN_BITS) & (uintptr_t)~SM_ALIGN_BITS)
+#define SM_ALIGN(p)	(((unsigned long)(p) + SM_ALIGN_BITS) & ~SM_ALIGN_BITS)
 #endif
 
 #define sm_io_flockfile(fp)	((void) 0)

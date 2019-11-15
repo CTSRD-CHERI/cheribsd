@@ -157,14 +157,23 @@ llan_attach(device_t dev)
 	struct llan_softc *sc;
 	phandle_t node;
 	int error, i;
+	ssize_t len;
 
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 
 	/* Get firmware properties */
 	node = ofw_bus_get_node(dev);
-	OF_getprop(node, "local-mac-address", sc->mac_address,
+	len = OF_getprop(node, "local-mac-address", sc->mac_address,
 	    sizeof(sc->mac_address));
+	/* If local-mac-address property has only 6 bytes (ETHER_ADDR_LEN)
+	 * instead of 8 (sizeof(sc->mac_address)), then its value must be
+	 * shifted 2 bytes to the right. */
+	if (len == ETHER_ADDR_LEN) {
+		bcopy(sc->mac_address, &sc->mac_address[2], len);
+		/* Zero out the first 2 bytes. */
+		bzero(sc->mac_address, 2);
+	}
 	OF_getencprop(node, "reg", &sc->unit, sizeof(sc->unit));
 
 	mtx_init(&sc->io_lock, "llan", NULL, MTX_DEF);
@@ -499,28 +508,28 @@ llan_start(struct ifnet *ifp)
 	mtx_unlock(&sc->io_lock);
 }
 
+static u_int
+llan_set_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
+{
+	struct llan_softc *sc = arg;
+	uint64_t macaddr = 0;
+
+	memcpy((uint8_t *)&macaddr + 2, LLADDR(sdl), 6);
+	phyp_hcall(H_MULTICAST_CTRL, sc->unit, LLAN_ADD_MULTICAST, macaddr);
+
+	return (1);
+}
+
 static int
 llan_set_multicast(struct llan_softc *sc)
 {
 	struct ifnet *ifp = sc->ifp;
-	struct ifmultiaddr *inm;
-	uint64_t macaddr;
 
 	mtx_assert(&sc->io_lock, MA_OWNED);
 
 	phyp_hcall(H_MULTICAST_CTRL, sc->unit, LLAN_CLEAR_MULTICAST, 0);
 
-	if_maddr_rlock(ifp);
-	CK_STAILQ_FOREACH(inm, &ifp->if_multiaddrs, ifma_link) {
-		if (inm->ifma_addr->sa_family != AF_LINK)
-			continue;
-
-		memcpy((uint8_t *)&macaddr + 2,
-		    LLADDR((struct sockaddr_dl *)inm->ifma_addr), 6);
-		phyp_hcall(H_MULTICAST_CTRL, sc->unit, LLAN_ADD_MULTICAST,
-		    macaddr);
-	}
-	if_maddr_runlock(ifp);
+	if_foreach_llmaddr(ifp, llan_set_maddr, sc);
 
 	return (0);
 }

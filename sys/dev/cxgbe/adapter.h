@@ -1155,13 +1155,12 @@ int update_mac_settings(struct ifnet *, int);
 int adapter_full_init(struct adapter *);
 int adapter_full_uninit(struct adapter *);
 uint64_t cxgbe_get_counter(struct ifnet *, ift_counter);
+void cxgbe_snd_tag_init(struct cxgbe_snd_tag *, struct ifnet *, int);
 int vi_full_init(struct vi_info *);
 int vi_full_uninit(struct vi_info *);
 void vi_sysctls(struct vi_info *);
 void vi_tick(void *);
 int rw_via_memwin(struct adapter *, int, uint32_t, uint32_t *, int, int);
-int alloc_atid_tab(struct tid_info *, int);
-void free_atid_tab(struct tid_info *);
 int alloc_atid(struct adapter *, void *);
 void *lookup_atid(struct adapter *, int);
 void free_atid(struct adapter *, int);
@@ -1214,7 +1213,7 @@ void t4_register_cpl_handler(int, cpl_handler_t);
 void t4_register_shared_cpl_handler(int, cpl_handler_t, int);
 #ifdef RATELIMIT
 int ethofld_transmit(struct ifnet *, struct mbuf *);
-void send_etid_flush_wr(struct cxgbe_snd_tag *);
+void send_etid_flush_wr(struct cxgbe_rate_tag *);
 #endif
 
 /* t4_tracer.c */
@@ -1240,13 +1239,14 @@ int sysctl_tc_params(SYSCTL_HANDLER_ARGS);
 #ifdef RATELIMIT
 void t4_init_etid_table(struct adapter *);
 void t4_free_etid_table(struct adapter *);
-struct cxgbe_snd_tag *lookup_etid(struct adapter *, int);
-int cxgbe_snd_tag_alloc(struct ifnet *, union if_snd_tag_alloc_params *,
+struct cxgbe_rate_tag *lookup_etid(struct adapter *, int);
+int cxgbe_rate_tag_alloc(struct ifnet *, union if_snd_tag_alloc_params *,
     struct m_snd_tag **);
-int cxgbe_snd_tag_modify(struct m_snd_tag *, union if_snd_tag_modify_params *);
-int cxgbe_snd_tag_query(struct m_snd_tag *, union if_snd_tag_query_params *);
-void cxgbe_snd_tag_free(struct m_snd_tag *);
-void cxgbe_snd_tag_free_locked(struct cxgbe_snd_tag *);
+int cxgbe_rate_tag_modify(struct m_snd_tag *, union if_snd_tag_modify_params *);
+int cxgbe_rate_tag_query(struct m_snd_tag *, union if_snd_tag_query_params *);
+void cxgbe_rate_tag_free(struct m_snd_tag *);
+void cxgbe_rate_tag_free_locked(struct cxgbe_rate_tag *);
+void cxgbe_ratelimit_query(struct ifnet *, struct if_ratelimit_query_results *);
 #endif
 
 /* t4_filter.c */

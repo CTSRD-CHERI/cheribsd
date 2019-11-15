@@ -183,8 +183,7 @@ int
 sys_uuidgen(struct thread *td, struct uuidgen_args *uap)
 {
 
-	return (user_uuidgen(td, __USER_CAP_ARRAY(uap->store, uap->count),
-	    uap->count));
+	return (user_uuidgen(td, uap->store, uap->count));
 }
 
 int
@@ -307,7 +306,7 @@ sbuf_printf_uuid(struct sbuf *sb, struct uuid *uuid)
 	char buf[38];
 
 	snprintf_uuid(buf, sizeof(buf), uuid);
-	return (sbuf_printf(sb, "%s", buf));
+	return (sbuf_cat(sb, buf));
 }
 
 /*

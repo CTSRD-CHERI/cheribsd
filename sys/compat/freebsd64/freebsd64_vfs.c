@@ -45,6 +45,206 @@ __FBSDID("$FreeBSD$");
 
 #include <compat/freebsd64/freebsd64_proto.h>
 
+#if defined(COMPAT_FREEBSD11)
+struct freebsd11_statfs64 {
+	uint32_t f_version;		/* structure version number */
+	uint32_t f_type;		/* type of filesystem */
+	uint64_t f_flags;		/* copy of mount exported flags */
+	uint64_t f_bsize;		/* filesystem fragment size */
+	uint64_t f_iosize;		/* optimal transfer block size */
+	uint64_t f_blocks;		/* total data blocks in filesystem */
+	uint64_t f_bfree;		/* free blocks in filesystem */
+	int64_t	 f_bavail;		/* free blocks avail to non-superuser */
+	uint64_t f_files;		/* total file nodes in filesystem */
+	int64_t	 f_ffree;		/* free nodes avail to non-superuser */
+	uint64_t f_syncwrites;		/* count of sync writes since mount */
+	uint64_t f_asyncwrites;		/* count of async writes since mount */
+	uint64_t f_syncreads;		/* count of sync reads since mount */
+	uint64_t f_asyncreads;		/* count of async reads since mount */
+	uint64_t f_spare[10];		/* unused spare */
+	uint32_t f_namemax;		/* maximum filename length */
+	uid_t	  f_owner;		/* user that mounted the filesystem */
+	fsid_t	  f_fsid;		/* filesystem id */
+	char	  f_charspare[80];	/* spare string space */
+	char	  f_fstypename[16];	/* filesystem type name */
+	char	  f_mntfromname[88];	/* mounted filesystem */
+	char	  f_mntonname[88];	/* directory on which mounted */
+};
+
+struct freebsd11_stat64 {
+	__uint32_t st_dev;		/* inode's device */
+	__uint32_t st_ino;		/* inode's number */
+	mode_t	  st_mode;		/* inode protection mode */
+	__uint16_t st_nlink;		/* number of hard links */
+	uid_t	  st_uid;		/* user ID of the file's owner */
+	gid_t	  st_gid;		/* group ID of the file's group */
+	__uint32_t st_rdev;		/* device type */
+	struct	timespec st_atim;	/* time of last access */
+	struct	timespec st_mtim;	/* time of last data modification */
+	struct	timespec st_ctim;	/* time of last file status change */
+	off_t	  st_size;		/* file size, in bytes */
+	blkcnt_t st_blocks;		/* blocks allocated for file */
+	blksize_t st_blksize;		/* optimal blocksize for I/O */
+	fflags_t  st_flags;		/* user defined flags for file */
+	__uint32_t st_gen;		/* file generation number */
+	__int32_t st_lspare;
+	struct timespec st_birthtim;	/* time of file creation */
+	/*
+	 * Explicitly pad st_birthtim to 16 bytes so that the size of
+	 * struct stat is backwards compatible.  We use bitfields instead
+	 * of an array of chars so that this doesn't require a C99 compiler
+	 * to compile if the size of the padding is 0.  We use 2 bitfields
+	 * to cover up to 64 bits on 32-bit machines.  We assume that
+	 * CHAR_BIT is 8...
+	 */
+	unsigned int :(8 / 2) * (16 - (int)sizeof(struct timespec));
+	unsigned int :(8 / 2) * (16 - (int)sizeof(struct timespec));
+};
+
+struct nstat64 {
+	__uint32_t st_dev;		/* inode's device */
+	__uint32_t st_ino;		/* inode's number */
+	__uint32_t st_mode;		/* inode protection mode */
+	__uint32_t st_nlink;		/* number of hard links */
+	uid_t	  st_uid;		/* user ID of the file's owner */
+	gid_t	  st_gid;		/* group ID of the file's group */
+	__uint32_t st_rdev;		/* device type */
+	struct	timespec st_atim;	/* time of last access */
+	struct	timespec st_mtim;	/* time of last data modification */
+	struct	timespec st_ctim;	/* time of last file status change */
+	off_t	  st_size;		/* file size, in bytes */
+	blkcnt_t st_blocks;		/* blocks allocated for file */
+	blksize_t st_blksize;		/* optimal blocksize for I/O */
+	fflags_t  st_flags;		/* user defined flags for file */
+	__uint32_t st_gen;		/* file generation number */
+	struct timespec st_birthtim;	/* time of file creation */
+	/*
+	 * See comment in the definition of struct freebsd11_stat
+	 * above about the following padding.
+	 */
+	unsigned int :(8 / 2) * (16 - (int)sizeof(struct timespec));
+	unsigned int :(8 / 2) * (16 - (int)sizeof(struct timespec));
+};
+
+static void freebsd11_freebsd64_cvtnstat(struct stat *sb, struct nstat64 *nsb);
+#endif
+
+/*
+ * kern_descrip.h
+ */
+
+#if defined(COMPAT_43) || defined(COMPAT_FREEBSD11)
+extern int ino64_trunc_error;
+
+static int
+freebsd11_freebsd64_cvtstat(struct stat *st, struct freebsd11_stat64 *ost)
+{
+
+	ost->st_dev = st->st_dev;
+	if (ost->st_dev != st->st_dev) {
+		switch (ino64_trunc_error) {
+		default:
+			/*
+			 * Since dev_t is almost raw, don't clamp to the
+			 * maximum for case 2, but ignore the error.
+			 */
+			break;
+		case 1:
+			return (EOVERFLOW);
+		}
+	}
+	ost->st_ino = st->st_ino;
+	if (ost->st_ino != st->st_ino) {
+		switch (ino64_trunc_error) {
+		default:
+		case 0:
+			break;
+		case 1:
+			return (EOVERFLOW);
+		case 2:
+			ost->st_ino = UINT32_MAX;
+			break;
+		}
+	}
+	ost->st_mode = st->st_mode;
+	ost->st_nlink = st->st_nlink;
+	if (ost->st_nlink != st->st_nlink) {
+		switch (ino64_trunc_error) {
+		default:
+		case 0:
+			break;
+		case 1:
+			return (EOVERFLOW);
+		case 2:
+			ost->st_nlink = UINT16_MAX;
+			break;
+		}
+	}
+	ost->st_uid = st->st_uid;
+	ost->st_gid = st->st_gid;
+	ost->st_rdev = st->st_rdev;
+	if (ost->st_rdev != st->st_rdev) {
+		switch (ino64_trunc_error) {
+		default:
+			break;
+		case 1:
+			return (EOVERFLOW);
+		}
+	}
+	ost->st_atim = st->st_atim;
+	ost->st_mtim = st->st_mtim;
+	ost->st_ctim = st->st_ctim;
+	ost->st_size = st->st_size;
+	ost->st_blocks = st->st_blocks;
+	ost->st_blksize = st->st_blksize;
+	ost->st_flags = st->st_flags;
+	ost->st_gen = st->st_gen;
+	ost->st_lspare = 0;
+	ost->st_birthtim = st->st_birthtim;
+	bzero((char *)&ost->st_birthtim + sizeof(ost->st_birthtim),
+	    sizeof(*ost) - offsetof(struct freebsd11_stat,
+	    st_birthtim) - sizeof(ost->st_birthtim));
+	return (0);
+}
+
+int
+freebsd11_freebsd64_stat(struct thread *td,
+    struct freebsd11_freebsd64_stat_args* uap)
+{
+	struct stat sb;
+	struct freebsd11_stat64 osb;
+	int error;
+
+	error = kern_statat(td, 0, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, &sb, NULL);
+	if (error != 0)
+		return (error);
+	error = freebsd11_freebsd64_cvtstat(&sb, &osb);
+	if (error == 0)
+		error = copyout_c(&osb, __USER_CAP_OBJ(uap->ub), sizeof(osb));
+	return (error);
+}
+
+/*
+ * Return status information about a file descriptor.
+ */
+int
+freebsd11_freebsd64_nfstat(struct thread *td,
+    struct freebsd11_freebsd64_nfstat_args *uap)
+{
+	struct nstat64 nub;
+	struct stat ub;
+	int error;
+
+	error = kern_fstat(td, uap->fd, &ub);
+	if (error == 0) {
+		freebsd11_freebsd64_cvtnstat(&ub, &nub);
+		error = copyout_c(&nub, __USER_CAP_OBJ(uap->sb), sizeof(nub));
+	}
+	return (error);
+}
+#endif /* COMPAT_FREEBSD11 */
+
 /*
  * vfs_acl.c
  */
@@ -289,6 +489,173 @@ freebsd64_extattr_list_link(struct thread *td,
 /*
  * vfs_syscalls.c
  */
+
+#ifdef COMPAT_FREEBSD11
+int
+freebsd11_freebsd64_lstat(struct thread *td,
+    struct freebsd11_freebsd64_lstat_args* uap)
+{
+	struct stat sb;
+	struct freebsd11_stat64 osb;
+	int error;
+
+	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
+	    __USER_CAP_STR(uap->path), UIO_USERSPACE, &sb, NULL);
+	if (error != 0)
+		return (error);
+	error = freebsd11_freebsd64_cvtstat(&sb, &osb);
+	if (error == 0)
+		error = copyout_c(&osb, __USER_CAP_OBJ(uap->ub), sizeof(osb));
+	return (error);
+}
+
+int
+freebsd11_freebsd64_fhstat(struct thread *td,
+    struct freebsd11_freebsd64_fhstat_args* uap)
+{
+	struct fhandle fh;
+	struct stat sb;
+	struct freebsd11_stat64 osb;
+	int error;
+
+	error = copyin_c(__USER_CAP_OBJ(uap->u_fhp), &fh, sizeof(fhandle_t));
+	if (error != 0)
+		return (error);
+	error = kern_fhstat(td, fh, &sb);
+	if (error != 0)
+		return (error);
+	error = freebsd11_freebsd64_cvtstat(&sb, &osb);
+	if (error == 0)
+		error = copyout_c(&osb, __USER_CAP_OBJ(uap->sb), sizeof(osb));
+	return (error);
+}
+
+int
+freebsd11_freebsd64_fstatat(struct thread *td,
+    struct freebsd11_freebsd64_fstatat_args* uap)
+{
+	struct stat sb;
+	struct freebsd11_stat64 osb;
+	int error;
+
+	error = kern_statat(td, uap->flag, uap->fd, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, &sb, NULL);
+	if (error != 0)
+		return (error);
+	error = freebsd11_freebsd64_cvtstat(&sb, &osb);
+	if (error == 0)
+		error = copyout_c(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
+	return (error);
+}
+
+int
+freebsd11_freebsd64_fstat(struct thread *td,
+    struct freebsd11_freebsd64_fstat_args *uap)
+{
+	struct stat sb;
+	struct freebsd11_stat64 osb;
+	int error;
+
+	error = kern_fstat(td, uap->fd, &sb);
+	if (error != 0)
+		return (error);
+	error = freebsd11_freebsd64_cvtstat(&sb, &osb);
+	if (error == 0)
+		error = copyout_c(&osb, __USER_CAP_OBJ(uap->sb), sizeof(osb));
+	return (error);
+}
+
+/*
+ * Implementation of the NetBSD [l]stat() functions.
+ */
+static void
+freebsd11_freebsd64_cvtnstat(struct stat *sb, struct nstat64 *nsb)
+{
+
+	bzero(nsb, sizeof(*nsb));
+	nsb->st_dev = sb->st_dev;
+	nsb->st_ino = sb->st_ino;
+	nsb->st_mode = sb->st_mode;
+	nsb->st_nlink = sb->st_nlink;
+	nsb->st_uid = sb->st_uid;
+	nsb->st_gid = sb->st_gid;
+	nsb->st_rdev = sb->st_rdev;
+	nsb->st_atim = sb->st_atim;
+	nsb->st_mtim = sb->st_mtim;
+	nsb->st_ctim = sb->st_ctim;
+	nsb->st_size = sb->st_size;
+	nsb->st_blocks = sb->st_blocks;
+	nsb->st_blksize = sb->st_blksize;
+	nsb->st_flags = sb->st_flags;
+	nsb->st_gen = sb->st_gen;
+	nsb->st_birthtim = sb->st_birthtim;
+}
+
+int
+freebsd11_freebsd64_nstat(struct thread *td,
+    struct freebsd11_freebsd64_nstat_args *uap)
+{
+	struct stat sb;
+	struct nstat64 nsb;
+	int error;
+
+	error = kern_statat(td, 0, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, &sb, NULL);
+	if (error != 0)
+		return (error);
+	freebsd11_freebsd64_cvtnstat(&sb, &nsb);
+	return (copyout_c(&nsb, __USER_CAP_OBJ(uap->ub), sizeof (nsb)));
+}
+
+/*
+ * NetBSD lstat.  Get file status; this version does not follow links.
+ */
+int
+freebsd11_freebsd64_nlstat(struct thread *td,
+    struct freebsd11_freebsd64_nlstat_args *uap)
+{
+	struct stat sb;
+	struct nstat64 nsb;
+	int error;
+
+	error = kern_statat(td, AT_SYMLINK_NOFOLLOW, AT_FDCWD,
+	    __USER_CAP_STR(uap->path), UIO_USERSPACE, &sb, NULL);
+	if (error != 0)
+		return (error);
+	freebsd11_freebsd64_cvtnstat(&sb, &nsb);
+	return (copyout_c(&nsb, __USER_CAP_OBJ(uap->ub), sizeof (nsb)));
+}
+
+int
+freebsd11_freebsd64_getdirentries(struct thread *td,
+    struct freebsd11_freebsd64_getdirentries_args *uap)
+{
+	long base;
+	int error;
+
+	error = freebsd11_kern_getdirentries(td, uap->fd,
+	    __USER_CAP(uap->buf, uap->count), uap->count, &base, NULL);
+
+	if (error == 0 && uap->basep != NULL)
+		error = copyout_c(&base, __USER_CAP(uap->basep, sizeof(long)),
+		    sizeof(long));
+	return (error);
+}
+
+int
+freebsd11_freebsd64_getdents(struct thread *td,
+    struct freebsd11_freebsd64_getdents_args *uap)
+{
+	struct freebsd11_freebsd64_getdirentries_args ap;
+
+	ap.fd = uap->fd;
+	ap.buf = uap->buf;
+	ap.count = uap->count;
+	ap.basep = NULL;
+	return (freebsd11_freebsd64_getdirentries(td, &ap));
+}
+#endif /* COMPAT_FREEBSD11 */
+
 int
 freebsd64_quotactl(struct thread *td, struct freebsd64_quotactl_args *uap)
 {
@@ -319,6 +686,146 @@ freebsd64_getfsstat(struct thread *td, struct freebsd64_getfsstat_args *uap)
 	return (user_getfsstat(td, __USER_CAP(uap->buf, uap->bufsize),
 	    uap->bufsize, uap->mode));
 }
+
+#if defined(COMPAT_FREEBSD11)
+/*
+ * Get old format filesystem statistics.
+ */
+static void freebsd11_freebsd64_cvtstatfs(struct statfs *,
+    struct freebsd11_statfs64 *);
+
+int
+freebsd11_freebsd64_statfs(struct thread *td,
+    struct freebsd11_freebsd64_statfs_args *uap)
+{
+	struct freebsd11_statfs64 osb;
+	struct statfs *sfp;
+	int error;
+
+	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
+	error = kern_statfs(td, __USER_CAP_STR(uap->path), UIO_USERSPACE, sfp);
+	if (error == 0) {
+		freebsd11_freebsd64_cvtstatfs(sfp, &osb);
+		error = copyout_c(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
+	}
+	free(sfp, M_STATFS);
+	return (error);
+}
+
+/*
+ * Get filesystem statistics.
+ */
+int
+freebsd11_freebsd64_fstatfs(struct thread *td,
+    struct freebsd11_freebsd64_fstatfs_args *uap)
+{
+	struct freebsd11_statfs64 osb;
+	struct statfs *sfp;
+	int error;
+
+	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
+	error = kern_fstatfs(td, uap->fd, sfp);
+	if (error == 0) {
+		freebsd11_freebsd64_cvtstatfs(sfp, &osb);
+		error = copyout_c(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
+	}
+	free(sfp, M_STATFS);
+	return (error);
+}
+
+/*
+ * Get statistics on all filesystems.
+ */
+int
+freebsd11_freebsd64_getfsstat(struct thread *td,
+    struct freebsd11_freebsd64_getfsstat_args *uap)
+{
+	struct freebsd11_statfs64 osb;
+	struct statfs * __capability buf;
+	struct statfs *sp;
+	size_t count, size;
+	int error;
+
+	count = uap->bufsize / sizeof(struct ostatfs);
+	size = count * sizeof(struct statfs);
+	error = kern_getfsstat(td, &buf, size, &count, UIO_SYSSPACE,
+	    uap->mode);
+	if (error == 0)
+		td->td_retval[0] = count;
+	if (size > 0) {
+		sp = (__cheri_fromcap struct statfs *)buf;
+		while (count > 0 && error == 0) {
+			freebsd11_freebsd64_cvtstatfs(sp, &osb);
+			error = copyout_c(&osb, __USER_CAP_OBJ(uap->buf),
+			    sizeof(osb));
+			sp++;
+			uap->buf++;
+			count--;
+		}
+		free_c(buf, M_STATFS);
+	}
+	return (error);
+}
+
+/*
+ * Implement fstatfs() for (NFS) file handles.
+ */
+int
+freebsd11_freebsd64_fhstatfs(struct thread *td,
+    struct freebsd11_freebsd64_fhstatfs_args *uap)
+{
+	struct freebsd11_statfs64 osb;
+	struct statfs *sfp;
+	fhandle_t fh;
+	int error;
+
+	error = copyin_c(__USER_CAP_OBJ(uap->u_fhp), &fh, sizeof(fhandle_t));
+	if (error)
+		return (error);
+	sfp = malloc(sizeof(struct statfs), M_STATFS, M_WAITOK);
+	error = kern_fhstatfs(td, fh, sfp);
+	if (error == 0) {
+		freebsd11_freebsd64_cvtstatfs(sfp, &osb);
+		error = copyout_c(&osb, __USER_CAP_OBJ(uap->buf), sizeof(osb));
+	}
+	free(sfp, M_STATFS);
+	return (error);
+}
+
+/*
+ * Convert a new format statfs structure to an old format statfs structure.
+ */
+static void
+freebsd11_freebsd64_cvtstatfs(struct statfs *nsp,
+    struct freebsd11_statfs64 *osp)
+{
+
+	bzero(osp, sizeof(*osp));
+	osp->f_version = FREEBSD11_STATFS_VERSION;
+	osp->f_type = nsp->f_type;
+	osp->f_flags = nsp->f_flags;
+	osp->f_bsize = nsp->f_bsize;
+	osp->f_iosize = nsp->f_iosize;
+	osp->f_blocks = nsp->f_blocks;
+	osp->f_bfree = nsp->f_bfree;
+	osp->f_bavail = nsp->f_bavail;
+	osp->f_files = nsp->f_files;
+	osp->f_ffree = nsp->f_ffree;
+	osp->f_syncwrites = nsp->f_syncwrites;
+	osp->f_asyncwrites = nsp->f_asyncwrites;
+	osp->f_syncreads = nsp->f_syncreads;
+	osp->f_asyncreads = nsp->f_asyncreads;
+	osp->f_namemax = nsp->f_namemax;
+	osp->f_owner = nsp->f_owner;
+	osp->f_fsid = nsp->f_fsid;
+	strlcpy(osp->f_fstypename, nsp->f_fstypename,
+	    MIN(MFSNAMELEN, sizeof(osp->f_fstypename)));
+	strlcpy(osp->f_mntonname, nsp->f_mntonname,
+	    MIN(MNAMELEN, sizeof(osp->f_mntonname)));
+	strlcpy(osp->f_mntfromname, nsp->f_mntfromname,
+	    MIN(MNAMELEN, sizeof(osp->f_mntfromname)));
+}
+#endif /* COMPAT_FREEBSD11 */
 
 int
 freebsd64_chdir(struct thread *td, struct freebsd64_chdir_args *uap)
@@ -358,6 +865,26 @@ freebsd64_mknodat(struct thread *td, struct freebsd64_mknodat_args *uap)
 	return (kern_mknodat(td, uap->fd, __USER_CAP_STR(uap->path),
 	    UIO_USERSPACE, uap->mode, uap->dev));
 }
+
+#if defined(COMPAT_FREEBSD11)
+int
+freebsd11_freebsd64_mknod(struct thread *td,
+    struct freebsd11_freebsd64_mknod_args *uap)
+{
+
+	return (kern_mknodat(td, AT_FDCWD, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, uap->mode, uap->dev));
+}
+
+int
+freebsd11_freebsd64_mknodat(struct thread *td,
+    struct freebsd11_freebsd64_mknodat_args *uap)
+{
+
+	return (kern_mknodat(td, uap->fd, __USER_CAP_STR(uap->path),
+	    UIO_USERSPACE, uap->mode, uap->dev));
+}
+#endif /* COMPAT_FREEBSD11 */
 
 int
 freebsd64_mkfifo(struct thread *td, struct freebsd64_mkfifo_args *uap)
@@ -654,6 +1181,17 @@ freebsd64_truncate(struct thread *td, struct freebsd64_truncate_args *uap)
 	    uap->length));
 }
 
+#if defined(COMPAT_FREEBSD6)
+/* Versions with the pad argument */
+int
+freebsd6_truncate(struct thread *td, struct freebsd6_truncate_args *uap)
+{
+
+	return (kern_truncate(td, __USER_CAP_STR(uap->path), UIO_USERSPACE,
+	    uap->length));
+}
+#endif
+
 int
 freebsd64_rename(struct thread *td, struct freebsd64_rename_args *uap)
 {
@@ -792,4 +1330,14 @@ freebsd64_fhstatfs(struct thread *td, struct freebsd64_fhstatfs_args *uap)
 
 	return (user_fhstatfs(td, __USER_CAP_OBJ(uap->u_fhp),
 	    __USER_CAP_OBJ(uap->buf)));
+}
+
+int
+freebsd64_copy_file_range(struct thread *td,
+    struct freebsd64_copy_file_range_args *uap)
+{
+
+	return (user_copy_file_range(td, uap->infd,
+	    __USER_CAP_OBJ(uap->inoffp), uap->outfd,
+	    __USER_CAP_OBJ(uap->outoffp), uap->len, uap->flags));
 }

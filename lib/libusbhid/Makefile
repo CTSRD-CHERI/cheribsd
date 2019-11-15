@@ -1,7 +1,6 @@
 #	$NetBSD: Makefile,v 1.5 1999/07/23 09:44:38 mrg Exp $
 #	$FreeBSD$
 
-PACKAGE=lib${LIB}
 LIB=	usbhid
 MAN=	usbhid.3
 
@@ -22,6 +21,8 @@ INCS=	usbhid.h
 
 .if defined(COMPAT_32BIT)
 CFLAGS+=	-DCOMPAT_32BIT
+.elif defined(COMPAT_64BIT)
+CFLAGS+=	-DCOMPAT_64BIT
 .endif
 
 .include <bsd.lib.mk>

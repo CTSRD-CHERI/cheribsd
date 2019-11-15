@@ -26,6 +26,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -1124,7 +1126,7 @@ int
 sys_kldload(struct thread *td, struct kldload_args *uap)
 {
 
-	return (user_kldload(td, __USER_CAP_STR(uap->file)));
+	return (user_kldload(td, uap->file));
 }
 
 int
@@ -1187,7 +1189,7 @@ int
 sys_kldfind(struct thread *td, struct kldfind_args *uap)
 {
 
-	return (kern_kldfind(td, __USER_CAP_STR(uap->file)));
+	return (kern_kldfind(td, uap->file));
 }
 
 int
@@ -1384,7 +1386,7 @@ sys_kldsym(struct thread *td, struct kldsym_args *uap)
 	    uap->cmd != KLDSYM_LOOKUP)
 		return (EINVAL);
 	error = kern_kldsym(td, uap->fileid, uap->cmd,
-	    __USER_CAP_STR(lookup.symname), &lookup.symvalue, &lookup.symsize);
+	    lookup.symname, &lookup.symvalue, &lookup.symsize);
 	if (error != 0)
 		return (error);
 	error = copyout(&lookup, uap->data, sizeof(lookup));

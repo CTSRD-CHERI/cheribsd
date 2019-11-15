@@ -53,8 +53,8 @@ struct bwstring
 	size_t				len;
 	union
 	{
-		wchar_t		wstr[0];
-		unsigned char	cstr[0];
+		wchar_t		wstr[0] __subobject_variable_length; /* FIXME: compiler should do this automatically */
+		unsigned char	cstr[0] __subobject_variable_length; /* FIXME: compiler should do this automatically */ 
 	}				data;
 };
 

@@ -17,6 +17,7 @@
 #include <string>
 
 #include "test_macros.h"
+TEST_CHERI_NO_SUBOBJECT_WARNING
 
 template <class Span>
 constexpr bool testConstexprSpan(Span s)

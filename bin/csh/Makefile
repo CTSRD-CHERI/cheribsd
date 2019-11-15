@@ -118,6 +118,7 @@ csh.1: tcsh.man
 
 build-tools: gethost
 
+DEPENDOBJS+= gethost
 gethost: gethost.c sh.err.h tc.const.h sh.h ${BUILD_TOOLS_META}
 	@rm -f ${.TARGET}
 	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} ${BUILD_TOOLS_LDFLAGS} \

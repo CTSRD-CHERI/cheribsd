@@ -295,7 +295,7 @@ msix_table_read(struct passthru_softc *sc, uint64_t offset, int size)
 	int index;
 
 	pi = sc->psc_pi;
-	if (offset >= pi->pi_msix.pba_offset &&
+	if (pi->pi_msix.pba_page != NULL && offset >= pi->pi_msix.pba_offset &&
 	    offset < pi->pi_msix.pba_offset + pi->pi_msix.pba_size) {
 		switch(size) {
 		case 1:
@@ -374,7 +374,7 @@ msix_table_write(struct vmctx *ctx, int vcpu, struct passthru_softc *sc,
 	int index;
 
 	pi = sc->psc_pi;
-	if (offset >= pi->pi_msix.pba_offset &&
+	if (pi->pi_msix.pba_page != NULL && offset >= pi->pi_msix.pba_offset &&
 	    offset < pi->pi_msix.pba_offset + pi->pi_msix.pba_size) {
 		switch(size) {
 		case 1:
@@ -639,6 +639,9 @@ cfginit(struct vmctx *ctx, struct pci_devinst *pi, int bus, int slot, int func)
 		goto done;
 	}
 
+	pci_set_cfgdata16(pi, PCIR_COMMAND, read_config(&sc->psc_sel,
+	    PCIR_COMMAND, 2));
+
 	error = 0;				/* success */
 done:
 	return (error);
@@ -665,14 +668,14 @@ passthru_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	memflags = vm_get_memflags(ctx);
 	if (!(memflags & VM_MEM_F_WIRED)) {
 		warnx("passthru requires guest memory to be wired");
-		goto done;
+		return (error);
 	}
 
 	if (pcifd < 0) {
 		pcifd = open(_PATH_DEVPCI, O_RDWR, 0);
 		if (pcifd < 0) {
 			warn("failed to open %s", _PATH_DEVPCI);
-			goto done;
+			return (error);
 		}
 	}
 
@@ -687,7 +690,7 @@ passthru_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 		iofd = open(_PATH_DEVIO, O_RDWR, 0);
 		if (iofd < 0) {
 			warn("failed to open %s", _PATH_DEVIO);
-			goto done;
+			return (error);
 		}
 	}
 
@@ -702,7 +705,7 @@ passthru_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 		memfd = open(_PATH_MEM, O_RDWR, 0);
 		if (memfd < 0) {
 			warn("failed to open %s", _PATH_MEM);
-			goto done;
+			return (error);
 		}
 	}
 
@@ -716,7 +719,7 @@ passthru_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	if (opts == NULL ||
 	    sscanf(opts, "%d/%d/%d", &bus, &slot, &func) != 3) {
 		warnx("invalid passthru options");
-		goto done;
+		return (error);
 	}
 
 	if (vm_assign_pptdev(ctx, bus, slot, func) != 0) {
@@ -731,10 +734,7 @@ passthru_init(struct vmctx *ctx, struct pci_devinst *pi, char *opts)
 	sc->psc_pi = pi;
 
 	/* initialize config space */
-	if ((error = cfginit(ctx, pi, bus, slot, func)) != 0)
-		goto done;
-	
-	error = 0;		/* success */
+	error = cfginit(ctx, pi, bus, slot, func);
 done:
 	if (error) {
 		free(sc);
@@ -815,6 +815,7 @@ passthru_cfgwrite(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 {
 	int error, msix_table_entries, i;
 	struct passthru_softc *sc;
+	uint16_t cmd_old;
 
 	sc = pi->pi_arg;
 
@@ -871,6 +872,14 @@ passthru_cfgwrite(struct vmctx *ctx, int vcpu, struct pci_devinst *pi,
 #endif
 
 	write_config(&sc->psc_sel, coff, bytes, val);
+	if (coff == PCIR_COMMAND) {
+		cmd_old = pci_get_cfgdata16(pi, PCIR_COMMAND);
+		if (bytes == 1)
+			pci_set_cfgdata8(pi, PCIR_COMMAND, val);
+		else if (bytes == 2)
+			pci_set_cfgdata16(pi, PCIR_COMMAND, val);
+		pci_emul_cmd_changed(pi, cmd_old);
+	}
 
 	return (0);
 }

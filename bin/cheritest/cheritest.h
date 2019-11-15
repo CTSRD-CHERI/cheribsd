@@ -439,6 +439,12 @@ DECLARE_CHERI_TEST(test_sealcap_sysarch);
 DECLARE_CHERI_TEST(test_sealcap_seal);
 DECLARE_CHERI_TEST(test_sealcap_seal_unseal);
 
+/* cheritest_signal.c */
+DECLARE_CHERI_TEST(test_signal_handler_usr1);
+DECLARE_CHERI_TEST(test_signal_sigaction_usr1);
+DECLARE_CHERI_TEST(test_signal_sigaltstack);
+DECLARE_CHERI_TEST(test_signal_sigaltstack_disable);
+
 /* cheritest_string.c */
 DECLARE_CHERI_TEST(test_string_kern_memcpy_c);
 DECLARE_CHERI_TEST(test_string_kern_memmove_c);

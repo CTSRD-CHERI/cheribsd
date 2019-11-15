@@ -68,10 +68,9 @@
 #define	CHERI_REG_C25	$c25
 #define	CHERI_REG_C26	$c26	/* Invoked data capability. */
 #define	CHERI_REG_IDC	CHERI_REG_C26
-
-/* 5 exception-context registers -- with names where appropriate. */
-#define	CHERI_REG_KR1C	$c27	/* Kernel exception handling capability (1). */
-#define	CHERI_REG_KR2C	$c28	/* Kernel exception handling capability (2). */
+#define	CHERI_REG_C27	$c27
+#define	CHERI_REG_KSCRATCH CHERI_REG_C27 /* Kernel scratch capability. */
+#define	CHERI_REG_C28	$c28
 #define	CHERI_REG_C29	$c29	/* Former Kernel code capability. */
 #define	CHERI_REG_C30	$c30	/* Former Kernel data capability. */
 #define	CHERI_REG_C31	$c31	/* Former Exception program counter cap. */
@@ -83,14 +82,6 @@
  */
 #define	CHERI_REG_CTEMP0	CHERI_REG_C13	/* C capability manipulation. */
 #define	CHERI_REG_CTEMP1	CHERI_REG_C14	/* C capability manipulation. */
-
-/*
- * Where to save the user $ddc during low-level exception handling.  Possibly
- * this should be an argument to macros rather than hard-coded in the macros.
- *
- * Ensure this is kept in sync with CHERI_CLEAR_CAPHI_SEC0.
- */
-#define	CHERI_REG_SEC0	CHERI_REG_KR2C	/* Saved $ddc in exception handling. */
 
 /*
  * (Possibly) temporary ABI in which $c1 is the code argument to CCall, and
@@ -125,10 +116,16 @@
 	andi	reg, reg, MIPS_SR_KSU_USER;				\
 	beq	reg, $0, 64f;						\
 	nop;								\
-	/* Save user $ddc; install kernel $ddc. */			\
-	cgetdefault	CHERI_REG_SEC0;					\
-	cgetkdc		CHERI_REG_KR1C;					\
-	csetdefault	CHERI_REG_KR1C;					\
+	/* Save user $c27. */						\
+	csetkr1c	CHERI_REG_KSCRATCH;				\
+	/* Save user $ddc in $kr2c. */					\
+	cgetdefault	CHERI_REG_KSCRATCH;				\
+	csetkr2c	CHERI_REG_KSCRATCH;				\
+	/* Install kernel $ddc. */					\
+	cgetkdc		CHERI_REG_KSCRATCH;				\
+	csetdefault	CHERI_REG_KSCRATCH;				\
+	/* Restore user $c27. */					\
+	cgetkr1c	CHERI_REG_KSCRATCH;				\
 64:
 
 /*
@@ -145,16 +142,17 @@
  * assignment here.
  */
 #define	CHERI_EXCEPTION_RETURN(reg)					\
+	/* Save $c27 in $kr1c. */					\
+	csetkr1c	CHERI_REG_KSCRATCH;				\
 	mfc0	reg, MIPS_COP_0_STATUS;					\
 	andi	reg, reg, MIPS_SR_KSU_USER;				\
 	beq	reg, $0, 65f;						\
 	nop;								\
 	/* If returning to userspace, restore saved user $ddc. */	\
-	csetdefault	CHERI_REG_SEC0; 				\
+	cgetkr2c	CHERI_REG_KSCRATCH;				\
+	csetdefault	CHERI_REG_KSCRATCH; 				\
 	b	66f;							\
-	/* Clear c29-c31 when returning to userspace (needs recent bitfile-> nop for now) */ 		\
-	/* CClearHi (CHERI_CLEAR_CAPHI_C29 | CHERI_CLEAR_CAPHI_C30 |	\
-	    CHERI_CLEAR_CAPHI_C31);*/ nop; /* delay slot */			\
+	nop; /* delay slot */						\
 65:									\
 	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
 	/*								\
@@ -164,25 +162,22 @@
 	 * FIXME: this does not work with non-zero $pcc base		\
 	 */								\
 	MFC0	reg, MIPS_COP_0_EXC_PC;					\
-	CGetKCC		CHERI_REG_KR1C;					\
-	CSetOffset	CHERI_REG_KR1C, CHERI_REG_KR1C, reg;		\
-	CSetEPCC	CHERI_REG_KR1C;					\
+	CGetKCC		CHERI_REG_KSCRATCH;				\
+	CSetOffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, reg;	\
+	CSetEPCC	CHERI_REG_KSCRATCH;				\
 66:									\
-	/* Clear C27 and C28 before returning */			\
-	CClearHi (CHERI_CLEAR_CAPHI_KR1C | CHERI_CLEAR_CAPHI_KR2C);
+	/* Restore $c27. */						\
+	cgetkr1c	CHERI_REG_KSCRATCH;
 
 /*
  * Save and restore user CHERI state on an exception.  Assumes that $ddc has
- * already been moved to $sec0, and that if we write $sec0, it will get moved
+ * already been moved to $krc2, and that if we write $krc2, it will get moved
  * to $ddc later.  Unlike kernel context switches, we both save and restore
  * the capability cause register.
- *
- * XXXRW: Note hard-coding of SEC0 here.
  *
  * XXXRW: We should in fact also do this for the kernel version?
  */
 #define	SAVE_CREGS_TO_PCB(pcb, treg)					\
-	SAVE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);				\
 	SAVE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);				\
 	SAVE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);				\
@@ -209,9 +204,17 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
-	/* EPCC is no longer a GPR so load it into KR1C first */	\
-	CGetEPCC	CHERI_REG_KR1C;					\
-	SAVE_U_PCB_CREG(CHERI_REG_KR1C, PCC, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C27, C27, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
+	SAVE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
+	/* Save special registers after KSCRATCH (C27) */		\
+	CGetEPCC	CHERI_REG_KSCRATCH;				\
+	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);			\
+	/* User DDC is saved in $kr2c. */				\
+	CGetKR2C	CHERI_REG_KSCRATCH;				\
+	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, DDC, pcb);			\
 	cgetcause	treg;						\
 	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
@@ -222,7 +225,10 @@
 	CSetEPCC capreg;
 
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
-	RESTORE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
+	/* Restore special registers before KSCRATCH (C27) */		\
+	/* User DDC is saved in $kr2c. */				\
+	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, DDC, pcb);		\
+	CSetKR2C	CHERI_REG_KSCRATCH;				\
 	RESTORE_U_PCB_CREG(CHERI_REG_C1, C1, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C2, C2, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C3, C3, pcb);			\
@@ -249,6 +255,11 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
+	/* Wait to restore KSCRATCH (C27) until after EPCC */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
+	RESTORE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
 	RESTORE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
 	csetcause	treg
 
@@ -365,14 +376,11 @@
 #define CHERI_CLEAR_CAPHI_C24  (1 << (24 - 16))
 #define CHERI_CLEAR_CAPHI_C25  (1 << (25 - 16))
 #define CHERI_CLEAR_CAPHI_IDC  (1 << (26 - 16))
-#define CHERI_CLEAR_CAPHI_KR1C (1 << (27 - 16))
-#define CHERI_CLEAR_CAPHI_KR2C (1 << (28 - 16))
+#define CHERI_CLEAR_CAPHI_C27  (1 << (27 - 16))
+#define CHERI_CLEAR_CAPHI_C28  (1 << (28 - 16))
 #define CHERI_CLEAR_CAPHI_C29  (1 << (29 - 16))
 #define CHERI_CLEAR_CAPHI_C30  (1 << (30 - 16))
 #define CHERI_CLEAR_CAPHI_C31  (1 << (31 - 16))
-
-/* Ensure that this is kept in sync with CHERI_REG_SEC0. */
-#define	CHERI_CLEAR_CAPHI_SEC0	CHERI_CLEAR_CAPHI_KR2C
 
 /*
  * The CCall (selector 1) branch delay slot has been removed but in order to
@@ -386,5 +394,58 @@
 	ccall cb, cd, 1;					\
 	nop; /* Fill branch delay slot for old harware*/	\
 	.set pop;
+
+/* Derive the initial DDC/KDC and PCC/KCC from an omnipotent boot
+ * capability, presumed to be in DDC.  Clobbers C27 and C28, which surely
+ * want to be cleared before handing off control.  (We don't do so here
+ * because in locore.S we have more privileged caps to derive, and we'll
+ * clean up later.)
+ *
+ * TODO: The capabilities derived for DDC/KDC and for PCC/KCC cover the
+ * entirety of the kernel.  Acutally changing base/length requires changes
+ * in linkage.
+ */
+#define CHERI_LOCORE_ROOT_CAPS \
+	/* Grab the initial omnipotent capability */                 \
+	cgetdefault	CHERI_REG_C28;                               \
+	                                                             \
+	/* Create a reduced DDC.  */                                 \
+	cmove		CHERI_REG_C27, CHERI_REG_C28;                \
+	REG_LI		t0, CHERI_CAP_KERN_BASE;                     \
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	REG_LI		t0, CHERI_CAP_KERN_LENGTH;                   \
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	REG_LI		t0, CHERI_PERMS_KERNEL_DATA;                 \
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	                                                             \
+	/* Preserve a copy in KDC for exception handlers. */         \
+	csetkdc		CHERI_REG_C27;                               \
+	                                                             \
+	/* Install the new DDC. */                                   \
+	csetdefault	CHERI_REG_C27;                               \
+	                                                             \
+	/* Create a reduced PCC.  */                                 \
+	cgetpcc		CHERI_REG_C27;                               \
+	REG_LI		t0, CHERI_CAP_KERN_BASE;                     \
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	REG_LI		t0, CHERI_CAP_KERN_LENGTH;                   \
+	csetbounds	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	REG_LI		t0, CHERI_PERMS_KERNEL_CODE;                 \
+	candperm	CHERI_REG_C27, CHERI_REG_C27, t0;            \
+	                                                             \
+	/* Preserve a copy in KCC for exception handlers.  */        \
+	                                                             \
+	csetkcc		CHERI_REG_C27;                               \
+	                                                             \
+	/* Install the new PCC. */                                   \
+	REG_LI		t0, CHERI_CAP_KERN_BASE;                     \
+	cgetpcc		CHERI_REG_C28;                               \
+	cgetoffset	t1, CHERI_REG_C28;                   /* 1 */ \
+	PTR_SUBU	t1, t1, t0;                          /* 2 */ \
+	PTR_ADDIU	t1, t1, (4 * 7);                     /* 3 */ \
+	csetoffset	CHERI_REG_C27, CHERI_REG_C27, t1;    /* 4 */ \
+	cjr		CHERI_REG_C27;                       /* 5 */ \
+	nop;                                                 /* 6 */ \
+	/* 7 (land here) */
 
 #endif /* _MIPS_INCLUDE_CHERIASM_H_ */

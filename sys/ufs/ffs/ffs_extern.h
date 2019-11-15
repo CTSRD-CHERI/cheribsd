@@ -69,6 +69,7 @@ ufs2_daddr_t ffs_blkpref_ufs2(struct inode *, ufs_lbn_t, int, ufs2_daddr_t *);
 void	ffs_blkrelease_finish(struct ufsmount *, u_long);
 u_long	ffs_blkrelease_start(struct ufsmount *, struct vnode *, ino_t);
 uint32_t ffs_calc_sbhash(struct fs *);
+int	ffs_check_blkno(struct mount *, ino_t, ufs2_daddr_t, int);
 int	ffs_checkfreefile(struct fs *, struct vnode *, ino_t);
 void	ffs_clrblock(struct fs *, u_char *, ufs1_daddr_t);
 void	ffs_clusteracct(struct fs *, struct cg *, ufs1_daddr_t, int);
@@ -79,7 +80,7 @@ void	ffs_fragacct(struct fs *, int, int32_t [], int);
 int	ffs_freefile(struct ufsmount *, struct fs *, struct vnode *, ino_t,
 	    int, struct workhead *);
 void	ffs_fserr(struct fs *, ino_t, char *);
-int	ffs_getcg(struct fs *, struct vnode *, u_int, struct buf **,
+int	ffs_getcg(struct fs *, struct vnode *, u_int, int, struct buf **,
 	    struct cg **);
 int	ffs_isblock(struct fs *, u_char *, ufs1_daddr_t);
 int	ffs_isfreeblock(struct fs *, u_char *, ufs1_daddr_t);
@@ -120,6 +121,7 @@ void	process_deferred_inactive(struct mount *mp);
  * Flags to ffs_vgetf
  */
 #define	FFSV_FORCEINSMQ	0x0001
+#define	FFSV_REPLACE	0x0002
 
 /*
  * Flags to ffs_reload

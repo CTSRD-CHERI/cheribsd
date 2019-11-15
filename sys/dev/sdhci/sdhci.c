@@ -185,15 +185,20 @@ sdhci_getaddr(void *arg, bus_dma_segment_t *segs, int nsegs, int error)
 static int
 slot_printf(const struct sdhci_slot *slot, const char * fmt, ...)
 {
+	char buf[128];
 	va_list ap;
 	int retval;
 
-	retval = printf("%s-slot%d: ",
-	    device_get_nameunit(slot->bus), slot->num);
-
+	/*
+	 * Make sure we print a single line all together rather than in two
+	 * halves to avoid console gibberish bingo.
+	 */
 	va_start(ap, fmt);
-	retval += vprintf(fmt, ap);
+	retval = vsnprintf(buf, sizeof(buf), fmt, ap);
 	va_end(ap);
+
+	retval += printf("%s-slot%d: %s",
+	    device_get_nameunit(slot->bus), slot->num, buf);
 	return (retval);
 }
 
@@ -476,7 +481,7 @@ sdhci_set_power(struct sdhci_slot *slot, u_char power)
 		DELAY(100);
 	}
 	if (!(RD1(slot, SDHCI_POWER_CONTROL) & SDHCI_POWER_ON))
-		slot_printf(slot, "Bus power failed to enable");
+		slot_printf(slot, "Bus power failed to enable\n");
 
 	if (slot->quirks & SDHCI_QUIRK_INTEL_POWER_UP_RESET) {
 		WR1(slot, SDHCI_POWER_CONTROL, pwr | 0x10);
@@ -914,8 +919,13 @@ sdhci_init_slot(device_t dev, struct sdhci_slot *slot, int num)
 	    slot->host.host_ocr |= MMC_OCR_320_330 | MMC_OCR_330_340;
 	if (caps & SDHCI_CAN_VDD_300)
 	    slot->host.host_ocr |= MMC_OCR_290_300 | MMC_OCR_300_310;
-	/* 1.8V VDD is not supposed to be used for removable cards. */
-	if ((caps & SDHCI_CAN_VDD_180) && (slot->opt & SDHCI_SLOT_EMBEDDED))
+	/*
+	 * 1.8V VDD is not supposed to be used for removable cards.  Hardware
+	 * prior to v3.0 had no way to indicate embedded slots, but did
+	 * sometimes support 1.8v for non-removable devices.
+	 */
+	if ((caps & SDHCI_CAN_VDD_180) && (slot->version < SDHCI_SPEC_300 ||
+	    (slot->opt & SDHCI_SLOT_EMBEDDED)))
 	    slot->host.host_ocr |= MMC_OCR_LOW_VOLTAGE;
 	if (slot->host.host_ocr == 0) {
 		slot_printf(slot, "Hardware doesn't report any "
@@ -1123,7 +1133,7 @@ no_tuning:
 	slot->timeout = 10;
 	SYSCTL_ADD_INT(device_get_sysctl_ctx(slot->bus),
 	    SYSCTL_CHILDREN(device_get_sysctl_tree(slot->bus)), OID_AUTO,
-	    "timeout", CTLFLAG_RW, &slot->timeout, 0,
+	    "timeout", CTLFLAG_RWTUN, &slot->timeout, 0,
 	    "Maximum timeout for SDHCI transfers (in secs)");
 	TASK_INIT(&slot->card_task, 0, sdhci_card_task, slot);
 	TIMEOUT_TASK_INIT(taskqueue_swi_giant, &slot->card_delayed_task, 0,
@@ -1762,7 +1772,9 @@ sdhci_start_command(struct sdhci_slot *slot, struct mmc_command *cmd)
 	/* Set data transfer mode. */
 	sdhci_set_transfer_mode(slot, cmd->data);
 	if (__predict_false(sdhci_debug > 1))
-		slot_printf(slot, "Starting command!\n");
+		slot_printf(slot, "Starting command opcode %#04x flags %#04x\n",
+		    cmd->opcode, flags);
+
 	/* Start command. */
 	WR2(slot, SDHCI_COMMAND_FLAGS, (cmd->opcode << 8) | (flags & 0xff));
 	/* Start timeout callout. */
@@ -1778,7 +1790,7 @@ sdhci_finish_command(struct sdhci_slot *slot)
 	uint8_t extra;
 
 	if (__predict_false(sdhci_debug > 1))
-		slot_printf(slot, "%s: called, err %d flags %d\n",
+		slot_printf(slot, "%s: called, err %d flags %#04x\n",
 		    __func__, slot->curcmd->error, slot->curcmd->flags);
 	slot->cmd_done = 1;
 	/*
@@ -1819,7 +1831,7 @@ sdhci_finish_command(struct sdhci_slot *slot)
 			slot->curcmd->resp[0] = RD4(slot, SDHCI_RESPONSE);
 	}
 	if (__predict_false(sdhci_debug > 1))
-		printf("Resp: %02x %02x %02x %02x\n",
+		slot_printf(slot, "Resp: %#04x %#04x %#04x %#04x\n",
 		    slot->curcmd->resp[0], slot->curcmd->resp[1],
 		    slot->curcmd->resp[2], slot->curcmd->resp[3]);
 
@@ -2511,8 +2523,8 @@ sdhci_start_slot(struct sdhci_slot *slot)
 		goto fail;
 
 	mtx_init(&slot->sim_mtx, "sdhcisim", NULL, MTX_DEF);
-	slot->sim = cam_sim_alloc(sdhci_cam_action, sdhci_cam_poll,
-	    "sdhci_slot", slot, device_get_unit(slot->bus),
+	slot->sim = cam_sim_alloc_dev(sdhci_cam_action, sdhci_cam_poll,
+	    "sdhci_slot", slot, slot->bus,
 	    &slot->sim_mtx, 1, 1, slot->devq);
 
 	if (slot->sim == NULL) {

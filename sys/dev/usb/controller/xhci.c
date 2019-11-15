@@ -95,6 +95,10 @@ static int xhcistreams;
 SYSCTL_INT(_hw_usb_xhci, OID_AUTO, streams, CTLFLAG_RWTUN,
     &xhcistreams, 0, "Set to enable streams mode support");
 
+static int xhcictlquirk = 1;
+SYSCTL_INT(_hw_usb_xhci, OID_AUTO, ctlquirk, CTLFLAG_RWTUN,
+    &xhcictlquirk, 0, "Set to enable control endpoint quirk");
+
 #ifdef USB_DEBUG
 static int xhcidebug;
 static int xhciroute;
@@ -601,6 +605,9 @@ xhci_init(struct xhci_softc *sc, device_t self, uint8_t dma32)
 	device_printf(self, "%d bytes context size, %d-bit DMA\n",
 	    sc->sc_ctx_is_64_byte ? 64 : 32, (int)sc->sc_bus.dma_bits);
 
+	/* enable 64Kbyte control endpoint quirk */
+	sc->sc_bus.control_ep_quirk = (xhcictlquirk ? 1 : 0);
+
 	temp = XREAD4(sc, capa, XHCI_HCSPARAMS1);
 
 	/* get number of device slots */
@@ -891,7 +898,7 @@ xhci_check_transfer(struct xhci_softc *sc, struct xhci_trb *trb)
 	uint64_t td_event;
 	uint32_t temp;
 	uint32_t remainder;
-	uint16_t stream_id;
+	uint16_t stream_id = 0;
 	uint16_t i;
 	uint8_t status;
 	uint8_t halted;
@@ -904,7 +911,6 @@ xhci_check_transfer(struct xhci_softc *sc, struct xhci_trb *trb)
 
 	remainder = XHCI_TRB_2_REM_GET(temp);
 	status = XHCI_TRB_2_ERROR_GET(temp);
-	stream_id = XHCI_TRB_2_STREAM_GET(temp);
 
 	temp = le32toh(trb->dwTrb3);
 	epno = XHCI_TRB_3_EP_GET(temp);
@@ -914,8 +920,8 @@ xhci_check_transfer(struct xhci_softc *sc, struct xhci_trb *trb)
 	halted = (status != XHCI_TRB_ERROR_SHORT_PKT &&
 	    status != XHCI_TRB_ERROR_SUCCESS);
 
-	DPRINTF("slot=%u epno=%u stream=%u remainder=%u status=%u\n",
-	    index, epno, stream_id, remainder, status);
+	DPRINTF("slot=%u epno=%u remainder=%u status=%u\n",
+	    index, epno, remainder, status);
 
 	if (index > sc->sc_noslot) {
 		DPRINTF("Invalid slot.\n");
@@ -929,18 +935,19 @@ xhci_check_transfer(struct xhci_softc *sc, struct xhci_trb *trb)
 
 	pepext = &sc->sc_hw.devs[index].endp[epno];
 
-	if (pepext->trb_ep_mode != USB_EP_MODE_STREAMS) {
-		stream_id = 0;
-		DPRINTF("stream_id=0\n");
-	} else if (stream_id >= XHCI_MAX_STREAMS) {
-		DPRINTF("Invalid stream ID.\n");
-		return;
-	}
-
 	/* try to find the USB transfer that generated the event */
-	for (i = 0; i != (XHCI_MAX_TRANSFERS - 1); i++) {
+	for (i = 0;; i++) {
 		struct usb_xfer *xfer;
 		struct xhci_td *td;
+
+		if (i == (XHCI_MAX_TRANSFERS - 1)) {
+			if (pepext->trb_ep_mode != USB_EP_MODE_STREAMS ||
+			    stream_id == (XHCI_MAX_STREAMS - 1))
+				break;
+			stream_id++;
+			i = 0;
+			DPRINTFN(5, "stream_id=%u\n", stream_id);
+		}
 
 		xfer = pepext->xfer[i + (XHCI_MAX_TRANSFERS * stream_id)];
 		if (xfer == NULL)
@@ -2003,7 +2010,7 @@ restart:
 
 	/* clear TD SIZE to zero, hence this is the last TRB */
 	/* remove chain bit because this is the last data TRB in the chain */
-	td->td_trb[td->ntrb - 1].dwTrb2 &= ~htole32(XHCI_TRB_2_TDSZ_SET(15));
+	td->td_trb[td->ntrb - 1].dwTrb2 &= ~htole32(XHCI_TRB_2_TDSZ_SET(31));
 	td->td_trb[td->ntrb - 1].dwTrb3 &= ~htole32(XHCI_TRB_3_CHAIN_BIT);
 	/* remove CHAIN-BIT from last LINK TRB */
 	td->td_trb[td->ntrb].dwTrb3 &= ~htole32(XHCI_TRB_3_CHAIN_BIT);

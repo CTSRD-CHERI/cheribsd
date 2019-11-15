@@ -351,7 +351,7 @@ setup_memory_segment(struct vmctx *ctx, vm_paddr_t gpa, size_t len, char *base)
 	int error, flags;
 
 	/* Map 'len' bytes starting at 'gpa' in the guest address space */
-	error = vm_mmap_memseg(ctx, gpa, VM_SYSMEM, gpa, len, PROT_ALL);
+	error = vm_mmap_memseg(ctx, gpa, VM_SYSMEM, gpa, len, _PROT_ALL);
 	if (error)
 		return (error);
 
@@ -503,7 +503,7 @@ vm_create_devmem(struct vmctx *ctx, int segid, const char *name, size_t len)
 	 * adjoining guard regions.
 	 */
 	len2 = VM_MMAP_GUARD_SIZE + len + VM_MMAP_GUARD_SIZE;
-	base = mmap(NULL, len2, PROT_NONE PROT_MAX(PROT_RW),
+	base = mmap(NULL, len2, PROT_NONE | PROT_MAX(PROT_RW),
 	    MAP_GUARD | MAP_ALIGNED_SUPER, -1, 0);
 	if (base == MAP_FAILED)
 		goto done;

@@ -41,9 +41,6 @@
 #ifdef _KERNEL
 #include <sys/systm.h>
 
-extern vm_paddr_t dump_avail[];
-extern vm_paddr_t phys_avail[];
-
 extern char *_tmppt;	/* poor name! */
 
 extern vm_offset_t virtual_avail;
@@ -77,6 +74,8 @@ pmap_vmspace_copy(pmap_t dst_pmap __unused, pmap_t src_pmap __unused)
 
 	return (0);
 }
+
+#define	PMAP_ENTER_QUICK_LOCKED	0x10000000
 
 #endif	/* _KERNEL */
 #endif	/* !_MACHINE_PMAP_H_ */

@@ -72,6 +72,7 @@
 #define	PT_SET_EVENT_MASK 26	/* set mask of optional events */
 
 #define	PT_GET_SC_ARGS	27	/* fetch syscall args */
+#define	PT_GET_SC_RET	28	/* fetch syscall results */
 
 #define PT_GETREGS      33	/* get general-purpose registers */
 #define PT_SETREGS      34	/* set general-purpose registers */
@@ -107,13 +108,14 @@ struct ptrace_io_desc {
 	size_t	piod_len;	/* request length */
 };
 
+#if defined(_KERNEL) && __has_feature(capabilities)
 struct ptrace_io_desc_c {
 	int	piod_op;	/* I/O operation */
-	vm_offset_t piod_offs;	/* child offset; not capability! */
+	void	* __capability piod_offs;	/* child offset */
 	void	* __capability piod_addr;	/* parent offset */
 	size_t	piod_len;	/* request length */
 };
-
+#endif
 
 /*
  * Operations in piod_op.
@@ -185,6 +187,19 @@ struct ptrace_lwpinfo32 {
 };
 #endif
 
+/* Argument structure for PT_GET_SC_RET. */
+struct ptrace_sc_ret {
+	syscallarg_t	sr_retval[2];	/* Only valid if sr_error == 0. */
+	int		sr_error;
+};
+
+#if defined(_KERNEL) && __has_feature(capabilities)
+struct ptrace_sc_ret64 {
+	uint64_t	sr_retval[2];	/* Only valid if sr_error == 0. */
+	int		sr_error;
+};
+#endif
+
 /* Argument structure for PT_VM_ENTRY. */
 struct ptrace_vm_entry {
 	int		pve_entry;	/* Entry number used for iteration. */
@@ -248,7 +263,7 @@ ssize_t	proc_readmem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
 ssize_t	proc_writemem(struct thread *_td, struct proc *_p, vm_offset_t _va,
 	    void *_buf, size_t _len);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 int	proc_read_capregs(struct thread *_td, struct capreg *_capregs);
 int	proc_write_capregs(struct thread *_td, struct capreg *_capregs);
 #endif

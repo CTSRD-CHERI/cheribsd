@@ -29,7 +29,7 @@
 // std::array is explicitly allowed to be initialized with A a = { init-list };.
 // Disable the missing braces warning for this reason.
 #include "disable_missing_braces_warning.h"
-
+TEST_CHERI_NO_SUBOBJECT_WARNING
 
 void checkCV()
 {

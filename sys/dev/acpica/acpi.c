@@ -33,6 +33,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_acpi.h"
 
 #include <sys/param.h>
+#include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/fcntl.h>
@@ -865,7 +866,7 @@ acpi_child_location_str_method(device_t cbdev, device_t child, char *buf,
                 strlcat(buf, buf2, buflen);
         }
     } else {
-        snprintf(buf, buflen, "unknown");
+        snprintf(buf, buflen, "");
     }
     return (0);
 }

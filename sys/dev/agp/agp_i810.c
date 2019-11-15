@@ -1795,9 +1795,7 @@ agp_i810_free_memory(device_t dev, struct agp_memory *mem)
 			 */
 			VM_OBJECT_WLOCK(mem->am_obj);
 			m = vm_page_lookup(mem->am_obj, 0);
-			vm_page_lock(m);
 			vm_page_unwire(m, PQ_INACTIVE);
-			vm_page_unlock(m);
 			VM_OBJECT_WUNLOCK(mem->am_obj);
 		} else {
 			contigfree(sc->argb_cursor, mem->am_size, M_AGP);
@@ -1956,7 +1954,7 @@ agp_intel_gtt_insert_pages(device_t dev, u_int first_entry, u_int num_entries,
 	sc = device_get_softc(dev);
 	for (i = 0; i < num_entries; i++) {
 		MPASS(pages[i]->valid == VM_PAGE_BITS_ALL);
-		MPASS(pages[i]->wire_count > 0);
+		MPASS(pages[i]->ref_count > 0);
 		sc->match->driver->install_gtt_pte(dev, first_entry + i,
 		    VM_PAGE_TO_PHYS(pages[i]), flags);
 	}

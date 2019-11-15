@@ -103,7 +103,11 @@ struct vm_domain {
 	struct vm_pagequeue vmd_pagequeues[PQ_COUNT];
 	struct mtx_padalign vmd_free_mtx;
 	struct mtx_padalign vmd_pageout_mtx;
-	uma_zone_t vmd_pgcache;		/* (c) page free cache. */
+	struct vm_pgcache {
+		int domain;
+		int pool;
+		uma_zone_t zone;
+	} vmd_pgcache[VM_NFREEPOOL];
 	struct vmem *vmd_kernel_arena;	/* (c) per-domain kva R/W arena. */
 	struct vmem *vmd_kernel_rwx_arena; /* (c) per-domain kva R/W/X arena. */
 	u_int vmd_domain;		/* (c) Domain number. */
@@ -193,6 +197,14 @@ vm_pagequeue_cnt_add(struct vm_pagequeue *pq, int addend)
 }
 #define	vm_pagequeue_cnt_inc(pq)	vm_pagequeue_cnt_add((pq), 1)
 #define	vm_pagequeue_cnt_dec(pq)	vm_pagequeue_cnt_add((pq), -1)
+
+static inline void
+vm_pagequeue_remove(struct vm_pagequeue *pq, vm_page_t m)
+{
+
+	TAILQ_REMOVE(&pq->pq_pl, m, plinks.q);
+	vm_pagequeue_cnt_dec(pq);
+}
 
 static inline void
 vm_batchqueue_init(struct vm_batchqueue *bq)

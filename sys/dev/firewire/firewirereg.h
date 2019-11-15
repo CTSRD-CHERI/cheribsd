@@ -254,7 +254,7 @@ struct fw_xfer {
 struct fw_rcv_buf {
 	struct firewire_comm *fc;
 	struct fw_xfer *xfer;
-	kiovec_t *vec;
+	struct iovec *vec;
 	u_int nvec;
 	uint8_t spd;
 };
@@ -301,12 +301,3 @@ extern int firewire_phydma_enable;
 
 MALLOC_DECLARE(M_FW);
 MALLOC_DECLARE(M_FWXFER);
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "header",
-//   "changes": [
-//     "kiovec_t"
-//   ]
-// }
-// CHERI CHANGES END

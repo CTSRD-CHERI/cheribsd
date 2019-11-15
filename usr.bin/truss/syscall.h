@@ -131,6 +131,7 @@ enum Argtype {
 	Sockprotocol,
 	Socktype,
 	Sysarch,
+	Sysctl,
 	Umtxop,
 	Waitoptions,
 	Whence,
@@ -227,7 +228,8 @@ struct syscall {
 };
 
 struct syscall *get_syscall(struct threadinfo *, u_int, u_int);
-char *print_arg(struct syscall_args *, unsigned long*, long *, struct trussinfo *);
+char *print_arg(struct syscall_args *, syscallarg_t *, syscallarg_t *,
+    struct trussinfo *);
 
 /*
  * Linux Socket defines
@@ -250,8 +252,8 @@ char *print_arg(struct syscall_args *, unsigned long*, long *, struct trussinfo 
 #define LINUX_SENDMSG		16
 #define LINUX_RECVMSG		17
 
-#define PAD_(t) (sizeof(register_t) <= sizeof(t) ? \
-    0 : sizeof(register_t) - sizeof(t))
+#define PAD_(t) (sizeof(syscallarg_t) <= sizeof(t) ? \
+    0 : sizeof(syscallarg_t) - sizeof(t))
 
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define PADL_(t)	0
@@ -271,5 +273,5 @@ struct linux_socketcall_args {
 
 void init_syscalls(void);
 void print_syscall(struct trussinfo *);
-void print_syscall_ret(struct trussinfo *, int, long *);
+void print_syscall_ret(struct trussinfo *, int, syscallarg_t *);
 void print_summary(struct trussinfo *trussinfo);

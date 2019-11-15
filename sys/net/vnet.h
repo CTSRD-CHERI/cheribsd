@@ -72,7 +72,7 @@ struct vnet {
 	u_int			 vnet_magic_n;
 	u_int			 vnet_ifcnt;
 	u_int			 vnet_sockcnt;
-	u_int			 vnet_state;	/* SI_SUB_* */
+	u_int			 vnet_shutdown; /* Shutdown in progress. */
 	void			*vnet_data_mem;
 	uintptr_t		 vnet_data_base;
 };
@@ -273,7 +273,8 @@ extern struct sx vnet_sxlock;
 /* struct _hack is to stop this from being used with static data */
 #define	VNET_DEFINE(t, n)	\
     struct _hack; t VNET_NAME(n) __section(VNET_SETNAME) __used
-#if defined(KLD_MODULE) && (defined(__aarch64__) || defined(__riscv))
+#if defined(KLD_MODULE) && (defined(__aarch64__) || defined(__riscv) \
+		|| defined(__powerpc64__))
 /*
  * As with DPCPU_DEFINE_STATIC we are unable to mark this data as static
  * in modules on some architectures.
@@ -325,6 +326,8 @@ struct vnet_sysinit {
 };
 
 #define	VNET_SYSINIT(ident, subsystem, order, func, arg)		\
+	CTASSERT((subsystem) > SI_SUB_VNET &&				\
+	    (subsystem) <= SI_SUB_VNET_DONE);				\
 	static struct vnet_sysinit ident ## _vnet_init = {		\
 		subsystem,						\
 		order,							\
@@ -337,6 +340,8 @@ struct vnet_sysinit {
 	    vnet_deregister_sysinit, &ident ## _vnet_init)
 
 #define	VNET_SYSUNINIT(ident, subsystem, order, func, arg)		\
+	CTASSERT((subsystem) > SI_SUB_VNET &&				\
+	    (subsystem) <= SI_SUB_VNET_DONE);				\
 	static struct vnet_sysinit ident ## _vnet_uninit = {		\
 		subsystem,						\
 		order,							\

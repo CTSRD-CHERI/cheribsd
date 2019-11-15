@@ -23,6 +23,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_kern_tls.h"
 #include "opt_ratelimit.h"
 
 #include <sys/param.h>
@@ -95,6 +96,11 @@ static struct {
 	{0, NULL}
 };
 
+struct lagg_snd_tag {
+	struct m_snd_tag com;
+	struct m_snd_tag *tag;
+};
+
 VNET_DEFINE(SLIST_HEAD(__trhead, lagg_softc), lagg_list); /* list of laggs */
 #define	V_lagg_list	VNET(lagg_list)
 VNET_DEFINE_STATIC(struct mtx, lagg_list_mtx);
@@ -130,11 +136,17 @@ static void	lagg_port2req(struct lagg_port *, struct lagg_reqport *);
 static void	lagg_init(void *);
 static void	lagg_stop(struct lagg_softc *);
 static int	lagg_ioctl(struct ifnet *, u_long, caddr_t);
-#ifdef RATELIMIT
+#if defined(KERN_TLS) || defined(RATELIMIT)
 static int	lagg_snd_tag_alloc(struct ifnet *,
 		    union if_snd_tag_alloc_params *,
 		    struct m_snd_tag **);
+static int	lagg_snd_tag_modify(struct m_snd_tag *,
+		    union if_snd_tag_modify_params *);
+static int	lagg_snd_tag_query(struct m_snd_tag *,
+		    union if_snd_tag_query_params *);
 static void	lagg_snd_tag_free(struct m_snd_tag *);
+static void     lagg_ratelimit_query(struct ifnet *,
+		    struct if_ratelimit_query_results *);
 #endif
 static int	lagg_setmulti(struct lagg_port *);
 static int	lagg_clrmulti(struct lagg_port *);
@@ -523,9 +535,12 @@ lagg_clone_create(struct if_clone *ifc, int unit, void * __capability params)
 	ifp->if_ioctl = lagg_ioctl;
 	ifp->if_get_counter = lagg_get_counter;
 	ifp->if_flags = IFF_SIMPLEX | IFF_BROADCAST | IFF_MULTICAST;
-#ifdef RATELIMIT
+#if defined(KERN_TLS) || defined(RATELIMIT)
 	ifp->if_snd_tag_alloc = lagg_snd_tag_alloc;
+	ifp->if_snd_tag_modify = lagg_snd_tag_modify;
+	ifp->if_snd_tag_query = lagg_snd_tag_query;
 	ifp->if_snd_tag_free = lagg_snd_tag_free;
+	ifp->if_ratelimit_query = lagg_ratelimit_query;
 #endif
 	ifp->if_capenable = ifp->if_capabilities = IFCAP_HWSTATS;
 
@@ -1537,66 +1552,143 @@ lagg_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	return (error);
 }
 
-#ifdef RATELIMIT
+#if defined(KERN_TLS) || defined(RATELIMIT)
+static inline struct lagg_snd_tag *
+mst_to_lst(struct m_snd_tag *mst)
+{
+
+	return (__containerof(mst, struct lagg_snd_tag, com));
+}
+
+/*
+ * Look up the port used by a specific flow.  This only works for lagg
+ * protocols with deterministic port mappings (e.g. not roundrobin).
+ * In addition protocols which use a hash to map flows to ports must
+ * be configured to use the mbuf flowid rather than hashing packet
+ * contents.
+ */
+static struct lagg_port *
+lookup_snd_tag_port(struct ifnet *ifp, uint32_t flowid, uint32_t flowtype)
+{
+	struct lagg_softc *sc;
+	struct lagg_port *lp;
+	struct lagg_lb *lb;
+	uint32_t p;
+
+	sc = ifp->if_softc;
+
+	switch (sc->sc_proto) {
+	case LAGG_PROTO_FAILOVER:
+		return (lagg_link_active(sc, sc->sc_primary));
+	case LAGG_PROTO_LOADBALANCE:
+		if ((sc->sc_opts & LAGG_OPT_USE_FLOWID) == 0 ||
+		    flowtype == M_HASHTYPE_NONE)
+			return (NULL);
+		p = flowid >> sc->flowid_shift;
+		p %= sc->sc_count;
+		lb = (struct lagg_lb *)sc->sc_psc;
+		lp = lb->lb_ports[p];
+		return (lagg_link_active(sc, lp));
+	case LAGG_PROTO_LACP:
+		if ((sc->sc_opts & LAGG_OPT_USE_FLOWID) == 0 ||
+		    flowtype == M_HASHTYPE_NONE)
+			return (NULL);
+		return (lacp_select_tx_port_by_hash(sc, flowid));
+	default:
+		return (NULL);
+	}
+}
+
 static int
 lagg_snd_tag_alloc(struct ifnet *ifp,
     union if_snd_tag_alloc_params *params,
     struct m_snd_tag **ppmt)
 {
-	struct lagg_softc *sc = (struct lagg_softc *)ifp->if_softc;
+	struct lagg_snd_tag *lst;
+	struct lagg_softc *sc;
 	struct lagg_port *lp;
-	struct lagg_lb *lb;
-	uint32_t p;
+	struct ifnet *lp_ifp;
+	int error;
+
+	sc = ifp->if_softc;
 
 	LAGG_RLOCK();
-	switch (sc->sc_proto) {
-	case LAGG_PROTO_FAILOVER:
-		lp = lagg_link_active(sc, sc->sc_primary);
-		break;
-	case LAGG_PROTO_LOADBALANCE:
-		if ((sc->sc_opts & LAGG_OPT_USE_FLOWID) == 0 ||
-		    params->hdr.flowtype == M_HASHTYPE_NONE) {
-			LAGG_RUNLOCK();
-			return (EOPNOTSUPP);
-		}
-		p = params->hdr.flowid >> sc->flowid_shift;
-		p %= sc->sc_count;
-		lb = (struct lagg_lb *)sc->sc_psc;
-		lp = lb->lb_ports[p];
-		lp = lagg_link_active(sc, lp);
-		break;
-	case LAGG_PROTO_LACP:
-		if ((sc->sc_opts & LAGG_OPT_USE_FLOWID) == 0 ||
-		    params->hdr.flowtype == M_HASHTYPE_NONE) {
-			LAGG_RUNLOCK();
-			return (EOPNOTSUPP);
-		}
-		lp = lacp_select_tx_port_by_hash(sc, params->hdr.flowid);
-		break;
-	default:
-		LAGG_RUNLOCK();
-		return (EOPNOTSUPP);
-	}
+	lp = lookup_snd_tag_port(ifp, params->hdr.flowid, params->hdr.flowtype);
 	if (lp == NULL) {
 		LAGG_RUNLOCK();
 		return (EOPNOTSUPP);
 	}
-	ifp = lp->lp_ifp;
-	LAGG_RUNLOCK();
-	if (ifp == NULL || ifp->if_snd_tag_alloc == NULL ||
-	    (ifp->if_capenable & IFCAP_TXRTLMT) == 0)
+	if (lp->lp_ifp == NULL || lp->lp_ifp->if_snd_tag_alloc == NULL) {
+		LAGG_RUNLOCK();
 		return (EOPNOTSUPP);
+	}
+	lp_ifp = lp->lp_ifp;
+	if_ref(lp_ifp);
+	LAGG_RUNLOCK();
 
-	/* forward allocation request */
-	return (ifp->if_snd_tag_alloc(ifp, params, ppmt));
+	lst = malloc(sizeof(*lst), M_LAGG, M_NOWAIT);
+	if (lst == NULL) {
+		if_rele(lp_ifp);
+		return (ENOMEM);
+	}
+
+	error = lp_ifp->if_snd_tag_alloc(lp_ifp, params, &lst->tag);
+	if_rele(lp_ifp);
+	if (error) {
+		free(lst, M_LAGG);
+		return (error);
+	}
+
+	m_snd_tag_init(&lst->com, ifp);
+
+	*ppmt = &lst->com;
+	return (0);
+}
+
+static int
+lagg_snd_tag_modify(struct m_snd_tag *mst,
+    union if_snd_tag_modify_params *params)
+{
+	struct lagg_snd_tag *lst;
+
+	lst = mst_to_lst(mst);
+	return (lst->tag->ifp->if_snd_tag_modify(lst->tag, params));
+}
+
+static int
+lagg_snd_tag_query(struct m_snd_tag *mst,
+    union if_snd_tag_query_params *params)
+{
+	struct lagg_snd_tag *lst;
+
+	lst = mst_to_lst(mst);
+	return (lst->tag->ifp->if_snd_tag_query(lst->tag, params));
 }
 
 static void
-lagg_snd_tag_free(struct m_snd_tag *tag)
+lagg_snd_tag_free(struct m_snd_tag *mst)
 {
-	tag->ifp->if_snd_tag_free(tag);
+	struct lagg_snd_tag *lst;
+
+	lst = mst_to_lst(mst);
+	m_snd_tag_rele(lst->tag);
+	free(lst, M_LAGG);
 }
 
+static void
+lagg_ratelimit_query(struct ifnet *ifp __unused, struct if_ratelimit_query_results *q)
+{
+	/*
+	 * For lagg, we have an indirect
+	 * interface. The caller needs to
+	 * get a ratelimit tag on the actual
+	 * interface the flow will go on.
+	 */
+	q->rate_table = NULL;
+	q->flags = RT_IS_INDIRECT;
+	q->max_flows = 0;
+	q->number_of_rates = 0;
+}
 #endif
 
 static int
@@ -1721,6 +1813,10 @@ lagg_transmit(struct ifnet *ifp, struct mbuf *m)
 	struct lagg_softc *sc = (struct lagg_softc *)ifp->if_softc;
 	int error;
 
+#if defined(KERN_TLS) || defined(RATELIMIT)
+	if (m->m_pkthdr.csum_flags & CSUM_SND_TAG)
+		MPASS(m->m_pkthdr.snd_tag->ifp == ifp);
+#endif
 	LAGG_RLOCK();
 	/* We need a Tx algorithm and at least one port */
 	if (sc->sc_proto == LAGG_PROTO_NONE || sc->sc_count == 0) {
@@ -1878,12 +1974,14 @@ lagg_link_active(struct lagg_softc *sc, struct lagg_port *lp)
 	 * Search a port which reports an active link state.
 	 */
 
+#ifdef INVARIANTS
 	/*
 	 * This is called with either LAGG_RLOCK() held or
 	 * LAGG_XLOCK(sc) held.
 	 */
 	if (!in_epoch(net_epoch_preempt))
 		LAGG_XLOCK_ASSERT(sc);
+#endif
 
 	if (lp == NULL)
 		goto search;
@@ -1911,6 +2009,21 @@ int
 lagg_enqueue(struct ifnet *ifp, struct mbuf *m)
 {
 
+#if defined(KERN_TLS) || defined(RATELIMIT)
+	if (m->m_pkthdr.csum_flags & CSUM_SND_TAG) {
+		struct lagg_snd_tag *lst;
+		struct m_snd_tag *mst;
+
+		mst = m->m_pkthdr.snd_tag;
+		lst = mst_to_lst(mst);
+		if (lst->tag->ifp != ifp) {
+			m_freem(m);
+			return (EAGAIN);
+		}
+		m->m_pkthdr.snd_tag = m_snd_tag_ref(lst->tag);
+		m_snd_tag_rele(mst);
+	}
+#endif
 	return (ifp->if_transmit)(ifp, m);
 }
 

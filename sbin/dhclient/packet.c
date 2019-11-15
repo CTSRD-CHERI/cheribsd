@@ -41,7 +41,18 @@
  * see ``http://www.vix.com/isc''.  To learn more about Vixie
  * Enterprises, see ``http://www.vix.com''.
  */
-
+/*
+ * CHERI CHANGES START
+ * {
+ *   "updated": 20190320,
+ *   "target_type": "lib",
+ *   "changes": [
+ *     "subobject_bounds"
+ *   ],
+ *   "change_comment": "checksum() over multiple struct members"
+ * }
+ * CHERI CHANGES END
+ */
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -113,13 +124,12 @@ void
 assemble_udp_ip_header(unsigned char *buf, int *bufix, u_int32_t from,
     u_int32_t to, unsigned int port, unsigned char *data, int len)
 {
-	struct ip ip __no_subobject_bounds;
-	/* XXXAR: need finer-grained opt-out or expression support.
-	 * Here we want bounds for ip_src + ip_dst. Since they are the
-	 * last two members of struct ip and it is allocated on the stack
-	 * there will not be any possible overflow, but it would still
-	 * be nice to express: please set bounds to 2*sizeof(struct in_addr).
+	/* XXXAR: this __no_subobject bounds is required since
+	 * otherwise we fail to get a DCHP lease.
+	 * FIXME: debug the difference in generated code that could cause
+	 * an invalid checksum result
 	 */
+	struct ip ip __no_subobject_bounds;
 	struct udphdr udp;
 
 	ip.ip_v = 4;
@@ -143,9 +153,16 @@ assemble_udp_ip_header(unsigned char *buf, int *bufix, u_int32_t from,
 	udp.uh_ulen = htons(sizeof(udp) + len);
 	memset(&udp.uh_sum, 0, sizeof(udp.uh_sum));
 
-	/* XXXAR: subobject bounds: address of int but range is 2x */
+	/*
+	 * XXXAR: subobject bounds: address of int but range is 2*int
+	 * Here we want bounds for ip_src + ip_dst. Since they are the
+	 * last two members of struct ip and it is allocated on the stack
+	 * there will not be any possible overflow. Explicitly setting bounds
+	 * to 8 bytes ensures that the checksum() won't read past the end.
+	 */
 	udp.uh_sum = wrapsum(checksum((unsigned char *)&udp, sizeof(udp),
-	    checksum(data, len, checksum((unsigned char *)&ip.ip_src,
+	    checksum(data, len, checksum(
+	    (unsigned char *)__bounded_addressof(ip.ip_src, 2 * sizeof(ip.ip_src)),
 	    2 * sizeof(ip.ip_src),
 	    IPPROTO_UDP + (u_int32_t)ntohs(udp.uh_ulen)))));
 
@@ -190,7 +207,7 @@ decode_udp_ip_header(unsigned char *buf, int bufix, struct sockaddr_in *from,
 	ip_packets_seen++;
 	if (wrapsum(checksum(buf + bufix, ip_len, 0)) != 0) {
 		ip_packets_bad_checksum++;
-		if (ip_packets_seen > 4 &&
+		if (ip_packets_seen > 4 && ip_packets_bad_checksum != 0 &&
 		    (ip_packets_seen / ip_packets_bad_checksum) < 2) {
 			note("%d bad IP checksums seen in %d packets",
 			    ip_packets_bad_checksum, ip_packets_seen);
@@ -233,17 +250,23 @@ decode_udp_ip_header(unsigned char *buf, int bufix, struct sockaddr_in *from,
 
 	usum = udp->uh_sum;
 	udp->uh_sum = 0;
-
+	/*
+	 * XXXAR: subobject bounds: address of int but range is 2*int
+	 * Here we want bounds for ip_src + ip_dst. Since they are the
+	 * last two members of struct ip and it is allocated on the stack
+	 * there will not be any possible overflow. Explicitly setting bounds
+	 * to 8 bytes ensures that the checksum() won't read past the end.
+	 */
 	sum = wrapsum(checksum((unsigned char *)udp, sizeof(*udp),
 	    checksum(data, len, checksum(
-	    (unsigned char *)&((struct ip * __no_subobject_bounds)ip)->ip_src,
+	    (unsigned char *)__bounded_addressof(ip->ip_src, 2 * sizeof(ip->ip_src)),
 	    2 * sizeof(ip->ip_src),
 	    IPPROTO_UDP + (u_int32_t)ntohs(udp->uh_ulen)))));
 
 	udp_packets_seen++;
 	if (usum && usum != sum) {
 		udp_packets_bad_checksum++;
-		if (udp_packets_seen > 4 &&
+		if (udp_packets_seen > 4 && udp_packets_bad_checksum != 0 &&
 		    (udp_packets_seen / udp_packets_bad_checksum) < 2) {
 			note("%d bad udp checksums in %d packets",
 			    udp_packets_bad_checksum, udp_packets_seen);

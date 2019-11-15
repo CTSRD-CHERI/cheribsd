@@ -28,7 +28,7 @@
 .\"     @(#)open.2	8.2 (Berkeley) 11/16/93
 .\" $FreeBSD$
 .\"
-.Dd November 11, 2018
+.Dd September 28, 2019
 .Dt OPEN 2
 .Os
 .Sh NAME
@@ -224,10 +224,7 @@ The descriptor remains in non-blocking mode for subsequent operations.
 If
 .Dv O_FSYNC
 is used in the mask, all writes will
-immediately be written to disk,
-the kernel will not cache written data
-and all writes on the descriptor will not return until
-the data to be written completes.
+immediately and synchronously be written to disk.
 .Pp
 .Dv O_SYNC
 is a synonym for
@@ -422,6 +419,11 @@ Too many symbolic links were encountered in translating the pathname.
 .It Bq Er EISDIR
 The named file is a directory, and the arguments specify
 it is to be modified.
+.It Bq Er EISDIR
+The named file is a directory, and the flags specified
+.Dv O_CREAT
+without
+.Dv O_DIRECTORY .
 .It Bq Er EROFS
 The named file resides on a read-only file system,
 and the file is to be modified.
@@ -613,3 +615,8 @@ permits searches.
 The present implementation of the
 .Fa openat
 checks the current permissions of directory instead.
+.Pp
+The
+.Fa mode
+argument is variadic and may result in different calling conventions
+than might otherwise be expected.

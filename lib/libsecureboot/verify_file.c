@@ -246,7 +246,9 @@ severity_guess(const char *filename)
 }
 
 static void
-verify_tweak(char *tweak, int *accept_no_fp, int *verbose, int *verifying)
+verify_tweak(int fd, off_t off, struct stat *stp,
+    char *tweak, int *accept_no_fp,
+    int *verbose, int *verifying)
 {
 	if (strcmp(tweak, "off") == 0) {
 		*verifying = 0;
@@ -268,7 +270,48 @@ verify_tweak(char *tweak, int *accept_no_fp, int *verbose, int *verifying)
 		*verbose = 1;
 	} else if (strcmp(tweak, "quiet") == 0) {
 		*verbose = 0;
+	} else if (strncmp(tweak, "trust", 5) == 0) {
+		/* content is trust anchor to add or revoke */
+		unsigned char *ucp;
+		size_t num;
+
+		if (off > 0)
+			lseek(fd, 0, SEEK_SET);
+		ucp = read_fd(fd, stp->st_size);
+		if (ucp == NULL)
+			return;
+		if (strstr(tweak, "revoke")) {
+			num = ve_trust_anchors_revoke(ucp, stp->st_size);
+			DEBUG_PRINTF(3, ("revoked %d trust anchors\n",
+				(int) num));
+		} else {
+			num = ve_trust_anchors_add_buf(ucp, stp->st_size);
+			DEBUG_PRINTF(3, ("added %d trust anchors\n",
+				(int) num));
+		}
 	}
+}
+
+#ifndef VE_DEBUG_LEVEL
+# define VE_DEBUG_LEVEL 0
+#endif
+
+static int
+getenv_int(const char *var, int def)
+{
+	const char *cp;
+	char *ep;
+	long val;
+
+	val = def;
+	cp = getenv(var);
+	if (cp && *cp) {
+		val = strtol(cp, &ep, 0);
+		if ((ep && *ep) || val != (int)val) {
+			val = def;
+		}
+	}
+	return (int)val;
 }
 
 /**
@@ -310,15 +353,16 @@ verify_file(int fd, const char *filename, off_t off, int severity)
 
 	if (verifying < 0) {
 		verifying = ve_trust_init();
-#ifdef VE_DEBUG_LEVEL
-		ve_debug_set(VE_DEBUG_LEVEL);
-#endif
+		verbose = getenv_int("VE_VERBOSE", VE_VERBOSE_DEFAULT);
+		ve_debug_set(getenv_int("VE_DEBUG_LEVEL", VE_DEBUG_LEVEL));
 		/* initialize ve_status with default result */
 		rc = verifying ? VE_NOT_CHECKED : VE_NOT_VERIFYING;
 		ve_status_set(0, rc);
 		ve_status_state = VE_STATUS_NONE;
-		if (verifying)
+		if (verifying) {
 			ve_self_tests();
+			ve_anchor_verbose_set(1);
+		}
 	}
 	if (!verifying)
 		return (0);
@@ -340,6 +384,14 @@ verify_file(int fd, const char *filename, off_t off, int severity)
 	if (rc != VE_FINGERPRINT_WRONG && loaded_manifests) {
 		if (severity <= VE_GUESS)
 			severity = severity_guess(filename);
+#ifdef VE_PCR_SUPPORT
+		/*
+		 * Only update pcr with things that must verify
+		 * these tend to be processed in a more deterministic
+		 * order, which makes our pseudo pcr more useful.
+		 */
+		ve_pcr_updating_set((severity == VE_MUST));
+#endif
 		if ((rc = verify_fd(fd, filename, off, &st)) >= 0) {
 			if (verbose || severity > VE_WANT) {
 #if defined(VE_DEBUG_LEVEL) && VE_DEBUG_LEVEL > 0
@@ -359,7 +411,7 @@ verify_file(int fd, const char *filename, off_t off, int severity)
 					cp++;
 					if (strncmp(cp, "loader.ve.", 10) == 0) {
 						cp += 10;
-						verify_tweak(cp,
+						verify_tweak(fd, off, &st, cp,
 						    &accept_no_fp, &verbose,
 						    &verifying);
 					}

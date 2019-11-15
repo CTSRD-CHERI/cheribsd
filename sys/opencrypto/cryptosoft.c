@@ -88,8 +88,8 @@ swcr_encdec(struct cryptodesc *crd, struct swcr_data *sw, caddr_t buf,
 	struct enc_xform *exf;
 	int i, j, k, blks, ind, count, ivlen;
 	struct uio *uio, uiolcl;
-	kiovec_t iovlcl[4];
-	kiovec_t *iov;
+	struct iovec iovlcl[4];
+	struct iovec *iov;
 	int iovcnt, iovalloc;
 	int error;
 
@@ -1418,11 +1418,10 @@ MODULE_VERSION(cryptosoft, 1);
 MODULE_DEPEND(cryptosoft, crypto, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities"
 //   ]
 // }

@@ -45,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/conf.h>
 #include <sys/cons.h>
+#include <sys/eventhandler.h>
 #include <sys/fcntl.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
@@ -272,6 +273,11 @@ vfs_mountroot_devfs(struct thread *td, struct mount **mpp)
 		if (error)
 			return (error);
 
+		error = VFS_STATFS(mp, &mp->mnt_stat);
+		KASSERT(error == 0, ("VFS_STATFS(devfs) failed %d", error));
+		if (error)
+			return (error);
+
 		opts = malloc(sizeof(struct vfsoptlist), M_MOUNT, M_WAITOK);
 		TAILQ_INIT(opts);
 		mp->mnt_opt = opts;
@@ -282,6 +288,7 @@ vfs_mountroot_devfs(struct thread *td, struct mount **mpp)
 
 		*mpp = mp;
 		rootdevmp = mp;
+		vfs_op_exit(mp);
 	}
 
 	set_rootvnode();

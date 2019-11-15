@@ -79,7 +79,7 @@ de_vncmpf(struct vnode *vp, void *arg)
 
 	a = arg;
 	de = VTODE(vp);
-	return (de->de_inode != *a);
+	return (de->de_inode != *a) || (de->de_refcnt <= 0);
 }
 
 /*
@@ -124,8 +124,9 @@ deget(struct msdosfsmount *pmp, u_long dirclust, u_long diroffset,
 	 * address of "." entry. For root dir (if not FAT32) use cluster
 	 * MSDOSFSROOT, offset MSDOSFSROOT_OFS
 	 *
-	 * NOTE: The check for de_refcnt > 0 below insures the denode being
-	 * examined does not represent an unlinked but still open file.
+	 * NOTE: de_vncmpf will explicitly skip any denodes that do not have
+	 * a de_refcnt > 0.  This insures that that we do not attempt to use
+	 * a denode that represents an unlinked but still open file.
 	 * These files are not to be accessible even when the directory
 	 * entry that represented the file happens to be reused while the
 	 * deleted file is still open.
@@ -429,7 +430,7 @@ detrunc(struct denode *dep, u_long length, int flags, struct ucred *cred)
 	dep->de_FileSize = length;
 	if (!isadir)
 		dep->de_flag |= DE_UPDATE | DE_MODIFIED;
-	allerror = vtruncbuf(DETOV(dep), cred, length, pmp->pm_bpcluster);
+	allerror = vtruncbuf(DETOV(dep), length, pmp->pm_bpcluster);
 #ifdef MSDOSFS_DEBUG
 	if (allerror)
 		printf("detrunc(): vtruncbuf error %d\n", allerror);
@@ -551,10 +552,6 @@ msdosfs_reclaim(struct vop_reclaim_args *ap)
 	    dep, dep->de_Name, dep->de_refcnt);
 #endif
 
-	/*
-	 * Destroy the vm object and flush associated pages.
-	 */
-	vnode_destroy_vobject(vp);
 	/*
 	 * Remove the denode from its hash chain.
 	 */

@@ -353,25 +353,15 @@ vdev_queue_type_tree(vdev_queue_t *vq, zio_type_t t)
 int
 vdev_queue_timestamp_compare(const void *x1, const void *x2)
 {
-	const zio_t *z1 = x1;
-	const zio_t *z2 = x2;
+	const zio_t *z1 = (const zio_t *)x1;
+	const zio_t *z2 = (const zio_t *)x2;
 
-	if (z1->io_timestamp < z2->io_timestamp)
-		return (-1);
-	if (z1->io_timestamp > z2->io_timestamp)
-		return (1);
+	int cmp = AVL_CMP(z1->io_timestamp, z2->io_timestamp);
 
-	if (z1->io_offset < z2->io_offset)
-		return (-1);
-	if (z1->io_offset > z2->io_offset)
-		return (1);
+	if (likely(cmp))
+		return (cmp);
 
-	if (z1 < z2)
-		return (-1);
-	if (z1 > z2)
-		return (1);
-
-	return (0);
+	return (AVL_PCMP(z1, z2));
 }
 
 void
@@ -815,6 +805,18 @@ vdev_queue_aggregate(vdev_queue_t *vq, zio_t *zio)
 	do {
 		dio = nio;
 		nio = AVL_NEXT(t, dio);
+		zio_add_child(dio, aio);
+		vdev_queue_io_remove(vq, dio);
+	} while (dio != last);
+
+	/*
+	 * We need to drop the vdev queue's lock during zio_execute() to
+	 * avoid a deadlock that we could encounter due to lock order
+	 * reversal between vq_lock and io_lock in zio_change_priority().
+	 * Use the dropped lock to do memory copy without congestion.
+	 */
+	mutex_exit(&vq->vq_lock);
+	while ((dio = zio_walk_parents(aio, &zl)) != NULL) {
 		ASSERT3U(dio->io_type, ==, aio->io_type);
 
 		if (dio->io_flags & ZIO_FLAG_NODATA) {
@@ -826,16 +828,6 @@ vdev_queue_aggregate(vdev_queue_t *vq, zio_t *zio)
 			    dio->io_offset - aio->io_offset, 0, dio->io_size);
 		}
 
-		zio_add_child(dio, aio);
-		vdev_queue_io_remove(vq, dio);
-	} while (dio != last);
-
-	/*
-	 * We need to drop the vdev queue's lock to avoid a deadlock that we
-	 * could encounter since this I/O will complete immediately.
-	 */
-	mutex_exit(&vq->vq_lock);
-	while ((dio = zio_walk_parents(aio, &zl)) != NULL) {
 		zio_vdev_io_bypass(dio);
 		zio_execute(dio);
 	}

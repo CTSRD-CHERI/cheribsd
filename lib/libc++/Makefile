@@ -2,19 +2,13 @@
 
 .include <src.opts.mk>
 
-# Seems like subobject bounds on references are too aggressive:
-# Implementations of vector/string take refernces to internal storage arrays and
-# then use address-of operator and assume the result will be unbounded.
-# TODO: fix this assumption in clang
-CHERI_SUBOBJECT_BOUNDS_MAX:=conservative
-
 PACKAGE=	clibs
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
 _LIBCXXRTDIR=   ${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/include
 SRCDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/src
-_LIBCXX_VERSION=8
+_LIBCXX_VERSION=9
 .else
 _LIBCXXRTDIR=	${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/include
@@ -25,6 +19,8 @@ CXXINCLUDEDIR=	${INCLUDEDIR}/c++/v${SHLIB_MAJOR}
 .if ${MACHINE_CPUARCH} == "arm"
 STATIC_CXXFLAGS+= -mlong-calls
 .endif
+
+ALLOW_MIPS_SHARED_TEXTREL=
 
 .PATH: ${SRCDIR}
 
@@ -38,8 +34,12 @@ SRCS+=		bind.cpp
 SRCS+=		charconv.cpp
 SRCS+=		chrono.cpp
 SRCS+=		condition_variable.cpp
+#SRCS+=		condition_variable_destructor.cpp
 SRCS+=		debug.cpp
 SRCS+=		exception.cpp
+SRCS+=		filesystem/directory_iterator.cpp
+SRCS+=		filesystem/int128_builtins.cpp
+SRCS+=		filesystem/operations.cpp
 SRCS+=		functional.cpp
 SRCS+=		future.cpp
 SRCS+=		hash.cpp
@@ -48,6 +48,7 @@ SRCS+=		iostream.cpp
 SRCS+=		locale.cpp
 SRCS+=		memory.cpp
 SRCS+=		mutex.cpp
+#SRCS+=		mutex_destructor.cpp
 SRCS+=		new.cpp
 SRCS+=		optional.cpp
 SRCS+=		random.cpp
@@ -63,13 +64,6 @@ SRCS+=		utility.cpp
 SRCS+=		valarray.cpp
 SRCS+=		variant.cpp
 SRCS+=		vector.cpp
-
-# TODO: the filesystem code currently crashes clang
-.if 0
-SRCS+=		filesystem/directory_iterator.cpp
-SRCS+=		filesystem/int128_builtins.cpp
-SRCS+=		filesystem/operations.cpp
-.endif
 
 CXXRT_SRCS+=	auxhelper.cc
 CXXRT_SRCS+=	dynamic_cast.cc
@@ -170,6 +164,7 @@ STD_HEADERS+=	cwctype
 STD_HEADERS+=	deque
 STD_HEADERS+=	errno.h
 STD_HEADERS+=	exception
+STD_HEADERS+=	fenv.h
 STD_HEADERS+=	filesystem
 STD_HEADERS+=	float.h
 STD_HEADERS+=	forward_list
@@ -253,8 +248,6 @@ STDDIR=		${CXXINCLUDEDIR}
 EXP_HEADERS+=	__config
 EXP_HEADERS+=	__memory
 EXP_HEADERS+=	algorithm
-EXP_HEADERS+=	any
-EXP_HEADERS+=	chrono
 EXP_HEADERS+=	coroutine
 EXP_HEADERS+=	deque
 EXP_HEADERS+=	filesystem
@@ -264,17 +257,11 @@ EXP_HEADERS+=	iterator
 EXP_HEADERS+=	list
 EXP_HEADERS+=	map
 EXP_HEADERS+=	memory_resource
-EXP_HEADERS+=	numeric
-EXP_HEADERS+=	optional
 EXP_HEADERS+=	propagate_const
-EXP_HEADERS+=	ratio
 EXP_HEADERS+=	regex
 EXP_HEADERS+=	set
 EXP_HEADERS+=	simd
 EXP_HEADERS+=	string
-EXP_HEADERS+=	string_view
-EXP_HEADERS+=	system_error
-EXP_HEADERS+=	tuple
 EXP_HEADERS+=	type_traits
 EXP_HEADERS+=	unordered_map
 EXP_HEADERS+=	unordered_set

@@ -102,7 +102,7 @@ sandbox_class_load(struct sandbox_class *sbcp)
 	sbcp->sbc_codelen = sandbox_map_maxoffset(sbcp->sbc_codemap);
 	sbcp->sbc_codelen = roundup2(sbcp->sbc_codelen, PAGE_SIZE);
 	base = sbcp->sbc_codemem = mmap(NULL, sbcp->sbc_codelen,
-	    PROT_MAX(PROT_ALL)|PROT_NONE, MAP_ANON, -1, 0);
+	    PROT_MAX(_PROT_ALL)|PROT_NONE, MAP_ANON, -1, 0);
 	if (sbcp->sbc_codemem == MAP_FAILED) {
 		saved_errno = errno;
 		warn("%s: mmap region", __func__);
@@ -255,7 +255,7 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	heaplen = roundup2(sbop->sbo_heaplen, PAGE_SIZE);
 #if CHERICAP_SIZE == 16
 	heaplen_adj = length + heaplen;		/* Requested length. */
-	heaplen_adj = roundup2(heaplen_adj, (1ULL << CHERI_SEAL_ALIGN_SHIFT(heaplen_adj))); /* Aligned len. */
+	heaplen_adj = CHERI_SEALABLE_LENGTH(heaplen_adj); /* Aligned len. */
 	heaplen_adj -= (length + heaplen);	/* Calculate adjustment. */
 	heaplen += heaplen_adj;			/* Apply adjustment. */
 #endif
@@ -266,7 +266,7 @@ sandbox_object_load(struct sandbox_class *sbcp, struct sandbox_object *sbop)
 	    PROT_MAX(PROT_READ|PROT_WRITE) | PROT_NONE,
 #else
 	    /* When mapping code+data together we have to use a RWX cap */
-	    PROT_MAX(PROT_ALL) | PROT_NONE,
+	    PROT_MAX(_PROT_ALL) | PROT_NONE,
 #endif
 	    MAP_ANON | MAP_ALIGNED_CHERI_SEAL, -1, 0);
 	if (sbop->sbo_datamem == MAP_FAILED) {

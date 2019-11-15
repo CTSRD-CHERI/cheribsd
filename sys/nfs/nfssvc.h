@@ -77,9 +77,9 @@
 
 /* Argument structure for NFSSVC_DUMPMNTOPTS. */
 struct nfscl_dumpmntopts {
-	char	*ndmnt_fname;		/* File Name */
+	char * __kerncap ndmnt_fname;		/* File Name */
 	size_t	ndmnt_blen;		/* Size of buffer */
-	void	*ndmnt_buf;		/* and the buffer */
+	void * __kerncap ndmnt_buf;		/* and the buffer */
 };
 
 #endif /* _NFS_NFSSVC_H */

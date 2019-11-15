@@ -41,6 +41,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/ktr.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/malloc.h>
@@ -348,6 +349,13 @@ unionfs_noderem(struct vnode *vp, struct thread *td)
 	vp->v_vnlock = &(vp->v_lock);
 	vp->v_data = NULL;
 	vp->v_object = NULL;
+	if (vp->v_writecount > 0) {
+		if (uvp != NULL)
+			VOP_ADD_WRITECOUNT(uvp, -vp->v_writecount);
+		else if (lvp != NULL)
+			VOP_ADD_WRITECOUNT(lvp, -vp->v_writecount);
+	} else if (vp->v_writecount < 0)
+		vp->v_writecount = 0;
 	VI_UNLOCK(vp);
 
 	if (lvp != NULLVP)
@@ -941,10 +949,14 @@ unionfs_vn_create_on_upper(struct vnode **vpp, struct vnode *udvp,
 		vput(vp);
 		goto unionfs_vn_create_on_upper_free_out1;
 	}
-	VOP_ADD_WRITECOUNT(vp, 1);
+	error = VOP_ADD_WRITECOUNT(vp, 1);
 	CTR3(KTR_VFS, "%s: vp %p v_writecount increased to %d",  __func__, vp,
 	    vp->v_writecount);
-	*vpp = vp;
+	if (error == 0) {
+		*vpp = vp;
+	} else {
+		VOP_CLOSE(vp, fmode, cred, td);
+	}
 
 unionfs_vn_create_on_upper_free_out1:
 	VOP_UNLOCK(udvp, LK_RELEASE);
@@ -974,7 +986,7 @@ unionfs_copyfile_core(struct vnode *lvp, struct vnode *uvp,
 	int		bufoffset;
 	char           *buf;
 	struct uio	uio;
-	kiovec_t	iov;
+	struct iovec	iov;
 
 	error = 0;
 	memset(&uio, 0, sizeof(uio));
@@ -1076,7 +1088,7 @@ unionfs_copyfile(struct unionfs_node *unp, int docopy, struct ucred *cred,
 		}
 	}
 	VOP_CLOSE(uvp, FWRITE, cred, td);
-	VOP_ADD_WRITECOUNT(uvp, -1);
+	VOP_ADD_WRITECOUNT_CHECKED(uvp, -1);
 	CTR3(KTR_VFS, "%s: vp %p v_writecount decreased to %d", __func__, uvp,
 	    uvp->v_writecount);
 
@@ -1117,7 +1129,7 @@ unionfs_check_rmdir(struct vnode *vp, struct ucred *cred, struct thread *td)
 	struct dirent  *dp;
 	struct dirent  *edp;
 	struct uio	uio;
-	kiovec_t	iov;
+	struct iovec	iov;
 
 	ASSERT_VOP_ELOCKED(vp, "unionfs_check_rmdir");
 
@@ -1264,11 +1276,10 @@ unionfs_checklowervp(struct vnode *vp, char *fil, int lno)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

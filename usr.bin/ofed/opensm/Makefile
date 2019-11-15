@@ -99,4 +99,6 @@ CFLAGS+=	-I${_spath:H} -DHAVE_CONFIG_H=1
 CFLAGS+=	-I${SYSROOT:U${DESTDIR}}/${INCLUDEDIR}/infiniband
 LIBADD=		opensm osmvendor osmcomp wrap pthread
 
+WANT_CHERI=	none
+
 .include <bsd.prog.mk>

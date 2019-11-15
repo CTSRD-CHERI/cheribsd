@@ -50,7 +50,7 @@ __unused static void cheri_init_globals(void);
 #include "rtld.h"
 
 void _rtld_do___caprelocs_self(const struct capreloc *start_relocs,
-    const struct capreloc* end_relocs, void *relocbase);
+    const struct capreloc* end_relocs, void *relocbase, Elf_Addr cheri_flags);
 
 /* FIXME: replace this with cheri_init_globals_impl once everyone has updated clang */
 static __attribute__((always_inline))
@@ -63,44 +63,7 @@ void _do___caprelocs(const struct capreloc *start_relocs,
 	    /*code_cap=*/pcc, /*rodata_cap=*/pcc,
 	    /*tight_code_bounds=*/tight_pcc_bounds, base_addr);
 #else
-#pragma message("LLVM cheri_init_globals.h is too old, please update LLVM")
-	(void)base_addr;
-	/*
-	 * XXX: Aux args capabilities have base 0, but mmap gives us a tight
-	 * base. Since reloc->object and (currently) reloc->capability_location
-	 * are now absolute addresses, we must subtract the absolute address of
-	 * gdc to avoid including mapbase twice.
-	 */
-	// vaddr_t mapbase = __builtin_cheri_address_get(gdc);
-	gdc = cheri_clearperm(gdc, DATA_PTR_REMOVE_PERMS);
-	pcc = cheri_clearperm(pcc, FUNC_PTR_REMOVE_PERMS);
-	for (const struct capreloc *reloc = start_relocs; reloc < stop_relocs; reloc++) {
-		_Bool isFunction = (reloc->permissions & function_reloc_flag) ==
-		    function_reloc_flag;
-		void **dest = __builtin_cheri_address_set(
-		    gdc, reloc->capability_location);
-		if (reloc->object == 0) {
-			/*
-			 * XXXAR: clang fills uninitialized capabilities with
-			 * 0xcacaca..., so we we need to explicitly write NUL
-			 * here.
-			 */
-			*dest = (void*)0;
-			continue;
-		}
-		void *src;
-		if (isFunction) {
-			src = cheri_setaddress(pcc, reloc->object);
-			if (tight_pcc_bounds)
-				src = __builtin_cheri_bounds_set(src, reloc->size);
-		} else {
-			src = cheri_setaddress(gdc, reloc->object);
-			if (reloc->size != 0)
-				src = __builtin_cheri_bounds_set(src, reloc->size);
-		}
-		src = __builtin_cheri_offset_increment(src, reloc->offset);
-		*dest = src;
-	}
+#error "LLVM cheri_init_globals.h is too old, please update LLVM"
 #endif
 }
 
@@ -115,12 +78,25 @@ void _do___caprelocs(const struct capreloc *start_relocs,
  */
 void
 _rtld_do___caprelocs_self(const struct capreloc *start_relocs,
-    const struct capreloc* end_relocs, void *relocbase)
+    const struct capreloc* end_relocs, void *relocbase, Elf_Addr cheri_flags)
 {
 	void *pcc = __builtin_cheri_program_counter_get();
 	// TODO: allow using tight bounds for RTLD by passing in the parameter
 	//  from ASM if it was built for the PLT ABI
-	_do___caprelocs(start_relocs, end_relocs, relocbase, pcc, 0, false);
+
+	bool relative_relocs = cheri_flags & DF_MIPS_CHERI_RELATIVE_CAPRELOCS;
+#if CHERI_INIT_GLOBALS_VERSION < 3
+#pragma message("Please update LLVM!")
+	if (relative_relocs) {
+		/* Not possible with the old <cheri_init_globals.h> */
+		__builtin_trap();
+	}
+#endif
+	// If the binary includes the RELATIVE_CAPRELOCS dynamic flag we have
+	// to add getaddr(relocbase) to every __cap_reloc location and object.
+	vaddr_t base_addr = relative_relocs ? cheri_getaddress(relocbase) : 0;
+	_do___caprelocs(
+	    start_relocs, end_relocs, relocbase, pcc, base_addr, false);
 }
 
 void
@@ -148,29 +124,39 @@ process___cap_relocs(Obj_Entry* obj)
 	    (end_relocs - start_relocs), obj->path, code_base, data_base);
 
 	/*
-	 * We currently emit dynamic relocations for the cap_relocs location, so
-	 * they will already have been processed when this function is called.
-	 * This means the load address will already be included in
-	 * reloc->capability_location.
+	 * We have dynamic relocations for the cap_relocs location, unless the
+	 * binary has the DF_MIPS_CHERI_RELATIVE_CAPRELOCS flag set.
+	 * In the non-relative case we do not need to add the base address since
+	 * that value will already have been added by the relocation processing.
 	 */
-#if 0
-	/* TODO: don't emit dynamic relocations for obj->capability_location */
-	vaddr_t base_addr = (vaddr_t)obj->relocbase;
+#if CHERI_INIT_GLOBALS_VERSION < 3
+#pragma message("Please update LLVM!")
+	if (obj->relative_cap_relocs) {
+		rtld_fatal("Not possible with the old <cheri_init_globals.h>");
+	}
+#else
+	if (!obj->relative_cap_relocs) {
+		rtld_fdprintf(STDERR_FILENO,
+		    "File '%s' still uses old __cap_relocs. Please recompile "
+		    "it with a newer toolchain.\n", obj->path);
+	}
 #endif
-	vaddr_t base_addr = 0;
+	// If the binary includes the RELATIVE_CAPRELOCS dynamic flag we have
+	// to add getaddr(relocbase) to every __cap_reloc location and object.
+	vaddr_t base_addr = obj->relative_cap_relocs ? cheri_getaddress(obj->relocbase) : 0;
 
 	_do___caprelocs(start_relocs, end_relocs, data_base, code_base, base_addr,
-	    obj->restrict_pcc_strict);
+	    can_use_tight_pcc_bounds(obj));
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1
 	// TODO: do this later
 	if (obj->per_function_captable) {
 		dbg_cheri_plt("Adding per-function plt stubs for %s", obj->path);
 		for (const struct capreloc *reloc = start_relocs; reloc < end_relocs; reloc++) {
-			_Bool isFunction = (reloc->permissions & function_reloc_flag) == function_reloc_flag;
+			bool isFunction = (reloc->permissions & function_reloc_flag) == function_reloc_flag;
 			if (!isFunction)
 				continue;
 			// TODO: write location as a relative value
-			const void **dest = cheri_incoffset(obj->relocbase, reloc->capability_location - (vaddr_t)obj->relocbase);
+			dlfunc_t *dest = (dlfunc_t*)cheri_setaddress(obj->relocbase, reloc->capability_location);
 			add_cgp_stub_for_local_function(obj, dest);
 		}
 	}

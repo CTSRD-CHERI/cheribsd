@@ -189,8 +189,6 @@
 #define MAX_NUM_MULTICAST_ADDRESSES     128
 #define IXGBE_82598_SCATTER             100
 #define IXGBE_82599_SCATTER             32
-#define MSIX_82598_BAR                  3
-#define MSIX_82599_BAR                  4
 #define IXGBE_TSO_SIZE                  262140
 #define IXGBE_RX_HDR                    128
 #define IXGBE_VFTA_SIZE                 128
@@ -339,7 +337,6 @@ struct rx_ring {
 struct ix_rx_queue {
 	struct adapter		*adapter;
 	u32			msix;           /* This queue's MSIX vector */
-	u32			eims;           /* This queue's EIMS bit */
 	u32			eitr_setting;
 	struct resource		*res;
 	void			*tag;
@@ -442,7 +439,6 @@ struct adapter {
 	 */
 	struct ix_tx_queue	*tx_queues;
 	struct ix_rx_queue	*rx_queues;
-	u64			active_queues;
 
 	/* Multicast array memory */
 	struct ixgbe_mc_addr    *mta;

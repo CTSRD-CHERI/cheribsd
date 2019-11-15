@@ -69,7 +69,9 @@ CRUNCH_SHLIBS+=	-lz
 
 # grep/tar/xz
 CRUNCH_LIBS+=	-llzma
-CRUNCH_LIBS+=	-larchive
+CRUNCH_LIBS+=	-larchive -lprivatezstd
+CRUNCH_SHLIBS+=	-pthread
+
 # ktrace:
 CRUNCH_LIBS+=	-lsysdecode
 
@@ -83,7 +85,9 @@ CRUNCH_LIBS+= -lfetch
 # devinfo
 CRUNCH_LIBS+= -ldevinfo
 # usbconfig
+.if ${MK_USB} != "no"
 CRUNCH_LIBS+= -lusb
+.endif
 
 # netstat needs libkvm (which needs libelf)
 CRUNCH_LIBS+= -lkvm -lelf -lmemstat
@@ -244,7 +248,9 @@ CRUNCH_PROGS_usr.bin+= \
 		tee \
 		tftp \
 		time \
+		timeout \
 		top \
+		touch \
 		tput \
 		tr \
 		true \
@@ -322,8 +328,12 @@ CRUNCH_PROGS_usr.sbin+= \
 		tcpdump \
 		traceroute \
 		traceroute6 \
-		usbconfig \
 		watch
+
+.if ${MK_USB} != "no"
+CRUNCH_PROGS_usr.sbin+= \
+		usbconfig
+.endif
 
 
 # Also build mount_smb for QEMU user-mode smb shares:

@@ -72,10 +72,19 @@ struct dirent {
 	__uint16_t d_namlen;		/* length of string in d_name */
 	__uint16_t d_pad1;
 #if __BSD_VISIBLE
+	/*
+	 * XXXAR: Note: this will usually be less than 255 bytes so csetbounds
+	 * might fail at the end of the buffer.
+	 * This should really be an annotation saying set bounds to
+	 * d_namlen/d_reclen. For now use the VLA approach of only increasing
+	 * the base and setting bounds to min(remaining_len, sizeof(array)).
+	 */
 #define	MAXNAMLEN	255
-	char	d_name[MAXNAMLEN + 1];	/* name must be no longer than this */
+	__subobject_variable_length_maxsize(MAXNAMLEN + 1) char
+	    d_name[MAXNAMLEN + 1]; /* name must be no longer than this */
 #else
-	char	d_name[255 + 1];	/* name must be no longer than this */
+	__subobject_variable_length_maxsize(255 + 1) char
+	    d_name[255 + 1]; /* name must be no longer than this */
 #endif
 };
 
@@ -85,7 +94,7 @@ struct freebsd11_dirent {
 	__uint16_t d_reclen;		/* length of this record */
 	__uint8_t  d_type;		/* file type, see below */
 	__uint8_t  d_namlen;		/* length of string in d_name */
-	char	d_name[255 + 1];	/* name must be no longer than this */
+	__subobject_variable_length_maxsize(255 + 1) char	d_name[255 + 1];	/* name must be no longer than this */
 };
 #endif /* _WANT_FREEBSD11_DIRENT || _KERNEL */
 

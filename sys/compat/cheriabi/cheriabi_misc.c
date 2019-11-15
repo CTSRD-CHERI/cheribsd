@@ -123,17 +123,22 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_util.h>
 #if 0
 #include <compat/cheriabi/cheriabi_ipc.h>
-#include <compat/cheriabi/cheriabi_misc.h>
 #endif
+#include <compat/cheriabi/cheriabi_misc.h>
 #include <compat/cheriabi/cheriabi_signal.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
 
-#include <sys/cheriabi.h>
-
 MALLOC_DECLARE(M_KQUEUE);
 
 FEATURE(compat_cheri_abi, "Compatible CHERI system call ABI");
+
+struct sf_hdtr_c {
+	struct iovec_c * __capability headers;	/* pointer to an array of header struct iovec's */
+	int hdr_cnt;		/* number of header iovec's */
+	struct iovec_c * __capability trailers;	/* pointer to an array of trailer struct iovec's */
+	int trl_cnt;		/* number of trailer iovec's */
+};
 
 #ifdef CHERIABI_NEEDS_UPDATE
 CTASSERT(sizeof(struct kevent32) == 20);
@@ -295,7 +300,7 @@ int
 cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
     struct uio **uiop)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	struct uio *uio;
 	size_t iovlen;
 	int error, i;
@@ -303,9 +308,9 @@ cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(kiovec_t);
+	iovlen = iovcnt * sizeof(struct iovec);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (kiovec_t *)(uio + 1);
+	iov = (struct iovec *)(uio + 1);
 	error = copyincap(iovp, iov, iovlen);
 	if (error) {
 		free(uio, M_IOV);
@@ -329,15 +334,15 @@ cheriabi_copyinuio(struct iovec_c * __capability iovp, u_int iovcnt,
 
 int
 cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
-    kiovec_t **iovp, int error)
+    struct iovec **iovp, int error)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	u_int iovlen;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof(kiovec_t);
+	iovlen = iovcnt * sizeof(struct iovec);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
 	error = copyincap(iovp_c, iov, iovlen);
 	if (error) {
@@ -350,7 +355,7 @@ cheriabi_copyiniov(struct iovec_c * __capability iovp_c, u_int iovcnt,
 
 static int
 cheriabi_copyin_hdtr(const struct sf_hdtr_c * __capability uhdtr,
-    ksf_hdtr_t *hdtr)
+    struct sf_hdtr *hdtr)
 {
 
 	return(copyincap(uhdtr, hdtr, sizeof(*hdtr)));
@@ -600,18 +605,33 @@ cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd)
  * create both types of capabilities (and currently creates W|X caps).
  * Its use should be replaced.
  */
-#define sucap(uaddr, base, offset, length, perms)			\
-	do {								\
-		void * __capability _tmpcap;				\
-		_tmpcap = cheri_capability_build_user_rwx((perms),	\
-		    (base), (length), (offset));			\
-		KASSERT(cheri_gettag(_tmpcap), ("%s:%d: Created "	\
-		     "invalid cap from base=%zx, offset=%#zx, "		\
-		     "length=%#zx, perms=%#zx", __func__, __LINE__,	\
-		     (size_t)(base), (size_t)(offset),			\
-		     (size_t)(length), (size_t)(perms)));		\
-		copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));		\
-	} while(0)
+#define sucap(uaddr, base, offset, length, what, perms)	\
+    _sucap(uaddr, (base), (offset), (length), (perms), what, __func__, __LINE__)
+
+static void
+_sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
+    uint64_t perms, const char *what, const char *func, int line)
+{
+	void *__capability _tmpcap;
+	size_t rounded_length = CHERI_REPRESENTABLE_LENGTH(length);
+	vaddr_t rounded_base = CHERI_REPRESENTABLE_BASE(base, length);
+	if (rounded_length != length)
+		printf("%s:%d rounding size of unrepresentable %s from %zd to "
+		    "%zd\n", func, line, what, length, rounded_length);
+	if (rounded_base != base) {
+		printf("%s:%d aligning base of unrepresentable %s from"
+		       " 0x%zx to 0x%zx and adjusting offset by %zd\n", func,
+		       line, what, base, rounded_base, base - rounded_base);
+		/* We have to adjust the offset by the difference */
+		offset += base - rounded_base;
+	}
+	_tmpcap = cheri_capability_build_user_rwx(
+	    perms, rounded_base, rounded_length, offset);
+	KASSERT(cheri_gettag(_tmpcap),("%s:%d: Created invalid cap "
+	     "from base=%zx, offset=%#zx, length=%#zx, perms=%#zx", func,
+	     line, base, offset, length, (size_t)(perms)));
+	copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));
+}
 
 register_t *
 cheriabi_copyout_strings(struct image_params *imgp)
@@ -732,7 +752,8 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	sucap(&arginfo->ps_argvstr, cheri_getaddress(vectp), 0,
-	    argc * sizeof(void * __capability), CHERI_CAP_USER_DATA_PERMS);
+	    argc * sizeof(void * __capability), "argv",
+	    CHERI_CAP_USER_DATA_PERMS);
 	suword32(&arginfo->ps_nargvstr, argc);
 
 	/*
@@ -741,7 +762,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	imgp->args->argv = (__cheri_fromcap void *)vectp;
 	for (; argc > 0; --argc) {
 		sucap(vectp++, cheri_getaddress(destp), 0, strlen(stringp) + 1,
-		    CHERI_CAP_USER_DATA_PERMS);
+		    "command line argument", CHERI_CAP_USER_DATA_PERMS);
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
@@ -752,7 +773,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	suword(vectp++, 0);
 
 	sucap(&arginfo->ps_envstr, cheri_getaddress(vectp), 0,
-	    arginfo->ps_nenvstr * sizeof(void * __capability),
+	    arginfo->ps_nenvstr * sizeof(void * __capability), "envv",
 	    CHERI_CAP_USER_DATA_PERMS);
 	suword32(&arginfo->ps_nenvstr, envc);
 
@@ -762,7 +783,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	imgp->args->envv = (__cheri_fromcap void *)vectp;
 	for (; envc > 0; --envc) {
 		sucap(vectp++, cheri_getaddress(destp), 0, strlen(stringp) + 1,
-		    CHERI_CAP_USER_DATA_PERMS);
+		    "environment variable", CHERI_CAP_USER_DATA_PERMS);
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
@@ -779,7 +800,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	{suword(pos++, id); suword(pos++, val);}
 #define	AUXARGS_ENTRY_CAP(pos, id, base, offset, len, perm) do {	\
 		suword(pos++, id);					\
-		sucap(pos++, base, offset, len, perm);			\
+		sucap(pos++, base, offset, len, #id, perm);		\
 	} while(0)
 
 static void
@@ -792,21 +813,25 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 
 	/* printf("%s: start=%#lx, end=%#lx, base=%#lx, interp_end=%#lx\n", __func__,
 		imgp->start_addr, imgp->end_addr, args->base, imgp->interp_end); */
-	prog_base = rounddown2(imgp->start_addr,
-	    1ULL << CHERI_ALIGN_SHIFT(imgp->start_addr));
-	prog_len = roundup2(imgp->end_addr - prog_base,
-	    1ULL << CHERI_ALIGN_SHIFT(imgp->end_addr - prog_base));
+	prog_base = imgp->start_addr;
+	prog_len = imgp->end_addr - prog_base;
+	/* Ensure program base and length are representable: */
+	prog_base = CHERI_REPRESENTABLE_BASE(prog_base, prog_len);
+	prog_len = CHERI_REPRESENTABLE_LENGTH(prog_len);
+	KASSERT(prog_len != 0, ("prog_len overflowed: %ld",
+	    (long)(imgp->end_addr - imgp->start_addr)));
 
 
-	if (imgp->interp_end) {
-		rtld_base = rounddown2(args->base,
-		    1ULL << CHERI_ALIGN_SHIFT(args->base));
-		rtld_len = roundup2(imgp->interp_end - rtld_base,
-		    1ULL << CHERI_ALIGN_SHIFT(imgp->interp_end - rtld_base));
-	} else {
-		rtld_base = prog_base;
-		rtld_len = prog_len;
+	if (!imgp->interp_end) {
+		imgp->interp_end = imgp->end_addr;
 	}
+	rtld_base = args->base;
+	rtld_len = imgp->interp_end - rtld_base;
+	/* Ensure rtld base and length are representable: */
+	rtld_base = CHERI_REPRESENTABLE_BASE(rtld_base, rtld_len);
+	rtld_len = CHERI_REPRESENTABLE_LENGTH(rtld_len);
+	KASSERT(rtld_len != 0, ("rtld_len overflowed: %ld",
+	    (long)(imgp->interp_end - args->base)));
 
 	if (args->execfd != -1)
 		AUXARGS_ENTRY_NOCAP(pos, AT_EXECFD, args->execfd);
@@ -826,8 +851,8 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 	/*
 	 * XXX-BD: grant code and data perms to allow textrel fixups.
 	 */
-	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, 0, rtld_len,
-	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
+	AUXARGS_ENTRY_CAP(pos, AT_BASE, rtld_base, args->base - rtld_base,
+	    rtld_len, CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS);
 	AUXARGS_ENTRY_NOCAP(pos, AT_EHDRFLAGS, args->hdr_eflags);
 	if (imgp->execpathp != 0)
 		AUXARGS_ENTRY_CAP(pos, AT_EXECPATH, imgp->execpathp, 0,
@@ -1446,6 +1471,23 @@ cheriabi___sysctl(struct thread *td, struct cheriabi___sysctl_args *uap)
 	    uap->oldlenp, uap->new, uap->newlen, SCTL_CHERIABI));
 }
 
+int
+cheriabi___sysctlbyname(struct thread *td,
+    struct cheriabi___sysctlbyname_args *uap)
+{
+	size_t rv;
+	int error;
+
+	error = kern___sysctlbyname(td, uap->name, uap->namelen, uap->old,
+	    uap->oldlenp, uap->new, uap->newlen, &rv, 0, 0);
+	if (error != 0)
+		return (error);
+	if (uap->oldlenp != NULL)
+		error = copyout(&rv, uap->oldlenp, sizeof(rv));
+
+	return (error);
+}
+
 /*
  * kern_thr.c
  */
@@ -1777,21 +1819,21 @@ int
 cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 {
 	union {
-		struct ptrace_io_desc piod;
+		struct ptrace_io_desc_c piod;
 		struct ptrace_lwpinfo pl;
 		struct ptrace_vm_entry_c pve;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		struct capreg capreg;
 #endif
 		struct dbreg dbreg;
 		struct fpreg fpreg;
 		struct reg reg;
-		char args[nitems(td->td_sa.args) * sizeof(register_t)];
+		syscallarg_t args[nitems(td->td_sa.args)];
+		struct ptrace_sc_ret psr;
 		int ptevents;
 	} r = { 0 };
 
 	union {
-		struct ptrace_io_desc_c piod;
 		struct ptrace_lwpinfo_c pl;
 	} c = { 0 };
 
@@ -1820,11 +1862,12 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_GETREGS:
 	case PT_GETFPREGS:
 	case PT_GETDBREGS:
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_GETCAPREGS:
 #endif
 	case PT_GETNUMLWPS:
 	case PT_GET_SC_ARGS:
+	case PT_GET_SC_RET:
 	case PT_LWP_EVENTS:
 	case PT_SUSPEND:
 		break;
@@ -1845,7 +1888,12 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 		addr = cheri_cleartag(uap->addr);
 		break;
 
-#ifdef CPU_CHERI
+	/* Pass along 'addr' unmodified. */
+	case PT_GETLWPLIST:
+		addr = uap->addr;
+		break;
+
+#if __has_feature(capabilities)
 	/*
 	 * XXXNWF Prohibited at the moment, because we have no sane way of
 	 * conveying tags through the kernel.
@@ -1872,11 +1920,11 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 			error = copyin(uap->addr, &r.ptevents, uap->data);
 		break;
 
+	case PT_IO:
+		error = copyincap(uap->addr, (char *)&r.piod, sizeof(r.piod));
+		break;
 	case PT_VM_ENTRY:
 		error = copyincap(uap->addr, (char *)&r.pve, sizeof r.pve);
-		if (error)
-			break;
-
 		break;
 
 #if 0
@@ -1884,7 +1932,6 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_READ_D:
 	case PT_WRITE_I:
 	case PT_WRITE_D:
-	case PT_IO:
 		// XXX TODO
 		break;
 	default:
@@ -1909,9 +1956,17 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_VM_ENTRY:
 		error = COPYOUT(&r.pve, uap->addr, sizeof r.pve);
 		break;
+#endif
 	case PT_IO:
-		error = COPYOUT(&r.piod, uap->addr, sizeof r.piod);
+		/*
+		 * Only copy out the updated piod_len to avoid the use
+		 * of copyoutcap.
+		 */
+		error = copyout(&r.piod.piod_len, uap->addr +
+		    offsetof(struct ptrace_io_desc_c, piod_len),
+		    sizeof(r.piod.piod_len));
 		break;
+#if 0
 	case PT_GETREGS:
 		error = COPYOUT(&r.reg, uap->addr, sizeof r.reg);
 		break;
@@ -1921,7 +1976,7 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 	case PT_GETDBREGS:
 		error = COPYOUT(&r.dbreg, uap->addr, sizeof r.dbreg);
 		break;
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	case PT_GETCAPREGS:
 		error = COPYOUT(&r.capreg, uap->addr, sizeof r.capreg);
 		break;
@@ -1947,12 +2002,14 @@ cheriabi_ptrace(struct thread *td, struct cheriabi_ptrace_args *uap)
 
 		error = copyout(&c.pl, uap->addr, uap->data);
 		break;
-#if 0
 	case PT_GET_SC_ARGS:
 		error = copyout(r.args, uap->addr, MIN(uap->data,
 		    sizeof(r.args)));
 		break;
-#endif
+	case PT_GET_SC_RET:
+		error = copyout(&r.psr, uap->addr, MIN(uap->data,
+		    sizeof(r.psr)));
+		break;
 	default:
 		break;
 	}

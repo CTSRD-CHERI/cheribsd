@@ -140,7 +140,7 @@ struct coder {
 };
 
 struct file {
-	struct archive_rb_node	 rbnode;
+	struct archive_rb_node	 rbnode __subobject_member_used_for_c_inheritance;
 
 	struct file		*next;
 	unsigned		 name_len;

@@ -19,6 +19,7 @@
 // XFAIL: with_system_cxx_lib=macosx10.9
 // XFAIL: with_system_cxx_lib=macosx10.8
 // XFAIL: with_system_cxx_lib=macosx10.7
+// FLAKY_TEST.
 
 // <thread>
 

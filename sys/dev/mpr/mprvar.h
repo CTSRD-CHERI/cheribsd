@@ -34,6 +34,9 @@
 #ifndef _MPRVAR_H
 #define _MPRVAR_H
 
+#include <sys/lock.h>
+#include <sys/mutex.h>
+
 #define MPR_DRIVER_VERSION	"23.00.00.00-fbsd"
 
 #define MPR_DB_MAX_WAIT		2500
@@ -247,7 +250,7 @@ struct mpr_command {
 	u_int				cm_length;
 	u_int				cm_out_len;
 	struct uio			cm_uio;
-	kiovec_t			cm_iovec[MPR_IOVEC_COUNT];
+	struct iovec			cm_iovec[MPR_IOVEC_COUNT];
 	u_int				cm_max_segs;
 	u_int				cm_sglsize;
 	void				*cm_sge;
@@ -272,11 +275,12 @@ struct mpr_command {
 #define	MPR_CM_FLAGS_ERROR_MASK		MPR_CM_FLAGS_CHAIN_FAILED
 #define	MPR_CM_FLAGS_USE_CCB		(1 << 9)
 #define	MPR_CM_FLAGS_SATA_ID_TIMEOUT	(1 << 10)
+#define MPR_CM_FLAGS_ON_RECOVERY	(1 << 12)
+#define MPR_CM_FLAGS_TIMEDOUT		(1 << 13)
 	u_int				cm_state;
 #define MPR_CM_STATE_FREE		0
 #define MPR_CM_STATE_BUSY		1
-#define MPR_CM_STATE_TIMEDOUT		2
-#define MPR_CM_STATE_INQUEUE		3
+#define MPR_CM_STATE_INQUEUE		2
 	bus_dmamap_t			cm_dmamap;
 	struct scsi_sense_data		*cm_sense;
 	uint64_t			*nvme_error_response;
@@ -983,13 +987,3 @@ struct unmap_parm_list {
 #define SCSI_ASCQ_INVALID_LUN_ID                        0x09
 
 #endif
-
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "header",
-//   "changes": [
-//     "kiovec_t"
-//   ]
-// }
-// CHERI CHANGES END

@@ -83,14 +83,14 @@ NESTED_NOPROFILE(__cerror, CALLFRAME_SIZ, ra)
 
 	j		ra
 #else
+	PIC_PROLOGUE(__cerror)
 	/* XXXRW: CFI annotations for debugger. */
-	daddiu		t0, zero, -CALLFRAME_SIZ
-	cincoffset	$csp, $csp, t0
+	cincoffset	$csp, $csp, -CALLFRAME_SIZ
 
 	csc		$c17, zero, CALLFRAME_CRA($csp)
 	csd		v0, zero, CALLFRAME_S0($csp)	# save errno ptr
 
-	PIC_CALL(__error)	# locate address of errno
+	PIC_CALL_LOCAL(__error)	# locate address of errno
 
 	cld		t0, zero, CALLFRAME_S0($csp)	# reload saved errno ptr
 	csw		t0, zero, 0($c3)		# save in errno

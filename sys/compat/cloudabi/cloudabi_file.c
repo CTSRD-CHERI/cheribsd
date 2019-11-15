@@ -379,7 +379,7 @@ int
 cloudabi_sys_file_readdir(struct thread *td,
     struct cloudabi_sys_file_readdir_args *uap)
 {
-	kiovec_t iov;
+	struct iovec iov;
 	IOVEC_INIT(&iov, uap->buf, uap->buf_len);
 	struct uio uio = {
 		.uio_iov = &iov,
@@ -415,7 +415,7 @@ cloudabi_sys_file_readdir(struct thread *td,
 	offset = uap->cookie;
 	vp = fp->f_vnode;
 	while (uio.uio_resid > 0) {
-		kiovec_t readiov;
+		struct iovec readiov;
 		IOVEC_INIT(&readiov, readbuf, MAXBSIZE);
 		struct uio readuio = {
 			.uio_iov = &readiov,
@@ -771,11 +771,10 @@ cloudabi_sys_file_unlink(struct thread *td,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190429,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities"
 //   ]
 // }

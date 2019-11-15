@@ -1603,7 +1603,7 @@ probe_device_check:
 				start = strspn(serial_buf->serial_num, " ");
 				slen = serial_buf->length - start;
 				if (slen <= 0) {
-					/* 
+					/*
 					 * SPC5r05 says that an all-space serial
 					 * number means no product serial number
 					 * is available
@@ -1684,8 +1684,9 @@ probe_device_check:
 	case PROBE_TUR_FOR_NEGOTIATION:
 	case PROBE_DV_EXIT:
 		if (cam_ccb_status(done_ccb) != CAM_REQ_CMP) {
-			cam_periph_error(done_ccb, 0,
-			    SF_NO_PRINT | SF_NO_RECOVERY | SF_NO_RETRY);
+			if (cam_periph_error(done_ccb, 0, SF_NO_PRINT |
+			    SF_NO_RECOVERY | SF_NO_RETRY) == ERESTART)
+				goto outr;
 		}
 		if ((done_ccb->ccb_h.status & CAM_DEV_QFRZN) != 0) {
 			/* Don't wedge the queue */
@@ -1735,8 +1736,9 @@ probe_device_check:
 		struct ccb_scsiio *csio;
 
 		if (cam_ccb_status(done_ccb) != CAM_REQ_CMP) {
-			cam_periph_error(done_ccb, 0,
-			    SF_NO_PRINT | SF_NO_RECOVERY | SF_NO_RETRY);
+			if (cam_periph_error(done_ccb, 0, SF_NO_PRINT |
+			    SF_NO_RECOVERY | SF_NO_RETRY) == ERESTART)
+				goto outr;
 		}
 		if ((done_ccb->ccb_h.status & CAM_DEV_QFRZN) != 0) {
 			/* Don't wedge the queue */
@@ -2116,7 +2118,7 @@ scsi_scan_bus(struct cam_periph *periph, union ccb *request_ccb)
 			CAM_GET_LUN(target->luns, 0, first);
 			if (first == 0 && scan_info->lunindex[target_id] == 0) {
 				scan_info->lunindex[target_id]++;
-			} 
+			}
 
 			/*
 			 * Skip any LUNs that the HBA can't deal with.
@@ -2513,6 +2515,7 @@ scsi_dev_advinfo(union ccb *start_ccb)
 	struct ccb_dev_advinfo *cdai;
 	off_t amt;
 
+	xpt_path_assert(start_ccb->ccb_h.path, MA_OWNED);
 	start_ccb->ccb_h.status = CAM_REQ_INVALID;
 	device = start_ccb->ccb_h.path->device;
 	cdai = &start_ccb->cdai;
@@ -2601,7 +2604,7 @@ scsi_dev_advinfo(union ccb *start_ccb)
 		 * We fetch extended inquiry data during probe, if
 		 * available.  We don't allow changing it.
 		 */
-		if (cdai->flags & CDAI_FLAG_STORE) 
+		if (cdai->flags & CDAI_FLAG_STORE)
 			return;
 		cdai->provsiz = device->ext_inq_len;
 		if (device->ext_inq_len == 0)
@@ -2993,7 +2996,7 @@ scsi_dev_async(u_int32_t async_code, struct cam_eb *bus, struct cam_et *target,
 		 */
 		if (async_code == AC_SENT_BDR
 		 || async_code == AC_BUS_RESET) {
-			cam_freeze_devq(&newpath); 
+			cam_freeze_devq(&newpath);
 			cam_release_devq(&newpath,
 				RELSIM_RELEASE_AFTER_TIMEOUT,
 				/*reduction*/0,
@@ -3051,7 +3054,7 @@ _scsi_announce_periph(struct cam_periph *periph, u_int *speed, u_int *freq, stru
 	cpi.ccb_h.func_code = XPT_PATH_INQ;
 	xpt_action((union ccb *)&cpi);
 
-	/* Report connection speed */ 
+	/* Report connection speed */
 	*speed = cpi.base_transfer_speed;
 	*freq = 0;
 

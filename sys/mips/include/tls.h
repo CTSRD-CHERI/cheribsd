@@ -59,7 +59,7 @@
 #define TLS_TCB_SIZE32	8
 #endif
 #ifdef COMPAT_CHERIABI
-#define	TLS_TCB_SIZE_C	(2*sizeof(struct chericap))
+#define	TLS_TCB_SIZE_C	(2 * __SIZEOF_CHERI_CAPABILITY__)
 #endif
 #else
 #define TLS_TCB_SIZE	8

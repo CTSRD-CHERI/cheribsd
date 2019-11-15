@@ -141,7 +141,7 @@ extern u_int		aju_cons_jtag_missed;
 /*
  * Base physical address of the JTAG UART in BERI.
  */
-#define	BERI_UART_BASE		0x7f000000	/* JTAG UART */
+#define	BERI_UART_BASE		0xff7f000000	/* JTAG UART */
 
 /*-
  * Routines for interacting with the BERI console JTAG UART.  Programming

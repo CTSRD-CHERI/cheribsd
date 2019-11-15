@@ -66,6 +66,7 @@
 #include <sys/param.h>
 #endif
 
+#include <inttypes.h>
 #ifdef HAVE_LIMITS_H
 #include <limits.h>
 #endif

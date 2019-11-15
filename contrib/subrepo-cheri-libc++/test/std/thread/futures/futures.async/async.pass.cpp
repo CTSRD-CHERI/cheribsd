@@ -96,9 +96,9 @@ void test(CheckLamdba&& getAndCheckFn, bool IsDeferred, Args&&... args) {
     // If the async is deferred it should take more than 100ms, otherwise
     // it should take less than 100ms.
     if (IsDeferred) {
-        assert(t1-t0 > ms(100));
+        assert(t1-t0 > ms(TEST_SLOW_HOST() ? 300 : 100));
     } else {
-        assert(t1-t0 < ms(100));
+        assert(t1-t0 < ms(TEST_SLOW_HOST() ? 300 : 100));
     }
 }
 
@@ -142,12 +142,12 @@ int main(int, char**)
 #ifndef TEST_HAS_NO_EXCEPTIONS
     {
         std::future<void> f = std::async(f5, 3);
-        std::this_thread::sleep_for(ms(300));
+        std::this_thread::sleep_for(ms(TEST_SLOW_HOST() ? 500 : 300));
         try { f.get(); assert (false); } catch ( int ) {}
     }
     {
         std::future<void> f = std::async(std::launch::deferred, f5, 3);
-        std::this_thread::sleep_for(ms(300));
+        std::this_thread::sleep_for(ms(TEST_SLOW_HOST() ? 500 : 300));
         try { f.get(); assert (false); } catch ( int ) {}
     }
 #endif

@@ -58,9 +58,12 @@ __FBSDID("$FreeBSD$");
 
 #include "bcm2835_dma.h"
 #include <arm/broadcom/bcm2835/bcm2835_mbox_prop.h>
-#include "bcm2835_vcbus.h"
+#ifdef NOTYET
+#include <arm/broadcom/bcm2835/bcm2835_clkman.h>
+#endif
 
 #define	BCM2835_DEFAULT_SDHCI_FREQ	50
+#define	BCM2838_DEFAULT_SDHCI_FREQ	100
 
 #define	BCM_SDHCI_BUFFER_SIZE		512
 #define	NUM_DMA_SEGS			2
@@ -84,10 +87,39 @@ SYSCTL_INT(_hw_sdhci, OID_AUTO, bcm2835_sdhci_debug, CTLFLAG_RWTUN,
 static int bcm2835_sdhci_hs = 1;
 static int bcm2835_sdhci_pio_mode = 0;
 
+struct bcm_mmc_conf {
+	int	clock_id;
+	int	clock_src;
+	int	default_freq;
+	int	quirks;
+	bool	use_dma;
+};
+
+struct bcm_mmc_conf bcm2835_sdhci_conf = {
+	.clock_id	= BCM2835_MBOX_CLOCK_ID_EMMC,
+	.clock_src	= -1,
+	.default_freq	= BCM2835_DEFAULT_SDHCI_FREQ,
+	.quirks		= SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
+	    SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | SDHCI_QUIRK_DONT_SET_HISPD_BIT |
+	    SDHCI_QUIRK_MISSING_CAPS,
+	.use_dma	= true
+};
+
+struct bcm_mmc_conf bcm2838_emmc2_conf = {
+	.clock_id	= BCM2838_MBOX_CLOCK_ID_EMMC2,
+	.clock_src	= -1,
+	.default_freq	= BCM2838_DEFAULT_SDHCI_FREQ,
+	.quirks		= 0,
+	/* XXX DMA is currently broken, but it shouldn't be. */
+	.use_dma	= false
+};
+
 static struct ofw_compat_data compat_data[] = {
-	{"broadcom,bcm2835-sdhci",	1},
-	{"brcm,bcm2835-sdhci",		1},
-	{"brcm,bcm2835-mmc",		1},
+	{"broadcom,bcm2835-sdhci",	(uintptr_t)&bcm2835_sdhci_conf},
+	{"brcm,bcm2835-sdhci",		(uintptr_t)&bcm2835_sdhci_conf},
+	{"brcm,bcm2835-mmc",		(uintptr_t)&bcm2835_sdhci_conf},
+	{"brcm,bcm2711-emmc2",		(uintptr_t)&bcm2838_emmc2_conf},
+	{"brcm,bcm2838-emmc2",		(uintptr_t)&bcm2838_emmc2_conf},
 	{NULL,				0}
 };
 
@@ -107,12 +139,18 @@ struct bcm_sdhci_softc {
 	bus_dma_tag_t		sc_dma_tag;
 	bus_dmamap_t		sc_dma_map;
 	vm_paddr_t		sc_sdhci_buffer_phys;
-	uint32_t		cmd_and_mode;
 	bus_addr_t		dmamap_seg_addrs[NUM_DMA_SEGS];
 	bus_size_t		dmamap_seg_sizes[NUM_DMA_SEGS];
 	int			dmamap_seg_count;
 	int			dmamap_seg_index;
 	int			dmamap_status;
+	uint32_t		blksz_and_count;
+	uint32_t		cmd_and_mode;
+	bool			need_update_blk;
+#ifdef NOTYET
+	device_t		clkman;
+#endif
+	struct bcm_mmc_conf *	conf;
 };
 
 static int bcm_sdhci_probe(device_t);
@@ -166,8 +204,12 @@ bcm_sdhci_attach(device_t dev)
 	sc->sc_dev = dev;
 	sc->sc_req = NULL;
 
-	err = bcm2835_mbox_set_power_state(BCM2835_MBOX_POWER_ID_EMMC,
-	    TRUE);
+	sc->conf = (struct bcm_mmc_conf *)ofw_bus_search_compatible(dev,
+	    compat_data)->ocd_data;
+	if (sc->conf == 0)
+	    return (ENXIO);
+
+	err = bcm2835_mbox_set_power_state(BCM2835_MBOX_POWER_ID_EMMC, TRUE);
 	if (err != 0) {
 		if (bootverbose)
 			device_printf(dev, "Unable to enable the power\n");
@@ -175,8 +217,7 @@ bcm_sdhci_attach(device_t dev)
 	}
 
 	default_freq = 0;
-	err = bcm2835_mbox_get_clock_rate(BCM2835_MBOX_CLOCK_ID_EMMC,
-	    &default_freq);
+	err = bcm2835_mbox_get_clock_rate(sc->conf->clock_id, &default_freq);
 	if (err == 0) {
 		/* Convert to MHz */
 		default_freq /= 1000000;
@@ -188,10 +229,27 @@ bcm_sdhci_attach(device_t dev)
 			default_freq = cell / 1000000;
 	}
 	if (default_freq == 0)
-		default_freq = BCM2835_DEFAULT_SDHCI_FREQ;
+		default_freq = sc->conf->default_freq;
 
 	if (bootverbose)
 		device_printf(dev, "SDHCI frequency: %dMHz\n", default_freq);
+#ifdef NOTYET
+	if (sc->conf->clock_src > 0) {
+		uint32_t f;
+		sc->clkman = devclass_get_device(devclass_find("bcm2835_clkman"), 0);
+		if (sc->clkman == NULL) {
+			device_printf(dev, "cannot find Clock Manager\n");
+			return (ENXIO);
+		}
+
+		f = bcm2835_clkman_set_frequency(sc->clkman, sc->conf->clock_src, default_freq);
+		if (f == 0)
+			return (EINVAL);
+
+		if (bootverbose)
+			device_printf(dev, "Clock source frequency: %dMHz\n", f);
+	}
+#endif
 
 	rid = 0;
 	sc->sc_mem_res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
@@ -207,7 +265,7 @@ bcm_sdhci_attach(device_t dev)
 
 	rid = 0;
 	sc->sc_irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
-	    RF_ACTIVE);
+	    RF_ACTIVE | RF_SHAREABLE);
 	if (!sc->sc_irq_res) {
 		device_printf(dev, "cannot allocate interrupt\n");
 		err = ENXIO;
@@ -228,36 +286,39 @@ bcm_sdhci_attach(device_t dev)
 	if (bcm2835_sdhci_hs)
 		sc->sc_slot.caps |= SDHCI_CAN_DO_HISPD;
 	sc->sc_slot.caps |= (default_freq << SDHCI_CLOCK_BASE_SHIFT);
-	sc->sc_slot.quirks = SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK 
-		| SDHCI_QUIRK_BROKEN_TIMEOUT_VAL
-		| SDHCI_QUIRK_DONT_SET_HISPD_BIT
-		| SDHCI_QUIRK_MISSING_CAPS;
+	sc->sc_slot.quirks = sc->conf->quirks;
  
 	sdhci_init_slot(dev, &sc->sc_slot, 0);
 
-	sc->sc_dma_ch = bcm_dma_allocate(BCM_DMA_CH_ANY);
-	if (sc->sc_dma_ch == BCM_DMA_CH_INVALID)
-		goto fail;
+	if (sc->conf->use_dma) {
+		sc->sc_dma_ch = bcm_dma_allocate(BCM_DMA_CH_ANY);
+		if (sc->sc_dma_ch == BCM_DMA_CH_INVALID)
+			goto fail;
 
-	bcm_dma_setup_intr(sc->sc_dma_ch, bcm_sdhci_dma_intr, sc);
+		if (bcm_dma_setup_intr(sc->sc_dma_ch, bcm_sdhci_dma_intr, sc) != 0) {
+			device_printf(dev, "cannot setup dma interrupt handler\n");
+			err = ENXIO;
+			goto fail;
+		}
 
-	/* Allocate bus_dma resources. */
-	err = bus_dma_tag_create(bus_get_dma_tag(dev),
-	    1, 0, BUS_SPACE_MAXADDR_32BIT,
-	    BUS_SPACE_MAXADDR, NULL, NULL,
-	    BCM_SDHCI_BUFFER_SIZE, NUM_DMA_SEGS, BCM_SDHCI_BUFFER_SIZE,
-	    BUS_DMA_ALLOCNOW, NULL, NULL,
-	    &sc->sc_dma_tag);
+		/* Allocate bus_dma resources. */
+		err = bus_dma_tag_create(bus_get_dma_tag(dev),
+		    1, 0, BUS_SPACE_MAXADDR_32BIT,
+		    BUS_SPACE_MAXADDR, NULL, NULL,
+		    BCM_SDHCI_BUFFER_SIZE, NUM_DMA_SEGS, BCM_SDHCI_BUFFER_SIZE,
+		    BUS_DMA_ALLOCNOW, NULL, NULL,
+		    &sc->sc_dma_tag);
 
-	if (err) {
-		device_printf(dev, "failed allocate DMA tag");
-		goto fail;
-	}
+		if (err) {
+			device_printf(dev, "failed allocate DMA tag");
+			goto fail;
+		}
 
-	err = bus_dmamap_create(sc->sc_dma_tag, 0, &sc->sc_dma_map);
-	if (err) {
-		device_printf(dev, "bus_dmamap_create failed\n");
-		goto fail;
+		err = bus_dmamap_create(sc->sc_dma_tag, 0, &sc->sc_dma_map);
+		if (err) {
+			device_printf(dev, "bus_dmamap_create failed\n");
+			goto fail;
+		}
 	}
 
 	/* FIXME: Fix along with other BUS_SPACE_PHYSADDR instances */
@@ -268,6 +329,10 @@ bcm_sdhci_attach(device_t dev)
 	bus_generic_attach(dev);
 
 	sdhci_start_slot(&sc->sc_slot);
+
+	/* Seed our copies. */
+	sc->blksz_and_count = SDHCI_READ_4(dev, &sc->sc_slot, SDHCI_BLOCK_SIZE);
+	sc->cmd_and_mode = SDHCI_READ_4(dev, &sc->sc_slot, SDHCI_TRANSFER_MODE);
 
 	return (0);
 
@@ -338,17 +403,21 @@ static uint16_t
 bcm_sdhci_read_2(device_t dev, struct sdhci_slot *slot, bus_size_t off)
 {
 	struct bcm_sdhci_softc *sc = device_get_softc(dev);
-	uint32_t val = RD4(sc, off & ~3);
+	uint32_t val32;
 
 	/*
-	 * Standard 32-bit handling of command and transfer mode.
+	 * Standard 32-bit handling of command and transfer mode, as
+	 * well as block size and count.
 	 */
-	if (off == SDHCI_TRANSFER_MODE) {
-		return (sc->cmd_and_mode >> 16);
-	} else if (off == SDHCI_COMMAND_FLAGS) {
-		return (sc->cmd_and_mode & 0x0000ffff);
-	}
-	return ((val >> (off & 3)*8) & 0xffff);
+	if ((off == SDHCI_BLOCK_SIZE || off == SDHCI_BLOCK_COUNT) &&
+	    sc->need_update_blk)
+		val32 = sc->blksz_and_count;
+	else if (off == SDHCI_TRANSFER_MODE || off == SDHCI_COMMAND_FLAGS)
+		val32 = sc->cmd_and_mode;
+	else
+		val32 = RD4(sc, off & ~3);
+
+	return ((val32 >> (off & 3)*8) & 0xffff);
 }
 
 static uint32_t
@@ -383,18 +452,43 @@ bcm_sdhci_write_2(device_t dev, struct sdhci_slot *slot, bus_size_t off, uint16_
 {
 	struct bcm_sdhci_softc *sc = device_get_softc(dev);
 	uint32_t val32;
-	if (off == SDHCI_COMMAND_FLAGS)
+
+	/*
+	 * If we have a queued up 16bit value for blk size or count, use and
+	 * update the saved value rather than doing any real register access.
+	 * If we did not touch either since the last write, then read from
+	 * register as at least block count can change.
+	 * Similarly, if we are about to issue a command, always use the saved
+	 * value for transfer mode as we can never write that without issuing
+	 * a command.
+	 */
+	if ((off == SDHCI_BLOCK_SIZE || off == SDHCI_BLOCK_COUNT) &&
+	    sc->need_update_blk)
+		val32 = sc->blksz_and_count;
+	else if (off == SDHCI_COMMAND_FLAGS)
 		val32 = sc->cmd_and_mode;
 	else
 		val32 = RD4(sc, off & ~3);
+
 	val32 &= ~(0xffff << (off & 3)*8);
 	val32 |= (val << (off & 3)*8);
+
 	if (off == SDHCI_TRANSFER_MODE)
 		sc->cmd_and_mode = val32;
-	else {
-		WR4(sc, off & ~3, val32);
-		if (off == SDHCI_COMMAND_FLAGS)
+	else if (off == SDHCI_BLOCK_SIZE || off == SDHCI_BLOCK_COUNT) {
+		sc->blksz_and_count = val32;
+		sc->need_update_blk = true;
+	} else {
+		if (off == SDHCI_COMMAND_FLAGS) {
+			/* If we saved blk writes, do them now before cmd. */
+			if (sc->need_update_blk) {
+				WR4(sc, SDHCI_BLOCK_SIZE, sc->blksz_and_count);
+				sc->need_update_blk = false;
+			}
+			/* Always save cmd and mode registers. */
 			sc->cmd_and_mode = val32;
+		}
+		WR4(sc, off & ~3, val32);
 	}
 }
 
@@ -419,26 +513,25 @@ bcm_sdhci_start_dma_seg(struct bcm_sdhci_softc *sc)
 {
 	struct sdhci_slot *slot;
 	vm_paddr_t pdst, psrc;
-	int err, idx, len, sync_op;
+	int err, idx, len, sync_op, width;
 
 	slot = &sc->sc_slot;
 	idx = sc->dmamap_seg_index++;
 	len = sc->dmamap_seg_sizes[idx];
 	slot->offset += len;
+	width = (len & 0xf ? BCM_DMA_32BIT : BCM_DMA_128BIT);
 
 	if (slot->curcmd->data->flags & MMC_DATA_READ) {
 		bcm_dma_setup_src(sc->sc_dma_ch, BCM_DMA_DREQ_EMMC,
 		    BCM_DMA_SAME_ADDR, BCM_DMA_32BIT); 
 		bcm_dma_setup_dst(sc->sc_dma_ch, BCM_DMA_DREQ_NONE,
-		    BCM_DMA_INC_ADDR,
-		    (len & 0xf) ? BCM_DMA_32BIT : BCM_DMA_128BIT);
+		    BCM_DMA_INC_ADDR, width);
 		psrc = sc->sc_sdhci_buffer_phys;
 		pdst = sc->dmamap_seg_addrs[idx];
 		sync_op = BUS_DMASYNC_PREREAD;
 	} else {
 		bcm_dma_setup_src(sc->sc_dma_ch, BCM_DMA_DREQ_NONE,
-		    BCM_DMA_INC_ADDR,
-		    (len & 0xf) ? BCM_DMA_32BIT : BCM_DMA_128BIT);
+		    BCM_DMA_INC_ADDR, width);
 		bcm_dma_setup_dst(sc->sc_dma_ch, BCM_DMA_DREQ_EMMC,
 		    BCM_DMA_SAME_ADDR, BCM_DMA_32BIT);
 		psrc = sc->dmamap_seg_addrs[idx];
@@ -503,6 +596,22 @@ bcm_sdhci_dma_intr(int ch, void *arg)
 
 	left = min(BCM_SDHCI_BUFFER_SIZE,
 	    slot->curcmd->data->len - slot->offset);
+
+	/*
+	 * If there is less than buffer size outstanding, we would not handle
+	 * it anymore using DMA if bcm_sdhci_will_handle_transfer() were asked.
+	 * Re-enable interrupts and return and let the SDHCI state machine
+	 * finish the job.
+	 */
+	if (left < BCM_SDHCI_BUFFER_SIZE) {
+		/* Re-enable data interrupts. */
+		slot->intmask |= SDHCI_INT_DATA_AVAIL | SDHCI_INT_SPACE_AVAIL |
+		    SDHCI_INT_DATA_END;
+		bcm_sdhci_write_4(slot->bus, slot, SDHCI_SIGNAL_ENABLE,
+		    slot->intmask);
+		mtx_unlock(&slot->mtx);
+		return;
+	}
 
 	/* DATA END? */
 	reg = bcm_sdhci_read_4(slot->bus, slot, SDHCI_INT_STATUS);
@@ -613,7 +722,11 @@ bcm_sdhci_write_dma(device_t dev, struct sdhci_slot *slot)
 static int
 bcm_sdhci_will_handle_transfer(device_t dev, struct sdhci_slot *slot)
 {
+	struct bcm_sdhci_softc *sc = device_get_softc(slot->bus);
 	size_t left;
+
+	if (!sc->conf->use_dma)
+		return (0);
 
 	/*
 	 * Do not use DMA for transfers less than block size or with a length
@@ -657,6 +770,7 @@ static device_method_t bcm_sdhci_methods[] = {
 	/* Bus interface */
 	DEVMETHOD(bus_read_ivar,	sdhci_generic_read_ivar),
 	DEVMETHOD(bus_write_ivar,	sdhci_generic_write_ivar),
+	DEVMETHOD(bus_add_child,	bus_generic_add_child),
 
 	/* MMC bridge interface */
 	DEVMETHOD(mmcbr_update_ios,	sdhci_generic_update_ios),
@@ -692,6 +806,9 @@ static driver_t bcm_sdhci_driver = {
 
 DRIVER_MODULE(sdhci_bcm, simplebus, bcm_sdhci_driver, bcm_sdhci_devclass,
     NULL, NULL);
+#ifdef NOTYET
+MODULE_DEPEND(sdhci_bcm, bcm2835_clkman, 1, 1, 1);
+#endif
 SDHCI_DEPEND(sdhci_bcm);
 #ifndef MMCCAM
 MMC_DECLARE_BRIDGE(sdhci_bcm);

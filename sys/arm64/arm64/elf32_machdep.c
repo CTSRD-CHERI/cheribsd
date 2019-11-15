@@ -115,7 +115,7 @@ static Elf32_Brandinfo freebsd32_brand_info = {
 	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf32_freebsd_sysvec,
-	.interp_newpath	= NULL,
+	.interp_newpath	= "/libexec/ld-elf32.so.1",
 	.brand_note	= &elf32_freebsd_brandnote,
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE,
 	.header_supported= elf32_arm_abi_supported,
@@ -130,7 +130,7 @@ elf32_arm_abi_supported(struct image_params *imgp)
 	const Elf32_Ehdr *hdr;
 
 	/* Check if we support AArch32 */
-	if (ID_AA64PFR0_EL0(READ_SPECIALREG(id_aa64pfr0_el1)) !=
+	if (ID_AA64PFR0_EL0_VAL(READ_SPECIALREG(id_aa64pfr0_el1)) !=
 	    ID_AA64PFR0_EL0_64_32)
 		return (FALSE);
 

@@ -13,7 +13,6 @@ machine		powerpc	powerpcspe
 include 	"dpaa/config.dpaa"
 makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
 makeoptions	WITH_CTF=1
-makeoptions	WERROR="-Werror -Wno-format -Wno-redundant-decls"
 
 options 	FPU_EMU
 options 	MAXCPU=2
@@ -94,7 +93,6 @@ device  	mmcsd
 device		pass
 device		pci
 device		quicc
-device		random
 #device		rl
 device		scbus
 device		scc
@@ -104,7 +102,7 @@ device  	spibus
 device  	spigen
 device		tsec
 device  	dpaa
-device		tun
+device		tuntap
 device		uart
 options 	USB_DEBUG	# enable debug msgs
 #device		uhci
