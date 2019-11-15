@@ -486,8 +486,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	/*
 	 * We need to call it again after setting the owner to 0.
 	 */
-	// XXX: Make it work again.
-	//vm_map_try_merge_entries(map, prev_entry, entry);
+	vm_map_try_merge_entries(map, prev, entry);
 }
 
 void
