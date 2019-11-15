@@ -857,8 +857,9 @@ getdiskinfo(int fd, const char *fname, const char *dtype, __unused int oflag,
 {
 
     struct disklabel *lp, dlp;
-    off_t ms, hs = 0;
+    off_t hs = 0;
 #ifndef MAKEFS
+    off_t ms;
     struct fd_type type;
 
     lp = NULL;
