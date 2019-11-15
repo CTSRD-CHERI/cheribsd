@@ -115,7 +115,7 @@ freebsd64_sendto(struct thread *td, struct freebsd64_sendto_args *uap)
 }
 
 static int
-freebsd64_copyinmsghdr(struct msghdr64 *msg64, kmsghdr_t *msg)
+freebsd64_copyinmsghdr(struct msghdr64 *msg64, struct msghdr *msg)
 {
 	struct msghdr64 m64;
 	int error;
@@ -138,7 +138,7 @@ freebsd64_copyinmsghdr(struct msghdr64 *msg64, kmsghdr_t *msg)
  * the pointers untouched.
  */
 static int
-freebsd64_copyoutmsghdr(kmsghdr_t *msg, struct msghdr64 *msg64)
+freebsd64_copyoutmsghdr(struct msghdr *msg, struct msghdr64 *msg64)
 {
 	struct msghdr64 m64;
 	int error;
@@ -166,7 +166,7 @@ freebsd64_copyoutmsghdr(kmsghdr_t *msg, struct msghdr64 *msg64)
  * conversions like on i386, but maybe alignment is an issue...
  */
 static int
-freebsd64_copy_msg_out(kmsghdr_t *msg, struct mbuf *control)
+freebsd64_copy_msg_out(struct msghdr *msg, struct mbuf *control)
 {
 	struct cmsghdr *cm;
 	void *data;
@@ -256,9 +256,9 @@ exit:
 int
 freebsd64_sendmsg(struct thread *td, struct freebsd64_sendmsg_args *uap)
 {
-	kmsghdr_t msg;
+	struct msghdr msg;
 	struct msghdr64 m64;
-	kiovec_t *iov;
+	struct iovec *iov;
 	int error;
 
 	error = copyin(uap->msg, &m64, sizeof(m64));
@@ -270,7 +270,7 @@ freebsd64_sendmsg(struct thread *td, struct freebsd64_sendmsg_args *uap)
 	    m64.msg_iovlen), m64.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
-	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
+	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
 	msg.msg_iovlen = m64.msg_iovlen;
 	msg.msg_control = __USER_CAP(m64.msg_control, m64.msg_controllen);
 	msg.msg_controllen = m64.msg_controllen;
@@ -293,9 +293,9 @@ freebsd64_recvfrom(struct thread *td, struct freebsd64_recvfrom_args *uap)
 int
 freebsd64_recvmsg(struct thread *td, struct freebsd64_recvmsg_args *uap)
 {
-	kmsghdr_t msg;
+	struct msghdr msg;
 	struct msghdr64 m64;
-	kiovec_t * __capability uiov, *iov;
+	struct iovec * __capability uiov, *iov;
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
 	int error;
@@ -312,7 +312,7 @@ freebsd64_recvmsg(struct thread *td, struct freebsd64_recvmsg_args *uap)
 		return (error);
 	msg.msg_flags = uap->flags;
 	uiov = msg.msg_iov;
-	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
+	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
 
 	controlp = (msg.msg_control != NULL) ?  &control : NULL;
 	error = kern_recvit(td, uap->s, &msg, UIO_USERSPACE, controlp);
@@ -374,12 +374,23 @@ freebsd64_getpeername(struct thread *td, struct freebsd64_getpeername_args *uap)
  * uipc_shm.c
  */
 
+#ifdef COMPAT_FREEBSD12
 int
-freebsd64_shm_open(struct thread *td, struct freebsd64_shm_open_args *uap)
+freebsd12_freebsd64_shm_open(struct thread *td,
+    struct freebsd12_freebsd64_shm_open_args *uap)
 {
 
-	return (kern_shm_open(td, __USER_CAP_STR(uap->path), uap->flags,
-	    uap->mode, NULL));
+	return (kern_shm_open(td, __USER_CAP_STR(uap->path),
+	    uap->flags | O_CLOEXEC, uap->mode, NULL, F_SEAL_SEAL));
+}
+#endif
+
+int
+freebsd64_shm_open2(struct thread *td, struct freebsd64_shm_open2_args *uap)
+{
+
+	return (kern_shm_open2(td, __USER_CAP_STR(uap->path), uap->flags,
+	    uap->mode, uap->shmflags, __USER_CAP_STR(uap->name)));
 }
 
 int
@@ -387,4 +398,12 @@ freebsd64_shm_unlink(struct thread *td, struct freebsd64_shm_unlink_args *uap)
 {
 
 	return (kern_shm_unlink(td, __USER_CAP_STR(uap->path)));
+}
+
+int
+freebsd64_shm_rename(struct thread *td, struct freebsd64_shm_rename_args *uap)
+{
+
+	return (kern_shm_rename(td, __USER_CAP_STR(uap->path_from),
+	    __USER_CAP_STR(uap->path_to), uap->flags));
 }

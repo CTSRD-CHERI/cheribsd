@@ -153,6 +153,7 @@
 #define	CHERIABI_SYS_cheriabi_quotactl	148
 				/* 149 is obsolete oquota */
 				/* 150 is obsolete ogetsockname */
+#define	CHERIABI_SYS_cheriabi_coexecve	151
 #define	CHERIABI_SYS_cheriabi_nlm_syscall	154
 #define	CHERIABI_SYS_cheriabi_nfssvc	155
 				/* 156 is obsolete ogetdirentries */
@@ -419,7 +420,7 @@
 #define	CHERIABI_SYS_cheriabi_truncate	479
 #define	CHERIABI_SYS_ftruncate	480
 #define	CHERIABI_SYS_thr_kill2	481
-#define	CHERIABI_SYS_cheriabi_shm_open	482
+				/* 482 is obsolete freebsd12_shm_open */
 #define	CHERIABI_SYS_cheriabi_shm_unlink	483
 #define	CHERIABI_SYS_cheriabi_cpuset	484
 #define	CHERIABI_SYS_cpuset_setid	485
@@ -505,5 +506,8 @@
 #define	CHERIABI_SYS_cheriabi_fhlinkat	566
 #define	CHERIABI_SYS_cheriabi_fhreadlink	567
 #define	CHERIABI_SYS_cheriabi_funlinkat	568
-#define	CHERIABI_SYS_cheriabi_coexecve	569
-#define	CHERIABI_SYS_MAXSYSCALL	570
+#define	CHERIABI_SYS_cheriabi_copy_file_range	569
+#define	CHERIABI_SYS_cheriabi___sysctlbyname	570
+#define	CHERIABI_SYS_cheriabi_shm_open2	571
+#define	CHERIABI_SYS_cheriabi_shm_rename	572
+#define	CHERIABI_SYS_MAXSYSCALL	573

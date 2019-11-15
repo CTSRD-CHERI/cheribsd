@@ -216,7 +216,7 @@ struct mps_command {
 	u_int				cm_length;
 	u_int				cm_out_len;
 	struct uio			cm_uio;
-	kiovec_t			cm_iovec[MPS_IOVEC_COUNT];
+	struct iovec			cm_iovec[MPS_IOVEC_COUNT];
 	u_int				cm_max_segs;
 	u_int				cm_sglsize;
 	MPI2_SGE_IO_UNION		*cm_sge;
@@ -862,13 +862,3 @@ SYSCTL_DECL(_hw_mps);
 #endif
 
 #endif
-
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "header",
-//   "changes": [
-//     "kiovec_t"
-//   ]
-// }
-// CHERI CHANGES END

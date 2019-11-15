@@ -46,6 +46,9 @@
 #define	VM_NFREEORDER_MAX	VM_NFREEORDER
 #endif
 
+extern vm_paddr_t phys_avail[];
+extern vm_paddr_t dump_avail[];
+
 /* Domains must be dense (non-sparse) and zero-based. */
 struct mem_affinity {
 	vm_paddr_t start;
@@ -100,6 +103,11 @@ vm_page_t vm_phys_scan_contig(int domain, u_long npages, vm_paddr_t low,
 void vm_phys_set_pool(int pool, vm_page_t m, int order);
 boolean_t vm_phys_unfree_page(vm_page_t m);
 int vm_phys_mem_affinity(int f, int t);
+vm_paddr_t vm_phys_early_alloc(int domain, size_t alloc_size);
+void vm_phys_early_startup(void);
+int vm_phys_avail_largest(void);
+vm_paddr_t vm_phys_avail_size(int i);
+
 
 /*
  *
@@ -123,6 +131,7 @@ vm_phys_domain(vm_page_t m)
 	return (0);
 #endif
 }
+int _vm_phys_domain(vm_paddr_t pa);
 
 #endif	/* _KERNEL */
 #endif	/* !_VM_PHYS_H_ */

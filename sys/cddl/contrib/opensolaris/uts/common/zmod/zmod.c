@@ -25,10 +25,31 @@
  */
 
 #include <sys/types.h>
+#include <sys/cmn_err.h>
+#include <sys/systm.h>
+#include <sys/kmem.h>
 #include <sys/zmod.h>
 
-#include "zlib.h"
-#include "zutil.h"
+#include <contrib/zlib/zlib.h>
+#include <contrib/zlib/zutil.h>
+
+/*ARGSUSED*/
+static void *
+zfs_zcalloc(void *opaque, uint_t items, uint_t size)
+{
+	void *ptr;
+
+	ptr = malloc((size_t)items * size, M_SOLARIS, M_NOWAIT);
+	return ptr;
+}
+
+/*ARGSUSED*/
+static void
+zfs_zcfree(void *opaque, void *ptr)
+{
+
+	free(ptr, M_SOLARIS);
+}
 
 /*
  * Uncompress the buffer 'src' into the buffer 'dst'.  The caller must store
@@ -47,6 +68,8 @@ z_uncompress(void *dst, size_t *dstlen, const void *src, size_t srclen)
 	zs.avail_in = srclen;
 	zs.next_out = dst;
 	zs.avail_out = *dstlen;
+	zs.zalloc = zfs_zcalloc;
+	zs.zfree = zfs_zcfree;
 
 	/*
 	 * Call inflateInit2() specifying a window size of DEF_WBITS
@@ -78,6 +101,8 @@ z_compress_level(void *dst, size_t *dstlen, const void *src, size_t srclen,
 	zs.avail_in = srclen;
 	zs.next_out = dst;
 	zs.avail_out = *dstlen;
+	zs.zalloc = zfs_zcalloc;
+	zs.zfree = zfs_zcfree;
 
 	if ((err = deflateInit(&zs, level)) != Z_OK)
 		return (err);

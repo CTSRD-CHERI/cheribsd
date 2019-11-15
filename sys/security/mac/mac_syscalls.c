@@ -83,7 +83,7 @@ int
 sys___mac_get_pid(struct thread *td, struct __mac_get_pid_args *uap)
 {
 
-	return (kern_mac_get_pid(td, uap->pid, __USER_CAP_OBJ(uap->mac_p)));
+	return (kern_mac_get_pid(td, uap->pid, uap->mac_p));
 }
 
 int
@@ -139,7 +139,7 @@ int
 sys___mac_get_proc(struct thread *td, struct __mac_get_proc_args *uap)
 {
 
-	return (kern_mac_get_proc(td, __USER_CAP_OBJ(uap->mac_p)));
+	return (kern_mac_get_proc(td, uap->mac_p));
 }
 
 int
@@ -179,7 +179,7 @@ int
 sys___mac_set_proc(struct thread *td, struct __mac_set_proc_args *uap)
 {
 
-	return (kern_mac_set_proc(td, __USER_CAP_OBJ(uap->mac_p)));
+	return (kern_mac_set_proc(td, uap->mac_p));
 }
 
 int
@@ -247,7 +247,7 @@ int
 sys___mac_get_fd(struct thread *td, struct __mac_get_fd_args *uap)
 {
 
-	return (kern_mac_get_fd(td, uap->fd, __USER_CAP_OBJ(uap->mac_p)));
+	return (kern_mac_get_fd(td, uap->fd, uap->mac_p));
 }
 
 int
@@ -347,16 +347,14 @@ int
 sys___mac_get_file(struct thread *td, struct __mac_get_file_args *uap)
 {
 
-	return (kern_mac_get_path(td, __USER_CAP_STR(uap->path_p),
-	    __USER_CAP_OBJ(uap->mac_p), FOLLOW));
+	return (kern_mac_get_path(td, uap->path_p, uap->mac_p, FOLLOW));
 }
 
 int
 sys___mac_get_link(struct thread *td, struct __mac_get_link_args *uap)
 {
 
-	return (kern_mac_get_path(td, __USER_CAP_STR(uap->path_p),
-	    __USER_CAP_OBJ(uap->mac_p), NOFOLLOW));
+	return (kern_mac_get_path(td, uap->path_p, uap->mac_p, NOFOLLOW));
 }
 
 int
@@ -414,7 +412,7 @@ int
 sys___mac_set_fd(struct thread *td, struct __mac_set_fd_args *uap)
 {
 
-	return (kern_mac_set_fd(td, uap->fd, __USER_CAP_OBJ(uap->mac_p)));
+	return (kern_mac_set_fd(td, uap->fd, uap->mac_p));
 }
 
 int
@@ -522,16 +520,14 @@ int
 sys___mac_set_file(struct thread *td, struct __mac_set_file_args *uap)
 {
 
-	return (kern_mac_set_path(td, __USER_CAP_STR(uap->path_p),
-	    __USER_CAP_OBJ(uap->mac_p), FOLLOW));
+	return (kern_mac_set_path(td, uap->path_p, uap->mac_p, FOLLOW));
 }
 
 int
 sys___mac_set_link(struct thread *td, struct __mac_set_link_args *uap)
 {
 
-	return (kern_mac_set_path(td, __USER_CAP_STR(uap->path_p),
-	    __USER_CAP_OBJ(uap->mac_p), NOFOLLOW));
+	return (kern_mac_set_path(td, uap->path_p, uap->mac_p, NOFOLLOW));
 }
 
 int
@@ -590,8 +586,7 @@ int
 sys_mac_syscall(struct thread *td, struct mac_syscall_args *uap)
 {
 
-	return (kern_mac_syscall(td, __USER_CAP_STR(uap->policy), uap->call,
-	    __USER_CAP_UNBOUND(uap->arg)));
+	return (kern_mac_syscall(td, uap->policy, uap->call, uap->arg));
 }
 
 int

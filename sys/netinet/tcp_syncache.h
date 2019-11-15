@@ -48,7 +48,7 @@ int	 syncache_add(struct in_conninfo *, struct tcpopt *,
 	     void *, void *);
 void	 syncache_chkrst(struct in_conninfo *, struct tcphdr *, struct mbuf *);
 void	 syncache_badack(struct in_conninfo *);
-int	 syncache_pcblist(struct sysctl_req *req, int max_pcbs, int *pcbs_exported);
+int	 syncache_pcblist(struct sysctl_req *);
 
 struct syncache {
 	TAILQ_ENTRY(syncache)	sc_hash;
@@ -111,6 +111,9 @@ struct syncookie_secret {
 	u_int lifetime;
 };
 
+#define	TCP_SYNCACHE_PAUSE_TIME		SYNCOOKIE_LIFETIME
+#define	TCP_SYNCACHE_MAX_BACKOFF	6	/* 16 minutes */
+
 struct tcp_syncache {
 	struct	syncache_head *hashbase;
 	uma_zone_t zone;
@@ -122,6 +125,11 @@ struct tcp_syncache {
 	uint32_t hash_secret;
 	struct vnet *vnet;
 	struct syncookie_secret secret;
+	struct mtx pause_mtx;
+	struct callout pause_co;
+	time_t	pause_until;
+	uint8_t pause_backoff;
+	volatile bool paused;
 };
 
 /* Internal use for the syncookie functions. */

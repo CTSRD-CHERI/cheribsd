@@ -5,10 +5,10 @@
 
 PACKAGE=runtime
 PROG=	ping
+SRCS=	ping.c utils.c
 MAN=	ping.8
 BINOWN=	root
 BINMODE=4555
-WARNS?=	3
 LIBADD=	m
 
 .if ${MK_DYNAMICROOT} == "no"
@@ -21,5 +21,9 @@ CFLAGS+=-DWITH_CASPER
 
 CFLAGS+=-DIPSEC
 LIBADD+=	ipsec
+
+# Doesn't link reliably with CheriABI
+#HAS_TESTS=
+#SUBDIR.${MK_TESTS}+= tests
 
 .include <bsd.prog.mk>

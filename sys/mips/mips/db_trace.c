@@ -210,7 +210,7 @@ loop:
 	 * subroutine.
 	 */
 	if (!subr) {
-		va = pc - sizeof(int);
+		va = pc;
 		while (1) {
 			instr = kdbpeek((int *)va);
 
@@ -421,10 +421,15 @@ done:
 		    (uintmax_t)cause, (uintmax_t)badvaddr);
 		goto loop;
 	} else if (ra) {
-		if (pc == ra && stksize == 0)
+		/*
+		 * We subtract two instructions from ra to convert it from a return
+		 * address to a calling address, accounting for the delay slot.
+		 */
+		register_t next_pc = ra - 2 * sizeof(int);
+		if (pc == next_pc && stksize == 0)
 			db_printf("stacktrace: loop!\n");
 		else {
-			pc = ra;
+			pc = next_pc;
 			sp += stksize;
 			ra = next_ra;
 			goto loop;

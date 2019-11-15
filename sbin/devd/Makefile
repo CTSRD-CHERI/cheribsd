@@ -3,7 +3,7 @@
 .include <src.opts.mk>
 
 WARNS?= 3
-PACKAGE=runtime
+PACKAGE=utilities
 CONFGROUPS=	CONFS DEVD
 CONFS=	devd.conf
 DEVD=	devmatch.conf
@@ -34,7 +34,7 @@ MAN=	devd.8 devd.conf.5
 
 NO_SHARED?=YES
 
-LIBADD=	l util
+LIBADD=	util
 
 YFLAGS+=-v
 CFLAGS+=-I. -I${.CURDIR}

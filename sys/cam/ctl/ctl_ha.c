@@ -273,7 +273,7 @@ ctl_ha_rx_thread(void *arg)
 	struct socket *so = softc->ha_so;
 	struct ha_msg_wire wire_hdr;
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	int error, flags, next;
 
 	bzero(&wire_hdr, sizeof(wire_hdr));
@@ -698,7 +698,7 @@ ctl_ha_msg_recv(ctl_ha_channel channel, void *addr, size_t len,
 {
 	struct ha_softc *softc = &ha_softc;
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	int error, flags;
 
 	if (!softc->ha_connected)
@@ -1006,11 +1006,10 @@ ctl_ha_msg_destroy(struct ctl_softc *ctl_softc)
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

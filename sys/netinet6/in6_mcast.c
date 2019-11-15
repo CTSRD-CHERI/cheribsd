@@ -1828,7 +1828,7 @@ ip6_getmoptions(struct inpcb *inp, struct sockopt *sopt)
  * Returns NULL if no ifp could be found.
  */
 static struct ifnet *
-in6p_lookup_mcast_ifp(const struct inpcb *in6p,
+in6p_lookup_mcast_ifp(const struct inpcb *inp,
     const struct sockaddr_in6 *gsin6)
 {
 	struct nhop6_basic	nh6;
@@ -1836,13 +1836,13 @@ in6p_lookup_mcast_ifp(const struct inpcb *in6p,
 	uint32_t		scopeid;
 	uint32_t		fibnum;
 
-	KASSERT(in6p->inp_vflag & INP_IPV6,
+	KASSERT(inp->inp_vflag & INP_IPV6,
 	    ("%s: not INP_IPV6 inpcb", __func__));
 	KASSERT(gsin6->sin6_family == AF_INET6,
 	    ("%s: not AF_INET6 group", __func__));
 
 	in6_splitscope(&gsin6->sin6_addr, &dst, &scopeid);
-	fibnum = in6p ? in6p->inp_inc.inc_fibnum : RT_DEFAULT_FIB;
+	fibnum = inp ? inp->inp_inc.inc_fibnum : RT_DEFAULT_FIB;
 	if (fib6_lookup_nh_basic(fibnum, &dst, scopeid, 0, 0, &nh6) != 0)
 		return (NULL);
 
@@ -2770,8 +2770,10 @@ sysctl_ip6_mcast_filters(SYSCTL_HANDLER_ARGS)
 		return (EINVAL);
 	}
 
+	NET_EPOCH_ENTER(et);
 	ifp = ifnet_byindex(ifindex);
 	if (ifp == NULL) {
+		NET_EPOCH_EXIT(et);
 		CTR2(KTR_MLD, "%s: no ifp for ifindex %u",
 		    __func__, ifindex);
 		return (ENOENT);
@@ -2783,12 +2785,13 @@ sysctl_ip6_mcast_filters(SYSCTL_HANDLER_ARGS)
 
 	retval = sysctl_wire_old_buffer(req,
 	    sizeof(uint32_t) + (in6_mcast_maxgrpsrc * sizeof(struct in6_addr)));
-	if (retval)
+	if (retval) {
+		NET_EPOCH_EXIT(et);
 		return (retval);
+	}
 
 	IN6_MULTI_LOCK();
 	IN6_MULTI_LIST_LOCK();
-	NET_EPOCH_ENTER(et);
 	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		inm = in6m_ifmultiaddr_get_inm(ifma);
 		if (inm == NULL)
@@ -2816,10 +2819,9 @@ sysctl_ip6_mcast_filters(SYSCTL_HANDLER_ARGS)
 				break;
 		}
 	}
-	NET_EPOCH_EXIT(et);
-
 	IN6_MULTI_LIST_UNLOCK();
 	IN6_MULTI_UNLOCK();
+	NET_EPOCH_EXIT(et);
 
 	return (retval);
 }

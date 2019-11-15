@@ -100,6 +100,9 @@
 
 #define	CPU_REV_THUNDERX2_0	0x00
 
+/* APM / Ampere Part Number */
+#define CPU_PART_EMAG8180	0x000
+
 #define	CPU_IMPL(midr)	(((midr) >> 24) & 0xff)
 #define	CPU_PART(midr)	(((midr) >> 4) & 0xfff)
 #define	CPU_VAR(midr)	(((midr) >> 20) & 0xf)
@@ -160,7 +163,6 @@ void	cpu_reset(void) __dead2;
 void	fork_trampoline(void);
 void	identify_cpu(void);
 void	install_cpu_errata(void);
-void	print_cpu_features(u_int);
 void	swi_vm(void *v);
 
 #define	CPU_AFFINITY(cpu)	__cpu_affinity[(cpu)]

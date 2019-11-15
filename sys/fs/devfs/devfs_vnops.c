@@ -54,6 +54,7 @@
 #include <sys/filio.h>
 #include <sys/jail.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mman.h>
@@ -286,38 +287,27 @@ devfs_vptocnp(struct vop_vptocnp_args *ap)
 	if (error != 0)
 		return (error);
 
-	i = *buflen;
-	dd = vp->v_data;
-
-	if (vp->v_type == VCHR) {
-		i -= strlen(dd->de_cdp->cdp_c.si_name);
-		if (i < 0) {
-			error = ENOMEM;
-			goto finished;
-		}
-		bcopy(dd->de_cdp->cdp_c.si_name, buf + i,
-		    strlen(dd->de_cdp->cdp_c.si_name));
-		de = dd->de_dir;
-	} else if (vp->v_type == VDIR) {
-		if (dd == dmp->dm_rootdir) {
-			*dvp = vp;
-			vref(*dvp);
-			goto finished;
-		}
-		i -= dd->de_dirent->d_namlen;
-		if (i < 0) {
-			error = ENOMEM;
-			goto finished;
-		}
-		bcopy(dd->de_dirent->d_name, buf + i,
-		    dd->de_dirent->d_namlen);
-		de = dd;
-	} else {
+	if (vp->v_type != VCHR && vp->v_type != VDIR) {
 		error = ENOENT;
 		goto finished;
 	}
+
+	dd = vp->v_data;
+	if (vp->v_type == VDIR && dd == dmp->dm_rootdir) {
+		*dvp = vp;
+		vref(*dvp);
+		goto finished;
+	}
+
+	i = *buflen;
+	i -= dd->de_dirent->d_namlen;
+	if (i < 0) {
+		error = ENOMEM;
+		goto finished;
+	}
+	bcopy(dd->de_dirent->d_name, buf + i, dd->de_dirent->d_namlen);
 	*buflen = i;
-	de = devfs_parent_dirent(de);
+	de = devfs_parent_dirent(dd);
 	if (de == NULL) {
 		error = ENOENT;
 		goto finished;
@@ -1150,7 +1140,6 @@ devfs_open(struct vop_open_args *ap)
 	int error, ref, vlocked;
 	struct cdevsw *dsw;
 	struct file *fpop;
-	struct mtx *mtxp;
 
 	if (vp->v_type == VBLK)
 		return (ENXIO);
@@ -1204,16 +1193,6 @@ devfs_open(struct vop_open_args *ap)
 #endif
 	if (fp->f_ops == &badfileops)
 		finit(fp, fp->f_flag, DTYPE_VNODE, dev, &devfs_ops_f);
-	mtxp = mtx_pool_find(mtxpool_sleep, fp);
-
-	/*
-	 * Hint to the dofilewrite() to not force the buffer draining
-	 * on the writer to the file.  Most likely, the write would
-	 * not need normal buffers.
-	 */
-	mtx_lock(mtxp);
-	fp->f_vnread_flags |= FDEVFS_VNODE;
-	mtx_unlock(mtxp);
 	return (error);
 }
 
@@ -1441,7 +1420,6 @@ devfs_reclaim(struct vop_reclaim_args *ap)
 		vp->v_data = NULL;
 	}
 	mtx_unlock(&devfs_de_interlock);
-	vnode_destroy_vobject(vp);
 	return (0);
 }
 

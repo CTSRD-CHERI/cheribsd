@@ -145,12 +145,12 @@ phys_pager_getpages(vm_object_t object, vm_page_t *m, int count, int *rbehind,
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
 	for (i = 0; i < count; i++) {
-		if (m[i]->valid == 0) {
+		if (vm_page_none_valid(m[i])) {
 			if ((m[i]->flags & PG_ZERO) == 0)
 				pmap_zero_page(m[i]);
-			m[i]->valid = VM_PAGE_BITS_ALL;
+			vm_page_valid(m[i]);
 		}
-		KASSERT(m[i]->valid == VM_PAGE_BITS_ALL,
+		KASSERT(vm_page_all_valid(m[i]),
 		    ("phys_pager_getpages: partially valid page %p", m[i]));
 		KASSERT(m[i]->dirty == 0,
 		    ("phys_pager_getpages: dirty page %p", m[i]));
@@ -206,32 +206,11 @@ phys_pager_populate(vm_object_t object, vm_pindex_t pidx,
 	*last = end;
 
 	for (i = base; i <= end; i++) {
-retry:
-		m = vm_page_lookup(object, i);
-		if (m == NULL) {
-			ahead = MIN(end - i, PHYSALLOC);
-			m = vm_page_alloc(object, i, VM_ALLOC_NORMAL |
-			    VM_ALLOC_ZERO | VM_ALLOC_WAITFAIL |
-			    VM_ALLOC_COUNT(ahead));
-			if (m == NULL)
-				goto retry;
-			if ((m->flags & PG_ZERO) == 0)
-				pmap_zero_page(m);
-			m->valid = VM_PAGE_BITS_ALL;
-		} else if (vm_page_xbusied(m)) {
-			vm_page_lock(m);
-			VM_OBJECT_WUNLOCK(object);
-			vm_page_busy_sleep(m, "physb", true);
-			VM_OBJECT_WLOCK(object);
-			goto retry;
-		} else {
-			vm_page_xbusy(m);
-			if (m->valid != VM_PAGE_BITS_ALL)
-				vm_page_zero_invalid(m, TRUE);
-		}
-
-		KASSERT(m->valid == VM_PAGE_BITS_ALL,
-		    ("phys_pager_populate: partially valid page %p", m));
+		ahead = MIN(end - i, PHYSALLOC);
+		m = vm_page_grab(object, i,
+		    VM_ALLOC_NORMAL | VM_ALLOC_COUNT(ahead));
+		if (!vm_page_all_valid(m))
+			vm_page_zero_invalid(m, TRUE);
 		KASSERT(m->dirty == 0,
 		    ("phys_pager_populate: dirty page %p", m));
 	}

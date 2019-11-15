@@ -358,6 +358,12 @@ vop_inactive {
 	IN struct thread *td;
 };
 
+%! need_inactive	pre	vop_need_inactive_pre
+%! need_inactive	post	vop_need_inactive_post
+
+vop_need_inactive {
+        IN struct vnode *vp;
+};
 
 %% reclaim	vp	E E E
 %! reclaim	post	vop_reclaim_post
@@ -695,7 +701,7 @@ vop_set_text {
 };
 
 
-%% vop_unset_text	vp	= = =
+%% vop_unset_text	vp	L L L
 
 vop_unset_text {
 	IN struct vnode *vp;
@@ -715,6 +721,22 @@ vop_add_writecount {
 vop_fdatasync {
 	IN struct vnode *vp;
 	IN struct thread *td;
+};
+
+
+%% copy_file_range	invp	U U U
+%% copy_file_range	outvp	U U U
+
+vop_copy_file_range {
+	IN struct vnode *invp;
+	INOUT off_t *inoffp;
+	IN struct vnode *outvp;
+	INOUT off_t *outoffp;
+	INOUT size_t *lenp;
+	IN unsigned int flags;
+	IN struct ucred *incred;
+	IN struct ucred *outcred;
+	IN struct thread *fsizetd;
 };
 
 

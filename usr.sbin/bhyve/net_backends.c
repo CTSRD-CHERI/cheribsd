@@ -110,6 +110,17 @@ struct net_backend {
 	ssize_t (*recv)(struct net_backend *be, struct iovec *iov, int iovcnt);
 
 	/*
+	 * Ask the backend to enable or disable receive operation in the
+	 * backend. On return from a disable operation, it is guaranteed
+	 * that the receive callback won't be called until receive is
+	 * enabled again. Note however that it is up to the caller to make
+	 * sure that netbe_recv() is not currently being executed by another
+	 * thread.
+	 */
+	void (*recv_enable)(struct net_backend *be);
+	void (*recv_disable)(struct net_backend *be);
+
+	/*
 	 * Ask the backend for the virtio-net features it is able to
 	 * support. Possible features are TSO, UFO and checksum offloading
 	 * in both rx and tx direction and for both IPv4 and IPv6.
@@ -209,7 +220,7 @@ tap_init(struct net_backend *be, const char *devname,
 		errx(EX_OSERR, "Unable to apply rights for sandbox");
 #endif
 
-	priv->mevp = mevent_add(be->fd, EVF_READ, cb, param);
+	priv->mevp = mevent_add_disabled(be->fd, EVF_READ, cb, param);
 	if (priv->mevp == NULL) {
 		WPRINTF(("Could not register event\n"));
 		goto error;
@@ -248,6 +259,22 @@ tap_recv(struct net_backend *be, struct iovec *iov, int iovcnt)
 	return (ret);
 }
 
+static void
+tap_recv_enable(struct net_backend *be)
+{
+	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+
+	mevent_enable(priv->mevp);
+}
+
+static void
+tap_recv_disable(struct net_backend *be)
+{
+	struct tap_priv *priv = (struct tap_priv *)be->opaque;
+
+	mevent_disable(priv->mevp);
+}
+
 static uint64_t
 tap_get_cap(struct net_backend *be)
 {
@@ -270,6 +297,8 @@ static struct net_backend tap_backend = {
 	.cleanup = tap_cleanup,
 	.send = tap_send,
 	.recv = tap_recv,
+	.recv_enable = tap_recv_enable,
+	.recv_disable = tap_recv_disable,
 	.get_cap = tap_get_cap,
 	.set_cap = tap_set_cap,
 };
@@ -282,6 +311,8 @@ static struct net_backend vmnet_backend = {
 	.cleanup = tap_cleanup,
 	.send = tap_send,
 	.recv = tap_recv,
+	.recv_enable = tap_recv_enable,
+	.recv_disable = tap_recv_disable,
 	.get_cap = tap_get_cap,
 	.set_cap = tap_set_cap,
 };
@@ -297,7 +328,8 @@ DATA_SET(net_backend_set, vmnet_backend);
 #define NETMAP_FEATURES (VIRTIO_NET_F_CSUM | VIRTIO_NET_F_HOST_TSO4 | \
 		VIRTIO_NET_F_HOST_TSO6 | VIRTIO_NET_F_HOST_UFO | \
 		VIRTIO_NET_F_GUEST_CSUM | VIRTIO_NET_F_GUEST_TSO4 | \
-		VIRTIO_NET_F_GUEST_TSO6 | VIRTIO_NET_F_GUEST_UFO)
+		VIRTIO_NET_F_GUEST_TSO6 | VIRTIO_NET_F_GUEST_UFO | \
+		VIRTIO_NET_F_MRG_RXBUF)
 
 struct netmap_priv {
 	char ifname[IFNAMSIZ];
@@ -401,7 +433,7 @@ netmap_init(struct net_backend *be, const char *devname,
 	priv->cb_param = param;
 	be->fd = priv->nmd->fd;
 
-	priv->mevp = mevent_add(be->fd, EVF_READ, cb, param);
+	priv->mevp = mevent_add_disabled(be->fd, EVF_READ, cb, param);
 	if (priv->mevp == NULL) {
 		WPRINTF(("Could not register event\n"));
 		return (-1);
@@ -571,6 +603,22 @@ netmap_recv(struct net_backend *be, struct iovec *iov, int iovcnt)
 	return (totlen);
 }
 
+static void
+netmap_recv_enable(struct net_backend *be)
+{
+	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+
+	mevent_enable(priv->mevp);
+}
+
+static void
+netmap_recv_disable(struct net_backend *be)
+{
+	struct netmap_priv *priv = (struct netmap_priv *)be->opaque;
+
+	mevent_disable(priv->mevp);
+}
+
 static struct net_backend netmap_backend = {
 	.prefix = "netmap",
 	.priv_size = sizeof(struct netmap_priv),
@@ -578,6 +626,8 @@ static struct net_backend netmap_backend = {
 	.cleanup = netmap_cleanup,
 	.send = netmap_send,
 	.recv = netmap_recv,
+	.recv_enable = netmap_recv_enable,
+	.recv_disable = netmap_recv_disable,
 	.get_cap = netmap_get_cap,
 	.set_cap = netmap_set_cap,
 };
@@ -590,6 +640,8 @@ static struct net_backend vale_backend = {
 	.cleanup = netmap_cleanup,
 	.send = netmap_send,
 	.recv = netmap_recv,
+	.recv_enable = netmap_recv_enable,
+	.recv_disable = netmap_recv_disable,
 	.get_cap = netmap_get_cap,
 	.set_cap = netmap_set_cap,
 };
@@ -805,3 +857,16 @@ netbe_rx_discard(struct net_backend *be)
 	return netbe_recv(be, &iov, 1);
 }
 
+void
+netbe_rx_disable(struct net_backend *be)
+{
+
+	return be->recv_disable(be);
+}
+
+void
+netbe_rx_enable(struct net_backend *be)
+{
+
+	return be->recv_enable(be);
+}

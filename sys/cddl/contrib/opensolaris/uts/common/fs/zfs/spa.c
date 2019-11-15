@@ -176,7 +176,11 @@ boolean_t	zio_taskq_sysdc = B_TRUE;	/* use SDC scheduling class */
 uint_t		zio_taskq_basedc = 80;		/* base duty cycle */
 #endif
 
+#ifdef _KERNEL
+#define SPA_PROCESS
+#endif
 boolean_t	spa_create_process = B_TRUE;	/* no process ==> no sysdc */
+
 extern int	zfs_sync_pass_deferred_free;
 
 /*
@@ -241,6 +245,10 @@ uint64_t	zfs_max_missing_tvds_cachefile = SPA_DVAS_PER_BP - 1;
 uint64_t	zfs_max_missing_tvds_scan = 0;
 
 
+SYSCTL_DECL(_vfs_zfs_zio);
+SYSCTL_INT(_vfs_zfs_zio, OID_AUTO, taskq_batch_pct, CTLFLAG_RDTUN,
+    &zio_taskq_batch_pct, 0,
+    "Percentage of CPUs to run an IO worker thread");
 SYSCTL_INT(_vfs_zfs, OID_AUTO, spa_load_print_vdev_tree, CTLFLAG_RWTUN,
     &spa_load_print_vdev_tree, 0,
     "print out vdev tree during pool import");
@@ -1090,23 +1098,49 @@ spa_create_zio_taskqs(spa_t *spa)
 	}
 }
 
-#ifdef _KERNEL
 #ifdef SPA_PROCESS
+static int
+newproc(void (*pc)(void *), void *arg, id_t cid, int pri,
+    void **ct, pid_t pid)
+{
+	va_list ap;
+	spa_t *spa = (spa_t *)arg;	/* XXX */
+	struct proc *newp;
+	struct thread *td;
+	int error;
+
+	ASSERT(ct == NULL);
+	ASSERT(pid == 0);
+	ASSERT(cid == syscid);
+
+	error = kproc_create(pc, arg, &newp, 0, 0, "zpool-%s", spa->spa_name);
+	if (error != 0)
+		return (error);
+	td = FIRST_THREAD_IN_PROC(newp);
+	thread_lock(td);
+	sched_prio(td, pri);
+	thread_unlock(td);
+	return (0);
+}
+
 static void
 spa_thread(void *arg)
 {
 	callb_cpr_t cprinfo;
 
 	spa_t *spa = arg;
+#ifdef illumos
 	user_t *pu = PTOU(curproc);
-
+#endif
 	CALLB_CPR_INIT(&cprinfo, &spa->spa_proc_lock, callb_generic_cpr,
 	    spa->spa_name);
 
 	ASSERT(curproc != &p0);
+#ifdef illumos
 	(void) snprintf(pu->u_psargs, sizeof (pu->u_psargs),
 	    "zpool-%s", spa->spa_name);
 	(void) strlcpy(pu->u_comm, pu->u_psargs, sizeof (pu->u_comm));
+#endif
 
 #ifdef PSRSET_BIND
 	/* bind this thread to the requested psrset */
@@ -1160,11 +1194,14 @@ spa_thread(void *arg)
 	cv_broadcast(&spa->spa_proc_cv);
 	CALLB_CPR_EXIT(&cprinfo);	/* drops spa_proc_lock */
 
+#ifdef illumos
 	mutex_enter(&curproc->p_lock);
 	lwp_exit();
+#else
+	kthread_exit();
+#endif
 }
 #endif	/* SPA_PROCESS */
-#endif
 
 /*
  * Activate an uninitialized pool.
@@ -1211,7 +1248,9 @@ spa_activate(spa_t *spa, int mode)
 	mutex_exit(&spa->spa_proc_lock);
 
 	/* If we didn't create a process, we need to create our taskqs. */
+#ifndef SPA_PROCESS
 	ASSERT(spa->spa_proc == &p0);
+#endif	/* SPA_PROCESS */
 	if (spa->spa_proc == &p0) {
 		spa_create_zio_taskqs(spa);
 	}
@@ -1315,6 +1354,7 @@ spa_deactivate(spa_t *spa)
 	mutex_exit(&spa->spa_proc_lock);
 
 #ifdef SPA_PROCESS
+#ifdef illumos
 	/*
 	 * We want to make sure spa_thread() has actually exited the ZFS
 	 * module, so that the module can't be unloaded out from underneath
@@ -1324,6 +1364,7 @@ spa_deactivate(spa_t *spa)
 		thread_join(spa->spa_did);
 		spa->spa_did = 0;
 	}
+#endif
 #endif	/* SPA_PROCESS */
 }
 
@@ -1438,13 +1479,11 @@ spa_unload(spa_t *spa)
 	}
 
 	if (spa->spa_condense_zthr != NULL) {
-		ASSERT(!zthr_isrunning(spa->spa_condense_zthr));
 		zthr_destroy(spa->spa_condense_zthr);
 		spa->spa_condense_zthr = NULL;
 	}
 
 	if (spa->spa_checkpoint_discard_zthr != NULL) {
-		ASSERT(!zthr_isrunning(spa->spa_checkpoint_discard_zthr));
 		zthr_destroy(spa->spa_checkpoint_discard_zthr);
 		spa->spa_checkpoint_discard_zthr = NULL;
 	}
@@ -2345,7 +2384,7 @@ spa_load(spa_t *spa, spa_load_state_t state, spa_import_type_t type)
 	 * and are making their way through the eviction process.
 	 */
 	spa_evicting_os_wait(spa);
-	spa->spa_minref = refcount_count(&spa->spa_refcount);
+	spa->spa_minref = zfs_refcount_count(&spa->spa_refcount);
 	if (error) {
 		if (error != EEXIST) {
 			spa->spa_loaded_ts.tv_sec = 0;
@@ -4978,7 +5017,7 @@ spa_create(const char *pool, nvlist_t *nvroot, nvlist_t *props,
 	 * and are making their way through the eviction process.
 	 */
 	spa_evicting_os_wait(spa);
-	spa->spa_minref = refcount_count(&spa->spa_refcount);
+	spa->spa_minref = zfs_refcount_count(&spa->spa_refcount);
 	spa->spa_load_state = SPA_LOAD_NONE;
 
 	mutex_exit(&spa_namespace_lock);
@@ -7310,12 +7349,12 @@ spa_async_suspend(spa_t *spa)
 	spa_vdev_remove_suspend(spa);
 
 	zthr_t *condense_thread = spa->spa_condense_zthr;
-	if (condense_thread != NULL && zthr_isrunning(condense_thread))
-		VERIFY0(zthr_cancel(condense_thread));
+	if (condense_thread != NULL)
+		zthr_cancel(condense_thread);
 
 	zthr_t *discard_thread = spa->spa_checkpoint_discard_zthr;
-	if (discard_thread != NULL && zthr_isrunning(discard_thread))
-		VERIFY0(zthr_cancel(discard_thread));
+	if (discard_thread != NULL)
+		zthr_cancel(discard_thread);
 }
 
 void
@@ -7328,11 +7367,11 @@ spa_async_resume(spa_t *spa)
 	spa_restart_removal(spa);
 
 	zthr_t *condense_thread = spa->spa_condense_zthr;
-	if (condense_thread != NULL && !zthr_isrunning(condense_thread))
+	if (condense_thread != NULL)
 		zthr_resume(condense_thread);
 
 	zthr_t *discard_thread = spa->spa_checkpoint_discard_zthr;
-	if (discard_thread != NULL && !zthr_isrunning(discard_thread))
+	if (discard_thread != NULL)
 		zthr_resume(discard_thread);
 }
 
@@ -8045,7 +8084,8 @@ spa_sync(spa_t *spa, uint64_t txg)
 		 * allocations all happen from spa_sync().
 		 */
 		for (int i = 0; i < spa->spa_alloc_count; i++)
-			ASSERT0(refcount_count(&(mg->mg_alloc_queue_depth[i])));
+			ASSERT0(zfs_refcount_count(
+			    &(mg->mg_alloc_queue_depth[i])));
 		mg->mg_max_alloc_queue_depth = max_queue_depth;
 
 		for (int i = 0; i < spa->spa_alloc_count; i++) {
@@ -8056,7 +8096,7 @@ spa_sync(spa_t *spa, uint64_t txg)
 	}
 	metaslab_class_t *mc = spa_normal_class(spa);
 	for (int i = 0; i < spa->spa_alloc_count; i++) {
-		ASSERT0(refcount_count(&mc->mc_alloc_slots[i]));
+		ASSERT0(zfs_refcount_count(&mc->mc_alloc_slots[i]));
 		mc->mc_alloc_max_slots[i] = slots_per_allocator;
 	}
 	mc->mc_alloc_throttle_enabled = zio_dva_throttle_enabled;

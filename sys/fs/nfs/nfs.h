@@ -175,17 +175,17 @@ struct nfsd_addsock_args {
  * (New version supports pNFS, indicated by NFSSVC_NEWSTRUCT flag.)
  */
 struct nfsd_nfsd_args {
-	const char *principal;	/* GSS-API service principal name */
+	const char * __kerncap principal; /* GSS-API service principal name */
 	int	minthreads;	/* minimum service thread count */
 	int	maxthreads;	/* maximum service thread count */
 	int	version;	/* Allow multiple variants */
-	char	*addr;		/* pNFS DS addresses */
+	char * __kerncap addr;	/* pNFS DS addresses */
 	int	addrlen;	/* Length of addrs */
-	char	*dnshost;	/* DNS names for DS addresses */
+	char * __kerncap dnshost; /* DNS names for DS addresses */
 	int	dnshostlen;	/* Length of DNS names */
-	char	*dspath;	/* DS Mount path on MDS */
+	char * __kerncap dspath; /* DS Mount path on MDS */
 	int	dspathlen;	/* Length of DS Mount path on MDS */
-	char	*mdspath;	/* MDS mount for DS path on MDS */
+	char * __kerncap mdspath; /* MDS mount for DS path on MDS */
 	int	mdspathlen;	/* Length of MDS mount for DS path on MDS */
 	int	mirrorcnt;	/* Number of mirrors to create on DSs */
 };
@@ -200,9 +200,9 @@ struct nfsd_nfsd_args {
 
 struct nfsd_pnfsd_args {
 	int	op;		/* Which pNFSd op to perform. */
-	char	*mdspath;	/* Path of MDS file. */
-	char	*dspath;	/* Path of recovered DS mounted on dir. */
-	char	*curdspath;	/* Path of current DS mounted on dir. */
+	char * __kerncap mdspath; /* Path of MDS file. */
+	char * __kerncap dspath; /* Path of recovered DS mounted on dir. */
+	char * __kerncap curdspath; /* Path of current DS mounted on dir. */
 };
 
 #define	PNFSDOP_DELDSSERVER	1
@@ -211,7 +211,7 @@ struct nfsd_pnfsd_args {
 
 /* Old version. */
 struct nfsd_nfsd_oargs {
-	const char *principal;	/* GSS-API service principal name */
+	const char * __kerncap principal; /* GSS-API service principal name */
 	int	minthreads;	/* minimum service thread count */
 	int	maxthreads;	/* maximum service thread count */
 };
@@ -264,7 +264,7 @@ struct nfsd_clid {
 
 struct nfsd_dumplist {
 	int		ndl_size;	/* Number of elements */
-	void		*ndl_list;	/* and the list of elements */
+	void * __kerncap ndl_list;	/* and the list of elements */
 };
 
 struct nfsd_dumpclients {
@@ -284,9 +284,9 @@ struct nfsd_dumpclients {
 };
 
 struct nfsd_dumplocklist {
-	char		*ndllck_fname;	/* File Name */
+	char * __kerncap ndllck_fname;	/* File Name */
 	int		ndllck_size;	/* Number of elements */
-	void		*ndllck_list;	/* and the list of elements */
+	void * __kerncap ndllck_list;	/* and the list of elements */
 };
 
 struct nfsd_dumplocks {

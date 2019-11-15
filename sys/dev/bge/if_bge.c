@@ -84,6 +84,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/taskqueue.h>
 
+#include <net/debugnet.h>
 #include <net/if.h>
 #include <net/if_var.h>
 #include <net/if_arp.h>
@@ -100,7 +101,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/tcp.h>
-#include <netinet/netdump/netdump.h>
 
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -519,7 +519,7 @@ static void bge_add_sysctl_stats(struct bge_softc *, struct sysctl_ctx_list *,
     struct sysctl_oid_list *);
 static int bge_sysctl_stats(SYSCTL_HANDLER_ARGS);
 
-NETDUMP_DEFINE(bge);
+DEBUGNET_DEFINE(bge);
 
 static device_method_t bge_methods[] = {
 	/* Device interface */
@@ -1621,33 +1621,32 @@ bge_setpromisc(struct bge_softc *sc)
 		BGE_CLRBIT(sc, BGE_RX_MODE, BGE_RXMODE_RX_PROMISC);
 }
 
+static u_int
+bge_hash_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
+{
+	uint32_t *hashes = arg;
+	int h;
+
+	h = ether_crc32_le(LLADDR(sdl), ETHER_ADDR_LEN) & 0x7F;
+	hashes[(h & 0x60) >> 5] |= 1 << (h & 0x1F);
+
+	return (1);
+}
+
 static void
 bge_setmulti(struct bge_softc *sc)
 {
 	if_t ifp;
-	int mc_count = 0;
 	uint32_t hashes[4] = { 0, 0, 0, 0 };
-	int h, i, mcnt;
-	unsigned char *mta;
+	int i;
 
 	BGE_LOCK_ASSERT(sc);
 
 	ifp = sc->bge_ifp;
 
-	mc_count = if_multiaddr_count(ifp, -1);
-	mta = malloc(sizeof(unsigned char) *  ETHER_ADDR_LEN *
-	    mc_count, M_DEVBUF, M_NOWAIT);
-
-	if(mta == NULL) {
-		device_printf(sc->bge_dev, 
-		    "Failed to allocated temp mcast list\n");
-		return;
-	}
-
 	if (if_getflags(ifp) & IFF_ALLMULTI || if_getflags(ifp) & IFF_PROMISC) {
 		for (i = 0; i < 4; i++)
 			CSR_WRITE_4(sc, BGE_MAR0 + (i * 4), 0xFFFFFFFF);
-		free(mta, M_DEVBUF);
 		return;
 	}
 
@@ -1655,17 +1654,10 @@ bge_setmulti(struct bge_softc *sc)
 	for (i = 0; i < 4; i++)
 		CSR_WRITE_4(sc, BGE_MAR0 + (i * 4), 0);
 
-	if_multiaddr_array(ifp, mta, &mcnt, mc_count);
-	for(i = 0; i < mcnt; i++) {
-		h = ether_crc32_le(mta + (i * ETHER_ADDR_LEN),
-		    ETHER_ADDR_LEN) & 0x7F;
-		hashes[(h & 0x60) >> 5] |= 1 << (h & 0x1F);
-	}
+	if_foreach_llmaddr(ifp, bge_hash_maddr, hashes);
 
 	for (i = 0; i < 4; i++)
 		CSR_WRITE_4(sc, BGE_MAR0 + (i * 4), hashes[i]);
-
-	free(mta, M_DEVBUF);
 }
 
 static void
@@ -3983,8 +3975,8 @@ again:
 		goto fail;
 	}
 
-	/* Attach driver netdump methods. */
-	NETDUMP_SET(ifp, bge);
+	/* Attach driver debugnet methods. */
+	DEBUGNET_SET(ifp, bge);
 
 fail:
 	if (error)
@@ -6844,16 +6836,16 @@ bge_get_counter(if_t ifp, ift_counter cnt)
 	}
 }
 
-#ifdef NETDUMP
+#ifdef DEBUGNET
 static void
-bge_netdump_init(if_t ifp, int *nrxr, int *ncl, int *clsize)
+bge_debugnet_init(if_t ifp, int *nrxr, int *ncl, int *clsize)
 {
 	struct bge_softc *sc;
 
 	sc = if_getsoftc(ifp);
 	BGE_LOCK(sc);
 	*nrxr = sc->bge_return_ring_cnt;
-	*ncl = NETDUMP_MAX_IN_FLIGHT;
+	*ncl = DEBUGNET_MAX_IN_FLIGHT;
 	if ((sc->bge_flags & BGE_FLAG_JUMBO_STD) != 0 &&
 	    (if_getmtu(sc->bge_ifp) + ETHER_HDR_LEN + ETHER_CRC_LEN +
 	    ETHER_VLAN_ENCAP_LEN > (MCLBYTES - ETHER_ALIGN)))
@@ -6864,12 +6856,12 @@ bge_netdump_init(if_t ifp, int *nrxr, int *ncl, int *clsize)
 }
 
 static void
-bge_netdump_event(if_t ifp __unused, enum netdump_ev event __unused)
+bge_debugnet_event(if_t ifp __unused, enum debugnet_ev event __unused)
 {
 }
 
 static int
-bge_netdump_transmit(if_t ifp, struct mbuf *m)
+bge_debugnet_transmit(if_t ifp, struct mbuf *m)
 {
 	struct bge_softc *sc;
 	uint32_t prodidx;
@@ -6888,7 +6880,7 @@ bge_netdump_transmit(if_t ifp, struct mbuf *m)
 }
 
 static int
-bge_netdump_poll(if_t ifp, int count)
+bge_debugnet_poll(if_t ifp, int count)
 {
 	struct bge_softc *sc;
 	uint32_t rx_prod, tx_cons;
@@ -6913,10 +6905,10 @@ bge_netdump_poll(if_t ifp, int count)
 	bge_txeof(sc, tx_cons);
 	return (0);
 }
-#endif /* NETDUMP */
+#endif /* DEBUGNET */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191029,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

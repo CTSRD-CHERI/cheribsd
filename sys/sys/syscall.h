@@ -153,6 +153,7 @@
 #define	SYS_quotactl	148
 				/* 149 is old quota */
 				/* 150 is old getsockname */
+#define	SYS_coexecve	151
 #define	SYS_nlm_syscall	154
 #define	SYS_nfssvc	155
 				/* 156 is old getdirentries */
@@ -419,7 +420,7 @@
 #define	SYS_truncate	479
 #define	SYS_ftruncate	480
 #define	SYS_thr_kill2	481
-#define	SYS_shm_open	482
+#define	SYS_freebsd12_shm_open	482
 #define	SYS_shm_unlink	483
 #define	SYS_cpuset	484
 #define	SYS_cpuset_setid	485
@@ -505,5 +506,8 @@
 #define	SYS_fhlinkat	566
 #define	SYS_fhreadlink	567
 #define	SYS_funlinkat	568
-#define	SYS_coexecve	569
-#define	SYS_MAXSYSCALL	570
+#define	SYS_copy_file_range	569
+#define	SYS___sysctlbyname	570
+#define	SYS_shm_open2	571
+#define	SYS_shm_rename	572
+#define	SYS_MAXSYSCALL	573

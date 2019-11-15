@@ -55,9 +55,11 @@ struct irq_ent {
 static inline int
 linux_irq_rid(struct device *dev, unsigned int irq)
 {
-	if (irq == dev->irq)
+	/* check for MSI- or MSIX- interrupt */
+	if (irq >= dev->irq_start && irq < dev->irq_end)
+		return (irq - dev->irq_start + 1);
+	else
 		return (0);
-	return irq - dev->msix + 1;
 }
 
 extern void linux_irq_handler(void *);
@@ -195,8 +197,8 @@ struct tasklet_struct {
 	unsigned long data;
 };
 
-#define	DECLARE_TASKLET(name, func, data)	\
-struct tasklet_struct name = { { NULL, NULL }, func, ATOMIC_INIT(0), data }
+#define	DECLARE_TASKLET(_name, _func, _data)	\
+struct tasklet_struct _name = { .func = (_func), .data = (_data) }
 
 #define	tasklet_hi_schedule(t)	tasklet_schedule(t)
 

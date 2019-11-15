@@ -345,7 +345,8 @@ void g_reset_bio(struct bio *);
 void * g_read_data(struct g_consumer *cp, off_t offset, off_t length, int *error);
 int g_write_data(struct g_consumer *cp, off_t offset, void *ptr, off_t length);
 int g_delete_data(struct g_consumer *cp, off_t offset, off_t length);
-void g_print_bio(struct bio *bp);
+void g_format_bio(struct sbuf *, const struct bio *bp);
+void g_print_bio(const char *prefix, const struct bio *bp, const char *fmtsuffix, ...) __printflike(3, 4);
 int g_use_g_read_data(void *, off_t, void **, int);
 int g_use_g_write_data(void *, off_t, void *, int);
 
@@ -427,6 +428,7 @@ void gctl_set_param_err(struct gctl_req *req, const char *param, void const *ptr
 void *gctl_get_param(struct gctl_req *req, const char *param, int *len);
 char const *gctl_get_asciiparam(struct gctl_req *req, const char *param);
 void *gctl_get_paraml(struct gctl_req *req, const char *param, int len);
+void *gctl_get_paraml_opt(struct gctl_req *req, const char *param, int len);
 int gctl_error(struct gctl_req *req, const char *fmt, ...) __printflike(2, 3);
 struct g_class *gctl_get_class(struct gctl_req *req, char const *arg);
 struct g_geom *gctl_get_geom(struct gctl_req *req, struct g_class *mpr, char const *arg);

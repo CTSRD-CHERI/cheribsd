@@ -27,7 +27,7 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd February 20, 2019
+.Dd November 7, 2019
 .Dt ZPOOL 8
 .Os
 .Sh NAME
@@ -192,6 +192,9 @@
 .Op Ar pool
 .Ar ...
 .Op Ar interval Op Ar count
+.Nm
+.Cm sync
+.Oo Ar pool Oc Ns ...
 .Nm
 .Cm upgrade
 .Op Fl v
@@ -599,8 +602,8 @@ Each pool has several properties associated with it. Some properties are
 read-only statistics while others are configurable and change the behavior of
 the pool. The following are read-only properties:
 .Bl -tag -width "dedupratio"
-.It Sy alloc
-Amount of storage space within the pool that has been physically allocated.
+.It Sy allocated
+Amount of storage space used within the pool.
 .It Sy capacity
 Percentage of pool space used. This property can also be referred to by its
 shortened column name, "cap".
@@ -650,8 +653,6 @@ Information about unsupported features that are enabled on the pool.
 See
 .Xr zpool-features 7
 for details.
-.It Sy used
-Amount of storage space used within the pool.
 .El
 .Pp
 The space usage properties report actual physical space available to the
@@ -1573,8 +1574,8 @@ Comma-separated list of properties to display. See the
 section for a list of valid properties. The default list is
 .Sy name ,
 .Sy size ,
-.Sy used ,
-.Sy available ,
+.Sy allocated ,
+.Sy free ,
 .Sy checkpoint ,
 .Sy expandsize ,
 .Sy fragmentation ,
@@ -1913,6 +1914,19 @@ unavailable.
 Warnings about pools not using the latest on-disk format, having non-native
 block size or disabled features will not be included.
 .El
+.It Xo
+.Nm
+.Cm sync
+.Oo Ar pool Oc Ns ...
+.Xc
+Forces all in-core dirty data to be written to the primary pool storage and
+not the ZIL.
+It will also update administrative information including quota reporting.
+Without arguments,
+.Nm zpool Cm sync
+will sync all pools on the system.
+Otherwise, it will only sync the specified
+.Ar pool .
 .It Xo
 .Nm
 .Cm upgrade

@@ -40,7 +40,7 @@ __FBSDID("$FreeBSD$");
 #include "opt_ipsec.h"
 #include "opt_tcpdebug.h"
 #include "opt_ratelimit.h"
-/*#include "opt_kern_tls.h"*/
+#include "opt_kern_tls.h"
 #include <sys/param.h>
 #include <sys/module.h>
 #include <sys/kernel.h>
@@ -50,20 +50,25 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/proc.h>
+#include <sys/qmath.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #ifdef KERN_TLS
-#include <sys/sockbuf_tls.h>
+#include <sys/ktls.h>
 #endif
 #include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/tree.h>
+#ifdef NETFLIX_STATS
+#include <sys/stats.h> /* Must come after qmath.h and tree.h */
+#endif
 #include <sys/refcount.h>
 #include <sys/queue.h>
 #include <sys/smp.h>
 #include <sys/kthread.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
+#include <sys/tim_filter.h>
 #include <sys/time.h>
 #include <vm/uma.h>
 #include <sys/kern_prefetch.h>
@@ -85,6 +90,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip6.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/ip6_var.h>
+#define	TCPOUTFLAGS
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcp_seq.h>
@@ -133,14 +139,14 @@ __FBSDID("$FreeBSD$");
 uint32_t
 ctf_get_opt_tls_size(struct socket *so, uint32_t rwnd)
 {
-	struct sbtls_info *tls;
+	struct ktls_session *tls;
 	uint32_t len;
 
 again:
 	tls = so->so_snd.sb_tls_info;
-	len = tls->sb_params.sb_maxlen;         /* max tls payload */
-	len += tls->sb_params.sb_tls_hlen;      /* tls header len  */
-	len += tls->sb_params.sb_tls_tlen;      /* tls trailer len */
+	len = tls->params.max_frame_len;         /* max tls payload */
+	len += tls->params.tls_hlen;      /* tls header len  */
+	len += tls->params.tls_tlen;      /* tls trailer len */
 	if ((len * 4) > rwnd) {
 		/*
 		 * Stroke this will suck counter and what
@@ -148,16 +154,75 @@ again:
 		 * TCP perspective I am not sure
 		 * what should be done...
 		 */
-		if (tls->sb_params.sb_maxlen > 4096) {
-			tls->sb_params.sb_maxlen -= 4096;
-			if (tls->sb_params.sb_maxlen < 4096)
-				tls->sb_params.sb_maxlen = 4096;
+		if (tls->params.max_frame_len > 4096) {
+			tls->params.max_frame_len -= 4096;
+			if (tls->params.max_frame_len < 4096)
+				tls->params.max_frame_len = 4096;
 			goto again;
 		}
 	}
 	return (len);
 }
 #endif
+
+
+/*
+ * The function ctf_process_inbound_raw() is used by
+ * transport developers to do the steps needed to
+ * support MBUF Queuing i.e. the flags in
+ * inp->inp_flags2:
+ *
+ * - INP_SUPPORTS_MBUFQ
+ * - INP_MBUF_QUEUE_READY
+ * - INP_DONT_SACK_QUEUE
+ * 
+ * These flags help control how LRO will deliver
+ * packets to the transport. You first set in inp_flags2
+ * the INP_SUPPORTS_MBUFQ to tell the LRO code that you
+ * will gladly take a queue of packets instead of a compressed
+ * single packet. You also set in your t_fb pointer the
+ * tfb_do_queued_segments to point to ctf_process_inbound_raw.
+ *
+ * This then gets you lists of inbound ACK's/Data instead
+ * of a condensed compressed ACK/DATA packet. Why would you
+ * want that? This will get you access to all the arrival
+ * times of at least LRO and possibly at the Hardware (if
+ * the interface card supports that) of the actual ACK/DATA.
+ * In some transport designs this is important since knowing
+ * the actual time we got the packet is useful information.
+ *
+ * Now there are some interesting Caveats that the transport
+ * designer needs to take into account when using this feature.
+ * 
+ * 1) It is used with HPTS and pacing, when the pacing timer
+ *    for output calls it will first call the input. 
+ * 2) When you set INP_MBUF_QUEUE_READY this tells LRO
+ *    queue normal packets, I am busy pacing out data and
+ *    will process the queued packets before my tfb_tcp_output
+ *    call from pacing. If a non-normal packet arrives, (e.g. sack)
+ *    you will be awoken immediately.
+ * 3) Finally you can add the INP_DONT_SACK_QUEUE to not even
+ *    be awoken if a SACK has arrived. You would do this when
+ *    you were not only running a pacing for output timer
+ *    but a Rack timer as well i.e. you know you are in recovery
+ *    and are in the process (via the timers) of dealing with
+ *    the loss.
+ *
+ * Now a critical thing you must be aware of here is that the
+ * use of the flags has a far greater scope then just your 
+ * typical LRO. Why? Well thats because in the normal compressed
+ * LRO case at the end of a driver interupt all packets are going
+ * to get presented to the transport no matter if there is one
+ * or 100. With the MBUF_QUEUE model, this is not true. You will
+ * only be awoken to process the queue of packets when:
+ *     a) The flags discussed above allow it.
+ *          <or>
+ *     b) You exceed a ack or data limit (by default the
+ *        ack limit is infinity (64k acks) and the data 
+ *        limit is 64k of new TCP data)
+ *         <or> 
+ *     c) The push bit has been set by the peer
+ */
 
 int
 ctf_process_inbound_raw(struct tcpcb *tp, struct socket *so, struct mbuf *m, int has_pkt)
@@ -188,7 +253,6 @@ ctf_process_inbound_raw(struct tcpcb *tp, struct socket *so, struct mbuf *m, int
 	 */
 	struct mbuf *m_save;
 	struct ether_header *eh;
-	struct epoch_tracker et;
 	struct tcphdr *th;
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;	/* Keep compiler happy. */
@@ -203,14 +267,8 @@ ctf_process_inbound_raw(struct tcpcb *tp, struct socket *so, struct mbuf *m, int
 	uint16_t drop_hdrlen;
 	uint8_t iptos, no_vn=0, bpf_req=0;
 
-	/* 
-	 * This is a bit deceptive, we get the
-	 * "info epoch" which is really the network
-	 * epoch. This covers us on both any INP
-	 * type change but also if the ifp goes
-	 * away it covers us as well.
-	 */
-	INP_INFO_RLOCK_ET(&V_tcbinfo, et);
+	NET_EPOCH_ASSERT();
+
 	if (m && m->m_pkthdr.rcvif)
 		ifp = m->m_pkthdr.rcvif;
 	else
@@ -356,8 +414,8 @@ skip_vnet:
 		 */
 		m->m_pkthdr.lro_nsegs = 1;
 		if (m->m_flags & M_TSTMP_LRO) {
-			tv.tv_sec = m->m_pkthdr.rcv_tstmp / 1000000000;
-			tv.tv_usec = (m->m_pkthdr.rcv_tstmp % 1000000000) / 1000;
+			tv.tv_sec = m->m_pkthdr.rcv_tstmp /1000000000;
+			tv.tv_usec = (m->m_pkthdr.rcv_tstmp % 1000000000)/1000;
 		} else {
 			/* Should not be should we kassert instead? */
 			tcp_get_usecs(&tv);
@@ -372,7 +430,7 @@ skip_vnet:
 		if (retval) {
 			/* We lost the lock and tcb probably */
 			m = m_save;
-			while (m) {
+			while(m) {
 				m_save = m->m_nextpkt;
 				m->m_nextpkt = NULL;
 				m_freem(m);
@@ -380,16 +438,14 @@ skip_vnet:
 			}
 			if (no_vn == 0)
 				CURVNET_RESTORE();
-			INP_INFO_RUNLOCK_ET(&V_tcbinfo, et);
-			return (retval);
+			return(retval);
 		}
 skipped_pkt:
 		m = m_save;
 	}
 	if (no_vn == 0)
 		CURVNET_RESTORE();
-	INP_INFO_RUNLOCK_ET(&V_tcbinfo, et);
-	return (retval);
+	return(retval);
 }
 
 int
@@ -404,7 +460,7 @@ ctf_do_queued_segments(struct socket *so, struct tcpcb *tp, int have_pkt)
 		tp->t_tail_pkt = NULL;
 		if (ctf_process_inbound_raw(tp, so, m, have_pkt)) {
 			/* We lost the tcpcb (maybe a RST came in)? */
-			return (1);
+			return(1);
 		}
 	}
 	return (0);
@@ -413,14 +469,14 @@ ctf_do_queued_segments(struct socket *so, struct tcpcb *tp, int have_pkt)
 uint32_t
 ctf_outstanding(struct tcpcb *tp)
 {
-	return (tp->snd_max - tp->snd_una);
+	return(tp->snd_max - tp->snd_una);
 }
 
 uint32_t 
 ctf_flight_size(struct tcpcb *tp, uint32_t rc_sacked)
 {
 	if (rc_sacked <= ctf_outstanding(tp))
-		return (ctf_outstanding(tp) - rc_sacked);
+		return(ctf_outstanding(tp) - rc_sacked);
 	else {
 		/* TSNH */
 #ifdef INVARIANTS
@@ -495,7 +551,8 @@ ctf_drop_checks(struct tcpopt *to, struct mbuf *m, struct tcphdr *th, struct tcp
 		 * DSACK - add SACK block for dropped range
 		 */
 		if (tp->t_flags & TF_SACK_PERMIT) {
-			tcp_update_sack_list(tp, th->th_seq, th->th_seq + tlen);
+			tcp_update_sack_list(tp, th->th_seq,
+			    th->th_seq + todrop);
 			/*
 			 * ACK now, as the next in-sequence segment
 			 * will clear the DSACK block again
@@ -614,7 +671,6 @@ ctf_process_rst(struct mbuf *m, struct tcphdr *th, struct socket *so, struct tcp
 	    SEQ_LT(th->th_seq, tp->last_ack_sent + tp->rcv_wnd)) ||
 	    (tp->rcv_wnd == 0 && tp->last_ack_sent == th->th_seq)) {
 
-		INP_INFO_RLOCK_ASSERT(&V_tcbinfo);
 		KASSERT(tp->t_state != TCPS_SYN_SENT,
 		    ("%s: TH_RST for TCPS_SYN_SENT th %p tp %p",
 		    __func__, th, tp));
@@ -666,7 +722,8 @@ ctf_process_rst(struct mbuf *m, struct tcphdr *th, struct socket *so, struct tcp
 void
 ctf_challenge_ack(struct mbuf *m, struct tcphdr *th, struct tcpcb *tp, int32_t * ret_val)
 {
-	INP_INFO_RLOCK_ASSERT(&V_tcbinfo);
+
+	NET_EPOCH_ASSERT();
 
 	TCPSTAT_INC(tcps_badsyn);
 	if (V_tcp_insecure_syn &&
@@ -854,5 +911,5 @@ ctf_decay_count(uint32_t count, uint32_t decay)
 	 * count decay value.
 	 */
 	decayed_count = count - (uint32_t)perc_count;
-	return (decayed_count);
+	return(decayed_count);
 }

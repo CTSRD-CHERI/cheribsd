@@ -87,7 +87,7 @@ static const struct args firmware_args[] = {
 static struct cmd firmware_cmd = {
 	.name = "firmware",
 	.fn = firmware,
-	.descr = "Download firmware image to controller.",
+	.descr = "Download firmware image to controller",
 	.ctx_size = sizeof(opt),
 	.opts = firmware_opts,
 	.args = firmware_args,
@@ -104,7 +104,7 @@ slot_has_valid_firmware(int fd, int slot)
 	int				has_fw = false;
 
 	read_logpage(fd, NVME_LOG_FIRMWARE_SLOT,
-	    NVME_GLOBAL_NAMESPACE_TAG, &fw, sizeof(fw));
+	    NVME_GLOBAL_NAMESPACE_TAG, 0, 0, 0, &fw, sizeof(fw));
 
 	if (fw.revision[slot-1] != 0LLU)
 		has_fw = true;
@@ -224,7 +224,7 @@ firmware(const struct cmd *f, int argc, char *argv[])
 	int				activate_action, reboot_required;
 	char				prompt[64];
 	void				*buf = NULL;
-	int32_t				size = 0;
+	int32_t				size = 0, nsid;
 	uint16_t			oacs_fw;
 	uint8_t				fw_slot1_ro, fw_num_slots;
 	struct nvme_controller_data	cdata;
@@ -253,10 +253,6 @@ firmware(const struct cmd *f, int argc, char *argv[])
 		arg_help(argc, argv, f);
 	}
 
-	/* Check that a controller (and not a namespace) was specified. */
-	if (strstr(opt.dev, NVME_NS_PREFIX) != NULL)
-		arg_help(argc, argv, f);
-
 	if (opt.activate && opt.fw_img == NULL && opt.slot == 0) {
 		fprintf(stderr,
 		    "Slot number to activate not specified.\n");
@@ -264,6 +260,14 @@ firmware(const struct cmd *f, int argc, char *argv[])
 	}
 
 	open_dev(opt.dev, &fd, 1, 1);
+
+	/* Check that a controller (and not a namespace) was specified. */
+	get_nsid(fd, NULL, &nsid);
+	if (nsid != 0) {
+		close(fd);
+		arg_help(argc, argv, f);
+	}
+
 	read_controller_data(fd, &cdata);
 
 	oacs_fw = (cdata.oacs >> NVME_CTRLR_DATA_OACS_FIRMWARE_SHIFT) &

@@ -499,7 +499,7 @@ struct xbb_file_data {
 	 * Only a single file based request is outstanding per-xbb instance,
 	 * so we only need one of these.
 	 */
-	kiovec_t	xiovecs[XBB_MAX_SEGMENTS_PER_REQLIST];
+	struct iovec	xiovecs[XBB_MAX_SEGMENTS_PER_REQLIST];
 #ifdef XBB_USE_BOUNCE_BUFFERS
 
 	/**
@@ -511,7 +511,7 @@ struct xbb_file_data {
 	 * bounce-out the read data.  This array serves as the temporary
 	 * storage for this saved data.
 	 */
-	kiovec_t	saved_xiovecs[XBB_MAX_SEGMENTS_PER_REQLIST];
+	struct iovec	saved_xiovecs[XBB_MAX_SEGMENTS_PER_REQLIST];
 
 	/**
 	 * \brief Array of memoized bounce buffer kva offsets used
@@ -2254,7 +2254,7 @@ xbb_dispatch_file(struct xbb_softc *xbb, struct xbb_xen_reqlist *reqlist,
 	u_int		      nseg;
 	struct uio            xuio;
 	struct xbb_sg        *xbb_sg;
-	kiovec_t         *xiovec;
+	struct iovec         *xiovec;
 #ifdef XBB_USE_BOUNCE_BUFFERS
 	void                **p_vaddr;
 	int                   saved_uio_iovcnt;
@@ -3942,12 +3942,3 @@ static driver_t xbb_driver = {
 devclass_t xbb_devclass;
 
 DRIVER_MODULE(xbbd, xenbusb_back, xbb_driver, xbb_devclass, 0, 0);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "kiovec_t"
-//   ]
-// }
-// CHERI CHANGES END

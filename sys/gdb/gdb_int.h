@@ -31,6 +31,20 @@
 #ifndef _GDB_GDB_INT_H_
 #define	_GDB_GDB_INT_H_
 
+#include "opt_ddb.h"
+
+#include <sys/sysctl.h>
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#endif
+
+#ifndef EOF
+#define EOF	(-1)
+#endif
+
+SYSCTL_DECL(_debug_gdb);
+
 extern struct gdb_dbgport *gdb_cur;
 
 extern int gdb_listening;
@@ -39,6 +53,13 @@ void gdb_consinit(void);
 extern char *gdb_rxp;
 extern size_t gdb_rxsz;
 extern char *gdb_txp;
+
+extern bool gdb_ackmode;
+
+#ifdef DDB
+/* If set, return to DDB when controlling GDB detaches. */
+extern bool gdb_return_to_ddb;
+#endif
 
 int gdb_rx_begin(void);
 int gdb_rx_equal(const char *);
@@ -54,7 +75,7 @@ gdb_rx_char(void)
 		c = *gdb_rxp++;
 		gdb_rxsz--;
 	} else
-		c = -1;
+		c = EOF;
 	return (c);
 }
 
@@ -62,6 +83,7 @@ void gdb_tx_begin(char);
 int gdb_tx_end(void);
 int gdb_tx_mem(const unsigned char *, size_t);
 void gdb_tx_reg(int);
+bool gdb_txbuf_has_capacity(size_t);
 int gdb_rx_bindata(unsigned char *data, size_t datalen, size_t *amt);
 int gdb_search_mem(const unsigned char *addr, size_t size,
     const unsigned char *pat, size_t patlen, const unsigned char **found);
@@ -112,6 +134,20 @@ static __inline void
 gdb_tx_varhex(uintmax_t n)
 {
 	gdb_txp += sprintf(gdb_txp, "%jx", n);
+}
+
+static __inline void
+gdb_nack(void)
+{
+	if (gdb_ackmode)
+		gdb_cur->gdb_putc('-');
+}
+
+static __inline void
+gdb_ack(void)
+{
+	if (gdb_ackmode)
+		gdb_cur->gdb_putc('+');
 }
 
 #endif /* !_GDB_GDB_INT_H_ */

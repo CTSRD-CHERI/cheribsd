@@ -413,7 +413,7 @@ int
 sys_shmdt(struct thread *td, struct shmdt_args *uap)
 {
 
-	return (kern_shmdt(td, __USER_CAP_UNBOUND(uap->shmaddr)));
+	return (kern_shmdt(td, uap->shmaddr));
 }
 
 static int
@@ -617,8 +617,7 @@ int
 sys_shmat(struct thread *td, struct shmat_args *uap)
 {
 
-	return (kern_shmat(td, uap->shmid, __USER_CAP_UNBOUND(uap->shmaddr),
-	    uap->shmflg));
+	return (kern_shmat(td, uap->shmid, uap->shmaddr, uap->shmflg));
 }
 
 static int
@@ -748,8 +747,7 @@ int
 sys_shmctl(struct thread *td, struct shmctl_args *uap)
 {
 
-	return (user_shmctl(td, uap->shmid, uap->cmd,
-	    __USER_CAP_OBJ(uap->buf)));
+	return (user_shmctl(td, uap->shmid, uap->cmd, uap->buf));
 }
 
 #ifdef COMPAT_CHERIABI

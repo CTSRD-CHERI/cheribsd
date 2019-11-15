@@ -29,7 +29,7 @@ struct thread;
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define	PADL_(t)	0
 #define	PADR_(t)	PAD_(t)
-#elif _MIPS_SZCAP == 256
+#elif defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
 /*
  * For non-capability arguments, the syscall argument is stored in the
  * cursor field in the second word.
@@ -37,7 +37,7 @@ struct thread;
 #define	PADL_(t)	(sizeof (t) > sizeof(register_t) ? \
 		0 : 2 * sizeof(register_t) - sizeof(t))
 #define	PADR_(t)	(sizeof (t) > sizeof(register_t) ? \
-		0 : 2 * sizeof(register_t)))
+		0 : 2 * sizeof(register_t))
 #else
 #define	PADL_(t)	PAD_(t)
 #define	PADR_(t)	0
@@ -730,6 +730,14 @@ struct freebsd32_cpuset_setdomain_args {
 	char mask_l_[PADL_(domainset_t *)]; domainset_t * mask; char mask_r_[PADR_(domainset_t *)];
 	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
 };
+struct freebsd32___sysctlbyname_args {
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+	char namelen_l_[PADL_(size_t)]; size_t namelen; char namelen_r_[PADR_(size_t)];
+	char old_l_[PADL_(void *)]; void * old; char old_r_[PADR_(void *)];
+	char oldlenp_l_[PADL_(uint32_t *)]; uint32_t * oldlenp; char oldlenp_r_[PADR_(uint32_t *)];
+	char new_l_[PADL_(void *)]; void * new; char new_r_[PADR_(void *)];
+	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
+};
 #if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
@@ -866,6 +874,7 @@ int	freebsd32_mknodat(struct thread *, struct freebsd32_mknodat_args *);
 int	freebsd32_kevent(struct thread *, struct freebsd32_kevent_args *);
 int	freebsd32_cpuset_getdomain(struct thread *, struct freebsd32_cpuset_getdomain_args *);
 int	freebsd32_cpuset_setdomain(struct thread *, struct freebsd32_cpuset_setdomain_args *);
+int	freebsd32___sysctlbyname(struct thread *, struct freebsd32___sysctlbyname_args *);
 
 #ifdef COMPAT_43
 
@@ -1258,6 +1267,30 @@ int	freebsd11_freebsd32_fstatat(struct thread *, struct freebsd11_freebsd32_fsta
 
 #endif /* COMPAT_FREEBSD11 */
 
+
+#ifdef COMPAT_FREEBSD12
+
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
+#define PAD64_REQUIRED
+#endif
+#ifdef PAD64_REQUIRED
+#else
+#endif
+#ifdef PAD64_REQUIRED
+#else
+#endif
+#ifdef PAD64_REQUIRED
+#else
+#endif
+#ifdef PAD64_REQUIRED
+#else
+#endif
+#ifdef PAD64_REQUIRED
+#else
+#endif
+
+#endif /* COMPAT_FREEBSD12 */
+
 #define	FREEBSD32_SYS_AUE_freebsd32_wait4	AUE_WAIT4
 #define	FREEBSD32_SYS_AUE_freebsd4_freebsd32_getfsstat	AUE_GETFSSTAT
 #define	FREEBSD32_SYS_AUE_ofreebsd32_lseek	AUE_LSEEK
@@ -1419,6 +1452,7 @@ int	freebsd11_freebsd32_fstatat(struct thread *, struct freebsd11_freebsd32_fsta
 #define	FREEBSD32_SYS_AUE_freebsd32_kevent	AUE_KEVENT
 #define	FREEBSD32_SYS_AUE_freebsd32_cpuset_getdomain	AUE_NULL
 #define	FREEBSD32_SYS_AUE_freebsd32_cpuset_setdomain	AUE_NULL
+#define	FREEBSD32_SYS_AUE_freebsd32___sysctlbyname	AUE_SYSCTL
 
 #undef PAD_
 #undef PADL_

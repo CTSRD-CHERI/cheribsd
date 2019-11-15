@@ -389,6 +389,13 @@ hdac_pin_patch(struct hdaa_widget *w)
 			patch = "as=1 seq=15";
 			break;
 		}
+	} else if (id == HDA_CODEC_ALC285 &&
+	    subid == LENOVO_X120KH_SUBVENDOR) {
+		switch (nid) {
+		case 33:
+			patch = "as=1 seq=15";
+			break;
+		}
 	} else if (id == HDA_CODEC_ALC269 &&
 	    subid == ASUS_UX31A_SUBVENDOR) {
 		switch (nid) {
@@ -422,13 +429,31 @@ hdac_pin_patch(struct hdaa_widget *w)
 			patch = "as=1 seq=15";
 			break;
 		}
+	} else if (id == HDA_CODEC_ALC298 && HDA_DEV_MATCH(LENOVO_ALL_SUBVENDOR, subid)) {
+		switch (nid) {
+		case 23:
+			config = 0x03a1103f;
+			break;
+		case 33:
+			config = 0x2121101f;
+			break;
+		}
 	} else if (id == HDA_CODEC_ALC298 && subid == DELL_XPS9560_SUBVENDOR) {
 		switch (nid) {
 		case 24:
-			config  = 0x01a1913c;
+			config = 0x01a1913c;
 			break;
 		case 26:
-			config  = 0x01a1913d;
+			config = 0x01a1913d;
+			break;
+		}
+	} else if (id == HDA_CODEC_ALC256 && subid == DELL_I7577_SUBVENDOR) {
+		switch (nid) {
+		case 20:
+			patch = "as=1 seq=0";
+			break;
+		case 33:
+			patch = "as=1 seq=15";
 			break;
 		}
 	}
@@ -768,6 +793,10 @@ hdaa_patch_direct(struct hdaa_devinfo *devinfo)
 			hdaa_write_coef(dev, 0x20, 0x07, 0x7cb);
 		}
 		break;
+	}
+	if (id == HDA_CODEC_ALC255 || id == HDA_CODEC_ALC256) {
+		val = hdaa_read_coef(dev, 0x20, 0x46);
+		hdaa_write_coef(dev, 0x20, 0x46, val|0x3000);
 	}
 	if (subid == APPLE_INTEL_MAC)
 		hda_command(dev, HDA_CMD_12BIT(0, devinfo->nid,

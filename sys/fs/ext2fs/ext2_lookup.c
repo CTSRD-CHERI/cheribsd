@@ -876,7 +876,7 @@ ext2_add_first_entry(struct vnode *dvp, struct ext2fs_direct_2 *entry,
     struct componentname *cnp)
 {
 	struct inode *dp;
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct uio auio;
 	char* buf = NULL;
 	int dirblksize, error;

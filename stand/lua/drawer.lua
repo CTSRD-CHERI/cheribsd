@@ -144,13 +144,20 @@ local function drawmenu(menudef)
 	return alias_table
 end
 
+local function defaultframe()
+	if core.isSerialConsole() then
+		return "ascii"
+	end
+	return "double"
+end
+
 local function drawbox()
 	local x = menu_position.x - 3
 	local y = menu_position.y - 1
 	local w = frame_size.w
 	local h = frame_size.h
 
-	local framestyle = loader.getenv("loader_menu_frame") or "double"
+	local framestyle = loader.getenv("loader_menu_frame") or defaultframe()
 	local framespec = drawer.frame_styles[framestyle]
 	-- If we don't have a framespec for the current frame style, just don't
 	-- draw a box.
@@ -370,20 +377,20 @@ drawer.frame_styles = {
 		bottom_right	= "+",
 	},
 	["single"] = {
-		horizontal	= "\xC4",
-		vertical	= "\xB3",
-		top_left	= "\xDA",
-		bottom_left	= "\xC0",
-		top_right	= "\xBF",
-		bottom_right	= "\xD9",
+		horizontal	= "\xE2\x94\x80",
+		vertical	= "\xE2\x94\x82",
+		top_left	= "\xE2\x94\x8C",
+		bottom_left	= "\xE2\x94\x94",
+		top_right	= "\xE2\x94\x90",
+		bottom_right	= "\xE2\x94\x98",
 	},
 	["double"] = {
-		horizontal	= "\xCD",
-		vertical	= "\xBA",
-		top_left	= "\xC9",
-		bottom_left	= "\xC8",
-		top_right	= "\xBB",
-		bottom_right	= "\xBC",
+		horizontal	= "\xE2\x95\x90",
+		vertical	= "\xE2\x95\x91",
+		top_left	= "\xE2\x95\x94",
+		bottom_left	= "\xE2\x95\x9A",
+		top_right	= "\xE2\x95\x97",
+		bottom_right	= "\xE2\x95\x9D",
 	},
 }
 

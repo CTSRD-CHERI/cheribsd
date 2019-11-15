@@ -361,7 +361,7 @@ pmclog_loop(void *arg)
 	struct thread *td;
 	sigset_t unb;
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	size_t nbytes;
 	int error;
 
@@ -1296,11 +1296,10 @@ pmclog_shutdown()
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

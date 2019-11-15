@@ -166,7 +166,7 @@ CC		?=	c89
 CFLAGS		?=	-O
 .else
 CC		?=	cc
-.if ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "mips"
+.if ${MACHINE_CPUARCH} == "mips"
 CFLAGS		?=	-O -pipe
 .else
 CFLAGS		?=	-O2 -pipe
@@ -177,8 +177,6 @@ CFLAGS		+=	-fno-strict-aliasing
 .endif
 IR_CFLAGS	?=	${STATIC_CFLAGS:N-O*} ${CFLAGS:N-O*}
 PO_CFLAGS	?=	${CFLAGS}
-
-CHERI_CC	?=	/usr/local/bin/cheri-unknown-freebsd-clang
 
 # cp(1) is used to copy source files to ${.OBJDIR}, make sure it can handle
 # read-only files as non-root by passing -f.

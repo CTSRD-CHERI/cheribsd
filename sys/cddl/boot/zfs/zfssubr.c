@@ -26,6 +26,8 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include <lz4.h>
+
 static uint64_t zfs_crc64_table[256];
 
 #define	ECKSUM	666
@@ -161,7 +163,6 @@ typedef struct zio_compress_info {
 
 #include "lzjb.c"
 #include "zle.c"
-#include "lz4.c"
 
 /*
  * Compression vectors.
@@ -318,8 +319,9 @@ zio_checksum_verify(const spa_t *spa, const blkptr_t *bp, void *data)
 			byteswap_uint64_array(&expected_cksum,
 			    sizeof (zio_cksum_t));
 	} else {
+		byteswap = BP_SHOULD_BYTESWAP(bp);
 		expected_cksum = bp->blk_cksum;
-		ci->ci_func[0](data, size, ctx, &actual_cksum);
+		ci->ci_func[byteswap](data, size, ctx, &actual_cksum);
 	}
 
 	if (!ZIO_CHECKSUM_EQUAL(actual_cksum, expected_cksum)) {

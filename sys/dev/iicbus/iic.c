@@ -362,7 +362,7 @@ iicioctl(struct cdev *dev, u_long cmd, caddr_t data, int flags, struct thread *t
 	device_t parent, iicdev;
 	struct iiccmd *s;
 	struct uio ubuf;
-	kiovec_t uvec;
+	struct iovec uvec;
 	struct iic_cdevpriv *priv;
 	int error;
 
@@ -502,11 +502,10 @@ MODULE_DEPEND(iic, iicbus, IICBUS_MINVER, IICBUS_PREFVER, IICBUS_MAXVER);
 MODULE_VERSION(iic, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

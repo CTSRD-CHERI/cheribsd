@@ -175,7 +175,7 @@ icl_conn_receive(struct icl_conn *ic, size_t len)
 static int
 icl_conn_receive_buf(struct icl_conn *ic, void *buf, size_t len)
 {
-	kiovec_t iov[1];
+	struct iovec iov[1];
 	struct uio uio;
 	struct socket *so;
 	int error, flags;
@@ -1565,11 +1565,10 @@ MODULE_DEPEND(icl_soft, icl, 1, 1, 1);
 MODULE_VERSION(icl_soft, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

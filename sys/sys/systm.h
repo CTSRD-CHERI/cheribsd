@@ -405,6 +405,7 @@ void	*memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #else
+#define	memcpy_c	memcpy
 #define	cheri_memcpy	memcpy
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);

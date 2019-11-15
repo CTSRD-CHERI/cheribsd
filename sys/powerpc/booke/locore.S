@@ -39,6 +39,10 @@
 #include <machine/vmparam.h>
 #include <machine/tlb.h>
 
+#ifdef _CALL_ELF
+.abiversion _CALL_ELF
+#endif
+
 #define TMPSTACKSZ	16384
 
 #ifdef __powerpc64__
@@ -74,6 +78,12 @@
 #define	ADDR(x)	\
 	.long	x
 #define	WORD_SIZE	4
+#endif
+
+#ifdef __powerpc64__
+	/* Placate lld by creating a kboot stub. */
+        .section ".text.kboot", "x", @progbits
+        b __start
 #endif
 
 	.text
@@ -252,7 +262,6 @@ __start:
 	isync
 	li	%r4, 0
 	mtspr	SPR_MAS7, %r4
-	bl	zero_mas8
 	isync
 	tlbwe
 	isync
@@ -298,16 +307,21 @@ done_mapping:
 	ld	%r1,0(%r2)
 	add	%r2,%r1,%r2
 	mtspr	SPR_SPRG8, %r2
+	nop
 
 	/* Get load offset */
 	ld	%r31,-0x8000(%r2) /* First TOC entry is TOC base */
 	subf    %r31,%r31,%r2	/* Subtract from real TOC base to get base */
 
 	/* Set up the stack pointer */
-	addis	%r1,%r2,TOC_REF(tmpstack)@ha
-	ld	%r1,TOC_REF(tmpstack)@l(%r1)
-	addi	%r1,%r1,TMPSTACKSZ-96
-	add	%r1,%r1,%r31
+	bl	1f
+	.llong	tmpstack + TMPSTACKSZ - 96 - .
+1:	mflr	%r3
+	ld	%r1,0(%r3)
+	add	%r1,%r1,%r3
+/*
+ * Relocate kernel
+ */
 	bl	1f
 	.llong _DYNAMIC-.
 1:	mflr	%r3
@@ -378,15 +392,62 @@ done_mapping:
 	.globl	__boot_page
 	.align	12
 __boot_page:
-	bl	1f
+	/*
+	 * The boot page is a special page of memory used during AP bringup.
+	 * Before the AP comes out of reset, the physical 4K page holding this
+	 * code is arranged to be mapped at 0xfffff000 by use of
+	 * platform-dependent registers.
+	 *
+	 * Alternatively, this page may be executed using an ePAPR-standardized
+	 * method -- writing to the address specified in "cpu-release-addr".
+	 *
+	 * In either case, execution begins at the last instruction of the
+	 * page, which is a branch back to the start of the page.
+	 *
+	 * The code in the page must do initial MMU setup and normalize the
+	 * TLBs for regular operation in the correct address space before
+	 * reading outside the page.
+	 *
+	 * This implementation accomplishes this by:
+	 * 1) Wiping TLB0 and all TLB1 entries but the one currently in use.
+	 * 2) Establishing a temporary 4K TLB1 mapping in AS=1, and switching
+	 *    to it with rfi. This entry must NOT be in TLB1 slot 0.
+	 *    (This is needed to give the code freedom to clean up AS=0.)
+	 * 3) Removing the initial TLB1 entry, leaving us with a single valid
+	 *    TLB1 entry, NOT in slot 0.
+	 * 4) Installing an AS0 entry in TLB1 slot 0 mapping the 64MB kernel
+	 *    segment at its final virtual address. A second rfi is done to
+	 *    switch to the final address space. At this point we can finally
+	 *    access the rest of the kernel segment safely.
+	 * 5) The temporary TLB1 AS=1 entry is removed, finally leaving us in
+	 *    a consistent (but minimal) state.
+	 * 6) Set up TOC, stack, and pcpu registers.
+	 * 7) Now that we can finally call C code, call pmap_boostrap_ap(),
+	 *    which finishes copying in the shared TLB1 entries.
+	 *
+	 * At this point, the MMU is fully set up, and we can proceed with
+	 * running the actual AP bootstrap code.
+	 *
+	 * Pieces of this code are also used for UP kernel, but in this case
+	 * the sections specific to boot page functionality are dropped by
+	 * the preprocessor.
+	 */
+#ifdef __powerpc64__
+	nop			/* PPC64 alignment word. 64-bit target. */
+#endif
+	bl	1f		/* 32-bit target. */
 
 	.globl	bp_trace
 bp_trace:
-	.long	0
+	ADDR(0)			/* Trace pointer (%r31). */
 
 	.globl	bp_kernload
 bp_kernload:
-	.long	0
+	ADDR(0)			/* Kern phys. load address. */
+
+	.globl	bp_virtaddr
+bp_virtaddr:
+	ADDR(0)			/* Virt. address of __boot_page. */
 
 /*
  * Initial configuration
@@ -443,7 +504,7 @@ bp_kernload:
 	mfmsr	%r3
 	ori	%r3, %r3, (PSL_IS | PSL_DS)
 #ifdef __powerpc64__
-	oris	%r3, %r3, PSL_CM@h
+	oris	%r3, %r3, PSL_CM@h	/* Ensure we're in 64-bit after RFI */
 #endif
 	bl	3f
 3:	mflr	%r4
@@ -460,7 +521,7 @@ bp_kernload:
 	bl	tlb1_inval_entry
 
 /*
- * Setup final mapping in TLB1[1] and switch to it
+ * Setup final mapping in TLB1[0] and switch to it
  */
 	/* Final kernel mapping, map in 64 MB of RAM */
 	lis	%r3, MAS0_TLBSEL1@h	/* Select TLB1 */
@@ -480,35 +541,22 @@ bp_kernload:
 	isync
 
 	/* Retrieve kernel load [physical] address from bp_kernload */
+5:
+	mflr	%r3
 #ifdef __powerpc64__
-	b	0f
-	.align	3
-0:
-	nop
-#endif
-	bl 5f
-	ADDR(bp_kernload)
-	ADDR(__boot_page)
-5:	mflr	%r3
-#ifdef __powerpc64__
-	ld	%r4, 0(%r3)
-	ld	%r5, 8(%r3)
-	clrrdi	%r3, %r3, 12
+	clrrdi	%r3, %r3, PAGE_SHIFT	/* trunc_page(%r3) */
 #else
-	lwz	%r4, 0(%r3)
-	lwz	%r5, 4(%r3)
-	rlwinm	%r3, %r3, 0, 0, 19
+	clrrwi	%r3, %r3, PAGE_SHIFT	/* trunc_page(%r3) */
 #endif
-	sub	%r4, %r4, %r5	/* offset of bp_kernload within __boot_page */
-	lwzx	%r3, %r4, %r3
+	LOAD	%r4, (bp_kernload - __boot_page)(%r3)
+	LOAD	%r5, (bp_virtaddr - __boot_page)(%r3)
 
 	/* Set RPN and protection */
-	ori	%r3, %r3, (MAS3_SX | MAS3_SW | MAS3_SR)@l
-	mtspr	SPR_MAS3, %r3
+	ori	%r4, %r4, (MAS3_SX | MAS3_SW | MAS3_SR)@l
+	mtspr	SPR_MAS3, %r4
 	isync
 	li	%r4, 0
 	mtspr	SPR_MAS7, %r4
-	bl	zero_mas8
 	isync
 	tlbwe
 	isync
@@ -518,8 +566,8 @@ bp_kernload:
 	bl	6f
 6:	mflr	%r3
 	rlwinm	%r3, %r3, 0, 0xfff	/* Offset from boot page start */
-	add	%r3, %r3, %r5		/* Make this virtual address */
-	addi	%r3, %r3, (7f - 6b)
+	add	%r3, %r3, %r5		/* Make this a virtual address */
+	addi	%r3, %r3, (7f - 6b)	/* And figure out return address. */
 #ifdef __powerpc64__
 	lis	%r4, PSL_CM@h		/* Note AS=0 */
 #else
@@ -700,7 +748,6 @@ tlb1_temp_mapping_as1:
 	mflr	%r3
 	li	%r4, 0
 	mtspr	SPR_MAS7, %r4
-	bl	zero_mas8
 	mtlr	%r3
 	isync
 	tlbwe
@@ -737,24 +784,6 @@ tlb1_inval_all_but_current:
 	cmpw	%r4, %r3		/* Check if this is the last entry */
 	bne	1b
 	blr
-
-/*
- * MAS8 conditional zeroing.
- */
-.globl zero_mas8
-zero_mas8:
-	mfpvr	%r20
-	rlwinm	%r20, %r20, 16, 16, 31
-	cmpli	0, 0, %r20, FSL_E500mc
-	beq	1f
-	cmpli	0, 0, %r20, FSL_E5500
-	beq	1f
-
-	blr
-1:
-	li	%r20, 0
-	mtspr	SPR_MAS8, %r20
-	blr
 #endif
 
 #ifdef SMP
@@ -777,6 +806,11 @@ __boot_page_padding:
 	 */
 	.space	4092 - (__boot_page_padding - __boot_page)
 	b	__boot_page
+	/*
+	 * This is the end of the boot page.
+	 * During AP startup, the previous instruction is at 0xfffffffc
+	 * virtual (i.e. the reset vector.)
+	 */
 #endif /* SMP */
 
 /************************************************************************/
@@ -900,6 +934,7 @@ ENTRY(bpred_enable)
  * created.
  */
 ENTRY(get_spr)
+	/* Note: The spr number is patched at runtime */
 	mfspr	%r3, 0
 	blr
 
@@ -919,7 +954,9 @@ tmpstackbound:
 	.space 10240	/* XXX: this really should not be necessary */
 #ifdef __powerpc64__
 TOC_ENTRY(tmpstack)
+#ifdef SMP
 TOC_ENTRY(bp_kernload)
+#endif
 #endif
 
 /*

@@ -855,7 +855,7 @@ cuse_proc2proc_copy(struct proc *proc_s, vm_offset_t data_s,
 	proc_cur = td->td_proc;
 
 	if (proc_cur == proc_d) {
-		kiovec_t iov;
+		struct iovec iov;
 		IOVEC_INIT(&iov, (void *)data_d, len);
 		struct uio uio = {
 			.uio_iov = &iov,
@@ -872,7 +872,7 @@ cuse_proc2proc_copy(struct proc *proc_s, vm_offset_t data_s,
 		PRELE(proc_s);
 
 	} else if (proc_cur == proc_s) {
-		kiovec_t iov;
+		struct iovec iov;
 		IOVEC_INIT(&iov, (void *)data_s, len);
 		struct uio uio = {
 			.uio_iov = &iov,
@@ -1910,11 +1910,10 @@ cuse_client_kqfilter(struct cdev *dev, struct knote *kn)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

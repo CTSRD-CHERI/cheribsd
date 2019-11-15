@@ -583,7 +583,7 @@ soaio_process_job(struct socket *so, struct sockbuf *sb, struct kaiocb *job)
 	struct thread *td;
 	struct file *fp;
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	size_t cnt, done;
 	long ru_before;
 	int error, flags;
@@ -822,11 +822,10 @@ soo_aio_queue(struct file *fp, struct kaiocb *job)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

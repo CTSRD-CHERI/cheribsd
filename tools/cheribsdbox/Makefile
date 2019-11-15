@@ -69,7 +69,9 @@ CRUNCH_SHLIBS+=	-lz
 
 # grep/tar/xz
 CRUNCH_LIBS+=	-llzma
-CRUNCH_LIBS+=	-larchive
+CRUNCH_LIBS+=	-larchive -lprivatezstd
+CRUNCH_SHLIBS+=	-pthread
+
 # ktrace:
 CRUNCH_LIBS+=	-lsysdecode
 

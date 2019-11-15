@@ -1112,26 +1112,12 @@ t4_teardown_adapter_queues(struct adapter *sc)
 
 /* Maximum payload that can be delivered with a single iq descriptor */
 static inline int
-mtu_to_max_payload(struct adapter *sc, int mtu, const int toe)
+mtu_to_max_payload(struct adapter *sc, int mtu)
 {
-	int payload;
 
-#ifdef TCP_OFFLOAD
-	if (toe) {
-		int rxcs = G_RXCOALESCESIZE(t4_read_reg(sc, A_TP_PARA_REG2));
-
-		/* Note that COP can set rx_coalesce on/off per connection. */
-		payload = max(mtu, rxcs);
-	} else {
-#endif
-		/* large enough even when hw VLAN extraction is disabled */
-		payload = sc->params.sge.fl_pktshift + ETHER_HDR_LEN +
-		    ETHER_VLAN_ENCAP_LEN + mtu;
-#ifdef TCP_OFFLOAD
-	}
-#endif
-
-	return (payload);
+	/* large enough even when hw VLAN extraction is disabled */
+	return (sc->params.sge.fl_pktshift + ETHER_HDR_LEN +
+	    ETHER_VLAN_ENCAP_LEN + mtu);
 }
 
 int
@@ -1201,7 +1187,7 @@ t4_setup_vi_queues(struct vi_info *vi)
 	 * Allocate rx queues first because a default iqid is required when
 	 * creating a tx queue.
 	 */
-	maxp = mtu_to_max_payload(sc, mtu, 0);
+	maxp = mtu_to_max_payload(sc, mtu);
 	oid = SYSCTL_ADD_NODE(&vi->ctx, children, OID_AUTO, "rxq",
 	    CTLFLAG_RD, NULL, "rx queues");
 	for_each_rxq(vi, i, rxq) {
@@ -1223,7 +1209,6 @@ t4_setup_vi_queues(struct vi_info *vi)
 		intr_idx = saved_idx + max(vi->nrxq, vi->nnmrxq);
 #endif
 #ifdef TCP_OFFLOAD
-	maxp = mtu_to_max_payload(sc, mtu, 1);
 	oid = SYSCTL_ADD_NODE(&vi->ctx, children, OID_AUTO, "ofld_rxq",
 	    CTLFLAG_RD, NULL, "rx queues for offloaded TCP connections");
 	for_each_ofld_rxq(vi, i, ofld_rxq) {
@@ -2194,7 +2179,7 @@ t4_update_fl_bufsize(struct ifnet *ifp)
 	struct sge_fl *fl;
 	int i, maxp, mtu = ifp->if_mtu;
 
-	maxp = mtu_to_max_payload(sc, mtu, 0);
+	maxp = mtu_to_max_payload(sc, mtu);
 	for_each_rxq(vi, i, rxq) {
 		fl = &rxq->fl;
 
@@ -2203,7 +2188,6 @@ t4_update_fl_bufsize(struct ifnet *ifp)
 		FL_UNLOCK(fl);
 	}
 #ifdef TCP_OFFLOAD
-	maxp = mtu_to_max_payload(sc, mtu, 1);
 	for_each_ofld_rxq(vi, i, ofld_rxq) {
 		fl = &ofld_rxq->fl;
 
@@ -2323,10 +2307,10 @@ set_mbuf_eo_tsclk_tsoff(struct mbuf *m, uint8_t tsclk_tsoff)
 }
 
 static inline int
-needs_eo(struct mbuf *m)
+needs_eo(struct cxgbe_snd_tag *cst)
 {
 
-	return (m->m_pkthdr.csum_flags & CSUM_SND_TAG);
+	return (cst != NULL && cst->type == IF_SND_TAG_TYPE_RATE_LIMIT);
 }
 #endif
 
@@ -2558,6 +2542,9 @@ parse_pkt(struct adapter *sc, struct mbuf **mp)
 #if defined(INET) || defined(INET6)
 	struct tcphdr *tcp;
 #endif
+#ifdef RATELIMIT
+	struct cxgbe_snd_tag *cst;
+#endif
 	uint16_t eh_type;
 	uint8_t cflags;
 
@@ -2578,6 +2565,12 @@ restart:
 	M_ASSERTPKTHDR(m0);
 	MPASS(m0->m_pkthdr.len > 0);
 	nsegs = count_mbuf_nsegs(m0, 0, &cflags);
+#ifdef RATELIMIT
+	if (m0->m_pkthdr.csum_flags & CSUM_SND_TAG)
+		cst = mst_to_cst(m0->m_pkthdr.snd_tag);
+	else
+		cst = NULL;
+#endif
 	if (nsegs > (needs_tso(m0) ? TX_SGL_SEGS_TSO : TX_SGL_SEGS)) {
 		if (defragged++ > 0 || (m = m_defrag(m0, M_NOWAIT)) == NULL) {
 			rc = EFBIG;
@@ -2611,16 +2604,17 @@ restart:
 	 * checksumming is enabled.  needs_l4_csum happens to check for all the
 	 * right things.
 	 */
-	if (__predict_false(needs_eo(m0) && !needs_l4_csum(m0))) {
+	if (__predict_false(needs_eo(cst) && !needs_l4_csum(m0))) {
 		m_snd_tag_rele(m0->m_pkthdr.snd_tag);
 		m0->m_pkthdr.snd_tag = NULL;
 		m0->m_pkthdr.csum_flags &= ~CSUM_SND_TAG;
+		cst = NULL;
 	}
 #endif
 
 	if (!needs_tso(m0) &&
 #ifdef RATELIMIT
-	    !needs_eo(m0) &&
+	    !needs_eo(cst) &&
 #endif
 	    !(sc->flags & IS_VF && (needs_l3_csum(m0) || needs_l4_csum(m0))))
 		return (0);
@@ -2682,7 +2676,7 @@ restart:
 #endif
 	}
 #ifdef RATELIMIT
-	if (needs_eo(m0)) {
+	if (needs_eo(cst)) {
 		u_int immhdrs;
 
 		/* EO WRs have the headers in the WR and not the GL. */
@@ -2865,6 +2859,7 @@ wr_can_update_eq(struct fw_eth_tx_pkts_wr *wr)
 	case FW_ULPTX_WR:
 	case FW_ETH_TX_PKT_WR:
 	case FW_ETH_TX_PKTS_WR:
+	case FW_ETH_TX_PKTS2_WR:
 	case FW_ETH_TX_PKT_VM_WR:
 		return (1);
 	default:
@@ -3217,7 +3212,7 @@ alloc_iq_fl(struct vi_info *vi, struct sge_iq *iq, struct sge_fl *fl,
 		}
 		c.fl0dcaen_to_fl0cidxfthresh =
 		    htobe16(V_FW_IQ_CMD_FL0FBMIN(chip_id(sc) <= CHELSIO_T5 ?
-			X_FETCHBURSTMIN_128B : X_FETCHBURSTMIN_64B) |
+			X_FETCHBURSTMIN_128B : X_FETCHBURSTMIN_64B_T6) |
 			V_FW_IQ_CMD_FL0FBMAX(chip_id(sc) <= CHELSIO_T5 ?
 			X_FETCHBURSTMAX_512B : X_FETCHBURSTMAX_256B));
 		c.fl0size = htobe16(fl->qsize);
@@ -3803,7 +3798,8 @@ ctrl_eq_alloc(struct adapter *sc, struct sge_eq *eq)
 		V_FW_EQ_CTRL_CMD_PCIECHN(eq->tx_chan) |
 		F_FW_EQ_CTRL_CMD_FETCHRO | V_FW_EQ_CTRL_CMD_IQID(eq->iqid));
 	c.dcaen_to_eqsize =
-	    htobe32(V_FW_EQ_CTRL_CMD_FBMIN(X_FETCHBURSTMIN_64B) |
+	    htobe32(V_FW_EQ_CTRL_CMD_FBMIN(chip_id(sc) <= CHELSIO_T5 ?
+		X_FETCHBURSTMIN_64B : X_FETCHBURSTMIN_64B_T6) |
 		V_FW_EQ_CTRL_CMD_FBMAX(X_FETCHBURSTMAX_512B) |
 		V_FW_EQ_CTRL_CMD_CIDXFTHRESH(qsize_to_fthresh(qsize)) |
 		V_FW_EQ_CTRL_CMD_EQSIZE(qsize));
@@ -3847,9 +3843,11 @@ eth_eq_alloc(struct adapter *sc, struct vi_info *vi, struct sge_eq *eq)
 	    htobe32(V_FW_EQ_ETH_CMD_HOSTFCMODE(X_HOSTFCMODE_NONE) |
 		V_FW_EQ_ETH_CMD_PCIECHN(eq->tx_chan) | F_FW_EQ_ETH_CMD_FETCHRO |
 		V_FW_EQ_ETH_CMD_IQID(eq->iqid));
-	c.dcaen_to_eqsize = htobe32(V_FW_EQ_ETH_CMD_FBMIN(X_FETCHBURSTMIN_64B) |
-	    V_FW_EQ_ETH_CMD_FBMAX(X_FETCHBURSTMAX_512B) |
-	    V_FW_EQ_ETH_CMD_EQSIZE(qsize));
+	c.dcaen_to_eqsize =
+	    htobe32(V_FW_EQ_ETH_CMD_FBMIN(chip_id(sc) <= CHELSIO_T5 ?
+		X_FETCHBURSTMIN_64B : X_FETCHBURSTMIN_64B_T6) |
+		V_FW_EQ_ETH_CMD_FBMAX(X_FETCHBURSTMAX_512B) |
+		V_FW_EQ_ETH_CMD_EQSIZE(qsize));
 	c.eqaddr = htobe64(eq->ba);
 
 	rc = -t4_wr_mbox(sc, sc->mbox, &c, sizeof(c), &c);
@@ -3891,7 +3889,8 @@ ofld_eq_alloc(struct adapter *sc, struct vi_info *vi, struct sge_eq *eq)
 		    V_FW_EQ_OFLD_CMD_PCIECHN(eq->tx_chan) |
 		    F_FW_EQ_OFLD_CMD_FETCHRO | V_FW_EQ_OFLD_CMD_IQID(eq->iqid));
 	c.dcaen_to_eqsize =
-	    htobe32(V_FW_EQ_OFLD_CMD_FBMIN(X_FETCHBURSTMIN_64B) |
+	    htobe32(V_FW_EQ_OFLD_CMD_FBMIN(chip_id(sc) <= CHELSIO_T5 ?
+		X_FETCHBURSTMIN_64B : X_FETCHBURSTMIN_64B_T6) |
 		V_FW_EQ_OFLD_CMD_FBMAX(X_FETCHBURSTMAX_512B) |
 		V_FW_EQ_OFLD_CMD_CIDXFTHRESH(qsize_to_fthresh(qsize)) |
 		V_FW_EQ_OFLD_CMD_EQSIZE(qsize));
@@ -5738,7 +5737,7 @@ done:
 #define ETID_FLOWC_LEN16 (howmany(ETID_FLOWC_LEN, 16))
 
 static int
-send_etid_flowc_wr(struct cxgbe_snd_tag *cst, struct port_info *pi,
+send_etid_flowc_wr(struct cxgbe_rate_tag *cst, struct port_info *pi,
     struct vi_info *vi)
 {
 	struct wrq_cookie cookie;
@@ -5784,7 +5783,7 @@ send_etid_flowc_wr(struct cxgbe_snd_tag *cst, struct port_info *pi,
 #define ETID_FLUSH_LEN16 (howmany(sizeof (struct fw_flowc_wr), 16))
 
 void
-send_etid_flush_wr(struct cxgbe_snd_tag *cst)
+send_etid_flush_wr(struct cxgbe_rate_tag *cst)
 {
 	struct fw_flowc_wr *flowc;
 	struct wrq_cookie cookie;
@@ -5810,7 +5809,7 @@ send_etid_flush_wr(struct cxgbe_snd_tag *cst)
 }
 
 static void
-write_ethofld_wr(struct cxgbe_snd_tag *cst, struct fw_eth_tx_eo_wr *wr,
+write_ethofld_wr(struct cxgbe_rate_tag *cst, struct fw_eth_tx_eo_wr *wr,
     struct mbuf *m0, int compl)
 {
 	struct cpl_tx_pkt_core *cpl;
@@ -5959,7 +5958,7 @@ write_ethofld_wr(struct cxgbe_snd_tag *cst, struct fw_eth_tx_eo_wr *wr,
 }
 
 static void
-ethofld_tx(struct cxgbe_snd_tag *cst)
+ethofld_tx(struct cxgbe_rate_tag *cst)
 {
 	struct mbuf *m;
 	struct wrq_cookie cookie;
@@ -5992,7 +5991,7 @@ ethofld_tx(struct cxgbe_snd_tag *cst)
 		cst->tx_credits -= next_credits;
 		cst->tx_nocompl += next_credits;
 		compl = cst->ncompl == 0 || cst->tx_nocompl >= cst->tx_total / 2;
-		ETHER_BPF_MTAP(cst->com.ifp, m);
+		ETHER_BPF_MTAP(cst->com.com.ifp, m);
 		write_ethofld_wr(cst, wr, m, compl);
 		commit_wrq_wr(cst->eo_txq, wr, &cookie);
 		if (compl) {
@@ -6004,7 +6003,7 @@ ethofld_tx(struct cxgbe_snd_tag *cst)
 		/*
 		 * Drop the mbuf's reference on the tag now rather
 		 * than waiting until m_freem().  This ensures that
-		 * cxgbe_snd_tag_free gets called when the inp drops
+		 * cxgbe_rate_tag_free gets called when the inp drops
 		 * its reference on the tag and there are no more
 		 * mbufs in the pending_tx queue and can flush any
 		 * pending requests.  Otherwise if the last mbuf
@@ -6013,7 +6012,7 @@ ethofld_tx(struct cxgbe_snd_tag *cst)
 		 */
 		m->m_pkthdr.snd_tag = NULL;
 		m->m_pkthdr.csum_flags &= ~CSUM_SND_TAG;
-		m_snd_tag_rele(&cst->com);
+		m_snd_tag_rele(&cst->com.com);
 
 		mbufq_enqueue(&cst->pending_fwack, m);
 	}
@@ -6022,13 +6021,13 @@ ethofld_tx(struct cxgbe_snd_tag *cst)
 int
 ethofld_transmit(struct ifnet *ifp, struct mbuf *m0)
 {
-	struct cxgbe_snd_tag *cst;
+	struct cxgbe_rate_tag *cst;
 	int rc;
 
 	MPASS(m0->m_nextpkt == NULL);
 	MPASS(m0->m_pkthdr.csum_flags & CSUM_SND_TAG);
 	MPASS(m0->m_pkthdr.snd_tag != NULL);
-	cst = mst_to_cst(m0->m_pkthdr.snd_tag);
+	cst = mst_to_crt(m0->m_pkthdr.snd_tag);
 
 	mtx_lock(&cst->lock);
 	MPASS(cst->flags & EO_SND_TAG_REF);
@@ -6067,10 +6066,10 @@ ethofld_transmit(struct ifnet *ifp, struct mbuf *m0)
 	 * ethofld_tx() in case we are sending the final mbuf after
 	 * the inp was freed.
 	 */
-	m_snd_tag_ref(&cst->com);
+	m_snd_tag_ref(&cst->com.com);
 	ethofld_tx(cst);
 	mtx_unlock(&cst->lock);
-	m_snd_tag_rele(&cst->com);
+	m_snd_tag_rele(&cst->com.com);
 	return (0);
 
 done:
@@ -6087,7 +6086,7 @@ ethofld_fw4_ack(struct sge_iq *iq, const struct rss_header *rss, struct mbuf *m0
 	const struct cpl_fw4_ack *cpl = (const void *)(rss + 1);
 	struct mbuf *m;
 	u_int etid = G_CPL_FW4_ACK_FLOWID(be32toh(OPCODE_TID(cpl)));
-	struct cxgbe_snd_tag *cst;
+	struct cxgbe_rate_tag *cst;
 	uint8_t credits = cpl->credits;
 
 	cst = lookup_etid(sc, etid);
@@ -6119,7 +6118,7 @@ ethofld_fw4_ack(struct sge_iq *iq, const struct rss_header *rss, struct mbuf *m0
 
 			cst->flags &= ~EO_FLUSH_RPL_PENDING;
 			cst->tx_credits += cpl->credits;
-			cxgbe_snd_tag_free_locked(cst);
+			cxgbe_rate_tag_free_locked(cst);
 			return (0);	/* cst is gone. */
 		}
 		KASSERT(m != NULL,
@@ -6141,12 +6140,12 @@ ethofld_fw4_ack(struct sge_iq *iq, const struct rss_header *rss, struct mbuf *m0
 		 * As with ethofld_transmit(), hold an extra reference
 		 * so that the tag is stable across ethold_tx().
 		 */
-		m_snd_tag_ref(&cst->com);	
+		m_snd_tag_ref(&cst->com.com);
 		m = mbufq_first(&cst->pending_tx);
 		if (m != NULL && cst->tx_credits >= mbuf_eo_len16(m))
 			ethofld_tx(cst);
 		mtx_unlock(&cst->lock);
-		m_snd_tag_rele(&cst->com);
+		m_snd_tag_rele(&cst->com.com);
 	} else {
 		/*
 		 * There shouldn't be any pending packets if the tag

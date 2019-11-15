@@ -9,9 +9,4 @@ NEED_CHERI=	pure
 
 NO_WERROR=	YES
 
-.if ${MK_CHERI_SHARED} == "yes"
-# Always build shared if we're building shared libs.
-MK_CHERI_SHARED_PROG=yes
-.endif
-
 .include <bsd.prog.mk>

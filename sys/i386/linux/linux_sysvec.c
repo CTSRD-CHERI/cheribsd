@@ -67,7 +67,6 @@ __FBSDID("$FreeBSD$");
 #include <i386/linux/linux.h>
 #include <i386/linux/linux_proto.h>
 #include <compat/linux/linux_emul.h>
-#include <compat/linux/linux_futex.h>
 #include <compat/linux/linux_ioctl.h>
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_misc.h>
@@ -1007,6 +1006,7 @@ linux_elf_modevent(module_t mod, int type, void *data)
 			linux_get_machine(&linux_kplatform);
 			linux_szplatform = roundup(strlen(linux_kplatform) + 1,
 			    sizeof(char *));
+			linux_dev_shm_create();
 			linux_osd_jail_register();
 			stclohz = (stathz ? stathz : hz);
 			if (bootverbose)
@@ -1032,6 +1032,7 @@ linux_elf_modevent(module_t mod, int type, void *data)
 			EVENTHANDLER_DEREGISTER(process_exit, linux_exit_tag);
 			EVENTHANDLER_DEREGISTER(process_exec, linux_exec_tag);
 			EVENTHANDLER_DEREGISTER(thread_dtor, linux_thread_dtor_tag);
+			linux_dev_shm_destroy();
 			linux_osd_jail_deregister();
 			if (bootverbose)
 				printf("Linux ELF exec handler removed\n");

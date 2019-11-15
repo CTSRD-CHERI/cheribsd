@@ -1049,16 +1049,19 @@
 	_Pragma("GCC error \"This file requires a capability-aware compiler\"")
 #endif
 
-#if __has_feature(capabilities)
-#define	__CAPABILITY	__capability
+/* Disable CHERI capability annotations for non-CHERI architectures. */
+#if !__has_feature(capabilities)
+#define	__capability
+#endif
+
+/*
+ * Used to tag pointer variables (typically structure members) shared
+ * with userspace that should always use capabilities in the kernel,
+ * but honor the default pointer ABI in userspace.
+ */
 #ifdef _KERNEL
 #define	__kerncap	__capability
 #else
-#define	__kerncap
-#endif
-#else
-#define	__CAPABILITY
-#define	__capability
 #define	__kerncap
 #endif
 

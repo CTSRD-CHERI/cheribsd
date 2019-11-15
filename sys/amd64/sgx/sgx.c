@@ -220,8 +220,8 @@ sgx_va_slot_init_by_index(struct sgx_softc *sc, vm_object_t object,
 
 		page = PHYS_TO_VM_PAGE(epc->phys);
 
-		vm_page_insert(page, object, idx);
 		page->valid = VM_PAGE_BITS_ALL;
+		vm_page_insert(page, object, idx);
 	}
 
 	return (0);
@@ -357,9 +357,7 @@ sgx_page_remove(struct sgx_softc *sc, vm_page_t p)
 	vm_paddr_t pa;
 	uint64_t offs;
 
-	vm_page_lock(p);
 	(void)vm_page_remove(p);
-	vm_page_unlock(p);
 
 	dprintf("%s: p->pidx %ld\n", __func__, p->pindex);
 
@@ -612,8 +610,8 @@ sgx_insert_epc_page_by_index(vm_page_t page, vm_object_t object,
 
 	VM_OBJECT_ASSERT_WLOCKED(object);
 
-	vm_page_insert(page, object, pidx);
 	page->valid = VM_PAGE_BITS_ALL;
+	vm_page_insert(page, object, pidx);
 }
 
 static void

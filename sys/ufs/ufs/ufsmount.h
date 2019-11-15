@@ -39,7 +39,7 @@
  * Arguments to mount UFS-based filesystems
  */
 struct ufs_args {
-	char	*fspec;			/* block special device to mount */
+	char * __kerncap fspec;		/* block special device to mount */
 	struct	oexport_args export;	/* network export information */
 };
 

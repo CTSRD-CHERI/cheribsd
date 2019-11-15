@@ -38,9 +38,6 @@
 #include <sys/disk/mbr.h>
 #include <sys/ioccom.h>
 
-void dos_partition_dec(void const *pp, struct dos_partition *d);
-void dos_partition_enc(void *pp, struct dos_partition *d);
-
 #define DIOCSMBR 	_IOW('M', 129, u_char[512])
 
 #endif /* !_SYS_DISKMBR_H_ */

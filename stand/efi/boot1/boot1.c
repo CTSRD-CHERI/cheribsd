@@ -137,8 +137,9 @@ try_boot(const boot_module_t *mod, dev_info_t *dev, void *loaderbuf, size_t load
 		goto errout;
 	}
 
-	if ((status = BS->HandleProtocol(loaderhandle, &LoadedImageGUID,
-	    (VOID**)&loaded_image)) != EFI_SUCCESS) {
+	status = OpenProtocolByHandle(loaderhandle, &LoadedImageGUID,
+	    (void **)&loaded_image);
+	if (status != EFI_SUCCESS) {
 		printf("Failed to query LoadedImage provided by %s (%lu)\n",
 		    mod->name, EFI_ERROR_CODE(status));
 		goto errout;
@@ -242,7 +243,7 @@ efi_main(EFI_HANDLE Ximage, EFI_SYSTEM_TABLE *Xsystab)
 	nhandles = hsize / sizeof(*handles);
 
 	/* Determine the devpath of our image so we can prefer it. */
-	status = BS->HandleProtocol(IH, &LoadedImageGUID, (VOID**)&img);
+	status = OpenProtocolByHandle(IH, &LoadedImageGUID, (void **)&img);
 	imgpath = NULL;
 	if (status == EFI_SUCCESS) {
 		text = efi_devpath_name(img->FilePath);
@@ -252,8 +253,8 @@ efi_main(EFI_HANDLE Ximage, EFI_SYSTEM_TABLE *Xsystab)
 			efi_free_devpath_name(text);
 		}
 
-		status = BS->HandleProtocol(img->DeviceHandle, &DevicePathGUID,
-		    (void **)&imgpath);
+		status = OpenProtocolByHandle(img->DeviceHandle,
+		    &DevicePathGUID, (void **)&imgpath);
 		if (status != EFI_SUCCESS) {
 			DPRINTF("Failed to get image DevicePath (%lu)\n",
 			    EFI_ERROR_CODE(status));
@@ -292,6 +293,18 @@ add_device(dev_info_t **devinfop, dev_info_t *devinfo)
 	dev->next = devinfo;
 }
 
+void
+efi_exit(EFI_STATUS s)
+{
+	BS->Exit(IH, s, 0, NULL);
+}
+
+void
+exit(int error __unused)
+{
+	efi_exit(EFI_LOAD_ERROR);
+}
+
 /*
  * OK. We totally give up. Exit back to EFI with a sensible status so
  * it can try the next option on the list.
@@ -307,7 +320,12 @@ efi_panic(EFI_STATUS s, const char *fmt, ...)
 	va_end(ap);
 	printf("\n");
 
-	BS->Exit(IH, s, 0, NULL);
+	efi_exit(s);
+}
+
+int getchar(void)
+{
+	return (-1);
 }
 
 void

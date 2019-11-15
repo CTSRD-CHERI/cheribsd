@@ -41,6 +41,7 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_capsicum.h"
+#include "opt_ddb.h"
 #include "opt_ktrace.h"
 
 #define	EXPLICIT_USER_ACCESS
@@ -50,11 +51,13 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/capsicum.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/sysctl.h>
 #include <sys/malloc.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
 #include <sys/jail.h>
+#include <sys/kdb.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/rmlock.h>
@@ -66,6 +69,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/uio.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
+#endif
+
+#ifdef DDB
+#include <ddb/ddb.h>
+#include <ddb/db_lex.h>
 #endif
 
 #include <net/vnet.h>
@@ -931,13 +939,18 @@ SYSINIT(sysctl, SI_SUB_KMEM, SI_ORDER_FIRST, sysctl_register_all, NULL);
  * (be aware though, that the proper interface isn't as obvious as it
  * may seem, there are various conflicting requirements.
  *
- * {0,0}	printf the entire MIB-tree.
- * {0,1,...}	return the name of the "..." OID.
- * {0,2,...}	return the next OID.
- * {0,3}	return the OID of the name in "new"
- * {0,4,...}	return the kind & format info for the "..." OID.
- * {0,5,...}	return the description of the "..." OID.
- * {0,6,...}	return the aggregation label of the "..." OID.
+ * {CTL_SYSCTL, CTL_SYSCTL_DEBUG}		printf the entire MIB-tree.
+ * {CTL_SYSCTL, CTL_SYSCTL_NAME, ...}		return the name of the "..."
+ *						OID.
+ * {CTL_SYSCTL, CTL_SYSCTL_NEXT, ...}		return the next OID.
+ * {CTL_SYSCTL, CTL_SYSCTL_NAME2OID}		return the OID of the name in
+ *						"new"
+ * {CTL_SYSCTL, CTL_SYSCTL_OIDFMT, ...}		return the kind & format info
+ *						for the "..." OID.
+ * {CTL_SYSCTL, CTL_SYSCTL_OIDDESCR, ...}	return the description of the
+ *						"..." OID.
+ * {CTL_SYSCTL, CTL_SYSCTL_OIDLABEL, ...}	return the aggregation label of
+ *						the "..." OID.
  */
 
 #ifdef SYSCTL_DEBUG
@@ -1005,8 +1018,8 @@ sysctl_sysctl_debug(SYSCTL_HANDLER_ARGS)
 	return (ENOENT);
 }
 
-SYSCTL_PROC(_sysctl, 0, debug, CTLTYPE_STRING|CTLFLAG_RD|CTLFLAG_MPSAFE,
-	0, 0, sysctl_sysctl_debug, "-", "");
+SYSCTL_PROC(_sysctl, CTL_SYSCTL_DEBUG, debug, CTLTYPE_STRING | CTLFLAG_RD |
+    CTLFLAG_MPSAFE, 0, 0, sysctl_sysctl_debug, "-", "");
 #endif
 
 static int
@@ -1071,8 +1084,8 @@ sysctl_sysctl_name(SYSCTL_HANDLER_ARGS)
  * XXXRW/JA: Shouldn't return name data for nodes that we don't permit in
  * capability mode.
  */
-static SYSCTL_NODE(_sysctl, 1, name, CTLFLAG_RD | CTLFLAG_MPSAFE | CTLFLAG_CAPRD,
-    sysctl_sysctl_name, "");
+static SYSCTL_NODE(_sysctl, CTL_SYSCTL_NAME, name, CTLFLAG_RD |
+    CTLFLAG_MPSAFE | CTLFLAG_CAPRD, sysctl_sysctl_name, "");
 
 static int
 sysctl_sysctl_next_ls(struct sysctl_oid_list *lsp, int *name, u_int namelen, 
@@ -1158,8 +1171,8 @@ sysctl_sysctl_next(SYSCTL_HANDLER_ARGS)
  * XXXRW/JA: Shouldn't return next data for nodes that we don't permit in
  * capability mode.
  */
-static SYSCTL_NODE(_sysctl, 2, next, CTLFLAG_RD | CTLFLAG_MPSAFE | CTLFLAG_CAPRD,
-    sysctl_sysctl_next, "");
+static SYSCTL_NODE(_sysctl, CTL_SYSCTL_NEXT, next, CTLFLAG_RD |
+    CTLFLAG_MPSAFE | CTLFLAG_CAPRD, sysctl_sysctl_next, "");
 
 static int
 name2oid(char *name, int *oid, int *len, struct sysctl_oid **oidpp)
@@ -1245,9 +1258,9 @@ sysctl_sysctl_name2oid(SYSCTL_HANDLER_ARGS)
  * XXXRW/JA: Shouldn't return name2oid data for nodes that we don't permit in
  * capability mode.
  */
-SYSCTL_PROC(_sysctl, 3, name2oid,
-    CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_ANYBODY | CTLFLAG_MPSAFE
-    | CTLFLAG_CAPRW, 0, 0, sysctl_sysctl_name2oid, "I", "");
+SYSCTL_PROC(_sysctl, CTL_SYSCTL_NAME2OID, name2oid, CTLTYPE_INT | CTLFLAG_RW |
+    CTLFLAG_ANYBODY | CTLFLAG_MPSAFE | CTLFLAG_CAPRW, 0, 0,
+    sysctl_sysctl_name2oid, "I", "");
 
 static int
 sysctl_sysctl_oidfmt(SYSCTL_HANDLER_ARGS)
@@ -1275,8 +1288,8 @@ sysctl_sysctl_oidfmt(SYSCTL_HANDLER_ARGS)
 }
 
 
-static SYSCTL_NODE(_sysctl, 4, oidfmt, CTLFLAG_RD|CTLFLAG_MPSAFE|CTLFLAG_CAPRD,
-    sysctl_sysctl_oidfmt, "");
+static SYSCTL_NODE(_sysctl, CTL_SYSCTL_OIDFMT, oidfmt, CTLFLAG_RD |
+    CTLFLAG_MPSAFE | CTLFLAG_CAPRD, sysctl_sysctl_oidfmt, "");
 
 static int
 sysctl_sysctl_oiddescr(SYSCTL_HANDLER_ARGS)
@@ -1300,8 +1313,8 @@ sysctl_sysctl_oiddescr(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-static SYSCTL_NODE(_sysctl, 5, oiddescr, CTLFLAG_RD|CTLFLAG_MPSAFE|CTLFLAG_CAPRD,
-    sysctl_sysctl_oiddescr, "");
+static SYSCTL_NODE(_sysctl, CTL_SYSCTL_OIDDESCR, oiddescr, CTLFLAG_RD |
+    CTLFLAG_MPSAFE|CTLFLAG_CAPRD, sysctl_sysctl_oiddescr, "");
 
 static int
 sysctl_sysctl_oidlabel(SYSCTL_HANDLER_ARGS)
@@ -1325,8 +1338,8 @@ sysctl_sysctl_oidlabel(SYSCTL_HANDLER_ARGS)
 	return (error);
 }
 
-static SYSCTL_NODE(_sysctl, 6, oidlabel,
-    CTLFLAG_RD | CTLFLAG_MPSAFE | CTLFLAG_CAPRD, sysctl_sysctl_oidlabel, "");
+static SYSCTL_NODE(_sysctl, CTL_SYSCTL_OIDLABEL, oidlabel, CTLFLAG_RD |
+    CTLFLAG_MPSAFE | CTLFLAG_CAPRD, sysctl_sysctl_oidlabel, "");
 
 /*
  * Default "handler" functions.
@@ -1613,9 +1626,10 @@ sysctl_handle_string(SYSCTL_HANDLER_ARGS)
 
 	/*
 	 * A zero-length buffer indicates a fixed size read-only
-	 * string:
+	 * string.  In ddb, don't worry about trying to make a malloced
+	 * snapshot.
 	 */
-	if (arg2 == 0) {
+	if (arg2 == 0 || kdb_active) {
 		arg2 = strlen((char *)arg1) + 1;
 		ro_string = 1;
 	}
@@ -1868,8 +1882,8 @@ kernel_sysctlbyname(struct thread *td, char *name, void *old, size_t *oldlenp,
         size_t oidlen, plen;
 	int error;
 
-	oid[0] = 0;		/* sysctl internal magic */
-	oid[1] = 3;		/* name2oid */
+	oid[0] = CTL_SYSCTL;
+	oid[1] = CTL_SYSCTL_NAME2OID;
 	oidlen = sizeof(oid);
 
 	error = kernel_sysctl(td, oid, 2, oid, &oidlen,
@@ -2157,10 +2171,8 @@ int
 sys___sysctl(struct thread *td, struct __sysctl_args *uap)
 {
 
-	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
-	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
-	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
-	    uap->newlen, 0));
+	return (kern_sysctl(td, uap->name, uap->namelen, uap->old,
+	    uap->oldlenp, uap->new, uap->newlen, 0));
 }
 
 int
@@ -2187,6 +2199,69 @@ kern_sysctl(struct thread *td, int * __capability uname, u_int namelen,
 		if (i)
 			return (i);
 	}
+	return (error);
+}
+
+int
+kern___sysctlbyname(struct thread *td, const char * __capability oname,
+    size_t namelen, void * __capability old, size_t * __capability oldlenp,
+    void * __capability new, size_t newlen, size_t *retval, int flags,
+    bool inkernel)
+{
+	int oid[CTL_MAXNAME];
+	char namebuf[16];
+	char *name;
+	size_t oidlen;
+	int error;
+
+	if (namelen > MAXPATHLEN || namelen == 0)
+		return (EINVAL);
+	name = namebuf;
+	if (namelen > sizeof(namebuf))
+		name = malloc(namelen, M_SYSCTL, M_WAITOK);
+	error = copyin(oname, name, namelen);
+	if (error != 0)
+		goto out;
+
+	oid[0] = CTL_SYSCTL;
+	oid[1] = CTL_SYSCTL_NAME2OID;
+	oidlen = sizeof(oid);
+	error = kernel_sysctl(td, oid, 2, oid, &oidlen, (void *)name, namelen,
+	    retval, flags);
+	if (error != 0)
+		goto out;
+	error = userland_sysctl(td, oid, *retval / sizeof(int), old, oldlenp,
+	    inkernel, new, newlen, retval, flags);
+
+out:
+	if (namelen > sizeof(namebuf))
+		free(name, M_SYSCTL);
+	return (error);
+}
+
+#ifndef	_SYS_SYSPROTO_H_
+struct __sysctlbyname_args {
+	const char	*name;
+	size_t	namelen;
+	void	*old;
+	size_t	*oldlenp;
+	void	*new;
+	size_t	newlen;
+};
+#endif
+int
+sys___sysctlbyname(struct thread *td, struct __sysctlbyname_args *uap)
+{
+	size_t rv;
+	int error;
+
+	error = kern___sysctlbyname(td, uap->name, uap->namelen, uap->old,
+	    uap->oldlenp, uap->new, uap->newlen, &rv, 0, 0);
+	if (error != 0)
+		return (error);
+	if (uap->oldlenp != NULL)
+		error = copyout(&rv, uap->oldlenp, sizeof(rv));
+
 	return (error);
 }
 
@@ -2295,6 +2370,531 @@ sbuf_new_for_sysctl(struct sbuf *s, char *buf, int length,
 	sbuf_set_drain(s, sbuf_sysctl_drain, req);
 	return (s);
 }
+
+#ifdef DDB
+
+/* The current OID the debugger is working with */
+static struct sysctl_oid *g_ddb_oid;
+
+/* The current flags specified by the user */
+static int g_ddb_sysctl_flags;
+
+/* Check to see if the last sysctl printed */
+static int g_ddb_sysctl_printed;
+
+static const int ctl_sign[CTLTYPE+1] = {
+	[CTLTYPE_INT] = 1,
+	[CTLTYPE_LONG] = 1,
+	[CTLTYPE_S8] = 1,
+	[CTLTYPE_S16] = 1,
+	[CTLTYPE_S32] = 1,
+	[CTLTYPE_S64] = 1,
+};
+
+static const int ctl_size[CTLTYPE+1] = {
+	[CTLTYPE_INT] = sizeof(int),
+	[CTLTYPE_UINT] = sizeof(u_int),
+	[CTLTYPE_LONG] = sizeof(long),
+	[CTLTYPE_ULONG] = sizeof(u_long),
+	[CTLTYPE_S8] = sizeof(int8_t),
+	[CTLTYPE_S16] = sizeof(int16_t),
+	[CTLTYPE_S32] = sizeof(int32_t),
+	[CTLTYPE_S64] = sizeof(int64_t),
+	[CTLTYPE_U8] = sizeof(uint8_t),
+	[CTLTYPE_U16] = sizeof(uint16_t),
+	[CTLTYPE_U32] = sizeof(uint32_t),
+	[CTLTYPE_U64] = sizeof(uint64_t),
+};
+
+#define DB_SYSCTL_NAME_ONLY	0x001	/* Compare with -N */
+#define DB_SYSCTL_VALUE_ONLY	0x002	/* Compare with -n */
+#define DB_SYSCTL_OPAQUE	0x004	/* Compare with -o */
+#define DB_SYSCTL_HEX		0x008	/* Compare with -x */
+
+#define DB_SYSCTL_SAFE_ONLY	0x100	/* Only simple types */
+
+static const char db_sysctl_modifs[] = {
+	'N', 'n', 'o', 'x',
+};
+
+static const int db_sysctl_modif_values[] = {
+	DB_SYSCTL_NAME_ONLY, DB_SYSCTL_VALUE_ONLY,
+	DB_SYSCTL_OPAQUE, DB_SYSCTL_HEX,
+};
+
+/* Handlers considered safe to print while recursing */
+static int (* const db_safe_handlers[])(SYSCTL_HANDLER_ARGS) = {
+	sysctl_handle_bool,
+	sysctl_handle_8,
+	sysctl_handle_16,
+	sysctl_handle_32,
+	sysctl_handle_64,
+	sysctl_handle_int,
+	sysctl_handle_long,
+	sysctl_handle_string,
+	sysctl_handle_opaque,
+};
+
+/*
+ * Use in place of sysctl_old_kernel to print sysctl values.
+ *
+ * Compare to the output handling in show_var from sbin/sysctl/sysctl.c
+ */
+static int
+sysctl_old_ddb(struct sysctl_req *req, const void *ptr, size_t len)
+{
+	const u_char *val, *p;
+	const char *sep1;
+	size_t intlen, slen;
+	uintmax_t umv;
+	intmax_t mv;
+	int sign, ctltype, hexlen, xflag, error;
+
+	/* Suppress false-positive GCC uninitialized variable warnings */
+	mv = 0;
+	umv = 0;
+
+	slen = len;
+	val = p = ptr;
+
+	if (ptr == NULL) {
+		error = 0;
+		goto out;
+	}
+
+	/* We are going to print */
+	g_ddb_sysctl_printed = 1;
+
+	xflag = g_ddb_sysctl_flags & DB_SYSCTL_HEX;
+
+	ctltype = (g_ddb_oid->oid_kind & CTLTYPE);
+	sign = ctl_sign[ctltype];
+	intlen = ctl_size[ctltype];
+
+	switch (ctltype) {
+	case CTLTYPE_NODE:
+	case CTLTYPE_STRING:
+		db_printf("%.*s", (int) len, (const char *) p);
+		error = 0;
+		goto out;
+
+	case CTLTYPE_INT:
+	case CTLTYPE_UINT:
+	case CTLTYPE_LONG:
+	case CTLTYPE_ULONG:
+	case CTLTYPE_S8:
+	case CTLTYPE_S16:
+	case CTLTYPE_S32:
+	case CTLTYPE_S64:
+	case CTLTYPE_U8:
+	case CTLTYPE_U16:
+	case CTLTYPE_U32:
+	case CTLTYPE_U64:
+		hexlen = 2 + (intlen * CHAR_BIT + 3) / 4;
+		sep1 = "";
+		while (len >= intlen) {
+			switch (ctltype) {
+			case CTLTYPE_INT:
+			case CTLTYPE_UINT:
+				umv = *(const u_int *)p;
+				mv = *(const int *)p;
+				break;
+			case CTLTYPE_LONG:
+			case CTLTYPE_ULONG:
+				umv = *(const u_long *)p;
+				mv = *(const long *)p;
+				break;
+			case CTLTYPE_S8:
+			case CTLTYPE_U8:
+				umv = *(const uint8_t *)p;
+				mv = *(const int8_t *)p;
+				break;
+			case CTLTYPE_S16:
+			case CTLTYPE_U16:
+				umv = *(const uint16_t *)p;
+				mv = *(const int16_t *)p;
+				break;
+			case CTLTYPE_S32:
+			case CTLTYPE_U32:
+				umv = *(const uint32_t *)p;
+				mv = *(const int32_t *)p;
+				break;
+			case CTLTYPE_S64:
+			case CTLTYPE_U64:
+				umv = *(const uint64_t *)p;
+				mv = *(const int64_t *)p;
+				break;
+			}
+
+			db_printf("%s", sep1);
+			if (xflag)
+				db_printf("%#0*jx", hexlen, umv);
+			else if (!sign)
+				db_printf("%ju", umv);
+			else if (g_ddb_oid->oid_fmt[1] == 'K') {
+				/* Kelvins are currently unsupported. */
+				error = EOPNOTSUPP;
+				goto out;
+			} else
+				db_printf("%jd", mv);
+
+			sep1 = " ";
+			len -= intlen;
+			p += intlen;
+		}
+		error = 0;
+		goto out;
+
+	case CTLTYPE_OPAQUE:
+		/* TODO: Support struct functions. */
+
+		/* FALLTHROUGH */
+	default:
+		db_printf("Format:%s Length:%zu Dump:0x",
+		    g_ddb_oid->oid_fmt, len);
+		while (len-- && (xflag || p < val + 16))
+			db_printf("%02x", *p++);
+		if (!xflag && len > 16)
+			db_printf("...");
+		error = 0;
+		goto out;
+	}
+
+out:
+	req->oldidx += slen;
+	return (error);
+}
+
+/*
+ * Avoid setting new sysctl values from the debugger
+ */
+static int
+sysctl_new_ddb(struct sysctl_req *req, void *p, size_t l)
+{
+
+	if (!req->newptr)
+		return (0);
+
+	/* Changing sysctls from the debugger is currently unsupported */
+	return (EPERM);
+}
+
+/*
+ * Run a sysctl handler with the DDB oldfunc and newfunc attached.
+ * Instead of copying any output to a buffer we'll dump it right to
+ * the console.
+ */
+static int
+db_sysctl(struct sysctl_oid *oidp, int *name, u_int namelen,
+    void * __capability old, size_t *oldlenp, size_t *retval, int flags)
+{
+	struct sysctl_req req;
+	int error;
+
+	/* Setup the request */
+	bzero(&req, sizeof req);
+	req.td = kdb_thread;
+	req.oldfunc = sysctl_old_ddb;
+	req.newfunc = sysctl_new_ddb;
+	req.lock = REQ_UNWIRED;
+	if (oldlenp) {
+		req.oldlen = *oldlenp;
+	}
+	req.validlen = req.oldlen;
+	if (old) {
+		req.oldptr = old;
+	}
+
+	/* Setup our globals for sysctl_old_ddb */
+	g_ddb_oid = oidp;
+	g_ddb_sysctl_flags = flags;
+	g_ddb_sysctl_printed = 0;
+
+	error = sysctl_root(0, name, namelen, &req);
+
+	/* Reset globals */
+	g_ddb_oid = NULL;
+	g_ddb_sysctl_flags = 0;
+
+	if (retval) {
+		if (req.oldptr && req.oldidx > req.validlen)
+			*retval = req.validlen;
+		else
+			*retval = req.oldidx;
+	}
+	return (error);
+}
+
+/*
+ * Show a sysctl's name
+ */
+static void
+db_show_oid_name(int *oid, size_t nlen)
+{
+	struct sysctl_oid *oidp;
+	int qoid[CTL_MAXNAME+2];
+	int error;
+
+	qoid[0] = 0;
+	memcpy(qoid + 2, oid, nlen * sizeof(int));
+	qoid[1] = 1;
+
+	error = sysctl_find_oid(qoid, nlen + 2, &oidp, NULL, NULL);
+	if (error)
+		db_error("sysctl name oid");
+
+	error = db_sysctl(oidp, qoid, nlen + 2, NULL, NULL, NULL, 0);
+	if (error)
+		db_error("sysctl name");
+}
+
+/*
+ * Check to see if an OID is safe to print from ddb.
+ */
+static bool
+db_oid_safe(const struct sysctl_oid *oidp)
+{
+	for (unsigned int i = 0; i < nitems(db_safe_handlers); ++i) {
+		if (oidp->oid_handler == db_safe_handlers[i])
+			return (true);
+	}
+
+	return (false);
+}
+
+/*
+ * Show a sysctl at a specific OID
+ * Compare to the input handling in show_var from sbin/sysctl/sysctl.c
+ */
+static int
+db_show_oid(struct sysctl_oid *oidp, int *oid, size_t nlen, int flags)
+{
+	int error, xflag, oflag, Nflag, nflag;
+	size_t len;
+
+	xflag = flags & DB_SYSCTL_HEX;
+	oflag = flags & DB_SYSCTL_OPAQUE;
+	nflag = flags & DB_SYSCTL_VALUE_ONLY;
+	Nflag = flags & DB_SYSCTL_NAME_ONLY;
+
+	if ((oidp->oid_kind & CTLTYPE) == CTLTYPE_OPAQUE &&
+	    (!xflag && !oflag))
+		return (0);
+
+	if (Nflag) {
+		db_show_oid_name(oid, nlen);
+		error = 0;
+		goto out;
+	}
+
+	if (!nflag) {
+		db_show_oid_name(oid, nlen);
+		db_printf(": ");
+	}
+
+	if ((flags & DB_SYSCTL_SAFE_ONLY) && !db_oid_safe(oidp)) {
+		db_printf("Skipping, unsafe to print while recursing.");
+		error = 0;
+		goto out;
+	}
+
+	/* Try once, and ask about the size */
+	len = 0;
+	error = db_sysctl(oidp, oid, nlen,
+	    NULL, NULL, &len, flags);
+	if (error)
+		goto out;
+
+	if (!g_ddb_sysctl_printed)
+		/* Lie about the size */
+		error = db_sysctl(oidp, oid, nlen,
+		    (void * __capability)(uintptr_t)1, &len, NULL, flags);
+
+out:
+	db_printf("\n");
+	return (error);
+}
+
+/*
+ * Show all sysctls under a specific OID
+ * Compare to sysctl_all from sbin/sysctl/sysctl.c
+ */
+static int
+db_show_sysctl_all(int *oid, size_t len, int flags)
+{
+	struct sysctl_oid *oidp;
+	int name1[CTL_MAXNAME + 2], name2[CTL_MAXNAME + 2];
+	size_t l1, l2;
+
+	name1[0] = CTL_SYSCTL;
+	name1[1] = CTL_SYSCTL_NEXT;
+	l1 = 2;
+	if (len) {
+		memcpy(name1+2, oid, len * sizeof(int));
+		l1 +=len;
+	} else {
+		name1[2] = 1;
+		l1++;
+	}
+	for (;;) {
+		int i, error;
+
+		l2 = sizeof(name2);
+		error = kernel_sysctl(kdb_thread, name1, l1,
+		    name2, &l2, NULL, 0, &l2, 0);
+		if (error != 0) {
+			if (error == ENOENT)
+				return (0);
+			else
+				db_error("sysctl(getnext)");
+		}
+
+		l2 /= sizeof(int);
+
+		if (l2 < (unsigned int)len)
+			return (0);
+
+		for (i = 0; i < len; i++)
+			if (name2[i] != oid[i])
+				return (0);
+
+		/* Find the OID in question */
+		error = sysctl_find_oid(name2, l2, &oidp, NULL, NULL);
+		if (error)
+			return (error);
+
+		i = db_show_oid(oidp, name2, l2, flags | DB_SYSCTL_SAFE_ONLY);
+
+		if (db_pager_quit)
+			return (0);
+
+		memcpy(name1+2, name2, l2 * sizeof(int));
+		l1 = 2 + l2;
+	}
+}
+
+/*
+ * Show a sysctl by its user facing string
+ */
+static int
+db_sysctlbyname(char *name, int flags)
+{
+	struct sysctl_oid *oidp;
+	int oid[CTL_MAXNAME];
+	int error, nlen;
+
+	error = name2oid(name, oid, &nlen, &oidp);
+	if (error) {
+		return (error);
+	}
+
+	if ((oidp->oid_kind & CTLTYPE) == CTLTYPE_NODE) {
+		db_show_sysctl_all(oid, nlen, flags);
+	} else {
+		error = db_show_oid(oidp, oid, nlen, flags);
+	}
+
+	return (error);
+}
+
+static void
+db_sysctl_cmd_usage(void)
+{
+	db_printf(
+	    " sysctl [/Nnox] <sysctl>					    \n"
+	    "								    \n"
+	    " <sysctl> The name of the sysctl to show.			    \n"
+	    "								    \n"
+	    " Show a sysctl by hooking into SYSCTL_IN and SYSCTL_OUT.	    \n"
+	    " This will work for most sysctls, but should not be used	    \n"
+	    " with sysctls that are known to malloc.			    \n"
+	    "								    \n"
+	    " While recursing any \"unsafe\" sysctls will be skipped.	    \n"
+	    " Call sysctl directly on the sysctl to try printing the	    \n"
+	    " skipped sysctl. This is unsafe and may make the ddb	    \n"
+	    " session unusable.						    \n"
+	    "								    \n"
+	    " Arguments:						    \n"
+	    "	/N	Display only the name of the sysctl.		    \n"
+	    "	/n	Display only the value of the sysctl.		    \n"
+	    "	/o	Display opaque values.				    \n"
+	    "	/x	Display the sysctl in hex.			    \n"
+	    "								    \n"
+	    "For example:						    \n"
+	    "sysctl vm.v_free_min					    \n"
+	    "vn.v_free_min: 12669					    \n"
+	    );
+}
+
+/*
+ * Show a specific sysctl similar to sysctl (8).
+ */
+DB_FUNC(sysctl, db_sysctl_cmd, db_cmd_table, CS_OWN, NULL)
+{
+	char name[TOK_STRING_SIZE];
+	int error, i, t, flags;
+
+	/* Parse the modifiers */
+	t = db_read_token();
+	if (t == tSLASH || t == tMINUS) {
+		t = db_read_token();
+		if (t != tIDENT) {
+			db_printf("Bad modifier\n");
+			error = EINVAL;
+			goto out;
+		}
+		db_strcpy(modif, db_tok_string);
+	}
+	else {
+		db_unread_token(t);
+		modif[0] = '\0';
+	}
+
+	flags = 0;
+	for (i = 0; i < nitems(db_sysctl_modifs); i++) {
+		if (strchr(modif, db_sysctl_modifs[i])) {
+			flags |= db_sysctl_modif_values[i];
+		}
+	}
+
+	/* Parse the sysctl names */
+	t = db_read_token();
+	if (t != tIDENT) {
+		db_printf("Need sysctl name\n");
+		error = EINVAL;
+		goto out;
+	}
+
+	/* Copy the name into a temporary buffer */
+	db_strcpy(name, db_tok_string);
+
+	/* Ensure there is no trailing cruft */
+	t = db_read_token();
+	if (t != tEOL) {
+		db_printf("Unexpected sysctl argument\n");
+		error = EINVAL;
+		goto out;
+	}
+
+	error = db_sysctlbyname(name, flags);
+	if (error == ENOENT) {
+		db_printf("unknown oid: '%s'\n", db_tok_string);
+		goto out;
+	} else if (error) {
+		db_printf("%s: error: %d\n", db_tok_string, error);
+		goto out;
+	}
+
+out:
+	/* Ensure we eat all of our text */
+	db_flush_lex();
+
+	if (error == EINVAL) {
+		db_sysctl_cmd_usage();
+	}
+}
+
+#endif /* DDB */
 // CHERI CHANGES START
 // {
 //   "updated": 20181127,

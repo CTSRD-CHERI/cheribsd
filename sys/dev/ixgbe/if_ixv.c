@@ -35,6 +35,7 @@
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_rss.h"
 
 #include "ixgbe.h"
 #include "ifdi_if.h"
@@ -268,7 +269,6 @@ ixv_if_tx_queues_alloc(if_ctx_t ctx, caddr_t *vaddrs, uint64_t *paddrs,
 
 		txr->me = i;
 		txr->adapter =  que->adapter = adapter;
-		adapter->active_queues |= (u64)1 << txr->me;
 
 		/* Allocate report status array */
 		if (!(txr->tx_rsq = (qidx_t *)malloc(sizeof(qidx_t) * scctx->isc_ntxd[0], M_DEVBUF, M_NOWAIT | M_ZERO))) {
@@ -495,7 +495,7 @@ ixv_if_attach_pre(if_ctx_t ctx)
 	scctx->isc_tx_csum_flags = CSUM_IP | CSUM_TCP | CSUM_UDP | CSUM_TSO |
 	    CSUM_IP6_TCP | CSUM_IP6_UDP | CSUM_IP6_TSO;
 	scctx->isc_tx_nsegments = IXGBE_82599_SCATTER;
-	scctx->isc_msix_bar = PCIR_BAR(MSIX_82598_BAR);
+	scctx->isc_msix_bar = pci_msix_table_bar(dev);
 	scctx->isc_tx_tso_segments_max = scctx->isc_tx_nsegments;
 	scctx->isc_tx_tso_size_max = IXGBE_TSO_SIZE;
 	scctx->isc_tx_tso_segsize_max = PAGE_SIZE;
@@ -1038,8 +1038,6 @@ ixv_if_msix_intr_assign(if_ctx_t ctx, int msix)
 		}
 
 		rx_que->msix = vector;
-		adapter->active_queues |= (u64)(1 << rx_que->msix);
-
 	}
 
 	for (int i = 0; i < adapter->num_tx_queues; i++) {
@@ -1457,7 +1455,12 @@ ixv_initialize_receive_units(if_ctx_t ctx)
 			    scctx->isc_nrxd[0] - 1);
 	}
 
-	ixv_initialize_rss_mapping(adapter);
+	/*
+	 * Do not touch RSS and RETA settings for older hardware
+	 * as those are shared among PF and all VF.
+	 */
+	if (adapter->hw.mac.type >= ixgbe_mac_X550_vf)
+		ixv_initialize_rss_mapping(adapter);
 } /* ixv_initialize_receive_units */
 
 /************************************************************************
@@ -1892,7 +1895,6 @@ ixv_init_device_features(struct adapter *adapter)
 {
 	adapter->feat_cap = IXGBE_FEATURE_NETMAP
 	                  | IXGBE_FEATURE_VF
-	                  | IXGBE_FEATURE_RSS
 	                  | IXGBE_FEATURE_LEGACY_TX;
 
 	/* A tad short on feature flags for VFs, atm. */
@@ -1905,6 +1907,7 @@ ixv_init_device_features(struct adapter *adapter)
 	case ixgbe_mac_X550EM_x_vf:
 	case ixgbe_mac_X550EM_a_vf:
 		adapter->feat_cap |= IXGBE_FEATURE_NEEDS_CTXD;
+		adapter->feat_cap |= IXGBE_FEATURE_RSS;
 		break;
 	default:
 		break;

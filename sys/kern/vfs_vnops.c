@@ -87,7 +87,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
-#include <vm/vnode_pager.h>
+#include <vm/vm_pager.h>
 
 #ifdef HWPMC_HOOKS
 #include <sys/pmckern.h>
@@ -262,6 +262,10 @@ restart:
 			vp = ndp->ni_vp;
 			if (fmode & O_EXCL) {
 				error = EEXIST;
+				goto bad;
+			}
+			if (vp->v_type == VDIR) {
+				error = EISDIR;
 				goto bad;
 			}
 			fmode &= ~O_CREAT;
@@ -526,7 +530,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
     struct ucred *file_cred, ssize_t *aresid, struct thread *td)
 {
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct mount *mp;
 	struct ucred *cred;
 	void *rl_cookie;
@@ -984,7 +988,7 @@ static int
 vn_io_fault_prefault_user(const struct uio *uio)
 {
 	char * __capability base;
-	kiovec_t *iov;
+	struct iovec *iov;
 	size_t len;
 	ssize_t resid;
 	int error, i;
@@ -1035,7 +1039,7 @@ vn_io_fault1(struct vnode *vp, struct uio *uio, struct vn_io_fault_args *args,
 {
 	vm_page_t ma[io_hold_cnt + 2];
 	struct uio *uio_clone, short_uio;
-	kiovec_t short_iovec[1];
+	struct iovec short_iovec[1];
 	vm_page_t *prev_td_ma;
 	vm_prot_t prot;
 	vm_offset_t addr, end;
@@ -1195,7 +1199,7 @@ int
 vn_io_fault_uiomove(char *data, int xfersize, struct uio *uio)
 {
 	struct uio transp_uio;
-	kiovec_t transp_iov[1];
+	struct iovec transp_iov[1];
 	struct thread *td;
 	size_t adv;
 	int error, pgadv;
@@ -1448,10 +1452,14 @@ vn_stat(struct vnode *vp, struct stat *sb, struct ucred *active_cred,
 	if (vap->va_size > OFF_MAX)
 		return (EOVERFLOW);
 	sb->st_size = vap->va_size;
-	sb->st_atim = vap->va_atime;
-	sb->st_mtim = vap->va_mtime;
-	sb->st_ctim = vap->va_ctime;
-	sb->st_birthtim = vap->va_birthtime;
+	sb->st_atim.tv_sec = vap->va_atime.tv_sec;
+	sb->st_atim.tv_nsec = vap->va_atime.tv_nsec;
+	sb->st_mtim.tv_sec = vap->va_mtime.tv_sec;
+	sb->st_mtim.tv_nsec = vap->va_mtime.tv_nsec;
+	sb->st_ctim.tv_sec = vap->va_ctime.tv_sec;
+	sb->st_ctim.tv_nsec = vap->va_ctime.tv_nsec;
+	sb->st_birthtim.tv_sec = vap->va_birthtime.tv_sec;
+	sb->st_birthtim.tv_nsec = vap->va_birthtime.tv_nsec;
 
         /*
 	 * According to www.opengroup.org, the meaning of st_blksize is 
@@ -1618,11 +1626,23 @@ vn_suspendable(struct mount *mp)
  * suspension is over, and then proceed.
  */
 static int
-vn_start_write_locked(struct mount *mp, int flags)
+vn_start_write_refed(struct mount *mp, int flags, bool mplocked)
 {
 	int error, mflags;
 
-	mtx_assert(MNT_MTX(mp), MA_OWNED);
+	if (__predict_true(!mplocked) && (flags & V_XSLEEP) == 0 &&
+	    vfs_op_thread_enter(mp)) {
+		MPASS((mp->mnt_kern_flag & MNTK_SUSPEND) == 0);
+		vfs_mp_count_add_pcpu(mp, writeopcount, 1);
+		vfs_op_thread_exit(mp);
+		return (0);
+	}
+
+	if (mplocked)
+		mtx_assert(MNT_MTX(mp), MA_OWNED);
+	else
+		MNT_ILOCK(mp);
+
 	error = 0;
 
 	/*
@@ -1691,11 +1711,10 @@ vn_start_write(struct vnode *vp, struct mount **mpp, int flags)
 	 * refcount for the provided mountpoint too, in order to
 	 * emulate a vfs_ref().
 	 */
-	MNT_ILOCK(mp);
 	if (vp == NULL && (flags & V_MNTREF) == 0)
-		MNT_REF(mp);
+		vfs_ref(mp);
 
-	return (vn_start_write_locked(mp, flags));
+	return (vn_start_write_refed(mp, flags, false));
 }
 
 /*
@@ -1777,15 +1796,30 @@ vn_start_secondary_write(struct vnode *vp, struct mount **mpp, int flags)
 void
 vn_finished_write(struct mount *mp)
 {
+	int c;
+
 	if (mp == NULL || !vn_suspendable(mp))
 		return;
+
+	if (vfs_op_thread_enter(mp)) {
+		vfs_mp_count_sub_pcpu(mp, writeopcount, 1);
+		vfs_mp_count_sub_pcpu(mp, ref, 1);
+		vfs_op_thread_exit(mp);
+		return;
+	}
+
 	MNT_ILOCK(mp);
+	vfs_assert_mount_counters(mp);
 	MNT_REL(mp);
-	mp->mnt_writeopcount--;
-	if (mp->mnt_writeopcount < 0)
-		panic("vn_finished_write: neg cnt");
-	if ((mp->mnt_kern_flag & MNTK_SUSPEND) != 0 &&
-	    mp->mnt_writeopcount <= 0)
+	c = --mp->mnt_writeopcount;
+	if (mp->mnt_vfs_ops == 0) {
+		MPASS((mp->mnt_kern_flag & MNTK_SUSPEND) == 0);
+		MNT_IUNLOCK(mp);
+		return;
+	}
+	if (c < 0)
+		vfs_dump_mount_counters(mp);
+	if ((mp->mnt_kern_flag & MNTK_SUSPEND) != 0 && c == 0)
 		wakeup(&mp->mnt_writeopcount);
 	MNT_IUNLOCK(mp);
 }
@@ -1824,8 +1858,12 @@ vfs_write_suspend(struct mount *mp, int flags)
 
 	MPASS(vn_suspendable(mp));
 
+	vfs_op_enter(mp);
+
 	MNT_ILOCK(mp);
+	vfs_assert_mount_counters(mp);
 	if (mp->mnt_susp_owner == curthread) {
+		vfs_op_exit_locked(mp);
 		MNT_IUNLOCK(mp);
 		return (EALREADY);
 	}
@@ -1842,6 +1880,7 @@ vfs_write_suspend(struct mount *mp, int flags)
 	 */
 	if ((flags & VS_SKIP_UNMOUNT) != 0 &&
 	    (mp->mnt_kern_flag & MNTK_UNMOUNT) != 0) {
+		vfs_op_exit_locked(mp);
 		MNT_IUNLOCK(mp);
 		return (EBUSY);
 	}
@@ -1853,8 +1892,10 @@ vfs_write_suspend(struct mount *mp, int flags)
 		    MNT_MTX(mp), (PUSER - 1)|PDROP, "suspwt", 0);
 	else
 		MNT_IUNLOCK(mp);
-	if ((error = VFS_SYNC(mp, MNT_SUSPEND)) != 0)
+	if ((error = VFS_SYNC(mp, MNT_SUSPEND)) != 0) {
 		vfs_write_resume(mp, 0);
+		vfs_op_exit(mp);
+	}
 	return (error);
 }
 
@@ -1883,9 +1924,10 @@ vfs_write_resume(struct mount *mp, int flags)
 		MNT_IUNLOCK(mp);
 		if ((flags & VR_NO_SUSPCLR) == 0)
 			VFS_SUSP_CLEAN(mp);
+		vfs_op_exit(mp);
 	} else if ((flags & VR_START_WRITE) != 0) {
 		MNT_REF(mp);
-		vn_start_write_locked(mp, 0);
+		vn_start_write_refed(mp, 0, true);
 	} else {
 		MNT_IUNLOCK(mp);
 	}
@@ -1945,7 +1987,7 @@ vn_extattr_get(struct vnode *vp, int ioflg, int attrnamespace,
     const char *attrname, int *buflen, char *buf, struct thread *td)
 {
 	struct uio	auio;
-	kiovec_t	iov;
+	struct iovec	iov;
 	int	error;
 
 	IOVEC_INIT(&iov, buf, *buflen);
@@ -1985,7 +2027,7 @@ vn_extattr_set(struct vnode *vp, int ioflg, int attrnamespace,
     const char *attrname, int buflen, char *buf, struct thread *td)
 {
 	struct uio	auio;
-	kiovec_t	iov;
+	struct iovec	iov;
 	struct mount	*mp;
 	int	error;
 
@@ -2092,7 +2134,7 @@ vn_vget_ino_gen(struct vnode *vp, vn_get_ino_t alloc, void *alloc_arg,
 	VOP_UNLOCK(vp, 0);
 	error = alloc(mp, alloc_arg, lkflags, rvp);
 	vfs_unbusy(mp);
-	if (*rvp != vp)
+	if (error != 0 || *rvp != vp)
 		vn_lock(vp, ltype | LK_RETRY);
 	if (vp->v_iflag & VI_DOOMED) {
 		if (error == 0) {
@@ -2270,9 +2312,13 @@ vn_seek(struct file *fp, off_t offset, int whence, struct thread *td)
 		break;
 	case SEEK_DATA:
 		error = fo_ioctl(fp, FIOSEEKDATA, &offset, cred, td);
+		if (error == ENOTTY)
+			error = EINVAL;
 		break;
 	case SEEK_HOLE:
 		error = fo_ioctl(fp, FIOSEEKHOLE, &offset, cred, td);
+		if (error == ENOTTY)
+			error = EINVAL;
 		break;
 	default:
 		error = EINVAL;
@@ -2494,7 +2540,7 @@ vn_mmap(struct file *fp, vm_map_t map, vm_offset_t *addr,
 		 * writecount, then undo that now.
 		 */
 		if (writecounted)
-			vnode_pager_release_writecount(object, 0, size);
+			vm_pager_release_writecount(object, 0, size);
 		vm_object_deallocate(object);
 	}
 #ifdef HWPMC_HOOKS
@@ -2615,13 +2661,473 @@ loop2:
 
 	return (error);
 }
+
+/*
+ * Copies a byte range from invp to outvp.  Calls VOP_COPY_FILE_RANGE()
+ * or vn_generic_copy_file_range() after rangelocking the byte ranges,
+ * to do the actual copy.
+ * vn_generic_copy_file_range() is factored out, so it can be called
+ * from a VOP_COPY_FILE_RANGE() call as well, but handles vnodes from
+ * different file systems.
+ */
+int
+vn_copy_file_range(struct vnode *invp, off_t *inoffp, struct vnode *outvp,
+    off_t *outoffp, size_t *lenp, unsigned int flags, struct ucred *incred,
+    struct ucred *outcred, struct thread *fsize_td)
+{
+	int error;
+	size_t len;
+	uint64_t uvalin, uvalout;
+
+	len = *lenp;
+	*lenp = 0;		/* For error returns. */
+	error = 0;
+
+	/* Do some sanity checks on the arguments. */
+	uvalin = *inoffp;
+	uvalin += len;
+	uvalout = *outoffp;
+	uvalout += len;
+	if (invp->v_type == VDIR || outvp->v_type == VDIR)
+		error = EISDIR;
+	else if (*inoffp < 0 || uvalin > INT64_MAX || uvalin <
+	    (uint64_t)*inoffp || *outoffp < 0 || uvalout > INT64_MAX ||
+	    uvalout < (uint64_t)*outoffp || invp->v_type != VREG ||
+	    outvp->v_type != VREG)
+		error = EINVAL;
+	else if (invp == outvp)
+		error = EBADF;
+	if (error != 0)
+		goto out;
+
+	/*
+	 * If the two vnode are for the same file system, call
+	 * VOP_COPY_FILE_RANGE(), otherwise call vn_generic_copy_file_range()
+	 * which can handle copies across multiple file systems.
+	 */
+	*lenp = len;
+	if (invp->v_mount == outvp->v_mount)
+		error = VOP_COPY_FILE_RANGE(invp, inoffp, outvp, outoffp,
+		    lenp, flags, incred, outcred, fsize_td);
+	else
+		error = vn_generic_copy_file_range(invp, inoffp, outvp,
+		    outoffp, lenp, flags, incred, outcred, fsize_td);
+out:
+	return (error);
+}
+
+/*
+ * Test len bytes of data starting at dat for all bytes == 0.
+ * Return true if all bytes are zero, false otherwise.
+ * Expects dat to be well aligned.
+ */
+static bool
+mem_iszero(void *dat, int len)
+{
+	int i;
+	const u_int *p;
+	const char *cp;
+
+	for (p = dat; len > 0; len -= sizeof(*p), p++) {
+		if (len >= sizeof(*p)) {
+			if (*p != 0)
+				return (false);
+		} else {
+			cp = (const char *)p;
+			for (i = 0; i < len; i++, cp++)
+				if (*cp != '\0')
+					return (false);
+		}
+	}
+	return (true);
+}
+
+/*
+ * Look for a hole in the output file and, if found, adjust *outoffp
+ * and *xferp to skip past the hole.
+ * *xferp is the entire hole length to be written and xfer2 is how many bytes
+ * to be written as 0's upon return.
+ */
+static off_t
+vn_skip_hole(struct vnode *outvp, off_t xfer2, off_t *outoffp, off_t *xferp,
+    off_t *dataoffp, off_t *holeoffp, struct ucred *cred)
+{
+	int error;
+	off_t delta;
+
+	if (*holeoffp == 0 || *holeoffp <= *outoffp) {
+		*dataoffp = *outoffp;
+		error = VOP_IOCTL(outvp, FIOSEEKDATA, dataoffp, 0, cred,
+		    curthread);
+		if (error == 0) {
+			*holeoffp = *dataoffp;
+			error = VOP_IOCTL(outvp, FIOSEEKHOLE, holeoffp, 0, cred,
+			    curthread);
+		}
+		if (error != 0 || *holeoffp == *dataoffp) {
+			/*
+			 * Since outvp is unlocked, it may be possible for
+			 * another thread to do a truncate(), lseek(), write()
+			 * creating a hole at startoff between the above
+			 * VOP_IOCTL() calls, if the other thread does not do
+			 * rangelocking.
+			 * If that happens, *holeoffp == *dataoffp and finding
+			 * the hole has failed, so disable vn_skip_hole().
+			 */
+			*holeoffp = -1;	/* Disable use of vn_skip_hole(). */
+			return (xfer2);
+		}
+		KASSERT(*dataoffp >= *outoffp,
+		    ("vn_skip_hole: dataoff=%jd < outoff=%jd",
+		    (intmax_t)*dataoffp, (intmax_t)*outoffp));
+		KASSERT(*holeoffp > *dataoffp,
+		    ("vn_skip_hole: holeoff=%jd <= dataoff=%jd",
+		    (intmax_t)*holeoffp, (intmax_t)*dataoffp));
+	}
+
+	/*
+	 * If there is a hole before the data starts, advance *outoffp and
+	 * *xferp past the hole.
+	 */
+	if (*dataoffp > *outoffp) {
+		delta = *dataoffp - *outoffp;
+		if (delta >= *xferp) {
+			/* Entire *xferp is a hole. */
+			*outoffp += *xferp;
+			*xferp = 0;
+			return (0);
+		}
+		*xferp -= delta;
+		*outoffp += delta;
+		xfer2 = MIN(xfer2, *xferp);
+	}
+
+	/*
+	 * If a hole starts before the end of this xfer2, reduce this xfer2 so
+	 * that the write ends at the start of the hole.
+	 * *holeoffp should always be greater than *outoffp, but for the
+	 * non-INVARIANTS case, check this to make sure xfer2 remains a sane
+	 * value.
+	 */
+	if (*holeoffp > *outoffp && *holeoffp < *outoffp + xfer2)
+		xfer2 = *holeoffp - *outoffp;
+	return (xfer2);
+}
+
+/*
+ * Write an xfer sized chunk to outvp in blksize blocks from dat.
+ * dat is a maximum of blksize in length and can be written repeatedly in
+ * the chunk.
+ * If growfile == true, just grow the file via vn_truncate_locked() instead
+ * of doing actual writes.
+ * If checkhole == true, a hole is being punched, so skip over any hole
+ * already in the output file.
+ */
+static int
+vn_write_outvp(struct vnode *outvp, char *dat, off_t outoff, off_t xfer,
+    u_long blksize, bool growfile, bool checkhole, struct ucred *cred)
+{
+	struct mount *mp;
+	off_t dataoff, holeoff, xfer2;
+	int error, lckf;
+
+	/*
+	 * Loop around doing writes of blksize until write has been completed.
+	 * Lock/unlock on each loop iteration so that a bwillwrite() can be
+	 * done for each iteration, since the xfer argument can be very
+	 * large if there is a large hole to punch in the output file.
+	 */
+	error = 0;
+	holeoff = 0;
+	do {
+		xfer2 = MIN(xfer, blksize);
+		if (checkhole) {
+			/*
+			 * Punching a hole.  Skip writing if there is
+			 * already a hole in the output file.
+			 */
+			xfer2 = vn_skip_hole(outvp, xfer2, &outoff, &xfer,
+			    &dataoff, &holeoff, cred);
+			if (xfer == 0)
+				break;
+			if (holeoff < 0)
+				checkhole = false;
+			KASSERT(xfer2 > 0, ("vn_write_outvp: xfer2=%jd",
+			    (intmax_t)xfer2));
+		}
+		bwillwrite();
+		mp = NULL;
+		error = vn_start_write(outvp, &mp, V_WAIT);
+		if (error == 0) {
+			if (MNT_SHARED_WRITES(mp))
+				lckf = LK_SHARED;
+			else
+				lckf = LK_EXCLUSIVE;
+			error = vn_lock(outvp, lckf);
+		}
+		if (error == 0) {
+			if (growfile)
+				error = vn_truncate_locked(outvp, outoff + xfer,
+				    false, cred);
+			else {
+				error = vn_rdwr(UIO_WRITE, outvp, dat, xfer2,
+				    outoff, UIO_SYSSPACE, IO_NODELOCKED,
+				    curthread->td_ucred, cred, NULL, curthread);
+				outoff += xfer2;
+				xfer -= xfer2;
+			}
+			VOP_UNLOCK(outvp, 0);
+		}
+		if (mp != NULL)
+			vn_finished_write(mp);
+	} while (!growfile && xfer > 0 && error == 0);
+	return (error);
+}
+
+/*
+ * Copy a byte range of one file to another.  This function can handle the
+ * case where invp and outvp are on different file systems.
+ * It can also be called by a VOP_COPY_FILE_RANGE() to do the work, if there
+ * is no better file system specific way to do it.
+ */
+int
+vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
+    struct vnode *outvp, off_t *outoffp, size_t *lenp, unsigned int flags,
+    struct ucred *incred, struct ucred *outcred, struct thread *fsize_td)
+{
+	struct vattr va;
+	struct mount *mp;
+	struct uio io;
+	off_t startoff, endoff, xfer, xfer2;
+	u_long blksize;
+	int error;
+	bool cantseek, readzeros, eof, lastblock;
+	ssize_t aresid;
+	size_t copylen, len, savlen;
+	char *dat;
+	long holein, holeout;
+
+	holein = holeout = 0;
+	savlen = len = *lenp;
+	error = 0;
+	dat = NULL;
+
+	error = vn_lock(invp, LK_SHARED);
+	if (error != 0)
+		goto out;
+	if (VOP_PATHCONF(invp, _PC_MIN_HOLE_SIZE, &holein) != 0)
+		holein = 0;
+	VOP_UNLOCK(invp, 0);
+
+	mp = NULL;
+	error = vn_start_write(outvp, &mp, V_WAIT);
+	if (error == 0)
+		error = vn_lock(outvp, LK_EXCLUSIVE);
+	if (error == 0) {
+		/*
+		 * If fsize_td != NULL, do a vn_rlimit_fsize() call,
+		 * now that outvp is locked.
+		 */
+		if (fsize_td != NULL) {
+			io.uio_offset = *outoffp;
+			io.uio_resid = len;
+			error = vn_rlimit_fsize(outvp, &io, fsize_td);
+			if (error != 0)
+				error = EFBIG;
+		}
+		if (VOP_PATHCONF(outvp, _PC_MIN_HOLE_SIZE, &holeout) != 0)
+			holeout = 0;
+		/*
+		 * Holes that are past EOF do not need to be written as a block
+		 * of zero bytes.  So, truncate the output file as far as
+		 * possible and then use va.va_size to decide if writing 0
+		 * bytes is necessary in the loop below.
+		 */
+		if (error == 0)
+			error = VOP_GETATTR(outvp, &va, outcred);
+		if (error == 0 && va.va_size > *outoffp && va.va_size <=
+		    *outoffp + len) {
+#ifdef MAC
+			error = mac_vnode_check_write(curthread->td_ucred,
+			    outcred, outvp);
+			if (error == 0)
+#endif
+				error = vn_truncate_locked(outvp, *outoffp,
+				    false, outcred);
+			if (error == 0)
+				va.va_size = *outoffp;
+		}
+		VOP_UNLOCK(outvp, 0);
+	}
+	if (mp != NULL)
+		vn_finished_write(mp);
+	if (error != 0)
+		goto out;
+
+	/*
+	 * Set the blksize to the larger of the hole sizes for invp and outvp.
+	 * If hole sizes aren't available, set the blksize to the larger 
+	 * f_iosize of invp and outvp.
+	 * This code expects the hole sizes and f_iosizes to be powers of 2.
+	 * This value is clipped at 4Kbytes and 1Mbyte.
+	 */
+	blksize = MAX(holein, holeout);
+	if (blksize == 0)
+		blksize = MAX(invp->v_mount->mnt_stat.f_iosize,
+		    outvp->v_mount->mnt_stat.f_iosize);
+	if (blksize < 4096)
+		blksize = 4096;
+	else if (blksize > 1024 * 1024)
+		blksize = 1024 * 1024;
+	dat = malloc(blksize, M_TEMP, M_WAITOK);
+
+	/*
+	 * If VOP_IOCTL(FIOSEEKHOLE) works for invp, use it and FIOSEEKDATA
+	 * to find holes.  Otherwise, just scan the read block for all 0s
+	 * in the inner loop where the data copying is done.
+	 * Note that some file systems such as NFSv3, NFSv4.0 and NFSv4.1 may
+	 * support holes on the server, but do not support FIOSEEKHOLE.
+	 */
+	eof = false;
+	while (len > 0 && error == 0 && !eof) {
+		endoff = 0;			/* To shut up compilers. */
+		cantseek = true;
+		startoff = *inoffp;
+		copylen = len;
+
+		/*
+		 * Find the next data area.  If there is just a hole to EOF,
+		 * FIOSEEKDATA should fail and then we drop down into the
+		 * inner loop and create the hole on the outvp file.
+		 * (I do not know if any file system will report a hole to
+		 *  EOF via FIOSEEKHOLE, but I am pretty sure FIOSEEKDATA
+		 *  will fail for those file systems.)
+		 *
+		 * For input files that don't support FIOSEEKDATA/FIOSEEKHOLE,
+		 * the code just falls through to the inner copy loop.
+		 */
+		error = EINVAL;
+		if (holein > 0)
+			error = VOP_IOCTL(invp, FIOSEEKDATA, &startoff, 0,
+			    incred, curthread);
+		if (error == 0) {
+			endoff = startoff;
+			error = VOP_IOCTL(invp, FIOSEEKHOLE, &endoff, 0,
+			    incred, curthread);
+			/*
+			 * Since invp is unlocked, it may be possible for
+			 * another thread to do a truncate(), lseek(), write()
+			 * creating a hole at startoff between the above
+			 * VOP_IOCTL() calls, if the other thread does not do
+			 * rangelocking.
+			 * If that happens, startoff == endoff and finding
+			 * the hole has failed, so set an error.
+			 */
+			if (error == 0 && startoff == endoff)
+				error = EINVAL; /* Any error. Reset to 0. */
+		}
+		if (error == 0) {
+			if (startoff > *inoffp) {
+				/* Found hole before data block. */
+				xfer = MIN(startoff - *inoffp, len);
+				if (*outoffp < va.va_size) {
+					/* Must write 0s to punch hole. */
+					xfer2 = MIN(va.va_size - *outoffp,
+					    xfer);
+					memset(dat, 0, MIN(xfer2, blksize));
+					error = vn_write_outvp(outvp, dat,
+					    *outoffp, xfer2, blksize, false,
+					    holeout > 0, outcred);
+				}
+
+				if (error == 0 && *outoffp + xfer >
+				    va.va_size && xfer == len)
+					/* Grow last block. */
+					error = vn_write_outvp(outvp, dat,
+					    *outoffp, xfer, blksize, true,
+					    false, outcred);
+				if (error == 0) {
+					*inoffp += xfer;
+					*outoffp += xfer;
+					len -= xfer;
+				}
+			}
+			copylen = MIN(len, endoff - startoff);
+			cantseek = false;
+		} else {
+			cantseek = true;
+			startoff = *inoffp;
+			copylen = len;
+			error = 0;
+		}
+
+		xfer = blksize;
+		if (cantseek) {
+			/*
+			 * Set first xfer to end at a block boundary, so that
+			 * holes are more likely detected in the loop below via
+			 * the for all bytes 0 method.
+			 */
+			xfer -= (*inoffp % blksize);
+		}
+		/* Loop copying the data block. */
+		while (copylen > 0 && error == 0 && !eof) {
+			if (copylen < xfer)
+				xfer = copylen;
+			error = vn_lock(invp, LK_SHARED);
+			if (error != 0)
+				goto out;
+			error = vn_rdwr(UIO_READ, invp, dat, xfer,
+			    startoff, UIO_SYSSPACE, IO_NODELOCKED,
+			    curthread->td_ucred, incred, &aresid,
+			    curthread);
+			VOP_UNLOCK(invp, 0);
+			lastblock = false;
+			if (error == 0 && aresid > 0) {
+				/* Stop the copy at EOF on the input file. */
+				xfer -= aresid;
+				eof = true;
+				lastblock = true;
+			}
+			if (error == 0) {
+				/*
+				 * Skip the write for holes past the initial EOF
+				 * of the output file, unless this is the last
+				 * write of the output file at EOF.
+				 */
+				readzeros = cantseek ? mem_iszero(dat, xfer) :
+				    false;
+				if (xfer == len)
+					lastblock = true;
+				if (!cantseek || *outoffp < va.va_size ||
+				    lastblock || !readzeros)
+					error = vn_write_outvp(outvp, dat,
+					    *outoffp, xfer, blksize,
+					    readzeros && lastblock &&
+					    *outoffp >= va.va_size, false,
+					    outcred);
+				if (error == 0) {
+					*inoffp += xfer;
+					startoff += xfer;
+					*outoffp += xfer;
+					copylen -= xfer;
+					len -= xfer;
+				}
+			}
+			xfer = blksize;
+		}
+	}
+out:
+	*lenp = savlen - len;
+	free(dat, M_TEMP);
+	return (error);
+}
 // CHERI CHANGES START
 // {
-//   "updated": 20190429,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "user_capabilities"
 //   ]
 // }

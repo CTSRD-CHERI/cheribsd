@@ -1,6 +1,4 @@
-#line 2 "tokenizer.c"
 
-#line 4 "tokenizer.c"
 
 #define  YY_INT_ALIGNED short int
 
@@ -345,6 +343,9 @@ void yyfree (void *  );
 
 /* Begin user sect3 */
 
+#define yywrap() 1
+#define YY_SKIP_YYWRAP
+
 typedef unsigned char YY_CHAR;
 
 FILE *yyin = (FILE *) 0, *yyout = (FILE *) 0;
@@ -480,10 +481,8 @@ int yy_flex_debug = 0;
 #define YY_MORE_ADJ 0
 #define YY_RESTORE_YY_MORE_OFFSET
 char *yytext;
-#line 1 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 #define YY_NO_INPUT 1
-#line 3 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
-/* $OpenBSD: tokenizer.l,v 1.8 2012/04/12 17:00:11 espie Exp $ */
+/* $OpenBSD: tokenizer.l,v 1.9 2017/06/15 13:48:42 bcallah Exp $ */
 /*
  * Copyright (c) 2004 Marc Espie <espie@cvs.openbsd.org>
  *
@@ -508,6 +507,7 @@ char *yytext;
 #include <stdint.h>
 #include <limits.h>
 
+extern void m4_warnx(const char *, ...);
 extern int mimic_gnu;
 extern int32_t yylval;
 
@@ -516,7 +516,6 @@ int32_t parse_radix(void);
 extern int yylex(void);
 
 #define	YY_DECL	int yylex(void)
-#line 520 "tokenizer.c"
 
 #define INITIAL 0
 
@@ -696,9 +695,7 @@ YY_DECL
 	char *yy_cp, *yy_bp;
 	int yy_act;
     
-#line 45 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 
-#line 702 "tokenizer.c"
 
 	if ( !(yy_init) )
 		{
@@ -784,17 +781,14 @@ do_action:	/* This label is used only to access EOF actions. */
 case 1:
 /* rule 1 can match eol */
 YY_RULE_SETUP
-#line 46 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 {/* just skip it */}
 	YY_BREAK
 case 2:
 YY_RULE_SETUP
-#line 47 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { yylval = number(); return(NUMBER); }
 	YY_BREAK
 case 3:
 YY_RULE_SETUP
-#line 48 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { if (mimic_gnu) {
 				yylval = parse_radix(); return(NUMBER);
 			  } else {
@@ -804,60 +798,48 @@ YY_RULE_SETUP
 	YY_BREAK
 case 4:
 YY_RULE_SETUP
-#line 54 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { return(LE); }
 	YY_BREAK
 case 5:
 YY_RULE_SETUP
-#line 55 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { return(GE); }
 	YY_BREAK
 case 6:
 YY_RULE_SETUP
-#line 56 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { return(LSHIFT); }
 	YY_BREAK
 case 7:
 YY_RULE_SETUP
-#line 57 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { return(RSHIFT); }
 	YY_BREAK
 case 8:
 YY_RULE_SETUP
-#line 58 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { return(EQ); }
 	YY_BREAK
 case 9:
 YY_RULE_SETUP
-#line 59 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { return(NE); }
 	YY_BREAK
 case 10:
 YY_RULE_SETUP
-#line 60 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { return(LAND); }
 	YY_BREAK
 case 11:
 YY_RULE_SETUP
-#line 61 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { return(LOR); }
 	YY_BREAK
 case 12:
 YY_RULE_SETUP
-#line 62 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { if (mimic_gnu) { return (EXPONENT); } }
 	YY_BREAK
 case 13:
 YY_RULE_SETUP
-#line 63 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 { return yytext[0]; }
 	YY_BREAK
 case 14:
 YY_RULE_SETUP
-#line 64 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 ECHO;
 	YY_BREAK
-#line 861 "tokenizer.c"
 case YY_STATE_EOF(INITIAL):
 	yyterminate();
 
@@ -1814,7 +1796,6 @@ void yyfree (void * ptr )
 
 #define YYTABLES_NAME "yytables"
 
-#line 64 "/home/alr48/devel/freebsd/usr.bin/m4/tokenizer.l"
 
 
 
@@ -1827,7 +1808,7 @@ number(void)
 	l = strtol(yytext, NULL, 0);
 	if (((l == LONG_MAX || l == LONG_MIN) && errno == ERANGE) ||
 	    l > INT32_MAX || l < INT32_MIN) {
-		fprintf(stderr, "m4: numeric overflow in expr: %s\n", yytext);
+		m4_warnx("numeric overflow in expr: %s", yytext);
 	}
 	return l;
 }
@@ -1843,7 +1824,7 @@ parse_radix(void)
 	l = 0;
 	base = strtol(yytext+2, &next, 0);
 	if (base > 36 || next == NULL) {
-		fprintf(stderr, "m4: error in number %s\n", yytext);
+		m4_warnx("error in number %s", yytext);
 	} else {
 		next++;
 		while (*next != 0) {
@@ -1856,8 +1837,7 @@ parse_radix(void)
 				d = *next - 'A' + 10;
 			}
 			if (d >= base) {
-				fprintf(stderr, 
-				    "m4: error in number %s\n", yytext);
+				m4_warnx("error in number %s", yytext);
 				return 0;
 			}
 			l = base * l + d;

@@ -613,7 +613,7 @@ sglist_append_sglist(struct sglist *sg, struct sglist *source, size_t offset,
 int
 sglist_append_uio(struct sglist *sg, struct uio *uio)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	struct sgsave save;
 	size_t resid, minlen;
 	pmap_t pmap;
@@ -661,7 +661,7 @@ sglist_append_uio(struct sglist *sg, struct uio *uio)
 int
 sglist_consume_uio(struct sglist *sg, struct uio *uio, size_t resid)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	size_t done;
 	pmap_t pmap;
 	int error, len;
@@ -1000,11 +1000,10 @@ sglist_slice(struct sglist *original, struct sglist **slice, size_t offset,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

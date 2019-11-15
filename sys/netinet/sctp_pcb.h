@@ -259,6 +259,7 @@ struct sctp_base_info {
 	int packet_log_end;
 	uint8_t packet_log_buffer[SCTP_PACKET_LOG_SIZE];
 #endif
+	eventhandler_tag eh_tag;
 };
 
 /*-
@@ -362,7 +363,7 @@ struct sctp_inpcb {
 	 */
 	union {
 		struct inpcb inp;
-		char align[(sizeof(struct in6pcb) + SCTP_ALIGNM1) &
+		char align[(sizeof(struct inpcb) + SCTP_ALIGNM1) &
 		    ~SCTP_ALIGNM1];
 	}     ip_inp;
 

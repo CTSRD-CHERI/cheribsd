@@ -206,7 +206,7 @@ int
 sys_acct(struct thread *td, struct acct_args *uap)
 {
 
-	return (kern_acct(td, __USER_CAP_STR(uap->path)));
+	return (kern_acct(td, uap->path));
 }
 
 int

@@ -11,11 +11,11 @@
  * CHERI CHANGES START
  * {
  *   "updated": 20190426,
- *   "target_type": "header"
+ *   "target_type": "header",
  *   "changes": [
- *     "subobject_bounds",
+ *     "subobject_bounds"
  *   ],
- *   "change_comment": "address of std::string::operator[]: `&str[0] -> buf.data()`",
+ *   "change_comment": "address of std::string::operator[]: `&str[0] -> buf.data()`"
  * }
  * CHERI CHANGES END
  */

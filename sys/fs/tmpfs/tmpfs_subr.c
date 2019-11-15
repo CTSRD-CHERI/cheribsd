@@ -190,8 +190,6 @@ tmpfs_alloc_node(struct mount *mp, struct tmpfs_mount *tmp, enum vtype type,
 	/* If the root directory of the 'tmp' file system is not yet
 	 * allocated, this must be the request to do it. */
 	MPASS(IMPLIES(tmp->tm_root == NULL, parent == NULL && type == VDIR));
-	KASSERT(tmp->tm_root == NULL || mp->mnt_writeopcount > 0,
-	    ("creating node not under vn_start_write"));
 
 	MPASS(IFF(type == VLNK, target != NULL));
 	MPASS(IFF(type == VBLK || type == VCHR, rdev != VNOVAL));
@@ -1149,8 +1147,9 @@ static int
 tmpfs_dir_getdotdotdent(struct tmpfs_mount *tm, struct tmpfs_node *node,
     struct uio *uio)
 {
-	int error;
+	struct tmpfs_node *parent;
 	struct dirent dent;
+	int error;
 
 	TMPFS_VALIDATE_DIR(node);
 	MPASS(uio->uio_offset == TMPFS_DIRCOOKIE_DOTDOT);
@@ -1159,12 +1158,13 @@ tmpfs_dir_getdotdotdent(struct tmpfs_mount *tm, struct tmpfs_node *node,
 	 * Return ENOENT if the current node is already removed.
 	 */
 	TMPFS_ASSERT_LOCKED(node);
-	if (node->tn_dir.tn_parent == NULL)
+	parent = node->tn_dir.tn_parent;
+	if (parent == NULL)
 		return (ENOENT);
 
-	TMPFS_NODE_LOCK(node->tn_dir.tn_parent);
-	dent.d_fileno = node->tn_dir.tn_parent->tn_id;
-	TMPFS_NODE_UNLOCK(node->tn_dir.tn_parent);
+	TMPFS_NODE_LOCK(parent);
+	dent.d_fileno = parent->tn_id;
+	TMPFS_NODE_UNLOCK(parent);
 
 	dent.d_type = DT_DIR;
 	dent.d_namlen = 2;
@@ -1406,11 +1406,9 @@ tmpfs_reg_resize(struct vnode *vp, off_t newsize, boolean_t ignerr)
 		if (base != 0) {
 			idx = OFF_TO_IDX(newsize);
 retry:
-			m = vm_page_lookup(uobj, idx);
+			m = vm_page_grab(uobj, idx, VM_ALLOC_NOCREAT);
 			if (m != NULL) {
-				if (vm_page_sleep_if_busy(m, "tmfssz"))
-					goto retry;
-				MPASS(m->valid == VM_PAGE_BITS_ALL);
+				MPASS(vm_page_all_valid(m));
 			} else if (vm_pager_has_page(uobj, idx, NULL, NULL)) {
 				m = vm_page_alloc(uobj, idx, VM_ALLOC_NORMAL |
 				    VM_ALLOC_WAITFAIL);
@@ -1418,7 +1416,6 @@ retry:
 					goto retry;
 				rv = vm_pager_get_pages(uobj, &m, 1, NULL,
 				    NULL);
-				vm_page_lock(m);
 				if (rv == VM_PAGER_OK) {
 					/*
 					 * Since the page was not resident,
@@ -1428,12 +1425,11 @@ retry:
 					 * current operation is not regarded
 					 * as an access.
 					 */
+					vm_page_lock(m);
 					vm_page_launder(m);
 					vm_page_unlock(m);
-					vm_page_xunbusy(m);
 				} else {
 					vm_page_free(m);
-					vm_page_unlock(m);
 					if (ignerr)
 						m = NULL;
 					else {
@@ -1445,6 +1441,7 @@ retry:
 			if (m != NULL) {
 				pmap_zero_page_area(m, base, PAGE_SIZE - base);
 				vm_page_dirty(m);
+				vm_page_xunbusy(m);
 				vm_pager_page_unswapped(m);
 			}
 		}
@@ -1480,10 +1477,10 @@ tmpfs_check_mtime(struct vnode *vp)
 	KASSERT((obj->flags & (OBJ_TMPFS_NODE | OBJ_TMPFS)) ==
 	    (OBJ_TMPFS_NODE | OBJ_TMPFS), ("non-tmpfs obj"));
 	/* unlocked read */
-	if ((obj->flags & OBJ_TMPFS_DIRTY) != 0) {
+	if (obj->generation != obj->cleangeneration) {
 		VM_OBJECT_WLOCK(obj);
-		if ((obj->flags & OBJ_TMPFS_DIRTY) != 0) {
-			obj->flags &= ~OBJ_TMPFS_DIRTY;
+		if (obj->generation != obj->cleangeneration) {
+			obj->cleangeneration = obj->generation;
 			node = VP_TO_TMPFS_NODE(vp);
 			node->tn_status |= TMPFS_NODE_MODIFIED |
 			    TMPFS_NODE_CHANGED;

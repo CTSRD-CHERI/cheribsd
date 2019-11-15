@@ -106,7 +106,7 @@ struct nfsd_addsock_args {
  * Start processing requests.
  */
 struct nfsd_nfsd_args {
-	const char *principal;	/* GSS-API service principal name */
+	const char * __kerncap principal; /* GSS-API service principal name */
 	int	minthreads;	/* minimum service thread count */
 	int	maxthreads;	/* maximum service thread count */
 };

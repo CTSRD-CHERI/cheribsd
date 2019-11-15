@@ -70,6 +70,7 @@ pdinfo_t *efiblk_get_pdinfo_by_handle(EFI_HANDLE h);
 pdinfo_t *efiblk_get_pdinfo_by_device_path(EFI_DEVICE_PATH *path);
 
 void *efi_get_table(EFI_GUID *tbl);
+EFI_STATUS OpenProtocolByHandle(EFI_HANDLE, EFI_GUID *, void **);
 
 int efi_getdev(void **vdev, const char *devspec, const char **path);
 char *efi_fmtdev(void *vdev);
@@ -105,6 +106,8 @@ EFI_STATUS errno_to_efi_status(int errno);
 void efi_time_init(void);
 void efi_time_fini(void);
 
+int parse_uefi_con_out(void);
+bool efi_cons_update_mode(void);
 EFI_STATUS efi_main(EFI_HANDLE Ximage, EFI_SYSTEM_TABLE* Xsystab);
 
 EFI_STATUS main(int argc, CHAR16 *argv[]);

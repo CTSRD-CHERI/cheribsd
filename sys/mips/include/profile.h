@@ -49,7 +49,8 @@
 #define	MCOUNT	void _mcount(uintfptr_t frompc, uintfptr_t selfpc) { abort(); }
 #else
 #define	MCOUNT \
-	__asm(".globl _mcount;"		\
+	__asm(".text;"			\
+	".globl _mcount;"		\
 	".type _mcount,@function;"	\
 	"_mcount:;"			\
 	".set noreorder;"		\

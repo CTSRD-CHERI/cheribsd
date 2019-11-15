@@ -788,6 +788,16 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
+	/* cheriabi_coexecve */
+	case 151: {
+		struct cheriabi_coexecve_args *p = params;
+		iarg[0] = p->pid; /* pid_t */
+		uarg[1] = (__cheri_addr intptr_t) p->fname; /* char * __capability */
+		uarg[2] = (__cheri_addr intptr_t) p->argv; /* char * __capability * __capability */
+		uarg[3] = (__cheri_addr intptr_t) p->envv; /* char * __capability * __capability */
+		*n_args = 4;
+		break;
+	}
 	/* cheriabi_nlm_syscall */
 	case 154: {
 		struct cheriabi_nlm_syscall_args *p = params;
@@ -2531,15 +2541,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* cheriabi_shm_open */
-	case 482: {
-		struct cheriabi_shm_open_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
-		iarg[1] = p->flags; /* int */
-		iarg[2] = p->mode; /* mode_t */
-		*n_args = 3;
-		break;
-	}
 	/* cheriabi_shm_unlink */
 	case 483: {
 		struct cheriabi_shm_unlink_args *p = params;
@@ -3268,14 +3269,48 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 4;
 		break;
 	}
-	/* cheriabi_coexecve */
+	/* cheriabi_copy_file_range */
 	case 569: {
-		struct cheriabi_coexecve_args *p = params;
-		iarg[0] = p->pid; /* pid_t */
-		uarg[1] = (__cheri_addr intptr_t) p->fname; /* char * __capability */
-		uarg[2] = (__cheri_addr intptr_t) p->argv; /* char * __capability * __capability */
-		uarg[3] = (__cheri_addr intptr_t) p->envv; /* char * __capability * __capability */
-		*n_args = 4;
+		struct cheriabi_copy_file_range_args *p = params;
+		iarg[0] = p->infd; /* int */
+		uarg[1] = (__cheri_addr intptr_t) p->inoffp; /* off_t * __capability */
+		iarg[2] = p->outfd; /* int */
+		uarg[3] = (__cheri_addr intptr_t) p->outoffp; /* off_t * __capability */
+		uarg[4] = p->len; /* size_t */
+		uarg[5] = p->flags; /* unsigned int */
+		*n_args = 6;
+		break;
+	}
+	/* cheriabi___sysctlbyname */
+	case 570: {
+		struct cheriabi___sysctlbyname_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
+		uarg[1] = p->namelen; /* size_t */
+		uarg[2] = (__cheri_addr intptr_t) p->old; /* void * __capability */
+		uarg[3] = (__cheri_addr intptr_t) p->oldlenp; /* size_t * __capability */
+		uarg[4] = (__cheri_addr intptr_t) p->new; /* void * __capability */
+		uarg[5] = p->newlen; /* size_t */
+		*n_args = 6;
+		break;
+	}
+	/* cheriabi_shm_open2 */
+	case 571: {
+		struct cheriabi_shm_open2_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		iarg[1] = p->flags; /* int */
+		iarg[2] = p->mode; /* mode_t */
+		iarg[3] = p->shmflags; /* int */
+		uarg[4] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
+		*n_args = 5;
+		break;
+	}
+	/* cheriabi_shm_rename */
+	case 572: {
+		struct cheriabi_shm_rename_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->path_from; /* const char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path_to; /* const char * __capability */
+		iarg[2] = p->flags; /* int */
+		*n_args = 3;
 		break;
 	}
 	default:
@@ -4534,6 +4569,25 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 3:
 			p = "userland void * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_coexecve */
+	case 151:
+		switch(ndx) {
+		case 0:
+			p = "pid_t";
+			break;
+		case 1:
+			p = "userland char * __capability";
+			break;
+		case 2:
+			p = "userland char * __capability * __capability";
+			break;
+		case 3:
+			p = "userland char * __capability * __capability";
 			break;
 		default:
 			break;
@@ -7409,22 +7463,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cheriabi_shm_open */
-	case 482:
-		switch(ndx) {
-		case 0:
-			p = "userland const char * __capability";
-			break;
-		case 1:
-			p = "int";
-			break;
-		case 2:
-			p = "mode_t";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* cheriabi_shm_unlink */
 	case 483:
 		switch(ndx) {
@@ -8728,20 +8766,89 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cheriabi_coexecve */
+	/* cheriabi_copy_file_range */
 	case 569:
 		switch(ndx) {
 		case 0:
-			p = "pid_t";
+			p = "int";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland off_t * __capability";
 			break;
 		case 2:
-			p = "userland char * __capability * __capability";
+			p = "int";
 			break;
 		case 3:
-			p = "userland char * __capability * __capability";
+			p = "userland off_t * __capability";
+			break;
+		case 4:
+			p = "size_t";
+			break;
+		case 5:
+			p = "unsigned int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi___sysctlbyname */
+	case 570:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "size_t";
+			break;
+		case 2:
+			p = "userland void * __capability";
+			break;
+		case 3:
+			p = "userland size_t * __capability";
+			break;
+		case 4:
+			p = "userland void * __capability";
+			break;
+		case 5:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_shm_open2 */
+	case 571:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "mode_t";
+			break;
+		case 3:
+			p = "int";
+			break;
+		case 4:
+			p = "userland const char * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_shm_rename */
+	case 572:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		case 2:
+			p = "int";
 			break;
 		default:
 			break;
@@ -9201,6 +9308,11 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 147:
 	/* cheriabi_quotactl */
 	case 148:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_coexecve */
+	case 151:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
@@ -10221,11 +10333,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_shm_open */
-	case 482:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
 	/* cheriabi_shm_unlink */
 	case 483:
 		if (ndx == 0 || ndx == 1)
@@ -10623,8 +10730,23 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_coexecve */
+	/* cheriabi_copy_file_range */
 	case 569:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* cheriabi___sysctlbyname */
+	case 570:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_shm_open2 */
+	case 571:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_shm_rename */
+	case 572:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

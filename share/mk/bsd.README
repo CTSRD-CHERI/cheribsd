@@ -17,6 +17,7 @@ files.  In most cases it is only interesting to include bsd.prog.mk or
 bsd.lib.mk.
 
 bsd.arch.inc.mk		- includes arch-specific Makefile.$arch
+bsd.compat.mk		- definitions for building programs against compat ABIs
 bsd.compiler.mk		- defined based on current compiler
 bsd.confs.mk		- install of configuration files
 bsd.cpu.mk		- sets CPU/arch-related variables (included from sys.mk)
@@ -462,6 +463,20 @@ If foo does not have a manual page at all, add the line:
 If foo has multiple source files, add the line:
 
 	SRCS=	a.c b.c c.c d.c
+
+=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
+
+The include file, <bsd.compat.mk>, allows programs (built with
+<bsd.prog.mk>) to be built for one the ABI(s) supported by the
+top-level Makefile.libcompat.  It requires that <bsd.prog.mk> also be
+included.
+
+NEED_COMPAT	Build and link targeting a compatibility ABI or fail if it
+		is not available.  Supported values are "32", "soft", and
+		"any" being a wildcard.
+
+WANT_COMPAT	Similar to NEED_COMPAT, but build with the base ABI if
+		the specified ABI is not available.
 
 =-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=
 

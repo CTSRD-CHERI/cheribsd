@@ -221,7 +221,7 @@ ffs_snapshot(mp, snapfile)
 	struct vattr vat;
 	struct vnode *vp, *xvp, *mvp, *devvp;
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct snapdata *sn;
 	struct ufsmount *ump;
 #ifdef DIAGNOSTIC
@@ -788,7 +788,6 @@ out1:
 	for (loc = 0; loc < len; loc++) {
 		error = bread(vp, blkno + loc, fs->fs_bsize, KERNCRED, &nbp);
 		if (error) {
-			brelse(nbp);
 			fs->fs_snapinum[snaploc] = 0;
 			free(snapblklist, M_UFSMNT);
 			goto done;
@@ -899,7 +898,7 @@ cgaccount(cg, vp, nbp, passno)
 
 	ip = VTOI(vp);
 	fs = ITOFS(ip);
-	if ((error = ffs_getcg(fs, ITODEVVP(ip), cg, &bp, &cgp)) != 0)
+	if ((error = ffs_getcg(fs, ITODEVVP(ip), cg, 0, &bp, &cgp)) != 0)
 		return (error);
 	UFS_LOCK(ITOUMP(ip));
 	ACTIVESET(fs, cg);
@@ -1984,7 +1983,7 @@ ffs_snapshot_mount(mp)
 	struct vnode *lastvp;
 	struct inode *ip;
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	void *snapblklist;
 	char *reason;
 	daddr_t snaplistsize;
@@ -2721,11 +2720,10 @@ ffs_snapdata_acquire(struct vnode *devvp)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "kiovec_t"
+//   "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

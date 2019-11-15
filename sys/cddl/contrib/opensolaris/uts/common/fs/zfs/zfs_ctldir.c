@@ -1196,6 +1196,7 @@ zfsctl_snapshot_vptocnp(struct vop_vptocnp_args *ap)
 	vnode_t *vp;
 	sfs_node_t *node;
 	size_t len;
+	enum vgetstate vs;
 	int locked;
 	int error;
 
@@ -1224,7 +1225,7 @@ zfsctl_snapshot_vptocnp(struct vop_vptocnp_args *ap)
 	 * before we can lock the vnode again.
 	 */
 	locked = VOP_ISLOCKED(vp);
-	vhold(vp);
+	vs = vget_prep(vp);
 	vput(vp);
 
 	/* Look up .zfs/snapshot, our parent. */
@@ -1236,7 +1237,7 @@ zfsctl_snapshot_vptocnp(struct vop_vptocnp_args *ap)
 		bcopy(node->sn_name, ap->a_buf + *ap->a_buflen, len);
 	}
 	vfs_unbusy(mp);
-	vget(vp, locked | LK_VNHELD | LK_RETRY, curthread);
+	vget_finish(vp, locked | LK_RETRY, vs);
 	return (error);
 }
 
@@ -1247,6 +1248,7 @@ zfsctl_snapshot_vptocnp(struct vop_vptocnp_args *ap)
 static struct vop_vector zfsctl_ops_snapshot = {
 	.vop_default =		NULL, /* ensure very restricted access */
 	.vop_inactive =		zfsctl_snapshot_inactive,
+	.vop_need_inactive =	vop_stdneed_inactive,
 	.vop_reclaim =		zfsctl_snapshot_reclaim,
 	.vop_vptocnp =		zfsctl_snapshot_vptocnp,
 	.vop_lock1 =		vop_stdlock,

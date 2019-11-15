@@ -71,7 +71,7 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 {
 	struct sf_buf *sf;
 	struct thread *td = curthread;
-	kiovec_t *iov;
+	struct iovec *iov;
 	void *cp;
 	vm_offset_t page_offset;
 	vm_paddr_t pa;
@@ -169,11 +169,10 @@ out:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
 //     "integer_provenance"
 //   ]
 // }

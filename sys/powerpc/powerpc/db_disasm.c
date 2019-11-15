@@ -224,7 +224,7 @@ const struct opcode opcodes_1f[] = {
 	{ "ldx",	0xfc0007fe, 0x7c00002a, Op_D | Op_A | Op_B },
 	{ "lwzx",	0xfc0007fe, 0x7c00002e, Op_D | Op_A | Op_B },
 	{ "slw",	0xfc0007fe, 0x7c000030, Op_D | Op_A | Op_B | Op_Rc },
-	{ "cntlzw",	0xfc0007fe, 0x7c000034, Op_D | Op_A | Op_Rc },
+	{ "cntlzw",	0xfc0007fe, 0x7c000034, Op_S | Op_A | Op_Rc },
 	{ "sld",	0xfc0007fe, 0x7c000036, Op_D | Op_A | Op_B | Op_Rc },
 	{ "and",	0xfc0007fe, 0x7c000038, Op_D | Op_A | Op_B | Op_Rc },
 	{ "cmplw",	0xfc2007fe, 0x7c000040, Op_crfD | Op_A | Op_B },
@@ -1073,6 +1073,8 @@ db_disasm(db_addr_t loc, bool extended)
 	int class;
 	instr_t opcode;
 	opcode = *(instr_t *)(loc);
+	if (extended)
+		db_printf("|%08x| ", opcode);
 	class = opcode >> 26;
 	(opcodes_base[class])(opcode, loc);
 

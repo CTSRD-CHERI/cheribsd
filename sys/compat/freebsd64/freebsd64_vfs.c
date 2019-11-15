@@ -1331,3 +1331,13 @@ freebsd64_fhstatfs(struct thread *td, struct freebsd64_fhstatfs_args *uap)
 	return (user_fhstatfs(td, __USER_CAP_OBJ(uap->u_fhp),
 	    __USER_CAP_OBJ(uap->buf)));
 }
+
+int
+freebsd64_copy_file_range(struct thread *td,
+    struct freebsd64_copy_file_range_args *uap)
+{
+
+	return (user_copy_file_range(td, uap->infd,
+	    __USER_CAP_OBJ(uap->inoffp), uap->outfd,
+	    __USER_CAP_OBJ(uap->outoffp), uap->len, uap->flags));
+}

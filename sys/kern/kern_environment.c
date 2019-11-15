@@ -101,13 +101,13 @@ sys_kenv(struct thread *td, struct kenv_args *uap)
 {
 
 	return (kern_kenv(td, uap->what,
-	    (__cheri_tocap const char * __CAPABILITY)uap->name,
-	    (__cheri_tocap char * __CAPABILITY)uap->value, uap->len));
+	    (__cheri_tocap const char * __capability)uap->name,
+	    (__cheri_tocap char * __capability)uap->value, uap->len));
 }
 
 int
-kern_kenv(struct thread *td, int what, const char * __CAPABILITY namep,
-    char * __CAPABILITY val, int vallen)
+kern_kenv(struct thread *td, int what, const char * __capability namep,
+    char * __capability val, int vallen)
 {
 	char *name, *value, *buffer = NULL;
 	size_t len, done, needed, buflen;
@@ -264,6 +264,16 @@ init_static_kenv(char *buf, size_t len)
 	char *eval;
 
 	KASSERT(!dynamic_kenv, ("kenv: dynamic_kenv already initialized"));
+	/*
+	 * Suitably sized means it must be able to hold at least one empty
+	 * variable, otherwise things go belly up if a kern_getenv call is
+	 * made without a prior call to kern_setenv as we have a malformed
+	 * environment.
+	 */
+	KASSERT(len == 0 || len >= 2,
+	    ("kenv: static env must be initialized or suitably sized"));
+	KASSERT(len == 0 || (*buf == '\0' && *(buf + 1) == '\0'),
+	    ("kenv: sized buffer must be initially empty"));
 
 	/*
 	 * We may be called twice, with the second call needed to relocate

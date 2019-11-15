@@ -162,7 +162,6 @@ CTASSERT((sizeof(struct md_ioctl32)) == 436);
 #define	MDIOCATTACH_32	_IOC_NEWTYPE(MDIOCATTACH, struct md_ioctl32)
 #define	MDIOCDETACH_32	_IOC_NEWTYPE(MDIOCDETACH, struct md_ioctl32)
 #define	MDIOCQUERY_32	_IOC_NEWTYPE(MDIOCQUERY, struct md_ioctl32)
-#define	MDIOCLIST_32	_IOC_NEWTYPE(MDIOCLIST, struct md_ioctl32)
 #define	MDIOCRESIZE_32	_IOC_NEWTYPE(MDIOCRESIZE, struct md_ioctl32)
 #endif /* COMPAT_FREEBSD32 */
 
@@ -887,8 +886,8 @@ mdstart_vnode(struct md_s *sc, struct bio *bp)
 {
 	int error;
 	struct uio auio;
-	kiovec_t aiov;
-	kiovec_t *piov;
+	struct iovec aiov;
+	struct iovec *piov;
 	struct mount *mp;
 	struct vnode *vp;
 	struct buf *pb;
@@ -1037,9 +1036,7 @@ md_swap_page_free(vm_page_t m)
 {
 
 	vm_page_xunbusy(m);
-	vm_page_lock(m);
 	vm_page_free(m);
-	vm_page_unlock(m);
 }
 
 static int
@@ -1084,7 +1081,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 		len = ((i == lastp) ? lastend : PAGE_SIZE) - offs;
 		m = vm_page_grab(sc->object, i, VM_ALLOC_SYSTEM);
 		if (bp->bio_cmd == BIO_READ) {
-			if (m->valid == VM_PAGE_BITS_ALL)
+			if (vm_page_all_valid(m))
 				rv = VM_PAGER_OK;
 			else
 				rv = vm_pager_get_pages(sc->object, &m, 1,
@@ -1100,7 +1097,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				 * can be recreated if thrown out.
 				 */
 				pmap_zero_page(m);
-				m->valid = VM_PAGE_BITS_ALL;
+				vm_page_valid(m);
 			}
 			if ((bp->bio_flags & BIO_UNMAPPED) != 0) {
 				pmap_copy_pages(&m, offs, bp->bio_ma,
@@ -1114,7 +1111,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				cpu_flush_dcache(p, len);
 			}
 		} else if (bp->bio_cmd == BIO_WRITE) {
-			if (len == PAGE_SIZE || m->valid == VM_PAGE_BITS_ALL)
+			if (len == PAGE_SIZE || vm_page_all_valid(m))
 				rv = VM_PAGER_OK;
 			else
 				rv = vm_pager_get_pages(sc->object, &m, 1,
@@ -1135,13 +1132,13 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				physcopyin(p, VM_PAGE_TO_PHYS(m) + offs, len);
 			}
 
-			m->valid = VM_PAGE_BITS_ALL;
+			vm_page_valid(m);
 			if (m->dirty != VM_PAGE_BITS_ALL) {
 				vm_page_dirty(m);
 				vm_pager_page_unswapped(m);
 			}
 		} else if (bp->bio_cmd == BIO_DELETE) {
-			if (len == PAGE_SIZE || m->valid == VM_PAGE_BITS_ALL)
+			if (len == PAGE_SIZE || vm_page_all_valid(m))
 				rv = VM_PAGER_OK;
 			else
 				rv = vm_pager_get_pages(sc->object, &m, 1,
@@ -1412,7 +1409,7 @@ mdsetcred(struct md_s *sc, struct ucred *cred)
 
 	if (sc->vnode) {
 		struct uio auio;
-		kiovec_t aiov;
+		struct iovec aiov;
 
 		tmpbuf = malloc(sc->sectorsize, M_TEMP, M_WAITOK);
 		bzero(&auio, sizeof(auio));
@@ -1883,48 +1880,6 @@ kern_mdquery(struct md_req *mdr)
 	return (error);
 }
 
-static int
-kern_mdlist_locked(struct md_req *mdr)
-{
-	struct md_s *sc;
-	int i;
-
-	sx_assert(&md_sx, SA_XLOCKED);
-
-	/*
-	 * Write the number of md devices to mdr->md_units[0].
-	 * Write the unit number of the first (mdr->md_units_nitems - 2)
-	 * units to mdr->md_units[1::(mdr->md_units - 2)] and terminate the
-	 * list with -1.
-	 *
-	 * XXX: There is currently no mechanism to retrieve unit
-	 * numbers for more than (MDNPAD - 2) units.
-	 *
-	 * XXX: Due to the use of LIST_INSERT_HEAD in mdnew(), the
-	 * list of visible unit numbers not stable.
-	 */
-	i = 1;
-	LIST_FOREACH(sc, &md_softc_list, list) {
-		if (i < mdr->md_units_nitems - 1)
-			mdr->md_units[i] = sc->unit;
-		i++;
-	}
-	mdr->md_units[MIN(i, mdr->md_units_nitems - 1)] = -1;
-	mdr->md_units[0] = i - 1;
-	return (0);
-}
-
-static int
-kern_mdlist(struct md_req *mdr)
-{
-	int error;
-
-	sx_xlock(&md_sx);
-	error = kern_mdlist_locked(mdr);
-	sx_xunlock(&md_sx);
-	return (error);
-}
-
 /* Copy members that are not userspace pointers. */
 #define	MD_IOCTL2REQ(mdio, mdr) do {					\
 	(mdr)->md_unit = (mdio)->md_unit;				\
@@ -1965,8 +1920,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case MDIOCATTACH:
 	case MDIOCDETACH:
 	case MDIOCRESIZE:
-	case MDIOCQUERY:
-	case MDIOCLIST: {
+	case MDIOCQUERY: {
 		struct md_ioctl *mdio = (struct md_ioctl *)addr;
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
@@ -2002,8 +1956,7 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case MDIOCATTACH_32:
 	case MDIOCDETACH_32:
 	case MDIOCRESIZE_32:
-	case MDIOCQUERY_32:
-	case MDIOCLIST_32: {
+	case MDIOCQUERY_32: {
 		struct md_ioctl32 *mdio = (struct md_ioctl32 *)addr;
 		if (mdio->md_version != MDIOVERSION)
 			return (EINVAL);
@@ -2057,12 +2010,6 @@ mdctlioctl(struct cdev *dev, u_long cmd, caddr_t addr, int flags,
 	case MDIOCQUERY_32:
 #endif
 		error = kern_mdquery(&mdr);
-		break;
-	case MDIOCLIST:
-#ifdef COMPAT_FREEBSD32
-	case MDIOCLIST_32:
-#endif
-		error = kern_mdlist(&mdr);
 		break;
 	default:
 		error = ENOIOCTL;
@@ -2284,12 +2231,11 @@ g_md_fini(struct g_class *mp __unused)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

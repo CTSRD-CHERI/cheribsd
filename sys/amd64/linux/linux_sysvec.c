@@ -75,7 +75,6 @@ __FBSDID("$FreeBSD$");
 #include <amd64/linux/linux.h>
 #include <amd64/linux/linux_proto.h>
 #include <compat/linux/linux_emul.h>
-#include <compat/linux/linux_futex.h>
 #include <compat/linux/linux_ioctl.h>
 #include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_misc.h>
@@ -342,6 +341,12 @@ linux_copyout_strings(struct image_params *imgp)
 	 * terminating NULL pointers.
 	 */
 	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
+
+	/*
+	 * Starting with 2.24, glibc depends on a 16-byte stack alignment.
+	 * One "long argc" will be prepended later.
+	 */
+	vectp = (char **)((((uintptr_t)vectp + 8) & ~0xF) - 8);
 
 	/* vectp also becomes our initial stack base. */
 	stack_base = (register_t *)vectp;
@@ -859,8 +864,6 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
 				linux_ioctl_register_handler(*lihp);
-			LIST_INIT(&futex_list);
-			mtx_init(&futex_mtx, "ftllk64", NULL, MTX_DEF);
 			stclohz = (stathz ? stathz : hz);
 			if (bootverbose)
 				printf("Linux x86-64 ELF exec handler installed\n");
@@ -881,7 +884,6 @@ linux64_elf_modevent(module_t mod, int type, void *data)
 		if (error == 0) {
 			SET_FOREACH(lihp, linux_ioctl_handler_set)
 				linux_ioctl_unregister_handler(*lihp);
-			mtx_destroy(&futex_mtx);
 			if (bootverbose)
 				printf("Linux ELF exec handler removed\n");
 		} else

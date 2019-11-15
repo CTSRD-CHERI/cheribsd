@@ -353,8 +353,8 @@ int
 sys___acl_get_file(struct thread *td, struct __acl_get_file_args *uap)
 {
 
-	return (kern___acl_get_path(td, __USER_CAP_STR(uap->path), uap->type,
-	    __USER_CAP_OBJ(uap->aclp), FOLLOW));
+	return (kern___acl_get_path(td, uap->path, uap->type, uap->aclp,
+	    FOLLOW));
 }
 
 /*
@@ -364,8 +364,8 @@ int
 sys___acl_get_link(struct thread *td, struct __acl_get_link_args *uap)
 {
 
-	return(kern___acl_get_path(td, __USER_CAP_STR(uap->path), uap->type,
-	    __USER_CAP_OBJ(uap->aclp), NOFOLLOW));
+	return(kern___acl_get_path(td, uap->path, uap->type, uap->aclp,
+	    NOFOLLOW));
 }
 
 int
@@ -391,8 +391,8 @@ int
 sys___acl_set_file(struct thread *td, struct __acl_set_file_args *uap)
 {
 
-	return(kern___acl_set_path(td, __USER_CAP_STR(uap->path), uap->type,
-	    __USER_CAP_OBJ(uap->aclp), FOLLOW));
+	return(kern___acl_set_path(td, uap->path, uap->type, uap->aclp,
+	    FOLLOW));
 }
 
 /*
@@ -402,8 +402,8 @@ int
 sys___acl_set_link(struct thread *td, struct __acl_set_link_args *uap)
 {
 
-	return(kern___acl_set_path(td, __USER_CAP_STR(uap->path), uap->type,
-	    __USER_CAP_OBJ(uap->aclp), NOFOLLOW));
+	return(kern___acl_set_path(td, uap->path, uap->type, uap->aclp,
+	    NOFOLLOW));
 }
 
 int
@@ -429,8 +429,7 @@ int
 sys___acl_get_fd(struct thread *td, struct __acl_get_fd_args *uap)
 {
 
-	return (kern___acl_get_fd(td, uap->filedes, uap->type,
-	    __USER_CAP_OBJ(uap->aclp)));
+	return (kern___acl_get_fd(td, uap->filedes, uap->type, uap->aclp));
 }
 
 int
@@ -458,8 +457,7 @@ int
 sys___acl_set_fd(struct thread *td, struct __acl_set_fd_args *uap)
 {
 
-	return (kern___acl_set_fd(td, uap->filedes, uap->type,
-	    __USER_CAP_OBJ(uap->aclp)));
+	return (kern___acl_set_fd(td, uap->filedes, uap->type, uap->aclp));
 }
 
 int
@@ -487,8 +485,7 @@ int
 sys___acl_delete_file(struct thread *td, struct __acl_delete_file_args *uap)
 {
 
-	return (kern___acl_delete_path(td, __USER_CAP_STR(uap->path),
-	    uap->type, FOLLOW));
+	return (kern___acl_delete_path(td, uap->path, uap->type, FOLLOW));
 }
 
 /*
@@ -498,8 +495,7 @@ int
 sys___acl_delete_link(struct thread *td, struct __acl_delete_link_args *uap)
 {
 
-	return (kern___acl_delete_path(td, __USER_CAP_STR(uap->path),
-	    uap->type, NOFOLLOW));
+	return (kern___acl_delete_path(td, uap->path, uap->type, NOFOLLOW));
 }
 
 int
@@ -545,8 +541,8 @@ int
 sys___acl_aclcheck_file(struct thread *td, struct __acl_aclcheck_file_args *uap)
 {
 
-	return (kern___acl_aclcheck_path(td, __USER_CAP_STR(uap->path),
-	    uap->type, __USER_CAP_OBJ(uap->aclp), FOLLOW));
+	return (kern___acl_aclcheck_path(td, uap->path, uap->type, uap->aclp,
+	    FOLLOW));
 }
 
 /*
@@ -556,8 +552,8 @@ int
 sys___acl_aclcheck_link(struct thread *td, struct __acl_aclcheck_link_args *uap)
 {
 
-	return (kern___acl_aclcheck_path(td, __USER_CAP_STR(uap->path),
-	    uap->type, __USER_CAP_OBJ(uap->aclp), NOFOLLOW));
+	return (kern___acl_aclcheck_path(td, uap->path, uap->type, uap->aclp,
+	    NOFOLLOW));
 }
 
 int
@@ -583,8 +579,7 @@ int
 sys___acl_aclcheck_fd(struct thread *td, struct __acl_aclcheck_fd_args *uap)
 {
 
-	return (kern___acl_aclcheck_fd(td, uap->filedes, uap->type,
-	    __USER_CAP_OBJ(uap->aclp)));
+	return (kern___acl_aclcheck_fd(td, uap->filedes, uap->type, uap->aclp));
 }
 
 int

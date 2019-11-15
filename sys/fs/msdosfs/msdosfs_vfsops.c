@@ -50,6 +50,8 @@
  * October 1992
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/buf.h>
@@ -187,7 +189,7 @@ update_mp(struct mount *mp, struct thread *td)
 }
 
 static int
-msdosfs_cmount(struct mntarg *ma, void *data, uint64_t flags)
+msdosfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	struct msdosfs_args args;
 	struct export_args exp;
@@ -311,16 +313,25 @@ msdosfs_mount(struct mount *mp)
 			if (error)
 				return (error);
 
+			/* Now that the volume is modifiable, mark it dirty. */
+			error = markvoldirty_upgrade(pmp, true, true);
+			if (error) {
+				/*
+				 * If dirtying the superblock failed, drop GEOM
+				 * 'w' refs (we're still RO).
+				 */
+				g_topology_lock();
+				(void)g_access(pmp->pm_cp, 0, -1, 0);
+				g_topology_unlock();
+
+				return (error);
+			}
+
 			pmp->pm_fmod = 1;
 			pmp->pm_flags &= ~MSDOSFSMNT_RONLY;
 			MNT_ILOCK(mp);
 			mp->mnt_flag &= ~MNT_RDONLY;
 			MNT_IUNLOCK(mp);
-
-			/* Now that the volume is modifiable, mark it dirty. */
-			error = markvoldirty(pmp, 1);
-			if (error)
-				return (error);
 		}
 	}
 	/*
@@ -701,10 +712,8 @@ mountmsdosfs(struct vnode *devvp, struct mount *mp)
 	if (ronly)
 		pmp->pm_flags |= MSDOSFSMNT_RONLY;
 	else {
-		if ((error = markvoldirty(pmp, 1)) != 0) {
-			(void)markvoldirty(pmp, 0);
+		if ((error = markvoldirty(pmp, 1)) != 0)
 			goto error_exit;
-		}
 		pmp->pm_fmod = 1;
 	}
 	mp->mnt_data =  pmp;
@@ -862,7 +871,6 @@ msdosfs_fsiflush(struct msdosfsmount *pmp, int waitfor)
 	error = bread(pmp->pm_devvp, pmp->pm_fsinfo, pmp->pm_BytesPerSec,
 	    NOCRED, &bp);
 	if (error != 0) {
-		brelse(bp);
 		goto unlock;
 	}
 	fp = (struct fsinfo *)bp->b_data;

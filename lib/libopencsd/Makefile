@@ -88,6 +88,7 @@ SRCS+=	\
 # MEM_ACC
 SRCS+=	\
 	trc_mem_acc_base.cpp			\
+	trc_mem_acc_cache.cpp			\
 	trc_mem_acc_cb.cpp			\
 	trc_mem_acc_mapper.cpp			\
 	trc_mem_acc_bufptr.cpp			\
@@ -104,6 +105,7 @@ CFLAGS+=	\
 
 INCS=	\
 	ocsd_if_types.h			\
+	ocsd_if_version.h		\
 	trc_gen_elem_types.h		\
 	trc_pkt_types.h
 

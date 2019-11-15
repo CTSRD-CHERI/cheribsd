@@ -53,8 +53,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/limits.h>
 #include <sys/queue.h>
 #include <sys/taskqueue.h>
-#include <sys/zlib.h>
+#include <contrib/zlib/zlib.h>
 
+#include <net/debugnet.h>
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/if_arp.h>
@@ -70,7 +71,6 @@ __FBSDID("$FreeBSD$");
 #include <netinet/ip6.h>
 #include <netinet/tcp.h>
 #include <netinet/udp.h>
-#include <netinet/netdump/netdump.h>
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -1492,29 +1492,8 @@ struct bxe_softc {
 #define BXE_STATS_UNLOCK(sc)      mtx_unlock(&sc->stats_mtx)
 #define BXE_STATS_LOCK_ASSERT(sc) mtx_assert(&sc->stats_mtx, MA_OWNED)
 
-#if __FreeBSD_version < 800000
-#define BXE_MCAST_LOCK(sc)        \
-    do {                          \
-        mtx_lock(&sc->mcast_mtx); \
-        IF_ADDR_LOCK(sc->ifp);  \
-    } while (0)
-#define BXE_MCAST_UNLOCK(sc)        \
-    do {                            \
-        IF_ADDR_UNLOCK(sc->ifp);  \
-        mtx_unlock(&sc->mcast_mtx); \
-    } while (0)
-#else
-#define BXE_MCAST_LOCK(sc)         \
-    do {                           \
-        mtx_lock(&sc->mcast_mtx);  \
-        if_maddr_rlock(sc->ifp); \
-    } while (0)
-#define BXE_MCAST_UNLOCK(sc)         \
-    do {                             \
-        if_maddr_runlock(sc->ifp); \
-        mtx_unlock(&sc->mcast_mtx);  \
-    } while (0)
-#endif
+#define BXE_MCAST_LOCK(sc)	mtx_lock(&sc->mcast_mtx); 
+#define BXE_MCAST_UNLOCK(sc)	mtx_unlock(&sc->mcast_mtx);
 #define BXE_MCAST_LOCK_ASSERT(sc) mtx_assert(&sc->mcast_mtx, MA_OWNED)
 
     int dmae_ready;

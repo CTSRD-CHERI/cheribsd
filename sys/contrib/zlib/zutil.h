@@ -30,7 +30,10 @@
 #endif
 
 #ifdef Z_SOLO
+#ifndef _PTRDIFF_T_DECLARED
    typedef long ptrdiff_t;  /* guess -- will be caught if guess is wrong */
+#define _PTRDIFF_T_DECLARED
+#endif
 #endif
 
 #ifndef local
@@ -253,7 +256,7 @@ extern z_const char * const z_errmsg[10]; /* indexed by 2-zlib_error */
 #  define Tracecv(c,x)
 #endif
 
-#ifndef Z_SOLO
+#if !defined(Z_SOLO) || defined(_KERNEL)
    voidpf ZLIB_INTERNAL zcalloc OF((voidpf opaque, unsigned items,
                                     unsigned size));
    void ZLIB_INTERNAL zcfree  OF((voidpf opaque, voidpf ptr));

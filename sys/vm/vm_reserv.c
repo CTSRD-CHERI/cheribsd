@@ -316,7 +316,8 @@ sysctl_vm_reserv_fullpop(SYSCTL_HANDLER_ARGS)
 	for (segind = 0; segind < vm_phys_nsegs; segind++) {
 		seg = &vm_phys_segs[segind];
 		paddr = roundup2(seg->start, VM_LEVEL_0_SIZE);
-		while (paddr + VM_LEVEL_0_SIZE <= seg->end) {
+		while (paddr + VM_LEVEL_0_SIZE > paddr && paddr +
+		    VM_LEVEL_0_SIZE <= seg->end) {
 			rv = &vm_reserv_array[paddr >> VM_LEVEL_0_SHIFT];
 			fullpop += rv->popcnt == VM_LEVEL_0_NPAGES;
 			paddr += VM_LEVEL_0_SIZE;
@@ -1055,7 +1056,8 @@ vm_reserv_init(void)
 	for (segind = 0; segind < vm_phys_nsegs; segind++) {
 		seg = &vm_phys_segs[segind];
 		paddr = roundup2(seg->start, VM_LEVEL_0_SIZE);
-		while (paddr + VM_LEVEL_0_SIZE <= seg->end) {
+		while (paddr + VM_LEVEL_0_SIZE > paddr && paddr +
+		    VM_LEVEL_0_SIZE <= seg->end) {
 			rv = &vm_reserv_array[paddr >> VM_LEVEL_0_SHIFT];
 			rv->pages = PHYS_TO_VM_PAGE(paddr);
 			rv->domain = seg->domain;
@@ -1358,10 +1360,23 @@ vm_reserv_size(int level)
  * management system's data structures, in particular, the reservation array.
  */
 vm_paddr_t
-vm_reserv_startup(vm_offset_t *vaddr, vm_paddr_t end, vm_paddr_t high_water)
+vm_reserv_startup(vm_offset_t *vaddr, vm_paddr_t end)
 {
-	vm_paddr_t new_end;
+	vm_paddr_t new_end, high_water;
 	size_t size;
+	int i;
+
+	high_water = phys_avail[1];
+	for (i = 0; i < vm_phys_nsegs; i++) {
+		if (vm_phys_segs[i].end > high_water)
+			high_water = vm_phys_segs[i].end;
+	}
+
+	/* Skip the first chunk.  It is already accounted for. */
+	for (i = 2; phys_avail[i + 1] != 0; i += 2) {
+		if (phys_avail[i + 1] > high_water)
+			high_water = phys_avail[i + 1];
+	}
 
 	/*
 	 * Calculate the size (in bytes) of the reservation array.  Round up

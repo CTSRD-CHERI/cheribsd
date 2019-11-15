@@ -899,8 +899,9 @@ trap(struct trapframe *trapframe)
 			int rv;
 
 	kernel_fault:
-			va = trunc_page((vm_offset_t)trapframe->badvaddr);
-			rv = vm_fault(kernel_map, va, ftype, VM_FAULT_NORMAL);
+			va = (vm_offset_t)trapframe->badvaddr;
+			rv = vm_fault_trap(kernel_map, va, ftype,
+			    VM_FAULT_NORMAL, NULL, NULL);
 			if (rv == KERN_SUCCESS)
 				return (trapframe->pc);
 			if (td->td_pcb->pcb_onfault != NULL) {
@@ -922,22 +923,10 @@ trap(struct trapframe *trapframe)
 
 	case T_TLB_LD_MISS + T_USER:
 		ftype = VM_PROT_READ;
-		goto checkrefbit;
+		goto dofault;
 
 	case T_TLB_ST_MISS + T_USER:
 		ftype = VM_PROT_WRITE;
-
-checkrefbit:
-		/*
-		 * Was this trap caused by the PTE_VR bit not being set?
-		 */
-		if (pmap_emulate_referenced(&p->p_vmspace->vm_pmap,
-		    trapframe->badvaddr) == 0) {
-			if (!usermode) {
-				return (trapframe->pc);
-			}
-			goto out;
-		}
 
 dofault:
 		{
@@ -948,7 +937,7 @@ dofault:
 
 			vm = p->p_vmspace;
 			map = &vm->vm_map;
-			va = trunc_page((vm_offset_t)trapframe->badvaddr);
+			va = (vm_offset_t)trapframe->badvaddr;
 			if (KERNLAND(trapframe->badvaddr)) {
 				/*
 				 * Don't allow user-mode faults in kernel
@@ -957,7 +946,8 @@ dofault:
 				goto nogo;
 			}
 
-			rv = vm_fault(map, va, ftype, VM_FAULT_NORMAL);
+			rv = vm_fault_trap(map, va, ftype, VM_FAULT_NORMAL,
+			    &i, &ucode);
 			/*
 			 * XXXDTRACE: add dtrace_doubletrap_func here?
 			 */
@@ -982,11 +972,6 @@ dofault:
 				}
 				goto err;
 			}
-			i = SIGSEGV;
-			if (rv == KERN_PROTECTION_FAILURE)
-				ucode = SEGV_ACCERR;
-			else
-				ucode = SEGV_MAPERR;
 
 			msg = "BAD_PAGE_FAULT";
 			log_bad_page_fault(msg, trapframe, type);
@@ -1818,16 +1803,9 @@ get_mapping_info(vm_offset_t va, pd_entry_t **pdepp, pt_entry_t **ptepp)
 	struct proc *p = curproc;
 
 	pdep = (&(p->p_vmspace->vm_pmap.pm_segtab[(va >> SEGSHIFT) & (NPDEPG - 1)]));
-	if (*pdep) {
-#if VM_NRESERVLEVEL > 0
-		pd_entry_t *pde = &pdep[(va >> PDRSHIFT) & (NPDEPG - 1)];
-
-		if (pde_is_superpage(pde))
-			ptep = (pt_entry_t *)pde;
-		else
-#endif /* VM_NRESERVLEVEL > 0 */
-			ptep = pmap_pte(&p->p_vmspace->vm_pmap, va);
-	} else
+	if (*pdep)
+		ptep = pmap_pte(&p->p_vmspace->vm_pmap, va);
+	else
 		ptep = (pt_entry_t *)0;
 
 	*pdepp = pdep;

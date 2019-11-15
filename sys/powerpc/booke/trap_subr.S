@@ -120,8 +120,8 @@
 	GET_CPUINFO(%r1);		/* Per-cpu structure */		\
 	STORE	%r30, (savearea+CPUSAVE_R30)(%r1);			\
 	STORE	%r31, (savearea+CPUSAVE_R31)(%r1); 			\
-	mfdear	%r30;		 					\
-	mfesr	%r31;							\
+	mfspr	%r30, SPR_DEAR;						\
+	mfspr	%r31, SPR_ESR;						\
 	STORE	%r30, (savearea+CPUSAVE_BOOKE_DEAR)(%r1); 		\
 	STORE	%r31, (savearea+CPUSAVE_BOOKE_ESR)(%r1); 		\
 	mfspr	%r30, isrr0;						\
@@ -143,8 +143,8 @@
 	GET_CPUINFO(%r1);		/* Per-cpu structure */		\
 	STORE	%r30, (savearea+CPUSAVE_R30)(%r1);			\
 	STORE	%r31, (savearea+CPUSAVE_R31)(%r1);			\
-	mfdear	%r30;							\
-	mfesr	%r31;							\
+	mfspr	%r30, SPR_DEAR;						\
+	mfspr	%r31, SPR_ESR;						\
 	STORE	%r30, (savearea+CPUSAVE_BOOKE_DEAR)(%r1);		\
 	STORE	%r31, (savearea+CPUSAVE_BOOKE_ESR)(%r1);		\
 	mfspr	%r30, isrr0;						\
@@ -365,19 +365,19 @@
 	ld	%r30, (TLBSAVE_BOOKE_R30)(br);				\
 	ld	%r31, (TLBSAVE_BOOKE_R31)(br);				
 #define TLB_NEST(outr,inr)						\
-	rlwinm	outr, inr, 7, 22, 24;	/* 8 x TLBSAVE_LEN */
+	rlwinm	outr, inr, 7, 23, 24;	/* 8 x TLBSAVE_LEN */
 #else
 #define TLB_SAVE_REGS(br)						\
 	stmw	%r20, TLBSAVE_BOOKE_R20(br)
 #define TLB_RESTORE_REGS(br)						\
 	lmw	%r20, TLBSAVE_BOOKE_R20(br)
 #define TLB_NEST(outr,inr)						\
-	rlwinm	outr, inr, 6, 23, 25;	/* 4 x TLBSAVE_LEN */
+	rlwinm	outr, inr, 6, 24, 25;	/* 4 x TLBSAVE_LEN */
 #endif
 #define TLB_PROLOG							\
-	mtsprg4	%r1;			/* Save SP */			\
-	mtsprg5 %r28;							\
-	mtsprg6 %r29;							\
+	mtspr	SPR_SPRG4, %r1;			/* Save SP */		\
+	mtspr	SPR_SPRG5, %r28;					\
+	mtspr	SPR_SPRG6, %r29;					\
 	/* calculate TLB nesting level and TLBSAVE instance address */	\
 	GET_CPUINFO(%r1);	 	/* Per-cpu structure */		\
 	LOAD	%r28, PC_BOOKE_TLB_LEVEL(%r1);				\
@@ -388,8 +388,8 @@
 	add	%r1, %r1, %r29;		/* current TLBSAVE ptr */	\
 									\
 	/* save R20-31 */						\
-	mfsprg5 %r28;		 					\
-	mfsprg6 %r29;							\
+	mfspr	%r28, SPR_SPRG5;		 			\
+	mfspr	%r29, SPR_SPRG6;					\
 	TLB_SAVE_REGS(%r1);			\
 	/* save LR, CR */						\
 	mflr	%r30;		 					\
@@ -402,7 +402,7 @@
 	STORE	%r30, (TLBSAVE_BOOKE_SRR0)(%r1);	/* save SRR0 */	\
 	STORE	%r31, (TLBSAVE_BOOKE_SRR1)(%r1);	/* save SRR1 */	\
 	isync;								\
-	mfsprg4	%r1
+	mfspr	%r1, SPR_SPRG4
 
 /*
  * restores LR, CR, SRR0-1, R20-31 from the TLBSAVE area
@@ -410,7 +410,7 @@
  * same notes as for the TLB_PROLOG
  */
 #define TLB_RESTORE							\
-	mtsprg4	%r1;			/* Save SP */			\
+	mtspr	SPR_SPRG4, %r1;			/* Save SP */		\
 	GET_CPUINFO(%r1);	 	/* Per-cpu structure */		\
 	/* calculate TLB nesting level and TLBSAVE instance addr */	\
 	LOAD	%r28, PC_BOOKE_TLB_LEVEL(%r1);				\
@@ -432,7 +432,7 @@
 	mtsrr1	%r31;							\
 	/* restore R20-31 */						\
 	TLB_RESTORE_REGS(%r1);						\
-	mfsprg4	%r1
+	mfspr	%r1, SPR_SPRG4
 
 #ifdef SMP
 #define TLB_LOCK							\
@@ -693,7 +693,7 @@ INTERRUPT(int_data_tlb_error)
 	TLB_PROLOG
 	TLB_LOCK
 
-	mfdear	%r31
+	mfspr	%r31, SPR_DEAR
 
 	/*
 	 * Save MAS0-MAS2 registers. There might be another tlb miss during
@@ -712,6 +712,15 @@ INTERRUPT(int_data_tlb_error)
 	mfsrr1	%r21
 	mtcr	%r21
 	bt	17, search_failed	/* check MSR[PR] */
+
+#ifdef __powerpc64__
+	srdi	%r21, %r31, 48
+	cmpldi	cr0, %r21, VM_MIN_KERNEL_ADDRESS@highest
+#else
+	lis	%r21, VM_MIN_KERNEL_ADDRESS@h
+	cmplw	cr0, %r31, %r21
+#endif
+	blt	search_failed
 
 search_kernel_pmap:
 	/* Load r26 with kernel_pmap address */
@@ -767,7 +776,6 @@ search_failed:
 
 	li	%r23, 0
 	mtspr	SPR_MAS7, %r23
-	bl	zero_mas8
 
 	isync
 	tlbwe
@@ -796,22 +804,18 @@ pte_lookup:
 	rldicl  %r25, %r31, (64 - PP2D_H_L), (64 - PP2D_H_NUM)
 	rldimi  %r21, %r25, PP2D_L_NUM, (64 - (PP2D_L_NUM + PP2D_H_NUM))
 	slwi    %r21, %r21, PP2D_ENTRY_SHIFT	/* multiply by pp2d entry size */
-	addi    %r25, %r26, PM_PP2D		/* pmap pm_pp2d[] address */
-	add     %r25, %r25, %r21		/* offset within pm_pp2d[] table */
-	ld      %r25, 0(%r25)			/* get pdir address, i.e.  pmap->pm_pp2d[pp2d_idx] * */
+	ld	%r25, PM_PP2D(%r26)		/* pmap pm_pp2d[] address */
+	ldx	%r25, %r25, %r21		/* get pdir address, i.e.  pmap->pm_pp2d[pp2d_idx] * */
 
 	cmpdi   %r25, 0
-	beq 1f
+	beq 2f
 
-#if PAGE_SIZE < 65536
-	rldicl  %r21, %r31, (64 - PDIR_L), (64 - PDIR_NUM)      /* pdir offset */
-	slwi    %r21, %r21, PDIR_ENTRY_SHIFT    /* multiply by pdir entry size */
-	add     %r25, %r25, %r21                /* offset within pdir table */
-	ld      %r25, 0(%r25)                   /* get ptbl address, i.e.  pmap->pm_pp2d[pp2d_idx][pdir_idx] */
+	rldicl  %r21, %r31, (64 - PDIR_L), (64 - PDIR_NUM)	/* pdir offset */
+	slwi    %r21, %r21, PDIR_ENTRY_SHIFT	/* multiply by pdir entry size */
+	ldx	%r25, %r25, %r21		/* get ptbl address, i.e.  pmap->pm_pp2d[pp2d_idx][pdir_idx] */
 
 	cmpdi   %r25, 0
-	beq     1f
-#endif
+	beq     2f
 
 	rldicl  %r21, %r31, (64 - PTBL_L), (64 - PTBL_NUM) /* ptbl offset */
 	slwi    %r21, %r21, PTBL_ENTRY_SHIFT   /* multiply by pte entry size */
@@ -820,14 +824,13 @@ pte_lookup:
 	srwi	%r21, %r31, PDIR_SHIFT		/* pdir offset */
 	slwi	%r21, %r21, PDIR_ENTRY_SHIFT	/* multiply by pdir entry size */
 
-	addi	%r25, %r26, PM_PDIR	/* pmap pm_dir[] address */
-	add	%r25, %r25, %r21	/* offset within pm_pdir[] table */
+	lwz	%r25, PM_PDIR(%r26)	/* pmap pm_dir[] address */
 	/*
 	 * Get ptbl address, i.e. pmap->pm_pdir[pdir_idx]
 	 * This load may cause a Data TLB miss for non-kernel pmap!
 	 */
-	LOAD	%r25, 0(%r25)
-	CMPI	%r25, 0
+	lwzx	%r25, %r25, %r21	/* offset within pm_pdir[] table */
+	cmpwi	%r25, 0
 	beq	2f
 
 	lis	%r21, PTBL_MASK@h
@@ -908,10 +911,6 @@ tlb_fill_entry:
 	mtspr	SPR_MAS2, %r27
 	mtspr	SPR_MAS3, %r22
 	mtspr	SPR_MAS7, %r23
-
-	mflr	%r21
-	bl	zero_mas8
-	mtlr	%r21
 
 	isync
 	tlbwe
@@ -1062,8 +1061,8 @@ ASENTRY_NOPROF(breakpoint)
 	mflr	%r31
 	mtsrr0	%r31
 
-	mfdear	%r30
-	mfesr	%r31
+	mfspr	%r30, SPR_DEAR
+	mfspr	%r31, SPR_ESR
 	STORE	%r30, (PC_DBSAVE+CPUSAVE_BOOKE_DEAR)(%r3)
 	STORE	%r31, (PC_DBSAVE+CPUSAVE_BOOKE_ESR)(%r3)
 

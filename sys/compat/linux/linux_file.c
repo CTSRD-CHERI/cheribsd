@@ -589,7 +589,7 @@ linux_chdir(struct thread *td, struct linux_chdir_args *args)
 
 	LCONVPATHEXIST(td, args->path, &path);
 
-	error = kern_chdir(td, (char * __CAPABILITY)path, UIO_SYSSPACE);
+	error = kern_chdir(td, (char * __capability)path, UIO_SYSSPACE);
 	LFREEPATH(path);
 	return (error);
 }
@@ -692,8 +692,35 @@ linux_rename(struct thread *td, struct linux_rename_args *args)
 int
 linux_renameat(struct thread *td, struct linux_renameat_args *args)
 {
+	struct linux_renameat2_args renameat2_args = {
+	    .olddfd = args->olddfd,
+	    .oldname = args->oldname,
+	    .newdfd = args->newdfd,
+	    .newname = args->newname,
+	    .flags = 0
+	};
+
+	return (linux_renameat2(td, &renameat2_args));
+}
+
+int
+linux_renameat2(struct thread *td, struct linux_renameat2_args *args)
+{
 	char *from, *to;
 	int error, olddfd, newdfd;
+
+	if (args->flags != 0) {
+		if (args->flags & ~(LINUX_RENAME_EXCHANGE |
+		    LINUX_RENAME_NOREPLACE | LINUX_RENAME_WHITEOUT))
+			return (EINVAL);
+		if (args->flags & LINUX_RENAME_EXCHANGE &&
+		    args->flags & (LINUX_RENAME_NOREPLACE |
+		    LINUX_RENAME_WHITEOUT))
+			return (EINVAL);
+		linux_msg(td, "renameat2 unsupported flags 0x%x",
+		    args->flags);
+		return (EINVAL);
+	}
 
 	olddfd = (args->olddfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->olddfd;
 	newdfd = (args->newdfd == LINUX_AT_FDCWD) ? AT_FDCWD : args->newdfd;

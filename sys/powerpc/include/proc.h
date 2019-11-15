@@ -46,6 +46,10 @@ struct mdthread {
 };
 
 struct mdproc {
+	/*
+	 * Avoid empty structs because they are undefined behavior.
+	 */
+	long	md_spare;
 };
 
 #ifdef __powerpc64__

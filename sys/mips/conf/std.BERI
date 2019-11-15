@@ -14,8 +14,6 @@ options 	SMP
 
 options 	HZ=200
 
-makeoptions	ARCH_FLAGS="-march=beri -mcpu=beri -mabi=64 -Wno-unused-command-line-argument"
-
 makeoptions 	KERNLOADADDR=0xffffffff80100000
 
 include		"../beri/std.beri"
@@ -28,6 +26,7 @@ options 	DDB
 options 	KDB
 options 	ALT_BREAK_TO_DEBUGGER
 options 	KTRACE
+options 	_KPOSIX_PRIORITY_SCHEDULING
 
 options 	CAPABILITY_MODE
 options 	CAPABILITIES

@@ -137,9 +137,9 @@ static Elf64_Brandinfo freebsd_cheriabi_brand_info = {
 	.machine	= EM_MIPS,
 	.compat_3_brand	= "FreeBSD",
 	.emul_path	= NULL,
-	.interp_path	= "/libexec/ld-cheri-elf.so.1",
+	.interp_path	= "/libexec/ld-elf.so.1",
 	.sysvec		= &elf_freebsd_cheriabi_sysvec,
-	.interp_newpath = NULL,
+	.interp_newpath	= "/libexec/ld-cheri-elf.so.1",
 	.flags		= BI_CAN_EXEC_DYN,
 	.header_supported = cheriabi_elf_header_supported
 };
@@ -293,32 +293,14 @@ static void
 cheriabi_set_syscall_retval(struct thread *td, int error)
 {
 	struct trapframe *locr0 = td->td_frame;
-#ifdef INVARIANTS
-	unsigned int code;
-	const struct sysentvec *se;
-
-	code = locr0->v0;
-	if (code == SYS_syscall || code == SYS___syscall)
-		code = locr0->a0;
-
-	se = td->td_proc->p_sysent;
-	/*
-	 * When programs start up, they pass through the return path
-	 * (maybe via execve?).  When this happens, code is an absurd
-	 * and out of range value.
-	 */
-	if (code > se->sv_size)
-		code = 0;
-#endif
 
 	switch (error) {
 	case 0:
-		KASSERT(error != 0 ||
-		    cheri_gettag((void * __capability)td->td_retval[0]) == 0 ||
-		    code == CHERIABI_SYS_cheriabi_mmap ||
-		    code == CHERIABI_SYS_cheriabi_shmat,
+		KASSERT(cheri_gettag((void * __capability)td->td_retval[0]) == 0 ||
+		    td->td_sa.code == CHERIABI_SYS_cheriabi_mmap ||
+		    td->td_sa.code == CHERIABI_SYS_cheriabi_shmat,
 		    ("trying to return capability from integer returning "
-		    "syscall (%u)", code));
+		    "syscall (%u)", td->td_sa.code));
 
 		locr0->v0 = td->td_retval[0];
 		locr0->v1 = td->td_retval[1];

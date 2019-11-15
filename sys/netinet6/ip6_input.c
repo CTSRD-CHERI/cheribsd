@@ -393,6 +393,7 @@ ip6_destroy(void *unused __unused)
 	}
 	IFNET_RUNLOCK();
 
+	frag6_destroy();
 	nd6_destroy();
 	in6_ifattach_destroy();
 
@@ -403,20 +404,22 @@ VNET_SYSUNINIT(inet6, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD, ip6_destroy, NULL);
 #endif
 
 static int
-ip6_input_hbh(struct mbuf *m, uint32_t *plen, uint32_t *rtalert, int *off,
+ip6_input_hbh(struct mbuf **mp, uint32_t *plen, uint32_t *rtalert, int *off,
     int *nxt, int *ours)
 {
+	struct mbuf *m;
 	struct ip6_hdr *ip6;
 	struct ip6_hbh *hbh;
 
-	if (ip6_hopopts_input(plen, rtalert, &m, off)) {
+	if (ip6_hopopts_input(plen, rtalert, mp, off)) {
 #if 0	/*touches NULL pointer*/
-		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_discard);
+		in6_ifstat_inc((*mp)->m_pkthdr.rcvif, ifs6_in_discard);
 #endif
 		goto out;	/* m have already been freed */
 	}
 
 	/* adjust pointer */
+	m = *mp;
 	ip6 = mtod(m, struct ip6_hdr *);
 
 	/*
@@ -854,7 +857,7 @@ passin:
 	 */
 	plen = (u_int32_t)ntohs(ip6->ip6_plen);
 	if (ip6->ip6_nxt == IPPROTO_HOPOPTS) {
-		if (ip6_input_hbh(m, &plen, &rtalert, &off, &nxt, &ours) != 0)
+		if (ip6_input_hbh(&m, &plen, &rtalert, &off, &nxt, &ours) != 0)
 			return;
 	} else
 		nxt = ip6->ip6_nxt;
@@ -1404,15 +1407,16 @@ ip6_savecontrol_v4(struct inpcb *inp, struct mbuf *m, struct mbuf **mp,
 }
 
 void
-ip6_savecontrol(struct inpcb *in6p, struct mbuf *m, struct mbuf **mp)
+ip6_savecontrol(struct inpcb *inp, struct mbuf *m, struct mbuf **mp)
 {
-	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+	struct ip6_hdr *ip6;
 	int v4only = 0;
 
-	mp = ip6_savecontrol_v4(in6p, m, mp, &v4only);
+	mp = ip6_savecontrol_v4(inp, m, mp, &v4only);
 	if (v4only)
 		return;
 
+	ip6 = mtod(m, struct ip6_hdr *);
 	/*
 	 * IPV6_HOPOPTS socket option.  Recall that we required super-user
 	 * privilege for the option (see ip6_ctloutput), but it might be too
@@ -1420,7 +1424,7 @@ ip6_savecontrol(struct inpcb *in6p, struct mbuf *m, struct mbuf **mp)
 	 * returned to normal user.
 	 * See also RFC 2292 section 6 (or RFC 3542 section 8).
 	 */
-	if ((in6p->inp_flags & IN6P_HOPOPTS) != 0) {
+	if ((inp->inp_flags & IN6P_HOPOPTS) != 0) {
 		/*
 		 * Check if a hop-by-hop options header is contatined in the
 		 * received packet, and if so, store the options as ancillary
@@ -1462,7 +1466,7 @@ ip6_savecontrol(struct inpcb *in6p, struct mbuf *m, struct mbuf **mp)
 			 * Note: this constraint is removed in RFC3542
 			 */
 			*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
-			    IS2292(in6p, IPV6_2292HOPOPTS, IPV6_HOPOPTS),
+			    IS2292(inp, IPV6_2292HOPOPTS, IPV6_HOPOPTS),
 			    IPPROTO_IPV6);
 			if (*mp)
 				mp = &(*mp)->m_next;
@@ -1472,7 +1476,7 @@ ip6_savecontrol(struct inpcb *in6p, struct mbuf *m, struct mbuf **mp)
 		}
 	}
 
-	if ((in6p->inp_flags & (IN6P_RTHDR | IN6P_DSTOPTS)) != 0) {
+	if ((inp->inp_flags & (IN6P_RTHDR | IN6P_DSTOPTS)) != 0) {
 		int nxt = ip6->ip6_nxt, off = sizeof(struct ip6_hdr);
 
 		/*
@@ -1533,22 +1537,22 @@ ip6_savecontrol(struct inpcb *in6p, struct mbuf *m, struct mbuf **mp)
 
 			switch (nxt) {
 			case IPPROTO_DSTOPTS:
-				if (!(in6p->inp_flags & IN6P_DSTOPTS))
+				if (!(inp->inp_flags & IN6P_DSTOPTS))
 					break;
 
 				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
-				    IS2292(in6p,
+				    IS2292(inp,
 					IPV6_2292DSTOPTS, IPV6_DSTOPTS),
 				    IPPROTO_IPV6);
 				if (*mp)
 					mp = &(*mp)->m_next;
 				break;
 			case IPPROTO_ROUTING:
-				if (!(in6p->inp_flags & IN6P_RTHDR))
+				if (!(inp->inp_flags & IN6P_RTHDR))
 					break;
 
 				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
-				    IS2292(in6p, IPV6_2292RTHDR, IPV6_RTHDR),
+				    IS2292(inp, IPV6_2292RTHDR, IPV6_RTHDR),
 				    IPPROTO_IPV6);
 				if (*mp)
 					mp = &(*mp)->m_next;
@@ -1584,7 +1588,7 @@ ip6_savecontrol(struct inpcb *in6p, struct mbuf *m, struct mbuf **mp)
 		;
 	}
 
-	if (in6p->inp_flags2 & INP_RECVFLOWID) {
+	if (inp->inp_flags2 & INP_RECVFLOWID) {
 		uint32_t flowid, flow_type;
 
 		flowid = m->m_pkthdr.flowid;
@@ -1605,7 +1609,7 @@ ip6_savecontrol(struct inpcb *in6p, struct mbuf *m, struct mbuf **mp)
 	}
 
 #ifdef	RSS
-	if (in6p->inp_flags2 & INP_RECVRSSBUCKETID) {
+	if (inp->inp_flags2 & INP_RECVRSSBUCKETID) {
 		uint32_t flowid, flow_type;
 		uint32_t rss_bucketid;
 

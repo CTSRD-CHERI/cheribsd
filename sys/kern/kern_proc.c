@@ -129,9 +129,7 @@ u_long pidhashlock;
 struct pgrphashhead *pgrphashtbl;
 u_long pgrphash;
 struct proclist allproc;
-struct proclist zombproc;
 struct sx __exclusive_cache_line allproc_lock;
-struct sx __exclusive_cache_line zombproc_lock;
 struct sx __exclusive_cache_line proctree_lock;
 struct mtx __exclusive_cache_line ppeers_lock;
 struct mtx __exclusive_cache_line procid_lock;
@@ -187,12 +185,10 @@ procinit(void)
 	u_long i;
 
 	sx_init(&allproc_lock, "allproc");
-	sx_init(&zombproc_lock, "zombproc");
 	sx_init(&proctree_lock, "proctree");
 	mtx_init(&ppeers_lock, "p_peers", NULL, MTX_DEF);
 	mtx_init(&procid_lock, "procid", NULL, MTX_DEF);
 	LIST_INIT(&allproc);
-	LIST_INIT(&zombproc);
 	pidhashtbl = hashinit(maxproc / 4, M_PROC, &pidhash);
 	pidhashlock = (pidhash + 1) / 64;
 	if (pidhashlock > 0)
@@ -1307,25 +1303,6 @@ pstats_free(struct pstats *ps)
 {
 
 	free(ps, M_SUBPROC);
-}
-
-/*
- * Locate a zombie process by number
- */
-struct proc *
-zpfind(pid_t pid)
-{
-	struct proc *p;
-
-	sx_slock(&zombproc_lock);
-	LIST_FOREACH(p, &zombproc, p_list) {
-		if (p->p_pid == pid) {
-			PROC_LOCK(p);
-			break;
-		}
-	}
-	sx_sunlock(&zombproc_lock);
-	return (p);
 }
 
 #ifdef COMPAT_FREEBSD32
@@ -2497,8 +2474,7 @@ sysctl_kern_proc_ovmmap(SYSCTL_HANDLER_ARGS)
 
 	map = &vm->vm_map;
 	vm_map_lock_read(map);
-	for (entry = map->header.next; entry != &map->header;
-	    entry = entry->next) {
+	VM_MAP_ENTRY_FOREACH(entry, map) {
 		vm_object_t obj, tobj, lobj;
 		vm_offset_t addr;
 
@@ -2621,7 +2597,7 @@ kern_proc_vmmap_resident(vm_map_t map, vm_map_entry_t entry,
 	vm_object_t obj, tobj;
 	vm_page_t m, m_adv;
 	vm_offset_t addr;
-	vm_paddr_t locked_pa;
+	vm_paddr_t pa;
 	vm_pindex_t pi, pi_adv, pindex;
 
 	*super = false;
@@ -2629,7 +2605,7 @@ kern_proc_vmmap_resident(vm_map_t map, vm_map_entry_t entry,
 	if (vmmap_skip_res_cnt)
 		return;
 
-	locked_pa = 0;
+	pa = 0;
 	obj = entry->object.vm_object;
 	addr = entry->start;
 	m_adv = NULL;
@@ -2659,8 +2635,7 @@ kern_proc_vmmap_resident(vm_map_t map, vm_map_entry_t entry,
 		m_adv = NULL;
 		if (m->psind != 0 && addr + pagesizes[1] <= entry->end &&
 		    (addr & (pagesizes[1] - 1)) == 0 &&
-		    (pmap_mincore(map->pmap, addr, &locked_pa) &
-		    MINCORE_SUPER) != 0) {
+		    (pmap_mincore(map->pmap, addr, &pa) & MINCORE_SUPER) != 0) {
 			*super = true;
 			pi_adv = atop(pagesizes[1]);
 		} else {
@@ -2676,7 +2651,6 @@ kern_proc_vmmap_resident(vm_map_t map, vm_map_entry_t entry,
 		*resident_count += pi_adv;
 next:;
 	}
-	PA_UNLOCK_COND(locked_pa);
 }
 
 /*
@@ -2713,8 +2687,7 @@ kern_proc_vmmap_out(struct proc *p, struct sbuf *sb, ssize_t maxlen, int flags)
 	error = 0;
 	map = &vm->vm_map;
 	vm_map_lock_read(map);
-	for (entry = map->header.next; entry != &map->header;
-	    entry = entry->next) {
+	VM_MAP_ENTRY_FOREACH(entry, map) {
 		if (entry->eflags & MAP_ENTRY_IS_SUB_MAP)
 			continue;
 

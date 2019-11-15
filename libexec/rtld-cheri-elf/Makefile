@@ -6,8 +6,6 @@
 
 .include <src.opts.mk>
 MK_SSP=		no
-MK_CHERI_SHARED_PROG:=yes
-
 
 RTLD_CHERI_ELF_DIR=${SRCTOP}/libexec/rtld-cheri-elf
 RTLD_ELF_DIR=${SRCTOP}/libexec/rtld-elf
@@ -41,16 +39,25 @@ CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=1
 CFLAGS+=-DRTLD_SUPPORT_PER_FUNCTION_CAPTABLE=0
 .endif
 
+.if ${MACHINE_ARCH:Mmips*c*}
+PROG?=		ld-elf.so.1
+.else
 PROG?=		ld-cheri-elf.so.1
+.endif
+.if ${MACHINE_ARCH:Mmips*c*} && ${PROG} == ld-elf.so.1
+LINKS=		${BINDIR}/ld-elf.so.1 ${BINDIR}/ld-cheri-elf.so.1
+.endif
 SRCS=		rtld_start.S reloc.c rtld.c heap.c malloc.c cheri_reloc.c
 .PATH: ${RTLD_ELF_DIR}
 SRCS+=	rtld_lock.c map_object.c xmalloc.c debug.c libmap.c
 
 MAN=
 NEED_CHERI=	pure
-MK_CHERI_SHARED=yes
 CSTD?=		gnu99
 CFLAGS+=	-Wall -DFREEBSD_ELF -DIN_RTLD -ffreestanding
+.if !${MACHINE_ARCH:Mmips64*c*}
+CFLAGS+=	-DCOMPAT_CHERI
+.endif
 CFLAGS+=	-I${SRCTOP}/lib/csu/common \
 		-I${SRCTOP}/lib/libc/${RTLD_ARCH}
 .if exists(${RTLD_CHERI_ELF_DIR}/${MACHINE_ARCH})

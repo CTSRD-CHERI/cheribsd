@@ -37,8 +37,6 @@ CWARNEXTRA+=	-Wno-error-shift-negative-value
 .if ${COMPILER_VERSION} >= 40000
 CWARNEXTRA+=	-Wno-address-of-packed-member
 .endif
-
-CLANG_NO_IAS= -no-integrated-as
 .endif
 
 .if ${COMPILER_TYPE} == "gcc"
@@ -61,8 +59,7 @@ CWARNEXTRA?=	-Wno-error=address				\
 CWARNEXTRA+=	-Wno-error=misleading-indentation		\
 		-Wno-error=nonnull-compare			\
 		-Wno-error=shift-overflow			\
-		-Wno-error=tautological-compare			\
-		-Wno-format-zero-length
+		-Wno-error=tautological-compare
 .endif
 .if ${COMPILER_VERSION} >= 70200
 CWARNEXTRA+=	-Wno-error=memset-elt-size
@@ -79,6 +76,9 @@ NO_WCAST_QUAL= -Wno-cast-qual
 NO_WNONNULL=	-Wno-nonnull
 .endif
 .endif
+
+# This warning is utter nonsense
+CWARNFLAGS+=	-Wno-format-zero-length
 
 # External compilers may not support our format extensions.  Allow them
 # to be disabled.  WARNING: format checking is disabled in this case.
@@ -128,8 +128,18 @@ CFLAGS += -ffixed-x18
 INLINE_LIMIT?=	8000
 .endif
 
+#
+# For RISC-V we specify the soft-float ABI (lp64) to avoid the use of floating
+# point registers within the kernel. We also specify the "medium" code model,
+# which generates code suitable for a 2GiB addressing range located at any
+# offset, allowing modules to be located anywhere in the 64-bit address space.
+# Note that clang and GCC refer to this code model as "medium" and "medany"
+# respectively.
+#
 .if ${MACHINE_CPUARCH} == "riscv"
-CFLAGS.gcc+=	-mcmodel=medany -march=rv64imafdc -mabi=lp64
+CFLAGS+=	-march=rv64imafdc -mabi=lp64
+CFLAGS.clang+=	-mcmodel=medium
+CFLAGS.gcc+=	-mcmodel=medany
 INLINE_LIMIT?=	8000
 .endif
 
@@ -246,6 +256,7 @@ CFLAGS+=	-gdwarf-2
 .endif
 
 CFLAGS+= ${CWARNFLAGS:M*} ${CWARNFLAGS.${.IMPSRC:T}}
+CFLAGS+= ${CWARNFLAGS.${COMPILER_TYPE}}
 CFLAGS+= ${CFLAGS.${COMPILER_TYPE}} ${CFLAGS.${.IMPSRC:T}}
 
 # Tell bmake not to mistake standard targets for things to be searched for

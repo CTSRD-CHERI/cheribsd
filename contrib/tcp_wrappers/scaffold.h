@@ -5,17 +5,6 @@
   *
   * $FreeBSD$
   */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #ifdef INET6
 extern struct addrinfo *find_inet_addr(char *host);

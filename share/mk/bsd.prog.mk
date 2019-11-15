@@ -6,6 +6,7 @@ __BSD_PROG_MK=yes
 .include <bsd.init.mk>
 .include <bsd.cheri.mk>
 .include <bsd.compiler.mk>
+.include <bsd.linker.mk>
 
 .SUFFIXES: .out .o .bc .c .cc .cpp .cxx .C .m .y .l .ll .ln .s .S .asm
 
@@ -47,11 +48,15 @@ CXXFLAGS+= -fPIE
 LDFLAGS+= -pie
 .endif
 .if ${MK_RETPOLINE} != "no"
+.if ${COMPILER_FEATURES:Mretpoline} && ${LINKER_FEATURES:Mretpoline}
 CFLAGS+= -mretpoline
 CXXFLAGS+= -mretpoline
 # retpolineplt is broken with static linking (PR 233336)
 .if !defined(NO_SHARED) || ${NO_SHARED:tl} == "no"
 LDFLAGS+= -Wl,-zretpolineplt
+.endif
+.else
+.warning Retpoline requested but not supported by compiler or linker
 .endif
 .endif
 
@@ -80,7 +85,7 @@ STRIP?=	-s
 
 .if defined(NO_ROOT)
 .if !defined(TAGS) || ! ${TAGS:Mpackage=*}
-TAGS+=		package=${PACKAGE:Uruntime}
+TAGS+=		package=${PACKAGE:Uutilities}
 .endif
 TAG_ARGS=	-T ${TAGS:[*]:S/ /,/g}
 .endif
@@ -89,8 +94,8 @@ TAG_ARGS=	-T ${TAGS:[*]:S/ /,/g}
 LDFLAGS+= -static
 .endif
 
-# clang currently defaults to dynamic TLS for binaries
-.if ${MACHINE:Mmips} && ${COMPILER_TYPE} == "clang"
+# clang currently defaults to dynamic TLS for mips64 binaries
+.if ${MACHINE_ARCH:Mmips64*} && ${COMPILER_TYPE} == "clang"
 CFLAGS+= -ftls-model=initial-exec
 .endif
 
@@ -216,7 +221,7 @@ ${PROGNAME}.debug: ${PROG_FULL}
 
 .if ${PROG_INSTALL} != ${PROG}
 ${PROG_INSTALL}: ${PROG}
-	strip -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
+	${STRIPBIN:Ustrip} -o ${.TARGET} ${STRIP_FLAGS} ${PROG}
 .endif
 
 .if defined(LLVM_LINK)

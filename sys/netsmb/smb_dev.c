@@ -835,7 +835,7 @@ nsmb_dev_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thre
 #endif
 	    {
 		struct uio auio;
-		kiovec_t iov;
+		struct iovec iov;
 	
 		if ((ssp = sdp->sd_share) == NULL) {
 			error = ENOTCONN;
@@ -962,12 +962,11 @@ smb_dev2share(int fd, int mode, struct smb_cred *scred,
 
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:misc",
-//     "iovec-macros",
-//     "kiovec_t"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

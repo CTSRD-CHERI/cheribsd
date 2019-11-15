@@ -50,7 +50,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 {
 	ssize_t orig_resid;
 	vm_offset_t off, v;
-	kiovec_t *iov;
+	struct iovec *iov;
 	struct vm_page m;
 	vm_page_t marr;
 	u_int cnt;
@@ -121,13 +121,3 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 
 	return (error);
 }
-
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "kiovec_t"
-//   ]
-// }
-// CHERI CHANGES END

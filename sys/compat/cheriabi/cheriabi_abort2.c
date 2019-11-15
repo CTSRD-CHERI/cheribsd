@@ -42,10 +42,9 @@ __FBSDID("$FreeBSD$");
 int
 cheriabi_abort2(struct thread *td, struct cheriabi_abort2_args *uap)
 {
-	void *uargs[16];
-	void *uargsp;
-	uintcap_t cap;
-	int i, nargs;
+	void * __capability uargs[16];
+	void * __capability *uargsp;
+	int error, nargs;
 
 	nargs = uap->nargs;
 	if (nargs < 0 || nargs > nitems(uargs))
@@ -53,15 +52,12 @@ cheriabi_abort2(struct thread *td, struct cheriabi_abort2_args *uap)
 	uargsp = NULL;
 	if (nargs > 0) {
 		if (uap->args != NULL) {
-			for (i = 0; i < nargs; i++) {
-				if (fuecap(uap->args + i, &cap) != 0) {
-					nargs = -1;
-					break;
-				} else
-					uargs[i] = (void *)(uintptr_t)cap;
-			}
-			if (nargs > 0)
-				uargsp = &uargs;
+			error = copyincap(uap->args, uargs,
+			    nargs * sizeof(void * __capability));
+			if (error)
+				nargs = -1;
+			else
+				uargsp = uargs;
 		} else
 			nargs = -1;
 	}

@@ -34,54 +34,51 @@ __FBSDID("$FreeBSD$");
 #include <zlib.h>
 
 #include "mkuzip.h"
-#include "mkuz_zlib.h"
 #include "mkuz_blk.h"
+#include "mkuz_zlib.h"
 
 struct mkuz_zlib {
-	uLongf oblen;
-	uint32_t blksz;
+	int comp_level;
 };
 
+size_t
+mkuz_zlib_cbound(size_t blksz)
+{
+	return (compressBound(blksz));
+}
+
 void *
-mkuz_zlib_init(uint32_t blksz)
+mkuz_zlib_init(int *comp_level)
 {
 	struct mkuz_zlib *zp;
 
-	if (blksz % DEV_BSIZE != 0) {
-		errx(1, "cluster size should be multiple of %d",
-		    DEV_BSIZE);
+	if (*comp_level == USE_DEFAULT_LEVEL)
+		*comp_level = Z_BEST_COMPRESSION;
+	if (*comp_level < Z_BEST_SPEED || *comp_level > Z_BEST_COMPRESSION)
+		errx(1, "provided compression level %d is invalid",
+		    *comp_level);
 		/* Not reached */
-	}
-	if (compressBound(blksz) > MAXPHYS) {
-		errx(1, "cluster size is too large");
-		/* Not reached */
-	}
-	zp = mkuz_safe_zmalloc(sizeof(struct mkuz_zlib));
-	zp->oblen = compressBound(blksz);
-	zp->blksz = blksz;
 
-	return (void *)zp;
+	zp = mkuz_safe_zmalloc(sizeof(struct mkuz_zlib));
+	zp->comp_level = *comp_level;
+
+	return (zp);
 }
 
-struct mkuz_blk *
-mkuz_zlib_compress(void *p, const struct mkuz_blk *iblk)
+void
+mkuz_zlib_compress(void *p, const struct mkuz_blk *iblk, struct mkuz_blk *oblk)
 {
 	uLongf destlen_z;
-	struct mkuz_blk *rval;
 	struct mkuz_zlib *zp;
 
 	zp = (struct mkuz_zlib *)p;
 
-	rval = mkuz_blk_ctor(zp->oblen);
-
-	destlen_z = rval->alen;
-	if (compress2(rval->data, &destlen_z, iblk->data, zp->blksz,
-	    Z_BEST_COMPRESSION) != Z_OK) {
-		errx(1, "can't compress data: compress2() "
-		    "failed");
+	destlen_z = oblk->alen;
+	if (compress2(oblk->data, &destlen_z, iblk->data, iblk->info.len,
+	    zp->comp_level) != Z_OK) {
+		errx(1, "can't compress data: compress2() failed");
 		/* Not reached */
 	}
 
-	rval->info.len = (uint32_t)destlen_z;
-	return (rval);
+	oblk->info.len = (uint32_t)destlen_z;
 }
