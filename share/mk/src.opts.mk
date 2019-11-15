@@ -391,6 +391,29 @@ BROKEN_OPTIONS+=HYPERV
 BROKEN_OPTIONS+=NVME
 .endif
 
+.if ${.MAKE.OS} != "FreeBSD"
+# Building the target compiler requires builtin tablegen on the host
+# which is (currently) not possible on non-FreeBSD
+BROKEN_OPTIONS+=CLANG LLD LLDB
+# The same also applies to the boostrap LLVM.
+BROKEN_OPTIONS+=CLANG_BOOTSTRAP LLD_BOOTSTRAP
+# Ancient GCC and binutils also does not boostrap on Linux.
+BROKEN_OPTIONS+=GCC_BOOTSTRAP BINUTILS_BOOTSTRAP
+
+
+# # Boot cannot be built with clang yet. Will need to bootstrap GNU as..
+# # BROKEN_OPTIONS+=BOOT
+# .if ${.MAKE.OS} == "Linux"
+# # crunchgen fails for some reason on Linux (but it works on MacOS):
+# # + cd /local/scratch/alr48/cheri/freebsd-mips/rescue/rescue/../../bin/cat
+# # + make -f /tmp//crunchgen_rescue9yuKRG -DRESCUE CRUNCH_CFLAGS=-DRESCUE MK_AUTO_OBJ=yes DIRPRFX=cat/ loop
+# # + echo OBJS= cat.o
+# # /tmp//crunchgen_rescue9yuKRG: Invalid argument
+# BROKEN_OPTIONS+=RESCUE
+# .endif
+.endif
+
+
 .if ${__T:Msparc64}
 # PR 233405
 BROKEN_OPTIONS+=LLVM_LIBUNWIND

@@ -19,7 +19,7 @@ all depend: ${SRCS}
 
 config_local.h: newvers.sh ${SRCTOP}/sys/conf/newvers.sh
 	@rm -f ${.TARGET}
-	sh ${.ALLSRC} > ${.TARGET}
+	env SYSDIR=${SRCTOP}/sys sh ${.ALLSRC} > ${.TARGET}.tmp && mv -f ${.TARGET}.tmp ${.TARGET}
 
 localconfig.h:
 	@rm -f ${.TARGET}

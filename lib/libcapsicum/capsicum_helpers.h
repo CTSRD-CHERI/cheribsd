@@ -49,13 +49,22 @@
 __BEGIN_DECLS
 
 static const unsigned long caph_stream_cmds[] =
-	{ TIOCGETA, TIOCGWINSZ, FIODTYPE };
+    {
+#ifdef TIOCGETA
+	TIOCGETA,
+#endif
+#ifdef TIOCGWINSZ
+	TIOCGWINSZ,
+#endif
+#ifdef FIODTYPE
+	FIODTYPE,
+#endif
+    };
 static const uint32_t caph_stream_fcntls = CAP_FCNTL_GETFL;
 
 static __inline void
 caph_stream_rights(cap_rights_t *rights, int flags)
 {
-
 	cap_rights_init(rights, CAP_EVENT, CAP_FCNTL, CAP_FSTAT,
 	    CAP_IOCTL, CAP_SEEK);
 

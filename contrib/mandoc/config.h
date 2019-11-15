@@ -25,6 +25,7 @@
 #define HAVE_LESS_T 1
 #define HAVE_MKDTEMP 1
 #define HAVE_NTOHL 1
+#define HAVE_OHASH 1
 #define HAVE_PLEDGE 0
 #define HAVE_PROGNAME 1
 #define HAVE_REALLOCARRAY 1

@@ -112,8 +112,8 @@ typedef struct collate_subst {
 	int32_t pri[COLLATE_STR_LEN];
 } collate_subst_t;
 
-struct xlocale_collate {
-	struct xlocale_component header;
+XLOCALE_STRUCT(collate) {
+	XLOCALE_STRUCT(component) header;
 	int __collate_load_error;
 	char * map;
 	size_t maplen;
@@ -127,14 +127,14 @@ struct xlocale_collate {
 
 __BEGIN_DECLS
 int	__collate_load_tables(const char *);
-int	__collate_equiv_value(locale_t, const wchar_t *, size_t);
-void	_collate_lookup(struct xlocale_collate *,const wchar_t *, int *, int *,
+int	__collate_equiv_value(XLOCALE_NAMESPACED(locale_t), const wchar_t *, size_t);
+void	_collate_lookup(XLOCALE_STRUCT(collate) *,const wchar_t *, int *, int *,
 	int, const int **);
 int	__collate_range_cmp(char, char);
 int	__wcollate_range_cmp(wchar_t, wchar_t);
-size_t	_collate_wxfrm(struct xlocale_collate *, const wchar_t *, wchar_t *,
+size_t	_collate_wxfrm(XLOCALE_STRUCT(collate) *, const wchar_t *, wchar_t *,
 	size_t);
-size_t	_collate_sxfrm(struct xlocale_collate *, const wchar_t *, char *,
+size_t	_collate_sxfrm(XLOCALE_STRUCT(collate) *, const wchar_t *, char *,
 	size_t);
 __END_DECLS
 

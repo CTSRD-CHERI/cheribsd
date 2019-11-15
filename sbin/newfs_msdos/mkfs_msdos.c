@@ -287,8 +287,9 @@ mkfs_msdos(const char *fname, const char *dtype, const struct msdos_options *op)
 	goto done;
     }
     if (o.create_size) {
-	if (!S_ISREG(sb.st_mode))
+	if (!S_ISREG(sb.st_mode)) {
 	    warnx("warning, %s is not a regular file", fname);
+	}
     } else {
 #ifdef MAKEFS
 	errx(1, "o.create_size must be set!");
@@ -548,7 +549,7 @@ mkfs_msdos(const char *fname, const char *dtype, const struct msdos_options *op)
 	x1 = bpb.bpbResSectors + rds;
 	x = bpb.bpbBigFATsecs ? bpb.bpbBigFATsecs : 1;
 	if (x1 + (u_int64_t)x * bpb.bpbFATs > bpb.bpbHugeSectors) {
-	    warnx("meta data exceeds file system size");
+	    errx(1, "meta data exceeds file system size");
 	    goto done;
 	}
 	x1 += x * bpb.bpbFATs;

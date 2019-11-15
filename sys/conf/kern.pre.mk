@@ -161,14 +161,19 @@ LDFLAGS+=	--build-id=sha1
     defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc} == ""
 .error amd64/arm64/i386 kernel requires linker ifunc support
 .endif
+
 .if ${MACHINE_CPUARCH} == "amd64"
 LDFLAGS+=	-z max-page-size=2097152
 .if ${LINKER_TYPE} != "lld"
 LDFLAGS+=	-z common-page-size=4096
 .else
+.if defined(LINKER_FEATURES) && ${LINKER_FEATURES:Mifunc-noplt} == ""
+.warning "linker ${LD} does not support -z ifunc-noplt. Kernel will be slower!"
+.else
 LDFLAGS+=	-z notext -z ifunc-noplt
 .endif
 .endif
+.endif  # ${MACHINE_CPUARCH} == "amd64"
 
 .if ${MACHINE_CPUARCH} == "riscv"
 # Hack: Work around undefined weak symbols being out of range when linking with

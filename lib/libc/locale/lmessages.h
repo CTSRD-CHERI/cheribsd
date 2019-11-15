@@ -45,7 +45,7 @@ struct	lc_messages_T {
 	const char	*nostr;
 };
 
-struct lc_messages_T *__get_current_messages_locale(locale_t);
+struct lc_messages_T *__get_current_messages_locale(XLOCALE_NAMESPACED(locale_t));
 int	__messages_load_locale(const char *);
 
 #endif /* !_LMESSAGES_H_ */

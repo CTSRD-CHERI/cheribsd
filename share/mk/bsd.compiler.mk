@@ -143,13 +143,17 @@ _cc_vars+=XCC X_
 # The value is only used/exported for the same environment that impacts
 # CC and COMPILER_* settings here.
 _exported_vars=	${X_}COMPILER_TYPE ${X_}COMPILER_VERSION \
-		${X_}COMPILER_FREEBSD_VERSION
+		${X_}COMPILER_FREEBSD_VERSION ${X_}COMPILER_RESOURCE_DIR \
+		${X_}COMPILER_ABSOLUTE_PATH
 ${X_}_cc_hash=	${${cc}}${MACHINE}${PATH}
 ${X_}_cc_hash:=	${${X_}_cc_hash:hash}
-# Only import if none of the vars are set somehow else.
+# Only import if none of the vars are set differently somehow else.
 _can_export=	yes
 .for var in ${_exported_vars}
-.if defined(${var})
+.if defined(${var}) && (!defined(${var}__${${X_}_cc_hash}) || ${${var}__${${X_}_cc_hash}} != ${${var}})
+.if defined(${var}__${${X_}_ld_hash})
+.info "Cannot import ${X_}COMPILER variables since cached ${var} is different: ${${var}__${${X_}_cc_hash}} != ${${var}}"
+.endif
 _can_export=	no
 .endif
 .endfor
@@ -169,6 +173,15 @@ ${X_}COMPILER_TYPE= none
 ${X_}COMPILER_VERSION= 0
 ${X_}COMPILER_FREEBSD_VERSION= 0
 .elif !defined(${X_}COMPILER_TYPE) || !defined(${X_}COMPILER_VERSION)
+# Ensure that all values are cached when running the buildworld stages. While
+# this only amounts to one executing ${CC}, echo and awk this adds to quite a
+# lot of unccessary fork()+exec() when building world
+# walking the entire object tree
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+.error "${.CURDIR}: Rerunning ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. This value should be cached!"
+.else
+.info "${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. ${cc}=${${cc}}"
+.endif
 _v!=	${${cc}:N${CCACHE_BIN}} --version || echo 0.0.0
 
 .if !defined(${X_}COMPILER_TYPE)
@@ -192,6 +205,11 @@ ${X_}COMPILER_VERSION!=echo "${_v:M[1-9]*.[0-9]*}" | awk -F. '{print $$1 * 10000
 .undef _v
 .endif
 .if !defined(${X_}COMPILER_FREEBSD_VERSION)
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+.error "${.CURDIR}: Recomputing ${X_}COMPILER_FREEBSD_VERSION. This value should be cached!"
+.else
+.info "${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION. ${cc}=${${cc}}"
+.endif
 ${X_}COMPILER_FREEBSD_VERSION!=	{ echo "__FreeBSD_cc_version" | ${${cc}:N${CCACHE_BIN}} -E - 2>/dev/null || echo __FreeBSD_cc_version; } | sed -n '$$p'
 # If we get a literal "__FreeBSD_cc_version" back then the compiler
 # is a non-FreeBSD build that doesn't support it or some other error
@@ -199,6 +217,10 @@ ${X_}COMPILER_FREEBSD_VERSION!=	{ echo "__FreeBSD_cc_version" | ${${cc}:N${CCACH
 .if ${${X_}COMPILER_FREEBSD_VERSION} == "__FreeBSD_cc_version"
 ${X_}COMPILER_FREEBSD_VERSION=	unknown
 .endif
+.endif
+
+.if !defined(${X_}COMPILER_RESOURCE_DIR)
+${X_}COMPILER_RESOURCE_DIR!=	${${cc}:N${CCACHE_BIN}} -print-resource-dir 2>/dev/null || echo unknown
 .endif
 
 ${X_}COMPILER_FEATURES=
@@ -218,12 +240,24 @@ ${X_}COMPILER_FEATURES+=	c++17
 ${X_}COMPILER_FEATURES+=	retpoline
 .endif
 
+.if ${${cc}:N${CCACHE_BIN}:[1]:M/*} && exists(${${cc}:N${CCACHE_BIN}:[1]})
+${X_}COMPILER_ABSOLUTE_PATH=	${${cc}:N${CCACHE_BIN}:[1]}
+.else
+${X_}COMPILER_ABSOLUTE_PATH!=	which ${${cc}:N${CCACHE_BIN}:[1]}
+.endif
+.if empty(${X_}COMPILER_ABSOLUTE_PATH)
+.error Could not find $$CC (${${cc}:N${CCACHE_BIN}:[1]}) in $$PATH. \
+	Please pass an absolute path to CC instead.
+.endif
+
 .else
 # Use CC's values
 X_COMPILER_TYPE=	${COMPILER_TYPE}
 X_COMPILER_VERSION=	${COMPILER_VERSION}
 X_COMPILER_FREEBSD_VERSION=	${COMPILER_FREEBSD_VERSION}
 X_COMPILER_FEATURES=	${COMPILER_FEATURES}
+X_COMPILER_RESOURCE_DIR=	${COMPILER_RESOURCE_DIR}
+X_COMPILER_ABSOLUTE_PATH=	${COMPILER_ABSOLUTE_PATH}
 .endif	# ${cc} == "CC" || (${cc} == "XCC" && ${XCC} != ${CC})
 
 # Export the values so sub-makes don't have to look them up again, using the

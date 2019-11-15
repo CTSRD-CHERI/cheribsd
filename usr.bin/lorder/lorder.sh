@@ -40,7 +40,7 @@ case $# in
 		echo "usage: lorder file ...";
 		exit ;;
 	1)
-		echo $1 $1;
+		echo "$1" "$1";
 		exit ;;
 esac
 
@@ -53,8 +53,8 @@ NM=${NM:-nm}
 trap "rm -f $R $S $T; exit 1" 1 2 3 13 15
 
 # make sure all the files get into the output
-for i in $*; do
-	echo $i $i
+for i in "$@"; do
+	echo "$i" "$i"
 done
 
 # if the line has " [TDW] " it's a globally defined symbol, put it
@@ -77,7 +77,8 @@ ${NM} ${NMFLAGS} -go $* | sed "
 
 export LC_ALL=C
 # eliminate references that can be resolved by the same library.
-if [ $(expr "$*" : '.*\.a[[:>:]]') -ne 0 ]; then
+# The [[:>:]] regex does not work on glib systems, so just skip this "optimization"
+if [ "`uname -s`" != "Linux" ] && [ "$(expr "$*" : '.*\.a[[:>:]]')" -ne 0 ]; then
 	sort -u -o $S $S
 	sort -u -o $R $R
 	T=$(mktemp -t _temp_)

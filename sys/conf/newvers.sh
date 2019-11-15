@@ -278,11 +278,11 @@ if [ -n "$git_cmd" ] ; then
 #		longer matters.
 		gitsvn=$($git_cmd log -n 10000 |
 		    grep '^    git-svn-id:' | head -1 | \
-		    sed -n 's/^.*@\([0-9][0-9]*\).*$/\1/p')
+		    sed -n 's/^.*@\([0-9][0-9]*\).*$/\1/p' || true)
 		if [ -z "$gitsvn" ] ; then
 			gitsvn=$($git_cmd log -n 10000 --format='format:%N' | \
 			     grep '^svn ' | head -1 | \
-			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p')
+			     sed -n 's/^.*revision=\([0-9][0-9]*\).*$/\1/p'  || true)
 		fi
 		if [ -n "$gitsvn" ] ; then
 			svn=" r${gitsvn}"

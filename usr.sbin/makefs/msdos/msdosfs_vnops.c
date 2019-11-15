@@ -53,7 +53,6 @@
 __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
-#include <sys/clock.h>
 #include <sys/errno.h>
 #include <sys/mman.h>
 #include <sys/time.h>
@@ -468,15 +467,15 @@ msdosfs_wfile(const char *path, struct denode *dep, fsnode *node)
 
 	if ((fd = open(path, O_RDONLY)) == -1) {
 		error = errno;
-		MSDOSFS_DPRINTF(("open %s: %s", path, strerror(error)));
+		fprintf(stderr, "open %s: %s\n", path, strerror(error));
 		return error;
 	}
 
 	if ((dat = mmap(0, nsize, PROT_READ, MAP_FILE | MAP_PRIVATE, fd, 0))
 	    == MAP_FAILED) {
 		error = errno;
-		MSDOSFS_DPRINTF(("%s: mmap %s: %s", __func__, node->name,
-		    strerror(error)));
+		fprintf(stderr, "%s: mmap %s: %s", __func__, node->name,
+		    strerror(error));
 		close(fd);
 		goto out;
 	}
