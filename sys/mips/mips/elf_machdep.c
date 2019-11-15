@@ -52,7 +52,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/cache.h>
 
 #if __has_feature(capabilities)
-struct sysentvec elf64c_freebsd_sysvec = {
+static struct sysentvec elf_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
 	.sv_errsize	= 0,
@@ -111,8 +111,60 @@ struct sysentvec elf64c_freebsd_sysvec = {
 	.sv_thread_detach = NULL,
 	.sv_trap	= NULL,
 };
-INIT_SYSENTVEC(elf64c_sysvec, &elf64c_freebsd_sysvec);
+#else
+static struct sysentvec elf_freebsd_sysvec = {
+	.sv_size	= SYS_MAXSYSCALL,
+	.sv_table	= sysent,
+	.sv_errsize	= 0,
+	.sv_errtbl	= NULL,
+	.sv_transtrap	= NULL,
+	.sv_fixup	= __elfN(freebsd_fixup),
+	.sv_sendsig	= sendsig,
+	.sv_sigcode	= sigcode,
+	.sv_szsigcode	= &szsigcode,
+#ifdef __mips_n64
+	.sv_name	= "FreeBSD ELF64",
+#else
+	.sv_name	= "FreeBSD ELF32",
+#endif
+	.sv_coredump	= __elfN(coredump),
+	.sv_imgact_try	= NULL,
+	.sv_minsigstksz	= MINSIGSTKSZ,
+	.sv_minuser	= VM_MIN_ADDRESS,
+	.sv_maxuser	= VM_MAXUSER_ADDRESS,
+	.sv_usrstack	= USRSTACK,
+	.sv_psstrings	= PS_STRINGS,
+	.sv_stackprot	= VM_PROT_ALL,
+	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
+	.sv_copyout_strings = exec_copyout_strings,
+	.sv_setregs	= exec_setregs,
+	.sv_fixlimit	= NULL,
+	.sv_maxssiz	= NULL,
+#ifdef __mips_n64
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_ASLR |
+#else
+	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 | SV_ASLR |
+#endif
+#ifdef MIPS_SHAREDPAGE
+			    SV_SHP,
+#else
+			    0,
+#endif
+	.sv_set_syscall_retval = cpu_set_syscall_retval,
+	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
+	.sv_syscallnames = syscallnames,
+#ifdef MIPS_SHAREDPAGE
+	.sv_shared_page_base = SHAREDPAGE,
+	.sv_shared_page_len = PAGE_SIZE,
+#endif
+	.sv_schedtail	= NULL,
+	.sv_thread_detach = NULL,
+	.sv_trap	= NULL,
+};
+#endif
+INIT_SYSENTVEC(elf_sysvec, &elf_freebsd_sysvec);
 
+#if __has_feature(capabilities)
 static __inline boolean_t
 cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)
 {
@@ -120,8 +172,6 @@ cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)
 	static int curfail;
 	const uint32_t expected = CHERICAP_SIZE * 8;
 
-	if (use_cheriabi)
-		return FALSE;
 	if (bits == expected)
 		return TRUE;
 	if (ppsratecheck(&lastfail, &curfail, 1))
@@ -148,72 +198,7 @@ mips_elf_header_supported(struct image_params * imgp)
 		return cheriabi_check_cpu_compatible(256, imgp->execpath);
 	return FALSE;
 }
-
-static Elf64_Brandinfo freebsd_brand_info = {
-	.brand		= ELFOSABI_FREEBSD,
-	.machine	= EM_MIPS,
-	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
-	.interp_path	= "/libexec/ld-elf.so.1",
-	.sysvec		= &elf64c_freebsd_sysvec,
-	.interp_newpath	= NULL,
-	.header_supported = mips_elf_header_supported,
-	.flags		= BI_CAN_EXEC_DYN
-};
-
-SYSINIT(elf64c, SI_SUB_EXEC, SI_ORDER_ANY,
-    (sysinit_cfunc_t) elf64c_insert_brand_entry,
-    &freebsd_brand_info);
-
-void
-elf64c_dump_thread(struct thread *td __unused, void *dst __unused,
-    size_t *off __unused)
-{
-}
 #elif defined(__mips_n64)
-struct sysentvec elf64_freebsd_sysvec = {
-	.sv_size	= SYS_MAXSYSCALL,
-	.sv_table	= sysent,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
-	.sv_transtrap	= NULL,
-	.sv_fixup	= __elfN(freebsd_fixup),
-	.sv_sendsig	= sendsig,
-	.sv_sigcode	= sigcode,
-	.sv_szsigcode	= &szsigcode,
-	.sv_name	= "FreeBSD ELF64",
-	.sv_coredump	= __elfN(coredump),
-	.sv_imgact_try	= NULL,
-	.sv_minsigstksz	= MINSIGSTKSZ,
-	.sv_minuser	= VM_MIN_ADDRESS,
-	.sv_maxuser	= VM_MAXUSER_ADDRESS,
-	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
-	.sv_stackprot	= VM_PROT_ALL,
-	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
-	.sv_copyout_strings = exec_copyout_strings,
-	.sv_setregs	= exec_setregs,
-	.sv_fixlimit	= NULL,
-	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_ASLR |
-#ifdef MIPS_SHAREDPAGE
-			    SV_SHP,
-#else
-			    0,
-#endif
-	.sv_set_syscall_retval = cpu_set_syscall_retval,
-	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
-	.sv_syscallnames = syscallnames,
-#ifdef MIPS_SHAREDPAGE
-	.sv_shared_page_base = SHAREDPAGE,
-	.sv_shared_page_len = PAGE_SIZE,
-#endif
-	.sv_schedtail	= NULL,
-	.sv_thread_detach = NULL,
-	.sv_trap	= NULL,
-};
-INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
-
 static boolean_t
 mips_elf_header_supported(struct image_params * imgp)
 {
@@ -222,95 +207,39 @@ mips_elf_header_supported(struct image_params * imgp)
 		return FALSE;
 	return TRUE;
 }
+#endif
 
-static Elf64_Brandinfo freebsd_brand_info = {
+static __ElfN(Brandinfo) freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_MIPS,
 	.compat_3_brand	= "FreeBSD",
 	.emul_path	= NULL,
 	.interp_path	= "/libexec/ld-elf.so.1",
-	.sysvec		= &elf64_freebsd_sysvec,
+	.sysvec		= &elf_freebsd_sysvec,
 	.interp_newpath	= NULL,
-	.brand_note	= &elf64_freebsd_brandnote,
+#if !__has_feature(capabilities)
+	.brand_note	= &__elfN(freebsd_brandnote),
+#endif
+#if defined(__mips_n64) || __has_feature(capabilities)
 	.header_supported = mips_elf_header_supported,
+#endif
+#if __has_feature(capabilities)
+	.flags		= BI_CAN_EXEC_DYN
+#else
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
+#endif
 };
 
-SYSINIT(elf64, SI_SUB_EXEC, SI_ORDER_ANY,
-    (sysinit_cfunc_t) elf64_insert_brand_entry,
+
+SYSINIT(elf, SI_SUB_EXEC, SI_ORDER_ANY,
+    (sysinit_cfunc_t) __elfN(insert_brand_entry),
     &freebsd_brand_info);
 
 void
-elf64_dump_thread(struct thread *td __unused, void *dst __unused,
+__elfN(dump_thread)(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
-#else
-struct sysentvec elf32_freebsd_sysvec = {
-	.sv_size	= SYS_MAXSYSCALL,
-	.sv_table	= sysent,
-	.sv_errsize	= 0,
-	.sv_errtbl	= NULL,
-	.sv_transtrap	= NULL,
-	.sv_fixup	= __elfN(freebsd_fixup),
-	.sv_sendsig	= sendsig,
-	.sv_sigcode	= sigcode,
-	.sv_szsigcode	= &szsigcode,
-	.sv_name	= "FreeBSD ELF32",
-	.sv_coredump	= __elfN(coredump),
-	.sv_imgact_try	= NULL,
-	.sv_minsigstksz	= MINSIGSTKSZ,
-	.sv_minuser	= VM_MIN_ADDRESS,
-	.sv_maxuser	= VM_MAXUSER_ADDRESS,
-	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
-	.sv_stackprot	= VM_PROT_ALL,
-	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
-	.sv_copyout_strings = exec_copyout_strings,
-	.sv_setregs	= exec_setregs,
-	.sv_fixlimit	= NULL,
-	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_ILP32 | SV_ASLR |
-#ifdef MIPS_SHAREDPAGE
-			    SV_SHP,
-#else
-			    0,
-#endif
-	.sv_set_syscall_retval = cpu_set_syscall_retval,
-	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
-	.sv_syscallnames = syscallnames,
-#ifdef MIPS_SHAREDPAGE
-	.sv_shared_page_base = SHAREDPAGE,
-	.sv_shared_page_len = PAGE_SIZE,
-#endif
-	.sv_schedtail	= NULL,
-	.sv_thread_detach = NULL,
-	.sv_trap	= NULL,
-};
-INIT_SYSENTVEC(elf32_sysvec, &elf32_freebsd_sysvec);
-
-static Elf32_Brandinfo freebsd_brand_info = {
-	.brand		= ELFOSABI_FREEBSD,
-	.machine	= EM_MIPS,
-	.compat_3_brand	= "FreeBSD",
-	.emul_path	= NULL,
-	.interp_path	= "/libexec/ld-elf.so.1",
-	.sysvec		= &elf32_freebsd_sysvec,
-	.interp_newpath	= NULL,
-	.brand_note	= &elf32_freebsd_brandnote,
-	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
-};
-
-SYSINIT(elf32, SI_SUB_EXEC, SI_ORDER_FIRST,
-    (sysinit_cfunc_t) elf32_insert_brand_entry,
-    &freebsd_brand_info);
-
-void
-elf32_dump_thread(struct thread *td __unused, void *dst __unused,
-    size_t *off __unused)
-{
-}
-#endif
 
 /*
  * The following MIPS relocation code for tracking multiple
