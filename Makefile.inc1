@@ -780,6 +780,9 @@ HOST_TOOLS_COMMON_MAKEFLAGS=	-DNO_PIC MK_PROFILE=no -DNO_SHARED
 HOST_TOOLS_COMMON_MAKEFLAGS=	MK_PROFILE=no MK_NLS=no MK_BSD_GREP=yes \
 	MK_DIALOG=no MK_DEBUG_FILES=no
 .endif
+# Avoid creating stripped binaries for the host tools
+# This should hopefully fix a build error on Jenkins
+HOST_TOOLS_COMMON_MAKEFLAGS+=	STRIP=
 
 # bootstrap-tools stage
 BMAKEENV=	INSTALL="sh ${.CURDIR}/tools/install.sh" \
