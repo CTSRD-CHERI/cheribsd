@@ -145,7 +145,7 @@ static int map_at_zero = 0;
 SYSCTL_INT(_security_bsd, OID_AUTO, map_at_zero, CTLFLAG_RWTUN, &map_at_zero, 0,
     "Permit processes to map an object at virtual address 0.");
 
-static int opportunistic_coexecve = 1;
+static int opportunistic_coexecve;
 SYSCTL_INT(_kern, OID_AUTO, opportunistic_coexecve, CTLFLAG_RW,
     &opportunistic_coexecve, 0,
     "Try to colocate binaries on execve(2)");
