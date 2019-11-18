@@ -9,6 +9,7 @@
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
 
+
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))
 
 #ifdef COMPAT_43
