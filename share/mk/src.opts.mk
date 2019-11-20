@@ -126,7 +126,6 @@ __DEFAULT_YES_OPTIONS = \
     LDNS \
     LDNS_UTILS \
     LEGACY_CONSOLE \
-    LIB64 \
     LIBPTHREAD \
     LIBTHR \
     LLVM_COV \
