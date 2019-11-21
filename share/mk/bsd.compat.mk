@@ -95,7 +95,7 @@ HAS_COMPAT=64
 .if ${COMPAT_ARCH:Mmips64el*} != ""
 LIB64CPUFLAGS=  -target mipsel-unknown-freebsd13.0
 .else
-LIB64CPUFLAGS=  -target mips-unknown-freebsd13.0
+LIB64CPUFLAGS=  -target cheri-unknown-freebsd13.0
 .endif
 LIB64CPUFLAGS+=	-mabi=64
 LIB64_MACHINE=	mips
