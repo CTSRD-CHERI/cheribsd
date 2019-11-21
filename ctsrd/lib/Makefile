@@ -11,11 +11,6 @@ SUBDIR=	${SUBDIR_ORDERED} \
 SUBDIR+= libvuln_magic
 .endif
 
-# XXX: libimagebox should be buildable without CHERI
-.if ${MK_CHERI} != "no"
-SUBDIR+=	libimagebox
-.endif
-
 .if defined(LIBCHERI)
 SUBDIR:=	libvuln_png
 .endif

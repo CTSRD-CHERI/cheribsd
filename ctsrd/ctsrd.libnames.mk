@@ -1,8 +1,4 @@
-LOCAL_LIBRARIES+=	imagebox terasic_mtl vuln_magic vuln_png
-
-LIBIMAGEBOXDIR=		ctsrd/lib/libimagebox
-LIBIMAGEBOX?=		${DESTDIR}${LIBDIR}/libimagebox.a
-_DP_imagebox=		vuln_png pthread
+LOCAL_LIBRARIES+=	terasic_mtl vuln_magic vuln_png
 
 # Depends on png, but don't include to all png or vuln_png to be used.
 LIBTERASIC_MTLDIR=	ctsrd/lib/libterasic_mtl
