@@ -391,8 +391,8 @@
 	}
 53	AUE_SIGALTSTACK	STD {
 		int sigaltstack(
-		    _In_opt_ _Contains_long_ptr_ const struct sigaltstack_native *ss,
-		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack_native *oss
+		    _In_opt_ _Contains_long_ptr_ const struct sigaltstack *ss,
+		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack *oss
 		);
 	}
 54	AUE_IOCTL	STD|VARARG {

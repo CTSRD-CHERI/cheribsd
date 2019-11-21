@@ -736,14 +736,6 @@ struct __stack_t {
 	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
 };
 
-#ifdef _KERNEL
-struct sigaltstack_native {
-	void	*ss_sp;			/* signal stack base */
-	__size_t ss_size;		/* signal stack length */
-	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
-};
-#endif
-
 #if __BSD_VISIBLE
 /*
  * 4.3 compatibility:

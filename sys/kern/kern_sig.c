@@ -1751,8 +1751,8 @@ osigstack(struct thread *td, struct osigstack_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct sigaltstack_args {
-	struct sigaltstack_native	*ss;
-	struct sigaltstack_native	*oss;
+	const stack_t	*ss;
+	stack_t	*oss;
 };
 #endif
 /* ARGSUSED */
@@ -1760,28 +1760,19 @@ int
 sys_sigaltstack(struct thread *td, struct sigaltstack_args *uap)
 {
 	stack_t ss, oss;
-	struct sigaltstack_native ss_n;
 	int error;
 
 	if (uap->ss != NULL) {
-		error = copyin(uap->ss, &ss_n, sizeof(ss_n));
+		error = copyincap(uap->ss, &ss, sizeof(ss));
 		if (error)
 			return (error);
-		ss.ss_sp = __USER_CAP_UNBOUND(ss_n.ss_sp);
-		ss.ss_size = ss_n.ss_size;
-		ss.ss_flags = ss_n.ss_flags;
 	}
 	error = kern_sigaltstack(td, (uap->ss != NULL) ? &ss : NULL,
 	    (uap->oss != NULL) ? &oss : NULL);
 	if (error)
 		return (error);
-	if (uap->oss != NULL) {
-		memset(&ss_n, 0, sizeof(ss_n));
-		ss_n.ss_sp = (__cheri_fromcap void *)oss.ss_sp;
-		ss_n.ss_size = oss.ss_size;
-		ss_n.ss_flags = oss.ss_flags;
-		error = copyout(&ss_n, uap->oss, sizeof(ss_n));
-	}
+	if (uap->oss != NULL)
+		error = copyoutcap(&oss, uap->oss, sizeof(stack_t));
 	return (error);
 }
 
