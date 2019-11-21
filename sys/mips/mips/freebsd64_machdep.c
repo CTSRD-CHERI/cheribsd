@@ -45,6 +45,8 @@
  * SUCH DAMAGE.
  */
 
+#define __ELF_WORD_SIZE 64
+
 #include "opt_ddb.h"
 
 #include <sys/types.h>
@@ -233,4 +235,10 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 	default:
 		return (EINVAL);
 	}
+}
+
+void
+elf64_dump_thread(struct thread *td __unused, void *dst __unused,
+    size_t *off __unused)
+{
 }

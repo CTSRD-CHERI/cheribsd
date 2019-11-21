@@ -145,9 +145,14 @@ static Elf64_Brandinfo freebsd_cheriabi_brand_info = {
 };
 
 SYSINIT(cheriabi, SI_SUB_EXEC, SI_ORDER_ANY,
-    (sysinit_cfunc_t) elf64_insert_brand_entry,
+    (sysinit_cfunc_t) elf64c_insert_brand_entry,
     &freebsd_cheriabi_brand_info);
 
+void
+elf64c_dump_thread(struct thread *td __unused, void *dst __unused,
+    size_t *off __unused)
+{
+}
 
 static __inline boolean_t
 cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)

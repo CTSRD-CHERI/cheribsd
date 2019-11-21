@@ -83,11 +83,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/elf.h>
 #include <machine/md_var.h>
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi.h>
-#include <compat/cheriabi/cheriabi_util.h>
-#endif
-
 #define ELF_NOTE_ROUNDSIZE	4
 #define OLD_EI_BRAND	8
 
@@ -95,8 +90,13 @@ __FBSDID("$FreeBSD$");
  * ELF_ABI_NAME is a string name of the ELF ABI.  ELF_ABI_ID is used
  * to build variable names.
  */
+#ifdef __ELF_CHERI
+#define	ELF_ABI_NAME	__XSTRING(__CONCAT(ELF, __CONCAT(__ELF_WORD_SIZE, C)))
+#define	ELF_ABI_ID	__CONCAT(elf, __CONCAT(__ELF_WORD_SIZE, c))
+#else
 #define	ELF_ABI_NAME	__XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
 #define	ELF_ABI_ID	__CONCAT(elf, __ELF_WORD_SIZE)
+#endif
 
 static int __elfN(check_header)(const Elf_Ehdr *hdr);
 static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
@@ -463,6 +463,21 @@ __elfN(check_header)(const Elf_Ehdr *hdr)
 	    hdr->e_phentsize != sizeof(Elf_Phdr) ||
 	    hdr->e_version != ELF_TARG_VER)
 		return (ENOEXEC);
+
+	/*
+	 * imgact_elf64c.c will "claim" non-CHERI binaries only to
+	 * choke on them later without trying imgact_elf64.c (and vice
+	 * versa).  We have to reject an ABI mismatch early so that
+	 * the imgact hook returns -1 instead of ENOXEC which means
+	 * doing it here.
+	 */
+#ifdef __ELF_CHERI
+	if (!ELF_IS_CHERI(hdr))
+		return (ENOEXEC);
+#elif __has_feature(capabilities)
+	if (ELF_IS_CHERI(hdr))
+		return (ENOEXEC);
+#endif
 
 	/*
 	 * Make sure we have at least one brand for this machine.
@@ -1291,9 +1306,10 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	addr = round_page((vm_offset_t)vmspace->vm_daddr + lim_max(td,
 	    RLIMIT_DATA));
+#ifdef __ELF_CHERI
 	/* Round up so signficant bits of rtld addresses aren't touched */
-	if (imgp->proc->p_sysent->sv_flags & SV_CHERI)
-		addr = roundup2(addr, 0x1000000);
+	addr = roundup2(addr, 0x1000000);
+#endif
 	if ((map->flags & MAP_ASLR) != 0) {
 		maxv1 = maxv / 2 + addr / 2;
 		MPASS(maxv1 >= addr);	/* No overflow */
@@ -2308,45 +2324,18 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 	int structsize;
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 	struct ptrace_lwpinfo32 pl;
+#elif defined(__ELF_CHERI)
+	struct ptrace_lwpinfo_c pl;
 #else
 	struct ptrace_lwpinfo pl;
 #endif
-#ifdef COMPAT_CHERIABI
-	struct ptrace_lwpinfo_c plc;
-#endif
 
 	td = (struct thread *)arg;
-#ifdef COMPAT_CHERIABI
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) != 0)
-		structsize = sizeof(plc);
-	else
-#endif
-		structsize = sizeof(pl);
+	structsize = sizeof(pl);
 	size = sizeof(structsize) + structsize;
 	if (sb != NULL) {
 		KASSERT(*sizep == size, ("invalid size"));
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
-#ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI) != 0) {
-			bzero(&plc, sizeof(plc));
-			plc.pl_lwpid = td->td_tid;
-			plc.pl_event = PL_EVENT_NONE;
-			plc.pl_sigmask = td->td_sigmask;
-			plc.pl_siglist = td->td_siglist;
-			if (td->td_si.si_signo != 0) {
-				plc.pl_event = PL_EVENT_SIGNAL;
-				plc.pl_flags |= PL_FLAG_SI;
-				_Static_assert(
-				    sizeof(plc.pl_siginfo) == sizeof(td->td_si),
-				    "_siginfo_t and siginfo_c mismatch");
-				memcpy(&plc.pl_siginfo, &td->td_si,
-				    sizeof(plc.pl_siginfo));
-			}
-			strcpy(plc.pl_tdname, td->td_name);
-			/* XXX TODO: supply more information in struct ptrace_lwpinfo*/
-			sbuf_bcat(sb, &plc, sizeof(plc));
-		} else {
-#endif
 		bzero(&pl, sizeof(pl));
 		pl.pl_lwpid = td->td_tid;
 		pl.pl_event = PL_EVENT_NONE;
@@ -2357,6 +2346,12 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 			pl.pl_flags |= PL_FLAG_SI;
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 			siginfo_to_siginfo32(&td->td_si, &pl.pl_siginfo);
+#elif defined(__ELF_CHERI)
+			_Static_assert(
+			    sizeof(pl.pl_siginfo) == sizeof(td->td_si),
+			    "_siginfo_t and siginfo_c mismatch");
+			memcpy(&pl.pl_siginfo, &td->td_si,
+			    sizeof(pl.pl_siginfo));
 #else
 			siginfo_to_siginfo_native(&td->td_si, &pl.pl_siginfo);
 #endif
@@ -2364,9 +2359,6 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 		strcpy(pl.pl_tdname, td->td_name);
 		/* XXX TODO: supply more information in struct ptrace_lwpinfo*/
 		sbuf_bcat(sb, &pl, sizeof(pl));
-#ifdef COMPAT_CHERIABI
-		}
-#endif
 	}
 	*sizep = size;
 }
@@ -2632,12 +2624,7 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 		sbuf_delete(sb);
 		*sizep = size;
 	} else {
-#ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(p, SV_CHERI) != 0)
-			structsize = sizeof(ElfCheriABI_Auxinfo);
-		else
-#endif /* ! COMPAT_CHERIABI */
-			structsize = sizeof(Elf_Auxinfo);
+		structsize = sizeof(Elf_Auxinfo);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
 		PHOLD(p);
 		proc_getauxv(curthread, p, sb);
