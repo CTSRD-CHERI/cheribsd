@@ -147,7 +147,6 @@ SUBDIR.${MK_BSNMP}+=	libbsnmp
 
 SUBDIR.${MK_CHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
-SUBDIR.${MK_CHERI}+=	libz-cheri
 SUBDIR.${MK_CHERI}+=	libpng_sb
 
 .if (${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no") && ${MACHINE_ARCH} != "mips"
