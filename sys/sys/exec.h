@@ -99,6 +99,7 @@ int exec_unregister(const struct execsw *);
 
 extern int coredump_pack_fileinfo;
 extern int coredump_pack_vmmapinfo;
+extern int use_cheriabi;
 
 /*
  * note: name##_mod cannot be const storage because the

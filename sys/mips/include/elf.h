@@ -250,9 +250,6 @@ __ElfType(Auxinfo);
 #define	R_MIPS_COPY		126
 #define	R_MIPS_JUMP_SLOT	127
 
-struct image_params;
-int       mips_elf_header_supported(struct image_params * imgp);
-
 #endif /* __MIPS_ELF_H */
 // CHERI CHANGES START
 // {

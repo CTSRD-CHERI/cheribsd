@@ -51,8 +51,127 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/cache.h>
 
-#ifdef __mips_n64
-#ifndef COMPAT_CHERIABI
+#if __has_feature(capabilities)
+struct sysentvec elf64c_freebsd_sysvec = {
+	.sv_size	= SYS_MAXSYSCALL,
+	.sv_table	= sysent,
+	.sv_errsize	= 0,
+	.sv_errtbl	= NULL,
+	.sv_transtrap	= NULL,
+/* XXX: TODO */
+#if 1
+	.sv_fixup	= __elfN(freebsd_fixup),
+	.sv_sendsig	= sendsig,
+	.sv_sigcode	= sigcode,
+	.sv_szsigcode	= &szsigcode,
+#else
+	.sv_fixup	= cheriabi_elf_fixup,
+	.sv_sendsig	= cheriabi_sendsig,
+	.sv_sigcode	= cheri_sigcode,
+	.sv_szsigcode	= &szcheri_sigcode,
+#endif
+	.sv_name	= "CheriABI ELF64",
+	.sv_coredump	= __elfN(coredump),
+	.sv_imgact_try	= NULL,
+	.sv_minsigstksz	= MINSIGSTKSZ,	/* XXXBD: or something bigger? */
+	.sv_minuser	= PAGE_SIZE,	/* Disallow mapping at NULL */
+	.sv_maxuser	= VM_MAXUSER_ADDRESS,
+	.sv_usrstack	= USRSTACK,
+	.sv_psstrings	= PS_STRINGS,
+	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
+/* XXX: TODO */
+#if 1
+	.sv_copyout_strings = exec_copyout_strings,
+	.sv_setregs	= exec_setregs,
+#else
+	.sv_copyout_strings = cheriabi_copyout_strings,
+	.sv_setregs	= cheriabi_exec_setregs,
+#endif
+	.sv_fixlimit	= NULL,
+	.sv_maxssiz	= NULL,
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_CHERI |
+#ifdef MIPS_SHAREDPAGE
+			    SV_SHP,
+#else
+			    0,
+#endif
+/* XXX: TODO */
+#if 1
+	.sv_set_syscall_retval = cpu_set_syscall_retval,
+	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
+#else
+	.sv_set_syscall_retval = cheriabi_set_syscall_retval,
+	.sv_fetch_syscall_args = cheriabi_fetch_syscall_args,
+#endif
+	.sv_syscallnames = syscallnames,
+#ifdef MIPS_SHAREDPAGE
+	.sv_shared_page_base = SHAREDPAGE,
+	.sv_shared_page_len = PAGE_SIZE,
+#endif
+	.sv_schedtail	= NULL,
+	.sv_thread_detach = NULL,
+	.sv_trap	= NULL,
+};
+INIT_SYSENTVEC(elf64c_sysvec, &elf64c_freebsd_sysvec);
+
+static __inline boolean_t
+cheriabi_check_cpu_compatible(uint32_t bits, const char *execpath)
+{
+	static struct timeval lastfail;
+	static int curfail;
+	const uint32_t expected = CHERICAP_SIZE * 8;
+
+	if (use_cheriabi)
+		return FALSE;
+	if (bits == expected)
+		return TRUE;
+	if (ppsratecheck(&lastfail, &curfail, 1))
+		printf("warning: attempting to execute %d-bit CheriABI "
+		    "binary '%s' on a %d-bit kernel\n", bits, execpath,
+		    expected);
+	return FALSE;
+}
+
+static boolean_t
+mips_elf_header_supported(struct image_params * imgp)
+{
+	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
+	const uint32_t machine = hdr->e_flags & EF_MIPS_MACH;
+
+	if (use_cheriabi)
+		return FALSE;
+	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI)
+		return FALSE;
+
+	if (machine == EF_MIPS_MACH_CHERI128)
+		return cheriabi_check_cpu_compatible(128, imgp->execpath);
+	else if (machine == EF_MIPS_MACH_CHERI256)
+		return cheriabi_check_cpu_compatible(256, imgp->execpath);
+	return FALSE;
+}
+
+static Elf64_Brandinfo freebsd_brand_info = {
+	.brand		= ELFOSABI_FREEBSD,
+	.machine	= EM_MIPS,
+	.compat_3_brand	= "FreeBSD",
+	.emul_path	= NULL,
+	.interp_path	= "/libexec/ld-elf.so.1",
+	.sysvec		= &elf64c_freebsd_sysvec,
+	.interp_newpath	= NULL,
+	.header_supported = mips_elf_header_supported,
+	.flags		= BI_CAN_EXEC_DYN
+};
+
+SYSINIT(elf64c, SI_SUB_EXEC, SI_ORDER_ANY,
+    (sysinit_cfunc_t) elf64c_insert_brand_entry,
+    &freebsd_brand_info);
+
+void
+elf64c_dump_thread(struct thread *td __unused, void *dst __unused,
+    size_t *off __unused)
+{
+}
+#elif defined(__mips_n64)
 struct sysentvec elf64_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
 	.sv_table	= sysent,
@@ -94,39 +213,16 @@ struct sysentvec elf64_freebsd_sysvec = {
 	.sv_trap	= NULL,
 };
 INIT_SYSENTVEC(elf64_sysvec, &elf64_freebsd_sysvec);
-#endif /* !COMPAT_CHERIABI */
 
-#ifdef CPU_CHERI
-static __inline boolean_t
-mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
-{
-	static struct timeval lastfail;
-	static int curfail;
-	const uint32_t expected = CHERICAP_SIZE * 8;
-
-	if (bits == expected)
-		return TRUE;
-	if (ppsratecheck(&lastfail, &curfail, 1))
-		printf("warning: attempting to execute %d-bit hybrid binary "
-		    "'%s' on a %d-bit kernel\n", bits, execpath, expected);
-	return FALSE;
-}
-
-boolean_t
+static boolean_t
 mips_elf_header_supported(struct image_params * imgp)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	if ((hdr->e_flags & EF_MIPS_ABI) == EF_MIPS_ABI_CHERIABI)
 		return FALSE;
-	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI128)
-		return mips_hybrid_check_cap_size(128, imgp->execpath);
-	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI256)
-		return mips_hybrid_check_cap_size(256, imgp->execpath);
 	return TRUE;
 }
-#endif
 
-#ifndef COMPAT_CHERIABI
 static Elf64_Brandinfo freebsd_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
 	.machine	= EM_MIPS,
@@ -136,9 +232,7 @@ static Elf64_Brandinfo freebsd_brand_info = {
 	.sysvec		= &elf64_freebsd_sysvec,
 	.interp_newpath	= NULL,
 	.brand_note	= &elf64_freebsd_brandnote,
-#ifdef CPU_CHERI
 	.header_supported = mips_elf_header_supported,
-#endif
 	.flags		= BI_CAN_EXEC_DYN | BI_BRAND_NOTE
 };
 
@@ -151,7 +245,6 @@ elf64_dump_thread(struct thread *td __unused, void *dst __unused,
     size_t *off __unused)
 {
 }
-#endif /* !COMPAT_CHERIABI */
 #else
 struct sysentvec elf32_freebsd_sysvec = {
 	.sv_size	= SYS_MAXSYSCALL,
