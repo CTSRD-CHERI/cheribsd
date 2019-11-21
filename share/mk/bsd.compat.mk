@@ -1,5 +1,8 @@
 # $FreeBSD$
 
+# cleandir is run with the wrong context for libcompat so don't do
+# anything in that case.
+.if !make(cleandir)
 .if !targets(__<${_this:T}>__)
 __<${_this:T}>__:
 
@@ -188,3 +191,4 @@ MACHINE_ARCH=	${LIBCOMPAT_MACHINE_ARCH}
 .endif
 
 .endif
+.endif # !make(cleandir)
