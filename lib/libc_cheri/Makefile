@@ -259,7 +259,7 @@ SRCS+=		libcheri_system_stub.c
 .include <bsd.init.mk>
 
 INCS=
-NO_MAN=		yes
+MAN=
 .undef SHLIB_MAJOR
 MK_PROFILE=	no
 NEED_CHERI=	sandbox
