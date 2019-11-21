@@ -5,11 +5,9 @@
 SUBDIR=	browser \
 	writefile
 
-# XXX: The latter two should be buildable without cheri but aren't yet.
 .if ${MK_CHERI} != "no"
 SUBDIR+=	cheripoint \
-		pictview \
-		pngsb
+		pictview
 .endif
 
 .include <bsd.subdir.mk>
