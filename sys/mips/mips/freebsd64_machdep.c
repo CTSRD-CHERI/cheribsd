@@ -114,7 +114,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_setregs	= freebsd64_exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 |
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_ASLR |
 #ifdef MIPS_SHAREDPAGE
 	SV_SHP,
 #else
