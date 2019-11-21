@@ -1,7 +1,6 @@
 # $FreeBSD$
 
-SUBDIR=	bin \
-	lib \
+SUBDIR=	lib \
 	share \
 	usr.bin \
 	usr.sbin
