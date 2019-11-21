@@ -150,6 +150,7 @@ static struct procabi_table abis[] = {
 	 * Eventually we will have to handle freebsd64 though.
 	 */
 	{ "CheriABI ELF64", &freebsd },
+	{ "FreeBSD ELF64C", &freebsd },
 };
 
 /*

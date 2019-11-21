@@ -70,7 +70,7 @@ struct sysentvec elf64c_freebsd_sysvec = {
 	.sv_sigcode	= cheri_sigcode,
 	.sv_szsigcode	= &szcheri_sigcode,
 #endif
-	.sv_name	= "CheriABI ELF64",
+	.sv_name	= "FreeBSD ELF64C",	/* CheriABI */
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
 	.sv_minsigstksz	= MINSIGSTKSZ,	/* XXXBD: or something bigger? */
