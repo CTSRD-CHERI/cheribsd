@@ -79,12 +79,11 @@ struct sysentvec elf64c_freebsd_sysvec = {
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= PS_STRINGS,
 	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
+	.sv_copyout_strings = exec_copyout_strings,
 /* XXX: TODO */
 #if 1
-	.sv_copyout_strings = exec_copyout_strings,
 	.sv_setregs	= exec_setregs,
 #else
-	.sv_copyout_strings = cheriabi_copyout_strings,
 	.sv_setregs	= cheriabi_exec_setregs,
 #endif
 	.sv_fixlimit	= NULL,

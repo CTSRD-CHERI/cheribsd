@@ -93,6 +93,9 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
+#include <cheri/cheri.h>
+#include <cheri/cheric.h>
+
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
 dtrace_execexit_func_t	dtrace_fasttrap_exec;
@@ -1625,6 +1628,41 @@ exec_args_get_begin_envv(struct image_args *args)
 	return (args->endp);
 }
 
+#if __has_feature(capabilities)
+/*
+ * This macro uses cheri_capability_build_user_rwx() because it can
+ * create both types of capabilities (and currently creates W|X caps).
+ * Its use should be replaced.
+ */
+#define sucap(uaddr, base, offset, length, what, perms)	\
+    _sucap(uaddr, (base), (offset), (length), (perms), what, __func__, __LINE__)
+
+static void
+_sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
+    uint64_t perms, const char *what, const char *func, int line)
+{
+	void *__capability _tmpcap;
+	size_t rounded_length = CHERI_REPRESENTABLE_LENGTH(length);
+	vaddr_t rounded_base = CHERI_REPRESENTABLE_BASE(base, length);
+	if (rounded_length != length)
+		printf("%s:%d rounding size of unrepresentable %s from %zd to "
+		    "%zd\n", func, line, what, length, rounded_length);
+	if (rounded_base != base) {
+		printf("%s:%d aligning base of unrepresentable %s from"
+		       " 0x%zx to 0x%zx and adjusting offset by %zd\n", func,
+		       line, what, base, rounded_base, base - rounded_base);
+		/* We have to adjust the offset by the difference */
+		offset += base - rounded_base;
+	}
+	_tmpcap = cheri_capability_build_user_rwx(
+	    perms, rounded_base, rounded_length, offset);
+	KASSERT(cheri_gettag(_tmpcap),("%s:%d: Created invalid cap "
+	     "from base=%zx, offset=%#zx, length=%#zx, perms=%#zx", func,
+	     line, base, offset, length, (size_t)(perms)));
+	copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));
+}
+#endif
+
 /*
  * Copy strings out to the new process address space, constructing new arg
  * and env vector tables. Return a pointer to the base so that it can be used
@@ -1634,15 +1672,19 @@ register_t *
 exec_copyout_strings(struct image_params *imgp)
 {
 	int argc, envc;
-	char **vectp;
+	char * __capability * __capability vectp;
 	char *stringp;
-	uintptr_t destp;
-	register_t *stack_base;
-	struct ps_strings *arginfo;
+	char * __capability destp;
+	void * __capability *stack_base;
+	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len;
 	int szsigcode, szps;
 	char canary[sizeof(long) * 8];
+
+#if __has_feature(capabilities)
+	KASSERT(imgp->auxargs != NULL, ("CHERI requires auxargs"));
+#endif
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -1655,20 +1697,30 @@ exec_copyout_strings(struct image_params *imgp)
 		execpath_len = 0;
 	p = imgp->proc;
 	szsigcode = 0;
+
+#if __has_feature(capabilities)
+	/* XXX: should be derived from a capability to the strings region */
+	arginfo = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
+	    CHERI_CAP_USER_DATA_LENGTH,
+	    p->p_sysent->sv_psstrings);
+#else
 	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
+#endif
 	if (p->p_sysent->sv_sigcode_base == 0) {
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);
 	}
-	destp =	(uintptr_t)arginfo;
+	destp =	(char * __capability)arginfo;
 
 	/*
 	 * install sigcode
 	 */
 	if (szsigcode != 0) {
 		destp -= szsigcode;
-		destp = rounddown2(destp, sizeof(void *));
-		copyout(p->p_sysent->sv_sigcode, (void *)destp, szsigcode);
+		destp = __builtin_align_down(destp,
+		    sizeof(void * __capability));
+		copyout_c(p->p_sysent->sv_sigcode, destp, szsigcode);
 	}
 
 	/*
@@ -1676,9 +1728,14 @@ exec_copyout_strings(struct image_params *imgp)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		destp = rounddown2(destp, sizeof(void *));
-		imgp->execpathp = destp;
-		copyout(imgp->execpath, (void *)destp, execpath_len);
+
+		/* XXX: CheriABI didn't do the align_down */
+		destp = __builtin_align_down(destp,
+		    sizeof(void * __capability));
+
+		/* XXX: Should execpathp be a pointer? */
+		imgp->execpathp = (__cheri_addr uintptr_t)destp;
+		copyout_c(imgp->execpath, destp, execpath_len);
 	}
 
 	/*
@@ -1686,23 +1743,23 @@ exec_copyout_strings(struct image_params *imgp)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = destp;
-	copyout(canary, (void *)destp, sizeof(canary));
+	imgp->canary = (__cheri_addr uintptr_t)destp;
+	copyout_c(canary, destp, sizeof(canary));
 	imgp->canarylen = sizeof(canary);
 
 	/*
 	 * Prepare the pagesizes array.
 	 */
 	destp -= szps;
-	destp = rounddown2(destp, sizeof(void *));
-	imgp->pagesizes = destp;
-	copyout(pagesizes, (void *)destp, szps);
+	destp = __builtin_align_down(destp, sizeof(void * __capability));
+	imgp->pagesizes = (__cheri_addr uintptr_t)destp;
+	copyout_c(pagesizes, destp, szps);
 	imgp->pagesizeslen = szps;
 
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(void *));
+	destp = __builtin_align_down(destp, sizeof(void * __capability));
 
-	vectp = (char **)destp;
+	vectp = (char * __capability * __capability)destp;
 	if (imgp->sysent->sv_stackgap != NULL)
 		imgp->sysent->sv_stackgap(imgp, (u_long *)&vectp);
 
@@ -1724,7 +1781,7 @@ exec_copyout_strings(struct image_params *imgp)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	stack_base = (register_t *)vectp;
+	stack_base = (__cheri_fromcap void * __capability *)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -1733,44 +1790,76 @@ exec_copyout_strings(struct image_params *imgp)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	copyout(stringp, (void *)destp, ARG_MAX - imgp->args->stringspace);
+	copyout_c(stringp, destp, ARG_MAX - imgp->args->stringspace);
 
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
+#if __has_feature(capabilities)
+	sucap(&arginfo->ps_argvstr, (__cheri_addr vaddr_t)vectp, 0,
+	    argc * sizeof(void * __capability), "argv",
+	    CHERI_CAP_USER_DATA_PERMS);
+#else
 	suword(&arginfo->ps_argvstr, (long)(intptr_t)vectp);
-	suword32(&arginfo->ps_nargvstr, argc);
+#endif
+	suword32_c(&arginfo->ps_nargvstr, argc);
 
 	/*
 	 * Fill in argument portion of vector table.
 	 */
+#if __has_feature(capabilities)
+	/* XXX? */
+	imgp->args->argv = (__cheri_fromcap void *)vectp;
+#endif
 	for (; argc > 0; --argc) {
+#if __has_feature(capabilities)
+		sucap(vectp++, (__cheri_addr vaddr_t)destp, 0,
+		    strlen(stringp) + 1,
+		    "command line argument", CHERI_CAP_USER_DATA_PERMS);
+#else
 		suword(vectp++, (long)(intptr_t)destp);
+#endif
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
-	suword(vectp++, 0);
+	suword_c(vectp++, 0);
 
+#if __has_feature(capabilities)
+	sucap(&arginfo->ps_envstr, (__cheri_addr vaddr_t)vectp, 0,
+	    arginfo->ps_nenvstr * sizeof(void * __capability), "envv",
+	    CHERI_CAP_USER_DATA_PERMS);
+#else
 	suword(&arginfo->ps_envstr, (long)(intptr_t)vectp);
-	suword32(&arginfo->ps_nenvstr, envc);
+#endif
+	suword32_c(&arginfo->ps_nenvstr, envc);
 
 	/*
 	 * Fill in environment portion of vector table.
 	 */
+#if __has_feature(capabilities)
+	/* XXX? */
+	imgp->args->envv = (__cheri_fromcap void *)vectp;
+#endif
 	for (; envc > 0; --envc) {
+#if __has_feature(capabilities)
+		sucap(vectp++, (__cheri_addr vaddr_t)destp, 0,
+		    strlen(stringp) + 1,
+		    "environment variable", CHERI_CAP_USER_DATA_PERMS);
+#else
 		suword(vectp++, (long)(intptr_t)destp);
+#endif
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
 	}
 
 	/* end of vector table is a null pointer */
-	suword(vectp, 0);
+	suword_c(vectp, 0);
 
-	return (stack_base);
+	return ((register_t *)stack_base);
 }
 
 /*

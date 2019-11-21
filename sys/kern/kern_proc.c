@@ -2040,12 +2040,7 @@ static int
 get_proc_vector(struct thread *td, struct proc *p, char ***proc_vectorp,
     size_t *vsizep, enum proc_vector_type type)
 {
-#if __has_feature(capabilities)
-	/* XXX */
-	struct cheriabi_ps_strings pss;
-#else
 	struct ps_strings pss;
-#endif
 	Elf_Auxinfo aux;
 	vm_offset_t vptr, ptr;
 	char **proc_vector;
@@ -3219,6 +3214,9 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 #ifdef COMPAT_FREEBSD32
 	struct freebsd32_ps_strings pss32;
 #endif
+#ifdef COMPAT_FREEBSD64
+	struct freebsd64_ps_strings pss64;
+#endif
 	struct ps_strings pss;
 	vm_offset_t ptr;
 	size_t len;
@@ -3240,38 +3238,55 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 		/*
 		 * NB: Only copy exactly the pss fields we might need here.
 		 */
-		pss.ps_sbclasses = (void *)(vm_offset_t)pss32.ps_sbclasses;
+		pss.ps_sbclasses = cheri_fromint(pss32.ps_sbclasses);
 		pss.ps_sbclasseslen = (size_t)pss32.ps_sbclasseslen;
-		pss.ps_sbmethods = (void *)(vm_offset_t)pss32.ps_sbmethods;
+		pss.ps_sbmethods = cheri_fromint(.ps_sbmethods);
 		pss.ps_sbmethodslen = (size_t)pss32.ps_sbmethodslen;
-		pss.ps_sbobjects = (void *)(vm_offset_t)pss32.ps_sbobjects;
+		pss.ps_sbobjects = cheri_fromint(pss32.ps_sbobjects);
 		pss.ps_sbobjectslen = (size_t)pss32.ps_sbobjectslen;
-	 } else {
+	} else
 #endif
+#ifdef COMPAT_FREEBSD64
+	if (SV_PROC_FLAG(p, SV_LP64 | SV_CHERI) == SV_LP64) {
+		if (proc_readmem(td, p,
+		    (vm_offset_t)p->p_sysent->sv_psstrings, &pss64,
+		    sizeof(pss64)) != sizeof(pss64))
+			return (ENOMEM);
+
+		/*
+		 * NB: Only copy exactly the pss fields we might need here.
+		 */
+		pss.ps_sbclasses = cheri_fromint(pss64.ps_sbclasses);
+		pss.ps_sbclasseslen = (size_t)pss64.ps_sbclasseslen;
+		pss.ps_sbmethods = cheri_fromint(pss64.ps_sbmethods);
+		pss.ps_sbmethodslen = (size_t)pss64.ps_sbmethodslen;
+		pss.ps_sbobjects = cheri_fromint(pss64.ps_sbobjects);
+		pss.ps_sbobjectslen = (size_t)pss64.ps_sbobjectslen;
+	} else
+#endif
+	{
 		if (proc_readmem(td, p,
 		    (vm_offset_t)(p->p_sysent->sv_psstrings), &pss,
 		    sizeof(pss)) != sizeof(pss))
 			return (ENOMEM);
-#ifdef COMPAT_FREEBSD32
 	}
-#endif
 
 	/*
 	 * Select dptr/dlen values based on requested metadata type.
 	 */
 	switch (type) {
 	case PROC_SBCLASSES:
-		ptr = (vm_offset_t)pss.ps_sbclasses;
+		ptr = (__cheri_addr vm_offset_t)pss.ps_sbclasses;
 		len = pss.ps_sbclasseslen;
 		break;
 
 	case PROC_SBMETHODS:
-		ptr = (vm_offset_t)pss.ps_sbmethods;
+		ptr = (__cheri_addr vm_offset_t)pss.ps_sbmethods;
 		len = pss.ps_sbmethodslen;
 		break;
 
 	case PROC_SBOBJECTS:
-		ptr = (vm_offset_t)pss.ps_sbobjects;
+		ptr = (__cheri_addr vm_offset_t)pss.ps_sbobjects;
 		len = pss.ps_sbobjectslen;
 		break;
 
@@ -3282,7 +3297,7 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 	/*
 	 * XXXRW: impose a length limit here...?  Unfortunately, it is not as
 	 * simple as bounding to the caller process buffer, as we need to
-	 * expose tne full actual length to the consumer.
+	 * expose the full actual length to the consumer.
 	 */
 	if (ptrp != NULL)
 		*ptrp = ptr;
