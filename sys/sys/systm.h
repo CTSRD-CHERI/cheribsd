@@ -373,7 +373,6 @@ void	hexdump(const void *ptr, int length, const char *hdr, int flags);
 
 #define ovbcopy(f, t, l) bcopy((f), (t), (l))
 void	bcopy(const void * _Nonnull from, void * _Nonnull to, size_t len);
-#define bcopy(from, to, len) __builtin_memmove((to), (from), (len))
 #if __has_feature(capabilities)
 void	bcopy_c(const void * _Nonnull __capability from,
 	    void * _Nonnull __capability to, size_t len);
@@ -386,18 +385,11 @@ void	cheri_bcopy(const void *src, void *dst, size_t len);
 #define	cheri_bcopy	bcopy
 #endif
 void	bzero(void * _Nonnull buf, size_t len);
-#define bzero(buf, len) __builtin_memset((buf), 0, (len))
 void	explicit_bzero(void * _Nonnull, size_t);
 int	bcmp(const void *b1, const void *b2, size_t len);
-#define bcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
 
 void	*memset(void * _Nonnull buf, int c, size_t len);
-#define memset(buf, c, len) __builtin_memset((buf), (c), (len))
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
-#if !__has_feature(capabilities)
-/* Causes a compiler crash. */
-#define memcpy(to, from, len) __builtin_memcpy(to, from, len)
-#endif
 #if __has_feature(capabilities)
 void	*memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
@@ -409,7 +401,6 @@ void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #define	cheri_memcpy	memcpy
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
-#define memmove(dest, src, n) __builtin_memmove((dest), (src), (n))
 #if __has_feature(capabilities)
 void	*memmove_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
@@ -422,8 +413,33 @@ struct copy_map {
 	size_t	uoffset;
 	size_t	koffset;
 };
+void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 int	memcmp(const void *b1, const void *b2, size_t len);
+
+#ifdef KCSAN
+void	*kcsan_memset(void *, int, size_t);
+void	*kcsan_memcpy(void *, const void *, size_t);
+void	*kcsan_memmove(void *, const void *, size_t);
+int	kcsan_memcmp(const void *, const void *, size_t);
+#define bcopy(from, to, len) kcsan_memmove((to), (from), (len))
+#define bzero(buf, len) kcsan_memset((buf), 0, (len))
+#define bcmp(b1, b2, len) kcsan_memcmp((b1), (b2), (len))
+#define memset(buf, c, len) kcsan_memset((buf), (c), (len))
+#define memcpy(to, from, len) kcsan_memcpy((to), (from), (len))
+#define memmove(dest, src, n) kcsan_memmove((dest), (src), (n))
+#define memcmp(b1, b2, len) kcsan_memcmp((b1), (b2), (len))
+#else
+#define bcopy(from, to, len) __builtin_memmove((to), (from), (len))
+#define bzero(buf, len) __builtin_memset((buf), 0, (len))
+#define bcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
+#define memset(buf, c, len) __builtin_memset((buf), (c), (len))
+//#if !__has_feature(capabilities)
+///* Causes a compiler crash. */
+#define memcpy(to, from, len) __builtin_memcpy((to), (from), (len))
+//#endif
+#define memmove(dest, src, n) __builtin_memmove((dest), (src), (n))
 #define memcmp(b1, b2, len) __builtin_memcmp((b1), (b2), (len))
+#endif
 
 void	*memset_early(void * _Nonnull buf, int c, size_t len);
 #define bzero_early(buf, len) memset_early((buf), 0, (len))
@@ -510,6 +526,17 @@ int	copyoutcap_nofault(
 #else
 #define	copyout_nofault_c	copyout_nofault
 #define	copyoutcap_nofault	copyout_nofault
+#endif
+
+#ifdef KCSAN
+int	kcsan_copystr(const void *, void *, size_t, size_t *);
+int	kcsan_copyin(const void *, void *, size_t);
+int	kcsan_copyinstr(const void *, void *, size_t, size_t *);
+int	kcsan_copyout(const void *, void *, size_t);
+#define	copystr(kf, k, l, lc) kcsan_copystr((kf), (k), (l), (lc))
+#define	copyin(u, k, l) kcsan_copyin((u), (k), (l))
+#define	copyinstr(u, k, l, lc) kcsan_copyinstr((u), (k), (l), (lc))
+#define	copyout(k, u, l) kcsan_copyout((k), (u), (l))
 #endif
 
 #if __has_feature(capabilities) && defined(EXPLICIT_USER_ACCESS)
