@@ -622,49 +622,14 @@ struct __siginfo;
 /*
  * Signal vector "template" used in sigaction call.
  */
-#ifndef _KERNEL
 struct sigaction {
 	union {
-		void    (*__sa_handler)(int);
-		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+		void    (* __kerncap __sa_handler)(int);
+		void    (* __kerncap __sa_sigaction)(int, struct __siginfo *, void *);
 	} __sigaction_u;		/* signal handler */
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
-#else
-#if __has_feature(capabilities)
-struct sigaction_c {
-	union {
-		void    (* __capability __sa_handler)(int);
-		void    (* __capability __sa_sigaction)
-			    (int, struct __siginfo *, void *);
-	} __sigaction_u;		/* signal handler */
-	int	sa_flags;		/* see signal options below */
-	sigset_t sa_mask;		/* signal mask to apply */
-};
-struct sigaction64 {
-	union {
-		void    (*__sa_handler)(int);
-		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
-	} __sigaction_u;		/* signal handler */
-	int	sa_flags;		/* see signal options below */
-	sigset_t sa_mask;		/* signal mask to apply */
-};
-#endif
-struct sigaction_native {
-	union {
-		void    (*__sa_handler)(int);
-		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
-	} __sigaction_u;		/* signal handler */
-	int	sa_flags;		/* see signal options below */
-	sigset_t sa_mask;		/* signal mask to apply */
-};
-#if __has_feature(capabilities)
-typedef struct sigaction_c	ksigaction_t;
-#else
-typedef	struct sigaction_native	ksigaction_t;
-#endif
-#endif
 
 #define	sa_handler	__sigaction_u.__sa_handler
 #endif

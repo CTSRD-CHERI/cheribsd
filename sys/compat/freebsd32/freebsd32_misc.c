@@ -2232,7 +2232,7 @@ int
 freebsd32_sigaction(struct thread *td, struct freebsd32_sigaction_args *uap)
 {
 	struct sigaction32 s32;
-	ksigaction_t sa, osa, *sap;
+	struct sigaction sa, osa, *sap;
 	int error;
 
 	if (uap->act) {
@@ -2261,7 +2261,7 @@ freebsd4_freebsd32_sigaction(struct thread *td,
 			     struct freebsd4_freebsd32_sigaction_args *uap)
 {
 	struct sigaction32 s32;
-	ksigaction_t sa, osa, *sap;
+	struct sigaction sa, osa, *sap;
 	int error;
 
 	if (uap->act) {

@@ -1137,8 +1137,8 @@ struct __mac_execve_args {
 };
 struct sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(const struct sigaction_native * __capability)]; const struct sigaction_native * __capability act; char act_r_[PADR_(const struct sigaction_native * __capability)];
-	char oact_l_[PADL_(struct sigaction_native * __capability)]; struct sigaction_native * __capability oact; char oact_r_[PADR_(struct sigaction_native * __capability)];
+	char act_l_[PADL_(const struct sigaction * __capability)]; const struct sigaction * __capability act; char act_r_[PADR_(const struct sigaction * __capability)];
+	char oact_l_[PADL_(struct sigaction * __capability)]; struct sigaction * __capability oact; char oact_r_[PADR_(struct sigaction * __capability)];
 };
 struct sigreturn_args {
 	char sigcntxp_l_[PADL_(const struct __ucontext * __capability)]; const struct __ucontext * __capability sigcntxp; char sigcntxp_r_[PADR_(const struct __ucontext * __capability)];
@@ -2442,8 +2442,8 @@ struct freebsd4_sendfile_args {
 };
 struct freebsd4_sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(const struct sigaction_native * __capability)]; const struct sigaction_native * __capability act; char act_r_[PADR_(const struct sigaction_native * __capability)];
-	char oact_l_[PADL_(struct sigaction_native * __capability)]; struct sigaction_native * __capability oact; char oact_r_[PADR_(struct sigaction_native * __capability)];
+	char act_l_[PADL_(const struct sigaction * __capability)]; const struct sigaction * __capability act; char act_r_[PADR_(const struct sigaction * __capability)];
+	char oact_l_[PADL_(struct sigaction * __capability)]; struct sigaction * __capability oact; char oact_r_[PADR_(struct sigaction * __capability)];
 };
 struct freebsd4_sigreturn_args {
 	char sigcntxp_l_[PADL_(const struct freebsd4_ucontext * __capability)]; const struct freebsd4_ucontext * __capability sigcntxp; char sigcntxp_r_[PADR_(const struct freebsd4_ucontext * __capability)];

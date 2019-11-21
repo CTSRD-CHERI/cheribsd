@@ -59,8 +59,8 @@ CTASSERT(sizeof(struct sigaltstack32) == 12);
 int
 cheriabi_sigaction(struct thread *td, struct cheriabi_sigaction_args *uap)
 {
-	struct sigaction_c act, oact;
-	struct sigaction_c *actp, *oactp;
+	struct sigaction act, oact;
+	struct sigaction *actp, *oactp;
 	int error;
 
 	actp = (uap->act != NULL) ? &act : NULL;
