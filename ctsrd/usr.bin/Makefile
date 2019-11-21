@@ -2,7 +2,6 @@
 
 .include <src.opts.mk>
 
-SUBDIR=	browser \
-	writefile
+SUBDIR=	writefile
 
 .include <bsd.subdir.mk>
