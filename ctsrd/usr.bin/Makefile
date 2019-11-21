@@ -6,8 +6,7 @@ SUBDIR=	browser \
 	writefile
 
 .if ${MK_CHERI} != "no"
-SUBDIR+=	cheripoint \
-		pictview
+SUBDIR+=	cheripoint
 .endif
 
 .include <bsd.subdir.mk>
