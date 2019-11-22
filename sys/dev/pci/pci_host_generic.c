@@ -215,7 +215,7 @@ static int
 generic_pcie_maxslots(device_t dev)
 {
 
-	return (31); /* max slots per bus acc. to standard */
+	return (1); /* max slots per bus acc. to standard */
 }
 
 static int

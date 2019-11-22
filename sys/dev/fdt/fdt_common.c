@@ -309,10 +309,24 @@ u_long
 fdt_data_get(void *data, int cells)
 {
 
+	printf("%s data %p cells %d\n", __func__, data, cells);
+
 	if (cells == 1)
 		return (fdt32_to_cpu(*((uint32_t *)data)));
 
-	return (fdt64_to_cpu(*((uint64_t *)data)));
+	int a;
+	int b;
+
+	a = fdt32_to_cpu(*(((uint32_t *)data) + 0));
+	b = fdt32_to_cpu(*(((uint32_t *)data) + 1));
+
+	u_long result;
+
+	result = a;
+	result <<= 32;
+	result |= b;
+
+	return (result);
 }
 
 int

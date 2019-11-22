@@ -13,44 +13,47 @@ include "std.BERI"
 
 options	KSTACK_LARGE_PAGE	# Use a 16K page for kernel stack
 
-options 	NFSCL			# Network Filesystem Client
-options 	NFSLOCKD		# Network Lock Manager
-options 	NFS_ROOT		# NFS usable as /, requires NFSCL
-options 	NFS_ROOT_TCP
+#options 	NFSCL			# Network Filesystem Client
+#options 	NFSLOCKD		# Network Lock Manager
+#options 	NFS_ROOT		# NFS usable as /, requires NFSCL
+#options 	NFS_ROOT_TCP
 
 options         FDT
 options         FDT_DTB_STATIC
-makeoptions     FDT_DTS_FILE=beripad-de4.dts
+makeoptions     FDT_DTS_FILE=beripad-de4-msgdma.dts
 device		fdt_clock
 
 hints		"BERI_DE4.hints"	# Flash partitions still use hints.
 
 device		altera_atse
-device		altera_avgen
+#device		altera_avgen
 device		altera_jtag_uart
-device		altera_pll
-device		altera_sdcard
-device		pixelstream
-device		terasic_de4led
-device		terasic_mtl
+#device		altera_pll
+#device		altera_sdcard
+#device		pixelstream
+#device		terasic_de4led
+#device		terasic_mtl
 
 device		bpf
 device		cfi
 device		cfid
 options 	CFI_SUPPORT_STRATAFLASH
 options 	ATSE_CFI_HACK
-device		vt
-device		kbdmux
+#device		vt
+#device		kbdmux
 
 device		uart
 
 device		miibus
-options 	DEVICE_POLLING
+#options 	DEVICE_POLLING
 
 #
 # DMA support
 #
-options		ALTERA_MSGDMA_DESC_PF_STD
+# IOMMU
+options		ALTERA_MSGDMA_DESC_PF_EXT
+# Non-IOMMU
+# options	ALTERA_MSGDMA_DESC_PF_STD
 device		xdma
 device		altera_softdma
 device		altera_msgdma
@@ -58,10 +61,10 @@ device		altera_msgdma
 #
 # USB support
 #
-options	USB_DEBUG
+#options	USB_DEBUG
 #options	USB_REQ_DEBUG
-options	USB_VERBOSE
-device		usb
-device		saf1761otg
-device		ukbd
-device		ums
+#options	USB_VERBOSE
+#device		usb
+#device		saf1761otg
+#device		ukbd
+#device		ums

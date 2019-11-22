@@ -2586,6 +2586,9 @@ dev/pci/hostb_pci.c		optional pci
 dev/pci/ignore_pci.c		optional pci
 dev/pci/isa_pci.c		optional pci isa
 dev/pci/pci.c			optional pci
+dev/pci/pci_host_generic.c	optional pci
+dev/pci/pci_host_generic_acpi.c	optional pci acpi
+dev/pci/pci_host_generic_fdt.c	optional pci fdt
 dev/pci/pci_if.m		standard
 dev/pci/pci_iov.c		optional pci pci_iov
 dev/pci/pci_iov_if.m		standard

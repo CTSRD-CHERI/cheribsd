@@ -163,6 +163,17 @@ VECTOR(MipsTLBMiss, unknown)
 #ifdef CPU_CHERI
 	CHERI_EXCEPTION_ENTER(k0)
 #endif
+
+#if defined(CPU_CHERI) && !defined(SMP)
+	mfc0	k0, $15, 6
+	and	k0, k0, 0xffff
+	beqz	k0, 1f
+	nop
+	dli	k0, 0xffffffff90002000
+	jr	k0
+	nop
+1:
+#endif
 	# Increment exception counter, if enabled.
 	INC_EXCEPTION_CNTR(TLB_MISS_CNT)
 	j	MipsDoTLBMiss
@@ -267,6 +278,18 @@ VECTOR(MipsException, unknown)
 #ifdef CPU_CHERI
 	CHERI_EXCEPTION_ENTER(k0)
 #endif
+
+#if defined(CPU_CHERI) && !defined(SMP)
+	mfc0	k0, $15, 6
+	and	k0, k0, 0xffff
+	beqz	k0, 1f
+	nop
+	dli	k0, 0xffffffff90001000
+	jr	k0
+	nop
+1:
+#endif
+
 	mfc0	k0, MIPS_COP_0_STATUS		# Get the status register
 	mfc0	k1, MIPS_COP_0_CAUSE		# Get the cause register value.
 	and	k0, k0, MIPS_SR_KSU_USER	# test for user mode

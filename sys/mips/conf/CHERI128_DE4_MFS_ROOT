@@ -11,4 +11,18 @@ ident		CHERI128_DE4_MFS_ROOT
 
 include		"std.CHERI128"
 
+options		FDT_DTB_STATIC_ONLY
+
 makeoptions	EMBED_CHERITEST_LIST=YES
+
+device		pci
+device		em
+device		iflib
+
+device		scbus
+device		pass
+#device		umass
+device		da
+device		ahci
+device		syscon
+device		ext_resources

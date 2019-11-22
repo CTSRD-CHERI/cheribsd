@@ -147,6 +147,9 @@ msgdma_intr(void *arg)
 
 	sc = arg;
 	chan = &sc->channels[0];
+	if (chan->used == 0)
+		return;
+
 	xchan = chan->xchan;
 
 	dprintf("%s(%d): status 0x%08x next_descr 0x%08x, control 0x%08x\n",
@@ -280,6 +283,11 @@ msgdma_detach(device_t dev)
 	struct msgdma_softc *sc;
 
 	sc = device_get_softc(dev);
+
+	msgdma_reset(sc);
+
+	bus_teardown_intr(dev, sc->res[2], sc->ih);
+	bus_release_resources(dev, msgdma_spec, sc->res);
 
 	return (0);
 }
@@ -487,7 +495,7 @@ msgdma_channel_submit_sg(device_t dev, struct xdma_channel *xchan,
 		dst_addr_lo = sg[i].dst_addr;
 		len = (uint32_t)sg[i].len;
 
-		dprintf("%s: src %x dst %x len %d\n", __func__,
+		dprintf("%s: src %lx dst %lx len %d\n", __func__,
 		    src_addr_lo, dst_addr_lo, len);
 
 		desc = chan->descs[chan->idx_head];
