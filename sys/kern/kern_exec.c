@@ -395,8 +395,16 @@ kern_execve(struct thread *td, struct image_args *args,
 
 	if (opportunistic_coexecve != 0) {
 		sx_slock(&proctree_lock);
+#ifdef OPPORTUNISTIC_USE_PARENTS
 		cop = proc_realparent(td->td_proc);
 		PROC_LOCK(cop);
+#else
+		cop = pfind(td->td_proc->p_session->s_sid);
+		if (cop == NULL) {
+			sx_sunlock(&proctree_lock);
+			goto fallback;
+		}
+#endif
 		if (p_cancolocate(td, cop, true) != 0) {
 			PROC_UNLOCK(cop);
 			sx_sunlock(&proctree_lock);
@@ -410,13 +418,8 @@ kern_execve(struct thread *td, struct image_args *args,
 
 		KASSERT(error != 0, ("%s: kern_coexecve returned 0", __func__));
 
-		/*
-		 * This is the "success" case.
-		 */
-		if (error == EJUSTRETURN)
-			return (error);
-
 		switch (error) {
+		case EJUSTRETURN: /* This is the success case. */
 		case ENOTDIR:
 		case ENAMETOOLONG:
 		case ENOEXEC:
