@@ -1048,6 +1048,9 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 	}
 
 
+	/* Giant because newbus is Giant locked revisit with newbus locking */
+	mtx_lock(&Giant);
+
 	switch (cmd) {
 	case PCIOCGETCONF:
 #ifdef COMPAT_CHERIABI
@@ -1374,8 +1377,10 @@ getconfexit:
 	case PCIOCBARMMAP:
 		pbm = (struct pci_bar_mmap *)data;
 		if ((flag & FWRITE) == 0 &&
-		    (pbm->pbm_flags & PCIIO_BAR_MMAP_RW) != 0)
-			return (EPERM);
+		    (pbm->pbm_flags & PCIIO_BAR_MMAP_RW) != 0) {
+			error = EPERM;
+			break;
+		}
 		pcidev = pci_find_dbsf(pbm->pbm_sel.pc_domain,
 		    pbm->pbm_sel.pc_bus, pbm->pbm_sel.pc_dev,
 		    pbm->pbm_sel.pc_func);
@@ -1386,6 +1391,8 @@ getconfexit:
 		error = ENOTTY;
 		break;
 	}
+
+	mtx_unlock(&Giant);
 
 	return (error);
 }
