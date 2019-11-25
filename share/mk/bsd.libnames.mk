@@ -177,7 +177,6 @@ LIBHELLOWORLD?=	${DESTDIR}${LIBDIR_BASE}/libhelloworld.a
 LIBJPEG?=	${DESTDIR}${LIBDIR_BASE}/libjpeg.a
 LIBMALLOC_SIMPLE=	${DESTDIR}${LIBDIR_BASE}/libmalloc_simple.a
 LIBPNG?=	${DESTDIR}${LIBDIR_BASE}/libpng.a
-LIBPNG_SB?=	${DESTDIR}${LIBDIR_BASE}/libpng_sb.a
 LIBSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libsyscalls.a
 
 # enforce that -lcheri, -lpthread, and -lc to always be the last in that

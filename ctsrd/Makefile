@@ -1,10 +1,7 @@
 # $FreeBSD$
 
-SUBDIR=	bin \
-	lib \
-	libexec \
+SUBDIR=	lib \
 	share \
-	usr.bin \
 	usr.sbin
 
 .include <bsd.subdir.mk>
