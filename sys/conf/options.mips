@@ -213,3 +213,6 @@ PV_STATS		opt_pmap.h
 #
 INTRNG			opt_global.h
 MIPS_NIRQ		opt_global.h
+
+# e1000 options
+E1000_DESC_CAP		opt_global.h

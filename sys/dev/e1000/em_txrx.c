@@ -369,7 +369,12 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 		 */
 		if (tso_desc && (j == (nsegs - 1)) && (seg_len > 8)) {
 			seg_len -= TSO_WORKAROUND;
+#if defined(E1000_DESC_CAP)
+			ctxd->buffer_addr_hi = 0;
+			ctxd->buffer_addr_lo = htole64(seg_addr);
+#else
 			ctxd->buffer_addr = htole64(seg_addr);
+#endif
 			ctxd->lower.data = htole32(cmd | txd_lower | seg_len);
 			ctxd->upper.data = htole32(txd_upper);
 
@@ -378,7 +383,12 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 
 			/* Now make the sentinel */
 			ctxd = &txr->tx_base[i];
+#if defined(E1000_DESC_CAP)
+			ctxd->buffer_addr_hi = 0;
+			ctxd->buffer_addr_lo = htole64(seg_addr + seg_len);
+#else
 			ctxd->buffer_addr = htole64(seg_addr + seg_len);
+#endif
 			ctxd->lower.data = htole32(cmd | txd_lower | TSO_WORKAROUND);
 			ctxd->upper.data = htole32(txd_upper);
 			pidx_last = i;
@@ -386,7 +396,12 @@ em_isc_txd_encap(void *arg, if_pkt_info_t pi)
 				i = 0;
 			DPRINTF(iflib_get_dev(sc->ctx), "TSO path pidx_last=%d i=%d ntxd[0]=%d\n", pidx_last, i, scctx->isc_ntxd[0]);
 		} else {
+#if defined(E1000_DESC_CAP)
+			ctxd->buffer_addr_hi = 0;
+			ctxd->buffer_addr_lo = htole64(seg_addr);
+#else
 			ctxd->buffer_addr = htole64(seg_addr);
+#endif
 			ctxd->lower.data = htole32(cmd | txd_lower | seg_len);
 			ctxd->upper.data = htole32(txd_upper);
 			pidx_last = i;
@@ -500,7 +515,12 @@ lem_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 
 	for (i = 0, next_pidx = pidx; i < count; i++) {
 		rxd = (struct e1000_rx_desc *)&rxr->rx_base[next_pidx];
+#if defined(E1000_DESC_CAP)
+		rxd->buffer_addr_hi = 0;
+		rxd->buffer_addr_lo = htole64(paddrs[i]);
+#else
 		rxd->buffer_addr = htole64(paddrs[i]);
+#endif
 		/* status bits must be cleared */
 		rxd->status = 0;
 
@@ -529,7 +549,12 @@ em_isc_rxd_refill(void *arg, if_rxd_update_t iru)
 
 	for (i = 0, next_pidx = pidx; i < count; i++) {
 		rxd = &rxr->rx_base[next_pidx];
+#if defined(E1000_DESC_CAP)
+		rxd->read.buffer_addr_hi = 0;
+		rxd->read.buffer_addr_lo = htole64(paddrs[i]);
+#else
 		rxd->read.buffer_addr = htole64(paddrs[i]);
+#endif
 		/* DD bits must be cleared */
 		rxd->wb.upper.status_error = 0;
 
