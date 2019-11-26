@@ -390,16 +390,28 @@ int
 kern_execve(struct thread *td, struct image_args *args,
     void * __capability mac_p)
 {
-	struct proc *cop;
+	struct proc *cop, *p;
 	int error;
 
+	p = td->td_proc;
+
 	if (opportunistic_coexecve != 0) {
-		sx_slock(&proctree_lock);
 #ifdef OPPORTUNISTIC_USE_PARENTS
-		cop = proc_realparent(td->td_proc);
+		sx_slock(&proctree_lock);
+		cop = proc_realparent(p);
 		PROC_LOCK(cop);
 #else
-		cop = pfind(td->td_proc->p_session->s_sid);
+		/*
+		 * If we're the session leader and we're executing something,
+		 * make sure it doesn't end up in the address space we could
+		 * have previously been sharing.  For example, don't try to
+		 * colocate users' session with init(8) just because getty(8)
+		 * used to colocate with it before changing the SID.
+		 */
+		if (p->p_pid == p->p_session->s_sid)
+			goto fallback;
+		sx_slock(&proctree_lock);
+		cop = pfind(p->p_session->s_sid);
 		if (cop == NULL) {
 			sx_sunlock(&proctree_lock);
 			goto fallback;
@@ -410,6 +422,11 @@ kern_execve(struct thread *td, struct image_args *args,
 			sx_sunlock(&proctree_lock);
 			goto fallback;
 		}
+#if 0
+		printf("%s: pid %d (%s), sid %d, colocating %s with pid %d (%s)\n",
+		    __func__, p->p_pid, p->p_comm, p->p_session->s_sid,
+		    args->fname, cop->p_pid, cop->p_comm);
+#endif
 		PROC_UNLOCK(cop);
 		PHOLD(cop);
 		sx_sunlock(&proctree_lock);
