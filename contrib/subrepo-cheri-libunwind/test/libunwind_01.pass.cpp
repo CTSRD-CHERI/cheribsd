@@ -60,10 +60,31 @@ __attribute__((noinline)) void test3(int i, int j, int k) {
   fprintf(stderr, "finished %s\n", __func__); // ensure return address is saved
 }
 
+void test_no_info() {
+  unw_context_t context;
+  unw_getcontext(&context);
+
+  unw_cursor_t cursor;
+  unw_init_local(&cursor, &context);
+
+  unw_proc_info_t info;
+  int ret = unw_get_proc_info(&cursor, &info);
+  if (ret != UNW_ESUCCESS)
+    abort();
+
+  // Set the IP to an address clearly outside any function.
+  unw_set_reg(&cursor, UNW_REG_IP, (unw_word_t)0);
+
+  ret = unw_get_proc_info(&cursor, &info);
+  if (ret != UNW_ENOINFO)
+    abort();
+}
+
 int main() {
   test1(3);
   test2(3, 4);
   test3(3, 4, 5);
+  test_no_info();
   fprintf(stderr, "Success!\n");
   return 0;
 }

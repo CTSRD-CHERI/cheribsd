@@ -181,6 +181,10 @@ static inline uintptr_t assert_pointer_in_bounds(uintptr_t value) {
 }
 #endif
 
+#if !__has_extension(cheri_casts)
+#define __cheri_addr /* nothing */
+#endif
+
 // Macros that define away in non-Debug builds
 #ifdef NDEBUG
   #define _LIBUNWIND_DEBUG_LOG(msg, ...)

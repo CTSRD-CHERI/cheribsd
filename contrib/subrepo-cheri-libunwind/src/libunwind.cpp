@@ -182,8 +182,7 @@ _LIBUNWIND_HIDDEN int __unw_get_proc_info(unw_cursor_t *cursor,
   co->getInfo(info);
   if (info->end_ip == 0)
     return UNW_ENOINFO;
-  else
-    return UNW_ESUCCESS;
+  return UNW_ESUCCESS;
 }
 _LIBUNWIND_WEAK_ALIAS(__unw_get_proc_info, unw_get_proc_info)
 
@@ -205,8 +204,7 @@ _LIBUNWIND_HIDDEN int __unw_get_proc_name(unw_cursor_t *cursor, char *buf,
   AbstractUnwindCursor *co = (AbstractUnwindCursor *)cursor;
   if (co->getFunctionName(buf, bufLen, offset))
     return UNW_ESUCCESS;
-  else
-    return UNW_EUNSPEC;
+  return UNW_EUNSPEC;
 }
 _LIBUNWIND_WEAK_ALIAS(__unw_get_proc_name, unw_get_proc_name)
 
@@ -267,8 +265,9 @@ void __unw_add_dynamic_fde(unw_word_t fde) {
   CFI_Parser<LocalAddressSpace>::FDE_Info fdeInfo;
   CFI_Parser<LocalAddressSpace>::CIE_Info cieInfo;
   const char *message = CFI_Parser<LocalAddressSpace>::decodeFDE(
-                           LocalAddressSpace::sThisAddressSpace, 0,
-                          (LocalAddressSpace::pint_t) fde, &fdeInfo, &cieInfo);
+      LocalAddressSpace::sThisAddressSpace,
+      LocalAddressSpace::pc_t{(uintptr_t) nullptr},
+      (LocalAddressSpace::pint_t)fde, &fdeInfo, &cieInfo);
   if (message == NULL) {
     // dynamically registered FDEs don't have a mach_header group they are in.
     // Use fde as mh_group
