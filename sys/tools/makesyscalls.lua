@@ -59,7 +59,9 @@ local config = {
 	abi_type_suffix = "",
 	abi_flags = "",
 	abi_flags_mask = 0,
+	abi_headers = "",
 	ptr_intptr_t_cast = "intptr_t",
+	ptr_qualified="*",
 }
 
 local config_modified = {}
@@ -149,6 +151,10 @@ local known_flags = {
 	NOPROTO		= 0x00000020,
 	NOSTD		= 0x00000040,
 	NOTSTATIC	= 0x00000080,
+	VARARG		= 0x00000100,
+	VARARG3		= 0x00000200,
+	VARARG4		= 0x00000400,
+	VARARG5		= 0x00000800,
 
 	-- Compat flags start from here.  We have plenty of space.
 }
@@ -415,6 +421,14 @@ local pattern_table = {
 		end,
 	},
 	{
+		dump_prevline = true,
+		pattern = "%%ABI_HEADERS%%",
+		process = function()
+			line = config['abi_headers'] .. "\n"
+			write_line('sysinc', line)
+		end,
+	},
+	{
 		-- Buffer anything else
 		pattern = ".+",
 		process = function(line, prevline)
@@ -527,6 +541,7 @@ local function align_sysent_comment(col)
 end
 
 local function strip_arg_annotations(arg)
+	arg = arg:gsub("_Contains_[^ ]*[_)] ?", "")
 	arg = arg:gsub("_In[^ ]*[_)] ?", "")
 	arg = arg:gsub("_Out[^ ]*[_)] ?", "")
 	return trim(arg)
@@ -569,6 +584,13 @@ local function process_args(args)
 			argtype = argtype:gsub("(union [^ ]*)", "%1" ..
 			    abi_type_suffix)
 		end
+
+		-- Allow pointers to be qualified
+		argtype = argtype:gsub("[*]", config['ptr_qualified'])
+		argtype = argtype:gsub(" *$", "")
+
+		-- Strip extra whitespace around pointers
+		argtype = argtype:gsub("  *", " ")
 
 		funcargs[#funcargs + 1] = {
 			type = argtype,
@@ -1101,7 +1123,7 @@ if not config_modified["capenabled"] then
 elseif config["capenabled"] ~= "" then
 	-- Due to limitations in the config format mostly, we'll have a comma
 	-- separated list.  Parse it into lines
-	local capenabled = {}
+	local capenabled, sysc = {}
 	-- print("here: " .. config["capenabled"])
 	for sysc in config["capenabled"]:gmatch("([^,]+)") do
 		capenabled[sysc] = true
@@ -1166,12 +1188,21 @@ struct proc;
 
 struct thread;
 
-#define	PAD_(t)	(sizeof(register_t) <= sizeof(t) ? \
-		0 : sizeof(register_t) - sizeof(t))
+#define	PAD_(t)	(sizeof(syscallarg_t) <= sizeof(t) ? \
+		0 : sizeof(syscallarg_t) - sizeof(t))
 
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define	PADL_(t)	0
 #define	PADR_(t)	PAD_(t)
+#elif defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
+/*
+ * For non-capability arguments, the syscall argument is stored in the
+ * cursor field in the second word.
+ */
+#define	PADL_(t)	(sizeof (t) > sizeof(register_t) ? \
+		0 : 2 * sizeof(register_t) - sizeof(t))
+#define	PADR_(t)	(sizeof (t) > sizeof(register_t) ? \
+		0 : 2 * sizeof(register_t))
 #else
 #define	PADL_(t)	PAD_(t)
 #define	PADR_(t)	0
@@ -1242,7 +1273,7 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 process_sysfile(sysfile)
 
 write_line("sysinc",
-    "\n#define AS(name) (sizeof(struct name) / sizeof(register_t))\n")
+    "\n#define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))\n")
 
 for _, v in pairs(compat_options) do
 	if v["count"] > 0 then
