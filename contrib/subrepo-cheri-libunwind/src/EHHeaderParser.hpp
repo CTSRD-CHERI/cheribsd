@@ -26,6 +26,7 @@ namespace libunwind {
 template <typename A> class EHHeaderParser {
 public:
   typedef typename A::pint_t pint_t;
+  typedef typename A::pc_t pc_t;
 
   /// Information encoded in the EH frame header.
   struct EHHeaderInfo {
@@ -37,7 +38,7 @@ public:
 
   static bool decodeEHHdr(A &addressSpace, pint_t ehHdrStart, pint_t ehHdrEnd,
                           EHHeaderInfo &ehHdrInfo);
-  static bool findFDE(A &addressSpace, pint_t pc, pint_t ehHdrStart,
+  static bool findFDE(A &addressSpace, pc_t pc, pint_t ehHdrStart,
                       uint32_t sectionLength,
                       typename CFI_Parser<A>::FDE_Info *fdeInfo,
                       typename CFI_Parser<A>::CIE_Info *cieInfo);
@@ -45,7 +46,7 @@ public:
 private:
   static bool decodeTableEntry(A &addressSpace, pint_t &tableEntry,
                                pint_t ehHdrStart, pint_t ehHdrEnd,
-                               uint8_t tableEnc, pint_t pc,
+                               uint8_t tableEnc, pc_t pc,
                                typename CFI_Parser<A>::FDE_Info *fdeInfo,
                                typename CFI_Parser<A>::CIE_Info *cieInfo);
   static size_t getTableEntrySize(uint8_t tableEnc);
@@ -80,7 +81,7 @@ bool EHHeaderParser<A>::decodeEHHdr(A &addressSpace, pint_t ehHdrStart,
 template <typename A>
 bool EHHeaderParser<A>::decodeTableEntry(
     A &addressSpace, pint_t &tableEntry, pint_t ehHdrStart, pint_t ehHdrEnd,
-    uint8_t tableEnc, pint_t pc, typename CFI_Parser<A>::FDE_Info *fdeInfo,
+    uint8_t tableEnc, pc_t pc, typename CFI_Parser<A>::FDE_Info *fdeInfo,
     typename CFI_Parser<A>::CIE_Info *cieInfo) {
   // Have to decode the whole FDE for the PC range anyway, so just throw away
   // the PC start.
@@ -99,7 +100,7 @@ bool EHHeaderParser<A>::decodeTableEntry(
 }
 
 template <typename A>
-bool EHHeaderParser<A>::findFDE(A &addressSpace, pint_t pc, pint_t ehHdrStart,
+bool EHHeaderParser<A>::findFDE(A &addressSpace, pc_t pc, pint_t ehHdrStart,
                                 uint32_t sectionLength,
                                 typename CFI_Parser<A>::FDE_Info *fdeInfo,
                                 typename CFI_Parser<A>::CIE_Info *cieInfo) {
@@ -134,7 +135,7 @@ bool EHHeaderParser<A>::findFDE(A &addressSpace, pint_t pc, pint_t ehHdrStart,
   tableEntry = hdrInfo.table + low * tableEntrySize;
   if (decodeTableEntry(addressSpace, tableEntry, ehHdrStart, ehHdrEnd,
                        hdrInfo.table_enc, pc, fdeInfo, cieInfo)) {
-    if (pc >= fdeInfo->pcStart && pc < fdeInfo->pcEnd)
+    if (pc.address() >= fdeInfo->pcStart && pc.address() < fdeInfo->pcEnd)
       return true;
   }
 
