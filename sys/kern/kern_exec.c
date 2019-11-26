@@ -691,7 +691,11 @@ interpret:
 	/*
 	 * Copy out strings (args and env) and initialize stack base.
 	 */
-	stack_base = (*p->p_sysent->sv_copyout_strings)(imgp);
+	error = (*p->p_sysent->sv_copyout_strings)(imgp, &stack_base);
+	if (error != 0) {
+		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
+		goto exec_fail_dealloc;
+	}
 
 	/*
 	 * Stack setup.
@@ -1645,7 +1649,7 @@ exec_args_get_begin_envv(struct image_args *args)
 #define sucap(uaddr, base, offset, length, what, perms)	\
     _sucap(uaddr, (base), (offset), (length), (perms), what, __func__, __LINE__)
 
-static void
+static int
 _sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
     uint64_t perms, const char *what, const char *func, int line)
 {
@@ -1667,7 +1671,7 @@ _sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
 	KASSERT(cheri_gettag(_tmpcap),("%s:%d: Created invalid cap "
 	     "from base=%zx, offset=%#zx, length=%#zx, perms=%#zx", func,
 	     line, base, offset, length, (size_t)(perms)));
-	copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));
+	return (copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap)));
 }
 #endif
 
@@ -1676,18 +1680,17 @@ _sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
  * and env vector tables. Return a pointer to the base so that it can be used
  * as the initial stack pointer.
  */
-register_t *
-exec_copyout_strings(struct image_params *imgp)
+int
+exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 {
 	int argc, envc;
 	char * __capability * __capability vectp;
 	char *stringp;
 	char * __capability destp;
-	void * __capability *stack_base;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len;
-	int szsigcode, szps;
+	int error, szsigcode, szps;
 	char canary[sizeof(long) * 8];
 
 #if __has_feature(capabilities)
@@ -1728,7 +1731,9 @@ exec_copyout_strings(struct image_params *imgp)
 		destp -= szsigcode;
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
-		copyout_c(p->p_sysent->sv_sigcode, destp, szsigcode);
+		error = copyout_c(p->p_sysent->sv_sigcode, destp, szsigcode);
+		if (error != 0)
+			return (error);
 	}
 
 	/*
@@ -1743,7 +1748,9 @@ exec_copyout_strings(struct image_params *imgp)
 
 		/* XXX: Should execpathp be a pointer? */
 		imgp->execpathp = (__cheri_addr uintptr_t)destp;
-		copyout_c(imgp->execpath, destp, execpath_len);
+		error = copyout_c(imgp->execpath, destp, execpath_len);
+		if (error != 0)
+			return (error);
 	}
 
 	/*
@@ -1752,7 +1759,9 @@ exec_copyout_strings(struct image_params *imgp)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 	imgp->canary = (__cheri_addr uintptr_t)destp;
-	copyout_c(canary, destp, sizeof(canary));
+	error = copyout_c(canary, destp, sizeof(canary));
+	if (error != 0)
+		return (error);
 	imgp->canarylen = sizeof(canary);
 
 	/*
@@ -1761,7 +1770,9 @@ exec_copyout_strings(struct image_params *imgp)
 	destp -= szps;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
 	imgp->pagesizes = (__cheri_addr uintptr_t)destp;
-	copyout_c(pagesizes, destp, szps);
+	error = copyout_c(pagesizes, destp, szps);
+	if (error != 0)
+		return (error);
 	imgp->pagesizeslen = szps;
 
 	destp -= ARG_MAX - imgp->args->stringspace;
@@ -1771,8 +1782,12 @@ exec_copyout_strings(struct image_params *imgp)
 	if (imgp->sysent->sv_stackgap != NULL)
 		imgp->sysent->sv_stackgap(imgp, (u_long *)&vectp);
 
-	if (imgp->auxargs)
-		imgp->sysent->sv_copyout_auxargs(imgp, (u_long *)&vectp);
+	if (imgp->auxargs) {
+		error = imgp->sysent->sv_copyout_auxargs(imgp,
+		    (u_long *)&vectp);
+		if (error != 0)
+			return (error);
+	}
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -1783,7 +1798,7 @@ exec_copyout_strings(struct image_params *imgp)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	stack_base = (__cheri_fromcap void * __capability *)vectp;
+	*stack_base = (__cheri_fromcap register_t *)(register_t * __capability)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -1792,19 +1807,24 @@ exec_copyout_strings(struct image_params *imgp)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	copyout_c(stringp, destp, ARG_MAX - imgp->args->stringspace);
+	error = copyout_c(stringp, destp, ARG_MAX - imgp->args->stringspace);
+	if (error != 0)
+		return (error);
 
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 #if __has_feature(capabilities)
-	sucap(&arginfo->ps_argvstr, (__cheri_addr vaddr_t)vectp, 0,
+	if (sucap(&arginfo->ps_argvstr, (__cheri_addr vaddr_t)vectp, 0,
 	    argc * sizeof(void * __capability), "argv",
-	    CHERI_CAP_USER_DATA_PERMS);
+	    CHERI_CAP_USER_DATA_PERMS) != 0)
+		return (EFAULT);
 #else
-	suword(&arginfo->ps_argvstr, (long)(intptr_t)vectp);
+	if (suword(&arginfo->ps_argvstr, (long)(intptr_t)vectp) != 0)
+		return (EFAULT)
 #endif
-	suword32_c(&arginfo->ps_nargvstr, argc);
+	if (suword32_c(&arginfo->ps_nargvstr, argc) != 0)
+		return (EFAULT);
 
 	/*
 	 * Fill in argument portion of vector table.
@@ -1815,11 +1835,13 @@ exec_copyout_strings(struct image_params *imgp)
 #endif
 	for (; argc > 0; --argc) {
 #if __has_feature(capabilities)
-		sucap(vectp++, (__cheri_addr vaddr_t)destp, 0,
+		if (sucap(vectp++, (__cheri_addr vaddr_t)destp, 0,
 		    strlen(stringp) + 1,
-		    "command line argument", CHERI_CAP_USER_DATA_PERMS);
+		    "command line argument", CHERI_CAP_USER_DATA_PERMS) != 0)
+			return (EFAULT);
 #else
-		suword(vectp++, (long)(intptr_t)destp);
+		if (suword(vectp++, (long)(intptr_t)destp) != 0)
+			return (EFAULT);
 #endif
 		while (*stringp++ != 0)
 			destp++;
@@ -1827,16 +1849,20 @@ exec_copyout_strings(struct image_params *imgp)
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
-	suword_c(vectp++, 0);
+	if (suword_c(vectp++, 0) != 0)
+		return (EFAULT);
 
 #if __has_feature(capabilities)
-	sucap(&arginfo->ps_envstr, (__cheri_addr vaddr_t)vectp, 0,
+	if (sucap(&arginfo->ps_envstr, (__cheri_addr vaddr_t)vectp, 0,
 	    arginfo->ps_nenvstr * sizeof(void * __capability), "envv",
-	    CHERI_CAP_USER_DATA_PERMS);
+	    CHERI_CAP_USER_DATA_PERMS) != 0)
+		return (EFAULT);
 #else
-	suword(&arginfo->ps_envstr, (long)(intptr_t)vectp);
+	if (suword(&arginfo->ps_envstr, (long)(intptr_t)vectp) != 0)
+		return (EFAULT);
 #endif
-	suword32_c(&arginfo->ps_nenvstr, envc);
+	if (suword32_c(&arginfo->ps_nenvstr, envc) != 0)
+		return (EFAULT);
 
 	/*
 	 * Fill in environment portion of vector table.
@@ -1847,11 +1873,13 @@ exec_copyout_strings(struct image_params *imgp)
 #endif
 	for (; envc > 0; --envc) {
 #if __has_feature(capabilities)
-		sucap(vectp++, (__cheri_addr vaddr_t)destp, 0,
+		if (sucap(vectp++, (__cheri_addr vaddr_t)destp, 0,
 		    strlen(stringp) + 1,
-		    "environment variable", CHERI_CAP_USER_DATA_PERMS);
+		    "environment variable", CHERI_CAP_USER_DATA_PERMS) != 0)
+			return (EFAULT);
 #else
-		suword(vectp++, (long)(intptr_t)destp);
+		if (suword(vectp++, (long)(intptr_t)destp) != 0)
+			return (EFAULT);
 #endif
 		while (*stringp++ != 0)
 			destp++;
@@ -1859,9 +1887,10 @@ exec_copyout_strings(struct image_params *imgp)
 	}
 
 	/* end of vector table is a null pointer */
-	suword_c(vectp, 0);
+	if (suword_c(vectp, 0) != 0)
+		return (EFAULT);
 
-	return ((register_t *)stack_base);
+	return (0);
 }
 
 /*

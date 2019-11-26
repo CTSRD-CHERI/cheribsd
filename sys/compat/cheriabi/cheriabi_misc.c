@@ -607,14 +607,17 @@ _sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
 	copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));
 }
 
-register_t *
-cheriabi_copyout_strings(struct image_params *imgp)
+/*
+ * XXXBD: should check copyout/su* for errors, but punt for now as this
+ * function shouldn't be long for the world.
+ */
+int
+cheriabi_copyout_strings(struct image_params *imgp, register_t **stack_base)
 {
 	int argc, envc;
 	void * __capability * __capability vectp;
 	char *stringp;
 	char * __capability destp;
-	void * __capability *stack_base;
 	struct cheriabi_ps_strings * __capability arginfo;
 	char canary[sizeof(long) * 8];
 	size_t execpath_len;
@@ -699,7 +702,8 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	stack_base = (__cheri_fromcap void * __capability *)vectp;
+	*stack_base = (__cheri_fromcap register_t *)
+	    (register_t * __capability)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -754,7 +758,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	/* XXX: suword clears the tag */
 	suword(vectp++, 0);
 
-	return ((register_t *)stack_base);
+	return (0);
 }
 
 #define	AUXARGS_ENTRY_NOCAP(pos, id, val)				\
