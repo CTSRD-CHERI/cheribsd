@@ -22,6 +22,7 @@ mips/mips/freebsd32_machdep.c		optional	compat_freebsd32
 mips/mips/freebsd64_machdep.c		optional	compat_freebsd64
 mips/mips/gdb_machdep.c			standard
 mips/mips/in_cksum.c			optional	inet
+mips/mips/iommu_if.m			standard
 mips/mips/libkern_machdep.c		standard
 mips/mips/locore.S			standard	no-obj
 mips/mips/machdep.c			standard
