@@ -439,6 +439,23 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	start = old_entry->start;
 	end = old_entry->end;
 	grown_down = old_entry->eflags & MAP_ENTRY_GROWS_DOWN;
+
+	/*
+	 * Unwire before removing addresses from the pmap; otherwise,
+	 * unwiring will put the entries back in the pmap.
+	 */
+	if (old_entry->wired_count != 0)
+		vm_map_entry_unwire(map, old_entry);
+
+	/*
+	 * Remove mappings for the pages, but only if the
+	 * mappings could exist.  For instance, it does not
+	 * make sense to call pmap_remove() for guard entries.
+	 */
+	if ((old_entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0 ||
+			old_entry->object.vm_object != NULL)
+		pmap_remove(map->pmap, start, end);
+
 	vm_map_entry_delete(map, old_entry);
 
 	/*

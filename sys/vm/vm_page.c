@@ -3606,15 +3606,8 @@ vm_page_free_prep(vm_page_t m)
 	}
 #endif
 	if ((m->oflags & VPO_UNMANAGED) == 0) {
-#if 0
 		KASSERT(!pmap_page_is_mapped(m),
 		    ("vm_page_free_prep: freeing mapped page %p", m));
-#else
-		// XXX: Temporary workaround
-		if (pmap_page_is_mapped(m))
-			return (false);
-
-#endif
 		KASSERT((m->aflags & (PGA_EXECUTABLE | PGA_WRITEABLE)) == 0,
 		    ("vm_page_free_prep: mapping flags set in page %p", m));
 	} else {

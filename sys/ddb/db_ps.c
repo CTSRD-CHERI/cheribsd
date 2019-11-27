@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 static void	dumpthread(volatile struct proc *p, volatile struct thread *td,
 		    int all);
 static void	db_ps_proc(struct proc *p);
+static void	db_vmspace_proc(struct proc *p);
 static int	ps_mode;
 
 /*
@@ -65,6 +66,11 @@ static int	ps_mode;
 DB_SHOW_ALL_COMMAND(procs, db_procs_cmd)
 {
 	db_ps(addr, have_addr, count, modif);
+}
+
+DB_SHOW_ALL_COMMAND(vmspaces, db_vmspaces_cmd)
+{
+	db_vmspace(addr, have_addr, count, modif);
 }
 
 static void
@@ -258,6 +264,65 @@ db_ps_proc(struct proc *p)
 		if (db_pager_quit)
 			break;
 	}
+}
+
+void
+db_vmspace(db_expr_t addr, bool hasaddr, db_expr_t count, char *modif)
+{
+	struct proc *p;
+	int i, j;
+
+	ps_mode = modif[0] == 'a' ? PRINT_ARGS : PRINT_NONE;
+
+	db_printf("  pid  ppid  pgrp   sid   uid vmaddr              cmd\n");
+
+	if (!LIST_EMPTY(&allproc))
+		p = LIST_FIRST(&allproc);
+	else
+		p = &proc0;
+	for (; p != NULL && !db_pager_quit; p = LIST_NEXT(p, p_list))
+		db_vmspace_proc(p);
+
+	/*
+	 * Do zombies.
+	 */
+	for (i = 0; i < pidhashlock + 1 && !db_pager_quit; i++) {
+		for (j = i; j <= pidhash && !db_pager_quit; j += pidhashlock + 1) {
+			LIST_FOREACH(p, &pidhashtbl[j], p_hash) {
+				if (p->p_state == PRS_ZOMBIE)
+					db_vmspace_proc(p);
+			}
+		}
+	}
+}
+
+static void
+db_vmspace_proc(struct proc *p)
+{
+	volatile struct proc *pp;
+	struct ucred *cred;
+	struct pgrp *pgrp;
+	struct session *session;
+
+	pp = p->p_pptr;
+	if (pp == NULL)
+		pp = p;
+
+	cred = p->p_ucred;
+	pgrp = p->p_pgrp;
+	session = p->p_session;
+
+	db_printf("%5d %5d %5d %5d %5d ", p->p_pid, pp->p_pid,
+	    pgrp != NULL ? pgrp->pg_id : 0,
+	    session != NULL ? session->s_sid : 0,
+	    cred != NULL ? cred->cr_ruid : 0);
+
+	db_printf("%p  ", p->p_vmspace);
+	db_printf("%s", p->p_comm);
+
+	db_printf(" ");
+	dump_args(p);
+	db_printf("\n");
 }
 
 static void

@@ -145,7 +145,7 @@ static int map_at_zero = 0;
 SYSCTL_INT(_security_bsd, OID_AUTO, map_at_zero, CTLFLAG_RWTUN, &map_at_zero, 0,
     "Permit processes to map an object at virtual address 0.");
 
-static int opportunistic_coexecve;
+static int opportunistic_coexecve = 1;
 SYSCTL_INT(_kern, OID_AUTO, opportunistic_coexecve, CTLFLAG_RW,
     &opportunistic_coexecve, 0,
     "Try to colocate binaries on execve(2)");
@@ -390,13 +390,33 @@ int
 kern_execve(struct thread *td, struct image_args *args,
     void * __capability mac_p)
 {
-	struct proc *cop;
+	struct proc *cop, *p;
 	int error;
 
+	p = td->td_proc;
+
 	if (opportunistic_coexecve != 0) {
+#ifdef OPPORTUNISTIC_USE_PARENTS
 		sx_slock(&proctree_lock);
-		cop = proc_realparent(td->td_proc);
+		cop = proc_realparent(p);
 		PROC_LOCK(cop);
+#else
+		/*
+		 * If we're the session leader and we're executing something,
+		 * make sure it doesn't end up in the address space we could
+		 * have previously been sharing.  For example, don't try to
+		 * colocate users' session with init(8) just because getty(8)
+		 * used to colocate with it before changing the SID.
+		 */
+		if (p->p_pid == p->p_session->s_sid)
+			goto fallback;
+		sx_slock(&proctree_lock);
+		cop = pfind(p->p_session->s_sid);
+		if (cop == NULL) {
+			sx_sunlock(&proctree_lock);
+			goto fallback;
+		}
+#endif
 		if (p_cancolocate(td, cop, true) != 0) {
 			PROC_UNLOCK(cop);
 			sx_sunlock(&proctree_lock);
@@ -409,14 +429,17 @@ kern_execve(struct thread *td, struct image_args *args,
 		PRELE(cop);
 
 		KASSERT(error != 0, ("%s: kern_coexecve returned 0", __func__));
-
-		/*
-		 * This is the "success" case.
-		 */
-		if (error == EJUSTRETURN)
-			return (error);
+#if 0
+		if (error == EJUSTRETURN) {
+			printf("%s: pid %d (%s), sid %d, "
+			    "coexecuted %s with pid %d (%s), vmspace %p\n",
+			    __func__, p->p_pid, p->p_comm, p->p_session->s_sid,
+			    args->fname, cop->p_pid, cop->p_comm, p->p_vmspace);
+		}
+#endif
 
 		switch (error) {
+		case EJUSTRETURN: /* This is the success case. */
 		case ENOTDIR:
 		case ENAMETOOLONG:
 		case ENOEXEC:

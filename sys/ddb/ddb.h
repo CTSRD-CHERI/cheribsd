@@ -247,6 +247,7 @@ db_cmdfcn_t	db_listbreak_cmd;
 db_cmdfcn_t	db_scripts_cmd;
 db_cmdfcn_t	db_print_cmd;
 db_cmdfcn_t	db_ps;
+db_cmdfcn_t	db_vmspace;
 db_cmdfcn_t	db_run_cmd;
 db_cmdfcn_t	db_script_cmd;
 db_cmdfcn_t	db_search_cmd;
