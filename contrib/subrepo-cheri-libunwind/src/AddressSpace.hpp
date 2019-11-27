@@ -392,20 +392,28 @@ public:
     return result;
 #endif
   }
-
 };
+
+#ifdef __CHERI_PURE_CAPABILITY__
+#define _pint_to_addr(val) ((__cheri_addr LocalAddressSpace::addr_t)val)
+#define PC_T_PINT_T_COMPARATORS(op)                                            \
+  inline bool operator op(LocalAddressSpace::pint_t lhs,                       \
+                          const LocalAddressSpace::pc_t &rhs) {                \
+    return _pint_to_addr(lhs) op rhs.address();                                \
+  }                                                                            \
+  inline bool operator op(const LocalAddressSpace::pc_t &lhs,                  \
+                          LocalAddressSpace::pint_t rhs) {                     \
+    return lhs.address() op _pint_to_addr(rhs);                                \
+  }
+#else
+#define PC_T_PINT_T_COMPARATORS(op) /* nothing */
+#define _pint_to_addr(val) ((LocalAddressSpace::addr_t)val)
+#endif
 
 // Comparison operators for pc_t:
 // Note: we ignore the tag in these comparisons
 #define PC_T_COMPARATOR(op)                                                    \
-  inline bool operator op(LocalAddressSpace::pint_t lhs,                       \
-                          const LocalAddressSpace::pc_t &rhs) {                \
-    return (__cheri_addr LocalAddressSpace::addr_t)lhs op rhs.address();       \
-  }                                                                            \
-  inline bool operator op(const LocalAddressSpace::pc_t &lhs,                  \
-                          LocalAddressSpace::pint_t rhs) {                     \
-    return lhs.address() op(__cheri_addr LocalAddressSpace::addr_t) rhs;       \
-  }                                                                            \
+  PC_T_PINT_T_COMPARATORS(op)                                                  \
   inline bool operator op(LocalAddressSpace::addr_t lhs,                       \
                           const LocalAddressSpace::pc_t &rhs) {                \
     return lhs op rhs.address();                                               \
@@ -698,7 +706,6 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
   };
 
   dl_iterate_cb_data cb_data = {this, &info, targetAddr};
-  using vaddr_t = size_t;
   CHERI_DBG("Calling dl_iterate_phdr()\n");
   int found = dl_iterate_phdr(
       [](struct dl_phdr_info *pinfo, size_t, void *data) -> int {
@@ -752,9 +759,6 @@ inline bool LocalAddressSpace::findUnwindSections(pc_t targetAddr,
 #endif
 #if !defined(Elf_Phdr)
         typedef ElfW(Phdr) Elf_Phdr;
-#endif
-#if !defined(Elf_Addr)
-        typedef ElfW(Addr) Elf_Addr;
 #endif
 
         uintptr_t image_base = static_cast<uintptr_t>(pinfo->dlpi_addr);
