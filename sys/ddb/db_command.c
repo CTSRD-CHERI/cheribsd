@@ -140,6 +140,7 @@ static struct command db_cmds[] = {
 	{ "call",	db_fncall,		CS_OWN,	NULL },
 	{ "show",	0,			0,	&db_show_table },
 	{ "ps",		db_ps,			0,	NULL },
+	{ "vmspaces",	db_vmspace,		0,	NULL },
 	{ "gdb",	db_gdb,			0,	NULL },
 	{ "halt",	db_halt,		0,	NULL },
 	{ "reboot",	db_reset,		0,	NULL },
