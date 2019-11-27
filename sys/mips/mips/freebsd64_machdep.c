@@ -110,6 +110,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= FREEBSD64_PS_STRINGS,
 	.sv_stackprot	= VM_PROT_ALL,
+	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
 	.sv_setregs	= freebsd64_exec_setregs,
 	.sv_fixlimit	= NULL,
@@ -153,8 +154,6 @@ static boolean_t
 mips_elf_header_supported(struct image_params * imgp)
 {
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
-	if ((hdr->e_flags & EF_MIPS_ABI) == EF_MIPS_ABI_CHERIABI)
-		return FALSE;
 	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI128)
 		return mips_hybrid_check_cap_size(128, imgp->execpath);
 	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI256)

@@ -80,11 +80,6 @@ RW_SYSINIT(lltable_list_lock, &lltable_list_lock, "lltable_list_lock");
 static void lltable_unlink(struct lltable *llt);
 static void llentries_unlink(struct lltable *llt, struct llentries *head);
 
-static void htable_unlink_entry(struct llentry *lle);
-static void htable_link_entry(struct lltable *llt, struct llentry *lle);
-static int htable_foreach_lle(struct lltable *llt, llt_foreach_cb_t *f,
-    void *farg);
-
 /*
  * Dump lle state for a specific address family.
  */
@@ -182,15 +177,16 @@ static void
 htable_unlink_entry(struct llentry *lle)
 {
 
-	if ((lle->la_flags & LLE_LINKED) != 0) {
-		IF_AFDATA_WLOCK_ASSERT(lle->lle_tbl->llt_ifp);
-		CK_LIST_REMOVE(lle, lle_next);
-		lle->la_flags &= ~(LLE_VALID | LLE_LINKED);
+	if ((lle->la_flags & LLE_LINKED) == 0)
+		return;
+
+	IF_AFDATA_WLOCK_ASSERT(lle->lle_tbl->llt_ifp);
+	CK_LIST_REMOVE(lle, lle_next);
+	lle->la_flags &= ~(LLE_VALID | LLE_LINKED);
 #if 0
-		lle->lle_tbl = NULL;
-		lle->lle_head = NULL;
+	lle->lle_tbl = NULL;
+	lle->lle_head = NULL;
 #endif
-	}
 }
 
 struct prefix_match_data {
@@ -447,50 +443,6 @@ llentry_free(struct llentry *lle)
 }
 
 /*
- * (al)locate an llentry for address dst (equivalent to rtalloc for new-arp).
- *
- * If found the llentry * is returned referenced and unlocked.
- */
-struct llentry *
-llentry_alloc(struct ifnet *ifp, struct lltable *lt,
-    struct sockaddr_storage *dst)
-{
-	struct epoch_tracker et;
-	struct llentry *la, *la_tmp;
-
-	NET_EPOCH_ENTER(et);
-	la = lla_lookup(lt, LLE_EXCLUSIVE, (struct sockaddr *)dst);
-	NET_EPOCH_EXIT(et);
-
-	if (la != NULL) {
-		LLE_ADDREF(la);
-		LLE_WUNLOCK(la);
-		return (la);
-	}
-
-	if ((ifp->if_flags & (IFF_NOARP | IFF_STATICARP)) == 0) {
-		la = lltable_alloc_entry(lt, 0, (struct sockaddr *)dst);
-		if (la == NULL)
-			return (NULL);
-		IF_AFDATA_WLOCK(ifp);
-		LLE_WLOCK(la);
-		/* Prefer any existing LLE over newly-created one */
-		la_tmp = lla_lookup(lt, LLE_EXCLUSIVE, (struct sockaddr *)dst);
-		if (la_tmp == NULL)
-			lltable_link_entry(lt, la);
-		IF_AFDATA_WUNLOCK(ifp);
-		if (la_tmp != NULL) {
-			lltable_free_entry(lt, la);
-			la = la_tmp;
-		}
-		LLE_ADDREF(la);
-		LLE_WUNLOCK(la);
-	}
-
-	return (la);
-}
-
-/*
  * Free all entries from given table and free itself.
  */
 
@@ -533,34 +485,6 @@ lltable_free(struct lltable *llt)
 
 	llt->llt_free_tbl(llt);
 }
-
-#if 0
-void
-lltable_drain(int af)
-{
-	struct lltable	*llt;
-	struct llentry	*lle;
-	int i;
-
-	LLTABLE_LIST_RLOCK();
-	SLIST_FOREACH(llt, &V_lltables, llt_link) {
-		if (llt->llt_af != af)
-			continue;
-
-		for (i=0; i < llt->llt_hsize; i++) {
-			CK_LIST_FOREACH(lle, &llt->lle_head[i], lle_next) {
-				LLE_WLOCK(lle);
-				if (lle->la_hold) {
-					m_freem(lle->la_hold);
-					lle->la_hold = NULL;
-				}
-				LLE_WUNLOCK(lle);
-			}
-		}
-	}
-	LLTABLE_LIST_RUNLOCK();
-}
-#endif
 
 /*
  * Deletes an address from given lltable.

@@ -91,12 +91,9 @@ __init_elf_aux_vector(void)
 static pthread_once_t aux_once = PTHREAD_ONCE_INIT;
 static int pagesize, osreldate, canary_len, ncpus, pagesizes_len;
 static int hwcap_present, hwcap2_present;
-static char *canary, *pagesizes;
+static char *canary, *pagesizes, *execpath;
 #ifdef AT_PS_STRINGS
 static void *ps_strings;
-#endif
-#ifdef AT_EXECPATH
-static const char *execpath;
 #endif
 static void *timekeep;
 static u_long hwcap, hwcap2;
@@ -114,6 +111,10 @@ init_aux(void)
 
 		case AT_CANARYLEN:
 			canary_len = aux->a_un.a_val;
+			break;
+
+		case AT_EXECPATH:
+			execpath = (char *)(aux->a_un.a_ptr);
 			break;
 
 		case AT_HWCAP:
@@ -155,11 +156,6 @@ init_aux(void)
 			ps_strings = aux->a_un.a_ptr;
 			break;
 #endif
-#ifdef AT_EXECPATH
-		case AT_EXECPATH:
-			execpath = aux->a_un.a_ptr;
-			break;
-#endif
 		}
 	}
 }
@@ -185,6 +181,18 @@ _elf_aux_info(int aux, void *buf, int buflen)
 			res = 0;
 		} else
 			res = ENOENT;
+		break;
+	case AT_EXECPATH:
+		if (execpath == NULL)
+			res = ENOENT;
+		else if (buf == NULL)
+			res = EINVAL;
+		else {
+			if (strlcpy(buf, execpath, buflen) >= buflen)
+				res = EINVAL;
+			else
+				res = 0;
+		}
 		break;
 	case AT_HWCAP:
 		if (hwcap_present && buflen == sizeof(u_long)) {
@@ -257,20 +265,6 @@ _elf_aux_info(int aux, void *buf, int buflen)
 				res = ENOENT;
 		} else
 			res = EINVAL;
-		break;
-#endif
-#ifdef AT_EXECPATH
-	case AT_EXECPATH:
-		if (execpath != NULL) {
-			if (buflen > strlen(execpath)) {
-				strlcpy(buf, execpath, buflen);
-				res = 0;
-			} else {
-				res = EINVAL;
-			}
-		} else {
-			res = ENOENT;
-		}
 		break;
 #endif
 	default:

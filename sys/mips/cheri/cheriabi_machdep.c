@@ -118,7 +118,7 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= CHERIABI_PS_STRINGS,
 	.sv_stackprot	= VM_PROT_READ|VM_PROT_WRITE,
-	.sv_copyout_strings = exec_copyout_strings,
+	.sv_copyout_strings = cheriabi_copyout_strings,
 	.sv_setregs	= cheriabi_exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
@@ -178,8 +178,6 @@ cheriabi_elf_header_supported(struct image_params *imgp)
 	const uint32_t machine = hdr->e_flags & EF_MIPS_MACH;
 
 	if (!use_cheriabi)
-		return FALSE;
-	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI)
 		return FALSE;
 
 	/* TODO: add a sysctl to allow loading old binaries */
