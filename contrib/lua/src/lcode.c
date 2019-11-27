@@ -470,7 +470,7 @@ int luaK_stringK (FuncState *fs, TString *s) {
 */
 int luaK_intK (FuncState *fs, lua_Integer n) {
   TValue k, o;
-  setpvalue(&k, cast(void*, cast(size_t, n)));
+  setpvalue(&k, cast(void*, cast(uintptr_t, n)));
   setivalue(&o, n);
   return addk(fs, &k, &o);
 }

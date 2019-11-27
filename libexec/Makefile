@@ -10,6 +10,7 @@ SUBDIR=	${_atf} \
 	${_cheri_bench_helper} \
 	${_comsat} \
 	${_dma} \
+	flua \
 	getty \
 	${_mail.local} \
 	${_makewhatis.local} \
