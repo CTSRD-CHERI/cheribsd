@@ -101,6 +101,8 @@ struct bus_dma_tag {
 	void			*lockfuncarg;
 	bus_dma_segment_t	*segments;
 	struct bounce_zone *bounce_zone;
+	device_t		iommu;
+	void			*iommu_cookie;
 };
 
 struct bounce_page {
@@ -274,10 +276,16 @@ run_filter(bus_dma_tag_t dmat, bus_addr_t paddr)
 	retval = 0;
 
 	do {
-		if (((paddr > dmat->lowaddr && paddr <= dmat->highaddr)
-		 || ((paddr & (dmat->alignment - 1)) != 0))
-		 && (dmat->filter == NULL
-		  || (*dmat->filter)(dmat->filterarg, paddr) != 0))
+		if (dmat->filter == NULL && dmat->iommu == NULL &&
+		    paddr > dmat->lowaddr && paddr <= dmat->highaddr)
+			retval = 1;
+
+		if (dmat->filter == NULL &&
+		    (paddr & (dmat->alignment - 1)) != 0)
+			retval = 1;
+
+		if (dmat->filter != NULL &&
+		    (*dmat->filter)(dmat->filterarg, paddr) != 0)
 			retval = 1;
 
 		dmat = dmat->parent;
