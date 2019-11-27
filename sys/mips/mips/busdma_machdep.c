@@ -65,6 +65,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpuinfo.h>
 #include <machine/md_var.h>
 
+#include "iommu_if.h"
+
 #define MAX_BPAGES 64
 #define BUS_DMA_COULD_BOUNCE	BUS_DMA_BUS3
 #define BUS_DMA_MIN_ALLOC_COMP	BUS_DMA_BUS4
