@@ -422,11 +422,6 @@ kern_execve(struct thread *td, struct image_args *args,
 			sx_sunlock(&proctree_lock);
 			goto fallback;
 		}
-#if 0
-		printf("%s: pid %d (%s), sid %d, colocating %s with pid %d (%s)\n",
-		    __func__, p->p_pid, p->p_comm, p->p_session->s_sid,
-		    args->fname, cop->p_pid, cop->p_comm);
-#endif
 		PROC_UNLOCK(cop);
 		PHOLD(cop);
 		sx_sunlock(&proctree_lock);
@@ -434,6 +429,14 @@ kern_execve(struct thread *td, struct image_args *args,
 		PRELE(cop);
 
 		KASSERT(error != 0, ("%s: kern_coexecve returned 0", __func__));
+#if 0
+		if (error == EJUSTRETURN) {
+			printf("%s: pid %d (%s), sid %d, "
+			    "coexecuted %s with pid %d (%s), vmspace %p\n",
+			    __func__, p->p_pid, p->p_comm, p->p_session->s_sid,
+			    args->fname, cop->p_pid, cop->p_comm, p->p_vmspace);
+		}
+#endif
 
 		switch (error) {
 		case EJUSTRETURN: /* This is the success case. */
