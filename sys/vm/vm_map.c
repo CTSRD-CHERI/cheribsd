@@ -402,7 +402,7 @@ vmspace_exitfree(struct proc *p)
 	vmspace_free(vm);
 }
 
-static int coexecve_cleanup_on_exit = 1;
+static int coexecve_cleanup_on_exit = 0;
 SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_on_exit, CTLFLAG_RWTUN,
     &coexecve_cleanup_on_exit, 0,
     "Clean up abandoned vm entries after colocated process exits");
