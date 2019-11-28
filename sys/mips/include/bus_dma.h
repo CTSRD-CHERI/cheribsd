@@ -34,4 +34,6 @@
 #include <sys/bus_dma.h>
 #include <sys/bus_dma_internal.h>
 
+int bus_dma_tag_set_iommu(bus_dma_tag_t, struct device *iommu, void *cookie);
+
 #endif /* _MIPS_BUS_DMA_H_ */

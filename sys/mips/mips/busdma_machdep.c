@@ -168,6 +168,7 @@ struct bus_dmamap {
 	void		*callback_arg;
 	int		sync_count;
 	struct sync_list *slist;
+	int		nsegs;
 };
 
 static STAILQ_HEAD(, bus_dmamap) bounce_map_waitinglist;
@@ -425,6 +426,7 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		newtag->lockfuncarg = NULL;
 	}
 	newtag->segments = NULL;
+	newtag->iommu = NULL;
 
 	/*
 	 * Take into account any restrictions imposed by our parent tag
@@ -451,9 +453,15 @@ bus_dma_tag_create(bus_dma_tag_t parent, bus_size_t alignment,
 		}
 		if (newtag->parent != NULL)
 			atomic_add_int(&parent->ref_count, 1);
+
+		newtag->iommu = parent->iommu;
+		newtag->iommu_cookie = parent->iommu_cookie;
 	}
-	if (_bus_dma_can_bounce(newtag->lowaddr, newtag->highaddr)
-	 || newtag->alignment > 1)
+	if (_bus_dma_can_bounce(newtag->lowaddr, newtag->highaddr) &&
+	    newtag->iommu == NULL)
+		newtag->flags |= BUS_DMA_COULD_BOUNCE;
+
+	if (newtag->alignment > 1)
 		newtag->flags |= BUS_DMA_COULD_BOUNCE;
 
 	if (((newtag->flags & BUS_DMA_COULD_BOUNCE) != 0) &&
@@ -544,6 +552,7 @@ bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 	bus_dmamap_t newmap;
 	int error = 0;
 
+#if 1
 	if (dmat->segments == NULL) {
 		dmat->segments = (bus_dma_segment_t *)malloc(
 		    sizeof(bus_dma_segment_t) * dmat->nsegments, M_BUSDMA,
@@ -554,6 +563,7 @@ bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 			return (ENOMEM);
 		}
 	}
+#endif
 
 	newmap = _busdma_alloc_dmamap(dmat);
 	if (newmap == NULL) {
@@ -610,6 +620,21 @@ bus_dmamap_create(bus_dma_tag_t dmat, int flags, bus_dmamap_t *mapp)
 		bz->map_count++;
 	}
 
+#if 0
+	(*mapp)->nsegs = 0;
+	(*mapp)->segments = (bus_dma_segment_t *)malloc(
+	    sizeof(bus_dma_segment_t) * dmat->nsegments, M_DEVBUF,
+	    M_NOWAIT);
+	if ((*mapp)->segments == NULL) {
+		CTR3(KTR_BUSDMA, "%s: tag %p error %d",
+		    __func__, dmat, ENOMEM);
+		return (ENOMEM);
+	}
+
+	if (error == 0)
+		dmat->map_count++;
+#endif
+
 	CTR4(KTR_BUSDMA, "%s: tag %p tag flags 0x%x error %d",
 	    __func__, dmat, dmat->flags, error);
 
@@ -657,6 +682,7 @@ bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddrp, int flags,
 		mflags = M_NOWAIT;
 	else
 		mflags = M_WAITOK;
+#if 1
 	if (dmat->segments == NULL) {
 		dmat->segments = (bus_dma_segment_t *)malloc(
 		    sizeof(bus_dma_segment_t) * dmat->nsegments, M_BUSDMA,
@@ -667,6 +693,7 @@ bus_dmamem_alloc(bus_dma_tag_t dmat, void** vaddrp, int flags,
 			return (ENOMEM);
 		}
 	}
+#endif
 
 	newmap = _busdma_alloc_dmamap(dmat);
 	if (newmap == NULL) {
@@ -917,7 +944,11 @@ _bus_dmamap_load_phys(bus_dma_tag_t dmat, bus_dmamap_t map,
 	int error;
 
 	if (segs == NULL)
+#if 1
 		segs = dmat->segments;
+#else
+		segs = map->segments;
+#endif
 
 	if ((dmat->flags & BUS_DMA_COULD_BOUNCE) != 0) {
 		_bus_dmamap_count_phys(dmat, map, buf, buflen, flags);
@@ -983,7 +1014,12 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 
 
 	if (segs == NULL)
+#if 1
 		segs = dmat->segments;
+#else
+		segs = map->segments;
+#endif
+
 	if ((flags & BUS_DMA_LOAD_MBUF) != 0)
 		map->flags |= DMAMAP_CACHE_ALIGNED;
 
@@ -1070,8 +1106,33 @@ _bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
     bus_dma_segment_t *segs, int nsegs, int error)
 {
 
+#if 0
+	/* Original code */
+
 	if (segs == NULL)
 		segs = dmat->segments;
+
+	if (dmat->iommu != NULL)
+		IOMMU_MAP(dmat->iommu, map->segments, &map->nsegs,
+		    dmat->lowaddr, dmat->highaddr, dmat->alignment,
+		    dmat->boundary, dmat->iommu_cookie);
+#endif
+
+	map->nsegs = nsegs;
+
+	if (segs != NULL)
+		memcpy(dmat->segments, segs, map->nsegs*sizeof(segs[0]));
+
+	if (dmat->iommu != NULL)
+		IOMMU_MAP(dmat->iommu, dmat->segments, &map->nsegs,
+		    dmat->lowaddr, dmat->highaddr, dmat->alignment,
+		    dmat->boundary, dmat->iommu_cookie);
+
+	if (segs != NULL)
+		memcpy(segs, dmat->segments, map->nsegs*sizeof(segs[0]));
+	else
+		segs = dmat->segments;
+
 	return (segs);
 }
 
@@ -1083,12 +1144,18 @@ bus_dmamap_unload(bus_dma_tag_t dmat, bus_dmamap_t map)
 {
 	struct bounce_page *bpage;
 
+	if (dmat->iommu) {
+		IOMMU_UNMAP(dmat->iommu, dmat->segments, map->nsegs,
+		    dmat->iommu_cookie);
+		map->nsegs = 0;
+	}
+
 	while ((bpage = STAILQ_FIRST(&map->bpages)) != NULL) {
 		STAILQ_REMOVE_HEAD(&map->bpages, links);
 		free_bounce_page(dmat, bpage);
 	}
+
 	map->sync_count = 0;
-	return;
 }
 
 static void
@@ -1532,4 +1599,14 @@ busdma_swi(void)
 		mtx_lock(&bounce_lock);
 	}
 	mtx_unlock(&bounce_lock);
+}
+
+int
+bus_dma_tag_set_iommu(bus_dma_tag_t tag, device_t iommu, void *cookie)
+{
+
+	tag->iommu = iommu;
+	tag->iommu_cookie = cookie;
+
+	return (0);
 }
