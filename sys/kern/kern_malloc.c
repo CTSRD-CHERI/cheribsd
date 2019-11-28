@@ -742,6 +742,7 @@ free_dbg(void **addrp, struct malloc_type *mtp)
 void
 free(void *addr, struct malloc_type *mtp)
 {
+	uma_zone_t zone;
 	uma_slab_t slab;
 	u_long size;
 
@@ -753,17 +754,17 @@ free(void *addr, struct malloc_type *mtp)
 	if (addr == NULL)
 		return;
 
-	slab = vtoslab((vm_offset_t)addr & (~UMA_SLAB_MASK));
+	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("free: address %p(%p) has not been allocated.\n",
 		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
 
 	if (!(slab->us_flags & UMA_SLAB_MALLOC)) {
-		size = slab->us_keg->uk_size;
+		size = zone->uz_size;
 #ifdef INVARIANTS
 		free_save_type(addr, mtp, size);
 #endif
-		uma_zfree_arg(LIST_FIRST(&slab->us_keg->uk_zones), addr, slab);
+		uma_zfree_arg(zone, addr, slab);
 	} else {
 		size = slab->us_size;
 		uma_large_free(slab);
@@ -774,6 +775,7 @@ free(void *addr, struct malloc_type *mtp)
 void
 free_domain(void *addr, struct malloc_type *mtp)
 {
+	uma_zone_t zone;
 	uma_slab_t slab;
 	u_long size;
 
@@ -786,18 +788,17 @@ free_domain(void *addr, struct malloc_type *mtp)
 	if (addr == NULL)
 		return;
 
-	slab = vtoslab((vm_offset_t)addr & (~UMA_SLAB_MASK));
+	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 	if (slab == NULL)
 		panic("free_domain: address %p(%p) has not been allocated.\n",
 		    addr, (void *)((u_long)addr & (~UMA_SLAB_MASK)));
 
 	if (!(slab->us_flags & UMA_SLAB_MALLOC)) {
-		size = slab->us_keg->uk_size;
+		size = zone->uz_size;
 #ifdef INVARIANTS
 		free_save_type(addr, mtp, size);
 #endif
-		uma_zfree_domain(LIST_FIRST(&slab->us_keg->uk_zones),
-		    addr, slab);
+		uma_zfree_domain(zone, addr, slab);
 	} else {
 		size = slab->us_size;
 		uma_large_free(slab);
@@ -811,6 +812,7 @@ free_domain(void *addr, struct malloc_type *mtp)
 void *
 realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 {
+	uma_zone_t zone;
 	uma_slab_t slab;
 	unsigned long alloc;
 	void *newaddr;
@@ -838,7 +840,7 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 	slab = NULL;
 	alloc = redzone_get_size(addr);
 #else
-	slab = vtoslab((vm_offset_t)addr & ~(UMA_SLAB_MASK));
+	vtozoneslab((vm_offset_t)addr & (~UMA_SLAB_MASK), &zone, &slab);
 
 	/* Sanity check */
 	KASSERT(slab != NULL,
@@ -846,7 +848,7 @@ realloc(void *addr, size_t size, struct malloc_type *mtp, int flags)
 
 	/* Get the size of the original block */
 	if (!(slab->us_flags & UMA_SLAB_MALLOC))
-		alloc = slab->us_keg->uk_size;
+		alloc = zone->uz_size;
 	else
 		alloc = slab->us_size;
 
