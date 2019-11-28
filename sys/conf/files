@@ -205,6 +205,7 @@ cddl/contrib/opensolaris/uts/common/fs/zfs/dsl_synctask.c		optional zfs compile-
 cddl/contrib/opensolaris/uts/common/fs/zfs/gzip.c			optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/fs/zfs/lzjb.c			optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/fs/zfs/metaslab.c			optional zfs compile-with "${ZFS_C}"
+cddl/contrib/opensolaris/uts/common/fs/zfs/mmp.c			optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/fs/zfs/multilist.c			optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/fs/zfs/range_tree.c			optional zfs compile-with "${ZFS_C}"
 cddl/contrib/opensolaris/uts/common/fs/zfs/refcount.c			optional zfs compile-with "${ZFS_C}"
@@ -1453,6 +1454,8 @@ dev/cxgbe/t4_vf.c		optional cxgbev pci \
 dev/cxgbe/common/t4_hw.c	optional cxgbe pci \
 	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
 dev/cxgbe/common/t4vf_hw.c	optional cxgbev pci \
+	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
+dev/cxgbe/crypto/t4_kern_tls.c	optional cxgbe pci kern_tls \
 	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
 dev/cxgbe/crypto/t4_keyctx.c	optional cxgbe pci \
 	compile-with "${NORMAL_C} -I$S/dev/cxgbe"
@@ -3840,6 +3843,8 @@ kern/subr_compressor.c		standard \
 kern/subr_coverage.c		optional coverage \
 	compile-with "${NORMAL_C:N-fsanitize*}"
 kern/subr_counter.c		standard
+kern/subr_csan.c		optional kcsan \
+	compile-with "${NORMAL_C:N-fsanitize*}"
 kern/subr_devstat.c		standard
 kern/subr_disk.c		standard
 kern/subr_early.c		standard

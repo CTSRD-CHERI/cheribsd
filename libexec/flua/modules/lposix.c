@@ -1,8 +1,5 @@
 /*-
- * SPDX-License-Identifier: BSD-3-Clause
- *
- * Copyright (c) 1991 The Regents of the University of California.
- * All rights reserved.
+ * Copyright (c) 2019 Kyle Evans <kevans@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -12,14 +9,11 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
  * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
  * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
@@ -28,24 +22,42 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	from: @(#)comreg.h	7.2 (Berkeley) 5/9/91
- * $FreeBSD$
  */
 
-/* Receiver clock frequency for "standard" pc serial ports. */
-#define	DEFAULT_RCLK	1843200
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-/* speed to initialize to during chip tests */
-#define SIO_TEST_SPEED	9600
+#include <unistd.h>
 
-/* default serial console speed if not set with sysctl or probed from boot */
-#ifndef CONSPEED
-#define CONSPEED 9600
-#endif
+#include <lua.h>
+#include "lauxlib.h"
+#include "lposix.h"
 
-/* default serial gdb speed if not set with sysctl or probed from boot */
-#ifndef GDBSPEED
-#define GDBSPEED CONSPEED
-#endif
+/*
+ * Minimal implementation of luaposix needed for internal FreeBSD bits.
+ */
 
-#define	IO_COMSIZE	8		/* 8250, 16x50 com controllers */
+static int
+lua_getpid(lua_State *L)
+{
+	int n;
+
+	n = lua_gettop(L);
+	luaL_argcheck(L, n == 0, 1, "too many arguments");
+	lua_pushinteger(L, getpid());
+	return 1;
+}
+
+#define REG_SIMPLE(n)	{ #n, lua_ ## n }
+static const struct luaL_Reg unistdlib[] = {
+	REG_SIMPLE(getpid),
+	{ NULL, NULL },
+};
+#undef REG_SIMPLE
+
+int
+luaopen_posix_unistd(lua_State *L)
+{
+	luaL_newlib(L, unistdlib);
+	return 1;
+}

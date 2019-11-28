@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/cons.h>
 #include <sys/cpu.h>
+#include <sys/csan.h>
 #include <sys/devmap.h>
 #include <sys/efi.h>
 #include <sys/exec.h>
@@ -412,8 +413,8 @@ int
 ptrace_set_pc(struct thread *td, u_long addr)
 {
 
-	printf("ARM64TODO: ptrace_set_pc");
-	return (EDOOFUS);
+	td->td_frame->tf_elr = addr;
+	return (0);
 }
 
 int
@@ -1208,6 +1209,8 @@ initarm(struct arm64_bootparams *abp)
 	dbg_init();
 	kdb_init();
 	pan_enable();
+
+	kcsan_cpu_init(0);
 
 	env = kern_getenv("kernelname");
 	if (env != NULL)
