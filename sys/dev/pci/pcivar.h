@@ -333,6 +333,7 @@ struct pci_devinfo {
 	struct resource_list resources;
 	pcicfgregs		cfg;
 	struct pci_conf		conf;
+	bus_dma_tag_t		mdi_dma_tag;
 };
 #endif
 

@@ -314,6 +314,35 @@ static int	em_get_regs(SYSCTL_HANDLER_ARGS);
 static void	lem_smartspeed(struct adapter *adapter);
 static void	igb_configure_queues(struct adapter *adapter);
 
+static bus_dma_tag_t
+em_get_dma_tag(device_t dev, device_t child)
+{
+
+#if 0
+	struct vdevice_devinfo *dinfo;
+
+	while (child != NULL && device_get_parent(child) != dev)
+		child = device_get_parent(child);
+
+        dinfo = device_get_ivars(child);
+
+	if (dinfo->mdi_dma_tag == NULL) {
+		bus_dma_tag_create(bus_get_dma_tag(dev),
+		    1, 0, BUS_SPACE_MAXADDR, BUS_SPACE_MAXADDR,
+		    NULL, NULL, BUS_SPACE_MAXSIZE, BUS_SPACE_UNRESTRICTED,
+		    BUS_SPACE_MAXSIZE, 0, NULL, NULL, &dinfo->mdi_dma_tag);
+		phyp_iommu_set_dma_tag(dev, child, dinfo->mdi_dma_tag);
+	}
+
+        return (dinfo->mdi_dma_tag);
+#endif
+
+	panic("here");
+
+	printf("%s\n", __func__);
+
+	return (NULL);
+}
 
 /*********************************************************************
  *  FreeBSD Device Interface Entry Points
@@ -327,6 +356,12 @@ static device_method_t em_methods[] = {
 	DEVMETHOD(device_shutdown, iflib_device_shutdown),
 	DEVMETHOD(device_suspend, iflib_device_suspend),
 	DEVMETHOD(device_resume, iflib_device_resume),
+
+	/* IOMMU interface */
+	DEVMETHOD(bus_get_dma_tag,	em_get_dma_tag),
+	//DEVMETHOD(iommu_map,		phyp_iommu_map),
+	//DEVMETHOD(iommu_unmap,	phyp_iommu_unmap),
+
 	DEVMETHOD_END
 };
 

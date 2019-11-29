@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/endian.h>
 
+#include <sys/pciio.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcib_private.h>
@@ -53,6 +54,8 @@ __FBSDID("$FreeBSD$");
 #include <machine/intr.h>
 
 #include "pcib_if.h"
+
+#include "iommu_if.h"
 
 /* Assembling ECAM Configuration Address */
 #define	PCIE_BUS_SHIFT		20
@@ -440,10 +443,83 @@ generic_pcie_adjust_resource(device_t dev, device_t child, int type,
 static bus_dma_tag_t
 generic_pcie_get_dma_tag(device_t dev, device_t child)
 {
+#if 1
 	struct generic_pcie_core_softc *sc;
 
+	printf("%s\n", __func__);
+
 	sc = device_get_softc(dev);
+
+	bus_dma_tag_set_iommu(sc->dmat, dev, NULL);
+
 	return (sc->dmat);
+#else
+
+	struct pci_devinfo *dinfo;
+	int error;
+
+	//while (child != NULL && device_get_parent(child) != dev)
+	//	child = device_get_parent(child);
+
+	if (device_get_parent(child) != dev)
+		printf("%s: dev is not parent for child\n", __func__);
+
+	printf("%s: dev name %s child name %s\n",
+			__func__,
+			device_get_name(dev),
+			device_get_name(child));
+
+        dinfo = device_get_ivars(child);
+	if (dinfo == NULL) {
+		printf("%s: dinfo is NULL\n", __func__);
+		return (NULL);
+	}
+
+	if (dinfo->mdi_dma_tag == NULL) {
+		printf("%s: dinfo is NULL, creating tag\n", __func__);
+		error = bus_dma_tag_create(bus_get_dma_tag(dev), /* parent */
+		    1, 0,			/* alignment, bounds */
+		    BUS_SPACE_MAXADDR,		/* lowaddr */
+		    BUS_SPACE_MAXADDR,		/* highaddr */
+		    NULL, NULL,			/* filter, filterarg */
+		    BUS_SPACE_MAXSIZE,		/* maxsize */
+		    BUS_SPACE_UNRESTRICTED,	/* nsegments */
+		    BUS_SPACE_MAXSIZE,		/* maxsegsize */
+		    0,				/* flags */
+		    NULL, NULL,			/* lockfunc, lockarg */
+		    &dinfo->mdi_dma_tag);
+		if (error != 0) {
+			panic("cant create tag");
+			return (NULL);
+		}
+
+		//phyp_iommu_set_dma_tag(dev, child, dinfo->mdi_dma_tag);
+	} else
+		printf("%s: dinfo is not NULL\n", __func__);
+
+	return (dinfo->mdi_dma_tag);
+#endif
+}
+
+static int
+generic_pcie_iommu_map(device_t dev, bus_dma_segment_t *segs, int *nsegs,
+    bus_addr_t min, bus_addr_t max, bus_size_t alignment, bus_addr_t boundary,
+    void *cookie)
+{
+
+	printf("%s: nsegs %d, min %lx, max %lx\n", __func__, *nsegs, min, max);
+
+	return (0);
+}
+
+static int
+generic_pcie_iommu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs,
+    void *cookie)
+{
+
+	printf("%s: nsegs %d\n", __func__, nsegs);
+
+	return (0);
 }
 
 static device_method_t generic_pcie_methods[] = {
@@ -459,6 +535,8 @@ static device_method_t generic_pcie_methods[] = {
 	DEVMETHOD(bus_teardown_intr,		bus_generic_teardown_intr),
 
 	DEVMETHOD(bus_get_dma_tag,		generic_pcie_get_dma_tag),
+	DEVMETHOD(iommu_map,			generic_pcie_iommu_map),
+	DEVMETHOD(iommu_unmap,			generic_pcie_iommu_unmap),
 
 	/* pcib interface */
 	DEVMETHOD(pcib_maxslots,		generic_pcie_maxslots),
