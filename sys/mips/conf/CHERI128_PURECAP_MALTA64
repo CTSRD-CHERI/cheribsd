@@ -67,3 +67,4 @@ nooptions	CPU_CHERI_HW_CCLEAR
 device		virtio
 device		virtio_pci
 
+device		tuntap

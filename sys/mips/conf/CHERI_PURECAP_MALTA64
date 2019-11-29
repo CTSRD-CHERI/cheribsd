@@ -66,3 +66,5 @@ nooptions	CPU_CHERI_HW_CCLEAR
 # support for virtio rng device
 device		virtio
 device		virtio_pci
+
+device		tuntap
