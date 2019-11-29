@@ -5718,7 +5718,7 @@ vop_listextattr {
 	char attrprefix[16];
 	u_char dirbuf[sizeof(struct dirent)];
 	struct dirent *dp;
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct uio auio, *uio = ap->a_uio;
 	size_t *sizep = ap->a_size;
 	size_t plen;
@@ -6071,7 +6071,7 @@ struct vop_vector zfs_shareops = {
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

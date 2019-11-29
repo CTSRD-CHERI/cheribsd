@@ -887,7 +887,7 @@ static void
 pipe_clone_write_buffer(struct pipe *wpipe)
 {
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	int size;
 	int pos;
 
@@ -1791,7 +1791,7 @@ filt_pipenotsup(struct knote *kn, long hint)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [

@@ -157,7 +157,7 @@ ksyms_size_calc(struct tsizes *ts)
 static int
 ksyms_emit(struct ksyms_softc *sc, void *buf, off_t off, size_t sz)
 {
-	kiovec_t iov;
+	struct iovec iov;
 	struct uio uio;
 
 	IOVEC_INIT(&iov, buf, sz);
@@ -524,7 +524,7 @@ MODULE_VERSION(ksyms, 1);
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

@@ -84,7 +84,7 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 {
 	int o;
 	u_int c = 0, v;
-	kiovec_t *iov;
+	struct iovec *iov;
 	int error = 0;
 	vm_offset_t addr, eaddr;
 
@@ -174,7 +174,7 @@ memmmap(struct cdev *dev, vm_ooffset_t offset, vm_paddr_t *paddr,
 //   "updated": 20180629,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

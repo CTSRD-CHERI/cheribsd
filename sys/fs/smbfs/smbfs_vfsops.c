@@ -410,7 +410,7 @@ smbfs_statfs(struct mount *mp, struct statfs *sbp)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

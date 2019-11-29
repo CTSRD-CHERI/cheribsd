@@ -236,7 +236,7 @@ struct mfi_query_disk {
 //   "updated": 20181018,
 //   "target_type": "header",
 //   "changes": [
-//     "kiovec_t",
+//     "struct iovec",
 //     "integer_provenance"
 //   ],
 //   "changes_purecap": [

@@ -1885,7 +1885,7 @@ struct mntaarg {
 
 /* The header for the mount arguments */
 struct mntarg {
-	kiovec_t *v;
+	struct iovec *v;
 	int len;
 	int error;
 	SLIST_HEAD(, mntaarg)	list;
@@ -2080,7 +2080,7 @@ vfs_oexport_conv(const struct oexport_args *oexp, struct export_args *exp)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

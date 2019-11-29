@@ -439,7 +439,7 @@ nfscl_lockderef(struct nfsv4lock *lckp)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

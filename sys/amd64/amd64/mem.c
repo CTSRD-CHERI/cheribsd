@@ -79,7 +79,7 @@ MALLOC_DEFINE(M_MEMDESC, "memdesc", "memory range descriptors");
 int
 memrw(struct cdev *dev, struct uio *uio, int flags)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	void *p;
 	ssize_t orig_resid;
 	u_long v, vd;
@@ -243,7 +243,7 @@ memioctl(struct cdev *dev __unused, u_long cmd, caddr_t data, int flags,
 //   "updated": 20180629,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ],
 //   "change_comment": "",
 //   "hybrid_specific": false

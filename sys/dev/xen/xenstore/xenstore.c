@@ -814,7 +814,7 @@ xs_dev_request_and_reply(struct xsd_sockmsg *msg, void **result)
  */
 static int
 xs_talkv(struct xs_transaction t, enum xsd_sockmsg_type request_type,
-    const kiovec_t *iovec, u_int num_vecs, u_int *len, void **result)
+    const struct iovec *iovec, u_int num_vecs, u_int *len, void **result)
 {
 	struct xsd_sockmsg msg;
 	void *ret = NULL;
@@ -887,7 +887,7 @@ static int
 xs_single(struct xs_transaction t, enum xsd_sockmsg_type request_type,
     const char *body, u_int *len, void **result)
 {
-	kiovec_t iovec;
+	struct iovec iovec;
 
 	IOVEC_INIT_STR(&iovec, __DECONST(void *, body));
 
@@ -907,7 +907,7 @@ xs_single(struct xs_transaction t, enum xsd_sockmsg_type request_type,
 static int
 xs_watch(const char *path, const char *token)
 {
-	kiovec_t iov[2];
+	struct iovec iov[2];
 
 	IOVEC_INIT_STR(&iov[0], __DECONST(void *, path));
 	IOVEC_INIT_STR(&iov[1], __DECONST(void *, token));
@@ -927,7 +927,7 @@ xs_watch(const char *path, const char *token)
 static int
 xs_unwatch(const char *path, const char *token)
 {
-	kiovec_t iov[2];
+	struct iovec iov[2];
 
 	IOVEC_INIT_STR(&iov[0], __DECONST(void *, path));
 	IOVEC_INIT_STR(&iov[1], __DECONST(void *, token));
@@ -1319,7 +1319,7 @@ xs_write(struct xs_transaction t, const char *dir, const char *node,
     const char *string)
 {
 	struct sbuf *path;
-	kiovec_t iovec[2];
+	struct iovec iovec[2];
 	int error;
 
 	path = xs_join(dir, node);
@@ -1656,7 +1656,7 @@ xs_unlock(void)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

@@ -108,7 +108,7 @@ paddr_unmap(void *phys, uint32_t size)
 
 static inline void
 _vq_record(uint32_t offs, int i, volatile struct vring_desc *vd,
-	kiovec_t *iov, int n_iov, uint16_t *flags) {
+	struct iovec *iov, int n_iov, uint16_t *flags) {
 
 	if (i >= n_iov)
 		return;
@@ -122,7 +122,7 @@ _vq_record(uint32_t offs, int i, volatile struct vring_desc *vd,
 
 int
 vq_getchain(uint32_t offs, struct vqueue_info *vq,
-	kiovec_t *iov, int n_iov, uint16_t *flags)
+	struct iovec *iov, int n_iov, uint16_t *flags)
 {
 	volatile struct vring_desc *vdir, *vindir, *vp;
 	int idx, ndesc, n_indir;
@@ -167,7 +167,7 @@ vq_getchain(uint32_t offs, struct vqueue_info *vq,
 }
 
 void
-vq_relchain(struct vqueue_info *vq, kiovec_t *iov, int n, uint32_t iolen)
+vq_relchain(struct vqueue_info *vq, struct iovec *iov, int n, uint32_t iolen)
 {
 	volatile struct vring_used_elem *vue;
 	volatile struct vring_used *vu;
@@ -244,13 +244,13 @@ setup_offset(device_t dev, uint32_t *offset)
 	return (0);
 }
 
-kiovec_t *
-getcopy(kiovec_t *iov, int n)
+struct iovec *
+getcopy(struct iovec *iov, int n)
 {
-	kiovec_t *tiov;
+	struct iovec *tiov;
 	int i;
 
-	tiov = malloc(n * sizeof(kiovec_t), M_DEVBUF, M_NOWAIT);
+	tiov = malloc(n * sizeof(struct iovec), M_DEVBUF, M_NOWAIT);
 	for (i = 0; i < n; i++) {
 		IOVEC_INIT(&tiov[i], iov[i].iov_base, iov[i].iov_len);
 	}
@@ -263,7 +263,7 @@ getcopy(kiovec_t *iov, int n)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

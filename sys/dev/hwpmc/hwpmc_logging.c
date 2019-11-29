@@ -361,7 +361,7 @@ pmclog_loop(void *arg)
 	struct thread *td;
 	sigset_t unb;
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	size_t nbytes;
 	int error;
 
@@ -1300,7 +1300,7 @@ pmclog_shutdown()
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

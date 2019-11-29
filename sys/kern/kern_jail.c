@@ -288,7 +288,7 @@ kern_jail(struct thread *td, const char * __capability path,
     struct in_addr * __capability ip4, size_t ip4s,
     struct in6_addr * __capability ip6, size_t ip6s, enum uio_seg ipseg)
 {
-	kiovec_t optiov[2 * (4 + nitems(pr_flag_allow)
+	struct iovec optiov[2 * (4 + nitems(pr_flag_allow)
 #ifdef INET
 			    + 1
 #endif
@@ -438,7 +438,7 @@ done:
 
 /*
  * struct jail_set_args {
- *	kiovec_t *iovp;
+ *	struct iovec *iovp;
  *	unsigned int iovcnt;
  *	int flags;
  * };
@@ -1907,7 +1907,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 
 /*
  * struct jail_get_args {
- *	kiovec_t *iovp;
+ *	struct iovec *iovp;
  *	unsigned int iovcnt;
  *	int flags;
  * };
@@ -4257,7 +4257,7 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

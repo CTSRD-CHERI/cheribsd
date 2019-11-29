@@ -167,7 +167,7 @@ typedef struct isc_session {
      struct i_stats	stats;
      bhs_t		bhs;
      struct uio		uio;
-     kiovec_t		iov;
+     struct iovec		iov;
      /*
       | cam stuff
       */
@@ -191,7 +191,7 @@ typedef struct pduq {
      union ccb		*ccb;
 
      struct uio		uio;
-     kiovec_t		iov[5];	// XXX: careful ...
+     struct iovec		iov[5];	// XXX: careful ...
      struct mbuf	*mp;
      struct bintime	ts;
      queue_t		*pduq;		
@@ -608,7 +608,7 @@ i_mbufcopy(struct mbuf *mp, caddr_t dp, int len)
 //   "target_type": "header",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

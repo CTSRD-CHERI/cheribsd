@@ -116,9 +116,9 @@ freebsd64_sendto(struct thread *td, struct freebsd64_sendto_args *uap)
 }
 
 static int
-freebsd64_copyinmsghdr(struct msghdr64 *msg64, kmsghdr_t *msg, struct msghdr64 *m64)
+freebsd64_copyinmsghdr(struct msghdr64 *msg64, struct msghdr *msg, struct msghdr64 *m64)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	int error;
 
 	error = copyin(msg64, m64, sizeof(*m64));
@@ -133,7 +133,7 @@ freebsd64_copyinmsghdr(struct msghdr64 *msg64, kmsghdr_t *msg, struct msghdr64 *
 	    m64->msg_iovlen), m64->msg_iovlen, &iov, EMSGSIZE);
 	if (error)
 		return (error);
-	msg->msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
+	msg->msg_iov = (__cheri_tocap struct iovec * __capability)iov;
 	msg->msg_iovlen = m64->msg_iovlen;
 
 	msg->msg_control = __USER_CAP(m64->msg_control, m64->msg_controllen);
@@ -143,7 +143,7 @@ freebsd64_copyinmsghdr(struct msghdr64 *msg64, kmsghdr_t *msg, struct msghdr64 *
 }
 
 static int
-freebsd64_copyoutmsghdr(struct msghdr64 *m64, kmsghdr_t *msg, struct msghdr64 *msg64)
+freebsd64_copyoutmsghdr(struct msghdr64 *m64, struct msghdr *msg, struct msghdr64 *msg64)
 {
 	int error;
 	/* Leave pointers untouched */
@@ -164,7 +164,7 @@ freebsd64_copyoutmsghdr(struct msghdr64 *m64, kmsghdr_t *msg, struct msghdr64 *m
     ((char *)(cmsg) + FREEBSD64_ALIGN(sizeof(struct cmsghdr)))
 
 static int
-freebsd64_copyout_control(kmsghdr_t *msg, struct mbuf *control)
+freebsd64_copyout_control(struct msghdr *msg, struct mbuf *control)
 {
 	struct cmsghdr *cm;
 	void *data;
@@ -319,7 +319,7 @@ freebsd64_copyin_control(struct mbuf **mp, char * __capability buf, u_int buflen
 int
 freebsd64_sendmsg(struct thread *td, struct freebsd64_sendmsg_args *uap)
 {
-	kmsghdr_t msg;
+	struct msghdr msg;
 	struct msghdr64 umsg64;
 	struct mbuf *control = NULL;
 	struct sockaddr *to = NULL;
@@ -378,7 +378,7 @@ freebsd64_recvfrom(struct thread *td, struct freebsd64_recvfrom_args *uap)
 int
 freebsd64_recvmsg(struct thread *td, struct freebsd64_recvmsg_args *uap)
 {
-	kmsghdr_t msg;
+	struct msghdr msg;
 	struct msghdr64 umsg64;
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;

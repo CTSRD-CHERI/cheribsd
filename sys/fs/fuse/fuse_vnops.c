@@ -1784,7 +1784,7 @@ fuse_vnop_getpages(struct vop_getpages_args *ap)
 {
 	int i, error, nextoff, size, toff, count, npages;
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	struct vnode *vp;
@@ -1911,7 +1911,7 @@ static int
 fuse_vnop_putpages(struct vop_putpages_args *ap)
 {
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	int i, error, npages, count;
@@ -2377,7 +2377,7 @@ fuse_vnop_print(struct vop_print_args *ap)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

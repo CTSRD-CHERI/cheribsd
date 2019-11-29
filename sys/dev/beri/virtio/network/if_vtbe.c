@@ -138,10 +138,10 @@ static int pio_enable_irq(struct vtbe_softc *sc, int enable);
 static void
 vtbe_txstart_locked(struct vtbe_softc *sc)
 {
-	kiovec_t iov[DESC_COUNT];
+	struct iovec iov[DESC_COUNT];
 	struct virtio_net_hdr *vnh;
 	struct vqueue_info *vq;
-	kiovec_t *tiov;
+	struct iovec *tiov;
 	struct ifnet *ifp;
 	struct mbuf *m;
 	struct uio uio;
@@ -382,8 +382,8 @@ vq_init(struct vtbe_softc *sc)
 static void
 vtbe_proc_rx(struct vtbe_softc *sc, struct vqueue_info *vq)
 {
-	kiovec_t iov[DESC_COUNT];
-	kiovec_t *tiov;
+	struct iovec iov[DESC_COUNT];
+	struct iovec *tiov;
 	struct ifnet *ifp;
 	struct uio uio;
 	struct mbuf *m;
@@ -654,7 +654,7 @@ MODULE_DEPEND(vtbe, ether, 1, 1, 1);
 //   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t",
+//     "struct iovec",
 //     "ioctl:net"
 //   ]
 // }

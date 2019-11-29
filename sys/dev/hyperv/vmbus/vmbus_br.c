@@ -267,7 +267,7 @@ vmbus_txbr_copyto(const struct vmbus_txbr *tbr, uint32_t windex,
  * immediately after this channel packet.
  */
 int
-vmbus_txbr_write(struct vmbus_txbr *tbr, const kiovec_t iov[], int iovlen,
+vmbus_txbr_write(struct vmbus_txbr *tbr, const struct iovec iov[], int iovlen,
     boolean_t *need_sig)
 {
 	uint32_t old_windex, windex, total;
@@ -410,7 +410,7 @@ vmbus_rxbr_read(struct vmbus_rxbr *rbr, void *data, int dlen, uint32_t skip)
 //   "updated": 20180629,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

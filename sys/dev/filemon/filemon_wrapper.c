@@ -52,7 +52,7 @@ static void
 filemon_output(struct filemon *filemon, char *msg, size_t len)
 {
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	int error;
 
 	if (filemon->fp == NULL)
@@ -464,7 +464,7 @@ filemon_wrapper_deinstall(void)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

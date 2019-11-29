@@ -2388,7 +2388,7 @@ MODULE_VERSION(firewire, 1);
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

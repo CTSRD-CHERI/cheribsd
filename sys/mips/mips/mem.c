@@ -80,7 +80,7 @@ struct mem_range_softc mem_range_softc;
 int
 memrw(struct cdev *dev, struct uio *uio, int flags)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	int error = 0;
 	vm_offset_t va, eva, off, v;
 	vm_ptr_t kva;
@@ -174,7 +174,7 @@ memmmap(struct cdev *dev, vm_ooffset_t offset, vm_paddr_t *paddr,
 //   "updated": 20190604,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ],
 //   "changes": [
 //     "pointer_as_integer",

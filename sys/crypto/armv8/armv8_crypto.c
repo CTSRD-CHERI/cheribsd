@@ -340,7 +340,7 @@ armv8_crypto_cipher_alloc(struct cryptodesc *enccrd, struct cryptop *crp,
 {
 	struct mbuf *m;
 	struct uio *uio;
-	kiovec_t *iov;
+	struct iovec *iov;
 	uint8_t *addr;
 
 	if (crp->crp_flags & CRYPTO_F_IMBUF) {
@@ -473,7 +473,7 @@ DRIVER_MODULE(armv8crypto, nexus, armv8_crypto_driver, armv8_crypto_devclass,
 //   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

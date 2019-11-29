@@ -600,7 +600,7 @@ nospace:
 static void
 m_copyfromunmapped(const struct mbuf *m, int off, int len, caddr_t cp)
 {
-	kiovec_t iov;
+	struct iovec iov;
 	struct uio uio;
 	int error;
 
@@ -2146,7 +2146,7 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, mbufprofileclr, CTLTYPE_INT|CTLFLAG_RW,
 // {
 //   "updated": 20190610,
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ],
 //   "changes_purecap": [
 //     "pointer_shape"

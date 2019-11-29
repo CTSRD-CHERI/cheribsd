@@ -285,7 +285,7 @@ struct csession {
 struct cryptop_data {
 	struct csession *cse;
 
-	kiovec_t	iovec[1];
+	struct iovec	iovec[1];
 	struct uio	uio;
 	bool		done;
 };
@@ -1549,7 +1549,7 @@ MODULE_DEPEND(cryptodev, zlib, 1, 1, 1);
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

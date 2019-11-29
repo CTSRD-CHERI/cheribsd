@@ -2207,7 +2207,7 @@ process_mpa_request(struct c4iw_ep *ep)
 	u16 plen;
 	int flags = MSG_DONTWAIT;
 	int rc;
-	kiovec_t iov;
+	struct iovec iov;
 	struct uio uio;
 	enum c4iw_ep_state state = ep->com.state;
 

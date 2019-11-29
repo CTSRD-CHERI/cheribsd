@@ -573,7 +573,7 @@ md_get_uio(struct mdchain *mdp, struct uio *uiop, int size)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

@@ -756,7 +756,7 @@ emulate_movs(void *vm, int vcpuid, uint64_t gpa, struct vie *vie,
 #ifdef _KERNEL
 	struct vm_copyinfo copyinfo[2];
 #else
-	kiovec_t copyinfo[2];
+	struct iovec copyinfo[2];
 #endif
 	uint64_t dstaddr, srcaddr, dstgpa, srcgpa, val;
 	uint64_t rcx, rdi, rsi, rflags;
@@ -1429,7 +1429,7 @@ emulate_stack_op(void *vm, int vcpuid, uint64_t mmio_gpa, struct vie *vie,
 #ifdef _KERNEL
 	struct vm_copyinfo copyinfo[2];
 #else
-	kiovec_t copyinfo[2];
+	struct iovec copyinfo[2];
 #endif
 	struct seg_desc ss_desc;
 	uint64_t cr0, rflags, rsp, stack_gla, val;
@@ -2744,7 +2744,7 @@ vmm_decode_instruction(struct vm *vm, int cpuid, uint64_t gla,
 //   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

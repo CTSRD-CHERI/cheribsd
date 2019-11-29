@@ -74,7 +74,7 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
-static int recvit(struct thread *td, int s, kmsghdr_t *mp,
+static int recvit(struct thread *td, int s, struct msghdr *mp,
     socklen_t * __capability namelenp);
 
 /*
@@ -679,7 +679,7 @@ user_socketpair(struct thread *td, int domain, int type, int protocol,
 }
 
 int
-user_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags)
+user_sendit(struct thread *td, int s, struct msghdr *mp, int flags)
 {
 	struct mbuf *control;
 	struct sockaddr *to;
@@ -737,12 +737,12 @@ bad:
 }
 
 int
-kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
+kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
     struct mbuf *control, enum uio_seg segflg)
 {
 	struct file *fp;
 	struct uio auio;
-	kiovec_t * __capability iov;
+	struct iovec * __capability iov;
 	struct socket *so;
 	cap_rights_t *rights;
 #ifdef KTRACE
@@ -785,7 +785,7 @@ kern_sendit(struct thread *td, int s, kmsghdr_t *mp, int flags,
 	}
 #endif
 
-	auio.uio_iov = (__cheri_fromcap kiovec_t *)mp->msg_iov;
+	auio.uio_iov = (__cheri_fromcap struct iovec *)mp->msg_iov;
 	auio.uio_iovcnt = mp->msg_iovlen;
 	auio.uio_segflg = segflg;
 	auio.uio_rw = UIO_WRITE;
@@ -845,8 +845,8 @@ user_sendto(struct thread *td, int s, const char * __capability buf,
     size_t len, int flags, const struct sockaddr * __capability to,
     socklen_t tolen)
 {
-	kmsghdr_t msg;
-	kiovec_t aiov;
+	struct msghdr msg;
+	struct iovec aiov;
 
 	msg.msg_name = __DECONST_CAP(void * __capability, to);
 	msg.msg_namelen = tolen;
@@ -864,8 +864,8 @@ user_sendto(struct thread *td, int s, const char * __capability buf,
 int
 osend(struct thread *td, struct osend_args *uap)
 {
-	kmsghdr_t msg;
-	kiovec_t aiov;
+	struct msghdr msg;
+	struct iovec aiov;
 
 	msg.msg_name = 0;
 	msg.msg_namelen = 0;
@@ -882,7 +882,7 @@ osendmsg(struct thread *td, struct osendmsg_args *uap)
 {
 	kmsthdr_t msg;
 	struct omsghdr umsg;
-	kiovec_t *iov;
+	struct iovec *iov;
 	int error;
 
 	error = copyin(uap->msg, &umsg, sizeof (umsg));
@@ -907,9 +907,9 @@ osendmsg(struct thread *td, struct osendmsg_args *uap)
 int
 sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 {
-	kmsghdr_t msg;
-	umsghdr_t umsg;
-	kiovec_t *iov;
+	struct msghdr msg;
+	struct msghdr_native umsg;
+	struct iovec *iov;
 	int error;
 
 	error = copyin(__USER_CAP_OBJ(uap->msg), &umsg, sizeof(umsg));
@@ -921,7 +921,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	    umsg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
-	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
+	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
 	msg.msg_iovlen = umsg.msg_iovlen;
 	msg.msg_control = __USER_CAP(umsg.msg_control, umsg.msg_controllen);
 	msg.msg_controllen = umsg.msg_controllen;
@@ -936,11 +936,11 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 }
 
 int
-kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
+kern_recvit(struct thread *td, int s, struct msghdr *mp, enum uio_seg fromseg,
     struct mbuf **controlp)
 {
 	struct uio auio;
-	kiovec_t * __capability iov;
+	struct iovec * __capability iov;
 	struct mbuf *control, *m;
 	char * __capability ctlbuf;
 	struct file *fp;
@@ -970,7 +970,7 @@ kern_recvit(struct thread *td, int s, kmsghdr_t *mp, enum uio_seg fromseg,
 	}
 #endif
 
-	auio.uio_iov = (__cheri_fromcap kiovec_t *)mp->msg_iov;
+	auio.uio_iov = (__cheri_fromcap struct iovec *)mp->msg_iov;
 	auio.uio_iovcnt = mp->msg_iovlen;
 	auio.uio_segflg = UIO_USERSPACE;
 	auio.uio_rw = UIO_READ;
@@ -1091,7 +1091,7 @@ out:
 }
 
 static int
-recvit(struct thread *td, int s, kmsghdr_t *mp,
+recvit(struct thread *td, int s, struct msghdr *mp,
     socklen_t * __capability namelenp)
 {
 	int error;
@@ -1124,8 +1124,8 @@ kern_recvfrom(struct thread *td, int s, void * __capability buf, size_t len,
     int flags, struct sockaddr * __capability __restrict from,
     socklen_t * __capability __restrict fromlenaddr)
 {
-	kmsghdr_t msg;
-	kiovec_t aiov;
+	struct msghdr msg;
+	struct iovec aiov;
 	int error;
 
 	if (fromlenaddr != NULL) {
@@ -1161,8 +1161,8 @@ orecvfrom(struct thread *td, struct recvfrom_args *uap)
 int
 orecv(struct thread *td, struct orecv_args *uap)
 {
-	kmsghdr_t msg;
-	kiovec_t aiov;
+	struct msghdr msg;
+	struct iovec aiov;
 
 	msg.msg_name = 0;
 	msg.msg_namelen = 0;
@@ -1182,9 +1182,9 @@ orecv(struct thread *td, struct orecv_args *uap)
 int
 orecvmsg(struct thread *td, struct orecvmsg_args *uap)
 {
-	kmsghdr_t msg;
+	struct msghdr msg;
 	struct omsghdr umsg;
-	kiovec_t *iov;
+	struct iovec *iov;
 	int error;
 
 	error = copyin(uap->msg, &umsg, sizeof(umsg));
@@ -1212,9 +1212,9 @@ orecvmsg(struct thread *td, struct orecvmsg_args *uap)
 int
 sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 {
-	kmsghdr_t msg;
-	umsghdr_t umsg;
-	kiovec_t *iov;
+	struct msghdr msg;
+	struct msghdr_native umsg;
+	struct iovec *iov;
 	int error;
 
 	error = copyin(__USER_CAP_OBJ(uap->msg), &umsg, sizeof(umsg));
@@ -1226,7 +1226,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	    umsg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
-	msg.msg_iov = (__cheri_tocap kiovec_t * __capability)iov;
+	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
 	msg.msg_iovlen = umsg.msg_iovlen;
 	msg.msg_control = __USER_CAP(umsg.msg_control, umsg.msg_controllen);
 	msg.msg_controllen = umsg.msg_controllen;
@@ -1704,7 +1704,7 @@ m_dispose_extcontrolm(struct mbuf *m)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

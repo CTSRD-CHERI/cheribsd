@@ -59,7 +59,7 @@ int
 uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 {
 	struct thread *td = curthread;
-	kiovec_t *iov;
+	struct iovec *iov;
 	void *cp;
 	vm_offset_t page_offset, vaddr;
 	size_t cnt;
@@ -137,7 +137,7 @@ out:
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

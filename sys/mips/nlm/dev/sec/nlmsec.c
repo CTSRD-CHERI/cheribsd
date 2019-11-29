@@ -559,11 +559,11 @@ xlp_get_nsegs(struct cryptop *crp, unsigned int *nsegs)
 		}
 	} else if (crp->crp_flags & CRYPTO_F_IOV) {
 		struct uio *uio = NULL;
-		kiovec_t *iov = NULL;
+		struct iovec *iov = NULL;
 		int iol = 0;
 
 		uio = (struct uio *)crp->crp_buf;
-		iov = (kiovec_t *)uio->uio_iov;
+		iov = (struct iovec *)uio->uio_iov;
 		iol = uio->uio_iovcnt;
 		while (iol > 0) {
 			*nsegs += NLM_CRYPTO_NUM_SEGS_REQD(iov->iov_len);
@@ -795,7 +795,7 @@ errout:
 //   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

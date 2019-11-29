@@ -638,7 +638,7 @@ fuse_io_strategy(struct vnode *vp, struct buf *bp)
 	struct ucred *cred;
 	struct uio *uiop;
 	struct uio uio;
-	kiovec_t io;
+	struct iovec io;
 	int error = 0;
 
 	const int biosize = fuse_iosize(vp);
@@ -840,7 +840,7 @@ fuse_io_invalbuf(struct vnode *vp, struct thread *td)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

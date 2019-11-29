@@ -36,7 +36,7 @@ int
 cloudabi_sys_random_get(struct thread *td,
     struct cloudabi_sys_random_get_args *uap)
 {
-	kiovec_t iov;
+	struct iovec iov;
 	IOVEC_INIT(&iov, uap->buf, uap->buf_len);
 	struct uio uio = {
 		.uio_iov = &iov,
@@ -55,7 +55,7 @@ cloudabi_sys_random_get(struct thread *td,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

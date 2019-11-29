@@ -121,7 +121,7 @@ ncl_getpages(struct vop_getpages_args *ap)
 {
 	int i, error, nextoff, size, toff, count, npages;
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	struct vnode *vp;
@@ -268,7 +268,7 @@ int
 ncl_putpages(struct vop_putpages_args *ap)
 {
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	int i, error, npages, count;
 	off_t offset;
 	int *rtvals;
@@ -739,7 +739,7 @@ nfs_directio_write(vp, uiop, cred, ioflag)
 	if (ioflag & IO_SYNC) {
 		int iomode, must_commit;
 		struct uio uio;
-		kiovec_t iov;
+		struct iovec iov;
 do_sync:
 		while (uiop->uio_resid > 0) {
 			size = MIN(uiop->uio_resid, wsize);
@@ -770,7 +770,7 @@ do_sync:
 		}
 	} else {
 		struct uio *t_uio;
-		kiovec_t *t_iov;
+		struct iovec *t_iov;
 		struct buf *bp;
 
 		/*
@@ -792,7 +792,7 @@ do_sync:
 			size = MIN(uiop->uio_iov->iov_len, size);
 			bp = uma_zalloc(ncl_pbuf_zone, M_WAITOK);
 			t_uio = malloc(sizeof(struct uio), M_NFSDIRECTIO, M_WAITOK);
-			t_iov = malloc(sizeof(kiovec_t), M_NFSDIRECTIO, M_WAITOK);
+			t_iov = malloc(sizeof(struct iovec), M_NFSDIRECTIO, M_WAITOK);
 			IOVEC_INIT(t_iov, malloc(size, M_NFSDIRECTIO, M_WAITOK),
 			    size);
 			t_uio->uio_iov = t_iov;
@@ -1585,7 +1585,7 @@ ncl_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td,
 	struct nfsmount *nmp;
 	int error = 0, iomode, must_commit = 0;
 	struct uio uio;
-	kiovec_t io;
+	struct iovec io;
 	struct proc *p = td ? td->td_proc : NULL;
 	uint8_t	iocmd;
 
@@ -1877,7 +1877,7 @@ ncl_meta_setsize(struct vnode *vp, struct thread *td, u_quad_t nsize)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

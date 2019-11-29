@@ -273,7 +273,7 @@ get_next_dirent(struct vnode *vp, struct dirent **dpp, char *dirbuf,
 {
 	int error, reclen;
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	struct dirent *dp;
 
 	KASSERT(VOP_ISLOCKED(vp), ("vp %p is not locked", vp));
@@ -848,7 +848,7 @@ vop_stdallocate(struct vop_allocate_args *ap)
 	struct statfs *sfs;
 	off_t maxfilesize = 0;
 #endif
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct vattr vattr, *vap;
 	struct uio auio;
 	off_t fsize, len, cur, offset;
@@ -1320,7 +1320,7 @@ vop_sigdefer(struct vop_vector *vop, struct vop_generic_args *a)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

@@ -2462,7 +2462,7 @@ CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

@@ -34,8 +34,8 @@
 
 struct octo_sess;
 
-typedef	int octo_encrypt_t(struct octo_sess *od, kiovec_t *iov, size_t iovcnt, size_t iovlen, int auth_off, int auth_len, int crypt_off, int crypt_len, int icv_off, uint8_t *ivp);
-typedef	int octo_decrypt_t(struct octo_sess *od, kiovec_t *iov, size_t iovcnt, size_t iovlen, int auth_off, int auth_len, int crypt_off, int crypt_len, int icv_off, uint8_t *ivp);
+typedef	int octo_encrypt_t(struct octo_sess *od, struct iovec *iov, size_t iovcnt, size_t iovlen, int auth_off, int auth_len, int crypt_off, int crypt_len, int icv_off, uint8_t *ivp);
+typedef	int octo_decrypt_t(struct octo_sess *od, struct iovec *iov, size_t iovcnt, size_t iovlen, int auth_off, int auth_len, int crypt_off, int crypt_len, int icv_off, uint8_t *ivp);
 
 struct octo_sess {
 	int					 octo_encalg;
@@ -58,7 +58,7 @@ struct octo_sess {
 	uint64_t			 octo_hminner[3];
 	uint64_t			 octo_hmouter[3];
 
-	kiovec_t				octo_iov[UIO_MAXIOV];
+	struct iovec				octo_iov[UIO_MAXIOV];
 };
 
 #define	dprintf(fmt, ...)						\
@@ -97,7 +97,7 @@ octo_decrypt_t octo_aes_cbc_sha1_decrypt;
 //   "updated": 20180629,
 //   "target_type": "header",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

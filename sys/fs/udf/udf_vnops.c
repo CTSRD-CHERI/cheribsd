@@ -908,7 +908,7 @@ udf_readlink(struct vop_readlink_args *ap)
 	struct path_component *pc, *end;
 	struct vnode *vp;
 	struct uio uio;
-	kiovec_t iov[1];
+	struct iovec iov[1];
 	struct udf_node *node;
 	void *buf;
 	char *cp;
@@ -1499,7 +1499,7 @@ udf_bmap_internal(struct udf_node *node, off_t offset, daddr_t *sector,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

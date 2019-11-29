@@ -51,7 +51,7 @@
 int
 uiocopy(void *p, size_t n, enum uio_rw rw, struct uio *uio, size_t *cbytes)
 {
-	kiovec_t small_iovec[1];
+	struct iovec small_iovec[1];
 	struct uio small_uio_clone;
 	struct uio *uio_clone;
 	int error;
@@ -95,7 +95,7 @@ uioskip(uio_t *uio, size_t n)
 //   "updated": 20180629,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

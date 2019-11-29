@@ -280,7 +280,7 @@ proto_busdma_md_load(struct proto_busdma *busdma, struct proto_md *md,
     struct proto_ioc_busdma *ioc, struct thread *td)
 {
 	struct proto_callback_bundle pcb;
-	kiovec_t iov;
+	struct iovec iov;
 	struct uio uio;
 	pmap_t pmap;
 	int error;
@@ -510,7 +510,7 @@ proto_busdma_mmap_allowed(struct proto_busdma *busdma, vm_paddr_t physaddr)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

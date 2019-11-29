@@ -53,7 +53,7 @@ kern_getrandom(struct thread *td, void * __capability user_buf, size_t buflen,
     unsigned int flags)
 {
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	int error;
 
 	if ((flags & ~GRND_VALIDFLAGS) != 0)

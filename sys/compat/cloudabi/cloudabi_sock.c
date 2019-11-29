@@ -72,13 +72,13 @@ cloudabi_sys_sock_shutdown(struct thread *td,
 }
 
 int
-cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, kiovec_t *data,
+cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
     size_t datalen, cloudabi_fd_t *fds, size_t fdslen,
     cloudabi_riflags_t flags, size_t *rdatalen, size_t *rfdslen,
     cloudabi_roflags_t *rflags)
 {
-	kmsghdr_t hdr = {
-		.msg_iov = (__cheri_tocap kiovec_t * __capability)data,
+	struct msghdr hdr = {
+		.msg_iov = (__cheri_tocap struct iovec * __capability)data,
 		.msg_iovlen = datalen,
 	};
 	struct mbuf *control;
@@ -145,11 +145,11 @@ cloudabi_sock_recv(struct thread *td, cloudabi_fd_t fd, kiovec_t *data,
 }
 
 int
-cloudabi_sock_send(struct thread *td, cloudabi_fd_t fd, kiovec_t *data,
+cloudabi_sock_send(struct thread *td, cloudabi_fd_t fd, struct iovec *data,
     size_t datalen, const cloudabi_fd_t *fds, size_t fdslen, size_t *rdatalen)
 {
-	kmsghdr_t hdr = {
-		.msg_iov = (__cheri_tocap kiovec_t * __capability)data,
+	struct msghdr hdr = {
+		.msg_iov = (__cheri_tocap struct iovec * __capability)data,
 		.msg_iovlen = datalen,
 	};
 	struct mbuf *control;
@@ -191,7 +191,7 @@ cloudabi_sock_send(struct thread *td, cloudabi_fd_t fd, kiovec_t *data,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

@@ -311,7 +311,7 @@ smbfs_doio(struct vnode *vp, struct buf *bp, struct ucred *cr, struct thread *td
 	struct smbmount *smp = VFSTOSMBFS(vp->v_mount);
 	struct smbnode *np = VTOSMB(vp);
 	struct uio *uiop;
-	kiovec_t io;
+	struct iovec io;
 	struct smb_cred *scred;
 	int error = 0;
 
@@ -424,7 +424,7 @@ smbfs_getpages(ap)
 #else
 	int i, error, nextoff, size, toff, npages, count;
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	struct vnode *vp;
@@ -564,7 +564,7 @@ smbfs_putpages(ap)
 	return error;
 #else
 	struct uio uio;
-	kiovec_t iov;
+	struct iovec iov;
 	vm_offset_t kva;
 	struct buf *bp;
 	int i, npages, count;
@@ -678,7 +678,7 @@ smbfs_vinvalbuf(struct vnode *vp, struct thread *td)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

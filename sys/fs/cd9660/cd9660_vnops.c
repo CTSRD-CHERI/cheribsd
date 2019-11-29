@@ -210,7 +210,7 @@ cd9660_getattr(ap)
 	vap->va_size	= (u_quad_t) ip->i_size;
 	if (ip->i_size == 0 && (vap->va_mode & S_IFMT) == S_IFLNK) {
 		struct vop_readlink_args rdlnk;
-		kiovec_t aiov;
+		struct iovec aiov;
 		struct uio auio;
 		char *cp;
 
@@ -925,7 +925,7 @@ struct vop_vector cd9660_fifoops = {
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

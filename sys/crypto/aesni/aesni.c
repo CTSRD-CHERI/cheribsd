@@ -976,7 +976,7 @@ aesni_cipher_mac(struct aesni_session *ses, struct cryptodesc *crd,
 //   "updated": 20181114,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

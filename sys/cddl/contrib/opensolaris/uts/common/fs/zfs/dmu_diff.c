@@ -52,7 +52,7 @@ static int
 write_bytes(struct diffarg *da)
 {
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 
 	IOVEC_INIT_OBJ(&aiov, da->da_ddr);
 	auio.uio_iov = &aiov;
@@ -254,7 +254,7 @@ dmu_diff(const char *tosnap_name, const char *fromsnap_name,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

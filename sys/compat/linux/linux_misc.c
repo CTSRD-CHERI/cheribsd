@@ -2312,7 +2312,7 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

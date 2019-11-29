@@ -587,7 +587,7 @@ bootpc_call(struct bootpc_globalcontext *gctx, struct thread *td)
 	struct sockaddr_in *sin, dst;
 	struct uio auio;
 	struct sockopt sopt;
-	kiovec_t aio;
+	struct iovec aio;
 	int error, on, rcvflg, timo, len;
 	time_t atimo;
 	time_t rtimo;
@@ -1912,7 +1912,7 @@ SYSINIT(bootp_rootconf, SI_SUB_ROOT_CONF, SI_ORDER_FIRST, bootpc_init, NULL);
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

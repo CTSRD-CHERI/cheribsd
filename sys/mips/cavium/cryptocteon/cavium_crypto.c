@@ -325,7 +325,7 @@ octo_calc_hash(uint8_t auth, unsigned char *key, uint64_t *inner, uint64_t *oute
 int
 octo_des_cbc_encrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -384,7 +384,7 @@ octo_des_cbc_encrypt(
 int
 octo_des_cbc_decrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -444,7 +444,7 @@ octo_des_cbc_decrypt(
 int
 octo_aes_cbc_encrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -513,7 +513,7 @@ octo_aes_cbc_encrypt(
 int
 octo_aes_cbc_decrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -584,7 +584,7 @@ octo_aes_cbc_decrypt(
 int
 octo_null_md5_encrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -686,7 +686,7 @@ octo_null_md5_encrypt(
 int
 octo_null_sha1_encrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -791,7 +791,7 @@ octo_null_sha1_encrypt(
 int
 octo_des_cbc_md5_encrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -939,7 +939,7 @@ octo_des_cbc_md5_encrypt(
 int
 octo_des_cbc_md5_decrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -1090,7 +1090,7 @@ octo_des_cbc_md5_decrypt(
 int
 octo_des_cbc_sha1_encrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -1241,7 +1241,7 @@ octo_des_cbc_sha1_encrypt(
 int
 octo_des_cbc_sha1_decrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -1394,7 +1394,7 @@ octo_des_cbc_sha1_decrypt(
 int
 octo_aes_cbc_md5_encrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -1571,7 +1571,7 @@ octo_aes_cbc_md5_encrypt(
 int
 octo_aes_cbc_md5_decrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -1747,7 +1747,7 @@ octo_aes_cbc_md5_decrypt(
 int
 octo_aes_cbc_sha1_encrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -1943,7 +1943,7 @@ octo_aes_cbc_sha1_encrypt(
 int
 octo_aes_cbc_sha1_decrypt(
     struct octo_sess *od,
-    kiovec_t *iov, size_t iovcnt, size_t iovlen,
+    struct iovec *iov, size_t iovcnt, size_t iovlen,
     int auth_off, int auth_len,
     int crypt_off, int crypt_len,
     int icv_off, uint8_t *ivp)
@@ -2141,7 +2141,7 @@ octo_aes_cbc_sha1_decrypt(
 //   "updated": 20180629,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

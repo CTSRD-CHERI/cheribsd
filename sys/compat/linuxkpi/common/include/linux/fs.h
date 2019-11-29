@@ -328,7 +328,7 @@ void linux_shmem_truncate_range(vm_object_t, loff_t, loff_t);
 //   "updated": 20181114,
 //   "target_type": "header",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

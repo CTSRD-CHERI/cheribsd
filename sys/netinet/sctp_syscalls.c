@@ -283,7 +283,7 @@ kern_sys_sctp_generic_sendmsg(struct thread *td, int sd,
 	struct uio *ktruio = NULL;
 #endif
 	struct uio auio;
-	kiovec_t iov[1];
+	struct iovec iov[1];
 	cap_rights_t rights;
 	int error = 0, len;
 
@@ -420,7 +420,7 @@ kern_sctp_generic_sendmsg_iov(struct thread *td, int sd,
 	struct uio *ktruio = NULL;
 #endif
 	struct uio auio;
-	kiovec_t *iov, *tiov;
+	struct iovec *iov, *tiov;
 	cap_rights_t rights;
 	ssize_t len;
 	int error, i;
@@ -576,7 +576,7 @@ kern_sctp_generic_recvmsg(struct thread *td, int sd, void * __capability uiov,
 #if (defined(INET) || defined(INET6)) && defined(SCTP)
 	uint8_t sockbufstore[256];
 	struct uio auio;
-	kiovec_t *iov, *tiov;
+	struct iovec *iov, *tiov;
 	struct sctp_sndrcvinfo sinfo;
 	struct socket *so;
 	struct file *fp = NULL;
@@ -717,7 +717,7 @@ out1:
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

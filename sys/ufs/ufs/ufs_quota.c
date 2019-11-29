@@ -1236,7 +1236,7 @@ static int
 dqopen(struct vnode *vp, struct ufsmount *ump, int type)
 {
 	struct dqhdr64 dqh;
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct uio auio;
 	int error;
 
@@ -1286,7 +1286,7 @@ dqget(struct vnode *vp, u_long id, struct ufsmount *ump, int type,
 	struct dquot *dq, *dq1;
 	struct dqhash *dqh;
 	struct vnode *dqvp;
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct uio auio;
 	int dqvplocked, error;
 
@@ -1559,7 +1559,7 @@ dqsync(struct vnode *vp, struct dquot *dq)
 	uint8_t buf[sizeof(struct dqblk64)];
 	off_t base, recsize;
 	struct vnode *dqvp;
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct uio auio;
 	int error;
 	struct mount *mp;
@@ -1895,7 +1895,7 @@ dqb32_dqb64(const struct dqblk32 *dqb32, struct dqblk64 *dqb64)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [

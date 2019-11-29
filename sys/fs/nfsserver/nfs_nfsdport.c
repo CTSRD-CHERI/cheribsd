@@ -495,7 +495,7 @@ nfsvno_namei(struct nfsrv_descript *nd, struct nameidata *ndp,
 {
 	struct componentname *cnp = &ndp->ni_cnd;
 	int i;
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct uio auio;
 	int lockleaf = (cnp->cn_flags & LOCKLEAF) != 0, linklen;
 	int error = 0;
@@ -718,8 +718,8 @@ int
 nfsvno_readlink(struct vnode *vp, struct ucred *cred, struct thread *p,
     struct mbuf **mpp, struct mbuf **mpendp, int *lenp)
 {
-	kiovec_t iv[(NFS_MAXPATHLEN+MLEN-1)/MLEN];
-	kiovec_t *ivp = iv;
+	struct iovec iv[(NFS_MAXPATHLEN+MLEN-1)/MLEN];
+	struct iovec *ivp = iv;
 	struct uio io, *uiop = &io;
 	struct mbuf *mp, *mp2 = NULL, *mp3 = NULL;
 	int i, len, tlen, error = 0;
@@ -782,8 +782,8 @@ nfsvno_read(struct vnode *vp, off_t off, int cnt, struct ucred *cred,
 {
 	struct mbuf *m;
 	int i;
-	kiovec_t *iv;
-	kiovec_t *iv2;
+	struct iovec *iv;
+	struct iovec *iv2;
 	int error = 0, len, left, siz, tlen, ioflag = 0;
 	struct mbuf *m2 = NULL, *m3;
 	struct uio io, *uiop = &io;
@@ -817,7 +817,7 @@ nfsvno_read(struct vnode *vp, off_t off, int cnt, struct ucred *cred,
 			m3 = m;
 		m2 = m;
 	}
-	iv = malloc(i * sizeof (kiovec_t), M_TEMP, M_WAITOK);
+	iv = malloc(i * sizeof (struct iovec), M_TEMP, M_WAITOK);
 	uiop->uio_iov = iv2 = iv;
 	m = m3;
 	left = len;
@@ -876,9 +876,9 @@ int
 nfsvno_write(struct vnode *vp, off_t off, int retlen, int cnt, int *stable,
     struct mbuf *mp, char *cp, struct ucred *cred, struct thread *p)
 {
-	kiovec_t *ivp;
+	struct iovec *ivp;
 	int i, len;
-	kiovec_t *iv;
+	struct iovec *iv;
 	int ioflags, error;
 	struct uio io, *uiop = &io;
 	struct nfsheur *nh;
@@ -894,7 +894,7 @@ nfsvno_write(struct vnode *vp, off_t off, int retlen, int cnt, int *stable,
 		return (error);
 	}
 
-	ivp = malloc(cnt * sizeof (kiovec_t), M_TEMP, M_WAITOK);
+	ivp = malloc(cnt * sizeof (struct iovec), M_TEMP, M_WAITOK);
 	uiop->uio_iov = iv = ivp;
 	uiop->uio_iovcnt = cnt;
 	i = mtod(mp, caddr_t) + mp->m_len - cp;
@@ -1821,7 +1821,7 @@ nfsrvd_readdir(struct nfsrv_descript *nd, int isdgram,
 	u_int64_t off, toff, verf __unused;
 	u_long *cookies = NULL, *cookiep;
 	struct uio io;
-	kiovec_t iv;
+	struct iovec iv;
 	int is_ufs;
 	struct thread *p = curthread;
 
@@ -2071,7 +2071,7 @@ nfsrvd_readdirplus(struct nfsrv_descript *nd, int isdgram,
 	u_long *cookies = NULL, *cookiep;
 	nfsattrbit_t attrbits, rderrbits, savbits;
 	struct uio io;
-	kiovec_t iv;
+	struct iovec iv;
 	struct componentname cn;
 	int at_root, is_ufs, is_zfs, needs_unbusy, supports_nfsv4acls;
 	struct mount *mp, *new_mp;
@@ -5865,7 +5865,7 @@ MODULE_DEPEND(nfsd, nfssvc, 1, 1, 1);
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

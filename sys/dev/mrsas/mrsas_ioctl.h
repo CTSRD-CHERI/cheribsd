@@ -131,7 +131,7 @@ struct mrsas_iocpacket32 {
 //   "updated": 20180629,
 //   "target_type": "header",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

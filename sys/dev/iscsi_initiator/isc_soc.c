@@ -186,7 +186,7 @@ int
 isc_sendPDU(isc_session_t *sp, pduq_t *pq)
 {
      struct uio *uio = &pq->uio;
-     kiovec_t	*iv;
+     struct iovec	*iv;
      pdu_t	*pp = &pq->pdu;
      int	len, error;
 
@@ -309,7 +309,7 @@ static __inline int
 so_getbhs(isc_session_t *sp)
 {
      struct uio		*uio = &sp->uio;
-     kiovec_t		*iov = &sp->iov;
+     struct iovec		*iov = &sp->iov;
      int		error, flags;
 
      debug_called(8);
@@ -362,7 +362,7 @@ so_recv(isc_session_t *sp, pduq_t *pq)
      struct uio		*uio = &pq->uio;
      pdu_t		*pp = &pq->pdu;
      bhs_t		*bhs = &pp->ipdu.bhs;
-     kiovec_t		*iov = pq->iov;
+     struct iovec		*iov = pq->iov;
      int		error;
      u_int		len;
      u_int		max, exp;
@@ -693,7 +693,7 @@ isc_start_receiver(isc_session_t *sp)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

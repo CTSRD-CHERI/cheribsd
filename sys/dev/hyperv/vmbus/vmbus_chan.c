@@ -1019,7 +1019,7 @@ vmbus_chan_send(struct vmbus_channel *chan, uint16_t type, uint16_t flags,
 	struct vmbus_chanpkt pkt;
 	int pktlen, pad_pktlen, hlen, error;
 	uint64_t pad = 0;
-	kiovec_t iov[3];
+	struct iovec iov[3];
 	boolean_t send_evt;
 
 	hlen = sizeof(pkt);
@@ -1050,7 +1050,7 @@ vmbus_chan_send_sglist(struct vmbus_channel *chan,
 {
 	struct vmbus_chanpkt_sglist pkt;
 	int pktlen, pad_pktlen, hlen, error;
-	kiovec_t iov[4];
+	struct iovec iov[4];
 	boolean_t send_evt;
 	uint64_t pad = 0;
 
@@ -1086,7 +1086,7 @@ vmbus_chan_send_prplist(struct vmbus_channel *chan,
 {
 	struct vmbus_chanpkt_prplist pkt;
 	int pktlen, pad_pktlen, hlen, error;
-	kiovec_t iov[4];
+	struct iovec iov[4];
 	boolean_t send_evt;
 	uint64_t pad = 0;
 
@@ -2200,7 +2200,7 @@ vmbus_chan_poll_disable(struct vmbus_channel *chan)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

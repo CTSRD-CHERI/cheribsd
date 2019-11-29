@@ -340,7 +340,7 @@ _bus_dmamap_load_uio(bus_dma_tag_t dmat, bus_dmamap_t map, struct uio *uio,
 {
 	bus_size_t resid;
 	bus_size_t minlen;
-	kiovec_t *iov;
+	struct iovec *iov;
 	pmap_t pmap;
 	caddr_t addr;
 	int error, i;
@@ -641,7 +641,7 @@ bus_dmamap_load_mem(bus_dma_tag_t dmat, bus_dmamap_t map,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

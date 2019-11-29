@@ -108,7 +108,7 @@ static struct resource_spec beri_spec[] = {
 };
 
 static int
-vtblk_rdwr(struct beri_vtblk_softc *sc, kiovec_t *iov,
+vtblk_rdwr(struct beri_vtblk_softc *sc, struct iovec *iov,
 	int cnt, int offset, int operation, int iolen)
 {
 	struct vnode *vp;
@@ -148,10 +148,10 @@ vtblk_rdwr(struct beri_vtblk_softc *sc, kiovec_t *iov,
 static void
 vtblk_proc(struct beri_vtblk_softc *sc, struct vqueue_info *vq)
 {
-	kiovec_t iov[VTBLK_MAXSEGS + 2];
+	struct iovec iov[VTBLK_MAXSEGS + 2];
 	uint16_t flags[VTBLK_MAXSEGS + 2];
 	struct virtio_blk_outhdr *vbh;
-	kiovec_t *tiov;
+	struct iovec *tiov;
 	uint8_t *status;
 	off_t offset;
 	int iolen;
@@ -564,7 +564,7 @@ DRIVER_MODULE(beri_vtblk, simplebus, beri_vtblk_driver,
 //   "updated": 20180629,
 //   "target_type": "kernel",
 //   "changes": [
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

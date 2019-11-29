@@ -387,7 +387,7 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
     struct uio **uiop)
 {
 	struct iovec64 iov64;
-	kiovec_t *iov;
+	struct iovec *iov;
 	struct uio *uio;
 	size_t iovlen;
 	int error, i;
@@ -395,9 +395,9 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(kiovec_t);
+	iovlen = iovcnt * sizeof(struct iovec);
 	uio = malloc(iovlen + sizeof(*uio), M_IOV, M_WAITOK);
-	iov = (kiovec_t *)(uio + 1);
+	iov = (struct iovec *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin_c(&iovp[i], &iov64, sizeof(iov64));
 		if (error) {
@@ -426,17 +426,17 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 
 int
 freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
-    kiovec_t **iovp, int error)
+    struct iovec **iovp, int error)
 {
 	struct iovec64 useriov;
-	kiovec_t *iovs;
+	struct iovec *iovs;
 	size_t iovlen;
 	int i;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof(kiovec_t);
+	iovlen = iovcnt * sizeof(struct iovec);
 	iovs = malloc(iovlen, M_IOV, M_WAITOK);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin_c(iov64 + i, &useriov, sizeof(useriov));
@@ -454,7 +454,7 @@ freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
 
 static int
 freebsd64_copyin_hdtr(const struct sf_hdtr64 * __capability uhdtr,
-    ksf_hdtr_t *hdtr)
+    struct sf_hdtr *hdtr)
 {
 	struct sf_hdtr64 hdtr64;
 	int error;

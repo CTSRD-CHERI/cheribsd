@@ -979,7 +979,7 @@ unionfs_copyfile_core(struct vnode *lvp, struct vnode *uvp,
 	int		bufoffset;
 	char           *buf;
 	struct uio	uio;
-	kiovec_t	iov;
+	struct iovec	iov;
 
 	error = 0;
 	memset(&uio, 0, sizeof(uio));
@@ -1122,7 +1122,7 @@ unionfs_check_rmdir(struct vnode *vp, struct ucred *cred, struct thread *td)
 	struct dirent  *dp;
 	struct dirent  *edp;
 	struct uio	uio;
-	kiovec_t	iov;
+	struct iovec	iov;
 
 	ASSERT_VOP_ELOCKED(vp, "unionfs_check_rmdir");
 
@@ -1273,7 +1273,7 @@ unionfs_checklowervp(struct vnode *vp, char *fil, int lno)
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

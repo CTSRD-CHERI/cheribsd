@@ -139,7 +139,7 @@ int
 physcopyin(void *src, vm_paddr_t dst, size_t len)
 {
 	vm_page_t m[PHYS_PAGE_COUNT(len)];
-	kiovec_t iov[1];
+	struct iovec iov[1];
 	struct uio uio;
 	int i;
 
@@ -159,7 +159,7 @@ int
 physcopyout(vm_paddr_t src, void *dst, size_t len)
 {
 	vm_page_t m[PHYS_PAGE_COUNT(len)];
-	kiovec_t iov[1];
+	struct iovec iov[1];
 	struct uio uio;
 	int i;
 
@@ -246,7 +246,7 @@ uiomove_nofault(void *cp, int n, struct uio *uio)
 static int
 uiomove_faultflag(void *cp, int n, struct uio *uio, int nofault)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	size_t cnt;
 	int error, newflags, save;
 
@@ -348,7 +348,7 @@ uiomove_frombuf(void *buf, int buflen, struct uio *uio)
 int
 ureadc(int c, struct uio *uio)
 {
-	kiovec_t *iov;
+	struct iovec *iov;
 	char * __capability iov_base;
 
 	WITNESS_WARN(WARN_GIANTOK | WARN_SLEEPOK, NULL,
@@ -423,20 +423,20 @@ copyinstrfrom(const void * __restrict src, void * __restrict dst, size_t len,
 }
 
 int
-copyiniov(const uiovec_t * __capability iovp, u_int iovcnt, kiovec_t **iov,
+copyiniov(const struct iovec_native * __capability iovp, u_int iovcnt, struct iovec **iov,
     int error)
 {
-	uiovec_t useriov;
-	kiovec_t *iovs;
+	struct iovec_native useriov;
+	struct iovec *iovs;
 	size_t iovlen;
 	int i;
 
 	*iov = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof (kiovec_t);
+	iovlen = iovcnt * sizeof (struct iovec);
 	iovs = malloc(iovlen, M_IOV, M_WAITOK);
-	/* XXXBD: needlessly slow when uiovec_t and kiovec_t are the same */
+	/* XXXBD: needlessly slow when struct iovec_native and struct iovec are the same */
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin_c(iovp + i, &useriov, sizeof(useriov));
 		if (error) {
@@ -450,10 +450,10 @@ copyiniov(const uiovec_t * __capability iovp, u_int iovcnt, kiovec_t **iov,
 }
 
 int
-copyinuio(const uiovec_t * __capability iovp, u_int iovcnt, struct uio **uiop)
+copyinuio(const struct iovec_native * __capability iovp, u_int iovcnt, struct uio **uiop)
 {
-	uiovec_t u_iov;
-	kiovec_t *iov;
+	struct iovec_native u_iov;
+	struct iovec *iov;
 	struct uio *uio;
 	size_t iovlen;
 	int error, i;
@@ -461,9 +461,9 @@ copyinuio(const uiovec_t * __capability iovp, u_int iovcnt, struct uio **uiop)
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof (kiovec_t);
+	iovlen = iovcnt * sizeof (struct iovec);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
-	iov = (kiovec_t *)(uio + 1);
+	iov = (struct iovec *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin_c(&iovp[i], &u_iov, sizeof(u_iov));
 		if (error) {
@@ -494,7 +494,7 @@ copyinuio(const uiovec_t * __capability iovp, u_int iovcnt, struct uio **uiop)
  * iovec.
  */
 int
-updateiov(const struct uio *uiop, uiovec_t *iovp)
+updateiov(const struct uio *uiop, struct iovec_native *iovp)
 {
 	int i, error;
 
@@ -512,10 +512,10 @@ cloneuio(struct uio *uiop)
 	struct uio *uio;
 	int iovlen;
 
-	iovlen = uiop->uio_iovcnt * sizeof (kiovec_t);
+	iovlen = uiop->uio_iovcnt * sizeof (struct iovec);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	*uio = *uiop;
-	uio->uio_iov = (kiovec_t *)(uio + 1);
+	uio->uio_iov = (struct iovec *)(uio + 1);
 	cheri_bcopy(uiop->uio_iov, uio->uio_iov, iovlen);
 	return (uio);
 }
@@ -950,7 +950,7 @@ casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [

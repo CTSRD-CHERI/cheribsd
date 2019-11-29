@@ -314,7 +314,7 @@ alq_doio(struct alq *alq)
 	struct vnode *vp;
 	void *write_start;
 	struct uio auio;
-	kiovec_t aiov[2];
+	struct iovec aiov[2];
 	int totlen;
 	int iov;
 	int wrapearly;
@@ -982,7 +982,7 @@ MODULE_VERSION(alq, 1);
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END

@@ -794,7 +794,7 @@ freebsd32_copyinuio(struct iovec32 * __capability iovp, u_int iovcnt,
     struct uio **uiop)
 {
 	struct iovec32 iov32;
-	kiovec_t *iov;
+	struct iovec *iov;
 	struct uio *uio;
 	u_int iovlen;
 	int error, i;
@@ -802,9 +802,9 @@ freebsd32_copyinuio(struct iovec32 * __capability iovp, u_int iovcnt,
 	*uiop = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (EINVAL);
-	iovlen = iovcnt * sizeof(kiovec_t);
+	iovlen = iovcnt * sizeof(struct iovec);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
-	iov = (kiovec_t *)(uio + 1);
+	iov = (struct iovec *)(uio + 1);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin_c(&iovp[i], &iov32, sizeof(struct iovec32));
 		if (error) {
@@ -866,17 +866,17 @@ freebsd32_pwritev(struct thread *td, struct freebsd32_pwritev_args *uap)
 
 int
 freebsd32_copyiniov(struct iovec32 * __capability iovp32, u_int iovcnt,
-    kiovec_t **iovp, int error)
+    struct iovec **iovp, int error)
 {
 	struct iovec32 iov32;
-	kiovec_t *iov;
+	struct iovec *iov;
 	u_int iovlen;
 	int i;
 
 	*iovp = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
-	iovlen = iovcnt * sizeof(kiovec_t);
+	iovlen = iovcnt * sizeof(struct iovec);
 	iov = malloc(iovlen, M_IOV, M_WAITOK);
 	for (i = 0; i < iovcnt; i++) {
 		error = copyin_c(&iovp32[i], &iov32, sizeof(struct iovec32));
@@ -891,7 +891,7 @@ freebsd32_copyiniov(struct iovec32 * __capability iovp32, u_int iovcnt,
 }
 
 static int
-freebsd32_copyinmsghdr(struct msghdr32 *msg32, kmsghdr_t *msg)
+freebsd32_copyinmsghdr(struct msghdr32 *msg32, struct msghdr *msg)
 {
 	struct msghdr32 m32;
 	int error;
@@ -910,7 +910,7 @@ freebsd32_copyinmsghdr(struct msghdr32 *msg32, kmsghdr_t *msg)
 }
 
 static int
-freebsd32_copyoutmsghdr(kmsghdr_t *msg, struct msghdr32 *msg32)
+freebsd32_copyoutmsghdr(struct msghdr *msg, struct msghdr32 *msg32)
 {
 	struct msghdr32 m32;
 	int error;
@@ -994,7 +994,7 @@ freebsd32_cmsg_convert(const struct cmsghdr *cm, void *data, socklen_t datalen)
 }
 
 static int
-freebsd32_copy_msg_out(kmsghdr_t *msg, struct mbuf *control)
+freebsd32_copy_msg_out(struct msghdr *msg, struct mbuf *control)
 {
 	struct cmsghdr *cm;
 	void *data;
@@ -1092,9 +1092,9 @@ freebsd32_recvmsg(td, uap)
 		int	flags;
 	} */ *uap;
 {
-	kmsghdr_t msg;
+	struct msghdr msg;
 	struct msghdr32 m32;
-	kiovec_t *uiov, *iov;
+	struct iovec *uiov, *iov;
 	struct mbuf *control = NULL;
 	struct mbuf **controlp;
 
@@ -1227,9 +1227,9 @@ int
 freebsd32_sendmsg(struct thread *td,
 		  struct freebsd32_sendmsg_args *uap)
 {
-	kmsghdr_t msg;
+	struct msghdr msg;
 	struct msghdr32 m32;
-	kiovec_t *iov;
+	struct iovec *iov;
 	struct mbuf *control = NULL;
 	struct sockaddr *to = NULL;
 	int error;
@@ -1285,8 +1285,8 @@ int
 freebsd32_recvfrom(struct thread *td,
 		   struct freebsd32_recvfrom_args *uap)
 {
-	kmsghdr_t msg;
-	kiovec_t aiov;
+	struct msghdr msg;
+	struct iovec aiov;
 	int error;
 
 	if (uap->fromlenaddr) {
@@ -1723,7 +1723,7 @@ struct sf_hdtr32 {
 
 static int
 freebsd32_copyin_hdtr(const struct sf_hdtr32 * __capability uhdtr,
-    ksf_hdtr_t *hdtr)
+    struct sf_hdtr *hdtr)
 {
 	struct sf_hdtr32 hdtr32;
 	int error;
@@ -3290,7 +3290,7 @@ freebsd32_sched_rr_get_interval(struct thread *td,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "kernel_sig_types",
 //     "integer_provenance",
 //     "user_capabilities",

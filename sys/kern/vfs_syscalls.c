@@ -2636,7 +2636,7 @@ static int
 kern_readlink_vp(struct vnode *vp, char * __capability buf,
     enum uio_seg bufseg, size_t count, struct thread *td)
 {
-	kiovec_t aiov;
+	struct iovec aiov;
 	struct uio auio;
 	int error;
 
@@ -4129,7 +4129,7 @@ kern_getdirentries(struct thread *td, int fd, char * __capability buf,
 	struct vnode *vp;
 	struct file *fp;
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	off_t loff;
 	int error, eofflag;
 	off_t foffset;
@@ -5093,7 +5093,7 @@ user_copy_file_range(struct thread *td, int infd,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t",
+//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

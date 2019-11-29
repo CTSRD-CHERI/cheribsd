@@ -651,7 +651,7 @@ static int
 vnode_pager_input_old(vm_object_t object, vm_page_t m)
 {
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	int error;
 	int size;
 	struct sf_buf *sf;
@@ -1245,7 +1245,7 @@ vnode_pager_generic_putpages(struct vnode *vp, vm_page_t *ma, int bytecount,
 	vm_page_t m;
 	vm_ooffset_t maxblksz, next_offset, poffset, prev_offset;
 	struct uio auio;
-	kiovec_t aiov;
+	struct iovec aiov;
 	off_t prev_resid, wrsz;
 	int count, error, i, maxsize, ncount, pgoff, ppscheck;
 	bool in_hole;
@@ -1592,7 +1592,7 @@ vnode_pager_release_writecount(vm_object_t object, vm_offset_t start,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "kiovec_t"
+//     "struct iovec"
 //   ]
 // }
 // CHERI CHANGES END
