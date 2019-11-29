@@ -43,15 +43,15 @@ options 	KDB
 options		KDB_TRACE # stacktrace on panic
 nooptions	DDB
 
-options		DIAGNOSTIC
-options		VERBOSE_SYSINIT
-options		BOOTVERBOSE=1
+#options		DIAGNOSTIC
+#options		VERBOSE_SYSINIT
+#options		BOOTVERBOSE=1
 # options	BUS_DEBUG
 # options	CAMDEBUG
 # options	CAM_DEBUG_FLAGS=3
 options		STACK
-options		WITNESS
-options		DEBUG_VFS_LOCKS
+#options		WITNESS
+#options		DEBUG_VFS_LOCKS
 # options	TRAP_DEBUG
 # options	KTR
 # options	KTR_VERBOSE=2
@@ -67,3 +67,7 @@ options 	CPU_QEMU_MALTA
 nooptions	CPU_CHERI_HW_CCALL_CHECKS
 nooptions	CPU_CHERI_HW_CCLEAR
  
+# support for virtio rng device
+device		virtio
+device		virtio_pci
+device		tuntap
