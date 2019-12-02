@@ -12,4 +12,7 @@ MK_PIE:=	no
 # There is no objcopy on macOS so we can't do the MK_DEBUG_FILES objcopy magic.
 MK_DEBUG_FILES:=no
 
+# Avoid bfd linker warnings due to tmpnam failing the build
+LD_FATAL_WARNINGS:=no
+
 .endif
