@@ -15,17 +15,6 @@
   *
   * $FreeBSD$
   */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "lib",
- *   "changes": [
- *     "calling_convention"
- *   ]
- * }
- * CHERI CHANGES END
- */
 
 #ifndef lint
 static char sccsid[] = "@(#) tcpdchk.c 1.8 97/02/12 02:13:25";

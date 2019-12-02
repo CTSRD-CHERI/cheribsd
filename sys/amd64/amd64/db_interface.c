@@ -97,10 +97,13 @@ void
 db_show_mdpcpu(struct pcpu *pc)
 {
 
+	db_printf("self         = %p\n", pc->pc_prvspace);
 	db_printf("curpmap      = %p\n", pc->pc_curpmap);
 	db_printf("tssp         = %p\n", pc->pc_tssp);
-	db_printf("commontssp   = %p\n", pc->pc_commontssp);
 	db_printf("rsp0         = 0x%lx\n", pc->pc_rsp0);
+	db_printf("kcr3         = 0x%lx\n", pc->pc_kcr3);
+	db_printf("ucr3         = 0x%lx\n", pc->pc_ucr3);
+	db_printf("scr3         = 0x%lx\n", pc->pc_saved_ucr3);
 	db_printf("gs32p        = %p\n", pc->pc_gs32p);
 	db_printf("ldt          = %p\n", pc->pc_ldt);
 	db_printf("tss          = %p\n", pc->pc_tss);

@@ -20,6 +20,8 @@ CXXINCLUDEDIR=	${INCLUDEDIR}/c++/v${SHLIB_MAJOR}
 STATIC_CXXFLAGS+= -mlong-calls
 .endif
 
+ALLOW_MIPS_SHARED_TEXTREL=
+
 .PATH: ${SRCDIR}
 
 LIB=		c++
@@ -32,8 +34,12 @@ SRCS+=		bind.cpp
 SRCS+=		charconv.cpp
 SRCS+=		chrono.cpp
 SRCS+=		condition_variable.cpp
+#SRCS+=		condition_variable_destructor.cpp
 SRCS+=		debug.cpp
 SRCS+=		exception.cpp
+SRCS+=		filesystem/directory_iterator.cpp
+SRCS+=		filesystem/int128_builtins.cpp
+SRCS+=		filesystem/operations.cpp
 SRCS+=		functional.cpp
 SRCS+=		future.cpp
 SRCS+=		hash.cpp
@@ -42,6 +48,7 @@ SRCS+=		iostream.cpp
 SRCS+=		locale.cpp
 SRCS+=		memory.cpp
 SRCS+=		mutex.cpp
+#SRCS+=		mutex_destructor.cpp
 SRCS+=		new.cpp
 SRCS+=		optional.cpp
 SRCS+=		random.cpp
@@ -57,16 +64,6 @@ SRCS+=		utility.cpp
 SRCS+=		valarray.cpp
 SRCS+=		variant.cpp
 SRCS+=		vector.cpp
-.if ${_LIBCXX_VERSION} >= 9
-.PATH:		${SRCDIR}/filesystem
-SRCS+=		directory_iterator.cpp
-SRCS+=		int128_builtins.cpp
-SRCS+=		operations.cpp
-.else
-SRCS+=		filesystem/directory_iterator.cpp
-SRCS+=		filesystem/int128_builtins.cpp
-SRCS+=		filesystem/operations.cpp
-.endif
 
 CXXRT_SRCS+=	auxhelper.cc
 CXXRT_SRCS+=	dynamic_cast.cc

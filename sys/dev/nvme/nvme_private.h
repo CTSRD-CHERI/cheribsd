@@ -37,6 +37,7 @@
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
+#include <sys/module.h>
 #include <sys/mutex.h>
 #include <sys/rman.h>
 #include <sys/systm.h>
@@ -122,6 +123,8 @@ struct nvme_completion_poll_status {
 	int			done;
 };
 
+extern devclass_t nvme_devclass;
+
 #define NVME_REQUEST_VADDR	1
 #define NVME_REQUEST_NULL	2 /* For requests with no payload. */
 #define NVME_REQUEST_UIO	3
@@ -172,7 +175,8 @@ struct nvme_qpair {
 
 	struct nvme_controller	*ctrlr;
 	uint32_t		id;
-	uint32_t		phase;
+	int			domain;
+	int			cpu;
 
 	uint16_t		vector;
 	int			rid;
@@ -184,6 +188,7 @@ struct nvme_qpair {
 	uint32_t		sq_tdbl_off;
 	uint32_t		cq_hdbl_off;
 
+	uint32_t		phase;
 	uint32_t		sq_head;
 	uint32_t		sq_tail;
 	uint32_t		cq_head;
@@ -223,7 +228,7 @@ struct nvme_namespace {
 	uint32_t			flags;
 	struct cdev			*cdev;
 	void				*cons_cookie[NVME_MAX_CONSUMERS];
-	uint32_t			stripesize;
+	uint32_t			boundary;
 	struct mtx			lock;
 };
 
@@ -235,7 +240,7 @@ struct nvme_controller {
 	device_t		dev;
 
 	struct mtx		lock;
-
+	int			domain;
 	uint32_t		ready_timeout_in_ms;
 	uint32_t		quirks;
 #define	QUIRK_DELAY_B4_CHK_RDY	1		/* Can't touch MMIO on disable */
@@ -255,11 +260,9 @@ struct nvme_controller {
 	struct resource		*bar4_resource;
 
 	uint32_t		msix_enabled;
-	uint32_t		force_intx;
 	uint32_t		enable_aborts;
 
 	uint32_t		num_io_queues;
-	uint32_t		num_cpus_per_ioq;
 	uint32_t		max_hw_pend_io;
 
 	/* Fields for tracking progress during controller initialization. */
@@ -293,6 +296,9 @@ struct nvme_controller {
 
 	/** timeout period in seconds */
 	uint32_t		timeout_period;
+
+	/** doorbell stride */
+	uint32_t		dstrd;
 
 	struct nvme_qpair	adminq;
 	struct nvme_qpair	*ioq;
@@ -371,7 +377,7 @@ void	nvme_ctrlr_cmd_get_firmware_page(struct nvme_controller *ctrlr,
 					 nvme_cb_fn_t cb_fn,
 					 void *cb_arg);
 void	nvme_ctrlr_cmd_create_io_cq(struct nvme_controller *ctrlr,
-				    struct nvme_qpair *io_que, uint16_t vector,
+				    struct nvme_qpair *io_que,
 				    nvme_cb_fn_t cb_fn, void *cb_arg);
 void	nvme_ctrlr_cmd_create_io_sq(struct nvme_controller *ctrlr,
 				    struct nvme_qpair *io_que,
@@ -407,9 +413,8 @@ void	nvme_ctrlr_submit_io_request(struct nvme_controller *ctrlr,
 void	nvme_ctrlr_post_failed_request(struct nvme_controller *ctrlr,
 				       struct nvme_request *req);
 
-int	nvme_qpair_construct(struct nvme_qpair *qpair, uint32_t id,
-			     uint16_t vector, uint32_t num_entries,
-			     uint32_t num_trackers,
+int	nvme_qpair_construct(struct nvme_qpair *qpair,
+			     uint32_t num_entries, uint32_t num_trackers,
 			     struct nvme_controller *ctrlr);
 void	nvme_qpair_submit_tracker(struct nvme_qpair *qpair,
 				  struct nvme_tracker *tr);
@@ -438,6 +443,30 @@ void	nvme_sysctl_initialize_ctrlr(struct nvme_controller *ctrlr);
 
 void	nvme_dump_command(struct nvme_command *cmd);
 void	nvme_dump_completion(struct nvme_completion *cpl);
+
+int	nvme_attach(device_t dev);
+int	nvme_shutdown(device_t dev);
+int	nvme_detach(device_t dev);
+
+/*
+ * Wait for a command to complete using the nvme_completion_poll_cb.
+ * Used in limited contexts where the caller knows it's OK to block
+ * briefly while the command runs. The ISR will run the callback which
+ * will set status->done to true.usually within microseconds. A 1s
+ * pause means something is seriously AFU and we should panic to
+ * provide the proper context to diagnose.
+ */
+static __inline
+void
+nvme_completion_poll(struct nvme_completion_poll_status *status)
+{
+	int sanity = hz * 1;
+
+	while (!atomic_load_acq_int(&status->done) && --sanity > 0)
+		pause("nvme", 1);
+	if (sanity <= 0)
+		panic("NVME polled command failed to complete within 1s.");
+}
 
 static __inline void
 nvme_single_map(void *arg, bus_dma_segment_t *seg, int nseg, int error)
@@ -528,5 +557,8 @@ void	nvme_notify_ns(struct nvme_controller *ctrlr, int nsid);
 
 void	nvme_ctrlr_intx_handler(void *arg);
 void	nvme_ctrlr_poll(struct nvme_controller *ctrlr);
+
+int	nvme_ctrlr_suspend(struct nvme_controller *ctrlr);
+int	nvme_ctrlr_resume(struct nvme_controller *ctrlr);
 
 #endif /* __NVME_PRIVATE_H__ */

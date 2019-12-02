@@ -238,14 +238,3 @@ memioctl(struct cdev *dev __unused, u_long cmd, caddr_t data, int flags,
 	}
 	return (error);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ],
-//   "change_comment": "",
-//   "hybrid_specific": false
-// }
-// CHERI CHANGES END

@@ -287,7 +287,7 @@
 #define DEFAULT_HZ 100
 
 /* Default number of megabytes for RLIMIT_MEMLOCK */
-#define DFLT_RLIMIT_MEMLOCK 32
+#define DFLT_RLIMIT_MEMLOCK -1
 
 /* Default number of 4k pages for RLIMIT_STACK */
 #define DFLT_RLIMIT_STACK 50
@@ -1477,7 +1477,7 @@
 #define PACKAGE_URL "http://www.ntp.org./"
 
 /* Define to the version of this package. */
-#define PACKAGE_VERSION "4.2.8p12"
+#define PACKAGE_VERSION "4.2.8p13"
 
 /* data dir */
 #define PERLLIBDIR "/usr/share/ntp/lib"

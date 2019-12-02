@@ -37,8 +37,19 @@ __FBSDID("$FreeBSD$");
 #include <sys/socketvar.h>
 #include <sys/syscallsubr.h>
 
+#include <compat/cheriabi/cheriabi_misc.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_util.h>
+
+struct msghdr_c {
+	void		* __capability msg_name;		/* optional address */
+	socklen_t	 msg_namelen;		/* size of address */
+	struct iovec_c	* __capability msg_iov;		/* scatter/gather array */
+	int		 msg_iovlen;		/* # elements in msg_iov */
+	void		* __capability msg_control;		/* ancillary data, see below */
+	socklen_t	 msg_controllen;	/* ancillary data buffer len */
+	int		 msg_flags;		/* flags on received message */
+};
 
 /*
  * kern_uipc.c
@@ -106,8 +117,8 @@ cheriabi_sendto(struct thread *td, struct cheriabi_sendto_args *uap)
 int
 cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 {
-	struct msghdr msg;
-	struct iovec *iov;
+	struct msghdr_c msg;
+	struct iovec_c *iov;
 	struct mbuf *control = NULL;
 	struct sockaddr *to = NULL;
 	int error;
@@ -115,10 +126,11 @@ cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 	error = copyincap(uap->msg, &msg, sizeof(msg));
 	if (error)
 		return (error);
-	error = cheriabi_copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
+	error = cheriabi_copyiniov(msg.msg_iov, msg.msg_iovlen,
+	    (struct iovec **)&iov, EMSGSIZE);
 	if (error)
 		return (error);
-	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
+	msg.msg_iov = (__cheri_tocap struct iovec_c * __capability)iov;
 	if (msg.msg_name != NULL) {
 		error = getsockaddr(&to, msg.msg_name, msg.msg_namelen);
 		if (error) {
@@ -150,8 +162,8 @@ cheriabi_sendmsg(struct thread *td, struct cheriabi_sendmsg_args *uap)
 			goto out;
 	}
 
-	error = kern_sendit(td, uap->s, &msg, uap->flags, control,
-	    UIO_USERSPACE);
+	error = kern_sendit(td, uap->s, (struct msghdr *)&msg, uap->flags,
+	    control, UIO_USERSPACE);
 
 out:
 	free(iov, M_IOV);
@@ -171,25 +183,26 @@ cheriabi_recvfrom(struct thread *td, struct cheriabi_recvfrom_args *uap)
 int
 cheriabi_recvmsg(struct thread *td, struct cheriabi_recvmsg_args *uap)
 {
-	struct msghdr msg;
+	struct msghdr_c msg;
 	struct iovec_c *__capability uiov;
-	struct iovec *iov;
-
+	struct iovec_c *iov;
 	int error;
 
 	error = copyincap(uap->msg, &msg, sizeof(msg));
 	if (error)
 		return (error);
 	uiov = msg.msg_iov;
-	error = cheriabi_copyiniov(uiov, msg.msg_iovlen, &iov, EMSGSIZE);
+	error = cheriabi_copyiniov(uiov, msg.msg_iovlen,
+	    (struct iovec **)&iov, EMSGSIZE);
 	if (error)
 		return (error);
 	msg.msg_flags = uap->flags;
-	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
+	msg.msg_iov = (__cheri_tocap struct iovec_c * __capability)iov;
 
-	error = kern_recvit(td, uap->s, &msg, UIO_USERSPACE, NULL);
+	error = kern_recvit(td, uap->s, (struct msghdr *)&msg, UIO_USERSPACE,
+	    NULL);
 	if (error == 0) {
-		msg.msg_iov = (struct iovec * __capability)uiov;
+		msg.msg_iov = uiov;
 
 		/*
 		 * Message contents have already been copied out, update
@@ -237,10 +250,11 @@ cheriabi_getpeername(struct thread *td, struct cheriabi_getpeername_args *uap)
  */
 
 int
-cheriabi_shm_open(struct thread *td, struct cheriabi_shm_open_args *uap)
+cheriabi_shm_open2(struct thread *td, struct cheriabi_shm_open2_args *uap)
 {
 
-	return (kern_shm_open(td, uap->path, uap->flags, uap->mode, NULL));
+	return (kern_shm_open2(td, uap->path, uap->flags, uap->mode,
+	    uap->shmflags, uap->name));
 }
 
 int
@@ -248,4 +262,12 @@ cheriabi_shm_unlink(struct thread *td, struct cheriabi_shm_unlink_args *uap)
 {
 
 	return (kern_shm_unlink(td, uap->path));
+}
+
+int
+cheriabi_shm_rename(struct thread *td, struct cheriabi_shm_rename_args *uap)
+{
+
+	return (kern_shm_rename(td, uap->path_from, uap->path_to,
+	    uap->flags));
 }

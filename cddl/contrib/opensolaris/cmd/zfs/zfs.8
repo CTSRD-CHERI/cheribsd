@@ -23,17 +23,16 @@
 .\" Copyright (c) 2012, Glen Barber <gjb@FreeBSD.org>
 .\" Copyright (c) 2012, Bryan Drewery <bdrewery@FreeBSD.org>
 .\" Copyright (c) 2013 by Saso Kiselkov. All rights reserved.
-.\" Copyright (c) 2014, Joyent, Inc. All rights reserved.
 .\" Copyright (c) 2013, Steven Hartland <smh@FreeBSD.org>
 .\" Copyright (c) 2016 Nexenta Systems, Inc. All Rights Reserved.
 .\" Copyright (c) 2014, Xin LI <delphij@FreeBSD.org>
 .\" Copyright (c) 2014-2015, The FreeBSD Foundation, All Rights Reserved.
-.\" Copyright 2018 Joyent, Inc.
+.\" Copyright 2019 Joyent, Inc.
 .\" Copyright (c) 2018 Datto Inc.
 .\"
 .\" $FreeBSD$
 .\"
-.Dd February 15, 2018
+.Dd October 16, 2019
 .Dt ZFS 8
 .Os
 .Sh NAME
@@ -103,6 +102,9 @@
 .Cm rename
 .Fl r
 .Ar snapshot snapshot
+.Nm
+.Cm rename
+.Ar bookmark bookmark
 .Nm
 .Cm rename
 .Fl u
@@ -190,8 +192,8 @@
 .Ar snapshot
 .Nm
 .Cm send
-.Op Fl Lce
-.Op Fl i Ar snapshot Ns | Ns bookmark
+.Op Fl LPcenv
+.Op Fl i Ar snapshot Ns | Ns Ar bookmark
 .Ar filesystem Ns | Ns Ar volume Ns | Ns Ar snapshot
 .Nm
 .Cm send
@@ -1132,8 +1134,23 @@ This feature must be enabled to be used
 .Po see
 .Xr zpool-features 7
 .Pc .
+.It Sy special_small_blocks Ns = Ns Ar size
+This value represents the threshold block size for including small file
+blocks into the special allocation class.
+Blocks smaller than or equal to this value will be assigned to the special
+allocation class while greater blocks will be assigned to the regular class.
+Valid values are zero or a power of two from 512B up to 128K.
+The default size is 0 which means no small file blocks will be allocated in
+the special class.
+.Pp
+Before setting this property, a special class vdev must be added to the
+pool.
+See
+.Xr zpool 8
+for more details on the special allocation class.
 .It Sy mountpoint Ns = Ns Ar path | Cm none | legacy
-Controls the mount point used for this file system. See the
+Controls the mount point used for this file system.
+See the
 .Qq Sx Mount Points
 section for more information on how this property is used.
 .Pp
@@ -1501,7 +1518,9 @@ command, or by changing the value of the
 .Sy refreservation
 property, or
 .Sy reservation
-property on pool version 8 or earlier
+property on pool 
+.Po
+version 8 or earlier
 .Pc
 after the volume has been created.
 A "sparse volume" is a volume where the value of
@@ -2092,6 +2111,16 @@ Recursively rename the snapshots of all descendent datasets. Snapshots are the
 only dataset that can be renamed recursively.
 .It Xo
 .Nm
+.Cm rename
+.Ar bookmark bookmark
+.Xc
+.Pp
+Renames the given bookmark.
+Bookmarks can only be renamed within the parent file system or volume.
+When renaming a bookmark, the parent file system or volume of the bookmark
+does not need to be specified as part of the second argument.
+.It Xo
+.Nm
 .Cm list
 .Op Fl r Ns | Ns Fl d Ar depth
 .Op Fl Hp
@@ -2323,7 +2352,7 @@ option was not specified.
 .Ar filesystem Ns | Ns Ar volume
 .Xc
 .Pp
-Remap the indirect blocks in the given fileystem or volume so that they no
+Remap the indirect blocks in the given filesystem or volume so that they no
 longer reference blocks on previously removed vdevs and we can eventually
 shrink the size of the indirect mapping objects for the previously removed
 vdevs. Note that remapping all blocks might not be possible and that
@@ -2764,7 +2793,7 @@ on future versions of
 .It Xo
 .Nm
 .Cm send
-.Op Fl Lce
+.Op Fl LPcenv
 .Op Fl i Ar snapshot Ns | Ns Ar bookmark
 .Ar filesystem Ns | Ns Ar volume Ns | Ns Ar snapshot
 .Xc
@@ -2778,7 +2807,7 @@ stream generated from a filesystem or volume is received, the default snapshot
 name will be
 .Pq --head-- .
 .Bl -tag -width indent
-.It Fl i Ar snapshot Ns | Ns bookmark
+.It Fl i Ar snapshot Ns | Ns Ar bookmark
 Generate an incremental send stream.
 The incremental source must be an earlier
 snapshot in the destination's history.
@@ -2790,6 +2819,23 @@ specified as the last component of the name
 If the incremental target is a clone, the incremental source can
 be the origin snapshot, or an earlier snapshot in the origin's filesystem,
 or the origin's origin, etc.
+.It Fl n, -dryrun
+Do a dry-run
+.Pq Qq No-op
+send.
+Do not generate any actual send data.
+This is useful in conjunction with the
+.Fl v
+or
+.Fl P
+flags to determine what data will be sent.
+In this case, the verbose output will be written to standard output
+.Po contrast with a non-dry-run, where the stream is written to standard output
+and the verbose output goes to standard error
+.Pc .
+.It Fl v, -verbose
+Print verbose information about the stream package generated.
+This information includes a per-second report of how much data has been sent.
 .It Fl L, -large-block
 Generate a stream which may contain blocks larger than 128KB.
 This flag
@@ -2806,6 +2852,8 @@ See
 for details on ZFS feature flags and the
 .Sy large_blocks
 feature.
+.It Fl P, -parsable
+Print machine-parsable verbose information about the stream package generated.
 .It Fl c, -compressed
 Generate a more compact stream by using compressed WRITE records for blocks
 which are compressed on disk and in memory (see the
@@ -2990,7 +3038,7 @@ property of the filesystem or volume which is received into.
 To use this flag, the storage pool must have the
 .Sy extensible_dataset
 feature enabled.  See
-.Xr zpool-features 5
+.Xr zpool-features 7
 for details on ZFS feature flags.
 .El
 .It Xo
@@ -3896,6 +3944,7 @@ M       F       /tank/test/modified
 .Xr jail 8 ,
 .Xr mount 8 ,
 .Xr umount 8 ,
+.Xr zfs-program 8 ,
 .Xr zpool 8
 .Sh AUTHORS
 This manual page is a

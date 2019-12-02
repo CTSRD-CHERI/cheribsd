@@ -10,9 +10,86 @@ newline.  Entries should be separated by a newline.
 
 Changes to this file should not be MFCed.
 
+r354517:
+	iwm(4) now supports most Intel 9260, 9460 and 9560 Wi-Fi devices.
+
+r354269:
+	sqlite3 is updated to sqlite3-3.30.1.
+
+r352668:
+	cron(8) now supports the -n (suppress mail on succesful run) and -q
+	(suppress logging of command execution) options in the crontab format.
+	See the crontab(5) manpage for details.
+
+r352304:
+	ntpd is no longer by default locked in memory. rlimit memlock 32
+	or rlimit memlock 0 can be used to restore this behaviour.
+
+r351522:
+	Add kernel-side support for in-kernel Transport Layer Security
+	(KTLS).  KTLS permits using sendfile(2) over sockets using
+	TLS.
+
+r351397:
+	WPA is updated from 2.8 to 2.9.
+
+r351361:
+	Add probes for lockmgr(9) to the lockstat DTrace provider, add
+	corresponding lockstat(1) events, and document the new probes in
+	dtrace_lockstat.4.
+
+r351356:
+	Intel RST is a new 'feature' that remaps NVMe devices from
+	their normal location to part of the AHCI bar space.  This
+	will eliminate the need to set the BIOS SATA setting from RST
+	to AHCI causing the nvme drive to be erased before FreeBSD
+	will see the nvme drive. FreeBSD will now be able to see the
+	nvme drive now in the default config.
+
+r351201, r351372:
+	Add a vop_stdioctl() call, so that file systems that do not support
+	holes will have a trivial implementation of lseek(SEEK_DATA/SEEK_HOLE).
+	The algorithm appears to be compatible with the POSIX draft and
+	the implementation in Linux for the case of a file system that
+	does not support holes.  Prior to this patch, lseek(2) would reply
+	-1 with errno set to ENOTTY for SEEK_DATA/SEEK_HOLE on files in
+	file systems that do not support holes.
+	r351372 maps ENOTTY to EINVAL for lseek(SEEK_DATA/SEEK_HOLE) for
+	any other cases, such as a ENOTTY return from vn_bmap_seekhole().
+
+r350665:
+	The fuse driver has been renamed to fusefs(5) and been substantially
+	rewritten.  The new driver includes many bug fixes and performance
+	enhancements, as well as the following user-visible features:
+	* Optional kernel-side permissions checks (-o default_permissions)
+	* mknod(2), socket(2), and pipe(2) support
+	* server side locking with fcntl(2)
+	* FUSE operations are now interruptible when mounted with -o intr
+	* server side handling of UTIME_NOW during utimensat(2)
+	* mount options may be updated with "mount -u"
+	* fusefs file system may now be exported over NFS
+	* RLIMIT_FSIZE support
+	* support for fuse file systems using protocols as old as 7.4
+	
+	FUSE file system developers should also take note of the following new
+	features:
+	* The protocol level has been raised from 7.8 to 7.23
+	* kqueue support on /dev/fuse
+	* server-initiated cache invalidation via FUSE_NOTIFY_REPLY
+
+r350471:
+	gnop(8) can now configure a delay to be applied to read and write
+	request delays.  See the -d, -q and -x parameters.
+
+r350315, r350316:
+	Adds a Linux compatible copy_file_range(2) syscall.
+
 r350307:
 	libcap_random(3) has been removed.  Applications can use native
 	APIs to get random data in capability mode.
+
+r349529,r349530:
+	Add support for using unmapped mbufs with sendfile(2).
 
 r349352:
 	nand(4) and related components have been removed.

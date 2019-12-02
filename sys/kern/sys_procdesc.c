@@ -213,7 +213,7 @@ int
 sys_pdgetpid(struct thread *td, struct pdgetpid_args *uap)
 {
 
-	return (user_pdgetpid(td, uap->fd, __USER_CAP_OBJ(uap->pidp)));
+	return (user_pdgetpid(td, uap->fd, uap->pidp));
 }
 
 int
@@ -426,7 +426,13 @@ procdesc_close(struct file *fp, struct thread *td)
 			 * terminate with prejudice.
 			 */
 			p->p_sigparent = SIGCHLD;
-			proc_reparent(p, p->p_reaper, true);
+			if ((p->p_flag & P_TRACED) == 0) {
+				proc_reparent(p, p->p_reaper, true);
+			} else {
+				proc_clear_orphan(p);
+				p->p_oppid = p->p_reaper->p_pid;
+				proc_add_orphan(p, p->p_reaper);
+			}
 			if ((pd->pd_flags & PDF_DAEMON) == 0)
 				kern_psignal(p, SIGKILL);
 			PROC_UNLOCK(p);

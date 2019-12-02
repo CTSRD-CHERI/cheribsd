@@ -28,18 +28,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "test",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "Missing mode to open with O_CREAT"
- * }
- * CHERI CHANGES END
- */
 #include <sys/cdefs.h>
 __RCSID("$NetBSD: t_stat.c,v 1.5 2017/01/13 20:06:50 christos Exp $");
 
@@ -343,6 +331,9 @@ ATF_TC_BODY(stat_socket, tc)
 	struct stat st;
 	uint32_t iaddr;
 	int fd, flags;
+
+	if (atf_tc_get_config_var_as_bool_wd(tc, "ci", false))
+		atf_tc_skip("https://bugs.freebsd.org/240621");
 
 	(void)memset(&st, 0, sizeof(struct stat));
 	(void)memset(&addr, 0, sizeof(struct sockaddr_in));

@@ -918,7 +918,7 @@ siftr_chkpkt(struct mbuf **m, struct ifnet *ifp, int flags,
 	 * Only pkts selected by the tcp port filter
 	 * can be inserted into the pkt_queue
 	 */
-	if ((siftr_port_filter != 0) && 
+	if ((siftr_port_filter != 0) &&
 	    (siftr_port_filter != ntohs(inp->inp_lport)) &&
 	    (siftr_port_filter != ntohs(inp->inp_fport))) {
 		goto inp_unlock;
@@ -1611,12 +1611,3 @@ static moduledata_t siftr_mod = {
 DECLARE_MODULE(siftr, siftr_mod, SI_SUB_LAST, SI_ORDER_ANY);
 MODULE_DEPEND(siftr, alq, 1, 1, 1);
 MODULE_VERSION(siftr, MODVERSION);
-// CHERI CHANGES START
-// {
-//   "updated": 20181121,
-//   "target_type": "kernel",
-//   "changes": [
-//     "integer_provenance"
-//   ]
-// }
-// CHERI CHANGES END

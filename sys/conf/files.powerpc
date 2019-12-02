@@ -16,7 +16,6 @@ font.h				optional	sc			\
 #
 # There is only an asm version on ppc64.
 cddl/compat/opensolaris/kern/opensolaris_atomic.c			optional zfs powerpc | dtrace powerpc | zfs powerpcspe | dtrace powerpcspe compile-with "${ZFS_C}"
-cddl/contrib/opensolaris/common/atomic/powerpc64/opensolaris_atomic.S	optional zfs powerpc64 | dtrace powerpc64 compile-with "${ZFS_S}"
 cddl/dev/dtrace/powerpc/dtrace_asm.S		optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/powerpc/dtrace_subr.c		optional dtrace compile-with "${DTRACE_C}"
 cddl/dev/fbt/powerpc/fbt_isa.c			optional dtrace_fbt | dtraceall compile-with "${FBT_C}"
@@ -108,6 +107,7 @@ powerpc/aim/moea64_if.m		optional	aim
 powerpc/aim/moea64_native.c	optional	aim
 powerpc/aim/mp_cpudep.c		optional	aim
 powerpc/aim/slb.c		optional	aim powerpc64
+powerpc/amigaone/platform_amigaone.c	optional	amigaone
 powerpc/booke/locore.S		optional	booke no-obj
 powerpc/booke/booke_machdep.c	optional	booke
 powerpc/booke/machdep_e500.c	optional	booke_e500
@@ -192,6 +192,7 @@ powerpc/powernv/opal_flash.c	optional	powernv opalflash
 powerpc/powernv/opal_hmi.c	optional	powernv
 powerpc/powernv/opal_i2c.c	optional	iicbus fdt powernv
 powerpc/powernv/opal_i2cm.c	optional	iicbus fdt powernv
+powerpc/powernv/opal_nvram.c	optional	powernv nvram
 powerpc/powernv/opal_pci.c	optional	powernv pci
 powerpc/powernv/opal_sensor.c	optional	powernv
 powerpc/powernv/opalcall.S	optional	powernv
@@ -224,6 +225,7 @@ powerpc/powerpc/intr_machdep.c	standard
 powerpc/powerpc/iommu_if.m	standard
 powerpc/powerpc/machdep.c	standard
 powerpc/powerpc/mem.c		optional	mem
+powerpc/powerpc/minidump_machdep.c	optional	powerpc64
 powerpc/powerpc/mmu_if.m	standard
 powerpc/powerpc/mp_machdep.c	optional	smp
 powerpc/powerpc/nexus.c		standard

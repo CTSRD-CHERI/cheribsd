@@ -258,11 +258,12 @@ typedef __vm_offset_t	vm_ptr_t;
 #endif
 
 /*
- * Types suitable for exporting size and pointers (as virtual addresses)
- * from the kernel independent of native word size.  These should be
- * used in place of size_t and (u)intptr_t in structs which contain such
- * types that are shared with userspace.
+ * Types suitable for exporting physical addresses, virtual addresses
+ * (pointers), and memory object sizes from the kernel independent of native
+ * word size.  These should be used in place of vm_paddr_t, (u)intptr_t, and
+ * size_t in structs which contain such types that are shared with userspace.
  */
+typedef	__uint64_t	kpaddr_t;
 typedef	__uint64_t	kvaddr_t;
 typedef	__uint64_t	ksize_t;
 

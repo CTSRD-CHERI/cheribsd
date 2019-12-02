@@ -197,16 +197,13 @@ struct pkthdr {
 };
 #define	ether_vtag	PH_per.sixteen[0]
 #define	PH_vt		PH_per
-#define	vt_nrecs	sixteen[0]
-#define	tso_segsz	PH_per.sixteen[1]
-#define	lro_nsegs	tso_segsz
-#define	csum_phsum	PH_per.sixteen[2]
-#define	csum_data	PH_per.thirtytwo[1]
-#define pace_thoff	PH_loc.sixteen[0]
-#define pace_tlen	PH_loc.sixteen[1]
-#define pace_drphdrlen	PH_loc.sixteen[2]
-#define pace_tos	PH_loc.eight[6]
-#define pace_lock	PH_loc.eight[7]
+#define	vt_nrecs	sixteen[0]	  /* mld and v6-ND */
+#define	tso_segsz	PH_per.sixteen[1] /* inbound after LRO */
+#define	lro_nsegs	tso_segsz	  /* inbound after LRO */
+#define	csum_data	PH_per.thirtytwo[1] /* inbound from hardware up */
+#define lro_len		PH_loc.sixteen[0] /* inbound during LRO (no reassembly) */
+#define lro_csum	PH_loc.sixteen[1] /* inbound during LRO (no reassembly) */
+/* Note PH_loc is used during IP reassembly (all 8 bytes as a ptr) */
 
 /*
  * Description of external storage mapped into mbuf; valid only if M_EXT is
@@ -310,6 +307,7 @@ struct mbuf {
 	};
 };
 
+struct ktls_session;
 struct socket;
 
 /*
@@ -318,7 +316,7 @@ struct socket;
  * - 21 (AES-CBC with explicit IV)
  * - 13 (AES-GCM with 8 byte explicit IV)
  */
-#define	MBUF_PEXT_HDR_LEN	24
+#define	MBUF_PEXT_HDR_LEN	23
 
 /*
  * TLS records for TLS 1.0-1.2 can have the following maximum trailer
@@ -334,7 +332,7 @@ struct socket;
 #define	MBUF_PEXT_MAX_PGS	(152 / sizeof(vm_paddr_t))
 #elif defined(CHERI_PURECAP_KERNEL)
 #ifdef CPU_CHERI128
-#define MBUF_PEXT_MAX_PGS	(144 / sizeof(vm_paddr_t))
+#define MBUF_PEXT_MAX_PGS	(112 / sizeof(vm_paddr_t))
 #else /* CHERI256 */
 #define MBUF_PEXT_MAX_PGS	(64 / sizeof(vm_paddr_t))
 #endif /* CHERI256 */
@@ -344,6 +342,8 @@ struct socket;
 
 #define	MBUF_PEXT_MAX_BYTES						\
     (MBUF_PEXT_MAX_PGS * PAGE_SIZE + MBUF_PEXT_HDR_LEN + MBUF_PEXT_TRAIL_LEN)
+
+#define MBUF_PEXT_FLAG_ANON	1	/* Data can be encrypted in place. */
 
 /*
  * This struct is 256 bytes in size and is arranged so that the most
@@ -359,7 +359,8 @@ struct mbuf_ext_pgs {
 	uint16_t	last_pg_len;		/* Length of last page */
 	vm_paddr_t	pa[MBUF_PEXT_MAX_PGS];	/* phys addrs of pages */
 	char		hdr[MBUF_PEXT_HDR_LEN];	/* TLS header */
-	void		*tls;			/* TLS session */
+	uint8_t		flags;			/* Flags */
+	struct ktls_session *tls;		/* TLS session */
 #if defined(__i386__) || \
     (defined(__powerpc__) && !defined(__powerpc64__) && defined(BOOKE))
 	/*
@@ -371,10 +372,12 @@ struct mbuf_ext_pgs {
 	union {
 		char	trail[MBUF_PEXT_TRAIL_LEN]; /* TLS trailer */
 		struct {
+			uint8_t record_type;	/* Must be first */
 			struct socket *so;
-			void	*mbuf;
+			struct mbuf *mbuf;
 			uint64_t seqno;
 			STAILQ_ENTRY(mbuf_ext_pgs) stailq;
+			int enc_cnt;
 		};
 	};
 };
@@ -405,7 +408,7 @@ void	mb_ext_pgs_check(struct mbuf_ext_pgs *ext_pgs);
 /*
  * mbuf flags of global significance and layer crossing.
  * Those of only protocol/layer specific significance are to be mapped
- * to M_PROTO[1-12] and cleared at layer handoff boundaries.
+ * to M_PROTO[1-11] and cleared at layer handoff boundaries.
  * NB: Limited to the lower 24 bits.
  */
 #define	M_EXT		0x00000001 /* has associated external storage */
@@ -424,18 +427,17 @@ void	mb_ext_pgs_check(struct mbuf_ext_pgs *ext_pgs);
 				      and 802.1AS) */
 #define M_TSTMP_LRO	0x00001000 /* Time LRO pushed in pkt is valid in (PH_loc) */
 
-#define	M_PROTO1	0x00001000 /* protocol-specific */
-#define	M_PROTO2	0x00002000 /* protocol-specific */
-#define	M_PROTO3	0x00004000 /* protocol-specific */
-#define	M_PROTO4	0x00008000 /* protocol-specific */
-#define	M_PROTO5	0x00010000 /* protocol-specific */
-#define	M_PROTO6	0x00020000 /* protocol-specific */
-#define	M_PROTO7	0x00040000 /* protocol-specific */
-#define	M_PROTO8	0x00080000 /* protocol-specific */
-#define	M_PROTO9	0x00100000 /* protocol-specific */
-#define	M_PROTO10	0x00200000 /* protocol-specific */
-#define	M_PROTO11	0x00400000 /* protocol-specific */
-#define	M_PROTO12	0x00800000 /* protocol-specific */
+#define	M_PROTO1	0x00002000 /* protocol-specific */
+#define	M_PROTO2	0x00004000 /* protocol-specific */
+#define	M_PROTO3	0x00008000 /* protocol-specific */
+#define	M_PROTO4	0x00010000 /* protocol-specific */
+#define	M_PROTO5	0x00020000 /* protocol-specific */
+#define	M_PROTO6	0x00040000 /* protocol-specific */
+#define	M_PROTO7	0x00080000 /* protocol-specific */
+#define	M_PROTO8	0x00100000 /* protocol-specific */
+#define	M_PROTO9	0x00200000 /* protocol-specific */
+#define	M_PROTO10	0x00400000 /* protocol-specific */
+#define	M_PROTO11	0x00800000 /* protocol-specific */
 
 #define MB_DTOR_SKIP	0x1	/* don't pollute the cache by touching a freed mbuf */
 
@@ -444,25 +446,25 @@ void	mb_ext_pgs_check(struct mbuf_ext_pgs *ext_pgs);
  */
 #define	M_PROTOFLAGS \
     (M_PROTO1|M_PROTO2|M_PROTO3|M_PROTO4|M_PROTO5|M_PROTO6|M_PROTO7|M_PROTO8|\
-     M_PROTO9|M_PROTO10|M_PROTO11|M_PROTO12)
+     M_PROTO9|M_PROTO10|M_PROTO11)
 
 /*
  * Flags preserved when copying m_pkthdr.
  */
 #define M_COPYFLAGS \
     (M_PKTHDR|M_EOR|M_RDONLY|M_BCAST|M_MCAST|M_PROMISC|M_VLANTAG|M_TSTMP| \
-     M_TSTMP_HPREC|M_PROTOFLAGS)
+     M_TSTMP_HPREC|M_TSTMP_LRO|M_PROTOFLAGS)
 
 /*
  * Mbuf flag description for use with printf(9) %b identifier.
  */
 #define	M_FLAG_BITS \
     "\20\1M_EXT\2M_PKTHDR\3M_EOR\4M_RDONLY\5M_BCAST\6M_MCAST" \
-    "\7M_PROMISC\10M_VLANTAG\11M_NOMAP\12M_NOFREE\13M_TSTMP\14M_TSTMP_HPREC"
+    "\7M_PROMISC\10M_VLANTAG\11M_NOMAP\12M_NOFREE\13M_TSTMP\14M_TSTMP_HPREC\15M_TSTMP_LRO"
 #define	M_FLAG_PROTOBITS \
-    "\15M_PROTO1\16M_PROTO2\17M_PROTO3\20M_PROTO4\21M_PROTO5" \
-    "\22M_PROTO6\23M_PROTO7\24M_PROTO8\25M_PROTO9\26M_PROTO10" \
-    "\27M_PROTO11\30M_PROTO12"
+    "\16M_PROTO1\17M_PROTO2\20M_PROTO3\21M_PROTO4" \
+    "\22M_PROTO5\23M_PROTO6\24M_PROTO7\25M_PROTO8\26M_PROTO9" \
+    "\27M_PROTO10\28M_PROTO11"
 #define	M_FLAG_PRINTF (M_FLAG_BITS M_FLAG_PROTOBITS)
 
 /*
@@ -1447,7 +1449,7 @@ static inline int
 mbufq_full(const struct mbufq *mq)
 {
 
-	return (mq->mq_len >= mq->mq_maxlen);
+	return (mq->mq_maxlen > 0 && mq->mq_len >= mq->mq_maxlen);
 }
 
 static inline int
@@ -1508,18 +1510,32 @@ mbuf_tstmp2timespec(struct mbuf *m, struct timespec *ts)
 {
 
 	KASSERT((m->m_flags & M_PKTHDR) != 0, ("mbuf %p no M_PKTHDR", m));
-	KASSERT((m->m_flags & M_TSTMP) != 0, ("mbuf %p no M_TSTMP", m));
+	KASSERT((m->m_flags & (M_TSTMP|M_TSTMP_LRO)) != 0, ("mbuf %p no M_TSTMP or M_TSTMP_LRO", m));
 	ts->tv_sec = m->m_pkthdr.rcv_tstmp / 1000000000;
 	ts->tv_nsec = m->m_pkthdr.rcv_tstmp % 1000000000;
 }
 #endif
 
-#ifdef NETDUMP
-/* Invoked from the netdump client code. */
-void	netdump_mbuf_drain(void);
-void	netdump_mbuf_dump(void);
-void	netdump_mbuf_reinit(int nmbuf, int nclust, int clsize);
+#ifdef DEBUGNET
+/* Invoked from the debugnet client code. */
+void	debugnet_mbuf_drain(void);
+void	debugnet_mbuf_start(void);
+void	debugnet_mbuf_finish(void);
+void	debugnet_mbuf_reinit(int nmbuf, int nclust, int clsize);
 #endif
+
+static inline bool
+mbuf_has_tls_session(struct mbuf *m)
+{
+
+	if (m->m_flags & M_NOMAP) {
+		MBUF_EXT_PGS_ASSERT(m);
+		if (m->m_ext.ext_pgs->tls != NULL) {
+			return (true);
+		}
+	}
+	return (false);
+}
 
 #endif /* _KERNEL */
 #endif /* !_SYS_MBUF_H_ */

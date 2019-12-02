@@ -598,6 +598,9 @@ shutdown_halt(void *junk, int howto)
 		printf("\n");
 		printf("The operating system has halted.\n");
 		printf("Please press any key to reboot.\n\n");
+
+		wdog_kern_pat(WD_TO_NEVER);
+
 		switch (cngetc()) {
 		case -1:		/* No console, just die */
 			cpu_halt();
@@ -716,7 +719,7 @@ SYSCTL_INT(_debug_kassert, OID_AUTO, do_log, KASSERT_RWTUN,
     &kassert_do_log, 0,
     "If warn_only is enabled, log (1) or do not log (0) assertion violations");
 
-SYSCTL_INT(_debug_kassert, OID_AUTO, warnings, KASSERT_RWTUN,
+SYSCTL_INT(_debug_kassert, OID_AUTO, warnings, CTLFLAG_RD | CTLFLAG_STATS,
     &kassert_warnings, 0, "number of KASSERTs that have been triggered");
 
 SYSCTL_INT(_debug_kassert, OID_AUTO, log_panic_at, KASSERT_RWTUN,
@@ -1281,6 +1284,20 @@ cleanup:
 	free_single_dumper(newdi);
 	return (error);
 }
+
+#ifdef DDB
+void
+dumper_ddb_insert(struct dumperinfo *newdi)
+{
+	TAILQ_INSERT_HEAD(&dumper_configs, newdi, di_next);
+}
+
+void
+dumper_ddb_remove(struct dumperinfo *di)
+{
+	TAILQ_REMOVE(&dumper_configs, di, di_next);
+}
+#endif
 
 static bool
 dumper_config_match(const struct dumperinfo *di, const char *devname,

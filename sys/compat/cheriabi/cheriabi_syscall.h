@@ -419,7 +419,7 @@
 #define	CHERIABI_SYS_cheriabi_truncate	479
 #define	CHERIABI_SYS_ftruncate	480
 #define	CHERIABI_SYS_thr_kill2	481
-#define	CHERIABI_SYS_cheriabi_shm_open	482
+				/* 482 is obsolete freebsd12_shm_open */
 #define	CHERIABI_SYS_cheriabi_shm_unlink	483
 #define	CHERIABI_SYS_cheriabi_cpuset	484
 #define	CHERIABI_SYS_cpuset_setid	485
@@ -506,4 +506,7 @@
 #define	CHERIABI_SYS_cheriabi_fhreadlink	567
 #define	CHERIABI_SYS_cheriabi_funlinkat	568
 #define	CHERIABI_SYS_cheriabi_copy_file_range	569
-#define	CHERIABI_SYS_MAXSYSCALL	570
+#define	CHERIABI_SYS_cheriabi___sysctlbyname	570
+#define	CHERIABI_SYS_cheriabi_shm_open2	571
+#define	CHERIABI_SYS_cheriabi_shm_rename	572
+#define	CHERIABI_SYS_MAXSYSCALL	573

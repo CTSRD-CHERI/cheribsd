@@ -47,14 +47,3 @@ int	zygote_clone_service_execute(int *chanfdp, int *procfdp);
 zygote_func_t	service_execute;
 
 #endif	/* !_ZYGOTE_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "lib",
-//   "changes": [
-//     "pointer_provenance"
-//   ],
-//   "change_comment": "pointers over IPC",
-//   "is_upstream": true
-// }
-// CHERI CHANGES END

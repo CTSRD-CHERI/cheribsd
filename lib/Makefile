@@ -109,7 +109,7 @@ SUBDIR=	${SUBDIR_BOOTSTRAP} \
 # libraries, those libraries should be listed as build order dependencies here.
 
 SUBDIR_DEPEND_geom=	libufs
-SUBDIR_DEPEND_libarchive= libz libbz2 libexpat liblzma libmd
+SUBDIR_DEPEND_libarchive= libz libbz2 libexpat liblzma libmd libzstd
 SUBDIR_DEPEND_libauditdm= libbsm
 SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
 SUBDIR_DEPEND_libc++:= libcxxrt
@@ -147,10 +147,8 @@ SUBDIR.${MK_BSNMP}+=	libbsnmp
 
 SUBDIR.${MK_CHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
-SUBDIR.${MK_CHERI}+=	libz-cheri
-SUBDIR.${MK_CHERI}+=	libpng_sb
 
-.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
+.if (${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no") && ${MACHINE_ARCH} != "mips"
 _libc_cheri=	libc_cheri
 _libcheri=	libcheri
 .endif
@@ -173,6 +171,7 @@ SUBDIR.${MK_GSSAPI}+=	libgssapi librpcsec_gss
 SUBDIR.${MK_ICONV}+=	libiconv_modules
 SUBDIR.${MK_KERBEROS_SUPPORT}+=	libcom_err
 SUBDIR.${MK_LDNS}+=	libldns
+SUBDIR.${MK_STATS}+=	libstats
 
 # The libraries under libclang_rt can only be built by clang, and only make
 # sense to build when clang is enabled at all.  Furthermore, they can only be
@@ -185,7 +184,7 @@ SUBDIR.${MK_LDNS}+=	libldns
     ${MACHINE_ARCH:Mmips64*}) && \
     ! ${MACHINE_ARCH:Mmips*c*}
 _libclang_rt=	libclang_rt
-.elif ! ${MACHINE_ARCH:Mmips*c*}
+.elif ! ${MACHINE_ARCH:Mmips*c*} && ${MACHINE_ARCH} != "mips"
 .error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
 .endif
 .endif # ${COMPILER_TYPE} == "clang"
@@ -194,9 +193,6 @@ _libclang_rt=	libclang_rt
 _libcxxrt=	libcxxrt
 _libcplusplus=	libc++
 _libcplusplus+=	libc++experimental
-.if ${MK_CHERI} == no
-_libcplusplus+=	libc++fs
-.endif
 .endif
 
 .if ${MK_LLVM_LIBUNWIND} != "no"
@@ -234,7 +230,9 @@ _libproc=	libproc
 _librtld_db=	librtld_db
 .endif
 
+.if ${MACHINE_ARCH} != "powerpc"
 SUBDIR.${MK_OPENMP}+=	libomp
+.endif
 SUBDIR.${MK_OPENSSL}+=	libmp
 SUBDIR.${MK_PMC}+=	libpmc libpmcstat
 SUBDIR.${MK_RADIUS_SUPPORT}+=	libradius

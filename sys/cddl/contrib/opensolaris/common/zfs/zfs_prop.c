@@ -292,10 +292,11 @@ zfs_prop_init(void)
 	    ZFS_VOLMODE_DEFAULT, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM | ZFS_TYPE_SNAPSHOT | ZFS_TYPE_VOLUME,
 	    "default | geom | dev | none", "VOLMODE", volmode_table);
+ 
 	zprop_register_index(ZFS_PROP_DNODESIZE, "dnodesize",
 	    ZFS_DNSIZE_LEGACY, PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
 	    "legacy | auto | 1k | 2k | 4k | 8k | 16k", "DNSIZE", dnsize_table);
- 
+
 	/* inherit index (boolean) properties */
 	zprop_register_index(ZFS_PROP_ATIME, "atime", 1, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM, "on | off", "ATIME", boolean_table);
@@ -450,6 +451,9 @@ zfs_prop_init(void)
 	zprop_register_number(ZFS_PROP_RECORDSIZE, "recordsize",
 	    SPA_OLD_MAXBLOCKSIZE, PROP_INHERIT,
 	    ZFS_TYPE_FILESYSTEM, "512 to 1M, power of 2", "RECSIZE");
+	zprop_register_number(ZFS_PROP_SPECIAL_SMALL_BLOCKS,
+	    "special_small_blocks", 0, PROP_INHERIT, ZFS_TYPE_FILESYSTEM,
+	    "zero or 512 to 128K, power of 2", "SPECIAL_SMALL_BLOCKS");
 
 	/* hidden properties */
 	zprop_register_hidden(ZFS_PROP_REMAPTXG, "remaptxg", PROP_TYPE_NUMBER,

@@ -488,7 +488,7 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_truncate",			/* 479 = cheriabi_truncate */
 	"ftruncate",			/* 480 = ftruncate */
 	"thr_kill2",			/* 481 = thr_kill2 */
-	"cheriabi_shm_open",			/* 482 = cheriabi_shm_open */
+	"obs_freebsd12_shm_open",			/* 482 = obsolete freebsd12_shm_open */
 	"cheriabi_shm_unlink",			/* 483 = cheriabi_shm_unlink */
 	"cheriabi_cpuset",			/* 484 = cheriabi_cpuset */
 	"cpuset_setid",			/* 485 = cpuset_setid */
@@ -576,4 +576,7 @@ const char *cheriabi_syscallnames[] = {
 	"cheriabi_fhreadlink",			/* 567 = cheriabi_fhreadlink */
 	"cheriabi_funlinkat",			/* 568 = cheriabi_funlinkat */
 	"cheriabi_copy_file_range",			/* 569 = cheriabi_copy_file_range */
+	"cheriabi___sysctlbyname",			/* 570 = cheriabi___sysctlbyname */
+	"cheriabi_shm_open2",			/* 571 = cheriabi_shm_open2 */
+	"cheriabi_shm_rename",			/* 572 = cheriabi_shm_rename */
 };

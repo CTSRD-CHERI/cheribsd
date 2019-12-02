@@ -41,6 +41,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/cons.h>	/* cngetc() */
 #include <sys/cpuset.h>
+#include <sys/csan.h>
 #ifdef GPROF 
 #include <sys/gmon.h>
 #endif
@@ -143,6 +144,11 @@ static void	cpustop_handler_post(u_int cpu);
 static int	hyperthreading_allowed = 1;
 SYSCTL_INT(_machdep, OID_AUTO, hyperthreading_allowed, CTLFLAG_RDTUN,
 	&hyperthreading_allowed, 0, "Use Intel HTT logical CPUs");
+
+static int	hyperthreading_intr_allowed = 0;
+SYSCTL_INT(_machdep, OID_AUTO, hyperthreading_intr_allowed, CTLFLAG_RDTUN,
+	&hyperthreading_intr_allowed, 0,
+	"Allow interrupts on HTT logical CPUs");
 
 static struct topo_node topo_root;
 
@@ -1075,6 +1081,8 @@ init_secondary_tail(void)
 	cpu_initclocks_ap();
 #endif
 
+	kcsan_cpu_init(cpuid);
+
 	sched_throw(NULL);
 
 	panic("scheduler returned us to %s", __func__);
@@ -1121,7 +1129,8 @@ set_interrupt_apic_ids(void)
 			continue;
 
 		/* Don't let hyperthreads service interrupts. */
-		if (cpu_info[apic_id].cpu_hyperthread)
+		if (cpu_info[apic_id].cpu_hyperthread &&
+		    !hyperthreading_intr_allowed)
 			continue;
 
 		intr_add_cpu(i);

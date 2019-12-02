@@ -946,11 +946,10 @@ casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190531,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [

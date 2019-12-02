@@ -207,8 +207,6 @@ struct futex {
 	TAILQ_HEAD(lf_waiting_proc, waiting_proc) f_waiting_proc;
 };
 
-struct futex_list futex_list;
-
 #define FUTEX_LOCK(f)		mtx_lock(&(f)->f_lck)
 #define FUTEX_LOCKED(f)		mtx_owned(&(f)->f_lck)
 #define FUTEX_UNLOCK(f)		mtx_unlock(&(f)->f_lck)
@@ -226,7 +224,6 @@ struct futex_list futex_list;
 #define FUTEX_ASSERT_LOCKED(f)	mtx_assert(&(f)->f_lck, MA_OWNED)
 #define FUTEX_ASSERT_UNLOCKED(f) mtx_assert(&(f)->f_lck, MA_NOTOWNED)
 
-struct mtx futex_mtx;			/* protects the futex list */
 #define FUTEXES_LOCK		do { \
 				    mtx_lock(&futex_mtx); \
 				    LIN_SDT_PROBE1(locks, futex_mtx, \

@@ -349,6 +349,13 @@ unionfs_noderem(struct vnode *vp, struct thread *td)
 	vp->v_vnlock = &(vp->v_lock);
 	vp->v_data = NULL;
 	vp->v_object = NULL;
+	if (vp->v_writecount > 0) {
+		if (uvp != NULL)
+			VOP_ADD_WRITECOUNT(uvp, -vp->v_writecount);
+		else if (lvp != NULL)
+			VOP_ADD_WRITECOUNT(lvp, -vp->v_writecount);
+	} else if (vp->v_writecount < 0)
+		vp->v_writecount = 0;
 	VI_UNLOCK(vp);
 
 	if (lvp != NULLVP)
@@ -1269,11 +1276,10 @@ unionfs_checklowervp(struct vnode *vp, char *fil, int lno)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "struct iovec"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

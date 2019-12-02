@@ -83,7 +83,7 @@ static struct intsrc **interrupt_sources;
 #ifdef SMP
 static struct intsrc **interrupt_sorted;
 static int intrbalance;
-SYSCTL_INT(_hw, OID_AUTO, intrbalance, CTLFLAG_RW, &intrbalance, 0,
+SYSCTL_INT(_hw, OID_AUTO, intrbalance, CTLFLAG_RWTUN, &intrbalance, 0,
     "Interrupt auto-balance interval (seconds).  Zero disables.");
 static struct timeout_task intrbalance_task;
 #endif
@@ -750,7 +750,7 @@ sysctl_hw_intrs(SYSCTL_HANDLER_ARGS)
 	sbuf_delete(&sbuf);
 	return (error);
 }
-SYSCTL_PROC(_hw, OID_AUTO, intrs, CTLTYPE_STRING | CTLFLAG_RW,
+SYSCTL_PROC(_hw, OID_AUTO, intrs, CTLTYPE_STRING | CTLFLAG_RD,
     0, 0, sysctl_hw_intrs, "A", "interrupt:number @cpu: count");
 
 /*

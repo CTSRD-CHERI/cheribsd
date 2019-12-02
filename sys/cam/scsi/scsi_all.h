@@ -2886,7 +2886,7 @@ struct scsi_vpd_logical_block_prov
 };
 
 /*
- * Block Limits VDP Page based on SBC-4 Revision 2
+ * Block Limits VDP Page based on SBC-4 Revision 17
  */
 struct scsi_vpd_block_limits
 {
@@ -2896,7 +2896,8 @@ struct scsi_vpd_block_limits
 	u_int8_t page_length[2];
 #define SVPD_BL_PL_BASIC	0x10
 #define SVPD_BL_PL_TP		0x3C
-	u_int8_t reserved1;
+	u_int8_t flags;
+#define	SVPD_BL_WSNZ		0x01
 	u_int8_t max_cmp_write_len;
 	u_int8_t opt_txfer_len_grain[2];
 	u_int8_t max_txfer_len[4];
@@ -3621,7 +3622,9 @@ struct scsi_mode_header_10
 	u_int8_t data_length[2];/* Sense data length */
 	u_int8_t medium_type;
 	u_int8_t dev_spec;
-	u_int8_t unused[2];
+	u_int8_t flags;
+#define	SMH_LONGLBA	0x01
+	u_int8_t unused;
 	u_int8_t blk_desc_len[2];
 };
 

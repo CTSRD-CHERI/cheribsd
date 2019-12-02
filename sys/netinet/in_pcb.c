@@ -210,6 +210,22 @@ SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, randomtime,
 	&VNET_NAME(ipport_randomtime), 0,
 	"Minimum time to keep sequental port "
 	"allocation before switching to a random one");
+
+#ifdef RATELIMIT
+counter_u64_t rate_limit_active;
+counter_u64_t rate_limit_alloc_fail;
+counter_u64_t rate_limit_set_ok;
+
+static SYSCTL_NODE(_net_inet_ip, OID_AUTO, rl, CTLFLAG_RD, 0,
+    "IP Rate Limiting");
+SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, active, CTLFLAG_RD,
+    &rate_limit_active, "Active rate limited connections");
+SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, alloc_fail, CTLFLAG_RD,
+   &rate_limit_alloc_fail, "Rate limited connection failures");
+SYSCTL_COUNTER_U64(_net_inet_ip_rl, OID_AUTO, set_ok, CTLFLAG_RD,
+   &rate_limit_set_ok, "Rate limited setting succeeded");
+#endif /* RATELIMIT */
+
 #endif /* INET */
 
 /*
@@ -499,7 +515,7 @@ in_pcballoc(struct socket *so, struct inpcbinfo *pcbinfo)
 
 #ifdef INVARIANTS
 	if (pcbinfo == &V_tcbinfo) {
-		INP_INFO_RLOCK_ASSERT(pcbinfo);
+		NET_EPOCH_ASSERT();
 	} else {
 		INP_INFO_WLOCK_ASSERT(pcbinfo);
 	}
@@ -2236,12 +2252,10 @@ in_pcblookup_hash_locked(struct inpcbinfo *pcbinfo, struct in_addr faddr,
 	struct inpcb *inp, *tmpinp;
 	u_short fport = fport_arg, lport = lport_arg;
 
-#ifdef INVARIANTS
 	KASSERT((lookupflags & ~(INPLOOKUP_WILDCARD)) == 0,
 	    ("%s: invalid lookup flags %d", __func__, lookupflags));
-	if (!mtx_owned(&pcbinfo->ipi_hash_lock))
-		MPASS(in_epoch_verbose(net_epoch_preempt, 1));
-#endif
+	INP_HASH_LOCK_ASSERT(pcbinfo);
+
 	/*
 	 * First look for an exact match.
 	 */
@@ -2368,7 +2382,6 @@ in_pcblookup_hash(struct inpcbinfo *pcbinfo, struct in_addr faddr,
 {
 	struct inpcb *inp;
 
-	INP_HASH_RLOCK(pcbinfo);
 	inp = in_pcblookup_hash_locked(pcbinfo, faddr, fport, laddr, lport,
 	    (lookupflags & ~(INPLOOKUP_RLOCKPCB | INPLOOKUP_WLOCKPCB)), ifp);
 	if (inp != NULL) {
@@ -2395,7 +2408,7 @@ in_pcblookup_hash(struct inpcbinfo *pcbinfo, struct in_addr faddr,
 		}
 #endif
 	}
-	INP_HASH_RUNLOCK(pcbinfo);
+
 	return (inp);
 }
 
@@ -2641,7 +2654,7 @@ in_pcbremlists(struct inpcb *inp)
 
 #ifdef INVARIANTS
 	if (pcbinfo == &V_tcbinfo) {
-		INP_INFO_RLOCK_ASSERT(pcbinfo);
+		NET_EPOCH_ASSERT();
 	} else {
 		INP_INFO_WLOCK_ASSERT(pcbinfo);
 	}
@@ -3170,6 +3183,7 @@ in_pcbmodify_txrtlmt(struct inpcb *inp, uint32_t max_pacing_rate)
 {
 	union if_snd_tag_modify_params params = {
 		.rate_limit.max_rate = max_pacing_rate,
+		.rate_limit.flags = M_NOWAIT,
 	};
 	struct m_snd_tag *mst;
 	struct ifnet *ifp;
@@ -3256,7 +3270,8 @@ in_pcbquery_txrlevel(struct inpcb *inp, uint32_t *p_txqueue_level)
  */
 int
 in_pcbattach_txrtlmt(struct inpcb *inp, struct ifnet *ifp,
-    uint32_t flowtype, uint32_t flowid, uint32_t max_pacing_rate)
+    uint32_t flowtype, uint32_t flowid, uint32_t max_pacing_rate, struct m_snd_tag **st)
+
 {
 	union if_snd_tag_alloc_params params = {
 		.rate_limit.hdr.type = (max_pacing_rate == -1U) ?
@@ -3264,20 +3279,49 @@ in_pcbattach_txrtlmt(struct inpcb *inp, struct ifnet *ifp,
 		.rate_limit.hdr.flowid = flowid,
 		.rate_limit.hdr.flowtype = flowtype,
 		.rate_limit.max_rate = max_pacing_rate,
+		.rate_limit.flags = M_NOWAIT,
 	};
 	int error;
 
 	INP_WLOCK_ASSERT(inp);
 
-	if (inp->inp_snd_tag != NULL)
+	if (*st != NULL)
 		return (EINVAL);
 
 	if (ifp->if_snd_tag_alloc == NULL) {
 		error = EOPNOTSUPP;
 	} else {
 		error = ifp->if_snd_tag_alloc(ifp, &params, &inp->inp_snd_tag);
+
+#ifdef INET
+		if (error == 0) {
+			counter_u64_add(rate_limit_set_ok, 1);
+			counter_u64_add(rate_limit_active, 1);
+		} else
+			counter_u64_add(rate_limit_alloc_fail, 1);
+#endif
 	}
 	return (error);
+}
+
+void
+in_pcbdetach_tag(struct ifnet *ifp, struct m_snd_tag *mst)
+{
+	if (ifp == NULL)
+		return;
+
+	/*
+	 * If the device was detached while we still had reference(s)
+	 * on the ifp, we assume if_snd_tag_free() was replaced with
+	 * stubs.
+	 */
+	ifp->if_snd_tag_free(mst);
+
+	/* release reference count on network interface */
+	if_rele(ifp);
+#ifdef INET
+	counter_u64_add(rate_limit_active, -1);
+#endif
 }
 
 /*
@@ -3298,6 +3342,56 @@ in_pcbdetach_txrtlmt(struct inpcb *inp)
 		return;
 
 	m_snd_tag_rele(mst);
+}
+
+int
+in_pcboutput_txrtlmt_locked(struct inpcb *inp, struct ifnet *ifp, struct mbuf *mb, uint32_t max_pacing_rate)
+{
+	int error;
+
+	/*
+	 * If the existing send tag is for the wrong interface due to
+	 * a route change, first drop the existing tag.  Set the
+	 * CHANGED flag so that we will keep trying to allocate a new
+	 * tag if we fail to allocate one this time.
+	 */
+	if (inp->inp_snd_tag != NULL && inp->inp_snd_tag->ifp != ifp) {
+		in_pcbdetach_txrtlmt(inp);
+		inp->inp_flags2 |= INP_RATE_LIMIT_CHANGED;
+	}
+
+	/*
+	 * NOTE: When attaching to a network interface a reference is
+	 * made to ensure the network interface doesn't go away until
+	 * all ratelimit connections are gone. The network interface
+	 * pointers compared below represent valid network interfaces,
+	 * except when comparing towards NULL.
+	 */
+	if (max_pacing_rate == 0 && inp->inp_snd_tag == NULL) {
+		error = 0;
+	} else if (!(ifp->if_capenable & IFCAP_TXRTLMT)) {
+		if (inp->inp_snd_tag != NULL)
+			in_pcbdetach_txrtlmt(inp);
+		error = 0;
+	} else if (inp->inp_snd_tag == NULL) {
+		/*
+		 * In order to utilize packet pacing with RSS, we need
+		 * to wait until there is a valid RSS hash before we
+		 * can proceed:
+		 */
+		if (M_HASHTYPE_GET(mb) == M_HASHTYPE_NONE) {
+			error = EAGAIN;
+		} else {
+			error = in_pcbattach_txrtlmt(inp, ifp, M_HASHTYPE_GET(mb),
+			    mb->m_pkthdr.flowid, max_pacing_rate, &inp->inp_snd_tag);
+		}
+	} else {
+		error = in_pcbmodify_txrtlmt(inp, max_pacing_rate);
+	}
+	if (error == 0 || error == EOPNOTSUPP)
+		inp->inp_flags2 &= ~INP_RATE_LIMIT_CHANGED;
+
+	return (error);
 }
 
 /*
@@ -3342,47 +3436,8 @@ in_pcboutput_txrtlmt(struct inpcb *inp, struct ifnet *ifp, struct mbuf *mb)
 	 */
 	max_pacing_rate = socket->so_max_pacing_rate;
 
-	/*
-	 * If the existing send tag is for the wrong interface due to
-	 * a route change, first drop the existing tag.  Set the
-	 * CHANGED flag so that we will keep trying to allocate a new
-	 * tag if we fail to allocate one this time.
-	 */
-	if (inp->inp_snd_tag != NULL && inp->inp_snd_tag->ifp != ifp) {
-		in_pcbdetach_txrtlmt(inp);
-		inp->inp_flags2 |= INP_RATE_LIMIT_CHANGED;
-	}
+	error = in_pcboutput_txrtlmt_locked(inp, ifp, mb, max_pacing_rate);
 
-	/*
-	 * NOTE: When attaching to a network interface a reference is
-	 * made to ensure the network interface doesn't go away until
-	 * all ratelimit connections are gone. The network interface
-	 * pointers compared below represent valid network interfaces,
-	 * except when comparing towards NULL.
-	 */
-	if (max_pacing_rate == 0 && inp->inp_snd_tag == NULL) {
-		error = 0;
-	} else if (!(ifp->if_capenable & IFCAP_TXRTLMT)) {
-		if (inp->inp_snd_tag != NULL)
-			in_pcbdetach_txrtlmt(inp);
-		error = 0;
-	} else if (inp->inp_snd_tag == NULL) {
-		/*
-		 * In order to utilize packet pacing with RSS, we need
-		 * to wait until there is a valid RSS hash before we
-		 * can proceed:
-		 */
-		if (M_HASHTYPE_GET(mb) == M_HASHTYPE_NONE) {
-			error = EAGAIN;
-		} else {
-			error = in_pcbattach_txrtlmt(inp, ifp, M_HASHTYPE_GET(mb),
-			    mb->m_pkthdr.flowid, max_pacing_rate);
-		}
-	} else {
-		error = in_pcbmodify_txrtlmt(inp, max_pacing_rate);
-	}
-	if (error == 0 || error == EOPNOTSUPP)
-		inp->inp_flags2 &= ~INP_RATE_LIMIT_CHANGED;
 	if (did_upgrade)
 		INP_DOWNGRADE(inp);
 }
@@ -3424,4 +3479,16 @@ in_pcboutput_eagain(struct inpcb *inp)
 	if (did_upgrade)
 		INP_DOWNGRADE(inp);
 }
+
+#ifdef INET
+static void
+rl_init(void *st)
+{
+	rate_limit_active = counter_u64_alloc(M_WAITOK);
+	rate_limit_alloc_fail = counter_u64_alloc(M_WAITOK);
+	rate_limit_set_ok = counter_u64_alloc(M_WAITOK);
+}
+
+SYSINIT(rl, SI_SUB_PROTO_DOMAININIT, SI_ORDER_ANY, rl_init, NULL);
+#endif
 #endif /* RATELIMIT */

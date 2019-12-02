@@ -2136,8 +2136,7 @@ int
 sys_kmq_open(struct thread *td, struct kmq_open_args *uap)
 {
 
-	return (user_kmq_open(td, __USER_CAP_STR(uap->path), uap->flags,
-	    uap->mode, __USER_CAP_OBJ(uap->attr)));
+	return (user_kmq_open(td, uap->path, uap->flags, uap->mode, uap->attr));
 }
 
 static int
@@ -2166,7 +2165,7 @@ int
 sys_kmq_unlink(struct thread *td, struct kmq_unlink_args *uap)
 {
 
-	return (kern_kmq_unlink(td, __USER_CAP_STR(uap->path)));
+	return (kern_kmq_unlink(td, uap->path));
 }
 
 static int
@@ -2286,8 +2285,7 @@ int
 sys_kmq_setattr(struct thread *td, struct kmq_setattr_args *uap)
 {
 
-	return (user_kmq_setattr(td, uap->mqd, __USER_CAP_OBJ(uap->attr),
-	    __USER_CAP_OBJ(uap->oattr)));
+	return (user_kmq_setattr(td, uap->mqd, uap->attr, uap->oattr));
 }
 
 static int
@@ -2316,9 +2314,8 @@ int
 sys_kmq_timedreceive(struct thread *td, struct kmq_timedreceive_args *uap)
 {
 
-	return (kern_timedreceive(td, uap->mqd, __USER_CAP(uap->msg_ptr,
-	    uap->msg_len), uap->msg_len, __USER_CAP_OBJ(uap->msg_prio),
-	    __USER_CAP_OBJ(uap->abs_timeout)));
+	return (kern_timedreceive(td, uap->mqd, uap->msg_ptr, uap->msg_len,
+	    uap->msg_prio, uap->abs_timeout));
 }
 
 static int
@@ -2355,9 +2352,8 @@ int
 sys_kmq_timedsend(struct thread *td, struct kmq_timedsend_args *uap)
 {
 
-	return (kern_kmq_timedsend(td, uap->mqd,
-	    __USER_CAP(uap->msg_ptr, uap->msg_len), uap->msg_len, uap->msg_prio,
-	    __USER_CAP_OBJ(uap->abs_timeout)));
+	return (kern_kmq_timedsend(td, uap->mqd, uap->msg_ptr, uap->msg_len,
+	    uap->msg_prio, uap->abs_timeout));
 }
 
 static int
@@ -2502,7 +2498,7 @@ sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(__USER_CAP_OBJ(uap->sigev), &ev_n, sizeof(ev));
+		error = copyin(uap->sigev, &ev_n, sizeof(ev));
 		if (error != 0)
 			return (error);
 		convert_sigevent(&ev_n, &ev);
@@ -2875,7 +2871,7 @@ freebsd32_kmq_timedsend(struct thread *td,
 	if (uap->abs_timeout != NULL) {
 		error = copyin(uap->abs_timeout, &ets32, sizeof(ets32));
 		if (error != 0)
-			return (error);
+			goto out;
 		CP(ets32, ets, tv_sec);
 		CP(ets32, ets, tv_nsec);
 		abs_timeout = &ets;
@@ -2884,6 +2880,7 @@ freebsd32_kmq_timedsend(struct thread *td,
 	waitok = !(fp->f_flag & O_NONBLOCK);
 	error = mqueue_send(mq, uap->msg_ptr, uap->msg_len,
 		uap->msg_prio, waitok, abs_timeout);
+out:
 	fdrop(fp, td);
 	return (error);
 }

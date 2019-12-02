@@ -39,8 +39,14 @@
         aout
         ..
         clang
-            8.0.1
+            9.0.0
                 include
+                    cuda_wrappers
+                    ..
+                    openmp_wrappers
+                    ..
+                    ppc_wrappers
+                    ..
                     sanitizer
                     ..
                 ..
@@ -196,6 +202,12 @@
             uk_UA.KOI8-U
             ..
         ..
+        certs
+            blacklisted
+            ..
+            trusted
+            ..
+        ..
         dict
         ..
         doc
@@ -304,8 +316,6 @@
             mdoc
             ..
             netgraph
-            ..
-            pc-sysinstall
             ..
             perfmon
             ..
@@ -1168,20 +1178,6 @@
                 ..
                 man3
                 ..
-            ..
-        ..
-        pc-sysinstall
-            backend
-            ..
-            backend-partmanager
-            ..
-            backend-query
-            ..
-            conf
-                license
-                ..
-            ..
-            doc
             ..
         ..
         security

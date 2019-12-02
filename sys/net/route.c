@@ -38,10 +38,9 @@
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
-#include "opt_route.h"
-#include "opt_sctp.h"
 #include "opt_mrouting.h"
 #include "opt_mpath.h"
+#include "opt_route.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -53,6 +52,7 @@
 #include <sys/sysproto.h>
 #include <sys/proc.h>
 #include <sys/domain.h>
+#include <sys/eventhandler.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/rmlock.h>
@@ -89,13 +89,6 @@
 #ifndef	RT_NUMFIBS
 #define	RT_NUMFIBS	1
 #endif
-
-#if defined(INET) || defined(INET6)
-#ifdef SCTP
-extern void sctp_addr_change(struct ifaddr *ifa, int cmd);
-#endif /* SCTP */
-#endif
-
 
 /* This is read-only.. */
 u_int rt_numfibs = RT_NUMFIBS;
@@ -140,6 +133,9 @@ VNET_DEFINE(int, rttrash);		/* routes not in table but not freed */
 VNET_DEFINE_STATIC(uma_zone_t, rtzone);		/* Routing table UMA zone. */
 #define	V_rtzone	VNET(rtzone)
 
+EVENTHANDLER_LIST_DEFINE(rt_addrmsg);
+
+static int rt_getifa_fib(struct rt_addrinfo *, u_int);
 static int rtrequest1_fib_change(struct rib_head *, struct rt_addrinfo *,
     struct rtentry **, u_int);
 static void rt_setmetrics(const struct rt_addrinfo *, struct rtentry *);
@@ -593,12 +589,12 @@ rtredirect_fib(struct sockaddr *dst,
 	int error = 0;
 	short *stat = NULL;
 	struct rt_addrinfo info;
-	struct epoch_tracker et;
 	struct ifaddr *ifa;
 	struct rib_head *rnh;
 
+	NET_EPOCH_ASSERT();
+
 	ifa = NULL;
-	NET_EPOCH_ENTER(et);
 	rnh = rt_tables_get_rnh(fibnum, dst->sa_family);
 	if (rnh == NULL) {
 		error = EAFNOSUPPORT;
@@ -693,7 +689,6 @@ done:
 	if (rt)
 		RTFREE_LOCKED(rt);
  out:
-	NET_EPOCH_EXIT(et);
 	if (error)
 		V_rtstat.rts_badredirect++;
 	else if (stat != NULL)
@@ -1299,7 +1294,7 @@ rt_getifa_fib(struct rt_addrinfo *info, u_int fibnum)
 	    ifpaddr->sa_family == AF_LINK) {
 	    const struct sockaddr_dl *sdl = (const struct sockaddr_dl *)ifpaddr;
 	    if (sdl->sdl_index != 0)
-		    info->rti_ifp = ifnet_byindex_locked(sdl->sdl_index);
+		    info->rti_ifp = ifnet_byindex(sdl->sdl_index);
 	}
 	/*
 	 * If we have source address specified, try to find it
@@ -1590,6 +1585,8 @@ rtrequest1_fib(int req, struct rt_addrinfo *info, struct rtentry **ret_nrt,
 	switch (req) {
 	case RTM_DELETE:
 		if (netmask) {
+			if (dst->sa_len > sizeof(mdst))
+				return (EINVAL);
 			rt_maskedcopy(dst, (struct sockaddr *)&mdst, netmask);
 			dst = (struct sockaddr *)&mdst;
 		}
@@ -2223,20 +2220,10 @@ rt_addrmsg(int cmd, struct ifaddr *ifa, int fibnum)
 
 	KASSERT(cmd == RTM_ADD || cmd == RTM_DELETE,
 	    ("unexpected cmd %d", cmd));
-	
 	KASSERT(fibnum == RT_ALL_FIBS || (fibnum >= 0 && fibnum < rt_numfibs),
 	    ("%s: fib out of range 0 <=%d<%d", __func__, fibnum, rt_numfibs));
 
-#if defined(INET) || defined(INET6)
-#ifdef SCTP
-	/*
-	 * notify the SCTP stack
-	 * this will only get called when an address is added/deleted
-	 * XXX pass the ifaddr struct instead if ifa->ifa_addr...
-	 */
-	sctp_addr_change(ifa, cmd);
-#endif /* SCTP */
-#endif
+	EVENTHANDLER_DIRECT_INVOKE(rt_addrmsg, ifa, cmd);
 	return (rtsock_addrmsg(cmd, ifa, fibnum));
 }
 

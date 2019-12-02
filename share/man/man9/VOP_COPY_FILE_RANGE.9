@@ -25,12 +25,13 @@
 .\"
 .\" $FreeBSD$
 .\"
-.Dd July 24, 2019
+.Dd November 9, 2019
 .Dt VOP_COPY_FILE_RANGE 9
 .Os
 .Sh NAME
 .Nm VOP_COPY_FILE_RANGE
-.Nd copy a byte range from one regular file to another within a file system
+.Nd copy a byte range from one file to another or within one file
+in a single file system
 .Sh SYNOPSIS
 .In sys/param.h
 .In sys/vnode.h
@@ -46,8 +47,17 @@
 .Fa "struct ucred *outcred"
 .Fa "struct thread *fsize_td"
 .Sh DESCRIPTION
-This entry point copies a byte range from one regular file to another within a
-file system.
+This entry point copies a byte range from one regular file to another
+or within one file in a single file system.
+.Fa invp
+and
+.Fa outvp
+can refer to the same file.
+For this case, the byte ranges defined by
+.Fa *inoff ,
+.Fa *outoff and
+.Fa *len
+will not overlap.
 .Pp
 The arguments are:
 .Bl -tag -width ioflag
@@ -60,7 +70,7 @@ The vnode of the output file.
 .It Fa outoff
 A pointer to the file offset for the output file.
 .It Fa len
-A pointer to the number of bytes to be copied.
+A pointer to the byte count for the copy.
 .It Fa flags
 Flags, should be set to 0 for now.
 .It Fa incred
@@ -89,11 +99,18 @@ The
 .Fa len
 argument points to the location that stores the number of bytes
 to be copied.
-It should be reduced by the number of bytes copied, which implies that
-the value pointed to by
+Upon a successful return
 .Fa len
-will normally be zero for a non-error return.
-However, a copy of fewer bytes than requested is permitted.
+will be updated to the number of bytes actually copied.
+Normally, this will be the number of bytes requested to be copied,
+however a copy of fewer bytes than requested is permitted.
+This does not necessarily indicate that the copy reached EOF on the input file.
+However, if the value pointed to by the
+.Fa len
+argument is zero upon a successful return,
+it indicates that the offset pointed to by
+.Fa inoff
+is at or beyond EOF on the input file.
 .Sh LOCKS
 The vnode are unlocked on entry and must be unlocked on return.
 The byte ranges for both

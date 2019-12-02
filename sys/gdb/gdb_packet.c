@@ -45,7 +45,27 @@ __FBSDID("$FreeBSD$");
 static char gdb_rxbuf[GDB_BUFSZ];
 char *gdb_rxp = NULL;
 size_t gdb_rxsz = 0;
-static char gdb_txbuf[GDB_BUFSZ];
+
+/*
+ * The goal here is to allow in-place framing without making the math around
+ * 'gdb_txbuf' more complicated.  A generous reading of union special rule for
+ * "common initial sequence" suggests this may be valid in standard C99 and
+ * later.
+ */
+static union {
+	struct _midbuf {
+		char mb_pad1;
+		char mb_buf[GDB_BUFSZ];
+		char mb_pad2[4];
+	} __packed txu_midbuf;
+	/* sizeof includes trailing nul byte and this is intentional. */
+	char txu_fullbuf[GDB_BUFSZ + sizeof("$#..")];
+} gdb_tx_u;
+#define	gdb_txbuf	gdb_tx_u.txu_midbuf.mb_buf
+#define	gdb_tx_fullbuf	gdb_tx_u.txu_fullbuf
+_Static_assert(sizeof(gdb_tx_u.txu_midbuf) == sizeof(gdb_tx_u.txu_fullbuf) &&
+    offsetof(struct _midbuf, mb_buf) == 1,
+    "assertions necessary for correctness");
 char *gdb_txp = NULL;			/* Used in inline functions. */
 
 #define	C2N(c)	(((c) < 'A') ? (c) - '0' : \
@@ -67,6 +87,9 @@ gdb_getc(void)
 
 	if (c == CTRL('C')) {
 		printf("Received ^C; trying to switch back to ddb.\n");
+
+		if (gdb_cur->gdb_dbfeatures & GDB_DBGP_FEAT_WANTTERM)
+			gdb_cur->gdb_term();
 
 		if (kdb_dbbe_select("ddb") != 0)
 			printf("The ddb backend could not be selected.\n");
@@ -111,18 +134,28 @@ gdb_rx_begin(void)
 
 		/* Bail out on a buffer overflow. */
 		if (c != '#') {
-			gdb_cur->gdb_putc('-');
+			gdb_nack();
 			return (ENOSPC);
 		}
+
+		/*
+		 * In Not-AckMode, we can assume reliable transport and neither
+		 * need to verify checksums nor send Ack/Nack.
+		 */
+		if (!gdb_ackmode)
+			break;
 
 		c = gdb_getc();
 		cksum -= (C2N(c) << 4) & 0xf0;
 		c = gdb_getc();
 		cksum -= C2N(c) & 0x0f;
-		gdb_cur->gdb_putc((cksum == 0) ? '+' : '-');
-		if (cksum != 0)
+		if (cksum == 0) {
+			gdb_ack();
+		} else {
+			gdb_nack();
 			printf("GDB: packet `%s' has invalid checksum\n",
 			    gdb_rxbuf);
+		}
 	} while (cksum != 0);
 
 	gdb_rxp = gdb_rxbuf;
@@ -197,7 +230,7 @@ gdb_rx_varhex(uintmax_t *vp)
 		v += C2N(c);
 		c = gdb_rx_char();
 	} while (isxdigit(c));
-	if (c != -1) {
+	if (c != EOF) {
 		gdb_rxp--;
 		gdb_rxsz++;
 	}
@@ -218,6 +251,29 @@ gdb_tx_begin(char tp)
 		gdb_tx_char(tp);
 }
 
+/*
+ * Take raw packet buffer and perform typical GDB packet framing, but not run-
+ * length encoding, before forwarding to driver ::gdb_sendpacket() routine.
+ */
+static void
+gdb_tx_sendpacket(void)
+{
+	size_t msglen, i;
+	unsigned char csum;
+
+	msglen = gdb_txp - gdb_txbuf;
+
+	/* Add GDB packet framing */
+	gdb_tx_fullbuf[0] = '$';
+
+	csum = 0;
+	for (i = 0; i < msglen; i++)
+		csum += (unsigned char)gdb_txbuf[i];
+	snprintf(&gdb_tx_fullbuf[1 + msglen], 4, "#%02x", (unsigned)csum);
+
+	gdb_cur->gdb_sendpacket(gdb_tx_fullbuf, msglen + 4);
+}
+
 int
 gdb_tx_end(void)
 {
@@ -226,6 +282,11 @@ gdb_tx_end(void)
 	unsigned char c, cksum;
 
 	do {
+		if (gdb_cur->gdb_sendpacket != NULL) {
+			gdb_tx_sendpacket();
+			goto getack;
+		}
+
 		gdb_cur->gdb_putc('$');
 
 		cksum = 0;
@@ -284,6 +345,15 @@ gdb_tx_end(void)
 		c = cksum & 0x0f;
 		gdb_cur->gdb_putc(N2C(c));
 
+getack:
+		/*
+		 * In NoAckMode, it is assumed that the underlying transport is
+		 * reliable and thus neither conservant sends acknowledgements;
+		 * there is nothing to wait for here.
+		 */
+		if (!gdb_ackmode)
+			break;
+
 		c = gdb_getc();
 	} while (c != '+');
 
@@ -327,6 +397,12 @@ gdb_tx_reg(int regnum)
 		gdb_tx_mem(regp, regsz);
 }
 
+bool
+gdb_txbuf_has_capacity(size_t req)
+{
+	return (((char *)gdb_txbuf + sizeof(gdb_txbuf) - gdb_txp) >= req);
+}
+
 /* Read binary data up until the end of the packet or until we have datalen decoded bytes */
 int
 gdb_rx_bindata(unsigned char *data, size_t datalen, size_t *amt)
@@ -337,13 +413,12 @@ gdb_rx_bindata(unsigned char *data, size_t datalen, size_t *amt)
 
 	while (*amt < datalen) {
 		c = gdb_rx_char();
-		/* End of packet? */
-		if (c == -1)
+		if (c == EOF)
 			break;
 		/* Escaped character up next */
 		if (c == '}') {
-			/* Truncated packet? Bail out */
-			if ((c = gdb_rx_char()) == -1)
+			/* Malformed packet. */
+			if ((c = gdb_rx_char()) == EOF)
 				return (1);
 			c ^= 0x20;
 		}

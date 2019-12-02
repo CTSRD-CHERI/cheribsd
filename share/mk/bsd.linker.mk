@@ -65,7 +65,7 @@ ${var}=	${${var}__${${X_}_ld_hash}}
 .if ${ld} == "LD" || (${ld} == "XLD" && ${XLD} != ${LD})
 .if !defined(${X_}LINKER_TYPE) || !defined(${X_}LINKER_VERSION)
 # See bsd.compiler.mk
-.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET)
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !make(sysent)
 .warning "${.CURDIR}: Rerunning ${${ld}} -v to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION. This value should be cached!"
 .else
 # .info "${.CURDIR}: Running ${${ld}} -v to compute ${X_}LINKER_TYPE/${X_}LINKER_VERSION"

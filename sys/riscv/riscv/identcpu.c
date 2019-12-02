@@ -52,12 +52,18 @@ __FBSDID("$FreeBSD$");
 #ifdef FDT
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/openfirm.h>
+#include <dev/ofw/ofw_bus_subr.h>
 #endif
 
 char machine[] = "riscv";
 
 SYSCTL_STRING(_hw, HW_MACHINE, machine, CTLFLAG_RD, machine, 0,
     "Machine class");
+
+/* Hardware implementation info. These values may be empty. */
+register_t mvendorid;	/* The CPU's JEDEC vendor ID */
+register_t marchid;	/* The architecture ID */
+register_t mimpid;	/* The implementation ID */
 
 struct cpu_desc {
 	u_int		cpu_impl;
@@ -141,11 +147,9 @@ fill_elf_hwcap(void *dummy __unused)
 	 * ISAs, keep only the extension bits that are common to all harts.
 	 */
 	for (node = OF_child(node); node > 0; node = OF_peer(node)) {
-		if (!fdt_is_compatible_strict(node, "riscv")) {
-			if (bootverbose)
-				printf("fill_elf_hwcap: Can't find cpu\n");
-			return;
-		}
+		/* Skip any non-CPU nodes, such as cpu-map. */
+		if (!ofw_bus_node_is_compatible(node, "riscv"))
+			continue;
 
 		len = OF_getprop(node, "riscv,isa", isa, sizeof(isa));
 		KASSERT(len <= ISA_NAME_MAXLEN, ("ISA string truncated"));

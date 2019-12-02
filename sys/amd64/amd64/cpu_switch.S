@@ -45,18 +45,6 @@
 
 	.text
 
-#ifdef SMP
-#define LK	lock ;
-#else
-#define LK
-#endif
-
-#if defined(SCHED_ULE) && defined(SMP)
-#define	SETLK	xchgq
-#else
-#define	SETLK	movq
-#endif
-
 /*
  * cpu_throw()
  *
@@ -86,7 +74,7 @@ END(cpu_throw)
  */
 ENTRY(cpu_switch)
 	/* Switch to new thread.  First, save context. */
-	movq	TD_PCB(%rdi),%r8
+	leaq	TD_MD_PCB(%rdi),%r8
 
 	movq	(%rsp),%rax			/* Hardware registers */
 	movq	%r15,PCB_R15(%r8)
@@ -150,17 +138,15 @@ ctx_switch_xsave:
 	movq	%rdx,%r15
 	movq	%rsi,%rdi
 	callq	pmap_activate_sw
-	SETLK	%r15,TD_LOCK(%r13)		/* Release the old thread */
+	movq	%r15,TD_LOCK(%r13)		/* Release the old thread */
 sw1:
-	movq	TD_PCB(%r12),%r8
+	leaq	TD_MD_PCB(%r12),%r8
 #if defined(SCHED_ULE) && defined(SMP)
-	/* Wait for the new thread to become unblocked */
 	movq	$blocked_lock, %rdx
-1:
 	movq	TD_LOCK(%r12),%rcx
 	cmpq	%rcx, %rdx
-	pause
-	je	1b
+	je	sw1wait
+sw1cont:
 #endif
 	/*
 	 * At this point, we've switched address spaces and are ready
@@ -202,16 +188,19 @@ do_kthread:
 	/* Do we need to reload tss ? */
 	movq	PCPU(TSSP),%rax
 	movq	PCB_TSSP(%r8),%rdx
+	movq	PCPU(PRVSPACE),%r13
+	addq	$PC_COMMONTSS,%r13
 	testq	%rdx,%rdx
-	cmovzq	PCPU(COMMONTSSP),%rdx
+	cmovzq	%r13,%rdx
 	cmpq	%rax,%rdx
 	jne	do_tss
 done_tss:
-	movq	%r8,PCPU(RSP0)
+	movq	TD_MD_STACK_BASE(%r12),%r9
+	movq	%r9,PCPU(RSP0)
 	movq	%r8,PCPU(CURPCB)
 	movq	PCPU(PTI_RSP0),%rax
 	cmpq	$~0,PCPU(UCR3)
-	cmove	%r8,%rax
+	cmove	%r9,%rax
 	movq	%rax,TSS_RSP0(%rdx)
 	movq	%r12,PCPU(CURTHREAD)		/* into next thread */
 
@@ -496,3 +485,14 @@ ENTRY(resumectx)
 	xorl	%eax,%eax
 	ret
 END(resumectx)
+
+/* Wait for the new thread to become unblocked */
+#if defined(SCHED_ULE) && defined(SMP)
+sw1wait:
+1:
+	pause
+	movq	TD_LOCK(%r12),%rcx
+	cmpq	%rcx, %rdx
+	je	1b
+	jmp	sw1cont
+#endif

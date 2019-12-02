@@ -11,4 +11,6 @@ SRCS=	bus_if.h device_if.h pci_if.h \
 SRCS+=	isp_sbus.c ofw_bus_if.h
 .endif
 
+# Silence spurious warning (array of bytes accessed as 32-bit words).
+CFLAGS+=	-Wno-sizeof-array-div
 .include <bsd.kmod.mk>

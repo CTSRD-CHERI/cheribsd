@@ -1092,10 +1092,12 @@ rt2860_drain_stats_fifo(struct rt2860_softc *sc)
 		DPRINTFN(4, ("tx stat 0x%08x\n", stat));
 
 		wcid = (stat >> RT2860_TXQ_WCID_SHIFT) & 0xff;
+		if (wcid > RT2860_WCID_MAX)
+			continue;
 		ni = sc->wcid2ni[wcid];
 
 		/* if no ACK was requested, no feedback is available */
-		if (!(stat & RT2860_TXQ_ACKREQ) || wcid == 0xff || ni == NULL)
+		if (!(stat & RT2860_TXQ_ACKREQ) || ni == NULL)
 			continue;
 
 		/* update per-STA AMRR stats */
@@ -2218,7 +2220,7 @@ static void
 rt2860_enable_mrr(struct rt2860_softc *sc)
 {
 #define CCK(mcs)	(mcs)
-#define OFDM(mcs)	(1 << 3 | (mcs))
+#define	OFDM(mcs)	(1U << 3 | (mcs))
 	RAL_WRITE(sc, RT2860_LG_FBK_CFG0,
 	    OFDM(6) << 28 |	/* 54->48 */
 	    OFDM(5) << 24 |	/* 48->36 */
@@ -3323,7 +3325,7 @@ b4inc(uint32_t b32, int8_t delta)
 			b4 = 0;
 		else if (b4 > 0xf)
 			b4 = 0xf;
-		b32 = b32 >> 4 | b4 << 28;
+		b32 = b32 >> 4 | (uint32_t)b4 << 28;
 	}
 	return b32;
 }

@@ -101,8 +101,8 @@ m_pulldown(struct mbuf *m, int off, int len, int *offp)
 	int writable;
 
 	/* check invalid arguments. */
-	if (m == NULL)
-		panic("m == NULL in m_pulldown()");
+	KASSERT(m != NULL, ("%s: fix caller: m is NULL off %d len %d offp %p\n",
+	    __func__, off, len, offp));
 	if (len > MCLBYTES) {
 		m_freem(m);
 		return NULL;	/* impossible */
@@ -216,7 +216,7 @@ m_pulldown(struct mbuf *m, int off, int len, int *offp)
 		goto ok;
 	}
 	if ((off == 0 || offp) && M_LEADINGSPACE(n->m_next) >= hlen
-	 && writable) {
+	 && writable && n->m_next->m_len >= tlen) {
 		n->m_next->m_data -= hlen;
 		n->m_next->m_len += hlen;
 		bcopy(mtod(n, caddr_t) + off, mtod(n->m_next, caddr_t), hlen);

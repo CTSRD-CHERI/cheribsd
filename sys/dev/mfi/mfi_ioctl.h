@@ -85,7 +85,7 @@ struct mfi_ioc_packet {
 	} mfi_frame;
 
 	struct iovec mfi_sgl[MAX_IOCTL_SGE];
-} __packed __aligned(sizeof(void *__CAPABILITY));
+} __packed __aligned(sizeof(void *__capability));
 
 #ifdef COMPAT_FREEBSD64
 /* XXX-AM: fix for freebsd64 */
@@ -102,7 +102,7 @@ struct mfi_ioc_packet64 {
 	} mfi_frame;
 
 	struct iovec_native mfi_sgl[MAX_IOCTL_SGE];
-} __packed __aligned(sizeof(void *__CAPABILITY));
+} __packed __aligned(sizeof(void *__capability));
 #endif
 
 #ifdef COMPAT_FREEBSD32
@@ -154,7 +154,7 @@ struct mfi_linux_ioc_packet {
 #else
 	struct iovec lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #endif
-} __packed __aligned(sizeof(void *__CAPABILITY));
+} __packed __aligned(sizeof(void *__capability));
 
 #ifdef COMPAT_FREEBSD64
 /* XXX-AM: fix for freebsd64 */
@@ -175,7 +175,7 @@ struct mfi_linux_ioc_packet {
 #else
 	struct iovec64 lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #endif
-} __packed __aligned(sizeof(void *__CAPABILITY));
+} __packed __aligned(sizeof(void *__capability));
 #endif /* COMPAT_FREEBSD64 */
 
 struct mfi_ioc_passthru {
@@ -233,10 +233,9 @@ struct mfi_query_disk {
 #define MFI_LINUX_SET_AEN_2	0x400c4d04
 // CHERI CHANGES START
 // {
-//   "updated": 20181018,
+//   "updated": 20191025,
 //   "target_type": "header",
 //   "changes": [
-//     "struct iovec",
 //     "integer_provenance"
 //   ],
 //   "changes_purecap": [

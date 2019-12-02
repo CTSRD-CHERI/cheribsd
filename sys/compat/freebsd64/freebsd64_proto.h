@@ -1090,11 +1090,6 @@ struct freebsd64_truncate_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 	char length_l_[PADL_(off_t)]; off_t length; char length_r_[PADR_(off_t)];
 };
-struct freebsd64_shm_open_args {
-	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
-	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
-	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
-};
 struct freebsd64_shm_unlink_args {
 	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
 };
@@ -1474,6 +1469,26 @@ struct freebsd64_copy_file_range_args {
 	char len_l_[PADL_(size_t)]; size_t len; char len_r_[PADR_(size_t)];
 	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
 };
+struct freebsd64___sysctlbyname_args {
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+	char namelen_l_[PADL_(size_t)]; size_t namelen; char namelen_r_[PADR_(size_t)];
+	char old_l_[PADL_(void *)]; void * old; char old_r_[PADR_(void *)];
+	char oldlenp_l_[PADL_(size_t *)]; size_t * oldlenp; char oldlenp_r_[PADR_(size_t *)];
+	char new_l_[PADL_(void *)]; void * new; char new_r_[PADR_(void *)];
+	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
+};
+struct freebsd64_shm_open2_args {
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+	char shmflags_l_[PADL_(int)]; int shmflags; char shmflags_r_[PADR_(int)];
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+};
+struct freebsd64_shm_rename_args {
+	char path_from_l_[PADL_(const char *)]; const char * path_from; char path_from_r_[PADR_(const char *)];
+	char path_to_l_[PADL_(const char *)]; const char * path_to; char path_to_r_[PADR_(const char *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
 int	freebsd64_read(struct thread *, struct freebsd64_read_args *);
 int	freebsd64_write(struct thread *, struct freebsd64_write_args *);
 int	freebsd64_open(struct thread *, struct freebsd64_open_args *);
@@ -1697,7 +1712,6 @@ int	freebsd64_pread(struct thread *, struct freebsd64_pread_args *);
 int	freebsd64_pwrite(struct thread *, struct freebsd64_pwrite_args *);
 int	freebsd64_mmap(struct thread *, struct freebsd64_mmap_args *);
 int	freebsd64_truncate(struct thread *, struct freebsd64_truncate_args *);
-int	freebsd64_shm_open(struct thread *, struct freebsd64_shm_open_args *);
 int	freebsd64_shm_unlink(struct thread *, struct freebsd64_shm_unlink_args *);
 int	freebsd64_cpuset(struct thread *, struct freebsd64_cpuset_args *);
 int	freebsd64_cpuset_getid(struct thread *, struct freebsd64_cpuset_getid_args *);
@@ -1769,6 +1783,9 @@ int	freebsd64_fhlinkat(struct thread *, struct freebsd64_fhlinkat_args *);
 int	freebsd64_fhreadlink(struct thread *, struct freebsd64_fhreadlink_args *);
 int	freebsd64_funlinkat(struct thread *, struct freebsd64_funlinkat_args *);
 int	freebsd64_copy_file_range(struct thread *, struct freebsd64_copy_file_range_args *);
+int	freebsd64___sysctlbyname(struct thread *, struct freebsd64___sysctlbyname_args *);
+int	freebsd64_shm_open2(struct thread *, struct freebsd64_shm_open2_args *);
+int	freebsd64_shm_rename(struct thread *, struct freebsd64_shm_rename_args *);
 
 #ifdef COMPAT_43
 
@@ -1968,6 +1985,18 @@ int	freebsd11_freebsd64_fstatat(struct thread *, struct freebsd11_freebsd64_fsta
 int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mknodat_args *);
 
 #endif /* COMPAT_FREEBSD11 */
+
+
+#ifdef COMPAT_FREEBSD12
+
+struct freebsd12_freebsd64_shm_open_args {
+	char path_l_[PADL_(const char *)]; const char * path; char path_r_[PADR_(const char *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+	char mode_l_[PADL_(mode_t)]; mode_t mode; char mode_r_[PADR_(mode_t)];
+};
+int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm_open_args *);
+
+#endif /* COMPAT_FREEBSD12 */
 
 #define	FREEBSD64_SYS_AUE_freebsd64_read	AUE_READ
 #define	FREEBSD64_SYS_AUE_freebsd64_write	AUE_WRITE
@@ -2217,7 +2246,7 @@ int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mkno
 #define	FREEBSD64_SYS_AUE_freebsd64_pwrite	AUE_PWRITE
 #define	FREEBSD64_SYS_AUE_freebsd64_mmap	AUE_MMAP
 #define	FREEBSD64_SYS_AUE_freebsd64_truncate	AUE_TRUNCATE
-#define	FREEBSD64_SYS_AUE_freebsd64_shm_open	AUE_SHMOPEN
+#define	FREEBSD64_SYS_AUE_freebsd12_freebsd64_shm_open	AUE_SHMOPEN
 #define	FREEBSD64_SYS_AUE_freebsd64_shm_unlink	AUE_SHMUNLINK
 #define	FREEBSD64_SYS_AUE_freebsd64_cpuset	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_cpuset_getid	AUE_NULL
@@ -2291,6 +2320,9 @@ int	freebsd11_freebsd64_mknodat(struct thread *, struct freebsd11_freebsd64_mkno
 #define	FREEBSD64_SYS_AUE_freebsd64_fhreadlink	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64_funlinkat	AUE_UNLINKAT
 #define	FREEBSD64_SYS_AUE_freebsd64_copy_file_range	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd64___sysctlbyname	AUE_SYSCTL
+#define	FREEBSD64_SYS_AUE_freebsd64_shm_open2	AUE_SHMOPEN
+#define	FREEBSD64_SYS_AUE_freebsd64_shm_rename	AUE_SHMRENAME
 
 #undef PAD_
 #undef PADL_

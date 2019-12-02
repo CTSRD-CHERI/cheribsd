@@ -247,7 +247,7 @@ struct freebsd32_aio_write_args {
 };
 struct freebsd32_lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct aiocb32 *const *)]; struct aiocb32 *const * acb_list; char acb_list_r_[PADR_(struct aiocb32 *const *)];
+	char acb_list_l_[PADL_(struct aiocb32 * const *)]; struct aiocb32 * const * acb_list; char acb_list_r_[PADR_(struct aiocb32 * const *)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char sig_l_[PADL_(struct sigevent32 *)]; struct sigevent32 * sig; char sig_r_[PADR_(struct sigevent32 *)];
 };
@@ -281,7 +281,7 @@ struct freebsd32_aio_return_args {
 	char aiocbp_l_[PADL_(struct aiocb32 *)]; struct aiocb32 * aiocbp; char aiocbp_r_[PADR_(struct aiocb32 *)];
 };
 struct freebsd32_aio_suspend_args {
-	char aiocbp_l_[PADL_(struct aiocb32 *const *)]; struct aiocb32 *const * aiocbp; char aiocbp_r_[PADR_(struct aiocb32 *const *)];
+	char aiocbp_l_[PADL_(struct aiocb32 * const *)]; struct aiocb32 * const * aiocbp; char aiocbp_r_[PADR_(struct aiocb32 * const *)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec32 *)]; const struct timespec32 * timeout; char timeout_r_[PADR_(const struct timespec32 *)];
 };
@@ -730,6 +730,14 @@ struct freebsd32_cpuset_setdomain_args {
 	char mask_l_[PADL_(domainset_t *)]; domainset_t * mask; char mask_r_[PADR_(domainset_t *)];
 	char policy_l_[PADL_(int)]; int policy; char policy_r_[PADR_(int)];
 };
+struct freebsd32___sysctlbyname_args {
+	char name_l_[PADL_(const char *)]; const char * name; char name_r_[PADR_(const char *)];
+	char namelen_l_[PADL_(size_t)]; size_t namelen; char namelen_r_[PADR_(size_t)];
+	char old_l_[PADL_(void *)]; void * old; char old_r_[PADR_(void *)];
+	char oldlenp_l_[PADL_(uint32_t *)]; uint32_t * oldlenp; char oldlenp_r_[PADR_(uint32_t *)];
+	char new_l_[PADL_(void *)]; void * new; char new_r_[PADR_(void *)];
+	char newlen_l_[PADL_(size_t)]; size_t newlen; char newlen_r_[PADR_(size_t)];
+};
 #if !defined(PAD64_REQUIRED) && !defined(__amd64__)
 #define PAD64_REQUIRED
 #endif
@@ -866,6 +874,7 @@ int	freebsd32_mknodat(struct thread *, struct freebsd32_mknodat_args *);
 int	freebsd32_kevent(struct thread *, struct freebsd32_kevent_args *);
 int	freebsd32_cpuset_getdomain(struct thread *, struct freebsd32_cpuset_getdomain_args *);
 int	freebsd32_cpuset_setdomain(struct thread *, struct freebsd32_cpuset_setdomain_args *);
+int	freebsd32___sysctlbyname(struct thread *, struct freebsd32___sysctlbyname_args *);
 
 #ifdef COMPAT_43
 
@@ -1086,7 +1095,7 @@ struct freebsd6_freebsd32_aio_write_args {
 };
 struct freebsd6_freebsd32_lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct oaiocb32 *const *)]; struct oaiocb32 *const * acb_list; char acb_list_r_[PADR_(struct oaiocb32 *const *)];
+	char acb_list_l_[PADL_(struct oaiocb32 * const *)]; struct oaiocb32 * const * acb_list; char acb_list_r_[PADR_(struct oaiocb32 * const *)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char sig_l_[PADL_(struct osigevent32 *)]; struct osigevent32 * sig; char sig_r_[PADR_(struct osigevent32 *)];
 };
@@ -1258,6 +1267,30 @@ int	freebsd11_freebsd32_fstatat(struct thread *, struct freebsd11_freebsd32_fsta
 
 #endif /* COMPAT_FREEBSD11 */
 
+
+#ifdef COMPAT_FREEBSD12
+
+#if !defined(PAD64_REQUIRED) && !defined(__amd64__)
+#define PAD64_REQUIRED
+#endif
+#ifdef PAD64_REQUIRED
+#else
+#endif
+#ifdef PAD64_REQUIRED
+#else
+#endif
+#ifdef PAD64_REQUIRED
+#else
+#endif
+#ifdef PAD64_REQUIRED
+#else
+#endif
+#ifdef PAD64_REQUIRED
+#else
+#endif
+
+#endif /* COMPAT_FREEBSD12 */
+
 #define	FREEBSD32_SYS_AUE_freebsd32_wait4	AUE_WAIT4
 #define	FREEBSD32_SYS_AUE_freebsd4_freebsd32_getfsstat	AUE_GETFSSTAT
 #define	FREEBSD32_SYS_AUE_ofreebsd32_lseek	AUE_LSEEK
@@ -1419,6 +1452,7 @@ int	freebsd11_freebsd32_fstatat(struct thread *, struct freebsd11_freebsd32_fsta
 #define	FREEBSD32_SYS_AUE_freebsd32_kevent	AUE_KEVENT
 #define	FREEBSD32_SYS_AUE_freebsd32_cpuset_getdomain	AUE_NULL
 #define	FREEBSD32_SYS_AUE_freebsd32_cpuset_setdomain	AUE_NULL
+#define	FREEBSD32_SYS_AUE_freebsd32___sysctlbyname	AUE_SYSCTL
 
 #undef PAD_
 #undef PADL_

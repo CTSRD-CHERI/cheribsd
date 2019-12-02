@@ -202,7 +202,6 @@ pcbmap(struct denode *dep, u_long findcn, daddr_t *bnp, u_long *cnp, int *sp)
 				brelse(bp);
 			error = bread(pmp->pm_devvp, bn, bsize, NOCRED, &bp);
 			if (error) {
-				brelse(bp);
 				return (error);
 			}
 			bp_bn = bn;
@@ -214,9 +213,9 @@ pcbmap(struct denode *dep, u_long findcn, daddr_t *bnp, u_long *cnp, int *sp)
 			return (EIO);
 		}
 		if (FAT32(pmp))
-			cn = getulong(&bp->b_data[bo]);
+			cn = getulong(bp->b_data + bo);
 		else
-			cn = getushort(&bp->b_data[bo]);
+			cn = getushort(bp->b_data + bo);
 		if (FAT12(pmp) && (prevcn & 1))
 			cn >>= 4;
 		cn &= pmp->pm_fatmask;
@@ -389,9 +388,10 @@ usemap_alloc(struct msdosfsmount *pmp, u_long cn)
 	    pmp->pm_maxcluster));
 	KASSERT((pmp->pm_flags & MSDOSFSMNT_RONLY) == 0,
 	    ("usemap_alloc on ro msdosfs mount"));
-	KASSERT((pmp->pm_inusemap[cn / N_INUSEBITS] & (1 << (cn % N_INUSEBITS)))
-	    == 0, ("Allocating used sector %ld %ld %x", cn, cn % N_INUSEBITS,
-		(unsigned)pmp->pm_inusemap[cn / N_INUSEBITS]));
+	KASSERT((pmp->pm_inusemap[cn / N_INUSEBITS] &
+	    (1U << (cn % N_INUSEBITS))) == 0,
+	    ("Allocating used sector %ld %ld %x", cn, cn % N_INUSEBITS,
+	    (unsigned)pmp->pm_inusemap[cn / N_INUSEBITS]));
 	pmp->pm_inusemap[cn / N_INUSEBITS] |= 1U << (cn % N_INUSEBITS);
 	KASSERT(pmp->pm_freeclustercount > 0, ("usemap_alloc: too little"));
 	pmp->pm_freeclustercount--;
@@ -410,9 +410,10 @@ usemap_free(struct msdosfsmount *pmp, u_long cn)
 	    ("usemap_free on ro msdosfs mount"));
 	pmp->pm_freeclustercount++;
 	pmp->pm_flags |= MSDOSFS_FSIMOD;
-	KASSERT((pmp->pm_inusemap[cn / N_INUSEBITS] & (1 << (cn % N_INUSEBITS)))
-	    != 0, ("Freeing unused sector %ld %ld %x", cn, cn % N_INUSEBITS,
-		(unsigned)pmp->pm_inusemap[cn / N_INUSEBITS]));
+	KASSERT((pmp->pm_inusemap[cn / N_INUSEBITS] &
+	    (1U << (cn % N_INUSEBITS))) != 0,
+	    ("Freeing unused sector %ld %ld %x", cn, cn % N_INUSEBITS,
+	    (unsigned)pmp->pm_inusemap[cn / N_INUSEBITS]));
 	pmp->pm_inusemap[cn / N_INUSEBITS] &= ~(1U << (cn % N_INUSEBITS));
 }
 
@@ -504,15 +505,14 @@ fatentry(int function, struct msdosfsmount *pmp, u_long cn, u_long *oldcontents,
 	fatblock(pmp, byteoffset, &bn, &bsize, &bo);
 	error = bread(pmp->pm_devvp, bn, bsize, NOCRED, &bp);
 	if (error) {
-		brelse(bp);
 		return (error);
 	}
 
 	if (function & FAT_GET) {
 		if (FAT32(pmp))
-			readcn = getulong(&bp->b_data[bo]);
+			readcn = getulong(bp->b_data + bo);
 		else
-			readcn = getushort(&bp->b_data[bo]);
+			readcn = getushort(bp->b_data + bo);
 		if (FAT12(pmp) & (cn & 1))
 			readcn >>= 4;
 		readcn &= pmp->pm_fatmask;
@@ -524,7 +524,7 @@ fatentry(int function, struct msdosfsmount *pmp, u_long cn, u_long *oldcontents,
 	if (function & FAT_SET) {
 		switch (pmp->pm_fatmask) {
 		case FAT12_MASK:
-			readcn = getushort(&bp->b_data[bo]);
+			readcn = getushort(bp->b_data + bo);
 			if (cn & 1) {
 				readcn &= 0x000f;
 				readcn |= newcontents << 4;
@@ -532,20 +532,20 @@ fatentry(int function, struct msdosfsmount *pmp, u_long cn, u_long *oldcontents,
 				readcn &= 0xf000;
 				readcn |= newcontents & 0xfff;
 			}
-			putushort(&bp->b_data[bo], readcn);
+			putushort(bp->b_data + bo, readcn);
 			break;
 		case FAT16_MASK:
-			putushort(&bp->b_data[bo], newcontents);
+			putushort(bp->b_data + bo, newcontents);
 			break;
 		case FAT32_MASK:
 			/*
 			 * According to spec we have to retain the
 			 * high order bits of the FAT entry.
 			 */
-			readcn = getulong(&bp->b_data[bo]);
+			readcn = getulong(bp->b_data + bo);
 			readcn &= ~FAT32_MASK;
 			readcn |= newcontents & FAT32_MASK;
-			putulong(&bp->b_data[bo], readcn);
+			putulong(bp->b_data + bo, readcn);
 			break;
 		}
 		updatefats(pmp, bp, bn);
@@ -587,7 +587,6 @@ fatchain(struct msdosfsmount *pmp, u_long start, u_long count, u_long fillwith)
 		fatblock(pmp, byteoffset, &bn, &bsize, &bo);
 		error = bread(pmp->pm_devvp, bn, bsize, NOCRED, &bp);
 		if (error) {
-			brelse(bp);
 			return (error);
 		}
 		while (count > 0) {
@@ -595,7 +594,7 @@ fatchain(struct msdosfsmount *pmp, u_long start, u_long count, u_long fillwith)
 			newc = --count > 0 ? start : fillwith;
 			switch (pmp->pm_fatmask) {
 			case FAT12_MASK:
-				readcn = getushort(&bp->b_data[bo]);
+				readcn = getushort(bp->b_data + bo);
 				if (start & 1) {
 					readcn &= 0xf000;
 					readcn |= newc & 0xfff;
@@ -603,20 +602,20 @@ fatchain(struct msdosfsmount *pmp, u_long start, u_long count, u_long fillwith)
 					readcn &= 0x000f;
 					readcn |= newc << 4;
 				}
-				putushort(&bp->b_data[bo], readcn);
+				putushort(bp->b_data + bo, readcn);
 				bo++;
 				if (!(start & 1))
 					bo++;
 				break;
 			case FAT16_MASK:
-				putushort(&bp->b_data[bo], newc);
+				putushort(bp->b_data + bo, newc);
 				bo += 2;
 				break;
 			case FAT32_MASK:
-				readcn = getulong(&bp->b_data[bo]);
+				readcn = getulong(bp->b_data + bo);
 				readcn &= ~pmp->pm_fatmask;
 				readcn |= newc & pmp->pm_fatmask;
-				putulong(&bp->b_data[bo], readcn);
+				putulong(bp->b_data + bo, readcn);
 				bo += 4;
 				break;
 			}
@@ -651,7 +650,7 @@ chainlength(struct msdosfsmount *pmp, u_long start, u_long count)
 	idx = start / N_INUSEBITS;
 	start %= N_INUSEBITS;
 	map = pmp->pm_inusemap[idx];
-	map &= ~((1 << start) - 1);
+	map &= ~((1U << start) - 1);
 	if (map) {
 		len = ffs(map) - 1 - start;
 		len = MIN(len, count);
@@ -843,7 +842,6 @@ freeclusterchain(struct msdosfsmount *pmp, u_long cluster)
 				updatefats(pmp, bp, lbn);
 			error = bread(pmp->pm_devvp, bn, bsize, NOCRED, &bp);
 			if (error) {
-				brelse(bp);
 				MSDOSFS_UNLOCK_MP(pmp);
 				return (error);
 			}
@@ -852,7 +850,7 @@ freeclusterchain(struct msdosfsmount *pmp, u_long cluster)
 		usemap_free(pmp, cluster);
 		switch (pmp->pm_fatmask) {
 		case FAT12_MASK:
-			readcn = getushort(&bp->b_data[bo]);
+			readcn = getushort(bp->b_data + bo);
 			if (cluster & 1) {
 				cluster = readcn >> 4;
 				readcn &= 0x000f;
@@ -862,15 +860,15 @@ freeclusterchain(struct msdosfsmount *pmp, u_long cluster)
 				readcn &= 0xf000;
 				readcn |= MSDOSFSFREE & 0xfff;
 			}
-			putushort(&bp->b_data[bo], readcn);
+			putushort(bp->b_data + bo, readcn);
 			break;
 		case FAT16_MASK:
-			cluster = getushort(&bp->b_data[bo]);
-			putushort(&bp->b_data[bo], MSDOSFSFREE);
+			cluster = getushort(bp->b_data + bo);
+			putushort(bp->b_data + bo, MSDOSFSFREE);
 			break;
 		case FAT32_MASK:
-			cluster = getulong(&bp->b_data[bo]);
-			putulong(&bp->b_data[bo],
+			cluster = getulong(bp->b_data + bo);
+			putulong(bp->b_data + bo,
 				 (MSDOSFSFREE & FAT32_MASK) | (cluster & ~FAT32_MASK));
 			break;
 		}
@@ -924,9 +922,9 @@ fillinusemap(struct msdosfsmount *pmp)
 				return (error);
 		}
 		if (FAT32(pmp))
-			readcn = getulong(&bp->b_data[bo]);
+			readcn = getulong(bp->b_data + bo);
 		else
-			readcn = getushort(&bp->b_data[bo]);
+			readcn = getushort(bp->b_data + bo);
 		if (FAT12(pmp) && (cn & 1))
 			readcn >>= 4;
 		readcn &= pmp->pm_fatmask;
@@ -1121,7 +1119,7 @@ extendfile(struct denode *dep, u_long count, struct buf **bpp, u_long *ncp,
  *	?	(other errors from called routines)
  */
 int
-markvoldirty(struct msdosfsmount *pmp, int dirty)
+markvoldirty_upgrade(struct msdosfsmount *pmp, bool dirty, bool rw_upgrade)
 {
 	struct buf *bp;
 	u_long bn, bo, bsize, byteoffset, fatval;
@@ -1134,8 +1132,11 @@ markvoldirty(struct msdosfsmount *pmp, int dirty)
 	if (FAT12(pmp))
 		return (0);
 
-	/* Can't change the bit on a read-only filesystem. */
-	if (pmp->pm_flags & MSDOSFSMNT_RONLY)
+	/*
+	 * Can't change the bit on a read-only filesystem, except as part of
+	 * ro->rw upgrade.
+	 */
+	if ((pmp->pm_flags & MSDOSFSMNT_RONLY) != 0 && !rw_upgrade)
 		return (EROFS);
 
 	/*
@@ -1145,10 +1146,8 @@ markvoldirty(struct msdosfsmount *pmp, int dirty)
 	byteoffset = FATOFS(pmp, 1);
 	fatblock(pmp, byteoffset, &bn, &bsize, &bo);
 	error = bread(pmp->pm_devvp, bn, bsize, NOCRED, &bp);
-	if (error) {
-		brelse(bp);
+	if (error)
 		return (error);
-	}
 
 	/*
 	 * Get the current value of the FAT entry and set/clear the relevant
@@ -1172,6 +1171,29 @@ markvoldirty(struct msdosfsmount *pmp, int dirty)
 			fatval |= 0x8000;
 		putushort(&bp->b_data[bo], fatval);
 	}
+
+	/*
+	 * The concern here is that a devvp may be readonly, without reporting
+	 * itself as such through the usual channels.  In that case, we'd like
+	 * it if attempting to mount msdosfs rw didn't panic the system.
+	 *
+	 * markvoldirty is invoked as the first write on backing devvps when
+	 * either msdosfs is mounted for the first time, or a ro mount is
+	 * upgraded to rw.
+	 *
+	 * In either event, if a write error occurs dirtying the volume:
+	 *   - No user data has been permitted to be written to cache yet.
+	 *   - We can abort the high-level operation (mount, or ro->rw) safely.
+	 *   - We don't derive any benefit from leaving a zombie dirty buf in
+	 *   the cache that can not be cleaned or evicted.
+	 *
+	 * So, mark B_INVALONERR to have bwrite() -> brelse() detect that
+	 * condition and force-invalidate our write to the block if it occurs.
+	 *
+	 * PR 210316 provides more context on the discovery and diagnosis of
+	 * the problem, as well as earlier attempts to solve it.
+	 */
+	bp->b_flags |= B_INVALONERR;
 
 	/* Write out the modified FAT block synchronously. */
 	return (bwrite(bp));

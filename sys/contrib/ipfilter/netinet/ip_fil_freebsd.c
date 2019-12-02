@@ -30,24 +30,24 @@ static const char rcsid[] = "@(#)$Id$";
 #include <sys/errno.h>
 #include <sys/types.h>
 #include <sys/file.h>
-# include <sys/fcntl.h>
-# include <sys/filio.h>
+#include <sys/fcntl.h>
+#include <sys/filio.h>
 #include <sys/time.h>
 #include <sys/systm.h>
 # include <sys/dirent.h>
 #if defined(__FreeBSD_version)
 #include <sys/jail.h>
 #endif
-# include <sys/malloc.h>
-# include <sys/mbuf.h>
-# include <sys/sockopt.h>
+#include <sys/malloc.h>
+#include <sys/mbuf.h>
+#include <sys/sockopt.h>
 #include <sys/socket.h>
-# include <sys/selinfo.h>
-# include <netinet/tcp_var.h>
+#include <sys/selinfo.h>
+#include <netinet/tcp_var.h>
 
 #include <net/if.h>
-# include <net/if_var.h>
-#  include <net/netisr.h>
+#include <net/if_var.h>
+#include <net/netisr.h>
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_fib.h>
@@ -77,7 +77,7 @@ static const char rcsid[] = "@(#)$Id$";
 #include "netinet/ip_scan.h"
 #endif
 #include "netinet/ip_pool.h"
-# include <sys/malloc.h>
+#include <sys/malloc.h>
 #include <sys/kernel.h>
 #ifdef CSUM_DATA_VALID
 #include <machine/in_cksum.h>
@@ -100,7 +100,10 @@ VNET_DEFINE(ipf_main_softc_t, ipfmain) = {
 # include <sys/conf.h>
 #  include <net/pfil.h>
 
-static eventhandler_tag ipf_arrivetag, ipf_departtag;
+VNET_DEFINE_STATIC(eventhandler_tag, ipf_arrivetag);
+VNET_DEFINE_STATIC(eventhandler_tag, ipf_departtag);
+#define	V_ipf_arrivetag		VNET(ipf_arrivetag)
+#define	V_ipf_departtag		VNET(ipf_departtag)
 #if 0
 /*
  * Disable the "cloner" event handler;  we are getting interface
@@ -110,7 +113,8 @@ static eventhandler_tag ipf_arrivetag, ipf_departtag;
  * If it turns out to be needed, well need a dedicated event handler
  * for it to deal with the ifc and the correct vnet.
  */
-static eventhandler_tag ipf_clonetag;
+VNET_DEFINE_STATIC(eventhandler_tag, ipf_clonetag);
+#define	V_ipf_clonetag		VNET(ipf_clonetag)
 #endif
 
 static void ipf_ifevent(void *arg, struct ifnet *ifp);
@@ -964,7 +968,7 @@ ipf_ifpaddr(softc, v, atype, ifptr, inp, inpmask)
 	i6addr_t *inp, *inpmask;
 {
 #ifdef USE_INET6
-	struct in6_addr *inp6 = NULL;
+	struct in6_addr *ia6 = NULL;
 #endif
 	struct sockaddr *sock, *mask;
 	struct sockaddr_in *sin;
@@ -992,9 +996,9 @@ ipf_ifpaddr(softc, v, atype, ifptr, inp, inpmask)
 			break;
 #ifdef USE_INET6
 		if ((v == 6) && (sin->sin_family == AF_INET6)) {
-			inp6 = &((struct sockaddr_in6 *)sin)->sin6_addr;
-			if (!IN6_IS_ADDR_LINKLOCAL(inp6) &&
-			    !IN6_IS_ADDR_LOOPBACK(inp6))
+			ia6 = &((struct sockaddr_in6 *)sin)->sin6_addr;
+			if (!IN6_IS_ADDR_LINKLOCAL(ia6) &&
+			    !IN6_IS_ADDR_LOOPBACK(ia6))
 				break;
 		}
 #endif
@@ -1308,8 +1312,10 @@ ipf_inject(fin, m)
 	fr_info_t *fin;
 	mb_t *m;
 {
+	struct epoch_tracker et;
 	int error = 0;
 
+	NET_EPOCH_ENTER(et);
 	if (fin->fin_out == 0) {
 		netisr_dispatch(NETISR_IP, m);
 	} else {
@@ -1317,6 +1323,7 @@ ipf_inject(fin, m)
 		fin->fin_ip->ip_off = ntohs(fin->fin_ip->ip_off);
 		error = ip_output(m, NULL, NULL, IP_FORWARDING, NULL, NULL);
 	}
+	NET_EPOCH_EXIT(et);
 
 	return error;
 }
@@ -1383,14 +1390,14 @@ int ipf_pfil_hook(void) {
 void
 ipf_event_reg(void)
 {
-	ipf_arrivetag = EVENTHANDLER_REGISTER(ifnet_arrival_event, \
+	V_ipf_arrivetag = EVENTHANDLER_REGISTER(ifnet_arrival_event, \
 					       ipf_ifevent, NULL, \
 					       EVENTHANDLER_PRI_ANY);
-	ipf_departtag = EVENTHANDLER_REGISTER(ifnet_departure_event, \
+	V_ipf_departtag = EVENTHANDLER_REGISTER(ifnet_departure_event, \
 					       ipf_ifevent, NULL, \
 					       EVENTHANDLER_PRI_ANY);
 #if 0
-	ipf_clonetag  = EVENTHANDLER_REGISTER(if_clone_event, ipf_ifevent, \
+	V_ipf_clonetag  = EVENTHANDLER_REGISTER(if_clone_event, ipf_ifevent, \
 					       NULL, EVENTHANDLER_PRI_ANY);
 #endif
 }
@@ -1398,15 +1405,15 @@ ipf_event_reg(void)
 void
 ipf_event_dereg(void)
 {
-	if (ipf_arrivetag != NULL) {
-		EVENTHANDLER_DEREGISTER(ifnet_arrival_event, ipf_arrivetag);
+	if (V_ipf_arrivetag != NULL) {
+		EVENTHANDLER_DEREGISTER(ifnet_arrival_event, V_ipf_arrivetag);
 	}
-	if (ipf_departtag != NULL) {
-		EVENTHANDLER_DEREGISTER(ifnet_departure_event, ipf_departtag);
+	if (V_ipf_departtag != NULL) {
+		EVENTHANDLER_DEREGISTER(ifnet_departure_event, V_ipf_departtag);
 	}
 #if 0
-	if (ipf_clonetag != NULL) {
-		EVENTHANDLER_DEREGISTER(if_clone_event, ipf_clonetag);
+	if (V_ipf_clonetag != NULL) {
+		EVENTHANDLER_DEREGISTER(if_clone_event, V_ipf_clonetag);
 	}
 #endif
 }

@@ -2739,12 +2739,3 @@ vmm_decode_instruction(struct vm *vm, int cpuid, uint64_t gla,
 	return (0);
 }
 #endif	/* _KERNEL */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

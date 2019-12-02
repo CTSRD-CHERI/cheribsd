@@ -26,14 +26,82 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	disable the most expensive debugging functionality run
 	"ln -s 'abort:false,junk:false' /etc/malloc.conf".)
 
+20191120:
+	The amd(8) automount daemon has been disabled by default, and will be
+	removed in the future.  As of FreeBSD 10.1 the autofs(5) is available
+	for automounting.
+
+20191107:
+	The nctgpio and wbwd drivers have been moved to the superio bus.
+	If you have one of these drivers in a kernel configuration, then
+	you should add device superio to it.  If you use one of these drivers
+	as a module and you compile a custom set of modules, then you should
+	add superio to the set.
+
+20191021:
+	KPIs for network drivers to access interface addresses have changed.
+	Users need to recompile NIC driver modules together with kernel.
+
+20191021:
+	The net.link.tap.user_open sysctl no longer prevents user opening of
+	already created /dev/tapNN devices.  Access is still controlled by
+	node permissions, just like tun devices.  The net.link.tap.user_open
+	sysctl is now used only to allow users to perform devfs cloning of
+	tap devices, and the subsequent open may not succeed if the user is not
+	in the appropriate group.  This sysctl may be deprecated/removed
+	completely in the future.
+
+20191009:
+	mips, powerpc, and sparc64 are no longer built as part of
+	universe / tinderbox unless MAKE_OBSOLETE_GCC is defined. If
+	not defined, mips, powerpc, and sparc64 builds will look for
+	the xtoolchain binaries and if installed use them for universe
+	builds. As llvm 9.0 becomes vetted for these architectures, they
+	will be removed from the list.
+
+20191009:
+	Clang, llvm, lld, lldb, compiler-rt, libc++, libunwind and openmp have
+	been upgraded to 9.0.0.  Please see the 20141231 entry below for
+	information about prerequisites and upgrading, if you are not already
+	using clang 3.5.0 or higher.
+
+20191003:
+	The hpt27xx, hptmv, hptnr, and hptrr drivers have been removed from
+	GENERIC.  They are available as modules and can be loaded by adding
+	to /boot/loader.conf hpt27xx_load="YES", hptmv_load="YES",
+	hptnr_load="YES", or hptrr_load="YES", respectively.
+
+20190913:
+	ntpd no longer by default locks its pages in memory, allowing them
+	to be paged out by the kernel. Use rlimit memlock to restore
+	historic BSD behaviour. For example, add "rlimit memlock 32"
+	to ntp.conf to lock up to 32 MB of ntpd address space in memory.
+
+20190823:
+	Several of ping6's options have been renamed for better consistency
+	with ping.  If you use any of -ARWXaghmrtwx, you must update your
+	scripts.  See ping6(8) for details.
+
+20190727:
+	The vfs.fusefs.sync_unmount and vfs.fusefs.init_backgrounded sysctls
+	and the "-o sync_unmount" and "-o init_backgrounded" mount options have
+	been removed from mount_fusefs(8).  You can safely remove them from
+	your scripts, because they had no effect.
+
+	The vfs.fusefs.fix_broken_io, vfs.fusefs.sync_resize,
+	vfs.fusefs.refresh_size, vfs.fusefs.mmap_enable,
+	vfs.fusefs.reclaim_revoked, and vfs.fusefs.data_cache_invalidate
+	sysctls have been removed.  If you felt the need to set any of them to
+	a non-default value, please tell asomers@FreeBSD.org why.
+
 20190713:
-	Default permissions on the /var/account/acct file (and copies of it 
-	rotated by periodic daily scripts) are changed from 0644 to 0640 
-	because the file contains sensitive information that should not be 
-	world-readable.  If the /var/account directory must be created by 
-	rc.d/accounting, the mode used is now 0750.  Admins who use the 
-	accounting feature are encouraged to change the mode of an existing 
-	/var/account directory to 0750 or 0700.  
+	Default permissions on the /var/account/acct file (and copies of it
+	rotated by periodic daily scripts) are changed from 0644 to 0640
+	because the file contains sensitive information that should not be
+	world-readable.  If the /var/account directory must be created by
+	rc.d/accounting, the mode used is now 0750.  Admins who use the
+	accounting feature are encouraged to change the mode of an existing
+	/var/account directory to 0750 or 0700.
 
 20190620:
 	Entropy collection and the /dev/random device are no longer optional
@@ -66,8 +134,8 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 
 20190507:
 	The tap(4) driver has been folded into tun(4), and the module has been
-	renamed to tuntap.  You should update any kld_load="if_tap" or
-	kld_load="if_tun" entries in /etc/rc.conf, if_tap_load="YES" or
+	renamed to tuntap.  You should update any kld_list="if_tap" or
+	kld_list="if_tun" entries in /etc/rc.conf, if_tap_load="YES" or
 	if_tun_load="YES" entries in /boot/loader.conf to load the if_tuntap
 	module instead, and "device tap" or "device tun" entries in kernel
 	config files to select the tuntap device instead.
@@ -557,7 +625,7 @@ NOTE TO PEOPLE WHO THINK THAT FreeBSD 13.x IS SLOW:
 	executables, but is not yet installed as /usr/bin/ld by default.
 
 	To revert to ld.bfd as the bootstrap linker, in /etc/src.conf set
-        WITHOUT_LLD_BOOTSTRAP=yes
+	WITHOUT_LLD_BOOTSTRAP=yes
 
 20180110:
 	On i386, pmtimer has been removed. Its functionality has been folded

@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <netinet/sctp_auth.h>
 #include <netinet/sctp_bsd_addr.h>
 #include <netinet/udp.h>
+#include <sys/eventhandler.h>
 
 
 
@@ -89,6 +90,8 @@ sctp_init(void)
 	SCTP_BASE_VAR(packet_log_end) = 0;
 	memset(&SCTP_BASE_VAR(packet_log_buffer), 0, SCTP_PACKET_LOG_SIZE);
 #endif
+	SCTP_BASE_VAR(eh_tag) = EVENTHANDLER_REGISTER(rt_addrmsg,
+	    sctp_addr_change_event_handler, NULL, EVENTHANDLER_PRI_FIRST);
 }
 
 #ifdef VIMAGE
@@ -1412,10 +1415,7 @@ sctp_do_connect_x(struct socket *so, struct sctp_inpcb *inp, void *optval,
 	}
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
 	    (num_v4 > 0)) {
-		struct in6pcb *inp6;
-
-		inp6 = (struct in6pcb *)inp;
-		if (SCTP_IPV6_V6ONLY(inp6)) {
+		if (SCTP_IPV6_V6ONLY(inp)) {
 			/*
 			 * if IPV6_V6ONLY flag, ignore connections destined
 			 * to a v4 addr or v4-mapped addr
@@ -6916,14 +6916,14 @@ sctp_connect(struct socket *so, struct sockaddr *addr, struct thread *p)
 #ifdef INET6
 	case AF_INET6:
 		{
-			struct sockaddr_in6 *sin6p;
+			struct sockaddr_in6 *sin6;
 
 			if (addr->sa_len != sizeof(struct sockaddr_in6)) {
 				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
 				return (EINVAL);
 			}
-			sin6p = (struct sockaddr_in6 *)addr;
-			if (p != NULL && (error = prison_remote_ip6(p->td_ucred, &sin6p->sin6_addr)) != 0) {
+			sin6 = (struct sockaddr_in6 *)addr;
+			if (p != NULL && (error = prison_remote_ip6(p->td_ucred, &sin6->sin6_addr)) != 0) {
 				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, error);
 				return (error);
 			}
@@ -6933,14 +6933,14 @@ sctp_connect(struct socket *so, struct sockaddr *addr, struct thread *p)
 #ifdef INET
 	case AF_INET:
 		{
-			struct sockaddr_in *sinp;
+			struct sockaddr_in *sin;
 
 			if (addr->sa_len != sizeof(struct sockaddr_in)) {
 				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
 				return (EINVAL);
 			}
-			sinp = (struct sockaddr_in *)addr;
-			if (p != NULL && (error = prison_remote_ip4(p->td_ucred, &sinp->sin_addr)) != 0) {
+			sin = (struct sockaddr_in *)addr;
+			if (p != NULL && (error = prison_remote_ip4(p->td_ucred, &sin->sin_addr)) != 0) {
 				SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, error);
 				return (error);
 			}
@@ -7229,28 +7229,56 @@ sctp_accept(struct socket *so, struct sockaddr **addr)
 		SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
 		return (ECONNRESET);
 	}
-	SCTP_INP_RLOCK(inp);
+	SCTP_INP_WLOCK(inp);
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_UDPTYPE) {
-		SCTP_INP_RUNLOCK(inp);
+		SCTP_INP_WUNLOCK(inp);
 		SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EOPNOTSUPP);
 		return (EOPNOTSUPP);
 	}
 	if (so->so_state & SS_ISDISCONNECTED) {
-		SCTP_INP_RUNLOCK(inp);
+		SCTP_INP_WUNLOCK(inp);
 		SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, ECONNABORTED);
 		return (ECONNABORTED);
 	}
 	stcb = LIST_FIRST(&inp->sctp_asoc_list);
 	if (stcb == NULL) {
-		SCTP_INP_RUNLOCK(inp);
+		SCTP_INP_WUNLOCK(inp);
 		SCTP_LTRACE_ERR_RET(inp, NULL, NULL, SCTP_FROM_SCTP_USRREQ, EINVAL);
 		return (ECONNRESET);
 	}
 	SCTP_TCB_LOCK(stcb);
-	SCTP_INP_RUNLOCK(inp);
 	store = stcb->asoc.primary_destination->ro._l_addr;
 	SCTP_CLEAR_SUBSTATE(stcb, SCTP_STATE_IN_ACCEPT_QUEUE);
-	SCTP_TCB_UNLOCK(stcb);
+	/* Wake any delayed sleep action */
+	if (inp->sctp_flags & SCTP_PCB_FLAGS_DONT_WAKE) {
+		inp->sctp_flags &= ~SCTP_PCB_FLAGS_DONT_WAKE;
+		if (inp->sctp_flags & SCTP_PCB_FLAGS_WAKEOUTPUT) {
+			inp->sctp_flags &= ~SCTP_PCB_FLAGS_WAKEOUTPUT;
+			SOCKBUF_LOCK(&inp->sctp_socket->so_snd);
+			if (sowriteable(inp->sctp_socket)) {
+				sowwakeup_locked(inp->sctp_socket);
+			} else {
+				SOCKBUF_UNLOCK(&inp->sctp_socket->so_snd);
+			}
+		}
+		if (inp->sctp_flags & SCTP_PCB_FLAGS_WAKEINPUT) {
+			inp->sctp_flags &= ~SCTP_PCB_FLAGS_WAKEINPUT;
+			SOCKBUF_LOCK(&inp->sctp_socket->so_rcv);
+			if (soreadable(inp->sctp_socket)) {
+				sctp_defered_wakeup_cnt++;
+				sorwakeup_locked(inp->sctp_socket);
+			} else {
+				SOCKBUF_UNLOCK(&inp->sctp_socket->so_rcv);
+			}
+		}
+	}
+	SCTP_INP_WUNLOCK(inp);
+	if (stcb->asoc.state & SCTP_STATE_ABOUT_TO_BE_FREED) {
+		sctp_free_assoc(inp, stcb, SCTP_NORMAL_PROC,
+		    SCTP_FROM_SCTP_USRREQ + SCTP_LOC_19);
+	} else {
+		SCTP_TCB_UNLOCK(stcb);
+	}
 	switch (store.sa.sa_family) {
 #ifdef INET
 	case AF_INET:
@@ -7291,40 +7319,6 @@ sctp_accept(struct socket *so, struct sockaddr **addr)
 	default:
 		/* TSNH */
 		break;
-	}
-	/* Wake any delayed sleep action */
-	if (inp->sctp_flags & SCTP_PCB_FLAGS_DONT_WAKE) {
-		SCTP_INP_WLOCK(inp);
-		inp->sctp_flags &= ~SCTP_PCB_FLAGS_DONT_WAKE;
-		if (inp->sctp_flags & SCTP_PCB_FLAGS_WAKEOUTPUT) {
-			inp->sctp_flags &= ~SCTP_PCB_FLAGS_WAKEOUTPUT;
-			SCTP_INP_WUNLOCK(inp);
-			SOCKBUF_LOCK(&inp->sctp_socket->so_snd);
-			if (sowriteable(inp->sctp_socket)) {
-				sowwakeup_locked(inp->sctp_socket);
-			} else {
-				SOCKBUF_UNLOCK(&inp->sctp_socket->so_snd);
-			}
-			SCTP_INP_WLOCK(inp);
-		}
-		if (inp->sctp_flags & SCTP_PCB_FLAGS_WAKEINPUT) {
-			inp->sctp_flags &= ~SCTP_PCB_FLAGS_WAKEINPUT;
-			SCTP_INP_WUNLOCK(inp);
-			SOCKBUF_LOCK(&inp->sctp_socket->so_rcv);
-			if (soreadable(inp->sctp_socket)) {
-				sctp_defered_wakeup_cnt++;
-				sorwakeup_locked(inp->sctp_socket);
-			} else {
-				SOCKBUF_UNLOCK(&inp->sctp_socket->so_rcv);
-			}
-			SCTP_INP_WLOCK(inp);
-		}
-		SCTP_INP_WUNLOCK(inp);
-	}
-	if (stcb->asoc.state & SCTP_STATE_ABOUT_TO_BE_FREED) {
-		SCTP_TCB_LOCK(stcb);
-		sctp_free_assoc(inp, stcb, SCTP_NORMAL_PROC,
-		    SCTP_FROM_SCTP_USRREQ + SCTP_LOC_19);
 	}
 	return (0);
 }

@@ -70,7 +70,7 @@ struct	route;			/* if_output */
 struct	vnet;
 struct	ifmedia;
 struct	netmap_adapter;
-struct	netdump_methods;
+struct	debugnet_methods;
 
 #ifdef _KERNEL
 #include <sys/_eventhandler.h>
@@ -188,11 +188,13 @@ struct if_encap_req {
  * m_snd_tag" comes from the network driver and it is free to allocate
  * as much additional space as it wants for its own use.
  */
+struct ktls_session;
 struct m_snd_tag;
 
 #define	IF_SND_TAG_TYPE_RATE_LIMIT 0
 #define	IF_SND_TAG_TYPE_UNLIMITED 1
-#define	IF_SND_TAG_TYPE_MAX 2
+#define	IF_SND_TAG_TYPE_TLS 2
+#define	IF_SND_TAG_TYPE_MAX 3
 
 struct if_snd_tag_alloc_header {
 	uint32_t type;		/* send tag type, see IF_SND_TAG_XXX */
@@ -203,6 +205,14 @@ struct if_snd_tag_alloc_header {
 struct if_snd_tag_alloc_rate_limit {
 	struct if_snd_tag_alloc_header hdr;
 	uint64_t max_rate;	/* in bytes/s */
+	uint32_t flags;		/* M_NOWAIT or M_WAITOK */
+	uint32_t reserved;	/* alignment */
+};
+
+struct if_snd_tag_alloc_tls {
+	struct if_snd_tag_alloc_header hdr;
+	struct inpcb *inp;
+	const struct ktls_session *tls;
 };
 
 struct if_snd_tag_rate_limit_params {
@@ -210,13 +220,14 @@ struct if_snd_tag_rate_limit_params {
 	uint32_t queue_level;	/* 0 (empty) .. 65535 (full) */
 #define	IF_SND_QUEUE_LEVEL_MIN 0
 #define	IF_SND_QUEUE_LEVEL_MAX 65535
-	uint32_t reserved;	/* padding */
+	uint32_t flags;		/* M_NOWAIT or M_WAITOK */
 };
 
 union if_snd_tag_alloc_params {
 	struct if_snd_tag_alloc_header hdr;
 	struct if_snd_tag_alloc_rate_limit rate_limit;
 	struct if_snd_tag_alloc_rate_limit unlimited;
+	struct if_snd_tag_alloc_tls tls;
 };
 
 union if_snd_tag_modify_params {
@@ -229,11 +240,37 @@ union if_snd_tag_query_params {
 	struct if_snd_tag_rate_limit_params unlimited;
 };
 
+/* Query return flags */
+#define RT_NOSUPPORT	  0x00000000	/* Not supported */
+#define RT_IS_INDIRECT    0x00000001	/*
+					 * Interface like a lagg, select
+					 * the actual interface for
+					 * capabilities.
+					 */
+#define RT_IS_SELECTABLE  0x00000002	/*
+					 * No rate table, you select
+					 * rates and the first
+					 * number_of_rates are created.
+					 */
+#define RT_IS_FIXED_TABLE 0x00000004	/* A fixed table is attached */
+#define RT_IS_UNUSABLE	  0x00000008	/* It is not usable for this */
+
+struct if_ratelimit_query_results {
+	const uint64_t *rate_table;	/* Pointer to table if present */
+	uint32_t flags;			/* Flags indicating results */
+	uint32_t max_flows;		/* Max flows using, 0=unlimited */
+	uint32_t number_of_rates;	/* How many unique rates can be created */
+	uint32_t min_segment_burst;	/* The amount the adapter bursts at each send */
+};
+
 typedef int (if_snd_tag_alloc_t)(struct ifnet *, union if_snd_tag_alloc_params *,
     struct m_snd_tag **);
 typedef int (if_snd_tag_modify_t)(struct m_snd_tag *, union if_snd_tag_modify_params *);
 typedef int (if_snd_tag_query_t)(struct m_snd_tag *, union if_snd_tag_query_params *);
 typedef void (if_snd_tag_free_t)(struct m_snd_tag *);
+typedef void (if_ratelimit_query_t)(struct ifnet *,
+    struct if_ratelimit_query_results *);
+
 
 /*
  * Structure defining a network interface.
@@ -280,6 +317,7 @@ struct ifnet {
 
 	struct  ifaltq if_snd;		/* output queue (includes altq) */
 	struct	task if_linktask;	/* task for link change events */
+	struct	task if_addmultitask;	/* task for SIOCADDMULTI */
 
 	/* Addresses of different protocol families assigned to this if. */
 	struct mtx if_addr_lock;	/* lock to protect address lists */
@@ -374,14 +412,15 @@ struct ifnet {
 	if_snd_tag_modify_t *if_snd_tag_modify;
 	if_snd_tag_query_t *if_snd_tag_query;
 	if_snd_tag_free_t *if_snd_tag_free;
+	if_ratelimit_query_t *if_ratelimit_query;
 
 	/* Ethernet PCP */
 	uint8_t if_pcp;
 
 	/*
-	 * Netdump hooks to be called while dumping.
+	 * Debugnet (Netdump) hooks to be called while in db/panic.
 	 */
-	struct netdump_methods *if_netdump_methods;
+	struct debugnet_methods *if_debugnet_methods;
 	struct epoch_context	if_epoch_ctx __subobject_use_container_bounds;
 
 	/*
@@ -410,16 +449,6 @@ struct ifnet {
 #define	NET_EPOCH_EXIT(et)	epoch_exit_preempt(net_epoch_preempt, &(et))
 #define	NET_EPOCH_WAIT()	epoch_wait_preempt(net_epoch_preempt)
 #define	NET_EPOCH_ASSERT()	MPASS(in_epoch(net_epoch_preempt))
-
-/*
- * Function variations on locking macros intended to be used by loadable
- * kernel modules in order to divorce them from the internals of address list
- * locking.
- */
-void	if_addr_rlock(struct ifnet *ifp);	/* if_addrhead */
-void	if_addr_runlock(struct ifnet *ifp);	/* if_addrhead */
-void	if_maddr_rlock(if_t ifp);	/* if_multiaddrs */
-void	if_maddr_runlock(if_t ifp);	/* if_multiaddrs */
 
 #ifdef _KERNEL
 /* interface link layer address change event */
@@ -591,7 +620,6 @@ extern	struct sx ifnet_sxlock;
  * to call ifnet_byindex() instead of ifnet_byindex_ref().
  */
 struct ifnet	*ifnet_byindex(u_short idx);
-struct ifnet	*ifnet_byindex_locked(u_short idx);
 struct ifnet	*ifnet_byindex_ref(u_short idx);
 
 /*
@@ -727,11 +755,16 @@ void if_bpfmtap(if_t ifp, struct mbuf *m);
 void if_etherbpfmtap(if_t ifp, struct mbuf *m);
 void if_vlancap(if_t ifp);
 
-int if_setupmultiaddr(if_t ifp, void *mta, int *cnt, int max);
-int if_multiaddr_array(if_t ifp, void *mta, int *cnt, int max);
-int if_multiaddr_count(if_t ifp, int max);
+/*
+ * Traversing through interface address lists.
+ */
+struct sockaddr_dl;
+typedef u_int iflladdr_cb_t(void *, struct sockaddr_dl *, u_int);
+u_int if_foreach_lladdr(if_t, iflladdr_cb_t, void *);
+u_int if_foreach_llmaddr(if_t, iflladdr_cb_t, void *);
+u_int if_lladdr_count(if_t);
+u_int if_llmaddr_count(if_t);
 
-int if_multi_apply(struct ifnet *ifp, int (*filter)(void *, struct ifmultiaddr *, int), void *arg);
 int if_getamcount(if_t ifp);
 struct ifaddr * if_getifaddr(if_t ifp);
 

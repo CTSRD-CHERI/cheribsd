@@ -1299,7 +1299,7 @@ LEAF_NOPROFILE(MipsTLBInvalidException)
 	cld		k0, zero, 0(CHERI_REG_KSCRATCH)	# k0=this PTE
 
 	/* Validate page table entry.  */
-	andi		k1, k0, PTE_VR
+	andi		k1, k0, PTE_V
 	beqz		k1, 3f
 	nop
 

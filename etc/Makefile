@@ -57,6 +57,8 @@ distribution:
 	${_+_}cd ${.CURDIR}/mtree; ${MAKE} install
 	${_+_}cd ${SRCTOP}/share/termcap; ${MAKE} etc-termcap
 	${_+_}cd ${SRCTOP}/usr.sbin/rmt; ${MAKE} etc-rmt
+	${INSTALL_SYMLINK} ../var/run/os-release \
+		${DESTDIR}/etc/os-release
 .if ${MK_UNBOUND} != "no"
 	if [ ! -e ${DESTDIR}/etc/unbound ]; then \
 		${INSTALL_SYMLINK} -T "package=unbound" \
@@ -111,6 +113,10 @@ MTREES+=	mtree/BSD.libcheri.dist		/usr/lib/debug/usr
 .if ${MK_LIB32} != "no"
 MTREES+=	mtree/BSD.lib32.dist		/usr
 MTREES+=	mtree/BSD.lib32.dist		/usr/lib/debug/usr
+.endif
+.if ${MK_LIB64} != "no"
+MTREES+=	mtree/BSD.lib64.dist		/usr
+MTREES+=	mtree/BSD.lib64.dist		/usr/lib/debug/usr
 .endif
 .if ${MK_LIBSOFT} != "no"
 MTREES+=	mtree/BSD.libsoft.dist		/usr

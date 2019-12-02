@@ -136,8 +136,6 @@ _CPUCFLAGS = -Wa,-me500 -msoft-float
 .  else
 _CPUCFLAGS = -mcpu=${CPUTYPE} -mno-powerpc64
 .  endif
-. elif ${MACHINE_ARCH} == "powerpcspe"
-_CPUCFLAGS = -Wa,-me500 -mspe=yes -mabi=spe -mfloat-gprs=double -mcpu=8548
 . elif ${MACHINE_ARCH} == "powerpc64"
 _CPUCFLAGS = -mcpu=${CPUTYPE}
 . elif ${MACHINE_CPUARCH} == "mips"
@@ -317,7 +315,9 @@ CFLAGS += -G0
 # Hack for CheriBSD because clang targets a much newer CPU
 # -mcpu=beri ensures that instructions are scheduled so that they can execute
 # without excessive pipeline bubbles on BERI FPGAs (whereas -mcpu=mips4 doesn't)
+.if ${MACHINE_ARCH} != mips
 CFLAGS += -mcpu=beri
+.endif
 AFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
 CFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
 LDFLAGS+= -${MIPS_ENDIAN} -mabi=${MIPS_ABI}
@@ -352,9 +352,6 @@ CFLAGS+=	-Werror=implicit-function-declaration
 # Turn off deprecated warnings
 # XXXBD: is this still needed?
 CFLAGS+=	-Wno-deprecated-declarations
-. if ${MK_CHERI_EXACT_EQUALS} == "yes"
-CFLAGS+=	-mllvm -cheri-exact-equals
-. endif
 # XXXBD: is -mstack-alignment needed here?
 . if ${MACHINE_ARCH:Mmips*c128}
 CFLAGS+=	-cheri=128
@@ -374,7 +371,7 @@ LDFLAGS+=	-Wl,-preemptible-caprelocs=elf
 # Work around cheri-unknown-freebsd-ld.lld: error: section: .init_array
 # is not contiguous with other relro sections
 # TODO: remove this once I've debugged the root cause
-LDFLAGS+=	-Wl,-z,norelro
+# LDFLAGS+=	-Wl,-z,norelro
 CFLAGS+=	-Qunused-arguments
 CFLAGS+=	-Werror=cheri-bitwise-operations
 # Don't remove CHERI symbols from the symbol table
@@ -419,7 +416,8 @@ LDFLAGS+= -Wl,--secure-plt
 .endif
 
 .if ${MACHINE_ARCH} == "powerpcspe"
-CFLAGS += -mcpu=8548 -Wa,-me500 -mspe=yes -mabi=spe -mfloat-gprs=double
+CFLAGS += -mcpu=8548 -mspe
+CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 .endif
 
 .if ${MACHINE_CPUARCH} == "riscv"

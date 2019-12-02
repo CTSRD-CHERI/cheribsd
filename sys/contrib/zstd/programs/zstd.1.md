@@ -144,6 +144,18 @@ the last one takes effect.
     Due to the chaotic nature of dynamic adaptation, compressed result is not reproducible.
     _note_ : at the time of this writing, `--adapt` can remain stuck at low speed
     when combined with multiple worker threads (>=2).
+* `--stream-size=#` :
+    Sets the pledged source size of input coming from a stream. This value must be exact, as it
+    will be included in the produced frame header. Incorrect stream sizes will cause an error.
+    This information will be used to better optimize compression parameters, resulting in
+    better and potentially faster compression, especially for smaller source sizes.
+* `--size-hint=#`:
+    When handling input from a stream, `zstd` must guess how large the source size
+    will be when optimizing compression parameters. If the stream size is relatively
+    small, this guess may be a poor one, resulting in a higher compression ratio than
+    expected. This feature allows for controlling the guess when needed.
+    Exact guesses result in better compression ratios. Overestimates result in slightly
+    degraded compression ratios, while underestimates may result in significant degradation.
 * `--rsyncable` :
     `zstd` will periodically synchronize the compression state to make the
     compressed file more rsync-friendly. There is a negligible impact to
@@ -179,6 +191,13 @@ the last one takes effect.
     This is the default behavior.
 * `-r`:
     operate recursively on directories
+* `--output-dir-flat[=dir]`:
+    resulting files are stored into target `dir` directory,
+    instead of same directory as origin file.
+    Be aware that this command can introduce name collision issues,
+    if multiple files, from different directories, end up having the same name.
+    Collision resolution ensures first file with a given name will be present in `dir`,
+    while in combination with `-f`, the last file will be present instead.
 * `--format=FORMAT`:
     compress and decompress in other formats. If compiled with
     support, zstd can compress to or decompress from other compression algorithm
@@ -201,6 +220,16 @@ the last one takes effect.
     add integrity check computed from uncompressed data (default: enabled)
 * `--`:
     All arguments after `--` are treated as files
+
+### Restricted usage of Environment Variables
+
+Using environment variables to set parameters has security implications.
+Therefore, this avenue is intentionally restricted.
+Only `ZSTD_CLEVEL` is supported currently, for setting compression level.
+`ZSTD_CLEVEL` can be used to set the level between 1 and 19 (the "normal" range).
+If the value of `ZSTD_CLEVEL` is not a valid integer, it will be ignored with a warning message.
+`ZSTD_CLEVEL` just replaces the default compression level (`3`).
+It can be overridden by corresponding command line arguments.
 
 
 DICTIONARY BUILDER
@@ -244,13 +273,15 @@ Compression of small files similar to the sample set will be greatly improved.
     This compares favorably to 4 bytes default.
     However, it's up to the dictionary manager to not assign twice the same ID to
     2 different dictionaries.
-* `--train-cover[=k#,d=#,steps=#,split=#]`:
+* `--train-cover[=k#,d=#,steps=#,split=#,shrink[=#]]`:
     Select parameters for the default dictionary builder algorithm named cover.
     If _d_ is not specified, then it tries _d_ = 6 and _d_ = 8.
     If _k_ is not specified, then it tries _steps_ values in the range [50, 2000].
     If _steps_ is not specified, then the default value of 40 is used.
     If _split_ is not specified or split <= 0, then the default value of 100 is used.
     Requires that _d_ <= _k_.
+    If _shrink_ flag is not used, then the default value for _shrinkDict_ of 0 is used.
+    If _shrink_ is not specified, then the default value for _shrinkDictMaxRegression_ of 1 is used.
 
     Selects segments of size _k_ with highest score to put in the dictionary.
     The score of a segment is computed by the sum of the frequencies of all the
@@ -262,6 +293,9 @@ Compression of small files similar to the sample set will be greatly improved.
     If _split_ is 100, all input samples are used for both training and testing
     to find optimal _d_ and _k_ to build dictionary.
     Supports multithreading if `zstd` is compiled with threading support.
+    Having _shrink_ enabled takes a truncated dictionary of minimum size and doubles
+    in size until compression ratio of the truncated dictionary is at most
+    _shrinkDictMaxRegression%_ worse than the compression ratio of the largest dictionary.
 
     Examples:
 
@@ -274,6 +308,10 @@ Compression of small files similar to the sample set will be greatly improved.
     `zstd --train-cover=k=50 FILEs`
 
     `zstd --train-cover=k=50,split=60 FILEs`
+
+    `zstd --train-cover=shrink FILEs`
+
+    `zstd --train-cover=shrink=2 FILEs`
 
 * `--train-fastcover[=k#,d=#,f=#,steps=#,split=#,accel=#]`:
     Same as cover but with extra parameters _f_ and _accel_ and different default value of split

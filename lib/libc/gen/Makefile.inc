@@ -11,6 +11,7 @@ CFLAGS.getpwent.c=	-mxgot
 
 CONFS+=	group master.passwd shells
 CONFSMODE_master.passwd=	600
+CONFSPACKAGE=   runtime
 
 SRCS+=	__getosreldate.c \
 	__pthread_mutex_init_calloc_cb_stub.c \
@@ -332,6 +333,7 @@ MLINKS+=arc4random.3 arc4random_buf.3 \
 	arc4random.3 arc4random_uniform.3
 MLINKS+=auxv.3 elf_aux_info.3
 MLINKS+=ctermid.3 ctermid_r.3
+MLINKS+=daemon.3 daemonfd.3
 MLINKS+=devname.3 devname_r.3
 MLINKS+=devname.3 fdevname.3
 MLINKS+=devname.3 fdevname_r.3

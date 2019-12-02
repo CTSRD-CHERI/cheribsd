@@ -689,11 +689,10 @@ isc_start_receiver(isc_session_t *sp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "struct iovec"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

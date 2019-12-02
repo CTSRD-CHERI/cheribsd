@@ -1,16 +1,4 @@
 /* $FreeBSD$ */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20180924,
- *   "target_type": "lib",
- *   "changes": [
- *     "unsupported"
- *   ],
- *   "is_upstream": true
- * }
- * CHERI CHANGES END
- */
 
 /* FreeBSD isn't any form of AIX. */
 #define bin_dummy_emulation bin_vanilla_emulation

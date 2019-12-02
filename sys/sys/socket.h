@@ -427,28 +427,17 @@ struct sockproto {
  * Message header for recvmsg and sendmsg calls.
  * Used value-result for recvmsg, value only for sendmsg.
  */
-#ifndef _KERNEL
 struct msghdr {
-	void		*msg_name;		/* optional address */
+	void * __kerncap msg_name;		/* optional address */
 	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec	*msg_iov;		/* scatter/gather array */
+	struct iovec * __kerncap msg_iov;	/* scatter/gather array */
 	int		 msg_iovlen;		/* # elements in msg_iov */
-	void		*msg_control;		/* ancillary data, see below */
+	void * __kerncap msg_control;		/* ancillary data, see below */
 	socklen_t	 msg_controllen;	/* ancillary data buffer len */
 	int		 msg_flags;		/* flags on received message */
 };
-#else /* _KERNEL */
+#ifdef _KERNEL
 #if __has_feature(capabilities)
-/* XXX-AM: Should this switch on COMPAT_CHERIABI and COMPAT_FREEBSD64? */
-struct msghdr_c {
-	void		* __capability msg_name;		/* optional address */
-	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec_c	* __capability msg_iov;		/* scatter/gather array */
-	int		 msg_iovlen;		/* # elements in msg_iov */
-	void		* __capability msg_control;		/* ancillary data, see below */
-	socklen_t	 msg_controllen;	/* ancillary data buffer len */
-	int		 msg_flags;		/* flags on received message */
-};
 struct msghdr64 {
 	uint64_t	msg_name;	/* (void *) optional address */
 	socklen_t	msg_namelen;	/* size of address */
@@ -467,14 +456,8 @@ struct msghdr_native {
 	void		*msg_control;		/* ancillary data, see below */
 	socklen_t	 msg_controllen;	/* ancillary data buffer len */
 	int		 msg_flags;		/* flags on received message */
-}; /* _KERNEL */
-#if __has_feature(capabilities)
-typedef	struct msghdr_c		kmsghdr_t;
-#else
-typedef	struct msghdr_native	kmsghdr_t;
-#endif
-typedef	struct msghdr_native	umsghdr_t;
-#endif
+};
+#endif	/* _KERNEL */
 
 #define	MSG_OOB		 0x00000001	/* process out-of-band data */
 #define	MSG_PEEK	 0x00000002	/* peek at incoming message */
@@ -685,28 +668,20 @@ struct omsghdr {
 /*
  * sendfile(2) header/trailer struct
  */
-#ifndef _KERNEL
 struct sf_hdtr {
-	struct iovec *headers;	/* pointer to an array of header struct iovec's */
+	struct iovec * __kerncap headers;	/* header struct iovec's */
 	int hdr_cnt;		/* number of header iovec's */
-	struct iovec *trailers;	/* pointer to an array of trailer struct iovec's */
+	struct iovec * __kerncap trailers;	/* trailer struct iovec's */
 	int trl_cnt;		/* number of trailer iovec's */
 };
-#else /* _KERNEL */
-struct sf_hdtr_c {
-	struct iovec_c * __capability headers;	/* pointer to an array of header struct iovec's */
-	int hdr_cnt;		/* number of header iovec's */
-	struct iovec_c * __capability trailers;	/* pointer to an array of trailer struct iovec's */
-	int trl_cnt;		/* number of trailer iovec's */
-};
+#ifdef _KERNEL
 struct sf_hdtr_native {
 	struct iovec_native *headers;	/* pointer to an array of header struct iovec's */
 	int hdr_cnt;		/* number of header iovec's */
 	struct iovec_native *trailers;	/* pointer to an array of trailer struct iovec's */
 	int trl_cnt;		/* number of trailer iovec's */
 };
-typedef	struct sf_hdtr_c	ksf_hdtr_t;
-typedef	int copyin_hdtr_t(const void * __capability hdtrp, ksf_hdtr_t *hdtr);
+typedef	int copyin_hdtr_t(const void * __capability hdtrp, struct sf_hdtr *hdtr);
 #endif /* _KERNEL */
 
 /*
@@ -727,28 +702,15 @@ typedef	int copyin_hdtr_t(const void * __capability hdtrp, ksf_hdtr_t *hdtr);
  * Sendmmsg/recvmmsg specific structure(s)
  */
 
-#ifndef _KERNEL
 struct mmsghdr {
 	struct msghdr	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */
 };
-#else /* _KERNEL */
-#if __has_feature(capabilities)
-struct mmsghdr_c {
-	struct msghdr_c	msg_hdr;		/* message header */
-	ssize_t		msg_len;		/* message length */
-};
-#endif
+#ifdef _KERNEL
 struct mmsghdr_native {
 	struct msghdr_native	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */
 };
-#if __has_feature(capabilities)
-typedef	struct mmsghdr_c	kmmsghdr_t;
-#else
-typedef	struct mmsghdr_native	kmmsghdr_t;
-#endif
-typedef	struct mmsghdr_native	ummsghdr_t;
 #endif /* _KERNEL */
 #endif /* __BSD_VISIBLE */
 
@@ -831,10 +793,9 @@ void so_unlock(struct socket *so);
 #endif /* !_SYS_SOCKET_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "header",
 //   "changes": [
-//     "kiovec_t",
 //     "pointer_alignment"
 //   ]
 // }

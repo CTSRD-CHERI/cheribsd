@@ -213,7 +213,7 @@ minidumpsys(struct dumperinfo *di)
 		pte = pmap_pte(kernel_pmap, va);
 		KASSERT(pte != NULL, ("pte for %jx is NULL", (uintmax_t)va));
 		for (i = 0; i < NPTEPG; i++) {
-			if (pte_is_valid(&pte[i])) {
+			if (pte_test((pte), PTE_V)) {
 				pa = TLBLO_PTE_TO_PA(pte[i]);
 				if (is_dumpable(pa))
 					dump_add_page(pa);

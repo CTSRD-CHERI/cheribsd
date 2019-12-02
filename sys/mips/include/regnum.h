@@ -73,11 +73,17 @@
 #ifndef _MACHINE_REGNUM_H_
 #define	_MACHINE_REGNUM_H_
 
+#define	NUMSAVEREGS	40
+#define	NUMFPREGS	34
+
+#define	NUMCHERISAVEREGS	34	/* Plenty of alignment already. */
+
 /*
  * Location of the saved registers relative to ZERO.
  * This must match struct trapframe defined in frame.h exactly.
  * This must also match regdef.h.
  */
+#if defined(_KERNEL) || defined(_WANT_MIPS_REGNUM)
 #define	ZERO	0
 #define	AST	1
 #define	V0	2
@@ -142,9 +148,6 @@
 #define	BADINSTR_P	39
 #endif
 
-
-#define	NUMSAVEREGS 40
-
 /*
  * Pseudo registers so we save a complete set of registers regardless of
  * the ABI. See regdef.h for a more complete explanation.
@@ -205,8 +208,6 @@
 #define	PCC		(CHERIBASE + 32 * CHERIREGOFFSIZE)
 #define	CAPCAUSE	(CHERIBASE + 33 * CHERIREGOFFSIZE)
 
-#define	NUMCHERISAVEREGS	34	/* Plenty of alignment already. */
-
 /*
  * Index of FP registers in 'struct frame', counting from the beginning
  * of the frame (i.e., including the general registers).
@@ -253,10 +254,6 @@
 #define	FSR	(FPBASE+32)
 #define FIR	(FPBASE+33)
 
-#define	NUMFPREGS	34
-
-#define	NREGS	(NUMSAVEREGS + NUMFPREGS)
-
 /*
  * Index of FP registers in 'struct frame', relative to the base
  * of the FP registers in frame (i.e., *not* including the general
@@ -296,5 +293,7 @@
 #define	F31_NUM	(31)
 #define	FSR_NUM	(32)
 #define	FIR_NUM	(33)
+
+#endif	/* _KERNEL || _WANT_MIPS_REGNUM */
 
 #endif /* !_MACHINE_REGNUM_H_ */

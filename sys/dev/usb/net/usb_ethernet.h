@@ -48,11 +48,7 @@
 #include <net/bpf.h>
 #include <net/ethernet.h>
 
-#include "miibus_if.h"
-
-#include <dev/mii/mii.h>
-#include <dev/mii/miivar.h>
-
+struct mii_data;
 struct usb_ether;
 struct usb_device_request;
 
@@ -91,7 +87,7 @@ struct usb_ether {
 
 	struct usb_process	ue_tq;
 	struct sysctl_ctx_list	ue_sysctl_ctx;
-	struct ifqueue		ue_rxq;
+	struct mbufq		ue_rxq;
 	struct usb_callout	ue_watchdog;
 	struct usb_ether_cfg_task	ue_sync_task[2];
 	struct usb_ether_cfg_task	ue_media_task[2];

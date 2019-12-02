@@ -135,10 +135,21 @@ pfs_add_node(struct pfs_node *parent, struct pfs_node *pn)
 	pfs_fileno_alloc(pn);
 
 	pfs_lock(parent);
-	pn->pn_next = parent->pn_nodes;
 	if ((parent->pn_flags & PFS_PROCDEP) != 0)
 		pn->pn_flags |= PFS_PROCDEP;
-	parent->pn_nodes = pn;
+	if (parent->pn_nodes == NULL) {
+		KASSERT(parent->pn_last_node == NULL,
+		    ("%s(): pn_last_node not NULL", __func__));
+		parent->pn_nodes = pn;
+		parent->pn_last_node = pn;
+	} else {
+		KASSERT(parent->pn_last_node != NULL,
+		    ("%s(): pn_last_node is NULL", __func__));
+		KASSERT(parent->pn_last_node->pn_next == NULL,
+		    ("%s(): pn_last_node->pn_next not NULL", __func__));
+		parent->pn_last_node->pn_next = pn;
+		parent->pn_last_node = pn;
+	}
 	pfs_unlock(parent);
 }
 
@@ -148,7 +159,7 @@ pfs_add_node(struct pfs_node *parent, struct pfs_node *pn)
 static void
 pfs_detach_node(struct pfs_node *pn)
 {
-	struct pfs_node *parent = pn->pn_parent;
+	struct pfs_node *node, *parent = pn->pn_parent;
 	struct pfs_node **iter;
 
 	KASSERT(parent != NULL, ("%s(): node has no parent", __func__));
@@ -156,6 +167,16 @@ pfs_detach_node(struct pfs_node *pn)
 	    ("%s(): parent has different pn_info", __func__));
 
 	pfs_lock(parent);
+	if (pn == parent->pn_last_node) {
+		if (pn == pn->pn_nodes) {
+			parent->pn_last_node = NULL;
+		} else {
+			for (node = parent->pn_nodes;
+			    node->pn_next != pn; node = node->pn_next)
+				continue;
+			parent->pn_last_node = node;
+		}
+	}
 	iter = &parent->pn_nodes;
 	while (*iter != NULL) {
 		if (*iter == pn) {
@@ -347,6 +368,7 @@ pfs_mount(struct pfs_info *pi, struct mount *mp)
 
 	MNT_ILOCK(mp);
 	mp->mnt_flag |= MNT_LOCAL;
+	mp->mnt_kern_flag |= MNTK_NOMSYNC;
 	MNT_IUNLOCK(mp);
 	mp->mnt_data = pi;
 	vfs_getnewfsid(mp);
@@ -368,7 +390,7 @@ pfs_mount(struct pfs_info *pi, struct mount *mp)
  * Compatibility shim for old mount(2) system call
  */
 int
-pfs_cmount(struct mntarg *ma, void *data, uint64_t flags)
+pfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	int error;
 

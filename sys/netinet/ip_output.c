@@ -36,6 +36,7 @@ __FBSDID("$FreeBSD$");
 
 #include "opt_inet.h"
 #include "opt_ipsec.h"
+#include "opt_kern_tls.h"
 #include "opt_mbuf_stress_test.h"
 #include "opt_mpath.h"
 #include "opt_ratelimit.h"
@@ -46,6 +47,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/ktls.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -210,16 +212,41 @@ ip_output_pfil(struct mbuf **mp, struct ifnet *ifp, int flags,
 
 static int
 ip_output_send(struct inpcb *inp, struct ifnet *ifp, struct mbuf *m,
-    const struct sockaddr_in *gw, struct route *ro)
+    const struct sockaddr_in *gw, struct route *ro, bool stamp_tag)
 {
+#ifdef KERN_TLS
+	struct ktls_session *tls = NULL;
+#endif
 	struct m_snd_tag *mst;
 	int error;
 
 	MPASS((m->m_pkthdr.csum_flags & CSUM_SND_TAG) == 0);
 	mst = NULL;
 
+#ifdef KERN_TLS
+	/*
+	 * If this is an unencrypted TLS record, save a reference to
+	 * the record.  This local reference is used to call
+	 * ktls_output_eagain after the mbuf has been freed (thus
+	 * dropping the mbuf's reference) in if_output.
+	 */
+	if (m->m_next != NULL && mbuf_has_tls_session(m->m_next)) {
+		tls = ktls_hold(m->m_next->m_ext.ext_pgs->tls);
+		mst = tls->snd_tag;
+
+		/*
+		 * If a TLS session doesn't have a valid tag, it must
+		 * have had an earlier ifp mismatch, so drop this
+		 * packet.
+		 */
+		if (mst == NULL) {
+			error = EAGAIN;
+			goto done;
+		}
+	}
+#endif
 #ifdef RATELIMIT
-	if (inp != NULL) {
+	if (inp != NULL && mst == NULL) {
 		if ((inp->inp_flags2 & INP_RATE_LIMIT_CHANGED) != 0 ||
 		    (inp->inp_snd_tag != NULL &&
 		    inp->inp_snd_tag->ifp != ifp))
@@ -229,7 +256,7 @@ ip_output_send(struct inpcb *inp, struct ifnet *ifp, struct mbuf *m,
 			mst = inp->inp_snd_tag;
 	}
 #endif
-	if (mst != NULL) {
+	if (stamp_tag && mst != NULL) {
 		KASSERT(m->m_pkthdr.rcvif == NULL,
 		    ("trying to add a send tag to a forwarded packet"));
 		if (mst->ifp != ifp) {
@@ -246,6 +273,13 @@ ip_output_send(struct inpcb *inp, struct ifnet *ifp, struct mbuf *m,
 
 done:
 	/* Check for route change invalidating send tags. */
+#ifdef KERN_TLS
+	if (tls != NULL) {
+		if (error == EAGAIN)
+			error = ktls_output_eagain(inp, tls);
+		ktls_free(tls);
+	}
+#endif
 #ifdef RATELIMIT
 	if (error == EAGAIN)
 		in_pcboutput_eagain(inp);
@@ -757,7 +791,8 @@ sendit:
 		 */
 		m_clrprotoflags(m);
 		IP_PROBE(send, NULL, NULL, ip, ifp, ip, NULL);
-		error = ip_output_send(inp, ifp, m, gw, ro);
+		error = ip_output_send(inp, ifp, m, gw, ro,
+		    (flags & IP_NO_SND_TAG_RL) ? false : true);
 		goto done;
 	}
 
@@ -793,7 +828,7 @@ sendit:
 
 			IP_PROBE(send, NULL, NULL, mtod(m, struct ip *), ifp,
 			    mtod(m, struct ip *), NULL);
-			error = ip_output_send(inp, ifp, m, gw, ro);
+			error = ip_output_send(inp, ifp, m, gw, ro, true);
 		} else
 			m_freem(m);
 	}
@@ -1043,7 +1078,7 @@ in_delayed_cksum(struct mbuf *m)
 int
 ip_ctloutput(struct socket *so, struct sockopt *sopt)
 {
-	struct	inpcb *inp = sotoinpcb(so);
+	struct inpcb *inp = sotoinpcb(so);
 	int	error, optval;
 #ifdef	RSS
 	uint32_t rss_bucket;

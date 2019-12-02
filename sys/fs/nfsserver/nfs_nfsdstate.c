@@ -7917,10 +7917,10 @@ nfsrv_createdevids(struct nfsd_nfsd_args *args, NFSPROC_T *p)
 	char *addrp, *dnshostp, *dspathp, *mdspathp;
 	int error, i;
 
-	addrp = args->addr;
-	dnshostp = args->dnshost;
-	dspathp = args->dspath;
-	mdspathp = args->mdspath;
+	addrp = (__cheri_fromcap char *)args->addr;
+	dnshostp = (__cheri_fromcap char *)args->dnshost;
+	dspathp = (__cheri_fromcap char *)args->dspath;
+	mdspathp = (__cheri_fromcap char *)args->mdspath;
 	nfsrv_maxpnfsmirror = args->mirrorcnt;
 	if (addrp == NULL || dnshostp == NULL || dspathp == NULL ||
 	    mdspathp == NULL)
@@ -7930,10 +7930,10 @@ nfsrv_createdevids(struct nfsd_nfsd_args *args, NFSPROC_T *p)
 	 * Loop around for each nul-terminated string in args->addr,
 	 * args->dnshost, args->dnspath and args->mdspath.
 	 */
-	while (addrp < (args->addr + args->addrlen) &&
-	    dnshostp < (args->dnshost + args->dnshostlen) &&
-	    dspathp < (args->dspath + args->dspathlen) &&
-	    mdspathp < (args->mdspath + args->mdspathlen)) {
+	while (addrp < ((__cheri_fromcap char *)args->addr + args->addrlen) &&
+	    dnshostp < ((__cheri_fromcap char *)args->dnshost + args->dnshostlen) &&
+	    dspathp < ((__cheri_fromcap char *)args->dspath + args->dspathlen) &&
+	    mdspathp < ((__cheri_fromcap char *)args->mdspath + args->mdspathlen)) {
 		error = nfsrv_setdsserver(dspathp, mdspathp, p, &ds);
 		if (error != 0) {
 			/* Free all DS servers. */
@@ -7999,7 +7999,7 @@ nfsrv_freealldevids(void)
  */
 #define	NFSCLIDVECSIZE	6
 APPLESTATIC int
-nfsrv_checkdsattr(struct nfsrv_descript *nd, vnode_t vp, NFSPROC_T *p)
+nfsrv_checkdsattr(vnode_t vp, NFSPROC_T *p)
 {
 	fhandle_t fh, *tfhp;
 	struct nfsstate *stp;

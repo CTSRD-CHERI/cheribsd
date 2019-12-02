@@ -68,8 +68,10 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 
 #include <machine/bootinfo.h>
 #include <machine/clock.h>
@@ -300,9 +302,9 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 #endif
 
 	if (OF_install(OFW_FDT, 0) == FALSE)
-		while (1);
+		panic("OF_install failed.");
 	if (OF_init((void *)dtbp) != 0)
-		while (1);
+		panic("OF_init failed.");
 
 	/*
 	 * Get bootargs from FDT if specified.
@@ -354,8 +356,12 @@ platform_start(__register_t a0, __register_t a1,  __register_t a2,
 		for (i = 0; envp[i]; i += 2)
 			printf("\t%s = %s\n", envp[i], envp[i+1]);
 
-		if (bootinfop != NULL)
-			printf("bootinfo found at %p\n", bootinfop);
+		if (bootinfop != NULL) {
+			printf("bootinfo found at %p, "
+			    "bootinfop->bi_memsize=0x%lx\n", bootinfop,
+			    (long)bootinfop->bi_memsize);
+			hexdump(bootinfop, sizeof(*bootinfop), "Bootinfo:", 0);
+		}
 
 		printf("memsize = %p\n", (void *)memsize);
 	}

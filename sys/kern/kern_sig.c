@@ -36,6 +36,8 @@
  *	@(#)kern_sig.c	8.7 (Berkeley) 4/18/94
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -57,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/kernel.h>
 #include <sys/ktr.h>
 #include <sys/ktrace.h>
+#include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
@@ -674,7 +677,7 @@ sigonstack(size_t sp)
 	if ((td->td_pflags & TDP_ALTSTACK) == 0)
 		return (0);
 #if defined(COMPAT_43)
-	if (td->td_sigstk.ss_size == 0)
+	if (SV_PROC_FLAG(td->td_proc, SV_AOUT) && td->td_sigstk.ss_size == 0)
 		return ((td->td_sigstk.ss_flags & SS_ONSTACK) != 0);
 #endif
 	return (sp >= (__cheri_addr size_t)td->td_sigstk.ss_sp &&
@@ -703,7 +706,7 @@ sig_ffs(sigset_t *set)
 }
 
 static bool
-sigact_flag_test(const ksigaction_t *act, int flag)
+sigact_flag_test(const struct sigaction *act, int flag)
 {
 
 	/*
@@ -723,8 +726,8 @@ sigact_flag_test(const ksigaction_t *act, int flag)
  * osigaction
  */
 int
-kern_sigaction(struct thread *td, int sig, const ksigaction_t *act,
-    ksigaction_t *oact, int flags)
+kern_sigaction(struct thread *td, int sig, const struct sigaction *act,
+    struct sigaction *oact, int flags)
 {
 	struct sigacts *ps;
 	struct proc *p = td->td_proc;
@@ -878,41 +881,20 @@ struct sigaction_args {
 int
 sys_sigaction(struct thread *td, struct sigaction_args *uap)
 {
-	ksigaction_t act, oact;
-	struct sigaction_native act_n, oact_n;
-	ksigaction_t *actp, *oactp;
+	struct sigaction act, oact;
+	struct sigaction *actp, *oactp;
 	int error;
 
 	actp = (uap->act != NULL) ? &act : NULL;
 	oactp = (uap->oact != NULL) ? &oact : NULL;
 	if (actp) {
-		error = copyin(uap->act, &act_n, sizeof(act));
+		error = copyincap(uap->act, &act, sizeof(act));
 		if (error)
 			return (error);
-#if __has_feature(capabilities)
-		if (is_magic_sighandler_constant(act_n.sa_handler))
-			actp->sa_handler = cheri_fromint((vaddr_t)act_n.sa_handler);
-		else
-			actp->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
-		actp->sa_flags = act_n.sa_flags;
-		actp->sa_mask = act_n.sa_mask;
-#else
-		*actp = act_n;
-#endif
 	}
 	error = kern_sigaction(td, uap->sig, actp, oactp, 0);
-	if (oactp && !error) {
-#if __has_feature(capabilities)
-		memset(&oact_n, 0, sizeof(oact_n));
-		oact_n.sa_handler = (void *)(uintptr_t)(__cheri_addr vaddr_t)
-		    oactp->sa_handler;
-		oact_n.sa_flags = oactp->sa_flags;
-		oact_n.sa_mask = oactp->sa_mask;
-#else
-		oact_n = *oactp;
-#endif
-		error = copyout(&oact_n, uap->oact, sizeof(oact_n));
-	}
+	if (oactp && !error)
+		error = copyoutcap(&oact, uap->oact, sizeof(oact));
 	return (error);
 }
 
@@ -920,48 +902,28 @@ sys_sigaction(struct thread *td, struct sigaction_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct freebsd4_sigaction_args {
 	int	sig;
-	struct	sigaction_native *act;
-	struct	sigaction_native *oact;
+	struct	sigaction *act;
+	struct	sigaction *oact;
 };
 #endif
 int
 freebsd4_sigaction(struct thread *td, struct freebsd4_sigaction_args *uap)
 {
-	ksigaction_t act, oact;
-	struct sigaction_native act_n, oact_n;
-	ksigaction_t *actp, *oactp;
+	struct sigaction act, oact;
+	struct sigaction *actp, *oactp;
 	int error;
 
 
 	actp = (uap->act != NULL) ? &act : NULL;
 	oactp = (uap->oact != NULL) ? &oact : NULL;
 	if (actp) {
-		error = copyin(uap->act, &act_n, sizeof(act));
+		error = copyin(uap->act, &act, sizeof(act));
 		if (error)
 			return (error);
-#if __has_feature(capabilities)
-		if (is_magic_sighandler_constant(act_n.sa_handler))
-			actp->sa_handler = cheri_fromint((vaddr_t)act_n.sa_handler);
-		else
-			actp->sa_handler = __USER_CODE_CAP(act_n.sa_handler);
-		actp->sa_flags = act_n.sa_flags;
-		actp->sa_mask = act_n.sa_mask;
-#else
-		*actp = act_n;
-#endif
 	}
 	error = kern_sigaction(td, uap->sig, actp, oactp, KSA_FREEBSD4);
-	if (oactp && !error) {
-#if __has_feature(capabilities)
-		memset(&oact_n, 0, sizeof(oact_n));
-		oact_n.sa_handler = (void *)(__cheri_addr vaddr_t)oactp->sa_handler;
-		oact_n.sa_flags = oactp->sa_flags;
-		oact_n.sa_mask = oactp->sa_mask;
-#else
-		oact_n = *oactp;
-#endif
-		error = copyout(&oact_n, uap->oact, sizeof(oact));
-	}
+	if (oactp && !error)
+		error = copyout(&oact, uap->oact, sizeof(oact));
 	return (error);
 }
 #endif	/* COMAPT_FREEBSD4 */
@@ -978,8 +940,8 @@ int
 osigaction(struct thread *td, struct osigaction_args *uap)
 {
 	struct osigaction sa;
-	ksigaction_t nsa, osa;
-	ksigaction_t *nsap, *osap;
+	struct sigaction nsa, osa;
+	struct sigaction *nsap, *osap;
 	int error;
 
 	if (uap->signum <= 0 || uap->signum >= ONSIG)
@@ -992,21 +954,14 @@ osigaction(struct thread *td, struct osigaction_args *uap)
 		error = copyin(uap->nsa, &sa, sizeof(sa));
 		if (error)
 			return (error);
-#if __has_feature(capabilities)
-		if (is_magic_sighandler_constant(sa.sa_handler))
-			nsap->sa_handler = cheri_fromint((vaddr_t)sa.sa_handler);
-		else
-			nsap->sa_handler = __USER_CODE_CAP(sa.sa_handler);
-#else
-		nsap.sa_handler = (void *)(uintptr_t)sa.sa_handler;
-#endif
+		nsap.sa_handler = sa.sa_handler;
 		nsap->sa_flags = sa.sa_flags;
 		OSIG2SIG(sa.sa_mask, nsap->sa_mask);
 	}
 	error = kern_sigaction(td, uap->signum, nsap, osap, KSA_OSIGSET);
 	if (osap && !error) {
 		sa.sa_handler = osap->sa_handler;
-		sa.sa_handler = (void *)(uintptr_t)osap->sa_handler;
+		sa.sa_handler = osap->sa_handler;
 		sa.sa_flags = osap->sa_flags;
 		SIG2OSIG(osap->sa_mask, sa.sa_mask);
 		error = copyout(&sa, uap->osa, sizeof(sa));
@@ -1081,12 +1036,7 @@ execsigs(struct proc *p)
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	ps = p->p_sigacts;
 	mtx_lock(&ps->ps_mtx);
-	while (SIGNOTEMPTY(ps->ps_sigcatch)) {
-		sig = sig_ffs(&ps->ps_sigcatch);
-		sigdflt(ps, sig);
-		if ((sigprop(sig) & SIGPROP_IGNORE) != 0)
-			sigqueue_delete_proc(p, sig);
-	}
+	sig_drop_caught(p);
 
 	/*
 	 * As CloudABI processes cannot modify signal handlers, fully
@@ -1207,8 +1157,7 @@ int
 sys_sigprocmask(struct thread *td, struct sigprocmask_args *uap)
 {
 
-	return (user_sigprocmask(td, uap->how, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->oset)));
+	return (user_sigprocmask(td, uap->how, uap->set, uap->oset));
 }
 
 int
@@ -1257,8 +1206,7 @@ int
 sys_sigwait(struct thread *td, struct sigwait_args *uap)
 {
 
-	return (user_sigwait(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->sig)));
+	return (user_sigwait(td, uap->set, uap->sig));
 }
 
 int
@@ -1303,8 +1251,7 @@ int
 sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 {
 
-	return (user_sigtimedwait(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->info), __USER_CAP_OBJ(uap->timeout),
+	return (user_sigtimedwait(td, uap->set, uap->info, uap->timeout,
 	    (copyout_siginfo_t *)copyout_siginfo_native));
 }
 
@@ -1348,8 +1295,7 @@ int
 sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 {
 
-	return (user_sigwaitinfo(td, __USER_CAP_OBJ(uap->set),
-	    __USER_CAP_OBJ(uap->info),
+	return (user_sigwaitinfo(td, uap->set, uap->info,
 	    (copyout_siginfo_t *)copyout_siginfo_native));
 }
 
@@ -1514,7 +1460,7 @@ int
 sys_sigpending(struct thread *td, struct sigpending_args *uap)
 {
 
-	return (kern_sigpending(td, __USER_CAP_OBJ(uap->set)));
+	return (kern_sigpending(td, uap->set));
 }
 
 int
@@ -1643,7 +1589,7 @@ int
 sys_sigsuspend(struct thread *td, struct sigsuspend_args *uap)
 {
 
-	return (user_sigsuspend(td, __USER_CAP_OBJ(uap->sigmask)));
+	return (user_sigsuspend(td, uap->sigmask));
 }
 
 int
@@ -1758,8 +1704,8 @@ osigstack(struct thread *td, struct osigstack_args *uap)
 
 #ifndef _SYS_SYSPROTO_H_
 struct sigaltstack_args {
-	struct sigaltstack_native	*ss;
-	struct sigaltstack_native	*oss;
+	const stack_t	*ss;
+	stack_t	*oss;
 };
 #endif
 /* ARGSUSED */
@@ -1767,28 +1713,19 @@ int
 sys_sigaltstack(struct thread *td, struct sigaltstack_args *uap)
 {
 	stack_t ss, oss;
-	struct sigaltstack_native ss_n;
 	int error;
 
 	if (uap->ss != NULL) {
-		error = copyin(uap->ss, &ss_n, sizeof(ss_n));
+		error = copyincap(uap->ss, &ss, sizeof(ss));
 		if (error)
 			return (error);
-		ss.ss_sp = __USER_CAP_UNBOUND(ss_n.ss_sp);
-		ss.ss_size = ss_n.ss_size;
-		ss.ss_flags = ss_n.ss_flags;
 	}
 	error = kern_sigaltstack(td, (uap->ss != NULL) ? &ss : NULL,
 	    (uap->oss != NULL) ? &oss : NULL);
 	if (error)
 		return (error);
-	if (uap->oss != NULL) {
-		memset(&ss_n, 0, sizeof(ss_n));
-		ss_n.ss_sp = (__cheri_fromcap void *)oss.ss_sp;
-		ss_n.ss_size = oss.ss_size;
-		ss_n.ss_flags = oss.ss_flags;
-		error = copyout(&ss_n, uap->oss, sizeof(ss_n));
-	}
+	if (uap->oss != NULL)
+		error = copyoutcap(&oss, uap->oss, sizeof(stack_t));
 	return (error);
 }
 
@@ -2014,7 +1951,11 @@ sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 	ksigval_union sv;
 
 	memset(&sv, 0, sizeof(sv));
+#if __has_feature(capabilities)
+	sv.sival_ptr_c = uap->value;
+#else
 	sv.sival_ptr_native = uap->value;
+#endif
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
 }
@@ -4055,9 +3996,26 @@ sigacts_shared(struct sigacts *ps)
 
 	return (ps->ps_refcnt > 1);
 }
+
+void
+sig_drop_caught(struct proc *p)
+{
+	int sig;
+	struct sigacts *ps;
+
+	ps = p->p_sigacts;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+	mtx_assert(&ps->ps_mtx, MA_OWNED);
+	while (SIGNOTEMPTY(ps->ps_sigcatch)) {
+		sig = sig_ffs(&ps->ps_sigcatch);
+		sigdflt(ps, sig);
+		if ((sigprop(sig) & SIGPROP_IGNORE) != 0)
+			sigqueue_delete_proc(p, sig);
+	}
+}
 // CHERI CHANGES START
 // {
-//   "updated": 20190531,
+//   "updated": 20191022,
 //   "target_type": "kernel",
 //   "changes": [
 //     "kernel_sig_types",

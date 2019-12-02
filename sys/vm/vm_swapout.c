@@ -85,12 +85,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
-#include <sys/_kstack_cache.h>
 #include <sys/kthread.h>
 #include <sys/ktr.h>
 #include <sys/mount.h>
 #include <sys/racct.h>
 #include <sys/resourcevar.h>
+#include <sys/refcount.h>
 #include <sys/sched.h>
 #include <sys/sdt.h>
 #include <sys/signalvar.h>
@@ -194,7 +194,7 @@ vm_swapout_object_deactivate_pages(pmap_t pmap, vm_object_t first_object,
 			goto unlock_return;
 		VM_OBJECT_ASSERT_LOCKED(object);
 		if ((object->flags & OBJ_UNMANAGED) != 0 ||
-		    object->paging_in_progress != 0)
+		    REFCOUNT_COUNT(object->paging_in_progress) > 0)
 			goto unlock_return;
 
 		remove_mode = 0;
@@ -208,16 +208,22 @@ vm_swapout_object_deactivate_pages(pmap_t pmap, vm_object_t first_object,
 				goto unlock_return;
 			if (should_yield())
 				goto unlock_return;
-			if (vm_page_busied(p))
+			if (vm_page_tryxbusy(p) == 0)
 				continue;
 			VM_CNT_INC(v_pdpages);
-			vm_page_lock(p);
-			if (vm_page_wired(p) ||
-			    !pmap_page_exists_quick(pmap, p)) {
-				vm_page_unlock(p);
+
+			/*
+			 * The page may acquire a wiring after this check.
+			 * The page daemon handles wired pages, so there is
+			 * no harm done if a wiring appears while we are
+			 * attempting to deactivate the page.
+			 */
+			if (vm_page_wired(p) || !pmap_page_exists_quick(pmap, p)) {
+				vm_page_xunbusy(p);
 				continue;
 			}
 			act_delta = pmap_ts_referenced(p);
+			vm_page_lock(p);
 			if ((p->aflags & PGA_REFERENCED) != 0) {
 				if (act_delta == 0)
 					act_delta = 1;
@@ -227,24 +233,27 @@ vm_swapout_object_deactivate_pages(pmap_t pmap, vm_object_t first_object,
 				vm_page_activate(p);
 				p->act_count += act_delta;
 			} else if (vm_page_active(p)) {
+				/*
+				 * The page daemon does not requeue pages
+				 * after modifying their activation count.
+				 */
 				if (act_delta == 0) {
 					p->act_count -= min(p->act_count,
 					    ACT_DECLINE);
 					if (!remove_mode && p->act_count == 0) {
-						pmap_remove_all(p);
+						(void)vm_page_try_remove_all(p);
 						vm_page_deactivate(p);
-					} else
-						vm_page_requeue(p);
+					}
 				} else {
 					vm_page_activate(p);
 					if (p->act_count < ACT_MAX -
 					    ACT_ADVANCE)
 						p->act_count += ACT_ADVANCE;
-					vm_page_requeue(p);
 				}
 			} else if (vm_page_inactive(p))
-				pmap_remove_all(p);
+				(void)vm_page_try_remove_all(p);
 			vm_page_unlock(p);
+			vm_page_xunbusy(p);
 		}
 		if ((backing_object = object->backing_object) == NULL)
 			goto unlock_return;
@@ -278,8 +287,7 @@ vm_swapout_map_deactivate_pages(vm_map_t map, long desired)
 	 * first, search out the biggest object, and try to free pages from
 	 * that.
 	 */
-	tmpe = map->header.next;
-	while (tmpe != &map->header) {
+	VM_MAP_ENTRY_FOREACH(tmpe, map) {
 		if ((tmpe->eflags & MAP_ENTRY_IS_SUB_MAP) == 0) {
 			obj = tmpe->object.vm_object;
 			if (obj != NULL && VM_OBJECT_TRYRLOCK(obj)) {
@@ -296,7 +304,6 @@ vm_swapout_map_deactivate_pages(vm_map_t map, long desired)
 		}
 		if (tmpe->wired_count > 0)
 			nothingwired = FALSE;
-		tmpe = tmpe->next;
 	}
 
 	if (bigobj != NULL) {
@@ -307,8 +314,7 @@ vm_swapout_map_deactivate_pages(vm_map_t map, long desired)
 	 * Next, hunt around for other pages to deactivate.  We actually
 	 * do this search sort of wrong -- .text first is not the best idea.
 	 */
-	tmpe = map->header.next;
-	while (tmpe != &map->header) {
+	VM_MAP_ENTRY_FOREACH(tmpe, map) {
 		if (pmap_resident_count(vm_map_pmap(map)) <= desired)
 			break;
 		if ((tmpe->eflags & MAP_ENTRY_IS_SUB_MAP) == 0) {
@@ -320,7 +326,6 @@ vm_swapout_map_deactivate_pages(vm_map_t map, long desired)
 				VM_OBJECT_RUNLOCK(obj);
 			}
 		}
-		tmpe = tmpe->next;
 	}
 
 	/*
@@ -408,7 +413,7 @@ vm_daemon(void)
 			 * avoidance measure.
 			 */
 			if ((swapout_flags & VM_SWAP_NORMAL) != 0)
-				vm_page_drain_pqbatch();
+				vm_page_pqbatch_drain();
 			swapout_procs(swapout_flags);
 		}
 
@@ -555,9 +560,7 @@ vm_thread_swapout(struct thread *td)
 		if (m == NULL)
 			panic("vm_thread_swapout: kstack already missing?");
 		vm_page_dirty(m);
-		vm_page_lock(m);
 		vm_page_unwire(m, PQ_LAUNDRY);
-		vm_page_unlock(m);
 	}
 	VM_OBJECT_WUNLOCK(ksobj);
 }
@@ -579,14 +582,14 @@ vm_thread_swapin(struct thread *td, int oom_alloc)
 	    pages);
 	for (i = 0; i < pages;) {
 		vm_page_assert_xbusied(ma[i]);
-		if (ma[i]->valid == VM_PAGE_BITS_ALL) {
+		if (vm_page_all_valid(ma[i])) {
 			vm_page_xunbusy(ma[i]);
 			i++;
 			continue;
 		}
 		vm_object_pip_add(ksobj, 1);
 		for (j = i + 1; j < pages; j++)
-			if (ma[j]->valid == VM_PAGE_BITS_ALL)
+			if (vm_page_all_valid(ma[j]))
 				break;
 		rv = vm_pager_has_page(ksobj, ma[i]->pindex, NULL, &a);
 		KASSERT(rv == 1, ("%s: missing page %p", __func__, ma[i]));

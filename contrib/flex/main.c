@@ -1857,13 +1857,3 @@ void usage ()
 		 backing_name, program_name, outfile_path, program_name);
 
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181121,
-//   "changes": [
-//     "calling_convention"
-//   ],
-//   "change_comment": "attemping to NULL terminate VA with 0",
-//   "is_upstream": true
-// }
-// CHERI CHANGES END

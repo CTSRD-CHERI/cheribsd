@@ -81,7 +81,7 @@ SYSCTL_UINT(_hw_ntb_transport, OID_AUTO, debug_level, CTLFLAG_RWTUN,
 
 static unsigned transport_mtu = 0x10000;
 
-static uint64_t max_mw_size;
+static uint64_t max_mw_size = 256*1024*1024;
 SYSCTL_UQUAD(_hw_ntb_transport, OID_AUTO, max_mw_size, CTLFLAG_RDTUN, &max_mw_size, 0,
     "If enabled (non-zero), limit the size of large memory windows. "
     "Both sides of the NTB MUST set the same value here.");
@@ -177,14 +177,17 @@ struct ntb_transport_mw {
 	size_t		xlat_align;
 	size_t		xlat_align_size;
 	bus_addr_t	addr_limit;
-	/* Tx buff is off vbase / phys_addr */
+	/* Tx buff is vbase / phys_addr / tx_size */
 	caddr_t		vbase;
-	size_t		buff_size;
-	/* Rx buff is off virt_addr / dma_addr */
+	size_t		tx_size;
+	/* Rx buff is virt_addr / dma_addr / rx_size */
 	bus_dma_tag_t	dma_tag;
 	bus_dmamap_t	dma_map;
 	caddr_t		virt_addr;
 	bus_addr_t	dma_addr;
+	size_t		rx_size;
+	/* rx_size increased to size alignment requirements of the hardware. */
+	size_t		buff_size;
 };
 
 struct ntb_transport_child {
@@ -200,6 +203,7 @@ struct ntb_transport_ctx {
 	struct ntb_transport_child *child;
 	struct ntb_transport_mw	*mw_vec;
 	struct ntb_transport_qp	*qp_vec;
+	int			compact;
 	unsigned		mw_count;
 	unsigned		qp_count;
 	uint64_t		qp_bitmap;
@@ -247,6 +251,15 @@ enum {
 	 * work around this watchdog.
 	 */
 	NTBT_WATCHDOG_SPAD = 15
+};
+
+/*
+ * Compart version of sratchpad protocol, using twice less registers.
+ */
+enum {
+	NTBTC_PARAMS = 0,	/* NUM_QPS << 24 + NUM_MWS << 16 + VERSION */
+	NTBTC_QP_LINKS,		/* QP links status */
+	NTBTC_MW0_SZ,		/* MW size limited to 32 bits. */
 };
 
 #define QP_TO_MW(nt, qp)	((qp) % nt->mw_count)
@@ -331,7 +344,7 @@ ntb_transport_attach(device_t dev)
 	struct ntb_transport_child **cpp = &nt->child;
 	struct ntb_transport_child *nc;
 	struct ntb_transport_mw *mw;
-	uint64_t db_bitmap, size;
+	uint64_t db_bitmap;
 	int rc, i, db_count, spad_count, qp, qpu, qpo, qpt;
 	char cfg[128] = "";
 	char buf[32];
@@ -349,14 +362,30 @@ ntb_transport_attach(device_t dev)
 		device_printf(dev, "At least 1 memory window required.\n");
 		return (ENXIO);
 	}
-	if (spad_count < 6) {
-		device_printf(dev, "At least 6 scratchpads required.\n");
-		return (ENXIO);
-	}
-	if (spad_count < 4 + 2 * nt->mw_count) {
-		nt->mw_count = (spad_count - 4) / 2;
-		device_printf(dev, "Scratchpads enough only for %d "
-		    "memory windows.\n", nt->mw_count);
+	nt->compact = (spad_count < 4 + 2 * nt->mw_count);
+	snprintf(buf, sizeof(buf), "hint.%s.%d.compact", device_get_name(dev),
+	    device_get_unit(dev));
+	TUNABLE_INT_FETCH(buf, &nt->compact);
+	if (nt->compact) {
+		if (spad_count < 3) {
+			device_printf(dev, "At least 3 scratchpads required.\n");
+			return (ENXIO);
+		}
+		if (spad_count < 2 + nt->mw_count) {
+			nt->mw_count = spad_count - 2;
+			device_printf(dev, "Scratchpads enough only for %d "
+			    "memory windows.\n", nt->mw_count);
+		}
+	} else {
+		if (spad_count < 6) {
+			device_printf(dev, "At least 6 scratchpads required.\n");
+			return (ENXIO);
+		}
+		if (spad_count < 4 + 2 * nt->mw_count) {
+			nt->mw_count = (spad_count - 4) / 2;
+			device_printf(dev, "Scratchpads enough only for %d "
+			    "memory windows.\n", nt->mw_count);
+		}
 	}
 	if (db_bitmap == 0) {
 		device_printf(dev, "At least one doorbell required.\n");
@@ -374,6 +403,21 @@ ntb_transport_attach(device_t dev)
 		if (rc != 0)
 			goto err;
 
+		mw->tx_size = mw->phys_size;
+		if (max_mw_size != 0 && mw->tx_size > max_mw_size) {
+			device_printf(dev, "Memory window %d limited from "
+			    "%ju to %ju\n", i, (uintmax_t)mw->tx_size,
+			    max_mw_size);
+			mw->tx_size = max_mw_size;
+		}
+		if (nt->compact && mw->tx_size > UINT32_MAX) {
+			device_printf(dev, "Memory window %d is too big "
+			    "(%ju)\n", i, (uintmax_t)mw->tx_size);
+			rc = ENXIO;
+			goto err;
+		}
+
+		mw->rx_size = 0;
 		mw->buff_size = 0;
 		mw->virt_addr = NULL;
 		mw->dma_addr = 0;
@@ -388,10 +432,7 @@ ntb_transport_attach(device_t dev)
 		 * that NTB windows are symmetric and this allocation remain,
 		 * but even if not, we will just reallocate it later.
 		 */
-		size = mw->phys_size;
-		if (max_mw_size != 0 && size > max_mw_size)
-			size = max_mw_size;
-		ntb_set_mw(nt, i, size);
+		ntb_set_mw(nt, i, mw->tx_size);
 	}
 
 	qpu = 0;
@@ -556,7 +597,7 @@ ntb_transport_init_queue(struct ntb_transport_ctx *nt, unsigned int qp_num)
 	struct ntb_transport_mw *mw;
 	struct ntb_transport_qp *qp;
 	vm_paddr_t mw_base;
-	uint64_t mw_size, qp_offset;
+	uint64_t qp_offset;
 	size_t tx_size;
 	unsigned num_qps_mw, mw_num, mw_count;
 
@@ -578,9 +619,8 @@ ntb_transport_init_queue(struct ntb_transport_ctx *nt, unsigned int qp_num)
 		num_qps_mw = nt->qp_count / mw_count;
 
 	mw_base = mw->phys_addr;
-	mw_size = mw->phys_size;
 
-	tx_size = mw_size / num_qps_mw;
+	tx_size = mw->tx_size / num_qps_mw;
 	qp_offset = tx_size * (qp_num / mw_count);
 
 	qp->tx_mw = mw->vbase + qp_offset;
@@ -1102,43 +1142,64 @@ ntb_transport_link_work(void *arg)
 	int rc;
 
 	/* send the local info, in the opposite order of the way we read it */
-	for (i = 0; i < nt->mw_count; i++) {
-		size = nt->mw_vec[i].phys_size;
-
-		if (max_mw_size != 0 && size > max_mw_size)
-			size = max_mw_size;
-
-		ntb_peer_spad_write(dev, NTBT_MW0_SZ_HIGH + (i * 2),
-		    size >> 32);
-		ntb_peer_spad_write(dev, NTBT_MW0_SZ_LOW + (i * 2), size);
+	if (nt->compact) {
+		for (i = 0; i < nt->mw_count; i++) {
+			size = nt->mw_vec[i].tx_size;
+			KASSERT(size <= UINT32_MAX, ("size too big (%jx)", size));
+			ntb_peer_spad_write(dev, NTBTC_MW0_SZ + i, size);
+		}
+		ntb_peer_spad_write(dev, NTBTC_QP_LINKS, 0);
+		ntb_peer_spad_write(dev, NTBTC_PARAMS,
+		    (nt->qp_count << 24) | (nt->mw_count << 16) |
+		    NTB_TRANSPORT_VERSION);
+	} else {
+		for (i = 0; i < nt->mw_count; i++) {
+			size = nt->mw_vec[i].tx_size;
+			ntb_peer_spad_write(dev, NTBT_MW0_SZ_HIGH + (i * 2),
+			    size >> 32);
+			ntb_peer_spad_write(dev, NTBT_MW0_SZ_LOW + (i * 2), size);
+		}
+		ntb_peer_spad_write(dev, NTBT_NUM_MWS, nt->mw_count);
+		ntb_peer_spad_write(dev, NTBT_NUM_QPS, nt->qp_count);
+		ntb_peer_spad_write(dev, NTBT_QP_LINKS, 0);
+		ntb_peer_spad_write(dev, NTBT_VERSION, NTB_TRANSPORT_VERSION);
 	}
-	ntb_peer_spad_write(dev, NTBT_NUM_MWS, nt->mw_count);
-	ntb_peer_spad_write(dev, NTBT_NUM_QPS, nt->qp_count);
-	ntb_peer_spad_write(dev, NTBT_QP_LINKS, 0);
-	ntb_peer_spad_write(dev, NTBT_VERSION, NTB_TRANSPORT_VERSION);
 
 	/* Query the remote side for its info */
 	val = 0;
-	ntb_spad_read(dev, NTBT_VERSION, &val);
-	if (val != NTB_TRANSPORT_VERSION)
-		goto out;
+	if (nt->compact) {
+		ntb_spad_read(dev, NTBTC_PARAMS, &val);
+		if (val != ((nt->qp_count << 24) | (nt->mw_count << 16) |
+		    NTB_TRANSPORT_VERSION))
+			goto out;
+	} else {
+		ntb_spad_read(dev, NTBT_VERSION, &val);
+		if (val != NTB_TRANSPORT_VERSION)
+			goto out;
 
-	ntb_spad_read(dev, NTBT_NUM_QPS, &val);
-	if (val != nt->qp_count)
-		goto out;
+		ntb_spad_read(dev, NTBT_NUM_QPS, &val);
+		if (val != nt->qp_count)
+			goto out;
 
-	ntb_spad_read(dev, NTBT_NUM_MWS, &val);
-	if (val != nt->mw_count)
-		goto out;
+		ntb_spad_read(dev, NTBT_NUM_MWS, &val);
+		if (val != nt->mw_count)
+			goto out;
+	}
 
 	for (i = 0; i < nt->mw_count; i++) {
-		ntb_spad_read(dev, NTBT_MW0_SZ_HIGH + (i * 2), &val);
-		val64 = (uint64_t)val << 32;
+		if (nt->compact) {
+			ntb_spad_read(dev, NTBTC_MW0_SZ + i, &val);
+			val64 = val;
+		} else {
+			ntb_spad_read(dev, NTBT_MW0_SZ_HIGH + (i * 2), &val);
+			val64 = (uint64_t)val << 32;
 
-		ntb_spad_read(dev, NTBT_MW0_SZ_LOW + (i * 2), &val);
-		val64 |= val;
+			ntb_spad_read(dev, NTBT_MW0_SZ_LOW + (i * 2), &val);
+			val64 |= val;
+		}
 
 		mw = &nt->mw_vec[i];
+		mw->rx_size = val64;
 		val64 = roundup(val64, mw->xlat_align_size);
 		if (mw->buff_size != val64) {
 
@@ -1288,7 +1349,7 @@ ntb_transport_setup_qp_mw(struct ntb_transport_ctx *nt, unsigned int qp_num)
 	else
 		num_qps_mw = nt->qp_count / mw_count;
 
-	rx_size = mw->buff_size / num_qps_mw;
+	rx_size = mw->rx_size / num_qps_mw;
 	qp->rx_buff = mw->virt_addr + rx_size * (qp_num / mw_count);
 	rx_size -= sizeof(struct ntb_rx_info);
 

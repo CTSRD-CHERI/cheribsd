@@ -16,3 +16,9 @@ int
 cap_rights_limit(int fd, const cap_rights_t *rights) {
 	return 0; /* Just pretend that it succeeded */
 }
+
+int
+cap_enter(void) {
+	errno = ENOSYS;
+	return -1;
+}

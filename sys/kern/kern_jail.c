@@ -236,26 +236,26 @@ sys_jail(struct thread *td, struct jail_args *uap)
 {
 	uint32_t version;
 	int error;
-	void * __capability jail = __USER_CAP_UNBOUND(uap->jailp);
 
-	error = copyin(jail, &version, sizeof(version));
+	error = copyin(uap->jailp, &version, sizeof(version));
 	if (error)
 		return (error);
 
 	switch (version) {
-	case 0: {
+	case 0:
+	{
 		struct jail_v0 j0;
 		struct in_addr ip4;
 
 		/* FreeBSD single IPv4 jails. */
-		error = copyin(jail, &j0, sizeof(struct jail_v0));
+		error = copyin(uap->jailp, &j0, sizeof(struct jail_v0));
 		if (error)
 			return (error);
 		/* jail_v0 is host order */
 		ip4.s_addr = htonl(j0.ip_number);
-		return (kern_jail(td, __USER_CAP_STR(j0.path),
-		    __USER_CAP_STR(j0.hostname), NULL, &ip4, 1, NULL, 0,
-		    UIO_SYSSPACE)); }
+		return (kern_jail(td, j0.path, j0.hostname, NULL, &ip4, 1,
+		    NULL, 0, UIO_SYSSPACE));
+	}
 
 	case 1:
 		/*
@@ -264,16 +264,16 @@ sys_jail(struct thread *td, struct jail_args *uap)
 		 */
 		return (EINVAL);
 
-	case 2:	{ /* JAIL_API_VERSION */
+	case 2:	/* JAIL_API_VERSION */
+	{
 		struct jail j;
+
 		/* FreeBSD multi-IPv4/IPv6,noIP jails. */
-		error = copyin(jail, &j, sizeof(struct jail));
+		error = copyin(uap->jailp, &j, sizeof(struct jail));
 		if (error)
 			return (error);
-		return (kern_jail(td, __USER_CAP_STR(j.path),
-		    __USER_CAP_STR(j.hostname), __USER_CAP_STR(j.jailname),
-		    __USER_CAP_ARRAY(j.ip4, j.ip4s), j.ip4s,
-		    __USER_CAP_ARRAY(j.ip6, j.ip6s), j.ip6s, UIO_USERSPACE));
+		return (kern_jail(td, j.path, j.hostname, j.jailname, j.ip4,
+		    j.ip4s, j.ip6, j.ip6s, UIO_USERSPACE));
 	}
 
 	default:
@@ -447,7 +447,7 @@ int
 sys_jail_set(struct thread *td, struct jail_set_args *uap)
 {
 
-	return (user_jail_set(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
+	return (user_jail_set(td, uap->iovp,
 	    uap->iovcnt, uap->flags, (copyinuio_t *)copyinuio));
 }
 
@@ -1916,7 +1916,7 @@ int
 sys_jail_get(struct thread *td, struct jail_get_args *uap)
 {
 
-	return (user_jail_get(td, __USER_CAP_ARRAY(uap->iovp, uap->iovcnt),
+	return (user_jail_get(td, uap->iovp,
 	    uap->iovcnt, uap->flags, (copyinuio_t *)copyinuio,
 	    (updateiov_t *)updateiov));
 }
@@ -4253,11 +4253,10 @@ DB_SHOW_COMMAND(prison, db_show_prison_command)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

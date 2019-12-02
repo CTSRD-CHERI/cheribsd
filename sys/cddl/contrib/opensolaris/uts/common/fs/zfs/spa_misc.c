@@ -27,6 +27,7 @@
  * Copyright 2013 Saso Kiselkov. All rights reserved.
  * Copyright (c) 2014 Integros [integros.com]
  * Copyright (c) 2017 Datto Inc.
+ * Copyright (c) 2017, Intel Corporation.
  */
 
 #include <sys/zfs_context.h>
@@ -85,7 +86,7 @@
  *	definition they must have an existing reference, and will never need
  *	to lookup a spa_t by name.
  *
- * spa_refcount (per-spa refcount_t protected by mutex)
+ * spa_refcount (per-spa zfs_refcount_t protected by mutex)
  *
  *	This reference count keep track of any active users of the spa_t.  The
  *	spa_t cannot be destroyed or freed while this is non-zero.  Internally,
@@ -469,6 +470,31 @@ spa_load_note(spa_t *spa, const char *fmt, ...)
 }
 
 /*
+ * By default dedup and user data indirects land in the special class
+ */
+int zfs_ddt_data_is_special = B_TRUE;
+int zfs_user_indirect_is_special = B_TRUE;
+
+/*
+ * The percentage of special class final space reserved for metadata only.
+ * Once we allocate 100 - zfs_special_class_metadata_reserve_pct we only
+ * let metadata into the class.
+ */
+int zfs_special_class_metadata_reserve_pct = 25;
+
+#if defined(__FreeBSD__) && defined(_KERNEL)
+SYSCTL_INT(_vfs_zfs, OID_AUTO, ddt_data_is_special, CTLFLAG_RWTUN,
+    &zfs_ddt_data_is_special, 0,
+    "Whether DDT data is eligible for the special class vdevs");
+SYSCTL_INT(_vfs_zfs, OID_AUTO, user_indirect_is_special, CTLFLAG_RWTUN,
+    &zfs_user_indirect_is_special, 0,
+    "Whether indirect blocks are eligible for the special class vdevs");
+SYSCTL_INT(_vfs_zfs, OID_AUTO, special_class_metadata_reserve_pct,
+    CTLFLAG_RWTUN, &zfs_special_class_metadata_reserve_pct, 0,
+    "Percentage of space in the special class reserved solely for metadata");
+#endif
+
+/*
  * ==========================================================================
  * SPA config locking
  * ==========================================================================
@@ -480,7 +506,7 @@ spa_config_lock_init(spa_t *spa)
 		spa_config_lock_t *scl = &spa->spa_config_lock[i];
 		mutex_init(&scl->scl_lock, NULL, MUTEX_DEFAULT, NULL);
 		cv_init(&scl->scl_cv, NULL, CV_DEFAULT, NULL);
-		refcount_create_untracked(&scl->scl_count);
+		zfs_refcount_create_untracked(&scl->scl_count);
 		scl->scl_writer = NULL;
 		scl->scl_write_wanted = 0;
 	}
@@ -493,7 +519,7 @@ spa_config_lock_destroy(spa_t *spa)
 		spa_config_lock_t *scl = &spa->spa_config_lock[i];
 		mutex_destroy(&scl->scl_lock);
 		cv_destroy(&scl->scl_cv);
-		refcount_destroy(&scl->scl_count);
+		zfs_refcount_destroy(&scl->scl_count);
 		ASSERT(scl->scl_writer == NULL);
 		ASSERT(scl->scl_write_wanted == 0);
 	}
@@ -516,7 +542,7 @@ spa_config_tryenter(spa_t *spa, int locks, void *tag, krw_t rw)
 			}
 		} else {
 			ASSERT(scl->scl_writer != curthread);
-			if (!refcount_is_zero(&scl->scl_count)) {
+			if (!zfs_refcount_is_zero(&scl->scl_count)) {
 				mutex_exit(&scl->scl_lock);
 				spa_config_exit(spa, locks & ((1 << i) - 1),
 				    tag);
@@ -524,7 +550,7 @@ spa_config_tryenter(spa_t *spa, int locks, void *tag, krw_t rw)
 			}
 			scl->scl_writer = curthread;
 		}
-		(void) refcount_add(&scl->scl_count, tag);
+		(void) zfs_refcount_add(&scl->scl_count, tag);
 		mutex_exit(&scl->scl_lock);
 	}
 	return (1);
@@ -550,14 +576,14 @@ spa_config_enter(spa_t *spa, int locks, void *tag, krw_t rw)
 			}
 		} else {
 			ASSERT(scl->scl_writer != curthread);
-			while (!refcount_is_zero(&scl->scl_count)) {
+			while (!zfs_refcount_is_zero(&scl->scl_count)) {
 				scl->scl_write_wanted++;
 				cv_wait(&scl->scl_cv, &scl->scl_lock);
 				scl->scl_write_wanted--;
 			}
 			scl->scl_writer = curthread;
 		}
-		(void) refcount_add(&scl->scl_count, tag);
+		(void) zfs_refcount_add(&scl->scl_count, tag);
 		mutex_exit(&scl->scl_lock);
 	}
 	ASSERT3U(wlocks_held, <=, locks);
@@ -571,8 +597,8 @@ spa_config_exit(spa_t *spa, int locks, void *tag)
 		if (!(locks & (1 << i)))
 			continue;
 		mutex_enter(&scl->scl_lock);
-		ASSERT(!refcount_is_zero(&scl->scl_count));
-		if (refcount_remove(&scl->scl_count, tag) == 0) {
+		ASSERT(!zfs_refcount_is_zero(&scl->scl_count));
+		if (zfs_refcount_remove(&scl->scl_count, tag) == 0) {
 			ASSERT(scl->scl_writer == NULL ||
 			    scl->scl_writer == curthread);
 			scl->scl_writer = NULL;	/* OK in either case */
@@ -591,7 +617,8 @@ spa_config_held(spa_t *spa, int locks, krw_t rw)
 		spa_config_lock_t *scl = &spa->spa_config_lock[i];
 		if (!(locks & (1 << i)))
 			continue;
-		if ((rw == RW_READER && !refcount_is_zero(&scl->scl_count)) ||
+		if ((rw == RW_READER &&
+		    !zfs_refcount_is_zero(&scl->scl_count)) ||
 		    (rw == RW_WRITER && scl->scl_writer == curthread))
 			locks_held |= 1 << i;
 	}
@@ -770,7 +797,7 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 	    spa_deadman_timeout, spa, 0);
 #endif
 #endif
-	refcount_create(&spa->spa_refcount);
+	zfs_refcount_create(&spa->spa_refcount);
 	spa_config_lock_init(spa);
 
 	avl_add(&spa_namespace_avl, spa);
@@ -836,6 +863,9 @@ spa_add(const char *name, nvlist_t *config, const char *altroot)
 		spa->spa_feat_refcount_cache[i] = SPA_FEATURE_DISABLED;
 	}
 
+	list_create(&spa->spa_leaf_list, sizeof (vdev_t),
+	    offsetof(vdev_t, vdev_leaf_node));
+
 	return (spa);
 }
 
@@ -851,7 +881,7 @@ spa_remove(spa_t *spa)
 
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 	ASSERT(spa->spa_state == POOL_STATE_UNINITIALIZED);
-	ASSERT3U(refcount_count(&spa->spa_refcount), ==, 0);
+	ASSERT3U(zfs_refcount_count(&spa->spa_refcount), ==, 0);
 
 	nvlist_free(spa->spa_config_splitting);
 
@@ -880,6 +910,7 @@ spa_remove(spa_t *spa)
 	    sizeof (avl_tree_t));
 
 	list_destroy(&spa->spa_config_list);
+	list_destroy(&spa->spa_leaf_list);
 
 	nvlist_free(spa->spa_label_features);
 	nvlist_free(spa->spa_load_info);
@@ -899,7 +930,7 @@ spa_remove(spa_t *spa)
 #endif
 #endif
 
-	refcount_destroy(&spa->spa_refcount);
+	zfs_refcount_destroy(&spa->spa_refcount);
 
 	spa_config_lock_destroy(spa);
 
@@ -958,9 +989,9 @@ spa_next(spa_t *prev)
 void
 spa_open_ref(spa_t *spa, void *tag)
 {
-	ASSERT(refcount_count(&spa->spa_refcount) >= spa->spa_minref ||
+	ASSERT(zfs_refcount_count(&spa->spa_refcount) >= spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
-	(void) refcount_add(&spa->spa_refcount, tag);
+	(void) zfs_refcount_add(&spa->spa_refcount, tag);
 }
 
 /*
@@ -970,9 +1001,9 @@ spa_open_ref(spa_t *spa, void *tag)
 void
 spa_close(spa_t *spa, void *tag)
 {
-	ASSERT(refcount_count(&spa->spa_refcount) > spa->spa_minref ||
+	ASSERT(zfs_refcount_count(&spa->spa_refcount) > spa->spa_minref ||
 	    MUTEX_HELD(&spa_namespace_lock));
-	(void) refcount_remove(&spa->spa_refcount, tag);
+	(void) zfs_refcount_remove(&spa->spa_refcount, tag);
 }
 
 /*
@@ -986,7 +1017,7 @@ spa_close(spa_t *spa, void *tag)
 void
 spa_async_close(spa_t *spa, void *tag)
 {
-	(void) refcount_remove(&spa->spa_refcount, tag);
+	(void) zfs_refcount_remove(&spa->spa_refcount, tag);
 }
 
 /*
@@ -999,7 +1030,7 @@ spa_refcount_zero(spa_t *spa)
 {
 	ASSERT(MUTEX_HELD(&spa_namespace_lock));
 
-	return (refcount_count(&spa->spa_refcount) == spa->spa_minref);
+	return (zfs_refcount_count(&spa->spa_refcount) == spa->spa_minref);
 }
 
 /*
@@ -1109,10 +1140,10 @@ spa_aux_activate(vdev_t *vd, avl_tree_t *avl)
 /*
  * Spares are tracked globally due to the following constraints:
  *
- * 	- A spare may be part of multiple pools.
- * 	- A spare may be added to a pool even if it's actively in use within
+ *	- A spare may be part of multiple pools.
+ *	- A spare may be added to a pool even if it's actively in use within
  *	  another pool.
- * 	- A spare in use in any pool can only be the source of a replacement if
+ *	- A spare in use in any pool can only be the source of a replacement if
  *	  the target is a spare in the same pool.
  *
  * We keep track of all spares on the system through the use of a reference
@@ -1292,6 +1323,8 @@ spa_vdev_config_exit(spa_t *spa, vdev_t *vd, uint64_t txg, int error, char *tag)
 	 */
 	ASSERT(metaslab_class_validate(spa_normal_class(spa)) == 0);
 	ASSERT(metaslab_class_validate(spa_log_class(spa)) == 0);
+	ASSERT(metaslab_class_validate(spa_special_class(spa)) == 0);
+	ASSERT(metaslab_class_validate(spa_dedup_class(spa)) == 0);
 
 	spa_config_exit(spa, SCL_ALL, spa);
 
@@ -1525,6 +1558,9 @@ spa_get_random(uint64_t range)
 
 	ASSERT(range != 0);
 
+	if (range == 1)
+		return (0);
+
 	(void) random_get_pseudo_bytes((void *)&r, sizeof (uint64_t));
 
 	return (r % range);
@@ -1630,6 +1666,16 @@ zfs_strtonum(const char *str, char **nptr)
 		*nptr = (char *)str;
 
 	return (val);
+}
+
+void
+spa_activate_allocation_classes(spa_t *spa, dmu_tx_t *tx)
+{
+	/*
+	 * We bump the feature refcount for each special vdev added to the pool
+	 */
+	ASSERT(spa_feature_is_enabled(spa, SPA_FEATURE_ALLOCATION_CLASSES));
+	spa_feature_incr(spa, SPA_FEATURE_ALLOCATION_CLASSES, tx);
 }
 
 /*
@@ -1854,7 +1900,7 @@ spa_get_failmode(spa_t *spa)
 boolean_t
 spa_suspended(spa_t *spa)
 {
-	return (spa->spa_suspended);
+	return (spa->spa_suspended != ZIO_SUSPEND_NONE);
 }
 
 uint64_t
@@ -1879,6 +1925,79 @@ metaslab_class_t *
 spa_log_class(spa_t *spa)
 {
 	return (spa->spa_log_class);
+}
+
+metaslab_class_t *
+spa_special_class(spa_t *spa)
+{
+	return (spa->spa_special_class);
+}
+
+metaslab_class_t *
+spa_dedup_class(spa_t *spa)
+{
+	return (spa->spa_dedup_class);
+}
+
+/*
+ * Locate an appropriate allocation class
+ */
+metaslab_class_t *
+spa_preferred_class(spa_t *spa, uint64_t size, dmu_object_type_t objtype,
+    uint_t level, uint_t special_smallblk)
+{
+	if (DMU_OT_IS_ZIL(objtype)) {
+		if (spa->spa_log_class->mc_groups != 0)
+			return (spa_log_class(spa));
+		else
+			return (spa_normal_class(spa));
+	}
+
+	boolean_t has_special_class = spa->spa_special_class->mc_groups != 0;
+
+	if (DMU_OT_IS_DDT(objtype)) {
+		if (spa->spa_dedup_class->mc_groups != 0)
+			return (spa_dedup_class(spa));
+		else if (has_special_class && zfs_ddt_data_is_special)
+			return (spa_special_class(spa));
+		else
+			return (spa_normal_class(spa));
+	}
+
+	/* Indirect blocks for user data can land in special if allowed */
+	if (level > 0 && (DMU_OT_IS_FILE(objtype) || objtype == DMU_OT_ZVOL)) {
+		if (has_special_class && zfs_user_indirect_is_special)
+			return (spa_special_class(spa));
+		else
+			return (spa_normal_class(spa));
+	}
+
+	if (DMU_OT_IS_METADATA(objtype) || level > 0) {
+		if (has_special_class)
+			return (spa_special_class(spa));
+		else
+			return (spa_normal_class(spa));
+	}
+
+	/*
+	 * Allow small file blocks in special class in some cases (like
+	 * for the dRAID vdev feature). But always leave a reserve of
+	 * zfs_special_class_metadata_reserve_pct exclusively for metadata.
+	 */
+	if (DMU_OT_IS_FILE(objtype) &&
+	    has_special_class && size <= special_smallblk) {
+		metaslab_class_t *special = spa_special_class(spa);
+		uint64_t alloc = metaslab_class_get_alloc(special);
+		uint64_t space = metaslab_class_get_space(special);
+		uint64_t limit =
+		    (space * (100 - zfs_special_class_metadata_reserve_pct))
+		    / 100;
+
+		if (alloc < limit)
+			return (special);
+	}
+
+	return (spa_normal_class(spa));
 }
 
 void
@@ -1932,6 +2051,12 @@ uint64_t
 spa_deadman_synctime(spa_t *spa)
 {
 	return (spa->spa_deadman_synctime);
+}
+
+struct proc *
+spa_proc(spa_t *spa)
+{
+	return (spa->spa_proc);
 }
 
 uint64_t
@@ -2056,7 +2181,8 @@ spa_init(int mode)
 	}
 #endif
 #endif /* illumos */
-	refcount_sysinit();
+
+	zfs_refcount_init();
 	unique_init();
 	range_tree_init();
 	metaslab_alloc_trace_init();
@@ -2096,7 +2222,7 @@ spa_fini(void)
 	metaslab_alloc_trace_fini();
 	range_tree_fini();
 	unique_fini();
-	refcount_fini();
+	zfs_refcount_fini();
 	scan_fini();
 	
 	avl_destroy(&spa_namespace_avl);
@@ -2255,6 +2381,29 @@ spa_maxdnodesize(spa_t *spa)
 		return (DNODE_MIN_SIZE);
 }
 
+boolean_t
+spa_multihost(spa_t *spa)
+{
+	return (spa->spa_multihost ? B_TRUE : B_FALSE);
+}
+
+unsigned long
+spa_get_hostid(void)
+{
+	unsigned long myhostid;
+
+#ifdef	_KERNEL
+	myhostid = zone_get_hostid(NULL);
+#else	/* _KERNEL */
+	/*
+	 * We're emulating the system's hostid in userland, so
+	 * we can't use zone_get_hostid().
+	 */
+	(void) ddi_strtoul(hw_serial, NULL, 10, &myhostid);
+#endif	/* _KERNEL */
+
+	return (myhostid);
+}
 
 /*
  * Returns the txg that the last device removal completed. No indirect mappings

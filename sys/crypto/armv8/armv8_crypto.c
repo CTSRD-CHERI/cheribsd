@@ -107,7 +107,7 @@ armv8_crypto_probe(device_t dev)
 
 	reg = READ_SPECIALREG(id_aa64isar0_el1);
 
-	switch (ID_AA64ISAR0_AES(reg)) {
+	switch (ID_AA64ISAR0_AES_VAL(reg)) {
 	case ID_AA64ISAR0_AES_BASE:
 	case ID_AA64ISAR0_AES_PMULL:
 		ret = 0;
@@ -274,9 +274,11 @@ armv8_crypto_newsession(device_t dev, crypto_session_t cses,
 	error = armv8_crypto_cipher_setup(ses, encini);
 	if (error != 0) {
 		CRYPTDEB("setup failed");
+		rw_wunlock(&sc->lock);
 		return (error);
 	}
 
+	rw_wunlock(&sc->lock);
 	return (0);
 }
 
@@ -468,12 +470,3 @@ static devclass_t armv8_crypto_devclass;
 
 DRIVER_MODULE(armv8crypto, nexus, armv8_crypto_driver, armv8_crypto_devclass,
     0, 0);
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

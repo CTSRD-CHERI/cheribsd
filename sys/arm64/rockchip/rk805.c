@@ -227,24 +227,16 @@ static struct rk805_regdef rk808_regdefs[] = {
 static int
 rk805_read(device_t dev, uint8_t reg, uint8_t *data, uint8_t size)
 {
+	int err;
 
-	return (iicdev_readfrom(dev, reg, data, size, IIC_INTRWAIT));
+	err = iicdev_readfrom(dev, reg, data, size, IIC_INTRWAIT);
+	return (err);
 }
 
 static int
 rk805_write(device_t dev, uint8_t reg, uint8_t data)
 {
-	struct iic_msg msg;
-	uint8_t buf[2];
-
-	buf[0] = reg;
-	buf[1] = data;
-	msg.slave = iicbus_get_addr(dev);
-	msg.flags = IIC_M_WR;
-	msg.buf = buf;
-	msg.len = sizeof(buf);
-
-	return (iicbus_transfer_excl(dev, &msg, 1, IIC_INTRWAIT));
+	return (iicdev_writeto(dev, reg, &data, 1, IIC_INTRWAIT));
 }
 
 static int
@@ -370,6 +362,7 @@ static regnode_method_t rk805_regnode_methods[] = {
 	REGNODEMETHOD(regnode_enable,		rk805_regnode_enable),
 	REGNODEMETHOD(regnode_set_voltage,	rk805_regnode_set_voltage),
 	REGNODEMETHOD(regnode_get_voltage,	rk805_regnode_get_voltage),
+	REGNODEMETHOD(regnode_check_voltage,	regnode_method_check_voltage),
 	REGNODEMETHOD_END
 };
 DEFINE_CLASS_1(rk805_regnode, rk805_regnode_class, rk805_regnode_methods,
@@ -475,9 +468,6 @@ rk805_attach(device_t dev)
 	if (config_intrhook_establish(&sc->intr_hook) != 0)
 		return (ENOMEM);
 
-	sc->regs = malloc(sizeof(struct rk805_reg_sc *) * sc->nregs,
-	    M_RK805_REG, M_WAITOK | M_ZERO);
-
 	sc->type = ofw_bus_search_compatible(dev, compat_data)->ocd_data;
 	switch (sc->type) {
 	case RK805:
@@ -488,7 +478,13 @@ rk805_attach(device_t dev)
 		regdefs = rk808_regdefs;
 		sc->nregs = nitems(rk808_regdefs);
 		break;
+	default:
+		device_printf(dev, "Unknown type %d\n", sc->type);
+		return (ENXIO);
 	}
+
+	sc->regs = malloc(sizeof(struct rk805_reg_sc *) * sc->nregs,
+	    M_RK805_REG, M_WAITOK | M_ZERO);
 
 	rnode = ofw_bus_find_child(ofw_bus_get_node(dev), "regulators");
 	if (rnode > 0) {

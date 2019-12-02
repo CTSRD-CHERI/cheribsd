@@ -27,6 +27,8 @@
  * SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include "opt_inet6.h"
 
 #include <sys/cdefs.h>
@@ -1406,7 +1408,8 @@ extern void nlm_prog_3(struct svc_req *rqstp, SVCXPRT *transp);
 extern void nlm_prog_4(struct svc_req *rqstp, SVCXPRT *transp);
 
 static int
-nlm_register_services(SVCPOOL *pool, int addr_count, char **addrs)
+nlm_register_services(SVCPOOL *pool, int addr_count,
+    char * __capability * __capability addrs)
 {
 	static rpcvers_t versions[] = {
 		NLM_SM, NLM_VERS, NLM_VERSX, NLM_VERS4
@@ -1441,10 +1444,10 @@ nlm_register_services(SVCPOOL *pool, int addr_count, char **addrs)
 			 * same transports.
 			 */
 			if (i == 0) {
-				char *up;
+				char * __capability up;
 
 				error = copyin(&addrs[2*j], &up,
-				    sizeof(char*));
+				    sizeof(up));
 				if (error)
 					goto out;
 				error = copyinstr(up, netid, sizeof(netid),
@@ -1452,7 +1455,7 @@ nlm_register_services(SVCPOOL *pool, int addr_count, char **addrs)
 				if (error)
 					goto out;
 				error = copyin(&addrs[2*j+1], &up,
-				    sizeof(char*));
+				    sizeof(up));
 				if (error)
 					goto out;
 				error = copyinstr(up, uaddr, sizeof(uaddr),
@@ -1505,7 +1508,7 @@ out:
  * by a signal.
  */
 static int
-nlm_server_main(int addr_count, char **addrs)
+nlm_server_main(int addr_count, char * __capability * __capability addrs)
 {
 	struct thread *td = curthread;
 	int error;

@@ -61,12 +61,8 @@ uma_small_alloc(uma_zone_t zone, vm_size_t bytes, int domain, u_int8_t *flags,
 #endif
 
 	for (;;) {
-#ifdef MIPS64_NEW_PMAP
-		m = vm_page_alloc(NULL, 0, pflags | VM_ALLOC_NOOBJ);
-#else /* ! MIPS64_NEW_PMAP */
 		m = vm_page_alloc_freelist_domain(domain, VM_FREELIST_DIRECT,
 		    pflags);
-#endif /* ! MIPS64_NEW_PMAP */
 #ifndef __mips_n64
 		if (m == NULL && vm_page_reclaim_contig(pflags, 1,
 		    0, MIPS_KSEG0_LARGEST_PHYS, PAGE_SIZE, 0))

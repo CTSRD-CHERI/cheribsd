@@ -40,7 +40,7 @@ __FBSDID("$FreeBSD$");
 int
 freebsd64_abort2(struct thread *td, struct freebsd64_abort2_args *uap)
 {
-	void *uargs[16];
+	void * __capability uargs[16];
 	void *uargsp;
 	long ptr;
 	int i, nargs;
@@ -56,7 +56,8 @@ freebsd64_abort2(struct thread *td, struct freebsd64_abort2_args *uap)
 					nargs = -1;
 					break;
 				} else
-					uargs[i] = (void *)(uintptr_t)ptr;
+					uargs[i] = __USER_CAP_UNBOUND(
+					    (void *)(uintptr_t)ptr);
 			}
 			if (nargs > 0)
 				uargsp = &uargs;

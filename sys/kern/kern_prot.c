@@ -64,6 +64,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sx.h>
 #include <sys/priv.h>
 #include <sys/proc.h>
+#include <sys/sysent.h>
 #include <sys/sysproto.h>
 #include <sys/jail.h>
 #include <sys/pioctl.h>
@@ -102,7 +103,8 @@ sys_getpid(struct thread *td, struct getpid_args *uap)
 
 	td->td_retval[0] = p->p_pid;
 #if defined(COMPAT_43)
-	td->td_retval[1] = kern_getppid(td);
+	if (SV_PROC_FLAG(p, SV_AOUT))
+		td->td_retval[1] = kern_getppid(td);
 #endif
 	return (0);
 }
@@ -287,8 +289,7 @@ int
 sys_getgroups(struct thread *td, struct getgroups_args *uap)
 {
 
-	return (kern_getgroups(td, uap->gidsetsize,
-	    __USER_CAP_ARRAY(uap->gidset, uap->gidsetsize)));
+	return (kern_getgroups(td, uap->gidsetsize, uap->gidset));
 }
 
 int
@@ -802,8 +803,7 @@ int
 sys_setgroups(struct thread *td, struct setgroups_args *uap)
 {
 
-	return (user_setgroups(td, uap->gidsetsize,
-	    __USER_CAP_ARRAY(uap->gidset, uap->gidsetsize)));
+	return (user_setgroups(td, uap->gidsetsize, uap->gidset));
 }
 
 int
@@ -1183,8 +1183,7 @@ int
 sys_getresuid(struct thread *td, struct getresuid_args *uap)
 {
 
-	return (kern_getresuid(td, __USER_CAP_OBJ(uap->ruid),
-	    __USER_CAP_OBJ(uap->euid), __USER_CAP_OBJ(uap->suid)));
+	return (kern_getresuid(td, uap->ruid, uap->euid, uap->suid));
 }
 
 int
@@ -1217,8 +1216,7 @@ int
 sys_getresgid(struct thread *td, struct getresgid_args *uap)
 {
 
-	return (kern_getresgid(td, __USER_CAP_OBJ(uap->rgid),
-	    __USER_CAP_OBJ(uap->egid), __USER_CAP_OBJ(uap->sgid)));
+	return (kern_getresgid(td, uap->rgid, uap->egid, uap->sgid));
 }
 
 int
@@ -2159,8 +2157,7 @@ int
 sys_getlogin(struct thread *td, struct getlogin_args *uap)
 {
 
-	return (kern_getlogin(td, __USER_CAP(uap->namebuf, uap->namelen),
-	    uap->namelen));
+	return (kern_getlogin(td, uap->namebuf, uap->namelen));
 }
 
 int
@@ -2195,7 +2192,7 @@ int
 sys_setlogin(struct thread *td, struct setlogin_args *uap)
 {
 
-	return (kern_setlogin(td, __USER_CAP_STR(uap->namebuf)));
+	return (kern_setlogin(td, uap->namebuf));
 }
 
 int

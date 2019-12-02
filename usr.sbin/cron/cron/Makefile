@@ -1,6 +1,8 @@
 # $FreeBSD$
 
-CHERI_NO_SHARED=	faults during test runs
+.if ${MACHINE_ARCH:Mmips64*c*}
+NO_SHARED=	faults during test runs
+.endif
 
 CONFS=	crontab
 PROG=	cron

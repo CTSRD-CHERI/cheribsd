@@ -13,7 +13,7 @@
 ;		case where the event exists, but we don't want auditing, the
 ;		event should be #defined to AUE_NULL in audit_kevents.h.
 ;	type	one of STD, OBSOL, UNIMPL, COMPAT, COMPAT4, COMPAT6,
-;		COMPAT7, COMPAT11, NODEF, NOARGS, NOPROTO, NOSTD
+;		COMPAT7, COMPAT11, COMPAT12, NODEF, NOARGS, NOPROTO, NOSTD
 ;		The COMPAT* options may be combined with one or more NO*
 ;		options separated by '|' with no spaces (e.g. COMPAT|NOARGS)
 ;	name	pseudo-prototype of syscall routine
@@ -31,6 +31,7 @@
 ;	COMPAT7	included on COMPAT_FREEBSD7 #ifdef (FreeBSD 7 compat)
 ;	COMPAT10 included on COMPAT_FREEBSD10 #ifdef (FreeBSD 10 compat)
 ;	COMPAT11 included on COMPAT_FREEBSD11 #ifdef (FreeBSD 11 compat)
+;	COMPAT12 included on COMPAT_FREEBSD12 #ifdef (FreeBSD 12 compat)
 ;	OBSOL	obsolete, not included in system, only specifies name
 ;	UNIMPL	not implemented, placeholder only
 ;	NOSTD	implemented but as a lkm that can be statically
@@ -552,7 +553,7 @@
 ; syscall numbers for FreeBSD
 300	AUE_NULL	NOPROTO	{ int modnext(int modid); }
 301	AUE_NULL	STD	{ int freebsd32_modstat(int modid, \
-				    struct module_stat32* stat); }
+				    struct module_stat32 *stat); }
 302	AUE_NULL	NOPROTO	{ int modfnext(int modid); }
 303	AUE_NULL	NOPROTO	{ int modfind(const char *name); }
 304	AUE_MODLOAD	NOPROTO	{ int kldload(const char *file); }
@@ -560,7 +561,7 @@
 306	AUE_NULL	NOPROTO	{ int kldfind(const char *file); }
 307	AUE_NULL	NOPROTO	{ int kldnext(int fileid); }
 308	AUE_NULL	STD	{ int freebsd32_kldstat(int fileid, \
-				    struct kld32_file_stat* stat); }
+				    struct kld32_file_stat *stat); }
 309	AUE_NULL	NOPROTO	{ int kldfirstmod(int fileid); }
 310	AUE_GETSID	NOPROTO	{ int getsid(pid_t pid); }
 311	AUE_SETRESUID	NOPROTO	{ int setresuid(uid_t ruid, uid_t euid, \
@@ -910,8 +911,8 @@
 				    uint32_t length1, uint32_t length2); }
 #endif
 481	AUE_THR_KILL2	NOPROTO	{ int thr_kill2(pid_t pid, long id, int sig); }
-482	AUE_SHMOPEN	NOPROTO	{ int shm_open(const char *path, int flags, \
-				    mode_t mode); }
+482	AUE_SHMOPEN	COMPAT12|NOPROTO	{ int shm_open( \
+				    const char *path, int flags, mode_t mode); }
 483	AUE_SHMUNLINK	NOPROTO	{ int shm_unlink(const char *path); }
 484	AUE_NULL	NOPROTO	{ int cpuset(cpusetid_t *setid); }
 #ifdef PAD64_REQUIRED
@@ -1148,5 +1149,16 @@
 				    size_t bufsize); }
 568	AUE_UNLINKAT	NOPROTO { int funlinkat(int dfd, const char *path, int fd, \
 				    int flag); }
+569	AUE_NULL	NOPROTO	{ ssize_t copy_file_range(int infd, \
+				    off_t *inoffp, int outfd, off_t *outoffp, \
+				    size_t len, unsigned int flags); }
+570	AUE_SYSCTL	STD	{ int freebsd32___sysctlbyname(const char *name, \
+				    size_t namelen, void *old, uint32_t *oldlenp, \
+				    void *new, size_t newlen); }
+571	AUE_SHMOPEN	NOPROTO	{ int shm_open2( \
+				    const char *path, int flags, mode_t mode, \
+				    int shmflags, const char *name); }
+572	AUE_SHMRENAME	NOPROTO { int shm_rename(const char *path_from, \
+				    const char *path_to, int flags); }
 
 ; vim: syntax=off

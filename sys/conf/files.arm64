@@ -25,12 +25,12 @@ cloudabi64_vdso_blob.o		optional	compat_cloudabi64	\
 #
 
 # Allwinner common files
-arm/allwinner/a10_ehci.c	optional	ehci aw_ehci fdt
 arm/allwinner/a10_timer.c	optional	a10_timer fdt
 arm/allwinner/a10_codec.c	optional	sound a10_codec
 arm/allwinner/a31_dmac.c	optional	a31_dmac
 arm/allwinner/sunxi_dma_if.m	optional	a31_dmac
 arm/allwinner/aw_cir.c		optional	evdev aw_cir fdt
+arm/allwinner/aw_dwc3.c		optional	aw_dwc3 fdt
 arm/allwinner/aw_gpio.c		optional	gpio aw_gpio fdt
 arm/allwinner/aw_mmc.c		optional	mmc aw_mmc fdt | mmccam aw_mmc fdt
 arm/allwinner/aw_nmi.c		optional	aw_nmi fdt \
@@ -43,6 +43,7 @@ arm/allwinner/aw_spi.c		optional	aw_spi fdt
 arm/allwinner/aw_syscon.c	optional	aw_syscon ext_resources syscon fdt
 arm/allwinner/aw_thermal.c	optional	aw_thermal nvmem fdt
 arm/allwinner/aw_usbphy.c	optional	ehci aw_usbphy fdt
+arm/allwinner/aw_usb3phy.c	optional	xhci aw_usbphy fdt
 arm/allwinner/aw_wdog.c		optional	aw_wdog fdt
 arm/allwinner/axp81x.c		optional	axp81x fdt
 arm/allwinner/if_awg.c		optional	awg ext_resources syscon aw_sid nvmem fdt
@@ -50,11 +51,17 @@ arm/allwinner/if_awg.c		optional	awg ext_resources syscon aw_sid nvmem fdt
 # Allwinner clock driver
 arm/allwinner/clkng/aw_ccung.c		optional	aw_ccu fdt
 arm/allwinner/clkng/aw_clk_frac.c	optional	aw_ccu fdt
+arm/allwinner/clkng/aw_clk_m.c		optional	aw_ccu fdt
+arm/allwinner/clkng/aw_clk_mipi.c	optional	aw_ccu fdt
 arm/allwinner/clkng/aw_clk_nkmp.c	optional	aw_ccu fdt
 arm/allwinner/clkng/aw_clk_nm.c		optional	aw_ccu fdt
+arm/allwinner/clkng/aw_clk_nmm.c	optional	aw_ccu fdt
+arm/allwinner/clkng/aw_clk_np.c		optional	aw_ccu fdt
 arm/allwinner/clkng/aw_clk_prediv_mux.c	optional	aw_ccu fdt
 arm/allwinner/clkng/ccu_a64.c		optional	soc_allwinner_a64 aw_ccu fdt
 arm/allwinner/clkng/ccu_h3.c		optional	soc_allwinner_h5 aw_ccu fdt
+arm/allwinner/clkng/ccu_h6.c		optional	soc_allwinner_h6 aw_ccu fdt
+arm/allwinner/clkng/ccu_h6_r.c		optional	soc_allwinner_h6 aw_ccu fdt
 arm/allwinner/clkng/ccu_sun8i_r.c	optional	aw_ccu fdt
 arm/allwinner/clkng/ccu_de2.c		optional	aw_ccu fdt
 
@@ -63,6 +70,8 @@ arm/allwinner/a64/a64_padconf.c	optional	soc_allwinner_a64 fdt
 arm/allwinner/a64/a64_r_padconf.c optional	soc_allwinner_a64 fdt
 arm/allwinner/h3/h3_padconf.c	optional	soc_allwinner_h5 fdt
 arm/allwinner/h3/h3_r_padconf.c optional	soc_allwinner_h5 fdt
+arm/allwinner/h6/h6_padconf.c optional		soc_allwinner_h6 fdt
+arm/allwinner/h6/h6_r_padconf.c optional	soc_allwinner_h6 fdt
 
 arm/annapurna/alpine/alpine_ccu.c		optional	al_ccu fdt
 arm/annapurna/alpine/alpine_nb_service.c	optional	al_nb_service fdt
@@ -79,29 +88,34 @@ arm/arm/pmu.c			standard
 arm/arm/physmem.c		standard
 arm/broadcom/bcm2835/bcm2835_audio.c		optional sound vchiq fdt \
 	compile-with "${NORMAL_C} -DUSE_VCHIQ_ARM -D__VCCOREVER__=0x04000000 -I$S/contrib/vchiq"
-arm/broadcom/bcm2835/bcm2835_bsc.c		optional bcm2835_bsc soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_cpufreq.c		optional soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_dma.c		optional soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_fbd.c		optional vt soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_ft5406.c		optional evdev bcm2835_ft5406 soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_gpio.c		optional gpio soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_intr.c		optional soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_mbox.c		optional soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_rng.c		optional !random_loadable soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_sdhci.c		optional sdhci soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_sdhost.c		optional sdhci soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_spi.c		optional bcm2835_spi soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_vcio.c		optional soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2835_wdog.c		optional soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm2836.c			optional soc_brcm_bcm2837 fdt
-arm/broadcom/bcm2835/bcm283x_dwc_fdt.c		optional dwcotg fdt soc_brcm_bcm2837
+arm/broadcom/bcm2835/bcm2835_bsc.c		optional bcm2835_bsc fdt
+arm/broadcom/bcm2835/bcm2835_clkman.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_cpufreq.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_dma.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_fbd.c		optional vt soc_brcm_bcm2837 fdt | vt soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_ft5406.c		optional evdev bcm2835_ft5406 fdt
+arm/broadcom/bcm2835/bcm2835_gpio.c		optional gpio soc_brcm_bcm2837 fdt | gpio soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_intr.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_mbox.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_rng.c		optional !random_loadable soc_brcm_bcm2837 fdt | !random_loadable soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_sdhci.c		optional sdhci soc_brcm_bcm2837 fdt | sdhci soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_sdhost.c		optional sdhci soc_brcm_bcm2837 fdt | sdhci soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_spi.c		optional bcm2835_spi fdt
+arm/broadcom/bcm2835/bcm2835_vcbus.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_vcio.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2835_wdog.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm2836.c			optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
+arm/broadcom/bcm2835/bcm283x_dwc_fdt.c		optional dwcotg fdt soc_brcm_bcm2837 | dwcotg fdt soc_brcm_bcm2838
 arm/mv/a37x0_gpio.c				optional a37x0_gpio gpio fdt
+arm/mv/armada38x/armada38x_rtc.c		optional mv_rtc fdt
 arm/mv/gpio.c					optional mv_gpio fdt
 arm/mv/mvebu_pinctrl.c				optional mvebu_pinctrl fdt
-arm/mv/mv_cp110_icu.c				optional mv_cp110_icu fdt
-arm/mv/mv_ap806_gicp.c				optional mv_ap806_gicp fdt
 arm/mv/mv_ap806_clock.c				optional SOC_MARVELL_8K fdt
+arm/mv/mv_ap806_gicp.c				optional mv_ap806_gicp fdt
+arm/mv/mv_ap806_sei.c				optional mv_ap806_sei fdt
 arm/mv/mv_cp110_clock.c				optional SOC_MARVELL_8K fdt
+arm/mv/mv_cp110_icu.c				optional mv_cp110_icu fdt
+arm/mv/mv_cp110_icu_bus.c			optional mv_cp110_icu fdt
 arm/mv/mv_thermal.c				optional SOC_MARVELL_8K mv_thermal fdt
 arm/mv/armada38x/armada38x_rtc.c		optional mv_rtc fdt
 arm/xilinx/uart_dev_cdnc.c			optional uart soc_xilinx_zynq
@@ -124,7 +138,7 @@ arm64/arm64/cpufunc_asm.S	standard
 arm64/arm64/db_disasm.c		optional	ddb
 arm64/arm64/db_interface.c	optional	ddb
 arm64/arm64/db_trace.c		optional	ddb
-arm64/arm64/debug_monitor.c	optional	ddb
+arm64/arm64/debug_monitor.c	standard
 arm64/arm64/disassem.c		optional	ddb
 arm64/arm64/dump_machdep.c	standard
 arm64/arm64/efirt_machdep.c	optional	efirt
@@ -140,6 +154,7 @@ arm64/arm64/identcpu.c		standard
 arm64/arm64/in_cksum.c		optional	inet | inet6
 arm64/arm64/locore.S		standard	no-obj
 arm64/arm64/machdep.c		standard
+arm64/arm64/machdep_boot.c	optional	linux_boot_abi
 arm64/arm64/mem.c		standard
 arm64/arm64/memcpy.S		standard
 arm64/arm64/memmove.S		standard
@@ -173,6 +188,9 @@ arm64/coresight/coresight-dynamic-replicator.c	standard
 arm64/coresight/coresight-etm4x.c		standard
 arm64/coresight/coresight-funnel.c		standard
 arm64/coresight/coresight-tmc.c			standard
+arm64/intel/firmware.c				optional soc_intel_stratix10
+arm64/intel/stratix10-soc-fpga-mgr.c		optional soc_intel_stratix10
+arm64/intel/stratix10-svc.c			optional soc_intel_stratix10
 arm64/qualcomm/qcom_gcc.c			optional qcom_gcc fdt
 contrib/vchiq/interface/compat/vchi_bsd.c	optional vchiq soc_brcm_bcm2837 \
 	compile-with "${NORMAL_C} -DUSE_VCHIQ_ARM -D__VCCOREVER__=0x04000000 -I$S/contrib/vchiq"
@@ -206,6 +224,7 @@ dev/acpica/acpi_pci_link.c	optional	acpi pci
 dev/acpica/acpi_pcib.c		optional	acpi pci
 dev/acpica/acpi_pxm.c		optional	acpi
 dev/ahci/ahci_generic.c		optional	ahci
+dev/altera/dwc/if_dwc_socfpga.c	optional	fdt dwc_socfpga
 dev/axgbe/if_axgbe.c		optional	axgbe
 dev/axgbe/xgbe-desc.c		optional	axgbe
 dev/axgbe/xgbe-dev.c		optional	axgbe
@@ -220,6 +239,7 @@ dev/hwpmc/hwpmc_arm64.c		optional	hwpmc
 dev/hwpmc/hwpmc_arm64_md.c	optional	hwpmc
 dev/mbox/mbox_if.m		optional	soc_brcm_bcm2837
 dev/mmc/host/dwmmc.c		optional	dwmmc fdt
+dev/mmc/host/dwmmc_altera.c	optional	dwmmc fdt dwmmc_altera
 dev/mmc/host/dwmmc_hisi.c	optional	dwmmc fdt soc_hisi_hi6220
 dev/mmc/host/dwmmc_rockchip.c	optional	dwmmc fdt soc_rockchip_rk3328
 dev/neta/if_mvneta_fdt.c	optional	neta fdt
@@ -229,16 +249,22 @@ dev/ofw/ofwpci.c		optional 	fdt pci
 dev/pci/pci_host_generic.c	optional	pci
 dev/pci/pci_host_generic_acpi.c	optional	pci acpi
 dev/pci/pci_host_generic_fdt.c	optional	pci fdt
+dev/pci/pci_dw_mv.c		optional	pci fdt
+dev/pci/pci_dw.c		optional	pci fdt
+dev/pci/pci_dw_if.m		optional	pci fdt
 dev/psci/psci.c			standard
-dev/psci/psci_arm64.S		standard
+dev/psci/smccc_arm64.S		standard
 dev/psci/smccc.c		standard
 dev/sdhci/sdhci_xenon.c		optional	sdhci_xenon sdhci fdt
 dev/uart/uart_cpu_arm64.c	optional	uart
 dev/uart/uart_dev_mu.c		optional	uart uart_mu
 dev/uart/uart_dev_pl011.c	optional	uart pl011
 dev/usb/controller/dwc_otg_hisi.c optional	dwcotg fdt soc_hisi_hi6220
+dev/usb/controller/dwc3.c	optional fdt dwc3
 dev/usb/controller/ehci_mv.c	optional	ehci_mv fdt
-dev/usb/controller/generic_ehci.c optional	ehci acpi
+dev/usb/controller/generic_ehci.c optional	ehci
+dev/usb/controller/generic_ehci_acpi.c optional	ehci acpi
+dev/usb/controller/generic_ehci_fdt.c optional	ehci fdt
 dev/usb/controller/generic_ohci.c optional	ohci fdt
 dev/usb/controller/generic_usb_if.m optional	ohci fdt
 dev/usb/controller/usb_nop_xceiv.c	optional fdt ext_resources
@@ -260,21 +286,26 @@ kern/pic_if.m			optional	intrng
 kern/subr_devmap.c		standard
 kern/subr_intr.c		optional	intrng
 libkern/bcmp.c			standard
-libkern/memcmp.c		standard
-libkern/memset.c		standard
+libkern/memcmp.c		standard				\
+	compile-with "${NORMAL_C:N-fsanitize*}"
+libkern/memset.c		standard				\
+	compile-with "${NORMAL_C:N-fsanitize*}"
 libkern/arm64/crc32c_armv8.S	standard
-cddl/contrib/opensolaris/common/atomic/aarch64/opensolaris_atomic.S	optional zfs | dtrace compile-with "${CDDL_C}"
 cddl/dev/dtrace/aarch64/dtrace_asm.S			optional dtrace compile-with "${DTRACE_S}"
 cddl/dev/dtrace/aarch64/dtrace_subr.c			optional dtrace compile-with "${DTRACE_C}"
 cddl/dev/fbt/aarch64/fbt_isa.c				optional dtrace_fbt | dtraceall compile-with "${FBT_C}"
 
 # RockChip Drivers
 arm64/rockchip/rk3399_emmcphy.c		optional fdt rk_emmcphy soc_rockchip_rk3399
+arm64/rockchip/rk_dwc3.c		optional fdt rk_dwc3 soc_rockchip_rk3399
 arm64/rockchip/rk_i2c.c			optional fdt rk_i2c soc_rockchip_rk3328 | fdt rk_i2c soc_rockchip_rk3399
 arm64/rockchip/rk805.c			optional fdt rk805 soc_rockchip_rk3328 | fdt rk805 soc_rockchip_rk3399
 arm64/rockchip/rk_grf.c			optional fdt soc_rockchip_rk3328 | fdt soc_rockchip_rk3399
 arm64/rockchip/rk_pinctrl.c		optional fdt rk_pinctrl soc_rockchip_rk3328 | fdt rk_pinctrl soc_rockchip_rk3399
 arm64/rockchip/rk_gpio.c		optional fdt rk_gpio soc_rockchip_rk3328 | fdt rk_gpio soc_rockchip_rk3399
+arm64/rockchip/rk_spi.c			optional fdt rk_spi
+arm64/rockchip/rk_usb2phy.c		optional fdt rk_usb2phy soc_rockchip_rk3328 | soc_rockchip_rk3399
+arm64/rockchip/rk_typec_phy.c		optional fdt rk_typec_phy soc_rockchip_rk3399
 arm64/rockchip/if_dwc_rk.c		optional fdt dwc_rk soc_rockchip_rk3328 | fdt dwc_rk soc_rockchip_rk3399
 dev/dwc/if_dwc.c			optional fdt dwc_rk soc_rockchip_rk3328 | fdt dwc_rk soc_rockchip_rk3399
 dev/dwc/if_dwc_if.m			optional fdt dwc_rk soc_rockchip_rk3328 | fdt dwc_rk soc_rockchip_rk3399
@@ -283,6 +314,7 @@ dev/dwc/if_dwc_if.m			optional fdt dwc_rk soc_rockchip_rk3328 | fdt dwc_rk soc_r
 arm64/rockchip/clk/rk_cru.c		optional fdt soc_rockchip_rk3328 | fdt soc_rockchip_rk3399
 arm64/rockchip/clk/rk_clk_armclk.c	optional fdt soc_rockchip_rk3328 | fdt soc_rockchip_rk3399
 arm64/rockchip/clk/rk_clk_composite.c	optional fdt soc_rockchip_rk3328 | fdt soc_rockchip_rk3399
+arm64/rockchip/clk/rk_clk_fract.c	optional fdt soc_rockchip_rk3328 | fdt soc_rockchip_rk3399
 arm64/rockchip/clk/rk_clk_gate.c	optional fdt soc_rockchip_rk3328 | fdt soc_rockchip_rk3399
 arm64/rockchip/clk/rk_clk_mux.c		optional fdt soc_rockchip_rk3328 | fdt soc_rockchip_rk3399
 arm64/rockchip/clk/rk_clk_pll.c		optional fdt soc_rockchip_rk3328 | fdt soc_rockchip_rk3399

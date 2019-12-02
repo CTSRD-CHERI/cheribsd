@@ -971,12 +971,3 @@ aesni_cipher_mac(struct aesni_session *ses, struct cryptodesc *crd,
 	    (void *)res);
 	return (0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

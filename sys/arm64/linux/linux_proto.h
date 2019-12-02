@@ -980,9 +980,9 @@ struct linux_sched_getattr_args {
 	char flags_l_[PADL_(l_uint)]; l_uint flags; char flags_r_[PADR_(l_uint)];
 };
 struct linux_renameat2_args {
-	char oldfd_l_[PADL_(l_int)]; l_int oldfd; char oldfd_r_[PADR_(l_int)];
+	char olddfd_l_[PADL_(l_int)]; l_int olddfd; char olddfd_r_[PADR_(l_int)];
 	char oldname_l_[PADL_(const char *)]; const char * oldname; char oldname_r_[PADR_(const char *)];
-	char newfd_l_[PADL_(l_int)]; l_int newfd; char newfd_r_[PADR_(l_int)];
+	char newdfd_l_[PADL_(l_int)]; l_int newdfd; char newdfd_r_[PADR_(l_int)];
 	char newname_l_[PADL_(const char *)]; const char * newname; char newname_r_[PADR_(const char *)];
 	char flags_l_[PADL_(unsigned int)]; unsigned int flags; char flags_r_[PADR_(unsigned int)];
 };
@@ -1328,6 +1328,13 @@ int	linux_pkey_free(struct thread *, struct linux_pkey_free_args *);
 #define	nosys	linux_nosys
 
 #endif /* COMPAT_FREEBSD11 */
+
+
+#ifdef COMPAT_FREEBSD12
+
+#define	nosys	linux_nosys
+
+#endif /* COMPAT_FREEBSD12 */
 
 #define	LINUX_SYS_AUE_linux_setxattr	AUE_NULL
 #define	LINUX_SYS_AUE_linux_lsetxattr	AUE_NULL

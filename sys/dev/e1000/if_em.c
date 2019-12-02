@@ -1002,7 +1002,7 @@ em_if_attach_pre(if_ctx_t ctx)
 	hw->mac.report_tx_early = 1;
 
 	/* Allocate multicast array memory. */
-	adapter->mta = malloc(sizeof(u8) * ETH_ADDR_LEN *
+	adapter->mta = malloc(sizeof(u8) * ETHER_ADDR_LEN *
 	    MAX_NUM_MULTICAST_ADDRESSES, M_DEVBUF, M_NOWAIT);
 	if (adapter->mta == NULL) {
 		device_printf(dev, "Can not allocate multicast setup array\n");
@@ -1395,10 +1395,8 @@ em_intr(void *arg)
 	IFDI_INTR_DISABLE(ctx);
 
 	/* Link status change */
-	if (reg_icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
-		adapter->hw.mac.get_link_status = 1;
-		iflib_admin_intr_deferred(ctx);
-	}
+	if (reg_icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC))
+		em_handle_link(ctx);
 
 	if (reg_icr & E1000_ICR_RXO)
 		adapter->rx_overruns++;
@@ -1481,22 +1479,24 @@ em_msix_link(void *arg)
 
 	if (reg_icr & (E1000_ICR_RXSEQ | E1000_ICR_LSC)) {
 		em_handle_link(adapter->ctx);
-	} else {
-		E1000_WRITE_REG(&adapter->hw, E1000_IMS,
-				EM_MSIX_LINK | E1000_IMS_LSC);
-		if (adapter->hw.mac.type >= igb_mac_min)
-			E1000_WRITE_REG(&adapter->hw, E1000_EIMS, adapter->link_mask);
+	} else if (adapter->hw.mac.type == e1000_82574) {
+		/* Only re-arm 82574 if em_if_update_admin_status() won't. */
+		E1000_WRITE_REG(&adapter->hw, E1000_IMS, EM_MSIX_LINK |
+		    E1000_IMS_LSC);
 	}
 
-	/*
-	 * Because we must read the ICR for this interrupt
-	 * it may clear other causes using autoclear, for
-	 * this reason we simply create a soft interrupt
-	 * for all these vectors.
-	 */
-	if (reg_icr && adapter->hw.mac.type < igb_mac_min) {
-		E1000_WRITE_REG(&adapter->hw,
-			E1000_ICS, adapter->ims);
+	if (adapter->hw.mac.type == e1000_82574) {
+		/*
+		 * Because we must read the ICR for this interrupt it may
+		 * clear other causes using autoclear, for this reason we
+		 * simply create a soft interrupt for all these vectors.
+		 */
+		if (reg_icr)
+			E1000_WRITE_REG(&adapter->hw, E1000_ICS, adapter->ims);
+	} else {
+		/* Re-arm unconditionally */
+		E1000_WRITE_REG(&adapter->hw, E1000_IMS, E1000_IMS_LSC);
+		E1000_WRITE_REG(&adapter->hw, E1000_EIMS, adapter->link_mask);
 	}
 
 	return (FILTER_HANDLED);
@@ -1511,7 +1511,6 @@ em_handle_link(void *context)
 	adapter->hw.mac.get_link_status = 1;
 	iflib_admin_intr_deferred(ctx);
 }
-
 
 /*********************************************************************
  *
@@ -1656,7 +1655,7 @@ em_disable_promisc(if_ctx_t ctx)
 	if (if_getflags(ifp) & IFF_ALLMULTI)
 		mcnt = MAX_NUM_MULTICAST_ADDRESSES;
 	else
-		mcnt = if_multiaddr_count(ifp, MAX_NUM_MULTICAST_ADDRESSES);
+		mcnt = if_llmaddr_count(ifp);
 	/* Don't disable if in MAX groups */
 	if (mcnt < MAX_NUM_MULTICAST_ADDRESSES)
 		reg_rctl &=  (~E1000_RCTL_MPE);
@@ -1664,6 +1663,19 @@ em_disable_promisc(if_ctx_t ctx)
 	E1000_WRITE_REG(&adapter->hw, E1000_RCTL, reg_rctl);
 }
 
+
+static u_int
+em_copy_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
+{
+	u8 *mta = arg;
+
+	if (cnt == MAX_NUM_MULTICAST_ADDRESSES)
+		return (1);
+
+	bcopy(LLADDR(sdl), &mta[cnt * ETHER_ADDR_LEN], ETHER_ADDR_LEN);
+
+	return (1);
+}
 
 /*********************************************************************
  *  Multicast Update
@@ -1684,7 +1696,7 @@ em_if_multi_set(if_ctx_t ctx)
 	IOCTL_DEBUGOUT("em_set_multi: begin");
 
 	mta = adapter->mta;
-	bzero(mta, sizeof(u8) * ETH_ADDR_LEN * MAX_NUM_MULTICAST_ADDRESSES);
+	bzero(mta, sizeof(u8) * ETHER_ADDR_LEN * MAX_NUM_MULTICAST_ADDRESSES);
 
 	if (adapter->hw.mac.type == e1000_82542 &&
 	    adapter->hw.revision_id == E1000_REVISION_2) {
@@ -1696,7 +1708,7 @@ em_if_multi_set(if_ctx_t ctx)
 		msec_delay(5);
 	}
 
-	if_multiaddr_array(ifp, mta, &mcnt, MAX_NUM_MULTICAST_ADDRESSES);
+	mcnt = if_foreach_llmaddr(ifp, em_copy_maddr, mta);
 
 	if (mcnt >= MAX_NUM_MULTICAST_ADDRESSES) {
 		reg_rctl = E1000_READ_REG(&adapter->hw, E1000_RCTL);
@@ -1829,14 +1841,15 @@ em_if_update_admin_status(if_ctx_t ctx)
 	em_update_stats_counters(adapter);
 
 	/* Reset LAA into RAR[0] on 82571 */
-	if ((adapter->hw.mac.type == e1000_82571) &&
-	    e1000_get_laa_state_82571(&adapter->hw))
-		e1000_rar_set(&adapter->hw, adapter->hw.mac.addr, 0);
+	if (hw->mac.type == e1000_82571 && e1000_get_laa_state_82571(hw))
+		e1000_rar_set(hw, hw->mac.addr, 0);
 
-	if (adapter->hw.mac.type < em_mac_min)
+	if (hw->mac.type < em_mac_min)
 		lem_smartspeed(adapter);
-
-	E1000_WRITE_REG(&adapter->hw, E1000_IMS, EM_MSIX_LINK | E1000_IMS_LSC);
+	else if (hw->mac.type == e1000_82574 &&
+	    adapter->intr_type == IFLIB_INTR_MSIX)
+		E1000_WRITE_REG(&adapter->hw, E1000_IMS, EM_MSIX_LINK |
+		    E1000_IMS_LSC);
 }
 
 static void
@@ -3903,6 +3916,7 @@ em_disable_aspm(struct adapter *adapter)
 static void
 em_update_stats_counters(struct adapter *adapter)
 {
+	u64 prev_xoffrxc = adapter->stats.xoffrxc;
 
 	if(adapter->hw.phy.media_type == e1000_media_type_copper ||
 	   (E1000_READ_REG(&adapter->hw, E1000_STATUS) & E1000_STATUS_LU)) {
@@ -3926,7 +3940,8 @@ em_update_stats_counters(struct adapter *adapter)
 	 ** For watchdog management we need to know if we have been
 	 ** paused during the last interval, so capture that here.
 	*/
-	adapter->shared->isc_pause_frames = adapter->stats.xoffrxc;
+	if (adapter->stats.xoffrxc != prev_xoffrxc)
+		adapter->shared->isc_pause_frames = 1;
 	adapter->stats.xofftxc += E1000_READ_REG(&adapter->hw, E1000_XOFFTXC);
 	adapter->stats.fcruc += E1000_READ_REG(&adapter->hw, E1000_FCRUC);
 	adapter->stats.prc64 += E1000_READ_REG(&adapter->hw, E1000_PRC64);

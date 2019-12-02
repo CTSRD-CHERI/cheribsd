@@ -1,4 +1,3 @@
-/* $Header: /p/tcsh/cvsroot/tcsh/tw.init.c,v 3.42 2011/04/17 14:49:30 christos Exp $ */
 /*
  * tw.init.c: Handle lists of things to complete
  */
@@ -31,9 +30,6 @@
  * SUCH DAMAGE.
  */
 #include "sh.h"
-
-RCSID("$tcsh: tw.init.c,v 3.42 2011/04/17 14:49:30 christos Exp $")
-
 #include "tw.h"
 #include "ed.h"
 #include "tc.h"
@@ -1028,14 +1024,3 @@ tw_job_next(struct Strbuf *res, struct Strbuf *dir, int *flags)
     }
     return 0;
 } /* end tw_job_next */
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "prog",
-//   "changes": [
-//     "pointer_provenance"
-//   ],
-//   "change_comment": "improper update of realloc()d pointers",
-//   "is_upstream": true
-// }
-// CHERI CHANGES END

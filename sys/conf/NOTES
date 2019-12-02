@@ -156,17 +156,14 @@ options 	BOOT_TAG=\"\"
 options 	BOOT_TAG_SZ=32
 
 options 	GEOM_BDE		# Disk encryption.
-options 	GEOM_BSD		# BSD disklabels (obsolete, gone in 12)
 options 	GEOM_CACHE		# Disk cache.
 options 	GEOM_CONCAT		# Disk concatenation.
 options 	GEOM_ELI		# Disk encryption.
-options 	GEOM_FOX		# Redundant path mitigation (obsolete, gone in 12)
 options 	GEOM_GATE		# Userland services.
 options 	GEOM_JOURNAL		# Journaling.
 options 	GEOM_LABEL		# Providers labelization.
 options 	GEOM_LINUX_LVM		# Linux LVM2 volumes
 options 	GEOM_MAP		# Map based partitioning
-options 	GEOM_MBR		# DOS/MBR partitioning (obsolete, gone in 12)
 options 	GEOM_MIRROR		# Disk mirroring.
 options 	GEOM_MULTIPATH		# Disk multipath
 options 	GEOM_NOP		# Test class.
@@ -183,11 +180,9 @@ options 	GEOM_RAID		# Soft RAID functionality.
 options 	GEOM_RAID3		# RAID3 functionality.
 options 	GEOM_SHSEC		# Shared secret.
 options 	GEOM_STRIPE		# Disk striping.
-options 	GEOM_SUNLABEL		# Sun/Solaris partitioning (obsolete, gone in 12)
 options 	GEOM_UZIP		# Read-only compressed disks
 options 	GEOM_VINUM		# Vinum logical volume manager
 options 	GEOM_VIRSTOR		# Virtual storage.
-options 	GEOM_VOL		# Volume names from UFS superblock (obsolete, gone in 12)
 options 	GEOM_ZERO		# Performance testing helper.
 
 #
@@ -338,16 +333,6 @@ options 	UMTX_PROFILING
 
 #####################################################################
 # COMPATIBILITY OPTIONS
-
-#
-# Implement system calls compatible with 4.3BSD and older versions of
-# FreeBSD.  You probably do NOT want to remove this as much current code
-# still relies on the 4.3 emulation.  Note that some architectures that
-# are supported by FreeBSD do not include support for certain important
-# aspects of this compatibility option, namely those related to the
-# signal delivery mechanism.
-#
-options 	COMPAT_43
 
 # Old tty interface.
 options 	COMPAT_43TTY
@@ -655,6 +640,7 @@ options 	ROUTETABLES=2		# allocated fibs up to 65536. default is 1.
 					# but that would be a bad idea as they are large.
 
 options 	TCP_OFFLOAD		# TCP offload support.
+options		TCP_RFC7413		# TCP Fast Open
 
 options		TCPHPTS
 
@@ -667,6 +653,10 @@ options 	IPSEC			#IP security (requires device crypto)
 # configuration.
 options		IPSEC_SUPPORT
 #options 	IPSEC_DEBUG		#debug for IP security
+
+
+# TLS framing and encryption of data transmitted over TCP sockets.
+options		KERN_TLS		# TLS transmit offload
 
 #
 # SMB/CIFS requester
@@ -1048,9 +1038,17 @@ options 	TCP_SIGNATURE		#include support for RFC 2385
 # a smooth scheduling of the traffic.
 options 	DUMMYNET
 
+# The DEBUGNET option enables a basic debug/panic-time networking API.  It
+# is used by NETDUMP and NETGDB.
+options 	DEBUGNET
+
 # The NETDUMP option enables netdump(4) client support in the kernel.
 # This allows a panicking kernel to transmit a kernel dump to a remote host.
 options 	NETDUMP
+
+# The NETGDB option enables netgdb(4) support in the kernel.  This allows a
+# panicking kernel to be debugged as a GDB remote over the network.
+options 	NETGDB
 
 #####################################################################
 # FILESYSTEM OPTIONS
@@ -1269,8 +1267,7 @@ options 	FFCLOCK
 # removed a disk drive, you may have had to rewrite your /etc/fstab
 # file, and also that you had to be careful when adding a new disk
 # as it may have been probed earlier and moved your device configuration
-# around.  (See also option GEOM_VOL for a different solution to this
-# problem.)
+# around.
 
 # This old behavior is maintained as the default behavior.  The unit
 # assignment begins with the first non-wired down unit for a device
@@ -1356,6 +1353,7 @@ device		ctl		#CAM Target Layer
 # CAM_DEBUG_TARGET	Limit debugging to the given target.
 # CAM_DEBUG_LUN		Limit debugging to the given lun.
 # CAM_DEBUG_DELAY	Delay in us after printing each debug line.
+# CAM_IO_STATS		Publish additional CAM device statics by sysctl
 #
 # CAM_MAX_HIGHPOWER: Maximum number of concurrent high power (start unit) cmds
 # SCSI_NO_SENSE_STRINGS: When defined disables sense descriptions
@@ -1377,6 +1375,7 @@ options 	SCSI_NO_SENSE_STRINGS
 options 	SCSI_NO_OP_STRINGS
 options 	SCSI_DELAY=5000	# Be pessimistic about Joe SCSI device
 options 	CAM_IOSCHED_DYNAMIC
+options		CAM_IO_STATS
 options		CAM_TEST_FAILURE
 
 # Options for the CAM CDROM driver:
@@ -1465,67 +1464,6 @@ options		KBDMUX_DFLT_KEYMAP	# specify the built-in keymap
 makeoptions	KBDMUX_DFLT_KEYMAP=it.iso
 
 options 	FB_DEBUG		# Frame buffer debugging
-
-device		splash			# Splash screen and screen saver support
-
-# Various screen savers.
-device		blank_saver
-device		daemon_saver
-device		dragon_saver
-device		fade_saver
-device		fire_saver
-device		green_saver
-device		logo_saver
-device		rain_saver
-device		snake_saver
-device		star_saver
-device		warp_saver
-
-# The syscons console driver (SCO color console compatible).
-device		sc
-hint.sc.0.at="isa"
-options 	MAXCONS=16		# number of virtual consoles
-options 	SC_ALT_MOUSE_IMAGE	# simplified mouse cursor in text mode
-options 	SC_DFLT_FONT		# compile font in
-makeoptions	SC_DFLT_FONT=cp850
-options 	SC_DFLT_TERM=\"sc\"	# default terminal emulator
-options 	SC_DISABLE_KDBKEY	# disable `debug' key
-options 	SC_DISABLE_REBOOT	# disable reboot key sequence
-options 	SC_HISTORY_SIZE=200	# number of history buffer lines
-options 	SC_MOUSE_CHAR=0x3	# char code for text mode mouse cursor
-options 	SC_PIXEL_MODE		# add support for the raster text mode
-
-# The following options will let you change the default colors of syscons.
-options 	SC_NORM_ATTR=(FG_GREEN|BG_BLACK)
-options 	SC_NORM_REV_ATTR=(FG_YELLOW|BG_GREEN)
-options 	SC_KERNEL_CONS_ATTR=(FG_RED|BG_BLACK)
-options 	SC_KERNEL_CONS_ATTRS=\"\x0c\x0d\x0e\x0f\x02\x09\x0a\x0b\"
-options 	SC_KERNEL_CONS_REV_ATTR=(FG_BLACK|BG_RED)
-
-# The following options will let you change the default behavior of
-# cut-n-paste feature
-options 	SC_CUT_SPACES2TABS	# convert leading spaces into tabs
-options 	SC_CUT_SEPCHARS=\"x09\"	# set of characters that delimit words
-					# (default is single space - \"x20\")
-
-# If you have a two button mouse, you may want to add the following option
-# to use the right button of the mouse to paste text.
-options 	SC_TWOBUTTON_MOUSE
-
-# You can selectively disable features in syscons.
-options 	SC_NO_CUTPASTE
-options 	SC_NO_FONT_LOADING
-options 	SC_NO_HISTORY
-options 	SC_NO_MODE_CHANGE
-options 	SC_NO_SYSMOUSE
-options 	SC_NO_SUSPEND_VTYSWITCH
-#!options 	SC_NO_TERM_DUMB
-#!options 	SC_NO_TERM_SC
-#!options 	SC_NO_TERM_SCTEKEN
-
-# `flags' for sc
-#	0x80	Put the video card in the VESA 800x600 dots, 16 color mode
-#	0x100	Probe for a keyboard device periodically if one is not present
 
 # Enable experimental features of the syscons terminal emulator (teken).
 options 	TEKEN_CONS25		# cons25-style terminal emulation
@@ -1766,32 +1704,6 @@ hint.ata.0.irq="14"
 hint.ata.1.at="isa"
 hint.ata.1.port="0x170"
 hint.ata.1.irq="15"
-
-#
-# Standard floppy disk controllers and floppy tapes, supports
-# the Y-E DATA External FDD (PC Card)
-#
-device		fdc
-hint.fdc.0.at="isa"
-hint.fdc.0.port="0x3F0"
-hint.fdc.0.irq="6"
-hint.fdc.0.drq="2"
-#
-# FDC_DEBUG enables floppy debugging.  Since the debug output is huge, you
-# gotta turn it actually on by setting the variable fd_debug with DDB,
-# however.
-options 	FDC_DEBUG
-#
-# Activate this line if you happen to have an Insight floppy tape.
-# Probing them proved to be dangerous for people with floppy disks only,
-# so it's "hidden" behind a flag:
-#hint.fdc.0.flags="1"
-
-# Specify floppy devices
-hint.fd.0.at="fdc0"
-hint.fd.0.drive="0"
-hint.fd.1.at="fdc0"
-hint.fd.1.drive="1"
 
 #
 # uart: newbusified driver for serial interfaces.  It consolidates the sio(4),
@@ -2422,6 +2334,7 @@ device		iicoc		# OpenCores I2C controller support
 # I2C peripheral devices
 #
 device		ad7418		# Analog Devices temp and voltage sensor
+device		ads111x		# Texas Instruments ADS101x and ADS111x ADCs
 device		ds1307		# Dallas DS1307 RTC and compatible
 device		ds13rtc		# All Dallas/Maxim ds13xx chips
 device		ds1672		# Dallas DS1672 RTC
@@ -2482,6 +2395,7 @@ device		lpbb
 device		pcfclock
 
 # General Purpose I/O pins
+device		dwgpio		# Synopsys DesignWare APB GPIO Controller
 device  	gpio		# gpio interfaces and bus support
 device  	gpiobacklight	# sysctl control of gpio-based backlight
 device  	gpioiic		# i2c via gpio bitbang
@@ -2954,8 +2868,8 @@ options         IMAGACT_BINMISC
 # This enables support for compressed core dumps.
 options 	GZIO
 
-# zstd I/O stream support
-# This enables support for Zstd compressed core dumps.
+# zstd support
+# This enables support for Zstd compressed core dumps and GEOM_UZIP images.
 options 	ZSTDIO
 
 # BHND(4) drivers
@@ -2981,4 +2895,9 @@ device		spigen		# Generic access to SPI devices from userland.
 # Enable legacy /dev/spigenN name aliases for /dev/spigenX.Y devices.
 options 	SPIGEN_LEGACY_CDEVNAME # legacy device names for spigen
 
+# Compression supports.
+device		zlib		# gzip/zlib compression/decompression library
 device		xz		# xz_embedded LZMA de-compression library
+
+# Kernel support for stats(3).
+options 	STATS

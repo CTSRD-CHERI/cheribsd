@@ -9,11 +9,11 @@
 // CHERI CHANGES START
 // {
 //   "updated": 20190426,
-//   "target_type": "lib"
+//   "target_type": "lib",
 //   "changes": [
-//     "subobject_bounds",
+//     "subobject_bounds"
 //   ],
-//   "change_comment": "std::string: &str[0] -> str.data()",
+//   "change_comment": "std::string: &str[0] -> str.data()"
 // }
 // CHERI CHANGES END
 

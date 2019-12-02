@@ -302,7 +302,6 @@ MIASM =  \
 	cheriabi_truncate.o \
 	ftruncate.o \
 	thr_kill2.o \
-	cheriabi_shm_open.o \
 	cheriabi_shm_unlink.o \
 	cheriabi_cpuset.o \
 	cpuset_setid.o \
@@ -383,4 +382,7 @@ MIASM =  \
 	cheriabi_fhlinkat.o \
 	cheriabi_fhreadlink.o \
 	cheriabi_funlinkat.o \
-	cheriabi_copy_file_range.o
+	cheriabi_copy_file_range.o \
+	cheriabi___sysctlbyname.o \
+	cheriabi_shm_open2.o \
+	cheriabi_shm_rename.o

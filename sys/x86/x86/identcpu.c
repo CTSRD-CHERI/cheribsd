@@ -118,6 +118,10 @@ u_int	cpu_mon_mwait_flags;	/* MONITOR/MWAIT flags (CPUID.05H.ECX) */
 u_int	cpu_mon_min_size;	/* MONITOR minimum range size, bytes */
 u_int	cpu_mon_max_size;	/* MONITOR minimum range size, bytes */
 u_int	cpu_maxphyaddr;		/* Max phys addr width in bits */
+u_int	cpu_power_eax;		/* 06H: Power management leaf, %eax */
+u_int	cpu_power_ebx;		/* 06H: Power management leaf, %eax */
+u_int	cpu_power_ecx;		/* 06H: Power management leaf, %eax */
+u_int	cpu_power_edx;		/* 06H: Power management leaf, %eax */
 char machine[] = MACHINE;
 
 SYSCTL_UINT(_hw, OID_AUTO, via_feature_rng, CTLFLAG_RD,
@@ -960,7 +964,8 @@ printcpuinfo(void)
 				       /* Supervisor Mode Access Prevention */
 				       "\025SMAP"
 				       "\026AVX512IFMA"
-				       "\027PCOMMIT"
+				       /* Formerly PCOMMIT */
+				       "\027<b22>"
 				       "\030CLFLUSHOPT"
 				       "\031CLWB"
 				       "\032PROCTRACE"
@@ -993,7 +998,7 @@ printcpuinfo(void)
 				       "\027RDPID"
 				       "\032CLDEMOTE"
 				       "\034MOVDIRI"
-				       "\035MOVDIRI64B"
+				       "\035MOVDIR64B"
 				       "\036ENQCMD"
 				       "\037SGXLC"
 				       );
@@ -1040,6 +1045,9 @@ printcpuinfo(void)
 				       "\003RSBA"
 				       "\004SKIP_L1DFL_VME"
 				       "\005SSB_NO"
+				       "\006MDS_NO"
+				       "\010TSX_CTRL"
+				       "\011TAA_NO"
 				       );
 			}
 
@@ -1062,6 +1070,9 @@ printcpuinfo(void)
 				    "\001CLZERO"
 				    "\002IRPerf"
 				    "\003XSaveErPtr"
+				    "\005RDPRU"
+				    "\011MCOMMIT"
+				    "\012WBNOINVD"
 				    "\015IBPB"
 				    "\017IBRS"
 				    "\020STIBP"
@@ -1550,6 +1561,14 @@ void
 identify_cpu2(void)
 {
 	u_int regs[4], cpu_stdext_disable;
+
+	if (cpu_high >= 6) {
+		cpuid_count(6, 0, regs);
+		cpu_power_eax = regs[0];
+		cpu_power_ebx = regs[1];
+		cpu_power_ecx = regs[2];
+		cpu_power_edx = regs[3];
+	}
 
 	if (cpu_high >= 7) {
 		cpuid_count(7, 0, regs);
@@ -2342,7 +2361,7 @@ print_svm_info(void)
 	       "\017<b14>"
 	       "\020V_VMSAVE_VMLOAD"
 	       "\021vGIF"
-	       "\022<b17>"
+	       "\022GMET"		/* Guest Mode Execute Trap */
 	       "\023<b18>"
 	       "\024<b19>"
 	       "\025<b20>"

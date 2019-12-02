@@ -558,11 +558,13 @@ struct siginfo32 {
 #define BUS_ADRALN	1	/* Invalid address alignment.		*/
 #define BUS_ADRERR	2	/* Nonexistent physical address.	*/
 #define BUS_OBJERR	3	/* Object-specific hardware error.	*/
+#define BUS_OOMERR	100	/* Non-standard: No memory.		*/
 
 /* codes for SIGSEGV */
 #define SEGV_MAPERR	1	/* Address not mapped to object.	*/
 #define SEGV_ACCERR	2	/* Invalid permissions for mapped	*/
 				/* object.				*/
+#define	SEGV_PKUERR	100	/* x86: PKU violation			*/
 
 /* codes for SIGFPE */
 #define FPE_INTOVF	1	/* Integer overflow.			*/
@@ -624,50 +626,14 @@ struct __siginfo;
 /*
  * Signal vector "template" used in sigaction call.
  */
-#ifndef _KERNEL
 struct sigaction {
 	union {
-		void    (*__sa_handler)(int);
-		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+		void    (* __kerncap __sa_handler)(int);
+		void    (* __kerncap __sa_sigaction)(int, struct __siginfo *, void *);
 	} __sigaction_u;		/* signal handler */
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
-#else
-#if __has_feature(capabilities)
-struct sigaction_c {
-	union {
-		void    (* __capability __sa_handler)(int);
-		void    (* __capability __sa_sigaction)
-			    (int, struct __siginfo *, void *);
-	} __sigaction_u;		/* signal handler */
-	int	sa_flags;		/* see signal options below */
-	sigset_t sa_mask;		/* signal mask to apply */
-};
-struct sigaction64 {
-	union {
-		uint64_t __sa_handler; /* void (*)(int); */
-		/* void (*)(int, struct __siginfo *, void *); */
-		uint64_t __sa_sigaction;
-	} __sigaction_u;		/* signal handler */
-	int	sa_flags;		/* see signal options below */
-	sigset_t sa_mask;		/* signal mask to apply */
-};
-#endif
-struct sigaction_native {
-	union {
-		void    (*__sa_handler)(int);
-		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
-	} __sigaction_u;		/* signal handler */
-	int	sa_flags;		/* see signal options below */
-	sigset_t sa_mask;		/* signal mask to apply */
-};
-#if __has_feature(capabilities)
-typedef struct sigaction_c	ksigaction_t;
-#else
-typedef	struct sigaction_native	ksigaction_t;
-#endif
-#endif
 
 #define	sa_handler	__sigaction_u.__sa_handler
 #endif
@@ -738,14 +704,6 @@ struct __stack_t {
 	__size_t ss_size;		/* signal stack length */
 	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
 };
-
-#ifdef _KERNEL
-struct sigaltstack_native {
-	void	*ss_sp;			/* signal stack base */
-	__size_t ss_size;		/* signal stack length */
-	int	ss_flags;		/* SS_DISABLE and/or SS_ONSTACK */
-};
-#endif
 
 #if __BSD_VISIBLE
 /*

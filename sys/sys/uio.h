@@ -53,7 +53,7 @@ typedef	__off_t	off_t;
 #ifdef _KERNEL
 
 struct uio {
-	kiovec_t	*uio_iov;	/* scatter/gather list */
+	struct iovec	*uio_iov;	/* scatter/gather list */
 	int	uio_iovcnt;		/* length of scatter/gather list */
 	off_t	uio_offset;		/* offset in target object */
 	ssize_t	uio_resid;		/* remaining bytes to process */
@@ -82,11 +82,11 @@ struct bus_dma_segment;
 struct uio *cloneuio(struct uio *uiop);
 int	copyinfrom(const void * __restrict src, void * __restrict dst,
 	    size_t len, int seg);
-int	copyiniov(const uiovec_t * __capability iovp, u_int iovcnt,
-	    kiovec_t **iov, int error);
+int	copyiniov(const struct iovec_native * __capability iovp, u_int iovcnt,
+	    struct iovec **iov, int error);
 int	copyinstrfrom(const void * __restrict src, void * __restrict dst,
 	    size_t len, size_t * __restrict copied, int seg);
-int	copyinuio(const uiovec_t * __capability iovp, u_int iovcnt,
+int	copyinuio(const struct iovec_native * __capability iovp, u_int iovcnt,
 	    struct uio **uiop);
 int	copyout_map(struct thread *td, vm_ptr_t *addr, size_t sz);
 int	copyout_unmap(struct thread *td, vm_offset_t addr, size_t sz);
@@ -102,7 +102,7 @@ int	uiomove_fromphys(struct vm_page *ma[], vm_offset_t offset, int n,
 	    struct uio *uio);
 int	uiomove_nofault(void *cp, int n, struct uio *uio);
 int	uiomove_object(struct vm_object *obj, off_t obj_size, struct uio *uio);
-int	updateiov(const struct uio *uiop, uiovec_t *iovp);
+int	updateiov(const struct uio *uiop, struct iovec_native *iovp);
 
 #else /* !_KERNEL */
 
@@ -120,10 +120,9 @@ __END_DECLS
 #endif /* !_SYS_UIO_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190531,
+//   "updated": 20191025,
 //   "target_type": "header",
 //   "changes": [
-//     "kiovec_t",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [

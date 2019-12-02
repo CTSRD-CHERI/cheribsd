@@ -82,7 +82,7 @@ static const unsigned long mask80 = 0x8080808080808080;
 #endif /* !CHERI_PURECAP_KERNEL */
 
 size_t
-strlen(const char *str)
+(strlen)(const char *str)
 {
 	const char *p;
 #ifndef CHERI_PURECAP_KERNEL

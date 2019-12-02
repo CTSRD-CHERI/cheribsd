@@ -185,21 +185,14 @@ SECTIONS
   PROVIDE (_erel_dyn = .);
 
   .rela.dyn	 : { *(.rela.dyn)		}
-  .init          : 
-  { 
-    KEEP (*(.init))
-  } =0x1000000
-  .reginfo : { *(.reginfo) }
-  .sdata2   : { *(.sdata2) *(.sdata2.*) *(.gnu.linkonce.s2.*) }
-  .sbss2   : { *(.sbss2) *(.sbss2.*) *(.gnu.linkonce.sb2.*) }
-  . = ALIGN(0x2000) + (. & (0x2000 - 1));
-  .data    :
-  {
-    *(.data)
-    *(.data.*)
-    *(.gnu.linkonce.d.*)
-  }
-  .data1   : { *(.data1) }
+
+  .plt      : { *(.plt)	}
+  _gp = ALIGN(16) + 0x7ff0;
+  .got		  : { *(.got.plt) *(.got) }
+  _captable = ALIGN(0x20);
+  .captable ALIGN(0x20): { *(.captable) }
+  _ecaptable = .;
+
   .eh_frame : { KEEP (*(.eh_frame)) }
   .gcc_except_table : { *(.gcc_except_table) }
   .ctors   : 
@@ -229,12 +222,22 @@ SECTIONS
     KEEP (*(SORT(.dtors.*)))
     KEEP (*(.dtors))
   }
-  .plt      : { *(.plt)	}
-  _gp = ALIGN(16) + 0x7ff0;
-  .got		  : { *(.got.plt) *(.got) }
-  _captable = ALIGN(0x20);
-  .captable ALIGN(0x20): { *(.captable) }
-  _ecaptable = .;
+  
+  .init          : 
+  { 
+    KEEP (*(.init))
+  } =0x1000000
+  .reginfo : { *(.reginfo) }
+  .sdata2   : { *(.sdata2) *(.sdata2.*) *(.gnu.linkonce.s2.*) }
+  .sbss2   : { *(.sbss2) *(.sbss2.*) *(.gnu.linkonce.sb2.*) }
+  . = ALIGN(0x2000) + (. & (0x2000 - 1));
+  .data    :
+  {
+    *(.data)
+    *(.data.*)
+    *(.gnu.linkonce.d.*)
+  }
+  .data1   : { *(.data1) }
 
   .dynamic       : { *(.dynamic) }
   /* We want the small data sections together, so single-instruction offsets

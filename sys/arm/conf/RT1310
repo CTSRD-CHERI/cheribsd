@@ -3,6 +3,7 @@
 #
 # $FreeBSD$
 #
+#NO_UNIVERSE
 
 ident		RT1310
 include 	"std.arm"
@@ -16,7 +17,6 @@ makeoptions	FDT_DTS_FILE=wzr2-g300n.dts
 makeoptions	MODULES_OVERRIDE=""
 
 #makeoptions	DEBUG=-g		# Build kernel with gdb(1) debug symbols
-makeoptions	WERROR="-Werror"
 
 options 	SCHED_4BSD		# 4BSD scheduler
 options 	INET			# InterNETworking

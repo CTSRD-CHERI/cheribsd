@@ -177,12 +177,3 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 		kva_free(ova, PAGE_SIZE * colors);
 	return (error);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

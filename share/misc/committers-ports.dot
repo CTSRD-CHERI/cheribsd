@@ -96,6 +96,7 @@ decke [label="Bernhard Froehlich\ndecke@FreeBSD.org\n2010/03/21"]
 delphij [label="Xin Li\ndelphij@FreeBSD.org\n2006/05/01"]
 demon [label="Dmitry Sivachenko\ndemon@FreeBSD.org\n2000/11/13"]
 dhn [label="Dennis Herrmann\ndhn@FreeBSD.org\n2009/03/03"]
+dmgk [label="Dmitri Goutnik\ndmgk@FreeBSD.org\n2019/09/15"]
 dryice [label="Dryice Dong Liu\ndryice@FreeBSD.org\n2006/12/25"]
 dteske [label="Devin Teske\ndteske@FreeBSD.org\n2018/03/01"]
 dumbbell [label="Jean-Sebastien Pedron\ndumbbell@FreeBSD.org\n2017/01/10"]
@@ -233,6 +234,7 @@ rodrigo [label="Rodrigo Osorio\nrodrigo@FreeBSD.org\n2014/01/15"]
 romain [label="Romain Tartiere\nromain@FreeBSD.org\n2010/01/24"]
 rpaulo [label="Rui Paulo\nrpaulo@FreeBSD.org\n2014/07/15"]
 sahil [label="Sahil Tandon\nsahil@FreeBSD.org\n2010/04/11"]
+samm [label="Alex Samorukov\nsamm@FreeBSD.org\n2019/10/09"]
 sat [label="Andrew Pantyukhin\nsat@FreeBSD.org\n2006/05/06"]
 sbruno [label="Sean Bruno\nsbruno@FreeBSD.org\n2014/09/14"]
 sbz [label="Sofian Brabez\nsbz@FreeBSD.org\n2011/03/14"]
@@ -304,11 +306,13 @@ amdmi3 -> arrowd
 
 antoine -> dumbbell
 
+araujo -> dmgk
 araujo -> egypcio
 araujo -> jhixson
 araujo -> lippe
 araujo -> pclin
 araujo -> pgollucci
+araujo -> samm
 
 arved -> markus
 arved -> stefan
@@ -505,6 +509,7 @@ krion -> kbowling
 krion -> miwi
 krion -> novel
 krion -> philip
+krion -> samm
 krion -> sat
 krion -> sem
 krion -> sergei
@@ -634,6 +639,7 @@ pgollucci -> junovitch
 pgollucci -> sunpoet
 pgollucci -> swills
 
+philip -> fox
 philip -> koitsu
 
 pi -> meta
@@ -735,6 +741,7 @@ timur -> kbowling
 tmclaugh -> itetcu
 tmclaugh -> xride
 
+tz -> dmgk
 tz -> joneum
 tz -> fernape
 tz -> mfechner

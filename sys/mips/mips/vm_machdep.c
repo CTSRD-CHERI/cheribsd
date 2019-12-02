@@ -619,7 +619,7 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	td->td_frame->sr |= MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX;
 #endif
 
-	 /* XXXRW: With CNMIPS moved, does this still belong here? */
+	/* XXXRW: With CNMIPS moved, does this still belong here? */
 #ifdef CPU_CHERI
 	/*
 	 * For the MIPS ABI, we can derive any required CHERI state from

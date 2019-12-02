@@ -887,6 +887,13 @@ struct tcp_function_block *
 find_and_ref_tcp_fb(struct tcp_function_block *fs);
 int tcp_default_ctloutput(struct socket *so, struct sockopt *sopt, struct inpcb *inp, struct tcpcb *tp);
 
+extern counter_u64_t tcp_inp_lro_direct_queue;
+extern counter_u64_t tcp_inp_lro_wokeup_queue;
+extern counter_u64_t tcp_inp_lro_compressed;
+extern counter_u64_t tcp_inp_lro_single_push;
+extern counter_u64_t tcp_inp_lro_locks_taken;
+extern counter_u64_t tcp_inp_lro_sack_wake;
+
 uint32_t tcp_maxmtu(struct in_conninfo *, struct tcp_ifcap *);
 uint32_t tcp_maxmtu6(struct in_conninfo *, struct tcp_ifcap *);
 u_int	 tcp_maxseg(const struct tcpcb *);
@@ -939,6 +946,7 @@ uint32_t tcp_new_ts_offset(struct in_conninfo *);
 tcp_seq	 tcp_new_isn(struct in_conninfo *);
 
 int	 tcp_sack_doack(struct tcpcb *, struct tcpopt *, tcp_seq);
+void	 tcp_update_dsack_list(struct tcpcb *, tcp_seq, tcp_seq);
 void	 tcp_update_sack_list(struct tcpcb *tp, tcp_seq rcv_laststart, tcp_seq rcv_lastend);
 void	 tcp_clean_dsack_blocks(struct tcpcb *tp);
 void	 tcp_clean_sackreport(struct tcpcb *tp);
@@ -952,7 +960,7 @@ uint32_t tcp_compute_initwnd(uint32_t);
 void	 tcp_sndbuf_autoscale(struct tcpcb *, struct socket *, uint32_t);
 struct mbuf *
 	 tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
-	   int32_t seglimit, int32_t segsize, struct sockbuf *sb);
+	   int32_t seglimit, int32_t segsize, struct sockbuf *sb, bool hw_tls);
 
 
 static inline void

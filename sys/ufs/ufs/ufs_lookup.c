@@ -1178,6 +1178,7 @@ ufs_dirremove(dvp, ip, flags, isrmdir)
 	 */
 	if (ip) {
 		ip->i_effnlink--;
+		ip->i_flag |= IN_CHANGE;
 		if (DOINGSOFTDEP(dvp)) {
 			softdep_setup_unlink(dp, ip);
 		} else {
@@ -1291,6 +1292,7 @@ ufs_dirrewrite(dp, oip, newinum, newtype, isrmdir)
 	 * necessary.
 	 */
 	oip->i_effnlink--;
+	oip->i_flag |= IN_CHANGE;
 	if (DOINGSOFTDEP(vdp)) {
 		softdep_setup_unlink(dp, oip);
 	} else {
@@ -1408,6 +1410,7 @@ ufs_dir_dd_ino(struct vnode *vp, struct ucred *cred, ino_t *dd_ino,
 	int error, namlen;
 
 	ASSERT_VOP_LOCKED(vp, "ufs_dir_dd_ino");
+	*dd_vp = NULL;
 	if (vp->v_type != VDIR)
 		return (ENOTDIR);
 	/*
@@ -1440,7 +1443,6 @@ ufs_dir_dd_ino(struct vnode *vp, struct ucred *cred, ino_t *dd_ino,
 	    dirbuf.dotdot_name[1] != '.')
 		return (ENOTDIR);
 	*dd_ino = dirbuf.dotdot_ino;
-	*dd_vp = NULL;
 	return (0);
 }
 

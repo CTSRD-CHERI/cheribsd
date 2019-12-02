@@ -578,6 +578,7 @@ ng_ether_rcvmsg(node_p node, item_p item, hook_p lasthook)
 		case NGM_ETHER_ADD_MULTI:
 		    {
 			struct sockaddr_dl sa_dl;
+			struct epoch_tracker et;
 			struct ifmultiaddr *ifma;
 
 			if (msg->header.arglen != ETHER_ADDR_LEN) {
@@ -597,10 +598,10 @@ ng_ether_rcvmsg(node_p node, item_p item, hook_p lasthook)
 			 * lose a race while we check if the membership
 			 * already exists.
 			 */
-			if_maddr_rlock(priv->ifp);
+			NET_EPOCH_ENTER(et);
 			ifma = if_findmulti(priv->ifp,
 			    (struct sockaddr *)&sa_dl);
-			if_maddr_runlock(priv->ifp);
+			NET_EPOCH_EXIT(et);
 			if (ifma != NULL) {
 				error = EADDRINUSE;
 			} else {
@@ -711,6 +712,7 @@ ng_ether_rcv_lower(hook_p hook, item_p item)
 static int
 ng_ether_rcv_upper(hook_p hook, item_p item)
 {
+	struct epoch_tracker et;
 	struct mbuf *m;
 	const node_p node = NG_HOOK_NODE(hook);
 	const priv_p priv = NG_NODE_PRIVATE(node);
@@ -738,7 +740,9 @@ ng_ether_rcv_upper(hook_p hook, item_p item)
 	}
 
 	/* Route packet back in */
+	NET_EPOCH_ENTER(et);
 	ether_demux(ifp, m);
+	NET_EPOCH_EXIT(et);
 	return (0);
 }
 

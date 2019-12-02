@@ -33,6 +33,8 @@
  *
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -236,11 +238,11 @@ nfsrv_object_create(struct vnode *vp, struct thread *td)
  * Look up a file name. Basically just initialize stuff and call namei().
  */
 int
-nfsrv_lookupfilename(struct nameidata *ndp, char *fname, NFSPROC_T *p)
+nfsrv_lookupfilename(struct nameidata *ndp, char * __capability fname, NFSPROC_T *p)
 {
 	int error;
 
-	NDINIT(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, fname,
+	NDINIT_C(ndp, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, fname,
 	    p);
 	error = namei(ndp);
 	if (!error) {

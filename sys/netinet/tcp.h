@@ -174,6 +174,8 @@ struct tcphdr {
 #define	TCP_LOGDUMP	37	/* dump connection log events to device */
 #define	TCP_LOGDUMPID	38	/* dump events from connections with same ID to
 				   device */
+#define	TCP_TXTLS_ENABLE 39	/* TLS framing and encryption for transmit */
+#define	TCP_TXTLS_MODE	40	/* Transmit TLS mode */
 #define	TCP_CONGESTION	64	/* get/set congestion control algorithm */
 #define	TCP_CCALGOOPT	65	/* get/set cc algorithm specific options */
 #define TCP_DELACK  	72	/* socket option for delayed ack */
@@ -237,6 +239,7 @@ struct tcphdr {
 #define TCP_BBR_ACK_COMP_ALG   1096 	/* Not used */
 #define TCP_BBR_TMR_PACE_OH    1096	/* Recycled in 4.2 */
 #define TCP_BBR_EXTRA_GAIN     1097
+#define TCP_RACK_DO_DETECTION  1097	/* Recycle of extra gain for rack, attack detection */
 #define TCP_BBR_RACK_RTT_USE   1098	/* what RTT should we use 0, 1, or 2? */
 #define TCP_BBR_RETRAN_WTSO    1099
 #define TCP_DATA_AFTER_CLOSE   1100
@@ -349,5 +352,16 @@ struct tcp_function_set {
 	char function_set_name[TCP_FUNCTION_NAME_LEN_MAX];
 	uint32_t pcbcnt;
 };
+
+/* TLS modes for TCP_TXTLS_MODE */
+#define	TCP_TLS_MODE_NONE	0
+#define	TCP_TLS_MODE_SW		1
+#define	TCP_TLS_MODE_IFNET	2
+#define	TCP_TLS_MODE_TOE	3
+
+/*
+ * TCP Control message types
+ */
+#define	TLS_SET_RECORD_TYPE	1
 
 #endif /* !_NETINET_TCP_H_ */

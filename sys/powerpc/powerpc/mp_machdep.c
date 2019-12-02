@@ -35,6 +35,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/ktr.h>
 #include <sys/bus.h>
 #include <sys/cpuset.h>
+#include <sys/domainset.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
@@ -60,8 +61,6 @@ __FBSDID("$FreeBSD$");
 #include <machine/smp.h>
 
 #include "pic_if.h"
-
-extern struct pcpu __pcpu[MAXCPU];
 
 volatile static int ap_awake;
 volatile static u_int ap_letgo;
@@ -151,7 +150,7 @@ cpu_mp_start(void)
 {
 	struct cpuref bsp, cpu;
 	struct pcpu *pc;
-	int error;
+	int domain, error;
 
 	error = platform_smp_get_bsp(&bsp);
 	KASSERT(error == 0, ("Don't know BSP"));
@@ -168,12 +167,18 @@ cpu_mp_start(void)
 			    cpu.cr_cpuid);
 			goto next;
 		}
+
+		if (vm_ndomains > 1)
+			domain = cpu.cr_domain;
+		else
+			domain = 0;
+
 		if (cpu.cr_cpuid != bsp.cr_cpuid) {
 			void *dpcpu;
 
 			pc = &__pcpu[cpu.cr_cpuid];
-			dpcpu = (void *)kmem_malloc(DPCPU_SIZE, M_WAITOK |
-			    M_ZERO);
+			dpcpu = (void *)kmem_malloc_domainset(DOMAINSET_PREF(domain),
+			    DPCPU_SIZE, M_WAITOK | M_ZERO);
 			pcpu_init(pc, cpu.cr_cpuid, sizeof(*pc));
 			dpcpu_init(dpcpu, cpu.cr_cpuid);
 		} else {
@@ -181,12 +186,8 @@ cpu_mp_start(void)
 			pc->pc_cpuid = bsp.cr_cpuid;
 			pc->pc_bsp = 1;
 		}
+		pc->pc_domain = domain;
 		pc->pc_hwref = cpu.cr_hwref;
-
-		if (vm_ndomains > 1)
-			pc->pc_domain = cpu.cr_domain;
-		else
-			pc->pc_domain = 0;
 
 		CPU_SET(pc->pc_cpuid, &cpuset_domain[pc->pc_domain]);
 		KASSERT(pc->pc_domain < MAXMEMDOM, ("bad domain value %d\n",
@@ -330,7 +331,6 @@ powerpc_ipi_handler(void *arg)
 			    __func__);
 			cpuid = PCPU_GET(cpuid);
 			savectx(&stoppcbs[cpuid]);
-			savectx(PCPU_GET(curpcb));
 			CPU_SET_ATOMIC(cpuid, &stopped_cpus);
 			while (!CPU_ISSET(cpuid, &started_cpus))
 				cpu_spinwait();

@@ -85,12 +85,3 @@ void cloudabi_vdso_init(struct sysentvec *, char *, char *);
 void cloudabi_vdso_destroy(struct sysentvec *);
 
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "header",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

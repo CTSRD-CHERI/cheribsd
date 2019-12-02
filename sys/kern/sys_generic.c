@@ -193,8 +193,7 @@ int
 sys_read(struct thread *td, struct read_args *uap)
 {
 
-	return (user_read(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
-	    uap->nbyte));
+	return (user_read(td, uap->fd, uap->buf, uap->nbyte));
 }
 
 int
@@ -229,8 +228,7 @@ int
 sys_pread(struct thread *td, struct pread_args *uap)
 {
 
-	return (kern_pread(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
-	    uap->nbyte, uap->offset));
+	return (kern_pread(td, uap->fd, uap->buf, uap->nbyte, uap->offset));
 }
 
 int
@@ -273,8 +271,8 @@ int
 sys_readv(struct thread *td, struct readv_args *uap)
 {
 
-	return (user_readv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)copyinuio));
+	return (user_readv(td, uap->fd, uap->iovp, uap->iovcnt,
+	    (copyinuio_t *)copyinuio));
 }
 
 int
@@ -321,8 +319,8 @@ int
 sys_preadv(struct thread *td, struct preadv_args *uap)
 {
 
-	return (user_preadv(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, uap->offset, (copyinuio_t *)copyinuio));
+	return (user_preadv(td, uap->fd, uap->iovp, uap->iovcnt, uap->offset,
+	    (copyinuio_t *)copyinuio));
 }
 
 int
@@ -416,8 +414,7 @@ int
 sys_write(struct thread *td, struct write_args *uap)
 {
 
-	return (kern_write(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
-	    uap->nbyte));
+	return (kern_write(td, uap->fd, uap->buf, uap->nbyte));
 }
 
 int
@@ -455,8 +452,7 @@ int
 sys_pwrite(struct thread *td, struct pwrite_args *uap)
 {
 
-	return (kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
-	    uap->nbyte, uap->offset));
+	return (kern_pwrite(td, uap->fd, uap->buf, uap->nbyte, uap->offset));
 }
 
 int
@@ -483,8 +479,7 @@ int
 freebsd6_pwrite(struct thread *td, struct freebsd6_pwrite_args *uap)
 {
 
-	return (kern_pwrite(td, uap->fd, __USER_CAP(uap->buf, uap->nbyte),
-	    uap->nbyte, uap->offset));
+	return (kern_pwrite(td, uap->fd, uap->buf, uap->nbyte, uap->offset));
 }
 #endif
 
@@ -502,8 +497,8 @@ int
 sys_writev(struct thread *td, struct writev_args *uap)
 {
 
-	return (user_writev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, (copyinuio_t *)copyinuio));
+	return (user_writev(td, uap->fd, uap->iovp, uap->iovcnt,
+	    (copyinuio_t *)copyinuio));
 }
 
 int
@@ -550,8 +545,7 @@ int
 sys_pwritev(struct thread *td, struct pwritev_args *uap)
 {
 
-	return (user_pwritev(td, uap->fd, __USER_CAP_ARRAY(uap->iovp,
-	    uap->iovcnt), uap->iovcnt, uap->offset,
+	return (user_pwritev(td, uap->fd, uap->iovp, uap->iovcnt, uap->offset,
 	    (copyinuio_t *)copyinuio));
 }
 
@@ -613,9 +607,6 @@ dofilewrite(struct thread *td, int fd, struct file *fp, struct uio *auio,
 		ktruio = cloneuio(auio);
 #endif
 	cnt = auio->uio_resid;
-	if (fp->f_type == DTYPE_VNODE &&
-	    (fp->f_vnread_flags & FDEVFS_VNODE) == 0)
-		bwillwrite();
 	if ((error = fo_write(fp, auio, td->td_ucred, flags, td))) {
 		if (auio->uio_resid != cnt && (error == ERESTART ||
 		    error == EINTR || error == EWOULDBLOCK))
@@ -706,16 +697,8 @@ struct ioctl_args {
 int
 sys_ioctl(struct thread *td, struct ioctl_args *uap)
 {
-	u_long com;
-	void * __capability udata;
 
-	com = uap->com;
-	if (com & IOC_VOID)
-		udata = (void * __capability)(intcap_t)uap->data;
-	else
-		udata = __USER_CAP(uap->data, IOCPARM_LEN(com));
-
-	return (user_ioctl(td, uap->fd, com, udata, &uap->data, 0));
+	return (user_ioctl(td, uap->fd, uap->com, uap->data, &uap->data, 1));
 }
 
 int
@@ -914,9 +897,8 @@ int
 sys_pselect(struct thread *td, struct pselect_args *uap)
 {
 
-	return (user_pselect(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
-	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex),
-	    __USER_CAP_OBJ(uap->ts), __USER_CAP_OBJ(uap->sm)));
+	return (user_pselect(td, uap->nd, uap->in, uap->ou, uap->ex, uap->ts,
+	    uap->sm));
 }
 
 int
@@ -984,9 +966,7 @@ int
 sys_select(struct thread *td, struct select_args *uap)
 {
 
-	return (user_select(td, uap->nd, __USER_CAP_UNBOUND(uap->in),
-	    __USER_CAP_UNBOUND(uap->ou), __USER_CAP_UNBOUND(uap->ex),
-	    __USER_CAP_OBJ(uap->tv)));
+	return (user_select(td, uap->nd, uap->in, uap->ou, uap->ex, uap->tv));
 }
 
 int
@@ -1390,8 +1370,7 @@ int
 sys_poll(struct thread *td, struct poll_args *uap)
 {
 
-	return (user_poll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds),
-	    uap->nfds, uap->timeout));
+	return (user_poll(td, uap->fds, uap->nfds, uap->timeout));
 }
 
 int
@@ -1517,8 +1496,7 @@ int
 sys_ppoll(struct thread *td, struct ppoll_args *uap)
 {
 
-	return (user_ppoll(td, __USER_CAP_ARRAY(uap->fds, uap->nfds),
-	    uap->nfds, __USER_CAP_OBJ(uap->ts), __USER_CAP_OBJ(uap->set)));
+	return (user_ppoll(td, uap->fds, uap->nfds, uap->ts, uap->set));
 }
 
 int
@@ -1993,11 +1971,10 @@ kern_posix_error(struct thread *td, int error)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190509,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [

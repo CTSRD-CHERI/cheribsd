@@ -395,12 +395,3 @@ SYSCTL_PROC(_net_inet_tcp_cc_newreno, OID_AUTO, beta_ecn,
 	"New Reno beta ecn, specified as number between 1 and 100");
 
 DECLARE_CC_MODULE(newreno, &newreno_cc_algo);
-
-// CHERI CHANGES START
-// {
-//   "updated": 20181121,
-//   "changes": [
-//     "integer_provenance"
-//   ]
-// }
-// CHERI CHANGES END

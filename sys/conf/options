@@ -106,18 +106,15 @@ GZIO		opt_gzio.h
 IMAGACT_BINMISC		opt_dontuse.h
 IPI_PREEMPTION	opt_sched.h
 GEOM_BDE	opt_geom.h
-GEOM_BSD	opt_geom.h
 GEOM_CACHE	opt_geom.h
 GEOM_CONCAT	opt_geom.h
 GEOM_ELI	opt_geom.h
-GEOM_FOX	opt_geom.h
 GEOM_GATE	opt_geom.h
 GEOM_JOURNAL	opt_geom.h
 GEOM_LABEL	opt_geom.h
 GEOM_LABEL_GPT	opt_geom.h
 GEOM_LINUX_LVM	opt_geom.h
 GEOM_MAP	opt_geom.h
-GEOM_MBR	opt_geom.h
 GEOM_MIRROR	opt_geom.h
 GEOM_MOUNTVER	opt_geom.h
 GEOM_MULTIPATH	opt_geom.h
@@ -135,12 +132,10 @@ GEOM_RAID	opt_geom.h
 GEOM_RAID3	opt_geom.h
 GEOM_SHSEC	opt_geom.h
 GEOM_STRIPE	opt_geom.h
-GEOM_SUNLABEL	opt_geom.h
 GEOM_UZIP	opt_geom.h
 GEOM_UZIP_DEBUG	opt_geom.h
 GEOM_VINUM	opt_geom.h
 GEOM_VIRSTOR	opt_geom.h
-GEOM_VOL	opt_geom.h
 GEOM_ZERO	opt_geom.h
 IFLIB		opt_iflib.h
 KDTRACE_HOOKS	opt_global.h
@@ -235,6 +230,7 @@ ZSTDIO		opt_zstdio.h
 # Sanitizers
 COVERAGE	opt_global.h
 KCOV
+KCSAN		opt_global.h
 KUBSAN		opt_global.h
 
 # POSIX kernel options
@@ -327,8 +323,12 @@ NFS_ROOT_TCP	opt_nfsroot.h
 # SMB/CIFS requester
 NETSMB		opt_netsmb.h
 
+# Enable debugnet(4) networking support.
+DEBUGNET 	opt_global.h
 # Enable netdump(4) client support.
 NETDUMP 	opt_global.h
+# Enable netgdb(4) support.
+NETGDB 		opt_global.h
 
 # Options used only in subr_param.c.
 HZ		opt_param.h
@@ -353,6 +353,7 @@ CAM_DEBUG_LUN		opt_cam.h
 CAM_DEBUG_FLAGS		opt_cam.h
 CAM_BOOT_DELAY		opt_cam.h
 CAM_IOSCHED_DYNAMIC	opt_cam.h
+CAM_IO_STATS		opt_cam.h
 CAM_TEST_FAILURE	opt_cam.h
 SCSI_DELAY		opt_scsi.h
 SCSI_NO_SENSE_STRINGS	opt_scsi.h
@@ -426,6 +427,7 @@ RATELIMIT		opt_ratelimit.h
 RATELIMIT_DEBUG		opt_ratelimit.h
 INET			opt_inet.h
 INET6			opt_inet6.h
+STATS			opt_global.h
 IPDIVERT
 IPFILTER		opt_ipfilter.h
 IPFILTER_DEFAULT_BLOCK	opt_ipfilter.h
@@ -443,6 +445,7 @@ IPSEC			opt_ipsec.h
 IPSEC_DEBUG		opt_ipsec.h
 IPSEC_SUPPORT		opt_ipsec.h
 IPSTEALTH
+KERN_TLS
 KRPC
 LIBALIAS
 LIBMCHAIN
@@ -621,6 +624,8 @@ NO_SWAPPING		opt_vm.h
 MALLOC_MAKE_FAILURES	opt_vm.h
 MALLOC_PROFILE		opt_vm.h
 MALLOC_DEBUG_MAXZONES	opt_vm.h
+UMA_XDOMAIN		opt_vm.h
+UMA_FIRSTTOUCH		opt_vm.h
 
 # The MemGuard replacement allocator used for tamper-after-free detection
 DEBUG_MEMGUARD		opt_vm.h
@@ -716,6 +721,8 @@ WITNESS_NO_VNODE	opt_witness.h
 WITNESS_SKIPSPIN	opt_witness.h
 WITNESS_COUNT		opt_witness.h
 OPENSOLARIS_WITNESS	opt_global.h
+
+EPOCH_TRACE		opt_global.h
 
 # options for ACPI support
 ACPI_DEBUG		opt_acpi.h

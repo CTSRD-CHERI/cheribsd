@@ -286,7 +286,7 @@ int
 sys_ntp_gettime(struct thread *td, struct ntp_gettime_args *uap)
 {	
 
-	return (kern_ntp_gettime(td, __USER_CAP_OBJ(uap->ntvp)));
+	return (kern_ntp_gettime(td, uap->ntvp));
 }
 
 int
@@ -358,13 +358,13 @@ sys_ntp_adjtime(struct thread *td, struct ntp_adjtime_args *uap)
 	struct timex ntv;
 	int error, retval;
 
-	error = copyin(__USER_CAP_OBJ(uap->tp), &ntv, sizeof(ntv));
+	error = copyin(uap->tp, &ntv, sizeof(ntv));
 	if (error)
 		return (error);
 	error = kern_ntp_adjtime(td, &ntv, &retval);
 	if (error)
 		return (error);
-	error = copyout(&ntv, __USER_CAP_OBJ(uap->tp), sizeof(ntv));
+	error = copyout(&ntv, uap->tp, sizeof(ntv));
 	if (error == 0)
 		td->td_retval[0] = retval;
 	return (error);
@@ -987,8 +987,7 @@ sys_adjtime(struct thread *td, struct adjtime_args *uap)
 	int error;
 
 	if (uap->delta) {
-		error = copyin(__USER_CAP_OBJ(uap->delta), &delta,
-		    sizeof(delta));
+		error = copyin(uap->delta, &delta, sizeof(delta));
 		if (error)
 			return (error);
 		deltap = &delta;
@@ -996,8 +995,7 @@ sys_adjtime(struct thread *td, struct adjtime_args *uap)
 		deltap = NULL;
 	error = kern_adjtime(td, deltap, &olddelta);
 	if (uap->olddelta && error == 0)
-		error = copyout(&olddelta, __USER_CAP_OBJ(uap->olddelta),
-		    sizeof(olddelta));
+		error = copyout(&olddelta, uap->olddelta, sizeof(olddelta));
 	return (error);
 }
 

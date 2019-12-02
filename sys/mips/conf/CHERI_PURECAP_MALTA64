@@ -9,7 +9,7 @@ include		"std.CHERI"
  
 hints		"CHERI_MALTA64.hints"  #Default places to look for devices.
 
-machine		mips mips64	# Malta supports both, so it isn't in std.malta
+machine		mips mips64c256
 
 nomakeoptions 	ARCH_FLAGS
 makeoptions	ARCH_PIC_FLAGS="-fpic"

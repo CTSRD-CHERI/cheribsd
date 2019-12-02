@@ -121,13 +121,3 @@ memrw(struct cdev *dev, struct uio *uio, int flags)
 
 	return (error);
 }
-
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

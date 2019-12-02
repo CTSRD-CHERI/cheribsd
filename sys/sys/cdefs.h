@@ -1037,6 +1037,13 @@
 /* Function should not be analyzed. */
 #define	__no_lock_analysis	__lock_annotate(no_thread_safety_analysis)
 
+/* Function or variable should not be sanitized, ie. by AddressSanitizer */
+#if __has_attribute(no_sanitize)
+#define __nosanitizeaddress	__attribute__((no_sanitize("address")))
+#else
+#define __nosanitizeaddress
+#endif
+
 /* Guard variables and structure members by lock. */
 #define	__guarded_by(x)		__lock_annotate(guarded_by(x))
 #define	__pt_guarded_by(x)	__lock_annotate(pt_guarded_by(x))
@@ -1049,16 +1056,19 @@
 	_Pragma("GCC error \"This file requires a capability-aware compiler\"")
 #endif
 
-#if __has_feature(capabilities)
-#define	__CAPABILITY	__capability
+/* Disable CHERI capability annotations for non-CHERI architectures. */
+#if !__has_feature(capabilities)
+#define	__capability
+#endif
+
+/*
+ * Used to tag pointer variables (typically structure members) shared
+ * with userspace that should always use capabilities in the kernel,
+ * but honor the default pointer ABI in userspace.
+ */
 #ifdef _KERNEL
 #define	__kerncap	__capability
 #else
-#define	__kerncap
-#endif
-#else
-#define	__CAPABILITY
-#define	__capability
 #define	__kerncap
 #endif
 

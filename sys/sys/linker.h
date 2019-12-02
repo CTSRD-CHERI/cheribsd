@@ -335,7 +335,7 @@ struct kld_file_stat {
 
 struct kld_sym_lookup {
     int		version;	/* set to sizeof(struct kld_sym_lookup) */
-    char	*symname;	/* Symbol name we are looking up */
+    char * __kerncap symname;	/* Symbol name we are looking up */
     u_long	symvalue;
     size_t	symsize;
 };

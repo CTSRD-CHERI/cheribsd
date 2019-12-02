@@ -1,8 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (C) 2018 Alexander Motin <mav@FreeBSD.org>
- * All rights reserved.
+ * Copyright (C) 2018-2019 Alexander Motin <mav@FreeBSD.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -76,19 +75,19 @@ static struct options {
 static const struct opts format_opts[] = {
 #define OPT(l, s, t, opt, addr, desc) { l, s, t, &opt.addr, desc }
 	OPT("crypto", 'C', arg_none, opt, Cflag,
-	    "Crptographically erase user data by forgetting key"),
+	    "Crptographic erase"),
 	OPT("erase", 'E', arg_none, opt, Eflag,
-	    "Erase user data"),
+	    "User data erase"),
 	OPT("lbaf", 'f', arg_uint32, opt, lbaf,
-	    "Set the LBA Format to apply to the media"),
+	    "LBA Format to apply to the media"),
 	OPT("ms", 'm', arg_uint32, opt, ms,
-	    "Slot to activate and/or download format to"),
+	    "Metadata settings"),
 	OPT("pi", 'p', arg_uint32, opt, pi,
-	    "Slot to activate and/or download format to"),
+	    "Protective information"),
 	OPT("pil", 'l', arg_uint32, opt, pil,
-	    "Slot to activate and/or download format to"),
+	    "Protective information location"),
 	OPT("ses", 's', arg_uint32, opt, ses,
-	    "Slot to activate and/or download format to"),
+	    "Secure erase settings"),
 	{ NULL, 0, arg_none, NULL, NULL }
 };
 #undef OPT
@@ -101,7 +100,7 @@ static const struct args format_args[] = {
 static struct cmd format_cmd = {
 	.name = "format",
 	.fn = format,
-	.descr = "Format/erase one or all the namespaces.",
+	.descr = "Format/erase one or all the namespaces",
 	.ctx_size = sizeof(opt),
 	.opts = format_opts,
 	.args = format_args,
@@ -117,7 +116,7 @@ format(const struct cmd *f, int argc, char *argv[])
 	struct nvme_controller_data	cd;
 	struct nvme_namespace_data	nsd;
 	struct nvme_pt_command		pt;
-	char				path[64];
+	char				*path;
 	const char			*target;
 	uint32_t			nsid;
 	int				lbaf, ms, pi, pil, ses, fd;
@@ -125,7 +124,7 @@ format(const struct cmd *f, int argc, char *argv[])
 	if (arg_parse(argc, argv, f))
 		return;
 
-	if (opt.Eflag || opt.Cflag || opt.ses != SES_NONE) {
+	if ((int)opt.Eflag + opt.Cflag + (opt.ses != SES_NONE) > 1) {
 		fprintf(stderr,
 		    "Only one of -E, -C or -s may be specified\n");
 		arg_help(argc, argv, f);
@@ -143,18 +142,9 @@ format(const struct cmd *f, int argc, char *argv[])
 	else
 		ses = opt.ses;
 
-	/*
-	 * Check if the specified device node exists before continuing.
-	 * This is a cleaner check for cases where the correct controller
-	 * is specified, but an invalid namespace on that controller.
-	 */
 	open_dev(target, &fd, 1, 1);
-
-	/*
-	 * If device node contains "ns", we consider it a namespace,
-	 * otherwise, consider it a controller.
-	 */
-	if (strstr(target, NVME_NS_PREFIX) == NULL) {
+	get_nsid(fd, &path, &nsid);
+	if (nsid == 0) {
 		nsid = NVME_GLOBAL_NAMESPACE_TAG;
 	} else {
 		/*
@@ -164,9 +154,9 @@ format(const struct cmd *f, int argc, char *argv[])
 		 * string to get the controller substring and namespace ID.
 		 */
 		close(fd);
-		parse_ns_str(target, path, &nsid);
 		open_dev(path, &fd, 1, 1);
 	}
+	free(path);
 
 	/* Check that controller can execute this command. */
 	read_controller_data(fd, &cd);

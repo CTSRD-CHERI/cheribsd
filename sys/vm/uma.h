@@ -50,8 +50,6 @@ struct uma_zone;
 /* Opaque type used as a handle to the zone */
 typedef struct uma_zone * uma_zone_t;
 
-void zone_drain(uma_zone_t);
-
 /*
  * Item constructor
  *
@@ -274,6 +272,7 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
 					 * NUMA aware Zone.  Implements a best
 					 * effort first-touch policy.
 					 */
+#define	UMA_ZONE_MINBUCKET	0x20000	/* Use smallest buckets. */
 
 /*
  * These flags are shared between the keg and zone.  In zones wishing to add
@@ -282,7 +281,7 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
  */
 #define	UMA_ZONE_INHERIT						\
     (UMA_ZONE_OFFPAGE | UMA_ZONE_MALLOC | UMA_ZONE_NOFREE |		\
-    UMA_ZONE_HASH | UMA_ZONE_VTOSLAB | UMA_ZONE_PCPU)
+    UMA_ZONE_HASH | UMA_ZONE_VTOSLAB | UMA_ZONE_PCPU | UMA_ZONE_NUMA)
 
 /* Definitions for align */
 #define UMA_ALIGN_PTR	(sizeof(void * __capability) - 1) /* Align for ptr */
@@ -292,6 +291,8 @@ uma_zone_t uma_zcache_create(char *name, int size, uma_ctor ctor, uma_dtor dtor,
 #define UMA_ALIGN_CHAR	(sizeof(char) - 1)	/* "" char */
 #define UMA_ALIGN_CACHE	(0 - 1)			/* Cache line size align */
 #define	UMA_ALIGNOF(type) (_Alignof(type) - 1)	/* Alignment fit for 'type' */
+
+#define	UMA_ANYDOMAIN	-1	/* Special value for domain search. */
 
 /*
  * Destroys an empty uma zone.  If the zone is not empty uma complains loudly.
@@ -435,17 +436,18 @@ typedef void *(*uma_alloc)(uma_zone_t zone, vm_size_t size, int domain,
 typedef void (*uma_free)(void *item, vm_size_t size, uint8_t pflag);
 
 /*
- * Reclaims unused memory for all zones
+ * Reclaims unused memory
  *
  * Arguments:
- *	None
+ *	req  Reclamation request type.
  * Returns:
  *	None
- *
- * This should only be called by the page out daemon.
  */
-
-void uma_reclaim(void);
+#define	UMA_RECLAIM_DRAIN	1	/* release bucket cache */
+#define	UMA_RECLAIM_DRAIN_CPU	2	/* release bucket and per-CPU caches */
+#define	UMA_RECLAIM_TRIM	3	/* trim bucket cache to WSS */
+void uma_reclaim(int req);
+void uma_zone_reclaim(uma_zone_t, int req);
 
 /*
  * Sets the alignment mask to be used for all zones requesting cache
@@ -492,7 +494,7 @@ int uma_zone_reserve_kva(uma_zone_t zone, int nitems);
  *	nitems  The requested upper limit on the number of items allowed
  *
  * Returns:
- *	int  The effective value of nitems after rounding up based on page size
+ *	int  The effective value of nitems
  */
 int uma_zone_set_max(uma_zone_t zone, int nitems);
 
@@ -502,11 +504,8 @@ int uma_zone_set_max(uma_zone_t zone, int nitems);
  * Arguments:
  *      zone  The zone to limit
  *      nitems  The requested upper limit on the number of items allowed
- *
- * Returns:
- *      int  The effective value of nitems set
  */
-int uma_zone_set_maxcache(uma_zone_t zone, int nitems);
+void uma_zone_set_maxcache(uma_zone_t zone, int nitems);
 
 /*
  * Obtains the effective limit on the number of items in a zone
@@ -648,8 +647,8 @@ int uma_zone_exhausted_nolock(uma_zone_t zone);
 /*
  * Common UMA_ZONE_PCPU zones.
  */
+extern uma_zone_t pcpu_zone_int;
 extern uma_zone_t pcpu_zone_64;
-extern uma_zone_t pcpu_zone_ptr;
 
 /*
  * Exported statistics structures to be used by user space monitoring tools.
@@ -689,7 +688,8 @@ struct uma_type_header {
 	uint64_t	uth_frees;	/* Zone: number of frees. */
 	uint64_t	uth_fails;	/* Zone: number of alloc failures. */
 	uint64_t	uth_sleeps;	/* Zone: number of alloc sleeps. */
-	uint64_t	_uth_reserved1[2];	/* Reserved. */
+	uint64_t	uth_xdomain;	/* Zone: Number of cross domain frees. */
+	uint64_t	_uth_reserved1[1];	/* Reserved. */
 };
 
 struct uma_percpu_stat {

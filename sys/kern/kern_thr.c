@@ -26,6 +26,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -78,7 +80,7 @@ SYSCTL_INT(_kern_threads, OID_AUTO, max_threads_hits, CTLFLAG_RD,
 #ifdef COMPAT_FREEBSD32
 
 static inline int
-suword_lwpid(void *addr, lwpid_t lwpid)
+suword_lwpid(void * __capability addr, lwpid_t lwpid)
 {
 	int error;
 
@@ -99,7 +101,7 @@ suword_lwpid(void *addr, lwpid_t lwpid)
 
 struct thr_create_initthr_args {
 	ucontext_t ctx;
-	long *tid;
+	long * __capability tid;
 };
 
 static int
@@ -122,7 +124,7 @@ sys_thr_create(struct thread *td, struct thr_create_args *uap)
 	struct thr_create_initthr_args args;
 	int error;
 
-	if ((error = copyin(uap->ctx, &args.ctx, sizeof(args.ctx))))
+	if ((error = copyincap(uap->ctx, &args.ctx, sizeof(args.ctx))))
 		return (error);
 	args.tid = uap->id;
 	return (thread_create(td, NULL, thr_create_initthr, &args));
@@ -138,7 +140,7 @@ sys_thr_new(struct thread *td, struct thr_new_args *uap)
 	if (uap->param_size < 0 || uap->param_size > sizeof(param))
 		return (EINVAL);
 	bzero(&param, sizeof(param));
-	if ((error = copyin(uap->param, &param, uap->param_size)))
+	if ((error = copyincap(uap->param, &param, uap->param_size)))
 		return (error);
 	return (kern_thr_new(td, &param));
 }
@@ -164,12 +166,13 @@ thr_new_initthr(struct thread *td, void *thunk)
 		return (EFAULT);
 
 	/* Set up our machine context. */
-	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
+	stack.ss_sp = param->stack_base;
 	stack.ss_size = param->stack_size;
 	/* Set upcall address to user thread entry function. */
-	cpu_set_upcall(td, param->start_func, param->arg, &stack);
+	cpu_set_upcall(td, param->start_func,
+	    (__cheri_fromcap void *)param->arg, &stack);
 	/* Setup user TLS address and TLS pointer register. */
-	return (cpu_set_user_tls(td, param->tls_base));
+	return (cpu_set_user_tls(td, (__cheri_fromcap void *)param->tls_base));
 }
 
 int
@@ -316,10 +319,9 @@ sys_thr_exit(struct thread *td, struct thr_exit_args *uap)
 	umtx_thread_exit(td);
 
 	/* Signal userland that it can free the stack. */
-	if ((void *)uap->state != NULL) {
+	if (uap->state != NULL) {
 		suword_lwpid(uap->state, 1);
-		kern_umtx_wake(td,
-		    __USER_CAP(uap->state, sizeof(struct umutex)), INT_MAX, 0);
+		kern_umtx_wake(td, uap->state, INT_MAX, 0);
 	}
 
 	return (kern_thr_exit(td));
@@ -499,8 +501,7 @@ sys_thr_suspend(struct thread *td, struct thr_suspend_args *uap)
 
 	tsp = NULL;
 	if (uap->timeout != NULL) {
-		error = umtx_copyin_timeout(
-		    __USER_CAP(uap->timeout, sizeof(struct timespec)), &ts);
+		error = umtx_copyin_timeout(uap->timeout, &ts);
 		if (error != 0)
 			return (error);
 		tsp = &ts;
@@ -581,7 +582,7 @@ int
 sys_thr_set_name(struct thread *td, struct thr_set_name_args *uap)
 {
 
-	return (kern_thr_set_name(td, uap->id, __USER_CAP_STR(uap->name)));
+	return (kern_thr_set_name(td, uap->id, uap->name));
 }
 
 int

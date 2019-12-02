@@ -305,7 +305,9 @@ vm_pageout_collect_batch(struct scan_state *ss, const bool dequeue)
 	vm_pagequeue_unlock(pq);
 }
 
-/* Return the next page to be scanned, or NULL if the scan is complete. */
+/*
+ * Return the next page to be scanned, or NULL if the scan is complete.
+ */
 static __always_inline vm_page_t
 vm_pageout_next(struct scan_state *ss, const bool dequeue)
 {
@@ -328,16 +330,11 @@ vm_pageout_cluster(vm_page_t m)
 	vm_pindex_t pindex;
 	int ib, is, page_base, pageout_count;
 
-	vm_page_assert_locked(m);
 	object = m->object;
 	VM_OBJECT_ASSERT_WLOCKED(object);
 	pindex = m->pindex;
 
-	vm_page_assert_unbusied(m);
-	KASSERT(!vm_page_wired(m), ("page %p is wired", m));
-
-	pmap_remove_write(m);
-	vm_page_unlock(m);
+	vm_page_assert_xbusied(m);
 
 	mc[vm_pageout_page_count] = pb = ps = m;
 	pageout_count = 1;
@@ -363,22 +360,29 @@ more:
 			ib = 0;
 			break;
 		}
-		if ((p = vm_page_prev(pb)) == NULL || vm_page_busied(p)) {
+		if ((p = vm_page_prev(pb)) == NULL ||
+		    vm_page_tryxbusy(p) == 0) {
 			ib = 0;
+			break;
+		}
+		if (vm_page_wired(p)) {
+			ib = 0;
+			vm_page_xunbusy(p);
 			break;
 		}
 		vm_page_test_dirty(p);
 		if (p->dirty == 0) {
 			ib = 0;
+			vm_page_xunbusy(p);
 			break;
 		}
 		vm_page_lock(p);
-		if (vm_page_wired(p) || !vm_page_in_laundry(p)) {
+		if (!vm_page_in_laundry(p) || !vm_page_try_remove_write(p)) {
 			vm_page_unlock(p);
+			vm_page_xunbusy(p);
 			ib = 0;
 			break;
 		}
-		pmap_remove_write(p);
 		vm_page_unlock(p);
 		mc[--page_base] = pb = p;
 		++pageout_count;
@@ -393,17 +397,24 @@ more:
 	}
 	while (pageout_count < vm_pageout_page_count && 
 	    pindex + is < object->size) {
-		if ((p = vm_page_next(ps)) == NULL || vm_page_busied(p))
+		if ((p = vm_page_next(ps)) == NULL ||
+		    vm_page_tryxbusy(p) == 0)
 			break;
-		vm_page_test_dirty(p);
-		if (p->dirty == 0)
-			break;
-		vm_page_lock(p);
-		if (vm_page_wired(p) || !vm_page_in_laundry(p)) {
-			vm_page_unlock(p);
+		if (vm_page_wired(p)) {
+			vm_page_xunbusy(p);
 			break;
 		}
-		pmap_remove_write(p);
+		vm_page_test_dirty(p);
+		if (p->dirty == 0) {
+			vm_page_xunbusy(p);
+			break;
+		}
+		vm_page_lock(p);
+		if (!vm_page_in_laundry(p) || !vm_page_try_remove_write(p)) {
+			vm_page_unlock(p);
+			vm_page_xunbusy(p);
+			break;
+		}
 		vm_page_unlock(p);
 		mc[page_base + pageout_count] = ps = p;
 		++pageout_count;
@@ -448,8 +459,8 @@ vm_pageout_flush(vm_page_t *mc, int count, int flags, int mreq, int *prunlen,
 	VM_OBJECT_ASSERT_WLOCKED(object);
 
 	/*
-	 * Initiate I/O.  Mark the pages busy and verify that they're valid
-	 * and read-only.
+	 * Initiate I/O.  Mark the pages shared busy and verify that they're
+	 * valid and read-only.
 	 *
 	 * We do not have to fixup the clean/dirty bits here... we can
 	 * allow the pager to do it after the I/O completes.
@@ -458,12 +469,12 @@ vm_pageout_flush(vm_page_t *mc, int count, int flags, int mreq, int *prunlen,
 	 * edge case with file fragments.
 	 */
 	for (i = 0; i < count; i++) {
-		KASSERT(mc[i]->valid == VM_PAGE_BITS_ALL,
+		KASSERT(vm_page_all_valid(mc[i]),
 		    ("vm_pageout_flush: partially invalid page %p index %d/%d",
 			mc[i], i, count));
 		KASSERT((mc[i]->aflags & PGA_WRITEABLE) == 0,
 		    ("vm_pageout_flush: writeable page %p", mc[i]));
-		vm_page_sbusy(mc[i]);
+		vm_page_busy_downgrade(mc[i]);
 	}
 	vm_object_pip_add(object, count);
 
@@ -601,6 +612,7 @@ vm_pageout_clean(vm_page_t m, int *numpagedout)
 	 */
 	if (object->type == OBJT_VNODE) {
 		vm_page_unlock(m);
+		vm_page_xunbusy(m);
 		vp = object->handle;
 		if (vp->v_type == VREG &&
 		    vn_start_write(vp, &mp, V_NOWAIT) != 0) {
@@ -648,15 +660,26 @@ vm_pageout_clean(vm_page_t m, int *numpagedout)
 		}
 
 		/*
-		 * The page may have been busied or referenced while the object
-		 * and page locks were released.
+		 * The page may have been busied while the object and page
+		 * locks were released.
 		 */
-		if (vm_page_busied(m) || vm_page_wired(m)) {
+		if (vm_page_tryxbusy(m) == 0) {
 			vm_page_unlock(m);
 			error = EBUSY;
 			goto unlock_all;
 		}
 	}
+
+	/*
+	 * Remove all writeable mappings, failing if the page is wired.
+	 */
+	if (!vm_page_try_remove_write(m)) {
+		vm_page_xunbusy(m);
+		vm_page_unlock(m);
+		error = EBUSY;
+		goto unlock_all;
+	}
+	vm_page_unlock(m);
 
 	/*
 	 * If a page is dirty, then it is either being washed
@@ -732,7 +755,9 @@ scan:
 recheck:
 		/*
 		 * The page may have been disassociated from the queue
-		 * while locks were dropped.
+		 * or even freed while locks were dropped.  We thus must be
+		 * careful whenever modifying page state.  Once the object lock
+		 * has been acquired, we have a stable reference to the page.
 		 */
 		if (vm_page_queue(m) != queue)
 			continue;
@@ -742,14 +767,16 @@ recheck:
 		 * chance.
 		 */
 		if ((m->aflags & PGA_REQUEUE) != 0) {
-			vm_page_requeue(m);
+			vm_page_pqbatch_submit(m, queue);
 			continue;
 		}
 
 		/*
 		 * Wired pages may not be freed.  Complete their removal
 		 * from the queue now to avoid needless revisits during
-		 * future scans.
+		 * future scans.  This check is racy and must be reverified once
+		 * we hold the object lock and have verified that the page
+		 * is not busy.
 		 */
 		if (vm_page_wired(m)) {
 			vm_page_dequeue_deferred(m);
@@ -759,8 +786,13 @@ recheck:
 		if (object != m->object) {
 			if (object != NULL)
 				VM_OBJECT_WUNLOCK(object);
-			object = m->object;
-			if (!VM_OBJECT_TRYWLOCK(object)) {
+
+			/*
+			 * A page's object pointer may be set to NULL before
+			 * the object lock is acquired.
+			 */
+			object = (vm_object_t)atomic_load_ptr(&m->object);
+			if (object != NULL && !VM_OBJECT_TRYWLOCK(object)) {
 				mtx_unlock(mtx);
 				/* Depends on type-stability. */
 				VM_OBJECT_WLOCK(object);
@@ -768,15 +800,36 @@ recheck:
 				goto recheck;
 			}
 		}
-
-		if (vm_page_busied(m))
+		if (__predict_false(m->object == NULL))
+			/*
+			 * The page has been removed from its object.
+			 */
 			continue;
+		KASSERT(m->object == object, ("page %p does not belong to %p",
+		    m, object));
+
+		if (vm_page_tryxbusy(m) == 0)
+			continue;
+
+		/*
+		 * Re-check for wirings now that we hold the object lock and
+		 * have verified that the page is unbusied.  If the page is
+		 * mapped, it may still be wired by pmap lookups.  The call to
+		 * vm_page_try_remove_all() below atomically checks for such
+		 * wirings and removes mappings.  If the page is unmapped, the
+		 * wire count is guaranteed not to increase.
+		 */
+		if (__predict_false(vm_page_wired(m))) {
+			vm_page_xunbusy(m);
+			vm_page_dequeue_deferred(m);
+			continue;
+		}
 
 		/*
 		 * Invalid pages can be easily freed.  They cannot be
 		 * mapped; vm_page_free() asserts this.
 		 */
-		if (m->valid == 0)
+		if (vm_page_none_valid(m))
 			goto free_page;
 
 		/*
@@ -801,6 +854,7 @@ recheck:
 		}
 		if (act_delta != 0) {
 			if (object->ref_count != 0) {
+				vm_page_xunbusy(m);
 				VM_CNT_INC(v_reactivated);
 				vm_page_activate(m);
 
@@ -825,6 +879,7 @@ recheck:
 					launder--;
 				continue;
 			} else if ((object->flags & OBJ_DEAD) == 0) {
+				vm_page_xunbusy(m);
 				vm_page_requeue(m);
 				continue;
 			}
@@ -839,8 +894,11 @@ recheck:
 		 */
 		if (object->ref_count != 0) {
 			vm_page_test_dirty(m);
-			if (m->dirty == 0)
-				pmap_remove_all(m);
+			if (m->dirty == 0 && !vm_page_try_remove_all(m)) {
+				vm_page_xunbusy(m);
+				vm_page_dequeue_deferred(m);
+				continue;
+			}
 		}
 
 		/*
@@ -862,6 +920,7 @@ free_page:
 			else
 				pageout_ok = true;
 			if (!pageout_ok) {
+				vm_page_xunbusy(m);
 				vm_page_requeue(m);
 				continue;
 			}
@@ -889,7 +948,8 @@ free_page:
 			}
 			mtx = NULL;
 			object = NULL;
-		}
+		} else
+			vm_page_xunbusy(m);
 	}
 	if (mtx != NULL) {
 		mtx_unlock(mtx);
@@ -1132,6 +1192,7 @@ vm_pageout_scan_active(struct vm_domain *vmd, int page_shortage)
 {
 	struct scan_state ss;
 	struct mtx *mtx;
+	vm_object_t object;
 	vm_page_t m, marker;
 	struct vm_pagequeue *pq;
 	long min_scan;
@@ -1192,7 +1253,9 @@ act_scan:
 
 		/*
 		 * The page may have been disassociated from the queue
-		 * while locks were dropped.
+		 * or even freed while locks were dropped.  We thus must be
+		 * careful whenever modifying page state.  Once the object lock
+		 * has been acquired, we have a stable reference to the page.
 		 */
 		if (vm_page_queue(m) != PQ_ACTIVE)
 			continue;
@@ -1204,6 +1267,17 @@ act_scan:
 			vm_page_dequeue_deferred(m);
 			continue;
 		}
+
+		/*
+		 * A page's object pointer may be set to NULL before
+		 * the object lock is acquired.
+		 */
+		object = (vm_object_t)atomic_load_ptr(&m->object);
+		if (__predict_false(object == NULL))
+			/*
+			 * The page has been removed from its object.
+			 */
+			continue;
 
 		/*
 		 * Check to see "how much" the page has been used.
@@ -1224,7 +1298,7 @@ act_scan:
 		 *    This race delays the detection of a new reference.  At
 		 *    worst, we will deactivate and reactivate the page.
 		 */
-		if (m->object->ref_count != 0)
+		if (object->ref_count != 0)
 			act_delta = pmap_ts_referenced(m);
 		else
 			act_delta = 0;
@@ -1256,9 +1330,9 @@ act_scan:
 			 * place them directly in the laundry queue to reduce
 			 * queuing overhead.
 			 */
-			if (page_shortage <= 0)
-				vm_page_deactivate(m);
-			else {
+			if (page_shortage <= 0) {
+				vm_page_swapqueue(m, PQ_ACTIVE, PQ_INACTIVE);
+			} else {
 				/*
 				 * Calling vm_page_test_dirty() here would
 				 * require acquisition of the object's write
@@ -1270,11 +1344,13 @@ act_scan:
 				 * dirty field by the pmap.
 				 */
 				if (m->dirty == 0) {
-					vm_page_deactivate(m);
+					vm_page_swapqueue(m, PQ_ACTIVE,
+					    PQ_INACTIVE);
 					page_shortage -=
 					    act_scan_laundry_weight;
 				} else {
-					vm_page_launder(m);
+					vm_page_swapqueue(m, PQ_ACTIVE,
+					    PQ_LAUNDRY);
 					page_shortage--;
 				}
 			}
@@ -1398,7 +1474,9 @@ vm_pageout_scan_inactive(struct vm_domain *vmd, int shortage,
 recheck:
 		/*
 		 * The page may have been disassociated from the queue
-		 * while locks were dropped.
+		 * or even freed while locks were dropped.  We thus must be
+		 * careful whenever modifying page state.  Once the object lock
+		 * has been acquired, we have a stable reference to the page.
 		 */
 		if (vm_page_queue(m) != PQ_INACTIVE) {
 			addl_page_shortage++;
@@ -1417,7 +1495,9 @@ recheck:
 		/*
 		 * Wired pages may not be freed.  Complete their removal
 		 * from the queue now to avoid needless revisits during
-		 * future scans.
+		 * future scans.  This check is racy and must be reverified once
+		 * we hold the object lock and have verified that the page
+		 * is not busy.
 		 */
 		if (vm_page_wired(m)) {
 			vm_page_dequeue_deferred(m);
@@ -1427,8 +1507,13 @@ recheck:
 		if (object != m->object) {
 			if (object != NULL)
 				VM_OBJECT_WUNLOCK(object);
-			object = m->object;
-			if (!VM_OBJECT_TRYWLOCK(object)) {
+
+			/*
+			 * A page's object pointer may be set to NULL before
+			 * the object lock is acquired.
+			 */
+			object = (vm_object_t)atomic_load_ptr(&m->object);
+			if (object != NULL && !VM_OBJECT_TRYWLOCK(object)) {
 				mtx_unlock(mtx);
 				/* Depends on type-stability. */
 				VM_OBJECT_WLOCK(object);
@@ -1436,8 +1521,15 @@ recheck:
 				goto recheck;
 			}
 		}
+		if (__predict_false(m->object == NULL))
+			/*
+			 * The page has been removed from its object.
+			 */
+			continue;
+		KASSERT(m->object == object, ("page %p does not belong to %p",
+		    m, object));
 
-		if (vm_page_busied(m)) {
+		if (vm_page_tryxbusy(m) == 0) {
 			/*
 			 * Don't mess with busy pages.  Leave them at
 			 * the front of the queue.  Most likely, they
@@ -1451,10 +1543,24 @@ recheck:
 		}
 
 		/*
+		 * Re-check for wirings now that we hold the object lock and
+		 * have verified that the page is unbusied.  If the page is
+		 * mapped, it may still be wired by pmap lookups.  The call to
+		 * vm_page_try_remove_all() below atomically checks for such
+		 * wirings and removes mappings.  If the page is unmapped, the
+		 * wire count is guaranteed not to increase.
+		 */
+		if (__predict_false(vm_page_wired(m))) {
+			vm_page_xunbusy(m);
+			vm_page_dequeue_deferred(m);
+			continue;
+		}
+
+		/*
 		 * Invalid pages can be easily freed. They cannot be
 		 * mapped, vm_page_free() asserts this.
 		 */
-		if (m->valid == 0)
+		if (vm_page_none_valid(m))
 			goto free_page;
 
 		/*
@@ -1479,6 +1585,7 @@ recheck:
 		}
 		if (act_delta != 0) {
 			if (object->ref_count != 0) {
+				vm_page_xunbusy(m);
 				VM_CNT_INC(v_reactivated);
 				vm_page_activate(m);
 
@@ -1492,6 +1599,7 @@ recheck:
 				m->act_count += act_delta + ACT_ADVANCE;
 				continue;
 			} else if ((object->flags & OBJ_DEAD) == 0) {
+				vm_page_xunbusy(m);
 				vm_page_aflag_set(m, PGA_REQUEUE);
 				goto reinsert;
 			}
@@ -1506,8 +1614,11 @@ recheck:
 		 */
 		if (object->ref_count != 0) {
 			vm_page_test_dirty(m);
-			if (m->dirty == 0)
-				pmap_remove_all(m);
+			if (m->dirty == 0 && !vm_page_try_remove_all(m)) {
+				vm_page_xunbusy(m);
+				vm_page_dequeue_deferred(m);
+				continue;
+			}
 		}
 
 		/*
@@ -1530,7 +1641,10 @@ free_page:
 			m->queue = PQ_NONE;
 			vm_page_free(m);
 			page_shortage--;
-		} else if ((object->flags & OBJ_DEAD) == 0)
+			continue;
+		}
+		vm_page_xunbusy(m);
+		if ((object->flags & OBJ_DEAD) == 0)
 			vm_page_launder(m);
 		continue;
 reinsert:
@@ -1698,8 +1812,7 @@ vm_pageout_oom_pagecount(struct vmspace *vmspace)
 	KASSERT(!map->system_map, ("system map"));
 	sx_assert(&map->lock, SA_LOCKED);
 	res = 0;
-	for (entry = map->header.next; entry != &map->header;
-	    entry = entry->next) {
+	VM_MAP_ENTRY_FOREACH(entry, map) {
 		if ((entry->eflags & MAP_ENTRY_IS_SUB_MAP) != 0)
 			continue;
 		obj = entry->object.vm_object;
@@ -1720,6 +1833,12 @@ vm_pageout_oom_pagecount(struct vmspace *vmspace)
 	return (res);
 }
 
+static int vm_oom_ratelim_last;
+static int vm_oom_pf_secs = 10;
+SYSCTL_INT(_vm, OID_AUTO, oom_pf_secs, CTLFLAG_RWTUN, &vm_oom_pf_secs, 0,
+    "");
+static struct mtx vm_oom_ratelim_mtx;
+
 void
 vm_pageout_oom(int shortage)
 {
@@ -1727,7 +1846,29 @@ vm_pageout_oom(int shortage)
 	vm_offset_t size, bigsize;
 	struct thread *td;
 	struct vmspace *vm;
+	int now;
 	bool breakout;
+
+	/*
+	 * For OOM requests originating from vm_fault(), there is a high
+	 * chance that a single large process faults simultaneously in
+	 * several threads.  Also, on an active system running many
+	 * processes of middle-size, like buildworld, all of them
+	 * could fault almost simultaneously as well.
+	 *
+	 * To avoid killing too many processes, rate-limit OOMs
+	 * initiated by vm_fault() time-outs on the waits for free
+	 * pages.
+	 */
+	mtx_lock(&vm_oom_ratelim_mtx);
+	now = ticks;
+	if (shortage == VM_OOM_MEM_PF &&
+	    (u_int)(now - vm_oom_ratelim_last) < hz * vm_oom_pf_secs) {
+		mtx_unlock(&vm_oom_ratelim_mtx);
+		return;
+	}
+	vm_oom_ratelim_last = now;
+	mtx_unlock(&vm_oom_ratelim_mtx);
 
 	/*
 	 * We keep the process bigproc locked once we find it to keep anyone
@@ -1793,7 +1934,7 @@ vm_pageout_oom(int shortage)
 			continue;
 		}
 		size = vmspace_swap_count(vm);
-		if (shortage == VM_OOM_MEM)
+		if (shortage == VM_OOM_MEM || shortage == VM_OOM_MEM_PF)
 			size += vm_pageout_oom_pagecount(vm);
 		vm_map_unlock_read(&vm->vm_map);
 		vmspace_free(vm);
@@ -1824,11 +1965,19 @@ vm_pageout_oom(int shortage)
 	}
 }
 
+/*
+ * Signal a free page shortage to subsystems that have registered an event
+ * handler.  Reclaim memory from UMA in the event of a severe shortage.
+ * Return true if the free page count should be re-evaluated.
+ */
 static bool
 vm_pageout_lowmem(void)
 {
 	static int lowmem_ticks = 0;
 	int last;
+	bool ret;
+
+	ret = false;
 
 	last = atomic_load_int(&lowmem_ticks);
 	while ((u_int)(ticks - last) / hz >= lowmem_period) {
@@ -1845,10 +1994,25 @@ vm_pageout_lowmem(void)
 		 * We do this explicitly after the caches have been
 		 * drained above.
 		 */
-		uma_reclaim();
-		return (true);
+		uma_reclaim(UMA_RECLAIM_TRIM);
+		ret = true;
 	}
-	return (false);
+
+	/*
+	 * Kick off an asynchronous reclaim of cached memory if one of the
+	 * page daemons is failing to keep up with demand.  Use the "severe"
+	 * threshold instead of "min" to ensure that we do not blow away the
+	 * caches if a subset of the NUMA domains are depleted by kernel memory
+	 * allocations; the domainset iterators automatically skip domains
+	 * below the "min" threshold on the first pass.
+	 *
+	 * UMA reclaim worker has its own rate-limiting mechanism, so don't
+	 * worry about kicking it too often.
+	 */
+	if (vm_page_count_severe())
+		uma_reclaim_wakeup();
+
+	return (ret);
 }
 
 static void
@@ -1940,7 +2104,9 @@ vm_pageout_worker(void *arg)
 }
 
 /*
- *	vm_pageout_init initialises basic pageout daemon settings.
+ * Initialize basic pageout daemon settings.  See the comment above the
+ * definition of vm_domain for some explanation of how these thresholds are
+ * used.
  */
 static void
 vm_pageout_init_domain(int domain)
@@ -1956,14 +2122,11 @@ vm_pageout_init_domain(int domain)
 	 * swap pager structures plus enough for any pv_entry structs
 	 * when paging. 
 	 */
-	if (vmd->vmd_page_count > 1024)
-		vmd->vmd_free_min = 4 + (vmd->vmd_page_count - 1024) / 200;
-	else
-		vmd->vmd_free_min = 4;
 	vmd->vmd_pageout_free_min = 2 * MAXBSIZE / PAGE_SIZE +
 	    vmd->vmd_interrupt_free_min;
 	vmd->vmd_free_reserved = vm_pageout_page_count +
-	    vmd->vmd_pageout_free_min + (vmd->vmd_page_count / 768);
+	    vmd->vmd_pageout_free_min + vmd->vmd_page_count / 768;
+	vmd->vmd_free_min = vmd->vmd_page_count / 200;
 	vmd->vmd_free_severe = vmd->vmd_free_min / 2;
 	vmd->vmd_free_target = 4 * vmd->vmd_free_min + vmd->vmd_free_reserved;
 	vmd->vmd_free_min += vmd->vmd_free_reserved;
@@ -2048,6 +2211,7 @@ vm_pageout(void)
 	p = curproc;
 	td = curthread;
 
+	mtx_init(&vm_oom_ratelim_mtx, "vmoomr", NULL, MTX_DEF);
 	swap_pager_swap_init();
 	for (first = -1, i = 0; i < vm_ndomains; i++) {
 		if (VM_DOMAIN_EMPTY(i)) {

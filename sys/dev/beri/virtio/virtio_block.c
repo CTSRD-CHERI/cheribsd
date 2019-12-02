@@ -559,12 +559,3 @@ static devclass_t beri_vtblk_devclass;
 
 DRIVER_MODULE(beri_vtblk, simplebus, beri_vtblk_driver,
     beri_vtblk_devclass, 0, 0);
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

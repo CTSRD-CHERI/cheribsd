@@ -29,7 +29,7 @@
 # The modules link in libpam.  They build the static modules as well.
 SUBDIR+=	libpam modules pam.d
 SUBDIR_DEPEND_modules=	libpam
-.if defined(LIBCHERI)
+.if defined(LIBCHERI) || ${MACHINE_ARCH:Mmips64*c*}
 # XXX: hack to build some sort of libpam while we want for dynamic
 # cheriabi binaries to be realiably useful.
 SUBDIR+=	static_libpam

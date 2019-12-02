@@ -96,6 +96,7 @@ SUBDIR=	adduser \
 	trpt \
 	tzsetup \
 	ugidfw \
+	valectl \
 	vigr \
 	vipw \
 	wake \
@@ -124,6 +125,9 @@ SUBDIR.${MK_BLUETOOTH}+=	bluetooth
 SUBDIR.${MK_BOOTPARAMD}+=	bootparamd
 SUBDIR.${MK_BSDINSTALL}+=	bsdinstall
 SUBDIR.${MK_BSNMP}+=	bsnmpd
+.if ${MK_CAROOT} != "no"
+SUBDIR.${MK_OPENSSL}+=	certctl
+.endif
 SUBDIR.${MK_CHERI}+=	cheri_tcpdump_control
 SUBDIR.${MK_CXGBETOOL}+=	cxgbetool
 SUBDIR.${MK_DIALOG}+=	bsdconfig
@@ -139,6 +143,7 @@ SUBDIR.${MK_FMTREE}+=	fmtree
 SUBDIR.${MK_FREEBSD_UPDATE}+=	freebsd-update
 SUBDIR.${MK_GSSAPI}+=	gssd
 SUBDIR.${MK_GPIO}+=	gpioctl
+SUBDIR.${MK_HTTPD}+=	simple_httpd
 SUBDIR.${MK_INET6}+=	ip6addrctl
 SUBDIR.${MK_INET6}+=	mld6query
 SUBDIR.${MK_INET6}+=	ndp
@@ -182,7 +187,6 @@ SUBDIR.${MK_NIS}+=	ypserv
 SUBDIR.${MK_NIS}+=	ypset
 SUBDIR.${MK_NTP}+=	ntp
 SUBDIR.${MK_OPENSSL}+=	keyserv
-SUBDIR.${MK_PC_SYSINSTALL}+=	pc-sysinstall
 SUBDIR.${MK_PF}+=	ftp-proxy
 SUBDIR.${MK_PKGBOOTSTRAP}+=	pkg
 .if ${COMPILER_FEATURES:Mc++11}

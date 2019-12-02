@@ -11,6 +11,7 @@ SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 .endif
 SHLIB_MAJOR=	1
 SHLIBDIR?=	/lib
+ALLOW_MIPS_SHARED_TEXTREL=
 
 .PATH: ${SRCDIR}
 

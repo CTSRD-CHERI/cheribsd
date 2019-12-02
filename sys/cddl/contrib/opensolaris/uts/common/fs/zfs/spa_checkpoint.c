@@ -129,7 +129,7 @@
  *   uberblock would reference data in the removed device. For this reason
  *   and others of similar nature, we disallow the following operations that
  *   can change the config:
- *   	vdev removal and attach/detach, mirror splitting, and pool reguid.
+ *	vdev removal and attach/detach, mirror splitting, and pool reguid.
  *
  * - As most of the checkpoint logic is implemented in the SPA and doesn't
  *   distinguish datasets when it comes to space accounting, having a
@@ -262,7 +262,7 @@ spa_checkpoint_accounting_verify(spa_t *spa)
 
 		if (vd->vdev_checkpoint_sm != NULL) {
 			ckpoint_sm_space_sum +=
-			    -vd->vdev_checkpoint_sm->sm_alloc;
+			    -space_map_allocated(vd->vdev_checkpoint_sm);
 			vs_ckpoint_space_sum +=
 			    vd->vdev_stat.vs_checkpoint_space;
 			ASSERT3U(ckpoint_sm_space_sum, ==,
@@ -347,7 +347,7 @@ spa_checkpoint_discard_thread_sync(void *arg, dmu_tx_t *tx)
 			    error, vd->vdev_id);
 		}
 		ASSERT0(words_after);
-		ASSERT0(vd->vdev_checkpoint_sm->sm_alloc);
+		ASSERT0(space_map_allocated(vd->vdev_checkpoint_sm));
 		ASSERT0(space_map_length(vd->vdev_checkpoint_sm));
 
 		space_map_free(vd->vdev_checkpoint_sm, tx);
@@ -391,7 +391,7 @@ spa_checkpoint_discard_thread_check(void *arg, zthr_t *zthr)
 	return (B_TRUE);
 }
 
-int
+void
 spa_checkpoint_discard_thread(void *arg, zthr_t *zthr)
 {
 	spa_t *spa = arg;
@@ -406,7 +406,7 @@ spa_checkpoint_discard_thread(void *arg, zthr_t *zthr)
 			dmu_buf_t **dbp;
 
 			if (zthr_iscancelled(zthr))
-				return (0);
+				return;
 
 			ASSERT3P(vd->vdev_ops, !=, &vdev_indirect_ops);
 
@@ -443,8 +443,6 @@ spa_checkpoint_discard_thread(void *arg, zthr_t *zthr)
 	VERIFY0(dsl_sync_task(spa->spa_name, NULL,
 	    spa_checkpoint_discard_complete_sync, spa,
 	    0, ZFS_SPACE_CHECK_NONE));
-
-	return (0);
 }
 
 

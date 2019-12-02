@@ -2136,12 +2136,3 @@ octo_aes_cbc_sha1_decrypt(
 }
 
 /****************************************************************************/
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

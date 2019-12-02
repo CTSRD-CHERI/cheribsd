@@ -169,16 +169,3 @@ memmmap(struct cdev *dev, vm_ooffset_t offset, vm_paddr_t *paddr,
 
 	return (0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20190604,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ],
-//   "changes": [
-//     "pointer_as_integer",
-//     "support"
-//   ]
-// }
-// CHERI CHANGES END

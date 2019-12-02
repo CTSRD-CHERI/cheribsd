@@ -187,7 +187,7 @@ typedef uint64_t pd_entry_t;
  * 	D:	Dirty bit.  This means a page is writable.  It is not
  * 		set at first, and a write is trapped, and the dirty
  * 		bit is set.  See also PTE_RO.
- * 	VR:	Valid/Reference bit. See also PTE_SV.
+ * 	V:	Valid bit.  Obvious, isn't it?
  * 	G:	Global bit.  This means that this mapping is present
  * 		in EVERY address space, and to ignore the ASID when
  * 		it is matched.
@@ -198,7 +198,7 @@ typedef uint64_t pd_entry_t;
 #define	PTE_C_CACHE		(PTE_C(MIPS_CCA_CACHED))
 #define	PTE_C_WC		(PTE_C(MIPS_CCA_WC))
 #define	PTE_D			0x04
-#define	PTE_VR			0x02
+#define	PTE_V			0x02
 #define	PTE_G			0x01
 
 /*
@@ -263,16 +263,6 @@ typedef uint64_t pd_entry_t;
 #define	PTE_PS_16M		((pt_entry_t)0x30 << TLBLO_SWBITS_SHIFT)
 #define	PTE_PS_64M		((pt_entry_t)0x38 << TLBLO_SWBITS_SHIFT)
 #define	PTE_PS_IDX_MASK		((pt_entry_t)0x38 << TLBLO_SWBITS_SHIFT)
-#define	PTE_PSIDX_NBITS_TO_LEFT		5
-#define	PTE_PSIDX_NBITS_TO_RIGHT	56
-#define	PTE_PFN_NBITS_TO_LEFT		11
-#define	PTE_PFN_NBITS_TO_RIGHT		6
-#define	PTE_HWFLAGS_NBITS_TO_LEFT	58
-#define	SW_VALID		0x40
-#define	PTE_SV			((pt_entry_t)SW_VALID << TLBLO_SWBITS_SHIFT)
-#else
-#define	PTE_PS_IDX_MASK		0
-#define	PTE_SV			0
 #endif
 
 #ifdef CPU_CHERI
@@ -288,26 +278,12 @@ typedef uint64_t pd_entry_t;
  * Promotion to a 4MB (PDE) page mapping requires that the corresponding 4KB
  * (PTE) page mappings have identical settings for the following fields:
  */
-#define	PG_PROMOTE_MASK	(PTE_G | PTE_VALID | PTE_D | PTE_C_UNCACHED | \
+#define	PG_PROMOTE_MASK	(PTE_G | PTE_V | PTE_D | PTE_C_UNCACHED | \
 			PTE_C_CACHE | PTE_RO | PTE_W | PTE_MANAGED | \
 			PTE_REF)
 
-#ifdef MIPS64_NEW_PMAP
-#define	TLBLO_PTE_TO_IDX(pte)	(((pte) & PTE_PS_IDX_MASK) >> 56)
-#define	TLBMASK_IDX_TO_MASK(idx) (((1 << ((idx) << 1)) - 1) << TLBMASK_SHIFT)
-#define	TLBLO_PTE_TO_MASK(pte)	TLBMASK_IDX_TO_MASK(TLBLO_PTE_TO_IDX(pte))
-#define	TLBMASK_4K_PAGE		TLBMASK_IDX_TO_MASK(0)
-#define	TLBMASK_16K_PAGE	TLBMASK_IDX_TO_MASK(1)
-#define	TLBMASK_64K_PAGE	TLBMASK_IDX_TO_MASK(2)
-#define	TLBMASK_256K_PAGE	TLBMASK_IDX_TO_MASK(3)
-#define	TLBMASK_1M_PAGE		TLBMASK_IDX_TO_MASK(4)
-#define	TLBMASK_4M_PAGE		TLBMASK_IDX_TO_MASK(5)
-#define	TLBMASK_16M_PAGE	TLBMASK_IDX_TO_MASK(6)
-#define	TLBMASK_64M_PAGE	TLBMASK_IDX_TO_MASK(7)
-#else /* ! MIPS64_NEW_PMAP */
 #define	TLBLO_PTE_TO_IDX(pte) 	0
 #define	TLBLO_PTE_TO_MASK(pte)	0
-#endif /* ! MIPS64_NEW_PMAP */
 
 /*
  * PTE management functions for bits defined above.
@@ -373,62 +349,8 @@ TLBLO_PTE_TO_PFN(pt_entry_t pte)
 	return (pte & TLBLO_PFN_MASK);
 }
 
-#ifdef MIPS64_NEW_PMAP
-
-#define	PTE_REF		PTE_VR
-#define	PTE_VALID 	PTE_SV
-
-#define	pte_is_ref(pte)			pte_test((pte), PTE_REF)
-#define	pte_ref_clear(pte)		pte_clear((pte), PTE_REF)
-#define	pte_ref_set(pte)		pte_set((pte), PTE_REF)
-#define	pte_ref_atomic_clear(pte)	atomic_clear_long((pte), PTE_REF)
-#define	pte_ref_atomic_set(pte)		atomic_set_long((pte), PTE_REF)
-
-#else /* ! MIPS64_NEW_PMAP */
 
 #define	PTE_REF		0
-#define	PTE_VALID	PTE_VR
-
-#define	pte_is_ref(pte)			0
-#define	pte_ref_clear(pte)
-#define	pte_ref_set(pte)
-#define	pte_ref_atomic_clear(pte)
-#define	pte_ref_atomic_set(pte, bit)
-
-#endif /* ! MIPS64_NEW_PMAP */
-
-#define	pte_is_valid(pte)		pte_test((pte), PTE_VALID)
-
-#if defined(__mips_n64) || defined(__mips_n32) /*  PHYSADDR_64_BIT */
-
-#define	pte_atomic_clear(pte, bit)	atomic_clear_64((pte), bit)
-#define	pte_atomic_set(pte, bit)	atomic_set_64((pte), bit)
-#define	pte_load_store(ptep, pte)	atomic_readandset_64(ptep, pte)
-#define	pde_load_store(pdep, pde)	(pd_entry_t)atomic_readandset_64(\
-						(pt_entry_t *)pdep, pde)
-
-#define	pte_atomic_store(ptep, pte)	atomic_store_rel_64(ptep, pte)
-#define pte_store(ptep, pte)	do {		\
-	*(u_long *)(ptep) = (u_long)(pte);	\
-} while (0)
-#define	pde_store(pdep, pde)		pte_store(pdep, pde)
-
-
-#else /* ! PHYSADDR_64_BIT */
-
-#define	pte_atomic_clear(pte, bit)	atomic_clear_32((pte), bit)
-#define	pte_atomic_set(pte, bit)	atomic_set_32((pte), bit)
-#define	pte_load_store(ptep, pte)	atomic_readandset_32(ptep, pte)
-#define	pde_load_store(pdep, pde)	(pd_entry_t)atomic_readandset_32(\
-						(pt_entry_t *)pdep, pde)
-
-#define	pte_atomic_store(ptep, pte)	atomic_store_rel_32(ptep, pte)
-#define pte_store(ptep, pte)	do {		\
-	*(u_int *)(ptep) = (u_int)(pte);	\
-} while (0)
-#define	pde_store(pdep, pde)		pte_store(pdep, pde)
-
-#endif /* ! PHYSADDR_64_BIT */
 
 #endif /* ! _LOCORE */
 
@@ -528,7 +450,6 @@ TLBLO_PDE_TO_PA(pd_entry_t pde)
 
 #else /* ! PHYSADDR_64_BIT */
 
-#define	pte_is_referenced(pte)		0
 #define	pte_reference_reset(pte)
 #define	pte_reference_page(pte)
 #define	pde_is_superpage(pde)		0
@@ -559,88 +480,7 @@ TLBLO_PTE_TO_PA(pt_entry_t pte)
 #define	PTE_S			sd
 #define	PTE_MTC0		dmtc0
 #define	CLEAR_PTE_SWBITS(r)
-
-#ifdef MIPS64_NEW_PMAP
-
-/* Superpage and referenced bit emulation ASM macros. */
-
-/*
- * GET_SUPERPAGE_IDX(r)
- *
- * Get the superpage index from the PTE by shifting it left by
- * PTE_PSIDX_NBITS_TO_LEFT (clearing the upper softbits) and then back to the
- * right by (PTE_PSIDX_NBITS_TO_RIGHT + PTE_PSIDX_NBITS_TO_RIGHT) clearing
- * all the lower bits in the process.
- */
-#define GET_SUPERPAGE_IDX(r)				\
-	dsll	r, (PTE_PSIDX_NBITS_TO_LEFT);		\
-	dsrl32	r, (PTE_PSIDX_NBITS_TO_RIGHT + PTE_PSIDX_NBITS_TO_LEFT - 32)
-
-/*
- * GET_HW_TLB_FLAGS(r)
- *
- * Get the lower hardware TLB flags but shifting left then right.
- */
-#define GET_HW_TLB_FLAGS(r)				\
-	dsll32	r, (PTE_HWFLAGS_NBITS_TO_LEFT - 32);	\
-	dsrl32	r, (PTE_HWFLAGS_NBITS_TO_LEFT - 32)
-
-/*
- * GET_ODD_1M_PFN_FROM_EVEN(r)
- *
- * Get the odd 1M PFN (TLB lo1) from the even 1M PTE.  First, mask out the PFN
- * from the even PTE. Then add 1M worth of pages to it (256). Finally, shift it
- * back to its position in the PTE.
- */
-#define GET_ODD_1M_PFN_FROM_EVEN(r)			\
-	dsll	r, (PTE_PFN_NBITS_TO_LEFT);		\
-	dsrl	r, (PTE_PFN_NBITS_TO_LEFT + PTE_PFN_NBITS_TO_RIGHT); \
-	daddiu	r, r, (1024 * 1024 / PAGE_SIZE);	\
-	dsll	r, (PTE_PFN_NBITS_TO_RIGHT)
-
-/*
- * IF_VALID_SET_REFBIT(r0, r1, offset, unique)
- *
- * If a PDE is valid then set the referenced bit (PTE_VR).  The first version
- * does it atomically.
- */
-#define ATOMIC_REFBIT_UPDATE
-#ifdef ATOMIC_REFBIT_UPDATE
-
-#define IF_VALID_SET_REFBIT(r0, r1, offset, unique)	\
-try_again ## unique ## : ;				\
-	dsrl32	r0, (TLBLO_SWBITS_SHIFT - 32);		\
-	andi	r0, r0, SW_VALID;			\
-	beqz	r0, not_valid ## unique ;		\
-	PTE_L	r0, offset ## (r1) ;			\
-	lld	r0, offset ## (r1) ;			\
-	ori	r0, r0, PTE_VR ;			\
-	scd	r0, offset ## (r1) ;			\
-	beqz	r0, try_again ## unique ;		\
-	PTE_L	r0, offset ## (r1) ;			\
-not_valid ## unique ## :
-
-#else /* ! ATOMIC_REFBIT_UPDATE */
-
-#define IF_VALID_SET_REFBIT(r0, r1, offset, unique)	\
-try_again ## unique ## : ;				\
-	dsrl32	r0, (TLBLO_SWBITS_SHIFT - 32) ;		\
-	andi	r0, r0, SW_VALID ;			\
-	beqz	r0, not_valid ## unique ;		\
-	PTE_L	r0, offset ## (r1) ;			\
-	ori	r0, r0, PTE_VR ;			\
-	PTE_S	r0, offset ## (r1) ;			\
-not_valid ## unique ## :
-#endif /* ! ATOMIC_REFBIT_UPDATE */
-
-#else /* ! MIPS64_NEW_PMAP */
-
-#define	GET_SUPERPAGE_IDX(r)
-#define GET_HW_TLB_FLAGS(r)
 #define	IF_VALID_SET_REFBIT(r0, r1, offset, unique)
-
-#endif /* ! MIPS64_NEW_PMAP */
-
 #else /* ! defined(__mips_n64) || defined(__mips_n32) */
 #define	PTESHIFT		2
 #define	PTE2MASK		0xff8	/* for the 2-page lo0/lo1 */
@@ -650,10 +490,6 @@ not_valid ## unique ## :
 #define	PTE_S			sw
 #define	PTE_MTC0		mtc0
 #define	CLEAR_PTE_SWBITS(r)	LONG_SLL r, TLBLO_SWBITS_CLEAR_SHIFT; LONG_SRL r, TLBLO_SWBITS_CLEAR_SHIFT /* remove swbits */
-
-#define	IS_PTE_VALID(r0, r1, offset, label)
-#define	SET_REF_BIT(r0, r1, offset)
-
 #endif /* ! defined(__mips_n64) || defined(__mips_n32) */
 
 #if defined(CPU_CHERI) && defined(CHERI_PURECAP_KERNEL)

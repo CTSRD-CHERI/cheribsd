@@ -39,6 +39,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/bus.h>
 #include <sys/cpuset.h>
+#include <sys/domainset.h>
 #ifdef GPROF 
 #include <sys/gmon.h>
 #endif
@@ -59,6 +60,8 @@ __FBSDID("$FreeBSD$");
 #include <vm/pmap.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_extern.h>
+#include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 
 #include <x86/apicreg.h>
 #include <machine/clock.h>
@@ -75,6 +78,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/cpu.h>
 #include <x86/init.h>
 
+#include <contrib/dev/acpica/include/acpi.h>
+#include <dev/acpica/acpivar.h>
+
 #define WARMBOOT_TARGET		0
 #define WARMBOOT_OFF		(KERNBASE + 0x0467)
 #define WARMBOOT_SEG		(KERNBASE + 0x0469)
@@ -87,8 +93,6 @@ __FBSDID("$FreeBSD$");
 #define GiB(v)			(v ## ULL << 30)
 
 #define	AP_BOOTPT_SZ		(PAGE_SIZE * 3)
-
-extern	struct pcpu __pcpu[];
 
 /* Temporary variables for init_secondary()  */
 char *doublefault_stack;
@@ -271,9 +275,10 @@ init_secondary(void)
 {
 	struct pcpu *pc;
 	struct nmi_pcpu *np;
+	struct user_segment_descriptor *gdt;
+	struct region_descriptor ap_gdt;
 	u_int64_t cr0;
 	int cpu, gsel_tss, x;
-	struct region_descriptor ap_gdt;
 
 	/* Set by the startup code for us to use */
 	cpu = bootAP;
@@ -281,38 +286,7 @@ init_secondary(void)
 	/* Update microcode before doing anything else. */
 	ucode_load_ap(cpu);
 
-	/* Init tss */
-	common_tss[cpu] = common_tss[0];
-	common_tss[cpu].tss_iobase = sizeof(struct amd64tss) +
-	    IOPERM_BITMAP_SIZE;
-	common_tss[cpu].tss_ist1 = (long)&doublefault_stack[PAGE_SIZE];
-
-	/* The NMI stack runs on IST2. */
-	np = ((struct nmi_pcpu *) &nmi_stack[PAGE_SIZE]) - 1;
-	common_tss[cpu].tss_ist2 = (long) np;
-
-	/* The MC# stack runs on IST3. */
-	np = ((struct nmi_pcpu *) &mce_stack[PAGE_SIZE]) - 1;
-	common_tss[cpu].tss_ist3 = (long) np;
-
-	/* The DB# stack runs on IST4. */
-	np = ((struct nmi_pcpu *) &dbg_stack[PAGE_SIZE]) - 1;
-	common_tss[cpu].tss_ist4 = (long) np;
-
-	/* Prepare private GDT */
-	gdt_segs[GPROC0_SEL].ssd_base = (long) &common_tss[cpu];
-	for (x = 0; x < NGDT; x++) {
-		if (x != GPROC0_SEL && x != (GPROC0_SEL + 1) &&
-		    x != GUSERLDT_SEL && x != (GUSERLDT_SEL + 1))
-			ssdtosd(&gdt_segs[x], &gdt[NGDT * cpu + x]);
-	}
-	ssdtosyssd(&gdt_segs[GPROC0_SEL],
-	    (struct system_segment_descriptor *)&gdt[NGDT * cpu + GPROC0_SEL]);
-	ap_gdt.rd_limit = NGDT * sizeof(gdt[0]) - 1;
-	ap_gdt.rd_base =  (long) &gdt[NGDT * cpu];
-	lgdt(&ap_gdt);			/* does magic intra-segment return */
-
-	/* Get per-cpu data */
+	/* Get per-cpu data and save  */
 	pc = &__pcpu[cpu];
 
 	/* prime data page for it to use */
@@ -321,33 +295,57 @@ init_secondary(void)
 	pc->pc_apic_id = cpu_apic_ids[cpu];
 	pc->pc_prvspace = pc;
 	pc->pc_curthread = 0;
-	pc->pc_tssp = &common_tss[cpu];
-	pc->pc_commontssp = &common_tss[cpu];
+	pc->pc_tssp = &pc->pc_common_tss;
 	pc->pc_rsp0 = 0;
 	pc->pc_pti_rsp0 = (((vm_offset_t)&pc->pc_pti_stack +
 	    PC_PTI_STACK_SZ * sizeof(uint64_t)) & ~0xful);
-	pc->pc_tss = (struct system_segment_descriptor *)&gdt[NGDT * cpu +
-	    GPROC0_SEL];
-	pc->pc_fs32p = &gdt[NGDT * cpu + GUFS32_SEL];
-	pc->pc_gs32p = &gdt[NGDT * cpu + GUGS32_SEL];
-	pc->pc_ldt = (struct system_segment_descriptor *)&gdt[NGDT * cpu +
-	    GUSERLDT_SEL];
+	gdt = pc->pc_gdt;
+	pc->pc_tss = (struct system_segment_descriptor *)&gdt[GPROC0_SEL];
+	pc->pc_fs32p = &gdt[GUFS32_SEL];
+	pc->pc_gs32p = &gdt[GUGS32_SEL];
+	pc->pc_ldt = (struct system_segment_descriptor *)&gdt[GUSERLDT_SEL];
 	/* See comment in pmap_bootstrap(). */
 	pc->pc_pcid_next = PMAP_PCID_KERN + 2;
 	pc->pc_pcid_gen = 1;
-	common_tss[cpu].tss_rsp0 = 0;
 
-	/* Save the per-cpu pointer for use by the NMI handler. */
+	/* Init tss */
+	pc->pc_common_tss = __pcpu[0].pc_common_tss;
+	pc->pc_common_tss.tss_iobase = sizeof(struct amd64tss) +
+	    IOPERM_BITMAP_SIZE;
+	pc->pc_common_tss.tss_rsp0 = 0;
+
+	/* The doublefault stack runs on IST1. */
+	np = ((struct nmi_pcpu *)&doublefault_stack[PAGE_SIZE]) - 1;
+	np->np_pcpu = (register_t)pc;
+	pc->pc_common_tss.tss_ist1 = (long)np;
+
+	/* The NMI stack runs on IST2. */
 	np = ((struct nmi_pcpu *) &nmi_stack[PAGE_SIZE]) - 1;
-	np->np_pcpu = (register_t) pc;
+	np->np_pcpu = (register_t)pc;
+	pc->pc_common_tss.tss_ist2 = (long)np;
 
-	/* Save the per-cpu pointer for use by the MC# handler. */
+	/* The MC# stack runs on IST3. */
 	np = ((struct nmi_pcpu *) &mce_stack[PAGE_SIZE]) - 1;
-	np->np_pcpu = (register_t) pc;
+	np->np_pcpu = (register_t)pc;
+	pc->pc_common_tss.tss_ist3 = (long)np;
 
-	/* Save the per-cpu pointer for use by the DB# handler. */
+	/* The DB# stack runs on IST4. */
 	np = ((struct nmi_pcpu *) &dbg_stack[PAGE_SIZE]) - 1;
-	np->np_pcpu = (register_t) pc;
+	np->np_pcpu = (register_t)pc;
+	pc->pc_common_tss.tss_ist4 = (long)np;
+
+	/* Prepare private GDT */
+	gdt_segs[GPROC0_SEL].ssd_base = (long)&pc->pc_common_tss;
+	for (x = 0; x < NGDT; x++) {
+		if (x != GPROC0_SEL && x != GPROC0_SEL + 1 &&
+		    x != GUSERLDT_SEL && x != GUSERLDT_SEL + 1)
+			ssdtosd(&gdt_segs[x], &gdt[x]);
+	}
+	ssdtosyssd(&gdt_segs[GPROC0_SEL],
+	    (struct system_segment_descriptor *)&gdt[GPROC0_SEL]);
+	ap_gdt.rd_limit = NGDT * sizeof(gdt[0]) - 1;
+	ap_gdt.rd_base = (u_long)gdt;
+	lgdt(&ap_gdt);			/* does magic intra-segment return */
 
 	wrmsr(MSR_FSBASE, 0);		/* User value */
 	wrmsr(MSR_GSBASE, (u_int64_t)pc);
@@ -384,6 +382,27 @@ init_secondary(void)
  * local functions and data
  */
 
+#ifdef NUMA
+static void
+mp_realloc_pcpu(int cpuid, int domain)
+{
+	vm_page_t m;
+	vm_offset_t oa, na;
+
+	oa = (vm_offset_t)&__pcpu[cpuid];
+	if (_vm_phys_domain(pmap_kextract(oa)) == domain)
+		return;
+	m = vm_page_alloc_domain(NULL, 0, domain,
+	    VM_ALLOC_NORMAL | VM_ALLOC_NOOBJ);
+	if (m == NULL)
+		return;
+	na = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(m));
+	pagecopy((void *)oa, (void *)na);
+	pmap_qenter((vm_offset_t)&__pcpu[cpuid], &m, 1);
+	/* XXX old pcpu page leaked. */
+}
+#endif
+
 /*
  * start each AP in our list
  */
@@ -392,7 +411,7 @@ native_start_all_aps(void)
 {
 	u_int64_t *pt4, *pt3, *pt2;
 	u_int32_t mpbioswarmvec;
-	int apic_id, cpu, i;
+	int apic_id, cpu, domain, i;
 	u_char mpbiosreason;
 
 	mtx_init(&ap_boot_mtx, "ap boot", NULL, MTX_SPIN);
@@ -431,21 +450,39 @@ native_start_all_aps(void)
 	outb(CMOS_REG, BIOS_RESET);
 	outb(CMOS_DATA, BIOS_WARM);	/* 'warm-start' */
 
+	/* Relocate pcpu areas to the correct domain. */
+#ifdef NUMA
+	if (vm_ndomains > 1)
+		for (cpu = 1; cpu < mp_ncpus; cpu++) {
+			apic_id = cpu_apic_ids[cpu];
+			domain = acpi_pxm_get_cpu_locality(apic_id);
+			mp_realloc_pcpu(cpu, domain);
+		}
+#endif
+
 	/* start each AP */
+	domain = 0;
 	for (cpu = 1; cpu < mp_ncpus; cpu++) {
 		apic_id = cpu_apic_ids[cpu];
-
+#ifdef NUMA
+		if (vm_ndomains > 1)
+			domain = acpi_pxm_get_cpu_locality(apic_id);
+#endif
 		/* allocate and set up an idle stack data page */
 		bootstacks[cpu] = (void *)kmem_malloc(kstack_pages * PAGE_SIZE,
 		    M_WAITOK | M_ZERO);
 		doublefault_stack = (char *)kmem_malloc(PAGE_SIZE, M_WAITOK |
 		    M_ZERO);
 		mce_stack = (char *)kmem_malloc(PAGE_SIZE, M_WAITOK | M_ZERO);
-		nmi_stack = (char *)kmem_malloc(PAGE_SIZE, M_WAITOK | M_ZERO);
-		dbg_stack = (char *)kmem_malloc(PAGE_SIZE, M_WAITOK | M_ZERO);
-		dpcpu = (void *)kmem_malloc(DPCPU_SIZE, M_WAITOK | M_ZERO);
+		nmi_stack = (char *)kmem_malloc_domainset(
+		    DOMAINSET_PREF(domain), PAGE_SIZE, M_WAITOK | M_ZERO);
+		dbg_stack = (char *)kmem_malloc_domainset(
+		    DOMAINSET_PREF(domain), PAGE_SIZE, M_WAITOK | M_ZERO);
+		dpcpu = (void *)kmem_malloc_domainset(DOMAINSET_PREF(domain),
+		    DPCPU_SIZE, M_WAITOK | M_ZERO);
 
-		bootSTK = (char *)bootstacks[cpu] + kstack_pages * PAGE_SIZE - 8;
+		bootSTK = (char *)bootstacks[cpu] +
+		    kstack_pages * PAGE_SIZE - 8;
 		bootAP = cpu;
 
 		/* attempt to start the Application Processor */
@@ -465,7 +502,7 @@ native_start_all_aps(void)
 	outb(CMOS_DATA, mpbiosreason);
 
 	/* number of APs actually started */
-	return mp_naps;
+	return (mp_naps);
 }
 
 

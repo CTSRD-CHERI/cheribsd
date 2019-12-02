@@ -72,9 +72,8 @@ int
 sys_extattrctl(struct thread *td, struct extattrctl_args *uap)
 {
 
-	return (kern_extattrctl(td, __USER_CAP_STR(uap->path), uap->cmd,
-	    __USER_CAP_STR(uap->filename), uap->attrnamespace,
-	    __USER_CAP_STR(uap->attrname)));
+	return (kern_extattrctl(td, uap->path, uap->cmd, uap->filename,
+	    uap->attrnamespace, uap->attrname));
 }
 
 int
@@ -235,8 +234,7 @@ sys_extattr_set_fd(struct thread *td, struct extattr_set_fd_args *uap)
 {
 
 	return (kern_extattr_set_fd(td, uap->fd, uap->attrnamespace,
-	    __USER_CAP_STR(uap->attrname), __USER_CAP(uap->data, uap->nbytes),
-	    uap->nbytes));
+	    uap->attrname, uap->data, uap->nbytes));
 }
 
 int
@@ -281,9 +279,8 @@ int
 sys_extattr_set_file(struct thread *td, struct extattr_set_file_args *uap)
 {
 
-	return (kern_extattr_set_path(td, __USER_CAP_STR(uap->path),
-	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
-	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, FOLLOW));
+	return (kern_extattr_set_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes, FOLLOW));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -299,9 +296,8 @@ int
 sys_extattr_set_link(struct thread *td, struct extattr_set_link_args *uap)
 {
 
-	return (kern_extattr_set_path(td, __USER_CAP_STR(uap->path),
-	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
-	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, NOFOLLOW));
+	return (kern_extattr_set_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes, NOFOLLOW));
 }
 
 int
@@ -416,8 +412,7 @@ sys_extattr_get_fd(struct thread *td, struct extattr_get_fd_args *uap)
 {
 
 	return (kern_extattr_get_fd(td, uap->fd, uap->attrnamespace,
-	    __USER_CAP_STR(uap->attrname),
-	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes));
+	    uap->attrname, uap->data, uap->nbytes));
 }
 
 int
@@ -461,9 +456,8 @@ struct extattr_get_file_args {
 int
 sys_extattr_get_file(struct thread *td, struct extattr_get_file_args *uap)
 {
-	return (kern_extattr_get_path(td, __USER_CAP_STR(uap->path),
-	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
-	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, FOLLOW));
+	return (kern_extattr_get_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes, FOLLOW));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -478,9 +472,8 @@ struct extattr_get_link_args {
 int
 sys_extattr_get_link(struct thread *td, struct extattr_get_link_args *uap)
 {
-	return (kern_extattr_get_path(td, __USER_CAP_STR(uap->path),
-	    uap->attrnamespace, __USER_CAP_STR(uap->attrname),
-	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes, NOFOLLOW));
+	return (kern_extattr_get_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, uap->data, uap->nbytes, NOFOLLOW));
 }
 
 int
@@ -565,7 +558,7 @@ sys_extattr_delete_fd(struct thread *td, struct extattr_delete_fd_args *uap)
 {
 
 	return (kern_extattr_delete_fd(td, uap->fd, uap->attrnamespace,
-	    __USER_CAP_STR(uap->attrname)));
+	    uap->attrname));
 }
 
 int
@@ -606,8 +599,8 @@ int
 sys_extattr_delete_file(struct thread *td, struct extattr_delete_file_args *uap)
 {
 
-	return (kern_extattr_delete_path(td, __USER_CAP_STR(uap->path),
-	    uap->attrnamespace, __USER_CAP_STR(uap->attrname), FOLLOW));
+	return (kern_extattr_delete_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, FOLLOW));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -621,8 +614,8 @@ int
 sys_extattr_delete_link(struct thread *td, struct extattr_delete_link_args *uap)
 {
 
-	return (kern_extattr_delete_path(td, __USER_CAP_STR(uap->path),
-	    uap->attrnamespace, __USER_CAP_STR(uap->attrname), NOFOLLOW));
+	return (kern_extattr_delete_path(td, uap->path, uap->attrnamespace,
+	    uap->attrname, NOFOLLOW));
 }
 
 int
@@ -726,7 +719,7 @@ sys_extattr_list_fd(struct thread *td, struct extattr_list_fd_args *uap)
 {
 
 	return (kern_extattr_list_fd(td, uap->fd, uap->attrnamespace,
-	    __USER_CAP(uap->data, uap->nbytes), uap->nbytes));
+	    uap->data, uap->nbytes));
 }
 
 int
@@ -762,9 +755,8 @@ int
 sys_extattr_list_file(struct thread *td, struct extattr_list_file_args *uap)
 {
 
-	return (kern_extattr_list_path(td, __USER_CAP_STR(uap->path),
-	    uap->attrnamespace, __USER_CAP(uap->data, uap->nbytes),
-	    uap->nbytes, FOLLOW));
+	return (kern_extattr_list_path(td, uap->path, uap->attrnamespace,
+	    uap->data, uap->nbytes, FOLLOW));
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -779,9 +771,8 @@ int
 sys_extattr_list_link(struct thread *td, struct extattr_list_link_args *uap)
 {
 
-	return (kern_extattr_list_path(td, __USER_CAP_STR(uap->path),
-	    uap->attrnamespace, __USER_CAP(uap->data, uap->nbytes),
-	    uap->nbytes, NOFOLLOW));
+	return (kern_extattr_list_path(td, uap->path, uap->attrnamespace,
+	    uap->data, uap->nbytes, NOFOLLOW));
 }
 
 int
@@ -805,11 +796,10 @@ kern_extattr_list_path(struct thread *td, const char * __capability path,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

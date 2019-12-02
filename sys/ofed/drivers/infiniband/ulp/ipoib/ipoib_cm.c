@@ -618,8 +618,10 @@ void ipoib_cm_send(struct ipoib_dev_priv *priv, struct mbuf *mb, struct ipoib_cm
 	struct ipoib_cm_tx_buf *tx_req;
 	struct ifnet *dev = priv->dev;
 
-	if (unlikely(priv->tx_outstanding > MAX_SEND_CQE))
-		while (ipoib_poll_tx(priv)); /* nothing */
+	if (unlikely(priv->tx_outstanding > MAX_SEND_CQE)) {
+		while (ipoib_poll_tx(priv, false))
+			;	/* nothing */
+	}
 
 	m_adj(mb, sizeof(struct ipoib_pseudoheader));
 	if (unlikely(mb->m_pkthdr.len > tx->mtu)) {
@@ -843,6 +845,7 @@ static int ipoib_cm_rep_handler(struct ib_cm_id *cm_id, struct ib_cm_event *even
 	struct ipoib_cm_tx *p = cm_id->context;
 	struct ipoib_dev_priv *priv = p->priv;
 	struct ipoib_cm_data *data = event->private_data;
+	struct epoch_tracker et;
 	struct ifqueue mbqueue;
 	struct ib_qp_attr qp_attr;
 	int qp_attr_mask, ret;
@@ -896,6 +899,7 @@ static int ipoib_cm_rep_handler(struct ib_cm_id *cm_id, struct ib_cm_event *even
 		}
 	spin_unlock_irq(&priv->lock);
 
+	NET_EPOCH_ENTER(et);
 	for (;;) {
 		struct ifnet *dev = p->priv->dev;
 		_IF_DEQUEUE(&mbqueue, mb);
@@ -906,6 +910,7 @@ static int ipoib_cm_rep_handler(struct ib_cm_id *cm_id, struct ib_cm_event *even
 			ipoib_warn(priv, "dev_queue_xmit failed "
 				   "to requeue packet\n");
 	}
+	NET_EPOCH_EXIT(et);
 
 	ret = ib_send_cm_rtu(cm_id, NULL, 0);
 	if (ret) {

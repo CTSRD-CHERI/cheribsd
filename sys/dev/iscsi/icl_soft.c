@@ -1565,11 +1565,10 @@ MODULE_DEPEND(icl_soft, icl, 1, 1, 1);
 MODULE_VERSION(icl_soft, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "struct iovec"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

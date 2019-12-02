@@ -516,7 +516,6 @@ proc0_init(void *dummy __unused)
 	td->td_pflags = TDP_KTHREAD;
 	td->td_cpuset = cpuset_thread0();
 	td->td_domain.dr_policy = td->td_cpuset->cs_domain;
-	epoch_thread_init(td);
 	prison0_init();
 	p->p_peers = 0;
 	p->p_leader = p;
@@ -819,11 +818,9 @@ start_init(void *dummy)
 }
 
 /*
- * Like kproc_create(), but runs in its own address space.
- * We do this early to reserve pid 1.
- *
- * Note special case - do not make it runnable yet.  Other work
- * in progress will change this more.
+ * Like kproc_create(), but runs in its own address space.  We do this
+ * early to reserve pid 1.  Note special case - do not make it
+ * runnable yet, init execution is started when userspace can be served.
  */
 static void
 create_init(const void *udata __unused)

@@ -408,17 +408,15 @@ iface_match(struct ifnet *ifp, ipfw_insn_if *cmd, struct ip_fw_chain *chain,
 #if !defined(USERSPACE) && defined(__FreeBSD__)	/* and OSX too ? */
 		struct ifaddr *ia;
 
-		if_addr_rlock(ifp);
+		NET_EPOCH_ASSERT();
+
 		CK_STAILQ_FOREACH(ia, &ifp->if_addrhead, ifa_link) {
 			if (ia->ifa_addr->sa_family != AF_INET)
 				continue;
 			if (cmd->p.ip.s_addr == ((struct sockaddr_in *)
-			    (ia->ifa_addr))->sin_addr.s_addr) {
-				if_addr_runlock(ifp);
-				return(1);	/* match */
-			}
+			    (ia->ifa_addr))->sin_addr.s_addr)
+				return (1);	/* match */
 		}
-		if_addr_runlock(ifp);
 #endif /* __FreeBSD__ */
 	}
 	return(0);	/* no match, fail ... */
@@ -1442,23 +1440,32 @@ ipfw_chk(struct ip_fw_args *args)
  * pointer might become stale after other pullups (but we never use it
  * this way).
  */
-#define PULLUP_TO(_len, p, T)	PULLUP_LEN(_len, p, sizeof(T))
+#define	PULLUP_TO(_len, p, T)	PULLUP_LEN(_len, p, sizeof(T))
 #define	EHLEN	(eh != NULL ? ((char *)ip - (char *)eh) : 0)
-#define PULLUP_LEN(_len, p, T)					\
+#define	_PULLUP_LOCKED(_len, p, T, unlock)			\
 do {								\
 	int x = (_len) + T + EHLEN;				\
 	if (mem) {						\
-		MPASS(pktlen >= x);				\
+		if (__predict_false(pktlen < x)) {		\
+			unlock;					\
+			goto pullup_failed;			\
+		}						\
 		p = (char *)args->mem + (_len) + EHLEN;		\
 	} else {						\
 		if (__predict_false((m)->m_len < x)) {		\
 			args->m = m = m_pullup(m, x);		\
-			if (m == NULL)				\
+			if (m == NULL) {			\
+				unlock;				\
 				goto pullup_failed;		\
+			}					\
 		}						\
 		p = mtod(m, char *) + (_len) + EHLEN;		\
 	}							\
 } while (0)
+
+#define	PULLUP_LEN(_len, p, T)	_PULLUP_LOCKED(_len, p, T, )
+#define	PULLUP_LEN_LOCKED(_len, p, T)	\
+    _PULLUP_LOCKED(_len, p, T, IPFW_PF_RUNLOCK(chain))
 /*
  * In case pointers got stale after pullups, update them.
  */
@@ -2310,7 +2317,7 @@ do {								\
 
 			case O_TCPOPTS:
 				if (proto == IPPROTO_TCP && offset == 0 && ulp){
-					PULLUP_LEN(hlen, ulp,
+					PULLUP_LEN_LOCKED(hlen, ulp,
 					    (TCP(ulp)->th_off << 2));
 					match = tcpopts_match(TCP(ulp), cmd);
 				}
@@ -2335,7 +2342,7 @@ do {								\
 					uint16_t mss, *p;
 					int i;
 
-					PULLUP_LEN(hlen, ulp,
+					PULLUP_LEN_LOCKED(hlen, ulp,
 					    (TCP(ulp)->th_off << 2));
 					if ((tcpopts_parse(TCP(ulp), &mss) &
 					    IP_FW_TCPOPT_MSS) == 0)
@@ -3182,6 +3189,7 @@ do {								\
 
 		}	/* end of inner loop, scan opcodes */
 #undef PULLUP_LEN
+#undef PULLUP_LEN_LOCKED
 
 		if (done)
 			break;

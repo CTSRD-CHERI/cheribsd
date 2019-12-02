@@ -162,7 +162,7 @@ void nfsrv_freefilelayouts(fhandle_t *);
 int nfsrv_deldsserver(int, char *, NFSPROC_T *);
 struct nfsdevice *nfsrv_deldsnmp(int, struct nfsmount *, NFSPROC_T *);
 int nfsrv_createdevids(struct nfsd_nfsd_args *, NFSPROC_T *);
-int nfsrv_checkdsattr(struct nfsrv_descript *, vnode_t, NFSPROC_T *);
+int nfsrv_checkdsattr(vnode_t, NFSPROC_T *);
 int nfsrv_copymr(vnode_t, vnode_t, vnode_t, struct nfsdevice *,
     struct pnfsdsfile *, struct pnfsdsfile *, int, struct ucred *, NFSPROC_T *);
 int nfsrv_mdscopymr(char *, char *, char *, char *, int *, char *, NFSPROC_T *,
@@ -393,7 +393,7 @@ void nfsd_getminorvers(struct nfsrv_descript *, u_char *, u_char **, int *,
 void nfscl_retopts(struct nfsmount *, char *, size_t);
 
 /* nfs_commonport.c */
-int nfsrv_lookupfilename(struct nameidata *, char *, NFSPROC_T *);
+int nfsrv_lookupfilename(struct nameidata *, char * __capability, NFSPROC_T *);
 void nfsrv_object_create(vnode_t, NFSPROC_T *);
 int nfsrv_mallocmget_limit(void);
 int nfsvno_v4rootexport(struct nfsrv_descript *);

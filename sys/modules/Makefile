@@ -184,6 +184,7 @@ SUBDIR=	\
 	${_iser} \
 	isp \
 	${_ispfw} \
+	${_itwd} \
 	${_iwi} \
 	${_iwifw} \
 	${_iwm} \
@@ -200,15 +201,13 @@ SUBDIR=	\
 	khelp \
 	krpc \
 	ksyms \
+	${_ktls_ocf} \
 	le \
 	lge \
 	libalias \
 	libiconv \
 	libmchain \
 	lindebugfs \
-	${_linux} \
-	${_linux_common} \
-	${_linux64} \
 	linuxkpi \
 	${_lio} \
 	lpt \
@@ -371,6 +370,7 @@ SUBDIR=	\
 	${_viawd} \
 	videomode \
 	vkbd \
+	${_vmd} \
 	${_vmm} \
 	${_vmware} \
 	${_vpo} \
@@ -417,6 +417,7 @@ _crypto=	crypto
 _cryptodev=	cryptodev
 _random_fortuna=random_fortuna
 _random_other=	random_other
+_ktls_ocf=	ktls_ocf
 .endif
 .endif
 
@@ -469,10 +470,22 @@ SUBDIR+=	iscsi_initiator
 SUBDIR+=	fdt
 .endif
 
+# Linuxulator
 .if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "i386"
 SUBDIR+=	linprocfs
 SUBDIR+=	linsysfs
+.endif
+.if ${MACHINE_CPUARCH} == "amd64" || ${MACHINE_CPUARCH} == "i386"
+SUBDIR+=	linux
+.endif
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64"
+SUBDIR+=	linux64
+SUBDIR+=	linux_common
+.endif
+
+.if ${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
+    ${MACHINE_CPUARCH} == "i386"
 _ena=		ena
 .if ${MK_OFED} != "no" || defined(ALL_MODULES)
 _ibcore=	ibcore
@@ -595,14 +608,15 @@ _et=		et
 _exca=		exca
 _if_ndis=	if_ndis
 _io=		io
+_itwd=		itwd
 _ix=		ix
 _ixv=		ixv
-_linux=		linux
 .if ${MK_SOURCELESS_UCODE} != "no"
 _lio=		lio
 .endif
 _nctgpio=	nctgpio
 _ndis=		ndis
+_ntb=		ntb
 _ocs_fc=	ocs_fc
 _pccard=	pccard
 .if ${MK_OFED} != "no" || defined(ALL_MODULES)
@@ -639,11 +653,11 @@ _ciss=		ciss
 _chromebook_platform=	chromebook_platform
 _cmx=		cmx
 _coretemp=	coretemp
-.if ${MK_SOURCELESS_HOST} != "no"
+.if ${MK_SOURCELESS_HOST} != "no" && empty(KCSAN_ENABLED)
 _hpt27xx=	hpt27xx
 .endif
 _hptiop=	hptiop
-.if ${MK_SOURCELESS_HOST} != "no"
+.if ${MK_SOURCELESS_HOST} != "no" && empty(KCSAN_ENABLED)
 _hptmv=		hptmv
 _hptnr=		hptnr
 _hptrr=		hptrr
@@ -698,13 +712,11 @@ _efirt=		efirt
 _iavf=		iavf
 _ioat=		ioat
 _ixl=		ixl
-_linux64=	linux64
-_linux_common=	linux_common
-_ntb=		ntb
 _nvdimm=	nvdimm
 _pms=		pms
 _qlxge=		qlxge
 _qlxgb=		qlxgb
+_vmd=		vmd
 .if ${MK_SOURCELESS_UCODE} != "no"
 _qlxgbe=	qlxgbe
 _qlnx=		qlnx
@@ -763,10 +775,11 @@ _wi=		wi
 
 .if ${MACHINE_ARCH} == "powerpc64"
 _ipmi=		ipmi
+_nvram=		opal_nvram
 .endif
 .if ${MACHINE_ARCH} == "powerpc64" || ${MACHINE_ARCH} == "powerpc"
 # Don't build powermac_nvram for powerpcspe, it's never supported.
-_nvram=		powermac_nvram
+_nvram+=	powermac_nvram
 .endif
 
 .if ${MACHINE_CPUARCH} == "sparc64"

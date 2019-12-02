@@ -50,6 +50,7 @@
 #include <machine/tte.h>
 
 #define	PMAP_CONTEXT_MAX	8192
+#define	PMAP_ENTER_QUICK_LOCKED	0x10000000
 
 typedef	struct pmap *pmap_t;
 
@@ -105,7 +106,6 @@ void	pmap_set_kctx(void);
 extern	struct pmap kernel_pmap_store;
 #define	kernel_pmap	(&kernel_pmap_store)
 extern	struct rwlock_padalign tte_list_global_lock;
-extern	vm_paddr_t phys_avail[];
 extern	vm_offset_t virtual_avail;
 extern	vm_offset_t virtual_end;
 

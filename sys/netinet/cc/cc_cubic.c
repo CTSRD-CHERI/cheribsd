@@ -52,6 +52,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/limits.h>
 #include <sys/malloc.h>
 #include <sys/module.h>
 #include <sys/socket.h>
@@ -78,6 +79,7 @@ static int	cubic_mod_init(void);
 static void	cubic_post_recovery(struct cc_var *ccv);
 static void	cubic_record_rtt(struct cc_var *ccv);
 static void	cubic_ssthresh_update(struct cc_var *ccv);
+static void	cubic_after_idle(struct cc_var *ccv);
 
 struct cubic {
 	/* Cubic K in fixed point form with CUBIC_SHIFT worth of precision. */
@@ -112,6 +114,7 @@ struct cc_algo cubic_cc_algo = {
 	.conn_init = cubic_conn_init,
 	.mod_init = cubic_mod_init,
 	.post_recovery = cubic_post_recovery,
+	.after_idle = cubic_after_idle,
 };
 
 static void
@@ -138,7 +141,14 @@ cubic_ack_received(struct cc_var *ccv, uint16_t type)
 		    cubic_data->min_rtt_ticks == TCPTV_SRTTBASE)
 			newreno_cc_algo.ack_received(ccv, type);
 		else {
-			ticks_since_cong = ticks - cubic_data->t_last_cong;
+			if ((ticks_since_cong =
+			    ticks - cubic_data->t_last_cong) < 0) {
+				/*
+				 * dragging t_last_cong along
+				 */
+				ticks_since_cong = INT_MAX;
+				cubic_data->t_last_cong = ticks - INT_MAX;
+			}
 
 			/*
 			 * The mean RTT is used to best reflect the equations in
@@ -157,12 +167,14 @@ cubic_ack_received(struct cc_var *ccv, uint16_t type)
 
 			ccv->flags &= ~CCF_ABC_SENTAWND;
 
-			if (w_cubic_next < w_tf)
+			if (w_cubic_next < w_tf) {
 				/*
 				 * TCP-friendly region, follow tf
 				 * cwnd growth.
 				 */
-				CCV(ccv, snd_cwnd) = w_tf;
+				if (CCV(ccv, snd_cwnd) < w_tf)
+					CCV(ccv, snd_cwnd) = ulmin(w_tf, INT_MAX);
+			}
 
 			else if (CCV(ccv, snd_cwnd) < w_cubic_next) {
 				/*
@@ -170,12 +182,14 @@ cubic_ack_received(struct cc_var *ccv, uint16_t type)
 				 * cwnd growth.
 				 */
 				if (V_tcp_do_rfc3465)
-					CCV(ccv, snd_cwnd) = w_cubic_next;
+					CCV(ccv, snd_cwnd) = ulmin(w_cubic_next,
+					    INT_MAX);
 				else
-					CCV(ccv, snd_cwnd) += ((w_cubic_next -
+					CCV(ccv, snd_cwnd) += ulmax(1,
+					    ((ulmin(w_cubic_next, INT_MAX) -
 					    CCV(ccv, snd_cwnd)) *
 					    CCV(ccv, t_maxseg)) /
-					    CCV(ccv, snd_cwnd);
+					    CCV(ccv, snd_cwnd));
 			}
 
 			/*
@@ -188,9 +202,31 @@ cubic_ack_received(struct cc_var *ccv, uint16_t type)
 			if (cubic_data->num_cong_events == 0 &&
 			    cubic_data->max_cwnd < CCV(ccv, snd_cwnd))
 				cubic_data->max_cwnd = CCV(ccv, snd_cwnd);
+				cubic_data->K = cubic_k(cubic_data->max_cwnd /
+				    CCV(ccv, t_maxseg));
 		}
 	}
 }
+
+/*
+ * This is a Cubic specific implementation of after_idle.
+ *   - Reset cwnd by calling New Reno implementation of after_idle.
+ *   - Reset t_last_cong.
+ */
+static void
+cubic_after_idle(struct cc_var *ccv)
+{
+	struct cubic *cubic_data;
+
+	cubic_data = ccv->cc_data;
+
+	cubic_data->max_cwnd = ulmax(cubic_data->max_cwnd, CCV(ccv, snd_cwnd));
+	cubic_data->K = cubic_k(cubic_data->max_cwnd / CCV(ccv, t_maxseg));
+
+	newreno_cc_algo.after_idle(ccv);
+	cubic_data->t_last_cong = ticks;
+}
+
 
 static void
 cubic_cb_destroy(struct cc_var *ccv)
@@ -287,9 +323,6 @@ cubic_conn_init(struct cc_var *ccv)
 static int
 cubic_mod_init(void)
 {
-
-	cubic_cc_algo.after_idle = newreno_cc_algo.after_idle;
-
 	return (0);
 }
 

@@ -2,7 +2,6 @@
 
 .include <src.opts.mk>
 
-PACKAGE=lib${LIB}
 LIB=	sysdecode
 
 SRCS=	errno.c flags.c ioctl.c signal.c syscallnames.c utrace.c
@@ -107,12 +106,10 @@ MLINKS+=sysdecode_mask.3 sysdecode_accessmode.3 \
 	sysdecode_mask.3 sysdecode_wait4_options.3 \
 	sysdecode_mask.3 sysdecode_wait6_options.3
 
-CLEANFILES= ioctl.c ioctl.c.tmp tables.h tables.h.tmp
+CLEANFILES= ioctl.c ioctl.c.tmp tables.h
 
 .if defined(COMPAT_32BIT)
 CPP+=	-m32
-.elfif defined(COMPAT_64BIT)
-CPP+=	-m64
 .endif
 
 .if ${MK_CHERI} != "no" && !defined(NEED_CHERI)
@@ -134,11 +131,8 @@ CFLAGS.ioctl.c+=	-Wno-error-cheri-capability-misuse
 .endif
 
 DEPENDOBJS+=	tables.h
-incdir=${SYSROOT:U${DESTDIR}}${INCLUDEDIR}
-tables.h: mktables ${incdir}/netinet/in.h ${incdir}/netinet/tcp.h \
-    ${incdir}/netinet6/in6.h
-	sh ${.CURDIR}/mktables ${incdir} ${.TARGET}.tmp && \
-	    mv -f ${.TARGET}.tmp ${.TARGET}
+tables.h: mktables
+	sh ${.CURDIR}/mktables ${SYSROOT:U${DESTDIR}}${INCLUDEDIR} ${.TARGET}
 
 # mkioctls runs find(1) for headers so needs to rebuild every time.  This used
 # to be a hack only done in buildworld.

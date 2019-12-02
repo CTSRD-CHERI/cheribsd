@@ -16,10 +16,6 @@ CFLAGS+=	-I${SRCTOP}/contrib/subrepo-cheri-libcxxrt
 CFLAGS+=	-I${SRCTOP}/contrib/libcxxrt
 .endif
 
-.if ${COMPILER_TYPE} == "clang"
-CWARNFLAGS.gcc_personality_v0.c+= -Wno-typedef-redefinition
-.endif
-
 # gcc has incompatible internal declarations for __divtc3 and __multc3, but has
 # no option to silence its warning, so make warnings non-fatal.
 NO_WERROR.gcc=

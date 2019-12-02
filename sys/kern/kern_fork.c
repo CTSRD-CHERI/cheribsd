@@ -125,7 +125,7 @@ int
 sys_pdfork(struct thread *td, struct pdfork_args *uap)
 {
 
-	return (kern_pdfork(td, __USER_CAP_OBJ(uap->fdp), uap->flags));
+	return (kern_pdfork(td, uap->fdp, uap->flags));
 }
 
 int
@@ -180,10 +180,18 @@ sys_rfork(struct thread *td, struct rfork_args *uap)
 	/* Don't allow kernel-only flags. */
 	if ((uap->flags & RFKERNELONLY) != 0)
 		return (EINVAL);
+	/* RFSPAWN must not appear with others */
+	if ((uap->flags & RFSPAWN) != 0 && uap->flags != RFSPAWN)
+		return (EINVAL);
 
 	AUDIT_ARG_FFLAGS(uap->flags);
 	bzero(&fr, sizeof(fr));
-	fr.fr_flags = uap->flags;
+	if ((uap->flags & RFSPAWN) != 0) {
+		fr.fr_flags = RFFDG | RFPROC | RFPPWAIT | RFMEM;
+		fr.fr_flags2 = FR2_DROPSIG_CAUGHT;
+	} else {
+		fr.fr_flags = uap->flags;
+	}
 	fr.fr_pidp = &pid;
 	error = fork1(td, &fr);
 	if (error == 0) {
@@ -256,32 +264,32 @@ static int
 fork_findpid(int flags)
 {
 	pid_t result;
-	int trypid;
+	int trypid, random;
+
+	/*
+	 * Avoid calling arc4random with procid_lock held.
+	 */
+	random = 0;
+	if (__predict_false(randompid))
+		random = arc4random() % randompid;
+
+	mtx_lock(&procid_lock);
 
 	trypid = lastpid + 1;
 	if (flags & RFHIGHPID) {
 		if (trypid < 10)
 			trypid = 10;
 	} else {
-		if (randompid)
-			trypid += arc4random() % randompid;
+		trypid += random;
 	}
-	mtx_lock(&procid_lock);
 retry:
-	/*
-	 * If the process ID prototype has wrapped around,
-	 * restart somewhat above 0, as the low-numbered procs
-	 * tend to include daemons that don't exit.
-	 */
-	if (trypid >= pid_max) {
-		trypid = trypid % pid_max;
-		if (trypid < 100)
-			trypid += 100;
-	}
+	if (trypid >= pid_max)
+		trypid = 2;
 
 	bit_ffc_at(&proc_id_pidmap, trypid, pid_max, &result);
 	if (result == -1) {
-		trypid = 100;
+		KASSERT(trypid != 2, ("unexpectedly ran out of IDs"));
+		trypid = 2;
 		goto retry;
 	}
 	if (bit_test(&proc_id_grpidmap, result) ||
@@ -358,34 +366,18 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
     struct vmspace *vm2, struct file *fp_procdesc)
 {
 	struct proc *p1, *pptr;
-	int trypid;
 	struct filedesc *fd;
 	struct filedesc_to_leader *fdtol;
 	struct sigacts *newsigacts;
 
-	sx_assert(&allproc_lock, SX_XLOCKED);
-
 	p1 = td->td_proc;
 
-	trypid = fork_findpid(fr->fr_flags);
-	p2->p_state = PRS_NEW;		/* protect against others */
-	p2->p_pid = trypid;
-	AUDIT_ARG_PID(p2->p_pid);
-	LIST_INSERT_HEAD(&allproc, p2, p_list);
-	allproc_gen++;
-	sx_xlock(PIDHASHLOCK(p2->p_pid));
-	LIST_INSERT_HEAD(PIDHASH(p2->p_pid), p2, p_hash);
-	sx_xunlock(PIDHASHLOCK(p2->p_pid));
-	PROC_LOCK(p2);
 	PROC_LOCK(p1);
-
-	sx_xunlock(&allproc_lock);
 
 	bcopy(__unbounded_addressof(p1->p_startcopy),
 	    __unbounded_addressof(p2->p_startcopy),
 	    __rangeof(struct proc, p_startcopy, p_endcopy));
 	pargs_hold(p2->p_args);
-
 	PROC_UNLOCK(p1);
 
 	bzero(__unbounded_addressof(p2->p_startzero),
@@ -394,7 +386,18 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	/* Tell the prison that we exist. */
 	prison_proc_hold(p2->p_ucred->cr_prison);
 
-	PROC_UNLOCK(p2);
+	p2->p_state = PRS_NEW;		/* protect against others */
+	p2->p_pid = fork_findpid(fr->fr_flags);
+	AUDIT_ARG_PID(p2->p_pid);
+
+	sx_xlock(&allproc_lock);
+	LIST_INSERT_HEAD(&allproc, p2, p_list);
+	allproc_gen++;
+	sx_xunlock(&allproc_lock);
+
+	sx_xlock(PIDHASHLOCK(p2->p_pid));
+	LIST_INSERT_HEAD(PIDHASH(p2->p_pid), p2, p_hash);
+	sx_xunlock(PIDHASHLOCK(p2->p_pid));
 
 	tidhash_add(td2);
 
@@ -478,7 +481,8 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	p2->p_flag = P_INMEM;
 	p2->p_flag2 = p1->p_flag2 & (P2_ASLR_DISABLE | P2_ASLR_ENABLE |
 	    P2_ASLR_IGNSTART | P2_NOTRACE | P2_NOTRACE_EXEC |
-	    P2_PROTMAX_ENABLE | P2_PROTMAX_DISABLE | P2_TRAPCAP);
+	    P2_PROTMAX_ENABLE | P2_PROTMAX_DISABLE | P2_TRAPCAP |
+	    P2_STKGAP_DISABLE | P2_STKGAP_DISABLE_EXEC);
 	p2->p_swtick = ticks;
 	if (p1->p_flag & P_PROFIL)
 		startprofclock(p2);
@@ -488,6 +492,11 @@ do_fork(struct thread *td, struct fork_req *fr, struct proc *p2, struct thread *
 	} else {
 		sigacts_copy(newsigacts, p1->p_sigacts);
 		p2->p_sigacts = newsigacts;
+		if ((fr->fr_flags2 & FR2_DROPSIG_CAUGHT) != 0) {
+			mtx_lock(&p2->p_sigacts->ps_mtx);
+			sig_drop_caught(p2);
+			mtx_unlock(&p2->p_sigacts->ps_mtx);
+		}
 	}
 
 	if (fr->fr_flags & RFTSIGZMB)
@@ -819,9 +828,10 @@ fork1(struct thread *td, struct fork_req *fr)
 	struct proc *p1, *newproc;
 	struct thread *td2;
 	struct vmspace *vm2;
+	struct ucred *cred;
 	struct file *fp_procdesc;
 	vm_ooffset_t mem_charged;
-	int error, nprocs_new, ok;
+	int error, nprocs_new;
 	static int curfail;
 	static struct timeval lastfail;
 	int flags, pages;
@@ -987,28 +997,21 @@ fork1(struct thread *td, struct fork_req *fr)
 	newproc->p_klist = knlist_alloc(&newproc->p_mtx);
 	STAILQ_INIT(&newproc->p_ktr);
 
-	sx_xlock(&allproc_lock);
-
 	/*
 	 * Increment the count of procs running with this uid. Don't allow
 	 * a nonprivileged user to exceed their current limit.
-	 *
-	 * XXXRW: Can we avoid privilege here if it's not needed?
 	 */
-	error = priv_check_cred(td->td_ucred, PRIV_PROC_LIMIT);
-	if (error == 0)
-		ok = chgproccnt(td->td_ucred->cr_ruidinfo, 1, 0);
-	else {
-		ok = chgproccnt(td->td_ucred->cr_ruidinfo, 1,
-		    lim_cur(td, RLIMIT_NPROC));
-	}
-	if (ok) {
-		do_fork(td, fr, newproc, td2, vm2, fp_procdesc);
-		return (0);
+	cred = td->td_ucred;
+	if (!chgproccnt(cred->cr_ruidinfo, 1, lim_cur(td, RLIMIT_NPROC))) {
+		if (priv_check_cred(cred, PRIV_PROC_LIMIT) != 0)
+			goto fail0;
+		chgproccnt(cred->cr_ruidinfo, 1, 0);
 	}
 
+	do_fork(td, fr, newproc, td2, vm2, fp_procdesc);
+	return (0);
+fail0:
 	error = EAGAIN;
-	sx_xunlock(&allproc_lock);
 #ifdef MAC
 	mac_proc_destroy(newproc);
 #endif

@@ -301,12 +301,3 @@ extern int firewire_phydma_enable;
 
 MALLOC_DECLARE(M_FW);
 MALLOC_DECLARE(M_FWXFER);
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "header",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

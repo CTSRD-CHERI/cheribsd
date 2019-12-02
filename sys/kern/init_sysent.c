@@ -9,6 +9,7 @@
 #include <sys/sysent.h>
 #include <sys/sysproto.h>
 
+
 #define AS(name) (sizeof(struct name) / sizeof(syscallarg_t))
 
 #ifdef COMPAT_43
@@ -45,6 +46,12 @@
 #define compat11(n, name) n, (sy_call_t *)__CONCAT(freebsd11_,name)
 #else
 #define compat11(n, name) 0, (sy_call_t *)nosys
+#endif
+
+#ifdef COMPAT_FREEBSD12
+#define compat12(n, name) n, (sy_call_t *)__CONCAT(freebsd12_,name)
+#else
+#define compat12(n, name) 0, (sy_call_t *)nosys
 #endif
 
 /* The casts are bogus but will do for now. */
@@ -531,7 +538,7 @@ struct sysent sysent[] = {
 	{ AS(truncate_args), (sy_call_t *)sys_truncate, AUE_TRUNCATE, NULL, 0, 0, 0, SY_THR_STATIC },	/* 479 = truncate */
 	{ AS(ftruncate_args), (sy_call_t *)sys_ftruncate, AUE_FTRUNCATE, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 480 = ftruncate */
 	{ AS(thr_kill2_args), (sy_call_t *)sys_thr_kill2, AUE_THR_KILL2, NULL, 0, 0, 0, SY_THR_STATIC },	/* 481 = thr_kill2 */
-	{ AS(shm_open_args), (sy_call_t *)sys_shm_open, AUE_SHMOPEN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 482 = shm_open */
+	{ compat12(AS(freebsd12_shm_open_args),shm_open), AUE_SHMOPEN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 482 = freebsd12 shm_open */
 	{ AS(shm_unlink_args), (sy_call_t *)sys_shm_unlink, AUE_SHMUNLINK, NULL, 0, 0, 0, SY_THR_STATIC },	/* 483 = shm_unlink */
 	{ AS(cpuset_args), (sy_call_t *)sys_cpuset, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 484 = cpuset */
 	{ AS(cpuset_setid_args), (sy_call_t *)sys_cpuset_setid, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 485 = cpuset_setid */
@@ -618,5 +625,8 @@ struct sysent sysent[] = {
 	{ AS(fhlinkat_args), (sy_call_t *)sys_fhlinkat, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 566 = fhlinkat */
 	{ AS(fhreadlink_args), (sy_call_t *)sys_fhreadlink, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 567 = fhreadlink */
 	{ AS(funlinkat_args), (sy_call_t *)sys_funlinkat, AUE_UNLINKAT, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 568 = funlinkat */
-	{ AS(copy_file_range_args), (sy_call_t *)sys_copy_file_range, AUE_NULL, NULL, 0, 0, 0, SY_THR_STATIC },	/* 569 = copy_file_range */
+	{ AS(copy_file_range_args), (sy_call_t *)sys_copy_file_range, AUE_NULL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 569 = copy_file_range */
+	{ AS(__sysctlbyname_args), (sy_call_t *)sys___sysctlbyname, AUE_SYSCTL, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 570 = __sysctlbyname */
+	{ AS(shm_open2_args), (sy_call_t *)sys_shm_open2, AUE_SHMOPEN, NULL, 0, 0, SYF_CAPENABLED, SY_THR_STATIC },	/* 571 = shm_open2 */
+	{ AS(shm_rename_args), (sy_call_t *)sys_shm_rename, AUE_SHMRENAME, NULL, 0, 0, 0, SY_THR_STATIC },	/* 572 = shm_rename */
 };

@@ -328,7 +328,7 @@ MIASM =  \
 	freebsd64_truncate.o \
 	ftruncate.o \
 	thr_kill2.o \
-	freebsd64_shm_open.o \
+	freebsd12_freebsd64_shm_open.o \
 	freebsd64_shm_unlink.o \
 	freebsd64_cpuset.o \
 	cpuset_setid.o \
@@ -411,4 +411,7 @@ MIASM =  \
 	freebsd64_fhlinkat.o \
 	freebsd64_fhreadlink.o \
 	freebsd64_funlinkat.o \
-	freebsd64_copy_file_range.o
+	freebsd64_copy_file_range.o \
+	freebsd64___sysctlbyname.o \
+	freebsd64_shm_open2.o \
+	freebsd64_shm_rename.o

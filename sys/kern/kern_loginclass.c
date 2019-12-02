@@ -189,8 +189,7 @@ int
 sys_getloginclass(struct thread *td, struct getloginclass_args *uap)
 {
 
-	return (kern_getloginclass(td, __USER_CAP(uap->namebuf, uap->namelen),
-	    uap->namelen));
+	return (kern_getloginclass(td, uap->namebuf, uap->namelen));
 }
 
 int
@@ -220,7 +219,7 @@ int
 sys_setloginclass(struct thread *td, struct setloginclass_args *uap)
 {
 
-	return (kern_setloginclass(td, __USER_CAP_STR(uap->namebuf)));
+	return (kern_setloginclass(td, uap->namebuf));
 }
 
 int

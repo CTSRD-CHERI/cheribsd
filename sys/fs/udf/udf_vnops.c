@@ -1265,11 +1265,6 @@ udf_reclaim(struct vop_reclaim_args *a)
 	vp = a->a_vp;
 	unode = VTON(vp);
 
-	/*
-	 * Destroy the vm object and flush associated pages.
-	 */
-	vnode_destroy_vobject(vp);
-
 	if (unode != NULL) {
 		vfs_hash_remove(vp);
 
@@ -1495,11 +1490,10 @@ udf_bmap_internal(struct udf_node *node, off_t offset, daddr_t *sector,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "struct iovec"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

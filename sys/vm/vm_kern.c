@@ -815,7 +815,7 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 	vm_map_lock(m);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
 	kernel_map = m;
-	(void) vm_map_insert(m, NULL, (vm_ooffset_t) 0,
+	(void)vm_map_insert(m, NULL, 0,
 #ifdef __amd64__
 	    KERNBASE,
 #else		     
@@ -823,6 +823,18 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 #endif
 	    ptr_to_va(start), VM_PROT_ALL, VM_PROT_ALL, MAP_NOFAULT);
 	/* ... and ending with the completion of the above `insert' */
+
+#ifdef __amd64__
+	/*
+	 * Mark KVA used for the page array as allocated.  Other platforms
+	 * that handle vm_page_array allocation can simply adjust virtual_avail
+	 * instead.
+	 */
+	(void)vm_map_insert(m, NULL, 0, (vm_offset_t)vm_page_array,
+	    (vm_offset_t)vm_page_array + round_2mpage(vm_page_array_size *
+	    sizeof(struct vm_page)),
+	    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT);
+#endif
 	vm_map_unlock(m);
 
 	/*
@@ -878,6 +890,14 @@ kmem_bootstrap_free(vm_offset_t start, vm_size_t size)
 	end = trunc_page(start + size);
 	start = round_page(start);
 
+#ifdef __amd64__
+	/*
+	 * Preloaded files do not have execute permissions by default on amd64.
+	 * Restore the default permissions to ensure that the direct map alias
+	 * is updated.
+	 */
+	pmap_change_prot(start, end - start, VM_PROT_RW);
+#endif
 	for (va = start; va < end; va += PAGE_SIZE) {
 		pa = pmap_kextract(va);
 		m = PHYS_TO_VM_PAGE(pa);
@@ -895,7 +915,6 @@ kmem_bootstrap_free(vm_offset_t start, vm_size_t size)
 #endif
 }
 
-#ifdef DIAGNOSTIC
 /*
  * Allow userspace to directly trigger the VM drain routine for testing
  * purposes.
@@ -918,15 +937,3 @@ debug_vm_lowmem(SYSCTL_HANDLER_ARGS)
 
 SYSCTL_PROC(_debug, OID_AUTO, vm_lowmem, CTLTYPE_INT | CTLFLAG_RW, 0, 0,
     debug_vm_lowmem, "I", "set to trigger vm_lowmem event with given flags");
-#endif
-// CHERI CHANGES START
-// {
-//   "updated": 20190606,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "uintptr_interp_offset",
-//     "pointer_as_integer",
-//     "support"
-//   ]
-// }
-// CHERI CHANGES END

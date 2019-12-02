@@ -782,11 +782,10 @@ DEFINE_IFUNC(, int, futex_xorl, (int, uint32_t *, int *))
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180912,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "struct iovec"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

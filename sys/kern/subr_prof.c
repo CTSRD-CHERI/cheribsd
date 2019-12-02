@@ -411,8 +411,8 @@ int
 sys_profil(struct thread *td, struct profil_args *uap)
 {
 
-	return (kern_profil(td, __USER_CAP(uap->samples, uap->size), uap->size,
-	    uap->offset, uap->scale));
+	return (kern_profil(td, uap->samples, uap->size, uap->offset,
+	    uap->scale));
 }
 
 int

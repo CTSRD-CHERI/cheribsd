@@ -54,7 +54,7 @@
 #include "en.h"
 #include "en_port.h"
 
-NETDUMP_DEFINE(mlx4_en);
+DEBUGNET_DEFINE(mlx4_en);
 
 static void mlx4_en_sysctl_stat(struct mlx4_en_priv *priv);
 static void mlx4_en_sysctl_conf(struct mlx4_en_priv *priv);
@@ -617,31 +617,30 @@ static void mlx4_en_clear_uclist(struct net_device *dev)
 	}
 }
 
+static u_int mlx4_copy_addr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
+{
+	struct mlx4_en_priv *priv = arg;
+	struct mlx4_en_addr_list *tmp;
+
+	if (sdl->sdl_alen != ETHER_ADDR_LEN)	/* XXXGL: can that happen? */
+		return (0);
+	tmp = kzalloc(sizeof(struct mlx4_en_addr_list), GFP_ATOMIC);
+	if (tmp == NULL) {
+		en_err(priv, "Failed to allocate address list\n");
+		return (0);
+	}
+	memcpy(tmp->addr, LLADDR(sdl), ETH_ALEN);
+	list_add_tail(&tmp->list, &priv->uc_list);
+
+	return (1);
+}
+
 static void mlx4_en_cache_uclist(struct net_device *dev)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
-	struct mlx4_en_addr_list *tmp;
-	struct ifaddr *ifa;
 
 	mlx4_en_clear_uclist(dev);
-
-	if_addr_rlock(dev);
-	CK_STAILQ_FOREACH(ifa, &dev->if_addrhead, ifa_link) {
-		if (ifa->ifa_addr->sa_family != AF_LINK)
-			continue;
-		if (((struct sockaddr_dl *)ifa->ifa_addr)->sdl_alen !=
-				ETHER_ADDR_LEN)
-			continue;
-		tmp = kzalloc(sizeof(struct mlx4_en_addr_list), GFP_ATOMIC);
-		if (tmp == NULL) {
-			en_err(priv, "Failed to allocate address list\n");
-			break;
-		}
-		memcpy(tmp->addr,
-			LLADDR((struct sockaddr_dl *)ifa->ifa_addr), ETH_ALEN);
-		list_add_tail(&tmp->list, &priv->uc_list);
-	}
-	if_addr_runlock(dev);
+	if_foreach_lladdr(dev, mlx4_copy_addr, priv);
 }
 
 static void mlx4_en_clear_mclist(struct net_device *dev)
@@ -655,31 +654,29 @@ static void mlx4_en_clear_mclist(struct net_device *dev)
 	}
 }
 
+static u_int mlx4_copy_maddr(void *arg, struct sockaddr_dl *sdl, u_int count)
+{
+	struct mlx4_en_priv *priv = arg;
+	struct mlx4_en_addr_list *tmp;
+
+	if (sdl->sdl_alen != ETHER_ADDR_LEN)	/* XXXGL: can that happen? */
+		return (0);
+	tmp = kzalloc(sizeof(struct mlx4_en_addr_list), GFP_ATOMIC);
+	if (tmp == NULL) {
+		en_err(priv, "Failed to allocate address list\n");
+		return (0);
+	}
+	memcpy(tmp->addr, LLADDR(sdl), ETH_ALEN);
+	list_add_tail(&tmp->list, &priv->mc_list);
+	return (1);
+}
+
 static void mlx4_en_cache_mclist(struct net_device *dev)
 {
 	struct mlx4_en_priv *priv = netdev_priv(dev);
-	struct mlx4_en_addr_list *tmp;
-	struct ifmultiaddr *ifma;
 
 	mlx4_en_clear_mclist(dev);
-
-	if_maddr_rlock(dev);
-	CK_STAILQ_FOREACH(ifma, &dev->if_multiaddrs, ifma_link) {
-		if (ifma->ifma_addr->sa_family != AF_LINK)
-			continue;
-		if (((struct sockaddr_dl *)ifma->ifma_addr)->sdl_alen !=
-				ETHER_ADDR_LEN)
-			continue;
-		tmp = kzalloc(sizeof(struct mlx4_en_addr_list), GFP_ATOMIC);
-		if (tmp == NULL) {
-			en_err(priv, "Failed to allocate address list\n");
-			break;
-		}
-		memcpy(tmp->addr,
-			LLADDR((struct sockaddr_dl *)ifma->ifma_addr), ETH_ALEN);
-		list_add_tail(&tmp->list, &priv->mc_list);
-	}
-	if_maddr_runlock(dev);
+	if_foreach_llmaddr(dev, mlx4_copy_maddr, priv);
 }
 
 static void update_addr_list_flags(struct mlx4_en_priv *priv,
@@ -2307,7 +2304,7 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 	ifmedia_add(&priv->media, IFM_ETHER | IFM_AUTO, 0, NULL);
 	ifmedia_set(&priv->media, IFM_ETHER | IFM_AUTO);
 
-	NETDUMP_SET(dev, mlx4_en);
+	DEBUGNET_SET(dev, mlx4_en);
 
 	en_warn(priv, "Using %d TX rings\n", prof->tx_ring_num);
 	en_warn(priv, "Using %d RX rings\n", prof->rx_ring_num);
@@ -2891,27 +2888,27 @@ static void mlx4_en_sysctl_stat(struct mlx4_en_priv *priv)
 	}
 }
 
-#ifdef NETDUMP
+#ifdef DEBUGNET
 static void
-mlx4_en_netdump_init(struct ifnet *dev, int *nrxr, int *ncl, int *clsize)
+mlx4_en_debugnet_init(struct ifnet *dev, int *nrxr, int *ncl, int *clsize)
 {
 	struct mlx4_en_priv *priv;
 
 	priv = if_getsoftc(dev);
 	mutex_lock(&priv->mdev->state_lock);
 	*nrxr = priv->rx_ring_num;
-	*ncl = NETDUMP_MAX_IN_FLIGHT;
+	*ncl = DEBUGNET_MAX_IN_FLIGHT;
 	*clsize = priv->rx_mb_size;
 	mutex_unlock(&priv->mdev->state_lock);
 }
 
 static void
-mlx4_en_netdump_event(struct ifnet *dev, enum netdump_ev event)
+mlx4_en_debugnet_event(struct ifnet *dev, enum debugnet_ev event)
 {
 }
 
 static int
-mlx4_en_netdump_transmit(struct ifnet *dev, struct mbuf *m)
+mlx4_en_debugnet_transmit(struct ifnet *dev, struct mbuf *m)
 {
 	struct mlx4_en_priv *priv;
 	int err;
@@ -2928,7 +2925,7 @@ mlx4_en_netdump_transmit(struct ifnet *dev, struct mbuf *m)
 }
 
 static int
-mlx4_en_netdump_poll(struct ifnet *dev, int count)
+mlx4_en_debugnet_poll(struct ifnet *dev, int count)
 {
 	struct mlx4_en_priv *priv;
 
@@ -2940,10 +2937,10 @@ mlx4_en_netdump_poll(struct ifnet *dev, int count)
 
 	return (0);
 }
-#endif /* NETDUMP */
+#endif /* DEBUGNET */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191029,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net"

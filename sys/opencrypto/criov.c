@@ -298,11 +298,10 @@ crypto_contiguous_subsegment(int crp_flags, void *crpbuf,
 
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

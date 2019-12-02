@@ -164,7 +164,7 @@ range_tree_seg_compare(const void *x1, const void *x2)
 
 	ASSERT3U(r1->rs_start, <=, r1->rs_end);
 	ASSERT3U(r2->rs_start, <=, r2->rs_end);
-	
+
 	return ((r1->rs_start >= r2->rs_end) - (r1->rs_end <= r2->rs_start));
 }
 
@@ -511,13 +511,11 @@ range_tree_find(range_tree_t *rt, uint64_t start, uint64_t size)
 }
 
 void
-range_tree_verify(range_tree_t *rt, uint64_t off, uint64_t size)
+range_tree_verify_not_present(range_tree_t *rt, uint64_t off, uint64_t size)
 {
-	range_seg_t *rs;
-
-	rs = range_tree_find(rt, off, size);
+	range_seg_t *rs = range_tree_find(rt, off, size);
 	if (rs != NULL)
-		panic("freeing free block; rs=%p", (void *)rs);
+		panic("segment already in tree; rs=%p", (void *)rs);
 }
 
 boolean_t

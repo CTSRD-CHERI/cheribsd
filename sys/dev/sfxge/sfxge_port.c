@@ -358,36 +358,35 @@ done:
 	SFXGE_PORT_UNLOCK(port);
 }
 
+static u_int
+sfxge_copy_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
+{
+	uint8_t *mcast_addr = arg;
+
+	if (cnt == EFX_MAC_MULTICAST_LIST_MAX)
+		return (0);
+
+	memcpy(mcast_addr + (cnt * EFX_MAC_ADDR_LEN), LLADDR(sdl),
+	    EFX_MAC_ADDR_LEN);
+
+	return (1);
+}
+
 static int
 sfxge_mac_multicast_list_set(struct sfxge_softc *sc)
 {
 	struct ifnet *ifp = sc->ifnet;
 	struct sfxge_port *port = &sc->port;
-	uint8_t *mcast_addr = port->mcast_addrs;
-	struct ifmultiaddr *ifma;
-	struct sockaddr_dl *sa;
 	int rc = 0;
 
 	mtx_assert(&port->lock, MA_OWNED);
 
-	port->mcast_count = 0;
-	if_maddr_rlock(ifp);
-	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-		if (ifma->ifma_addr->sa_family == AF_LINK) {
-			if (port->mcast_count == EFX_MAC_MULTICAST_LIST_MAX) {
-				device_printf(sc->dev,
-				    "Too many multicast addresses\n");
-				rc = EINVAL;
-				break;
-			}
-
-			sa = (struct sockaddr_dl *)ifma->ifma_addr;
-			memcpy(mcast_addr, LLADDR(sa), EFX_MAC_ADDR_LEN);
-			mcast_addr += EFX_MAC_ADDR_LEN;
-			++port->mcast_count;
-		}
+	port->mcast_count = if_foreach_llmaddr(ifp, sfxge_copy_maddr,
+	    port->mcast_addrs);
+	if (port->mcast_count == EFX_MAC_MULTICAST_LIST_MAX) {
+		device_printf(sc->dev, "Too many multicast addresses\n");
+		rc = EINVAL;
 	}
-	if_maddr_runlock(ifp);
 
 	if (rc == 0) {
 		rc = efx_mac_multicast_list_set(sc->enp, port->mcast_addrs,
@@ -485,6 +484,7 @@ int
 sfxge_port_start(struct sfxge_softc *sc)
 {
 	uint8_t mac_addr[ETHER_ADDR_LEN];
+	struct epoch_tracker et;
 	struct ifnet *ifp = sc->ifnet;
 	struct sfxge_port *port;
 	efx_nic_t *enp;
@@ -518,10 +518,10 @@ sfxge_port_start(struct sfxge_softc *sc)
 		goto fail3;
 
 	/* Set the unicast address */
-	if_addr_rlock(ifp);
+	NET_EPOCH_ENTER(et);
 	bcopy(LLADDR((struct sockaddr_dl *)ifp->if_addr->ifa_addr),
 	      mac_addr, sizeof(mac_addr));
-	if_addr_runlock(ifp);
+	NET_EPOCH_EXIT(et);
 	if ((rc = efx_mac_addr_set(enp, mac_addr)) != 0)
 		goto fail4;
 
@@ -798,7 +798,8 @@ sfxge_port_init(struct sfxge_softc *sc)
 	port->mac_stats.decode_buf = malloc(EFX_MAC_NSTATS * sizeof(uint64_t),
 					    M_SFXGE, M_WAITOK | M_ZERO);
 	mac_nstats = efx_nic_cfg_get(sc->enp)->enc_mac_stats_nstats;
-	mac_stats_size = P2ROUNDUP(mac_nstats * sizeof(uint64_t), EFX_BUF_SIZE);
+	mac_stats_size = EFX_P2ROUNDUP(size_t, mac_nstats * sizeof(uint64_t),
+				       EFX_BUF_SIZE);
 	if ((rc = sfxge_dma_alloc(sc, mac_stats_size, mac_stats_buf)) != 0)
 		goto fail2;
 	port->stats_update_period_ms = sfxge_port_stats_update_period_ms(sc);

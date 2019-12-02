@@ -20,7 +20,6 @@ SUBDIR=	alias \
 	cksum \
 	cmp \
 	col \
-	colldef \
 	colrm \
 	column \
 	comm \
@@ -94,7 +93,6 @@ SUBDIR=	alias \
 	mkdep \
 	mkfifo \
 	mkimg \
-	mklocale \
 	mktemp \
 	mkuzip \
 	mt \
@@ -205,7 +203,6 @@ SUBDIR.${MK_BLUETOOTH}+=	bluetooth
 SUBDIR.${MK_BSD_CPIO}+=	cpio
 SUBDIR.${MK_CALENDAR}+=	calendar
 SUBDIR.${MK_CHERI}+=	capsize \
-			libpng_sb_test \
 			qtrace
 SUBDIR.${MK_CLANG}+=	clang
 SUBDIR.${MK_DIALOG}+=	dpv
@@ -237,6 +234,8 @@ SUBDIR.${MK_KDUMP}+=	truss
 SUBDIR.${MK_KERBEROS_SUPPORT}+=	compile_et
 SUBDIR.${MK_LDNS_UTILS}+=	drill
 SUBDIR.${MK_LDNS_UTILS}+=	host
+SUBDIR.${MK_LIB32}+=	ldd32
+SUBDIR.${MK_LIB64}+=	ldd64
 SUBDIR.${MK_LOCATE}+=	locate
 # XXX msgs?
 SUBDIR.${MK_MAIL}+=	biff

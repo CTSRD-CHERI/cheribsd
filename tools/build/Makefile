@@ -5,7 +5,7 @@
 LIB=		egacy
 SRC=
 INCSGROUPS=	INCS SYSINCS CASPERINC
-INCSGROUPS+=	MACHINESYSINCS UFSINCS FFSINCS X86INCS RPCINCS
+INCSGROUPS+=	MACHINESYSINCS UFSINCS FFSINCS MSDOSFSINCS X86INCS RPCINCS DISKINCS
 INCS=
 
 SYSINCSDIR=	${INCLUDEDIR}/sys
@@ -13,6 +13,9 @@ CASPERINCDIR=	${INCLUDEDIR}/casper
 MACHINESYSINCSDIR=	${INCLUDEDIR}/machine
 UFSINCSDIR=	${INCLUDEDIR}/ufs/ufs
 FFSINCSDIR=	${INCLUDEDIR}/ufs/ffs
+# Also add msdosfs+sys/disk headers to allow building makefs as a bootstrap tool
+MSDOSFSINCSDIR=	${INCLUDEDIR}/fs/msdosfs
+DISKINCSDIR=	${INCLUDEDIR}/sys/disk
 X86INCSDIR=	${INCLUDEDIR}/x86
 
 BOOTSTRAPPING?=	0
@@ -82,8 +85,9 @@ SRCS+=		explicit_bzero.c
 
 .if exists(${HOST_INCLUDE_ROOT}/capsicum_helpers.h)
 _WITH_CAPH_ENTER!= grep -c caph_enter ${HOST_INCLUDE_ROOT}/capsicum_helpers.h || true
+_WITH_CAPH_RIGHTS_LIMIT!= grep -c caph_rights_limit ${HOST_INCLUDE_ROOT}/capsicum_helpers.h || true
 .endif
-.if !defined(_WITH_CAPH_ENTER) || ${_WITH_CAPH_ENTER} == 0
+.if !defined(_WITH_CAPH_ENTER) || ${_WITH_CAPH_ENTER} == 0 || ${_WITH_CAPH_RIGHTS_LIMIT} == 0
 .PATH: ${SRCTOP}/lib/libcapsicum
 INCS+=		capsicum_helpers.h
 .PATH: ${SRCTOP}/lib/libcasper/libcasper
@@ -162,6 +166,14 @@ SUBDIR+=		cross-build
 UFSINCS+=	${SRCTOP}/sys/ufs/ufs/dinode.h
 UFSINCS+=	${SRCTOP}/sys/ufs/ufs/dir.h
 FFSINCS+=	${SRCTOP}/sys/ufs/ffs/fs.h
+
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/bootsect.h
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/bpb.h
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/denode.h
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/direntry.h
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/fat.h
+MSDOSFSINCS+=	${SRCTOP}/sys/fs/msdosfs/msdosfsmount.h
+DISKINCS+=	${SRCTOP}/sys/sys/disk/bsd.h
 
 # Needed to build config (since it uses libnv)
 SYSINCS+=	${SRCTOP}/sys/sys/nv.h ${SRCTOP}/sys/sys/cnv.h \
@@ -252,10 +264,18 @@ host-symlinks:
 # Create all the directories that are needed during the legacy, bootstrap-tools
 # and cross-tools stages. We do this here using mkdir since mtree may not exist
 # yet (this happens if we are crossbuilding from Linux/Mac).
+INSTALLDIR_LIST= \
+	bin \
+	lib/casper \
+	lib/geom \
+	usr/include/casper \
+	usr/include/private/zstd \
+	usr/lib \
+	usr/libexec
+
 installdirs:
-.for _dir in bin usr/lib usr/include usr/include/casper lib/geom lib/casper
-	mkdir -p "${DESTDIR}/${_dir}"
-.endfor
+	mkdir -p ${INSTALLDIR_LIST:S,^,${DESTDIR}/,}
+
 # Link usr/bin, sbin, and usr/sbin to bin so that it doesn't matter whether a
 # bootstrap tool was added to WORLTMP with a symlink or by building it in the
 # bootstrap-tools phase. We could also overrride BINDIR when building bootstrap

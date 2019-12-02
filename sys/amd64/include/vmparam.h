@@ -165,6 +165,7 @@
  *
  * Within the kernel map:
  *
+ * 0xfffffe0000000000                        vm_page_array
  * 0xffffffff80000000                        KERNBASE
  */
 
@@ -210,6 +211,12 @@
 	    ("virtual address %#jx not covered by the DMAP",		\
 	    (uintmax_t)x));						\
 	(x) & ~DMAP_MIN_ADDRESS; })
+
+/*
+ * amd64 maps the page array into KVA so that it can be more easily
+ * allocated on the correct memory domains.
+ */
+#define	PMAP_HAS_PAGE_ARRAY	1
 
 /*
  * How many physical pages per kmem arena virtual page.

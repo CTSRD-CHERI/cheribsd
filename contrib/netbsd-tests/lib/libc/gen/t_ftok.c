@@ -28,18 +28,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-/*
- * CHERI CHANGES START
- * {
- *   "updated": 20181121,
- *   "target_type": "test",
- *   "changes": [
- *     "calling_convention"
- *   ],
- *   "change_comment": "Missing mode to open with O_CREAT"
- * }
- * CHERI CHANGES END
- */
 #include <sys/cdefs.h>
 __RCSID("$NetBSD: t_ftok.c,v 1.2 2017/01/10 15:19:52 christos Exp $");
 

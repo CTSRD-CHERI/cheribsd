@@ -172,7 +172,7 @@ tmpfs_update_mtime(struct mount *mp, bool lazy)
 		 * For non-lazy case, we must flush all pending
 		 * metadata changes now.
 		 */
-		if (!lazy || (obj->flags & OBJ_TMPFS_DIRTY) != 0) {
+		if (!lazy || obj->generation != obj->cleangeneration) {
 			if (vget(vp, LK_EXCLUSIVE | LK_INTERLOCK,
 			    curthread) != 0)
 				continue;
@@ -262,8 +262,7 @@ again:
 		vm_map_lock(map);
 		if (map->busy)
 			vm_map_wait_busy(map);
-		for (entry = map->header.next; entry != &map->header;
-		    entry = entry->next) {
+		VM_MAP_ENTRY_FOREACH(entry, map) {
 			if ((entry->eflags & (MAP_ENTRY_GUARD |
 			    MAP_ENTRY_IS_SUB_MAP | MAP_ENTRY_COW)) != 0 ||
 			    (entry->max_protection & VM_PROT_WRITE) == 0)
@@ -507,7 +506,8 @@ tmpfs_mount(struct mount *mp)
 
 	MNT_ILOCK(mp);
 	mp->mnt_flag |= MNT_LOCAL;
-	mp->mnt_kern_flag |= MNTK_LOOKUP_SHARED | MNTK_EXTENDED_SHARED;
+	mp->mnt_kern_flag |= MNTK_LOOKUP_SHARED | MNTK_EXTENDED_SHARED |
+	    MNTK_TEXT_REFS | MNTK_NOMSYNC;
 	MNT_IUNLOCK(mp);
 
 	mp->mnt_data = tmp;
@@ -709,7 +709,8 @@ tmpfs_susp_clean(struct mount *mp __unused)
 struct vfsops tmpfs_vfsops = {
 	.vfs_mount =			tmpfs_mount,
 	.vfs_unmount =			tmpfs_unmount,
-	.vfs_root =			tmpfs_root,
+	.vfs_root =			vfs_cache_root,
+	.vfs_cachedroot =		tmpfs_root,
 	.vfs_statfs =			tmpfs_statfs,
 	.vfs_fhtovp =			tmpfs_fhtovp,
 	.vfs_sync =			tmpfs_sync,

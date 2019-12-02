@@ -488,7 +488,7 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_truncate",			/* 479 = freebsd64_truncate */
 	"ftruncate",			/* 480 = ftruncate */
 	"thr_kill2",			/* 481 = thr_kill2 */
-	"freebsd64_shm_open",			/* 482 = freebsd64_shm_open */
+	"compat12.freebsd64_shm_open",		/* 482 = freebsd12 freebsd64_shm_open */
 	"freebsd64_shm_unlink",			/* 483 = freebsd64_shm_unlink */
 	"freebsd64_cpuset",			/* 484 = freebsd64_cpuset */
 	"cpuset_setid",			/* 485 = cpuset_setid */
@@ -576,4 +576,7 @@ const char *freebsd64_syscallnames[] = {
 	"freebsd64_fhreadlink",			/* 567 = freebsd64_fhreadlink */
 	"freebsd64_funlinkat",			/* 568 = freebsd64_funlinkat */
 	"freebsd64_copy_file_range",			/* 569 = freebsd64_copy_file_range */
+	"freebsd64___sysctlbyname",			/* 570 = freebsd64___sysctlbyname */
+	"freebsd64_shm_open2",			/* 571 = freebsd64_shm_open2 */
+	"freebsd64_shm_rename",			/* 572 = freebsd64_shm_rename */
 };

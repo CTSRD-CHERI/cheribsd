@@ -307,12 +307,3 @@ nlm_get_cipher_param(struct xlp_sec_command *cmd)
 	}
 	return (0);
 }
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

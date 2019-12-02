@@ -472,6 +472,11 @@ sctp_clean_up_control(struct sctp_tcb *stcb, struct sctp_queued_to_read *control
 		chk->data = NULL;
 		sctp_free_a_chunk(stcb, chk, SCTP_SO_NOT_LOCKED);
 	}
+	sctp_free_remote_addr(control->whoFrom);
+	if (control->data) {
+		sctp_m_freem(control->data);
+		control->data = NULL;
+	}
 	sctp_free_a_readq(stcb, control);
 }
 
@@ -711,6 +716,7 @@ sctp_add_to_tail_pointer(struct sctp_queued_to_read *control, struct mbuf *m, ui
 	}
 	if (control->tail_mbuf == NULL) {
 		/* TSNH */
+		sctp_m_freem(control->data);
 		control->data = m;
 		sctp_setup_tail_pointer(control);
 		return;
@@ -1479,6 +1485,16 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 				    "The last fsn is now in place fsn: %u\n",
 				    chk->rec.data.fsn);
 				control->last_frag_seen = 1;
+				if (SCTP_TSN_GT(control->top_fsn, chk->rec.data.fsn)) {
+					SCTPDBG(SCTP_DEBUG_XXX,
+					    "New fsn: %u is not at top_fsn: %u -- abort\n",
+					    chk->rec.data.fsn,
+					    control->top_fsn);
+					sctp_abort_in_reasm(stcb, control, chk,
+					    abort_flag,
+					    SCTP_FROM_SCTP_INDATA + SCTP_LOC_9);
+					return;
+				}
 			}
 			if (asoc->idata_supported || control->first_frag_seen) {
 				/*
@@ -1494,7 +1510,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					 */
 					sctp_abort_in_reasm(stcb, control, chk,
 					    abort_flag,
-					    SCTP_FROM_SCTP_INDATA + SCTP_LOC_9);
+					    SCTP_FROM_SCTP_INDATA + SCTP_LOC_10);
 					return;
 				}
 			}
@@ -1506,7 +1522,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 				    chk->rec.data.fsn, control->top_fsn);
 				sctp_abort_in_reasm(stcb, control,
 				    chk, abort_flag,
-				    SCTP_FROM_SCTP_INDATA + SCTP_LOC_10);
+				    SCTP_FROM_SCTP_INDATA + SCTP_LOC_11);
 				return;
 			}
 			if (asoc->idata_supported || control->first_frag_seen) {
@@ -1527,7 +1543,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 					    chk->rec.data.fsn, control->fsn_included);
 					sctp_abort_in_reasm(stcb, control, chk,
 					    abort_flag,
-					    SCTP_FROM_SCTP_INDATA + SCTP_LOC_11);
+					    SCTP_FROM_SCTP_INDATA + SCTP_LOC_12);
 					return;
 				}
 			}
@@ -1542,7 +1558,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 				    control->top_fsn);
 				sctp_abort_in_reasm(stcb, control, chk,
 				    abort_flag,
-				    SCTP_FROM_SCTP_INDATA + SCTP_LOC_12);
+				    SCTP_FROM_SCTP_INDATA + SCTP_LOC_13);
 				return;
 			}
 		}
@@ -1585,7 +1601,7 @@ sctp_queue_data_for_reasm(struct sctp_tcb *stcb, struct sctp_association *asoc,
 				    at->rec.data.fsn);
 				sctp_abort_in_reasm(stcb, control,
 				    chk, abort_flag,
-				    SCTP_FROM_SCTP_INDATA + SCTP_LOC_13);
+				    SCTP_FROM_SCTP_INDATA + SCTP_LOC_14);
 				return;
 			}
 		}
@@ -2104,10 +2120,13 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb, struct sctp_association *asoc,
 			struct mbuf *mm;
 
 			control->data = dmbuf;
+			control->tail_mbuf = NULL;
 			for (mm = control->data; mm; mm = mm->m_next) {
 				control->length += SCTP_BUF_LEN(mm);
+				if (SCTP_BUF_NEXT(mm) == NULL) {
+					control->tail_mbuf = mm;
+				}
 			}
-			control->tail_mbuf = NULL;
 			control->end_added = 1;
 			control->last_frag_seen = 1;
 			control->first_frag_seen = 1;
@@ -3098,13 +3117,12 @@ sctp_process_segment_range(struct sctp_tcb *stcb, struct sctp_tmit_chunk **p_tp1
 							 * update RTO too ?
 							 */
 							if (tp1->do_rtt) {
-								if (*rto_ok) {
-									tp1->whoTo->RTO =
-									    sctp_calculate_rto(stcb,
-									    &stcb->asoc,
-									    tp1->whoTo,
-									    &tp1->sent_rcv_time,
-									    SCTP_RTT_FROM_DATA);
+								if (*rto_ok &&
+								    sctp_calculate_rto(stcb,
+								    &stcb->asoc,
+								    tp1->whoTo,
+								    &tp1->sent_rcv_time,
+								    SCTP_RTT_FROM_DATA)) {
 									*rto_ok = 0;
 								}
 								if (tp1->whoTo->rto_needed == 0) {
@@ -4076,16 +4094,12 @@ sctp_express_handle_sack(struct sctp_tcb *stcb, uint32_t cumack,
 
 						/* update RTO too? */
 						if (tp1->do_rtt) {
-							if (rto_ok) {
-								tp1->whoTo->RTO =
-								/*
-								 * sa_ignore
-								 * NO_NULL_CHK
-								 */
-								    sctp_calculate_rto(stcb,
-								    asoc, tp1->whoTo,
-								    &tp1->sent_rcv_time,
-								    SCTP_RTT_FROM_DATA);
+							if (rto_ok &&
+							    sctp_calculate_rto(stcb,
+							    &stcb->asoc,
+							    tp1->whoTo,
+							    &tp1->sent_rcv_time,
+							    SCTP_RTT_FROM_DATA)) {
 								rto_ok = 0;
 							}
 							if (tp1->whoTo->rto_needed == 0) {
@@ -4694,12 +4708,12 @@ hopeless_peer:
 
 						/* update RTO too? */
 						if (tp1->do_rtt) {
-							if (rto_ok) {
-								tp1->whoTo->RTO =
-								    sctp_calculate_rto(stcb,
-								    asoc, tp1->whoTo,
-								    &tp1->sent_rcv_time,
-								    SCTP_RTT_FROM_DATA);
+							if (rto_ok &&
+							    sctp_calculate_rto(stcb,
+							    &stcb->asoc,
+							    tp1->whoTo,
+							    &tp1->sent_rcv_time,
+							    SCTP_RTT_FROM_DATA)) {
 								rto_ok = 0;
 							}
 							if (tp1->whoTo->rto_needed == 0) {

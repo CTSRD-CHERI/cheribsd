@@ -35,7 +35,6 @@
 #
 # $FreeBSD$
 
-PACKAGE=lib${LIB}
 OPENPAM=	${SRCTOP}/contrib/openpam
 .PATH: ${OPENPAM}/include ${OPENPAM}/lib/libpam ${OPENPAM}/doc/man
 
@@ -43,6 +42,8 @@ OPENPAM=	${SRCTOP}/contrib/openpam
 .if !defined(LIB)
 SHLIB=	pam
 .endif
+
+PACKAGE=	runtime
 
 MK_PROFILE=no
 
@@ -163,6 +164,9 @@ CFLAGS+= -DHAVE_FDLOPEN=1
 CFLAGS+= -DHAVE_FPURGE=1
 CFLAGS+= -DHAVE_STRLCAT=1
 CFLAGS+= -DHAVE_STRLCPY=1
+.ifdef LIBCHERI
+CFLAGS+= -DCOMPAT_CHERI=1
+.endif
 
 HEADERS=	security/openpam.h \
 		security/openpam_attr.h \

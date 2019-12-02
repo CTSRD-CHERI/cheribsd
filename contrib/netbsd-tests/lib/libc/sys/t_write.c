@@ -28,12 +28,12 @@
 /*
  * CHERI CHANGES START
  * {
- *   "updated": 20181121,
+ *   "updated": 20191104,
  *   "target_type": "test",
  *   "changes": [
- *     "calling_convention"
+ *     "other"
  *   ],
- *   "change_comment": "Missing mode to open with O_CREAT"
+ *   "change_comment": "EPROT"
  * }
  * CHERI CHANGES END
  */

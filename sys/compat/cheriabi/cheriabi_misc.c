@@ -123,8 +123,8 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_util.h>
 #if 0
 #include <compat/cheriabi/cheriabi_ipc.h>
-#include <compat/cheriabi/cheriabi_misc.h>
 #endif
+#include <compat/cheriabi/cheriabi_misc.h>
 #include <compat/cheriabi/cheriabi_signal.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
@@ -132,6 +132,13 @@ __FBSDID("$FreeBSD$");
 MALLOC_DECLARE(M_KQUEUE);
 
 FEATURE(compat_cheri_abi, "Compatible CHERI system call ABI");
+
+struct sf_hdtr_c {
+	struct iovec_c * __capability headers;	/* pointer to an array of header struct iovec's */
+	int hdr_cnt;		/* number of header iovec's */
+	struct iovec_c * __capability trailers;	/* pointer to an array of trailer struct iovec's */
+	int trl_cnt;		/* number of trailer iovec's */
+};
 
 #ifdef CHERIABI_NEEDS_UPDATE
 CTASSERT(sizeof(struct kevent32) == 20);
@@ -600,14 +607,17 @@ _sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
 	copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap));
 }
 
-register_t *
-cheriabi_copyout_strings(struct image_params *imgp)
+/*
+ * XXXBD: should check copyout/su* for errors, but punt for now as this
+ * function shouldn't be long for the world.
+ */
+int
+cheriabi_copyout_strings(struct image_params *imgp, register_t **stack_base)
 {
 	int argc, envc;
 	void * __capability * __capability vectp;
 	char *stringp;
 	char * __capability destp;
-	void * __capability *stack_base;
 	struct cheriabi_ps_strings * __capability arginfo;
 	char canary[sizeof(long) * 8];
 	size_t execpath_len;
@@ -692,7 +702,8 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	stack_base = (__cheri_fromcap void * __capability *)vectp;
+	*stack_base = (__cheri_fromcap register_t *)
+	    (register_t * __capability)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -747,7 +758,7 @@ cheriabi_copyout_strings(struct image_params *imgp)
 	/* XXX: suword clears the tag */
 	suword(vectp++, 0);
 
-	return ((register_t *)stack_base);
+	return (0);
 }
 
 #define	AUXARGS_ENTRY_NOCAP(pos, id, val)				\
@@ -1423,6 +1434,23 @@ cheriabi___sysctl(struct thread *td, struct cheriabi___sysctl_args *uap)
 
 	return (kern_sysctl(td, uap->name, uap->namelen, uap->old,
 	    uap->oldlenp, uap->new, uap->newlen, SCTL_CHERIABI));
+}
+
+int
+cheriabi___sysctlbyname(struct thread *td,
+    struct cheriabi___sysctlbyname_args *uap)
+{
+	size_t rv;
+	int error;
+
+	error = kern___sysctlbyname(td, uap->name, uap->namelen, uap->old,
+	    uap->oldlenp, uap->new, uap->newlen, &rv, 0, 0);
+	if (error != 0)
+		return (error);
+	if (uap->oldlenp != NULL)
+		error = copyout(&rv, uap->oldlenp, sizeof(rv));
+
+	return (error);
 }
 
 /*

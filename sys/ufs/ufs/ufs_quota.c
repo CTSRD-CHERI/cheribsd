@@ -161,6 +161,7 @@ chkdq(struct inode *ip, ufs2_daddr_t change, struct ucred *cred, int flags)
 	struct vnode *vp = ITOV(ip);
 	int i, error, warn, do_check;
 
+	MPASS(cred != NOCRED || (flags & FORCE) != 0);
 	/*
 	 * Disk quotas must be turned off for system files.  Currently
 	 * snapshot and quota files.
@@ -313,6 +314,7 @@ chkiq(struct inode *ip, int change, struct ucred *cred, int flags)
 	struct dquot *dq;
 	int i, error, warn, do_check;
 
+	MPASS(cred != NOCRED || (flags & FORCE) != 0);
 #ifdef DIAGNOSTIC
 	if ((flags & CHOWN) == 0)
 		chkdquot(ip);
@@ -492,7 +494,7 @@ chkdquot(struct inode *ip)
  * Q_QUOTAON - set up a quota file for a particular filesystem.
  */
 int
-quotaon(struct thread *td, struct mount *mp, int type, void * __CAPABILITY fname)
+quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname)
 {
 	struct ufsmount *ump;
 	struct vnode *vp, **vpp;
@@ -617,7 +619,7 @@ again:
 			MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);
 			goto again;
 		}
-		if (vp->v_type == VNON || vp->v_writecount == 0) {
+		if (vp->v_type == VNON || vp->v_writecount <= 0) {
 			VOP_UNLOCK(vp, 0);
 			vrele(vp);
 			continue;
@@ -999,7 +1001,7 @@ setuse32(struct thread *td, struct mount *mp, u_long id, int type,
 
 int
 getquota(struct thread *td, struct mount *mp, u_long id, int type,
-    void * __CAPABILITY addr)
+    void * __capability addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1013,7 +1015,7 @@ getquota(struct thread *td, struct mount *mp, u_long id, int type,
 
 int
 setquota(struct thread *td, struct mount *mp, u_long id, int type,
-    void * __CAPABILITY addr)
+    void * __capability addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1027,7 +1029,7 @@ setquota(struct thread *td, struct mount *mp, u_long id, int type,
 
 int
 setuse(struct thread *td, struct mount *mp, u_long id, int type,
-    void * __CAPABILITY addr)
+    void * __capability addr)
 {
 	struct dqblk64 dqb64;
 	int error;
@@ -1044,7 +1046,7 @@ setuse(struct thread *td, struct mount *mp, u_long id, int type,
  */
 int
 getquotasize(struct thread *td, struct mount *mp, u_long id, int type,
-    void * __CAPABILITY sizep)
+    void * __capability sizep)
 {
 	struct ufsmount *ump = VFSTOUFS(mp);
 	int bitsize;
@@ -1891,11 +1893,10 @@ dqb32_dqb64(const struct dqblk32 *dqb32, struct dqblk64 *dqb64)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190628,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [

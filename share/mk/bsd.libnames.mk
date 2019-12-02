@@ -137,6 +137,7 @@ LIBSDP?=	${LIBDESTDIR}${LIBDIR_BASE}/libsdp.a
 LIBSMB?=	${LIBDESTDIR}${LIBDIR_BASE}/libsmb.a
 LIBSSL?=	${LIBDESTDIR}${LIBDIR_BASE}/libssl.a
 LIBSSP_NONSHARED?=	${LIBDESTDIR}${LIBDIR_BASE}/libssp_nonshared.a
+LIBSTATS?=	${LIBDESTDIR}${LIBDIR_BASE}/libstats.a
 LIBSTATCOUNTERS?= ${LIBDESTDIR}${LIBDIR_BASE}/libstatcounters.a
 LIBSTDCPLUSPLUS?= ${LIBDESTDIR}${LIBDIR_BASE}/libstdc++.a
 LIBSTDTHREADS?=	${LIBDESTDIR}${LIBDIR_BASE}/libstdthreads.a
@@ -176,7 +177,6 @@ LIBHELLOWORLD?=	${DESTDIR}${LIBDIR_BASE}/libhelloworld.a
 LIBJPEG?=	${DESTDIR}${LIBDIR_BASE}/libjpeg.a
 LIBMALLOC_SIMPLE=	${DESTDIR}${LIBDIR_BASE}/libmalloc_simple.a
 LIBPNG?=	${DESTDIR}${LIBDIR_BASE}/libpng.a
-LIBPNG_SB?=	${DESTDIR}${LIBDIR_BASE}/libpng_sb.a
 LIBSYSCALLS?=	${DESTDIR}${LIBDIR_BASE}/libsyscalls.a
 
 # enforce that -lcheri, -lpthread, and -lc to always be the last in that

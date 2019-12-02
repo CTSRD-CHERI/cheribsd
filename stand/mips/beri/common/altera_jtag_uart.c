@@ -42,7 +42,7 @@
  * Hard-coded physical address for the first JTAG UART -- true on all BERI and
  * CHERI boards.
  */
-#define	CHERI_UART_BASE		0x7f000000	/* JTAG UART */
+#define	CHERI_UART_BASE		0xff7f000000	/* JTAG UART */
 
 /*
  *

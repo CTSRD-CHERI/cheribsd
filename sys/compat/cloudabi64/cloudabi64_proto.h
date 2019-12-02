@@ -366,6 +366,12 @@ int	cloudabi_sys_thread_yield(struct thread *, struct cloudabi_sys_thread_yield_
 
 #endif /* COMPAT_FREEBSD11 */
 
+
+#ifdef COMPAT_FREEBSD12
+
+
+#endif /* COMPAT_FREEBSD12 */
+
 #define	CLOUDABI64_SYS_AUE_cloudabi_sys_clock_res_get	AUE_NULL
 #define	CLOUDABI64_SYS_AUE_cloudabi_sys_clock_time_get	AUE_NULL
 #define	CLOUDABI64_SYS_AUE_cloudabi_sys_condvar_signal	AUE_NULL

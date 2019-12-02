@@ -303,7 +303,7 @@ bcm2835_mbox_dma_cb(void *arg, bus_dma_segment_t *segs, int nseg, int err)
 	if (err)
 		return;
 	addr = (bus_addr_t *)arg;
-	*addr = PHYS_TO_VCBUS(segs[0].ds_addr);
+	*addr = ARMC_TO_VCBUS(segs[0].ds_addr);
 }
 
 static void *
@@ -314,7 +314,7 @@ bcm2835_mbox_init_dma(device_t dev, size_t len, bus_dma_tag_t *tag,
 	int err;
 
 	err = bus_dma_tag_create(bus_get_dma_tag(dev), 16, 0,
-	    BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR, NULL, NULL,
+	    bcm283x_dmabus_peripheral_lowaddr(), BUS_SPACE_MAXADDR, NULL, NULL,
 	    len, 1, len, 0, NULL, NULL, tag);
 	if (err != 0) {
 		device_printf(dev, "can't create DMA tag\n");
@@ -499,6 +499,26 @@ bcm2835_mbox_fb_get_w_h(struct bcm2835_fb_config *fb)
 }
 
 int
+bcm2835_mbox_fb_get_bpp(struct bcm2835_fb_config *fb)
+{
+	int err;
+	struct msg_fb_get_bpp msg;
+	
+	memset(&msg, 0, sizeof(msg));
+	msg.hdr.buf_size = sizeof(msg);
+	msg.hdr.code = BCM2835_MBOX_CODE_REQ;
+	BCM2835_MBOX_INIT_TAG(&msg.bpp, GET_DEPTH);
+	msg.bpp.tag_hdr.val_len = 0;
+	msg.end_tag = 0;
+	
+	err = bcm2835_mbox_property(&msg, sizeof(msg));
+	if (err == 0)
+		fb->bpp = msg.bpp.body.resp.bpp;
+	
+	return (err);
+}
+
+int
 bcm2835_mbox_fb_init(struct bcm2835_fb_config *fb)
 {
 	int err;
@@ -534,7 +554,7 @@ bcm2835_mbox_fb_init(struct bcm2835_fb_config *fb)
 		fb->xoffset = msg.offset.body.resp.x;
 		fb->yoffset = msg.offset.body.resp.y;
 		fb->pitch = msg.pitch.body.resp.pitch;
-		fb->base = VCBUS_TO_PHYS(msg.buffer.body.resp.fb_address);
+		fb->base = VCBUS_TO_ARMC(msg.buffer.body.resp.fb_address);
 		fb->size = msg.buffer.body.resp.fb_size;
 	}
 

@@ -40,15 +40,17 @@ CFLAGS.errlst.c+=-I${LIBC_SRCTOP}/include
 
 # Use the string and memory .o files from libc instead of rebuilding them (they
 # might be using optimized assembly and duplicating that logic here is awkward).
-_libc_string_objects=	bcmp bcopy memchr memcmp memcpy memmove stpncpy strcat \
+_libc_string_objects=bcmp bcopy memchr memcmp memcpy memmove stpncpy strcat \
     strchr strcmp stpcpy strcpy strcspn strdup strlcat strlcpy strlen strncmp \
     strncpy strrchr strsep strspn strstr strtok
 # Also use all the syscall .o files from libc_nossp_pic:
-_libc_other_objects= sigsetjmp lstat stat fstat fstatat fstatfs syscall \
+_libc_other_objects=sigsetjmp lstat stat fstat fstatat fstatfs syscall \
     cerror geteuid getegid munmap mprotect sysarch __sysctl issetugid __getcwd \
-    utrace thr_self thr_kill pread mmap lseek _exit _fstat _fstatat _fstatfs \
-    getdirentries _getdirentries _close _fcntl _open _openat _read \
-    _sigprocmask _write readlink _setjmp setjmp setjmperr
+    utrace thr_self thr_kill pread mmap lseek _exit \
+    getdirentries _close _fcntl _open _openat _read \
+    __sysctlbyname _sigprocmask _write readlink _setjmp setjmp setjmperr
+
+# XXX: which architectures include _fstat _fstatat _fstatfs _getdirentries?
 
 
 # Finally add additional architecture-dependent libc dependencies
@@ -74,13 +76,11 @@ _libc_other_objects+=umoddi3 udivdi3 qdivrem
 .endif
 # For CHERI we also use sysctlbyname
 _libc_other_objects+=sysctlbyname
-# And apparently bcmp
-_libc_other_objects+=bcmp
 .ifdef BUILDING_RTLD_CHERI_ELF
 # In purecap, mergesort uses timsort
 _libc_other_objects+=timsort
-# And setjmp is defined in setjmp_c.S
-_libc_other_objects+=setjmp_c _setjmp_c
+# Instead of setjmp/_setjmp we use setjmp_c/_setjmp_c
+_libc_other_objects:=${_libc_other_objects:Nsetjmp:N_setjmp} setjmp_c _setjmp_c
 .endif
 .elif ${LIBC_ARCH} == "sparc64"
 # reloc.c uses __sparc_utrap which needs a lot of other object files

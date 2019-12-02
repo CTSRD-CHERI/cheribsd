@@ -44,6 +44,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/cons.h>
 #include <sys/cpu.h>
+#include <sys/devmap.h>
 #include <sys/exec.h>
 #include <sys/imgact.h>
 #include <sys/kdb.h>
@@ -67,9 +68,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmmeter.h>
 
 #include <vm/vm.h>
+#include <vm/vm_param.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #include <vm/vm_pager.h>
@@ -100,9 +103,6 @@ struct pcpu __pcpu[MAXCPU];
 
 static struct trapframe proc0_tf;
 
-vm_paddr_t phys_avail[PHYS_AVAIL_SIZE + 2];
-vm_paddr_t dump_avail[PHYS_AVAIL_SIZE + 2];
-
 int early_boot = 1;
 int cold = 1;
 long realmem = 0;
@@ -110,8 +110,7 @@ long Maxmem = 0;
 
 #define	DTB_SIZE_MAX	(1024 * 1024)
 
-#define	PHYSMAP_SIZE	(2 * (VM_PHYSSEG_MAX - 1))
-vm_paddr_t physmap[PHYSMAP_SIZE];
+vm_paddr_t physmap[PHYS_AVAIL_ENTRIES];
 u_int physmap_idx;
 
 struct kva_md_info kmi;
@@ -124,12 +123,12 @@ uint32_t boot_hart;	/* The hart we booted on. */
 cpuset_t all_harts;
 
 extern int *end;
-extern int *initstack_end;
 
 static void
 cpu_startup(void *dummy)
 {
 
+	sbi_print_version();
 	identify_cpu();
 
 	printf("real memory  = %ju (%ju MB)\n", ptoa((uintmax_t)realmem),
@@ -159,6 +158,8 @@ cpu_startup(void *dummy)
 	printf("avail memory = %ju (%ju MB)\n",
 	    ptoa((uintmax_t)vm_free_count()),
 	    ptoa((uintmax_t)vm_free_count()) / (1024 * 1024));
+	if (bootverbose)
+		devmap_print_table();
 
 	bufinit();
 	vm_pager_bufferinit();
@@ -657,7 +658,9 @@ init_proc0(vm_offset_t kstack)
 
 	proc_linkup0(&proc0, &thread0);
 	thread0.td_kstack = kstack;
-	thread0.td_pcb = (struct pcb *)(thread0.td_kstack) - 1;
+	thread0.td_kstack_pages = KSTACK_PAGES;
+	thread0.td_pcb = (struct pcb *)(thread0.td_kstack +
+	    thread0.td_kstack_pages * PAGE_SIZE) - 1;
 	thread0.td_pcb->pcb_fpflags = 0;
 	thread0.td_frame = &proc0_tf;
 	pcpup->pc_curpcb = thread0.td_pcb;
@@ -707,7 +710,7 @@ add_physmap_entry(uint64_t base, uint64_t length, vm_paddr_t *physmap,
 
 	_physmap_idx += 2;
 	*physmap_idxp = _physmap_idx;
-	if (_physmap_idx == PHYSMAP_SIZE) {
+	if (_physmap_idx == PHYS_AVAIL_ENTRIES) {
 		printf(
 		"Too many segments in the physical address map, giving up\n");
 		return (0);
@@ -848,6 +851,9 @@ initriscv(struct riscv_bootparams *rvbp)
 
 	PCPU_SET(curthread, &thread0);
 
+	/* Initialize SBI interface. */
+	sbi_init();
+
 	/* Set the module data location */
 	lastaddr = fake_preload_metadata(rvbp);
 
@@ -899,6 +905,9 @@ initriscv(struct riscv_bootparams *rvbp)
 	/* Bootstrap enough of pmap to enter the kernel proper */
 	kernlen = (lastaddr - KERNBASE);
 	pmap_bootstrap(rvbp->kern_l1pt, mem_regions[0].mr_start, kernlen);
+
+	/* Establish static device mappings */
+	devmap_bootstrap(0, NULL);
 
 	cninit();
 

@@ -37,7 +37,7 @@
 #define	_COMPAT64_BASENAME_RTLD		"ld-elf64.so.1"
 
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#ifdef COMPAT_CHERI
 #define	_PATH_ELF_HINTS		"/var/run/ld-cheri-elf.so.hints"
 #define	_PATH_LIBMAP_CONF	"/etc/libmap-cheri.conf"
 #define	_BASENAME_RTLD		_CHERIABI_BASENAME_RTLD

@@ -9,7 +9,6 @@ SRCS=	helloworld.c
 MAN=
 NEED_CHERI=	pure
 
-MK_CHERI_SHARED_PROG:=no
 NO_SHARED=yes
 
 .include <bsd.prog.mk>

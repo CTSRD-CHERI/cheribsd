@@ -511,12 +511,10 @@ linux_cdev_pager_fault(vm_object_t vm_obj, vm_ooffset_t offset, int prot,
 			vm_page_replace_checked(page, vm_obj,
 			    (*mres)->pindex, *mres);
 
-			vm_page_lock(*mres);
 			vm_page_free(*mres);
-			vm_page_unlock(*mres);
 			*mres = page;
 		}
-		page->valid = VM_PAGE_BITS_ALL;
+		vm_page_valid(page);
 		return (VM_PAGER_OK);
 	}
 	return (VM_PAGER_FAIL);
@@ -2458,11 +2456,10 @@ SYSUNINIT(linux_compat, SI_SUB_DRIVERS, SI_ORDER_SECOND, linux_compat_uninit, NU
 CTASSERT(sizeof(unsigned long) == sizeof(uintptr_t));
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

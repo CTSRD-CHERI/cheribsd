@@ -19,6 +19,7 @@ FILES=	\
 	bsd.arch.inc.mk \
 	bsd.clang-analyze.mk \
 	bsd.compiler.mk \
+	bsd.compat.mk \
 	bsd.confs.mk \
 	bsd.cpu.mk \
 	bsd.crunchgen.mk \
@@ -55,6 +56,7 @@ FILES=	\
 	bsd.suffixes.mk \
 	bsd.symver.mk \
 	bsd.sys.mk \
+	bsd.sysdir.mk \
 	bsd.test.mk \
 	dirdeps.mk \
 	dirdeps-options.mk \

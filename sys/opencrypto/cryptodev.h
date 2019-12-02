@@ -575,12 +575,3 @@ extern void *crypto_contiguous_subsegment(int, void *, size_t, size_t);
 
 #endif /* _KERNEL */
 #endif /* _CRYPTO_CRYPTO_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "header",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

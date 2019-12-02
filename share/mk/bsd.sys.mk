@@ -29,6 +29,15 @@ CFLAGS+=	-std=${CSTD}
 CXXFLAGS+=	-std=${CXXSTD}
 .endif
 
+#
+# Turn off -Werror for gcc 4.2.1. The compiler is on the glide path out of the
+# system, and any warnings specific to it are no longer relevant as there are
+# too many false positives.
+#
+.if ${COMPILER_VERSION} <  50000
+NO_WERROR.gcc=	yes
+.endif
+
 # -pedantic is problematic because it also imposes namespace restrictions
 #CFLAGS+=	-pedantic
 .if defined(WARNS)
@@ -128,6 +137,7 @@ CWARNFLAGS+=	-Wno-error=address			\
 		-Wno-error=bool-compare			\
 		-Wno-error=cast-align			\
 		-Wno-error=clobbered			\
+		-Wno-error=deprecated-declarations	\
 		-Wno-error=enum-compare			\
 		-Wno-error=extra			\
 		-Wno-error=inline			\
@@ -192,23 +202,21 @@ FORMAT_EXTENSIONS=	-fformat-extensions
 CWARNFLAGS+=	-Wno-unknown-pragmas
 .endif # IGNORE_PRAGMA
 
-# We need this conditional because many places that use it
-# only enable it for some files with CLFAGS.$FILE+=${CLANG_NO_IAS}.
-# unconditionally, and can't easily use the CFLAGS.clang=
-# mechanism.
-.if ${COMPILER_TYPE} == "clang"
-CLANG_NO_IAS=	 -no-integrated-as
+# This warning is utter nonsense
+CFLAGS+=	-Wno-format-zero-length
 
 # The headers provided by clang are incompatible with the FreeBSD headers.
 # If the version of clang is not one that has been patched to omit the
 # incompatible headers, we need to compile with -nobuiltininc and add the
-# resource dir to the end of the search paths. This ensures that headers such as
-# immintrin.h are still found but stddef.h, etc. are picked up from FreeBSD.
-.if ${MK_CLANG_BOOTSTRAP} == "no" && ${COMPILER_RESOURCE_DIR:Uunknown} != "unknown" && \
+# resource dir to the end of the search paths. This ensures that headers
+# immintrin.h are still found but stddef.h, etc. are picked up from
+# FreeBSD.such as
+.if ${COMPILER_TYPE} == "clang" && ${MK_CLANG_BOOTSTRAP} == "no" && \
+    ${COMPILER_RESOURCE_DIR:Uunknown} != "unknown" && \
     !defined(BOOTSTRAPPING)
 CFLAGS+=-nobuiltininc -idirafter ${COMPILER_RESOURCE_DIR}/include
 .endif
-.endif
+
 CLANG_OPT_SMALL= -mstack-alignment=8 -mllvm -inline-threshold=3\
 		 -mllvm -simplifycfg-dup-ret
 .if ${COMPILER_VERSION} >= 30500 && ${COMPILER_VERSION} < 30700
@@ -250,6 +258,8 @@ DEBUG_FILES_CFLAGS?= -g
 .if ${MK_WARNS} != "no"
 CFLAGS+=	${CWARNFLAGS:M*} ${CWARNFLAGS.${COMPILER_TYPE}}
 CFLAGS+=	${CWARNFLAGS.${.IMPSRC:T}}
+CXXFLAGS+=	${CXXWARNFLAGS:M*} ${CXXWARNFLAGS.${COMPILER_TYPE}}
+CXXFLAGS+=	${CXXWARNFLAGS.${.IMPSRC:T}}
 .endif
 
 CFLAGS+=	 ${CFLAGS.${COMPILER_TYPE}}

@@ -408,8 +408,6 @@ struct pv_chunk {
 
 extern caddr_t	CADDR1;
 extern pt_entry_t *CMAP1;
-extern vm_paddr_t phys_avail[];
-extern vm_paddr_t dump_avail[];
 extern vm_offset_t virtual_avail;
 extern vm_offset_t virtual_end;
 extern vm_paddr_t dmaplimit;
@@ -424,9 +422,11 @@ struct thread;
 
 void	pmap_activate_boot(pmap_t pmap);
 void	pmap_activate_sw(struct thread *);
+void	pmap_allow_2m_x_ept_recalculate(void);
 void	pmap_bootstrap(vm_paddr_t *);
 int	pmap_cache_bits(pmap_t pmap, int mode, boolean_t is_pde);
 int	pmap_change_attr(vm_offset_t, vm_size_t, int);
+int	pmap_change_prot(vm_offset_t, vm_size_t, vm_prot_t);
 void	pmap_demote_DMAP(vm_paddr_t base, vm_size_t len, boolean_t invalidate);
 void	pmap_flush_cache_range(vm_offset_t, vm_offset_t);
 void	pmap_flush_cache_phys_range(vm_paddr_t, vm_paddr_t, vm_memattr_t);
@@ -469,6 +469,7 @@ int	pmap_pkru_set(pmap_t pmap, vm_offset_t sva, vm_offset_t eva,
 	    u_int keyidx, int flags);
 void	pmap_thread_init_invl_gen(struct thread *td);
 int	pmap_vmspace_copy(pmap_t dst_pmap, pmap_t src_pmap);
+void	pmap_page_array_startup(long count);
 #endif /* _KERNEL */
 
 /* Return various clipped indexes for a given VA */

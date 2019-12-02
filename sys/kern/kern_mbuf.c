@@ -31,6 +31,7 @@
 __FBSDID("$FreeBSD$");
 
 #include "opt_param.h"
+#include "opt_kern_tls.h"
 
 #include <sys/param.h>
 #include <sys/conf.h>
@@ -41,10 +42,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/domain.h>
 #include <sys/eventhandler.h>
 #include <sys/kernel.h>
+#include <sys/ktls.h>
 #include <sys/limits.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/protosw.h>
+#include <sys/refcount.h>
 #include <sys/sf_buf.h>
 #include <sys/smp.h>
 #include <sys/socket.h>
@@ -114,10 +117,10 @@ int nmbjumbop;			/* limits number of page size jumbo clusters */
 int nmbjumbo9;			/* limits number of 9k jumbo clusters */
 int nmbjumbo16;			/* limits number of 16k jumbo clusters */
 
-bool mb_use_ext_pgs;		/* use EXT_PGS mbufs for sendfile */
+bool mb_use_ext_pgs;		/* use EXT_PGS mbufs for sendfile & TLS */
 SYSCTL_BOOL(_kern_ipc, OID_AUTO, mb_use_ext_pgs, CTLFLAG_RWTUN,
     &mb_use_ext_pgs, 0,
-    "Use unmapped mbufs for sendfile(2)");
+    "Use unmapped mbufs for sendfile(2) and TLS offload");
 
 static quad_t maxmbufmem;	/* overall real memory limit for all mbufs */
 
@@ -412,10 +415,10 @@ mbuf_init(void *dummy)
 }
 SYSINIT(mbuf, SI_SUB_MBUF, SI_ORDER_FIRST, mbuf_init, NULL);
 
-#ifdef NETDUMP
+#ifdef DEBUGNET
 /*
- * netdump makes use of a pre-allocated pool of mbufs and clusters.  When
- * netdump is configured, we initialize a set of UMA cache zones which return
+ * debugnet makes use of a pre-allocated pool of mbufs and clusters.  When
+ * debugnet is configured, we initialize a set of UMA cache zones which return
  * items from this pool.  At panic-time, the regular UMA zone pointers are
  * overwritten with those of the cache zones so that drivers may allocate and
  * free mbufs and clusters without attempting to allocate physical memory.
@@ -423,18 +426,28 @@ SYSINIT(mbuf, SI_SUB_MBUF, SI_ORDER_FIRST, mbuf_init, NULL);
  * We keep mbufs and clusters in a pair of mbuf queues.  In particular, for
  * the purpose of caching clusters, we treat them as mbufs.
  */
-static struct mbufq nd_mbufq =
-    { STAILQ_HEAD_INITIALIZER(nd_mbufq.mq_head), 0, INT_MAX };
-static struct mbufq nd_clustq =
-    { STAILQ_HEAD_INITIALIZER(nd_clustq.mq_head), 0, INT_MAX };
+static struct mbufq dn_mbufq =
+    { STAILQ_HEAD_INITIALIZER(dn_mbufq.mq_head), 0, INT_MAX };
+static struct mbufq dn_clustq =
+    { STAILQ_HEAD_INITIALIZER(dn_clustq.mq_head), 0, INT_MAX };
 
-static int nd_clsize;
-static uma_zone_t nd_zone_mbuf;
-static uma_zone_t nd_zone_clust;
-static uma_zone_t nd_zone_pack;
+static int dn_clsize;
+static uma_zone_t dn_zone_mbuf;
+static uma_zone_t dn_zone_clust;
+static uma_zone_t dn_zone_pack;
+
+static struct debugnet_saved_zones {
+	uma_zone_t dsz_mbuf;
+	uma_zone_t dsz_clust;
+	uma_zone_t dsz_pack;
+	uma_zone_t dsz_jumbop;
+	uma_zone_t dsz_jumbo9;
+	uma_zone_t dsz_jumbo16;
+	bool dsz_debugnet_zones_enabled;
+} dn_saved_zones;
 
 static int
-nd_buf_import(void *arg, void **store, int count, int domain __unused,
+dn_buf_import(void *arg, void **store, int count, int domain __unused,
     int flags)
 {
 	struct mbufq *q;
@@ -447,7 +460,7 @@ nd_buf_import(void *arg, void **store, int count, int domain __unused,
 		m = mbufq_dequeue(q);
 		if (m == NULL)
 			break;
-		trash_init(m, q == &nd_mbufq ? MSIZE : nd_clsize, flags);
+		trash_init(m, q == &dn_mbufq ? MSIZE : dn_clsize, flags);
 		store[i] = m;
 	}
 	KASSERT((flags & M_WAITOK) == 0 || i == count,
@@ -456,7 +469,7 @@ nd_buf_import(void *arg, void **store, int count, int domain __unused,
 }
 
 static void
-nd_buf_release(void *arg, void **store, int count)
+dn_buf_release(void *arg, void **store, int count)
 {
 	struct mbufq *q;
 	struct mbuf *m;
@@ -471,7 +484,7 @@ nd_buf_release(void *arg, void **store, int count)
 }
 
 static int
-nd_pack_import(void *arg __unused, void **store, int count, int domain __unused,
+dn_pack_import(void *arg __unused, void **store, int count, int domain __unused,
     int flags __unused)
 {
 	struct mbuf *m;
@@ -482,12 +495,12 @@ nd_pack_import(void *arg __unused, void **store, int count, int domain __unused,
 		m = m_get(MT_DATA, M_NOWAIT);
 		if (m == NULL)
 			break;
-		clust = uma_zalloc(nd_zone_clust, M_NOWAIT);
+		clust = uma_zalloc(dn_zone_clust, M_NOWAIT);
 		if (clust == NULL) {
 			m_free(m);
 			break;
 		}
-		mb_ctor_clust(clust, nd_clsize, m, 0);
+		mb_ctor_clust(clust, dn_clsize, m, 0);
 		store[i] = m;
 	}
 	KASSERT((flags & M_WAITOK) == 0 || i == count,
@@ -496,7 +509,7 @@ nd_pack_import(void *arg __unused, void **store, int count, int domain __unused,
 }
 
 static void
-nd_pack_release(void *arg __unused, void **store, int count)
+dn_pack_release(void *arg __unused, void **store, int count)
 {
 	struct mbuf *m;
 	void *clust;
@@ -505,109 +518,142 @@ nd_pack_release(void *arg __unused, void **store, int count)
 	for (i = 0; i < count; i++) {
 		m = store[i];
 		clust = m->m_ext.ext_buf;
-		uma_zfree(nd_zone_clust, clust);
-		uma_zfree(nd_zone_mbuf, m);
+		uma_zfree(dn_zone_clust, clust);
+		uma_zfree(dn_zone_mbuf, m);
 	}
 }
 
 /*
- * Free the pre-allocated mbufs and clusters reserved for netdump, and destroy
+ * Free the pre-allocated mbufs and clusters reserved for debugnet, and destroy
  * the corresponding UMA cache zones.
  */
 void
-netdump_mbuf_drain(void)
+debugnet_mbuf_drain(void)
 {
 	struct mbuf *m;
 	void *item;
 
-	if (nd_zone_mbuf != NULL) {
-		uma_zdestroy(nd_zone_mbuf);
-		nd_zone_mbuf = NULL;
+	if (dn_zone_mbuf != NULL) {
+		uma_zdestroy(dn_zone_mbuf);
+		dn_zone_mbuf = NULL;
 	}
-	if (nd_zone_clust != NULL) {
-		uma_zdestroy(nd_zone_clust);
-		nd_zone_clust = NULL;
+	if (dn_zone_clust != NULL) {
+		uma_zdestroy(dn_zone_clust);
+		dn_zone_clust = NULL;
 	}
-	if (nd_zone_pack != NULL) {
-		uma_zdestroy(nd_zone_pack);
-		nd_zone_pack = NULL;
+	if (dn_zone_pack != NULL) {
+		uma_zdestroy(dn_zone_pack);
+		dn_zone_pack = NULL;
 	}
 
-	while ((m = mbufq_dequeue(&nd_mbufq)) != NULL)
+	while ((m = mbufq_dequeue(&dn_mbufq)) != NULL)
 		m_free(m);
-	while ((item = mbufq_dequeue(&nd_clustq)) != NULL)
-		uma_zfree(m_getzone(nd_clsize), item);
+	while ((item = mbufq_dequeue(&dn_clustq)) != NULL)
+		uma_zfree(m_getzone(dn_clsize), item);
 }
 
 /*
- * Callback invoked immediately prior to starting a netdump.
+ * Callback invoked immediately prior to starting a debugnet connection.
  */
 void
-netdump_mbuf_dump(void)
+debugnet_mbuf_start(void)
 {
+
+	MPASS(!dn_saved_zones.dsz_debugnet_zones_enabled);
+
+	/* Save the old zone pointers to restore when debugnet is closed. */
+	dn_saved_zones = (struct debugnet_saved_zones) {
+		.dsz_debugnet_zones_enabled = true,
+		.dsz_mbuf = zone_mbuf,
+		.dsz_clust = zone_clust,
+		.dsz_pack = zone_pack,
+		.dsz_jumbop = zone_jumbop,
+		.dsz_jumbo9 = zone_jumbo9,
+		.dsz_jumbo16 = zone_jumbo16,
+	};
 
 	/*
 	 * All cluster zones return buffers of the size requested by the
 	 * drivers.  It's up to the driver to reinitialize the zones if the
-	 * MTU of a netdump-enabled interface changes.
+	 * MTU of a debugnet-enabled interface changes.
 	 */
-	printf("netdump: overwriting mbuf zone pointers\n");
-	zone_mbuf = nd_zone_mbuf;
-	zone_clust = nd_zone_clust;
-	zone_pack = nd_zone_pack;
-	zone_jumbop = nd_zone_clust;
-	zone_jumbo9 = nd_zone_clust;
-	zone_jumbo16 = nd_zone_clust;
+	printf("debugnet: overwriting mbuf zone pointers\n");
+	zone_mbuf = dn_zone_mbuf;
+	zone_clust = dn_zone_clust;
+	zone_pack = dn_zone_pack;
+	zone_jumbop = dn_zone_clust;
+	zone_jumbo9 = dn_zone_clust;
+	zone_jumbo16 = dn_zone_clust;
 }
 
 /*
- * Reinitialize the netdump mbuf+cluster pool and cache zones.
+ * Callback invoked when a debugnet connection is closed/finished.
  */
 void
-netdump_mbuf_reinit(int nmbuf, int nclust, int clsize)
+debugnet_mbuf_finish(void)
+{
+
+	MPASS(dn_saved_zones.dsz_debugnet_zones_enabled);
+
+	printf("debugnet: restoring mbuf zone pointers\n");
+	zone_mbuf = dn_saved_zones.dsz_mbuf;
+	zone_clust = dn_saved_zones.dsz_clust;
+	zone_pack = dn_saved_zones.dsz_pack;
+	zone_jumbop = dn_saved_zones.dsz_jumbop;
+	zone_jumbo9 = dn_saved_zones.dsz_jumbo9;
+	zone_jumbo16 = dn_saved_zones.dsz_jumbo16;
+
+	memset(&dn_saved_zones, 0, sizeof(dn_saved_zones));
+}
+
+/*
+ * Reinitialize the debugnet mbuf+cluster pool and cache zones.
+ */
+void
+debugnet_mbuf_reinit(int nmbuf, int nclust, int clsize)
 {
 	struct mbuf *m;
 	void *item;
 
-	netdump_mbuf_drain();
+	debugnet_mbuf_drain();
 
-	nd_clsize = clsize;
+	dn_clsize = clsize;
 
-	nd_zone_mbuf = uma_zcache_create("netdump_" MBUF_MEM_NAME,
+	dn_zone_mbuf = uma_zcache_create("debugnet_" MBUF_MEM_NAME,
 	    MSIZE, mb_ctor_mbuf, mb_dtor_mbuf,
 #ifdef INVARIANTS
 	    trash_init, trash_fini,
 #else
 	    NULL, NULL,
 #endif
-	    nd_buf_import, nd_buf_release,
-	    &nd_mbufq, UMA_ZONE_NOBUCKET);
+	    dn_buf_import, dn_buf_release,
+	    &dn_mbufq, UMA_ZONE_NOBUCKET);
 
-	nd_zone_clust = uma_zcache_create("netdump_" MBUF_CLUSTER_MEM_NAME,
+	dn_zone_clust = uma_zcache_create("debugnet_" MBUF_CLUSTER_MEM_NAME,
 	    clsize, mb_ctor_clust,
 #ifdef INVARIANTS
 	    trash_dtor, trash_init, trash_fini,
 #else
 	    NULL, NULL, NULL,
 #endif
-	    nd_buf_import, nd_buf_release,
-	    &nd_clustq, UMA_ZONE_NOBUCKET);
+	    dn_buf_import, dn_buf_release,
+	    &dn_clustq, UMA_ZONE_NOBUCKET);
 
-	nd_zone_pack = uma_zcache_create("netdump_" MBUF_PACKET_MEM_NAME,
+	dn_zone_pack = uma_zcache_create("debugnet_" MBUF_PACKET_MEM_NAME,
 	    MCLBYTES, mb_ctor_pack, mb_dtor_pack, NULL, NULL,
-	    nd_pack_import, nd_pack_release,
+	    dn_pack_import, dn_pack_release,
 	    NULL, UMA_ZONE_NOBUCKET);
 
 	while (nmbuf-- > 0) {
 		m = m_get(MT_DATA, M_WAITOK);
-		uma_zfree(nd_zone_mbuf, m);
+		uma_zfree(dn_zone_mbuf, m);
 	}
 	while (nclust-- > 0) {
-		item = uma_zalloc(m_getzone(nd_clsize), M_WAITOK);
-		uma_zfree(nd_zone_clust, item);
+		item = uma_zalloc(m_getzone(dn_clsize), M_WAITOK);
+		uma_zfree(dn_zone_clust, item);
 	}
 }
-#endif /* NETDUMP */
+#endif /* DEBUGNET */
 
 /*
  * UMA backend page allocator for the jumbo frame zones.
@@ -710,14 +756,14 @@ mb_dtor_pack(void *mem, int size, void *arg)
 #endif
 	/*
 	 * If there are processes blocked on zone_clust, waiting for pages
-	 * to be freed up, * cause them to be woken up by draining the
-	 * packet zone.  We are exposed to a race here * (in the check for
+	 * to be freed up, cause them to be woken up by draining the
+	 * packet zone.  We are exposed to a race here (in the check for
 	 * the UMA_ZFLAG_FULL) where we might miss the flag set, but that
 	 * is deliberate. We don't want to acquire the zone lock for every
 	 * mbuf free.
 	 */
 	if (uma_zone_exhausted_nolock(zone_clust))
-		zone_drain(zone_pack);
+		uma_zone_reclaim(zone_pack, UMA_RECLAIM_DRAIN);
 }
 
 /*
@@ -1170,6 +1216,7 @@ mb_alloc_ext_pgs(int how, bool pkthdr, m_ext_free_t ext_free)
 	ext_pgs->nrdy = 0;
 	ext_pgs->first_pg_off = 0;
 	ext_pgs->last_pg_len = 0;
+	ext_pgs->flags = 0;
 	ext_pgs->hdr_len = 0;
 	ext_pgs->trail_len = 0;
 	ext_pgs->tls = NULL;
@@ -1283,13 +1330,27 @@ mb_free_ext(struct mbuf *m)
 			uma_zfree(zone_jumbo16, m->m_ext.ext_buf);
 			uma_zfree(zone_mbuf, mref);
 			break;
-		case EXT_PGS:
+		case EXT_PGS: {
+#ifdef KERN_TLS
+			struct mbuf_ext_pgs *pgs;
+			struct ktls_session *tls;
+#endif
+
 			KASSERT(mref->m_ext.ext_free != NULL,
 			    ("%s: ext_free not set", __func__));
 			mref->m_ext.ext_free(mref);
-			uma_zfree(zone_extpgs, mref->m_ext.ext_pgs);
+#ifdef KERN_TLS
+			pgs = mref->m_ext.ext_pgs;
+			tls = pgs->tls;
+			if (tls != NULL &&
+			    !refcount_release_if_not_last(&tls->refcount))
+				ktls_enqueue_to_free(pgs);
+			else
+#endif
+				uma_zfree(zone_extpgs, mref->m_ext.ext_pgs);
 			uma_zfree(zone_mbuf, mref);
 			break;
+		}
 		case EXT_SFBUF:
 		case EXT_NET_DRV:
 		case EXT_MOD_TYPE:
@@ -1347,7 +1408,7 @@ m_clget(struct mbuf *m, int how)
 	 * we might be able to loosen a few clusters up on the drain.
 	 */
 	if ((how & M_NOWAIT) && (m->m_ext.ext_buf == NULL)) {
-		zone_drain(zone_pack);
+		uma_zone_reclaim(zone_pack, UMA_RECLAIM_DRAIN);
 		uma_zalloc_arg(zone_clust, m, how);
 	}
 	MBUF_PROBE2(m__clget, m, how);

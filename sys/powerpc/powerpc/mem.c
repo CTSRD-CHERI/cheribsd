@@ -318,13 +318,3 @@ memioctl(struct cdev *dev __unused, u_long cmd, caddr_t data, int flags,
 	}
 	return (error);
 }
-
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "kernel",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

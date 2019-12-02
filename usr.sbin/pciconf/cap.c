@@ -371,9 +371,12 @@ static void
 cap_subvendor(int fd, struct pci_conf *p, uint8_t ptr)
 {
 	uint32_t id;
+	uint16_t ssid, ssvid;
 
 	id = read_config(fd, &p->pc_sel, ptr + PCIR_SUBVENDCAP_ID, 4);
-	printf("PCI Bridge card=0x%08x", id);
+	ssid = id >> 16;
+	ssvid = id & 0xffff;
+	printf("PCI Bridge subvendor=0x%04x subdevice=0x%04x", ssvid, ssid);
 }
 
 #define	MAX_PAYLOAD(field)		(128 << (field))
@@ -514,6 +517,11 @@ cap_express(int fd, struct pci_conf *p, uint8_t ptr)
 		ctl = read_config(fd, &p->pc_sel, ptr + PCIER_LINK_CTL, 2);
 		printf(" ASPM %s(%s)", aspm_string(ctl & PCIEM_LINK_CTL_ASPMC),
 		    aspm_string((cap & PCIEM_LINK_CAP_ASPM) >> 10));
+	}
+	if ((cap & PCIEM_LINK_CAP_CLOCK_PM) != 0) {
+		ctl = read_config(fd, &p->pc_sel, ptr + PCIER_LINK_CTL, 2);
+		printf(" ClockPM %s", (ctl & PCIEM_LINK_CTL_ECPM) ?
+		    "enabled" : "disabled");
 	}
 	if (!(flags & PCIEM_FLAGS_SLOT))
 		return;

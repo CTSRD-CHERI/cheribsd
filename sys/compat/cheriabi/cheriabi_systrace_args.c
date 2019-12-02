@@ -2531,15 +2531,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* cheriabi_shm_open */
-	case 482: {
-		struct cheriabi_shm_open_args *p = params;
-		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
-		iarg[1] = p->flags; /* int */
-		iarg[2] = p->mode; /* mode_t */
-		*n_args = 3;
-		break;
-	}
 	/* cheriabi_shm_unlink */
 	case 483: {
 		struct cheriabi_shm_unlink_args *p = params;
@@ -3278,6 +3269,38 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[4] = p->len; /* size_t */
 		uarg[5] = p->flags; /* unsigned int */
 		*n_args = 6;
+		break;
+	}
+	/* cheriabi___sysctlbyname */
+	case 570: {
+		struct cheriabi___sysctlbyname_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
+		uarg[1] = p->namelen; /* size_t */
+		uarg[2] = (__cheri_addr intptr_t) p->old; /* void * __capability */
+		uarg[3] = (__cheri_addr intptr_t) p->oldlenp; /* size_t * __capability */
+		uarg[4] = (__cheri_addr intptr_t) p->new; /* void * __capability */
+		uarg[5] = p->newlen; /* size_t */
+		*n_args = 6;
+		break;
+	}
+	/* cheriabi_shm_open2 */
+	case 571: {
+		struct cheriabi_shm_open2_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->path; /* const char * __capability */
+		iarg[1] = p->flags; /* int */
+		iarg[2] = p->mode; /* mode_t */
+		iarg[3] = p->shmflags; /* int */
+		uarg[4] = (__cheri_addr intptr_t) p->name; /* const char * __capability */
+		*n_args = 5;
+		break;
+	}
+	/* cheriabi_shm_rename */
+	case 572: {
+		struct cheriabi_shm_rename_args *p = params;
+		uarg[0] = (__cheri_addr intptr_t) p->path_from; /* const char * __capability */
+		uarg[1] = (__cheri_addr intptr_t) p->path_to; /* const char * __capability */
+		iarg[2] = p->flags; /* int */
+		*n_args = 3;
 		break;
 	}
 	default:
@@ -7411,22 +7434,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* cheriabi_shm_open */
-	case 482:
-		switch(ndx) {
-		case 0:
-			p = "userland const char * __capability";
-			break;
-		case 1:
-			p = "int";
-			break;
-		case 2:
-			p = "mode_t";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* cheriabi_shm_unlink */
 	case 483:
 		switch(ndx) {
@@ -8750,6 +8757,69 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		case 5:
 			p = "unsigned int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi___sysctlbyname */
+	case 570:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "size_t";
+			break;
+		case 2:
+			p = "userland void * __capability";
+			break;
+		case 3:
+			p = "userland size_t * __capability";
+			break;
+		case 4:
+			p = "userland void * __capability";
+			break;
+		case 5:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_shm_open2 */
+	case 571:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "mode_t";
+			break;
+		case 3:
+			p = "int";
+			break;
+		case 4:
+			p = "userland const char * __capability";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* cheriabi_shm_rename */
+	case 572:
+		switch(ndx) {
+		case 0:
+			p = "userland const char * __capability";
+			break;
+		case 1:
+			p = "userland const char * __capability";
+			break;
+		case 2:
+			p = "int";
 			break;
 		default:
 			break;
@@ -10229,11 +10299,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* cheriabi_shm_open */
-	case 482:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
 	/* cheriabi_shm_unlink */
 	case 483:
 		if (ndx == 0 || ndx == 1)
@@ -10635,6 +10700,21 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 569:
 		if (ndx == 0 || ndx == 1)
 			p = "ssize_t";
+		break;
+	/* cheriabi___sysctlbyname */
+	case 570:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_shm_open2 */
+	case 571:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* cheriabi_shm_rename */
+	case 572:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
 		break;
 	default:
 		break;

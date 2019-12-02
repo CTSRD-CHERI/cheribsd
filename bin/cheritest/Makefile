@@ -79,21 +79,9 @@ CFLAGS+=	-DCHERITHREAD_TESTS
 MAN=
 
 .ifndef BOOTSTRAPPING
-.if ${PROG} == cheritest
+.if ${PROG:Mcheritest*}
 NEED_CHERI=	hybrid
-.elif ${PROG} == cheritest-mt
-NEED_CHERI=	hybrid
-.elif ${PROG} == cheritest-dynamic
-NEED_CHERI=	hybrid
-.elif ${PROG} == cheritest-dynamic-mt
-NEED_CHERI=	hybrid
-.elif ${PROG} == cheriabitest
-WANT_CHERI=	pure
-.elif ${PROG} == cheriabitest-mt
-WANT_CHERI=	pure
-.elif ${PROG} == cheriabitest-dynamic
-WANT_CHERI=	pure
-.elif ${PROG} == cheriabitest-dynamic-mt
+.elif ${PROG:Mcheriabitest*}
 WANT_CHERI=	pure
 .else
 .error Unknown cheritest variant ${PROG}
@@ -105,7 +93,6 @@ LIBADD+=	xo util
 
 .ifdef CHERI_DYNAMIC_TESTS
 CFLAGS+=	-DCHERI_DYNAMIC_TESTS
-MK_CHERI_SHARED_PROG=	yes
 .else
 NO_SHARED?=	YES
 # XXX-JC: Enable unconditionally once we have a dynamic libcheri

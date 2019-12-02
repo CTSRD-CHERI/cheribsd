@@ -14,6 +14,10 @@ PROG=	${COMPARTMENT_NAME}.co.0
 SRCS=	${COMPARTMENT_NAME}.c
 MAN=
 
+.ifdef LIBCHERI
 BINDIR=	/usr/libcheri
+.else
+BINDIR=	/usr/lib
+.endif
 
 .include <bsd.prog.mk>

@@ -72,8 +72,6 @@ __FBSDID("$FreeBSD$");
 
 boolean_t ofw_cpu_reg(phandle_t node, u_int, cell_t *);
 
-extern struct pcpu __pcpu[];
-
 uint32_t __riscv_boot_ap[MAXCPU];
 
 static enum {
@@ -259,8 +257,10 @@ init_secondary(uint64_t hart)
 	/* Enable software interrupts */
 	riscv_unmask_ipi();
 
+#ifndef EARLY_AP_STARTUP
 	/* Start per-CPU event timers. */
 	cpu_initclocks_ap();
+#endif
 
 	/* Enable external (PLIC) interrupts */
 	csr_set(sie, SIE_SEIE);

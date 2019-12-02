@@ -144,7 +144,7 @@ struct vm_map_entry {
 #define	MAP_ENTRY_GROWS_UP		0x00002000	/* bottom-up stacks */
 
 #define	MAP_ENTRY_WIRE_SKIPPED		0x00004000
-#define	MAP_ENTRY_VN_WRITECNT		0x00008000	/* writeable vnode
+#define	MAP_ENTRY_WRITECNT		0x00008000	/* tracked writeable
 							   mapping */
 #define	MAP_ENTRY_GUARD			0x00010000
 #define	MAP_ENTRY_STACK_GAP_DN		0x00020000
@@ -209,6 +209,9 @@ struct vm_map {
 	int busy;
 #ifdef CHERI_PURECAP_KERNEL
 	void *map_capability;		/* Capability spanning the whole map */
+#endif
+#ifdef DIAGNOSTIC
+	int nupdates;
 #endif
 };
 
@@ -368,7 +371,7 @@ vm_ptr_t vm_map_make_ptr(vm_map_t map, vm_offset_t addr, vm_size_t size, vm_prot
 #define	MAP_CREATE_GUARD	0x00000080
 #define	MAP_DISABLE_COREDUMP	0x00000100
 #define	MAP_PREFAULT_MADVISE	0x00000200    /* from (user) madvise request */
-#define	MAP_VN_WRITECOUNT	0x00000400
+#define	MAP_WRITECOUNT		0x00000400
 #define	MAP_REMAP		0x00000800
 #define	MAP_STACK_GROWS_DOWN	0x00001000
 #define	MAP_STACK_GROWS_UP	0x00002000
@@ -436,9 +439,29 @@ int vm_map_lookup_locked(vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, v
     vm_pindex_t *, vm_prot_t *, boolean_t *);
 void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
+
+static inline vm_map_entry_t
+vm_map_entry_first(vm_map_t map)
+{
+
+	return (map->header.next);
+}
+
+static inline vm_map_entry_t
+vm_map_entry_succ(vm_map_entry_t entry)
+{
+
+	return (entry->next);
+}
+
+#define VM_MAP_ENTRY_FOREACH(it, map)		\
+	for ((it) = vm_map_entry_first(map);	\
+	    (it) != &(map)->header;		\
+	    (it) = vm_map_entry_succ(it))
 int vm_map_protect (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t, boolean_t);
 int vm_map_remove (vm_map_t, vm_offset_t, vm_offset_t);
-void vm_map_simplify_entry(vm_map_t map, vm_map_entry_t entry);
+void vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev,
+    vm_map_entry_t entry);
 void vm_map_startup (void);
 int vm_map_submap (vm_map_t, vm_ptr_t, vm_ptr_t, vm_map_t);
 int vm_map_sync(vm_map_t, vm_offset_t, vm_offset_t, boolean_t, boolean_t,

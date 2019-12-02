@@ -2278,10 +2278,11 @@ vxlan_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		break;
 
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < ETHERMIN || ifr->ifr_mtu > VXLAN_MAX_MTU)
+		if (ifr_mtu_get(&ifr) < ETHERMIN ||
+		    ifr_mtu_get(&ifr) > VXLAN_MAX_MTU)
 			error = EINVAL;
 		else
-			ifp->if_mtu = ifr->ifr_mtu;
+			ifp->if_mtu = ifr_mtu_get(&ifr);
 		break;
 
 	default:

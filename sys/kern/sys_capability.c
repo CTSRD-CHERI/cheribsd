@@ -127,7 +127,7 @@ int
 sys_cap_getmode(struct thread *td, struct cap_getmode_args *uap)
 {
 
-	return (kern_cap_getmode(td, __USER_CAP_OBJ(uap->modep)));
+	return (kern_cap_getmode(td, uap->modep));
 }
 
 int
@@ -263,8 +263,7 @@ int
 sys_cap_rights_limit(struct thread *td, struct cap_rights_limit_args *uap)
 {
 
-	return (user_cap_rights_limit(td, uap->fd,
-	    __USER_CAP_UNBOUND(uap->rightsp)));
+	return (user_cap_rights_limit(td, uap->fd, uap->rightsp));
 }
 
 int
@@ -315,8 +314,7 @@ int
 sys___cap_rights_get(struct thread *td, struct __cap_rights_get_args *uap)
 {
 
-	return (kern_cap_rights_get(td, uap->version, uap->fd,
-	    __USER_CAP_UNBOUND(uap->rightsp)));
+	return (kern_cap_rights_get(td, uap->version, uap->fd, uap->rightsp));
 }
 
 int
@@ -469,8 +467,7 @@ int
 sys_cap_ioctls_limit(struct thread *td, struct cap_ioctls_limit_args *uap)
 {
 
-	return (user_cap_ioctls_limit(td, uap->fd,
-	    __USER_CAP_ARRAY(uap->cmds, uap->ncmds), uap->ncmds));
+	return (user_cap_ioctls_limit(td, uap->fd, uap->cmds, uap->ncmds));
 }
 
 int
@@ -501,8 +498,7 @@ int
 sys_cap_ioctls_get(struct thread *td, struct cap_ioctls_get_args *uap)
 {
 
-	return (kern_cap_ioctls_get(td, uap->fd,
-	    __USER_CAP_ARRAY(uap->cmds, uap->maxcmds), uap->maxcmds));
+	return (kern_cap_ioctls_get(td, uap->fd, uap->cmds, uap->maxcmds));
 }
 
 int
@@ -632,8 +628,7 @@ int
 sys_cap_fcntls_get(struct thread *td, struct cap_fcntls_get_args *uap)
 {
 
-	return (kern_cap_fcntls_get(td, uap->fd,
-	    __USER_CAP_OBJ(uap->fcntlrightsp)));
+	return (kern_cap_fcntls_get(td, uap->fd, uap->fcntlrightsp));
 }
 
 int

@@ -1626,22 +1626,14 @@ mb_free_mext_pgs(struct mbuf *m)
 {
 	struct mbuf_ext_pgs *ext_pgs;
 	vm_page_t pg;
-	int wire_adj;
 
 	MBUF_EXT_PGS_ASSERT(m);
 	ext_pgs = m->m_ext.ext_pgs;
-	wire_adj = 0;
 	for (int i = 0; i < ext_pgs->npgs; i++) {
 		pg = PHYS_TO_VM_PAGE(ext_pgs->pa[i]);
-		/*
-		 * Note: page is not locked, as it has no
-		 * object and is not on any queues.
-		 */
-		vm_page_free_toq(pg);
-		wire_adj++;
+		vm_page_unwire_noq(pg);
+		vm_page_free(pg);
 	}
-	if (wire_adj)
-		vm_wire_sub(wire_adj);
 }
 
 static struct mbuf *
@@ -1650,9 +1642,10 @@ m_uiotombuf_nomap(struct uio *uio, int how, int len, int maxseg, int flags)
 	struct mbuf *m, *mb, *prev;
 	struct mbuf_ext_pgs *pgs;
 	vm_page_t pg_array[MBUF_PEXT_MAX_PGS];
-	int error, length, i, needed, wire_adj = 0;
+	int error, length, i, needed;
 	ssize_t total;
-	int pflags = malloc2vm_flags(how) | VM_ALLOC_NOOBJ | VM_ALLOC_NODUMP;
+	int pflags = malloc2vm_flags(how) | VM_ALLOC_NOOBJ | VM_ALLOC_NODUMP |
+	    VM_ALLOC_WIRED;
 
 	/*
 	 * len can be zero or an arbitrary large value bound by
@@ -1681,14 +1674,12 @@ m_uiotombuf_nomap(struct uio *uio, int how, int len, int maxseg, int flags)
 			prev->m_next = mb;
 		prev = mb;
 		pgs = mb->m_ext.ext_pgs;
+		pgs->flags = MBUF_PEXT_FLAG_ANON;
 		needed = length = MIN(maxseg, total);
 		for (i = 0; needed > 0; i++, needed -= PAGE_SIZE) {
 retry_page:
 			pg_array[i] = vm_page_alloc(NULL, 0, pflags);
 			if (pg_array[i] == NULL) {
-				if (wire_adj)
-					vm_wire_add(wire_adj);
-				wire_adj = 0;
 				if (how & M_NOWAIT) {
 					goto failed;
 				} else {
@@ -1696,15 +1687,12 @@ retry_page:
 					goto retry_page;
 				}
 			}
-			wire_adj++;
 			pg_array[i]->flags &= ~PG_ZERO;
 			pgs->pa[i] = VM_PAGE_TO_PHYS(pg_array[i]);
 			pgs->npgs++;
 		}
 		pgs->last_pg_len = length - PAGE_SIZE * (pgs->npgs - 1);
 		MBUF_EXT_PGS_ASSERT_SANITY(pgs);
-		vm_wire_add(wire_adj);
-		wire_adj = 0;
 		total -= length;
 		error = uiomove_fromphys(pg_array, 0, length, uio);
 		if (error != 0)
@@ -2142,16 +2130,3 @@ SYSCTL_PROC(_kern_ipc, OID_AUTO, mbufprofile, CTLTYPE_STRING|CTLFLAG_RD,
 SYSCTL_PROC(_kern_ipc, OID_AUTO, mbufprofileclr, CTLTYPE_INT|CTLFLAG_RW,
 	    NULL, 0, mbprof_clr_handler, "I", "clear mbuf profiling statistics");
 #endif
-// CHERI CHANGES START
-// {
-//   "updated": 20190610,
-//   "changes": [
-//     "struct iovec"
-//   ],
-//   "changes_purecap": [
-//     "pointer_shape"
-//   ],  
-//   "change_comment": "",
-//   "hybrid_specific": false
-// }
-// CHERI CHANGES END

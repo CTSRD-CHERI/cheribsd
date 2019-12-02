@@ -120,6 +120,10 @@ __FBSDID("$FreeBSD$");
 
 #include <net/if.h>
 #include <net/if_var.h>
+#include <net/if_media.h>
+
+#include <dev/mii/mii.h>
+#include <dev/mii/miivar.h>
 
 #include <dev/usb/usb.h>
 #include <dev/usb/usbdi.h>
@@ -131,6 +135,8 @@ __FBSDID("$FreeBSD$");
 #include <dev/usb/usb_process.h>
 
 #include <dev/usb/net/usb_ethernet.h>
+
+#include "miibus_if.h"
 
 //#include <dev/usb/net/if_mosreg.h>
 #include "if_mosreg.h"
@@ -583,16 +589,23 @@ mos_setpromisc(struct usb_ether *ue)
 	mos_reg_write_1(sc, MOS_CTL, rxmode);
 }
 
+static u_int
+mos_hash_maddr(void *arg, struct sockaddr_dl *sdl, u_int cnt)
+{
+	uint8_t *hashtbl = arg;
+	uint32_t h;
 
+	h = ether_crc32_be(LLADDR(sdl), ETHER_ADDR_LEN) >> 26;
+	hashtbl[h / 8] |= 1 << (h % 8);
+
+	return (1);
+}
 
 static void
 mos_setmulti(struct usb_ether *ue)
 {
 	struct mos_softc *sc = uether_getsc(ue);
 	struct ifnet *ifp = uether_getifp(ue);
-	struct ifmultiaddr *ifma;
-
-	uint32_t h = 0;
 	uint8_t rxmode;
 	uint8_t hashtbl[8] = {0, 0, 0, 0, 0, 0, 0, 0};
 	int allmulti = 0;
@@ -605,17 +618,7 @@ mos_setmulti(struct usb_ether *ue)
 		allmulti = 1;
 
 	/* get all new ones */
-	if_maddr_rlock(ifp);
-	CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
-		if (ifma->ifma_addr->sa_family != AF_LINK) {
-			allmulti = 1;
-			continue;
-		}
-		h = ether_crc32_be(LLADDR((struct sockaddr_dl *)
-		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
-		hashtbl[h / 8] |= 1 << (h % 8);
-	}
-	if_maddr_runlock(ifp);
+	if_foreach_llmaddr(ifp, mos_hash_maddr, &hashtbl);
 
 	/* now program new ones */
 	if (allmulti == 1) {

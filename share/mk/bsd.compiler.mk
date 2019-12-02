@@ -140,10 +140,6 @@ _cc_vars=CC $${_empty_var_}
 # makefiles can save a noticeable amount of time when walking the whole source
 # tree (e.g. during make includes, etc.).
 _cc_vars+=XCC X_
-# Also get version information from CHERI_CC (if it is set)
-.ifdef CHERI_CC
-_cc_vars+=CHERI_CC CHERI_
-.endif
 .endif
 
 .for cc X_ in ${_cc_vars}
@@ -186,7 +182,7 @@ ${X_}COMPILER_FREEBSD_VERSION= 0
 # this only amounts to one executing ${CC}, echo and awk this adds to quite a
 # lot of unccessary fork()+exec() when building world
 # walking the entire object tree
-.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT)
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !make(sysent)
 .error "${.CURDIR}: Rerunning ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. This value should be cached!"
 .else
 # .info "${.CURDIR}: Running ${${cc}} --version to compute ${X_}COMPILER_TYPE/${X_}COMPILER_VERSION. ${cc}=${${cc}}"
@@ -214,7 +210,7 @@ ${X_}COMPILER_VERSION!=echo "${_v:M[1-9]*.[0-9]*}" | awk -F. '{print $$1 * 10000
 .undef _v
 .endif
 .if !defined(${X_}COMPILER_FREEBSD_VERSION)
-.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT)
+.if defined(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !empty(_TOOLCHAIN_VARS_SHOULD_BE_SET) && !defined(COMPAT_32BIT) && !defined(COMPAT_64BIT) && !make(sysent)
 .error "${.CURDIR}: Recomputing ${X_}COMPILER_FREEBSD_VERSION. This value should be cached!"
 .else
 # .info "${.CURDIR}: Computing ${X_}COMPILER_FREEBSD_VERSION. ${cc}=${${cc}}"

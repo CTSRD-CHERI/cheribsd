@@ -226,6 +226,12 @@ struct mount {
 	struct lock	mnt_explock;		/* vfs_export walkers lock */
 	TAILQ_ENTRY(mount) mnt_upper_link;	/* (m) we in the all uppers */
 	TAILQ_HEAD(, mount) mnt_uppers;		/* (m) upper mounts over us*/
+	int __aligned(CACHE_LINE_SIZE)	mnt_vfs_ops;/* (i) pending vfs ops */
+	int		*mnt_thread_in_ops_pcpu;
+	int		*mnt_ref_pcpu;
+	int		*mnt_lockref_pcpu;
+	int		*mnt_writeopcount_pcpu;
+	struct vnode	*mnt_rootvnode;
 };
 
 /*
@@ -265,11 +271,17 @@ void          __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *);
 #define	MNT_ITRYLOCK(mp) mtx_trylock(&(mp)->mnt_mtx)
 #define	MNT_IUNLOCK(mp)	mtx_unlock(&(mp)->mnt_mtx)
 #define	MNT_MTX(mp)	(&(mp)->mnt_mtx)
-#define	MNT_REF(mp)	(mp)->mnt_ref++
+
+#define	MNT_REF(mp)	do {						\
+	mtx_assert(MNT_MTX(mp), MA_OWNED);				\
+	mp->mnt_ref++;							\
+} while (0)
 #define	MNT_REL(mp)	do {						\
-	KASSERT((mp)->mnt_ref > 0, ("negative mnt_ref"));		\
+	mtx_assert(MNT_MTX(mp), MA_OWNED);				\
 	(mp)->mnt_ref--;						\
-	if ((mp)->mnt_ref == 0)						\
+	if ((mp)->mnt_vfs_ops && (mp)->mnt_ref < 0)		\
+		vfs_dump_mount_counters(mp);				\
+	if ((mp)->mnt_ref == 0 && (mp)->mnt_vfs_ops)		\
 		wakeup((mp));						\
 } while (0)
 
@@ -362,29 +374,29 @@ void          __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *);
 #define	MNT_SNAPSHOT	0x0000000001000000ULL /* snapshot the filesystem */
 #define	MNT_NONBUSY	0x0000000004000000ULL /* check vnode use counts. */
 #define	MNT_BYFSID	0x0000000008000000ULL /* specify filesystem by ID. */
+#define	MNT_NOCOVER	0x0000001000000000ULL /* Do not cover a mount point */
+#define	MNT_EMPTYDIR	0x0000002000000000ULL /* Only mount on empty dir */
 #define MNT_CMDFLAGS   (MNT_UPDATE	| MNT_DELEXPORT	| MNT_RELOAD	| \
 			MNT_FORCE	| MNT_SNAPSHOT	| MNT_NONBUSY	| \
-			MNT_BYFSID)
+			MNT_BYFSID	| MNT_NOCOVER	| MNT_EMPTYDIR)
 /*
  * Internal filesystem control flags stored in mnt_kern_flag.
  *
- * MNTK_UNMOUNT locks the mount entry so that name lookup cannot proceed
- * past the mount point.  This keeps the subtree stable during mounts
- * and unmounts.
+ * MNTK_UNMOUNT locks the mount entry so that name lookup cannot
+ * proceed past the mount point.  This keeps the subtree stable during
+ * mounts and unmounts.  When non-forced unmount flushes all vnodes
+ * from the mp queue, the MNTK_UNMOUNT flag prevents insmntque() from
+ * queueing new vnodes.
  *
  * MNTK_UNMOUNTF permits filesystems to detect a forced unmount while
  * dounmount() is still waiting to lock the mountpoint. This allows
  * the filesystem to cancel operations that might otherwise deadlock
  * with the unmount attempt (used by NFS).
- *
- * MNTK_NOINSMNTQ is strict subset of MNTK_UNMOUNT. They are separated
- * to allow for failed unmount attempt to restore the syncer vnode for
- * the mount.
  */
 #define MNTK_UNMOUNTF	0x00000001	/* forced unmount in progress */
 #define MNTK_ASYNC	0x00000002	/* filtered async flag */
 #define MNTK_SOFTDEP	0x00000004	/* async disabled by softdep */
-#define MNTK_NOINSMNTQ	0x00000008	/* insmntque is not allowed */
+#define MNTK_NOMSYNC	0x00000008	/* don't do vfs_msync */
 #define	MNTK_DRAINING	0x00000010	/* lock draining is happening */
 #define	MNTK_REFEXPIRE	0x00000020	/* refcount expiring is happening */
 #define MNTK_EXTENDED_SHARED	0x00000040 /* Allow shared locking for more ops */
@@ -398,6 +410,8 @@ void          __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *);
 #define	MNTK_MARKER		0x00001000
 #define	MNTK_UNMAPPED_BUFS	0x00002000
 #define	MNTK_USES_BCACHE	0x00004000 /* FS uses the buffer cache. */
+#define	MNTK_TEXT_REFS		0x00008000 /* Keep use ref for text */
+#define	MNTK_VMSETSIZE_BUG	0x00010000
 #define MNTK_NOASYNC	0x00800000	/* disable async */
 #define MNTK_UNMOUNT	0x01000000	/* unmount in progress */
 #define	MNTK_MWAIT	0x02000000	/* waiting for unmount to finish */
@@ -648,11 +662,24 @@ struct nameidata;
 struct sysctl_req;
 struct mntarg;
 
-typedef int vfs_cmount_t(struct mntarg *ma, void *data, uint64_t flags);
+/*
+ * N.B., vfs_cmount is the ancient vfsop invoked by the old mount(2) syscall.
+ * The new way is vfs_mount.
+ *
+ * vfs_cmount implementations typically translate arguments from their
+ * respective old per-FS structures into the key-value list supported by
+ * nmount(2), then use kernel_mount(9) to mimic nmount(2) from kernelspace.
+ *
+ * Filesystems with mounters that use nmount(2) do not need to and should not
+ * implement vfs_cmount.  Hopefully a future cleanup can remove vfs_cmount and
+ * mount(2) entirely.
+ */
+typedef int vfs_cmount_t(struct mntarg *ma, void * __capability data,
+		    uint64_t flags);
 typedef int vfs_unmount_t(struct mount *mp, int mntflags);
 typedef int vfs_root_t(struct mount *mp, int flags, struct vnode **vpp);
 typedef	int vfs_quotactl_t(struct mount *mp, int cmds, uid_t uid,
-		    void * __CAPABILITY arg);
+		    void * __capability arg);
 typedef	int vfs_statfs_t(struct mount *mp, struct statfs *sbp);
 typedef	int vfs_sync_t(struct mount *mp, int waitfor);
 typedef	int vfs_vget_t(struct mount *mp, ino_t ino, int flags,
@@ -679,6 +706,7 @@ struct vfsops {
 	vfs_cmount_t		*vfs_cmount;
 	vfs_unmount_t		*vfs_unmount;
 	vfs_root_t		*vfs_root;
+	vfs_root_t		*vfs_cachedroot;
 	vfs_quotactl_t		*vfs_quotactl;
 	vfs_statfs_t		*vfs_statfs;
 	vfs_sync_t		*vfs_sync;
@@ -716,6 +744,12 @@ vfs_statfs_t	__vfs_statfs;
 	int _rc;							\
 									\
 	_rc = (*(MP)->mnt_op->vfs_root)(MP, FLAGS, VPP);		\
+	_rc; })
+
+#define	VFS_CACHEDROOT(MP, FLAGS, VPP) ({				\
+	int _rc;							\
+									\
+	_rc = (*(MP)->mnt_op->vfs_cachedroot)(MP, FLAGS, VPP);		\
 	_rc; })
 
 #define	VFS_QUOTACTL(MP, C, U, A) ({					\
@@ -842,7 +876,7 @@ int	kernel_vmount(int flags, ...);
 struct mntarg *mount_arg(struct mntarg *ma, const char *name, const void *val, int len);
 struct mntarg *mount_argb(struct mntarg *ma, int flag, const char *name);
 struct mntarg *mount_argf(struct mntarg *ma, const char *name, const char *fmt, ...);
-struct mntarg *mount_argsu(struct mntarg *ma, const char *name, const void *val, int len);
+struct mntarg *mount_argsu(struct mntarg *ma, const char *name, const void * __capability val, int len);
 void	statfs_scale_blocks(struct statfs *sf, long max_size);
 struct vfsconf *vfs_byname(const char *);
 struct vfsconf *vfs_byname_kld(const char *, struct thread *td, int *);
@@ -926,6 +960,77 @@ vfs_sysctl_t		vfs_stdsysctl;
 
 void	syncer_suspend(void);
 void	syncer_resume(void);
+
+struct vnode *vfs_cache_root_clear(struct mount *);
+void	vfs_cache_root_set(struct mount *, struct vnode *);
+
+void	vfs_op_barrier_wait(struct mount *);
+void	vfs_op_enter(struct mount *);
+void	vfs_op_exit_locked(struct mount *);
+void	vfs_op_exit(struct mount *);
+
+#ifdef DIAGNOSTIC
+void	vfs_assert_mount_counters(struct mount *);
+void	vfs_dump_mount_counters(struct mount *);
+#else
+#define vfs_assert_mount_counters(mp) do { } while (0)
+#define vfs_dump_mount_counters(mp) do { } while (0)
+#endif
+
+enum mount_counter { MNT_COUNT_REF, MNT_COUNT_LOCKREF, MNT_COUNT_WRITEOPCOUNT };
+int	vfs_mount_fetch_counter(struct mount *, enum mount_counter);
+
+/*
+ * We mark ourselves as entering the section and post a sequentially consistent
+ * fence, meaning the store is completed before we get into the section and
+ * mnt_vfs_ops is only read afterwards.
+ *
+ * Any thread transitioning the ops counter 0->1 does things in the opposite
+ * order - first bumps the count, posts a sequentially consistent fence and
+ * observes all CPUs not executing within the section.
+ *
+ * This provides an invariant that by the time the last CPU is observed not
+ * executing, everyone else entering will see the counter > 0 and exit.
+ *
+ * Note there is no barrier between vfs_ops and the rest of the code in the
+ * section. It is not necessary as the writer has to wait for everyone to drain
+ * before making any changes or only make changes safe while the section is
+ * executed.
+ */
+#define vfs_op_thread_entered(mp) ({				\
+	MPASS(curthread->td_critnest > 0);			\
+	*(int *)zpcpu_get(mp->mnt_thread_in_ops_pcpu) == 1;	\
+})
+
+#define vfs_op_thread_enter(mp) ({				\
+	bool _retval = true;					\
+	critical_enter();					\
+	MPASS(!vfs_op_thread_entered(mp));			\
+	*(int *)zpcpu_get(mp->mnt_thread_in_ops_pcpu) = 1;	\
+	atomic_thread_fence_seq_cst();				\
+	if (__predict_false(mp->mnt_vfs_ops > 0)) {		\
+		vfs_op_thread_exit(mp);				\
+		_retval = false;				\
+	}							\
+	_retval;						\
+})
+
+#define vfs_op_thread_exit(mp) do {				\
+	MPASS(vfs_op_thread_entered(mp));			\
+	atomic_thread_fence_rel();				\
+	*(int *)zpcpu_get(mp->mnt_thread_in_ops_pcpu) = 0;	\
+	critical_exit();					\
+} while (0)
+
+#define vfs_mp_count_add_pcpu(mp, count, val) do {		\
+	MPASS(vfs_op_thread_entered(mp));			\
+	(*(int *)zpcpu_get(mp->mnt_##count##_pcpu)) += val;	\
+} while (0)
+
+#define vfs_mp_count_sub_pcpu(mp, count, val) do {		\
+	MPASS(vfs_op_thread_entered(mp));			\
+	(*(int *)zpcpu_get(mp->mnt_##count##_pcpu)) -= val;	\
+} while (0)
 
 #else /* !_KERNEL */
 

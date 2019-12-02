@@ -987,13 +987,3 @@ struct unmap_parm_list {
 #define SCSI_ASCQ_INVALID_LUN_ID                        0x09
 
 #endif
-
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "header",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

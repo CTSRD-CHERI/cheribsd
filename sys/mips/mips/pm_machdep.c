@@ -37,6 +37,8 @@
  *	JNPR: pm_machdep.c,v 1.9.2.1 2007/08/16 15:59:10 girish
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -279,7 +281,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 	free(cfp, M_TEMP);
 #endif
-	if (copyout(&sf, sfp, sizeof(struct sigframe)) != 0) {
+	if (copyout(&sf, __USER_CAP_OBJ(sfp), sizeof(struct sigframe)) != 0) {
 		/*
 		 * Something is wrong with the stack pointer.
 		 * ...Kill the process.

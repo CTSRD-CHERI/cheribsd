@@ -507,7 +507,7 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 	struct filedescent *fde;
 	struct proc *p;
 	struct vnode *vp;
-	int error, flg, tmp;
+	int error, flg, seals, tmp;
 	uint64_t bsize;
 	off_t foffset;
 
@@ -774,6 +774,25 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		fdrop(fp, td);
 		break;
 
+	case F_ADD_SEALS:
+		error = fget_unlocked(fdp, fd, &cap_no_rights, &fp, NULL);
+		if (error != 0)
+			break;
+		error = fo_add_seals(fp, arg);
+		fdrop(fp, td);
+		break;
+
+	case F_GET_SEALS:
+		error = fget_unlocked(fdp, fd, &cap_no_rights, &fp, NULL);
+		if (error != 0)
+			break;
+		if (fo_get_seals(fp, &seals) == 0)
+			td->td_retval[0] = seals;
+		else
+			error = EINVAL;
+		fdrop(fp, td);
+		break;
+
 	case F_RDAHEAD:
 		arg = arg ? 128 * 1024: 0;
 		/* FALLTHROUGH */
@@ -787,6 +806,12 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 			break;
 		}
 		vp = fp->f_vnode;
+		if (vp->v_type != VREG) {
+			fdrop(fp, td);
+			error = ENOTTY;
+			break;
+		}
+
 		/*
 		 * Exclusive lock synchronizes against f_seqcount reads and
 		 * writes in sequential_heuristic().
@@ -1331,7 +1356,7 @@ ofstat(struct thread *td, struct ofstat_args *uap)
 	error = kern_fstat(td, uap->fd, &ub);
 	if (error == 0) {
 		cvtstat(&ub, &oub);
-		error = copyout(&oub, __USER_CAP_OBJ(uap->sb), sizeof(oub));
+		error = copyout(&oub, uap->sb, sizeof(oub));
 	}
 	return (error);
 }
@@ -1350,7 +1375,7 @@ freebsd11_fstat(struct thread *td, struct freebsd11_fstat_args *uap)
 		return (error);
 	error = freebsd11_cvtstat(&sb, &osb);
 	if (error == 0)
-		error = copyout(&osb, __USER_CAP_OBJ(uap->sb), sizeof(osb));
+		error = copyout(&osb, uap->sb, sizeof(osb));
 	return (error);
 }
 #endif	/* COMPAT_FREEBSD11 */
@@ -1369,7 +1394,7 @@ int
 sys_fstat(struct thread *td, struct fstat_args *uap)
 {
 
-	return (user_fstat(td, uap->fd, __USER_CAP_OBJ(uap->sb)));
+	return (user_fstat(td, uap->fd, uap->sb));
 }
 
 int
@@ -1436,7 +1461,7 @@ freebsd11_nfstat(struct thread *td, struct freebsd11_nfstat_args *uap)
 	error = kern_fstat(td, uap->fd, &ub);
 	if (error == 0) {
 		freebsd11_cvtnstat(&ub, &nub);
-		error = copyout(&nub, __USER_CAP_OBJ(uap->sb), sizeof(nub));
+		error = copyout(&nub, uap->sb, sizeof(nub));
 	}
 	return (error);
 }

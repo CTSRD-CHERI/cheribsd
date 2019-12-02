@@ -13,11 +13,11 @@
 // CHERI CHANGES START
 // {
 //   "updated": 20190722,
-//   "target_type": "header"
+//   "target_type": "header",
 //   "changes": [
-//     "subobject_bounds",
+//     "subobject_bounds"
 //   ],
-//   "change_comment": "address of std::string::operator[]: `std::string buf; &buf[0] -> __buf.begin().base()`",
+//   "change_comment": "address of std::string::operator[]: `std::string buf; &buf[0] -> __buf.begin().base()`"
 // }
 // CHERI CHANGES END
 

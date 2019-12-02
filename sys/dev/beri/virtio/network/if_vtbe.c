@@ -651,10 +651,9 @@ DRIVER_MODULE(vtbe, simplebus, vtbe_driver, vtbe_devclass, 0, 0);
 MODULE_DEPEND(vtbe, ether, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "struct iovec",
 //     "ioctl:net"
 //   ]
 // }

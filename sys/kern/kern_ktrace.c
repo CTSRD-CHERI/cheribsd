@@ -1026,8 +1026,7 @@ int
 sys_ktrace(struct thread *td, struct ktrace_args *uap)
 {
 
-	return (kern_ktrace(td, __USER_CAP_STR(uap->fname), uap->ops,
-	    uap->facs, uap->pid));
+	return (kern_ktrace(td, uap->fname, uap->ops, uap->facs, uap->pid));
 }
 
 int
@@ -1177,8 +1176,7 @@ int
 sys_utrace(struct thread *td, struct utrace_args *uap)
 {
 
-	return (kern_utrace(td, __USER_CAP(uap->addr, uap->len),
-	    uap->len));
+	return (kern_utrace(td, uap->addr, uap->len));
 }
 
 int
@@ -1444,11 +1442,10 @@ ktrcanset(struct thread *td, struct proc *targetp)
 #endif /* KTRACE */
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "support",
 //     "user_capabilities"
 //   ]

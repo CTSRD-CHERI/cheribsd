@@ -35,6 +35,9 @@
 #error "sys/cdefs.h is a prerequisite for this file"
 #endif
 
+#include <machine/segments.h>
+#include <machine/tss.h>
+
 #define	PC_PTI_STACK_SZ	16
 
 struct monitorbuf {
@@ -56,7 +59,7 @@ _Static_assert(sizeof(struct monitorbuf) == 128, "2x cache line");
 	struct	pcpu *pc_prvspace;	/* Self-reference */		\
 	struct	pmap *pc_curpmap;					\
 	struct	amd64tss *pc_tssp;	/* TSS segment active on CPU */	\
-	struct	amd64tss *pc_commontssp;/* Common TSS for the CPU */	\
+	void	*pc_pad0;						\
 	uint64_t pc_kcr3;						\
 	uint64_t pc_ucr3;						\
 	uint64_t pc_saved_ucr3;						\
@@ -89,7 +92,9 @@ _Static_assert(sizeof(struct monitorbuf) == 128, "2x cache line");
 	uint32_t pc_pad[2];						\
 	uint8_t	pc_mds_tmp[64];						\
 	u_int 	pc_ipi_bitmap;						\
-	char	__pad[3172]		/* pad to UMA_PCPU_ALLOC_SIZE */
+	struct amd64tss pc_common_tss;					\
+	struct user_segment_descriptor pc_gdt[NGDT];			\
+	char	__pad[2956]		/* pad to UMA_PCPU_ALLOC_SIZE */
 
 #define	PC_DBREG_CMD_NONE	0
 #define	PC_DBREG_CMD_LOAD	1
@@ -232,35 +237,6 @@ _Static_assert(sizeof(struct monitorbuf) == 128, "2x cache line");
 #define	PCPU_INC(member)	__PCPU_INC(pc_ ## member)
 #define	PCPU_PTR(member)	__PCPU_PTR(pc_ ## member)
 #define	PCPU_SET(member, val)	__PCPU_SET(pc_ ## member, val)
-
-#define	OFFSETOF_CURTHREAD	0
-#ifdef __clang__
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wnull-dereference"
-#endif
-static __inline __pure2 struct thread *
-__curthread(void)
-{
-	struct thread *td;
-
-	__asm("movq %%gs:%P1,%0" : "=r" (td) : "n" (OFFSETOF_CURTHREAD));
-	return (td);
-}
-#ifdef __clang__
-#pragma clang diagnostic pop
-#endif
-#define	curthread		(__curthread())
-
-#define	OFFSETOF_CURPCB		32
-static __inline __pure2 struct pcb *
-__curpcb(void)
-{
-	struct pcb *pcb;
-
-	__asm("movq %%gs:%P1,%0" : "=r" (pcb) : "n" (OFFSETOF_CURPCB));
-	return (pcb);
-}
-#define	curpcb		(__curpcb())
 
 #define	IS_BSP()	(PCPU_GET(cpuid) == 0)
 

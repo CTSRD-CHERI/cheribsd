@@ -1418,11 +1418,10 @@ MODULE_VERSION(cryptosoft, 1);
 MODULE_DEPEND(cryptosoft, crypto, 1, 1, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

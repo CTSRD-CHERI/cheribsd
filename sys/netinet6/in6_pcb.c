@@ -714,7 +714,7 @@ in6_pcblookup_local(struct inpcbinfo *pcbinfo, struct in6_addr *laddr,
 	KASSERT((lookupflags & ~(INPLOOKUP_WILDCARD)) == 0,
 	    ("%s: invalid lookup flags %d", __func__, lookupflags));
 
-	INP_HASH_WLOCK_ASSERT(pcbinfo);
+	INP_HASH_LOCK_ASSERT(pcbinfo);
 
 	if ((lookupflags & INPLOOKUP_WILDCARD) == 0) {
 		struct inpcbhead *head;
@@ -801,20 +801,20 @@ in6_pcblookup_local(struct inpcbinfo *pcbinfo, struct in6_addr *laddr,
 void
 in6_pcbpurgeif0(struct inpcbinfo *pcbinfo, struct ifnet *ifp)
 {
-	struct inpcb *in6p;
+	struct inpcb *inp;
 	struct in6_multi *inm;
 	struct in6_mfilter *imf;
 	struct ip6_moptions *im6o;
 
 	INP_INFO_WLOCK(pcbinfo);
-	CK_LIST_FOREACH(in6p, pcbinfo->ipi_listhead, inp_list) {
-		INP_WLOCK(in6p);
-		if (__predict_false(in6p->inp_flags2 & INP_FREED)) {
-			INP_WUNLOCK(in6p);
+	CK_LIST_FOREACH(inp, pcbinfo->ipi_listhead, inp_list) {
+		INP_WLOCK(inp);
+		if (__predict_false(inp->inp_flags2 & INP_FREED)) {
+			INP_WUNLOCK(inp);
 			continue;
 		}
-		im6o = in6p->in6p_moptions;
-		if ((in6p->inp_vflag & INP_IPV6) && im6o != NULL) {
+		im6o = inp->in6p_moptions;
+		if ((inp->inp_vflag & INP_IPV6) && im6o != NULL) {
 			/*
 			 * Unselect the outgoing ifp for multicast if it
 			 * is being detached.
@@ -838,7 +838,7 @@ restart:
 				goto restart;
 			}
 		}
-		INP_WUNLOCK(in6p);
+		INP_WUNLOCK(inp);
 	}
 	INP_INFO_WUNLOCK(pcbinfo);
 }
@@ -1245,7 +1245,6 @@ in6_pcblookup_hash(struct inpcbinfo *pcbinfo, struct in6_addr *faddr,
 {
 	struct inpcb *inp;
 
-	INP_HASH_RLOCK(pcbinfo);
 	inp = in6_pcblookup_hash_locked(pcbinfo, faddr, fport, laddr, lport,
 	    (lookupflags & ~(INPLOOKUP_RLOCKPCB | INPLOOKUP_WLOCKPCB)), ifp);
 	if (inp != NULL) {
@@ -1272,7 +1271,6 @@ in6_pcblookup_hash(struct inpcbinfo *pcbinfo, struct in6_addr *faddr,
 		}
 #endif
 	}
-	INP_HASH_RUNLOCK(pcbinfo);
 	return (inp);
 }
 

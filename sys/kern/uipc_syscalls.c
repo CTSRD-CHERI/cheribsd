@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/syscallsubr.h>
+#include <sys/sysent.h>
 #include <sys/uio.h>
 #include <sys/un.h>
 #include <sys/unpcb.h>
@@ -165,8 +166,7 @@ int
 sys_bind(struct thread *td, struct bind_args *uap)
 {
 
-	return (user_bind(td, uap->s, __USER_CAP(uap->name, uap->namelen),
-	    uap->namelen));
+	return (user_bind(td, uap->s, uap->name, uap->namelen));
 }
 
 int
@@ -226,8 +226,7 @@ int
 sys_bindat(struct thread *td, struct bindat_args *uap)
 {
 
-	return(user_bindat(td, uap->fd, uap->s,
-	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
+	return(user_bindat(td, uap->fd, uap->s, uap->name, uap->namelen));
 }
 
 int
@@ -297,7 +296,8 @@ user_accept(struct thread *td, int s, struct sockaddr * __capability uname,
 
 	if (error == 0 && uname != NULL) {
 #ifdef COMPAT_OLDSOCK
-		if (flags & ACCEPT4_COMPAT)
+		if (SV_PROC_FLAG(td->td_proc, SV_AOUT) &&
+		    (flags & ACCEPT4_COMPAT) != 0)
 			((struct osockaddr *)name)->sa_family =
 			    name->sa_family;
 #endif
@@ -440,8 +440,8 @@ int
 sys_accept(struct thread *td, struct accept_args *uap)
 {
 
-	return (user_accept(td, uap->s, __USER_CAP_UNBOUND(uap->name),
-	    __USER_CAP_OBJ(uap->anamelen), ACCEPT4_INHERIT));
+	return (user_accept(td, uap->s, uap->name, uap->anamelen,
+	    ACCEPT4_INHERIT));
 }
 
 int
@@ -451,8 +451,7 @@ sys_accept4(struct thread *td, struct accept4_args *uap)
 	if (uap->flags & ~(SOCK_CLOEXEC | SOCK_NONBLOCK))
 		return (EINVAL);
 
-	return (user_accept(td, uap->s, __USER_CAP_UNBOUND(uap->name),
-	    __USER_CAP_OBJ(uap->anamelen), uap->flags));
+	return (user_accept(td, uap->s, uap->name, uap->anamelen, uap->flags));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -460,8 +459,8 @@ int
 oaccept(struct thread *td, struct oaccept_args *uap)
 {
 
-	return (user_accept(td, uap->s, __USER_CAP_UNBCOUND(uap->name),
-	    __USER_CAP_OBJ(uap->anamelen), ACCEPT4_INHERIT | ACCEPT4_COMPAT));
+	return (user_accept(td, uap->s, uap->name, uap->anamelen,
+	    ACCEPT4_INHERIT | ACCEPT4_COMPAT));
 }
 #endif /* COMPAT_OLDSOCK */
 
@@ -469,8 +468,7 @@ int
 sys_connect(struct thread *td, struct connect_args *uap)
 {
 
-	return (user_connectat(td, AT_FDCWD, uap->s,
-	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
+	return (user_connectat(td, AT_FDCWD, uap->s, uap->name, uap->namelen));
 }
 
 int
@@ -559,8 +557,7 @@ int
 sys_connectat(struct thread *td, struct connectat_args *uap)
 {
 
-	return (user_connectat(td, uap->fd, uap->s,
-	    __USER_CAP(uap->name, uap->namelen), uap->namelen));
+	return (user_connectat(td, uap->fd, uap->s, uap->name, uap->namelen));
 }
 
 int
@@ -658,7 +655,7 @@ sys_socketpair(struct thread *td, struct socketpair_args *uap)
 {
 
 	return (user_socketpair(td, uap->domain, uap->type, uap->protocol,
-	    __USER_CAP(uap->rsv, 2 * sizeof(int))));
+	    uap->rsv));
 }
 
 int
@@ -704,7 +701,8 @@ user_sendit(struct thread *td, int s, struct msghdr *mp, int flags)
 	if (mp->msg_control) {
 		if (mp->msg_controllen < sizeof(struct cmsghdr)
 #ifdef COMPAT_OLDSOCK
-		    && mp->msg_flags != MSG_COMPAT
+		    && (mp->msg_flags != MSG_COMPAT ||
+		    !SV_PROC_FLAG(td->td_proc, SV_AOUT))
 #endif
 		) {
 			error = EINVAL;
@@ -715,7 +713,8 @@ user_sendit(struct thread *td, int s, struct msghdr *mp, int flags)
 		if (error != 0)
 			goto bad;
 #ifdef COMPAT_OLDSOCK
-		if (mp->msg_flags == MSG_COMPAT) {
+		if (mp->msg_flags == MSG_COMPAT &&
+		    SV_PROC_FLAG(td->td_proc, SV_AOUT)) {
 			struct cmsghdr *cm;
 
 			M_PREPEND(control, sizeof(*cm), M_WAITOK);
@@ -836,8 +835,8 @@ int
 sys_sendto(struct thread *td, struct sendto_args *uap)
 {
 
-	return (user_sendto(td, uap->s, __USER_CAP(uap->buf, uap->len),
-	    uap->len, uap->flags, __USER_CAP(uap->to, uap->tolen), uap->tolen));
+	return (user_sendto(td, uap->s, uap->buf,
+	    uap->len, uap->flags, uap->to, uap->tolen));
 }
 
 int
@@ -854,7 +853,8 @@ user_sendto(struct thread *td, int s, const char * __capability buf,
 	msg.msg_iovlen = 1;
 	msg.msg_control = 0;
 #ifdef COMPAT_OLDSOCK
-	msg.msg_flags = 0;
+	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
+		msg.msg_flags = 0;
 #endif
 	IOVEC_INIT_C(&aiov, __DECONST_CAP(void * __capability, buf), len);
 	return (user_sendit(td, s, &msg, flags));
@@ -880,7 +880,7 @@ osend(struct thread *td, struct osend_args *uap)
 int
 osendmsg(struct thread *td, struct osendmsg_args *uap)
 {
-	kmsthdr_t msg;
+	struct msghdr msg;
 	struct omsghdr umsg;
 	struct iovec *iov;
 	int error;
@@ -912,7 +912,7 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	struct iovec *iov;
 	int error;
 
-	error = copyin(__USER_CAP_OBJ(uap->msg), &umsg, sizeof(umsg));
+	error = copyin(uap->msg, &umsg, sizeof(umsg));
 	if (error != 0)
 		return (error);
 	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
@@ -925,10 +925,10 @@ sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 	msg.msg_iovlen = umsg.msg_iovlen;
 	msg.msg_control = __USER_CAP(umsg.msg_control, umsg.msg_controllen);
 	msg.msg_controllen = umsg.msg_controllen;
-#ifdef COMPAT_OLDSOCK
-	msg.msg_flags = 0;
-#else
 	msg.msg_flags = umsg.msg_flags;
+#ifdef COMPAT_OLDSOCK
+	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
+		msg.msg_flags = 0;
 #endif
 	error = user_sendit(td, uap->s, &msg, uap->flags);
 	free(iov, M_IOV);
@@ -1017,7 +1017,8 @@ kern_recvit(struct thread *td, int s, struct msghdr *mp, enum uio_seg fromseg,
 			/* save sa_len before it is destroyed by MSG_COMPAT */
 			len = MIN(len, fromsa->sa_len);
 #ifdef COMPAT_OLDSOCK
-			if (mp->msg_flags & MSG_COMPAT)
+			if ((mp->msg_flags & MSG_COMPAT) != 0 &&
+			    SV_PROC_FLAG(td->td_proc, SV_AOUT))
 				((struct osockaddr *)fromsa)->sa_family =
 				    fromsa->sa_family;
 #endif
@@ -1042,7 +1043,8 @@ kern_recvit(struct thread *td, int s, struct msghdr *mp, enum uio_seg fromseg,
 		 * If we receive rights, trim the cmsghdr; anything else
 		 * is tossed.
 		 */
-		if (control && mp->msg_flags & MSG_COMPAT) {
+		if (control && (mp->msg_flags & MSG_COMPAT) != 0 &&
+		    SV_PROC_FLAG(td->td_proc, SV_AOUT)) {
 			if (mtod(control, struct cmsghdr *)->cmsg_level !=
 			    SOL_SOCKET ||
 			    mtod(control, struct cmsghdr *)->cmsg_type !=
@@ -1103,7 +1105,8 @@ recvit(struct thread *td, int s, struct msghdr *mp,
 		error = copyout(&mp->msg_namelen, namelenp,
 		    sizeof (socklen_t));
 #ifdef COMPAT_OLDSOCK
-		if (mp->msg_flags & MSG_COMPAT)
+		if ((mp->msg_flags & MSG_COMPAT) != 0 &&
+		    SV_PROC_FLAG(td->td_proc, SV_AOUT))
 			error = 0;	/* old recvfrom didn't check */
 #endif
 	}
@@ -1114,9 +1117,8 @@ int
 sys_recvfrom(struct thread *td, struct recvfrom_args *uap)
 {
 
-	return (kern_recvfrom(td, uap->s, __USER_CAP(uap->buf, uap->len),
-	    uap->len, uap->flags, __USER_CAP_UNBOUND(uap->from),
-	    __USER_CAP_OBJ(uap->fromlenaddr)));
+	return (kern_recvfrom(td, uap->s, uap->buf,
+	    uap->len, uap->flags, uap->from, uap->fromlenaddr));
 }
 
 int
@@ -1217,7 +1219,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	struct iovec *iov;
 	int error;
 
-	error = copyin(__USER_CAP_OBJ(uap->msg), &umsg, sizeof(umsg));
+	error = copyin(uap->msg, &umsg, sizeof(umsg));
 	if (error != 0)
 		return (error);
 	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
@@ -1232,7 +1234,8 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 	msg.msg_controllen = umsg.msg_controllen;
 	msg.msg_flags = uap->flags;
 #ifdef COMPAT_OLDSOCK
-	msg.msg_flags &= ~MSG_COMPAT;
+	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
+		msg.msg_flags &= ~MSG_COMPAT;
 #endif
 	error = recvit(td, uap->s, &msg, NULL);
 	if (error == 0) {
@@ -1244,7 +1247,7 @@ sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 		umsg.msg_namelen = msg.msg_namelen;
 		umsg.msg_iovlen = msg.msg_iovlen;
 		umsg.msg_controllen = msg.msg_controllen;
-		error = copyout(&umsg, __USER_CAP_OBJ(uap->msg), sizeof(umsg));
+		error = copyout(&umsg, uap->msg, sizeof(umsg));
 	}
 	free(iov, M_IOV);
 	return (error);
@@ -1289,7 +1292,7 @@ sys_setsockopt(struct thread *td, struct setsockopt_args *uap)
 {
 
 	return (kern_setsockopt(td, uap->s, uap->level, uap->name,
-	    __USER_CAP(uap->val, uap->valsize), UIO_USERSPACE, uap->valsize));
+	    uap->val, UIO_USERSPACE, uap->valsize));
 }
 
 int
@@ -1338,7 +1341,7 @@ sys_getsockopt(struct thread *td, struct getsockopt_args *uap)
 {
 
 	return (user_getsockopt(td, uap->s, uap->level, uap->name,
-	    __USER_CAP_UNBOUND(uap->val), __USER_CAP_OBJ(uap->avalsize)));
+	    uap->val, uap->avalsize));
 }
 
 int
@@ -1427,7 +1430,7 @@ user_getsockname(struct thread *td, int fdes,
 
 	if (len != 0) {
 #ifdef COMPAT_OLDSOCK
-		if (compat)
+		if (compat && SV_PROC_FLAG(td->td_proc, SV_AOUT))
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
 		error = copyout(sa, asa, len);
@@ -1481,8 +1484,7 @@ int
 sys_getsockname(struct thread *td, struct getsockname_args *uap)
 {
 
-	return (user_getsockname(td, uap->fdes,
-	    __USER_CAP_UNBOUND(uap->asa), __USER_CAP_OBJ(uap->alen), 0));
+	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, 0));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -1490,8 +1492,7 @@ int
 ogetsockname(struct thread *td, struct getsockname_args *uap)
 {
 
-	return (user_getsockname(td, uap->fdes,
-	    __USER_CAP_UNBOUND(uap->asa), __USER_CAP_OBJ(uap->alen), 1));
+	return (user_getsockname(td, uap->fdes, uap->asa, uap->alen, 1));
 }
 #endif /* COMPAT_OLDSOCK */
 
@@ -1514,7 +1515,7 @@ user_getpeername(struct thread *td, int fdes,
 
 	if (len != 0) {
 #ifdef COMPAT_OLDSOCK
-		if (compat)
+		if (compat && SV_PROC_FLAG(td->td_proc, SV_AOUT))
 			((struct osockaddr *)sa)->sa_family = sa->sa_family;
 #endif
 		error = copyout(sa, asa, len);
@@ -1573,8 +1574,7 @@ int
 sys_getpeername(struct thread *td, struct getpeername_args *uap)
 {
 
-	return (user_getpeername(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
-	    __USER_CAP_OBJ(uap->alen), 0));
+	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, 0));
 }
 
 #ifdef COMPAT_OLDSOCK
@@ -1582,8 +1582,7 @@ int
 ogetpeername(struct thread *td, struct ogetpeername_args *uap)
 {
 
-	return (user_getpeername(td, uap->fdes, __USER_CAP_UNBOUND(uap->asa),
-	    __USER_CAP_OBJ(uap->alen), 1));
+	return (user_getpeername(td, uap->fdes, uap->asa, uap->alen, 1));
 }
 #endif /* COMPAT_OLDSOCK */
 
@@ -1596,7 +1595,8 @@ sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen, int type)
 
 	if (buflen > MLEN) {
 #ifdef COMPAT_OLDSOCK
-		if (type == MT_SONAME && buflen <= 112)
+		if (type == MT_SONAME && buflen <= 112 &&
+		    SV_CURPROC_FLAG(SV_AOUT))
 			buflen = MLEN;		/* unix domain compat. hack */
 		else
 #endif
@@ -1614,7 +1614,8 @@ sockargs(struct mbuf **mp, char * __capability buf, socklen_t buflen, int type)
 			sa = mtod(m, struct sockaddr *);
 
 #if defined(COMPAT_OLDSOCK) && BYTE_ORDER != BIG_ENDIAN
-			if (sa->sa_family == 0 && sa->sa_len < AF_MAX)
+			if (sa->sa_family == 0 && sa->sa_len < AF_MAX &&
+			    SV_CURPROC_FLAG(SV_AOUT))
 				sa->sa_family = sa->sa_len;
 #endif
 			sa->sa_len = buflen;
@@ -1640,7 +1641,8 @@ getsockaddr(struct sockaddr **namp, const struct sockaddr * __capability uaddr,
 		free(sa, M_SONAME);
 	} else {
 #if defined(COMPAT_OLDSOCK) && BYTE_ORDER != BIG_ENDIAN
-		if (sa->sa_family == 0 && sa->sa_len < AF_MAX)
+		if (sa->sa_family == 0 && sa->sa_len < AF_MAX &&
+		    SV_CURPROC_FLAG(SV_AOUT))
 			sa->sa_family = sa->sa_len;
 #endif
 		sa->sa_len = len;
@@ -1700,11 +1702,10 @@ m_dispose_extcontrolm(struct mbuf *m)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

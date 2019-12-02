@@ -62,7 +62,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/link_elf.h>
 
 #ifdef DDB_CTF
-#include <sys/zlib.h>
+#include <contrib/zlib/zlib.h>
 #endif
 
 #include "linker_if.h"
@@ -70,8 +70,8 @@ __FBSDID("$FreeBSD$");
 typedef struct {
 	void		*addr;
 	Elf_Off		size;
-	int		flags;
-	int		sec;	/* Original section */
+	int		flags;	/* Section flags. */
+	int		sec;	/* Original section number. */
 	char		*name;
 } Elf_progent;
 
@@ -163,7 +163,7 @@ static kobj_method_t link_elf_methods[] = {
 	KOBJMETHOD(linker_ctf_get,		link_elf_ctf_get),
 	KOBJMETHOD(linker_symtab_get, 		link_elf_symtab_get),
 	KOBJMETHOD(linker_strtab_get, 		link_elf_strtab_get),
-	{ 0, 0 }
+	KOBJMETHOD_END
 };
 
 static struct linker_class link_elf_class = {
@@ -193,8 +193,129 @@ link_elf_init(void *arg)
 
 	linker_add_class(&link_elf_class);
 }
-
 SYSINIT(link_elf_obj, SI_SUB_KLD, SI_ORDER_SECOND, link_elf_init, NULL);
+
+static void
+link_elf_protect_range(elf_file_t ef, vm_offset_t start, vm_offset_t end,
+    vm_prot_t prot)
+{
+	int error __unused;
+
+	KASSERT(start <= end && start >= (vm_offset_t)ef->address &&
+	    end <= round_page((vm_offset_t)ef->address + ef->lf.size),
+	    ("link_elf_protect_range: invalid range %#jx-%#jx",
+	    (uintmax_t)start, (uintmax_t)end));
+
+	if (start == end)
+		return;
+	if (ef->preloaded) {
+#ifdef __amd64__
+		error = pmap_change_prot(start, end - start, prot);
+		KASSERT(error == 0,
+		    ("link_elf_protect_range: pmap_change_prot() returned %d",
+		    error));
+#endif
+		return;
+	}
+	error = vm_map_protect(kernel_map, start, end, prot, FALSE);
+	KASSERT(error == KERN_SUCCESS,
+	    ("link_elf_protect_range: vm_map_protect() returned %d", error));
+}
+
+/*
+ * Restrict permissions on linker file memory based on section flags.
+ * Sections need not be page-aligned, so overlap within a page is possible.
+ */
+static void
+link_elf_protect(elf_file_t ef)
+{
+	vm_offset_t end, segend, segstart, start;
+	vm_prot_t gapprot, prot, segprot;
+	int i;
+
+	/*
+	 * If the file was preloaded, the last page may contain other preloaded
+	 * data which may need to be writeable.  ELF files are always
+	 * page-aligned, but other preloaded data, such as entropy or CPU
+	 * microcode may be loaded with a smaller alignment.
+	 */
+	gapprot = ef->preloaded ? VM_PROT_RW : VM_PROT_READ;
+
+	start = end = (vm_offset_t)ef->address;
+	prot = VM_PROT_READ;
+	for (i = 0; i < ef->nprogtab; i++) {
+		/*
+		 * VNET and DPCPU sections have their memory allocated by their
+		 * respective subsystems.
+		 */
+		if (ef->progtab[i].name != NULL && (
+#ifdef VIMAGE
+		    strcmp(ef->progtab[i].name, VNET_SETNAME) == 0 ||
+#endif
+		    strcmp(ef->progtab[i].name, DPCPU_SETNAME) == 0))
+			continue;
+
+		segstart = trunc_page((vm_offset_t)ef->progtab[i].addr);
+		segend = round_page((vm_offset_t)ef->progtab[i].addr +
+		    ef->progtab[i].size);
+		segprot = VM_PROT_READ;
+		if ((ef->progtab[i].flags & SHF_WRITE) != 0)
+			segprot |= VM_PROT_WRITE;
+		if ((ef->progtab[i].flags & SHF_EXECINSTR) != 0)
+			segprot |= VM_PROT_EXECUTE;
+
+		if (end <= segstart) {
+			/*
+			 * Case 1: there is no overlap between the previous
+			 * segment and this one.  Apply protections to the
+			 * previous segment, and protect the gap between the
+			 * previous and current segments, if any.
+			 */
+			link_elf_protect_range(ef, start, end, prot);
+			link_elf_protect_range(ef, end, segstart, gapprot);
+
+			start = segstart;
+			end = segend;
+			prot = segprot;
+		} else if (start < segstart && end == segend) {
+			/*
+			 * Case 2: the current segment is a subrange of the
+			 * previous segment.  Apply protections to the
+			 * non-overlapping portion of the previous segment.
+			 */
+			link_elf_protect_range(ef, start, segstart, prot);
+
+			start = segstart;
+			prot |= segprot;
+		} else if (end < segend) {
+			/*
+			 * Case 3: there is partial overlap between the previous
+			 * and current segments.  Apply protections to the
+			 * non-overlapping portion of the previous segment, and
+			 * then the overlap, which must use the union of the two
+			 * segments' protections.
+			 */
+			link_elf_protect_range(ef, start, segstart, prot);
+			link_elf_protect_range(ef, segstart, end,
+			    prot | segprot);
+			start = end;
+			end = segend;
+			prot = segprot;
+		} else {
+			/*
+			 * Case 4: the two segments reside in the same page.
+			 */
+			prot |= segprot;
+		}
+	}
+
+	/*
+	 * Fix up the last unprotected segment and trailing data.
+	 */
+	link_elf_protect_range(ef, start, end, prot);
+	link_elf_protect_range(ef, end,
+	    round_page((vm_offset_t)ef->address + ef->lf.size), gapprot);
+}
 
 static int
 link_elf_link_preload(linker_class_t cls, const char *filename,
@@ -358,6 +479,7 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 			else
 				ef->progtab[pb].name = "<<NOBITS>>";
 			ef->progtab[pb].size = shdr[i].sh_size;
+			ef->progtab[pb].flags = shdr[i].sh_flags;
 			ef->progtab[pb].sec = i;
 			if (ef->shstrtab && shdr[i].sh_name != 0)
 				ef->progtab[pb].name =
@@ -450,6 +572,14 @@ link_elf_link_preload(linker_class_t cls, const char *filename,
 		goto out;
 	}
 
+	/*
+	 * The file needs to be writeable and executable while applying
+	 * relocations.  Mapping protections are applied once relocation
+	 * processing is complete.
+	 */
+	link_elf_protect_range(ef, (vm_offset_t)ef->address,
+	    round_page((vm_offset_t)ef->address + ef->lf.size), VM_PROT_ALL);
+
 	/* Local intra-module relocations */
 	error = link_elf_reloc_local(lf, false);
 	if (error != 0)
@@ -502,7 +632,9 @@ link_elf_link_preload_finish(linker_file_t lf)
 		return (error);
 #endif
 
-	/* Invoke .ctors */
+	/* Apply protections now that relocation processing is complete. */
+	link_elf_protect(ef);
+
 	link_elf_invoke_ctors(lf->ctors_addr, lf->ctors_size);
 	return (0);
 }
@@ -774,18 +906,18 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	 * This stuff needs to be in a single chunk so that profiling etc
 	 * can get the bounds and gdb can associate offsets with modules
 	 */
-	ef->object = vm_object_allocate(OBJT_DEFAULT,
-	    round_page(mapsize) >> PAGE_SHIFT);
+	ef->object = vm_object_allocate(OBJT_PHYS, atop(round_page(mapsize)));
 	if (ef->object == NULL) {
 		error = ENOMEM;
 		goto out;
 	}
-	ef->address = (caddr_t) vm_map_min(kernel_map);
 
 	/*
 	 * In order to satisfy amd64's architectural requirements on the
 	 * location of code and data in the kernel's address space, request a
-	 * mapping that is above the kernel.  
+	 * mapping that is above the kernel.
+	 *
+	 * Protections will be restricted once relocations are applied.
 	 */
 #ifdef __amd64__
 	mapbase = KERNBASE;
@@ -795,9 +927,10 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 	error = vm_map_find(kernel_map, ef->object, 0, &mapbase,
 	    round_page(mapsize), 0, VMFS_OPTIMAL_SPACE, VM_PROT_ALL,
 	    VM_PROT_ALL, 0);
-	if (error) {
+	if (error != KERN_SUCCESS) {
 		vm_object_deallocate(ef->object);
-		ef->object = 0;
+		ef->object = NULL;
+		error = ENOMEM;
 		goto out;
 	}
 
@@ -885,6 +1018,7 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 				goto out;
 			}
 			ef->progtab[pb].size = shdr[i].sh_size;
+			ef->progtab[pb].flags = shdr[i].sh_flags;
 			ef->progtab[pb].sec = i;
 			if (shdr[i].sh_type == SHT_PROGBITS
 #ifdef __amd64__
@@ -1024,9 +1158,8 @@ link_elf_load_file(linker_class_t cls, const char *filename,
 		goto out;
 #endif
 
-	/* Invoke .ctors */
+	link_elf_protect(ef);
 	link_elf_invoke_ctors(lf->ctors_addr, lf->ctors_size);
-
 	*result = lf;
 
 out:
@@ -1085,11 +1218,9 @@ link_elf_unload_file(linker_file_t file)
 	free(ef->relatab, M_LINKER);
 	free(ef->progtab, M_LINKER);
 
-	if (ef->object) {
-		vm_map_remove(kernel_map, (vm_offset_t) ef->address,
-		    (vm_offset_t) ef->address +
-		    (ef->object->size << PAGE_SHIFT));
-	}
+	if (ef->object != NULL)
+		vm_map_remove(kernel_map, (vm_offset_t)ef->address,
+		    (vm_offset_t)ef->address + ptoa(ef->object->size));
 	free(ef->e_shdr, M_LINKER);
 	free(ef->ddbsymtab, M_LINKER);
 	free(ef->ddbstrtab, M_LINKER);

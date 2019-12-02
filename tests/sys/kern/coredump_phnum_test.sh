@@ -40,18 +40,41 @@ coredump_phnum_head()
 coredump_phnum_body()
 {
 	# Set up core dumping
-	cat > coredump_phnum_restore_state.sh <<-EOF
-	#!/bin/sh
-	ulimit -c '$(ulimit -c)'
-	sysctl kern.coredump=$(sysctl -n kern.coredump)
-	sysctl kern.corefile='$(sysctl -n kern.corefile)'
-EOF
+	atf_check -o save:coredump_phnum_restore_state sysctl -e \
+	    kern.coredump kern.corefile
 
 	ulimit -c unlimited
-	sysctl kern.coredump=1
-	sysctl kern.corefile="$(pwd)/coredump_phnum_helper.core"
+	atf_check -o ignore sysctl kern.coredump=1
+	atf_check -o ignore sysctl kern.corefile=coredump_phnum_helper.core
+	atf_check -o save:cuc sysctl -n kern.compress_user_cores
+	read cuc < cuc
 
 	atf_check -s signal:sigabrt "$(atf_get_srcdir)/coredump_phnum_helper"
+
+	case "$cuc" in
+	0)
+		unzip_status=0
+		;;
+	1)
+		gunzip coredump_phnum_helper.core.gz 2>unzip_stderr
+		unzip_status=$?
+		;;
+	2)
+		zstd -qd coredump_phnum_helper.core.zst 2>unzip_stderr
+		unzip_status=$?
+		;;
+	*)
+		atf_skip "unsupported kern.compress_user_cores=$cuc"
+		;;
+	esac
+
+	if [ $unzip_status -ne 0 ]; then
+		if grep -q 'No space left on device' unzip_stderr; then
+			atf_skip "file system full: $(df $PWD | tail -n 1)"
+		fi
+		atf_fail "unzip failed; status ${unzip_status}; " \
+			"stderr: $(cat unzip_stderr)"
+	fi
 
 	# Check that core looks good
 	if [ ! -f coredump_phnum_helper.core ]; then
@@ -74,10 +97,11 @@ EOF
 coredump_phnum_cleanup()
 {
 	rm -f coredump_phnum_helper.core
-	if [ -f coredump_phnum_restore_state.sh ]; then
-		. ./coredump_phnum_restore_state.sh
+	if [ -f coredump_phnum_restore_state ]; then
+		sysctl -f coredump_phnum_restore_state
+		rm -f coredump_phnum_restore_state
 	fi
-	rm -f coredump_phnum_restore_state.sh
+	rm -f cuc
 }
 
 atf_init_test_cases()

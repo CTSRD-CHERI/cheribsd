@@ -201,6 +201,7 @@ struct pcpu {
 	struct thread	*pc_fpcurthread;	/* Fp state owner */
 	struct thread	*pc_deadthread;		/* Zombie thread or NULL */
 	struct pcb	*pc_curpcb;		/* Current pcb */
+	void		*pc_sched;		/* Scheduler state */
 	uint64_t	pc_switchtime;		/* cpu_ticks() at last csw */
 	int		pc_switchticks;		/* `ticks' at last csw */
 	u_int		pc_cpuid;		/* This cpu number */
@@ -236,26 +237,16 @@ extern struct cpuhead cpuhead;
 extern struct pcpu *cpuid_to_pcpu[];
 
 #define	curcpu		PCPU_GET(cpuid)
-#define	curproc		(curthread->td_proc)
-#ifndef curthread
-#define	curthread	PCPU_GET(curthread)
-#endif
 #define	curvidata	PCPU_GET(vidata)
 
 #define UMA_PCPU_ALLOC_SIZE		PAGE_SIZE
 
-#ifdef CTASSERT
-#if defined(__i386__) || defined(__amd64__)
-/* Required for counters(9) to work on x86. */
-CTASSERT(sizeof(struct pcpu) == UMA_PCPU_ALLOC_SIZE);
-#else
-/*
- * To minimize memory waste in per-cpu UMA zones, size of struct pcpu
- * should be denominator of PAGE_SIZE.
- */
-CTASSERT((PAGE_SIZE / sizeof(struct pcpu)) * sizeof(struct pcpu) == PAGE_SIZE);
-#endif	/* UMA_PCPU_ALLOC_SIZE && x86 */
-#endif	/* CTASSERT */
+#include <machine/pcpu_aux.h>
+
+#ifndef curthread
+#define	curthread	PCPU_GET(curthread)
+#endif
+#define	curproc		(curthread->td_proc)
 
 /* Accessor to elements allocated via UMA_ZONE_PCPU zone. */
 static inline void *
@@ -271,6 +262,18 @@ zpcpu_get_cpu(void *base, int cpu)
 
 	return ((char *)(base) + UMA_PCPU_ALLOC_SIZE * cpu);
 }
+
+/*
+ * This operation is NOT atomic and does not post any barriers.
+ * If you use this the assumption is that the target CPU will not
+ * be modifying this variable.
+ * If you need atomicity use xchg.
+ * */
+#define zpcpu_replace_cpu(base, val, cpu) ({				\
+	__typeof(val) _old = *(__typeof(val) *)zpcpu_get_cpu(base, cpu);\
+	*(__typeof(val) *)zpcpu_get_cpu(base, cpu) = val;		\
+	_old;								\
+})
 
 /*
  * Machine dependent callouts.  cpu_pcpu_init() is responsible for

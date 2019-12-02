@@ -8,19 +8,19 @@
 
 PROG=	m4
 CFLAGS+=-DEXTENDED -I${.CURDIR} -I${SRCTOP}/lib/libopenbsd
-LIBADD=	y l m openbsd
+LIBADD=	m openbsd
 
 NO_WMISSING_VARIABLE_DECLARATIONS=
 
-SRCS=	eval.c expr.c look.c main.c misc.c gnum4.c trace.c
-.if target(bootstrap_m4_tokenizer_and_parser)
+SRCS=	eval.c expr.c look.c main.c misc.c gnum4.c trace.c parser.y
+.if target(bootstrap_m4_tokenizer)
 # When crossbuilding on non-FreeBSD we need to first build m4 with pre-generated
-# tokenizer/parser files and the build the real m4 once we have lex+yacc.
+# tokenizer files and the build the real m4 once we have lex+yacc.
 # Avoid pulling in bsd.prog.mk early when this makefile is included from
 # tools/build/bootstrap-m4/Makefile
-SRCS+=	parser.c tokenizer.c
+SRCS+=	tokenizer.c
 .else
-SRCS+=	parser.y tokenizer.l
+SRCS+=	tokenizer.l
 .endif
 
 GENFILES=	tokenizer.c parser.c parser.h

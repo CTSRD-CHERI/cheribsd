@@ -14,11 +14,11 @@
  * CHERI CHANGES START
  * {
  *   "updated": 20190426,
- *   "target_type": "header"
+ *   "target_type": "header",
  *   "changes": [
- *     "subobject_bounds",
+ *     "subobject_bounds"
  *   ],
- *   "change_comment": "std::string: short-string optimization references to __data_ should span the full array since they are passed to std::addressof()",
+ *   "change_comment": "std::string: short-string optimization references to __data_ should span the full array since they are passed to std::addressof()"
  * }
  * CHERI CHANGES END
  */

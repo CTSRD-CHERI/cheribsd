@@ -35,7 +35,7 @@
  *   "updated": 20190124,
  *   "target_type": "lib",
  *   "changes": [
- *     "subobject_bounds",
+ *     "subobject_bounds"
  *   ],
  *   "change_comment": "C inheritance addrof first member (ENCODING)"
  * }

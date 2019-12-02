@@ -92,6 +92,5 @@ struct getrandom_args {
 int
 sys_getrandom(struct thread *td, struct getrandom_args *uap)
 {
-	return (kern_getrandom(td, __USER_CAP(uap->buf, uap->buflen),
-	    uap->buflen, uap->flags));
+	return (kern_getrandom(td, uap->buf, uap->buflen, uap->flags));
 }

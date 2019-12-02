@@ -131,7 +131,8 @@ _kvm_probe_elf_kernel(kvm_t *kd, int class, int machine)
 {
 
 	return (kd->nlehdr.e_ident[EI_CLASS] == class &&
-	    kd->nlehdr.e_type == ET_EXEC &&
+	    ((machine == EM_PPC || machine == EM_PPC64) ?
+	     kd->nlehdr.e_type == ET_DYN : kd->nlehdr.e_type == ET_EXEC) &&
 	    kd->nlehdr.e_machine == machine);
 }
 
@@ -754,13 +755,13 @@ _kvm_visit_cb(kvm_t *kd, kvm_walk_pages_cb_t *cb, void *arg, u_long pa,
 {
 	unsigned int pgsz = page_size ? page_size : len;
 	struct kvm_page p = {
-		.version = LIBKVM_WALK_PAGES_VERSION,
-		.paddr = pa,
-		.kmap_vaddr = kmap_vaddr,
-		.dmap_vaddr = dmap_vaddr,
-		.prot = prot,
-		.offset = _kvm_pt_find(kd, pa, pgsz),
-		.len = len,
+		.kp_version = LIBKVM_WALK_PAGES_VERSION,
+		.kp_paddr = pa,
+		.kp_kmap_vaddr = kmap_vaddr,
+		.kp_dmap_vaddr = dmap_vaddr,
+		.kp_prot = prot,
+		.kp_offset = _kvm_pt_find(kd, pa, pgsz),
+		.kp_len = len,
 	};
 
 	return cb(&p, arg);

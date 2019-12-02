@@ -169,11 +169,10 @@ out:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "integer_provenance"
 //   ]
 // }

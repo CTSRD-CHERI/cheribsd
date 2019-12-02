@@ -203,7 +203,7 @@ struct uma_hash {
  */
 
 struct uma_bucket {
-	LIST_ENTRY(uma_bucket)	ub_link;	/* Link into the zone */
+	TAILQ_ENTRY(uma_bucket)	ub_link;	/* Link into the zone */
 	int16_t	ub_cnt;				/* Count of items in bucket. */
 	int16_t	ub_entries;			/* Max items. */
 	void	*ub_bucket[];			/* actual allocation storage */
@@ -214,6 +214,7 @@ typedef struct uma_bucket * uma_bucket_t;
 struct uma_cache {
 	uma_bucket_t	uc_freebucket;	/* Bucket we're freeing to */
 	uma_bucket_t	uc_allocbucket;	/* Bucket to allocate from */
+	uma_bucket_t	uc_crossbucket;	/* cross domain bucket */
 	uint64_t	uc_allocs;	/* Count of allocations */
 	uint64_t	uc_frees;	/* Count of frees */
 } UMA_ALIGN;
@@ -311,8 +312,10 @@ struct uma_slab {
 
 typedef struct uma_slab * uma_slab_t;
 
+TAILQ_HEAD(uma_bucketlist, uma_bucket);
+
 struct uma_zone_domain {
-	LIST_HEAD(,uma_bucket)	uzd_buckets;	/* full buckets */
+	struct uma_bucketlist uzd_buckets; /* full buckets */
 	long		uzd_nitems;	/* total item count */
 	long		uzd_imax;	/* maximum item count this period */
 	long		uzd_imin;	/* minimum item count this period */
@@ -374,6 +377,7 @@ struct uma_zone {
 	counter_u64_t	uz_frees;	/* Total number of frees */
 	counter_u64_t	uz_fails;	/* Total number of alloc failures */
 	uint64_t	uz_sleeps;	/* Total number of alloc sleeps */
+	uint64_t	uz_xdomain;	/* Total number of cross-domain frees */
 
 	/*
 	 * This HAS to be the last item because we adjust the zone size
@@ -388,7 +392,7 @@ struct uma_zone {
  * These flags must not overlap with the UMA_ZONE flags specified in uma.h.
  */
 #define	UMA_ZFLAG_CACHE		0x04000000	/* uma_zcache_create()d it */
-#define	UMA_ZFLAG_DRAINING	0x08000000	/* Running zone_drain. */
+#define	UMA_ZFLAG_RECLAIMING	0x08000000	/* Running zone_reclaim(). */
 #define	UMA_ZFLAG_BUCKET	0x10000000	/* Bucket zone. */
 #define UMA_ZFLAG_INTERNAL	0x20000000	/* No offpage no PCPU. */
 #define UMA_ZFLAG_CACHEONLY	0x80000000	/* Don't ask VM for buckets. */

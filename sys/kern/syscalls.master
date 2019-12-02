@@ -12,7 +12,8 @@
 ;		case where the event exists, but we don't want auditing, the
 ;		event should be #defined to AUE_NULL in audit_kevents.h.
 ;	type	one of STD, OBSOL, UNIMPL, COMPAT, COMPAT4, COMPAT6,
-;		COMPAT7, COMPAT10, COMPAT11, NODEF, NOARGS, NOPROTO, NOSTD
+;		COMPAT7, COMPAT10, COMPAT11, COMPAT12,
+;		NODEF, NOARGS, NOPROTO, NOSTD
 ;		The COMPAT* options may be combined with one or more NO*
 ;		options separated by '|' with no spaces (e.g. COMPAT|NOARGS)
 ;	name	pseudo-prototype of syscall routine
@@ -30,6 +31,7 @@
 ;	COMPAT7	included on COMPAT_FREEBSD7 #ifdef (FreeBSD 7 compat)
 ;	COMPAT10 included on COMPAT_FREEBSD10 #ifdef (FreeBSD 10 compat)
 ;	COMPAT11 included on COMPAT_FREEBSD11 #ifdef (FreeBSD 11 compat)
+;	COMPAT12 included on COMPAT_FREEBSD12 #ifdef (FreeBSD 12 compat)
 ;	OBSOL	obsolete, not included in system, only specifies name
 ;	UNIMPL	not implemented, placeholder only
 ;	NOSTD	implemented but as a lkm that can be statically
@@ -389,8 +391,8 @@
 	}
 53	AUE_SIGALTSTACK	STD {
 		int sigaltstack(
-		    _In_opt_ _Contains_long_ptr_ const struct sigaltstack_native *ss,
-		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack_native *oss
+		    _In_opt_ _Contains_long_ptr_ const struct sigaltstack *ss,
+		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack *oss
 		);
 	}
 54	AUE_IOCTL	STD|VARARG {
@@ -946,7 +948,7 @@
 ; Syscalls 151-180 inclusive are reserved for vendor-specific
 ; system calls.  (This includes various calls added for compatibity
 ; with other Unix variants.)
-; Some of these calls are now supported by BSD...
+; Some of these calls are now supported by BSD.
 151	AUE_NULL	UNIMPL	sem_lock (BSD/OS 2.x)
 152	AUE_NULL	UNIMPL	sem_wakeup (BSD/OS 2.x)
 153	AUE_NULL	UNIMPL	asyncdaemon (BSD/OS 2.x)
@@ -1784,8 +1786,8 @@
 342	AUE_SIGACTION	COMPAT4 {
 		int sigaction(
 		    int sig,
-		    _In_opt_ _Contains_ptr_ const struct sigaction_native *act,
-		    _Out_opt_ _Contains_ptr_ struct sigaction_native *oact
+		    _In_opt_ _Contains_ptr_ const struct sigaction *act,
+		    _Out_opt_ _Contains_ptr_ struct sigaction *oact
 		);
 	}
 343	AUE_SIGPENDING	STD {
@@ -2202,8 +2204,8 @@
 416	AUE_SIGACTION	STD {
 		int sigaction(
 		    int sig,
-		    _In_opt_ _Contains_ptr_ const struct sigaction_native *act,
-		    _Out_opt_ _Contains_ptr_ struct sigaction_native *oact
+		    _In_opt_ _Contains_ptr_ const struct sigaction *act,
+		    _Out_opt_ _Contains_ptr_ struct sigaction *oact
 		);
 	}
 417	AUE_SIGRETURN	STD {
@@ -2580,7 +2582,7 @@
 		    int sig
 		);
 	}
-482	AUE_SHMOPEN	STD {
+482	AUE_SHMOPEN	COMPAT12 {
 		int shm_open(
 		    _In_z_ const char *path,
 		    int flags,
@@ -3184,6 +3186,32 @@
 		    _Inout_opt_ off_t *outoffp,
 		    size_t len,
 		    unsigned int flags
+		);
+	}
+570	AUE_SYSCTL	STD {
+		int __sysctlbyname(
+		    _In_reads_(namelen) const char *name,
+		    size_t namelen,
+		    _Out_writes_bytes_opt_(*oldlenp) void *old,
+		    _Inout_opt_ size_t *oldlenp,
+		    _In_reads_bytes_opt_(newlen) void *new,
+		    size_t newlen
+		);
+	}
+571	AUE_SHMOPEN	STD {
+		int shm_open2(
+		    _In_z_ const char *path,
+		    int flags,
+		    mode_t mode,
+		    int shmflags,
+		    _In_z_ const char *name
+		);
+	}
+572	AUE_SHMRENAME	STD {
+		int shm_rename(
+		    _In_z_ const char *path_from,
+		    _In_z_ const char *path_to,
+		    int flags
 		);
 	}
 

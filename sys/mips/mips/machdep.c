@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_kern.h>
 #include <vm/vm_object.h>
 #include <vm/vm_page.h>
+#include <vm/vm_phys.h>
 #include <vm/pmap.h>
 #include <vm/vm_map.h>
 #include <vm/vm_pager.h>
@@ -145,9 +146,7 @@ char pcpu_space[MAXCPU][PAGE_SIZE * 2] \
 
 struct pcpu *pcpup = (struct pcpu *)pcpu_space;
 
-vm_paddr_t phys_avail[PHYS_AVAIL_ENTRIES + 2];
-vm_paddr_t physmem_desc[PHYS_AVAIL_ENTRIES + 2];
-vm_paddr_t dump_avail[PHYS_AVAIL_ENTRIES + 2];
+vm_paddr_t physmem_desc[PHYS_AVAIL_COUNT];
 
 #ifdef UNIMPLEMENTED
 struct platform platform;
@@ -399,7 +398,7 @@ mips_vector_init(void)
 	 * be that we do want a specialised vector here at some point.
 	 */
 	bcopy(MipsException, (void *)CHERI_CCALL_EXC_VEC,
-	      MipsCacheEnd - MipsCache);
+	      MipsExceptionEnd - MipsException);
 #endif
 
 	/*
@@ -505,7 +504,7 @@ mips_pcpu_tlb_init(struct pcpu *pcpu)
 	 * We use a wired tlb index to do this one-time mapping.
 	 */
 	pa = vtophys(pcpu);
-	pte = PTE_D | PTE_VALID | PTE_REF | PTE_G | PTE_C_CACHE;
+	pte = PTE_D | PTE_V | PTE_REF | PTE_G | PTE_C_CACHE;
 	tlb_insert_wired(PCPU_TLB_ENTRY, (vm_offset_t)pcpup,
 			 TLBLO_PA_TO_PFN(pa) | pte,
 			 TLBLO_PA_TO_PFN(pa + PAGE_SIZE) | pte);

@@ -31,6 +31,8 @@
  *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -61,11 +63,11 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 #ifdef CPU_QEMU_MALTA
 	int intval;
 #endif
-	void *tlsbase;
+	void * __capability tlsbase;
 
 	switch (uap->op) {
 	case MIPS_SET_TLS:
-		td->td_md.md_tls = __USER_CAP_UNBOUND(uap->parms);
+		td->td_md.md_tls = uap->parms;
 
 		/*
 		 * If there is an user local register implementation (ULRI)
@@ -79,13 +81,13 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 		 * with the '_thread' attribute).
 		 */
 		if (cpuinfo.userlocal_reg == true) {
-			mips_wr_userlocal((unsigned long)(uap->parms +
+			mips_wr_userlocal((__cheri_addr unsigned long)(uap->parms +
 			    td->td_md.md_tls_tcb_offset));
 		}
 		return (0);
 
 	case MIPS_GET_TLS:
-		tlsbase = (__cheri_fromcap void *)td->td_md.md_tls;
+		tlsbase = td->td_md.md_tls;
 		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
 
@@ -116,8 +118,7 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 #endif
 
 	case CHERI_GET_SEALCAP:
-		return (cheri_sysarch_getsealcap(td,
-		    __USER_CAP(uap->parms, sizeof(void * __capability))));
+		return (cheri_sysarch_getsealcap(td, uap->parms));
 #endif
 
 	default:

@@ -18,7 +18,6 @@ comments.  The following example shows all the current annotations.
  *     "ioctl:net",
  *     "iovec-macros",
  *     "kernel_sig_types",
- *     "kiovec_t",
  *     "monotonicity",
  *     "platform",
  *     "pointer_alignment",
@@ -73,8 +72,6 @@ values are:
    `struct iovec`.  A subset of `user_capabilities`.
  * `kernel_sig_types` - (kernel) Changes to signal related types to store
    signal handlers as poineters  A subset of `user_capabilities`.
- * `kiovec_t` - (kernel) Use `kiovec_t` rather than `struct iovec`.
-   A subset of `user_capabilities`.
  * `monotonicity` - Need to retrieve a capability with greater range or
    permissions from a lesser capability.
  * `platform` - Changes related to the CHERI platform(s) that are not

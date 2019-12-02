@@ -413,7 +413,7 @@ int
 sys_shmdt(struct thread *td, struct shmdt_args *uap)
 {
 
-	return (kern_shmdt(td, __USER_CAP_UNBOUND(uap->shmaddr)));
+	return (kern_shmdt(td, uap->shmaddr));
 }
 
 static int
@@ -618,8 +618,7 @@ int
 sys_shmat(struct thread *td, struct shmat_args *uap)
 {
 
-	return (kern_shmat(td, uap->shmid, __USER_CAP_UNBOUND(uap->shmaddr),
-	    uap->shmflg));
+	return (kern_shmat(td, uap->shmid, uap->shmaddr, uap->shmflg));
 }
 
 static int
@@ -749,8 +748,7 @@ int
 sys_shmctl(struct thread *td, struct shmctl_args *uap)
 {
 
-	return (user_shmctl(td, uap->shmid, uap->cmd,
-	    __USER_CAP_OBJ(uap->buf)));
+	return (user_shmctl(td, uap->shmid, uap->cmd, uap->buf));
 }
 
 #ifdef COMPAT_CHERIABI
@@ -924,11 +922,6 @@ shmget_allocate_segment(struct thread *td, struct shmget_args *uap, int mode)
 #endif
 		return (ENOMEM);
 	}
-	shm_object->pg_color = 0;
-	VM_OBJECT_WLOCK(shm_object);
-	vm_object_clear_flag(shm_object, OBJ_ONEMAPPING);
-	vm_object_set_flag(shm_object, OBJ_COLORED | OBJ_NOSPLIT);
-	VM_OBJECT_WUNLOCK(shm_object);
 
 	shmseg->object = shm_object;
 	shmseg->u.shm_perm.cuid = shmseg->u.shm_perm.uid = cred->cr_uid;

@@ -472,8 +472,13 @@ cleanup:
 		locked = false;
 		VOP_CLOSE(vp, FREAD, td->td_ucred, td);
 	}
-	if (textset)
+	if (textset) {
+		if (!locked) {
+			locked = true;
+			VOP_LOCK(vp, LK_SHARED | LK_RETRY);
+		}
 		VOP_UNSET_TEXT_CHECKED(vp);
+	}
 	if (locked)
 		VOP_UNLOCK(vp, 0);
 
@@ -1550,17 +1555,6 @@ linux_reboot(struct thread *td, struct linux_reboot_args *args)
 }
 
 
-/*
- * The FreeBSD native getpid(2), getgid(2) and getuid(2) also modify
- * td->td_retval[1] when COMPAT_43 is defined. This clobbers registers that
- * are assumed to be preserved. The following lightweight syscalls fixes
- * this. See also linux_getgid16() and linux_getuid16() in linux_uid16.c
- *
- * linux_getpid() - MP SAFE
- * linux_getgid() - MP SAFE
- * linux_getuid() - MP SAFE
- */
-
 int
 linux_getpid(struct thread *td, struct linux_getpid_args *args)
 {
@@ -2308,11 +2302,10 @@ linux_mincore(struct thread *td, struct linux_mincore_args *args)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
-//     "struct iovec",
 //     "user_capabilities"
 //   ]
 // }

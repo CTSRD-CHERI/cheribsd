@@ -43,10 +43,12 @@ __FBSDID("$FreeBSD$");
 #include <sys/malloc.h>
 #include <sys/module.h>
 #include <sys/uuid.h>
+
 #include <contrib/dev/acpica/include/acpi.h>
 #include <contrib/dev/acpica/include/accommon.h>
 #include <contrib/dev/acpica/include/acuuid.h>
 #include <dev/acpica/acpivar.h>
+
 #include <dev/nvdimm/nvdimm_var.h>
 
 #define _COMPONENT	ACPI_OEM
@@ -59,7 +61,6 @@ static struct uuid intel_nvdimm_dsm_uuid =
 #define INTEL_NVDIMM_DSM_GET_LABEL_DATA 5
 
 static devclass_t nvdimm_devclass;
-static devclass_t nvdimm_root_devclass;
 MALLOC_DEFINE(M_NVDIMM, "nvdimm", "NVDIMM driver memory");
 
 static int
@@ -182,7 +183,7 @@ label_index_is_valid(struct nvdimm_label_index *index, uint32_t max_labels,
 {
 	uint64_t checksum;
 
-	index = (struct nvdimm_label_index *)((uint8_t *)index + offset);
+	index = (struct nvdimm_label_index *)((uint8_t *)index + size * offset);
 	if (strcmp(index->signature, NVDIMM_INDEX_BLOCK_SIGNATURE) != 0)
 		return false;
 	checksum = index->checksum;
@@ -241,7 +242,7 @@ read_label(struct nvdimm_dev *nv, int num)
 static int
 read_labels(struct nvdimm_dev *nv)
 {
-	struct nvdimm_label_index *indices;
+	struct nvdimm_label_index *indices, *index1;
 	size_t bitfield_size, index_size, num_labels;
 	int error, n;
 	bool index_0_valid, index_1_valid;
@@ -257,6 +258,7 @@ read_labels(struct nvdimm_dev *nv)
 	    sizeof(struct nvdimm_label);
 	bitfield_size = roundup2(num_labels, 8) / 8;
 	indices = malloc(2 * index_size, M_NVDIMM, M_WAITOK);
+	index1 = (void *)((uint8_t *)indices + index_size);
 	error = read_label_area(nv, (void *)indices, 0, 2 * index_size);
 	if (error != 0) {
 		free(indices, M_NVDIMM);
@@ -270,18 +272,29 @@ read_labels(struct nvdimm_dev *nv)
 		free(indices, M_NVDIMM);
 		return (ENXIO);
 	}
-	if (index_0_valid && index_1_valid &&
-	    (indices[1].seq > indices[0].seq ||
-	    (indices[1].seq == 1 && indices[0].seq == 3)))
-		index_0_valid = false;
+	if (index_0_valid && index_1_valid) {
+		if (((int)indices->seq - (int)index1->seq + 3) % 3 == 1) {
+			/* index 0 was more recently updated */
+			index_1_valid = false;
+		} else {
+			/*
+			 * either index 1 was more recently updated,
+			 * or the sequence numbers are equal, in which
+			 * case the specification says the block with
+			 * the higher offset is to be treated as valid
+			 */
+			index_0_valid = false;
+		}
+	}
 	nv->label_index = malloc(index_size, M_NVDIMM, M_WAITOK);
-	bcopy(indices + (index_0_valid ? 0 : 1), nv->label_index, index_size);
+	bcopy(index_0_valid ? indices : index1, nv->label_index, index_size);
 	free(indices, M_NVDIMM);
-	for (bit_ffc_at((bitstr_t *)nv->label_index->free, 0, num_labels, &n);
-	     n >= 0;
-	     bit_ffc_at((bitstr_t *)nv->label_index->free, n + 1, num_labels,
-	     &n)) {
+	bit_ffc_at((bitstr_t *)nv->label_index->free, 0,
+	    nv->label_index->slot_cnt, &n);
+	while (n >= 0) {
 		read_label(nv, n);
+		bit_ffc_at((bitstr_t *)nv->label_index->free, n + 1,
+		    nv->label_index->slot_cnt, &n);
 	}
 	return (0);
 }
@@ -325,8 +338,7 @@ nvdimm_attach(device_t dev)
 
 	nv = device_get_softc(dev);
 	handle = nvdimm_root_get_acpi_handle(dev);
-	if (handle == NULL)
-		return (EINVAL);
+	MPASS(handle != NULL);
 	nv->nv_dev = dev;
 	nv->nv_handle = nvdimm_root_get_device_handle(dev);
 
@@ -380,204 +392,6 @@ nvdimm_resume(device_t dev)
 	return (0);
 }
 
-static ACPI_STATUS
-find_dimm(ACPI_HANDLE handle, UINT32 nesting_level, void *context,
-    void **return_value)
-{
-	ACPI_DEVICE_INFO *device_info;
-	ACPI_STATUS status;
-
-	status = AcpiGetObjectInfo(handle, &device_info);
-	if (ACPI_FAILURE(status))
-		return_ACPI_STATUS(AE_ERROR);
-	if (device_info->Address == (uintptr_t)context) {
-		*(ACPI_HANDLE *)return_value = handle;
-		return_ACPI_STATUS(AE_CTRL_TERMINATE);
-	}
-	return_ACPI_STATUS(AE_OK);
-}
-
-static ACPI_HANDLE
-get_dimm_acpi_handle(ACPI_HANDLE root_handle, nfit_handle_t adr)
-{
-	ACPI_HANDLE res;
-	ACPI_STATUS status;
-
-	res = NULL;
-	status = AcpiWalkNamespace(ACPI_TYPE_DEVICE, root_handle, 1, find_dimm,
-	    NULL, (void *)(uintptr_t)adr, &res);
-	if (ACPI_FAILURE(status))
-		res = NULL;
-	return (res);
-}
-
-static int
-nvdimm_root_create_devs(device_t dev, ACPI_TABLE_NFIT *nfitbl)
-{
-	ACPI_HANDLE root_handle, dimm_handle;
-	device_t child;
-	nfit_handle_t *dimm_ids, *dimm;
-	uintptr_t *ivars;
-	int num_dimm_ids;
-
-	root_handle = acpi_get_handle(dev);
-	acpi_nfit_get_dimm_ids(nfitbl, &dimm_ids, &num_dimm_ids);
-	for (dimm = dimm_ids; dimm < dimm_ids + num_dimm_ids; dimm++) {
-		dimm_handle = get_dimm_acpi_handle(root_handle, *dimm);
-		child = BUS_ADD_CHILD(dev, 100, "nvdimm", -1);
-		if (child == NULL) {
-			device_printf(dev, "failed to create nvdimm\n");
-			return (ENXIO);
-		}
-		ivars = mallocarray(NVDIMM_ROOT_IVAR_MAX, sizeof(uintptr_t),
-		    M_NVDIMM, M_ZERO | M_WAITOK);
-		device_set_ivars(child, ivars);
-		nvdimm_root_set_acpi_handle(child, dimm_handle);
-		nvdimm_root_set_device_handle(child, *dimm);
-	}
-	free(dimm_ids, M_NVDIMM);
-	return (0);
-}
-
-static int
-nvdimm_root_create_spas(struct nvdimm_root_dev *dev, ACPI_TABLE_NFIT *nfitbl)
-{
-	ACPI_NFIT_SYSTEM_ADDRESS **spas, **spa;
-	struct SPA_mapping *spa_mapping;
-	enum SPA_mapping_type spa_type;
-	int error, num_spas;
-
-	error = 0;
-	acpi_nfit_get_spa_ranges(nfitbl, &spas, &num_spas);
-	for (spa = spas; spa < spas + num_spas; spa++) {
-		spa_type = nvdimm_spa_type_from_uuid(
-			(struct uuid *)(*spa)->RangeGuid);
-		if (spa_type == SPA_TYPE_UNKNOWN)
-			continue;
-		spa_mapping = malloc(sizeof(struct SPA_mapping), M_NVDIMM,
-		    M_WAITOK | M_ZERO);
-		error = nvdimm_spa_init(spa_mapping, *spa, spa_type);
-		if (error != 0) {
-			nvdimm_spa_fini(spa_mapping);
-			free(spa, M_NVDIMM);
-			break;
-		}
-		nvdimm_create_namespaces(spa_mapping, nfitbl);
-		SLIST_INSERT_HEAD(&dev->spas, spa_mapping, link);
-	}
-	free(spas, M_NVDIMM);
-	return (error);
-}
-
-static char *nvdimm_root_id[] = {"ACPI0012", NULL};
-
-static int
-nvdimm_root_probe(device_t dev)
-{
-	int rv;
-
-	if (acpi_disabled("nvdimm"))
-		return (ENXIO);
-	rv = ACPI_ID_PROBE(device_get_parent(dev), dev, nvdimm_root_id, NULL);
-	if (rv <= 0)
-		device_set_desc(dev, "ACPI NVDIMM root device");
-
-	return (rv);
-}
-
-static int
-nvdimm_root_attach(device_t dev)
-{
-	struct nvdimm_root_dev *root;
-	ACPI_TABLE_NFIT *nfitbl;
-	ACPI_STATUS status;
-	int error;
-
-	status = AcpiGetTable(ACPI_SIG_NFIT, 1, (ACPI_TABLE_HEADER **)&nfitbl);
-	if (ACPI_FAILURE(status)) {
-		device_printf(dev, "cannot get NFIT\n");
-		return (ENXIO);
-	}
-	error = nvdimm_root_create_devs(dev, nfitbl);
-	if (error != 0)
-		return (error);
-	error = bus_generic_attach(dev);
-	if (error != 0)
-		return (error);
-	root = device_get_softc(dev);
-	error = nvdimm_root_create_spas(root, nfitbl);
-	AcpiPutTable(&nfitbl->Header);
-	return (error);
-}
-
-static int
-nvdimm_root_detach(device_t dev)
-{
-	struct nvdimm_root_dev *root;
-	struct SPA_mapping *spa, *next;
-	device_t *children;
-	int i, error, num_children;
-
-	root = device_get_softc(dev);
-	SLIST_FOREACH_SAFE(spa, &root->spas, link, next) {
-		nvdimm_destroy_namespaces(spa);
-		nvdimm_spa_fini(spa);
-		SLIST_REMOVE_HEAD(&root->spas, link);
-		free(spa, M_NVDIMM);
-	}
-	error = bus_generic_detach(dev);
-	if (error != 0)
-		return (error);
-	error = device_get_children(dev, &children, &num_children);
-	if (error != 0)
-		return (error);
-	for (i = 0; i < num_children; i++)
-		free(device_get_ivars(children[i]), M_NVDIMM);
-	free(children, M_TEMP);
-	error = device_delete_children(dev);
-	return (error);
-}
-
-static int
-nvdimm_root_read_ivar(device_t dev, device_t child, int index,
-    uintptr_t *result)
-{
-
-	if (index < 0 || index >= NVDIMM_ROOT_IVAR_MAX)
-		return (ENOENT);
-	*result = ((uintptr_t *)device_get_ivars(child))[index];
-	return (0);
-}
-
-static int
-nvdimm_root_write_ivar(device_t dev, device_t child, int index,
-    uintptr_t value)
-{
-
-	if (index < 0 || index >= NVDIMM_ROOT_IVAR_MAX)
-		return (ENOENT);
-	((uintptr_t *)device_get_ivars(child))[index] = value;
-	return (0);
-}
-
-static int
-nvdimm_root_child_location_str(device_t dev, device_t child, char *buf,
-    size_t buflen)
-{
-	ACPI_HANDLE handle;
-	int res;
-
-	handle = nvdimm_root_get_acpi_handle(child);
-	if (handle != NULL)
-		res = snprintf(buf, buflen, "handle=%s", acpi_name(handle));
-	else
-		res = snprintf(buf, buflen, "unknown");
-
-	if (res >= buflen)
-		return (EOVERFLOW);
-	return (0);
-}
-
 static device_method_t nvdimm_methods[] = {
 	DEVMETHOD(device_probe, nvdimm_probe),
 	DEVMETHOD(device_attach, nvdimm_attach),
@@ -593,24 +407,6 @@ static driver_t	nvdimm_driver = {
 	sizeof(struct nvdimm_dev),
 };
 
-static device_method_t nvdimm_root_methods[] = {
-	DEVMETHOD(device_probe, nvdimm_root_probe),
-	DEVMETHOD(device_attach, nvdimm_root_attach),
-	DEVMETHOD(device_detach, nvdimm_root_detach),
-	DEVMETHOD(bus_add_child, bus_generic_add_child),
-	DEVMETHOD(bus_read_ivar, nvdimm_root_read_ivar),
-	DEVMETHOD(bus_write_ivar, nvdimm_root_write_ivar),
-	DEVMETHOD(bus_child_location_str, nvdimm_root_child_location_str),
-	DEVMETHOD_END
-};
-
-static driver_t	nvdimm_root_driver = {
-	"nvdimm_root",
-	nvdimm_root_methods,
-	sizeof(struct nvdimm_root_dev),
-};
-
-DRIVER_MODULE(nvdimm_root, acpi, nvdimm_root_driver, nvdimm_root_devclass, NULL,
+DRIVER_MODULE(nvdimm, nvdimm_acpi_root, nvdimm_driver, nvdimm_devclass, NULL,
     NULL);
-DRIVER_MODULE(nvdimm, nvdimm_root, nvdimm_driver, nvdimm_devclass, NULL, NULL);
 MODULE_DEPEND(nvdimm, acpi, 1, 1, 1);

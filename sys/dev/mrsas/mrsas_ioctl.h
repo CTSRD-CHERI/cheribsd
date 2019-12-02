@@ -126,12 +126,3 @@ struct mrsas_iocpacket32 {
 #endif					/* COMPAT_FREEBSD32 */
 
 #endif					/* MRSAS_IOCTL_H */
-// CHERI CHANGES START
-// {
-//   "updated": 20180629,
-//   "target_type": "header",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

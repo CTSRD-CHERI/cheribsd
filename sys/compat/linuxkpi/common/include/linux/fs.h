@@ -323,12 +323,3 @@ void linux_shmem_truncate_range(vm_object_t, loff_t, loff_t);
   linux_shmem_truncate_range(__VA_ARGS__)
 
 #endif /* _LINUX_FS_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "header",
-//   "changes": [
-//     "struct iovec"
-//   ]
-// }
-// CHERI CHANGES END

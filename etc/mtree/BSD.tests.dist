@@ -384,6 +384,8 @@
         ..
         libdevdctl
         ..
+        libexecinfo
+        ..
         libkvm
         ..
         libmp
@@ -439,6 +441,10 @@
         pfctl
             files
             ..
+        ..
+        ping
+        ..
+        ping6
         ..
     ..
     secure
@@ -731,6 +737,8 @@
         file
         ..
         fs
+            fusefs
+            ..
             tmpfs
             ..
         ..
@@ -786,6 +794,10 @@
         ..
         netinet
         ..
+        netinet6
+            frag6
+            ..
+        ..
         netipsec
             tunnel
             ..
@@ -793,6 +805,8 @@
     netmap
     ..
         netpfil
+            common
+            ..
             pf
                 ioctl
                 ..
@@ -1002,6 +1016,8 @@
         ..
         limits
         ..
+        locale
+        ..
         m4
         ..
         mkimg
@@ -1009,6 +1025,8 @@
         ncal
         ..
         opensm
+        ..
+        patch
         ..
         pr
         ..
@@ -1046,6 +1064,8 @@
         ..
         uuencode
         ..
+        unifdef
+        ..
         uniq
         ..
         vmstat
@@ -1070,7 +1090,11 @@
         ..
         fstyp
         ..
+        jail
+        ..
         makefs
+        ..
+        mixer
         ..
         newsyslog
         ..

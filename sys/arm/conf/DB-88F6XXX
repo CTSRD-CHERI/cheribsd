@@ -3,14 +3,13 @@
 #
 # $FreeBSD$
 #
+#NO_UNIVERSE
 
 ident		DB-88F6XXX
 include 	"std.arm"
 include 	"../mv/kirkwood/std.db88f6xxx"
 
 options 	SOC_MV_KIRKWOOD
-
-makeoptions	WERROR="-Werror"
 
 options 	SCHED_4BSD		# 4BSD scheduler
 options 	INET			# InterNETworking

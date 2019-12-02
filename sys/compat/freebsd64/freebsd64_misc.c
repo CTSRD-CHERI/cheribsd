@@ -619,23 +619,23 @@ freebsd64_nmount(struct thread *td, struct freebsd64_nmount_args *uap)
 	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd64_copyinuio));
 }
 
-register_t *
-freebsd64_copyout_strings(struct image_params *imgp)
+int
+freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 {
 #ifndef CHERI_PURECAP_KERNEL
 	/* XXX: works while exec_copyout_strings isn't cheriabi aware */
-	return (exec_copyout_strings(imgp));
+	return (exec_copyout_strings(imgp, stack_base));
 #else /* CHERI_PURECAP_KERNEL */
 	int argc, envc;
 	vaddr_t *vectp;
 	char *stringp;
-	uintptr_t destp;
-	register_t *stack_base;
-	struct ps_strings *arginfo;
+	char *destp;
+	struct freebsd64_ps_strings *arginfo;
 	struct proc *p;
 	size_t execpath_len;
 	int szsigcode, szps;
 	char canary[sizeof(long) * 8];
+	int error;
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -648,15 +648,14 @@ freebsd64_copyout_strings(struct image_params *imgp)
 		execpath_len = 0;
 	p = imgp->proc;
 	szsigcode = 0;
-	arginfo = (struct ps_strings *)cheri_capability_build_user_data(
+	arginfo = (struct freebsd64_ps_strings *)cheri_capability_build_user_data(
 	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
 	    CHERI_CAP_USER_DATA_LENGTH, p->p_sysent->sv_psstrings);
 
-	if (p->p_sysent->sv_sigcode_base == 0) {
-		if (p->p_sysent->sv_szsigcode != NULL)
-			szsigcode = *(p->p_sysent->sv_szsigcode);
-	}
-	destp =	(uintptr_t)arginfo;
+	if (p->p_sysent->sv_sigcode_base == 0)
+		szsigcode = *(p->p_sysent->sv_szsigcode);
+	
+	destp =	(char *)arginfo;
 
 	/*
 	 * install sigcode
@@ -664,7 +663,9 @@ freebsd64_copyout_strings(struct image_params *imgp)
 	if (szsigcode != 0) {
 		destp -= szsigcode;
 		destp = rounddown2(destp, sizeof(vaddr_t));
-		copyout(p->p_sysent->sv_sigcode, (void *)destp, szsigcode);
+		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
+		if (error != 0)
+			return (error);
 	}
 
 	/*
@@ -674,7 +675,9 @@ freebsd64_copyout_strings(struct image_params *imgp)
 		destp -= execpath_len;
 		destp = rounddown2(destp, sizeof(vaddr_t));
 		imgp->execpathp = (__cheri_addr unsigned long)destp;
-		copyout(imgp->execpath, (void *)destp, execpath_len);
+		error = copyout(imgp->execpath, destp, execpath_len);
+		if (error != 0)
+			return(error);
 	}
 
 	/*
@@ -682,8 +685,10 @@ freebsd64_copyout_strings(struct image_params *imgp)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = destp;
-	copyout(canary, (void *)destp, sizeof(canary));
+	imgp->canary = (__cheri_addr vaddr_t)destp;
+	error = copyout(canary, destp, sizeof(canary));
+	if (error != 0)
+		return (error);
 	imgp->canarylen = sizeof(canary);
 
 	/*
@@ -691,21 +696,24 @@ freebsd64_copyout_strings(struct image_params *imgp)
 	 */
 	destp -= szps;
 	destp = rounddown2(destp, sizeof(vaddr_t));
-	imgp->pagesizes = destp;
-	copyout(pagesizes, (void *)destp, szps);
+	imgp->pagesizes = (uintptr_t)destp;
+	error = copyout(pagesizes, destp, szps);
+	if (error != 0)
+		return (error);
 	imgp->pagesizeslen = szps;
 
 	destp -= ARG_MAX - imgp->args->stringspace;
 	destp = rounddown2(destp, sizeof(vaddr_t));
 
 	vectp = (vaddr_t *)destp;
+	if (imgp->sysent->sv_stackgap != NULL)
+		imgp->sysent->sv_stackgap(imgp, (u_long *)&vectp);
+
 	if (imgp->auxargs) {
-		/*
-		 * Allocate room on the stack for the ELF auxargs
-		 * array.  It has up to AT_COUNT entries.
-		 */
-		vectp -= howmany(AT_COUNT * sizeof(Elf_Auxinfo),
-		    sizeof(vaddr_t));
+		error = imgp->sysent->sv_copyout_auxargs(imgp,
+		    (u_long *)&vectp);
+		if (error != 0)
+			return (error);
 	}
 
 	/*
@@ -717,7 +725,7 @@ freebsd64_copyout_strings(struct image_params *imgp)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	stack_base = (register_t *)vectp;
+	*stack_base = (register_t *)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -726,44 +734,52 @@ freebsd64_copyout_strings(struct image_params *imgp)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	copyout(stringp, (void *)destp, ARG_MAX - imgp->args->stringspace);
+	error = copyout(stringp, destp, ARG_MAX - imgp->args->stringspace);
+	if (error != 0)
+		return (error);
 
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
-	suword(&arginfo->ps_argvstr, (__cheri_addr vaddr_t)vectp);
-	suword32(&arginfo->ps_nargvstr, argc);
+	if (suword(&arginfo->ps_argvstr, (__cheri_addr vaddr_t)vectp) != 0 ||
+	    suword32(&arginfo->ps_nargvstr, argc) != 0)
+		return (EFAULT);
 
 	/*
 	 * Fill in argument portion of vector table.
 	 */
 	for (; argc > 0; --argc) {
-		suword(vectp++, (__cheri_addr vaddr_t)destp);
+		if (suword(vectp++, (__cheri_addr vaddr_t)destp) != 0)
+			return (EFAULT);
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
-	suword(vectp++, 0);
+	if (suword(vectp++, 0) != 0)
+		return (EFAULT);
 
-	suword(&arginfo->ps_envstr, (__cheri_addr vaddr_t)vectp);
-	suword32(&arginfo->ps_nenvstr, envc);
+	if (suword(&arginfo->ps_envstr, (__cheri_addr vaddr_t)vectp) != 0 ||
+	    suword32(&arginfo->ps_nenvstr, envc) != 0)
+		return (EFAULT);
 
 	/*
 	 * Fill in environment portion of vector table.
 	 */
 	for (; envc > 0; --envc) {
-		suword(vectp++, (__cheri_addr vaddr_t)destp);
+		if (suword(vectp++, (__cheri_addr vaddr_t)destp) != 0)
+			return (EFAULT);
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
 	}
 
 	/* end of vector table is a null pointer */
-	suword(vectp, 0);
+	if (suword(vectp, 0) != 0)
+		return (EFAULT);
 
-	return (stack_base);
+	return (0);
 #endif /* CHERI_PURECAP_KERNEL */
 }
 
@@ -1360,6 +1376,25 @@ freebsd64___sysctl(struct thread *td, struct freebsd64___sysctl_args *uap)
 	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
 	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
 	    uap->newlen, 0));
+}
+
+int
+freebsd64___sysctlbyname(struct thread *td, struct
+    freebsd64___sysctlbyname_args *uap)
+{
+	size_t rv;
+	int error;
+
+	error = kern___sysctlbyname(td, __USER_CAP(uap->name, uap->namelen),
+	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
+	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
+	    uap->newlen, &rv, 0, 0);
+	if (error != 0)
+		return (error);
+	if (uap->oldlenp != NULL)
+		error = copyout(&rv, uap->oldlenp, sizeof(rv));
+
+	return (error);
 }
 
 /*

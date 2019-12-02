@@ -688,7 +688,6 @@ cd9660_readlink(ap)
 		      (imp->im_bshift - DEV_BSHIFT),
 		      imp->logical_block_size, NOCRED, &bp);
 	if (error) {
-		brelse(bp);
 		return (EINVAL);
 	}
 
@@ -921,11 +920,10 @@ struct vop_vector cd9660_fifoops = {
 };
 // CHERI CHANGES START
 // {
-//   "updated": 20181127,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "struct iovec"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

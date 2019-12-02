@@ -5,7 +5,7 @@
 FILES=	mech qop
 FILESDIR= /etc/gss
 
-.if ${MK_CHERI_PURE} == "yes"
+.if ${MK_CHERI_PURE} == "yes" && !${MACHINE_ARCH:Mmips64*c*}
 GSS_LIBDIR= /usr/libcheri
 .else
 GSS_LIBDIR= /usr/lib

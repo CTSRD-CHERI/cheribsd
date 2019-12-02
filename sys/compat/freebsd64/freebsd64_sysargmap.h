@@ -296,7 +296,6 @@ int freebsd64_sysargmask[] = {
  [FREEBSD64_SYS_freebsd64_truncate] = (0x0 | 0x1),
  [FREEBSD64_SYS_ftruncate] = (0x0),
  [FREEBSD64_SYS_thr_kill2] = (0x0),
- [FREEBSD64_SYS_freebsd64_shm_open] = (0x0 | 0x1),
  [FREEBSD64_SYS_freebsd64_shm_unlink] = (0x0 | 0x1),
  [FREEBSD64_SYS_freebsd64_cpuset] = (0x0 | 0x1),
  [FREEBSD64_SYS_cpuset_setid] = (0x0),
@@ -377,6 +376,9 @@ int freebsd64_sysargmask[] = {
  [FREEBSD64_SYS_freebsd64_fhreadlink] = (0x0 | 0x1 | 0x2),
  [FREEBSD64_SYS_freebsd64_funlinkat] = (0x0 | 0x2),
  [FREEBSD64_SYS_freebsd64_copy_file_range] = (0x0 | 0x2 | 0x8),
+ [FREEBSD64_SYS_freebsd64___sysctlbyname] = (0x0 | 0x1 | 0x4 | 0x8 | 0x10),
+ [FREEBSD64_SYS_freebsd64_shm_open2] = (0x0 | 0x1 | 0x10),
+ [FREEBSD64_SYS_freebsd64_shm_rename] = (0x0 | 0x1 | 0x2),
 };
 
 #endif /* !_FREEBSD64_SYSARGMAP_H_ */

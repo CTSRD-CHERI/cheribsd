@@ -4,8 +4,11 @@
 # The user-driven targets are:
 #
 # universe            - *Really* build *everything* (buildworld and
-#                       all kernels on all architectures).  Define the
-#                       MAKE_JUST_KERNELS variable to only build kernels.
+#                       all kernels on all architectures).  Define
+#                       MAKE_JUST_KERNELS to only build kernels,
+#                       MAKE_JUST_WORLDS to only build userland, and/or
+#                       MAKE_OBSOLETE_GCC to also build architectures
+#                       unsupported by clang using in-tree gcc.
 # tinderbox           - Same as universe, but presents a list of failed build
 #                       targets and exits with an error if there were any.
 # buildworld          - Rebuild *everything*, including glue to help do
@@ -34,6 +37,7 @@
 # targets             - Print a list of supported TARGET/TARGET_ARCH pairs
 #                       for world and kernel targets.
 # toolchains          - Build a toolchain for all world and kernel targets.
+# makeman             - Regenerate src.conf(5)
 # sysent              - (Re)build syscall entries from syscalls.master.
 # xdev                - xdev-build + xdev-install for the architecture
 #                       specified with TARGET and TARGET_ARCH.
@@ -83,7 +87,7 @@
 #  5.  `reboot'        (in single user mode: boot -s from the loader prompt).
 #  6.  `mergemaster -p'
 #  7.  `make installworld'
-#  8.  `mergemaster'		(you may wish to use -i, along with -U or -F).
+#  8.  `mergemaster'            (you may wish to use -i, along with -U or -F).
 #  9.  `make delete-old'
 # 10.  `reboot'
 # 11.  `make delete-old-libs' (in case no 3rd party program uses them anymore)
@@ -135,7 +139,7 @@ TGTS=	all all-man buildenv buildenvvars buildkernel buildworld \
 	reinstallkernel reinstallkernel.debug \
 	installworld kernel-toolchain libraries maninstall \
 	obj objlink showconfig tags toolchain update \
-	sysent \
+	makeman sysent \
 	_worldtmp _legacy _bootstrap-tools _cleanobj _obj \
 	_build-tools _build-metadata _cross-tools _includes _libraries \
 	build32 distribute32 install32 \
@@ -250,9 +254,6 @@ CHERI_FLAGS=	-DDB_FROM_SRC \
 		LOCAL_DIRS="ctsrd tools/tools/atsectl" \
 		LOCAL_LIB_DIRS=ctsrd/lib \
 		LOCAL_MTREE=ctsrd/ctsrd.mtree
-.if !defined(CHERI_CC) && defined(XCC)
-CHERI_CC=	${XCC}
-.endif
 .if ${CHERI} == "128"
 CHERI_FLAGS+=	-DWITH_CHERI128
 .elif ${CHERI} == "256" || ${CHERI} == "1"
@@ -512,9 +513,20 @@ worlds: .PHONY
 #
 .if make(universe) || make(universe_kernels) || make(tinderbox) || \
     make(targets) || make(universe-toolchain)
-TARGETS?=amd64 arm arm64 i386 mips powerpc riscv sparc64
+#
+# Always build architectures supported by clang.  Only build architectures
+# only supported by GCC if a suitable toolchain is present or enabled.
+# In all cases, if the user specifies TARGETS on the command line,
+# honor that most of all.
+#
+_OBSOLETE_GCC_TARGETS=mips sparc64
+.if defined(MAKE_OBSOLETE_GCC)
+_OBSOLETE_GCC_TARGETS+=powerpc
+.endif
+TARGETS?=amd64 arm arm64 i386 riscv ${_OBSOLETE_GCC_TARGETS}
 _UNIVERSE_TARGETS=	${TARGETS}
-TARGET_ARCHES_arm?=	arm armv6 armv7
+# arm (armv5) excluded due to broken buildworld
+TARGET_ARCHES_arm?=	armv6 armv7
 TARGET_ARCHES_arm64?=	aarch64
 TARGET_ARCHES_mips?=	mipsel mips mips64el mips64 mipsn32 mipselhf mipshf mips64elhf mips64hf
 TARGET_ARCHES_powerpc?=	powerpc powerpc64 powerpcspe
@@ -525,11 +537,23 @@ TARGET_ARCHES_${target}?= ${target}
 .endfor
 
 MAKE_PARAMS_riscv?=	CROSS_TOOLCHAIN=riscv64-gcc
+.if !defined(MAKE_OBSOLETE_GCC)
+OBSOLETE_GCC_TARGETS=${_OBSOLETE_GCC_TARGETS}
+MAKE_PARAMS_mips?=	CROSS_TOOLCHAIN=mips-gcc
+MAKE_PARAMS_powerpc?=	CROSS_TOOLCHAIN=powerpc64-gcc
+MAKE_PARAMS_sparc64?=	CROSS_TOOLCHAIN=sparc64-gcc
+.endif
 
-# XXX Remove architectures only supported by external toolchain from universe
-# if required toolchain packages are missing.
+TOOLCHAINS_mips=	mips
+TOOLCHAINS_powerpc=	powerpc64
 TOOLCHAINS_riscv=	riscv64
-.for target in riscv
+TOOLCHAINS_sparc64=	sparc64
+
+# Remove architectures only supported by external toolchain from
+# universe if required toolchain packages are missing. riscv requires
+# an out-of-tree toolchain. When MAKE_OBSOLETE_GCC is not defined,
+# the same logic appleis to the obsolete gcc targets.
+.for target in riscv ${OBSOLETE_GCC_TARGETS}
 .if ${_UNIVERSE_TARGETS:M${target}}
 .for toolchain in ${TOOLCHAINS_${target}}
 .if !exists(/usr/local/share/toolchains/${toolchain}-gcc.mk)

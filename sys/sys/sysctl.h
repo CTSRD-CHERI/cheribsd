@@ -705,7 +705,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 /* Oid for a 64-bit unsigned counter(9).  The pointer must be non NULL. */
 #define	SYSCTL_COUNTER_U64(parent, nbr, name, access, ptr, descr)	\
 	SYSCTL_OID(parent, nbr, name,					\
-	    CTLTYPE_U64 | CTLFLAG_MPSAFE | (access),			\
+	    CTLTYPE_U64 | CTLFLAG_MPSAFE | CTLFLAG_STATS | (access),	\
 	    (ptr), 0, sysctl_handle_counter_u64, "QU", descr);		\
 	CTASSERT((((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_U64) &&	\
@@ -718,7 +718,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_U64);		\
 	sysctl_add_oid(ctx, parent, nbr, name,				\
-	    CTLTYPE_U64 | CTLFLAG_MPSAFE | (access),			\
+	    CTLTYPE_U64 | CTLFLAG_MPSAFE | CTLFLAG_STATS | (access),	\
 	    __ptr, 0, sysctl_handle_counter_u64, "QU", __DESCR(descr),	\
 	    NULL);							\
 })
@@ -726,7 +726,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 /* Oid for an array of counter(9)s.  The pointer and length must be non zero. */
 #define	SYSCTL_COUNTER_U64_ARRAY(parent, nbr, name, access, ptr, len, descr) \
 	SYSCTL_OID(parent, nbr, name,					\
-	    CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | (access),			\
+	    CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | CTLFLAG_STATS | (access),	\
 	    (ptr), (len), sysctl_handle_counter_u64_array, "S", descr);	\
 	CTASSERT((((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_OPAQUE) &&	\
@@ -740,7 +740,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 	CTASSERT(((access) & CTLTYPE) == 0 ||				\
 	    ((access) & SYSCTL_CT_ASSERT_MASK) == CTLTYPE_OPAQUE);	\
 	sysctl_add_oid(ctx, parent, nbr, name,				\
-	    CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | (access),			\
+	    CTLTYPE_OPAQUE | CTLFLAG_MPSAFE | CTLFLAG_STATS | (access),	\
 	    __ptr, len, sysctl_handle_counter_u64_array, "S",		\
 	    __DESCR(descr), NULL);					\
 })
@@ -895,7 +895,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 /*
  * Top-level identifiers
  */
-#define	CTL_UNSPEC	0		/* unused */
+#define	CTL_SYSCTL	0		/* "magic" numbers */
 #define	CTL_KERN	1		/* "high kernel": proc, limits */
 #define	CTL_VM		2		/* virtual memory */
 #define	CTL_VFS		3		/* filesystem, mount type is next */
@@ -905,6 +905,17 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define	CTL_MACHDEP	7		/* machine dependent */
 #define	CTL_USER	8		/* user-level */
 #define	CTL_P1003_1B	9		/* POSIX 1003.1B */
+
+/*
+ * CTL_SYSCTL identifiers
+ */
+#define	CTL_SYSCTL_DEBUG	0	/* printf all nodes */
+#define	CTL_SYSCTL_NAME		1	/* string name of OID */
+#define	CTL_SYSCTL_NEXT		2	/* next OID */
+#define	CTL_SYSCTL_NAME2OID	3	/* int array of name */
+#define	CTL_SYSCTL_OIDFMT	4	/* OID's kind and format */
+#define	CTL_SYSCTL_OIDDESCR	5	/* OID's description */
+#define	CTL_SYSCTL_OIDLABEL	6	/* aggregation label */
 
 /*
  * CTL_KERN identifiers
@@ -1092,6 +1103,7 @@ SYSCTL_DECL(_hw_bus);
 SYSCTL_DECL(_hw_bus_devices);
 SYSCTL_DECL(_hw_bus_info);
 SYSCTL_DECL(_machdep);
+SYSCTL_DECL(_machdep_mitigations);
 SYSCTL_DECL(_user);
 SYSCTL_DECL(_compat);
 SYSCTL_DECL(_regression);
@@ -1138,6 +1150,10 @@ int	sysctl_find_oid(int *name, u_int namelen, struct sysctl_oid **noid,
 void	sysctl_wlock(void);
 void	sysctl_wunlock(void);
 int	sysctl_wire_old_buffer(struct sysctl_req *req, size_t len);
+int	kern___sysctlbyname(struct thread *td, const char * __capability name,
+	    size_t namelen, void * __capability old,
+	    size_t * __capability oldlenp, void * __capability new,
+	    size_t newlen, size_t *retval, int flags, bool inkernel);
 
 struct sbuf;
 struct sbuf *sbuf_new_for_sysctl(struct sbuf *, char *, int,

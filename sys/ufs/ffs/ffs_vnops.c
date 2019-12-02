@@ -1765,10 +1765,10 @@ ffs_getpages_async(struct vop_getpages_async_args *ap)
 
 // CHERI CHANGES START
 // {
-//   "updated": 20190628,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
+//     "iovec-macros"
 //     "struct iovec"
 //   ],
 //   "changes_purecap": [

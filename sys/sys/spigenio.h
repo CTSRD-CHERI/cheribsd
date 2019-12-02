@@ -54,12 +54,3 @@ struct spigen_transfer_mmapped {
 #define SPIGENIOC_SET_SPI_MODE     _IOW(SPIGENIOC_BASE, 5, uint32_t)
 
 #endif /* !_SYS_SPIGENIO_H_ */
-// CHERI CHANGES START
-// {
-//   "updated": 20181114,
-//   "target_type": "header",
-//   "changes": [
-//     "kiovec_t"
-//   ]
-// }
-// CHERI CHANGES END

@@ -28,6 +28,8 @@
  * $FreeBSD$
  */
 
+#define	EXPLICIT_USER_ACCESS
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
@@ -91,7 +93,7 @@ MODULE_DEPEND(smbfs, libmchain, 1, 1, 1);
 uma_zone_t smbfs_pbuf_zone;
 
 static int
-smbfs_cmount(struct mntarg *ma, void * data, uint64_t flags)
+smbfs_cmount(struct mntarg *ma, void * __capability data, uint64_t flags)
 {
 	struct smbfs_args args;
 	int error;
@@ -353,7 +355,7 @@ out:
  */
 /* ARGSUSED */
 static int
-smbfs_quotactl(struct mount *mp, int cmd, uid_t uid, void * __CAPABILITY arg)
+smbfs_quotactl(struct mount *mp, int cmd, uid_t uid, void * __capability arg)
 {
 	SMBVDEBUG("return EOPNOTSUPP\n");
 	return EOPNOTSUPP;
@@ -406,11 +408,10 @@ smbfs_statfs(struct mount *mp, struct statfs *sbp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180629,
+//   "updated": 20191025,
 //   "target_type": "kernel",
 //   "changes": [
-//     "iovec-macros",
-//     "struct iovec"
+//     "iovec-macros"
 //   ]
 // }
 // CHERI CHANGES END

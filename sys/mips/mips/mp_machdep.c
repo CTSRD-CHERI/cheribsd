@@ -374,8 +374,13 @@ release_aps(void *dummy __unused)
 
 	atomic_store_rel_int(&aps_ready, 1);
 
-	while (smp_started == 0)
+	if (bootverbose)
+		printf("Waiting for smp_started to be set...\n");
+	while (smp_started == 0) {
 		; /* nothing */
+	}
+	if (bootverbose)
+		printf("smp_started has been set.\n");
 }
 
 SYSINIT(start_aps, SI_SUB_SMP, SI_ORDER_FIRST, release_aps, NULL);

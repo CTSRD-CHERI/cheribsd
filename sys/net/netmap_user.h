@@ -117,7 +117,7 @@
 		(nifp)->ni_host_tx_rings] )
 
 #define NETMAP_BUF(ring, index)				\
-	((char *)(ring) + (ring)->buf_ofs + ((index)*(ring)->nr_buf_size))
+	((char *)(ring) + (ring)->buf_ofs + ((size_t)(index)*(ring)->nr_buf_size))
 
 #define NETMAP_BUF_IDX(ring, buf)			\
 	( ((char *)(buf) - ((char *)(ring) + (ring)->buf_ofs) ) / \
@@ -254,7 +254,7 @@ struct nm_desc {
 	struct nm_desc *self; /* point to self if netmap. */
 	int fd;
 	void *mem;
-	uint32_t memsize;
+	size_t memsize;
 	int done_mmap;	/* set if mem is the result of mmap */
 	struct netmap_if * const nifp;
 	uint16_t first_tx_ring, last_tx_ring, cur_tx_ring;
@@ -981,7 +981,8 @@ nm_close(struct nm_desc *d)
 static int
 nm_mmap(struct nm_desc *d, const struct nm_desc *parent)
 {
-	//XXX TODO: check if mmap is already done
+	if (d->done_mmap)
+		return 0;
 
 	if (IS_NETMAP_DESC(parent) && parent->mem &&
 	    parent->req.nr_arg2 == d->req.nr_arg2) {
@@ -1116,7 +1117,7 @@ nm_dispatch(struct nm_desc *d, int cnt, nm_cb_t cb, u_char *arg)
 				slot = &ring->slot[i];
 				d->hdr.len += slot->len;
 				nbuf = (u_char *)NETMAP_BUF(ring, slot->buf_idx);
-				if (oldbuf != NULL && nbuf - oldbuf == ring->nr_buf_size &&
+				if (oldbuf != NULL && nbuf - oldbuf == (int)ring->nr_buf_size &&
 						oldlen == ring->nr_buf_size) {
 					d->hdr.caplen += slot->len;
 					oldbuf = nbuf;

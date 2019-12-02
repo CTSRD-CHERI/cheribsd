@@ -1278,7 +1278,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 257: {
 		struct freebsd32_lio_listio_args *p = params;
 		iarg[0] = p->mode; /* int */
-		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb32 *const * */
+		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb32 * const * */
 		iarg[2] = p->nent; /* int */
 		uarg[3] = (intptr_t) p->sig; /* struct sigevent32 * */
 		*n_args = 4;
@@ -1447,7 +1447,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* freebsd32_aio_suspend */
 	case 315: {
 		struct freebsd32_aio_suspend_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb32 *const * */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb32 * const * */
 		iarg[1] = p->nent; /* int */
 		uarg[2] = (intptr_t) p->timeout; /* const struct timespec32 * */
 		*n_args = 3;
@@ -2501,15 +2501,6 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 3;
 		break;
 	}
-	/* shm_open */
-	case 482: {
-		struct shm_open_args *p = params;
-		uarg[0] = (intptr_t) p->path; /* const char * */
-		iarg[1] = p->flags; /* int */
-		iarg[2] = p->mode; /* mode_t */
-		*n_args = 3;
-		break;
-	}
 	/* shm_unlink */
 	case 483: {
 		struct shm_unlink_args *p = params;
@@ -3335,6 +3326,50 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[2] = p->fd; /* int */
 		iarg[3] = p->flag; /* int */
 		*n_args = 4;
+		break;
+	}
+	/* copy_file_range */
+	case 569: {
+		struct copy_file_range_args *p = params;
+		iarg[0] = p->infd; /* int */
+		uarg[1] = (intptr_t) p->inoffp; /* off_t * */
+		iarg[2] = p->outfd; /* int */
+		uarg[3] = (intptr_t) p->outoffp; /* off_t * */
+		uarg[4] = p->len; /* size_t */
+		uarg[5] = p->flags; /* unsigned int */
+		*n_args = 6;
+		break;
+	}
+	/* freebsd32___sysctlbyname */
+	case 570: {
+		struct freebsd32___sysctlbyname_args *p = params;
+		uarg[0] = (intptr_t) p->name; /* const char * */
+		uarg[1] = p->namelen; /* size_t */
+		uarg[2] = (intptr_t) p->old; /* void * */
+		uarg[3] = (intptr_t) p->oldlenp; /* uint32_t * */
+		uarg[4] = (intptr_t) p->new; /* void * */
+		uarg[5] = p->newlen; /* size_t */
+		*n_args = 6;
+		break;
+	}
+	/* shm_open2 */
+	case 571: {
+		struct shm_open2_args *p = params;
+		uarg[0] = (intptr_t) p->path; /* const char * */
+		iarg[1] = p->flags; /* int */
+		iarg[2] = p->mode; /* mode_t */
+		iarg[3] = p->shmflags; /* int */
+		uarg[4] = (intptr_t) p->name; /* const char * */
+		*n_args = 5;
+		break;
+	}
+	/* shm_rename */
+	case 572: {
+		struct shm_rename_args *p = params;
+		uarg[0] = (intptr_t) p->path_from; /* const char * */
+		uarg[1] = (intptr_t) p->path_to; /* const char * */
+		iarg[2] = p->flags; /* int */
+		*n_args = 3;
 		break;
 	}
 	default:
@@ -5352,7 +5387,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb32 *const *";
+			p = "userland struct aiocb32 * const *";
 			break;
 		case 2:
 			p = "int";
@@ -5628,7 +5663,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 315:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb32 *const *";
+			p = "userland struct aiocb32 * const *";
 			break;
 		case 1:
 			p = "int";
@@ -7454,22 +7489,6 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* shm_open */
-	case 482:
-		switch(ndx) {
-		case 0:
-			p = "userland const char *";
-			break;
-		case 1:
-			p = "int";
-			break;
-		case 2:
-			p = "mode_t";
-			break;
-		default:
-			break;
-		};
-		break;
 	/* shm_unlink */
 	case 483:
 		switch(ndx) {
@@ -8980,6 +8999,94 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
+	/* copy_file_range */
+	case 569:
+		switch(ndx) {
+		case 0:
+			p = "int";
+			break;
+		case 1:
+			p = "userland off_t *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		case 3:
+			p = "userland off_t *";
+			break;
+		case 4:
+			p = "size_t";
+			break;
+		case 5:
+			p = "unsigned int";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* freebsd32___sysctlbyname */
+	case 570:
+		switch(ndx) {
+		case 0:
+			p = "userland const char *";
+			break;
+		case 1:
+			p = "size_t";
+			break;
+		case 2:
+			p = "userland void *";
+			break;
+		case 3:
+			p = "userland uint32_t *";
+			break;
+		case 4:
+			p = "userland void *";
+			break;
+		case 5:
+			p = "size_t";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* shm_open2 */
+	case 571:
+		switch(ndx) {
+		case 0:
+			p = "userland const char *";
+			break;
+		case 1:
+			p = "int";
+			break;
+		case 2:
+			p = "mode_t";
+			break;
+		case 3:
+			p = "int";
+			break;
+		case 4:
+			p = "userland const char *";
+			break;
+		default:
+			break;
+		};
+		break;
+	/* shm_rename */
+	case 572:
+		switch(ndx) {
+		case 0:
+			p = "userland const char *";
+			break;
+		case 1:
+			p = "userland const char *";
+			break;
+		case 2:
+			p = "int";
+			break;
+		default:
+			break;
+		};
+		break;
 	default:
 		break;
 	};
@@ -10420,11 +10527,6 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* shm_open */
-	case 482:
-		if (ndx == 0 || ndx == 1)
-			p = "int";
-		break;
 	/* shm_unlink */
 	case 483:
 		if (ndx == 0 || ndx == 1)
@@ -10861,6 +10963,26 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		break;
 	/* funlinkat */
 	case 568:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* copy_file_range */
+	case 569:
+		if (ndx == 0 || ndx == 1)
+			p = "ssize_t";
+		break;
+	/* freebsd32___sysctlbyname */
+	case 570:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* shm_open2 */
+	case 571:
+		if (ndx == 0 || ndx == 1)
+			p = "int";
+		break;
+	/* shm_rename */
+	case 572:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;

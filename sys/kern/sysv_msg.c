@@ -651,15 +651,14 @@ sys_msgctl(struct thread *td, struct msgctl_args *uap)
 	int cmd = uap->cmd;
 	struct msqid_ds msqbuf;
 	int error;
-	struct msqid_ds * __capability buf = __USER_CAP_OBJ(uap->buf);
 
 	DPRINTF(("call to msgctl(%d, %d, %p)\n", msqid, cmd, uap->buf));
 	if (cmd == IPC_SET &&
-	    (error = copyin(buf, &msqbuf, sizeof(msqbuf))) != 0)
+	    (error = copyin(uap->buf, &msqbuf, sizeof(msqbuf))) != 0)
 		return (error);
 	error = kern_msgctl(td, msqid, cmd, &msqbuf);
 	if (cmd == IPC_STAT && error == 0)
-		error = copyout(&msqbuf, buf, sizeof(struct msqid_ds));
+		error = copyout(&msqbuf, uap->buf, sizeof(struct msqid_ds));
 	return (error);
 }
 
@@ -1274,17 +1273,17 @@ sys_msgsnd(struct thread *td, struct msgsnd_args *uap)
 {
 	int error;
 	long mtype;
-	const char * __capability msgp = __USER_CAP(uap->msgp, uap->msgsz);
 
 	DPRINTF(("call to msgsnd(%d, %p, %zu, %d)\n", uap->msqid, uap->msgp,
 	    uap->msgsz, uap->msgflg));
 
-	if ((error = copyin(msgp, &mtype, sizeof(mtype))) != 0) {
+	if ((error = copyin(uap->msgp, &mtype, sizeof(mtype))) != 0) {
 		DPRINTF(("error %d copying the message type\n", error));
 		return (error);
 	}
-	return (kern_msgsnd(td, uap->msqid, msgp + sizeof(mtype), uap->msgsz,
-	    uap->msgflg, mtype));
+	return (kern_msgsnd(td, uap->msqid,
+	    (const char * __capability)uap->msgp + sizeof(mtype),
+	    uap->msgsz, uap->msgflg, mtype));
 }
 
 /* XXX msgp is actually mtext. */
@@ -1562,15 +1561,15 @@ sys_msgrcv(struct thread *td, struct msgrcv_args *uap)
 {
 	int error;
 	long mtype;
-	char * __capability msgp = __USER_CAP(uap->msgp, uap->msgsz);
 
 	DPRINTF(("call to msgrcv(%d, %p, %zu, %ld, %d)\n", uap->msqid,
 	    uap->msgp, uap->msgsz, uap->msgtyp, uap->msgflg));
 
-	if ((error = kern_msgrcv(td, uap->msqid, msgp + sizeof(mtype),
-	    uap->msgsz, uap->msgtyp, uap->msgflg, &mtype)) != 0)
+	if ((error = kern_msgrcv(td, uap->msqid,
+	    (char * __capability)uap->msgp + sizeof(mtype), uap->msgsz,
+	    uap->msgtyp, uap->msgflg, &mtype)) != 0)
 		return (error);
-	if ((error = copyout(&mtype, msgp, sizeof(mtype))) != 0)
+	if ((error = copyout(&mtype, uap->msgp, sizeof(mtype))) != 0)
 		DPRINTF(("error %d copying the message type\n", error));
 	return (error);
 }

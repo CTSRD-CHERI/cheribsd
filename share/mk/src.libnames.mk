@@ -165,7 +165,6 @@ _LIBRARIES=	\
 		pcsclite \
 		pjdlog \
 		pmc \
-		png_sb \
 		proc \
 		procstat \
 		pthread \
@@ -182,6 +181,7 @@ _LIBRARIES=	\
 		smb \
 		ssl \
 		ssp_nonshared \
+		stats \
 		statcounters \
 		stdthreads \
 		supcplusplus \
@@ -249,7 +249,7 @@ LIBVERIEXEC?=	${LIBVERIEXECDIR}/libveriexec${PIE_SUFFIX}.a
 # Each library's LIBADD needs to be duplicated here for static linkage of
 # 2nd+ order consumers.  Auto-generating this would be better.
 _DP_80211=	sbuf bsdxml
-_DP_archive=	z bz2 lzma bsdxml
+_DP_archive=	z bz2 lzma bsdxml zstd
 _DP_zstd=	pthread
 .if ${MK_BLACKLIST} != "no"
 _DP_blacklist+=	pthread
@@ -368,6 +368,7 @@ _DP_c_nosyscalls=		compiler_rt
 _DP_c+=		ssp_nonshared
 _DP_c_nosyscalls+=		ssp_nonshared
 .endif
+_DP_stats=	sbuf pthread
 _DP_stdthreads=	pthread
 _DP_tacplus=	md
 _DP_panel=	ncurses
@@ -487,7 +488,6 @@ LDADD+=		${LDADD_${_l}}
 .endfor
 
 _LIB_OBJTOP?=	${OBJTOP}
-
 # INTERNALLIB definitions.
 LIBELFTCDIR=	${_LIB_OBJTOP}/lib/libelftc
 LIBELFTC?=	${LIBELFTCDIR}/libelftc${PIE_SUFFIX}.a
@@ -517,7 +517,7 @@ LIBSLDIR=	${_LIB_OBJTOP}/kerberos5/lib/libsl
 LIBSL?=		${LIBSLDIR}/libsl${PIE_SUFFIX}.a
 
 LIBIFCONFIGDIR=	${_LIB_OBJTOP}/lib/libifconfig
-LIBIFCONFIG?=	${LIBIFCONFIGDIR}libifconfig${PIE_SUFFIX}.a
+LIBIFCONFIG?=	${LIBIFCONFIGDIR}/libifconfig${PIE_SUFFIX}.a
 
 LIBIPFDIR=	${_LIB_OBJTOP}/sbin/ipf/libipf
 LIBIPF?=	${LIBIPFDIR}/libipf${PIE_SUFFIX}.a
@@ -550,15 +550,15 @@ LIBBSNMPTOOLSDIR=	${_LIB_OBJTOP}/usr.sbin/bsnmpd/tools/libbsnmptools
 LIBBSNMPTOOLS?=	${LIBBSNMPTOOLSDIR}/libbsnmptools${PIE_SUFFIX}.a
 
 LIBAMUDIR=	${_LIB_OBJTOP}/usr.sbin/amd/libamu
-LIBAMU?=	${LIBAMUDIR}/libamu${PIE_SUFFIX}${PIE_SUFFIX}.a
+LIBAMU?=	${LIBAMUDIR}/libamu${PIE_SUFFIX}.a
 
 LIBBEDIR=	${_LIB_OBJTOP}/lib/libbe
 LIBBE?=		${LIBBEDIR}/libbe${PIE_SUFFIX}.a
 
 LIBPMCSTATDIR=	${_LIB_OBJTOP}/lib/libpmcstat
-LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat${PIE_SUFFIX}${PIE_SUFFIX}.a
+LIBPMCSTAT?=	${LIBPMCSTATDIR}/libpmcstat${PIE_SUFFIX}.a
 
-LIBC_NOSSP_PICDIR=	${OBJTOP}/lib/libc
+LIBC_NOSSP_PICDIR=	${_LIB_OBJTOP}/lib/libc
 LIBC_NOSSP_PIC?=	${LIBC_NOSSP_PICDIR}/libc_nossp_pic${PIE_SUFFIX}.a
 
 LIBBFDDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbfd
@@ -566,9 +566,6 @@ LIBBFD?=	${LIBBFDDIR}/libbfd${PIE_SUFFIX}.a
 
 LIBBINUTILSDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libbinutils
 LIBBINUTILS?=	${LIBBINUTILSDIR}/libbinutils${PIE_SUFFIX}.a
-
-LIBGDBDIR=	${_LIB_OBJTOP}/gnu/usr.bin/gdb/libgdb
-LIBGDB?=	${LIBGDBDIR}/libgdb${PIE_SUFFIX}.a
 
 LIBIBERTYDIR=	${_LIB_OBJTOP}/gnu/usr.bin/binutils/libiberty
 LIBIBERTY?=	${LIBIBERTYDIR}/libiberty${PIE_SUFFIX}.a
