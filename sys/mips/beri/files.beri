@@ -26,6 +26,7 @@ dev/terasic/pixelstream/pixelstream.c		optional pixelstream
 dev/terasic/pixelstream/pixelstream_fdt.c	optional pixelstream
 dev/terasic/pixelstream/pixelstream_reg.c	optional pixelstream
 dev/terasic/pixelstream/pixelstream_vt.c	optional pixelstream vt
+mips/beri/asm_beri_mp.S			optional smp
 mips/beri/beri_iommu.c			optional xdma
 mips/beri/beri_machdep.c		standard
 mips/beri/beri_mp.c			optional smp
