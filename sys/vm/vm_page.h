@@ -203,10 +203,18 @@
 
 #if PAGE_SIZE == 4096
 #define VM_PAGE_BITS_ALL 0xffu
+#if defined(atomic_set_8)
 typedef uint8_t vm_page_bits_t;
+#else
+typedef uint8_t __subobject_use_container_bounds vm_page_bits_t;
+#endif
 #elif PAGE_SIZE == 8192
 #define VM_PAGE_BITS_ALL 0xffffu
+#if defined(atomic_set_16)
 typedef uint16_t vm_page_bits_t;
+#else
+typedef uint16_t __subobject_use_container_bounds vm_page_bits_t;
+#endif
 #elif PAGE_SIZE == 16384
 #define VM_PAGE_BITS_ALL 0xffffffffu
 typedef uint32_t vm_page_bits_t;
@@ -819,7 +827,7 @@ vm_page_pqstate_cmpset(vm_page_t m, uint32_t oldq, uint32_t newq,
 	qsmask = ((PGA_DEQUEUE | PGA_REQUEUE | PGA_REQUEUE_HEAD) <<
 	    VM_PAGE_AFLAG_SHIFT) | VM_PAGE_QUEUE_MASK;
 
-	addr = (void *)&m->aflags;
+	addr = (void *)__bounded_addressof(m->aflags, sizeof(uint32_t));
 	oval = atomic_load_32(addr);
 	do {
 		if ((oval & fflags) != 0)
