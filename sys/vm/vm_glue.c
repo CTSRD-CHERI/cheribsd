@@ -558,9 +558,10 @@ vm_thread_new(struct thread *td, int pages)
 	ks = 0;
 	ksobj = NULL;
 	if (pages == kstack_pages && kstack_cache != NULL) {
-		ks = (vm_offset_t)uma_zalloc(kstack_cache, M_NOWAIT);
+		ks = (vm_ptr_t)uma_zalloc(kstack_cache, M_NOWAIT);
 		if (ks != 0) 
-			ksobj = PHYS_TO_VM_PAGE(pmap_kextract(ks))->object;
+			ksobj = PHYS_TO_VM_PAGE(
+			    pmap_kextract(ptr_to_va(ks)))->object;
 	}
 
 	/*
@@ -574,7 +575,7 @@ vm_thread_new(struct thread *td, int pages)
 	if (ks == 0)
 		return (0);
 	td->td_kstack_obj = ksobj;
-	td->td_kstack = (char *)ks;
+	td->td_kstack = ks;
 	td->td_kstack_pages = pages;
 	return (1);
 }
