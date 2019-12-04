@@ -225,17 +225,17 @@
 /*
  * The CHERI object-type space is split between userspace and kernel,
  * permitting kernel object references to be delegated to userspace (if
- * desired).  Currently, we provide 23 bits of namespace to each, with the top
+ * desired).  Currently, we provide 17 bits of namespace to each, with the top
  * bit set for kernel object types, but it is easy to imagine other splits.
  * User and kernel software should be written so as to not place assumptions
  * about the specific values used here, as they may change.
  */
+#define	CHERI_OTYPE_BITS	(18)
 #define	CHERI_OTYPE_USER_MIN	(0)
-#define	CHERI_OTYPE_USER_MAX	((1 << 23) - 1)
-#define	CHERI_OTYPE_KERN_MIN	(1 << 23)
-#define	CHERI_OTYPE_KERN_MAX	((1 << 24) - 1)
-
-#define	CHERI_OTYPE_KERN_FLAG	(1 << 23)
+#define	CHERI_OTYPE_USER_MAX	((1 << (CHERI_OTYPE_BITS - 1)) - 1)
+#define	CHERI_OTYPE_KERN_MIN	(1 << (CHERI_OTYPE_BITS - 1))
+#define	CHERI_OTYPE_KERN_MAX	((1 << CHERI_OTYPE_BITS) - 1)
+#define	CHERI_OTYPE_KERN_FLAG	(1 << (CHERI_OTYPE_BITS - 1))
 #define	CHERI_OTYPE_ISKERN(x)	(((x) & CHERI_OTYPE_KERN_FLAG) != 0)
 #define	CHERI_OTYPE_ISUSER(x)	(!(CHERI_OTYPE_ISKERN(x)))
 
@@ -246,7 +246,7 @@
  * bit set -- combined with a suitable selector on the CCall instruction to
  * ensure that this behaviour is intended.
  */
-#define	CHERI_OTYPE_LOCALOK_SHIFT	(22)
+#define	CHERI_OTYPE_LOCALOK_SHIFT	(CHERI_OTYPE_BITS - 2)
 #define	CHERI_OTYPE_LOCALOK_FLAG	(1 << CHERI_OTYPE_LOCALOK_SHIFT
 #define	CHERI_OTYPE_IS_LOCALOK(x)	(((x) & CHERI_OTYPE_LOCALOK_FLAG) != 0)
 
