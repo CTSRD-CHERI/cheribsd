@@ -2124,7 +2124,7 @@ int	cheriabi_shm_rename(struct thread *, struct cheriabi_shm_rename_args *);
 #define	CHERIABI_SYS_AUE_cheriabi_copy_file_range	AUE_NULL
 #define	CHERIABI_SYS_AUE_cheriabi___sysctlbyname	AUE_SYSCTL
 #define	CHERIABI_SYS_AUE_cheriabi_shm_open2	AUE_SHMOPEN
-#define	CHERIABI_SYS_AUE_cheriabi_shm_rename	AUE_NULL
+#define	CHERIABI_SYS_AUE_cheriabi_shm_rename	AUE_SHMRENAME
 
 #undef PAD_
 #undef PADL_

@@ -222,8 +222,8 @@ struct osigpending_args {
 	register_t dummy;
 };
 struct sigaltstack_args {
-	char ss_l_[PADL_(const struct sigaltstack_native * __capability)]; const struct sigaltstack_native * __capability ss; char ss_r_[PADR_(const struct sigaltstack_native * __capability)];
-	char oss_l_[PADL_(struct sigaltstack_native * __capability)]; struct sigaltstack_native * __capability oss; char oss_r_[PADR_(struct sigaltstack_native * __capability)];
+	char ss_l_[PADL_(const struct sigaltstack * __capability)]; const struct sigaltstack * __capability ss; char ss_r_[PADR_(const struct sigaltstack * __capability)];
+	char oss_l_[PADL_(struct sigaltstack * __capability)]; struct sigaltstack * __capability oss; char oss_r_[PADR_(struct sigaltstack * __capability)];
 };
 struct ioctl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -1162,8 +1162,8 @@ struct __mac_execve_args {
 };
 struct sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(const struct sigaction_native * __capability)]; const struct sigaction_native * __capability act; char act_r_[PADR_(const struct sigaction_native * __capability)];
-	char oact_l_[PADL_(struct sigaction_native * __capability)]; struct sigaction_native * __capability oact; char oact_r_[PADR_(struct sigaction_native * __capability)];
+	char act_l_[PADL_(const struct sigaction * __capability)]; const struct sigaction * __capability act; char act_r_[PADR_(const struct sigaction * __capability)];
+	char oact_l_[PADL_(struct sigaction * __capability)]; struct sigaction * __capability oact; char oact_r_[PADR_(struct sigaction * __capability)];
 };
 struct sigreturn_args {
 	char sigcntxp_l_[PADL_(const struct __ucontext * __capability)]; const struct __ucontext * __capability sigcntxp; char sigcntxp_r_[PADR_(const struct __ucontext * __capability)];
@@ -2473,8 +2473,8 @@ struct freebsd4_sendfile_args {
 };
 struct freebsd4_sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];
-	char act_l_[PADL_(const struct sigaction_native * __capability)]; const struct sigaction_native * __capability act; char act_r_[PADR_(const struct sigaction_native * __capability)];
-	char oact_l_[PADL_(struct sigaction_native * __capability)]; struct sigaction_native * __capability oact; char oact_r_[PADR_(struct sigaction_native * __capability)];
+	char act_l_[PADL_(const struct sigaction * __capability)]; const struct sigaction * __capability act; char act_r_[PADR_(const struct sigaction * __capability)];
+	char oact_l_[PADL_(struct sigaction * __capability)]; struct sigaction * __capability oact; char oact_r_[PADR_(struct sigaction * __capability)];
 };
 struct freebsd4_sigreturn_args {
 	char sigcntxp_l_[PADL_(const struct freebsd4_ucontext * __capability)]; const struct freebsd4_ucontext * __capability sigcntxp; char sigcntxp_r_[PADR_(const struct freebsd4_ucontext * __capability)];
@@ -3183,7 +3183,7 @@ int	freebsd12_shm_open(struct thread *, struct freebsd12_shm_open_args *);
 #define	SYS_AUE_copy_file_range	AUE_NULL
 #define	SYS_AUE___sysctlbyname	AUE_SYSCTL
 #define	SYS_AUE_shm_open2	AUE_SHMOPEN
-#define	SYS_AUE_shm_rename	AUE_NULL
+#define	SYS_AUE_shm_rename	AUE_SHMRENAME
 
 #undef PAD_
 #undef PADL_

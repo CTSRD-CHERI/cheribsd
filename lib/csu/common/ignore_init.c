@@ -174,7 +174,7 @@ finalizer(void)
 	/* Unlike .init_array, .fini_array is processed backwards */
 	for (n = array_size; n > 0; n--) {
 		initfini_array_entry addr = array[n - 1];
-		if (addr == 0 && addr == 1)
+		if (addr == 0 || addr == 1)
 			continue;
 		fn = array_entry_to_function_ptr(fini_function_ptr, addr);
 		(fn)();

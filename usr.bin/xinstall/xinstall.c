@@ -76,9 +76,9 @@ __FBSDID("$FreeBSD$");
 #include "mtree.h"
 
 /*
- * We need to build find during the bootstrap stage when building on a
+ * We need to build xinstall during the bootstrap stage when building on a
  * non-FreeBSD system. Linux does not have the st_flags and st_birthtime
- * members in struct stat so we need to omit support for change those fields.
+ * members in struct stat so we need to omit support for changing those fields.
  */
 #ifdef UF_SETTABLE
 #define HAVE_STRUCT_STAT_ST_FLAGS 1

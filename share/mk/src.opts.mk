@@ -55,7 +55,6 @@ __<src.opts.mk>__:
 __DEFAULT_YES_OPTIONS = \
     ACCT \
     ACPI \
-    AMD \
     APM \
     AT \
     ATM \
@@ -126,7 +125,6 @@ __DEFAULT_YES_OPTIONS = \
     LDNS \
     LDNS_UTILS \
     LEGACY_CONSOLE \
-    LIB64 \
     LIBPTHREAD \
     LIBTHR \
     LLVM_COV \
@@ -195,6 +193,7 @@ __DEFAULT_YES_OPTIONS = \
     ZONEINFO
 
 __DEFAULT_NO_OPTIONS = \
+    AMD \
     BEARSSL \
     BSD_GREP \
     CLANG_EXTRAS \
@@ -278,6 +277,7 @@ __LLVM_TARGETS= \
 		arm \
 		mips \
 		powerpc \
+		riscv \
 		sparc \
 		x86
 __LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:S/sparc64/sparc/:S/arm64/aarch64/:S/powerpc64/powerpc/
@@ -300,7 +300,6 @@ __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}/LLVM
 .endfor
 
 __DEFAULT_NO_OPTIONS+=LLVM_TARGET_BPF
-__DEFAULT_NO_OPTIONS+=LLVM_TARGET_RISCV
 
 .include <bsd.compiler.mk>
 # If the compiler is not C++11 capable, disable Clang and use GCC instead.
@@ -312,13 +311,13 @@ __DEFAULT_NO_OPTIONS+=LLVM_TARGET_RISCV
 # Clang is enabled, and will be installed as the default /usr/bin/cc.
 __DEFAULT_YES_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
 __DEFAULT_NO_OPTIONS+=GCC GCC_BOOTSTRAP GNUCXX GPL_DTC
-.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mriscv*} == "" && ${__T} != "sparc64" && ! (${__T:Mmips*c*} || ${MACHINE_ARCH:Mmips*c*})
+.elif ${COMPILER_FEATURES:Mc++11} && ${__T} != "sparc64" && !${__T:Mmips*c*}
 # If an external compiler that supports C++11 is used as ${CC} and Clang
 # supports the target, then Clang is enabled but GCC is installed as the
 # default /usr/bin/cc.
 __DEFAULT_YES_OPTIONS+=CLANG GCC GCC_BOOTSTRAP GNUCXX GPL_DTC LLD
 __DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
-.elif ${COMPILER_FEATURES:Mc++11} && (${__T:Mmips*c*} || ${MACHINE_ARCH:Mmips*c*})
+.elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mmips*c*}
 # CHERI pure-capability targets alwasy use libc++
 # Don't build CLANG for now
 __DEFAULT_NO_OPTIONS+=CLANG CLANG_IS_CC
@@ -386,7 +385,7 @@ __DEFAULT_YES_OPTIONS+=LIB32
 BROKEN_OPTIONS+=LIB32
 .endif
 # LIB64 on mips64*c*
-.if ${MACHINE_ARCH:Mmips64*c*}
+.if ${__T:Mmips64*c*}
 __DEFAULT_YES_OPTIONS+=LIB64
 # In principal, LIB32 could work, but Makefile.libcompat only supports
 # one compat layer.

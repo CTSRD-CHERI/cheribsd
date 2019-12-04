@@ -134,6 +134,15 @@
 #define	MAP_CHERI_NOSETBOUNDS	0x0020		/* Don't alter addr */
 #define	MAP_ALIGNED_CHERI	MAP_ALIGNED(2)	/* align for CHERI data */
 #define	MAP_ALIGNED_CHERI_SEAL	MAP_ALIGNED(3)	/* align for sealing on CHERI */
+
+/*
+ * Flags provided to shm_rename
+ */
+/* Don't overwrite dest, if it exists */
+#define SHM_RENAME_NOREPLACE	(1 << 0)
+/* Atomically swap src and dest */
+#define SHM_RENAME_EXCHANGE	(1 << 1)
+
 #endif /* __BSD_VISIBLE */
 
 #if __POSIX_VISIBLE >= 199309
@@ -148,14 +157,6 @@
  * Error return from mmap()
  */
 #define MAP_FAILED	((void *)-1)
-
-/*
- * Flags provided to shm_rename
- */
-/* Don't overwrite dest, if it exists */
-#define SHM_RENAME_NOREPLACE	(1 << 0)
-/* Atomically swap src and dest */
-#define SHM_RENAME_EXCHANGE	(1 << 1)
 
 /*
  * msync() flags
@@ -358,11 +359,11 @@ int	posix_madvise(void *, size_t, int);
 int	mlockall(int);
 int	munlockall(void);
 int	shm_open(const char *, int, mode_t);
-int	shm_rename(const char *, const char *, int);
 int	shm_unlink(const char *);
 #endif
 #if __BSD_VISIBLE
 int	memfd_create(const char *, unsigned int);
+int	shm_rename(const char *, const char *, int);
 #endif
 __END_DECLS
 

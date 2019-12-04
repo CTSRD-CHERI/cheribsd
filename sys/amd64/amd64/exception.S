@@ -345,10 +345,11 @@ IDTVEC(dblfault)
 	pushfq
 	andq	$~(PSL_D | PSL_AC),(%rsp)
 	popfq
-	testb	$SEL_RPL_MASK,TF_CS(%rsp) /* Did we come from kernel? */
-	jz	1f			/* already running with kernel GS.base */
-	swapgs
-1:	lfence
+	movq	TF_SIZE(%rsp),%rdx
+	movl	%edx,%eax
+	shrq	$32,%rdx
+	movl	$MSR_GSBASE,%ecx
+	wrmsr
 	movq	%cr3,%rax
 	movq	%rax,PCPU(SAVED_UCR3)
 	movq	PCPU(KCR3),%rax
@@ -497,8 +498,8 @@ prot_addrf:
 3:	cmpw	$KUG32SEL,TF_GS(%rsp)
 	jne	4f
 	movq	%rdx,PCB_GSBASE(%rdi)
+	orl	$PCB_FULL_IRET,PCB_FLAGS(%rdi)	/* full iret from user #gp */
 4:	call	handle_ibrs_entry
-	orl	$PCB_FULL_IRET,PCB_FLAGS(%rdi)	/* always full iret from GPF */
 	movw	%es,TF_ES(%rsp)
 	movw	%ds,TF_DS(%rsp)
 	testl	$PSL_I,TF_RFLAGS(%rsp)

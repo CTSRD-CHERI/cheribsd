@@ -384,6 +384,29 @@ bucket_zone_lookup(int entries)
 	return (ubz);
 }
 
+static struct uma_bucket_zone *
+bucket_zone_max(uma_zone_t zone, int nitems)
+{
+	struct uma_bucket_zone *ubz;
+	int bpcpu;
+
+	bpcpu = 2;
+#ifdef UMA_XDOMAIN
+	if ((zone->uz_flags & UMA_ZONE_NUMA) != 0)
+		/* Count the cross-domain bucket. */
+		bpcpu++;
+#endif
+
+	for (ubz = &bucket_zones[0]; ubz->ubz_entries != 0; ubz++)
+		if (ubz->ubz_entries * bpcpu * mp_ncpus > nitems)
+			break;
+	if (ubz == &bucket_zones[0])
+		ubz = NULL;
+	else
+		ubz--;
+	return (ubz);
+}
+
 static int
 bucket_select(int size)
 {
@@ -503,8 +526,8 @@ zone_put_bucket(uma_zone_t zone, uma_zone_domain_t zdom, uma_bucket_t bucket,
 {
 
 	ZONE_LOCK_ASSERT(zone);
-	KASSERT(zone->uz_bkt_count < zone->uz_bkt_max, ("%s: zone %p overflow",
-	    __func__, zone));
+	KASSERT(!ws || zone->uz_bkt_count < zone->uz_bkt_max,
+	    ("%s: zone %p overflow", __func__, zone));
 
 	if (ws)
 		TAILQ_INSERT_HEAD(&zdom->uzd_buckets, bucket, ub_link);
@@ -582,9 +605,13 @@ zone_domain_update_wss(uma_zone_domain_t zdom)
 static void
 zone_timeout(uma_zone_t zone)
 {
-	uma_keg_t keg = zone->uz_keg;
+	uma_keg_t keg;
 	u_int slabs;
 
+	if ((zone->uz_flags & UMA_ZONE_HASH) == 0)
+		goto update_wss;
+
+	keg = zone->uz_keg;
 	KEG_LOCK(keg);
 	/*
 	 * Expand the keg hash table.
@@ -623,6 +650,7 @@ zone_timeout(uma_zone_t zone)
 	}
 	KEG_UNLOCK(keg);
 
+update_wss:
 	ZONE_LOCK(zone);
 	for (int i = 0; i < vm_ndomains; i++)
 		zone_domain_update_wss(&zone->uz_domain[i]);
@@ -1081,7 +1109,8 @@ zone_reclaim(uma_zone_t zone, int waitok, bool drain)
 	 * we're running.  Normally the uma_rwlock would protect us but we
 	 * must be able to release and acquire the right lock for each keg.
 	 */
-	keg_drain(zone->uz_keg);
+	if ((zone->uz_flags & UMA_ZFLAG_CACHE) == 0)
+		keg_drain(zone->uz_keg);
 	ZONE_LOCK(zone);
 	zone->uz_flags &= ~UMA_ZFLAG_RECLAIMING;
 	wakeup(zone);
@@ -1562,7 +1591,14 @@ keg_small_init(uma_keg_t keg)
 		    "new wasted space = %d\n", keg->uk_name, keg, wastedspace,
 		    slabsize / UMA_MAX_WASTE, keg->uk_ipers,
 		    slabsize - keg->uk_ipers * keg->uk_rsize);
-		keg->uk_flags |= UMA_ZONE_OFFPAGE;
+		/*
+		 * If we had access to memory to embed a slab header we
+		 * also have a page structure to use vtoslab() instead of
+		 * hash to find slabs.  If the zone was explicitly created
+		 * OFFPAGE we can't necessarily touch the memory.
+		 */
+		if ((keg->uk_flags & UMA_ZONE_OFFPAGE) == 0)
+			keg->uk_flags |= UMA_ZONE_OFFPAGE | UMA_ZONE_VTOSLAB;
 	}
 
 	if ((keg->uk_flags & UMA_ZONE_OFFPAGE) &&
@@ -1602,7 +1638,7 @@ keg_large_init(uma_keg_t keg)
 		 * slab header.
 		 */
 		if ((keg->uk_flags & UMA_ZFLAG_INTERNAL) == 0)
-			keg->uk_flags |= UMA_ZONE_OFFPAGE;
+			keg->uk_flags |= UMA_ZONE_OFFPAGE | UMA_ZONE_VTOSLAB;
 		else
 			keg->uk_ppera++;
 	}
@@ -2027,6 +2063,8 @@ zone_foreach(void (*zfunc)(uma_zone_t))
 		LIST_FOREACH(zone, &keg->uk_zones, uz_link)
 			zfunc(zone);
 	}
+	LIST_FOREACH(zone, &uma_cachezones, uz_link)
+		zfunc(zone);
 	if (__predict_true(booted == BOOT_RUNNING))
 		rw_runlock(&uma_rwlock);
 }
@@ -2198,7 +2236,6 @@ uma_startup2(void)
 static void
 uma_startup3(void)
 {
-	uma_zone_t zone;
 
 #ifdef INVARIANTS
 	TUNABLE_INT_FETCH("vm.debug.divisor", &dbg_divisor);
@@ -2206,8 +2243,6 @@ uma_startup3(void)
 	uma_skip_cnt = counter_u64_alloc(M_WAITOK);
 #endif
 	zone_foreach(zone_alloc_counters);
-	LIST_FOREACH(zone, &uma_cachezones, uz_link)
-		zone_alloc_counters(zone);
 	callout_init(&uma_callout, 1);
 	callout_reset(&uma_callout, UMA_TIMEOUT * hz, uma_timeout, NULL);
 	booted = BOOT_RUNNING;
@@ -3457,22 +3492,12 @@ int
 uma_zone_set_max(uma_zone_t zone, int nitems)
 {
 	struct uma_bucket_zone *ubz;
-
-	/*
-	 * If limit is very low we may need to limit how
-	 * much items are allowed in CPU caches.
-	 */
-	ubz = &bucket_zones[0];
-	for (; ubz->ubz_entries != 0; ubz++)
-		if (ubz->ubz_entries * 2 * mp_ncpus > nitems)
-			break;
-	if (ubz == &bucket_zones[0])
-		nitems = ubz->ubz_entries * 2 * mp_ncpus;
-	else
-		ubz--;
+	int count;
 
 	ZONE_LOCK(zone);
-	zone->uz_count_max = zone->uz_count = ubz->ubz_entries;
+	ubz = bucket_zone_max(zone, nitems);
+	count = ubz != NULL ? ubz->ubz_entries : 0;
+	zone->uz_count_max = zone->uz_count = count;
 	if (zone->uz_count_min > zone->uz_count_max)
 		zone->uz_count_min = zone->uz_count_max;
 	zone->uz_max_items = nitems;
@@ -3482,15 +3507,30 @@ uma_zone_set_max(uma_zone_t zone, int nitems)
 }
 
 /* See uma.h */
-int
+void
 uma_zone_set_maxcache(uma_zone_t zone, int nitems)
 {
+	struct uma_bucket_zone *ubz;
+	int bpcpu;
 
 	ZONE_LOCK(zone);
+	ubz = bucket_zone_max(zone, nitems);
+	if (ubz != NULL) {
+		bpcpu = 2;
+#ifdef UMA_XDOMAIN
+		if ((zone->uz_flags & UMA_ZONE_NUMA) != 0)
+			/* Count the cross-domain bucket. */
+			bpcpu++;
+#endif
+		nitems -= ubz->ubz_entries * bpcpu * mp_ncpus;
+		zone->uz_count_max = ubz->ubz_entries;
+	} else {
+		zone->uz_count_max = zone->uz_count = 0;
+	}
+	if (zone->uz_count_min > zone->uz_count_max)
+		zone->uz_count_min = zone->uz_count_max;
 	zone->uz_bkt_max = nitems;
 	ZONE_UNLOCK(zone);
-
-	return (nitems);
 }
 
 /* See uma.h */

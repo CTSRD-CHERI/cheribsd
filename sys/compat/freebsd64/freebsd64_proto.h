@@ -2322,7 +2322,7 @@ int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm
 #define	FREEBSD64_SYS_AUE_freebsd64_copy_file_range	AUE_NULL
 #define	FREEBSD64_SYS_AUE_freebsd64___sysctlbyname	AUE_SYSCTL
 #define	FREEBSD64_SYS_AUE_freebsd64_shm_open2	AUE_SHMOPEN
-#define	FREEBSD64_SYS_AUE_freebsd64_shm_rename	AUE_NULL
+#define	FREEBSD64_SYS_AUE_freebsd64_shm_rename	AUE_SHMRENAME
 
 #undef PAD_
 #undef PADL_

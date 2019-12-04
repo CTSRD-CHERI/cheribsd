@@ -1686,7 +1686,7 @@ da_periph_release_locked(struct cam_periph *periph, da_ref_token token)
 	    da_ref_text[token], token);
 	cnt = atomic_fetchadd_int(&softc->ref_flags[token], -1);
 	if (cnt != 1)
-		panic("Unholding %d with cnt = %d", token, cnt);
+		panic("releasing (locked) %d with cnt = %d", token, cnt);
 	cam_periph_release_locked(periph);
 }
 
@@ -2133,8 +2133,8 @@ daasync(void *callback_arg, u_int32_t code,
 				    "Capacity data has changed\n");
 				cam_periph_lock(periph);
 				softc->flags &= ~DA_FLAG_PROBED;
-				cam_periph_unlock(periph);
 				dareprobe(periph);
+				cam_periph_unlock(periph);
 			} else if (asc == 0x28 && ascq == 0x00) {
 				cam_periph_lock(periph);
 				softc->flags &= ~DA_FLAG_PROBED;
@@ -2145,8 +2145,8 @@ daasync(void *callback_arg, u_int32_t code,
 				    "INQUIRY data has changed\n");
 				cam_periph_lock(periph);
 				softc->flags &= ~DA_FLAG_PROBED;
-				cam_periph_unlock(periph);
 				dareprobe(periph);
+				cam_periph_unlock(periph);
 			}
 		}
 		break;
@@ -2875,6 +2875,8 @@ daregister(struct cam_periph *periph, void *arg)
 	softc->disk->d_hba_device = cpi.hba_device;
 	softc->disk->d_hba_subvendor = cpi.hba_subvendor;
 	softc->disk->d_hba_subdevice = cpi.hba_subdevice;
+	snprintf(softc->disk->d_attachment, sizeof(softc->disk->d_attachment),
+	    "%s%d", cpi.dev_name, cpi.unit_number);
 
 	/*
 	 * Acquire a reference to the periph before we register with GEOM.
@@ -4611,6 +4613,14 @@ dadone_probewp(struct cam_periph *periph, union ccb *done_ccb)
 
 	cam_periph_assert(periph, MA_OWNED);
 
+	KASSERT(softc->state == DA_STATE_PROBE_WP,
+	    ("State (%d) not PROBE_WP in dadone_probewp, periph %p ccb %p",
+		softc->state, periph, done_ccb));
+        KASSERT((csio->ccb_h.ccb_state & DA_CCB_TYPE_MASK) == DA_CCB_PROBE_WP,
+	    ("CCB State (%lu) not PROBE_WP in dadone_probewp, periph %p ccb %p",
+		(unsigned long)csio->ccb_h.ccb_state & DA_CCB_TYPE_MASK, periph,
+		done_ccb));
+
 	if (softc->minimum_cmd_size > 6) {
 		mode_hdr10 = (struct scsi_mode_header_10 *)csio->data_ptr;
 		dev_spec = mode_hdr10->dev_spec;
@@ -4643,11 +4653,11 @@ dadone_probewp(struct cam_periph *periph, union ccb *done_ccb)
 	}
 
 	free(csio->data_ptr, M_SCSIDA);
-	xpt_release_ccb(done_ccb);
 	if ((softc->flags & DA_FLAG_CAN_RC16) != 0)
 		softc->state = DA_STATE_PROBE_RC16;
 	else
 		softc->state = DA_STATE_PROBE_RC;
+	xpt_release_ccb(done_ccb);
 	xpt_schedule(periph, priority);
 	return;
 }
@@ -4670,6 +4680,13 @@ dadone_proberc(struct cam_periph *periph, union ccb *done_ccb)
 	priority = done_ccb->ccb_h.pinfo.priority;
 	csio = &done_ccb->csio;
 	state = csio->ccb_h.ccb_state & DA_CCB_TYPE_MASK;
+
+	KASSERT(softc->state == DA_STATE_PROBE_RC || softc->state == DA_STATE_PROBE_RC16,
+	    ("State (%d) not PROBE_RC* in dadone_proberc, periph %p ccb %p",
+		softc->state, periph, done_ccb));
+	KASSERT(state == DA_CCB_PROBE_RC || state == DA_CCB_PROBE_RC16,
+	    ("CCB State (%lu) not PROBE_RC* in dadone_probewp, periph %p ccb %p",
+		(unsigned long)state, periph, done_ccb));
 
 	lbp = 0;
 	rdcap = NULL;
@@ -4707,8 +4724,8 @@ dadone_proberc(struct cam_periph *periph, union ccb *done_ccb)
 			 */
 			if (maxsector == 0xffffffff) {
 				free(rdcap, M_SCSIDA);
-				xpt_release_ccb(done_ccb);
 				softc->state = DA_STATE_PROBE_RC16;
+				xpt_release_ccb(done_ccb);
 				xpt_schedule(periph, priority);
 				return;
 			}
@@ -4814,8 +4831,8 @@ dadone_proberc(struct cam_periph *periph, union ccb *done_ccb)
 				cam_periph_assert(periph, MA_OWNED);
 				softc->flags &= ~DA_FLAG_CAN_RC16;
 				free(rdcap, M_SCSIDA);
-				xpt_release_ccb(done_ccb);
 				softc->state = DA_STATE_PROBE_RC;
+				xpt_release_ccb(done_ccb);
 				xpt_schedule(periph, priority);
 				return;
 			}
@@ -4922,14 +4939,14 @@ dadone_proberc(struct cam_periph *periph, union ccb *done_ccb)
 		dadeleteflag(softc, DA_DELETE_WS10, 1);
 		dadeleteflag(softc, DA_DELETE_UNMAP, 1);
 
-		xpt_release_ccb(done_ccb);
 		softc->state = DA_STATE_PROBE_LBP;
+		xpt_release_ccb(done_ccb);
 		xpt_schedule(periph, priority);
 		return;
 	}
 
-	xpt_release_ccb(done_ccb);
 	softc->state = DA_STATE_PROBE_BDC;
+	xpt_release_ccb(done_ccb);
 	xpt_schedule(periph, priority);
 	return;
 }
@@ -4986,8 +5003,8 @@ dadone_probelbp(struct cam_periph *periph, union ccb *done_ccb)
 	}
 
 	free(lbp, M_SCSIDA);
-	xpt_release_ccb(done_ccb);
 	softc->state = DA_STATE_PROBE_BLK_LIMITS;
+	xpt_release_ccb(done_ccb);
 	xpt_schedule(periph, priority);
 	return;
 }
@@ -5080,8 +5097,8 @@ dadone_probeblklimits(struct cam_periph *periph, union ccb *done_ccb)
 	}
 
 	free(block_limits, M_SCSIDA);
-	xpt_release_ccb(done_ccb);
 	softc->state = DA_STATE_PROBE_BDC;
+	xpt_release_ccb(done_ccb);
 	xpt_schedule(periph, priority);
 	return;
 }
@@ -5181,8 +5198,8 @@ dadone_probebdc(struct cam_periph *periph, union ccb *done_ccb)
 	}
 
 	free(bdc, M_SCSIDA);
-	xpt_release_ccb(done_ccb);
 	softc->state = DA_STATE_PROBE_ATA;
+	xpt_release_ccb(done_ccb);
 	xpt_schedule(periph, priority);
 	return;
 }
@@ -5321,8 +5338,8 @@ dadone_probeata(struct cam_periph *periph, union ccb *done_ccb)
 		continue_probe = 1;
 	}
 	if (continue_probe != 0) {
-		xpt_release_ccb(done_ccb);
 		xpt_schedule(periph, priority);
+		xpt_release_ccb(done_ccb);
 		return;
 	} else
 		daprobedone(periph, done_ccb);
@@ -5811,8 +5828,8 @@ dadone_tur(struct cam_periph *periph, union ccb *done_ccb)
 					 /*timeout*/0,
 					 /*getcount_only*/0);
 	}
-	xpt_release_ccb(done_ccb);
 	softc->flags &= ~DA_FLAG_TUR_PENDING;
+	xpt_release_ccb(done_ccb);
 	da_periph_release_locked(periph, DA_REF_TUR);
 	return;
 }
@@ -5824,6 +5841,8 @@ dareprobe(struct cam_periph *periph)
 	int status;
 
 	softc = (struct da_softc *)periph->softc;
+
+	cam_periph_assert(periph, MA_OWNED);
 
 	/* Probe in progress; don't interfere. */
 	if (softc->state != DA_STATE_NORMAL)
@@ -5930,6 +5949,7 @@ damediapoll(void *arg)
 
 	if (!cam_iosched_has_work_flags(softc->cam_iosched, DA_WORK_TUR) &&
 	    (softc->flags & DA_FLAG_TUR_PENDING) == 0 &&
+	    softc->state == DA_STATE_NORMAL &&
 	    LIST_EMPTY(&softc->pending_ccbs)) {
 		if (da_periph_acquire(periph, DA_REF_TUR) == 0) {
 			cam_iosched_set_work_flags(softc->cam_iosched, DA_WORK_TUR);

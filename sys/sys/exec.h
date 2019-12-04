@@ -60,15 +60,15 @@
  * changes to freebsd32_ps_strings.
  */
 struct ps_strings {
-	char	**ps_argvstr;	/* first of 0 or more argument strings */
+	char * __kerncap * __kerncap ps_argvstr; /* first of 0 or more argument strings */
 	unsigned int ps_nargvstr; /* the number of argument strings */
-	char	**ps_envstr;	/* first of 0 or more environment strings */
+	char * __kerncap * __kerncap ps_envstr;	/* first of 0 or more environment strings */
 	unsigned int ps_nenvstr; /* the number of environment strings */
-	void	*ps_sbclasses;		/* pointer to sandbox class data */
+	void * __kerncap ps_sbclasses;	/* pointer to sandbox class data */
 	size_t	 ps_sbclasseslen;	/* length of sandbox class data */
-	void	*ps_sbmethods;		/* pointer to sandbox method data */
+	void * __kerncap ps_sbmethods;	/* pointer to sandbox method data */
 	size_t	 ps_sbmethodslen;	/* length of sandbox method data */
-	void	*ps_sbobjects;		/* pointer to sandbox object data */
+	void * __kerncap ps_sbobjects;	/* pointer to sandbox object data */
 	size_t	 ps_sbobjectslen;	/* length of sandbox object data */
 };
 
@@ -99,6 +99,7 @@ int exec_unregister(const struct execsw *);
 
 extern int coredump_pack_fileinfo;
 extern int coredump_pack_vmmapinfo;
+extern int use_cheriabi;
 
 /*
  * note: name##_mod cannot be const storage because the

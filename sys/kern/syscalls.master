@@ -391,8 +391,8 @@
 	}
 53	AUE_SIGALTSTACK	STD {
 		int sigaltstack(
-		    _In_opt_ _Contains_long_ptr_ const struct sigaltstack_native *ss,
-		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack_native *oss
+		    _In_opt_ _Contains_long_ptr_ const struct sigaltstack *ss,
+		    _Out_opt_ _Contains_long_ptr_ struct sigaltstack *oss
 		);
 	}
 54	AUE_IOCTL	STD|VARARG {
@@ -1814,8 +1814,8 @@
 342	AUE_SIGACTION	COMPAT4 {
 		int sigaction(
 		    int sig,
-		    _In_opt_ _Contains_ptr_ const struct sigaction_native *act,
-		    _Out_opt_ _Contains_ptr_ struct sigaction_native *oact
+		    _In_opt_ _Contains_ptr_ const struct sigaction *act,
+		    _Out_opt_ _Contains_ptr_ struct sigaction *oact
 		);
 	}
 343	AUE_SIGPENDING	STD {
@@ -2232,8 +2232,8 @@
 416	AUE_SIGACTION	STD {
 		int sigaction(
 		    int sig,
-		    _In_opt_ _Contains_ptr_ const struct sigaction_native *act,
-		    _Out_opt_ _Contains_ptr_ struct sigaction_native *oact
+		    _In_opt_ _Contains_ptr_ const struct sigaction *act,
+		    _Out_opt_ _Contains_ptr_ struct sigaction *oact
 		);
 	}
 417	AUE_SIGRETURN	STD {
@@ -3235,7 +3235,7 @@
 		    _In_z_ const char *name
 		);
 	}
-572	AUE_NULL	STD {
+572	AUE_SHMRENAME	STD {
 		int shm_rename(
 		    _In_z_ const char *path_from,
 		    _In_z_ const char *path_to,

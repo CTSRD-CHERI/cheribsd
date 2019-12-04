@@ -32,10 +32,11 @@ class DwarfInstructions {
 public:
   typedef typename A::pint_t pint_t;
   typedef typename A::sint_t sint_t;
+  typedef typename A::pc_t pc_t;
   typedef typename A::capability_t capability_t;
 
-  static int stepWithDwarf(A &addressSpace, pint_t pc, pint_t fdeStart,
-                           R &registers);
+  static int stepWithDwarf(A &addressSpace, pc_t pc, pint_t fdeStart,
+                           R &registers, bool &isSignalFrame);
 
 private:
 
@@ -65,7 +66,7 @@ private:
   static v128 getSavedVectorRegister(A &addressSpace, const R &registers,
                                   pint_t cfa, const RegisterLocation &savedReg);
 
-  static pint_t getCFA(A &addressSpace, const PrologInfo &prolog, pint_t pc,
+  static pint_t getCFA(A &addressSpace, const PrologInfo &prolog, pc_t pc,
                        const R &registers, bool *success) {
     *success = true;
     if (prolog.cfaRegister != 0) {
@@ -84,7 +85,10 @@ private:
     if (prolog.cfaExpression != 0)
       return evaluateExpression((pint_t)prolog.cfaExpression, addressSpace, 
                                 registers, 0);
-    fprintf(stderr, "WARNING: libunwind got broken prolog for pc %#p\n", (void*)pc);
+    fprintf(stderr,
+            "WARNING: libunwind got broken prolog for pc " _LIBUNWIND_FMT_PTR
+            "\n",
+            (void *)pc.get());
     *success = false;
 #if 0
     assert(0 && "getCFA(): unknown location");
@@ -203,15 +207,17 @@ v128 DwarfInstructions<A, R>::getSavedVectorRegister(
 }
 
 template <typename A, typename R>
-int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pint_t pc,
-                                           pint_t fdeStart, R &registers) {
+int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pc_t pc,
+                                           pint_t fdeStart, R &registers,
+                                           bool &isSignalFrame) {
   FDE_Info fdeInfo;
   CIE_Info cieInfo;
   if (CFI_Parser<A>::decodeFDE(addressSpace, pc, fdeStart, &fdeInfo,
                                &cieInfo) == NULL) {
     PrologInfo prolog;
-    if (CFI_Parser<A>::parseFDEInstructions(addressSpace, fdeInfo, cieInfo, pc,
-                                            R::getArch(), &prolog)) {
+    if (CFI_Parser<A>::parseFDEInstructions(addressSpace, fdeInfo, cieInfo,
+                                            pc.address(), R::getArch(),
+                                            &prolog)) {
       // get pointer to cfa (architecture specific)
       bool cfa_valid = false;
       pint_t cfa = getCFA(addressSpace, prolog, pc, registers, &cfa_valid);
@@ -261,6 +267,8 @@ int DwarfInstructions<A, R>::stepWithDwarf(A &addressSpace, pint_t pc,
       // By definition, the CFA is the stack pointer at the call site, so
       // restoring SP means setting it to CFA.
       newRegisters.setSP(cfa);
+
+      isSignalFrame = cieInfo.isSignalFrame;
 
 #if defined(_LIBUNWIND_TARGET_AARCH64)
       // If the target is aarch64 then the return address may have been signed

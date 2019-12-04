@@ -2,6 +2,7 @@
 
 ARM64				opt_global.h
 INTRNG				opt_global.h
+LINUX_BOOT_ABI			opt_global.h
 SOCDEV_PA			opt_global.h
 SOCDEV_VA			opt_global.h
 THUNDERX_PASS_1_1_ERRATA	opt_global.h
@@ -18,6 +19,7 @@ SOC_ALLWINNER_A64		opt_soc.h
 SOC_ALLWINNER_H5		opt_soc.h
 SOC_ALLWINNER_H6		opt_soc.h
 SOC_BRCM_BCM2837		opt_soc.h
+SOC_BRCM_BCM2838		opt_soc.h
 SOC_CAVM_THUNDERX		opt_soc.h
 SOC_HISI_HI6220			opt_soc.h
 SOC_INTEL_STRATIX10		opt_soc.h

@@ -88,9 +88,9 @@ convert_sigevent64(const struct sigevent64 *sig64, ksigevent_t *sig)
 int
 freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 {
-	ksigaction_t act, oact;
+	struct sigaction act, oact;
 	struct sigaction64 act64, oact64;
-	ksigaction_t *actp, *oactp;
+	struct sigaction *actp, *oactp;
 	int error;
 
 	actp = (uap->act != NULL) ? &act : NULL;

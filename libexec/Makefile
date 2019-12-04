@@ -10,8 +10,8 @@ SUBDIR=	${_atf} \
 	${_cheri_bench_helper} \
 	${_comsat} \
 	${_dma} \
+	flua \
 	getty \
-	${_libpng_sb_helper} \
 	${_mail.local} \
 	${_makewhatis.local} \
 	${_mknetid} \
@@ -51,7 +51,6 @@ SUBDIR+=	bootpd
 .if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
 _cheri_bench_helper=	cheri_bench-helper
 _cheritest_helper=	cheritest-helper
-_libpng_sb_helper=	libpng_sb-helper
 _rtld-cheri-elf=	rtld-cheri-elf rtld-cheri-elf-debug
 _tcpdump_helper=	tcpdump-helper # Currently broken with the new compiler
 .endif

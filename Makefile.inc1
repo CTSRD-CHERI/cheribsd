@@ -317,9 +317,9 @@ WANT_LINKER_TYPE=
 .if !defined(WANT_LINKER_FREEBSD_VERSION) && !make(showconfig) && \
     !make(test-system-compiler)
 .if ${WANT_LINKER_TYPE} == "lld"
-WANT_LINKER_FREEBSD_VERSION_FILE= lib/clang/include/lld/Common/Version.inc
+WANT_LINKER_FREEBSD_VERSION_FILE= lib/clang/include/VCSVersion.inc
 WANT_LINKER_FREEBSD_VERSION!= \
-	awk '$$2 == "LLD_REVISION_STRING" {gsub(/"/, "", $$3); print $$3}' \
+	awk '$$2 == "LLD_REVISION" {gsub(/"/, "", $$3); print $$3}' \
 	${SRCDIR}/${WANT_LINKER_FREEBSD_VERSION_FILE} || echo unknown
 WANT_LINKER_VERSION_FILE= lib/clang/include/lld/Common/Version.inc
 WANT_LINKER_VERSION!= \
@@ -780,6 +780,9 @@ HOST_TOOLS_COMMON_MAKEFLAGS=	-DNO_PIC MK_PROFILE=no -DNO_SHARED
 HOST_TOOLS_COMMON_MAKEFLAGS=	MK_PROFILE=no MK_NLS=no MK_BSD_GREP=yes \
 	MK_DIALOG=no MK_DEBUG_FILES=no
 .endif
+# Avoid creating stripped binaries for the host tools
+# This should hopefully fix a build error on Jenkins
+HOST_TOOLS_COMMON_MAKEFLAGS+=	STRIP=
 
 # bootstrap-tools stage
 BMAKEENV=	INSTALL="sh ${.CURDIR}/tools/install.sh" \
@@ -830,6 +833,7 @@ TMAKE=		\
 # TOOLS_PREFIX set in BMAKE
 XMAKE=		${BMAKE} \
 		TARGET=${TARGET} TARGET_ARCH=${TARGET_ARCH} \
+		MK_CLANG_IS_CC=${MK_CLANG_BOOTSTRAP} \
 		MK_GDB=no MK_TESTS=no
 
 # kernel-tools stage
@@ -1712,7 +1716,7 @@ _zoneinfo=	zic tzsetup
 ITOOLS=	[ awk cap_mkdb cat chflags chmod chown cmp cp \
 	date echo egrep find grep id install ${_install-info} \
 	ln make mkdir mtree mv pwd_mkdb \
-	rm sed services_mkdb sh sort ${XSTRIP} sysctl test true uname wc ${_zoneinfo} \
+	rm sed services_mkdb sh sort strip sysctl test true uname wc ${_zoneinfo} \
 	${LOCAL_ITOOLS}
 
 # Needed for share/man
@@ -1884,6 +1888,11 @@ makeman: .PHONY
 	${_+_}cd ${.CURDIR}/tools/build/options; sh makeman > \
 	    ${.CURDIR}/share/man/man5/src.conf.5
 
+.if make(sysent)
+.include <src.lua.mk>
+.endif
+
+_sysent_PATH=	${WORLDTMP}/legacy/usr/libexec:/usr/libexec:${PATH}
 _sysent_dirs=	sys/kern
 _sysent_dirs+=	sys/compat/freebsd32
 _sysent_dirs+=	sys/compat/freebsd64
@@ -1896,7 +1905,9 @@ _sysent_dirs+=	sys/amd64/linux		\
 		sys/i386/linux
 sysent: .PHONY
 .for _dir in ${_sysent_dirs}
-	${_+_}${MAKE} -C ${.CURDIR}/${_dir} sysent
+	@echo "${MAKE} -C ${.CURDIR}/${_dir} sysent"
+	${_+_}@env PATH=${_sysent_PATH} LUA=${LUA_CMD} \
+	    ${MAKE} -C ${.CURDIR}/${_dir} sysent
 .endfor
 
 #
@@ -2585,6 +2596,13 @@ ${_bt}-lib/libelf: ${_bt_m4_depend}
 ${_bt}-lib/libdwarf: ${_bt_m4_depend}
 .endif
 
+# flua is required to regenerate syscall files.  It first appeared during the
+# 13.0-CURRENT cycle, thus needs to be built on -older releases and stable
+# branches.
+.if ${BOOTSTRAPPING} < 1300059
+_flua= libexec/flua
+.endif
+
 # r245440 mtree -N support added
 # r313404 requires sha384.h for libnetbsd, added to libmd in r292782
 .if ${BOOTSTRAPPING} < 1100093
@@ -2832,6 +2850,7 @@ bootstrap-tools: ${_bt}-links .PHONY
     usr.bin/xinstall \
     ${_gensnmptree} \
     usr.sbin/config \
+    ${_flua} \
     ${_crunchide} \
     ${_crunchgen} \
     ${_nmtree} \

@@ -1,5 +1,8 @@
 # $FreeBSD$
 
+# cleandir is run with the wrong context for libcompat so don't do
+# anything in that case.
+.if !make(cleandir)
 .if !targets(__<${_this:T}>__)
 __<${_this:T}>__:
 
@@ -95,7 +98,7 @@ HAS_COMPAT=64
 .if ${COMPAT_ARCH:Mmips64el*} != ""
 LIB64CPUFLAGS=  -target mipsel-unknown-freebsd13.0
 .else
-LIB64CPUFLAGS=  -target mips-unknown-freebsd13.0
+LIB64CPUFLAGS=  -target cheri-unknown-freebsd13.0
 .endif
 LIB64CPUFLAGS+=	-mabi=64
 LIB64_MACHINE=	mips
@@ -188,3 +191,4 @@ MACHINE_ARCH=	${LIBCOMPAT_MACHINE_ARCH}
 .endif
 
 .endif
+.endif # !make(cleandir)

@@ -109,6 +109,8 @@ linux_common_open(struct thread *td, int dirfd, char *path, int l_flags, int mod
 		bsd_flags |= O_APPEND;
 	if (l_flags & LINUX_O_SYNC)
 		bsd_flags |= O_FSYNC;
+	if (l_flags & LINUX_O_CLOEXEC)
+		bsd_flags |= O_CLOEXEC;
 	if (l_flags & LINUX_O_NONBLOCK)
 		bsd_flags |= O_NONBLOCK;
 	if (l_flags & LINUX_FASYNC)
@@ -130,7 +132,12 @@ linux_common_open(struct thread *td, int dirfd, char *path, int l_flags, int mod
 	/* XXX LINUX_O_NOATIME: unable to be easily implemented. */
 
 	error = kern_openat(td, dirfd, path, UIO_SYSSPACE, bsd_flags, mode);
-	if (error != 0)
+	if (error != 0) {
+		if (error == EMLINK)
+			error = ELOOP;
+		goto done;
+	}
+	if (p->p_flag & P_CONTROLT)
 		goto done;
 	if (bsd_flags & O_NOCTTY)
 		goto done;

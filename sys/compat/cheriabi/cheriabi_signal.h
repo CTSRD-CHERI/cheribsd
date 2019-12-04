@@ -31,6 +31,16 @@
 #ifndef _COMPAT_CHERIABI_CHERIABI_SIGNAL_H_
 #define _COMPAT_CHERIABI_CHERIABI_SIGNAL_H_
 
+struct sigaction_c {
+	union {
+		void    (* __capability __sa_handler)(int);
+		void    (* __capability __sa_sigaction)
+			    (int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
+
 struct sigaltstack_c {
 	void * __capability	ss_sp;		/* signal stack base */
 	size_t		ss_size;	/* signal stack length */

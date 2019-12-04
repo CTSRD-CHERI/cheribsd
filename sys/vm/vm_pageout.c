@@ -1965,11 +1965,19 @@ vm_pageout_oom(int shortage)
 	}
 }
 
+/*
+ * Signal a free page shortage to subsystems that have registered an event
+ * handler.  Reclaim memory from UMA in the event of a severe shortage.
+ * Return true if the free page count should be re-evaluated.
+ */
 static bool
 vm_pageout_lowmem(void)
 {
 	static int lowmem_ticks = 0;
 	int last;
+	bool ret;
+
+	ret = false;
 
 	last = atomic_load_int(&lowmem_ticks);
 	while ((u_int)(ticks - last) / hz >= lowmem_period) {
@@ -1984,15 +1992,27 @@ vm_pageout_lowmem(void)
 
 		/*
 		 * We do this explicitly after the caches have been
-		 * drained above.  If we have a severe page shortage on
-		 * our hands, completely drain all UMA zones.  Otherwise,
-		 * just prune the caches.
+		 * drained above.
 		 */
-		uma_reclaim(vm_page_count_min() ? UMA_RECLAIM_DRAIN_CPU :
-		    UMA_RECLAIM_TRIM);
-		return (true);
+		uma_reclaim(UMA_RECLAIM_TRIM);
+		ret = true;
 	}
-	return (false);
+
+	/*
+	 * Kick off an asynchronous reclaim of cached memory if one of the
+	 * page daemons is failing to keep up with demand.  Use the "severe"
+	 * threshold instead of "min" to ensure that we do not blow away the
+	 * caches if a subset of the NUMA domains are depleted by kernel memory
+	 * allocations; the domainset iterators automatically skip domains
+	 * below the "min" threshold on the first pass.
+	 *
+	 * UMA reclaim worker has its own rate-limiting mechanism, so don't
+	 * worry about kicking it too often.
+	 */
+	if (vm_page_count_severe())
+		uma_reclaim_wakeup();
+
+	return (ret);
 }
 
 static void
@@ -2084,7 +2104,9 @@ vm_pageout_worker(void *arg)
 }
 
 /*
- *	vm_pageout_init initialises basic pageout daemon settings.
+ * Initialize basic pageout daemon settings.  See the comment above the
+ * definition of vm_domain for some explanation of how these thresholds are
+ * used.
  */
 static void
 vm_pageout_init_domain(int domain)
@@ -2100,14 +2122,11 @@ vm_pageout_init_domain(int domain)
 	 * swap pager structures plus enough for any pv_entry structs
 	 * when paging. 
 	 */
-	if (vmd->vmd_page_count > 1024)
-		vmd->vmd_free_min = 4 + (vmd->vmd_page_count - 1024) / 200;
-	else
-		vmd->vmd_free_min = 4;
 	vmd->vmd_pageout_free_min = 2 * MAXBSIZE / PAGE_SIZE +
 	    vmd->vmd_interrupt_free_min;
 	vmd->vmd_free_reserved = vm_pageout_page_count +
-	    vmd->vmd_pageout_free_min + (vmd->vmd_page_count / 768);
+	    vmd->vmd_pageout_free_min + vmd->vmd_page_count / 768;
+	vmd->vmd_free_min = vmd->vmd_page_count / 200;
 	vmd->vmd_free_severe = vmd->vmd_free_min / 2;
 	vmd->vmd_free_target = 4 * vmd->vmd_free_min + vmd->vmd_free_reserved;
 	vmd->vmd_free_min += vmd->vmd_free_reserved;

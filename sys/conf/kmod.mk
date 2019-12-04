@@ -73,27 +73,8 @@ KMODUNLOAD?=	/sbin/kldunload
 KMODISLOADED?=	/sbin/kldstat -q -n
 OBJCOPY?=	objcopy
 
-.include <bsd.init.mk>
-# Grab all the options for a kernel build. For backwards compat, we need to
-# do this after bsd.own.mk.
-.include "kern.opts.mk"
-.include <bsd.compiler.mk>
-.include "config.mk"
-
-# Search for kernel source tree in standard places.
-.if empty(KERNBUILDDIR)
-.if !defined(SYSDIR)
-.for _dir in ${SRCTOP:D${SRCTOP}/sys} \
-    ${.CURDIR}/../.. ${.CURDIR}/../../.. /sys /usr/src/sys
-.if !defined(SYSDIR) && exists(${_dir}/kern/)
-SYSDIR=	${_dir:tA}
-.endif
-.endfor
-.endif
-.if !defined(SYSDIR) || !exists(${SYSDIR}/kern/)
-.error "can't find kernel source tree"
-.endif
-.endif
+.include "kmod.opts.mk"
+.include <bsd.sysdir.mk>
 
 .SUFFIXES: .out .o .c .cc .cxx .C .y .l .s .S .m
 
@@ -169,6 +150,10 @@ CFLAGS+=	-funwind-tables
 
 .if ${MACHINE_CPUARCH} == powerpc
 CFLAGS+=	-mlongcall -fno-omit-frame-pointer
+.if ${LINKER_TYPE} == "lld"
+# TOC optimization in LLD (9.0) currently breaks kernel modules, so disable it
+LDFLAGS+=	--no-toc-optimize
+.endif
 .endif
 
 .if ${MACHINE_CPUARCH} == mips

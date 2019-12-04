@@ -145,7 +145,7 @@ static Elf64_Brandinfo freebsd_cheriabi_brand_info = {
 };
 
 SYSINIT(cheriabi, SI_SUB_EXEC, SI_ORDER_ANY,
-    (sysinit_cfunc_t) elf64_insert_brand_entry,
+    (sysinit_cfunc_t) elf64c_insert_brand_entry,
     &freebsd_cheriabi_brand_info);
 
 
@@ -177,7 +177,7 @@ cheriabi_elf_header_supported(struct image_params *imgp)
 	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
 	const uint32_t machine = hdr->e_flags & EF_MIPS_MACH;
 
-	if ((hdr->e_flags & EF_MIPS_ABI) != EF_MIPS_ABI_CHERIABI)
+	if (!use_cheriabi)
 		return FALSE;
 
 	/* TODO: add a sysctl to allow loading old binaries */
