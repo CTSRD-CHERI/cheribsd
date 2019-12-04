@@ -219,6 +219,9 @@
 #define	CHERI_PERMS_KERNEL_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
+/* Reserved CHERI object types: */
+#define	CHERI_OTYPE_UNSEALED	(-1l)
+#define	CHERI_OTYPE_SENTRY	(-2l)
 /*
  * The CHERI object-type space is split between userspace and kernel,
  * permitting kernel object references to be delegated to userspace (if
