@@ -131,7 +131,7 @@
 	RESTORE_U_PCB_REG(t1, MULHI, pcb)	; \
 	mtlo	t0				; \
 	mthi	t1				; \
-	RESTORE_U_PCB_PC(a0, t0, pcb)		; \
+	RESTORE_U_PCB_PC(t0, t1, pcb)		; \
 	RESTORE_U_PCB_REG(v0, V0, pcb)		; \
 	RESTORE_U_PCB_REG(v1, V1, pcb)		; \
 	RESTORE_U_PCB_REG(a0, A0, pcb)		; \

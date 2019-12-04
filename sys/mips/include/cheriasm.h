@@ -219,9 +219,14 @@
 	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
 
-#define RESTORE_EPCC(capreg, pc_vaddr, tmpreg)			\
-	/* update the address of EPCC to the return pc */ 	\
-	CSetOffset capreg, capreg, pc_vaddr;			\
+#define RESTORE_EPCC(capreg, pc_offset, tmpreg)					\
+	/* Do not attempt to modify EPCC if it is already correct. */		\
+	/* This is needed in case it is a sentry (e.g. for signal handlers) */	\
+	CGetOffset tmpreg, capreg;						\
+	/* update the offset of EPCC to the return pc if different */		\
+	beq tmpreg, pc_offset, 12345f; nop;					\
+	CSetOffset capreg, capreg, pc_offset;					\
+	12345:									\
 	CSetEPCC capreg;
 
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
