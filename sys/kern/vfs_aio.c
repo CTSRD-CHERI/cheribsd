@@ -298,7 +298,7 @@ struct kaioinfo {
  * Different ABIs provide their own operations.
  */
 struct aiocb_ops {
-	int	(*copyin)(void * __capability ujob, kaiocb_t *kjob);
+	int	(*aio_copyin)(void * __capability ujob, kaiocb_t *kjob);
 	long	(*fetch_status)(void * __capability ujob);
 	long	(*fetch_error)(void * __capability ujob);
 	void	(*free_kaiocb)(struct kaiocb *kjob);
@@ -1493,7 +1493,7 @@ aiocb_size(void)
 }
 
 static struct aiocb_ops aiocb_ops = {
-	.copyin = aiocb_copyin,
+	.aio_copyin = aiocb_copyin,
 	.fetch_status = aiocb_fetch_status,
 	.fetch_error = aiocb_fetch_error,
 	.free_kaiocb = aiocb_free_kaiocb,
@@ -1507,7 +1507,7 @@ static struct aiocb_ops aiocb_ops = {
 
 #ifdef COMPAT_FREEBSD6
 static struct aiocb_ops aiocb_ops_osigevent = {
-	.copyin = aiocb_copyin_old_sigevent,
+	.aio_copyin = aiocb_copyin_old_sigevent,
 	.fetch_status = aiocb_fetch_status,
 	.fetch_error = aiocb_fetch_error,
 	.free_kaiocb = aiocb_free_kaiocb,
@@ -1557,7 +1557,7 @@ aio_aqueue(struct thread *td, kaiocb_t * __capability ujob, void *ujobptrp,
 	job = uma_zalloc(aiocb_zone, M_WAITOK | M_ZERO);
 	knlist_init_mtx(&job->klist, AIO_MTX(ki));
 
-	error = ops->copyin(ujob, &job->uaiocb);
+	error = ops->aio_copyin(ujob, &job->uaiocb);
 	if (error) {
 		ops->store_error(ujob, error);
 		ops->free_kaiocb(job);
@@ -2912,7 +2912,7 @@ aiocb32_size(void)
 }
 
 static struct aiocb_ops aiocb32_ops = {
-	.copyin = aiocb32_copyin,
+	.aio_copyin = aiocb32_copyin,
 	.fetch_status = aiocb32_fetch_status,
 	.fetch_error = aiocb32_fetch_error,
 	.free_kaiocb = aiocb_free_kaiocb,	/* Identical to 64-bit */
@@ -2926,7 +2926,7 @@ static struct aiocb_ops aiocb32_ops = {
 
 #ifdef COMPAT_FREEBSD6
 static struct aiocb_ops aiocb32_ops_osigevent = {
-	.copyin = aiocb32_copyin_old_sigevent,
+	.aio_copyin = aiocb32_copyin_old_sigevent,
 	.fetch_status = aiocb32_fetch_status,
 	.fetch_error = aiocb32_fetch_error,
 	.free_kaiocb = aiocb_free_kaiocb,	/* Identical to 64-bit */
@@ -3367,7 +3367,7 @@ aiocb64_size(void)
 }
 
 static struct aiocb_ops aiocb64_ops = {
-	.copyin = aiocb64_copyin,
+	.aio_copyin = aiocb64_copyin,
 	.fetch_status = aiocb64_fetch_status,
 	.fetch_error = aiocb64_fetch_error,
 	.free_kaiocb = aiocb_free_kaiocb,	/* Identical to 64-bit */
@@ -3381,7 +3381,7 @@ static struct aiocb_ops aiocb64_ops = {
 
 #ifdef COMPAT_FREEBSD6
 static struct aiocb_ops aiocb64_ops_osigevent = {
-	.copyin = aiocb64_copyin_old_sigevent,
+	.aio_copyin = aiocb64_copyin_old_sigevent,
 	.fetch_status = aiocb64_fetch_status,
 	.fetch_error = aiocb64_fetch_error,
 	.free_kaiocb = aiocb_free_kaiocb,	/* Identical to 64-bit */
@@ -3725,7 +3725,7 @@ aiocb_c_size(void)
 }
 
 static struct aiocb_ops aiocb_c_ops = {
-	.copyin = aiocb_c_copyin,
+	.aio_copyin = aiocb_c_copyin,
 	.fetch_status = aiocb_c_fetch_status,
 	.fetch_error = aiocb_c_fetch_error,
 	.free_kaiocb = aiocb_c_free_kaiocb,

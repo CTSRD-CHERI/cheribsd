@@ -35,6 +35,15 @@
 #ifndef _COMPAT_FREEBSD64_FREEBSD64_SIGNAL_H_
 #define _COMPAT_FREEBSD64_FREEBSD64_SIGNAL_H_
 
+struct sigaction64 {
+	union {
+		void    (*__sa_handler)(int);
+		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
+	} __sigaction_u;		/* signal handler */
+	int	sa_flags;		/* see signal options below */
+	sigset_t sa_mask;		/* signal mask to apply */
+};
+
 struct sigaltstack64 {
 	void		*ss_sp;		/* signal stack base */
 	size_t		ss_size;	/* signal stack length */

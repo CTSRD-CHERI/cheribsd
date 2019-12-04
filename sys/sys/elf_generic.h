@@ -52,7 +52,11 @@
 #error "Unknown byte order"
 #endif
 
+#ifdef __ELF_CHERI
+#define	__elfN(x)	__CONCAT(__CONCAT(__CONCAT(elf,__ELF_WORD_SIZE),c_),x)
+#else
 #define	__elfN(x)	__CONCAT(__CONCAT(__CONCAT(elf,__ELF_WORD_SIZE),_),x)
+#endif
 #define	__ElfN(x)	__CONCAT(__CONCAT(__CONCAT(Elf,__ELF_WORD_SIZE),_),x)
 #define	__ELFN(x)	__CONCAT(__CONCAT(__CONCAT(ELF,__ELF_WORD_SIZE),_),x)
 #define	__ElfType(x)	typedef __ElfN(x) __CONCAT(Elf_,x)

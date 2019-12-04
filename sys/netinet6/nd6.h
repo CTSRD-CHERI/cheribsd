@@ -116,59 +116,13 @@ struct in6_nbrinfo {
 	int	expire;		/* lifetime for NDP state transition */
 };
 
-#define DRLSTSIZ 10
-#define PRLSTSIZ 10
-struct	in6_drlist {
-	char ifname[IFNAMSIZ];
-	struct {
-		struct	in6_addr rtaddr;
-		u_char	flags;
-		u_short	rtlifetime;
-		u_long	expire;
-		u_short if_index;
-	} defrouter[DRLSTSIZ];
-};
-
+/* Sysctls, shared with user space. */
 struct	in6_defrouter {
 	struct	sockaddr_in6 rtaddr;
 	u_char	flags;
 	u_short	rtlifetime;
 	u_long	expire;
 	u_short if_index;
-};
-
-#ifdef _KERNEL
-struct	in6_oprlist {
-	char ifname[IFNAMSIZ];
-	struct {
-		struct	in6_addr prefix;
-		struct prf_ra raflags;
-		u_char	prefixlen;
-		u_char	origin;
-		u_long vltime;
-		u_long pltime;
-		u_long expire;
-		u_short if_index;
-		u_short advrtrs; /* number of advertisement routers */
-		struct	in6_addr advrtr[DRLSTSIZ]; /* XXX: explicit limit */
-	} prefix[PRLSTSIZ];
-};
-#endif
-
-struct	in6_prlist {
-	char ifname[IFNAMSIZ];
-	struct {
-		struct	in6_addr prefix;
-		struct prf_ra raflags;
-		u_char	prefixlen;
-		u_char	origin;
-		u_int32_t vltime;
-		u_int32_t pltime;
-		time_t expire;
-		u_short if_index;
-		u_short advrtrs; /* number of advertisement routers */
-		struct	in6_addr advrtr[DRLSTSIZ]; /* XXX: explicit limit */
-	} prefix[PRLSTSIZ];
 };
 
 struct in6_prefix {
@@ -239,7 +193,6 @@ struct	in6_ndifreq {
 		(((MIN_RANDOM_FACTOR * (x >> 10)) + (arc4random() & \
 		((MAX_RANDOM_FACTOR - MIN_RANDOM_FACTOR) * (x >> 10)))) /1000)
 
-TAILQ_HEAD(nd_drhead, nd_defrouter);
 struct nd_defrouter {
 	TAILQ_ENTRY(nd_defrouter) dr_entry;
 	struct in6_addr rtaddr;
@@ -292,32 +245,6 @@ struct nd_prefix {
 #define ndpr_raf_auto		ndpr_flags.autonomous
 #define ndpr_raf_router		ndpr_flags.router
 
-/*
- * Message format for use in obtaining information about prefixes
- * from inet6 sysctl function
- */
-struct inet6_ndpr_msghdr {
-	u_short	inpm_msglen;	/* to skip over non-understood messages */
-	u_char	inpm_version;	/* future binary compatibility */
-	u_char	inpm_type;	/* message type */
-	struct in6_addr inpm_prefix;
-	u_long	prm_vltim;
-	u_long	prm_pltime;
-	u_long	prm_expire;
-	u_long	prm_preferred;
-	struct in6_prflags prm_flags;
-	u_short	prm_index;	/* index for associated ifp */
-	u_char	prm_plen;	/* length of prefix in bits */
-};
-
-#define prm_raf_onlink		prm_flags.prf_ra.onlink
-#define prm_raf_auto		prm_flags.prf_ra.autonomous
-
-#define prm_statef_onlink	prm_flags.prf_state.onlink
-
-#define prm_rrf_decrvalid	prm_flags.prf_rr.decrvalid
-#define prm_rrf_decrprefd	prm_flags.prf_rr.decrprefd
-
 struct nd_pfxrouter {
 	LIST_ENTRY(nd_pfxrouter) pfr_entry;
 	struct nd_defrouter *router;
@@ -335,7 +262,6 @@ VNET_DECLARE(int, nd6_mmaxtries);
 VNET_DECLARE(int, nd6_useloopback);
 VNET_DECLARE(int, nd6_maxnudhint);
 VNET_DECLARE(int, nd6_gctimer);
-VNET_DECLARE(struct nd_drhead, nd_defrouter);
 VNET_DECLARE(struct nd_prhead, nd_prefix);
 VNET_DECLARE(int, nd6_debug);
 VNET_DECLARE(int, nd6_onlink_ns_rfc4861);
@@ -346,7 +272,6 @@ VNET_DECLARE(int, nd6_onlink_ns_rfc4861);
 #define	V_nd6_useloopback		VNET(nd6_useloopback)
 #define	V_nd6_maxnudhint		VNET(nd6_maxnudhint)
 #define	V_nd6_gctimer			VNET(nd6_gctimer)
-#define	V_nd_defrouter			VNET(nd_defrouter)
 #define	V_nd_prefix			VNET(nd_prefix)
 #define	V_nd6_debug			VNET(nd6_debug)
 #define	V_nd6_onlink_ns_rfc4861		VNET(nd6_onlink_ns_rfc4861)
@@ -440,7 +365,6 @@ void nd6_option_init(void *, int, union nd_opts *);
 struct nd_opt_hdr *nd6_option(union nd_opts *);
 int nd6_options(union nd_opts *);
 struct llentry *nd6_lookup(const struct in6_addr *, int, struct ifnet *);
-struct llentry *nd6_alloc(const struct in6_addr *, int, struct ifnet *);
 void nd6_setmtu(struct ifnet *);
 void nd6_llinfo_setstate(struct llentry *lle, int newstate);
 void nd6_timer(void *);
@@ -477,14 +401,17 @@ void nd6_dad_stop(struct ifaddr *);
 void nd6_rs_input(struct mbuf *, int, int);
 void nd6_ra_input(struct mbuf *, int, int);
 void nd6_ifnet_link_event(void *, struct ifnet *, int);
+struct nd_defrouter *defrouter_lookup(struct in6_addr *, struct ifnet *);
+struct nd_defrouter *defrouter_lookup_locked(struct in6_addr *, struct ifnet *);
 void defrouter_reset(void);
 void defrouter_select_fib(int fibnum);
-void defrouter_select(void);
-void defrouter_ref(struct nd_defrouter *);
 void defrouter_rele(struct nd_defrouter *);
 bool defrouter_remove(struct in6_addr *, struct ifnet *);
-void defrouter_unlink(struct nd_defrouter *, struct nd_drhead *);
-void defrouter_del(struct nd_defrouter *);
+bool nd6_defrouter_list_empty(void);
+void nd6_defrouter_flush_all(void);
+void nd6_defrouter_purge(struct ifnet *);
+void nd6_defrouter_timer(void);
+void nd6_defrouter_init(void);
 int nd6_prelist_add(struct nd_prefixctl *, struct nd_defrouter *,
     struct nd_prefix **);
 void nd6_prefix_unlink(struct nd_prefix *, struct nd_prhead *);
@@ -494,8 +421,6 @@ void nd6_prefix_rele(struct nd_prefix *);
 int nd6_prefix_onlink(struct nd_prefix *);
 int nd6_prefix_offlink(struct nd_prefix *);
 void pfxlist_onlink_check(void);
-struct nd_defrouter *defrouter_lookup(struct in6_addr *, struct ifnet *);
-struct nd_defrouter *defrouter_lookup_locked(struct in6_addr *, struct ifnet *);
 struct nd_prefix *nd6_prefix_lookup(struct nd_prefixctl *);
 void rt6_flush(struct in6_addr *, struct ifnet *);
 int nd6_setdefaultiface(int);

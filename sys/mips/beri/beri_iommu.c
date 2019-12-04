@@ -151,7 +151,7 @@ beri_iommu_enter(device_t dev, struct xdma_iommu *xio, vm_offset_t va,
 	mips_dcache_wbinv_range((vm_offset_t)pte, sizeof(vm_offset_t));
 
 	/* Invalidate the entry. */
-	if (pte_test(&opte, PTE_VALID) && opte != npte)
+	if (pte_test(&opte, PTE_V) && opte != npte)
 		beri_iommu_invalidate(sc, va);
 
 	return (0);

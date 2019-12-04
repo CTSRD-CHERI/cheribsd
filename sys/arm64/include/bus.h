@@ -89,6 +89,9 @@
 #define	BUS_SPACE_BARRIER_READ	0x01
 #define	BUS_SPACE_BARRIER_WRITE	0x02
 
+#if defined(KCSAN) && !defined(KCSAN_RUNTIME)
+#include <sys/_cscan_bus.h>
+#else
 
 struct bus_space {
 	/* cookie */
@@ -322,7 +325,7 @@ struct bus_space {
 #define	bus_space_read_stream_1(t, h, o)        __bs_rs_s(1,(t), (h), (o))
 #define	bus_space_read_stream_2(t, h, o)        __bs_rs_s(2,(t), (h), (o))
 #define	bus_space_read_stream_4(t, h, o)        __bs_rs_s(4,(t), (h), (o))
-#define	bus_space_read_stream_8(t, h, o)	__bs_rs_s(8,8,(t),(h),(o))
+#define	bus_space_read_stream_8(t, h, o)	__bs_rs_s(8,(t), (h), (o))
 
 /*
  * Bus read multiple operations.
@@ -463,6 +466,8 @@ struct bus_space {
 	__bs_copy(4, t, h1, o1, h2, o2, c)
 #define	bus_space_copy_region_8(t, h1, o1, h2, o2, c)				\
 	__bs_copy(8, t, h1, o1, h2, o2, c)
+
+#endif
 
 #include <machine/bus_dma.h>
 

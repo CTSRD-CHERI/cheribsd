@@ -83,13 +83,20 @@ __FBSDID("$FreeBSD$");
 #include <machine/elf.h>
 #include <machine/md_var.h>
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi.h>
-#include <compat/cheriabi/cheriabi_util.h>
-#endif
-
 #define ELF_NOTE_ROUNDSIZE	4
 #define OLD_EI_BRAND	8
+
+/*
+ * ELF_ABI_NAME is a string name of the ELF ABI.  ELF_ABI_ID is used
+ * to build variable names.
+ */
+#ifdef __ELF_CHERI
+#define	ELF_ABI_NAME	__XSTRING(__CONCAT(ELF, __CONCAT(__ELF_WORD_SIZE, C)))
+#define	ELF_ABI_ID	__CONCAT(elf, __CONCAT(__ELF_WORD_SIZE, c))
+#else
+#define	ELF_ABI_NAME	__XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+#define	ELF_ABI_ID	__CONCAT(elf, __ELF_WORD_SIZE)
+#endif
 
 static int __elfN(check_header)(const Elf_Ehdr *hdr);
 static Elf_Brandinfo *__elfN(get_brandinfo)(struct image_params *imgp,
@@ -107,15 +114,17 @@ static boolean_t __elfN(check_note)(struct image_params *imgp,
 static vm_prot_t __elfN(trans_prot)(Elf_Word);
 static Elf_Word __elfN(untrans_prot)(vm_prot_t);
 
-SYSCTL_NODE(_kern, OID_AUTO, __CONCAT(elf, __ELF_WORD_SIZE), CTLFLAG_RW, 0,
+SYSCTL_NODE(_kern, OID_AUTO, ELF_ABI_ID, CTLFLAG_RW, 0,
     "");
 
 #define	CORE_BUF_SIZE	(16 * 1024)
 
+#define	ELF_NODE_OID	__CONCAT(_kern_, ELF_ABI_ID)
+
 int __elfN(fallback_brand) = -1;
-SYSCTL_INT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO,
+SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
     fallback_brand, CTLFLAG_RWTUN, &__elfN(fallback_brand), 0,
-    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE)) " brand of last resort");
+    ELF_ABI_NAME " brand of last resort");
 
 static int elf_legacy_coredump = 0;
 SYSCTL_INT(_debug, OID_AUTO, __elfN(legacy_coredump), CTLFLAG_RW, 
@@ -130,9 +139,9 @@ int __elfN(nxstack) =
 #else
 	0;
 #endif
-SYSCTL_INT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO,
+SYSCTL_INT(ELF_NODE_OID, OID_AUTO,
     nxstack, CTLFLAG_RW, &__elfN(nxstack), 0,
-    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE)) ": enable non-executable stack");
+    ELF_ABI_NAME ": enable non-executable stack");
 
 #if __ELF_WORD_SIZE == 32 && (defined(__amd64__) || defined(__i386__))
 int i386_read_exec = 0;
@@ -156,36 +165,36 @@ sysctl_pie_base(SYSCTL_HANDLER_ARGS)
 	__elfN(pie_base) = val;
 	return (0);
 }
-SYSCTL_PROC(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO, pie_base,
+SYSCTL_PROC(ELF_NODE_OID, OID_AUTO, pie_base,
     CTLTYPE_ULONG | CTLFLAG_MPSAFE | CTLFLAG_RW, NULL, 0,
     sysctl_pie_base, "LU",
     "PIE load base without randomization");
 
-SYSCTL_NODE(__CONCAT(_kern_elf, __ELF_WORD_SIZE), OID_AUTO, aslr, CTLFLAG_RW, 0,
+SYSCTL_NODE(ELF_NODE_OID, OID_AUTO, aslr, CTLFLAG_RW, 0,
     "");
-#define	ASLR_NODE_OID	__CONCAT(__CONCAT(_kern_elf, __ELF_WORD_SIZE), _aslr)
+#define	ASLR_NODE_OID	__CONCAT(ELF_NODE_OID, _aslr)
 
 static int __elfN(aslr_enabled) = 0;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, enable, CTLFLAG_RWTUN,
     &__elfN(aslr_enabled), 0,
-    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+    ELF_ABI_NAME
     ": enable address map randomization");
 
 static int __elfN(pie_aslr_enabled) = 0;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, pie_enable, CTLFLAG_RWTUN,
     &__elfN(pie_aslr_enabled), 0,
-    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+    ELF_ABI_NAME
     ": enable address map randomization for PIE binaries");
 
 static int __elfN(aslr_honor_sbrk) = 1;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, honor_sbrk, CTLFLAG_RW,
     &__elfN(aslr_honor_sbrk), 0,
-    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE)) ": assume sbrk is used");
+    ELF_ABI_NAME ": assume sbrk is used");
 
 static int __elfN(aslr_stack_gap) = 3;
 SYSCTL_INT(ASLR_NODE_OID, OID_AUTO, stack_gap, CTLFLAG_RW,
     &__elfN(aslr_stack_gap), 0,
-    __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+    ELF_ABI_NAME
     ": maximum percentage of main stack to waste on a random gap");
 
 static Elf_Brandinfo *elf_brand_list[MAX_BRANDS];
@@ -454,6 +463,21 @@ __elfN(check_header)(const Elf_Ehdr *hdr)
 	    hdr->e_phentsize != sizeof(Elf_Phdr) ||
 	    hdr->e_version != ELF_TARG_VER)
 		return (ENOEXEC);
+
+	/*
+	 * imgact_elf64c.c will "claim" non-CHERI binaries only to
+	 * choke on them later without trying imgact_elf64.c (and vice
+	 * versa).  We have to reject an ABI mismatch early so that
+	 * the imgact hook returns -1 instead of ENOXEC which means
+	 * doing it here.
+	 */
+#ifdef __ELF_CHERI
+	if (!ELF_IS_CHERI(hdr))
+		return (ENOEXEC);
+#elif __has_feature(capabilities)
+	if (ELF_IS_CHERI(hdr))
+		return (ENOEXEC);
+#endif
 
 	/*
 	 * Make sure we have at least one brand for this machine.
@@ -1399,10 +1423,10 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	addr = round_page((vm_offset_t)vmspace->vm_daddr + lim_max(td,
 	    RLIMIT_DATA));
-
+#ifdef __ELF_CHERI
 	/* Round up so signficant bits of rtld addresses aren't touched */
-	if (imgp->proc->p_sysent->sv_flags & SV_CHERI)
-		addr = roundup2(addr, 0x1000000);
+	addr = roundup2(addr, 0x1000000);
+#endif
 	if ((map->flags & MAP_ASLR) != 0) {
 		maxv1 = maxv / 2 + addr / 2;
 		MPASS(maxv1 >= addr);	/* No overflow */
@@ -1433,7 +1457,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 		addr = et_dyn_addr;
 
 	/*
-	 * Construct auxargs table (used by the fixup routine)
+	 * Construct auxargs table (used by the copyout_auxargs routine)
 	 */
 	elf_auxargs = malloc(sizeof(Elf_Auxargs), M_TEMP, M_NOWAIT);
 	if (elf_auxargs == NULL) {
@@ -1468,15 +1492,13 @@ ret:
 #define	suword __CONCAT(suword, __ELF_WORD_SIZE)
 
 int
-__elfN(freebsd_fixup)(register_t **stack_base, struct image_params *imgp)
+__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, u_long *base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 	Elf_Auxinfo *argarray, *pos;
-	Elf_Addr *base, *auxbase;
+	u_long auxlen;
 	int error;
 
-	base = (Elf_Addr *)*stack_base;
-	auxbase = base + imgp->args->argc + 1 + imgp->args->envc + 1;
 	argarray = pos = malloc(AT_COUNT * sizeof(*pos), M_TEMP,
 	    M_WAITOK | M_ZERO);
 
@@ -1520,11 +1542,19 @@ __elfN(freebsd_fixup)(register_t **stack_base, struct image_params *imgp)
 	imgp->auxargs = NULL;
 	KASSERT(pos - argarray <= AT_COUNT, ("Too many auxargs"));
 
-	error = copyout(argarray, auxbase, sizeof(*argarray) * AT_COUNT);
+	auxlen = sizeof(*argarray) * (pos - argarray);
+	*base -= auxlen;
+	error = copyout(argarray, (void *)*base, auxlen);
 	free(argarray, M_TEMP);
-	if (error != 0)
-		return (error);
+	return (error);
+}
 
+int
+__elfN(freebsd_fixup)(register_t **stack_base, struct image_params *imgp)
+{
+	Elf_Addr *base;
+
+	base = (Elf_Addr *)*stack_base;
 	base--;
 	if (suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
@@ -2417,45 +2447,18 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 	int structsize;
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 	struct ptrace_lwpinfo32 pl;
+#elif defined(__ELF_CHERI)
+	struct ptrace_lwpinfo_c pl;
 #else
 	struct ptrace_lwpinfo pl;
 #endif
-#ifdef COMPAT_CHERIABI
-	struct ptrace_lwpinfo_c plc;
-#endif
 
 	td = (struct thread *)arg;
-#ifdef COMPAT_CHERIABI
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) != 0)
-		structsize = sizeof(plc);
-	else
-#endif
-		structsize = sizeof(pl);
+	structsize = sizeof(pl);
 	size = sizeof(structsize) + structsize;
 	if (sb != NULL) {
 		KASSERT(*sizep == size, ("invalid size"));
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
-#ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI) != 0) {
-			bzero(&plc, sizeof(plc));
-			plc.pl_lwpid = td->td_tid;
-			plc.pl_event = PL_EVENT_NONE;
-			plc.pl_sigmask = td->td_sigmask;
-			plc.pl_siglist = td->td_siglist;
-			if (td->td_si.si_signo != 0) {
-				plc.pl_event = PL_EVENT_SIGNAL;
-				plc.pl_flags |= PL_FLAG_SI;
-				_Static_assert(
-				    sizeof(plc.pl_siginfo) == sizeof(td->td_si),
-				    "_siginfo_t and siginfo_c mismatch");
-				memcpy(&plc.pl_siginfo, &td->td_si,
-				    sizeof(plc.pl_siginfo));
-			}
-			strcpy(plc.pl_tdname, td->td_name);
-			/* XXX TODO: supply more information in struct ptrace_lwpinfo*/
-			sbuf_bcat(sb, &plc, sizeof(plc));
-		} else {
-#endif
 		bzero(&pl, sizeof(pl));
 		pl.pl_lwpid = td->td_tid;
 		pl.pl_event = PL_EVENT_NONE;
@@ -2466,6 +2469,12 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 			pl.pl_flags |= PL_FLAG_SI;
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 			siginfo_to_siginfo32(&td->td_si, &pl.pl_siginfo);
+#elif defined(__ELF_CHERI)
+			_Static_assert(
+			    sizeof(pl.pl_siginfo) == sizeof(td->td_si),
+			    "_siginfo_t and siginfo_c mismatch");
+			memcpy(&pl.pl_siginfo, &td->td_si,
+			    sizeof(pl.pl_siginfo));
 #else
 			siginfo_to_siginfo_native(&td->td_si, &pl.pl_siginfo);
 #endif
@@ -2473,9 +2482,6 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 		strcpy(pl.pl_tdname, td->td_name);
 		/* XXX TODO: supply more information in struct ptrace_lwpinfo*/
 		sbuf_bcat(sb, &pl, sizeof(pl));
-#ifdef COMPAT_CHERIABI
-		}
-#endif
 	}
 	*sizep = size;
 }
@@ -2741,12 +2747,7 @@ __elfN(note_procstat_auxv)(void *arg, struct sbuf *sb, size_t *sizep)
 		sbuf_delete(sb);
 		*sizep = size;
 	} else {
-#ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(p, SV_CHERI) != 0)
-			structsize = sizeof(ElfCheriABI_Auxinfo);
-		else
-#endif /* ! COMPAT_CHERIABI */
-			structsize = sizeof(Elf_Auxinfo);
+		structsize = sizeof(Elf_Auxinfo);
 		sbuf_bcat(sb, &structsize, sizeof(structsize));
 		PHOLD(p);
 		proc_getauxv(curthread, p, sb);
@@ -2915,9 +2916,9 @@ __elfN(check_note)(struct image_params *imgp, Elf_Brandnote *brandnote,
  */
 static struct execsw __elfN(execsw) = {
 	.ex_imgact = __CONCAT(exec_, __elfN(imgact)),
-	.ex_name = __XSTRING(__CONCAT(ELF, __ELF_WORD_SIZE))
+	.ex_name = ELF_ABI_NAME
 };
-EXEC_SET(__CONCAT(elf, __ELF_WORD_SIZE), __elfN(execsw));
+EXEC_SET(ELF_ABI_ID, __elfN(execsw));
 
 static vm_prot_t
 __elfN(trans_prot)(Elf_Word flags)

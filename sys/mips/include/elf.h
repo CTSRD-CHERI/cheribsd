@@ -71,6 +71,10 @@
 #else
 #define __ELF_WORD_SIZE 32
 #endif
+#if defined(__CHERI_PURE_CAPABILITY__) || \
+    (__has_feature(capabilities) && defined(_KERNEL))
+#define	__ELF_CHERI
+#endif
 #endif
 #include <sys/elf32.h>
 #include <sys/elf64.h>
@@ -95,6 +99,9 @@
 #define	ELF_TARG_MACH	EM_MIPS
 #define	ELF_TARG_VER	1
 
+#define	ELF_IS_CHERI(hdr)					\
+	(((hdr)->e_flags & EF_MIPS_ABI) == EF_MIPS_ABI_CHERIABI)
+
 /*
  * The expected EI_ABIVERSION value for CheriABI binaries. Can be used to
  * reject loading of binaries compiled with a too new/old toolchain.
@@ -108,24 +115,43 @@
  * but POSIX lays claim to all symbols ending with "_t".
  */
 typedef struct {	/* Auxiliary vector entry on initial stack */
-	int	a_type;			/* Entry type. */
+	int32_t	a_type;			/* Entry type. */
 	union {
-		int	a_val;		/* Integer value. */
+		int32_t	a_val;		/* Integer value. */
+#if __ELF_WORD_SIZE == 32
 		void	*a_ptr;		/* Address. */
 		void	(*a_fcn)(void); /* Function pointer (not used). */
+#endif
 	} a_un;
 } Elf32_Auxinfo;
 
 typedef struct {	/* Auxiliary vector entry on initial stack */
-	long	a_type;			/* Entry type. */
+	int64_t	a_type;			/* Entry type. */
 	union {
-		long	a_val;		/* Integer value. */
+		int64_t	a_val;		/* Integer value. */
+#if __ELF_WORD_SIZE == 64 && !defined(__CHERI_PURE_CAPABILITY__)
 		void	*a_ptr;		/* Address. */
 		void	(*a_fcn)(void); /* Function pointer (not used). */
+#endif
 	} a_un;
 } Elf64_Auxinfo;
 
+#if __has_feature(capabilities)
+typedef struct {	/* Auxiliary vector entry on initial stack */
+	int64_t	a_type;			/* Entry type. */
+	union {
+		int64_t	a_val;		/* Integer value. */
+		void * __capability a_ptr;		/* Address. */
+		void	(* __capability a_fcn)(void); /* Function pointer (not used). */
+	} a_un;
+} Elf64C_Auxinfo;
+#endif
+
+#ifdef __ELF_CHERI
+typedef Elf64C_Auxinfo Elf_Auxinfo;
+#else
 __ElfType(Auxinfo);
+#endif
 
 #define	ET_DYN_LOAD_ADDR 0x0120000
 
@@ -223,9 +249,6 @@ __ElfType(Auxinfo);
 
 #define	R_MIPS_COPY		126
 #define	R_MIPS_JUMP_SLOT	127
-
-struct image_params;
-int       mips_elf_header_supported(struct image_params * imgp);
 
 #endif /* __MIPS_ELF_H */
 // CHERI CHANGES START

@@ -336,8 +336,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* sigaltstack */
 	case 53: {
 		struct sigaltstack_args *p = params;
-		uarg[0] = (intptr_t) p->ss; /* const struct sigaltstack_native * __capability */
-		uarg[1] = (intptr_t) p->oss; /* struct sigaltstack_native * __capability */
+		uarg[0] = (intptr_t) p->ss; /* const struct sigaltstack * __capability */
+		uarg[1] = (intptr_t) p->oss; /* struct sigaltstack * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -538,7 +538,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct fcntl_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->cmd; /* int */
-		uarg[2] = (intptr_t) p->arg; /* intptr_t */
+		iarg[2] = p->arg; /* intptr_t */
 		*n_args = 3;
 		break;
 	}
@@ -874,10 +874,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 169: {
 		struct semsys_args *p = params;
 		iarg[0] = p->which; /* int */
-		uarg[1] = (intptr_t) p->a2; /* intptr_t */
-		uarg[2] = (intptr_t) p->a3; /* intptr_t */
-		uarg[3] = (intptr_t) p->a4; /* intptr_t */
-		uarg[4] = (intptr_t) p->a5; /* intptr_t */
+		iarg[1] = p->a2; /* intptr_t */
+		iarg[2] = p->a3; /* intptr_t */
+		iarg[3] = p->a4; /* intptr_t */
+		iarg[4] = p->a5; /* intptr_t */
 		*n_args = 5;
 		break;
 	}
@@ -885,11 +885,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 170: {
 		struct msgsys_args *p = params;
 		iarg[0] = p->which; /* int */
-		uarg[1] = (intptr_t) p->a2; /* intptr_t */
-		uarg[2] = (intptr_t) p->a3; /* intptr_t */
-		uarg[3] = (intptr_t) p->a4; /* intptr_t */
-		uarg[4] = (intptr_t) p->a5; /* intptr_t */
-		uarg[5] = (intptr_t) p->a6; /* intptr_t */
+		iarg[1] = p->a2; /* intptr_t */
+		iarg[2] = p->a3; /* intptr_t */
+		iarg[3] = p->a4; /* intptr_t */
+		iarg[4] = p->a5; /* intptr_t */
+		iarg[5] = p->a6; /* intptr_t */
 		*n_args = 6;
 		break;
 	}
@@ -897,9 +897,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 171: {
 		struct shmsys_args *p = params;
 		iarg[0] = p->which; /* int */
-		uarg[1] = (intptr_t) p->a2; /* intptr_t */
-		uarg[2] = (intptr_t) p->a3; /* intptr_t */
-		uarg[3] = (intptr_t) p->a4; /* intptr_t */
+		iarg[1] = p->a2; /* intptr_t */
+		iarg[2] = p->a3; /* intptr_t */
+		iarg[3] = p->a4; /* intptr_t */
 		*n_args = 4;
 		break;
 	}
@@ -2114,8 +2114,8 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 416: {
 		struct sigaction_args *p = params;
 		iarg[0] = p->sig; /* int */
-		uarg[1] = (intptr_t) p->act; /* const struct sigaction_native * __capability */
-		uarg[2] = (intptr_t) p->oact; /* struct sigaction_native * __capability */
+		uarg[1] = (intptr_t) p->act; /* const struct sigaction * __capability */
+		uarg[2] = (intptr_t) p->oact; /* struct sigaction * __capability */
 		*n_args = 3;
 		break;
 	}
@@ -3876,10 +3876,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 53:
 		switch(ndx) {
 		case 0:
-			p = "userland const struct sigaltstack_native * __capability";
+			p = "userland const struct sigaltstack * __capability";
 			break;
 		case 1:
-			p = "userland struct sigaltstack_native * __capability";
+			p = "userland struct sigaltstack * __capability";
 			break;
 		default:
 			break;
@@ -6781,10 +6781,10 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sigaction_native * __capability";
+			p = "userland const struct sigaction * __capability";
 			break;
 		case 2:
-			p = "userland struct sigaction_native * __capability";
+			p = "userland struct sigaction * __capability";
 			break;
 		default:
 			break;

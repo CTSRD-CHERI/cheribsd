@@ -610,12 +610,159 @@ freebsd64_nmount(struct thread *td, struct freebsd64_nmount_args *uap)
 	    uap->iovcnt, uap->flags, (copyinuio_t *)freebsd64_copyinuio));
 }
 
-register_t *
-freebsd64_copyout_strings(struct image_params *imgp)
+int
+freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 {
+	int argc, envc;
+	uint64_t *vectp;
+	char *stringp;
+	char *destp;
+	struct freebsd64_ps_strings *arginfo;
+	struct proc *p;
+	size_t execpath_len;
+	int error, szsigcode, szps;
+	char canary[sizeof(long) * 8];
 
-	/* XXX: works while exec_copyout_strings isn't cheriabi aware */
-	return (exec_copyout_strings(imgp));
+	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
+	/*
+	 * Calculate string base and vector table pointers.
+	 * Also deal with signal trampoline code for this exec type.
+	 */
+	if (imgp->execpath != NULL && imgp->auxargs != NULL)
+		execpath_len = strlen(imgp->execpath) + 1;
+	else
+		execpath_len = 0;
+	p = imgp->proc;
+	szsigcode = 0;
+	arginfo = (struct freebsd64_ps_strings *)p->p_sysent->sv_psstrings;
+	if (p->p_sysent->sv_sigcode_base == 0)
+		szsigcode = *(p->p_sysent->sv_szsigcode);
+	else
+		szsigcode = 0;
+	destp =	(char *)arginfo;
+
+	/*
+	 * install sigcode
+	 */
+	if (szsigcode != 0) {
+		destp -= szsigcode;
+		destp = __builtin_align_down(destp, sizeof(uint64_t));
+		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
+		if (error != 0)
+			return (error);
+	}
+
+	/*
+	 * Copy the image path for the rtld.
+	 */
+	if (execpath_len != 0) {
+		destp -= execpath_len;
+		imgp->execpathp = (uintptr_t)destp;
+		error = copyout(imgp->execpath, destp, execpath_len);
+		if (error != 0)
+			return(error);
+	}
+
+	/*
+	 * Prepare the canary for SSP.
+	 */
+	arc4rand(canary, sizeof(canary), 0);
+	destp -= sizeof(canary);
+	imgp->canary = (uintptr_t)destp;
+	error = copyout(canary, destp, sizeof(canary));
+	if (error != 0)
+		return (error);
+	imgp->canarylen = sizeof(canary);
+
+	/*
+	 * Prepare the pagesizes array.
+	 */
+	destp -= szps;
+	destp = __builtin_align_down(destp, sizeof(uint64_t));
+	imgp->pagesizes = (uintptr_t)destp;
+	error = copyout(pagesizes, destp, szps);
+	if (error != 0)
+		return (error);
+	imgp->pagesizeslen = szps;
+
+	destp -= ARG_MAX - imgp->args->stringspace;
+	destp = __builtin_align_down(destp, sizeof(uint64_t));
+
+	vectp = (uint64_t *)destp;
+	if (imgp->sysent->sv_stackgap != NULL)
+		imgp->sysent->sv_stackgap(imgp, (u_long *)&vectp);
+
+	if (imgp->auxargs) {
+		error = imgp->sysent->sv_copyout_auxargs(imgp,
+		    (u_long *)&vectp);
+		if (error != 0)
+			return (error);
+	}
+
+	/*
+	 * Allocate room for the argv[] and env vectors including the
+	 * terminating NULL pointers.
+	 */
+	vectp -= imgp->args->argc + 1 + imgp->args->envc + 1;
+
+	/*
+	 * vectp also becomes our initial stack base
+	 */
+	*stack_base = (register_t *)vectp;
+
+	stringp = imgp->args->begin_argv;
+	argc = imgp->args->argc;
+	envc = imgp->args->envc;
+
+	/*
+	 * Copy out strings - arguments and environment.
+	 */
+	error = copyout(stringp, destp, ARG_MAX - imgp->args->stringspace);
+	if (error != 0)
+		return (error);
+
+	/*
+	 * Fill in "ps_strings" struct for ps, w, etc.
+	 */
+	if (suword(&arginfo->ps_argvstr, (uint64_t)(intptr_t)vectp) != 0 ||
+	    suword32(&arginfo->ps_nargvstr, argc) != 0)
+		return (EFAULT);
+
+	/*
+	 * Fill in argument portion of vector table.
+	 */
+	for (; argc > 0; --argc) {
+		if (suword(vectp++, (uint64_t)(intptr_t)destp) != 0)
+			return (EFAULT);
+		while (*stringp++ != 0)
+			destp++;
+		destp++;
+	}
+
+	/* a null vector table pointer separates the argp's from the envp's */
+	if (suword(vectp++, 0) != 0)
+		return (EFAULT);
+
+	if (suword(&arginfo->ps_envstr, (uint64_t)(intptr_t)vectp) != 0 ||
+	    suword32(&arginfo->ps_nenvstr, envc) != 0)
+		return (EFAULT);
+
+	/*
+	 * Fill in environment portion of vector table.
+	 */
+	for (; envc > 0; --envc) {
+		if (suword(vectp++, (uint64_t)(intptr_t)destp) != 0)
+			return (EFAULT);
+		while (*stringp++ != 0)
+			destp++;
+		destp++;
+	}
+
+	/* end of vector table is a null pointer */
+	if (suword(vectp, 0) != 0)
+		return (EFAULT);
+
+	return (0);
 }
 
 int

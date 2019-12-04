@@ -128,6 +128,7 @@ static void
 cpu_startup(void *dummy)
 {
 
+	sbi_print_version();
 	identify_cpu();
 
 	printf("real memory  = %ju (%ju MB)\n", ptoa((uintmax_t)realmem),
@@ -849,6 +850,9 @@ initriscv(struct riscv_bootparams *rvbp)
 	__asm __volatile("mv tp, %0" :: "r"(pcpup));
 
 	PCPU_SET(curthread, &thread0);
+
+	/* Initialize SBI interface. */
+	sbi_init();
 
 	/* Set the module data location */
 	lastaddr = fake_preload_metadata(rvbp);

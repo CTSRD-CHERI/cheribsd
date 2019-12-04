@@ -45,6 +45,8 @@
  * SUCH DAMAGE.
  */
 
+#define __ELF_WORD_SIZE 64
+
 #include "opt_ddb.h"
 
 #include <sys/types.h>
@@ -106,13 +108,14 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_minuser	= VM_MIN_ADDRESS,
 	.sv_maxuser	= VM_MAXUSER_ADDRESS,
 	.sv_usrstack	= USRSTACK,
-	.sv_psstrings	= PS_STRINGS,
+	.sv_psstrings	= FREEBSD64_PS_STRINGS,
 	.sv_stackprot	= VM_PROT_ALL,
+	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
 	.sv_setregs	= freebsd64_exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
-	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 |
+	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_ASLR |
 #ifdef MIPS_SHAREDPAGE
 	SV_SHP,
 #else
@@ -130,6 +133,34 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_trap	= NULL,
 };
 INIT_SYSENTVEC(freebsd64_sysent, &elf_freebsd_freebsd64_sysvec);
+
+#ifdef CPU_CHERI
+static __inline boolean_t
+mips_hybrid_check_cap_size(uint32_t bits, const char *execpath)
+{
+	static struct timeval lastfail;
+	static int curfail;
+	const uint32_t expected = CHERICAP_SIZE * 8;
+
+	if (bits == expected)
+		return TRUE;
+	if (ppsratecheck(&lastfail, &curfail, 1))
+		printf("warning: attempting to execute %d-bit hybrid binary "
+		    "'%s' on a %d-bit kernel\n", bits, execpath, expected);
+	return FALSE;
+}
+
+static boolean_t
+mips_elf_header_supported(struct image_params * imgp)
+{
+	const Elf_Ehdr *hdr = (const Elf_Ehdr *)imgp->image_header;
+	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI128)
+		return mips_hybrid_check_cap_size(128, imgp->execpath);
+	if ((hdr->e_flags & EF_MIPS_MACH) == EF_MIPS_MACH_CHERI256)
+		return mips_hybrid_check_cap_size(256, imgp->execpath);
+	return TRUE;
+}
+#endif
 
 static Elf64_Brandinfo freebsd_freebsd64_brand_info = {
 	.brand		= ELFOSABI_FREEBSD,
@@ -233,4 +264,10 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 	default:
 		return (EINVAL);
 	}
+}
+
+void
+elf64_dump_thread(struct thread *td __unused, void *dst __unused,
+    size_t *off __unused)
+{
 }

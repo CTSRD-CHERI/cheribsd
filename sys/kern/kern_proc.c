@@ -93,6 +93,11 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd32/freebsd32_util.h>
 #endif
 
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64.h>
+#include <compat/freebsd64/freebsd64_util.h>
+#endif
+
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_util.h>
@@ -1960,56 +1965,43 @@ done:
 }
 #endif
 
-#ifdef COMPAT_CHERIABI
+#ifdef COMPAT_FREEBSD64
 static int
-get_proc_vector_cheriabi(struct thread *td, struct proc *p,
-    char ***proc_vectorp, size_t *vsizep, enum proc_vector_type type)
+get_proc_vector64(struct thread *td, struct proc *p, char ***proc_vectorp,
+    size_t *vsizep, enum proc_vector_type type)
 {
-	struct cheriabi_ps_strings pss;
-	ElfCheriABI_Auxinfo aux;
+	struct freebsd64_ps_strings pss;
+	Elf64_Auxinfo aux;
 	vm_offset_t vptr, ptr;
-	char **proc_vector;
+	uint64_t *proc_vector64;
+	char * __capability *proc_vector;
 	size_t vsize, size;
-	int i;
+	int i, error;
 
+	error = 0;
 	if (proc_readmem(td, p, (vm_offset_t)p->p_psstrings, &pss,
 	    sizeof(pss)) != sizeof(pss))
 		return (ENOMEM);
 	switch (type) {
 	case PROC_ARG:
-		vptr = (__cheri_addr vm_offset_t)pss.ps_argvstr;
+		vptr = (vm_offset_t)pss.ps_argvstr;
 		vsize = pss.ps_nargvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
-		size = vsize * sizeof(void * __capability);
+		size = vsize * sizeof(int64_t);
 		break;
 	case PROC_ENV:
-		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr;
+		vptr = (vm_offset_t)pss.ps_envstr;
 		vsize = pss.ps_nenvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
-		size = vsize * sizeof(void * __capability);
+		size = vsize * sizeof(int64_t);
 		break;
 	case PROC_AUX:
-		/*
-		 * The aux array is just above env array on the stack. Check
-		 * that the address is naturally aligned.
-		 */
-		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr +
-			(pss.ps_nenvstr + 1) * sizeof(void * __capability);
-#if __ELF_WORD_SIZE == 64
-		if (vptr % sizeof(uint64_t) != 0)
-#else
-		if (vptr % sizeof(uint32_t) != 0)
-#endif
+		vptr = (vm_offset_t)pss.ps_envstr +
+		    (pss.ps_nenvstr + 1) * sizeof(int64_t);
+		if (vptr % 4 != 0)
 			return (ENOEXEC);
-		/*
-		 * We count the array size reading the aux vectors from the
-		 * stack until AT_NULL vector is returned.  So (to keep the code
-		 * simple) we read the process stack twice: the first time here
-		 * to find the size and the second time when copying the vectors
-		 * to the allocated proc_vector.
-		 */
 		for (ptr = vptr, i = 0; i < PROC_AUXV_MAX; i++) {
 			if (proc_readmem(td, p, ptr, &aux, sizeof(aux)) !=
 			    sizeof(aux))
@@ -2018,12 +2010,6 @@ get_proc_vector_cheriabi(struct thread *td, struct proc *p,
 				break;
 			ptr += sizeof(aux);
 		}
-		/*
-		 * If the PROC_AUXV_MAX entries are iterated over, and we have
-		 * not reached AT_NULL, it is most likely we are reading wrong
-		 * data: either the process doesn't have auxv array or data has
-		 * been modified. Return the error in this case.
-		 */
 		if (aux.a_type != AT_NULL)
 			return (ENOEXEC);
 		vsize = i + 1;
@@ -2031,19 +2017,29 @@ get_proc_vector_cheriabi(struct thread *td, struct proc *p,
 		break;
 	default:
 		KASSERT(0, ("Wrong proc vector type: %d", type));
-		return (EINVAL); /* In case we are built without INVARIANTS. */
+		return (EINVAL);
 	}
-	proc_vector = malloc(size, M_TEMP, M_WAITOK);
-	if (proc_readmem(td, p, vptr, proc_vector, size) != size) {
-		free(proc_vector, M_TEMP);
-		return (ENOMEM);
+	proc_vector64 = malloc(size, M_TEMP, M_WAITOK);
+	if (proc_readmem(td, p, vptr, proc_vector64, size) != size) {
+		error = ENOMEM;
+		goto done;
 	}
-	*proc_vectorp = proc_vector;
+	if (type == PROC_AUX) {
+		*proc_vectorp = (char **)proc_vector64;
+		*vsizep = vsize;
+		return (0);
+	}
+	proc_vector = malloc(vsize * sizeof(char * __capability), M_TEMP,
+	    M_WAITOK);
+	for (i = 0; i < (int)vsize; i++)
+		proc_vector[i] = cheri_fromint(proc_vector64[i]);
+	*proc_vectorp = (char **)proc_vector;
 	*vsizep = vsize;
-
-	return (0);
+done:
+	free(proc_vector64, M_TEMP);
+	return (error);
 }
-#endif /* COMPACT_CHERIABI */
+#endif
 
 static int
 get_proc_vector(struct thread *td, struct proc *p, char ***proc_vectorp,
@@ -2060,36 +2056,35 @@ get_proc_vector(struct thread *td, struct proc *p, char ***proc_vectorp,
 	if (SV_PROC_FLAG(p, SV_ILP32) != 0)
 		return (get_proc_vector32(td, p, proc_vectorp, vsizep, type));
 #endif
-#ifdef COMPAT_CHERIABI
-	if (SV_PROC_FLAG(p, SV_CHERI) != 0)
-		return (get_proc_vector_cheriabi(td, p, proc_vectorp, vsizep,
-			type));
+#ifdef COMPAT_FREEBSD64
+	if (SV_PROC_FLAG(p, SV_LP64 | SV_CHERI) == SV_LP64)
+		return (get_proc_vector64(td, p, proc_vectorp, vsizep, type));
 #endif
 	if (proc_readmem(td, p, (vm_offset_t)p->p_psstrings, &pss,
 	    sizeof(pss)) != sizeof(pss))
 		return (ENOMEM);
 	switch (type) {
 	case PROC_ARG:
-		vptr = (vm_offset_t)pss.ps_argvstr;
+		vptr = (__cheri_addr vm_offset_t)pss.ps_argvstr;
 		vsize = pss.ps_nargvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
-		size = vsize * sizeof(char *);
+		size = vsize * sizeof(char * __capability);
 		break;
 	case PROC_ENV:
-		vptr = (vm_offset_t)pss.ps_envstr;
+		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr;
 		vsize = pss.ps_nenvstr;
 		if (vsize > ARG_MAX)
 			return (ENOEXEC);
-		size = vsize * sizeof(char *);
+		size = vsize * sizeof(char * __capability);
 		break;
 	case PROC_AUX:
 		/*
 		 * The aux array is just above env array on the stack. Check
 		 * that the address is naturally aligned.
 		 */
-		vptr = (vm_offset_t)pss.ps_envstr + (pss.ps_nenvstr + 1)
-		    * sizeof(char *);
+		vptr = (__cheri_addr vm_offset_t)pss.ps_envstr +
+		    (pss.ps_nenvstr + 1) * sizeof(char * __capability);
 #if __ELF_WORD_SIZE == 64
 		if (vptr % sizeof(uint64_t) != 0)
 #else
@@ -2215,9 +2210,9 @@ proc_getauxv(struct thread *td, struct proc *p, struct sbuf *sb)
 			size = vsize * sizeof(Elf32_Auxinfo);
 		else
 #endif
-#ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(p, SV_CHERI) != 0)
-			size = vsize * sizeof(ElfCheriABI_Auxinfo);
+#ifdef COMPAT_FREEBSD64
+		if (SV_PROC_FLAG(p, SV_LP64 | SV_CHERI) == SV_LP64)
+			size = vsize * sizeof(Elf64_Auxinfo);
 		else
 #endif
 			size = vsize * sizeof(Elf_Auxinfo);
@@ -3225,6 +3220,9 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 #ifdef COMPAT_FREEBSD32
 	struct freebsd32_ps_strings pss32;
 #endif
+#ifdef COMPAT_FREEBSD64
+	struct freebsd64_ps_strings pss64;
+#endif
 	struct ps_strings pss;
 	vm_offset_t ptr;
 	size_t len;
@@ -3246,38 +3244,55 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 		/*
 		 * NB: Only copy exactly the pss fields we might need here.
 		 */
-		pss.ps_sbclasses = (void *)(vm_offset_t)pss32.ps_sbclasses;
+		pss.ps_sbclasses = cheri_fromint(pss32.ps_sbclasses);
 		pss.ps_sbclasseslen = (size_t)pss32.ps_sbclasseslen;
-		pss.ps_sbmethods = (void *)(vm_offset_t)pss32.ps_sbmethods;
+		pss.ps_sbmethods = cheri_fromint(.ps_sbmethods);
 		pss.ps_sbmethodslen = (size_t)pss32.ps_sbmethodslen;
-		pss.ps_sbobjects = (void *)(vm_offset_t)pss32.ps_sbobjects;
+		pss.ps_sbobjects = cheri_fromint(pss32.ps_sbobjects);
 		pss.ps_sbobjectslen = (size_t)pss32.ps_sbobjectslen;
-	 } else {
+	} else
 #endif
+#ifdef COMPAT_FREEBSD64
+	if (SV_PROC_FLAG(p, SV_LP64 | SV_CHERI) == SV_LP64) {
+		if (proc_readmem(td, p,
+		    (vm_offset_t)p->p_sysent->sv_psstrings, &pss64,
+		    sizeof(pss64)) != sizeof(pss64))
+			return (ENOMEM);
+
+		/*
+		 * NB: Only copy exactly the pss fields we might need here.
+		 */
+		pss.ps_sbclasses = cheri_fromint(pss64.ps_sbclasses);
+		pss.ps_sbclasseslen = (size_t)pss64.ps_sbclasseslen;
+		pss.ps_sbmethods = cheri_fromint(pss64.ps_sbmethods);
+		pss.ps_sbmethodslen = (size_t)pss64.ps_sbmethodslen;
+		pss.ps_sbobjects = cheri_fromint(pss64.ps_sbobjects);
+		pss.ps_sbobjectslen = (size_t)pss64.ps_sbobjectslen;
+	} else
+#endif
+	{
 		if (proc_readmem(td, p,
 		    (vm_offset_t)(p->p_psstrings), &pss,
 		    sizeof(pss)) != sizeof(pss))
 			return (ENOMEM);
-#ifdef COMPAT_FREEBSD32
 	}
-#endif
 
 	/*
 	 * Select dptr/dlen values based on requested metadata type.
 	 */
 	switch (type) {
 	case PROC_SBCLASSES:
-		ptr = (vm_offset_t)pss.ps_sbclasses;
+		ptr = (__cheri_addr vm_offset_t)pss.ps_sbclasses;
 		len = pss.ps_sbclasseslen;
 		break;
 
 	case PROC_SBMETHODS:
-		ptr = (vm_offset_t)pss.ps_sbmethods;
+		ptr = (__cheri_addr vm_offset_t)pss.ps_sbmethods;
 		len = pss.ps_sbmethodslen;
 		break;
 
 	case PROC_SBOBJECTS:
-		ptr = (vm_offset_t)pss.ps_sbobjects;
+		ptr = (__cheri_addr vm_offset_t)pss.ps_sbobjects;
 		len = pss.ps_sbobjectslen;
 		break;
 
@@ -3288,7 +3303,7 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 	/*
 	 * XXXRW: impose a length limit here...?  Unfortunately, it is not as
 	 * simple as bounding to the caller process buffer, as we need to
-	 * expose tne full actual length to the consumer.
+	 * expose the full actual length to the consumer.
 	 */
 	if (ptrp != NULL)
 		*ptrp = ptr;

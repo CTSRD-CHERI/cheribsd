@@ -970,8 +970,7 @@ if_epochalloc(void *dummy __unused)
 	net_epoch_preempt = epoch_alloc("Net preemptible", EPOCH_PREEMPT);
 	net_epoch = epoch_alloc("Net", 0);
 }
-SYSINIT(ifepochalloc, SI_SUB_TASKQ + 1, SI_ORDER_ANY,
-    if_epochalloc, NULL);
+SYSINIT(ifepochalloc, SI_SUB_EPOCH, SI_ORDER_ANY, if_epochalloc, NULL);
 
 static void
 if_attachdomain(void *dummy)
@@ -4092,7 +4091,9 @@ if_siocaddmulti(void *arg, int pending)
 	if (pending > 1)
 		if_printf(ifp, "%d SIOCADDMULTI coalesced\n", pending);
 #endif
+	CURVNET_SET(ifp->if_vnet);
 	(void )(*ifp->if_ioctl)(ifp, SIOCADDMULTI, 0);
+	CURVNET_RESTORE();
 }
 
 /*

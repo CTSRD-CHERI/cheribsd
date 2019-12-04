@@ -165,7 +165,6 @@ _LIBRARIES=	\
 		pcsclite \
 		pjdlog \
 		pmc \
-		png_sb \
 		proc \
 		procstat \
 		pthread \

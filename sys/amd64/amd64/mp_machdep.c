@@ -275,9 +275,10 @@ init_secondary(void)
 {
 	struct pcpu *pc;
 	struct nmi_pcpu *np;
+	struct user_segment_descriptor *gdt;
+	struct region_descriptor ap_gdt;
 	u_int64_t cr0;
 	int cpu, gsel_tss, x;
-	struct region_descriptor ap_gdt;
 
 	/* Set by the startup code for us to use */
 	cpu = bootAP;
@@ -285,38 +286,7 @@ init_secondary(void)
 	/* Update microcode before doing anything else. */
 	ucode_load_ap(cpu);
 
-	/* Init tss */
-	common_tss[cpu] = common_tss[0];
-	common_tss[cpu].tss_iobase = sizeof(struct amd64tss) +
-	    IOPERM_BITMAP_SIZE;
-	common_tss[cpu].tss_ist1 = (long)&doublefault_stack[PAGE_SIZE];
-
-	/* The NMI stack runs on IST2. */
-	np = ((struct nmi_pcpu *) &nmi_stack[PAGE_SIZE]) - 1;
-	common_tss[cpu].tss_ist2 = (long) np;
-
-	/* The MC# stack runs on IST3. */
-	np = ((struct nmi_pcpu *) &mce_stack[PAGE_SIZE]) - 1;
-	common_tss[cpu].tss_ist3 = (long) np;
-
-	/* The DB# stack runs on IST4. */
-	np = ((struct nmi_pcpu *) &dbg_stack[PAGE_SIZE]) - 1;
-	common_tss[cpu].tss_ist4 = (long) np;
-
-	/* Prepare private GDT */
-	gdt_segs[GPROC0_SEL].ssd_base = (long) &common_tss[cpu];
-	for (x = 0; x < NGDT; x++) {
-		if (x != GPROC0_SEL && x != (GPROC0_SEL + 1) &&
-		    x != GUSERLDT_SEL && x != (GUSERLDT_SEL + 1))
-			ssdtosd(&gdt_segs[x], &gdt[NGDT * cpu + x]);
-	}
-	ssdtosyssd(&gdt_segs[GPROC0_SEL],
-	    (struct system_segment_descriptor *)&gdt[NGDT * cpu + GPROC0_SEL]);
-	ap_gdt.rd_limit = NGDT * sizeof(gdt[0]) - 1;
-	ap_gdt.rd_base =  (long) &gdt[NGDT * cpu];
-	lgdt(&ap_gdt);			/* does magic intra-segment return */
-
-	/* Get per-cpu data */
+	/* Get per-cpu data and save  */
 	pc = &__pcpu[cpu];
 
 	/* prime data page for it to use */
@@ -325,33 +295,57 @@ init_secondary(void)
 	pc->pc_apic_id = cpu_apic_ids[cpu];
 	pc->pc_prvspace = pc;
 	pc->pc_curthread = 0;
-	pc->pc_tssp = &common_tss[cpu];
-	pc->pc_commontssp = &common_tss[cpu];
+	pc->pc_tssp = &pc->pc_common_tss;
 	pc->pc_rsp0 = 0;
 	pc->pc_pti_rsp0 = (((vm_offset_t)&pc->pc_pti_stack +
 	    PC_PTI_STACK_SZ * sizeof(uint64_t)) & ~0xful);
-	pc->pc_tss = (struct system_segment_descriptor *)&gdt[NGDT * cpu +
-	    GPROC0_SEL];
-	pc->pc_fs32p = &gdt[NGDT * cpu + GUFS32_SEL];
-	pc->pc_gs32p = &gdt[NGDT * cpu + GUGS32_SEL];
-	pc->pc_ldt = (struct system_segment_descriptor *)&gdt[NGDT * cpu +
-	    GUSERLDT_SEL];
+	gdt = pc->pc_gdt;
+	pc->pc_tss = (struct system_segment_descriptor *)&gdt[GPROC0_SEL];
+	pc->pc_fs32p = &gdt[GUFS32_SEL];
+	pc->pc_gs32p = &gdt[GUGS32_SEL];
+	pc->pc_ldt = (struct system_segment_descriptor *)&gdt[GUSERLDT_SEL];
 	/* See comment in pmap_bootstrap(). */
 	pc->pc_pcid_next = PMAP_PCID_KERN + 2;
 	pc->pc_pcid_gen = 1;
-	common_tss[cpu].tss_rsp0 = 0;
 
-	/* Save the per-cpu pointer for use by the NMI handler. */
+	/* Init tss */
+	pc->pc_common_tss = __pcpu[0].pc_common_tss;
+	pc->pc_common_tss.tss_iobase = sizeof(struct amd64tss) +
+	    IOPERM_BITMAP_SIZE;
+	pc->pc_common_tss.tss_rsp0 = 0;
+
+	/* The doublefault stack runs on IST1. */
+	np = ((struct nmi_pcpu *)&doublefault_stack[PAGE_SIZE]) - 1;
+	np->np_pcpu = (register_t)pc;
+	pc->pc_common_tss.tss_ist1 = (long)np;
+
+	/* The NMI stack runs on IST2. */
 	np = ((struct nmi_pcpu *) &nmi_stack[PAGE_SIZE]) - 1;
-	np->np_pcpu = (register_t) pc;
+	np->np_pcpu = (register_t)pc;
+	pc->pc_common_tss.tss_ist2 = (long)np;
 
-	/* Save the per-cpu pointer for use by the MC# handler. */
+	/* The MC# stack runs on IST3. */
 	np = ((struct nmi_pcpu *) &mce_stack[PAGE_SIZE]) - 1;
-	np->np_pcpu = (register_t) pc;
+	np->np_pcpu = (register_t)pc;
+	pc->pc_common_tss.tss_ist3 = (long)np;
 
-	/* Save the per-cpu pointer for use by the DB# handler. */
+	/* The DB# stack runs on IST4. */
 	np = ((struct nmi_pcpu *) &dbg_stack[PAGE_SIZE]) - 1;
-	np->np_pcpu = (register_t) pc;
+	np->np_pcpu = (register_t)pc;
+	pc->pc_common_tss.tss_ist4 = (long)np;
+
+	/* Prepare private GDT */
+	gdt_segs[GPROC0_SEL].ssd_base = (long)&pc->pc_common_tss;
+	for (x = 0; x < NGDT; x++) {
+		if (x != GPROC0_SEL && x != GPROC0_SEL + 1 &&
+		    x != GUSERLDT_SEL && x != GUSERLDT_SEL + 1)
+			ssdtosd(&gdt_segs[x], &gdt[x]);
+	}
+	ssdtosyssd(&gdt_segs[GPROC0_SEL],
+	    (struct system_segment_descriptor *)&gdt[GPROC0_SEL]);
+	ap_gdt.rd_limit = NGDT * sizeof(gdt[0]) - 1;
+	ap_gdt.rd_base = (u_long)gdt;
+	lgdt(&ap_gdt);			/* does magic intra-segment return */
 
 	wrmsr(MSR_FSBASE, 0);		/* User value */
 	wrmsr(MSR_GSBASE, (u_int64_t)pc);
