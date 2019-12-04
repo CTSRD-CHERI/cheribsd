@@ -1780,11 +1780,11 @@ exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 
 	vectp = (char * __capability * __capability)destp;
 	if (imgp->sysent->sv_stackgap != NULL)
-		imgp->sysent->sv_stackgap(imgp, (u_long *)&vectp);
+		imgp->sysent->sv_stackgap(imgp, (caddr_t *)&vectp);
 
 	if (imgp->auxargs) {
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (u_long *)&vectp);
+		    (caddr_t *)&vectp);
 		if (error != 0)
 			return (error);
 	}

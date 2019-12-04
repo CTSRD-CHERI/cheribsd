@@ -622,12 +622,8 @@ freebsd64_nmount(struct thread *td, struct freebsd64_nmount_args *uap)
 int
 freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 {
-#ifndef CHERI_PURECAP_KERNEL
-	/* XXX: works while exec_copyout_strings isn't cheriabi aware */
-	return (exec_copyout_strings(imgp, stack_base));
-#else /* CHERI_PURECAP_KERNEL */
 	int argc, envc;
-	vaddr_t *vectp;
+	uint64_t *vectp;
 	char *stringp;
 	char *destp;
 	struct freebsd64_ps_strings *arginfo;
@@ -705,13 +701,13 @@ freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	destp -= ARG_MAX - imgp->args->stringspace;
 	destp = rounddown2(destp, sizeof(vaddr_t));
 
-	vectp = (vaddr_t *)destp;
+	vectp = (uint64_t *)destp;
 	if (imgp->sysent->sv_stackgap != NULL)
-		imgp->sysent->sv_stackgap(imgp, (u_long *)&vectp);
+		imgp->sysent->sv_stackgap(imgp, (caddr_t *)&vectp);
 
 	if (imgp->auxargs) {
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (u_long *)&vectp);
+		    (caddr_t *)&vectp);
 		if (error != 0)
 			return (error);
 	}
@@ -780,7 +776,6 @@ freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 		return (EFAULT);
 
 	return (0);
-#endif /* CHERI_PURECAP_KERNEL */
 }
 
 int

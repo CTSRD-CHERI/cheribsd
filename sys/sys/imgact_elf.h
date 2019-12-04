@@ -99,8 +99,8 @@ void	__elfN(set_auxargs)(Elf_Addr *pos, struct image_params *imgp);
 int	__elfN(freebsd_fixup)(register_t **, struct image_params *);
 int	__elfN(coredump)(struct thread *, struct vnode *, off_t, int);
 size_t	__elfN(populate_note)(int, void *, void *, size_t, void **);
-void	__elfN(stackgap)(struct image_params *, u_long *);
-int	__elfN(freebsd_copyout_auxargs)(struct image_params *, u_long *);
+void	__elfN(stackgap)(struct image_params *, caddr_t *);
+int	__elfN(freebsd_copyout_auxargs)(struct image_params *, caddr_t *);
 
 /* Machine specific function to dump per-thread information. */
 void	__elfN(dump_thread)(struct thread *, void *, size_t *);

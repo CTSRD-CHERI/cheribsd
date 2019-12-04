@@ -1400,7 +1400,7 @@ ret:
 #define	suword __CONCAT(suword, __ELF_WORD_SIZE)
 
 int
-__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, u_long *base)
+__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, caddr_t *base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 #ifdef COMPAT_FREEBSD64
@@ -1456,7 +1456,7 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, u_long *base)
 
 	auxlen = sizeof(*argarray) * (pos - argarray);
 	*base -= auxlen;
-	error = copyout(argarray, (void *)*base, auxlen);
+	error = copyout(argarray, *base, auxlen);
 	free(argarray, M_TEMP);
 	return (error);
 }
@@ -2872,7 +2872,7 @@ __elfN(untrans_prot)(vm_prot_t prot)
 }
 
 void
-__elfN(stackgap)(struct image_params *imgp, u_long *stack_base)
+__elfN(stackgap)(struct image_params *imgp, caddr_t *stack_base)
 {
 	u_long range, rbase, gap;
 	int pct;
