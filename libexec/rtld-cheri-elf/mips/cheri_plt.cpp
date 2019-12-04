@@ -58,11 +58,10 @@ struct SimpleExternalCallTrampoline {
 	dlfunc_t target;
 	uint32_t code[4]; // Three instructions + delay slot nop
 	// Code:
-	//
-	// clc $cgp, $zero, -(2* CAP_SIZE) ($c12)
-	// clc $c12, $zero, -CAP_SIZE($c12)
+	// cgetpcc $cgp
+	// clc $c12, $zero, -CAP_SIZE($cgp)
 	// cjr $c12
-	// nop
+	// clc $cgp, $zero, -(2* CAP_SIZE)($cgp)
 	void init(const void* target_cgp, dlfunc_t target_func) {
 		this->cgp = target_cgp;
 		this->target = target_func;
