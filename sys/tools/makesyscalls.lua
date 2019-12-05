@@ -565,9 +565,11 @@ end
 
 local function process_args(args)
 	local funcargs = {}
+	local changes_abi = false
 
 	for arg in args:gmatch("([^,]+)") do
 		local abi_change = not isptrtype(arg) or check_abi_changes(arg)
+		changes_abi = changes_abi or abi_change
 
 		arg = strip_arg_annotations(arg)
 
@@ -604,11 +606,12 @@ local function process_args(args)
 	end
 
 	::out::
-	return funcargs
+	return funcargs, changes_abi
 end
 
 local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
-    auditev, syscallret, funcname, funcalias, funcargs, argalias)
+    auditev, syscallret, funcname, funcalias, funcargs, argalias,
+    skip_proto)
 	local argssize
 
 	if #funcargs > 0 or flags & known_flags["NODEF"] ~= 0 then
@@ -686,7 +689,7 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 	write_line("systracetmp", "\t\tbreak;\n")
 
 	local nargflags = get_mask({"NOARGS", "NOPROTO", "NODEF"})
-	if flags & nargflags == 0 then
+	if flags & nargflags == 0 and not skip_proto then
 		if #funcargs > 0 then
 			write_line("sysarg", string.format("struct %s {\n",
 			    argalias))
@@ -706,7 +709,7 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 	end
 
 	local protoflags = get_mask({"NOPROTO", "NODEF"})
-	if flags & protoflags == 0 then
+	if flags & protoflags == 0 and not skip_proto then
 		if funcname == "nosys" or funcname == "lkmnosys" or
 		    funcname == "sysarch" or funcname:find("^freebsd") or
 		    funcname:find("^linux") or
@@ -778,7 +781,7 @@ local function handle_obsol(sysnum, funcname, comment)
 end
 
 local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
-    auditev, funcname, funcalias, funcargs, argalias)
+    auditev, funcname, funcalias, funcargs, argalias, skip_proto)
 	local argssize, out, outdcl, wrap, prefix, descr
 
 	if #funcargs > 0 or flags & known_flags["NODEF"] ~= 0 then
@@ -807,7 +810,7 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 	::compatdone::
 	local dprotoflags = get_mask({"NOPROTO", "NODEF"})
 	local nargflags = dprotoflags | known_flags["NOARGS"]
-	if #funcargs > 0 and flags & nargflags == 0 then
+	if #funcargs > 0 and flags & nargflags == 0 and not skip_proto then
 		write_line(out, string.format("struct %s {\n", argalias))
 		for _, v in ipairs(funcargs) do
 			local argname, argtype = v["name"], v["type"]
@@ -818,11 +821,11 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 			    argname, argtype))
 		end
 		write_line(out, "};\n")
-	elseif flags & nargflags == 0 then
+	elseif flags & nargflags == 0 and not skip_proto then
 		write_line("sysarg", string.format(
 		    "struct %s {\n\tregister_t dummy;\n};\n", argalias))
 	end
-	if flags & dprotoflags == 0 then
+	if flags & dprotoflags == 0 and not skip_proto then
 		write_line(outdcl, string.format(
 		    "%s\t%s%s(struct thread *, struct %s *);\n",
 		    rettype, prefix, funcname, argalias))
@@ -1026,9 +1029,11 @@ process_syscall_def = function(line)
 	end
 
 	local funcargs = {}
+	local changes_abi = false
 	if args ~= nil then
-		funcargs = process_args(args)
+		funcargs, changes_abi = process_args(args)
 	end
+	local skip_proto = config["abi_flags"] ~= "" and changes_abi
 
 	local argprefix = ''
 	local funcprefix = ''
@@ -1040,6 +1045,7 @@ process_syscall_def = function(line)
 				argprefix = config['abi_func_prefix']
 				funcprefix = config['abi_func_prefix']
 				funcalias = funcprefix .. funcname
+				skip_proto = false
 				goto ptrfound
 			end
 		end
@@ -1077,11 +1083,12 @@ process_syscall_def = function(line)
 			abort(1, "Incompatible COMPAT/STD: " .. line)
 		end
 		handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
-		    auditev, funcname, funcalias, funcargs, argalias)
+		    auditev, funcname, funcalias, funcargs, argalias,
+		    skip_proto)
 	elseif flags & ncompatflags ~= 0 then
 		handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 		    auditev, syscallret, funcname, funcalias, funcargs,
-		    argalias)
+		    argalias, skip_proto)
 	elseif flags & known_flags["OBSOL"] ~= 0 then
 		handle_obsol(sysnum, funcname, funcomment)
 	elseif flags & known_flags["UNIMPL"] ~= 0 then
