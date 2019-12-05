@@ -271,12 +271,6 @@ SYSTEM_OBJS+= embedfs_${MFS_IMAGE:T:R}.o
 .endif
 .endif
 
-# If we are building for a cheri target, then LD_EMULATION should adapt.
-# Set CHERI_LD_TARGET accordingly
-.if ${ARCH_FLAGS:M-mabi=purecap} != ""
-CHERI_LD_TARGET=cheri
-.endif
-
 SYSTEM_LD= @${LD} -m ${LD_EMULATION} -Bdynamic -T ${LDSCRIPT} ${_LDFLAGS} \
 	--no-warn-mismatch --warn-common --export-dynamic \
 	--dynamic-linker /red/herring \

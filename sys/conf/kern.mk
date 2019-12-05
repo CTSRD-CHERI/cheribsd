@@ -299,6 +299,11 @@ CC+=	-fuse-ld=${LD:[1]} -Qunused-arguments
 .endif
 
 # Set target-specific linker emulation name.
+# If we are building for a cheri target, then LD_EMULATION should adapt.
+# Set CHERI_LD_TARGET accordingly
+.if "${MIPS_ABI}" == "purecap"
+CHERI_LD_TARGET=cheri
+.endif
 LD_EMULATION_aarch64=aarch64elf
 LD_EMULATION_amd64=elf_x86_64_fbsd
 LD_EMULATION_arm=armelf_fbsd
