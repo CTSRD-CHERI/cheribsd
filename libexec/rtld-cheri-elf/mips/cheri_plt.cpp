@@ -58,11 +58,10 @@ struct SimpleExternalCallTrampoline {
 	dlfunc_t target;
 	uint32_t code[4]; // Three instructions + delay slot nop
 	// Code:
-	//
-	// clc $cgp, $zero, -(2* CAP_SIZE) ($c12)
-	// clc $c12, $zero, -CAP_SIZE($c12)
+	// cgetpcc $cgp
+	// clc $c12, $zero, -CAP_SIZE($cgp)
 	// cjr $c12
-	// nop
+	// clc $cgp, $zero, -(2* CAP_SIZE)($cgp)
 	void init(const void* target_cgp, dlfunc_t target_func) {
 		this->cgp = target_cgp;
 		this->target = target_func;
@@ -74,8 +73,14 @@ struct SimpleExternalCallTrampoline {
 	static SimpleExternalCallTrampoline*
 	create(const Obj_Entry* defobj, const Elf_Sym *sym, bool tight_bounds);
 	inline dlfunc_t pcc_value() const {
-		const void* result = cheri_incoffset(this, offsetof(SimpleExternalCallTrampoline, code));
-		return (dlfunc_t)cheri_clearperm(result, FUNC_PTR_REMOVE_PERMS);
+		void* result = cheri_incoffset(this, offsetof(SimpleExternalCallTrampoline, code));
+		result = cheri_clearperm(result, FUNC_PTR_REMOVE_PERMS);
+#if __has_builtin(__builtin_cheri_seal_entry)
+		result = __builtin_cheri_seal_entry(result);
+#else
+#warning "__builtin_cheri_seal_entry not supported, please update LLVM"
+#endif
+		return (dlfunc_t)result;
 	}
 };
 
@@ -249,6 +254,7 @@ _mips_rtld_bind(void* _plt_stub)
 	//  restore of $cgp (due to the call to lock_release) but it would be
 	//  much nicer if we could just return (target, $cgp) in $c3,$c4
 	__asm__ volatile("cmove $cgp, %0"::"C"(target_cgp): "$c26", "memory");
+	dbg_assert(cheri_gettype((void*)target) == CHERI_OTYPE_SENTRY);
 	return target;
 }
 
@@ -300,6 +306,7 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	 */
 	dlfunc_t _rtld_bind_start_local_fn_ptr =
 	    (dlfunc_t)make_rtld_local_function_pointer(_rtld_bind_start);
+	dbg_assert(cheri_gettype((void*)_rtld_bind_start_local_fn_ptr) == CHERI_OTYPE_SENTRY);
 #if RTLD_SUPPORT_PER_FUNCTION_CAPTABLE == 1 && defined(notyet)
 	plt->rtld_cgp = target_cgp_for_func(rtldobj, _rtld_bind_start_local_fn_ptr);
 #else
@@ -315,10 +322,10 @@ add_cheri_plt_stub(const Obj_Entry* obj, const Obj_Entry *rtldobj,
 	// currently use a self-reference (to beginning of struct) as data cap
 	plt->trampoline.init(target_cap, _rtld_bind_start_local_fn_ptr);
 	// but the actual target that is written to the PLT should point to the code:
-	target_cap = cheri_incoffset(target_cap, offsetof(CheriPltStub, trampoline.code));
-	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
+	target_cap = (void*)plt->trampoline.pcc_value();
 	dbg_cheri_plt_verbose("where=%p <- plt_code=%#p", where, target_cap);
-	assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
+	dbg_assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
+	dbg_assert(cheri_gettype(target_cap) == CHERI_OTYPE_SENTRY);
 	dbg_assert(cheri_getlen(target_cap) == sizeof(CheriPltStub) &&
 	    "stub should have tight bounds");
 	*where = target_cap;
@@ -526,15 +533,14 @@ find_external_call_thunk(const Elf_Sym* symbol, const Obj_Entry* obj)
 	const ExportsTableEntry* s = obj->cheri_exports->getOrAddThunk(obj, symbol);
 
 	// TODO: should we store this in the exports table entry?
-	void* target_cap = cheri_csetbounds(s->thunk, sizeof(SimpleExternalCallTrampoline));
-	target_cap = cheri_incoffset(target_cap, offsetof(SimpleExternalCallTrampoline, code));
-	target_cap = cheri_clearperm(target_cap, FUNC_PTR_REMOVE_PERMS);
+	dbg_assert(cheri_getlen(s->thunk) == sizeof(SimpleExternalCallTrampoline));
+	dlfunc_t target_cap = s->thunk->pcc_value();
 	dbg_cheri_plt_verbose("External call thunk for %s resolved to %-#p (thunk %p)",
-	    strtab_value(obj, symbol->st_name), s->thunk->pcc_value(), target_cap);
-	dbg_assert(cheri_getperm(target_cap) & CHERI_PERM_EXECUTE);
-	dbg_assert(cheri_getlen(target_cap) == sizeof(SimpleExternalCallTrampoline) &&
+	    strtab_value(obj, symbol->st_name), s->thunk->pcc_value(), (void*)target_cap);
+	dbg_assert(cheri_getperm((void*)target_cap) & CHERI_PERM_EXECUTE);
+	dbg_assert(cheri_getlen((void*)target_cap) == sizeof(SimpleExternalCallTrampoline) &&
 	    "stub should have tight bounds");
-	return (dlfunc_t)target_cap;
+	return target_cap;
 }
 
 #define STRING_CASE(val) case val: return #val;

@@ -1037,7 +1037,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	RESTORE_U_PCB_REG(t1, MULHI, k1)
 	mtlo	t0
 	mthi	t1
-	RESTORE_U_PCB_PC(t2, t0, k1)	# set return address
+	RESTORE_U_PCB_PC(t0, t1, k1)	# set return address
 	RESTORE_U_PCB_REG(v0, V0, k1)
 	RESTORE_U_PCB_REG(v1, V1, k1)
 	RESTORE_U_PCB_REG(a0, A0, k1)

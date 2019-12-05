@@ -115,7 +115,7 @@ _make_rtld_function_pointer(dlfunc_t target_func) {
 	/* Need a trampoline in PLT ABI */
 	dbg_assert(can_use_tight_pcc_bounds(&obj_rtld));
 	return allocate_function_pointer_trampoline(target_func, &obj_rtld);
- #endif
+#endif
 }
 
 #if !defined(__CHERI_CAPABILITY_TABLE__) || __CHERI_CAPABILITY_TABLE__ == 3
@@ -168,12 +168,18 @@ make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 	dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_LEGACY);
 	if (tight_bounds) {
 		dbg_assert(defobj->cheri_captable_abi != DF_MIPS_CHERI_ABI_PCREL);
-		return (dlfunc_t)cheri_csetbounds(ret, def->st_size);
+		ret = cheri_csetbounds(ret, def->st_size);
 	} else {
 		/* PC-relative ABI needs full DSO bounds */
 		dbg_assert(defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL);
-		return __DECONST(dlfunc_t, ret);
 	}
+	/* All code pointers should be sentries: */
+#if __has_builtin(__builtin_cheri_seal_entry)
+	ret = __builtin_cheri_seal_entry(ret);
+#else
+#warning "__builtin_cheri_seal_entry not supported, please update LLVM"
+#endif
+	return __DECONST(dlfunc_t, ret);
 }
 
 /*

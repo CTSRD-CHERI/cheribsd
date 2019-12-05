@@ -1149,7 +1149,11 @@ dofault:
 			td->td_pcb->pcb_onfault = NULL;
 			return (pc);
 		}
-
+		fetch_bad_instr(trapframe);
+		log_c2e_exception("KERNEL_CHERI_EXCEPTION", trapframe, type);
+		printf("badvaddr = %#jx, pc = %#jx, ra = %#jx, sr = %#jx\n",
+		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc,
+		    (intmax_t)trapframe->ra, (intmax_t)trapframe->sr);
 		goto err;
 		break;
 

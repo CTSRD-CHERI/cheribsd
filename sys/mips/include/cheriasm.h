@@ -151,21 +151,7 @@
 	/* If returning to userspace, restore saved user $ddc. */	\
 	cgetkr2c	CHERI_REG_KSCRATCH;				\
 	csetdefault	CHERI_REG_KSCRATCH; 				\
-	b	66f;							\
-	nop; /* delay slot */						\
 65:									\
-	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
-	/*								\
-	 * XXXRW: If requested PC has been adjusted by stack, similarly	\
-	 * adjust $epcc.offset, which will overwrite an earlier $epc	\
-	 * assignment.							\
-	 * FIXME: this does not work with non-zero $pcc base		\
-	 */								\
-	MFC0	reg, MIPS_COP_0_EXC_PC;					\
-	CGetKCC		CHERI_REG_KSCRATCH;				\
-	CSetOffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, reg;	\
-	CSetEPCC	CHERI_REG_KSCRATCH;				\
-66:									\
 	/* Restore $c27. */						\
 	cgetkr1c	CHERI_REG_KSCRATCH;
 
@@ -219,9 +205,14 @@
 	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
 
 
-#define RESTORE_EPCC(capreg, pc_vaddr, tmpreg)			\
-	/* update the address of EPCC to the return pc */ 	\
-	CSetOffset capreg, capreg, pc_vaddr;			\
+#define RESTORE_EPCC(capreg, pc_offset, tmpreg)					\
+	/* Do not attempt to modify EPCC if it is already correct. */		\
+	/* This is needed in case it is a sentry (e.g. for signal handlers) */	\
+	CGetOffset tmpreg, capreg;						\
+	/* update the offset of EPCC to the return pc if different */		\
+	beq tmpreg, pc_offset, 12345f; nop;					\
+	CSetOffset capreg, capreg, pc_offset;					\
+	12345:									\
 	CSetEPCC capreg;
 
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
