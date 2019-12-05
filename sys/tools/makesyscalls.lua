@@ -253,6 +253,11 @@ local function process_config(file)
 			else
 				value = trim(value, '"')
 			end
+			-- Heuristically convert anything fully numeric
+			-- to a number.
+			if tonumber(value) ~= nil then
+				value = tonumber(value)
+			end
 			cfg[key] = value
 		end
 	end
