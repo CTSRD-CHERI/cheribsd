@@ -214,7 +214,7 @@ end
 -- be fine to make various assumptions
 local function process_config(file)
 	local cfg = {}
-	local commentExpr = "#.*"
+	local commentExpr = "^#.*"
 	local lineExpr = "([%w%p]+)%s*=%s*([`\"]?[^\"`]+[`\"]?)"
 
 	if file == nil then
