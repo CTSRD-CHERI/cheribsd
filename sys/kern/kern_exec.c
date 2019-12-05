@@ -1793,11 +1793,13 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	}
 
 	if (imgp->auxargs) {
-		uptr_old = uptr = (__cheri_addr uintptr_t)destp;
-		error = imgp->sysent->sv_copyout_auxargs(imgp, &uptr);
-		if (error != 0)
-			return (error);
-		destp -= (uptr_old - uptr);
+		/*
+		 * Allocate room on the stack for the ELF auxargs
+		 * array.  It has up to AT_COUNT entries.
+		 */
+		destp -= AT_COUNT * sizeof(Elf_Auxinfo);
+		destp = __builtin_align_down(destp,
+		    sizeof(void * __capability));
 	}
 
 	vectp = (char * __capability * __capability)destp;
@@ -1904,6 +1906,14 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	if (suword_c(vectp, 0) != 0)
 		return (EFAULT);
 
+	if (imgp->auxargs) {
+		vectp++;
+		error = imgp->sysent->sv_copyout_auxargs(imgp,
+		    (__cheri_addr uintptr_t)vectp);
+		if (error != 0)
+			return (error);
+	}
+	
 	return (0);
 }
 
