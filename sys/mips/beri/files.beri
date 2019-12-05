@@ -32,6 +32,7 @@ mips/beri/beri_machdep.c		standard
 mips/beri/beri_manager.c		standard
 mips/beri/beri_mp.c			optional smp
 mips/beri/beri_pic.c			optional fdt
+mips/beri/busdma_iommu.c		standard
 mips/cheri/cheri.c			optional cpu_cheri
 mips/cheri/cheri_bcopy.S		optional cpu_cheri
 mips/cheri/cheri_debug.c		optional cpu_cheri
