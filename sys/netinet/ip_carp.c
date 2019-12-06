@@ -577,7 +577,7 @@ carp6_input(struct mbuf **mp, int *offp, int proto)
 			return (IPPROTO_DONE);
 		}
 	}
-	ch = (struct carp_header *)(mtod(m, caddr_t) + *offp);
+	ch = (struct carp_header *)(mtod(m, char *) + *offp);
 
 
 	/* verify the CARP checksum */
@@ -980,6 +980,7 @@ carp_send_ad_locked(struct carp_softc *sc)
 #endif /* INET */
 #ifdef INET6
 	if (sc->sc_naddrs6) {
+		struct epoch_tracker et;
 		struct ip6_hdr *ip6;
 
 		m = m_gethdr(M_NOWAIT, MT_DATA);
@@ -1033,8 +1034,10 @@ carp_send_ad_locked(struct carp_softc *sc)
 
 		CARPSTATS_INC(carps_opackets6);
 
+		NET_EPOCH_ENTER(et);
 		carp_send_ad_error(sc, ip6_output(m, NULL, NULL, 0,
 		    &sc->sc_carpdev->if_carp->cif_im6o, NULL, NULL));
+		NET_EPOCH_EXIT(et);
 	}
 #endif /* INET6 */
 
@@ -1192,7 +1195,7 @@ carp_iamatch6(struct ifnet *ifp, struct in6_addr *taddr)
 	return (ifa);
 }
 
-caddr_t
+char *
 carp_macmatch6(struct ifnet *ifp, struct mbuf *m, const struct in6_addr *taddr)
 {
 	struct ifaddr *ifa;
