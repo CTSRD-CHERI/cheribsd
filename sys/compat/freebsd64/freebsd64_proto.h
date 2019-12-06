@@ -528,7 +528,7 @@ struct freebsd64_aio_write_args {
 };
 struct freebsd64_lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct aiocb64 *const *)]; struct aiocb64 *const * acb_list; char acb_list_r_[PADR_(struct aiocb64 *const *)];
+	char acb_list_l_[PADL_(struct aiocb64 * const *)]; struct aiocb64 * const * acb_list; char acb_list_r_[PADR_(struct aiocb64 * const *)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char sig_l_[PADL_(struct sigevent64 *)]; struct sigevent64 * sig; char sig_r_[PADR_(struct sigevent64 *)];
 };
@@ -583,7 +583,7 @@ struct freebsd64_aio_return_args {
 	char aiocbp_l_[PADL_(struct aiocb64 *)]; struct aiocb64 * aiocbp; char aiocbp_r_[PADR_(struct aiocb64 *)];
 };
 struct freebsd64_aio_suspend_args {
-	char aiocbp_l_[PADL_(struct aiocb64 *const *)]; struct aiocb64 *const * aiocbp; char aiocbp_r_[PADR_(struct aiocb64 *const *)];
+	char aiocbp_l_[PADL_(struct aiocb64 * const *)]; struct aiocb64 * const * aiocbp; char aiocbp_r_[PADR_(struct aiocb64 * const *)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec *)]; const struct timespec * timeout; char timeout_r_[PADR_(const struct timespec *)];
 };
@@ -1837,7 +1837,7 @@ struct freebsd6_freebsd64_aio_write_args {
 };
 struct freebsd6_freebsd64_lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct oaiocb64 *const *)]; struct oaiocb64 *const * acb_list; char acb_list_r_[PADR_(struct oaiocb64 *const *)];
+	char acb_list_l_[PADL_(struct oaiocb64 * const *)]; struct oaiocb64 * const * acb_list; char acb_list_r_[PADR_(struct oaiocb64 * const *)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char sig_l_[PADL_(struct osigevent64 *)]; struct osigevent64 * sig; char sig_r_[PADR_(struct osigevent64 *)];
 };
@@ -2078,8 +2078,8 @@ int	freebsd12_freebsd64_shm_open(struct thread *, struct freebsd12_freebsd64_shm
 #define	FREEBSD64_SYS_AUE_freebsd11_freebsd64_fstat	AUE_FSTAT
 #define	FREEBSD64_SYS_AUE_freebsd11_freebsd64_lstat	AUE_LSTAT
 #define	FREEBSD64_SYS_AUE_freebsd64_pathconf	AUE_PATHCONF
-#define	FREEBSD64_SYS_AUE_getrlimit	AUE_GETRLIMIT
-#define	FREEBSD64_SYS_AUE_setrlimit	AUE_SETRLIMIT
+#define	FREEBSD64_SYS_AUE_freebsd64_getrlimit	AUE_GETRLIMIT
+#define	FREEBSD64_SYS_AUE_freebsd64_setrlimit	AUE_SETRLIMIT
 #define	FREEBSD64_SYS_AUE_freebsd11_freebsd64_getdirentries	AUE_GETDIRENTRIES
 #define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_mmap	AUE_MMAP
 #define	FREEBSD64_SYS_AUE_freebsd6_freebsd64_truncate	AUE_TRUNCATE
