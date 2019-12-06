@@ -214,7 +214,7 @@ end
 -- be fine to make various assumptions
 local function process_config(file)
 	local cfg = {}
-	local commentExpr = "#.*"
+	local commentExpr = "^#.*"
 	local lineExpr = "([%w%p]+)%s*=%s*([`\"]?[^\"`]+[`\"]?)"
 
 	if file == nil then
@@ -252,6 +252,11 @@ local function process_config(file)
 				value = exec(value)
 			else
 				value = trim(value, '"')
+			end
+			-- Heuristically convert anything fully numeric
+			-- to a number.
+			if tonumber(value) ~= nil then
+				value = tonumber(value)
 			end
 			cfg[key] = value
 		end
@@ -385,8 +390,8 @@ local function write_line_pfile(tmppat, line)
 end
 
 local function isptrtype(type)
-	return type:find("*") or type:find("caddr_t")
-	    -- XXX NOTYET: or type:find("intptr_t")
+	return type:find("*") or type:find("caddr_t") or
+	    type:find("intptr_t")
 end
 
 local process_syscall_def
@@ -560,9 +565,11 @@ end
 
 local function process_args(args)
 	local funcargs = {}
+	local changes_abi = false
 
 	for arg in args:gmatch("([^,]+)") do
 		local abi_change = not isptrtype(arg) or check_abi_changes(arg)
+		changes_abi = changes_abi or abi_change
 
 		arg = strip_arg_annotations(arg)
 
@@ -578,7 +585,7 @@ local function process_args(args)
 		-- XX TODO: Forward declarations? See: sysstubfwd in CheriBSD
 		if abi_change then
 			local abi_type_suffix = config["abi_type_suffix"]
-			argtype = argtype:gsub("_native ", "")
+			argtype = argtype:gsub("_native ", " ")
 			argtype = argtype:gsub("(struct [^ ]*)", "%1" ..
 			    abi_type_suffix)
 			argtype = argtype:gsub("(union [^ ]*)", "%1" ..
@@ -599,11 +606,12 @@ local function process_args(args)
 	end
 
 	::out::
-	return funcargs
+	return funcargs, changes_abi
 end
 
 local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
-    auditev, syscallret, funcname, funcalias, funcargs, argalias)
+    auditev, syscallret, funcname, funcalias, funcargs, argalias,
+    skip_proto)
 	local argssize
 
 	if #funcargs > 0 or flags & known_flags["NODEF"] ~= 0 then
@@ -681,7 +689,7 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 	write_line("systracetmp", "\t\tbreak;\n")
 
 	local nargflags = get_mask({"NOARGS", "NOPROTO", "NODEF"})
-	if flags & nargflags == 0 then
+	if flags & nargflags == 0 and not skip_proto then
 		if #funcargs > 0 then
 			write_line("sysarg", string.format("struct %s {\n",
 			    argalias))
@@ -701,7 +709,7 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 	end
 
 	local protoflags = get_mask({"NOPROTO", "NODEF"})
-	if flags & protoflags == 0 then
+	if flags & protoflags == 0 and not skip_proto then
 		if funcname == "nosys" or funcname == "lkmnosys" or
 		    funcname == "sysarch" or funcname:find("^freebsd") or
 		    funcname:find("^linux") or
@@ -773,7 +781,7 @@ local function handle_obsol(sysnum, funcname, comment)
 end
 
 local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
-    auditev, funcname, funcalias, funcargs, argalias)
+    auditev, funcname, funcalias, funcargs, argalias, skip_proto)
 	local argssize, out, outdcl, wrap, prefix, descr
 
 	if #funcargs > 0 or flags & known_flags["NODEF"] ~= 0 then
@@ -802,7 +810,7 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 	::compatdone::
 	local dprotoflags = get_mask({"NOPROTO", "NODEF"})
 	local nargflags = dprotoflags | known_flags["NOARGS"]
-	if #funcargs > 0 and flags & nargflags == 0 then
+	if #funcargs > 0 and flags & nargflags == 0 and not skip_proto then
 		write_line(out, string.format("struct %s {\n", argalias))
 		for _, v in ipairs(funcargs) do
 			local argname, argtype = v["name"], v["type"]
@@ -813,11 +821,11 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 			    argname, argtype))
 		end
 		write_line(out, "};\n")
-	elseif flags & nargflags == 0 then
+	elseif flags & nargflags == 0 and not skip_proto then
 		write_line("sysarg", string.format(
 		    "struct %s {\n\tregister_t dummy;\n};\n", argalias))
 	end
-	if flags & dprotoflags == 0 then
+	if flags & dprotoflags == 0 and not skip_proto then
 		write_line(outdcl, string.format(
 		    "%s\t%s%s(struct thread *, struct %s *);\n",
 		    rettype, prefix, funcname, argalias))
@@ -1021,30 +1029,37 @@ process_syscall_def = function(line)
 	end
 
 	local funcargs = {}
+	local changes_abi = false
 	if args ~= nil then
-		funcargs = process_args(args)
+		funcargs, changes_abi = process_args(args)
 	end
+	local skip_proto = config["abi_flags"] ~= "" and changes_abi
 
 	local argprefix = ''
+	local funcprefix = ''
 	if abi_changes("pointer_args") then
 		for _, v in ipairs(funcargs) do
 			if isptrtype(v["type"]) then
 				-- argalias should be:
 				--   COMPAT_PREFIX + ABI Prefix + funcname
 				argprefix = config['abi_func_prefix']
-				funcalias = config['abi_func_prefix'] ..
-				    funcname
+				funcprefix = config['abi_func_prefix']
+				funcalias = funcprefix .. funcname
+				skip_proto = false
 				goto ptrfound
 			end
 		end
 		::ptrfound::
+	end
+	if funcname ~= nil then
+		funcname = funcprefix .. funcname
 	end
 	if funcalias == nil or funcalias == "" then
 		funcalias = funcname
 	end
 
 	if argalias == nil and funcname ~= nil then
-		argalias = argprefix .. funcname .. "_args"
+		argalias = funcname .. "_args"
 		for _, v in pairs(compat_options) do
 			local mask = v["mask"]
 			if (flags & mask) ~= 0 then
@@ -1068,11 +1083,12 @@ process_syscall_def = function(line)
 			abort(1, "Incompatible COMPAT/STD: " .. line)
 		end
 		handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
-		    auditev, funcname, funcalias, funcargs, argalias)
+		    auditev, funcname, funcalias, funcargs, argalias,
+		    skip_proto)
 	elseif flags & ncompatflags ~= 0 then
 		handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 		    auditev, syscallret, funcname, funcalias, funcargs,
-		    argalias)
+		    argalias, skip_proto)
 	elseif flags & known_flags["OBSOL"] ~= 0 then
 		handle_obsol(sysnum, funcname, funcomment)
 	elseif flags & known_flags["UNIMPL"] ~= 0 then

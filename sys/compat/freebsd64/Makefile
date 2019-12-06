@@ -11,8 +11,8 @@ all:
 sysent:  freebsd64_sysent.c freebsd64_syscall.h freebsd64_proto.h freebsd64_systrace_args.c
 
 freebsd64_sysent.c freebsd64_syscalls.c freebsd64_syscall.h freebsd64_proto.h freebsd64_systrace_args.c : \
-	    ../../kern/makesyscalls.sh ../../kern/syscalls.master ${.CURDIR}/syscalls.conf
-	sh ../../kern/makesyscalls.sh ../../kern/syscalls.master ${.CURDIR}/syscalls.conf
+	    ../../tools/makesyscalls.lua ../../kern/syscalls.master ${.CURDIR}/syscalls.conf
+	${LUA} ../../tools/makesyscalls.lua ../../kern/syscalls.master ${.CURDIR}/syscalls.conf
 
 clean:
 	rm -f freebsd64_sysent.c freebsd64_syscalls.c freebsd64_syscall.h freebsd64_proto.h
