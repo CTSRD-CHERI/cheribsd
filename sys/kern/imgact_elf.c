@@ -1375,7 +1375,7 @@ ret:
 #define	suword __CONCAT(suword, __ELF_WORD_SIZE)
 
 int
-__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t base)
+__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 	Elf_Auxinfo *argarray, *pos;
@@ -1395,16 +1395,16 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t base)
 	AUXARGS_ENTRY(pos, AT_BASE, args->base);
 	AUXARGS_ENTRY(pos, AT_EHDRFLAGS, args->hdr_eflags);
 	if (imgp->execpathp != 0)
-		AUXARGS_ENTRY(pos, AT_EXECPATH, imgp->execpathp);
+		AUXARGS_ENTRY_PTR(pos, AT_EXECPATH, imgp->execpathp);
 	AUXARGS_ENTRY(pos, AT_OSRELDATE,
 	    imgp->proc->p_ucred->cr_prison->pr_osreldate);
 	if (imgp->canary != 0) {
-		AUXARGS_ENTRY(pos, AT_CANARY, imgp->canary);
+		AUXARGS_ENTRY_PTR(pos, AT_CANARY, imgp->canary);
 		AUXARGS_ENTRY(pos, AT_CANARYLEN, imgp->canarylen);
 	}
 	AUXARGS_ENTRY(pos, AT_NCPUS, mp_ncpus);
 	if (imgp->pagesizes != 0) {
-		AUXARGS_ENTRY(pos, AT_PAGESIZES, imgp->pagesizes);
+		AUXARGS_ENTRY_PTR(pos, AT_PAGESIZES, imgp->pagesizes);
 		AUXARGS_ENTRY(pos, AT_PAGESIZESLEN, imgp->pagesizeslen);
 	}
 	if (imgp->sysent->sv_timekeep_base != 0) {
@@ -1424,7 +1424,8 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t base)
 	imgp->auxargs = NULL;
 	KASSERT(pos - argarray <= AT_COUNT, ("Too many auxargs"));
 
-	error = copyout(argarray, (void *)base, sizeof(*argarray) * AT_COUNT);
+	error = copyoutcap(argarray, (void * __capability)base,
+	    sizeof(*argarray) * AT_COUNT);
 	free(argarray, M_TEMP);
 	return (error);
 }

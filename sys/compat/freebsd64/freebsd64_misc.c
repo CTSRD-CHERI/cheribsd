@@ -121,6 +121,7 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 
 #include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_util.h>
@@ -658,7 +659,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		imgp->execpathp = (uintptr_t)destp;
+		imgp->execpathp = cheri_fromint(destp);
 		error = copyout(imgp->execpath, (void *)destp, execpath_len);
 		if (error != 0)
 			return(error);
@@ -669,7 +670,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = (uintptr_t)destp;
+	imgp->canary = cheri_fromint(destp);
 	error = copyout(canary, (void *)destp, sizeof(canary));
 	if (error != 0)
 		return (error);
@@ -680,7 +681,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	destp -= szps;
 	destp = __builtin_align_down(destp, sizeof(uint64_t));
-	imgp->pagesizes = (uintptr_t)destp;
+	imgp->pagesizes = cheri_fromint(destp);
 	error = copyout(pagesizes, (void *)destp, szps);
 	if (error != 0)
 		return (error);
@@ -733,6 +734,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
+	imgp->argv = cheri_fromint((intptr_t)vectp);
 	if (suword(&arginfo->ps_argvstr, (uint64_t)(intptr_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
@@ -752,6 +754,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	if (suword(vectp++, 0) != 0)
 		return (EFAULT);
 
+	imgp->envv = cheri_fromint((intptr_t)vectp);
 	if (suword(&arginfo->ps_envstr, (uint64_t)(intptr_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
@@ -774,7 +777,9 @@ freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	if (imgp->auxargs) {
 		vectp++;
 		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (uintptr_t)vectp);
+		    (uintcap_t)cheri_capability_build_user_data(
+			CHERI_CAP_USER_DATA_PERMS, (uintptr_t)vectp,
+			AT_COUNT * sizeof(Elf64_Auxinfo), 0));
 		if (error != 0)
 			return (error);
 	}
