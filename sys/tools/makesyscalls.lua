@@ -43,6 +43,8 @@ local generated_tag = "@" .. "generated"
 local config = {
 	os_id_keyword = "FreeBSD",
 	abi_func_prefix = "",
+	sysargmap = "/dev/null",
+	sysargmap_h = "_SYS_SYSARGMAP_H_",
 	sysnames = "syscalls.c",
 	sysproto = "../sys/sysproto.h",
 	sysproto_h = "_SYS_SYSPROTO_H_",
@@ -62,6 +64,7 @@ local config = {
 	abi_headers = "",
 	ptr_intptr_t_cast = "intptr_t",
 	ptr_qualified="*",
+	ptrmaskname = "sysargmask",
 }
 
 local config_modified = {}
@@ -70,6 +73,7 @@ local tmpspace = "/tmp/sysent." .. unistd.getpid() .. "/"
 
 -- These ones we'll open in place
 local config_files_needed = {
+	"sysargmap",
 	"sysnames",
 	"syshdr",
 	"sysmk",
@@ -708,6 +712,21 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 		end
 	end
 
+	local daflags = get_mask({"NOPROTO", "NODEF"})
+	if flags & daflags == 0 then
+		write_line("sysargmap", string.format("\t[%s%s] = (0x0",
+		    config["syscallprefix"], funcname))
+		local i = 0
+		for _, v in ipairs(funcargs) do
+			if isptrtype(v["type"]) then
+			    write_line("sysargmap", string.format(" | 0x%x",
+				1 << i))
+			end
+			i = i + 1
+		end
+		write_line("sysargmap", "),\n")
+	end
+
 	local protoflags = get_mask({"NOPROTO", "NODEF"})
 	if flags & protoflags == 0 and not skip_proto then
 		if funcname == "nosys" or funcname == "lkmnosys" or
@@ -1230,6 +1249,20 @@ for _, v in pairs(compat_options) do
 	write_line(v["tmp"], string.format("\n#ifdef %s\n\n", v["definition"]))
 end
 
+write_line("sysargmap", string.format([[/*
+ * System call prototypes.
+ *
+ * DO NOT EDIT-- this file is automatically %s.
+ * $%s$
+ */
+
+#ifndef %s
+#define	%s
+
+static int %s[] = {
+]], generated_tag, config['os_id_keyword'], config['sysargmap_h'],
+    config['sysargmap_h'], config['ptrmaskname']))
+
 write_line("sysnames", string.format([[/*
  * System call names.
  *
@@ -1349,6 +1382,8 @@ write_line("systraceret", [[
 ]])
 
 -- Finish up; output
+write_line("sysargmap", "};\n")
+
 write_line("syssw", read_file("sysinc"))
 write_line("syssw", read_file("sysent"))
 
