@@ -1868,7 +1868,7 @@ restart:
 		  sb.st_ino != oldinum) {
 		error = EIDRM;	/* Identifier removed */
 	} else if (fp != NULL && fp->f_vnode != vp) {
-		if ((fp->f_vnode->v_iflag & VI_DOOMED) != 0)
+		if (VN_IS_DOOMED(fp->f_vnode))
 			error = EBADF;
 		else
 			error = EDEADLK;
@@ -3841,7 +3841,7 @@ restart:
 	}
 
 	if (fp != NULL && fp->f_vnode != vp) {
-		if ((fp->f_vnode->v_iflag & VI_DOOMED) != 0)
+		if (VN_IS_DOOMED(fp->f_vnode))
 			error = EBADF;
 		else
 			error = EDEADLK;

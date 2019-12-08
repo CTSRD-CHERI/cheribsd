@@ -1234,7 +1234,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 			vrele(newvp);
 		*vpp = NULLVP;
 	} else if (error == ENOENT) {
-		if (dvp->v_iflag & VI_DOOMED)
+		if (VN_IS_DOOMED(dvp))
 			return (ENOENT);
 		/*
 		 * We only accept a negative hit in the cache if the
@@ -1339,7 +1339,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 			error = vfs_busy(mp, 0);
 			NFSVOPLOCK(dvp, ltype | LK_RETRY);
 			vfs_rel(mp);
-			if (error == 0 && (dvp->v_iflag & VI_DOOMED)) {
+			if (error == 0 && VN_IS_DOOMED(dvp)) {
 				vfs_unbusy(mp);
 				error = ENOENT;
 			}
@@ -1354,7 +1354,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 		vfs_unbusy(mp);
 		if (newvp != dvp)
 			NFSVOPLOCK(dvp, ltype | LK_RETRY);
-		if (dvp->v_iflag & VI_DOOMED) {
+		if (VN_IS_DOOMED(dvp)) {
 			if (error == 0) {
 				if (newvp == dvp)
 					vrele(newvp);
@@ -3138,7 +3138,7 @@ nfs_advlock(struct vop_advlock_args *ap)
 		else
 			cred = td->td_ucred;
 		NFSVOPLOCK(vp, LK_UPGRADE | LK_RETRY);
-		if (vp->v_iflag & VI_DOOMED) {
+		if (VN_IS_DOOMED(vp)) {
 			error = EBADF;
 			goto out;
 		}
@@ -3168,7 +3168,7 @@ nfs_advlock(struct vop_advlock_args *ap)
 				if (error)
 					return (EINTR);
 				NFSVOPLOCK(vp, LK_EXCLUSIVE | LK_RETRY);
-				if (vp->v_iflag & VI_DOOMED) {
+				if (VN_IS_DOOMED(vp)) {
 					error = EBADF;
 					goto out;
 				}
