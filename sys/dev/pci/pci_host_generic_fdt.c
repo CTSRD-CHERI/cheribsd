@@ -63,6 +63,8 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/intr.h>
 
+#include <mips/beri/busdma_iommu.h>
+
 #include "pcib_if.h"
 
 #define	PCI_IO_WINDOW_OFFSET	0x1000
@@ -103,6 +105,53 @@ get_addr_size_cells(phandle_t node, pcell_t *addr_cells, pcell_t *size_cells)
 }
 
 static int
+generic_pcie_get_iommu(device_t dev)
+{
+	struct generic_pcie_fdt_softc *sc;
+	device_t iommu_dev;
+	phandle_t node;
+	pcell_t prop;
+	size_t len;
+
+	sc = device_get_softc(dev);
+
+	printf("%s\n", __func__);
+
+	node = ofw_bus_get_node(dev);
+	if (OF_getproplen(node, "iommu") <= 0) {
+		device_printf(dev, "iommu not found\n");
+		return (0);
+	}
+
+	printf("%s 1\n", __func__);
+
+	len = OF_getencprop(node, "iommu", &prop, sizeof(prop));
+	if (len != sizeof(prop)) {
+		device_printf(dev,
+		    "%s: Can't get iommu device node\n", __func__);
+		return (0);
+	}
+
+	printf("%s 2\n", __func__);
+
+	iommu_dev = OF_device_from_xref(prop);
+	if (iommu_dev == NULL) {
+		device_printf(dev,
+		    "%s: Can't get iommu device\n", __func__);
+		return (0);
+	}
+
+	printf("%s 3\n", __func__);
+
+	device_printf(dev, "iommu device found\n");
+	sc->base.iommu_dev = iommu_dev;
+	sc->base.xio.dev = iommu_dev;
+
+	/* Found */
+	return (1);
+}
+
+static int
 generic_pcie_fdt_probe(device_t dev)
 {
 
@@ -137,17 +186,20 @@ pci_host_generic_attach(device_t dev)
 	/* Retrieve 'ranges' property from FDT */
 	if (bootverbose)
 		device_printf(dev, "parsing FDT for ECAM%d:\n", sc->base.ecam);
+
 	if (parse_pci_mem_ranges(dev, &sc->base))
 		return (ENXIO);
+
+	generic_pcie_get_iommu(dev);
 
 	/* Attach OFW bus */
 	if (generic_pcie_ofw_bus_attach(dev) != 0)
 		return (ENXIO);
 
 	node = ofw_bus_get_node(dev);
-	if (sc->base.coherent == 0) {
+	if (sc->base.coherent == 0)
 		sc->base.coherent = OF_hasprop(node, "dma-coherent");
-	}
+
 	if (bootverbose)
 		device_printf(dev, "Bus is%s cache-coherent\n",
 		    sc->base.coherent ? "" : " not");

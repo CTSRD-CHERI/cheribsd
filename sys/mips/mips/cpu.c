@@ -413,8 +413,10 @@ cpu_identify(void)
 		panic("%s: QEMU-CHERI is too old to run this kernel. Update "
 		    "QEMU before rebooting or comment out this check!", __func__);
 #else
+#if 0
 		panic("%s: Bitfile is too old to run this kernel. CPU revision "
 		    "must be at least %d", __func__, min_cpu_rev);
+#endif
 #endif
 #endif
 

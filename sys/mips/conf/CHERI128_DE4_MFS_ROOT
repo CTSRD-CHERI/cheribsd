@@ -20,7 +20,7 @@ device		em
 device		iflib
 
 # Capability descriptor
-options		E1000_DESC_CAP
+#options		E1000_DESC_CAP
 
 device		scbus
 device		pass

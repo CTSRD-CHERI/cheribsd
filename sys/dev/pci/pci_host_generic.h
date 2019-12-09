@@ -34,6 +34,8 @@
 #ifndef __PCI_HOST_GENERIC_H_
 #define	__PCI_HOST_GENERIC_H_
 
+#include <mips/beri/busdma_iommu.h>
+
 #include "pci_if.h"
 
 #define	MAX_RANGES_TUPLES	16
@@ -64,6 +66,8 @@ struct generic_pcie_core_softc {
 	device_t		dev;
 	bus_space_handle_t	ioh;
 	bus_dma_tag_t		dmat;
+	device_t		iommu_dev;
+	struct busdma_iommu	xio;
 };
 
 DECLARE_CLASS(generic_pcie_core_driver);

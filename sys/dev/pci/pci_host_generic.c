@@ -450,7 +450,10 @@ generic_pcie_get_dma_tag(device_t dev, device_t child)
 
 	sc = device_get_softc(dev);
 
-	bus_dma_tag_set_iommu(sc->dmat, dev, NULL);
+	if (sc->xio.dev != NULL) {
+		bus_dma_tag_set_iommu(sc->dmat, dev, NULL);
+		busdma_iommu_init(&sc->xio);
+	}
 
 	return (sc->dmat);
 #else
@@ -506,8 +509,29 @@ generic_pcie_iommu_map(device_t dev, bus_dma_segment_t *segs, int *nsegs,
     bus_addr_t min, bus_addr_t max, bus_size_t alignment, bus_addr_t boundary,
     void *cookie)
 {
+	struct generic_pcie_core_softc *sc;
+	bus_dma_segment_t *seg;
+	vm_offset_t va;
+	int i;
 
-	printf("%s: nsegs %d, min %lx, max %lx\n", __func__, *nsegs, min, max);
+	sc = device_get_softc(dev);
+
+	//printf("%s: nsegs %d, min %lx, max %lx\n",
+	//    __func__, *nsegs, min, max);
+
+	printf("%s: nsegs %d\n", __func__, *nsegs);
+
+	for (i = 0; i < *nsegs; i++) {
+		seg = &segs[i];
+
+		busdma_iommu_add_entry(&sc->xio, &va, seg->ds_addr,
+		    seg->ds_len, VM_PROT_WRITE | VM_PROT_READ);
+
+		printf("  seg%d: ds_addr %lx ds_len %ld, va %lx\n",
+		    i, seg->ds_addr, seg->ds_len, va);
+
+		seg->ds_addr = va;
+	}
 
 	return (0);
 }

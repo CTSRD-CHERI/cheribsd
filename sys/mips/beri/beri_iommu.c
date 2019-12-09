@@ -49,15 +49,18 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/openfirm.h>
 #include <dev/ofw/ofw_bus.h>
 #include <dev/ofw/ofw_bus_subr.h>
+#include <dev/xdma/xdma.h>
 
 #include <machine/cache.h>
 #include <machine/bus.h>
 #include <machine/cpu.h>
 #include <machine/intr.h>
 
-#include <dev/xdma/xdma.h>
+#include <vm/vm.h>
+#include <vm/pmap.h>
 
 #include "xdma_if.h"
+#include "busdma_iommu_if.h"
 
 #define	IOMMU_INVALIDATE	0x00
 #define	IOMMU_SET_BASE		0x08
@@ -90,33 +93,39 @@ beri_iommu_set_base(struct beri_iommu_softc *sc, vm_offset_t addr)
 }
 
 static int
-beri_iommu_release(device_t dev, struct xdma_iommu *xio)
+beri_iommu_release(device_t dev, pmap_t p)
 {
 	struct beri_iommu_softc *sc;
 
+	printf("%s\n", __func__);
+
 	sc = device_get_softc(dev);
 
-	beri_iommu_set_base(sc, 0);
+	//beri_iommu_set_base(sc, 0);
 
 	return (0);
 }
 
 static int
-beri_iommu_init(device_t dev, struct xdma_iommu *xio)
+beri_iommu_init(device_t dev, pmap_t p)
 {
 	struct beri_iommu_softc *sc;
 
+	printf("%s: setting segtab %lx\n", __func__, (uintptr_t)p->pm_segtab);
+
 	sc = device_get_softc(dev);
 
-	beri_iommu_set_base(sc, (uintptr_t)xio->p.pm_segtab);
+	beri_iommu_set_base(sc, (uintptr_t)p->pm_segtab);
 
 	return (0);
 }
 
 static int
-beri_iommu_remove(device_t dev, struct xdma_iommu *xio, vm_offset_t va)
+beri_iommu_remove(device_t dev, pmap_t p, vm_offset_t va)
 {
 	struct beri_iommu_softc *sc;
+
+	printf("%s\n", __func__);
 
 	sc = device_get_softc(dev);
 
@@ -126,16 +135,16 @@ beri_iommu_remove(device_t dev, struct xdma_iommu *xio, vm_offset_t va)
 }
 
 static int
-beri_iommu_enter(device_t dev, struct xdma_iommu *xio, vm_offset_t va,
+beri_iommu_enter(device_t dev, pmap_t p, vm_offset_t va,
     vm_paddr_t pa)
 {
 	struct beri_iommu_softc *sc;
 	pt_entry_t opte, npte;
 	pt_entry_t *pte;
-	pmap_t p;
+
+	printf("%s: pa %lx va %lx\n", __func__, pa, va);
 
 	sc = device_get_softc(dev);
-	p = &xio->p;
 
 	pte = pmap_pte(p, va);
 	if (pte == NULL)
@@ -209,13 +218,62 @@ beri_iommu_detach(device_t dev)
 	return (0);
 }
 
+/* xDMA interface */
+
+static int
+beri_xdma_iommu_release(device_t dev, struct xdma_iommu *xio)
+{
+	int ret;
+
+	ret = beri_iommu_release(dev, &xio->p);
+
+	return (ret);
+}
+
+static int
+beri_xdma_iommu_init(device_t dev, struct xdma_iommu *xio)
+{
+	int ret;
+
+	ret = beri_iommu_init(dev, &xio->p);
+
+	return (ret);
+}
+
+static int
+beri_xdma_iommu_remove(device_t dev, struct xdma_iommu *xio, vm_offset_t va)
+{
+	int ret;
+
+	ret = beri_iommu_remove(dev, &xio->p, va);
+
+	return (ret);
+}
+
+static int
+beri_xdma_iommu_enter(device_t dev, struct xdma_iommu *xio, vm_offset_t va,
+    vm_paddr_t pa)
+{
+	int ret;
+
+	ret = beri_iommu_enter(dev, &xio->p, va, pa);
+
+	return (ret);
+}
+
 static device_method_t beri_iommu_methods[] = {
 
 	/* xDMA IOMMU interface */
-	DEVMETHOD(xdma_iommu_init,	beri_iommu_init),
-	DEVMETHOD(xdma_iommu_release,	beri_iommu_release),
-	DEVMETHOD(xdma_iommu_enter,	beri_iommu_enter),
-	DEVMETHOD(xdma_iommu_remove,	beri_iommu_remove),
+	DEVMETHOD(xdma_iommu_init,	beri_xdma_iommu_init),
+	DEVMETHOD(xdma_iommu_release,	beri_xdma_iommu_release),
+	DEVMETHOD(xdma_iommu_enter,	beri_xdma_iommu_enter),
+	DEVMETHOD(xdma_iommu_remove,	beri_xdma_iommu_remove),
+
+	/* busdma IOMMU interface */
+	DEVMETHOD(busdma_iommu_init,	beri_iommu_init),
+	DEVMETHOD(busdma_iommu_release,	beri_iommu_release),
+	DEVMETHOD(busdma_iommu_enter,	beri_iommu_enter),
+	DEVMETHOD(busdma_iommu_remove,	beri_iommu_remove),
 
 	/* Device interface */
 	DEVMETHOD(device_probe,		beri_iommu_probe),
