@@ -1726,6 +1726,7 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	destp = (void *)p->p_sysent->sv_psstrings;
 	arginfo = (struct ps_strings *)destp;
 #endif
+	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0) {
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);

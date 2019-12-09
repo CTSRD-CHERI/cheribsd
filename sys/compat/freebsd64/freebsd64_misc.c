@@ -636,6 +636,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	p = imgp->proc;
 	szsigcode = 0;
 	arginfo = (struct freebsd64_ps_strings *)p->p_sysent->sv_psstrings;
+	imgp->ps_strings = cheri_fromint((uintptr_t)arginfo);
 	if (p->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(p->p_sysent->sv_szsigcode);
 	else

@@ -71,6 +71,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/syslog.h>
 #include <sys/eventhandler.h>
 #include <sys/user.h>
+#ifdef __ELF_CHERI
+#include <sys/vdso.h>
+#endif
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -79,6 +82,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
+
+#ifdef __ELF_CHERI
+#include <cheri/cheric.h>
+#endif
 
 #include <machine/elf.h>
 #include <machine/md_var.h>
@@ -1374,11 +1381,75 @@ ret:
 
 #define	suword __CONCAT(suword, __ELF_WORD_SIZE)
 
+#ifdef __ELF_CHERI
+static void * __capability
+prog_cap(struct image_params *imgp, uint64_t perms)
+{
+	vaddr_t prog_base;
+	ssize_t prog_len;
+
+	prog_base = imgp->start_addr;
+	prog_len = imgp->end_addr - prog_base;
+
+	/* Ensure program base and length are representable. */
+	prog_base = CHERI_REPRESENTABLE_BASE(prog_base, prog_len);
+	prog_len = CHERI_REPRESENTABLE_LENGTH(prog_len);
+	KASSERT(prog_len != 0, ("prog_len overflowed: %ld",
+	    (long)(imgp->end_addr - imgp->start_addr)));
+
+	return (cheri_capability_build_user_rwx(perms, prog_base, prog_len,
+	    imgp->start_addr - prog_base));
+}
+
+static void * __capability
+interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
+{
+	vaddr_t interp_base;
+	ssize_t interp_len;
+
+	interp_base = args->base;
+	interp_len = imgp->interp_end - interp_base;
+
+	/* Ensure rtld base and length are representable. */
+	interp_base = CHERI_REPRESENTABLE_BASE(interp_base, interp_len);
+	interp_len = CHERI_REPRESENTABLE_LENGTH(interp_len);
+	KASSERT(interp_len != 0, ("interp_len overflowed: %ld",
+	    (long)(imgp->end_addr - imgp->start_addr)));
+
+	return (cheri_capability_build_user_rwx(perms, interp_base, interp_len,
+	    args->base - interp_base));
+}
+
+static void * __capability
+timekeep_cap(struct image_params *imgp)
+{
+	vaddr_t timekeep_base;
+	size_t timekeep_len;
+
+	timekeep_base = imgp->sysent->sv_timekeep_base;
+	timekeep_len = sizeof(struct vdso_timekeep) +
+	    sizeof(struct vdso_timehands) * VDSO_TH_NUM;
+
+	/* These are sub-page so should be representable as-is. */
+	KASSERT(timekeep_base == CHERI_REPRESENTABLE_BASE(timekeep_base,
+	    timekeep_len), ("timekeep_base needs rounding"));
+	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
+	    ("timekeep_len needs rounding"));
+
+	/* XXX: Read-only? */
+	return (cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+	    timekeep_base, timekeep_len, 0));
+}
+#endif
+
 int
 __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 	Elf_Auxinfo *argarray, *pos;
+#ifdef __ELF_CHERI
+	void * __capability exec_base;
+#endif
 	int error;
 
 	argarray = pos = malloc(AT_COUNT * sizeof(*pos), M_TEMP,
@@ -1386,13 +1457,42 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 
 	if (args->execfd != -1)
 		AUXARGS_ENTRY(pos, AT_EXECFD, args->execfd);
+#ifdef __ELF_CHERI
+	/*
+	 * AT_ENTRY gives an executable capability for the whole
+	 * program and AT_PHDR a writable one.  RTLD is reponsible for
+	 * setting bounds.
+	 */
+	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
+	    CHERI_CAP_USER_DATA_PERMS), args->phdr));
+#else
 	AUXARGS_ENTRY(pos, AT_PHDR, args->phdr);
+#endif
 	AUXARGS_ENTRY(pos, AT_PHENT, args->phent);
 	AUXARGS_ENTRY(pos, AT_PHNUM, args->phnum);
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
+#ifdef __ELF_CHERI
+	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, cheri_setaddress(prog_cap(imgp,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS),
+	    args->entry));
+
+	/*
+	 * XXX: AT_BASE is both writable and executable to permit textrel
+	 * fixups.
+	 */
+	if (imgp->interp_end == 0)
+		exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
+		    CHERI_CAP_USER_CODE_PERMS);
+	else
+		exec_base = interp_cap(imgp, args, CHERI_CAP_USER_DATA_PERMS |
+		    CHERI_CAP_USER_CODE_PERMS);
+	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_setaddress(exec_base,
+	    args->base));
+#else
 	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
 	AUXARGS_ENTRY(pos, AT_BASE, args->base);
+#endif
 	AUXARGS_ENTRY(pos, AT_EHDRFLAGS, args->hdr_eflags);
 	if (imgp->execpathp != 0)
 		AUXARGS_ENTRY_PTR(pos, AT_EXECPATH, imgp->execpathp);
@@ -1408,8 +1508,11 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY(pos, AT_PAGESIZESLEN, imgp->pagesizeslen);
 	}
 	if (imgp->sysent->sv_timekeep_base != 0) {
-		AUXARGS_ENTRY(pos, AT_TIMEKEEP,
-		    imgp->sysent->sv_timekeep_base);
+#ifdef __ELF_CHERI
+		AUXARGS_ENTRY_PTR(pos, AT_TIMEKEEP, timekeep_cap(imgp));
+#else
+		AUXARGS_ENTRY(pos, AT_TIMEKEEP, imgp->sysent->sv_timekeep_base);
+#endif
 	}
 	AUXARGS_ENTRY(pos, AT_STACKPROT, imgp->sysent->sv_shared_page_obj
 	    != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
@@ -1418,6 +1521,11 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 		AUXARGS_ENTRY(pos, AT_HWCAP, *imgp->sysent->sv_hwcap);
 	if (imgp->sysent->sv_hwcap2 != NULL)
 		AUXARGS_ENTRY(pos, AT_HWCAP2, *imgp->sysent->sv_hwcap2);
+	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
+	AUXARGS_ENTRY_PTR(pos, AT_ARGV, imgp->argv);
+	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
+	AUXARGS_ENTRY_PTR(pos, AT_ENVV, imgp->envv);
+	AUXARGS_ENTRY_PTR(pos, AT_PS_STRINGS, imgp->ps_strings);
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);

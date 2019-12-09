@@ -853,8 +853,7 @@ cheriabi_copyout_auxargs(struct image_params *imgp, uintcap_t base)
 	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
 	AUXARGS_ENTRY_PTR(pos, AT_ENVV, imgp->envv);
 
-	AUXARGS_ENTRY_CAP(pos, AT_PS_STRINGS, imgp->sysent->sv_psstrings, 0,
-	    sizeof(struct cheriabi_ps_strings), CHERI_CAP_USER_DATA_PERMS);
+	AUXARGS_ENTRY_PTR(pos, AT_PS_STRINGS, imgp->ps_strings);
 
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 

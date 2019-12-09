@@ -199,8 +199,12 @@ exec_aout_imgact(struct image_params *imgp)
 		virtual_offset = PAGE_SIZE;
 		file_offset = 0;
 		/* Pass PS_STRINGS for BSD/OS binaries only. */
+		/*
+		 * XXXCHERI: This is now set for all a.out binaries in
+		 * exec_copyout_strings.
+		 */
 		if (N_GETMID(*a_out) == MID_ZERO)
-			imgp->ps_strings = aout_sysvec.sv_psstrings;
+			imgp->ps_strings = (void *)aout_sysvec.sv_psstrings;
 		break;
 	default:
 		/* NetBSD compatibility */

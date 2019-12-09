@@ -78,7 +78,7 @@ struct image_params {
 	char *interpreter_name;	/* name of the interpreter */
 	void *auxargs;		/* ELF Auxinfo structure pointer */
 	struct sf_buf *firstpage;	/* first page that we mapped */
-	unsigned long ps_strings; /* PS_STRINGS for BSD/OS binaries */
+	void * __capability ps_strings;
 	struct image_args *args;	/* system call arguments */
 	struct sysentvec *sysent;	/* system entry vector */
 	void * __capability argv;	/* pointer to argv (user space) */

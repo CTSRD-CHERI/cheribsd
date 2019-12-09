@@ -671,7 +671,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	td->td_frame->a0 = (register_t) stack;
 	td->td_frame->a1 = 0;
 	td->td_frame->a2 = 0;
-	td->td_frame->a3 = (register_t)imgp->ps_strings;
+	td->td_frame->a3 = (__cheri_addr register_t)imgp->ps_strings;
 
 	td->td_md.md_flags &= ~MDTD_FPUSED;
 	if (PCPU_GET(fpcurthread) == td)
