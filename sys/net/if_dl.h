@@ -64,7 +64,7 @@ struct sockaddr_dl {
 	u_char	sdl_nlen;	/* interface name length, no trailing 0 reqd. */
 	u_char	sdl_alen;	/* link level address length */
 	u_char	sdl_slen;	/* link layer selector length */
-	char	sdl_data[46];	/* minimum work area, can be larger;
+	char	sdl_data[46] __no_subobject_bounds;	/* minimum work area, can be larger;
 				   contains both if name and ll address */
 } __aligned(sizeof(long));
 
