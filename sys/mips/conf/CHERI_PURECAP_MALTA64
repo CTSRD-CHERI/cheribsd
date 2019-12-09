@@ -33,6 +33,9 @@ nooptions	NFSD, NFSCL
 # disable raid, we don't need it
 nooptions	GEOM_RAID
 
+# networking
+options		INET6
+
 # debugging
 options 	KTRACE
 options 	KDB

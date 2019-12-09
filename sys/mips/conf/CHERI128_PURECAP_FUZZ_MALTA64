@@ -37,6 +37,9 @@ nooptions	GEOM_RAID
 options		COVERAGE
 options		KCOV
 
+# networking
+options		INET6
+
 # debugging
 options 	KTRACE
 options 	KDB
