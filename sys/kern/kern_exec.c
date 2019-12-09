@@ -370,7 +370,7 @@ do_execve(struct thread *td, struct image_args *args,
 	struct nameidata nd;
 	struct ucred *oldcred;
 	struct uidinfo *euip = NULL;
-	register_t *stack_base;
+	uintptr_t stack_base;
 	struct image_params image_params, *imgp;
 	struct vattr attr;
 	int (*img_first)(struct image_params *);
@@ -887,7 +887,7 @@ interpret:
 #endif
 
 	/* Set values passed into the program in registers. */
-	(*p->p_sysent->sv_setregs)(td, imgp, (u_long)(uintptr_t)stack_base);
+	(*p->p_sysent->sv_setregs)(td, imgp, stack_base);
 
 	vfs_mark_atime(imgp->vp, td->td_ucred);
 
@@ -1681,12 +1681,14 @@ _sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
  * as the initial stack pointer.
  */
 int
-exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
+exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 {
 	int argc, envc;
 	char * __capability * __capability vectp;
 	char *stringp;
-	char * __capability destp;
+	uintcap_t destp, ustringp;
+	/* XXX: Temporary */
+	uintptr_t uptr, uptr_old;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len;
@@ -1722,7 +1724,7 @@ exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);
 	}
-	destp =	(char * __capability)arginfo;
+	destp =	(uintcap_t)arginfo;
 
 	/*
 	 * install sigcode
@@ -1731,7 +1733,8 @@ exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 		destp -= szsigcode;
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
-		error = copyout_c(p->p_sysent->sv_sigcode, destp, szsigcode);
+		error = copyout_c(p->p_sysent->sv_sigcode,
+		    (void * __capability)destp, szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -1748,7 +1751,8 @@ exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 
 		/* XXX: Should execpathp be a pointer? */
 		imgp->execpathp = (__cheri_addr uintptr_t)destp;
-		error = copyout_c(imgp->execpath, destp, execpath_len);
+		error = copyout_c(imgp->execpath, (void * __capability)destp,
+		    execpath_len);
 		if (error != 0)
 			return (error);
 	}
@@ -1759,7 +1763,7 @@ exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 	imgp->canary = (__cheri_addr uintptr_t)destp;
-	error = copyout_c(canary, destp, sizeof(canary));
+	error = copyout_c(canary, (void * __capability)destp, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -1770,24 +1774,33 @@ exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	destp -= szps;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
 	imgp->pagesizes = (__cheri_addr uintptr_t)destp;
-	error = copyout_c(pagesizes, destp, szps);
+	error = copyout_c(pagesizes, (void * __capability)destp, szps);
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = szps;
 
+	/*
+	 * Allocate room for the argument and environment strings.
+	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
+	ustringp = destp;
 
-	vectp = (char * __capability * __capability)destp;
-	if (imgp->sysent->sv_stackgap != NULL)
-		imgp->sysent->sv_stackgap(imgp, (u_long *)&vectp);
+	if (imgp->sysent->sv_stackgap != NULL) {
+		uptr_old = uptr = (__cheri_addr uintptr_t)destp;
+		imgp->sysent->sv_stackgap(imgp, &uptr);
+		destp -= (uptr_old - uptr);
+	}
 
 	if (imgp->auxargs) {
-		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (u_long *)&vectp);
+		uptr_old = uptr = (__cheri_addr uintptr_t)destp;
+		error = imgp->sysent->sv_copyout_auxargs(imgp, &uptr);
 		if (error != 0)
 			return (error);
+		destp -= (uptr_old - uptr);
 	}
+
+	vectp = (char * __capability * __capability)destp;
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -1798,7 +1811,7 @@ exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (__cheri_fromcap register_t *)(register_t * __capability)vectp;
+	*stack_base = (__cheri_addr uintptr_t)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -1807,7 +1820,8 @@ exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout_c(stringp, destp, ARG_MAX - imgp->args->stringspace);
+	error = copyout_c(stringp, (void * __capability)ustringp,
+	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
 
@@ -1835,17 +1849,17 @@ exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 #endif
 	for (; argc > 0; --argc) {
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (__cheri_addr vaddr_t)destp, 0,
+		if (sucap(vectp++, (__cheri_addr vaddr_t)ustringp, 0,
 		    strlen(stringp) + 1,
 		    "command line argument", CHERI_CAP_USER_DATA_PERMS) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, (long)(intptr_t)destp) != 0)
+		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
 #endif
 		while (*stringp++ != 0)
-			destp++;
-		destp++;
+			ustringp++;
+		ustringp++;
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
@@ -1873,17 +1887,17 @@ exec_copyout_strings(struct image_params *imgp, register_t **stack_base)
 #endif
 	for (; envc > 0; --envc) {
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (__cheri_addr vaddr_t)destp, 0,
+		if (sucap(vectp++, (__cheri_addr vaddr_t)ustringp, 0,
 		    strlen(stringp) + 1,
 		    "environment variable", CHERI_CAP_USER_DATA_PERMS) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, (long)(intptr_t)destp) != 0)
+		if (suword(vectp++, ustringp) != 0)
 			return (EFAULT);
 #endif
 		while (*stringp++ != 0)
-			destp++;
-		destp++;
+			ustringp++;
+		ustringp++;
 	}
 
 	/* end of vector table is a null pointer */
