@@ -3240,11 +3240,14 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 		/*
 		 * NB: Only copy exactly the pss fields we might need here.
 		 */
-		pss.ps_sbclasses = cheri_fromint(pss32.ps_sbclasses);
+		pss.ps_sbclasses =
+		    (void * __capability)(uintcap_t)pss32.ps_sbclasses;
 		pss.ps_sbclasseslen = (size_t)pss32.ps_sbclasseslen;
-		pss.ps_sbmethods = cheri_fromint(pss32.ps_sbmethods);
+		pss.ps_sbmethods =
+		    (void * __capability)(uintcap_t)pss32.ps_sbmethods;
 		pss.ps_sbmethodslen = (size_t)pss32.ps_sbmethodslen;
-		pss.ps_sbobjects = cheri_fromint(pss32.ps_sbobjects);
+		pss.ps_sbobjects =
+		    (void * __capability)(uintcap_t)pss32.ps_sbobjects;
 		pss.ps_sbobjectslen = (size_t)pss32.ps_sbobjectslen;
 	} else
 #endif
@@ -3258,11 +3261,14 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 		/*
 		 * NB: Only copy exactly the pss fields we might need here.
 		 */
-		pss.ps_sbclasses = cheri_fromint(pss64.ps_sbclasses);
+		pss.ps_sbclasses =
+		    (void * __capability)(uintcap_t)pss64.ps_sbclasses;
 		pss.ps_sbclasseslen = (size_t)pss64.ps_sbclasseslen;
-		pss.ps_sbmethods = cheri_fromint(pss64.ps_sbmethods);
+		pss.ps_sbmethods =
+		    (void * __capability)(uintcap_t)pss64.ps_sbmethods;
 		pss.ps_sbmethodslen = (size_t)pss64.ps_sbmethodslen;
-		pss.ps_sbobjects = cheri_fromint(pss64.ps_sbobjects);
+		pss.ps_sbobjects =
+		    (void * __capability)(uintcap_t)pss64.ps_sbobjects;
 		pss.ps_sbobjectslen = (size_t)pss64.ps_sbobjectslen;
 	} else
 #endif
