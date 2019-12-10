@@ -86,8 +86,6 @@
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
 static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
-static void	freebsd64_exec_setregs(struct thread *, struct image_params *,
-		    u_long);
 
 extern const char *freebsd64_syscallnames[];
 
@@ -111,7 +109,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
-	.sv_setregs	= freebsd64_exec_setregs,
+	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_ASLR |
@@ -201,14 +199,6 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
 
 	sendsig(catcher, ksi, mask);
-}
-
-static void
-freebsd64_exec_setregs(struct thread *td, struct image_params *imgp,
-    u_long stack)
-{
-
-	exec_setregs(td, imgp, stack);
 }
 
 int
