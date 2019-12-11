@@ -293,9 +293,7 @@ cpu_thread_free(struct thread *td)
 	 * We need to recover the full capability to the stack, including the
 	 * pcb region.
 	 * XXX-AM: The ideal solution would be to avoid rederivation altogheter
-	 * and cache the pcb capability along the kstack. Maybe add a hook in
-	 * vm_glue to allow cpu_* to do different things with a new and
-	 * recycled stack?
+	 * and make sure that the kstack cache zone can rebuild the full capability.
 	 */
 	td->td_kstack = (vm_ptr_t)cheri_ptrperm(
 	    cheri_setaddress(cheri_kall_capability,
