@@ -10,7 +10,7 @@ CRTARCH?=	armhf
 .elif ${MACHINE_ARCH:Mmips64*} != ""
 CRTARCH?=	mips64
 .else
-CRTARCH?=	${MACHINE_CPUARCH:C/amd64/x86_64/}
+CRTARCH?=	${MACHINE_ARCH:C/amd64/x86_64/}
 .endif
 CRTSRC=		${SRCTOP}/contrib/compiler-rt
 

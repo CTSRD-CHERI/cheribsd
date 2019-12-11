@@ -1,7 +1,6 @@
 /*-
  * Copyright (c) 2018 Emmanuel Vadot <manu@FreeBSD.Org>
  * Copyright (c) 2016 Jared McNeill <jmcneill@invisible.ca>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -455,6 +454,12 @@ cpufreq_dt_attach(device_t dev)
 	sc = device_get_softc(dev);
 	sc->dev = dev;
 	node = ofw_bus_get_node(device_get_parent(dev));
+	cpu = device_get_unit(device_get_parent(dev));
+
+	if (cpu >= mp_ncpus) {
+		device_printf(dev, "Not attaching as cpu is not present\n");
+		return (ENXIO);
+	}
 
 	if (regulator_get_by_ofw_property(dev, node,
 	    "cpu-supply", &sc->reg) != 0) {
@@ -497,7 +502,6 @@ cpufreq_dt_attach(device_t dev)
 	 * Find all CPUs that share the same opp table
 	 */
 	CPU_ZERO(&sc->cpus);
-	cpu = device_get_unit(device_get_parent(dev));
 	for (cnode = node; cnode > 0; cnode = OF_peer(cnode), cpu++) {
 		copp = -1;
 		if (version == OPP_V1)

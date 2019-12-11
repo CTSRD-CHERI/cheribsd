@@ -2786,6 +2786,7 @@ ffs_freefile(ump, fs, devvp, ino, mode, wkhd)
 	u_int cg;
 	u_int8_t *inosused;
 	struct cdev *dev;
+	ino_t cgino;
 
 	cg = ino_to_cg(fs, ino);
 	if (devvp->v_type == VREG) {
@@ -2805,16 +2806,16 @@ ffs_freefile(ump, fs, devvp, ino, mode, wkhd)
 	if ((error = ffs_getcg(fs, devvp, cg, 0, &bp, &cgp)) != 0)
 		return (error);
 	inosused = cg_inosused(cgp);
-	ino %= fs->fs_ipg;
-	if (isclr(inosused, ino)) {
+	cgino = ino % fs->fs_ipg;
+	if (isclr(inosused, cgino)) {
 		printf("dev = %s, ino = %ju, fs = %s\n", devtoname(dev),
-		    (uintmax_t)(ino + cg * fs->fs_ipg), fs->fs_fsmnt);
+		    (uintmax_t)ino, fs->fs_fsmnt);
 		if (fs->fs_ronly == 0)
 			panic("ffs_freefile: freeing free inode");
 	}
-	clrbit(inosused, ino);
-	if (ino < cgp->cg_irotor)
-		cgp->cg_irotor = ino;
+	clrbit(inosused, cgino);
+	if (cgino < cgp->cg_irotor)
+		cgp->cg_irotor = cgino;
 	cgp->cg_cs.cs_nifree++;
 	UFS_LOCK(ump);
 	fs->fs_cstotal.cs_nifree++;
@@ -2828,8 +2829,7 @@ ffs_freefile(ump, fs, devvp, ino, mode, wkhd)
 	ACTIVECLEAR(fs, cg);
 	UFS_UNLOCK(ump);
 	if (MOUNTEDSOFTDEP(UFSTOVFS(ump)) && devvp->v_type == VCHR)
-		softdep_setup_inofree(UFSTOVFS(ump), bp,
-		    ino + cg * fs->fs_ipg, wkhd);
+		softdep_setup_inofree(UFSTOVFS(ump), bp, ino, wkhd);
 	bdwrite(bp);
 	return (0);
 }
@@ -2955,16 +2955,19 @@ ffs_getcg(fs, devvp, cg, flags, bpp, cgpp)
 	struct buf *bp;
 	struct cg *cgp;
 	const struct statfs *sfs;
+	daddr_t blkno;
 	int error;
 
 	*bpp = NULL;
 	*cgpp = NULL;
 	if ((fs->fs_metackhash & CK_CYLGRP) != 0)
 		flags |= GB_CKHASH;
-	error = breadn_flags(devvp, devvp->v_type == VREG ?
-	    fragstoblks(fs, cgtod(fs, cg)) : fsbtodb(fs, cgtod(fs, cg)),
-	    (int)fs->fs_cgsize, NULL, NULL, 0, NOCRED, flags,
-	    ffs_ckhash_cg, &bp);
+	if (devvp->v_type == VREG)
+		blkno = fragstoblks(fs, cgtod(fs, cg));
+	else
+		blkno = fsbtodb(fs, cgtod(fs, cg));
+	error = breadn_flags(devvp, blkno, blkno, (int)fs->fs_cgsize, NULL,
+	    NULL, 0, NOCRED, flags, ffs_ckhash_cg, &bp);
 	if (error != 0)
 		return (error);
 	cgp = (struct cg *)bp->b_data;

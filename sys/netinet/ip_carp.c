@@ -568,14 +568,16 @@ carp6_input(struct mbuf **mp, int *offp, int proto)
 	}
 
 	/* verify that we have a complete carp packet */
-	len = m->m_len;
-	m = m_pullup(m, *offp + sizeof(*ch));
-	if (m == NULL) {
-		CARPSTATS_INC(carps_badlen);
-		CARP_DEBUG("%s: packet size %u too small\n", __func__, len);
-		return (IPPROTO_DONE);
+	if (m->m_len < *offp + sizeof(*ch)) {
+		len = m->m_len;
+		m = m_pullup(m, *offp + sizeof(*ch));
+		if (m == NULL) {
+			CARPSTATS_INC(carps_badlen);
+			CARP_DEBUG("%s: packet size %u too small\n", __func__, len);
+			return (IPPROTO_DONE);
+		}
 	}
-	ch = (struct carp_header *)(mtod(m, caddr_t) + *offp);
+	ch = (struct carp_header *)(mtod(m, char *) + *offp);
 
 
 	/* verify the CARP checksum */
@@ -1190,7 +1192,7 @@ carp_iamatch6(struct ifnet *ifp, struct in6_addr *taddr)
 	return (ifa);
 }
 
-caddr_t
+char *
 carp_macmatch6(struct ifnet *ifp, struct mbuf *m, const struct in6_addr *taddr)
 {
 	struct ifaddr *ifa;

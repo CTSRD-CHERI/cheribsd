@@ -1835,7 +1835,7 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		return (EFAULT);
 #else
 	if (suword(&arginfo->ps_argvstr, (long)(intptr_t)vectp) != 0)
-		return (EFAULT)
+		return (EFAULT);
 #endif
 	if (suword32_c(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);

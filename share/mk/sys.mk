@@ -154,7 +154,9 @@ ARFLAGS		?=	-crD
 .endif
 RANLIB		?=	ranlib
 .if !defined(%POSIX)
-RANLIBFLAGS	?=	-D
+# elftoolchain and llvm ranlib default to deterministic and llvm-ranlib
+# doesn't currently support -D (https://bugs.llvm.org/show_bug.cgi?id=41707)
+#RANLIBFLAGS	?=	-D
 .endif
 
 AS		?=	as
