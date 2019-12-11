@@ -44,7 +44,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/bus.h>
 #include <sys/endian.h>
 
-#include <sys/pciio.h>
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcib_private.h>
@@ -443,10 +442,7 @@ generic_pcie_adjust_resource(device_t dev, device_t child, int type,
 static bus_dma_tag_t
 generic_pcie_get_dma_tag(device_t dev, device_t child)
 {
-#if 1
 	struct generic_pcie_core_softc *sc;
-
-	printf("%s\n", __func__);
 
 	sc = device_get_softc(dev);
 
@@ -456,52 +452,6 @@ generic_pcie_get_dma_tag(device_t dev, device_t child)
 	}
 
 	return (sc->dmat);
-#else
-
-	struct pci_devinfo *dinfo;
-	int error;
-
-	//while (child != NULL && device_get_parent(child) != dev)
-	//	child = device_get_parent(child);
-
-	if (device_get_parent(child) != dev)
-		printf("%s: dev is not parent for child\n", __func__);
-
-	printf("%s: dev name %s child name %s\n",
-			__func__,
-			device_get_name(dev),
-			device_get_name(child));
-
-        dinfo = device_get_ivars(child);
-	if (dinfo == NULL) {
-		printf("%s: dinfo is NULL\n", __func__);
-		return (NULL);
-	}
-
-	if (dinfo->mdi_dma_tag == NULL) {
-		printf("%s: dinfo is NULL, creating tag\n", __func__);
-		error = bus_dma_tag_create(bus_get_dma_tag(dev), /* parent */
-		    1, 0,			/* alignment, bounds */
-		    BUS_SPACE_MAXADDR,		/* lowaddr */
-		    BUS_SPACE_MAXADDR,		/* highaddr */
-		    NULL, NULL,			/* filter, filterarg */
-		    BUS_SPACE_MAXSIZE,		/* maxsize */
-		    BUS_SPACE_UNRESTRICTED,	/* nsegments */
-		    BUS_SPACE_MAXSIZE,		/* maxsegsize */
-		    0,				/* flags */
-		    NULL, NULL,			/* lockfunc, lockarg */
-		    &dinfo->mdi_dma_tag);
-		if (error != 0) {
-			panic("cant create tag");
-			return (NULL);
-		}
-
-		//phyp_iommu_set_dma_tag(dev, child, dinfo->mdi_dma_tag);
-	} else
-		printf("%s: dinfo is not NULL\n", __func__);
-
-	return (dinfo->mdi_dma_tag);
-#endif
 }
 
 static int
@@ -515,9 +465,6 @@ generic_pcie_iommu_map(device_t dev, bus_dma_segment_t *segs, int *nsegs,
 	int i;
 
 	sc = device_get_softc(dev);
-
-	//printf("%s: nsegs %d, min %lx, max %lx\n",
-	//    __func__, *nsegs, min, max);
 
 	printf("%s: nsegs %d\n", __func__, *nsegs);
 
@@ -540,8 +487,18 @@ static int
 generic_pcie_iommu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs,
     void *cookie)
 {
+	struct generic_pcie_core_softc *sc;
+	vm_offset_t va;
+	int i;
+
+	sc = device_get_softc(dev);
 
 	printf("%s: nsegs %d\n", __func__, nsegs);
+
+	for (i = 0; i < nsegs; i++) {
+		va = segs[i].ds_addr;
+		busdma_iommu_remove_entry(&sc->xio, va);
+	}
 
 	return (0);
 }

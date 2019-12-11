@@ -115,15 +115,11 @@ generic_pcie_get_iommu(device_t dev)
 
 	sc = device_get_softc(dev);
 
-	printf("%s\n", __func__);
-
 	node = ofw_bus_get_node(dev);
 	if (OF_getproplen(node, "iommu") <= 0) {
 		device_printf(dev, "iommu not found\n");
 		return (0);
 	}
-
-	printf("%s 1\n", __func__);
 
 	len = OF_getencprop(node, "iommu", &prop, sizeof(prop));
 	if (len != sizeof(prop)) {
@@ -132,8 +128,6 @@ generic_pcie_get_iommu(device_t dev)
 		return (0);
 	}
 
-	printf("%s 2\n", __func__);
-
 	iommu_dev = OF_device_from_xref(prop);
 	if (iommu_dev == NULL) {
 		device_printf(dev,
@@ -141,9 +135,6 @@ generic_pcie_get_iommu(device_t dev)
 		return (0);
 	}
 
-	printf("%s 3\n", __func__);
-
-	device_printf(dev, "iommu device found\n");
 	sc->base.iommu_dev = iommu_dev;
 	sc->base.xio.dev = iommu_dev;
 
@@ -186,7 +177,6 @@ pci_host_generic_attach(device_t dev)
 	/* Retrieve 'ranges' property from FDT */
 	if (bootverbose)
 		device_printf(dev, "parsing FDT for ECAM%d:\n", sc->base.ecam);
-
 	if (parse_pci_mem_ranges(dev, &sc->base))
 		return (ENXIO);
 
@@ -197,9 +187,9 @@ pci_host_generic_attach(device_t dev)
 		return (ENXIO);
 
 	node = ofw_bus_get_node(dev);
-	if (sc->base.coherent == 0)
+	if (sc->base.coherent == 0) {
 		sc->base.coherent = OF_hasprop(node, "dma-coherent");
-
+	}
 	if (bootverbose)
 		device_printf(dev, "Bus is%s cache-coherent\n",
 		    sc->base.coherent ? "" : " not");
