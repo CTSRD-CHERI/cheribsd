@@ -516,12 +516,13 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	tf = td->td_frame;
 	bzero(tf, sizeof(struct trapframe));
 	tf->sp = sp;
-	tf->pc = (register_t)(intptr_t)entry;
+	// FIXME: this is wrong for the purecap kernel
+	TRAPF_PC_SET_ADDR(tf, (vaddr_t)(intptr_t)entry);
 	/* 
 	 * MIPS ABI requires T9 to be the same as PC 
 	 * in subroutine entry point
 	 */
-	tf->t9 = (register_t)(intptr_t)entry; 
+	tf->t9 = (register_t)(__cheri_offset intptr_t)tf->pc;
 	tf->a0 = (register_t)(intptr_t)arg;
 
 	/*
@@ -694,7 +695,9 @@ dump_trapframe(struct trapframe *trapframe)
 	DB_PRINT_REG(trapframe, mulhi);
 	DB_PRINT_REG(trapframe, badvaddr);
 	DB_PRINT_REG(trapframe, cause);
+#if !__has_feature(capabilities)
 	DB_PRINT_REG(trapframe, pc);
+#endif
 }
 
 DB_SHOW_COMMAND(pcb, ddb_dump_pcb)

@@ -100,8 +100,7 @@ LEAF(fork_trampoline)
 
 #ifdef CPU_CHERI
 	/*
-	 * Note: This restores does not restore EPCC, since that is restored
-	 * by RESTORE_U_PCB_PC() below.
+	 * Note: This restores EPCC (RESTORE_REGS_FROM_PCB does not touch EPC)
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
@@ -109,7 +108,9 @@ LEAF(fork_trampoline)
 	RESTORE_U_PCB_REG(t1, MULHI, k1)
 	mtlo	t0
 	mthi	t1
-	RESTORE_U_PCB_PC(a0, t0, k1)	# set return address
+	# Set return address (EPC). This is a no-op for CHERI since it is done
+	# in RESTORE_CREGS_FROM_PCB.
+	RESTORE_U_PCB_PC(a0, k1)
 	RESTORE_U_PCB_REG(AT, AST, k1)
 	RESTORE_U_PCB_REG(v0, V0, k1)
 

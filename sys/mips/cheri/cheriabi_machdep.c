@@ -69,6 +69,7 @@
 #include <cheri/cheric.h>
 
 #include <machine/cpuinfo.h>
+#include <machine/cheri_machdep.h>
 #include <machine/md_var.h>
 #include <machine/pcb.h>
 #include <machine/sigframe.h>
@@ -217,7 +218,7 @@ cheriabi_fetch_syscall_args(struct thread *td)
 	if (DELAYBRANCH(sa->trapframe->cause))	 /* Check BD bit */
 		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0, 0);
 	else
-		locr0->pc += sizeof(int);
+		TRAPF_PC_INCREMENT(locr0, sizeof(int));
 
 	sa->code = locr0->v0;
 	sa->argoff = 0;
@@ -351,7 +352,7 @@ cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
 		mcp->mc_cheriframe.cf_c3 = NULL;
 	}
 
-	mcp->mc_pc = td->td_frame->pc;
+	mcp->mc_pc = (__cheri_offset register_t)td->td_frame->pc;
 	mcp->mullo = td->td_frame->mullo;
 	mcp->mulhi = td->td_frame->mulhi;
 	mcp->mc_tls = td->td_md.md_tls;
@@ -377,7 +378,7 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 	if (mcp->mc_fpused)
 		bcopy((void *)&mcp->mc_fpregs, (void *)&td->td_frame->f0,
 		    sizeof(mcp->mc_fpregs));
-	td->td_frame->pc = mcp->mc_pc;
+	td->td_frame->pc = update_pcc_offset(mcp->mc_cheriframe.cf_pcc, mcp->mc_pc);
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
 
@@ -388,6 +389,25 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 
 	return (0);
 }
+
+/* Check that mcontext_c_t matches struct sigcontext) */
+#define	CHECK_SIGCTX_MCTX_OFFSET(mfield, sfield)	\
+    _Static_assert(offsetof(mcontext_c_t, mfield) == 	\
+	offsetof(struct sigcontext, sfield) -		\
+	offsetof(struct sigcontext, sc_onstack), "mcontext_c_t layout error")
+
+CHECK_SIGCTX_MCTX_OFFSET(mc_onstack, sc_onstack);
+CHECK_SIGCTX_MCTX_OFFSET(mc_pc, sc_pc);
+CHECK_SIGCTX_MCTX_OFFSET(sr, sr);
+CHECK_SIGCTX_MCTX_OFFSET(mullo, mullo);
+CHECK_SIGCTX_MCTX_OFFSET(mulhi, mulhi);
+CHECK_SIGCTX_MCTX_OFFSET(mc_fpused, sc_fpused);
+CHECK_SIGCTX_MCTX_OFFSET(mc_fpregs, sc_fpregs);
+/*
+ * mc_fpc_eir is the last field that matches (due to the following
+ * void* argument that is different for CheriABI.
+ */
+CHECK_SIGCTX_MCTX_OFFSET(mc_fpc_eir, sc_fpc_eir);
 
 /*
  * The CheriABI version of sendsig(9) largely borrows from the MIPS version,
@@ -499,7 +519,7 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_stack = td->td_sigstk;
 #endif
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
-	sf.sf_uc.uc_mcontext.mc_pc = regs->pc;
+	sf.sf_uc.uc_mcontext.mc_pc = (__cheri_offset register_t)regs->pc;
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
@@ -631,16 +651,10 @@ cheriabi_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 * Install CHERI signal-delivery register state for handler to run
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (generally) be removed automatically on sigreturn().
-	 *
-	 * Note: regs->pc should currently be the same as the offset of pcc and
-	 * not the virtual address.
-	 * TODO: add an update_trapframe_pc(void* __kerncap) that guarantees
-	 * this invariant always holds.
 	 */
-	regs->pc = (__cheri_offset register_t)catcher;
-	regs->pcc = catcher;
+	regs->pc = (trapf_pc_t)catcher;
 	regs->csp = sfp;
-	regs->c12 = catcher;
+	regs->c12 = regs->pc;
 	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
 	/*
 	 * For now only change IDC if we were sandboxed. This makes cap-table
@@ -778,7 +792,6 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp,
 	    CHERI_PERM_CHERIABI_VMMAP,
 	    ("%s: mmap() cap lacks CHERI_PERM_CHERIABI_VMMAP", __func__));
 
-	td->td_frame->pc = imgp->entry_addr;
 	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
 	    (mips_rd_status() & MIPS_SR_INT_MASK) |
 	    MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX | MIPS_SR_COP_2_BIT;
@@ -837,8 +850,6 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp,
 	code_end = code_start + code_length;
 	frame->pcc = cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
 	    code_start, code_end - code_start, imgp->entry_addr - code_start);
-	/* Ensure that frame->pc is the offset of frame->pcc (needed for eret) */
-	frame->pc = cheri_getoffset(frame->pcc);
 	frame->c12 = frame->pcc;
 
 	/*
@@ -922,7 +933,6 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 	 * XXX-BD: cpu_copy_thread() copies the cheri_signal struct.  Do we
 	 * want to point it at our stack instead?
 	 */
-	frame->pc = cheri_getoffset(param->start_func);
 	frame->pcc = param->start_func;
 	frame->c12 = param->start_func;
 	frame->c3 = param->arg;

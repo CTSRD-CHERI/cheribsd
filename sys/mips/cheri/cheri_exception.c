@@ -198,8 +198,8 @@ _cheri_trapframe_to_cheriframe(struct trapframe *frame,
 	    strip_tags);
 	cheri_copy_and_validate(&cfp->cf_c31, &frame->c31, &cfp->cf_capvalid, 31,
 	    strip_tags);
-	cheri_copy_and_validate(&cfp->cf_pcc, &frame->pcc, &cfp->cf_capvalid, 32,
-	    strip_tags);
+	cheri_copy_and_validate(&cfp->cf_pcc, (void *__capability *)&frame->pc,
+	    &cfp->cf_capvalid, 32, strip_tags);
 	cfp->cf_capcause = frame->capcause;
 }
 

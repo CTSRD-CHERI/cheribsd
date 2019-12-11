@@ -164,7 +164,9 @@ mips_wr_ ## n(uint64_t a0)					\
 } struct __hack
 
 #if defined(__mips_n64)
+#if !__has_feature(capabilities)
 MIPS_RW64_COP0(excpc, MIPS_COP_0_EXC_PC);
+#endif
 MIPS_RW64_COP0(entryhi, MIPS_COP_0_TLB_HI);
 MIPS_RW64_COP0(pagemask, MIPS_COP_0_TLB_PG_MASK);
 MIPS_RW64_COP0_SEL(userlocal, MIPS_COP_0_USERLOCAL, 2);

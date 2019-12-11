@@ -59,6 +59,7 @@ typedef struct	__mcontext {
 	int		mc_fpused;	/* fp has been used */
 	f_register_t	mc_fpregs[33];	/* fp regs 0 to 31 and csr */
 	__register_t	mc_fpc_eir;	/* fp exception instruction reg */
+	/* XXX: layout differs for CheriABI starting here */
 	void		*mc_tls;	/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 
@@ -174,7 +175,7 @@ typedef struct __ucontext64 {
 
 typedef struct	__mcontext_c {
 	int		mc_onstack;	/* sigstack state to restore */
-	register_t	mc_pc;		/* pc at time of signal */
+	register_t	mc_pc;		/* pcc.offset at time of signal ($pcc is in mc_cheriframe) */
 	register_t	mc_regs[32];	/* processor regs 0 to 31 */
 	register_t	sr;		/* status register */
 	register_t	mullo, mulhi;	/* mullo and mulhi registers... */

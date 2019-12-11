@@ -142,15 +142,15 @@
  * contains the bounds). This means we need to update the offset of PCC to
  * value of PC - PCC.base before writing to EPCC.
  */
-#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpreg2, pcb)			\
-	/* EPCC is no longer a GPR so load it into KSCRATCH first */	\
-	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);		\
-	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
-	RESTORE_EPCC(CHERI_REG_KSCRATCH, pc_vaddr_tmpreg, tmpreg2);	\
+#define RESTORE_U_PCB_PC(unused_pc_vaddr_tmpreg, pcb)			\
+	/* EPCC is no longer a GPR so load it into C27 first. */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_C27, PCC, pcb);			\
+	CSetEPCC CHERI_REG_C27;						\
+	/* Restore $c27 since we clobbered it to set EPCC */		\
 	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb)
 #else
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
-#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, unused_reg, pcb)	\
+#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, pcb)	\
 	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);		\
 	MTC0	pc_vaddr_tmpreg, MIPS_COP_0_EXC_PC
 #endif
@@ -187,7 +187,7 @@ struct pcb
 	struct trapframe pcb_regs;	/* saved CPU and registers */
 	__register_t pcb_context[14];	/* kernel context for resume */
 	void *pcb_onfault;		/* for copyin/copyout faults */
-	register_t pcb_tpc;
+	trapf_pc_t pcb_tpc;
 #ifdef CPU_CHERI
 	struct cheri_signal pcb_cherisignal;	/* CHERI signal-related state. */
 	struct cheri_kframe pcb_cherikframe;	/* kernel caller-save state. */
