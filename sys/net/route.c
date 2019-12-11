@@ -1941,7 +1941,7 @@ rt_setgate(struct rtentry *rt, struct sockaddr *dst, struct sockaddr *gate)
 		 * (and also rt->rt_gateway == NULL).
 		 * Free()/free() handle a NULL argument just fine.
 		 */
-		bcopy(dst, new, dlen);
+		bcopy(dst, new, dst->sa_len);
 		R_Free(rt_key(rt));	/* free old block, if any */
 		rt_key(rt) = (struct sockaddr *)new;
 		rt->rt_gateway = (struct sockaddr *)(new + dlen);
