@@ -612,7 +612,7 @@ freebsd64_nmount(struct thread *td, struct freebsd64_nmount_args *uap)
 }
 
 int
-freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
+freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 {
 	int argc, envc;
 	uint64_t *vectp;
@@ -718,7 +718,9 @@ freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (uintptr_t)vectp;
+	*stack_base = (uintcap_t)cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
+	    CHERI_CAP_USER_DATA_LENGTH, (uintptr_t)vectp);
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;

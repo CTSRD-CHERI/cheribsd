@@ -1539,16 +1539,16 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 }
 
 int
-__elfN(freebsd_fixup)(uintptr_t *stack_base, struct image_params *imgp)
+__elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 {
 #ifndef __ELF_CHERI
-	Elf_Addr *base;
+	Elf_Addr * __capability base;
 
-	base = (Elf_Addr *)*stack_base;
+	base = (Elf_Addr * __capability)*stack_base;
 	base--;
-	if (suword(base, imgp->args->argc) == -1)
+	if (suword_c(base, imgp->args->argc) == -1)
 		return (EFAULT);
-	*stack_base = (uintptr_t)base;
+	*stack_base = (uintcap_t)base;
 #endif
 	return (0);
 }

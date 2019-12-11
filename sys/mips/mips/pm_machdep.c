@@ -612,12 +612,12 @@ set_capregs(struct thread *td, struct capreg *capregs)
  * code by the MIPS elf abi).
  */
 void
-exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
+exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 {
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 
-	td->td_frame->sp = ((register_t)stack) & ~(STACK_ALIGN - 1);
+	td->td_frame->sp = ((__cheri_addr register_t)stack) & ~(STACK_ALIGN - 1);
 
 	/*
 	 * If we're running o32 or n32 programs but have 64-bit registers,
@@ -671,7 +671,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	 *	a2	rtld object (filled in by dynamic loader)
 	 *	a3	ps_strings
 	 */
-	td->td_frame->a0 = (register_t) stack;
+	td->td_frame->a0 = (__cheri_addr register_t)stack;
 	td->td_frame->a1 = 0;
 	td->td_frame->a2 = 0;
 	td->td_frame->a3 = (__cheri_addr register_t)imgp->ps_strings;

@@ -372,7 +372,7 @@ do_execve(struct thread *td, struct image_args *args,
 	struct nameidata nd;
 	struct ucred *oldcred;
 	struct uidinfo *euip = NULL;
-	uintptr_t stack_base;
+	uintcap_t stack_base;
 	struct image_params image_params, *imgp;
 	struct vattr attr;
 	int (*img_first)(struct image_params *);
@@ -1669,7 +1669,7 @@ sucap(void *uaddr, void *ptr)
  * as the initial stack pointer.
  */
 int
-exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
+exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 {
 	int argc, envc;
 	char * __capability * __capability vectp;
@@ -1829,7 +1829,7 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (__cheri_addr uintptr_t)vectp;
+	*stack_base = (uintcap_t)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
