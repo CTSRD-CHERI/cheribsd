@@ -2140,8 +2140,8 @@ next:				continue;
 				cp = addr_data;
 				cp2 = ifa->ifa_addr->sa_data;
 				cp3 = ifa->ifa_netmask->sa_data;
-				cplim = ifa->ifa_netmask->sa_len
-					+ (char *)ifa->ifa_netmask;
+				cplim = (char *)ifa->ifa_netmask
+					+ ifa->ifa_netmask->sa_len;
 				while (cp3 < cplim)
 					if ((*cp++ ^ *cp2++) & *cp3++)
 						goto next; /* next address! */
@@ -2204,7 +2204,7 @@ ifaof_ifpforaddr(const struct sockaddr *addr, struct ifnet *ifp)
 			cp = addr->sa_data;
 			cp2 = ifa->ifa_addr->sa_data;
 			cp3 = ifa->ifa_netmask->sa_data;
-			cplim = ifa->ifa_netmask->sa_len + (char *)ifa->ifa_netmask;
+			cplim = (char *)ifa->ifa_netmask + ifa->ifa_netmask->sa_len;
 			for (; cp3 < cplim; cp3++)
 				if ((*cp++ ^ *cp2++) & *cp3)
 					break;
