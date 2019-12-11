@@ -103,6 +103,8 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_util.h>
 #endif
 
+#include <cheri/cheric.h>
+
 SDT_PROVIDER_DEFINE(proc);
 
 MALLOC_DEFINE(M_PGRP, "pgrp", "process group header");
@@ -3240,7 +3242,7 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 		 */
 		pss.ps_sbclasses = cheri_fromint(pss32.ps_sbclasses);
 		pss.ps_sbclasseslen = (size_t)pss32.ps_sbclasseslen;
-		pss.ps_sbmethods = cheri_fromint(.ps_sbmethods);
+		pss.ps_sbmethods = cheri_fromint(pss32.ps_sbmethods);
 		pss.ps_sbmethodslen = (size_t)pss32.ps_sbmethodslen;
 		pss.ps_sbobjects = cheri_fromint(pss32.ps_sbobjects);
 		pss.ps_sbobjectslen = (size_t)pss32.ps_sbobjectslen;
