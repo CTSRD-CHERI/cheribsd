@@ -71,7 +71,7 @@ SYSCTL_INT(_net_inet6_ip6, OID_AUTO, grehlim, CTLFLAG_VNET | CTLFLAG_RW,
     &VNET_NAME(ip6_gre_hlim), 0, "Default hop limit for encapsulated packets");
 
 struct in6_gre_socket {
-	struct gre_socket	base;
+	struct gre_socket	base __subobject_use_container_bounds;
 	struct in6_addr		addr; /* scope zone id is embedded */
 };
 VNET_DEFINE_STATIC(struct gre_sockets *, ipv6_sockets) = NULL;

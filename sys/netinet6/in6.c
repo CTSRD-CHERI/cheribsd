@@ -1107,8 +1107,7 @@ in6_alloc_ifa(struct ifnet *ifp, struct in6_aliasreq *ifra, int flags)
 		 * Some functions expect that ifa_dstaddr is not
 		 * NULL for p2p interfaces.
 		 */
-		ia->ia_ifa.ifa_dstaddr =
-		    (struct sockaddr *)&ia->ia_dstaddr;
+		ia->ia_ifa.ifa_dstaddr = (struct sockaddr *)&ia->ia_dstaddr;
 	} else {
 		ia->ia_ifa.ifa_dstaddr = NULL;
 	}
@@ -2029,7 +2028,7 @@ in6_if2idlen(struct ifnet *ifp)
 }
 
 struct in6_llentry {
-	struct llentry		base;
+	struct llentry base __subobject_use_container_bounds;
 };
 
 #define	IN6_LLTBL_DEFAULT_HSIZE	32
