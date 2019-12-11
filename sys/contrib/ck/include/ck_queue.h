@@ -124,7 +124,7 @@
  * Singly-linked List declarations.
  */
 #define	CK_SLIST_HEAD(name, type)						\
-struct name {									\
+struct __no_subobject_bounds name {							\
 	struct type *cslh_first;	/* first element */				\
 }
 
@@ -132,7 +132,7 @@ struct name {									\
 	{ NULL }
 
 #define	CK_SLIST_ENTRY(type)							\
-struct {									\
+struct __no_subobject_bounds {								\
 	struct type *csle_next;	/* next element */				\
 }
 
@@ -228,7 +228,7 @@ struct {									\
  * Singly-linked Tail queue declarations.
  */
 #define	CK_STAILQ_HEAD(name, type)					\
-struct name {								\
+struct __no_subobject_bounds name {						\
 	struct type *cstqh_first;/* first element */			\
 	struct type **cstqh_last;/* addr of last next element */		\
 }
@@ -237,7 +237,7 @@ struct name {								\
 	{ NULL, &(head).cstqh_first }
 
 #define	CK_STAILQ_ENTRY(type)						\
-struct {								\
+struct __no_subobject_bounds {							\
 	struct type *cstqe_next;	/* next element */			\
 }
 
@@ -352,7 +352,7 @@ struct {								\
  * List declarations.
  */
 #define	CK_LIST_HEAD(name, type)						\
-struct name {									\
+struct __no_subobject_bounds name {						\
 	struct type *clh_first;	/* first element */				\
 }
 
@@ -360,7 +360,7 @@ struct name {									\
 	{ NULL }
 
 #define	CK_LIST_ENTRY(type)							\
-struct {									\
+struct __no_subobject_bounds {							\
 	struct type *cle_next;	/* next element */				\
 	struct type **cle_prev;	/* address of previous next element */		\
 }
