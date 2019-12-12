@@ -657,7 +657,7 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		vm_map_unlock_and_wait(map, 0);
 	}
 	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_RW, VM_PROT_RW,
-	    MAP_ACC_CHARGED);
+	    MAP_ACC_CHARGED, addr);
 	vm_map_unlock(map);
 	return (addr);
 }
@@ -755,6 +755,7 @@ void
 kmem_init(vm_offset_t start, vm_offset_t end)
 {
 	vm_map_t m;
+	vm_offset_t addr;
 	int domain;
 
 	m = vm_map_create(kernel_pmap, VM_MIN_KERNEL_ADDRESS, end);
@@ -762,13 +763,13 @@ kmem_init(vm_offset_t start, vm_offset_t end)
 	vm_map_lock(m);
 	/* N.B.: cannot use kgdb to debug, starting with this assignment ... */
 	kernel_map = m;
-	(void)vm_map_insert(m, NULL, 0,
 #ifdef __amd64__
-	    KERNBASE,
-#else		     
-	    VM_MIN_KERNEL_ADDRESS,
+	addr = KERNBASE;
+#else
+	addr = VM_MIN_KERNEL_ADDRESS;
 #endif
-	    start, VM_PROT_ALL, VM_PROT_ALL, MAP_NOFAULT);
+	(void)vm_map_insert(m, NULL, 0, addr, start, VM_PROT_ALL,
+	    VM_PROT_ALL, MAP_NOFAULT, addr);
 	/* ... and ending with the completion of the above `insert' */
 
 #ifdef __amd64__
@@ -780,7 +781,7 @@ kmem_init(vm_offset_t start, vm_offset_t end)
 	(void)vm_map_insert(m, NULL, 0, (vm_offset_t)vm_page_array,
 	    (vm_offset_t)vm_page_array + round_2mpage(vm_page_array_size *
 	    sizeof(struct vm_page)),
-	    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT);
+	    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT, (vm_offset_t)vm_page_array);
 #endif
 	vm_map_unlock(m);
 
