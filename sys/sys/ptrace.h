@@ -84,8 +84,10 @@
 #define	PT_VM_TIMESTAMP	40	/* Get VM version (timestamp) */
 #define	PT_VM_ENTRY	41	/* Get VM map (entry) */
 
+#if __has_feature(capabilities)
 #define	PT_GETCAPREGS	50	/* get capability registers */
 #define	PT_SETCAPREGS	51	/* set capability registers */
+#endif
 
 #define PT_FIRSTMACH    64	/* for machine-specific requests */
 #include <machine/ptrace.h>	/* machine-specific requests, if any */
