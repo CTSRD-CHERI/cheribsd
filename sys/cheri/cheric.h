@@ -259,6 +259,9 @@ cheri_bytes_remaining(const void * __capability cap)
 
 #define CHERI_FPRINT_PTR(f, ptr)					\
 	fprintf(f, _CHERI_PRINT_PTR_FMT(ptr))
+#else
+/* Some macros work even without capability support */
+#define cheri_fromint(i) ((void*)(uintptr_t)i)
 #endif
 
 /*
