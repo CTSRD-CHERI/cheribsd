@@ -94,8 +94,7 @@
 static __always_inline inline void * __capability
 cheri_copyaddress(const void * __capability dst, const void * __capability src)
 {
-	return (cheri_incoffset(dst,
-	    (const char* __capability)src - (const char* __capability)dst));
+	return (cheri_setaddress(dst, cheri_getaddress(src)));
 }
 
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
