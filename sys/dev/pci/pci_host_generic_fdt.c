@@ -116,12 +116,12 @@ generic_pcie_get_iommu(device_t dev)
 	sc = device_get_softc(dev);
 
 	node = ofw_bus_get_node(dev);
-	if (OF_getproplen(node, "iommu") <= 0) {
+	if (OF_getproplen(node, "iommu-map") <= 0) {
 		device_printf(dev, "iommu not found\n");
 		return (0);
 	}
 
-	len = OF_getencprop(node, "iommu", &prop, sizeof(prop));
+	len = OF_getencprop(node, "iommu-map", &prop, sizeof(prop));
 	if (len != sizeof(prop)) {
 		device_printf(dev,
 		    "%s: Can't get iommu device node\n", __func__);

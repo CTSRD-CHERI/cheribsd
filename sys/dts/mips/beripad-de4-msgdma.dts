@@ -421,7 +421,7 @@
 			#address-cells = <3>;
 			#size-cells = <2>;
 
-			iommu = <&iommu0>;
+			iommu-map = <&iommu0>;
 
 			reg = <0 0xfdb10000 0x50000>;
 			reg-names = "PCI ECAM";
