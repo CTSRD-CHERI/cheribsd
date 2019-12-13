@@ -88,7 +88,7 @@
 
 void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 static void	freebsd64_exec_setregs(struct thread *, struct image_params *,
-		    u_long);
+		    uintptr_t);
 #ifdef CHERI_PURECAP_KERNEL
 static void	freebsd64_do_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 #endif
@@ -280,7 +280,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 
 static void
 freebsd64_exec_setregs(struct thread *td, struct image_params *imgp,
-    u_long stack)
+    uintptr_t stack)
 {
 
 	exec_setregs(td, imgp, stack);
