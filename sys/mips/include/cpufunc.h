@@ -165,6 +165,14 @@ mips_wr_ ## n(uint64_t a0)					\
 
 #if defined(__mips_n64)
 #if !__has_feature(capabilities)
+/*
+ * While CHERI-MIPS exposes coprocessor 0's excpc register, we do not
+ * define the name here.  Instead, we use the capability analogue, EPCC.
+ * This ensures that we always use the capability register and avoids problems
+ * if the EPCC is a sealed capability: in that case writing to the EPC register
+ * will clear the tag bit on EPCC (even if it doesn't change the value).
+ * Also this avoids additional unnecessary instructions.
+ */
 MIPS_RW64_COP0(excpc, MIPS_COP_0_EXC_PC);
 #endif
 MIPS_RW64_COP0(entryhi, MIPS_COP_0_TLB_HI);
