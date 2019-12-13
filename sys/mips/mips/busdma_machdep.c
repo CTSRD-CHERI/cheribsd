@@ -1076,7 +1076,7 @@ _bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
 	map->nsegs = nsegs;
 
 	if (segs != NULL)
-		memcpy(dmat->segments, segs, map->nsegs*sizeof(segs[0]));
+		memcpy(dmat->segments, segs, map->nsegs * sizeof(segs[0]));
 
 	if (dmat->iommu != NULL)
 		IOMMU_MAP(dmat->iommu, dmat->segments, &map->nsegs,
@@ -1084,7 +1084,7 @@ _bus_dmamap_complete(bus_dma_tag_t dmat, bus_dmamap_t map,
 		    dmat->boundary, dmat->iommu_cookie);
 
 	if (segs != NULL)
-		memcpy(segs, dmat->segments, map->nsegs*sizeof(segs[0]));
+		memcpy(segs, dmat->segments, map->nsegs * sizeof(segs[0]));
 	else
 		segs = dmat->segments;
 

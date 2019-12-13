@@ -56,4 +56,3 @@ METHOD int unmap {
 	int			nsegs;
 	void			*cookie;
 };
-
