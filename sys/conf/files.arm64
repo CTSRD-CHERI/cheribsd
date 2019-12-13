@@ -107,6 +107,8 @@ arm/broadcom/bcm2835/bcm2835_wdog.c		optional soc_brcm_bcm2837 fdt | soc_brcm_bc
 arm/broadcom/bcm2835/bcm2836.c			optional soc_brcm_bcm2837 fdt | soc_brcm_bcm2838 fdt
 arm/broadcom/bcm2835/bcm283x_dwc_fdt.c		optional dwcotg fdt soc_brcm_bcm2837 | dwcotg fdt soc_brcm_bcm2838
 arm/mv/a37x0_gpio.c				optional a37x0_gpio gpio fdt
+arm/mv/a37x0_iic.c				optional a37x0_iic iicbus fdt
+arm/mv/a37x0_spi.c				optional a37x0_spi spibus fdt
 arm/mv/armada38x/armada38x_rtc.c		optional mv_rtc fdt
 arm/mv/gpio.c					optional mv_gpio fdt
 arm/mv/mvebu_pinctrl.c				optional mvebu_pinctrl fdt
@@ -154,7 +156,6 @@ arm64/arm64/identcpu.c		standard
 arm64/arm64/in_cksum.c		optional	inet | inet6
 arm64/arm64/locore.S		standard	no-obj
 arm64/arm64/machdep.c		standard
-arm64/arm64/machdep_boot.c	optional	linux_boot_abi
 arm64/arm64/mem.c		standard
 arm64/arm64/memcpy.S		standard
 arm64/arm64/memmove.S		standard
@@ -307,6 +308,8 @@ arm64/rockchip/rk_spi.c			optional fdt rk_spi
 arm64/rockchip/rk_usb2phy.c		optional fdt rk_usb2phy soc_rockchip_rk3328 | soc_rockchip_rk3399
 arm64/rockchip/rk_typec_phy.c		optional fdt rk_typec_phy soc_rockchip_rk3399
 arm64/rockchip/if_dwc_rk.c		optional fdt dwc_rk soc_rockchip_rk3328 | fdt dwc_rk soc_rockchip_rk3399
+arm64/rockchip/rk_tsadc_if.m		optional fdt soc_rockchip_rk3399
+arm64/rockchip/rk_tsadc.c		optional fdt soc_rockchip_rk3399
 dev/dwc/if_dwc.c			optional fdt dwc_rk soc_rockchip_rk3328 | fdt dwc_rk soc_rockchip_rk3399
 dev/dwc/if_dwc_if.m			optional fdt dwc_rk soc_rockchip_rk3328 | fdt dwc_rk soc_rockchip_rk3399
 

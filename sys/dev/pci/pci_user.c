@@ -1,8 +1,7 @@
 /*-
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
- * Copyright (c) 1997, Stefan Esser <se@freebsd.org>
- * All rights reserved.
+ * Copyright 1997, Stefan Esser <se@freebsd.org>
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -156,7 +155,7 @@ static d_ioctl_t	pci_ioctl;
 
 struct cdevsw pcicdev = {
 	.d_version =	D_VERSION,
-	.d_flags =	D_NEEDGIANT,
+	.d_flags =	0,
 	.d_open =	pci_open,
 	.d_close =	pci_close,
 	.d_ioctl =	pci_ioctl,
@@ -1066,6 +1065,9 @@ pci_ioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *t
 	}
 
 
+	/* Giant because newbus is Giant locked revisit with newbus locking */
+	mtx_lock(&Giant);
+
 	switch (cmd) {
 	case PCIOCGETCONF:
 #ifdef COMPAT_FREEBSD64
@@ -1392,8 +1394,10 @@ getconfexit:
 	case PCIOCBARMMAP:
 		pbm = (struct pci_bar_mmap *)data;
 		if ((flag & FWRITE) == 0 &&
-		    (pbm->pbm_flags & PCIIO_BAR_MMAP_RW) != 0)
-			return (EPERM);
+		    (pbm->pbm_flags & PCIIO_BAR_MMAP_RW) != 0) {
+			error = EPERM;
+			break;
+		}
 		pcidev = pci_find_dbsf(pbm->pbm_sel.pc_domain,
 		    pbm->pbm_sel.pc_bus, pbm->pbm_sel.pc_dev,
 		    pbm->pbm_sel.pc_func);
@@ -1404,6 +1408,8 @@ getconfexit:
 		error = ENOTTY;
 		break;
 	}
+
+	mtx_unlock(&Giant);
 
 	return (error);
 }

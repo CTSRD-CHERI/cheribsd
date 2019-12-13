@@ -103,10 +103,12 @@ sctp6_input_with_port(struct mbuf **i_pak, int *offp, uint16_t port)
 	SCTP_STAT_INCR_COUNTER64(sctps_inpackets);
 	/* Get IP, SCTP, and first chunk header together in the first mbuf. */
 	offset = iphlen + sizeof(struct sctphdr) + sizeof(struct sctp_chunkhdr);
-	m = m_pullup(m, offset);
-	if (m == NULL) {
-		SCTP_STAT_INCR(sctps_hdrops);
-		return (IPPROTO_DONE);
+	if (m->m_len < offset) {
+		m = m_pullup(m, offset);
+		if (m == NULL) {
+			SCTP_STAT_INCR(sctps_hdrops);
+			return (IPPROTO_DONE);
+		}
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
 	sh = (struct sctphdr *)(mtod(m, caddr_t) + iphlen);
@@ -238,6 +240,11 @@ sctp6_notify(struct sctp_inpcb *inp,
 		}
 		if (net->mtu > next_mtu) {
 			net->mtu = next_mtu;
+			if (net->port) {
+				sctp_hc_set_mtu(&net->ro._l_addr, inp->fibnum, next_mtu + sizeof(struct udphdr));
+			} else {
+				sctp_hc_set_mtu(&net->ro._l_addr, inp->fibnum, next_mtu);
+			}
 		}
 		/* Update the association MTU */
 		if (stcb->asoc.smallest_mtu > next_mtu) {

@@ -538,7 +538,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct fcntl_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->cmd; /* int */
-		iarg[2] = p->arg; /* intptr_t */
+		uarg[2] = (intptr_t) p->arg; /* intptr_t */
 		*n_args = 3;
 		break;
 	}
@@ -864,10 +864,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 169: {
 		struct semsys_args *p = params;
 		iarg[0] = p->which; /* int */
-		iarg[1] = p->a2; /* intptr_t */
-		iarg[2] = p->a3; /* intptr_t */
-		iarg[3] = p->a4; /* intptr_t */
-		iarg[4] = p->a5; /* intptr_t */
+		uarg[1] = (intptr_t) p->a2; /* intptr_t */
+		uarg[2] = (intptr_t) p->a3; /* intptr_t */
+		uarg[3] = (intptr_t) p->a4; /* intptr_t */
+		uarg[4] = (intptr_t) p->a5; /* intptr_t */
 		*n_args = 5;
 		break;
 	}
@@ -875,11 +875,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 170: {
 		struct msgsys_args *p = params;
 		iarg[0] = p->which; /* int */
-		iarg[1] = p->a2; /* intptr_t */
-		iarg[2] = p->a3; /* intptr_t */
-		iarg[3] = p->a4; /* intptr_t */
-		iarg[4] = p->a5; /* intptr_t */
-		iarg[5] = p->a6; /* intptr_t */
+		uarg[1] = (intptr_t) p->a2; /* intptr_t */
+		uarg[2] = (intptr_t) p->a3; /* intptr_t */
+		uarg[3] = (intptr_t) p->a4; /* intptr_t */
+		uarg[4] = (intptr_t) p->a5; /* intptr_t */
+		uarg[5] = (intptr_t) p->a6; /* intptr_t */
 		*n_args = 6;
 		break;
 	}
@@ -887,9 +887,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 171: {
 		struct shmsys_args *p = params;
 		iarg[0] = p->which; /* int */
-		iarg[1] = p->a2; /* intptr_t */
-		iarg[2] = p->a3; /* intptr_t */
-		iarg[3] = p->a4; /* intptr_t */
+		uarg[1] = (intptr_t) p->a2; /* intptr_t */
+		uarg[2] = (intptr_t) p->a3; /* intptr_t */
+		uarg[3] = (intptr_t) p->a4; /* intptr_t */
 		*n_args = 4;
 		break;
 	}

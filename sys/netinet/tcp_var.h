@@ -210,7 +210,12 @@ struct tcpcb {
 	struct tcp_log_id_node *t_lin;
 	struct tcp_log_id_bucket *t_lib;
 	const char *t_output_caller;	/* Function that called tcp_output */
+	struct statsblob *t_stats;	/* Per-connection stats */
 	uint32_t t_logsn;		/* Log "serial number" */
+	uint32_t gput_ts;		/* Time goodput measurement started */
+	tcp_seq gput_seq;		/* Outbound measurement seq */
+	tcp_seq gput_ack;		/* Inbound measurement ack */
+	int32_t t_stats_gput_prev;	/* XXXLAS: Prev gput measurement */
 	uint8_t t_tfo_client_cookie_len; /* TCP Fast Open client cookie length */
 	unsigned int *t_tfo_pending;	/* TCP Fast Open server pending counter */
 	union {
@@ -312,33 +317,35 @@ TAILQ_HEAD(tcp_funchead, tcp_function);
 /*
  * Flags and utility macros for the t_flags field.
  */
-#define	TF_ACKNOW	0x000001	/* ack peer immediately */
-#define	TF_DELACK	0x000002	/* ack, but try to delay it */
-#define	TF_NODELAY	0x000004	/* don't delay packets to coalesce */
-#define	TF_NOOPT	0x000008	/* don't use tcp options */
-#define	TF_SENTFIN	0x000010	/* have sent FIN */
-#define	TF_REQ_SCALE	0x000020	/* have/will request window scaling */
-#define	TF_RCVD_SCALE	0x000040	/* other side has requested scaling */
-#define	TF_REQ_TSTMP	0x000080	/* have/will request timestamps */
-#define	TF_RCVD_TSTMP	0x000100	/* a timestamp was received in SYN */
-#define	TF_SACK_PERMIT	0x000200	/* other side said I could SACK */
-#define	TF_NEEDSYN	0x000400	/* send SYN (implicit state) */
-#define	TF_NEEDFIN	0x000800	/* send FIN (implicit state) */
-#define	TF_NOPUSH	0x001000	/* don't push */
-#define	TF_PREVVALID	0x002000	/* saved values for bad rxmit valid */
-#define	TF_MORETOCOME	0x010000	/* More data to be appended to sock */
-#define	TF_LQ_OVERFLOW	0x020000	/* listen queue overflow */
-#define	TF_LASTIDLE	0x040000	/* connection was previously idle */
-#define	TF_RXWIN0SENT	0x080000	/* sent a receiver win 0 in response */
-#define	TF_FASTRECOVERY	0x100000	/* in NewReno Fast Recovery */
-#define	TF_WASFRECOVERY	0x200000	/* was in NewReno Fast Recovery */
-#define	TF_SIGNATURE	0x400000	/* require MD5 digests (RFC2385) */
-#define	TF_FORCEDATA	0x800000	/* force out a byte */
-#define	TF_TSO		0x1000000	/* TSO enabled on this connection */
-#define	TF_TOE		0x2000000	/* this connection is offloaded */
-#define	TF_ECN_PERMIT	0x4000000	/* connection ECN-ready */
-#define	TF_ECN_SND_CWR	0x8000000	/* ECN CWR in queue */
-#define	TF_ECN_SND_ECE	0x10000000	/* ECN ECE in queue */
+#define	TF_ACKNOW	0x00000001	/* ack peer immediately */
+#define	TF_DELACK	0x00000002	/* ack, but try to delay it */
+#define	TF_NODELAY	0x00000004	/* don't delay packets to coalesce */
+#define	TF_NOOPT	0x00000008	/* don't use tcp options */
+#define	TF_SENTFIN	0x00000010	/* have sent FIN */
+#define	TF_REQ_SCALE	0x00000020	/* have/will request window scaling */
+#define	TF_RCVD_SCALE	0x00000040	/* other side has requested scaling */
+#define	TF_REQ_TSTMP	0x00000080	/* have/will request timestamps */
+#define	TF_RCVD_TSTMP	0x00000100	/* a timestamp was received in SYN */
+#define	TF_SACK_PERMIT	0x00000200	/* other side said I could SACK */
+#define	TF_NEEDSYN	0x00000400	/* send SYN (implicit state) */
+#define	TF_NEEDFIN	0x00000800	/* send FIN (implicit state) */
+#define	TF_NOPUSH	0x00001000	/* don't push */
+#define	TF_PREVVALID	0x00002000	/* saved values for bad rxmit valid */
+#define	TF_UNUSED1	0x00004000	/* unused */
+#define	TF_GPUTINPROG	0x00008000	/* Goodput measurement in progress */
+#define	TF_MORETOCOME	0x00010000	/* More data to be appended to sock */
+#define	TF_LQ_OVERFLOW	0x00020000	/* listen queue overflow */
+#define	TF_LASTIDLE	0x00040000	/* connection was previously idle */
+#define	TF_RXWIN0SENT	0x00080000	/* sent a receiver win 0 in response */
+#define	TF_FASTRECOVERY	0x00100000	/* in NewReno Fast Recovery */
+#define	TF_WASFRECOVERY	0x00200000	/* was in NewReno Fast Recovery */
+#define	TF_SIGNATURE	0x00400000	/* require MD5 digests (RFC2385) */
+#define	TF_FORCEDATA	0x00800000	/* force out a byte */
+#define	TF_TSO		0x01000000	/* TSO enabled on this connection */
+#define	TF_TOE		0x02000000	/* this connection is offloaded */
+#define	TF_UNUSED3	0x04000000	/* unused */
+#define	TF_UNUSED4	0x08000000	/* unused */
+#define	TF_UNUSED5	0x10000000	/* unused */
 #define	TF_CONGRECOVERY	0x20000000	/* congestion recovery mode */
 #define	TF_WASCRECOVERY	0x40000000	/* was in congestion recovery */
 #define	TF_FASTOPEN	0x80000000	/* TCP Fast Open indication */
@@ -377,6 +384,10 @@ TAILQ_HEAD(tcp_funchead, tcp_function);
 #define	TF2_PLPMTU_MAXSEGSNT	0x00000004 /* Last seg sent was full seg. */
 #define	TF2_LOG_AUTO		0x00000008 /* Session is auto-logging. */
 #define TF2_DROP_AF_DATA 	0x00000010 /* Drop after all data ack'd */
+#define	TF2_ECN_PERMIT		0x00000020 /* connection ECN-ready */
+#define	TF2_ECN_SND_CWR		0x00000040 /* ECN CWR in queue */
+#define	TF2_ECN_SND_ECE		0x00000080 /* ECN ECE in queue */
+#define	TF2_ACE_PERMIT		0x00000100 /* Accurate ECN mode */
 
 /*
  * Structure to hold TCP options that are only used during segment
@@ -767,6 +778,7 @@ VNET_DECLARE(int, tcp_delack_enabled);
 VNET_DECLARE(int, tcp_do_autorcvbuf);
 VNET_DECLARE(int, tcp_do_autosndbuf);
 VNET_DECLARE(int, tcp_do_ecn);
+VNET_DECLARE(int, tcp_do_newcwv);
 VNET_DECLARE(int, tcp_do_rfc1323);
 VNET_DECLARE(int, tcp_do_rfc3042);
 VNET_DECLARE(int, tcp_do_rfc3390);
@@ -780,6 +792,10 @@ VNET_DECLARE(int, tcp_insecure_rst);
 VNET_DECLARE(int, tcp_insecure_syn);
 VNET_DECLARE(int, tcp_minmss);
 VNET_DECLARE(int, tcp_mssdflt);
+#ifdef STATS
+VNET_DECLARE(int, tcp_perconn_stats_dflt_tpl);
+VNET_DECLARE(int, tcp_perconn_stats_enable);
+#endif /* STATS */
 VNET_DECLARE(int, tcp_recvspace);
 VNET_DECLARE(int, tcp_sack_globalholes);
 VNET_DECLARE(int, tcp_sack_globalmaxholes);
@@ -789,6 +805,7 @@ VNET_DECLARE(int, tcp_sendspace);
 VNET_DECLARE(struct inpcbhead, tcb);
 VNET_DECLARE(struct inpcbinfo, tcbinfo);
 
+#define	V_tcp_do_newcwv			VNET(tcp_do_newcwv)
 #define	V_drop_synfin			VNET(drop_synfin)
 #define	V_path_mtu_discovery		VNET(path_mtu_discovery)
 #define	V_tcb				VNET(tcb)
@@ -815,6 +832,10 @@ VNET_DECLARE(struct inpcbinfo, tcbinfo);
 #define	V_tcp_insecure_syn		VNET(tcp_insecure_syn)
 #define	V_tcp_minmss			VNET(tcp_minmss)
 #define	V_tcp_mssdflt			VNET(tcp_mssdflt)
+#ifdef STATS
+#define	V_tcp_perconn_stats_dflt_tpl	VNET(tcp_perconn_stats_dflt_tpl)
+#define	V_tcp_perconn_stats_enable	VNET(tcp_perconn_stats_enable)
+#endif /* STATS */
 #define	V_tcp_recvspace			VNET(tcp_recvspace)
 #define	V_tcp_sack_globalholes		VNET(tcp_sack_globalholes)
 #define	V_tcp_sack_globalmaxholes	VNET(tcp_sack_globalmaxholes)
@@ -958,10 +979,13 @@ int	 tcp_newreno(struct tcpcb *, struct tcphdr *);
 int	 tcp_compute_pipe(struct tcpcb *);
 uint32_t tcp_compute_initwnd(uint32_t);
 void	 tcp_sndbuf_autoscale(struct tcpcb *, struct socket *, uint32_t);
+int	 tcp_stats_sample_rollthedice(struct tcpcb *tp, void *seed_bytes,
+    size_t seed_len);
 struct mbuf *
 	 tcp_m_copym(struct mbuf *m, int32_t off0, int32_t *plen,
 	   int32_t seglimit, int32_t segsize, struct sockbuf *sb, bool hw_tls);
 
+int	tcp_stats_init(void);
 
 static inline void
 tcp_fields_to_host(struct tcphdr *th)

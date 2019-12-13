@@ -613,7 +613,7 @@ set_capregs(struct thread *td, struct capreg *capregs)
  * code by the MIPS elf abi).
  */
 void
-exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
+exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 {
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));

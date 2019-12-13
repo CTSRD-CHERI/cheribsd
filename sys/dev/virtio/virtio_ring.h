@@ -154,8 +154,7 @@ vring_init(struct vring *vr, unsigned int num, uint8_t *p,
         vr->desc = (struct vring_desc *) p;
         vr->avail = (struct vring_avail *) (p +
 	    num * sizeof(struct vring_desc));
-        vr->used = (void *)
-	    (((unsigned long) &vr->avail->ring[num] + align-1) & ~(align-1));
+        vr->used = (void *)roundup2(&vr->avail->ring[num], align);
 }
 
 /*

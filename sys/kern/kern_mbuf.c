@@ -324,12 +324,7 @@ mbuf_init(void *dummy)
 	 * Configure UMA zones for Mbufs, Clusters, and Packets.
 	 */
 	zone_mbuf = uma_zcreate(MBUF_MEM_NAME, MSIZE,
-	    mb_ctor_mbuf, mb_dtor_mbuf,
-#ifdef INVARIANTS
-	    trash_init, trash_fini,
-#else
-	    NULL, NULL,
-#endif
+	    mb_ctor_mbuf, mb_dtor_mbuf, NULL, NULL,
 	    MSIZE - 1, UMA_ZONE_MAXBUCKET);
 	if (nmbufs > 0)
 		nmbufs = uma_zone_set_max(zone_mbuf, nmbufs);
@@ -337,12 +332,7 @@ mbuf_init(void *dummy)
 	uma_zone_set_maxaction(zone_mbuf, mb_reclaim);
 
 	zone_clust = uma_zcreate(MBUF_CLUSTER_MEM_NAME, MCLBYTES,
-	    mb_ctor_clust,
-#ifdef INVARIANTS
-	    trash_dtor, trash_init, trash_fini,
-#else
-	    NULL, NULL, NULL,
-#endif
+	    mb_ctor_clust, NULL, NULL, NULL,
 	    UMA_ALIGN_PTR, 0);
 	if (nmbclusters > 0)
 		nmbclusters = uma_zone_set_max(zone_clust, nmbclusters);
@@ -354,12 +344,7 @@ mbuf_init(void *dummy)
 
 	/* Make jumbo frame zone too. Page size, 9k and 16k. */
 	zone_jumbop = uma_zcreate(MBUF_JUMBOP_MEM_NAME, MJUMPAGESIZE,
-	    mb_ctor_clust,
-#ifdef INVARIANTS
-	    trash_dtor, trash_init, trash_fini,
-#else
-	    NULL, NULL, NULL,
-#endif
+	    mb_ctor_clust, NULL, NULL, NULL,
 	    UMA_ALIGN_PTR, 0);
 	if (nmbjumbop > 0)
 		nmbjumbop = uma_zone_set_max(zone_jumbop, nmbjumbop);
@@ -367,12 +352,7 @@ mbuf_init(void *dummy)
 	uma_zone_set_maxaction(zone_jumbop, mb_reclaim);
 
 	zone_jumbo9 = uma_zcreate(MBUF_JUMBO9_MEM_NAME, MJUM9BYTES,
-	    mb_ctor_clust,
-#ifdef INVARIANTS
-	    trash_dtor, trash_init, trash_fini,
-#else
-	    NULL, NULL, NULL,
-#endif
+	    mb_ctor_clust, NULL, NULL, NULL,
 	    UMA_ALIGN_PTR, 0);
 	uma_zone_set_allocf(zone_jumbo9, mbuf_jumbo_alloc);
 	if (nmbjumbo9 > 0)
@@ -381,12 +361,7 @@ mbuf_init(void *dummy)
 	uma_zone_set_maxaction(zone_jumbo9, mb_reclaim);
 
 	zone_jumbo16 = uma_zcreate(MBUF_JUMBO16_MEM_NAME, MJUM16BYTES,
-	    mb_ctor_clust,
-#ifdef INVARIANTS
-	    trash_dtor, trash_init, trash_fini,
-#else
-	    NULL, NULL, NULL,
-#endif
+	    mb_ctor_clust, NULL, NULL, NULL,
 	    UMA_ALIGN_PTR, 0);
 	uma_zone_set_allocf(zone_jumbo16, mbuf_jumbo_alloc);
 	if (nmbjumbo16 > 0)
@@ -396,11 +371,7 @@ mbuf_init(void *dummy)
 
 	zone_extpgs = uma_zcreate(MBUF_EXTPGS_MEM_NAME,
 	    sizeof(struct mbuf_ext_pgs),
-#ifdef INVARIANTS
-	    trash_ctor, trash_dtor, trash_init, trash_fini,
-#else
 	    NULL, NULL, NULL, NULL,
-#endif
 	    UMA_ALIGN_CACHE, 0);
 
 	/*
@@ -620,22 +591,12 @@ debugnet_mbuf_reinit(int nmbuf, int nclust, int clsize)
 	dn_clsize = clsize;
 
 	dn_zone_mbuf = uma_zcache_create("debugnet_" MBUF_MEM_NAME,
-	    MSIZE, mb_ctor_mbuf, mb_dtor_mbuf,
-#ifdef INVARIANTS
-	    trash_init, trash_fini,
-#else
-	    NULL, NULL,
-#endif
+	    MSIZE, mb_ctor_mbuf, mb_dtor_mbuf, NULL, NULL,
 	    dn_buf_import, dn_buf_release,
 	    &dn_mbufq, UMA_ZONE_NOBUCKET);
 
 	dn_zone_clust = uma_zcache_create("debugnet_" MBUF_CLUSTER_MEM_NAME,
-	    clsize, mb_ctor_clust,
-#ifdef INVARIANTS
-	    trash_dtor, trash_init, trash_fini,
-#else
-	    NULL, NULL, NULL,
-#endif
+	    clsize, mb_ctor_clust, NULL, NULL, NULL,
 	    dn_buf_import, dn_buf_release,
 	    &dn_clustq, UMA_ZONE_NOBUCKET);
 
@@ -689,9 +650,6 @@ mb_ctor_mbuf(void *mem, int size, void *arg, int how)
 	int flags;
 	short type;
 
-#ifdef INVARIANTS
-	trash_ctor(mem, size, arg, how);
-#endif
 	args = (struct mb_args *)arg;
 	type = args->type;
 
@@ -726,9 +684,6 @@ mb_dtor_mbuf(void *mem, int size, void *arg)
 	KASSERT((m->m_flags & M_NOFREE) == 0, ("%s: M_NOFREE set", __func__));
 	if (!(flags & MB_DTOR_SKIP) && (m->m_flags & M_PKTHDR) && !SLIST_EMPTY(&m->m_pkthdr.tags))
 		m_tag_delete_chain(m, NULL);
-#ifdef INVARIANTS
-	trash_dtor(mem, size, arg);
-#endif
 }
 
 /*
@@ -779,9 +734,6 @@ mb_ctor_clust(void *mem, int size, void *arg, int how)
 {
 	struct mbuf *m;
 
-#ifdef INVARIANTS
-	trash_ctor(mem, size, arg, how);
-#endif
 	m = (struct mbuf *)arg;
 	if (m != NULL) {
 		m->m_ext.ext_buf = cheri_csetbounds((char *)mem, size);

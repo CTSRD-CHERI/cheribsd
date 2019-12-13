@@ -32,10 +32,12 @@ __FBSDID("$FreeBSD$");
 #define	EXPLICIT_USER_ACCESS
 
 #include <sys/param.h>
+#include <sys/arb.h>
 #include <sys/kernel.h>
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mutex.h>
+#include <sys/qmath.h>
 #include <sys/queue.h>
 #include <sys/refcount.h>
 #include <sys/rwlock.h>
@@ -43,6 +45,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/socketvar.h>
 #include <sys/sysctl.h>
 #include <sys/tree.h>
+#include <sys/stats.h>
 #include <sys/counter.h>
 
 #include <dev/tcp_log/tcp_log_dev.h>
@@ -477,7 +480,7 @@ tcp_log_grow_tlb(char *tlb_id, struct tcpcb *tp)
 
 	INP_WLOCK_ASSERT(tp->t_inpcb);
 
-#ifdef NETFLIX
+#ifdef STATS
 	if (V_tcp_perconn_stats_enable == 2 && tp->t_stats == NULL)
 		(void)tcp_stats_sample_rollthedice(tp, tlb_id, strlen(tlb_id));
 #endif

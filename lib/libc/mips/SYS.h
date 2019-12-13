@@ -149,9 +149,7 @@
  */
 #  define PIC_PROLOGUE(x)				\
 	.set push; .set noat;				\
-	lui	$1, %hi(%neg(%captab_rel(x)));		\
-	daddiu	$1, $1, %lo(%neg(%captab_rel(x)));	\
-	cincoffset	GLOBALS_REG, $c12, $1;		\
+	PCREL_LOAD_CODE_PTR(GLOBALS_REG, $1, _CHERI_CAPABILITY_TABLE_); \
 	.set pop;					\
 	.set PIC_GLOBALS_POINTER_CHANGED, 0;		\
 	.set PIC_GLOBALS_POINTER_SAVED, 0;

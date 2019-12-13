@@ -1268,7 +1268,9 @@ in_joingroup_locked(struct ifnet *ifp, const struct in_addr *gina,
 	if (error) {
 
 		CTR2(KTR_IGMPV3, "%s: dropping ref on %p", __func__, inm);
+		IF_ADDR_WLOCK(ifp);
 		inm_release_deferred(inm);
+		IF_ADDR_WUNLOCK(ifp);
 	} else {
 		*pinm = inm;
 	}
@@ -2209,7 +2211,11 @@ inp_join_group(struct inpcb *inp, struct sockopt *sopt)
                             __func__);
 			goto out_inp_locked;
 		}
-		inm_acquire(imf->imf_inm);
+		/*
+		 * NOTE: Refcount from in_joingroup_locked()
+		 * is protecting membership.
+		 */
+		ip_mfilter_insert(&imo->imo_head, imf);
 	} else {
 		CTR1(KTR_IGMPV3, "%s: merge inm state", __func__);
 		IN_MULTI_LIST_LOCK();
@@ -2233,8 +2239,6 @@ inp_join_group(struct inpcb *inp, struct sockopt *sopt)
 			goto out_inp_locked;
 		}
 	}
-	if (is_new)
-		ip_mfilter_insert(&imo->imo_head, imf);
 
 	imf_commit(imf);
 	imf = NULL;
@@ -2247,7 +2251,9 @@ out_inp_unlocked:
 	if (is_new && imf) {
 		if (imf->imf_inm != NULL) {
 			IN_MULTI_LIST_LOCK();
+			IF_ADDR_WLOCK(ifp);
 			inm_release_deferred(imf->imf_inm);
+			IF_ADDR_WUNLOCK(ifp);
 			IN_MULTI_LIST_UNLOCK();
 		}
 		ip_mfilter_free(imf);

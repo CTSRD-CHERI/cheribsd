@@ -267,11 +267,11 @@
  */
 #ifdef CHERI_PURECAP_KERNEL
 
-#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpcreg, pcb)			\
+#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpcreg, pcb, tmpreg2)	\
 	/* EPCC is no longer a GPR so load it into tmpcreg first */	\
 	RESTORE_U_PCB_CREG(tmpcreg, PCC, pcb);				\
 	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
-	RESTORE_EPCC(tmpcreg, pc_vaddr_tmpreg)
+	RESTORE_EPCC(tmpcreg, pc_vaddr_tmpreg, tmpreg2)
 
 #else /* ! CHERI_PURECAP_KERNEL */
 

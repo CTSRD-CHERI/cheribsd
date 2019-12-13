@@ -390,39 +390,39 @@ static int32_t tcp_addrack(module_t mod, int32_t type, void *data);
 static int
 rack_do_close_wait(struct mbuf *m, struct tcphdr *th,
     struct socket *so, struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen,
-    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt);
+    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos);
 static int
 rack_do_closing(struct mbuf *m, struct tcphdr *th,
     struct socket *so, struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen,
-    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt);
+    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos);
 static int
 rack_do_established(struct mbuf *m, struct tcphdr *th,
     struct socket *so, struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen,
-    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt);
+    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos);
 static int
 rack_do_fastnewdata(struct mbuf *m, struct tcphdr *th,
     struct socket *so, struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen,
-    int32_t tlen, uint32_t tiwin, int32_t nxt_pkt);
+    int32_t tlen, uint32_t tiwin, int32_t nxt_pkt, uint8_t iptos);
 static int
 rack_do_fin_wait_1(struct mbuf *m, struct tcphdr *th,
     struct socket *so, struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen,
-    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt);
+    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos);
 static int
 rack_do_fin_wait_2(struct mbuf *m, struct tcphdr *th,
     struct socket *so, struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen,
-    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt);
+    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos);
 static int
 rack_do_lastack(struct mbuf *m, struct tcphdr *th,
     struct socket *so, struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen,
-    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt);
+    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos);
 static int
 rack_do_syn_recv(struct mbuf *m, struct tcphdr *th,
     struct socket *so, struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen,
-    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt);
+    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos);
 static int
 rack_do_syn_sent(struct mbuf *m, struct tcphdr *th,
     struct socket *so, struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen,
-    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt);
+    int32_t tlen, uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos);
 struct rack_sendmap *
 tcp_rack_output(struct tcpcb *tp, struct tcp_rack *rack,
     uint32_t tsused);
@@ -1663,7 +1663,9 @@ rack_ack_received(struct tcpcb *tp, struct tcp_rack *rack, struct tcphdr *th, ui
 			tp->ccv->bytes_this_ack = max;
 		}
 	}
-	if (tp->snd_cwnd <= tp->snd_wnd)
+	if ((!V_tcp_do_newcwv && (tp->snd_cwnd <= tp->snd_wnd)) ||
+	    (V_tcp_do_newcwv && (tp->snd_cwnd <= tp->snd_wnd) &&
+	     (tp->snd_cwnd < (ctf_flight_size(tp, rack->r_ctl.rc_sacked) * 2))))
 		tp->ccv->flags |= CCF_CWND_LIMITED;
 	else
 		tp->ccv->flags &= ~CCF_CWND_LIMITED;
@@ -1809,16 +1811,16 @@ rack_cong_signal(struct tcpcb *tp, struct tcphdr *th, uint32_t type)
 			rack_log_to_prr(rack, 2);
 			rack->r_ctl.rc_prr_recovery_fs = tp->snd_max - tp->snd_una;
 			tp->snd_recover = tp->snd_max;
-			if (tp->t_flags & TF_ECN_PERMIT)
-				tp->t_flags |= TF_ECN_SND_CWR;
+			if (tp->t_flags2 & TF2_ECN_PERMIT)
+				tp->t_flags2 |= TF2_ECN_SND_CWR;
 		}
 		break;
 	case CC_ECN:
 		if (!IN_CONGRECOVERY(tp->t_flags)) {
 			TCPSTAT_INC(tcps_ecn_rcwnd);
 			tp->snd_recover = tp->snd_max;
-			if (tp->t_flags & TF_ECN_PERMIT)
-				tp->t_flags |= TF_ECN_SND_CWR;
+			if (tp->t_flags2 & TF2_ECN_PERMIT)
+				tp->t_flags2 |= TF2_ECN_SND_CWR;
 		}
 		break;
 	case CC_RTO:
@@ -5898,7 +5900,7 @@ dodata:				/* XXX */
 static int
 rack_do_fastnewdata(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen, int32_t tlen,
-    uint32_t tiwin, int32_t nxt_pkt)
+    uint32_t tiwin, int32_t nxt_pkt, uint8_t iptos)
 {
 	int32_t nsegs;
 	int32_t newsize = 0;	/* automatic sockbuf scaling */
@@ -6039,7 +6041,7 @@ rack_do_fastnewdata(struct mbuf *m, struct tcphdr *th, struct socket *so,
 static int
 rack_fastack(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen, int32_t tlen,
-    uint32_t tiwin, int32_t nxt_pkt, uint32_t cts)
+    uint32_t tiwin, int32_t nxt_pkt, uint32_t cts, uint8_t iptos)
 {
 	int32_t acked;
 	int32_t nsegs;
@@ -6225,7 +6227,7 @@ rack_fastack(struct mbuf *m, struct tcphdr *th, struct socket *so,
 static int
 rack_do_syn_sent(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen, int32_t tlen,
-    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt)
+    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t tos)
 {
 	int32_t ret_val = 0;
 	int32_t todrop;
@@ -6307,7 +6309,7 @@ rack_do_syn_sent(struct mbuf *m, struct tcphdr *th, struct socket *so,
 
 		if (((thflags & (TH_CWR | TH_ECE)) == TH_ECE) &&
 		    V_tcp_do_ecn) {
-			tp->t_flags |= TF_ECN_PERMIT;
+			tp->t_flags2 |= TF2_ECN_PERMIT;
 			TCPSTAT_INC(tcps_ecn_shs);
 		}
 		if (SEQ_GT(th->th_ack, tp->snd_una)) {
@@ -6428,7 +6430,7 @@ rack_do_syn_sent(struct mbuf *m, struct tcphdr *th, struct socket *so,
 static int
 rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen, int32_t tlen,
-    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt)
+    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos)
 {
 	struct tcp_rack *rack;
 	int32_t ret_val = 0;
@@ -6624,7 +6626,7 @@ rack_do_syn_recv(struct mbuf *m, struct tcphdr *th, struct socket *so,
 static int
 rack_do_established(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen, int32_t tlen,
-    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt)
+    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos)
 {
 	int32_t ret_val = 0;
 
@@ -6651,12 +6653,12 @@ rack_do_established(struct mbuf *m, struct tcphdr *th, struct socket *so,
 		rack = (struct tcp_rack *)tp->t_fb_ptr;
 		if (tlen == 0) {
 			if (rack_fastack(m, th, so, tp, to, drop_hdrlen, tlen,
-			    tiwin, nxt_pkt, rack->r_ctl.rc_rcvtime)) {
+			    tiwin, nxt_pkt, rack->r_ctl.rc_rcvtime, iptos)) {
 				return (0);
 			}
 		} else {
 			if (rack_do_fastnewdata(m, th, so, tp, to, drop_hdrlen, tlen,
-			    tiwin, nxt_pkt)) {
+			    tiwin, nxt_pkt, iptos)) {
 				return (0);
 			}
 		}
@@ -6754,7 +6756,7 @@ rack_do_established(struct mbuf *m, struct tcphdr *th, struct socket *so,
 static int
 rack_do_close_wait(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen, int32_t tlen,
-    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt)
+    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos)
 {
 	int32_t ret_val = 0;
 
@@ -6871,7 +6873,7 @@ rack_check_data_after_close(struct mbuf *m,
 static int
 rack_do_fin_wait_1(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen, int32_t tlen,
-    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt)
+    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos)
 {
 	int32_t ret_val = 0;
 	int32_t ourfinisacked = 0;
@@ -6992,7 +6994,7 @@ rack_do_fin_wait_1(struct mbuf *m, struct tcphdr *th, struct socket *so,
 static int
 rack_do_closing(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen, int32_t tlen,
-    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt)
+    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos)
 {
 	int32_t ret_val = 0;
 	int32_t ourfinisacked = 0;
@@ -7099,7 +7101,7 @@ rack_do_closing(struct mbuf *m, struct tcphdr *th, struct socket *so,
 static int
 rack_do_lastack(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen, int32_t tlen,
-    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt)
+    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos)
 {
 	int32_t ret_val = 0;
 	int32_t ourfinisacked = 0;
@@ -7207,7 +7209,7 @@ rack_do_lastack(struct mbuf *m, struct tcphdr *th, struct socket *so,
 static int
 rack_do_fin_wait_2(struct mbuf *m, struct tcphdr *th, struct socket *so,
     struct tcpcb *tp, struct tcpopt *to, int32_t drop_hdrlen, int32_t tlen,
-    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt)
+    uint32_t tiwin, int32_t thflags, int32_t nxt_pkt, uint8_t iptos)
 {
 	int32_t ret_val = 0;
 	int32_t ourfinisacked = 0;
@@ -7708,12 +7710,12 @@ rack_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	 * TCP ECN processing. XXXJTL: If we ever use ECN, we need to move
 	 * this to occur after we've validated the segment.
 	 */
-	if (tp->t_flags & TF_ECN_PERMIT) {
+	if (tp->t_flags2 & TF2_ECN_PERMIT) {
 		if (thflags & TH_CWR)
-			tp->t_flags &= ~TF_ECN_SND_ECE;
+			tp->t_flags2 &= ~TF2_ECN_SND_ECE;
 		switch (iptos & IPTOS_ECN_MASK) {
 		case IPTOS_ECN_CE:
-			tp->t_flags |= TF_ECN_SND_ECE;
+			tp->t_flags2 |= TF2_ECN_SND_ECE;
 			TCPSTAT_INC(tcps_ecn_ce);
 			break;
 		case IPTOS_ECN_ECT0:
@@ -7837,7 +7839,7 @@ rack_do_segment_nounlock(struct mbuf *m, struct tcphdr *th, struct socket *so,
 	rack_clear_rate_sample(rack);
 	retval = (*rack->r_substate) (m, th, so,
 	    tp, &to, drop_hdrlen,
-	    tlen, tiwin, thflags, nxt_pkt);
+	    tlen, tiwin, thflags, nxt_pkt, iptos);
 #ifdef INVARIANTS
 	if ((retval == 0) &&
 	    (tp->t_inpcb == NULL)) {
@@ -9470,7 +9472,7 @@ send:
 			flags |= TH_ECE | TH_CWR;
 	}
 	if (tp->t_state == TCPS_ESTABLISHED &&
-	    (tp->t_flags & TF_ECN_PERMIT)) {
+	    (tp->t_flags2 & TF2_ECN_PERMIT)) {
 		/*
 		 * If the peer has ECN, mark data packets with ECN capable
 		 * transmission (ECT). Ignore pure ack packets,
@@ -9489,11 +9491,11 @@ send:
 		/*
 		 * Reply with proper ECN notifications.
 		 */
-		if (tp->t_flags & TF_ECN_SND_CWR) {
+		if (tp->t_flags2 & TF2_ECN_SND_CWR) {
 			flags |= TH_CWR;
-			tp->t_flags &= ~TF_ECN_SND_CWR;
+			tp->t_flags2 &= ~TF2_ECN_SND_CWR;
 		}
-		if (tp->t_flags & TF_ECN_SND_ECE)
+		if (tp->t_flags2 & TF2_ECN_SND_ECE)
 			flags |= TH_ECE;
 	}
 	/*

@@ -51,7 +51,7 @@
 #define	cheri_getperm(x)	__builtin_cheri_perms_get((x))
 #define	cheri_getsealed(x)	__builtin_cheri_sealed_get((x))
 #define	cheri_gettag(x)		__builtin_cheri_tag_get((x))
-#define	cheri_gettype(x)	__builtin_cheri_type_get((x))
+#define	cheri_gettype(x)	((long)__builtin_cheri_type_get((x)))
 
 #define	cheri_andperm(x, y)	__builtin_cheri_perms_and((x), (y))
 #define	cheri_clearperm(x, y)	__builtin_cheri_perms_and((x), ~(y))

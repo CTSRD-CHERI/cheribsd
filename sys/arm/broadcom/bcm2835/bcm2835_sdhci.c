@@ -113,7 +113,7 @@ struct bcm_mmc_conf {
 	int	clock_src;
 	int	default_freq;
 	int	quirks;
-	bool	use_dma;
+	int	emmc_dreq;
 };
 
 struct bcm_mmc_conf bcm2835_sdhci_conf = {
@@ -123,7 +123,7 @@ struct bcm_mmc_conf bcm2835_sdhci_conf = {
 	.quirks		= SDHCI_QUIRK_DATA_TIMEOUT_USES_SDCLK |
 	    SDHCI_QUIRK_BROKEN_TIMEOUT_VAL | SDHCI_QUIRK_DONT_SET_HISPD_BIT |
 	    SDHCI_QUIRK_MISSING_CAPS,
-	.use_dma	= true
+	.emmc_dreq	= BCM_DMA_DREQ_EMMC,
 };
 
 struct bcm_mmc_conf bcm2838_emmc2_conf = {
@@ -131,8 +131,7 @@ struct bcm_mmc_conf bcm2838_emmc2_conf = {
 	.clock_src	= -1,
 	.default_freq	= BCM2838_DEFAULT_SDHCI_FREQ,
 	.quirks		= 0,
-	/* XXX DMA is currently broken, but it shouldn't be. */
-	.use_dma	= false
+	.emmc_dreq	= BCM_DMA_DREQ_NONE,
 };
 
 static struct ofw_compat_data compat_data[] = {
@@ -317,37 +316,35 @@ bcm_sdhci_attach(device_t dev)
 
 	sdhci_init_slot(dev, &sc->sc_slot, 0);
 
-	if (sc->conf->use_dma) {
-		sc->sc_dma_ch = bcm_dma_allocate(BCM_DMA_CH_ANY);
-		if (sc->sc_dma_ch == BCM_DMA_CH_INVALID)
-			goto fail;
+	sc->sc_dma_ch = bcm_dma_allocate(BCM_DMA_CH_ANY);
+	if (sc->sc_dma_ch == BCM_DMA_CH_INVALID)
+		goto fail;
 
-		err = bcm_dma_setup_intr(sc->sc_dma_ch, bcm_sdhci_dma_intr, sc);
-		if (err != 0) {
-			device_printf(dev,
-			    "cannot setup dma interrupt handler\n");
-			err = ENXIO;
-			goto fail;
-		}
+	err = bcm_dma_setup_intr(sc->sc_dma_ch, bcm_sdhci_dma_intr, sc);
+	if (err != 0) {
+		device_printf(dev,
+		    "cannot setup dma interrupt handler\n");
+		err = ENXIO;
+		goto fail;
+	}
 
-		/* Allocate bus_dma resources. */
-		err = bus_dma_tag_create(bus_get_dma_tag(dev),
-		    1, 0, bcm283x_dmabus_peripheral_lowaddr(),
-		    BUS_SPACE_MAXADDR, NULL, NULL,
-		    BCM_DMA_MAXSIZE, ALLOCATED_DMA_SEGS, BCM_SDHCI_BUFFER_SIZE,
-		    BUS_DMA_ALLOCNOW, NULL, NULL,
-		    &sc->sc_dma_tag);
+	/* Allocate bus_dma resources. */
+	err = bus_dma_tag_create(bus_get_dma_tag(dev),
+	    1, 0, bcm283x_dmabus_peripheral_lowaddr(),
+	    BUS_SPACE_MAXADDR, NULL, NULL,
+	    BCM_DMA_MAXSIZE, ALLOCATED_DMA_SEGS, BCM_SDHCI_BUFFER_SIZE,
+	    BUS_DMA_ALLOCNOW, NULL, NULL,
+	    &sc->sc_dma_tag);
 
-		if (err) {
-			device_printf(dev, "failed allocate DMA tag");
-			goto fail;
-		}
+	if (err) {
+		device_printf(dev, "failed allocate DMA tag");
+		goto fail;
+	}
 
-		err = bus_dmamap_create(sc->sc_dma_tag, 0, &sc->sc_dma_map);
-		if (err) {
-			device_printf(dev, "bus_dmamap_create failed\n");
-			goto fail;
-		}
+	err = bus_dmamap_create(sc->sc_dma_tag, 0, &sc->sc_dma_map);
+	if (err) {
+		device_printf(dev, "bus_dmamap_create failed\n");
+		goto fail;
 	}
 
 	/* FIXME: Fix along with other BUS_SPACE_PHYSADDR instances */
@@ -555,7 +552,11 @@ bcm_sdhci_start_dma_seg(struct bcm_sdhci_softc *sc)
 	width = (len & 0xf ? BCM_DMA_32BIT : BCM_DMA_128BIT);
 
 	if (slot->curcmd->data->flags & MMC_DATA_READ) {
-		bcm_dma_setup_src(sc->sc_dma_ch, BCM_DMA_DREQ_EMMC,
+		/*
+		 * Peripherals on the AXI bus do not need DREQ pacing for reads
+		 * from the ARM core, so we can safely set this to NONE.
+		 */
+		bcm_dma_setup_src(sc->sc_dma_ch, BCM_DMA_DREQ_NONE,
 		    BCM_DMA_SAME_ADDR, BCM_DMA_32BIT);
 		bcm_dma_setup_dst(sc->sc_dma_ch, BCM_DMA_DREQ_NONE,
 		    BCM_DMA_INC_ADDR, width);
@@ -563,9 +564,13 @@ bcm_sdhci_start_dma_seg(struct bcm_sdhci_softc *sc)
 		pdst = sc->dmamap_seg_addrs[idx];
 		sync_op = BUS_DMASYNC_PREREAD;
 	} else {
+		/*
+		 * The ordering here is important, because the last write to
+		 * dst/src in the dma control block writes the real dreq value.
+		 */
 		bcm_dma_setup_src(sc->sc_dma_ch, BCM_DMA_DREQ_NONE,
 		    BCM_DMA_INC_ADDR, width);
-		bcm_dma_setup_dst(sc->sc_dma_ch, BCM_DMA_DREQ_EMMC,
+		bcm_dma_setup_dst(sc->sc_dma_ch, sc->conf->emmc_dreq,
 		    BCM_DMA_SAME_ADDR, BCM_DMA_32BIT);
 		psrc = sc->dmamap_seg_addrs[idx];
 		pdst = sc->sc_sdhci_buffer_phys;
@@ -713,10 +718,9 @@ bcm_sdhci_start_dma(struct sdhci_slot *slot)
 static int
 bcm_sdhci_will_handle_transfer(device_t dev, struct sdhci_slot *slot)
 {
+#ifdef INVARIANTS
 	struct bcm_sdhci_softc *sc = device_get_softc(slot->bus);
-
-	if (!sc->conf->use_dma)
-		return (0);
+#endif
 
 	/*
 	 * This indicates that we somehow let a data interrupt slip by into the

@@ -612,7 +612,7 @@ _sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
  * function shouldn't be long for the world.
  */
 int
-cheriabi_copyout_strings(struct image_params *imgp, register_t **stack_base)
+cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 {
 	int argc, envc;
 	void * __capability * __capability vectp;
@@ -702,8 +702,7 @@ cheriabi_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (__cheri_fromcap register_t *)
-	    (register_t * __capability)vectp;
+	*stack_base = (__cheri_addr vaddr_t)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -866,7 +865,7 @@ cheriabi_set_auxargs(void * __capability * __capability pos,
 }
 
 int
-cheriabi_elf_fixup(register_t **stack_base, struct image_params *imgp)
+cheriabi_elf_fixup(uintptr_t *stack_base, struct image_params *imgp)
 {
 	size_t argenvcount;
 	void * __capability * __capability base;

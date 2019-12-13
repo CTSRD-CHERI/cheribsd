@@ -179,7 +179,7 @@ main(int argc, char *argv[])
     if (argc < 1 || argc > 2)
 	usage();
 	if (o.align) {
-		if (o.hidden_sectors_set)
+		if (o.reserved_sectors)
 		    errx(1, "align (-A) is incompatible with -r");
 	}
     fname = *argv++;
@@ -189,7 +189,7 @@ main(int argc, char *argv[])
 	    err(1, NULL);
     }
     dtype = *argv;
-    return !!mkfs_msdos(fname, dtype, &o);
+    exit(!!mkfs_msdos(fname, dtype, &o));
 }
 
 /*

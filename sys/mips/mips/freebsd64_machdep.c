@@ -78,7 +78,6 @@
 #include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
-#include <compat/freebsd64/freebsd64_sysargmap.h>
 #include <compat/freebsd64/freebsd64_util.h>
 
 #include <ddb/ddb.h>

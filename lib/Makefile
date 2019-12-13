@@ -181,6 +181,7 @@ SUBDIR.${MK_STATS}+=	libstats
 .if ${COMPILER_TYPE} == "clang"
 .if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
+    ${MACHINE_CPUARCH} == "powerpc" || \
     ${MACHINE_ARCH:Mmips64*}) && \
     ! ${MACHINE_ARCH:Mmips*c*}
 _libclang_rt=	libclang_rt

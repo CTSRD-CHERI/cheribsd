@@ -78,6 +78,7 @@
 #define	NFS_FABLKSIZE	512	/* Size in bytes of a block wrt fa_blocks */
 #define	NFSV4_MINORVERSION	0	/* V4 Minor version */
 #define	NFSV41_MINORVERSION	1	/* V4 Minor version */
+#define	NFSV42_MINORVERSION	2	/* V4 Minor version */
 #define	NFSV4_CBVERS		1	/* V4 CB Version */
 #define	NFSV41_CBVERS		4	/* V4.1 CB Version */
 #define	NFSV4_SMALLSTR	50		/* Strings small enough for stack */
@@ -213,6 +214,22 @@
 #define	NFSERR_REJECTDELEG	10085
 #define	NFSERR_RETURNCONFLICT	10086
 #define	NFSERR_DELEGREVOKED	10087
+
+/* NFSv4.2 specific errors. */
+#define	NFSERR_PARTNERNOTSUPP	10088
+#define	NFSERR_PARTNERNOAUTH	10089
+#define	NFSERR_UNIONNOTSUPP	10090
+#define	NFSERR_OFFLOADDENIED	10091
+#define	NFSERR_WRONGLFS		10092
+#define	NFSERR_BADLABEL		10093
+#define	NFSERR_OFFLOADNOREQS	10094
+
+/* NFSv4.2 Extended Attribute errors. */
+#define	NFSERR_NOXATTR		10095
+#define	NFSERR_XATTR2BIG	10096
+
+/* Maximum value of all the NFS error values. */
+#define	NFSERR_MAXERRVAL	NFSERR_XATTR2BIG
 
 #define	NFSERR_STALEWRITEVERF	30001	/* Fake return for nfs_commit() */
 #define	NFSERR_DONTREPLY	30003	/* Don't process request */
@@ -363,6 +380,24 @@
  * Must be defined as one higher than the last NFSv4.1 Proc# above.
  */
 #define	NFSV41_NPROCS		56
+
+/* Additional procedures for NFSv4.2. */
+#define	NFSPROC_IOADVISE	56
+#define	NFSPROC_ALLOCATE	57
+#define	NFSPROC_COPY		58
+#define	NFSPROC_SEEK		59
+#define	NFSPROC_SEEKDS		60
+
+/* and the ones for the optional Extended attribute support (RFC-8276). */
+#define	NFSPROC_GETEXTATTR	61
+#define	NFSPROC_SETEXTATTR	62
+#define	NFSPROC_RMEXTATTR	63
+#define	NFSPROC_LISTEXTATTR	64
+
+/*
+ * Must be defined as one higher than the last NFSv4.2 Proc# above.
+ */
+#define	NFSV42_NPROCS		65
 
 #endif	/* NFS_V3NPROCS */
 
@@ -594,6 +629,11 @@
 #define	NFSACCESS_DELETE		0x10
 #define	NFSACCESS_EXECUTE		0x20
 
+/* Additional Extended Attribute access bits RFC-8276. */
+#define	NFSACCESS_XAREAD		0x40
+#define	NFSACCESS_XAWRITE		0x80
+#define	NFSACCESS_XALIST		0x100
+
 #define	NFSWRITE_UNSTABLE		0
 #define	NFSWRITE_DATASYNC		1
 #define	NFSWRITE_FILESYNC		2
@@ -665,6 +705,7 @@
 /* Flags for File Layout. */
 #define	NFSFLAYUTIL_DENSE		0x1
 #define	NFSFLAYUTIL_COMMIT_THRU_MDS	0x2
+#define	NFSFLAYUTIL_IOADVISE_THRU_MDS	0x4
 #define	NFSFLAYUTIL_STRIPE_MASK		0xffffffc0
 
 /* Flags for Flex File Layout. */
@@ -834,6 +875,24 @@ struct nfsv3_sattr {
 	u_int32_t sa_mtimetype;
 	nfstime3  sa_mtime;
 };
+
+/*
+ * IO Advise hint bits for NFSv4.2.
+ * Since these go on the wire as a bitmap, the NFSATTRBIT macros are
+ * used to manipulate these bits.
+ */
+#define	NFSV4IOHINT_NORMAL		0
+#define	NFSV4IOHINT_SEQUENTIAL		1
+#define	NFSV4IOHINT_SEQUENTIALBACK	2
+#define	NFSV4IOHINT_RANDOM		3
+#define	NFSV4IOHINT_WILLNEED		4
+#define	NFSV4IOHINT_WILLNEEDOPTUN	5
+#define	NFSV4IOHINT_DONTNEED		6
+#define	NFSV4IOHINT_NOREUSE		7
+#define	NFSV4IOHINT_READ		8
+#define	NFSV4IOHINT_WRITE		9
+#define	NFSV4IOHINT_INITPROXIMITY	10
+
 #endif	/* _KERNEL */
 
 /*
@@ -920,6 +979,12 @@ struct nfsv3_sattr {
 #define	NFSATTRBIT_MODESETMASKED	74
 #define	NFSATTRBIT_SUPPATTREXCLCREAT	75
 #define	NFSATTRBIT_FSCHARSETCAP		76
+#define	NFSATTRBIT_CLONEBLKSIZE		77
+#define	NFSATTRBIT_SPACEFREED		78
+#define	NFSATTRBIT_CHANGEATTRTYPE	79
+#define	NFSATTRBIT_SECLABEL		80
+/* Not sure what attribute bit #81 is? */
+#define	NFSATTRBIT_XATTRSUPPORT		82
 
 #define	NFSATTRBM_SUPPORTEDATTRS	0x00000001
 #define	NFSATTRBM_TYPE			0x00000002
@@ -998,6 +1063,12 @@ struct nfsv3_sattr {
 #define	NFSATTRBM_MODESETMASKED		0x00000400
 #define	NFSATTRBM_SUPPATTREXCLCREAT	0x00000800
 #define	NFSATTRBM_FSCHARSETCAP		0x00001000
+#define	NFSATTRBM_CLONEBLKSIZE		0x00002000
+#define	NFSATTRBM_SPACEFREED		0x00004000
+#define	NFSATTRBM_CHANGEATTRTYPE	0x00008000
+#define	NFSATTRBM_SECLABEL		0x00010000
+/* Not sure what attribute bit#81/0x00020000 is? */
+#define	NFSATTRBM_XATTRSUPPORT		0x00040000
 
 #define	NFSATTRBIT_MAX			77
 
@@ -1120,6 +1191,11 @@ struct nfsv3_sattr {
 	NFSATTRBM_LAYOUTALIGNMENT |					\
 	NFSATTRBM_MODESETMASKED |					\
 	NFSATTRBM_SUPPATTREXCLCREAT)
+
+/*
+ * NFSATTRBIT_NFSV42 - Attributes only supported by NFSv4.2.
+ */
+#define	NFSATTRBIT_NFSV42_2	NFSATTRBM_XATTRSUPPORT
 
 /*
  * Set of attributes that the getattr vnode op needs.
@@ -1422,5 +1498,14 @@ typedef struct nfsv4stateid nfsv4stateid_t;
 #define	NFSV4LAYOUTRET_FILE	1
 #define	NFSV4LAYOUTRET_FSID	2
 #define	NFSV4LAYOUTRET_ALL	3
+
+/* Seek Contents. */
+#define	NFSV4CONTENT_DATA	0
+#define	NFSV4CONTENT_HOLE	1
+
+/* Options for Set Extended attribute (RFC-8276). */
+#define	NFSV4SXATTR_EITHER	0
+#define	NFSV4SXATTR_CREATE	1
+#define	NFSV4SXATTR_REPLACE	2
 
 #endif	/* _NFS_NFSPROTO_H_ */

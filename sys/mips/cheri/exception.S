@@ -1098,7 +1098,7 @@ END(MipsKernIntr)
 	mtlo	t0;					\
 	mthi	t1;					\
 	/* set return address */			\
-	RESTORE_U_PCB_PC(t2, CHERI_REG_KSCRATCH2, pcb);	\
+	RESTORE_U_PCB_PC(t2, CHERI_REG_KSCRATCH2, pcb, t3);	\
 	RESTORE_U_PCB_REG(v0, V0, pcb);			\
 	RESTORE_U_PCB_REG(v1, V1, pcb);			\
 	RESTORE_U_PCB_REG(a0, A0, pcb);			\

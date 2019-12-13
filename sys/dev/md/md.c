@@ -1030,14 +1030,6 @@ unmapped_step:
 	return (error);
 }
 
-static void
-md_swap_page_free(vm_page_t m)
-{
-
-	vm_page_xunbusy(m);
-	vm_page_free(m);
-}
-
 static int
 mdstart_swap(struct md_s *sc, struct bio *bp)
 {
@@ -1086,7 +1078,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				rv = vm_pager_get_pages(sc->object, &m, 1,
 				    NULL, NULL);
 			if (rv == VM_PAGER_ERROR) {
-				md_swap_page_free(m);
+				vm_page_free(m);
 				break;
 			} else if (rv == VM_PAGER_FAIL) {
 				/*
@@ -1116,7 +1108,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				rv = vm_pager_get_pages(sc->object, &m, 1,
 				    NULL, NULL);
 			if (rv == VM_PAGER_ERROR) {
-				md_swap_page_free(m);
+				vm_page_free(m);
 				break;
 			} else if (rv == VM_PAGER_FAIL)
 				pmap_zero_page(m);
@@ -1143,10 +1135,10 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 				rv = vm_pager_get_pages(sc->object, &m, 1,
 				    NULL, NULL);
 			if (rv == VM_PAGER_ERROR) {
-				md_swap_page_free(m);
+				vm_page_free(m);
 				break;
 			} else if (rv == VM_PAGER_FAIL) {
-				md_swap_page_free(m);
+				vm_page_free(m);
 				m = NULL;
 			} else {
 				/* Page is valid. */
@@ -1158,7 +1150,7 @@ mdstart_swap(struct md_s *sc, struct bio *bp)
 					}
 				} else {
 					vm_pager_page_unswapped(m);
-					md_swap_page_free(m);
+					vm_page_free(m);
 					m = NULL;
 				}
 			}

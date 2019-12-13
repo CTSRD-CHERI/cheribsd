@@ -84,9 +84,13 @@
 #ifndef CHERI_PURECAP_KERNEL
 #define SWITCH_TO_KERNEL_STACK(pcb)		\
 	PTR_SUBU	sp, pcb, CALLFRAME_SIZ
+#define RESTORE_PC_FROM_PCB(tmpcreg, pcb)	\
+	RESTORE_U_PCB_PC(a0, tmpcreg, pcb)
 #else /* CHERI_PURECAP_KERNEL */
 /* Skip this in purecap kernel, we will do it after saving REG_STC */
 #define SWITCH_TO_KERNEL_STACK(pcb)
+#define RESTORE_PC_FROM_PCB(tmpcreg, pcb)	\
+	RESTORE_U_PCB_PC(a0, tmpcreg, pcb, t2)
 #endif /* CHERI_PURECAP_KERNEL */
 
 /*
@@ -146,7 +150,7 @@
 	RESTORE_U_PCB_REG(t1, MULHI, pcb)	; \
 	mtlo	t0				; \
 	mthi	t1				; \
-	RESTORE_U_PCB_PC(a0, tmpcreg, pcb)	; \
+	RESTORE_PC_FROM_PCB(tmpcreg, pcb)	; \
 	RESTORE_U_PCB_REG(v0, V0, pcb)		; \
 	RESTORE_U_PCB_REG(v1, V1, pcb)		; \
 	RESTORE_U_PCB_REG(a0, A0, pcb)		; \

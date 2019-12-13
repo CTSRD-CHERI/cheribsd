@@ -94,7 +94,7 @@ static int	cheriabi_fetch_syscall_args(struct thread *td);
 static void	cheriabi_set_syscall_retval(struct thread *td, int error);
 static void	cheriabi_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 static void	cheriabi_exec_setregs(struct thread *, struct image_params *,
-		    u_long);
+		    uintptr_t);
 static __inline boolean_t cheriabi_check_cpu_compatible(uint32_t, const char *);
 static boolean_t cheriabi_elf_header_supported(struct image_params *);
 
@@ -705,7 +705,7 @@ cheriabi_newthread_init(struct thread *td)
 }
 
 static void
-cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
+cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 {
 	struct cheri_signal *csigp;
 	struct trapframe *frame;

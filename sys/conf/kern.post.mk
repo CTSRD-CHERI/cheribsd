@@ -427,9 +427,9 @@ kernel-install: .PHONY
 .if defined(DEBUG) && !defined(INSTALL_NODEBUG) && ${MK_KERNEL_SYMBOLS} != "no"
 	mkdir -p ${DESTDIR}${KERN_DEBUGDIR}${KODIR}
 	${INSTALL} -p -m 555 -o ${KMODOWN} -g ${KMODGRP} ${KERNEL_KO}.debug ${DESTDIR}${KERN_DEBUGDIR}${KODIR}/
-.if defined(INSTALL_KERNEL_DOT_FULL)
-	${INSTALL} -p -m 555 -o ${KMODOWN} -g ${KMODGRP} ${FULLKERNEL} ${DESTDIR}${KODIR}/
 .endif
+.if defined(DEBUG) && defined(INSTALL_KERNEL_DOT_FULL)
+	${INSTALL} -p -m 555 -o ${KMODOWN} -g ${KMODGRP} ${FULLKERNEL} ${DESTDIR}${KODIR}/
 .endif
 .if defined(KERNEL_EXTRA_INSTALL)
 	${INSTALL} -p -m 555 -o ${KMODOWN} -g ${KMODGRP} ${KERNEL_EXTRA_INSTALL} ${DESTDIR}${KODIR}/

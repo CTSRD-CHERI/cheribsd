@@ -184,8 +184,8 @@
 #define	FREEBSD64_SYS_freebsd11_freebsd64_lstat	190
 #define	FREEBSD64_SYS_freebsd64_pathconf	191
 #define	FREEBSD64_SYS_fpathconf	192
-#define	FREEBSD64_SYS_getrlimit	194
-#define	FREEBSD64_SYS_setrlimit	195
+#define	FREEBSD64_SYS_freebsd64_getrlimit	194
+#define	FREEBSD64_SYS_freebsd64_setrlimit	195
 #define	FREEBSD64_SYS_freebsd11_freebsd64_getdirentries	196
 				/* 197 is freebsd6 freebsd64_mmap */
 #define	FREEBSD64_SYS___syscall	198

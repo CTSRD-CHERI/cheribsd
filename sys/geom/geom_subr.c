@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/errno.h>
 #include <sys/sbuf.h>
+#include <sys/sdt.h>
 #include <geom/geom.h>
 #include <geom/geom_dbg.h>
 #include <geom/geom_int.h>
@@ -65,6 +66,8 @@ __FBSDID("$FreeBSD$");
 #ifdef KDB
 #include <sys/kdb.h>
 #endif
+
+SDT_PROVIDER_DEFINE(geom);
 
 struct class_list_head g_classes = LIST_HEAD_INITIALIZER(g_classes);
 static struct g_tailq_head geoms = TAILQ_HEAD_INITIALIZER(geoms);
@@ -983,7 +986,7 @@ g_access(struct g_consumer *cp, int dcr, int dcw, int dce)
 	    pp, pp->name);
 
 	/* If foot-shooting is enabled, any open on rank#1 is OK */
-	if ((g_debugflags & 16) && gp->rank == 1)
+	if ((g_debugflags & G_F_FOOTSHOOTING) && gp->rank == 1)
 		;
 	/* If we try exclusive but already write: fail */
 	else if (dce > 0 && pw > 0)

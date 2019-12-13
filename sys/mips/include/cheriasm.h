@@ -305,11 +305,6 @@
 	cgetcause	treg;						\
 	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)
 
-#define RESTORE_EPCC(capreg, pc_vaddr)				\
-	/* update the address of EPCC to the return pc */ 	\
-	CSetOffset capreg, capreg, pc_vaddr;			\
-	CSetEPCC capreg;
-
 /*
  * Restore state from PCB. Assume that pcb is pointed to by KSCRATCH
  * and KSCRATCH2 is the kernel GP. We use C1 as an extra scratch register.
@@ -411,11 +406,6 @@
 	cgetcause	treg;						\
 	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)
 
-#define RESTORE_EPCC(capreg, tmpreg, pc_vaddr)			\
-	/* update the address of EPCC to the return pc */ 	\
-	CSetOffset capreg, capreg, pc_vaddr;			\
-	CSetEPCC capreg;
-
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
 	/* Restore special registers before KSCRATCH (C27) */		\
 	/* User DDC is saved in $kr2c. */				\
@@ -456,6 +446,16 @@
 	csetcause	treg
 
 #endif /* ! CHERI_PURECAP_KERNEL */
+
+#define RESTORE_EPCC(capreg, pc_vaddr, tmpreg)					\
+	/* Do not attempt to modify EPCC if it is already correct. */		\
+	/* This is needed in case it is a sentry (e.g. for signal handlers) */	\
+	cgetoffset tmpreg, capreg;						\
+	/* update the offset of EPCC to the return pc if different */		\
+	beq tmpreg, pc_vaddr, 12345f; nop;					\
+	csetoffset capreg, capreg, pc_vaddr;					\
+	12345:									\
+	csetepcc capreg;
 
 /*
  * Macros saving capability state to, and restoring it from, voluntary kernel

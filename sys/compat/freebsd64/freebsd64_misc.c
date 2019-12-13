@@ -620,12 +620,12 @@ freebsd64_nmount(struct thread *td, struct freebsd64_nmount_args *uap)
 }
 
 int
-freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
+freebsd64_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 {
 	int argc, envc;
 	uint64_t *vectp;
 	char *stringp;
-	char *destp;
+	uintptr_t destp, ustringp;
 	struct freebsd64_ps_strings *arginfo;
 	struct proc *p;
 	size_t execpath_len;
@@ -650,16 +650,18 @@ freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 
 	if (p->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(p->p_sysent->sv_szsigcode);
-	
-	destp =	(char *)arginfo;
+	else
+		szsigcode = 0;
+	destp =	(uintptr_t)arginfo;
 
 	/*
 	 * install sigcode
 	 */
 	if (szsigcode != 0) {
 		destp -= szsigcode;
-		destp = rounddown2(destp, sizeof(vaddr_t));
-		error = copyout(p->p_sysent->sv_sigcode, destp, szsigcode);
+		destp = __builtin_align_down(destp, sizeof(uint64_t));
+		error = copyout(p->p_sysent->sv_sigcode, (void *)destp,
+		    szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -669,9 +671,8 @@ freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		destp = rounddown2(destp, sizeof(vaddr_t));
-		imgp->execpathp = (__cheri_addr unsigned long)destp;
-		error = copyout(imgp->execpath, destp, execpath_len);
+		imgp->execpathp = (__cheri_addr vaddr_t)destp;
+		error = copyout(imgp->execpath, (void *)destp, execpath_len);
 		if (error != 0)
 			return(error);
 	}
@@ -682,7 +683,7 @@ freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
 	imgp->canary = (__cheri_addr vaddr_t)destp;
-	error = copyout(canary, destp, sizeof(canary));
+	error = copyout(canary, (void *)destp, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -693,24 +694,28 @@ freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	destp -= szps;
 	destp = rounddown2(destp, sizeof(vaddr_t));
 	imgp->pagesizes = (uintptr_t)destp;
-	error = copyout(pagesizes, destp, szps);
+	error = copyout(pagesizes, (void *)destp, szps);
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = szps;
 
+	/*
+	 * Allocate room for the argument and environment strings.
+	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
-	destp = rounddown2(destp, sizeof(vaddr_t));
+	destp = __builtin_align_down(destp, sizeof(uint64_t));
+	ustringp = destp;
 
-	vectp = (uint64_t *)destp;
 	if (imgp->sysent->sv_stackgap != NULL)
-		imgp->sysent->sv_stackgap(imgp, (caddr_t *)&vectp);
+		imgp->sysent->sv_stackgap(imgp, &destp);
 
 	if (imgp->auxargs) {
-		error = imgp->sysent->sv_copyout_auxargs(imgp,
-		    (caddr_t *)&vectp);
+		error = imgp->sysent->sv_copyout_auxargs(imgp, &destp);
 		if (error != 0)
 			return (error);
 	}
+
+	vectp = (uint64_t *)destp;
 
 	/*
 	 * Allocate room for the argv[] and env vectors including the
@@ -721,7 +726,7 @@ freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (register_t *)vectp;
+	*stack_base = (uintptr_t)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -730,7 +735,8 @@ freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	/*
 	 * Copy out strings - arguments and environment.
 	 */
-	error = copyout(stringp, destp, ARG_MAX - imgp->args->stringspace);
+	error = copyout(stringp, (void *)ustringp,
+	    ARG_MAX - imgp->args->stringspace);
 	if (error != 0)
 		return (error);
 
@@ -745,11 +751,11 @@ freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	 * Fill in argument portion of vector table.
 	 */
 	for (; argc > 0; --argc) {
-		if (suword(vectp++, (__cheri_addr vaddr_t)destp) != 0)
+		if (suword(vectp++, (__cheri_addr vaddr_t)ustringp) != 0)
 			return (EFAULT);
 		while (*stringp++ != 0)
-			destp++;
-		destp++;
+			ustringp++;
+		ustringp++;
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
@@ -764,11 +770,11 @@ freebsd64_copyout_strings(struct image_params *imgp, register_t **stack_base)
 	 * Fill in environment portion of vector table.
 	 */
 	for (; envc > 0; --envc) {
-		if (suword(vectp++, (__cheri_addr vaddr_t)destp) != 0)
+		if (suword(vectp++, (__cheri_addr vaddr_t)ustringp) != 0)
 			return (EFAULT);
 		while (*stringp++ != 0)
-			destp++;
-		destp++;
+			ustringp++;
+		ustringp++;
 	}
 
 	/* end of vector table is a null pointer */

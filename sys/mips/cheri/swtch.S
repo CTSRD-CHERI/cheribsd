@@ -117,7 +117,7 @@ LEAF(fork_trampoline)
 	mtlo	t0
 	mthi	t1
 	/* Note: this uses $c1 as scratch register. */
-	RESTORE_U_PCB_PC(a0, CHERI_REG_C1, CHERI_REG_KSCRATCH) # set return address
+	RESTORE_U_PCB_PC(a0, CHERI_REG_C1, CHERI_REG_KSCRATCH, t2) # set return address
 	RESTORE_U_PCB_REG(a0, PC, CHERI_REG_KSCRATCH)
 	RESTORE_U_PCB_REG(AT, AST, CHERI_REG_KSCRATCH)
 	RESTORE_U_PCB_REG(v0, V0, CHERI_REG_KSCRATCH)

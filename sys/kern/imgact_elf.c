@@ -1400,7 +1400,7 @@ ret:
 #define	suword __CONCAT(suword, __ELF_WORD_SIZE)
 
 int
-__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, caddr_t *base)
+__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t *base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 #ifdef COMPAT_FREEBSD64
@@ -1456,13 +1456,13 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, caddr_t *base)
 
 	auxlen = sizeof(*argarray) * (pos - argarray);
 	*base -= auxlen;
-	error = copyout(argarray, *base, auxlen);
+	error = copyout(argarray, (void *)*base, auxlen);
 	free(argarray, M_TEMP);
 	return (error);
 }
 
 int
-__elfN(freebsd_fixup)(register_t **stack_base, struct image_params *imgp)
+__elfN(freebsd_fixup)(uintptr_t *stack_base, struct image_params *imgp)
 {
 	Elf_Addr *base;
 
@@ -1470,7 +1470,7 @@ __elfN(freebsd_fixup)(register_t **stack_base, struct image_params *imgp)
 	base--;
 	if (suword(base, imgp->args->argc) == -1)
 		return (EFAULT);
-	*stack_base = (register_t *)base;
+	*stack_base = (uintptr_t)base;
 	return (0);
 }
 
@@ -2872,9 +2872,10 @@ __elfN(untrans_prot)(vm_prot_t prot)
 }
 
 void
-__elfN(stackgap)(struct image_params *imgp, caddr_t *stack_base)
+__elfN(stackgap)(struct image_params *imgp, uintptr_t *stack_base)
 {
-	u_long range, rbase, gap;
+	uintptr_t rbase;
+	vm_offset_t range, gap;
 	int pct;
 
 	if ((imgp->map_flags & MAP_ASLR) == 0)
@@ -2886,7 +2887,7 @@ __elfN(stackgap)(struct image_params *imgp, caddr_t *stack_base)
 		pct = 50;
 	range = imgp->eff_stack_sz * pct / 100;
 	arc4rand(&rbase, sizeof(rbase), 0);
-	gap = rbase % range;
+	gap = ptr_to_va(rbase) % range;
 	gap &= ~(sizeof(u_long) - 1);
 	*stack_base -= gap;
 }

@@ -43,6 +43,8 @@ local generated_tag = "@" .. "generated"
 local config = {
 	os_id_keyword = "FreeBSD",
 	abi_func_prefix = "",
+	sysargmap = "/dev/null",
+	sysargmap_h = "_SYS_SYSARGMAP_H_",
 	sysnames = "syscalls.c",
 	sysproto = "../sys/sysproto.h",
 	sysproto_h = "_SYS_SYSPROTO_H_",
@@ -62,6 +64,7 @@ local config = {
 	abi_headers = "",
 	ptr_intptr_t_cast = "intptr_t",
 	ptr_qualified="*",
+	ptrmaskname = "sysargmask",
 }
 
 local config_modified = {}
@@ -70,6 +73,7 @@ local tmpspace = "/tmp/sysent." .. unistd.getpid() .. "/"
 
 -- These ones we'll open in place
 local config_files_needed = {
+	"sysargmap",
 	"sysnames",
 	"syshdr",
 	"sysmk",
@@ -214,8 +218,13 @@ end
 -- be fine to make various assumptions
 local function process_config(file)
 	local cfg = {}
-	local commentExpr = "#.*"
-	local lineExpr = "([%w%p]+)%s*=%s*([`\"]?[^\"`]+[`\"]?)"
+	local comment_line_expr = "^%s*#.*"
+	-- We capture any whitespace padding here so we can easily advance to
+	-- the end of the line as needed to check for any trailing bogus bits.
+	-- Alternatively, we could drop the whitespace and instead try to
+	-- use a pattern to strip out the meaty part of the line, but then we
+	-- would need to sanitize the line for potentially special characters.
+	local line_expr = "^([%w%p]+%s*)=(%s*[`\"]?[^\"`]+[`\"]?)"
 
 	if file == nil then
 		return nil, "No file given"
@@ -227,18 +236,36 @@ local function process_config(file)
 	end
 
 	for nextline in fh:lines() do
-		-- Strip any comments
-		nextline = nextline:gsub(commentExpr, "")
+		-- Strip any whole-line comments
+		nextline = nextline:gsub(comment_line_expr, "")
 		-- Parse it into key, value pairs
-		local key, value = nextline:match(lineExpr)
+		local key, value = nextline:match(line_expr)
 		if key ~= nil and value ~= nil then
-			if value:sub(1,1) == '`' then
+			local kvp = key .. "=" .. value
+			key = trim(key)
+			value = trim(value)
+			local delim = value:sub(1,1)
+			if delim == '`' or delim == '"' then
+				local trailing_context
+				-- Strip off the key/value part
+				trailing_context = nextline:sub(kvp:len() + 1)
+				-- Strip off any trailing comment
+				trailing_context = trailing_context:gsub("#.*$",
+				    "")
+				-- Strip off leading/trailing whitespace
+				trailing_context = trim(trailing_context)
+				if trailing_context ~= "" then
+					print(trailing_context)
+					abort(1, "Malformed line: " .. nextline)
+				end
+			end
+			if delim == '`' then
 				-- Command substition may use $1 and $2 to mean
 				-- the syscall definition file and itself
 				-- respectively.  We'll go ahead and replace
 				-- $[0-9] with respective arg in case we want to
 				-- expand this in the future easily...
-				value = trim(value, "`")
+				value = trim(value, delim)
 				for capture in value:gmatch("$([0-9]+)") do
 					capture = tonumber(capture)
 					if capture > #arg then
@@ -250,10 +277,29 @@ local function process_config(file)
 				end
 
 				value = exec(value)
+			elseif delim == '"' then
+				value = trim(value, delim)
 			else
-				value = trim(value, '"')
+				-- Strip off potential comments
+				value = value:gsub("#.*$", "")
+				-- Strip off any padding whitespace
+				value = trim(value)
+				if value:match("%s") then
+					abort(1, "Malformed config line: " ..
+					    nextline)
+				end
+			end
+			-- Heuristically convert anything fully numeric
+			-- to a number.
+			if tonumber(value) ~= nil then
+				value = tonumber(value)
 			end
 			cfg[key] = value
+		elseif not nextline:match("^%s*$") then
+			-- Make sure format violations don't get overlooked
+			-- here, but ignore blank lines.  Comments are already
+			-- stripped above.
+			abort(1, "Malformed config line: " .. nextline)
 		end
 	end
 
@@ -385,8 +431,8 @@ local function write_line_pfile(tmppat, line)
 end
 
 local function isptrtype(type)
-	return type:find("*") or type:find("caddr_t")
-	    -- XXX NOTYET: or type:find("intptr_t")
+	return type:find("*") or type:find("caddr_t") or
+	    type:find("intptr_t")
 end
 
 local process_syscall_def
@@ -560,9 +606,11 @@ end
 
 local function process_args(args)
 	local funcargs = {}
+	local changes_abi = false
 
 	for arg in args:gmatch("([^,]+)") do
 		local abi_change = not isptrtype(arg) or check_abi_changes(arg)
+		changes_abi = changes_abi or abi_change
 
 		arg = strip_arg_annotations(arg)
 
@@ -578,7 +626,7 @@ local function process_args(args)
 		-- XX TODO: Forward declarations? See: sysstubfwd in CheriBSD
 		if abi_change then
 			local abi_type_suffix = config["abi_type_suffix"]
-			argtype = argtype:gsub("_native ", "")
+			argtype = argtype:gsub("_native ", " ")
 			argtype = argtype:gsub("(struct [^ ]*)", "%1" ..
 			    abi_type_suffix)
 			argtype = argtype:gsub("(union [^ ]*)", "%1" ..
@@ -599,11 +647,12 @@ local function process_args(args)
 	end
 
 	::out::
-	return funcargs
+	return funcargs, changes_abi
 end
 
 local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
-    auditev, syscallret, funcname, funcalias, funcargs, argalias)
+    auditev, syscallret, funcname, funcalias, funcargs, argalias,
+    skip_proto)
 	local argssize
 
 	if #funcargs > 0 or flags & known_flags["NODEF"] ~= 0 then
@@ -681,7 +730,7 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 	write_line("systracetmp", "\t\tbreak;\n")
 
 	local nargflags = get_mask({"NOARGS", "NOPROTO", "NODEF"})
-	if flags & nargflags == 0 then
+	if flags & nargflags == 0 and not skip_proto then
 		if #funcargs > 0 then
 			write_line("sysarg", string.format("struct %s {\n",
 			    argalias))
@@ -700,8 +749,23 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 		end
 	end
 
+	local daflags = get_mask({"NOPROTO", "NODEF"})
+	if flags & daflags == 0 then
+		write_line("sysargmap", string.format("\t[%s%s] = (0x0",
+		    config["syscallprefix"], funcname))
+		local i = 0
+		for _, v in ipairs(funcargs) do
+			if isptrtype(v["type"]) then
+			    write_line("sysargmap", string.format(" | 0x%x",
+				1 << i))
+			end
+			i = i + 1
+		end
+		write_line("sysargmap", "),\n")
+	end
+
 	local protoflags = get_mask({"NOPROTO", "NODEF"})
-	if flags & protoflags == 0 then
+	if flags & protoflags == 0 and not skip_proto then
 		if funcname == "nosys" or funcname == "lkmnosys" or
 		    funcname == "sysarch" or funcname:find("^freebsd") or
 		    funcname:find("^linux") or
@@ -773,7 +837,7 @@ local function handle_obsol(sysnum, funcname, comment)
 end
 
 local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
-    auditev, funcname, funcalias, funcargs, argalias)
+    auditev, funcname, funcalias, funcargs, argalias, skip_proto)
 	local argssize, out, outdcl, wrap, prefix, descr
 
 	if #funcargs > 0 or flags & known_flags["NODEF"] ~= 0 then
@@ -802,7 +866,7 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 	::compatdone::
 	local dprotoflags = get_mask({"NOPROTO", "NODEF"})
 	local nargflags = dprotoflags | known_flags["NOARGS"]
-	if #funcargs > 0 and flags & nargflags == 0 then
+	if #funcargs > 0 and flags & nargflags == 0 and not skip_proto then
 		write_line(out, string.format("struct %s {\n", argalias))
 		for _, v in ipairs(funcargs) do
 			local argname, argtype = v["name"], v["type"]
@@ -813,11 +877,11 @@ local function handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
 			    argname, argtype))
 		end
 		write_line(out, "};\n")
-	elseif flags & nargflags == 0 then
+	elseif flags & nargflags == 0 and not skip_proto then
 		write_line("sysarg", string.format(
 		    "struct %s {\n\tregister_t dummy;\n};\n", argalias))
 	end
-	if flags & dprotoflags == 0 then
+	if flags & dprotoflags == 0 and not skip_proto then
 		write_line(outdcl, string.format(
 		    "%s\t%s%s(struct thread *, struct %s *);\n",
 		    rettype, prefix, funcname, argalias))
@@ -1021,30 +1085,37 @@ process_syscall_def = function(line)
 	end
 
 	local funcargs = {}
+	local changes_abi = false
 	if args ~= nil then
-		funcargs = process_args(args)
+		funcargs, changes_abi = process_args(args)
 	end
+	local skip_proto = config["abi_flags"] ~= "" and changes_abi
 
 	local argprefix = ''
+	local funcprefix = ''
 	if abi_changes("pointer_args") then
 		for _, v in ipairs(funcargs) do
 			if isptrtype(v["type"]) then
 				-- argalias should be:
 				--   COMPAT_PREFIX + ABI Prefix + funcname
 				argprefix = config['abi_func_prefix']
-				funcalias = config['abi_func_prefix'] ..
-				    funcname
+				funcprefix = config['abi_func_prefix']
+				funcalias = funcprefix .. funcname
+				skip_proto = false
 				goto ptrfound
 			end
 		end
 		::ptrfound::
+	end
+	if funcname ~= nil then
+		funcname = funcprefix .. funcname
 	end
 	if funcalias == nil or funcalias == "" then
 		funcalias = funcname
 	end
 
 	if argalias == nil and funcname ~= nil then
-		argalias = argprefix .. funcname .. "_args"
+		argalias = funcname .. "_args"
 		for _, v in pairs(compat_options) do
 			local mask = v["mask"]
 			if (flags & mask) ~= 0 then
@@ -1068,11 +1139,12 @@ process_syscall_def = function(line)
 			abort(1, "Incompatible COMPAT/STD: " .. line)
 		end
 		handle_compat(sysnum, thr_flag, flags, sysflags, rettype,
-		    auditev, funcname, funcalias, funcargs, argalias)
+		    auditev, funcname, funcalias, funcargs, argalias,
+		    skip_proto)
 	elseif flags & ncompatflags ~= 0 then
 		handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 		    auditev, syscallret, funcname, funcalias, funcargs,
-		    argalias)
+		    argalias, skip_proto)
 	elseif flags & known_flags["OBSOL"] ~= 0 then
 		handle_obsol(sysnum, funcname, funcomment)
 	elseif flags & known_flags["UNIMPL"] ~= 0 then
@@ -1214,6 +1286,20 @@ for _, v in pairs(compat_options) do
 	write_line(v["tmp"], string.format("\n#ifdef %s\n\n", v["definition"]))
 end
 
+write_line("sysargmap", string.format([[/*
+ * System call prototypes.
+ *
+ * DO NOT EDIT-- this file is automatically %s.
+ * $%s$
+ */
+
+#ifndef %s
+#define	%s
+
+static int %s[] = {
+]], generated_tag, config['os_id_keyword'], config['sysargmap_h'],
+    config['sysargmap_h'], config['ptrmaskname']))
+
 write_line("sysnames", string.format([[/*
  * System call names.
  *
@@ -1333,6 +1419,8 @@ write_line("systraceret", [[
 ]])
 
 -- Finish up; output
+write_line("sysargmap", "};\n")
+
 write_line("syssw", read_file("sysinc"))
 write_line("syssw", read_file("sysent"))
 
