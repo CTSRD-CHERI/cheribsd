@@ -1373,7 +1373,7 @@ err:
 		else
 			printf("kernel mode)\n");
 
-		printf("capcause = 0x%x, badaddr = %#jx, pc = %p, ra = %p, "
+		printf("capcause = 0x%lx, badaddr = %#jx, pc = %p, ra = %p, "
 		       "sp = %p, sr = %jx\n", trapframe->capcause,
 		       (intmax_t)trapframe->badvaddr, trapframe->pcc,
 		       trapframe->c17, trapframe->csp, (intmax_t)trapframe->sr);
@@ -1381,7 +1381,7 @@ err:
 #ifdef TRAP_DEBUG
 		if (trap_debug) {
 #ifdef CHERI_PURECAP_KERNEL
-			printf("capcause = 0x%x, badaddr = %#jx, pc = %p, ra = %p, "
+			printf("capcause = 0x%lx, badaddr = %#jx, pc = %p, ra = %p, "
 			    "sp = %p, sr = %jx\n", trapframe->capcause,
 			    (intmax_t)trapframe->badvaddr, trapframe->pcc,
 			    trapframe->c17, trapframe->csp, (intmax_t)trapframe->sr);
