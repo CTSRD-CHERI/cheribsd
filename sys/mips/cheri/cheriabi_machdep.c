@@ -720,7 +720,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t st
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 
-	KASSERT(stack % sizeof(void * __capability) == 0,
+	KASSERT(is_aligned(stack, sizeof(void * __capability)),
 	    ("CheriABI stack pointer not properly aligned"));
 
 	/*
@@ -733,7 +733,7 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t st
 	PROC_UNLOCK(td->td_proc);
 	stackbase = td->td_proc->p_sysent->sv_usrstack - rlim_stack.rlim_max;
 	KASSERT(stack > stackbase,
-	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
+	    ("top of stack 0x%lx is below stack base 0x%lx", ptr_to_va(stack), stackbase));
 	stacklen = stack - stackbase;
 	/*
 	 * Round the stack down as required to make it representable.
