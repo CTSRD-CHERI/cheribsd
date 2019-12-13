@@ -149,6 +149,7 @@ struct vm_map_entry {
 #define	MAP_ENTRY_STACK_GAP_DN		0x00020000
 #define	MAP_ENTRY_STACK_GAP_UP		0x00040000
 #define	MAP_ENTRY_HEADER		0x00080000
+#define	MAP_ENTRY_UNMAPPED		0x00100000
 
 #ifdef	_KERNEL
 static __inline u_char
@@ -364,6 +365,7 @@ long vmspace_resident_count(struct vmspace *vmspace);
 #define	MAP_CREATE_STACK_GAP_UP	0x00010000
 #define	MAP_CREATE_STACK_GAP_DN	0x00020000
 #define	MAP_VN_EXEC		0x00040000
+#define MAP_CREATE_UNMAPPED	0x00080000
 
 /*
  * vm_fault option flags
@@ -465,6 +467,8 @@ int vm_map_lookup_locked(vm_map_t *, vm_offset_t, vm_prot_t, vm_map_entry_t *, v
     vm_pindex_t *, vm_prot_t *, boolean_t *);
 void vm_map_lookup_done (vm_map_t, vm_map_entry_t);
 boolean_t vm_map_lookup_entry (vm_map_t, vm_offset_t, vm_map_entry_t *);
+bool vm_map_reservation_is_unmapped(vm_map_t, vm_offset_t);
+int vm_map_reservation_delete(vm_map_t, vm_offset_t);
 
 static inline vm_map_entry_t
 vm_map_entry_first(vm_map_t map)
