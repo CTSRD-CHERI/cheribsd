@@ -34,7 +34,8 @@ WANT_CHERI?=	pure
 .endif
 .endif
 
-.if ! ${MACHINE_ARCH:Mmips*c*} || defined(LIBCHERI)
+.if (${MACHINE_ARCH:Mmips64*} && ! ${MACHINE_ARCH:Mmips*c*}) || \
+    defined(LIBCHERI)
 .if !${.TARGETS:Mbuild-tools} && !defined(BOOTSTRAPPING)
 .if defined(NEED_CHERI)
 .if ${MK_CHERI} == "no"
