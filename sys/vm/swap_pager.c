@@ -189,6 +189,9 @@ void * __capability swap_restore_cap;
 static u_long swap_reserved;
 static u_long swap_total;
 static int sysctl_page_shift(SYSCTL_HANDLER_ARGS);
+
+static SYSCTL_NODE(_vm_stats, OID_AUTO, swap, CTLFLAG_RD, 0, "VM swap stats");
+
 SYSCTL_PROC(_vm, OID_AUTO, swap_reserved, CTLTYPE_U64 | CTLFLAG_RD | CTLFLAG_MPSAFE,
     &swap_reserved, 0, sysctl_page_shift, "A", 
     "Amount of swap storage needed to back all allocated anonymous memory.");
@@ -206,6 +209,16 @@ SYSCTL_ULONG(_vm, OID_AUTO, swzone, CTLFLAG_RD, &swzone, 0,
 static unsigned long swap_maxpages;
 SYSCTL_ULONG(_vm, OID_AUTO, swap_maxpages, CTLFLAG_RD, &swap_maxpages, 0,
     "Maximum amount of swap supported");
+
+static counter_u64_t swap_free_deferred;
+SYSCTL_COUNTER_U64(_vm_stats_swap, OID_AUTO, free_deferred,
+    CTLFLAG_RD, &swap_free_deferred,
+    "Number of pages that deferred freeing swap space");
+
+static counter_u64_t swap_free_completed;
+SYSCTL_COUNTER_U64(_vm_stats_swap, OID_AUTO, free_completed,
+    CTLFLAG_RD, &swap_free_completed,
+    "Number of deferred frees completed");
 
 /* bits from overcommit */
 #define	SWAP_RESERVE_FORCE_ON		(1 << 0)
@@ -551,6 +564,15 @@ swap_pager_init(void)
 	sx_init(&sw_alloc_sx, "swspsx");
 	sx_init(&swdev_syscall_lock, "swsysc");
 }
+
+static void
+swap_pager_counters(void)
+{
+
+	swap_free_deferred = counter_u64_alloc(M_WAITOK);
+	swap_free_completed = counter_u64_alloc(M_WAITOK);
+}
+SYSINIT(swap_counters, SI_SUB_CPU, SI_ORDER_ANY, swap_pager_counters, NULL);
 
 /*
  * SWAP_PAGER_SWAP_INIT() - swap pager initialization from pageout process
@@ -1151,14 +1173,37 @@ swap_pager_haspage(vm_object_t object, vm_pindex_t pindex, int *before,
  *
  *	This routine may not sleep.
  *
- *	The object containing the page must be locked.
+ *	The object containing the page may be locked.
  */
 static void
 swap_pager_unswapped(vm_page_t m)
 {
 	struct swblk *sb;
+	vm_object_t obj;
 
-	VM_OBJECT_ASSERT_WLOCKED(m->object);
+	/*
+	 * Handle enqueing deferred frees first.  If we do not have the
+	 * object lock we wait for the page daemon to clear the space.
+	 */
+	obj = m->object;
+	if (!VM_OBJECT_WOWNED(obj)) {
+		VM_PAGE_OBJECT_BUSY_ASSERT(m);
+		/*
+		 * The caller is responsible for synchronization but we
+		 * will harmlessly handle races.  This is typically provided
+		 * by only calling unswapped() when a page transitions from
+		 * clean to dirty.
+		 */
+		if ((m->a.flags & (PGA_SWAP_SPACE | PGA_SWAP_FREE)) ==
+		    PGA_SWAP_SPACE) {
+			vm_page_aflag_set(m, PGA_SWAP_FREE);
+			counter_u64_add(swap_free_deferred, 1);
+		}
+		return;
+	}
+	if ((m->a.flags & PGA_SWAP_FREE) != 0)
+		counter_u64_add(swap_free_completed, 1);
+	vm_page_aflag_clear(m, PGA_SWAP_FREE | PGA_SWAP_SPACE);
 
 	/*
 	 * The meta data only exists if the object is OBJT_SWAP
@@ -1475,6 +1520,7 @@ swap_pager_putpages(vm_object_t object, vm_page_t *ma, int count,
 		VM_OBJECT_WLOCK(object);
 		for (j = 0; j < n; ++j) {
 			mreq = ma[i + j];
+			vm_page_aflag_clear(mreq, PGA_SWAP_FREE);
 			addr = swp_pager_meta_build(mreq->object, mreq->pindex,
 			    blk + j);
 			if (addr != SWAPBLK_NONE)
@@ -1602,6 +1648,9 @@ swp_pager_async_iodone(struct buf *bp)
 			wakeup(&object->handle);
 		}
 
+		/* We always have space after I/O, successful or not. */
+		vm_page_aflag_set(m, PGA_SWAP_SPACE);
+
 		if (bp->b_ioflags & BIO_ERROR) {
 			/*
 			 * If an error occurs I'd love to throw the swapblk
@@ -1623,6 +1672,7 @@ swp_pager_async_iodone(struct buf *bp)
 				 * then finish the I/O.
 				 */
 				MPASS(m->dirty == VM_PAGE_BITS_ALL);
+				/* PQ_UNSWAPPABLE? */
 				vm_page_lock(m);
 				vm_page_activate(m);
 				vm_page_unlock(m);
