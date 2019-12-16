@@ -612,12 +612,12 @@ set_capregs(struct thread *td, struct capreg *capregs)
  * code by the MIPS elf abi).
  */
 void
-exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
+exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 {
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 
-	td->td_frame->sp = ((register_t)stack) & ~(STACK_ALIGN - 1);
+	td->td_frame->sp = ((__cheri_addr register_t)stack) & ~(STACK_ALIGN - 1);
 
 	/*
 	 * If we're running o32 or n32 programs but have 64-bit registers,
@@ -645,10 +645,13 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	td->td_frame->t9 = imgp->entry_addr & ~3; /* abicall req */
 	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
 	    (mips_rd_status() & MIPS_SR_INT_MASK);
-#if defined(__mips_n32) 
+#if defined(__mips_n32) || defined(__mips_n64)
 	td->td_frame->sr |= MIPS_SR_PX;
-#elif  defined(__mips_n64)
-	td->td_frame->sr |= MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX;
+#endif
+#if defined(__mips_n64)
+	if (SV_PROC_FLAG(td->td_proc, SV_LP64))
+		td->td_frame->sr |= MIPS_SR_UX;
+	td->td_frame->sr |= MIPS_SR_KX;
 #endif
 #if defined(CPU_CHERI)
 	td->td_frame->sr |= MIPS_SR_COP_2_BIT;
@@ -668,17 +671,22 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 	 *	a2	rtld object (filled in by dynamic loader)
 	 *	a3	ps_strings
 	 */
-	td->td_frame->a0 = (register_t) stack;
+	td->td_frame->a0 = (__cheri_addr register_t)stack;
 	td->td_frame->a1 = 0;
 	td->td_frame->a2 = 0;
-	td->td_frame->a3 = (register_t)imgp->ps_strings;
+	td->td_frame->a3 = (__cheri_addr register_t)imgp->ps_strings;
 
 	td->td_md.md_flags &= ~MDTD_FPUSED;
 	if (PCPU_GET(fpcurthread) == td)
 	    PCPU_SET(fpcurthread, (struct thread *)0);
 	td->td_md.md_ss_addr = 0;
 
-	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
+#ifdef COMPAT_FREEBSD32
+	if (!SV_PROC_FLAG(td->td_proc, SV_LP64))
+		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE32;
+	else
+#endif
+		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;
 }
 
 int

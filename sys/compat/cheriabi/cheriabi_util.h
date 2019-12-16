@@ -104,6 +104,7 @@ int    cheriabi_syscall_helper_register(struct syscall_helper_data *sd, int flag
 int    cheriabi_syscall_helper_unregister(struct syscall_helper_data *sd);
 
 struct iovec_c;
+int	cheriabi_copyout_auxargs(struct image_params *imgp, uintcap_t base);
 int	cheriabi_copyout_strings(struct image_params *imgp,
 	    uintptr_t *stack_base);
 int	cheriabi_copyiniov(struct iovec_c * __capability iovp, u_int iovcnt,

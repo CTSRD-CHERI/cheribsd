@@ -93,8 +93,10 @@ __FBSDID("$FreeBSD$");
 #include <security/audit/audit.h>
 #include <security/mac/mac_framework.h>
 
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#endif
 
 #ifdef KDTRACE_HOOKS
 #include <sys/dtrace_bsd.h>
@@ -370,7 +372,7 @@ do_execve(struct thread *td, struct image_args *args,
 	struct nameidata nd;
 	struct ucred *oldcred;
 	struct uidinfo *euip = NULL;
-	uintptr_t stack_base;
+	uintcap_t stack_base;
 	struct image_params image_params, *imgp;
 	struct vattr attr;
 	int (*img_first)(struct image_params *);
@@ -1642,36 +1644,22 @@ exec_args_get_begin_envv(struct image_args *args)
 
 #if __has_feature(capabilities)
 /*
- * This macro uses cheri_capability_build_user_rwx() because it can
- * create both types of capabilities (and currently creates W|X caps).
- * Its use should be replaced.
+ * XXX: We may want a wrapper of cheri_csetbounds() that warns about
+ * capabilities that are overly broad.
  */
-#define sucap(uaddr, base, offset, length, what, perms)	\
-    _sucap(uaddr, (base), (offset), (length), (perms), what, __func__, __LINE__)
 
 static int
-_sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
-    uint64_t perms, const char *what, const char *func, int line)
+sucap(void * __capability uaddr, void * __capability cap)
 {
-	void *__capability _tmpcap;
-	size_t rounded_length = CHERI_REPRESENTABLE_LENGTH(length);
-	vaddr_t rounded_base = CHERI_REPRESENTABLE_BASE(base, length);
-	if (rounded_length != length)
-		printf("%s:%d rounding size of unrepresentable %s from %zd to "
-		    "%zd\n", func, line, what, length, rounded_length);
-	if (rounded_base != base) {
-		printf("%s:%d aligning base of unrepresentable %s from"
-		       " 0x%zx to 0x%zx and adjusting offset by %zd\n", func,
-		       line, what, base, rounded_base, base - rounded_base);
-		/* We have to adjust the offset by the difference */
-		offset += base - rounded_base;
-	}
-	_tmpcap = cheri_capability_build_user_rwx(
-	    perms, rounded_base, rounded_length, offset);
-	KASSERT(cheri_gettag(_tmpcap),("%s:%d: Created invalid cap "
-	     "from base=%zx, offset=%#zx, length=%#zx, perms=%#zx", func,
-	     line, base, offset, length, (size_t)(perms)));
-	return (copyoutcap(&_tmpcap, uaddr, sizeof(_tmpcap)));
+
+	return (copyoutcap(&cap, uaddr, sizeof(cap)) == 0 ? 0 : -1);
+}
+#else
+static int
+sucap(void *uaddr, void *ptr)
+{
+
+	return (suword(uaddr, (long)(intptr_t)ptr));
 }
 #endif
 
@@ -1681,23 +1669,24 @@ _sucap(void *__capability uaddr, vaddr_t base, ssize_t offset, size_t length,
  * as the initial stack pointer.
  */
 int
-exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
+exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 {
 	int argc, envc;
 	char * __capability * __capability vectp;
 	char *stringp;
-	uintcap_t destp, ustringp;
+#if __has_feature(capabilities)
+	char * __capability ustackp;
+	vaddr_t rounded_stack_vaddr, stack_vaddr, stack_offset;
+	size_t ssiz;
+#endif
+	char * __capability destp, * __capability ustringp;
 	/* XXX: Temporary */
 	uintptr_t uptr, uptr_old;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
-	size_t execpath_len;
+	size_t execpath_len, len;
 	int error, szsigcode, szps;
 	char canary[sizeof(long) * 8];
-
-#if __has_feature(capabilities)
-	KASSERT(imgp->auxargs != NULL, ("CHERI requires auxargs"));
-#endif
 
 	szps = sizeof(pagesizes[0]) * MAXPAGESIZES;
 	/*
@@ -1712,19 +1701,36 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	szsigcode = 0;
 
 #if __has_feature(capabilities)
-	/* XXX: should be derived from a capability to the strings region */
-	arginfo = cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
-	    CHERI_CAP_USER_DATA_LENGTH,
-	    p->p_sysent->sv_psstrings);
+	/*
+	 * ustackp must cover all of the smaller buffers copied out
+	 * onto the stack, so roundup the length to be representable
+	 * even if it means the capability extends beyond the stack
+	 * bounds.
+	 */
+	stack_vaddr = (vaddr_t)p->p_vmspace->vm_maxsaddr;
+	ssiz = p->p_sysent->sv_usrstack - stack_vaddr;
+	stack_offset = 0;
+	do {
+		rounded_stack_vaddr = CHERI_REPRESENTABLE_BASE(stack_vaddr,
+		    ssiz + stack_offset);
+		stack_offset = stack_vaddr - rounded_stack_vaddr;
+	} while (rounded_stack_vaddr != CHERI_REPRESENTABLE_BASE(stack_vaddr,
+	    ssiz + stack_offset));
+	ustackp = cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, rounded_stack_vaddr,
+	    CHERI_REPRESENTABLE_LENGTH(ssiz + stack_offset), stack_offset);
+	destp = cheri_setaddress(ustackp, p->p_sysent->sv_psstrings);
+	arginfo = (struct ps_strings * __capability)cheri_csetbounds(destp,
+	    sizeof(*arginfo));
 #else
-	arginfo = (struct ps_strings *)p->p_sysent->sv_psstrings;
+	destp = (void *)p->p_sysent->sv_psstrings;
+	arginfo = (struct ps_strings *)destp;
 #endif
+	imgp->ps_strings = arginfo;
 	if (p->p_sysent->sv_sigcode_base == 0) {
 		if (p->p_sysent->sv_szsigcode != NULL)
 			szsigcode = *(p->p_sysent->sv_szsigcode);
 	}
-	destp =	(uintcap_t)arginfo;
 
 	/*
 	 * install sigcode
@@ -1733,8 +1739,7 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		destp -= szsigcode;
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
-		error = copyout_c(p->p_sysent->sv_sigcode,
-		    (void * __capability)destp, szsigcode);
+		error = copyout_c(p->p_sysent->sv_sigcode, destp, szsigcode);
 		if (error != 0)
 			return (error);
 	}
@@ -1744,15 +1749,14 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-
-		/* XXX: CheriABI didn't do the align_down */
 		destp = __builtin_align_down(destp,
 		    sizeof(void * __capability));
-
-		/* XXX: Should execpathp be a pointer? */
-		imgp->execpathp = (__cheri_addr uintptr_t)destp;
-		error = copyout_c(imgp->execpath, (void * __capability)destp,
-		    execpath_len);
+#if __has_feature(capabilities)
+		imgp->execpathp = cheri_csetbounds(destp, execpath_len);
+#else
+		imgp->execpathp = destp;
+#endif
+		error = copyout_c(imgp->execpath, destp, execpath_len);
 		if (error != 0)
 			return (error);
 	}
@@ -1762,8 +1766,12 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = (__cheri_addr uintptr_t)destp;
-	error = copyout_c(canary, (void * __capability)destp, sizeof(canary));
+#if __has_feature(capabilities)
+	imgp->canary = cheri_csetbounds(destp, sizeof(canary));
+#else
+	imgp->canary = destp;
+#endif
+	error = copyout_c(canary, destp, sizeof(canary));
 	if (error != 0)
 		return (error);
 	imgp->canarylen = sizeof(canary);
@@ -1773,8 +1781,12 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	destp -= szps;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
-	imgp->pagesizes = (__cheri_addr uintptr_t)destp;
-	error = copyout_c(pagesizes, (void * __capability)destp, szps);
+#if __has_feature(capabilities)
+	imgp->pagesizes = cheri_csetbounds(destp, szps);
+#else
+	imgp->pagesizes = destp;
+#endif
+	error = copyout_c(pagesizes, destp, szps);
 	if (error != 0)
 		return (error);
 	imgp->pagesizeslen = szps;
@@ -1784,7 +1796,11 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	destp -= ARG_MAX - imgp->args->stringspace;
 	destp = __builtin_align_down(destp, sizeof(void * __capability));
+#if __has_feature(capabilities)
+	ustringp = cheri_csetbounds(destp, ARG_MAX - imgp->args->stringspace);
+#else
 	ustringp = destp;
+#endif
 
 	if (imgp->sysent->sv_stackgap != NULL) {
 		uptr_old = uptr = (__cheri_addr uintptr_t)destp;
@@ -1793,11 +1809,13 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	}
 
 	if (imgp->auxargs) {
-		uptr_old = uptr = (__cheri_addr uintptr_t)destp;
-		error = imgp->sysent->sv_copyout_auxargs(imgp, &uptr);
-		if (error != 0)
-			return (error);
-		destp -= (uptr_old - uptr);
+		/*
+		 * Allocate room on the stack for the ELF auxargs
+		 * array.  It has up to AT_COUNT entries.
+		 */
+		destp -= AT_COUNT * sizeof(Elf_Auxinfo);
+		destp = __builtin_align_down(destp,
+		    sizeof(void * __capability));
 	}
 
 	vectp = (char * __capability * __capability)destp;
@@ -1811,7 +1829,7 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (__cheri_addr uintptr_t)vectp;
+	*stack_base = (uintcap_t)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;
@@ -1829,37 +1847,29 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 #if __has_feature(capabilities)
-	if (sucap(&arginfo->ps_argvstr, (__cheri_addr vaddr_t)vectp, 0,
-	    argc * sizeof(void * __capability), "argv",
-	    CHERI_CAP_USER_DATA_PERMS) != 0)
-		return (EFAULT);
+	imgp->argv = cheri_csetbounds(vectp, (argc + 1) * sizeof(*vectp));
 #else
-	if (suword(&arginfo->ps_argvstr, (long)(intptr_t)vectp) != 0)
-		return (EFAULT);
+	imgp->argv = vectp;
 #endif
+	if (sucap(&arginfo->ps_argvstr, imgp->argv) != 0)
+		return (EFAULT);
 	if (suword32_c(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
 
 	/*
 	 * Fill in argument portion of vector table.
 	 */
-#if __has_feature(capabilities)
-	/* XXX? */
-	imgp->args->argv = (__cheri_fromcap void *)vectp;
-#endif
 	for (; argc > 0; --argc) {
+		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (__cheri_addr vaddr_t)ustringp, 0,
-		    strlen(stringp) + 1,
-		    "command line argument", CHERI_CAP_USER_DATA_PERMS) != 0)
+		if (sucap(vectp++, cheri_csetbounds(ustringp, len)) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, ustringp) != 0)
+		if (suword(vectp++, (uintptr_t)ustringp) != 0)
 			return (EFAULT);
 #endif
-		while (*stringp++ != 0)
-			ustringp++;
-		ustringp++;
+		stringp += len;
+		ustringp += len;
 	}
 
 	/* a null vector table pointer separates the argp's from the envp's */
@@ -1867,42 +1877,42 @@ exec_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		return (EFAULT);
 
 #if __has_feature(capabilities)
-	if (sucap(&arginfo->ps_envstr, (__cheri_addr vaddr_t)vectp, 0,
-	    arginfo->ps_nenvstr * sizeof(void * __capability), "envv",
-	    CHERI_CAP_USER_DATA_PERMS) != 0)
-		return (EFAULT);
+	imgp->envv = cheri_csetbounds(vectp, (envc + 1) * sizeof(*vectp));
 #else
-	if (suword(&arginfo->ps_envstr, (long)(intptr_t)vectp) != 0)
-		return (EFAULT);
+	imgp->envv = vectp;
 #endif
+	if (sucap(&arginfo->ps_envstr, imgp->envv) != 0)
+		return (EFAULT);
 	if (suword32_c(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
 
 	/*
 	 * Fill in environment portion of vector table.
 	 */
-#if __has_feature(capabilities)
-	/* XXX? */
-	imgp->args->envv = (__cheri_fromcap void *)vectp;
-#endif
 	for (; envc > 0; --envc) {
+		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, (__cheri_addr vaddr_t)ustringp, 0,
-		    strlen(stringp) + 1,
-		    "environment variable", CHERI_CAP_USER_DATA_PERMS) != 0)
+		if (sucap(vectp++, cheri_csetbounds(ustringp, len)) != 0)
 			return (EFAULT);
 #else
-		if (suword(vectp++, ustringp) != 0)
+		if (suword(vectp++, (uintptr_t)ustringp) != 0)
 			return (EFAULT);
 #endif
-		while (*stringp++ != 0)
-			ustringp++;
-		ustringp++;
+		stringp += len;
+		ustringp += len;
 	}
 
 	/* end of vector table is a null pointer */
 	if (suword_c(vectp, 0) != 0)
 		return (EFAULT);
+
+	if (imgp->auxargs) {
+		vectp++;
+		error = imgp->sysent->sv_copyout_auxargs(imgp,
+		    (uintcap_t)vectp);
+		if (error != 0)
+			return (error);
+	}
 
 	return (0);
 }

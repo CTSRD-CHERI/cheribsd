@@ -80,6 +80,9 @@
 #include <compat/cheriabi/cheriabi_sysargmap.h>
 #include <compat/cheriabi/cheriabi_util.h>
 
+#include <vm/vm.h>
+#include <vm/vm_map.h>
+
 #include <ddb/ddb.h>
 #include <sys/kdb.h>
 
@@ -94,7 +97,7 @@ static int	cheriabi_fetch_syscall_args(struct thread *td);
 static void	cheriabi_set_syscall_retval(struct thread *td, int error);
 static void	cheriabi_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 static void	cheriabi_exec_setregs(struct thread *, struct image_params *,
-		    u_long);
+		    uintcap_t);
 static __inline boolean_t cheriabi_check_cpu_compatible(uint32_t, const char *);
 static boolean_t cheriabi_elf_header_supported(struct image_params *);
 
@@ -105,7 +108,7 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 	.sv_table	= cheriabi_sysent,
 	.sv_errsize	= 0,
 	.sv_errtbl	= NULL,
-	.sv_fixup	= cheriabi_elf_fixup,
+	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= cheriabi_sendsig,
 	.sv_sigcode	= cheri_sigcode,
 	.sv_szsigcode	= &szcheri_sigcode,
@@ -118,7 +121,8 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 	.sv_usrstack	= USRSTACK,
 	.sv_psstrings	= CHERIABI_PS_STRINGS,
 	.sv_stackprot	= VM_PROT_READ|VM_PROT_WRITE,
-	.sv_copyout_strings = cheriabi_copyout_strings,
+	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
+	.sv_copyout_strings = exec_copyout_strings,
 	.sv_setregs	= cheriabi_exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
@@ -702,43 +706,42 @@ cheriabi_newthread_init(struct thread *td)
 }
 
 static void
-cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
+cheriabi_exec_setregs(struct thread *td, struct image_params *imgp,
+    uintcap_t stack)
 {
 	struct cheri_signal *csigp;
 	struct trapframe *frame;
-	u_long auxv, stackbase, stacklen;
+	Elf_Auxinfo * __capability auxv;
+	u_long stackbase, stacklen, stacktop;
 	size_t map_base, map_length, text_end, code_start, code_end, code_length;
 #ifdef CHERIABI_LEGACY_SUPPORT
 	size_t data_length;
 #endif
-	struct rlimit rlim_stack;
 	/* const bool is_dynamic_binary = imgp->interp_end != 0; */
 	/* const bool is_rtld_direct_exec = imgp->reloc_base == imgp->start_addr; */
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 
-	KASSERT(stack % sizeof(void * __capability) == 0,
+	KASSERT((__cheri_addr vaddr_t)stack % sizeof(void * __capability) == 0,
 	    ("CheriABI stack pointer not properly aligned"));
 
 	/*
 	 * Restrict the stack capability to the maximum region allowed for
 	 * this process and adjust csp accordingly.
 	 */
-	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
-	PROC_LOCK(td->td_proc);
-	lim_rlimit_proc(td->td_proc, RLIMIT_STACK, &rlim_stack);
-	PROC_UNLOCK(td->td_proc);
-	stackbase = td->td_proc->p_sysent->sv_usrstack - rlim_stack.rlim_max;
-	KASSERT(stack > stackbase,
-	    ("top of stack 0x%lx is below stack base 0x%lx", stack, stackbase));
-	stacklen = stack - stackbase;
+	stackbase = (vaddr_t)td->td_proc->p_vmspace->vm_maxsaddr;
+	stacktop = (__cheri_addr vaddr_t)stack;
+	KASSERT(stacktop > stackbase,
+	    ("top of stack 0x%lx is below stack base 0x%lx", stacktop,
+	    stackbase));
+	stacklen = stacktop - stackbase;
 	/*
 	 * Round the stack down as required to make it representable.
 	 */
 	stacklen = rounddown2(stacklen, CHERI_REPRESENTABLE_ALIGNMENT(stacklen));
-	td->td_frame->csp = cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, stackbase, stacklen, stacklen);
-
+	td->td_frame->csp = (char * __capability)cheri_csetbounds(
+	    cheri_setaddress((void * __capability)stack, stackbase), stacklen) +
+	    stacklen;
 
 	/* Using addr as length means ddc base must be 0. */
 	CTASSERT(CHERI_CAP_USER_DATA_BASE == 0);
@@ -848,11 +851,11 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp, u_long stack
 	/*
 	 * Pass a pointer to the ELF auxiliary argument vector.
 	 */
-	auxv = stack + (imgp->args->argc + 1 + imgp->args->envc + 1) *
-	    sizeof(void * __capability);
-	td->td_frame->c3 = cheri_capability_build_user_data(
-	    CHERI_CAP_USER_DATA_PERMS, auxv,
-	    AT_COUNT * 2 * sizeof(void * __capability), 0);
+	auxv = (Elf_Auxinfo * __capability)
+	    ((void * __capability * __capability)stack + imgp->args->argc + 1 +
+	    imgp->args->envc + 1);
+	td->td_frame->c3 = cheri_csetbounds(auxv, AT_COUNT * sizeof(*auxv));
+
 	/*
 	 * Load relocbase for RTLD into $c4 so that rtld has a capability with
 	 * the correct bounds available on startup
