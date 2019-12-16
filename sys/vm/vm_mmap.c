@@ -128,20 +128,6 @@ SYSCTL_INT(_vm, OID_AUTO, imply_prot_max, CTLFLAG_RWTUN, &imply_prot_max, 0,
 static int log_wxrequests = 0;
 SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
     "Log requests for PROT_WRITE and PROT_EXEC");
-#if __has_feature(capabilities)
-SYSCTL_DECL(_security_cheri);
-SYSCTL_NODE(_security_cheri, OID_AUTO, mmap, CTLFLAG_RW, 0, "mmap");
-static int cheriabi_mmap_precise_bounds = 1;
-SYSCTL_INT(_security_cheri_mmap, OID_AUTO, precise_bounds,
-    CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
-    "Require that bounds on returned capabilities be precise.");
-#ifdef COMPAT_CHERIABI
-SYSCTL_DECL(_compat_cheriabi_mmap);
-SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
-     CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
-     "Require that bounds on returned capabilities be precise.");
-#endif
-#endif
 
 #ifdef MAP_32BIT
 #define	MAP_32BIT_MAX_ADDR	((vm_offset_t)1 << 31)
@@ -696,8 +682,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		if (CHERI_REPRESENTABLE_ALIGNMENT(size) > (1UL << PAGE_SHIFT)) {
 			flags |= MAP_ALIGNED(CHERI_ALIGN_SHIFT(size));
 
-			if (size != CHERI_REPRESENTABLE_LENGTH(size) &&
-			    (cheriabi_mmap_precise_bounds || (flags & MAP_FIXED))) {
+			if (size != CHERI_REPRESENTABLE_LENGTH(size)) {
 				SYSERRCAUSE("%s: MAP_ALIGNED_CHERI and size "
 				    "(0x%zx) is insufficently rounded (mask "
 				    "0x%lx)", __func__, size,
@@ -714,8 +699,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		if (CHERI_SEALABLE_ALIGNMENT(size) > (1UL << PAGE_SHIFT)) {
 			flags |= MAP_ALIGNED(CHERI_SEAL_ALIGN_SHIFT(size));
 
-			if (size != CHERI_SEALABLE_LENGTH(size) &&
-			    (cheriabi_mmap_precise_bounds || (flags & MAP_FIXED))) {
+			if (size != CHERI_SEALABLE_LENGTH(size)) {
 				SYSERRCAUSE("%s: MAP_ALIGNED_CHERI_SEAL and "
 				    "size (0x%zx) is insufficently rounded "
 				    "(mask 0x%lx)", __func__, size,
