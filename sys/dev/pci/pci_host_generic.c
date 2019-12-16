@@ -446,6 +446,11 @@ generic_pcie_get_dma_tag(device_t dev, device_t child)
 
 	sc = device_get_softc(dev);
 
+	printf("%s: pci%d:%d:%d\n", __func__,
+		pci_get_bus(child),
+		pci_get_slot(child),
+		pci_get_function(child));
+
 	if (sc->xio.dev != NULL) {
 		bus_dma_tag_set_iommu(sc->dmat, dev, NULL);
 		busdma_iommu_init(&sc->xio);
