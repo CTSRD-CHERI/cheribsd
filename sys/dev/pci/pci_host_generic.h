@@ -38,6 +38,7 @@
 
 #include "pci_if.h"
 
+#define	MAX_IOMMU_DEVICES	16
 #define	MAX_RANGES_TUPLES	16
 #define	MIN_RANGES_TUPLES	2
 
@@ -50,9 +51,18 @@ struct pcie_range {
 #define	FLAG_MEM	(1 << 1)
 };
 
+struct pcie_iommu {
+	uint32_t rid;
+	uint32_t base;
+	uint32_t len;
+	device_t dev;
+};
+
 struct generic_pcie_core_softc {
 	struct pcie_range	ranges[MAX_RANGES_TUPLES];
+	struct pcie_iommu	iommus[MAX_IOMMU_DEVICES];
 	int			nranges;
+	int			niommus;
 	int			coherent;
 	struct rman		mem_rman;
 	struct rman		io_rman;

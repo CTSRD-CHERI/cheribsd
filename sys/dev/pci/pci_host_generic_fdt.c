@@ -112,31 +112,58 @@ generic_pcie_get_iommu(device_t dev)
 	phandle_t node;
 	pcell_t prop;
 	size_t len;
+	int niommu;
+	cell_t *base_iommu;
+	int i;
+	int j;
+	uint32_t rid, base, length;
 
 	sc = device_get_softc(dev);
 
 	node = ofw_bus_get_node(dev);
-	if (OF_getproplen(node, "iommu-map") <= 0) {
+	len = OF_getproplen(node, "iommu-map");
+
+	if (len <= 0) {
 		device_printf(dev, "iommu not found\n");
 		return (0);
 	}
 
-	len = OF_getencprop(node, "iommu-map", &prop, sizeof(prop));
-	if (len != sizeof(prop)) {
-		device_printf(dev,
-		    "%s: Can't get iommu device node\n", __func__);
-		return (0);
+	/* (rid-base,iommu,iommu-base,length) */
+	niommu = len / sizeof(cell_t) / 4;
+
+	printf("niommu %d\n", niommu);
+
+	base_iommu = malloc(len, M_DEVBUF, M_WAITOK);
+	OF_getencprop(node, "iommu-map", base_iommu, len);
+
+	sc->base.niommus = 0;
+
+	for (i = 0, j = 0; i < niommu; i++) {
+		rid = base_iommu[j++];
+		prop = base_iommu[j++];
+		base = base_iommu[j++];
+		length = base_iommu[j++];
+
+		printf("rid %x base %x length %x\n", rid, base, length);
+
+		iommu_dev = OF_device_from_xref(prop);
+		if (iommu_dev == NULL) {
+			device_printf(dev,
+			    "%s: Can't get iommu device\n", __func__);
+			continue;
+		}
+
+		sc->base.iommus[i].rid = rid;
+		sc->base.iommus[i].base = base;
+		sc->base.iommus[i].len = length;
+		sc->base.iommus[i].dev = iommu_dev;
+		sc->base.niommus++;
+
+		sc->base.iommu_dev = iommu_dev;
+		sc->base.xio.dev = iommu_dev;
 	}
 
-	iommu_dev = OF_device_from_xref(prop);
-	if (iommu_dev == NULL) {
-		device_printf(dev,
-		    "%s: Can't get iommu device\n", __func__);
-		return (0);
-	}
-
-	sc->base.iommu_dev = iommu_dev;
-	sc->base.xio.dev = iommu_dev;
+	free(base_iommu, M_DEVBUF);
 
 	/* Found */
 	return (1);

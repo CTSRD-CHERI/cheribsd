@@ -421,7 +421,12 @@
 			#address-cells = <3>;
 			#size-cells = <2>;
 
-			iommu-map = <&iommu0>;
+			/*
+			 * Devices within bus 0 slot 0 are mastered
+			 * via iommu0, everything else with iommu1.
+			 */
+			iommu-map = <0x0000 &iommu0 0x0000 0x0008>,
+				    <0x0008 &iommu1 0x0000 0xfff8>;
 
 			reg = <0 0xfdb10000 0x50000>;
 			reg-names = "PCI ECAM";
