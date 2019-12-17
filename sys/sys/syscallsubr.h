@@ -340,9 +340,8 @@ int	kern_mlock(struct proc *proc, struct ucred *cred, uintptr_t addr,
 	    size_t len);
 int	kern_mmap(struct thread *td, uintptr_t addr, size_t len, int prot,
 	    int flags, int fd, off_t pos);
-int	kern_mmap_req(struct thread *td, const struct mmap_req *mrp);
 int	kern_mmap_maxprot(struct proc *p, int prot);
-int	kern_mmap_req(struct thread *td, const struct mmap_req *mrp);
+int	kern_mmap_req(struct thread *td, struct mmap_req *mrp);
 int	kern_modfind(struct thread *td, const char * __capability uname);
 int	kern_modstat(struct thread *td, int modid,
 	    struct module_stat * __capability stat);

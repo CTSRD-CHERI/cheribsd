@@ -218,12 +218,20 @@ test_cheriabi_mmap_unrepresentable(const struct cheri_test *ctp __unused)
 {
 #ifdef CHERI_BASELEN_BITS
 	size_t len = ((size_t)PAGE_SIZE << CHERI_BASELEN_BITS) + 1;
+	size_t expected_len;
 	void *cap;
 
+	expected_len = __builtin_cheri_round_representable_length(len);
 	if ((cap = mmap(0, len, PROT_READ|PROT_WRITE|PROT_EXEC,
-	    MAP_ANON, -1, 0)) != MAP_FAILED)
-		cheritest_failure_errx("mmap() returned a pointer when "
-		    "given an unrepresentable length (%zu): %#p", len, cap);
+	    MAP_ANON, -1, 0)) == MAP_FAILED)
+
+		cheritest_failure_errx("mmap() failed to return a pointer "
+		   "when given an unrepresentable length (%zu)", len);
+	if (cheri_getlen(cap) != expected_len)
+		cheritest_failure_errx("mmap() returned a pointer with "
+		    "an unexpected length (%zu vs %zu) when given an "
+		    "unrepresentable length (%zu): %#p", cheri_getlen(cap),
+		    expected_len, len, cap);
 	cheritest_success();
 #endif
 
