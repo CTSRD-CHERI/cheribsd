@@ -139,6 +139,26 @@ pci_host_generic_core_attach(device_t dev)
 	return (0);
 }
 
+int
+pci_host_generic_core_detach(device_t dev)
+{
+	struct generic_pcie_core_softc *sc;
+	int error;
+	int rid;
+
+	sc = device_get_softc(dev);
+	rid = 0;
+
+	if (sc->res != NULL) {
+		error = bus_release_resource(dev,
+		    SYS_RES_MEMORY, rid, sc->res);
+		if (error)
+			return (error);
+	}
+
+	return (0);
+}
+
 static uint32_t
 generic_pcie_read_config(device_t dev, u_int bus, u_int slot,
     u_int func, u_int reg, int bytes)
@@ -443,20 +463,32 @@ static bus_dma_tag_t
 generic_pcie_get_dma_tag(device_t dev, device_t child)
 {
 	struct generic_pcie_core_softc *sc;
+	static bus_dma_tag_t tag;
+	int error;
 
 	sc = device_get_softc(dev);
+
+	error = bus_dma_tag_create(bus_get_dma_tag(dev), /* parent */
+	    1, 0,				/* alignment, bounds */
+	    BUS_SPACE_MAXADDR,			/* lowaddr */
+	    BUS_SPACE_MAXADDR,			/* highaddr */
+	    NULL, NULL,				/* filter, filterarg */
+	    BUS_SPACE_MAXSIZE,			/* maxsize */
+	    BUS_SPACE_UNRESTRICTED,		/* nsegments */
+	    BUS_SPACE_MAXSIZE,			/* maxsegsize */
+	    sc->coherent ? BUS_DMA_COHERENT : 0, /* flags */
+	    NULL, NULL,				/* lockfunc, lockarg */
+	    &tag);
 
 	printf("%s: pci%d:%d:%d\n", __func__,
 		pci_get_bus(child),
 		pci_get_slot(child),
 		pci_get_function(child));
 
-	if (sc->xio.dev != NULL) {
-		bus_dma_tag_set_iommu(sc->dmat, dev, NULL);
-		busdma_iommu_init(&sc->xio);
-	}
+	if (sc->xio.dev != NULL)
+		bus_dma_tag_set_iommu(tag, dev, NULL);
 
-	return (sc->dmat);
+	return (tag);
 }
 
 static int
@@ -510,6 +542,7 @@ generic_pcie_iommu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs,
 
 static device_method_t generic_pcie_methods[] = {
 	DEVMETHOD(device_attach,		pci_host_generic_core_attach),
+	DEVMETHOD(device_detach,		pci_host_generic_core_detach),
 	DEVMETHOD(bus_read_ivar,		generic_pcie_read_ivar),
 	DEVMETHOD(bus_write_ivar,		generic_pcie_write_ivar),
 	DEVMETHOD(bus_alloc_resource,		pci_host_generic_core_alloc_resource),

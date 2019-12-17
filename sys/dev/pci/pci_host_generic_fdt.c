@@ -116,7 +116,6 @@ generic_pcie_get_iommu(device_t dev)
 	cell_t *base_iommu;
 	int i;
 	int j;
-	uint32_t rid, base, length;
 
 	sc = device_get_softc(dev);
 
@@ -139,12 +138,15 @@ generic_pcie_get_iommu(device_t dev)
 	sc->base.niommus = 0;
 
 	for (i = 0, j = 0; i < niommu; i++) {
-		rid = base_iommu[j++];
+		sc->base.iommus[i].rid = base_iommu[j++];
 		prop = base_iommu[j++];
-		base = base_iommu[j++];
-		length = base_iommu[j++];
+		sc->base.iommus[i].base = base_iommu[j++];
+		sc->base.iommus[i].len = base_iommu[j++];
 
-		printf("rid %x base %x length %x\n", rid, base, length);
+		printf("rid %x base %x length %x\n",
+			sc->base.iommus[i].rid,
+			sc->base.iommus[i].base,
+			sc->base.iommus[i].len);
 
 		iommu_dev = OF_device_from_xref(prop);
 		if (iommu_dev == NULL) {
@@ -153,14 +155,12 @@ generic_pcie_get_iommu(device_t dev)
 			continue;
 		}
 
-		sc->base.iommus[i].rid = rid;
-		sc->base.iommus[i].base = base;
-		sc->base.iommus[i].len = length;
 		sc->base.iommus[i].dev = iommu_dev;
 		sc->base.niommus++;
 
 		sc->base.iommu_dev = iommu_dev;
 		sc->base.xio.dev = iommu_dev;
+		busdma_iommu_init(&sc->base.xio);
 	}
 
 	free(base_iommu, M_DEVBUF);
@@ -255,6 +255,22 @@ pci_host_generic_attach(device_t dev)
 
 	device_add_child(dev, "pci", -1);
 	return (bus_generic_attach(dev));
+}
+
+int
+pci_host_generic_detach(device_t dev)
+{
+	int error;
+
+	error = pci_host_generic_core_detach(dev);
+	if (error != 0)
+		return (error);
+
+	error = bus_generic_detach(dev);
+	if (error)
+		return (error);
+
+	return (device_delete_children(dev));
 }
 
 static int
@@ -621,6 +637,7 @@ generic_pcie_ofw_bus_attach(device_t dev)
 static device_method_t generic_pcie_fdt_methods[] = {
 	DEVMETHOD(device_probe,		generic_pcie_fdt_probe),
 	DEVMETHOD(device_attach,	pci_host_generic_attach),
+	DEVMETHOD(device_detach,	pci_host_generic_detach),
 	DEVMETHOD(bus_alloc_resource,	pci_host_generic_alloc_resource),
 	DEVMETHOD(bus_release_resource,	generic_pcie_fdt_release_resource),
 
