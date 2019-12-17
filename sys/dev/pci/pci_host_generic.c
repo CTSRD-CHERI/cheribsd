@@ -464,9 +464,19 @@ generic_pcie_get_dma_tag(device_t dev, device_t child)
 {
 	struct generic_pcie_core_softc *sc;
 	static bus_dma_tag_t tag;
+	devclass_t pci_class;
+	uint32_t rid;
+	int pci_bus, pci_slot, pci_func;
 	int error;
+	int i;
 
 	sc = device_get_softc(dev);
+	pci_class = devclass_find("pci");
+
+	if (device_get_devclass(device_get_parent(child)) != pci_class) {
+		printf("%s: not a pci bus device\n", __func__);
+		return (sc->dmat);
+	}
 
 	error = bus_dma_tag_create(bus_get_dma_tag(dev), /* parent */
 	    1, 0,				/* alignment, bounds */
@@ -480,13 +490,27 @@ generic_pcie_get_dma_tag(device_t dev, device_t child)
 	    NULL, NULL,				/* lockfunc, lockarg */
 	    &tag);
 
+	pci_bus = pci_get_bus(child);
+	pci_slot = pci_get_slot(child);
+	pci_func = pci_get_function(child);
+
 	printf("%s: pci%d:%d:%d\n", __func__,
 		pci_get_bus(child),
 		pci_get_slot(child),
 		pci_get_function(child));
 
-	if (sc->xio.dev != NULL)
-		bus_dma_tag_set_iommu(tag, dev, NULL);
+	rid = pci_bus << 8 | pci_slot << 3 | pci_func;
+
+	for (i = 0; i < sc->niommus; i++) {
+		printf("rid %x, iommu rid %x\n", rid, sc->iommus[i].rid);
+		if (rid < (sc->iommus[i].rid + sc->iommus[i].len)) {
+			printf("iommu found %p\n", &sc->iommus[i]);
+
+			/* Enable IOMMU */
+			bus_dma_tag_set_iommu(tag, dev, &sc->iommus[i]);
+			break;
+		}
+	}
 
 	return (tag);
 }
