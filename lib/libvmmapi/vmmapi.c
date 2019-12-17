@@ -46,7 +46,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/sysctl.h>
 #include <sys/ioctl.h>
+#include <sys/linker.h>
 #include <sys/mman.h>
+#include <sys/module.h>
 #include <sys/_iovec.h>
 #include <sys/cpuset.h>
 
@@ -114,7 +116,11 @@ vm_device_open(const char *name)
 int
 vm_create(const char *name)
 {
-
+	/* Try to load vmm(4) module before creating a guest. */
+	if (modfind("vmm") < 0) {
+		if (modfind("vmm") < 0)
+			kldload("vmm");
+	}
 	return (CREATE((char *)name));
 }
 
