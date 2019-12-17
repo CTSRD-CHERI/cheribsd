@@ -449,11 +449,6 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		 * However, do not request alignment if both MAP_FIXED and
 		 * MAP_CHERI_NOSETBOUNDS is set since that means we are filling
 		 * in reserved address space from a file or MAP_ANON memory.
-		 *
-		 * XXX: It seems likely a user passing too small an
-		 * alignment will have also passed an invalid length,
-		 * but upgrading the alignment is always safe and
-		 * we'll catch the length later.
 		 */
 		if (!((flags & MAP_FIXED) && (flags & MAP_CHERI_NOSETBOUNDS))) {
 			if ((1UL << (flags >> MAP_ALIGNMENT_SHIFT)) <
@@ -517,7 +512,7 @@ kern_mmap_maxprot(struct proc *p, int prot)
 }
 
 int
-kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
+kern_mmap_req(struct thread *td, struct mmap_req *mrp)
 {
 	struct vmspace *vms;
 	struct file *fp;
@@ -525,6 +520,9 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 	off_t pos;
 	vm_offset_t addr_mask = PAGE_MASK;
 	vm_size_t len, pageoff, size;
+#if __has_feature(capabilities)
+	vm_size_t padded_size = 0;
+#endif
 	vm_offset_t addr, max_addr;
 	vm_prot_t cap_maxprot;
 	int align, error, fd, flags, max_prot, prot;
@@ -675,20 +673,23 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 #else /* __has_feature(capabilities) */
 	/*
 	 * Convert MAP_ALIGNED_CHERI(_SEAL) into explicit alignment
-	 * requests and check lengths.
+	 * requests and pad lengths.  The combination of alignment (via
+	 * the updated, explicit alignment flags) and padding is required
+	 * for any request that would otherwise be unrepresentable due
+	 * to compressed capability bounds.
+	 *
+	 * XXX: With CHERI Concentrate, there is no difference in
+	 * precision between sealed and unsealed capabilities.  We
+	 * retain the duplicate code paths in case other otype tradeoffs
+	 * are made at a later date.
 	 */
 	if (align == MAP_ALIGNED_CHERI) {
 		flags &= ~MAP_ALIGNMENT_MASK;
-		if (CHERI_REPRESENTABLE_ALIGNMENT(size) > (1UL << PAGE_SHIFT)) {
+		if (CHERI_REPRESENTABLE_ALIGNMENT(size) > PAGE_SIZE) {
 			flags |= MAP_ALIGNED(CHERI_ALIGN_SHIFT(size));
 
-			if (size != CHERI_REPRESENTABLE_LENGTH(size)) {
-				SYSERRCAUSE("%s: MAP_ALIGNED_CHERI and size "
-				    "(0x%zx) is insufficently rounded (mask "
-				    "0x%lx)", __func__, size,
-				    CHERI_ALIGN_MASK(size));
-				return (ERANGE);
-			}
+			if (size != CHERI_REPRESENTABLE_LENGTH(size))
+				padded_size = CHERI_REPRESENTABLE_LENGTH(size);
 
 			if (CHERI_ALIGN_MASK(size) != 0)
 				addr_mask = CHERI_ALIGN_MASK(size);
@@ -699,18 +700,19 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		if (CHERI_SEALABLE_ALIGNMENT(size) > (1UL << PAGE_SHIFT)) {
 			flags |= MAP_ALIGNED(CHERI_SEAL_ALIGN_SHIFT(size));
 
-			if (size != CHERI_SEALABLE_LENGTH(size)) {
-				SYSERRCAUSE("%s: MAP_ALIGNED_CHERI_SEAL and "
-				    "size (0x%zx) is insufficently rounded "
-				    "(mask 0x%lx)", __func__, size,
-				    CHERI_SEAL_ALIGN_MASK(size));
-				return (ERANGE);
-			}
+			if (size != CHERI_SEALABLE_LENGTH(size))
+				padded_size = CHERI_SEALABLE_LENGTH(size);
 
 			if (CHERI_SEAL_ALIGN_MASK(size) != 0)
 				addr_mask = CHERI_SEAL_ALIGN_MASK(size);
 		}
 		align = flags & MAP_ALIGNMENT_MASK;
+	}
+	if ((flags & MAP_STACK) != 0 && padded_size != 0) {
+		SYSERRCAUSE("%s: MAP_STACK request requires padding to "
+		    "be representable (%#lx -> %#lx)", __func__, size,
+		    padded_size);
+		return (EINVAL);
 	}
 #endif /* __has_feature(capabilities) */
 
@@ -795,6 +797,26 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 			addr = round_page((vm_offset_t)vms->vm_daddr +
 			    lim_max(td, RLIMIT_DATA));
 	}
+
+#if __has_feature(capabilities)
+	if (padded_size != 0) {
+		KASSERT(size != padded_size,
+		    ("padded_size is non-zero, and equal to size %#lx", size));
+		error = vm_mmap_object(&vms->vm_map, &addr,
+		    max_addr, padded_size,
+		    VM_PROT_NONE, VM_PROT_NONE,
+		    (flags & ~MAP_GUARD) | MAP_UNMAPPED,
+		    NULL, pos, FALSE, td);
+		if (error != 0)
+			return (error);
+		flags &= ~MAP_EXCL;
+		flags |= MAP_FIXED;
+		mrp->mr_source_cap = mmap_retcap(td,
+		    addr + pageoff, mrp);
+		mrp->mr_flags = flags;
+	}
+#endif	/* __has_feature(capabilities) */
+
 	if (len == 0) {
 		/*
 		 * Return success without mapping anything for old
