@@ -425,8 +425,9 @@
 			 * Devices within bus 0 slot 0 are mastered
 			 * via iommu0, everything else with iommu1.
 			 */
-			iommu-map = <0x0000 &iommu0 0x0000 0x0008>,
+			iommu-map1 = <0x0000 &iommu0 0x0000 0x0008>,
 				    <0x0008 &iommu1 0x0000 0xfff8>;
+			iommu-map = <0x0000 &iommu1 0x0000 0xffff>;
 
 			reg = <0 0xfdb10000 0x50000>;
 			reg-names = "PCI ECAM";

@@ -33,6 +33,7 @@
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
+#include "opt_platform.h"
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/bus.h>
@@ -51,6 +52,13 @@ __FBSDID("$FreeBSD$");
 #include <dev/ofw/ofw_bus_subr.h>
 #include <dev/xdma/xdma.h>
 
+#ifdef FDT
+#include <dev/fdt/fdt_common.h>
+#include <dev/ofw/ofw_bus.h>
+#include <dev/ofw/ofw_bus_subr.h>
+#include <dev/ofw/openfirm.h>
+#endif
+
 #include <machine/cache.h>
 #include <machine/bus.h>
 #include <machine/cpu.h>
@@ -58,12 +66,16 @@ __FBSDID("$FreeBSD$");
 
 #include <vm/vm.h>
 #include <vm/pmap.h>
+#include <vm/vm_extern.h>
+#include <vm/vm_page.h>
 
 #include "xdma_if.h"
-#include "busdma_iommu_if.h"
+#include "iommu_if.h"
 
 #define	IOMMU_INVALIDATE	0x00
 #define	IOMMU_SET_BASE		0x08
+
+#define	FDT_REG_CELLS		4
 
 struct beri_iommu_softc {
 	struct resource		*res[1];
@@ -71,12 +83,91 @@ struct beri_iommu_softc {
 	bus_space_tag_t		bst_data;
 	bus_space_handle_t	bsh_data;
 	uint32_t		offs;
+	struct pmap		p;
+	vmem_t *vmem;		/* VA space */
 };
 
 static struct resource_spec beri_iommu_spec[] = {
 	{ SYS_RES_MEMORY,	0,	RF_ACTIVE },
 	{ -1, 0 }
 };
+
+static int
+beri_handle_mem_node(vmem_t *vmem, phandle_t memory)
+{
+	pcell_t reg[FDT_REG_CELLS * FDT_MEM_REGIONS];
+	pcell_t *regp;
+	int addr_cells, size_cells;
+	int i, reg_len, ret, tuple_size, tuples;
+	u_long mem_start, mem_size;
+
+	if ((ret = fdt_addrsize_cells(OF_parent(memory), &addr_cells,
+	    &size_cells)) != 0)
+		return (ret);
+
+	if (addr_cells > 2)
+		return (ERANGE);
+
+	tuple_size = sizeof(pcell_t) * (addr_cells + size_cells);
+	reg_len = OF_getproplen(memory, "reg");
+	if (reg_len <= 0 || reg_len > sizeof(reg))
+		return (ERANGE);
+
+	if (OF_getprop(memory, "reg", reg, reg_len) <= 0)
+		return (ENXIO);
+
+	tuples = reg_len / tuple_size;
+	regp = (pcell_t *)&reg;
+	for (i = 0; i < tuples; i++) {
+		ret = fdt_data_to_res(regp, addr_cells, size_cells,
+		    &mem_start, &mem_size);
+		if (ret != 0)
+			return (ret);
+
+		vmem_add(vmem, mem_start, mem_size, 0);
+		regp += addr_cells + size_cells;
+	}
+
+	return (0);
+}
+
+static int
+beri_iommu_parse_fdt(struct beri_iommu_softc *sc)
+{
+#ifdef FDT
+	phandle_t mem_node, node;
+	pcell_t mem_handle;
+#endif
+
+	printf("%s\n", __func__);
+
+	pmap_pinit(&sc->p);
+
+#ifdef FDT
+	node = ofw_bus_get_node(sc->dev);
+	if (!OF_hasprop(node, "va-region"))
+		return (ENXIO);
+
+	if (OF_getencprop(node, "va-region", (void *)&mem_handle,
+	    sizeof(mem_handle)) <= 0)
+		return (ENXIO);
+#endif
+
+	sc->vmem = vmem_create("beri iommu", 0, 0, PAGE_SIZE,
+	    PAGE_SIZE, M_FIRSTFIT | M_WAITOK);
+	if (sc->vmem == NULL)
+		return (ENXIO);
+
+#ifdef FDT
+	mem_node = OF_node_from_xref(mem_handle);
+	if (beri_handle_mem_node(sc->vmem, mem_node) != 0) {
+		vmem_destroy(sc->vmem);
+		return (ENXIO);
+	}
+#endif
+
+	return (0);
+}
 
 static void
 beri_iommu_invalidate(struct beri_iommu_softc *sc, vm_offset_t addr)
@@ -166,6 +257,21 @@ beri_iommu_enter(device_t dev, pmap_t p, vm_offset_t va,
 	return (0);
 }
 
+#if 0
+int
+beri_busdma_iommu_release(struct beri_iommu_softc *sc)
+{
+
+	pmap_release(&sc->p);
+
+	vmem_destroy(sc->vmem);
+
+	beri_iommu_release(sc->dev, &sc->p);
+
+	return (0);
+}
+#endif
+
 static int
 beri_iommu_probe(device_t dev)
 {
@@ -199,6 +305,9 @@ beri_iommu_attach(device_t dev)
 	sc->bst_data = rman_get_bustag(sc->res[0]);
 	sc->bsh_data = rman_get_bushandle(sc->res[0]);
 
+	beri_iommu_parse_fdt(sc);
+	beri_iommu_init(sc->dev, &sc->p);
+
 	node = ofw_bus_get_node(dev);
 	xref = OF_xref_from_node(node);
 	OF_device_register_xref(xref, dev);
@@ -216,6 +325,31 @@ beri_iommu_detach(device_t dev)
 	bus_release_resources(dev, beri_iommu_spec, sc->res);
 
 	return (0);
+}
+
+/* busdma interface */
+
+static void
+beri_busdma_iommu_enter(struct beri_iommu_softc *sc, vm_offset_t va,
+    vm_paddr_t pa, vm_size_t size, vm_prot_t prot)
+{
+	vm_page_t m;
+	pmap_t p;
+
+	p = &sc->p;
+
+	KASSERT((size & PAGE_MASK) == 0,
+	    ("%s: device mapping not page-sized", __func__));
+
+	for (; size > 0; size -= PAGE_SIZE) {
+		m = PHYS_TO_VM_PAGE(pa);
+		pmap_enter(p, va, m, prot, prot | PMAP_ENTER_WIRED, 0);
+
+		beri_iommu_enter(sc->dev, p, va, pa);
+
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+	}
 }
 
 /* xDMA interface */
@@ -261,6 +395,88 @@ beri_xdma_iommu_enter(device_t dev, struct xdma_iommu *xio, vm_offset_t va,
 	return (ret);
 }
 
+static void
+beri_iommu_add_entry(struct beri_iommu_softc *sc, vm_offset_t *va,
+    vm_paddr_t pa, vm_size_t size, vm_prot_t prot)
+{
+	vm_offset_t addr;
+
+	size = roundup2(size, PAGE_SIZE * 2);
+
+	if (vmem_alloc(sc->vmem, size,
+	    M_FIRSTFIT | M_NOWAIT, &addr)) {
+		panic("Could not allocate virtual address.\n");
+	}
+
+	addr |= pa & (PAGE_SIZE - 1);
+
+	if (va)
+		*va = addr;
+
+	beri_busdma_iommu_enter(sc, addr, pa, size, prot);
+}
+
+static int
+beri_iommu_map(device_t dev, bus_dma_segment_t *segs, int *nsegs,
+    bus_addr_t min, bus_addr_t max, bus_size_t alignment, bus_addr_t boundary,
+    void *cookie)
+{
+	struct beri_iommu_softc *sc;
+	bus_dma_segment_t *seg;
+	vm_offset_t va;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	printf("%s: nsegs %d\n", __func__, *nsegs);
+
+	for (i = 0; i < *nsegs; i++) {
+		seg = &segs[i];
+
+		beri_iommu_add_entry(sc, &va, seg->ds_addr,
+		    seg->ds_len, VM_PROT_WRITE | VM_PROT_READ);
+
+		printf("  seg%d: ds_addr %lx ds_len %ld, va %lx\n",
+		    i, seg->ds_addr, seg->ds_len, va);
+
+		seg->ds_addr = va;
+	}
+
+	return (0);
+}
+
+static void
+beri_busdma_iommu_remove_entry(struct beri_iommu_softc *sc, vm_offset_t va)
+{
+
+	va &= ~(PAGE_SIZE - 1);
+	pmap_remove(&sc->p, va, va + PAGE_SIZE);
+
+	beri_iommu_remove(sc->dev, &sc->p, va);
+
+	vmem_free(sc->vmem, va, PAGE_SIZE);
+}
+
+static int
+beri_iommu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs,
+    void *cookie)
+{
+	struct beri_iommu_softc *sc;
+	vm_offset_t va;
+	int i;
+
+	sc = device_get_softc(dev);
+
+	printf("%s: nsegs %d\n", __func__, nsegs);
+
+	for (i = 0; i < nsegs; i++) {
+		va = segs[i].ds_addr;
+		beri_busdma_iommu_remove_entry(sc, va);
+	}
+
+	return (0);
+}
+
 static device_method_t beri_iommu_methods[] = {
 
 	/* xDMA IOMMU interface */
@@ -270,10 +486,8 @@ static device_method_t beri_iommu_methods[] = {
 	DEVMETHOD(xdma_iommu_remove,	beri_xdma_iommu_remove),
 
 	/* busdma IOMMU interface */
-	DEVMETHOD(busdma_iommu_init,	beri_iommu_init),
-	DEVMETHOD(busdma_iommu_release,	beri_iommu_release),
-	DEVMETHOD(busdma_iommu_enter,	beri_iommu_enter),
-	DEVMETHOD(busdma_iommu_remove,	beri_iommu_remove),
+	DEVMETHOD(iommu_map,		beri_iommu_map),
+	DEVMETHOD(iommu_unmap,		beri_iommu_unmap),
 
 	/* Device interface */
 	DEVMETHOD(device_probe,		beri_iommu_probe),

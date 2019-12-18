@@ -157,10 +157,6 @@ generic_pcie_get_iommu(device_t dev)
 
 		sc->base.iommus[i].dev = iommu_dev;
 		sc->base.niommus++;
-
-		sc->base.iommu_dev = iommu_dev;
-		sc->base.xio.dev = iommu_dev;
-		busdma_iommu_init(&sc->base.xio);
 	}
 
 	free(base_iommu, M_DEVBUF);

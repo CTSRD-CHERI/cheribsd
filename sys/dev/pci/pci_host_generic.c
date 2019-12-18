@@ -507,61 +507,12 @@ generic_pcie_get_dma_tag(device_t dev, device_t child)
 			printf("iommu found %p\n", &sc->iommus[i]);
 
 			/* Enable IOMMU */
-			bus_dma_tag_set_iommu(tag, dev, &sc->iommus[i]);
+			bus_dma_tag_set_iommu(tag, sc->iommus[i].dev, NULL);
 			break;
 		}
 	}
 
 	return (tag);
-}
-
-static int
-generic_pcie_iommu_map(device_t dev, bus_dma_segment_t *segs, int *nsegs,
-    bus_addr_t min, bus_addr_t max, bus_size_t alignment, bus_addr_t boundary,
-    void *cookie)
-{
-	struct generic_pcie_core_softc *sc;
-	bus_dma_segment_t *seg;
-	vm_offset_t va;
-	int i;
-
-	sc = device_get_softc(dev);
-
-	printf("%s: nsegs %d\n", __func__, *nsegs);
-
-	for (i = 0; i < *nsegs; i++) {
-		seg = &segs[i];
-
-		busdma_iommu_add_entry(&sc->xio, &va, seg->ds_addr,
-		    seg->ds_len, VM_PROT_WRITE | VM_PROT_READ);
-
-		printf("  seg%d: ds_addr %lx ds_len %ld, va %lx\n",
-		    i, seg->ds_addr, seg->ds_len, va);
-
-		seg->ds_addr = va;
-	}
-
-	return (0);
-}
-
-static int
-generic_pcie_iommu_unmap(device_t dev, bus_dma_segment_t *segs, int nsegs,
-    void *cookie)
-{
-	struct generic_pcie_core_softc *sc;
-	vm_offset_t va;
-	int i;
-
-	sc = device_get_softc(dev);
-
-	printf("%s: nsegs %d\n", __func__, nsegs);
-
-	for (i = 0; i < nsegs; i++) {
-		va = segs[i].ds_addr;
-		busdma_iommu_remove_entry(&sc->xio, va);
-	}
-
-	return (0);
 }
 
 static device_method_t generic_pcie_methods[] = {
@@ -578,8 +529,6 @@ static device_method_t generic_pcie_methods[] = {
 	DEVMETHOD(bus_teardown_intr,		bus_generic_teardown_intr),
 
 	DEVMETHOD(bus_get_dma_tag,		generic_pcie_get_dma_tag),
-	DEVMETHOD(iommu_map,			generic_pcie_iommu_map),
-	DEVMETHOD(iommu_unmap,			generic_pcie_iommu_unmap),
 
 	/* pcib interface */
 	DEVMETHOD(pcib_maxslots,		generic_pcie_maxslots),
