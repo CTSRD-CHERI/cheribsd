@@ -799,7 +799,7 @@ szsigcode:
 #if defined(__mips_n64) && defined(COMPAT_FREEBSD64)
 	.globl	_C_LABEL(freebsd64_sigcode)
 _C_LABEL(freebsd64_sigcode):
-	PTR_ADDU	a0, sp, SIGF_UC		# address of ucontext
+	PTR_ADDU	a0, sp, SIGF64_UC		# address of ucontext
 	li		v0, SYS_sigreturn
 # sigreturn (ucp)
 	syscall
