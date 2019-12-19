@@ -1714,7 +1714,7 @@ swp_pager_force_dirty(vm_page_t m)
 	vm_page_dirty(m);
 #ifdef INVARIANTS
 	vm_page_lock(m);
-	if (!vm_page_wired(m) && m->queue == PQ_NONE)
+	if (!vm_page_wired(m) && m->a.queue == PQ_NONE)
 		panic("page %p is neither wired nor queued", m);
 	vm_page_unlock(m);
 #endif
@@ -3087,7 +3087,7 @@ swapongeom(struct vnode *vp)
 	int error;
 
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-	if (vp->v_type != VCHR || (vp->v_iflag & VI_DOOMED) != 0) {
+	if (vp->v_type != VCHR || VN_IS_DOOMED(vp)) {
 		error = ENOENT;
 	} else {
 		g_topology_lock();

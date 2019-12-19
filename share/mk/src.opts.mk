@@ -128,6 +128,7 @@ __DEFAULT_YES_OPTIONS = \
     LIBPTHREAD \
     LIBTHR \
     LLVM_COV \
+    LLVM_TARGET_ALL \
     LOADER_GELI \
     LOADER_LUA \
     LOADER_OFW \
@@ -220,7 +221,6 @@ __DEFAULT_NO_OPTIONS = \
 # RIGHT option is disabled.
 __DEFAULT_DEPENDENT_OPTIONS= \
 	CLANG_FULL/CLANG \
-	LLVM_TARGET_ALL/CLANG \
 	LOADER_VERIEXEC/BEARSSL \
 	LOADER_EFI_SECUREBOOT/LOADER_VERIEXEC \
 	VERIEXEC/BEARSSL \
@@ -282,9 +282,9 @@ __LLVM_TARGETS= \
 		x86
 __LLVM_TARGET_FILT=	C/(amd64|i386)/x86/:S/sparc64/sparc/:S/arm64/aarch64/:S/powerpc64/powerpc/
 .for __llt in ${__LLVM_TARGETS}
-# Default the given TARGET's LLVM_TARGET support to the value of MK_CLANG.
+# Default enable the given TARGET's LLVM_TARGET support
 .if ${__TT:${__LLVM_TARGET_FILT}} == ${__llt}
-__DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}/CLANG
+__DEFAULT_YES_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}
 # Disable other targets for arm, to work around "relocation truncated
 # to fit" errors with BFD ld, since libllvm.a will get too large to link.
 .elif ${__T} == "arm"
@@ -292,8 +292,7 @@ __DEFAULT_NO_OPTIONS+=LLVM_TARGET_${__llt:tu}
 # aarch64 needs arm for -m32 support.
 .elif ${__TT} == "arm64" && ${__llt} == "arm"
 __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_ARM/LLVM_TARGET_AARCH64
-# Default the rest of the LLVM_TARGETs to the value of MK_LLVM_TARGET_ALL
-# which is based on MK_CLANG.
+# Default the rest of the LLVM_TARGETs to the value of MK_LLVM_TARGET_ALL.
 .else
 __DEFAULT_DEPENDENT_OPTIONS+=	LLVM_TARGET_${__llt:${__LLVM_TARGET_FILT}:tu}/LLVM_TARGET_ALL
 .endif
@@ -349,9 +348,8 @@ BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GCC GCC_BOOTSTRAP GDB
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
 .endif
-.if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "armv6" || \
-    ${__T} == "armv7" || ${__T} == "i386" || ${__T:Mriscv*} != "" || \
-    ${__TT} == "mips"
+.if ${__T} == "aarch64" || ${__T} == "amd64" || ${__T} == "i386" || \
+    ${__T:Mriscv*} != "" || ${__TT} == "mips"
 __DEFAULT_YES_OPTIONS+=LLVM_LIBUNWIND
 .else
 __DEFAULT_NO_OPTIONS+=LLVM_LIBUNWIND

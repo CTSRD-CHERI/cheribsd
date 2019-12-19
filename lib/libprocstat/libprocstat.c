@@ -458,6 +458,15 @@ getctty(kvm_t *kd, struct kinfo_proc *kp)
 	return (sess.s_ttyvp);
 }
 
+static int
+procstat_vm_map_reader(void *token, vm_map_entry_t addr, vm_map_entry_t dest)
+{
+	kvm_t *kd;
+
+	kd = (kvm_t *)token;
+	return (kvm_read_all(kd, (unsigned long)addr, dest, sizeof(*dest)));
+}
+
 static struct filestat_list *
 procstat_getfiles_kvm(struct procstat *procstat, struct kinfo_proc *kp, int mmapped)
 {
@@ -467,7 +476,6 @@ procstat_getfiles_kvm(struct procstat *procstat, struct kinfo_proc *kp, int mmap
 	struct vm_object object;
 	struct vmspace vmspace;
 	vm_map_entry_t entryp;
-	vm_map_t map;
 	vm_object_t objp;
 	struct vnode *vp;
 	struct file **ofiles;
@@ -628,17 +636,11 @@ do_mmapped:
 			    (void *)kp->ki_vmspace);
 			goto exit;
 		}
-		map = &vmspace.vm_map;
 
-		for (entryp = map->header.next;
-		    entryp != &kp->ki_vmspace->vm_map.header;
-		    entryp = vmentry.next) {
-			if (!kvm_read_all(kd, (unsigned long)entryp, &vmentry,
-			    sizeof(vmentry))) {
-				warnx("can't read vm_map_entry at %p",
-				    (void *)entryp);
-				continue;
-			}
+		vmentry = vmspace.vm_map.header;
+		for (entryp = vm_map_entry_read_succ(kd, &vmentry, procstat_vm_map_reader);
+		    entryp != NULL && entryp != &kp->ki_vmspace->vm_map.header;
+		     entryp = vm_map_entry_read_succ(kd, &vmentry, procstat_vm_map_reader)) {
 			if (vmentry.eflags & MAP_ENTRY_IS_SUB_MAP)
 				continue;
 			if ((objp = vmentry.object.vm_object) == NULL)
@@ -673,6 +675,8 @@ do_mmapped:
 			if (entry != NULL)
 				STAILQ_INSERT_TAIL(head, entry, next);
 		}
+		if (entryp == NULL)
+			warnx("can't read vm_map_entry");
 	}
 exit:
 	return (head);

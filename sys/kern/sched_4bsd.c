@@ -706,8 +706,8 @@ sched_rr_interval(void)
  * favor processes which haven't run much recently, and to round-robin
  * among other processes.
  */
-void
-sched_clock(struct thread *td)
+static void
+sched_clock_tick(struct thread *td)
 {
 	struct pcpuidlestat *stat;
 	struct td_sched *ts;
@@ -734,6 +734,14 @@ sched_clock(struct thread *td)
 	stat = DPCPU_PTR(idlestat);
 	stat->oldidlecalls = stat->idlecalls;
 	stat->idlecalls = 0;
+}
+
+void
+sched_clock(struct thread *td, int cnt)
+{
+
+	for ( ; cnt > 0; cnt--)
+		sched_clock_tick(td);
 }
 
 /*
@@ -1173,7 +1181,7 @@ forward_wakeup(int cpunum)
 
 	if (forward_wakeup_use_mask) {
 		map = idle_cpus_mask;
-		CPU_NAND(&map, &dontuse);
+		CPU_ANDNOT(&map, &dontuse);
 
 		/* If they are both on, compare and use loop if different. */
 		if (forward_wakeup_use_loop) {
@@ -1358,7 +1366,7 @@ sched_add(struct thread *td, int flags)
 	} else {
 		if (!single_cpu) {
 			tidlemsk = idle_cpus_mask;
-			CPU_NAND(&tidlemsk, &hlt_cpus_mask);
+			CPU_ANDNOT(&tidlemsk, &hlt_cpus_mask);
 			CPU_CLR(cpuid, &tidlemsk);
 
 			if (!CPU_ISSET(cpuid, &idle_cpus_mask) &&

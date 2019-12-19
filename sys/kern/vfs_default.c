@@ -87,7 +87,6 @@ static int vop_stdadd_writecount(struct vop_add_writecount_args *ap);
 static int vop_stdcopy_file_range(struct vop_copy_file_range_args *ap);
 static int vop_stdfdatasync(struct vop_fdatasync_args *ap);
 static int vop_stdgetpages_async(struct vop_getpages_async_args *ap);
-static int vop_stdioctl(struct vop_ioctl_args *ap);
 
 /*
  * This vnode table stores what we want to do if the filesystem doesn't
@@ -544,6 +543,71 @@ vop_stdislocked(ap)
 }
 
 /*
+ * Variants of the above set.
+ *
+ * Differences are:
+ * - shared locking disablement is not supported
+ * - v_vnlock pointer is not honored
+ */
+int
+vop_lock(ap)
+	struct vop_lock1_args /* {
+		struct vnode *a_vp;
+		int a_flags;
+		char *file;
+		int line;
+	} */ *ap;
+{
+	struct vnode *vp = ap->a_vp;
+	int flags = ap->a_flags;
+	struct mtx *ilk;
+
+	MPASS(vp->v_vnlock == &vp->v_lock);
+
+	if (__predict_false((flags & ~(LK_TYPE_MASK | LK_NODDLKTREAT | LK_RETRY)) != 0))
+		goto other;
+
+	switch (flags & LK_TYPE_MASK) {
+	case LK_SHARED:
+		return (lockmgr_slock(&vp->v_lock, flags, ap->a_file, ap->a_line));
+	case LK_EXCLUSIVE:
+		return (lockmgr_xlock(&vp->v_lock, flags, ap->a_file, ap->a_line));
+	}
+other:
+	ilk = VI_MTX(vp);
+	return (lockmgr_lock_fast_path(&vp->v_lock, flags,
+	    &ilk->lock_object, ap->a_file, ap->a_line));
+}
+
+int
+vop_unlock(ap)
+	struct vop_unlock_args /* {
+		struct vnode *a_vp;
+		int a_flags;
+	} */ *ap;
+{
+	struct vnode *vp = ap->a_vp;
+
+	MPASS(vp->v_vnlock == &vp->v_lock);
+	MPASS(ap->a_flags == 0);
+
+	return (lockmgr_unlock(&vp->v_lock));
+}
+
+int
+vop_islocked(ap)
+	struct vop_islocked_args /* {
+		struct vnode *a_vp;
+	} */ *ap;
+{
+	struct vnode *vp = ap->a_vp;
+
+	MPASS(vp->v_vnlock == &vp->v_lock);
+
+	return (lockstatus(&vp->v_lock));
+}
+
+/*
  * Return true for select/poll.
  */
 int
@@ -593,7 +657,7 @@ vop_stdgetwritemount(ap)
 	 * Note that having a reference does not prevent forced unmount from
 	 * setting ->v_mount to NULL after the lock gets released. This is of
 	 * no consequence for typical consumers (most notably vn_start_write)
-	 * since in this case the vnode is VI_DOOMED. Unmount might have
+	 * since in this case the vnode is VIRF_DOOMED. Unmount might have
 	 * progressed far enough that its completion is only delayed by the
 	 * reference obtained here. The consumer only needs to concern itself
 	 * with releasing it.
@@ -1016,7 +1080,7 @@ vop_stdadvise(struct vop_advise_args *ap)
 	case POSIX_FADV_DONTNEED:
 		error = 0;
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
-		if (vp->v_iflag & VI_DOOMED) {
+		if (VN_IS_DOOMED(vp)) {
 			VOP_UNLOCK(vp, 0);
 			break;
 		}
@@ -1181,7 +1245,7 @@ vop_stdneed_inactive(struct vop_need_inactive_args *ap)
 	return (1);
 }
 
-static int
+int
 vop_stdioctl(struct vop_ioctl_args *ap)
 {
 	struct vnode *vp;

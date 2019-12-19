@@ -181,7 +181,7 @@ nvme_ctrlr_fail(struct nvme_controller *ctrlr)
 {
 	int i;
 
-	ctrlr->is_failed = TRUE;
+	ctrlr->is_failed = true;
 	nvme_admin_qpair_disable(&ctrlr->adminq);
 	nvme_qpair_fail(&ctrlr->adminq);
 	if (ctrlr->ioq != NULL) {
@@ -546,7 +546,7 @@ nvme_ctrlr_construct_namespaces(struct nvme_controller *ctrlr)
 	return (0);
 }
 
-static boolean_t
+static bool
 is_log_page_id_valid(uint8_t page_id)
 {
 
@@ -558,10 +558,10 @@ is_log_page_id_valid(uint8_t page_id)
 	case NVME_LOG_COMMAND_EFFECT:
 	case NVME_LOG_RES_NOTIFICATION:
 	case NVME_LOG_SANITIZE_STATUS:
-		return (TRUE);
+		return (true);
 	}
 
-	return (FALSE);
+	return (false);
 }
 
 static uint32_t
@@ -782,7 +782,7 @@ nvme_ctrlr_construct_and_submit_aer(struct nvme_controller *ctrlr,
 	 * Disable timeout here, since asynchronous event requests should by
 	 *  nature never be timed out.
 	 */
-	req->timeout = FALSE;
+	req->timeout = false;
 	req->cmd.opc = NVME_OPC_ASYNC_EVENT_REQUEST;
 	nvme_ctrlr_submit_admin_request(ctrlr, req);
 }
@@ -909,6 +909,25 @@ void
 nvme_ctrlr_start_config_hook(void *arg)
 {
 	struct nvme_controller *ctrlr = arg;
+	int status;
+
+	/*
+	 * Reset controller twice to ensure we do a transition from cc.en==1 to
+	 * cc.en==0.  This is because we don't really know what status the
+	 * controller was left in when boot handed off to OS.  Linux doesn't do
+	 * this, however. If we adopt that policy, see also nvme_ctrlr_resume().
+	 */
+	status = nvme_ctrlr_hw_reset(ctrlr);
+	if (status != 0) {
+		nvme_ctrlr_fail(ctrlr);
+		return;
+	}
+
+	status = nvme_ctrlr_hw_reset(ctrlr);
+	if (status != 0) {
+		nvme_ctrlr_fail(ctrlr);
+		return;
+	}
 
 	nvme_qpair_reset(&ctrlr->adminq);
 	nvme_admin_qpair_enable(&ctrlr->adminq);
@@ -1179,7 +1198,7 @@ nvme_ctrlr_construct(struct nvme_controller *ctrlr, device_t dev)
 	TASK_INIT(&ctrlr->reset_task, 0, nvme_ctrlr_reset_task, ctrlr);
 	TASK_INIT(&ctrlr->fail_req_task, 0, nvme_ctrlr_fail_req_task, ctrlr);
 	STAILQ_INIT(&ctrlr->fail_req);
-	ctrlr->is_failed = FALSE;
+	ctrlr->is_failed = false;
 
 	make_dev_args_init(&md_args);
 	md_args.mda_devsw = &nvme_ctrlr_cdevsw;

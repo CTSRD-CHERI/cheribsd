@@ -99,10 +99,8 @@ union vm_map_object {
  *	Also included is control information for virtual copy operations.
  */
 struct vm_map_entry {
-	struct vm_map_entry *prev;	/* previous entry */
-	struct vm_map_entry *next;	/* next entry */
-	struct vm_map_entry *left;	/* left child in binary search tree */
-	struct vm_map_entry *right;	/* right child in binary search tree */
+	struct vm_map_entry *left;	/* left child or previous entry */
+	struct vm_map_entry *right;	/* right child or next entry */
 	vm_offset_t start;		/* start address */
 	vm_offset_t end;		/* end address */
 	vm_offset_t next_read;		/* vaddr of the next sequential read */
@@ -175,9 +173,12 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
 
 /*
  *	A map is a set of map entries.  These map entries are
- *	organized both as a binary search tree and as a doubly-linked
- *	list.  Both structures are ordered based upon the start and
- *	end addresses contained within each map entry.
+ *	organized as a threaded binary search tree.  Both structures
+ *	are ordered based upon the start and end addresses contained
+ *	within each map entry.  The largest gap between an entry in a
+ *	subtree and one of its neighbors is saved in the max_free
+ *	field, and that field is updated when the tree is
+ *	restructured.
  *
  *	Sleator and Tarjan's top-down splay algorithm is employed to
  *	control height imbalance in the binary search tree.
@@ -185,10 +186,12 @@ vm_map_entry_system_wired_count(vm_map_entry_t entry)
  *	The map's min offset value is stored in map->header.end, and
  *	its max offset value is stored in map->header.start.  These
  *	values act as sentinels for any forward or backward address
- *	scan of the list.  The map header has a special value for the
- *	eflags field, MAP_ENTRY_HEADER, that is set initially, is
- *	never changed, and prevents an eflags match of the header
- *	with any other map entry.
+ *	scan of the list.  The right and left fields of the map
+ *	header point to the first and list map entries.  The map
+ *	header has a special value for the eflags field,
+ *	MAP_ENTRY_HEADER, that is set initially, is never changed,
+ *	and prevents an eflags match of the header with any other map
+ *	entry.
  *
  *	List of locks
  *	(c)	const until freed
@@ -399,6 +402,47 @@ long vmspace_resident_count(struct vmspace *vmspace);
 
 #define VM_MAP_WIRE_WRITE	4	/* Validate writable. */
 
+typedef int vm_map_entry_reader(void *token, vm_map_entry_t addr, 
+    vm_map_entry_t dest);
+
+#ifndef _KERNEL
+/*
+ * Find the successor of a map_entry, using a reader to dereference pointers.
+ * '*clone' is a copy of a vm_map entry.  'reader' is used to copy a map entry
+ * at some address into '*clone'.  Change *clone to a copy of the next map
+ * entry, and return the address of that entry, or NULL if copying has failed.
+ *
+ * This function is made available to user-space code that needs to traverse
+ * map entries.
+ */
+static inline vm_map_entry_t
+vm_map_entry_read_succ(void *token, struct vm_map_entry *const clone,
+    vm_map_entry_reader reader)
+{
+	vm_map_entry_t after, backup;
+	vm_offset_t start;
+
+	after = clone->right;
+	start = clone->start;
+	if (!reader(token, after, clone))
+		return (NULL);
+	backup = clone->left;
+	if (!reader(token, backup, clone))
+		return (NULL);
+	if (clone->start > start) {
+		do {
+			after = backup;
+			backup = clone->left;
+			if (!reader(token, backup, clone))
+				return (NULL);
+		} while (clone->start != start);
+	}
+	if (!reader(token, after, clone))
+		return (NULL);
+	return (after);
+}
+#endif				/* ! _KERNEL */
+
 #ifdef _KERNEL
 boolean_t vm_map_check_protection (vm_map_t, vm_offset_t, vm_offset_t, vm_prot_t);
 vm_map_t vm_map_create(pmap_t, vm_offset_t, vm_offset_t);
@@ -424,14 +468,21 @@ static inline vm_map_entry_t
 vm_map_entry_first(vm_map_t map)
 {
 
-	return (map->header.next);
+	return (map->header.right);
 }
 
 static inline vm_map_entry_t
 vm_map_entry_succ(vm_map_entry_t entry)
 {
+	vm_map_entry_t after;
 
-	return (entry->next);
+	after = entry->right;
+	if (after->left->start > entry->start) {
+		do
+			after = after->left;
+		while (after->left != entry);
+	}
+	return (after);
 }
 
 #define VM_MAP_ENTRY_FOREACH(it, map)		\
