@@ -722,7 +722,7 @@ sem_remove(int semidx, struct ucred *cred)
 		    sema[i].u.__sem_base > semakptr->u.__sem_base)
 			mtx_lock_flags(&sema_mtx[i], LOP_DUPOK);
 	}
-	for (i = semakptr->u.__sem_base - sem; i < semtot; i++)
+	for (i = (__cheri_fromcap struct sem *)semakptr->u.__sem_base - sem; i < semtot; i++)
 		sem[i] = sem[i + semakptr->u.sem_nsems];
 	for (i = 0; i < seminfo.semmni; i++) {
 		if ((sema[i].u.sem_perm.mode & SEM_ALLOC) &&
@@ -772,12 +772,8 @@ int
 sys___semctl(struct thread *td, struct __semctl_args *uap)
 {
 	struct semid_ds dsbuf;
-#if __has_feature(capabilities)
-	union semun_c arg;
-#else
-	union semun_native arg;
-#endif
-	ksemun_t semun;
+	union semun arg;
+	union semun semun;
 	register_t rval;
 	int error;
 
@@ -838,7 +834,7 @@ cheriabi___semctl(struct thread *td, struct cheriabi___semctl_args *uap)
 	struct semid_ds dsbuf;
 	struct semid_ds_c dsbuf_c;
 	union semun_c arg;
-	ksemun_t semun;
+	union semun semun;
 	register_t rval;
 	int error;
 
@@ -911,14 +907,14 @@ cheriabi_semop(struct thread *td, struct cheriabi_semop_args *uap)
 #endif /* COMPAT_CHERIABI */
 
 int
-kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
-    register_t *rval)
+kern_semctl(struct thread *td, int semid, int semnum, int cmd,
+    union semun *arg, register_t *rval)
 {
 	u_short *array;
 	struct ucred *cred = td->td_ucred;
 	int i, error;
 	struct prison *rpr;
-	struct semid_ds *sbuf;
+	struct semid_ds * __capability sbuf;
 	struct semid_kernel *semakptr;
 	struct mtx *sema_mtxp;
 	u_short usval, count;
@@ -960,7 +956,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 		if (error != 0)
 			goto done2;
 #endif
-		bcopy(&semakptr->u, arg->buf, sizeof(struct semid_ds));
+		bcopy_c(&semakptr->u, arg->buf, sizeof(struct semid_ds));
 		if (cred->cr_prison != semakptr->cred->cr_prison)
 			arg->buf->sem_perm.key = IPC_PRIVATE;
 		*rval = IXSEQ_TO_IPCID(semid, semakptr->u.sem_perm);
@@ -997,7 +993,8 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 		break;
 
 	case IPC_SET:
-		AUDIT_ARG_SVIPC_PERM(&arg->buf->sem_perm);
+		AUDIT_ARG_SVIPC_PERM((__cheri_fromcap struct ipc_perm *)
+		    &arg->buf->sem_perm);
 		if ((error = semvalid(semid, rpr, semakptr)) != 0)
 			goto done2;
 		if ((error = ipcperm(td, &semakptr->u.sem_perm, IPC_M)))
@@ -1015,7 +1012,7 @@ kern_semctl(struct thread *td, int semid, int semnum, int cmd, ksemun_t *arg,
 			goto done2;
 		if ((error = ipcperm(td, &semakptr->u.sem_perm, IPC_R)))
 			goto done2;
-		bcopy(&semakptr->u, arg->buf, sizeof(struct semid_ds));
+		bcopy_c(&semakptr->u, arg->buf, sizeof(struct semid_ds));
 		if (cred->cr_prison != semakptr->cred->cr_prison)
 			arg->buf->sem_perm.key = IPC_PRIVATE;
 		break;
@@ -1280,14 +1277,15 @@ sys_semget(struct thread *td, struct semget_args *uap)
 		sema[semid].u.sem_ctime = time_second;
 		sema[semid].u.__sem_base = &sem[semtot];
 		semtot += nsems;
-		bzero(sema[semid].u.__sem_base,
+		bzero(&sem[semtot],
 		    sizeof(sema[semid].u.__sem_base[0])*nsems);
 #ifdef MAC
 		mac_sysvsem_create(cred, &sema[semid]);
 #endif
 		mtx_unlock(&sema_mtx[semid]);
 		DPRINTF(("sembase = %p, next = %p\n",
-		    sema[semid].u.__sem_base, &sem[semtot]));
+		    (__cheri_fromcap struct sem *)sema[semid].u.__sem_base,
+		    &sem[semtot]));
 	} else {
 		DPRINTF(("didn't find it and wasn't asked to create it\n"));
 		error = ENOENT;
@@ -1325,7 +1323,7 @@ kern_semop(struct thread *td, int usemid, struct sembuf * __capability usops,
 	struct sembuf *sops;
 	struct semid_kernel *semakptr;
 	struct sembuf *sopptr = NULL;
-	struct sem *semptr = NULL;
+	struct sem * __capability semptr = NULL;
 	struct sem_undo *suptr;
 	struct mtx *sema_mtxp;
 	size_t i, j, k;
@@ -2031,7 +2029,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 	struct semid_ds_old dsold;
 	struct semid_ds dsbuf;
 	union semun_old arg;
-	ksemun_t semun;
+	union semun semun;
 	register_t rval;
 	int error;
 
@@ -2128,7 +2126,7 @@ freebsd7_freebsd32_semctl(struct thread *td,
 {
 	struct semid_ds32_old dsbuf32;
 	struct semid_ds dsbuf;
-	ksemun_t semun;
+	union semun semun;
 	union semun32 arg;
 	register_t rval;
 	int error;
@@ -2200,7 +2198,7 @@ freebsd32_semctl(struct thread *td, struct freebsd32_semctl_args *uap)
 {
 	struct semid_ds32 dsbuf32;
 	struct semid_ds dsbuf;
-	ksemun_t semun;
+	union semun semun;
 	union semun32 arg;
 	register_t rval;
 	int error;
@@ -2295,7 +2293,7 @@ freebsd7_freebsd64___semctl(struct thread *td,
 {
 	struct semid_ds64_old dsbuf64;
 	struct semid_ds dsbuf;
-	ksemun_t semun;
+	union semun semun;
 	union semun64 arg;
 	register_t rval;
 	int error;
@@ -2369,7 +2367,7 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 {
 	struct semid_ds64 dsbuf64;
 	struct semid_ds dsbuf;
-	ksemun_t semun;
+	union semun semun;
 	union semun64 arg;
 	register_t rval;
 	int error;
@@ -2398,7 +2396,7 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 		if (error)
 			return (error);
 		CP(dsbuf64, dsbuf, sem_perm);
-		CP(dsbuf64, dsbuf, __sem_base);
+		dsbuf.__sem_base = NULL;	/* unused */
 		CP(dsbuf64, dsbuf, sem_nsems);
 		CP(dsbuf64, dsbuf, sem_otime);
 		CP(dsbuf64, dsbuf, sem_ctime);
@@ -2423,7 +2421,6 @@ freebsd64___semctl(struct thread *td, struct freebsd64___semctl_args *uap)
 	case IPC_STAT:
 		bzero(&dsbuf64, sizeof(dsbuf64));
 		CP(dsbuf, dsbuf64, sem_perm);
-		CP(dsbuf, dsbuf64, __sem_base);
 		CP(dsbuf, dsbuf64, sem_nsems);
 		CP(dsbuf, dsbuf64, sem_otime);
 		CP(dsbuf, dsbuf64, sem_ctime);

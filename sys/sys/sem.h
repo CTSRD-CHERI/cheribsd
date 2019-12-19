@@ -48,7 +48,7 @@ struct semid_ds_old {
 
 struct semid_ds {
 	struct ipc_perm	sem_perm;	/* operation permission struct */
-	struct sem	*__sem_base;	/* pointer to first semaphore in set */
+	struct sem * __kerncap __sem_base; /* first semaphore in set */
 	unsigned short	sem_nsems;	/* number of sems in set */
 	time_t		sem_otime;	/* last operation time */
 	time_t		sem_ctime;	/* last change time */
@@ -75,40 +75,22 @@ union semun_old {
 	unsigned short	*array;		/* array for GETALL & SETALL */
 };
 #endif
-#if defined(_WANT_SEMUN) && !defined(_KERNEL)
+#if defined(_WANT_SEMUN) || defined(_KERNEL)
 /*
  * semctl's arg parameter structure
  */
 union semun {
 	int		val;		/* value for SETVAL */
-	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
-	unsigned short	*array;		/* array for GETALL & SETALL */
+	struct semid_ds * __kerncap buf; /* buffer for IPC_STAT & IPC_SET */
+	unsigned short * __kerncap array; /* array for GETALL & SETALL */
 };
 #endif
 #if defined(_KERNEL)
-#if __has_feature(capabilities)
-/*
- * XXX: We'd like to use semun_c here, but semid_ds currently contains
- * kernel pointers for no good reason.  Because buf is copied in and
- * translated in the syscall make it not be a capability for easy of use.
- */
-union semun_kernel {
-	int			val;	/* value for SETVAL */
-	struct semid_ds		*buf;	/* buffer for IPC_STAT & IPC_SET */
-	unsigned short * __capability array;	/* array for GETALL & SETALL */
-};
-#endif
 union semun_native {
 	int		val;		/* value for SETVAL */
 	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
 	unsigned short	*array;		/* array for GETALL & SETALL */
 };
-#if __has_feature(capabilities)
-typedef union semun_kernel	ksemun_t;
-#else
-typedef union semun_native	ksemun_t;
-#endif
-typedef union semun_native	usemun_t;
 #endif /* defined(_KERNEL) */
 
 /*
