@@ -1393,7 +1393,8 @@ freebsd64___sysctlbyname(struct thread *td, struct
 	if (error != 0)
 		return (error);
 	if (uap->oldlenp != NULL)
-		error = copyout(&rv, uap->oldlenp, sizeof(rv));
+		error = copyout(&rv, __USER_CAP(uap->oldlenp, sizeof(rv)),
+		    sizeof(rv));
 
 	return (error);
 }
