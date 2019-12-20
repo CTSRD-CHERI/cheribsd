@@ -657,7 +657,7 @@ kmap_alloc_wait(vm_map_t map, vm_size_t size)
 		vm_map_unlock_and_wait(map, 0);
 	}
 	vm_map_insert(map, NULL, 0, addr, addr + size, VM_PROT_RW, VM_PROT_RW,
-	    MAP_ACC_CHARGED, addr);
+	    MAP_ACC_CHARGED, VM_MIN_KERNEL_ADDRESS);
 	vm_map_unlock(map);
 	return (addr);
 }
@@ -769,7 +769,7 @@ kmem_init(vm_offset_t start, vm_offset_t end)
 	addr = VM_MIN_KERNEL_ADDRESS;
 #endif
 	(void)vm_map_insert(m, NULL, 0, addr, start, VM_PROT_ALL,
-	    VM_PROT_ALL, MAP_NOFAULT, addr);
+	    VM_PROT_ALL, MAP_NOFAULT, VM_MIN_KERNEL_ADDRESS);
 	/* ... and ending with the completion of the above `insert' */
 
 #ifdef __amd64__
@@ -781,7 +781,7 @@ kmem_init(vm_offset_t start, vm_offset_t end)
 	(void)vm_map_insert(m, NULL, 0, (vm_offset_t)vm_page_array,
 	    (vm_offset_t)vm_page_array + round_2mpage(vm_page_array_size *
 	    sizeof(struct vm_page)),
-	    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT, (vm_offset_t)vm_page_array);
+	    VM_PROT_RW, VM_PROT_RW, MAP_NOFAULT, VM_MIN_KERNEL_ADDRESS);
 #endif
 	vm_map_unlock(m);
 
