@@ -136,7 +136,7 @@
 #if __has_feature(capabilities) && defined(_KERNEL)
 /*
  * Ensure that we don't use the PC macro for CHERI, use PCC instead.
- * However, we do need to expose it to userland since it is used e.g. by ASAN. *
+ * However, we do need to expose it to userland since it is used e.g. by ASAN.
  */
 #pragma GCC poison PC
 /* Define a macro that can be used for the PT_GETREGS/PT_SETREGS implementation. */

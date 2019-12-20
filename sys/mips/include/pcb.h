@@ -138,16 +138,19 @@
 /*
  * Note: Updating EPCC will also update CP0_EPC. Therefore we should not be
  * setting CP0_EPC to the value of PC (which is an absolute pc address).
- * All kernel code updates the PC value and not PCC (which effectively only
- * contains the bounds). This means we need to update the offset of PCC to
- * value of PC - PCC.base before writing to EPCC.
+ * The kernel has been adjusted to use $pcc instead of $pc everywhere so we
+ * can simply write that to $epcc.
  */
 #define RESTORE_U_PCB_PC(unused_pc_vaddr_tmpreg, pcb)			\
 	/* EPCC is no longer a GPR so load it into C27 first. */	\
-	RESTORE_U_PCB_CREG(CHERI_REG_C27, PCC, pcb);			\
-	CSetEPCC CHERI_REG_C27;						\
+	csetkr1c	CHERI_REG_KSCRATCH; /* Save $c27 in $kr1c. */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);		\
+	CSetEPCC CHERI_REG_KSCRATCH;					\
 	/* Restore $c27 since we clobbered it to set EPCC */		\
-	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb)
+	cgetkr1c	CHERI_REG_KSCRATCH;				\
+	/* Clear kr1c again */						\
+	csetkr1c	$cnull
+
 #else
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, pcb)	\
