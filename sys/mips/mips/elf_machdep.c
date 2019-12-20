@@ -80,12 +80,7 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_stackprot	= VM_PROT_READ | VM_PROT_WRITE,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = exec_copyout_strings,
-/* XXX: TODO */
-#if 1
 	.sv_setregs	= exec_setregs,
-#else
-	.sv_setregs	= cheriabi_exec_setregs,
-#endif
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_CHERI |
