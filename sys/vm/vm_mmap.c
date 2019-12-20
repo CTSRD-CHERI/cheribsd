@@ -1095,17 +1095,22 @@ kern_munmap(struct thread *td, uintptr_t addr0, size_t size)
 		}
 	}
 #endif
-	reservation = -1;
-	if (vm_map_lookup_entry(map, addr, &entry))
-		reservation = entry->reservation;
+	if ((map->flags & MAP_RESERVATIONS) != 0) {
+		reservation = 0;
+		if (vm_map_lookup_entry(map, addr, &entry))
+			reservation = entry->reservation;
+	}
+
 	vm_map_delete(map, addr, addr + size);
 
-	result = vm_map_insert(map, NULL, 0, addr, addr + size,
-	    VM_PROT_NONE, VM_PROT_NONE, MAP_CREATE_UNMAPPED,
-	    reservation);
+	if ((map->flags & MAP_RESERVATIONS) != 0) {
+		result = vm_map_insert(map, NULL, 0, addr, addr + size,
+		    VM_PROT_NONE, VM_PROT_NONE, MAP_CREATE_UNMAPPED,
+		    reservation);
 
-	if (vm_map_reservation_is_unmapped(map, reservation))
-		vm_map_reservation_delete(map, reservation);
+		if (vm_map_reservation_is_unmapped(map, reservation))
+			vm_map_reservation_delete(map, reservation);
+	}
 
 #ifdef HWPMC_HOOKS
 	if (__predict_false(pmc_handled)) {

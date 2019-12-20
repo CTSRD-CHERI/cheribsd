@@ -1755,7 +1755,8 @@ charged:
 		    prev_entry->protection == prot &&
 		    prev_entry->max_protection == max &&
 		    prev_entry->wired_count == 0 &&
-		    prev_entry->reservation == reservation) {
+		    ((map->flags & MAP_RESERVATIONS) == 0 ||
+		    prev_entry->reservation == reservation)) {
 			KASSERT((prev_entry->eflags & MAP_ENTRY_USER_WIRED) ==
 			    0, ("prev_entry %p has incoherent wiring",
 			    prev_entry));
@@ -2270,7 +2271,8 @@ vm_map_find_min(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    MAP_ENTRY_IN_TRANSITION | MAP_ENTRY_IS_SUB_MAP | MAP_ENTRY_VN_EXEC)
 
 static bool
-vm_map_mergeable_neighbors(vm_map_entry_t prev, vm_map_entry_t entry)
+vm_map_mergeable_neighbors(vm_map_t map, vm_map_entry_t prev,
+    vm_map_entry_t entry)
 {
 
 	KASSERT((prev->eflags & MAP_ENTRY_NOMERGE_MASK) == 0 ||
@@ -2287,7 +2289,8 @@ vm_map_mergeable_neighbors(vm_map_entry_t prev, vm_map_entry_t entry)
 	    prev->inheritance == entry->inheritance &&
 	    prev->wired_count == entry->wired_count &&
 	    prev->cred == entry->cred &&
-	    prev->reservation == entry->reservation);
+	    ((map->flags & MAP_RESERVATIONS) == 0 ||
+	    prev->reservation == entry->reservation));
 }
 
 static void
@@ -2327,7 +2330,7 @@ vm_map_try_merge_entries(vm_map_t map, vm_map_entry_t prev_entry,
 
 	VM_MAP_ASSERT_LOCKED(map);
 	if ((entry->eflags & MAP_ENTRY_NOMERGE_MASK) == 0 &&
-	    vm_map_mergeable_neighbors(prev_entry, entry)) {
+	    vm_map_mergeable_neighbors(map, prev_entry, entry)) {
 		vm_map_entry_unlink(map, prev_entry, UNLINK_MERGE_NEXT);
 		vm_map_merged_neighbor_dispose(map, prev_entry);
 	}
