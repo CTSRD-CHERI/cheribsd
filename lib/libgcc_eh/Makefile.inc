@@ -2,7 +2,7 @@
 
 .include <src.opts.mk>
 
-COMPILERRTDIR=	${SRCTOP}/contrib/compiler-rt
+COMPILERRTDIR=	${SRCTOP}/contrib/llvm-project/compiler-rt
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
 UNWINDINCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/include
@@ -13,6 +13,8 @@ UNWINDSRCDIR=	${SRCTOP}/contrib/subrepo-cheri-libunwind/src
 .else
 UNWINDINCDIR=	${SRCTOP}/contrib/libunwind/include
 UNWINDSRCDIR=	${SRCTOP}/contrib/libunwind/src
+UNWINDINCDIR=	${SRCTOP}/contrib/llvm-project/libunwind/include
+UNWINDSRCDIR=	${SRCTOP}/contrib/llvm-project/libunwind/src
 .endif
 
 STATIC_CFLAGS+=${PICFLAG} -fvisibility=hidden -DVISIBILITY_HIDDEN
@@ -49,6 +51,6 @@ STATIC_CXXFLAGS+= -fvisibility=hidden -fPIC
 .if ${MK_CHERI} != "no" || ${MACHINE_ARCH:Mmips*}
 CFLAGS+=	-isystem ${SRCTOP}/contrib/subrepo-cheri-libc++/include -nostdinc++
 .else
-CFLAGS+=	-isystem ${SRCTOP}/contrib/libc++/include -nostdinc++
+CFLAGS+=	-isystem ${SRCTOP}/contrib/llvm-project/libcxx/include -nostdinc++
 .endif
 .endif
