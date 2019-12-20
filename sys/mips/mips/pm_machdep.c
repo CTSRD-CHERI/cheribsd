@@ -49,6 +49,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysent.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
+#include <sys/elf.h>
 #include <sys/exec.h>
 #include <sys/ktr.h>
 #include <sys/imgact.h>
@@ -587,7 +588,7 @@ set_fpregs(struct thread *td, struct fpreg *fpregs)
 	return 0;
 }
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 int
 fill_capregs(struct thread *td, struct capreg *capregs)
 {
@@ -602,8 +603,129 @@ set_capregs(struct thread *td, struct capreg *capregs)
 {
 	return (ENOSYS);
 }
+
+static void * __capability
+cheri_stack_pointer(struct thread *td, struct image_params *imgp, uintcap_t stack)
+{
+	vm_offset_t stackbase, stacktop;
+	size_t stacklen;
+	char * __capability csp;
+
+	KASSERT((__cheri_addr vaddr_t)stack % sizeof(void * __capability) == 0,
+	    ("CheriABI stack pointer not properly aligned"));
+
+	/*
+	 * Restrict the stack capability to the maximum region allowed
+	 * for this process and adjust csp accordingly.
+	 */
+	stackbase = (vaddr_t)td->td_proc->p_vmspace->vm_maxsaddr;
+	stacktop = (__cheri_addr vaddr_t)stack;
+	KASSERT(stacktop > stackbase,
+	    ("top of stack 0x%lx is below stack base 0x%lx", stacktop,
+	    stackbase));
+	stacklen = stacktop - stackbase;
+
+	/*
+	 * Round the stack down as required to make it representable.
+	 */
+	stacklen = rounddown2(stacklen, CHERI_REPRESENTABLE_ALIGNMENT(stacklen));
+	KASSERT(stackbase == CHERI_REPRESENTABLE_BASE(stackbase, stacklen),
+	    ("%s: rounded base != base", __func__));
+	csp = cheri_setaddress((void * __capability)stack, stackbase);
+	csp = cheri_csetbounds(csp, stacklen);
+	return (csp + stacklen);
+}
+
+/*
+ * Build a capability to describe the MMAP'able space from the end of
+ * the program's heap to the bottom of the stack.
+ *
+ * XXX: We could probably use looser bounds and rely on the VM system
+ * to manage the address space via vm_map instead of the more complex
+ * calculations here.
+ */
+static void
+cheri_mmap_capability(struct thread *td, struct image_params *imgp)
+{
+	vm_offset_t map_base, stack_base, text_end;
+	size_t map_length;
+
+	stack_base = cheri_getbase(td->td_frame->csp);
+	text_end = roundup2(imgp->end_addr,
+	    CHERI_SEALABLE_ALIGNMENT(imgp->end_addr - imgp->start_addr));
+
+	/*
+	 * Less confusing rounded up to a page and 256-bit
+	 * requires no other rounding.
+	 */
+	text_end = roundup2(text_end, PAGE_SIZE);
+	KASSERT(text_end <= stack_base,
+	    ("text_end 0x%zx > stack_base 0x%lx", text_end, stack_base));
+
+	map_base = (text_end == stack_base) ?
+	    CHERI_CAP_USER_MMAP_BASE :
+	    roundup2(text_end,
+		CHERI_REPRESENTABLE_ALIGNMENT(stack_base - text_end));
+	KASSERT(map_base < stack_base,
+	    ("map_base 0x%zx >= stack_base 0x%lx", map_base, stack_base));
+	map_length = stack_base - map_base;
+	map_length = rounddown2(map_length,
+	    CHERI_REPRESENTABLE_ALIGNMENT(map_length));
+
+	/*
+	 * Use cheri_capability_build_user_rwx so mmap() can return
+	 * appropriate permissions derived from a single capability.
+	 */
+	td->td_md.md_cheri_mmap_cap = cheri_capability_build_user_rwx(
+	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
+	    CHERI_CAP_USER_MMAP_OFFSET);
+	KASSERT(cheri_getperm(td->td_md.md_cheri_mmap_cap) &
+	    CHERI_PERM_CHERIABI_VMMAP,
+	    ("%s: mmap() cap lacks CHERI_PERM_CHERIABI_VMMAP", __func__));
+}
+
+static void * __capability
+cheri_pcc(struct thread *td, struct image_params *imgp)
+{
+	vm_offset_t code_start, code_end;
+	size_t code_length;
+
+#ifdef CHERIABI_LEGACY_SUPPORT
+#pragma message("Warning: Building kernel with LEGACY ABI support!")
+	/*
+	 * The legacy ABI needs a full address space $pcc (with base
+	 * == 0) to create code capabilities using cgetpccsetoffset
+	 */
+	code_start = CHERI_CAP_USER_CODE_BASE;
+	code_end = CHERI_CAP_USER_CODE_LENGTH;
+#else
+	/*
+	 * If we are executing a static binary we use end_addr as the
+	 * end of the text segment. If $pcc is the start of rtld we
+	 * use interp_end.  If we are executing ld-cheri-elf.so.1
+	 * directly we can use end_addr to find the end of the rtld
+	 * mapping.
+	 */
+	code_end = imgp->interp_end ? imgp->interp_end : imgp->end_addr;
+
+	/*
+	 * Statically linked binaries need a base 0 code capability
+	 * since otherwise crt_init_globals_will fail.
+	 *
+	 * XXXAR: TODO: is this still true??
+	 */
+	code_start = imgp->interp_end ? imgp->reloc_base : 0;
 #endif
 
+	/* Ensure CHERI128 representability */
+	code_length = code_end - code_start;
+	code_start = CHERI_REPRESENTABLE_BASE(code_start, code_length);
+	code_length = CHERI_REPRESENTABLE_LENGTH(code_length);
+	KASSERT(code_start + code_length >= code_end, ("%s: truncated PCC", __func__));
+	return (cheri_capability_build_user_code(CHERI_CAP_USER_CODE_PERMS,
+	    code_start, code_length, imgp->entry_addr - code_start));
+}
+#endif
 
 /*
  * Clear registers on exec
@@ -617,32 +739,137 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 	bzero((caddr_t)td->td_frame, sizeof(struct trapframe));
 
-	td->td_frame->sp = ((__cheri_addr register_t)stack) & ~(STACK_ALIGN - 1);
+#if __has_feature(capabilities)
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
+		struct cheri_signal *csigp;
+		Elf_Auxinfo * __capability auxv;
 
-	/*
-	 * If we're running o32 or n32 programs but have 64-bit registers,
-	 * GCC may use stack-relative addressing near the top of user
-	 * address space that, due to sign extension, will yield an
-	 * invalid address.  For instance, if sp is 0x7fffff00 then GCC
-	 * might do something like this to load a word from 0x7ffffff0:
-	 *
-	 * 	addu	sp, sp, 32768
-	 * 	lw	t0, -32528(sp)
-	 *
-	 * On systems with 64-bit registers, sp is sign-extended to
-	 * 0xffffffff80007f00 and the load is instead done from
-	 * 0xffffffff7ffffff0.
-	 *
-	 * To prevent this, we subtract 64K from the stack pointer here
-	 * for processes with 32-bit pointers.
-	 */
+		td->td_frame->csp = cheri_stack_pointer(td, imgp, stack);
+		cheri_mmap_capability(td, imgp);
+#ifdef CHERIABI_LEGACY_SUPPORT
+		/*
+		 * XXXAR: data_length needs to be the full address
+		 * space to allow legacy ABI to work since the TLS
+		 * region will be beyond the end of the text section.
+		 *
+		 * TODO: Start with a NULL $ddc once we drop legacy
+		 * ABI support.
+		 *
+		 * Having a full address space $ddc on startup does
+		 * not matter for new binaries since they will all
+		 * clear $ddc as one of the first user instructions
+		 * anyway.
+		 */
+		td->td_frame->ddc = cheri_capability_build_user_data(
+		    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
+		    CHERI_CAP_USER_DATA_LENGTH, CHERI_CAP_USER_DATA_OFFSET);
+#endif
+		td->td_frame->pcc = cheri_pcc(td, imgp);
+
+		/* Ensure that frame->pc is the offset of frame->pcc (needed for eret) */
+		td->td_frame->pc = cheri_getoffset(td->td_frame->pcc);
+		td->td_frame->c12 = td->td_frame->pcc;
+
+		/*
+		 * Set up CHERI-related state: most register state,
+		 * signal delivery, sealing capabilities, trusted
+		 * stack.
+		 */
+		cheriabi_newthread_init(td);
+
+		/*
+		 * Pass a pointer to the ELF auxiliary argument vector.
+		 */
+		auxv = (Elf_Auxinfo * __capability)
+		    ((void * __capability * __capability)stack +
+		    imgp->args->argc + 1 + imgp->args->envc + 1);
+		td->td_frame->c3 = cheri_csetbounds(auxv,
+		    AT_COUNT * sizeof(*auxv));
+
+		/*
+		 * Load relocbase for RTLD into $c4 so that rtld has a
+		 * capability with the correct bounds available on
+		 * startup
+		 *
+		 * XXXAR: this should not be necessary since it should
+		 * be the same as auxv[AT_BASE] but trying to load
+		 * that from $c3 crashes...
+		 *
+		 * TODO: load the AT_BASE value instead of using
+		 * duplicated code!
+		 */
+		if (imgp->reloc_base) {
+			vaddr_t rtld_base = imgp->reloc_base;
+			vaddr_t rtld_end = imgp->interp_end;
+			vaddr_t rtld_len = rtld_end - rtld_base;
+			rtld_base = CHERI_REPRESENTABLE_BASE(rtld_base,
+			    rtld_len);
+			rtld_len = CHERI_REPRESENTABLE_LENGTH(rtld_len);
+			td->td_frame->c4 = cheri_capability_build_user_data(
+			    CHERI_CAP_USER_DATA_PERMS, rtld_base, rtld_len, 0);
+		}
+
+		/*
+		 * Update privileged signal-delivery environment for
+		 * actual stack.
+		 *
+		 * XXXRW: Not entirely clear whether we want an offset
+		 * of 'stacklen' for csig_csp here.  Maybe we don't
+		 * want to use csig_csp at all?  Possibly csig_csp
+		 * should default to NULL...?
+		 */
+		csigp = &td->td_pcb->pcb_cherisignal;
+		csigp->csig_csp = td->td_frame->csp;
+		csigp->csig_default_stack = csigp->csig_csp;
+#ifdef CHERIABI_LEGACY_SUPPORT
+		csigp->csig_ddc = frame->ddc;
+#endif
+	} else
+#endif
+	{
+		td->td_frame->sp = ((__cheri_addr register_t)stack) & ~(STACK_ALIGN - 1);
+
+		/*
+		 * If we're running o32 or n32 programs but have 64-bit registers,
+		 * GCC may use stack-relative addressing near the top of user
+		 * address space that, due to sign extension, will yield an
+		 * invalid address.  For instance, if sp is 0x7fffff00 then GCC
+		 * might do something like this to load a word from 0x7ffffff0:
+		 *
+		 * 	addu	sp, sp, 32768
+		 * 	lw	t0, -32528(sp)
+		 *
+		 * On systems with 64-bit registers, sp is sign-extended to
+		 * 0xffffffff80007f00 and the load is instead done from
+		 * 0xffffffff7ffffff0.
+		 *
+		 * To prevent this, we subtract 64K from the stack pointer here
+		 * for processes with 32-bit pointers.
+		 */
 #if defined(__mips_n32) || defined(__mips_n64)
-	if (!SV_PROC_FLAG(td->td_proc, SV_LP64))
-		td->td_frame->sp -= 65536;
+		if (!SV_PROC_FLAG(td->td_proc, SV_LP64))
+			td->td_frame->sp -= 65536;
 #endif
 
-	td->td_frame->pc = imgp->entry_addr & ~3;
-	td->td_frame->t9 = imgp->entry_addr & ~3; /* abicall req */
+		td->td_frame->pc = imgp->entry_addr & ~3;
+		td->td_frame->t9 = imgp->entry_addr & ~3; /* abicall req */
+#if __has_feature(capabilities)
+		hybridabi_exec_setregs(td, imgp->entry_addr & ~3);
+#endif
+
+		/*
+		 * Set up arguments for the rtld-capable crt0:
+		 *	a0	stack pointer
+		 *	a1	rtld cleanup (filled in by dynamic loader)
+		 *	a2	rtld object (filled in by dynamic loader)
+		 *	a3	ps_strings
+		 */
+		td->td_frame->a0 = (__cheri_addr register_t)stack;
+		td->td_frame->a1 = 0;
+		td->td_frame->a2 = 0;
+		td->td_frame->a3 = (__cheri_addr register_t)imgp->ps_strings;
+	}
+
 	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
 	    (mips_rd_status() & MIPS_SR_INT_MASK);
 #if defined(__mips_n32) || defined(__mips_n64)
@@ -653,9 +880,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		td->td_frame->sr |= MIPS_SR_UX;
 	td->td_frame->sr |= MIPS_SR_KX;
 #endif
-#if defined(CPU_CHERI)
+#if __has_feature(capabilities)
 	td->td_frame->sr |= MIPS_SR_COP_2_BIT;
-	hybridabi_exec_setregs(td, imgp->entry_addr & ~3);
 #endif
 	/*
 	 * FREEBSD_DEVELOPERS_FIXME:
@@ -664,26 +890,19 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 	 *  that are needed.
 	 */
 
-	/*
-	 * Set up arguments for the rtld-capable crt0:
-	 *	a0	stack pointer
-	 *	a1	rtld cleanup (filled in by dynamic loader)
-	 *	a2	rtld object (filled in by dynamic loader)
-	 *	a3	ps_strings
-	 */
-	td->td_frame->a0 = (__cheri_addr register_t)stack;
-	td->td_frame->a1 = 0;
-	td->td_frame->a2 = 0;
-	td->td_frame->a3 = (__cheri_addr register_t)imgp->ps_strings;
-
 	td->td_md.md_flags &= ~MDTD_FPUSED;
 	if (PCPU_GET(fpcurthread) == td)
 	    PCPU_SET(fpcurthread, (struct thread *)0);
 	td->td_md.md_ss_addr = 0;
 
 #ifdef COMPAT_FREEBSD32
-	if (!SV_PROC_FLAG(td->td_proc, SV_LP64))
-		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE32;
+	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
+		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET32 + TLS_TCB_SIZE32;
+	else
+#endif
+#ifdef COMPAT_FREEBSD64
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI | SV_LP64) == SV_LP64)
+		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET64 + TLS_TCB_SIZE64;
 	else
 #endif
 		td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET + TLS_TCB_SIZE;

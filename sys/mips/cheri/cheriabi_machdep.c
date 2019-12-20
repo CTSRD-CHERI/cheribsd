@@ -123,7 +123,7 @@ struct sysentvec elf_freebsd_cheriabi_sysvec = {
 	.sv_stackprot	= VM_PROT_READ|VM_PROT_WRITE,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = exec_copyout_strings,
-	.sv_setregs	= cheriabi_exec_setregs,
+	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_CHERI | SV_SHP,
@@ -669,7 +669,7 @@ cheriabi_capability_set_user_ddc(void * __capability *cp, size_t length)
  * Common per-thread CHERI state initialisation across execve(2) and
  * additional thread creation.
  */
-static void
+void
 cheriabi_newthread_init(struct thread *td)
 {
 	struct cheri_signal *csigp;
