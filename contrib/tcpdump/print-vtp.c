@@ -248,7 +248,7 @@ _vtp_print (netdissect_options *ndo,
 	 */
 
 	tptr += 4;
-	while (tptr < (pptr+length)) {
+	while ((unsigned)(tptr - pptr) < length) {
 
 	    ND_TCHECK_8BITS(tptr);
 	    len = *tptr;
