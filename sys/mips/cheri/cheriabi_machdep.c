@@ -969,44 +969,6 @@ cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param)
 }
 
 int
-cheriabi_set_user_tls(struct thread *td, void * __capability tls_base)
-{
-
-	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET_C + TLS_TCB_SIZE_C;
-	/* XXX-AR: add a TLS alignment check here */
-	td->td_md.md_tls = tls_base;
-	/* XXX-JC: only use cwritehwr */
-	if (curthread == td) {
-		__asm __volatile ("cwritehwr %0, $chwr_userlocal"
-				  :
-				  : "C" ((char * __capability)td->td_md.md_tls +
-				      td->td_md.md_tls_tcb_offset));
-	}
-#ifdef CHERIABI_LEGACY_SUPPORT
-#pragma message("Warning: Building with support for LEGACY TLS")
-	if (curthread == td && cpuinfo.userlocal_reg == true) {
-		/*
-		 * If there is an user local register implementation
-		 * (ULRI) update it as well.  Add the TLS and TCB
-		 * offsets so the value in this register is
-		 * adjusted like in the case of the rdhwr trap()
-		 * instruction handler.
-		 *
-		 * The user local register needs the TLS and TCB
-		 * offsets because the compiler simply generates a
-		 * 'rdhwr reg, $29' instruction to access thread local
-		 * storage (i.e., variables with the '_thread'
-		 * attribute).
-		 */
-		mips_wr_userlocal((__cheri_addr u_long)td->td_md.md_tls +
-		    td->td_md.md_tls_tcb_offset);
-	}
-#endif
-
-	return (0);
-}
-
-int
 cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 {
 	int error;
@@ -1019,7 +981,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 	 * Operations shared with MIPS.
 	 */
 	case MIPS_SET_TLS:
-		return (cheriabi_set_user_tls(td, uap->parms));
+		return (cpu_set_user_tls(td, uap->parms));
 
 	case MIPS_GET_TLS:
 		error = copyoutcap(&td->td_md.md_tls, uap->parms,
