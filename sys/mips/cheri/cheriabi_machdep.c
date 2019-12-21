@@ -59,6 +59,7 @@
 #include <sys/imgact.h>
 #include <sys/mman.h>
 #include <sys/syscall.h>
+#include <sys/sysargmap.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysproto.h>
 #include <sys/ucontext.h>
@@ -77,7 +78,6 @@
 #include <compat/cheriabi/cheriabi.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
-#include <compat/cheriabi/cheriabi_sysargmap.h>
 #include <compat/cheriabi/cheriabi_util.h>
 
 #include <vm/vm.h>
@@ -93,7 +93,6 @@
 static void	cheriabi_capability_set_user_ddc(void * __capability *,
 		    size_t);
 #endif
-static int	cheriabi_fetch_syscall_args(struct thread *td);
 static void	cheriabi_set_syscall_retval(struct thread *td, int error);
 static void	cheriabi_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 static void	cheriabi_exec_setregs(struct thread *, struct image_params *,
@@ -200,7 +199,7 @@ cheriabi_elf_header_supported(struct image_params *imgp)
 	return FALSE;
 }
 
-static int
+int
 cheriabi_fetch_syscall_args(struct thread *td)
 {
 	struct trapframe *locr0 = td->td_frame;	 /* aka td->td_pcb->pcv_regs */
@@ -236,10 +235,10 @@ cheriabi_fetch_syscall_args(struct thread *td)
 
 	sa->narg = sa->callp->sy_narg;
 
-	if (sa->code >= nitems(cheriabi_sysargmask))
+	if (sa->code >= nitems(sysargmask))
 		ptrmask = 0;
 	else
-		ptrmask = cheriabi_sysargmask[sa->code];
+		ptrmask = sysargmask[sa->code];
 
 	/*
 	 * For syscall() and __syscall(), the arguments are stored in a

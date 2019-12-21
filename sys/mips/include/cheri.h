@@ -125,6 +125,7 @@ void	cheri_capability_set_user_sigcode(void * __capability *,
 	    struct sysentvec *);
 int	cheri_capcause_to_sicode(register_t capcause);
 
+int	cheriabi_fetch_syscall_args(struct thread *td);
 void	cheriabi_newthread_init(struct thread *td);
 
 void	hybridabi_exec_setregs(struct thread *td, unsigned long entry_addr);

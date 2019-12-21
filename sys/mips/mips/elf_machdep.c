@@ -90,12 +90,7 @@ static struct sysentvec elf_freebsd_sysvec = {
 			    0,
 #endif
 	.sv_set_syscall_retval = cpu_set_syscall_retval,
-/* XXX: TODO */
-#if 1
-	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
-#else
 	.sv_fetch_syscall_args = cheriabi_fetch_syscall_args,
-#endif
 	.sv_syscallnames = syscallnames,
 #ifdef MIPS_SHAREDPAGE
 	.sv_shared_page_base = SHAREDPAGE,
