@@ -70,8 +70,9 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/tls.h>
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 #include <cheri/cheri.h>
+#include <cheri/cheric.h>
 #endif
 
 #include <vm/vm.h>
@@ -355,18 +356,17 @@ cpu_set_syscall_retval(struct thread *td, int error)
 		quad_syscall = 1;
 #endif
 
-	if (code == SYS_syscall)
-		code = locr0->a0;
-	else if (code == SYS___syscall) {
-		if (quad_syscall)
-			code = _QUAD_LOWWORD ? locr0->a1 : locr0->a0;
-		else
-			code = locr0->a0;
-	}
-
 	switch (error) {
 	case 0:
-		if (quad_syscall && code != SYS_lseek) {
+#if __has_feature(capabilities)
+		KASSERT(cheri_gettag((void * __capability)td->td_retval[0]) == 0 ||
+		    td->td_sa.code == SYS_mmap ||
+		    td->td_sa.code == SYS_shmat,
+		    ("trying to return capability from integer returning "
+		    "syscall (%u)", td->td_sa.code));
+#endif
+
+		if (quad_syscall && td->td_sa.code != SYS_lseek) {
 			/*
 			 * System call invoked through the
 			 * SYS___syscall interface but the
@@ -381,6 +381,11 @@ cpu_set_syscall_retval(struct thread *td, int error)
 			locr0->v0 = td->td_retval[0];
 			locr0->v1 = td->td_retval[1];
 			locr0->a3 = 0;
+#if __has_feature(capabilities)
+			if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+				locr0->c3 =
+				    (void * __capability)td->td_retval[0];
+#endif
 		}
 		break;
 
@@ -392,7 +397,7 @@ cpu_set_syscall_retval(struct thread *td, int error)
 		break;	/* nothing to do */
 
 	default:
-		if (quad_syscall && code != SYS_lseek) {
+		if (quad_syscall && td->td_sa.code != SYS_lseek) {
 			locr0->v0 = error;
 			if (_QUAD_LOWWORD)
 				locr0->v1 = error;
