@@ -89,12 +89,11 @@ static struct sysentvec elf_freebsd_sysvec = {
 #else
 			    0,
 #endif
+	.sv_set_syscall_retval = cpu_set_syscall_retval,
 /* XXX: TODO */
 #if 1
-	.sv_set_syscall_retval = cpu_set_syscall_retval,
 	.sv_fetch_syscall_args = cpu_fetch_syscall_args,
 #else
-	.sv_set_syscall_retval = cheriabi_set_syscall_retval,
 	.sv_fetch_syscall_args = cheriabi_fetch_syscall_args,
 #endif
 	.sv_syscallnames = syscallnames,
