@@ -1489,7 +1489,7 @@ cheriabi_thr_new_initthr(struct thread *td, void *thunk)
 	    suword(param->parent_tid, td->td_tid)))
 		return (EFAULT);
 	cheriabi_set_threadregs(td, param);
-	return (cheriabi_set_user_tls(td, param->tls_base));
+	return (cpu_set_user_tls(td, param->tls_base));
 }
 
 int

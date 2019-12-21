@@ -123,6 +123,5 @@ void * __capability	cheriabi_mmap_retcap(struct thread *td,
 int	cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags);
 int	cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp);
 void	cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param);
-int	cheriabi_set_user_tls(struct thread *td, void * __capability tls_base);
 
 #endif /* !_COMPAT_CHERIABI_CHERIABI_UTIL_H_ */

@@ -1495,7 +1495,7 @@ freebsd64_thr_new_initthr(struct thread *td, void *thunk)
 	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
 	stack.ss_size = param->stack_size;
 	cpu_set_upcall(td, param->start_func, param->arg, &stack);
-	return (cpu_set_user_tls(td, param->tls_base));
+	return (cpu_set_user_tls(td, __USER_CAP_UNBOUND(param->tls_base)));
 }
 
 int

@@ -215,17 +215,11 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 	 * Operations shared with MIPS.
 	 */
 	case MIPS_SET_TLS:
-		td->td_md.md_tls =
-		    __USER_CAP_UNBOUND((void *)(intptr_t)uap->parms);
-		if (cpuinfo.userlocal_reg == true) {
-			mips_wr_userlocal((unsigned long)(uap->parms +
-			    td->td_md.md_tls_tcb_offset));
-		}
-		return (0);
+		return (cpu_set_user_tls(td,
+		    __USER_CAP_UNBOUND((void *)(intptr_t)uap->parms)));
 
 	case MIPS_GET_TLS:
-		tlsbase =
-		    (int64_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
+		tlsbase = (__cheri_addr int64_t)td->td_md.md_tls;
 		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
 
