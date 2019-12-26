@@ -214,6 +214,12 @@ SRCF:=  ${SRCF:Ngcc_personality_v0}
 SRCF+=		atomic
 .endif
 
+.if "${COMPILER_TYPE}" == "clang" && \
+    (${MACHINE_ARCH} == "powerpc" || ${MACHINE_ARCH} == "powerpcspe")
+SRCS+=          atomic.c
+CFLAGS.atomic.c+=      -Wno-atomic-alignment
+.endif
+
 
 .for file in ${SRCF}
 .if ${MACHINE_ARCH:Marmv[67]*} && (!defined(CPUTYPE) || ${CPUTYPE:M*soft*} == "") \
