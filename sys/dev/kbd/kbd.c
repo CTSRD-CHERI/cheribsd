@@ -73,7 +73,7 @@ static void	genkbd_diag(keyboard_t *kbd, int level);
 static	SLIST_HEAD(, keyboard_driver) keyboard_drivers =
 	SLIST_HEAD_INITIALIZER(keyboard_drivers);
 
-SET_DECLARE(kbddriver_set, const keyboard_driver_t);
+SET_DECLARE(kbddriver_set, keyboard_driver_t);
 
 /* local arrays */
 
@@ -166,12 +166,18 @@ kbd_set_maps(keyboard_t *kbd, keymap_t *keymap, accentmap_t *accmap,
 int
 kbd_add_driver(keyboard_driver_t *driver)
 {
-	if (SLIST_NEXT(driver, link))
-		return (EINVAL);
+
+	if ((driver->flags & KBDF_REGISTERED) != 0)
+		return (0);
+
+	KASSERT(SLIST_NEXT(driver, link) == NULL,
+	    ("%s: keyboard driver list garbage detected", __func__));
 	if (driver->kbdsw->get_fkeystr == NULL)
 		driver->kbdsw->get_fkeystr = genkbd_get_fkeystr;
 	if (driver->kbdsw->diag == NULL)
 		driver->kbdsw->diag = genkbd_diag;
+
+	driver->flags |= KBDF_REGISTERED;
 	SLIST_INSERT_HEAD(&keyboard_drivers, driver, link);
 	return (0);
 }
@@ -179,6 +185,11 @@ kbd_add_driver(keyboard_driver_t *driver)
 int
 kbd_delete_driver(keyboard_driver_t *driver)
 {
+
+	if ((driver->flags & KBDF_REGISTERED) == 0)
+		return (EINVAL);
+
+	driver->flags &= ~KBDF_REGISTERED;
 	SLIST_REMOVE(&keyboard_drivers, driver, keyboard_driver, link);
 	SLIST_NEXT(driver, link) = NULL;
 	return (0);
@@ -188,7 +199,6 @@ kbd_delete_driver(keyboard_driver_t *driver)
 int
 kbd_register(keyboard_t *kbd)
 {
-	const keyboard_driver_t **list;
 	const keyboard_driver_t *p;
 	keyboard_t *mux;
 	keyboard_info_t ki;
@@ -214,23 +224,6 @@ kbd_register(keyboard_t *kbd)
 	kbd->kb_callback.kc_arg = NULL;
 
 	SLIST_FOREACH(p, &keyboard_drivers, link) {
-		if (strcmp(p->name, kbd->kb_name) == 0) {
-			kbd->kb_drv = p;
-			keyboard[index] = kbd;
-
-			if (mux != NULL) {
-				bzero(&ki, sizeof(ki));
-				strcpy(ki.kb_name, kbd->kb_name);
-				ki.kb_unit = kbd->kb_unit;
-
-				(void)kbdd_ioctl(mux, KBADDKBD, (caddr_t) &ki);
-			}
-
-			return (index);
-		}
-	}
-	SET_FOREACH(list, kbddriver_set) {
-		p = *list;
 		if (strcmp(p->name, kbd->kb_name) == 0) {
 			kbd->kb_drv = p;
 			keyboard[index] = kbd;
@@ -285,15 +278,9 @@ kbd_unregister(keyboard_t *kbd)
 keyboard_switch_t *
 kbd_get_switch(char *driver)
 {
-	const keyboard_driver_t **list;
 	const keyboard_driver_t *p;
 
 	SLIST_FOREACH(p, &keyboard_drivers, link) {
-		if (strcmp(p->name, driver) == 0)
-			return (p->kbdsw);
-	}
-	SET_FOREACH(list, kbddriver_set) {
-		p = *list;
 		if (strcmp(p->name, driver) == 0)
 			return (p->kbdsw);
 	}
@@ -438,15 +425,9 @@ kbd_get_keyboard(int index)
 int
 kbd_configure(int flags)
 {
-	const keyboard_driver_t **list;
 	const keyboard_driver_t *p;
 
 	SLIST_FOREACH(p, &keyboard_drivers, link) {
-		if (p->configure != NULL)
-			(*p->configure)(flags);
-	}
-	SET_FOREACH(list, kbddriver_set) {
-		p = *list;
 		if (p->configure != NULL)
 			(*p->configure)(flags);
 	}
@@ -1522,18 +1503,27 @@ kbd_ev_event(keyboard_t *kbd, uint16_t type, uint16_t code, int32_t value)
 	}
 }
 
-static void
-kbd_drv_init(void)
+void
+kbdinit(void)
 {
-	const keyboard_driver_t **list;
-	const keyboard_driver_t *p;
+	keyboard_driver_t *drv, **list;
 
 	SET_FOREACH(list, kbddriver_set) {
-		p = *list;
-		if (p->kbdsw->get_fkeystr == NULL)
-			p->kbdsw->get_fkeystr = genkbd_get_fkeystr;
-		if (p->kbdsw->diag == NULL)
-			p->kbdsw->diag = genkbd_diag;
+		drv = *list;
+
+		/*
+		 * The following printfs will almost universally get dropped,
+		 * with exception to kernel configs with EARLY_PRINTF and
+		 * special setups where msgbufinit() is called early with a
+		 * static buffer to capture output occurring before the dynamic
+		 * message buffer is mapped.
+		 */
+		if (kbd_add_driver(drv) != 0)
+			printf("kbd: failed to register driver '%s'\n",
+			    drv->name);
+		else if (bootverbose)
+			printf("kbd: registered driver '%s'\n",
+			    drv->name);
 	}
 }
 
