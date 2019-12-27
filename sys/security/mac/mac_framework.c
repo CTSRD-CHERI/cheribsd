@@ -180,6 +180,7 @@ MALLOC_DEFINE(M_MACTEMP, "mactemp", "MAC temporary label storage");
 #ifndef MAC_STATIC
 static struct rmlock mac_policy_rm;	/* Non-sleeping entry points. */
 static struct sx mac_policy_sx;		/* Sleeping entry points. */
+static struct rmslock mac_policy_rms;
 #endif
 
 struct mac_policy_list_head mac_policy_list;
@@ -213,7 +214,7 @@ mac_policy_slock_sleep(void)
 	if (!mac_late)
 		return;
 
-	sx_slock(&mac_policy_sx);
+	rms_rlock(&mac_policy_rms);
 #endif
 }
 
@@ -237,7 +238,7 @@ mac_policy_sunlock_sleep(void)
 	if (!mac_late)
 		return;
 
-	sx_sunlock(&mac_policy_sx);
+	rms_runlock(&mac_policy_rms);
 #endif
 }
 
@@ -253,6 +254,7 @@ mac_policy_xlock(void)
 		return;
 
 	sx_xlock(&mac_policy_sx);
+	rms_wlock(&mac_policy_rms);
 	rm_wlock(&mac_policy_rm);
 #endif
 }
@@ -266,6 +268,7 @@ mac_policy_xunlock(void)
 		return;
 
 	rm_wunlock(&mac_policy_rm);
+	rms_wunlock(&mac_policy_rms);
 	sx_xunlock(&mac_policy_sx);
 #endif
 }
@@ -298,6 +301,7 @@ mac_init(void)
 	rm_init_flags(&mac_policy_rm, "mac_policy_rm", RM_NOWITNESS |
 	    RM_RECURSE);
 	sx_init_flags(&mac_policy_sx, "mac_policy_sx", SX_NOWITNESS);
+	rms_init(&mac_policy_rms, "mac_policy_rms");
 #endif
 }
 
