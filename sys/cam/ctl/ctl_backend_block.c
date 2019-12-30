@@ -580,9 +580,7 @@ ctl_be_block_flush_file(struct ctl_be_block_lun *be_lun,
 	DPRINTF("entered\n");
 
 	binuptime(&beio->ds_t0);
-	mtx_lock(&be_lun->io_lock);
 	devstat_start_transaction(beio->lun->disk_stats, &beio->ds_t0);
-	mtx_unlock(&be_lun->io_lock);
 
 	(void) vn_start_write(be_lun->vn, &mountpoint, V_WAIT);
 
@@ -661,9 +659,7 @@ ctl_be_block_dispatch_file(struct ctl_be_block_lun *be_lun,
 		IOVEC_INIT(xiovec, beio->sg_segs[i].addr, beio->sg_segs[i].len);
 
 	binuptime(&beio->ds_t0);
-	mtx_lock(&be_lun->io_lock);
 	devstat_start_transaction(beio->lun->disk_stats, &beio->ds_t0);
-	mtx_unlock(&be_lun->io_lock);
 
 	if (beio->bio_cmd == BIO_READ) {
 		vn_lock(be_lun->vn, LK_SHARED | LK_RETRY);
@@ -890,9 +886,7 @@ ctl_be_block_dispatch_zvol(struct ctl_be_block_lun *be_lun,
 		IOVEC_INIT(xiovec, beio->sg_segs[i].addr, beio->sg_segs[i].len);
 
 	binuptime(&beio->ds_t0);
-	mtx_lock(&be_lun->io_lock);
 	devstat_start_transaction(beio->lun->disk_stats, &beio->ds_t0);
-	mtx_unlock(&be_lun->io_lock);
 
 	csw = devvn_refthread(be_lun->vn, &dev, &ref);
 	if (csw) {
@@ -1030,9 +1024,7 @@ ctl_be_block_flush_dev(struct ctl_be_block_lun *be_lun,
 	beio->send_complete = 1;
 
 	binuptime(&beio->ds_t0);
-	mtx_lock(&be_lun->io_lock);
 	devstat_start_transaction(be_lun->disk_stats, &beio->ds_t0);
-	mtx_unlock(&be_lun->io_lock);
 
 	csw = devvn_refthread(be_lun->vn, &dev, &ref);
 	if (csw) {
@@ -1103,9 +1095,7 @@ ctl_be_block_unmap_dev(struct ctl_be_block_lun *be_lun,
 	DPRINTF("entered\n");
 
 	binuptime(&beio->ds_t0);
-	mtx_lock(&be_lun->io_lock);
 	devstat_start_transaction(be_lun->disk_stats, &beio->ds_t0);
-	mtx_unlock(&be_lun->io_lock);
 
 	if (beio->io_offset == -1) {
 		beio->io_len = 0;
@@ -1182,11 +1172,9 @@ ctl_be_block_dispatch_dev(struct ctl_be_block_lun *be_lun,
 			beio->num_bios_sent++;
 		}
 	}
-	binuptime(&beio->ds_t0);
-	mtx_lock(&be_lun->io_lock);
-	devstat_start_transaction(be_lun->disk_stats, &beio->ds_t0);
 	beio->send_complete = 1;
-	mtx_unlock(&be_lun->io_lock);
+	binuptime(&beio->ds_t0);
+	devstat_start_transaction(be_lun->disk_stats, &beio->ds_t0);
 
 	/*
 	 * Fire off all allocated requests!
