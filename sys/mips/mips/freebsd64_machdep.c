@@ -46,6 +46,7 @@
  */
 
 #define __ELF_WORD_SIZE 64
+#define	EXPLICIT_USER_ACCESS
 
 #include "opt_ddb.h"
 
@@ -220,17 +221,20 @@ freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 
 	case MIPS_GET_TLS:
 		tlsbase = (__cheri_addr int64_t)td->td_md.md_tls;
-		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
+		error = copyout(&tlsbase, __USER_CAP(uap->parms,
+		    sizeof(tlsbase)), sizeof(tlsbase));
 		return (error);
 
 #ifdef CPU_QEMU_MALTA
 	case QEMU_GET_QTRACE:
 		intval = (td->td_md.md_flags & MDTD_QTRACE) ? 1 : 0;
-		error = copyout(&intval, uap->parms, sizeof(intval));
+		error = copyout(&intval, __USER_CAP(uap->parms, sizeof(intval)),
+		    sizeof(intval));
 		return (error);
 
 	case QEMU_SET_QTRACE:
-		error = copyin(uap->parms, &intval, sizeof(intval));
+		error = copyin(__USER_CAP(uap->parms, sizeof(intval)),
+		    &intval, sizeof(intval));
 		if (error)
 			return (error);
 		if (intval)
