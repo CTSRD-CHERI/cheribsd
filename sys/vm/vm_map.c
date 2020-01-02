@@ -1952,7 +1952,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
     vm_offset_t start, vm_size_t length, vm_prot_t prot,
     vm_prot_t max, int cow)
 {
-	vm_map_entry_t prev_entry;
+	vm_map_entry_t entry;
 	vm_offset_t end, reservation;
 	int result;
 
@@ -1964,9 +1964,26 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	VM_MAP_RANGE_CHECK(map, start, end);
 	reservation = start;
 	if ((cow & MAP_CHECK_EXCL) == 0) {
-		if (vm_map_lookup_entry(map, start, &prev_entry) &&
-		    prev_entry->start <= start && prev_entry->end >= end)
-			reservation = prev_entry->reservation;
+		if ((map->flags & MAP_RESERVATIONS) != 0) {
+			if (vm_map_lookup_entry(map, start, &entry))
+				reservation = entry->reservation;
+			else
+				entry = vm_map_entry_succ(entry);
+
+			/*
+			 * Prevent mappings that span reservations
+			 * or are already unmapped.
+			 */
+			while ((entry->eflags & MAP_ENTRY_HEADER) == 0 &&
+			    entry->end <= end) {
+				if (entry->reservation != reservation ||
+				    ((entry->eflags & MAP_UNMAPPED) != 0)) {
+					result = KERN_NO_SPACE;
+					goto done;
+				}
+				entry = vm_map_entry_succ(entry);
+			}
+		}
 		vm_map_delete(map, start, end);
 	}
 	if ((cow & (MAP_STACK_GROWS_DOWN | MAP_STACK_GROWS_UP)) != 0) {
@@ -1976,6 +1993,7 @@ vm_map_fixed(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 		result = vm_map_insert(map, object, offset, start, end,
 		    prot, max, cow, reservation);
 	}
+done:
 	vm_map_unlock(map);
 	return (result);
 }
