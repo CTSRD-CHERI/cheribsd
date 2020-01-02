@@ -160,7 +160,6 @@ TARGET_MACHINE=	${TARGET_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mip
 TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd13.0
 KNOWN_ARCHES?=	aarch64/arm64 \
 		amd64 \
-		arm \
 		armv6/arm \
 		armv7/arm \
 		i386 \
