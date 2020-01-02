@@ -320,7 +320,7 @@ static struct mtx umtx_lock;
 
 #ifdef UMTX_PROFILING
 static void
-umtx_init_profiling(void) 
+umtx_init_profiling(void)
 {
 	struct sysctl_oid *chain_oid;
 	char chain_name[10];
@@ -328,8 +328,8 @@ umtx_init_profiling(void)
 
 	for (i = 0; i < UMTX_CHAINS; ++i) {
 		snprintf(chain_name, sizeof(chain_name), "%d", i);
-		chain_oid = SYSCTL_ADD_NODE(NULL, 
-		    SYSCTL_STATIC_CHILDREN(_debug_umtx_chains), OID_AUTO, 
+		chain_oid = SYSCTL_ADD_NODE(NULL,
+		    SYSCTL_STATIC_CHILDREN(_debug_umtx_chains), OID_AUTO,
 		    chain_name, CTLFLAG_RD, NULL, "umtx hash stats");
 		SYSCTL_ADD_INT(NULL, SYSCTL_CHILDREN(chain_oid), OID_AUTO,
 		    "max_length0", CTLFLAG_RD, &umtxq_chains[0][i].max_length, 0, NULL);
@@ -798,7 +798,7 @@ umtxq_signal_thread(struct umtx_q *uq)
 	wakeup(uq);
 }
 
-static inline int 
+static inline int
 tstohz(const struct timespec *tsp)
 {
 	struct timeval tv;
@@ -853,7 +853,7 @@ abs_timeout_gethz(struct abs_timeout *timo)
 	struct timespec tts;
 
 	if (timespeccmp(&timo->end, &timo->cur, <=))
-		return (-1); 
+		return (-1);
 	timespecsub(&timo->end, &timo->cur, &tts);
 	return (tstohz(&tts));
 }
@@ -1561,7 +1561,7 @@ umtx_pi_check_loop(struct umtx_pi *pi)
 /*
  * Propagate priority when a thread is blocked on POSIX
  * PI mutex.
- */ 
+ */
 static void
 umtx_propagate_priority(struct thread *td)
 {
@@ -1812,7 +1812,7 @@ umtx_pi_ref(struct umtx_pi *pi)
 /*
  * Decrease reference count for a PI mutex, if the counter
  * is decreased to zero, its memory space is freed.
- */ 
+ */
 static void
 umtx_pi_unref(struct umtx_pi *pi)
 {
@@ -2139,7 +2139,7 @@ usrloop:
 			umtx_pi_disown(pi);
 		/* get highest priority thread which is still sleeping. */
 		uq_first = TAILQ_FIRST(&pi->pi_blocked);
-		while (uq_first != NULL && 
+		while (uq_first != NULL &&
 		    (uq_first->uq_flags & UQF_UMTXQ) == 0) {
 			uq_first = TAILQ_NEXT(uq_first, uq_lockq);
 		}
@@ -3505,7 +3505,7 @@ umtx_copyin_umtx_time(const void * __capability addr, size_t size,
 		tp->_clockid = CLOCK_REALTIME;
 		tp->_flags = 0;
 		error = copyin(addr, &tp->_timeout, sizeof(struct timespec));
-	} else 
+	} else
 		error = copyin(addr, tp, sizeof(struct _umtx_time));
 	if (error != 0)
 		return (error);
@@ -4614,7 +4614,7 @@ umtx_copyin_umtx_time32(const void *addr, size_t size, struct _umtx_time *tp)
 	t32.flags   = 0;
 	if (size <= sizeof(struct timespec32))
 		error = copyin(addr, &t32.timeout, sizeof(struct timespec32));
-	else 
+	else
 		error = copyin(addr, &t32, sizeof(struct umtx_time32));
 	if (error != 0)
 		return (error);
@@ -4675,7 +4675,7 @@ __umtx_op_wait_umutex_compat32(struct thread *td, struct _umtx_op_args *uap)
 	if (uap->uaddr2 == NULL)
 		tm_p = NULL;
 	else {
-		error = umtx_copyin_umtx_time32(uap->uaddr2, 
+		error = umtx_copyin_umtx_time32(uap->uaddr2,
 		    (size_t)uap->uaddr1, &timeout);
 		if (error != 0)
 			return (error);
