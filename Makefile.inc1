@@ -2949,13 +2949,6 @@ kernel-tools: .PHONY
 .if ${TARGET_ARCH} == "amd64" || ${TARGET_ARCH} == "i386"
 _btxld=		usr.sbin/btxld
 .endif
-.if ${TARGET_ARCH} == "mips64" && !defined(CROSSBUILD_HOST)
-# Avoid bootstrapping libxo when crossbuilding from Linux/mac since it doesn't
-# work yet and cheritest as a bootstrap tool is only needed for jenkins.
-_cheritest=	lib/libxo \
-		bin/cheritest \
-		bin/cheriabitest
-.endif
 .endif
 
 # Rebuild ctfconvert and ctfmerge to avoid difficult-to-diagnose failures
@@ -3012,7 +3005,6 @@ _ar=usr.bin/ar
 cross-tools: .MAKE .PHONY
 .for _tool in \
     ${LOCAL_XTOOL_DIRS} \
-    ${_cheritest} \
     ${_ar} \
     ${_clang_libs} \
     ${_clang} \
