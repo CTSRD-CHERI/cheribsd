@@ -63,17 +63,4 @@ _update_pcc_offset(trapf_pc_t pcc, register_t pc, const char *func)
 }
 #define	update_pcc_offset(pcc, pc)	_update_pcc_offset(pcc, pc, __func__)
 
-static __inline trapf_pc_t
-trapf_pc_from_kernel_code_ptr(void *ptr)
-{
-#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
-	/* In the hybrid kernel, we assume that addr is within $pcc bounds */
-	 KASSERT(cheri_is_address_inbounds(cheri_getpcc(), (register_t)ptr),
-	     ("Invalid ptr %p", ptr));
-	return (cheri_setaddress(cheri_getpcc(), (register_t)ptr));
-#else
-	return ((trapf_pc_t)ptr);
-#endif
-}
-
 #endif /* _MIPS_INCLUDE_CHERI_MACHDEP_H_ */

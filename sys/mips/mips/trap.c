@@ -415,6 +415,18 @@ static int emulate_unaligned_access(struct trapframe *frame, int mode);
 
 extern void fswintrberr(void); /* XXX */
 
+static __inline trapf_pc_t
+trapf_pc_from_kernel_code_ptr(void *ptr)
+{
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	/* In the hybrid kernel, we assume that addr is within $pcc bounds */
+	 KASSERT(cheri_is_address_inbounds(cheri_getpcc(), (register_t)ptr),
+	     ("Invalid ptr %p", ptr));
+	return (cheri_setaddress(cheri_getpcc(), (register_t)ptr));
+#else
+	return ((trapf_pc_t)ptr);
+#endif
+}
 
 /*
  * Fetch an instruction from near frame->pc (or frame->pcc for CHERI).
