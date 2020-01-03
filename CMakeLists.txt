@@ -27,12 +27,10 @@ else()
     message(FATAL_ERROR "Unsupported TARGET: ${TARGET}:${TARGET_ARCH}!")
 endif()
 
-# TODO: also copy this to tmpsysroot
 include_directories(${CMAKE_SOURCE_DIR}/include)
+include_directories(${CMAKE_SOURCE_DIR}/sys)
 
 set(TMPSYSROOT ${CMAKE_BINARY_DIR}/sysroot/usr)
-file(MAKE_DIRECTORY ${TMPSYSROOT}/include/c++)
-file(MAKE_DIRECTORY ${TMPSYSROOT}/kern_opt)
 add_compile_options(--sysroot=${CMAKE_BINARY_DIR}/sysroot/)
 
 # Create symlinks
@@ -40,10 +38,11 @@ execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${MACHINE_HEADERS} ${
 execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/sys/sys/errno.h ${TMPSYSROOT}/include/errno.h)
 execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/sys/sys/fcntl.h ${TMPSYSROOT}/include/fcntl.h)
 execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/sys/sys/_stdarg.h ${TMPSYSROOT}/include/stdarg.h)
-execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/sys/sys ${TMPSYSROOT}/include/sys)
-execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/sys/cheri ${TMPSYSROOT}/include/cheri)
 # TODO: should only be for CHERI
+file(MAKE_DIRECTORY ${TMPSYSROOT}/include/c++)
 execute_process(COMMAND ${CMAKE_COMMAND} -E create_symlink ${CMAKE_SOURCE_DIR}/contrib/subrepo-cheri-libc++/include ${TMPSYSROOT}/include/c++/v1)
+
+file(MAKE_DIRECTORY ${TMPSYSROOT}/kern_opt)
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ddb.h "#define DDB 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_ktrace.h "#define KTRACE 1\n")
 file(WRITE ${CMAKE_BINARY_DIR}/kern_opt/opt_global.h "#define KDB 1
@@ -80,7 +79,7 @@ file(GLOB_RECURSE FAKE_KERNEL_SRCS_CHERI sys/cheri "*.c")
 file(GLOB_RECURSE FAKE_KERNEL_SRCS_CHERIABI sys/compat/cheriabi "*.c")
 file(GLOB_RECURSE FAKE_KERNEL_SRCS_KERN sys/kern "*.c")
 file(GLOB_RECURSE FAKE_KERNEL_SRCS_LIBKERN sys/libkern "*.c")
-add_executable(fake_kernel ${FAKE_KERNEL_SRCS_MIPS} ${FAKE_KERNEL_SRCS_DDB} ${FAKE_KERNEL_SRCS_CHERI} ${FAKE_KERNEL_SRCS_CHERIABI} ${FAKE_KERNEL_SRCS_KERN} ${FAKE_KERNEL_SRCS_LIBKERN})
+add_library(fake_kernel STATIC ${FAKE_KERNEL_SRCS_MIPS} ${FAKE_KERNEL_SRCS_DDB} ${FAKE_KERNEL_SRCS_CHERI} ${FAKE_KERNEL_SRCS_CHERIABI} ${FAKE_KERNEL_SRCS_KERN} ${FAKE_KERNEL_SRCS_LIBKERN})
 target_compile_definitions(fake_kernel PRIVATE _KERNEL=1)
 target_include_directories(fake_kernel PRIVATE ${CMAKE_SOURCE_DIR}/sys)
 target_include_directories(fake_kernel PRIVATE ${CMAKE_BINARY_DIR}/kern_opt)
