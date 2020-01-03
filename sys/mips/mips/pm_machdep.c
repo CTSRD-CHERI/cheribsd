@@ -105,12 +105,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct thread *td;
 	struct trapframe *regs;
 	struct sigacts *psp;
-#if __has_feature(capabilities)
-	/* XXX: Temporary until sigframe becomes sigframe_c */
-	struct sigframe_c sf, * __capability sfp;
-#else
 	struct sigframe sf, * __capability sfp;
-#endif
 	uintcap_t sp;
 #if __has_feature(capabilities)
 	int cheri_is_sandboxed;
@@ -192,7 +187,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 
 	/* save user context */
-	bzero(&sf, sizeof(sf));
+	bzero(&sf, sizeof(struct sigframe));
 	sf.sf_uc.uc_sigmask = *mask;
 #if !__has_feature(capabilities)
 	/* XXX: Re-enable once ucontext_t == ucontext_c_t */
@@ -250,13 +245,11 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		sp = (vm_offset_t)regs->sp;
 #endif
 	}
-	sp -= sizeof(*sfp);
+	sp -= sizeof(struct sigframe);
 	sp = __builtin_align_down(sp, STACK_ALIGN);
-#if __has_feature(capabilities)
-	sfp = (struct sigframe_c * __capability)sp;
-	sfp = cheri_andperm(sfp, CHERI_CAP_USER_DATA_PERMS);
-#else
 	sfp = (struct sigframe * __capability)sp;
+#if __has_feature(capabilities)
+	sfp = cheri_andperm(sfp, CHERI_CAP_USER_DATA_PERMS);
 #endif
 
 	/* Build the argument list for the signal handler. */
