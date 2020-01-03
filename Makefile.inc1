@@ -3256,7 +3256,6 @@ _startup_libs+=	gnu/lib/csu
 .if ${MK_LIBCHERI} != "no"
 _startup_libs+= lib/libc_cheri
 .endif
-_startup_libs+=	lib/libcompiler_rt
 _startup_libs+=	lib/libc
 _startup_libs+=	lib/libc_nonshared
 .if ${MK_LIBCPLUSPLUS} != "no"
