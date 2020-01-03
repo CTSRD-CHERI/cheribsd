@@ -169,12 +169,7 @@ void	signal_handler_clear(int sig);
 #define CHERITEST_CHECK_SYSCALL(call) \
 	CHERITEST_CHECK_SYSCALL2(call, "Call \'" #call "\' failed")
 
-#ifdef LIST_ONLY
-#define DECLARE_CHERI_TEST_IMPL(name, args...) \
-	static inline void name(args) {}
-#else
 #define DECLARE_CHERI_TEST_IMPL(name, args...) void name(args)
-#endif
 #define DECLARE_CHERI_TEST_WITH_ARGS(name, args...) \
 	DECLARE_CHERI_TEST_IMPL(name, const struct cheri_test *ctp, args)
 #define DECLARE_CHERI_TEST(name) \

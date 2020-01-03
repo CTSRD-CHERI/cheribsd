@@ -31,10 +31,8 @@
 
 #include <sys/cdefs.h>
 
-#ifndef LIST_ONLY
 #if !__has_feature(capabilities)
 #error "This code requires a CHERI-aware compiler"
-#endif
 #endif
 
 #include <sys/param.h>
@@ -45,7 +43,6 @@
 #include <sys/ucontext.h>
 #include <sys/wait.h>
 
-#ifndef LIST_ONLY
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
@@ -61,7 +58,6 @@
 #endif
 
 #include <machine/sysarch.h>
-#endif
 
 #include <assert.h>
 #ifdef CHERI_LIBCHERI_TESTS
@@ -86,9 +82,6 @@
 
 #include "cheritest.h"
 #include "cheritest.h"
-#ifdef LIST_ONLY
-#include "cheritest_list_only.h"
-#endif
 
 #ifndef SIGPROT
 #define	SIGPROT				0
@@ -1792,21 +1785,17 @@ usage(void)
 	fprintf(stderr,
 "usage:\n"
 "    cheritest [options] -l               -- List tests\n"
-#ifndef LIST_ONLY
 "    cheritest [options] -a               -- Run all tests\n"
 "    cheritest [options] <test> [...]     -- Run specified tests\n"
 "    cheritest [options] -g <glob> [...]  -- Run matching tests\n"
-#endif
 "\n"
 "options:\n"
 "    -f  -- Only include \"fast\" tests\n"
-#ifndef LIST_ONLY
 "    -c  -- Enable core dumps\n"
 "    -d  -- Attach debugger before running test\n"
 "    -s  -- Sleep one second after each test\n"
 "    -q  -- Enable qemu tracing in test process\n"
 "    -Q  -- Enable qemu tracing in test process (user-mode only)\n"
-#endif
 "    -u  -- Only include unsandboxed tests\n"
 "    -v  -- Increase verbosity\n"
 	     );
@@ -1857,7 +1846,6 @@ list_tests(void)
 	exit(EX_OK);
 }
 
-#ifndef LIST_ONLY
 static void
 signal_handler(int signum, siginfo_t *info, void *vuap)
 {
@@ -2332,7 +2320,6 @@ cheritest_memmove(void *dst, const void *src, size_t n)
 {
 	return memmove(dst, src, n);
 }
-#endif /* !LIST_ONLY */
 
 int
 main(int argc, char *argv[])
@@ -2340,11 +2327,9 @@ main(int argc, char *argv[])
 	struct rlimit rl;
 	int opt;
 	int glob = 0;
-#ifndef LIST_ONLY
 	stack_t stack;
 	int i;
 	u_int t;
-#endif
 	uint qemu_trace_perthread;
 	size_t len;
 
@@ -2417,10 +2402,6 @@ main(int argc, char *argv[])
 		warnx("-l and a list of tests are incompatible");
 		usage();
 	}
-#ifdef LIST_ONLY
-	else
-		usage();
-#else /* LIST_ONLY */
 	if (argc == 0 && !run_all)
 		usage();
 	if (argc > 0 && run_all) {
@@ -2573,5 +2554,4 @@ main(int argc, char *argv[])
 	if (tests_failed > tests_xfailed)
 		exit(-1);
 	exit(EX_OK);
-#endif /* !LIST_ONLY */
 }
