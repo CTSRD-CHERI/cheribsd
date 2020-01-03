@@ -80,6 +80,7 @@ __FBSDID("$FreeBSD$");
 #ifdef CPU_CHERI
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <machine/cheri_machdep.h>
 #endif
 
 #include <ddb/ddb.h>
@@ -183,7 +184,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_sigmask = *mask;
 	sf.sf_uc.uc_stack = td->td_sigstk;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
-	sf.sf_uc.uc_mcontext.mc_pc = regs->pc;
+	sf.sf_uc.uc_mcontext.mc_pc = TRAPF_PC(regs);
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls =
@@ -303,9 +304,9 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	hybridabi_sendsig(td);
 #endif
 
-	regs->pc = (register_t)(__cheri_offset intptr_t)catcher;
+	regs->pc = (trapf_pc_t)catcher;
 	// FIXME: should this be an offset relative to PCC or an address?
-	regs->t9 = (register_t)(__cheri_offset intptr_t)catcher;
+	regs->t9 = (register_t)(__cheri_offset intptr_t)regs->pc;
 	regs->sp = (register_t)(intptr_t)sfp;
 	if (p->p_sysent->sv_sigcode_base != 0) {
 		/* Signal trampoline code is in the shared page */
@@ -355,7 +356,7 @@ ptrace_set_pc(struct thread *td, unsigned long addr)
 	    !cheri_is_address_inbounds(td->td_frame->pcc, addr))
 		return (EINVAL);
 #endif
-	td->td_frame->pc = (register_t) addr;
+	TRAPF_PC_SET_ADDR(td->td_frame, (vaddr_t)addr);
 	return 0;
 }
 
@@ -392,7 +393,7 @@ ptrace_single_step(struct thread *td)
 	/*
 	 * Fetch what's at the current location.
 	 */
-	error = ptrace_read_int(td, locr0->pc, &curinstr);
+	error = ptrace_read_int(td, TRAPF_PC(locr0), &curinstr);
 	if (error)
 		goto out;
 
@@ -402,9 +403,10 @@ ptrace_single_step(struct thread *td)
 
 	/* compute next address after current location */
 	if (locr0->cause & MIPS_CR_BR_DELAY) {
-		va = MipsEmulateBranch(locr0, locr0->pc, locr0->fsr, &curinstr);
+		va = (__cheri_addr vaddr_t)MipsEmulateBranch(
+		    locr0, locr0->pc, locr0->fsr, &curinstr);
 	} else {
-		va = locr0->pc + 4;
+		va = TRAPF_PC(locr0) + 4;
 	}
 	if (td->td_md.md_ss_addr) {
 		printf("SS %s (%d): breakpoint already set at %p (va %p)\n",
@@ -446,7 +448,7 @@ makectx(struct trapframe *tf, struct pcb *pcb)
 {
 
 	pcb->pcb_context[PCB_REG_RA] = tf->ra;
-	pcb->pcb_context[PCB_REG_PC] = tf->pc;
+	pcb->pcb_context[PCB_REG_PC] = TRAPF_PC(tf);
 	pcb->pcb_context[PCB_REG_SP] = tf->sp;
 }
 
@@ -454,6 +456,14 @@ int
 fill_regs(struct thread *td, struct reg *regs)
 {
 	memcpy(regs, td->td_frame, sizeof(struct reg));
+#if __has_feature(capabilities)
+	/*
+	 * When targeting CHERI, we don't fill the PT_REGS_PC value
+	 * since we only use $pcc and not $pc in trap handling.
+	 * Copy it manually instead.
+	 */
+	regs->r_regs[PT_REGS_PC] = cheri_getoffset(td->td_frame->pc);
+#endif
 	return (0);
 }
 
@@ -470,6 +480,11 @@ set_regs(struct thread *td, struct reg *regs)
 	sr = f->sr;
 	memcpy(td->td_frame, regs, sizeof(struct reg));
 	f->sr = sr;
+#if __has_feature(capabilities)
+	/* When targeting CHERI, update the offset of $pcc from PT_REGS_PC. */
+	td->td_frame->pc =
+	    update_pcc_offset(td->td_frame->pc, regs->r_regs[PT_REGS_PC]);
+#endif
 	return (0);
 }
 
@@ -496,7 +511,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 		mcp->mc_regs[A3] = 0;
 	}
 
-	mcp->mc_pc = td->td_frame->pc;
+	mcp->mc_pc = TRAPF_PC(td->td_frame);
 	mcp->mullo = td->td_frame->mullo;
 	mcp->mulhi = td->td_frame->mulhi;
 	mcp->mc_tls = (__cheri_fromcap void *)td->td_md.md_tls;
@@ -558,7 +573,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 		bcopy((void *)&mcp->mc_fpregs, (void *)&td->td_frame->f0,
 		    sizeof(mcp->mc_fpregs));
 	}
-	td->td_frame->pc = mcp->mc_pc;
+	TRAPF_PC_SET_ADDR(td->td_frame, mcp->mc_pc);
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
 	td->td_md.md_tls = __USER_CAP_UNBOUND(mcp->mc_tls);
@@ -765,10 +780,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		    CHERI_CAP_USER_DATA_LENGTH, CHERI_CAP_USER_DATA_OFFSET);
 #endif
 		td->td_frame->pcc = cheri_pcc(td, imgp);
-
-		/* Ensure that frame->pc is the offset of frame->pcc (needed for eret) */
-		td->td_frame->pc = cheri_getoffset(td->td_frame->pcc);
-		td->td_frame->c12 = td->td_frame->pcc;
+		td->td_frame->c12 = td->td_frame->pc;
 
 		/*
 		 * Set up CHERI-related state: most register state,
@@ -851,10 +863,12 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 			td->td_frame->sp -= 65536;
 #endif
 
-		td->td_frame->pc = imgp->entry_addr & ~3;
 		td->td_frame->t9 = imgp->entry_addr & ~3; /* abicall req */
 #if __has_feature(capabilities)
 		hybridabi_exec_setregs(td, imgp->entry_addr & ~3);
+#else
+		/* For CHERI $pcc is set by hybridabi_exec_setregs() */
+		td->td_frame->pc = (trapf_pc_t)(uintptr_t)(imgp->entry_addr & ~3);
 #endif
 
 		/*

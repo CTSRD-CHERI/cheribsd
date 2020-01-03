@@ -451,8 +451,8 @@ freebsd32_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		sigexit(td, SIGILL);
 	}
 
-	td->td_frame->pc = (register_t)(__cheri_offset intptr_t)catcher;
-	td->td_frame->t9 = (register_t)(__cheri_offset intptr_t)catcher;
+	td->td_frame->pc = (trapf_pc_t)catcher;
+	td->td_frame->t9 = (register_t)(__cheri_offset intptr_t)td->td_frame->pc;
 	td->td_frame->sp = (register_t)(intptr_t)sfp;
 	/*
 	 * Signal trampoline code is at base of user stack.

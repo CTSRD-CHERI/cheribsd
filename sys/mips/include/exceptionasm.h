@@ -78,6 +78,15 @@
 	ITLBNOPFIX
 #endif
 
+/* For CHERI SAVE_U_PCB_EPC does not save EPC since we only use EPCC */
+#if __has_feature(capabilities)
+#define SAVE_U_PCB_EPC(gpr, pcb)
+#else
+#define SAVE_U_PCB_EPC(gpr, pcb)	\
+	MFC0	a3, MIPS_COP_0_EXC_PC;	\
+	SAVE_U_PCB_REG(a3, PC, pcb)
+#endif
+
 /*
  * Save all of the registers except for the kernel temporaries in u.u_pcb.
  */
@@ -112,7 +121,6 @@
 	SAVE_U_PCB_REG(s6, S6, pcb)		; \
 	SAVE_U_PCB_REG(s7, S7, pcb)		; \
 	SAVE_U_PCB_REG(t8, T8, pcb)		; \
-	MFC0	a3, MIPS_COP_0_EXC_PC		; \
 	SAVE_U_PCB_REG(t9, T9, pcb)		; \
 	SAVE_U_PCB_REG(gp, GP, pcb)		; \
 	SAVE_U_PCB_REG(sp, SP, pcb)		; \
@@ -124,14 +132,14 @@
 	SAVE_U_PCB_REG(a0, SR, pcb)		; \
 	SAVE_U_PCB_REG(a1, CAUSE, pcb)		; \
 	SAVE_U_PCB_REG(a2, BADVADDR, pcb)	; \
-	SAVE_U_PCB_REG(a3, PC, pcb)
+	SAVE_U_PCB_EPC(a3, pcb)
 
 #define	RESTORE_REGS_FROM_PCB(pcb)		\
 	RESTORE_U_PCB_REG(t0, MULLO, pcb)	; \
 	RESTORE_U_PCB_REG(t1, MULHI, pcb)	; \
 	mtlo	t0				; \
 	mthi	t1				; \
-	RESTORE_U_PCB_PC(t0, t1, pcb)		; \
+	RESTORE_U_PCB_PC(t0, pcb)		; \
 	RESTORE_U_PCB_REG(v0, V0, pcb)		; \
 	RESTORE_U_PCB_REG(v1, V1, pcb)		; \
 	RESTORE_U_PCB_REG(a0, A0, pcb)		; \

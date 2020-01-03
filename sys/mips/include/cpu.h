@@ -67,7 +67,17 @@
 #include <machine/frame.h>
 
 #define	TRAPF_USERMODE(framep)  (((framep)->sr & MIPS_SR_KSU_USER) != 0)
-#define	TRAPF_PC(framep)	((framep)->pc)
+#define	TRAPF_PC(framep)	((__cheri_addr vaddr_t)(framep)->pc)
+#if __has_feature(capabilities)
+#define	TRAPF_PC_SET_ADDR(framep, addr)	\
+    (framep)->pc = __builtin_cheri_address_set((framep)->pc, addr)
+#else
+#define	TRAPF_PC_SET_ADDR(framep, addr)	\
+    ((framep)->pc) = (trapf_pc_t)(uintptr_t)addr
+#endif
+/* Note: No ifdef needed as uintcap_t is uintptr_t for !has_feature(capabilities) */
+#define	TRAPF_PC_INCREMENT(framep, offset)	\
+    (framep)->pc = (trapf_pc_t)((uintcap_t)((framep)->pc) + offset)
 #define	cpu_getstack(td)	((td)->td_frame->sp)
 #define	cpu_setstack(td, nsp)	((td)->td_frame->sp = (nsp))
 #define	cpu_spinwait()		/* nothing */

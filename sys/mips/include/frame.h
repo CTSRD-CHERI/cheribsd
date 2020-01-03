@@ -75,9 +75,12 @@
 typedef union {
 	uint32_t inst;
 	register_t pad; /* Ensure this is aligned the same way as other fields */
+
 } badinstr_t;
 
-/* Note: This must also match regnum.h and regdef.h */
+/* Use a incomplete type to avoid pointer-arithmetic */
+struct trapf_pc_type;
+typedef struct trapf_pc_type * __capability trapf_pc_t;
 
 struct trapframe {
 	register_t	zero;
@@ -128,7 +131,13 @@ struct trapframe {
 	register_t	mulhi;
 	register_t	badvaddr;
 	register_t	cause;
-	register_t	pc;
+#if __has_feature(capabilities)
+	/* keep the field for layout compatibility */
+	register_t	_padding_for_the_mips_pc_field;
+#else
+	trapf_pc_t	pc;
+	_Static_assert(sizeof(trapf_pc_t) == sizeof(register_t), "");
+#endif
 	/*
 	 * FREEBSD_DEVELOPERS_FIXME:
 	 * Include any other registers which are CPU-Specific and
@@ -159,7 +168,7 @@ struct trapframe {
 	 * NB: We round the size up to an even multiple of capability size;
 	 * this assumption can also be found in regnum.h.
 	 */
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	void * __capability	ddc;
 	void * __capability	c1;
 	void * __capability	c2;
@@ -192,7 +201,12 @@ struct trapframe {
 	void * __capability	c29;
 	void * __capability	c30;
 	void * __capability	c31;
-	void * __capability	pcc;
+	union {
+		/* XXXAR: anoynmous union to keep both names for now */
+		/* FIXME: remove this hack */
+		trapf_pc_t pc;
+		trapf_pc_t pcc;
+	};
 	register_t		capcause;  /* NB: Saved but not restored. */
 	register_t		_pad0;
 #if (CHERICAP_SIZE == 32)

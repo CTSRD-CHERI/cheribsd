@@ -161,6 +161,8 @@
  * to $ddc later.  Unlike kernel context switches, we both save and restore
  * the capability cause register.
  *
+ * Note: EPCC is saved last so CHERI_REG_KSCRATCH will contain $epcc
+ *
  * XXXRW: We should in fact also do this for the kernel version?
  */
 #define	SAVE_CREGS_TO_PCB(pcb, treg)					\
@@ -196,24 +198,15 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
 	/* Save special registers after KSCRATCH (C27) */		\
-	CGetEPCC	CHERI_REG_KSCRATCH;				\
-	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);			\
 	/* User DDC is saved in $kr2c. */				\
 	CGetKR2C	CHERI_REG_KSCRATCH;				\
 	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, DDC, pcb);			\
 	cgetcause	treg;						\
-	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
+	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
+	/* EPCC is saved last so that it can be read from KSCRATCH */	\
+	CGetEPCC	CHERI_REG_KSCRATCH;				\
+	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb)
 
-
-#define RESTORE_EPCC(capreg, pc_offset, tmpreg)					\
-	/* Do not attempt to modify EPCC if it is already correct. */		\
-	/* This is needed in case it is a sentry (e.g. for signal handlers) */	\
-	CGetOffset tmpreg, capreg;						\
-	/* update the offset of EPCC to the return pc if different */		\
-	beq tmpreg, pc_offset, 12345f; nop;					\
-	CSetOffset capreg, capreg, pc_offset;					\
-	12345:									\
-	CSetEPCC capreg;
 
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
 	/* Restore special registers before KSCRATCH (C27) */		\
@@ -246,7 +239,7 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
-	/* Wait to restore KSCRATCH (C27) until after EPCC */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\

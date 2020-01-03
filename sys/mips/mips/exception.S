@@ -403,12 +403,13 @@ SlowFault:
 	SAVE_CREG(CHERI_REG_C30, sp, C30, $ddc);	\
 	SAVE_CREG(CHERI_REG_C31, sp, C31, $ddc);	\
 	/* Save special registers after KSCRATCH (C27) */	\
-	CGetEPCC CHERI_REG_KSCRATCH;			\
-	SAVE_CREG(CHERI_REG_KSCRATCH, sp, PCC, $ddc);	\
 	CGetDefault CHERI_REG_KSCRATCH;			\
 	SAVE_CREG(CHERI_REG_KSCRATCH, sp, DDC, $ddc);	\
-	cgetcause	treg0;					\
-	SAVE_CAPCAUSE(treg0, treg1, sp, CAPCAUSE, $ddc)
+	cgetcause	treg0;				\
+	SAVE_CAPCAUSE(treg0, treg1, sp, CAPCAUSE, $ddc);	\
+	/* Save $epcc last to keep it in KSCRATCH */	\
+	CGetEPCC CHERI_REG_KSCRATCH;			\
+	SAVE_CREG(CHERI_REG_KSCRATCH, sp, PCC, $ddc)
 #else
 #define	SAVE_CHERI(treg0, treg1)
 #endif
@@ -434,6 +435,21 @@ SlowFault:
  */
 #define	SAVE_REG(reg, offs, base) \
 	REG_S	reg, (CALLFRAME_SIZ + (SZREG * offs)) (base)
+
+#if __has_feature(capabilities)
+/*
+ * Note: for CHERI the save is done by SAVE_CHERI() but we still need to move
+ * the address of $epcc into addr_gpr
+ */
+#define SAVE_EPC_REG(addr_gpr, epcc_reg, base)	\
+	CGetEPCC epcc_reg;			\
+	CGetAddr addr_gpr, epcc_reg
+#else
+#define SAVE_EPC_REG(addr_gpr, epcc_reg, base)	\
+	MFC0	addr_gpr, MIPS_COP_0_EXC_PC;	\
+	SAVE_REG(addr_gpr, PC, base)
+#endif
+
 
 #define	SAVE_CPU \
 	SAVE_REG(AT, AST, sp)		;\
@@ -469,18 +485,14 @@ SlowFault:
 	mfc0	a0, MIPS_COP_0_STATUS	;\
 	mfc0	a1, MIPS_COP_0_CAUSE	;\
 	MFC0	a2, MIPS_COP_0_BAD_VADDR;\
-	MFC0	a3, MIPS_COP_0_EXC_PC	;\
 	SAVE_REG(v0, MULLO, sp)		;\
 	SAVE_REG(v1, MULHI, sp)		;\
 	SAVE_REG(a0, SR, sp)		;\
 	SAVE_REG(a1, CAUSE, sp)		;\
 	SAVE_REG(a2, BADVADDR, sp)	;\
-	/* TODO: should we clear badinstr + badinstrp here? */ \
+	/* SAVE_CHERI saves $epcc */	;\
 	SAVE_CHERI(t0, t1)		;\
-	move	t0, ra			;\
-	move	ra, a3			;\
-	SAVE_REG(ra, PC, sp)		;\
-	move	ra, t0			;\
+	SAVE_EPC_REG(a3, CHERI_REG_KSCRATCH, sp);\
 	SAVE_REG(ra, RA, sp)		;\
 	SAVE_REG(k1, SP, sp)		/* Notice: k1 stored for sp. */	;\
 	CLEAR_STATUS			;\
@@ -526,22 +538,17 @@ SlowFault:
 	RESTORE_CREG(CHERI_REG_C24, sp, C24, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C25, sp, C25, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C26, sp, IDC, $ddc);	\
-	/* Wait to restore KSCRATCH (C27) until after EPCC */	\
+	RESTORE_CREG(CHERI_REG_C27, sp, C27, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C28, sp, C28, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C29, sp, C29, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C30, sp, C30, $ddc);	\
 	RESTORE_CREG(CHERI_REG_C31, sp, C31, $ddc);	\
 
-/* For CHERI we don't move $v0 to EPC since it is already updated by CSetEPCC */
-#define MTC0_EXC_PC(reg) \
-	/* EPCC is no longer a GPR so load it into KSCRATCH first */	\
-	RESTORE_CREG(CHERI_REG_KSCRATCH, sp, PCC, $ddc);		\
-	/* update the address of EPCC to the return pc */ 		\
-	RESTORE_EPCC(CHERI_REG_KSCRATCH, reg, t0);	\
-	RESTORE_CREG(CHERI_REG_C27, sp, C27, $ddc);
+/* For CHERI we don't write to EPC since it is already updated by CSetEPCC. */
+#define MTC0_EXC_PC(epc, epcc) CSetEPCC epcc;
 #else
 #define	RESTORE_CHERI
-#define MTC0_EXC_PC(reg) MTC0	reg, MIPS_COP_0_EXC_PC
+#define MTC0_EXC_PC(epc, epcc) MTC0	epc, MIPS_COP_0_EXC_PC
 #endif
 
 /*
@@ -553,13 +560,16 @@ SlowFault:
 
 #define	RESTORE_CPU \
 	CLEAR_STATUS			;\
-	RESTORE_CHERI			;\
 	RESTORE_REG(k0, SR, sp)		;\
 	RESTORE_REG(t0, MULLO, sp)	;\
 	RESTORE_REG(t1, MULHI, sp)	;\
 	mtlo	t0			;\
 	mthi	t1			;\
-	MTC0_EXC_PC(v0)			;\
+	MTC0_EXC_PC(v0, $c3)		;\
+	/* Now that $c3 has been moved	\
+	 * to $epcc, we can restore the	\
+	 * remaining CHERI registers */	\
+	RESTORE_CHERI			;\
 	.set noat		        ;\
 	RESTORE_REG(AT, AST, sp)	;\
 	RESTORE_REG(v0, V0, sp)		;\
@@ -626,7 +636,7 @@ NESTED_NOPROFILE(MipsKernGenException, KERN_EXC_FRAME_SIZE, ra)
 	and	a1, a1, ~(MIPS_SR_INT_MASK|MIPS_SR_COP_USABILITY)
 	or	a1, a1, a0
 	SAVE_REG(a1, SR, sp)
-	RESTORE_CPU			# v0 contains the return address.
+	RESTORE_CPU			# v0/$c3 contains the return address.
 
 	/* Restore preempted sp from k1 now we are done with the stack. */
 	move	sp, k1
@@ -682,7 +692,8 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	ITLBNOPFIX
 
 /*
- * Call the exception handler.
+ * Call the exception handler. Return pc is in $c3 for CHERI and $v0 for MIPS.
+ * However, that is currently ignore since it is the same as trapframe->pc.
  */
 	PTR_LA	t9, _C_LABEL(trap)
 	jalr	t9
@@ -718,8 +729,7 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 
 #ifdef CPU_CHERI
 	/*
-	 * Note: This does not restore EPCC, since that is restored by
-	 * RESTORE_U_PCB_PC() (inside RESTORE_REGS_FROM_PCB) below.
+	 * Note: This restores EPCC (RESTORE_REGS_FROM_PCB does not touch EPC)
 	 */
 	RESTORE_CREGS_FROM_PCB(k1, t0)
 #endif
@@ -795,14 +805,26 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
  * in the kernel ring is sufficient to imply that PCC matches the kernel
  * address space.
  */
+#if __has_feature(capabilities)
+	CGetEPCC CHERI_REG_KSCRATCH
+	/* Get the address (not offset!) of $epcc to perform the range check */
+	CGetAddr	k0, CHERI_REG_KSCRATCH
+#else
 	MFC0	k0, MIPS_COP_0_EXC_PC
+#endif
 	ori	k0, 0xf
 	xori	k0, 0xf			# 16 byte align
 	PTR_LA	k1, MipsWaitStart
 	bne	k0, k1, 1f
 	nop
+#if __has_feature(capabilities)
+	CIncOffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, 16
+	CSetEPCC	CHERI_REG_KSCRATCH
+	CGetNull	CHERI_REG_KSCRATCH	# Don't leave the EPCC value in C27
+#else
 	PTR_ADDU k1, 16			# skip over wait
 	MTC0	k1, MIPS_COP_0_EXC_PC
+#endif
 1:
 
 	/* Save exception sp in k1 to put on the stack later. */
@@ -827,7 +849,9 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	PTR_LA	t9, _C_LABEL(cpu_intr)
 #endif
 	jalr	t9
-	REG_S	a3, CALLFRAME_RA + KERN_REG_SIZE(sp)		# for debugging
+	# SAVE_CPU places EPC into a3. For CHERI we don't save EPC (the offset
+	# of $epcc) but instad a3 will contain the address of $epcc.
+	REG_S	a3, CALLFRAME_RA + KERN_REG_SIZE(sp)
 
 	/*
 	 * Update interrupt and CPU mask in saved status register
@@ -842,7 +866,13 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	or	a1, a1, a0
 	SAVE_REG(a1, SR, sp)
 	REG_L	v0, (CALLFRAME_RA + KERN_REG_SIZE)(sp)
-	RESTORE_CPU			# v0 contains the return address.
+#if __has_feature(capabilities)
+	/* v0 contains the target virtual address -> set it on $epcc */
+	/* XXX: This will need changing for purecap */
+	CGetEPCC	$c3
+	CSetAddr	$c3, $c3, v0
+#endif
+	RESTORE_CPU			# v0/$c3 contains the return address.
 
 	/* Restore preempted sp from k1 now we are done with the stack. */
 	move	sp, k1
@@ -920,17 +950,18 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	mfhi	v1
 	mfc0	a0, MIPS_COP_0_STATUS
 	mfc0	a1, MIPS_COP_0_CAUSE
-	MFC0	a3, MIPS_COP_0_EXC_PC
 	SAVE_U_PCB_REG(v0, MULLO, k1)
 	SAVE_U_PCB_REG(v1, MULHI, k1)
 	SAVE_U_PCB_REG(a0, SR, k1)
 	SAVE_U_PCB_REG(a1, CAUSE, k1)
-	SAVE_U_PCB_REG(a3, PC, k1)	# PC in a3, note used later!
-#ifdef CPU_CHERI
+	SAVE_U_PCB_EPC(a3, k1)	# $pc in a3, note used later! (not for CHERI)
+#if __has_feature(capabilities)
 	/*
-	 * Note: This saves EPCC, matching the explicit EPC save above.
+	 * Note: This saves EPCC, and leaves it in CHERI_REG_KSCRATCH
+	 * so we can do a CGetAddr to get the pc vaddr in a3 to match MIPS
 	 */
 	SAVE_CREGS_TO_PCB(k1, t0)
+	CGetAddr	a3, CHERI_REG_KSCRATCH
 #endif
 	PTR_SUBU	sp, k1, CALLFRAME_SIZ  # switch to kernel SP
 	PTR_LA	gp, _C_LABEL(_gp)	# switch to kernel GP
@@ -1014,7 +1045,7 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	RESTORE_U_PCB_REG(t1, MULHI, k1)
 	mtlo	t0
 	mthi	t1
-	RESTORE_U_PCB_PC(t0, t1, k1)	# set return address
+	RESTORE_U_PCB_PC(t0, k1)	# set return address
 	RESTORE_U_PCB_REG(v0, V0, k1)
 	RESTORE_U_PCB_REG(v1, V1, k1)
 	RESTORE_U_PCB_REG(a0, A0, k1)
