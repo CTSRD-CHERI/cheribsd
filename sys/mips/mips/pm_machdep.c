@@ -104,14 +104,15 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	struct proc *p;
 	struct thread *td;
 	struct trapframe *regs;
-#ifdef CPU_CHERI
-	struct cheri_frame *cfp;
-#endif
 	struct sigacts *psp;
-	struct sigframe sf, *sfp;
-	vm_offset_t sp;
-#ifdef CPU_CHERI
-	size_t cp2_len;
+#if __has_feature(capabilities)
+	/* XXX: Temporary until sigframe becomes sigframe_c */
+	struct sigframe_c sf, * __capability sfp;
+#else
+	struct sigframe sf, * __capability sfp;
+#endif
+	uintcap_t sp;
+#if __has_feature(capabilities)
 	int cheri_is_sandboxed;
 #endif
 	int sig;
@@ -125,9 +126,20 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	mtx_assert(&psp->ps_mtx, MA_OWNED);
 
 	regs = td->td_frame;
-	oonstack = sigonstack(regs->sp);
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
+	/*
+	 * XXXRW: We make an on-stack determination using the virtual address
+	 * associated with the stack pointer, rather than using the full
+	 * capability.  Should we compare the entire capability...?  Just
+	 * pointer and bounds...?
+	 */
+	oonstack = sigonstack((__cheri_addr vaddr_t)regs->csp);
+#else
+	oonstack = sigonstack(regs->sp);
+#endif
+
+#if __has_feature(capabilities)
 	/*
 	 * CHERI affects signal delivery in the following ways:
 	 *
@@ -182,13 +194,15 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* save user context */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
+#if !__has_feature(capabilities)
+	/* XXX: Re-enable once ucontext_t == ucontext_c_t */
 	sf.sf_uc.uc_stack = td->td_sigstk;
+#endif
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
 	sf.sf_uc.uc_mcontext.mc_pc = TRAPF_PC_OFFSET(regs);
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
-	sf.sf_uc.uc_mcontext.mc_tls =
-	    (__cheri_fromcap void *)td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
 	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
@@ -205,14 +219,17 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 	/* XXXRW: sf.sf_uc.uc_mcontext.sr seems never to be set? */
 	sf.sf_uc.uc_mcontext.cause = regs->cause;
+#if __has_feature(capabilities)
+	cheri_trapframe_to_cheriframe(regs,
+	    &sf.sf_uc.uc_mcontext.mc_cheriframe);
+#endif
 
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = (vm_offset_t)((__cheri_addr vaddr_t)td->td_sigstk.ss_sp +
-		    td->td_sigstk.ss_size);
+		sp = (uintcap_t)td->td_sigstk.ss_sp + td->td_sigstk.ss_size;
 	} else {
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		/*
 		 * Signals delivered when a CHERI sandbox is present must be
 		 * delivered on the alternative stack rather than a local one.
@@ -228,35 +245,56 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 			sigexit(td, SIGILL);
 			/* NOTREACHED */
 		}
-#endif
+		sp = (uintcap_t)regs->csp;
+#else
 		sp = (vm_offset_t)regs->sp;
-	}
-#ifdef CPU_CHERI
-	cp2_len = sizeof(*cfp);
-	sp -= cp2_len;
-	sp &= ~(CHERICAP_SIZE - 1);
-	sf.sf_uc.uc_mcontext.mc_cp2state = sp;
-	sf.sf_uc.uc_mcontext.mc_cp2state_len = cp2_len;
 #endif
-	sp -= sizeof(struct sigframe);
-	sp &= ~(STACK_ALIGN - 1);
-	sfp = (struct sigframe *)sp;
+	}
+	sp -= sizeof(*sfp);
+	sp = __builtin_align_down(sp, STACK_ALIGN);
+#if __has_feature(capabilities)
+	sfp = (struct sigframe_c * __capability)sp;
+	sfp = cheri_andperm(sfp, CHERI_CAP_USER_DATA_PERMS);
+#else
+	sfp = (struct sigframe * __capability)sp;
+#endif
 
 	/* Build the argument list for the signal handler. */
 	regs->a0 = sig;
+#if __has_feature(capabilities)
+	regs->c3 = cheri_csetbounds(&sfp->sf_uc, sizeof(sfp->sf_uc));
+#else
 	regs->a2 = (register_t)(intptr_t)&sfp->sf_uc;
+#endif
 	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* Signal handler installed with SA_SIGINFO. */
+#if __has_feature(capabilities)
+		regs->c4 = regs->c3;
+		regs->c3 = cheri_csetbounds(&sfp->sf_si, sizeof(sfp->sf_si));
+#else
 		regs->a1 = (register_t)(intptr_t)&sfp->sf_si;
+#endif
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
 		/* fill siginfo structure */
+#if __has_feature(capabilities)
+		/* XXX: Hack until siginfo_t == siginfo_c */
+		memcpy_c(&sf.sf_si, &ksi->ksi_info, sizeof(sf.sf_si));
+#else
 		siginfo_to_siginfo_native(&ksi->ksi_info, &sf.sf_si);
+#endif
 		sf.sf_si.si_signo = sig;
 	} else {
 		/* Old FreeBSD-style arguments. */
 		regs->a1 = ksi->ksi_code;
-		regs->a3 = (__cheri_addr uintptr_t)ksi->ksi_addr;
+#if __has_feature(capabilities)
+		/*
+		 * XXX: Should this strip tags?
+		 */
+		regs->c4 = ksi->ksi_addr;
+#else
+		regs->a3 = (uintptr_t)ksi->ksi_addr;
+#endif
 		/* sf.sf_ahu.sf_handler = catcher; */
 	}
 
@@ -266,22 +304,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/*
 	 * Copy the sigframe out to the user's stack.
 	 */
-#ifdef CPU_CHERI
-	cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
-	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs, cfp);
-	if (copyoutcap(cfp,
-	    __USER_CAP((void *)(uintptr_t)sf.sf_uc.uc_mcontext.mc_cp2state,
-	    cp2_len), cp2_len) != 0) {
-		free(cfp, M_TEMP);
-		PROC_LOCK(p);
-		printf("pid %d, tid %d: could not copy out cheriframe\n",
-		    td->td_proc->p_pid, td->td_tid);
-		sigexit(td, SIGILL);
-		/* NOTREACHED */
-	}
-	free(cfp, M_TEMP);
-#endif
-	if (copyout(&sf, __USER_CAP_OBJ(sfp), sizeof(struct sigframe)) != 0) {
+	if (copyoutcap(&sf, sfp, sizeof(sf)) != 0) {
 		/*
 		 * Something is wrong with the stack pointer.
 		 * ...Kill the process.
@@ -293,17 +316,30 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* NOTREACHED */
 	}
 
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 	/*
 	 * Install CHERI signal-delivery register state for handler to run
 	 * in.  As we don't install this in the CHERI frame on the user stack,
-	 * it will be (genrally) be removed automatically on sigreturn().
+	 * it will be (generally) be removed automatically on sigreturn().
 	 */
-	hybridabi_sendsig(td);
-#endif
-
 	regs->pc = (trapf_pc_t)catcher;
-	regs->t9 = TRAPF_PC_OFFSET(regs);
+	regs->c12 = regs->pc;
+	regs->csp = sfp;
+	regs->c17 = td->td_pcb->pcb_cherisignal.csig_sigcode;
+
+	/*
+	 * For now only change IDC if we were sandboxed. This makes cap-table
+	 * binaries work as expected (since they need cgp to remain the same).
+	 *
+	 * TODO: remove csigp->csig_idc
+	 */
+	if (cheri_is_sandboxed) {
+		regs->ddc = td->td_pcb->pcb_cherisignal.csig_ddc;
+		regs->idc = td->td_pcb->pcb_cherisignal.csig_idc;
+	}
+#else
+	regs->pc = (trapf_pc_t)catcher;
+	regs->t9 = (register_t)(intptr_t)catcher;
 	regs->sp = (register_t)(intptr_t)sfp;
 	if (p->p_sysent->sv_sigcode_base != 0) {
 		/* Signal trampoline code is in the shared page */
@@ -314,6 +350,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		regs->ra = (register_t)(intptr_t)PS_STRINGS -
 		    *(p->p_sysent->sv_szsigcode);
 	}
+#endif
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
 }

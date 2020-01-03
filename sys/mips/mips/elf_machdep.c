@@ -59,13 +59,12 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
+	.sv_sendsig	= sendsig,
 /* XXX: TODO */
 #if 1
-	.sv_sendsig	= sendsig,
 	.sv_sigcode	= sigcode,
 	.sv_szsigcode	= &szsigcode,
 #else
-	.sv_sendsig	= cheriabi_sendsig,
 	.sv_sigcode	= cheri_sigcode,
 	.sv_szsigcode	= &szcheri_sigcode,
 #endif
