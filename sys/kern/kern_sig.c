@@ -3506,7 +3506,7 @@ static void
 vnode_close_locked(struct thread *td, struct vnode *vp)
 {
 
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	vn_close(vp, FWRITE, td->td_ucred, td);
 }
 
@@ -3797,12 +3797,12 @@ coredump(struct thread *td)
 	if (vp->v_type != VREG || VOP_GETATTR(vp, &vattr, cred) != 0 ||
 	    vattr.va_nlink != 1 || (vp->v_vflag & VV_SYSTEM) != 0 ||
 	    vattr.va_uid != cred->cr_uid) {
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		error = EFAULT;
 		goto out;
 	}
 
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	/* Postpone other writers, including core dumps of other processes. */
 	rl_cookie = vn_rangelock_wlock(vp, 0, OFF_MAX);
@@ -3819,7 +3819,7 @@ coredump(struct thread *td)
 		vattr.va_flags = UF_NODUMP;
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	VOP_SETATTR(vp, &vattr, cred);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	PROC_LOCK(p);
 	p->p_acflag |= ACORE;
 	PROC_UNLOCK(p);
