@@ -811,7 +811,7 @@ trap(struct trapframe *trapframe)
 #endif
 
 #ifdef CPU_CHERI
-	addr = (void *__capability)trapframe->pcc;
+	addr = (void * __capability)trapframe->pcc;
 #else
 	addr = (void *)(uintptr_t)trapframe->pc;
 #endif
@@ -1447,11 +1447,11 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 	InstFmt inst;
 	register_t *regsPtr = (register_t *)framePtr;
 	/* Cast to uint8_t* for pointer arithmetic */
-	uint8_t *__capability instPC = (uint8_t * __capability) _instPC;
+	uint8_t * __capability instPC = (uint8_t * __capability) _instPC;
 #if __has_feature(capabilities)
 	void * __capability *capRegsPtr = &framePtr->ddc;
 #endif
-	uint8_t *__capability retAddr = NULL;
+	uint8_t * __capability retAddr = NULL;
 	int condition;
 
 #define	GetBranchDest(InstPtr, inst) \

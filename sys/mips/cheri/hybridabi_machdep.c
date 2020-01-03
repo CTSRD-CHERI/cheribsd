@@ -131,7 +131,7 @@ hybridabi_thread_init(struct thread *td, unsigned long entry_addr)
 	hybridabi_capability_set_user_ddc(&frame->ddc);
 	hybridabi_capability_set_user_csp(&frame->csp);
 	hybridabi_capability_set_user_idc(&frame->idc);
-	hybridabi_capability_set_user_entry((void *__capability *)&frame->pc, entry_addr);
+	hybridabi_capability_set_user_entry((void * __capability *)&frame->pc, entry_addr);
 	hybridabi_capability_set_user_entry(&frame->c12, entry_addr);
 
 	/*

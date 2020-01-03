@@ -115,7 +115,7 @@ ktrcexception_mdfill(struct trapframe *frame,
 	    ke->ktr_regnum == CHERI_CR_C29 ? &frame->c29 :
 	    ke->ktr_regnum == CHERI_CR_C30 ? &frame->c30 :
 	    ke->ktr_regnum == CHERI_CR_C31 ? &frame->c31 :
-	    ke->ktr_regnum == 0xff ? (void *__capability *)&frame->pc :
+	    ke->ktr_regnum == 0xff ? (void * __capability *)&frame->pc :
 	    NULL;
 	if (cp != NULL)
 		cheri_serialize(&ke->ktr_cap, *cp);
