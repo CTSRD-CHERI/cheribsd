@@ -253,14 +253,13 @@ ktls_ocf_tls13_gcm_encrypt(struct ktls_session *tls,
 	for (i = 0; i < iovcnt; i++) {
 		iov[i + 1] = outiov[i];
 		if (iniov[i].iov_base != outiov[i].iov_base)
-			memcpy(outiov[i].iov_base, iniov[i].iov_base,
+			memcpy_c(outiov[i].iov_base, iniov[i].iov_base,
 			    outiov[i].iov_len);
 		uio.uio_resid += outiov[i].iov_len;
 	}
 
 	trailer[0] = record_type;
-	iov[iovcnt + 1].iov_base = trailer;
-	iov[iovcnt + 1].iov_len = AES_GMAC_HASH_LEN + 1;
+	IOVEC_INIT(&iov[iovcnt + 1], trailer, AES_GMAC_HASH_LEN + 1);
 	uio.uio_resid += AES_GMAC_HASH_LEN + 1;
 
 	uio.uio_iov = iov;
