@@ -516,8 +516,19 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	tf = td->td_frame;
 	bzero(tf, sizeof(struct trapframe));
 	tf->sp = sp;
-	// FIXME: this is wrong for the purecap kernel
+
+	/* XXXRW: With CNMIPS moved, does this still belong here? */
+#if __has_feature(capabilities)
+	/*
+	 * For the MIPS ABI, we can derive any required CHERI state from
+	 * the completed MIPS trapframe and existing process state.
+	 */
+	tf->sr |= MIPS_SR_COP_2_BIT;
+	hybridabi_newthread_setregs(td, (uintptr_t)entry);
+#else
+	/* For CHERI $pcc is set by hybridabi_newthread_setregs() */
 	TRAPF_PC_SET_ADDR(tf, (vaddr_t)(intptr_t)entry);
+#endif
 	/* 
 	 * MIPS ABI requires T9 to be the same as PC 
 	 * in subroutine entry point
@@ -539,15 +550,6 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	td->td_frame->sr |= MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX;
 #endif
 
-	/* XXXRW: With CNMIPS moved, does this still belong here? */
-#ifdef CPU_CHERI
-	/*
-	 * For the MIPS ABI, we can derive any required CHERI state from
-	 * the completed MIPS trapframe and existing process state.
-	 */
-	tf->sr |= MIPS_SR_COP_2_BIT;
-	hybridabi_newthread_setregs(td, (uintptr_t)entry);
-#endif
 /*	tf->sr |= (ALL_INT_MASK & idle_mask) | SR_INT_ENAB; */
 	/**XXX the above may now be wrong -- mips2 implements this as panic */
 	/*
