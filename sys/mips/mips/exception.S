@@ -806,6 +806,8 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
  * address space.
  */
 #if __has_feature(capabilities)
+	/* Save previous $c27. */
+	csetkr1c	CHERI_REG_KSCRATCH
 	CGetEPCC CHERI_REG_KSCRATCH
 	/* Get the address (not offset!) of $epcc to perform the range check */
 	CGetAddr	k0, CHERI_REG_KSCRATCH
@@ -825,6 +827,11 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	MTC0	k1, MIPS_COP_0_EXC_PC
 #endif
 1:
+
+#if __has_feature(capabilities)
+	/* Restore previous $c27. */
+	cgetkr1c	CHERI_REG_KSCRATCH
+#endif
 
 	/* Save exception sp in k1 to put on the stack later. */
 	move	k1, sp
