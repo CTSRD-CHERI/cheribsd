@@ -266,6 +266,8 @@ typedef	__size_t	size_t;
 #endif
 
 #ifdef _KERNEL
+struct file;
+typedef int (*mmap_check_fp_fn)(struct file *, int, int, int);
 struct mmap_req {
 	vm_offset_t	mr_hint;
 	vm_offset_t	mr_max_addr;
@@ -275,10 +277,11 @@ struct mmap_req {
 	int		mr_fd;
 	int		_int_pad;
 	off_t		mr_pos;
+	mmap_check_fp_fn	mr_check_fp_fn;
 #if __has_feature(capabilities)
 	void * __capability mr_source_cap;
 #endif
-	};
+};
 #endif
 
 #if defined(_KERNEL) || defined(_WANT_FILE)
