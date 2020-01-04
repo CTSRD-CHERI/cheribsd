@@ -817,12 +817,11 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	PTR_LA	k1, MipsWaitStart
 	bne	k0, k1, 1f
 	nop
-#if __has_feature(capabilities)
-	CIncOffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, 16
-	CSetEPCC	CHERI_REG_KSCRATCH
-	CGetNull	CHERI_REG_KSCRATCH	# Don't leave the EPCC value in C27
-#else
 	PTR_ADDU k1, 16			# skip over wait
+#if __has_feature(capabilities)
+	CSetAddr	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k1
+	CSetEPCC	CHERI_REG_KSCRATCH
+#else
 	MTC0	k1, MIPS_COP_0_EXC_PC
 #endif
 1:
