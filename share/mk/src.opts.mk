@@ -561,6 +561,10 @@ MK_BSDINSTALL:=	no
 MK_SVNLITE:=	no
 .endif
 
+.if ${__T:Mmips64*} && ${MK_GCC} == "no"
+MK_BINUTILS_BOOTSTRAP:=	no
+.endif
+
 .if ${MK_MAIL} == "no"
 MK_MAILWRAPPER:= no
 MK_SENDMAIL:=	no
