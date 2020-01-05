@@ -2899,7 +2899,7 @@ vget_finish(struct vnode *vp, int flags, enum vgetstate vs)
 	refcount_acquire(&vp->v_usecount);
 	if (oweinact && VOP_ISLOCKED(vp) == LK_EXCLUSIVE &&
 	    (flags & LK_NOWAIT) == 0)
-		vinactive(vp, curthread);
+		vinactive(vp);
 	VI_UNLOCK(vp);
 	return (0);
 }
@@ -3065,7 +3065,7 @@ vputx(struct vnode *vp, enum vputx_op func)
 	    ("vnode with usecount and VI_OWEINACT set"));
 	if (error == 0) {
 		if (vp->v_iflag & VI_OWEINACT)
-			vinactive(vp, curthread);
+			vinactive(vp);
 		if (func != VPUTX_VUNREF)
 			VOP_UNLOCK(vp);
 	}
@@ -3284,7 +3284,7 @@ vdropl(struct vnode *vp)
  * failed lock upgrade.
  */
 void
-vinactive(struct vnode *vp, struct thread *td)
+vinactive(struct vnode *vp)
 {
 	struct vm_object *obj;
 
@@ -3312,7 +3312,7 @@ vinactive(struct vnode *vp, struct thread *td)
 		vm_object_page_clean(obj, 0, 0, 0);
 		VM_OBJECT_WUNLOCK(obj);
 	}
-	VOP_INACTIVE(vp, td);
+	VOP_INACTIVE(vp, curthread);
 	VI_LOCK(vp);
 	VNASSERT(vp->v_iflag & VI_DOINGINACT, vp,
 	    ("vinactive: lost VI_DOINGINACT"));
@@ -3608,7 +3608,7 @@ vgonel(struct vnode *vp)
 	if (oweinact || active) {
 		VI_LOCK(vp);
 		if ((vp->v_iflag & VI_DOINGINACT) == 0)
-			vinactive(vp, td);
+			vinactive(vp);
 		VI_UNLOCK(vp);
 	}
 	if (vp->v_type == VSOCK)
