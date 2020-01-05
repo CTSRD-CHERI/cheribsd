@@ -255,7 +255,7 @@ cheriabi_shm_open2(struct thread *td, struct cheriabi_shm_open2_args *uap)
 {
 
 	return (kern_shm_open2(td, uap->path, uap->flags, uap->mode,
-	    uap->shmflags, uap->name));
+	    uap->shmflags, NULL, uap->name));
 }
 
 int

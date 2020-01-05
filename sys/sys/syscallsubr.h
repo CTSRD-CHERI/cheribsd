@@ -452,9 +452,9 @@ int	kern_setsockopt(struct thread *td, int s, int level, int name,
 int	kern_settimeofday(struct thread *td, struct timeval *tv,
 	    struct timezone *tzp);
 int	kern_shm_open(struct thread *td, const char * __capability userpath,
-	    int flags, mode_t mode, struct filecaps *fcaps, int initial_seals);
+	    int flags, mode_t mode, struct filecaps *fcaps);
 int	kern_shm_open2(struct thread *td, const char * __capability path,
-	    int flags, mode_t mode, int shmflags,
+	    int flags, mode_t mode, int shmflags, struct filecaps *fcaps,
 	    const char * __capability name);
 int	kern_shm_rename(struct thread *td,
 	    const char * __capability path_from_p,
