@@ -107,9 +107,6 @@ ASSYM(SIGF32_UC, offsetof(struct sigframe32, sf_uc));
 #ifdef COMPAT_FREEBSD64
 ASSYM(SIGF64_UC, offsetof(struct sigframe64, sf_uc));
 #endif
-#ifdef COMPAT_CHERIABI
-ASSYM(SIGF_C_UC, offsetof(struct sigframe_c, sf_uc));
-#endif
 ASSYM(SIGFPE, SIGFPE);
 ASSYM(PAGE_SHIFT, PAGE_SHIFT);
 ASSYM(PAGE_SIZE, PAGE_SIZE);

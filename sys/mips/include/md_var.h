@@ -52,10 +52,6 @@ extern	int	szsigcode32;
 extern	char	freebsd64_sigcode[];
 extern	int	freebsd64_szsigcode;
 #endif
-#ifdef COMPAT_CHERIABI
-extern	char	cheri_sigcode[];
-extern	int	szcheri_sigcode;
-#endif
 extern	uint32_t *vm_page_dump;
 extern	int vm_page_dump_size;
 
