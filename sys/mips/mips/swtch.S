@@ -835,25 +835,6 @@ szsigcode32:
 	.long	esigcode32-sigcode32
 	.text
 #endif
-
-#ifdef COMPAT_CHERIABI
-	.globl	_C_LABEL(cheri_sigcode)
-_C_LABEL(cheri_sigcode):
-	dli		t0, SIGF_C_UC
-	cincoffset	$c3, $c11, t0		# In the hybrid ABI named $c11,
-	li		v0, SYS_sigreturn	# but we really mean $csp.
-# sigreturn (ucp)
-	syscall
-	break	0				# just in case sigreturn fails
-	.globl	_C_LABEL(echeri_sigcode)
-_C_LABEL(echeri_sigcode):
-
-	.data
-	.globl	szcheri_sigcode
-szcheri_sigcode:
-	.long	echeri_sigcode-cheri_sigcode
-	.text
-#endif
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,
