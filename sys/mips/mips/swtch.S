@@ -782,7 +782,11 @@ END(MipsSaveCurFPState)
  */
 	.globl	_C_LABEL(sigcode)
 _C_LABEL(sigcode):
+#if __has_feature(capabilities)
+	cincoffsetimm	$c3, $c11, SIGF_UC	# address of ucontext
+#else
 	PTR_ADDU	a0, sp, SIGF_UC		# address of ucontext
+#endif
 	li		v0, SYS_sigreturn
 # sigreturn (ucp)
 	syscall

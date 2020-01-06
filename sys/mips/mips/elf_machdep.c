@@ -60,14 +60,8 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
 	.sv_sendsig	= sendsig,
-/* XXX: TODO */
-#if 1
 	.sv_sigcode	= sigcode,
 	.sv_szsigcode	= &szsigcode,
-#else
-	.sv_sigcode	= cheri_sigcode,
-	.sv_szsigcode	= &szcheri_sigcode,
-#endif
 	.sv_name	= "FreeBSD ELF64C",	/* CheriABI */
 	.sv_coredump	= __elfN(coredump),
 	.sv_imgact_try	= NULL,
