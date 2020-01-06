@@ -1637,7 +1637,7 @@ MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
 				retAddr = GetBranchDest(instPC, inst);
 			else
 				retAddr = instPC + 8;
-			break;
+			return (trapf_pc_t)(retAddr);
 		}
 		/* FALLTHROUGH */
 #endif
