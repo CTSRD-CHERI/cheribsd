@@ -517,13 +517,11 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	bzero(tf, sizeof(struct trapframe));
 	tf->sp = sp;
 
-	/* XXXRW: With CNMIPS moved, does this still belong here? */
 #if __has_feature(capabilities)
 	/*
 	 * For the MIPS ABI, we can derive any required CHERI state from
 	 * the completed MIPS trapframe and existing process state.
 	 */
-	tf->sr |= MIPS_SR_COP_2_BIT;
 	hybridabi_newthread_setregs(td, (uintptr_t)entry);
 #else
 	/* For CHERI $pcc is set by hybridabi_newthread_setregs() */
@@ -548,6 +546,10 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	td->td_frame->sr |= MIPS_SR_PX;
 #elif  defined(__mips_n64)
 	td->td_frame->sr |= MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX;
+#endif
+
+#if __has_feature(capabilities)
+	tf->sr |= MIPS_SR_COP_2_BIT;
 #endif
 
 /*	tf->sr |= (ALL_INT_MASK & idle_mask) | SR_INT_ENAB; */
