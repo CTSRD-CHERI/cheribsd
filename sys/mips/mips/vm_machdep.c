@@ -504,7 +504,7 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
     stack_t *stack)
 {
 	struct trapframe *tf;
-	register_t sp;
+	register_t sp, sr;
 
 	sp = (((__cheri_addr vaddr_t)stack->ss_sp + stack->ss_size) & ~(STACK_ALIGN - 1)) -
 	    CALLFRAME_SIZ;
@@ -514,8 +514,10 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	 * function.
 	 */
 	tf = td->td_frame;
+	sr = tf->sr;
 	bzero(tf, sizeof(struct trapframe));
 	tf->sp = sp;
+	tf->sr = sr;
 
 #if __has_feature(capabilities)
 	/*
@@ -534,26 +536,6 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	tf->t9 = (register_t)(__cheri_offset intptr_t)tf->pc;
 	tf->a0 = (register_t)(intptr_t)arg;
 
-	/*
-	 * Keep interrupt mask
-	 *
-	 * XXXRW: I'm a bit puzzled by the code below and feel that even if it
-	 * works, it can't really be right.
-	 */
-	td->td_frame->sr = MIPS_SR_KSU_USER | MIPS_SR_EXL | MIPS_SR_INT_IE |
-	    (mips_rd_status() & MIPS_SR_INT_MASK);
-#if defined(__mips_n32) 
-	td->td_frame->sr |= MIPS_SR_PX;
-#elif  defined(__mips_n64)
-	td->td_frame->sr |= MIPS_SR_PX | MIPS_SR_UX | MIPS_SR_KX;
-#endif
-
-#if __has_feature(capabilities)
-	tf->sr |= MIPS_SR_COP_2_BIT;
-#endif
-
-/*	tf->sr |= (ALL_INT_MASK & idle_mask) | SR_INT_ENAB; */
-	/**XXX the above may now be wrong -- mips2 implements this as panic */
 	/*
 	 * FREEBSD_DEVELOPERS_FIXME:
 	 * Setup any other CPU-Specific registers (Not MIPS Standard)
