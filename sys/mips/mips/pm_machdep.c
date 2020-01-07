@@ -184,7 +184,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_sigmask = *mask;
 	sf.sf_uc.uc_stack = td->td_sigstk;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
-	sf.sf_uc.uc_mcontext.mc_pc = TRAPF_PC(regs);
+	sf.sf_uc.uc_mcontext.mc_pc = TRAPF_PC_OFFSET(regs);
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls =
@@ -511,7 +511,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 		mcp->mc_regs[A3] = 0;
 	}
 
-	mcp->mc_pc = TRAPF_PC(td->td_frame);
+	mcp->mc_pc = TRAPF_PC_OFFSET(td->td_frame);
 	mcp->mullo = td->td_frame->mullo;
 	mcp->mulhi = td->td_frame->mulhi;
 	mcp->mc_tls = (__cheri_fromcap void *)td->td_md.md_tls;
@@ -573,7 +573,8 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 		bcopy((void *)&mcp->mc_fpregs, (void *)&td->td_frame->f0,
 		    sizeof(mcp->mc_fpregs));
 	}
-	TRAPF_PC_SET_ADDR(td->td_frame, mcp->mc_pc);
+	td->td_frame->pc =
+	    update_pcc_offset(td->td_frame->pc, mcp->mc_pc);
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
 	td->td_md.md_tls = __USER_CAP_UNBOUND(mcp->mc_tls);
