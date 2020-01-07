@@ -50,7 +50,10 @@ _update_pcc_offset(trapf_pc_t pcc, register_t pc, const char *func)
 	 * a CHERI trap in the kernel which results in a panic().
 	 */
 	if (cheri_gettype(pcc) == CHERI_OTYPE_UNSEALED) {
-		return cheri_setoffset(pcc, pc);
+		void* __capability result = cheri_setoffset(pcc, pc);
+		KASSERT(cheri_gettag(result),
+		    ("created untagged pcc: " _CHERI_PRINT_PTR_FMT(result)));
+		return result;
 	} else if (cheri_getoffset(pcc) == pc) {
 		/* Don't warn if the values match (not modifying $pcc) */
 		return pcc;
