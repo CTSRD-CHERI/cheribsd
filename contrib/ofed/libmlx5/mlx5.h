@@ -343,7 +343,7 @@ struct mlx5_cq {
 
 struct mlx5_srq {
 	struct mlx5_resource            rsc;  /* This struct must be first */
-	struct verbs_srq		vsrq;
+	struct verbs_srq		vsrq __subobject_use_container_bounds;
 	struct mlx5_buf			buf;
 	struct mlx5_spinlock		lock;
 	uint64_t		       *wrid;
@@ -389,14 +389,14 @@ struct mlx5_bf {
 };
 
 struct mlx5_mr {
-	struct ibv_mr			ibv_mr;
+	struct ibv_mr			ibv_mr __subobject_use_container_bounds;
 	struct mlx5_buf			buf;
 	uint32_t			alloc_flags;
 };
 
 struct mlx5_qp {
 	struct mlx5_resource            rsc; /* This struct must be first */
-	struct verbs_qp			verbs_qp;
+	struct verbs_qp			verbs_qp __subobject_use_container_bounds;
 	struct ibv_qp		       *ibv_qp;
 	struct mlx5_buf                 buf;
 	void				*sq_start;
@@ -429,7 +429,7 @@ struct mlx5_ah {
 
 struct mlx5_rwq {
 	struct mlx5_resource rsc;
-	struct ibv_wq wq;
+	struct ibv_wq wq __subobject_use_container_bounds;
 	struct mlx5_buf buf;
 	int buf_size;
 	struct mlx5_wq rq;
