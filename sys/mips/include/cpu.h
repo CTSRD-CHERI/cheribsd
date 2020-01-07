@@ -69,6 +69,7 @@
 
 #define	TRAPF_USERMODE(framep)  (((framep)->sr & MIPS_SR_KSU_USER) != 0)
 #define	TRAPF_PC(framep)	((__cheri_addr vaddr_t)(framep)->pc)
+#define	TRAPF_PC_OFFSET(framep)	((__cheri_offset vaddr_t)(framep)->pc)
 #if __has_feature(capabilities)
 #define	TRAPF_PC_SET_ADDR(framep, addr)	do {				\
     (framep)->pc = __builtin_cheri_address_set((framep)->pc, addr);	\
