@@ -83,8 +83,8 @@
 #define SAVE_U_PCB_EPC(gpr, pcb)
 #else
 #define SAVE_U_PCB_EPC(gpr, pcb)	\
-	MFC0	a3, MIPS_COP_0_EXC_PC;	\
-	SAVE_U_PCB_REG(a3, PC, pcb)
+	MFC0	gpr, MIPS_COP_0_EXC_PC;	\
+	SAVE_U_PCB_REG(gpr, PC, pcb)
 #endif
 
 /*
