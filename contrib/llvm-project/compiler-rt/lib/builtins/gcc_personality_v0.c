@@ -223,7 +223,7 @@ COMPILER_RT_ABI _Unwind_Reason_Code __gcc_personality_v0(
 
   uintptr_t pc = (uintptr_t)_Unwind_GetIP(context) - 1;
   uintptr_t funcStart = (uintptr_t)_Unwind_GetRegionStart(context);
-  uintptr_t pcOffset = pc - funcStart;
+  uintptr_t pcOffset = (char*)pc - (char*)funcStart;
 
   // Parse LSDA header.
   uint8_t lpStartEncoding = *lsda++;
@@ -242,8 +242,8 @@ COMPILER_RT_ABI _Unwind_Reason_Code __gcc_personality_v0(
   const uint8_t *p = callSiteTableStart;
   while (p < callSiteTableEnd) {
     uintptr_t start = readEncodedPointer(&p, callSiteEncoding);
-    uintptr_t length = readEncodedPointer(&p, callSiteEncoding);
-    uintptr_t landingPad = readEncodedPointer(&p, callSiteEncoding);
+    uint64_t length = readEncodedPointer(&p, callSiteEncoding);
+    uint64_t landingPad = readEncodedPointer(&p, callSiteEncoding);
     readULEB128(&p); // action value not used for C code
     if (landingPad == 0)
       continue; // no landing pad for this entry

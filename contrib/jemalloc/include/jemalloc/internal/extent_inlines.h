@@ -217,7 +217,7 @@ extent_addr_randomize(UNUSED tsdn_t *tsdn, extent_t *extent, size_t alignment) {
 			    &extent_arena_get(extent)->offset_state,
 			    lg_range, true);
 		}
-		uintptr_t random_offset = r << (LG_PAGE - lg_range);
+		size_t random_offset = r << (LG_PAGE - lg_range);
 		extent->e_addr = (void *)((uintptr_t)extent->e_addr +
 		    random_offset);
 		assert(ALIGNMENT_ADDR2BASE(extent->e_addr, alignment) ==

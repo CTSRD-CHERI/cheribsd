@@ -265,7 +265,7 @@ popcount_bytes(uint64_t *addr, uint32_t bit0, uint32_t bitN)
 void *
 _kvm_pmap_get(kvm_t *kd, u_long idx, size_t len)
 {
-	uintptr_t off = idx * len;
+	size_t off = idx * len;
 
 	if ((off_t)off >= kd->pt_sparse_off)
 		return (NULL);
