@@ -1526,8 +1526,6 @@ kbdinit(void)
 			    drv->name);
 	}
 }
-
-SYSINIT(kbd_drv_init, SI_SUB_DRIVERS, SI_ORDER_FIRST, kbd_drv_init, NULL);
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,
