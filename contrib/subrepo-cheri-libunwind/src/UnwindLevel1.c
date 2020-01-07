@@ -73,7 +73,7 @@ unwind_phase1(unw_context_t *uc, unw_cursor_t *cursor, _Unwind_Exception *except
     if (_LIBUNWIND_TRACING_UNWINDING) {
       char functionBuf[512];
       const char *functionName = functionBuf;
-      unw_word_t offset;
+      size_t offset;
       if ((__unw_get_proc_name(cursor, functionBuf, sizeof(functionBuf),
                                &offset) != UNW_ESUCCESS) ||
           (frameInfo.start_ip + offset > frameInfo.end_ip))
@@ -179,7 +179,7 @@ unwind_phase2(unw_context_t *uc, unw_cursor_t *cursor, _Unwind_Exception *except
     if (_LIBUNWIND_TRACING_UNWINDING) {
       char functionBuf[512];
       const char *functionName = functionBuf;
-      unw_word_t offset;
+      size_t offset;
       if ((__unw_get_proc_name(cursor, functionBuf, sizeof(functionBuf),
                                &offset) != UNW_ESUCCESS) ||
           (frameInfo.start_ip + offset > frameInfo.end_ip))
@@ -270,7 +270,7 @@ unwind_phase2_forced(unw_context_t *uc, unw_cursor_t *cursor,
     if (_LIBUNWIND_TRACING_UNWINDING) {
       char functionBuf[512];
       const char *functionName = functionBuf;
-      unw_word_t offset;
+      size_t offset;
       if ((__unw_get_proc_name(cursor, functionBuf, sizeof(functionBuf),
                                &offset) != UNW_ESUCCESS) ||
           (frameInfo.start_ip + offset > frameInfo.end_ip))

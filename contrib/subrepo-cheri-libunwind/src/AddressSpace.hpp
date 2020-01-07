@@ -249,7 +249,7 @@ public:
 #endif
     bool isImmutable() const {
 #ifdef __CHERI_PURE_CAPABILITY__
-      return __builtin_cheri_type_get((void *)value) !=
+      return (uint64_t)__builtin_cheri_type_get((void *)value) !=
              UINT64_MAX; // -1 is unsealed
 #else
       return false;
@@ -365,8 +365,7 @@ public:
 
   pint_t getEncodedP(pint_t &addr, pint_t end, uint8_t encoding,
                      pint_t datarelBase = 0);
-  bool findFunctionName(pc_t addr, char *buf, size_t bufLen,
-                        unw_word_t *offset);
+  bool findFunctionName(pc_t addr, char *buf, size_t bufLen, size_t *offset);
   bool findUnwindSections(pc_t targetAddr, UnwindInfoSections &info);
   bool findOtherFDE(addr_t targetAddr, pint_t &fde);
 
@@ -556,7 +555,7 @@ LocalAddressSpace::getEncodedP(pint_t &addr, pint_t end, uint8_t encoding,
   case DW_EH_PE_pcrel:
     // Note: for CHERI we must add the result (untagged offset) to startAddr
     // to get a value with valid tag since uintptr_t addition is not commutative
-    result = assert_pointer_in_bounds(startAddr + result);
+    result = assert_pointer_in_bounds(startAddr + _pint_to_addr(result));
     break;
   case DW_EH_PE_textrel:
     _LIBUNWIND_ABORT("DW_EH_PE_textrel pointer encoding not supported");
@@ -570,7 +569,7 @@ LocalAddressSpace::getEncodedP(pint_t &addr, pint_t end, uint8_t encoding,
     // Note: for CHERI we must add the result (untagged offset) to startAddr
     // to get a value with valid tag since uintptr_t addition is not commutative
     assert_pointer_in_bounds(datarelBase);
-    result = assert_pointer_in_bounds(datarelBase + result);
+    result = assert_pointer_in_bounds(datarelBase + _pint_to_addr(result));
     break;
   case DW_EH_PE_funcrel:
     _LIBUNWIND_ABORT("DW_EH_PE_funcrel pointer encoding not supported");
@@ -904,8 +903,7 @@ inline bool LocalAddressSpace::findOtherFDE(addr_t targetAddr, pint_t &fde) {
 }
 
 inline bool LocalAddressSpace::findFunctionName(pc_t ip, char *buf,
-                                                size_t bufLen,
-                                                unw_word_t *offset) {
+                                                size_t bufLen, size_t *offset) {
 #if _LIBUNWIND_USE_DLADDR
   Dl_info dyldInfo;
   CHERI_DBG("%s(0x%jx: %#p))\n", __func__, (uintmax_t)ip.address(),

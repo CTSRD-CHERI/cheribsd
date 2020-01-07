@@ -260,7 +260,7 @@ unwind_phase2_forced(unw_context_t *uc,
     if (_LIBUNWIND_TRACING_UNWINDING) {
       char functionBuf[512];
       const char *functionName = functionBuf;
-      unw_word_t offset;
+      size_t offset;
       if ((__unw_get_proc_name(&cursor2, functionBuf, sizeof(functionBuf),
                                &offset) != UNW_ESUCCESS) ||
           (frameInfo.start_ip + offset > frameInfo.end_ip))
