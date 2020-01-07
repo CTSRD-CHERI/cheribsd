@@ -533,7 +533,7 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	 * MIPS ABI requires T9 to be the same as PC 
 	 * in subroutine entry point
 	 */
-	tf->t9 = (register_t)(__cheri_offset intptr_t)tf->pc;
+	tf->t9 = TRAPF_PC_OFFSET(tf);
 	tf->a0 = (register_t)(intptr_t)arg;
 
 	/*

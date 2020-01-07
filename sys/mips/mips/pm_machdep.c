@@ -305,8 +305,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 
 	regs->pc = (trapf_pc_t)catcher;
-	// FIXME: should this be an offset relative to PCC or an address?
-	regs->t9 = (register_t)(__cheri_offset intptr_t)regs->pc;
+	regs->t9 = TRAPF_PC_OFFSET(regs);
 	regs->sp = (register_t)(intptr_t)sfp;
 	if (p->p_sysent->sv_sigcode_base != 0) {
 		/* Signal trampoline code is in the shared page */

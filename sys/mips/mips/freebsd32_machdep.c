@@ -452,7 +452,7 @@ freebsd32_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	td->td_frame->pc = (trapf_pc_t)catcher;
-	td->td_frame->t9 = (register_t)(__cheri_offset intptr_t)td->td_frame->pc;
+	td->td_frame->t9 = TRAPF_PC_OFFSET(td->td_frame);
 	td->td_frame->sp = (register_t)(intptr_t)sfp;
 	/*
 	 * Signal trampoline code is at base of user stack.
