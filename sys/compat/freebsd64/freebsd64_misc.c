@@ -427,7 +427,7 @@ int
 freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
     struct iovec **iovp, int error)
 {
-	struct iovec_native useriov;
+	struct iovec64 useriov;
 	struct iovec *iovs;
 	size_t iovlen;
 	int i;

@@ -654,7 +654,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 120: {
 		struct readv_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec_native * __capability */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec * __capability */
 		uarg[2] = p->iovcnt; /* u_int */
 		*n_args = 3;
 		break;
@@ -663,7 +663,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 121: {
 		struct writev_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec_native * __capability */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec * __capability */
 		uarg[2] = p->iovcnt; /* u_int */
 		*n_args = 3;
 		break;
@@ -1350,7 +1350,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 289: {
 		struct preadv_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec_native * __capability */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec * __capability */
 		uarg[2] = p->iovcnt; /* u_int */
 		iarg[3] = p->offset; /* off_t */
 		*n_args = 4;
@@ -1360,7 +1360,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 290: {
 		struct pwritev_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->iovp; /* struct iovec_native * __capability */
+		uarg[1] = (intptr_t) p->iovp; /* struct iovec * __capability */
 		uarg[2] = p->iovcnt; /* u_int */
 		iarg[3] = p->offset; /* off_t */
 		*n_args = 4;
@@ -1866,7 +1866,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* nmount */
 	case 378: {
 		struct nmount_args *p = params;
-		uarg[0] = (intptr_t) p->iovp; /* struct iovec_native * __capability */
+		uarg[0] = (intptr_t) p->iovp; /* struct iovec * __capability */
 		uarg[1] = p->iovcnt; /* unsigned int */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -2497,7 +2497,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 473: {
 		struct sctp_generic_sendmsg_iov_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->iov; /* struct iovec_native * __capability */
+		uarg[1] = (intptr_t) p->iov; /* struct iovec * __capability */
 		iarg[2] = p->iovlen; /* int */
 		uarg[3] = (intptr_t) p->to; /* const struct sockaddr * __capability */
 		iarg[4] = p->tolen; /* __socklen_t */
@@ -2510,7 +2510,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 474: {
 		struct sctp_generic_recvmsg_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->iov; /* struct iovec_native * __capability */
+		uarg[1] = (intptr_t) p->iov; /* struct iovec * __capability */
 		iarg[2] = p->iovlen; /* int */
 		uarg[3] = (intptr_t) p->from; /* struct sockaddr * __capability */
 		uarg[4] = (intptr_t) p->fromlenaddr; /* __socklen_t * __capability */
@@ -2783,7 +2783,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* jail_get */
 	case 506: {
 		struct jail_get_args *p = params;
-		uarg[0] = (intptr_t) p->iovp; /* struct iovec_native * __capability */
+		uarg[0] = (intptr_t) p->iovp; /* struct iovec * __capability */
 		uarg[1] = p->iovcnt; /* unsigned int */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -2792,7 +2792,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* jail_set */
 	case 507: {
 		struct jail_set_args *p = params;
-		uarg[0] = (intptr_t) p->iovp; /* struct iovec_native * __capability */
+		uarg[0] = (intptr_t) p->iovp; /* struct iovec * __capability */
 		uarg[1] = p->iovcnt; /* unsigned int */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
@@ -4388,7 +4388,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_native * __capability";
+			p = "userland struct iovec * __capability";
 			break;
 		case 2:
 			p = "u_int";
@@ -4404,7 +4404,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_native * __capability";
+			p = "userland struct iovec * __capability";
 			break;
 		case 2:
 			p = "u_int";
@@ -5495,7 +5495,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_native * __capability";
+			p = "userland struct iovec * __capability";
 			break;
 		case 2:
 			p = "u_int";
@@ -5514,7 +5514,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_native * __capability";
+			p = "userland struct iovec * __capability";
 			break;
 		case 2:
 			p = "u_int";
@@ -6346,7 +6346,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 378:
 		switch(ndx) {
 		case 0:
-			p = "userland struct iovec_native * __capability";
+			p = "userland struct iovec * __capability";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -7414,7 +7414,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_native * __capability";
+			p = "userland struct iovec * __capability";
 			break;
 		case 2:
 			p = "int";
@@ -7442,7 +7442,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec_native * __capability";
+			p = "userland struct iovec * __capability";
 			break;
 		case 2:
 			p = "int";
@@ -7942,7 +7942,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 506:
 		switch(ndx) {
 		case 0:
-			p = "userland struct iovec_native * __capability";
+			p = "userland struct iovec * __capability";
 			break;
 		case 1:
 			p = "unsigned int";
@@ -7958,7 +7958,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 507:
 		switch(ndx) {
 		case 0:
-			p = "userland struct iovec_native * __capability";
+			p = "userland struct iovec * __capability";
 			break;
 		case 1:
 			p = "unsigned int";

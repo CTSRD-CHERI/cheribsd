@@ -760,14 +760,14 @@
 120	AUE_READV	STD {
 		int readv(
 		    int fd,
-		    _Inout_updates_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _Inout_updates_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt
 		);
 	}
 121	AUE_WRITEV	STD {
 		int writev(
 		    int fd,
-		    _In_reads_opt_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_opt_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt
 		);
 	}
@@ -1526,7 +1526,7 @@
 289	AUE_PREADV	STD {
 		ssize_t preadv(
 		    int fd,
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt,
 		    off_t offset
 		);
@@ -1534,7 +1534,7 @@
 290	AUE_PWRITEV	STD {
 		ssize_t pwritev(
 		    int fd,
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    u_int iovcnt,
 		    off_t offset
 		);
@@ -1991,7 +1991,7 @@
 	}
 378	AUE_NMOUNT	STD {
 		int nmount(
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    unsigned int iovcnt,
 		    int flags
 		);
@@ -2511,7 +2511,7 @@
 473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD {
 		int sctp_generic_sendmsg_iov(
 		    int sd,
-		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec_native *iov,
+		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec *iov,
 		    int iovlen,
 		    _In_reads_bytes_(tolen) const struct sockaddr *to,
 		    __socklen_t tolen,
@@ -2522,7 +2522,7 @@
 474	AUE_SCTP_GENERIC_RECVMSG	NOSTD {
 		int sctp_generic_recvmsg(
 		    int sd,
-		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec_native *iov,
+		    _In_reads_(iovlen) _Contains_long_ptr_ struct iovec *iov,
 		    int iovlen,
 		    _Out_writes_bytes_(*fromlenaddr) struct sockaddr *from,
 		    _Out_ __socklen_t *fromlenaddr,
@@ -2761,14 +2761,14 @@
 	}
 506	AUE_JAIL_GET	STD {
 		int jail_get(
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    unsigned int iovcnt,
 		    int flags
 		);
 	}
 507	AUE_JAIL_SET	STD {
 		int jail_set(
-		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec_native *iovp,
+		    _In_reads_(iovcnt) _Contains_long_ptr_ struct iovec *iovp,
 		    unsigned int iovcnt,
 		    int flags
 		);

@@ -378,7 +378,7 @@ sctp_bad2:
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_generic_sendmsg_iov_args {
 	int sd;
-	struct iovec_native *iov;
+	struct iovec *iov;
 	int iovlen;
 	struct sockaddr *to;
 	__socklen_t tolen;
@@ -556,7 +556,7 @@ sctp_bad2:
 #ifndef _SYS_SYSPROTO_H_
 struct sctp_generic_recvmsg_args {
 	int sd;
-	struct iovec_native *iov;
+	struct iovec *iov;
 	int iovlen;
 	struct sockaddr *from;
 	__socklen_t *fromlenaddr;

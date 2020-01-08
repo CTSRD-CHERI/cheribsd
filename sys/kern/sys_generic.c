@@ -263,7 +263,7 @@ freebsd6_pread(struct thread *td, struct freebsd6_pread_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct readv_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec *iovp;
 	u_int	iovcnt;
 };
 #endif
@@ -310,7 +310,7 @@ kern_readv(struct thread *td, int fd, struct uio *auio)
 #ifndef _SYS_SYSPROTO_H_
 struct preadv_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec *iovp;
 	u_int	iovcnt;
 	off_t	offset;
 };
@@ -489,7 +489,7 @@ freebsd6_pwrite(struct thread *td, struct freebsd6_pwrite_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct writev_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec *iovp;
 	u_int	iovcnt;
 };
 #endif
@@ -536,7 +536,7 @@ kern_writev(struct thread *td, int fd, struct uio *auio)
 #ifndef _SYS_SYSPROTO_H_
 struct pwritev_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec *iovp;
 	u_int	iovcnt;
 	off_t	offset;
 };

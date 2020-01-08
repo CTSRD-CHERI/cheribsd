@@ -396,12 +396,12 @@ struct getsockopt_args {
 };
 struct readv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 };
 struct writev_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 };
 struct settimeofday_args {
@@ -739,13 +739,13 @@ struct lutimes_args {
 };
 struct preadv_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
 struct pwritev_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(u_int)]; u_int iovcnt; char iovcnt_r_[PADR_(u_int)];
 	char offset_l_[PADL_(off_t)]; off_t offset; char offset_r_[PADR_(off_t)];
 };
@@ -1011,7 +1011,7 @@ struct afs3_syscall_args {
 	char parm6_l_[PADL_(long)]; long parm6; char parm6_r_[PADR_(long)];
 };
 struct nmount_args {
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
@@ -1342,7 +1342,7 @@ struct sctp_generic_sendmsg_args {
 };
 struct sctp_generic_sendmsg_iov_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char iov_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iov; char iov_r_[PADR_(struct iovec_native * __capability)];
+	char iov_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iov; char iov_r_[PADR_(struct iovec * __capability)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
 	char to_l_[PADL_(const struct sockaddr * __capability)]; const struct sockaddr * __capability to; char to_r_[PADR_(const struct sockaddr * __capability)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
@@ -1351,7 +1351,7 @@ struct sctp_generic_sendmsg_iov_args {
 };
 struct sctp_generic_recvmsg_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char iov_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iov; char iov_r_[PADR_(struct iovec_native * __capability)];
+	char iov_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iov; char iov_r_[PADR_(struct iovec * __capability)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
 	char from_l_[PADL_(struct sockaddr * __capability)]; struct sockaddr * __capability from; char from_r_[PADR_(struct sockaddr * __capability)];
 	char fromlenaddr_l_[PADL_(__socklen_t * __capability)]; __socklen_t * __capability fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t * __capability)];
@@ -1508,12 +1508,12 @@ struct gssd_syscall_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
 };
 struct jail_get_args {
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct jail_set_args {
-	char iovp_l_[PADL_(struct iovec_native * __capability)]; struct iovec_native * __capability iovp; char iovp_r_[PADR_(struct iovec_native * __capability)];
+	char iovp_l_[PADL_(struct iovec * __capability)]; struct iovec * __capability iovp; char iovp_r_[PADR_(struct iovec * __capability)];
 	char iovcnt_l_[PADL_(unsigned int)]; unsigned int iovcnt; char iovcnt_r_[PADR_(unsigned int)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };

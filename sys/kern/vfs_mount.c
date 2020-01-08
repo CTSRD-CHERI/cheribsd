@@ -399,7 +399,7 @@ vfs_mergeopts(struct vfsoptlist *toopts, struct vfsoptlist *oldopts)
  */
 #ifndef _SYS_SYSPROTO_H_
 struct nmount_args {
-	struct iovec_native *iovp;
+	struct iovec *iovp;
 	unsigned int iovcnt;
 	int flags;
 };
