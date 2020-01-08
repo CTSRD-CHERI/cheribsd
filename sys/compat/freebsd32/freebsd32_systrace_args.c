@@ -2331,9 +2331,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* sctp_generic_sendmsg_iov */
+	/* freebsd32_sctp_generic_sendmsg_iov */
 	case 473: {
-		struct sctp_generic_sendmsg_iov_args *p = params;
+		struct freebsd32_sctp_generic_sendmsg_iov_args *p = params;
 		iarg[0] = p->sd; /* int */
 		uarg[1] = (intptr_t) p->iov; /* struct iovec * */
 		iarg[2] = p->iovlen; /* int */
@@ -2344,9 +2344,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		*n_args = 7;
 		break;
 	}
-	/* sctp_generic_recvmsg */
+	/* freebsd32_sctp_generic_recvmsg */
 	case 474: {
-		struct sctp_generic_recvmsg_args *p = params;
+		struct freebsd32_sctp_generic_recvmsg_args *p = params;
 		iarg[0] = p->sd; /* int */
 		uarg[1] = (intptr_t) p->iov; /* struct iovec * */
 		iarg[2] = p->iovlen; /* int */
@@ -7150,7 +7150,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sctp_generic_sendmsg_iov */
+	/* freebsd32_sctp_generic_sendmsg_iov */
 	case 473:
 		switch(ndx) {
 		case 0:
@@ -7178,7 +7178,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			break;
 		};
 		break;
-	/* sctp_generic_recvmsg */
+	/* freebsd32_sctp_generic_recvmsg */
 	case 474:
 		switch(ndx) {
 		case 0:
@@ -10449,12 +10449,12 @@ systrace_return_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sctp_generic_sendmsg_iov */
+	/* freebsd32_sctp_generic_sendmsg_iov */
 	case 473:
 		if (ndx == 0 || ndx == 1)
 			p = "int";
 		break;
-	/* sctp_generic_recvmsg */
+	/* freebsd32_sctp_generic_recvmsg */
 	case 474:
 		if (ndx == 0 || ndx == 1)
 			p = "int";

@@ -401,6 +401,24 @@ struct freebsd32_aio_fsync_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
 	char aiocbp_l_[PADL_(struct aiocb32 *)]; struct aiocb32 * aiocbp; char aiocbp_r_[PADR_(struct aiocb32 *)];
 };
+struct freebsd32_sctp_generic_sendmsg_iov_args {
+	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
+	char iov_l_[PADL_(struct iovec *)]; struct iovec * iov; char iov_r_[PADR_(struct iovec *)];
+	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
+	char to_l_[PADL_(struct sockaddr *)]; struct sockaddr * to; char to_r_[PADR_(struct sockaddr *)];
+	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *)]; struct sctp_sndrcvinfo * sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *)];
+	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
+};
+struct freebsd32_sctp_generic_recvmsg_args {
+	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
+	char iov_l_[PADL_(struct iovec *)]; struct iovec * iov; char iov_r_[PADR_(struct iovec *)];
+	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
+	char from_l_[PADL_(struct sockaddr *)]; struct sockaddr * from; char from_r_[PADR_(struct sockaddr *)];
+	char fromlenaddr_l_[PADL_(__socklen_t *)]; __socklen_t * fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t *)];
+	char sinfo_l_[PADL_(struct sctp_sndrcvinfo *)]; struct sctp_sndrcvinfo * sinfo; char sinfo_r_[PADR_(struct sctp_sndrcvinfo *)];
+	char msg_flags_l_[PADL_(int *)]; int * msg_flags; char msg_flags_r_[PADR_(int *)];
+};
 #ifdef PAD64_REQUIRED
 struct freebsd32_pread_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
@@ -812,6 +830,8 @@ int	freebsd32_kmq_timedreceive(struct thread *, struct freebsd32_kmq_timedreceiv
 int	freebsd32_kmq_timedsend(struct thread *, struct freebsd32_kmq_timedsend_args *);
 int	freebsd32_kmq_notify(struct thread *, struct freebsd32_kmq_notify_args *);
 int	freebsd32_aio_fsync(struct thread *, struct freebsd32_aio_fsync_args *);
+int	freebsd32_sctp_generic_sendmsg_iov(struct thread *, struct freebsd32_sctp_generic_sendmsg_iov_args *);
+int	freebsd32_sctp_generic_recvmsg(struct thread *, struct freebsd32_sctp_generic_recvmsg_args *);
 #ifdef PAD64_REQUIRED
 int	freebsd32_pread(struct thread *, struct freebsd32_pread_args *);
 int	freebsd32_pwrite(struct thread *, struct freebsd32_pwrite_args *);
@@ -1404,6 +1424,8 @@ int	freebsd11_freebsd32_fstatat(struct thread *, struct freebsd11_freebsd32_fsta
 #define	FREEBSD32_SYS_AUE_freebsd32_kmq_timedsend	AUE_MQ_TIMEDSEND
 #define	FREEBSD32_SYS_AUE_freebsd32_kmq_notify	AUE_MQ_NOTIFY
 #define	FREEBSD32_SYS_AUE_freebsd32_aio_fsync	AUE_AIO_FSYNC
+#define	FREEBSD32_SYS_AUE_freebsd32_sctp_generic_sendmsg_iov	AUE_SCTP_GENERIC_SENDMSG_IOV
+#define	FREEBSD32_SYS_AUE_freebsd32_sctp_generic_recvmsg	AUE_SCTP_GENERIC_RECVMSG
 #define	FREEBSD32_SYS_AUE_freebsd32_pread	AUE_PREAD
 #define	FREEBSD32_SYS_AUE_freebsd32_pwrite	AUE_PWRITE
 #define	FREEBSD32_SYS_AUE_freebsd32_mmap	AUE_MMAP

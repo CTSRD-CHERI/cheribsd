@@ -390,8 +390,8 @@
 #define	FREEBSD32_SYS_rtprio_thread	466
 #define	FREEBSD32_SYS_sctp_peeloff	471
 #define	FREEBSD32_SYS_sctp_generic_sendmsg	472
-#define	FREEBSD32_SYS_sctp_generic_sendmsg_iov	473
-#define	FREEBSD32_SYS_sctp_generic_recvmsg	474
+#define	FREEBSD32_SYS_freebsd32_sctp_generic_sendmsg_iov	473
+#define	FREEBSD32_SYS_freebsd32_sctp_generic_recvmsg	474
 #define	FREEBSD32_SYS_freebsd32_pread	475
 #define	FREEBSD32_SYS_freebsd32_pwrite	476
 #define	FREEBSD32_SYS_freebsd32_mmap	477
