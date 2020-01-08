@@ -6,8 +6,6 @@
 SUBDIR=	${_atf} \
 	${_atrun} \
 	${_blacklistd-helper} \
-	${_cheritest_helper} \
-	${_cheri_bench_helper} \
 	${_comsat} \
 	${_dma} \
 	flua \
@@ -25,11 +23,9 @@ SUBDIR=	${_atf} \
 	rpc.rwalld \
 	rpc.sprayd \
 	${_rshd} \
-	${_rtld-cheri-elf} \
 	${_rtld-elf} \
 	save-entropy \
 	${_smrsh} \
-	${_tcpdump_helper} \
 	${_telnetd} \
 	${_tests} \
 	${_tftp-proxy} \
@@ -49,11 +45,12 @@ SUBDIR+=	bootpd
 .endif
 
 .if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
-_cheri_bench_helper=	cheri_bench-helper
-_cheritest_helper=	cheritest-helper
-_rtld-cheri-elf=	rtld-cheri-elf rtld-cheri-elf-debug
-_tcpdump_helper=	tcpdump-helper # Currently broken with the new compiler
+SUBDIR+=	rtld-cheri-elf rtld-cheri-elf-debug
 .endif
+
+SUBDIR.${MK_LIBCHERI}+=	cheri_bench-helper
+SUBDIR.${MK_LIBCHERI}+=	cheritest-helper
+SUBDIR.${MK_LIBCHERI}+=	tcpdump-helper
 
 .if ${MK_FINGER} != "no"
 SUBDIR+=	fingerd

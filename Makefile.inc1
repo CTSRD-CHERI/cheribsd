@@ -1412,8 +1412,11 @@ _cheri_libs+=kerberos5/lib/libroken kerberos5/lib/libasn1 kerberos5/lib/libwind 
 .endif
 
 _cheri_libs+=lib/libopie lib/libradius lib/libtacplus lib/libypclnt \
-	     lib/libldns secure/lib/libssh lib/msun lib/libnv lib/libcheri \
-	     gnu/lib/libdialog lib/libfigpar
+	     lib/libldns secure/lib/libssh lib/msun lib/libnv
+.if ${MK_LIBCHERI} == "yes"
+_cheri_libs+=lib/libcheri
+.endif
+_cheri_libs+=gnu/lib/libdialog lib/libfigpar
 .if ${MK_KERBEROS} != "no"
 _cheri_libs+=lib/libgssapi
 .endif
@@ -3249,7 +3252,7 @@ _startup_libs=	lib/csu
 .if ${MK_BSD_CRTBEGIN} == "no"
 _startup_libs+=	gnu/lib/csu
 .endif
-.if ${MK_CHERI} != "no"
+.if ${MK_LIBCHERI} != "no"
 _startup_libs+= lib/libc_cheri
 .endif
 _startup_libs+=	lib/libcompiler_rt
@@ -3317,8 +3320,10 @@ gnu/lib/libstdc++__L: lib/msun__L
 gnu/lib/libsupc++__L: gnu/lib/libstdc++__L
 .endif
 
-.if ${MK_CHERI} != "no"
+.if ${MK_LIBCHERI} != "no"
 _prebuild_libs+=	lib/libcheri
+.endif
+.if ${MK_CHERI} != "no"
 _prebuild_libs+=	lib/libpng
 lib/libpng__L: lib/libz__L
 .endif

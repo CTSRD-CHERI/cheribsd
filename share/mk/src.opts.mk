@@ -218,6 +218,9 @@ __DEFAULT_NO_OPTIONS = \
     ZONEINFO_LEAPSECONDS_SUPPORT \
     ZONEINFO_OLD_TIMEZONES_SUPPORT \
 
+__DEFAULT_NO_OPTIONS+= \
+    LIBCHERI
+
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
 __DEFAULT_DEPENDENT_OPTIONS= \

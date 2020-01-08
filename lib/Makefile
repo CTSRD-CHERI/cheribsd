@@ -145,10 +145,10 @@ SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
-SUBDIR.${MK_CHERI}+=	libhelloworld
+SUBDIR.${MK_LIBCHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
 
-.if (${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no") && ${MACHINE_ARCH} != "mips"
+.if ${MK_LIBCHERI} == "yes" && ${MACHINE_ARCH} != "mips"
 _libc_cheri=	libc_cheri
 _libcheri=	libcheri
 .endif
@@ -262,8 +262,8 @@ SUBDIR:=	${SUBDIR:Nlibc++experimental}
 
 .if ${MACHINE_ARCH:Mmips*c*}
 SUBDIR+=	libmalloc_simple
-SUBDIR+=	libcheri_syscalls
-SUBDIR+=	libcheri_support
+SUBDIR.${MK_LIBCHERI}+=	libcheri_syscalls
+SUBDIR.${MK_LIBCHERI}+=	libcheri_support
 .endif
 
 .include <bsd.subdir.mk>
