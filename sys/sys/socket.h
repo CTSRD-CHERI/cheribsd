@@ -441,7 +441,7 @@ struct msghdr {
 struct msghdr64 {
 	void		*msg_name;		/* optional address */
 	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec_native	*msg_iov;	/* scatter/gather array */
+	struct iovec64	*msg_iov;	/* scatter/gather array */
 	int		 msg_iovlen;		/* # elements in msg_iov */
 	void		*msg_control;		/* ancillary data, see below */
 	socklen_t	 msg_controllen;	/* ancillary data buffer len */
@@ -637,7 +637,7 @@ struct osockaddr {
 struct omsghdr {
 	char	*msg_name;		/* optional address */
 	int	msg_namelen;		/* size of address */
-	struct	iovec_native *msg_iov;		/* scatter/gather array */
+	struct	iovec *msg_iov;		/* scatter/gather array */
 	int	msg_iovlen;		/* # elements in msg_iov */
 	char	*msg_accrights;		/* access rights sent/received */
 	int	msg_accrightslen;
