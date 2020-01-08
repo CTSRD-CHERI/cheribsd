@@ -45,7 +45,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <cheritest-helper.h>
 #include <err.h>
 #include <fcntl.h>
 #include <inttypes.h>
