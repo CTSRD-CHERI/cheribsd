@@ -752,7 +752,7 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 	local daflags = get_mask({"NOPROTO", "NODEF"})
 	if flags & daflags == 0 then
 		write_line("sysargmap", string.format("\t[%s%s] = (0x0",
-		    config["syscallprefix"], funcname))
+		    config["syscallprefix"], funcalias))
 		local i = 0
 		for _, v in ipairs(funcargs) do
 			if isptrtype(v["type"]) then
@@ -1288,7 +1288,7 @@ for _, v in pairs(compat_options) do
 end
 
 write_line("sysargmap", string.format([[/*
- * System call prototypes.
+ * System call argument map.
  *
  * DO NOT EDIT-- this file is automatically %s.
  * $%s$
@@ -1420,7 +1420,11 @@ write_line("systraceret", [[
 ]])
 
 -- Finish up; output
-write_line("sysargmap", "};\n")
+write_line("sysargmap", string.format([[
+};
+
+#endif /* !%s */
+]], config["sysargmap_h"]))
 
 write_line("syssw", read_file("sysinc"))
 write_line("syssw", read_file("sysent"))
