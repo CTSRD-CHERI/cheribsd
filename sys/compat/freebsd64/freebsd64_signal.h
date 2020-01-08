@@ -51,11 +51,6 @@ struct sigaltstack64 {
 };
 typedef struct sigaltstack64 freebsd64_stack_t;
 
-union sigval64 {
-	int	sival_int;
-	void	*sival_ptr;
-};
-
 struct sigevent64 {
 	int	sigev_notify;
 	int	sigev_signo;

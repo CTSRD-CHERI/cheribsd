@@ -2739,7 +2739,7 @@ struct freebsd32_sigqueue_args {
 int
 freebsd32_sigqueue(struct thread *td, struct freebsd32_sigqueue_args *uap)
 {
-	ksigval_union sv;
+	union sigval sv;
 
 	/*
 	 * On 32-bit ABIs, sival_int and sival_ptr are the same.
@@ -3159,15 +3159,15 @@ convert_sigevent32(struct sigevent32 *sig32, ksigevent_t *sig)
 	case SIGEV_SIGNAL:
 		CP(*sig32, *sig, sigev_signo);
 		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
-		sig->sigev_value.sival_ptr32 =
-		    sig32->sigev_value.sival_ptr;
+		sig->sigev_value.sival_int =
+		    sig32->sigev_value.sival_int;
 		break;
 	case SIGEV_KEVENT:
 		CP(*sig32, *sig, sigev_notify_kqueue);
 		CP(*sig32, *sig, sigev_notify_kevent_flags);
 		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
-		sig->sigev_value.sival_ptr32 =
-		    sig32->sigev_value.sival_ptr;
+		sig->sigev_value.sival_int =
+		    sig32->sigev_value.sival_int;
 		break;
 	default:
 		return (EINVAL);

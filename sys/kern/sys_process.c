@@ -558,8 +558,7 @@ ptrace_lwpinfo_to32(const struct ptrace_lwpinfo *pl,
 	si_n.si_uid = pl->pl_siginfo.si_uid;
 	si_n.si_status = pl->pl_siginfo.si_status;
 	si_n.si_addr = pl->pl_siginfo.si_addr;
-	si_n.si_value.sival_ptr_native =
-	    pl->pl_siginfo.si_value.sival_ptr_native;
+	si_n.si_value = pl->pl_siginfo.si_value;
 	memcpy(&si_n._reason, &pl->pl_siginfo._reason, sizeof(si_n._reason));
 	siginfo_to_siginfo32(&si_n, &pl32->pl_siginfo);
 	strcpy(pl32->pl_tdname, pl->pl_tdname);
