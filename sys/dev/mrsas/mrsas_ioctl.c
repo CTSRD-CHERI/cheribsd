@@ -37,6 +37,8 @@
  *
  */
 
+#define EXPLICIT_USER_ACCESS
+
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -91,7 +93,7 @@ mrsas_passthru(struct mrsas_softc *sc, void *arg, u_long ioctlCmd)
 	int i, ioctl_data_size = 0, ioctl_sense_size, ret = 0;
 	struct mrsas_sge32 *kern_sge32;
 	unsigned long *sense_ptr;
-	uint8_t *iov_base_ptrin = NULL;
+	uint8_t * __capability iov_base_ptrin = NULL;
 	size_t iov_len = 0;
 
 	/*
@@ -198,8 +200,9 @@ mrsas_passthru(struct mrsas_softc *sc, void *arg, u_long ioctlCmd)
 		} else {
 			kern_sge32[i].length = user_ioc32->sgl[i].iov_len;
 
-			iov_base_ptrin = PTRIN(user_ioc32->sgl[i].iov_base);
 			iov_len = user_ioc32->sgl[i].iov_len;
+			iov_base_ptrin = __USER_CAP(PTRIN(
+			    user_ioc32->sgl[i].iov_base, iov_len));
 #endif
 		}
 
@@ -270,8 +273,9 @@ mrsas_passthru(struct mrsas_softc *sc, void *arg, u_long ioctlCmd)
 			iov_len = user_ioc->sgl[i].iov_len;
 #ifdef COMPAT_FREEBSD32
 		} else {
-			iov_base_ptrin = PTRIN(user_ioc32->sgl[i].iov_base);
 			iov_len = user_ioc32->sgl[i].iov_len;
+			iov_base_ptrin = __USER_CAP(PTRIN(
+			    user_ioc32->sgl[i].iov_base, iov_len));
 #endif
 		}
 
@@ -292,7 +296,8 @@ mrsas_passthru(struct mrsas_softc *sc, void *arg, u_long ioctlCmd)
 		 */
 		sense_ptr = (unsigned long *)((unsigned long)user_ioc->frame.raw +
 		    user_ioc->sense_off);
-		ret = copyout(ioctl_sense_mem, (unsigned long *)*sense_ptr,
+		ret = copyout(ioctl_sense_mem,
+		    __USER_CAP((unsigned long *)*sense_ptr, user_ioc->sense_len),
 		    user_ioc->sense_len);
 		if (ret) {
 			device_printf(sc->mrsas_dev, "IOCTL sense copyout failed!\n");
