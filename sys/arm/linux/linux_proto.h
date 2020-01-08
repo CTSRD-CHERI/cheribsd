@@ -23,12 +23,21 @@ struct proc;
 
 struct thread;
 
-#define	PAD_(t)	(sizeof(register_t) <= sizeof(t) ? \
-		0 : sizeof(register_t) - sizeof(t))
+#define	PAD_(t)	(sizeof(syscallarg_t) <= sizeof(t) ? \
+		0 : sizeof(syscallarg_t) - sizeof(t))
 
 #if BYTE_ORDER == LITTLE_ENDIAN
 #define	PADL_(t)	0
 #define	PADR_(t)	PAD_(t)
+#elif defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
+/*
+ * For non-capability arguments, the syscall argument is stored in the
+ * cursor field in the second word.
+ */
+#define	PADL_(t)	(sizeof (t) > sizeof(register_t) ? \
+		0 : 2 * sizeof(register_t) - sizeof(t))
+#define	PADR_(t)	(sizeof (t) > sizeof(register_t) ? \
+		0 : 2 * sizeof(register_t))
 #else
 #define	PADL_(t)	PAD_(t)
 #define	PADR_(t)	0
