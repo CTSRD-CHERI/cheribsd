@@ -1189,15 +1189,13 @@ convert_sigevent(const struct sigevent_native *sig_n, ksigevent_t *sig)
 		/* FALLTHROUGH */
 	case SIGEV_SIGNAL:
 		sig->sigev_signo = sig_n->sigev_signo;
-		sig->sigev_value.sival_ptr_native =
-		    sig_n->sigev_value.sival_ptr_native;
+		sig->sigev_value = sig_n->sigev_value;
 		break;
 	case SIGEV_KEVENT:
 		sig->sigev_notify_kqueue = sig_n->sigev_notify_kqueue;
 		sig->sigev_notify_kevent_flags =
 		    sig_n->sigev_notify_kevent_flags;
-		sig->sigev_value.sival_ptr_native =
-		    sig_n->sigev_value.sival_ptr_native;
+		sig->sigev_value = sig_n->sigev_value;
 		break;
 	default:
 		return (EINVAL);

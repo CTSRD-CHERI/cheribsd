@@ -151,13 +151,12 @@ cheriabi_sigaltstack(struct thread *td,
 int
 cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
 {
-	union sigval_c	value_union;
-	ksigval_union	sv;
+	union sigval	value_union, sv;
 	int		flags = 0, tag;
 
 	value_union.sival_ptr = uap->value;
 	if (uap->pid == td->td_proc->p_pid) {
-		sv.sival_ptr_c = value_union.sival_ptr;
+		sv.sival_ptr = value_union.sival_ptr;
 	} else {
 		/*
 		 * Cowardly refuse to send capabilities to other
@@ -170,6 +169,7 @@ cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
 		tag = cheri_gettag(value_union.sival_ptr);
 		if (tag)
 			return (EPROT);
+		memset(&sv, 0, sizeof(sv));
 		sv.sival_int = value_union.sival_int;
 	}
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, flags));

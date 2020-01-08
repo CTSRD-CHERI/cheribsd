@@ -183,31 +183,14 @@ typedef	__sigset_t	sigset_t;
 #endif
 
 #if __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE >= 500
-#ifndef _KERNEL
 union sigval {
 	/* Members as suggested by Annex C of POSIX 1003.1b. */
 	int	sival_int;
-	void	*sival_ptr;
+	void	* __kerncap sival_ptr;
 	/* 6.0 compatibility */
 	int     sigval_int;
-	void    *sigval_ptr;
+	void    * __kerncap sigval_ptr;
 };
-
-#else /* _KERNEL */
-union sigval_native {
-	int	sival_int;
-#ifdef __LP64__
-	uint32_t sival_ptr32;
-#endif
-	void	*sival_ptr_native;
-};
-#if __has_feature(capabilities)
-union sigval_c {
-	int	sival_int;
-	void * __capability sival_ptr;
-};
-#endif
-#endif /* _KERNEL */
 
 #if defined(_WANT_LWPINFO32) || (defined(_KERNEL) && defined(__LP64__))
 union sigval32 {
@@ -219,18 +202,18 @@ union sigval32 {
 };
 #endif
 
-#ifdef _KERNEL
-typedef union {
-	int		sival_int;
-	void		*sival_ptr_native;
-#if (defined(_KERNEL) && defined(__LP64__))
-	uint32_t	sival_ptr32;
+#if defined(_WANT_LWPINFO64) || (defined(_KERNEL) && defined(COMPAT_FREEBSD64))
+union sigval64 {
+	int	sival_int;
+	uint64_t sival_ptr;
+};
 #endif
-#if __has_feature(capabilities)
-	void * /* __ptr64 */ sival_ptr64;
-	void * __capability sival_ptr_c;
-#endif
-} ksigval_union;
+
+#if defined(_KERNEL) && defined(COMPAT_CHERIABI)
+union sigval_c {
+	int	sival_int;
+	void * __capability sival_ptr;
+};
 #endif
 #endif /* __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE >= 500 */
 
@@ -259,11 +242,11 @@ struct sigevent {
 struct sigevent_native {
 	int	sigev_notify;		/* Notification type */
 	int	sigev_signo;		/* Signal number */
-	union sigval_native sigev_value;	/* Signal value */
+	union sigval sigev_value;	/* Signal value */
 	union {
 		__lwpid_t	_threadid;
 		struct {
-			void (*_function)(union sigval_native);
+			void (*_function)(union sigval);
 			struct pthread_attr **_attribute;
 		} _sigev_thread;
 		unsigned short _kevent_flags;
@@ -275,11 +258,11 @@ struct sigevent_native {
 struct sigevent_c {
 	int	sigev_notify;		/* Notification type */
 	int	sigev_signo;		/* Signal number */
-	ksigval_union sigev_value;	/* Signal value */
+	union sigval sigev_value;	/* Signal value */
 	union {
 		__lwpid_t	_threadid;
 		struct {
-			void (* __capability _function)(ksigval_union);
+			void (* __capability _function)(union sigval);
 			struct pthread_attr * __capability * __capability _attribute;
 		} _sigev_thread;
 		unsigned short _kevent_flags;
@@ -363,7 +346,7 @@ struct siginfo_native {
 	__uid_t	si_uid;			/* sender's ruid */
 	int	si_status;		/* exit value */
 	void	*si_addr;		/* faulting instruction */
-	union sigval_native si_value;
+	union sigval si_value;
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
@@ -422,42 +405,6 @@ struct siginfo_c {
 		} __spare__;
 	} _reason;
 };
-struct siginfo64 {
-	int	si_signo;		/* signal number */
-	int	si_errno;		/* errno association */
-	/*
-	 * Cause of signal, one of the SI_ macros or signal-specific
-	 * values, i.e. one of the FPE_... values for SIGFPE.  This
-	 * value is equivalent to the second argument to an old-style
-	 * FreeBSD signal handler.
-	 */
-	int	si_code;		/* signal code */
-	__pid_t	si_pid;			/* sending process */
-	__uid_t	si_uid;			/* sender's ruid */
-	int	si_status;		/* exit value */
-	void	*si_addr;		/* faulting instruction */
-	union sigval_native si_value;
-	union	{
-		struct {
-			int	_trapno;/* machine specific trap code */
-			int	_capreg;/* only for SIGPROT */
-		} _fault;
-		struct {
-			int	_timerid;
-			int	_overrun;
-		} _timer;
-		struct {
-			int	_mqd;
-		} _mesgq;
-		struct {
-			long	_band;		/* band event for SIGPOLL */
-		} _poll;			/* was this ever used ? */
-		struct {
-			long	__spare1__;
-			int	__spare2__[7];
-		} __spare__;
-	} _reason;
-};
 #endif
 
 typedef struct {
@@ -474,7 +421,7 @@ typedef struct {
 	__uid_t	si_uid;			/* sender's ruid */
 	int	si_status;		/* exit value */
 	void* __capability si_addr;	/* faulting instruction */
-	ksigval_union si_value;
+	union sigval si_value;
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
@@ -520,6 +467,7 @@ struct siginfo32 {
 	union	{
 		struct {
 			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
 		} _fault;
 		struct {
 			int	_timerid;
@@ -533,6 +481,39 @@ struct siginfo32 {
 		} _poll;			/* was this ever used ? */
 		struct {
 			int32_t	__spare1__;
+			int	__spare2__[7];
+		} __spare__;
+	} _reason;
+};
+#endif
+
+#if defined(_WANT_LWPINFO64) || (defined(_KERNEL) && defined(COMPAT_FREEBSD64))
+struct siginfo64 {
+	int	si_signo;		/* signal number */
+	int	si_errno;		/* errno association */
+	int	si_code;		/* signal code */
+	__pid_t	si_pid;			/* sending process */
+	__uid_t	si_uid;			/* sender's ruid */
+	int	si_status;		/* exit value */
+	uint64_t si_addr;		/* faulting instruction */
+	union sigval64 si_value;
+	union	{
+		struct {
+			int	_trapno;/* machine specific trap code */
+			int	_capreg;/* only for SIGPROT */
+		} _fault;
+		struct {
+			int	_timerid;
+			int	_overrun;
+		} _timer;
+		struct {
+			int	_mqd;
+		} _mesgq;
+		struct {
+			long	_band;		/* band event for SIGPOLL */
+		} _poll;			/* was this ever used ? */
+		struct {
+			long	__spare1__;
 			int	__spare2__[7];
 		} __spare__;
 	} _reason;

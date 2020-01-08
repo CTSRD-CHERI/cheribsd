@@ -69,15 +69,15 @@ convert_sigevent64(const struct sigevent64 *sig64, ksigevent_t *sig)
 	case SIGEV_SIGNAL:
 		CP(*sig64, *sig, sigev_signo);
 		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
-		sig->sigev_value.sival_ptr64 =
-		    sig64->sigev_value.sival_ptr;
+		sig->sigev_value.sival_ptr =
+		    cheri_fromint(sig64->sigev_value.sival_ptr);
 		break;
 	case SIGEV_KEVENT:
 		CP(*sig64, *sig, sigev_notify_kqueue);
 		CP(*sig64, *sig, sigev_notify_kevent_flags);
 		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
-		sig->sigev_value.sival_ptr64 =
-		    sig64->sigev_value.sival_ptr;
+		sig->sigev_value.sival_ptr =
+		    cheri_fromint(sig64->sigev_value.sival_ptr);
 		break;
 	default:
 		return (EINVAL);
@@ -144,8 +144,8 @@ siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64)
 	si64->si_pid = si->si_pid;
 	si64->si_uid = si->si_uid;
 	si64->si_status = si->si_status;
-	si64->si_addr = (__cheri_fromcap void *)si->si_addr;
-	si64->si_value.sival_ptr_native = si->si_value.sival_ptr_native;
+	si64->si_addr = (__cheri_addr uint64_t)si->si_addr;
+	si64->si_value.sival_ptr = (__cheri_addr uint64_t)si->si_value.sival_ptr;
 }
 
 static int
@@ -223,10 +223,14 @@ freebsd64_sigaltstack(struct thread *td,
 int
 freebsd64_sigqueue(struct thread *td, struct freebsd64_sigqueue_args *uap)
 {
-	ksigval_union sv;
+	union sigval sv;
 
+	/*
+	 * Store the 64-bit value (either int or address) in the
+	 * capability's address.
+	 */
 	memset(&sv, 0, sizeof(sv));
-	sv.sival_ptr_native = uap->value;
+	sv.sival_ptr = cheri_fromint((uintptr_t)uap->value);
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
 }

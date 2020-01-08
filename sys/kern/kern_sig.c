@@ -302,7 +302,7 @@ siginfo_to_siginfo_native(const _siginfo_t *si,
 	si_n->si_uid = si->si_uid;
 	si_n->si_status = si->si_status;
 	si_n->si_addr = (__cheri_fromcap void *)si->si_addr;
-	si_n->si_value.sival_ptr_native = si->si_value.sival_ptr_native;
+	si_n->si_value = si->si_value;
 	memcpy(&si_n->_reason, &si->_reason, sizeof(si_n->_reason));
 #endif
 }
@@ -322,7 +322,7 @@ siginfo_native_to_siginfo(const struct siginfo_native *si_n,
 	si->si_uid = si_n->si_uid;
 	si->si_status = si_n->si_status;
 	si->si_addr = (__cheri_tocap void * __capability)si_n->si_addr;
-	si->si_value.sival_ptr_native = si_n->si_value.sival_ptr_native;
+	si->si_value = si_n->si_value;
 	memcpy(&si->_reason, &si_n->_reason, sizeof(si_n->_reason));
 #endif
 }
@@ -1991,20 +1991,35 @@ struct sigqueue_args {
 int
 sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 {
-	ksigval_union sv;
-
-	memset(&sv, 0, sizeof(sv));
+	union sigval sv;
 #if __has_feature(capabilities)
-	sv.sival_ptr_c = uap->value;
-#else
-	sv.sival_ptr_native = uap->value;
+	union sigval sv2;
+#endif
+
+	sv.sival_ptr = uap->value;
+#if __has_feature(capabilities)
+	if (uap->pid != td->td_proc->p_pid) {
+		/*
+		 * Cowardly refuse to send capabilities to other
+		 * processes.
+		 *
+		 * XXX-BD: allow untagged capablities between
+		 * CheriABI processess? (Would have to happen in
+		 * delivery code to avoid a race).
+		 */
+		if (cheri_gettag(uap->value))
+			return (EPROT);
+		memset(&sv2, 0, sizeof(sv2));
+		sv2.sival_int = sv.sival_int;
+		sv = sv2;
+	}
 #endif
 
 	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
 }
 
 int
-kern_sigqueue(struct thread *td, pid_t pid, int signum, ksigval_union *value,
+kern_sigqueue(struct thread *td, pid_t pid, int signum, union sigval *value,
     int flags)
 {
 	ksiginfo_t ksi;
@@ -2031,18 +2046,7 @@ kern_sigqueue(struct thread *td, pid_t pid, int signum, ksigval_union *value,
 		ksi.ksi_code = SI_QUEUE;
 		ksi.ksi_pid = td->td_proc->p_pid;
 		ksi.ksi_uid = td->td_ucred->cr_ruid;
-		memset(&ksi.ksi_value, 0, sizeof(ksi.ksi_value));
-#ifdef COMPAT_FREEBSD32
-		if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
-			ksi.ksi_value.sival_ptr32 = value->sival_ptr32;
-		else
-#endif
-#ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			ksi.ksi_value.sival_ptr_c = value->sival_ptr_c;
-		else
-#endif
-			ksi.ksi_value.sival_ptr_native = value->sival_ptr_native;
+		ksi.ksi_value = *value;
 		error = pksignal(p, ksi.ksi_signo, &ksi);
 	}
 	PROC_UNLOCK(p);
