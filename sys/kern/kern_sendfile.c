@@ -1139,20 +1139,10 @@ out:
 }
 
 static int
-copyin_hdtr(const struct sf_hdtr_native * __capability uhdtr, struct sf_hdtr *hdtr)
+copyin_hdtr(const struct sf_hdtr * __capability uhdtr, struct sf_hdtr *hdtr)
 {
-	struct sf_hdtr_native hdtr_n;
-	int error;
 
-	error = copyin_c(uhdtr, &hdtr_n, sizeof(hdtr_n));
-	if (error != 0)
-		return (error);
-	hdtr->headers = (void * __capability)__USER_CAP_ARRAY(hdtr_n.headers, hdtr_n.hdr_cnt);
-	hdtr->hdr_cnt = hdtr_n.hdr_cnt;
-	hdtr->trailers = (void * __capability)__USER_CAP_ARRAY(hdtr_n.trailers, hdtr_n.trl_cnt);
-	hdtr->hdr_cnt = hdtr_n.trl_cnt;
-
-	return (0);
+	return (copyincap(uhdtr, hdtr, sizeof(*hdtr)));
 }
 
 int

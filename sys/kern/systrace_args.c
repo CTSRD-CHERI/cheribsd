@@ -1951,7 +1951,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[1] = p->s; /* int */
 		iarg[2] = p->offset; /* off_t */
 		uarg[3] = p->nbytes; /* size_t */
-		uarg[4] = (intptr_t) p->hdtr; /* struct sf_hdtr_native * __capability */
+		uarg[4] = (intptr_t) p->hdtr; /* struct sf_hdtr * __capability */
 		uarg[5] = (intptr_t) p->sbytes; /* off_t * __capability */
 		iarg[6] = p->flags; /* int */
 		*n_args = 7;
@@ -6491,7 +6491,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "size_t";
 			break;
 		case 4:
-			p = "userland struct sf_hdtr_native * __capability";
+			p = "userland struct sf_hdtr * __capability";
 			break;
 		case 5:
 			p = "userland off_t * __capability";

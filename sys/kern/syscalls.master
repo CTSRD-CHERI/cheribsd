@@ -1745,7 +1745,7 @@
 		    int s,
 		    off_t offset,
 		    size_t nbytes,
-		    _In_opt_ _Contains_ptr_ struct sf_hdtr_native *hdtr,
+		    _In_opt_ _Contains_ptr_ struct sf_hdtr *hdtr,
 		    _Out_opt_ off_t *sbytes,
 		    int flags
 		);
@@ -2061,7 +2061,7 @@
 		    int s,
 		    off_t offset,
 		    size_t nbytes,
-		    _In_opt_ _Contains_ptr_ struct sf_hdtr_native *hdtr,
+		    _In_opt_ _Contains_ptr_ struct sf_hdtr *hdtr,
 		    _Out_opt_ off_t *sbytes,
 		    int flags
 		);
