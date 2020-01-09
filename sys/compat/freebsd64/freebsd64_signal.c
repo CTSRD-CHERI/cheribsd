@@ -56,7 +56,7 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd64/freebsd64_proto.h>
 
 int
-convert_sigevent64(const struct sigevent64 *sig64, ksigevent_t *sig)
+convert_sigevent64(const struct sigevent64 *sig64, struct sigevent *sig)
 {
 
 	CP(*sig64, *sig, sigev_notify);

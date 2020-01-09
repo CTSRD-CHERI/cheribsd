@@ -171,7 +171,7 @@ struct mqueue;
 
 struct mqueue_notifier {
 	LIST_ENTRY(mqueue_notifier)	nt_link;
-	ksigevent_t			nt_sigev;
+	struct sigevent			nt_sigev;
 	ksiginfo_t			nt_ksi;
 	struct proc			*nt_proc;
 };
@@ -2386,7 +2386,7 @@ out:
 }
 
 static int
-kern_kmq_notify(struct thread *td, int mqd, ksigevent_t *sigev)
+kern_kmq_notify(struct thread *td, int mqd, struct sigevent *sigev)
 {
 	struct filedesc *fdp;
 	struct proc *p;
@@ -2491,17 +2491,15 @@ out:
 int
 sys_kmq_notify(struct thread *td, struct kmq_notify_args *uap)
 {
-	struct sigevent_native ev_n;
-	ksigevent_t ev, *evp;
+	struct sigevent ev, *evp;
 	int error;
 
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->sigev, &ev_n, sizeof(ev));
+		error = copyincap(uap->sigev, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
-		convert_sigevent(&ev_n, &ev);
 		evp = &ev;
 	}
 	return (kern_kmq_notify(td, uap->mqd, evp));
@@ -2920,7 +2918,7 @@ out:
 int
 freebsd32_kmq_notify(struct thread *td, struct freebsd32_kmq_notify_args *uap)
 {
-	ksigevent_t ev, *evp;
+	struct sigevent_t ev, *evp;
 	struct sigevent32 ev32;
 	int error;
 
@@ -2997,13 +2995,13 @@ cheriabi_kmq_timedreceive(struct thread *td,
 int
 cheriabi_kmq_notify(struct thread *td, struct cheriabi_kmq_notify_args *uap)
 {
-	struct sigevent_c ev, *evp;
+	struct sigevent ev, *evp;
 	int error;
 
 	if (uap->sigev == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->sigev, &ev, sizeof(ev));
+		error = copyincap(uap->sigev, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
 		evp = &ev;

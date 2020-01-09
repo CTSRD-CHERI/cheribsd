@@ -1176,55 +1176,26 @@ itimer_leave(struct itimer *it)
 		wakeup(it);
 }
 
-int
-convert_sigevent(const struct sigevent_native *sig_n, ksigevent_t *sig)
-{
-
-	sig->sigev_notify = sig_n->sigev_notify;
-	switch (sig->sigev_notify) {
-	case SIGEV_NONE:
-		break;
-	case SIGEV_THREAD_ID:
-		sig->sigev_notify_thread_id = sig_n->sigev_notify_thread_id;
-		/* FALLTHROUGH */
-	case SIGEV_SIGNAL:
-		sig->sigev_signo = sig_n->sigev_signo;
-		sig->sigev_value = sig_n->sigev_value;
-		break;
-	case SIGEV_KEVENT:
-		sig->sigev_notify_kqueue = sig_n->sigev_notify_kqueue;
-		sig->sigev_notify_kevent_flags =
-		    sig_n->sigev_notify_kevent_flags;
-		sig->sigev_value = sig_n->sigev_value;
-		break;
-	default:
-		return (EINVAL);
-	}
-	return (0);
-}
-
 #ifndef _SYS_SYSPROTO_H_
 struct ktimer_create_args {
 	clockid_t clock_id;
-	struct sigevent_native * evp;
+	struct sigevent * evp;
 	int * timerid;
 };
 #endif
 int
 sys_ktimer_create(struct thread *td, struct ktimer_create_args *uap)
 {
-	struct sigevent_native ev_n;
-	ksigevent_t *evp, ev;
+	struct sigevent *evp, ev;
 	int id;
 	int error;
 
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->evp, &ev_n, sizeof(ev_n));
+		error = copyincap(uap->evp, &ev, sizeof(ev));
 		if (error != 0)
 			return (error);
-		convert_sigevent(&ev_n, &ev);
 		evp = &ev;
 	}
 	error = kern_ktimer_create(td, uap->clock_id, evp, &id, -1);
@@ -1237,7 +1208,7 @@ sys_ktimer_create(struct thread *td, struct ktimer_create_args *uap)
 }
 
 int
-kern_ktimer_create(struct thread *td, clockid_t clock_id, ksigevent_t *evp,
+kern_ktimer_create(struct thread *td, clockid_t clock_id, struct sigevent *evp,
     int *timerid, int preset_id)
 {
 	struct proc *p = td->td_proc;

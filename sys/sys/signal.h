@@ -221,7 +221,6 @@ union sigval_c {
 
 struct pthread_attr;
 
-#ifndef _KERNEL
 struct sigevent {
 	int	sigev_notify;		/* Notification type */
 	int	sigev_signo;		/* Signal number */
@@ -229,32 +228,15 @@ struct sigevent {
 	union {
 		__lwpid_t	_threadid;
 		struct {
-			void (*_function)(union sigval);
-			struct pthread_attr **_attribute;
+			void (* __kerncap _function)(union sigval);
+			struct pthread_attr * __kerncap * __kerncap _attribute;
 		} _sigev_thread;
 		unsigned short _kevent_flags;
 		long __spare__[8];
 	} _sigev_un;
 };
 
-#else /* _KERNEL */
-
-struct sigevent_native {
-	int	sigev_notify;		/* Notification type */
-	int	sigev_signo;		/* Signal number */
-	union sigval sigev_value;	/* Signal value */
-	union {
-		__lwpid_t	_threadid;
-		struct {
-			void (*_function)(union sigval);
-			struct pthread_attr **_attribute;
-		} _sigev_thread;
-		unsigned short _kevent_flags;
-		long __spare__[8];
-	} _sigev_un;
-};
-
-#if __has_feature(capabilities)
+#if defined(_KERNEL) && defined(COMPAT_CHERIABI)
 struct sigevent_c {
 	int	sigev_notify;		/* Notification type */
 	int	sigev_signo;		/* Signal number */
@@ -269,11 +251,7 @@ struct sigevent_c {
 		long __spare__[8];
 	} _sigev_un;
 };
-typedef	struct sigevent_c	ksigevent_t;
-#else
-typedef	struct sigevent_native	ksigevent_t;
 #endif
-#endif /* _KERNEL */
 
 #if __BSD_VISIBLE
 #define	sigev_notify_kqueue		sigev_signo
@@ -749,10 +727,7 @@ __BEGIN_DECLS
 __sighandler_t *signal(int, __sighandler_t *);
 __END_DECLS
 
-#ifdef _KERNEL
-int	convert_sigevent(const struct sigevent_native *, ksigevent_t *);
-
-#if __has_feature(capabilities)
+#if defined(_KERNEL) && __has_feature(capabilities)
 static inline bool
 is_magic_sighandler_constant(void* handler) {
 	/*
@@ -763,7 +738,6 @@ is_magic_sighandler_constant(void* handler) {
 	 */
 	return (vaddr_t)handler < 64;
 }
-#endif
 #endif
 
 #endif /* !_SYS_SIGNAL_H_ */

@@ -491,7 +491,7 @@ int	kern_sysctl(struct thread *td, int * __capability uname,
 	    void * __capability old, size_t * __capability oldlenp,
 	    const void * __capability new, size_t newlen, int flags);
 int	kern_ktimer_create(struct thread *td, clockid_t clock_id,
-	    ksigevent_t *evp, int *timerid, int preset_id);
+	    struct sigevent *evp, int *timerid, int preset_id);
 int	kern_ktimer_delete(struct thread *, int);
 int	kern_ktimer_settime(struct thread *td, int timer_id, int flags,
 	    struct itimerspec *val, struct itimerspec *oval);
