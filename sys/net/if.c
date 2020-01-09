@@ -311,7 +311,7 @@ static void	if_attach_internal(struct ifnet *, int, struct if_clone *);
 static int	if_detach_internal(struct ifnet *, int, struct if_clone **);
 static void	if_siocaddmulti(void *, int);
 #ifdef VIMAGE
-static void	if_vmove(struct ifnet *, struct vnet *);
+static int	if_vmove(struct ifnet *, struct vnet *);
 #endif
 
 #ifdef INET6
@@ -1294,7 +1294,7 @@ finish_vnet_shutdown:
  * unused if_index in target vnet and calls if_grow() if necessary,
  * and finally find an unused if_xname for the target vnet.
  */
-static void
+static int
 if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 {
 	struct if_clone *ifc;
@@ -1320,7 +1320,7 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 	 */
 	rc = if_detach_internal(ifp, 1, &ifc);
 	if (rc != 0)
-		return;
+		return (rc);
 
 	/*
 	 * Unlink the ifnet from ifindex_table[] in current vnet, and shrink
@@ -1364,6 +1364,7 @@ if_vmove(struct ifnet *ifp, struct vnet *new_vnet)
 #endif
 
 	CURVNET_RESTORE();
+	return (0);
 }
 
 /*
@@ -1374,6 +1375,7 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 {
 	struct prison *pr;
 	struct ifnet *difp;
+	int error;
 
 	/* Try to find the prison within our visibility. */
 	sx_slock(&allprison_lock);
@@ -1409,13 +1411,14 @@ if_vmove_loan(struct thread *td, struct ifnet *ifp, char *ifname, int jid)
 	CURVNET_RESTORE();
 
 	/* Move the interface into the child jail/vnet. */
-	if_vmove(ifp, pr->pr_vnet);
+	error = if_vmove(ifp, pr->pr_vnet);
 
-	/* Report the new if_xname back to the userland. */
-	sprintf(ifname, "%s", ifp->if_xname);
+	/* Report the new if_xname back to the userland on success. */
+	if (error == 0)
+		sprintf(ifname, "%s", ifp->if_xname);
 
 	prison_free(pr);
-	return (0);
+	return (error);
 }
 
 static int
@@ -1424,6 +1427,7 @@ if_vmove_reclaim(struct thread *td, char *ifname, int jid)
 	struct prison *pr;
 	struct vnet *vnet_dst;
 	struct ifnet *ifp;
+	int error;
 
 	/* Try to find the prison within our visibility. */
 	sx_slock(&allprison_lock);
@@ -1459,14 +1463,15 @@ if_vmove_reclaim(struct thread *td, char *ifname, int jid)
 	}
 
 	/* Get interface back from child jail/vnet. */
-	if_vmove(ifp, vnet_dst);
+	error = if_vmove(ifp, vnet_dst);
 	CURVNET_RESTORE();
 
-	/* Report the new if_xname back to the userland. */
-	sprintf(ifname, "%s", ifp->if_xname);
+	/* Report the new if_xname back to the userland on success. */
+	if (error == 0)
+		sprintf(ifname, "%s", ifp->if_xname);
 
 	prison_free(pr);
-	return (0);
+	return (error);
 }
 #endif /* VIMAGE */
 
