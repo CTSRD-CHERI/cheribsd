@@ -99,11 +99,11 @@ extern void (*__cleanup)(void);
  * Function declarations.
  */
 static const char *basename(const char *);
+static bool digest_dynamic(Obj_Entry *, int);
 static void digest_dynamic1(Obj_Entry *, int, const Elf_Dyn **,
     const Elf_Dyn **, const Elf_Dyn **);
-static void digest_dynamic2(Obj_Entry *, const Elf_Dyn *, const Elf_Dyn *,
+static bool digest_dynamic2(Obj_Entry *, const Elf_Dyn *, const Elf_Dyn *,
     const Elf_Dyn *);
-static void digest_dynamic(Obj_Entry *, int);
 static Obj_Entry *digest_phdr(const Elf_Phdr *, int, dlfunc_t, const char *);
 static void distribute_static_tls(Objlist *, RtldLockState *);
 static Obj_Entry *dlcheck(void *);
@@ -757,7 +757,8 @@ _rtld(Elf_Addr *sp, func_ptr_type *exit_proc, Obj_Entry **objp)
     }
 #endif
 
-    digest_dynamic(obj_main, 0);
+    if (!digest_dynamic(obj_main, 0))
+	rtld_die();
     dbg("%s valid_hash_sysv %d valid_hash_gnu %d dynsymcount %d",
 	obj_main->path, obj_main->valid_hash_sysv, obj_main->valid_hash_gnu,
 	obj_main->dynsymcount);
@@ -1602,13 +1603,13 @@ obj_resolve_origin(Obj_Entry *obj)
 	return (rtld_dirname_abs(obj->path, obj->origin_path) != -1);
 }
 
-static void
+static bool
 digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
     const Elf_Dyn *dyn_soname, const Elf_Dyn *dyn_runpath)
 {
 
 	if (obj->z_origin && !obj_resolve_origin(obj))
-		rtld_die();
+		return (false);
 
 	if (dyn_runpath != NULL) {
 		obj->runpath = (const char *)obj->strtab + dyn_runpath->d_un.d_val;
@@ -1692,9 +1693,10 @@ digest_dynamic2(Obj_Entry *obj, const Elf_Dyn *dyn_rpath,
 	dbg("%s: tightened bounds of text/rodata cap: " PTR_FMT, obj->path,
 	    obj->text_rodata_cap);
 #endif
+	return (true);
 }
 
-static void
+static bool
 digest_dynamic(Obj_Entry *obj, int early)
 {
 	const Elf_Dyn *dyn_rpath;
@@ -1702,7 +1704,7 @@ digest_dynamic(Obj_Entry *obj, int early)
 	const Elf_Dyn *dyn_runpath;
 
 	digest_dynamic1(obj, early, &dyn_rpath, &dyn_soname, &dyn_runpath);
-	digest_dynamic2(obj, dyn_rpath, dyn_soname, dyn_runpath);
+	return (digest_dynamic2(obj, dyn_rpath, dyn_soname, dyn_runpath));
 }
 
 /*
@@ -2930,16 +2932,15 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
     if (name != NULL)
 	object_add_name(obj, name);
     obj->path = path;
-    digest_dynamic(obj, 0);
+    if (!digest_dynamic(obj, 0))
+	goto errp;
     dbg("%s valid_hash_sysv %d valid_hash_gnu %d dynsymcount %d", obj->path,
 	obj->valid_hash_sysv, obj->valid_hash_gnu, obj->dynsymcount);
     if (obj->z_noopen && (flags & (RTLD_LO_DLOPEN | RTLD_LO_TRACE)) ==
       RTLD_LO_DLOPEN) {
 	dbg("refusing to load non-loadable \"%s\"", obj->path);
 	_rtld_error("Cannot dlopen non-loadable %s", obj->path);
-	munmap(obj->mapbase, obj->mapsize);
-	obj_free(obj);
-	return (NULL);
+	goto errp;
     }
 
     obj->dlopened = (flags & RTLD_LO_DLOPEN) != 0;
@@ -2956,7 +2957,12 @@ do_load_object(int fd, const char *name, char *path, struct stat *sbp,
     LD_UTRACE(UTRACE_LOAD_OBJECT, obj, obj->mapbase, obj->mapsize, 0,
 	obj->path);
 
-    return obj;
+    return (obj);
+
+errp:
+    munmap(obj->mapbase, obj->mapsize);
+    obj_free(obj);
+    return (NULL);
 }
 
 static Obj_Entry *
@@ -4418,12 +4424,17 @@ rtld_dirname_abs(const char *path, char *base)
 {
 	char *last;
 
-	if (realpath(path, base) == NULL)
+	if (realpath(path, base) == NULL) {
+		_rtld_error("realpath \"%s\" failed (%s)", path,
+		    rtld_strerror(errno));
 		return (-1);
+	}
 	dbg("%s -> %s", path, base);
 	last = strrchr(base, '/');
-	if (last == NULL)
+	if (last == NULL) {
+		_rtld_error("non-abs result from realpath \"%s\"", path);
 		return (-1);
+	}
 	if (last != base)
 		*last = '\0';
 	return (0);
