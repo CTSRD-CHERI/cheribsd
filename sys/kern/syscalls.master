@@ -240,14 +240,14 @@
 27	AUE_RECVMSG	STD {
 		ssize_t recvmsg(
 		    int s,
-		    _Inout_ _Contains_ptr_ struct msghdr_native *msg,
+		    _Inout_ _Contains_ptr_ struct msghdr *msg,
 		    int flags
 		);
 	}
 28	AUE_SENDMSG	STD {
 		ssize_t sendmsg(
 		    int s,
-		    _In_ _Contains_ptr_ const struct msghdr_native *msg,
+		    _In_ _Contains_ptr_ const struct msghdr *msg,
 		    int flags
 		);
 	}

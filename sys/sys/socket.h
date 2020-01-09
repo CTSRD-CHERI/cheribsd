@@ -448,15 +448,6 @@ struct msghdr64 {
 	int		 msg_flags;		/* flags on received message */
 };
 #endif
-struct msghdr_native {
-	void		*msg_name;		/* optional address */
-	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec_native	*msg_iov;	/* scatter/gather array */
-	int		 msg_iovlen;		/* # elements in msg_iov */
-	void		*msg_control;		/* ancillary data, see below */
-	socklen_t	 msg_controllen;	/* ancillary data buffer len */
-	int		 msg_flags;		/* flags on received message */
-};
 #endif	/* _KERNEL */
 
 #define	MSG_OOB		 0x00000001	/* process out-of-band data */
@@ -702,12 +693,6 @@ struct mmsghdr {
 	struct msghdr	msg_hdr;		/* message header */
 	ssize_t		msg_len;		/* message length */
 };
-#ifdef _KERNEL
-struct mmsghdr_native {
-	struct msghdr_native	msg_hdr;		/* message header */
-	ssize_t		msg_len;		/* message length */
-};
-#endif /* _KERNEL */
 #endif /* __BSD_VISIBLE */
 
 #ifndef	_KERNEL
