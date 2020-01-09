@@ -662,12 +662,6 @@ struct sf_hdtr {
 	int trl_cnt;		/* number of trailer iovec's */
 };
 #ifdef _KERNEL
-struct sf_hdtr_native {
-	struct iovec_native *headers;	/* pointer to an array of header struct iovec's */
-	int hdr_cnt;		/* number of header iovec's */
-	struct iovec_native *trailers;	/* pointer to an array of trailer struct iovec's */
-	int trl_cnt;		/* number of trailer iovec's */
-};
 typedef	int copyin_hdtr_t(const void * __capability hdtrp, struct sf_hdtr *hdtr);
 #endif /* _KERNEL */
 
