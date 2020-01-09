@@ -2335,7 +2335,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 473: {
 		struct freebsd32_sctp_generic_sendmsg_iov_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->iov; /* struct iovec * */
+		uarg[1] = (intptr_t) p->iov; /* struct iovec32 * */
 		iarg[2] = p->iovlen; /* int */
 		uarg[3] = (intptr_t) p->to; /* struct sockaddr * */
 		iarg[4] = p->tolen; /* __socklen_t */
@@ -2348,7 +2348,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 474: {
 		struct freebsd32_sctp_generic_recvmsg_args *p = params;
 		iarg[0] = p->sd; /* int */
-		uarg[1] = (intptr_t) p->iov; /* struct iovec * */
+		uarg[1] = (intptr_t) p->iov; /* struct iovec32 * */
 		iarg[2] = p->iovlen; /* int */
 		uarg[3] = (intptr_t) p->from; /* struct sockaddr * */
 		uarg[4] = (intptr_t) p->fromlenaddr; /* __socklen_t * */
@@ -7157,7 +7157,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec *";
+			p = "userland struct iovec32 *";
 			break;
 		case 2:
 			p = "int";
@@ -7185,7 +7185,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct iovec *";
+			p = "userland struct iovec32 *";
 			break;
 		case 2:
 			p = "int";

@@ -403,7 +403,7 @@ struct freebsd32_aio_fsync_args {
 };
 struct freebsd32_sctp_generic_sendmsg_iov_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char iov_l_[PADL_(struct iovec *)]; struct iovec * iov; char iov_r_[PADR_(struct iovec *)];
+	char iov_l_[PADL_(struct iovec32 *)]; struct iovec32 * iov; char iov_r_[PADR_(struct iovec32 *)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
 	char to_l_[PADL_(struct sockaddr *)]; struct sockaddr * to; char to_r_[PADR_(struct sockaddr *)];
 	char tolen_l_[PADL_(__socklen_t)]; __socklen_t tolen; char tolen_r_[PADR_(__socklen_t)];
@@ -412,7 +412,7 @@ struct freebsd32_sctp_generic_sendmsg_iov_args {
 };
 struct freebsd32_sctp_generic_recvmsg_args {
 	char sd_l_[PADL_(int)]; int sd; char sd_r_[PADR_(int)];
-	char iov_l_[PADL_(struct iovec *)]; struct iovec * iov; char iov_r_[PADR_(struct iovec *)];
+	char iov_l_[PADL_(struct iovec32 *)]; struct iovec32 * iov; char iov_r_[PADR_(struct iovec32 *)];
 	char iovlen_l_[PADL_(int)]; int iovlen; char iovlen_r_[PADR_(int)];
 	char from_l_[PADL_(struct sockaddr *)]; struct sockaddr * from; char from_r_[PADR_(struct sockaddr *)];
 	char fromlenaddr_l_[PADL_(__socklen_t *)]; __socklen_t * fromlenaddr; char fromlenaddr_r_[PADR_(__socklen_t *)];
