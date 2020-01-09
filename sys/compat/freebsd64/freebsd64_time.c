@@ -273,13 +273,17 @@ int
 freebsd64_ktimer_create(struct thread *td,
     struct freebsd64_ktimer_create_args *uap)
 {
-	struct sigevent_c ev, *evp;
+	struct sigevent64 ev64;
+	struct sigevent ev, *evp;
 	int error, id;
 
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
-		error = copyin(uap->evp, &ev, sizeof(ev));
+		error = copyin(uap->evp, &ev64, sizeof(ev64));
+		if (error != 0)
+			return (error);
+		error = convert_sigevent64(&ev64, &ev);
 		if (error != 0)
 			return (error);
 		evp = &ev;

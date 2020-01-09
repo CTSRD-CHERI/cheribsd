@@ -2575,7 +2575,7 @@ int freebsd32_ktimer_create(struct thread *td,
     struct freebsd32_ktimer_create_args *uap)
 {
 	struct sigevent32 ev32;
-	ksigevent_t ev, *evp;
+	struct sigevent ev, *evp;
 	int error, id;
 
 	if (uap->evp == NULL) {
@@ -3146,7 +3146,7 @@ freebsd32_posix_fadvise(struct thread *td,
 }
 
 int
-convert_sigevent32(struct sigevent32 *sig32, ksigevent_t *sig)
+convert_sigevent32(struct sigevent32 *sig32, struct sigevent *sig)
 {
 
 	CP(*sig32, *sig, sigev_notify);

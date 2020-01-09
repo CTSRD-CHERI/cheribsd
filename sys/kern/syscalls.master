@@ -1360,7 +1360,7 @@
 235	AUE_NULL	STD {
 		int ktimer_create(
 		    clockid_t clock_id,
-		    _In_ _Contains_long_ptr_ struct sigevent_native *evp,
+		    _In_ _Contains_long_ptr_ struct sigevent *evp,
 		    _Out_ int *timerid
 		);
 	}
@@ -1470,7 +1470,7 @@
 		    int mode,
 		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb_native * const *acb_list,
 		    int nent,
-		    _In_opt_ _Contains_long_ptr_ struct sigevent_native *sig
+		    _In_opt_ _Contains_long_ptr_ struct sigevent *sig
 		);
 	}
 258	AUE_NULL	STD {
@@ -2454,7 +2454,7 @@
 461	AUE_MQ_NOTIFY	NOSTD {
 		int kmq_notify(
 		    int mqd,
-		    _In_opt_ _Contains_long_ptr_ const struct sigevent_native *sigev
+		    _In_opt_ _Contains_long_ptr_ const struct sigevent *sigev
 		);
 	}
 462	AUE_MQ_UNLINK	NOSTD {

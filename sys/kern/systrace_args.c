@@ -1174,7 +1174,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 235: {
 		struct ktimer_create_args *p = params;
 		iarg[0] = p->clock_id; /* clockid_t */
-		uarg[1] = (intptr_t) p->evp; /* struct sigevent_native * __capability */
+		uarg[1] = (intptr_t) p->evp; /* struct sigevent * __capability */
 		uarg[2] = (intptr_t) p->timerid; /* int * __capability */
 		*n_args = 3;
 		break;
@@ -1316,7 +1316,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->mode; /* int */
 		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb_native * __capability const * __capability */
 		iarg[2] = p->nent; /* int */
-		uarg[3] = (intptr_t) p->sig; /* struct sigevent_native * __capability */
+		uarg[3] = (intptr_t) p->sig; /* struct sigevent * __capability */
 		*n_args = 4;
 		break;
 	}
@@ -2427,7 +2427,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 461: {
 		struct kmq_notify_args *p = params;
 		iarg[0] = p->mqd; /* int */
-		uarg[1] = (intptr_t) p->sigev; /* const struct sigevent_native * __capability */
+		uarg[1] = (intptr_t) p->sigev; /* const struct sigevent * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -5210,7 +5210,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "clockid_t";
 			break;
 		case 1:
-			p = "userland struct sigevent_native * __capability";
+			p = "userland struct sigevent * __capability";
 			break;
 		case 2:
 			p = "userland int * __capability";
@@ -5437,7 +5437,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct sigevent_native * __capability";
+			p = "userland struct sigevent * __capability";
 			break;
 		default:
 			break;
@@ -7292,7 +7292,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct sigevent_native * __capability";
+			p = "userland const struct sigevent * __capability";
 			break;
 		default:
 			break;

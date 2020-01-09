@@ -67,6 +67,7 @@ struct sigevent64 {
 };
 
 void	siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64);
-int	convert_sigevent64(const struct sigevent64 *sig64, ksigevent_t *sig);
+int	convert_sigevent64(const struct sigevent64 *sig64,
+	    struct sigevent *sig);
 
 #endif /* _COMPAT_FREEBSD64_FREEBSD64_SIGNAL_H_ */

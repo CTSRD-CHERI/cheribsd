@@ -311,11 +311,10 @@ ksiginfo_copy(ksiginfo_t *src, ksiginfo_t *dst)
 }
 
 static __inline void
-ksiginfo_set_sigev(ksiginfo_t *dst, ksigevent_t *sigev)
+ksiginfo_set_sigev(ksiginfo_t *dst, struct sigevent *sigev)
 {
 	dst->ksi_signo = sigev->sigev_signo;
-	__builtin_memcpy(&dst->ksi_value, &sigev->sigev_value,
-	    sizeof(dst->ksi_value));
+	dst->ksi_value = sigev->sigev_value;
 }
 
 struct pgrp;
@@ -404,7 +403,7 @@ struct sigacts *sigacts_hold(struct sigacts *ps);
 int	sigacts_shared(struct sigacts *ps);
 void	sig_drop_caught(struct proc *p);
 void	sigexit(struct thread *td, int sig) __dead2;
-int	sigev_findtd(struct proc *p, ksigevent_t *sigev, struct thread **);
+int	sigev_findtd(struct proc *p, struct sigevent *sigev, struct thread **);
 int	sig_ffs(sigset_t *set);
 void	siginfo_to_siginfo_native(const _siginfo_t *si,
 	    struct siginfo_native *si_n);

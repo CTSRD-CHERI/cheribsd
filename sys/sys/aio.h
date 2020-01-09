@@ -114,7 +114,7 @@ struct aiocb_native {
 		long	error;
 		void	*kernelinfo;
 	} _aiocb_private;
-	struct sigevent_native aio_sigevent;	/* Signal to deliver */
+	struct sigevent aio_sigevent;	/* Signal to deliver */
 };
 #if __has_feature(capabilities)
 struct aiocb_c {
@@ -131,7 +131,7 @@ struct aiocb_c {
 		long	error;
 		void * __capability kernelinfo;
 	} _aiocb_private;
-	struct sigevent_c aio_sigevent;	/* Signal to deliver */
+	struct sigevent aio_sigevent;	/* Signal to deliver */
 };
 typedef	struct aiocb_c		kaiocb_t;
 #else
