@@ -62,6 +62,7 @@ local config = {
 	abi_flags = "",
 	abi_flags_mask = 0,
 	abi_headers = "",
+	abi_intptr_t = "intptr_t",
 	ptr_intptr_t_cast = "intptr_t",
 	ptr_qualified="*",
 	ptrmaskname = "sysargmask",
@@ -430,9 +431,11 @@ local function write_line_pfile(tmppat, line)
 	end
 end
 
+-- Check both literal intptr_t and the abi version because this needs
+-- to work both before and after the substitution
 local function isptrtype(type)
 	return type:find("*") or type:find("caddr_t") or
-	    type:find("intptr_t")
+	    type:find("intptr_t") or type:find(config['abi_intptr_t'])
 end
 
 local process_syscall_def
@@ -622,6 +625,8 @@ local function process_args(args)
 		if argtype == "" and argname == "void" then
 			goto out
 		end
+
+		argtype = argtype:gsub("intptr_t", config["abi_intptr_t"])
 
 		-- XX TODO: Forward declarations? See: sysstubfwd in CheriBSD
 		if abi_change then
