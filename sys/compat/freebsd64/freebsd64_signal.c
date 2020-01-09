@@ -232,5 +232,5 @@ freebsd64_sigqueue(struct thread *td, struct freebsd64_sigqueue_args *uap)
 	memset(&sv, 0, sizeof(sv));
 	sv.sival_ptr = cheri_fromint((uintptr_t)uap->value);
 
-	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
+	return (kern_sigqueue(td, uap->pid, uap->signum, &sv));
 }

@@ -2015,12 +2015,11 @@ sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 	}
 #endif
 
-	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
+	return (kern_sigqueue(td, uap->pid, uap->signum, &sv));
 }
 
 int
-kern_sigqueue(struct thread *td, pid_t pid, int signum, union sigval *value,
-    int flags)
+kern_sigqueue(struct thread *td, pid_t pid, int signum, union sigval *value)
 {
 	ksiginfo_t ksi;
 	struct proc *p;
@@ -2041,7 +2040,7 @@ kern_sigqueue(struct thread *td, pid_t pid, int signum, union sigval *value,
 	error = p_cansignal(td, p, signum);
 	if (error == 0 && signum != 0) {
 		ksiginfo_init(&ksi);
-		ksi.ksi_flags = KSI_SIGQ | flags;
+		ksi.ksi_flags = KSI_SIGQ;
 		ksi.ksi_signo = signum;
 		ksi.ksi_code = SI_QUEUE;
 		ksi.ksi_pid = td->td_proc->p_pid;

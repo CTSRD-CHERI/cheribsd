@@ -152,7 +152,7 @@ int
 cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
 {
 	union sigval	value_union, sv;
-	int		flags = 0, tag;
+	int		tag;
 
 	value_union.sival_ptr = uap->value;
 	if (uap->pid == td->td_proc->p_pid) {
@@ -172,5 +172,5 @@ cheriabi_sigqueue(struct thread *td, struct cheriabi_sigqueue_args *uap)
 		memset(&sv, 0, sizeof(sv));
 		sv.sival_int = value_union.sival_int;
 	}
-	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, flags));
+	return (kern_sigqueue(td, uap->pid, uap->signum, &sv));
 }
