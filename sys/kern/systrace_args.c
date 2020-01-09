@@ -179,7 +179,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 27: {
 		struct recvmsg_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->msg; /* struct msghdr_native * __capability */
+		uarg[1] = (intptr_t) p->msg; /* struct msghdr * __capability */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -188,7 +188,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 28: {
 		struct sendmsg_args *p = params;
 		iarg[0] = p->s; /* int */
-		uarg[1] = (intptr_t) p->msg; /* const struct msghdr_native * __capability */
+		uarg[1] = (intptr_t) p->msg; /* const struct msghdr * __capability */
 		iarg[2] = p->flags; /* int */
 		*n_args = 3;
 		break;
@@ -3619,7 +3619,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct msghdr_native * __capability";
+			p = "userland struct msghdr * __capability";
 			break;
 		case 2:
 			p = "int";
@@ -3635,7 +3635,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct msghdr_native * __capability";
+			p = "userland const struct msghdr * __capability";
 			break;
 		case 2:
 			p = "int";

@@ -131,12 +131,12 @@ struct ptrace_args {
 };
 struct recvmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(struct msghdr_native * __capability)]; struct msghdr_native * __capability msg; char msg_r_[PADR_(struct msghdr_native * __capability)];
+	char msg_l_[PADL_(struct msghdr * __capability)]; struct msghdr * __capability msg; char msg_r_[PADR_(struct msghdr * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct sendmsg_args {
 	char s_l_[PADL_(int)]; int s; char s_r_[PADR_(int)];
-	char msg_l_[PADL_(const struct msghdr_native * __capability)]; const struct msghdr_native * __capability msg; char msg_r_[PADR_(const struct msghdr_native * __capability)];
+	char msg_l_[PADL_(const struct msghdr * __capability)]; const struct msghdr * __capability msg; char msg_r_[PADR_(const struct msghdr * __capability)];
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct recvfrom_args {

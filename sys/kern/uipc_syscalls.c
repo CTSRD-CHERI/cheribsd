@@ -908,24 +908,16 @@ int
 sys_sendmsg(struct thread *td, struct sendmsg_args *uap)
 {
 	struct msghdr msg;
-	struct msghdr_native umsg;
 	struct iovec *iov;
 	int error;
 
-	error = copyin(uap->msg, &umsg, sizeof(umsg));
+	error = copyincap(uap->msg, &msg, sizeof(msg));
 	if (error != 0)
 		return (error);
-	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
-	msg.msg_namelen = umsg.msg_namelen;
-	error = copyiniov(__USER_CAP_ARRAY(umsg.msg_iov, umsg.msg_iovlen),
-	    umsg.msg_iovlen, &iov, EMSGSIZE);
+	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
 	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
-	msg.msg_iovlen = umsg.msg_iovlen;
-	msg.msg_control = __USER_CAP(umsg.msg_control, umsg.msg_controllen);
-	msg.msg_controllen = umsg.msg_controllen;
-	msg.msg_flags = umsg.msg_flags;
 #ifdef COMPAT_OLDSOCK
 	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
 		msg.msg_flags = 0;
@@ -1215,40 +1207,24 @@ int
 sys_recvmsg(struct thread *td, struct recvmsg_args *uap)
 {
 	struct msghdr msg;
-	struct msghdr_native umsg;
 	struct iovec *iov;
 	int error;
 
-	error = copyin(uap->msg, &umsg, sizeof(umsg));
+	error = copyincap(uap->msg, &msg, sizeof(msg));
 	if (error != 0)
 		return (error);
-	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
-	msg.msg_namelen = umsg.msg_namelen;
-	error = copyiniov(__USER_CAP_ARRAY(umsg.msg_iov, umsg.msg_iovlen),
-	    umsg.msg_iovlen, &iov, EMSGSIZE);
+	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
 	msg.msg_iov = (__cheri_tocap struct iovec * __capability)iov;
-	msg.msg_iovlen = umsg.msg_iovlen;
-	msg.msg_control = __USER_CAP(umsg.msg_control, umsg.msg_controllen);
-	msg.msg_controllen = umsg.msg_controllen;
 	msg.msg_flags = uap->flags;
 #ifdef COMPAT_OLDSOCK
 	if (SV_PROC_FLAG(td->td_proc, SV_AOUT))
 		msg.msg_flags &= ~MSG_COMPAT;
 #endif
 	error = recvit(td, uap->s, &msg, NULL);
-	if (error == 0) {
-		/*
-		 * The pointers should not have changed so don't touch them.
-		 * XXX: assert this?
-		 * XXX: what if anything else should have changed?
-		 */
-		umsg.msg_namelen = msg.msg_namelen;
-		umsg.msg_iovlen = msg.msg_iovlen;
-		umsg.msg_controllen = msg.msg_controllen;
-		error = copyout(&umsg, uap->msg, sizeof(umsg));
-	}
+	if (error == 0)
+		error = copyoutcap(&msg, uap->msg, sizeof(msg));
 	free(iov, M_IOV);
 	return (error);
 }
