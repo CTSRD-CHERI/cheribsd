@@ -46,10 +46,6 @@ struct iovec {
 	void * __kerncap	iov_base;	/* Base address. */
 	size_t			iov_len;	/* Length. */
 };
-struct iovec_native {
-	void *	iov_base;	/* Base address. */
-	size_t			iov_len;	/* Length. */
-};
 
 #if defined(_KERNEL)
 #define	IOVEC_INIT(iovp, base, len)	do {				\
