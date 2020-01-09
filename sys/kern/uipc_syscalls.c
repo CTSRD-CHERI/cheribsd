@@ -871,7 +871,7 @@ osend(struct thread *td, struct osend_args *uap)
 	msg.msg_namelen = 0;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT(&aiov, uap->buf, uap->len);
+	IOVEC_INIT_C(&aiov, uap->buf, uap->len);
 	msg.msg_control = 0;
 	msg.msg_flags = 0;
 	return (user_sendit(td, uap->s, &msg, uap->flags));
@@ -888,14 +888,14 @@ osendmsg(struct thread *td, struct osendmsg_args *uap)
 	error = copyin(uap->msg, &umsg, sizeof (umsg));
 	if (error != 0)
 		return (error);
-	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
+	msg.msg_name = umsg.msg_name;
 	msg.msg_namelen = umsg.msg_namelen;
 	error = copyiniov(umsg.msg_iov, umsg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)
 		return (error);
 	msg.msg_iov = iov;
 	msg.msg_iovlen = umsg.msg_iovlen;
-	msg.msg_control = __USER_CAP(umsg.msg_accrights, umsg.msg_accrightslen);
+	msg.msg_control = umsg.msg_accrights;
 	msg.msg_controllen = umsg.msg_accrightslen;
 	msg.msg_flags = MSG_COMPAT;
 	error = user_sendit(td, uap->s, &msg, uap->flags);
@@ -1162,7 +1162,7 @@ orecv(struct thread *td, struct orecv_args *uap)
 	msg.msg_namelen = 0;
 	msg.msg_iov = &aiov;
 	msg.msg_iovlen = 1;
-	IOVEC_INIT(&aiov, uap->buf, uap->len);
+	IOVEC_INIT_C(&aiov, uap->buf, uap->len);
 	msg.msg_control = 0;
 	msg.msg_flags = uap->flags;
 	return (recvit(td, uap->s, &msg, NULL));
@@ -1184,7 +1184,7 @@ orecvmsg(struct thread *td, struct orecvmsg_args *uap)
 	error = copyin(uap->msg, &umsg, sizeof(umsg));
 	if (error != 0)
 		return (error);
-	msg.msg_name = __USER_CAP(umsg.msg_name, umsg.msg_namelen);
+	msg.msg_name = umsg.msg_name;
 	msg.msg_namelen = umsg.msg_namelen;
 	error = copyiniov(msg.msg_iov, msg.msg_iovlen, &iov, EMSGSIZE);
 	if (error != 0)

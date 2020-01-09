@@ -626,11 +626,11 @@ struct osockaddr {
  * 4.3-compat message header (move to compat file later).
  */
 struct omsghdr {
-	char	*msg_name;		/* optional address */
+	char * __kerncap msg_name;	/* optional address */
 	int	msg_namelen;		/* size of address */
-	struct	iovec *msg_iov;		/* scatter/gather array */
+	struct iovec * __kerncap msg_iov; /* scatter/gather array */
 	int	msg_iovlen;		/* # elements in msg_iov */
-	char	*msg_accrights;		/* access rights sent/received */
+	char * __kerncap msg_accrights;	/* access rights sent/received */
 	int	msg_accrightslen;
 };
 #endif
