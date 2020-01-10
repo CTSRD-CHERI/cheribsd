@@ -314,9 +314,6 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #endif
 #ifdef __check_low_ptr_bits_assignment
 #ifndef _cheri_bits_assert
-#ifndef assert
-#include <assert.h>
-#endif
 #define _cheri_bits_assert(e) assert(e)
 #endif
 #define __runtime_assert_sensible_low_bits(bits)                               \
