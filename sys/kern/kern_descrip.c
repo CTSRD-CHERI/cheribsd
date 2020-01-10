@@ -404,31 +404,15 @@ sys_dup(struct thread *td, struct dup_args *uap)
 struct fcntl_args {
 	int	fd;
 	int	cmd;
-	long	arg;
+	intcap_t arg;
 };
 #endif
 /* ARGSUSED */
 int
 sys_fcntl(struct thread *td, struct fcntl_args *uap)
 {
-	intcap_t tmp;
 
-	switch (uap->cmd) {
-	case F_GETLK:
-	case F_OGETLK:
-	case F_OSETLK:
-	case F_OSETLKW:
-	case F_SETLK:
-	case F_SETLKW:
-	case F_SETLK_REMOTE:
-		tmp = (intcap_t)__USER_CAP_UNBOUND((void *)uap->arg);
-		break;
-
-	default:
-		tmp = (intcap_t)uap->arg;
-	}
-
-	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, tmp));
+	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, uap->arg));
 }
 
 int
