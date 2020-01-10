@@ -222,7 +222,7 @@ struct osigevent {
 #ifdef _KERNEL
 typedef struct ksiginfo {
 	TAILQ_ENTRY(ksiginfo)	ksi_link;
-	_siginfo_t		ksi_info;
+	siginfo_t		ksi_info;
 	int			ksi_flags;
 	struct sigqueue		*ksi_sigq;
 } ksiginfo_t;
@@ -405,11 +405,6 @@ void	sig_drop_caught(struct proc *p);
 void	sigexit(struct thread *td, int sig) __dead2;
 int	sigev_findtd(struct proc *p, struct sigevent *sigev, struct thread **);
 int	sig_ffs(sigset_t *set);
-void	siginfo_to_siginfo_native(const _siginfo_t *si,
-	    struct siginfo_native *si_n);
-int	copyout_siginfo_native(const _siginfo_t *si, void * __capability info);
-void	siginfo_native_to_siginfo(const struct siginfo_native *si_n,
-	    _siginfo_t *si);
 void	siginit(struct proc *p);
 void	signotify(struct thread *td);
 int	sigprop(int sig);

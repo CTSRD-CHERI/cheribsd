@@ -135,7 +135,7 @@ freebsd64_sigwait(struct thread *td, struct freebsd64_sigwait_args *uap)
 }
 
 void
-siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64)
+siginfo_to_siginfo64(const siginfo_t *si, struct siginfo64 *si64)
 {
 	memset(si64, 0, sizeof(*si64));
 	si64->si_signo = si->si_signo;
@@ -149,7 +149,7 @@ siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64)
 }
 
 static int
-freebsd64_copyout_siginfo(const _siginfo_t *si, void * __capability info)
+freebsd64_copyout_siginfo(const siginfo_t *si, void * __capability info)
 {
 	struct siginfo64 si64;
 	
@@ -173,7 +173,7 @@ freebsd64_sigwaitinfo(struct thread *td, struct freebsd64_sigwaitinfo_args *uap)
 
 	return (user_sigwaitinfo(td, __USER_CAP_OBJ(uap->set),
 	    __USER_CAP_OBJ(uap->info),
-	    (copyout_siginfo_t *)copyout_siginfo_native));
+	    (copyout_siginfo_t *)freebsd64_copyout_siginfo));
 }
 
 int

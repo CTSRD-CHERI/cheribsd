@@ -48,11 +48,7 @@ struct sigframe {
 #else
 	ucontext_t	sf_uc;		/* = *sf_ucontext */
 #endif
-#ifdef _KERNEL
-	struct siginfo_native sf_si;	/* = *sf_siginfo (SA_SIGINFO case) */
-#else
 	siginfo_t	sf_si;		/* = *sf_siginfo (SA_SIGINFO case) */
-#endif
 	unsigned long	__spare__[2];
 };
 

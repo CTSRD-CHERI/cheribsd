@@ -1648,7 +1648,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 345: {
 		struct sigtimedwait_args *p = params;
 		uarg[0] = (intptr_t) p->set; /* const sigset_t * __capability */
-		uarg[1] = (intptr_t) p->info; /* struct siginfo_native * __capability */
+		uarg[1] = (intptr_t) p->info; /* struct siginfo * __capability */
 		uarg[2] = (intptr_t) p->timeout; /* const struct timespec * __capability */
 		*n_args = 3;
 		break;
@@ -1657,7 +1657,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 346: {
 		struct sigwaitinfo_args *p = params;
 		uarg[0] = (intptr_t) p->set; /* const sigset_t * __capability */
-		uarg[1] = (intptr_t) p->info; /* struct siginfo_native * __capability */
+		uarg[1] = (intptr_t) p->info; /* struct siginfo * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -2997,7 +2997,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		uarg[2] = (intptr_t) p->status; /* int * __capability */
 		iarg[3] = p->options; /* int */
 		uarg[4] = (intptr_t) p->wrusage; /* struct __wrusage * __capability */
-		uarg[5] = (intptr_t) p->info; /* struct siginfo_native * __capability */
+		uarg[5] = (intptr_t) p->info; /* struct siginfo * __capability */
 		*n_args = 6;
 		break;
 	}
@@ -5957,7 +5957,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const sigset_t * __capability";
 			break;
 		case 1:
-			p = "userland struct siginfo_native * __capability";
+			p = "userland struct siginfo * __capability";
 			break;
 		case 2:
 			p = "userland const struct timespec * __capability";
@@ -5973,7 +5973,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland const sigset_t * __capability";
 			break;
 		case 1:
-			p = "userland struct siginfo_native * __capability";
+			p = "userland struct siginfo * __capability";
 			break;
 		default:
 			break;
@@ -8319,7 +8319,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "userland struct __wrusage * __capability";
 			break;
 		case 5:
-			p = "userland struct siginfo_native * __capability";
+			p = "userland struct siginfo * __capability";
 			break;
 		default:
 			break;

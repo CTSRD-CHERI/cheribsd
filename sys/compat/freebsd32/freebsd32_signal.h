@@ -63,7 +63,7 @@ struct sigevent32 {
 
 struct sigevent;
 int convert_sigevent32(struct sigevent32 *sig32, struct sigevent *sig);
-void siginfo_to_siginfo32(const _siginfo_t *src, struct siginfo32 *dst);
+void siginfo_to_siginfo32(const siginfo_t *src, struct siginfo32 *dst);
 
 #endif /* !_COMPAT_FREEBSD32_SIGNAL_H_ */
 // CHERI CHANGES START

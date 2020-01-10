@@ -154,7 +154,7 @@ freebsd64_wait4(struct thread *td, struct freebsd64_wait4_args *uap)
 int
 freebsd64_wait6(struct thread *td, struct freebsd64_wait6_args *uap)
 {
-	_siginfo_t si, *sip;
+	siginfo_t si, *sip;
 	struct siginfo64 si64;
 	int error;
 	

@@ -288,46 +288,6 @@ ksiginfo_tryfree(ksiginfo_t *ksi)
 }
 
 void
-siginfo_to_siginfo_native(const _siginfo_t *si,
-    struct siginfo_native *si_n)
-{
-
-#if !__has_feature(capabilities)
-	memcpy(si_n, si, sizeof(*si_n));
-#else
-	si_n->si_signo = si->si_signo;
-	si_n->si_errno = si->si_errno;
-	si_n->si_code = si->si_code;
-	si_n->si_pid = si->si_pid;
-	si_n->si_uid = si->si_uid;
-	si_n->si_status = si->si_status;
-	si_n->si_addr = (__cheri_fromcap void *)si->si_addr;
-	si_n->si_value = si->si_value;
-	memcpy(&si_n->_reason, &si->_reason, sizeof(si_n->_reason));
-#endif
-}
-
-void
-siginfo_native_to_siginfo(const struct siginfo_native *si_n,
-    _siginfo_t *si)
-{
-
-#if !__has_feature(capabilities)
-	memcpy(si, si_n, sizeof(*si_n));
-#else
-	si->si_signo = si_n->si_signo;
-	si->si_errno = si_n->si_errno;
-	si->si_code = si_n->si_code;
-	si->si_pid = si_n->si_pid;
-	si->si_uid = si_n->si_uid;
-	si->si_status = si_n->si_status;
-	si->si_addr = (__cheri_tocap void * __capability)si_n->si_addr;
-	si->si_value = si_n->si_value;
-	memcpy(&si->_reason, &si_n->_reason, sizeof(si_n->_reason));
-#endif
-}
-
-void
 sigqueue_init(sigqueue_t *list, struct proc *p)
 {
 	SIGEMPTYSET(list->sq_signals);
@@ -1239,13 +1199,11 @@ user_sigwait(struct thread *td, const sigset_t * __capability uset,
 	return (0);
 }
 
-int
-copyout_siginfo_native(const _siginfo_t *si, void * __capability info)
+static int
+copyout_siginfo(const siginfo_t *si, void * __capability info)
 {
-	struct siginfo_native si_n;
 
-	siginfo_to_siginfo_native(si, &si_n);
-	return (copyout_c(&si_n, info, sizeof(si_n)));
+	return (copyoutcap(si, info, sizeof(*si)));
 }
 
 int
@@ -1253,7 +1211,7 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 {
 
 	return (user_sigtimedwait(td, uap->set, uap->info, uap->timeout,
-	    (copyout_siginfo_t *)copyout_siginfo_native));
+	    copyout_siginfo));
 }
 
 int
@@ -1296,8 +1254,7 @@ int
 sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 {
 
-	return (user_sigwaitinfo(td, uap->set, uap->info,
-	    (copyout_siginfo_t *)copyout_siginfo_native));
+	return (user_sigwaitinfo(td, uap->set, uap->info, copyout_siginfo));
 }
 
 int
@@ -1325,7 +1282,7 @@ user_sigwaitinfo(struct thread *td, const sigset_t * __capability uset,
 }
 
 static void
-proc_td_siginfo_capture(struct thread *td, _siginfo_t *si)
+proc_td_siginfo_capture(struct thread *td, siginfo_t *si)
 {
 	struct thread *thr;
 

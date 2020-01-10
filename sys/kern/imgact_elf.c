@@ -2438,8 +2438,8 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 	int structsize;
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 	struct ptrace_lwpinfo32 pl;
-#elif defined(__ELF_CHERI)
-	struct ptrace_lwpinfo_c pl;
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+	struct ptrace_lwpinfo64 pl;
 #else
 	struct ptrace_lwpinfo pl;
 #endif
@@ -2460,14 +2460,10 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 			pl.pl_flags |= PL_FLAG_SI;
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 			siginfo_to_siginfo32(&td->td_si, &pl.pl_siginfo);
-#elif defined(__ELF_CHERI)
-			_Static_assert(
-			    sizeof(pl.pl_siginfo) == sizeof(td->td_si),
-			    "_siginfo_t and siginfo_c mismatch");
-			memcpy(&pl.pl_siginfo, &td->td_si,
-			    sizeof(pl.pl_siginfo));
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+			siginfo_to_siginfo64(&td->td_si, &pl.pl_siginfo);
 #else
-			siginfo_to_siginfo_native(&td->td_si, &pl.pl_siginfo);
+			pl.pl_siginfo = td->td_si;
 #endif
 		}
 		strcpy(pl.pl_tdname, td->td_name);

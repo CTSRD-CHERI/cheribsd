@@ -532,7 +532,7 @@ int	kern_wait(struct thread *td, pid_t pid, int *status, int options,
 int	kern_wait4(struct thread *td, int pid, int * __capability status,
 	    int options, struct rusage * __capability rusage);
 int	kern_wait6(struct thread *td, enum idtype idtype, id_t id, int *status,
-	    int options, struct __wrusage *wrup, _siginfo_t *sip);
+	    int options, struct __wrusage *wrup, siginfo_t *sip);
 int	kern_write(struct thread *td, int fd, const void * __capability buf,
 	    size_t nbyte);
 int	kern_writev(struct thread *td, int fd, struct uio *auio);
@@ -650,7 +650,7 @@ int	user_uuidgen(struct thread *td, struct uuid * __capability storep,
 	    int count);
 int	user_wait6(struct thread *td, enum idtype idtype, id_t id,
 	    int * __capability statusp, int options,
-	    struct __wrusage * __capability wrusage, _siginfo_t *sip);
+	    struct __wrusage * __capability wrusage, siginfo_t *sip);
 int	user_writev(struct thread *td, int fd, void * __capability iovp,
 	    u_int iovcnt, copyinuio_t *copyinuio_f);
 
