@@ -91,7 +91,7 @@ cheriabi_sigwait(struct thread *td, struct cheriabi_sigwait_args *uap)
 }
 
 static int
-cheriabi_copyout_siginfo(const _siginfo_t *si, void * __capability info)
+cheriabi_copyout_siginfo(const siginfo_t *si, void * __capability info)
 {
 
 	return (copyout(si, info, sizeof(*si)));

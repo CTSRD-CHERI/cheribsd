@@ -272,7 +272,6 @@ struct sigevent_c {
 #endif /* __POSIX_VISIBLE >= 199309 */
 
 #if __POSIX_VISIBLE >= 199309 || __XSI_VISIBLE
-#ifndef _KERNEL
 typedef	struct __siginfo {
 	int	si_signo;		/* signal number */
 	int	si_errno;		/* errno association */
@@ -286,7 +285,7 @@ typedef	struct __siginfo {
 	__pid_t	si_pid;			/* sending process */
 	__uid_t	si_uid;			/* sender's ruid */
 	int	si_status;		/* exit value */
-	void	*si_addr;		/* faulting instruction */
+	void	* __kerncap si_addr;   	/* faulting instruction */
 	union sigval si_value;		/* signal value */
 	union	{
 		struct {
@@ -309,44 +308,9 @@ typedef	struct __siginfo {
 		} __spare__;
 	} _reason;
 } siginfo_t;
-#else /* _KERNEL */
-struct siginfo_native {
-	int	si_signo;		/* signal number */
-	int	si_errno;		/* errno association */
-	/*
-	 * Cause of signal, one of the SI_ macros or signal-specific
-	 * values, i.e. one of the FPE_... values for SIGFPE.  This
-	 * value is equivalent to the second argument to an old-style
-	 * FreeBSD signal handler.
-	 */
-	int	si_code;		/* signal code */
-	__pid_t	si_pid;			/* sending process */
-	__uid_t	si_uid;			/* sender's ruid */
-	int	si_status;		/* exit value */
-	void	*si_addr;		/* faulting instruction */
-	union sigval si_value;
-	union	{
-		struct {
-			int	_trapno;/* machine specific trap code */
-			int	_capreg;/* only for SIGPROT */
-		} _fault;
-		struct {
-			int	_timerid;
-			int	_overrun;
-		} _timer;
-		struct {
-			int	_mqd;
-		} _mesgq;
-		struct {
-			long	_band;		/* band event for SIGPOLL */
-		} _poll;			/* was this ever used ? */
-		struct {
-			long	__spare1__;
-			int	__spare2__[7];
-		} __spare__;
-	} _reason;
-};
-#if __has_feature(capabilities)
+
+#ifdef _KERNEL
+#ifdef COMPAT_CHERIABI
 struct siginfo_c {
 	int	si_signo;		/* signal number */
 	int	si_errno;		/* errno association */
@@ -385,44 +349,7 @@ struct siginfo_c {
 };
 #endif
 
-typedef struct {
-	int	si_signo;		/* signal number */
-	int	si_errno;		/* errno association */
-	/*
-	 * Cause of signal, one of the SI_ macros or signal-specific
-	 * values, i.e. one of the FPE_... values for SIGFPE.  This
-	 * value is equivalent to the second argument to an old-style
-	 * FreeBSD signal handler.
-	 */
-	int	si_code;		/* signal code */
-	__pid_t	si_pid;			/* sending process */
-	__uid_t	si_uid;			/* sender's ruid */
-	int	si_status;		/* exit value */
-	void* __capability si_addr;	/* faulting instruction */
-	union sigval si_value;
-	union	{
-		struct {
-			int	_trapno;/* machine specific trap code */
-			int	_capreg;/* only for SIGPROT */
-		} _fault;
-		struct {
-			int	_timerid;
-			int	_overrun;
-		} _timer;
-		struct {
-			int	_mqd;
-		} _mesgq;
-		struct {
-			long	_band;		/* band event for SIGPOLL */
-		} _poll;			/* was this ever used ? */
-		struct {
-			long	__spare1__;
-			int	__spare2__[7];
-		} __spare__;
-	} _reason;
-} _siginfo_t;
-
-typedef int (copyout_siginfo_t)(const _siginfo_t *si, void * __capability info);
+typedef int (copyout_siginfo_t)(const siginfo_t *si, void * __capability info);
 #endif /* _KERNEL */
 
 #define si_trapno	_reason._fault._trapno

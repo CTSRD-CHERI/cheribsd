@@ -270,12 +270,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
 		/* fill siginfo structure */
-#if __has_feature(capabilities)
-		/* XXX: Hack until siginfo_t == siginfo_c */
-		memcpy_c(&sf.sf_si, &ksi->ksi_info, sizeof(sf.sf_si));
-#else
-		siginfo_to_siginfo_native(&ksi->ksi_info, &sf.sf_si);
-#endif
+		sf.sf_si = ksi->ksi_info;
 		sf.sf_si.si_signo = sig;
 	} else {
 		/* Old FreeBSD-style arguments. */

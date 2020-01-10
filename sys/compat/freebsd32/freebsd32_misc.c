@@ -201,7 +201,7 @@ freebsd32_wait6(struct thread *td, struct freebsd32_wait6_args *uap)
 	struct wrusage32 wru32;
 	struct __wrusage wru, *wrup;
 	struct siginfo32 si32;
-	_siginfo_t si, *sip;
+	siginfo_t si, *sip;
 	int error, status;
 
 	if (uap->wrusage != NULL)
@@ -2704,7 +2704,7 @@ freebsd32_thr_suspend(struct thread *td, struct freebsd32_thr_suspend_args *uap)
 }
 
 void
-siginfo_to_siginfo32(const _siginfo_t *src, struct siginfo32 *dst)
+siginfo_to_siginfo32(const siginfo_t *src, struct siginfo32 *dst)
 {
 	bzero(dst, sizeof(*dst));
 	dst->si_signo = src->si_signo;
@@ -2720,7 +2720,7 @@ siginfo_to_siginfo32(const _siginfo_t *src, struct siginfo32 *dst)
 }
 
 static int
-freebsd32_copyout_siginfo(const _siginfo_t *si, void * __capability info)
+freebsd32_copyout_siginfo(const siginfo_t *si, void * __capability info)
 {
 	struct siginfo32 si32;
 

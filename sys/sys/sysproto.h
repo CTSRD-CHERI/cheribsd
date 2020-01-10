@@ -887,12 +887,12 @@ struct sigpending_args {
 };
 struct sigtimedwait_args {
 	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
-	char info_l_[PADL_(struct siginfo_native * __capability)]; struct siginfo_native * __capability info; char info_r_[PADR_(struct siginfo_native * __capability)];
+	char info_l_[PADL_(struct siginfo * __capability)]; struct siginfo * __capability info; char info_r_[PADR_(struct siginfo * __capability)];
 	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
 struct sigwaitinfo_args {
 	char set_l_[PADL_(const sigset_t * __capability)]; const sigset_t * __capability set; char set_r_[PADR_(const sigset_t * __capability)];
-	char info_l_[PADL_(struct siginfo_native * __capability)]; struct siginfo_native * __capability info; char info_r_[PADR_(struct siginfo_native * __capability)];
+	char info_l_[PADL_(struct siginfo * __capability)]; struct siginfo * __capability info; char info_r_[PADR_(struct siginfo * __capability)];
 };
 struct __acl_get_file_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -1628,7 +1628,7 @@ struct wait6_args {
 	char status_l_[PADL_(int * __capability)]; int * __capability status; char status_r_[PADR_(int * __capability)];
 	char options_l_[PADL_(int)]; int options; char options_r_[PADR_(int)];
 	char wrusage_l_[PADL_(struct __wrusage * __capability)]; struct __wrusage * __capability wrusage; char wrusage_r_[PADR_(struct __wrusage * __capability)];
-	char info_l_[PADL_(struct siginfo_native * __capability)]; struct siginfo_native * __capability info; char info_r_[PADR_(struct siginfo_native * __capability)];
+	char info_l_[PADL_(struct siginfo * __capability)]; struct siginfo * __capability info; char info_r_[PADR_(struct siginfo * __capability)];
 };
 struct cap_rights_limit_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];

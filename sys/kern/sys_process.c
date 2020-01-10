@@ -542,7 +542,6 @@ static void
 ptrace_lwpinfo_to32(const struct ptrace_lwpinfo *pl,
     struct ptrace_lwpinfo32 *pl32)
 {
-	_siginfo_t si_n;
 
 	bzero(pl32, sizeof(*pl32));
 	pl32->pl_lwpid = pl->pl_lwpid;
@@ -550,17 +549,7 @@ ptrace_lwpinfo_to32(const struct ptrace_lwpinfo *pl,
 	pl32->pl_flags = pl->pl_flags;
 	pl32->pl_sigmask = pl->pl_sigmask;
 	pl32->pl_siglist = pl->pl_siglist;
-	/* XXXBD: ptrace should be using capability aware structs by default. */
-	si_n.si_signo = pl->pl_siginfo.si_signo;
-	si_n.si_errno = pl->pl_siginfo.si_errno;
-	si_n.si_code = pl->pl_siginfo.si_code;
-	si_n.si_pid = pl->pl_siginfo.si_pid;
-	si_n.si_uid = pl->pl_siginfo.si_uid;
-	si_n.si_status = pl->pl_siginfo.si_status;
-	si_n.si_addr = pl->pl_siginfo.si_addr;
-	si_n.si_value = pl->pl_siginfo.si_value;
-	memcpy(&si_n._reason, &pl->pl_siginfo._reason, sizeof(si_n._reason));
-	siginfo_to_siginfo32(&si_n, &pl32->pl_siginfo);
+	siginfo_to_siginfo32(&pl->pl_siginfo, &pl32->pl_siginfo);
 	strcpy(pl32->pl_tdname, pl->pl_tdname);
 	pl32->pl_child_pid = pl->pl_child_pid;
 	pl32->pl_syscall_code = pl->pl_syscall_code;
@@ -579,7 +568,25 @@ ptrace_sc_ret_to32(const struct ptrace_sc_ret *psr,
 }
 #endif /* COMPAT_FREEBSD32 */
 
-#if __has_feature(capabilities)
+#ifdef COMPAT_FREEBSD64
+static void
+ptrace_lwpinfo_to64(const struct ptrace_lwpinfo *pl,
+    struct ptrace_lwpinfo64 *pl64)
+{
+
+	bzero(pl64, sizeof(*pl64));
+	pl64->pl_lwpid = pl->pl_lwpid;
+	pl64->pl_event = pl->pl_event;
+	pl64->pl_flags = pl->pl_flags;
+	pl64->pl_sigmask = pl->pl_sigmask;
+	pl64->pl_siglist = pl->pl_siglist;
+	siginfo_to_siginfo64(&pl->pl_siginfo, &pl64->pl_siginfo);
+	strcpy(pl64->pl_tdname, pl->pl_tdname);
+	pl64->pl_child_pid = pl->pl_child_pid;
+	pl64->pl_syscall_code = pl->pl_syscall_code;
+	pl64->pl_syscall_narg = pl->pl_syscall_narg;
+}
+
 static void
 ptrace_sc_ret_to64(const struct ptrace_sc_ret * __capability psr,
     struct ptrace_sc_ret64 * __capability psr64)
@@ -839,9 +846,10 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	int error, num, tmp;
 	int proctree_locked = 0;
 	lwpid_t tid = 0, *buf;
-#if __has_feature(capabilities)
+#ifdef COMPAT_FREEBSD64
 	int wrap64 = 0;
 	struct ptrace_sc_ret64 * __capability psr64 = NULL;
+	struct ptrace_lwpinfo64 * __capability pl64 = NULL;
 	struct ptrace_io_desc_c * __capability piodc = NULL;
 #endif
 #ifdef COMPAT_FREEBSD32
@@ -850,7 +858,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	struct ptrace_lwpinfo32 *pl32 = NULL;
 	struct ptrace_sc_ret32 *psr32 = NULL;
 #endif
-#if defined(COMPAT_FREEBSD32) || __has_feature(capabilities)
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_FREEBSD64)
 	union {
 		struct ptrace_lwpinfo pl;
 		struct ptrace_sc_ret psr;
@@ -933,8 +941,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		tid = td2->td_tid;
 	}
 
-#if __has_feature(capabilities)
-	if (!SV_CURPROC_FLAG(SV_CHERI))
+#ifdef COMPAT_FREEBSD64
+	if (SV_CURPROC_FLAG(SV_CHERI | SV_LP64) == SV_LP64)
 		wrap64 = 1;
 #endif
 #ifdef COMPAT_FREEBSD32
@@ -1169,7 +1177,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			break;
 		}
 		bzero((__cheri_fromcap void *)addr, sizeof(td2->td_sa.args));
-#if __has_feature(capabilities)
+#ifdef COMPAT_FREEBSD64
 		if (wrap64)
 			for (num = 0; num < td2->td_sa.narg; num++)
 				((uint64_t * __capability)addr)[num] =
@@ -1196,7 +1204,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			error = EINVAL;
 			break;
 		}
-#if __has_feature(capabilities)
+#ifdef COMPAT_FREEBSD64
 		if (wrap64) {
 			psr = &r.psr;
 			psr64 = addr;
@@ -1215,7 +1223,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			psr->sr_retval[0] = td2->td_retval[0];
 			psr->sr_retval[1] = td2->td_retval[1];
 		}
-#if __has_feature(capabilities)
+#ifdef COMPAT_FREEBSD64
 		if (wrap64)
 			ptrace_sc_ret_to64(psr, psr64);
 #endif
@@ -1533,43 +1541,56 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 #endif
 
 	case PT_LWPINFO:
-		if (data <= 0 ||
-#ifdef COMPAT_FREEBSD32
-		    (!wrap32 && data > sizeof(*pl)) ||
-		    (wrap32 && data > sizeof(*pl32))) {
-#else
-		    data > sizeof(*pl)) {
-#endif
+	{
+		bool set_siginfo;
+
+		if (data <= 0) {
 			error = EINVAL;
 			break;
 		}
+#ifdef COMPAT_FREEBSD64
+		if (wrap64) {
+			if (data > sizeof(*pl64)) {
+				error = EINVAL;
+				break;
+			}
+			set_siginfo = data >= offsetof(struct ptrace_lwpinfo64,
+			    pl_siginfo) + sizeof(struct siginfo64);
+			pl = &r.pl;
+			pl64 = addr;
+		} else
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32) {
+			if (data > sizeof(*pl32)) {
+				error = EINVAL;
+				break;
+			}
+			set_siginfo = data >= offsetof(struct ptrace_lwpinfo32,
+			    pl_siginfo) + sizeof(struct siginfo32);
 			pl = &r.pl;
 			pl32 = addr;
 		} else
 #endif
-		pl = addr;
+		{
+			if (data > sizeof(*pl)) {
+				error = EINVAL;
+				break;
+			}
+			set_siginfo = data >= offsetof(struct ptrace_lwpinfo,
+			    pl_siginfo) + sizeof(pl->pl_siginfo);
+			pl = addr;
+		}
 		bzero((__cheri_fromcap void *)pl, sizeof(*pl));
 		pl->pl_lwpid = td2->td_tid;
 		pl->pl_event = PL_EVENT_NONE;
 		pl->pl_flags = 0;
 		if (td2->td_dbgflags & TDB_XSIG) {
 			pl->pl_event = PL_EVENT_SIGNAL;
-			if (td2->td_si.si_signo != 0 &&
-#ifdef COMPAT_FREEBSD32
-			    ((!wrap32 && data >= offsetof(struct ptrace_lwpinfo,
-			    pl_siginfo) + sizeof(pl->pl_siginfo)) ||
-			    (wrap32 && data >= offsetof(struct ptrace_lwpinfo32,
-			    pl_siginfo) + sizeof(struct siginfo32)))
-#else
-			    data >= offsetof(struct ptrace_lwpinfo, pl_siginfo)
-			    + sizeof(pl->pl_siginfo)
-#endif
-			){
+			if (td2->td_si.si_signo != 0 && set_siginfo) {
 				pl->pl_flags |= PL_FLAG_SI;
-				siginfo_to_siginfo_native(&td2->td_si,
-				    (__cheri_fromcap struct siginfo_native *)&pl->pl_siginfo);
+				pl->pl_siginfo = td2->td_si;
+;
 			}
 		}
 		if (td2->td_dbgflags & TDB_SCE)
@@ -1602,6 +1623,11 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 			pl->pl_syscall_code = 0;
 			pl->pl_syscall_narg = 0;
 		}
+#ifdef COMPAT_FREEBSD64
+		if (wrap64)
+			ptrace_lwpinfo_to64((__cheri_fromcap void *)pl,
+			    (__cheri_fromcap void *)pl64);
+#endif
 #ifdef COMPAT_FREEBSD32
 		if (wrap32)
 			ptrace_lwpinfo_to32(pl, pl32);
@@ -1611,6 +1637,7 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 		    td2->td_tid, p->p_pid, pl->pl_event, pl->pl_flags,
 		    pl->pl_child_pid, pl->pl_syscall_code);
 		break;
+	}
 
 	case PT_GETNUMLWPS:
 		CTR2(KTR_PTRACE, "PT_GETNUMLWPS: pid %d: %d threads", p->p_pid,

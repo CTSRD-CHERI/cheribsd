@@ -66,7 +66,7 @@ struct sigevent64 {
 	} _sigev_un;
 };
 
-void	siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64);
+void	siginfo_to_siginfo64(const siginfo_t *si, struct siginfo64 *si64);
 int	convert_sigevent64(const struct sigevent64 *sig64,
 	    struct sigevent *sig);
 
