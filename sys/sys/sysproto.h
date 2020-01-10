@@ -1016,26 +1016,26 @@ struct nmount_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct __mac_get_proc_args {
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_set_proc_args {
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_get_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_get_file_args {
 	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_set_fd_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_set_file_args {
 	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct kenv_args {
 	char what_l_[PADL_(int)]; int what; char what_r_[PADR_(int)];
@@ -1100,15 +1100,15 @@ struct ksem_destroy_args {
 };
 struct __mac_get_pid_args {
 	char pid_l_[PADL_(pid_t)]; pid_t pid; char pid_r_[PADR_(pid_t)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_get_link_args {
 	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct __mac_set_link_args {
 	char path_p_l_[PADL_(const char * __capability)]; const char * __capability path_p; char path_p_r_[PADR_(const char * __capability)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct extattr_set_link_args {
 	char path_l_[PADL_(const char * __capability)]; const char * __capability path; char path_r_[PADR_(const char * __capability)];
@@ -1133,7 +1133,7 @@ struct __mac_execve_args {
 	char fname_l_[PADL_(const char * __capability)]; const char * __capability fname; char fname_r_[PADR_(const char * __capability)];
 	char argv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability argv; char argv_r_[PADR_(char * __capability * __capability)];
 	char envv_l_[PADL_(char * __capability * __capability)]; char * __capability * __capability envv; char envv_r_[PADR_(char * __capability * __capability)];
-	char mac_p_l_[PADL_(struct mac_native * __capability)]; struct mac_native * __capability mac_p; char mac_p_r_[PADR_(struct mac_native * __capability)];
+	char mac_p_l_[PADL_(struct mac * __capability)]; struct mac * __capability mac_p; char mac_p_r_[PADR_(struct mac * __capability)];
 };
 struct sigaction_args {
 	char sig_l_[PADL_(int)]; int sig; char sig_r_[PADR_(int)];

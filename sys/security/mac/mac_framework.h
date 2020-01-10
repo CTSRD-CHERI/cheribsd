@@ -68,6 +68,7 @@ struct ipq;
 struct ksem;
 struct label;
 struct m_tag;
+struct mac;
 struct mbuf;
 struct mount;
 struct msg;
@@ -91,23 +92,7 @@ struct vop_setlabel_args;
 #include <sys/acl.h>			/* XXX acl_type_t */
 #include <sys/types.h>			/* accmode_t */
 
-#if __has_feature(capabilities)
-struct mac_c {
-	size_t			m_buflen;
-	char * __capability	m_string;
-};
-#endif
-struct mac_native {
-	size_t		 m_buflen;
-	char		*m_string;
-};
-#if __has_feature(capabilities)
-typedef	struct mac_c		kmac_t;
-#else
-typedef	struct mac_native	kmac_t;
-#endif
-
-int	copyin_mac(void * __capability mac_p, kmac_t *mac);
+int	copyin_mac(void * __capability mac_p, struct mac *mac);
 
 /*
  * Entry points to the TrustedBSD MAC Framework from the remainder of the
@@ -286,7 +271,7 @@ int	mac_proc_check_wait(struct ucred *cred, struct proc *p);
 void	mac_proc_destroy(struct proc *);
 void	mac_proc_init(struct proc *);
 void	mac_proc_vm_revoke(struct thread *td);
-int	mac_execve_enter(struct image_params *imgp, kmac_t *mac_p);
+int	mac_execve_enter(struct image_params *imgp, struct mac *mac_p);
 void	mac_execve_exit(struct image_params *imgp);
 void	mac_execve_interpreter_enter(struct vnode *interpvp,
 	    struct label **interplabel);
@@ -312,11 +297,11 @@ void	mac_socket_destroy(struct socket *);
 int	mac_socket_init(struct socket *, int);
 void	mac_socket_newconn(struct socket *oldso, struct socket *newso);
 int	mac_getsockopt_label(struct ucred *cred, struct socket *so,
-	    const kmac_t *extmac);
+	    const struct mac *extmac);
 int	mac_getsockopt_peerlabel(struct ucred *cred, struct socket *so,
-	    const kmac_t *extmac);
+	    const struct mac *extmac);
 int	mac_setsockopt_label(struct ucred *cred, struct socket *so,
-	    const kmac_t *extmac);
+	    const struct mac *extmac);
 
 void	mac_socketpeer_set_from_mbuf(struct mbuf *m, struct socket *so);
 void	mac_socketpeer_set_from_socket(struct socket *oldso,

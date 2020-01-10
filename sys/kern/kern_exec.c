@@ -267,7 +267,7 @@ struct __mac_execve_args {
 	char	*fname;
 	char	**argv;
 	char	**envv;
-	struct mac_native	*mac_p;
+	struct mac	*mac_p;
 };
 #endif
 
@@ -385,8 +385,8 @@ do_execve(struct thread *td, struct image_args *args,
 	struct vnode *oldtextvp = NULL, *newtextvp;
 	int credential_changing;
 #ifdef MAC
-	kmac_t extmac;
-	kmac_t *mac_p;
+	struct mac extmac;
+	struct mac *mac_p;
 	struct label *interpvplabel = NULL;
 	int will_transition;
 #endif

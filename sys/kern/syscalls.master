@@ -2003,36 +2003,36 @@
 383	AUE_NULL	OBSOL	kse_release
 384	AUE_NULL	STD {
 		int __mac_get_proc(
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 385	AUE_NULL	STD {
 		int __mac_set_proc(
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 386	AUE_NULL	STD {
 		int __mac_get_fd(
 		    int fd,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 387	AUE_NULL	STD {
 		int __mac_get_file(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 388	AUE_NULL	STD {
 		int __mac_set_fd(
 		    int fd,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 389	AUE_NULL	STD {
 		int __mac_set_file(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 390	AUE_NULL	STD {
@@ -2153,19 +2153,19 @@
 409	AUE_NULL	STD {
 		int __mac_get_pid(
 		    pid_t pid,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 410	AUE_NULL	STD {
 		int __mac_get_link(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 411	AUE_NULL	STD {
 		int __mac_set_link(
 		    _In_z_ const char *path_p,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 412	AUE_EXTATTR_SET_LINK	STD {
@@ -2198,7 +2198,7 @@
 		    _In_z_ const char *fname,
 		    _In_ char **argv,
 		    _In_ char **envv,
-		    _In_ _Contains_long_ptr_ struct mac_native *mac_p
+		    _In_ _Contains_long_ptr_ struct mac *mac_p
 		);
 	}
 416	AUE_SIGACTION	STD {

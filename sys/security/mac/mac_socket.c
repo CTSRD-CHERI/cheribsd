@@ -526,7 +526,7 @@ mac_socket_label_set(struct ucred *cred, struct socket *so,
 
 int
 mac_setsockopt_label(struct ucred *cred, struct socket *so,
-    const kmac_t *mac)
+    const struct mac *mac)
 {
 	struct label *intlabel;
 	char *buffer;
@@ -560,7 +560,7 @@ out:
 
 int
 mac_getsockopt_label(struct ucred *cred, struct socket *so,
-    const kmac_t *mac)
+    const struct mac *mac)
 {
 	char *buffer, *elements;
 	struct label *intlabel;
@@ -599,7 +599,7 @@ mac_getsockopt_label(struct ucred *cred, struct socket *so,
 
 int
 mac_getsockopt_peerlabel(struct ucred *cred, struct socket *so,
-    const kmac_t *mac)
+    const struct mac *mac)
 {
 	char *elements, *buffer;
 	struct label *intlabel;

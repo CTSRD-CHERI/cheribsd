@@ -591,7 +591,7 @@ mac_error_select(int error1, int error2)
 }
 
 int
-mac_check_structmac_consistent(const kmac_t *mac)
+mac_check_structmac_consistent(const struct mac *mac)
 {
 
 	/* Require that labels have a non-zero length. */
@@ -603,7 +603,7 @@ mac_check_structmac_consistent(const kmac_t *mac)
 }
 
 int
-copyin_mac(void * __capability mac_p, kmac_t *mac)
+copyin_mac(void * __capability mac_p, struct mac *mac)
 {
 	int error;
 
@@ -613,16 +613,16 @@ copyin_mac(void * __capability mac_p, kmac_t *mac)
 		error = EOPNOTSUPP;
 	else
 #endif
-#ifdef COMPAT_CHERIABI
-	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		error = copyincap(mac_p, mac, sizeof(*mac));
-	} else
-#endif
-	{
-		struct mac_native tmpmac;
+#ifdef COMPAT_FREEBSD64
+	if (!SV_CURPROC_FLAG(SV_CHERI)) {
+		struct mac64 tmpmac;
 		error = copyin(mac_p, &tmpmac, sizeof(tmpmac));
 		mac->m_buflen = tmpmac.m_buflen;
 		mac->m_string = __USER_CAP(tmpmac.m_string, tmpmac.m_buflen);
+	} else
+#endif
+	{
+		error = copyincap(mac_p, mac, sizeof(*mac));
 	}
 	return (error);
 }

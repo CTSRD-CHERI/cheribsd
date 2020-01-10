@@ -135,7 +135,7 @@ mac_thread_userret(struct thread *td)
 }
 
 int
-mac_execve_enter(struct image_params *imgp, kmac_t *mac)
+mac_execve_enter(struct image_params *imgp, struct mac *mac)
 {
 	struct label *label;
 	char *buffer;
