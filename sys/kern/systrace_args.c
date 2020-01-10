@@ -538,7 +538,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		struct fcntl_args *p = params;
 		iarg[0] = p->fd; /* int */
 		iarg[1] = p->cmd; /* int */
-		uarg[2] = (intptr_t) p->arg; /* intptr_t */
+		uarg[2] = (intptr_t) p->arg; /* intcap_t */
 		*n_args = 3;
 		break;
 	}
@@ -864,10 +864,10 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 169: {
 		struct semsys_args *p = params;
 		iarg[0] = p->which; /* int */
-		uarg[1] = (intptr_t) p->a2; /* intptr_t */
-		uarg[2] = (intptr_t) p->a3; /* intptr_t */
-		uarg[3] = (intptr_t) p->a4; /* intptr_t */
-		uarg[4] = (intptr_t) p->a5; /* intptr_t */
+		uarg[1] = (intptr_t) p->a2; /* intcap_t */
+		uarg[2] = (intptr_t) p->a3; /* intcap_t */
+		uarg[3] = (intptr_t) p->a4; /* intcap_t */
+		uarg[4] = (intptr_t) p->a5; /* intcap_t */
 		*n_args = 5;
 		break;
 	}
@@ -875,11 +875,11 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 170: {
 		struct msgsys_args *p = params;
 		iarg[0] = p->which; /* int */
-		uarg[1] = (intptr_t) p->a2; /* intptr_t */
-		uarg[2] = (intptr_t) p->a3; /* intptr_t */
-		uarg[3] = (intptr_t) p->a4; /* intptr_t */
-		uarg[4] = (intptr_t) p->a5; /* intptr_t */
-		uarg[5] = (intptr_t) p->a6; /* intptr_t */
+		uarg[1] = (intptr_t) p->a2; /* intcap_t */
+		uarg[2] = (intptr_t) p->a3; /* intcap_t */
+		uarg[3] = (intptr_t) p->a4; /* intcap_t */
+		uarg[4] = (intptr_t) p->a5; /* intcap_t */
+		uarg[5] = (intptr_t) p->a6; /* intcap_t */
 		*n_args = 6;
 		break;
 	}
@@ -887,9 +887,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 171: {
 		struct shmsys_args *p = params;
 		iarg[0] = p->which; /* int */
-		uarg[1] = (intptr_t) p->a2; /* intptr_t */
-		uarg[2] = (intptr_t) p->a3; /* intptr_t */
-		uarg[3] = (intptr_t) p->a4; /* intptr_t */
+		uarg[1] = (intptr_t) p->a2; /* intcap_t */
+		uarg[2] = (intptr_t) p->a3; /* intcap_t */
+		uarg[3] = (intptr_t) p->a4; /* intcap_t */
 		*n_args = 4;
 		break;
 	}
@@ -4183,7 +4183,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		default:
 			break;
@@ -4742,16 +4742,16 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		case 3:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		case 4:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		default:
 			break;
@@ -4764,19 +4764,19 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		case 3:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		case 4:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		case 5:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		default:
 			break;
@@ -4789,13 +4789,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		case 2:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		case 3:
-			p = "intptr_t";
+			p = "intcap_t";
 			break;
 		default:
 			break;

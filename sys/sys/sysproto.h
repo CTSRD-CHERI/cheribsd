@@ -332,7 +332,7 @@ struct dup2_args {
 struct fcntl_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(intptr_t)]; intptr_t arg; char arg_r_[PADR_(intptr_t)];
+	char arg_l_[PADL_(intcap_t)]; intcap_t arg; char arg_r_[PADR_(intcap_t)];
 };
 struct select_args {
 	char nd_l_[PADL_(int)]; int nd; char nd_r_[PADR_(int)];
@@ -514,24 +514,24 @@ struct rtprio_args {
 };
 struct semsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(intcap_t)]; intcap_t a2; char a2_r_[PADR_(intcap_t)];
+	char a3_l_[PADL_(intcap_t)]; intcap_t a3; char a3_r_[PADR_(intcap_t)];
+	char a4_l_[PADL_(intcap_t)]; intcap_t a4; char a4_r_[PADR_(intcap_t)];
+	char a5_l_[PADL_(intcap_t)]; intcap_t a5; char a5_r_[PADR_(intcap_t)];
 };
 struct msgsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
-	char a5_l_[PADL_(intptr_t)]; intptr_t a5; char a5_r_[PADR_(intptr_t)];
-	char a6_l_[PADL_(intptr_t)]; intptr_t a6; char a6_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(intcap_t)]; intcap_t a2; char a2_r_[PADR_(intcap_t)];
+	char a3_l_[PADL_(intcap_t)]; intcap_t a3; char a3_r_[PADR_(intcap_t)];
+	char a4_l_[PADL_(intcap_t)]; intcap_t a4; char a4_r_[PADR_(intcap_t)];
+	char a5_l_[PADL_(intcap_t)]; intcap_t a5; char a5_r_[PADR_(intcap_t)];
+	char a6_l_[PADL_(intcap_t)]; intcap_t a6; char a6_r_[PADR_(intcap_t)];
 };
 struct shmsys_args {
 	char which_l_[PADL_(int)]; int which; char which_r_[PADR_(int)];
-	char a2_l_[PADL_(intptr_t)]; intptr_t a2; char a2_r_[PADR_(intptr_t)];
-	char a3_l_[PADL_(intptr_t)]; intptr_t a3; char a3_r_[PADR_(intptr_t)];
-	char a4_l_[PADL_(intptr_t)]; intptr_t a4; char a4_r_[PADR_(intptr_t)];
+	char a2_l_[PADL_(intcap_t)]; intcap_t a2; char a2_r_[PADR_(intcap_t)];
+	char a3_l_[PADL_(intcap_t)]; intcap_t a3; char a3_r_[PADR_(intcap_t)];
+	char a4_l_[PADL_(intcap_t)]; intcap_t a4; char a4_r_[PADR_(intcap_t)];
 };
 struct setfib_args {
 	char fibnum_l_[PADL_(int)]; int fibnum; char fibnum_r_[PADR_(int)];
