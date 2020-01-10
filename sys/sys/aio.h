@@ -76,47 +76,28 @@
 
 #endif
 
-#ifndef _KERNEL
 /*
  * I/O control block
  */
 typedef struct aiocb {
 	int	aio_fildes;		/* File descriptor */
 	off_t	aio_offset;		/* File offset for I/O */
-	volatile void *aio_buf;         /* I/O buffer in process space */
+	volatile void * __kerncap aio_buf; /* I/O buffer in process space */
 	size_t	aio_nbytes;		/* Number of bytes for I/O */
 	int	__spare__[2];
-	void	*__spare2__;
+	void	* __kerncap __spare2__;
 	int	aio_lio_opcode;		/* LIO opcode */
 	int	aio_reqprio;		/* Request priority -- ignored */
 	struct {
 		long	status;
 		long	error;
-		void	*kernelinfo;
+		void	* __kerncap kernelinfo;
 	} _aiocb_private;
 	struct	sigevent aio_sigevent;	/* Signal to deliver */
 } aiocb_t;
-#endif
 
 #ifdef _KERNEL
-
-struct aiocb_native {
-	int	aio_fildes;		/* File descriptor */
-	off_t	aio_offset;		/* File offset for I/O */
-	volatile void *aio_buf;         /* I/O buffer in process space */
-	size_t	aio_nbytes;		/* Number of bytes for I/O */
-	int	__spare__[2];
-	void	*__spare2__;
-	int	aio_lio_opcode;		/* LIO opcode */
-	int	aio_reqprio;		/* Request priority -- ignored */
-	struct {
-		long	status;
-		long	error;
-		void	*kernelinfo;
-	} _aiocb_private;
-	struct sigevent aio_sigevent;	/* Signal to deliver */
-};
-#if __has_feature(capabilities)
+#ifdef COMPAT_CHERIABI
 struct aiocb_c {
 	int	aio_fildes;		/* File descriptor */
 	off_t	aio_offset;		/* File offset for I/O */
@@ -133,9 +114,6 @@ struct aiocb_c {
 	} _aiocb_private;
 	struct sigevent aio_sigevent;	/* Signal to deliver */
 };
-typedef	struct aiocb_c		kaiocb_t;
-#else
-typedef	struct aiocb_native	kaiocb_t;
 #endif
 
 typedef void aio_cancel_fn_t(struct kaiocb *);
@@ -166,7 +144,7 @@ struct kaiocb {
 	void * __capability ujob;	/* (*) pointer to userspace aiocb */
 	intcap_t	ujobptr;
 	struct	knlist klist;		/* (a) list of knotes */
-	kaiocb_t uaiocb;		/* (*) copy of user I/O control block */
+	struct	aiocb uaiocb;		/* (*) copy of user I/O control block */
 	ksiginfo_t ksi;			/* (a) realtime signal info */
 	uint64_t seqno;			/* (*) job number */
 	aio_cancel_fn_t *cancel_fn;	/* (a) backend cancel function */
