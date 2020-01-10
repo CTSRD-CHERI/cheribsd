@@ -640,7 +640,7 @@ user_procctl(struct thread *td, idtype_t idtype, id_t id, int com,
 		break;
 	case PROC_REAP_GETPIDS:
 		/* XXX: fix for cheriabi and freebsd32 */
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI)) {
 			error = copyincap(udata, &x.rp, sizeof(x.rp));
 			if (error != 0)

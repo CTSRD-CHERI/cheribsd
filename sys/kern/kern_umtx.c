@@ -5400,7 +5400,7 @@ umtx_read_uptr(struct thread *td, uintcap_t ptr, uintcap_t *res)
 #endif
 	int error;
 
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		error = fuecap((void * __capability)ptr, &res1);
 	} else
@@ -5434,7 +5434,7 @@ umtx_read_rb_list(struct thread *td, struct umutex *m, uintcap_t *rb_list)
 	struct umutex32 m32;
 #endif
 
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		cheri_memcpy(&m_c, m, sizeof(m_c));
 		*rb_list = m_c.m_rb_lnk;
@@ -5461,7 +5461,7 @@ umtx_handle_rb(struct thread *td, uintcap_t rbp, uintcap_t *rb_list, bool inact)
 	int error;
 
 	KASSERT(td->td_proc == curproc, ("need current vmspace"));
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 	if (SV_PROC_FLAG(td->td_proc, SV_CHERI)) {
 		error = copyincap((void * __capability)rbp, &mu.m_c,
 		    sizeof(mu.m_c));
