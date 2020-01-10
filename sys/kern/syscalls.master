@@ -1457,18 +1457,18 @@
 	}
 255	AUE_AIO_READ	STD {
 		int aio_read(
-		    _Inout_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 256	AUE_AIO_WRITE	STD {
 		int aio_write(
-		    _Inout_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 257	AUE_LIO_LISTIO	STD {
 		int lio_listio(
 		    int mode,
-		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb_native * const *acb_list,
+		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb * const *acb_list,
 		    int nent,
 		    _In_opt_ _Contains_long_ptr_ struct sigevent *sig
 		);
@@ -1632,12 +1632,12 @@
 313	AUE_NULL	OBSOL	signanosleep
 314	AUE_AIO_RETURN	STD {
 		ssize_t aio_return(
-		    _Inout_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _Inout_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 315	AUE_AIO_SUSPEND	STD {
 		int aio_suspend(
-		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb_native * const *aiocbp,
+		    _Inout_updates_(nent) _Contains_long_ptr_ struct aiocb * const *aiocbp,
 		    int nent,
 		    _In_opt_ _Contains_long_timet_ const struct timespec *timeout
 		);
@@ -1645,12 +1645,12 @@
 316	AUE_AIO_CANCEL	STD {
 		int aio_cancel(
 		    int fd,
-		    _In_opt_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_opt_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 317	AUE_AIO_ERROR	STD {
 		int aio_error(
-		    _In_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 318	AUE_AIO_READ	COMPAT6 {
@@ -1903,7 +1903,7 @@
 	}
 359	AUE_AIO_WAITCOMPLETE	STD {
 		ssize_t aio_waitcomplete(
-		    _Outptr_result_maybenull_ _Contains_long_ptr_ struct aiocb_native **aiocbp,
+		    _Outptr_result_maybenull_ _Contains_long_ptr_ struct aiocb **aiocbp,
 		    _In_opt_ _Contains_long_timet_ struct timespec *timeout
 		);
 	}
@@ -2478,7 +2478,7 @@
 465	AUE_AIO_FSYNC	STD {
 		int aio_fsync(
 		    int op,
-		    _In_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 466	AUE_RTPRIO	STD {
@@ -3004,7 +3004,7 @@
 	}
 543	AUE_AIO_MLOCK	STD {
 		int aio_mlock(
-		    _In_ _Contains_long_ptr_ struct aiocb_native *aiocbp
+		    _In_ _Contains_long_ptr_ struct aiocb *aiocbp
 		);
 	}
 544	AUE_PROCCTL	STD {

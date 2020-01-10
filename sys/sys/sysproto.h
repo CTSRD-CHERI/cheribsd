@@ -712,14 +712,14 @@ struct lchown_args {
 	char gid_l_[PADL_(int)]; int gid; char gid_r_[PADR_(int)];
 };
 struct aio_read_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct aio_write_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct lio_listio_args {
 	char mode_l_[PADL_(int)]; int mode; char mode_r_[PADR_(int)];
-	char acb_list_l_[PADL_(struct aiocb_native * __capability const * __capability)]; struct aiocb_native * __capability const * __capability acb_list; char acb_list_r_[PADR_(struct aiocb_native * __capability const * __capability)];
+	char acb_list_l_[PADL_(struct aiocb * __capability const * __capability)]; struct aiocb * __capability const * __capability acb_list; char acb_list_r_[PADR_(struct aiocb * __capability const * __capability)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char sig_l_[PADL_(struct sigevent * __capability)]; struct sigevent * __capability sig; char sig_r_[PADR_(struct sigevent * __capability)];
 };
@@ -799,19 +799,19 @@ struct setresgid_args {
 	char sgid_l_[PADL_(gid_t)]; gid_t sgid; char sgid_r_[PADR_(gid_t)];
 };
 struct aio_return_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct aio_suspend_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability const * __capability)]; struct aiocb_native * __capability const * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability const * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability const * __capability)]; struct aiocb * __capability const * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability const * __capability)];
 	char nent_l_[PADL_(int)]; int nent; char nent_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };
 struct aio_cancel_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct aio_error_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct yield_args {
 	register_t dummy;
@@ -959,7 +959,7 @@ struct extattr_delete_file_args {
 	char attrname_l_[PADL_(const char * __capability)]; const char * __capability attrname; char attrname_r_[PADR_(const char * __capability)];
 };
 struct aio_waitcomplete_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability * __capability)]; struct aiocb_native * __capability * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability * __capability)]; struct aiocb * __capability * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability * __capability)];
 	char timeout_l_[PADL_(struct timespec * __capability)]; struct timespec * __capability timeout; char timeout_r_[PADR_(struct timespec * __capability)];
 };
 struct getresuid_args {
@@ -1320,7 +1320,7 @@ struct thr_set_name_args {
 };
 struct aio_fsync_args {
 	char op_l_[PADL_(int)]; int op; char op_r_[PADR_(int)];
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct rtprio_thread_args {
 	char function_l_[PADL_(int)]; int function; char function_r_[PADR_(int)];
@@ -1681,7 +1681,7 @@ struct pipe2_args {
 	char flags_l_[PADL_(int)]; int flags; char flags_r_[PADR_(int)];
 };
 struct aio_mlock_args {
-	char aiocbp_l_[PADL_(struct aiocb_native * __capability)]; struct aiocb_native * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb_native * __capability)];
+	char aiocbp_l_[PADL_(struct aiocb * __capability)]; struct aiocb * __capability aiocbp; char aiocbp_r_[PADR_(struct aiocb * __capability)];
 };
 struct procctl_args {
 	char idtype_l_[PADL_(idtype_t)]; idtype_t idtype; char idtype_r_[PADR_(idtype_t)];

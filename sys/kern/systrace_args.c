@@ -1299,14 +1299,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* aio_read */
 	case 255: {
 		struct aio_read_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * __capability */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * __capability */
 		*n_args = 1;
 		break;
 	}
 	/* aio_write */
 	case 256: {
 		struct aio_write_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * __capability */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * __capability */
 		*n_args = 1;
 		break;
 	}
@@ -1314,7 +1314,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 257: {
 		struct lio_listio_args *p = params;
 		iarg[0] = p->mode; /* int */
-		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb_native * __capability const * __capability */
+		uarg[1] = (intptr_t) p->acb_list; /* struct aiocb * __capability const * __capability */
 		iarg[2] = p->nent; /* int */
 		uarg[3] = (intptr_t) p->sig; /* struct sigevent * __capability */
 		*n_args = 4;
@@ -1474,14 +1474,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* aio_return */
 	case 314: {
 		struct aio_return_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * __capability */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * __capability */
 		*n_args = 1;
 		break;
 	}
 	/* aio_suspend */
 	case 315: {
 		struct aio_suspend_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * __capability const * __capability */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * __capability const * __capability */
 		iarg[1] = p->nent; /* int */
 		uarg[2] = (intptr_t) p->timeout; /* const struct timespec * __capability */
 		*n_args = 3;
@@ -1491,14 +1491,14 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 316: {
 		struct aio_cancel_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb_native * __capability */
+		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb * __capability */
 		*n_args = 2;
 		break;
 	}
 	/* aio_error */
 	case 317: {
 		struct aio_error_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * __capability */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * __capability */
 		*n_args = 1;
 		break;
 	}
@@ -1776,7 +1776,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* aio_waitcomplete */
 	case 359: {
 		struct aio_waitcomplete_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * __capability * __capability */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * __capability * __capability */
 		uarg[1] = (intptr_t) p->timeout; /* struct timespec * __capability */
 		*n_args = 2;
 		break;
@@ -2459,7 +2459,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 465: {
 		struct aio_fsync_args *p = params;
 		iarg[0] = p->op; /* int */
-		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb_native * __capability */
+		uarg[1] = (intptr_t) p->aiocbp; /* struct aiocb * __capability */
 		*n_args = 2;
 		break;
 	}
@@ -3094,7 +3094,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	/* aio_mlock */
 	case 543: {
 		struct aio_mlock_args *p = params;
-		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb_native * __capability */
+		uarg[0] = (intptr_t) p->aiocbp; /* struct aiocb * __capability */
 		*n_args = 1;
 		break;
 	}
@@ -5408,7 +5408,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 255:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_native * __capability";
+			p = "userland struct aiocb * __capability";
 			break;
 		default:
 			break;
@@ -5418,7 +5418,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 256:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_native * __capability";
+			p = "userland struct aiocb * __capability";
 			break;
 		default:
 			break;
@@ -5431,7 +5431,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb_native * __capability const * __capability";
+			p = "userland struct aiocb * __capability const * __capability";
 			break;
 		case 2:
 			p = "int";
@@ -5691,7 +5691,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 314:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_native * __capability";
+			p = "userland struct aiocb * __capability";
 			break;
 		default:
 			break;
@@ -5701,7 +5701,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 315:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_native * __capability const * __capability";
+			p = "userland struct aiocb * __capability const * __capability";
 			break;
 		case 1:
 			p = "int";
@@ -5720,7 +5720,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb_native * __capability";
+			p = "userland struct aiocb * __capability";
 			break;
 		default:
 			break;
@@ -5730,7 +5730,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 317:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_native * __capability";
+			p = "userland struct aiocb * __capability";
 			break;
 		default:
 			break;
@@ -6187,7 +6187,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 359:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_native * __capability * __capability";
+			p = "userland struct aiocb * __capability * __capability";
 			break;
 		case 1:
 			p = "userland struct timespec * __capability";
@@ -7344,7 +7344,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland struct aiocb_native * __capability";
+			p = "userland struct aiocb * __capability";
 			break;
 		default:
 			break;
@@ -8489,7 +8489,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 	case 543:
 		switch(ndx) {
 		case 0:
-			p = "userland struct aiocb_native * __capability";
+			p = "userland struct aiocb * __capability";
 			break;
 		default:
 			break;
