@@ -2040,7 +2040,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 	case GETALL:
 	case SETVAL:
 	case SETALL:
-		error = copyin(uap->arg, &arg, sizeof(arg));
+		error = copyincap(uap->arg, &arg, sizeof(arg));
 		if (error)
 			return (error);
 		break;
@@ -2052,7 +2052,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 		semun.buf = &dsbuf;
 		break;
 	case IPC_SET:
-		error = copyin(__USER_CAP_OBJ(arg.buf), &dsold, sizeof(dsold));
+		error = copyin(arg.buf, &dsold, sizeof(dsold));
 		if (error)
 			return (error);
 		ipcperm_old2new(&dsold.sem_perm, &dsbuf.sem_perm);
@@ -2064,8 +2064,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 		break;
 	case GETALL:
 	case SETALL:
-		/* Longer than ideal, but better than nothing */
-		semun.array = __USER_CAP_ARRAY(arg.array, SHRT_MAX);
+		semun.array = arg.array;
 		break;
 	case SETVAL:
 		semun.val = arg.val;
@@ -2086,7 +2085,7 @@ freebsd7___semctl(struct thread *td, struct freebsd7___semctl_args *uap)
 		CP(dsbuf, dsold, sem_nsems);
 		CP(dsbuf, dsold, sem_otime);
 		CP(dsbuf, dsold, sem_ctime);
-		error = copyout(&dsold, __USER_CAP_OBJ(arg.buf), sizeof(dsold));
+		error = copyoutcap(&dsold, arg.buf, sizeof(dsold));
 		break;
 	}
 

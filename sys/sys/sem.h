@@ -72,7 +72,7 @@ struct sembuf {
 union semun_old {
 	int		val;		/* value for SETVAL */
 	struct		semid_ds_old *buf; /* buffer for IPC_STAT & IPC_SET */
-	unsigned short	*array;		/* array for GETALL & SETALL */
+	unsigned short * __kerncap array; /* array for GETALL & SETALL */
 };
 #endif
 #if defined(_WANT_SEMUN) || defined(_KERNEL)

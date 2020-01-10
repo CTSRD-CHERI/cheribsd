@@ -2311,8 +2311,7 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 	DPRINTF(("call to freebsd7_msgctl(%d, %d, %p)\n", uap->msqid, uap->cmd,
 	    uap->buf));
 	if (uap->cmd == IPC_SET) {
-		error = copyin(__USER_CAP_OBJ(uap->buf), &msqold,
-		    sizeof(msqold));
+		error = copyin(uap->buf, &msqold, sizeof(msqold));
 		if (error)
 			return (error);
 		ipcperm_old2new(&msqold.msg_perm, &msqbuf.msg_perm);
@@ -2343,8 +2342,7 @@ freebsd7_msgctl(struct thread *td, struct freebsd7_msgctl_args *uap)
 		CP(msqbuf, msqold, msg_stime);
 		CP(msqbuf, msqold, msg_rtime);
 		CP(msqbuf, msqold, msg_ctime);
-		error = copyout(&msqold, __USER_CAP_OBJ(uap->buf),
-		    sizeof(struct msqid_ds_old));
+		error = copyout(&msqold, uap->buf, sizeof(msqold));
 	}
 	return (error);
 }

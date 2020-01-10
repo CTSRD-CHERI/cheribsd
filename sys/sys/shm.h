@@ -98,7 +98,7 @@ struct shmid_ds_old {
 	time_t          shm_atime;	/* time of last shmat() */
 	time_t          shm_dtime;	/* time of last shmdt() */
 	time_t          shm_ctime;	/* time of last change by shmctl() */
-	void           *shm_internal;   /* sysv stupidity */
+	void * __kerncap shm_internal;	/* sysv stupidity */
 };
 #endif
 

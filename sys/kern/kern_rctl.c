@@ -1609,9 +1609,8 @@ int
 sys_rctl_get_racct(struct thread *td, struct rctl_get_racct_args *uap)
 {
 
-	return (kern_rctl_get_racct(td, __USER_CAP(uap->inbufp, uap->inbuflen),
-	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
-	    uap->outbuflen));
+	return (kern_rctl_get_racct(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
 }
 
 int
@@ -1715,9 +1714,8 @@ int
 sys_rctl_get_rules(struct thread *td, struct rctl_get_rules_args *uap)
 {
 
-	return (kern_rctl_get_rules(td, __USER_CAP(uap->inbufp, uap->inbuflen),
-	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
-	    uap->outbuflen));
+	return (kern_rctl_get_rules(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
 }
 
 int
@@ -1811,9 +1809,8 @@ int
 sys_rctl_get_limits(struct thread *td, struct rctl_get_limits_args *uap)
 {
 
-	return (kern_rctl_get_limits(td, __USER_CAP(uap->inbufp, uap->inbuflen),
-	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
-	    uap->outbuflen));
+	return (kern_rctl_get_limits(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
 }
 
 int
@@ -1904,9 +1901,8 @@ int
 sys_rctl_add_rule(struct thread *td, struct rctl_add_rule_args *uap)
 {
 
-	return (kern_rctl_add_rule(td, __USER_CAP(uap->inbufp, uap->inbuflen),
-	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
-	    uap->outbuflen));
+	return (kern_rctl_add_rule(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
 }
 
 int
@@ -1959,9 +1955,8 @@ int
 sys_rctl_remove_rule(struct thread *td, struct rctl_remove_rule_args *uap)
 {
 
-	return (kern_rctl_remove_rule(td, __USER_CAP(uap->inbufp, uap->inbuflen),
-	    uap->inbuflen, __USER_CAP(uap->outbufp, uap->outbuflen),
-	    uap->outbuflen));
+	return (kern_rctl_remove_rule(td, uap->inbufp, uap->inbuflen,
+	    uap->outbufp, uap->outbuflen));
 }
 
 int
