@@ -394,7 +394,7 @@ public:
 };
 
 #ifdef __CHERI_PURE_CAPABILITY__
-#define _pint_to_addr(val) ((__cheri_addr LocalAddressSpace::addr_t)val)
+#define _pint_to_addr(val) (__builtin_cheri_address_get((void*)val))
 #define PC_T_PINT_T_COMPARATORS(op)                                            \
   inline bool operator op(LocalAddressSpace::pint_t lhs,                       \
                           const LocalAddressSpace::pc_t &rhs) {                \
