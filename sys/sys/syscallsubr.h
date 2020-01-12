@@ -445,6 +445,7 @@ int	kern_sendit(struct thread *td, int s, struct msghdr *mp, int flags,
 int	kern_setgroups(struct thread *td, u_int ngrp, gid_t *groups);
 int	kern_setitimer(struct thread *, u_int, struct itimerval *,
 	    struct itimerval *);
+int	kern_setpriority(struct thread *td, int which, int who, int prio);
 int	kern_setrlimit(struct thread *, u_int, struct rlimit *);
 int	kern_setsockopt(struct thread *td, int s, int level, int name,
 	    const void * __capability val, enum uio_seg valseg,
