@@ -2503,7 +2503,7 @@ static void
 iscsi_shutdown_post(struct iscsi_softc *sc)
 {
 
-	if (panicstr == NULL) {
+	if (!KERNEL_PANICKED()) {
 		ISCSI_DEBUG("removing all sessions due to shutdown");
 		iscsi_terminate_sessions(sc);
 	}
