@@ -145,8 +145,8 @@ CTASSERT(sizeof(struct kevent32) == 20);
 CTASSERT(sizeof(struct iovec32) == 8);
 #endif
 
-static int cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count);
-static int cheriabi_kevent_copyin(void *arg, kkevent_t *kevp, int count);
+static int cheriabi_kevent_copyout(void *arg, struct kevent *kevp, int count);
+static int cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count);
 
 int
 cheriabi_wait4(struct thread *td, struct cheriabi_wait4_args *uap)
@@ -216,7 +216,7 @@ cheriabi_fexecve(struct thread *td, struct cheriabi_fexecve_args *uap)
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
 static int
-cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count)
+cheriabi_kevent_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct cheriabi_kevent_args *uap;
 	int error;
@@ -234,7 +234,7 @@ cheriabi_kevent_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-cheriabi_kevent_copyin(void *arg, kkevent_t *kevp, int count)
+cheriabi_kevent_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct cheriabi_kevent_args *uap;
 	int error;

@@ -1516,7 +1516,7 @@ aio_aqueue(struct thread *td, struct aiocb * __capability ujob, void *ujobptrp,
 	struct file *fp;
 	struct kaiocb *job;
 	struct kaioinfo *ki;
-	kkevent_t kev;
+	struct kevent kev;
 	int opcode;
 	int error;
 	int fd, kqfd;
@@ -2220,7 +2220,7 @@ kern_lio_listio(struct thread *td, int mode, intcap_t uacb_list,
 	struct aiocb * __capability job;
 	struct kaioinfo *ki;
 	struct aioliojob *lj;
-	kkevent_t kev;
+	struct kevent kev;
 	int error;
 	int nagain, nerror;
 	int i;

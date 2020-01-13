@@ -145,8 +145,8 @@ CTASSERT(sizeof(struct freebsd11_stat32) == 96);
 #endif
 CTASSERT(sizeof(struct sigaction32) == 24);
 
-static int freebsd32_kevent_copyout(void *arg, kkevent_t *kevp, int count);
-static int freebsd32_kevent_copyin(void *arg, kkevent_t *kevp, int count);
+static int freebsd32_kevent_copyout(void *arg, struct kevent *kevp, int count);
+static int freebsd32_kevent_copyin(void *arg, struct kevent *kevp, int count);
 static int freebsd32_user_clock_nanosleep(struct thread *td, clockid_t clock_id,
     int flags, const struct timespec32 *ua_rqtp, struct timespec32 *ua_rmtp);
 
@@ -529,7 +529,7 @@ freebsd32_pselect(struct thread *td, struct freebsd32_pselect_args *uap)
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
 static int
-freebsd32_kevent_copyout(void *arg, kkevent_t *kevp, int count)
+freebsd32_kevent_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd32_kevent_args *uap;
 	struct kevent32	ks32[KQ_NEVENTS];
@@ -573,7 +573,7 @@ freebsd32_kevent_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-freebsd32_kevent_copyin(void *arg, kkevent_t *kevp, int count)
+freebsd32_kevent_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd32_kevent_args *uap;
 	struct kevent32	ks32[KQ_NEVENTS];
@@ -653,7 +653,7 @@ freebsd32_kevent(struct thread *td, struct freebsd32_kevent_args *uap)
 
 #ifdef COMPAT_FREEBSD11
 static int
-freebsd32_kevent11_copyout(void *arg, kkevent_t *kevp, int count)
+freebsd32_kevent11_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_freebsd32_kevent_args *uap;
 	struct kevent32_freebsd11 ks32[KQ_NEVENTS];
@@ -680,7 +680,7 @@ freebsd32_kevent11_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-freebsd32_kevent11_copyin(void *arg, kkevent_t *kevp, int count)
+freebsd32_kevent11_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_freebsd32_kevent_args *uap;
 	struct kevent32_freebsd11 ks32[KQ_NEVENTS];
