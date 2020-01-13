@@ -3314,7 +3314,6 @@ nfsd_mntinit(void)
 	inited = 1;
 	nfsv4root_mnt.mnt_flag = (MNT_RDONLY | MNT_EXPORTED);
 	TAILQ_INIT(&nfsv4root_mnt.mnt_nvnodelist);
-	TAILQ_INIT(&nfsv4root_mnt.mnt_activevnodelist);
 	TAILQ_INIT(&nfsv4root_mnt.mnt_lazyvnodelist);
 	nfsv4root_mnt.mnt_export = NULL;
 	TAILQ_INIT(&nfsv4root_opt);
@@ -3322,7 +3321,6 @@ nfsd_mntinit(void)
 	nfsv4root_mnt.mnt_opt = &nfsv4root_opt;
 	nfsv4root_mnt.mnt_optnew = &nfsv4root_newopt;
 	nfsv4root_mnt.mnt_nvnodelistsize = 0;
-	nfsv4root_mnt.mnt_activevnodelistsize = 0;
 	nfsv4root_mnt.mnt_lazyvnodelistsize = 0;
 }
 
