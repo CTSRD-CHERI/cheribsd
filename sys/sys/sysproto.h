@@ -1527,7 +1527,7 @@ struct __semctl_args {
 	char semid_l_[PADL_(int)]; int semid; char semid_r_[PADR_(int)];
 	char semnum_l_[PADL_(int)]; int semnum; char semnum_r_[PADR_(int)];
 	char cmd_l_[PADL_(int)]; int cmd; char cmd_r_[PADR_(int)];
-	char arg_l_[PADL_(union semun_native * __capability)]; union semun_native * __capability arg; char arg_r_[PADR_(union semun_native * __capability)];
+	char arg_l_[PADL_(union semun * __capability)]; union semun * __capability arg; char arg_r_[PADR_(union semun * __capability)];
 };
 struct msgctl_args {
 	char msqid_l_[PADL_(int)]; int msqid; char msqid_r_[PADR_(int)];

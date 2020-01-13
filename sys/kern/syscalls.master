@@ -2788,7 +2788,7 @@
 		    int semid,
 		    int semnum,
 		    int cmd,
-		    _Inout_ _Contains_ptr_ union semun_native *arg
+		    _Inout_ _Contains_ptr_ union semun *arg
 		);
 	}
 511	AUE_MSGCTL	NOSTD {

@@ -85,13 +85,6 @@ union semun {
 	unsigned short * __kerncap array; /* array for GETALL & SETALL */
 };
 #endif
-#if defined(_KERNEL)
-union semun_native {
-	int		val;		/* value for SETVAL */
-	struct		semid_ds *buf;	/* buffer for IPC_STAT & IPC_SET */
-	unsigned short	*array;		/* array for GETALL & SETALL */
-};
-#endif /* defined(_KERNEL) */
 
 /*
  * commands for semctl
