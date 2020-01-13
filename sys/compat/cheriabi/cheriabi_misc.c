@@ -411,7 +411,7 @@ cheriabi_jail_get(struct thread *td, struct cheriabi_jail_get_args *uap)
 int
 cheriabi_sigreturn(struct thread *td, struct cheriabi_sigreturn_args *uap)
 {
-	ucontext_c_t uc;
+	ucontext_t uc;
 	int error;
 
 	error = copyincap(uap->sigcntxp, &uc, sizeof(uc));
@@ -427,13 +427,13 @@ cheriabi_sigreturn(struct thread *td, struct cheriabi_sigreturn_args *uap)
 	return (EJUSTRETURN);
 }
 
-#define UCC_COPY_SIZE	offsetof(ucontext_c_t, uc_link)
+#define UCC_COPY_SIZE	offsetof(ucontext_t, uc_link)
 
 int
 cheriabi_getcontext(struct thread *td, struct cheriabi_getcontext_args *uap)
 {
 
-	ucontext_c_t uc;
+	ucontext_t uc;
 
 	if (uap->ucp == NULL)
 		return (EINVAL);
@@ -449,7 +449,7 @@ cheriabi_getcontext(struct thread *td, struct cheriabi_getcontext_args *uap)
 int
 cheriabi_setcontext(struct thread *td, struct cheriabi_setcontext_args *uap)
 {
-	ucontext_c_t uc;
+	ucontext_t uc;
 	int ret;
 
 	if (uap->ucp == NULL)
@@ -467,7 +467,7 @@ cheriabi_setcontext(struct thread *td, struct cheriabi_setcontext_args *uap)
 int
 cheriabi_swapcontext(struct thread *td, struct cheriabi_swapcontext_args *uap)
 {
-	ucontext_c_t uc;
+	ucontext_t uc;
 	int ret;
 
 	if (uap->oucp == NULL || uap->ucp == NULL)
@@ -1450,7 +1450,7 @@ cheriabi___sysctlbyname(struct thread *td,
  */
 
 struct thr_create_initthr_args_c {
-	ucontext_c_t ctx;
+	ucontext_t ctx;
 	long * __capability tid;
 };
 

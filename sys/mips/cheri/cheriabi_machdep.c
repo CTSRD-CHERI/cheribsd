@@ -327,7 +327,7 @@ cheriabi_set_syscall_retval(struct thread *td, int error)
 }
 
 int
-cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
+cheriabi_get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 {
 	struct trapframe *tp;
 
@@ -361,7 +361,7 @@ cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags)
 }
 
 int
-cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
+cheriabi_set_mcontext(struct thread *td, mcontext_t *mcp)
 {
 	struct trapframe *tp;
 	int tag;
@@ -392,7 +392,7 @@ cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp)
 
 /* Check that mcontext_c_t matches struct sigcontext) */
 #define	CHECK_SIGCTX_MCTX_OFFSET(mfield, sfield)	\
-    _Static_assert(offsetof(mcontext_c_t, mfield) == 	\
+    _Static_assert(offsetof(mcontext_t, mfield) == 	\
 	offsetof(struct sigcontext, sfield) -		\
 	offsetof(struct sigcontext, sc_onstack), "mcontext_c_t layout error")
 

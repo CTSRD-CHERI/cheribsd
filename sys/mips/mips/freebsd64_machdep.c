@@ -180,20 +180,92 @@ SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_freebsd64_brand_info);
 
-_Static_assert(sizeof(mcontext64_t) == sizeof(mcontext_t),
-    "mcontext_t and mcontext64_t aren't compatiable");
 int
 freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 {
+	mcontext_t mc;
+	unsigned i;
+	int error;
 
-	return (get_mcontext(td, (mcontext_t *)mcp, flags));
+	error = get_mcontext(td, &mc, flags);
+	if (error != 0)
+		return (error);
+
+	mcp->mc_onstack = mc.mc_onstack;
+	mcp->mc_pc = mc.mc_pc;
+	for (i = 0; i < 32; i++)
+		mcp->mc_regs[i] = mc.mc_regs[i];
+	mcp->sr = mc.sr;
+	mcp->mullo = mc.mullo;
+	mcp->mulhi = mc.mulhi;
+	mcp->mc_fpused = mc.mc_fpused;
+	for (i = 0; i < 33; i++)
+		mcp->mc_fpregs[i] = mc.mc_fpregs[i];
+	mcp->mc_fpc_eir = mc.mc_fpc_eir;
+	mcp->mc_tls = (__cheri_fromcap void *)mc.mc_tls;
+	mcp->cause = mc.cause;
+
+	/*
+	 * We can't store cap registers here directly.  If the caller
+	 * is using getcontextx(), that function will fetch the
+	 * capability registers and initialize these fields in
+	 * userland after getcontext() returns.
+	 */
+	mcp->mc_cp2state = 0;
+	mcp->mc_cp2state_len = 0;
+
+	return (0);
 }
 
 int
 freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 {
+	mcontext_t mc;
+	unsigned i;
+	int error;
 
-	return (set_mcontext(td, (mcontext_t *)mcp));
+	if (mcp->mc_cp2state != 0) {
+		if (mcp->mc_cp2state_len != sizeof(mc.mc_cheriframe)) {
+			printf("%s: invalid cp2 state length "
+			    "(expected %zd, got %zd)\n", __func__,
+			    sizeof(mc.mc_cheriframe), mcp->mc_cp2state_len);
+			return (EINVAL);
+		}
+		error = copyincap(__USER_CAP((void *)mcp->mc_cp2state,
+		    mcp->mc_cp2state_len), &mc.mc_cheriframe,
+		    sizeof(mc.mc_cheriframe));
+		if (error) {
+			printf("%s: invalid pointer\n", __func__);
+			return (error);
+		}
+	} else {
+		/*
+		 * Fetch current capability registers so that
+		 * set_mcontext() has something to write.
+		 */
+		cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
+		    &mc.mc_cheriframe);
+	}
+
+	mc.mc_onstack = mcp->mc_onstack;
+	mc.mc_pc = mcp->mc_pc;
+	for (i = 0; i < 32; i++)
+		mc.mc_regs[i] = mcp->mc_regs[i];
+	mc.sr = mcp->sr;
+	mc.mullo = mcp->mullo;
+	mc.mulhi = mcp->mulhi;
+	mc.mc_fpused = mcp->mc_fpused;
+	for (i = 0; i < 33; i++)
+		mc.mc_fpregs[i] = mcp->mc_fpregs[i];
+	mc.mc_fpc_eir = mcp->mc_fpc_eir;
+
+	/*
+	 * XXX: Should this be relative to DDC saved in
+	 * mc_cheriframe?
+	 */
+	mc.mc_tls = __USER_CAP_UNBOUND(mcp->mc_tls);
+
+	return (set_mcontext(td, &mc));
 }
 
 static void
