@@ -41,8 +41,9 @@
 
 #ifndef _LOCORE
 
-#if defined(COMPAT_CHERIABI) || defined(__CHERI_PURE_CAPABILITY__)
-#include <cheri/cheri.h>
+#if (defined(_KERNEL) && __has_feature(capabilities)) || \
+    defined(__CHERI_PURE_CAPABILITY__)
+#include <machine/cheri.h>
 #endif
 
 typedef struct	__mcontext {
@@ -59,11 +60,14 @@ typedef struct	__mcontext {
 	int		mc_fpused;	/* fp has been used */
 	f_register_t	mc_fpregs[33];	/* fp regs 0 to 31 and csr */
 	__register_t	mc_fpc_eir;	/* fp exception instruction reg */
-	/* XXX: layout differs for CheriABI starting here */
-	void		*mc_tls;	/* pointer to TLS area */
+	void * __kerncap mc_tls;	/* pointer to TLS area */
 	__register_t	cause;		/* cause register */
 
-#ifndef __CHERI_PURE_CAPABILITY__
+#if (defined(_KERNEL) && __has_feature(capabilities)) || \
+    defined(__CHERI_PURE_CAPABILITY__)
+	struct cheri_frame	mc_cheriframe;	/* capability registers */
+	void * __capability __spare__[3];
+#else
         /*
          * Optional externally referenced storage for coprocessors.  Modeled
          * on the approach taken for extended FPU state on x86, which leaves
@@ -83,10 +87,7 @@ typedef struct	__mcontext {
 #else
         int             xxx[5];         /* XXX reserved */
 #endif
-#else /* defined(__CHERI_PURE_CAPABILITY__) */
-	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	void * __capability __spare__[3];
-#endif /* defined(__CHERI_PURE_CAPABILITY__) */
+#endif
 } mcontext_t;
 
 #if (defined(__mips_n32) || defined(__mips_n64)) && defined(COMPAT_FREEBSD32)
@@ -170,33 +171,6 @@ typedef struct __ucontext64 {
 } ucontext64_t;
 #endif
 
-#ifdef COMPAT_CHERIABI
-#include <compat/cheriabi/cheriabi_signal.h>
-
-typedef struct	__mcontext_c {
-	int		mc_onstack;	/* sigstack state to restore */
-	register_t	mc_pc;		/* pcc.offset at time of signal ($pcc is in mc_cheriframe) */
-	register_t	mc_regs[32];	/* processor regs 0 to 31 */
-	register_t	sr;		/* status register */
-	register_t	mullo, mulhi;	/* mullo and mulhi registers... */
-	int		mc_fpused;	/* fp has been used */
-	f_register_t	mc_fpregs[33];	/* fp regs 0 to 31 and csr */
-	register_t	mc_fpc_eir;	/* fp exception instruction reg */
-	void * __capability	mc_tls;		/* pointer to TLS area */
-	__register_t	cause;		/* cause register */
-	struct cheri_frame	mc_cheriframe;	/* capability registers */
-	void * __capability	__spare__[3];
-} mcontext_c_t;
-
-typedef struct __ucontext_c {
-	sigset_t		uc_sigmask;
-	mcontext_c_t		uc_mcontext;
-	void * __capability	uc_link;
-	cheriabi_stack_t	uc_stack;
-	int			uc_flags;
-	int			__spare__[4];
-} ucontext_c_t;
-#endif
 #endif
 
 #ifndef SZREG

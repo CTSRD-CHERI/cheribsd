@@ -189,10 +189,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* save user context */
 	bzero(&sf, sizeof(struct sigframe));
 	sf.sf_uc.uc_sigmask = *mask;
-#if !__has_feature(capabilities)
-	/* XXX: Re-enable once ucontext_t == ucontext_c_t */
 	sf.sf_uc.uc_stack = td->td_sigstk;
-#endif
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
 	sf.sf_uc.uc_mcontext.mc_pc = TRAPF_PC_OFFSET(regs);
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
@@ -356,7 +353,7 @@ sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 	ucontext_t uc;
 	int error;
 
-	error = copyin(uap->sigcntxp, &uc, sizeof(uc));
+	error = copyincap(uap->sigcntxp, &uc, sizeof(uc));
 	if (error != 0)
 	    return (error);
 
@@ -517,7 +514,12 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 
 	tp = td->td_frame;
 	PROC_LOCK(curthread->td_proc);
-	mcp->mc_onstack = sigonstack(tp->sp);
+#if __has_feature(capabilities)
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
+		mcp->mc_onstack = sigonstack((__cheri_addr vaddr_t)tp->csp);
+	else
+#endif
+		mcp->mc_onstack = sigonstack(tp->sp);
 	PROC_UNLOCK(curthread->td_proc);
 	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
 	    sizeof(mcp->mc_regs));
@@ -531,21 +533,19 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 		mcp->mc_regs[V0] = 0;
 		mcp->mc_regs[V1] = 0;
 		mcp->mc_regs[A3] = 0;
+#if __has_feature(capabilities)
+		mcp->mc_cheriframe.cf_c3 = NULL;
+#endif
 	}
 
 	mcp->mc_pc = TRAPF_PC_OFFSET(td->td_frame);
 	mcp->mullo = td->td_frame->mullo;
 	mcp->mulhi = td->td_frame->mulhi;
-	mcp->mc_tls = (__cheri_fromcap void *)td->td_md.md_tls;
+	mcp->mc_tls = td->td_md.md_tls;
 
-#ifdef CPU_CHERI
-	/*
-	 * XXXBD: Can't do easily do anything useful with capability state
-	 * here because we get mcp as an uninitialized stack allocation from
-	 * sys_getcontext().
-	 */
-	mcp->mc_cp2state = 0;
-	mcp->mc_cp2state_len = 0;
+#if __has_feature(capabilities)
+	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
+	    &mcp->mc_cheriframe);
 #endif
 
 	return (0);
@@ -554,33 +554,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 int
 set_mcontext(struct thread *td, mcontext_t *mcp)
 {
-#ifdef CPU_CHERI
-	struct cheri_frame *cfp;
-	int error;
-#endif
 	struct trapframe *tp;
-
-#ifdef CPU_CHERI
-	if ((void *)mcp->mc_cp2state != NULL) {
-		if (mcp->mc_cp2state_len != sizeof(*cfp)) {
-			printf("%s: invalid cp2 state length "
-			    "(expected %zd, got %zd)\n", __func__,
-			    sizeof(*cfp), mcp->mc_cp2state_len);
-			return (EINVAL);
-		}
-		cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
-		error = copyincap(__USER_CAP((void *)mcp->mc_cp2state,
-		    mcp->mc_cp2state_len), cfp, sizeof(*cfp));
-		if (error) {
-			free(cfp, M_TEMP);
-			printf("%s: invalid pointer\n", __func__);
-			return (EINVAL);
-		}
-		cheri_trapframe_from_cheriframe(&td->td_pcb->pcb_regs, cfp);
-		free(cfp, M_TEMP);
-		td->td_pcb->pcb_regs.capcause = 0;
-	}
-#endif
 
 	tp = td->td_frame;
 	bcopy((void *)&mcp->mc_regs, (void *)&td->td_frame->zero,
@@ -596,11 +570,15 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 		    sizeof(mcp->mc_fpregs));
 	}
 	td->td_frame->pc =
-	    update_pcc_offset(td->td_frame->pc, mcp->mc_pc);
+	    update_pcc_offset(mcp->mc_cheriframe.cf_pcc, mcp->mc_pc);
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
-	td->td_md.md_tls = __USER_CAP_UNBOUND(mcp->mc_tls);
+	td->td_md.md_tls = mcp->mc_tls;
 	/* Dont let user to set any bits in status and cause registers. */
+
+#if __has_feature(capabilities)
+	cheri_trapframe_from_cheriframe(tp, &mcp->mc_cheriframe);
+#endif
 
 	return (0);
 }

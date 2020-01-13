@@ -120,8 +120,8 @@ void	cheriabi_fetch_syscall_arg(struct thread *td, void * __capability *arg,
 void * __capability	cheriabi_mmap_retcap(struct thread *td,
 	    vm_offset_t addr, const struct mmap_req *mrp);
 
-int	cheriabi_get_mcontext(struct thread *td, mcontext_c_t *mcp, int flags);
-int	cheriabi_set_mcontext(struct thread *td, mcontext_c_t *mcp);
+int	cheriabi_get_mcontext(struct thread *td, mcontext_t *mcp, int flags);
+int	cheriabi_set_mcontext(struct thread *td, mcontext_t *mcp);
 void	cheriabi_set_threadregs(struct thread *td, struct thr_param_c *param);
 
 #endif /* !_COMPAT_CHERIABI_CHERIABI_UTIL_H_ */
