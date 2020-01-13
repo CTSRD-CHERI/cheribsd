@@ -873,9 +873,9 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	SAVE_REG(a1, SR, sp)
 	REG_L	v0, (CALLFRAME_RA + KERN_REG_SIZE)(sp)
 #if __has_feature(capabilities)
-	/* v0 contains the target virtual address -> set it on $epcc */
+	/* v0 contains the target virtual address -> set it on saved $epcc */
 	/* XXX: This will need changing for purecap */
-	CGetEPCC	$c3
+	RESTORE_CREG($c3, sp, PCC, $ddc)
 	CSetAddr	$c3, $c3, v0
 #endif
 	RESTORE_CPU			# v0/$c3 contains the return address.
