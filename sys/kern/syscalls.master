@@ -3108,9 +3108,9 @@
 560	AUE_KEVENT	STD {
 		int kevent(
 		    int fd,
-		    _In_reads_opt_(nchanges) _Contains_ptr_ const struct kevent_native *changelist,
+		    _In_reads_opt_(nchanges) _Contains_ptr_ const struct kevent *changelist,
 		    int nchanges,
-		    _Out_writes_opt_(nevents) _Contains_ptr_ struct kevent_native *eventlist,
+		    _Out_writes_opt_(nevents) _Contains_ptr_ struct kevent *eventlist,
 		    int nevents,
 		    _In_opt_ _Contains_long_timet_ const struct timespec *timeout
 		);

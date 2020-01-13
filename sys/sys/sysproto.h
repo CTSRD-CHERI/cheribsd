@@ -1753,9 +1753,9 @@ struct mknodat_args {
 };
 struct kevent_args {
 	char fd_l_[PADL_(int)]; int fd; char fd_r_[PADR_(int)];
-	char changelist_l_[PADL_(const struct kevent_native * __capability)]; const struct kevent_native * __capability changelist; char changelist_r_[PADR_(const struct kevent_native * __capability)];
+	char changelist_l_[PADL_(const struct kevent * __capability)]; const struct kevent * __capability changelist; char changelist_r_[PADR_(const struct kevent * __capability)];
 	char nchanges_l_[PADL_(int)]; int nchanges; char nchanges_r_[PADR_(int)];
-	char eventlist_l_[PADL_(struct kevent_native * __capability)]; struct kevent_native * __capability eventlist; char eventlist_r_[PADR_(struct kevent_native * __capability)];
+	char eventlist_l_[PADL_(struct kevent * __capability)]; struct kevent * __capability eventlist; char eventlist_r_[PADR_(struct kevent * __capability)];
 	char nevents_l_[PADL_(int)]; int nevents; char nevents_r_[PADR_(int)];
 	char timeout_l_[PADL_(const struct timespec * __capability)]; const struct timespec * __capability timeout; char timeout_r_[PADR_(const struct timespec * __capability)];
 };

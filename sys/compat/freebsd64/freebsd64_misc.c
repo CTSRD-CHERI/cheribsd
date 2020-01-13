@@ -140,8 +140,8 @@ struct sf_hdtr64 {
 
 FEATURE(compat_freebsd64_abi, "Compatible 64-bit FreeBSD system call ABI");
 
-static int freebsd64_kevent_copyout(void *arg, kkevent_t *kevp, int count);
-static int freebsd64_kevent_copyin(void *arg, kkevent_t *kevp, int count);
+static int freebsd64_kevent_copyout(void *arg, struct kevent *kevp, int count);
+static int freebsd64_kevent_copyin(void *arg, struct kevent *kevp, int count);
 
 int
 freebsd64_wait4(struct thread *td, struct freebsd64_wait4_args *uap)
@@ -216,7 +216,7 @@ freebsd64_fexecve(struct thread *td, struct freebsd64_fexecve_args *uap)
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
 static int
-freebsd64_kevent_copyout(void *arg, kkevent_t *kevp, int count)
+freebsd64_kevent_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd64_kevent_args *uap;
 	struct kevent64 ks64[KQ_NEVENTS];
@@ -244,7 +244,7 @@ freebsd64_kevent_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-freebsd64_kevent_copyin(void *arg, kkevent_t *kevp, int count)
+freebsd64_kevent_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd64_kevent_args *uap;
 	struct kevent64 ks64[KQ_NEVENTS];
@@ -302,7 +302,7 @@ struct kevent_freebsd1164 {
 };
 
 static int
-kevent11_freebsd64_copyout(void *arg, kkevent_t *kevp, int count)
+kevent11_freebsd64_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_freebsd64_kevent_args *uap;
 	struct kevent_freebsd1164 kev11;
@@ -332,7 +332,7 @@ kevent11_freebsd64_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-kevent11_freebsd64_copyin(void *arg, kkevent_t *kevp, int count)
+kevent11_freebsd64_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_freebsd64_kevent_args *uap;
 	struct kevent_freebsd1164 kev11;

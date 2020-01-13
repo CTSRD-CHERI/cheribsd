@@ -3226,9 +3226,9 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 560: {
 		struct kevent_args *p = params;
 		iarg[0] = p->fd; /* int */
-		uarg[1] = (intptr_t) p->changelist; /* const struct kevent_native * __capability */
+		uarg[1] = (intptr_t) p->changelist; /* const struct kevent * __capability */
 		iarg[2] = p->nchanges; /* int */
-		uarg[3] = (intptr_t) p->eventlist; /* struct kevent_native * __capability */
+		uarg[3] = (intptr_t) p->eventlist; /* struct kevent * __capability */
 		iarg[4] = p->nevents; /* int */
 		uarg[5] = (intptr_t) p->timeout; /* const struct timespec * __capability */
 		*n_args = 6;
@@ -8720,13 +8720,13 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 1:
-			p = "userland const struct kevent_native * __capability";
+			p = "userland const struct kevent * __capability";
 			break;
 		case 2:
 			p = "int";
 			break;
 		case 3:
-			p = "userland struct kevent_native * __capability";
+			p = "userland struct kevent * __capability";
 			break;
 		case 4:
 			p = "int";
