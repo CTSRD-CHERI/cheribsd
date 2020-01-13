@@ -2818,7 +2818,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 		iarg[0] = p->semid; /* int */
 		iarg[1] = p->semnum; /* int */
 		iarg[2] = p->cmd; /* int */
-		uarg[3] = (intptr_t) p->arg; /* union semun_native * __capability */
+		uarg[3] = (intptr_t) p->arg; /* union semun * __capability */
 		*n_args = 4;
 		break;
 	}
@@ -8003,7 +8003,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "int";
 			break;
 		case 3:
-			p = "userland union semun_native * __capability";
+			p = "userland union semun * __capability";
 			break;
 		default:
 			break;
