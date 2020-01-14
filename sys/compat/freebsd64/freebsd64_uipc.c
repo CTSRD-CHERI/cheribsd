@@ -382,7 +382,7 @@ freebsd12_freebsd64_shm_open(struct thread *td,
 {
 
 	return (kern_shm_open(td, __USER_CAP_STR(uap->path),
-	    uap->flags | O_CLOEXEC, uap->mode, NULL, F_SEAL_SEAL));
+	    uap->flags | O_CLOEXEC, uap->mode, NULL));
 }
 #endif
 
