@@ -69,6 +69,10 @@ typedef	int		__cpuwhich_t;	/* which parameter for cpuset. */
 typedef	int		__cpulevel_t;	/* level parameter for cpuset. */
 typedef int		__cpusetid_t;	/* cpuset identifier. */
 typedef __int64_t	__daddr_t;	/* bwrite(3), FIOBMAP2, etc */
+#if !__has_feature(capabilities)
+typedef	__intptr_t	__intcap_t;
+typedef	__uintptr_t	__uintcap_t;
+#endif
 
 /*
  * Unusual type definitions.

@@ -73,18 +73,12 @@ typedef	__uint64_t		uint64_t;
 #endif
 
 #ifndef _INTCAP_T_DECLARED
-#if __has_feature(capabilities)
 typedef	__intcap_t		intcap_t;
-#else
-typedef	__intptr_t		intcap_t;
-#endif
+#define	_INTCAP_T_DECLARED
 #endif
 #ifndef _UINTCAP_T_DECLARED
-#if __has_feature(capabilities)
 typedef	__uintcap_t		uintcap_t;
-#else
-typedef	__uintptr_t		uintcap_t;
-#endif
+#define	_UINTCAP_T_DECLARED
 #endif
 #ifndef _INTPTR_T_DECLARED
 typedef	__intptr_t		intptr_t;
