@@ -103,7 +103,9 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_util.h>
 #endif
 
+#if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#endif
 
 SDT_PROVIDER_DEFINE(proc);
 
