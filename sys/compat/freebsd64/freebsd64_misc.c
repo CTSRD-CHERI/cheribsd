@@ -469,7 +469,8 @@ freebsd64_copyin_hdtr(const struct sf_hdtr64 * __capability uhdtr,
 	return (0);
 }
 
-int freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
+int
+freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
 {
 
 	return (kern_sendfile(td, uap->fd, uap->s, uap->offset, uap->nbytes,
@@ -480,7 +481,7 @@ int freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
 
 #if 0
 int
-cheriabi_jail(struct thread *td, struct cheriabi_jail_args *uap)
+freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
 {
 }
 #endif
@@ -515,7 +516,7 @@ freebsd64_jail_get(struct thread *td, struct freebsd64_jail_get_args *uap)
 	    (updateiov_t *)freebsd64_updateiov));
 }
 
-#define UCC_COPY_SIZE	offsetof(ucontext64_t, uc_link)
+#define UC_COPY_SIZE	offsetof(ucontext64_t, uc_link)
 
 int
 freebsd64_getcontext(struct thread *td, struct freebsd64_getcontext_args *uap)
@@ -530,7 +531,7 @@ freebsd64_getcontext(struct thread *td, struct freebsd64_getcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	return (copyout(&uc, uap->ucp, UCC_COPY_SIZE));
+	return (copyout(&uc, uap->ucp, UC_COPY_SIZE));
 }
 
 int
@@ -541,7 +542,7 @@ freebsd64_setcontext(struct thread *td, struct freebsd64_setcontext_args *uap)
 
 	if (uap->ucp == NULL)
 		return (EINVAL);
-	if ((ret = copyin(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyin(uap->ucp, &uc, UC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = freebsd64_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -565,9 +566,9 @@ freebsd64_swapcontext(struct thread *td, struct freebsd64_swapcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	if ((ret = copyout(&uc, uap->oucp, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyout(&uc, uap->oucp, UC_COPY_SIZE)) != 0)
 		return (ret);
-	if ((ret = copyin(uap->ucp, &uc, UCC_COPY_SIZE)) != 0)
+	if ((ret = copyin(uap->ucp, &uc, UC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = freebsd64_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
