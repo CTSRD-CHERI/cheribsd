@@ -515,25 +515,6 @@ freebsd64_jail_get(struct thread *td, struct freebsd64_jail_get_args *uap)
 	    (updateiov_t *)freebsd64_updateiov));
 }
 
-int
-freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
-{
-	ucontext64_t uc;
-	int error;
-
-	error = copyin(uap->sigcntxp, &uc, sizeof(uc));
-	if (error != 0)
-		return (error);
-
-	error = freebsd64_set_mcontext(td, &uc.uc_mcontext);
-	if (error != 0)
-		return (error);
-
-	kern_sigprocmask(td, SIG_SETMASK, &uc.uc_sigmask, NULL, 0);
-
-	return (EJUSTRETURN);
-}
-
 #define UCC_COPY_SIZE	offsetof(ucontext64_t, uc_link)
 
 int
