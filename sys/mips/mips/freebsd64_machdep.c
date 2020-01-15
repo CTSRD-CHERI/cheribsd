@@ -492,6 +492,25 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 }
 
 int
+freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
+{
+	ucontext64_t uc;
+	int error;
+
+	error = copyin(__USER_CAP_OBJ(uap->sigcntxp), &uc, sizeof(uc));
+	if (error != 0)
+		return (error);
+
+	error = freebsd64_set_mcontext(td, &uc.uc_mcontext);
+	if (error != 0)
+		return (error);
+
+	kern_sigprocmask(td, SIG_SETMASK, &uc.uc_sigmask, NULL, 0);
+
+	return (EJUSTRETURN);
+}
+
+int
 freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
 {
 	int error;
