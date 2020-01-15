@@ -274,7 +274,7 @@ gif_transmit(struct ifnet *ifp, struct mbuf *m)
 	uint8_t proto, ecn;
 	int error;
 
-	GIF_RLOCK();
+	NET_EPOCH_ASSERT();
 #ifdef MAC
 	error = mac_ifnet_check_transmit(ifp, m);
 	if (error) {
@@ -372,7 +372,6 @@ gif_transmit(struct ifnet *ifp, struct mbuf *m)
 err:
 	if (error)
 		if_inc_counter(ifp, IFCOUNTER_OERRORS, 1);
-	GIF_RUNLOCK();
 	return (error);
 }
 
