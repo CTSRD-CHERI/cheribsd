@@ -337,6 +337,8 @@ WANT_LINKER_FREEBSD_VERSION=
     defined(WANT_LINKER_FREEBSD_VERSION) && \
     (${MK_LLD_BOOTSTRAP} == "yes") && \
     !make(xdev*) && \
+    defined(X_LINKER_TYPE) && defined(X_LINKER_VERSION) && \
+    defined(X_LINKER_FREEBSD_VERSION) && \
     ${X_LINKER_TYPE} == ${WANT_LINKER_TYPE} && \
     ${X_LINKER_VERSION} == ${WANT_LINKER_VERSION} && \
     ${X_LINKER_FREEBSD_VERSION} == ${WANT_LINKER_FREEBSD_VERSION}
