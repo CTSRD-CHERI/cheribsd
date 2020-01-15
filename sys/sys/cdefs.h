@@ -1085,12 +1085,17 @@
 #define __cheri_addr
 #endif
 
+#if 0
 #define __static_assert_if_constant(val, expr, message) \
 	_Static_assert(__builtin_choose_expr(__builtin_constant_p(val), \
 	    expr, 1), message)
 #define __static_assert_power_of_two(val) \
 	__static_assert_if_constant(val, (val & ((val)-1)) == 0, \
 	     "Alignment must be a power-of-two")
+#else
+// XXX-BD: riscv64c bringup, failing with const variable with llvm 9.0
+#define	__static_assert_power_of_two(val)
+#endif
 
 /* Allow use of __builtin_is_aligned/align_up/align_down unconditionally */
 #if !__has_builtin(__builtin_is_aligned)
