@@ -569,8 +569,12 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 		bcopy((void *)&mcp->mc_fpregs, (void *)&td->td_frame->f0,
 		    sizeof(mcp->mc_fpregs));
 	}
+#if __has_feature(capabilities)
 	td->td_frame->pc =
 	    update_pcc_offset(mcp->mc_cheriframe.cf_pcc, mcp->mc_pc);
+#else
+	td->td_frame->pc = (trapf_pc_t) mcp->mc_pc;
+#endif
 	td->td_frame->mullo = mcp->mullo;
 	td->td_frame->mulhi = mcp->mulhi;
 	td->td_md.md_tls = mcp->mc_tls;
