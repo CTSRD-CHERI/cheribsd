@@ -243,11 +243,36 @@ END(sigcode)
 	.align	3
 esigcode:
 
+#ifdef COMPAT_FREEBSD64
+ENTRY(freebsd64_sigcode)
+	mv	a0, sp
+	addi	a0, a0, SF64_UC
+
+1:
+	li	t0, SYS_sigreturn
+	ecall
+
+	/* sigreturn failed, exit */
+	li	t0, SYS_exit
+	ecall
+
+	j	1b
+END(freebsd64_sigcode)
+	/* This may be copied to the stack, keep it 16-byte aligned */
+	.align	3
+freebsd64_esigcode:
+#endif
+
 	.data
 	.align	3
 	.global	szsigcode
 szsigcode:
 	.quad	esigcode - sigcode
+#ifdef COMPAT_FREEBSD64
+	.global	freebsd64_szsigcode
+freebsd64_szsigcode:
+	.quad	freebsd64_esigcode - freebsd64_sigcode
+#endif
 
 	.align	12
 pagetable_l1:
