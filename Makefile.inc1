@@ -928,11 +928,6 @@ _LIBCOMPAT=64
 _LIBCOMPAT= SOFT
 .include "Makefile.libcompat"
 .endif
-.if ${MK_CHERI} != "no"
-# CHERI specific code isn't o32 compatible and other attempts to disable
-# failed so use a big hammer for now.
-.undef LIBCOMPAT
-.endif
 
 # META_MODE normally ignores host file changes since every build updates
 # timestamps (see NO_META_IGNORE_HOST in sys.mk).  There are known times
