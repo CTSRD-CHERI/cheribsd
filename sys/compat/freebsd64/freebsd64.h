@@ -192,12 +192,6 @@ struct procctl_reaper_pids64 {
 	struct procctl_reaper_pidinfo	*rp_pids;
 };
 
-union semun64 {
-	int		val;
-	struct semid_ds	*buf;
-	unsigned short 	*array;
-};
-
 #include <sys/ipc.h>
 #include <sys/msg.h>
 
