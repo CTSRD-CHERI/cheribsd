@@ -99,19 +99,17 @@ freebsd64_sigaction(struct thread *td, struct freebsd64_sigaction_args *uap)
 		error = copyin(uap->act, &act64, sizeof(act64));
 		if (error)
 			return (error);
-		if (is_magic_sighandler_constant(act64.sa_handler))
-			actp->sa_handler =
-			    cheri_fromint((vaddr_t)act64.sa_handler);
+		if (is_magic_sighandler_constant(act64.sa_u))
+			actp->sa_handler = cheri_fromint(act64.sa_u);
 		else
-			actp->sa_handler = __USER_CODE_CAP(act64.sa_handler);
+			actp->sa_handler = __USER_CODE_CAP((void *)act64.sa_u);
 		actp->sa_flags = act64.sa_flags;
 		actp->sa_mask = act64.sa_mask;
 	}
 	error = kern_sigaction(td, uap->sig, actp, oactp, 0);
 	if (oactp && !error) {
 		memset(&oact64, 0, sizeof(oact64));
-		oact64.sa_handler =
-		    (void *)(__cheri_addr vaddr_t)oactp->sa_handler;
+		oact64.sa_u = (__cheri_addr vaddr_t)oactp->sa_handler;
 		oact64.sa_flags = oactp->sa_flags;
 		oact64.sa_mask = oactp->sa_mask;
 		error = copyout(&oact64, uap->oact, sizeof(oact64));
