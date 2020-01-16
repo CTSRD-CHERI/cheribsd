@@ -430,10 +430,10 @@ vm_kstack_palloc(vm_object_t ksobj, vm_ptr_t ks, int allocflags, int pages,
 
 #define	KSTACK_OBJT		OBJT_DEFAULT
 
-static vm_offset_t
+static vm_ptr_t
 vm_kstack_valloc(int pages)
 {
-	vm_offset_t ks;
+	vm_ptr_t ks;
 
 	ks = kva_alloc((pages + KSTACK_GUARD_PAGES) * PAGE_SIZE);
 
@@ -626,13 +626,13 @@ kstack_import(void *arg, void **store, int cnt, int domain, int flags)
 static void
 kstack_release(void *arg, void **store, int cnt)
 {
-	vm_offset_t ks;
+	vm_ptr_t ks;
 	int i;
 
 	for (i = 0; i < cnt; i++) {
-		ks = (vm_offset_t)store[i];
+		ks = (vm_ptr_t)store[i];
 		vm_thread_stack_dispose(
-		    PHYS_TO_VM_PAGE(pmap_kextract(ks))->object,
+		    PHYS_TO_VM_PAGE(pmap_kextract(ptr_to_va(ks)))->object,
 		    ks, kstack_pages);
 	}
 }
