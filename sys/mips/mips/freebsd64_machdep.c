@@ -271,7 +271,6 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 static void
 freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
-
 	struct proc *p;
 	struct thread *td;
 	struct trapframe *regs;
