@@ -1628,7 +1628,7 @@ sysctl_msqids(SYSCTL_HANDLER_ARGS)
 #ifdef COMPAT_FREEBSD64
 		if (!SV_CURPROC_FLAG(SV_CHERI)) {
 			bzero(&tmsqk64, sizeof(tmsqk64));
-			CP(tmsqk, tmsqk_c, u.msg_perm);
+			CP(tmsqk, tmsqk64, u.msg_perm);
 			/* Don't copy u.msg_first or u.msg_last */
 			CP(tmsqk, tmsqk64, u.msg_cbytes);
 			CP(tmsqk, tmsqk64, u.msg_qnum);
