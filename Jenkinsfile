@@ -20,7 +20,7 @@ for (i in ["mips", "cheri", "purecap"]) {
             runTests: false, /* TODO: run cheritest */)
 }
 
-boolean runParallel = true;
+boolean runParallel = false;
 if (runParallel) {
     jobs.failFast = true
     parallel jobs
