@@ -122,7 +122,7 @@ struct type2str_ent {
 };
 
 void
-elf64_dump_thread(struct thread *td, void *dst, size_t *off)
+__elfN(dump_thread)(struct thread *td, void *dst, size_t *off)
 {
 
 }
