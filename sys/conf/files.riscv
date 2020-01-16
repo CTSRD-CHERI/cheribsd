@@ -42,6 +42,7 @@ riscv/riscv/db_trace.c		optional	ddb
 riscv/riscv/dump_machdep.c	standard
 riscv/riscv/elf_machdep.c	standard
 riscv/riscv/exception.S		standard
+riscv/riscv/freebsd64_machdep.c	optional	compat_freebsd64
 riscv/riscv/intr_machdep.c	standard
 riscv/riscv/in_cksum.c		optional	inet | inet6
 riscv/riscv/identcpu.c		standard
