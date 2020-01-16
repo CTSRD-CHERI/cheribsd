@@ -38,9 +38,10 @@ __FBSDID("$FreeBSD$");
 #include "opt_ffclock.h"
 
 #include <sys/param.h>
-#include <sys/timeffc.h>
 #include <sys/proc.h>
 #include <sys/syscallsubr.h>
+#include <sys/sysctl.h>
+#include <sys/timeffc.h>
 #include <sys/timex.h>
 
 #include <compat/freebsd64/freebsd64_proto.h>
