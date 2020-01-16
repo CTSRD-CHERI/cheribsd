@@ -36,10 +36,7 @@
 #define _COMPAT_FREEBSD64_FREEBSD64_SIGNAL_H_
 
 struct sigaction64 {
-	union {
-		void    (*__sa_handler)(int);
-		void    (*__sa_sigaction)(int, struct __siginfo *, void *);
-	} __sigaction_u;		/* signal handler */
+	uint64_t sa_u;
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
