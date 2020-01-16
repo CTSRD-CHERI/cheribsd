@@ -55,6 +55,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/imgact.h>
 #include <sys/imgact_elf.h>
 #include <sys/kernel.h>
+#include <sys/ktr.h>
 #include <sys/proc.h>
 #include <sys/syscallsubr.h>
 #include <sys/sysent.h>
@@ -159,8 +160,81 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 static void
 freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
+	struct sigframe64 *fp, frame;
+	struct sysentvec *sysent;
+	struct trapframe *tf;
+	struct sigacts *psp;
+	struct thread *td;
+	struct proc *p;
+	int onstack;
+	int sig;
 
-	panic("TODO");
+	td = curthread;
+	p = td->td_proc;
+	PROC_LOCK_ASSERT(p, MA_OWNED);
+
+	sig = ksi->ksi_signo;
+	psp = p->p_sigacts;
+	mtx_assert(&psp->ps_mtx, MA_OWNED);
+
+	tf = td->td_frame;
+	onstack = sigonstack(tf->tf_sp);
+
+	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
+	    catcher, sig);
+
+	/* Allocate and validate space for the signal handler context. */
+	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
+	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
+		fp = (struct sigframe64 *)((uintptr_t)td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size);
+	} else {
+		fp = (struct sigframe64 *)td->td_frame->tf_sp;
+	}
+
+	/* Make room, keeping the stack aligned */
+	fp--;
+	fp = (struct sigframe64 *)STACKALIGN(fp);
+
+	/* Fill in the frame to copy out */
+	bzero(&frame, sizeof(frame));
+	freebsd64_get_mcontext(td, &frame.sf_uc.uc_mcontext, 0);
+	siginfo_to_siginfo64(&ksi->ksi_info, &frame.sf_si);
+	frame.sf_uc.uc_sigmask = *mask;
+	frame.sf_uc.uc_stack.ss_sp = (__cheri_fromcap void *)td->td_sigstk.ss_sp;
+	frame.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
+	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
+	    (onstack ? SS_ONSTACK : 0) : SS_DISABLE;
+	mtx_unlock(&psp->ps_mtx);
+	PROC_UNLOCK(td->td_proc);
+
+	/* Copy the sigframe out to the user's stack. */
+	if (copyout(&frame, fp, sizeof(*fp)) != 0) {
+		/* Process has trashed its stack. Kill it. */
+		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
+		PROC_LOCK(p);
+		sigexit(td, SIGILL);
+	}
+
+	tf->tf_a[0] = sig;
+	tf->tf_a[1] = (register_t)&fp->sf_si;
+	tf->tf_a[2] = (register_t)&fp->sf_uc;
+
+	tf->tf_sepc = (register_t)catcher;
+	tf->tf_sp = (register_t)fp;
+
+	sysent = p->p_sysent;
+	if (sysent->sv_sigcode_base != 0)
+		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
+	else
+		tf->tf_ra = (register_t)(sysent->sv_psstrings -
+		    *(sysent->sv_szsigcode));
+
+	CTR3(KTR_SIG, "sendsig: return td=%p pc=%#x sp=%#x", td, tf->tf_sepc,
+	    tf->tf_sp);
+
+	PROC_LOCK(p);
+	mtx_lock(&psp->ps_mtx);
 }
 
 int
