@@ -5268,7 +5268,7 @@ int
 freebsd64__umtx_op(struct thread *td, struct freebsd64__umtx_op_args *uap)
 {
 
-	if ((unsigned)uap->op < nitems(op_table_cheriabi)) {
+	if ((unsigned)uap->op < nitems(op_table_freebsd64)) {
 		return (*op_table_freebsd64[uap->op])(td, uap);
 	}
 	return (EINVAL);
