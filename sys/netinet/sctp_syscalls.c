@@ -72,6 +72,14 @@ __FBSDID("$FreeBSD$");
 #endif
 #ifdef COMPAT_FREEBSD32
 #include <compat/freebsd32/freebsd32_util.h>
+#include <compat/freebsd32/freebsd32_syscall.h>
+#include <compat/freebsd32/freebsd32_proto.h>
+#endif
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64.h>
+#include <compat/freebsd64/freebsd64_util.h>
+#include <compat/freebsd64/freebsd64_syscall.h>
+#include <compat/freebsd64/freebsd64_proto.h>
 #endif
 #ifdef COMPAT_CHERIABI
 #include <compat/cheriabi/cheriabi_proto.h>
@@ -99,18 +107,18 @@ static struct syscall_helper_data sctp_syscalls[] = {
 static struct syscall_helper_data sctp_syscalls32[] = {
 	SYSCALL32_INIT_HELPER_COMPAT(sctp_peeloff),
 	SYSCALL32_INIT_HELPER_COMPAT(sctp_generic_sendmsg),
-	SYSCALL32_INIT_HELPER_COMPAT(sctp_generic_sendmsg_iov),
-	SYSCALL32_INIT_HELPER_COMPAT(sctp_generic_recvmsg),
+	SYSCALL32_INIT_HELPER(freebsd32_sctp_generic_sendmsg_iov),
+	SYSCALL32_INIT_HELPER(freebsd32_sctp_generic_recvmsg),
 	SYSCALL_INIT_LAST
 };
 #endif
 
 #ifdef COMPAT_FREEBSD64
 static struct syscall_helper_data sctp_syscalls64[] = {
-	SYSCALL64_INIT_HELPER_COMPAT(sctp_peeloff),
-	SYSCALL64_INIT_HELPER_COMPAT(sctp_generic_sendmsg),
-	SYSCALL64_INIT_HELPER_COMPAT(sctp_generic_sendmsg_iov),
-	SYSCALL64_INIT_HELPER_COMPAT(sctp_generic_recvmsg),
+	FREEBSD64_SYSCALL_INIT_HELPER_COMPAT(sctp_peeloff),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_sctp_generic_sendmsg),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_sctp_generic_sendmsg_iov),
+	FREEBSD64_SYSCALL_INIT_HELPER(freebsd64_sctp_generic_recvmsg),
 	SYSCALL_INIT_LAST
 };
 #endif
@@ -157,9 +165,10 @@ sctp_syscalls_init(void *unused __unused)
 	    __func__));
 #endif
 #ifdef COMPAT_FREEBSD64
-	error = syscall64_helper_register(sctp_syscalls64, SY_THR_STATIC);
+	error = freebsd64_syscall_helper_register(sctp_syscalls64,
+	    SY_THR_STATIC);
 	KASSERT((error == 0),
-	    ("%s: syscall64_helper_register failed for sctp syscalls",
+	    ("%s: freebsd64_syscall_helper_register failed for sctp syscalls",
 	    __func__));
 #endif
 #ifdef COMPAT_CHERIABI
@@ -270,24 +279,9 @@ sys_sctp_generic_sendmsg(struct thread *td,
     struct sctp_generic_sendmsg_args *uap)
 {
 
-	return (kern_sys_sctp_generic_sendmsg(td, uap->sd,
-	__USER_CAP(uap->msg, uap->mlen), uap->mlen,
-	__USER_CAP(uap->to, uap->tolen), uap->tolen,
-	__USER_CAP_OBJ(uap->sinfo), uap->flags));
+	return (kern_sys_sctp_generic_sendmsg(td, uap->sd, uap->msg, uap->mlen,
+	    uap->to, uap->tolen, uap->sinfo, uap->flags));
 }
-
-#ifdef COMPAT_FREEBSD32
-int
-freebsd32_sctp_generic_sendmsg(struct thread *td,
-    struct freebsd32_sctp_generic_sendmsg_args *uap)
-{
-
-	return (kern_sctp_generic_sendmsg(td, uap->sd,
-	    __USER_CAP(uap->msg, uap->mlen), uap->mlen,
-	    __USER_CAP(uap->to, uap->tolen), uap->tolen,
-	    __USER_CAP_OBJ(uap->sinfo), uap->flags));
-}
-#endif
 
 #ifdef COMPAT_FREEBSD64
 int
@@ -295,7 +289,7 @@ freebsd64_sctp_generic_sendmsg(struct thread *td,
     struct freebsd64_sctp_generic_sendmsg_args *uap)
 {
 
-	return (kern_sctp_generic_sendmsg(td, uap->sd,
+	return (kern_sys_sctp_generic_sendmsg(td, uap->sd,
 	    __USER_CAP(uap->msg, uap->mlen), uap->mlen,
 	    __USER_CAP(uap->to, uap->tolen), uap->tolen,
 	    __USER_CAP_OBJ(uap->sinfo), uap->flags));
@@ -448,7 +442,7 @@ freebsd32_sctp_generic_sendmsg_iov(struct thread *td,
 	    __USER_CAP_ARRAY(uap->iov, uap->iovlen), uap->iovlen,
 	    __USER_CAP(uap->to, uap->tolen), uap->tolen,
 	    __USER_CAP_OBJ(uap->sinfo), uap->flags,
-	    freebsd32_copyiniov));
+	    (copyiniov_t *)freebsd32_copyiniov));
 }
 #endif
 
@@ -462,7 +456,7 @@ freebsd64_sctp_generic_sendmsg_iov(struct thread *td,
 	    __USER_CAP_ARRAY(uap->iov, uap->iovlen), uap->iovlen,
 	    __USER_CAP(uap->to, uap->tolen), uap->tolen,
 	    __USER_CAP_OBJ(uap->sinfo), uap->flags,
-	    freebsd64_copyiniov));
+	    (copyiniov_t *)freebsd64_copyiniov));
 }
 #endif
 
@@ -474,7 +468,7 @@ cheriabi_sctp_generic_sendmsg_iov(struct thread *td,
 
 	return (kern_sctp_generic_sendmsg_iov(td, uap->sd, uap->iov,
 	    uap->iovlen, uap->to, uap->tolen, uap->sinfo, uap->flags,
-	    copyiniov);
+	    copyiniov));
 }
 #endif
 
@@ -626,7 +620,7 @@ freebsd32_sctp_generic_recvmsg(struct thread *td,
 	   __USER_CAP_ARRAY(uap->iov, uap->iovlen), uap->iovlen,
 	   __USER_CAP_UNBOUND(uap->from),
 	   __USER_CAP_OBJ(uap->fromlenaddr), __USER_CAP_OBJ(uap->sinfo),
-	   __USER_CAP_OBJ(uap->msg_flags), freebsd32_copyiniov));
+	   __USER_CAP_OBJ(uap->msg_flags), (copyiniov_t *)freebsd32_copyiniov));
 }
 #endif
 
@@ -640,7 +634,7 @@ freebsd64_sctp_generic_recvmsg(struct thread *td,
 	   __USER_CAP_ARRAY(uap->iov, uap->iovlen), uap->iovlen,
 	   __USER_CAP_UNBOUND(uap->from),
 	   __USER_CAP_OBJ(uap->fromlenaddr), __USER_CAP_OBJ(uap->sinfo),
-	   __USER_CAP_OBJ(uap->msg_flags), freebsd64_copyiniov));
+	   __USER_CAP_OBJ(uap->msg_flags), (copyiniov_t *)freebsd64_copyiniov));
 }
 #endif
 
