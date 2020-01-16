@@ -133,7 +133,11 @@ freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 	if (error != 0)
 		return (error);
 
-	panic("TODO");
+	memset(mcp, 0, sizeof(*mcp));
+	mcp->mc_gpregs = mc.mc_gpregs;
+	mcp->mc_flags = mc.mc_flags;
+	if (mc.mc_flags & _MC_FP_VALID)
+		mcp->mc_fpregs = mc.mc_fpregs;
 
 	return (0);
 }
@@ -143,7 +147,11 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 {
 	mcontext_t mc;
 
-	panic("TODO");
+	memset(&mc, 0, sizeof(mc));
+	mc.mc_gpregs = mcp->mc_gpregs;
+	mc.mc_flags = mcp->mc_flags;
+	if (mcp->mc_flags & _MC_FP_VALID)
+		mc.mc_fpregs = mcp->mc_fpregs;
 
 	return (set_mcontext(td, &mc));
 }
