@@ -15,12 +15,13 @@ for (i in ["mips", "cheri", "purecap"]) {
     String suffix = "${i}" // work around stupid groovy lambda captures
     String name = "cheribsd-${suffix}"
     jobs[name] = cheribuildProject(target: "cheribsd-${suffix}", cpu: suffix == 'mips' ? 'mips': 'cheri128',
-            extraArgs: '',
+            extraArgs: '--cheribsd/build-options=-s --cheribsd/no-debug-info',
             skipArchiving: true,
+            customGitCheckoutDir: 'cheribsd',
             runTests: false, /* TODO: run cheritest */)
 }
 
-boolean runParallel = false;
+boolean runParallel = true;
 if (runParallel) {
     jobs.failFast = true
     parallel jobs
