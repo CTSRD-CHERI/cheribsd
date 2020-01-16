@@ -124,6 +124,13 @@ struct ifgroupreq_c {
 	} ifgr_ifgru;
 };
 
+#define	_CASE_IOC_IFGROUPREQ_C(cmd)				\
+    _IOC_NEWTYPE((cmd), struct ifgroupreq_c): case
+#else
+#define _CASE_IOC_IFGROUPREQ_C(cmd)
+#endif
+
+#if defined(COMPAT_FREEBSD64)
 struct ifmediareq64 {
 	char	ifm_name[IFNAMSIZ];
 	int	ifm_current;
@@ -135,11 +142,6 @@ struct ifmediareq64 {
 };
 #define	SIOCGIFMEDIA64	_IOC_NEWTYPE(SIOCGIFMEDIA, struct ifmediareq64)
 #define	SIOCGIFXMEDIA64	_IOC_NEWTYPE(SIOCGIFXMEDIA, struct ifmediareq64)
-
-#define	_CASE_IOC_IFGROUPREQ_C(cmd)				\
-    _IOC_NEWTYPE((cmd), struct ifgroupreq_c): case
-#else
-#define _CASE_IOC_IFGROUPREQ_C(cmd)
 #endif
 
 #ifdef COMPAT_FREEBSD32
@@ -3333,16 +3335,13 @@ struct ifconf32 {
 #define	SIOCGIFCONF32	_IOWR('i', 36, struct ifconf32)
 #endif
 #ifdef COMPAT_FREEBSD64
-_Pragma("pointer_interpretation push")
-_Pragma("pointer_interpretation integer")
 struct ifconf64 {
 	int	ifc_len;
 	union {
-		char		*ifcu_buf;
-		struct ifreq	*ifcu_req;
+		uint64_t	ifcu_buf;
+		uint64_t	ifcu_req;
 	} ifc_ifcu;
 };
-_Pragma("pointer_interpretation pop")
 #define	SIOCGIFCONF64	_IOC_NEWTYPE(SIOCGIFCONF, struct ifconf64)
 #endif
 
@@ -3428,7 +3427,7 @@ ifmr_update(const struct ifmediareq *ifmr, caddr_t data)
 int
 ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 {
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI)
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD64)
 	caddr_t saved_data = NULL;
 	struct ifmediareq ifmr;
 	struct ifmediareq *ifmrp = NULL;
@@ -3476,7 +3475,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 	case SIOCGIFCONF64:
 		ifc64 = (struct ifconf64 *)data;
 		ifc.ifc_len = ifc64->ifc_len;
-		ifc.ifc_buf = __USER_CAP(ifc64->ifc_buf, ifc64->ifc_len);
+		ifc.ifc_buf = __USER_CAP((void *)ifc64->ifc_buf, ifc64->ifc_len);
 
 		error = ifconf(SIOCGIFCONF, (void *)&ifc);
 		if (error == 0)
@@ -3599,7 +3598,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct thread *td)
 out_ref:
 	if_rele(ifp);
 out_noref:
-#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI)
+#if defined(COMPAT_FREEBSD32) || defined(COMPAT_CHERIABI) || defined(COMPAT_FREEBSD64)
 	if (ifmrp != NULL) {
 		KASSERT((cmd == SIOCGIFMEDIA || cmd == SIOCGIFXMEDIA),
 		    ("ifmrp non-NULL, but cmd is not an ifmedia req 0x%lx",
