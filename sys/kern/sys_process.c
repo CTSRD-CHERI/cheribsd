@@ -850,6 +850,8 @@ kern_ptrace(struct thread *td, int req, pid_t pid, void * __capability addr, int
 	int wrap64 = 0;
 	struct ptrace_sc_ret64 * __capability psr64 = NULL;
 	struct ptrace_lwpinfo64 * __capability pl64 = NULL;
+#endif
+#if __has_feature(capabilities)
 	struct ptrace_io_desc_c * __capability piodc = NULL;
 #endif
 #ifdef COMPAT_FREEBSD32
