@@ -58,11 +58,9 @@ LDFLAGS+=	-stdlib=libc++
 
 .endif
 
-.if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none" || ${WANT_CHERI} == "variables")
+.if ${MK_CHERI} != "no" && (!defined(WANT_CHERI) || ${WANT_CHERI} == "none")
 # When building MIPS code for CHERI ensure 16/32 byte stack alignment
 # for libraries because it could also be used by hybrid code
-# Note: libc sets WANT_CHERI=variables when building for MIPS so we also need to
-# handle that case.
 # TODO: should be only for libraries and not programs
 .if ${COMPILER_TYPE} == "clang"
 # GCC doesn't support -mstack-alignment but I think it has been patched
@@ -166,7 +164,6 @@ LDFLAGS+=	-Wl,-z,norelro
 _CHERI_CFLAGS+=	-Qunused-arguments
 _CHERI_CFLAGS+=	-Werror=cheri-bitwise-operations
 
-.if ${WANT_CHERI} != "variables"
 .if ${WANT_CHERI} == "sandbox"
 # Force position-dependent sandboxes; PIEs aren't supported
 NO_SHARED=	yes
@@ -182,7 +179,6 @@ CXXFLAGS+=	-stdlib=libc++
 # Don't remove CHERI symbols from the symbol table
 STRIP_FLAGS+=	-w --keep-symbol=__cheri_callee_method.\* \
 		--keep-symbol=__cheri_method.\*
-.endif
 .endif
 .endif
 .endif
