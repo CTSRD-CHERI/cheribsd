@@ -286,7 +286,7 @@ is_unionstack(int fd)
 	struct statfs sfb;
 	int unionstack;
 
-	unionstack = _fcntl(fd, F_ISUNIONSTACK);
+	unionstack = _fcntl(fd, F_ISUNIONSTACK, 0);
 	if (unionstack != -1)
 		return (unionstack);
 
