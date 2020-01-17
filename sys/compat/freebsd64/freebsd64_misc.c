@@ -479,13 +479,6 @@ freebsd64_sendfile(struct thread *td, struct freebsd64_sendfile_args *uap)
 	    (copyinuio_t *)freebsd64_copyinuio));
 }
 
-#if 0
-int
-freebsd64_jail(struct thread *td, struct freebsd64_jail_args *uap)
-{
-}
-#endif
-
 int
 freebsd64_jail_set(struct thread *td, struct freebsd64_jail_set_args *uap)
 {
