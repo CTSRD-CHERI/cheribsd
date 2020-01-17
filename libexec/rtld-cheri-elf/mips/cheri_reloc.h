@@ -81,12 +81,20 @@ process_r_cheri_capability(Obj_Entry *obj, Elf_Word r_symndx,
 			return -1;
 		}
 	} else if (ELF_ST_TYPE(def->st_info) == STT_FUNC) {
-		if (addend != 0) {
+		/* Only warn about the first ten bad relocations for now */
+		static int nonzero_addend_warnings = 0;
+		if (addend != 0 && nonzero_addend_warnings < 10) {
 			rtld_fdprintf(STDERR_FILENO,
 			    "Warning: %s: got relocation against function (%s) "
 			    "with non-zero offset (%jd). This is deprecated!\n",
 			    obj->path, symname(obj, r_symndx),
 			    (uintmax_t)addend);
+			nonzero_addend_warnings++;
+			if (nonzero_addend_warnings >= 10) {
+				rtld_fdprintf(STDERR_FILENO,
+				    "Note: reached warning limit, will not warn"
+				    "about further bad function relocations\n");
+			}
 		}
 		/* Remove write permissions and set bounds */
 		symval = make_function_pointer_with_addend(def, defobj, addend);
