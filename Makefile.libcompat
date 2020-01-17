@@ -99,7 +99,7 @@ build${libcompat}: .PHONY
 .endfor
 	${_+_}cd ${.CURDIR}; \
 	    ${LIBCOMPATWMAKE} -f Makefile.inc1 -DNO_FSCHG libraries
-.if ${MK_COMPAT_CHERIABI} == "yes"
+.if ${MK_COMPAT_CHERIABI} == "yes" && ${MK_CHERI_PURE} == "yes"
 # To build a purecap world against /usr/libcheri, we need internal libs.
 # Skip amu because it needs unifdef which isn't available here and we
 # don't build amd (and it's going away).
