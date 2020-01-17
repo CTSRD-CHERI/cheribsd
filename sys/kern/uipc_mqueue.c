@@ -2918,7 +2918,7 @@ out:
 int
 freebsd32_kmq_notify(struct thread *td, struct freebsd32_kmq_notify_args *uap)
 {
-	struct sigevent_t ev, *evp;
+	struct sigevent ev, *evp;
 	struct sigevent32 ev32;
 	int error;
 
