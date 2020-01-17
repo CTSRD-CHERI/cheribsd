@@ -169,7 +169,7 @@ struct kevent64 {
 	unsigned short	flags;
 	unsigned int	fflags;
 	__int64_t	data;
-	void		*udata;		/* opaque user data identifier */
+	__uint64_t	udata;		/* opaque user data identifier */
 	__uint64_t	ext[4];
 };
 #endif
