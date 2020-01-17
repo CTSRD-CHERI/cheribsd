@@ -58,8 +58,8 @@ SRCS+=	test_runtime.c	\
 
 # These tests do math with (u)intcap_t's where the provenance (or
 # rather lack there of) isn't clear to the compiler.
-CFLAGS.clang_purecap_intcapmath.c+=	-Wno-cheri-provenance
-CFLAGS.clang_purecap_uintcapmath.c+=	-Wno-cheri-provenance
+CFLAGS.clang_purecap_intcapmath.c+=	-Wno-cheri-provenance -Wno-unknown-warning-option
+CFLAGS.clang_purecap_uintcapmath.c+=	-Wno-cheri-provenance -Wno-unknown-warning-option
 
 .for test in ${TEST_SRCS}
 # Avoid the need for extern declarations for variables/functions that are
