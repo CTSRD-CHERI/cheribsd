@@ -65,7 +65,7 @@ LIB32_MACHINE_ARCH=	powerpc
 LIB32WMAKEFLAGS=	\
 		LD="${LD_BFD} -m elf32ppc_fbsd"
 
-.elif ${COMPAT_ARCH:Mmips64*} != ""
+.elif ${COMPAT_ARCH:Mmips64*}
 HAS_COMPAT=32
 .if ${COMPAT_COMPILER_TYPE} == gcc
 .if empty(COMPAT_CPUTYPE)
@@ -74,7 +74,7 @@ LIB32CPUFLAGS=	-march=mips3
 LIB32CPUFLAGS=	-march=${COMPAT_CPUTYPE}
 .endif
 .else
-.if ${COMPAT_ARCH:Mmips64el*} != ""
+.if ${COMPAT_ARCH:Mmips64el*}
 LIB32CPUFLAGS=  -target mipsel-unknown-freebsd13.0
 .else
 LIB32CPUFLAGS=  -target mips-unknown-freebsd13.0
@@ -82,7 +82,7 @@ LIB32CPUFLAGS=  -target mips-unknown-freebsd13.0
 .endif
 LIB32CPUFLAGS+= -mabi=32
 LIB32_MACHINE=	mips
-.if ${COMPAT_ARCH:Mmips64el*} != ""
+.if ${COMPAT_ARCH:Mmips64el*}
 LIB32_MACHINE_ARCH=	mipsel
 _EMULATION=	elf32ltsmip_fbsd
 .else
@@ -105,7 +105,7 @@ LIB32WMAKEFLAGS+=	-DCOMPAT_32BIT
 .if ${COMPAT_ARCH:Mmips64*c*}
 HAS_COMPAT=64
 # XXX: clang specific
-.if ${COMPAT_ARCH:Mmips64el*} != ""
+.if ${COMPAT_ARCH:Mmips64el*}
 LIB64CPUFLAGS=  -target mipsel-unknown-freebsd13.0
 .else
 LIB64CPUFLAGS=  -target cheri-unknown-freebsd13.0
@@ -145,7 +145,7 @@ LIBCHERIWMAKEFLAGS=	LIBCHERI=yes
 
 # -------------------------------------------------------------------
 # soft-fp world
-.if ${COMPAT_ARCH:Marmv[67]*} != ""
+.if ${COMPAT_ARCH:Marmv[67]*}
 HAS_COMPAT=SOFT
 LIBSOFTCFLAGS=        -DCOMPAT_SOFTFP
 LIBSOFTCPUFLAGS= -mfloat-abi=softfp
