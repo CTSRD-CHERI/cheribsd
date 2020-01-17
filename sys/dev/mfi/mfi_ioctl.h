@@ -34,7 +34,6 @@ __FBSDID("$FreeBSD$");
 #include <compat/freebsd32/freebsd32.h>
 #endif
 #ifdef COMPAT_FREEBSD64
-#include <sys/signal.h>
 #include <compat/freebsd64/freebsd64.h>
 #endif
 
