@@ -44,7 +44,6 @@ __FBSDID("$FreeBSD$");
 #include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
-#include <cheri_private.h>
 #include "xlocale_private.h"
 
 /*
@@ -54,11 +53,10 @@ __FBSDID("$FreeBSD$");
  * alphabets and digits are each contiguous.
  */
 long
-__CAPSUFFIX(strtol_l)(const char * __CAP __restrict nptr,
-		      char * __CAP * __CAP __restrict endptr,
-		      int base, locale_t locale)
+strtol_l(const char * __restrict nptr, char ** __restrict endptr, int base,
+		locale_t locale)
 {
-	const char * __CAP s;
+	const char *s;
 	unsigned long acc;
 	char c;
 	unsigned long cutoff;
@@ -146,19 +144,11 @@ noconv:
 	} else if (neg)
 		acc = -acc;
 	if (endptr != NULL)
-		/*
-		 * XXX-BD: static analysis opportunity.  The origional code:
-		 *	*endptr = (__CAP char *)(any ? s - 1 : nptr);
-		 * is fairly easy to prove safe.
-		 */
-		*endptr = (char * __CAP)(any ? nptr + ((s - nptr) - 1) :
-		    nptr);
+		*endptr = (char *)(any ? s - 1 : nptr);
 	return (acc);
 }
 long
-__CAPSUFFIX(strtol)(const char * __CAP __restrict nptr,
-		    char * __CAP * __CAP __restrict endptr,
-		    int base)
+strtol(const char * __restrict nptr, char ** __restrict endptr, int base)
 {
-	return __CAPSUFFIX(strtol_l)(nptr, endptr, base, __get_locale());
+	return strtol_l(nptr, endptr, base, __get_locale());
 }
