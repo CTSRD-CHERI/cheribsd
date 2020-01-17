@@ -202,7 +202,7 @@ mrsas_passthru(struct mrsas_softc *sc, void *arg, u_long ioctlCmd)
 
 			iov_len = user_ioc32->sgl[i].iov_len;
 			iov_base_ptrin = __USER_CAP(PTRIN(
-			    user_ioc32->sgl[i].iov_base, iov_len));
+			    user_ioc32->sgl[i].iov_base), iov_len);
 #endif
 		}
 
@@ -275,7 +275,7 @@ mrsas_passthru(struct mrsas_softc *sc, void *arg, u_long ioctlCmd)
 		} else {
 			iov_len = user_ioc32->sgl[i].iov_len;
 			iov_base_ptrin = __USER_CAP(PTRIN(
-			    user_ioc32->sgl[i].iov_base, iov_len));
+			    user_ioc32->sgl[i].iov_base), iov_len);
 #endif
 		}
 
