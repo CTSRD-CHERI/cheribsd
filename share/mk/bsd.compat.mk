@@ -41,7 +41,7 @@ LIB32_MACHINE_ARCH=	i386
 LIB32WMAKEENV=	MACHINE_CPU="i686 mmx sse sse2"
 LIB32WMAKEFLAGS=	\
 		AS="${XAS} --32" \
-		LD="${XLD} -m elf_i386_fbsd -L${LIBCOMPATTMP}/usr/lib32"
+		LD="${XLD} -m elf_i386_fbsd -L${WORLDTMP}/usr/lib32"
 
 .elif ${COMPAT_ARCH} == "powerpc64"
 HAS_COMPAT=32
@@ -177,11 +177,10 @@ LIBCOMPAT${_var}?=	${LIB${_LIBCOMPAT}${_var}}
 
 # Shared flags
 LIBCOMPAT_OBJTOP?=	${OBJTOP}/obj-lib${libcompat}
-LIBCOMPATTMP?=		${LIBCOMPAT_OBJTOP}/tmp
 
 LIBCOMPATCFLAGS+=	${LIBCOMPATCPUFLAGS} \
-			-L${LIBCOMPATTMP}/usr/lib${libcompat} \
-			--sysroot=${LIBCOMPATTMP} \
+			-L${WORLDTMP}/usr/lib${libcompat} \
+			--sysroot=${WORLDTMP} \
 			${BFLAGS}
 
 LIBCOMPATWMAKEENV+=	MACHINE=${LIBCOMPAT_MACHINE}
@@ -189,7 +188,7 @@ LIBCOMPATWMAKEENV+=	MACHINE_ARCH=${LIBCOMPAT_MACHINE_ARCH}
 
 # -B is needed to find /usr/lib32/crti.o for GCC and /usr/libsoft/crti.o for
 # Clang/GCC.
-LIBCOMPATCFLAGS+=	-B${LIBCOMPATTMP}/usr/lib${libcompat}
+LIBCOMPATCFLAGS+=	-B${WORLDTMP}/usr/lib${libcompat}
 
 .if defined(WANT_COMPAT)
 LIBDIR_BASE:=	/usr/lib${libcompat}
