@@ -70,6 +70,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rman.h>
 #include <sys/bio.h>
 #include <sys/ioccom.h>
+#include <sys/mount.h>
 #include <sys/uio.h>
 #include <sys/proc.h>
 #include <sys/signalvar.h>
@@ -3085,8 +3086,6 @@ out:
 	return (error);
 }
 
-#define	PTRIN(p)		((void *)(uintptr_t)(p))
-
 static int
 mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td)
 {
@@ -3272,7 +3271,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						/* 32bit on 64bit */
 						ioc32 = (struct mfi_ioc_packet32 *)ioc;
 						len = ioc32->mfi_sgl[i].iov_len;
-						addr = __USER_CAP(PTRIN(ioc32->mfi_sgl[i].iov_base, len));
+						addr = __USER_CAP(PTRIN(ioc32->mfi_sgl[i].iov_base), len);
 						break;
 #endif
 #ifdef COMPAT_FREEBSD64
@@ -3340,7 +3339,7 @@ mfi_ioctl(struct cdev *dev, u_long cmd, caddr_t arg, int flag, struct thread *td
 						/* 32bit on 64bit */
 						ioc32 = (struct mfi_ioc_packet32 *)ioc;
 						len = ioc32->mfi_sgl[i].iov_len;
-						addr = __USER_CAP(PTRIN(ioc32->mfi_sgl[i].iov_base));
+						addr = __USER_CAP(PTRIN(ioc32->mfi_sgl[i].iov_base), len);
 #endif
 #ifdef COMPAT_FREEBSD64
 					case MFI_CMD64:
