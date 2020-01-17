@@ -39,9 +39,7 @@
 #ifndef _COMPAT_FREEBSD64_FREEBSD64_H_
 #define _COMPAT_FREEBSD64_FREEBSD64_H_
 
-#include "opt_ktrace.h"
 #include <sys/uio.h>
-#include <sys/ktrace.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 
