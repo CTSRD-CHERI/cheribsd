@@ -371,9 +371,9 @@ freebsd11_freebsd64_kevent(struct thread *td,
 	};
 	struct g_kevent_args gk_args = {
 		.fd = uap->fd,
-		.changelist = __USER_CAP_UNBOUND(uap->changelist),
+		.changelist = __USER_CAP_ARRAY(uap->changelist, uap->nchanges),
 		.nchanges = uap->nchanges,
-		.eventlist = __USER_CAP_UNBOUND(uap->eventlist),
+		.eventlist = __USER_CAP_ARRAY(uap->eventlist, uap->nevents),
 		.nevents = uap->nevents,
 		.timeout = __USER_CAP_OBJ(uap->timeout),
 	};
@@ -1353,9 +1353,22 @@ freebsd64_getrusage(struct thread *td, struct freebsd64_getrusage_args *uap)
 int
 freebsd64___sysctl(struct thread *td, struct freebsd64___sysctl_args *uap)
 {
+	size_t oldlen;
+
+	/*
+	 * Fetch the oldlen so we can bound the old capability.
+	 * While there is a race between here and kern_sysctl's use,
+	 * the caller will get what they deserve if they increase the
+	 * value at uap->oldlenp between now its later use.
+	 */
+	if (uap->oldlenp == NULL)
+		oldlen = 0;
+	else
+		if (fueword(uap->oldlenp, &oldlen) == -1)
+			return (EFAULT);
 
 	return (kern_sysctl(td, __USER_CAP_ARRAY(uap->name, uap->namelen),
-	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
+	    uap->namelen, __USER_CAP(uap->old, oldlen),
 	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
 	    uap->newlen, 0));
 }
@@ -1364,11 +1377,23 @@ int
 freebsd64___sysctlbyname(struct thread *td, struct
     freebsd64___sysctlbyname_args *uap)
 {
-	size_t rv;
+	size_t rv, oldlen;
 	int error;
 
+	/*
+	 * Fetch the oldlen so we can bound the old capability.
+	 * While there is a race between here and kern_sysctl's use,
+	 * the caller will get what they deserve if they increase the
+	 * value at uap->oldlenp between now its later use.
+	 */
+	if (uap->oldlenp == NULL)
+		oldlen = 0;
+	else
+		if (fueword(uap->oldlenp, &oldlen) == -1)
+			return (EFAULT);
+
 	error = kern___sysctlbyname(td, __USER_CAP(uap->name, uap->namelen),
-	    uap->namelen, __USER_CAP_UNBOUND(uap->old),
+	    uap->namelen, __USER_CAP(uap->old, oldlen),
 	    __USER_CAP_OBJ(uap->oldlenp), __USER_CAP(uap->new, uap->newlen),
 	    uap->newlen, &rv, 0, 0);
 	if (error != 0)
@@ -1598,7 +1623,7 @@ freebsd64_cap_rights_limit(struct thread *td,
 {
 
 	return (user_cap_rights_limit(td, uap->fd,
-	    __USER_CAP_UNBOUND(uap->rightsp)));
+	    __USER_CAP_OBJ(uap->rightsp)));
 }
 
 int
@@ -1607,7 +1632,7 @@ freebsd64___cap_rights_get(struct thread *td,
 {
 
 	return (kern_cap_rights_get(td, uap->version, uap->fd,
-	    __USER_CAP_UNBOUND(uap->rightsp)));
+	    __USER_CAP_OBJ(uap->rightsp)));
 }
 
 int
