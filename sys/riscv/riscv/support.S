@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2015-2018 Ruslan Bukin <br@bsdpad.com>
+ * Copyright (c) 2015-2020 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
  *
  * Portions of this software were developed by SRI International and the
@@ -141,9 +141,9 @@ ENTRY(fubyte)
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 	ENTER_USER_ACCESS(a1)
 #if __has_feature(capabilities)
-	lb.cap	a0, 0(ca0)		/* Try loading the data */
+	lbu.cap	a0, 0(ca0)		/* Try loading the data */
 #else
-	lb	a0, 0(a0)		/* Try loading the data */
+	lbu	a0, 0(a0)		/* Try loading the data */
 #endif
 	EXIT_USER_ACCESS(a1)
 	SET_FAULT_HANDLER(x0, a1)	/* Reset the fault handler */
@@ -168,9 +168,9 @@ ENTRY(fuword16)
 	SET_FAULT_HANDLER(a6, a1)	/* And set it */
 	ENTER_USER_ACCESS(a1)
 #if __has_feature(capabilities)
-	lh.cap	a0, 0(ca0)		/* Try loading the data */
+	lhu.cap	a0, 0(ca0)		/* Try loading the data */
 #else
-	lh	a0, 0(a0)		/* Try loading the data */
+	lhu	a0, 0(a0)		/* Try loading the data */
 #endif
 	EXIT_USER_ACCESS(a1)
 	SET_FAULT_HANDLER(x0, a1)	/* Reset the fault handler */
