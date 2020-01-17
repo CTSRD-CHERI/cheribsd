@@ -226,6 +226,9 @@ __DEFAULT_NO_OPTIONS = \
 __DEFAULT_NO_OPTIONS+= \
     LIBCHERI
 
+__DEFAULT_YES_OPTIONS+=	\
+	COMPAT_CHERIABI
+
 # LEFT/RIGHT. Left options which default to "yes" unless their corresponding
 # RIGHT option is disabled.
 __DEFAULT_DEPENDENT_OPTIONS= \
@@ -412,6 +415,10 @@ BROKEN_OPTIONS+=MLX5TOOL
 __DEFAULT_YES_OPTIONS+=PIE
 .else
 __DEFAULT_NO_OPTIONS+=PIE
+.endif
+
+.if ${__T} != "mips64"
+BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
 .if ${.MAKE.OS} != "FreeBSD"

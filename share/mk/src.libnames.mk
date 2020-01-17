@@ -3,7 +3,7 @@
 # The include file <src.libnames.mk> define library names suitable
 # for INTERNALLIB and PRIVATELIB definition
 
-.if !target(__<bsd.init.mk>__)
+.if !target(__<bsd.init.mk>__) && !target(__<Makefile.libcompat>__)
 .error src.libnames.mk cannot be included directly.
 .endif
 

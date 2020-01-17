@@ -3,6 +3,8 @@
 .if !targets(__<${_this:T}>__)
 __<${_this:T}>__:
 
+.include <src.libnames.mk>
+
 # Makefile for the compatibility libraries.
 # - 32-bit compat libraries on MIPS, PowerPC, and AMD64.
 # - 64-bit compat on CHERI MIPS
@@ -97,6 +99,16 @@ build${libcompat}: .PHONY
 .endfor
 	${_+_}cd ${.CURDIR}; \
 	    ${LIBCOMPATWMAKE} -f Makefile.inc1 -DNO_FSCHG libraries
+.if ${MK_COMPAT_CHERIABI} == "yes"
+# To build a purecap world against /usr/libcheri, we need internal libs.
+# Skip amu because it needs unifdef which isn't available here and we
+# don't build amd (and it's going away).
+# We've locally removed gdb.
+.for _lib in ${_INTERNALLIBS:Namu:Ngdb}
+	${_+_}cd ${.CURDIR}${LIB${_lib:tu}DIR:S|${_LIB_OBJTOP}||}; \
+	    ${LIBCOMPATWMAKE} all
+.endfor
+.endif
 
 distribute${libcompat} install${libcompat}: .PHONY
 .for _dir in ${_LC_LIBDIRS.yes}

@@ -129,6 +129,21 @@ LIB64DTRACE=	${DTRACE} -64
 LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
 
 # -------------------------------------------------------------------
+# CHERI world
+.if ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
+.if ${COMPAT_ARCH:Mmips*el*}
+.error No little endian CHERI
+.endif
+HAS_COMPAT=CHERI
+LIBCHERICFLAGS=		-DCOMPAT_CHERI
+LIBCHERICPUFLAGS=  -target cheri-unknown-freebsd13.0 -mabi=purecap
+LIBCHERI_MACHINE=	mips
+LIBCHERI_MACHINE_ARCH=	mips64c128
+LIBCHERIWMAKEFLAGS=	LIBCHERI=yes
+# XXX: do we need to handle LD?
+.endif
+
+# -------------------------------------------------------------------
 # soft-fp world
 .if ${COMPAT_ARCH:Marmv[67]*} != ""
 HAS_COMPAT=SOFT
