@@ -27,14 +27,24 @@ LIBCOMPATWMAKEFLAGS+= CC="${XCC} ${LIBCOMPATCFLAGS}" \
 		CXX="${XCXX} ${LIBCOMPATCXXFLAGS} ${LIBCOMPATCFLAGS}" \
 		CPP="${XCPP} ${LIBCOMPATCFLAGS}" \
 		DESTDIR=${WORLDTMP} \
-		COMPILER_TYPE=${COMPILER_TYPE} \
-		COMPILER_VERSION=${COMPILER_VERSION} \
-		COMPILER_FREEBSD_VERSION=${COMPILER_FREEBSD_VERSION} \
 		-DNO_CPU_CFLAGS \
 		MK_CTF=no \
 		-DNO_LINT \
 		MK_TESTS=no \
 		WORLDTMP_MTREE="${WORLDTMP_MTREE}"
+# Avoid re-computing COMPILER_VERSION, etc. values:
+# $CC is different in the libcompat case compared to the non-compat value.
+# Since bsd.compiler.mk (and bsd.linker.mk) save the variables using a full
+# hash of the compiler/link command, this means that the cached values for
+# X_COMPILER_TYPE, etc. cannot be loaded.
+# Instead set all the values, so that we can avoid including bsd.compiler.mk and
+# bsd.linker.mk. This provides a noticeable speed-up as it avoids multiple
+# processes from being spawned in each subdirectory.
+.for _var in ${_TOOLCHAIN_METADATA_VARS}
+LIBCOMPATWMAKEFLAGS+=	${_var}="${X_${_var}}"
+.endfor
+LIBCOMPATWMAKEFLAGS+=_NO_INCLUDE_LINKERMK=yes _NO_INCLUDE_COMPILERMK=yes
+
 LIBCOMPATWMAKE+=	${LIBCOMPATWMAKEENV} ${MAKE} ${LIBCOMPATWMAKEFLAGS} \
 			OBJTOP=${LIBCOMPAT_OBJTOP} \
 			OBJROOT='$${OBJTOP}/' \
