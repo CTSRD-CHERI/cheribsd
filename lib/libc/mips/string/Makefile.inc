@@ -36,8 +36,13 @@ CHERI_MISRCS=	\
 MDSRCS+=	${CHERI_MDSRCS}
 
 .if ! ${MACHINE_ARCH:Mmips*c*}
+.if ${MK_CHERI128} == "yes"
+_CHERIBITS=128
+.else
+_CHERIBITS=256
+.endif
 .for src in ${CHERI_MDSRCS} ${CHERI_MISRCS}
-CC.${src}=	${_CHERI_CC}
+CC.${src}=	${CC} -target cheri-unknown-freebsd -cheri=${_CHERIBITS}
 .endfor
 .endif
 

@@ -3,7 +3,6 @@
 
 PACKAGE=	clibs
 SHLIBDIR?= /lib
-WANT_CHERI=	variables
 
 .include <src.opts.mk>
 
