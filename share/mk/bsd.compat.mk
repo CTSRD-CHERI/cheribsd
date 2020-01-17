@@ -140,7 +140,12 @@ LIBCHERICPUFLAGS=  -target cheri-unknown-freebsd13.0 -mabi=purecap
 LIBCHERI_MACHINE=	mips
 LIBCHERI_MACHINE_ARCH=	mips64c128
 LIBCHERIWMAKEFLAGS=	LIBCHERI=yes
-# XXX: do we need to handle LD?
+# Forward the cross linker and binutils
+LIBCHERIWMAKEFLAGS+=	LD="${XLD}"
+.for BINUTIL in ${XBINUTILS}
+LIBCHERIWMAKEFLAGS+=	${BINUTIL}="${X${BINUTIL}}"
+.endfor
+.info "LIBCHERIWMAKEFLAGS=${LIBCHERIWMAKEFLAGS}"
 .endif
 
 # -------------------------------------------------------------------
