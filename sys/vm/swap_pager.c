@@ -1236,12 +1236,15 @@ swap_pager_getpages(vm_object_t object, vm_page_t *ma, int count, int *rbehind,
 	daddr_t blk;
 	int i, maxahead, maxbehind, reqcount;
 
+	VM_OBJECT_WLOCK(object);
 	reqcount = count;
 
 	KASSERT(object->type == OBJT_SWAP,
 	    ("%s: object not swappable", __func__));
-	if (!swap_pager_haspage(object, ma[0]->pindex, &maxbehind, &maxahead))
+	if (!swap_pager_haspage(object, ma[0]->pindex, &maxbehind, &maxahead)) {
+		VM_OBJECT_WUNLOCK(object);
 		return (VM_PAGER_FAIL);
+	}
 
 	KASSERT(reqcount - 1 <= maxahead,
 	    ("page count %d extends beyond swap block", reqcount));
@@ -1358,6 +1361,7 @@ swap_pager_getpages(vm_object_t object, vm_page_t *ma, int count, int *rbehind,
 	 * is set in the metadata for each page in the request.
 	 */
 	VM_OBJECT_WLOCK(object);
+	/* This could be implemented more efficiently with aflags */
 	while ((ma[0]->oflags & VPO_SWAPINPROG) != 0) {
 		ma[0]->oflags |= VPO_SWAPSLEEP;
 		VM_CNT_INC(v_intrans);
@@ -1368,6 +1372,7 @@ swap_pager_getpages(vm_object_t object, vm_page_t *ma, int count, int *rbehind,
 			    bp->b_bufobj, (intmax_t)bp->b_blkno, bp->b_bcount);
 		}
 	}
+	VM_OBJECT_WUNLOCK(object);
 
 	/*
 	 * If we had an unrecoverable read error pages will not be valid.
@@ -1399,7 +1404,6 @@ swap_pager_getpages_async(vm_object_t object, vm_page_t *ma, int count,
 	int r, error;
 
 	r = swap_pager_getpages(object, ma, count, rbehind, rahead);
-	VM_OBJECT_WUNLOCK(object);
 	switch (r) {
 	case VM_PAGER_OK:
 		error = 0;
@@ -1414,7 +1418,6 @@ swap_pager_getpages_async(vm_object_t object, vm_page_t *ma, int count,
 		panic("unhandled swap_pager_getpages() error %d", r);
 	}
 	(iodone)(arg, ma, count, error);
-	VM_OBJECT_WLOCK(object);
 
 	return (r);
 }
@@ -1801,10 +1804,12 @@ swp_pager_force_pagein(vm_object_t object, vm_pindex_t pindex, int npages)
 		if (i < npages && ma[i]->valid != VM_PAGE_BITS_ALL)
 			continue;
 		if (j < i) {
+			VM_OBJECT_WUNLOCK(object);
 			/* Page-in nonresident pages. Mark for laundering. */
 			if (swap_pager_getpages(object, &ma[j], i - j, NULL,
 			    NULL) != VM_PAGER_OK)
 				panic("%s: read from swap failed", __func__);
+			VM_OBJECT_WLOCK(object);
 			do {
 				swp_pager_force_launder(ma[j]);
 			} while (++j < i);
