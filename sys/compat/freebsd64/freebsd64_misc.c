@@ -405,7 +405,8 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 			free(uio, M_IOV);
 			return (error);
 		}
-		IOVEC_INIT(&iov[i], iov64.iov_base, iov64.iov_len);
+		IOVEC_INIT_C(&iov[i], __USER_CAP(iov64.iov_base, iov64.iov_len),
+		    iov64.iov_len);
 	}
 	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
@@ -443,7 +444,9 @@ freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
 			free(iovs, M_IOV);
 			return (error);
 		}
-		IOVEC_INIT(iovs + i, useriov.iov_base, useriov.iov_len);
+		IOVEC_INIT_C(iovs + i,
+		    __USER_CAP(useriov.iov_base, useriov.iov_len),
+		    useriov.iov_len);
 	}
 	*iovp = iovs;
 	return (0);
@@ -1087,7 +1090,7 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
         bcopy(&stat.name[0], &stat64.name[0], sizeof(stat.name));
         CP(stat, stat64, refs);
         CP(stat, stat64, id);
-	stat64.address = stat.address;
+	stat64.address = (uint64_t)stat.address;
         CP(stat, stat64, size);
         bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
         return (copyout(&stat64, uap->stat, version));
@@ -1486,15 +1489,18 @@ freebsd64_thr_new_initthr(struct thread *td, void *thunk)
 {
 	stack_t stack;
 	struct thr_param64 *param = thunk;
+	long * __capability child_tid = __USER_CAP(param->child_tid,
+	    sizeof(long));
+	long * __capability parent_tid = __USER_CAP(param->parent_tid,
+	    sizeof(long));
 
-	if ((param->child_tid != NULL &&
-	    suword(param->child_tid, td->td_tid)) ||
-	    (param->parent_tid != NULL &&
-	    suword(param->parent_tid, td->td_tid)))
+	if ((child_tid != NULL && suword_c(child_tid, td->td_tid)) ||
+	    (parent_tid != NULL && suword_c(parent_tid, td->td_tid)))
 		return (EFAULT);
 	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
 	stack.ss_size = param->stack_size;
-	cpu_set_upcall(td, param->start_func, param->arg, &stack);
+	cpu_set_upcall(td, (void (*)(void *))param->start_func,
+	    (void *)param->arg, &stack);
 	return (cpu_set_user_tls(td, __USER_CAP_UNBOUND(param->tls_base)));
 }
 
@@ -1512,8 +1518,9 @@ freebsd64_thr_new(struct thread *td, struct freebsd64_thr_new_args *uap)
 	if (error != 0)
 		return (error);
 
-	if (param64.rtp != NULL) {
-		error = copyin(param64.rtp, &rtp, sizeof(struct rtprio));
+	if (param64.rtp != 0) {
+		error = copyin_c(__USER_CAP(param64.rtp, sizeof(struct rtprio)),
+		    &rtp, sizeof(struct rtprio));
 		if (error)
 			return (error);
 		rtpp = &rtp;
