@@ -309,7 +309,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 
 /* Turn on the checking by default for now (until we have fixed everything)*/
 #define __check_low_ptr_bits_assignment
-#if defined(_KERNEL) /* Don't pull in assert.h when building the kernel */
+#if defined(_KERNEL) || !defined(assert) /* Don't pull in assert.h when building the kernel */
 #define _cheri_bits_assert(e) (void)0
 #endif
 #ifdef __check_low_ptr_bits_assignment
