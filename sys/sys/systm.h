@@ -177,7 +177,7 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * sentinel values to work.
  */
 #define ___USER_CFROMPTR(ptr, cap)					\
-    ((ptr) == NULL ? NULL :						\
+    ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
      ((vm_offset_t)(ptr) < 4096 ||					\
       (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
 	__builtin_cheri_offset_set(NULL, (vaddr_t)(ptr)) :		\
