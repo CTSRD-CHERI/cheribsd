@@ -41,6 +41,8 @@
 #ifndef _MACHINE_CHERIREG_H_
 #define	_MACHINE_CHERIREG_H_
 
+#define	CHERICAP_SIZE		__SIZEOF_CHERI_CAPABILITY__
+
 /*
  * CHERI ISA-defined constants for capabilities -- suitable for inclusion from
  * assembly source code.
