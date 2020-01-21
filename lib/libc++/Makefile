@@ -5,10 +5,12 @@
 PACKAGE=	clibs
 .if ${MK_CHERI} != "no"
 WANT_CHERI?=	hybrid
+LIBCXX_VERSION=10
 _LIBCXXRTDIR=   ${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/include
 SRCDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/src
 .else
+LIBCXX_VERSION=9
 _LIBCXXRTDIR=	${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/include
 SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/src
@@ -32,7 +34,9 @@ SRCS+=		bind.cpp
 SRCS+=		charconv.cpp
 SRCS+=		chrono.cpp
 SRCS+=		condition_variable.cpp
-#SRCS+=		condition_variable_destructor.cpp
+.if ${LIBCXX_VERSION} >= 10
+SRCS+=		condition_variable_destructor.cpp
+.endif
 SRCS+=		debug.cpp
 SRCS+=		exception.cpp
 SRCS+=		filesystem/directory_iterator.cpp
@@ -46,7 +50,9 @@ SRCS+=		iostream.cpp
 SRCS+=		locale.cpp
 SRCS+=		memory.cpp
 SRCS+=		mutex.cpp
-#SRCS+=		mutex_destructor.cpp
+.if ${LIBCXX_VERSION} >= 10
+SRCS+=		mutex_destructor.cpp
+.endif
 SRCS+=		new.cpp
 SRCS+=		optional.cpp
 SRCS+=		random.cpp
