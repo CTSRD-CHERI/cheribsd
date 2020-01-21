@@ -84,6 +84,10 @@ int	fill_fpregs(struct thread *, struct fpreg *);
 int	set_fpregs(struct thread *, struct fpreg *);
 int	fill_dbregs(struct thread *, struct dbreg *);
 int	set_dbregs(struct thread *, struct dbreg *);
+#if __has_feature(capabilities)
+int	fill_capregs(struct thread *, struct capreg *);
+int	set_capregs(struct thread *, struct capreg *);
+#endif
 #endif
 
 #endif /* !_MACHINE_REG_H_ */

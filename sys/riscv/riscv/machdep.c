@@ -275,6 +275,22 @@ set_dbregs(struct thread *td, struct dbreg *regs)
 	panic("set_dbregs");
 }
 
+#if __has_feature(capabilities)
+int
+fill_capregs(struct thread *td, struct capreg *regs)
+{
+
+	panic("fill_capregs");
+}
+
+int
+set_capregs(struct thread *td, struct capreg *regs)
+{
+
+	return (EOPNOTSUPP);
+}
+#endif
+
 int
 ptrace_set_pc(struct thread *td, u_long addr)
 {
