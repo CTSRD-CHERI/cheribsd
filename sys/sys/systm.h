@@ -184,10 +184,10 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 	__builtin_cheri_offset_set((cap), (vaddr_t)(ptr)))
 
 #define	__USER_CAP_UNBOUND(ptr)						\
-    ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.ddc)
+	___USER_CFROMPTR((ptr), __USER_DDC)
 
 #define	__USER_CODE_CAP(ptr)						\
-     ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.pcc)
+	___USER_CFROMPTR((ptr), __USER_PCC)
 
 #define	__USER_CAP(ptr, len)						\
 ({									\

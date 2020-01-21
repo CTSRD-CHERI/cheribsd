@@ -116,6 +116,10 @@ struct cheri_kframe {
 	void * __capability	ckf_c24;
 };
 
+/* Return userspace DDC and PCC of current thread. */
+#define	__USER_DDC		(curthread->td_pcb->pcb_regs.ddc)
+#define	__USER_PCC		(curthread->td_pcb->pcb_regs.pcc)
+
 /*
  * CHERI-MIPS-specific kernel utility functions.
  */
