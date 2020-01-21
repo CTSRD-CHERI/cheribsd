@@ -243,4 +243,12 @@
 #define	csr_read64(csr)		((uint64_t)csr_read(csr))
 #endif
 
+#if __has_feature(capabilities)
+#define	scr_read(scr)							\
+({	void * __capability val;					\
+	__asm __volatile("cspecialr %0, " #scr : "=C" (val));		\
+	val;								\
+})
+#endif
+
 #endif /* !_MACHINE_RISCVREG_H_ */
