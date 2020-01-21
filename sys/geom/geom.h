@@ -218,7 +218,8 @@ struct g_provider {
 	off_t			stripesize;
 	off_t			stripeoffset;
 	struct devstat		*stat;
-	u_int			nstart, nend;
+	u_int			spare1;
+	u_int			spare2;
 	u_int			flags;
 #define G_PF_WITHER		0x2
 #define G_PF_ORPHAN		0x4
@@ -229,17 +230,6 @@ struct g_provider {
 	/* Two fields for the implementing class to use */
 	void			*private;
 	u_int			index;
-};
-
-/*
- * Descriptor of a classifier. We can register a function and
- * an argument, which is called by g_io_request() on bio's
- * that are not previously classified.
- */
-struct g_classifier_hook {
-	TAILQ_ENTRY(g_classifier_hook) link;
-	int			(*func)(void *arg, struct bio *bp);
-	void			*arg;
 };
 
 /* BIO_GETATTR("GEOM::setstate") argument values. */
@@ -343,8 +333,7 @@ void g_io_deliver(struct bio *bp, int error);
 int g_io_getattr(const char *attr, struct g_consumer *cp, int *len, void *ptr);
 int g_io_zonecmd(struct disk_zone_args *zone_args, struct g_consumer *cp);
 int g_io_flush(struct g_consumer *cp);
-int g_register_classifier(struct g_classifier_hook *hook);
-void g_unregister_classifier(struct g_classifier_hook *hook);
+int g_io_speedup(size_t shortage, u_int flags, size_t *resid, struct g_consumer *cp);
 void g_io_request(struct bio *bp, struct g_consumer *cp);
 struct bio *g_new_bio(void);
 struct bio *g_alloc_bio(void);

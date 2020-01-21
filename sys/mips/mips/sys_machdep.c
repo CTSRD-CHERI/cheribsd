@@ -67,28 +67,11 @@ sysarch(struct thread *td, struct sysarch_args *uap)
 
 	switch (uap->op) {
 	case MIPS_SET_TLS:
-		td->td_md.md_tls = uap->parms;
-
-		/*
-		 * If there is an user local register implementation (ULRI)
-		 * update it as well.  Add the TLS and TCB offsets so the
-		 * value in this register is adjusted like in the case of the
-		 * rdhwr trap() instruction handler.
-		 *
-		 * The user local register needs the TLS and TCB offsets
-		 * because the compiler simply generates a 'rdhwr reg, $29'
-		 * instruction to access thread local storage (i.e., variables
-		 * with the '_thread' attribute).
-		 */
-		if (cpuinfo.userlocal_reg == true) {
-			mips_wr_userlocal((__cheri_addr unsigned long)(uap->parms +
-			    td->td_md.md_tls_tcb_offset));
-		}
-		return (0);
+		return (cpu_set_user_tls(td, uap->parms));
 
 	case MIPS_GET_TLS:
 		tlsbase = td->td_md.md_tls;
-		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
+		error = copyoutcap(&tlsbase, uap->parms, sizeof(tlsbase));
 		return (error);
 
 #ifdef CPU_QEMU_MALTA

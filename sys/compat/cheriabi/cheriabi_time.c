@@ -269,7 +269,7 @@ int
 cheriabi_ktimer_create(struct thread *td,
     struct cheriabi_ktimer_create_args *uap)
 {
-	struct sigevent_c ev, *evp;
+	struct sigevent ev, *evp;
 	int error, id;
 
 	if (uap->evp == NULL) {

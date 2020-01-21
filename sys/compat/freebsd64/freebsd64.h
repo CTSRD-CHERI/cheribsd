@@ -39,9 +39,7 @@
 #ifndef _COMPAT_FREEBSD64_FREEBSD64_H_
 #define _COMPAT_FREEBSD64_FREEBSD64_H_
 
-#include "opt_ktrace.h"
 #include <sys/uio.h>
-#include <sys/ktrace.h>
 #include <sys/proc.h>
 #include <sys/user.h>
 
@@ -190,12 +188,6 @@ struct procctl_reaper_pids64 {
 	u_int		rp_count;
 	u_int		rp_pad0[15];
 	uint64_t	rp_pids;	/* struct procctl_reaper_pidinfo* */
-};
-
-union semun64 {
-	int		val;
-	uint64_t	buf;		/* struct semid_ds* */
-	uint64_t	array;		/* unsigned short* */
 };
 
 #include <sys/ipc.h>

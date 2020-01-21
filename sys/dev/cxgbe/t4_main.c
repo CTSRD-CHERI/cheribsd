@@ -4252,9 +4252,8 @@ set_params__pre_init(struct adapter *sc)
 		val = 1;
 		rc = -t4_set_params(sc, sc->mbox, sc->pf, 0, 1, &param, &val);
 		/* firmwares < 1.20.1.0 do not have this param. */
-		if (rc == FW_EINVAL && sc->params.fw_vers <
-		    (V_FW_HDR_FW_VER_MAJOR(1) | V_FW_HDR_FW_VER_MINOR(20) |
-		    V_FW_HDR_FW_VER_MICRO(1) | V_FW_HDR_FW_VER_BUILD(0))) {
+		if (rc == FW_EINVAL &&
+		    sc->params.fw_vers < FW_VERSION32(1, 20, 1, 0)) {
 			rc = 0;
 		}
 		if (rc != 0) {
@@ -4381,6 +4380,14 @@ get_params__post_init(struct adapter *sc)
 	else
 		sc->params.ulptx_memwrite_dsgl = false;
 
+	/* FW_RI_FR_NSMR_TPTE_WR support */
+	param[0] = FW_PARAM_DEV(RI_FR_NSMR_TPTE_WR);
+	rc = -t4_query_params(sc, sc->mbox, sc->pf, 0, 1, param, val);
+	if (rc == 0)
+		sc->params.fr_nsmr_tpte_wr_support = val[0] != 0;
+	else
+		sc->params.fr_nsmr_tpte_wr_support = false;
+
 	/* get capabilites */
 	bzero(&caps, sizeof(caps));
 	caps.op_to_write = htobe32(V_FW_CMD_OP(FW_CAPS_CONFIG_CMD) |
@@ -4419,9 +4426,7 @@ get_params__post_init(struct adapter *sc)
 			return (rc);
 		}
 		sc->tids.ntids = val[0];
-		if (sc->params.fw_vers <
-		    (V_FW_HDR_FW_VER_MAJOR(1) | V_FW_HDR_FW_VER_MINOR(20) |
-		    V_FW_HDR_FW_VER_MICRO(5) | V_FW_HDR_FW_VER_BUILD(0))) {
+		if (sc->params.fw_vers < FW_VERSION32(1, 20, 5, 0)) {
 			MPASS(sc->tids.ntids >= sc->tids.nhpftids);
 			sc->tids.ntids -= sc->tids.nhpftids;
 		}
@@ -4461,9 +4466,7 @@ get_params__post_init(struct adapter *sc)
 			return (rc);
 		}
 		sc->tids.ntids = val[0];
-		if (sc->params.fw_vers <
-		    (V_FW_HDR_FW_VER_MAJOR(1) | V_FW_HDR_FW_VER_MINOR(20) |
-		    V_FW_HDR_FW_VER_MICRO(5) | V_FW_HDR_FW_VER_BUILD(0))) {
+		if (sc->params.fw_vers < FW_VERSION32(1, 20, 5, 0)) {
 			MPASS(sc->tids.ntids >= sc->tids.nhpftids);
 			sc->tids.ntids -= sc->tids.nhpftids;
 		}

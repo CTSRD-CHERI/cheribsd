@@ -212,7 +212,7 @@ deadlres_td_on_lock(struct proc *p, struct thread *td, int blkticks)
 static void
 deadlres_td_sleep_q(struct proc *p, struct thread *td, int slpticks)
 {
-	void *wchan;
+	const void *wchan;
 	int i, slptype, tticks;
 
 	sx_assert(&allproc_lock, SX_LOCKED);
@@ -282,8 +282,7 @@ deadlkres(void)
 				if (TD_ON_LOCK(td))
 					deadlres_td_on_lock(p, td,
 					    blkticks);
-				else if (TD_IS_SLEEPING(td) &&
-				    TD_ON_SLEEPQ(td))
+				else if (TD_IS_SLEEPING(td))
 					deadlres_td_sleep_q(p, td,
 					    slpticks);
 				thread_unlock(td);
@@ -711,8 +710,7 @@ statclock(int cnt, int usermode)
 	td->td_incruntime += runtime;
 	PCPU_SET(switchtime, new_switchtime);
 
-	for ( ; cnt > 0; cnt--)
-		sched_clock(td);
+	sched_clock(td, cnt);
 	thread_unlock(td);
 #ifdef HWPMC_HOOKS
 	if (td->td_intr_frame != NULL)

@@ -909,7 +909,7 @@ vm_object_page_remove_write(vm_page_t p, int flags, boolean_t *allclean)
 	 * nosync page, skip it.  Note that the object flags were not
 	 * cleared in this case so we do not have to set them.
 	 */
-	if ((flags & OBJPC_NOSYNC) != 0 && (p->aflags & PGA_NOSYNC) != 0) {
+	if ((flags & OBJPC_NOSYNC) != 0 && (p->a.flags & PGA_NOSYNC) != 0) {
 		*allclean = FALSE;
 		return (FALSE);
 	} else {
@@ -1138,7 +1138,7 @@ vm_object_sync(vm_object_t object, vm_ooffset_t offset, vm_size_t size,
 		VM_OBJECT_WUNLOCK(object);
 		if (fsync_after)
 			error = VOP_FSYNC(vp, MNT_WAIT, curthread);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vn_finished_write(mp);
 		if (error != 0)
 			res = FALSE;
@@ -1305,9 +1305,7 @@ next_page:
 			vm_page_busy_sleep(tm, "madvpo", false);
   			goto relookup;
 		}
-		vm_page_lock(tm);
 		vm_page_advise(tm, advice);
-		vm_page_unlock(tm);
 		vm_page_xunbusy(tm);
 		vm_object_madvise_freespace(tobject, advice, tm->pindex, 1);
 next_pindex:
@@ -1487,6 +1485,16 @@ retry:
 			vm_page_sleep_if_busy(m, "spltwt");
 			VM_OBJECT_WLOCK(new_object);
 			goto retry;
+		}
+
+		/*
+		 * The page was left invalid.  Likely placed there by
+		 * an incomplete fault.  Just remove and ignore.
+		 */
+		if (vm_page_none_valid(m)) {
+			if (vm_page_remove(m))
+				vm_page_free(m);
+			continue;
 		}
 
 		/* vm_page_rename() will dirty the page. */
@@ -1675,8 +1683,6 @@ vm_object_collapse_scan(vm_object_t object, int op)
 			    ("freeing mapped page %p", p));
 			if (vm_page_remove(p))
 				vm_page_free(p);
-			else
-				vm_page_xunbusy(p);
 			continue;
 		}
 
@@ -1700,8 +1706,16 @@ vm_object_collapse_scan(vm_object_t object, int op)
 			continue;
 		}
 
-		KASSERT(pp == NULL || !vm_page_none_valid(pp),
-		    ("unbusy invalid page %p", pp));
+		if (pp != NULL && vm_page_none_valid(pp)) {
+			/*
+			 * The page was invalid in the parent.  Likely placed
+			 * there by an incomplete fault.  Just remove and
+			 * ignore.  p can replace it.
+			 */
+			if (vm_page_remove(pp))
+				vm_page_free(pp);
+			pp = NULL;
+		}
 
 		if (pp != NULL || vm_pager_has_page(object, new_pindex, NULL,
 			NULL)) {
@@ -1718,8 +1732,6 @@ vm_object_collapse_scan(vm_object_t object, int op)
 			    ("freeing mapped page %p", p));
 			if (vm_page_remove(p))
 				vm_page_free(p);
-			else
-				vm_page_xunbusy(p);
 			if (pp != NULL)
 				vm_page_xunbusy(pp);
 			continue;
@@ -2057,7 +2069,6 @@ wired:
 void
 vm_object_page_noreuse(vm_object_t object, vm_pindex_t start, vm_pindex_t end)
 {
-	struct mtx *mtx;
 	vm_page_t p, next;
 
 	VM_OBJECT_ASSERT_LOCKED(object);
@@ -2071,14 +2082,10 @@ vm_object_page_noreuse(vm_object_t object, vm_pindex_t start, vm_pindex_t end)
 	 * Here, the variable "p" is either (1) the page with the least pindex
 	 * greater than or equal to the parameter "start" or (2) NULL. 
 	 */
-	mtx = NULL;
 	for (; p != NULL && (p->pindex < end || end == 0); p = next) {
 		next = TAILQ_NEXT(p, listq);
-		vm_page_change_lock(p, &mtx);
 		vm_page_deactivate_noreuse(p);
 	}
-	if (mtx != NULL)
-		mtx_unlock(mtx);
 }
 
 /*
@@ -2236,8 +2243,6 @@ vm_object_coalesce(vm_object_t prev_object, vm_ooffset_t prev_offset,
 void
 vm_object_set_writeable_dirty(vm_object_t object)
 {
-
-	VM_OBJECT_ASSERT_LOCKED(object);
 
 	/* Only set for vnodes & tmpfs */
 	if (object->type != OBJT_VNODE &&
@@ -2486,9 +2491,9 @@ sysctl_vm_object_list(SYSCTL_HANDLER_ARGS)
 			 * sysctl is only meant to give an
 			 * approximation of the system anyway.
 			 */
-			if (m->queue == PQ_ACTIVE)
+			if (m->a.queue == PQ_ACTIVE)
 				kvo->kvo_active++;
-			else if (m->queue == PQ_INACTIVE)
+			else if (m->a.queue == PQ_INACTIVE)
 				kvo->kvo_inactive++;
 		}
 

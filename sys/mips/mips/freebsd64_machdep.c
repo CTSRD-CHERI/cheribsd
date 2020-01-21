@@ -46,6 +46,7 @@
  */
 
 #define __ELF_WORD_SIZE 64
+#define	EXPLICIT_USER_ACCESS
 
 #include "opt_ddb.h"
 
@@ -86,12 +87,7 @@
 #define	DELAYBRANCH(x)	((int)(x) < 0)
 #define	UCONTEXT_MAGIC	0xACEDBADE
 
-void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
-static void	freebsd64_exec_setregs(struct thread *, struct image_params *,
-		    uintptr_t);
-#ifdef CHERI_PURECAP_KERNEL
-static void	freebsd64_do_sendsig(sig_t, ksiginfo_t *, sigset_t *);
-#endif
+static void	freebsd64_sendsig(sig_t, ksiginfo_t *, sigset_t *);
 
 extern const char *freebsd64_syscallnames[];
 
@@ -115,7 +111,7 @@ struct sysentvec elf_freebsd_freebsd64_sysvec = {
 	.sv_stackprot	= VM_PROT_ALL,
 	.sv_copyout_auxargs = __elfN(freebsd_copyout_auxargs),
 	.sv_copyout_strings = freebsd64_copyout_strings,
-	.sv_setregs	= freebsd64_exec_setregs,
+	.sv_setregs	= exec_setregs,
 	.sv_fixlimit	= NULL,
 	.sv_maxssiz	= NULL,
 	.sv_flags	= SV_ABI_FREEBSD | SV_LP64 | SV_ASLR |
@@ -187,30 +183,34 @@ SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
 int
 freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 {
-  	struct trapframe *tp;
+	mcontext_t mc;
+	unsigned i;
+	int error;
 
-	tp = td->td_frame;
-	PROC_LOCK(curthread->td_proc);
-	mcp->mc_onstack = sigonstack(tp->sp);
-	PROC_UNLOCK(curthread->td_proc);
-	bcopy((void *)__unbounded_addressof(td->td_frame->zero),
-	    (void *)&mcp->mc_regs, sizeof(mcp->mc_regs));
+	error = get_mcontext(td, &mc, flags);
+	if (error != 0)
+		return (error);
 
-	mcp->mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
-	if (mcp->mc_fpused) {
-		bcopy((void *)__unbounded_addressof(td->td_frame->f0),
-		    (void *)&mcp->mc_fpregs, sizeof(mcp->mc_fpregs));
-	}
-	if (flags & GET_MC_CLEAR_RET) {
-		mcp->mc_regs[V0] = 0;
-		mcp->mc_regs[V1] = 0;
-		mcp->mc_regs[A3] = 0;
-	}
+	mcp->mc_onstack = mc.mc_onstack;
+	mcp->mc_pc = mc.mc_pc;
+	for (i = 0; i < 32; i++)
+		mcp->mc_regs[i] = mc.mc_regs[i];
+	mcp->sr = mc.sr;
+	mcp->mullo = mc.mullo;
+	mcp->mulhi = mc.mulhi;
+	mcp->mc_fpused = mc.mc_fpused;
+	for (i = 0; i < 33; i++)
+		mcp->mc_fpregs[i] = mc.mc_fpregs[i];
+	mcp->mc_fpc_eir = mc.mc_fpc_eir;
+	mcp->mc_tls = (__cheri_fromcap void *)mc.mc_tls;
+	mcp->cause = mc.cause;
 
-	mcp->mc_pc = td->td_frame->pc;
-	mcp->mullo = td->td_frame->mullo;
-	mcp->mulhi = td->td_frame->mulhi;
-	mcp->mc_tls = (__cheri_addr vaddr_t)td->td_md.md_tls;
+	/*
+	 * We can't store cap registers here directly.  If the caller
+	 * is using getcontextx(), that function will fetch the
+	 * capability registers and initialize these fields in
+	 * userland after getcontext() returns.
+	 */
 	mcp->mc_cp2state = 0;
 	mcp->mc_cp2state_len = 0;
 
@@ -220,162 +220,70 @@ freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 int
 freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 {
-	struct cheri_frame *cfp;
+	mcontext_t mc;
+	unsigned i;
 	int error;
-	struct trapframe *tp;
 
-	if ((void *)(uintptr_t)mcp->mc_cp2state != NULL) {
-		if (mcp->mc_cp2state_len != sizeof(*cfp)) {
+	if (mcp->mc_cp2state != 0) {
+		if (mcp->mc_cp2state_len != sizeof(mc.mc_cheriframe)) {
 			printf("%s: invalid cp2 state length "
 			    "(expected %zd, got %zd)\n", __func__,
-			    sizeof(*cfp), mcp->mc_cp2state_len);
+			    sizeof(mc.mc_cheriframe), mcp->mc_cp2state_len);
 			return (EINVAL);
 		}
-		cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
-		error = copyincap(__USER_CAP(mcp->mc_cp2state, mcp->mc_cp2state_len),
-		    cfp, sizeof(*cfp));
+		error = copyincap(__USER_CAP((void *)mcp->mc_cp2state,
+		    mcp->mc_cp2state_len), &mc.mc_cheriframe,
+		    sizeof(mc.mc_cheriframe));
 		if (error) {
-			free(cfp, M_TEMP);
 			printf("%s: invalid pointer\n", __func__);
-			return (EINVAL);
+			return (error);
 		}
-		cheri_trapframe_from_cheriframe(&td->td_pcb->pcb_regs, cfp);
-		free(cfp, M_TEMP);
-		td->td_pcb->pcb_regs.capcause = 0;
+	} else {
+		/*
+		 * Fetch current capability registers so that
+		 * set_mcontext() has something to write.
+		 */
+		cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs,
+		    &mc.mc_cheriframe);
 	}
 
-	tp = td->td_frame;
-	bcopy((void *)&mcp->mc_regs,
-	    (void *)__unbounded_addressof(td->td_frame->zero),
-	    sizeof(mcp->mc_regs));
+	mc.mc_onstack = mcp->mc_onstack;
+	mc.mc_pc = mcp->mc_pc;
+	for (i = 0; i < 32; i++)
+		mc.mc_regs[i] = mcp->mc_regs[i];
+	mc.sr = mcp->sr;
+	mc.mullo = mcp->mullo;
+	mc.mulhi = mcp->mulhi;
+	mc.mc_fpused = mcp->mc_fpused;
+	for (i = 0; i < 33; i++)
+		mc.mc_fpregs[i] = mcp->mc_fpregs[i];
+	mc.mc_fpc_eir = mcp->mc_fpc_eir;
 
-	td->td_md.md_flags = (mcp->mc_fpused & MDTD_FPUSED)
-#ifdef CPU_QEMU_MALTA
-	    | (td->td_md.md_flags & MDTD_QTRACE)
-#endif
-	    ;
-	if (mcp->mc_fpused) {
-		bcopy((void *)&mcp->mc_fpregs,
-		    (void *)__unbounded_addressof(td->td_frame->f0),
-		    sizeof(mcp->mc_fpregs));
-	}
-	td->td_frame->pc = mcp->mc_pc;
-	td->td_frame->mullo = mcp->mullo;
-	td->td_frame->mulhi = mcp->mulhi;
-	td->td_md.md_tls = __USER_CAP_UNBOUND(mcp->mc_tls);
-	/* Dont let user to set any bits in status and cause registers. */
+	/*
+	 * XXX: Should this be relative to DDC saved in
+	 * mc_cheriframe?
+	 */
+	mc.mc_tls = __USER_CAP_UNBOUND(mcp->mc_tls);
 
-	return (0);
+	return (set_mcontext(td, &mc));
 }
 
 void
 freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
-#ifdef CHERI_PURECAP_KERNEL
-	freebsd64_do_sendsig(catcher, ksi, mask);
-#else
-	sendsig(catcher, ksi, mask);
-#endif
-}
-
-static void
-freebsd64_exec_setregs(struct thread *td, struct image_params *imgp,
-    uintptr_t stack)
-{
-
-	exec_setregs(td, imgp, stack);
-
-#ifdef CHERI_PURECAP_KERNEL
-	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET64 + TLS_TCB_SIZE64;
-#endif
-}
-
-int
-freebsd64_set_user_tls(struct thread *td, void *tls_base)
-{
-
-	td->td_md.md_tls_tcb_offset = TLS_TP_OFFSET64 + TLS_TCB_SIZE64;
-	td->td_md.md_tls = __USER_CAP_UNBOUND(tls_base);
-	if (td == curthread && cpuinfo.userlocal_reg == true) {
-		mips_wr_userlocal((unsigned long)tls_base +
-		    td->td_md.md_tls_tcb_offset);
-	}
-
-	return (0);
-}
-
-int
-freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
-{
-	int error;
-#ifdef CPU_QEMU_MALTA
-	int intval;
-#endif
-	int64_t tlsbase;
-
-	switch (uap->op) {
-	/*
-	 * Operations shared with MIPS.
-	 */
-	case MIPS_SET_TLS:
-		td->td_md.md_tls =
-		    __USER_CAP_UNBOUND((void *)(intptr_t)uap->parms);
-		if (cpuinfo.userlocal_reg == true) {
-			mips_wr_userlocal((unsigned long)(uap->parms +
-			    td->td_md.md_tls_tcb_offset));
-		}
-		return (0);
-
-	case MIPS_GET_TLS:
-		tlsbase = (__cheri_addr int64_t)td->td_md.md_tls;
-		error = copyout(&tlsbase, uap->parms, sizeof(tlsbase));
-		return (error);
-
-#ifdef CPU_QEMU_MALTA
-	case QEMU_GET_QTRACE:
-		intval = (td->td_md.md_flags & MDTD_QTRACE) ? 1 : 0;
-		error = copyout(&intval, uap->parms, sizeof(intval));
-		return (error);
-
-	case QEMU_SET_QTRACE:
-		error = copyin(uap->parms, &intval, sizeof(intval));
-		if (error)
-			return (error);
-		if (intval)
-			td->td_md.md_flags |= MDTD_QTRACE;
-		else
-			td->td_md.md_flags &= ~MDTD_QTRACE;
-		return (0);
-#endif
-
-	case CHERI_GET_SEALCAP:
-		return (cheri_sysarch_getsealcap(td,
-		    __USER_CAP(uap->parms, sizeof(void * __capability))));
-
-	default:
-		return (EINVAL);
-	}
-}
-
-void
-elf64_dump_thread(struct thread *td __unused, void *dst __unused,
-    size_t *off __unused)
-{
-}
-
-#ifdef CHERI_PURECAP_KERNEL
-static void
-freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
-{
 	struct proc *p;
 	struct thread *td;
 	struct trapframe *regs;
+#ifdef CPU_CHERI
 	struct cheri_frame *cfp;
+#endif
 	struct sigacts *psp;
 	struct sigframe64 sf, *sfp;
-	vm_ptr_t sp;
+	vm_offset_t sp;
+#ifdef CPU_CHERI
 	size_t cp2_len;
 	int cheri_is_sandboxed;
+#endif
 	int sig;
 	int oonstack;
 
@@ -389,6 +297,7 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	regs = td->td_frame;
 	oonstack = sigonstack(regs->sp);
 
+#ifdef CPU_CHERI
 	/*
 	 * CHERI affects signal delivery in the following ways:
 	 *
@@ -438,25 +347,22 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	 */
 	if (cheri_is_sandboxed != 0)
 		oonstack = 0;
+#endif
 
 	/* save user context */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
-#if 0
-	/*
-	 * XXX-AM: what to do in this case? stack_t type differs. Do we
-	 * restore the value of this?
-	 */
-	sf.sf_uc.uc_stack = td->td_sigstk;
-#endif
+	sf.sf_uc.uc_stack.ss_sp = (__cheri_fromcap void *)td->td_sigstk.ss_sp;
+	sf.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
+	sf.sf_uc.uc_stack.ss_flags = td->td_sigstk.ss_flags;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
-	sf.sf_uc.uc_mcontext.mc_pc = regs->pc;
+	sf.sf_uc.uc_mcontext.mc_pc = TRAPF_PC_OFFSET(regs);
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
-	sf.sf_uc.uc_mcontext.mc_tls = (__cheri_addr uint64_t)td->td_md.md_tls;
+	sf.sf_uc.uc_mcontext.mc_tls =
+	    (__cheri_fromcap void *)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
-	bcopy((void *)__unbounded_addressof(regs->ast),
-	    (void *)__unbounded_addressof(sf.sf_uc.uc_mcontext.mc_regs[1]),
+	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
 	sf.sf_uc.uc_mcontext.mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 #if defined(CPU_HAVEFPU)
@@ -464,7 +370,7 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* if FPU has current state, save it first */
 		if (td == PCPU_GET(fpcurthread))
 			MipsSaveCurFPState(td);
-		bcopy((void *)__unbounded_addressof(td->td_frame->f0),
+		bcopy((void *)&td->td_frame->f0,
 		    (void *)sf.sf_uc.uc_mcontext.mc_fpregs,
 		    sizeof(sf.sf_uc.uc_mcontext.mc_fpregs));
 	}
@@ -475,8 +381,10 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = (vm_ptr_t)td->td_sigstk.ss_sp + td->td_sigstk.ss_size;
+		sp = (vm_offset_t)((__cheri_addr vaddr_t)td->td_sigstk.ss_sp +
+		    td->td_sigstk.ss_size);
 	} else {
+#ifdef CPU_CHERI
 		/*
 		 * Signals delivered when a CHERI sandbox is present must be
 		 * delivered on the alternative stack rather than a local one.
@@ -492,37 +400,35 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 			sigexit(td, SIGILL);
 			/* NOTREACHED */
 		}
-		sp = (vm_ptr_t)__USER_CAP_UNBOUND((void *)(uintptr_t)regs->sp);
+#endif
+		sp = (vm_offset_t)regs->sp;
 	}
-
+#ifdef CPU_CHERI
 	cp2_len = sizeof(*cfp);
 	sp -= cp2_len;
 	sp = rounddown2(sp, CHERICAP_SIZE);
-	sf.sf_uc.uc_mcontext.mc_cp2state = (__cheri_addr register_t)sp;
+	sf.sf_uc.uc_mcontext.mc_cp2state = sp;
 	sf.sf_uc.uc_mcontext.mc_cp2state_len = cp2_len;
-
-	sp -= sizeof(struct sigframe64);
+#endif
+	sp -= sizeof(sf);
 	sp = rounddown2(sp, STACK_ALIGN);
-	sfp = (struct sigframe64 *)cheri_csetbounds((void *)sp,
-	    sizeof(struct sigframe64));
+	sfp = (struct sigframe64 *)sp;
 
 	/* Build the argument list for the signal handler. */
 	regs->a0 = sig;
-	regs->a2 = (__cheri_addr register_t)&sfp->sf_uc;
+	regs->a2 = (register_t)(intptr_t)&sfp->sf_uc;
 	if (SIGISMEMBER(psp->ps_siginfo, sig)) {
 		/* Signal handler installed with SA_SIGINFO. */
-		regs->a1 = (__cheri_addr register_t)&sfp->sf_si;
+		regs->a1 = (register_t)(intptr_t)&sfp->sf_si;
 		/* sf.sf_ahu.sf_action = (__siginfohandler_t *)catcher; */
 
 		/* fill siginfo structure */
 		siginfo_to_siginfo64(&ksi->ksi_info, &sf.sf_si);
 		sf.sf_si.si_signo = sig;
-		sf.sf_si.si_code = ksi->ksi_code;
-		sf.sf_si.si_addr = regs->badvaddr;
 	} else {
 		/* Old FreeBSD-style arguments. */
 		regs->a1 = ksi->ksi_code;
-		regs->a3 = regs->badvaddr;
+		regs->a3 = (__cheri_addr uintptr_t)ksi->ksi_addr;
 		/* sf.sf_ahu.sf_handler = catcher; */
 	}
 
@@ -532,6 +438,7 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/*
 	 * Copy the sigframe out to the user's stack.
 	 */
+#ifdef CPU_CHERI
 	cfp = malloc(sizeof(*cfp), M_TEMP, M_WAITOK);
 	cheri_trapframe_to_cheriframe(&td->td_pcb->pcb_regs, cfp);
 	if (copyoutcap(cfp,
@@ -545,8 +452,8 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* NOTREACHED */
 	}
 	free(cfp, M_TEMP);
-
-	if (copyout(&sf, sfp, sizeof(struct sigframe64)) != 0) {
+#endif
+	if (copyout(&sf, __USER_CAP_OBJ(sfp), sizeof(sf)) != 0) {
 		/*
 		 * Something is wrong with the stack pointer.
 		 * ...Kill the process.
@@ -558,39 +465,103 @@ freebsd64_do_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* NOTREACHED */
 	}
 
+#ifdef CPU_CHERI
 	/*
 	 * Install CHERI signal-delivery register state for handler to run
 	 * in.  As we don't install this in the CHERI frame on the user stack,
 	 * it will be (genrally) be removed automatically on sigreturn().
 	 */
 	hybridabi_sendsig(td);
+#endif
 
-	regs->pc = (register_t)(__cheri_offset vaddr_t)catcher;
-	// FIXME: should this be an offset relative to PCC or an address?
-	regs->t9 = (register_t)(__cheri_offset vaddr_t)catcher;
-	regs->sp = (__cheri_addr register_t)sfp;
+	regs->pc = (trapf_pc_t)catcher;
+	regs->t9 = TRAPF_PC_OFFSET(regs);
+	regs->sp = (register_t)(intptr_t)sfp;
 	if (p->p_sysent->sv_sigcode_base != 0) {
 		/* Signal trampoline code is in the shared page */
 		regs->ra = p->p_sysent->sv_sigcode_base;
 	} else {
 		/* Signal trampoline code is at base of user stack. */
 		/* XXX: GC this code path once shared page is stable */
-		regs->ra = (register_t)(intptr_t)PS_STRINGS -
+		regs->ra = (register_t)(intptr_t)FREEBSD64_PS_STRINGS -
 		    *(p->p_sysent->sv_szsigcode);
 	}
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
-
 }
-#endif /* CHERI_PURECAP_KERNEL */
-// CHERI CHANGES START
-// {
-//   "updated": 20190812,
-//   "target_type": "kernel",
-//   "changes_purecap": [
-//     "support",
-//     "subobject_bounds"
-//   ],
-//   "change_comment": "freebsd64 purecap sendsig"
-// }
-// CHERI CHANGES END
+
+int
+freebsd64_sigreturn(struct thread *td, struct freebsd64_sigreturn_args *uap)
+{
+	ucontext64_t uc;
+	int error;
+
+	error = copyin(__USER_CAP_OBJ(uap->sigcntxp), &uc, sizeof(uc));
+	if (error != 0)
+		return (error);
+
+	error = freebsd64_set_mcontext(td, &uc.uc_mcontext);
+	if (error != 0)
+		return (error);
+
+	kern_sigprocmask(td, SIG_SETMASK, &uc.uc_sigmask, NULL, 0);
+
+	return (EJUSTRETURN);
+}
+
+int
+freebsd64_sysarch(struct thread *td, struct freebsd64_sysarch_args *uap)
+{
+	int error;
+#ifdef CPU_QEMU_MALTA
+	int intval;
+#endif
+	int64_t tlsbase;
+
+	switch (uap->op) {
+	/*
+	 * Operations shared with MIPS.
+	 */
+	case MIPS_SET_TLS:
+		return (cpu_set_user_tls(td,
+		    __USER_CAP_UNBOUND((void *)(intptr_t)uap->parms)));
+
+	case MIPS_GET_TLS:
+		tlsbase = (__cheri_addr int64_t)td->td_md.md_tls;
+		error = copyout(&tlsbase, __USER_CAP(uap->parms,
+		    sizeof(tlsbase)), sizeof(tlsbase));
+		return (error);
+
+#ifdef CPU_QEMU_MALTA
+	case QEMU_GET_QTRACE:
+		intval = (td->td_md.md_flags & MDTD_QTRACE) ? 1 : 0;
+		error = copyout(&intval, __USER_CAP(uap->parms, sizeof(intval)),
+		    sizeof(intval));
+		return (error);
+
+	case QEMU_SET_QTRACE:
+		error = copyin(__USER_CAP(uap->parms, sizeof(intval)),
+		    &intval, sizeof(intval));
+		if (error)
+			return (error);
+		if (intval)
+			td->td_md.md_flags |= MDTD_QTRACE;
+		else
+			td->td_md.md_flags &= ~MDTD_QTRACE;
+		return (0);
+#endif
+
+	case CHERI_GET_SEALCAP:
+		return (cheri_sysarch_getsealcap(td,
+		    __USER_CAP(uap->parms, sizeof(void * __capability))));
+
+	default:
+		return (EINVAL);
+	}
+}
+
+void
+elf64_dump_thread(struct thread *td __unused, void *dst __unused,
+    size_t *off __unused)
+{
+}

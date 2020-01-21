@@ -57,7 +57,6 @@
 #include <sys/mman.h>
 #endif
 #include <assert.h>
-#include <sys/ipc.h>
 
 #include <dt_impl.h>
 #include <dt_provider.h>
@@ -229,9 +228,10 @@ prepare_elf32(dtrace_hdl_t *dtp, const dof_hdr_t *dof, dof_elf32_t *dep)
 
 		for (j = 0; j < nrel; j++) {
 #if defined(__aarch64__)
-/* XXX */
-			printf("%s:%s(%d): aarch64 not implemented\n",
-			    __FUNCTION__, __FILE__, __LINE__);
+			rel->r_offset = s->dofs_offset +
+			    dofr[j].dofr_offset;
+			rel->r_info = ELF32_R_INFO(count + dep->de_global,
+			    R_ARM_REL32);
 #elif defined(__arm__)
 /* XXX */
 			printf("%s:%s(%d): arm not implemented\n",
@@ -425,7 +425,10 @@ prepare_elf64(dtrace_hdl_t *dtp, const dof_hdr_t *dof, dof_elf64_t *dep)
 
 		for (j = 0; j < nrel; j++) {
 #if defined(__aarch64__)
-/* XXX */
+			rel->r_offset = s->dofs_offset +
+			    dofr[j].dofr_offset;
+			rel->r_info = ELF64_R_INFO(count + dep->de_global,
+			    R_AARCH64_PREL64);
 #elif defined(__arm__)
 /* XXX */
 #elif defined(__mips__)
@@ -541,6 +544,8 @@ dump_elf32(dtrace_hdl_t *dtp, const dof_hdr_t *dof, int fd)
 	elf_file.ehdr.e_machine = EM_SPARC;
 #elif defined(__i386) || defined(__amd64)
 	elf_file.ehdr.e_machine = EM_386;
+#elif defined(__aarch64__)
+	elf_file.ehdr.e_machine = EM_AARCH64;
 #endif
 	elf_file.ehdr.e_version = EV_CURRENT;
 	elf_file.ehdr.e_shoff = sizeof (Elf32_Ehdr);
@@ -687,6 +692,8 @@ dump_elf64(dtrace_hdl_t *dtp, const dof_hdr_t *dof, int fd)
 	elf_file.ehdr.e_machine = EM_SPARCV9;
 #elif defined(__i386) || defined(__amd64)
 	elf_file.ehdr.e_machine = EM_AMD64;
+#elif defined(__aarch64__)
+	elf_file.ehdr.e_machine = EM_AARCH64;
 #endif
 	elf_file.ehdr.e_version = EV_CURRENT;
 	elf_file.ehdr.e_shoff = sizeof (Elf64_Ehdr);
@@ -802,14 +809,66 @@ dt_symtab_lookup(Elf_Data *data_sym, int start, int end, uintptr_t addr,
 }
 
 #if defined(__aarch64__)
-/* XXX */
+#define	DT_OP_NOP		0xd503201f
+#define	DT_OP_RET		0xd65f03c0
+#define	DT_OP_CALL26		0x94000000
+#define	DT_OP_JUMP26		0x14000000
+
 static int
 dt_modtext(dtrace_hdl_t *dtp, char *p, int isenabled, GElf_Rela *rela,
     uint32_t *off)
 {
-	printf("%s:%s(%d): aarch64 not implemented\n", __FUNCTION__, __FILE__,
-	    __LINE__);
-	return (-1);
+	uint32_t *ip;
+
+	/*
+	 * Ensure that the offset is aligned on an instruction boundary.
+	 */
+	if ((rela->r_offset & (sizeof (uint32_t) - 1)) != 0)
+		return (-1);
+
+	/*
+	 * We only know about some specific relocation types.
+	 * We also recognize relocation type NONE, since that gets used for
+	 * relocations of USDT probes, and we might be re-processing a file.
+	 */
+	if (GELF_R_TYPE(rela->r_info) != R_AARCH64_CALL26 &&
+	    GELF_R_TYPE(rela->r_info) != R_AARCH64_JUMP26 &&
+	    GELF_R_TYPE(rela->r_info) != R_AARCH64_NONE)
+		return (-1);
+
+	ip = (uint32_t *)(p + rela->r_offset);
+
+	/*
+	 * We may have already processed this object file in an earlier linker
+	 * invocation. Check to see if the present instruction sequence matches
+	 * the one we would install below.
+	 */
+	if (ip[0] == DT_OP_NOP || ip[0] == DT_OP_RET)
+		return (0);
+
+	/*
+	 * We only expect call instructions with a displacement of 0, or a jump
+	 * instruction acting as a tail call.
+	 */
+	if (ip[0] != DT_OP_CALL26 && ip[0] != DT_OP_JUMP26) {
+		dt_dprintf("found %x instead of a call or jmp instruction at "
+		    "%llx\n", ip[0], (u_longlong_t)rela->r_offset);
+		return (-1);
+	}
+
+	/*
+	 * On arm64, we do not have to differentiate between regular probes and
+	 * is-enabled probes.  Both cases are encoded as a regular branch for
+	 * non-tail call locations, and a jump for tail call locations.  Calls
+	 * are to be converted into a no-op whereas jumps should become a
+	 * return.
+	 */
+	if (ip[0] == DT_OP_CALL26)
+		ip[0] = DT_OP_NOP;
+	else
+		ip[0] = DT_OP_RET;
+
+	return (0);
 }
 #elif defined(__arm__)
 /* XXX */
@@ -1189,13 +1248,32 @@ dt_link_error(dtrace_hdl_t *dtp, Elf *elf, int fd, dt_link_pair_t *bufs,
 	return (dt_set_errno(dtp, EDT_COMPILER));
 }
 
+/*
+ * Provide a unique identifier used when adding global symbols to an object.
+ * This is the FNV-1a hash of an absolute path for the file.
+ */
+static unsigned int
+hash_obj(const char *obj, int fd)
+{
+	char path[PATH_MAX];
+	unsigned int h;
+
+	if (realpath(obj, path) == NULL)
+		return (-1);
+
+	for (h = 2166136261u, obj = &path[0]; *obj != '\0'; obj++)
+		h = (h ^ *obj) * 16777619;
+	h &= 0x7fffffff;
+	return (h);
+}
+
 static int
 process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 {
 	static const char dt_prefix[] = "__dtrace";
 	static const char dt_enabled[] = "enabled";
 	static const char dt_symprefix[] = "$dtrace";
-	static const char dt_symfmt[] = "%s%ld.%s";
+	static const char dt_symfmt[] = "%s%u.%s";
 	static const char dt_weaksymfmt[] = "%s.%s";
 	char probename[DTRACE_NAMELEN];
 	int fd, i, ndx, eprobe, mod = 0;
@@ -1212,7 +1290,7 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 	dt_probe_t *prp;
 	uint32_t off, eclass, emachine1, emachine2;
 	size_t symsize, osym, nsym, isym, istr, len;
-	key_t objkey;
+	unsigned int objkey;
 	dt_link_pair_t *pair, *bufs = NULL;
 	dt_strtab_t *strtab;
 	void *tmp;
@@ -1254,6 +1332,8 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 		emachine1 = emachine2 = EM_SPARCV9;
 #elif defined(__i386) || defined(__amd64)
 		emachine1 = emachine2 = EM_AMD64;
+#elif defined(__aarch64__)
+		emachine1 = emachine2 = EM_AARCH64;
 #endif
 		symsize = sizeof (Elf64_Sym);
 	} else {
@@ -1288,10 +1368,9 @@ process_obj(dtrace_hdl_t *dtp, const char *obj, int *eprobesp)
 	 * system in order to disambiguate potential conflicts between files of
 	 * the same name which contain identially named local symbols.
 	 */
-	if ((objkey = ftok(obj, 0)) == (key_t)-1) {
+	if ((objkey = hash_obj(obj, fd)) == (unsigned int)-1)
 		return (dt_link_error(dtp, elf, fd, bufs,
 		    "failed to generate unique key for object file: %s", obj));
-	}
 
 	scn_rel = NULL;
 	while ((scn_rel = elf_nextscn(elf, scn_rel)) != NULL) {

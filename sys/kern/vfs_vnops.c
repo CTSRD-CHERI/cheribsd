@@ -103,6 +103,7 @@ static fo_kqfilter_t	vn_kqfilter;
 static fo_stat_t	vn_statfile;
 static fo_close_t	vn_closefile;
 static fo_mmap_t	vn_mmap;
+static fo_fallocate_t	vn_fallocate;
 
 struct 	fileops vnops = {
 	.fo_read = vn_io_fault,
@@ -119,6 +120,7 @@ struct 	fileops vnops = {
 	.fo_seek = vn_seek,
 	.fo_fill_kinfo = vn_fill_kinfo,
 	.fo_mmap = vn_mmap,
+	.fo_fallocate = vn_fallocate,
 	.fo_flags = DFLAG_PASSABLE | DFLAG_SEEKABLE
 };
 
@@ -314,7 +316,7 @@ vn_open_vnode_advlock(struct vnode *vp, int fmode, struct file *fp)
 		return (EOPNOTSUPP);
 
 	lock_flags = VOP_ISLOCKED(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	lf.l_whence = SEEK_SET;
 	lf.l_start = 0;
@@ -328,7 +330,7 @@ vn_open_vnode_advlock(struct vnode *vp, int fmode, struct file *fp)
 		fp->f_flag |= FHASLOCK;
 
 	vn_lock(vp, lock_flags | LK_RETRY);
-	if (error == 0 && (vp->v_iflag & VI_DOOMED) != 0)
+	if (error == 0 && VN_IS_DOOMED(vp))
 		error = ENOENT;
 	return (error);
 }
@@ -460,7 +462,7 @@ vn_close1(struct vnode *vp, int flags, struct ucred *file_cred,
 	}
 	error = VOP_CLOSE(vp, flags, file_cred, td);
 	if (keep_ref)
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 	else
 		vput(vp);
 	vn_finished_write(mp);
@@ -612,7 +614,7 @@ vn_rdwr(enum uio_rw rw, struct vnode *vp, void *base, int len, off_t offset,
 		if (auio.uio_resid && error == 0)
 			error = EIO;
 	if ((ioflg & IO_NODELOCKED) == 0) {
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		if (mp != NULL)
 			vn_finished_write(mp);
 	}
@@ -815,7 +817,7 @@ vn_read(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 #endif
 		error = VOP_READ(vp, uio, ioflag, fp->f_cred);
 	fp->f_nextoff = uio->uio_offset;
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	if (error == 0 && advice == POSIX_FADV_NOREUSE &&
 	    orig_offset != uio->uio_offset)
 		/*
@@ -890,7 +892,7 @@ vn_write(struct file *fp, struct uio *uio, struct ucred *active_cred, int flags,
 #endif
 		error = VOP_WRITE(vp, uio, ioflag, fp->f_cred);
 	fp->f_nextoff = uio->uio_offset;
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	if (vp->v_type != VCHR)
 		vn_finished_write(mp);
 	if (error == 0 && advice == POSIX_FADV_NOREUSE &&
@@ -1325,7 +1327,7 @@ vn_truncate(struct file *fp, off_t length, struct ucred *active_cred,
 	error = vn_truncate_locked(vp, length, (fp->f_flag & O_FSYNC) != 0,
 	    fp->f_cred);
 out:
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	vn_finished_write(mp);
 out1:
 	vn_rangelock_unlock(vp, rl_cookie);
@@ -1366,7 +1368,7 @@ vn_statfile(struct file *fp, struct stat *sb, struct ucred *active_cred,
 
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 	error = vn_stat(vp, sb, active_cred, fp->f_cred, td);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	return (error);
 }
@@ -1502,7 +1504,7 @@ vn_ioctl(struct file *fp, u_long com, void *data, struct ucred *active_cred,
 		case FIONREAD:
 			vn_lock(vp, LK_SHARED | LK_RETRY);
 			error = VOP_GETATTR(vp, &vattr, active_cred);
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			if (error == 0)
 				*(int *)data = vattr.va_size - fp->f_offset;
 			return (error);
@@ -1516,7 +1518,7 @@ vn_ioctl(struct file *fp, u_long com, void *data, struct ucred *active_cred,
 #endif
 				error = VOP_BMAP(vp, bmarg->bn, NULL,
 				    &bmarg->bn, &bmarg->runp, &bmarg->runb);
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			return (error);
 		case FIONBIO:
 		case FIOASYNC:
@@ -1549,7 +1551,7 @@ vn_poll(struct file *fp, int events, struct ucred *active_cred,
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	AUDIT_ARG_VNODE1(vp);
 	error = mac_vnode_check_poll(active_cred, fp->f_cred, vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	if (!error)
 #endif
 
@@ -1561,28 +1563,53 @@ vn_poll(struct file *fp, int events, struct ucred *active_cred,
  * Acquire the requested lock and then check for validity.  LK_RETRY
  * permits vn_lock to return doomed vnodes.
  */
+static int __noinline
+_vn_lock_fallback(struct vnode *vp, int flags, char *file, int line, int error)
+{
+
+	KASSERT((flags & LK_RETRY) == 0 || error == 0,
+	    ("vn_lock: error %d incompatible with flags %#x", error, flags));
+
+	if (error == 0)
+		VNASSERT(VN_IS_DOOMED(vp), vp, ("vnode not doomed"));
+
+	if ((flags & LK_RETRY) == 0) {
+		if (error == 0) {
+			VOP_UNLOCK(vp);
+			error = ENOENT;
+		}
+		return (error);
+	}
+
+	/*
+	 * LK_RETRY case.
+	 *
+	 * Nothing to do if we got the lock.
+	 */
+	if (error == 0)
+		return (0);
+
+	/*
+	 * Interlock was dropped by the call in _vn_lock.
+	 */
+	flags &= ~LK_INTERLOCK;
+	do {
+		error = VOP_LOCK1(vp, flags, file, line);
+	} while (error != 0);
+	return (0);
+}
+
 int
 _vn_lock(struct vnode *vp, int flags, char *file, int line)
 {
 	int error;
 
-	VNASSERT((flags & LK_TYPE_MASK) != 0, vp,
-	    ("vn_lock: no locktype"));
+	VNASSERT((flags & LK_TYPE_MASK) != 0, vp, ("vn_lock: no locktype"));
 	VNASSERT(vp->v_holdcnt != 0, vp, ("vn_lock: zero hold count"));
-retry:
 	error = VOP_LOCK1(vp, flags, file, line);
-	flags &= ~LK_INTERLOCK;	/* Interlock is always dropped. */
-	KASSERT((flags & LK_RETRY) == 0 || error == 0,
-	    ("vn_lock: error %d incompatible with flags %#x", error, flags));
-
-	if ((flags & LK_RETRY) == 0) {
-		if (error == 0 && (vp->v_iflag & VI_DOOMED) != 0) {
-			VOP_UNLOCK(vp, 0);
-			error = ENOENT;
-		}
-	} else if (error != 0)
-		goto retry;
-	return (error);
+	if (__predict_false(error != 0 || VN_IS_DOOMED(vp)))
+		return (_vn_lock_fallback(vp, flags, file, line, error));
+	return (0);
 }
 
 /*
@@ -2011,7 +2038,7 @@ vn_extattr_get(struct vnode *vp, int ioflg, int attrnamespace,
 	    td);
 
 	if ((ioflg & IO_NODELOCKED) == 0)
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 
 	if (error == 0) {
 		*buflen = *buflen - auio.uio_resid;
@@ -2055,7 +2082,7 @@ vn_extattr_set(struct vnode *vp, int ioflg, int attrnamespace,
 
 	if ((ioflg & IO_NODELOCKED) == 0) {
 		vn_finished_write(mp);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 	}
 
 	return (error);
@@ -2084,7 +2111,7 @@ vn_extattr_rm(struct vnode *vp, int ioflg, int attrnamespace,
 
 	if ((ioflg & IO_NODELOCKED) == 0) {
 		vn_finished_write(mp);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 	}
 
 	return (error);
@@ -2121,23 +2148,23 @@ vn_vget_ino_gen(struct vnode *vp, vn_get_ino_t alloc, void *alloc_arg,
 	error = vfs_busy(mp, MBF_NOWAIT);
 	if (error != 0) {
 		vfs_ref(mp);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		error = vfs_busy(mp, 0);
 		vn_lock(vp, ltype | LK_RETRY);
 		vfs_rel(mp);
 		if (error != 0)
 			return (ENOENT);
-		if (vp->v_iflag & VI_DOOMED) {
+		if (VN_IS_DOOMED(vp)) {
 			vfs_unbusy(mp);
 			return (ENOENT);
 		}
 	}
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	error = alloc(mp, alloc_arg, lkflags, rvp);
 	vfs_unbusy(mp);
 	if (error != 0 || *rvp != vp)
 		vn_lock(vp, ltype | LK_RETRY);
-	if (vp->v_iflag & VI_DOOMED) {
+	if (VN_IS_DOOMED(vp)) {
 		if (error == 0) {
 			if (*rvp == vp)
 				vunref(vp);
@@ -2176,7 +2203,7 @@ vn_chmod(struct file *fp, mode_t mode, struct ucred *active_cred,
 #ifdef AUDIT
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 	AUDIT_ARG_VNODE1(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 #endif
 	return (setfmode(td, active_cred, vp, mode));
 }
@@ -2191,7 +2218,7 @@ vn_chown(struct file *fp, uid_t uid, gid_t gid, struct ucred *active_cred,
 #ifdef AUDIT
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 	AUDIT_ARG_VNODE1(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 #endif
 	return (setfown(td, active_cred, vp, uid, gid));
 }
@@ -2256,7 +2283,7 @@ vn_bmap_seekhole(struct vnode *vp, u_long cmd, off_t *off, struct ucred *cred)
 	if (cmd == FIOSEEKDATA)
 		error = ENXIO;
 unlock:
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	if (error == 0)
 		*off = noff;
 	return (error);
@@ -2289,7 +2316,7 @@ vn_seek(struct file *fp, off_t offset, int whence, struct thread *td)
 	case L_XTND:
 		vn_lock(vp, LK_SHARED | LK_RETRY);
 		error = VOP_GETATTR(vp, &vattr, cred);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		if (error)
 			break;
 
@@ -2423,7 +2450,7 @@ vn_fill_kinfo_vnode(struct vnode *vp, struct kinfo_file *kif)
 	va.va_rdev = NODEV;
 	vn_lock(vp, LK_SHARED | LK_RETRY);
 	error = VOP_GETATTR(vp, &va, curthread->td_ucred);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	if (error != 0)
 		return (error);
 	if (va.va_fsid != VNOVAL)
@@ -2875,7 +2902,7 @@ vn_write_outvp(struct vnode *outvp, char *dat, off_t outoff, off_t xfer,
 				outoff += xfer2;
 				xfer -= xfer2;
 			}
-			VOP_UNLOCK(outvp, 0);
+			VOP_UNLOCK(outvp);
 		}
 		if (mp != NULL)
 			vn_finished_write(mp);
@@ -2916,7 +2943,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 		goto out;
 	if (VOP_PATHCONF(invp, _PC_MIN_HOLE_SIZE, &holein) != 0)
 		holein = 0;
-	VOP_UNLOCK(invp, 0);
+	VOP_UNLOCK(invp);
 
 	mp = NULL;
 	error = vn_start_write(outvp, &mp, V_WAIT);
@@ -2956,7 +2983,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 			if (error == 0)
 				va.va_size = *outoffp;
 		}
-		VOP_UNLOCK(outvp, 0);
+		VOP_UNLOCK(outvp);
 	}
 	if (mp != NULL)
 		vn_finished_write(mp);
@@ -3080,7 +3107,7 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 			    startoff, UIO_SYSSPACE, IO_NODELOCKED,
 			    curthread->td_ucred, incred, &aresid,
 			    curthread);
-			VOP_UNLOCK(invp, 0);
+			VOP_UNLOCK(invp);
 			lastblock = false;
 			if (error == 0 && aresid > 0) {
 				/* Stop the copy at EOF on the input file. */
@@ -3119,6 +3146,63 @@ vn_generic_copy_file_range(struct vnode *invp, off_t *inoffp,
 out:
 	*lenp = savlen - len;
 	free(dat, M_TEMP);
+	return (error);
+}
+
+static int
+vn_fallocate(struct file *fp, off_t offset, off_t len, struct thread *td)
+{
+	struct mount *mp;
+	struct vnode *vp;
+	off_t olen, ooffset;
+	int error;
+#ifdef AUDIT
+	int audited_vnode1 = 0;
+#endif
+
+	vp = fp->f_vnode;
+	if (vp->v_type != VREG)
+		return (ENODEV);
+
+	/* Allocating blocks may take a long time, so iterate. */
+	for (;;) {
+		olen = len;
+		ooffset = offset;
+
+		bwillwrite();
+		mp = NULL;
+		error = vn_start_write(vp, &mp, V_WAIT | PCATCH);
+		if (error != 0)
+			break;
+		error = vn_lock(vp, LK_EXCLUSIVE);
+		if (error != 0) {
+			vn_finished_write(mp);
+			break;
+		}
+#ifdef AUDIT
+		if (!audited_vnode1) {
+			AUDIT_ARG_VNODE1(vp);
+			audited_vnode1 = 1;
+		}
+#endif
+#ifdef MAC
+		error = mac_vnode_check_write(td->td_ucred, fp->f_cred, vp);
+		if (error == 0)
+#endif
+			error = VOP_ALLOCATE(vp, &offset, &len);
+		VOP_UNLOCK(vp);
+		vn_finished_write(mp);
+
+		if (olen + ooffset != offset + len) {
+			panic("offset + len changed from %jx/%jx to %jx/%jx",
+			    ooffset, olen, offset, len);
+		}
+		if (error != 0 || len == 0)
+			break;
+		KASSERT(olen > len, ("Iteration did not make progress?"));
+		maybe_yield();
+	}
+
 	return (error);
 }
 // CHERI CHANGES START

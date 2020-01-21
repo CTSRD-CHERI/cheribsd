@@ -423,36 +423,28 @@ copyinstrfrom(const void * __restrict src, void * __restrict dst, size_t len,
 }
 
 int
-copyiniov(const struct iovec_native * __capability iovp, u_int iovcnt, struct iovec **iov,
+copyiniov(const struct iovec* __capability iovp, u_int iovcnt, struct iovec **iov,
     int error)
 {
-	struct iovec_native useriov;
 	struct iovec *iovs;
 	size_t iovlen;
-	int i;
 
 	*iov = NULL;
 	if (iovcnt > UIO_MAXIOV)
 		return (error);
 	iovlen = iovcnt * sizeof (struct iovec);
 	iovs = malloc(iovlen, M_IOV, M_WAITOK);
-	/* XXXBD: needlessly slow when struct iovec_native and struct iovec are the same */
-	for (i = 0; i < iovcnt; i++) {
-		error = copyin_c(iovp + i, &useriov, sizeof(useriov));
-		if (error) {
-			free(iovs, M_IOV);
-			return (error);
-		}
-		IOVEC_INIT(iovs + i, useriov.iov_base, useriov.iov_len);
-	}
+	error = copyincap(iovp, iovs, iovlen);
+	if (error != 0)
+		free(iovs, M_IOV);
 	*iov = iovs;
 	return (error);
 }
 
 int
-copyinuio(const struct iovec_native * __capability iovp, u_int iovcnt, struct uio **uiop)
+copyinuio(const struct iovec * __capability iovp, u_int iovcnt,
+    struct uio **uiop)
 {
-	struct iovec_native u_iov;
 	struct iovec *iov;
 	struct uio *uio;
 	size_t iovlen;
@@ -464,13 +456,10 @@ copyinuio(const struct iovec_native * __capability iovp, u_int iovcnt, struct ui
 	iovlen = iovcnt * sizeof (struct iovec);
 	uio = malloc(iovlen + sizeof *uio, M_IOV, M_WAITOK);
 	iov = (struct iovec *)(uio + 1);
-	for (i = 0; i < iovcnt; i++) {
-		error = copyin_c(&iovp[i], &u_iov, sizeof(u_iov));
-		if (error) {
-			free(uio, M_IOV);
-			return (error);
-		}
-		IOVEC_INIT(&iov[i], u_iov.iov_base, u_iov.iov_len);
+	error = copyincap(iovp, iov, iovlen);
+	if (error != 0) {
+		free(uio, M_IOV);
+		return (error);
 	}
 	uio->uio_iov = iov;
 	uio->uio_iovcnt = iovcnt;
@@ -494,7 +483,7 @@ copyinuio(const struct iovec_native * __capability iovp, u_int iovcnt, struct ui
  * iovec.
  */
 int
-updateiov(const struct uio *uiop, struct iovec_native *iovp)
+updateiov(const struct uio *uiop, struct iovec *iovp)
 {
 	int i, error;
 

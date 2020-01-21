@@ -38,46 +38,34 @@
  * TLS parameters
  */
 
-#ifdef __CHERI_PURE_CAPABILITY__
+#if defined(__CHERI_PURE_CAPABILITY__) || \
+    (defined(_KERNEL) && __has_feature(capabilities))
 #define TLS_TP_OFFSET	0
 #define TLS_DTP_OFFSET	0
-#define	TLS_TP_OFFSET_C	TLS_TP_OFFSET
-#ifdef COMPAT_FREEBSD64
-#define TLS_TP_OFFSET64	0x7000
-#endif
 #else /* ! __CHERI_PURE_CAPABILITY__ */
 #define TLS_TP_OFFSET	0x7000
 #define TLS_DTP_OFFSET	0x8000
+#endif /* ! __CHERI_PURE_CAPABILITY__ */
+#ifdef COMPAT_FREEBSD32
+#define TLS_TP_OFFSET32	0x7000
+#endif
+#ifdef COMPAT_FREEBSD64
+#define TLS_TP_OFFSET64	0x7000
+#endif
 #ifdef COMPAT_CHERIABI
 #define	TLS_TP_OFFSET_C	0
 #endif
-#ifdef COMPAT_FREEBSD64
-#define TLS_TP_OFFSET64	TLS_TP_OFFSET
-#endif
-#endif /* ! __CHERI_PURE_CAPABILITY__ */
 
-
-/* XXX-AR: #define TLS_TCB_SIZE	(2 * sizeof(void*)) for all ABIs? */
-#ifdef __CHERI_PURE_CAPABILITY__
-#define TLS_TCB_SIZE	(2 * __SIZEOF_CHERI_CAPABILITY__)
-#define	TLS_TCB_SIZE_C	TLS_TCB_SIZE
-#ifdef COMPAT_FREEBSD64
-#define TLS_TCB_SIZE64	16
-#endif
-#elif defined(__mips_n64)
-#define TLS_TCB_SIZE	16
+#define	TLS_TCB_SIZE	(2 * sizeof(void * __kerncap))
 #ifdef COMPAT_FREEBSD32
 #define TLS_TCB_SIZE32	8
+#endif
+#ifdef COMPAT_FREEBSD64
+#define	TLS_TCB_SIZE64	16
 #endif
 #ifdef COMPAT_CHERIABI
 #define	TLS_TCB_SIZE_C	(2 * __SIZEOF_CHERI_CAPABILITY__)
 #endif
-#ifdef COMPAT_FREEBSD64
-#define TLS_TCB_SIZE64	TLS_TCB_SIZE
-#endif
-#else /* mips32 */
-#define TLS_TCB_SIZE	8
-#endif /* mips32 */
 
 #endif	/* __MIPS_TLS_H__ */
 // CHERI CHANGES START

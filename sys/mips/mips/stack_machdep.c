@@ -233,7 +233,7 @@ stack_save_td(struct stack *st, struct thread *td)
 #ifdef CHERI_PURECAP_KERNEL
 	uintptr_t pc, sp;
 #else
-	u_register_t pc, sp;
+	vaddr_t pc, sp;
 #endif
 
 	if (TD_IS_SWAPPED(td))
@@ -243,12 +243,12 @@ stack_save_td(struct stack *st, struct thread *td)
 
 #ifdef CHERI_PURECAP_KERNEL
 	/* XXX-AM: what about compat64 processes? */
-	pc = (uintptr_t)td->td_pcb->pcb_cherikframe.ckf_pcc;
-	sp = (uintptr_t)td->td_pcb->pcb_cherikframe.ckf_stc;
+	pc = (uintptr_t)td->td_pcb->pcb_regs.pc;
+	sp = (uintptr_t)td->td_pcb->pcb_regs.csp;
 #else
 	/* XXXRW: Should be pcb_context? */
-	pc = td->td_pcb->pcb_regs.pc;
-	sp = td->td_pcb->pcb_regs.sp;
+	pc = TRAPF_PC(&td->td_pcb->pcb_regs);
+	sp = td->td_pcb->pcb_regs.sp; // FIXME: use $c11 for CHERI purecap
 #endif
 	stack_capture(st, pc, sp);
 }
@@ -266,7 +266,7 @@ stack_save(struct stack *st)
 #ifdef CHERI_PURECAP_KERNEL
 	uintptr_t pc, sp;
 #else
-	u_register_t pc, sp;
+	vaddr_t pc, sp;
 #endif
 
 	if (curthread == NULL)
@@ -276,12 +276,10 @@ stack_save(struct stack *st)
 	/* XXX-AM: what about compat64 processes? */
 	pc = (uintptr_t)cheri_getpcc();
 	sp = (uintptr_t)cheri_getstack();
-	/* pc = (uintptr_t)curthread->td_pcb->pcb_regs.pcc; */
-	/* sp = (uintptr_t)curthread->td_pcb->pcb_regs.csp; */
 #else
 	/* XXXRW: Should be pcb_context? */
-	pc = curthread->td_pcb->pcb_regs.pc;
-	sp = curthread->td_pcb->pcb_regs.sp;
+	pc = TRAPF_PC(&curthread->td_pcb->pcb_regs);
+	sp = curthread->td_pcb->pcb_regs.sp; // FIXME: use $c11 for CHERI purecap
 #endif
 	stack_capture(st, pc, sp);
 }

@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2020, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -508,6 +508,8 @@ AdParseTable (
     AmlStart = ((UINT8 *) Table + sizeof (ACPI_TABLE_HEADER));
     ASL_CV_INIT_FILETREE(Table, AmlStart, AmlLength);
 
+    AcpiUtSetIntegerWidth (Table->Revision);
+
     /* Create the root object */
 
     AcpiGbl_ParseOpRoot = AcpiPsCreateScopeOp (AmlStart);
@@ -543,7 +545,6 @@ AdParseTable (
     }
 
     WalkState->ParseFlags &= ~ACPI_PARSE_DELETE_TREE;
-    WalkState->ParseFlags |= ACPI_PARSE_DISASSEMBLE;
 
     Status = AcpiPsParseAml (WalkState);
     if (ACPI_FAILURE (Status))

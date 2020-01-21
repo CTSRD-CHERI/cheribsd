@@ -598,15 +598,15 @@ loop:
 		MPASS((node->tn_vpstate & TMPFS_VNODE_DOOMED) == 0);
 		VI_LOCK(vp);
 		if ((node->tn_type == VDIR && node->tn_dir.tn_parent == NULL) ||
-		    ((vp->v_iflag & VI_DOOMED) != 0 &&
-		    (lkflag & LK_NOWAIT) != 0)) {
+		    (VN_IS_DOOMED(vp) &&
+		     (lkflag & LK_NOWAIT) != 0)) {
 			VI_UNLOCK(vp);
 			TMPFS_NODE_UNLOCK(node);
 			error = ENOENT;
 			vp = NULL;
 			goto out;
 		}
-		if ((vp->v_iflag & VI_DOOMED) != 0) {
+		if (VN_IS_DOOMED(vp)) {
 			VI_UNLOCK(vp);
 			node->tn_vpstate |= TMPFS_VNODE_WRECLAIM;
 			while ((node->tn_vpstate & TMPFS_VNODE_WRECLAIM) != 0) {
@@ -671,7 +671,7 @@ loop:
 	MPASS(vp != NULL);
 
 	/* lkflag is ignored, the lock is exclusive */
-	(void) vn_lock(vp, lkflag | LK_RETRY);
+	(void) vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 
 	vp->v_data = node;
 	vp->v_type = node->tn_type;
@@ -1490,9 +1490,7 @@ retry:
 					 * current operation is not regarded
 					 * as an access.
 					 */
-					vm_page_lock(m);
 					vm_page_launder(m);
-					vm_page_unlock(m);
 				} else {
 					vm_page_free(m);
 					if (ignerr)
@@ -1505,9 +1503,8 @@ retry:
 			}
 			if (m != NULL) {
 				pmap_zero_page_area(m, base, PAGE_SIZE - base);
-				vm_page_dirty(m);
+				vm_page_set_dirty(m);
 				vm_page_xunbusy(m);
-				vm_pager_page_unswapped(m);
 			}
 		}
 

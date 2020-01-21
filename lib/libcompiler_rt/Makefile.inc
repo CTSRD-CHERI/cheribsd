@@ -2,7 +2,7 @@
 
 CRTARCH=	${MACHINE_CPUARCH:C/amd64/x86_64/}
 
-CRTSRC=		${SRCTOP}/contrib/compiler-rt/lib/builtins
+CRTSRC=		${SRCTOP}/contrib/llvm-project/compiler-rt/lib/builtins
 
 .PATH:		${CRTSRC}/${CRTARCH}
 .PATH:		${CRTSRC}
@@ -212,6 +212,12 @@ SRCF+=		stdatomic
 SRCF:=  ${SRCF:Ngcc_personality_v0}
 # Currently needed for capability atomic load/swap
 SRCF+=		atomic
+.endif
+
+.if "${COMPILER_TYPE}" == "clang" && \
+    (${MACHINE_ARCH} == "powerpc" || ${MACHINE_ARCH} == "powerpcspe")
+SRCS+=          atomic.c
+CFLAGS.atomic.c+=      -Wno-atomic-alignment
 .endif
 
 

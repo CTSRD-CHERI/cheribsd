@@ -34,8 +34,8 @@
 #include <sys/_iovec.h>
 
 struct spigen_transfer {
-	struct iovec_native st_command; /* master to slave */
-	struct iovec_native st_data;    /* slave to master and/or master to slave */
+	struct iovec st_command; /* master to slave */
+	struct iovec st_data;    /* slave to master and/or master to slave */
 };
 
 struct spigen_transfer_mmapped {

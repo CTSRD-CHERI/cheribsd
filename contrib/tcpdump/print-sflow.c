@@ -888,6 +888,14 @@ _sflow_print(netdissect_options *ndo,
     tptr = pptr;
     tlen = len;
     sflow_datagram = (const struct sflow_datagram_t *)pptr;
+    if (len < sizeof(struct sflow_datagram_t)) {
+        ND_TCHECK(sflow_datagram->version);
+        ND_PRINT((ndo, "sFlowv%u", EXTRACT_32BITS(sflow_datagram->version)));
+        ND_PRINT((ndo, " [length %u < %zu]",
+                  len, sizeof(struct sflow_datagram_t)));
+        ND_PRINT((ndo, " (invalid)"));
+        return;
+    }
     ND_TCHECK(*sflow_datagram);
 
     /*
@@ -923,6 +931,8 @@ _sflow_print(netdissect_options *ndo,
 
     /* skip Common header */
     tptr += sizeof(const struct sflow_datagram_t);
+
+    if(tlen <= sizeof(const struct sflow_datagram_t)) goto trunc;
     tlen -= sizeof(const struct sflow_datagram_t);
 
     while (nsamples > 0 && tlen > 0) {

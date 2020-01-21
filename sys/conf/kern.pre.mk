@@ -171,6 +171,17 @@ LDFLAGS+=	-z notext -z ifunc-noplt
 .endif
 .endif  # ${MACHINE_CPUARCH} == "amd64"
 
+.if ${MACHINE_CPUARCH} == "riscv"
+# Hack: Work around undefined weak symbols being out of range when linking with
+# LLD (address is a PC-relative calculation, and BFD works around this by
+# rewriting the instructions to generate an absolute address of 0); -fPIE
+# avoids this since it uses the GOT for all extern symbols, which is overly
+# inefficient for us. Drop once undefined weak symbols work with medany.
+.if ${LINKER_TYPE} == "lld"
+CFLAGS+=	-fPIE
+.endif
+.endif
+
 NORMAL_C= ${CC} -c ${CFLAGS} ${WERROR} ${PROF} ${.IMPSRC}
 NORMAL_S= ${CC:N${CCACHE_BIN}} -c ${ASM_CFLAGS} ${WERROR} ${.IMPSRC}
 PROFILE_C= ${CC} -c ${CFLAGS} ${WERROR} ${.IMPSRC}
@@ -270,11 +281,11 @@ MD_ROOT_SIZE_CONFIGURED!=	grep MD_ROOT_SIZE opt_md.h || true ; echo
 SYSTEM_OBJS+= embedfs_${MFS_IMAGE:T:R}.o
 .endif
 .endif
-
-SYSTEM_LD= @${LD} -m ${LD_EMULATION} -Bdynamic -T ${LDSCRIPT} ${_LDFLAGS} \
+SYSTEM_LD_BASECMD= \
+	${LD} -m ${LD_EMULATION} -Bdynamic -T ${LDSCRIPT} ${_LDFLAGS} \
 	--no-warn-mismatch --warn-common --export-dynamic \
-	--dynamic-linker /red/herring \
-	-o ${.TARGET} -X ${SYSTEM_OBJS} vers.o
+	--dynamic-linker /red/herring -X
+SYSTEM_LD= @${SYSTEM_LD_BASECMD} -o ${.TARGET} ${SYSTEM_OBJS} vers.o
 SYSTEM_LD_TAIL= @${OBJCOPY} --strip-symbol gcc2_compiled. ${.TARGET} ; \
 	${SIZE} ${.TARGET} ; chmod 755 ${.TARGET}
 SYSTEM_DEP+= ${LDSCRIPT}

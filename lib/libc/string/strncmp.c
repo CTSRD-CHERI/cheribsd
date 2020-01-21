@@ -36,19 +36,17 @@ static char sccsid[] = "@(#)strncmp.c	8.1 (Berkeley) 6/4/93";
 __FBSDID("$FreeBSD$");
 
 #include <string.h>
-#include "cheri_private.h"
 
 int
-__CAPSUFFIX(strncmp)(const char * __CAP s1, const char * __CAP s2, size_t n)
+strncmp(const char *s1, const char *s2, size_t n)
 {
 
 	if (n == 0)
 		return (0);
 	do {
-		if (*s1 != *s2)
-			return (*(const unsigned char * __CAP)s1 -
-				*(const unsigned char * __CAP)s2);
-		s2++;
+		if (*s1 != *s2++)
+			return (*(const unsigned char *)s1 -
+				*(const unsigned char *)(s2 - 1));
 		if (*s1++ == '\0')
 			break;
 	} while (--n != 0);

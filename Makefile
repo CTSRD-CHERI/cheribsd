@@ -6,9 +6,7 @@
 # universe            - *Really* build *everything* (buildworld and
 #                       all kernels on all architectures).  Define
 #                       MAKE_JUST_KERNELS to only build kernels,
-#                       MAKE_JUST_WORLDS to only build userland, and/or
-#                       MAKE_OBSOLETE_GCC to also build architectures
-#                       unsupported by clang using in-tree gcc.
+#                       MAKE_JUST_WORLDS to only build userland.
 # tinderbox           - Same as universe, but presents a list of failed build
 #                       targets and exits with an error if there were any.
 # buildworld          - Rebuild *everything*, including glue to help do
@@ -302,7 +300,7 @@ MK_META_MODE= no
 # exceptions.
 .if !defined(TARGET_ARCH) && defined(TARGET)
 # T->TA mapping is usually TARGET with arm64 the odd man out
-_TARGET_ARCH=	${TARGET:S/arm64/aarch64/:S/riscv/riscv64/}
+_TARGET_ARCH=	${TARGET:S/arm64/aarch64/:S/riscv/riscv64/:S/arm/armv7/}
 .elif !defined(TARGET) && defined(TARGET_ARCH) && \
     ${TARGET_ARCH} != ${MACHINE_ARCH}
 # TA->T mapping is accidentally CPUARCH with aarch64 the odd man out
@@ -519,49 +517,35 @@ worlds: .PHONY
 # In all cases, if the user specifies TARGETS on the command line,
 # honor that most of all.
 #
-_OBSOLETE_GCC_TARGETS=mips sparc64
-.if defined(MAKE_OBSOLETE_GCC)
-_OBSOLETE_GCC_TARGETS+=powerpc
-.endif
-TARGETS?=amd64 arm arm64 i386 riscv ${_OBSOLETE_GCC_TARGETS}
+TARGETS?=amd64 arm arm64 i386 mips powerpc riscv sparc64
 _UNIVERSE_TARGETS=	${TARGETS}
-# arm (armv5) excluded due to broken buildworld
 TARGET_ARCHES_arm?=	armv6 armv7
 TARGET_ARCHES_arm64?=	aarch64
 TARGET_ARCHES_mips?=	mipsel mips mips64el mips64 mipsn32 mipselhf mipshf mips64elhf mips64hf
-TARGET_ARCHES_powerpc?=	powerpc powerpc64 powerpcspe
-# riscv64sf excluded due to PR 232085
-TARGET_ARCHES_riscv?=	riscv64
+# powerpcspe excluded until clang fixed
+TARGET_ARCHES_powerpc?=	powerpc powerpc64
+TARGET_ARCHES_riscv?=	riscv64 riscv64sf
 .for target in ${TARGETS}
 TARGET_ARCHES_${target}?= ${target}
 .endfor
 
-MAKE_PARAMS_riscv?=	CROSS_TOOLCHAIN=riscv64-gcc
-.if !defined(MAKE_OBSOLETE_GCC)
-OBSOLETE_GCC_TARGETS=${_OBSOLETE_GCC_TARGETS}
-MAKE_PARAMS_mips?=	CROSS_TOOLCHAIN=mips-gcc
-MAKE_PARAMS_powerpc?=	CROSS_TOOLCHAIN=powerpc64-gcc
-MAKE_PARAMS_sparc64?=	CROSS_TOOLCHAIN=sparc64-gcc
-.endif
+MAKE_PARAMS_mips?=	CROSS_TOOLCHAIN=mips-gcc6
+MAKE_PARAMS_sparc64?=	CROSS_TOOLCHAIN=sparc64-gcc6
 
-TOOLCHAINS_mips=	mips
-TOOLCHAINS_powerpc=	powerpc64
-TOOLCHAINS_riscv=	riscv64
-TOOLCHAINS_sparc64=	sparc64
+TOOLCHAINS_mips=	mips-gcc6
+TOOLCHAINS_sparc64=	sparc64-gcc6
 
 # Remove architectures only supported by external toolchain from
-# universe if required toolchain packages are missing. riscv requires
-# an out-of-tree toolchain. When MAKE_OBSOLETE_GCC is not defined,
-# the same logic appleis to the obsolete gcc targets.
-.for target in riscv ${OBSOLETE_GCC_TARGETS}
+# universe if required toolchain packages are missing.
+.for target in mips sparc64
 .if ${_UNIVERSE_TARGETS:M${target}}
 .for toolchain in ${TOOLCHAINS_${target}}
-.if !exists(/usr/local/share/toolchains/${toolchain}-gcc.mk)
+.if !exists(/usr/local/share/toolchains/${toolchain}.mk)
 _UNIVERSE_TARGETS:= ${_UNIVERSE_TARGETS:N${target}}
 universe: universe_${toolchain}_skip .PHONY
 universe_epilogue: universe_${toolchain}_skip .PHONY
 universe_${toolchain}_skip: universe_prologue .PHONY
-	@echo ">> ${target} skipped - install ${toolchain}-xtoolchain-gcc port or package to build"
+	@echo ">> ${target} skipped - install ${toolchain} port or package to build"
 .endif
 .endfor
 .endif
@@ -754,7 +738,7 @@ TARGET_ARCH_${kernel}!=	cd ${KERNSRCDIR}/${TARGET}/conf && \
 .if empty(TARGET_ARCH_${kernel})
 .error "Target architecture for ${TARGET}/conf/${kernel} unknown.  config(8) likely too old."
 .endif
-universe_kernconfs: universe_kernconf_${TARGET}_${kernel}
+universe_kernconfs_${TARGET_ARCH_${kernel}}: universe_kernconf_${TARGET}_${kernel}
 universe_kernconf_${TARGET}_${kernel}: .MAKE
 	@echo ">> ${TARGET}.${TARGET_ARCH_${kernel}} ${kernel} kernel started on `LC_ALL=C date`"
 	@(cd ${.CURDIR} && env __MAKE_CONF=/dev/null \
@@ -767,6 +751,10 @@ universe_kernconf_${TARGET}_${kernel}: .MAKE
 	    (echo "${TARGET} ${kernel} kernel failed," \
 	    "check _.${TARGET}.${kernel} for details"| ${MAKEFAIL}))
 	@echo ">> ${TARGET}.${TARGET_ARCH_${kernel}} ${kernel} kernel completed on `LC_ALL=C date`"
+.endfor
+.for target_arch in ${TARGET_ARCHES_${TARGET}}
+universe_kernconfs: universe_kernconfs_${target_arch} .PHONY
+universe_kernconfs_${target_arch}:
 .endfor
 .endif	# make(universe_kernels)
 universe: universe_epilogue

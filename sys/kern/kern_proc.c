@@ -103,6 +103,10 @@ __FBSDID("$FreeBSD$");
 #include <compat/cheriabi/cheriabi_util.h>
 #endif
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 SDT_PROVIDER_DEFINE(proc);
 
 MALLOC_DEFINE(M_PGRP, "pgrp", "process group header");
@@ -886,7 +890,7 @@ killjobc(void)
 			sx_xunlock(&proctree_lock);
 			if (vn_lock(ttyvp, LK_EXCLUSIVE) == 0) {
 				VOP_REVOKE(ttyvp, REVOKEALL);
-				VOP_UNLOCK(ttyvp, 0);
+				VOP_UNLOCK(ttyvp);
 			}
 			vrele(ttyvp);
 			sx_xlock(&proctree_lock);
@@ -1312,7 +1316,7 @@ pstats_free(struct pstats *ps)
  * it can be replaced by assignment of zero.
  */
 static inline uint32_t
-ptr32_trim(void *ptr)
+ptr32_trim(const void *ptr)
 {
 	uintptr_t uptr;
 
@@ -3243,11 +3247,14 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 		/*
 		 * NB: Only copy exactly the pss fields we might need here.
 		 */
-		pss.ps_sbclasses = cheri_fromint(pss32.ps_sbclasses);
+		pss.ps_sbclasses =
+		    (void * __capability)(uintcap_t)pss32.ps_sbclasses;
 		pss.ps_sbclasseslen = (size_t)pss32.ps_sbclasseslen;
-		pss.ps_sbmethods = cheri_fromint(.ps_sbmethods);
+		pss.ps_sbmethods =
+		    (void * __capability)(uintcap_t)pss32.ps_sbmethods;
 		pss.ps_sbmethodslen = (size_t)pss32.ps_sbmethodslen;
-		pss.ps_sbobjects = cheri_fromint(pss32.ps_sbobjects);
+		pss.ps_sbobjects =
+		    (void * __capability)(uintcap_t)pss32.ps_sbobjects;
 		pss.ps_sbobjectslen = (size_t)pss32.ps_sbobjectslen;
 	} else
 #endif
@@ -3261,11 +3268,14 @@ proc_get_sbmetadata_ptrlen(struct thread *td, struct proc *p,
 		/*
 		 * NB: Only copy exactly the pss fields we might need here.
 		 */
-		pss.ps_sbclasses = cheri_fromint(pss64.ps_sbclasses);
+		pss.ps_sbclasses =
+		    (void * __capability)(uintcap_t)pss64.ps_sbclasses;
 		pss.ps_sbclasseslen = (size_t)pss64.ps_sbclasseslen;
-		pss.ps_sbmethods = cheri_fromint(pss64.ps_sbmethods);
+		pss.ps_sbmethods =
+		    (void * __capability)(uintcap_t)pss64.ps_sbmethods;
 		pss.ps_sbmethodslen = (size_t)pss64.ps_sbmethodslen;
-		pss.ps_sbobjects = cheri_fromint(pss64.ps_sbobjects);
+		pss.ps_sbobjects =
+		    (void * __capability)(uintcap_t)pss64.ps_sbobjects;
 		pss.ps_sbobjectslen = (size_t)pss64.ps_sbobjectslen;
 	} else
 #endif

@@ -27,6 +27,38 @@ S=	../../..
 
 INCLUDES+= -I$S/contrib/libfdt
 
+# Use a custom SYSTEM_LD command to generate the elf kernel, so we can
+# set the text segment start address, and also strip the "arm mapping
+# symbols" which have names like $a.0 and $d.2; see the document
+# "ELF for the ARM architecture" for more info on the mapping symbols.
+SYSTEM_LD= \
+	${SYSTEM_LD_BASECMD} \
+	    --defsym='text_start=kernbase + SIZEOF_HEADERS' \
+	    -o ${.TARGET} ${SYSTEM_OBJS} vers.o; \
+	$(OBJCOPY) \
+	    --wildcard \
+	    --strip-symbol='$$[adtx]*' \
+	    ${.TARGET}
+
+# Generate the .bin (no elf headers) kernel as an extra build output.
+# We must relink to generate the .bin kernel, because without headers the
+# location of everything changes.  We also strip the ARM marker symbols.
+KERNEL_EXTRA+= ${KERNEL_KO}.bin
+KERNEL_EXTRA_INSTALL+= ${KERNEL_KO}.bin
+
+${KERNEL_KO}.bin: ${SYSTEM_DEP} vers.o
+	@echo "linking ${.TARGET}"
+	@${SYSTEM_LD_BASECMD} \
+	    --defsym='text_start=kernbase' \
+	    -o ${.TARGET} ${SYSTEM_OBJS} vers.o
+	${SIZE} ${.TARGET}
+	@${OBJCOPY} \
+	    --wildcard \
+	    --strip-symbol='$$[adtx]*' \
+	    --output-target=binary \
+	    ${.TARGET}
+	@chmod 755 ${.TARGET}
+
 .if !empty(DDB_ENABLED)
 CFLAGS += -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 .endif
@@ -42,6 +74,7 @@ CFLAGS += -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer
 %FILES.m
 
 %CLEAN
+CLEAN+=	${KERNEL_KO}.bin
 
 %RULES
 

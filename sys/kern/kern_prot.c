@@ -191,14 +191,21 @@ struct getsid_args {
 int
 sys_getsid(struct thread *td, struct getsid_args *uap)
 {
+
+	return (kern_getsid(td, uap->pid));
+}
+
+int
+kern_getsid(struct thread *td, pid_t pid)
+{
 	struct proc *p;
 	int error;
 
-	if (uap->pid == 0) {
+	if (pid == 0) {
 		p = td->td_proc;
 		PROC_LOCK(p);
 	} else {
-		p = pfind(uap->pid);
+		p = pfind(pid);
 		if (p == NULL)
 			return (ESRCH);
 		error = p_cansee(td, p);
@@ -2015,10 +2022,9 @@ proc_set_cred_init(struct proc *p, struct ucred *newcred)
  * only used when the process is about to be freed, at which point it should
  * not be visible anymore).
  */
-struct ucred *
+void
 proc_set_cred(struct proc *p, struct ucred *newcred)
 {
-	struct ucred *oldcred;
 
 	MPASS(p->p_ucred != NULL);
 	if (newcred == NULL)
@@ -2026,11 +2032,9 @@ proc_set_cred(struct proc *p, struct ucred *newcred)
 	else
 		PROC_LOCK_ASSERT(p, MA_OWNED);
 
-	oldcred = p->p_ucred;
 	p->p_ucred = newcred;
 	if (newcred != NULL)
 		PROC_UPDATE_COW(p);
-	return (oldcred);
 }
 
 struct ucred *

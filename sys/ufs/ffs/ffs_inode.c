@@ -124,7 +124,7 @@ loop:
 		 *
 		 * Hold a reference to the vnode to protect against
 		 * ffs_snapgone(). Since we hold a reference, it can only
-		 * get reclaimed (VI_DOOMED flag) in a forcible downgrade
+		 * get reclaimed (VIRF_DOOMED flag) in a forcible downgrade
 		 * or unmount. For an unmount, the entire filesystem will be
 		 * gone, so we cannot attempt to touch anything associated
 		 * with it while the vnode is unlocked; all we can do is 
@@ -133,11 +133,11 @@ loop:
 		 * longer necessary and we can just return an error.
 		 */
 		vref(vp);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		pause("ffsupd", 1);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		vrele(vp);
-		if ((vp->v_iflag & VI_DOOMED) != 0)
+		if (VN_IS_DOOMED(vp))
 			return (ENOENT);
 		goto loop;
 	}

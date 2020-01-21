@@ -222,11 +222,13 @@ _mips_rtld_bind(void* _plt_stub)
 		// We can use tight bounds (but can't update .captable to point
 		// to the target function directly)
 		// TODO: actually we should be able to for local calls!
-		target = make_code_pointer(def, defobj, /*tight_bounds=*/true);
+		target = make_code_pointer(
+		    def, defobj, /*tight_bounds=*/true, /*addend=*/0);
 	} else {
 		// PC-relative/legacy does not need any trampolines and uses the
 		// full DSO bounds (or full addrspace for legacy)
-		target = make_code_pointer(def, defobj, /*tight_bounds=*/false);
+		target = make_code_pointer(
+		    def, defobj, /*tight_bounds=*/false, /*addend=*/0);
 		// TODO: update .captable entry to avoid future trampoline jumps
 		// TODO: could also free the stub, but that probably just wastes time
 	}
@@ -387,7 +389,8 @@ reloc_plt_bind_now(Obj_Entry *obj, int flags, const Obj_Entry *rtldobj __unused,
 		} else {
 			// No trampoline needed for PCREL or legacy
 			// TODO: can we have any addends for plt relocations?
-			target = make_code_pointer(def, defobj, /*tight_bounds=*/false);
+			target = make_code_pointer(
+			    def, defobj, /*tight_bounds=*/false, /*addend=*/0);
 		}
 		dbg_cheri_plt_verbose("BIND_NOW: %p <-- %#p (%s)", where, target,
 		    symname(obj, r_symndx));
@@ -512,8 +515,9 @@ private:
 };
 
 extern "C" dlfunc_t
-find_external_call_thunk(const Elf_Sym* symbol, const Obj_Entry* obj)
+find_external_call_thunk(const Elf_Sym* symbol, const Obj_Entry* obj, size_t addend)
 {
+	assert(addend == 0 && "Not supported yet");
 	// This should be called with a global RTLD lock held so there should
 	// not be any races.
 	// FIXME: verify that this assumption is correct
@@ -675,7 +679,8 @@ allocate_function_pointer_trampoline(dlfunc_t target_func, const Obj_Entry *obj)
 
 SimpleExternalCallTrampoline*
 SimpleExternalCallTrampoline::create(const Obj_Entry* defobj, const Elf_Sym *sym, bool tight_bounds) {
-	dlfunc_t target_func = make_code_pointer(sym, defobj, tight_bounds);
+	dlfunc_t target_func =
+	    make_code_pointer(sym, defobj, tight_bounds, /*addend=*/0);
 	const void *target_cgp = target_cgp_for_func(defobj, target_func);
 	return create(target_cgp, target_func);
 }

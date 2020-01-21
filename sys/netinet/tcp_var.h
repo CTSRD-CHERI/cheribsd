@@ -103,7 +103,8 @@ struct tcpcb {
 		t_idle_reduce : 1,
 		t_delayed_ack: 7,	/* Delayed ack variable */
 		t_fin_is_rst: 1,	/* Are fin's treated as resets */
-		bits_spare : 3;
+		t_log_state_set: 1,
+		bits_spare : 2;
 	u_int	t_flags;
 	tcp_seq	snd_una;		/* sent but unacknowledged */
 	tcp_seq	snd_max;		/* highest sequence number sent;
@@ -206,6 +207,7 @@ struct tcpcb {
 	u_int	t_keepcnt;		/* number of keepalives before close */
 	int	t_dupacks;		/* consecutive dup acks recd */
 	int	t_lognum;		/* Number of log entries */
+	int	t_loglimit;		/* Maximum number of log entries */
 	struct tcp_log_stailq t_logs;	/* Log buffer */
 	struct tcp_log_id_node *t_lin;
 	struct tcp_log_id_bucket *t_lib;
@@ -234,6 +236,9 @@ struct tcptemp {
 	u_char	tt_ipgen[40]; /* the size must be of max ip header, now IPv6 */
 	struct	tcphdr tt_t;
 };
+
+/* Minimum map entries limit value, if set */
+#define TCP_MIN_MAP_ENTRIES_LIMIT	128
 
 /* 
  * TODO: We yet need to brave plowing in
@@ -762,7 +767,8 @@ SYSCTL_DECL(_net_inet_tcp_sack);
 MALLOC_DECLARE(M_TCPLOG);
 #endif
 
-extern	int tcp_log_in_vain;
+VNET_DECLARE(int, tcp_log_in_vain);
+#define	V_tcp_log_in_vain		VNET(tcp_log_in_vain)
 
 /*
  * Global TCP tunables shared between different stacks.
@@ -790,6 +796,8 @@ VNET_DECLARE(int, tcp_ecn_maxretries);
 VNET_DECLARE(int, tcp_initcwnd_segments);
 VNET_DECLARE(int, tcp_insecure_rst);
 VNET_DECLARE(int, tcp_insecure_syn);
+VNET_DECLARE(uint32_t, tcp_map_entries_limit);
+VNET_DECLARE(uint32_t, tcp_map_split_limit);
 VNET_DECLARE(int, tcp_minmss);
 VNET_DECLARE(int, tcp_mssdflt);
 #ifdef STATS
@@ -830,6 +838,8 @@ VNET_DECLARE(struct inpcbinfo, tcbinfo);
 #define	V_tcp_initcwnd_segments		VNET(tcp_initcwnd_segments)
 #define	V_tcp_insecure_rst		VNET(tcp_insecure_rst)
 #define	V_tcp_insecure_syn		VNET(tcp_insecure_syn)
+#define	V_tcp_map_entries_limit		VNET(tcp_map_entries_limit)
+#define	V_tcp_map_split_limit		VNET(tcp_map_split_limit)
 #define	V_tcp_minmss			VNET(tcp_minmss)
 #define	V_tcp_mssdflt			VNET(tcp_mssdflt)
 #ifdef STATS
@@ -844,7 +854,6 @@ VNET_DECLARE(struct inpcbinfo, tcbinfo);
 #define	V_tcp_sendspace			VNET(tcp_sendspace)
 #define	V_tcp_udp_tunneling_overhead	VNET(tcp_udp_tunneling_overhead)
 #define	V_tcp_udp_tunneling_port	VNET(tcp_udp_tunneling_port)
-
 
 #ifdef TCP_HHOOK
 VNET_DECLARE(struct hhook_head *, tcp_hhh[HHOOK_TCP_LAST + 1]);
@@ -883,6 +892,7 @@ void	cc_ack_received(struct tcpcb *tp, struct tcphdr *th,
 			    uint16_t nsegs, uint16_t type);
 void 	cc_conn_init(struct tcpcb *tp);
 void 	cc_post_recovery(struct tcpcb *tp, struct tcphdr *th);
+void    cc_ecnpkt_handler(struct tcpcb *tp, struct tcphdr *th, uint8_t iptos);
 void	cc_cong_signal(struct tcpcb *tp, struct tcphdr *th, uint32_t type);
 #ifdef TCP_HHOOK
 void	hhook_run_tcp_est_in(struct tcpcb *tp,
@@ -914,6 +924,19 @@ extern counter_u64_t tcp_inp_lro_compressed;
 extern counter_u64_t tcp_inp_lro_single_push;
 extern counter_u64_t tcp_inp_lro_locks_taken;
 extern counter_u64_t tcp_inp_lro_sack_wake;
+
+#ifdef NETFLIX_EXP_DETECTION
+/* Various SACK attack thresholds */
+extern int32_t tcp_force_detection;
+extern int32_t tcp_sack_to_ack_thresh;
+extern int32_t tcp_sack_to_move_thresh;
+extern int32_t tcp_restoral_thresh;
+extern int32_t tcp_sad_decay_val;
+extern int32_t tcp_sad_pacing_interval;
+extern int32_t tcp_sad_low_pps;
+extern int32_t tcp_map_minimum;
+extern int32_t tcp_attack_on_turns_on_logging;
+#endif
 
 uint32_t tcp_maxmtu(struct in_conninfo *, struct tcp_ifcap *);
 uint32_t tcp_maxmtu6(struct in_conninfo *, struct tcp_ifcap *);

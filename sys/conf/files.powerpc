@@ -76,6 +76,7 @@ dev/uart/uart_cpu_powerpc.c	optional	uart
 dev/usb/controller/ehci_fsl.c	optional	ehci mpc85xx
 dev/vt/hw/ofwfb/ofwfb.c		optional	vt aim
 kern/kern_clocksource.c		standard
+kern/subr_atomic64.c		optional	powerpc | powerpcspe
 kern/subr_dummy_vdso_tc.c	standard
 kern/syscalls.c			optional	ktr
 kern/subr_sfbuf.c		standard
@@ -88,8 +89,6 @@ libkern/divdi3.c		optional	powerpc | powerpcspe
 libkern/ffs.c			standard
 libkern/ffsl.c			standard
 libkern/ffsll.c			standard
-libkern/fls.c			standard
-libkern/flsl.c			standard
 libkern/flsll.c			standard
 libkern/lshrdi3.c		optional	powerpc | powerpcspe
 libkern/memcmp.c		standard
@@ -141,7 +140,7 @@ powerpc/mpc85xx/ds1553_core.c	optional	ds1553
 powerpc/mpc85xx/fsl_diu.c	optional	mpc85xx diu
 powerpc/mpc85xx/fsl_espi.c	optional	mpc85xx spibus
 powerpc/mpc85xx/fsl_sata.c	optional	mpc85xx ata
-powerpc/mpc85xx/i2c.c		optional	iicbus
+powerpc/mpc85xx/i2c.c		optional	mpc85xx iicbus
 powerpc/mpc85xx/isa.c		optional	mpc85xx isa
 powerpc/mpc85xx/lbc.c		optional	mpc85xx
 powerpc/mpc85xx/mpc85xx.c	optional	mpc85xx
@@ -187,6 +186,7 @@ powerpc/powermac/vcoregpio.c	optional	powermac
 powerpc/powernv/opal.c		optional	powernv
 powerpc/powernv/opal_async.c	optional	powernv
 powerpc/powernv/opal_console.c	optional	powernv
+powerpc/powernv/opal_dbg.c	optional	powernv gdb
 powerpc/powernv/opal_dev.c	optional	powernv
 powerpc/powernv/opal_flash.c	optional	powernv opalflash
 powerpc/powernv/opal_hmi.c	optional	powernv

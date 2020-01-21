@@ -44,11 +44,6 @@
 #include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 
-#include <cheri/libcheri_enter.h>
-#include <cheri/libcheri_fd.h>
-#include <cheri/libcheri_sandbox.h>
-
-#include <cheritest-helper.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>

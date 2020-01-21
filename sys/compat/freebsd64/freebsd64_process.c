@@ -91,7 +91,7 @@ freebsd64_ptrace(struct thread *td, struct freebsd64_ptrace_args *uap)
 	 */
 	union {
 		struct ptrace_io_desc piod;
-		struct ptrace_lwpinfo pl;
+		struct ptrace_lwpinfo64 pl;
 		kptrace_vm_entry_t pve;
 #if __has_feature(capabilities)
 		struct capreg capreg;

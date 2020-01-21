@@ -905,10 +905,22 @@ linux_linkat(struct thread *td, struct linux_linkat_args *args)
 }
 
 int
-linux_fdatasync(td, uap)
-	struct thread *td;
-	struct linux_fdatasync_args *uap;
+linux_fdatasync(struct thread *td, struct linux_fdatasync_args *uap)
 {
+
+	return (kern_fsync(td, uap->fd, false));
+}
+
+int
+linux_sync_file_range(struct thread *td, struct linux_sync_file_range_args *uap)
+{
+
+	if (uap->offset < 0 || uap->nbytes < 0 ||
+	    (uap->flags & ~(LINUX_SYNC_FILE_RANGE_WAIT_BEFORE |
+	    LINUX_SYNC_FILE_RANGE_WRITE |
+	    LINUX_SYNC_FILE_RANGE_WAIT_AFTER)) != 0) {
+		return (EINVAL);
+	}
 
 	return (kern_fsync(td, uap->fd, false));
 }
@@ -1010,9 +1022,13 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 	    NULL);
 	if (error != 0)
 		goto out;
-	error = copyinstr(args->specialfile, mntfromname, MNAMELEN - 1, NULL);
-	if (error != 0)
-		goto out;
+	if (args->specialfile != NULL) {
+		error = copyinstr(args->specialfile, mntfromname, MNAMELEN - 1, NULL);
+		if (error != 0)
+			goto out;
+	} else {
+		mntfromname[0] = '\0';
+	}
 	error = copyinstr(args->dir, mntonname, MNAMELEN - 1, NULL);
 	if (error != 0)
 		goto out;
@@ -1027,20 +1043,18 @@ linux_mount(struct thread *td, struct linux_mount_args *args)
 
 	fsflags = 0;
 
-	if ((args->rwflag & 0xffff0000) == 0xc0ed0000) {
-		/*
-		 * Linux SYNC flag is not included; the closest equivalent
-		 * FreeBSD has is !ASYNC, which is our default.
-		 */
-		if (args->rwflag & LINUX_MS_RDONLY)
-			fsflags |= MNT_RDONLY;
-		if (args->rwflag & LINUX_MS_NOSUID)
-			fsflags |= MNT_NOSUID;
-		if (args->rwflag & LINUX_MS_NOEXEC)
-			fsflags |= MNT_NOEXEC;
-		if (args->rwflag & LINUX_MS_REMOUNT)
-			fsflags |= MNT_UPDATE;
-	}
+	/*
+	 * Linux SYNC flag is not included; the closest equivalent
+	 * FreeBSD has is !ASYNC, which is our default.
+	 */
+	if (args->rwflag & LINUX_MS_RDONLY)
+		fsflags |= MNT_RDONLY;
+	if (args->rwflag & LINUX_MS_NOSUID)
+		fsflags |= MNT_NOSUID;
+	if (args->rwflag & LINUX_MS_NOEXEC)
+		fsflags |= MNT_NOEXEC;
+	if (args->rwflag & LINUX_MS_REMOUNT)
+		fsflags |= MNT_UPDATE;
 
 	error = kernel_vmount(fsflags,
 	    "fstype", fstypename,
@@ -1560,6 +1574,47 @@ linux_fallocate(struct thread *td, struct linux_fallocate_args *args)
 	return (kern_posix_fallocate(td, args->fd, args->offset,
 	    args->len));
 }
+
+int
+linux_copy_file_range(struct thread *td, struct linux_copy_file_range_args
+    *args)
+{
+	l_loff_t inoff, outoff, *inoffp, *outoffp;
+	int error, flags;
+
+	/*
+	 * copy_file_range(2) on Linux doesn't define any flags (yet), so is
+	 * the native implementation.  Enforce it.
+	 */
+	if (args->flags != 0) {
+		linux_msg(td, "copy_file_range unsupported flags 0x%x",
+		    args->flags);
+		return (EINVAL);
+	}
+	flags = 0;
+	inoffp = outoffp = NULL;
+	if (args->off_in != NULL) {
+		error = copyin(args->off_in, &inoff, sizeof(l_loff_t));
+		if (error != 0)
+			return (error);
+		inoffp = &inoff;
+	}
+	if (args->off_out != NULL) {
+		error = copyin(args->off_out, &outoff, sizeof(l_loff_t));
+		if (error != 0)
+			return (error);
+		outoffp = &outoff;
+	}
+
+	error = kern_copy_file_range(td, args->fd_in, inoffp, args->fd_out,
+	    outoffp, args->len, flags);
+	if (error == 0 && args->off_in != NULL)
+		error = copyout(inoffp, args->off_in, sizeof(l_loff_t));
+	if (error == 0 && args->off_out != NULL)
+		error = copyout(outoffp, args->off_out, sizeof(l_loff_t));
+	return (error);
+}
+
 // CHERI CHANGES START
 // {
 //   "updated": 20181114,

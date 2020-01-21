@@ -709,15 +709,6 @@ void	usrinfoinit(void);
 void	kern_reboot(int) __dead2;
 void	shutdown_nice(int);
 
-/* Timeouts */
-typedef void timeout_t(void *);	/* timeout function type */
-#define CALLOUT_HANDLE_INITIALIZER(handle)	\
-	{ NULL }
-
-void	callout_handle_init(struct callout_handle *);
-struct	callout_handle timeout(timeout_t *, void *, int);
-void	untimeout(timeout_t *, void *, struct callout_handle);
-
 /* Stubs for obsolete functions that used to be for interrupt management */
 static __inline intrmask_t	splbio(void)		{ return 0; }
 static __inline intrmask_t	splcam(void)		{ return 0; }
@@ -732,7 +723,7 @@ static __inline void		splx(intrmask_t ipl __unused)	{ return; }
  * Common `proc' functions are declared here so that proc.h can be included
  * less often.
  */
-int	_sleep(void * _Nonnull chan, struct lock_object *lock, int pri,
+int	_sleep(const void * _Nonnull chan, struct lock_object *lock, int pri,
 	   const char *wmesg, sbintime_t sbt, sbintime_t pr, int flags);
 #define	msleep(chan, mtx, pri, wmesg, timo)				\
 	_sleep((chan), &(mtx)->lock_object, (pri), (wmesg),		\
@@ -740,7 +731,7 @@ int	_sleep(void * _Nonnull chan, struct lock_object *lock, int pri,
 #define	msleep_sbt(chan, mtx, pri, wmesg, bt, pr, flags)		\
 	_sleep((chan), &(mtx)->lock_object, (pri), (wmesg), (bt), (pr),	\
 	    (flags))
-int	msleep_spin_sbt(void * _Nonnull chan, struct mtx *mtx,
+int	msleep_spin_sbt(const void * _Nonnull chan, struct mtx *mtx,
 	    const char *wmesg, sbintime_t sbt, sbintime_t pr, int flags);
 #define	msleep_spin(chan, mtx, wmesg, timo)				\
 	msleep_spin_sbt((chan), (mtx), (wmesg), tick_sbt * (timo),	\
@@ -756,9 +747,9 @@ int	pause_sbt(const char *wmesg, sbintime_t sbt, sbintime_t pr,
 	    0, C_HARDCLOCK)
 #define	tsleep_sbt(chan, pri, wmesg, bt, pr, flags)			\
 	_sleep((chan), NULL, (pri), (wmesg), (bt), (pr), (flags))
-void	wakeup(void * chan);
-void	wakeup_one(void * chan);
-void	wakeup_any(void * chan);
+void	wakeup(const void *chan);
+void	wakeup_one(const void *chan);
+void	wakeup_any(const void *chan);
 
 /*
  * Common `struct cdev *' stuff are declared here to avoid #include poisoning
@@ -845,7 +836,7 @@ void _gone_in_dev(struct device *dev, int major, const char *msg);
 #ifdef NO_OBSOLETE_CODE
 #define __gone_ok(m, msg)					 \
 	_Static_assert(m < P_OSREL_MAJOR(__FreeBSD_version)),	 \
-	    "Obsolete code" msg);
+	    "Obsolete code: " msg);
 #else
 #define	__gone_ok(m, msg)
 #endif

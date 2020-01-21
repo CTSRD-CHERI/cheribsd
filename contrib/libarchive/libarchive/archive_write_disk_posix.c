@@ -430,7 +430,7 @@ la_opendirat(int fd, const char *path) {
 	    | O_PATH
 #elif defined(O_SEARCH)
 	    | O_SEARCH
-#elif defined(O_EXEC)
+#elif defined(__FreeBSD__) && defined(O_EXEC)
 	    | O_EXEC
 #else
 	    | O_RDONLY

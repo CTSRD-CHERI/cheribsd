@@ -842,8 +842,7 @@ kern_wait4(struct thread *td, int pid, int * __capability statusp, int options,
 int
 sys_wait6(struct thread *td, struct wait6_args *uap)
 {
-	_siginfo_t si, *sip;
-	struct siginfo_native si_n;
+	siginfo_t si, *sip;
 	int error;
 
 	if (uap->info != NULL) {
@@ -854,8 +853,13 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 	error = user_wait6(td, uap->idtype, uap->id, uap->status, uap->options,
 	    uap->wrusage, sip);
 	if (uap->info != NULL && error == 0) {
-		siginfo_to_siginfo_native(&si, &si_n);
-		error = copyout(&si_n, uap->info, sizeof(si_n));
+		/*
+		 * This does not use copyoutcap() as a fail-safe.  The
+		 * returned signal information object shouldn't
+		 * contain any capabilities as neither the si_addr nor
+		 * si_value fields are relevant for SIGCHLD.
+		 */
+		error = copyout(&si, uap->info, sizeof(si));
 	}
 	return (error);
 }
@@ -863,7 +867,7 @@ sys_wait6(struct thread *td, struct wait6_args *uap)
 int
 user_wait6(struct thread *td, idtype_t idtype, id_t id,
     int * __capability statusp, int options,
-    struct __wrusage * __capability wrusage, _siginfo_t *sip)
+    struct __wrusage * __capability wrusage, siginfo_t *sip)
 {
 	struct __wrusage wru, *wrup;
 	int error, status;
@@ -1029,7 +1033,7 @@ proc_reap(struct thread *td, struct proc *p, int *status, int options)
 
 static int
 proc_to_reap(struct thread *td, struct proc *p, idtype_t idtype, id_t id,
-    int *status, int options, struct __wrusage *wrusage, _siginfo_t *siginfo,
+    int *status, int options, struct __wrusage *wrusage, siginfo_t *siginfo,
     int check_only)
 {
 	struct rusage *rup;
@@ -1222,7 +1226,7 @@ kern_wait(struct thread *td, pid_t pid, int *status, int options,
 }
 
 static void
-report_alive_proc(struct thread *td, struct proc *p, _siginfo_t *siginfo,
+report_alive_proc(struct thread *td, struct proc *p, siginfo_t *siginfo,
     int *status, int options, int si_code)
 {
 	bool cont;
@@ -1255,7 +1259,7 @@ report_alive_proc(struct thread *td, struct proc *p, _siginfo_t *siginfo,
 
 int
 kern_wait6(struct thread *td, idtype_t idtype, id_t id, int *status,
-    int options, struct __wrusage *wrusage, _siginfo_t *siginfo)
+    int options, struct __wrusage *wrusage, siginfo_t *siginfo)
 {
 	struct proc *p, *q;
 	pid_t pid;

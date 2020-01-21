@@ -91,6 +91,7 @@ static struct vop_vector fdesc_vnodeops = {
 	.vop_reclaim =		fdesc_reclaim,
 	.vop_setattr =		fdesc_setattr,
 };
+VFS_VOP_VECTOR_REGISTER(fdesc_vnodeops);
 
 static void fdesc_insmntque_dtr(struct vnode *, void *);
 static void fdesc_remove_entry(struct fdescnode *);
@@ -340,14 +341,14 @@ fdesc_lookup(struct vop_lookup_args *ap)
 		 * will be re-acquired.
 		 */
 		vhold(dvp);
-		VOP_UNLOCK(dvp, 0);
+		VOP_UNLOCK(dvp);
 		fdrop(fp, td);
 
 		/* Re-aquire the lock afterwards. */
 		vn_lock(dvp, LK_RETRY | LK_EXCLUSIVE);
 		vdrop(dvp);
 		fvp = dvp;
-		if ((dvp->v_iflag & VI_DOOMED) != 0)
+		if (VN_IS_DOOMED(dvp))
 			error = ENOENT;
 	} else {
 		/*
@@ -417,7 +418,7 @@ fdesc_pathconf(struct vop_pathconf_args *ap)
 		if (VTOFDESC(vp)->fd_type == Froot)
 			return (vop_stdpathconf(ap));
 		vref(vp);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		error = kern_fpathconf(curthread, VTOFDESC(vp)->fd_fd,
 		    ap->a_name, ap->a_retval);
 		vn_lock(vp, LK_SHARED | LK_RETRY);
@@ -515,7 +516,7 @@ fdesc_setattr(struct vop_setattr_args *ap)
 	if ((error = vn_start_write(vp, &mp, V_WAIT | PCATCH)) == 0) {
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 		error = VOP_SETATTR(vp, ap->a_vap, ap->a_cred);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vn_finished_write(mp);
 	}
 	fdrop(fp, td);
@@ -629,7 +630,7 @@ fdesc_readlink(struct vop_readlink_args *va)
 		panic("fdesc_readlink: not fdescfs link");
 	fd_fd = ((struct fdescnode *)vn->v_data)->fd_fd;
 	lockflags = VOP_ISLOCKED(vn);
-	VOP_UNLOCK(vn, 0);
+	VOP_UNLOCK(vn);
 
 	td = curthread;
 	error = fget_cap(td, fd_fd, &cap_no_rights, &fp, NULL);

@@ -626,6 +626,10 @@ linker_make_file(const char *pathname, linker_class_t lc)
 	lf->ndeps = 0;
 	lf->deps = NULL;
 	lf->loadcnt = ++loadcnt;
+#ifdef __arm__
+	lf->exidx_addr = 0;
+	lf->exidx_size = 0;
+#endif
 	STAILQ_INIT(&lf->common);
 	TAILQ_INIT(&lf->modules);
 	TAILQ_INSERT_TAIL(&linker_files, lf, link);
@@ -1842,7 +1846,7 @@ linker_lookup_file(const char *path, int pathlen, const char *name,
 			type = nd.ni_vp->v_type;
 			if (vap)
 				VOP_GETATTR(nd.ni_vp, vap, td->td_ucred);
-			VOP_UNLOCK(nd.ni_vp, 0);
+			VOP_UNLOCK(nd.ni_vp);
 			vn_close(nd.ni_vp, FREAD, td->td_ucred, td);
 			if (type == VREG)
 				return (result);
@@ -1907,7 +1911,7 @@ linker_hints_lookup(const char *path, int pathlen, const char *modname,
 	    UIO_SYSSPACE, IO_NODELOCKED, cred, NOCRED, &reclen, td);
 	if (error)
 		goto bad;
-	VOP_UNLOCK(nd.ni_vp, 0);
+	VOP_UNLOCK(nd.ni_vp);
 	vn_close(nd.ni_vp, FREAD, cred, td);
 	nd.ni_vp = NULL;
 	if (reclen != 0) {
@@ -1975,7 +1979,7 @@ bad:
 	if (hints)
 		free(hints, M_TEMP);
 	if (nd.ni_vp != NULL) {
-		VOP_UNLOCK(nd.ni_vp, 0);
+		VOP_UNLOCK(nd.ni_vp);
 		vn_close(nd.ni_vp, FREAD, cred, td);
 	}
 	/*

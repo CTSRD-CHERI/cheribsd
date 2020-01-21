@@ -51,7 +51,7 @@ struct tls_record_layer {
 #define	TLS_RLTYPE_APP		23
 
 /*
- * Nonce for GCM.
+ * Nonce for GCM for TLS 1.2 per RFC 5288.
  */
 struct tls_nonce_data {
 	uint8_t fixed[TLS_AEAD_GCM_LEN];
@@ -59,7 +59,7 @@ struct tls_nonce_data {
 } __packed; 
 
 /*
- * AEAD additional data format per RFC.
+ * AEAD additional data format for TLS 1.2 per RFC 5246.
  */
 struct tls_aead_data {
 	uint64_t seq;	/* In network order */
@@ -67,6 +67,16 @@ struct tls_aead_data {
 	uint8_t tls_vmajor;
 	uint8_t tls_vminor;
 	uint16_t tls_length;	
+} __packed;
+
+/*
+ * AEAD additional data format for TLS 1.3 per RFC 8446.
+ */
+struct tls_aead_data_13 {
+	uint8_t	type;
+	uint8_t tls_vmajor;
+	uint8_t tls_vminor;
+	uint16_t tls_length;
 } __packed;
 
 /*

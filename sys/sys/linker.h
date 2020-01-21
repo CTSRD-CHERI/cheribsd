@@ -97,6 +97,11 @@ struct linker_file {
      */
     int			nenabled;	/* number of enabled probes. */
     int			fbt_nentries;	/* number of fbt entries created. */
+
+#ifdef __arm__
+    caddr_t		exidx_addr;	/* Unwind data index table start */
+    size_t		exidx_size;	/* Unwind data index table size */
+#endif
 };
 
 /*
@@ -300,6 +305,7 @@ int	linker_ctf_get(linker_file_t, linker_ctf_t *);
 
 int elf_cpu_load_file(linker_file_t);
 int elf_cpu_unload_file(linker_file_t);
+int elf_cpu_parse_dynamic(linker_file_t, Elf_Dyn *);
 
 /* values for type */
 #define ELF_RELOC_REL	1

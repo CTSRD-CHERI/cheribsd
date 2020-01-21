@@ -1501,8 +1501,8 @@ t4fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t4fw.fwo"
 t4fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t4fw-1.23.0.0.bin.uu"	\
-	compile-with	"${NORMAL_FW}"					\
+	dependency	"$S/dev/cxgbe/firmware/t4fw-1.24.11.0.bin"	\
+	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t4fw.fw"
 t5fw_cfg.c		optional cxgbe					\
@@ -1535,8 +1535,8 @@ t5fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t5fw.fwo"
 t5fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t5fw-1.23.0.0.bin.uu"	\
-	compile-with	"${NORMAL_FW}"					\
+	dependency	"$S/dev/cxgbe/firmware/t5fw-1.24.11.0.bin"	\
+	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t5fw.fw"
 t6fw_cfg.c		optional cxgbe					\
@@ -1569,8 +1569,8 @@ t6fw.fwo		optional cxgbe					\
 	no-implicit-rule						\
 	clean		"t6fw.fwo"
 t6fw.fw			optional cxgbe					\
-	dependency	"$S/dev/cxgbe/firmware/t6fw-1.23.0.0.bin.uu"	\
-	compile-with	"${NORMAL_FW}"					\
+	dependency	"$S/dev/cxgbe/firmware/t6fw-1.24.11.0.bin"	\
+	compile-with	"${CP} ${.ALLSRC} ${.TARGET}"			\
 	no-obj no-implicit-rule						\
 	clean		"t6fw.fw"
 dev/cxgbe/crypto/t4_crypto.c	optional ccr \
@@ -1829,8 +1829,14 @@ dev/iicbus/iiconf.c		optional iicbus
 dev/iicbus/iicsmb.c		optional iicsmb				\
 	dependency	"iicbus_if.h"
 dev/iicbus/iicoc.c		optional iicoc
+dev/iicbus/iicoc_fdt.c		optional iicoc ext_resources fdt
+dev/iicbus/iicoc_pci.c		optional iicoc pci
 dev/iicbus/isl12xx.c		optional isl12xx
 dev/iicbus/lm75.c		optional lm75
+dev/iicbus/mux/iicmux.c		optional iicmux
+dev/iicbus/mux/iicmux_if.m	optional iicmux
+dev/iicbus/mux/iic_gpiomux.c	optional iic_gpiomux fdt
+dev/iicbus/mux/ltc430x.c	optional ltc430x
 dev/iicbus/nxprtc.c		optional nxprtc | pcf8563
 dev/iicbus/ofw_iicbus.c		optional fdt iicbus
 dev/iicbus/rtc8583.c		optional rtc8583
@@ -2584,7 +2590,6 @@ dev/pccard/pccard_cis_quirks.c	optional pccard
 dev/pccard/pccard_device.c	optional pccard
 dev/pccard/power_if.m		standard
 dev/pccbb/pccbb.c		optional cbb
-dev/pccbb/pccbb_isa.c		optional cbb isa
 dev/pccbb/pccbb_pci.c		optional cbb pci
 dev/pcf/pcf.c			optional pcf
 dev/pci/fixup_pci.c		optional pci
@@ -3429,6 +3434,7 @@ dev/virtio/scsi/virtio_scsi.c		optional	virtio_scsi
 dev/virtio/random/virtio_random.c	optional	virtio_random
 dev/virtio/console/virtio_console.c	optional	virtio_console
 dev/vkbd/vkbd.c			optional vkbd
+dev/vmgenc/vmgenc_acpi.c	optional acpi
 dev/vr/if_vr.c			optional vr pci
 dev/vt/colors/vt_termcolors.c	optional vt
 dev/vt/font/vt_font_default.c	optional vt

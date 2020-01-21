@@ -78,19 +78,24 @@
 	ITLBNOPFIX
 #endif
 
+/* For CHERI SAVE_U_PCB_EPC does not save EPC since we only use EPCC */
+#if __has_feature(capabilities)
+#define SAVE_U_PCB_EPC(gpr, pcb)
+#else
+#define SAVE_U_PCB_EPC(gpr, pcb)	\
+	MFC0	gpr, MIPS_COP_0_EXC_PC;	\
+	SAVE_U_PCB_REG(gpr, PC, pcb)
+#endif
+
 /*
  * Note: The kernel stack is allocated below the pcb
  */
 #ifndef CHERI_PURECAP_KERNEL
 #define SWITCH_TO_KERNEL_STACK(pcb)		\
 	PTR_SUBU	sp, pcb, CALLFRAME_SIZ
-#define RESTORE_PC_FROM_PCB(tmpcreg, pcb)	\
-	RESTORE_U_PCB_PC(a0, tmpcreg, pcb)
 #else /* CHERI_PURECAP_KERNEL */
 /* Skip this in purecap kernel, we will do it after saving REG_STC */
 #define SWITCH_TO_KERNEL_STACK(pcb)
-#define RESTORE_PC_FROM_PCB(tmpcreg, pcb)	\
-	RESTORE_U_PCB_PC(a0, tmpcreg, pcb, t2)
 #endif /* CHERI_PURECAP_KERNEL */
 
 /*
@@ -127,7 +132,6 @@
 	SAVE_U_PCB_REG(s6, S6, pcb)		; \
 	SAVE_U_PCB_REG(s7, S7, pcb)		; \
 	SAVE_U_PCB_REG(t8, T8, pcb)		; \
-	MFC0	a3, MIPS_COP_0_EXC_PC		; \
 	SAVE_U_PCB_REG(t9, T9, pcb)		; \
 	SAVE_U_PCB_REG(gp, GP, pcb)		; \
 	SAVE_U_PCB_REG(sp, SP, pcb)		; \
@@ -139,7 +143,7 @@
 	SAVE_U_PCB_REG(a0, SR, pcb)		; \
 	SAVE_U_PCB_REG(a1, CAUSE, pcb)		; \
 	SAVE_U_PCB_REG(a2, BADVADDR, pcb)	; \
-	SAVE_U_PCB_REG(a3, PC, pcb)
+	SAVE_U_PCB_EPC(a3, pcb)
 
 /*
  * Note: tmpcreg must be a temporary capability register.
@@ -150,7 +154,7 @@
 	RESTORE_U_PCB_REG(t1, MULHI, pcb)	; \
 	mtlo	t0				; \
 	mthi	t1				; \
-	RESTORE_PC_FROM_PCB(tmpcreg, pcb)	; \
+	RESTORE_U_PCB_PC(tmpcreg, pcb)		; \
 	RESTORE_U_PCB_REG(v0, V0, pcb)		; \
 	RESTORE_U_PCB_REG(v1, V1, pcb)		; \
 	RESTORE_U_PCB_REG(a0, A0, pcb)		; \

@@ -288,46 +288,6 @@ ksiginfo_tryfree(ksiginfo_t *ksi)
 }
 
 void
-siginfo_to_siginfo_native(const _siginfo_t *si,
-    struct siginfo_native *si_n)
-{
-
-#if !__has_feature(capabilities)
-	memcpy(si_n, si, sizeof(*si_n));
-#else
-	si_n->si_signo = si->si_signo;
-	si_n->si_errno = si->si_errno;
-	si_n->si_code = si->si_code;
-	si_n->si_pid = si->si_pid;
-	si_n->si_uid = si->si_uid;
-	si_n->si_status = si->si_status;
-	si_n->si_addr = (__cheri_fromcap void *)si->si_addr;
-	si_n->si_value.sival_ptr_native = si->si_value.sival_ptr_native;
-	memcpy(&si_n->_reason, &si->_reason, sizeof(si_n->_reason));
-#endif
-}
-
-void
-siginfo_native_to_siginfo(const struct siginfo_native *si_n,
-    _siginfo_t *si)
-{
-
-#if !__has_feature(capabilities)
-	memcpy(si, si_n, sizeof(*si_n));
-#else
-	si->si_signo = si_n->si_signo;
-	si->si_errno = si_n->si_errno;
-	si->si_code = si_n->si_code;
-	si->si_pid = si_n->si_pid;
-	si->si_uid = si_n->si_uid;
-	si->si_status = si_n->si_status;
-	si->si_addr = (__cheri_tocap void * __capability)si_n->si_addr;
-	si->si_value.sival_ptr_native = si_n->si_value.sival_ptr_native;
-	memcpy(&si->_reason, &si_n->_reason, sizeof(si_n->_reason));
-#endif
-}
-
-void
 sigqueue_init(sigqueue_t *list, struct proc *p)
 {
 	SIGEMPTYSET(list->sq_signals);
@@ -1239,13 +1199,11 @@ user_sigwait(struct thread *td, const sigset_t * __capability uset,
 	return (0);
 }
 
-int
-copyout_siginfo_native(const _siginfo_t *si, void * __capability info)
+static int
+copyout_siginfo(const siginfo_t *si, void * __capability info)
 {
-	struct siginfo_native si_n;
 
-	siginfo_to_siginfo_native(si, &si_n);
-	return (copyout_c(&si_n, info, sizeof(si_n)));
+	return (copyoutcap(si, info, sizeof(*si)));
 }
 
 int
@@ -1253,7 +1211,7 @@ sys_sigtimedwait(struct thread *td, struct sigtimedwait_args *uap)
 {
 
 	return (user_sigtimedwait(td, uap->set, uap->info, uap->timeout,
-	    (copyout_siginfo_t *)copyout_siginfo_native));
+	    copyout_siginfo));
 }
 
 int
@@ -1296,8 +1254,7 @@ int
 sys_sigwaitinfo(struct thread *td, struct sigwaitinfo_args *uap)
 {
 
-	return (user_sigwaitinfo(td, uap->set, uap->info,
-	    (copyout_siginfo_t *)copyout_siginfo_native));
+	return (user_sigwaitinfo(td, uap->set, uap->info, copyout_siginfo));
 }
 
 int
@@ -1325,7 +1282,7 @@ user_sigwaitinfo(struct thread *td, const sigset_t * __capability uset,
 }
 
 static void
-proc_td_siginfo_capture(struct thread *td, _siginfo_t *si)
+proc_td_siginfo_capture(struct thread *td, siginfo_t *si)
 {
 	struct thread *thr;
 
@@ -1787,6 +1744,36 @@ kern_sigaltstack(struct thread *td, stack_t *ss, stack_t *oss)
 	return (0);
 }
 
+struct killpg1_ctx {
+	struct thread *td;
+	ksiginfo_t *ksi;
+	int sig;
+	bool sent;
+	bool found;
+	int ret;
+};
+
+static void
+killpg1_sendsig(struct proc *p, bool notself, struct killpg1_ctx *arg)
+{
+	int err;
+
+	if (p->p_pid <= 1 || (p->p_flag & P_SYSTEM) != 0 ||
+	    (notself && p == arg->td->td_proc) || p->p_state == PRS_NEW)
+		return;
+	PROC_LOCK(p);
+	err = p_cansignal(arg->td, p, arg->sig);
+	if (err == 0 && arg->sig != 0)
+		pksignal(p, arg->sig, arg->ksi);
+	PROC_UNLOCK(p);
+	if (err != ESRCH)
+		arg->found = true;
+	if (err == 0)
+		arg->sent = true;
+	else if (arg->ret == 0 && err != ESRCH && err != EPERM)
+		arg->ret = err;
+}
+
 /*
  * Common code for kill process group/broadcast kill.
  * cp is calling process.
@@ -1796,30 +1783,21 @@ killpg1(struct thread *td, int sig, int pgid, int all, ksiginfo_t *ksi)
 {
 	struct proc *p;
 	struct pgrp *pgrp;
-	int err;
-	int ret;
+	struct killpg1_ctx arg;
 
-	ret = ESRCH;
+	arg.td = td;
+	arg.ksi = ksi;
+	arg.sig = sig;
+	arg.sent = false;
+	arg.found = false;
+	arg.ret = 0;
 	if (all) {
 		/*
 		 * broadcast
 		 */
 		sx_slock(&allproc_lock);
 		FOREACH_PROC_IN_SYSTEM(p) {
-			if (p->p_pid <= 1 || p->p_flag & P_SYSTEM ||
-			    p == td->td_proc || p->p_state == PRS_NEW) {
-				continue;
-			}
-			PROC_LOCK(p);
-			err = p_cansignal(td, p, sig);
-			if (err == 0) {
-				if (sig)
-					pksignal(p, sig, ksi);
-				ret = err;
-			}
-			else if (ret == ESRCH)
-				ret = err;
-			PROC_UNLOCK(p);
+			killpg1_sendsig(p, true, &arg);
 		}
 		sx_sunlock(&allproc_lock);
 	} else {
@@ -1839,25 +1817,14 @@ killpg1(struct thread *td, int sig, int pgid, int all, ksiginfo_t *ksi)
 		}
 		sx_sunlock(&proctree_lock);
 		LIST_FOREACH(p, &pgrp->pg_members, p_pglist) {
-			PROC_LOCK(p);
-			if (p->p_pid <= 1 || p->p_flag & P_SYSTEM ||
-			    p->p_state == PRS_NEW) {
-				PROC_UNLOCK(p);
-				continue;
-			}
-			err = p_cansignal(td, p, sig);
-			if (err == 0) {
-				if (sig)
-					pksignal(p, sig, ksi);
-				ret = err;
-			}
-			else if (ret == ESRCH)
-				ret = err;
-			PROC_UNLOCK(p);
+			killpg1_sendsig(p, false, &arg);
 		}
 		PGRP_UNLOCK(pgrp);
 	}
-	return (ret);
+	MPASS(arg.ret != 0 || arg.found || !arg.sent);
+	if (arg.ret == 0 && !arg.sent)
+		arg.ret = arg.found ? EPERM : ESRCH;
+	return (arg.ret);
 }
 
 #ifndef _SYS_SYSPROTO_H_
@@ -1870,6 +1837,13 @@ struct kill_args {
 int
 sys_kill(struct thread *td, struct kill_args *uap)
 {
+
+	return (kern_kill(td, uap->pid, uap->signum));
+}
+
+int
+kern_kill(struct thread *td, pid_t pid, int signum)
+{
 	ksiginfo_t ksi;
 	struct proc *p;
 	int error;
@@ -1879,38 +1853,38 @@ sys_kill(struct thread *td, struct kill_args *uap)
 	 * The main rationale behind this is that abort(3) is implemented as
 	 * kill(getpid(), SIGABRT).
 	 */
-	if (IN_CAPABILITY_MODE(td) && uap->pid != td->td_proc->p_pid)
+	if (IN_CAPABILITY_MODE(td) && pid != td->td_proc->p_pid)
 		return (ECAPMODE);
 
-	AUDIT_ARG_SIGNUM(uap->signum);
-	AUDIT_ARG_PID(uap->pid);
-	if ((u_int)uap->signum > _SIG_MAXSIG)
+	AUDIT_ARG_SIGNUM(signum);
+	AUDIT_ARG_PID(pid);
+	if ((u_int)signum > _SIG_MAXSIG)
 		return (EINVAL);
 
 	ksiginfo_init(&ksi);
-	ksi.ksi_signo = uap->signum;
+	ksi.ksi_signo = signum;
 	ksi.ksi_code = SI_USER;
 	ksi.ksi_pid = td->td_proc->p_pid;
 	ksi.ksi_uid = td->td_ucred->cr_ruid;
 
-	if (uap->pid > 0) {
+	if (pid > 0) {
 		/* kill single process */
-		if ((p = pfind_any(uap->pid)) == NULL)
+		if ((p = pfind_any(pid)) == NULL)
 			return (ESRCH);
 		AUDIT_ARG_PROCESS(p);
-		error = p_cansignal(td, p, uap->signum);
-		if (error == 0 && uap->signum)
-			pksignal(p, uap->signum, &ksi);
+		error = p_cansignal(td, p, signum);
+		if (error == 0 && signum)
+			pksignal(p, signum, &ksi);
 		PROC_UNLOCK(p);
 		return (error);
 	}
-	switch (uap->pid) {
+	switch (pid) {
 	case -1:		/* broadcast signal */
-		return (killpg1(td, uap->signum, 0, 1, &ksi));
+		return (killpg1(td, signum, 0, 1, &ksi));
 	case 0:			/* signal own process group */
-		return (killpg1(td, uap->signum, 0, 0, &ksi));
+		return (killpg1(td, signum, 0, 0, &ksi));
 	default:		/* negative explicit process group */
-		return (killpg1(td, uap->signum, -uap->pid, 0, &ksi));
+		return (killpg1(td, signum, -pid, 0, &ksi));
 	}
 	/* NOTREACHED */
 }
@@ -1974,21 +1948,35 @@ struct sigqueue_args {
 int
 sys_sigqueue(struct thread *td, struct sigqueue_args *uap)
 {
-	ksigval_union sv;
-
-	memset(&sv, 0, sizeof(sv));
+	union sigval sv;
 #if __has_feature(capabilities)
-	sv.sival_ptr_c = uap->value;
-#else
-	sv.sival_ptr_native = uap->value;
+	union sigval sv2;
 #endif
 
-	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
+	sv.sival_ptr = uap->value;
+#if __has_feature(capabilities)
+	if (uap->pid != td->td_proc->p_pid) {
+		/*
+		 * Cowardly refuse to send capabilities to other
+		 * processes.
+		 *
+		 * XXX-BD: allow untagged capablities between
+		 * CheriABI processess? (Would have to happen in
+		 * delivery code to avoid a race).
+		 */
+		if (cheri_gettag(uap->value))
+			return (EPROT);
+		memset(&sv2, 0, sizeof(sv2));
+		sv2.sival_int = sv.sival_int;
+		sv = sv2;
+	}
+#endif
+
+	return (kern_sigqueue(td, uap->pid, uap->signum, &sv));
 }
 
 int
-kern_sigqueue(struct thread *td, pid_t pid, int signum, ksigval_union *value,
-    int flags)
+kern_sigqueue(struct thread *td, pid_t pid, int signum, union sigval *value)
 {
 	ksiginfo_t ksi;
 	struct proc *p;
@@ -2009,23 +1997,12 @@ kern_sigqueue(struct thread *td, pid_t pid, int signum, ksigval_union *value,
 	error = p_cansignal(td, p, signum);
 	if (error == 0 && signum != 0) {
 		ksiginfo_init(&ksi);
-		ksi.ksi_flags = KSI_SIGQ | flags;
+		ksi.ksi_flags = KSI_SIGQ;
 		ksi.ksi_signo = signum;
 		ksi.ksi_code = SI_QUEUE;
 		ksi.ksi_pid = td->td_proc->p_pid;
 		ksi.ksi_uid = td->td_ucred->cr_ruid;
-		memset(&ksi.ksi_value, 0, sizeof(ksi.ksi_value));
-#ifdef COMPAT_FREEBSD32
-		if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
-			ksi.ksi_value.sival_ptr32 = value->sival_ptr32;
-		else
-#endif
-#ifdef COMPAT_CHERIABI
-		if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-			ksi.ksi_value.sival_ptr_c = value->sival_ptr_c;
-		else
-#endif
-			ksi.ksi_value.sival_ptr_native = value->sival_ptr_native;
+		ksi.ksi_value = *value;
 		error = pksignal(p, ksi.ksi_signo, &ksi);
 	}
 	PROC_UNLOCK(p);
@@ -2212,7 +2189,7 @@ pksignal(struct proc *p, int sig, ksiginfo_t *ksi)
 
 /* Utility function for finding a thread to send signal event to. */
 int
-sigev_findtd(struct proc *p, ksigevent_t *sigev, struct thread **ttd)
+sigev_findtd(struct proc *p, struct sigevent *sigev, struct thread **ttd)
 {
 	struct thread *td;
 
@@ -2359,6 +2336,8 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 		p->p_step = 0;
 		wakeup(&p->p_step);
 	}
+	wakeup_swapper = 0;
+
 	/*
 	 * Some signals have a process-wide effect and a per-thread
 	 * component.  Most processing occurs when the process next
@@ -2461,15 +2440,13 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 		 * the PROCESS runnable, leave it stopped.
 		 * It may run a bit until it hits a thread_suspend_check().
 		 */
-		wakeup_swapper = 0;
 		PROC_SLOCK(p);
 		thread_lock(td);
-		if (TD_ON_SLEEPQ(td) && (td->td_flags & TDF_SINTR))
+		if (TD_CAN_ABORT(td))
 			wakeup_swapper = sleepq_abort(td, intrval);
-		thread_unlock(td);
+		else
+			thread_unlock(td);
 		PROC_SUNLOCK(p);
-		if (wakeup_swapper)
-			kick_proc0();
 		goto out;
 		/*
 		 * Mutexes are short lived. Threads waiting on them will
@@ -2503,8 +2480,6 @@ tdsendsignal(struct proc *p, struct thread *td, int sig, ksiginfo_t *ksi)
 				sigqueue_delete_proc(p, p->p_xsig);
 			} else
 				PROC_SUNLOCK(p);
-			if (wakeup_swapper)
-				kick_proc0();
 			goto out;
 		}
 	} else {
@@ -2525,6 +2500,9 @@ runfast:
 out:
 	/* If we jump here, proc slock should not be owned. */
 	PROC_SLOCK_ASSERT(p, MA_NOTOWNED);
+	if (wakeup_swapper)
+		kick_proc0();
+
 	return (ret);
 }
 
@@ -2537,10 +2515,8 @@ static void
 tdsigwakeup(struct thread *td, int sig, sig_t action, int intrval)
 {
 	struct proc *p = td->td_proc;
-	int prop;
-	int wakeup_swapper;
+	int prop, wakeup_swapper;
 
-	wakeup_swapper = 0;
 	PROC_LOCK_ASSERT(p, MA_OWNED);
 	prop = sigprop(sig);
 
@@ -2596,22 +2572,25 @@ tdsigwakeup(struct thread *td, int sig, sig_t action, int intrval)
 			sched_prio(td, PUSER);
 
 		wakeup_swapper = sleepq_abort(td, intrval);
-	} else {
-		/*
-		 * Other states do nothing with the signal immediately,
-		 * other than kicking ourselves if we are running.
-		 * It will either never be noticed, or noticed very soon.
-		 */
-#ifdef SMP
-		if (TD_IS_RUNNING(td) && td != curthread)
-			forward_signal(td);
-#endif
+		PROC_SUNLOCK(p);
+		if (wakeup_swapper)
+			kick_proc0();
+		return;
 	}
+
+	/*
+	 * Other states do nothing with the signal immediately,
+	 * other than kicking ourselves if we are running.
+	 * It will either never be noticed, or noticed very soon.
+	 */
+#ifdef SMP
+	if (TD_IS_RUNNING(td) && td != curthread)
+		forward_signal(td);
+#endif
+
 out:
 	PROC_SUNLOCK(p);
 	thread_unlock(td);
-	if (wakeup_swapper)
-		kick_proc0();
 }
 
 static int
@@ -2639,12 +2618,13 @@ sig_suspend_threads(struct thread *td, struct proc *p, int sending)
 				 */
 				KASSERT(!TD_IS_SUSPENDED(td2),
 				    ("thread with deferred stops suspended"));
-				if (TD_SBDRY_INTR(td2))
+				if (TD_SBDRY_INTR(td2)) {
 					wakeup_swapper |= sleepq_abort(td2,
 					    TD_SBDRY_ERRNO(td2));
-			} else if (!TD_IS_SUSPENDED(td2)) {
+					continue;
+				}
+			} else if (!TD_IS_SUSPENDED(td2))
 				thread_suspend_one(td2);
-			}
 		} else if (!TD_IS_SUSPENDED(td2)) {
 			if (sending || td != td2)
 				td2->td_flags |= TDF_ASTPENDING;
@@ -3486,7 +3466,7 @@ static void
 vnode_close_locked(struct thread *td, struct vnode *vp)
 {
 
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	vn_close(vp, FWRITE, td->td_ucred, td);
 }
 
@@ -3777,12 +3757,12 @@ coredump(struct thread *td)
 	if (vp->v_type != VREG || VOP_GETATTR(vp, &vattr, cred) != 0 ||
 	    vattr.va_nlink != 1 || (vp->v_vflag & VV_SYSTEM) != 0 ||
 	    vattr.va_uid != cred->cr_uid) {
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		error = EFAULT;
 		goto out;
 	}
 
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 
 	/* Postpone other writers, including core dumps of other processes. */
 	rl_cookie = vn_rangelock_wlock(vp, 0, OFF_MAX);
@@ -3799,7 +3779,7 @@ coredump(struct thread *td)
 		vattr.va_flags = UF_NODUMP;
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	VOP_SETATTR(vp, &vattr, cred);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	PROC_LOCK(p);
 	p->p_acflag |= ACORE;
 	PROC_UNLOCK(p);

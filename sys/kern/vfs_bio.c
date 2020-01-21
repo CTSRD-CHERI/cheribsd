@@ -72,7 +72,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rwlock.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
-#include <sys/sysproto.h>
+#include <sys/syscallsubr.h>
 #include <sys/vmem.h>
 #include <sys/vmmeter.h>
 #include <sys/vnode.h>
@@ -1351,7 +1351,7 @@ bufshutdown(int show_busybufs)
 	 * Sync filesystems for shutdown
 	 */
 	wdog_kern_pat(WD_LASTVAL);
-	sys_sync(curthread, NULL);
+	kern_sync(curthread);
 
 	/*
 	 * With soft updates, some buffers that are
@@ -1378,7 +1378,7 @@ bufshutdown(int show_busybufs)
 		pbusy = nbusy;
 
 		wdog_kern_pat(WD_LASTVAL);
-		sys_sync(curthread, NULL);
+		kern_sync(curthread);
 
 #ifdef PREEMPTION
 		/*
@@ -1392,8 +1392,7 @@ bufshutdown(int show_busybufs)
 		 */
 		for (subiter = 0; subiter < 50 * iter; subiter++) {
 			thread_lock(curthread);
-			mi_switch(SW_VOL, NULL);
-			thread_unlock(curthread);
+			mi_switch(SW_VOL);
 			DELAY(1000);
 		}
 #endif
@@ -3564,7 +3563,7 @@ flushbufqueues(struct vnode *lvp, struct bufdomain *bd, int target,
 			}
 			vn_finished_write(mp);
 			if (unlock)
-				VOP_UNLOCK(vp, 0);
+				VOP_UNLOCK(vp);
 			flushwithdeps += hasdeps;
 			flushed++;
 

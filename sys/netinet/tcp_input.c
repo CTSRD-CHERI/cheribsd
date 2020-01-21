@@ -132,9 +132,9 @@ __FBSDID("$FreeBSD$");
 
 const int tcprexmtthresh = 3;
 
-int tcp_log_in_vain = 0;
-SYSCTL_INT(_net_inet_tcp, OID_AUTO, log_in_vain, CTLFLAG_RW,
-    &tcp_log_in_vain, 0,
+VNET_DEFINE(int, tcp_log_in_vain) = 0;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, log_in_vain, CTLFLAG_VNET | CTLFLAG_RW,
+    &VNET_NAME(tcp_log_in_vain), 0,
     "Log all incoming TCP segments to closed ports");
 
 VNET_DEFINE(int, blackhole) = 0;
@@ -514,7 +514,7 @@ cc_post_recovery(struct tcpcb *tp, struct tcphdr *th)
 	    (tlen <= tp->t_maxseg) &&					\
 	    (V_tcp_delack_enabled || (tp->t_flags & TF_NEEDSYN)))
 
-static void inline
+void inline
 cc_ecnpkt_handler(struct tcpcb *tp, struct tcphdr *th, uint8_t iptos)
 {
 	INP_WLOCK_ASSERT(tp->t_inpcb);
@@ -522,14 +522,15 @@ cc_ecnpkt_handler(struct tcpcb *tp, struct tcphdr *th, uint8_t iptos)
 	if (CC_ALGO(tp)->ecnpkt_handler != NULL) {
 		switch (iptos & IPTOS_ECN_MASK) {
 		case IPTOS_ECN_CE:
-		    tp->ccv->flags |= CCF_IPHDR_CE;
-		    break;
+			tp->ccv->flags |= CCF_IPHDR_CE;
+			break;
 		case IPTOS_ECN_ECT0:
-		    tp->ccv->flags &= ~CCF_IPHDR_CE;
-		    break;
+			/* FALLTHROUGH */
 		case IPTOS_ECN_ECT1:
-		    tp->ccv->flags &= ~CCF_IPHDR_CE;
-		    break;
+			/* FALLTHROUGH */
+		case IPTOS_ECN_NOTECT:
+			tp->ccv->flags &= ~CCF_IPHDR_CE;
+			break;
 		}
 
 		if (th->th_flags & TH_CWR)
@@ -537,15 +538,12 @@ cc_ecnpkt_handler(struct tcpcb *tp, struct tcphdr *th, uint8_t iptos)
 		else
 			tp->ccv->flags &= ~CCF_TCPHDR_CWR;
 
-		if (tp->t_flags & TF_DELACK)
-			tp->ccv->flags |= CCF_DELACK;
-		else
-			tp->ccv->flags &= ~CCF_DELACK;
-
 		CC_ALGO(tp)->ecnpkt_handler(tp->ccv);
 
-		if (tp->ccv->flags & CCF_ACKNOW)
+		if (tp->ccv->flags & CCF_ACKNOW) {
 			tcp_timer_activate(tp, TT_DELACK, tcp_delacktime);
+			tp->t_flags |= TF_ACKNOW;
+		}
 	}
 }
 
@@ -894,8 +892,8 @@ findpcb:
 		 * Log communication attempts to ports that are not
 		 * in use.
 		 */
-		if ((tcp_log_in_vain == 1 && (thflags & TH_SYN)) ||
-		    tcp_log_in_vain == 2) {
+		if ((V_tcp_log_in_vain == 1 && (thflags & TH_SYN)) ||
+		    V_tcp_log_in_vain == 2) {
 			if ((s = tcp_log_vain(NULL, th, (void *)ip, ip6)))
 				log(LOG_INFO, "%s; %s: Connection attempt "
 				    "to closed port\n", s, __func__);

@@ -80,7 +80,7 @@ static void	calcru1(struct proc *p, struct rusage_ext *ruxp,
 		    struct timeval *up, struct timeval *sp);
 static int	donice(struct thread *td, struct proc *chgp, int n);
 static struct uidinfo *uilookup(uid_t uid);
-static void	ruxagg_locked(struct rusage_ext *rux, struct thread *td);
+static void	ruxagg_ext_locked(struct rusage_ext *rux, struct thread *td);
 
 /*
  * Resource controls and accounting.
@@ -876,7 +876,7 @@ rufetchtd(struct thread *td, struct rusage *ru)
 		td->td_incruntime += runtime;
 		PCPU_SET(switchtime, u);
 	}
-	ruxagg(p, td);
+	ruxagg_locked(p, td);
 	*ru = td->td_ru;
 	calcru1(p, &td->td_rux, &ru->ru_utime, &ru->ru_stime);
 }
@@ -1132,11 +1132,9 @@ ruadd(struct rusage *ru, struct rusage_ext *rux, struct rusage *ru2,
  * Aggregate tick counts into the proc's rusage_ext.
  */
 static void
-ruxagg_locked(struct rusage_ext *rux, struct thread *td)
+ruxagg_ext_locked(struct rusage_ext *rux, struct thread *td)
 {
 
-	THREAD_LOCK_ASSERT(td, MA_OWNED);
-	PROC_STATLOCK_ASSERT(td->td_proc, MA_OWNED);
 	rux->rux_runtime += td->td_incruntime;
 	rux->rux_uticks += td->td_uticks;
 	rux->rux_sticks += td->td_sticks;
@@ -1144,16 +1142,25 @@ ruxagg_locked(struct rusage_ext *rux, struct thread *td)
 }
 
 void
-ruxagg(struct proc *p, struct thread *td)
+ruxagg_locked(struct proc *p, struct thread *td)
 {
+	THREAD_LOCK_ASSERT(td, MA_OWNED);
+	PROC_STATLOCK_ASSERT(td->td_proc, MA_OWNED);
 
-	thread_lock(td);
-	ruxagg_locked(&p->p_rux, td);
-	ruxagg_locked(&td->td_rux, td);
+	ruxagg_ext_locked(&p->p_rux, td);
+	ruxagg_ext_locked(&td->td_rux, td);
 	td->td_incruntime = 0;
 	td->td_uticks = 0;
 	td->td_iticks = 0;
 	td->td_sticks = 0;
+}
+
+void
+ruxagg(struct proc *p, struct thread *td)
+{
+
+	thread_lock(td);
+	ruxagg_locked(p, td);
 	thread_unlock(td);
 }
 

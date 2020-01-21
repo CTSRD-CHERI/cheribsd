@@ -196,6 +196,8 @@ device		mmc			# mmc/sd bus
 device		mmcsd			# mmc/sd flash cards
 device		dwmmc
 device		dwmmc_altera
+device		dwmmc_hisi
+device		rk_dwmmc
 device		rk_emmcphy
 
 # Serial (COM) ports
@@ -328,6 +330,9 @@ device		nvmem
 device		regulator
 device		syscon
 device		aw_syscon
+
+# IO Domains
+device		rk_iodomain
 
 # The `bpf' device enables the Berkeley Packet Filter.
 # Be aware of the administrative consequences of enabling this!

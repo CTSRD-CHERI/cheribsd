@@ -59,6 +59,7 @@ __FBSDID("$FreeBSD$");
 #include <machine/md_var.h>
 #include <machine/setjmp.h>
 
+#include <cheri/cheric.h>
 #include <ddb/ddb.h>
 #include <ddb/db_sym.h>
 #include <ddb/db_access.h>
@@ -117,7 +118,10 @@ struct db_variable db_regs[] = {
 	{ "hi",  DB_OFFSET(mulhi),	db_frame },
 	{ "bad", DB_OFFSET(badvaddr),	db_frame },
 	{ "cs",  DB_OFFSET(cause),	db_frame },
+#if !__has_feature(capabilities)
+    /* FIXME: make this work for CHERI */
 	{ "pc",  DB_OFFSET(pc),		db_frame },
+#endif
 };
 struct db_variable *db_eregs = db_regs + nitems(db_regs);
 
@@ -227,6 +231,19 @@ db_write_bytes(vm_offset_t addr, size_t size, char *data)
 	return (ret);
 }
 
+static db_addr_t
+MipsEmulateBranch_addr(db_addr_t pc, int fpucsr)
+{
+
+#if __has_feature(capabilities)
+	/* XXXAR: will not work with narrow pcc bounds */
+	return cheri_getaddress(MipsEmulateBranch(
+	    kdb_frame, cheri_setaddress(cheri_getpcc(), pc), fpucsr, 0));
+#else
+	return (db_addr_t)MipsEmulateBranch(kdb_frame, (trapf_pc_t)(uintptr_t)pc, fpucsr, 0);
+#endif
+}
+
 /*
  *	To do a single step ddb needs to know the next address
  *	that we will get to. It means that we need to find out
@@ -240,7 +257,7 @@ next_instr_address(db_addr_t pc, boolean_t bd)
 {
 	db_addr_t next;
 
-	next = (db_addr_t)MipsEmulateBranch(kdb_frame, pc, 0, 0);
+	next = MipsEmulateBranch_addr(pc, 0);
 	return (next);
 }
 
@@ -345,6 +362,6 @@ branch_taken(int inst, db_addr_t pc)
 
 	/* TBD: when is fsr set */
 	fpucsr = (curthread) ? curthread->td_pcb->pcb_regs.fsr : 0;
-	ra = (db_addr_t)MipsEmulateBranch(kdb_frame, pc, fpucsr, 0);
+	ra = MipsEmulateBranch_addr(pc, fpucsr);
 	return (ra);
 }

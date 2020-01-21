@@ -533,13 +533,15 @@
 312	AUE_NULL	STD	{ int linux_get_robust_list(l_int pid, \
 				    struct linux_robust_list_head **head, l_size_t *len); }
 313	AUE_NULL	STD	{ int linux_splice(void); }
-314	AUE_NULL	STD	{ int linux_sync_file_range(void); }
+314	AUE_NULL	STD	{ int linux_sync_file_range(l_int fd, l_loff_t offset,
+				    l_loff_t nbytes, unsigned int flags); }
 315	AUE_NULL	STD	{ int linux_tee(void); }
 316	AUE_NULL	STD	{ int linux_vmsplice(void); }
 ; Linux 2.6.18:
 317	AUE_NULL	STD	{ int linux_move_pages(void); }
 ; Linux 2.6.19:
-318	AUE_NULL	STD	{ int linux_getcpu(void); }
+318	AUE_NULL	STD	{ int linux_getcpu(l_uint *cpu, l_uint *node,	\
+				    void *cache); }
 319	AUE_NULL	STD	{ int linux_epoll_pwait(l_int epfd, struct epoll_event *events, \
 				    l_int maxevents, l_int timeout, l_sigset_t *mask, \
 				    l_size_t sigsetsize); }

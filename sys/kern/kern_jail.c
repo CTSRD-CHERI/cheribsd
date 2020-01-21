@@ -947,7 +947,7 @@ kern_jail_set(struct thread *td, struct uio *optuio, int flags)
 			vput(root);
 			goto done_free;
 		}
-		VOP_UNLOCK(root, 0);
+		VOP_UNLOCK(root);
 		if (fullpath_disabled) {
 			/* Leave room for a real-root full pathname. */
 			if (len + (path[0] == '/' && strcmp(mypr->pr_path, "/")
@@ -2411,7 +2411,7 @@ do_jail_attach(struct thread *td, struct prison *pr)
 	if ((error = mac_vnode_check_chroot(td->td_ucred, pr->pr_root)))
 		goto e_unlock;
 #endif
-	VOP_UNLOCK(pr->pr_root, 0);
+	VOP_UNLOCK(pr->pr_root);
 	if ((error = pwd_chroot(td, pr->pr_root)))
 		goto e_revert_osd;
 
@@ -2435,7 +2435,7 @@ do_jail_attach(struct thread *td, struct prison *pr)
 	return (0);
 
  e_unlock:
-	VOP_UNLOCK(pr->pr_root, 0);
+	VOP_UNLOCK(pr->pr_root);
  e_revert_osd:
 	/* Tell modules this thread is still in its old jail after all. */
 	(void)osd_jail_call(td->td_ucred->cr_prison, PR_METHOD_ATTACH, td);
@@ -2800,13 +2800,13 @@ prison_check_af(struct ucred *cred, int af)
  * the jail doesn't allow the address family.  IPv4 Address passed in in NBO.
  */
 int
-prison_if(struct ucred *cred, struct sockaddr *sa)
+prison_if(struct ucred *cred, const struct sockaddr *sa)
 {
 #ifdef INET
-	struct sockaddr_in *sai;
+	const struct sockaddr_in *sai;
 #endif
 #ifdef INET6
-	struct sockaddr_in6 *sai6;
+	const struct sockaddr_in6 *sai6;
 #endif
 	int error;
 
@@ -2823,13 +2823,13 @@ prison_if(struct ucred *cred, struct sockaddr *sa)
 	{
 #ifdef INET
 	case AF_INET:
-		sai = (struct sockaddr_in *)sa;
+		sai = (const struct sockaddr_in *)sa;
 		error = prison_check_ip4(cred, &sai->sin_addr);
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
-		sai6 = (struct sockaddr_in6 *)sa;
+		sai6 = (const struct sockaddr_in6 *)sa;
 		error = prison_check_ip6(cred, &sai6->sin6_addr);
 		break;
 #endif

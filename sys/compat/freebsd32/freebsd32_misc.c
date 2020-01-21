@@ -145,8 +145,8 @@ CTASSERT(sizeof(struct freebsd11_stat32) == 96);
 #endif
 CTASSERT(sizeof(struct sigaction32) == 24);
 
-static int freebsd32_kevent_copyout(void *arg, kkevent_t *kevp, int count);
-static int freebsd32_kevent_copyin(void *arg, kkevent_t *kevp, int count);
+static int freebsd32_kevent_copyout(void *arg, struct kevent *kevp, int count);
+static int freebsd32_kevent_copyin(void *arg, struct kevent *kevp, int count);
 static int freebsd32_user_clock_nanosleep(struct thread *td, clockid_t clock_id,
     int flags, const struct timespec32 *ua_rqtp, struct timespec32 *ua_rmtp);
 
@@ -201,7 +201,7 @@ freebsd32_wait6(struct thread *td, struct freebsd32_wait6_args *uap)
 	struct wrusage32 wru32;
 	struct __wrusage wru, *wrup;
 	struct siginfo32 si32;
-	_siginfo_t si, *sip;
+	siginfo_t si, *sip;
 	int error, status;
 
 	if (uap->wrusage != NULL)
@@ -529,7 +529,7 @@ freebsd32_pselect(struct thread *td, struct freebsd32_pselect_args *uap)
  * Copy 'count' items into the destination list pointed to by uap->eventlist.
  */
 static int
-freebsd32_kevent_copyout(void *arg, kkevent_t *kevp, int count)
+freebsd32_kevent_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd32_kevent_args *uap;
 	struct kevent32	ks32[KQ_NEVENTS];
@@ -573,7 +573,7 @@ freebsd32_kevent_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-freebsd32_kevent_copyin(void *arg, kkevent_t *kevp, int count)
+freebsd32_kevent_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd32_kevent_args *uap;
 	struct kevent32	ks32[KQ_NEVENTS];
@@ -653,7 +653,7 @@ freebsd32_kevent(struct thread *td, struct freebsd32_kevent_args *uap)
 
 #ifdef COMPAT_FREEBSD11
 static int
-freebsd32_kevent11_copyout(void *arg, kkevent_t *kevp, int count)
+freebsd32_kevent11_copyout(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_freebsd32_kevent_args *uap;
 	struct kevent32_freebsd11 ks32[KQ_NEVENTS];
@@ -680,7 +680,7 @@ freebsd32_kevent11_copyout(void *arg, kkevent_t *kevp, int count)
  * Copy 'count' items from the list pointed to by uap->changelist.
  */
 static int
-freebsd32_kevent11_copyin(void *arg, kkevent_t *kevp, int count)
+freebsd32_kevent11_copyin(void *arg, struct kevent *kevp, int count)
 {
 	struct freebsd11_freebsd32_kevent_args *uap;
 	struct kevent32_freebsd11 ks32[KQ_NEVENTS];
@@ -2575,7 +2575,7 @@ int freebsd32_ktimer_create(struct thread *td,
     struct freebsd32_ktimer_create_args *uap)
 {
 	struct sigevent32 ev32;
-	ksigevent_t ev, *evp;
+	struct sigevent ev, *evp;
 	int error, id;
 
 	if (uap->evp == NULL) {
@@ -2704,7 +2704,7 @@ freebsd32_thr_suspend(struct thread *td, struct freebsd32_thr_suspend_args *uap)
 }
 
 void
-siginfo_to_siginfo32(const _siginfo_t *src, struct siginfo32 *dst)
+siginfo_to_siginfo32(const siginfo_t *src, struct siginfo32 *dst)
 {
 	bzero(dst, sizeof(*dst));
 	dst->si_signo = src->si_signo;
@@ -2720,7 +2720,7 @@ siginfo_to_siginfo32(const _siginfo_t *src, struct siginfo32 *dst)
 }
 
 static int
-freebsd32_copyout_siginfo(const _siginfo_t *si, void * __capability info)
+freebsd32_copyout_siginfo(const siginfo_t *si, void * __capability info)
 {
 	struct siginfo32 si32;
 
@@ -2739,7 +2739,7 @@ struct freebsd32_sigqueue_args {
 int
 freebsd32_sigqueue(struct thread *td, struct freebsd32_sigqueue_args *uap)
 {
-	ksigval_union sv;
+	union sigval sv;
 
 	/*
 	 * On 32-bit ABIs, sival_int and sival_ptr are the same.
@@ -2752,7 +2752,7 @@ freebsd32_sigqueue(struct thread *td, struct freebsd32_sigqueue_args *uap)
 	bzero(&sv, sizeof(sv));
 	sv.sival_int = uap->value;
 
-	return (kern_sigqueue(td, uap->pid, uap->signum, &sv, 0));
+	return (kern_sigqueue(td, uap->pid, uap->signum, &sv));
 }
 
 int
@@ -2939,6 +2939,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		execpath_len = 0;
 	arginfo = (struct freebsd32_ps_strings *)curproc->p_sysent->
 	    sv_psstrings;
+	imgp->ps_strings = arginfo;
 	if (imgp->proc->p_sysent->sv_sigcode_base == 0)
 		szsigcode = *(imgp->proc->p_sysent->sv_szsigcode);
 	else
@@ -2962,7 +2963,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	if (execpath_len != 0) {
 		destp -= execpath_len;
-		imgp->execpathp = destp;
+		imgp->execpathp = (void *)destp;
 		error = copyout(imgp->execpath, (void *)destp, execpath_len);
 		if (error != 0)
 			return (error);
@@ -2973,7 +2974,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 */
 	arc4rand(canary, sizeof(canary), 0);
 	destp -= sizeof(canary);
-	imgp->canary = destp;
+	imgp->canary = (void *)destp;
 	error = copyout(canary, (void *)destp, sizeof(canary));
 	if (error != 0)
 		return (error);
@@ -2986,7 +2987,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		pagesizes32[i] = (uint32_t)pagesizes[i];
 	destp -= sizeof(pagesizes32);
 	destp = rounddown2(destp, sizeof(uint32_t));
-	imgp->pagesizes = destp;
+	imgp->pagesizes = (void *)destp;
 	error = copyout(pagesizes32, (void *)destp, sizeof(pagesizes32));
 	if (error != 0)
 		return (error);
@@ -3003,9 +3004,12 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 		imgp->sysent->sv_stackgap(imgp, &destp);
 
 	if (imgp->auxargs) {
-		error = imgp->sysent->sv_copyout_auxargs(imgp, &destp);
-		if (error != 0)
-			return (error);
+		/*
+		 * Allocate room on the stack for the ELF auxargs
+		 * array.  It has up to AT_COUNT entries.
+		 */
+		destp -= AT_COUNT * sizeof(Elf32_Auxinfo);
+		destp = rounddown2(destp, sizeof(uint32_t));
 	}
 
 	vectp = (uint32_t *)destp;
@@ -3035,6 +3039,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/*
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
+	imgp->argv = vectp;
 	if (suword32(&arginfo->ps_argvstr, (u_int32_t)(intptr_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
@@ -3054,6 +3059,7 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	if (suword32(vectp++, 0) != 0)
 		return (EFAULT);
 
+	imgp->envv = vectp;
 	if (suword32(&arginfo->ps_envstr, (u_int32_t)(intptr_t)vectp) != 0 ||
 	    suword32(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
@@ -3072,6 +3078,14 @@ freebsd32_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	/* end of vector table is a null pointer */
 	if (suword32(vectp, 0) != 0)
 		return (EFAULT);
+
+	if (imgp->auxargs) {
+		vectp++;
+		error = imgp->sysent->sv_copyout_auxargs(imgp,
+		    (uintptr_t)vectp);
+		if (error != 0)
+			return (error);
+	}
 
 	return (0);
 }
@@ -3132,7 +3146,7 @@ freebsd32_posix_fadvise(struct thread *td,
 }
 
 int
-convert_sigevent32(struct sigevent32 *sig32, ksigevent_t *sig)
+convert_sigevent32(struct sigevent32 *sig32, struct sigevent *sig)
 {
 
 	CP(*sig32, *sig, sigev_notify);
@@ -3145,15 +3159,15 @@ convert_sigevent32(struct sigevent32 *sig32, ksigevent_t *sig)
 	case SIGEV_SIGNAL:
 		CP(*sig32, *sig, sigev_signo);
 		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
-		sig->sigev_value.sival_ptr32 =
-		    sig32->sigev_value.sival_ptr;
+		sig->sigev_value.sival_int =
+		    sig32->sigev_value.sival_int;
 		break;
 	case SIGEV_KEVENT:
 		CP(*sig32, *sig, sigev_notify_kqueue);
 		CP(*sig32, *sig, sigev_notify_kevent_flags);
 		memset(&sig->sigev_value, 0, sizeof(sig->sigev_value));
-		sig->sigev_value.sival_ptr32 =
-		    sig32->sigev_value.sival_ptr;
+		sig->sigev_value.sival_int =
+		    sig32->sigev_value.sival_int;
 		break;
 	default:
 		return (EINVAL);

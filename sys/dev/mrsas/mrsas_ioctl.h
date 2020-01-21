@@ -101,7 +101,7 @@ struct mrsas_iocpacket {
 		u_int8_t raw[MEGAMFI_RAW_FRAME_SIZE];
 		struct mrsas_header hdr;
 	}	frame;
-	struct iovec_native sgl[MAX_IOCTL_SGE];
+	struct iovec sgl[MAX_IOCTL_SGE];
 };
 
 #pragma pack()

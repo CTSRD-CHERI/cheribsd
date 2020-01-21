@@ -78,7 +78,7 @@ get_codesegment(const struct Struct_Obj_Entry *obj) {
 	return obj->text_rodata_cap;
 }
 
-extern dlfunc_t find_external_call_thunk(const Elf_Sym* def, const Obj_Entry* defobj);
+extern dlfunc_t find_external_call_thunk(const Elf_Sym* def, const Obj_Entry* defobj, size_t addend);
 
 static inline bool
 can_use_tight_pcc_bounds(const struct Struct_Obj_Entry *defobj)
@@ -150,7 +150,7 @@ _make_rtld_function_pointer(dlfunc_t target_func) {
  */
 static inline dlfunc_t
 make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
-    bool tight_bounds)
+    bool tight_bounds, size_t addend)
 {
 	const void *ret = get_codesegment(defobj) + def->st_value;
 #ifndef __CHERI_CAPABILITY_TABLE__
@@ -173,6 +173,7 @@ make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 		/* PC-relative ABI needs full DSO bounds */
 		dbg_assert(defobj->cheri_captable_abi == DF_MIPS_CHERI_ABI_PCREL);
 	}
+	ret = cheri_incoffset(ret, addend); // TODO: remove addend support
 	/* All code pointers should be sentries: */
 #if __has_builtin(__builtin_cheri_seal_entry)
 	ret = __builtin_cheri_seal_entry(ret);
@@ -184,18 +185,26 @@ make_code_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj,
 
 /*
  * Create a function pointer that can be called anywhere (i.e. for the PLT ABI
- * this will be a pointer to a trampoline that loads the correct $cgp.
+ * this will be a pointer to a trampoline that loads the correct $cgp).
  */
+
 static inline dlfunc_t
-make_function_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
+make_function_pointer_with_addend(
+    const Elf_Sym *def, const struct Struct_Obj_Entry *defobj, size_t addend)
 {
 	// Add a trampoline if the target ABI is not PCREL
 	if (can_use_tight_pcc_bounds(defobj)) {
-		return find_external_call_thunk(def, defobj);
+		return find_external_call_thunk(def, defobj, addend);
 	} else {
 		/* No need for a function pointer trampoline in the legacy/pcrel ABI */
-		return make_code_pointer(def, defobj, /*tight_bounds=*/false);
+		return make_code_pointer(def, defobj, /*tight_bounds=*/false, addend);
 	}
+}
+
+static inline dlfunc_t
+make_function_pointer(const Elf_Sym *def, const struct Struct_Obj_Entry *defobj)
+{
+	return make_function_pointer_with_addend(def, defobj, /*addend=*/0);
 }
 
 static inline void*

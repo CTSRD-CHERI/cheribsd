@@ -420,7 +420,7 @@ int
 sys_ffclock_setestimate(struct thread *td, struct ffclock_setestimate_args *uap)
 {
 
-	return (kern_ffclock_setestimate(td, __USER_CAP_OBJ(uap->cest)));
+	return (kern_ffclock_setestimate(td, uap->cest));
 }
 
 int
@@ -460,7 +460,7 @@ int
 sys_ffclock_getestimate(struct thread *td, struct ffclock_getestimate_args *uap)
 {
 
-	return (kern_ffclock_getestimate(td, __USER_CAP_OBJ(uap->cest)));
+	return (kern_ffclock_getestimate(td, uap->cest));
 }
 
 int

@@ -91,7 +91,7 @@ struct trapdebug {		/* trap history buffer for debugging */
 	trp->status = x->sr;		\
 	trp->cause = x->cause;		\
 	trp->vadr = x->badvaddr;	\
-	trp->pc = x->pc;		\
+	trp->pc = TRAPF_PC(x);		\
 	trp->sp = x->sp;		\
 	trp->ra = x->ra;		\
 	trp->code = cd;			\
@@ -123,25 +123,6 @@ void MipsTLBModException(void);
 void MipsUserGenException(void);
 void MipsUserIntr(void);
 
-#ifdef TRAP_DEBUG
-extern int trap_debug;
-#endif
-
-#ifdef CHERI_PURECAP_KERNEL
-typedef uintptr_t trap_return_t;
-
-#define trap_return(frame)						\
-	(trap_return_t)((cheri_getsealed(frame->pcc)) ?			\
-	frame->pcc : cheri_setoffset(frame->pcc, frame->pc))
-
-#else
-typedef register_t trap_return_t;
-
-#define trap_return(frame) frame->pc
-#endif
-
-trap_return_t trap(struct trapframe *);
-
-#endif /* ! _LOCORE */
+trapf_pc_t trap(struct trapframe *);
 
 #endif /* !_MACHINE_TRAP_H_ */

@@ -71,6 +71,9 @@ __FBSDID("$FreeBSD$");
 #include <sys/syslog.h>
 #include <sys/eventhandler.h>
 #include <sys/user.h>
+#ifdef __ELF_CHERI
+#include <sys/vdso.h>
+#endif
 
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -79,6 +82,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 #include <vm/vm_object.h>
 #include <vm/vm_extern.h>
+
+#ifdef __ELF_CHERI
+#include <cheri/cheric.h>
+#endif
 
 #include <machine/elf.h>
 #include <machine/md_var.h>
@@ -605,7 +612,7 @@ __elfN(map_insert)(struct image_params *imgp, vm_map_t map, vm_object_t object,
 		    (object != NULL ? MAP_VN_EXEC : 0));
 		if (rv != KERN_SUCCESS) {
 			locked = VOP_ISLOCKED(imgp->vp);
-			VOP_UNLOCK(imgp->vp, 0);
+			VOP_UNLOCK(imgp->vp);
 			vm_object_deallocate(object);
 			vn_lock(imgp->vp, locked | LK_RETRY);
 			return (rv);
@@ -1038,7 +1045,7 @@ __elfN(get_interp)(struct image_params *imgp, const Elf_Phdr *phdr,
 		 */
 		interp = malloc(interp_name_len + 1, M_TEMP, M_NOWAIT);
 		if (interp == NULL) {
-			VOP_UNLOCK(imgp->vp, 0);
+			VOP_UNLOCK(imgp->vp);
 			interp = malloc(interp_name_len + 1, M_TEMP, M_WAITOK);
 			vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		}
@@ -1259,7 +1266,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 * The VV_TEXT flag prevents modifications to the executable while
 	 * the vnode is unlocked.
 	 */
-	VOP_UNLOCK(imgp->vp, 0);
+	VOP_UNLOCK(imgp->vp);
 
 	/*
 	 * Decide whether to enable randomization of user mappings.
@@ -1348,7 +1355,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	imgp->interp_end = 0;
 
 	if (interp != NULL) {
-		VOP_UNLOCK(imgp->vp, 0);
+		VOP_UNLOCK(imgp->vp);
 		if ((map->flags & MAP_ASLR) != 0) {
 			/* Assume that interpeter fits into 1/4 of AS */
 			maxv1 = maxv / 2 + addr / 2;
@@ -1369,7 +1376,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	 */
 	elf_auxargs = malloc(sizeof(Elf_Auxargs), M_TEMP, M_NOWAIT);
 	if (elf_auxargs == NULL) {
-		VOP_UNLOCK(imgp->vp, 0);
+		VOP_UNLOCK(imgp->vp);
 		elf_auxargs = malloc(sizeof(Elf_Auxargs), M_TEMP, M_WAITOK);
 		vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 	}
@@ -1399,8 +1406,69 @@ ret:
 
 #define	suword __CONCAT(suword, __ELF_WORD_SIZE)
 
+#ifdef __ELF_CHERI
+static void * __capability
+prog_cap(struct image_params *imgp, uint64_t perms)
+{
+	vaddr_t prog_base;
+	ssize_t prog_len;
+
+	prog_base = imgp->start_addr;
+	prog_len = imgp->end_addr - prog_base;
+
+	/* Ensure program base and length are representable. */
+	prog_base = CHERI_REPRESENTABLE_BASE(prog_base, prog_len);
+	prog_len = CHERI_REPRESENTABLE_LENGTH(prog_len);
+	KASSERT(prog_len != 0, ("prog_len overflowed: %ld",
+	    (long)(imgp->end_addr - imgp->start_addr)));
+
+	return (cheri_capability_build_user_rwx(perms, prog_base, prog_len,
+	    imgp->start_addr - prog_base));
+}
+
+static void * __capability
+interp_cap(struct image_params *imgp, Elf_Auxargs *args, uint64_t perms)
+{
+	vaddr_t interp_base;
+	ssize_t interp_len;
+
+	interp_base = args->base;
+	interp_len = imgp->interp_end - interp_base;
+
+	/* Ensure rtld base and length are representable. */
+	interp_base = CHERI_REPRESENTABLE_BASE(interp_base, interp_len);
+	interp_len = CHERI_REPRESENTABLE_LENGTH(interp_len);
+	KASSERT(interp_len != 0, ("interp_len overflowed: %ld",
+	    (long)(imgp->end_addr - imgp->start_addr)));
+
+	return (cheri_capability_build_user_rwx(perms, interp_base, interp_len,
+	    args->base - interp_base));
+}
+
+static void * __capability
+timekeep_cap(struct image_params *imgp)
+{
+	vaddr_t timekeep_base;
+	size_t timekeep_len;
+
+	timekeep_base = imgp->sysent->sv_timekeep_base;
+	timekeep_len = sizeof(struct vdso_timekeep) +
+	    sizeof(struct vdso_timehands) * VDSO_TH_NUM;
+
+	/* These are sub-page so should be representable as-is. */
+	KASSERT(timekeep_base == CHERI_REPRESENTABLE_BASE(timekeep_base,
+	    timekeep_len), ("timekeep_base needs rounding"));
+	KASSERT(timekeep_len == CHERI_REPRESENTABLE_LENGTH(timekeep_len),
+	    ("timekeep_len needs rounding"));
+
+	/* XXX: Read-only? */
+	return (cheri_capability_build_user_rwx(CHERI_CAP_USER_DATA_PERMS,
+	    timekeep_base, timekeep_len, 0));
+}
+#endif
+
 int
-__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t *base)
+__elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
 #ifdef COMPAT_FREEBSD64
@@ -1408,7 +1476,9 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t *base)
 #else
 	Elf_Auxinfo *argarray, *pos;
 #endif
-	u_long auxlen;
+#ifdef __ELF_CHERI
+	void * __capability exec_base;
+#endif
 	int error;
 
 	argarray = pos = malloc(AT_COUNT * sizeof(*pos), M_TEMP,
@@ -1416,30 +1486,62 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t *base)
 
 	if (args->execfd != -1)
 		AUXARGS_ENTRY(pos, AT_EXECFD, args->execfd);
+#ifdef __ELF_CHERI
+	/*
+	 * AT_ENTRY gives an executable capability for the whole
+	 * program and AT_PHDR a writable one.  RTLD is reponsible for
+	 * setting bounds.
+	 */
+	AUXARGS_ENTRY_PTR(pos, AT_PHDR, cheri_setaddress(prog_cap(imgp,
+	    CHERI_CAP_USER_DATA_PERMS), args->phdr));
+#else
 	AUXARGS_ENTRY(pos, AT_PHDR, args->phdr);
+#endif
 	AUXARGS_ENTRY(pos, AT_PHENT, args->phent);
 	AUXARGS_ENTRY(pos, AT_PHNUM, args->phnum);
 	AUXARGS_ENTRY(pos, AT_PAGESZ, args->pagesz);
 	AUXARGS_ENTRY(pos, AT_FLAGS, args->flags);
+#ifdef __ELF_CHERI
+	AUXARGS_ENTRY_PTR(pos, AT_ENTRY, cheri_setaddress(prog_cap(imgp,
+	    CHERI_CAP_USER_DATA_PERMS | CHERI_CAP_USER_CODE_PERMS),
+	    args->entry));
+
+	/*
+	 * XXX: AT_BASE is both writable and executable to permit textrel
+	 * fixups.
+	 */
+	if (imgp->interp_end == 0)
+		exec_base = prog_cap(imgp, CHERI_CAP_USER_DATA_PERMS |
+		    CHERI_CAP_USER_CODE_PERMS);
+	else
+		exec_base = interp_cap(imgp, args, CHERI_CAP_USER_DATA_PERMS |
+		    CHERI_CAP_USER_CODE_PERMS);
+	AUXARGS_ENTRY_PTR(pos, AT_BASE, cheri_setaddress(exec_base,
+	    args->base));
+#else
 	AUXARGS_ENTRY(pos, AT_ENTRY, args->entry);
 	AUXARGS_ENTRY(pos, AT_BASE, args->base);
+#endif
 	AUXARGS_ENTRY(pos, AT_EHDRFLAGS, args->hdr_eflags);
 	if (imgp->execpathp != 0)
-		AUXARGS_ENTRY(pos, AT_EXECPATH, imgp->execpathp);
+		AUXARGS_ENTRY_PTR(pos, AT_EXECPATH, imgp->execpathp);
 	AUXARGS_ENTRY(pos, AT_OSRELDATE,
 	    imgp->proc->p_ucred->cr_prison->pr_osreldate);
 	if (imgp->canary != 0) {
-		AUXARGS_ENTRY(pos, AT_CANARY, imgp->canary);
+		AUXARGS_ENTRY_PTR(pos, AT_CANARY, imgp->canary);
 		AUXARGS_ENTRY(pos, AT_CANARYLEN, imgp->canarylen);
 	}
 	AUXARGS_ENTRY(pos, AT_NCPUS, mp_ncpus);
 	if (imgp->pagesizes != 0) {
-		AUXARGS_ENTRY(pos, AT_PAGESIZES, imgp->pagesizes);
+		AUXARGS_ENTRY_PTR(pos, AT_PAGESIZES, imgp->pagesizes);
 		AUXARGS_ENTRY(pos, AT_PAGESIZESLEN, imgp->pagesizeslen);
 	}
 	if (imgp->sysent->sv_timekeep_base != 0) {
-		AUXARGS_ENTRY(pos, AT_TIMEKEEP,
-		    imgp->sysent->sv_timekeep_base);
+#ifdef __ELF_CHERI
+		AUXARGS_ENTRY_PTR(pos, AT_TIMEKEEP, timekeep_cap(imgp));
+#else
+		AUXARGS_ENTRY(pos, AT_TIMEKEEP, imgp->sysent->sv_timekeep_base);
+#endif
 	}
 	AUXARGS_ENTRY(pos, AT_STACKPROT, imgp->sysent->sv_shared_page_obj
 	    != NULL && imgp->stack_prot != 0 ? imgp->stack_prot :
@@ -1448,29 +1550,35 @@ __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintptr_t *base)
 		AUXARGS_ENTRY(pos, AT_HWCAP, *imgp->sysent->sv_hwcap);
 	if (imgp->sysent->sv_hwcap2 != NULL)
 		AUXARGS_ENTRY(pos, AT_HWCAP2, *imgp->sysent->sv_hwcap2);
+	AUXARGS_ENTRY(pos, AT_ARGC, imgp->args->argc);
+	AUXARGS_ENTRY_PTR(pos, AT_ARGV, imgp->argv);
+	AUXARGS_ENTRY(pos, AT_ENVC, imgp->args->envc);
+	AUXARGS_ENTRY_PTR(pos, AT_ENVV, imgp->envv);
+	AUXARGS_ENTRY_PTR(pos, AT_PS_STRINGS, imgp->ps_strings);
 	AUXARGS_ENTRY(pos, AT_NULL, 0);
 
 	free(imgp->auxargs, M_TEMP);
 	imgp->auxargs = NULL;
 	KASSERT(pos - argarray <= AT_COUNT, ("Too many auxargs"));
 
-	auxlen = sizeof(*argarray) * (pos - argarray);
-	*base -= auxlen;
-	error = copyout(argarray, (void *)*base, auxlen);
+	error = copyoutcap(argarray, (void * __capability)base,
+	    sizeof(*argarray) * AT_COUNT);
 	free(argarray, M_TEMP);
 	return (error);
 }
 
 int
-__elfN(freebsd_fixup)(uintptr_t *stack_base, struct image_params *imgp)
+__elfN(freebsd_fixup)(uintcap_t *stack_base, struct image_params *imgp)
 {
-	Elf_Addr *base;
+#ifndef __ELF_CHERI
+	Elf_Addr * __capability base;
 
-	base = (Elf_Addr *)*stack_base;
+	base = (Elf_Addr * __capability)*stack_base;
 	base--;
-	if (suword(base, imgp->args->argc) == -1)
+	if (suword_c(base, imgp->args->argc) == -1)
 		return (EFAULT);
-	*stack_base = (uintptr_t)base;
+	*stack_base = (uintcap_t)base;
+#endif
 	return (0);
 }
 
@@ -2359,8 +2467,8 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 	int structsize;
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 	struct ptrace_lwpinfo32 pl;
-#elif defined(__ELF_CHERI)
-	struct ptrace_lwpinfo_c pl;
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+	struct ptrace_lwpinfo64 pl;
 #else
 	struct ptrace_lwpinfo pl;
 #endif
@@ -2381,14 +2489,10 @@ __elfN(note_ptlwpinfo)(void *arg, struct sbuf *sb, size_t *sizep)
 			pl.pl_flags |= PL_FLAG_SI;
 #if defined(COMPAT_FREEBSD32) && __ELF_WORD_SIZE == 32
 			siginfo_to_siginfo32(&td->td_si, &pl.pl_siginfo);
-#elif defined(__ELF_CHERI)
-			_Static_assert(
-			    sizeof(pl.pl_siginfo) == sizeof(td->td_si),
-			    "_siginfo_t and siginfo_c mismatch");
-			memcpy(&pl.pl_siginfo, &td->td_si,
-			    sizeof(pl.pl_siginfo));
+#elif defined(COMPAT_FREEBSD64) && __ELF_WORD_SIZE == 64 && !defined(__ELF_CHERI)
+			siginfo_to_siginfo64(&td->td_si, &pl.pl_siginfo);
 #else
-			memcpy(&pl.pl_siginfo, &td->td_si, sizeof(pl.pl_siginfo));
+			pl.pl_siginfo = td->td_si;
 #endif
 		}
 		strcpy(pl.pl_tdname, td->td_name);
@@ -2691,7 +2795,7 @@ __elfN(parse_notes)(struct image_params *imgp, Elf_Note *checknote,
 	    pnote->p_filesz > PAGE_SIZE - pnote->p_offset) {
 		buf = malloc(pnote->p_filesz, M_TEMP, M_NOWAIT);
 		if (buf == NULL) {
-			VOP_UNLOCK(imgp->vp, 0);
+			VOP_UNLOCK(imgp->vp);
 			buf = malloc(pnote->p_filesz, M_TEMP, M_WAITOK);
 			vn_lock(imgp->vp, LK_SHARED | LK_RETRY);
 		}

@@ -39,6 +39,13 @@
 
 #define	AUXARGS_ENTRY(pos, id, val) \
     {(pos)->a_type = (id); (pos)->a_un.a_val = (val); (pos)++;}
+#if __has_feature(capabilities) && !defined(__ELF_CHERI)
+#define	AUXARGS_ENTRY_PTR(pos, id, ptr) \
+    {(pos)->a_type = (id); (pos)->a_un.a_val = (__cheri_addr vaddr_t)(ptr); (pos)++;}
+#else
+#define	AUXARGS_ENTRY_PTR(pos, id, ptr) \
+    {(pos)->a_type = (id); (pos)->a_un.a_ptr = (ptr); (pos)++;}
+#endif
 
 struct image_params;
 struct thread;
@@ -95,11 +102,11 @@ __ElfType(Brandinfo);
 int	__elfN(brand_inuse)(Elf_Brandinfo *entry);
 int	__elfN(insert_brand_entry)(Elf_Brandinfo *entry);
 int	__elfN(remove_brand_entry)(Elf_Brandinfo *entry);
-int	__elfN(freebsd_fixup)(uintptr_t *, struct image_params *);
+int	__elfN(freebsd_fixup)(uintcap_t *, struct image_params *);
 int	__elfN(coredump)(struct thread *, struct vnode *, off_t, int);
 size_t	__elfN(populate_note)(int, void *, void *, size_t, void **);
 void	__elfN(stackgap)(struct image_params *, uintptr_t *);
-int	__elfN(freebsd_copyout_auxargs)(struct image_params *, uintptr_t *);
+int	__elfN(freebsd_copyout_auxargs)(struct image_params *, uintcap_t);
 
 /* Machine specific function to dump per-thread information. */
 void	__elfN(dump_thread)(struct thread *, void *, size_t *);

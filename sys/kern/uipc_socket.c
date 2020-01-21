@@ -2840,7 +2840,7 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 	sbintime_t val;
 	uint32_t val32;
 #ifdef MAC
-	kmac_t extmac;
+	struct mac extmac;
 #endif
 
 	CURVNET_SET(so->so_vnet);
@@ -2992,21 +2992,21 @@ sosetopt(struct socket *so, struct sockopt *sopt)
 				error = EOPNOTSUPP;
 			else
 #endif
-#ifdef COMPAT_CHERIABI
-			if (SV_CURPROC_FLAG(SV_CHERI)) {
-				sopt->sopt_dir = SOPT_SETCAP;
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-				sopt->sopt_dir = SOPT_SET;
-			} else
-#endif
-			{
-				struct mac_native tmpmac;
+#ifdef COMPAT_FREEBSD64
+			if (!SV_CURPROC_FLAG(SV_CHERI)) {
+				struct mac64 tmpmac;
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
 				extmac.m_string = __USER_CAP(tmpmac.m_string,
 				    tmpmac.m_buflen);
+			} else
+#endif
+			{
+				sopt->sopt_dir = SOPT_SETCAP;
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_SET;
 			}
 			if (error)
 				goto bad;
@@ -3094,7 +3094,7 @@ sogetopt(struct socket *so, struct sockopt *sopt)
 	struct	linger l;
 	struct	timeval tv;
 #ifdef MAC
-	kmac_t extmac;
+	struct mac extmac;
 #endif
 
 	CURVNET_SET(so->so_vnet);
@@ -3200,21 +3200,21 @@ integer:
 				error = EOPNOTSUPP;
 			else
 #endif
-#ifdef COMPAT_CHERIABI
-			if (SV_CURPROC_FLAG(SV_CHERI)) {
-				sopt->sopt_dir = SOPT_GETCAP;
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-				sopt->sopt_dir = SOPT_GET;
-			} else
-#endif
-			{
-				struct mac_native tmpmac;
+#ifdef COMPAT_FREEBSD64
+			if (!SV_CURPROC_FLAG(SV_CHERI)) {
+				struct mac64 tmpmac;
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
 				extmac.m_string = __USER_CAP(tmpmac.m_string,
 				    tmpmac.m_buflen);
+			} else
+#endif
+			{
+				sopt->sopt_dir = SOPT_GETCAP;
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_GET;
 			}
 			if (error)
 				goto bad;
@@ -3235,21 +3235,21 @@ integer:
 				error = EOPNOTSUPP;
 			else
 #endif
-#ifdef COMPAT_CHERIABI
-			if (SV_CURPROC_FLAG(SV_CHERI)) {
-				sopt->sopt_dir = SOPT_GETCAP;
-				error = sooptcopyin(sopt, &extmac,
-				    sizeof extmac, sizeof extmac);
-				sopt->sopt_dir = SOPT_GET;
-			} else
-#endif
-			{
-				struct mac_native tmpmac;
+#ifdef COMPAT_FREEBSD64
+			if (!SV_CURPROC_FLAG(SV_CHERI)) {
+				struct mac64 tmpmac;
 				error = sooptcopyin(sopt, &tmpmac,
 				    sizeof tmpmac, sizeof tmpmac);
 				extmac.m_buflen = tmpmac.m_buflen;
 				extmac.m_string = __USER_CAP(tmpmac.m_string,
 				    tmpmac.m_buflen);
+			} else
+#endif
+			{
+				sopt->sopt_dir = SOPT_GETCAP;
+				error = sooptcopyin(sopt, &extmac,
+				    sizeof extmac, sizeof extmac);
+				sopt->sopt_dir = SOPT_GET;
 			}
 			if (error)
 				goto bad;

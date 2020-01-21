@@ -96,8 +96,7 @@
 static __always_inline inline void * __capability
 cheri_copyaddress(const void * __capability dst, const void * __capability src)
 {
-	return (cheri_incoffset(dst,
-	    (const char* __capability)src - (const char* __capability)dst));
+	return (cheri_setaddress(dst, cheri_getaddress(src)));
 }
 
 /* Get the top of a capability (i.e. one byte past the last accessible one) */
@@ -353,14 +352,11 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 
 /* Turn on the checking by default for now (until we have fixed everything)*/
 #define __check_low_ptr_bits_assignment
-#if defined(_KERNEL) /* Don't pull in assert.h when building the kernel */
+#if defined(_KERNEL) || !defined(assert) /* Don't pull in assert.h when building the kernel */
 #define _cheri_bits_assert(e) (void)0
 #endif
 #ifdef __check_low_ptr_bits_assignment
 #ifndef _cheri_bits_assert
-#ifndef assert
-#include <assert.h>
-#endif
 #define _cheri_bits_assert(e) assert(e)
 #endif
 #define __runtime_assert_sensible_low_bits(bits)                               \

@@ -258,15 +258,16 @@ linux_synchronize_rcu_cb(ck_epoch_t *epoch __unused, ck_epoch_record_t *epoch_re
 			/* set new thread priority */
 			sched_prio(td, prio);
 			/* task switch */
-			mi_switch(SW_VOL | SWT_RELINQUISH, NULL);
-
+			mi_switch(SW_VOL | SWT_RELINQUISH);
 			/*
-			 * Release the thread lock while yielding to
-			 * allow other threads to acquire the lock
-			 * pointed to by TDQ_LOCKPTR(td). Else a
-			 * deadlock like situation might happen.
+			 * It is important the thread lock is dropped
+			 * while yielding to allow other threads to
+			 * acquire the lock pointed to by
+			 * TDQ_LOCKPTR(td). Currently mi_switch() will
+			 * unlock the thread lock before
+			 * returning. Else a deadlock like situation
+			 * might happen.
 			 */
-			thread_unlock(td);
 			thread_lock(td);
 		}
 	} else {

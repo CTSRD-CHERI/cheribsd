@@ -447,7 +447,7 @@ cpu_reset(void)
 	if (smp_started) {
 		map = all_cpus;
 		CPU_CLR(PCPU_GET(cpuid), &map);
-		CPU_NAND(&map, &stopped_cpus);
+		CPU_ANDNOT(&map, &stopped_cpus);
 		if (!CPU_EMPTY(&map)) {
 			printf("cpu_reset: Stopping other CPUs\n");
 			stop_cpus(map);
@@ -1254,8 +1254,7 @@ x86_taa_recalculate(void)
 	/* Check to see what mitigation options the CPU gives us */
 	if (cpu_ia32_arch_caps & IA32_ARCH_CAP_TAA_NO) {
 		/* CPU is not suseptible to TAA */
-		taa_need = TAA_NONE;
-		taa_state = TAA_TAA_UC;
+		taa_need = TAA_TAA_UC;
 	} else if (cpu_ia32_arch_caps & IA32_ARCH_CAP_TSX_CTRL) {
 		/*
 		 * CPU can turn off TSX.  This is the next best option

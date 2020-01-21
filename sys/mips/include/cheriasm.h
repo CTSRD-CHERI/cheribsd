@@ -361,6 +361,8 @@
  * to $ddc later.  Unlike kernel context switches, we both save and restore
  * the capability cause register.
  *
+ * Note: EPCC is saved last so CHERI_REG_KSCRATCH will contain $epcc
+ *
  * XXXRW: We should in fact also do this for the kernel version?
  */
 #define	SAVE_CREGS_TO_PCB(pcb, treg)					\
@@ -398,13 +400,14 @@
 	/* Note we save KR2C here, so later we can use it */		\
 	SAVE_U_PCB_CREG(CHERI_REG_SEC0, DDC, pcb);			\
 	/* Save special registers after KSCRATCH (C27) */		\
-	CGetEPCC	CHERI_REG_KSCRATCH;				\
-	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);			\
 	/* User DDC is saved in $kr2c. */				\
 	CGetKR2C	CHERI_REG_KSCRATCH;				\
 	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, DDC, pcb);			\
 	cgetcause	treg;						\
 	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)
+	/* EPCC is saved last so that it can be read from KSCRATCH */	\
+	CGetEPCC	CHERI_REG_KSCRATCH;				\
+	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb)
 
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
 	/* Restore special registers before KSCRATCH (C27) */		\
@@ -437,7 +440,7 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
-	/* Wait to restore KSCRATCH (C27) until after EPCC */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
@@ -446,16 +449,6 @@
 	csetcause	treg
 
 #endif /* ! CHERI_PURECAP_KERNEL */
-
-#define RESTORE_EPCC(capreg, pc_vaddr, tmpreg)					\
-	/* Do not attempt to modify EPCC if it is already correct. */		\
-	/* This is needed in case it is a sentry (e.g. for signal handlers) */	\
-	cgetoffset tmpreg, capreg;						\
-	/* update the offset of EPCC to the return pc if different */		\
-	beq tmpreg, pc_vaddr, 12345f; nop;					\
-	csetoffset capreg, capreg, pc_vaddr;					\
-	12345:									\
-	csetepcc capreg;
 
 /*
  * Macros saving capability state to, and restoring it from, voluntary kernel

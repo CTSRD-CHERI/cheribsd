@@ -24,7 +24,7 @@ CFLAGS+=	-I${LLVM_SRCS}/lib/Target/${arch}
 . endif
 .endfor
 
-SRCDIR=		lib
+SRCDIR=		llvm/lib
 
 # Explanation of different SRCS variants below:
 # SRCS_MIN:	always required, even for bootstrap
@@ -1046,6 +1046,7 @@ SRCS_MIN+=	Target/ARM/Utils/ARMBaseInfo.cpp
 .endif # MK_LLVM_TARGET_ARM
 .if ${MK_LLVM_TARGET_BPF} != "no"
 SRCS_MIN+=	Target/BPF/AsmParser/BPFAsmParser.cpp
+SRCS_MIN+=	Target/BPF/BPFAbstractMemberAccess.cpp
 SRCS_MIN+=	Target/BPF/BPFAsmPrinter.cpp
 SRCS_MIN+=	Target/BPF/BPFFrameLowering.cpp
 SRCS_MIN+=	Target/BPF/BPFISelDAGToDAG.cpp
@@ -1054,6 +1055,7 @@ SRCS_MIN+=	Target/BPF/BPFInstrInfo.cpp
 SRCS_MIN+=	Target/BPF/BPFMCInstLower.cpp
 SRCS_MIN+=	Target/BPF/BPFMIChecking.cpp
 SRCS_MIN+=	Target/BPF/BPFMIPeephole.cpp
+SRCS_MIN+=	Target/BPF/BPFMISimplifyPatchable.cpp
 SRCS_MIN+=	Target/BPF/BPFRegisterInfo.cpp
 SRCS_MIN+=	Target/BPF/BPFSelectionDAGInfo.cpp
 SRCS_MIN+=	Target/BPF/BPFSubtarget.cpp

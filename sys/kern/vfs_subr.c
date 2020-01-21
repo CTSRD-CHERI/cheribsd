@@ -141,9 +141,9 @@ static int	v_inval_buf_range_locked(struct vnode *vp, struct bufobj *bo,
 
 /*
  * Number of vnodes in existence.  Increased whenever getnewvnode()
- * allocates a new vnode, decreased in vdropl() for VI_DOOMED vnode.
+ * allocates a new vnode, decreased in vdropl() for VIRF_DOOMED vnode.
  */
-static unsigned long	numvnodes;
+static u_long __exclusive_cache_line numvnodes;
 
 SYSCTL_ULONG(_vfs, OID_AUTO, numvnodes, CTLFLAG_RD, &numvnodes, 0,
     "Number of vnodes in existence");
@@ -208,6 +208,10 @@ static counter_u64_t recycles_count;
 SYSCTL_COUNTER_U64(_vfs, OID_AUTO, recycles, CTLFLAG_RD, &recycles_count,
     "Number of vnodes recycled to meet vnode cache targets");
 
+static counter_u64_t recycles_free_count;
+SYSCTL_COUNTER_U64(_vfs, OID_AUTO, recycles_free, CTLFLAG_RD, &recycles_free_count,
+    "Number of free vnodes recycled to meet vnode cache targets");
+
 /*
  * Various variables used for debugging the new implementation of
  * reassignbuf().
@@ -217,10 +221,9 @@ static int reassignbufcalls;
 SYSCTL_INT(_vfs, OID_AUTO, reassignbufcalls, CTLFLAG_RW | CTLFLAG_STATS,
     &reassignbufcalls, 0, "Number of calls to reassignbuf");
 
-static counter_u64_t free_owe_inact;
-SYSCTL_COUNTER_U64(_vfs, OID_AUTO, free_owe_inact, CTLFLAG_RD, &free_owe_inact,
-    "Number of times free vnodes kept on active list due to VFS "
-    "owing inactivation");
+static counter_u64_t deferred_inact;
+SYSCTL_COUNTER_U64(_vfs, OID_AUTO, deferred_inact, CTLFLAG_RD, &deferred_inact,
+    "Number of times inactive processing was deferred");
 
 /* To keep more than one thread at a time from running vfs_getnewfsid */
 static struct mtx mntid_mtx;
@@ -231,7 +234,7 @@ static struct mtx mntid_mtx;
  *	numvnodes
  *	freevnodes
  */
-static struct mtx vnode_free_list_mtx;
+static struct mtx __exclusive_cache_line vnode_free_list_mtx;
 
 /* Publicly exported FS */
 struct nfs_public nfs_pub;
@@ -371,7 +374,7 @@ sysctl_try_reclaim_vnode(SYSCTL_HANDLER_ARGS)
 		goto out;
 	vp = nd.ni_vp;
 
-	if ((vp->v_iflag & VI_DOOMED) != 0) {
+	if (VN_IS_DOOMED(vp)) {
 		/*
 		 * This vnode is being recycled.  Return != 0 to let the caller
 		 * know that the sysctl had no effect.  Return EAGAIN because a
@@ -417,7 +420,7 @@ sysctl_ftry_reclaim_vnode(SYSCTL_HANDLER_ARGS)
 
 	counter_u64_add(recycles_count, 1);
 	vgone(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 drop:
 	fdrop(fp, td);
 	return (error);
@@ -462,6 +465,28 @@ PCTRIE_DEFINE(BUF, buf, b_lblkno, buf_trie_alloc, buf_trie_free);
 #ifndef	MAXVNODES_MAX
 #define	MAXVNODES_MAX	(512 * 1024 * 1024 / 64)	/* 8M */
 #endif
+
+static MALLOC_DEFINE(M_VNODE_MARKER, "vnodemarker", "vnode marker");
+
+static struct vnode *
+vn_alloc_marker(struct mount *mp)
+{
+	struct vnode *vp;
+
+	vp = malloc(sizeof(struct vnode), M_VNODE_MARKER, M_WAITOK | M_ZERO);
+	vp->v_type = VMARKER;
+	vp->v_mount = mp;
+
+	return (vp);
+}
+
+static void
+vn_free_marker(struct vnode *vp)
+{
+
+	MPASS(vp->v_type == VMARKER);
+	free(vp, M_VNODE_MARKER);
+}
 
 /*
  * Initialize a vnode as it first enters the zone.
@@ -585,7 +610,8 @@ vntblinit(void *dummy __unused)
 
 	vnodes_created = counter_u64_alloc(M_WAITOK);
 	recycles_count = counter_u64_alloc(M_WAITOK);
-	free_owe_inact = counter_u64_alloc(M_WAITOK);
+	recycles_free_count = counter_u64_alloc(M_WAITOK);
+	deferred_inact = counter_u64_alloc(M_WAITOK);
 
 	/*
 	 * Initialize the filesystem syncer.
@@ -1037,7 +1063,7 @@ vlrureclaim(struct mount *mp, bool reclaim_nc_src, int trigger)
 		if (vp->v_usecount ||
 		    (!reclaim_nc_src && !LIST_EMPTY(&vp->v_cache_src)) ||
 		    ((vp->v_iflag & VI_FREE) != 0) ||
-		    (vp->v_iflag & VI_DOOMED) != 0 || (vp->v_object != NULL &&
+		    VN_IS_DOOMED(vp) || (vp->v_object != NULL &&
 		    vp->v_object->resident_page_count > trigger)) {
 			VI_UNLOCK(vp);
 			goto next_iter;
@@ -1053,7 +1079,7 @@ vlrureclaim(struct mount *mp, bool reclaim_nc_src, int trigger)
 		 * v_usecount may have been bumped after VOP_LOCK() dropped
 		 * the vnode interlock and before it was locked again.
 		 *
-		 * It is not necessary to recheck VI_DOOMED because it can
+		 * It is not necessary to recheck VIRF_DOOMED because it can
 		 * only be set by another thread that holds both the vnode
 		 * lock and vnode interlock.  If another thread has the
 		 * vnode lock before we get to VOP_LOCK() and obtains the
@@ -1063,18 +1089,17 @@ vlrureclaim(struct mount *mp, bool reclaim_nc_src, int trigger)
 		 */
 		if (vp->v_usecount ||
 		    (!reclaim_nc_src && !LIST_EMPTY(&vp->v_cache_src)) ||
-		    (vp->v_iflag & VI_FREE) != 0 ||
 		    (vp->v_object != NULL &&
 		    vp->v_object->resident_page_count > trigger)) {
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			vdropl(vp);
 			goto next_iter_mntunlocked;
 		}
-		KASSERT((vp->v_iflag & VI_DOOMED) == 0,
-		    ("VI_DOOMED unexpectedly detected in vlrureclaim()"));
+		KASSERT(!VN_IS_DOOMED(vp),
+		    ("VIRF_DOOMED unexpectedly detected in vlrureclaim()"));
 		counter_u64_add(recycles_count, 1);
 		vgonel(vp);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vdropl(vp);
 		done++;
 next_iter_mntunlocked:
@@ -1194,16 +1219,19 @@ vnlru_free(int count, struct vfsops *mnt_op)
 static int
 vspace(void)
 {
+	u_long rnumvnodes, rfreevnodes;
 	int space;
 
 	gapvnodes = imax(desiredvnodes - wantfreevnodes, 100);
 	vhiwat = gapvnodes / 11; /* 9% -- just under the 10% in vlrureclaim() */
 	vlowat = vhiwat / 2;
-	if (numvnodes > desiredvnodes)
+	rnumvnodes = atomic_load_long(&numvnodes);
+	rfreevnodes = atomic_load_long(&freevnodes);
+	if (rnumvnodes > desiredvnodes)
 		return (0);
-	space = desiredvnodes - numvnodes;
+	space = desiredvnodes - rnumvnodes;
 	if (freevnodes > wantfreevnodes)
-		space += freevnodes - wantfreevnodes;
+		space += rfreevnodes - wantfreevnodes;
 	return (space);
 }
 
@@ -1275,6 +1303,7 @@ static int vnlruproc_sig;
 static void
 vnlru_proc(void)
 {
+	u_long rnumvnodes, rfreevnodes;
 	struct mount *mp, *nmp;
 	unsigned long onumvnodes;
 	int done, force, trigger, usevnodes, vsp;
@@ -1287,13 +1316,14 @@ vnlru_proc(void)
 	for (;;) {
 		kproc_suspend_check(vnlruproc);
 		mtx_lock(&vnode_free_list_mtx);
+		rnumvnodes = atomic_load_long(&numvnodes);
 		/*
 		 * If numvnodes is too large (due to desiredvnodes being
 		 * adjusted using its sysctl, or emergency growth), first
 		 * try to reduce it by discarding from the free list.
 		 */
-		if (numvnodes > desiredvnodes)
-			vnlru_free_locked(numvnodes - desiredvnodes, NULL);
+		if (rnumvnodes > desiredvnodes)
+			vnlru_free_locked(rnumvnodes - desiredvnodes, NULL);
 		/*
 		 * Sleep if the vnode cache is in a good state.  This is
 		 * when it is not over-full and has space for about a 4%
@@ -1315,7 +1345,10 @@ vnlru_proc(void)
 		}
 		mtx_unlock(&vnode_free_list_mtx);
 		done = 0;
-		onumvnodes = numvnodes;
+		rnumvnodes = atomic_load_long(&numvnodes);
+		rfreevnodes = atomic_load_long(&freevnodes);
+
+		onumvnodes = rnumvnodes;
 		/*
 		 * Calculate parameters for recycling.  These are the same
 		 * throughout the loop to give some semblance of fairness.
@@ -1323,10 +1356,10 @@ vnlru_proc(void)
 		 * of resident pages.  We aren't trying to free memory; we
 		 * are trying to recycle or at least free vnodes.
 		 */
-		if (numvnodes <= desiredvnodes)
-			usevnodes = numvnodes - freevnodes;
+		if (rnumvnodes <= desiredvnodes)
+			usevnodes = rnumvnodes - rfreevnodes;
 		else
-			usevnodes = numvnodes;
+			usevnodes = rnumvnodes;
 		if (usevnodes <= 0)
 			usevnodes = 1;
 		/*
@@ -1418,7 +1451,7 @@ vtryrecycle(struct vnode *vp)
 	 * Don't recycle if its filesystem is being suspended.
 	 */
 	if (vn_start_write(vp, &vnmp, V_NOWAIT) != 0) {
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		CTR2(KTR_VFS,
 		    "%s: impossible to recycle, cannot start the write for %p",
 		    __func__, vp);
@@ -1432,7 +1465,7 @@ vtryrecycle(struct vnode *vp)
 	 */
 	VI_LOCK(vp);
 	if (vp->v_usecount) {
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		VI_UNLOCK(vp);
 		vn_finished_write(vnmp);
 		CTR2(KTR_VFS,
@@ -1440,11 +1473,11 @@ vtryrecycle(struct vnode *vp)
 		    __func__, vp);
 		return (EBUSY);
 	}
-	if ((vp->v_iflag & VI_DOOMED) == 0) {
-		counter_u64_add(recycles_count, 1);
+	if (!VN_IS_DOOMED(vp)) {
+		counter_u64_add(recycles_free_count, 1);
 		vgonel(vp);
 	}
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	VI_UNLOCK(vp);
 	vn_finished_write(vnmp);
 	return (0);
@@ -1499,14 +1532,17 @@ getnewvnode_wait(int suspended)
 void
 getnewvnode_reserve(u_int count)
 {
+	u_long rnumvnodes, rfreevnodes;
 	struct thread *td;
 
 	/* Pre-adjust like the pre-adjust in getnewvnode(), with any count. */
 	/* XXX no longer so quick, but this part is not racy. */
 	mtx_lock(&vnode_free_list_mtx);
-	if (numvnodes + count > desiredvnodes && freevnodes > wantfreevnodes)
-		vnlru_free_locked(ulmin(numvnodes + count - desiredvnodes,
-		    freevnodes - wantfreevnodes), NULL);
+	rnumvnodes = atomic_load_long(&numvnodes);
+	rfreevnodes = atomic_load_long(&freevnodes);
+	if (rnumvnodes + count > desiredvnodes && rfreevnodes > wantfreevnodes)
+		vnlru_free_locked(ulmin(rnumvnodes + count - desiredvnodes,
+		    rfreevnodes - wantfreevnodes), NULL);
 	mtx_unlock(&vnode_free_list_mtx);
 
 	td = curthread;
@@ -1562,6 +1598,10 @@ getnewvnode(const char *tag, struct mount *mp, struct vop_vector *vops,
 	int error __unused;
 
 	CTR3(KTR_VFS, "%s: mp %p with tag %s", __func__, mp, tag);
+
+	KASSERT(vops->registered,
+	    ("%s: not registered vector op %p\n", __func__, vops));
+
 	vp = NULL;
 	td = curthread;
 	if (td->td_vp_reserv > 0) {
@@ -1636,7 +1676,6 @@ alloc:
 	KASSERT(vp->v_lockf == NULL, ("stale v_lockf %p", vp));
 	KASSERT(vp->v_pollinfo == NULL, ("stale v_pollinfo %p", vp));
 	vp->v_type = VNON;
-	vp->v_tag = tag;
 	vp->v_op = vops;
 	v_init_counters(vp);
 	vp->v_bufobj.bo_ops = &buf_ops_bio;
@@ -1667,6 +1706,65 @@ alloc:
 	return (0);
 }
 
+static void
+freevnode(struct vnode *vp)
+{
+	struct bufobj *bo;
+
+	/*
+	 * The vnode has been marked for destruction, so free it.
+	 *
+	 * The vnode will be returned to the zone where it will
+	 * normally remain until it is needed for another vnode. We
+	 * need to cleanup (or verify that the cleanup has already
+	 * been done) any residual data left from its current use
+	 * so as not to contaminate the freshly allocated vnode.
+	 */
+	CTR2(KTR_VFS, "%s: destroying the vnode %p", __func__, vp);
+	atomic_subtract_long(&numvnodes, 1);
+	bo = &vp->v_bufobj;
+	VNASSERT((vp->v_iflag & VI_FREE) == 0, vp,
+	    ("cleaned vnode still on the free list."));
+	VNASSERT(vp->v_data == NULL, vp, ("cleaned vnode isn't"));
+	VNASSERT(vp->v_holdcnt == 0, vp, ("Non-zero hold count"));
+	VNASSERT(vp->v_usecount == 0, vp, ("Non-zero use count"));
+	VNASSERT(vp->v_writecount == 0, vp, ("Non-zero write count"));
+	VNASSERT(bo->bo_numoutput == 0, vp, ("Clean vnode has pending I/O's"));
+	VNASSERT(bo->bo_clean.bv_cnt == 0, vp, ("cleanbufcnt not 0"));
+	VNASSERT(pctrie_is_empty(&bo->bo_clean.bv_root), vp,
+	    ("clean blk trie not empty"));
+	VNASSERT(bo->bo_dirty.bv_cnt == 0, vp, ("dirtybufcnt not 0"));
+	VNASSERT(pctrie_is_empty(&bo->bo_dirty.bv_root), vp,
+	    ("dirty blk trie not empty"));
+	VNASSERT(TAILQ_EMPTY(&vp->v_cache_dst), vp, ("vp has namecache dst"));
+	VNASSERT(LIST_EMPTY(&vp->v_cache_src), vp, ("vp has namecache src"));
+	VNASSERT(vp->v_cache_dd == NULL, vp, ("vp has namecache for .."));
+	VNASSERT(TAILQ_EMPTY(&vp->v_rl.rl_waiters), vp,
+	    ("Dangling rangelock waiters"));
+	VI_UNLOCK(vp);
+#ifdef MAC
+	mac_vnode_destroy(vp);
+#endif
+	if (vp->v_pollinfo != NULL) {
+		destroy_vpollinfo(vp->v_pollinfo);
+		vp->v_pollinfo = NULL;
+	}
+#ifdef INVARIANTS
+	/* XXX Elsewhere we detect an already freed vnode via NULL v_op. */
+	vp->v_op = NULL;
+#endif
+	vp->v_mountedhere = NULL;
+	vp->v_unpcb = NULL;
+	vp->v_rdev = NULL;
+	vp->v_fifoinfo = NULL;
+	vp->v_lasta = vp->v_clen = vp->v_cstart = vp->v_lastw = 0;
+	vp->v_irflag = 0;
+	vp->v_iflag = 0;
+	vp->v_vflag = 0;
+	bo->bo_flag = 0;
+	uma_zfree(vnode_zone, vp);
+}
+
 /*
  * Delete from old mount point vnode list, if on one.
  */
@@ -1674,7 +1772,6 @@ static void
 delmntque(struct vnode *vp)
 {
 	struct mount *mp;
-	int active;
 
 	mp = vp->v_mount;
 	if (mp == NULL)
@@ -1684,9 +1781,8 @@ delmntque(struct vnode *vp)
 	KASSERT(mp->mnt_activevnodelistsize <= mp->mnt_nvnodelistsize,
 	    ("Active vnode list size %d > Vnode list size %d",
 	     mp->mnt_activevnodelistsize, mp->mnt_nvnodelistsize));
-	active = vp->v_iflag & VI_ACTIVE;
-	vp->v_iflag &= ~VI_ACTIVE;
-	if (active) {
+	if (vp->v_iflag & VI_ACTIVE) {
+		vp->v_iflag &= ~VI_ACTIVE;
 		mtx_lock(&mp->mnt_listmtx);
 		TAILQ_REMOVE(&mp->mnt_activevnodelist, vp, v_actfreelist);
 		mp->mnt_activevnodelistsize--;
@@ -2352,7 +2448,7 @@ sync_vnode(struct synclist *slp, struct bufobj **bo, struct thread *td)
 	}
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	(void) VOP_FSYNC(vp, MNT_LAZY, td);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	vn_finished_write(mp);
 	BO_LOCK(*bo);
 	if (((*bo)->bo_flag & BO_ONWORKLST) != 0) {
@@ -2700,7 +2796,7 @@ v_decr_devcount(struct vnode *vp)
 
 /*
  * Grab a particular vnode from the free list, increment its
- * reference count and lock it.  VI_DOOMED is set if the vnode
+ * reference count and lock it.  VIRF_DOOMED is set if the vnode
  * is being destroyed.  Only callers who specify LK_RETRY will
  * see doomed vnodes.  If inactive processing was delayed in
  * vput try to do it here.
@@ -2713,7 +2809,7 @@ v_decr_devcount(struct vnode *vp)
  * usecount is permitted to transition 1->0 without the interlock because
  * vnode is kept live by holdcnt.
  */
-static enum vgetstate
+static enum vgetstate __always_inline
 _vget_prep(struct vnode *vp, bool interlock)
 {
 	enum vgetstate vs;
@@ -2721,7 +2817,10 @@ _vget_prep(struct vnode *vp, bool interlock)
 	if (refcount_acquire_if_not_zero(&vp->v_usecount)) {
 		vs = VGET_USECOUNT;
 	} else {
-		_vhold(vp, interlock);
+		if (interlock)
+			vholdl(vp);
+		else
+			vhold(vp);
 		vs = VGET_HOLDCNT;
 	}
 	return (vs);
@@ -2787,8 +2886,8 @@ vget_finish(struct vnode *vp, int flags, enum vgetstate vs)
 	 */
 	if (refcount_acquire_if_not_zero(&vp->v_usecount)) {
 #ifdef INVARIANTS
-		int old = atomic_fetchadd_int(&vp->v_holdcnt, -1) - 1;
-		VNASSERT(old > 0, vp, ("%s: wrong hold count", __func__));
+		int old = atomic_fetchadd_int(&vp->v_holdcnt, -1);
+		VNASSERT(old > 1, vp, ("%s: wrong hold count %d", __func__, old));
 #else
 		refcount_release(&vp->v_holdcnt);
 #endif
@@ -2813,8 +2912,8 @@ vget_finish(struct vnode *vp, int flags, enum vgetstate vs)
 	 */
 	if (refcount_acquire_if_not_zero(&vp->v_usecount)) {
 #ifdef INVARIANTS
-		int old = atomic_fetchadd_int(&vp->v_holdcnt, -1) - 1;
-		VNASSERT(old > 0, vp, ("%s: wrong hold count", __func__));
+		int old = atomic_fetchadd_int(&vp->v_holdcnt, -1);
+		VNASSERT(old > 1, vp, ("%s: wrong hold count %d", __func__, old));
 #else
 		refcount_release(&vp->v_holdcnt);
 #endif
@@ -2836,7 +2935,7 @@ vget_finish(struct vnode *vp, int flags, enum vgetstate vs)
 	refcount_acquire(&vp->v_usecount);
 	if (oweinact && VOP_ISLOCKED(vp) == LK_EXCLUSIVE &&
 	    (flags & LK_NOWAIT) == 0)
-		vinactive(vp, curthread);
+		vinactive(vp);
 	VI_UNLOCK(vp);
 	return (0);
 }
@@ -2894,7 +2993,7 @@ vrefact(struct vnode *vp)
 	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
 #ifdef INVARIANTS
 	int old = atomic_fetchadd_int(&vp->v_usecount, 1);
-	VNASSERT(old > 0, vp, ("%s: wrong use count", __func__));
+	VNASSERT(old > 0, vp, ("%s: wrong use count %d", __func__, old));
 #else
 	refcount_acquire(&vp->v_usecount);
 #endif
@@ -2916,9 +3015,41 @@ vrefcnt(struct vnode *vp)
 	return (vp->v_usecount);
 }
 
-#define	VPUTX_VRELE	1
-#define	VPUTX_VPUT	2
-#define	VPUTX_VUNREF	3
+static void
+vdefer_inactive(struct vnode *vp)
+{
+
+	ASSERT_VI_LOCKED(vp, __func__);
+	VNASSERT(vp->v_iflag & VI_OWEINACT, vp,
+	    ("%s: vnode without VI_OWEINACT", __func__));
+	if (VN_IS_DOOMED(vp)) {
+		vdropl(vp);
+		return;
+	}
+	if (vp->v_iflag & VI_DEFINACT) {
+		VNASSERT(vp->v_holdcnt > 1, vp, ("lost hold count"));
+		vdropl(vp);
+		return;
+	}
+	vp->v_iflag |= VI_DEFINACT;
+	VI_UNLOCK(vp);
+	counter_u64_add(deferred_inact, 1);
+}
+
+static void
+vdefer_inactive_cond(struct vnode *vp)
+{
+
+	VI_LOCK(vp);
+	VNASSERT(vp->v_holdcnt > 0, vp, ("vnode without hold count"));
+	if ((vp->v_iflag & VI_OWEINACT) == 0) {
+		vdropl(vp);
+		return;
+	}
+	vdefer_inactive(vp);
+}
+
+enum vputx_op { VPUTX_VRELE, VPUTX_VPUT, VPUTX_VUNREF };
 
 /*
  * Decrement the use and hold counts for a vnode.
@@ -2926,35 +3057,18 @@ vrefcnt(struct vnode *vp)
  * See an explanation near vget() as to why atomic operation is safe.
  */
 static void
-vputx(struct vnode *vp, int func)
+vputx(struct vnode *vp, enum vputx_op func)
 {
 	int error;
 
 	KASSERT(vp != NULL, ("vputx: null vp"));
 	if (func == VPUTX_VUNREF)
 		ASSERT_VOP_LOCKED(vp, "vunref");
-	else if (func == VPUTX_VPUT)
-		ASSERT_VOP_LOCKED(vp, "vput");
-	else
-		KASSERT(func == VPUTX_VRELE, ("vputx: wrong func"));
 	ASSERT_VI_UNLOCKED(vp, __func__);
 	VNASSERT(vp->v_holdcnt > 0 && vp->v_usecount > 0, vp,
 	    ("%s: wrong ref counts", __func__));
 
 	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
-
-	/*
-	 * It is an invariant that all VOP_* calls operate on a held vnode.
-	 * We may be only having an implicit hold stemming from our usecount,
-	 * which we are about to release. If we unlock the vnode afterwards we
-	 * open a time window where someone else dropped the last usecount and
-	 * proceeded to free the vnode before our unlock finished. For this
-	 * reason we unlock the vnode early. This is a little bit wasteful as
-	 * it may be the vnode is exclusively locked and inactive processing is
-	 * needed, in which case we are adding work.
-	 */
-	if (func == VPUTX_VPUT)
-		VOP_UNLOCK(vp, 0);
 
 	/*
 	 * We want to hold the vnode until the inactive finishes to
@@ -2982,15 +3096,6 @@ vputx(struct vnode *vp, int func)
 		return;
 	}
 
-	error = 0;
-
-	if (vp->v_usecount != 0) {
-		vn_printf(vp, "vputx: usecount not zero for vnode ");
-		panic("vputx: usecount not zero");
-	}
-
-	CTR2(KTR_VFS, "%s: return vnode %p to the freelist", __func__, vp);
-
 	/*
 	 * Check if the fs wants to perform inactive processing. Note we
 	 * may be only holding the interlock, in which case it is possible
@@ -2998,7 +3103,7 @@ vputx(struct vnode *vp, int func)
 	 * Since vgone performs inactive on its own there is nothing to do
 	 * here but to drop our hold count.
 	 */
-	if (__predict_false(vp->v_iflag & VI_DOOMED) ||
+	if (__predict_false(VN_IS_DOOMED(vp)) ||
 	    VOP_NEED_INACTIVE(vp) == 0) {
 		vdropl(vp);
 		return;
@@ -3019,6 +3124,7 @@ vputx(struct vnode *vp, int func)
 		VI_LOCK(vp);
 		break;
 	case VPUTX_VUNREF:
+		error = 0;
 		if (VOP_ISLOCKED(vp) != LK_EXCLUSIVE) {
 			error = VOP_LOCK(vp, LK_TRYUPGRADE | LK_INTERLOCK);
 			VI_LOCK(vp);
@@ -3029,11 +3135,15 @@ vputx(struct vnode *vp, int func)
 	    ("vnode with usecount and VI_OWEINACT set"));
 	if (error == 0) {
 		if (vp->v_iflag & VI_OWEINACT)
-			vinactive(vp, curthread);
+			vinactive(vp);
 		if (func != VPUTX_VUNREF)
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
+		vdropl(vp);
+	} else if (vp->v_iflag & VI_OWEINACT) {
+		vdefer_inactive(vp);
+	} else {
+		vdropl(vp);
 	}
-	vdropl(vp);
 }
 
 /*
@@ -3051,11 +3161,21 @@ vrele(struct vnode *vp)
  * Release an already locked vnode.  This give the same effects as
  * unlock+vrele(), but takes less time and avoids releasing and
  * re-aquiring the lock (as vrele() acquires the lock internally.)
+ *
+ * It is an invariant that all VOP_* calls operate on a held vnode.
+ * We may be only having an implicit hold stemming from our usecount,
+ * which we are about to release. If we unlock the vnode afterwards we
+ * open a time window where someone else dropped the last usecount and
+ * proceeded to free the vnode before our unlock finished. For this
+ * reason we unlock the vnode early. This is a little bit wasteful as
+ * it may be the vnode is exclusively locked and inactive processing is
+ * needed, in which case we are adding work.
  */
 void
 vput(struct vnode *vp)
 {
 
+	VOP_UNLOCK(vp);
 	vputx(vp, VPUTX_VPUT);
 }
 
@@ -3072,31 +3192,12 @@ vunref(struct vnode *vp)
 /*
  * Increase the hold count and activate if this is the first reference.
  */
-void
-_vhold(struct vnode *vp, bool locked)
+static void
+vhold_activate(struct vnode *vp)
 {
 	struct mount *mp;
 
-	if (locked)
-		ASSERT_VI_LOCKED(vp, __func__);
-	else
-		ASSERT_VI_UNLOCKED(vp, __func__);
-	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
-	if (!locked) {
-		if (refcount_acquire_if_not_zero(&vp->v_holdcnt)) {
-			VNODE_REFCOUNT_FENCE_ACQ();
-			VNASSERT((vp->v_iflag & VI_FREE) == 0, vp,
-			    ("_vhold: vnode with holdcnt is free"));
-			return;
-		}
-		VI_LOCK(vp);
-	}
-	if ((vp->v_iflag & VI_FREE) == 0) {
-		refcount_acquire(&vp->v_holdcnt);
-		if (!locked)
-			VI_UNLOCK(vp);
-		return;
-	}
+	ASSERT_VI_LOCKED(vp, __func__);
 	VNASSERT(vp->v_holdcnt == 0, vp,
 	    ("%s: wrong hold count", __func__));
 	VNASSERT(vp->v_op != NULL, vp,
@@ -3127,8 +3228,36 @@ _vhold(struct vnode *vp, bool locked)
 	mp->mnt_activevnodelistsize++;
 	mtx_unlock(&mp->mnt_listmtx);
 	refcount_acquire(&vp->v_holdcnt);
-	if (!locked)
-		VI_UNLOCK(vp);
+}
+
+void
+vhold(struct vnode *vp)
+{
+
+	ASSERT_VI_UNLOCKED(vp, __func__);
+	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
+	if (refcount_acquire_if_not_zero(&vp->v_holdcnt)) {
+		VNODE_REFCOUNT_FENCE_ACQ();
+		VNASSERT((vp->v_iflag & VI_FREE) == 0, vp,
+		    ("vhold: vnode with holdcnt is free"));
+		return;
+	}
+	VI_LOCK(vp);
+	vholdl(vp);
+	VI_UNLOCK(vp);
+}
+
+void
+vholdl(struct vnode *vp)
+{
+
+	ASSERT_VI_LOCKED(vp, __func__);
+	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
+	if ((vp->v_iflag & VI_FREE) == 0) {
+		refcount_acquire(&vp->v_holdcnt);
+		return;
+	}
+	vhold_activate(vp);
 }
 
 void
@@ -3138,7 +3267,7 @@ vholdnz(struct vnode *vp)
 	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
 #ifdef INVARIANTS
 	int old = atomic_fetchadd_int(&vp->v_holdcnt, 1);
-	VNASSERT(old > 0, vp, ("%s: wrong hold count", __func__));
+	VNASSERT(old > 0, vp, ("%s: wrong hold count %d", __func__, old));
 #else
 	atomic_add_int(&vp->v_holdcnt, 1);
 #endif
@@ -3147,136 +3276,78 @@ vholdnz(struct vnode *vp)
 /*
  * Drop the hold count of the vnode.  If this is the last reference to
  * the vnode we place it on the free list unless it has been vgone'd
- * (marked VI_DOOMED) in which case we will free it.
+ * (marked VIRF_DOOMED) in which case we will free it.
  *
  * Because the vnode vm object keeps a hold reference on the vnode if
  * there is at least one resident non-cached page, the vnode cannot
  * leave the active list without the page cleanup done.
  */
-void
-_vdrop(struct vnode *vp, bool locked)
+static void
+vdrop_deactivate(struct vnode *vp)
 {
-	struct bufobj *bo;
 	struct mount *mp;
 
-	if (locked)
-		ASSERT_VI_LOCKED(vp, __func__);
-	else
-		ASSERT_VI_UNLOCKED(vp, __func__);
+	ASSERT_VI_LOCKED(vp, __func__);
+	/*
+	 * Mark a vnode as free: remove it from its active list
+	 * and put it up for recycling on the freelist.
+	 */
+	VNASSERT(!VN_IS_DOOMED(vp), vp,
+	    ("vdrop: returning doomed vnode"));
+	VNASSERT(vp->v_op != NULL, vp,
+	    ("vdrop: vnode already reclaimed."));
+	VNASSERT((vp->v_iflag & VI_FREE) == 0, vp,
+	    ("vnode already free"));
+	VNASSERT((vp->v_iflag & VI_OWEINACT) == 0, vp,
+	    ("vnode with VI_OWEINACT set"));
+	VNASSERT((vp->v_iflag & VI_DEFINACT) == 0, vp,
+	    ("vnode with VI_DEFINACT set"));
+	VNASSERT(vp->v_holdcnt == 0, vp,
+	    ("vdrop: freeing when we shouldn't"));
+	mp = vp->v_mount;
+	mtx_lock(&mp->mnt_listmtx);
+	if (vp->v_iflag & VI_ACTIVE) {
+		vp->v_iflag &= ~VI_ACTIVE;
+		TAILQ_REMOVE(&mp->mnt_activevnodelist, vp, v_actfreelist);
+		mp->mnt_activevnodelistsize--;
+	}
+	TAILQ_INSERT_TAIL(&mp->mnt_tmpfreevnodelist, vp, v_actfreelist);
+	mp->mnt_tmpfreevnodelistsize++;
+	vp->v_iflag |= VI_FREE;
+	vp->v_mflag |= VMP_TMPMNTFREELIST;
+	VI_UNLOCK(vp);
+	if (mp->mnt_tmpfreevnodelistsize >= mnt_free_list_batch)
+		vnlru_return_batch_locked(mp);
+	mtx_unlock(&mp->mnt_listmtx);
+}
+
+void
+vdrop(struct vnode *vp)
+{
+
+	ASSERT_VI_UNLOCKED(vp, __func__);
 	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
-	if (__predict_false((int)vp->v_holdcnt <= 0)) {
-		vn_printf(vp, "vdrop: holdcnt %d", vp->v_holdcnt);
-		panic("vdrop: wrong holdcnt");
-	}
-	if (!locked) {
-		if (refcount_release_if_not_last(&vp->v_holdcnt))
-			return;
-		VI_LOCK(vp);
-	}
-	if (refcount_release(&vp->v_holdcnt) == 0) {
+	if (refcount_release_if_not_last(&vp->v_holdcnt))
+		return;
+	VI_LOCK(vp);
+	vdropl(vp);
+}
+
+void
+vdropl(struct vnode *vp)
+{
+
+	ASSERT_VI_LOCKED(vp, __func__);
+	CTR2(KTR_VFS, "%s: vp %p", __func__, vp);
+	if (!refcount_release(&vp->v_holdcnt)) {
 		VI_UNLOCK(vp);
 		return;
 	}
-	if ((vp->v_iflag & VI_DOOMED) == 0) {
-		/*
-		 * Mark a vnode as free: remove it from its active list
-		 * and put it up for recycling on the freelist.
-		 */
-		VNASSERT(vp->v_op != NULL, vp,
-		    ("vdropl: vnode already reclaimed."));
-		VNASSERT((vp->v_iflag & VI_FREE) == 0, vp,
-		    ("vnode already free"));
-		VNASSERT(vp->v_holdcnt == 0, vp,
-		    ("vdropl: freeing when we shouldn't"));
-		if ((vp->v_iflag & VI_OWEINACT) == 0) {
-			mp = vp->v_mount;
-			if (mp != NULL) {
-				mtx_lock(&mp->mnt_listmtx);
-				if (vp->v_iflag & VI_ACTIVE) {
-					vp->v_iflag &= ~VI_ACTIVE;
-					TAILQ_REMOVE(&mp->mnt_activevnodelist,
-					    vp, v_actfreelist);
-					mp->mnt_activevnodelistsize--;
-				}
-				TAILQ_INSERT_TAIL(&mp->mnt_tmpfreevnodelist,
-				    vp, v_actfreelist);
-				mp->mnt_tmpfreevnodelistsize++;
-				vp->v_iflag |= VI_FREE;
-				vp->v_mflag |= VMP_TMPMNTFREELIST;
-				VI_UNLOCK(vp);
-				if (mp->mnt_tmpfreevnodelistsize >=
-				    mnt_free_list_batch)
-					vnlru_return_batch_locked(mp);
-				mtx_unlock(&mp->mnt_listmtx);
-			} else {
-				VNASSERT((vp->v_iflag & VI_ACTIVE) == 0, vp,
-				    ("vdropl: active vnode not on per mount "
-				    "vnode list"));
-				mtx_lock(&vnode_free_list_mtx);
-				TAILQ_INSERT_TAIL(&vnode_free_list, vp,
-				    v_actfreelist);
-				freevnodes++;
-				vp->v_iflag |= VI_FREE;
-				VI_UNLOCK(vp);
-				mtx_unlock(&vnode_free_list_mtx);
-			}
-		} else {
-			VI_UNLOCK(vp);
-			counter_u64_add(free_owe_inact, 1);
-		}
+	if (VN_IS_DOOMED(vp)) {
+		freevnode(vp);
 		return;
 	}
-	/*
-	 * The vnode has been marked for destruction, so free it.
-	 *
-	 * The vnode will be returned to the zone where it will
-	 * normally remain until it is needed for another vnode. We
-	 * need to cleanup (or verify that the cleanup has already
-	 * been done) any residual data left from its current use
-	 * so as not to contaminate the freshly allocated vnode.
-	 */
-	CTR2(KTR_VFS, "%s: destroying the vnode %p", __func__, vp);
-	atomic_subtract_long(&numvnodes, 1);
-	bo = &vp->v_bufobj;
-	VNASSERT((vp->v_iflag & VI_FREE) == 0, vp,
-	    ("cleaned vnode still on the free list."));
-	VNASSERT(vp->v_data == NULL, vp, ("cleaned vnode isn't"));
-	VNASSERT(vp->v_holdcnt == 0, vp, ("Non-zero hold count"));
-	VNASSERT(vp->v_usecount == 0, vp, ("Non-zero use count"));
-	VNASSERT(vp->v_writecount == 0, vp, ("Non-zero write count"));
-	VNASSERT(bo->bo_numoutput == 0, vp, ("Clean vnode has pending I/O's"));
-	VNASSERT(bo->bo_clean.bv_cnt == 0, vp, ("cleanbufcnt not 0"));
-	VNASSERT(pctrie_is_empty(&bo->bo_clean.bv_root), vp,
-	    ("clean blk trie not empty"));
-	VNASSERT(bo->bo_dirty.bv_cnt == 0, vp, ("dirtybufcnt not 0"));
-	VNASSERT(pctrie_is_empty(&bo->bo_dirty.bv_root), vp,
-	    ("dirty blk trie not empty"));
-	VNASSERT(TAILQ_EMPTY(&vp->v_cache_dst), vp, ("vp has namecache dst"));
-	VNASSERT(LIST_EMPTY(&vp->v_cache_src), vp, ("vp has namecache src"));
-	VNASSERT(vp->v_cache_dd == NULL, vp, ("vp has namecache for .."));
-	VNASSERT(TAILQ_EMPTY(&vp->v_rl.rl_waiters), vp,
-	    ("Dangling rangelock waiters"));
-	VI_UNLOCK(vp);
-#ifdef MAC
-	mac_vnode_destroy(vp);
-#endif
-	if (vp->v_pollinfo != NULL) {
-		destroy_vpollinfo(vp->v_pollinfo);
-		vp->v_pollinfo = NULL;
-	}
-#ifdef INVARIANTS
-	/* XXX Elsewhere we detect an already freed vnode via NULL v_op. */
-	vp->v_op = NULL;
-#endif
-	vp->v_mountedhere = NULL;
-	vp->v_unpcb = NULL;
-	vp->v_rdev = NULL;
-	vp->v_fifoinfo = NULL;
-	vp->v_lasta = vp->v_clen = vp->v_cstart = vp->v_lastw = 0;
-	vp->v_iflag = 0;
-	vp->v_vflag = 0;
-	bo->bo_flag = 0;
-	uma_zfree(vnode_zone, vp);
+	vdrop_deactivate(vp);
 }
 
 /*
@@ -3286,7 +3357,7 @@ _vdrop(struct vnode *vp, bool locked)
  * failed lock upgrade.
  */
 void
-vinactive(struct vnode *vp, struct thread *td)
+vinactive(struct vnode *vp)
 {
 	struct vm_object *obj;
 
@@ -3314,7 +3385,7 @@ vinactive(struct vnode *vp, struct thread *td)
 		vm_object_page_clean(obj, 0, 0, 0);
 		VM_OBJECT_WUNLOCK(obj);
 	}
-	VOP_INACTIVE(vp, td);
+	VOP_INACTIVE(vp, curthread);
 	VI_LOCK(vp);
 	VNASSERT(vp->v_iflag & VI_DOINGINACT, vp,
 	    ("vinactive: lost VI_DOINGINACT"));
@@ -3382,7 +3453,7 @@ loop:
 		 * Skip over a vnodes marked VV_SYSTEM.
 		 */
 		if ((flags & SKIPSYSTEM) && (vp->v_vflag & VV_SYSTEM)) {
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			vdrop(vp);
 			continue;
 		}
@@ -3399,7 +3470,7 @@ loop:
 			}
 			error = VOP_FSYNC(vp, MNT_WAIT, td);
 			if (error != 0) {
-				VOP_UNLOCK(vp, 0);
+				VOP_UNLOCK(vp);
 				vdrop(vp);
 				MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);
 				return (error);
@@ -3410,7 +3481,7 @@ loop:
 			if ((vp->v_type == VNON ||
 			    (error == 0 && vattr.va_nlink > 0)) &&
 			    (vp->v_writecount <= 0 || vp->v_type != VREG)) {
-				VOP_UNLOCK(vp, 0);
+				VOP_UNLOCK(vp);
 				vdropl(vp);
 				continue;
 			}
@@ -3431,7 +3502,7 @@ loop:
 				vn_printf(vp, "vflush: busy vnode ");
 #endif
 		}
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vdropl(vp);
 	}
 	if (rootrefs > 0 && (flags & FORCECLOSE) == 0) {
@@ -3447,7 +3518,7 @@ loop:
 		if (busy == 1 && rootvp->v_usecount == rootrefs) {
 			VOP_LOCK(rootvp, LK_EXCLUSIVE|LK_INTERLOCK);
 			vgone(rootvp);
-			VOP_UNLOCK(rootvp, 0);
+			VOP_UNLOCK(rootvp);
 			busy = 0;
 		} else
 			VI_UNLOCK(rootvp);
@@ -3588,9 +3659,9 @@ vgonel(struct vnode *vp)
 	/*
 	 * Don't vgonel if we're already doomed.
 	 */
-	if (vp->v_iflag & VI_DOOMED)
+	if (vp->v_irflag & VIRF_DOOMED)
 		return;
-	vp->v_iflag |= VI_DOOMED;
+	vp->v_irflag |= VIRF_DOOMED;
 
 	/*
 	 * Check to see if the vnode is in use.  If so, we have to call
@@ -3598,7 +3669,17 @@ vgonel(struct vnode *vp)
 	 */
 	active = vp->v_usecount > 0;
 	oweinact = (vp->v_iflag & VI_OWEINACT) != 0;
-	VI_UNLOCK(vp);
+	/*
+	 * If we need to do inactive VI_OWEINACT will be set.
+	 */
+	if (vp->v_iflag & VI_DEFINACT) {
+		VNASSERT(vp->v_holdcnt > 1, vp, ("lost hold count"));
+		vp->v_iflag &= ~VI_DEFINACT;
+		vdropl(vp);
+	} else {
+		VNASSERT(vp->v_holdcnt > 0, vp, ("vnode without hold count"));
+		VI_UNLOCK(vp);
+	}
 	vfs_notify_upper(vp, VFS_NOTIFY_UPPER_RECLAIM);
 
 	/*
@@ -3610,7 +3691,7 @@ vgonel(struct vnode *vp)
 	if (oweinact || active) {
 		VI_LOCK(vp);
 		if ((vp->v_iflag & VI_DOINGINACT) == 0)
-			vinactive(vp, td);
+			vinactive(vp);
 		VI_UNLOCK(vp);
 	}
 	if (vp->v_type == VSOCK)
@@ -3663,7 +3744,7 @@ vgonel(struct vnode *vp)
 	if (mp != NULL)
 		vn_finished_secondary_write(mp);
 	VNASSERT(vp->v_object == NULL, vp,
-	    ("vop_reclaim left v_object vp=%p, tag=%s", vp, vp->v_tag));
+	    ("vop_reclaim left v_object vp=%p", vp));
 	/*
 	 * Clear the advisory locks and wake up waiting threads.
 	 */
@@ -3681,7 +3762,6 @@ vgonel(struct vnode *vp)
 	VI_LOCK(vp);
 	vp->v_vnlock = &vp->v_lock;
 	vp->v_op = &dead_vnodeops;
-	vp->v_tag = "none";
 	vp->v_type = VBAD;
 }
 
@@ -3717,7 +3797,7 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 	vprintf(fmt, ap);
 	va_end(ap);
 	printf("%p: ", (void *)vp);
-	printf("tag %s, type %s\n", vp->v_tag, typename[vp->v_type]);
+	printf("type %s\n", typename[vp->v_type]);
 	printf("    usecount %d, writecount %d, refcount %d",
 	    vp->v_usecount, vp->v_writecount, vp->v_holdcnt);
 	switch (vp->v_type) {
@@ -3739,6 +3819,13 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 	}
 	buf[0] = '\0';
 	buf[1] = '\0';
+	if (vp->v_irflag & VIRF_DOOMED)
+		strlcat(buf, "|VIRF_DOOMED", sizeof(buf));
+	flags = vp->v_irflag & ~(VIRF_DOOMED);
+	if (flags != 0) {
+		snprintf(buf2, sizeof(buf2), "|VIRF(0x%lx)", flags);
+		strlcat(buf, buf2, sizeof(buf));
+	}
 	if (vp->v_vflag & VV_ROOT)
 		strlcat(buf, "|VV_ROOT", sizeof(buf));
 	if (vp->v_vflag & VV_ISTTY)
@@ -3749,6 +3836,8 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 		strlcat(buf, "|VV_ETERNALDEV", sizeof(buf));
 	if (vp->v_vflag & VV_CACHEDLABEL)
 		strlcat(buf, "|VV_CACHEDLABEL", sizeof(buf));
+	if (vp->v_vflag & VV_VMSIZEVNLOCK)
+		strlcat(buf, "|VV_VMSIZEVNLOCK", sizeof(buf));
 	if (vp->v_vflag & VV_COPYONWRITE)
 		strlcat(buf, "|VV_COPYONWRITE", sizeof(buf));
 	if (vp->v_vflag & VV_SYSTEM)
@@ -3763,6 +3852,8 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 		strlcat(buf, "|VV_MD", sizeof(buf));
 	if (vp->v_vflag & VV_FORCEINSMQ)
 		strlcat(buf, "|VV_FORCEINSMQ", sizeof(buf));
+	if (vp->v_vflag & VV_READLINK)
+		strlcat(buf, "|VV_READLINK", sizeof(buf));
 	flags = vp->v_vflag & ~(VV_ROOT | VV_ISTTY | VV_NOSYNC | VV_ETERNALDEV |
 	    VV_CACHEDLABEL | VV_COPYONWRITE | VV_SYSTEM | VV_PROCDEP |
 	    VV_NOKNOTE | VV_DELETED | VV_MD | VV_FORCEINSMQ);
@@ -3770,10 +3861,10 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 		snprintf(buf2, sizeof(buf2), "|VV(0x%lx)", flags);
 		strlcat(buf, buf2, sizeof(buf));
 	}
+	if (vp->v_iflag & VI_TEXT_REF)
+		strlcat(buf, "|VI_TEXT_REF", sizeof(buf));
 	if (vp->v_iflag & VI_MOUNT)
 		strlcat(buf, "|VI_MOUNT", sizeof(buf));
-	if (vp->v_iflag & VI_DOOMED)
-		strlcat(buf, "|VI_DOOMED", sizeof(buf));
 	if (vp->v_iflag & VI_FREE)
 		strlcat(buf, "|VI_FREE", sizeof(buf));
 	if (vp->v_iflag & VI_ACTIVE)
@@ -3782,12 +3873,19 @@ vn_printf(struct vnode *vp, const char *fmt, ...)
 		strlcat(buf, "|VI_DOINGINACT", sizeof(buf));
 	if (vp->v_iflag & VI_OWEINACT)
 		strlcat(buf, "|VI_OWEINACT", sizeof(buf));
-	if (vp->v_iflag & VI_TEXT_REF)
-		strlcat(buf, "|VI_TEXT_REF", sizeof(buf));
-	flags = vp->v_iflag & ~(VI_MOUNT | VI_DOOMED | VI_FREE |
-	    VI_ACTIVE | VI_DOINGINACT | VI_OWEINACT | VI_TEXT_REF);
+	if (vp->v_iflag & VI_DEFINACT)
+		strlcat(buf, "|VI_DEFINACT", sizeof(buf));
+	flags = vp->v_iflag & ~(VI_TEXT_REF | VI_MOUNT | VI_FREE | VI_ACTIVE |
+	    VI_DOINGINACT | VI_OWEINACT | VI_DEFINACT);
 	if (flags != 0) {
 		snprintf(buf2, sizeof(buf2), "|VI(0x%lx)", flags);
+		strlcat(buf, buf2, sizeof(buf));
+	}
+	if (vp->v_mflag & VMP_TMPMNTFREELIST)
+		strlcat(buf, "|VMP_TMPMNTFREELIST", sizeof(buf));
+	flags = vp->v_mflag & ~(VMP_TMPMNTFREELIST);
+	if (flags != 0) {
+		snprintf(buf2, sizeof(buf2), "|VMP(0x%lx)", flags);
 		strlcat(buf, buf2, sizeof(buf));
 	}
 	printf("    flags (%s)\n", buf + 1);
@@ -4370,46 +4468,117 @@ vfs_unmountall(void)
 		unmount_or_warn(rootdevmp);
 }
 
-/*
- * perform msync on all vnodes under a mount point
- * the mount point must be locked.
- */
-void
-vfs_msync(struct mount *mp, int flags)
+static void
+vfs_deferred_inactive(struct vnode *vp, int lkflags)
+{
+
+	ASSERT_VI_LOCKED(vp, __func__);
+	VNASSERT((vp->v_iflag & VI_DEFINACT) == 0, vp, ("VI_DEFINACT still set"));
+	if ((vp->v_iflag & VI_OWEINACT) == 0) {
+		vdropl(vp);
+		return;
+	}
+	if (vn_lock(vp, lkflags) == 0) {
+		VI_LOCK(vp);
+		if ((vp->v_iflag & (VI_OWEINACT | VI_DOINGINACT)) == VI_OWEINACT)
+			vinactive(vp);
+		VOP_UNLOCK(vp);
+		vdropl(vp);
+		return;
+	}
+	vdefer_inactive_cond(vp);
+}
+
+static void __noinline
+vfs_periodic_inactive(struct mount *mp, int flags)
+{
+	struct vnode *vp, *mvp;
+	int lkflags;
+
+	lkflags = LK_EXCLUSIVE | LK_INTERLOCK;
+	if (flags != MNT_WAIT)
+		lkflags |= LK_NOWAIT;
+
+	MNT_VNODE_FOREACH_ACTIVE(vp, mp, mvp) {
+		if ((vp->v_iflag & VI_DEFINACT) == 0) {
+			VI_UNLOCK(vp);
+			continue;
+		}
+		vp->v_iflag &= ~VI_DEFINACT;
+		vfs_deferred_inactive(vp, lkflags);
+	}
+}
+
+static inline bool
+vfs_want_msync(struct vnode *vp)
+{
+	struct vm_object *obj;
+
+	if (vp->v_vflag & VV_NOSYNC)
+		return (false);
+	obj = vp->v_object;
+	return (obj != NULL && vm_object_mightbedirty(obj));
+}
+
+static void __noinline
+vfs_periodic_msync_inactive(struct mount *mp, int flags)
 {
 	struct vnode *vp, *mvp;
 	struct vm_object *obj;
+	struct thread *td;
+	int lkflags, objflags;
+	bool seen_defer;
+
+	td = curthread;
+
+	lkflags = LK_EXCLUSIVE | LK_INTERLOCK;
+	if (flags != MNT_WAIT) {
+		lkflags |= LK_NOWAIT;
+		objflags = OBJPC_NOSYNC;
+	} else {
+		objflags = OBJPC_SYNC;
+	}
+
+	MNT_VNODE_FOREACH_ACTIVE(vp, mp, mvp) {
+		seen_defer = false;
+		if (vp->v_iflag & VI_DEFINACT) {
+			vp->v_iflag &= ~VI_DEFINACT;
+			seen_defer = true;
+		}
+		if (!vfs_want_msync(vp)) {
+			if (seen_defer)
+				vfs_deferred_inactive(vp, lkflags);
+			else
+				VI_UNLOCK(vp);
+			continue;
+		}
+		if (vget(vp, lkflags, td) == 0) {
+			obj = vp->v_object;
+			if (obj != NULL && (vp->v_vflag & VV_NOSYNC) == 0) {
+				VM_OBJECT_WLOCK(obj);
+				vm_object_page_clean(obj, 0, 0, objflags);
+				VM_OBJECT_WUNLOCK(obj);
+			}
+			vput(vp);
+			if (seen_defer)
+				vdrop(vp);
+		} else {
+			if (seen_defer)
+				vdefer_inactive_cond(vp);
+		}
+	}
+}
+
+void
+vfs_periodic(struct mount *mp, int flags)
+{
 
 	CTR2(KTR_VFS, "%s: mp %p", __func__, mp);
 
 	if ((mp->mnt_kern_flag & MNTK_NOMSYNC) != 0)
-		return;
-
-	MNT_VNODE_FOREACH_ACTIVE(vp, mp, mvp) {
-		obj = vp->v_object;
-		if (obj != NULL && vm_object_mightbedirty(obj) &&
-		    (flags == MNT_WAIT || VOP_ISLOCKED(vp) == 0)) {
-			if (!vget(vp,
-			    LK_EXCLUSIVE | LK_RETRY | LK_INTERLOCK,
-			    curthread)) {
-				if (vp->v_vflag & VV_NOSYNC) {	/* unlinked */
-					vput(vp);
-					continue;
-				}
-
-				obj = vp->v_object;
-				if (obj != NULL) {
-					VM_OBJECT_WLOCK(obj);
-					vm_object_page_clean(obj, 0, 0,
-					    flags == MNT_WAIT ?
-					    OBJPC_SYNC : OBJPC_NOSYNC);
-					VM_OBJECT_WUNLOCK(obj);
-				}
-				vput(vp);
-			}
-		} else
-			VI_UNLOCK(vp);
-	}
+		vfs_periodic_inactive(mp, flags);
+	else
+		vfs_periodic_msync_inactive(mp, flags);
 }
 
 static void
@@ -4507,6 +4676,7 @@ static struct vop_vector sync_vnodeops = {
 	.vop_unlock =	vop_stdunlock,	/* unlock */
 	.vop_islocked =	vop_stdislocked,	/* islocked */
 };
+VFS_VOP_VECTOR_REGISTER(sync_vnodeops);
 
 /*
  * Create a new filesystem syncer vnode for the specified mount point.
@@ -4530,7 +4700,7 @@ vfs_allocate_syncvnode(struct mount *mp)
 	if (error != 0)
 		panic("vfs_allocate_syncvnode: insmntque() failed");
 	vp->v_vflag &= ~VV_FORCEINSMQ;
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	/*
 	 * Place the vnode onto the syncer worklist. We attempt to
 	 * scatter them about on the list so that they will go off
@@ -4621,7 +4791,7 @@ sync_fsync(struct vop_fsync_args *ap)
 	 * batch.  Return them instead of letting them stay there indefinitely.
 	 */
 	vnlru_return_batch(mp);
-	vfs_msync(mp, MNT_NOWAIT);
+	vfs_periodic(mp, MNT_NOWAIT);
 	error = VFS_SYNC(mp, MNT_LAZY);
 	curthread_pflags_restore(save);
 	vn_finished_write(mp);
@@ -5049,18 +5219,13 @@ vop_unlock_pre(void *ap)
 {
 	struct vop_unlock_args *a = ap;
 
-	if (a->a_flags & LK_INTERLOCK)
-		ASSERT_VI_LOCKED(a->a_vp, "VOP_UNLOCK");
 	ASSERT_VOP_LOCKED(a->a_vp, "VOP_UNLOCK");
 }
 
 void
 vop_unlock_post(void *ap, int rc)
 {
-	struct vop_unlock_args *a = ap;
-
-	if (a->a_flags & LK_INTERLOCK)
-		ASSERT_VI_UNLOCKED(a->a_vp, "VOP_UNLOCK");
+	return;
 }
 
 void
@@ -5238,7 +5403,7 @@ vop_close_post(void *ap, int rc)
 	struct vop_close_args *a = ap;
 
 	if (!rc && (a->a_cred != NOCRED || /* filter out revokes */
-	    (a->a_vp->v_iflag & VI_DOOMED) == 0)) {
+	    !VN_IS_DOOMED(a->a_vp))) {
 		VFS_KNOTE_LOCKED(a->a_vp, (a->a_fflag & FWRITE) != 0 ?
 		    NOTE_CLOSE_WRITE : NOTE_CLOSE);
 	}
@@ -5391,7 +5556,7 @@ vfs_knlunlock(void *arg)
 {
 	struct vnode *vp = arg;
 
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 }
 
 static void
@@ -5706,7 +5871,7 @@ restart:
 		MNT_ILOCK(mp);
 		vp = mp->mnt_rootvnode;
 		if (vp != NULL) {
-			if ((vp->v_iflag & VI_DOOMED) == 0) {
+			if (!VN_IS_DOOMED(vp)) {
 				vrefact(vp);
 				MNT_IUNLOCK(mp);
 				error = vn_lock(vp, flags);
@@ -5746,7 +5911,7 @@ restart:
 			mp->mnt_rootvnode = *vpp;
 		} else {
 			if (mp->mnt_rootvnode != *vpp) {
-				if ((mp->mnt_rootvnode->v_iflag & VI_DOOMED) == 0) {
+				if (!VN_IS_DOOMED(mp->mnt_rootvnode)) {
 					panic("%s: mismatch between vnode returned "
 					    " by VFS_CACHEDROOT and the one cached "
 					    " (%p != %p)",
@@ -5768,7 +5933,7 @@ vfs_cache_root(struct mount *mp, int flags, struct vnode **vpp)
 	if (!vfs_op_thread_enter(mp))
 		return (vfs_cache_root_fallback(mp, flags, vpp));
 	vp = (struct vnode *)atomic_load_ptr(&mp->mnt_rootvnode);
-	if (vp == NULL || (vp->v_iflag & VI_DOOMED)) {
+	if (vp == NULL || VN_IS_DOOMED(vp)) {
 		vfs_op_thread_exit(mp);
 		return (vfs_cache_root_fallback(mp, flags, vpp));
 	}
@@ -5813,7 +5978,6 @@ vfs_cache_root_set(struct mount *mp, struct vnode *vp)
  * This interface replaces MNT_VNODE_FOREACH.
  */
 
-MALLOC_DEFINE(M_VNODE_MARKER, "vnodemarker", "vnode marker");
 
 struct vnode *
 __mnt_vnode_next_all(struct vnode **mvp, struct mount *mp)
@@ -5826,11 +5990,11 @@ __mnt_vnode_next_all(struct vnode **mvp, struct mount *mp)
 	KASSERT((*mvp)->v_mount == mp, ("marker vnode mount list mismatch"));
 	for (vp = TAILQ_NEXT(*mvp, v_nmntvnodes); vp != NULL;
 	    vp = TAILQ_NEXT(vp, v_nmntvnodes)) {
-		/* Allow a racy peek at VI_DOOMED to save a lock acquisition. */
-		if (vp->v_type == VMARKER || (vp->v_iflag & VI_DOOMED) != 0)
+		/* Allow a racy peek at VIRF_DOOMED to save a lock acquisition. */
+		if (vp->v_type == VMARKER || VN_IS_DOOMED(vp))
 			continue;
 		VI_LOCK(vp);
-		if ((vp->v_iflag & VI_DOOMED) != 0) {
+		if (VN_IS_DOOMED(vp)) {
 			VI_UNLOCK(vp);
 			continue;
 		}
@@ -5853,18 +6017,16 @@ __mnt_vnode_first_all(struct vnode **mvp, struct mount *mp)
 {
 	struct vnode *vp;
 
-	*mvp = malloc(sizeof(struct vnode), M_VNODE_MARKER, M_WAITOK | M_ZERO);
+	*mvp = vn_alloc_marker(mp);
 	MNT_ILOCK(mp);
 	MNT_REF(mp);
-	(*mvp)->v_mount = mp;
-	(*mvp)->v_type = VMARKER;
 
 	TAILQ_FOREACH(vp, &mp->mnt_nvnodelist, v_nmntvnodes) {
-		/* Allow a racy peek at VI_DOOMED to save a lock acquisition. */
-		if (vp->v_type == VMARKER || (vp->v_iflag & VI_DOOMED) != 0)
+		/* Allow a racy peek at VIRF_DOOMED to save a lock acquisition. */
+		if (vp->v_type == VMARKER || VN_IS_DOOMED(vp))
 			continue;
 		VI_LOCK(vp);
-		if ((vp->v_iflag & VI_DOOMED) != 0) {
+		if (VN_IS_DOOMED(vp)) {
 			VI_UNLOCK(vp);
 			continue;
 		}
@@ -5873,7 +6035,7 @@ __mnt_vnode_first_all(struct vnode **mvp, struct mount *mp)
 	if (vp == NULL) {
 		MNT_REL(mp);
 		MNT_IUNLOCK(mp);
-		free(*mvp, M_VNODE_MARKER);
+		vn_free_marker(*mvp);
 		*mvp = NULL;
 		return (NULL);
 	}
@@ -5897,7 +6059,7 @@ __mnt_vnode_markerfree_all(struct vnode **mvp, struct mount *mp)
 	TAILQ_REMOVE(&mp->mnt_nvnodelist, *mvp, v_nmntvnodes);
 	MNT_REL(mp);
 	MNT_IUNLOCK(mp);
-	free(*mvp, M_VNODE_MARKER);
+	vn_free_marker(*mvp);
 	*mvp = NULL;
 }
 
@@ -5914,7 +6076,7 @@ mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *mp)
 	MNT_ILOCK(mp);
 	MNT_REL(mp);
 	MNT_IUNLOCK(mp);
-	free(*mvp, M_VNODE_MARKER);
+	vn_free_marker(*mvp);
 	*mvp = NULL;
 }
 
@@ -6021,7 +6183,7 @@ restart:
 		KASSERT(vp->v_type != VMARKER, ("locked marker %p", vp));
 		KASSERT(vp->v_mount == mp || vp->v_mount == NULL,
 		    ("alien vnode on the active list %p %p", vp, mp));
-		if (vp->v_mount == mp && (vp->v_iflag & VI_DOOMED) == 0)
+		if (vp->v_mount == mp && !VN_IS_DOOMED(vp))
 			break;
 		nvp = TAILQ_NEXT(vp, v_actfreelist);
 		VI_UNLOCK(vp);
@@ -6057,12 +6219,10 @@ __mnt_vnode_first_active(struct vnode **mvp, struct mount *mp)
 {
 	struct vnode *vp;
 
-	*mvp = malloc(sizeof(struct vnode), M_VNODE_MARKER, M_WAITOK | M_ZERO);
+	*mvp = vn_alloc_marker(mp);
 	MNT_ILOCK(mp);
 	MNT_REF(mp);
 	MNT_IUNLOCK(mp);
-	(*mvp)->v_type = VMARKER;
-	(*mvp)->v_mount = mp;
 
 	mtx_lock(&mp->mnt_listmtx);
 	vp = TAILQ_FIRST(&mp->mnt_activevnodelist);

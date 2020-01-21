@@ -323,6 +323,7 @@ while ((getline < srcfile) > 0) {
 	}
 
 	if (cfile) {
+		funcarr[name] = 1;
 		# Print out the vop_F_vp_offsets structure.  This all depends
 		# on naming conventions and nothing else.
 		printc("static int " name "_vp_offsets[] = {");
@@ -361,20 +362,21 @@ while ((getline < srcfile) > 0) {
 		printc("");
 		printc("\tVNASSERT(a->a_gen.a_desc == &" name "_desc, a->a_" args[0]",");
 		printc("\t    (\"Wrong a_desc in " name "(%p, %p)\", a->a_" args[0]", a));");
-		printc("\twhile(vop != NULL && \\");
-		printc("\t    vop->"name" == NULL && vop->vop_bypass == NULL)")
-		printc("\t\tvop = vop->vop_default;")
 		printc("\tVNASSERT(vop != NULL, a->a_" args[0]", (\"No "name"(%p, %p)\", a->a_" args[0]", a));")
-		printc("\tSDT_PROBE2(vfs, vop, " name ", entry, a->a_" args[0] ", a);\n");
-		for (i = 0; i < numargs; ++i)
-			add_debug_code(name, args[i], "Entry", "\t");
 		printc("\tKTR_START" ctrstr);
 		add_pre(name);
-		printc("\tif (vop->"name" != NULL)")
+		for (i = 0; i < numargs; ++i)
+			add_debug_code(name, args[i], "Entry", "\t");
+		printc("\tif (__predict_true(!SDT_PROBES_ENABLED() && vop->"name" != NULL)) {");
 		printc("\t\trc = vop->"name"(a);")
-		printc("\telse")
-		printc("\t\trc = vop->vop_bypass(&a->a_gen);")
-		printc("\tSDT_PROBE3(vfs, vop, " name ", return, a->a_" args[0] ", a, rc);\n");
+		printc("\t} else {")
+		printc("\t\tSDT_PROBE2(vfs, vop, " name ", entry, a->a_" args[0] ", a);");
+		printc("\t\tif (vop->"name" != NULL)")
+		printc("\t\t\trc = vop->"name"(a);")
+		printc("\t\telse")
+		printc("\t\t\trc = vop->vop_bypass(&a->a_gen);")
+		printc("\t\tSDT_PROBE3(vfs, vop, " name ", return, a->a_" args[0] ", a, rc);");
+		printc("\t}")
 		printc("\tif (rc == 0) {");
 		for (i = 0; i < numargs; ++i)
 			add_debug_code(name, args[i], "OK", "\t\t");
@@ -422,9 +424,44 @@ while ((getline < srcfile) > 0) {
 		printc("};\n");
 	}
 }
- 
-if (pfile)
+
+if (cfile) {
+	printc("void");
+	printc("vfs_vector_op_register(struct vop_vector *orig_vop)");
+	printc("{");
+	printc("\tstruct vop_vector *vop;");
+	printc("");
+	printc("\tif (orig_vop->registered)");
+	printc("\t\tpanic(\"%s: vop_vector %p already registered\",")
+	printc("\t\t    __func__, orig_vop);");
+	printc("");
+	for (name in funcarr) {
+		printc("\tvop = orig_vop;");
+		printc("\twhile (vop != NULL && \\");
+		printc("\t    vop->"name" == NULL && vop->vop_bypass == NULL)")
+		printc("\t\tvop = vop->vop_default;")
+		printc("\tif (vop != NULL)");
+		printc("\t\torig_vop->"name" = vop->"name";");
+		printc("");
+	}
+	printc("\tvop = orig_vop;");
+	printc("\twhile (vop != NULL && vop->vop_bypass == NULL)")
+	printc("\t\tvop = vop->vop_default;")
+	printc("\tif (vop != NULL)");
+	printc("\t\torig_vop->vop_bypass = vop->vop_bypass;");
+	printc("");
+	printc("\torig_vop->registered = true;");
+	printc("}")
+}
+
+if (hfile) {
+	printh("void vfs_vector_op_register(struct vop_vector *orig_vop);");
+}
+
+if (pfile) {
+	printp("\tbool\tregistered;")
 	printp("};")
+}
  
 if (hfile)
 	close(hfile);

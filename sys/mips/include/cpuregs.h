@@ -507,7 +507,11 @@ extern caddr_t cheri_kall_capability;
 #define	MIPS_COP_0_TLB_HI	_(10)
 #define	MIPS_COP_0_STATUS	_(12)
 #define	MIPS_COP_0_CAUSE	_(13)
+#if __has_feature(capabilities)
+#pragma GCC poison MIPS_COP_0_EXC_PC
+#else
 #define	MIPS_COP_0_EXC_PC	_(14)
+#endif
 #define	MIPS_COP_0_PRID		_(15)
 
 /* MIPS-III */

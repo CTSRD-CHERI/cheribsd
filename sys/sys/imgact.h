@@ -53,9 +53,7 @@ struct image_args {
 	char *fname_buf;	/* pointer to optional malloc(M_TEMP) buffer */
 	int stringspace;	/* space left in arg & env buffer */
 	int argc;		/* count of argument strings */
-	char **argv;		/* pointer to argv (user space) */
 	int envc;		/* count of environment strings */
-	char **envv;		/* pointer to envv (user space) */
 	int fd;			/* file descriptor of the executable */
 	struct filedesc *fdp;	/* new file descriptor table */
 };
@@ -80,15 +78,17 @@ struct image_params {
 	char *interpreter_name;	/* name of the interpreter */
 	void *auxargs;		/* ELF Auxinfo structure pointer */
 	struct sf_buf *firstpage;	/* first page that we mapped */
-	unsigned long ps_strings; /* PS_STRINGS for BSD/OS binaries */
+	void * __capability ps_strings;
 	struct image_args *args;	/* system call arguments */
 	struct sysentvec *sysent;	/* system entry vector */
+	void * __capability argv;	/* pointer to argv (user space) */
+	void * __capability envv;	/* pointer to envv (user space) */
 	char *execpath;
-	unsigned long execpathp;
+	void * __capability execpathp;
 	char *freepath;
-	unsigned long canary;
+	void * __capability canary;
 	int canarylen;
-	unsigned long pagesizes;
+	void * __capability pagesizes;
 	int pagesizeslen;
 	vm_prot_t stack_prot;
 	u_long stack_sz;
@@ -115,10 +115,10 @@ int	exec_args_adjust_args(struct image_args *args, size_t consume,
 	    ssize_t extend);
 char	*exec_args_get_begin_envv(struct image_args *args);
 int	exec_check_permissions(struct image_params *);
-int	exec_copyout_strings(struct image_params *, uintptr_t *);
+int	exec_copyout_strings(struct image_params *, uintcap_t *);
 void	exec_free_args(struct image_args *);
 int	exec_new_vmspace(struct image_params *, struct sysentvec *);
-void	exec_setregs(struct thread *, struct image_params *, uintptr_t);
+void	exec_setregs(struct thread *, struct image_params *, uintcap_t);
 int	exec_shell_imgact(struct image_params *);
 int	exec_copyin_args(struct image_args *, const char * __capability,
 	    enum uio_seg, void * __capability, void * __capability);

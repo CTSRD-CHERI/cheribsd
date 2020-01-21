@@ -185,7 +185,7 @@ static void
 release_aps(void *dummy __unused)
 {
 	cpuset_t mask;
-	int cpu, i;
+	int i;
 
 	if (mp_ncpus == 1)
 		return;
@@ -204,13 +204,8 @@ release_aps(void *dummy __unused)
 	sbi_send_ipi(mask.__bits);
 
 	for (i = 0; i < 2000; i++) {
-		if (smp_started) {
-			for (cpu = 0; cpu <= mp_maxid; cpu++) {
-				if (CPU_ABSENT(cpu))
-					continue;
-			}
+		if (smp_started)
 			return;
-		}
 		DELAY(1000);
 	}
 

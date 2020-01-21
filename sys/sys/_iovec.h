@@ -46,10 +46,6 @@ struct iovec {
 	void * __kerncap	iov_base;	/* Base address. */
 	size_t			iov_len;	/* Length. */
 };
-struct iovec_native {
-	void *	iov_base;	/* Base address. */
-	size_t			iov_len;	/* Length. */
-};
 
 #if defined(_KERNEL)
 #define	IOVEC_INIT(iovp, base, len)	do {				\
@@ -84,6 +80,8 @@ struct iovec_native {
 #ifdef _KERNEL
 struct uio;
 
+typedef int (copyiniov_t)(const struct iovec * __capability iovp, u_int iovcnt,
+            struct iovec **iov, int error);
 typedef int (copyinuio_t)(void * __capability iovp, u_int iovcnt,
 	    struct uio **iov);
 typedef int (updateiov_t)(const struct uio *uiop, void * __capability iovp);

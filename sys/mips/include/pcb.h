@@ -257,36 +257,22 @@
 /*
  * Note: Updating EPCC will also update CP0_EPC. Therefore we should not be
  * setting CP0_EPC to the value of PC (which is an absolute pc address).
- * All kernel code updates the PC value and not PCC (which effectively only
- * contains the bounds). This means we need to update the offset of PCC to
- * value of PC - PCC.base before writing to EPCC.
  *
- * pc_vaddr_tmpreg: u_long register used for the pc offset.
- * tmpcreg: this is a capability temporary register.
- * pcb: pointer to the PCB structure.
+ * The kernel has been adjusted to use $pcc instead of $pc everywhere so we
+ * can simply write that to $epcc.
  */
-#ifdef CHERI_PURECAP_KERNEL
-
-#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpcreg, pcb, tmpreg2)	\
-	/* EPCC is no longer a GPR so load it into tmpcreg first */	\
-	RESTORE_U_PCB_CREG(tmpcreg, PCC, pcb);				\
-	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
-	RESTORE_EPCC(tmpcreg, pc_vaddr_tmpreg, tmpreg2)
-
-#else /* ! CHERI_PURECAP_KERNEL */
-
-#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, tmpreg2, pcb)			\
-	/* EPCC is no longer a GPR so load it into KSCRATCH first */	\
+#define RESTORE_U_PCB_PC(unused_pc_vaddr_tmpreg, pcb)			\
+	/* EPCC is no longer a GPR so load it into C27 first. */	\
+	csetkr1c	CHERI_REG_KSCRATCH; /* Save $c27 in $kr1c. */	\
 	RESTORE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);		\
-	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);			\
-	RESTORE_EPCC(CHERI_REG_KSCRATCH, pc_vaddr_tmpreg, tmpreg2);	\
-	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb)
-
-#endif /* ! CHERI_PURECAP_KERNEL */
-
+	CSetEPCC CHERI_REG_KSCRATCH;					\
+	/* Restore $c27 since we clobbered it to set EPCC */		\
+	cgetkr1c	CHERI_REG_KSCRATCH;				\
+	/* Clear kr1c again */						\
+	csetkr1c	$cnull
 #else /* ! CPU_CHERI */
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
-#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, unused_reg, pcb)	\
+#define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, pcb)	\
 	RESTORE_U_PCB_REG(pc_vaddr_tmpreg, PC, pcb);		\
 	MTC0	pc_vaddr_tmpreg, MIPS_COP_0_EXC_PC
 #endif /* ! CPU_CHERI */
@@ -305,7 +291,7 @@ struct pcb
 	struct trapframe pcb_regs;	/* saved CPU and registers */
 	__register_t pcb_context[14];	/* kernel context for resume */
 	void *pcb_onfault;		/* for copyin/copyout faults */
-	register_t pcb_tpc;
+	trapf_pc_t pcb_tpc;
 #ifdef CPU_CHERI
 	struct cheri_signal pcb_cherisignal;	/* CHERI signal-related state. */
 	struct cheri_kframe pcb_cherikframe;	/* kernel caller-save state. */

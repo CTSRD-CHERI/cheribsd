@@ -537,7 +537,7 @@ quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname
 		}
 	}
 	if (error != 0) {
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		(void) vn_close(vp, FREAD|FWRITE, td->td_ucred, td);
 		return (error);
 	}
@@ -545,7 +545,7 @@ quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname
 	UFS_LOCK(ump);
 	if ((ump->um_qflags[type] & (QTF_OPENING|QTF_CLOSING)) != 0) {
 		UFS_UNLOCK(ump);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		(void) vn_close(vp, FREAD|FWRITE, td->td_ucred, td);
 		vfs_unbusy(mp);
 		return (EALREADY);
@@ -553,7 +553,7 @@ quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname
 	ump->um_qflags[type] |= QTF_OPENING|QTF_CLOSING;
 	UFS_UNLOCK(ump);
 	if ((error = dqopen(vp, ump, type)) != 0) {
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		UFS_LOCK(ump);
 		ump->um_qflags[type] &= ~(QTF_OPENING|QTF_CLOSING);
 		UFS_UNLOCK(ump);
@@ -561,7 +561,7 @@ quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname
 		vfs_unbusy(mp);
 		return (error);
 	}
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	MNT_ILOCK(mp);
 	mp->mnt_flag |= MNT_QUOTA;
 	MNT_IUNLOCK(mp);
@@ -585,7 +585,7 @@ quotaon(struct thread *td, struct mount *mp, int type, void * __capability fname
 	vp->v_vflag |= VV_SYSTEM;
 	VN_LOCK_AREC(vp);
 	VN_LOCK_DSHARE(vp);
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	*vpp = vp;
 	/*
 	 * Save the credential of the process that turned on quotas.
@@ -620,12 +620,12 @@ again:
 			goto again;
 		}
 		if (vp->v_type == VNON || vp->v_writecount <= 0) {
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 			vrele(vp);
 			continue;
 		}
 		error = getinoquota(VTOI(vp));
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vrele(vp);
 		if (error) {
 			MNT_VNODE_FOREACH_ALL_ABORT(mp, mvp);
@@ -690,7 +690,7 @@ again:
 		dq = ip->i_dquot[type];
 		ip->i_dquot[type] = NODQUOT;
 		dqrele(vp, dq);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vrele(vp);
 	}
 
@@ -709,7 +709,7 @@ again:
 
 	vn_lock(qvp, LK_EXCLUSIVE | LK_RETRY);
 	qvp->v_vflag &= ~VV_SYSTEM;
-	VOP_UNLOCK(qvp, 0);
+	VOP_UNLOCK(qvp);
 	error = vn_close(qvp, FREAD|FWRITE, td->td_ucred, td);
 	crfree(cr);
 

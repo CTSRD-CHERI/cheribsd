@@ -546,7 +546,7 @@ sendfile_getobj(struct thread *td, struct file *fp, vm_object_t *obj_res,
 
 out:
 	if (vp != NULL)
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 	return (error);
 }
 
@@ -766,7 +766,7 @@ retry_space:
 				goto done;
 			error = VOP_GETATTR(vp, &va, td->td_ucred);
 			if (error != 0 || off >= va.va_size) {
-				VOP_UNLOCK(vp, 0);
+				VOP_UNLOCK(vp);
 				goto done;
 			}
 			if (va.va_size != obj_size) {
@@ -832,7 +832,7 @@ retry_space:
 		    rhpages, flags);
 		if (error != 0) {
 			if (vp != NULL)
-				VOP_UNLOCK(vp, 0);
+				VOP_UNLOCK(vp);
 			sfio->m = NULL;
 			sendfile_iodone(sfio, NULL, 0, error);
 			goto done;
@@ -1014,7 +1014,7 @@ retry_space:
 		}
 
 		if (vp != NULL)
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 
 		/* Keep track of bytes processed. */
 		off += space;
@@ -1142,20 +1142,10 @@ out:
 }
 
 static int
-copyin_hdtr(const struct sf_hdtr_native * __capability uhdtr, struct sf_hdtr *hdtr)
+copyin_hdtr(const struct sf_hdtr * __capability uhdtr, struct sf_hdtr *hdtr)
 {
-	struct sf_hdtr_native hdtr_n;
-	int error;
 
-	error = copyin_c(uhdtr, &hdtr_n, sizeof(hdtr_n));
-	if (error != 0)
-		return (error);
-	hdtr->headers = (void * __capability)__USER_CAP_ARRAY(hdtr_n.headers, hdtr_n.hdr_cnt);
-	hdtr->hdr_cnt = hdtr_n.hdr_cnt;
-	hdtr->trailers = (void * __capability)__USER_CAP_ARRAY(hdtr_n.trailers, hdtr_n.trl_cnt);
-	hdtr->hdr_cnt = hdtr_n.trl_cnt;
-
-	return (0);
+	return (copyincap(uhdtr, hdtr, sizeof(*hdtr)));
 }
 
 int

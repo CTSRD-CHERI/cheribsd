@@ -62,6 +62,7 @@ local config = {
 	abi_flags = "",
 	abi_flags_mask = 0,
 	abi_headers = "",
+	abi_intptr_t = "intptr_t",
 	ptr_intptr_t_cast = "intptr_t",
 	ptr_qualified="*",
 	ptrmaskname = "sysargmask",
@@ -71,14 +72,14 @@ local config_modified = {}
 local cleantmp = true
 local tmpspace = "/tmp/sysent." .. unistd.getpid() .. "/"
 
--- These ones we'll open in place
-local config_files_needed = {
+local output_files = {
 	"sysargmap",
 	"sysnames",
 	"syshdr",
 	"sysmk",
 	"syssw",
 	"systrace",
+	"sysproto",
 }
 
 -- These ones we'll create temporary files for; generation purposes.
@@ -430,9 +431,11 @@ local function write_line_pfile(tmppat, line)
 	end
 end
 
+-- Check both literal intptr_t and the abi version because this needs
+-- to work both before and after the substitution
 local function isptrtype(type)
 	return type:find("*") or type:find("caddr_t") or
-	    type:find("intptr_t")
+	    type:find("intptr_t") or type:find(config['abi_intptr_t'])
 end
 
 local process_syscall_def
@@ -623,6 +626,8 @@ local function process_args(args)
 			goto out
 		end
 
+		argtype = argtype:gsub("intptr_t", config["abi_intptr_t"])
+
 		-- XX TODO: Forward declarations? See: sysstubfwd in CheriBSD
 		if abi_change then
 			local abi_type_suffix = config["abi_type_suffix"]
@@ -752,7 +757,7 @@ local function handle_noncompat(sysnum, thr_flag, flags, sysflags, rettype,
 	local daflags = get_mask({"NOPROTO", "NODEF"})
 	if flags & daflags == 0 then
 		write_line("sysargmap", string.format("\t[%s%s] = (0x0",
-		    config["syscallprefix"], funcname))
+		    config["syscallprefix"], funcalias))
 		local i = 0
 		for _, v in ipairs(funcargs) do
 			if isptrtype(v["type"]) then
@@ -1059,6 +1064,7 @@ process_syscall_def = function(line)
 			abort(1, "Not a signature? " .. line)
 		end
 		args = line:match("^[^(]+%((.+)%)[^)]*$")
+		args = trim(args, '[,%s]')
 	end
 
 	::skipalt::
@@ -1214,9 +1220,9 @@ for _, v in ipairs(temp_files) do
 	files[v] = io.open(tmpname, "w+")
 end
 
-
-for _, v in ipairs(config_files_needed) do
-	files[v] = io.open(config[v], "w+")
+for _, v in ipairs(output_files) do
+	local tmpname = tmpspace .. v
+	files[v] = io.open(tmpname, "w+")
 end
 
 -- Write out all of the preamble bits
@@ -1287,7 +1293,7 @@ for _, v in pairs(compat_options) do
 end
 
 write_line("sysargmap", string.format([[/*
- * System call prototypes.
+ * System call argument map.
  *
  * DO NOT EDIT-- this file is automatically %s.
  * $%s$
@@ -1419,23 +1425,37 @@ write_line("systraceret", [[
 ]])
 
 -- Finish up; output
-write_line("sysargmap", "};\n")
+write_line("sysargmap", string.format([[
+};
+
+#endif /* !%s */
+]], config["sysargmap_h"]))
 
 write_line("syssw", read_file("sysinc"))
 write_line("syssw", read_file("sysent"))
 
-local fh = io.open(config["sysproto"], "w+")
-fh:write(read_file("sysarg"))
-fh:write(read_file("sysdcl"))
+write_line("sysproto", read_file("sysarg"))
+write_line("sysproto", read_file("sysdcl"))
 for _, v in pairs(compat_options) do
-	fh:write(read_file(v["tmp"]))
-	fh:write(read_file(v["dcltmp"]))
+	write_line("sysproto", read_file(v["tmp"]))
+	write_line("sysproto", read_file(v["dcltmp"]))
 end
-fh:write(read_file("sysaue"))
-fh:write(read_file("sysprotoend"))
-fh:close()
+write_line("sysproto", read_file("sysaue"))
+write_line("sysproto", read_file("sysprotoend"))
 
 write_line("systrace", read_file("systracetmp"))
 write_line("systrace", read_file("systraceret"))
+
+for _, v in ipairs(output_files) do
+	local target = config[v]
+	if target ~= "/dev/null" then
+		local fh = io.open(target, "w+")
+		if fh == nil then
+			abort(1, "Failed to open '" .. target .. "'")
+		end
+		fh:write(read_file(v))
+		fh:close()
+	end
+end
 
 cleanup()

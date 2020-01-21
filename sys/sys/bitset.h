@@ -41,7 +41,7 @@
 #define	__constexpr_cond(expr)	(__builtin_constant_p((expr)) && (expr))
 
 #define	__bitset_mask(_s, n)						\
-	(1L << (__constexpr_cond(__bitset_words((_s)) == 1) ?		\
+	(1UL << (__constexpr_cond(__bitset_words((_s)) == 1) ?		\
 	    (__size_t)(n) : ((n) % _BITSET_BITS)))
 
 #define	__bitset_word(_s, n)						\
@@ -149,13 +149,13 @@
 		(d)->__bits[__i] = (s1)->__bits[__i] & (s2)->__bits[__i];\
 } while (0)
 
-#define	BIT_NAND(_s, d, s) do {						\
+#define	BIT_ANDNOT(_s, d, s) do {					\
 	__size_t __i;							\
 	for (__i = 0; __i < __bitset_words((_s)); __i++)		\
 		(d)->__bits[__i] &= ~(s)->__bits[__i];			\
 } while (0)
 
-#define	BIT_NAND2(_s, d, s1, s2) do {					\
+#define	BIT_ANDNOT2(_s, d, s1, s2) do {					\
 	__size_t __i;							\
 	for (__i = 0; __i < __bitset_words((_s)); __i++)		\
 		(d)->__bits[__i] = (s1)->__bits[__i] & ~(s2)->__bits[__i];\

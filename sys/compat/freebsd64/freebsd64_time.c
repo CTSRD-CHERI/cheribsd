@@ -38,9 +38,10 @@ __FBSDID("$FreeBSD$");
 #include "opt_ffclock.h"
 
 #include <sys/param.h>
-#include <sys/timeffc.h>
 #include <sys/proc.h>
 #include <sys/syscallsubr.h>
+#include <sys/sysctl.h>
+#include <sys/timeffc.h>
 #include <sys/timex.h>
 
 #include <compat/freebsd64/freebsd64_proto.h>
@@ -286,14 +287,18 @@ int
 freebsd64_ktimer_create(struct thread *td,
     struct freebsd64_ktimer_create_args *uap)
 {
-	struct sigevent_c ev, *evp;
+	struct sigevent64 ev64;
+	struct sigevent ev, *evp;
 	int error, id;
 
 	if (uap->evp == NULL) {
 		evp = NULL;
 	} else {
 		error = copyin(PURECAP_KERNEL_USER_CAP_OBJ(uap->evp),
-		    &ev, sizeof(ev));
+		    &ev64, sizeof(ev64));
+		if (error != 0)
+			return (error);
+		error = convert_sigevent64(&ev64, &ev);
 		if (error != 0)
 			return (error);
 		evp = &ev;

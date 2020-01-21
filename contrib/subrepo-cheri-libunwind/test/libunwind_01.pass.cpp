@@ -10,7 +10,7 @@ void backtrace(int lower_bound) {
   unw_init_local(&cursor, &context);
 
   char buffer[1024];
-  unw_word_t offset = 0;
+  size_t offset = 0;
 
   int n = 0;
   while (1) {

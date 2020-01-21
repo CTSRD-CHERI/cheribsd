@@ -3,6 +3,8 @@
 .if !targets(__<${_this:T}>__)
 __<${_this:T}>__:
 
+.include <src.libnames.mk>
+
 # Makefile for the compatibility libraries.
 # - 32-bit compat libraries on MIPS, PowerPC, and AMD64.
 # - 64-bit compat on CHERI MIPS
@@ -13,7 +15,7 @@ __<${_this:T}>__:
 LIBCOMPATWMAKEENV+= \
 		INSTALL="sh ${.CURDIR}/tools/install.sh" \
 		PATH=${TMPPATH} \
-		SYSROOT=${LIBCOMPATTMP} \
+		SYSROOT=${WORLDTMP} \
 		LIBDIR=/usr/lib${libcompat} \
 		SHLIBDIR=/usr/lib${libcompat} \
 		DTRACE="${LIB$COMPATDTRACE:U${DTRACE}}"
@@ -24,11 +26,25 @@ LIBCOMPATWMAKEENV+=	BUILD_TOOLS_META=.NOMETA
 LIBCOMPATWMAKEFLAGS+= CC="${XCC} ${LIBCOMPATCFLAGS}" \
 		CXX="${XCXX} ${LIBCOMPATCXXFLAGS} ${LIBCOMPATCFLAGS}" \
 		CPP="${XCPP} ${LIBCOMPATCFLAGS}" \
-		DESTDIR=${LIBCOMPATTMP} \
+		DESTDIR=${WORLDTMP} \
 		-DNO_CPU_CFLAGS \
 		MK_CTF=no \
 		-DNO_LINT \
-		MK_TESTS=no
+		MK_TESTS=no \
+		WORLDTMP_MTREE="${WORLDTMP_MTREE}"
+# Avoid re-computing COMPILER_VERSION, etc. values:
+# $CC is different in the libcompat case compared to the non-compat value.
+# Since bsd.compiler.mk (and bsd.linker.mk) save the variables using a full
+# hash of the compiler/link command, this means that the cached values for
+# X_COMPILER_TYPE, etc. cannot be loaded.
+# Instead set all the values, so that we can avoid including bsd.compiler.mk and
+# bsd.linker.mk. This provides a noticeable speed-up as it avoids multiple
+# processes from being spawned in each subdirectory.
+.for _var in ${_TOOLCHAIN_METADATA_VARS}
+LIBCOMPATWMAKEFLAGS+=	${_var}="${X_${_var}}"
+.endfor
+LIBCOMPATWMAKEFLAGS+=_NO_INCLUDE_LINKERMK=yes _NO_INCLUDE_COMPILERMK=yes
+
 LIBCOMPATWMAKE+=	${LIBCOMPATWMAKEENV} ${MAKE} ${LIBCOMPATWMAKEFLAGS} \
 			OBJTOP=${LIBCOMPAT_OBJTOP} \
 			OBJROOT='$${OBJTOP}/' \
@@ -64,32 +80,13 @@ build${libcompat}: .PHONY
 	@echo "--------------------------------------------------------------"
 	@echo ">>> stage 4.3: building lib${libcompat} shim libraries"
 	@echo "--------------------------------------------------------------"
-.if !defined(NO_CLEAN)
-	rm -rf ${LIBCOMPATTMP}
-.else
-	${_+_}@if [ -e "${LIBCOMPATTMP}" ]; then \
-		echo ">>> Deleting stale files in build${libcompat} tree..."; \
-		cd ${.CURDIR}; ${WMAKE} -DBATCH_DELETE_OLD_FILES \
-		    DESTDIR=${LIBCOMPATTMP} \
-		    delete-old delete-old-libs >/dev/null; \
-	fi
-.endif	# !defined(NO_CLEAN)
 
-	mkdir -p ${LIBCOMPATTMP}/usr/include
-	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.usr.dist \
-	    -p ${LIBCOMPATTMP}/usr >/dev/null
-	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
-	    -p ${LIBCOMPATTMP}/usr/include >/dev/null
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
-	    -p ${LIBCOMPATTMP}/usr >/dev/null
+	    -p ${WORLDTMP}/usr >/dev/null
 .if ${MK_DEBUG_FILES} != "no"
-	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.debug.dist \
-	    -p ${LIBCOMPATTMP}/usr/lib >/dev/null
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.lib${libcompat}.dist \
-	    -p ${LIBCOMPATTMP}/usr/lib/debug/usr >/dev/null
+	    -p ${WORLDTMP}/usr/lib/debug/usr >/dev/null
 .endif
-	mkdir -p ${WORLDTMP}
-	ln -sf ${.CURDIR}/sys ${WORLDTMP}
 .for _t in ${_obj} includes
 .for _dir in ${_LC_INCDIRS}
 	${_+_}cd ${.CURDIR}/${_dir}; ${LIBCOMPATWMAKE} MK_INCLUDES=yes \
@@ -112,6 +109,16 @@ build${libcompat}: .PHONY
 .endfor
 	${_+_}cd ${.CURDIR}; \
 	    ${LIBCOMPATWMAKE} -f Makefile.inc1 -DNO_FSCHG libraries
+.if ${MK_COMPAT_CHERIABI} == "yes" && ${MK_CHERI_PURE} == "yes"
+# To build a purecap world against /usr/libcheri, we need internal libs.
+# Skip amu because it needs unifdef which isn't available here and we
+# don't build amd (and it's going away).
+# We've locally removed gdb.
+.for _lib in ${_INTERNALLIBS:Namu:Ngdb}
+	${_+_}cd ${.CURDIR}${LIB${_lib:tu}DIR:S|${_LIB_OBJTOP}||}; \
+	    ${LIBCOMPATWMAKE} all
+.endfor
+.endif
 
 distribute${libcompat} install${libcompat}: .PHONY
 .for _dir in ${_LC_LIBDIRS.yes}

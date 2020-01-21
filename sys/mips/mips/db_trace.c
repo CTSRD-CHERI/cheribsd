@@ -404,7 +404,17 @@ done:
 	if (trapframe) {
 #define	TF_REG(base, reg)	((base) + CALLFRAME_SIZ + ((reg) * SZREG))
 #if defined(__mips_n64) || defined(__mips_n32)
+#if __has_feature(capabilities)
+		trapf_pc_t pcc;
+		vaddr_t pc_addr = sp + CALLFRAME_SIZ + offsetof(struct trapframe, pc);
+		if (db_read_bytes(pc_addr, sizeof(pcc), (char*)&pcc) != 0) {
+			db_printf("*** error reading from address %llx ***\n",
+			    (long long)pc_addr);
+		}
+		pc = (__cheri_addr register_t)pcc;
+#else
 		pc = kdbpeekd((int *)TF_REG(sp, PC));
+#endif
 		ra = kdbpeekd((int *)TF_REG(sp, RA));
 		sp = kdbpeekd((int *)TF_REG(sp, SP));
 		cause = kdbpeekd((int *)TF_REG(sp, CAUSE));

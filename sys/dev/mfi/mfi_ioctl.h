@@ -30,11 +30,12 @@
 __FBSDID("$FreeBSD$");
 
 #include <dev/mfi/mfireg.h>
-
-struct iovec32 {
-	u_int32_t	iov_base;
-	int		iov_len;
-};
+#ifdef COMPAT_FREEBSD32
+#include <compat/freebsd32/freebsd32.h>
+#endif
+#ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64.h>
+#endif
 
 #define MFIQ_FREE	0
 #define MFIQ_BIO	1
@@ -87,24 +88,6 @@ struct mfi_ioc_packet {
 	struct iovec mfi_sgl[MAX_IOCTL_SGE];
 } __packed __aligned(sizeof(void *__capability));
 
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
-struct mfi_ioc_packet64 {
-	uint16_t	mfi_adapter_no;
-	uint16_t	mfi_pad1;
-	uint32_t	mfi_sgl_off;
-	uint32_t	mfi_sge_count;
-	uint32_t	mfi_sense_off;
-	uint32_t	mfi_sense_len;
-	union {
-		uint8_t raw[128];
-		struct mfi_frame_header hdr;
-	} mfi_frame;
-
-	struct iovec_native mfi_sgl[MAX_IOCTL_SGE];
-} __packed __aligned(sizeof(void *__capability));
-#endif
-
 #ifdef COMPAT_FREEBSD32
 struct mfi_ioc_packet32 {
 	uint16_t	mfi_adapter_no;
@@ -122,6 +105,23 @@ struct mfi_ioc_packet32 {
 } __packed;
 #endif
 
+#ifdef COMPAT_FREEBSD64
+struct mfi_ioc_packet64 {
+	uint16_t	mfi_adapter_no;
+	uint16_t	mfi_pad1;
+	uint32_t	mfi_sgl_off;
+	uint32_t	mfi_sge_count;
+	uint32_t	mfi_sense_off;
+	uint32_t	mfi_sense_len;
+	union {
+		uint8_t raw[128];
+		struct mfi_frame_header hdr;
+	} mfi_frame;
+
+	struct iovec64 mfi_sgl[MAX_IOCTL_SGE];
+} __packed;
+#endif
+
 struct mfi_ioc_aen {
 	uint16_t	aen_adapter_no;
 	uint16_t	aen_pad1;
@@ -131,7 +131,10 @@ struct mfi_ioc_aen {
 
 #define MFI_CMD		_IOWR('M', 1, struct mfi_ioc_packet)
 #ifdef COMPAT_FREEBSD32
-#define MFI_CMD32	_IOWR('M', 1, struct mfi_ioc_packet32)
+#define MFI_CMD32	_IOC_NEWTYPE(MFI_CMD, struct mfi_ioc_packet32)
+#endif
+#ifdef COMPAT_FREEBSD64
+#define MFI_CMD64	_IOC_NEWTYPE(MFI_CMD, struct mfi_ioc_packet64)
 #endif
 #define MFI_SET_AEN	_IOW('M', 3, struct mfi_ioc_aen)
 
@@ -155,28 +158,6 @@ struct mfi_linux_ioc_packet {
 	struct iovec lioc_sgl[MAX_LINUX_IOCTL_SGE];
 #endif
 } __packed __aligned(sizeof(void *__capability));
-
-#ifdef COMPAT_FREEBSD64
-/* XXX-AM: fix for freebsd64 */
-struct mfi_linux_ioc_packet {
-	uint16_t	lioc_adapter_no;
-	uint16_t	lioc_pad1;
-	uint32_t	lioc_sgl_off;
-	uint32_t	lioc_sge_count;
-	uint32_t	lioc_sense_off;
-	uint32_t	lioc_sense_len;
-	union {
-		uint8_t raw[128];
-		struct mfi_frame_header hdr;
-	} lioc_frame;
-
-#if defined(__amd64__) /* Assume amd64 wants 32 bit Linux */
-	struct iovec32 lioc_sgl[MAX_LINUX_IOCTL_SGE];
-#else
-	struct iovec64 lioc_sgl[MAX_LINUX_IOCTL_SGE];
-#endif
-} __packed __aligned(sizeof(void *__capability));
-#endif /* COMPAT_FREEBSD64 */
 
 struct mfi_ioc_passthru {
 	struct mfi_dcmd_frame	ioc_frame;
@@ -203,7 +184,7 @@ struct mfi_ioc_passthru32 {
 #define MFIIO_STATS	_IOWR('Q', 101, union mfi_statrequest)
 #define MFIIO_PASSTHRU	_IOWR('C', 102, struct mfi_ioc_passthru)
 #ifdef COMPAT_FREEBSD32
-#define MFIIO_PASSTHRU32	_IOWR('C', 102, struct mfi_ioc_passthru32)
+#define MFIIO_PASSTHRU32	_IOC_NEWTYPE(MFIIO_PASSTHRU, struct mfi_ioc_passthru32)
 #endif
 
 struct mfi_linux_ioc_aen {

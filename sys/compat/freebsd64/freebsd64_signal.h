@@ -36,11 +36,7 @@
 #define _COMPAT_FREEBSD64_FREEBSD64_SIGNAL_H_
 
 struct sigaction64 {
-	union {
-		uint64_t __sa_handler; /* void (*)(int); */
-		/* void (*)(int, struct __siginfo *, void *); */
-		uint64_t __sa_sigaction;
-	} __sigaction_u;		/* signal handler */
+	uint64_t sa_u;
 	int	sa_flags;		/* see signal options below */
 	sigset_t sa_mask;		/* signal mask to apply */
 };
@@ -67,8 +63,9 @@ struct sigevent64 {
 	} _sigev_un;
 };
 
-void	siginfo_to_siginfo64(const _siginfo_t *si, struct siginfo64 *si64);
-int	convert_sigevent64(const struct sigevent64 *sig64, ksigevent_t *sig);
+void	siginfo_to_siginfo64(const siginfo_t *si, struct siginfo64 *si64);
+int	convert_sigevent64(const struct sigevent64 *sig64,
+	    struct sigevent *sig);
 
 #endif /* _COMPAT_FREEBSD64_FREEBSD64_SIGNAL_H_ */
 // CHERI CHANGES START

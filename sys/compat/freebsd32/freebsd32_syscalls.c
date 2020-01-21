@@ -482,8 +482,8 @@ const char *freebsd32_syscallnames[] = {
 	"#470",			/* 470 = __getpath_fromaddr */
 	"sctp_peeloff",			/* 471 = sctp_peeloff */
 	"sctp_generic_sendmsg",			/* 472 = sctp_generic_sendmsg */
-	"sctp_generic_sendmsg_iov",			/* 473 = sctp_generic_sendmsg_iov */
-	"sctp_generic_recvmsg",			/* 474 = sctp_generic_recvmsg */
+	"freebsd32_sctp_generic_sendmsg_iov",			/* 473 = freebsd32_sctp_generic_sendmsg_iov */
+	"freebsd32_sctp_generic_recvmsg",			/* 474 = freebsd32_sctp_generic_recvmsg */
 #ifdef PAD64_REQUIRED
 	"freebsd32_pread",			/* 475 = freebsd32_pread */
 	"freebsd32_pwrite",			/* 476 = freebsd32_pwrite */

@@ -90,6 +90,7 @@ __FBSDID("$FreeBSD$");
 #ifdef CPU_CHERI
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
+#include <machine/cheri_machdep.h>
 #endif
 
 #ifdef KDB
@@ -415,6 +416,18 @@ static int emulate_unaligned_access(struct trapframe *frame, int mode);
 
 extern void fswintrberr(void); /* XXX */
 
+static __inline trapf_pc_t
+trapf_pc_from_kernel_code_ptr(void *ptr)
+{
+#if __has_feature(capabilities) && !defined(__CHERI_PURE_CAPABILITY__)
+	/* In the hybrid kernel, we assume that addr is within $pcc bounds */
+	 KASSERT(cheri_is_address_inbounds(cheri_getpcc(), (register_t)ptr),
+	     ("Invalid ptr %p", ptr));
+	return (cheri_setaddress(cheri_getpcc(), (register_t)ptr));
+#else
+	return ((trapf_pc_t)ptr);
+#endif
+}
 
 /*
  * Fetch an instruction from near frame->pc (or frame->pcc for CHERI).
@@ -441,11 +454,8 @@ fetch_instr_near_pc(struct trapframe *frame, register_t offset_from_pc, int32_t 
 		*instr = -1;
 		return (bad_inst_ptr);
 	}
-	KASSERT(cheri_getoffset(frame->pcc) == frame->pc,
-	    ("pcc.offset (%jx) <-> pc (%jx) mismatch:",
-	    (uintmax_t)cheri_getoffset(frame->pcc), (uintmax_t)frame->pc));
 #else
-	bad_inst_ptr = __USER_CODE_CAP((void*)(frame->pc + offset_from_pc));
+	bad_inst_ptr = __USER_CODE_CAP((uint8_t*)(frame->pc) + offset_from_pc);
 #endif
 	if (fueword32_c(bad_inst_ptr, instr) != 0) {
 		struct thread *td = curthread;
@@ -517,8 +527,9 @@ cpu_fetch_syscall_args(struct thread *td)
 		fetch_bad_branch_instr(sa->trapframe);
 		locr0->pc = MipsEmulateBranch(locr0, sa->trapframe->pc, 0,
 		    &sa->trapframe->badinstr_p.inst);
-	} else
-		locr0->pc += sizeof(int);
+	} else {
+		TRAPF_PC_INCREMENT(locr0, sizeof(int));
+	}
 	sa->code = locr0->v0;
 
 	switch (sa->code) {
@@ -676,7 +687,7 @@ cpu_fetch_syscall_args(struct thread *td)
  * p->p_addr->u_pcb.pcb_onfault is set, otherwise, return old pc.
  * In the pure capability kernel, trap returns the full pcc to return to.
  */
-trap_return_t
+trapf_pc_t
 trap(struct trapframe *trapframe)
 {
 	int type, usermode;
@@ -690,7 +701,7 @@ trap(struct trapframe *trapframe)
 	ksiginfo_t ksi;
 	char *msg = NULL;
 	char * __capability addr;
-	trap_return_t pc;
+	trapf_pc_t pc;
 	int cop, error;
 	register_t *frame_regs;
 
@@ -724,24 +735,6 @@ trap(struct trapframe *trapframe)
 	trapframe->badinstr.pad = 0;
 	trapframe->badinstr_p.inst = 0;
 #endif
-
-#ifdef CPU_CHERI
-#ifndef CPU_QEMU_MALTA
-	/*
-	 * Work around bug in the FPGA implementation: EPCC points to the
-	 * delay slot if a trap happenend in the delay slot.
-	 */
-	if (cheri_getoffset(trapframe->pcc) != trapframe->pc) {
-		KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc + 4,
-		    ("NEW BUG FOUND? pcc (%jx) <-> pc (%jx) mismatch:",
-		    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
-		trapframe->pcc = cheri_setoffset(trapframe->pcc, trapframe->pc);
-	}
-#endif
-	KASSERT(cheri_getoffset(trapframe->pcc) == trapframe->pc,
-	    ("%s(entry): pcc.offset (%jx) <-> pc (%jx) mismatch:", __func__,
-	    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
-#endif /* defined(CPU_CHERI) */
 
 	/*
 	 * Enable hardware interrupts if they were on before the trap. If it
@@ -782,7 +775,7 @@ trap(struct trapframe *trapframe)
 		    (curproc ? curproc->p_pid : -1), pid);
 #else
 		printf("badaddr = %#jx, pc = %#jx, ra = %#jx, sp = %#jx, sr = %jx, pid = %d, ASID = %u\n",
-		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc, (intmax_t)trapframe->ra,
+		    (intmax_t)trapframe->badvaddr, (intmax_t)TRAPF_PC(trapframe), (intmax_t)trapframe->ra,
 		    (intmax_t)trapframe->sp, (intmax_t)trapframe->sr,
 		    (curproc ? curproc->p_pid : -1), pid);
 #endif
@@ -799,7 +792,7 @@ trap(struct trapframe *trapframe)
 			this_badvaddr = trapframe->ra;
 			break;
 		default:
-			this_badvaddr = trapframe->pc;
+			this_badvaddr = TRAPF_PC(trapframe);
 			break;
 		}
 		if ((last_badvaddr == this_badvaddr) &&
@@ -835,12 +828,12 @@ trap(struct trapframe *trapframe)
 	if (!usermode) {
 		if (dtrace_trap_func != NULL &&
 		    (*dtrace_trap_func)(trapframe, type) != 0)
-			return (trap_return(trapframe));
+			return (trapframe->pc);
 	}
 #endif
 
 #ifdef CPU_CHERI
-	addr = trapframe->pcc;
+	addr = (void * __capability)trapframe->pcc;
 #else
 	addr = (void *)(uintptr_t)trapframe->pc;
 #endif
@@ -869,7 +862,7 @@ trap(struct trapframe *trapframe)
 				tlb_invalidate_all_user(pmap);
 				mips_wr_status(status & ~MIPS_SR_TS);
 
-				return (trap_return(trapframe));
+				return (trapframe->pc);
 			} else {
 #ifdef DDB
 				kdb_trap(type, 0, trapframe);
@@ -886,7 +879,7 @@ trap(struct trapframe *trapframe)
 				ftype = VM_PROT_WRITE;
 				goto kernel_fault;
 			}
-			return (trap_return(trapframe));
+			return (trapframe->pc);
 		}
 		/* FALLTHROUGH */
 
@@ -897,7 +890,7 @@ trap(struct trapframe *trapframe)
 			goto dofault;
 		}
 		if (!usermode)
-			return (trap_return(trapframe));
+			return (trapframe->pc);
 		goto out;
 
 	case T_TLB_LD_MISS:
@@ -913,9 +906,9 @@ trap(struct trapframe *trapframe)
 			rv = vm_fault_trap(kernel_map, va, ftype,
 			    VM_FAULT_NORMAL, NULL, NULL);
 			if (rv == KERN_SUCCESS)
-				return (trap_return(trapframe));
+				return (trapframe->pc);
 			if (td->td_pcb->pcb_onfault != NULL) {
-				pc = (trap_return_t)(intptr_t)td->td_pcb->pcb_onfault;
+				pc = trapf_pc_from_kernel_code_ptr(td->td_pcb->pcb_onfault);
 				td->td_pcb->pcb_onfault = NULL;
 				return (pc);
 			}
@@ -967,14 +960,14 @@ dofault:
 #endif
 			if (rv == KERN_SUCCESS) {
 				if (!usermode) {
-					return (trap_return(trapframe));
+					return (trapframe->pc);
 				}
 				goto out;
 			}
 	nogo:
 			if (!usermode) {
 				if (td->td_pcb->pcb_onfault != NULL) {
-					pc = (trap_return_t)(intptr_t)td->td_pcb->pcb_onfault;
+					pc = trapf_pc_from_kernel_code_ptr(td->td_pcb->pcb_onfault);
 					td->td_pcb->pcb_onfault = NULL;
 					return (pc);
 				}
@@ -1039,7 +1032,7 @@ dofault:
 			 * for SYS_ptrace().
 			 */
 			syscallret(td);
-			return (trap_return(trapframe));
+			return (trapframe->pc);
 		}
 
 #if defined(KDTRACE_HOOKS) || defined(DDB)
@@ -1047,12 +1040,12 @@ dofault:
 #ifdef KDTRACE_HOOKS
 		if (!usermode && dtrace_invop_jump_addr != 0) {
 			dtrace_invop_jump_addr(trapframe);
-			return (trap_return(trapframe));
+			return (trapframe->pc);
 		}
 #endif
 #ifdef DDB
 		kdb_trap(type, 0, trapframe);
-		return (trap_return(trapframe));
+		return (trapframe->pc);
 #endif
 #endif
 
@@ -1117,7 +1110,7 @@ dofault:
 				locr0->pc = MipsEmulateBranch(locr0, trapframe->pc,
 				    0, &trapframe->badinstr_p.inst);
 			} else {
-				locr0->pc += sizeof(int);
+				TRAPF_PC_INCREMENT(locr0, sizeof(int));
 			}
 			i = SIGEMT;	/* Stuff it with something for now */
 			break;
@@ -1138,7 +1131,7 @@ dofault:
 						frame_regs = &(trapframe->zero);
 						frame_regs[inst.RType.rt] = (register_t)(intptr_t)(__cheri_fromcap void *)td->td_md.md_tls;
 						frame_regs[inst.RType.rt] += td->td_md.md_tls_tcb_offset;
-						trapframe->pc += sizeof(int);
+						TRAPF_PC_INCREMENT(trapframe, sizeof(int));
 						goto out;
 					}
 				break;
@@ -1153,14 +1146,14 @@ dofault:
 #ifdef CPU_CHERI
 	case T_C2E:
 		if (td->td_pcb->pcb_onfault != NULL) {
-			pc = (trap_return_t)(intptr_t)td->td_pcb->pcb_onfault;
+			pc = trapf_pc_from_kernel_code_ptr(td->td_pcb->pcb_onfault);
 			td->td_pcb->pcb_onfault = NULL;
 			return (pc);
 		}
 		fetch_bad_instr(trapframe);
 		log_c2e_exception("KERNEL_CHERI_EXCEPTION", trapframe, type);
 		printf("badvaddr = %#jx, pc = %#jx, ra = %#jx, sr = %#jx\n",
-		    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc,
+		    (intmax_t)trapframe->badvaddr, (intmax_t)TRAPF_PC(trapframe),
 		    (intmax_t)trapframe->ra, (intmax_t)trapframe->sr);
 		goto err;
 		break;
@@ -1201,7 +1194,7 @@ dofault:
 			printf("%s: reenabling COP_2 for kernel\n", __func__);
 			mips_wr_status(mips_rd_status() | MIPS_SR_COP_2_BIT);
 			td->td_frame->sr |= MIPS_SR_COP_2_BIT;
-			return (trap_return(trapframe));
+			return (trapframe->pc);
 		}
 #endif
 #ifdef	CPU_CNMIPS
@@ -1234,7 +1227,7 @@ dofault:
 		td->td_md.md_cop2owner = COP2_OWNER_KERNEL;
 		/* Enable COP2, it will be disabled in cpu_switch */
 		mips_wr_status(mips_rd_status() | MIPS_SR_COP_2_BIT);
-		return (trap_return(trapframe));
+		return (trapframe->pc);
 #else
 		goto err;
 		break;
@@ -1302,7 +1295,7 @@ dofault:
 		trapDump("fpintr");
 #else
 		printf("FPU Trap: PC %#jx CR %x SR %x\n",
-		    (intmax_t)trapframe->pc, (unsigned)trapframe->cause, (unsigned)trapframe->sr);
+		    (intmax_t)TRAPF_PC(trapframe), (unsigned)trapframe->cause, (unsigned)trapframe->sr);
 		goto err;
 #endif
 
@@ -1343,13 +1336,13 @@ dofault:
 
 			access_type = emulate_unaligned_access(trapframe, mode);
 			if (access_type != 0)
-				return (trap_return(trapframe));
+				return (trapframe->pc);
 		}
 		/* FALLTHROUGH */
 
 	case T_BUS_ERR_LD_ST:	/* BERR asserted to cpu */
 		if (td->td_pcb->pcb_onfault != NULL) {
-			pc = (trap_return_t)(intptr_t)td->td_pcb->pcb_onfault;
+			pc = trapf_pc_from_kernel_code_ptr(td->td_pcb->pcb_onfault);
 			td->td_pcb->pcb_onfault = NULL;
 			return (pc);
 		}
@@ -1387,8 +1380,8 @@ err:
 			    trapframe->c17, trapframe->csp, (intmax_t)trapframe->sr);
 #else
 			printf("badvaddr = %#jx, pc = %#jx, ra = %#jx, sr = %#jxx\n",
-			    (intmax_t)trapframe->badvaddr, (intmax_t)trapframe->pc, (intmax_t)trapframe->ra,
-			    (intmax_t)trapframe->sr);
+			       (intmax_t)trapframe->badvaddr, (intmax_t)TRAPF_PC(trapframe), (intmax_t)trapframe->ra,
+			       (intmax_t)trapframe->sr);
 #endif
 		}
 #endif /* TRAP_DEBUG */
@@ -1412,7 +1405,6 @@ err:
 	ksi.ksi_addr = (void * __capability)(intcap_t)addr;
 	ksi.ksi_trapno = type;
 #if defined(CPU_CHERI)
-	td->td_frame->pcc = trapframe->pcc;
 	if (i == SIGPROT)
 		ksi.ksi_capreg = trapframe->capcause &
 		    CHERI_CAPCAUSE_REGNUM_MASK;
@@ -1439,7 +1431,7 @@ out:
 	 *    (uintmax_t)cheri_getoffset(trapframe->pcc), (uintmax_t)trapframe->pc));
 	 */
 #endif
-	return (trap_return(trapframe));
+	return (trapframe->pc);
 }
 
 #if !defined(SMP) && (defined(DDB) || defined(DEBUG))
@@ -1481,16 +1473,18 @@ trapDump(char *msg)
  * XXXRW: What about CHERI branch instructions?
  * XXXAR: This needs to be fixed for cjalr/cjr/ccall_fast
  */
-uintptr_t
-MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
+trapf_pc_t
+MipsEmulateBranch(struct trapframe *framePtr, trapf_pc_t _instPC, int fpcCSR,
     uint32_t *instptr)
 {
 	InstFmt inst;
-	register_t *regsPtr = (register_t *) framePtr;
-#ifdef CPU_CHERI
+	register_t *regsPtr = (register_t *)framePtr;
+	/* Cast to uint8_t* for pointer arithmetic */
+	uint8_t * __capability instPC = (uint8_t * __capability) _instPC;
+#if __has_feature(capabilities)
 	void * __capability *capRegsPtr = &framePtr->ddc;
 #endif
-	uintptr_t retAddr = 0;
+	uint8_t * __capability retAddr = NULL;
 	int condition;
 
 #define	GetBranchDest(InstPtr, inst) \
@@ -1502,10 +1496,10 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 		else
 			inst = *(InstFmt *) instptr;
 	} else {
-		if (!KERNLAND(instPC))
-			inst.word = fuword32((void *)instPC);  /* XXXAR: error check? */
+		if (!KERNLAND((__cheri_addr vaddr_t)instPC))
+			inst.word = fuword32_c(instPC);  /* XXXAR: error check? */
 		else
-			inst = *(InstFmt *) instPC;
+			memcpy_c(&inst, instPC, sizeof(InstFmt));
 	}
 	/* Save the bad branch instruction so we can log it */
 	framePtr->badinstr_p.inst = inst.word;
@@ -1517,9 +1511,15 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 	case OP_SPECIAL:
 		switch ((int)inst.RType.func) {
 		case OP_JR:
-		case OP_JALR:
-			retAddr = regsPtr[inst.RType.rs];
+		case OP_JALR: {
+			vaddr_t ret_va = regsPtr[inst.RType.rs];
+#if __has_feature(capabilities)
+			retAddr = cheri_setoffset(instPC, ret_va);
+#else
+			retAddr = (uint8_t* __capability)ret_va;
+#endif
 			break;
+		}
 
 		default:
 			retAddr = instPC + 4;
@@ -1564,10 +1564,16 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 		break;
 
 	case OP_J:
-	case OP_JAL:
-		retAddr = (inst.JType.target << 2) |
-		    ((unsigned)(instPC + 4) & 0xF0000000);
+	case OP_JAL: {
+		vaddr_t ret_va = (inst.JType.target << 2) |
+		    (((__cheri_addr vaddr_t)instPC + 4) & 0xF0000000);
+#if __has_feature(capabilities)
+		retAddr = cheri_setoffset(instPC, ret_va);
+#else
+		retAddr = (uint8_t*)ret_va;
+#endif
 		break;
+	}
 
 	case OP_BEQ:
 	case OP_BEQL:
@@ -1652,7 +1658,7 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 				retAddr = GetBranchDest(instPC, inst);
 			else
 				retAddr = instPC + 8;
-			return (retAddr);
+			return (trapf_pc_t)(retAddr);
 		}
 		/* FALLTHROUGH */
 #endif
@@ -1666,19 +1672,18 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 		 */
 		int32_t context_instr;
 		fetch_instr_near_pc(framePtr, -8, &context_instr);
-		db_printf("Instr at %p ($pc-8): %x   ", (char*)framePtr->pc - 8, context_instr);
+		db_printf("Instr at %p ($pc-8): %x   ", (char*)TRAPF_PC(framePtr) - 8, context_instr);
 		db_disasm((db_addr_t)&context_instr, 0);
 		fetch_instr_near_pc(framePtr, -4, &context_instr);
-		db_printf("Instr at %p ($pc-4): %x   ", (char*)framePtr->pc - 4, context_instr);
+		db_printf("Instr at %p ($pc-4): %x   ", (char*)TRAPF_PC(framePtr) - 4, context_instr);
 		db_disasm((db_addr_t)&context_instr, 0);
 		fetch_instr_near_pc(framePtr, 0, &context_instr);
-		db_printf("Instr at %p ($pc+0): %x   ", (char*)framePtr->pc + 0, context_instr);
+		db_printf("Instr at %p ($pc+0): %x   ", (char*)TRAPF_PC(framePtr) + 0, context_instr);
 		db_disasm((db_addr_t)&context_instr, 0);
 		fetch_instr_near_pc(framePtr, 4, &context_instr);
-		db_printf("Instr at %p ($pc+4): %x   ", (char*)framePtr->pc + 4, context_instr);
+		db_printf("Instr at %p ($pc+4): %x   ", (char*)TRAPF_PC(framePtr) + 4, context_instr);
 		db_disasm((db_addr_t)&context_instr, 0);
 #endif
-
 
 		/* retAddr = instPC + 4;  */
 		/* log registers in trap frame */
@@ -1693,7 +1698,7 @@ MipsEmulateBranch(struct trapframe *framePtr, uintptr_t instPC, int fpcCSR,
 		/* Return to NULL to force a crash in the user program */
 		retAddr = 0;
 	}
-	return (retAddr);
+	return (trapf_pc_t)(retAddr);
 }
 
 static void
@@ -1742,7 +1747,7 @@ log_frame_dump(struct trapframe *frame)
 	    (intmax_t)frame->sr, (intmax_t)frame->mullo, (intmax_t)frame->mulhi, (intmax_t)frame->badvaddr);
 
 	printf("cause: %#jx; pc: %#jx\n",
-	    (intmax_t)(uint32_t)frame->cause, (intmax_t)frame->pc);
+	    (intmax_t)(uint32_t)frame->cause, (intmax_t)TRAPF_PC(frame));
 
 #if 0
 	/* XXXAR: this can KASSERT() for bad instruction fetches. See #276 */
@@ -1814,7 +1819,7 @@ trap_frame_dump(struct trapframe *frame)
 	    (intmax_t)frame->sr, (intmax_t)frame->mullo, (intmax_t)frame->mulhi, (intmax_t)frame->badvaddr);
 
 	printf("\tcause: %#jx\tpc: %#jx\n",
-	    (intmax_t)(uint32_t)frame->cause, (intmax_t)frame->pc);
+	    (intmax_t)(uint32_t)frame->cause, (intmax_t)TRAPF_PC(frame));
 }
 
 #endif
@@ -1855,7 +1860,7 @@ log_illegal_instruction(const char *msg, struct trapframe *frame)
 #ifdef SMP
 	printf("cpuid = %d\n", PCPU_GET(cpuid));
 #endif
-	pc = frame->pc + (DELAYBRANCH(frame->cause) ? 4 : 0);
+	pc = TRAPF_PC(frame) + (DELAYBRANCH(frame->cause) ? 4 : 0);
 	log(LOG_ERR, "%s: pid %d tid %ld (%s), uid %d: pc %#jx ra %#jx\n",
 	    msg, p->p_pid, (long)td->td_tid, p->p_comm,
 	    p->p_ucred ? p->p_ucred->cr_uid : -1,
@@ -1939,7 +1944,7 @@ log_bad_page_fault(char *msg, struct trapframe *frame, int trap_type)
 		read_or_write = "unknown";
 	}
 
-	pc = frame->pc + (DELAYBRANCH(frame->cause) ? 4 : 0);
+	pc = TRAPF_PC(frame) + (DELAYBRANCH(frame->cause) ? 4 : 0);
 	log(LOG_ERR, "%s: pid %d tid %ld (%s), uid %d: pc %#jx got a %s fault "
 	    "(type %#x) at %#jx\n",
 	    msg, p->p_pid, (long)td->td_tid, p->p_comm,
@@ -2220,7 +2225,7 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 	struct thread *td = curthread;
 	struct proc *p = curproc;
 
-	pc = frame->pc + (DELAYBRANCH(frame->cause) ? 4 : 0);
+	pc = TRAPF_PC(frame) + (DELAYBRANCH(frame->cause) ? 4 : 0);
 
 	/*
 	 * Fall through if it's instruction fetch exception
@@ -2244,8 +2249,9 @@ emulate_unaligned_access(struct trapframe *frame, int mode)
 				fetch_bad_branch_instr(frame);
 				frame->pc = MipsEmulateBranch(frame, frame->pc,
 				    0, &frame->badinstr_p.inst);
-			} else
-				frame->pc += 4;
+			} else {
+				TRAPF_PC_INCREMENT(frame, sizeof(int));
+			}
 
 			if (ppsratecheck(&unaligned_lasterr,
 			    &unaligned_curerr, unaligned_pps_log_limit)) {
