@@ -144,12 +144,13 @@ INLINE_LIMIT?=	8000
 #
 .if ${MACHINE_CPUARCH} == "riscv"
 RISCV_MARCH=	rv64imafdc
+.if ${MACHINE_CPU:Mcheri}
+RISCV_MARCH:=	${RISCV_MARCH}xcheri
+.endif
+
 RISCV_ABI=	lp64
 .if ${MACHINE_ARCH:Mriscv*c*}
 RISCV_ABI=	l64pc128
-.elif ${MACHINE_CPU:Mcheri}
-RISCV_MARCH:=	${RISCV_MARCH}xcheri
-.endif
 
 CFLAGS+=	-march=${RISCV_MARCH} -mabi=${RISCV_ABI}
 CFLAGS.clang+=	-mcmodel=medium

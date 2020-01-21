@@ -19,7 +19,10 @@ MACHINE_CPU = mips
 . elif ${MACHINE_CPUARCH} == "powerpc"
 MACHINE_CPU = aim
 . elif ${MACHINE_CPUARCH} == "riscv"
-MACHINE_CPU = riscv
+.  if ${MACHINE_ARCH:Mriscv*c*}
+MACHINE_CPU = cheri
+.  endif
+MACHINE_CPU += riscv
 . elif ${MACHINE_CPUARCH} == "sparc64"
 MACHINE_CPU = ultrasparc
 . endif
@@ -429,19 +432,23 @@ CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 
 .if ${MACHINE_CPUARCH} == "riscv"
 RISCV_MARCH=	rv64ima
-RISCV_ABI=	lp64
-.if ${MACHINE_ARCH:Mriscv*sf} == ""
+.if ${MACHINE_ARCH:Mriscv*sf*} == ""
 RISCV_MARCH:=	${RISCV_MARCH}fd
 .endif
 RISCV_MARCH:=	${RISCV_MARCH}c
+.if ${MACHINE_CPU:Mcheri}
+RISCV_MARCH:=	${RISCV_MARCH}xcheri
+.endif
+
 .if ${MACHINE_ARCH:Mriscv*c*}
 RISCV_ABI=	l64pc128
-.elif ${MACHINE_CPU:Mcheri}
-RISCV_MARCH:=	${RISCV_MARCH}xcheri
+.else
+RISCV_ABI=	lp64
 .endif
 .if ${MACHINE_ARCH:Mriscv*sf} == ""
 RISCV_ABI:=	${RISCV_ABI}d
 .endif
+
 CFLAGS += -march=${RISCV_MARCH} -mabi=${RISCV_ABI}
 .endif
 
