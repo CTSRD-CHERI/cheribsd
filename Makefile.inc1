@@ -108,12 +108,12 @@ _TOOLCHAIN_VARS_SHOULD_BE_SET=
 # Pull in COMPILER_TYPE and COMPILER_FREEBSD_VERSION early. Pull it from the
 # tree to be friendlier to foreign OS builds. It's safe to do so unconditionally
 # here since we will always have the right make, unlike in src/Makefile
-#XXXXX# Don't include bsd.linker.mk yet until XBINUTILS is handled (after src.opts.mk)
-#XXXXX_NO_INCLUDE_LINKERMK=	t
+# Don't include bsd.linker.mk yet until XBINUTILS is handled (after src.opts.mk)
+_NO_INCLUDE_LINKERMK=	t
 # We also want the X_COMPILER* variables if we are using an external toolchain.
 _WANT_TOOLCHAIN_CROSS_VARS=	t
 .include "share/mk/bsd.compiler.mk"
-#XXXXX.undef _NO_INCLUDE_LINKERMK
+.undef _NO_INCLUDE_LINKERMK
 .undef _WANT_TOOLCHAIN_CROSS_VARS
 # src.opts.mk depends on COMPILER_FEATURES
 .include "share/mk/src.opts.mk"

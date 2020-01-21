@@ -23,7 +23,8 @@
 # This file may be included multiple times, but only has effect the first time.
 #
 
-.if !target(__<bsd.linker.mk>__)
+.if !target(__<bsd.linker.mk>__) && !defined(_NO_INCLUDE_LINKERMK) && \
+    !defined(_NO_INCLUDE_COMPILERMK)
 __<bsd.linker.mk>__:
 
 _ld_vars=LD $${_empty_var_}
@@ -31,10 +32,6 @@ _ld_vars=LD $${_empty_var_}
 # Only the toplevel makefile needs to compute the X_LINKER_* variables.
 # This avoids unncessary fork+exec calls in every subdir (see bsd.compiler.mk)
 _ld_vars+=XLD X_
-# Also get version information from CHERI_LD (if it is set)
-.ifdef CHERI_LD
-_ld_vars+=CHERI_LD CHERI_
-.endif
 .endif
 
 .for ld X_ in ${_ld_vars}
