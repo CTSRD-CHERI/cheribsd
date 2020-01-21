@@ -132,4 +132,13 @@
 #define	CHERI_PERMS_KERNEL_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
+/*
+ * CHERI_BASELEN_BITS is used in cheritest_cheriabi.c.  The others are
+ * unused.
+ */
+#define	CHERI_BASELEN_BITS	10
+#define	CHERI_SEAL_BASELEN_BITS	5
+#define	CHERI_ADDR_BITS		64
+#define	CHERI_SEAL_MIN_ALIGN	12
+
 #endif /* !_MACHINE_CHERIREG_H_ */

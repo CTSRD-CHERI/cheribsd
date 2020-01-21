@@ -101,4 +101,63 @@
 #define	CHERI_OTYPE_UNSEALED	(-1l)
 #define	CHERI_OTYPE_SENTRY	(-2l)
 
+#if defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
+/*
+ * XXXAR: __builtin_cheri_round_representable_length and
+ * __builtin_cheri_representable_alignment_mask are currently not constant
+ * evaluated by the compiler for CHERI256 so we use different macros here
+ * instead.
+ *
+ * CHERI256 capabilities are precise so we can return the length unchanged
+ * and use a mask of all ones.
+ */
+#define	CHERI_REPRESENTABLE_LENGTH(len) (len)
+#define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) UINT64_MAX
+
+#else /* (!(_MIPS_SZCAP == 256)) */
+
+#define	CHERI_REPRESENTABLE_LENGTH(len) \
+	__builtin_cheri_round_representable_length(len)
+#define	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) \
+	__builtin_cheri_representable_alignment_mask(len)
+
+#endif /* (!(_MIPS_SZCAP == 256)) */
+
+/* Provide macros to make it easier to work with the raw CRAM/CRRL results: */
+#define	CHERI_REPRESENTABLE_ALIGNMENT(len) \
+	(~CHERI_REPRESENTABLE_ALIGNMENT_MASK(len) + 1)
+#define	CHERI_REPRESENTABLE_BASE(base, len) \
+	((base) & CHERI_REPRESENTABLE_ALIGNMENT_MASK(len))
+
+/*
+ * In the current encoding sealed and unsealed capabilities have the same
+ * alignment constraints.
+ */
+#define	CHERI_SEALABLE_LENGTH(len)	\
+	CHERI_REPRESENTABLE_LENGTH(len)
+#define	CHERI_SEALABLE_ALIGNMENT_MASK(len)	\
+	CHERI_REPRESENTABLE_ALIGNMENT_MASK(len)
+#define	CHERI_SEALABLE_ALIGNMENT(len)	\
+	CHERI_REPRESENTABLE_ALIGNMENT(len)
+#define	CHERI_SEALABLE_BASE(base, len)	\
+	CHERI_REPRESENTABLE_BASE(base, len)
+
+/* A mask for the lower bits, i.e. the negated alignment mask */
+#define	CHERI_SEAL_ALIGN_MASK(l)	~(CHERI_SEALABLE_ALIGNMENT_MASK(l))
+#define	CHERI_ALIGN_MASK(l)		~(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
+
+#if defined(_MIPS_SZCAP) && _MIPS_SZCAP == 256
+#define	CHERI_ALIGN_SHIFT(l)	0ULL
+#define	CHERI_SEAL_ALIGN_SHIFT(l)	0ULL
+#else
+/*
+ * TODO: avoid using these since count leading/trailing zeroes is expensive on
+ * BERI/CHERI
+ */
+#define	CHERI_ALIGN_SHIFT(l)	\
+	__builtin_ctzll(CHERI_REPRESENTABLE_ALIGNMENT_MASK(l))
+#define	CHERI_SEAL_ALIGN_SHIFT(l)	\
+	__builtin_ctzll(CHERI_SEALABLE_ALIGNMENT_MASK(l))
+#endif
+
 #endif /* !__SYS_CHERIREG_H__ */
