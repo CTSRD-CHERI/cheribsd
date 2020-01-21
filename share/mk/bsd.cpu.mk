@@ -428,15 +428,18 @@ CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 .endif
 
 .if ${MACHINE_CPUARCH} == "riscv"
-RISCV_MARCH=	rv64imac
+RISCV_MARCH=	rv64ima
 RISCV_ABI=	lp64
+.if ${MACHINE_ARCH:Mriscv*sf} == ""
+RISCV_MARCH:=	${RISCV_MARCH}fd
+.endif
+RISCV_MARCH:=	${RISCV_MARCH}c
 .if ${MACHINE_ARCH:Mriscv*c*}
 RISCV_ABI=	l64pc128
 .elif ${MACHINE_CPU:Mcheri}
 RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .endif
 .if ${MACHINE_ARCH:Mriscv*sf} == ""
-RISCV_MARCH:=	${RISCV_MARCH}fd
 RISCV_ABI:=	${RISCV_ABI}d
 .endif
 CFLAGS += -march=${RISCV_MARCH} -mabi=${RISCV_ABI}
