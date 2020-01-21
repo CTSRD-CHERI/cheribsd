@@ -141,11 +141,9 @@ LIBCHERI_MACHINE=	mips
 LIBCHERI_MACHINE_ARCH=	mips64c128
 LIBCHERIWMAKEFLAGS=	LIBCHERI=yes
 # Forward the cross linker and binutils
-LIBCHERIWMAKEFLAGS+=	LD="${XLD}"
 .for BINUTIL in ${XBINUTILS}
 LIBCHERIWMAKEFLAGS+=	${BINUTIL}="${X${BINUTIL}}"
 .endfor
-.info "LIBCHERIWMAKEFLAGS=${LIBCHERIWMAKEFLAGS}"
 .endif
 
 # -------------------------------------------------------------------
