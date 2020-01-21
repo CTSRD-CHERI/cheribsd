@@ -31,7 +31,7 @@
  */
 
 #include <machine/asm.h>
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 #include "SYS.h"
 
 .globl _C_LABEL(_rtld_relocate_nonplt_self)

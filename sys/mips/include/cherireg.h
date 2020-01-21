@@ -120,24 +120,6 @@
 #endif /* (!(CHERICAP_SIZE == 32)) */
 
 /*
- * The kernel snags one for the software-defined permissions for the purposes
- * of authorising system calls from $pcc.  This is a bit of an oddity:
- * normally, we check permissions on data capabilities, not code capabilities,
- * but aligns with 'privilege' checks: e.g., $epcc access.  We may wish to
- * switch to another model, such as having userspace register one or more
- * class capabilities as suitable for system-call use.
- */
-#define	CHERI_PERM_SYSCALL			CHERI_PERM_SW0
-
-/*
- * Use another software-defined permission to restrict the ability to change
- * the page mapping underlying a capability.  This can't be the same
- * permission bit as CHERI_PERM_SYSCALL because $pcc should not confer the
- * right rewrite or remap executable memory.
- */
-#define	CHERI_PERM_CHERIABI_VMMAP		CHERI_PERM_SW1
-
-/*
  * Macros defining initial permission sets for various scenarios; details
  * depend on the permissions available on 256-bit or 128-bit CHERI:
  *
@@ -224,9 +206,6 @@
 #define	CHERI_PERMS_KERNEL_SEALCAP					\
 	(CHERI_PERM_GLOBAL | CHERI_PERM_SEAL | CHERI_PERM_UNSEAL)
 
-/* Reserved CHERI object types: */
-#define	CHERI_OTYPE_UNSEALED	(-1l)
-#define	CHERI_OTYPE_SENTRY	(-2l)
 /*
  * The CHERI object-type space is split between userspace and kernel,
  * permitting kernel object references to be delegated to userspace (if
@@ -254,40 +233,6 @@
 #define	CHERI_OTYPE_LOCALOK_SHIFT	(CHERI_OTYPE_BITS - 2)
 #define	CHERI_OTYPE_LOCALOK_FLAG	(1 << CHERI_OTYPE_LOCALOK_SHIFT
 #define	CHERI_OTYPE_IS_LOCALOK(x)	(((x) & CHERI_OTYPE_LOCALOK_FLAG) != 0)
-
-/*
- * Definition for a highly privileged kernel capability able to name the
- * entire address space, and suitable to derive all other kernel-related
- * capabilities from, including sealing capabilities.
- */
-#define	CHERI_CAP_KERN_PERMS						\
-	(CHERI_PERMS_SWALL | CHERI_PERMS_HWALL)
-#define	CHERI_CAP_KERN_BASE		0x0
-#define	CHERI_CAP_KERN_LENGTH		0xffffffffffffffff
-#define	CHERI_CAP_KERN_OFFSET		0x0
-
-/*
- * Definition for userspace "unprivileged" capability able to name the user
- * portion of the address space.
- */
-#define	CHERI_CAP_USER_CODE_PERMS	CHERI_PERMS_USERSPACE_CODE
-#define	CHERI_CAP_USER_CODE_BASE	VM_MINUSER_ADDRESS
-#define	CHERI_CAP_USER_CODE_LENGTH	(VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS)
-#define	CHERI_CAP_USER_CODE_OFFSET	0x0
-
-#define	CHERI_CAP_USER_DATA_PERMS	CHERI_PERMS_USERSPACE_DATA
-#define	CHERI_CAP_USER_DATA_BASE	VM_MINUSER_ADDRESS
-#define	CHERI_CAP_USER_DATA_LENGTH	(VM_MAXUSER_ADDRESS - VM_MINUSER_ADDRESS)
-#define	CHERI_CAP_USER_DATA_OFFSET	0x0
-
-#define	CHERI_CAP_USER_MMAP_PERMS					\
-	(CHERI_PERMS_USERSPACE_DATA | CHERI_PERMS_USERSPACE_CODE |	\
-	CHERI_PERM_CHERIABI_VMMAP)
-/* Start at 256MB to avoid low PC values in sandboxes */
-#define	CHERI_CAP_USER_MMAP_BASE	(VM_MINUSER_ADDRESS + 0x10000000)
-#define	CHERI_CAP_USER_MMAP_LENGTH					\
-    (VM_MAXUSER_ADDRESS - CHERI_CAP_USER_MMAP_BASE)
-#define	CHERI_CAP_USER_MMAP_OFFSET	0x0
 
 /*
  * Root sealing capability for all userspace object capabilities.  This is

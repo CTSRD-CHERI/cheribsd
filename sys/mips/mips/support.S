@@ -94,7 +94,7 @@
 #include <machine/cpuregs.h>
 #include <machine/pcb.h>
 #ifdef CPU_CHERI
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 #endif
 
 /* Always build normal userspace access functions for non-CHERI */

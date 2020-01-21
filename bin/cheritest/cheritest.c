@@ -46,7 +46,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/cherireg.h>
 #include <machine/cpuregs.h>
 #include <machine/frame.h>
 #include <machine/trap.h>

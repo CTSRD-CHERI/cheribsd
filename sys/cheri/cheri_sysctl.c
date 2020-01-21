@@ -37,8 +37,6 @@
 
 #include <cheri/cheri.h>
 
-#include <machine/cherireg.h>
-
 SYSCTL_NODE(_security, OID_AUTO, cheri, CTLFLAG_RD, 0,
     "CHERI settings and statistics");
 

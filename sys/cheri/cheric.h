@@ -34,7 +34,7 @@
 #include <sys/cdefs.h>
 #include <sys/types.h>
 
-#include <machine/cherireg.h>	/* Permission definitions. */
+#include <cheri/cherireg.h>	/* Permission definitions. */
 
 #if __has_feature(capabilities) || defined(__CHERI__)
 

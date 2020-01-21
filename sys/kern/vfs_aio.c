@@ -3577,8 +3577,6 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 #ifdef COMPAT_CHERIABI
 #include <sys/user.h>
 
-#include <machine/cherireg.h>
-
 #include <cheri/cheric.h>
 
 #include <compat/cheriabi/cheriabi.h>

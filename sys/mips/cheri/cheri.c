@@ -44,7 +44,6 @@
 #include <cheri/cheri_serial.h>
 
 #include <machine/atomic.h>
-#include <machine/cherireg.h>
 #include <machine/pcb.h>
 #include <machine/proc.h>
 #include <machine/sysarch.h>

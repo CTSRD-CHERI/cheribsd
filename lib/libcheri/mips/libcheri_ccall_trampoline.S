@@ -33,7 +33,7 @@
 
 #define	_CHERI_INTERNAL
 #include <machine/cheriasm.h>
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 
 #define	LIBCHERI_ERRNO_ASM
 #include <cheri/libcheri_errno.h>
