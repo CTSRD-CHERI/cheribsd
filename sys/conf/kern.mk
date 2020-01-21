@@ -151,6 +151,7 @@ RISCV_MARCH:=	${RISCV_MARCH}xcheri
 RISCV_ABI=	lp64
 .if ${MACHINE_ARCH:Mriscv*c*}
 RISCV_ABI=	l64pc128
+.endif
 
 CFLAGS+=	-march=${RISCV_MARCH} -mabi=${RISCV_ABI}
 CFLAGS.clang+=	-mcmodel=medium
