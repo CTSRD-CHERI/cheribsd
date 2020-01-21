@@ -297,7 +297,10 @@ MACHINE_CPU = booke softfp
 .  endif
 ########## riscv
 . elif ${MACHINE_CPUARCH} == "riscv"
-MACHINE_CPU = riscv
+.  if ${CPUTYPE} == "cheri"
+MACHINE_CPU = cheri
+.  endif
+MACHINE_CPU += riscv
 ########## sparc64
 . elif ${MACHINE_ARCH} == "sparc64"
 .  if ${CPUTYPE} == "v9"
@@ -425,11 +428,18 @@ CFLAGS.gcc+= -mabi=spe -mfloat-gprs=double -Wa,-me500
 .endif
 
 .if ${MACHINE_CPUARCH} == "riscv"
-.if ${MACHINE_ARCH:Mriscv*sf}
-CFLAGS += -march=rv64imac -mabi=lp64
-.else
-CFLAGS += -march=rv64imafdc -mabi=lp64d
+RISCV_MARCH=	rv64imac
+RISCV_ABI=	lp64
+.if ${MACHINE_ARCH:Mriscv*c*}
+RISCV_ABI=	l64pc128
+.elif ${MACHINE_CPU:Mcheri}
+RISCV_MARCH:=	${RISCV_MARCH}xcheri
 .endif
+.if ${MACHINE_ARCH:Mriscv*sf} == ""
+RISCV_MARCH:=	${RISCV_MARCH}fd
+RISCV_ABI:=	${RISCV_ABI}d
+.endif
+CFLAGS += -march=${RISCV_MARCH} -mabi=${RISCV_ABI}
 .endif
 
 # NB: COPTFLAGS is handled in /usr/src/sys/conf/kern.pre.mk
