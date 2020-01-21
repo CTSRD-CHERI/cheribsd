@@ -194,6 +194,12 @@ CWARNFLAGS+=	-Wno-error=aggressive-loop-optimizations	\
 CWARNFLAGS+=	-Wno-error=pass-failed
 .endif
 
+.if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 100000
+CWARNFLAGS+=	-Wno-error=misleading-indentation
+# CXXWARNFLAGS+=	-Wno-error=deprecated-copy
+CXXWARNFLAGS+=	-Wno-deprecated-copy
+.endif
+
 # How to handle FreeBSD custom printf format specifiers.
 .if ${COMPILER_TYPE} == "clang" && ${COMPILER_VERSION} >= 30600
 FORMAT_EXTENSIONS=	-D__printf__=__freebsd_kprintf__
