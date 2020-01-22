@@ -898,7 +898,8 @@ lockmgr_upgrade(struct lock *lk, u_int flags, struct lock_object *ilk,
 	 * Try to switch from one shared lock to an exclusive one.
 	 * We need to preserve waiters flags during the operation.
 	 */
-	if (atomic_cmpset_ptr(&lk->lk_lock, x | v | LK_SHARERS_LOCK(1),
+	if (atomic_cmpset_ptr(&lk->lk_lock,
+	    ptr_to_va(x) | ptr_to_va(v) | LK_SHARERS_LOCK(1),
 	    ptr_set_flag(tid, x))) {
 		LOCK_LOG_LOCK("XUPGRADE", &lk->lock_object, 0, 0, file,
 		    line);
@@ -1222,7 +1223,7 @@ lockmgr_unlock(struct lock *lk)
 
 	_lockmgr_assert(lk, KA_LOCKED, file, line);
 	x = lk->lk_lock;
-	if (__predict_true(x & LK_SHARE) != 0) {
+	if (__predict_true(ptr_get_flag(x, LK_SHARE)) != 0) {
 		if (lockmgr_sunlock_try(lk, &x)) {
 			lockmgr_note_shared_release(lk, file, line);
 		} else {
