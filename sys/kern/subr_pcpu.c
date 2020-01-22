@@ -262,7 +262,7 @@ dpcpu_copy(void *s, int size)
 		memcpy((void *)(dpcpu + (uintptr_t)s), s, size);
 	}
 #else
-	memcpy((void *)(dpcpu_off[0] + (uintptr_t)s), s, size);
+	memcpy((void *)(dpcpu_off[0] + (vaddr_t)ptr_to_va(s)), s, size);
 #endif
 }
 
@@ -300,7 +300,7 @@ sysctl_dpcpu_quad(SYSCTL_HANDLER_ARGS)
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		count += *(int64_t *)(dpcpu + (uintptr_t)arg1);
+		count += *(int64_t *)(dpcpu + (vaddr_t)ptr_to_va(arg1));
 	}
 	return (SYSCTL_OUT(req, &count, sizeof(count)));
 }
@@ -317,7 +317,7 @@ sysctl_dpcpu_long(SYSCTL_HANDLER_ARGS)
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		count += *(long *)(dpcpu + (uintptr_t)arg1);
+		count += *(long *)(dpcpu + (vaddr_t)ptr_to_va(arg1));
 	}
 	return (SYSCTL_OUT(req, &count, sizeof(count)));
 }
@@ -334,7 +334,7 @@ sysctl_dpcpu_int(SYSCTL_HANDLER_ARGS)
 		dpcpu = dpcpu_off[i];
 		if (dpcpu == 0)
 			continue;
-		count += *(int *)(dpcpu + (uintptr_t)arg1);
+		count += *(int *)(dpcpu + (vaddr_t)ptr_to_va(arg1));
 	}
 	return (SYSCTL_OUT(req, &count, sizeof(count)));
 }

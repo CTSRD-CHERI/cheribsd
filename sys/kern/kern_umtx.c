@@ -510,7 +510,7 @@ umtxq_hash(struct umtx_key *key)
 {
 	unsigned n;
 
-	n = (uintptr_t)key->info.both.a + key->info.both.b;
+	n = ptr_to_va(key->info.both.a) + ptr_to_va(key->info.both.b);
 	key->hash = ((n * GOLDEN_RATIO_PRIME) >> UMTX_SHIFTS) % UMTX_CHAINS;
 }
 
