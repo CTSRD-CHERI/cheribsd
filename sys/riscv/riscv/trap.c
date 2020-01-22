@@ -58,6 +58,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_extern.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #ifdef FPE
 #include <machine/fpe.h>
 #endif
@@ -80,6 +84,7 @@ extern register_t fsu_intr_fault;
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 
+/* XXX: CHERI TODO: Make 'addr' a capability. */
 static __inline void
 call_trapsignal(struct thread *td, int sig, int code, void *addr)
 {
@@ -88,7 +93,7 @@ call_trapsignal(struct thread *td, int sig, int code, void *addr)
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = sig;
 	ksi.ksi_code = code;
-	ksi.ksi_addr = addr;
+	ksi.ksi_addr = (void * __capability)(uintcap_t)(uintptr_t)addr;
 	trapsignal(td, &ksi);
 }
 

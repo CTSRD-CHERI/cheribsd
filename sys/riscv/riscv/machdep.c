@@ -33,6 +33,7 @@
  * SUCH DAMAGE.
  */
 
+#define EXPLICIT_USER_ACCESS
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
@@ -315,8 +316,9 @@ ptrace_clear_single_step(struct thread *td)
 	return (EOPNOTSUPP);
 }
 
+/* XXX: CHERI TODO: Set cap registers. */
 void
-exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
+exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 {
 	struct trapframe *tf;
 	struct pcb *pcb;
@@ -326,8 +328,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 
 	memset(tf, 0, sizeof(struct trapframe));
 
-	tf->tf_a[0] = stack;
-	tf->tf_sp = STACKALIGN(stack);
+	tf->tf_a[0] = (__cheri_addr uintptr_t)stack;
+	tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack);
 	tf->tf_ra = imgp->entry_addr;
 	tf->tf_sepc = imgp->entry_addr;
 
@@ -585,6 +587,7 @@ makectx(struct trapframe *tf, struct pcb *pcb)
 	pcb->pcb_sepc = tf->tf_sepc;
 }
 
+/* XXX: CHERI TODO: Update for capability registers. */
 void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
@@ -614,7 +617,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct sigframe *)((uintptr_t)td->td_sigstk.ss_sp +
+		fp = (struct sigframe *)((__cheri_addr uintptr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
 		fp = (struct sigframe *)td->td_frame->tf_sp;
@@ -636,7 +639,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_UNLOCK(td->td_proc);
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyout(&frame, fp, sizeof(*fp)) != 0) {
+	if (copyout(&frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
 		PROC_LOCK(p);
@@ -647,7 +650,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_a[1] = (register_t)&fp->sf_si;
 	tf->tf_a[2] = (register_t)&fp->sf_uc;
 
-	tf->tf_sepc = (register_t)catcher;
+	tf->tf_sepc = (__cheri_offset register_t)catcher;
 	tf->tf_sp = (register_t)fp;
 
 	sysent = p->p_sysent;
