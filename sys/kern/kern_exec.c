@@ -1775,7 +1775,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	/*
 	 * vectp also becomes our initial stack base
 	 */
-	*stack_base = (__cheri_addr vaddr_t)vectp;
+	*stack_base = (uintcap_t)vectp;
 
 	stringp = imgp->args->begin_argv;
 	argc = imgp->args->argc;

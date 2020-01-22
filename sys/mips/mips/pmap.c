@@ -2183,7 +2183,7 @@ pmap_enter(pmap_t pmap, vm_offset_t va, vm_page_t m, vm_prot_t prot,
 	origpte = *pte;
 	KASSERT(!pte_test(&origpte, PTE_D | PTE_RO | PTE_V),
 	    ("pmap_enter: modified page not writable: va: %p, pte: %#jx",
-	    (void *)va, (uintmax_t)origpte));
+	    (void *)(uintptr_t)va, (uintmax_t)origpte));
 	opa = TLBLO_PTE_TO_PA(origpte);
 
 	/*
