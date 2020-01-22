@@ -186,7 +186,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct sigframe64 *)((uintptr_t)td->td_sigstk.ss_sp +
+		fp = (struct sigframe64 *)((__cheri_addr uintptr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
 		fp = (struct sigframe64 *)td->td_frame->tf_sp;
@@ -201,7 +201,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	freebsd64_get_mcontext(td, &frame.sf_uc.uc_mcontext, 0);
 	siginfo_to_siginfo64(&ksi->ksi_info, &frame.sf_si);
 	frame.sf_uc.uc_sigmask = *mask;
-	frame.sf_uc.uc_stack.ss_sp = (__cheri_fromcap void *)td->td_sigstk.ss_sp;
+	frame.sf_uc.uc_stack.ss_sp = (__cheri_addr uintptr_t)td->td_sigstk.ss_sp;
 	frame.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
 	frame.sf_uc.uc_stack.ss_flags = (td->td_pflags & TDP_ALTSTACK) != 0 ?
 	    (onstack ? SS_ONSTACK : 0) : SS_DISABLE;
@@ -209,7 +209,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_UNLOCK(td->td_proc);
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyout(&frame, fp, sizeof(*fp)) != 0) {
+	if (copyout(&frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
 		PROC_LOCK(p);
@@ -220,7 +220,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_a[1] = (register_t)&fp->sf_si;
 	tf->tf_a[2] = (register_t)&fp->sf_uc;
 
-	tf->tf_sepc = (register_t)catcher;
+	tf->tf_sepc = (__cheri_offset register_t)catcher;
 	tf->tf_sp = (register_t)fp;
 
 	sysent = p->p_sysent;
