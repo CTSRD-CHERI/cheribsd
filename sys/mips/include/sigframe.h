@@ -63,6 +63,8 @@ struct sigframe32 {
 #endif
 
 #ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64_signal.h>
+
 struct sigframe64 {
 	int64_t		sf_signum;
 	int64_t		sf_siginfo;	/* code or pointer to sf_si */
@@ -84,20 +86,6 @@ struct sigframe_c {
 	register_t	sf_addr;	/* undocumented 4th arg */
 	ucontext_t	sf_uc;		/* = *sf_ucontext */
 	struct siginfo_c	sf_si;	/* = *sf_siginfo (SA_SIGINFO case) */
-	unsigned long	__spare__[2];
-};
-#endif
-
-#ifdef COMPAT_FREEBSD64
-#include <compat/freebsd64/freebsd64_signal.h>
-
-struct sigframe64 {
-	register_t	sf_signum;
-	register_t	sf_siginfo;	/* code or pointer to sf_si */
-	register_t	sf_ucontext;	/* points to sf_uc */
-	register_t	sf_addr;	/* undocumented 4th arg */
-	ucontext64_t	sf_uc;		/* = *sf_ucontext */
-	struct siginfo64	sf_si;	/* = *sf_siginfo (SA_SIGINFO case) */
 	unsigned long	__spare__[2];
 };
 #endif

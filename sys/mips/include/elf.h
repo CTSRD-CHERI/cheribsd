@@ -136,27 +136,6 @@ typedef struct {	/* Auxiliary vector entry on initial stack */
 	} a_un;
 } Elf64_Auxinfo;
 
-#if defined(_KERNEL) && defined(COMPAT_FREEBSD64)
-typedef struct {	/* Auxiliary vector entry on initial stack */
-	int	a_type;			/* Entry type. */
-	union {
-		int		a_val;	/* Integer value. */
-		uint64_t	a_ptr;	/* Address. */
-		uint64_t	a_fcn;	/* Function pointer (not used). */
-	} a_un;
-} Elf32_Auxinfo_fbsd64;
-
-typedef struct {	/* Auxiliary vector entry on initial stack */
-	long	a_type;			/* Entry type. */
-	union {
-		long		a_val;	/* Integer value. */
-		uint64_t	a_ptr;	/* Address. */
-		uint64_t	a_fcn;	/* Function pointer (not used). */
-	} a_un;
-} Elf64_Auxinfo_fbsd64;
-__ElfType(Auxinfo_fbsd64);
-#endif
-
 #if __has_feature(capabilities)
 typedef struct {	/* Auxiliary vector entry on initial stack */
 	int64_t	a_type;			/* Entry type. */

@@ -1471,11 +1471,7 @@ int
 __elfN(freebsd_copyout_auxargs)(struct image_params *imgp, uintcap_t base)
 {
 	Elf_Auxargs *args = (Elf_Auxargs *)imgp->auxargs;
-#ifdef COMPAT_FREEBSD64
-	Elf_Auxinfo_fbsd64 *argarray, *pos;
-#else
 	Elf_Auxinfo *argarray, *pos;
-#endif
 #ifdef __ELF_CHERI
 	void * __capability exec_base;
 #endif
