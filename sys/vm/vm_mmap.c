@@ -432,7 +432,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	case MAP_ALIGNED_CHERI_SEAL:
 		break;
 	case MAP_ALIGNED_SUPER:
-#ifdef __mips_n64
+#if VM_NRESERVLEVEL > 0
 		/*
 		 * pmap_align_superpage() is a no-op for allocations
 		 * less than a super page so request data alignment
@@ -441,13 +441,11 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		 * In practice this is a no-op as super-pages are
 		 * precisely representable.
 		 */
-		if (uap->len < PDRSIZE &&
+		if (uap->len < (1UL << (VM_LEVEL_0_ORDER + PAGE_SHIFT)) &&
 		    CHERI_REPRESENTABLE_ALIGNMENT(uap->len) > (1UL << PAGE_SHIFT)) {
 			flags &= ~MAP_ALIGNMENT_MASK;
 			flags |= MAP_ALIGNED_CHERI;
 		}
-#else
-#error	MAP_ALIGNED_SUPER handling unimplemented for this architecture
 #endif
 		break;
 	default:
