@@ -397,8 +397,10 @@ struct uma_slab {
 	uint8_t		us_domain;		/* Backing NUMA domain. */
 	struct noslabbits us_free;		/* Free bitmask, flexible. */
 };
+#ifndef CHERI_PURECAP_KERNEL
 _Static_assert(sizeof(struct uma_slab) == offsetof(struct uma_slab, us_free),
     "us_free field must be last");
+#endif
 #if MAXMEMDOM >= 255
 #error "Slab domain type insufficient"
 #endif

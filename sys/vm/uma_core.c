@@ -1353,7 +1353,7 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 
 	/* Point the slab into the allocated memory */
 	if (!(keg->uk_flags & UMA_ZFLAG_OFFPAGE))
-		slab = (uma_slab_t )(mem + keg->uk_pgoff);
+		slab = (uma_slab_t)(mem + keg->uk_pgoff);
 	else
 		((uma_hash_slab_t)slab)->uhs_data = mem;
 
@@ -1372,7 +1372,7 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 #endif
 
 	if (keg->uk_init != NULL) {
-		for (i = 0; i < keg->uk_ipers; i++)
+		for (i = 0; i < keg->uk_ipers; i++) {
 			if (keg->uk_init(slab_item(slab, keg, i),
 			    keg->uk_size, flags) != 0)
 				break;
@@ -1946,8 +1946,8 @@ keg_ctor(void *mem, int size, void *udata, int flags)
 	keg->uk_slabzone = NULL;
 
 #ifdef CHERI_PURECAP_KERNEL
-	if ((keg->uk_flags & UMA_ZONE_HASH) == 0)
-		keg->uk_flags |= UMA_ZONE_VTOSLAB;
+	if ((keg->uk_flags & UMA_ZFLAG_HASH) == 0)
+		keg->uk_flags |= UMA_ZFLAG_VTOSLAB;
 #endif
 
 	/*
@@ -4082,7 +4082,7 @@ zone_release(void *arg, void **bucket, int cnt)
 		if (__predict_true((zone->uz_flags & UMA_ZFLAG_VTOSLAB) != 0)) {
 			slab = vtoslab((vm_offset_t)ptr_to_va(item));
 		} else {
-			mem = (uint8_t *)((uintptr_t)item & (~UMA_SLAB_MASK));
+			mem = (uint8_t *)rounddown2(item, UMA_SLAB_SIZE);
 			if ((zone->uz_flags & UMA_ZFLAG_HASH) != 0)
 				slab = hash_sfind(&keg->uk_hash, mem);
 			else
@@ -4868,7 +4868,7 @@ uma_dbg_getslab(uma_zone_t zone, void *item)
 	 * zone is unlocked because the item's allocation state
 	 * essentially holds a reference.
 	 */
-	mem = (uint8_t *)((uintptr_t)item & (~UMA_SLAB_MASK));
+	mem = (uint8_t *)rounddown2(item, UMA_SLAB_SIZE);
 	if ((zone->uz_flags & UMA_ZFLAG_CACHE) != 0)
 		return (NULL);
 	if (zone->uz_flags & UMA_ZFLAG_VTOSLAB)
@@ -4938,10 +4938,11 @@ uma_dbg_alloc(uma_zone_t zone, uma_slab_t slab, void *item)
 
 	keg = zone->uz_keg;
 #ifdef CHERI_PURECAP_KERNEL
-	/* Check first that item is a subset of slab->us_data */
-	if (!cheri_is_subset(slab, item))
+	/* Check first that item is a subset of slab capability */
+	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0 &&
+	    !cheri_is_subset(slab, item))
 		panic("Item capability %p is not a subset of the"
-		    " slab capability %p.", item, slab->us_data);
+		    " slab capability %p.", item, slab);
 #endif
 	freei = slab_item_index(slab, keg, item);
 
@@ -4970,10 +4971,11 @@ uma_dbg_free(uma_zone_t zone, uma_slab_t slab, void *item)
 	}
 	keg = zone->uz_keg;
 #ifdef CHERI_PURECAP_KERNEL
-	/* Check first that item is a subset of slab->us_data */
-	if (!cheri_is_subset(slab, item))
+	/* Check first that item is a subset of slab */
+	if ((keg->uk_flags & UMA_ZFLAG_OFFPAGE) == 0 &&
+	    !cheri_is_subset(slab, item))
 		panic("Item capability %p is not a subset of the"
-		    " slab capability %p.", item, slab->us_data);
+		    " slab capability %p.", item, slab);
 #endif
 	freei = slab_item_index(slab, keg, item);
 
