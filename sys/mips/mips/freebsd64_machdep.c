@@ -202,7 +202,7 @@ freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 	for (i = 0; i < 33; i++)
 		mcp->mc_fpregs[i] = mc.mc_fpregs[i];
 	mcp->mc_fpc_eir = mc.mc_fpc_eir;
-	mcp->mc_tls = (__cheri_fromcap void *)mc.mc_tls;
+	mcp->mc_tls = (uint64_t)(__cheri_fromcap void *)mc.mc_tls;
 	mcp->cause = mc.cause;
 
 	/*
@@ -231,7 +231,7 @@ freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 			    sizeof(mc.mc_cheriframe), mcp->mc_cp2state_len);
 			return (EINVAL);
 		}
-		error = copyincap(__USER_CAP((void *)mcp->mc_cp2state,
+		error = copyincap(__USER_CAP(mcp->mc_cp2state,
 		    mcp->mc_cp2state_len), &mc.mc_cheriframe,
 		    sizeof(mc.mc_cheriframe));
 		if (error) {
@@ -279,7 +279,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 #endif
 	struct sigacts *psp;
 	struct sigframe64 sf, *sfp;
-	vm_offset_t sp;
+	uintptr_t sp;
 #ifdef CPU_CHERI
 	size_t cp2_len;
 	int cheri_is_sandboxed;
@@ -352,7 +352,8 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* save user context */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack.ss_sp = (__cheri_fromcap void *)td->td_sigstk.ss_sp;
+	sf.sf_uc.uc_stack.ss_sp =
+	    (uint64_t)(__cheri_fromcap void *)td->td_sigstk.ss_sp;
 	sf.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
 	sf.sf_uc.uc_stack.ss_flags = td->td_sigstk.ss_flags;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
@@ -360,9 +361,10 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mullo = regs->mullo;
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls =
-	    (__cheri_fromcap void *)td->td_md.md_tls;
+	    (uint64_t)(__cheri_fromcap void *)td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
-	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
+	bcopy(__unbounded_addressof(regs->ast),
+	    (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
 	sf.sf_uc.uc_mcontext.mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 #if defined(CPU_HAVEFPU)
@@ -370,7 +372,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* if FPU has current state, save it first */
 		if (td == PCPU_GET(fpcurthread))
 			MipsSaveCurFPState(td);
-		bcopy((void *)&td->td_frame->f0,
+		bcopy(__unbounded_addressof(td->td_frame->f0),
 		    (void *)sf.sf_uc.uc_mcontext.mc_fpregs,
 		    sizeof(sf.sf_uc.uc_mcontext.mc_fpregs));
 	}
@@ -381,8 +383,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !oonstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		sp = (vm_offset_t)((__cheri_addr vaddr_t)td->td_sigstk.ss_sp +
-		    td->td_sigstk.ss_size);
+		sp = (uintptr_t)td->td_sigstk.ss_sp + td->td_sigstk.ss_size;
 	} else {
 #ifdef CPU_CHERI
 		/*
@@ -400,8 +401,13 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 			sigexit(td, SIGILL);
 			/* NOTREACHED */
 		}
+		sp = (uintptr_t)
+		    cheri_capability_build_user_data(CHERI_CAP_USER_DATA_PERMS,
+		        CHERI_CAP_USER_DATA_BASE, CHERI_CAP_USER_DATA_LENGTH,
+		        regs->sp);
+#else
+		sp = (uintptr_t)regs->sp;
 #endif
-		sp = (vm_offset_t)regs->sp;
 	}
 #ifdef CPU_CHERI
 	cp2_len = sizeof(*cfp);
@@ -428,7 +434,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	} else {
 		/* Old FreeBSD-style arguments. */
 		regs->a1 = ksi->ksi_code;
-		regs->a3 = (__cheri_addr uintptr_t)ksi->ksi_addr;
+		regs->a3 = (__cheri_addr vaddr_t)ksi->ksi_addr;
 		/* sf.sf_ahu.sf_handler = catcher; */
 	}
 

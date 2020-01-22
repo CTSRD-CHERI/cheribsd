@@ -98,7 +98,6 @@ __FBSDID("$FreeBSD$");
  * frame pointer, it returns to the user
  * specified pc, psl.
  */
-#ifndef CHERI_PURECAP_KERNEL
 void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
@@ -197,7 +196,8 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	sf.sf_uc.uc_mcontext.mulhi = regs->mulhi;
 	sf.sf_uc.uc_mcontext.mc_tls = td->td_md.md_tls;
 	sf.sf_uc.uc_mcontext.mc_regs[0] = UCONTEXT_MAGIC;  /* magic number */
-	bcopy((void *)&regs->ast, (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
+	bcopy(__unbounded_addressof(regs->ast),
+	    (void *)&sf.sf_uc.uc_mcontext.mc_regs[1],
 	    sizeof(sf.sf_uc.uc_mcontext.mc_regs) - sizeof(register_t));
 	sf.sf_uc.uc_mcontext.mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 #if defined(CPU_HAVEFPU)
@@ -205,7 +205,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		/* if FPU has current state, save it first */
 		if (td == PCPU_GET(fpcurthread))
 			MipsSaveCurFPState(td);
-		bcopy((void *)&td->td_frame->f0,
+		bcopy(__unbounded_addressof(td->td_frame->f0),
 		    (void *)sf.sf_uc.uc_mcontext.mc_fpregs,
 		    sizeof(sf.sf_uc.uc_mcontext.mc_fpregs));
 	}
@@ -340,7 +340,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_LOCK(p);
 	mtx_lock(&psp->ps_mtx);
 }
-#endif /* ! CHERI_PURECAP_KERNEL */
 
 /*
  * System call to cleanup state after a signal
@@ -523,12 +522,13 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int flags)
 #endif
 		mcp->mc_onstack = sigonstack(tp->sp);
 	PROC_UNLOCK(curthread->td_proc);
-	bcopy((void *)&td->td_frame->zero, (void *)&mcp->mc_regs,
+	bcopy(__unbounded_addressof(td->td_frame->zero), (void *)&mcp->mc_regs,
 	    sizeof(mcp->mc_regs));
 
 	mcp->mc_fpused = td->td_md.md_flags & MDTD_FPUSED;
 	if (mcp->mc_fpused) {
-		bcopy((void *)&td->td_frame->f0, (void *)&mcp->mc_fpregs,
+		bcopy(__unbounded_addressof(td->td_frame->f0),
+		    (void *)&mcp->mc_fpregs,
 		    sizeof(mcp->mc_fpregs));
 	}
 	if (flags & GET_MC_CLEAR_RET) {
@@ -655,6 +655,7 @@ cheri_stack_pointer(struct thread *td, struct image_params *imgp, uintcap_t stac
 	    ("%s: rounded base != base", __func__));
 	csp = cheri_setaddress((void * __capability)stack, stackbase);
 	csp = cheri_csetbounds(csp, stacklen);
+
 	return (csp + stacklen);
 }
 
@@ -973,7 +974,8 @@ ptrace_clear_single_step(struct thread *td)
 //   ],
 //   "changes_purecap": [
 //     "support",
+//     "subobject_bounds"
 //   ],
-//   "change_comment": "freebsd64 purecap sendsig"
+//   "change_comment": "sendsig"
 // }
 // CHERI CHANGES END

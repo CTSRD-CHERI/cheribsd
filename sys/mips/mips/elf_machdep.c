@@ -58,7 +58,7 @@ static struct sysentvec elf_freebsd_sysvec = {
 	.sv_errtbl	= NULL,
 	.sv_transtrap	= NULL,
 	.sv_fixup	= __elfN(freebsd_fixup),
-	.sv_sendsig	= freebsd64_sendsig,
+	.sv_sendsig	= sendsig,
 	.sv_sigcode	= sigcode,
 	.sv_szsigcode	= &szsigcode,
 #if __has_feature(capabilities)

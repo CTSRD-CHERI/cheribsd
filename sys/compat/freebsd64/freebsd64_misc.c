@@ -669,7 +669,7 @@ freebsd64_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	 */
 	destp -= szps;
 	destp = rounddown2(destp, sizeof(vaddr_t));
-	imgp->pagesizes = (uintptr_t)destp;
+	imgp->pagesizes = cheri_fromint(destp);
 	error = copyout(pagesizes, (void *)destp, szps);
 	if (error != 0)
 		return (error);
@@ -1519,7 +1519,7 @@ freebsd64_thr_new_initthr(struct thread *td, void *thunk)
 	stack.ss_size = param->stack_size;
 	cpu_set_upcall(td, PURECAP_KERNEL_USER_CODE_CAP(param->start_func),
 	    PURECAP_KERNEL_USER_CAP_UNBOUND(param->arg), &stack);
-	return (freebsd64_set_user_tls(td,
+	return (cpu_set_user_tls(td,
 	    PURECAP_KERNEL_USER_CAP_UNBOUND(param->tls_base)));
 }
 
