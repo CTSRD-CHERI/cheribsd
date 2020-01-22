@@ -109,7 +109,7 @@ ENTRY(fubyte)
 END(fubyte)
 
 /*
- * int fuword(volatile const void *)
+ * int fuword16(volatile const void *)
  */
 ENTRY(fuword16)
 	li	a1, (VM_MAXUSER_ADDRESS-1)
