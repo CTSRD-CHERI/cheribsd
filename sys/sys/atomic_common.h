@@ -45,7 +45,7 @@
 #define	atomic_load_8(p)	(*(volatile uint8_t *)(p))
 #define	atomic_load_16(p)	(*(volatile uint16_t *)(p))
 #define	atomic_load_32(p)	(*(volatile uint32_t *)(p))
-#ifdef _LP64
+#if defined(_LP64) || __has_feature(capabilities)
 #define	atomic_load_64(p)	(*(volatile uint64_t *)(p))
 #endif
 
