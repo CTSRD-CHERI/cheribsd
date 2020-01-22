@@ -322,6 +322,9 @@ struct thread {
 	uintcap_t	td_rb_inact;	/* (k) Current in-action mutex loc. */
 	struct syscall_args td_sa;	/* (kx) Syscall parameters. Copied on
 					   fork for child tracing. */
+#if __has_feature(capabilities)
+	void * __capability td_cheri_mmap_cap; /* (x) */
+#endif
 #define	td_endcopy td_pcb
 
 /*
