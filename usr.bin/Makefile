@@ -234,7 +234,9 @@ SUBDIR.${MK_KDUMP}+=	truss
 SUBDIR.${MK_KERBEROS_SUPPORT}+=	compile_et
 SUBDIR.${MK_LDNS_UTILS}+=	drill
 SUBDIR.${MK_LDNS_UTILS}+=	host
+.if ${MK_COMPAT_CHERIABI} == no
 SUBDIR.${MK_LIB32}+=	ldd32
+.endif
 SUBDIR.${MK_LIB64}+=	ldd64
 SUBDIR.${MK_LOCATE}+=	locate
 # XXX msgs?
