@@ -125,4 +125,5 @@ void MipsUserIntr(void);
 
 trapf_pc_t trap(struct trapframe *);
 
+#endif /* _LOCORE */
 #endif /* !_MACHINE_TRAP_H_ */

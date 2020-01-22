@@ -296,14 +296,16 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
 	/* Save special registers after KSCRATCH regs */		\
-	CGetEPCC	CHERI_REG_C1;					\
-	SAVE_U_PCB_CREG(CHERI_REG_C1, PCC, pcb);			\
 	/* User DDC is still installed. */				\
 	cgetdefault	CHERI_REG_C1;					\
 	SAVE_U_PCB_CREG(CHERI_REG_C1, DDC, pcb);			\
 	csetdefault	$cnull;						\
 	cgetcause	treg;						\
-	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)
+	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb);				\
+	/* EPCC is saved last so that it can be read from KSCRATCH */	\
+	CGetEPCC	CHERI_REG_C1;					\
+	SAVE_U_PCB_CREG(CHERI_REG_C1, PCC, pcb);			\
+	cmove		CHERI_REG_KSCRATCH, CHERI_REG_C1
 
 /*
  * Restore state from PCB. Assume that pcb is pointed to by KSCRATCH
@@ -404,7 +406,7 @@
 	CGetKR2C	CHERI_REG_KSCRATCH;				\
 	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, DDC, pcb);			\
 	cgetcause	treg;						\
-	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb)
+	SAVE_CAPCAUSE_TO_PCB(treg, treg2, pcb);				\
 	/* EPCC is saved last so that it can be read from KSCRATCH */	\
 	CGetEPCC	CHERI_REG_KSCRATCH;				\
 	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb)

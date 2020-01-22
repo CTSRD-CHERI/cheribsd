@@ -261,6 +261,11 @@
  * The kernel has been adjusted to use $pcc instead of $pc everywhere so we
  * can simply write that to $epcc.
  */
+#ifdef CHERI_PURECAP_KERNEL
+#define RESTORE_U_PCB_PC(tmpcreg, pcb)					\
+	RESTORE_U_PCB_CREG(tmpcreg, PCC, pcb);				\
+	CSetEPCC tmpcreg
+#else
 #define RESTORE_U_PCB_PC(unused_pc_vaddr_tmpreg, pcb)			\
 	/* EPCC is no longer a GPR so load it into C27 first. */	\
 	csetkr1c	CHERI_REG_KSCRATCH; /* Save $c27 in $kr1c. */	\
@@ -270,6 +275,7 @@
 	cgetkr1c	CHERI_REG_KSCRATCH;				\
 	/* Clear kr1c again */						\
 	csetkr1c	$cnull
+#endif
 #else /* ! CPU_CHERI */
 /* Non-CHERI case: just update CP0_EPC with the saved pc virtual address. */
 #define RESTORE_U_PCB_PC(pc_vaddr_tmpreg, pcb)	\

@@ -529,6 +529,10 @@ SlowFault:
  * k1 is used as a temporary
  */
 
+#define SAVE_EPC_REG(addr_gpr, epcc_reg)	\
+	CGetEPCC epcc_reg;			\
+	CGetAddr addr_gpr, epcc_reg
+
 #define	SAVE_REG(reg, offs)		\
 	csd	reg, zero, (CALLFRAME_SIZ + (SZREG * offs))(CHERI_REG_STC)
 
@@ -566,17 +570,14 @@ SlowFault:
 	mfc0	a0, MIPS_COP_0_STATUS	;\
 	mfc0	a1, MIPS_COP_0_CAUSE	;\
 	MFC0	a2, MIPS_COP_0_BAD_VADDR;\
-	MFC0	a3, MIPS_COP_0_EXC_PC	;\
 	SAVE_REG(v0, MULLO)		;\
 	SAVE_REG(v1, MULHI)		;\
 	SAVE_REG(a0, SR)		;\
 	SAVE_REG(a1, CAUSE)		;\
 	SAVE_REG(a2, BADVADDR)		;\
+	/* SAVE_CHERI saves $epcc */	;\
 	SAVE_CHERI(t0, t1)		;\
-	move	t0, ra			;\
-	move	ra, a3			;\
-	SAVE_REG(ra, PC)		;\
-	move	ra, t0			;\
+	SAVE_EPC_REG(a3, CHERI_REG_KSCRATCH);\
 	SAVE_REG(ra, RA)		;\
 	SAVE_REG(sp, SP)	/* Notice: store sp as a normal register. */;\
 	CLEAR_STATUS			;\
@@ -591,17 +592,14 @@ SlowFault:
  * Restore CHERI registers from the on-stack kernel trap frame.
  * Note that this is only used for kernel-generated exceptions.
  *
- * EPCC is expected to be given in the epcc parameter register with the offset
- * already set.
  * STC must be restored later in the cheri kernel, otherwise we can not
  * restore the the rest of the registers. Here we restore KSCRATCH in KR1C and
  * STC in KSCRATCH for later use. XXX-AM: Could restore capregs last?
  *
  * Notice: the capability cause register is saved, but not restored.
  */
-#define	RESTORE_CHERI(epcc_reg)					\
+#define	RESTORE_CHERI					\
 	/* Restore special registers before KSCRATCH (C27) */	\
-	csetepcc epcc_reg;			\
 	RESTORE_CREG(CHERI_REG_KSCRATCH, DDC);	\
 	CSetDefault CHERI_REG_KSCRATCH;		\
 	RESTORE_CREG(CHERI_REG_C1, C1);		\
@@ -639,6 +637,9 @@ SlowFault:
 	RESTORE_CREG(CHERI_REG_C31, C31) ;	\
 	RESTORE_CREG(CHERI_REG_KSCRATCH, STC)
 
+/* For CHERI we don't write to EPC since it is already updated by CSetEPCC. */
+#define MTC0_EXC_PC(unused_epc, epcc) CSetEPCC epcc;
+
 /*
  * Restore preempted kernel state following a kernel exception.  The caller
  * will restore the original sp from k1 after RESTORE_CPU has ended.
@@ -648,12 +649,16 @@ SlowFault:
 
 #define	RESTORE_CPU(epcc_reg) \
 	CLEAR_STATUS			;\
-	RESTORE_CHERI(epcc_reg)		;\
 	RESTORE_REG(k0, SR)		;\
-	RESTORE_REG(t0, MULLO)	;\
-	RESTORE_REG(t1, MULHI)	;\
+	RESTORE_REG(t0, MULLO)		;\
+	RESTORE_REG(t1, MULHI)		;\
 	mtlo	t0			;\
 	mthi	t1			;\
+	MTC0_EXC_PC(v0, epcc_reg)	;\
+	/* Now that $c3 has been moved	\
+	 * to $epcc, we can restore the	\
+	 * remaining CHERI registers */	\
+	RESTORE_CHERI			;\
 	.set noat			;\
 	RESTORE_REG(AT, AST)	;\
 	RESTORE_REG(v0, V0)		;\
@@ -811,7 +816,9 @@ NESTED_NOPROFILE(MipsUserGenException, CALLFRAME_SIZ, ra)
 	mtc0	t0, MIPS_COP_0_STATUS
 	ITLBNOPFIX
 
-	/* Assume CURPCB left in KSCRATCH */
+	/* Prepare the trapframe capability */
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH)
+	clc	CHERI_REG_KSCRATCH, zero, PC_CURPCB(CHERI_REG_KSCRATCH)
 	cincoffset	$c3, CHERI_REG_KSCRATCH, U_PCB_REGS
 	REG_LI	t0, TRAPFRAME_SIZE
 	csetbounds	$c3, $c3, t0
@@ -934,7 +941,11 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
  * in the kernel ring is sufficient to imply that PCC matches the kernel
  * address space.
  */
-	MFC0	k0, MIPS_COP_0_EXC_PC
+	/* Save previous $c27. */
+	csetkr1c	CHERI_REG_KSCRATCH
+	CGetEPCC CHERI_REG_KSCRATCH
+	/* Get the address (not offset!) of $epcc to perform the range check */
+	CGetAddr	k0, CHERI_REG_KSCRATCH
 	ori	k0, 0xf
 	xori	k0, 0xf			# 16 byte align
 	CAPTABLE_LOAD(CHERI_REG_KSCRATCH, MipsWaitStart)
@@ -942,8 +953,11 @@ NESTED_NOPROFILE(MipsKernIntr, KERN_EXC_FRAME_SIZE, ra)
 	bne	k0, k1, 1f
 	nop
 	PTR_ADDU k1, 16			# skip over wait
-	MTC0	k1, MIPS_COP_0_EXC_PC
+	CSetAddr	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, k1
+	CSetEPCC	CHERI_REG_KSCRATCH
 1:
+	/* Restore previous $c27. */
+	cgetkr1c	CHERI_REG_KSCRATCH
 
 	/* Save exception sp in kscratch to put on the stack later. */
 	cmove	CHERI_REG_KSCRATCH, CHERI_REG_STC
@@ -1074,12 +1088,10 @@ END(MipsKernIntr)
 	mfhi	v1;					\
 	mfc0	a0, MIPS_COP_0_STATUS;			\
 	mfc0	a1, MIPS_COP_0_CAUSE;			\
-	MFC0	a3, MIPS_COP_0_EXC_PC;			\
 	SAVE_U_PCB_REG(v0, MULLO, pcb);			\
 	SAVE_U_PCB_REG(v1, MULHI, pcb);			\
 	SAVE_U_PCB_REG(a0, SR, pcb);			\
-	SAVE_U_PCB_REG(a1, CAUSE, pcb);			\
-	SAVE_U_PCB_REG(a3, PC, pcb)
+	SAVE_U_PCB_REG(a1, CAUSE, pcb)
 
 /* Note: this trashes KSCRATCH2 */
 #define RESTORE_UINTR_PCB_REGS(pcb)			\
@@ -1094,11 +1106,10 @@ END(MipsKernIntr)
 	RESTORE_U_PCB_REG(s8, S8, pcb);			\
 	RESTORE_U_PCB_REG(t0, MULLO, pcb);		\
 	RESTORE_U_PCB_REG(t1, MULHI, pcb);		\
-	RESTORE_U_PCB_REG(t2, PC, pcb);			\
 	mtlo	t0;					\
 	mthi	t1;					\
 	/* set return address */			\
-	RESTORE_U_PCB_PC(t2, CHERI_REG_KSCRATCH2, pcb, t3);	\
+	RESTORE_U_PCB_PC(CHERI_REG_KSCRATCH2, pcb);	\
 	RESTORE_U_PCB_REG(v0, V0, pcb);			\
 	RESTORE_U_PCB_REG(v1, V1, pcb);			\
 	RESTORE_U_PCB_REG(a0, A0, pcb);			\
@@ -1157,16 +1168,18 @@ NESTED_NOPROFILE(MipsUserIntr, CALLFRAME_SIZ, ra)
 	cmove $c24, CHERI_REG_STC
 #endif
 
-	/*
-	 * Call the interrupt handler.
-	 * Assume CURPCB left in KSCRATCH
-	 */
+	/* Prepare the trapframe capability. */
+	GET_CPU_PCPU(CHERI_REG_KSCRATCH)
+	clc	CHERI_REG_KSCRATCH, zero, PC_CURPCB(CHERI_REG_KSCRATCH)
 	cincoffset $c3, CHERI_REG_KSCRATCH, U_PCB_REGS
+	REG_LI	t0, TRAPFRAME_SIZE
+	csetbounds $c3, $c3, t0
 #ifdef INTRNG
 	CAPCALL_LOAD($c12, intr_irq_handler)
 #else
 	CAPCALL_LOAD($c12, cpu_intr)
 #endif
+	/* Call the interrupt handler. */
 	cjalr	$c12, $c17
 	nop
 
@@ -1540,8 +1553,6 @@ NESTED_NOPROFILE(MipsCacheException, KERN_EXC_FRAME_SIZE, ra)
 	mfc0	a2, MIPS_COP_0_CACHE_ERR	# 3rd arg cache error
 
 	MTC0	k0, MIPS_COP_0_ERROR_PC		# set return address
-	/* XXX-AM: It seems that we need to set EXC_PC in CHERI */
-	MTC0	k0, MIPS_COP_0_EXC_PC		# set return address
 
 	mfc0	k0, MIPS_COP_0_STATUS		# restore status
 	li	k1, MIPS_SR_DIAG_PE		# ignore further errors
