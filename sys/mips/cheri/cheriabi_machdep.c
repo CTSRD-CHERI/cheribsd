@@ -785,10 +785,10 @@ cheriabi_exec_setregs(struct thread *td, struct image_params *imgp,
 	 * Use cheri_capability_build_user_rwx so mmap() can return
 	 * appropriate permissions derived from a single capability.
 	 */
-	td->td_md.md_cheri_mmap_cap = cheri_capability_build_user_rwx(
+	td->td_cheri_mmap_cap = cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
 	    CHERI_CAP_USER_MMAP_OFFSET);
-	KASSERT(cheri_getperm(td->td_md.md_cheri_mmap_cap) &
+	KASSERT(cheri_getperm(td->td_cheri_mmap_cap) &
 	    CHERI_PERM_CHERIABI_VMMAP,
 	    ("%s: mmap() cap lacks CHERI_PERM_CHERIABI_VMMAP", __func__));
 
@@ -1023,7 +1023,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 	case CHERI_MMAP_GETBASE: {
 		size_t base;
 
-		base = cheri_getbase(td->td_md.md_cheri_mmap_cap);
+		base = cheri_getbase(td->td_cheri_mmap_cap);
 		if (suword(uap->parms, base) != 0)
 			return (EFAULT);
 		return (0);
@@ -1032,7 +1032,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 	case CHERI_MMAP_GETLEN: {
 		size_t len;
 
-		len = cheri_getlen(td->td_md.md_cheri_mmap_cap);
+		len = cheri_getlen(td->td_cheri_mmap_cap);
 		if (suword(uap->parms, len) != 0)
 			return (EFAULT);
 		return (0);
@@ -1041,7 +1041,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 	case CHERI_MMAP_GETOFFSET: {
 		ssize_t offset;
 
-		offset = cheri_getoffset(td->td_md.md_cheri_mmap_cap);
+		offset = cheri_getoffset(td->td_cheri_mmap_cap);
 		if (suword(uap->parms, offset) != 0)
 			return (EFAULT);
 		return (0);
@@ -1050,7 +1050,7 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 	case CHERI_MMAP_GETPERM: {
 		uint64_t perms;
 
-		perms = cheri_getperm(td->td_md.md_cheri_mmap_cap);
+		perms = cheri_getperm(td->td_cheri_mmap_cap);
 		if (suword64(uap->parms, perms) != 0)
 			return (EFAULT);
 		return (0);
@@ -1062,9 +1062,9 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 
 		if (perms == -1)
 			return (EINVAL);
-		td->td_md.md_cheri_mmap_cap =
-		    cheri_andperm(td->td_md.md_cheri_mmap_cap, perms);
-		perms = cheri_getperm(td->td_md.md_cheri_mmap_cap);
+		td->td_cheri_mmap_cap =
+		    cheri_andperm(td->td_cheri_mmap_cap, perms);
+		perms = cheri_getperm(td->td_cheri_mmap_cap);
 		if (suword64(uap->parms, perms) != 0)
 			return (EFAULT);
 		return (0);
@@ -1078,13 +1078,13 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		/* Reject errors and misaligned offsets */
 		if (offset == -1 || (offset & PAGE_MASK) != 0)
 			return (EINVAL);
-		len = cheri_getlen(td->td_md.md_cheri_mmap_cap);
+		len = cheri_getlen(td->td_cheri_mmap_cap);
 		/* Don't allow out of bounds offsets, they aren't useful */
 		if (offset < 0 || offset > len) {
 			return (EINVAL);
 		}
-		td->td_md.md_cheri_mmap_cap =
-		    cheri_setoffset(td->td_md.md_cheri_mmap_cap,
+		td->td_cheri_mmap_cap =
+		    cheri_setoffset(td->td_cheri_mmap_cap,
 		    (register_t)offset);
 		return (0);
 	}
@@ -1097,14 +1097,14 @@ cheriabi_sysarch(struct thread *td, struct cheriabi_sysarch_args *uap)
 		/* Reject errors or misaligned lengths */
 		if (len == (size_t)-1 || (len & PAGE_MASK) != 0)
 			return (EINVAL);
-		olen = cheri_getlen(td->td_md.md_cheri_mmap_cap);
-		offset = cheri_getoffset(td->td_md.md_cheri_mmap_cap);
+		olen = cheri_getlen(td->td_cheri_mmap_cap);
+		offset = cheri_getoffset(td->td_cheri_mmap_cap);
 		/* Don't try to set out of bounds lengths */
 		if (offset > olen || len > olen - offset) {
 			return (EINVAL);
 		}
-		td->td_md.md_cheri_mmap_cap =
-		    cheri_csetbounds(td->td_md.md_cheri_mmap_cap,
+		td->td_cheri_mmap_cap =
+		    cheri_csetbounds(td->td_cheri_mmap_cap,
 		    (register_t)len);
 		return (0);
 	}
