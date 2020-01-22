@@ -142,7 +142,7 @@ ck_ht_map_create(struct ck_ht *table, CK_HT_TYPE entries)
 {
 	struct ck_ht_map *map;
 	CK_HT_TYPE size;
-	uintptr_t prefix;
+	size_t prefix;
 	uint32_t n_entries;
 
 	n_entries = ck_internal_power_2(entries);
