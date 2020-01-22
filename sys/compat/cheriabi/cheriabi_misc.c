@@ -872,8 +872,9 @@ int
 cheriabi_elf_fixup(uintptr_t *stack_base, struct image_params *imgp)
 {
 
-	KASSERT(((vaddr_t)*stack_base & (sizeof(void * __capability) - 1)) == 0,
-	    ("*stack_base (%p) is not capability aligned", *stack_base));
+	KASSERT(!is_aligned(*stack_base, sizeof(void * __capability)),
+	    ("*stack_base (%p) is not capability aligned",
+	     (void *)*stack_base));
 
 	return (0);
 }
