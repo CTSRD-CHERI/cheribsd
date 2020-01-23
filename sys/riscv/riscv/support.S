@@ -360,6 +360,7 @@ EEND(suword64)
 END(suword)
 #endif
 
+/* XXX: CHERI TODO: Save/restore cap registers. */
 ENTRY(setjmp)
 	/* Store the stack pointer */
 	sd	sp, 0(a0)
