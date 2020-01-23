@@ -842,10 +842,10 @@ netisr_select_cpuid(struct netisr_proto *npp, u_int dispatch_policy,
 	MPASS((m->m_pkthdr.csum_flags & CSUM_SND_TAG) == 0);
 	ifp = m->m_pkthdr.rcvif;
 	if (ifp != NULL)
-		*cpuidp = nws_array[(ifp->if_index + ptr_to_va(source)) %
+		*cpuidp = nws_array[(ifp->if_index + source) %
 		    nws_count];
 	else
-		*cpuidp = nws_array[ptr_to_va(source) % nws_count];
+		*cpuidp = nws_array[source % nws_count];
 	return (m);
 }
 
@@ -1539,7 +1539,7 @@ DB_SHOW_COMMAND(netisr, db_show_netisr)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190603,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset"

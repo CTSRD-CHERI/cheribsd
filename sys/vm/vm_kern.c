@@ -207,7 +207,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	vmem = vm_dom[domain].vmd_kernel_arena;
 	if (vmem_alloc(vmem, size, M_BESTFIT | flags, &addr))
 		return (0);
-	offset = ptr_to_va(addr) - VM_MIN_KERNEL_ADDRESS;
+	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
 	pflags &= ~(VM_ALLOC_NOWAIT | VM_ALLOC_WAITOK | VM_ALLOC_WAITFAIL);
 	pflags |= VM_ALLOC_NOWAIT;
@@ -229,7 +229,7 @@ retry:
 				tries++;
 				goto retry;
 			}
-			kmem_unback(object, ptr_to_va(addr), i);
+			kmem_unback(object, addr, i);
 			vmem_free(vmem, addr, size);
 			return (0);
 		}
@@ -239,7 +239,7 @@ retry:
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
 		m->valid = VM_PAGE_BITS_ALL;
-		pmap_enter(kernel_pmap, ptr_to_va(addr) + i, m, prot,
+		pmap_enter(kernel_pmap, addr + i, m, prot,
 		    prot | PMAP_ENTER_WIRED, 0);
 	}
 	VM_OBJECT_WUNLOCK(object);
@@ -302,7 +302,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	vmem = vm_dom[domain].vmd_kernel_arena;
 	if (vmem_alloc(vmem, size, flags | M_BESTFIT, &addr))
 		return (0);
-	offset = ptr_to_va(addr) - VM_MIN_KERNEL_ADDRESS;
+	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
 	pflags &= ~(VM_ALLOC_NOWAIT | VM_ALLOC_WAITOK | VM_ALLOC_WAITFAIL);
 	pflags |= VM_ALLOC_NOWAIT;
@@ -330,7 +330,7 @@ retry:
 	    ("kmem_alloc_contig_domain: Domain mismatch %d != %d",
 	    vm_phys_domain(m), domain));
 	end_m = m + npages;
-	tmp = ptr_to_va(addr);
+	tmp = addr;
 	for (; m < end_m; m++) {
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
@@ -498,7 +498,7 @@ kmem_back_domain(int domain, vm_object_t object, vm_ptr_t addr,
 	    ("kmem_back_domain: only supports kernel object."));
 	CHERI_VM_ASSERT_VALID(addr);
 
-	offset = ptr_to_va(addr) - VM_MIN_KERNEL_ADDRESS;
+	offset = addr - VM_MIN_KERNEL_ADDRESS;
 	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
 	pflags &= ~(VM_ALLOC_NOWAIT | VM_ALLOC_WAITOK | VM_ALLOC_WAITFAIL);
 	if (flags & M_WAITOK)
@@ -522,7 +522,7 @@ retry:
 			if ((flags & M_NOWAIT) == 0)
 				goto retry;
 			VM_OBJECT_WUNLOCK(object);
-			kmem_unback(object, ptr_to_va(addr), i);
+			kmem_unback(object, addr, i);
 			return (KERN_NO_SPACE);
 		}
 		KASSERT(vm_phys_domain(m) == domain,
@@ -533,7 +533,7 @@ retry:
 		KASSERT((m->oflags & VPO_UNMANAGED) != 0,
 		    ("kmem_malloc: page %p is managed", m));
 		m->valid = VM_PAGE_BITS_ALL;
-		pmap_enter(kernel_pmap, ptr_to_va(addr) + i, m, prot,
+		pmap_enter(kernel_pmap, addr + i, m, prot,
 		    prot | PMAP_ENTER_WIRED, 0);
 #if VM_NRESERVLEVEL > 0
 		if (__predict_false((prot & VM_PROT_EXECUTE) != 0))
@@ -565,8 +565,7 @@ kmem_back(vm_object_t object, vm_ptr_t addr, vm_size_t size, int flags)
 		 * all come from the same physical domain.
 		 */
 		if (vm_ndomains > 1) {
-			domain = (ptr_to_va(addr) >> KVA_QUANTUM_SHIFT) %
-			    vm_ndomains;
+			domain = (addr >> KVA_QUANTUM_SHIFT) % vm_ndomains;
 			while (VM_DOMAIN_EMPTY(domain))
 				domain++;
 			next = roundup2(addr + 1, KVA_QUANTUM);
@@ -577,10 +576,10 @@ kmem_back(vm_object_t object, vm_ptr_t addr, vm_size_t size, int flags)
 			next = end;
 		}
 		rv = kmem_back_domain(domain, object, addr,
-		    ptr_to_va(next) - ptr_to_va(addr), flags);
+		    (vaddr_t)next - (vaddr_t)addr, flags);
 		if (rv != KERN_SUCCESS) {
 			kmem_unback(object, start,
-			    ptr_to_va(addr) - ptr_to_va(start));
+			    (vaddr_t)addr - (vaddr_t)start);
 			break;
 		}
 	}
@@ -653,7 +652,7 @@ kmem_free(vm_ptr_t addr, vm_size_t size)
 	struct vmem *arena;
 
 	size = round_page(size);
-	arena = _kmem_unback(kernel_object, ptr_to_va(addr), size);
+	arena = _kmem_unback(kernel_object, addr, size);
 	if (arena != NULL)
 		vmem_free(arena, addr, size);
 }
@@ -740,9 +739,8 @@ kmem_init_zero_region(void)
 	if ((m->flags & PG_ZERO) == 0)
 		pmap_zero_page(m);
 	for (i = 0; i < ZERO_REGION_SIZE; i += PAGE_SIZE)
-		pmap_qenter(ptr_to_va(addr) + i, &m, 1);
-	pmap_protect(kernel_pmap, ptr_to_va(addr),
-	    ptr_to_va(addr) + ZERO_REGION_SIZE, VM_PROT_READ);
+		pmap_qenter(addr + i, &m, 1);
+	pmap_protect(kernel_pmap, addr, addr + ZERO_REGION_SIZE, VM_PROT_READ);
 
 	zero_region = (const void *)addr;
 }
@@ -806,9 +804,8 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 #ifndef CHERI_PURECAP_KERNEL
 	kern_map_start = VM_MIN_KERNEL_ADDRESS;
 #else
-	kern_map_start = (vm_ptr_t)cheri_setoffset(
-		(void *)start,
-		VM_MIN_KERNEL_ADDRESS - cheri_getbase((void *)start));
+	kern_map_start = (vm_ptr_t)cheri_setaddress((void *)start,
+	    VM_MIN_KERNEL_ADDRESS);
 #endif
 
 	m = vm_map_create(kernel_pmap, kern_map_start, end);
@@ -820,9 +817,9 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 #ifdef __amd64__
 	    KERNBASE,
 #else		     
-	    ptr_to_va(kern_map_start),
+	    kern_map_start,
 #endif
-	    ptr_to_va(start), VM_PROT_ALL, VM_PROT_ALL, MAP_NOFAULT);
+	    start, VM_PROT_ALL, VM_PROT_ALL, MAP_NOFAULT);
 	/* ... and ending with the completion of the above `insert' */
 
 #ifdef __amd64__
@@ -938,3 +935,15 @@ debug_vm_lowmem(SYSCTL_HANDLER_ARGS)
 
 SYSCTL_PROC(_debug, OID_AUTO, vm_lowmem, CTLTYPE_INT | CTLFLAG_RW, 0, 0,
     debug_vm_lowmem, "I", "set to trigger vm_lowmem event with given flags");
+// CHERI CHANGES START
+// {
+//   "updated": 20200123,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "uintptr_interp_offset",
+//     "pointer_shape",
+//     "pointer_as_integer",
+//     "support"
+//   ]
+// }
+// CHERI CHANGES END

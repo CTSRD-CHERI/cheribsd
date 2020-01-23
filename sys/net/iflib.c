@@ -268,7 +268,7 @@ iflib_get_sctx(if_ctx_t ctx)
 	return (ctx->ifc_sctx);
 }
 
-#define IP_ALIGNED(m) ((ptr_to_va((uintptr_t)(m)->m_data) & 0x3) == 0x2)
+#define IP_ALIGNED(m) ((((uintptr_t)(m)->m_data) & 0x3) == 0x2)
 #define CACHE_PTR_INCREMENT (CACHE_LINE_SIZE/sizeof(void*))
 #define CACHE_PTR_NEXT(ptr) ((void *)(roundup2(ptr, CACHE_LINE_SIZE)))
 
@@ -6851,14 +6851,15 @@ iflib_debugnet_poll(if_t ifp, int count)
 #endif /* DEBUGNET */
 // CHERI CHANGES START
 // {
-//   "updated": 20191029,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "ioctl:net",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "pointer_shape"
+//     "pointer_shape",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

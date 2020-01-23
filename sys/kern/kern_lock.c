@@ -899,7 +899,7 @@ lockmgr_upgrade(struct lock *lk, u_int flags, struct lock_object *ilk,
 	 * We need to preserve waiters flags during the operation.
 	 */
 	if (atomic_cmpset_ptr(&lk->lk_lock,
-	    ptr_to_va(x) | ptr_to_va(v) | LK_SHARERS_LOCK(1),
+	    (vaddr_t)x | (vaddr_t)v | LK_SHARERS_LOCK(1),
 	    ptr_set_flag(tid, x))) {
 		LOCK_LOG_LOCK("XUPGRADE", &lk->lock_object, 0, 0, file,
 		    line);

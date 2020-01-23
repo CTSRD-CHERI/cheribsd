@@ -4699,7 +4699,7 @@ vm_page_bits_swap(vm_page_t m, vm_page_bits_t *bits, vm_page_bits_t newbits)
 	 * containing aligned word, to not depend on the existence
 	 * of atomic_{set, swap, clear}_{8, 16}.
 	 */
-	shift = ptr_to_va(addr) & (sizeof(uint32_t) - 1);
+	shift = addr & (sizeof(uint32_t) - 1);
 #if BYTE_ORDER == BIG_ENDIAN
 	shift = (sizeof(uint32_t) - sizeof(vm_page_bits_t) - shift) * NBBY;
 #else
@@ -5244,7 +5244,7 @@ DB_SHOW_COMMAND(pginfo, vm_page_print_pginfo)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20190603,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",

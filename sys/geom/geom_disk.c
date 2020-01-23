@@ -345,8 +345,8 @@ g_disk_seg_limit(bus_dma_segment_t *seg, off_t *poffset,
 
 	seg_page_base = trunc_page(seg->ds_addr + offset);
 	seg_page_end  = round_page(seg->ds_addr + offset + length);
-	seg_pages = (ptr_to_va(seg_page_end) -
-	    ptr_to_va(seg_page_base)) >> PAGE_SHIFT;
+	seg_pages = ((vaddr_t)seg_page_end -
+	    (vaddr_t)seg_page_base) >> PAGE_SHIFT;
 
 	if (seg_pages > *ppages) {
 		seg_pages = *ppages;
@@ -1083,7 +1083,7 @@ SYSCTL_PROC(_kern, OID_AUTO, disks,
 
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset"

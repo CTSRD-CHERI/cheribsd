@@ -1044,7 +1044,7 @@ _bus_dmamap_load_buffer(bus_dma_tag_t dmat, bus_dmamap_t map, void *buf,
 		 * XXX in user address space.
 		 */
 		KASSERT(kernel_pmap == pmap, ("pmap is not kernel pmap"));
-		curaddr = pmap_kextract(ptr_to_va(vaddr));
+		curaddr = pmap_kextract(vaddr);
 
 		/*
 		 * Compute the segment size, and adjust counts.
@@ -1176,8 +1176,12 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 		size_clend = 0;
 	} else {
 #ifdef CHERI_PURECAP_KERNEL
-		tmp_va = ptr_to_va(buf) & ~cache_linesize_mask;
-		size_cl = ptr_to_va(buf) & cache_linesize_mask;
+		/*
+		 * We cast first to make sure that the masking is done on
+		 * the full virtual address and not only on the offset.
+		 */
+		tmp_va = (vm_offset_t)buf & ~cache_linesize_mask;
+		size_cl = (vm_offset_t)buf & cache_linesize_mask;
 		if (size_cl) {
 			/*
 			 * Note that buf_cl and tmp_cl will have the same
@@ -1194,7 +1198,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 			     " pointer aligned %p", tmp_cl));
 		}
 
-		tmp_va = ptr_to_va(buf + len);
+		tmp_va = buf + len;
 		size_clend = (mips_dcache_max_linesize -
 		    (tmp_va & cache_linesize_mask)) & cache_linesize_mask;
 		if (size_clend) {
@@ -1203,8 +1207,8 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 			    size_clend, CHERI_PERMS_KERNEL_DATA);
 			/* Enforce the same misalignment as in buf_clend */
 			tmp_clend += mips_dcache_max_linesize - size_clend;
-			KASSERT((ptr_to_va(buf_clend) & cache_linesize_mask) ==
-			    (ptr_to_va(tmp_clend) & cache_linesize_mask),
+			KASSERT(((vm_offset_t)buf_clend & cache_linesize_mask) ==
+			    ((vm_offset_t)tmp_clend & cache_linesize_mask),
 			    ("dmamap cacheline tail source and temp buffers"
 			     " have different misalignment source=%p temp=%p",
 			     (void *)buf_clend, tmp_clend));
@@ -1229,7 +1233,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 			memcpy (tmp_cl, (void*)buf_cl, size_cl);
 		if (size_clend)
 			memcpy (tmp_clend, (void*)buf_clend, size_clend);
-		mips_dcache_inv_range(ptr_to_va(buf), len);
+		mips_dcache_inv_range(buf, len);
 		/*
 		 * Restore them
 		 */
@@ -1244,14 +1248,15 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 		 * necessary.
 		 */
 		if (size_cl)
-			mips_dcache_wbinv_range(ptr_to_va(buf_cl), size_cl);
+			mips_dcache_wbinv_range(buf_cl, size_cl);
 		if (size_clend && (size_cl == 0 ||
-		    ptr_to_va(buf_clend) - ptr_to_va(buf_cl) > mips_dcache_max_linesize))
-			mips_dcache_wbinv_range(ptr_to_va(buf_clend), size_clend);
+		    (vaddr_t)buf_clend - (vaddr_t)buf_cl >
+		        mips_dcache_max_linesize))
+			mips_dcache_wbinv_range(buf_clend, size_clend);
 		break;
 
 	case BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE:
-		mips_dcache_wbinv_range(ptr_to_va(buf), len);
+		mips_dcache_wbinv_range(buf, len);
 		break;
 
 	case BUS_DMASYNC_PREREAD:
@@ -1262,7 +1267,7 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 			memcpy (tmp_cl, (void *)buf_cl, size_cl);
 		if (size_clend)
 			memcpy (tmp_clend, (void *)buf_clend, size_clend);
-		mips_dcache_inv_range(ptr_to_va(buf), len);
+		mips_dcache_inv_range(buf, len);
 		/*
 		 * Restore them
 		 */
@@ -1277,17 +1282,18 @@ bus_dmamap_sync_buf(vm_ptr_t buf, int len, bus_dmasync_op_t op, int aligned)
 		 * necessary.
 		 */
 		if (size_cl)
-			mips_dcache_wbinv_range(ptr_to_va(buf_cl), size_cl);
+			mips_dcache_wbinv_range(buf_cl, size_cl);
 		if (size_clend && (size_cl == 0 ||
-		    ptr_to_va(buf_clend) - ptr_to_va(buf_cl) > mips_dcache_max_linesize))
-			mips_dcache_wbinv_range(ptr_to_va(buf_clend), size_clend);
+		    (vaddr_t)buf_clend - (vaddr_t)buf_cl >
+			mips_dcache_max_linesize))
+			mips_dcache_wbinv_range(buf_clend, size_clend);
 		break;
 
 	case BUS_DMASYNC_PREWRITE:
 #ifdef BUS_DMA_FORCE_WBINV
-		mips_dcache_wbinv_range(ptr_to_va(buf), len);
+		mips_dcache_wbinv_range(buf, len);
 #else
-		mips_dcache_wb_range(ptr_to_va(buf), len);
+		mips_dcache_wb_range(buf, len);
 #endif
 		break;
 	}
@@ -1314,10 +1320,10 @@ _bus_dmamap_sync_bp(bus_dma_tag_t dmat, bus_dmamap_t map, bus_dmasync_op_t op)
 				    bpage->datacount);
 			if (bpage->vaddr_nocache == 0) {
 #ifdef BUS_DMA_FORCE_WBINV
-				mips_dcache_wbinv_range(ptr_to_va(bpage->vaddr),
+				mips_dcache_wbinv_range(bpage->vaddr,
 				    bpage->datacount);
 #else
-				mips_dcache_wb_range(ptr_to_va(bpage->vaddr),
+				mips_dcache_wb_range(bpage->vaddr,
 				    bpage->datacount);
 #endif
 			}
@@ -1325,7 +1331,7 @@ _bus_dmamap_sync_bp(bus_dma_tag_t dmat, bus_dmamap_t map, bus_dmasync_op_t op)
 		}
 		if (op & BUS_DMASYNC_POSTREAD) {
 			if (bpage->vaddr_nocache == 0) {
-				mips_dcache_inv_range(ptr_to_va(bpage->vaddr),
+				mips_dcache_inv_range(bpage->vaddr,
 				    bpage->datacount);
 			}
 			if (bpage->datavaddr != 0)
@@ -1493,7 +1499,7 @@ alloc_bounce_pages(bus_dma_tag_t dmat, u_int numpages)
 			free(bpage, M_BUSDMA);
 			break;
 		}
-		bpage->busaddr = pmap_kextract(ptr_to_va(bpage->vaddr));
+		bpage->busaddr = pmap_kextract(bpage->vaddr);
 		bpage->vaddr_nocache = 
 		    (vm_ptr_t)pmap_mapdev(bpage->busaddr, PAGE_SIZE);
 		mtx_lock(&bounce_lock);
@@ -1625,7 +1631,7 @@ busdma_swi(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190604,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

@@ -119,7 +119,7 @@ shared_page_init(void *dummy __unused)
 	vm_page_valid(m);
 	vm_page_xunbusy(m);
 	addr = kva_alloc(PAGE_SIZE);
-	pmap_qenter(ptr_to_va(addr), &m, 1);
+	pmap_qenter(addr, &m, 1);
 	shared_page_mapping = (char *)addr;
 }
 
@@ -290,10 +290,11 @@ exec_sysvec_init(void *param)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190426,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "pointer_as_integer"
+//     "pointer_as_integer",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

@@ -510,7 +510,7 @@ kern_mmap_fpcheck(struct thread *td, uintptr_t addr0, size_t len, int prot,
     int flags, int fd, off_t pos, mmap_check_fp_fn check_fp_fn)
 {
 	struct mmap_req	mr = {
-		.mr_hint = ptr_to_va(addr0),
+		.mr_hint = addr0,
 		.mr_len = len,
 		.mr_prot = prot,
 		.mr_flags = flags,
@@ -760,15 +760,15 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		 * should be aligned after adjustment by pageoff.
 		 */
 		addr -= pageoff;
-		if (ptr_to_va(addr) & addr_mask) {
+		if (addr & addr_mask) {
 			SYSERRCAUSE("%s: addr (%p) is underaligned "
 			    "(mask 0x%zx)", __func__, (void *)addr, addr_mask);
 			return (EINVAL);
 		}
 
 		/* Address range must be all in user VM space. */
-		if (ptr_to_va(addr) < vm_map_min(&vms->vm_map) ||
-		    ptr_to_va(addr) + size > vm_map_max(&vms->vm_map)) {
+		if (addr < vm_map_min(&vms->vm_map) ||
+		    addr + size > vm_map_max(&vms->vm_map)) {
 			SYSERRCAUSE("%s: range (%p-%p) is outside user "
 			    "address range (%p-%p)", __func__, (void *)addr,
 			    (void *)(addr + size),
@@ -776,7 +776,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 			    (void *)(uintptr_t)vm_map_max(&vms->vm_map));
 			return (EINVAL);
 		}
-		if (ptr_to_va(addr) + size < ptr_to_va(addr)) {
+		if (addr + size < addr) {
 			SYSERRCAUSE("%s: addr (%p) + size (0x%zx) overflows",
 			    __func__, (void *)addr, size);
 			return (EINVAL);
@@ -786,7 +786,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 			KASSERT(!SV_CURPROC_FLAG(SV_CHERI),
 			    ("MAP_32BIT on a CheriABI process"));
 			max_addr = MAP_32BIT_MAX_ADDR;
-			if (ptr_to_va(addr) + size > MAP_32BIT_MAX_ADDR) {
+			if (addr + size > MAP_32BIT_MAX_ADDR) {
 				SYSERRCAUSE("%s: addr (%p) + size (0x%zx) is "
 				    "> 0x%zx (MAP_32BIT_MAX_ADDR)", __func__,
 				    (void *)addr, size, MAP_32BIT_MAX_ADDR);
@@ -802,7 +802,7 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		 * do not bother moving the mapping past the heap (since
 		 * the heap is usually above 2GB).
 		 */
-		if (ptr_to_va(addr) + size > MAP_32BIT_MAX_ADDR)
+		if (addr + size > MAP_32BIT_MAX_ADDR)
 			addr = 0;
 #endif
 	} else {
@@ -814,9 +814,9 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 		 * There should really be a pmap call to determine a reasonable
 		 * location.
 		 */
-		if (ptr_to_va(addr) == 0 ||
-		    (ptr_to_va(addr) >= round_page((vm_offset_t)vms->vm_taddr) &&
-		    ptr_to_va(addr) < round_page((vm_offset_t)vms->vm_daddr +
+		if (addr == 0 ||
+		    (addr >= round_page((vm_offset_t)vms->vm_taddr) &&
+		    addr < round_page((vm_offset_t)vms->vm_daddr +
 		    lim_max(td, RLIMIT_DATA))))
 			addr = round_page((vm_offset_t)vms->vm_daddr +
 			    lim_max(td, RLIMIT_DATA));
@@ -885,10 +885,10 @@ kern_mmap_req(struct thread *td, const struct mmap_req *mrp)
 #if __has_feature(capabilities)
 		if (SV_CURPROC_FLAG(SV_CHERI))
 			td->td_retval[0] = (uintcap_t)mmap_retcap(td,
-			    ptr_to_va(addr) + pageoff,  mrp);
+			    addr + pageoff,  mrp);
 		else
 #endif
-			td->td_retval[0] = (syscallarg_t)(ptr_to_va(addr) + pageoff);
+			td->td_retval[0] = (syscallarg_t)(addr + pageoff);
 	}
 done:
 	if (fp)
@@ -2142,9 +2142,9 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 			    max_addr, findspace, prot, maxprot, docow);
 		}
 	} else {
-		if (max_addr != 0 && ptr_to_va(*addr) + size > max_addr)
+		if (max_addr != 0 && *addr + size > max_addr)
 			return (ENOMEM);
-		rv = vm_map_fixed(map, object, foff, ptr_to_va(*addr), size,
+		rv = vm_map_fixed(map, object, foff, *addr, size,
 		    prot, maxprot, docow);
 #ifdef CHERI_PURECAP_KERNEL
 		/*
@@ -2153,8 +2153,7 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 		 * we make one.
 		 */
 		if (rv == KERN_SUCCESS)
-			*addr = vm_map_make_ptr(map, ptr_to_va(*addr),
-			    size, prot);
+			*addr = vm_map_make_ptr(map, *addr, size, prot);
 #endif
 	}
 
@@ -2166,8 +2165,8 @@ vm_mmap_object(vm_map_t map, vm_ptr_t *addr, vm_offset_t max_addr,
 		if ((map->flags & MAP_WIREFUTURE) != 0) {
 			vm_map_lock(map);
 			if ((map->flags & MAP_WIREFUTURE) != 0)
-				(void)vm_map_wire_locked(map, ptr_to_va(*addr),
-				    ptr_to_va(*addr) + size, VM_MAP_WIRE_USER |
+				(void)vm_map_wire_locked(map, *addr,
+				    *addr + size, VM_MAP_WIRE_USER |
 				    ((flags & MAP_STACK) ? VM_MAP_WIRE_HOLESOK :
 				    VM_MAP_WIRE_NOHOLES));
 			vm_map_unlock(map);
@@ -2198,7 +2197,7 @@ vm_mmap_to_errno(int rv)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190517,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",

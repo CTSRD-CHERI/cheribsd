@@ -510,7 +510,7 @@ umtxq_hash(struct umtx_key *key)
 {
 	unsigned n;
 
-	n = ptr_to_va(key->info.both.a) + ptr_to_va(key->info.both.b);
+	n = (vaddr_t)key->info.both.a + (vaddr_t)key->info.both.b;
 	key->hash = ((n * GOLDEN_RATIO_PRIME) >> UMTX_SHIFTS) % UMTX_CHAINS;
 }
 
@@ -5512,10 +5512,13 @@ umtx_thread_cleanup(struct thread *td)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180509,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
+//   ],
+//   "changes_purecap": [
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

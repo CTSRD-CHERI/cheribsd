@@ -621,7 +621,6 @@ static sbintime_t
 timer2sbintime(intptr_t data, int flags)
 {
 	int64_t secs;
-	int64_t tdata = (int64_t)ptr_to_va(data);
 
         /*
          * Macros for converting to the fractional second portion of an
@@ -633,41 +632,41 @@ timer2sbintime(intptr_t data, int flags)
 	switch (flags & NOTE_TIMER_PRECMASK) {
 	case NOTE_SECONDS:
 #ifdef __LP64__
-		if (tdata > (SBT_MAX / SBT_1S))
+		if (data > (SBT_MAX / SBT_1S))
 			return (SBT_MAX);
 #endif
-		return ((sbintime_t)tdata << 32);
+		return ((sbintime_t)data << 32);
 	case NOTE_MSECONDS: /* FALLTHROUGH */
 	case 0:
-		if (tdata >= 1000) {
-			secs = tdata / 1000;
+		if (data >= 1000) {
+			secs = data / 1000;
 #ifdef __LP64__
 			if (secs > (SBT_MAX / SBT_1S))
 				return (SBT_MAX);
 #endif
-			return (secs << 32 | MS_TO_SBT(tdata % 1000));
+			return (secs << 32 | MS_TO_SBT(data % 1000));
 		}
-		return (MS_TO_SBT(tdata));
+		return (MS_TO_SBT(data));
 	case NOTE_USECONDS:
-		if (tdata >= 1000000) {
-			secs = tdata / 1000000;
+		if (data >= 1000000) {
+			secs = data / 1000000;
 #ifdef __LP64__
 			if (secs > (SBT_MAX / SBT_1S))
 				return (SBT_MAX);
 #endif
-			return (secs << 32 | US_TO_SBT(tdata % 1000000));
+			return (secs << 32 | US_TO_SBT(data % 1000000));
 		}
-		return (US_TO_SBT(tdata));
+		return (US_TO_SBT(data));
 	case NOTE_NSECONDS:
-		if (tdata >= 1000000000) {
-			secs = tdata / 1000000000;
+		if (data >= 1000000000) {
+			secs = data / 1000000000;
 #ifdef __LP64__
 			if (secs > (SBT_MAX / SBT_1S))
 				return (SBT_MAX);
 #endif
-			return (secs << 32 | US_TO_SBT(tdata % 1000000000));
+			return (secs << 32 | US_TO_SBT(data % 1000000000));
 		}
-		return (NS_TO_SBT(tdata));
+		return (NS_TO_SBT(data));
 	default:
 		break;
 	}
@@ -2738,14 +2737,15 @@ noacquire:
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190531,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "uintptr_interp_offset"
+//     "uintptr_interp_offset",
+//     "user_capabilities"
 //   ]
 // }
 // CHERI CHANGES END

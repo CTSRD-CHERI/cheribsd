@@ -797,7 +797,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 			base = 16;
 			sharpflag = (width == 0);
 			sign = 0;
-			num = ptr_to_va((uintptr_t)va_arg(ap, void *));
+			num = (uintptr_t)va_arg(ap, void *);
 			goto number;
 		case 'q':
 			qflag = 1;
@@ -1297,7 +1297,7 @@ sbuf_printf_drain(void *arg, const char *data, int len)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20180228,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset"

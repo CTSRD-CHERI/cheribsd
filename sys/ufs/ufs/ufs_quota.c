@@ -1149,7 +1149,7 @@ qsyncvp(struct vnode *vp)
  * Code pertaining to management of the in-core dquot data structures.
  */
 #define DQHASH(dqvp, id) \
-  	(&dqhashtbl[(((ptr_to_va(dqvp)) >> 8) + id) & dqhash])
+	(&dqhashtbl[(((vaddr_t)(dqvp) >> 8) + id) & dqhash])
 static LIST_HEAD(dqhash, dquot) *dqhashtbl;
 static u_long dqhash;
 
@@ -1893,14 +1893,15 @@ dqb32_dqb64(const struct dqblk32 *dqb32, struct dqblk64 *dqb64)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191025,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "iovec-macros",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "hashing"
+//     "hashing",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

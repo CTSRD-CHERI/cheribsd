@@ -112,14 +112,8 @@ extern uintptr_t dpcpu_off[];
 /*
  * Accessors with a given base.
  */
-#ifndef CHERI_PURECAP_KERNEL
-#define	_DPCPU_PTR(b, n)						\
-    (__typeof(DPCPU_NAME(n))*)((b) + (uintptr_t)&DPCPU_NAME(n))
-#else /* CHERI_PURECAP_KERNEL */
-/* The dpcpu entry symbol address VA should be considered here */
-#define	_DPCPU_PTR(b, n)						\
-    (__typeof(DPCPU_NAME(n))*)((b) + ptr_to_va(&DPCPU_NAME(n)))
-#endif /* CHERI_PURECAP_KERNEL */
+#define	_DPCPU_PTR(b, n)					\
+    (__typeof(DPCPU_NAME(n))*)((b) + (vaddr_t)&DPCPU_NAME(n))
 #define	_DPCPU_GET(b, n)	(*_DPCPU_PTR(b, n))
 #define	_DPCPU_SET(b, n, v)	(*_DPCPU_PTR(b, n) = v)
 
@@ -134,7 +128,7 @@ extern uintptr_t dpcpu_off[];
  * subtracted the DPCPU_START, so we do it now.
  */
 #define	DPCPU_PTR(n)				\
-    _DPCPU_PTR(PCPU_GET(dynamic) - ptr_to_va(DPCPU_START), n)
+    _DPCPU_PTR(PCPU_GET(dynamic) - (vaddr_t)DPCPU_START, n)
 #endif /* CHERI_PURECAP_KERNEL */
 #define	DPCPU_GET(n)		(*DPCPU_PTR(n))
 #define	DPCPU_SET(n, v)		(*DPCPU_PTR(n) = v)
@@ -147,7 +141,7 @@ extern uintptr_t dpcpu_off[];
 #else /* CHERI_PURECAP_KERNEL */
 /* see DPCPU_PTR() */
 #define	DPCPU_ID_PTR(i, n)					\
-    _DPCPU_PTR(dpcpu_off[(i)] - ptr_to_va(DPCPU_START), n)
+    _DPCPU_PTR(dpcpu_off[(i)] - (vaddr_t)DPCPU_START, n)
 #endif /* CHERI_PURECAP_KERNEL */
 #define	DPCPU_ID_GET(i, n)	(*DPCPU_ID_PTR(i, n))
 #define	DPCPU_ID_SET(i, n, v)	(*DPCPU_ID_PTR(i, n) = v)
@@ -299,7 +293,7 @@ void	pcpu_init(struct pcpu *pcpu, int cpuid, size_t size);
 #endif /* !_SYS_PCPU_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20200123,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",

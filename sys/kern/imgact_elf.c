@@ -1385,7 +1385,7 @@ __CONCAT(exec_, __elfN(imgact))(struct image_params *imgp)
 	elf_auxargs->phent = hdr->e_phentsize;
 	elf_auxargs->phnum = hdr->e_phnum;
 	elf_auxargs->pagesz = PAGE_SIZE;
-	elf_auxargs->base = ptr_to_va(addr);
+	elf_auxargs->base = addr;
 	elf_auxargs->flags = 0;
 	elf_auxargs->entry = entry;
 	elf_auxargs->hdr_eflags = hdr->e_flags;
@@ -2987,20 +2987,21 @@ __elfN(stackgap)(struct image_params *imgp, uintptr_t *stack_base)
 		pct = 50;
 	range = imgp->eff_stack_sz * pct / 100;
 	arc4rand(&rbase, sizeof(rbase), 0);
-	gap = ptr_to_va(rbase) % range;
+	gap = rbase % range;
 	gap &= ~(sizeof(u_long) - 1);
 	*stack_base -= gap;
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191014,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "pointer_provenance"
+//     "pointer_provenance",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

@@ -1700,7 +1700,7 @@ alloc:
 	 * E.g., nullfs uses vfs_hash_index() on the lower vnode for
 	 * its own hashing.
 	 */
-	vp->v_hash = ptr_to_va(vp) >> vnsz2log;
+	vp->v_hash = (vaddr_t)vp >> vnsz2log;
 
 	*vpp = vp;
 	return (0);
@@ -6249,7 +6249,7 @@ __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *mp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190617,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "sysctl"

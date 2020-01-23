@@ -139,7 +139,7 @@ static inline void
 sf_buf_map(struct sf_buf *sf, int flags)
 {
 
-	pmap_qenter(ptr_to_va(sf->kva), &sf->m, 1);
+	pmap_qenter(sf->kva, &sf->m, 1);
 }
 
 static inline int
@@ -198,11 +198,12 @@ extern counter_u64_t sfstat[sizeof(struct sfstat) / sizeof(uint64_t)];
 #endif /* !_SYS_SF_BUF_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20181228,
+//   "updated": 20200123,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support",
 //     "pointer_as_integer"
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

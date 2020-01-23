@@ -541,7 +541,7 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		fde = fdeget_locked(fdp, fd);
 		if (fde != NULL) {
 			fde->fde_flags = (fde->fde_flags & ~UF_EXCLOSE) |
-			    (ptr_to_va(arg) & FD_CLOEXEC ? UF_EXCLOSE : 0);
+			    (arg & FD_CLOEXEC ? UF_EXCLOSE : 0);
 			error = 0;
 		}
 		FILEDESC_XUNLOCK(fdp);
@@ -562,7 +562,7 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		do {
 			tmp = flg = fp->f_flag;
 			tmp &= ~FCNTLFLAGS;
-			tmp |= FFLAGS(ptr_to_va(arg) & ~O_ACCMODE) & FCNTLFLAGS;
+			tmp |= FFLAGS(arg & ~O_ACCMODE) & FCNTLFLAGS;
 		} while(atomic_cmpset_int(&fp->f_flag, flg, tmp) == 0);
 		tmp = fp->f_flag & FNONBLOCK;
 		error = fo_ioctl(fp, FIONBIO, &tmp, td->td_ucred, td);
@@ -4294,13 +4294,14 @@ fildesc_drvinit(void *unused)
 SYSINIT(fildescdev, SI_SUB_DRIVERS, SI_ORDER_MIDDLE, fildesc_drvinit, NULL);
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"
 //   ],
 //   "changes_purecap": [
-//     "subobject_bounds"
+//     "subobject_bounds",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

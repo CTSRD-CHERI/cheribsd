@@ -115,6 +115,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_map.h>
 #include <vm/vm_page.h>
 #include <vm/vm_pager.h>
+#include <vm/cheri.h>
 
 FEATURE(sysv_shm, "System V shared memory segments support");
 
@@ -435,8 +436,8 @@ kern_shmat_locked(struct thread *td, int shmid,
 	struct proc *p = td->td_proc;
 	struct shmid_kernel *shmseg;
 	struct shmmap_state *shmmap_s;
-	vm_ptr_t attach_va = 0;
-	vm_offset_t max_va;
+	vm_offset_t attach_va = 0, max_va;
+	vm_ptr_t attach_addr;
 	vm_prot_t prot;
 	vm_size_t size;
 	int cow, error, find_space, i, rv;
@@ -514,7 +515,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		else
 			return (EINVAL);
 		shmaddr = (const char * __capability)shmaddr -
-		    ((__cheri_addr vm_offset_t)shmaddr - ptr_to_va(attach_va));
+		    ((__cheri_addr vm_offset_t)shmaddr - attach_va);
 		if ((shmflg & SHM_REMAP) != 0)
 			cow |= MAP_REMAP;
 		find_space = VMFS_NO_SPACE;
@@ -566,22 +567,29 @@ kern_shmat_locked(struct thread *td, int shmid,
 	max_va = 0;
 #endif
 	vm_object_reference(shmseg->object);
-	rv = vm_map_find(&p->p_vmspace->vm_map, shmseg->object, 0, &attach_va,
+	attach_addr = attach_va;
+	rv = vm_map_find(&p->p_vmspace->vm_map, shmseg->object, 0, &attach_addr,
 	    size, max_va, find_space, prot, prot, cow);
 	if (rv != KERN_SUCCESS) {
 		vm_object_deallocate(shmseg->object);
 		return (ENOMEM);
 	}
+	CHERI_VM_ASSERT_VALID(attach_addr);
 
-	shmmap_s->va = ptr_to_va(attach_va);
+	shmmap_s->va = (vm_offset_t)attach_addr;
 	shmmap_s->shmid = shmid;
 	shmseg->u.shm_lpid = p->p_pid;
 	shmseg->u.shm_atime = time_second;
 	shmseg->u.shm_nattch++;
 #ifdef COMPAT_CHERIABI
 	if (SV_CURPROC_FLAG(SV_CHERI)) {
-		shmaddr = cheri_setoffset(shmaddr,
-		    ptr_to_va(attach_va) - cheri_getbase(shmaddr));
+		/*
+		 * XXX-AM: In the purecap kernel we currently do the same and
+		 * re-derive the mmapped capability from the thread mmap
+		 * capability. However we could directly return the capability
+		 * given by vm_map_find().
+		 */
+		shmaddr = cheri_setaddress(shmaddr, (vm_offset_t)attach_addr);
 		if (cheriabi_sysv_shm_setbounds) {
 			shmaddr = cheri_csetbounds(shmaddr, 
 			    CHERI_REPRESENTABLE_LENGTH(shmseg->u.shm_segsz));
@@ -591,7 +599,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 		    shmaddr);
 	} else
 #endif
-		td->td_retval[0] = ptr_to_va(attach_va);
+		td->td_retval[0] = (vm_offset_t)attach_addr;
 	return (error);
 }
 
@@ -2249,7 +2257,7 @@ DECLARE_MODULE(sysvshm, sysvshm_mod, SI_SUB_SYSV_SHM, SI_ORDER_FIRST);
 MODULE_VERSION(sysvshm, 1);
 // CHERI CHANGES START
 // {
-//   "updated": 20190531,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

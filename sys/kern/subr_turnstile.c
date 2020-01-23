@@ -96,7 +96,7 @@ __FBSDID("$FreeBSD$");
 #define	TC_TABLESIZE	128			/* Must be power of 2. */
 #define	TC_MASK		(TC_TABLESIZE - 1)
 #define	TC_SHIFT	8
-#define	TC_HASH(lock)	((ptr_to_va(lock) >> TC_SHIFT) & TC_MASK)
+#define	TC_HASH(lock)	(((uintptr_t)(lock) >> TC_SHIFT) & TC_MASK)
 #define	TC_LOOKUP(lock)	&turnstile_chains[TC_HASH(lock)]
 
 /*
@@ -1324,7 +1324,7 @@ DB_SHOW_COMMAND(locktree, db_show_locktree)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180817,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset"

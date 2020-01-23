@@ -385,7 +385,7 @@ kcov_alloc(struct kcov_info *info, size_t entries)
 		m = vm_page_grab(info->bufobj, n,
 		    VM_ALLOC_NOBUSY | VM_ALLOC_ZERO | VM_ALLOC_WIRED);
 		m->valid = VM_PAGE_BITS_ALL;
-		pmap_qenter(ptr_to_va(info->kvaddr) + n * PAGE_SIZE, &m, 1);
+		pmap_qenter(info->kvaddr + n * PAGE_SIZE, &m, 1);
 	}
 	VM_OBJECT_WUNLOCK(info->bufobj);
 
@@ -576,3 +576,12 @@ kcov_init(const void *unused)
 }
 
 SYSINIT(kcovdev, SI_SUB_LAST, SI_ORDER_ANY, kcov_init, NULL);
+// CHERI CHANGES START
+// {
+//   "updated": 20200123,
+//   "target_type": "kernel",
+//   "changes_purecap": [
+//     "pointer_as_integer"
+//   ]
+// }
+// CHERI CHANGES END

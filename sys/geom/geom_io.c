@@ -778,7 +778,7 @@ retry:
 		}
 	}
 	atomic_add_int(&inflight_transient_maps, 1);
-	pmap_qenter(ptr_to_va(addr), bp->bio_ma, OFF_TO_IDX(size));
+	pmap_qenter((vm_offset_t)addr, bp->bio_ma, OFF_TO_IDX(size));
 	bp->bio_data = (caddr_t)addr + bp->bio_ma_offset;
 	bp->bio_flags |= BIO_TRANSIENT_MAPPING;
 	bp->bio_flags &= ~BIO_UNMAPPED;
@@ -1079,7 +1079,7 @@ g_format_bio(struct sbuf *sb, const struct bio *bp)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_as_integer",

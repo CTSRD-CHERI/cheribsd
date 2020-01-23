@@ -361,7 +361,8 @@ static void
 tlb_invalidate_one(unsigned i)
 {
 	/* XXX an invalid ASID? */
-	mips_wr_entryhi(TLBHI_ENTRY(ptr_to_va(MIPS_KSEG0_START) + (2 * i * PAGE_SIZE), 0));
+	mips_wr_entryhi(TLBHI_ENTRY((vaddr_t)MIPS_KSEG0_START +
+	    (2 * i * PAGE_SIZE), 0));
 	mips_wr_entrylo0(0);
 	mips_wr_entrylo1(0);
 	mips_wr_pagemask(0);
@@ -427,7 +428,7 @@ DB_SHOW_COMMAND(tlb, ddb_dump_tlb)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190604,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"

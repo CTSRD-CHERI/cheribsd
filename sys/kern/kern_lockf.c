@@ -309,9 +309,9 @@ lf_hash_owner(caddr_t id, struct vnode *vp, struct flock *fl, int flags)
 		h = HASHSTEP(0, fl->l_pid);
 		h = HASHSTEP(h, fl->l_sysid);
 	} else if (flags & F_FLOCK) {
-		h = ptr_to_va((uintptr_t) id) >> 7;
+		h = ((uintptr_t) id) >> 7;
 	} else {
-		h = ptr_to_va((uintptr_t) vp) >> 7;
+		h = ((uintptr_t) vp) >> 7;
 	}
 
 	return (h % LOCK_OWNER_HASH_SIZE);
@@ -2558,7 +2558,7 @@ lf_printlist(char *tag, struct lockf_entry *lock)
 #endif /* LOCKF_DEBUG */
 // CHERI CHANGES START
 // {
-//   "updated": 20190531,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset"

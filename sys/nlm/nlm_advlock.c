@@ -1155,7 +1155,7 @@ nlm_find_svid(void *id)
 	struct nlm_file_svid *ns, *newns;
 	int h;
 
-	h = ((ptr_to_va(id)) >> 7) % NLM_SVID_HASH_SIZE;
+	h = (((uintptr_t) id)) >> 7) % NLM_SVID_HASH_SIZE;
 
 	mtx_lock(&nlm_svid_lock);
 	LIST_FOREACH(ns, &nlm_file_svids[h], ns_link) {
@@ -1276,7 +1276,7 @@ nlm_init_lock(struct flock *fl, int flags, int svid,
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190709,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset"

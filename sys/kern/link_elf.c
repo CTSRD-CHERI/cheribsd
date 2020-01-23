@@ -456,7 +456,7 @@ link_elf_init(void* arg)
 	linker_kernel_file->size = (intptr_t)(__endkernel - __startkernel);
 #else
 	linker_kernel_file->address += KERNBASE;
-	linker_kernel_file->size = -ptr_to_va(linker_kernel_file->address);
+	linker_kernel_file->size = -(intptr_t)linker_kernel_file->address;
 #endif
 
 	if (modptr != NULL) {
@@ -1956,7 +1956,7 @@ link_elf_ireloc(caddr_t kmdp)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20180830,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_provenance",

@@ -236,7 +236,7 @@ static inline struct neglist *
 NCP2NEGLIST(struct namecache *ncp)
 {
 
-	return (&neglists[((ptr_to_va((uintptr_t)ncp) >> 8) & ncneghash)]);
+	return (&neglists[(((vaddr_t)ncp >> 8) & ncneghash)]);
 }
 
 #define	numbucketlocks (ncbuckethash + 1)
@@ -252,7 +252,7 @@ static inline struct mtx *
 VP2VNODELOCK(struct vnode *vp)
 {
 
-	return (&vnodelocks[((ptr_to_va((uintptr_t)vp) >> 8) & ncvnodehash)]);
+	return (&vnodelocks[(((vaddr_t)vp >> 8) & ncvnodehash)]);
 }
 
 /*
@@ -2657,7 +2657,7 @@ DB_SHOW_COMMAND(vpath, db_show_vpath)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190812,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

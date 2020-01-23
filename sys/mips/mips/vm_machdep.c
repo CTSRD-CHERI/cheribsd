@@ -165,7 +165,7 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	/* kstack is the top of the stack, we initialise it at the bottom */
 	pcb2->pcb_cherikframe.ckf_stc = (void *)(rounddown2(
 	    td2->td_kstack + kstack_size, CHERICAP_SIZE) - CALLFRAME_SIZ);
-	/* Set up fork_trampoline arguments in the frame registers 
+	/* Set up fork_trampoline arguments in the frame registers
 	 * Note that in CHERI we do not have an RA slot, we use C17.
 	 */
 	pcb2->pcb_cherikframe.ckf_c18 = fork_return;
@@ -324,10 +324,9 @@ cpu_thread_swapin(struct thread *td)
 	 */
 #ifdef KSTACK_LARGE_PAGE
 #ifdef CHERI_PURECAP_KERNEL
-	pte = pmap_pte(kernel_pmap, ptr_to_va(td->td_kstack));
+	pte = pmap_pte(kernel_pmap, td->td_kstack);
 	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
-	pte = pmap_pte(kernel_pmap,
-	    ptr_to_va(td->td_kstack + KSTACK_PAGE_SIZE));
+	pte = pmap_pte(kernel_pmap, td->td_kstack + KSTACK_PAGE_SIZE);
 	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
 #else /* ! CHERI_PURECAP_KERNEL */
 	/* Just one entry for one large kernel page. */
@@ -386,10 +385,9 @@ cpu_thread_alloc(struct thread *td)
 	td->td_frame = &td->td_pcb->pcb_regs;
 #ifdef KSTACK_LARGE_PAGE
 #if defined(CHERI_PURECAP_KERNEL)
-	pte = pmap_pte(kernel_pmap, ptr_to_va(td->td_kstack));
+	pte = pmap_pte(kernel_pmap, td->td_kstack);
 	td->td_md.md_upte[0] = *pte & ~TLBLO_SWBITS_MASK;
-	pte = pmap_pte(kernel_pmap,
-	    ptr_to_va(td->td_kstack + KSTACK_PAGE_SIZE));
+	pte = pmap_pte(kernel_pmap, td->td_kstack + KSTACK_PAGE_SIZE);
 	td->td_md.md_upte[1] = *pte & ~TLBLO_SWBITS_MASK;
 #else /* ! CHERI_PURECAP_KERNEL */
 	/* Just one entry for one large kernel page. */
@@ -838,7 +836,7 @@ DB_SHOW_COMMAND(trapframe, ddb_dump_trapframe)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20190605,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support"

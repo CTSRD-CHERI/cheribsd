@@ -215,7 +215,7 @@
  */
 #define UMA_HASH_SIZE_INIT	32		
 
-#define UMA_HASH(h, s) ((ptr_to_va(s) >> UMA_SLAB_SHIFT) & (h)->uh_hashmask)
+#define UMA_HASH(h, s) ((((uintptr_t)s) >> UMA_SLAB_SHIFT) & (h)->uh_hashmask)
 
 #define UMA_HASH_INSERT(h, s, mem)					\
 	LIST_INSERT_HEAD(&(h)->uh_slab_hash[UMA_HASH((h),		\
@@ -463,8 +463,7 @@ slab_item_index(uma_slab_t slab, uma_keg_t keg, void *item)
 	uintptr_t data;
 
 	data = (uintptr_t)slab_data(slab, keg);
-	return (((uintptr_t)ptr_to_va(item) - ptr_to_va(data)) /
-	    keg->uk_rsize);
+	return (((vaddr_t)item - (vaddr_t)data) / keg->uk_rsize);
 }
 #endif /* _KERNEL */
 
@@ -748,7 +747,7 @@ void uma_set_limit(unsigned long limit);
 #endif /* VM_UMA_INT_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20180822,
+//   "updated": 20200123,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "support",

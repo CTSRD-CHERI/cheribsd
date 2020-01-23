@@ -50,7 +50,7 @@
 
 #define	LK_HOLDER(x)		(ptr_clear_flag(x, LK_FLAGMASK))
 #define	LK_SHARERS_SHIFT	4
-#define	LK_SHARERS(x)		(ptr_to_va(LK_HOLDER(x)) >> LK_SHARERS_SHIFT)
+#define	LK_SHARERS(x)		((vaddr_t)LK_HOLDER(x) >> LK_SHARERS_SHIFT)
 #define	LK_SHARERS_LOCK(x)	((x) << LK_SHARERS_SHIFT | LK_SHARE)
 #define	LK_ONE_SHARER		(1 << LK_SHARERS_SHIFT)
 #define	LK_UNLOCKED		LK_SHARERS_LOCK(0)
@@ -209,10 +209,11 @@ _lockmgr_args_rw(struct lock *lk, u_int flags, struct rwlock *ilk,
 #endif /* !_SYS_LOCKMGR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180917,
+//   "updated": 20200123,
 //   "target_type": "header",
 //   "changes_purecap": [
-//     "pointer_bit_flags"
+//     "pointer_bit_flags",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

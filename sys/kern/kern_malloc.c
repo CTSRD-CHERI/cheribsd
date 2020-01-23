@@ -569,18 +569,18 @@ malloc_dbg(caddr_t *vap, size_t *sizep, struct malloc_type *mtp,
 static inline bool
 malloc_large_slab(uma_slab_t slab)
 {
-	vaddr_t va;
+	vm_offset_t va;
 
-	va = ptr_to_va(slab);
+	va = (vm_offset_t)slab;
 	return ((va & 1) != 0);
 }
 
 static inline size_t
 malloc_large_size(uma_slab_t slab)
 {
-	vaddr_t va;
+	vm_offset_t va;
 
-	va = ptr_to_va(slab);
+	va = (vm_offset_t)slab;
 	return (va >> 1);
 }
 
@@ -594,8 +594,7 @@ malloc_large(size_t *size, struct domainset *policy, int flags)
 	va = kmem_malloc_domainset(policy, sz, flags, 0);
 	if (va != 0) {
 		/* The low bit is unused for slab pointers. */
-		vsetzoneslab(ptr_to_va(va), NULL,
-		    (void *)(uintptr_t)((sz << 1) | 1));
+		vsetzoneslab(va, NULL, (void *)(uintptr_t)((sz << 1) | 1));
 		uma_total_inc(sz);
 		*size = sz;
 	}
@@ -606,7 +605,7 @@ static void
 free_large(void *addr, size_t size)
 {
 
-	kmem_free((vm_offset_t)addr, size);
+	kmem_free((vm_ptr_t)addr, size);
 	uma_total_dec(size);
 }
 
@@ -765,7 +764,7 @@ free_save_type(void *addr, struct malloc_type *mtp, u_long size)
 	 */
 	mtpp = (vaddr_t *)roundup2(mtpp, sizeof(vaddr_t));
 	if (cheri_getlen(mtpp) - cheri_getoffset(mtpp) >= sizeof(vaddr_t))
-		*mtpp = ptr_to_va(mtp);
+		*mtpp = (vaddr_t)mtp;
 #else
 	mtpp = (struct malloc_type **)rounddown2(mtpp, sizeof(struct malloc_type *));
 	mtpp += (size - sizeof(struct malloc_type *)) / sizeof(struct malloc_type *);
@@ -1465,13 +1464,14 @@ SYSCTL_OID(_kern, OID_AUTO, mprof, CTLTYPE_STRING|CTLFLAG_RD,
 #endif /* MALLOC_PROFILE */
 // CHERI CHANGES START
 // {
-//   "updated": 20181121,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance"
 //   ],
 //   "changes_purecap": [
-//     "pointer_alignment"
+//     "pointer_alignment",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END

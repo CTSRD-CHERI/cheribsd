@@ -497,7 +497,7 @@ vm_thread_stack_create(struct domainset *ds, vm_object_t *ksobjp, int pages)
 	}
 
 	if (KSTACK_GUARD_PAGES != 0) {
-		pmap_qremove(ptr_to_va(ks), KSTACK_GUARD_PAGES);
+		pmap_qremove(ks, KSTACK_GUARD_PAGES);
 		ks += KSTACK_GUARD_PAGES * PAGE_SIZE;
 	}
 
@@ -513,7 +513,7 @@ vm_thread_stack_create(struct domainset *ds, vm_object_t *ksobjp, int pages)
 		printf("vm_thread_new: vm_kstack_palloc() failed\n");
 		return (0);
 	}
-	pmap_qenter(ptr_to_va(ks), ma, pages);
+	pmap_qenter(ks, ma, pages);
 	*ksobjp = ksobj;
 
 	return (ks);
@@ -525,7 +525,7 @@ vm_thread_stack_dispose(vm_object_t ksobj, vm_ptr_t ks, int pages)
 	vm_page_t m;
 	int i;
 
-	pmap_qremove(ptr_to_va(ks), pages);
+	pmap_qremove(ks, pages);
 	VM_OBJECT_WLOCK(ksobj);
 	for (i = 0; i < pages; i++) {
 		m = vm_page_lookup(ksobj, i);
@@ -561,8 +561,7 @@ vm_thread_new(struct thread *td, int pages)
 	if (pages == kstack_pages && kstack_cache != NULL) {
 		ks = (vm_ptr_t)uma_zalloc(kstack_cache, M_NOWAIT);
 		if (ks != 0) 
-			ksobj = PHYS_TO_VM_PAGE(
-			    pmap_kextract(ptr_to_va(ks)))->object;
+			ksobj = PHYS_TO_VM_PAGE(pmap_kextract(ks))->object;
 	}
 
 	/*
@@ -632,7 +631,7 @@ kstack_release(void *arg, void **store, int cnt)
 	for (i = 0; i < cnt; i++) {
 		ks = (vm_ptr_t)store[i];
 		vm_thread_stack_dispose(
-		    PHYS_TO_VM_PAGE(pmap_kextract(ptr_to_va(ks)))->object,
+		    PHYS_TO_VM_PAGE(pmap_kextract(ks))->object,
 		    ks, kstack_pages);
 	}
 }
@@ -773,7 +772,7 @@ kick_proc0(void)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20181114,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "support",

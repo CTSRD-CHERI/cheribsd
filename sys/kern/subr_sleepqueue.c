@@ -103,7 +103,7 @@ __FBSDID("$FreeBSD$");
 CTASSERT(powerof2(SC_TABLESIZE));
 #define	SC_MASK		(SC_TABLESIZE - 1)
 #define	SC_SHIFT	8
-#define	SC_HASH(wc)	(((ptr_to_va(wc) >> SC_SHIFT) ^ ptr_to_va(wc)) & \
+#define	SC_HASH(wc)	((((vaddr_t)(wc) >> SC_SHIFT) ^ (vaddr_t)(wc)) & \
 			    SC_MASK)
 #define	SC_LOOKUP(wc)	&sleepq_chains[SC_HASH(wc)]
 #define NR_SLEEPQS      2
@@ -1504,10 +1504,11 @@ DB_SHOW_ALIAS(sleepqueue, db_show_sleepqueue);
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190531,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
-//     "uintptr_interp_offset"
+//     "uintptr_interp_offset",
+//     "hashing"
 //   ]
 // }
 // CHERI CHANGES END

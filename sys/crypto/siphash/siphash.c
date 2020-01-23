@@ -144,7 +144,7 @@ SipHash_Update(SIPHASH_CTX *ctx, const void *src, size_t len)
 	len >>= 3;
 
 	/* Optimze for 64bit aligned/unaligned access. */
-	if ((ptr_to_va(s) & 0x7) == 0) {
+	if (((uintptr_t)s & 0x7) == 0) {
 		for (p = (const uint64_t *)s; len > 0; len--, p++) {
 			m = le64toh(*p);
 			ctx->v[3] ^= m;
@@ -241,7 +241,7 @@ SipRounds(SIPHASH_CTX *ctx, int final)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",

@@ -1626,8 +1626,6 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	size_t ssiz;
 #endif
 	char * __capability destp, * __capability ustringp;
-	/* XXX: Temporary */
-	uintptr_t uptr, uptr_old;
 	struct ps_strings * __capability arginfo;
 	struct proc *p;
 	size_t execpath_len, len;
@@ -1748,11 +1746,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	ustringp = destp;
 #endif
 
-	if (imgp->sysent->sv_stackgap != NULL) {
-		uptr_old = uptr = (__cheri_addr vaddr_t)destp;
-		imgp->sysent->sv_stackgap(imgp, &uptr);
-		destp -= (ptr_to_va(uptr_old) - ptr_to_va(uptr));
-	}
+	if (imgp->sysent->sv_stackgap != NULL)
+		imgp->sysent->sv_stackgap(imgp, (uintptr_t *)&destp);
 
 	if (imgp->auxargs) {
 		/*
@@ -1996,7 +1991,7 @@ exec_unregister(const struct execsw *execsw_arg)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190520,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "integer_provenance",

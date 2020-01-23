@@ -186,7 +186,7 @@ static inline uint64_t MurmurHash64A ( const void * key, int len, uint64_t seed 
   {
     uint64_t k;
 
-    if (!(ptr_to_va(data) & 0x7))
+    if (!((uintptr_t)data & 0x7))
 	    k = *data++;
     else {
 	    memcpy(&k, data, sizeof(k));
@@ -287,7 +287,7 @@ static inline uint64_t MurmurHash64B ( const void * key, int len, uint64_t seed 
 #endif /* CK_HT_HASH_H */
 // CHERI CHANGES START
 // {
-//   "updated": 20190528,
+//   "updated": 20200123,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "uintptr_interp_offset"

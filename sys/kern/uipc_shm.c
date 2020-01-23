@@ -1303,13 +1303,13 @@ shm_map(struct file *fp, size_t size, off_t offset, void **memp)
 	    VMFS_OPTIMAL_SPACE, VM_PROT_READ | VM_PROT_WRITE,
 	    VM_PROT_READ | VM_PROT_WRITE, 0);
 	if (rv == KERN_SUCCESS) {
-		rv = vm_map_wire(kernel_map, ptr_to_va(kva), ptr_to_va(kva) + size,
+		rv = vm_map_wire(kernel_map, kva, kva + size,
 		    VM_MAP_WIRE_SYSTEM | VM_MAP_WIRE_NOHOLES);
 		if (rv == KERN_SUCCESS) {
 			*memp = (void *)(kva + ofs);
 			return (0);
 		}
-		vm_map_remove(kernel_map, ptr_to_va(kva), ptr_to_va(kva) + size);
+		vm_map_remove(kernel_map, kva, kva + size);
 	} else
 		vm_object_deallocate(obj);
 
@@ -1567,7 +1567,7 @@ sys_shm_open2(struct thread *td, struct shm_open2_args *uap)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191022,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "user_capabilities"

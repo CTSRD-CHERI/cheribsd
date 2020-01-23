@@ -1359,7 +1359,7 @@ keg_alloc_slab(uma_keg_t keg, uma_zone_t zone, int domain, int flags,
 
 	if (keg->uk_flags & UMA_ZFLAG_VTOSLAB)
 		for (i = 0; i < keg->uk_ppera; i++)
-			vsetzoneslab(ptr_to_va(mem) + (i * PAGE_SIZE),
+			vsetzoneslab((vm_offset_t)mem + (i * PAGE_SIZE),
 			    zone, slab);
 
 	slab->us_freecount = keg->uk_ipers;
@@ -1552,7 +1552,7 @@ pcpu_page_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *pflag,
 	CHERI_VM_ASSERT_BOUNDS(addr, bytes);
 	zkva = addr;
 	TAILQ_FOREACH(p, &alloctail, listq) {
-		pmap_qenter(ptr_to_va(zkva), &p, 1);
+		pmap_qenter(zkva, &p, 1);
 		zkva += PAGE_SIZE;
 	}
 	return ((void*)addr);
@@ -1618,7 +1618,7 @@ noobj_alloc(uma_zone_t zone, vm_size_t bytes, int domain, uint8_t *flags,
 	    atomic_fetchadd_long(&keg->uk_offset, round_page(bytes));
 	retkva = zkva;
 	TAILQ_FOREACH(p, &alloctail, listq) {
-		pmap_qenter(ptr_to_va(zkva), &p, 1);
+		pmap_qenter(zkva, &p, 1);
 		zkva += PAGE_SIZE;
 	}
 
@@ -1666,7 +1666,7 @@ pcpu_page_free(void *mem, vm_size_t size, uint8_t flags)
 	vm_page_t m;
 
 	MPASS(size == (mp_maxid+1)*PAGE_SIZE);
-	sva = ptr_to_va(mem);
+	sva = (vm_offset_t)mem;
 	for (curva = sva; curva < sva + size; curva += PAGE_SIZE) {
 		paddr = pmap_kextract(curva);
 		m = PHYS_TO_VM_PAGE(paddr);
@@ -2623,7 +2623,7 @@ uma_startup(void *mem, int npages)
 	/* Use bootpages memory for the zone of zones and zone of kegs. */
 	m = (uintptr_t)mem;
 #ifdef CHERI_PURECAP_KERNEL
-	uma_bootmem_start = ptr_to_va(mem);
+	uma_bootmem_start = (vm_offset_t)mem;
 	uma_bootmem_end = uma_bootmem_start + (npages * PAGE_SIZE);
 	uma_boot_vtoslab = (uma_slab_t *)m;
 	m += sizeof(uma_slab_t) * npages;
@@ -2636,7 +2636,7 @@ uma_startup(void *mem, int npages)
 	masterkeg = (uma_keg_t)m;
 	m += ksize;
 	m = roundup(m, PAGE_SIZE);
-	npages -= (ptr_to_va(m) - ptr_to_va(mem)) / PAGE_SIZE;
+	npages -= ((char *)m - (char *)mem) / PAGE_SIZE;
 	mem = (void *)m;
 
 	/* "manually" create the initial zone */
@@ -4080,7 +4080,7 @@ zone_release(void *arg, void **bucket, int cnt)
 	for (i = 0; i < cnt; i++) {
 		item = bucket[i];
 		if (__predict_true((zone->uz_flags & UMA_ZFLAG_VTOSLAB) != 0)) {
-			slab = vtoslab((vm_offset_t)ptr_to_va(item));
+			slab = vtoslab((vm_offset_t)item);
 		} else {
 			mem = (uint8_t *)rounddown2(item, UMA_SLAB_SIZE);
 			if ((zone->uz_flags & UMA_ZFLAG_HASH) != 0)
@@ -4872,7 +4872,7 @@ uma_dbg_getslab(uma_zone_t zone, void *item)
 	if ((zone->uz_flags & UMA_ZFLAG_CACHE) != 0)
 		return (NULL);
 	if (zone->uz_flags & UMA_ZFLAG_VTOSLAB)
-		return (vtoslab((vm_offset_t)ptr_to_va(mem)));
+		return (vtoslab((vm_offset_t)mem));
 	keg = zone->uz_keg;
 	if ((keg->uk_flags & UMA_ZFLAG_HASH) == 0)
 		return ((uma_slab_t)(mem + keg->uk_pgoff));
@@ -4904,10 +4904,10 @@ uma_dbg_kskip(uma_keg_t keg, void *mem)
 	if (dbg_divisor == 1)
 		return (false);
 
-	idx = ptr_to_va(mem) >> PAGE_SHIFT;
+	idx = (uintptr_t)mem >> PAGE_SHIFT;
 	if (keg->uk_ipers > 1) {
 		idx *= keg->uk_ipers;
-		idx += (ptr_to_va(mem) & PAGE_MASK) / keg->uk_rsize;
+		idx += ((uintptr_t)mem & PAGE_MASK) / keg->uk_rsize;
 	}
 
 	if ((idx / dbg_divisor) * dbg_divisor != idx) {
@@ -5119,7 +5119,7 @@ DB_SHOW_COMMAND(umacache, db_show_umacache)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20190617,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",

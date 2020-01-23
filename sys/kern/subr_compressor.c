@@ -281,7 +281,7 @@ zstdio_init(size_t maxiosize, int level)
 	owkspc = wkspc = malloc(wkspc_size + 8, M_COMPRESS,
 	    M_WAITOK | M_NODUMP);
 	/* Zstd API requires 8-byte alignment. */
-	if (ptr_to_va(wkspc) % 8 != 0)
+	if ((uintptr_t)wkspc % 8 != 0)
 		wkspc = (void *)roundup2((uintptr_t)wkspc, 8);
 
 	dump_compressor = ZSTD_initStaticCCtx(wkspc, wkspc_size);
@@ -558,7 +558,7 @@ compressor_fini(struct compressor *stream)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20190531,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset"

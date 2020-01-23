@@ -212,18 +212,11 @@ static uma_zone_t vmem_zone;
 #define	VMEM_LOCK_DESTROY(vm)	mtx_destroy(&vm->vm_lock)
 #define	VMEM_ASSERT_LOCKED(vm)	mtx_assert(&vm->vm_lock, MA_OWNED);
 
-#ifndef CHERI_PURECAP_KERNEL
-#define	VMEM_ALIGNUP(addr, align)	(-(-(addr) & -(align)))
-
-#define	VMEM_CROSS_P(addr1, addr2, boundary) \
-    ((((addr1) ^ (addr2)) & -(boundary)) != 0)
-#else /* CHERI_PURECAP_KERNEL */
+/* XXX-AM: should use roundup2 instead? */
 #define	VMEM_ALIGNUP(addr, align)	__builtin_align_up(addr, align)
 
 #define	VMEM_CROSS_P(addr1, addr2, boundary)				\
-    (((ptr_to_va((uintptr_t)addr1) ^ ptr_to_va((uintptr_t)addr2)) &	\
-    -(boundary)) != 0)
-#endif
+    ((((vaddr_t)addr1 ^ (vaddr_t)addr2) & -(boundary)) != 0)
 
 #define	ORDER2SIZE(order)	((order) < VMEM_OPTVALUE ? ((order) + 1) : \
     (vmem_size_t)1 << ((order) - (VMEM_OPTVALUE - VMEM_OPTORDER - 1)))
@@ -434,7 +427,7 @@ bt_lookupbusy(vmem_t *vm, vmem_addr_t addr)
 	bt_t *bt;
 
 	VMEM_ASSERT_LOCKED(vm);
-	list = bt_hashhead(vm, (__cheri_addr vaddr_t)addr);
+	list = bt_hashhead(vm, addr);
 	LIST_FOREACH(bt, list, bt_hashlist) {
 		if (bt->bt_start == addr) {
 			break;
@@ -463,7 +456,7 @@ bt_insbusy(vmem_t *vm, bt_t *bt)
 	VMEM_ASSERT_LOCKED(vm);
 	MPASS(bt->bt_type == BT_TYPE_BUSY);
 
-	list = bt_hashhead(vm, (__cheri_addr vaddr_t)bt->bt_start);
+	list = bt_hashhead(vm, bt->bt_start);
 	LIST_INSERT_HEAD(list, bt, bt_hashlist);
 	vm->vm_nbusytag++;
 	vm->vm_inuse += bt->bt_size;
@@ -932,11 +925,11 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 	CHERI_VM_ASSERT_VALID(bt->bt_start);
 
 	start = bt->bt_start;
-	if (ptr_to_va(start) < ptr_to_va(minaddr)) {
+	if (start < minaddr) {
 		start = minaddr;
 	}
 	end = BT_END(bt);
-	if (ptr_to_va(end) > ptr_to_va(maxaddr))
+	if (end > maxaddr)
 		end = maxaddr;
 
 	/*
@@ -958,13 +951,13 @@ vmem_fit(const bt_t *bt, vmem_size_t size, vmem_size_t align,
 		MPASS(align < nocross);
 		start = VMEM_ALIGNUP(start - phase, nocross) + phase;
 	}
-	if (start <= end && ptr_to_va(end) - ptr_to_va(start) >= size - 1) {
-		MPASS((ptr_to_va(start) & (align - 1)) == phase);
+	if (start <= end && (vaddr_t)end - (vaddr_t)start >= size - 1) {
+		MPASS((start & (align - 1)) == phase);
 		MPASS(!VMEM_CROSS_P(start, start + size - 1, nocross));
-		MPASS(minaddr <= ptr_to_va(start));
-		MPASS(maxaddr == 0 || ptr_to_va(start) + size - 1 <= maxaddr);
+		MPASS(minaddr <= start);
+		MPASS(maxaddr == 0 || start + size - 1 <= maxaddr);
 		MPASS(bt->bt_start <= start);
-		MPASS(ptr_to_va(BT_END(bt)) - ptr_to_va(start) >= size - 1);
+		MPASS((vaddr_t)BT_END(bt) - (vaddr_t)start >= size - 1);
 		*addrp = start;
 
 		return (0);
@@ -989,7 +982,7 @@ vmem_clip(vmem_t *vm, bt_t *bt, vmem_addr_t start, vmem_size_t size)
 		btprev = bt_alloc(vm);
 		btprev->bt_type = BT_TYPE_FREE;
 		btprev->bt_start = bt->bt_start;
-		btprev->bt_size = ptr_to_va(start) - ptr_to_va(bt->bt_start);
+		btprev->bt_size = (vaddr_t)start - (vaddr_t)bt->bt_start;
 		bt->bt_start = start;
 		bt->bt_size -= btprev->bt_size;
 		bt_insfree(vm, btprev);
@@ -1827,7 +1820,7 @@ vmem_check(vmem_t *vm)
 #endif /* defined(DIAGNOSTIC) */
 // CHERI CHANGES START
 // {
-//   "updated": 20190805,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset",

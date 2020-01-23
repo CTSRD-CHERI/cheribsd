@@ -375,9 +375,9 @@ _epoch_enter_preempt(epoch_t epoch, epoch_tracker_t et EPOCH_FILE_LINE)
 	MPASS(cold || epoch != NULL);
 	MPASS(epoch->e_flags & EPOCH_PREEMPT);
 	td = curthread;
-	MPASS(ptr_to_va(et) >= ptr_to_va(td->td_kstack) &&
-	    ptr_to_va(et) + sizeof(struct epoch_tracker) <=
-	    ptr_to_va(td->td_kstack) + td->td_kstack_pages * PAGE_SIZE);
+	MPASS((vm_offset_t)et >= td->td_kstack &&
+	    (vm_offset_t)et + sizeof(struct epoch_tracker) <=
+	    td->td_kstack + td->td_kstack_pages * PAGE_SIZE);
 
 	INIT_CHECK(epoch);
 #ifdef EPOCH_TRACE
@@ -846,7 +846,7 @@ epoch_drain_callbacks(epoch_t epoch)
 }
 // CHERI CHANGES START
 // {
-//   "updated": 20191203,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "uintptr_interp_offset"

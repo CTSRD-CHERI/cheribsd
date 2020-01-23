@@ -973,8 +973,8 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 	map->needs_wakeup = FALSE;
 	map->system_map = 0;
 	map->pmap = pmap;
-	map->header.end = ptr_to_va(min);
-	map->header.start = ptr_to_va(max);
+	map->header.end = min;
+	map->header.start = max;
 	map->flags = 0;
 	map->header.left = map->header.right = &map->header;
 	map->root = NULL;
@@ -982,7 +982,7 @@ _vm_map_init(vm_map_t map, pmap_t pmap, vm_ptr_t min, vm_ptr_t max)
 	map->busy = 0;
 	map->anon_loc = 0;
 #ifdef CHERI_PURECAP_KERNEL
-	map->map_capability = cheri_bound((void *)min,
+	map->map_capability = cheri_csetbounds((void *)min,
 	    ((caddr_t)max - (caddr_t)min));
 #endif
 #ifdef DIAGNOSTIC
@@ -2148,7 +2148,7 @@ vm_map_find(vm_map_t map, vm_object_t object, vm_ooffset_t offset,
 	    find_space != VMFS_NO_SPACE && object == NULL &&
 	    (cow & (MAP_INHERIT_SHARE | MAP_STACK_GROWS_UP |
 	    MAP_STACK_GROWS_DOWN)) == 0 && prot != PROT_NONE;
-	curr_min_addr = min_addr = vaddr = ptr_to_va(*addr);
+	curr_min_addr = min_addr = vaddr = *addr;
 	if (en_aslr && min_addr == 0 && !cluster &&
 	    find_space != VMFS_NO_SPACE &&
 	    (map->flags & MAP_ASLR_IGNSTART) != 0)
@@ -2549,19 +2549,15 @@ _vm_map_clip_end(vm_map_t map, vm_map_entry_t entry, vm_offset_t end)
 int
 vm_map_submap(
 	vm_map_t map,
-	vm_ptr_t startp,
-	vm_ptr_t endp,
+	vm_ptr_t start,
+	vm_ptr_t end,
 	vm_map_t submap)
 {
 	vm_map_entry_t entry;
-	vm_offset_t start;
-	vm_offset_t end;
 	int result = KERN_INVALID_ARGUMENT;
 
-	CHERI_VM_ASSERT_VALID(startp);
-	CHERI_VM_ASSERT_VALID(endp);
-	start = ptr_to_va(startp);
-	end = ptr_to_va(endp);
+	CHERI_VM_ASSERT_VALID(start);
+	CHERI_VM_ASSERT_VALID(end);
 
 	vm_map_lock(submap);
 	submap->flags |= MAP_IS_SUB_MAP;
@@ -5430,14 +5426,15 @@ DB_SHOW_COMMAND(procvm, procvm)
 #endif /* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20190610,
+//   "updated": 20200123,
 //   "target_type": "kernel",
 //   "changes": [
 //     "platform"
 //   ],
 //   "changes_purecap": [
 //     "pointer_as_integer",
-//     "support"
+//     "support",
+//     "uintptr_interp_offset"
 //   ]
 // }
 // CHERI CHANGES END
