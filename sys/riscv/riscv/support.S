@@ -379,6 +379,24 @@ EEND(suword64)
 END(suword)
 #endif
 
+#if __has_feature(capabilities)
+/*
+ * int sucap(volatile void * __capability, intcap_t)
+ */
+ENTRY(sucap)
+	li	a2, (VM_MAXUSER_ADDRESS-3)
+	bgt	a0, a2, fsu_fault_nopcb
+	la	a6, fsu_fault		/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
+	ENTER_USER_ACCESS(a2)
+	sc.cap	ca1, 0(ca0)		/* Try storing the data */
+	EXIT_USER_ACCESS(a2)
+	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+	li	a0, 0			/* Success */
+	ret				/* Return */
+END(sucap)
+#endif
+
 /* XXX: CHERI TODO: Save/restore cap registers. */
 ENTRY(setjmp)
 	/* Store the stack pointer */
