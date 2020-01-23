@@ -27,6 +27,7 @@ libkern/flsl.c			standard
 libkern/flsll.c			standard
 libkern/memcmp.c		standard
 libkern/memset.c		standard
+riscv/cheri/cheri_machdep.c	optional	cpu_cheri
 riscv/riscv/autoconf.c		standard
 riscv/riscv/bus_machdep.c	standard
 riscv/riscv/bus_space_asm.S	standard
