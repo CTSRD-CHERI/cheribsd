@@ -42,10 +42,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/atomic.h>
-#include <machine/pcb.h>
-#include <machine/sysarch.h>
-
 /*
  * Only allow most system calls from either ambient authority, or from
  * sandboxes that have been explicitly delegated CHERI_PERM_SYSCALL via their
@@ -66,7 +62,7 @@ cheri_syscall_authorize(struct thread *td, u_int code, int nargs,
 	 *
 	 * XXXRW: Possibly ECAPMODE should be EPROT or ESANDBOX?
 	 */
-	c_perms = cheri_getperm(td->td_pcb->pcb_regs.pcc);
+	c_perms = cheri_getperm(__USER_PCC);
 	if ((c_perms & CHERI_PERM_SYSCALL) == 0) {
 		atomic_add_int(&security_cheri_syscall_violations, 1);
 
