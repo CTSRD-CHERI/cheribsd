@@ -594,6 +594,7 @@ int	suword_c(volatile void * __capability base, long word);
 int	suword16_c(volatile void * __capability base, int word);
 int	suword32_c(volatile void * __capability base, int32_t word);
 int	suword64_c(volatile void * __capability base, int64_t word);
+int	sucap(volatile const void * __capability base, intcap_t val);
 uint32_t casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 	    uint32_t newval);
 u_long	casuword_c(volatile u_long * __capability base, u_long oldval,
@@ -615,6 +616,7 @@ int	casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 #define	suword16_c	suword16
 #define	suword32_c	suword32
 #define	suword64_c	suword64
+#define	sucap		suword
 #define	casuword32_c	casuword32
 #define	casuword_c	casuword
 #define	casueword32_c	casueword32
