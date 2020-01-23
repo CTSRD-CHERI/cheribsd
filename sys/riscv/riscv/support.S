@@ -244,6 +244,25 @@ EEND(fueword64)
 END(fueword)
 #endif
 
+#if __has_feature(capabilities)
+/*
+ * int fuecap(volatile const void __capability *, intcap_t *)
+ */
+ENTRY(fuecap)
+	li	a2, (VM_MAXUSER_ADDRESS-7)
+	bgt	a0, a2, fsu_fault_nopcb
+	la	a6, fsu_fault		/* Load the fault handler */
+	SET_FAULT_HANDLER(a6, a2)	/* And set it */
+	ENTER_USER_ACCESS(a2)
+	lc.cap	ca0, 0(ca0)		/* Try loading the data */
+	EXIT_USER_ACCESS(a2)
+	SET_FAULT_HANDLER(x0, a2)	/* Reset the fault handler */
+	sc.ddc	ca0, 0(a1)		/* Save the data in kernel space */
+	li	a0, 0			/* Success */
+	ret				/* Return */
+END(fuecap)
+#endif
+
 /*
  * int subyte_c(volatile void * __capability, int)
  */
