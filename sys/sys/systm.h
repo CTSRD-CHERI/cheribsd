@@ -391,9 +391,9 @@ int	bcmp(const void *b1, const void *b2, size_t len);
 void	*memset(void * _Nonnull buf, int c, size_t len);
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
 #if __has_feature(capabilities)
-void	*memcpy_c(void * _Nonnull __capability to,
+void	* __capability memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
-void	*memcpynocap_c(void * _Nonnull __capability to,
+void	* __capability memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #else
@@ -402,9 +402,9 @@ void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 #if __has_feature(capabilities)
-void	*memmove_c(void * _Nonnull __capability dest,
+void	* __capability memmove_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
-void	*memmovenocap_c(void * _Nonnull __capability dest,
+void	* __capability memmovenocap_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
 #endif
 
