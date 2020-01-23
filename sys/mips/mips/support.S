@@ -718,6 +718,20 @@ XLEAF(suword_c)
 	move	v0, zero
 END(suword64_c)
 
+LEAF(sucap)
+	PTR_LA	v0, fswberr
+	cgetbase	t0, $c3
+	blt	t0, zero, fswberr	# make sure address is in user space
+	nop
+	GET_CPU_PCPU(v1)
+	PTR_L	v1, PC_CURPCB(v1)
+	PTR_S	v0, U_PCB_ONFAULT(v1)
+	csc	$c4, zero, 0($c3)	# store cap
+	PTR_S	zero, U_PCB_ONFAULT(v1)
+	j	ra
+	move	v0, zero
+END(sucap)
+
 /*
  * casueword_c(9)
  * <v0>u_long casueword_c(<c3>u_long * __capability p, <a0>u_long oldval,

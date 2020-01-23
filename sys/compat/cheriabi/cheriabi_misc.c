@@ -604,18 +604,6 @@ _builducap(vaddr_t base, ssize_t offset, size_t length, uint64_t perms,
 }
 
 /*
- * XXX: We may want a wrapper of cheri_csetbounds() that warns about
- * capabilities that are overly broad similar to builducap()
- */
-
-static int
-sucap(void * __capability uaddr, void * __capability cap)
-{
-
-	return (copyoutcap(&cap, uaddr, sizeof(cap)) == 0 ? 0 : -1);
-}
-
-/*
  * XXXBD: should check copyout/su* for errors, but punt for now as this
  * function shouldn't be long for the world.
  */
@@ -724,14 +712,15 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	 * Fill in "ps_strings" struct for ps, w, etc.
 	 */
 	imgp->argv = cheri_csetbounds(vectp, (argc + 1) * sizeof(*vectp));
-	sucap(&arginfo->ps_argvstr, imgp->argv);
+	sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv);
 	suword32(&arginfo->ps_nargvstr, argc);
 
 	/*
 	 * Fill in argument portion of vector table.
 	 */
 	for (; argc > 0; --argc) {
-		sucap(vectp++, cheri_csetbounds(destp, strlen(stringp) + 1));
+		sucap(vectp++,
+		    (intcap_t)cheri_csetbounds(destp, strlen(stringp) + 1));
 		while (*stringp++ != 0)
 			destp++;
 		destp++;
@@ -742,14 +731,15 @@ cheriabi_copyout_strings(struct image_params *imgp, uintptr_t *stack_base)
 	suword(vectp++, 0);
 
 	imgp->envv = cheri_csetbounds(vectp, (envc + 1) * sizeof(*vectp));
-	sucap(&arginfo->ps_envstr, imgp->envv);
+	sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv);
 	suword32(&arginfo->ps_nenvstr, envc);
 
 	/*
 	 * Fill in environment portion of vector table.
 	 */
 	for (; envc > 0; --envc) {
-		sucap(vectp++, cheri_csetbounds(destp, strlen(stringp) + 1));
+		sucap(vectp++,
+		    (intcap_t)cheri_csetbounds(destp, strlen(stringp) + 1));
 		while (*stringp++ != 0)
 			destp++;
 		destp++;

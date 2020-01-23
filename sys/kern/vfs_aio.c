@@ -1462,11 +1462,7 @@ aiocb_store_aiocb(struct aiocb ** __capability ujobp, struct kaiocb *kjob)
 	else
 		memcpy(&ujob, &kjob->ujobptr, sizeof(intcap_t));
 
-#if __has_feature(capabilities)
-	return (copyoutcap(&ujob, ujobp, sizeof(ujob)) == 0 ? 0 : -1);
-#else
-	return (suword(ujobp, ujob));
-#endif
+	return (sucap(ujobp, ujob));
 }
 
 static size_t
@@ -3669,7 +3665,7 @@ aiocb_c_store_aiocb(struct aiocb ** __capability ujobp, struct kaiocb *kjob)
 	else
 		cheri_memcpy(&ujob, &kjob->ujobptr, sizeof(__intcap_t));
 
-	return (copyoutcap(&ujob, ujobp, sizeof(intcap_t)));
+	return (sucap(ujobp, ujob));
 }
 
 static size_t
