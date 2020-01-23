@@ -419,9 +419,10 @@ vm_kstack_palloc(vm_object_t ksobj, vm_offset_t ks, int allocflags, int pages,
 	allocflags = (allocflags & ~VM_ALLOC_CLASS_MASK) | VM_ALLOC_NORMAL;
 
 	(void)vm_page_grab_pages(ksobj, 0, allocflags, ma, pages);
-	for (i = 0; i < pages; i++)
-		ma[i]->valid = VM_PAGE_BITS_ALL;
-
+	for (i = 0; i < pages; i++) {
+		vm_page_valid(ma[i]);
+		vm_page_xunbusy(ma[i]);
+	}
 	return (i);
 }
 #endif /* ! KSTACK_LARGE_PAGE */
@@ -505,8 +506,8 @@ vm_thread_stack_create(struct domainset *ds, vm_object_t *ksobjp, int pages)
 	 * For the length of the stack, link in a real page of ram for each
 	 * page of stack.
 	 */
-		VM_OBJECT_WLOCK(ksobj);
-	pages = vm_kstack_palloc(ksobj, ks, (VM_ALLOC_NOBUSY | VM_ALLOC_WIRED),
+	VM_OBJECT_WLOCK(ksobj);
+	pages = vm_kstack_palloc(ksobj, ks, VM_ALLOC_NOBUSY | VM_ALLOC_WIRED,
 	    pages, ma);
 	VM_OBJECT_WUNLOCK(ksobj);
 	if (pages == 0) {
