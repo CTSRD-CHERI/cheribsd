@@ -97,6 +97,25 @@
     (VM_MAXUSER_ADDRESS - CHERI_CAP_USER_MMAP_BASE)
 #define	CHERI_CAP_USER_MMAP_OFFSET	0x0
 
+/*
+ * Root sealing capability for all userspace object capabilities.  This is
+ * made available to userspace via a sysarch(2).
+ */
+#define	CHERI_SEALCAP_USERSPACE_PERMS	CHERI_PERMS_USERSPACE_SEALCAP
+#define	CHERI_SEALCAP_USERSPACE_BASE	CHERI_OTYPE_USER_MIN
+#define	CHERI_SEALCAP_USERSPACE_LENGTH	\
+    (CHERI_OTYPE_USER_MAX - CHERI_OTYPE_USER_MIN + 1)
+#define	CHERI_SEALCAP_USERSPACE_OFFSET	0x0
+
+/*
+ * Root sealing capability for kernel managed objects.
+ */
+#define	CHERI_SEALCAP_KERNEL_PERMS	CHERI_PERMS_KERNEL_SEALCAP
+#define CHERI_SEALCAP_KERNEL_BASE	CHERI_OTYPE_KERN_MIN
+#define	CHERI_SEALCAP_KERNEL_LENGTH	\
+    (CHERI_OTYPE_KERN_MAX - CHERI_OTYPE_KERN_MIN + 1)
+#define	CHERI_SEALCAP_KERNEL_OFFSET	0x0
+
 /* Reserved CHERI object types: */
 #define	CHERI_OTYPE_UNSEALED	(-1l)
 #define	CHERI_OTYPE_SENTRY	(-2l)
