@@ -129,11 +129,18 @@ static int log_wxrequests = 0;
 SYSCTL_INT(_vm, OID_AUTO, log_wxrequests, CTLFLAG_RWTUN, &log_wxrequests, 0,
     "Log requests for PROT_WRITE and PROT_EXEC");
 #if __has_feature(capabilities)
-SYSCTL_DECL(_compat_cheriabi_mmap);
+SYSCTL_DECL(_security_cheri);
+SYSCTL_NODE(_security_cheri, OID_AUTO, mmap, CTLFLAG_RW, 0, "mmap");
 static int cheriabi_mmap_precise_bounds = 1;
-SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
+SYSCTL_INT(_security_cheri_mmap, OID_AUTO, precise_bounds,
     CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
     "Require that bounds on returned capabilities be precise.");
+#ifdef COMPAT_CHERIABI
+SYSCTL_DECL(_compat_cheriabi_mmap);
+SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
+     CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
+     "Require that bounds on returned capabilities be precise.");
+#endif
 #endif
 
 #ifdef MAP_32BIT
