@@ -42,7 +42,7 @@ struct sigaction64 {
 };
 
 struct sigaltstack64 {
-	void		*ss_sp;		/* signal stack base */
+	uint64_t	ss_sp;		/* (void *) signal stack base */
 	size_t		ss_size;	/* signal stack length */
 	int		ss_flags;	/* SS_DISABLE and/or SS_ONSTACK */
 };
@@ -55,8 +55,10 @@ struct sigevent64 {
 	union {
 		__lwpid_t	_threadid;
 		struct {
-			void (*_function)(union sigval64);
-			struct pthread_attr **_attribute;
+			/* void (*_function)(union sigval64); */
+			uint64_t _function;
+			/* struct pthread_attr **_attribute; */
+			uint64_t _attribute;
 		} _sigev_thread;
 		unsigned short _kevent_flags;
 		long __spare__[8];

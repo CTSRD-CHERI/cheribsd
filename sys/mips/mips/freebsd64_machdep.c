@@ -352,7 +352,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* save user context */
 	bzero(&sf, sizeof(sf));
 	sf.sf_uc.uc_sigmask = *mask;
-	sf.sf_uc.uc_stack.ss_sp = (__cheri_fromcap void *)td->td_sigstk.ss_sp;
+	sf.sf_uc.uc_stack.ss_sp = (__cheri_addr uint64_t)td->td_sigstk.ss_sp;
 	sf.sf_uc.uc_stack.ss_size = td->td_sigstk.ss_size;
 	sf.sf_uc.uc_stack.ss_flags = td->td_sigstk.ss_flags;
 	sf.sf_uc.uc_mcontext.mc_onstack = (oonstack) ? 1 : 0;
