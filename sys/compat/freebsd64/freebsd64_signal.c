@@ -210,7 +210,7 @@ freebsd64_sigaltstack(struct thread *td,
 		return (error);
 	if (uap->oss != NULL) {
 		memset(&ss64, 0, sizeof(ss64));
-		ss64.ss_sp = (__cheri_fromcap void *)oss.ss_sp;
+		ss64.ss_sp = (__cheri_addr uint64_t)oss.ss_sp;
 		ss64.ss_size = oss.ss_size;
 		ss64.ss_flags = oss.ss_flags;
 		error = copyout(&ss64, uap->oss, sizeof(ss64));
