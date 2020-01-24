@@ -2942,7 +2942,7 @@ __elfN(untrans_prot)(vm_prot_t prot)
 }
 
 void
-__elfN(stackgap)(struct image_params *imgp, uintptr_t *stack_base)
+__elfN(stackgap)(struct image_params *imgp, uintcap_t *stack_base)
 {
 	uintptr_t range, rbase, gap;
 	int pct;
