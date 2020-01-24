@@ -44,7 +44,7 @@ _blacklistd-helper+=	blacklistd-helper
 SUBDIR+=	bootpd
 .endif
 
-.if (${MACHINE_ARCH:Mmips*c*} && !defined(LIBCHERI)) || ${MK_CHERI} != "no"
+.if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no"
 SUBDIR+=	rtld-cheri-elf rtld-cheri-elf-debug
 .endif
 
@@ -81,8 +81,7 @@ _pppoed=	pppoed
 _tftp-proxy=	tftp-proxy
 .endif
 
-.if !defined(NO_PIC) && !defined(NO_RTLD) && !${MACHINE_ARCH:Mmips*c*} && \
-    ${MK_COMPAT_CHERIABI} == no
+.if !defined(NO_PIC) && !defined(NO_RTLD) && !${MACHINE_ARCH:Mmips*c*}
 _rtld-elf=	rtld-elf rtld-elf-debug
 SUBDIR.${MK_LIB32}+=	rtld-elf32
 .endif

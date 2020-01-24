@@ -11,9 +11,7 @@ CLEANFILES=	${FILES}
 CFLAGS+=-mxgot -mllvm -mxmxgot
 CFLAGS+=	-DCRT_IRELOC_SUPPRESS
 
-.if !${MACHINE_ARCH:Mmips*c*}
 NEED_CHERI=	pure
-.endif
 
 NO_BSD_CRTBEGIN=	yes
 .PATH:	${.CURDIR}/../common-cheri
