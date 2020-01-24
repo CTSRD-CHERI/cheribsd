@@ -68,6 +68,7 @@ static const char *cheri_exccode_descr[] = {
 	[CHERI_EXCCODE_PERM_CCALL] = "permit ccall violation",
 	[CHERI_EXCCODE_CCALL_IDC] = "access ccall IDC violation",
 	[CHERI_EXCCODE_PERM_UNSEAL] = "permit unseal violation",
+	[CHERI_EXCCODE_PERM_SET_CID] = "permit CSetCID violation",
 	[CHERI_EXCCODE_SW_LOCALARG] = "local capability in argument",
 	[CHERI_EXCCODE_SW_LOCALRET] = "local capability in return value",
 	[CHERI_EXCCODE_SW_CCALLREGS] = "incorrect CCall registers",
@@ -388,6 +389,7 @@ cheri_capcause_to_sicode(register_t capcause)
 	case CHERI_EXCCODE_PERM_SEAL:
 	case CHERI_EXCCODE_PERM_UNSEAL:
 	case CHERI_EXCCODE_USER_PERM:
+	case CHERI_EXCCODE_PERM_SET_CID:
 		return (PROT_CHERI_PERM);
 
 	case CHERI_EXCCODE_TLBSTORE:
