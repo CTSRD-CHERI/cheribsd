@@ -37,6 +37,11 @@
 /* Return userspace DDC and PCC of current thread. */
 #define	__USER_DDC		scr_read(ddc)
 #define	__USER_PCC		scr_read(pcc)
+
+/*
+ * CHERI-RISC-V-specific kernel utility functions.
+ */
+int	cheri_sccsr_to_sicode(register_t sccsr);
 #endif
 
 #endif /* !_MACHINE_CHERI_H_ */

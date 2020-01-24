@@ -252,6 +252,9 @@ do_trap_supervisor(struct trapframe *frame)
 {
 	uint64_t exception;
 	uint64_t sstatus;
+#if __has_feature(capabilities)
+	uint64_t sccsr;
+#endif
 
 	/* Ensure we came from supervisor mode, interrupts disabled */
 	__asm __volatile("csrr %0, sstatus" : "=&r" (sstatus));
@@ -299,6 +302,15 @@ do_trap_supervisor(struct trapframe *frame)
 		dump_regs(frame);
 		panic("Illegal instruction at 0x%016lx\n", frame->tf_sepc);
 		break;
+#if __has_feature(capabilities)
+	case EXCP_CHERI:
+		dump_regs(frame);
+		sccsr = csr_read(sccsr);
+		panic("CHERI exception %#x at 0x%016lx\n",
+		    (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT,
+		    frame->tf_sepc);
+		break;
+#endif
 	default:
 		dump_regs(frame);
 		panic("Unknown kernel exception %x trap value %lx\n",
@@ -367,6 +379,14 @@ do_trap_user(struct trapframe *frame)
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, (void *)frame->tf_sepc);
 		userret(td, frame);
 		break;
+#if __has_feature(capabilities)
+	case EXCP_CHERI:
+		call_trapsignal(td, SIGPROT,
+		    cheri_sccsr_to_sicode(csr_read(sccsr)),
+		    (void *)frame->tf_sepc);
+		userret(td, frame);
+		break;
+#endif
 	default:
 		dump_regs(frame);
 		panic("Unknown userland exception %x, trap value %lx\n",
