@@ -513,8 +513,6 @@ int	kern_truncate(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg, off_t length);
 int	kern_undelete(struct thread *td, const char * __capability path,
 	    enum uio_seg pathseg);
-int	kern_unmount(struct thread *td, const char * __capability path,
-	    int flags);
 int	kern_funlinkat(struct thread *td, int dfd,
 	    const char * __capability path, int fd, enum uio_seg pathseg,
 	    int flag, ino_t oldinum);
@@ -543,6 +541,8 @@ int	kern_write(struct thread *td, int fd, const void * __capability buf,
 int	kern_writev(struct thread *td, int fd, struct uio *auio);
 int	kern_socketpair(struct thread *td, int domain, int type, int protocol,
 	    int *rsv);
+int	kern_unmount(struct thread *td, const char * __capability path,
+	    int flags);
 
 int	user_accept(struct thread *td, int s,
 	    struct sockaddr * __capability uname,
