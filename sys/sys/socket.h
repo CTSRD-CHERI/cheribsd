@@ -439,13 +439,13 @@ struct msghdr {
 #ifdef _KERNEL
 #ifdef COMPAT_FREEBSD64
 struct msghdr64 {
-	void		*msg_name;		/* optional address */
-	socklen_t	 msg_namelen;		/* size of address */
-	struct iovec64	*msg_iov;		/* scatter/gather array */
-	int		 msg_iovlen;		/* # elements in msg_iov */
-	void		*msg_control;		/* ancillary data, see below */
-	socklen_t	 msg_controllen;	/* ancillary data buffer len */
-	int		 msg_flags;		/* flags on received message */
+	uint64_t	msg_name;	/* (void *) optional address */
+	socklen_t	msg_namelen;	/* size of address */
+	uint64_t	msg_iov;	/* (struct iovec64 *) scatter/gather array */
+	int		msg_iovlen;	/* # elements in msg_iov */
+	uint64_t	msg_control;	/* (void *) ancillary data, see below */
+	socklen_t	msg_controllen;	/* ancillary data buffer len */
+	int		msg_flags;	/* flags on received message */
 };
 #endif
 #endif	/* _KERNEL */
@@ -539,14 +539,18 @@ struct sockcred {
 
 #endif /* __BSD_VISIBLE */
 
-#ifndef __CHERI_PURE_CAPABILITY__
-#define	_CMSG_ALIGN(n)	_ALIGN(n)
-#else
 /*
- * Don't align for capabilities in CheriABI.  Sending them makes little
+ * We should not need to align for capabilities in CheriABI. Sending them makes little
  * sense and would be a major potential security hole.
+ * However within the kernel control messages may contain pointers (see SCM_RIGHTS),
+ * therefore we need to align to pointer size within the kernel.
+ * Aligning to capability size should remove the need for realignment in the hybrid kernel/
+ * purecap userspace combination.
  */
-#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(u_long))
+#if __has_feature(capabilities)
+#define	_CMSG_ALIGN(n)	__builtin_align_up((n), sizeof(void * __capability))
+#else
+#define	_CMSG_ALIGN(n)	_ALIGN(n)
 #endif
 
 /* given pointer to struct cmsghdr, return pointer to data */

@@ -212,4 +212,4 @@ struct iovec64 {
 	size_t	iov_len;
 };
 
-#endif /* !_COMPAT_CHERIABI_CHERIABI_H_ */
+#endif /* !_COMPAT_FREEBSD64_FREEBSD64_H_ */
