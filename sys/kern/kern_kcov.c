@@ -401,7 +401,7 @@ kcov_free(struct kcov_info *info)
 	size_t i;
 
 	if (info->kvaddr != 0) {
-		pmap_qremove(ptr_to_va(info->kvaddr), info->bufsize / PAGE_SIZE);
+		pmap_qremove(info->kvaddr, info->bufsize / PAGE_SIZE);
 		kva_free(info->kvaddr, info->bufsize);
 	}
 	if (info->bufobj != NULL) {
