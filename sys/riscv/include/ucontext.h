@@ -56,13 +56,41 @@ struct fpregs {
 	int		pad;
 };
 
+#if __has_feature(capabilities)
+struct capregs {
+	__uintcap_t	cp_cra;
+	__uintcap_t	cp_csp;
+	__uintcap_t	cp_cgp;
+	__uintcap_t	cp_ctp;
+	__uintcap_t	cp_ct[7];
+	__uintcap_t	cp_cs[12];
+	__uintcap_t	cp_ca[8];
+	__uintcap_t	cp_sepcc;
+	__uintcap_t	cp_ddc;
+	__register_t	cp_sstatus;
+	__register_t	cp_pad;
+};
+#endif
+
 struct __mcontext {
+#if (defined(_KERNEL) && __has_feature(capabilities)) || \
+    defined(__CHERI_PURE_CAPABILITY__)
+	struct capregs	mc_capregs;
+#else
 	struct gpregs	mc_gpregs;
+#endif
 	struct fpregs	mc_fpregs;
 	int		mc_flags;
 #define	_MC_FP_VALID	0x1		/* Set when mc_fpregs has valid data */
 	int		mc_pad;
-	__uint64_t	mc_spare[8];	/* Space for expansion */
+#if (defined(_KERNEL) && __has_feature(capabilities)) || \
+    defined(__CHERI_PURE_CAPABILITY__)
+	__uint64_t	mc_spare[8];
+#else
+	__uintcap_t	mc_sepcc;
+	__uintcap_t	mc_ddc;
+	__uint64_t	mc_spare[4];	/* Space for expansion */
+#endif
 };
 
 typedef struct __mcontext mcontext_t;
@@ -75,7 +103,9 @@ typedef struct	__mcontext64 {
 	struct fpregs	mc_fpregs;
 	int		mc_flags;
 	int		mc_pad;
-	__uint64_t	mc_spare[8];
+	__uintcap_t	mc_sepcc;
+	__uintcap_t	mc_ddc;
+	__uint64_t	mc_spare[4];
 } mcontext64_t;
 
 typedef struct __ucontext64 {

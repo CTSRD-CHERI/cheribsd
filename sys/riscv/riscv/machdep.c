@@ -95,6 +95,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/fpe.h>
 #endif
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #ifdef FDT
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/openfirm.h>
@@ -178,22 +182,38 @@ cpu_idle_wakeup(int cpu)
 	return (0);
 }
 
+/*
+ * XXX: CHERI TODO: Eventually 'struct reg' should use capregs for purecap
+ * which would make this much cleaner.
+ */
 int
 fill_regs(struct thread *td, struct reg *regs)
 {
 	struct trapframe *frame;
+#if __has_feature(capabilities)
+	u_int i;
+#endif
 
 	frame = td->td_frame;
-	regs->sepc = frame->tf_sepc;
+	regs->sepc = (__cheri_addr register_t)frame->tf_sepc;
 	regs->sstatus = frame->tf_sstatus;
-	regs->ra = frame->tf_ra;
-	regs->sp = frame->tf_sp;
-	regs->gp = frame->tf_gp;
-	regs->tp = frame->tf_tp;
+	regs->ra = (__cheri_addr register_t)frame->tf_ra;
+	regs->sp = (__cheri_addr register_t)frame->tf_sp;
+	regs->gp = (__cheri_addr register_t)frame->tf_gp;
+	regs->tp = (__cheri_addr register_t)frame->tf_tp;
 
+#if __has_feature(capabilities)
+	for (i = 0; i < nitems(regs->t); i++)
+		regs->t[i] = (__cheri_addr register_t)frame->tf_t[i];
+	for (i = 0; i < nitems(regs->s); i++)
+		regs->s[i] = (__cheri_addr register_t)frame->tf_s[i];
+	for (i = 0; i < nitems(regs->a); i++)
+		regs->a[i] = (__cheri_addr register_t)frame->tf_a[i];
+#else
 	memcpy(regs->t, frame->tf_t, sizeof(regs->t));
 	memcpy(regs->s, frame->tf_s, sizeof(regs->s));
 	memcpy(regs->a, frame->tf_a, sizeof(regs->a));
+#endif
 
 	return (0);
 }
@@ -202,17 +222,34 @@ int
 set_regs(struct thread *td, struct reg *regs)
 {
 	struct trapframe *frame;
+#if __has_feature(capabilities)
+	u_int i;
+#endif
 
 	frame = td->td_frame;
+#if __has_feature(capabilities)
+	frame->tf_sepc = (uintcap_t)cheri_setaddress(
+	    (void * __capability)frame->tf_sepc, regs->sepc);
+#else
 	frame->tf_sepc = regs->sepc;
-	frame->tf_ra = regs->ra;
-	frame->tf_sp = regs->sp;
-	frame->tf_gp = regs->gp;
-	frame->tf_tp = regs->tp;
+#endif
+	frame->tf_ra = (uintcap_t)regs->ra;
+	frame->tf_sp = (uintcap_t)regs->sp;
+	frame->tf_gp = (uintcap_t)regs->gp;
+	frame->tf_tp = (uintcap_t)regs->tp;
 
+#if __has_feature(capabilities)
+	for (i = 0; i < nitems(regs->t); i++)
+		frame->tf_t[i] = (uintcap_t)regs->t[i];
+	for (i = 0; i < nitems(regs->s); i++)
+		frame->tf_s[i] = (uintcap_t)regs->s[i];
+	for (i = 0; i < nitems(regs->a); i++)
+		frame->tf_a[i] = (uintcap_t)regs->a[i];
+#else
 	memcpy(frame->tf_t, regs->t, sizeof(frame->tf_t));
 	memcpy(frame->tf_s, regs->s, sizeof(frame->tf_s));
 	memcpy(frame->tf_a, regs->a, sizeof(frame->tf_a));
+#endif
 
 	return (0);
 }
@@ -277,11 +314,31 @@ set_dbregs(struct thread *td, struct dbreg *regs)
 }
 
 #if __has_feature(capabilities)
+/* Number of capability registers in 'struct capreg'. */
+#define	NCAPREGS	(offsetof(struct capreg, tagmask) / sizeof(uintcap_t))
+
 int
 fill_capregs(struct thread *td, struct capreg *regs)
 {
+	struct trapframe *frame;
+	uintcap_t *pcap;
+	u_int i;
 
-	panic("fill_capregs");
+	frame = td->td_frame;
+	memset(regs, 0, sizeof(*regs));
+	regs->cra = frame->tf_ra;
+	regs->csp = frame->tf_sp;
+	regs->cgp = frame->tf_gp;
+	regs->ctp = frame->tf_tp;
+	memcpy(regs->ct, frame->tf_t, sizeof(regs->ct));
+	memcpy(regs->cs, frame->tf_s, sizeof(regs->cs));
+	memcpy(regs->ca, frame->tf_a, sizeof(regs->ca));
+	pcap = (uintcap_t *)regs;
+	for (i = 0; i < NCAPREGS; i++) {
+		if (cheri_gettag((void * __capability)pcap[i]))
+			regs->tagmask |= (uint64_t)1 << i;
+	}
+	return (0);
 }
 
 int
@@ -296,7 +353,14 @@ int
 ptrace_set_pc(struct thread *td, u_long addr)
 {
 
-	td->td_frame->tf_sepc = addr;
+#if __has_feature(capabilities)
+	if (SV_PROC_FLAG(td->td_proc, SV_CHERI) &&
+	    !cheri_is_address_inbounds(
+	    (void * __capability)td->td_frame->tf_sepc, addr))
+		return (EINVAL);
+#endif
+	td->td_frame->tf_sepc = (uintcap_t)cheri_setaddress(
+	    (void * __capability)td->td_frame->tf_sepc, addr);
 	return (0);
 }
 
@@ -337,6 +401,14 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 }
 
 /* Sanity check these are the same size, they will be memcpy'd to and fro */
+#if __has_feature(capabilities)
+CTASSERT(sizeof(((struct trapframe *)0)->tf_a) ==
+    sizeof((struct capregs *)0)->cp_ca);
+CTASSERT(sizeof(((struct trapframe *)0)->tf_s) ==
+    sizeof((struct capregs *)0)->cp_cs);
+CTASSERT(sizeof(((struct trapframe *)0)->tf_t) ==
+    sizeof((struct capregs *)0)->cp_ct);
+#else
 CTASSERT(sizeof(((struct trapframe *)0)->tf_a) ==
     sizeof((struct gpregs *)0)->gp_a);
 CTASSERT(sizeof(((struct trapframe *)0)->tf_s) ==
@@ -349,6 +421,7 @@ CTASSERT(sizeof(((struct trapframe *)0)->tf_s) ==
     sizeof((struct reg *)0)->s);
 CTASSERT(sizeof(((struct trapframe *)0)->tf_t) ==
     sizeof((struct reg *)0)->t);
+#endif
 
 /* Support for FDT configurations only. */
 CTASSERT(FDT);
@@ -358,6 +431,24 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 {
 	struct trapframe *tf = td->td_frame;
 
+#if __has_feature(capabilities)
+	memcpy(mcp->mc_capregs.cp_ct, tf->tf_t, sizeof(mcp->mc_capregs.cp_ct));
+	memcpy(mcp->mc_capregs.cp_cs, tf->tf_s, sizeof(mcp->mc_capregs.cp_cs));
+	memcpy(mcp->mc_capregs.cp_ca, tf->tf_a, sizeof(mcp->mc_capregs.cp_ca));
+
+	if (clear_ret & GET_MC_CLEAR_RET) {
+		mcp->mc_capregs.cp_ca[0] = 0;
+		mcp->mc_capregs.cp_ct[0] = 0; /* clear syscall error */
+	}
+
+	mcp->mc_capregs.cp_cra = tf->tf_ra;
+	mcp->mc_capregs.cp_csp = tf->tf_sp;
+	mcp->mc_capregs.cp_cgp = tf->tf_gp;
+	mcp->mc_capregs.cp_ctp = tf->tf_tp;
+	mcp->mc_capregs.cp_sepcc = tf->tf_sepc;
+	mcp->mc_capregs.cp_ctp = tf->tf_ddc;
+	mcp->mc_capregs.cp_sstatus = tf->tf_sstatus;
+#else
 	memcpy(mcp->mc_gpregs.gp_t, tf->tf_t, sizeof(mcp->mc_gpregs.gp_t));
 	memcpy(mcp->mc_gpregs.gp_s, tf->tf_s, sizeof(mcp->mc_gpregs.gp_s));
 	memcpy(mcp->mc_gpregs.gp_a, tf->tf_a, sizeof(mcp->mc_gpregs.gp_a));
@@ -373,6 +464,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 	mcp->mc_gpregs.gp_tp = tf->tf_tp;
 	mcp->mc_gpregs.gp_sepc = tf->tf_sepc;
 	mcp->mc_gpregs.gp_sstatus = tf->tf_sstatus;
+#endif
 	get_fpcontext(td, mcp);
 
 	return (0);
@@ -382,17 +474,36 @@ int
 set_mcontext(struct thread *td, mcontext_t *mcp)
 {
 	struct trapframe *tf;
+	register_t new_sstatus;
 
 	tf = td->td_frame;
+
+#if __has_feature(capabilities)
+	new_sstatus = mcp->mc_capregs.cp_sstatus;
+#else
+	new_sstatus = mcp->mc_gpregs.gp_sstatus;
+#endif
 
 	/*
 	 * Make sure the processor mode has not been tampered with and
 	 * interrupts have not been disabled.
 	 * Supervisor interrupts in user mode are always enabled.
 	 */
-	if ((mcp->mc_gpregs.gp_sstatus & SSTATUS_SPP) != 0)
+	if ((new_sstatus & SSTATUS_SPP) != 0)
 		return (EINVAL);
 
+#if __has_feature(capabilities)
+	memcpy(tf->tf_t, mcp->mc_capregs.cp_ct, sizeof(tf->tf_t));
+	memcpy(tf->tf_s, mcp->mc_capregs.cp_cs, sizeof(tf->tf_s));
+	memcpy(tf->tf_a, mcp->mc_capregs.cp_ca, sizeof(tf->tf_a));
+
+	tf->tf_ra = mcp->mc_capregs.cp_cra;
+	tf->tf_sp = mcp->mc_capregs.cp_csp;
+	tf->tf_gp = mcp->mc_capregs.cp_cgp;
+	tf->tf_sepc = mcp->mc_capregs.cp_sepcc;
+	tf->tf_ddc = mcp->mc_capregs.cp_ddc;
+	tf->tf_sstatus = mcp->mc_capregs.cp_sstatus;
+#else
 	memcpy(tf->tf_t, mcp->mc_gpregs.gp_t, sizeof(tf->tf_t));
 	memcpy(tf->tf_s, mcp->mc_gpregs.gp_s, sizeof(tf->tf_s));
 	memcpy(tf->tf_a, mcp->mc_gpregs.gp_a, sizeof(tf->tf_a));
@@ -402,6 +513,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	tf->tf_gp = mcp->mc_gpregs.gp_gp;
 	tf->tf_sepc = mcp->mc_gpregs.gp_sepc;
 	tf->tf_sstatus = mcp->mc_gpregs.gp_sstatus;
+#endif
 	set_fpcontext(td, mcp);
 
 	return (0);
@@ -576,22 +688,18 @@ void
 makectx(struct trapframe *tf, struct pcb *pcb)
 {
 
-	memcpy(pcb->pcb_t, tf->tf_t, sizeof(tf->tf_t));
 	memcpy(pcb->pcb_s, tf->tf_s, sizeof(tf->tf_s));
-	memcpy(pcb->pcb_a, tf->tf_a, sizeof(tf->tf_a));
 
 	pcb->pcb_ra = tf->tf_ra;
 	pcb->pcb_sp = tf->tf_sp;
 	pcb->pcb_gp = tf->tf_gp;
 	pcb->pcb_tp = tf->tf_tp;
-	pcb->pcb_sepc = tf->tf_sepc;
 }
 
-/* XXX: CHERI TODO: Update for capability registers. */
 void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
-	struct sigframe *fp, frame;
+	struct sigframe * __capability fp, frame;
 	struct sysentvec *sysent;
 	struct trapframe *tf;
 	struct sigacts *psp;
@@ -609,7 +717,14 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	mtx_assert(&psp->ps_mtx, MA_OWNED);
 
 	tf = td->td_frame;
-	onstack = sigonstack(tf->tf_sp);
+
+	/*
+	 * XXXCHERI: We make an on-stack determination using the
+	 * virtual address associated with the stack pointer, rather
+	 * than using the full capability.  Should we compare the
+	 * entire capability...?  Just pointer and bounds...?
+	 */
+	onstack = sigonstack((__cheri_addr vaddr_t)tf->tf_sp);
 
 	CTR4(KTR_SIG, "sendsig: td=%p (%s) catcher=%p sig=%d", td, p->p_comm,
 	    catcher, sig);
@@ -617,15 +732,15 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct sigframe *)((__cheri_addr uintptr_t)td->td_sigstk.ss_sp +
+		fp = (struct sigframe * __capability)((uintcap_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
-		fp = (struct sigframe *)td->td_frame->tf_sp;
+		fp = (struct sigframe * __capability)td->td_frame->tf_sp;
 	}
 
 	/* Make room, keeping the stack aligned */
 	fp--;
-	fp = (struct sigframe *)STACKALIGN(fp);
+	fp = __builtin_align_down(fp, STACKALIGNBYTES + 1);
 
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
@@ -639,7 +754,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_UNLOCK(td->td_proc);
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyout(&frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {
+	if (copyout(&frame, fp, sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
 		PROC_LOCK(p);
@@ -647,13 +762,24 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	}
 
 	tf->tf_a[0] = sig;
+#if __has_feature(capabilities)
+	tf->tf_a[1] = (uintcap_t)cheri_csetbounds(&fp->sf_si,
+	    sizeof(fp->sf_si));
+	tf->tf_a[2] = (uintcap_t)cheri_csetbounds(&fp->sf_uc,
+	    sizeof(fp->sf_uc));
+#else
 	tf->tf_a[1] = (register_t)&fp->sf_si;
 	tf->tf_a[2] = (register_t)&fp->sf_uc;
+#endif
 
-	tf->tf_sepc = (__cheri_offset register_t)catcher;
-	tf->tf_sp = (register_t)fp;
+	tf->tf_sepc = (uintcap_t)catcher;
+	tf->tf_sp = (uintcap_t)fp;
 
 	sysent = p->p_sysent;
+#if __has_feature(capabilities)
+	/* XXX: CHERI TODO: Save proper bounds for sigcode. */
+	tf->tf_ra = 0;
+#endif
 	if (sysent->sv_sigcode_base != 0)
 		tf->tf_ra = (register_t)sysent->sv_sigcode_base;
 	else
