@@ -641,6 +641,12 @@ MK_LLVM_COV:= no
 MK_LOADER_VERIEXEC_PASS_MANIFEST := no
 .endif
 
+# COMPAT_CHERIABI and LIBCHERI depend on CHERI support.
+.if ${MK_CHERI} == "no"
+MK_LIBCHERI:=	no
+MK_COMPAT_CHERIABI:=	no
+.endif
+
 #
 # MK_* options whose default value depends on another option.
 #
