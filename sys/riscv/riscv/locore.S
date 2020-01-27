@@ -182,7 +182,17 @@ va:
 
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
+#if __has_feature(capabilities)
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	cspecialw stcc, ct1
+	cspecialr ct1, ddc
+	cspecialw stdc, ct1
+#else
 	csrw	stvec, t0
+#endif
 
 	/* Ensure sscratch is zero */
 	li	t0, 0
@@ -360,7 +370,17 @@ mpva:
 
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
+#if __has_feature(capabilities)
+	cspecialr ct1, pcc
+	csetaddr ct1, ct1, t0
+	li	t0, 1
+	csetflags ct1, ct1, t0
+	cspecialw stcc, ct1
+	cspecialr ct1, ddc
+	cspecialw stdc, ct1
+#else
 	csrw	stvec, t0
+#endif
 
 	/* Ensure sscratch is zero */
 	li	t0, 0

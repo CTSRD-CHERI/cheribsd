@@ -63,6 +63,8 @@ __FBSDID("$FreeBSD$");
 
 #include <machine/md_var.h>
 
+#include <cheri/cheric.h>
+
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
@@ -124,18 +126,35 @@ SYSINIT(freebsd64, SI_SUB_EXEC, SI_ORDER_ANY,
     (sysinit_cfunc_t) elf64_insert_brand_entry,
     &freebsd_freebsd64_brand_info);
 
+/*
+ * Number of GPRs in mc_gpregs that are mirrored in mc_capregs up to,
+ * but not including sepc.
+ */
+#define	CONTEXT64_GPREGS	(offsetof(struct gpregs, gp_sepc) / sizeof(register_t))
+
 int
 freebsd64_get_mcontext(struct thread *td, mcontext64_t *mcp, int flags)
 {
 	mcontext_t mc;
+	const uintcap_t *creg;
+	register_t *greg;
 	int error;
+	u_int i;
 
 	error = get_mcontext(td, &mc, flags);
 	if (error != 0)
 		return (error);
 
 	memset(mcp, 0, sizeof(*mcp));
-	mcp->mc_gpregs = mc.mc_gpregs;
+	creg = (uintcap_t *)&mc.mc_capregs;
+	greg = (register_t *)&mcp->mc_gpregs;
+	for (i = 0; i < CONTEXT64_GPREGS; i++)
+		greg[i] = (__cheri_addr register_t)creg[i];
+	mcp->mc_gpregs.gp_sepc =
+	    (__cheri_offset register_t)mc.mc_capregs.cp_sepcc;
+	mcp->mc_sepcc = mc.mc_capregs.cp_sepcc;
+	mcp->mc_ddc = mc.mc_capregs.cp_ddc;
+	mcp->mc_gpregs.gp_sstatus = mc.mc_capregs.cp_sstatus;
 	mcp->mc_flags = mc.mc_flags;
 	if (mc.mc_flags & _MC_FP_VALID)
 		mcp->mc_fpregs = mc.mc_fpregs;
@@ -147,9 +166,19 @@ int
 freebsd64_set_mcontext(struct thread *td, mcontext64_t *mcp)
 {
 	mcontext_t mc;
+	uintcap_t *creg;
+	const register_t *greg;
+	u_int i;
 
 	memset(&mc, 0, sizeof(mc));
-	mc.mc_gpregs = mcp->mc_gpregs;
+	creg = (uintcap_t *)&mc.mc_capregs;
+	greg = (register_t *)&mcp->mc_gpregs;
+	for (i = 0; i < CONTEXT64_GPREGS; i++)
+		creg[i] = (uintcap_t)greg[i];
+	mc.mc_capregs.cp_sepcc = (uintcap_t)cheri_setoffset(
+	    (void * __capability)mcp->mc_sepcc, mcp->mc_gpregs.gp_sepc);
+	mc.mc_capregs.cp_ddc = mcp->mc_ddc;
+	mc.mc_capregs.cp_sstatus = mcp->mc_gpregs.gp_sstatus;
 	mc.mc_flags = mcp->mc_flags;
 	if (mcp->mc_flags & _MC_FP_VALID)
 		mc.mc_fpregs = mcp->mc_fpregs;
@@ -189,7 +218,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 		fp = (struct sigframe64 *)((__cheri_addr uintptr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
-		fp = (struct sigframe64 *)td->td_frame->tf_sp;
+		fp = (struct sigframe64 *)(__cheri_addr uintptr_t)td->td_frame->tf_sp;
 	}
 
 	/* Make room, keeping the stack aligned */
