@@ -63,6 +63,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/vmmeter.h>
 #include <sys/lock_profile.h>
 
+#include <cheri/cheric.h>
+
 #include <machine/atomic.h>
 #include <machine/bus.h>
 #include <machine/cpu.h>
@@ -243,7 +245,7 @@ owner_mtx(const struct lock_object *lock, struct thread **owner)
 
 	m = (const struct mtx *)lock;
 	x = m->mtx_lock;
-	*owner = (struct thread *)ptr_clear_flag(x, MTX_FLAGMASK);
+	*owner = (struct thread *)cheri_clear_low_ptr_bits(x, MTX_FLAGMASK);
 	return (*owner != NULL);
 }
 #endif
@@ -639,9 +641,9 @@ retry_turnstile:
 		 * setting the contested bit, the mutex was either released
 		 * or the state of the MTX_RECURSED bit changed.
 		 */
-		if (ptr_get_flag(v, MTX_CONTESTED) == 0 &&
+		if (cheri_get_low_ptr_bits(v, MTX_CONTESTED) == 0 &&
 		    !atomic_fcmpset_ptr(&m->mtx_lock, &v,
-		        ptr_set_flag(v, MTX_CONTESTED))) {
+		        cheri_set_low_ptr_bits(v, MTX_CONTESTED))) {
 			goto retry_turnstile;
 		}
 
@@ -1026,7 +1028,7 @@ __mtx_unlock_sleep(volatile uintptr_t *c, uintptr_t v)
 	if (__predict_false(v == tid))
 		v = MTX_READ_VALUE(m);
 
-	if (__predict_false(ptr_get_flag(v, MTX_RECURSED))) {
+	if (__predict_false(cheri_get_low_ptr_bits(v, MTX_RECURSED))) {
 		if (--(m->mtx_recurse) == 0)
 			atomic_clear_ptr(&m->mtx_lock, MTX_RECURSED);
 		if (LOCK_LOG_TEST(&m->lock_object, opts))
@@ -1179,7 +1181,8 @@ _mtx_destroy(volatile uintptr_t *c)
 	if (!mtx_owned(m))
 		MPASS(mtx_unowned(m));
 	else {
-		MPASS(ptr_get_flag(m->mtx_lock, (MTX_RECURSED|MTX_CONTESTED)) == 0);
+		MPASS(cheri_get_low_ptr_bits(m->mtx_lock,
+		    (MTX_RECURSED|MTX_CONTESTED)) == 0);
 
 		/* Perform the non-mtx related part of mtx_unlock_spin(). */
 		if (LOCK_CLASS(&m->lock_object) == &lock_class_mtx_spin)
@@ -1300,9 +1303,9 @@ db_show_mtx(const struct lock_object *lock)
 		db_printf("DESTROYED");
 	else {
 		db_printf("OWNED");
-		if (ptr_get_flag(m->mtx_lock, MTX_CONTESTED))
+		if (cheri_get_low_ptr_bits(m->mtx_lock, MTX_CONTESTED))
 			db_printf(", CONTESTED");
-		if (ptr_get_flag(m->mtx_lock, MTX_RECURSED))
+		if (cheri_get_low_ptr_bits(m->mtx_lock, MTX_RECURSED))
 			db_printf(", RECURSED");
 	}
 	db_printf("}\n");
@@ -1317,7 +1320,7 @@ db_show_mtx(const struct lock_object *lock)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190617,
+//   "updated": 20200127,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_bit_flags"

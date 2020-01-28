@@ -50,6 +50,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/systm.h>
 #include <sys/turnstile.h>
 
+#include <cheri/cheric.h>
+
 #include <machine/cpu.h>
 
 #if defined(SMP) && !defined(NO_ADAPTIVE_RWLOCKS)
@@ -131,7 +133,7 @@ LOCK_DELAY_SYSINIT(rw_lock_delay_init);
  */
 
 #define	lv_rw_wowner(v)							\
-	(ptr_get_flag(v, RW_LOCK_READ) ? NULL :				\
+	(cheri_get_low_ptr_bits(v, RW_LOCK_READ) ? NULL :				\
 	 (struct thread *)RW_OWNER((v)))
 
 #define	rw_wowner(rw)	lv_rw_wowner(RW_READ_VALUE(rw))
@@ -184,7 +186,7 @@ unlock_rw(struct lock_object *lock)
 
 	rw = (struct rwlock *)lock;
 	rw_assert(rw, RA_LOCKED | LA_NOTRECURSED);
-	if (ptr_get_flag(rw->rw_lock, RW_LOCK_READ)) {
+	if (cheri_get_low_ptr_bits(rw->rw_lock, RW_LOCK_READ)) {
 		rw_runlock(rw);
 		return (1);
 	} else {
@@ -201,8 +203,8 @@ owner_rw(const struct lock_object *lock, struct thread **owner)
 	uintptr_t x = rw->rw_lock;
 
 	*owner = rw_wowner(rw);
-	return (ptr_get_flag(x, RW_LOCK_READ) != 0 ? (RW_READERS(x) != 0) :
-	    (*owner != NULL));
+	return (cheri_get_low_ptr_bits(x, RW_LOCK_READ) != 0 ?
+	    (RW_READERS(x) != 0) : (*owner != NULL));
 }
 #endif
 
@@ -389,10 +391,10 @@ static bool __always_inline
 __rw_can_read(struct thread *td, uintptr_t v, bool fp)
 {
 
-	if (ptr_get_flag(v, (RW_LOCK_READ | RW_LOCK_WRITE_WAITERS | RW_LOCK_WRITE_SPINNER))
-	    == RW_LOCK_READ)
+	if (cheri_get_low_ptr_bits(v, (RW_LOCK_READ | RW_LOCK_WRITE_WAITERS |
+	    RW_LOCK_WRITE_SPINNER)) == RW_LOCK_READ)
 		return (true);
-	if (!fp && td->td_rw_rlocks && (ptr_get_flag(v, RW_LOCK_READ)))
+	if (!fp && td->td_rw_rlocks && (cheri_get_low_ptr_bits(v, RW_LOCK_READ)))
 		return (true);
 	return (false);
 }
@@ -497,7 +499,7 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 		 * the owner stops running or the state of the lock
 		 * changes.
 		 */
-		if (ptr_get_flag(v, RW_LOCK_READ) == 0) {
+		if (cheri_get_low_ptr_bits(v, RW_LOCK_READ) == 0) {
 			owner = (struct thread *)RW_OWNER(v);
 			if (TD_IS_RUNNING(owner)) {
 				if (LOCK_LOG_TEST(&rw->lock_object, 0))
@@ -517,7 +519,8 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 				continue;
 			}
 		} else {
-			if (ptr_get_flag(v, RW_LOCK_WRITE_SPINNER) && RW_READERS(v) == 0) {
+			if (cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_SPINNER) &&
+			    RW_READERS(v) == 0) {
 				MPASS(!__rw_can_read(td, v, false));
 				lock_delay_spin(2);
 				v = RW_READ_VALUE(rw);
@@ -532,7 +535,7 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 				for (i = 0; i < rowner_loops; i += n) {
 					lock_delay_spin(n);
 					v = RW_READ_VALUE(rw);
-					if (!ptr_get_flag(v, RW_LOCK_READ))
+					if (!cheri_get_low_ptr_bits(v, RW_LOCK_READ))
 						break;
 					n = RW_READERS(v);
 					if (n == 0)
@@ -565,8 +568,8 @@ __rw_rlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 		 */
 		v = RW_READ_VALUE(rw);
 retry_ts:
-		if ((ptr_get_flag(v, RW_LOCK_WRITE_SPINNER) && RW_READERS(v) == 0) ||
-		    __rw_can_read(td, v, false)) {
+		if ((cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_SPINNER) &&
+		    RW_READERS(v) == 0) || __rw_can_read(td, v, false)) {
 			turnstile_cancel(ts);
 			continue;
 		}
@@ -600,9 +603,9 @@ retry_ts:
 		 * to set it.  If we fail to set it drop the turnstile
 		 * lock and restart the loop.
 		 */
-		if (!ptr_get_flag(v, RW_LOCK_READ_WAITERS)) {
+		if (!cheri_get_low_ptr_bits(v, RW_LOCK_READ_WAITERS)) {
 			if (!atomic_fcmpset_ptr(&rw->rw_lock, &v,
-			    ptr_set_flag(v, RW_LOCK_READ_WAITERS)))
+			    cheri_set_low_ptr_bits(v, RW_LOCK_READ_WAITERS)))
 				goto retry_ts;
 			if (LOCK_LOG_TEST(&rw->lock_object, 0))
 				CTR2(KTR_LOCK, "%s: %p set read waiters flag",
@@ -637,15 +640,18 @@ retry_ts:
 #ifdef KDTRACE_HOOKS
 	all_time += lockstat_nsecs(&rw->lock_object);
 	if (sleep_time)
-		LOCKSTAT_RECORD4(rw__block, rw, sleep_time,
-		     LOCKSTAT_READER, ptr_get_flag(state, RW_LOCK_READ) == 0,
-		     ptr_get_flag(state, RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
+		LOCKSTAT_RECORD4(rw__block, rw, sleep_time, LOCKSTAT_READER,
+		     cheri_get_low_ptr_bits(state, RW_LOCK_READ) == 0,
+		     cheri_get_low_ptr_bits(state, RW_LOCK_READ) == 0 ?
+		         0 : RW_READERS(state));
 
 	/* Record only the loops spinning and not sleeping. */
 	if (lda.spin_cnt > sleep_cnt)
 		LOCKSTAT_RECORD4(rw__spin, rw, all_time - sleep_time,
-		    LOCKSTAT_READER, ptr_get_flag(state, RW_LOCK_READ) == 0,
-		    ptr_get_flag(state, RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
+		    LOCKSTAT_READER,
+		    cheri_get_low_ptr_bits(state, RW_LOCK_READ) == 0,
+		    cheri_get_low_ptr_bits(state, RW_LOCK_READ) == 0 ?
+		        0 : RW_READERS(state));
 out_lockstat:
 #endif
 	/*
@@ -714,7 +720,7 @@ __rw_try_rlock_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 	for (;;) {
 		KASSERT(rw->rw_lock != RW_DESTROYED,
 		    ("rw_try_rlock() of destroyed rwlock @ %s:%d", file, line));
-		if (!ptr_get_flag(x, RW_LOCK_READ))
+		if (!cheri_get_low_ptr_bits(x, RW_LOCK_READ))
 			break;
 		if (atomic_fcmpset_acq_ptr(&rw->rw_lock, &x, x + RW_ONE_READER)) {
 			LOCK_LOG_TRY("RLOCK", &rw->lock_object, 0, 1, file,
@@ -747,7 +753,7 @@ __rw_runlock_try(struct rwlock *rw, struct thread *td, uintptr_t *vp)
 
 	for (;;) {
 		if (RW_READERS(*vp) > 1 ||
-		    !ptr_get_flag(*vp, RW_LOCK_WAITERS)) {
+		    !cheri_get_low_ptr_bits(*vp, RW_LOCK_WAITERS)) {
 			if (atomic_fcmpset_rel_ptr(&rw->rw_lock, vp,
 			    *vp - RW_ONE_READER)) {
 				if (LOCK_LOG_TEST(&rw->lock_object, 0))
@@ -787,7 +793,7 @@ __rw_runlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 	for (;;) {
 		if (__rw_runlock_try(rw, td, &v))
 			break;
-		MPASS(ptr_get_flag(v, RW_LOCK_WAITERS));
+		MPASS(cheri_get_low_ptr_bits(v, RW_LOCK_WAITERS));
 
 		/*
 		 * Try to drop our lock leaving the lock in a unlocked
@@ -807,11 +813,11 @@ __rw_runlock_hard(struct rwlock *rw, struct thread *td, uintptr_t v
 		 */
 		setv = RW_UNLOCKED;
 		queue = TS_SHARED_QUEUE;
-		if (ptr_get_flag(v, RW_LOCK_WRITE_WAITERS)) {
+		if (cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_WAITERS)) {
 			queue = TS_EXCLUSIVE_QUEUE;
-			setv |= ptr_get_flag(v, RW_LOCK_READ_WAITERS);
+			setv |= cheri_get_low_ptr_bits(v, RW_LOCK_READ_WAITERS);
 		}
-		setv |= ptr_get_flag(v, RW_LOCK_WRITE_SPINNER);
+		setv |= cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_SPINNER);
 		if (!atomic_fcmpset_rel_ptr(&rw->rw_lock, &v, setv))
 			continue;
 		if (LOCK_LOG_TEST(&rw->lock_object, 0))
@@ -875,7 +881,7 @@ static inline void
 rw_drop_critical(uintptr_t v, bool *in_critical, int *extra_work)
 {
 
-	if (ptr_get_flag(v, RW_LOCK_WRITE_SPINNER))
+	if (cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_SPINNER))
 		return;
 	if (*in_critical) {
 		critical_exit();
@@ -999,7 +1005,7 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 		 * running on another CPU, spin until the owner stops
 		 * running or the state of the lock changes.
 		 */
-		if (!ptr_get_flag(v, RW_LOCK_READ)) {
+		if (!cheri_get_low_ptr_bits(v, RW_LOCK_READ)) {
 			rw_drop_critical(v, &in_critical, &extra_work);
 			sleep_reason = WRITER;
 			owner = lv_rw_wowner(v);
@@ -1023,14 +1029,14 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 			sleep_reason = READERS;
 			if (spintries == rowner_retries)
 				goto ts;
-			if (!ptr_get_flag(v, RW_LOCK_WRITE_SPINNER)) {
+			if (!cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_SPINNER)) {
 				if (!in_critical) {
 					critical_enter();
 					in_critical = true;
 					extra_work++;
 				}
 				if (!atomic_fcmpset_ptr(&rw->rw_lock, &v,
-				    ptr_set_flag(v, RW_LOCK_WRITE_SPINNER))) {
+				    cheri_set_low_ptr_bits(v, RW_LOCK_WRITE_SPINNER))) {
 					critical_exit();
 					in_critical = false;
 					extra_work--;
@@ -1045,9 +1051,9 @@ __rw_wlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 			for (i = 0; i < rowner_loops; i += n) {
 				lock_delay_spin(n);
 				v = RW_READ_VALUE(rw);
-				if (!ptr_get_flag(v, RW_LOCK_WRITE_SPINNER))
+				if (!cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_SPINNER))
 					break;
-				if (!ptr_get_flag(v, RW_LOCK_READ))
+				if (!cheri_get_low_ptr_bits(v, RW_LOCK_READ))
 					break;
 				n = RW_READERS(v);
 				if (n == 0)
@@ -1095,11 +1101,12 @@ retry_ts:
 		 * If a pending waiters queue is present, claim the lock
 		 * ownership and maintain the pending queue.
 		 */
-		setv = ptr_get_flag(v, (RW_LOCK_WAITERS | RW_LOCK_WRITE_SPINNER));
-		if (ptr_clear_flag(v, setv) == RW_UNLOCKED) {
-			setv = ptr_get_flag(setv, ~RW_LOCK_WRITE_SPINNER);
+		setv = cheri_get_low_ptr_bits(v,
+		    (RW_LOCK_WAITERS | RW_LOCK_WRITE_SPINNER));
+		if (cheri_clear_low_ptr_bits(v, setv) == RW_UNLOCKED) {
+			setv = cheri_get_low_ptr_bits(setv, ~RW_LOCK_WRITE_SPINNER);
 			if (atomic_fcmpset_acq_ptr(&rw->rw_lock, &v,
-			    ptr_set_flag(tid, setv))) {
+			    cheri_set_low_ptr_bits(tid, setv))) {
 				if (setv)
 					turnstile_claim(ts);
 				else
@@ -1110,10 +1117,12 @@ retry_ts:
 		}
 #ifdef ADAPTIVE_RWLOCKS
 		if (in_critical) {
-			if (ptr_get_flag(v, RW_LOCK_WRITE_SPINNER) ||
-			    !(ptr_get_flag(v, RW_LOCK_WRITE_WAITERS))) {
-				setv = ptr_clear_flag(v, RW_LOCK_WRITE_SPINNER);
-				setv = ptr_set_flag(setv, RW_LOCK_WRITE_WAITERS);
+			if (cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_SPINNER) ||
+			    !(cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_WAITERS))) {
+				setv = cheri_clear_low_ptr_bits(v,
+				    RW_LOCK_WRITE_SPINNER);
+				setv = cheri_set_low_ptr_bits(setv,
+				    RW_LOCK_WRITE_WAITERS);
 				if (!atomic_fcmpset_ptr(&rw->rw_lock, &v, setv))
 					goto retry_ts;
 			}
@@ -1127,9 +1136,9 @@ retry_ts:
 			 * set it.  If we fail to set it, then loop back and try
 			 * again.
 			 */
-			if (!ptr_get_flag(v, RW_LOCK_WRITE_WAITERS)) {
+			if (!cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_WAITERS)) {
 				if (!atomic_fcmpset_ptr(&rw->rw_lock, &v,
-				    ptr_set_flag(v, RW_LOCK_WRITE_WAITERS)))
+				    cheri_set_low_ptr_bits(v, RW_LOCK_WRITE_WAITERS)))
 					goto retry_ts;
 				if (LOCK_LOG_TEST(&rw->lock_object, 0))
 					CTR2(KTR_LOCK, "%s: %p set write waiters flag",
@@ -1175,15 +1184,18 @@ retry_ts:
 #ifdef KDTRACE_HOOKS
 	all_time += lockstat_nsecs(&rw->lock_object);
 	if (sleep_time)
-		LOCKSTAT_RECORD4(rw__block, rw, sleep_time,
-		    LOCKSTAT_WRITER, ptr_get_flag(state, RW_LOCK_READ) == 0,
-		    ptr_get_flag(state, RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
+		LOCKSTAT_RECORD4(rw__block, rw, sleep_time, LOCKSTAT_WRITER,
+		    cheri_get_low_ptr_bits(state, RW_LOCK_READ) == 0,
+		    cheri_get_low_ptr_bits(state, RW_LOCK_READ) == 0 ?
+		        0 : RW_READERS(state));
 
 	/* Record only the loops spinning and not sleeping. */
 	if (lda.spin_cnt > sleep_cnt)
 		LOCKSTAT_RECORD4(rw__spin, rw, all_time - sleep_time,
-		    LOCKSTAT_WRITER, ptr_get_flag(state, RW_LOCK_READ) == 0,
-		    ptr_get_flag(state, RW_LOCK_READ) == 0 ? 0 : RW_READERS(state));
+		    LOCKSTAT_WRITER,
+		    cheri_get_low_ptr_bits(state, RW_LOCK_READ) == 0,
+		    cheri_get_low_ptr_bits(state, RW_LOCK_READ) == 0 ?
+		        0 : RW_READERS(state));
 out_lockstat:
 #endif
 	LOCKSTAT_PROFILE_OBTAIN_RWLOCK_SUCCESS(rw__acquire, rw, contested,
@@ -1212,7 +1224,7 @@ __rw_wunlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 	if (__predict_false(v == tid))
 		v = RW_READ_VALUE(rw);
 
-	if (ptr_get_flag(v, RW_LOCK_WRITER_RECURSED)) {
+	if (cheri_get_low_ptr_bits(v, RW_LOCK_WRITER_RECURSED)) {
 		if (--(rw->rw_recurse) == 0)
 			atomic_clear_ptr(&rw->rw_lock, RW_LOCK_WRITER_RECURSED);
 		if (LOCK_LOG_TEST(&rw->lock_object, 0))
@@ -1224,7 +1236,7 @@ __rw_wunlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 	if (v == tid && _rw_write_unlock(rw, tid))
 		return;
 
-	KASSERT(ptr_get_flag(rw->rw_lock, (RW_LOCK_READ_WAITERS |
+	KASSERT(cheri_get_low_ptr_bits(rw->rw_lock, (RW_LOCK_READ_WAITERS |
 	    RW_LOCK_WRITE_WAITERS)),
 	    ("%s: neither of the waiter flags are set", __func__));
 
@@ -1252,9 +1264,9 @@ __rw_wunlock_hard(volatile uintptr_t *c, uintptr_t v LOCK_FILE_LINE_ARG_DEF)
 	setv = RW_UNLOCKED;
 	v = RW_READ_VALUE(rw);
 	queue = TS_SHARED_QUEUE;
-	if (ptr_get_flag(v, RW_LOCK_WRITE_WAITERS)) {
+	if (cheri_get_low_ptr_bits(v, RW_LOCK_WRITE_WAITERS)) {
 		queue = TS_EXCLUSIVE_QUEUE;
-		setv |= ptr_get_flag(v, RW_LOCK_READ_WAITERS);
+		setv |= cheri_get_low_ptr_bits(v, RW_LOCK_READ_WAITERS);
 	}
 	atomic_store_rel_ptr(&rw->rw_lock, setv);
 
@@ -1302,7 +1314,7 @@ __rw_try_upgrade_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 	for (;;) {
 		if (RW_READERS(v) > 1)
 			break;
-		if (!ptr_get_flag(v, RW_LOCK_WAITERS)) {
+		if (!cheri_get_low_ptr_bits(v, RW_LOCK_WAITERS)) {
 			success = atomic_fcmpset_acq_ptr(&rw->rw_lock, &v, tid);
 			if (!success)
 				continue;
@@ -1325,10 +1337,11 @@ retry_ts:
 		 * If we obtain the lock with the flags set, then claim
 		 * ownership of the turnstile.
 		 */
-		setv = ptr_set_flag(tid, ptr_get_flag(v, RW_LOCK_WAITERS));
+		setv = cheri_set_low_ptr_bits(tid,
+		    cheri_get_low_ptr_bits(v, RW_LOCK_WAITERS));
 		success = atomic_fcmpset_ptr(&rw->rw_lock, &v, setv);
 		if (success) {
-			if (ptr_get_flag(v, RW_LOCK_WAITERS))
+			if (cheri_get_low_ptr_bits(v, RW_LOCK_WAITERS))
 				turnstile_claim(ts);
 			else
 				turnstile_cancel(ts);
@@ -1393,7 +1406,7 @@ __rw_downgrade_int(struct rwlock *rw LOCK_FILE_LINE_ARG_DEF)
 	 * read the waiter flags without any races.
 	 */
 	turnstile_chain_lock(&rw->lock_object);
-	v = ptr_get_flag(rw->rw_lock, RW_LOCK_WAITERS);
+	v = cheri_get_low_ptr_bits(rw->rw_lock, RW_LOCK_WAITERS);
 	rwait = v & RW_LOCK_READ_WAITERS;
 	wwait = v & RW_LOCK_WRITE_WAITERS;
 	MPASS(rwait | wwait);
@@ -1468,13 +1481,13 @@ __rw_assert(const volatile uintptr_t *c, int what, const char *file, int line)
 		 * has a lock at all, fail.
 		 */
 		if (rw->rw_lock == RW_UNLOCKED ||
-		    (!ptr_get_flag(rw->rw_lock, RW_LOCK_READ) &&
+		    (!cheri_get_low_ptr_bits(rw->rw_lock, RW_LOCK_READ) &&
 		     (what & RA_RLOCKED || rw_wowner(rw) != curthread)))
 			panic("Lock %s not %slocked @ %s:%d\n",
 			    rw->lock_object.lo_name, (what & RA_RLOCKED) ?
 			    "read " : "", file, line);
 
-		if (!ptr_get_flag(rw->rw_lock, RW_LOCK_READ) &&
+		if (!cheri_get_low_ptr_bits(rw->rw_lock, RW_LOCK_READ) &&
 		    !(what & RA_RLOCKED)) {
 			if (rw_recursed(rw)) {
 				if (what & RA_NOTRECURSED)
@@ -1536,7 +1549,7 @@ db_show_rwlock(const struct lock_object *lock)
 	else if (rw->rw_lock == RW_DESTROYED) {
 		db_printf("DESTROYED\n");
 		return;
-	} else if (ptr_get_flag(rw->rw_lock, RW_LOCK_READ))
+	} else if (cheri_get_low_ptr_bits(rw->rw_lock, RW_LOCK_READ))
 		db_printf("RLOCK: %ju locks\n",
 		    (uintmax_t)(RW_READERS(rw->rw_lock)));
 	else {
@@ -1547,7 +1560,7 @@ db_show_rwlock(const struct lock_object *lock)
 			db_printf(" recursed: %u\n", rw->rw_recurse);
 	}
 	db_printf(" waiters: ");
-	switch (ptr_get_flag(rw->rw_lock, RW_LOCK_WAITERS)) {
+	switch (cheri_get_low_ptr_bits(rw->rw_lock, RW_LOCK_WAITERS)) {
 	case RW_LOCK_READ_WAITERS:
 		db_printf("readers\n");
 		break;
@@ -1566,7 +1579,7 @@ db_show_rwlock(const struct lock_object *lock)
 #endif
 // CHERI CHANGES START
 // {
-//   "updated": 20190531,
+//   "updated": 20200127,
 //   "target_type": "kernel",
 //   "changes_purecap": [
 //     "pointer_bit_flags"

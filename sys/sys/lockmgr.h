@@ -37,7 +37,8 @@
 #include <sys/_lockmgr.h>
 #include <sys/_mutex.h>
 #include <sys/_rwlock.h>
-#include <sys/ptrbits.h>
+
+#include <cheri/cheric.h>
 
 #define	LK_SHARE			0x01
 #define	LK_SHARED_WAITERS		0x02
@@ -48,13 +49,14 @@
 #define	LK_FLAGMASK							\
 	(LK_SHARE | LK_ALL_WAITERS | LK_EXCLUSIVE_SPINNERS)
 
-#define	LK_HOLDER(x)		(ptr_clear_flag(x, LK_FLAGMASK))
+#define	LK_HOLDER(x)		(cheri_clear_low_ptr_bits(x, LK_FLAGMASK))
 #define	LK_SHARERS_SHIFT	4
 #define	LK_SHARERS(x)		((vaddr_t)LK_HOLDER(x) >> LK_SHARERS_SHIFT)
 #define	LK_SHARERS_LOCK(x)	((x) << LK_SHARERS_SHIFT | LK_SHARE)
 #define	LK_ONE_SHARER		(1 << LK_SHARERS_SHIFT)
 #define	LK_UNLOCKED		LK_SHARERS_LOCK(0)
-#define	LK_KERNPROC		(ptr_clear_flag((uintptr_t)(-1), LK_FLAGMASK))
+#define	LK_KERNPROC						\
+	(cheri_clear_low_ptr_bits((uintptr_t)(-1), LK_FLAGMASK))
 
 #ifdef _KERNEL
 
@@ -209,7 +211,7 @@ _lockmgr_args_rw(struct lock *lk, u_int flags, struct rwlock *ilk,
 #endif /* !_SYS_LOCKMGR_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200127,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_bit_flags",

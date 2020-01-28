@@ -71,7 +71,6 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysctl.h>
 #include <sys/mutex.h>
 #include <sys/proc.h>
-#include <sys/ptrbits.h>
 #include <sys/random.h>
 #include <sys/rwlock.h>
 #include <sys/sbuf.h>
@@ -467,11 +466,11 @@ bucket_alloc(uma_zone_t zone, void *udata, int flags)
 	if ((zone->uz_flags & UMA_ZFLAG_BUCKET) == 0)
 		udata = (void *)(uintptr_t)zone->uz_flags;
 	else {
-		if (ptr_get_flag(udata, UMA_ZFLAG_BUCKET))
+		if ((uintptr_t)udata & UMA_ZFLAG_BUCKET)
 			return (NULL);
-		udata = (void *)ptr_set_flag(udata, UMA_ZFLAG_BUCKET);
+		udata = (void *)((uintptr_t)udata | UMA_ZFLAG_BUCKET);
 	}
-	if (ptr_get_flag(udata, UMA_ZFLAG_CACHEONLY))
+	if ((uintptr_t)udata & UMA_ZFLAG_CACHEONLY)
 		flags |= M_NOVM;
 	ubz = bucket_zone_lookup(zone->uz_bucket_size);
 	if (ubz->ubz_zone == zone && (ubz + 1)->ubz_entries != 0)
@@ -5119,9 +5118,10 @@ DB_SHOW_COMMAND(umacache, db_show_umacache)
 #endif	/* DDB */
 // CHERI CHANGES START
 // {
-//   "updated": 20200123,
+//   "updated": 20200127,
 //   "target_type": "kernel",
 //   "changes_purecap": [
+//     "pointer_bit_flags",
 //     "uintptr_interp_offset",
 //     "pointer_shape",
 //     "pointer_as_integer",

@@ -361,7 +361,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #endif
 #define __runtime_assert_sensible_low_bits(bits)                               \
   __extension__({                                                              \
-    _cheri_bits_assert(bits < 32 && "Should only use the low 5 pointer bits"); \
+    _cheri_bits_assert((bits) < 32 && "Should only use the low 5 pointer bits"); \
     bits;                                                                      \
   })
 #else
@@ -369,7 +369,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
 #endif
 #define __static_assert_sensible_low_bits(bits)                                \
   __extension__({                                                              \
-    _Static_assert(bits < 32, "Should only use the low 5 pointer bits");       \
+    _Static_assert((bits) < 32, "Should only use the low 5 pointer bits");     \
     bits;                                                                      \
   })
 
@@ -430,7 +430,7 @@ __cheri_clear_low_ptr_bits(uintptr_t ptr, size_t bits_mask) {
  *
  */
 #define cheri_clear_low_ptr_bits(ptr, mask)                                    \
-  __cheri_clear_low_ptr_bits((uintptr_t)(ptr), __static_assert_sensible_low_bits(mask))
+  __cheri_clear_low_ptr_bits((uintptr_t)(ptr), __runtime_assert_sensible_low_bits(mask))
 
 #if __has_feature(capabilities) || defined(__CHERI__)
 #include <machine/cheric.h>

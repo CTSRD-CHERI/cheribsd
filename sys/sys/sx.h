@@ -36,12 +36,12 @@
 
 #include <sys/_lock.h>
 #include <sys/_sx.h>
+#include <cheri/cheric.h>
 
 #ifdef	_KERNEL
 #include <sys/pcpu.h>
 #include <sys/lock_profile.h>
 #include <sys/lockstat.h>
-#include <sys/ptrbits.h>
 #include <machine/atomic.h>
 #endif
 
@@ -78,10 +78,10 @@
 	SX_LOCK_EXCLUSIVE_WAITERS | SX_LOCK_RECURSED | SX_LOCK_WRITE_SPINNER)
 #define	SX_LOCK_WAITERS			(SX_LOCK_SHARED_WAITERS | SX_LOCK_EXCLUSIVE_WAITERS)
 
-#define	SX_OWNER(x)		(ptr_clear_flag(x, SX_LOCK_FLAGMASK))
+#define	SX_OWNER(x)		(cheri_clear_low_ptr_bits(x, SX_LOCK_FLAGMASK))
 #define	SX_SHARERS_SHIFT	5
 #define	SX_SHARERS(x)							\
-	(ptr_get_flag(x, ~SX_LOCK_FLAGMASK) >> SX_SHARERS_SHIFT)
+	(cheri_get_low_ptr_bits(x, ~SX_LOCK_FLAGMASK) >> SX_SHARERS_SHIFT)
 #define	SX_SHARERS_LOCK(x)	((x) << SX_SHARERS_SHIFT | SX_LOCK_SHARED)
 #define	SX_ONE_SHARER		(1 << SX_SHARERS_SHIFT)
 
@@ -96,7 +96,8 @@
 #define	SX_READ_VALUE(sx)	((sx)->sx_lock)
 
 #define	lv_sx_owner(v)							\
-	(ptr_get_flag(v, SX_LOCK_SHARED) ? NULL : (struct thread *)SX_OWNER(v))
+	(cheri_get_low_ptr_bits(v, SX_LOCK_SHARED) ?			\
+	    NULL : (struct thread *)SX_OWNER(v))
 
 /*
  * Function prototipes.  Routines that start with an underscore are not part
@@ -247,12 +248,12 @@ __sx_xunlock(struct sx *sx, struct thread *td, const char *file, int line)
  * locked.
  */
 #define	sx_xholder(sx)							\
-	(ptr_get_flag((sx)->sx_lock, SX_LOCK_SHARED) ? NULL :		\
+	(cheri_get_low_ptr_bits((sx)->sx_lock, SX_LOCK_SHARED) ? NULL :	\
 	(struct thread *)SX_OWNER((sx)->sx_lock))
 
 #define	sx_xlocked(sx)							\
-	(ptr_clear_flag((sx)->sx_lock, (SX_LOCK_FLAGMASK & ~SX_LOCK_SHARED)) == \
-	    (uintptr_t)curthread)
+	(cheri_clear_low_ptr_bits((sx)->sx_lock,			\
+	(SX_LOCK_FLAGMASK & ~SX_LOCK_SHARED)) == (uintptr_t)curthread)
 
 #define	sx_unlock_(sx, file, line) do {					\
 	if (sx_xlocked(sx))						\
@@ -304,7 +305,7 @@ __sx_xunlock(struct sx *sx, struct thread *td, const char *file, int line)
 #endif /* !_SYS_SX_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180823,
+//   "updated": 20200127,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_bit_flags"

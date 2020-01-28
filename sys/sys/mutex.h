@@ -42,7 +42,7 @@
 #include <sys/pcpu.h>
 #include <sys/lock_profile.h>
 #include <sys/lockstat.h>
-#include <sys/ptrbits.h>
+#include <cheri/cheric.h>
 #include <machine/atomic.h>
 #include <machine/cpufunc.h>
 
@@ -468,7 +468,8 @@ extern struct mtx_pool *mtxpool_sleep;
 
 #define	mtx_initialized(m)	lock_initialized(&(m)->lock_object)
 
-#define lv_mtx_owner(v)	((struct thread *)ptr_clear_flag(v, MTX_FLAGMASK))
+#define lv_mtx_owner(v)							\
+	((struct thread *)cheri_clear_low_ptr_bits(v, MTX_FLAGMASK))
 
 #define mtx_owner(m)	lv_mtx_owner(MTX_READ_VALUE(m))
 
@@ -557,7 +558,7 @@ struct mtx_args {
 #endif	/* _SYS_MUTEX_H_ */
 // CHERI CHANGES START
 // {
-//   "updated": 20180809,
+//   "updated": 20200127,
 //   "target_type": "header",
 //   "changes_purecap": [
 //     "pointer_bit_flags"
