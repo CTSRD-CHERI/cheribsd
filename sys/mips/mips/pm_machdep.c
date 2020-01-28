@@ -817,7 +817,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		 */
 		if (imgp->reloc_base) {
 			vaddr_t rtld_base = imgp->reloc_base;
-			vaddr_t rtld_end = imgp->interp_end;
+			vaddr_t rtld_end = imgp->interp_end ? imgp->interp_end : imgp->end_addr;
 			vaddr_t rtld_len = rtld_end - rtld_base;
 			rtld_base = CHERI_REPRESENTABLE_BASE(rtld_base,
 			    rtld_len);
