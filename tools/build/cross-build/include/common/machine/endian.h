@@ -33,5 +33,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#pragma once
-#include <sys/ioctl.h>
+#if __has_include_next(<machine/endian.h>)
+#include_next <machine/endian.h>
+#endif
