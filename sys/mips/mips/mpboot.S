@@ -32,7 +32,7 @@
 
 #if defined(CPU_CHERI)
 #include <machine/cheriasm.h>
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 .set cheri_sysregs_accessible	# Don't warn about uses of c27-c30
 #endif
 

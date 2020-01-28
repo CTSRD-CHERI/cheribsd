@@ -12,6 +12,10 @@ __<${_this:T}>__:
 .include <bsd.compat.mk>
 
 # Yes, the flags are redundant.
+LIBCOMPAT_COMPILERS= \
+		CC="${XCC} ${LIBCOMPATCFLAGS}" \
+		CXX="${XCXX} ${LIBCOMPATCXXFLAGS} ${LIBCOMPATCFLAGS}" \
+		CPP="${XCPP} ${LIBCOMPATCFLAGS}"
 LIBCOMPATWMAKEENV+= \
 		INSTALL="sh ${.CURDIR}/tools/install.sh" \
 		PATH=${TMPPATH} \
@@ -23,9 +27,8 @@ LIBCOMPATWMAKEENV+= \
 # Don't rebuild build-tools targets during normal build.
 LIBCOMPATWMAKEENV+=	BUILD_TOOLS_META=.NOMETA
 .endif
-LIBCOMPATWMAKEFLAGS+= CC="${XCC} ${LIBCOMPATCFLAGS}" \
-		CXX="${XCXX} ${LIBCOMPATCXXFLAGS} ${LIBCOMPATCFLAGS}" \
-		CPP="${XCPP} ${LIBCOMPATCFLAGS}" \
+LIBCOMPATWMAKEFLAGS+= \
+		${LIBCOMPAT_COMPILERS} \
 		DESTDIR=${WORLDTMP} \
 		-DNO_CPU_CFLAGS \
 		MK_CTF=no \
@@ -124,5 +127,20 @@ distribute${libcompat} install${libcompat}: .PHONY
 .for _dir in ${_LC_LIBDIRS.yes}
 	${_+_}cd ${.CURDIR}/${_dir}; ${LIBCOMPATIMAKE} ${.TARGET:S/${libcompat}$//}
 .endfor
+
+.if ${.TARGETS:Mlib${libcompat}buildenv}
+.if ${.MAKEFLAGS:M-j}
+.error The lib${libcompat}buildenv target is incompatible with -j
+.endif
+BUILDENV_DIR?=  ${.CURDIR}
+lib${libcompat}buildenv: .PHONY
+	@echo "Entering world for lib${libcompat} on ${TARGET_ARCH}:${TARGET}"
+.if ${BUILDENV_SHELL:M*zsh*}
+	@echo For ZSH you must run: export CPUTYPE=${TARGET_CPUTYPE}
+.endif
+	@cd ${BUILDENV_DIR} && \
+	    env ${LIBCOMPATWMAKEENV} ${LIBCOMPAT_COMPILERS} BUILDENV=1 \
+	    ${BUILDENV_SHELL} || true
+.endif
 
 .endif # !targets(__<${_this:T}>__)

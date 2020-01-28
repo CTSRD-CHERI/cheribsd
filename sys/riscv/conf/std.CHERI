@@ -1,0 +1,6 @@
+makeoptions	CPUTYPE=cheri
+options 	CPU_CHERI
+options 	COMPAT_FREEBSD64
+
+# DTrace doesn't work with CHERI yet
+nooptions 	KDTRACE_HOOKS		# Kernel DTrace hooks

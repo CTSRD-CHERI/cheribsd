@@ -33,6 +33,7 @@
  * SUCH DAMAGE.
  */
 
+#define EXPLICIT_USER_ACCESS
 #include "opt_platform.h"
 
 #include <sys/cdefs.h>
@@ -98,6 +99,9 @@ __FBSDID("$FreeBSD$");
 #include <dev/fdt/fdt_common.h>
 #include <dev/ofw/openfirm.h>
 #endif
+
+static void get_fpcontext(struct thread *td, mcontext_t *mcp);
+static void set_fpcontext(struct thread *td, mcontext_t *mcp);
 
 struct pcpu __pcpu[MAXCPU];
 
@@ -272,6 +276,22 @@ set_dbregs(struct thread *td, struct dbreg *regs)
 	panic("set_dbregs");
 }
 
+#if __has_feature(capabilities)
+int
+fill_capregs(struct thread *td, struct capreg *regs)
+{
+
+	panic("fill_capregs");
+}
+
+int
+set_capregs(struct thread *td, struct capreg *regs)
+{
+
+	return (EOPNOTSUPP);
+}
+#endif
+
 int
 ptrace_set_pc(struct thread *td, u_long addr)
 {
@@ -296,8 +316,9 @@ ptrace_clear_single_step(struct thread *td)
 	return (EOPNOTSUPP);
 }
 
+/* XXX: CHERI TODO: Set cap registers. */
 void
-exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
+exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 {
 	struct trapframe *tf;
 	struct pcb *pcb;
@@ -307,8 +328,8 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 
 	memset(tf, 0, sizeof(struct trapframe));
 
-	tf->tf_a[0] = stack;
-	tf->tf_sp = STACKALIGN(stack);
+	tf->tf_a[0] = (__cheri_addr uintptr_t)stack;
+	tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack);
 	tf->tf_ra = imgp->entry_addr;
 	tf->tf_sepc = imgp->entry_addr;
 
@@ -352,6 +373,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 	mcp->mc_gpregs.gp_tp = tf->tf_tp;
 	mcp->mc_gpregs.gp_sepc = tf->tf_sepc;
 	mcp->mc_gpregs.gp_sstatus = tf->tf_sstatus;
+	get_fpcontext(td, mcp);
 
 	return (0);
 }
@@ -363,6 +385,14 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 
 	tf = td->td_frame;
 
+	/*
+	 * Make sure the processor mode has not been tampered with and
+	 * interrupts have not been disabled.
+	 * Supervisor interrupts in user mode are always enabled.
+	 */
+	if ((mcp->mc_gpregs.gp_sstatus & SSTATUS_SPP) != 0)
+		return (EINVAL);
+
 	memcpy(tf->tf_t, mcp->mc_gpregs.gp_t, sizeof(tf->tf_t));
 	memcpy(tf->tf_s, mcp->mc_gpregs.gp_s, sizeof(tf->tf_s));
 	memcpy(tf->tf_a, mcp->mc_gpregs.gp_a, sizeof(tf->tf_a));
@@ -372,6 +402,7 @@ set_mcontext(struct thread *td, mcontext_t *mcp)
 	tf->tf_gp = mcp->mc_gpregs.gp_gp;
 	tf->tf_sepc = mcp->mc_gpregs.gp_sepc;
 	tf->tf_sstatus = mcp->mc_gpregs.gp_sstatus;
+	set_fpcontext(td, mcp);
 
 	return (0);
 }
@@ -518,29 +549,15 @@ struct sigreturn_args {
 int
 sys_sigreturn(struct thread *td, struct sigreturn_args *uap)
 {
-	uint64_t sstatus;
 	ucontext_t uc;
 	int error;
 
-	if (uap == NULL)
-		return (EFAULT);
 	if (copyin(uap->sigcntxp, &uc, sizeof(uc)))
 		return (EFAULT);
-
-	/*
-	 * Make sure the processor mode has not been tampered with and
-	 * interrupts have not been disabled.
-	 * Supervisor interrupts in user mode are always enabled.
-	 */
-	sstatus = uc.uc_mcontext.mc_gpregs.gp_sstatus;
-	if ((sstatus & SSTATUS_SPP) != 0)
-		return (EINVAL);
 
 	error = set_mcontext(td, &uc.uc_mcontext);
 	if (error != 0)
 		return (error);
-
-	set_fpcontext(td, &uc.uc_mcontext);
 
 	/* Restore signal mask. */
 	kern_sigprocmask(td, SIG_SETMASK, &uc.uc_sigmask, NULL, 0);
@@ -570,6 +587,7 @@ makectx(struct trapframe *tf, struct pcb *pcb)
 	pcb->pcb_sepc = tf->tf_sepc;
 }
 
+/* XXX: CHERI TODO: Update for capability registers. */
 void
 sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 {
@@ -599,7 +617,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Allocate and validate space for the signal handler context. */
 	if ((td->td_pflags & TDP_ALTSTACK) != 0 && !onstack &&
 	    SIGISMEMBER(psp->ps_sigonstack, sig)) {
-		fp = (struct sigframe *)((uintptr_t)td->td_sigstk.ss_sp +
+		fp = (struct sigframe *)((__cheri_addr uintptr_t)td->td_sigstk.ss_sp +
 		    td->td_sigstk.ss_size);
 	} else {
 		fp = (struct sigframe *)td->td_frame->tf_sp;
@@ -612,7 +630,6 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	/* Fill in the frame to copy out */
 	bzero(&frame, sizeof(frame));
 	get_mcontext(td, &frame.sf_uc.uc_mcontext, 0);
-	get_fpcontext(td, &frame.sf_uc.uc_mcontext);
 	frame.sf_si = ksi->ksi_info;
 	frame.sf_uc.uc_sigmask = *mask;
 	frame.sf_uc.uc_stack = td->td_sigstk;
@@ -622,7 +639,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	PROC_UNLOCK(td->td_proc);
 
 	/* Copy the sigframe out to the user's stack. */
-	if (copyout(&frame, fp, sizeof(*fp)) != 0) {
+	if (copyout(&frame, __USER_CAP_OBJ(fp), sizeof(*fp)) != 0) {
 		/* Process has trashed its stack. Kill it. */
 		CTR2(KTR_SIG, "sendsig: sigexit td=%p fp=%p", td, fp);
 		PROC_LOCK(p);
@@ -633,7 +650,7 @@ sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_a[1] = (register_t)&fp->sf_si;
 	tf->tf_a[2] = (register_t)&fp->sf_uc;
 
-	tf->tf_sepc = (register_t)catcher;
+	tf->tf_sepc = (__cheri_offset register_t)catcher;
 	tf->tf_sp = (register_t)fp;
 
 	sysent = p->p_sysent;

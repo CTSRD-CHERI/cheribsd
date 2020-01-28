@@ -24,7 +24,7 @@ M make (Init vals)
 {
     M ret;
     for (int v : vals)
-        ret.insert(typename M::value_type(v, v + 10));
+        ret.emplace(static_cast<typename M::key_type>(v), static_cast<typename M::mapped_type>(v + 10));
     return ret;
 }
 
@@ -48,7 +48,7 @@ void test()
     auto is4 = [](auto v) { return v.first == 4;};
     auto True  = [](auto) { return true; };
     auto False = [](auto) { return false; };
-    
+
     test0<S>({}, is1, {});
 
     test0<S>({1}, is1, {});
@@ -73,7 +73,7 @@ void test()
     test0<S>({1,2,2}, is1, {2,2});
     test0<S>({1,2,2}, is2, {1});
     test0<S>({1,2,2}, is3, {1,2,2});
-    
+
     test0<S>({1,2,3}, True,  {});
     test0<S>({1,2,3}, False, {1,2,3});
 }

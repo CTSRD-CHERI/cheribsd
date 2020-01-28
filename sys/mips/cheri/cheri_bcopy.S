@@ -40,7 +40,7 @@
 
 #ifdef CPU_CHERI
 #include <machine/cheriasm.h>
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 #endif
 
 #include "assym.inc"

@@ -58,6 +58,10 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_param.h>
 #include <vm/vm_extern.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #ifdef FPE
 #include <machine/fpe.h>
 #endif
@@ -80,6 +84,7 @@ extern register_t fsu_intr_fault;
 void do_trap_supervisor(struct trapframe *);
 void do_trap_user(struct trapframe *);
 
+/* XXX: CHERI TODO: Make 'addr' a capability. */
 static __inline void
 call_trapsignal(struct thread *td, int sig, int code, void *addr)
 {
@@ -88,7 +93,7 @@ call_trapsignal(struct thread *td, int sig, int code, void *addr)
 	ksiginfo_init_trap(&ksi);
 	ksi.ksi_signo = sig;
 	ksi.ksi_code = code;
-	ksi.ksi_addr = addr;
+	ksi.ksi_addr = (void * __capability)(uintcap_t)(uintptr_t)addr;
 	trapsignal(td, &ksi);
 }
 
@@ -98,7 +103,7 @@ cpu_fetch_syscall_args(struct thread *td)
 	struct proc *p;
 	register_t *ap;
 	struct syscall_args *sa;
-	int nap;
+	int i, nap;
 
 	nap = NARGREG;
 	p = td->td_proc;
@@ -118,7 +123,8 @@ cpu_fetch_syscall_args(struct thread *td)
 		sa->callp = &p->p_sysent->sv_table[sa->code];
 
 	sa->narg = sa->callp->sy_narg;
-	memcpy(sa->args, ap, nap * sizeof(register_t));
+	for (i = 0; i < nap; i++)
+		sa->args[i] = ap[i];
 	if (sa->narg > nap)
 		panic("TODO: Could we have more then %d args?", NARGREG);
 
@@ -246,6 +252,9 @@ do_trap_supervisor(struct trapframe *frame)
 {
 	uint64_t exception;
 	uint64_t sstatus;
+#if __has_feature(capabilities)
+	uint64_t sccsr;
+#endif
 
 	/* Ensure we came from supervisor mode, interrupts disabled */
 	__asm __volatile("csrr %0, sstatus" : "=&r" (sstatus));
@@ -293,6 +302,15 @@ do_trap_supervisor(struct trapframe *frame)
 		dump_regs(frame);
 		panic("Illegal instruction at 0x%016lx\n", frame->tf_sepc);
 		break;
+#if __has_feature(capabilities)
+	case EXCP_CHERI:
+		dump_regs(frame);
+		sccsr = csr_read(sccsr);
+		panic("CHERI exception %#x at 0x%016lx\n",
+		    (sccsr & SCCSR_CAUSE_MASK) >> SCCSR_CAUSE_SHIFT,
+		    frame->tf_sepc);
+		break;
+#endif
 	default:
 		dump_regs(frame);
 		panic("Unknown kernel exception %x trap value %lx\n",
@@ -361,6 +379,14 @@ do_trap_user(struct trapframe *frame)
 		call_trapsignal(td, SIGTRAP, TRAP_BRKPT, (void *)frame->tf_sepc);
 		userret(td, frame);
 		break;
+#if __has_feature(capabilities)
+	case EXCP_CHERI:
+		call_trapsignal(td, SIGPROT,
+		    cheri_sccsr_to_sicode(csr_read(sccsr)),
+		    (void *)frame->tf_sepc);
+		userret(td, frame);
+		break;
+#endif
 	default:
 		dump_regs(frame);
 		panic("Unknown userland exception %x, trap value %lx\n",

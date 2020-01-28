@@ -97,7 +97,7 @@ __FBSDID("$FreeBSD$");
 #endif
 
 #if __has_feature(capabilities)
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 #endif
 
 #include <ddb/ddb.h>

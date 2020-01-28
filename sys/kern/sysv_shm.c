@@ -97,8 +97,11 @@ __FBSDID("$FreeBSD$");
 #include <sys/sysproto.h>
 #include <sys/jail.h>
 
-#ifdef COMPAT_CHERIABI
+#if __has_feature(capabilities)
 #include <cheri/cheric.h>
+#endif
+
+#ifdef COMPAT_CHERIABI
 #include <sys/user.h>
 #include <compat/cheriabi/cheriabi_proto.h>
 #include <compat/cheriabi/cheriabi_syscall.h>
@@ -544,7 +547,7 @@ kern_shmat_locked(struct thread *td, int shmid,
 			find_space = CHERI_REPRESENTABLE_ALIGNMENT(size) < (1UL << 12) ?
 			    VMFS_OPTIMAL_SPACE :
 			    VMFS_ALIGNED_SPACE(CHERI_ALIGN_SHIFT(size));
-			shmaddr = td->td_md.md_cheri_mmap_cap;
+			shmaddr = td->td_cheri_mmap_cap;
 			attach_va = cheri_getbase(shmaddr);
 		} else
 #endif

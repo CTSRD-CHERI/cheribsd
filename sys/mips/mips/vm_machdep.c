@@ -168,9 +168,8 @@ cpu_fork(struct thread *td1, struct proc *p2, struct thread *td2, int flags)
 	td2->td_md.md_tls_tcb_offset = td1->td_md.md_tls_tcb_offset;
 	td2->td_md.md_saved_intr = MIPS_SR_INT_IE;
 	td2->td_md.md_spinlock_count = 1;
-#if __has_feature(capabilities)
-	td2->td_md.md_cheri_mmap_cap = td1->td_md.md_cheri_mmap_cap;
 
+#if __has_feature(capabilities)
 	/*
 	 * XXXRW: Ensure capability coprocessor is enabled for the
 	 * kernel.  in child.  It should already be enabled for
@@ -485,9 +484,6 @@ cpu_copy_thread(struct thread *td, struct thread *td0)
 	/* Setup to release spin count in in fork_exit(). */
 	td->td_md.md_spinlock_count = 1;
 	td->td_md.md_saved_intr = MIPS_SR_INT_IE;
-#if __has_feature(capabilities)
-	td->td_md.md_cheri_mmap_cap = td0->td_md.md_cheri_mmap_cap;
-#endif
 #if 0
 	    /* Maybe we need to fix this? */
 	td->td_md.md_saved_sr = ( (MIPS_SR_COP_2_BIT | MIPS_SR_COP_0_BIT) |

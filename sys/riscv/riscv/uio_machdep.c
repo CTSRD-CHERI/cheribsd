@@ -35,6 +35,7 @@
  *	@(#)kern_subr.c	8.3 (Berkeley) 1/21/94
  */
 
+#define	EXPLICIT_USER_ACCESS
 #include <sys/cdefs.h>
 __FBSDID("$FreeBSD$");
 
@@ -103,9 +104,11 @@ uiomove_fromphys(vm_page_t ma[], vm_offset_t offset, int n, struct uio *uio)
 			break;
 		case UIO_SYSSPACE:
 			if (uio->uio_rw == UIO_READ)
-				bcopy(cp, iov->iov_base, cnt);
+				bcopy(cp, (__cheri_fromcap void *)iov->iov_base,
+				    cnt);
 			else
-				bcopy(iov->iov_base, cp, cnt);
+				bcopy((__cheri_fromcap void *)iov->iov_base, cp,
+				    cnt);
 			break;
 		case UIO_NOCOPY:
 			break;

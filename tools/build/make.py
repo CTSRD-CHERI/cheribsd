@@ -61,6 +61,7 @@ def bootstrap_bmake(source_root, objdir_prefix):
 
     if (bmake_install_dir / "bin/bmake").exists():
         return bmake_binary
+    print("Bootstrapping bmake...")
     # TODO: check if the host system bmake is new enough and use that instead
     if not bmake_build_dir.exists():
         os.makedirs(str(bmake_build_dir))
@@ -83,6 +84,7 @@ def bootstrap_bmake(source_root, objdir_prefix):
 
     run(["sh", bmake_source_dir / "boot-strap", "op=install"] + configure_args,
         cwd=str(bmake_build_dir))
+    print("Finished bootstrapping bmake...")
     return bmake_binary
 
 

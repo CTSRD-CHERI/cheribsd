@@ -132,11 +132,18 @@ static int abandon_on_munmap = 1;
 SYSCTL_INT(_debug, OID_AUTO, abandon_on_munmap, CTLFLAG_RWTUN, &abandon_on_munmap, 0,
     "Add abandoned vm entries on munmap(2)");
 #if __has_feature(capabilities)
-SYSCTL_DECL(_compat_cheriabi_mmap);
+SYSCTL_DECL(_security_cheri);
+SYSCTL_NODE(_security_cheri, OID_AUTO, mmap, CTLFLAG_RW, 0, "mmap");
 static int cheriabi_mmap_precise_bounds = 1;
-SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
+SYSCTL_INT(_security_cheri_mmap, OID_AUTO, precise_bounds,
     CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
     "Require that bounds on returned capabilities be precise.");
+#ifdef COMPAT_CHERIABI
+SYSCTL_DECL(_compat_cheriabi_mmap);
+SYSCTL_INT(_compat_cheriabi_mmap, OID_AUTO, precise_bounds,
+     CTLFLAG_RWTUN, &cheriabi_mmap_precise_bounds, 0,
+     "Require that bounds on returned capabilities be precise.");
+#endif
 #endif
 
 #ifdef MAP_32BIT
@@ -379,10 +386,10 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		}
 
 		/* Allocate from the per-thread capability. */
-		source_cap = td->td_md.md_cheri_mmap_cap;
+		source_cap = td->td_cheri_mmap_cap;
 	}
 	KASSERT(cheri_gettag(source_cap),
-	    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+	    ("td->td_cheri_mmap_cap is untagged!"));
 
 	/*
 	 * If MAP_FIXED is specified, make sure that that the reqested
@@ -428,7 +435,7 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 	case MAP_ALIGNED_CHERI_SEAL:
 		break;
 	case MAP_ALIGNED_SUPER:
-#ifdef __mips_n64
+#if VM_NRESERVLEVEL > 0
 		/*
 		 * pmap_align_superpage() is a no-op for allocations
 		 * less than a super page so request data alignment
@@ -437,13 +444,11 @@ sys_mmap(struct thread *td, struct mmap_args *uap)
 		 * In practice this is a no-op as super-pages are
 		 * precisely representable.
 		 */
-		if (uap->len < PDRSIZE &&
+		if (uap->len < (1UL << (VM_LEVEL_0_ORDER + PAGE_SHIFT)) &&
 		    CHERI_REPRESENTABLE_ALIGNMENT(uap->len) > (1UL << PAGE_SHIFT)) {
 			flags &= ~MAP_ALIGNMENT_MASK;
 			flags |= MAP_ALIGNED_CHERI;
 		}
-#else
-#error	MAP_ALIGNED_SUPER handling unimplemented for this architecture
 #endif
 		break;
 	default:

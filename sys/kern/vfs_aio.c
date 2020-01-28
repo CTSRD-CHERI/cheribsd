@@ -1462,11 +1462,7 @@ aiocb_store_aiocb(struct aiocb ** __capability ujobp, struct kaiocb *kjob)
 	else
 		memcpy(&ujob, &kjob->ujobptr, sizeof(intcap_t));
 
-#if __has_feature(capabilities)
-	return (copyoutcap(&ujob, ujobp, sizeof(ujob)) == 0 ? 0 : -1);
-#else
-	return (suword(ujobp, ujob));
-#endif
+	return (sucap(ujobp, ujob));
 }
 
 static size_t
@@ -3581,8 +3577,6 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 #ifdef COMPAT_CHERIABI
 #include <sys/user.h>
 
-#include <machine/cherireg.h>
-
 #include <cheri/cheric.h>
 
 #include <compat/cheriabi/cheriabi.h>
@@ -3669,7 +3663,7 @@ aiocb_c_store_aiocb(struct aiocb ** __capability ujobp, struct kaiocb *kjob)
 	else
 		cheri_memcpy(&ujob, &kjob->ujobptr, sizeof(__intcap_t));
 
-	return (copyoutcap(&ujob, ujobp, sizeof(intcap_t)));
+	return (sucap(ujobp, ujob));
 }
 
 static size_t

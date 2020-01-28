@@ -33,7 +33,7 @@
 #.set nobopt
 .set noat
 
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 
 #include "libcheri_class.h"
 #include "libcheri_system_md.h"

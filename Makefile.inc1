@@ -108,12 +108,12 @@ _TOOLCHAIN_VARS_SHOULD_BE_SET=
 # Pull in COMPILER_TYPE and COMPILER_FREEBSD_VERSION early. Pull it from the
 # tree to be friendlier to foreign OS builds. It's safe to do so unconditionally
 # here since we will always have the right make, unlike in src/Makefile
-#XXXXX# Don't include bsd.linker.mk yet until XBINUTILS is handled (after src.opts.mk)
-#XXXXX_NO_INCLUDE_LINKERMK=	t
+# Don't include bsd.linker.mk yet until XBINUTILS is handled (after src.opts.mk)
+_NO_INCLUDE_LINKERMK=	t
 # We also want the X_COMPILER* variables if we are using an external toolchain.
 _WANT_TOOLCHAIN_CROSS_VARS=	t
 .include "share/mk/bsd.compiler.mk"
-#XXXXX.undef _NO_INCLUDE_LINKERMK
+.undef _NO_INCLUDE_LINKERMK
 .undef _WANT_TOOLCHAIN_CROSS_VARS
 # src.opts.mk depends on COMPILER_FEATURES
 .include "share/mk/src.opts.mk"
@@ -155,10 +155,10 @@ TARGET_ABI=	gnueabi
 .endif
 .endif
 MACHINE_ABI?=	unknown
-MACHINE_MACHINE=${MACHINE_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/cheri/}
+MACHINE_MACHINE=${MACHINE_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/cheri/:S/riscv64c/riscv64/}
 MACHINE_TRIPLE?=${MACHINE_MACHINE}-${MACHINE_ABI}-freebsd13.0
 TARGET_ABI?=	unknown
-TARGET_MACHINE=	${TARGET_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/cheri/}
+TARGET_MACHINE=	${TARGET_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mips.*c.*/cheri/:S/riscv64c/riscv64/}
 TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd13.0
 KNOWN_ARCHES?=	aarch64/arm64 \
 		amd64 \
@@ -182,6 +182,8 @@ KNOWN_ARCHES?=	aarch64/arm64 \
 		powerpcspe/powerpc \
 		riscv64/riscv \
 		riscv64sf/riscv \
+		riscv64c/riscv \
+		riscv64sfc/riscv \
 		sparc64
 
 .if ${TARGET} == ${TARGET_ARCH}

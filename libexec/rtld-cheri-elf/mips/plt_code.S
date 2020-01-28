@@ -1,5 +1,5 @@
 #include <machine/asm.h>
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 
 .set noreorder
 .set noat

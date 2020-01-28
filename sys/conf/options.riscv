@@ -3,3 +3,5 @@
 RISCV				opt_global.h
 FPE				opt_global.h
 INTRNG				opt_global.h
+
+COMPAT_FREEBSD64	opt_global.h

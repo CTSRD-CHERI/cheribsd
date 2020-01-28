@@ -1036,3 +1036,11 @@ AMDSBWD_DEBUG	opt_amdsbwd.h
 # gcov support
 GCOV		opt_global.h
 LINDEBUGFS
+
+# CHERI
+CPU_CHERI	opt_global.h
+
+#
+# Disable system-call authorisation for compartmentalised user code.
+#
+CPU_CHERI_NO_SYSCALL_AUTHORIZE opt_global.h

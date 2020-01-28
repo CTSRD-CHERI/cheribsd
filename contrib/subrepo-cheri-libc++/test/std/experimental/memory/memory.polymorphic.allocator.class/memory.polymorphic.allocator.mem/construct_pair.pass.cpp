@@ -22,7 +22,7 @@
 #include <tuple>
 #include <cassert>
 #include <cstdlib>
-#include "uses_alloc_types.hpp"
+#include "uses_alloc_types.h"
 
 #include "test_macros.h"
 

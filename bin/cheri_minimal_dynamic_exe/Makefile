@@ -10,6 +10,9 @@ CFLAGS+=	-I${SRCTOP}/lib/libsimple_printf -DSIMPLE_PRINTF_PREFIX=simple
 LDADD+=		-lsimple_printf -nodefaultlibs
 
 SRCS=	main.c
+# The compiler generates a call to memset() for a 160-byte write in crt1.c
+.PATH: ${SRCTOP}/lib/libc/string
+SRCS+=	memset.c
 
 # For now avoid linking against libsyscalls since it crashes
 USE_LIBSYSCALLS?=yes

@@ -134,18 +134,16 @@ LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
 .if ${COMPAT_ARCH:Mmips*el*}
 .error No little endian CHERI
 .endif
-HAS_COMPAT=CHERI
+HAS_COMPAT+=CHERI
 LIBCHERICFLAGS=		-DCOMPAT_CHERI
 LIBCHERICPUFLAGS=  -target cheri-unknown-freebsd13.0 -mabi=purecap
 LIBCHERI_MACHINE=	mips
 LIBCHERI_MACHINE_ARCH=	mips64c128
 LIBCHERIWMAKEFLAGS=	LIBCHERI=yes
 # Forward the cross linker and binutils
-LIBCHERIWMAKEFLAGS+=	LD="${XLD}"
 .for BINUTIL in ${XBINUTILS}
 LIBCHERIWMAKEFLAGS+=	${BINUTIL}="${X${BINUTIL}}"
 .endfor
-.info "LIBCHERIWMAKEFLAGS=${LIBCHERIWMAKEFLAGS}"
 .endif
 
 # -------------------------------------------------------------------
@@ -166,7 +164,7 @@ LIBSOFTWMAKEFLAGS=        -DCOMPAT_SOFTFP
 .ifndef HAS_COMPAT
 .warning NEED_COMPAT defined, but no LIBCOMPAT is available (COMPAT_ARCH == ${COMPAT_ARCH}
 .elif !${HAS_COMPAT:M${NEED_COMPAT}} && ${NEED_COMPAT} != "any"
-.error NEED_COMPAT (${NEED_COMPAT}) defined, but not in HAS_COMPAT ($HAS_COMPAT)
+.error NEED_COMPAT (${NEED_COMPAT}) defined, but not in HAS_COMPAT (${HAS_COMPAT})
 .elif ${NEED_COMPAT} == "any"
 .endif
 .ifdef WANT_COMPAT
