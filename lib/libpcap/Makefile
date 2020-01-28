@@ -46,6 +46,7 @@ PCAPINCS= \
 	pcap/nflog.h \
 	pcap/pcap-inttypes.h \
 	pcap/pcap.h \
+	pcap/socket.h \
 	pcap/sll.h \
 	pcap/usb.h \
 	pcap/vlan.h
@@ -93,9 +94,7 @@ MAN=	pcap.3 \
 	pcap_open_offline.3 \
 	pcap_set_buffer_size.3 \
 	pcap_set_datalink.3 \
-	pcap_set_immediate_mode.3 \
 	pcap_set_promisc.3 \
-	pcap_set_protocol.3 \
 	pcap_set_rfmon.3 \
 	pcap_set_snaplen.3 \
 	pcap_set_timeout.3 \
@@ -109,7 +108,11 @@ MAN=	pcap.3 \
 	pcap_statustostr.3 \
 	pcap_strerror.3 \
 	pcap_tstamp_type_name_to_val.3 \
-	pcap_tstamp_type_val_to_name.3
+	pcap_tstamp_type_val_to_name.3 \
+	pcap-savefile.5 \
+	pcap-filter.7 \
+	pcap-linktype.7 \
+	pcap-tstamp.7
 
 MLINKS= \
 	pcap_datalink_val_to_name.3 pcap_datalink_val_to_description.3 \
@@ -173,7 +176,7 @@ tokdefs.h: grammar.h .NOMETA
 ${_page}:
 	if [ -f ${PCAP_DISTDIR}/${_page:S/3$/3pcap/} ]; then		\
 		F=${_page:S/3$/3pcap/}; 				\
-	elif [ -f ${PCAP_DISTDIR}/${_page:S/3$/3pcap.in/} ]; then		\
+	elif [ -f ${PCAP_DISTDIR}/${_page:S/3$/3pcap.in/} ]; then	\
 		F=${_page:S/3$/3pcap.in/}; 				\
 	elif [ -f ${PCAP_DISTDIR}/${_page:S/5$/manfile.in/} ]; then	\
 		F=${_page:S/5$/manfile.in/};				\
@@ -182,7 +185,12 @@ ${_page}:
 	else								\
 		F=${_page:S/7$/manmisc.in/};				\
 	fi;								\
-	sed -e 's/3PCAP/3/g' ${PCAP_DISTDIR}/$$F > ${_page}
+	sed \
+		-e 's/3PCAP/3/g' \
+		-e 's/@MAN_FILE_FORMATS@/5/g' \
+		-e 's/@MAN_MISC_INFO@/7/g' \
+		-e 's/@MAN_ADMIN_COMMANDS@/8/g' \
+		${PCAP_DISTDIR}/$$F > ${_page}
 .endfor
 
 .include <bsd.lib.mk>

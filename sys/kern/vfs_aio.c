@@ -256,7 +256,7 @@ struct aioliojob {
 	int	lioj_flags;			/* (a) listio flags */
 	int	lioj_count;			/* (a) listio flags */
 	int	lioj_finished_count;		/* (a) listio flags */
-	ksigevent_t lioj_signal;		/* (a) signal on all I/O done */
+	struct	sigevent lioj_signal;		/* (a) signal on all I/O done */
 	TAILQ_ENTRY(aioliojob) lioj_list;	/* (a) lio list */
 	struct	knlist klist;			/* (a) list of knotes */
 	ksiginfo_t lioj_ksi;			/* (a) Realtime signal info */
@@ -298,7 +298,7 @@ struct kaioinfo {
  * Different ABIs provide their own operations.
  */
 struct aiocb_ops {
-	int	(*aio_copyin)(void * __capability ujob, kaiocb_t *kjob);
+	int	(*aio_copyin)(void * __capability ujob, struct aiocb *kjob);
 	long	(*fetch_status)(void * __capability ujob);
 	long	(*fetch_error)(void * __capability ujob);
 	void	(*free_kaiocb)(struct kaiocb *kjob);
@@ -306,7 +306,7 @@ struct aiocb_ops {
 	int	(*store_error)(void * __capability ujob, long error);
 	int	(*store_kernelinfo)(void * __capability ujob, long jobref);
 	void	(*save_aiocb)(struct kaiocb *kjob, const void *ujobptrp);
-	int	(*store_aiocb)(kaiocb_t ** __capability ujobp,
+	int	(*store_aiocb)(struct aiocb ** __capability ujobp,
 		    struct kaiocb *kjob);
 	size_t	(*size)(void);
 };
@@ -327,7 +327,7 @@ static void	aio_process_sync(struct kaiocb *job);
 static void	aio_process_mlock(struct kaiocb *job);
 static void	aio_schedule_fsync(void *context, int pending);
 static int	aio_newproc(int *);
-static int	aio_aqueue(struct thread *td, kaiocb_t * __capability ujob,
+static int	aio_aqueue(struct thread *td, struct aiocb * __capability ujob,
 		    void *ujobptr, struct aioliojob *lio, int type,
 		    struct aiocb_ops *ops);
 static int	aio_queue_file(struct file *fp, struct kaiocb *job);
@@ -479,7 +479,7 @@ aio_init_aioinfo(struct proc *p)
 }
 
 static int
-aio_sendsig(struct proc *p, ksigevent_t *sigev, ksiginfo_t *ksi)
+aio_sendsig(struct proc *p, struct sigevent *sigev, ksiginfo_t *ksi)
 {
 	struct thread *td;
 	int error;
@@ -746,7 +746,7 @@ aio_fsync_vnode(struct thread *td, struct vnode *vp)
 	}
 	error = VOP_FSYNC(vp, MNT_WAIT, td);
 
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	vn_finished_write(mp);
 drop:
 	return (error);
@@ -765,7 +765,7 @@ aio_process_rw(struct kaiocb *job)
 {
 	struct ucred *td_savedcred;
 	struct thread *td;
-	kaiocb_t *cb;
+	struct aiocb *cb;
 	struct file *fp;
 	struct uio auio;
 	struct iovec aiov;
@@ -871,7 +871,7 @@ aio_process_sync(struct kaiocb *job)
 static void
 aio_process_mlock(struct kaiocb *job)
 {
-	kaiocb_t *cb = &job->uaiocb;
+	struct aiocb *cb = &job->uaiocb;
 	int error;
 
 	KASSERT(job->uaiocb.aio_lio_opcode == LIO_MLOCK,
@@ -1219,7 +1219,7 @@ aio_newproc(int *start)
 static int
 aio_qbio(struct proc *p, struct kaiocb *job)
 {
-	kaiocb_t *cb;
+	struct aiocb *cb;
 	struct file *fp;
 	struct bio *bp;
 	struct buf *pbuf;
@@ -1343,7 +1343,7 @@ unref:
 
 #ifdef COMPAT_FREEBSD6
 static int
-convert_old_sigevent(struct osigevent *osig, ksigevent_t *nsig)
+convert_old_sigevent(struct osigevent *osig, struct sigevent *nsig)
 {
 
 	/*
@@ -1361,7 +1361,7 @@ convert_old_sigevent(struct osigevent *osig, ksigevent_t *nsig)
 		nsig->sigev_notify_kqueue =
 		    osig->__sigev_u.__sigev_notify_kqueue;
 		nsig->sigev_value.sival_ptr =
-		    __USER_CAP_UNBOUND(osig->sigev_value.sival_ptr);
+		    osig->sigev_value.sival_ptr;
 		break;
 	default:
 		return (EINVAL);
@@ -1376,7 +1376,7 @@ aiocb_copyin_old_sigevent(void * __capability ujob, struct aiocb *kjob)
 	int error;
 
 	bzero(kjob, sizeof(struct aiocb));
-	error = copyin(ujob, kjob, sizeof(struct oaiocb));
+	error = copyincap(ujob, kjob, sizeof(struct oaiocb));
 	if (error)
 		return (error);
 	ojob = (struct oaiocb *)kjob;
@@ -1385,35 +1385,15 @@ aiocb_copyin_old_sigevent(void * __capability ujob, struct aiocb *kjob)
 #endif
 
 static int
-aiocb_copyin(void * __capability ujob, kaiocb_t *kjob)
+aiocb_copyin(void * __capability ujob, struct aiocb *kjob)
 {
-#if __has_feature(capabilities)
-	struct aiocb_native	njob;
-	int error;
-
-	error = copyin(ujob, &njob, sizeof(njob));
-	if (error != 0)
-		return (error);
-	kjob->aio_fildes = njob.aio_fildes;
-	kjob->aio_offset = njob.aio_offset;
-	kjob->aio_buf = __USER_CAP(njob.aio_buf, njob.aio_nbytes);
-	kjob->aio_nbytes = njob.aio_nbytes;
-	kjob->aio_lio_opcode = njob.aio_lio_opcode;
-	kjob->aio_reqprio = njob.aio_reqprio;
-	kjob->_aiocb_private.status = njob._aiocb_private.status;
-	kjob->_aiocb_private.error = njob._aiocb_private.error;
-	kjob->_aiocb_private.kernelinfo =
-	    __USER_CAP_UNBOUND(njob._aiocb_private.kernelinfo);
-	return (convert_sigevent(&njob.aio_sigevent, &kjob->aio_sigevent));
-#else
-	return (copyin(ujob, kjob, sizeof(kjob)));
-#endif
+	return (copyincap(ujob, kjob, sizeof(kjob)));
 }
 
 static long
 aiocb_fetch_status(void * __capability ujobp)
 {
-	struct aiocb_native * __capability ujob;
+	struct aiocb * __capability ujob;
 
 	ujob = ujobp;
 	return (fuword(&ujob->_aiocb_private.status));
@@ -1422,7 +1402,7 @@ aiocb_fetch_status(void * __capability ujobp)
 static long
 aiocb_fetch_error(void * __capability ujobp)
 {
-	struct aiocb_native * __capability ujob;
+	struct aiocb * __capability ujob;
 
 	ujob = ujobp;
 	return (fuword(&ujob->_aiocb_private.error));
@@ -1438,7 +1418,7 @@ aiocb_free_kaiocb(struct kaiocb *kjob)
 static int
 aiocb_store_status(void * __capability ujobp, long status)
 {
-	struct aiocb_native * __capability ujob;
+	struct aiocb * __capability ujob;
 
 	ujob = ujobp;
 	return (suword(&ujob->_aiocb_private.status, status));
@@ -1447,7 +1427,7 @@ aiocb_store_status(void * __capability ujobp, long status)
 static int
 aiocb_store_error(void * __capability ujobp, long error)
 {
-	struct aiocb_native * __capability ujob;
+	struct aiocb * __capability ujob;
 
 	ujob = ujobp;
 	return (suword(&ujob->_aiocb_private.error, error));
@@ -1456,7 +1436,7 @@ aiocb_store_error(void * __capability ujobp, long error)
 static int
 aiocb_store_kernelinfo(void * __capability ujobp, long jobref)
 {
-	struct aiocb_native * __capability ujob;
+	struct aiocb * __capability ujob;
 
 	ujob = ujobp;
 	return (suword(&ujob->_aiocb_private.kernelinfo, jobref));
@@ -1469,27 +1449,31 @@ aiocb_save_aiocb(struct kaiocb *kjob, const void *ujobptrp)
 	if (ujobptrp == NULL)
 		memset(&kjob->ujobptr, 0, sizeof(kjob->ujobptr));
 	else
-		memcpy(&kjob->ujobptr, ujobptrp, sizeof(long));
+		memcpy(&kjob->ujobptr, ujobptrp, sizeof(intcap_t));
 }
 
 static int
-aiocb_store_aiocb(kaiocb_t ** __capability ujobp, struct kaiocb *kjob)
+aiocb_store_aiocb(struct aiocb ** __capability ujobp, struct kaiocb *kjob)
 {
-	long ujob;
+	intcap_t ujob;
 
 	if (kjob == NULL)
 		ujob = 0;
 	else
-		memcpy(&ujob, &kjob->ujobptr, sizeof(long));
+		memcpy(&ujob, &kjob->ujobptr, sizeof(intcap_t));
 
+#if __has_feature(capabilities)
+	return (copyoutcap(&ujob, ujobp, sizeof(ujob)) == 0 ? 0 : -1);
+#else
 	return (suword(ujobp, ujob));
+#endif
 }
 
 static size_t
 aiocb_size(void)
 {
 
-	return (sizeof(struct aiocb_native));
+	return (sizeof(struct aiocb));
 }
 
 static struct aiocb_ops aiocb_ops = {
@@ -1525,14 +1509,14 @@ static struct aiocb_ops aiocb_ops_osigevent = {
  * technique is done in this code.
  */
 int
-aio_aqueue(struct thread *td, kaiocb_t * __capability ujob, void *ujobptrp,
+aio_aqueue(struct thread *td, struct aiocb * __capability ujob, void *ujobptrp,
     struct aioliojob *lj, int type, struct aiocb_ops *ops)
 {
 	struct proc *p = td->td_proc;
 	struct file *fp;
 	struct kaiocb *job;
 	struct kaioinfo *ki;
-	kkevent_t kev;
+	struct kevent kev;
 	int opcode;
 	int error;
 	int fd, kqfd;
@@ -1676,17 +1660,7 @@ aio_aqueue(struct thread *td, kaiocb_t * __capability ujob, void *ujobptrp,
 	kev.filter = EVFILT_AIO;
 	kev.flags = EV_ADD | EV_ENABLE | EV_FLAG1 | evflags;
 	kev.data = (intptr_t)job;
-#ifdef COMPAT_FREEBSD32
-	if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
-		kev.udata = __USER_CAP_UNBOUND((void *)(uintptr_t)job->uaiocb.aio_sigevent.sigev_value.sival_ptr32);
-	else
-#endif
-#ifdef COMPAT_CHERIABI
-	if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-		kev.udata = job->uaiocb.aio_sigevent.sigev_value.sival_ptr_c;
-	else
-#endif
-		kev.udata = __USER_CAP_UNBOUND(job->uaiocb.aio_sigevent.sigev_value.sival_ptr_native);
+	kev.udata = job->uaiocb.aio_sigevent.sigev_value.sival_ptr;
 	error = kqfd_register(kqfd, &kev, td, M_WAITOK);
 	if (error)
 		goto aqueue_fail;
@@ -1958,7 +1932,7 @@ sys_aio_return(struct thread *td, struct aio_return_args *uap)
  */
 static int
 kern_aio_suspend(struct thread *td, int njoblist,
-    kaiocb_t * __capability *ujoblist, struct timespec *ts)
+    struct aiocb * __capability *ujoblist, struct timespec *ts)
 {
 	struct proc *p = td->td_proc;
 	struct timeval atv;
@@ -2019,9 +1993,8 @@ int
 sys_aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 {
 	struct timespec ts, *tsp;
-	kaiocb_t * __capability * ujoblist;
-	kaiocb_t **ujoblist_native;
-	int error, i;
+	struct aiocb * __capability * ujoblist;
+	int error;
 
 	if (uap->nent < 0 || uap->nent > max_aio_queue_per_proc)
 		return (EINVAL);
@@ -2035,12 +2008,9 @@ sys_aio_suspend(struct thread *td, struct aio_suspend_args *uap)
 		tsp = NULL;
 
 	ujoblist = malloc(uap->nent * sizeof(ujoblist[0]), M_AIOS, M_WAITOK);
-	ujoblist_native = (kaiocb_t **)ujoblist;
-	error = copyin(uap->aiocbp, ujoblist, uap->nent * sizeof(ujoblist[0]));
+	error = copyincap(uap->aiocbp, ujoblist, uap->nent * sizeof(ujoblist[0]));
 	if (error == 0)
 		error = kern_aio_suspend(td, uap->nent, ujoblist, tsp);
-	for (i = uap->nent - 1; i >= 0; i--)
-		ujoblist[i] = __USER_CAP_OBJ(ujoblist_native[i]);
 	free(ujoblist, M_AIOS);
 	return (error);
 }
@@ -2137,7 +2107,7 @@ sys_aio_cancel(struct thread *td, struct aio_cancel_args *uap)
  * a userland subroutine.
  */
 static int
-kern_aio_error(struct thread *td, kaiocb_t * __capability ujob,
+kern_aio_error(struct thread *td, struct aiocb * __capability ujob,
     struct aiocb_ops *ops)
 {
 	struct proc *p = td->td_proc;
@@ -2186,7 +2156,7 @@ int
 sys_aio_error(struct thread *td, struct aio_error_args *uap)
 {
 
-	return (kern_aio_error(td, (kaiocb_t * __capability)uap->aiocbp,
+	return (kern_aio_error(td, (struct aiocb * __capability)uap->aiocbp,
 	    &aiocb_ops));
 }
 
@@ -2197,7 +2167,7 @@ freebsd6_aio_read(struct thread *td, struct freebsd6_aio_read_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &uap->aiocbp, NULL, LIO_READ, &aiocb_ops_osigevent));
 }
 #endif
@@ -2207,7 +2177,7 @@ sys_aio_read(struct thread *td, struct aio_read_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &uap->aiocbp, NULL, LIO_READ, &aiocb_ops));
 }
 
@@ -2218,7 +2188,7 @@ freebsd6_aio_write(struct thread *td, struct freebsd6_aio_write_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &uap->aiocbp, NULL, LIO_WRITE, &aiocb_ops_osigevent));
 }
 #endif
@@ -2228,7 +2198,7 @@ sys_aio_write(struct thread *td, struct aio_write_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &uap->aiocbp, NULL, LIO_WRITE, &aiocb_ops));
 }
 
@@ -2237,20 +2207,20 @@ sys_aio_mlock(struct thread *td, struct aio_mlock_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &uap->aiocbp, NULL, LIO_MLOCK, &aiocb_ops));
 }
 
 static int
 kern_lio_listio(struct thread *td, int mode, intcap_t uacb_list,
-    kaiocb_t * __capability *acb_list, int nent, ksigevent_t *sig,
+    struct aiocb * __capability *acb_list, int nent, struct sigevent *sig,
     struct aiocb_ops *ops)
 {
 	struct proc *p = td->td_proc;
-	kaiocb_t * __capability job;
+	struct aiocb * __capability job;
 	struct kaioinfo *ki;
 	struct aioliojob *lj;
-	kkevent_t kev;
+	struct kevent kev;
 	int error;
 	int nagain, nerror;
 	int i;
@@ -2286,17 +2256,7 @@ kern_lio_listio(struct thread *td, int mode, intcap_t uacb_list,
 			kev.ident = (uintptr_t)uacb_list; /* something unique */
 			kev.data = (intptr_t)lj;
 			/* pass user defined sigval data */
-#ifdef COMPAT_FREEBSD32
-			if (SV_PROC_FLAG(td->td_proc, SV_ILP32))
-				kev.udata = __USER_CAP_UNBOUND((void *)(uintptr_t)lj->lioj_signal.sigev_value.sival_ptr32);
-			else
-#endif
-#ifdef COMPAT_CHERIABI
-			if (SV_PROC_FLAG(td->td_proc, SV_CHERI))
-				kev.udata = lj->lioj_signal.sigev_value.sival_ptr_c;
-			else
-#endif
-				kev.udata = __USER_CAP_UNBOUND(lj->lioj_signal.sigev_value.sival_ptr_native);
+			kev.udata = lj->lioj_signal.sigev_value.sival_ptr;
 			error = kqfd_register(
 			    lj->lioj_signal.sigev_notify_kqueue, &kev, td,
 			    M_WAITOK);
@@ -2399,8 +2359,8 @@ kern_lio_listio(struct thread *td, int mode, intcap_t uacb_list,
 int
 freebsd6_lio_listio(struct thread *td, struct freebsd6_lio_listio_args *uap)
 {
-	kaiocb_t **acb_list;
-	ksigevent_t *sigp, sig;
+	struct aiocb **acb_list;
+	struct sigevent *sigp, sig;
 	struct osigevent osig;
 	int error, nent;
 
@@ -2422,8 +2382,8 @@ freebsd6_lio_listio(struct thread *td, struct freebsd6_lio_listio_args *uap)
 	} else
 		sigp = NULL;
 
-	acb_list = malloc(sizeof(kaiocb_t *) * nent, M_LIO, M_WAITOK);
-	error = copyin(uap->acb_list, acb_list, nent * sizeof(acb_list[0]));
+	acb_list = malloc(sizeof(struct aiocb *) * nent, M_LIO, M_WAITOK);
+	error = copyincap(uap->acb_list, acb_list, nent * sizeof(acb_list[0]));
 	if (error == 0)
 		error = kern_lio_listio(td, uap->mode,
 		    (intcap_t)uap->acb_list, acb_list, nent, sigp,
@@ -2437,10 +2397,9 @@ freebsd6_lio_listio(struct thread *td, struct freebsd6_lio_listio_args *uap)
 int
 sys_lio_listio(struct thread *td, struct lio_listio_args *uap)
 {
-	kaiocb_t * __capability *acb_list;
-	kaiocb_t **acb_list_native;
-	ksigevent_t *sigp, sig;
-	int error, i, nent;
+	struct aiocb * __capability *acb_list;
+	struct sigevent *sigp, sig;
+	int error, nent;
 
 	if ((uap->mode != LIO_NOWAIT) && (uap->mode != LIO_WAIT))
 		return (EINVAL);
@@ -2450,23 +2409,19 @@ sys_lio_listio(struct thread *td, struct lio_listio_args *uap)
 		return (EINVAL);
 
 	if (uap->sig && (uap->mode == LIO_NOWAIT)) {
-		error = copyin(uap->sig, &sig, sizeof(sig));
+		error = copyincap(uap->sig, &sig, sizeof(sig));
 		if (error)
 			return (error);
 		sigp = &sig;
 	} else
 		sigp = NULL;
 
-	acb_list = malloc(sizeof(kaiocb_t * __capability) * nent, M_LIO,
+	acb_list = malloc(sizeof(struct aiocb * __capability) * nent, M_LIO,
 	    M_WAITOK);
-	acb_list_native = (kaiocb_t **)acb_list;
-	error = copyin(uap->acb_list, acb_list, nent * sizeof(acb_list[0]));
-	if (error == 0) {
-		for (i = nent - 1; i >= 0; i--)
-			acb_list[i] = __USER_CAP_OBJ(acb_list_native[i]);
+	error = copyincap(uap->acb_list, acb_list, nent * sizeof(acb_list[0]));
+	if (error == 0)
 		error = kern_lio_listio(td, uap->mode, (intcap_t)uap->acb_list,
 		    acb_list, nent, sigp, &aiocb_ops);
-	}
 	free(acb_list, M_LIO);
 	return (error);
 }
@@ -2517,14 +2472,14 @@ aio_biowakeup(struct bio *bp)
 
 /* syscall - wait for the next completion of an aio request */
 static int
-kern_aio_waitcomplete(struct thread *td, kaiocb_t ** __capability ujobp,
+kern_aio_waitcomplete(struct thread *td, struct aiocb ** __capability ujobp,
     struct timespec *ts, struct aiocb_ops *ops)
 {
 	struct proc *p = td->td_proc;
 	struct timeval atv;
 	struct kaioinfo *ki;
 	struct kaiocb *job;
-	kaiocb_t * __capability ujob;
+	struct aiocb * __capability ujob;
 	long error, status;
 	int timo;
 
@@ -2577,7 +2532,7 @@ kern_aio_waitcomplete(struct thread *td, kaiocb_t ** __capability ujobp,
 		td->td_ru.ru_msgrcv += job->msgrcv;
 		aio_free_entry(job);
 		AIO_UNLOCK(ki);
-		error = ops->store_aiocb(ujobp, job);
+		ops->store_aiocb(ujobp, job);
 		ops->store_error(ujob, error);
 		ops->store_status(ujob, status);
 	} else
@@ -2601,12 +2556,12 @@ sys_aio_waitcomplete(struct thread *td, struct aio_waitcomplete_args *uap)
 	} else
 		tsp = NULL;
 
-	return (kern_aio_waitcomplete(td, (kaiocb_t ** __capability)uap->aiocbp,
+	return (kern_aio_waitcomplete(td, (struct aiocb ** __capability)uap->aiocbp,
 	    tsp, &aiocb_ops));
 }
 
 static int
-kern_aio_fsync(struct thread *td, int op, kaiocb_t * __capability ujob,
+kern_aio_fsync(struct thread *td, int op, struct aiocb * __capability ujob,
     void *ujobptrp, struct aiocb_ops *ops)
 {
 
@@ -2620,7 +2575,7 @@ sys_aio_fsync(struct thread *td, struct aio_fsync_args *uap)
 {
 
 	return (kern_aio_fsync(td, uap->op,
-	    (kaiocb_t * __capability)uap->aiocbp, &uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp, &uap->aiocbp,
 	    &aiocb_ops));
 }
 
@@ -2763,7 +2718,7 @@ typedef struct aiocb32 {
 
 #ifdef COMPAT_FREEBSD6
 static int
-convert_old_sigevent32(struct osigevent32 *osig, ksigevent_t sigevent *nsig)
+convert_old_sigevent32(struct osigevent32 *osig, struct sigevent *nsig)
 {
 
 	/*
@@ -2780,8 +2735,8 @@ convert_old_sigevent32(struct osigevent32 *osig, ksigevent_t sigevent *nsig)
 	case SIGEV_KEVENT:
 		nsig->sigev_notify_kqueue =
 		    osig->__sigev_u.__sigev_notify_kqueue;
-		nsig->sigev_value.sival_ptr =
-		    __USER_CAP_UNBOUND(PTRIN(osig->sigev_value.sival_ptr));
+		nsig->sigev_value.sival_ptr = (void * __capability)(uintcap_t)
+		    PTRIN(osig->sigev_value.sival_ptr);
 		break;
 	default:
 		return (EINVAL);
@@ -2791,7 +2746,7 @@ convert_old_sigevent32(struct osigevent32 *osig, ksigevent_t sigevent *nsig)
 
 static int
 aiocb32_copyin_old_sigevent(void * __capability ujob,
-    kaiocb_t *kjob)
+    struct aiocb *kjob)
 {
 	struct oaiocb32 job32;
 	int error;
@@ -2816,7 +2771,7 @@ aiocb32_copyin_old_sigevent(void * __capability ujob,
 #endif
 
 static int
-aiocb32_copyin(void * __capability ujob, kaiocb_t *kjob)
+aiocb32_copyin(void * __capability ujob, struct aiocb *kjob)
 {
 	struct aiocb32 job32;
 	int error;
@@ -2892,7 +2847,7 @@ aiocb32_save_aiocb(struct kaiocb *kjob, const void *ujobptrp)
 }
 
 static int
-aiocb32_store_aiocb(kaiocb_t ** __capability ujobp, struct kaiocb *kjob)
+aiocb32_store_aiocb(struct aiocb ** __capability ujobp, struct kaiocb *kjob)
 {
 	int32_t ujob;
 
@@ -2950,7 +2905,7 @@ freebsd32_aio_suspend(struct thread *td, struct freebsd32_aio_suspend_args *uap)
 {
 	struct timespec32 ts32;
 	struct timespec ts, *tsp;
-	kaiocb_t * __capability * ujoblist;
+	struct aiocb * __capability * ujoblist;
 	uint32_t *ujoblist32;
 	int error, i;
 
@@ -2994,7 +2949,7 @@ int
 freebsd32_aio_error(struct thread *td, struct freebsd32_aio_error_args *uap)
 {
 
-	return (kern_aio_error(td, (kaiocb_t *)uap->aiocbp, &aiocb32_ops));
+	return (kern_aio_error(td, (struct aiocb *)uap->aiocbp, &aiocb32_ops));
 }
 
 #ifdef COMPAT_FREEBSD6
@@ -3004,7 +2959,7 @@ freebsd6_freebsd32_aio_read(struct thread *td,
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)__USER_CAP_OBJ(uap->aiocbp),
+	    (struct aiocb * __capability)__USER_CAP_OBJ(uap->aiocbp),
 	    &uap->aiocbp, NULL, LIO_READ, &aiocb32_ops_osigevent));
 }
 #endif
@@ -3014,7 +2969,7 @@ freebsd32_aio_read(struct thread *td, struct freebsd32_aio_read_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)__USER_CAP_OBJ(uap->aiocbp),
+	    (struct aiocb * __capability)__USER_CAP_OBJ(uap->aiocbp),
 	    &uap->aiocbp, NULL, LIO_READ, &aiocb32_ops));
 }
 
@@ -3025,7 +2980,7 @@ freebsd6_freebsd32_aio_write(struct thread *td,
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)__USER_CAP_OBJ(uap->aiocbp),
+	    (struct aiocb * __capability)__USER_CAP_OBJ(uap->aiocbp),
 	    &uap->aiocbp, NULL, LIO_WRITE, &aiocb32_ops_osigevent));
 }
 #endif
@@ -3035,7 +2990,7 @@ freebsd32_aio_write(struct thread *td, struct freebsd32_aio_write_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)__USER_CAP_OBJ(uap->aiocbp),
+	    (struct aiocb * __capability)__USER_CAP_OBJ(uap->aiocbp),
 	    &uap->aiocbp, NULL, LIO_WRITE, &aiocb32_ops));
 }
 
@@ -3044,7 +2999,7 @@ freebsd32_aio_mlock(struct thread *td, struct freebsd32_aio_mlock_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)__USER_CAP_OBJ(uap->aiocbp),
+	    (struct aiocb * __capability)__USER_CAP_OBJ(uap->aiocbp),
 	    &uap->aiocbp, NULL, LIO_MLOCK, &aiocb32_ops));
 }
 
@@ -3067,7 +3022,7 @@ freebsd32_aio_waitcomplete(struct thread *td,
 	} else
 		tsp = NULL;
 
-	return (kern_aio_waitcomplete(td, (kaiocb_t **)uap->aiocbp, tsp,
+	return (kern_aio_waitcomplete(td, (struct aiocb **)uap->aiocbp, tsp,
 	    &aiocb32_ops));
 }
 
@@ -3075,7 +3030,7 @@ int
 freebsd32_aio_fsync(struct thread *td, struct freebsd32_aio_fsync_args *uap)
 {
 
-	return (kern_aio_fsync(td, uap->op, (kaiocb_t *)uap->aiocbp,
+	return (kern_aio_fsync(td, uap->op, (struct aiocb *)uap->aiocbp,
 	    &uap->aiocbp, &aiocb32_ops));
 }
 
@@ -3084,8 +3039,8 @@ int
 freebsd6_freebsd32_lio_listio(struct thread *td,
     struct freebsd6_freebsd32_lio_listio_args *uap)
 {
-	kaiocb_t **acb_list;
-	ksigevent_t *sigp, sig;
+	struct aiocb **acb_list;
+	struct sigevent *sigp, sig;
 	struct osigevent32 osig;
 	uint32_t *acb_list32;
 	int error, i, nent;
@@ -3114,7 +3069,7 @@ freebsd6_freebsd32_lio_listio(struct thread *td,
 		free(acb_list32, M_LIO);
 		return (error);
 	}
-	acb_list = malloc(sizeof(kaiocb_t *) * nent, M_LIO, M_WAITOK);
+	acb_list = malloc(sizeof(struct aiocb *) * nent, M_LIO, M_WAITOK);
 	for (i = 0; i < nent; i++)
 		acb_list[i] = __USER_CAP(PTRIN(acb_list32[i]),
 		    sizeof(struct aiocb32));
@@ -3130,8 +3085,8 @@ freebsd6_freebsd32_lio_listio(struct thread *td,
 int
 freebsd32_lio_listio(struct thread *td, struct freebsd32_lio_listio_args *uap)
 {
-	kaiocb_t **acb_list;
-	ksigevent_t *sigp, sig;
+	struct aiocb **acb_list;
+	struct sigevent *sigp, sig;
 	struct sigevent32 sig32;
 	uint32_t *acb_list32;
 	int error, i, nent;
@@ -3160,7 +3115,7 @@ freebsd32_lio_listio(struct thread *td, struct freebsd32_lio_listio_args *uap)
 		free(acb_list32, M_LIO);
 		return (error);
 	}
-	acb_list = malloc(sizeof(kaiocb_t *) * nent, M_LIO, M_WAITOK);
+	acb_list = malloc(sizeof(struct aiocb *) * nent, M_LIO, M_WAITOK);
 	for (i = 0; i < nent; i++)
 		acb_list[i] = __USER_CAP(PTRIN(acb_list32[i]),
 		    sizeof(struct aiocb32));
@@ -3217,7 +3172,7 @@ typedef struct aiocb64 {
 
 #ifdef COMPAT_FREEBSD6
 static int
-convert_old_sigevent64(struct osigevent64 *osig, ksigevent_t sigevent *nsig)
+convert_old_sigevent64(struct osigevent64 *osig, struct sigevent *nsig)
 {
 
 	/*
@@ -3234,8 +3189,8 @@ convert_old_sigevent64(struct osigevent64 *osig, ksigevent_t sigevent *nsig)
 	case SIGEV_KEVENT:
 		nsig->sigev_notify_kqueue =
 		    osig->__sigev_u.__sigev_notify_kqueue;
-		nsig->sigev_value.sival_ptr =
-		    __USER_CAP_UNBOUND(PTRIN(osig->sigev_value.sival_ptr));
+		nsig->sigev_value.sival_ptr = (void * __capability)(uintcap_t)
+		    osig->sigev_value.sival_ptr;
 		break;
 	default:
 		return (EINVAL);
@@ -3245,7 +3200,7 @@ convert_old_sigevent64(struct osigevent64 *osig, ksigevent_t sigevent *nsig)
 
 static int
 aiocb64_copyin_old_sigevent(void * __capability ujob,
-    kaiocb_t *kjob)
+    struct aiocb *kjob)
 {
 	struct oaiocb64 job64;
 	int error;
@@ -3270,7 +3225,7 @@ aiocb64_copyin_old_sigevent(void * __capability ujob,
 #endif
 
 static int
-aiocb64_copyin(void * __capability ujob, kaiocb_t *kjob)
+aiocb64_copyin(void * __capability ujob, struct aiocb *kjob)
 {
 	struct aiocb64 job64;
 	int error;
@@ -3347,7 +3302,7 @@ aiocb64_save_aiocb(struct kaiocb *kjob, const void *ujobptrp)
 }
 
 static int
-aiocb64_store_aiocb(kaiocb_t ** __capability ujobp, struct kaiocb *kjob)
+aiocb64_store_aiocb(struct aiocb ** __capability ujobp, struct kaiocb *kjob)
 {
 	int64_t ujob;
 
@@ -3404,7 +3359,7 @@ int
 freebsd64_aio_suspend(struct thread *td, struct freebsd64_aio_suspend_args *uap)
 {
 	struct timespec ts, *tsp;
-	kaiocb_t * __capability * ujoblist;
+	struct aiocb * __capability * ujoblist;
 	void * /* __ptr64 */ *ujoblist64;
 	int error, i;
 
@@ -3456,7 +3411,7 @@ freebsd6_freebsd64_aio_read(struct thread *td,
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)__USER_CAP_OBJ(uap->aiocbp),
+	    (struct aiocb * __capability)__USER_CAP_OBJ(uap->aiocbp),
 	    &uap->aiocbp, NULL, LIO_READ, &aiocb64_ops_osigevent));
 }
 #endif
@@ -3466,7 +3421,7 @@ freebsd64_aio_read(struct thread *td, struct freebsd64_aio_read_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)__USER_CAP_OBJ(uap->aiocbp),
+	    (struct aiocb * __capability)__USER_CAP_OBJ(uap->aiocbp),
 	    &uap->aiocbp, NULL, LIO_READ, &aiocb64_ops));
 }
 
@@ -3477,7 +3432,7 @@ freebsd6_freebsd64_aio_write(struct thread *td,
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)__USER_CAP_OBJ(uap->aiocbp),
+	    (struct aiocb * __capability)__USER_CAP_OBJ(uap->aiocbp),
 	    &uap->aiocbp, NULL, LIO_WRITE, &aiocb64_ops_osigevent));
 }
 #endif
@@ -3487,7 +3442,7 @@ freebsd64_aio_write(struct thread *td, struct freebsd64_aio_write_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)__USER_CAP_OBJ(uap->aiocbp),
+	    (struct aiocb * __capability)__USER_CAP_OBJ(uap->aiocbp),
 	    &uap->aiocbp, NULL, LIO_WRITE, &aiocb64_ops));
 }
 
@@ -3496,7 +3451,7 @@ freebsd64_aio_mlock(struct thread *td, struct freebsd64_aio_mlock_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)__USER_CAP_OBJ(uap->aiocbp),
+	    (struct aiocb * __capability)__USER_CAP_OBJ(uap->aiocbp),
 	    &uap->aiocbp, NULL, LIO_MLOCK, &aiocb64_ops));
 }
 
@@ -3533,8 +3488,8 @@ int
 freebsd6_freebsd64_lio_listio(struct thread *td,
     struct freebsd6_freebsd64_lio_listio_args *uap)
 {
-	kaiocb_t **acb_list;
-	ksigevent_t *sigp, sig;
+	struct aiocb **acb_list;
+	struct sigevent *sigp, sig;
 	struct osigevent64 osig;
 	uint64_t *acb_list64;
 	int error, i, nent;
@@ -3563,7 +3518,7 @@ freebsd6_freebsd64_lio_listio(struct thread *td,
 		free(acb_list64, M_LIO);
 		return (error);
 	}
-	acb_list = malloc(sizeof(kaiocb_t *) * nent, M_LIO, M_WAITOK);
+	acb_list = malloc(sizeof(struct aiocb *) * nent, M_LIO, M_WAITOK);
 	for (i = 0; i < nent; i++)
 		acb_list[i] = __USER_CAP(PTRIN(acb_list64[i]),
 		    sizeof(struct aiocb64));
@@ -3579,8 +3534,8 @@ freebsd6_freebsd64_lio_listio(struct thread *td,
 int
 freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 {
-	kaiocb_t * __capability *acb_list;
-	ksigevent_t *sigp, sig;
+	struct aiocb * __capability *acb_list;
+	struct sigevent *sigp, sig;
 	struct sigevent64 sig64;
 	void * /* __ptr64 */ *acb_list64;
 	int error, i, nent;
@@ -3610,7 +3565,7 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 		free(acb_list64, M_LIO);
 		return (error);
 	}
-	acb_list = malloc(sizeof(kaiocb_t *) * nent, M_LIO, M_WAITOK);
+	acb_list = malloc(sizeof(struct aiocb *) * nent, M_LIO, M_WAITOK);
 	for (i = 0; i < nent; i++)
 		acb_list[i] = __USER_CAP(acb_list64[i], sizeof(struct aiocb64));
 	free(acb_list64, M_LIO);
@@ -3637,7 +3592,7 @@ freebsd64_lio_listio(struct thread *td, struct freebsd64_lio_listio_args *uap)
 #include <compat/cheriabi/cheriabi_util.h>
 
 static int
-aiocb_c_copyin(void * __capability ujob, kaiocb_t *kjob)
+aiocb_c_copyin(void * __capability ujob, struct aiocb *kjob)
 {
 
 	return (copyincap(ujob, kjob, sizeof(*kjob)));
@@ -3705,7 +3660,7 @@ aiocb_c_save_aiocb(struct kaiocb *kjob, const void *ujobptrp)
 }
 
 static int
-aiocb_c_store_aiocb(kaiocb_t ** __capability ujobp, struct kaiocb *kjob)
+aiocb_c_store_aiocb(struct aiocb ** __capability ujobp, struct kaiocb *kjob)
 {
 	intcap_t ujob;
 
@@ -3767,7 +3722,7 @@ cheriabi_aio_suspend(struct thread *td, struct cheriabi_aio_suspend_args *uap)
 	    uap->nent * sizeof(*ujoblist));
 	if (error == 0)
 		error = kern_aio_suspend(td, uap->nent,
-		    (kaiocb_t * __capability *)ujoblist, tsp);
+		    (struct aiocb * __capability *)ujoblist, tsp);
 	free(ujoblist, M_AIOS);
 	return (error);
 }
@@ -3781,7 +3736,7 @@ cheriabi_aio_cancel(struct thread *td, struct cheriabi_aio_cancel_args *uap)
 {
 
 	return(kern_aio_cancel(td, uap->fd,
-	    (kaiocb_t * __capability)uap->aiocbp, &aiocb_c_ops));
+	    (struct aiocb * __capability)uap->aiocbp, &aiocb_c_ops));
 }
 
 int
@@ -3789,7 +3744,7 @@ cheriabi_aio_error(struct thread *td, struct cheriabi_aio_error_args *uap)
 {
 
 	return (kern_aio_error(td,
-	    (kaiocb_t * __capability)uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &aiocb_c_ops));
 }
 
@@ -3798,7 +3753,7 @@ cheriabi_aio_read(struct thread *td, struct cheriabi_aio_read_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &uap->aiocbp, NULL, LIO_READ, &aiocb_c_ops));
 }
 
@@ -3807,7 +3762,7 @@ cheriabi_aio_write(struct thread *td, struct cheriabi_aio_write_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &uap->aiocbp, NULL, LIO_WRITE, &aiocb_c_ops));
 }
 
@@ -3816,7 +3771,7 @@ cheriabi_aio_mlock(struct thread *td, struct cheriabi_aio_mlock_args *uap)
 {
 
 	return (aio_aqueue(td,
-	    (kaiocb_t * __capability)uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &uap->aiocbp, NULL, LIO_MLOCK, &aiocb_c_ops));
 }
 
@@ -3837,7 +3792,7 @@ cheriabi_aio_waitcomplete(struct thread *td,
 		tsp = NULL;
 
 	return (kern_aio_waitcomplete(td,
-	    (kaiocb_t ** __capability)uap->aiocbp, tsp,
+	    (struct aiocb ** __capability)uap->aiocbp, tsp,
 	    &aiocb_c_ops));
 }
 
@@ -3846,15 +3801,15 @@ cheriabi_aio_fsync(struct thread *td, struct cheriabi_aio_fsync_args *uap)
 {
 
 	return (kern_aio_fsync(td, uap->op,
-	    (kaiocb_t * __capability)uap->aiocbp,
+	    (struct aiocb * __capability)uap->aiocbp,
 	    &uap->aiocbp, &aiocb_c_ops));
 }
 
 int
 cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 {
-	kaiocb_t * __capability *acb_list;
-	ksigevent_t *sigp, sig;
+	struct aiocb * __capability *acb_list;
+	struct sigevent *sigp, sig;
 	int error, nent;
 
 	if ((uap->mode != LIO_NOWAIT) && (uap->mode != LIO_WAIT))
@@ -3871,7 +3826,7 @@ cheriabi_lio_listio(struct thread *td, struct cheriabi_lio_listio_args *uap)
 		sigp = &sig;
 	} else
 		sigp = NULL;
-	acb_list = malloc(sizeof(kaiocb_t *) * nent, M_LIO, M_WAITOK);
+	acb_list = malloc(sizeof(struct aiocb *) * nent, M_LIO, M_WAITOK);
 	error = copyincap(uap->acb_list, acb_list, nent * sizeof(*acb_list));
 	if (error) {
 		free(acb_list, M_LIO);

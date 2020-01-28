@@ -61,6 +61,9 @@ struct dwmmc_softc {
 	uint32_t		use_pio;
 	uint32_t		pwren_inverted;
 	u_int			desc_count;
+	device_t		child;
+	struct task		card_task;	/* Card presence check task */
+	struct timeout_task	card_delayed_task;/* Card insert delayed task */
 
 	int			(*update_ios)(struct dwmmc_softc *sc, struct mmc_ios *ios);
 
@@ -94,5 +97,6 @@ struct dwmmc_softc {
 DECLARE_CLASS(dwmmc_driver);
 
 int dwmmc_attach(device_t);
+int dwmmc_detach(device_t);
 
 #endif

@@ -74,6 +74,10 @@ int	 lockmgr_lock_fast_path(struct lock *lk, u_int flags,
 	    struct lock_object *ilk, const char *file, int line);
 int	 lockmgr_unlock_fast_path(struct lock *lk, u_int flags,
 	    struct lock_object *ilk);
+int	lockmgr_slock(struct lock *lk, u_int flags, const char *file, int line);
+int	lockmgr_xlock(struct lock *lk, u_int flags, const char *file, int line);
+int	lockmgr_unlock(struct lock *lk);
+
 #if defined(INVARIANTS) || defined(INVARIANT_SUPPORT)
 void	 _lockmgr_assert(const struct lock *lk, int what, const char *file, int line);
 #endif
@@ -150,7 +154,7 @@ _lockmgr_args_rw(struct lock *lk, u_int flags, struct rwlock *ilk,
 #define	LK_NOSHARE	0x000008
 #define	LK_NOWITNESS	0x000010
 #define	LK_QUIET	0x000020
-#define	LK_ADAPTIVE	0x000040
+#define	LK_UNUSED0	0x000040	/* Was LK_ADAPTIVE */
 #define	LK_IS_VNODE	0x000080	/* Tell WITNESS about a VNODE lock */
 #define	LK_NEW		0x000100
 

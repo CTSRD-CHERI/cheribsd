@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2020, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -192,7 +192,7 @@ static ACPI_SLEEP_FUNCTIONS         AcpiSleepDispatch[] =
                        ACPI_HW_OPTIONAL_FUNCTION (AcpiHwLegacyWakePrep)),
      ACPI_STRUCT_INIT (ExtendedFunction,
                        AcpiHwExtendedWakePrep) },
-    {ACPI_STRUCT_INIT (Legacy_function,
+    {ACPI_STRUCT_INIT (LegacyFunction,
                        ACPI_HW_OPTIONAL_FUNCTION (AcpiHwLegacyWake)),
      ACPI_STRUCT_INIT (ExtendedFunction,
                        AcpiHwExtendedWake) }

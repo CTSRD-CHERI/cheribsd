@@ -1267,6 +1267,7 @@ out_in6m_release:
 		struct epoch_tracker et;
 
 		CTR2(KTR_MLD, "%s: dropping ref on %p", __func__, inm);
+		IF_ADDR_WLOCK(ifp);
 		NET_EPOCH_ENTER(et);
 		CK_STAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 			if (ifma->ifma_protospec == inm) {
@@ -1277,6 +1278,7 @@ out_in6m_release:
 		in6m_disconnect_locked(&inmh, inm);
 		in6m_rele_locked(&inmh, inm);
 		NET_EPOCH_EXIT(et);
+		IF_ADDR_WUNLOCK(ifp);
 	} else {
 		*pinm = inm;
 	}
@@ -2109,6 +2111,7 @@ in6p_join_group(struct inpcb *inp, struct sockopt *sopt)
 		 * NOTE: Refcount from in6_joingroup_locked()
 		 * is protecting membership.
 		 */
+		ip6_mfilter_insert(&imo->im6o_head, imf);
 	} else {
 		CTR1(KTR_MLD, "%s: merge inm state", __func__);
 		IN6_MULTI_LIST_LOCK();
@@ -2133,9 +2136,6 @@ in6p_join_group(struct inpcb *inp, struct sockopt *sopt)
 			goto out_in6p_locked;
 		}
 	}
-
-	if (is_new)
-		ip6_mfilter_insert(&imo->im6o_head, imf);
 
 	im6f_commit(imf);
 	imf = NULL;
@@ -2328,6 +2328,12 @@ in6p_leave_group(struct inpcb *inp, struct sockopt *sopt)
 	if (is_final) {
 		ip6_mfilter_remove(&imo->im6o_head, imf);
 		im6f_leave(imf);
+
+		/*
+		 * Give up the multicast address record to which
+		 * the membership points.
+		 */
+		(void)in6_leavegroup_locked(inm, imf);
 	} else {
 		if (imf->im6f_st[0] == MCAST_EXCLUDE) {
 			error = EADDRNOTAVAIL;
@@ -2384,14 +2390,8 @@ in6p_leave_group(struct inpcb *inp, struct sockopt *sopt)
 out_in6p_locked:
 	INP_WUNLOCK(inp);
 
-	if (is_final && imf) {
-		/*
-		 * Give up the multicast address record to which
-		 * the membership points.
-		 */
-		(void)in6_leavegroup_locked(inm, imf);
+	if (is_final && imf)
 		ip6_mfilter_free(imf);
-	}
 
 	IN6_MULTI_UNLOCK();
 	return (error);

@@ -215,7 +215,6 @@ static void nfsrv_freealllayouts(void);
 static void nfsrv_freedevid(struct nfsdevice *ds);
 static int nfsrv_setdsserver(char *dspathp, char *mdspathp, NFSPROC_T *p,
     struct nfsdevice **dsp);
-static int nfsrv_delds(char *devid, NFSPROC_T *p);
 static void nfsrv_deleteds(struct nfsdevice *fndds);
 static void nfsrv_allocdevid(struct nfsdevice *ds, char *addr, char *dnshost);
 static void nfsrv_freealldevids(void);
@@ -1555,7 +1554,7 @@ nfsrv_freeallnfslocks(struct nfsstate *stp, vnode_t vp, int cansleep,
 				tvp = NULL;
 			else if (vp == NULL && cansleep != 0) {
 				tvp = nfsvno_getvp(&lfp->lf_fh);
-				NFSVOPUNLOCK(tvp, 0);
+				NFSVOPUNLOCK(tvp);
 			} else
 				tvp = vp;
 			gottvp = 1;
@@ -1781,7 +1780,7 @@ tryagain:
 			if (vnode_unlocked == 0) {
 				ASSERT_VOP_ELOCKED(vp, "nfsrv_lockctrl1");
 				vnode_unlocked = 1;
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 			}
 			reterr = nfsrv_locallock(vp, lfp,
 			    (new_lop->lo_flags & (NFSLCK_READ | NFSLCK_WRITE)),
@@ -1955,7 +1954,7 @@ tryagain:
 			if (vnode_unlocked == 0) {
 				ASSERT_VOP_ELOCKED(vp, "nfsrv_lockctrl2");
 				vnode_unlocked = 1;
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 			}
 			nfsrv_locallock_rollback(vp, lfp, p);
 			NFSLOCKSTATE();
@@ -2039,7 +2038,7 @@ tryagain:
 					ASSERT_VOP_ELOCKED(vp,
 					    "nfsrv_lockctrl3");
 					vnode_unlocked = 1;
-					NFSVOPUNLOCK(vp, 0);
+					NFSVOPUNLOCK(vp);
 				}
 				nfsrv_locallock_rollback(vp, lfp, p);
 				NFSLOCKSTATE();
@@ -2151,7 +2150,7 @@ tryagain:
 			NFSUNLOCKSTATE();
 			if (vnode_unlocked == 0) {
 				ASSERT_VOP_ELOCKED(vp, "nfsrv_lockctrl4");
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 			}
 			nfsrv_locallock_rollback(vp, lfp, p);
 			NFSLOCKSTATE();
@@ -2159,7 +2158,7 @@ tryagain:
 			NFSUNLOCKSTATE();
 			NFSVOPLOCK(vp, LK_EXCLUSIVE | LK_RETRY);
 			vnode_unlocked = 0;
-			if ((vp->v_iflag & VI_DOOMED) != 0)
+			if (VN_IS_DOOMED(vp))
 				ret = NFSERR_SERVERFAULT;
 			NFSLOCKSTATE();
 		}
@@ -2206,7 +2205,7 @@ tryagain:
 			if (vnode_unlocked == 0) {
 				ASSERT_VOP_ELOCKED(vp, "nfsrv_lockctrl5");
 				vnode_unlocked = 1;
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 			}
 			/* Update the local locks. */
 			nfsrv_localunlock(vp, lfp, first, end, p);
@@ -2248,7 +2247,7 @@ tryagain:
 		    if (filestruct_locked != 0) {
 			if (vnode_unlocked == 0) {
 				ASSERT_VOP_ELOCKED(vp, "nfsrv_lockctrl6");
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 			}
 			/* Roll back local locks. */
 			nfsrv_locallock_rollback(vp, lfp, p);
@@ -2257,7 +2256,7 @@ tryagain:
 			NFSUNLOCKSTATE();
 			NFSVOPLOCK(vp, LK_EXCLUSIVE | LK_RETRY);
 			vnode_unlocked = 0;
-			if ((vp->v_iflag & VI_DOOMED) != 0) {
+			if (VN_IS_DOOMED(vp)) {
 				error = NFSERR_SERVERFAULT;
 				goto out;
 			}
@@ -2297,7 +2296,7 @@ tryagain:
 			if (vnode_unlocked == 0) {
 				ASSERT_VOP_ELOCKED(vp, "nfsrv_lockctrl7");
 				vnode_unlocked = 1;
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 			}
 			nfsrv_locallock_rollback(vp, lfp, p);
 			NFSLOCKSTATE();
@@ -2379,7 +2378,7 @@ out:
 	}
 	if (vnode_unlocked != 0) {
 		NFSVOPLOCK(vp, LK_EXCLUSIVE | LK_RETRY);
-		if (error == 0 && (vp->v_iflag & VI_DOOMED) != 0)
+		if (error == 0 && VN_IS_DOOMED(vp))
 			error = NFSERR_SERVERFAULT;
 	}
 	if (other_lop)
@@ -3526,7 +3525,7 @@ nfsrv_openupdate(vnode_t vp, struct nfsstate *new_stp, nfsquad_t clientid,
 			nfsrv_locklf(lfp);
 			NFSUNLOCKSTATE();
 			ASSERT_VOP_ELOCKED(vp, "nfsrv_openupdate");
-			NFSVOPUNLOCK(vp, 0);
+			NFSVOPUNLOCK(vp);
 			if (nfsrv_freeopen(stp, vp, 1, p) == 0) {
 				NFSLOCKSTATE();
 				nfsrv_unlocklf(lfp);
@@ -4057,10 +4056,10 @@ nfsrv_getclientipaddr(struct nfsrv_descript *nd, struct nfsclient *clp)
 	int i, j, maxalen = 0, minalen = 0;
 	sa_family_t af;
 #ifdef INET
-	struct sockaddr_in *rin, *sin;
+	struct sockaddr_in *rin = NULL, *sin;
 #endif
 #ifdef INET6
-	struct sockaddr_in6 *rin6, *sin6;
+	struct sockaddr_in6 *rin6 = NULL, *sin6;
 #endif
 	u_char *addr;
 	int error = 0, cantparse = 0;
@@ -4455,6 +4454,8 @@ nfsrv_docallback(struct nfsclient *clp, int procnum, nfsv4stateid_t *stateidp,
 		nd->nd_flag |= ND_KERBV;
 	if ((clp->lc_flags & LCL_NFSV41) != 0)
 		nd->nd_flag |= ND_NFSV41;
+	if ((clp->lc_flags & LCL_NFSV42) != 0)
+		nd->nd_flag |= ND_NFSV42;
 	nd->nd_repstat = 0;
 	cred->cr_uid = clp->lc_uid;
 	cred->cr_gid = clp->lc_gid;
@@ -4653,7 +4654,10 @@ nfsrv_cbcallargs(struct nfsrv_descript *nd, struct nfsclient *clp,
 	(void)nfsm_strtom(nd, optag, len);
 	NFSM_BUILD(tl, uint32_t *, 4 * NFSX_UNSIGNED);
 	if ((nd->nd_flag & ND_NFSV41) != 0) {
-		*tl++ = txdr_unsigned(NFSV41_MINORVERSION);
+		if ((nd->nd_flag & ND_NFSV42) != 0)
+			*tl++ = txdr_unsigned(NFSV42_MINORVERSION);
+		else
+			*tl++ = txdr_unsigned(NFSV41_MINORVERSION);
 		*tl++ = txdr_unsigned(callback);
 		*tl++ = txdr_unsigned(2);
 		*tl = txdr_unsigned(NFSV4OP_CBSEQUENCE);
@@ -4975,7 +4979,7 @@ nfsrv_updatestable(NFSPROC_T *p)
 	if (NFSVOPLOCK(vp, LK_EXCLUSIVE) == 0) {
 		error = nfsvno_setattr(vp, &nva, NFSFPCRED(sf->nsf_fp), p,
 		    NULL);
-		NFSVOPUNLOCK(vp, 0);
+		NFSVOPUNLOCK(vp);
 	} else
 		error = EPERM;
 	vn_finished_write(mp);
@@ -5133,7 +5137,7 @@ nfsrv_checkstable(struct nfsclient *clp)
  * Return 0 to indicate the conflict can't be revoked and 1 to indicate
  * the revocation worked and the conflicting client is "bye, bye", so it
  * can be tried again.
- * Return 2 to indicate that the vnode is VI_DOOMED after NFSVOPLOCK().
+ * Return 2 to indicate that the vnode is VIRF_DOOMED after NFSVOPLOCK().
  * Unlocks State before a non-zero value is returned.
  */
 static int
@@ -5152,7 +5156,7 @@ nfsrv_clientconflict(struct nfsclient *clp, int *haslockp, vnode_t vp,
 		NFSUNLOCKSTATE();
 		if (vp != NULL) {
 			lktype = NFSVOPISLOCKED(vp);
-			NFSVOPUNLOCK(vp, 0);
+			NFSVOPUNLOCK(vp);
 		}
 		NFSLOCKV4ROOTMUTEX();
 		nfsv4_relref(&nfsv4rootfs_lock);
@@ -5164,7 +5168,7 @@ nfsrv_clientconflict(struct nfsclient *clp, int *haslockp, vnode_t vp,
 		*haslockp = 1;
 		if (vp != NULL) {
 			NFSVOPLOCK(vp, lktype | LK_RETRY);
-			if ((vp->v_iflag & VI_DOOMED) != 0)
+			if (VN_IS_DOOMED(vp))
 				return (2);
 		}
 		return (1);
@@ -5327,7 +5331,7 @@ nfsrv_delegconflict(struct nfsstate *stp, int *haslockp, NFSPROC_T *p,
 		NFSUNLOCKSTATE();
 		if (vp != NULL) {
 			lktype = NFSVOPISLOCKED(vp);
-			NFSVOPUNLOCK(vp, 0);
+			NFSVOPUNLOCK(vp);
 		}
 		NFSLOCKV4ROOTMUTEX();
 		nfsv4_relref(&nfsv4rootfs_lock);
@@ -5339,7 +5343,7 @@ nfsrv_delegconflict(struct nfsstate *stp, int *haslockp, NFSPROC_T *p,
 		*haslockp = 1;
 		if (vp != NULL) {
 			NFSVOPLOCK(vp, lktype | LK_RETRY);
-			if ((vp->v_iflag & VI_DOOMED) != 0) {
+			if (VN_IS_DOOMED(vp)) {
 				*haslockp = 0;
 				NFSLOCKV4ROOTMUTEX();
 				nfsv4_unlock(&nfsv4rootfs_lock, 1);
@@ -5386,13 +5390,16 @@ out:
  * delegations.
  */
 APPLESTATIC int
-nfsrv_checkremove(vnode_t vp, int remove, NFSPROC_T *p)
+nfsrv_checkremove(vnode_t vp, int remove, struct nfsrv_descript *nd,
+    nfsquad_t clientid, NFSPROC_T *p)
 {
+	struct nfsclient *clp;
 	struct nfsstate *stp;
 	struct nfslockfile *lfp;
 	int error, haslock = 0;
 	fhandle_t nfh;
 
+	clp = NULL;
 	/*
 	 * First, get the lock file structure.
 	 * (A return of -1 means no associated state, so remove ok.)
@@ -5400,6 +5407,9 @@ nfsrv_checkremove(vnode_t vp, int remove, NFSPROC_T *p)
 	error = nfsrv_getlockfh(vp, NFSLCK_CHECK, NULL, &nfh, p);
 tryagain:
 	NFSLOCKSTATE();
+	if (error == 0 && clientid.qval != 0)
+		error = nfsrv_getclient(clientid, CLOPS_RENEW, &clp, NULL,
+		    (nfsquad_t)((u_quad_t)0), 0, nd, p);
 	if (!error)
 		error = nfsrv_getlockfile(NFSLCK_CHECK, NULL, &lfp, &nfh, 0);
 	if (error) {
@@ -5417,7 +5427,7 @@ tryagain:
 	/*
 	 * Now, we must Recall any delegations.
 	 */
-	error = nfsrv_cleandeleg(vp, lfp, NULL, &haslock, p);
+	error = nfsrv_cleandeleg(vp, lfp, clp, &haslock, p);
 	if (error) {
 		/*
 		 * nfsrv_cleandeleg() unlocks state for non-zero
@@ -5554,8 +5564,9 @@ nfsd_recalldelegation(vnode_t vp, NFSPROC_T *p)
 	starttime = NFSD_MONOSEC;
 	do {
 		if (NFSVOPLOCK(vp, LK_EXCLUSIVE) == 0) {
-			error = nfsrv_checkremove(vp, 0, p);
-			NFSVOPUNLOCK(vp, 0);
+			error = nfsrv_checkremove(vp, 0, NULL,
+			    (nfsquad_t)((u_quad_t)0), p);
+			NFSVOPUNLOCK(vp);
 		} else
 			error = EPERM;
 		if (error == NFSERR_DELAY) {
@@ -6199,6 +6210,10 @@ nfsrv_checksequence(struct nfsrv_descript *nd, uint32_t sequenceid,
 	sep->sess_clp->lc_expiry = nfsrv_leaseexpiry();
 	nd->nd_clientid.qval = sep->sess_clp->lc_clientid.qval;
 	nd->nd_flag |= ND_IMPLIEDCLID;
+
+	/* Save maximum request and reply sizes. */
+	nd->nd_maxreq = sep->sess_maxreq;
+	nd->nd_maxresp = sep->sess_maxresp;
 
 	/*
 	 * If this session handles the backchannel, save the nd_xprt for this
@@ -7060,7 +7075,7 @@ nfsrv_recalloldlayout(NFSPROC_T *p)
 	nfsquad_t clientid;
 	nfsv4stateid_t stateid;
 	fhandle_t fh;
-	int error, laytype, ret;
+	int error, laytype = 0, ret;
 
 	lhyp = &nfslayouthash[arc4random() % nfsrv_layouthashsize];
 	NFSLOCKLAYOUT(lhyp);
@@ -7585,7 +7600,7 @@ nfsrv_setdsserver(char *dspathp, char *mdspathp, NFSPROC_T *p,
 	    M_NFSDSTATE, M_WAITOK | M_ZERO);
 	ds->nfsdev_dvp = nd.ni_vp;
 	ds->nfsdev_nmp = VFSTONFS(nd.ni_vp->v_mount);
-	NFSVOPUNLOCK(nd.ni_vp, 0);
+	NFSVOPUNLOCK(nd.ni_vp);
 
 	dsdirsize = strlen(dspathp) + 16;
 	dsdirpath = malloc(dsdirsize, M_TEMP, M_WAITOK);
@@ -7611,7 +7626,7 @@ nfsrv_setdsserver(char *dspathp, char *mdspathp, NFSPROC_T *p,
 			break;
 		}
 		ds->nfsdev_dsdir[i] = nd.ni_vp;
-		NFSVOPUNLOCK(nd.ni_vp, 0);
+		NFSVOPUNLOCK(nd.ni_vp);
 	}
 	free(dsdirpath, M_TEMP);
 
@@ -7747,7 +7762,7 @@ nfsrv_deldsnmp(int op, struct nfsmount *nmp, NFSPROC_T *p)
  * point.
  * Also, returns an error instead of the nfsdevice found.
  */
-static int
+APPLESTATIC int
 nfsrv_delds(char *devid, NFSPROC_T *p)
 {
 	struct nfsdevice *ds, *fndds;
@@ -7879,7 +7894,7 @@ nfsrv_allocdevid(struct nfsdevice *ds, char *addr, char *dnshost)
 	 * as defined for Flexible File Layout) in XDR.
 	 */
 	addrlen = NFSM_RNDUP(strlen(addr)) + NFSM_RNDUP(strlen(netprot)) +
-	    9 * NFSX_UNSIGNED;
+	    14 * NFSX_UNSIGNED;
 	ds->nfsdev_flexaddrlen = addrlen;
 	tl = malloc(addrlen, M_NFSDSTATE, M_WAITOK | M_ZERO);
 	ds->nfsdev_flexaddr = (char *)tl;
@@ -7891,7 +7906,12 @@ nfsrv_allocdevid(struct nfsdevice *ds, char *addr, char *dnshost)
 	*tl++ = txdr_unsigned(strlen(addr));
 	NFSBCOPY(addr, tl, strlen(addr));
 	tl += (NFSM_RNDUP(strlen(addr)) / NFSX_UNSIGNED);
-	*tl++ = txdr_unsigned(1);		/* One NFS Version. */
+	*tl++ = txdr_unsigned(2);		/* Two NFS Versions. */
+	*tl++ = txdr_unsigned(NFS_VER4);	/* NFSv4. */
+	*tl++ = txdr_unsigned(NFSV42_MINORVERSION); /* Minor version 2. */
+	*tl++ = txdr_unsigned(NFS_SRVMAXIO);	/* DS max rsize. */
+	*tl++ = txdr_unsigned(NFS_SRVMAXIO);	/* DS max wsize. */
+	*tl++ = newnfs_true;			/* Tightly coupled. */
 	*tl++ = txdr_unsigned(NFS_VER4);	/* NFSv4. */
 	*tl++ = txdr_unsigned(NFSV41_MINORVERSION); /* Minor version 1. */
 	*tl++ = txdr_unsigned(NFS_SRVMAXIO);	/* DS max rsize. */
@@ -8221,7 +8241,7 @@ nfsrv_copymr(vnode_t vp, vnode_t fvp, vnode_t dvp, struct nfsdevice *ds,
 	didprintf = 0;
 	TAILQ_INIT(&thl);
 	/* Unlock the MDS vp, so that a LayoutReturn can be done on it. */
-	NFSVOPUNLOCK(vp, 0);
+	NFSVOPUNLOCK(vp);
 	/* Now, do a recall for all layouts not yet recalled. */
 tryagain:
 	NFSDRECALLLOCK();
@@ -8313,7 +8333,7 @@ tryagain2:
 	 * changed until the copy is complete.
 	 */
 	NFSVOPLOCK(vp, LK_EXCLUSIVE | LK_RETRY);
-	if (ret == 0 && (vp->v_iflag & VI_DOOMED) != 0) {
+	if (ret == 0 && VN_IS_DOOMED(vp)) {
 		NFSD_DEBUG(4, "nfsrv_copymr: lk_exclusive doomed\n");
 		ret = ESTALE;
 	}

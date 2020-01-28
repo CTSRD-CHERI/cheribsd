@@ -442,7 +442,8 @@ static bool dwarf_eh_find_callsite(struct _Unwind_Context *context,
 	while (callsite_table <= lsda->action_table)
 	{
 		// Once again, the layout deviates from the spec.
-		uint64_t call_site_start, call_site_size, landing_pad, action;
+		uint64_t call_site_start, call_site_size, action;
+		uintptr_t landing_pad;
 		call_site_start = read_value(lsda->callsite_encoding, &callsite_table);
 		call_site_size = read_value(lsda->callsite_encoding, &callsite_table);
 
@@ -455,6 +456,23 @@ static bool dwarf_eh_find_callsite(struct _Unwind_Context *context,
 		// Read the address of the landing pad and the action from the call
 		// site table.
 		landing_pad = read_value(lsda->callsite_encoding, &callsite_table);
+#ifdef __CHERI_PURE_CAPABILITY__
+		// In the pure-capability ABI, non-NULL landing pads are not offsets
+		// from the start of the function but rather a valid capability.
+		// A following capability is indicated by the magic value 0xc for landing_pad.
+		if (landing_pad != 0) {
+			// TODO: should probably return false instead of asserting
+			if (landing_pad != 0xc) {
+				fprintf(stderr, "libcxxrt: Read invalid capability marker "
+					"0x%x instead of 0xc. Ignoring landing pad\n", (unsigned)landing_pad);
+				return false;
+			}
+			// Read a capability from the next aligned address (must be valid)
+			callsite_table = __builtin_align_up(callsite_table, alignof(uintptr_t*));
+			landing_pad = assert_pointer_in_bounds(*((uintptr_t*)callsite_table));
+			callsite_table += sizeof(uintptr_t);
+		}
+#endif
 		action = read_uleb128(&callsite_table);
 
 		// We should not include the call_site_start (beginning of the region)
@@ -476,8 +494,15 @@ static bool dwarf_eh_find_callsite(struct _Unwind_Context *context,
 			// No landing pad means keep unwinding.
 			if (landing_pad)
 			{
+#ifdef __CHERI_PURE_CAPABILITY__
+				// If landing_pad is not NULL, it must be a valid pointer:
+				assert(__builtin_cheri_tag_get((void*)landing_pad));
+				// TODO: assert that it is a sentry once we use them by default
+				result->landing_pad = (dw_eh_ptr_t)landing_pad;
+#else
 				// Landing pad is the offset from the value in the header
 				result->landing_pad = lsda->landing_pads + landing_pad;
+#endif
 			}
 			return true;
 		}

@@ -151,21 +151,7 @@
 	/* If returning to userspace, restore saved user $ddc. */	\
 	cgetkr2c	CHERI_REG_KSCRATCH;				\
 	csetdefault	CHERI_REG_KSCRATCH; 				\
-	b	66f;							\
-	nop; /* delay slot */						\
 65:									\
-	/* If returning to kernelspace, reinstall kernel code $pcc. */	\
-	/*								\
-	 * XXXRW: If requested PC has been adjusted by stack, similarly	\
-	 * adjust $epcc.offset, which will overwrite an earlier $epc	\
-	 * assignment.							\
-	 * FIXME: this does not work with non-zero $pcc base		\
-	 */								\
-	MFC0	reg, MIPS_COP_0_EXC_PC;					\
-	CGetKCC		CHERI_REG_KSCRATCH;				\
-	CSetOffset	CHERI_REG_KSCRATCH, CHERI_REG_KSCRATCH, reg;	\
-	CSetEPCC	CHERI_REG_KSCRATCH;				\
-66:									\
 	/* Restore $c27. */						\
 	cgetkr1c	CHERI_REG_KSCRATCH;
 
@@ -174,6 +160,8 @@
  * already been moved to $krc2, and that if we write $krc2, it will get moved
  * to $ddc later.  Unlike kernel context switches, we both save and restore
  * the capability cause register.
+ *
+ * Note: EPCC is saved last so CHERI_REG_KSCRATCH will contain $epcc
  *
  * XXXRW: We should in fact also do this for the kernel version?
  */
@@ -210,19 +198,15 @@
 	SAVE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\
 	SAVE_U_PCB_CREG(CHERI_REG_C31, C31, pcb);			\
 	/* Save special registers after KSCRATCH (C27) */		\
-	CGetEPCC	CHERI_REG_KSCRATCH;				\
-	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb);			\
 	/* User DDC is saved in $kr2c. */				\
 	CGetKR2C	CHERI_REG_KSCRATCH;				\
 	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, DDC, pcb);			\
 	cgetcause	treg;						\
-	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb)
+	SAVE_U_PCB_REG(treg, CAPCAUSE, pcb);				\
+	/* EPCC is saved last so that it can be read from KSCRATCH */	\
+	CGetEPCC	CHERI_REG_KSCRATCH;				\
+	SAVE_U_PCB_CREG(CHERI_REG_KSCRATCH, PCC, pcb)
 
-
-#define RESTORE_EPCC(capreg, pc_vaddr, tmpreg)			\
-	/* update the address of EPCC to the return pc */ 	\
-	CSetOffset capreg, capreg, pc_vaddr;			\
-	CSetEPCC capreg;
 
 #define	RESTORE_CREGS_FROM_PCB(pcb, treg)				\
 	/* Restore special registers before KSCRATCH (C27) */		\
@@ -255,7 +239,7 @@
 	RESTORE_U_PCB_CREG(CHERI_REG_C24, C24, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C25, C25, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C26, IDC, pcb);			\
-	/* Wait to restore KSCRATCH (C27) until after EPCC */	\
+	RESTORE_U_PCB_CREG(CHERI_REG_C27, C27, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C28, C28, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C29, C29, pcb);			\
 	RESTORE_U_PCB_CREG(CHERI_REG_C30, C30, pcb);			\

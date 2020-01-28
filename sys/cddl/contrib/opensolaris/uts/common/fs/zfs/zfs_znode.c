@@ -1216,8 +1216,7 @@ again:
 
 		locked = VOP_ISLOCKED(vp);
 		VI_LOCK(vp);
-		if ((vp->v_iflag & VI_DOOMED) != 0 &&
-		    locked != LK_EXCLUSIVE) {
+		if (VN_IS_DOOMED(vp) && locked != LK_EXCLUSIVE) {
 			/*
 			 * The vnode is doomed and this thread doesn't
 			 * hold the exclusive lock on it, so the vnode
@@ -1273,7 +1272,7 @@ again:
 		err = insmntque(vp, zfsvfs->z_vfs);
 		if (err == 0) {
 			vp->v_hash = obj_num;
-			VOP_UNLOCK(vp, 0);
+			VOP_UNLOCK(vp);
 		} else {
 			zp->z_vnode = NULL;
 			zfs_znode_dmu_fini(zp);

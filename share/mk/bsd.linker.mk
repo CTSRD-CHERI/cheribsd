@@ -29,6 +29,8 @@ __<bsd.linker.mk>__:
 _ld_vars=LD $${_empty_var_}
 .if !empty(_WANT_TOOLCHAIN_CROSS_VARS)
 # Only the toplevel makefile needs to compute the X_LINKER_* variables.
+# This avoids unncessary fork+exec calls in every subdir (see bsd.compiler.mk)
+_ld_vars+=XLD X_
 # Also get version information from CHERI_LD (if it is set)
 .ifdef CHERI_LD
 _ld_vars+=CHERI_LD CHERI_
@@ -112,8 +114,16 @@ ${X_}LINKER_FEATURES=
 ${X_}LINKER_FEATURES+=	build-id
 ${X_}LINKER_FEATURES+=	ifunc
 .endif
+.if ${${X_}LINKER_TYPE} == "bfd" && ${${X_}LINKER_VERSION} > 21750
+${X_}LINKER_FEATURES+=	riscv-relaxations
+.endif
 .if ${${X_}LINKER_TYPE} == "lld" && ${${X_}LINKER_VERSION} >= 60000
 ${X_}LINKER_FEATURES+=	retpoline
+.endif
+
+.if ${${X_}LINKER_TYPE} == "lld" && ${${X_}LINKER_VERSION} >= 100000
+# If we are using lld 10.0 or newer we can use -Wl,--gdb-index without crashing
+${X_}LINKER_FEATURES+=	gdb-index
 .endif
 # Upstream lld does not have support for ifunc-noplt so check the FreeBSD
 # version to check if the flag is supported.

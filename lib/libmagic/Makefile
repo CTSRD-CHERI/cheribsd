@@ -39,15 +39,23 @@ MAGFILES=	${CONTRDIR}/magic/Header \
 magic: ${MAGFILES}
 	cat ${.ALLSRC:O} > ${.TARGET}
 
-magic.mgc: mkmagic magic
+magic.mgc: magic
 	${BTOOLSPATH:U.}/mkmagic magic
 
+.if ${MACHINE} == "host" || ${MK_DIRDEPS_BUILD} == "no"
 CLEANFILES+=	mkmagic
 DEPENDOBJS+=	mkmagic
 build-tools: mkmagic
 mkmagic: apprentice.c cdf_time.c encoding.c funcs.c magic.c print.c ${INCS} ${BUILD_TOOLS_META}
 	${BUILD_TOOLS_CC} ${BUILD_TOOLS_CFLAGS} -DCOMPILE_ONLY \
 	    ${BUILD_TOOLS_LDFLAGS} -o ${.TARGET} ${.ALLSRC:N*.h:O:u} ${LDADD}
+
+.endif
+.if ${MK_DIRDEPS_BUILD} == "yes"
+BTOOLSPATH= ${HOST_OBJTOP}/${RELDIR}
+.else
+magic.mgc: mkmagic
+.endif
 
 FILEVER!= awk '$$1 == "\#define" && $$2 == "VERSION" { print $$3; exit }' \
 			${.CURDIR}/config.h

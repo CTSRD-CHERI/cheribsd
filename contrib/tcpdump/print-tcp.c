@@ -275,11 +275,11 @@ _tcp_print(netdissect_options *ndo,
                         if (rev) {
                                 UNALIGNED_MEMCPY(&tha.src, dst, sizeof ip6->ip6_dst);
                                 UNALIGNED_MEMCPY(&tha.dst, src, sizeof ip6->ip6_src);
-                                tha.port = dport << 16 | sport;
+                                tha.port = ((u_int)dport) << 16 | sport;
                         } else {
                                 UNALIGNED_MEMCPY(&tha.dst, dst, sizeof ip6->ip6_dst);
                                 UNALIGNED_MEMCPY(&tha.src, src, sizeof ip6->ip6_src);
-                                tha.port = sport << 16 | dport;
+                                tha.port = ((u_int)sport) << 16 | dport;
                         }
 
                         for (th = &tcp_seq_hash[tha.port % TSEQ_HASHSIZE];
@@ -326,11 +326,11 @@ _tcp_print(netdissect_options *ndo,
                         if (rev) {
                                 UNALIGNED_MEMCPY(&tha.src, &ip->ip_dst, sizeof ip->ip_dst);
                                 UNALIGNED_MEMCPY(&tha.dst, &ip->ip_src, sizeof ip->ip_src);
-                                tha.port = dport << 16 | sport;
+                                tha.port = ((u_int)dport) << 16 | sport;
                         } else {
                                 UNALIGNED_MEMCPY(&tha.dst, &ip->ip_dst, sizeof ip->ip_dst);
                                 UNALIGNED_MEMCPY(&tha.src, &ip->ip_src, sizeof ip->ip_src);
-                                tha.port = sport << 16 | dport;
+                                tha.port = ((u_int)sport) << 16 | dport;
                         }
 
                         for (th = &tcp_seq_hash[tha.port % TSEQ_HASHSIZE];
@@ -722,6 +722,12 @@ _tcp_print(netdissect_options *ndo,
                 rtsp_print(ndo, bp, length);
         } else if (length > 2 &&
                  (IS_SRC_OR_DST_PORT(NAMESERVER_PORT))) {
+                /* domain_print() assumes it does not have to prepend a space before its
+                 * own output to separate it from the output of the calling function. This
+                 * works well with udp_print(), but requires a small prop here.
+                 */
+                ND_PRINT((ndo, " "));
+
                 /*
                  * TCP DNS query has 2byte length at the head.
                  * XXX packet could be unaligned, it can go strange

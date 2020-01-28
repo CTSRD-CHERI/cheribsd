@@ -8,7 +8,7 @@
  *
  * 1. Copyright Notice
  *
- * Some or all of this work - Copyright (c) 1999 - 2019, Intel Corp.
+ * Some or all of this work - Copyright (c) 1999 - 2020, Intel Corp.
  * All rights reserved.
  *
  * 2. License
@@ -1019,7 +1019,7 @@ AcpiDbCommandDispatch (
         if (ACPI_FAILURE (Status) || Temp64 >= ACPI_NUM_PREDEFINED_REGIONS)
         {
             AcpiOsPrintf (
-                "Invalid adress space ID: must be between 0 and %u inclusive\n",
+                "Invalid address space ID: must be between 0 and %u inclusive\n",
                 ACPI_NUM_PREDEFINED_REGIONS - 1);
             return (AE_OK);
         }

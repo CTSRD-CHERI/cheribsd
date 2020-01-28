@@ -124,8 +124,8 @@ MIASM =  \
 	freebsd11_freebsd64_lstat.o \
 	freebsd64_pathconf.o \
 	fpathconf.o \
-	getrlimit.o \
-	setrlimit.o \
+	freebsd64_getrlimit.o \
+	freebsd64_setrlimit.o \
 	freebsd11_freebsd64_getdirentries.o \
 	__syscall.o \
 	freebsd64___sysctl.o \

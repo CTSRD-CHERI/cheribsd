@@ -51,7 +51,6 @@
 #include <elf-hints.h>
 #include <link.h>
 #include <stdarg.h>
-/* We might as well do booleans like C++. */
 #include <stdbool.h>
 #include <setjmp.h>
 #include <stddef.h>

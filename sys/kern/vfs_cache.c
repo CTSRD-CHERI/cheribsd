@@ -332,9 +332,11 @@ cache_out_ts(struct namecache *ncp, struct timespec *tsp, int *ticksp)
 		*ticksp = ncp_ts->nc_ticks;
 }
 
+#ifdef DEBUG_CACHE
 static int __read_mostly	doingcache = 1;	/* 1 => enable the cache */
 SYSCTL_INT(_debug, OID_AUTO, vfscache, CTLFLAG_RW, &doingcache, 0,
     "VFS namecache enabled");
+#endif
 
 /* Export size information to userland */
 SYSCTL_INT(_debug_sizeof, OID_AUTO, namecache, CTLFLAG_RD, SYSCTL_NULL_INT_PTR,
@@ -1158,7 +1160,7 @@ cache_lookup_dot(struct vnode *dvp, struct vnode **vpp, struct componentname *cn
 	if (ltype != VOP_ISLOCKED(*vpp)) {
 		if (ltype == LK_EXCLUSIVE) {
 			vn_lock(*vpp, LK_UPGRADE | LK_RETRY);
-			if ((*vpp)->v_iflag & VI_DOOMED) {
+			if (VN_IS_DOOMED((*vpp))) {
 				/* forced unmount */
 				vrele(*vpp);
 				*vpp = NULL;
@@ -1300,10 +1302,12 @@ cache_lookup(struct vnode *dvp, struct vnode **vpp, struct componentname *cnp,
 	enum vgetstate vs;
 	int error, ltype;
 
+#ifdef DEBUG_CACHE
 	if (__predict_false(!doingcache)) {
 		cnp->cn_flags &= ~MAKEENTRY;
 		return (0);
 	}
+#endif
 
 	counter_u64_add(numcalls, 1);
 
@@ -1392,14 +1396,14 @@ success:
 	ltype = 0;	/* silence gcc warning */
 	if (cnp->cn_flags & ISDOTDOT) {
 		ltype = VOP_ISLOCKED(dvp);
-		VOP_UNLOCK(dvp, 0);
+		VOP_UNLOCK(dvp);
 	}
 	vs = vget_prep(*vpp);
 	cache_lookup_unlock(blp, dvlp);
 	error = vget_finish(*vpp, cnp->cn_lkflags, vs);
 	if (cnp->cn_flags & ISDOTDOT) {
 		vn_lock(dvp, ltype | LK_RETRY);
-		if (dvp->v_iflag & VI_DOOMED) {
+		if (VN_IS_DOOMED(dvp)) {
 			if (error == 0)
 				vput(*vpp);
 			*vpp = NULL;
@@ -1659,6 +1663,33 @@ cache_enter_unlock(struct celockstate *cel)
 	cache_unlock_vnodes_cel(cel);
 }
 
+static void __noinline
+cache_enter_dotdot_prep(struct vnode *dvp, struct vnode *vp,
+    struct componentname *cnp)
+{
+	struct celockstate cel;
+	struct namecache *ncp;
+	uint32_t hash;
+	int len;
+
+	if (dvp->v_cache_dd == NULL)
+		return;
+	len = cnp->cn_namelen;
+	cache_celockstate_init(&cel);
+	hash = cache_get_hash(cnp->cn_nameptr, len, dvp);
+	cache_enter_lock_dd(&cel, dvp, vp, hash);
+	ncp = dvp->v_cache_dd;
+	if (ncp != NULL && (ncp->nc_flag & NCF_ISDOTDOT)) {
+		KASSERT(ncp->nc_dvp == dvp, ("wrong isdotdot parent"));
+		cache_zap_locked(ncp, false);
+	} else {
+		ncp = NULL;
+	}
+	dvp->v_cache_dd = NULL;
+	cache_enter_unlock(&cel);
+	cache_free(ncp);
+}
+
 /*
  * Add an entry to the cache.
  */
@@ -1670,21 +1701,32 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 	struct namecache *ncp, *n2, *ndd;
 	struct namecache_ts *ncp_ts, *n2_ts;
 	struct nchashhead *ncpp;
-	struct neglist *neglist;
 	uint32_t hash;
 	int flag;
 	int len;
-	bool neg_locked, held_dvp;
+	bool held_dvp;
 	u_long lnumcache;
 
 	CTR3(KTR_VFS, "cache_enter(%p, %p, %s)", dvp, vp, cnp->cn_nameptr);
-	VNASSERT(vp == NULL || (vp->v_iflag & VI_DOOMED) == 0, vp,
+	VNASSERT(vp == NULL || !VN_IS_DOOMED(vp), vp,
 	    ("cache_enter: Adding a doomed vnode"));
-	VNASSERT(dvp == NULL || (dvp->v_iflag & VI_DOOMED) == 0, dvp,
+	VNASSERT(dvp == NULL || !VN_IS_DOOMED(dvp), dvp,
 	    ("cache_enter: Doomed vnode used as src"));
 
+#ifdef DEBUG_CACHE
 	if (__predict_false(!doingcache))
 		return;
+#endif
+
+	flag = 0;
+	if (__predict_false(cnp->cn_nameptr[0] == '.')) {
+		if (cnp->cn_namelen == 1)
+			return;
+		if (cnp->cn_namelen == 2 && cnp->cn_nameptr[1] == '.') {
+			cache_enter_dotdot_prep(dvp, vp, cnp);
+			flag = NCF_ISDOTDOT;
+		}
+	}
 
 	/*
 	 * Avoid blowout in namecache entries.
@@ -1698,65 +1740,6 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 	cache_celockstate_init(&cel);
 	ndd = NULL;
 	ncp_ts = NULL;
-	flag = 0;
-	if (cnp->cn_nameptr[0] == '.') {
-		if (cnp->cn_namelen == 1)
-			return;
-		if (cnp->cn_namelen == 2 && cnp->cn_nameptr[1] == '.') {
-			len = cnp->cn_namelen;
-			hash = cache_get_hash(cnp->cn_nameptr, len, dvp);
-			cache_enter_lock_dd(&cel, dvp, vp, hash);
-			/*
-			 * If dotdot entry already exists, just retarget it
-			 * to new parent vnode, otherwise continue with new
-			 * namecache entry allocation.
-			 */
-			if ((ncp = dvp->v_cache_dd) != NULL &&
-			    ncp->nc_flag & NCF_ISDOTDOT) {
-				KASSERT(ncp->nc_dvp == dvp,
-				    ("wrong isdotdot parent"));
-				neg_locked = false;
-				if (ncp->nc_flag & NCF_NEGATIVE || vp == NULL) {
-					neglist = NCP2NEGLIST(ncp);
-					mtx_lock(&ncneg_hot.nl_lock);
-					mtx_lock(&neglist->nl_lock);
-					neg_locked = true;
-				}
-				if (!(ncp->nc_flag & NCF_NEGATIVE)) {
-					TAILQ_REMOVE(&ncp->nc_vp->v_cache_dst,
-					    ncp, nc_dst);
-				} else {
-					cache_negative_remove(ncp, true);
-				}
-				if (vp != NULL) {
-					TAILQ_INSERT_HEAD(&vp->v_cache_dst,
-					    ncp, nc_dst);
-					if (ncp->nc_flag & NCF_HOTNEGATIVE)
-						numhotneg--;
-					ncp->nc_flag &= ~(NCF_NEGATIVE|NCF_HOTNEGATIVE);
-				} else {
-					if (ncp->nc_flag & NCF_HOTNEGATIVE) {
-						numhotneg--;
-						ncp->nc_flag &= ~(NCF_HOTNEGATIVE);
-					}
-					ncp->nc_flag |= NCF_NEGATIVE;
-					cache_negative_insert(ncp, true);
-				}
-				if (neg_locked) {
-					mtx_unlock(&neglist->nl_lock);
-					mtx_unlock(&ncneg_hot.nl_lock);
-				}
-				ncp->nc_vp = vp;
-				cache_enter_unlock(&cel);
-				return;
-			}
-			dvp->v_cache_dd = NULL;
-			cache_enter_unlock(&cel);
-			cache_celockstate_init(&cel);
-			SDT_PROBE3(vfs, namecache, enter, done, dvp, "..", vp);
-			flag = NCF_ISDOTDOT;
-		}
-	}
 
 	held_dvp = false;
 	if (LIST_EMPTY(&dvp->v_cache_src) && flag != NCF_ISDOTDOT) {
@@ -2384,7 +2367,7 @@ vn_vptocnp(struct vnode **vp, struct ucred *cred, char *buf, u_int *buflen)
 	}
 
 	*vp = dvp;
-	if (dvp->v_iflag & VI_DOOMED) {
+	if (VN_IS_DOOMED(dvp)) {
 		/* forced unmount */
 		vrele(dvp);
 		error = ENOENT;
@@ -2448,7 +2431,7 @@ vn_fullpath1(struct thread *td, struct vnode *vp, struct vnode *rdir,
 			 * mnt_vnodecovered can be NULL only for the
 			 * case of unmount.
 			 */
-			if ((vp->v_iflag & VI_DOOMED) != 0 ||
+			if (VN_IS_DOOMED(vp) ||
 			    (vp1 = vp->v_mount->mnt_vnodecovered) == NULL ||
 			    vp1->v_mountedhere != vp->v_mount) {
 				vput(vp);
@@ -2581,7 +2564,7 @@ vn_path_to_global_path(struct thread *td, struct vnode *vp, char *path,
 		return (ENODEV);
 
 	/* Construct global filesystem path from vp. */
-	VOP_UNLOCK(vp, 0);
+	VOP_UNLOCK(vp);
 	error = vn_fullpath_global(td, vp, &rpath, &fbuf);
 
 	if (error != 0) {

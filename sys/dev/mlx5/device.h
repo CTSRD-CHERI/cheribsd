@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2013-2018, Mellanox Technologies, Ltd.  All rights reserved.
+ * Copyright (c) 2013-2019, Mellanox Technologies, Ltd.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -361,6 +361,7 @@ enum {
 	MLX5_OPCODE_ATOMIC_MASKED_FA	= 0x15,
 	MLX5_OPCODE_BIND_MW		= 0x18,
 	MLX5_OPCODE_CONFIG_CMD		= 0x1f,
+	MLX5_OPCODE_DUMP		= 0x23,
 
 	MLX5_RECV_OPCODE_RDMA_WRITE_IMM	= 0x00,
 	MLX5_RECV_OPCODE_SEND		= 0x01,
@@ -379,6 +380,18 @@ enum {
 	MLX5_OPCODE_UMR			= 0x25,
 
 	MLX5_OPCODE_SIGNATURE_CANCELED	= (1 << 15),
+};
+
+enum {
+	MLX5_OPCODE_MOD_UMR_UMR = 0x0,
+	MLX5_OPCODE_MOD_UMR_TLS_TIS_STATIC_PARAMS = 0x1,
+	MLX5_OPCODE_MOD_UMR_TLS_TIR_STATIC_PARAMS = 0x2,
+};
+
+enum {
+	MLX5_OPCODE_MOD_PSV_PSV = 0x0,
+	MLX5_OPCODE_MOD_PSV_TLS_TIS_PROGRESS_PARAMS = 0x1,
+	MLX5_OPCODE_MOD_PSV_TLS_TIR_PROGRESS_PARAMS = 0x2,
 };
 
 enum {
@@ -919,6 +932,10 @@ enum mlx5_cap_type {
 	MLX5_CAP_VECTOR_CALC,
 	MLX5_CAP_QOS,
 	MLX5_CAP_DEBUG,
+	MLX5_CAP_NVME,
+	MLX5_CAP_DMC,
+	MLX5_CAP_DEC,
+	MLX5_CAP_TLS,
 	/* NUM OF CAP Types */
 	MLX5_CAP_NUM
 };
@@ -950,6 +967,9 @@ enum mlx5_mcam_feature_groups {
 /* GET Dev Caps macros */
 #define MLX5_CAP_GEN(mdev, cap) \
 	MLX5_GET(cmd_hca_cap, mdev->hca_caps_cur[MLX5_CAP_GENERAL], cap)
+
+#define	MLX5_CAP_GEN_64(mdev, cap)					\
+	MLX5_GET64(cmd_hca_cap, mdev->hca_caps_cur[MLX5_CAP_GENERAL], cap)
 
 #define MLX5_CAP_GEN_MAX(mdev, cap) \
 	MLX5_GET(cmd_hca_cap, mdev->hca_caps_max[MLX5_CAP_GENERAL], cap)
@@ -1075,6 +1095,9 @@ enum mlx5_mcam_feature_groups {
 
 #define MLX5_CAP64_FPGA(mdev, cap) \
 	MLX5_GET64(fpga_cap, (mdev)->caps.fpga, cap)
+
+#define	MLX5_CAP_TLS(mdev, cap) \
+	MLX5_GET(tls_capabilities, (mdev)->hca_caps_cur[MLX5_CAP_TLS], cap)
 
 enum {
 	MLX5_CMD_STAT_OK			= 0x0,

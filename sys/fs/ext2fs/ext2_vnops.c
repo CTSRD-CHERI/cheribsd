@@ -182,6 +182,7 @@ struct vop_vector ext2_vnodeops = {
 #endif /* UFS_ACL */
 	.vop_vptofh =		ext2_vptofh,
 };
+VFS_VOP_VECTOR_REGISTER(ext2_vnodeops);
 
 struct vop_vector ext2_fifoops = {
 	.vop_default =		&fifo_specops,
@@ -199,6 +200,7 @@ struct vop_vector ext2_fifoops = {
 	.vop_write =		VOP_PANIC,
 	.vop_vptofh =		ext2_vptofh,
 };
+VFS_VOP_VECTOR_REGISTER(ext2_fifoops);
 
 /*
  * A virgin directory (no blushing please).
@@ -835,13 +837,13 @@ abortit:
 	ip = VTOI(fvp);
 	if (ip->i_nlink >= EXT4_LINK_MAX &&
 	    !EXT2_HAS_RO_COMPAT_FEATURE(ip->i_e2fs, EXT2F_ROCOMPAT_DIR_NLINK)) {
-		VOP_UNLOCK(fvp, 0);
+		VOP_UNLOCK(fvp);
 		error = EMLINK;
 		goto abortit;
 	}
 	if ((ip->i_flags & (NOUNLINK | IMMUTABLE | APPEND))
 	    || (dp->i_flags & APPEND)) {
-		VOP_UNLOCK(fvp, 0);
+		VOP_UNLOCK(fvp);
 		error = EPERM;
 		goto abortit;
 	}
@@ -852,7 +854,7 @@ abortit:
 		if ((fcnp->cn_namelen == 1 && fcnp->cn_nameptr[0] == '.') ||
 		    dp == ip || (fcnp->cn_flags | tcnp->cn_flags) & ISDOTDOT ||
 		    (ip->i_flag & IN_RENAME)) {
-			VOP_UNLOCK(fvp, 0);
+			VOP_UNLOCK(fvp);
 			error = EINVAL;
 			goto abortit;
 		}
@@ -880,7 +882,7 @@ abortit:
 	ext2_inc_nlink(ip);
 	ip->i_flag |= IN_CHANGE;
 	if ((error = ext2_update(fvp, !DOINGASYNC(fvp))) != 0) {
-		VOP_UNLOCK(fvp, 0);
+		VOP_UNLOCK(fvp);
 		goto bad;
 	}
 
@@ -895,7 +897,7 @@ abortit:
 	 * call to checkpath().
 	 */
 	error = VOP_ACCESS(fvp, VWRITE, tcnp->cn_cred, tcnp->cn_thread);
-	VOP_UNLOCK(fvp, 0);
+	VOP_UNLOCK(fvp);
 	if (oldparent != dp->i_number)
 		newparent = dp->i_number;
 	if (doingdirectory && newparent) {
@@ -1492,7 +1494,7 @@ ext2_rmdir(struct vop_rmdir_args *ap)
 	ext2_dec_nlink(dp);
 	dp->i_flag |= IN_CHANGE;
 	cache_purge(dvp);
-	VOP_UNLOCK(dvp, 0);
+	VOP_UNLOCK(dvp);
 	/*
 	 * Truncate inode.  The only stuff left
 	 * in the directory is "." and "..".
@@ -1502,7 +1504,7 @@ ext2_rmdir(struct vop_rmdir_args *ap)
 	    cnp->cn_thread);
 	cache_purge(ITOV(ip));
 	if (vn_lock(dvp, LK_EXCLUSIVE | LK_NOWAIT) != 0) {
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vn_lock(dvp, LK_EXCLUSIVE | LK_RETRY);
 		vn_lock(vp, LK_EXCLUSIVE | LK_RETRY);
 	}

@@ -131,7 +131,7 @@ cluster_read(struct vnode *vp, u_quad_t filesize, daddr_t lblkno, long size,
 	/*
 	 * get the requested block
 	 */
-	error = getblkx(vp, lblkno, size, 0, 0, gbflags, &bp);
+	error = getblkx(vp, lblkno, lblkno, size, 0, 0, gbflags, &bp);
 	if (error != 0) {
 		*bpp = NULL;
 		return (error);
@@ -865,8 +865,7 @@ cluster_wbuild(struct vnode *vp, long size, daddr_t start_lbn, int len,
 		  (tbp->b_bcount != tbp->b_bufsize) ||
 		  (tbp->b_bcount != size) ||
 		  (len == 1) ||
-		  ((bp = uma_zalloc(cluster_pbuf_zone,
-		  (vp->v_vflag & VV_MD) != 0 ? M_NOWAIT : M_WAITOK)) == NULL)) {
+		  ((bp = uma_zalloc(cluster_pbuf_zone, M_NOWAIT)) == NULL)) {
 			totalwritten += tbp->b_bufsize;
 			bawrite(tbp);
 			++start_lbn;

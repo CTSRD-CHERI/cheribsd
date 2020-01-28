@@ -1145,6 +1145,7 @@ static struct syscall_helper_data shm32_syscalls[] = {
 #endif
 
 #ifdef COMPAT_FREEBSD64
+#include <compat/freebsd64/freebsd64.h>
 #include <compat/freebsd64/freebsd64_proto.h>
 #include <compat/freebsd64/freebsd64_syscall.h>
 #include <compat/freebsd64/freebsd64_util.h>
@@ -2164,8 +2165,7 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 
 	/* IPC_SET needs to copyin the buffer before calling kern_shmctl */
 	if (uap->cmd == IPC_SET) {
-		if ((error = copyin(__USER_CAP_OBJ(uap->buf), &old,
-		    sizeof(old))))
+		if ((error = copyincap(uap->buf, &old, sizeof(old))))
 			goto done;
 		ipcperm_old2new(&old.shm_perm, &buf.shm_perm);
 		CP(old, buf, shm_segsz);
@@ -2200,7 +2200,7 @@ freebsd7_shmctl(struct thread *td, struct freebsd7_shmctl_args *uap)
 		CP(buf, old, shm_dtime);
 		CP(buf, old, shm_ctime);
 		old.shm_internal = NULL;
-		error = copyout(&old, __USER_CAP_OBJ(uap->buf), sizeof(old));
+		error = copyoutcap(&old, uap->buf, sizeof(old));
 		break;
 	}
 

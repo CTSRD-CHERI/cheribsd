@@ -863,10 +863,10 @@
 				    int sd, void *msg, int mlen, \
 				    struct sockaddr *to, __socklen_t tolen, \
 				    struct sctp_sndrcvinfo *sinfo, int flags); }
-473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOPROTO|NOSTD	{ int sctp_generic_sendmsg_iov(int sd, struct iovec *iov, int iovlen, \
+473	AUE_SCTP_GENERIC_SENDMSG_IOV	NOSTD	{ int freebsd32_sctp_generic_sendmsg_iov(int sd, struct iovec32 *iov, int iovlen, \
 				    struct sockaddr *to, __socklen_t tolen, \
 				    struct sctp_sndrcvinfo *sinfo, int flags); }
-474	AUE_SCTP_GENERIC_RECVMSG	NOPROTO|NOSTD	{ int sctp_generic_recvmsg(int sd, struct iovec *iov, int iovlen, \
+474	AUE_SCTP_GENERIC_RECVMSG	NOSTD	{ int freebsd32_sctp_generic_recvmsg(int sd, struct iovec32 *iov, int iovlen, \
 				    struct sockaddr * from, __socklen_t *fromlenaddr, \
 				    struct sctp_sndrcvinfo *sinfo, int *msg_flags); }
 #ifdef PAD64_REQUIRED

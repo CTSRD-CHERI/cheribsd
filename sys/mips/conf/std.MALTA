@@ -30,7 +30,9 @@ options 	MAC			# TrustedBSD MAC Framework
 options 	SYSVSHM
 options 	SYSVMSG
 options 	SYSVSEM
-options 	COMPAT_FREEBSD11	# Support FreeBSD 11 syscalls
+options 	COMPAT_FREEBSD10
+options 	COMPAT_FREEBSD11
+options 	COMPAT_FREEBSD12
 options 	MIPS_SHAREDPAGE		# Enable shared page support
 
 options 	TMPFS			#Efficient memory filesystem

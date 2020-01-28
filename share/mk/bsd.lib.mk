@@ -56,6 +56,9 @@ NO_WERROR=
 
 .if defined(DEBUG_FLAGS)
 CFLAGS+= ${DEBUG_FLAGS}
+.if ${LINKER_FEATURES:Mgdb-index}
+SOLINKOPTS+= -Wl,--gdb-index
+.endif
 
 .if ${MK_CTF} != "no" && ${DEBUG_FLAGS:M-g} != ""
 CTFFLAGS+= -g
@@ -108,6 +111,10 @@ STATIC_CXXFLAGS+= -ftls-model=initial-exec
 .if ${MACHINE_ARCH:Mmips64*} && ${COMPILER_TYPE} == "clang"
 STATIC_CFLAGS+= -ftls-model=initial-exec
 STATIC_CXXFLAGS+= -ftls-model=initial-exec
+.endif
+
+.if ${MACHINE_CPUARCH} == "riscv" && ${LINKER_FEATURES:Mriscv-relaxations} == ""
+CFLAGS += -mno-relax
 .endif
 
 .include <bsd.libnames.mk>

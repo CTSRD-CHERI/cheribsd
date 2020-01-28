@@ -22,6 +22,8 @@ SUBDIR_BOOTSTRAP= \
 	${_libcplusplus} \
 	${_libcxxrt} \
 	libelf \
+	libssp \
+	libssp_nonshared \
 	msun
 
 # The main list; please keep these sorted alphabetically.
@@ -113,7 +115,9 @@ SUBDIR_DEPEND_libarchive= libz libbz2 libexpat liblzma libmd libzstd
 SUBDIR_DEPEND_libauditdm= libbsm
 SUBDIR_DEPEND_libbsnmp= ${_libnetgraph}
 SUBDIR_DEPEND_libc++:= libcxxrt
-SUBDIR_DEPEND_libc= libcompiler_rt
+# libssp_nonshared doesn't need to be linked into libc on every arch, but it is
+# small enough to build that this bit of serialization is likely insignificant.
+SUBDIR_DEPEND_libc= libcompiler_rt libssp_nonshared
 SUBDIR_DEPEND_libcam= libsbuf
 SUBDIR_DEPEND_libcasper= libnv
 SUBDIR_DEPEND_libdevstat= libkvm
@@ -145,10 +149,10 @@ SUBDIR.${MK_BLACKLIST}+=libblacklist
 SUBDIR.${MK_BLUETOOTH}+=libbluetooth libsdp
 SUBDIR.${MK_BSNMP}+=	libbsnmp
 
-SUBDIR.${MK_CHERI}+=	libhelloworld
+SUBDIR.${MK_LIBCHERI}+=	libhelloworld
 SUBDIR.${MK_CHERI}+=	libsyscalls
 
-.if (${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} != "no") && ${MACHINE_ARCH} != "mips"
+.if ${MK_LIBCHERI} == "yes" && ${MACHINE_ARCH} != "mips"
 _libc_cheri=	libc_cheri
 _libcheri=	libcheri
 .endif
@@ -181,10 +185,12 @@ SUBDIR.${MK_STATS}+=	libstats
 .if ${COMPILER_TYPE} == "clang"
 .if (${MACHINE_CPUARCH} == "aarch64" || ${MACHINE_CPUARCH} == "amd64" || \
     ${MACHINE_CPUARCH} == "arm" || ${MACHINE_CPUARCH} == "i386" || \
+    ${MACHINE_CPUARCH} == "powerpc" || \
     ${MACHINE_ARCH:Mmips64*}) && \
     ! ${MACHINE_ARCH:Mmips*c*}
 _libclang_rt=	libclang_rt
-.elif ! ${MACHINE_ARCH:Mmips*c*} && ${MACHINE_ARCH} != "mips"
+.elif ! ${MACHINE_ARCH:Mmips*c*} && ${MACHINE_ARCH} != "mips" && \
+    ! ${MACHINE_ARCH:Mriscv*}
 .error "NOT BUILDING libclang_rt for ${MACHINE_ARCH}"
 .endif
 .endif # ${COMPILER_TYPE} == "clang"
@@ -261,8 +267,8 @@ SUBDIR:=	${SUBDIR:Nlibc++experimental}
 
 .if ${MACHINE_ARCH:Mmips*c*}
 SUBDIR+=	libmalloc_simple
-SUBDIR+=	libcheri_syscalls
-SUBDIR+=	libcheri_support
+SUBDIR.${MK_LIBCHERI}+=	libcheri_syscalls
+SUBDIR.${MK_LIBCHERI}+=	libcheri_support
 .endif
 
 .include <bsd.subdir.mk>

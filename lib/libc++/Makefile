@@ -8,12 +8,10 @@ WANT_CHERI?=	hybrid
 _LIBCXXRTDIR=   ${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/include
 SRCDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/src
-_LIBCXX_VERSION=9
 .else
 _LIBCXXRTDIR=	${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/include
 SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/src
-_LIBCXX_VERSION=8
 .endif
 CXXINCLUDEDIR=	${INCLUDEDIR}/c++/v${SHLIB_MAJOR}
 .if ${MACHINE_CPUARCH} == "arm"

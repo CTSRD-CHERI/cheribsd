@@ -241,7 +241,7 @@ vm_object_zinit(void *mem, int size, int flags)
 
 static void
 _vm_object_allocate(objtype_t type, vm_pindex_t size, u_short flags,
-    vm_object_t object)
+    vm_object_t object, void *handle)
 {
 
 	TAILQ_INIT(&object->memq);
@@ -280,7 +280,7 @@ _vm_object_allocate(objtype_t type, vm_pindex_t size, u_short flags,
 	object->memattr = VM_MEMATTR_DEFAULT;
 	object->cred = NULL;
 	object->charge = 0;
-	object->handle = NULL;
+	object->handle = handle;
 	object->backing_object = NULL;
 	object->backing_object_offset = (vm_ooffset_t) 0;
 #if VM_NRESERVLEVEL > 0
@@ -302,7 +302,7 @@ vm_object_init(void)
 	
 	rw_init(&kernel_object->lock, "kernel vm object");
 	_vm_object_allocate(OBJT_PHYS, atop(VM_MAX_KERNEL_ADDRESS -
-	    VM_MIN_KERNEL_ADDRESS), OBJ_UNMANAGED, kernel_object);
+	    VM_MIN_KERNEL_ADDRESS), OBJ_UNMANAGED, kernel_object, NULL);
 #if VM_NRESERVLEVEL > 0
 	kernel_object->flags |= OBJ_COLORED;
 	kernel_object->pg_color = (u_short)atop(VM_MIN_KERNEL_ADDRESS);
@@ -446,7 +446,7 @@ vm_object_allocate(objtype_t type, vm_pindex_t size)
 		panic("vm_object_allocate: type %d is undefined", type);
 	}
 	object = (vm_object_t)uma_zalloc(obj_zone, M_WAITOK);
-	_vm_object_allocate(type, size, flags, object);
+	_vm_object_allocate(type, size, flags, object, NULL);
 
 	return (object);
 }
@@ -459,14 +459,22 @@ vm_object_allocate(objtype_t type, vm_pindex_t size)
  *	to be initialized by the caller.
  */
 vm_object_t
-vm_object_allocate_anon(vm_pindex_t size)
+vm_object_allocate_anon(vm_pindex_t size, vm_object_t backing_object,
+    struct ucred *cred, vm_size_t charge)
 {
-	vm_object_t object;
+	vm_object_t handle, object;
 
-	object = (vm_object_t)uma_zalloc(obj_zone, M_WAITOK);
+	if (backing_object == NULL)
+		handle = NULL;
+	else if ((backing_object->flags & OBJ_ANON) != 0)
+		handle = backing_object->handle;
+	else
+		handle = backing_object;
+	object = uma_zalloc(obj_zone, M_WAITOK);
 	_vm_object_allocate(OBJT_DEFAULT, size, OBJ_ANON | OBJ_ONEMAPPING,
-	    object);
-
+	    object, handle);
+	object->cred = cred;
+	object->charge = cred != NULL ? charge : 0;
 	return (object);
 }
 
@@ -480,11 +488,28 @@ vm_object_allocate_anon(vm_pindex_t size)
 void
 vm_object_reference(vm_object_t object)
 {
+	struct vnode *vp;
+	u_int old;
+
 	if (object == NULL)
 		return;
-	VM_OBJECT_RLOCK(object);
-	vm_object_reference_locked(object);
-	VM_OBJECT_RUNLOCK(object);
+
+	/*
+	 * Many places assume exclusive access to objects with a single
+	 * ref. vm_object_collapse() in particular will directly mainpulate
+	 * references for objects in this state.  vnode objects only need
+	 * the lock for the first ref to reference the vnode.
+	 */
+	if (!refcount_acquire_if_gt(&object->ref_count,
+	    object->type == OBJT_VNODE ? 0 : 1)) {
+		VM_OBJECT_RLOCK(object);
+		old = refcount_acquire(&object->ref_count);
+		if (object->type == OBJT_VNODE && old == 0) {
+			vp = object->handle;
+			vref(vp);
+		}
+		VM_OBJECT_RUNLOCK(object);
+	}
 }
 
 /*
@@ -498,10 +523,11 @@ void
 vm_object_reference_locked(vm_object_t object)
 {
 	struct vnode *vp;
+	u_int old;
 
 	VM_OBJECT_ASSERT_LOCKED(object);
-	refcount_acquire(&object->ref_count);
-	if (object->type == OBJT_VNODE) {
+	old = refcount_acquire(&object->ref_count);
+	if (object->type == OBJT_VNODE && old == 0) {
 		vp = object->handle;
 		vref(vp);
 	}
@@ -514,16 +540,22 @@ static void
 vm_object_vndeallocate(vm_object_t object)
 {
 	struct vnode *vp = (struct vnode *) object->handle;
+	bool last;
 
 	KASSERT(object->type == OBJT_VNODE,
 	    ("vm_object_vndeallocate: not a vnode object"));
 	KASSERT(vp != NULL, ("vm_object_vndeallocate: missing vp"));
 
-	if (refcount_release(&object->ref_count) &&
-	    !umtx_shm_vnobj_persistent)
+	/* Object lock to protect handle lookup. */
+	last = refcount_release(&object->ref_count);
+	VM_OBJECT_RUNLOCK(object);
+
+	if (!last)
+		return;
+
+	if (!umtx_shm_vnobj_persistent)
 		umtx_shm_object_terminated(object);
 
-	VM_OBJECT_RUNLOCK(object);
 	/* vrele may need the vnode lock. */
 	vrele(vp);
 }
@@ -542,16 +574,10 @@ vm_object_vndeallocate(vm_object_t object)
 void
 vm_object_deallocate(vm_object_t object)
 {
-	vm_object_t temp;
+	vm_object_t robject, temp;
 	bool released;
 
 	while (object != NULL) {
-		VM_OBJECT_RLOCK(object);
-		if (object->type == OBJT_VNODE) {
-			vm_object_vndeallocate(object);
-			return;
-		}
-
 		/*
 		 * If the reference count goes to 0 we start calling
 		 * vm_object_terminate() on the object chain.  A ref count
@@ -563,33 +589,41 @@ vm_object_deallocate(vm_object_t object)
 			released = refcount_release_if_gt(&object->ref_count, 1);
 		else
 			released = refcount_release_if_gt(&object->ref_count, 2);
-		VM_OBJECT_RUNLOCK(object);
 		if (released)
 			return;
 
-		VM_OBJECT_WLOCK(object);
-		KASSERT(object->ref_count != 0,
-			("vm_object_deallocate: object deallocated too many times: %d", object->type));
+		if (object->type == OBJT_VNODE) {
+			VM_OBJECT_RLOCK(object);
+			if (object->type == OBJT_VNODE) {
+				vm_object_vndeallocate(object);
+				return;
+			}
+			VM_OBJECT_RUNLOCK(object);
+		}
 
-		refcount_release(&object->ref_count);
+		VM_OBJECT_WLOCK(object);
+		KASSERT(object->ref_count > 0,
+		    ("vm_object_deallocate: object deallocated too many times: %d",
+		    object->type));
+
+		if (refcount_release(&object->ref_count))
+			goto doterm;
 		if (object->ref_count > 1) {
 			VM_OBJECT_WUNLOCK(object);
 			return;
 		} else if (object->ref_count == 1) {
 			if (object->shadow_count == 0 &&
-			    object->handle == NULL &&
 			    (object->flags & OBJ_ANON) != 0) {
 				vm_object_set_flag(object, OBJ_ONEMAPPING);
-			} else if ((object->shadow_count == 1) &&
-			    (object->handle == NULL) &&
-			    (object->flags & OBJ_ANON) != 0) {
-				vm_object_t robject;
-
+			} else if (object->shadow_count == 1) {
+				KASSERT((object->flags & OBJ_ANON) != 0,
+				    ("obj %p with shadow_count > 0 is not anon",
+				    object));
 				robject = LIST_FIRST(&object->shadow_head);
 				KASSERT(robject != NULL,
-				    ("vm_object_deallocate: ref_count: %d, shadow_count: %d",
-					 object->ref_count,
-					 object->shadow_count));
+				    ("vm_object_deallocate: ref_count: %d, "
+				    "shadow_count: %d", object->ref_count,
+				    object->shadow_count));
 				KASSERT((robject->flags & OBJ_TMPFS_NODE) == 0,
 				    ("shadowed tmpfs v_object %p", object));
 				if (!VM_OBJECT_TRYWLOCK(robject)) {
@@ -614,8 +648,7 @@ vm_object_deallocate(vm_object_t object)
 				 * deallocating its shadow.
 				 */
 				if ((robject->flags &
-				    (OBJ_DEAD | OBJ_ANON)) == OBJ_ANON &&
-				    robject->handle == NULL) {
+				    (OBJ_DEAD | OBJ_ANON)) == OBJ_ANON) {
 
 					refcount_acquire(&robject->ref_count);
 retry:
@@ -644,7 +677,7 @@ retry:
 						VM_OBJECT_WUNLOCK(object);
 
 					if (robject->ref_count == 1) {
-						robject->ref_count--;
+						refcount_release(&robject->ref_count);
 						object = robject;
 						goto doterm;
 					}
@@ -876,7 +909,7 @@ vm_object_page_remove_write(vm_page_t p, int flags, boolean_t *allclean)
 	 * nosync page, skip it.  Note that the object flags were not
 	 * cleared in this case so we do not have to set them.
 	 */
-	if ((flags & OBJPC_NOSYNC) != 0 && (p->aflags & PGA_NOSYNC) != 0) {
+	if ((flags & OBJPC_NOSYNC) != 0 && (p->a.flags & PGA_NOSYNC) != 0) {
 		*allclean = FALSE;
 		return (FALSE);
 	} else {
@@ -1105,7 +1138,7 @@ vm_object_sync(vm_object_t object, vm_ooffset_t offset, vm_size_t size,
 		VM_OBJECT_WUNLOCK(object);
 		if (fsync_after)
 			error = VOP_FSYNC(vp, MNT_WAIT, curthread);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		vn_finished_write(mp);
 		if (error != 0)
 			res = FALSE;
@@ -1272,9 +1305,7 @@ next_page:
 			vm_page_busy_sleep(tm, "madvpo", false);
   			goto relookup;
 		}
-		vm_page_lock(tm);
 		vm_page_advise(tm, advice);
-		vm_page_unlock(tm);
 		vm_page_xunbusy(tm);
 		vm_object_madvise_freespace(tobject, advice, tm->pindex, 1);
 next_pindex:
@@ -1295,10 +1326,8 @@ next_pindex:
  *	are returned in the source parameters.
  */
 void
-vm_object_shadow(
-	vm_object_t *object,	/* IN/OUT */
-	vm_ooffset_t *offset,	/* IN/OUT */
-	vm_size_t length)
+vm_object_shadow(vm_object_t *object, vm_ooffset_t *offset, vm_size_t length,
+    struct ucred *cred, bool shared)
 {
 	vm_object_t source;
 	vm_object_t result;
@@ -1314,13 +1343,13 @@ vm_object_shadow(
 	 * will be collapsed later.
 	 */
 	if (source != NULL && source->ref_count == 1 &&
-	    source->handle == NULL && (source->flags & OBJ_ANON) != 0)
+	    (source->flags & OBJ_ANON) != 0)
 		return;
 
 	/*
 	 * Allocate a new object with the given length.
 	 */
-	result = vm_object_allocate_anon(atop(length));
+	result = vm_object_allocate_anon(atop(length), source, cred, length);
 
 	/*
 	 * Store the offset into the source object, and fix up the offset into
@@ -1328,25 +1357,37 @@ vm_object_shadow(
 	 */
 	result->backing_object_offset = *offset;
 
-	/*
-	 * The new object shadows the source object, adding a reference to it.
-	 * Our caller changes his reference to point to the new object,
-	 * removing a reference to the source object.  Net result: no change
-	 * of reference count.
-	 *
-	 * Try to optimize the result object's page color when shadowing
-	 * in order to maintain page coloring consistency in the combined 
-	 * shadowed object.
-	 */
-	if (source != NULL) {
+	if (shared || source != NULL) {
 		VM_OBJECT_WLOCK(result);
-		vm_object_backing_insert(result, source);
-		result->domain = source->domain;
+
+		/*
+		 * The new object shadows the source object, adding a
+		 * reference to it.  Our caller changes his reference
+		 * to point to the new object, removing a reference to
+		 * the source object.  Net result: no change of
+		 * reference count, unless the caller needs to add one
+		 * more reference due to forking a shared map entry.
+		 */
+		if (shared) {
+			vm_object_reference_locked(result);
+			vm_object_clear_flag(result, OBJ_ONEMAPPING);
+		}
+
+		/*
+		 * Try to optimize the result object's page color when
+		 * shadowing in order to maintain page coloring
+		 * consistency in the combined shadowed object.
+		 */
+		if (source != NULL) {
+			vm_object_backing_insert(result, source);
+			result->domain = source->domain;
 #if VM_NRESERVLEVEL > 0
-		result->flags |= source->flags & OBJ_COLORED;
-		result->pg_color = (source->pg_color + OFF_TO_IDX(*offset)) &
-		    ((1 << (VM_NFREEORDER - 1)) - 1);
+			result->flags |= source->flags & OBJ_COLORED;
+			result->pg_color = (source->pg_color +
+			    OFF_TO_IDX(*offset)) & ((1 << (VM_NFREEORDER -
+			    1)) - 1);
 #endif
+		}
 		VM_OBJECT_WUNLOCK(result);
 	}
 
@@ -1386,7 +1427,8 @@ vm_object_split(vm_map_entry_t entry)
 	 * If swap_pager_copy() is later called, it will convert new_object
 	 * into a swap object.
 	 */
-	new_object = vm_object_allocate_anon(size);
+	new_object = vm_object_allocate_anon(size, orig_object,
+	    orig_object->cred, ptoa(size));
 
 	/*
 	 * At this point, the new object is still private, so the order in
@@ -1403,6 +1445,7 @@ vm_object_split(vm_map_entry_t entry)
 				VM_OBJECT_WUNLOCK(source);
 				VM_OBJECT_WUNLOCK(orig_object);
 				VM_OBJECT_WUNLOCK(new_object);
+				new_object->cred = NULL;
 				vm_object_deallocate(new_object);
 				VM_OBJECT_WLOCK(orig_object);
 				return;
@@ -1419,9 +1462,7 @@ vm_object_split(vm_map_entry_t entry)
 			orig_object->backing_object_offset + entry->offset;
 	}
 	if (orig_object->cred != NULL) {
-		new_object->cred = orig_object->cred;
 		crhold(orig_object->cred);
-		new_object->charge = ptoa(size);
 		KASSERT(orig_object->charge >= ptoa(size),
 		    ("orig_object->charge < 0"));
 		orig_object->charge -= ptoa(size);
@@ -1444,6 +1485,16 @@ retry:
 			vm_page_sleep_if_busy(m, "spltwt");
 			VM_OBJECT_WLOCK(new_object);
 			goto retry;
+		}
+
+		/*
+		 * The page was left invalid.  Likely placed there by
+		 * an incomplete fault.  Just remove and ignore.
+		 */
+		if (vm_page_none_valid(m)) {
+			if (vm_page_remove(m))
+				vm_page_free(m);
+			continue;
 		}
 
 		/* vm_page_rename() will dirty the page. */
@@ -1511,6 +1562,8 @@ vm_object_collapse_scan_wait(vm_object_t object, vm_page_t p, vm_page_t next,
 		return (next);
 	/* The page is only NULL when rename fails. */
 	if (p == NULL) {
+		VM_OBJECT_WUNLOCK(object);
+		VM_OBJECT_WUNLOCK(backing_object);
 		vm_radix_wait();
 	} else {
 		if (p->object == object)
@@ -1630,8 +1683,6 @@ vm_object_collapse_scan(vm_object_t object, int op)
 			    ("freeing mapped page %p", p));
 			if (vm_page_remove(p))
 				vm_page_free(p);
-			else
-				vm_page_xunbusy(p);
 			continue;
 		}
 
@@ -1655,8 +1706,16 @@ vm_object_collapse_scan(vm_object_t object, int op)
 			continue;
 		}
 
-		KASSERT(pp == NULL || !vm_page_none_valid(pp),
-		    ("unbusy invalid page %p", pp));
+		if (pp != NULL && vm_page_none_valid(pp)) {
+			/*
+			 * The page was invalid in the parent.  Likely placed
+			 * there by an incomplete fault.  Just remove and
+			 * ignore.  p can replace it.
+			 */
+			if (vm_page_remove(pp))
+				vm_page_free(pp);
+			pp = NULL;
+		}
 
 		if (pp != NULL || vm_pager_has_page(object, new_pindex, NULL,
 			NULL)) {
@@ -1673,8 +1732,6 @@ vm_object_collapse_scan(vm_object_t object, int op)
 			    ("freeing mapped page %p", p));
 			if (vm_page_remove(p))
 				vm_page_free(p);
-			else
-				vm_page_xunbusy(p);
 			if (pp != NULL)
 				vm_page_xunbusy(pp);
 			continue;
@@ -1763,10 +1820,8 @@ vm_object_collapse(vm_object_t object)
 		if ((backing_object->flags & OBJ_ANON) == 0)
 			break;
 		VM_OBJECT_WLOCK(backing_object);
-		if (backing_object->handle != NULL ||
-		    (backing_object->flags & OBJ_DEAD) != 0 ||
-		    object->handle != NULL ||
-		    (object->flags & OBJ_DEAD) != 0) {
+		if ((backing_object->flags & OBJ_DEAD) != 0 ||
+		    (object->flags & (OBJ_DEAD | OBJ_ANON)) != OBJ_ANON) {
 			VM_OBJECT_WUNLOCK(backing_object);
 			break;
 		}
@@ -1853,7 +1908,7 @@ vm_object_collapse(vm_object_t object)
 			    backing_object));
 			vm_object_pip_wakeup(backing_object);
 			backing_object->type = OBJT_DEAD;
-			backing_object->ref_count = 0;
+			refcount_release(&backing_object->ref_count);
 			VM_OBJECT_WUNLOCK(backing_object);
 			vm_object_destroy(backing_object);
 
@@ -2014,7 +2069,6 @@ wired:
 void
 vm_object_page_noreuse(vm_object_t object, vm_pindex_t start, vm_pindex_t end)
 {
-	struct mtx *mtx;
 	vm_page_t p, next;
 
 	VM_OBJECT_ASSERT_LOCKED(object);
@@ -2028,14 +2082,10 @@ vm_object_page_noreuse(vm_object_t object, vm_pindex_t start, vm_pindex_t end)
 	 * Here, the variable "p" is either (1) the page with the least pindex
 	 * greater than or equal to the parameter "start" or (2) NULL. 
 	 */
-	mtx = NULL;
 	for (; p != NULL && (p->pindex < end || end == 0); p = next) {
 		next = TAILQ_NEXT(p, listq);
-		vm_page_change_lock(p, &mtx);
 		vm_page_deactivate_noreuse(p);
 	}
-	if (mtx != NULL)
-		mtx_unlock(mtx);
 }
 
 /*
@@ -2193,8 +2243,6 @@ vm_object_coalesce(vm_object_t prev_object, vm_ooffset_t prev_offset,
 void
 vm_object_set_writeable_dirty(vm_object_t object)
 {
-
-	VM_OBJECT_ASSERT_LOCKED(object);
 
 	/* Only set for vnodes & tmpfs */
 	if (object->type != OBJT_VNODE &&
@@ -2443,9 +2491,9 @@ sysctl_vm_object_list(SYSCTL_HANDLER_ARGS)
 			 * sysctl is only meant to give an
 			 * approximation of the system anyway.
 			 */
-			if (m->queue == PQ_ACTIVE)
+			if (m->a.queue == PQ_ACTIVE)
 				kvo->kvo_active++;
-			else if (m->queue == PQ_INACTIVE)
+			else if (m->a.queue == PQ_INACTIVE)
 				kvo->kvo_inactive++;
 		}
 
@@ -2561,8 +2609,7 @@ DB_SHOW_COMMAND(vmochk, vm_object_check)
 	 * and none have zero ref counts.
 	 */
 	TAILQ_FOREACH(object, &vm_object_list, object_list) {
-		if (object->handle == NULL &&
-		    (object->type == OBJT_DEFAULT || object->type == OBJT_SWAP)) {
+		if ((object->flags & OBJ_ANON) != 0) {
 			if (object->ref_count == 0) {
 				db_printf("vmochk: internal obj has zero ref count: %ld\n",
 					(long)object->size);

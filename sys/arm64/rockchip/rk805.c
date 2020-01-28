@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2018 Emmanuel Vadot <manu@FreeBSD.org>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -205,6 +204,7 @@ static struct rk805_regdef rk808_regdefs[] = {
 		.voltage_nstep = 64,
 	},
 	{
+		/* BUCK3 voltage is calculated based on external resistor */
 		.id = RK805_DCDC3,
 		.name = "DCDC_REG3",
 		.enable_reg = RK805_DCDC_EN,
@@ -221,6 +221,118 @@ static struct rk805_regdef rk808_regdefs[] = {
 		.voltage_max = 3300000,
 		.voltage_step = 100000,
 		.voltage_nstep = 16,
+	},
+	{
+		.id = RK808_LDO1,
+		.name = "LDO_REG1",
+		.enable_reg = RK808_LDO_EN,
+		.enable_mask = 0x1,
+		.voltage_reg = RK805_LDO1_ON_VSEL,
+		.voltage_mask = 0x1F,
+		.voltage_min = 1800000,
+		.voltage_max = 3400000,
+		.voltage_step = 100000,
+		.voltage_nstep = 17,
+	},
+	{
+		.id = RK808_LDO2,
+		.name = "LDO_REG2",
+		.enable_reg = RK808_LDO_EN,
+		.enable_mask = 0x2,
+		.voltage_reg = RK805_LDO2_ON_VSEL,
+		.voltage_mask = 0x1F,
+		.voltage_min = 1800000,
+		.voltage_max = 3400000,
+		.voltage_step = 100000,
+		.voltage_nstep = 17,
+	},
+	{
+		.id = RK808_LDO3,
+		.name = "LDO_REG3",
+		.enable_reg = RK808_LDO_EN,
+		.enable_mask = 0x4,
+		.voltage_reg = RK805_LDO3_ON_VSEL,
+		.voltage_mask = 0xF,
+		.voltage_min = 800000,
+		.voltage_max = 2500000,
+		.voltage_step = 100000,
+		.voltage_nstep = 18,
+	},
+	{
+		.id = RK808_LDO4,
+		.name = "LDO_REG4",
+		.enable_reg = RK808_LDO_EN,
+		.enable_mask = 0x8,
+		.voltage_reg = RK808_LDO4_ON_VSEL,
+		.voltage_mask = 0x1F,
+		.voltage_min = 1800000,
+		.voltage_max = 3400000,
+		.voltage_step = 100000,
+		.voltage_nstep = 17,
+	},
+	{
+		.id = RK808_LDO5,
+		.name = "LDO_REG5",
+		.enable_reg = RK808_LDO_EN,
+		.enable_mask = 0x10,
+		.voltage_reg = RK808_LDO5_ON_VSEL,
+		.voltage_mask = 0x1F,
+		.voltage_min = 1800000,
+		.voltage_max = 3400000,
+		.voltage_step = 100000,
+		.voltage_nstep = 17,
+	},
+	{
+		.id = RK808_LDO6,
+		.name = "LDO_REG6",
+		.enable_reg = RK808_LDO_EN,
+		.enable_mask = 0x20,
+		.voltage_reg = RK808_LDO6_ON_VSEL,
+		.voltage_mask = 0x1F,
+		.voltage_min = 800000,
+		.voltage_max = 2500000,
+		.voltage_step = 100000,
+		.voltage_nstep = 18,
+	},
+	{
+		.id = RK808_LDO7,
+		.name = "LDO_REG7",
+		.enable_reg = RK808_LDO_EN,
+		.enable_mask = 0x40,
+		.voltage_reg = RK808_LDO7_ON_VSEL,
+		.voltage_mask = 0x1F,
+		.voltage_min = 800000,
+		.voltage_max = 2500000,
+		.voltage_step = 100000,
+		.voltage_nstep = 18,
+	},
+	{
+		.id = RK808_LDO8,
+		.name = "LDO_REG8",
+		.enable_reg = RK808_LDO_EN,
+		.enable_mask = 0x80,
+		.voltage_reg = RK808_LDO8_ON_VSEL,
+		.voltage_mask = 0x1F,
+		.voltage_min = 1800000,
+		.voltage_max = 3400000,
+		.voltage_step = 100000,
+		.voltage_nstep = 17,
+	},
+	{
+		.id = RK808_SWITCH1,
+		.name = "SWITCH_REG1",
+		.enable_reg = RK805_DCDC_EN,
+		.enable_mask = 0x20,
+		.voltage_min = 3000000,
+		.voltage_max = 3000000,
+	},
+	{
+		.id = RK808_SWITCH2,
+		.name = "SWITCH_REG2",
+		.enable_reg = RK805_DCDC_EN,
+		.enable_mask = 0x40,
+		.voltage_min = 3000000,
+		.voltage_max = 3000000,
 	},
 };
 
@@ -301,6 +413,22 @@ rk805_regnode_voltage_to_reg(struct rk805_reg_sc *sc, int min_uvolt,
 }
 
 static int
+rk805_regnode_status(struct regnode *regnode, int *status)
+{
+	struct rk805_reg_sc *sc;
+	uint8_t val;
+
+	sc = regnode_get_softc(regnode);
+
+	*status = 0;
+	rk805_read(sc->base_dev, sc->def->enable_reg, &val, 1);
+	if (val & sc->def->enable_mask)
+		*status = REGULATOR_STATUS_ENABLED;
+
+	return (0);
+}
+
+static int
 rk805_regnode_set_voltage(struct regnode *regnode, int min_uvolt,
     int max_uvolt, int *udelay)
 {
@@ -343,6 +471,11 @@ rk805_regnode_get_voltage(struct regnode *regnode, int *uvolt)
 
 	sc = regnode_get_softc(regnode);
 
+	if (sc->def->voltage_min ==  sc->def->voltage_max) {
+		*uvolt = sc->def->voltage_min;
+		return (0);
+	}
+
 	if (!sc->def->voltage_step)
 		return (ENXIO);
 
@@ -360,6 +493,7 @@ static regnode_method_t rk805_regnode_methods[] = {
 	/* Regulator interface */
 	REGNODEMETHOD(regnode_init,		rk805_regnode_init),
 	REGNODEMETHOD(regnode_enable,		rk805_regnode_enable),
+	REGNODEMETHOD(regnode_status,		rk805_regnode_status),
 	REGNODEMETHOD(regnode_set_voltage,	rk805_regnode_set_voltage),
 	REGNODEMETHOD(regnode_get_voltage,	rk805_regnode_get_voltage),
 	REGNODEMETHOD(regnode_check_voltage,	regnode_method_check_voltage),

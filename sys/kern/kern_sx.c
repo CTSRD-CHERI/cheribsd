@@ -143,17 +143,18 @@ struct lock_class lock_class_sx = {
 #endif
 
 #ifdef ADAPTIVE_SX
-static __read_frequently u_int asx_retries;
-static __read_frequently u_int asx_loops;
+#ifdef SX_CUSTOM_BACKOFF
+static u_short __read_frequently asx_retries;
+static u_short __read_frequently asx_loops;
 static SYSCTL_NODE(_debug, OID_AUTO, sx, CTLFLAG_RD, NULL, "sxlock debugging");
-SYSCTL_UINT(_debug_sx, OID_AUTO, retries, CTLFLAG_RW, &asx_retries, 0, "");
-SYSCTL_UINT(_debug_sx, OID_AUTO, loops, CTLFLAG_RW, &asx_loops, 0, "");
+SYSCTL_U16(_debug_sx, OID_AUTO, retries, CTLFLAG_RW, &asx_retries, 0, "");
+SYSCTL_U16(_debug_sx, OID_AUTO, loops, CTLFLAG_RW, &asx_loops, 0, "");
 
 static struct lock_delay_config __read_frequently sx_delay;
 
-SYSCTL_INT(_debug_sx, OID_AUTO, delay_base, CTLFLAG_RW, &sx_delay.base,
+SYSCTL_U16(_debug_sx, OID_AUTO, delay_base, CTLFLAG_RW, &sx_delay.base,
     0, "");
-SYSCTL_INT(_debug_sx, OID_AUTO, delay_max, CTLFLAG_RW, &sx_delay.max,
+SYSCTL_U16(_debug_sx, OID_AUTO, delay_max, CTLFLAG_RW, &sx_delay.max,
     0, "");
 
 static void
@@ -165,6 +166,11 @@ sx_lock_delay_init(void *arg __unused)
 	asx_loops = max(10000, sx_delay.max);
 }
 LOCK_DELAY_SYSINIT(sx_lock_delay_init);
+#else
+#define sx_delay	locks_delay
+#define asx_retries	locks_delay_retries
+#define asx_loops	locks_delay_loops
+#endif
 #endif
 
 void
@@ -661,6 +667,12 @@ _sx_xlock_hard(struct sx *sx, uintptr_t x, int opts LOCK_FILE_LINE_ARG_DEF)
 		lda.spin_cnt++;
 #endif
 #ifdef ADAPTIVE_SX
+		if (x == (SX_LOCK_SHARED | SX_LOCK_WRITE_SPINNER)) {
+			if (atomic_fcmpset_acq_ptr(&sx->sx_lock, &x, tid))
+				break;
+			continue;
+		}
+
 		/*
 		 * If the lock is write locked and the owner is
 		 * running on another CPU, spin until the owner stops
@@ -1520,7 +1532,7 @@ db_show_sx(const struct lock_object *lock)
 int
 sx_chain(struct thread *td, struct thread **ownerp)
 {
-	struct sx *sx;
+	const struct sx *sx;
 
 	/*
 	 * Check to see if this thread is blocked on an sx lock.

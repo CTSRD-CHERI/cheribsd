@@ -72,7 +72,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/rwlock.h>
 #include <sys/smp.h>
 #include <sys/sysctl.h>
-#include <sys/sysproto.h>
+#include <sys/syscallsubr.h>
 #include <sys/vmem.h>
 #include <sys/vmmeter.h>
 #include <sys/vnode.h>
@@ -149,7 +149,7 @@ struct bufdomain {
 
 static struct buf *buf;		/* buffer header pool */
 extern struct buf *swbuf;	/* Swap buffer header pool. */
-caddr_t unmapped_buf;
+caddr_t __read_mostly unmapped_buf;
 
 /* Used below and for softdep flushing threads in ufs/ffs/ffs_softdep.c */
 struct proc *bufdaemonproc;
@@ -1342,7 +1342,7 @@ bufshutdown(int show_busybufs)
 	 * Sync filesystems for shutdown
 	 */
 	wdog_kern_pat(WD_LASTVAL);
-	sys_sync(curthread, NULL);
+	kern_sync(curthread);
 
 	/*
 	 * With soft updates, some buffers that are
@@ -1369,7 +1369,7 @@ bufshutdown(int show_busybufs)
 		pbusy = nbusy;
 
 		wdog_kern_pat(WD_LASTVAL);
-		sys_sync(curthread, NULL);
+		kern_sync(curthread);
 
 #ifdef PREEMPTION
 		/*
@@ -1383,8 +1383,7 @@ bufshutdown(int show_busybufs)
 		 */
 		for (subiter = 0; subiter < 50 * iter; subiter++) {
 			thread_lock(curthread);
-			mi_switch(SW_VOL, NULL);
-			thread_unlock(curthread);
+			mi_switch(SW_VOL);
 			DELAY(1000);
 		}
 #endif
@@ -2126,10 +2125,17 @@ breada(struct vnode * vp, daddr_t * rablkno, int * rabsize, int cnt,
  * getblk(). Also starts asynchronous I/O on read-ahead blocks.
  *
  * Always return a NULL buffer pointer (in bpp) when returning an error.
+ *
+ * The blkno parameter is the logical block being requested. Normally
+ * the mapping of logical block number to disk block address is done
+ * by calling VOP_BMAP(). However, if the mapping is already known, the
+ * disk block address can be passed using the dblkno parameter. If the
+ * disk block address is not known, then the same value should be passed
+ * for blkno and dblkno.
  */
 int
-breadn_flags(struct vnode *vp, daddr_t blkno, int size, daddr_t *rablkno,
-    int *rabsize, int cnt, struct ucred *cred, int flags,
+breadn_flags(struct vnode *vp, daddr_t blkno, daddr_t dblkno, int size,
+    daddr_t *rablkno, int *rabsize, int cnt, struct ucred *cred, int flags,
     void (*ckhashfunc)(struct buf *), struct buf **bpp)
 {
 	struct buf *bp;
@@ -2142,11 +2148,14 @@ breadn_flags(struct vnode *vp, daddr_t blkno, int size, daddr_t *rablkno,
 	 * Can only return NULL if GB_LOCK_NOWAIT or GB_SPARSE flags
 	 * are specified.
 	 */
-	error = getblkx(vp, blkno, size, 0, 0, flags, &bp);
+	error = getblkx(vp, blkno, dblkno, size, 0, 0, flags, &bp);
 	if (error != 0) {
 		*bpp = NULL;
 		return (error);
 	}
+	KASSERT(blkno == bp->b_lblkno,
+	    ("getblkx returned buffer for blkno %jd instead of blkno %jd",
+	    (intmax_t)bp->b_lblkno, (intmax_t)blkno));
 	flags &= ~GB_NOSPARSE;
 	*bpp = bp;
 
@@ -3545,7 +3554,7 @@ flushbufqueues(struct vnode *lvp, struct bufdomain *bd, int target,
 			}
 			vn_finished_write(mp);
 			if (unlock)
-				VOP_UNLOCK(vp, 0);
+				VOP_UNLOCK(vp);
 			flushwithdeps += hasdeps;
 			flushed++;
 
@@ -3791,7 +3800,7 @@ getblk(struct vnode *vp, daddr_t blkno, int size, int slpflag, int slptimeo,
 	struct buf *bp;
 	int error;
 
-	error = getblkx(vp, blkno, size, slpflag, slptimeo, flags, &bp);
+	error = getblkx(vp, blkno, blkno, size, slpflag, slptimeo, flags, &bp);
 	if (error != 0)
 		return (NULL);
 	return (bp);
@@ -3819,7 +3828,7 @@ getblk(struct vnode *vp, daddr_t blkno, int size, int slpflag, int slptimeo,
  *	case it is returned with B_INVAL clear and B_CACHE set based on the
  *	backing VM.
  *
- *	getblk() also forces a bwrite() for any B_DELWRI buffer whos
+ *	getblk() also forces a bwrite() for any B_DELWRI buffer whose
  *	B_CACHE bit is clear.
  *	
  *	What this means, basically, is that the caller should use B_CACHE to
@@ -3832,10 +3841,17 @@ getblk(struct vnode *vp, daddr_t blkno, int size, int slpflag, int slptimeo,
  *	a write attempt or if it was a successful read.  If the caller 
  *	intends to issue a READ, the caller must clear B_INVAL and BIO_ERROR
  *	prior to issuing the READ.  biodone() will *not* clear B_INVAL.
+ *
+ *	The blkno parameter is the logical block being requested. Normally
+ *	the mapping of logical block number to disk block address is done
+ *	by calling VOP_BMAP(). However, if the mapping is already known, the
+ *	disk block address can be passed using the dblkno parameter. If the
+ *	disk block address is not known, then the same value should be passed
+ *	for blkno and dblkno.
  */
 int
-getblkx(struct vnode *vp, daddr_t blkno, int size, int slpflag, int slptimeo,
-    int flags, struct buf **bpp)
+getblkx(struct vnode *vp, daddr_t blkno, daddr_t dblkno, int size, int slpflag,
+    int slptimeo, int flags, struct buf **bpp)
 {
 	struct buf *bp;
 	struct bufobj *bo;
@@ -3854,7 +3870,7 @@ getblkx(struct vnode *vp, daddr_t blkno, int size, int slpflag, int slptimeo,
 		flags &= ~(GB_UNMAPPED | GB_KVAALLOC);
 
 	bo = &vp->v_bufobj;
-	d_blkno = blkno;
+	d_blkno = dblkno;
 loop:
 	BO_RLOCK(bo);
 	bp = gbincore(bo, blkno);

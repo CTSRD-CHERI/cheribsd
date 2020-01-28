@@ -147,6 +147,10 @@ static u_int allow_nesting = 0;
 SYSCTL_UINT(_kern_geom_part, OID_AUTO, allow_nesting,
     CTLFLAG_RWTUN, &allow_nesting, 0,
     "Allow additional levels of nesting");
+char g_part_separator[MAXPATHLEN] = "";
+SYSCTL_STRING(_kern_geom_part, OID_AUTO, separator,
+    CTLFLAG_RDTUN, &g_part_separator, sizeof(g_part_separator),
+    "Partition name separator");
 
 /*
  * The GEOM partitioning class.
@@ -1383,7 +1387,7 @@ g_part_ctl_resize(struct gctl_req *req, struct g_part_parms *gpp)
 	}
 
 	pp = entry->gpe_pp;
-	if ((g_debugflags & 16) == 0 &&
+	if ((g_debugflags & G_F_FOOTSHOOTING) == 0 &&
 	    (pp->acr > 0 || pp->acw > 0 || pp->ace > 0)) {
 		if (entry->gpe_end - entry->gpe_start + 1 > gpp->gpp_size) {
 			/* Deny shrinking of an opened partition. */

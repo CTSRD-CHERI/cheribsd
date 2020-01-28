@@ -436,7 +436,7 @@ ptrace_clear_single_step(struct thread *td)
 }
 
 void
-exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
+exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 {
 	struct trapframe *tf = td->td_frame;
 
@@ -635,9 +635,9 @@ spinlock_enter(void)
 		daif = intr_disable();
 		td->td_md.md_spinlock_count = 1;
 		td->td_md.md_saved_daif = daif;
+		critical_enter();
 	} else
 		td->td_md.md_spinlock_count++;
-	critical_enter();
 }
 
 void
@@ -647,11 +647,12 @@ spinlock_exit(void)
 	register_t daif;
 
 	td = curthread;
-	critical_exit();
 	daif = td->td_md.md_saved_daif;
 	td->td_md.md_spinlock_count--;
-	if (td->td_md.md_spinlock_count == 0)
+	if (td->td_md.md_spinlock_count == 0) {
+		critical_exit();
 		intr_restore(daif);
+	}
 }
 
 #ifndef	_SYS_SYSPROTO_H_
@@ -964,7 +965,6 @@ try_load_dtb(caddr_t kmdp)
 	vm_offset_t dtbp;
 
 	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
-
 #if defined(FDT_DTB_STATIC)
 	/*
 	 * In case the device tree blob was not retrieved (from metadata) try
@@ -984,6 +984,8 @@ try_load_dtb(caddr_t kmdp)
 
 	if (OF_init((void *)dtbp) != 0)
 		panic("OF_init failed with the found device tree");
+
+	parse_fdt_bootargs();
 }
 #endif
 
@@ -1077,26 +1079,6 @@ cache_setup(void)
 	}
 }
 
-static vm_offset_t
-freebsd_parse_boot_param(struct arm64_bootparams *abp)
-{
-	vm_offset_t lastaddr;
-	void *kmdp;
-	static char *loader_envp;
-
-	preload_metadata = (caddr_t)(uintptr_t)(abp->modulep);
-	kmdp = preload_search_by_type("elf kernel");
-	if (kmdp == NULL)
-		return (0);
-
-	boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
-	loader_envp = MD_FETCH(kmdp, MODINFOMD_ENVP, char *);
-	init_static_kenv(loader_envp, 0);
-	lastaddr = MD_FETCH(kmdp, MODINFOMD_KERNEND, vm_offset_t);
-
-	return (lastaddr);
-}
-
 void
 initarm(struct arm64_bootparams *abp)
 {
@@ -1112,15 +1094,8 @@ initarm(struct arm64_bootparams *abp)
 	caddr_t kmdp;
 	bool valid;
 
-	if ((abp->modulep & VM_MIN_KERNEL_ADDRESS) ==
-	    VM_MIN_KERNEL_ADDRESS)
-		/* Booted from loader. */
-		lastaddr = freebsd_parse_boot_param(abp);
-#ifdef LINUX_BOOT_ABI
-	else
-		/* Booted from U-Boot. */
-		lastaddr = linux_parse_boot_param(abp);
-#endif
+	/* Parse loader or FDT boot parametes. Determine last used address. */
+	lastaddr = parse_boot_param(abp);
 
 	/* Find the kernel address */
 	kmdp = preload_search_by_type("elf kernel");
@@ -1128,13 +1103,7 @@ initarm(struct arm64_bootparams *abp)
 		kmdp = preload_search_by_type("elf64 kernel");
 
 	link_elf_ireloc(kmdp);
-
-#ifdef FDT
 	try_load_dtb(kmdp);
-#ifdef LINUX_BOOT_ABI
-	parse_bootargs(&lastaddr, abp);
-#endif
-#endif
 
 	efi_systbl_phys = MD_FETCH(kmdp, MODINFOMD_FW_HANDLE, vm_paddr_t);
 

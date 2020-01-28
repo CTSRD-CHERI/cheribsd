@@ -62,6 +62,8 @@ LOCALBASE?=	/usr/local
 .if defined(CROSS_TOOLCHAIN)
 .if exists(${LOCALBASE}/share/toolchains/${CROSS_TOOLCHAIN}.mk)
 .include "${LOCALBASE}/share/toolchains/${CROSS_TOOLCHAIN}.mk"
+.elif exists(/usr/share/toolchains/${CROSS_TOOLCHAIN}.mk)
+.include "/usr/share/toolchains/${CROSS_TOOLCHAIN}.mk"
 .elif exists(${CROSS_TOOLCHAIN})
 .include "${CROSS_TOOLCHAIN}"
 .else
@@ -160,7 +162,6 @@ TARGET_MACHINE=	${TARGET_ARCH:S/amd64/x86_64/:C/[hs]f$//:S/mipsn32/mips64/:C/mip
 TARGET_TRIPLE?=	${TARGET_MACHINE}-${TARGET_ABI}-freebsd13.0
 KNOWN_ARCHES?=	aarch64/arm64 \
 		amd64 \
-		arm \
 		armv6/arm \
 		armv7/arm \
 		i386 \
@@ -336,6 +337,8 @@ WANT_LINKER_FREEBSD_VERSION=
     defined(WANT_LINKER_FREEBSD_VERSION) && \
     (${MK_LLD_BOOTSTRAP} == "yes") && \
     !make(xdev*) && \
+    defined(X_LINKER_TYPE) && defined(X_LINKER_VERSION) && \
+    defined(X_LINKER_FREEBSD_VERSION) && \
     ${X_LINKER_TYPE} == ${WANT_LINKER_TYPE} && \
     ${X_LINKER_VERSION} == ${WANT_LINKER_VERSION} && \
     ${X_LINKER_FREEBSD_VERSION} == ${WANT_LINKER_FREEBSD_VERSION}
@@ -870,12 +873,7 @@ HMAKE+=		PATH=${TMPPATH} METALOG=${METALOG} -DNO_ROOT
 
 # cross-building -> add -target flag to clang command line
 .if ${MACHINE:Nhost:Ncommon} != "" && ${TARGET_MACHINE} != ${HOST_MACHINE} && ${X_COMPILER_TYPE} == "clang"
-.if ${TARGET_ARCH} == "amd64"
-_triple_arch=x86_64
-.else
-_triple_arch=${TARGET_ARCH}
-.endif
-CROSS_TARGET_FLAGS=-target ${_triple_arch}-unknown-freebsd${_REVISION}
+CROSS_TARGET_FLAGS=-target ${TARGET_TRIPLE}
 .endif
 
 CROSSENV+=	CC="${XCC} ${CROSS_TARGET_FLAGS} ${XCFLAGS}"\
@@ -920,7 +918,10 @@ XCFLAGS+=	--sysroot=${WORLDTMP}
 XCFLAGS+=	${BFLAGS}
 .endif
 
-.if ${MK_LIB32} == "yes"
+.if ${MK_COMPAT_CHERIABI} == "yes"
+_LIBCOMPAT=CHERI
+.include "Makefile.libcompat"
+.elif ${MK_LIB32} == "yes"
 _LIBCOMPAT= 32
 .include "Makefile.libcompat"
 .elif ${MK_LIB64} == "yes"
@@ -929,11 +930,6 @@ _LIBCOMPAT=64
 .elif ${MK_LIBSOFT} == "yes"
 _LIBCOMPAT= SOFT
 .include "Makefile.libcompat"
-.endif
-.if ${MK_CHERI} != "no"
-# CHERI specific code isn't o32 compatible and other attempts to disable
-# failed so use a big hammer for now.
-.undef LIBCOMPAT
 .endif
 
 # META_MODE normally ignores host file changes since every build updates
@@ -993,54 +989,6 @@ host-osreldate.h: # DO NOT ADD /usr/include/osreldate.h here
 WMAKE=		${WMAKEENV} ${MAKE} ${WORLD_FLAGS} -f Makefile.inc1 \
 		BWPHASE=${.TARGET:C,^_,,} \
 		DESTDIR=${WORLDTMP}
-
-.if ${MK_CHERI} != "no"
-# cheri world
-LIBCHERI_OBJTOP=	${OBJTOP}/obj-libcheri
-LIBCHERI_TESTSBASE=	${TESTSBASE}/cheri
-
-# Yes, the flags are redundant.
-LIBCHERIWMAKEENV= \
-		NEED_CHERI=pure \
-		LIBCHERI=yes \
-		MK_PROFILE=no \
-		SYSROOT=${WORLDTMP} \
-		OBJTOP=${LIBCHERI_OBJTOP} \
-		OBJROOT='$${OBJTOP}/' \
-		VERSION="${VERSION}" \
-		INSTALL="sh ${.CURDIR}/tools/install.sh" \
-		PATH=${TMPPATH} \
-		LIBDIR=/usr/libcheri \
-		SHLIBDIR=/usr/libcheri \
-		TESTSBASE=${LIBCHERI_TESTSBASE} \
-		CC="${XCC}" CXX="${XCXX}" CPP="${XCPP}" \
-		BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
-		AS="${XAS}" AR="${XAR}" LD="${XLD}" LLVM_LINK="${XLLVM_LINK}" \
-		NM=${XNM} OBJCOPY="${XOBJCOPY}" \
-		RANLIB=${XRANLIB} STRINGS=${XSTRINGS} \
-		SIZE="${XSIZE}"
-
-LIBCHERIWMAKEENV+=	MACHINE=mips
-.if ${MK_CHERI128} == "yes"
-LIBCHERIWMAKEENV+=	MACHINE_ARCH=mips64c128
-.elif ${MK_CHERI256} == "yes"
-LIBCHERIWMAKEENV+=	MACHINE_ARCH=mips64c256
-.else
-.error Unknown CHERI arch
-.endif
-LIBCHERIWMAKEFLAGS= \
-		DESTDIR=${WORLDTMP} \
-		-DLIBRARIES_ONLY \
-		-DNO_CPU_CFLAGS \
-		MK_CTF=no \
-		MK_TESTS_SUPPORT=${MK_TESTS} \
-		-DNO_LINT
-
-LIBCHERIWMAKE=	${LIBCHERIWMAKEENV} ${MAKE} ${LIBCHERIWMAKEFLAGS} \
-		MK_MAN=no MK_HTML=no
-LIBCHERIIMAKE=	${LIBCHERIWMAKE:NINSTALL=*:NDESTDIR=*} \
-		MK_TOOLCHAIN=no ${IMAKE_INSTALL}
-.endif
 
 IMAKEENV=	${CROSSENV}
 IMAKE=		${IMAKEENV} ${MAKE} -f Makefile.inc1 \
@@ -1272,11 +1220,6 @@ _bootstrap-tools:
 	${_+_}cd ${.CURDIR}; ${BMAKE} bootstrap-tools
 	mkdir -p ${WORLDTMP}/usr ${WORLDTMP}/lib/casper ${WORLDTMP}/lib/geom
 	mkdir -p ${WORLDTMP}/bin
-.if ${MK_CHERI} == "yes"
-.for _dir in engines geom i18n
-	mkdir -p ${WORLDTMP}/usr/libcheri/${_dir}
-.endfor
-.endif
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.usr.dist \
 	    -p ${WORLDTMP}/usr >/dev/null
 	${WORLDTMP_MTREE} -f ${.CURDIR}/etc/mtree/BSD.include.dist \
@@ -1300,9 +1243,6 @@ _cleanobj:
 	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t ${CLEANDIR}
 .if defined(_LIBCOMPAT)
 	${_+_}cd ${.CURDIR}; ${LIBCOMPATWMAKE} _NO_INCLUDE_COMPILERMK=t -f Makefile.inc1 ${CLEANDIR}
-.endif
-.if defined (CHERI)
-	${_+_}cd ${.CURDIR}; ${LIBCHERIWMAKE} -f Makefile.inc1 ${CLEANDIR}
 .endif
 .else
 	${_+_}cd ${.CURDIR}; ${WMAKE} _NO_INCLUDE_COMPILERMK=t _cleanobj_fast_depend_hack
@@ -1361,147 +1301,6 @@ everything: .PHONY
 	@echo "--------------------------------------------------------------"
 	${_+_}cd ${.CURDIR}; _PARALLEL_SUBDIR_OK=1 ${WMAKE} all
 
-.if ${MK_CHERI} != "no"
-.if ${MK_CHERI_PURE} != "no"
-INTERNAL_INC_DIRS=				\
-	include/rpcsvc				\
-	usr.sbin/amd/include
-INTERNAL_LIB_DIRS=
-.if ${MK_BINUTILS} != "no"
-INTERNAL_LIB_DIRS+=				\
-	gnu/usr.bin/binutils/libbfd		\
-	gnu/usr.bin/binutils/libbinutils	\
-	gnu/usr.bin/binutils/libiberty		\
-	gnu/usr.bin/binutils/libopcodes
-.endif
-INTERNAL_LIB_DIRS+=sbin/ipf/libipf
-.if ${MK_AMD} != "no"
-INTERNAL_LIB_DIRS+=usr.sbin/amd/libamu
-.endif
-.if ${MK_BSNMP} != "no"
-INTERNAL_LIB_DIRS+=usr.sbin/bsnmpd/tools/libbsnmptools
-.endif
-INTERNAL_LIB_DIRS+=				\
-	usr.sbin/cron/lib			\
-	usr.sbin/fifolog/lib			\
-	usr.sbin/lpr/common_source		\
-	usr.sbin/ntp/libntp			\
-	usr.sbin/ntp/libntpevent		\
-	usr.sbin/ntp/libopts			\
-	usr.sbin/ntp/libopts			\
-	usr.sbin/ntp/libopts			\
-	usr.sbin/ntp/libparse
-.endif
-
-_cheri_libs=lib/csu lib/libgcc_eh lib/libcompiler_rt lib/libc \
-	    lib/libc_nonshared lib/libgcc_s lib/libthr lib/libz lib/libbz2 \
-	    lib/liblzma lib/libexpat secure/lib/libcrypto lib/libsbuf \
-	    lib/libelf lib/libkvm lib/ncurses/ncurses lib/ncurses/ncursesw \
-	    secure/lib/libssl lib/libmd lib/libutil lib/libprocstat \
-	    lib/librtld_db lib/libzstd
-.if ${MK_CDDL} != "no"
-_cheri_libs+=cddl/lib/libctf
-.endif
-_cheri_libs+=lib/libkiconv lib/libpam/libpam \
-	    lib/libcom_err lib/libcrypt lib/libufs
-
-.if ${MK_KERBEROS} != "no"
-_cheri_libs+=kerberos5/lib/libroken kerberos5/lib/libasn1 kerberos5/lib/libwind \
-	     kerberos5/lib/libhx509 kerberos5/lib/libheimbase \
-	     kerberos5/lib/libheimipcc kerberos5/lib/libkrb5
-.endif
-
-_cheri_libs+=lib/libopie lib/libradius lib/libtacplus lib/libypclnt \
-	     lib/libldns secure/lib/libssh lib/msun lib/libnv lib/libcheri \
-	     gnu/lib/libdialog lib/libfigpar
-.if ${MK_KERBEROS} != "no"
-_cheri_libs+=lib/libgssapi
-.endif
-_cheri_libs+=lib/libgeom
-.if ${MK_CDDL} != "no"
-_cheri_libs+=cddl/lib/libnvpair cddl/lib/libumem cddl/lib/libuutil \
-	     cddl/lib/libzfs_core cddl/lib/libavl cddl/lib/libzfs
-.endif
-.if ${MK_KERBEROS} != "no"
-_cheri_libs+=kerberos5/lib/libheimntlm
-.endif
-_cheri_libs+=lib/libsqlite3
-.if ${MK_KERBEROS} != "no"
-_cheri_libs+=kerberos5/lib/libhdb
-.endif
-.if ${MK_OFED} != "no"
-_cheri_libs+=lib/ofed/libibverbs lib/ofed/libibumad lib/ofed/libibmad lib/ofed/complib lib/ofed/libmlx5
-.endif
-_cheri_libs+=usr.bin/lex/lib lib/libcxxrt lib/libc++ lib ${LOCAL_LIB_DIRS}
-.if ${MK_CDDL} != "no"
-_cheri_libs+=cddl/lib
-.endif
-_cheri_libs+=gnu/lib secure/lib
-.if ${MK_KERBEROS} != "no"
-_cheri_libs+=kerberos5/lib
-.endif
-_cheri_libs+=${INTERNAL_INC_DIRS} ${INTERNAL_LIB_DIRS}
-
-_cheri_test_libs=lib/csu lib ${LOCAL_LIB_DIRS}
-.if ${MK_CDDL} != "no"
-_cheri_test_libs+=cddl/lib
-.endif
-_cheri_test_libs+=gnu/lib secure/lib
-.if ${MK_KERBEROS} != "no"
-_cheri_test_libs+=kerberos5/lib
-.endif
-
-_cheri_distrib_dirs=lib ${LOCAL_LIB_DIRS} gnu/lib secure/lib
-.if ${MK_CDDL} != "no"
-_cheri_distrib_dirs+=cddl/lib
-.endif
-.if ${MK_KERBEROS} != "no"
-_cheri_distrib_dirs+=kerberos5/lib
-.endif
-buildcheri:
-	@echo
-	@echo "--------------------------------------------------------------"
-	@echo ">>> stage 4.2.1: building CHERI libraries"
-	@echo "--------------------------------------------------------------"
-.for _dir in lib/ncurses/ncurses lib/ncurses/ncursesw ${_libmagic} ${_jevents}
-.for _t in ${_obj} build-tools
-	${_+_}cd ${.CURDIR}/${_dir}; \
-	    WORLDTMP=${WORLDTMP} \
-	    BUILD_TOOLS_CC="env PATH=${PATH}:/usr/bin:/bin ${COMPILER_ABSOLUTE_PATH}" \
-	    MAKEFLAGS="-m ${.CURDIR}/tools/build/mk ${.MAKEFLAGS}" \
-	    ${MAKE} SSP_CFLAGS= DESTDIR= \
-	    OBJTOP=${LIBCHERI_OBJTOP} \
-	    OBJROOT='$${OBJTOP}/' \
-	    MAKEOBJDIRPREFIX= \
-	    DIRPRFX=${_dir}/ -DNO_LINT -DNO_CPU_CFLAGS \
-	    MK_CTF=no MK_RETPOLINE=no MK_WARNS=no \
-	    ${_t}
-.endfor
-.endfor
-# Add one extra recursive make call here to avoid computing the bsd.compiler.mk values
-	${_+_}cd ${.CURDIR}; ${LIBCHERIWMAKE} -f Makefile.inc1 _buildcheri_impl
-
-_buildcheri_impl:
-.for _lib in ${_cheri_libs}
-	${_+_}@${ECHODIR} "===> ${_lib} (obj,all,install)"; \
-		cd ${.CURDIR}/${_lib} && \
-		    if [ -z "${NO_OBJ}" ]; then ${MAKE} DIRPRFX=${_lib}/ obj; fi && \
-		    ${MAKE} MK_TESTS=no DIRPRFX=${_lib}/ all && \
-		    ${MAKE} MK_TESTS=no DIRPRFX=${_lib}/ install
-.endfor
-.if ${MK_TESTS} == "yes"
-.for _lib in ${_cheri_test_libs}
-		cd ${.CURDIR}/${_lib} && \
-		    ${MAKE} DIRPRFX=${_lib}/ all
-.endfor
-.endif
-
-distributecheri installcheri:
-.for _lib in ${_cheri_distrib_dirs}
-	cd ${.CURDIR}/${_lib}; ${LIBCHERIIMAKE} ${.TARGET:S/cheri$//}
-.endfor
-.endif
-
 WMAKE_TGTS=
 .if !defined(WORLDFAST)
 WMAKE_TGTS+=	_sanity_check _worldtmp _legacy
@@ -1518,9 +1317,6 @@ WMAKE_TGTS+=	_includes
 .endif
 .if !defined(NO_LIBS)
 WMAKE_TGTS+=	_libraries
-.if ${MK_CHERI} != "no" && empty(SUBDIR_OVERRIDE)
-WMAKE_TGTS+=	buildcheri
-.endif
 .if defined(_LIBCOMPAT) && empty(SUBDIR_OVERRIDE)
 WMAKE_TGTS+=	build${libcompat}
 .endif
@@ -1582,25 +1378,7 @@ buildenv: .PHONY
 .endif
 	@cd ${BUILDENV_DIR} && env ${WMAKEENV} BUILDENV=1 ${BUILDENV_SHELL}
 
-.if ${MK_CHERI} != "no"
-libcheribuildenvvars:
-	@echo ${LIBCHERIWMAKEENV:Q} ${.MAKE.EXPORTED:@v@$v=\"${$v}\"@}
-
-.if ${.TARGETS:Mlibcheribuildenv}
-.if ${.MAKEFLAGS:M-j}
-.error The libcheribuildenv target is incompatible with -j
-.endif
-.endif
-libcheribuildenv:
-	@echo "Entering world (CHERI${CHERI}) for ${TARGET_ARCH}:${TARGET}"
-.if ${BUILDENV_SHELL:M*zsh*}
-	@echo For ZSH you must run: export CPUTYPE=${TARGET_CPUTYPE}
-.endif
-	@cd ${BUILDENV_DIR} && env ${LIBCHERIWMAKEENV} BUILDENV=1 \
-	    ${BUILDENV_SHELL} || true
-.endif
-
-TOOLCHAIN_TGTS=	${WMAKE_TGTS:Neverything:Nbuild${libcompat}:Nbuildcheri}
+TOOLCHAIN_TGTS=	${WMAKE_TGTS:Neverything:Nbuild${libcompat}}
 toolchain: ${TOOLCHAIN_TGTS} .PHONY
 KERNEL_TOOLCHAIN_TGTS=	${TOOLCHAIN_TGTS:N_obj:N_cleanobj:N_includes:N_libraries}
 .if make(kernel-toolchain)
@@ -1901,6 +1679,7 @@ _sysent_dirs+=	sys/compat/cloudabi32	\
 		sys/compat/cloudabi64
 _sysent_dirs+=	sys/amd64/linux		\
 		sys/amd64/linux32	\
+		sys/arm/linux		\
 		sys/arm64/linux		\
 		sys/i386/linux
 sysent: .PHONY
@@ -1938,9 +1717,6 @@ restage reinstall reinstallsysroot: .MAKE .PHONY
 .if defined(_LIBCOMPAT)
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 install${libcompat}
 .endif
-.if ${MK_CHERI} != "no"
-	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 installcheri
-.endif
 .if make(reinstallsysroot)
 	@echo "Removing $$(find ${DESTDIR} -type d -empty -print | wc -l) empty directories from ${DESTDIR}"
 	find ${DESTDIR} -type d -empty -delete
@@ -1958,10 +1734,6 @@ redistribute: .MAKE .PHONY
 .if defined(_LIBCOMPAT)
 	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 distribute${libcompat} \
 	    DISTRIBUTION=lib${libcompat}
-.endif
-.if ${MK_CHERI} != "no"
-	${_+_}cd ${.CURDIR}; ${MAKE} -f Makefile.inc1 distributecheri \
-	    DISTRIBUTION=libcheri
 .endif
 
 distrib-dirs distribution: .MAKE .PHONY
@@ -2682,8 +2454,7 @@ ${_bt}-usr.bin/clang/llvm-tblgen: ${_bt}-lib/clang/libllvmminimal
 ${_bt}-usr.bin/clang/lldb-tblgen: ${_bt}-lib/clang/libllvmminimal
 .endif
 
-# Default to building the GPL DTC, but build the BSDL one if users explicitly
-# request it.
+# Build BSDL or GPL DTC depending on GPL_DTC option.
 _dtc= usr.bin/dtc
 .if ${MK_GPL_DTC} != "no"
 _dtc= gnu/usr.bin/dtc
@@ -2897,7 +2668,8 @@ _libmagic=lib/libmagic
 .endif
 
 .if ${MK_PMC} != "no" && \
-    (${TARGET_ARCH} == "amd64" || ${TARGET_ARCH} == "i386")
+    (${TARGET_ARCH} == "aarch64" || ${TARGET_ARCH} == "amd64" || \
+    ${TARGET_ARCH} == "i386")
 _jevents=lib/libpmc/pmu-events
 .endif
 
@@ -2947,13 +2719,6 @@ kernel-tools: .PHONY
 .if ${TARGET_ARCH} != ${MACHINE_ARCH} || ${BUILD_WITH_STRICT_TMPPATH} != 0
 .if ${TARGET_ARCH} == "amd64" || ${TARGET_ARCH} == "i386"
 _btxld=		usr.sbin/btxld
-.endif
-.if ${TARGET_ARCH} == "mips64" && !defined(CROSSBUILD_HOST)
-# Avoid bootstrapping libxo when crossbuilding from Linux/mac since it doesn't
-# work yet and cheritest as a bootstrap tool is only needed for jenkins.
-_cheritest=	lib/libxo \
-		bin/cheritest \
-		bin/cheriabitest
 .endif
 .endif
 
@@ -3011,7 +2776,6 @@ _ar=usr.bin/ar
 cross-tools: .MAKE .PHONY
 .for _tool in \
     ${LOCAL_XTOOL_DIRS} \
-    ${_cheritest} \
     ${_ar} \
     ${_clang_libs} \
     ${_clang} \
@@ -3244,7 +3008,7 @@ libraries: .MAKE .PHONY
 #
 _prereq_libs= lib/libcompiler_rt
 .if ${MK_SSP} != "no"
-_prereq_libs+= gnu/lib/libssp/libssp_nonshared
+_prereq_libs+= lib/libssp_nonshared
 .endif
 
 # These dependencies are not automatically generated:
@@ -3256,10 +3020,9 @@ _startup_libs=	lib/csu
 .if ${MK_BSD_CRTBEGIN} == "no"
 _startup_libs+=	gnu/lib/csu
 .endif
-.if ${MK_CHERI} != "no"
+.if ${MK_LIBCHERI} != "no"
 _startup_libs+= lib/libc_cheri
 .endif
-_startup_libs+=	lib/libcompiler_rt
 _startup_libs+=	lib/libc
 _startup_libs+=	lib/libc_nonshared
 .if ${MK_LIBCPLUSPLUS} != "no"
@@ -3274,17 +3037,6 @@ lib/libgcc_s__L: lib/libc__L
 lib/libgcc_s__L: lib/libc_nonshared__L
 .if ${MK_LIBCPLUSPLUS} != "no"
 lib/libcxxrt__L: lib/libgcc_s__L
-.endif
-
-.else # MK_LLVM_LIBUNWIND == no
-
-_prereq_libs+=	gnu/lib/libgcc
-_startup_libs+=	gnu/lib/libgcc
-
-gnu/lib/libgcc__L: lib/libc__L
-gnu/lib/libgcc__L: lib/libc_nonshared__L
-.if ${MK_LIBCPLUSPLUS} != "no"
-lib/libcxxrt__L: gnu/lib/libgcc__L
 .endif
 .endif
 
@@ -3324,8 +3076,10 @@ gnu/lib/libstdc++__L: lib/msun__L
 gnu/lib/libsupc++__L: gnu/lib/libstdc++__L
 .endif
 
-.if ${MK_CHERI} != "no"
+.if ${MK_LIBCHERI} != "no"
 _prebuild_libs+=	lib/libcheri
+.endif
+.if ${MK_CHERI} != "no"
 _prebuild_libs+=	lib/libpng
 lib/libpng__L: lib/libz__L
 .endif

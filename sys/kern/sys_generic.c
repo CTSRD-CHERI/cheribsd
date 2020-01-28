@@ -263,7 +263,7 @@ freebsd6_pread(struct thread *td, struct freebsd6_pread_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct readv_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec *iovp;
 	u_int	iovcnt;
 };
 #endif
@@ -310,7 +310,7 @@ kern_readv(struct thread *td, int fd, struct uio *auio)
 #ifndef _SYS_SYSPROTO_H_
 struct preadv_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec *iovp;
 	u_int	iovcnt;
 	off_t	offset;
 };
@@ -489,7 +489,7 @@ freebsd6_pwrite(struct thread *td, struct freebsd6_pwrite_args *uap)
 #ifndef _SYS_SYSPROTO_H_
 struct writev_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec *iovp;
 	u_int	iovcnt;
 };
 #endif
@@ -536,7 +536,7 @@ kern_writev(struct thread *td, int fd, struct uio *auio)
 #ifndef _SYS_SYSPROTO_H_
 struct pwritev_args {
 	int	fd;
-	struct	iovec_native *iovp;
+	struct	iovec *iovp;
 	u_int	iovcnt;
 	off_t	offset;
 };
@@ -874,6 +874,47 @@ out:
 	}
 	if (fp != NULL)
 		fdrop(fp, td);
+	return (error);
+}
+
+int
+sys_posix_fallocate(struct thread *td, struct posix_fallocate_args *uap)
+{
+	int error;
+
+	error = kern_posix_fallocate(td, uap->fd, uap->offset, uap->len);
+	return (kern_posix_error(td, error));
+}
+
+int
+kern_posix_fallocate(struct thread *td, int fd, off_t offset, off_t len)
+{
+	struct file *fp;
+	int error;
+
+	AUDIT_ARG_FD(fd);
+	if (offset < 0 || len <= 0)
+		return (EINVAL);
+	/* Check for wrap. */
+	if (offset > OFF_MAX - len)
+		return (EFBIG);
+	AUDIT_ARG_FD(fd);
+	error = fget(td, fd, &cap_pwrite_rights, &fp);
+	if (error != 0)
+		return (error);
+	AUDIT_ARG_FILE(td->td_proc, fp);
+	if ((fp->f_ops->fo_flags & DFLAG_SEEKABLE) == 0) {
+		error = ESPIPE;
+		goto out;
+	}
+	if ((fp->f_flag & FWRITE) == 0) {
+		error = EBADF;
+		goto out;
+	}
+
+	error = fo_fallocate(fp, offset, len, td);
+ out:
+	fdrop(fp, td);
 	return (error);
 }
 

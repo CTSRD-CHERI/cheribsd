@@ -3753,6 +3753,22 @@ bus_generic_attach(device_t dev)
 }
 
 /**
+ * @brief Helper function for delaying attaching children
+ *
+ * Many buses can't run transactions on the bus which children need to probe and
+ * attach until after interrupts and/or timers are running.  This function
+ * delays their attach until interrupts and timers are enabled.
+ */
+int
+bus_delayed_attach_children(device_t dev)
+{
+	/* Probe and attach the bus children when interrupts are available */
+	config_intrhook_oneshot((ich_func_t)bus_generic_attach, dev);
+
+	return (0);
+}
+
+/**
  * @brief Helper function for implementing DEVICE_DETACH()
  *
  * This function can be used to help implement the DEVICE_DETACH() for
@@ -5955,7 +5971,7 @@ _gone_in(int major, const char *msg)
 
 	gone_panic(major, P_OSREL_MAJOR(__FreeBSD_version), msg);
 	if (P_OSREL_MAJOR(__FreeBSD_version) >= major)
-		printf("Obsolete code will removed soon: %s\n", msg);
+		printf("Obsolete code will be removed soon: %s\n", msg);
 	else
 		printf("Deprecated code (to be removed in FreeBSD %d): %s\n",
 		    major, msg);
@@ -5968,7 +5984,7 @@ _gone_in_dev(device_t dev, int major, const char *msg)
 	gone_panic(major, P_OSREL_MAJOR(__FreeBSD_version), msg);
 	if (P_OSREL_MAJOR(__FreeBSD_version) >= major)
 		device_printf(dev,
-		    "Obsolete code will removed soon: %s\n", msg);
+		    "Obsolete code will be removed soon: %s\n", msg);
 	else
 		device_printf(dev,
 		    "Deprecated code (to be removed in FreeBSD %d): %s\n",

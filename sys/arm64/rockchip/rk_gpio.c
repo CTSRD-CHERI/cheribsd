@@ -2,7 +2,6 @@
  * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
  *
  * Copyright (c) 2018 Emmanuel Vadot <manu@FreeBSD.org>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -195,7 +194,7 @@ rk_gpio_pin_max(device_t dev, int *maxpin)
 
 	/* Each bank have always 32 pins */
 	/* XXX not true*/
-	*maxpin = 32;
+	*maxpin = 31;
 	return (0);
 }
 

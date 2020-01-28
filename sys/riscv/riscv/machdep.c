@@ -297,7 +297,7 @@ ptrace_clear_single_step(struct thread *td)
 }
 
 void
-exec_setregs(struct thread *td, struct image_params *imgp, u_long stack)
+exec_setregs(struct thread *td, struct image_params *imgp, uintptr_t stack)
 {
 	struct trapframe *tf;
 	struct pcb *pcb;
@@ -489,9 +489,9 @@ spinlock_enter(void)
 		reg = intr_disable();
 		td->td_md.md_spinlock_count = 1;
 		td->td_md.md_saved_sstatus_ie = reg;
+		critical_enter();
 	} else
 		td->td_md.md_spinlock_count++;
-	critical_enter();
 }
 
 void
@@ -501,11 +501,12 @@ spinlock_exit(void)
 	register_t sstatus_ie;
 
 	td = curthread;
-	critical_exit();
 	sstatus_ie = td->td_md.md_saved_sstatus_ie;
 	td->td_md.md_spinlock_count--;
-	if (td->td_md.md_spinlock_count == 0)
+	if (td->td_md.md_spinlock_count == 0) {
+		critical_exit();
 		intr_restore(sstatus_ie);
+	}
 }
 
 #ifndef	_SYS_SYSPROTO_H_

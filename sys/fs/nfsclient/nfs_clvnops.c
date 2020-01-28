@@ -51,6 +51,8 @@ __FBSDID("$FreeBSD$");
 #include <sys/mount.h>
 #include <sys/bio.h>
 #include <sys/buf.h>
+#include <sys/extattr.h>
+#include <sys/filio.h>
 #include <sys/jail.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -142,6 +144,14 @@ static vop_advlock_t	nfs_advlock;
 static vop_advlockasync_t nfs_advlockasync;
 static vop_getacl_t nfs_getacl;
 static vop_setacl_t nfs_setacl;
+static vop_advise_t nfs_advise;
+static vop_allocate_t nfs_allocate;
+static vop_copy_file_range_t nfs_copy_file_range;
+static vop_ioctl_t nfs_ioctl;
+static vop_getextattr_t nfs_getextattr;
+static vop_setextattr_t nfs_setextattr;
+static vop_listextattr_t nfs_listextattr;
+static vop_deleteextattr_t nfs_deleteextattr;
 static vop_lock1_t	nfs_lock;
 
 /*
@@ -181,7 +191,16 @@ static struct vop_vector newnfs_vnodeops_nosig = {
 	.vop_write =		ncl_write,
 	.vop_getacl =		nfs_getacl,
 	.vop_setacl =		nfs_setacl,
+	.vop_advise =		nfs_advise,
+	.vop_allocate =		nfs_allocate,
+	.vop_copy_file_range =	nfs_copy_file_range,
+	.vop_ioctl =		nfs_ioctl,
+	.vop_getextattr =	nfs_getextattr,
+	.vop_setextattr =	nfs_setextattr,
+	.vop_listextattr =	nfs_listextattr,
+	.vop_deleteextattr =	nfs_deleteextattr,
 };
+VFS_VOP_VECTOR_REGISTER(newnfs_vnodeops_nosig);
 
 static int
 nfs_vnodeops_bypass(struct vop_generic_args *a)
@@ -194,6 +213,7 @@ struct vop_vector newnfs_vnodeops = {
 	.vop_default =		&default_vnodeops,
 	.vop_bypass =		nfs_vnodeops_bypass,
 };
+VFS_VOP_VECTOR_REGISTER(newnfs_vnodeops);
 
 static struct vop_vector newnfs_fifoops_nosig = {
 	.vop_default =		&fifo_specops,
@@ -209,6 +229,7 @@ static struct vop_vector newnfs_fifoops_nosig = {
 	.vop_setattr =		nfs_setattr,
 	.vop_write =		nfsfifo_write,
 };
+VFS_VOP_VECTOR_REGISTER(newnfs_fifoops_nosig);
 
 static int
 nfs_fifoops_bypass(struct vop_generic_args *a)
@@ -221,6 +242,7 @@ struct vop_vector newnfs_fifoops = {
 	.vop_default =		&default_vnodeops,
 	.vop_bypass =		nfs_fifoops_bypass,
 };
+VFS_VOP_VECTOR_REGISTER(newnfs_fifoops);
 
 static int nfs_mknodrpc(struct vnode *dvp, struct vnode **vpp,
     struct componentname *cnp, struct vattr *vap);
@@ -312,6 +334,8 @@ nfs_lock(struct vop_lock1_args *ap)
 	if (error != 0 || vp->v_op != &newnfs_vnodeops)
 		return (error);
 	np = VTONFS(vp);
+	if (np == NULL)
+		return (0);
 	NFSLOCKNODE(np);
 	if ((np->n_flag & NVNSETSZSKIP) == 0 || (lktype != LK_SHARED &&
 	    lktype != LK_EXCLUSIVE && lktype != LK_UPGRADE &&
@@ -329,7 +353,7 @@ nfs_lock(struct vop_lock1_args *ap)
 		 * sleepable call to vnode_pager_setsize().
 		 */
 		NFSUNLOCKNODE(np);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		return (EBUSY);
 	}
 	if ((ap->a_flags & LK_NOWAIT) != 0 ||
@@ -339,12 +363,15 @@ nfs_lock(struct vop_lock1_args *ap)
 	}
 	if (lktype == LK_SHARED) {
 		NFSUNLOCKNODE(np);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		ap->a_flags &= ~(LK_TYPE_MASK | LK_INTERLOCK);
 		ap->a_flags |= LK_EXCLUSIVE;
 		error = VOP_LOCK1_APV(&default_vnodeops, ap);
 		if (error != 0 || vp->v_op != &newnfs_vnodeops)
 			return (error);
+		if (vp->v_data == NULL)
+			goto downgrade;
+		MPASS(vp->v_data == np);
 		NFSLOCKNODE(np);
 		if ((np->n_flag & NVNSETSZSKIP) == 0) {
 			NFSUNLOCKNODE(np);
@@ -1229,7 +1256,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 			vrele(newvp);
 		*vpp = NULLVP;
 	} else if (error == ENOENT) {
-		if (dvp->v_iflag & VI_DOOMED)
+		if (VN_IS_DOOMED(dvp))
 			return (ENOENT);
 		/*
 		 * We only accept a negative hit in the cache if the
@@ -1330,18 +1357,18 @@ nfs_lookup(struct vop_lookup_args *ap)
 		error = vfs_busy(mp, MBF_NOWAIT);
 		if (error != 0) {
 			vfs_ref(mp);
-			NFSVOPUNLOCK(dvp, 0);
+			NFSVOPUNLOCK(dvp);
 			error = vfs_busy(mp, 0);
 			NFSVOPLOCK(dvp, ltype | LK_RETRY);
 			vfs_rel(mp);
-			if (error == 0 && (dvp->v_iflag & VI_DOOMED)) {
+			if (error == 0 && VN_IS_DOOMED(dvp)) {
 				vfs_unbusy(mp);
 				error = ENOENT;
 			}
 			if (error != 0)
 				return (error);
 		}
-		NFSVOPUNLOCK(dvp, 0);
+		NFSVOPUNLOCK(dvp);
 		error = nfscl_nget(mp, dvp, nfhp, cnp, td, &np, NULL,
 		    cnp->cn_lkflags);
 		if (error == 0)
@@ -1349,7 +1376,7 @@ nfs_lookup(struct vop_lookup_args *ap)
 		vfs_unbusy(mp);
 		if (newvp != dvp)
 			NFSVOPLOCK(dvp, ltype | LK_RETRY);
-		if (dvp->v_iflag & VI_DOOMED) {
+		if (VN_IS_DOOMED(dvp)) {
 			if (error == 0) {
 				if (newvp == dvp)
 					vrele(newvp);
@@ -1907,7 +1934,7 @@ nfs_rename(struct vop_rename_args *ap)
 	 * this condition can result in potential (silent) data loss.
 	 */
 	error = VOP_FSYNC(fvp, MNT_WAIT, fcnp->cn_thread);
-	NFSVOPUNLOCK(fvp, 0);
+	NFSVOPUNLOCK(fvp);
 	if (!error && tvp)
 		error = VOP_FSYNC(tvp, MNT_WAIT, tcnp->cn_thread);
 	if (error)
@@ -3133,7 +3160,7 @@ nfs_advlock(struct vop_advlock_args *ap)
 		else
 			cred = td->td_ucred;
 		NFSVOPLOCK(vp, LK_UPGRADE | LK_RETRY);
-		if (vp->v_iflag & VI_DOOMED) {
+		if (VN_IS_DOOMED(vp)) {
 			error = EBADF;
 			goto out;
 		}
@@ -3157,13 +3184,13 @@ nfs_advlock(struct vop_advlock_args *ap)
 			    ap->a_fl, 0, cred, td, ap->a_id, ap->a_flags);
 			if (ret == NFSERR_DENIED && (ap->a_flags & F_WAIT) &&
 			    ap->a_op == F_SETLK) {
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 				error = nfs_catnap(PZERO | PCATCH, ret,
 				    "ncladvl");
 				if (error)
 					return (EINTR);
 				NFSVOPLOCK(vp, LK_EXCLUSIVE | LK_RETRY);
-				if (vp->v_iflag & VI_DOOMED) {
+				if (VN_IS_DOOMED(vp)) {
 					error = EBADF;
 					goto out;
 				}
@@ -3211,13 +3238,13 @@ nfs_advlock(struct vop_advlock_args *ap)
 	} else if (!NFS_ISV4(vp)) {
 		if ((VFSTONFS(vp->v_mount)->nm_flag & NFSMNT_NOLOCKD) != 0) {
 			size = VTONFS(vp)->n_size;
-			NFSVOPUNLOCK(vp, 0);
+			NFSVOPUNLOCK(vp);
 			error = lf_advlock(ap, &(vp->v_lockf), size);
 		} else {
 			if (nfs_advlock_p != NULL)
 				error = nfs_advlock_p(ap);
 			else {
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 				error = ENOLCK;
 			}
 		}
@@ -3228,14 +3255,14 @@ nfs_advlock(struct vop_advlock_args *ap)
 				NFSLOCKNODE(np);
 				np->n_flag |= NHASBEENLOCKED;
 				NFSUNLOCKNODE(np);
-				NFSVOPUNLOCK(vp, 0);
+				NFSVOPUNLOCK(vp);
 			}
 		}
 		return (error);
 	} else
 		error = EOPNOTSUPP;
 out:
-	NFSVOPUNLOCK(vp, 0);
+	NFSVOPUNLOCK(vp);
 	return (error);
 }
 
@@ -3256,10 +3283,10 @@ nfs_advlockasync(struct vop_advlockasync_args *ap)
 		return (error);
 	if ((VFSTONFS(vp->v_mount)->nm_flag & NFSMNT_NOLOCKD) != 0) {
 		size = VTONFS(vp)->n_size;
-		NFSVOPUNLOCK(vp, 0);
+		NFSVOPUNLOCK(vp);
 		error = lf_advlockasync(ap, &(vp->v_lockf), size);
 	} else {
-		NFSVOPUNLOCK(vp, 0);
+		NFSVOPUNLOCK(vp);
 		error = EOPNOTSUPP;
 	}
 	return (error);
@@ -3499,6 +3526,619 @@ nfs_setacl(struct vop_setacl_args *ap)
 }
 
 /*
+ * VOP_ADVISE for NFS.
+ * Just return 0 for any errors, since it is just a hint.
+ */
+static int
+nfs_advise(struct vop_advise_args *ap)
+{
+	struct thread *td = curthread;
+	struct nfsmount *nmp;
+	uint64_t len;
+	int error;
+
+	/*
+	 * First do vop_stdadvise() to handle the buffer cache.
+	 */
+	error = vop_stdadvise(ap);
+	if (error != 0)
+		return (error);
+	if (ap->a_start < 0 || ap->a_end < 0)
+		return (0);
+	if (ap->a_end == OFF_MAX)
+		len = 0;
+	else if (ap->a_end < ap->a_start)
+		return (0);
+	else
+		len = ap->a_end - ap->a_start + 1;
+	nmp = VFSTONFS(ap->a_vp->v_mount);
+	mtx_lock(&nmp->nm_mtx);
+	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION ||
+	    (NFSHASPNFS(nmp) && (nmp->nm_privflag & NFSMNTP_IOADVISETHRUMDS) ==
+	    0) || (nmp->nm_privflag & NFSMNTP_NOADVISE) != 0) {
+		mtx_unlock(&nmp->nm_mtx);
+		return (0);
+	}
+	mtx_unlock(&nmp->nm_mtx);
+	error = nfsrpc_advise(ap->a_vp, ap->a_start, len, ap->a_advice,
+	    td->td_ucred, td);
+	if (error == NFSERR_NOTSUPP) {
+		mtx_lock(&nmp->nm_mtx);
+		nmp->nm_privflag |= NFSMNTP_NOADVISE;
+		mtx_unlock(&nmp->nm_mtx);
+	}
+	return (0);
+}
+
+/*
+ * nfs allocate call
+ */
+static int
+nfs_allocate(struct vop_allocate_args *ap)
+{
+	struct vnode *vp = ap->a_vp;
+	struct thread *td = curthread;
+	struct nfsvattr nfsva;
+	struct nfsmount *nmp;
+	int attrflag, error, ret;
+
+	attrflag = 0;
+	nmp = VFSTONFS(vp->v_mount);
+	mtx_lock(&nmp->nm_mtx);
+	if (NFSHASNFSV4(nmp) && nmp->nm_minorvers >= NFSV42_MINORVERSION &&
+	    (nmp->nm_privflag & NFSMNTP_NOALLOCATE) == 0) {
+		mtx_unlock(&nmp->nm_mtx);
+		/*
+		 * Flush first to ensure that the allocate adds to the
+		 * file's allocation on the server.
+		 */
+		error = ncl_flush(vp, MNT_WAIT, td, 1, 0);
+		if (error == 0)
+			error = nfsrpc_allocate(vp, *ap->a_offset, *ap->a_len,
+			    &nfsva, &attrflag, td->td_ucred, td, NULL);
+		if (error == 0) {
+			*ap->a_offset += *ap->a_len;
+			*ap->a_len = 0;
+		} else if (error == NFSERR_NOTSUPP) {
+			mtx_lock(&nmp->nm_mtx);
+			nmp->nm_privflag |= NFSMNTP_NOALLOCATE;
+			mtx_unlock(&nmp->nm_mtx);
+		}
+	} else {
+		mtx_unlock(&nmp->nm_mtx);
+		error = EIO;
+	}
+	/*
+	 * If the NFS server cannot perform the Allocate operation, just call
+	 * vop_stdallocate() to perform it.
+	 */
+	if (error != 0)
+		error = vop_stdallocate(ap);
+	if (attrflag != 0) {
+		ret = nfscl_loadattrcache(&vp, &nfsva, NULL, NULL, 0, 1);
+		if (error == 0 && ret != 0)
+			error = ret;
+	}
+	if (error != 0)
+		error = nfscl_maperr(td, error, (uid_t)0, (gid_t)0);
+	return (error);
+}
+
+/*
+ * nfs copy_file_range call
+ */
+static int
+nfs_copy_file_range(struct vop_copy_file_range_args *ap)
+{
+	struct vnode *invp = ap->a_invp;
+	struct vnode *outvp = ap->a_outvp;
+	struct mount *mp;
+	struct nfsvattr innfsva, outnfsva;
+	struct vattr *vap;
+	struct uio io;
+	struct nfsmount *nmp;
+	size_t len, len2, copiedlen;
+	int error, inattrflag, outattrflag, ret, ret2;
+	off_t inoff, outoff;
+	bool consecutive, must_commit, tryoutcred;
+
+	ret = ret2 = 0;
+	nmp = VFSTONFS(invp->v_mount);
+	mtx_lock(&nmp->nm_mtx);
+	/* NFSv4.2 Copy is not permitted for infile == outfile. */
+	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION ||
+	    (nmp->nm_privflag & NFSMNTP_NOCOPY) != 0 || invp == outvp) {
+		mtx_unlock(&nmp->nm_mtx);
+		error = vn_generic_copy_file_range(ap->a_invp, ap->a_inoffp,
+		    ap->a_outvp, ap->a_outoffp, ap->a_lenp, ap->a_flags,
+		    ap->a_incred, ap->a_outcred, ap->a_fsizetd);
+		return (error);
+	}
+	mtx_unlock(&nmp->nm_mtx);
+
+	/* Lock both vnodes, avoiding risk of deadlock. */
+	do {
+		mp = NULL;
+		error = vn_start_write(outvp, &mp, V_WAIT);
+		if (error == 0) {
+			error = vn_lock(outvp, LK_EXCLUSIVE);
+			if (error == 0) {
+				error = vn_lock(invp, LK_SHARED | LK_NOWAIT);
+				if (error == 0)
+					break;
+				VOP_UNLOCK(outvp);
+				if (mp != NULL)
+					vn_finished_write(mp);
+				mp = NULL;
+				error = vn_lock(invp, LK_SHARED);
+				if (error == 0)
+					VOP_UNLOCK(invp);
+			}
+		}
+		if (mp != NULL)
+			vn_finished_write(mp);
+	} while (error == 0);
+	if (error != 0)
+		return (error);
+
+	/*
+	 * Do the vn_rlimit_fsize() check.  Should this be above the VOP layer?
+	 */
+	io.uio_offset = *ap->a_outoffp;
+	io.uio_resid = *ap->a_lenp;
+	error = vn_rlimit_fsize(outvp, &io, ap->a_fsizetd);
+
+	/*
+	 * Flush the input file so that the data is up to date before
+	 * the copy.  Flush writes for the output file so that they
+	 * do not overwrite the data copied to the output file by the Copy.
+	 * Set the commit argument for both flushes so that the data is on
+	 * stable storage before the Copy RPC.  This is done in case the
+	 * server reboots during the Copy and needs to be redone.
+	 */
+	if (error == 0)
+		error = ncl_flush(invp, MNT_WAIT, curthread, 1, 0);
+	if (error == 0)
+		error = ncl_flush(outvp, MNT_WAIT, curthread, 1, 0);
+
+	/* Do the actual NFSv4.2 RPC. */
+	len = *ap->a_lenp;
+	mtx_lock(&nmp->nm_mtx);
+	if ((nmp->nm_privflag & NFSMNTP_NOCONSECUTIVE) == 0)
+		consecutive = true;
+	else
+		consecutive = false;
+	mtx_unlock(&nmp->nm_mtx);
+	inoff = *ap->a_inoffp;
+	outoff = *ap->a_outoffp;
+	tryoutcred = true;
+	must_commit = false;
+	if (error == 0) {
+		vap = &VTONFS(invp)->n_vattr.na_vattr;
+		error = VOP_GETATTR(invp, vap, ap->a_incred);
+		if (error == 0) {
+			/*
+			 * Clip "len" at va_size so that RFC compliant servers
+			 * will not reply NFSERR_INVAL.
+			 * Setting "len == 0" for the RPC would be preferred,
+			 * but some Linux servers do not support that.
+			 */
+			if (inoff >= vap->va_size)
+				*ap->a_lenp = len = 0;
+			else if (inoff + len > vap->va_size)
+				*ap->a_lenp = len = vap->va_size - inoff;
+		} else
+			error = 0;
+	}
+	copiedlen = 0;
+	while (len > 0 && error == 0) {
+		inattrflag = outattrflag = 0;
+		len2 = len;
+		if (tryoutcred)
+			error = nfsrpc_copy_file_range(invp, ap->a_inoffp,
+			    outvp, ap->a_outoffp, &len2, ap->a_flags,
+			    &inattrflag, &innfsva, &outattrflag, &outnfsva,
+			    ap->a_outcred, consecutive, &must_commit);
+		else
+			error = nfsrpc_copy_file_range(invp, ap->a_inoffp,
+			    outvp, ap->a_outoffp, &len2, ap->a_flags,
+			    &inattrflag, &innfsva, &outattrflag, &outnfsva,
+			    ap->a_incred, consecutive, &must_commit);
+		if (inattrflag != 0)
+			ret = nfscl_loadattrcache(&invp, &innfsva, NULL, NULL,
+			    0, 1);
+		if (outattrflag != 0)
+			ret2 = nfscl_loadattrcache(&outvp, &outnfsva, NULL,
+			    NULL, 1, 1);
+		if (error == 0) {
+			if (consecutive == false) {
+				if (len2 == len) {
+					mtx_lock(&nmp->nm_mtx);
+					nmp->nm_privflag |=
+					    NFSMNTP_NOCONSECUTIVE;
+					mtx_unlock(&nmp->nm_mtx);
+				} else
+					error = NFSERR_OFFLOADNOREQS;
+			}
+			/*
+			 * If the Copy returns a length == 0, it hit the
+			 * EOF on the input file.
+			 */
+			if (len2 == 0) {
+				*ap->a_lenp = copiedlen;
+				len = 0;
+			} else {
+				len -= len2;
+				copiedlen += len2;
+			}
+			if (len == 0 && must_commit && error == 0)
+				error = ncl_commit(outvp, outoff, *ap->a_lenp,
+				    ap->a_outcred, curthread);
+			if (error == 0 && ret != 0)
+				error = ret;
+			if (error == 0 && ret2 != 0)
+				error = ret2;
+		} else if (error == NFSERR_OFFLOADNOREQS && consecutive) {
+			/*
+			 * Try consecutive == false, which is ok only if all
+			 * bytes are copied.
+			 */
+			consecutive = false;
+			error = 0;
+		} else if (error == NFSERR_ACCES && tryoutcred) {
+			/* Try again with incred. */
+			tryoutcred = false;
+			error = 0;
+		}
+		if (error == NFSERR_STALEWRITEVERF) {
+			/*
+			 * Server rebooted, so do it all again.
+			 */
+			*ap->a_inoffp = inoff;
+			*ap->a_outoffp = outoff;
+			len = *ap->a_lenp;
+			must_commit = false;
+			error = 0;
+		}
+	}
+	VOP_UNLOCK(invp);
+	VOP_UNLOCK(outvp);
+	if (mp != NULL)
+		vn_finished_write(mp);
+	if (error == NFSERR_NOTSUPP || error == NFSERR_OFFLOADNOREQS ||
+	    error == NFSERR_ACCES) {
+		/*
+		 * Unlike the NFSv4.2 Copy, vn_generic_copy_file_range() can
+		 * use a_incred for the read and a_outcred for the write, so
+		 * try this for NFSERR_ACCES failures for the Copy.
+		 * For NFSERR_NOTSUPP and NFSERR_OFFLOADNOREQS, the Copy can
+		 * never succeed, so disable it.
+		 */
+		if (error != NFSERR_ACCES) {
+			/* Can never do Copy on this mount. */
+			mtx_lock(&nmp->nm_mtx);
+			nmp->nm_privflag |= NFSMNTP_NOCOPY;
+			mtx_unlock(&nmp->nm_mtx);
+		}
+		*ap->a_inoffp = inoff;
+		*ap->a_outoffp = outoff;
+		error = vn_generic_copy_file_range(ap->a_invp, ap->a_inoffp,
+		    ap->a_outvp, ap->a_outoffp, ap->a_lenp, ap->a_flags,
+		    ap->a_incred, ap->a_outcred, ap->a_fsizetd);
+	} else if (error != 0)
+		*ap->a_lenp = 0;
+
+	if (error != 0)
+		error = nfscl_maperr(curthread, error, (uid_t)0, (gid_t)0);
+	return (error);
+}
+
+/*
+ * nfs ioctl call
+ */
+static int
+nfs_ioctl(struct vop_ioctl_args *ap)
+{
+	struct vnode *vp = ap->a_vp;
+	struct nfsvattr nfsva;
+	struct nfsmount *nmp;
+	int attrflag, content, error, ret;
+	bool eof = false;			/* shut up compiler. */
+
+	if (vp->v_type != VREG)
+		return (ENOTTY);
+	nmp = VFSTONFS(vp->v_mount);
+	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION) {
+		error = vop_stdioctl(ap);
+		return (error);
+	}
+
+	/* Do the actual NFSv4.2 RPC. */
+	switch (ap->a_command) {
+	case FIOSEEKDATA:
+		content = NFSV4CONTENT_DATA;
+		break;
+	case FIOSEEKHOLE:
+		content = NFSV4CONTENT_HOLE;
+		break;
+	default:
+		return (ENOTTY);
+	}
+
+	error = vn_lock(vp, LK_SHARED);
+	if (error != 0)
+		return (EBADF);
+	attrflag = 0;
+	if (*((off_t *)ap->a_data) >= VTONFS(vp)->n_size)
+		error = ENXIO;
+	else {
+		/*
+		 * Flush all writes, so that the server is up to date.
+		 * Although a Commit is not required, the commit argument
+		 * is set so that, for a pNFS File/Flexible File Layout
+		 * server, the LayoutCommit will be done to ensure the file
+		 * size is up to date on the Metadata Server.
+		 */
+		error = ncl_flush(vp, MNT_WAIT, ap->a_td, 1, 0);
+		if (error == 0)
+			error = nfsrpc_seek(vp, (off_t *)ap->a_data, &eof,
+			    content, ap->a_cred, &nfsva, &attrflag);
+		/* If at eof for FIOSEEKDATA, return ENXIO. */
+		if (eof && error == 0 && content == NFSV4CONTENT_DATA)
+			error = ENXIO;
+	}
+	if (attrflag != 0) {
+		ret = nfscl_loadattrcache(&vp, &nfsva, NULL, NULL, 0, 1);
+		if (error == 0 && ret != 0)
+			error = ret;
+	}
+	NFSVOPUNLOCK(vp);
+
+	if (error != 0)
+		error = ENXIO;
+	return (error);
+}
+
+/*
+ * nfs getextattr call
+ */
+static int
+nfs_getextattr(struct vop_getextattr_args *ap)
+{
+	struct vnode *vp = ap->a_vp;
+	struct nfsmount *nmp;
+	struct ucred *cred;
+	struct thread *td = ap->a_td;
+	struct nfsvattr nfsva;
+	ssize_t len;
+	int attrflag, error, ret;
+
+	nmp = VFSTONFS(vp->v_mount);
+	mtx_lock(&nmp->nm_mtx);
+	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION ||
+	    (nmp->nm_privflag & NFSMNTP_NOXATTR) != 0 ||
+	    ap->a_attrnamespace != EXTATTR_NAMESPACE_USER) {
+		mtx_unlock(&nmp->nm_mtx);
+		return (EOPNOTSUPP);
+	}
+	mtx_unlock(&nmp->nm_mtx);
+
+	cred = ap->a_cred;
+	if (cred == NULL)
+		cred = td->td_ucred;
+	/* Do the actual NFSv4.2 Optional Extended Attribute (RFC-8276) RPC. */
+	attrflag = 0;
+	error = nfsrpc_getextattr(vp, ap->a_name, ap->a_uio, &len, &nfsva,
+	    &attrflag, cred, td);
+	if (attrflag != 0) {
+		ret = nfscl_loadattrcache(&vp, &nfsva, NULL, NULL, 0, 1);
+		if (error == 0 && ret != 0)
+			error = ret;
+	}
+	if (error == 0 && ap->a_size != NULL)
+		*ap->a_size = len;
+
+	switch (error) {
+	case NFSERR_NOTSUPP:
+	case NFSERR_OPILLEGAL:
+		mtx_lock(&nmp->nm_mtx);
+		nmp->nm_privflag |= NFSMNTP_NOXATTR;
+		mtx_unlock(&nmp->nm_mtx);
+		error = EOPNOTSUPP;
+		break;
+	case NFSERR_NOXATTR:
+	case NFSERR_XATTR2BIG:
+		error = ENOATTR;
+		break;
+	default:
+		error = nfscl_maperr(td, error, 0, 0);
+		break;
+	}
+	return (error);
+}
+
+/*
+ * nfs setextattr call
+ */
+static int
+nfs_setextattr(struct vop_setextattr_args *ap)
+{
+	struct vnode *vp = ap->a_vp;
+	struct nfsmount *nmp;
+	struct ucred *cred;
+	struct thread *td = ap->a_td;
+	struct nfsvattr nfsva;
+	int attrflag, error, ret;
+
+	nmp = VFSTONFS(vp->v_mount);
+	mtx_lock(&nmp->nm_mtx);
+	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION ||
+	    (nmp->nm_privflag & NFSMNTP_NOXATTR) != 0 ||
+	    ap->a_attrnamespace != EXTATTR_NAMESPACE_USER) {
+		mtx_unlock(&nmp->nm_mtx);
+		return (EOPNOTSUPP);
+	}
+	mtx_unlock(&nmp->nm_mtx);
+
+	if (ap->a_uio->uio_resid <= 0)
+		return (EINVAL);
+	cred = ap->a_cred;
+	if (cred == NULL)
+		cred = td->td_ucred;
+	/* Do the actual NFSv4.2 Optional Extended Attribute (RFC-8276) RPC. */
+	attrflag = 0;
+	error = nfsrpc_setextattr(vp, ap->a_name, ap->a_uio, &nfsva,
+	    &attrflag, cred, td);
+	if (attrflag != 0) {
+		ret = nfscl_loadattrcache(&vp, &nfsva, NULL, NULL, 0, 1);
+		if (error == 0 && ret != 0)
+			error = ret;
+	}
+
+	switch (error) {
+	case NFSERR_NOTSUPP:
+	case NFSERR_OPILLEGAL:
+		mtx_lock(&nmp->nm_mtx);
+		nmp->nm_privflag |= NFSMNTP_NOXATTR;
+		mtx_unlock(&nmp->nm_mtx);
+		error = EOPNOTSUPP;
+		break;
+	case NFSERR_NOXATTR:
+	case NFSERR_XATTR2BIG:
+		error = ENOATTR;
+		break;
+	default:
+		error = nfscl_maperr(td, error, 0, 0);
+		break;
+	}
+	return (error);
+}
+
+/*
+ * nfs listextattr call
+ */
+static int
+nfs_listextattr(struct vop_listextattr_args *ap)
+{
+	struct vnode *vp = ap->a_vp;
+	struct nfsmount *nmp;
+	struct ucred *cred;
+	struct thread *td = ap->a_td;
+	struct nfsvattr nfsva;
+	size_t len, len2;
+	uint64_t cookie;
+	int attrflag, error, ret;
+	bool eof;
+
+	nmp = VFSTONFS(vp->v_mount);
+	mtx_lock(&nmp->nm_mtx);
+	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION ||
+	    (nmp->nm_privflag & NFSMNTP_NOXATTR) != 0 ||
+	    ap->a_attrnamespace != EXTATTR_NAMESPACE_USER) {
+		mtx_unlock(&nmp->nm_mtx);
+		return (EOPNOTSUPP);
+	}
+	mtx_unlock(&nmp->nm_mtx);
+
+	cred = ap->a_cred;
+	if (cred == NULL)
+		cred = td->td_ucred;
+
+	/* Loop around doing List Extended Attribute RPCs. */
+	eof = false;
+	cookie = 0;
+	len2 = 0;
+	error = 0;
+	while (!eof && error == 0) {
+		len = nmp->nm_rsize;
+		attrflag = 0;
+		error = nfsrpc_listextattr(vp, &cookie, ap->a_uio, &len, &eof,
+		    &nfsva, &attrflag, cred, td);
+		if (attrflag != 0) {
+			ret = nfscl_loadattrcache(&vp, &nfsva, NULL, NULL, 0,
+			    1);
+			if (error == 0 && ret != 0)
+				error = ret;
+		}
+		if (error == 0) {
+			len2 += len;
+			if (len2 > SSIZE_MAX)
+				error = ENOATTR;
+		}
+	}
+	if (error == 0 && ap->a_size != NULL)
+		*ap->a_size = len2;
+
+	switch (error) {
+	case NFSERR_NOTSUPP:
+	case NFSERR_OPILLEGAL:
+		mtx_lock(&nmp->nm_mtx);
+		nmp->nm_privflag |= NFSMNTP_NOXATTR;
+		mtx_unlock(&nmp->nm_mtx);
+		error = EOPNOTSUPP;
+		break;
+	case NFSERR_NOXATTR:
+	case NFSERR_XATTR2BIG:
+		error = ENOATTR;
+		break;
+	default:
+		error = nfscl_maperr(td, error, 0, 0);
+		break;
+	}
+	return (error);
+}
+
+/*
+ * nfs setextattr call
+ */
+static int
+nfs_deleteextattr(struct vop_deleteextattr_args *ap)
+{
+	struct vnode *vp = ap->a_vp;
+	struct nfsmount *nmp;
+	struct nfsvattr nfsva;
+	int attrflag, error, ret;
+
+	nmp = VFSTONFS(vp->v_mount);
+	mtx_lock(&nmp->nm_mtx);
+	if (!NFSHASNFSV4(nmp) || nmp->nm_minorvers < NFSV42_MINORVERSION ||
+	    (nmp->nm_privflag & NFSMNTP_NOXATTR) != 0 ||
+	    ap->a_attrnamespace != EXTATTR_NAMESPACE_USER) {
+		mtx_unlock(&nmp->nm_mtx);
+		return (EOPNOTSUPP);
+	}
+	mtx_unlock(&nmp->nm_mtx);
+
+	/* Do the actual NFSv4.2 Optional Extended Attribute (RFC-8276) RPC. */
+	attrflag = 0;
+	error = nfsrpc_rmextattr(vp, ap->a_name, &nfsva, &attrflag, ap->a_cred,
+	    ap->a_td);
+	if (attrflag != 0) {
+		ret = nfscl_loadattrcache(&vp, &nfsva, NULL, NULL, 0, 1);
+		if (error == 0 && ret != 0)
+			error = ret;
+	}
+
+	switch (error) {
+	case NFSERR_NOTSUPP:
+	case NFSERR_OPILLEGAL:
+		mtx_lock(&nmp->nm_mtx);
+		nmp->nm_privflag |= NFSMNTP_NOXATTR;
+		mtx_unlock(&nmp->nm_mtx);
+		error = EOPNOTSUPP;
+		break;
+	case NFSERR_NOXATTR:
+	case NFSERR_XATTR2BIG:
+		error = ENOATTR;
+		break;
+	default:
+		error = nfscl_maperr(ap->a_td, error, 0, 0);
+		break;
+	}
+	return (error);
+}
+
+/*
  * Return POSIX pathconf information applicable to nfs filesystems.
  */
 static int
@@ -3507,7 +4147,10 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 	struct nfsv3_pathconf pc;
 	struct nfsvattr nfsva;
 	struct vnode *vp = ap->a_vp;
+	struct nfsmount *nmp;
 	struct thread *td = curthread;
+	off_t off;
+	bool eof;
 	int attrflag, error;
 
 	if ((NFS_ISV34(vp) && (ap->a_name == _PC_LINK_MAX ||
@@ -3605,6 +4248,40 @@ nfs_pathconf(struct vop_pathconf_args *ap)
 		break;
 	case _PC_SYMLINK_MAX:
 		*ap->a_retval = NFS_MAXPATHLEN;
+		break;
+	case _PC_MIN_HOLE_SIZE:
+		/* Only some NFSv4.2 servers support Seek for Holes. */
+		*ap->a_retval = 0;
+		nmp = VFSTONFS(vp->v_mount);
+		if (NFS_ISV4(vp) && nmp->nm_minorvers == NFSV42_MINORVERSION) {
+			/*
+			 * NFSv4.2 doesn't have an attribute for hole size,
+			 * so all we can do is see if the Seek operation is
+			 * supported and then use f_iosize as a "best guess".
+			 */
+			mtx_lock(&nmp->nm_mtx);
+			if ((nmp->nm_privflag & NFSMNTP_SEEKTESTED) == 0) {
+				mtx_unlock(&nmp->nm_mtx);
+				off = 0;
+				attrflag = 0;
+				error = nfsrpc_seek(vp, &off, &eof,
+				    NFSV4CONTENT_HOLE, td->td_ucred, &nfsva,
+				    &attrflag);
+				if (attrflag != 0)
+					nfscl_loadattrcache(&vp, &nfsva,
+					    NULL, NULL, 0, 1);
+				mtx_lock(&nmp->nm_mtx);
+				if (error == NFSERR_NOTSUPP)
+					nmp->nm_privflag |= NFSMNTP_SEEKTESTED;
+				else
+					nmp->nm_privflag |= NFSMNTP_SEEKTESTED |
+					    NFSMNTP_SEEK;
+				error = 0;
+			}
+			if ((nmp->nm_privflag & NFSMNTP_SEEK) != 0)
+				*ap->a_retval = vp->v_mount->mnt_stat.f_iosize;
+			mtx_unlock(&nmp->nm_mtx);
+		}
 		break;
 
 	default:

@@ -41,7 +41,7 @@ LIB32_MACHINE_ARCH=	i386
 LIB32WMAKEENV=	MACHINE_CPU="i686 mmx sse sse2"
 LIB32WMAKEFLAGS=	\
 		AS="${XAS} --32" \
-		LD="${XLD} -m elf_i386_fbsd -L${LIBCOMPATTMP}/usr/lib32"
+		LD="${XLD} -m elf_i386_fbsd -L${WORLDTMP}/usr/lib32"
 
 .elif ${COMPAT_ARCH} == "powerpc64"
 HAS_COMPAT=32
@@ -50,13 +50,22 @@ LIB32CPUFLAGS=	-mcpu=powerpc
 .else
 LIB32CPUFLAGS=	-mcpu=${COMPAT_CPUTYPE}
 .endif
+
+.if ${COMPAT_COMPILER_TYPE} == "gcc"
 LIB32CPUFLAGS+=	-m32
+.else
+LIB32CPUFLAGS+=	-target powerpc-unknown-freebsd13.0
+
+# Use BFD to workaround ld.lld issues on PowerPC 32 bit 
+LIB32CPUFLAGS+= -fuse-ld=${LD_BFD}
+.endif
+
 LIB32_MACHINE=	powerpc
 LIB32_MACHINE_ARCH=	powerpc
 LIB32WMAKEFLAGS=	\
-		LD="${XLD} -m elf32ppc_fbsd"
+		LD="${LD_BFD} -m elf32ppc_fbsd"
 
-.elif ${COMPAT_ARCH:Mmips64*} != ""
+.elif ${COMPAT_ARCH:Mmips64*}
 HAS_COMPAT=32
 .if ${COMPAT_COMPILER_TYPE} == gcc
 .if empty(COMPAT_CPUTYPE)
@@ -65,7 +74,7 @@ LIB32CPUFLAGS=	-march=mips3
 LIB32CPUFLAGS=	-march=${COMPAT_CPUTYPE}
 .endif
 .else
-.if ${COMPAT_ARCH:Mmips64el*} != ""
+.if ${COMPAT_ARCH:Mmips64el*}
 LIB32CPUFLAGS=  -target mipsel-unknown-freebsd13.0
 .else
 LIB32CPUFLAGS=  -target mips-unknown-freebsd13.0
@@ -73,10 +82,11 @@ LIB32CPUFLAGS=  -target mips-unknown-freebsd13.0
 .endif
 LIB32CPUFLAGS+= -mabi=32
 LIB32_MACHINE=	mips
-LIB32_MACHINE_ARCH=	mips
-.if ${COMPAT_ARCH:Mmips64el*} != ""
+.if ${COMPAT_ARCH:Mmips64el*}
+LIB32_MACHINE_ARCH=	mipsel
 _EMULATION=	elf32ltsmip_fbsd
 .else
+LIB32_MACHINE_ARCH=	mips
 _EMULATION=	elf32btsmip_fbsd
 .endif
 LIB32WMAKEFLAGS= LD="${XLD} -m ${_EMULATION}"
@@ -95,7 +105,7 @@ LIB32WMAKEFLAGS+=	-DCOMPAT_32BIT
 .if ${COMPAT_ARCH:Mmips64*c*}
 HAS_COMPAT=64
 # XXX: clang specific
-.if ${COMPAT_ARCH:Mmips64el*} != ""
+.if ${COMPAT_ARCH:Mmips64el*}
 LIB64CPUFLAGS=  -target mipsel-unknown-freebsd13.0
 .else
 LIB64CPUFLAGS=  -target cheri-unknown-freebsd13.0
@@ -119,8 +129,28 @@ LIB64DTRACE=	${DTRACE} -64
 LIB64WMAKEFLAGS+=	-DCOMPAT_64BIT
 
 # -------------------------------------------------------------------
+# CHERI world
+.if ${COMPAT_ARCH:Mmips64*} && !${COMPAT_ARCH:Mmips64*c*}
+.if ${COMPAT_ARCH:Mmips*el*}
+.error No little endian CHERI
+.endif
+HAS_COMPAT=CHERI
+LIBCHERICFLAGS=		-DCOMPAT_CHERI
+LIBCHERICPUFLAGS=  -target cheri-unknown-freebsd13.0 -mabi=purecap
+LIBCHERI_MACHINE=	mips
+LIBCHERI_MACHINE_ARCH=	mips64c128
+LIBCHERIWMAKEFLAGS=	LIBCHERI=yes
+# Forward the cross linker and binutils
+LIBCHERIWMAKEFLAGS+=	LD="${XLD}"
+.for BINUTIL in ${XBINUTILS}
+LIBCHERIWMAKEFLAGS+=	${BINUTIL}="${X${BINUTIL}}"
+.endfor
+.info "LIBCHERIWMAKEFLAGS=${LIBCHERIWMAKEFLAGS}"
+.endif
+
+# -------------------------------------------------------------------
 # soft-fp world
-.if ${COMPAT_ARCH:Marmv[67]*} != ""
+.if ${COMPAT_ARCH:Marmv[67]*}
 HAS_COMPAT=SOFT
 LIBSOFTCFLAGS=        -DCOMPAT_SOFTFP
 LIBSOFTCPUFLAGS= -mfloat-abi=softfp
@@ -167,11 +197,10 @@ LIBCOMPAT${_var}?=	${LIB${_LIBCOMPAT}${_var}}
 
 # Shared flags
 LIBCOMPAT_OBJTOP?=	${OBJTOP}/obj-lib${libcompat}
-LIBCOMPATTMP?=		${LIBCOMPAT_OBJTOP}/tmp
 
 LIBCOMPATCFLAGS+=	${LIBCOMPATCPUFLAGS} \
-			-L${LIBCOMPATTMP}/usr/lib${libcompat} \
-			--sysroot=${LIBCOMPATTMP} \
+			-L${WORLDTMP}/usr/lib${libcompat} \
+			--sysroot=${WORLDTMP} \
 			${BFLAGS}
 
 LIBCOMPATWMAKEENV+=	MACHINE=${LIBCOMPAT_MACHINE}
@@ -179,7 +208,7 @@ LIBCOMPATWMAKEENV+=	MACHINE_ARCH=${LIBCOMPAT_MACHINE_ARCH}
 
 # -B is needed to find /usr/lib32/crti.o for GCC and /usr/libsoft/crti.o for
 # Clang/GCC.
-LIBCOMPATCFLAGS+=	-B${LIBCOMPATTMP}/usr/lib${libcompat}
+LIBCOMPATCFLAGS+=	-B${WORLDTMP}/usr/lib${libcompat}
 
 .if defined(WANT_COMPAT)
 LIBDIR_BASE:=	/usr/lib${libcompat}

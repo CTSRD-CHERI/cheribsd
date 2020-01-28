@@ -176,7 +176,7 @@ struct filedesc0 {
 /*
  * Descriptor management.
  */
-volatile int __exclusive_cache_line openfiles; /* actual number of open files */
+static int __exclusive_cache_line openfiles; /* actual number of open files */
 struct mtx sigio_lock;		/* mtx to protect pointers to sigio */
 void __read_mostly (*mq_fdclose)(struct thread *td, int fd, struct file *fp);
 
@@ -404,31 +404,15 @@ sys_dup(struct thread *td, struct dup_args *uap)
 struct fcntl_args {
 	int	fd;
 	int	cmd;
-	long	arg;
+	intcap_t arg;
 };
 #endif
 /* ARGSUSED */
 int
 sys_fcntl(struct thread *td, struct fcntl_args *uap)
 {
-	intcap_t tmp;
 
-	switch (uap->cmd) {
-	case F_GETLK:
-	case F_OGETLK:
-	case F_OSETLK:
-	case F_OSETLKW:
-	case F_SETLK:
-	case F_SETLKW:
-	case F_SETLK_REMOTE:
-		tmp = (intcap_t)__USER_CAP_UNBOUND((void *)uap->arg);
-		break;
-
-	default:
-		tmp = (intcap_t)uap->arg;
-	}
-
-	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, tmp));
+	return (kern_fcntl_freebsd(td, uap->fd, uap->cmd, uap->arg));
 }
 
 int
@@ -830,7 +814,7 @@ kern_fcntl(struct thread *td, int fd, int cmd, intptr_t arg)
 		} else {
 			atomic_clear_int(&fp->f_flag, FRDAHEAD);
 		}
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 		fdrop(fp, td);
 		break;
 
@@ -1508,7 +1492,7 @@ kern_fpathconf(struct thread *td, int fd, int name, long *valuep)
 	if (vp != NULL) {
 		vn_lock(vp, LK_SHARED | LK_RETRY);
 		error = VOP_PATHCONF(vp, name, valuep);
-		VOP_UNLOCK(vp, 0);
+		VOP_UNLOCK(vp);
 	} else if (fp->f_type == DTYPE_PIPE || fp->f_type == DTYPE_SOCKET) {
 		if (name != _PC_PIPE_BUF) {
 			error = EINVAL;
@@ -4073,7 +4057,7 @@ SYSCTL_INT(_kern, KERN_MAXFILES, maxfiles, CTLFLAG_RW,
     &maxfiles, 0, "Maximum number of files");
 
 SYSCTL_INT(_kern, OID_AUTO, openfiles, CTLFLAG_RD,
-    __DEVOLATILE(int *, &openfiles), 0, "System-wide number of open files");
+    &openfiles, 0, "System-wide number of open files");
 
 /* ARGSUSED*/
 static void

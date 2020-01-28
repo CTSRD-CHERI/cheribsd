@@ -104,14 +104,7 @@ crt_init_globals_3(void *data_cap, const void *code_cap, const void *rodata_cap)
 		return;
 #endif
 	/* Otherwise we need to initialize globals manually */
-#ifdef CHERI_INIT_GLOBALS_SUPPORTS_CONSTANT_FLAG
 	cheri_init_globals_3(data_cap, code_cap, rodata_cap);
-#else
-#pragma message("Warning: cheri_init_globals.h is outdated. Please update LLVM")
-	(void)code_cap;
-	(void)rodata_cap;
-	cheri_init_globals_gdc(data_cap);
-#endif
 }
 
 #ifndef CRT_INIT_GLOBALS_GDC_ONLY

@@ -315,7 +315,7 @@ static	int		cdsendkey(struct cam_periph *periph,
 				  struct dvd_authinfo *authinfo);
 static	int		cdreaddvdstructure(struct cam_periph *periph,
 					   struct dvd_struct *dvdstruct);
-static timeout_t	cdmediapoll;
+static	callout_func_t	cdmediapoll;
 
 static struct periph_driver cddriver =
 {
@@ -1045,7 +1045,8 @@ cdstart(struct cam_periph *periph, union ccb *start_ccb)
 		 * If the CD is already locked, we don't need to do this.
 		 * Move on to the capacity check.
 		 */
-		if ((softc->flags & CD_FLAG_DISC_LOCKED) != 0) {
+		if (softc->state == CD_STATE_MEDIA_PREVENT
+		 && (softc->flags & CD_FLAG_DISC_LOCKED) != 0) {
 			softc->state = CD_STATE_MEDIA_SIZE;
 			xpt_release_ccb(start_ccb);
 			xpt_schedule(periph, CAM_PRIORITY_NORMAL);

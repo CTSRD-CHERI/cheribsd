@@ -42,7 +42,7 @@ SUBDIR= cat \
 
 .if ${TARGET} == "mips"
 SUBDIR+=	shmem_bench
-SUBDIR+=	cheri_bench
+SUBDIR.${MK_LIBCHERI}+=	cheri_bench
 .endif
 
 # Small cheri programs
@@ -54,8 +54,8 @@ SUBDIR.${MK_CHERI}+=	helloworld_cxx
 SUBDIR.${MK_CHERI}+=	helloworld_static
 
 # Consumers of libhelloworld
-SUBDIR.${MK_CHERI}+=	cheri_helloworld
-SUBDIR.${MK_CHERI}+=	cheriabi_helloworld
+SUBDIR.${MK_LIBCHERI}+=	cheri_helloworld
+SUBDIR.${MK_LIBCHERI}+=	cheriabi_helloworld
 
 # cheritest
 SUBDIR.${MK_CHERI}+=	cheriabitest

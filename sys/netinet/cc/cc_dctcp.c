@@ -109,7 +109,7 @@ dctcp_ack_received(struct cc_var *ccv, uint16_t type)
 
 	dctcp_data = ccv->cc_data;
 
-	if (CCV(ccv, t_flags) & TF_ECN_PERMIT) {
+	if (CCV(ccv, t_flags2) & TF2_ECN_PERMIT) {
 		/*
 		 * DCTCP doesn't treat receipt of ECN marked packet as a
 		 * congestion event. Thus, DCTCP always executes the ACK
@@ -168,7 +168,7 @@ dctcp_after_idle(struct cc_var *ccv)
 {
 	struct dctcp *dctcp_data;
 
-	if (CCV(ccv, t_flags) & TF_ECN_PERMIT) {
+	if (CCV(ccv, t_flags2) & TF2_ECN_PERMIT) {
 		dctcp_data = ccv->cc_data;
 
 		/* Initialize internal parameters after idle time */
@@ -234,7 +234,7 @@ dctcp_cong_signal(struct cc_var *ccv, uint32_t type)
 	struct dctcp *dctcp_data;
 	u_int cwin, mss;
 
-	if (CCV(ccv, t_flags) & TF_ECN_PERMIT) {
+	if (CCV(ccv, t_flags2) & TF2_ECN_PERMIT) {
 		dctcp_data = ccv->cc_data;
 		cwin = CCV(ccv, snd_cwnd);
 		mss = CCV(ccv, t_maxseg);
@@ -284,7 +284,7 @@ dctcp_cong_signal(struct cc_var *ccv, uint32_t type)
 			dctcp_data->ece_curr = 1;
 			break;
 		case CC_RTO:
-			CCV(ccv, t_flags) |= TF_ECN_SND_CWR;
+			CCV(ccv, t_flags2) |= TF2_ECN_SND_CWR;
 			dctcp_update_alpha(ccv);
 			dctcp_data->save_sndnxt += CCV(ccv, t_maxseg);
 			dctcp_data->num_cong_events++;
@@ -301,7 +301,7 @@ dctcp_conn_init(struct cc_var *ccv)
 
 	dctcp_data = ccv->cc_data;
 
-	if (CCV(ccv, t_flags) & TF_ECN_PERMIT)
+	if (CCV(ccv, t_flags2) & TF2_ECN_PERMIT)
 		dctcp_data->save_sndnxt = CCV(ccv, snd_nxt);
 }
 
@@ -313,51 +313,48 @@ dctcp_post_recovery(struct cc_var *ccv)
 {
 	newreno_cc_algo.post_recovery(ccv);
 
-	if (CCV(ccv, t_flags) & TF_ECN_PERMIT)
+	if (CCV(ccv, t_flags2) & TF2_ECN_PERMIT)
 		dctcp_update_alpha(ccv);
 }
 
 /*
- * Execute an additional ECN processing using ECN field in IP header and the CWR
- * bit in TCP header.
- *
- * delay_ack == 0 - Delayed ACK disabled
- * delay_ack == 1 - Delayed ACK enabled
+ * Execute an additional ECN processing using ECN field in IP header
+ * and the CWR bit in TCP header.
  */
-
 static void
 dctcp_ecnpkt_handler(struct cc_var *ccv)
 {
 	struct dctcp *dctcp_data;
 	uint32_t ccflag;
-	int delay_ack;
+	int acknow;
 
 	dctcp_data = ccv->cc_data;
 	ccflag = ccv->flags;
-	delay_ack = 1;
+	acknow = 0;
 
 	/*
 	 * DCTCP responds with an ACK immediately when the CE state
 	 * in between this segment and the last segment has changed.
 	 */
 	if (ccflag & CCF_IPHDR_CE) {
-		if (!dctcp_data->ce_prev && (ccflag & CCF_DELACK))
-			delay_ack = 0;
-		dctcp_data->ce_prev = 1;
-		CCV(ccv, t_flags) |= TF_ECN_SND_ECE;
+		if (!dctcp_data->ce_prev) {
+			acknow = 1;
+			dctcp_data->ce_prev = 1;
+			CCV(ccv, t_flags2) |= TF2_ECN_SND_ECE;
+		}
 	} else {
-		if (dctcp_data->ce_prev && (ccflag & CCF_DELACK))
-			delay_ack = 0;
-		dctcp_data->ce_prev = 0;
-		CCV(ccv, t_flags) &= ~TF_ECN_SND_ECE;
+		if (dctcp_data->ce_prev) {
+			acknow = 1;
+			dctcp_data->ce_prev = 0;
+			CCV(ccv, t_flags2) &= ~TF2_ECN_SND_ECE;
+		}
 	}
 
-	/* DCTCP sets delayed ack when this segment sets the CWR flag. */
-	if ((ccflag & CCF_DELACK) && (ccflag & CCF_TCPHDR_CWR))
-		delay_ack = 1;
-
-	if (delay_ack == 0)
+	if ((acknow) || (ccflag & CCF_TCPHDR_CWR)) {
 		ccv->flags |= CCF_ACKNOW;
+	} else {
+		ccv->flags &= ~CCF_ACKNOW;
+	}
 }
 
 /*

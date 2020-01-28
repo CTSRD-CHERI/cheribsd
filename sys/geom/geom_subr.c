@@ -53,6 +53,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/mutex.h>
 #include <sys/errno.h>
 #include <sys/sbuf.h>
+#include <sys/sdt.h>
 #include <geom/geom.h>
 #include <geom/geom_dbg.h>
 #include <geom/geom_int.h>
@@ -65,6 +66,8 @@ __FBSDID("$FreeBSD$");
 #ifdef KDB
 #include <sys/kdb.h>
 #endif
+
+SDT_PROVIDER_DEFINE(geom);
 
 struct class_list_head g_classes = LIST_HEAD_INITIALIZER(g_classes);
 static struct g_tailq_head geoms = TAILQ_HEAD_INITIALIZER(geoms);
@@ -936,6 +939,9 @@ g_access(struct g_consumer *cp, int dcr, int dcw, int dce)
 	KASSERT(cp->acw + dcw >= 0, ("access resulting in negative acw"));
 	KASSERT(cp->ace + dce >= 0, ("access resulting in negative ace"));
 	KASSERT(dcr != 0 || dcw != 0 || dce != 0, ("NOP access request"));
+	KASSERT(cp->acr + dcr != 0 || cp->acw + dcw != 0 ||
+	    cp->ace + dce != 0 || cp->nstart == cp->nend,
+	    ("Last close with active requests"));
 	KASSERT(gp->access != NULL, ("NULL geom->access"));
 
 	/*
@@ -983,7 +989,7 @@ g_access(struct g_consumer *cp, int dcr, int dcw, int dce)
 	    pp, pp->name);
 
 	/* If foot-shooting is enabled, any open on rank#1 is OK */
-	if ((g_debugflags & 16) && gp->rank == 1)
+	if ((g_debugflags & G_F_FOOTSHOOTING) && gp->rank == 1)
 		;
 	/* If we try exclusive but already write: fail */
 	else if (dce > 0 && pw > 0)
@@ -1423,8 +1429,10 @@ db_show_geom_consumer(int indent, struct g_consumer *cp)
 		}
 		gprintln("  access:   r%dw%de%d", cp->acr, cp->acw, cp->ace);
 		gprintln("  flags:    0x%04x", cp->flags);
+#ifdef INVARIANTS
 		gprintln("  nstart:   %u", cp->nstart);
 		gprintln("  nend:     %u", cp->nend);
+#endif
 	} else {
 		gprintf("consumer: %p (%s), access=r%dw%de%d", cp,
 		    cp->provider != NULL ? cp->provider->name : "none",
@@ -1456,8 +1464,6 @@ db_show_geom_provider(int indent, struct g_provider *pp)
 		    provider_flags_to_string(pp, flags, sizeof(flags)),
 		    pp->flags);
 		gprintln("  error:        %d", pp->error);
-		gprintln("  nstart:       %u", pp->nstart);
-		gprintln("  nend:         %u", pp->nend);
 		if (LIST_EMPTY(&pp->consumers))
 			gprintln("  consumers:    none");
 	} else {

@@ -55,16 +55,6 @@ struct spin_entry {
 static phandle_t cpu_of_nodes[MAXCPU];
 static device_t picmap[MAXCPU];
 
-int
-platform_processor_id(void)
-{
-	int cpu;
-
-	cpu = beri_get_cpu();
-
-	return (cpu);
-}
-
 void
 platform_cpu_mask(cpuset_t *mask)
 {

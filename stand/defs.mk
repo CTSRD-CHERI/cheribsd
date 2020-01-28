@@ -28,6 +28,7 @@ FDTSRC=		${BOOTSRC}/fdt
 FICLSRC=	${BOOTSRC}/ficl
 LDRSRC=		${BOOTSRC}/common
 LIBLUASRC=	${BOOTSRC}/liblua
+LIBOFWSRC=	${BOOTSRC}/libofw
 LUASRC=		${SRCTOP}/contrib/lua/src
 SASRC=		${BOOTSRC}/libsa
 SYSDIR=		${SRCTOP}/sys
@@ -99,6 +100,10 @@ CFLAGS+= -DLOADER_DISK_SUPPORT
 # or powerpc64.
 .if ${MACHINE_ARCH} == "powerpc64"
 CFLAGS+=	-m32 -mcpu=powerpc
+# Use ld.bfd to workaround ld.lld issues on PowerPC 32 bit
+.if "${COMPILER_TYPE}" == "clang" && "${LINKER_TYPE}" == "lld"
+CFLAGS+=	-fuse-ld=${LD_BFD}
+.endif
 .endif
 
 # For amd64, there's a bit of mixed bag. Some of the tree (i386, lib*32) is
