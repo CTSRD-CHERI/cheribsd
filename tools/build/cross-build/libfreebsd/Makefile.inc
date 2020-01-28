@@ -1,14 +1,61 @@
-LIB=	freebsd
 NO_SHARED=	yes
+LIB?=	freebsd
+TOOLS_CROSSBUILD_DIR=${SRCTOP}/tools/build/cross-build
+LIBFREEBSD_DIR=${TOOLS_CROSSBUILD_DIR}/libfreebsd
+.PATH: ${TOOLS_CROSSBUILD_DIR}/libfreebsd
 
-INCSGROUPS=	INCS SYSINCS
-SYSINCSDIR=	${INCLUDEDIR}/sys
+INCSGROUPS?=	INCS SYSINCS
+SYSINCSDIR?=	${INCLUDEDIR}/sys
 
 INCS+=	${SRCTOP}/include/mpool.h \
 		${SRCTOP}/include/ndbm.h
 INCS+=	${SRCTOP}/include/err.h \
 		${SRCTOP}/include/stringlist.h
 SYSINCS+=	${SRCTOP}/sys/sys/queue.h
+
+SYSINCS+=	${SRCTOP}/sys/sys/md5.h
+SYSINCS+=	${SRCTOP}/sys/sys/sbuf.h
+SYSINCS+=	${SRCTOP}/sys/sys/elf32.h
+SYSINCS+=	${SRCTOP}/sys/sys/elf64.h
+SYSINCS+=	${SRCTOP}/sys/sys/elf_common.h
+SYSINCS+=	${SRCTOP}/sys/sys/elf_generic.h
+SYSINCS+=	${SRCTOP}/sys/sys/tree.h
+
+_host_arch=${MACHINE}
+.if ${_host_arch} == "x86_64"
+# bmake on Linux/mac often prints that instead of amd64
+_host_arch=amd64
+.endif
+.if ${_host_arch} == "unknown"
+# HACK: If MACHINE is unknown, assume we are building on x86
+_host_arch=amd64
+.endif
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/elf.h
+.if ${_host_arch} == "amd64" || ${_host_arch} == "i386"
+X86INCS+=	${SRCTOP}/sys/x86/include/elf.h
+.endif
+
+# needed for btxld:
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/exec.h
+MACHINESYSINCS+=	${SRCTOP}/sys/${_host_arch}/include/reloc.h
+INCS+=	${SRCTOP}/include/a.out.h
+INCS+=	${SRCTOP}/include/nlist.h
+SYSINCS+=	${SRCTOP}/sys/sys/imgact_aout.h
+SYSINCS+=	${SRCTOP}/sys/sys/nlist_aout.h
+
+# For mkscrfil.c:
+SYSINCS+=	${SRCTOP}/sys/sys/consio.h
+
+# for gencat:
+INCS+=	${SRCTOP}/include/nl_types.h
+
+# for vtfontcvt:
+SYSINCS+=	${SRCTOP}/sys/sys/fnv_hash.h
+
+# opensolaris stuff
+INCS+=	${SRCTOP}/include/elf.h
+
+
 
 # Note: ${LIBC_SRCTOP}/db.h is explicitly not added here so that all cross-tools
 # include ../include/common/db.h instead (which defines dbopen to __freebsd_dbopen)
@@ -19,8 +66,8 @@ LIBC_SRCTOP=	${SRCTOP}/lib/libc/
 
 # dbopen behaves differently on Linux and FreeBSD -> namespace the symbols
 # to ensure that we get linker errors if libfreebsd isn't linked.
-CFLAGS+=	-I ${.CURDIR}/../libc-bootstrap -Ddbopen=__freebsd_dbopen
-INCS+=	db.h
+CFLAGS+=	-I ${TOOLS_CROSSBUILD_DIR}/libc-bootstrap -Ddbopen=__freebsd_dbopen
+INCS+=	${LIBFREEBSD_DIR}/db.h
 
 # Do the same as we did for dbopen() for getopt() on since it's not compatible
 # on Linux (and to avoid surprises also compile the FreeBSD code on macOS
@@ -75,8 +122,10 @@ SRCS+=	fake_sysctl.c
 SYSINCS+=	${SRCTOP}/sys/sys/capsicum.h
 SYSINCS+=	${SRCTOP}/sys/sys/caprights.h
 SRCS+=	capsicum_stubs.c
-# add this to .PATH last since otherwise it causes other files to be picked up from sys/kern
-.PATH: ${SRCTOP}/sys/kern
+# XXX: we can't add ${SRCTOP}/sys/kern to .PATH since that will causes
+# conflicts with other files. Instead create a symlink to subr_capability
+# in the source tree
+subr_capability.c: ${SRCTOP}/sys/kern/subr_capability.c
+	cp ${.ALLSRC} ${.TARGET}
+CLEANFILES+=	subr_capability.c
 SRCS+=		subr_capability.c
-
-.include <bsd.lib.mk>
