@@ -314,7 +314,7 @@ __DEFAULT_YES_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
 __DEFAULT_YES_OPTIONS+=CLANG LLD
 __DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
 .elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mmips*c*}
-# CHERI pure-capability targets alwasy use libc++
+# CHERI pure-capability targets always use libc++
 # Don't build CLANG for now
 __DEFAULT_NO_OPTIONS+=CLANG CLANG_IS_CC
 # Don't bootstrap clang, it isn't the version we want
@@ -437,6 +437,16 @@ BROKEN_OPTIONS+=HYPERV
 BROKEN_OPTIONS+=NVME
 .endif
 
+.if ${.MAKE.OS} != "FreeBSD"
+# Building the target compiler requires builtin tablegen on the host
+# which is (currently) not possible on non-FreeBSD
+BROKEN_OPTIONS+=CLANG LLD LLDB
+# The same also applies to the boostrap LLVM.
+BROKEN_OPTIONS+=CLANG_BOOTSTRAP LLD_BOOTSTRAP
+# Ancient GCC and binutils also does not bootstrap on Linux.
+BROKEN_OPTIONS+=GCC_BOOTSTRAP BINUTILS_BOOTSTRAP
+.endif
+
 .if ${__T:Msparc64}
 # Sparc64 need extra crt*.o files - PR 239851
 BROKEN_OPTIONS+=BSD_CRTBEGIN
@@ -457,17 +467,6 @@ __DEFAULT_NO_OPTIONS+=OPENMP
 .endif
 
 .include <bsd.mkopt.mk>
-
-.if ${.MAKE.OS} != "FreeBSD"
-# Building on a Linux/Mac requires an external toolchain to be specified
-# since clang/gcc will not build there using the FreeBSD makefiles
-MK_BINUTILS_BOOTSTRAP:=no
-MK_CLANG_BOOTSTRAP:=no
-MK_LLD_BOOTSTRAP:=no
-MK_GCC_BOOTSTRAP:=no
-# However, the elftoolchain tools build and should be used
-# MK_ELFTOOLCHAIN_BOOTSTRAP:=	yes
-.endif
 
 #
 # MK_* options that default to "yes" if the compiler is a C++11 compiler.
