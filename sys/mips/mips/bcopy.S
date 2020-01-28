@@ -35,6 +35,8 @@
  */
 
 
+.error "Should no longer be used"
+
 #include <machine/asm.h>
 __FBSDID("$FreeBSD$");
 
