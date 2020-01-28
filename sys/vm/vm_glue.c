@@ -716,8 +716,7 @@ vm_forkproc(struct thread *td, struct proc *p2, struct thread *td2,
 	if ((flags & RFMEM) == 0 && (flags & RFPROC) != 0) {
 		map2 = &vm2->vm_map;
 		vm_map_lock(map2);
-		for (entry = map2->header.next; entry != &map2->header;
-		    entry = entry->next) {
+		VM_MAP_ENTRY_FOREACH(entry, map2) {
 			if (entry->owner == p1->p_pid)
 				entry->owner = p2->p_pid;
 		}

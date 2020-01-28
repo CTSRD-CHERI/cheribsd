@@ -423,13 +423,15 @@ SYSCTL_INT(_debug, OID_AUTO, coexecve_cleanup_margin_down, CTLFLAG_RWTUN,
 static void
 vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 {
-	vm_map_entry_t entry, prev, next;
+	vm_map_entry_t entry, next;
 	vm_offset_t start, end;
 	boolean_t found, grown_down;
 	int rv;
 
-	prev = old_entry->prev;
-	next = old_entry->next;
+#ifdef notyet
+	prev = entry->prev;
+#endif
+	next = vm_map_entry_succ(old_entry);
 	start = old_entry->start;
 	end = old_entry->end;
 	grown_down = old_entry->eflags & MAP_ENTRY_GROWS_DOWN;
@@ -457,6 +459,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	 * vm_map_try_merge_entries() can coalesce them.  Use much larger
 	 * threshold for stacks.
 	 */
+#ifdef notyet
 	if (prev != &map->header && prev->object.vm_object == NULL &&
 	    prev->protection == PROT_NONE && prev->owner == 0 &&
 	    start > prev->end && start - prev->end <=
@@ -464,6 +467,7 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 	    coexecve_cleanup_margin_down : coexecve_cleanup_margin_up)) {
 		start = prev->end;
 	}
+#endif
 
 	if (next != &map->header && next->object.vm_object == NULL &&
 	    next->protection == PROT_NONE && next->owner == 0 &&
@@ -501,10 +505,12 @@ vm_map_entry_abandon(vm_map_t map, vm_map_entry_t old_entry)
 		entry->eflags |= MAP_ENTRY_GROWS_DOWN;
 	entry->owner = 0;
 
+#ifdef notyet
 	/*
 	 * We need to call it again after setting the owner to 0.
 	 */
 	vm_map_try_merge_entries(map, prev, entry);
+#endif
 }
 
 void
@@ -560,8 +566,7 @@ vmspace_exit(struct thread *td)
 		map = &vm->vm_map;
 		vm_map_lock(map);
 again:
-		for (entry = map->header.next; entry != &map->header;
-		    entry = entry->next) {
+		VM_MAP_ENTRY_FOREACH(entry, map) {
 			if (entry->owner == p->p_pid) {
 				if (coexecve_cleanup_on_exit != 0) {
 					vm_map_entry_abandon(map, entry);
@@ -2809,8 +2814,7 @@ vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	if (!found)
 		return (KERN_SUCCESS);
 
-	for (; entry != &map->header && entry->start < end;
-	    entry = entry->next) {
+	VM_MAP_ENTRY_FOREACH(entry, map) {
 		if (entry->owner != p->p_pid) {
 			printf("%s: requested range [%#lx, %#lx], "
 			    "owner %d (%s), map %#p, would overlap with "
