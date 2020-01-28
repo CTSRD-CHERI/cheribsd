@@ -424,8 +424,6 @@ BROKEN_OPTIONS+=COMPAT_CHERIABI
 .if ${.MAKE.OS} != "FreeBSD"
 # tablegen will not build on non-FreeBSD so also disable target clang and lld
 BROKEN_OPTIONS+=CLANG LLD
-# The cddl bootstrap tools still need some changes in order to compile
-BROKEN_OPTIONS+=CDDL ZFS
 .endif
 
 # HyperV is currently x86-only
