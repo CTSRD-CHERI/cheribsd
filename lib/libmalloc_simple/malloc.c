@@ -385,7 +385,7 @@ __simple_realloc(void *cp, size_t nbytes)
 	}
 
 	res = __simple_malloc(nbytes);
-	if (res == NULL);
+	if (res == NULL)
 		return (NULL);
 	/*
 	 * Only copy data the caller had access to even if this is less
