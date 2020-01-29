@@ -33,7 +33,7 @@ _CHERIBITS=128
 _CHERIBITS=256
 .endif
 .for src in ${CHERI_MDSRCS} ${CHERI_MISRCS}
-CC.${src}=	${CC} -target mips64c${_CHERIBITS}-unknown-freebsd
+CC.${src}=	${CC} -target cheri-unknown-freebsd -cheri=${_CHERIBITS}
 .endfor
 .endif
 
