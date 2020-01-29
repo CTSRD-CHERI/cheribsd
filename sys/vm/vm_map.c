@@ -2814,7 +2814,8 @@ vm_map_check_owner_proc(vm_map_t map, vm_offset_t start, vm_offset_t end,
 	if (!found)
 		return (KERN_SUCCESS);
 
-	VM_MAP_ENTRY_FOREACH(entry, map) {
+	for (; entry != &map->header && entry->start < end;
+	    entry = vm_map_entry_succ(entry)) {
 		if (entry->owner != p->p_pid) {
 			printf("%s: requested range [%#lx, %#lx], "
 			    "owner %d (%s), map %#p, would overlap with "
