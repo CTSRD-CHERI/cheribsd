@@ -49,44 +49,8 @@
 .set noreorder
 
 /*
- * Implement CHERI memcpy() and bcopy() variants in assembly.
+ * XXXAR: do we really need these to be written in assembly?
  *
- * These routines attempt to handle only fully aligned access, and will throw
- * exceptions if that is not the case.  Likewise, they do not handle
- * overlapping copies, a typical requirement of bcopy() implementations.
- *
- * XXX-BD: these should probably go away in favor of capability
- * oblivious memcpy/bcopy.
- *
- * cheri_bcopy() accepts:
- * a0 - source pointer
- * a1 - destination pointer
- * a2 - length
- *
- * cheri_memcpy() has inverted source/destination pointers.
- */
-LEAF(cheri_memcpy)
-	move	v0, a0		/* Note cleverness: v0 will hold original... */
-	move	a0, a1		/* ... value of a0 for cheri_memcpy(). */
-	move	a1, v0
-
-XLEAF(cheri_bcopy)
-	beqz	a2, return	/* Return immediately if zero-length. */
-	li	v1, -CHERICAP_SIZE	/* Handle under-aligned lengths by... */
-	and	a2, a2, v1	/* .. truncating the length to capsize bytes. */
-	daddu	a2, a1, a2	/* Branch delay: put end pointer in a2. */
-loop:
-	clc	CHERI_REG_CTEMP0, a0, 0($ddc)
-	csc	CHERI_REG_CTEMP0, a1, 0($ddc)
-	daddiu	a1, a1, CHERICAP_SIZE	/* Increment destination pointer. */
-	bne	a1, a2, loop	/* Are we there yet?  If not, loop. */
-	daddiu	a0, a0, CHERICAP_SIZE	/* Branch delay: increment src ptr. */
-return:
-	jr	ra
-	nop
-END(cheri_memcpy)
-
-/*
  * Copy a string from one capabilty to another up to a maximum length.
  * Return the length by reference.
  *
@@ -96,7 +60,6 @@ END(cheri_memcpy)
  * c5 - pointer length copied (size_t)
  * a0 - maximum length
  */
-
 LEAF(copystr_c)
 	li		v0, 0	/* Hopefully we succeed */
 	beqz		a0, cstr_return_toolong /* Return if zero-length. */	

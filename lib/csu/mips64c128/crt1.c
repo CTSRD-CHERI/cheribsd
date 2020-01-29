@@ -246,12 +246,13 @@ _start(void *auxv,
 	void (*cleanup)(void),			/* from shared loader */
 	struct Struct_Obj_Entry *obj __unused)	/* from shared loader */
 {
-	Elf_Auxinfo *aux_info[AT_COUNT];
-	int i;
 	int argc = 0;
 	char **argv = NULL;
 	char **env = NULL;
-	Elf_Auxinfo *auxp;
+#ifndef POSITION_INDEPENDENT_STARTUP
+	const Elf_Phdr *at_phdr = NULL;
+	long at_phnum = 0;
+#endif
 
 	/*
 	 * XXX: Clear DDC. Eventually the kernel should stop setting it in the
@@ -263,12 +264,26 @@ _start(void *auxv,
 #pragma message("Not clearing $ddc since it is required for the legacy ABI")
 #endif
 
-	/* Digest the auxiliary vector for local use. */
-	for (i = 0;  i < AT_COUNT;  i++)
-	    aux_info[i] = NULL;
-	for (auxp = auxv;  auxp->a_type != AT_NULL;  auxp++) {
-		if (auxp->a_type < AT_COUNT)
-			aux_info[auxp->a_type] = auxp;
+	/*
+	 * Digest the auxiliary vector for local use.
+	 *
+	 * Note: this file must be compile with -fno-jump-tables to avoid use
+	 * of the captable before do_crt_init_globals() has been called.
+	 */
+	for (Elf_Auxinfo *auxp = auxv;  auxp->a_type != AT_NULL;  auxp++) {
+		if (auxp->a_type == AT_ARGV) {
+			argv = (char **)auxp->a_un.a_ptr;
+		} else if (auxp->a_type == AT_ENVV) {
+			env = (char **)auxp->a_un.a_ptr;
+		} else if (auxp->a_type == AT_ARGC) {
+			argc = auxp->a_un.a_val;
+#ifndef POSITION_INDEPENDENT_STARTUP
+		} else if (auxp->a_type == AT_PHDR) {
+			at_phdr = auxp->a_un.a_ptr;
+		} else if (auxp->a_type == AT_PHNUM) {
+			at_phnum = auxp->a_un.a_val;
+#endif
+		}
 	}
 
 	/* For -pie executables rtld will initialize the __cap_relocs */
@@ -279,13 +294,9 @@ _start(void *auxv,
 	 * Note: We parse the phdrs to ensure that the global data cap does
 	 * not span the readonly segment or text segment.
 	 */
-	do_crt_init_globals(
-	    aux_info[AT_PHDR]->a_un.a_ptr, aux_info[AT_PHNUM]->a_un.a_val);
+	do_crt_init_globals(at_phdr, at_phnum);
 #endif
 	__auxargs = auxv;
-	argc = aux_info[AT_ARGC]->a_un.a_val;
-	argv = (char **)aux_info[AT_ARGV]->a_un.a_ptr;
-	env = (char **)aux_info[AT_ENVV]->a_un.a_ptr;
 
 	handle_argv(argc, argv, env);
 
