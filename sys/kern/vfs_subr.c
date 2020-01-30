@@ -3867,6 +3867,7 @@ vgonel(struct vnode *vp)
 		vinactivef(vp);
 		VI_UNLOCK(vp);
 	}
+	VNPASS(!vn_need_pageq_flush(vp), vp);
 	if (vp->v_type == VSOCK)
 		vfs_unp_reclaim(vp);
 
@@ -5033,7 +5034,7 @@ vn_need_pageq_flush(struct vnode *vp)
 	struct vm_object *obj;
 	int need;
 
-	MPASS(mtx_owned(VI_MTX(vp)));
+	VNPASS(VN_IS_DOOMED(vp) || mtx_owned(VI_MTX(vp)), vp);
 	need = 0;
 	if ((obj = vp->v_object) != NULL && (vp->v_vflag & VV_NOSYNC) == 0 &&
 	    vm_object_mightbedirty(obj))
