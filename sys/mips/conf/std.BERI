@@ -7,8 +7,6 @@
 # $FreeBSD$
 #
 
-machine		mips mips64
-
 cpu		CPU_BERI
 options 	SMP
 

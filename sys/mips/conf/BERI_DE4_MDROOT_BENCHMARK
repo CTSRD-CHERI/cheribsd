@@ -1,6 +1,7 @@
 # Inherit base config
 include "BERI_DE4_MDROOT"
 
+machine		mips mips64
 ident BERI_DE4_MDROOT_BENCHMARK
 
 # Disable slow things

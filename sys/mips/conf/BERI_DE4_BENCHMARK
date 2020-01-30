@@ -10,6 +10,7 @@
 options         FDT_DTB_STATIC_ONLY
 
 include		BERI_DE4_MDROOT
+machine		mips mips64
 ident		BERI_DE4_BENCHMARK
 
 nocpu           CPU_HAVEFPU

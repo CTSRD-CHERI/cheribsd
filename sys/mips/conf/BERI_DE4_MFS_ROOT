@@ -10,6 +10,7 @@
 
 include "BERI_DE4_BASE"
 
+machine		mips mips64
 ident		BERI_DE4_MFS_ROOT
 
 include "std.MFS_ROOT"

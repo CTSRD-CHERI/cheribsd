@@ -8,6 +8,8 @@
 
 include "std.BERI"
 
+machine		mips mips64
+
 ident		BERI_NETFPGA_MDROOT
 
 options 	HZ=100

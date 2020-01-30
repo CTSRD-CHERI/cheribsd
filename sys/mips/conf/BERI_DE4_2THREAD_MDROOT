@@ -8,6 +8,7 @@
 
 include "BERI_DE4_MDROOT"
 
+machine		mips mips64
 ident		BERI_DE4_2THREAD_MDROOT
 
 nomakeoption	FDT_DTS_FILE

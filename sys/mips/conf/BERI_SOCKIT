@@ -9,6 +9,8 @@
 
 include "std.BERI"
 
+machine		mips mips64
+
 ident		BERI_SOCKIT
 
 options 	ROOTDEVNAME=\"ufs:vtbd0\"
