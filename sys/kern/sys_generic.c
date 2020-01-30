@@ -1621,7 +1621,6 @@ pollrescan(struct thread *td)
 	return (0);
 }
 
-
 static int
 pollout(struct thread *td, struct pollfd *fds,
     struct pollfd * __capability ufds, u_int nfd)

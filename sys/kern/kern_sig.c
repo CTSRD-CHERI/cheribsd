@@ -874,7 +874,6 @@ freebsd4_sigaction(struct thread *td, struct freebsd4_sigaction_args *uap)
 	struct sigaction *actp, *oactp;
 	int error;
 
-
 	actp = (uap->act != NULL) ? &act : NULL;
 	oactp = (uap->oact != NULL) ? &oact : NULL;
 	if (actp) {
@@ -2049,7 +2048,6 @@ pgsignal(struct pgrp *pgrp, int sig, int checkctty, ksiginfo_t *ksi)
 	}
 }
 
-
 /*
  * Recalculate the signal mask and reset the signal disposition after
  * usermode frame for delivery is formed.  Should be called after
@@ -2071,7 +2069,6 @@ postsig_done(int sig, struct thread *td, struct sigacts *ps)
 	if (SIGISMEMBER(ps->ps_sigreset, sig))
 		sigdflt(ps, sig);
 }
-
 
 /*
  * Send a signal caused by a trap to the current thread.  If it will be

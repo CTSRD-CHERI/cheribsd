@@ -743,7 +743,6 @@ umtxq_signal_queue(struct umtx_key *key, int n_wake, int q)
 	return (ret);
 }
 
-
 /*
  * Wake up specified thread.
  */
@@ -1616,7 +1615,6 @@ umtx_pi_setowner(struct umtx_pi *pi, struct thread *owner)
 	pi->pi_owner = owner;
 	TAILQ_INSERT_TAIL(&uq_owner->uq_pi_contested, pi, pi_link);
 }
-
 
 /*
  * Disown a PI mutex, and remove it from the owned list.
