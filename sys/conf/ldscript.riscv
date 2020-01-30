@@ -3,11 +3,19 @@ OUTPUT_ARCH(riscv)
 ENTRY(_start)
 
 SEARCH_DIR(/usr/lib);
+
+/*
+ * Set the ELF LMA to the address that OpenSBI's fw_jump jumps to. This allows
+ * us to load the kernel with the -kernel flag in QEMU without having to embed
+ * it inside BBL or OpenSBI's fw_payload first.
+ */
+__OPENSBI_FW_JUMP_ADDR__ = 0x80200000; /* Note: 0x80400000 for RISCV32 */
+
 SECTIONS
 {
   /* Read-only sections, merged into text segment: */
   . = kernbase;
-  .text      : AT(ADDR(.text) - kernbase)
+  .text      : AT(__OPENSBI_FW_JUMP_ADDR__)
   {
     *(.text)
     *(.stub)
