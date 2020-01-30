@@ -10,7 +10,7 @@ _LIBCXXRTDIR=   ${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/include
 SRCDIR=         ${SRCTOP}/contrib/subrepo-cheri-libc++/src
 .else
-LIBCXX_VERSION=9
+LIBCXX_VERSION=10
 _LIBCXXRTDIR=	${SRCTOP}/contrib/subrepo-cheri-libcxxrt/src
 HDRDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/include
 SRCDIR=		${SRCTOP}/contrib/subrepo-cheri-libc++/src
