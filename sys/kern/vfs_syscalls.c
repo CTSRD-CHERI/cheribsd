@@ -193,9 +193,10 @@ kern_quotactl(struct thread *td, const char * __capability path, int cmd,
 	vfs_ref(mp);
 	vput(nd.ni_vp);
 	error = vfs_busy(mp, 0);
-	vfs_rel(mp);
-	if (error != 0)
+	if (error != 0) {
+		vfs_rel(mp);
 		return (error);
+	}
 	error = VFS_QUOTACTL(mp, cmd, uid, arg);
 
 	/*
@@ -212,6 +213,7 @@ kern_quotactl(struct thread *td, const char * __capability path, int cmd,
 	if ((cmd >> SUBCMDSHIFT) != Q_QUOTAON &&
 	    (cmd >> SUBCMDSHIFT) != Q_QUOTAOFF)
 		vfs_unbusy(mp);
+	vfs_rel(mp);
 	return (error);
 }
 
