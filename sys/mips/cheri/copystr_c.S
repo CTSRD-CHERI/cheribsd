@@ -49,8 +49,6 @@
 .set noreorder
 
 /*
- * XXXAR: do we really need these to be written in assembly?
- *
  * Copy a string from one capabilty to another up to a maximum length.
  * Return the length by reference.
  *
@@ -61,8 +59,8 @@
  * a0 - maximum length
  */
 LEAF(copystr_c)
-#ifdef CHERI_PURECAP_KERNEL	
-XLEAF(copystr)
+#ifdef CHERI_PURECAP_KERNEL
+XLEAF(copystr)	
 #endif
 	li		v0, 0	/* Hopefully we succeed */
 	beqz		a0, cstr_return_toolong /* Return if zero-length. */	
