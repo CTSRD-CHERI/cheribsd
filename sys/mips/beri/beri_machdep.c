@@ -179,7 +179,7 @@ platform_reset(void)
 }
 
 void
-platform_start(__register_t a0, __register_t a1,  __register_t a2, 
+platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
     __register_t a3)
 {
 	struct bootinfo *bootinfop;
