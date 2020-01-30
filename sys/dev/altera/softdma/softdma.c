@@ -101,8 +101,8 @@ struct softdma_channel {
 };
 
 struct softdma_desc {
-	uint64_t		src_addr;
-	uint64_t		dst_addr;
+	bus_addr_t		src_addr;
+	bus_addr_t		dst_addr;
 	uint32_t		len;
 	uint32_t		access_width;
 	uint32_t		count;
@@ -299,7 +299,7 @@ static int
 softdma_process_tx(struct softdma_channel *chan, struct softdma_desc *desc)
 {
 	struct softdma_softc *sc;
-	uint64_t addr;
+	bus_addr_t addr;
 	uint64_t buf;
 	uint32_t word;
 	uint32_t missing;

@@ -91,8 +91,8 @@ altpll_fdt_attach(device_t dev)
 		goto error;
 	}
 	device_printf(sc->ap_dev, "registers at mem %p-%p\n",
-	    (void *)rman_get_start(sc->ap_reg_res),
-	    (void *)(rman_get_start(sc->ap_reg_res) +
+	    (void *)(uintptr_t)rman_get_start(sc->ap_reg_res),
+	    (void *)(uintptr_t)(rman_get_start(sc->ap_reg_res) +
 	      rman_get_size(sc->ap_reg_res)));
 	if ((node = ofw_bus_get_node(dev)) == -1) {
 		error = ENXIO;
