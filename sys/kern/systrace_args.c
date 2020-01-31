@@ -813,7 +813,7 @@ systrace_args(int sysnum, void *params, uint64_t *uarg, int *n_args)
 	case 151: {
 		struct coexecve_args *p = params;
 		iarg[0] = p->pid; /* pid_t */
-		uarg[1] = (intptr_t) p->fname; /* char * __capability */
+		uarg[1] = (intptr_t) p->fname; /* const char * __capability */
 		uarg[2] = (intptr_t) p->argv; /* char * __capability * __capability */
 		uarg[3] = (intptr_t) p->envv; /* char * __capability * __capability */
 		*n_args = 4;
@@ -4665,7 +4665,7 @@ systrace_entry_setargdesc(int sysnum, int ndx, char *desc, size_t descsz)
 			p = "pid_t";
 			break;
 		case 1:
-			p = "userland char * __capability";
+			p = "userland const char * __capability";
 			break;
 		case 2:
 			p = "userland char * __capability * __capability";

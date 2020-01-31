@@ -999,12 +999,12 @@ SYS_STUB(148, int, quotactl,
 )
 
 SYS_STUB(151, int, coexecve,
-    /* _protoargs */ (pid_t pid, char *  fname, char *  * __capability argv, char *  * __capability envv),
-    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, pid_t pid, char * __capability   fname, char * __capability   * __capability  __capability argv, char * __capability   * __capability  __capability envv),
-    /* _protoargs_err */ (int * __capability stub_errno, pid_t pid, char * __capability   fname, char * __capability   * __capability  __capability argv, char * __capability   * __capability  __capability envv),
-    /* _callargs */ (pid, (__cheri_fromcap char * )fname, (__cheri_fromcap char *  * __capability)argv, (__cheri_fromcap char *  * __capability)envv),
+    /* _protoargs */ (pid_t pid, const char *  fname, char *  * __capability argv, char *  * __capability envv),
+    /* _protoargs_chk */ (int *retp , int * __capability stub_errno, pid_t pid, const char * __capability   fname, char * __capability   * __capability  __capability argv, char * __capability   * __capability  __capability envv),
+    /* _protoargs_err */ (int * __capability stub_errno, pid_t pid, const char * __capability   fname, char * __capability   * __capability  __capability argv, char * __capability   * __capability  __capability envv),
+    /* _callargs */ (pid, (__cheri_fromcap const char * )fname, (__cheri_fromcap char *  * __capability)argv, (__cheri_fromcap char *  * __capability)envv),
     /* _callargs_chk */ (&ret, stub_errno, pid, fname, argv, envv),
-    /* _callargs_err */ (&errno, pid, (char * )fname, (char *  * __capability)argv, (char *  * __capability)envv),
+    /* _callargs_err */ (&errno, pid, (const char * )fname, (char *  * __capability)argv, (char *  * __capability)envv),
     /* _localcheck */ {if (!(cheri_getperm(fname) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(argv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} if (!(cheri_getperm(envv) & CHERI_PERM_GLOBAL)) {errno = EPROT; return ((int)-1);} }
 )
 
