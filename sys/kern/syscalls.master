@@ -952,9 +952,9 @@
 151	AUE_NULL	STD {
 		int coexecve(
 		    pid_t pid,
-		    char *fname,
-		    char **argv,
-		    char **envv
+		    _In_z_ const char *fname,
+		    _In_z_ char **argv,
+		    _In_z_ char **envv
 		);
 	}
 152	AUE_NULL	UNIMPL	sem_wakeup (BSD/OS 2.x)
