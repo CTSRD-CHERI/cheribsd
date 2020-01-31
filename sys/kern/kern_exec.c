@@ -1275,14 +1275,12 @@ exec_new_vmspace(struct image_params *imgp, struct sysentvec *sv)
 	if (error != KERN_SUCCESS)
 		return (vm_mmap_to_errno(error));
 
-	if (imgp->cop == NULL) {
-		/*
-		 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
-		 * are still used to enforce the stack rlimit on the process stack.
-		 */
-		vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
-		vmspace->vm_maxsaddr = (char *)stack_addr;
-	}
+	/*
+	 * vm_ssize and vm_maxsaddr are somewhat antiquated concepts, but they
+	 * are still used to enforce the stack rlimit on the process stack.
+	 */
+	vmspace->vm_ssize = sgrowsiz >> PAGE_SHIFT;
+	vmspace->vm_maxsaddr = (char *)stack_addr;
 
 	return (0);
 }
