@@ -3006,13 +3006,10 @@ _prereq_libs+= lib/libssp_nonshared
 
 # These dependencies are not automatically generated:
 #
-# gnu/lib/csu, gnu/lib/libgcc, lib/csu and lib/libc must be built before
+# gnu/lib/libgcc, lib/csu and lib/libc must be built before
 # all shared libraries for ELF.
 #
 _startup_libs=	lib/csu
-.if ${MK_BSD_CRTBEGIN} == "no"
-_startup_libs+=	gnu/lib/csu
-.endif
 .if ${MK_LIBCHERI} != "no"
 _startup_libs+= lib/libc_cheri
 .endif
