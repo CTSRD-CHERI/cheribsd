@@ -2169,13 +2169,6 @@ vfs_cache_lookup(struct vop_lookup_args *ap)
 	return (error);
 }
 
-/*
- * XXX All of these sysctls would probably be more productive dead.
- */
-static int __read_mostly disablecwd;
-SYSCTL_INT(_debug, OID_AUTO, disablecwd, CTLFLAG_RW, &disablecwd, 0,
-   "Disable the getcwd syscall");
-
 /* Implementation of the getcwd syscall. */
 int
 sys___getcwd(struct thread *td, struct __getcwd_args *uap)
@@ -2194,8 +2187,6 @@ kern___getcwd(struct thread *td, char * __capability buf, enum uio_seg bufseg,
 	struct vnode *cdir, *rdir;
 	int error;
 
-	if (__predict_false(disablecwd))
-		return (ENODEV);
 	if (__predict_false(buflen < 2))
 		return (EINVAL);
 	if (buflen > path_max)
@@ -2228,14 +2219,6 @@ kern___getcwd(struct thread *td, char * __capability buf, enum uio_seg bufseg,
 }
 
 /*
- * Thus begins the fullpath magic.
- */
-
-static int __read_mostly disablefullpath;
-SYSCTL_INT(_debug, OID_AUTO, disablefullpath, CTLFLAG_RW, &disablefullpath, 0,
-    "Disable the vn_fullpath function");
-
-/*
  * Retrieve the full filesystem path that correspond to a vnode from the name
  * cache (if available)
  */
@@ -2247,8 +2230,6 @@ vn_fullpath(struct thread *td, struct vnode *vn, char **retbuf, char **freebuf)
 	struct vnode *rdir;
 	int error;
 
-	if (__predict_false(disablefullpath))
-		return (ENODEV);
 	if (__predict_false(vn == NULL))
 		return (EINVAL);
 
@@ -2281,8 +2262,6 @@ vn_fullpath_global(struct thread *td, struct vnode *vn,
 	char *buf;
 	int error;
 
-	if (__predict_false(disablefullpath))
-		return (ENODEV);
 	if (__predict_false(vn == NULL))
 		return (EINVAL);
 	buf = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
@@ -2517,9 +2496,6 @@ vn_commname(struct vnode *vp, char *buf, u_int buflen)
  * Requires a locked, referenced vnode.
  * Vnode is re-locked on success or ENODEV, otherwise unlocked.
  *
- * If sysctl debug.disablefullpath is set, ENODEV is returned,
- * vnode is left locked and path remain untouched.
- *
  * If vp is a directory, the call to vn_fullpath_global() always succeeds
  * because it falls back to the ".." lookup if the namecache lookup fails.
  */
@@ -2533,10 +2509,6 @@ vn_path_to_global_path(struct thread *td, struct vnode *vp, char *path,
 	int error;
 
 	ASSERT_VOP_ELOCKED(vp, __func__);
-
-	/* Return ENODEV if sysctl debug.disablefullpath==1 */
-	if (__predict_false(disablefullpath))
-		return (ENODEV);
 
 	/* Construct global filesystem path from vp. */
 	VOP_UNLOCK(vp);
