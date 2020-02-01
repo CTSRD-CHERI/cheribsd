@@ -355,7 +355,7 @@ freebsd64___getcwd(struct thread *td, struct freebsd64___getcwd_args *uap)
 {
 
 	return (kern___getcwd(td, __USER_CAP(uap->buf, uap->buflen),
-	    UIO_USERSPACE, uap->buflen, MAXPATHLEN));
+	    uap->buflen));
 }
 
 /*
