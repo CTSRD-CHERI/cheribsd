@@ -277,7 +277,7 @@ devfs_vptocnp(struct vop_vptocnp_args *ap)
 	struct vnode **dvp = ap->a_vpp;
 	struct devfs_mount *dmp;
 	char *buf = ap->a_buf;
-	int *buflen = ap->a_buflen;
+	size_t *buflen = ap->a_buflen;
 	struct devfs_dirent *dd, *de;
 	int i, error;
 
