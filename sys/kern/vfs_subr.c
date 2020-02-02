@@ -5424,12 +5424,6 @@ vop_unlock_pre(void *ap)
 }
 
 void
-vop_unlock_post(void *ap, int rc)
-{
-	return;
-}
-
-void
 vop_need_inactive_pre(void *ap)
 {
 	struct vop_need_inactive_args *a = ap;
