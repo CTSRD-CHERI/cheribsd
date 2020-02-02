@@ -372,7 +372,6 @@ SUBDIR=	\
 	${_vmd} \
 	${_vmm} \
 	${_vmware} \
-	${_vpo} \
 	vr \
 	vte \
 	${_wbwd} \
@@ -567,7 +566,6 @@ _hwpmc_mips74k=	hwpmc_mips74k
 	${MACHINE_CPUARCH} != "mips" && ${MACHINE_CPUARCH} != "powerpc" && \
 	${MACHINE_CPUARCH} != "riscv"
 _syscons=	syscons
-_vpo=		vpo
 .endif
 
 .if ${MACHINE_CPUARCH} != "mips"
