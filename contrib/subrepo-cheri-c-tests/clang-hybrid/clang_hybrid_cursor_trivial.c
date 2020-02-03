@@ -39,23 +39,23 @@ BEGIN_TEST(clang_hybrid_cursor_trivial)
 		sizeof(buffer));
 	// Set the cursor past the end and check that dereferencing fires an
 	// exception.
-	v = __builtin_cheri_offset_increment(__DEVOLATILE(void * __capability, v),
+	v = __builtin_cheri_offset_increment(__DEVOLATILE_CAP(void * __capability, v),
 		42*sizeof(int));
 	int unused = *v;
 	assert(faults == count+1);
 	// Move the cursor back into range and check that it works
-	v = __builtin_cheri_offset_increment(__DEVOLATILE(void * __capability, v),
+	v = __builtin_cheri_offset_increment(__DEVOLATILE_CAP(void * __capability, v),
 		(-1)*sizeof(int));
 	assert(*v == 12);
 	// Set the cursor before the start and check that dereferencing fires
 	// an exception
-	v = __builtin_cheri_offset_set(__DEVOLATILE(void * __capability, v), -1);
+	v = __builtin_cheri_offset_set(__DEVOLATILE_CAP(void * __capability, v), -1);
 	unused = *v;
 	assert(faults == count+2);
 	// Move the cursor back into range and check that it works
 	// XXX: This might not work with imprecise capabilities, as the
 	// base might be lower than the start of the array.
-	v = __builtin_cheri_offset_set(__DEVOLATILE(void * __capability, v), 41*sizeof(int));
+	v = __builtin_cheri_offset_set(__DEVOLATILE_CAP(void * __capability, v), 41*sizeof(int));
 	assert(*v == 12);
 
 	assert(faults == 2);
