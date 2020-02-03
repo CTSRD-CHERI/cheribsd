@@ -427,7 +427,7 @@ __DEFAULT_YES_OPTIONS+=PIE
 __DEFAULT_NO_OPTIONS+=PIE
 .endif
 
-.if ${__T} != "mips64"
+.if ${__T} != "mips64" && (${__TT} != "riscv" || ${__T:Mriscv*64*c})
 BROKEN_OPTIONS+=COMPAT_CHERIABI
 .endif
 
@@ -637,8 +637,8 @@ MK_LLVM_COV:= no
 MK_LOADER_VERIEXEC_PASS_MANIFEST := no
 .endif
 
-# COMPAT_CHERIABI and LIBCHERI depend on CHERI support.
-.if ${MK_CHERI} == "no"
+# COMPAT_CHERIABI and LIBCHERI depend on CHERI support on mips.
+.if ${MK_CHERI} == "no" && ${__TT} == "mips"
 MK_LIBCHERI:=	no
 MK_COMPAT_CHERIABI:=	no
 .endif
