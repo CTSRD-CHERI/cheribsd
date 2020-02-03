@@ -319,7 +319,7 @@ intr_child_irq_handler(struct intr_pic *parent, uintptr_t irq)
 	mtx_lock_spin(&parent->pic_child_lock);
 	SLIST_FOREACH(child, &parent->pic_children, pc_next) {
 		if (child->pc_start <= irq &&
-		    irq < (child->pc_start + child->pc_length)) {
+		    irq < (child->pc_start + (size_t)child->pc_length)) {
 			found = true;
 			break;
 		}
