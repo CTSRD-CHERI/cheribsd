@@ -130,6 +130,10 @@ struct uio;
  *
  *	Describes a single contiguous DMA transaction.  Values
  *	are suitable for programming into DMA registers.
+ *
+ * XXX-AM: the use of bus_addr_t is wrong.
+ * We are using a segment bus_addr_t to hold a virtual address.
+ * This is a type mismatch and results in tag violations in CHERI.
  */
 typedef struct bus_dma_segment {
 	bus_addr_t	ds_addr;	/* DMA address */

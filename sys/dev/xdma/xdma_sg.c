@@ -504,6 +504,11 @@ _xdma_load_data(xdma_channel_t *xchan, struct xdma_request *xr,
 	nsegs = 1;
 
 	switch (xr->req_type) {
+	/* 
+	 * XXX-AM: this code is wrong in multiple places.
+	 * We are using a segment bus_addr_t to hold a virtual address.
+	 * This is a type mismatch and results in tag violations in CHERI.
+	 */
 	case XR_TYPE_MBUF:
 		if (xchan->caps & XCHAN_CAP_BOUNCE) {
 			if (xr->direction == XDMA_MEM_TO_DEV)

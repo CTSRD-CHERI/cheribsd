@@ -80,3 +80,8 @@ options 	ROOTDEVNAME=\"ufs:md0\"
 # following line.
 #nooptions	MD_ROOT_SIZE
 #makeoptions	MFS_IMAGE=/foo/baz/baz/mdroot.img
+
+nodevice xdma
+nodevice altera_softdma
+nodevice altera_msgdma
+nodevice altera_atse
