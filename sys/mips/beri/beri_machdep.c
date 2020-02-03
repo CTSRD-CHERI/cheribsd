@@ -83,6 +83,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/pmap.h>
 #include <machine/trap.h>
 
+#ifdef CHERI_PURECAP_KERNEL
+#include <cheri/cheric.h>
+#endif
+
 #define	FDT_SOURCE_NONE		0
 #define	FDT_SOURCE_LOADER	1
 #define	FDT_SOURCE_ROM		2
@@ -94,6 +98,28 @@ __FBSDID("$FreeBSD$");
 
 extern int	*edata;
 extern int	*end;
+
+#ifdef CHERI_PURECAP_KERNEL
+/*
+ * XXX-AM: Create a pointer for the platform-specific data structures.
+ * Currently we do not set bounds of these as it is hard to determine
+ * correct bounds. Only load permission are handed out.
+ */
+static void *
+beri_platform_ptr(vm_offset_t vaddr)
+{
+	void *cap = cheri_setaddress(cheri_kall_capability, vaddr);
+	cap = cheri_andperm(cap, CHERI_PERM_LOAD);
+
+	return (cap);
+}
+#else
+static void *
+beri_platform_ptr(vm_offset_t vaddr)
+{
+	return ((void *)vaddr);
+}
+#endif
 
 void
 platform_cpu_init()
@@ -189,8 +215,9 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	char **argv = (char **)a1;
 	char **envp = (char **)a2;
 	long memsize;
+	char *boot_env;
 #ifdef FDT
-	vm_offset_t dtbp = 0;
+	char *dtbp = 0;
 	void *kmdp;
 	int dtb_needs_swap = 0; /* error */
 	size_t dtb_size = 0;
@@ -203,6 +230,7 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	int i;
 
 	/* clear the BSS and SBSS segments */
+	/* XXX-AM: may need to reuse code from malta platform_start for this. */
 	kernend = (vm_offset_t)&end;
 	memset(&edata, 0, kernend - (vm_offset_t)(&edata));
 
@@ -221,9 +249,9 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 * module information.
 	 */
 	if (a3 >= 0x9800000000000000ULL) {
-		bootinfop = (void *)a3;
+		bootinfop = beri_platform_ptr(a3);
+		preload_metadata = beri_platform_ptr(bootinfop->bi_modulep);
 		memsize = bootinfop->bi_memsize;
-		preload_metadata = (caddr_t)bootinfop->bi_modulep;
 	} else {
 		bootinfop = NULL;
 		memsize = a3;
@@ -245,7 +273,9 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 * Configure more boot-time parameters passed in by loader.
 	 */
 	boothowto = MD_FETCH(kmdp, MODINFOMD_HOWTO, int);
-	init_static_kenv(MD_FETCH(kmdp, MODINFOMD_ENVP, char *), 0);
+	boot_env = beri_platform_ptr(
+	    MD_FETCH(kmdp, MODINFOMD_ENVP, vm_offset_t));
+	init_static_kenv(boot_env, 0);
 
 
 #ifdef FDT
@@ -256,16 +286,16 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 * Prefer a dtb provided as a module to one from bootinfo as we may
 	 * have loaded an alternative one or created a modified version.
 	 */
-	dtbp = MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t);
-	if (dtbp == (vm_offset_t)NULL &&
+	dtbp = beri_platform_ptr(MD_FETCH(kmdp, MODINFOMD_DTBP, vm_offset_t));
+	if (dtbp == NULL &&
 	    bootinfop != NULL && bootinfop->bi_dtb != (bi_ptr_t)NULL) {
-		dtbp = bootinfop->bi_dtb;
+		dtbp = beri_platform_ptr(bootinfop->bi_dtb);
 		fdt_source = FDT_SOURCE_LOADER;
 	}
 
 	/* Try to find an FDT directly in the hardware */
-	if (dtbp == (vm_offset_t)NULL) {
-		dtb_rom = (void*)(intptr_t)0x900000007f010000;
+	if (dtbp == NULL) {
+		dtb_rom = beri_platform_ptr(0x900000007f010000);
 		if (dtb_rom->magic == FDT_MAGIC) {
 			dtb_needs_swap = 0;
 			dtb_size = dtb_rom->totalsize;
@@ -275,7 +305,7 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 		}
 		if (dtb_size != 0) {
 			/* Steal a bit of memory... */
-			dtb = (void *)kernel_kseg0_end;
+			dtb = beri_platform_ptr(kernel_kseg0_end);
 			/* Round alignment from linker script. */
 			kernel_kseg0_end += roundup2(dtb_size, 64 / 8);
 			memcpy(dtb, dtb_rom, dtb_size);
@@ -284,7 +314,7 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 				    swapptr < (uint32_t *)dtb + (dtb_size/sizeof(*dtb));
 				    swapptr++)
 					*swapptr = bswap32(*swapptr);
-			dtbp = (vm_offset_t)dtb;
+			dtbp = (char *)dtb;
 			fdt_source = FDT_SOURCE_ROM;
 		}
 	}
@@ -295,8 +325,8 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	 * In case the device tree blob was not retrieved (from metadata) try
 	 * to use the statically embedded one.
 	 */
-	if (dtbp == (vm_offset_t)NULL) {
-		dtbp = (vm_offset_t)&fdt_static_dtb;
+	if (dtbp == NULL) {
+		dtbp = &fdt_static_dtb;
 		fdt_source = FDT_SOURCE_STATIC;
 	}
 #endif
@@ -323,7 +353,7 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 	printf("entry: platform_start()\n");
 
 #ifdef FDT
-	if (dtbp != (vm_offset_t)NULL) {
+	if (dtbp != NULL) {
 		printf("Using FDT at %p from ", (void *)dtbp);
 		switch (fdt_source) {
 		case FDT_SOURCE_LOADER:
@@ -363,7 +393,7 @@ platform_start(__register_t a0, __intptr_t a1,  __intptr_t a2,
 			hexdump(bootinfop, sizeof(*bootinfop), "Bootinfo:", 0);
 		}
 
-		printf("memsize = %p\n", (void *)memsize);
+		printf("memsize = %p\n", (void *)(uintptr_t)memsize);
 	}
 
 	realmem = btoc(memsize);
