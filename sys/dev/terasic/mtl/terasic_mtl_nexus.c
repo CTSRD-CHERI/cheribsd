@@ -125,8 +125,8 @@ terasic_mtl_nexus_attach(device_t dev)
 		error = ENXIO;
 		goto error;
 	}
-	device_printf(sc->mtl_dev, "registers at mem %p-%p\n",
-	    (void *)reg_maddr, (void *)(reg_maddr + reg_msize));
+	device_printf(sc->mtl_dev, "registers at mem %#lx-%#lx\n",
+	    reg_maddr, reg_maddr + reg_msize);
 	sc->mtl_pixel_rid = 0;
 	sc->mtl_pixel_res = bus_alloc_resource(dev, SYS_RES_MEMORY,
 	    &sc->mtl_pixel_rid, pixel_maddr, pixel_maddr + pixel_msize - 1,
@@ -136,8 +136,8 @@ terasic_mtl_nexus_attach(device_t dev)
 		error = ENXIO;
 		goto error;
 	}
-	device_printf(sc->mtl_dev, "pixel frame buffer at mem %p-%p\n",
-	    (void *)pixel_maddr, (void *)(pixel_maddr + pixel_msize));
+	device_printf(sc->mtl_dev, "pixel frame buffer at mem %#lx-%#lx\n",
+	    pixel_maddr, pixel_maddr + pixel_msize);
 	sc->mtl_text_rid = 0;
 	sc->mtl_text_res = bus_alloc_resource(dev, SYS_RES_MEMORY,
 	    &sc->mtl_text_rid, text_maddr, text_maddr + text_msize - 1,
@@ -147,8 +147,8 @@ terasic_mtl_nexus_attach(device_t dev)
 		error = ENXIO;
 		goto error;
 	}
-	device_printf(sc->mtl_dev, "text frame buffer at mem %p-%p\n",
-	    (void *)text_maddr, (void *)(text_maddr + text_msize));
+	device_printf(sc->mtl_dev, "text frame buffer at mem %#lx-%#lx\n",
+	    text_maddr, text_maddr + text_msize);
 	error = terasic_mtl_attach(sc);
 	if (error == 0)
 		return (0);

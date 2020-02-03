@@ -89,8 +89,8 @@ pixelstream_fdt_attach(device_t dev)
 		goto error;
 	}
 	device_printf(sc->ps_dev, "registers at mem %p-%p\n",
-            (void *)rman_get_start(sc->ps_reg_res),
-	    (void *)(rman_get_start(sc->ps_reg_res) +
+	    (void *)(uintptr_t)rman_get_start(sc->ps_reg_res),
+	    (void *)(uintptr_t)(rman_get_start(sc->ps_reg_res) +
 	      rman_get_size(sc->ps_reg_res)));
 
 	error = pixelstream_attach(sc);

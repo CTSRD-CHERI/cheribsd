@@ -108,8 +108,8 @@ terasic_mtl_fdt_attach(device_t dev)
 		goto error;
 	}
 	device_printf(sc->mtl_dev, "registers at mem %p-%p\n",
-            (void *)rman_get_start(sc->mtl_reg_res),
-	    (void *)(rman_get_start(sc->mtl_reg_res) +
+	    (void *)(uintptr_t)rman_get_start(sc->mtl_reg_res),
+	    (void *)(uintptr_t)(rman_get_start(sc->mtl_reg_res) +
 	      rman_get_size(sc->mtl_reg_res)));
 
 	sc->mtl_pixel_rid = 1;
@@ -131,8 +131,8 @@ terasic_mtl_fdt_attach(device_t dev)
 		goto error;
 	}
 	device_printf(sc->mtl_dev, "pixel frame buffer at mem %p-%p\n",
-            (void *)rman_get_start(sc->mtl_pixel_res),
-	    (void *)(rman_get_start(sc->mtl_pixel_res) +
+            (void *)(uintptr_t)rman_get_start(sc->mtl_pixel_res),
+	    (void *)(uintptr_t)(rman_get_start(sc->mtl_pixel_res) +
 	      rman_get_size(sc->mtl_pixel_res)));
 
 	sc->mtl_text_rid = 2;
@@ -154,8 +154,8 @@ terasic_mtl_fdt_attach(device_t dev)
 		goto error;
 	}
 	device_printf(sc->mtl_dev, "text frame buffer at mem %p-%p\n",
-            (void *)rman_get_start(sc->mtl_text_res),
-	    (void *)(rman_get_start(sc->mtl_text_res) +
+            (void *)(uintptr_t)rman_get_start(sc->mtl_text_res),
+	    (void *)(uintptr_t)(rman_get_start(sc->mtl_text_res) +
 	      rman_get_size(sc->mtl_text_res)));
 
 	error = terasic_mtl_attach(sc);
