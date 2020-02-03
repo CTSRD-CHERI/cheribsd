@@ -394,8 +394,12 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 
 	tf->tf_a[0] = (__cheri_addr uintptr_t)stack;
 	tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack);
-	tf->tf_ra = imgp->entry_addr;
+#if __has_feature(capabilities)
+	hybridabi_thread_setregs(td, imgp->entry_addr);
+#else
 	tf->tf_sepc = imgp->entry_addr;
+#endif
+	tf->tf_ra = tf->tf_sepc;
 
 	pcb->pcb_fpflags &= ~PCB_FP_STARTED;
 }

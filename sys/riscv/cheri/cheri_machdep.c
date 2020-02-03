@@ -32,8 +32,13 @@
 
 #include <sys/param.h>
 #include <sys/kernel.h>
+#include <sys/proc.h>
 
+#include <cheri/cheri.h>
+
+#include <machine/frame.h>
 #include <machine/riscvreg.h>
+#include <machine/vmparam.h>
 
 /* XXX: CHERI TODO: Probably should init this in locore on the BSP. */
 extern void * __capability userspace_cap;
@@ -46,3 +51,21 @@ cheri_cpu_startup(void)
 }
 SYSINIT(cheri_cpu_startup, SI_SUB_CPU, SI_ORDER_FIRST, cheri_cpu_startup,
     NULL);
+
+void
+hybridabi_thread_setregs(struct thread *td, unsigned long entry_addr)
+{
+	struct trapframe *tf;
+
+	tf = td->td_frame;
+
+	/* Set DDC to full user privilege. */
+	tf->tf_ddc = (uintcap_t)cheri_capability_build_user_data(
+	    CHERI_CAP_USER_DATA_PERMS, CHERI_CAP_USER_DATA_BASE,
+	    CHERI_CAP_USER_DATA_LENGTH, CHERI_CAP_USER_DATA_OFFSET);
+
+	/* Use 'entry_addr' as offset of PCC. */
+	tf->tf_sepc = (uintcap_t)cheri_capability_build_user_code(
+	    CHERI_CAP_USER_CODE_PERMS, CHERI_CAP_USER_CODE_BASE,
+	    CHERI_CAP_USER_CODE_LENGTH, entry_addr);
+}

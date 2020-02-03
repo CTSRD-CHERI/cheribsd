@@ -200,7 +200,11 @@ cpu_set_upcall(struct thread *td, void (*entry)(void *), void *arg,
 	tf = td->td_frame;
 
 	tf->tf_sp = STACKALIGN((__cheri_addr uintptr_t)stack->ss_sp + stack->ss_size);
+#if __has_feature(capabilities)
+	hybridabi_thread_setregs(td, (__cheri_addr unsigned long)entry);
+#else
 	tf->tf_sepc = (register_t)entry;
+#endif
 	tf->tf_a[0] = (register_t)arg;
 }
 
