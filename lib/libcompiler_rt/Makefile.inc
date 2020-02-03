@@ -205,7 +205,7 @@ CFLAGS+=	-DEMIT_SYNC_ATOMICS
 SRCF+=		stdatomic
 .endif
 
-.if ${MACHINE_ARCH:Mmips*c*}
+.if ${MACHINE_ARCH:Mmips*c*} || ${MACHINE_ARCH:Mriscv64*c*}
 # -Wcapabilities warning while trying to decode a string to a pointer.
 # Easy to suppress, but the result is unlikely to work so leave the symbol
 # unimplemented for now.
