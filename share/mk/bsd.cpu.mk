@@ -450,6 +450,7 @@ RISCV_ABI:=	${RISCV_ABI}d
 .endif
 
 CFLAGS += -march=${RISCV_MARCH} -mabi=${RISCV_ABI}
+LDFLAGS += -march=${RISCV_MARCH} -mabi=${RISCV_ABI}
 .endif
 
 # NB: COPTFLAGS is handled in /usr/src/sys/conf/kern.pre.mk
