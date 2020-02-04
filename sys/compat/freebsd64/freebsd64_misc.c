@@ -527,7 +527,7 @@ freebsd64_getcontext(struct thread *td, struct freebsd64_getcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	return (copyout(&uc, uap->ucp, UC_COPY_SIZE));
+	return (copyoutcap(&uc, __USER_CAP_OBJ(uap->ucp), UC_COPY_SIZE));
 }
 
 int
@@ -538,7 +538,7 @@ freebsd64_setcontext(struct thread *td, struct freebsd64_setcontext_args *uap)
 
 	if (uap->ucp == NULL)
 		return (EINVAL);
-	if ((ret = copyin(uap->ucp, &uc, UC_COPY_SIZE)) != 0)
+	if ((ret = copyincap(__USER_CAP_OBJ(uap->ucp), &uc, UC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = freebsd64_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
@@ -562,9 +562,10 @@ freebsd64_swapcontext(struct thread *td, struct freebsd64_swapcontext_args *uap)
 	PROC_LOCK(td->td_proc);
 	uc.uc_sigmask = td->td_sigmask;
 	PROC_UNLOCK(td->td_proc);
-	if ((ret = copyout(&uc, uap->oucp, UC_COPY_SIZE)) != 0)
+	if ((ret = copyoutcap(&uc, __USER_CAP_OBJ(uap->oucp), UC_COPY_SIZE)) !=
+	    0)
 		return (ret);
-	if ((ret = copyin(uap->ucp, &uc, UC_COPY_SIZE)) != 0)
+	if ((ret = copyincap(__USER_CAP_OBJ(uap->ucp), &uc, UC_COPY_SIZE)) != 0)
 		return (ret);
 	if ((ret = freebsd64_set_mcontext(td, &uc.uc_mcontext)) != 0)
 		return (ret);
