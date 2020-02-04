@@ -10,7 +10,7 @@ WARNS?=		2
 CFLAGS+=	${PICFLAG}
 CFLAGS+=	-fvisibility=hidden
 CFLAGS+=	-DVISIBILITY_HIDDEN
-.if ${COMPILER_TYPE} == "clang" && ${MACHINE_ARCH:Mmips*} != ""
+.if (${MACHINE_ARCH:Mmips*} || ${MACHINE_ARCH:Mriscv*c*})
 CFLAGS+=	-I${SRCTOP}/contrib/subrepo-cheri-libcxxrt
 .else
 CFLAGS+=	-I${SRCTOP}/contrib/libcxxrt
