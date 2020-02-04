@@ -249,7 +249,7 @@ freebsd64_sendsig(sig_t catcher, ksiginfo_t *ksi, sigset_t *mask)
 	tf->tf_a[1] = (register_t)&fp->sf_si;
 	tf->tf_a[2] = (register_t)&fp->sf_uc;
 
-	tf->tf_sepc = (__cheri_offset register_t)catcher;
+	tf->tf_sepc = (uintcap_t)catcher;
 	tf->tf_sp = (register_t)fp;
 
 	sysent = p->p_sysent;
