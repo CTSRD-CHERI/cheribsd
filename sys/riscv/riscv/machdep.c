@@ -450,7 +450,7 @@ get_mcontext(struct thread *td, mcontext_t *mcp, int clear_ret)
 	mcp->mc_capregs.cp_cgp = tf->tf_gp;
 	mcp->mc_capregs.cp_ctp = tf->tf_tp;
 	mcp->mc_capregs.cp_sepcc = tf->tf_sepc;
-	mcp->mc_capregs.cp_ctp = tf->tf_ddc;
+	mcp->mc_capregs.cp_ddc = tf->tf_ddc;
 	mcp->mc_capregs.cp_sstatus = tf->tf_sstatus;
 #else
 	memcpy(mcp->mc_gpregs.gp_t, tf->tf_t, sizeof(mcp->mc_gpregs.gp_t));
