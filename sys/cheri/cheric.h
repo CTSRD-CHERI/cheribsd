@@ -61,19 +61,10 @@
 #define	cheri_seal(x, y)	__builtin_cheri_seal((x), (y))
 #define	cheri_unseal(x, y)	__builtin_cheri_unseal((x), (y))
 
-#define	cheri_getcause()	__builtin_mips_cheri_get_cause()
-#define	cheri_setcause(x)	__builtin_mips_cheri_set_cause(x)
-
 #define	cheri_ccheckperm(c, p)	__builtin_cheri_perms_check((c), (p))
 #define	cheri_cchecktype(c, t)	__builtin_cheri_type_check((c), (t))
 
 #define	cheri_getdefault()	__builtin_cheri_global_data_get()
-#define	cheri_getidc()		__builtin_mips_cheri_get_invoke_data_cap()
-#define	cheri_getkr1c()		__builtin_mips_cheri_get_kernel_cap1()
-#define	cheri_getkr2c()		__builtin_mips_cheri_get_kernel_cap2()
-#define	cheri_getkcc()		__builtin_mips_cheri_get_kernel_code_cap()
-#define	cheri_getkdc()		__builtin_mips_cheri_get_kernel_data_cap()
-#define	cheri_getepcc()		__builtin_mips_cheri_get_exception_program_counter_cap()
 #define	cheri_getpcc()		__builtin_cheri_program_counter_get()
 #define	cheri_getstack()	__builtin_cheri_stack_get()
 
