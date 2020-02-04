@@ -195,8 +195,12 @@ va:
 #endif
 
 	/* Ensure sscratch is zero */
+#if __has_feature(capabilities)
+	cspecialw sscratchc, cnull
+#else
 	li	t0, 0
 	csrw	sscratch, t0
+#endif
 
 	/* Initialize stack pointer */
 	la	s3, initstack_end
