@@ -149,7 +149,7 @@ find_marker(struct g_consumer *cp, const char *line, off_t *offset)
 	bzero(search_key, MAP_MAX_MARKER_LEN);
 	sectorsize = cp->provider->sectorsize;
 
-#ifdef __LP64__
+#if defined(__LP64__) || __has_feature(capabilities)
 	ret = sscanf(line, "search:%li:%li:%63c",
 	    &search_start, &search_step, search_key);
 #else
