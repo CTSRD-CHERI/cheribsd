@@ -42,6 +42,24 @@
 	li	t0, SYS_ ## name;				\
 	ecall
 
+#ifndef __CHERI_PURE_CAPABILITY__
+#define _GET_FNPTR(outreg, function)	la outreg, _C_LABEL(function)
+#define _CALL_FNPTR(fnptr)	jalr fnptr
+#define _TAILCALL_FNPTR(fnptr)	jr fnptr
+#define _CALL_TMPREG	t1
+#else
+#define _GET_FNPTR(outreg, function)	clgc outreg, _C_LABEL(function)
+#define _CALL_FNPTR(fnptr)	cjalr fnptr
+#define _TAILCALL_FNPTR(fnptr)	cjr fnptr
+#define _CALL_TMPREG	ct1
+#endif
+#define ASM_TAILCALL(function)					\
+	_GET_FNPTR(_CALL_TMPREG, function);			\
+	_TAILCALL_FNPTR(_CALL_TMPREG)
+#define ASM_CALL(function)					\
+	_GET_FNPTR(_CALL_TMPREG, function);			\
+	_CALL_FNPTR(_CALL_TMPREG)
+
 #define	SYSCALL(name)						\
 ENTRY(__sys_##name);						\
 	WEAK_REFERENCE(__sys_##name, name);			\
@@ -56,8 +74,7 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	ret;							\
-1:	la	t1, cerror;					\
-	jr	t1;						\
+1:	ASM_TAILCALL(cerror);					\
 END(__sys_##name)
 
 #define	RSYSCALL(name)						\
@@ -67,6 +84,5 @@ ENTRY(__sys_##name);						\
 	_SYSCALL(name);						\
 	bnez	t0, 1f; 					\
 	ret;							\
-1:	la	t1, cerror;					\
-	jr	t1;						\
+1:	ASM_TAILCALL(cerror);					\
 END(__sys_##name)
