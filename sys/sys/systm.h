@@ -62,6 +62,8 @@ extern int cold;		/* nonzero if we are doing a cold boot */
 extern int suspend_blocked;	/* block suspend due to pending shutdown */
 extern int rebooting;		/* kern_reboot() has been called. */
 extern const char *panicstr;	/* panic message */
+extern bool panicked;
+#define	KERNEL_PANICKED()	__predict_false(panicked)
 extern char version[];		/* system version */
 extern char compiler_version[];	/* compiler version */
 extern char copyright[];	/* system copyright */
@@ -114,15 +116,23 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
 } while (0)
 #define	VNASSERT(exp, vp, msg) do {					\
 	if (__predict_false(!(exp))) {					\
-		vn_printf(vp, "VNASSERT failed\n");			\
+		vn_printf(vp, "VNASSERT failed: %s not true at %s:%d (%s)\n",\
+		   #exp, __FILE__, __LINE__, __func__);	 		\
 		kassert_panic msg;					\
 	}								\
+} while (0)
+#define	VNPASS(exp, vp)	do {						\
+	const char *_exp = #exp;					\
+	VNASSERT(exp, vp, ("condition %s not met at %s:%d (%s)",	\
+	    _exp, __FILE__, __LINE__, __func__));			\
 } while (0)
 #else
 #define	KASSERT(exp,msg) do { \
 } while (0)
 
 #define	VNASSERT(exp, vp, msg) do { \
+} while (0)
+#define	VNPASS(exp, vp) do { \
 } while (0)
 #endif
 
@@ -177,17 +187,17 @@ void	kassert_panic(const char *fmt, ...)  __printflike(1, 2);
  * sentinel values to work.
  */
 #define ___USER_CFROMPTR(ptr, cap)					\
-     ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
+    ((void *)(uintptr_t)(ptr) == NULL ? NULL :				\
      ((vm_offset_t)(ptr) < 4096 ||					\
       (vm_offset_t)(ptr) > VM_MAXUSER_ADDRESS) ?			\
 	__builtin_cheri_offset_set(NULL, (vaddr_t)(ptr)) :		\
 	__builtin_cheri_offset_set((cap), (vaddr_t)(ptr)))
 
 #define	__USER_CAP_UNBOUND(ptr)						\
-    ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.ddc)
+	___USER_CFROMPTR((ptr), __USER_DDC)
 
 #define	__USER_CODE_CAP(ptr)						\
-     ___USER_CFROMPTR((ptr), curthread->td_pcb->pcb_regs.pcc)
+	___USER_CFROMPTR((ptr), __USER_PCC)
 
 #define	__USER_CAP(ptr, len)						\
 ({									\
@@ -411,9 +421,9 @@ int	bcmp(const void *b1, const void *b2, size_t len);
 void	*memset(void * _Nonnull buf, int c, size_t len);
 void	*memcpy(void * _Nonnull to, const void * _Nonnull from, size_t len);
 #if __has_feature(capabilities)
-void	*memcpy_c(void * _Nonnull __capability to,
+void	* __capability memcpy_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
-void	*memcpynocap_c(void * _Nonnull __capability to,
+void	* __capability memcpynocap_c(void * _Nonnull __capability to,
 	    const void * _Nonnull __capability from, size_t len);
 void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #else
@@ -422,9 +432,9 @@ void	*cheri_memcpy(void *dst, const void *src, size_t len);
 #endif
 void	*memmove(void * _Nonnull dest, const void * _Nonnull src, size_t n);
 #if __has_feature(capabilities)
-void	*memmove_c(void * _Nonnull __capability dest,
+void	* __capability memmove_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
-void	*memmovenocap_c(void * _Nonnull __capability dest,
+void	* __capability memmovenocap_c(void * _Nonnull __capability dest,
 	    const void * _Nonnull __capability src, size_t n);
 #endif
 
@@ -614,6 +624,7 @@ int	suword_c(volatile void * __capability base, long word);
 int	suword16_c(volatile void * __capability base, int word);
 int	suword32_c(volatile void * __capability base, int32_t word);
 int	suword64_c(volatile void * __capability base, int64_t word);
+int	sucap(volatile const void * __capability base, intcap_t val);
 uint32_t casuword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 	    uint32_t newval);
 u_long	casuword_c(volatile u_long * __capability base, u_long oldval,
@@ -636,6 +647,7 @@ int	casueword32_c(volatile uint32_t * __capability base, uint32_t oldval,
 #define	suword16_c	suword16
 #define	suword32_c	suword32
 #define	suword64_c	suword64
+#define	sucap		suword
 #define	casuword32_c	casuword32
 #define	casuword_c	casuword
 #define	casueword32_c	casueword32

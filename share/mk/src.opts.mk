@@ -63,7 +63,6 @@ __DEFAULT_YES_OPTIONS = \
     AUTOFS \
     BHYVE \
     BINUTILS \
-    BINUTILS_BOOTSTRAP \
     BLACKLIST \
     BLUETOOTH \
     BOOT \
@@ -314,7 +313,7 @@ __DEFAULT_YES_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
 __DEFAULT_YES_OPTIONS+=CLANG LLD
 __DEFAULT_NO_OPTIONS+=CLANG_BOOTSTRAP CLANG_IS_CC
 .elif ${COMPILER_FEATURES:Mc++11} && ${__T:Mmips*c*}
-# CHERI pure-capability targets alwasy use libc++
+# CHERI pure-capability targets always use libc++
 # Don't build CLANG for now
 __DEFAULT_NO_OPTIONS+=CLANG CLANG_IS_CC
 # Don't bootstrap clang, it isn't the version we want
@@ -338,6 +337,11 @@ __DEFAULT_NO_OPTIONS+=CLANG CLANG_BOOTSTRAP CLANG_IS_CC LLD
 # In-tree binutils/gcc are older versions without modern architecture support.
 .if ${__T} == "aarch64" || ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=BINUTILS BINUTILS_BOOTSTRAP GCC GCC_BOOTSTRAP GDB
+.endif
+.if ${__T} == "amd64" || ${__T} == "i386" || ${__T:Mpowerpc*}
+__DEFAULT_YES_OPTIONS+=BINUTILS_BOOTSTRAP
+.else
+__DEFAULT_NO_OPTIONS+=BINUTILS_BOOTSTRAP
 .endif
 .if ${__T:Mriscv*} != ""
 BROKEN_OPTIONS+=OFED
@@ -424,21 +428,6 @@ BROKEN_OPTIONS+=COMPAT_CHERIABI
 .if ${.MAKE.OS} != "FreeBSD"
 # tablegen will not build on non-FreeBSD so also disable target clang and lld
 BROKEN_OPTIONS+=CLANG LLD
-# The cddl bootstrap tools still need some changes in order to compile
-BROKEN_OPTIONS+=CDDL ZFS
-
-# Boot cannot be built with clang yet. Will need to bootstrap GNU as..
-BROKEN_OPTIONS+=BOOT
-# libsnmp use ls -D which is not supported on MacOS (and possibly linux)
-BROKEN_OPTIONS+=BSNMP
-.if ${.MAKE.OS} == "Linux"
-# crunchgen fails for some reason on Linux (but it works on MacOS):
-# + cd /local/scratch/alr48/cheri/freebsd-mips/rescue/rescue/../../bin/cat
-# + make -f /tmp//crunchgen_rescue9yuKRG -DRESCUE CRUNCH_CFLAGS=-DRESCUE MK_AUTO_OBJ=yes DIRPRFX=cat/ loop
-# + echo OBJS= cat.o
-# /tmp//crunchgen_rescue9yuKRG: Invalid argument
-BROKEN_OPTIONS+=RESCUE
-.endif
 .endif
 
 # HyperV is currently x86-only
@@ -576,6 +565,7 @@ MK_NLS_CATALOGS:= no
 .endif
 
 .if ${MK_OPENSSL} == "no"
+MK_DMAGENT:=	no
 MK_OPENSSH:=	no
 MK_KERBEROS:=	no
 MK_KERBEROS_SUPPORT:=	no
@@ -639,6 +629,12 @@ MK_LLVM_COV:= no
 
 .if ${MK_LOADER_VERIEXEC} == "no"
 MK_LOADER_VERIEXEC_PASS_MANIFEST := no
+.endif
+
+# COMPAT_CHERIABI and LIBCHERI depend on CHERI support.
+.if ${MK_CHERI} == "no"
+MK_LIBCHERI:=	no
+MK_COMPAT_CHERIABI:=	no
 .endif
 
 #

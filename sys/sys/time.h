@@ -53,8 +53,11 @@ struct timezone {
 
 #if __BSD_VISIBLE
 struct bintime {
+#if defined(__LP64__) || __has_feature(capabilities)
 	/* XXXAR: hack to avoid memcpy() dep in libsyscalls */
-	_Alignas(sizeof(void*)) time_t	sec;
+	_Alignas(sizeof(void * __capability))
+#endif
+	time_t	sec;
 	uint64_t frac;
 };
 

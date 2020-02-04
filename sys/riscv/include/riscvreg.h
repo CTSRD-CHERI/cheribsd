@@ -54,6 +54,9 @@
 #define	EXCP_INST_PAGE_FAULT		12
 #define	EXCP_LOAD_PAGE_FAULT		13
 #define	EXCP_STORE_PAGE_FAULT		15
+#if __has_feature(capabilities)
+#define	EXCP_CHERI			28
+#endif
 #define	EXCP_INTR			(1ul << 63)
 
 #define	SSTATUS_UIE			(1 << 0)
@@ -72,8 +75,11 @@
 #define	SSTATUS_XS_SHIFT		15
 #define	SSTATUS_XS_MASK			(0x3 << SSTATUS_XS_SHIFT)
 #define	SSTATUS_SUM			(1 << 18)
-#define	SSTATUS32_SD			(1 << 63)
-#define	SSTATUS64_SD			(1 << 31)
+#if __riscv_xlen == 64
+#define	SSTATUS_SD			(1 << 63)
+#else
+#define	SSTATUS_SD			(1 << 31)
+#endif
 
 #define	MSTATUS_UIE			(1 << 0)
 #define	MSTATUS_SIE			(1 << 1)
@@ -155,8 +161,21 @@
 #define	SATP_MODE_SV39	(8ULL << SATP_MODE_S)
 #define	SATP_MODE_SV48	(9ULL << SATP_MODE_S)
 
+#if __has_feature(capabilities)
+#define	SCCSR_E			(1 << 0)
+#define	SCCSR_D			(1 << 1)
+#define	SCCSR_CAUSE_SHIFT	5
+#define	SCCSR_CAUSE_MASK	(0x1f << SCCSR_CAUSE_SHIFT)
+#define	SCCSR_CAP_IDX_SHIFT	10
+#define	SCCSR_CAP_IDX_MASK	(0x3f << SCCSR_CAP_IDX_SHIFT)
+#endif
+
 #define	XLEN		__riscv_xlen
 #define	XLEN_BYTES	(XLEN / 8)
+#if __has_feature(capabilities)
+#define	CLEN		__riscv_clen
+#define	CLEN_BYTES	(CLEN / 8)
+#endif
 #define	INSN_SIZE	4
 #define	INSN_C_SIZE	2
 
@@ -241,6 +260,14 @@
 })
 #else
 #define	csr_read64(csr)		((uint64_t)csr_read(csr))
+#endif
+
+#if __has_feature(capabilities)
+#define	scr_read(scr)							\
+({	void * __capability val;					\
+	__asm __volatile("cspecialr %0, " #scr : "=C" (val));		\
+	val;								\
+})
 #endif
 
 #endif /* !_MACHINE_RISCVREG_H_ */

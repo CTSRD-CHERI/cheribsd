@@ -71,6 +71,7 @@
 
 #include <machine/cheriasm.h>
 #include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 
 #include "opt_stack.h"
 

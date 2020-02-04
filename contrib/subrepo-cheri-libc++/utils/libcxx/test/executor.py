@@ -9,6 +9,8 @@
 from __future__ import print_function
 import platform
 import os
+import posixpath
+import ntpath
 import errno
 import tempfile
 import datetime
@@ -22,6 +24,9 @@ from libcxx.util import executeCommand, ExecuteCommandTimeoutException
 
 class Executor(object):
     is_remote = False
+
+    def __init__(self):
+        self.target_info = None
 
     def run(self, exe_path, cmd, local_cwd, file_deps=None, env=None):
         """Execute a command.
@@ -38,6 +43,20 @@ class Executor(object):
         """
         raise NotImplementedError
 
+    def merge_environments(self, current_env, updated_env):
+        """Merges two execution environments.
+
+        If both environments contain the PATH variables, they are also merged
+        using the proper separator.
+        """
+        result_env = dict(current_env)
+        for k, v in updated_env.items():
+            if k == 'PATH' and self.target_info:
+                self.target_info.add_path(result_env, v)
+            else:
+                result_env[k] = v
+        return result_env
+
 
 class LocalExecutor(Executor):
     def __init__(self):
@@ -48,6 +67,10 @@ class LocalExecutor(Executor):
         cmd = cmd or [exe_path]
         if work_dir == '.':
             work_dir = os.getcwd()
+
+        if env:
+            env = self.merge_environments(os.environ, env)
+
         out, err, rc = executeCommand(cmd, cwd=work_dir, env=env)
         return (cmd, out, err, rc)
 
@@ -148,6 +171,7 @@ class RemoteExecutor(Executor):
     is_remote = True
 
     def __init__(self):
+        super(RemoteExecutor, self).__init__()
         self.local_run = executeCommand
         self.keep_test = False
 
@@ -171,7 +195,7 @@ class RemoteExecutor(Executor):
 
     def delete_remote(self, remote):
         try:
-            self._execute_command_remote(['rm', '-rf', remote])
+            self.execute_command_remote(['rm', '-rf', remote])
         except OSError:
             # TODO: Log failure to delete?
             pass
@@ -181,7 +205,12 @@ class RemoteExecutor(Executor):
         target_cwd = None
         try:
             target_cwd = self.remote_temp_dir()
-            target_exe_path = os.path.join(target_cwd, os.path.basename(exe_path))
+            executable_name = 'libcxx_test.exe'
+            if self.target_info.is_windows():
+                target_exe_path = ntpath.join(target_cwd, executable_name)
+            else:
+                target_exe_path = posixpath.join(target_cwd, executable_name)
+
             if cmd:
                 # Replace exe_path with target_exe_path.
                 cmd = [c if c != exe_path else target_exe_path for c in cmd]
@@ -202,17 +231,23 @@ class RemoteExecutor(Executor):
                 srcs.extend(file_deps)
                 dsts.extend(dev_paths)
             self.copy_in(srcs, dsts)
+
+            # When testing executables that were cross-compiled on Windows for
+            # Linux, we may need to explicitly set the execution permission to
+            # avoid the 'Permission denied' error:
+            chmod_cmd = ['chmod', '+x', target_exe_path]
+
             # TODO(jroelofs): capture the copy_in and delete_remote commands,
             # and conjugate them with '&&'s around the first tuple element
             # returned here:
-            (remote_cmd, out, err, rc) = self._execute_command_remote(cmd, target_cwd, env)
+            (remote_cmd, out, err, rc) = self._execute_command_remote(cmd, target_cwd, pre_cmd=chmod_cmd, env=env)
             self.keep_test = rc != 0
             return remote_cmd, out, err, rc
         finally:
             if target_cwd and not self.keep_test:
                 self.delete_remote(target_cwd)
 
-    def _execute_command_remote(self, cmd, remote_work_dir='.', env=None):
+    def _execute_command_remote(self, cmd, remote_work_dir='.', pre_cmd=None, env=None):
         raise NotImplementedError()
 
 
@@ -247,7 +282,7 @@ class SSHExecutor(RemoteExecutor):
         # Not sure how to do suffix on osx yet
         dir_arg = '-d' if is_dir else ''
         cmd = 'mktemp -q {} /tmp/libcxx.XXXXXXXXXX'.format(dir_arg)
-        _, temp_path, err, exitCode = self._execute_command_remote([cmd])
+        _, temp_path, err, exitCode = self.execute_command_remote([cmd])
         temp_path = temp_path.strip()
         if exitCode != 0:
             if not is_retry and "write: Broken pipe" in err:
@@ -264,17 +299,36 @@ class SSHExecutor(RemoteExecutor):
             print('{}: Copying {} to {}'.format(datetime.datetime.now(), src, dst), file=sys.stderr)
         self.local_run(cmd)
 
-    def _execute_command_remote(self, cmd, remote_work_dir='.', env=None):
+    def _export_command(self, env):
+        if not env:
+            return []
+
+        export_cmd = ['export']
+
+        for k, v in env.items():
+            v = v.replace('\\', '\\\\')
+            if k == 'PATH':
+                # Pick up the existing paths, so we don't lose any commands
+                if self.target_info and self.target_info.is_windows():
+                    export_cmd.append('PATH="%s;%PATH%"' % v)
+                else:
+                    export_cmd.append('PATH="%s:$PATH"' % v)
+            else:
+                export_cmd.append('"%s"="%s"' % (k, v))
+
+        return export_cmd
+
+    def _execute_command_remote(self, cmd, remote_work_dir='.', pre_cmd=None, env=None):
         remote = self.user_prefix + self.host
         # Add -tt to force a TTY allocation so that the remote process is killed
         # when SSH exits.
         ssh_cmd = self.ssh_command + ['-tt', '-oBatchMode=yes', remote]
-        # FIXME: doesn't handle spaces... and Py2.7 doesn't have shlex.quote()
-        if env:
-            env_cmd = ['env'] + ['%s=%s' % (k, v) for k, v in env.items()]
-        else:
-            env_cmd = []
-        remote_cmd = ' '.join(map(pipes.quote, env_cmd + cmd))
+        export_cmd = self._export_command(env)
+        remote_cmd = ' '.join(map(pipes.quote, cmd))
+        if pre_cmd:
+            remote_cmd = ' '.join(map(pipes.quote, pre_cmd)) + ' && ' + remote_cmd
+        if export_cmd:
+            remote_cmd = ' '.join(export_cmd) + ' && ' + remote_cmd
         if remote_work_dir != '.':
             remote_cmd = 'cd ' + pipes.quote(remote_work_dir) + ' && ' + remote_cmd
         if self.config and self.config.lit_config.debug:
@@ -356,7 +410,7 @@ class SSHExecutorWithNFSMount(SSHExecutor):
         else:
             return tempfile.mkstemp(prefix="libcxx-", dir=self.nfs_dir)
 
-    def _execute_command_remote(self, cmd, remote_work_dir='.', env=None):
+    def _execute_command_remote(self, cmd, remote_work_dir='.', pre_cmd=None, env=None):
         if remote_work_dir != ".":
             if not remote_work_dir.startswith(self.nfs_dir):
                 return cmd, None, "Custom remote_work_dir not implemented: %r" % remote_work_dir, 42
@@ -367,4 +421,5 @@ class SSHExecutorWithNFSMount(SSHExecutor):
         if all(self.nfs_dir not in s for s in cmd):
             raise NotImplementedError("Cannot run non-test binaries: Command was: %s" % cmd)
         cmd = [s.replace(self.nfs_dir, self.path_in_target) for s in cmd]
-        return super(SSHExecutorWithNFSMount, self)._execute_command_remote(cmd, remote_work_dir=remote_work_dir, env=env)
+        return super(SSHExecutorWithNFSMount, self)._execute_command_remote(cmd, remote_work_dir=remote_work_dir,
+                                                                            pre_cmd=pre_cmd, env=env)

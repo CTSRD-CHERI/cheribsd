@@ -55,8 +55,10 @@ struct sigevent64 {
 	union {
 		__lwpid_t	_threadid;
 		struct {
-			uint64_t _function; /* void (*)(union sigval64) */
-			uint64_t _attribute; /* struct pthread_attr ** */
+			/* void (*_function)(union sigval64); */
+			uint64_t _function;
+			/* struct pthread_attr **_attribute; */
+			uint64_t _attribute;
 		} _sigev_thread;
 		unsigned short _kevent_flags;
 		long __spare__[8];

@@ -37,7 +37,7 @@
 #endif
 
 #include <sys/types.h>
-
+#include <cheri/cherireg.h>
 
 /*
  * Canonical C-language representation of a CHERI object capability -- code and

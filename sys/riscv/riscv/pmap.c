@@ -157,6 +157,10 @@ __FBSDID("$FreeBSD$");
 #include <machine/pcb.h>
 #include <machine/sbi.h>
 
+#if __has_feature(capabilities)
+#include <cheri/cheric.h>
+#endif
+
 #define	NUL1E		(Ln_ENTRIES * Ln_ENTRIES)
 #define	NUL2E		(Ln_ENTRIES * NUL1E)
 
@@ -325,6 +329,21 @@ pagecopy(void *s, void *d)
 
 	memcpy(d, s, PAGE_SIZE);
 }
+
+#if __has_feature(capabilities)
+static __inline void
+pagecopy_cleartags(void *s, void *d)
+{
+	void * __capability *dst;
+	void * __capability *src;
+	u_int i;
+
+	dst = d;
+	src = s;
+	for (i = 0; i < PAGE_SIZE / sizeof(*dst); i++)
+		*dst++ = cheri_cleartag(*src++);
+}
+#endif
 
 static __inline void
 pagezero(void *p)
@@ -3374,6 +3393,13 @@ pmap_zero_page_area(vm_page_t m, int off, int size)
  *	page by mapping the page into virtual memory and using
  *	bcopy to copy the page, one machine dependent page at a
  *	time.
+ *
+ *	With CHERI, it is sometimes desirable to explicitly propagate
+ *	tags between pages (e.g., during copy-on-write), but not other
+ *	times (e.g., copying data from VM to buffer cache).  There is
+ *	more playing out here yet to do (e.g., if any filesystems
+ *	learn to preserve tags) but these KPIs allow us to capture
+ *	that difference in the mean time.
  */
 void
 pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
@@ -3381,6 +3407,17 @@ pmap_copy_page(vm_page_t msrc, vm_page_t mdst)
 	vm_offset_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
 	vm_offset_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
 
+#if __has_feature(capabilities)
+	pagecopy_cleartags((void *)src, (void *)dst);
+}
+
+void
+pmap_copy_page_tags(vm_page_t msrc, vm_page_t mdst)
+{
+	vm_offset_t src = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(msrc));
+	vm_offset_t dst = PHYS_TO_DMAP(VM_PAGE_TO_PHYS(mdst));
+
+#endif
 	pagecopy((void *)src, (void *)dst);
 }
 

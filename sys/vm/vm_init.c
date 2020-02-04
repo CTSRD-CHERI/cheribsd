@@ -96,9 +96,7 @@ __FBSDID("$FreeBSD$");
 #include <vm/vm_pager.h>
 #include <vm/vm_extern.h>
 
-extern void	uma_startup1(void);
-extern void	uma_startup2(void);
-extern void	vm_radix_reserve_kva(void);
+extern void	uma_startup1(vm_offset_t);
 
 long physmem;
 
@@ -111,8 +109,6 @@ SYSINIT(vm_mem, SI_SUB_VM, SI_ORDER_FIRST, vm_mem_init, NULL);
 /*
  *	vm_init initializes the virtual memory system.
  *	This is done only by the first cpu up.
- *
- *	The start and end address of physical memory is passed in.
  */
 static void
 vm_mem_init(void *dummy)
@@ -136,10 +132,9 @@ vm_mem_init(void *dummy)
 	 */
 	domainset_zero();
 
-#ifdef	UMA_MD_SMALL_ALLOC
-	/* Announce page availability to UMA. */
-	uma_startup1();
-#endif
+	/* Bootstrap the kernel memory allocator. */
+	uma_startup1(virtual_avail);
+
 	/*
 	 * Initialize other VM packages
 	 */
@@ -149,12 +144,6 @@ vm_mem_init(void *dummy)
 	kmem_init(virtual_avail, virtual_end);
 	/* XXX-AM: in principle we could now destroy the virtual_avail/end capabilities */
 
-#ifndef	UMA_MD_SMALL_ALLOC
-	/* Set up radix zone to use noobj_alloc. */
-	vm_radix_reserve_kva();
-#endif
-	/* Announce full page availability to UMA. */
-	uma_startup2();
 	kmem_init_zero_region();
 	pmap_init();
 	vm_pager_init();

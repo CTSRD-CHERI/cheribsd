@@ -16,7 +16,7 @@ void backtrace(int lower_bound) {
   while (1) {
     n++;
     if (unw_get_proc_name(&cursor, buffer, sizeof(buffer), &offset) == 0) {
-      fprintf(stderr, "Frame %d: %s+%p\n", n, buffer, (void*)offset);
+      fprintf(stderr, "Frame %d: %s+%p\n", n, buffer, (void*)(intptr_t)offset);
     } else {
       fprintf(stderr, "Frame %d: Could not get name for cursor\n", n);
     }

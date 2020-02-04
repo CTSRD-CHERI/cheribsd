@@ -76,6 +76,9 @@ ASSYM(PCB_X, offsetof(struct pcb, pcb_x));
 ASSYM(PCB_FCSR, offsetof(struct pcb, pcb_fcsr));
 
 ASSYM(SF_UC, offsetof(struct sigframe, sf_uc));
+#ifdef COMPAT_FREEBSD64
+ASSYM(SF64_UC, offsetof(struct sigframe64, sf_uc));
+#endif
 
 ASSYM(PC_CURPCB, offsetof(struct pcpu, pc_curpcb));
 ASSYM(PC_CURTHREAD, offsetof(struct pcpu, pc_curthread));

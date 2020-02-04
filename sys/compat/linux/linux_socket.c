@@ -72,6 +72,7 @@ __FBSDID("$FreeBSD$");
 #endif
 #include <compat/linux/linux_common.h>
 #include <compat/linux/linux_file.h>
+#include <compat/linux/linux_mib.h>
 #include <compat/linux/linux_socket.h>
 #include <compat/linux/linux_timer.h>
 #include <compat/linux/linux_util.h>
@@ -243,6 +244,8 @@ linux_to_bsd_tcp_sockopt(int opt)
 		return (TCP_NODELAY);
 	case LINUX_TCP_MAXSEG:
 		return (TCP_MAXSEG);
+	case LINUX_TCP_CORK:
+		return (TCP_NOPUSH);
 	case LINUX_TCP_KEEPIDLE:
 		return (TCP_KEEPIDLE);
 	case LINUX_TCP_KEEPINTVL:
@@ -1393,22 +1396,14 @@ linux_shutdown(struct thread *td, struct linux_shutdown_args *args)
 int
 linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 {
-	struct setsockopt_args /* {
-		int s;
-		int level;
-		int name;
-		const void *val;
-		int valsize;
-	} */ bsd_args;
 	l_timeval linux_tv;
 	struct sockaddr *sa;
 	struct timeval tv;
 	socklen_t len;
-	int error, name;
+	int error, level, name;
 
-	bsd_args.s = args->s;
-	bsd_args.level = linux_to_bsd_sockopt_level(args->level);
-	switch (bsd_args.level) {
+	level = linux_to_bsd_sockopt_level(args->level);
+	switch (level) {
 	case SOL_SOCKET:
 		name = linux_to_bsd_so_sockopt(args->optname);
 		switch (name) {
@@ -1421,7 +1416,7 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 				return (error);
 			tv.tv_sec = linux_tv.tv_sec;
 			tv.tv_usec = linux_tv.tv_usec;
-			return (kern_setsockopt(td, args->s, bsd_args.level,
+			return (kern_setsockopt(td, args->s, level,
 			    name, &tv, UIO_SYSSPACE, sizeof(tv)));
 			/* NOTREACHED */
 		default:
@@ -1429,6 +1424,14 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 		}
 		break;
 	case IPPROTO_IP:
+		if (args->optname == LINUX_IP_RECVERR &&
+		    linux_ignore_ip_recverr) {
+			/*
+			 * XXX: This is a hack to unbreak DNS resolution
+			 *	with glibc 2.30 and above.
+			 */
+			return (0);
+		}
 		name = linux_to_bsd_ip_sockopt(args->optname);
 		break;
 	case IPPROTO_IPV6:
@@ -1446,20 +1449,17 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 
 
 	if (name == IPV6_NEXTHOP) {
-
 		len = args->optlen;
 		error = linux_to_bsd_sockaddr(PTRIN(args->optval), &sa, &len);
 		if (error != 0)
 			return (error);
 
-		error = kern_setsockopt(td, args->s, bsd_args.level,
+		error = kern_setsockopt(td, args->s, level,
 		    name, sa, UIO_SYSSPACE, len);
 		free(sa, M_SONAME);
 	} else {
-		bsd_args.name = name;
-		bsd_args.val = PTRIN(args->optval);
-		bsd_args.valsize = args->optlen;
-		error = sys_setsockopt(td, &bsd_args);
+		error = kern_setsockopt(td, args->s, level,
+		    name, PTRIN(args->optval), UIO_USERSPACE, args->optlen);
 	}
 
 	return (error);
@@ -1468,13 +1468,6 @@ linux_setsockopt(struct thread *td, struct linux_setsockopt_args *args)
 int
 linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 {
-	struct getsockopt_args /* {
-		int s;
-		int level;
-		int name;
-		caddr_t val;
-		int *avalsize;
-	} */ bsd_args;
 	l_timeval linux_tv;
 	struct timeval tv;
 	socklen_t tv_len, xulen, len;
@@ -1482,11 +1475,10 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 	struct sockaddr *sa;
 	struct xucred xu;
 	struct l_ucred lxu;
-	int error, name, newval;
+	int error, level, name, newval;
 
-	bsd_args.s = args->s;
-	bsd_args.level = linux_to_bsd_sockopt_level(args->level);
-	switch (bsd_args.level) {
+	level = linux_to_bsd_sockopt_level(args->level);
+	switch (level) {
 	case SOL_SOCKET:
 		name = linux_to_bsd_so_sockopt(args->optname);
 		switch (name) {
@@ -1494,7 +1486,7 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 			/* FALLTHROUGH */
 		case SO_SNDTIMEO:
 			tv_len = sizeof(tv);
-			error = kern_getsockopt(td, args->s, bsd_args.level,
+			error = kern_getsockopt(td, args->s, level,
 			    name, &tv, UIO_SYSSPACE, &tv_len);
 			if (error != 0)
 				return (error);
@@ -1510,9 +1502,9 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 			 * LOCAL_PEERCRED is not served at the SOL_SOCKET level,
 			 * but by the Unix socket's level 0.
 			 */
-			bsd_args.level = 0;
+			level = 0;
 			xulen = sizeof(xu);
-			error = kern_getsockopt(td, args->s, bsd_args.level,
+			error = kern_getsockopt(td, args->s, level,
 			    name, &xu, UIO_SYSSPACE, &xulen);
 			if (error != 0)
 				return (error);
@@ -1523,7 +1515,7 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 			/* NOTREACHED */
 		case SO_ERROR:
 			len = sizeof(newval);
-			error = kern_getsockopt(td, args->s, bsd_args.level,
+			error = kern_getsockopt(td, args->s, level,
 			    name, &newval, UIO_SYSSPACE, &len);
 			if (error != 0)
 				return (error);
@@ -1550,16 +1542,13 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 	if (name == -1)
 		return (EINVAL);
 
-	bsd_args.name = name;
-	bsd_args.avalsize = PTRIN(args->optlen);
-
 	if (name == IPV6_NEXTHOP) {
 		error = copyin(PTRIN(args->optlen), &len, sizeof(len));
                 if (error != 0)
                         return (error);
 		sa = malloc(len, M_SONAME, M_WAITOK);
 
-		error = kern_getsockopt(td, args->s, bsd_args.level,
+		error = kern_getsockopt(td, args->s, level,
 		    name, sa, UIO_SYSSPACE, &len);
 		if (error != 0)
 			goto out;
@@ -1574,8 +1563,16 @@ linux_getsockopt(struct thread *td, struct linux_getsockopt_args *args)
 out:
 		free(sa, M_SONAME);
 	} else {
-		bsd_args.val = PTRIN(args->optval);
-		error = sys_getsockopt(td, &bsd_args);
+		if (args->optval) {
+			error = copyin(PTRIN(args->optlen), &len, sizeof(len));
+			if (error != 0)
+				return (error);
+		}
+		error = kern_getsockopt(td, args->s, level,
+		    name, PTRIN(args->optval), UIO_USERSPACE, &len);
+		if (error == 0)
+			error = copyout(&len, PTRIN(args->optlen),
+			    sizeof(len));
 	}
 
 	return (error);

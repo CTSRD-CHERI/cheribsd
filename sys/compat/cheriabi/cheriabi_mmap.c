@@ -168,10 +168,10 @@ cheriabi_mmap(struct thread *td, struct cheriabi_mmap_args *uap)
 		}
 
 		/* Allocate from the per-thread capability. */
-		source_cap = td->td_md.md_cheri_mmap_cap;
+		source_cap = td->td_cheri_mmap_cap;
 	}
 	KASSERT(cheri_gettag(source_cap),
-	    ("td->td_md.md_cheri_mmap_cap is untagged!"));
+	    ("td->td_cheri_mmap_cap is untagged!"));
 
 	/*
 	 * If MAP_FIXED is specified, make sure that that the reqested

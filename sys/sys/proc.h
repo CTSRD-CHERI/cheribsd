@@ -297,7 +297,7 @@ struct thread {
 	struct osd	td_osd;		/* (k) Object specific data. */
 	struct vm_map_entry *td_map_def_user; /* (k) Deferred entries. */
 	pid_t		td_dbg_forked;	/* (c) Child pid for debugger. */
-	u_int		td_vp_reserv;	/* (k) Count of reserved vnodes. */
+	struct vnode	*td_vp_reserved;/* (k) Prealloated vnode. */
 	u_int		td_no_sleeping;	/* (k) Sleeping disabled count. */
 	void		*td_su;		/* (k) FFS SU private */
 	sbintime_t	td_sleeptimo;	/* (t) Sleep timeout. */
@@ -322,6 +322,9 @@ struct thread {
 	uintcap_t	td_rb_inact;	/* (k) Current in-action mutex loc. */
 	struct syscall_args td_sa;	/* (kx) Syscall parameters. Copied on
 					   fork for child tracing. */
+#if __has_feature(capabilities)
+	void * __capability td_cheri_mmap_cap; /* (x) */
+#endif
 #define	td_endcopy td_pcb
 
 /*

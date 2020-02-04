@@ -130,6 +130,8 @@ SYSCTL_ULONG(_vm, OID_AUTO, max_kernel_address, CTLFLAG_RD,
 #endif
 #define	KVA_QUANTUM		(1 << KVA_QUANTUM_SHIFT)
 
+extern void     uma_startup2(void);
+
 /*
  *	kva_alloc:
  *
@@ -208,7 +210,7 @@ kmem_alloc_attr_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	if (vmem_alloc(vmem, size, M_BESTFIT | flags, &addr))
 		return (0);
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
-	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
+	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
 	pflags &= ~(VM_ALLOC_NOWAIT | VM_ALLOC_WAITOK | VM_ALLOC_WAITFAIL);
 	pflags |= VM_ALLOC_NOWAIT;
 	prot = (flags & M_EXEC) != 0 ? VM_PROT_ALL : VM_PROT_RW;
@@ -238,7 +240,8 @@ retry:
 		    vm_phys_domain(m), domain));
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
-		m->valid = VM_PAGE_BITS_ALL;
+		vm_page_valid(m);
+		vm_page_xunbusy(m);
 		pmap_enter(kernel_pmap, addr + i, m, prot,
 		    prot | PMAP_ENTER_WIRED, 0);
 	}
@@ -303,7 +306,7 @@ kmem_alloc_contig_domain(int domain, vm_size_t size, int flags, vm_paddr_t low,
 	if (vmem_alloc(vmem, size, flags | M_BESTFIT, &addr))
 		return (0);
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
-	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
+	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
 	pflags &= ~(VM_ALLOC_NOWAIT | VM_ALLOC_WAITOK | VM_ALLOC_WAITFAIL);
 	pflags |= VM_ALLOC_NOWAIT;
 	npages = atop(size);
@@ -334,7 +337,8 @@ retry:
 	for (; m < end_m; m++) {
 		if ((flags & M_ZERO) && (m->flags & PG_ZERO) == 0)
 			pmap_zero_page(m);
-		m->valid = VM_PAGE_BITS_ALL;
+		vm_page_valid(m);
+		vm_page_xunbusy(m);
 		pmap_enter(kernel_pmap, tmp, m, VM_PROT_RW,
 		    VM_PROT_RW | PMAP_ENTER_WIRED, 0);
 		tmp += PAGE_SIZE;
@@ -499,7 +503,7 @@ kmem_back_domain(int domain, vm_object_t object, vm_ptr_t addr,
 	CHERI_VM_ASSERT_VALID(addr);
 
 	offset = addr - VM_MIN_KERNEL_ADDRESS;
-	pflags = malloc2vm_flags(flags) | VM_ALLOC_NOBUSY | VM_ALLOC_WIRED;
+	pflags = malloc2vm_flags(flags) | VM_ALLOC_WIRED;
 	pflags &= ~(VM_ALLOC_NOWAIT | VM_ALLOC_WAITOK | VM_ALLOC_WAITFAIL);
 	if (flags & M_WAITOK)
 		pflags |= VM_ALLOC_WAITFAIL;
@@ -532,7 +536,8 @@ retry:
 			pmap_zero_page(m);
 		KASSERT((m->oflags & VPO_UNMANAGED) != 0,
 		    ("kmem_malloc: page %p is managed", m));
-		m->valid = VM_PAGE_BITS_ALL;
+		vm_page_valid(m);
+		vm_page_xunbusy(m);
 		pmap_enter(kernel_pmap, addr + i, m, prot,
 		    prot | PMAP_ENTER_WIRED, 0);
 #if VM_NRESERVLEVEL > 0
@@ -867,6 +872,13 @@ kmem_init(vm_ptr_t start, vm_ptr_t end)
 		    kernel_arena, KVA_QUANTUM);
 #endif
 	}
+
+	/*
+	 * This must be the very first call so that the virtual address
+	 * space used for early allocations is properly marked used in
+	 * the map.
+	 */
+	uma_startup2();
 }
 
 /*
@@ -933,7 +945,7 @@ debug_vm_lowmem(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
-SYSCTL_PROC(_debug, OID_AUTO, vm_lowmem, CTLTYPE_INT | CTLFLAG_RW, 0, 0,
+SYSCTL_PROC(_debug, OID_AUTO, vm_lowmem, CTLTYPE_INT | CTLFLAG_MPSAFE | CTLFLAG_RW, 0, 0,
     debug_vm_lowmem, "I", "set to trigger vm_lowmem event with given flags");
 // CHERI CHANGES START
 // {

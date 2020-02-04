@@ -17,7 +17,8 @@ MDSRCS+= \
 .if ${MACHINE_ARCH:Mmips*c*} || ${MK_CHERI} == "yes"
 CHERI_MDSRCS=	\
 		memcpy_c.c \
-		memmove_c.c
+		memmove_c.c \
+		memset_c.c
 CHERI_MISRCS=	\
 		bcopy.c \
 		memcpy.c \

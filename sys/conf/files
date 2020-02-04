@@ -312,6 +312,8 @@ cddl/contrib/opensolaris/uts/common/fs/zfs/lua/lzio.c			optional zfs compile-wit
 cheri/cheri_asserts.c			optional cpu_cheri
 cheri/cheri_sysctl.c			optional cpu_cheri
 cheri/cheri_otype.c			optional cpu_cheri
+cheri/cheri_syscall.c			optional cpu_cheri
+cheri/cheri_usercap.c			optional cpu_cheri
 compat/cheriabi/cheriabi_abort2.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_generic.c	optional compat_cheriabi
 compat/cheriabi/cheriabi_mac.c		optional compat_cheriabi
@@ -4136,6 +4138,7 @@ net/radix_mpath.c		standard
 net/raw_cb.c			standard
 net/raw_usrreq.c		standard
 net/route.c			standard
+net/route_temporal.c		standard
 net/rss_config.c		optional inet rss | inet6 rss
 net/rtsock.c			standard
 net/slcompress.c		optional netgraph_vjc | sppp | \

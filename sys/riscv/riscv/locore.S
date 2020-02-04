@@ -53,6 +53,12 @@
 	.text
 	.globl _start
 _start:
+	/* Set the global pointer */
+.option push
+.option norelax
+	lla	gp, __global_pointer$
+.option pop
+
 	/* Get the physical address kernel loaded to */
 	lla	t0, virt_map
 	ld	t1, 0(t0)
@@ -168,6 +174,11 @@ _start:
 
 	.align 2
 va:
+	/* Set the global pointer again, this time with the virtual address. */
+.option push
+.option norelax
+	lla	gp, __global_pointer$
+.option pop
 
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
@@ -176,12 +187,6 @@ va:
 	/* Ensure sscratch is zero */
 	li	t0, 0
 	csrw	sscratch, t0
-
-	/* Set the global pointer */
-.option push
-.option norelax
-	la	gp, __global_pointer$
-.option pop
 
 	/* Initialize stack pointer */
 	la	s3, initstack_end
@@ -243,11 +248,36 @@ END(sigcode)
 	.align	3
 esigcode:
 
+#ifdef COMPAT_FREEBSD64
+ENTRY(freebsd64_sigcode)
+	mv	a0, sp
+	addi	a0, a0, SF64_UC
+
+1:
+	li	t0, SYS_sigreturn
+	ecall
+
+	/* sigreturn failed, exit */
+	li	t0, SYS_exit
+	ecall
+
+	j	1b
+END(freebsd64_sigcode)
+	/* This may be copied to the stack, keep it 16-byte aligned */
+	.align	3
+freebsd64_esigcode:
+#endif
+
 	.data
 	.align	3
 	.global	szsigcode
 szsigcode:
 	.quad	esigcode - sigcode
+#ifdef COMPAT_FREEBSD64
+	.global	freebsd64_szsigcode
+freebsd64_szsigcode:
+	.quad	freebsd64_esigcode - freebsd64_sigcode
+#endif
 
 	.align	12
 pagetable_l1:
@@ -287,7 +317,7 @@ ENTRY(mpentry)
 	li	t1, 4
 	mulw	t1, t1, a0
 	/* Get the pointer */
-	la	t0, __riscv_boot_ap
+	lla	t0, __riscv_boot_ap
 	add	t0, t0, t1
 
 1:
@@ -296,7 +326,7 @@ ENTRY(mpentry)
 	beqz	t1, 1b
 
 	/* Setup stack pointer */
-	la	t0, secondary_stacks
+	lla	t0, secondary_stacks
 	li	t1, (PAGE_SIZE * KSTACK_PAGES)
 	mulw	t2, t1, a0
 	add	t0, t0, t2
@@ -306,14 +336,14 @@ ENTRY(mpentry)
 	add	sp, t0, t1
 
 	/* Setup supervisor trap vector */
-	la	t0, mpva
+	lla	t0, mpva
 	sub	t0, t0, s9
 	li	t1, KERNBASE
 	add	t0, t0, t1
 	csrw	stvec, t0
 
 	/* Set page tables base register */
-	la	s2, pagetable_l1
+	lla	s2, pagetable_l1
 	srli	s2, s2, PAGE_SHIFT
 	li	t0, SATP_MODE_SV39
 	or	s2, s2, t0
@@ -322,6 +352,12 @@ ENTRY(mpentry)
 
 	.align 2
 mpva:
+	/* Set the global pointer again, this time with the virtual address. */
+.option push
+.option norelax
+	lla	gp, __global_pointer$
+.option pop
+
 	/* Setup supervisor trap vector */
 	la	t0, cpu_exception_handler
 	csrw	stvec, t0
@@ -329,12 +365,6 @@ mpva:
 	/* Ensure sscratch is zero */
 	li	t0, 0
 	csrw	sscratch, t0
-
-	/* Set the global pointer */
-.option push
-.option norelax
-	la	gp, __global_pointer$
-.option pop
 
 	call	init_secondary
 END(mpentry)

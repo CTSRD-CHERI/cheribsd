@@ -160,8 +160,9 @@ sysctl_mem_reserved(SYSCTL_HANDLER_ARGS)
 	return (0);
 }
 
-SYSCTL_PROC(_vfs_tmpfs, OID_AUTO, memory_reserved, CTLTYPE_LONG|CTLFLAG_RW,
-    &tmpfs_pages_reserved, 0, sysctl_mem_reserved, "L",
+SYSCTL_PROC(_vfs_tmpfs, OID_AUTO, memory_reserved,
+    CTLTYPE_LONG|CTLFLAG_MPSAFE|CTLFLAG_RW, &tmpfs_pages_reserved, 0,
+    sysctl_mem_reserved, "L",
     "Amount of available memory and swap below which tmpfs growth stops");
 
 static __inline int tmpfs_dirtree_cmp(struct tmpfs_dirent *a,
@@ -1479,8 +1480,12 @@ retry:
 				    VM_ALLOC_WAITFAIL);
 				if (m == NULL)
 					goto retry;
+				vm_object_pip_add(uobj, 1);
+				VM_OBJECT_WUNLOCK(uobj);
 				rv = vm_pager_get_pages(uobj, &m, 1, NULL,
 				    NULL);
+				VM_OBJECT_WLOCK(uobj);
+				vm_object_pip_wakeup(uobj);
 				if (rv == VM_PAGER_OK) {
 					/*
 					 * Since the page was not resident,

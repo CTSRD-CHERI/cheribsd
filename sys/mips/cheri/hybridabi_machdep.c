@@ -35,7 +35,6 @@
 #include <cheri/cheri.h>
 #include <cheri/cheric.h>
 
-#include <machine/cherireg.h>
 #include <machine/pcb.h>
 #include <machine/proc.h>
 #include <machine/vmparam.h>

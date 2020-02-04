@@ -467,6 +467,7 @@ syncache_timer(void *xsch)
 {
 	struct syncache_head *sch = (struct syncache_head *)xsch;
 	struct syncache *sc, *nsc;
+	struct epoch_tracker et;
 	int tick = ticks;
 	char *s;
 	bool paused;
@@ -526,7 +527,9 @@ syncache_timer(void *xsch)
 			free(s, M_TCPLOG);
 		}
 
+		NET_EPOCH_ENTER(et);
 		syncache_respond(sc, NULL, TH_SYN|TH_ACK);
+		NET_EPOCH_EXIT(et);
 		TCPSTAT_INC(tcps_sc_retransmitted);
 		syncache_timeout(sc, sch, 0);
 	}
@@ -841,33 +844,7 @@ syncache_socket(struct syncache *sc, struct socket *lso, struct mbuf *m)
 #endif
 	}
 
-	/*
-	 * Install in the reservation hash table for now, but don't yet
-	 * install a connection group since the full 4-tuple isn't yet
-	 * configured.
-	 */
 	inp->inp_lport = sc->sc_inc.inc_lport;
-	if ((error = in_pcbinshash_nopcbgroup(inp)) != 0) {
-		/*
-		 * Undo the assignments above if we failed to
-		 * put the PCB on the hash lists.
-		 */
-#ifdef INET6
-		if (sc->sc_inc.inc_flags & INC_ISIPV6)
-			inp->in6p_laddr = in6addr_any;
-		else
-#endif
-			inp->inp_laddr.s_addr = INADDR_ANY;
-		inp->inp_lport = 0;
-		if ((s = tcp_log_addrs(&sc->sc_inc, NULL, NULL, NULL))) {
-			log(LOG_DEBUG, "%s; %s: in_pcbinshash failed "
-			    "with error %i\n",
-			    s, __func__, error);
-			free(s, M_TCPLOG);
-		}
-		INP_HASH_WUNLOCK(&V_tcbinfo);
-		goto abort;
-	}
 #ifdef INET6
 	if (inp->inp_vflag & INP_IPV6PROTO) {
 		struct inpcb *oinp = sotoinpcb(lso);
@@ -900,7 +877,7 @@ syncache_socket(struct syncache *sc, struct socket *lso, struct mbuf *m)
 		if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
 			inp->in6p_laddr = sc->sc_inc.inc6_laddr;
 		if ((error = in6_pcbconnect_mbuf(inp, (struct sockaddr *)&sin6,
-		    thread0.td_ucred, m)) != 0) {
+		    thread0.td_ucred, m, false)) != 0) {
 			inp->in6p_laddr = laddr6;
 			if ((s = tcp_log_addrs(&sc->sc_inc, NULL, NULL, NULL))) {
 				log(LOG_DEBUG, "%s; %s: in6_pcbconnect failed "
@@ -940,7 +917,7 @@ syncache_socket(struct syncache *sc, struct socket *lso, struct mbuf *m)
 		if (inp->inp_laddr.s_addr == INADDR_ANY)
 			inp->inp_laddr = sc->sc_inc.inc_laddr;
 		if ((error = in_pcbconnect_mbuf(inp, (struct sockaddr *)&sin,
-		    thread0.td_ucred, m)) != 0) {
+		    thread0.td_ucred, m, false)) != 0) {
 			inp->inp_laddr = laddr;
 			if ((s = tcp_log_addrs(&sc->sc_inc, NULL, NULL, NULL))) {
 				log(LOG_DEBUG, "%s; %s: in_pcbconnect failed "
@@ -1777,6 +1754,9 @@ syncache_respond(struct syncache *sc, const struct mbuf *m0, int flags)
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
 #endif
+
+	NET_EPOCH_ASSERT();
+
 	hlen =
 #ifdef INET6
 	       (sc->sc_inc.inc_flags & INC_ISIPV6) ? sizeof(struct ip6_hdr) :

@@ -669,7 +669,8 @@ amd_read_ext_features(void)
 {
 	uint32_t version;
 
-	if (cpu_vendor_id != CPU_VENDOR_AMD)
+	if (cpu_vendor_id != CPU_VENDOR_AMD &&
+	    cpu_vendor_id != CPU_VENDOR_HYGON)
 		return (0);
 	version = lapic_read32(LAPIC_VERSION);
 	if ((version & APIC_VER_AMD_EXT_SPACE) != 0)
@@ -2076,7 +2077,7 @@ native_lapic_ipi_vectored(u_int vector, int dest)
 
 	/* Wait for an earlier IPI to finish. */
 	if (!lapic_ipi_wait(BEFORE_SPIN)) {
-		if (panicstr != NULL)
+		if (KERNEL_PANICKED())
 			return;
 		else
 			panic("APIC: Previous IPI is stuck");

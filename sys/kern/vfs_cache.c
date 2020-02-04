@@ -207,7 +207,6 @@ SYSCTL_ULONG(_vfs, OID_AUTO, ncnegfactor, CTLFLAG_RW, &ncnegfactor, 0,
     "Ratio of negative namecache entries");
 static u_long __exclusive_cache_line	numneg;	/* number of negative entries allocated */
 static u_long __exclusive_cache_line	numcache;/* number of cache entries allocated */
-static u_long __exclusive_cache_line	numcachehv;/* number of cache entries with vnodes held */
 u_int ncsizefactor = 2;
 SYSCTL_UINT(_vfs, OID_AUTO, ncsizefactor, CTLFLAG_RW, &ncsizefactor, 0,
     "Size factor for namecache");
@@ -354,7 +353,7 @@ static SYSCTL_NODE(_vfs, OID_AUTO, cache, CTLFLAG_RW, 0,
 	SYSCTL_COUNTER_U64(_vfs_cache, OID_AUTO, name, CTLFLAG_RD, &name, descr);
 STATNODE_ULONG(numneg, "Number of negative cache entries");
 STATNODE_ULONG(numcache, "Number of cache entries");
-STATNODE_ULONG(numcachehv, "Number of namecache entries with vnodes held");
+STATNODE_COUNTER(numcachehv, "Number of namecache entries with vnodes held");
 STATNODE_COUNTER(numcalls, "Number of cache lookups");
 STATNODE_COUNTER(dothits, "Number of '.' hits");
 STATNODE_COUNTER(dotdothits, "Number of '..' hits");
@@ -875,7 +874,7 @@ cache_zap_locked(struct namecache *ncp, bool neg_locked)
 		LIST_REMOVE(ncp, nc_src);
 		if (LIST_EMPTY(&ncp->nc_dvp->v_cache_src)) {
 			ncp->nc_flag |= NCF_DVDROP;
-			atomic_subtract_rel_long(&numcachehv, 1);
+			counter_u64_add(numcachehv, -1);
 		}
 	}
 	atomic_subtract_rel_long(&numcache, 1);
@@ -1704,7 +1703,6 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 	uint32_t hash;
 	int flag;
 	int len;
-	bool held_dvp;
 	u_long lnumcache;
 
 	CTR3(KTR_VFS, "cache_enter(%p, %p, %s)", dvp, vp, cnp->cn_nameptr);
@@ -1740,13 +1738,6 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 	cache_celockstate_init(&cel);
 	ndd = NULL;
 	ncp_ts = NULL;
-
-	held_dvp = false;
-	if (LIST_EMPTY(&dvp->v_cache_src) && flag != NCF_ISDOTDOT) {
-		vhold(dvp);
-		atomic_add_long(&numcachehv, 1);
-		held_dvp = true;
-	}
 
 	/*
 	 * Calculate the hash key and setup as much of the new
@@ -1837,21 +1828,8 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 
 	if (flag != NCF_ISDOTDOT) {
 		if (LIST_EMPTY(&dvp->v_cache_src)) {
-			if (!held_dvp) {
-				vhold(dvp);
-				atomic_add_long(&numcachehv, 1);
-			}
-		} else {
-			if (held_dvp) {
-				/*
-				 * This will not take the interlock as someone
-				 * else already holds the vnode on account of
-				 * the namecache and we hold locks preventing
-				 * this from changing.
-				 */
-				vdrop(dvp);
-				atomic_subtract_long(&numcachehv, 1);
-			}
+			vhold(dvp);
+			counter_u64_add(numcachehv, 1);
 		}
 		LIST_INSERT_HEAD(&dvp->v_cache_src, ncp, nc_src);
 	}
@@ -1886,10 +1864,6 @@ cache_enter_time(struct vnode *dvp, struct vnode *vp, struct componentname *cnp,
 out_unlock_free:
 	cache_enter_unlock(&cel);
 	cache_free(ncp);
-	if (held_dvp) {
-		vdrop(dvp);
-		atomic_subtract_long(&numcachehv, 1);
-	}
 	return;
 }
 
@@ -1959,6 +1933,7 @@ nchinit(void *dummy __unused)
 
 	mtx_init(&ncneg_shrink_lock, "ncnegs", NULL, MTX_DEF);
 
+	numcachehv = counter_u64_alloc(M_WAITOK);
 	numcalls = counter_u64_alloc(M_WAITOK);
 	dothits = counter_u64_alloc(M_WAITOK);
 	dotdothits = counter_u64_alloc(M_WAITOK);
@@ -1981,13 +1956,13 @@ nchinit(void *dummy __unused)
 SYSINIT(vfs, SI_SUB_VFS, SI_ORDER_SECOND, nchinit, NULL);
 
 void
-cache_changesize(int newmaxvnodes)
+cache_changesize(u_long newmaxvnodes)
 {
 	struct nchashhead *new_nchashtbl, *old_nchashtbl;
 	u_long new_nchash, old_nchash;
 	struct namecache *ncp;
 	uint32_t hash;
-	int newncsize;
+	u_long newncsize;
 	int i;
 
 	newncsize = newmaxvnodes * ncsizefactor;

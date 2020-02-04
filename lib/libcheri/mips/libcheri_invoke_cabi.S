@@ -32,7 +32,7 @@
 #define _MIPS_REGDEF_H
 #include <machine/asm.h>
 
-#include <machine/cherireg.h>
+#include <cheri/cherireg.h>
 #define _CHERI_INTERNAL
 #include <machine/cheriasm.h>
 

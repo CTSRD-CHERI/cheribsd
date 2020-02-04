@@ -1447,6 +1447,23 @@ sync_doupdate(struct inode *ip)
 	    IN_UPDATE)) != 0);
 }
 
+static int
+ffs_sync_lazy_filter(struct vnode *vp, void *arg __unused)
+{
+	struct inode *ip;
+
+	/*
+	 * Flags are safe to access because ->v_data invalidation
+	 * is held off by listmtx.
+	 */
+	if (vp->v_type == VNON)
+		return (false);
+	ip = VTOI(vp);
+	if (!sync_doupdate(ip) && (vp->v_iflag & VI_OWEINACT) == 0)
+		return (false);
+	return (true);
+}
+
 /*
  * For a lazy sync, we only care about access times, quotas and the
  * superblock.  Other filesystem changes are already converted to
@@ -1464,9 +1481,13 @@ ffs_sync_lazy(mp)
 
 	allerror = 0;
 	td = curthread;
-	if ((mp->mnt_flag & MNT_NOATIME) != 0)
-		goto qupdate;
-	MNT_VNODE_FOREACH_ACTIVE(vp, mp, mvp) {
+	if ((mp->mnt_flag & MNT_NOATIME) != 0) {
+#ifdef QUOTA
+		qsync(mp);
+#endif
+		goto sbupdate;
+	}
+	MNT_VNODE_FOREACH_LAZY(vp, mp, mvp, ffs_sync_lazy_filter, NULL) {
 		if (vp->v_type == VNON) {
 			VI_UNLOCK(vp);
 			continue;
@@ -1487,18 +1508,16 @@ ffs_sync_lazy(mp)
 		if ((error = vget(vp, LK_EXCLUSIVE | LK_NOWAIT | LK_INTERLOCK,
 		    td)) != 0)
 			continue;
+#ifdef QUOTA
+		qsyncvp(vp);
+#endif
 		if (sync_doupdate(ip))
 			error = ffs_update(vp, 0);
 		if (error != 0)
 			allerror = error;
 		vput(vp);
 	}
-
-qupdate:
-#ifdef QUOTA
-	qsync(mp);
-#endif
-
+sbupdate:
 	if (VFSTOUFS(mp)->um_fs->fs_fmod != 0 &&
 	    (error = ffs_sbupdate(VFSTOUFS(mp), MNT_LAZY, 0)) != 0)
 		allerror = error;
@@ -1591,6 +1610,9 @@ loop:
 			}
 			continue;
 		}
+#ifdef QUOTA
+		qsyncvp(vp);
+#endif
 		if ((error = ffs_syncvnode(vp, waitfor, 0)) != 0)
 			allerror = error;
 		vput(vp);
@@ -1605,9 +1627,6 @@ loop:
 		if (allerror == 0 && count)
 			goto loop;
 	}
-#ifdef QUOTA
-	qsync(mp);
-#endif
 
 	devvp = ump->um_devvp;
 	bo = &devvp->v_bufobj;
@@ -1769,6 +1788,7 @@ ffs_vgetf(mp, ino, flags, vpp, ffs_flags)
 		 * still zero, it will be unlinked and returned to the free
 		 * list by vput().
 		 */
+		vgone(vp);
 		vput(vp);
 		*vpp = NULL;
 		return (error);
@@ -1779,6 +1799,7 @@ ffs_vgetf(mp, ino, flags, vpp, ffs_flags)
 		ip->i_din2 = uma_zalloc(uma_ufs2, M_WAITOK);
 	if ((error = ffs_load_inode(bp, ip, fs, ino)) != 0) {
 		bqrelse(bp);
+		vgone(vp);
 		vput(vp);
 		*vpp = NULL;
 		return (error);
@@ -1796,6 +1817,7 @@ ffs_vgetf(mp, ino, flags, vpp, ffs_flags)
 	error = ufs_vinit(mp, I_IS_UFS1(ip) ? &ffs_fifoops1 : &ffs_fifoops2,
 	    &vp);
 	if (error) {
+		vgone(vp);
 		vput(vp);
 		*vpp = NULL;
 		return (error);
@@ -1817,7 +1839,7 @@ ffs_vgetf(mp, ino, flags, vpp, ffs_flags)
 		while (ip->i_gen == 0)
 			ip->i_gen = arc4random();
 		if ((vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
-			ip->i_flag |= IN_MODIFIED;
+			UFS_INODE_SET_FLAG(ip, IN_MODIFIED);
 			DIP_SET(ip, i_gen, ip->i_gen);
 		}
 	}
@@ -1831,6 +1853,7 @@ ffs_vgetf(mp, ino, flags, vpp, ffs_flags)
 		error = mac_vnode_associate_extattr(mp, vp);
 		if (error) {
 			/* ufs_inactive will release ip->i_devvp ref. */
+			vgone(vp);
 			vput(vp);
 			*vpp = NULL;
 			return (error);

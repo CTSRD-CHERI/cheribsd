@@ -44,67 +44,50 @@
 #include <machine/pcb.h>
 #include <machine/sysarch.h>
 
-static const char *cheri_exccode_isa_array[] = {
-	"none",					/* CHERI_EXCCODE_NONE */
-	"length violation",			/* CHERI_EXCCODE_LENGTH */
-	"tag violation",			/* CHERI_EXCCODE_TAG */
-	"seal violation",			/* CHERI_EXCCODE_SEAL */
-	"type violation",			/* CHERI_EXCCODE_TYPE */
-	"call trap",				/* CHERI_EXCCODE_CALL */
-	"return trap",				/* CHERI_EXCCODE_RETURN */
-	"underflow of trusted system stack",	/* CHERI_EXCCODE_UNDERFLOW */
-	"user-defined permission violation",	/* CHERI_EXCCODE_PERM_USER */
-	"TLB prohibits store capability",	/* CHERI_EXCCODE_TLBSTORE */
-    "bounds cannot be represented precisely", /* 0xa: CHERI_EXCCODE_IMPRECISE */
-	"reserved",				/* 0xb: TBD */
-	"reserved",				/* 0xc: TBD */
-	"reserved",				/* 0xd: TBD */
-	"reserved",				/* 0xe: TBD */
-	"reserved",				/* 0xf: TBD */
-	"global violation",			/* CHERI_EXCCODE_GLOBAL */
-	"permit execute violation",		/* CHERI_EXCCODE_PERM_EXECUTE */
-	"permit load violation",		/* CHERI_EXCCODE_PERM_LOAD */
-	"permit store violation",		/* CHERI_EXCCODE_PERM_STORE */
-	"permit load capability violation",	/* CHERI_EXCCODE_PERM_LOADCAP */
-	"permit store capability violation",   /* CHERI_EXCCODE_PERM_STORECAP */
-     "permit store local capability violation", /* CHERI_EXCCODE_STORE_LOCAL */
-	"permit seal violation",		/* CHERI_EXCCODE_PERM_SEAL */
-	"access system registers violation",	/* CHERI_EXCCODE_SYSTEM_REGS */
-	"permit ccall violation",		/* CHERI_EXCCODE_PERM_CCALL */
-	"access ccall IDC violation",		/* CHERI_EXCCODE_CCALL_IDC */
-	"permit unseal violation",		/* CHERI_EXCODE_PERM_UNSEAL */
-	"reserved",				/* 0x1c */
-	"reserved",				/* 0x1d */
-	"reserved",				/* 0x1e */ 
-	"reserved",				/* 0x1f */
+static const char *cheri_exccode_descr[] = {
+	[CHERI_EXCCODE_NONE] = "none",
+	[CHERI_EXCCODE_LENGTH] = "length violation",
+	[CHERI_EXCCODE_TAG] = "tag violation",
+	[CHERI_EXCCODE_SEAL] = "seal violation",
+	[CHERI_EXCCODE_TYPE] = "type violation",
+	[CHERI_EXCCODE_CALL] = "call trap",
+	[CHERI_EXCCODE_RETURN] = "return trap",
+	[CHERI_EXCCODE_UNDERFLOW] = "underflow of trusted system stack",
+	[CHERI_EXCCODE_PERM_USER] = "user-defined permission violation",
+	[CHERI_EXCCODE_TLBSTORE] = "TLB prohibits store capability",
+	[CHERI_EXCCODE_IMPRECISE] = "bounds cannot be represented precisely",
+	[CHERI_EXCCODE_GLOBAL] = "global violation",
+	[CHERI_EXCCODE_PERM_EXECUTE] = "permit execute violation",
+	[CHERI_EXCCODE_PERM_LOAD] = "permit load violation",
+	[CHERI_EXCCODE_PERM_STORE] = "permit store violation",
+	[CHERI_EXCCODE_PERM_LOADCAP] = "permit load capability violation",
+	[CHERI_EXCCODE_PERM_STORECAP] = "permit store capability violation",
+	[CHERI_EXCCODE_STORE_LOCALCAP] = "permit store local capability violation",
+	[CHERI_EXCCODE_PERM_SEAL] = "permit seal violation",
+	[CHERI_EXCCODE_SYSTEM_REGS] = "access system registers violation",
+	[CHERI_EXCCODE_PERM_CCALL] = "permit ccall violation",
+	[CHERI_EXCCODE_CCALL_IDC] = "access ccall IDC violation",
+	[CHERI_EXCCODE_PERM_UNSEAL] = "permit unseal violation",
+	[CHERI_EXCCODE_PERM_SET_CID] = "permit CSetCID violation",
+	[CHERI_EXCCODE_SW_LOCALARG] = "local capability in argument",
+	[CHERI_EXCCODE_SW_LOCALRET] = "local capability in return value",
+	[CHERI_EXCCODE_SW_CCALLREGS] = "incorrect CCall registers",
+	[CHERI_EXCCODE_SW_OVERFLOW] = "trusted stack overflow",
+	[CHERI_EXCCODE_SW_UNDERFLOW] = "trusted stack underflow",
 };
-static const int cheri_exccode_isa_array_length =
-    sizeof(cheri_exccode_isa_array) / sizeof(cheri_exccode_isa_array[0]);
-
-static const char *cheri_exccode_sw_array[] = {
-	"local capability in argument",		/* CHERI_EXCCODE_SW_LOCALARG */
-	"local capability in return value",	/* CHERI_EXCCODE_SW_LOCALRET */
-	"incorrect CCall registers",		/* CHERI_EXCCODE_SW_CCALLREGS */
-	"trusted stack overflow",		/* CHERI_EXCCODE_SW_OVERFLOW */
-	"trusted stack underflow",		/* CHERI_EXCCODE_SW_UNDERFLOW */
-};
-static const int cheri_exccode_sw_array_length =
-    sizeof(cheri_exccode_sw_array) / sizeof(cheri_exccode_sw_array[0]);
 
 const char *
 cheri_exccode_string(uint8_t exccode)
 {
 
-	if (exccode >= CHERI_EXCCODE_SW_BASE) {
-		exccode -= CHERI_EXCCODE_SW_BASE;
-		if (exccode >= cheri_exccode_sw_array_length)
+	if (exccode >= nitems(cheri_exccode_descr) ||
+	    cheri_exccode_descr[exccode] == NULL) {
+		if (exccode >= CHERI_EXCCODE_SW_BASE)
 			return ("unknown software exception");
-		return (cheri_exccode_sw_array[exccode]);
-	} else {
-		if (exccode >= cheri_exccode_isa_array_length)
+		else
 			return ("unknown ISA exception");
-		return (cheri_exccode_isa_array[exccode]);
 	}
+	return (cheri_exccode_descr[exccode]);
 }
 
 static inline void
@@ -406,6 +389,7 @@ cheri_capcause_to_sicode(register_t capcause)
 	case CHERI_EXCCODE_PERM_SEAL:
 	case CHERI_EXCCODE_PERM_UNSEAL:
 	case CHERI_EXCCODE_USER_PERM:
+	case CHERI_EXCCODE_PERM_SET_CID:
 		return (PROT_CHERI_PERM);
 
 	case CHERI_EXCCODE_TLBSTORE:

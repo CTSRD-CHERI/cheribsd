@@ -479,7 +479,7 @@ ktrsyscall(int code, int narg, syscallarg_t args[])
 	buflen = sizeof(register_t) * narg;
 	if (buflen > 0) {
 		buf = malloc(buflen, M_KTRACE, M_WAITOK);
-#ifdef CPU_CHERI
+#if __has_feature(capabilities)
 		for (int i = 0; i < narg; i++)
 			buf[i] = (register_t)args[i];
 #else

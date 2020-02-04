@@ -231,7 +231,7 @@ freebsd64_kevent_copyout(void *arg, struct kevent *kevp, int count)
 		ks64[i].flags = kevp[i].flags;
 		ks64[i].fflags = kevp[i].fflags;
 		ks64[i].data = kevp[i].data;
-		ks64[i].udata = (__cheri_addr vaddr_t)kevp[i].udata;
+		ks64[i].udata = (__cheri_addr uint64_t)kevp[i].udata;
 		memcpy(&ks64[i].ext[0], &kevp->ext[0], sizeof(kevp->ext));
 	}
 	error = copyout(ks64, uap->eventlist, count * sizeof(*ks64));
@@ -405,8 +405,7 @@ freebsd64_copyinuio(struct iovec64 * __capability iovp, u_int iovcnt,
 			free(uio, M_IOV);
 			return (error);
 		}
-		IOVEC_INIT(&iov[i],
-		    PURECAP_KERNEL_USER_CAP(iov64.iov_base, iov64.iov_len),
+		IOVEC_INIT_C(&iov[i], __USER_CAP(iov64.iov_base, iov64.iov_len),
 		    iov64.iov_len);
 	}
 	uio->uio_iov = iov;
@@ -445,8 +444,8 @@ freebsd64_copyiniov(struct iovec64 * __capability iov64, u_int iovcnt,
 			free(iovs, M_IOV);
 			return (error);
 		}
-		IOVEC_INIT(iovs + i,
-		    PURECAP_KERNEL_USER_CAP(useriov.iov_base, useriov.iov_len),
+		IOVEC_INIT_C(iovs + i,
+		    __USER_CAP(useriov.iov_base, useriov.iov_len),
 		    useriov.iov_len);
 	}
 	*iovp = iovs;
@@ -1101,7 +1100,7 @@ freebsd64_kldstat(struct thread *td, struct freebsd64_kldstat_args *uap)
         bcopy(&stat.name[0], &stat64.name[0], sizeof(stat.name));
         CP(stat, stat64, refs);
         CP(stat, stat64, id);
-	stat64.address = (__cheri_addr uint64_t)stat.address;
+	stat64.address = (uint64_t)stat.address;
         CP(stat, stat64, size);
         bcopy(&stat.pathname[0], &stat64.pathname[0], sizeof(stat.pathname));
         return (copyout(&stat64, PURECAP_KERNEL_USER_CAP_OBJ(uap->stat),
@@ -1507,20 +1506,19 @@ freebsd64_thr_new_initthr(struct thread *td, void *thunk)
 {
 	stack_t stack;
 	struct thr_param64 *param = thunk;
-	long *child_tid = PURECAP_KERNEL_USER_CAP(param->child_tid,
+	long * __capability child_tid = __USER_CAP(param->child_tid,
 	    sizeof(long));
-	long *parent_tid = PURECAP_KERNEL_USER_CAP(param->parent_tid,
+	long * __capability parent_tid = __USER_CAP(param->parent_tid,
 	    sizeof(long));
 
-	if ((child_tid != NULL && suword(child_tid, td->td_tid)) ||
-	    (parent_tid != NULL && suword(parent_tid, td->td_tid)))
+	if ((child_tid != NULL && suword_c(child_tid, td->td_tid)) ||
+	    (parent_tid != NULL && suword_c(parent_tid, td->td_tid)))
 		return (EFAULT);
 	stack.ss_sp = __USER_CAP_UNBOUND(param->stack_base);
 	stack.ss_size = param->stack_size;
-	cpu_set_upcall(td, PURECAP_KERNEL_USER_CODE_CAP(param->start_func),
-	    PURECAP_KERNEL_USER_CAP_UNBOUND(param->arg), &stack);
-	return (cpu_set_user_tls(td,
-	    PURECAP_KERNEL_USER_CAP_UNBOUND(param->tls_base)));
+	cpu_set_upcall(td, (void (*)(void *))param->start_func,
+	    (void *)param->arg, &stack);
+	return (cpu_set_user_tls(td, __USER_CAP_UNBOUND(param->tls_base)));
 }
 
 int
@@ -1538,9 +1536,9 @@ freebsd64_thr_new(struct thread *td, struct freebsd64_thr_new_args *uap)
 	if (error != 0)
 		return (error);
 
-	if ((void *)(uintptr_t)param64.rtp != NULL) {
-		error = copyin(PURECAP_KERNEL_USER_CAP(param64.rtp,
-		    sizeof(struct rtprio)), &rtp, sizeof(struct rtprio));
+	if (param64.rtp != 0) {
+		error = copyin_c(__USER_CAP(param64.rtp, sizeof(struct rtprio)),
+		    &rtp, sizeof(struct rtprio));
 		if (error)
 			return (error);
 		rtpp = &rtp;

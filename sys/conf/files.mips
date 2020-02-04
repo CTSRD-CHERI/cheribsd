@@ -5,6 +5,16 @@
 #
 
 # Arch dependent files
+mips/cheri/cheri.c			optional cpu_cheri compile-with ${NOCOV_C}
+mips/cheri/cheri_debug.c		optional cpu_cheri
+mips/cheri/cheri_exception.c		optional cpu_cheri
+mips/cheri/cheri_ktrace.c		optional cpu_cheri ktrace
+mips/cheri/cheri_memcpy_c.S		optional cpu_cheri
+mips/cheri/cheri_sealcap.c		optional cpu_cheri
+mips/cheri/cheri_signal.c		optional cpu_cheri
+mips/cheri/cheriabi_machdep.c		optional cpu_cheri compat_cheriabi
+mips/cheri/copystr_c.S			optional cpu_cheri
+mips/cheri/hybridabi_machdep.c		optional cpu_cheri
 mips/mips/autoconf.c			standard
 mips/mips/bus_space_generic.c		standard
 mips/mips/busdma_machdep.c		standard
@@ -39,7 +49,6 @@ mips/mips/stack_machdep.c		optional	!cheri_purecap_kernel (ddb | stack)
 mips/mips/stdatomic.c			standard \
 	compile-with "${NORMAL_C:N-Wmissing-prototypes}"
 mips/mips/support.S			optional	!cheri_purecap_kernel
-mips/mips/bcopy.S			optional	!cheri_purecap_kernel
 mips/mips/swtch.S			optional	!cheri_purecap_kernel
 mips/mips/sys_machdep.c			standard
 mips/mips/tlb.c				standard
@@ -75,6 +84,7 @@ libkern/ucmpdi2.c			optional	mips | mipshf | mipsel | mipselhf
 libkern/ashldi3.c			standard
 libkern/ashrdi3.c			standard
 libkern/memcmp.c			standard
+libkern/bcopy.c				standard
 
 # cfe support
 dev/cfe/cfe_api.c			optional	cfe

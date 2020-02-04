@@ -223,6 +223,7 @@ static struct {
 } cpu_vendors[] = {
 	{ INTEL_VENDOR_ID,	CPU_VENDOR_INTEL },	/* GenuineIntel */
 	{ AMD_VENDOR_ID,	CPU_VENDOR_AMD },	/* AuthenticAMD */
+	{ HYGON_VENDOR_ID,	CPU_VENDOR_HYGON },	/* HygonGenuine*/
 	{ CENTAUR_VENDOR_ID,	CPU_VENDOR_CENTAUR },	/* CentaurHauls */
 #ifdef __i386__
 	{ NSC_VENDOR_ID,	CPU_VENDOR_NSC },	/* Geode by NSC */
@@ -682,6 +683,18 @@ printcpuinfo(void)
 		}
 		break;
 #endif
+	case CPU_VENDOR_HYGON:
+		strcpy(cpu_model, "Hygon ");
+#ifdef __i386__
+		strcat(cpu_model, "Unknown");
+#else
+		if ((cpu_id & 0xf00) == 0xf00)
+			strcat(cpu_model, "AMD64 Processor");
+		else
+			strcat(cpu_model, "Unknown");
+#endif
+		break;
+
 	default:
 		strcat(cpu_model, "Unknown");
 		break;
@@ -741,6 +754,7 @@ printcpuinfo(void)
 
 	if (cpu_vendor_id == CPU_VENDOR_INTEL ||
 	    cpu_vendor_id == CPU_VENDOR_AMD ||
+	    cpu_vendor_id == CPU_VENDOR_HYGON ||
 	    cpu_vendor_id == CPU_VENDOR_CENTAUR ||
 #ifdef __i386__
 	    cpu_vendor_id == CPU_VENDOR_TRANSMETA ||
@@ -919,7 +933,7 @@ printcpuinfo(void)
 				"\034PTSC"	/* Performance TSC */
 				"\035PL2I"	/* L2I perf count */
 				"\036MWAITX"	/* MONITORX/MWAITX instructions */
-				"\037<b30>"
+				"\037ADMSKX"	/* Address mask extension */
 				"\040<b31>"
 				);
 			}
@@ -1010,10 +1024,12 @@ printcpuinfo(void)
 				       "\020"
 				       "\003AVX512_4VNNIW"
 				       "\004AVX512_4FMAPS"
+				       "\005FSRM"
 				       "\011AVX512VP2INTERSECT"
 				       "\013MD_CLEAR"
 				       "\016TSXFA"
 				       "\023PCONFIG"
+				       "\025IBT"
 				       "\033IBPB"
 				       "\034STIBP"
 				       "\035L1DFL"
@@ -1095,7 +1111,8 @@ printcpuinfo(void)
 				print_svm_info();
 
 			if ((cpu_feature & CPUID_HTT) &&
-			    cpu_vendor_id == CPU_VENDOR_AMD)
+			    (cpu_vendor_id == CPU_VENDOR_AMD ||
+			     cpu_vendor_id == CPU_VENDOR_HYGON))
 				cpu_feature &= ~CPUID_HTT;
 
 			/*
@@ -1125,7 +1142,8 @@ printcpuinfo(void)
 		printf("\n");
 
 	if (bootverbose) {
-		if (cpu_vendor_id == CPU_VENDOR_AMD)
+		if (cpu_vendor_id == CPU_VENDOR_AMD ||
+		    cpu_vendor_id == CPU_VENDOR_HYGON)
 			print_AMD_info();
 		else if (cpu_vendor_id == CPU_VENDOR_INTEL)
 			print_INTEL_info();
@@ -1631,6 +1649,7 @@ finishidentcpu(void)
 	if (cpu_high > 0 &&
 	    (cpu_vendor_id == CPU_VENDOR_INTEL ||
 	     cpu_vendor_id == CPU_VENDOR_AMD ||
+	     cpu_vendor_id == CPU_VENDOR_HYGON ||
 	     cpu_vendor_id == CPU_VENDOR_TRANSMETA ||
 	     cpu_vendor_id == CPU_VENDOR_CENTAUR ||
 	     cpu_vendor_id == CPU_VENDOR_NSC)) {
@@ -1641,6 +1660,7 @@ finishidentcpu(void)
 #else
 	if (cpu_vendor_id == CPU_VENDOR_INTEL ||
 	    cpu_vendor_id == CPU_VENDOR_AMD ||
+	    cpu_vendor_id == CPU_VENDOR_HYGON ||
 	    cpu_vendor_id == CPU_VENDOR_CENTAUR) {
 		do_cpuid(0x80000000, regs);
 		cpu_exthigh = regs[0];
@@ -1760,7 +1780,8 @@ int
 pti_get_default(void)
 {
 
-	if (strcmp(cpu_vendor, AMD_VENDOR_ID) == 0)
+	if (strcmp(cpu_vendor, AMD_VENDOR_ID) == 0 ||
+	    strcmp(cpu_vendor, HYGON_VENDOR_ID) == 0)
 		return (0);
 	if ((cpu_ia32_arch_caps & IA32_ARCH_CAP_RDCL_NO) != 0)
 		return (0);

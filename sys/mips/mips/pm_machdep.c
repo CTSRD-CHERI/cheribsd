@@ -699,10 +699,10 @@ cheri_mmap_capability(struct thread *td, struct image_params *imgp)
 	 * Use cheri_capability_build_user_rwx so mmap() can return
 	 * appropriate permissions derived from a single capability.
 	 */
-	td->td_md.md_cheri_mmap_cap = cheri_capability_build_user_rwx(
+	td->td_cheri_mmap_cap = cheri_capability_build_user_rwx(
 	    CHERI_CAP_USER_MMAP_PERMS, map_base, map_length,
 	    CHERI_CAP_USER_MMAP_OFFSET);
-	KASSERT(cheri_getperm(td->td_md.md_cheri_mmap_cap) &
+	KASSERT(cheri_getperm(td->td_cheri_mmap_cap) &
 	    CHERI_PERM_CHERIABI_VMMAP,
 	    ("%s: mmap() cap lacks CHERI_PERM_CHERIABI_VMMAP", __func__));
 }
@@ -820,7 +820,7 @@ exec_setregs(struct thread *td, struct image_params *imgp, uintcap_t stack)
 		 */
 		if (imgp->reloc_base) {
 			vaddr_t rtld_base = imgp->reloc_base;
-			vaddr_t rtld_end = imgp->interp_end;
+			vaddr_t rtld_end = imgp->interp_end ? imgp->interp_end : imgp->end_addr;
 			vaddr_t rtld_len = rtld_end - rtld_base;
 			rtld_base = CHERI_REPRESENTABLE_BASE(rtld_base,
 			    rtld_len);

@@ -1588,31 +1588,13 @@ exec_args_get_begin_envv(struct image_args *args)
 	return (args->endp);
 }
 
-#if __has_feature(capabilities)
-/*
- * XXX: We may want a wrapper of cheri_csetbounds() that warns about
- * capabilities that are overly broad.
- */
-
-static int
-sucap(void * __capability uaddr, void * __capability cap)
-{
-
-	return (copyoutcap(&cap, uaddr, sizeof(cap)) == 0 ? 0 : -1);
-}
-#else
-static int
-sucap(void *uaddr, void *ptr)
-{
-
-	return (suword(uaddr, (long)(intptr_t)ptr));
-}
-#endif
-
 /*
  * Copy strings out to the new process address space, constructing new arg
  * and env vector tables. Return a pointer to the base so that it can be used
  * as the initial stack pointer.
+ *
+ * XXX: We may want a wrapper of cheri_csetbounds() that warns about
+ * capabilities that are overly broad.
  */
 int
 exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
@@ -1792,7 +1774,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->argv = vectp;
 #endif
-	if (sucap(&arginfo->ps_argvstr, imgp->argv) != 0)
+	if (sucap(&arginfo->ps_argvstr, (intcap_t)imgp->argv) != 0)
 		return (EFAULT);
 	if (suword32_c(&arginfo->ps_nargvstr, argc) != 0)
 		return (EFAULT);
@@ -1803,7 +1785,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; argc > 0; --argc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, cheri_csetbounds(ustringp, len)) != 0)
+		if (sucap(vectp++, (intcap_t)cheri_csetbounds(ustringp,
+		    len)) != 0)
 			return (EFAULT);
 #else
 		if (suword(vectp++, (uintptr_t)ustringp) != 0)
@@ -1822,7 +1805,7 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 #else
 	imgp->envv = vectp;
 #endif
-	if (sucap(&arginfo->ps_envstr, imgp->envv) != 0)
+	if (sucap(&arginfo->ps_envstr, (intcap_t)imgp->envv) != 0)
 		return (EFAULT);
 	if (suword32_c(&arginfo->ps_nenvstr, envc) != 0)
 		return (EFAULT);
@@ -1833,7 +1816,8 @@ exec_copyout_strings(struct image_params *imgp, uintcap_t *stack_base)
 	for (; envc > 0; --envc) {
 		len = strlen(stringp) + 1;
 #if __has_feature(capabilities)
-		if (sucap(vectp++, cheri_csetbounds(ustringp, len)) != 0)
+		if (sucap(vectp++, (intcap_t)cheri_csetbounds(ustringp,
+		    len)) != 0)
 			return (EFAULT);
 #else
 		if (suword(vectp++, (uintptr_t)ustringp) != 0)

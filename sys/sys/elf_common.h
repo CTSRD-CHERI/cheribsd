@@ -175,6 +175,7 @@ typedef struct {
 #define	ELFOSABI_AROS		15	/* Amiga Research OS */
 #define	ELFOSABI_FENIXOS	16	/* FenixOS */
 #define	ELFOSABI_CLOUDABI	17	/* Nuxi CloudABI */
+#define	ELFOSABI_OPENVOS	18	/* Stratus Technologies OpenVOS */
 #define	ELFOSABI_ARM_AEABI	64	/* ARM EABI */
 #define	ELFOSABI_ARM		97	/* ARM */
 #define	ELFOSABI_STANDALONE	255	/* Standalone (embedded) application */
@@ -381,6 +382,8 @@ typedef struct {
 #define	EF_RISCV_FLOAT_ABI_QUAD	0x00000006
 #define	EF_RISCV_RVE		0x00000008
 #define	EF_RISCV_TSO		0x00000010
+#define	EF_RISCV_CHERIABI	0x00010000
+#define	EF_RISCV_CAPMODE	0x00020000
 
 #define	EF_SPARC_EXT_MASK	0x00ffff00
 #define	EF_SPARC_32PLUS		0x00000100
@@ -546,6 +549,10 @@ typedef struct {
 #define	PT_LOPROC	0x70000000	/* First processor-specific type. */
 #define	PT_ARM_ARCHEXT	0x70000000	/* ARM arch compat information. */
 #define	PT_ARM_EXIDX	0x70000001	/* ARM exception unwind tables. */
+#define	PT_MIPS_REGINFO		0x70000000	/* MIPS register usage info */
+#define	PT_MIPS_RTPROC		0x70000001	/* MIPS runtime procedure tbl */
+#define	PT_MIPS_OPTIONS		0x70000002	/* MIPS e_flags value*/
+#define	PT_MIPS_ABIFLAGS	0x70000003	/* MIPS fp mode */
 #define	PT_HIPROC	0x7fffffff	/* Last processor-specific type. */
 
 #define	PT_OPENBSD_RANDOMIZE	0x65A3DBE6	/* OpenBSD random data segment */

@@ -219,10 +219,8 @@ struct mount {
 #define	mnt_endzero	mnt_gjprovider
 	char		*mnt_gjprovider;	/* gjournal provider name */
 	struct mtx	mnt_listmtx;
-	struct vnodelst	mnt_activevnodelist;	/* (l) list of active vnodes */
-	int		mnt_activevnodelistsize;/* (l) # of active vnodes */
-	struct vnodelst	mnt_tmpfreevnodelist;	/* (l) list of free vnodes */
-	int		mnt_tmpfreevnodelistsize;/* (l) # of free vnodes */
+	struct vnodelst	mnt_lazyvnodelist;	/* (l) list of lazy vnodes */
+	int		mnt_lazyvnodelistsize;	/* (l) # of lazy vnodes */
 	struct lock	mnt_explock;		/* vfs_export walkers lock */
 	TAILQ_ENTRY(mount) mnt_upper_link;	/* (m) we in the all uppers */
 	TAILQ_HEAD(, mount) mnt_uppers;		/* (m) upper mounts over us*/
@@ -254,18 +252,22 @@ void          __mnt_vnode_markerfree_all(struct vnode **mvp, struct mount *mp);
 	} while (0)
 
 /*
- * Definitions for MNT_VNODE_FOREACH_ACTIVE.
+ * Definitions for MNT_VNODE_FOREACH_LAZY.
  */
-struct vnode *__mnt_vnode_next_active(struct vnode **mvp, struct mount *mp);
-struct vnode *__mnt_vnode_first_active(struct vnode **mvp, struct mount *mp);
-void          __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *);
+typedef int mnt_lazy_cb_t(struct vnode *, void *);
+struct vnode *__mnt_vnode_next_lazy(struct vnode **mvp, struct mount *mp,
+    mnt_lazy_cb_t *cb, void *cbarg);
+struct vnode *__mnt_vnode_first_lazy(struct vnode **mvp, struct mount *mp,
+    mnt_lazy_cb_t *cb, void *cbarg);
+void          __mnt_vnode_markerfree_lazy(struct vnode **mvp, struct mount *mp);
 
-#define MNT_VNODE_FOREACH_ACTIVE(vp, mp, mvp) 				\
-	for (vp = __mnt_vnode_first_active(&(mvp), (mp)); 		\
-		(vp) != NULL; vp = __mnt_vnode_next_active(&(mvp), (mp)))
+#define MNT_VNODE_FOREACH_LAZY(vp, mp, mvp, cb, cbarg)			\
+	for (vp = __mnt_vnode_first_lazy(&(mvp), (mp), (cb), (cbarg));	\
+		(vp) != NULL; 						\
+		vp = __mnt_vnode_next_lazy(&(mvp), (mp), (cb), (cbarg)))
 
-#define MNT_VNODE_FOREACH_ACTIVE_ABORT(mp, mvp)				\
-	__mnt_vnode_markerfree_active(&(mvp), (mp))
+#define MNT_VNODE_FOREACH_LAZY_ABORT(mp, mvp)				\
+	__mnt_vnode_markerfree_lazy(&(mvp), (mp))
 
 #define	MNT_ILOCK(mp)	mtx_lock(&(mp)->mnt_mtx)
 #define	MNT_ITRYLOCK(mp) mtx_trylock(&(mp)->mnt_mtx)
@@ -412,6 +414,7 @@ void          __mnt_vnode_markerfree_active(struct vnode **mvp, struct mount *);
 #define	MNTK_USES_BCACHE	0x00004000 /* FS uses the buffer cache. */
 #define	MNTK_TEXT_REFS		0x00008000 /* Keep use ref for text */
 #define	MNTK_VMSETSIZE_BUG	0x00010000
+#define	MNTK_UNIONFS	0x00020000	/* A hack for F_ISUNIONSTACK */
 #define MNTK_NOASYNC	0x00800000	/* disable async */
 #define MNTK_UNMOUNT	0x01000000	/* unmount in progress */
 #define	MNTK_MWAIT	0x02000000	/* waiting for unmount to finish */

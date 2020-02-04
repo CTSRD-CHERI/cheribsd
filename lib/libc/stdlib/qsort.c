@@ -169,6 +169,24 @@ qsort(void *a, size_t n, size_t es, cmp_t *cmp)
 	}
 #endif
 
+#ifdef I_AM_QSORT_S
+	if (n > RSIZE_MAX) {
+		__throw_constraint_handler_s("qsort_s : n > RSIZE_MAX", EINVAL);
+		return (EINVAL);
+	} else if (es > RSIZE_MAX) {
+		__throw_constraint_handler_s("qsort_s : es > RSIZE_MAX", EINVAL);
+		return (EINVAL);
+	} else if (n != 0) {
+		if (a == NULL) {
+			__throw_constraint_handler_s("qsort_s : a == NULL", EINVAL);
+			return (EINVAL);
+		} else if (cmp == NULL) {
+			__throw_constraint_handler_s("qsort_s : cmp == NULL", EINVAL);
+			return (EINVAL);
+		}
+	}
+#endif
+
 loop:
 	SWAPINIT(big_primitive_type, a, es);
 	SWAPINIT(int, a, es);

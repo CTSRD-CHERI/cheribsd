@@ -52,258 +52,8 @@
 	.text
 
 /*
- * Copy a string from one capabilty to another up to a maximum length.
- * Return the length by reference.
- *
- * copystr_c() accepts:
- * c3 - source pointer
- * c4 - destination pointer
- * c5 - pointer length copied (size_t)
- * a0 - maximum length
- */
-LEAF(copystr)
-XLEAF(copystr_c)
-	li		v0, 0	/* Hopefully we succeed */
-	beqz		a0, cstr_return_toolong /* Return if zero-length. */
-	li		t1, 1	/* Length we will have copied in loop */
-cstr_loop:
-	clbu		t0, t1, -1($c3)
-	beq		t0, zero, cstr_return_nul
-	csb		t0, t1, -1($c4)
-	bne		t1, a0, cstr_loop
-	daddiu		t1, t1, 1
-
-cstr_return_toolong:
-	li		v0, ENAMETOOLONG
-	daddiu		t1, t1, -1	/* Count is 1 too high */
-cstr_return_nul:	/* Store length read if c5 is non-NULL */
-	cbez		$c5, cstr_return
-	nop
-	csd		t1, zero, 0($c5)	/* Store bytes copied */
-cstr_return:
-	cjr	$c17
-	nop
-XEND(copystr_c)
-END(copystr)	
-
-/*
  * pure capability ABI-only versions of the support routines
  */
-
-#if 0 /* XXX-AM: We now use the memcpy version in cheri_memcpy.c */
-/*
- * Implement CHERI memcpy() and bcopy() variants in assembly; C works fine in
- * the kernel most of the time, but copyincap() and copyoutcap() require that
- * no callee-save registers be trampled over due to fault-based error
- * handling.
- *
- * This version handles both aligned and unaligned access.
- * This version also handles overlapping copies.
- * This version does not preserve memory tags.
- *
- *
- * bcopy() accepts:
- * c3 - source pointer
- * c4 - destination pointer
- * a0 - length
- *
- * memcpy() has inverted source/destination pointers.
- */
-LEAF(memcpynocap)
-XLEAF(memcpynocap_c)
-	cmove	$c1, $c3
-	cmove	$c3, $c4
-	cmove	$c4, $c1
-XLEAF(bcopynocap)
-XLEAF(bcopynocap_c)
-	beqz	a0, 5f	/* return immediately if zero-length */
-	cltu	t0, $c4, $c3	/* forward or backward copy? */
-	bnez	t0, 9f	/* forward */
-	/* backward copy */
-	cmove	$c2, $c4	/* end pointer in c2 */
-	cincoffset	$c3, $c3, a0
-	cincoffset	$c4, $c4, a0
-	b 8f	/* do_copy */
-	li	v0, -1	/* byte copy increment */
-9:	/* forward: */
-	li	v0, 1	/* byte copy increment */
-	cincoffset	$c2, $c4, a0	/* end pointer in c2 */
-8:	/* do_copy: */
-	cgetbase	t2, $c3
-	cgetoffset	t1, $c3
-	daddu	t2, t2, t1	/* src cursor in t2 */
-	cgetbase	t3, $c4
-	cgetoffset	t1, $c4
-	daddu	t3, t3, t1	/* dest cursor in t3 */
-	/* enough bytes to copy for an aligned copy? */
-	slti	t1, a0, CHERICAP_SIZE
-	bnez	t1, 3f /* check_word_align */
-	/* check dest alignment */
-	andi	t1, t3, (CHERICAP_SIZE - 1)
-	beqz	t1, 7f	/* cap_copy */
-3:	/* check_word_align: */
-	/* enough bytes to copy for an aligned copy? */
-	slti	t1, a0, SZREG
-	bnez	t1, 6f /* byte_copy */
-	andi	t1, t3, (SZREG - 1)
-	bnez	t1, 6f	/* byte_copy */
-	nop
-	/* fall through */
-
-	/* word_copy: */
-	andi	t1, t2, (SZREG - 1)	/* check src alignment */
-	bnez	t1, 6f	/* byte_copy */
-	li	v1, -SZREG	/* delay slot: backward loop increment */
-	bltz	v0, 1f	/* word_copy_back */
-	and	a0, a0, v1	/* delay slot: aligned copy length */
-	/* forward copy */
-	li	v1, SZREG	/* forward loop increment */
-	li	t3, 0	/* forward loop offset in t3 */
-	b	2f	/* word_loop */
-	cincoffset	$c13, $c4, a0
-1:	/* word_copy_back: */
-	/* backward copy */
-	dsub	a0, zero, a0	/* negate copy length becase c4 points at the end */
-	li	t3, -SZREG	/* backward loop offset in t3 */
-	cincoffset	$c13, $c4, a0
-2:	/* word_loop: */
-	cld	t0, t3, 0($c3)
-	csd	t0, t3, 0($c4)
-	cincoffset	$c4, $c4, v1
-	ceq	t0, $c13, $c4	/* did we reach the aligned end? */
-	beqz	t0, 2b	/* word_loop */
-	cincoffset	$c3, $c3, v1
-	b	6f	/* byte_copy */
-	nop
-
-7:	/* cap_copy: */
-	andi	t1, t2, (CHERICAP_SIZE - 1)	/* check src alignment */
-	bnez	t1, 6f	/* byte_copy */
-	li	v1, -CHERICAP_SIZE	/* delay slot: backward loop increment */
-	bltz	v0, 1f	/* cap_copy_back */
-	and	a0, a0, v1	/* delay slot: aligned copy length */
-	/* forward copy  */
-	li	v1, CHERICAP_SIZE	/* forward loop increment */
-	li	t3, 0	/* forward loop offset in t3 */
-	b	2f	/* cap_loop */
-	cincoffset	$c13, $c4, a0
-1:	/* cap_copy_back: */
-	/* backward copy  */
-	dsub	a0, zero, a0	/* negate copy length becase c4 points at the end */
-	li	t3, -CHERICAP_SIZE	/* backward loop offset in t3 */
-	cincoffset	$c13, $c4, a0
-2:	/* cap_loop: */
-	clc	$c14, zero, 0($c3)
-	ccleartag	$c14, $c14
-	csc	$c14, zero, 0($c4)
-	cincoffset	$c4, $c4, v1
-	ceq	t0, $c13, $c4	/* did we reach the aligned end? */
-	beqz	t0, 2b	/* cap_loop */
-	cincoffset	$c3, $c3, v1
-	/* fall through */
-
-6:	/* byte_copy: */
-	ceq	t0, $c2, $c4	/* did we reach the actual end? */
-	bnez	t0, 5f	/* return */
-	li	t3, 0	/* delay slot: forward loop offset */
-	bgtz	v0, 1f	/* if forward copy, skip to byte_loop */
-	nop
-	li	t3, -1	/* backward loop offset */
-1:	/* byte_loop: */
-	clb	t0, t3, 0($c3)
-	csb	t0, t3, 0($c4)
-	cincoffset	$c4, $c4, v0
-	ceq	t0, $c2, $c4	/* did we reach the end? */
-	beqz	t0, 1b	/* byte_loop */
-	cincoffset	$c3, $c3, v0
-
-5:	/* return: */
-	cjr	$c17
-	cmove	$c3, $c1	/* need to return original c3 for memcpy */
-END(memcpynocap)
-
-/*
- * See memcpy() bcopy()
- * This version preserves memory tags, however it requres
- * the input and output pointers to be capability-aligned.
- */
-LEAF(memcpy)
-XLEAF(memcpy_c)
-XLEAF(cheri_memcpy)
-	cmove	$c1, $c3
-	cmove	$c3, $c4
-	cmove	$c4, $c1
-XLEAF(bcopy)
-XLEAF(bcopy_c)
-XLEAF(cheri_bcopy)
-	//ori	zero, zero, 0xbeef
-	beqz	a0, 9f /* return immediately if zero-length. */
-	cltu	v0, $c4, $c3	/* v0 <- forward or backward copy? */
-	bnez	v0, 2f		/* forward */
-	li	v0, +1	/* delay slot: loop increment direction (forward copy) */
-
-	/* backward bcopy */
-	cincoffset	$c4, $c4, a0	/* dst to the end of buffer */
-	cincoffset 	$c3, $c3, a0	/* src to the end of buffer */
-	li	v0, -1	/* loop increment direction */
-	b	2f	/* bcopy main loop */
-	/* fall through to bcopy main loop */
-2:
-	cgetbase	t3, $c4	/* t3 <- base of dst, used to check alignment */
-	cgetbase	t2, $c3	/* t2 <- base of src, used to check alignment */
-	/* compute loop shift from direction */
-	daddiu	a1, v0, -1
-	sra	a1, a1, 1	/* a1 = (fwd) ? 0 : -1 bytecopy loop offset */
-3:	/* copy bytes until we are aligned to CHERICAP_SIZE or we are done */
-	beqz	a0, 9f	/* if we are done copying just return */
-	cgetoffset	t1, $c4
-	daddu	t1, t1, t3	/* current dst cursor */
-	andi	t1, t1, (CHERICAP_SIZE - 1)	/* t1 <- !aligned(dst) */
-	seq	t1, t1, zero
-	cgetoffset	t0, $c3
-	daddu	t0, t0, t2	/* current src cursor */
-	andi	t0, t0, (CHERICAP_SIZE - 1)	/* a0 <- !aligned(src) */
-	seq	t0, t0, zero
-	and	t1, t1, t0	/* t1 <- aligned(dst) and aligned(src) */
-	bnez	t1, 2f	/* done, next loop */
-	nop	/* XXX-AM probably we can remove this */
-	clb	t0, a1, 0($c3)
-	cincoffset	$c3, $c3, v0
-	csb	t0, a1, 0($c4)
-	cincoffset	$c4, $c4, v0
-	b	3b	/* loop */
-	daddiu	a0, a0, -1	/* consumed another byte */
-
-2:	/* copy aligned bytes until we are past end */
-	sll	v1, v0, CHERICAP_SHIFT	/* v1 <- loop increment +- CHERICAP_SIZE */
-	sll	t2, a1, CHERICAP_SHIFT	/* t2 <- loop offset 0/-CHERICAP_SIZE */
-	li	t0, (-CHERICAP_SIZE) /* find aligned length to copy */
-	and	t0, a0, t0
-	srl	t3, t0, CHERICAP_SHIFT	/* number of aligned loop iterations */
-	dsubu	a0, a0, t0	/* update a0 with remaining tail bytes */
-3:
-	beqz	t3, 2f	/* done, next loop */
-	daddiu	t3, t3, -1
-	clc	$c5, t2, 0($c3)
-	cincoffset	$c3, $c3, v1
-	csc	$c5, t2, 0($c4)
-	b	3b	/* loop */
-	cincoffset	$c4, $c4, v1
-
-2:	/* copy unaligned bytes until the end */
-	beqz	a0, 9f	/* done */
-	daddiu	a0, a0, -1
-	clb	t0, a1, 0($c3)
-	cincoffset	$c3, $c3, v0
-	csb	t0, a1, 0($c4)
-	b	2b	/* loop */
-	cincoffset	$c4, $c4, v0
-9:	/* done, just return */
-	cjr	$c17
-	cmove	$c3, $c1	/* need to return original c3 for memcpy */
-END(memcpy)
-
-#endif /* disable memcpy */
 
 /*
  * Copy a null terminated string from the user address space into
@@ -667,6 +417,24 @@ XEND(suword)
 XEND(suword64)	
 XEND(suword_c)
 END(suword64_c)
+
+LEAF(sucap)
+	CAPTABLE_LOAD($c2, fswberr)
+	cgetbase	t0, $c3
+	blt	t0, zero, 1f	# make sure address is in user space
+	nop
+	GET_CPU_PCPU($c1)
+	clc	$c1, zero, PC_CURPCB($c1)
+	csc	$c2, zero, U_PCB_ONFAULT($c1)	# store onfault function
+	csc	$c4, zero, 0($c3)	# store cap
+	CHERI_NULL($c2)
+	csc	$cnull, zero, U_PCB_ONFAULT($c1)
+	cjr	$c17
+	move	v0, zero
+1:
+	cjr	$c2	# fswberr
+	nop
+END(sucap)	
 
 LEAF(suword32)
 XLEAF(suword32_c)

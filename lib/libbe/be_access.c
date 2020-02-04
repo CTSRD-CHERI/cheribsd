@@ -4,7 +4,6 @@
  * Copyright (c) 2017 Kyle J. Kneitinger <kyle@kneit.in>
  * Copyright (c) 2018 Kyle Evans <kevans@FreeBSD.org>
  * Copyright (c) 2019 Wes Maag <wes@jwmaag.org>
- * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -82,7 +81,6 @@ be_mount_iter(zfs_handle_t *zfs_hdl, void *data)
 	char *mountpoint;
 	char tmp[BE_MAXPATHLEN], zfs_mnt[BE_MAXPATHLEN];
 	struct be_mount_info *info;
-	char opt;
 
 	info = (struct be_mount_info *)data;
 
@@ -121,9 +119,7 @@ be_mount_iter(zfs_handle_t *zfs_hdl, void *data)
 		    mountpoint);
 	}
 
-	opt = '\0';
-	if ((err = zmount(zfs_get_name(zfs_hdl), tmp, info->mntflags,
-	    __DECONST(char *, MNTTYPE_ZFS), NULL, 0, &opt, 1)) != 0) {
+	if ((err = zfs_mount_at(zfs_hdl, NULL, info->mntflags, tmp)) != 0) {
 		switch (errno) {
 		case ENAMETOOLONG:
 			return (set_error(info->lbh, BE_ERR_PATHLEN));

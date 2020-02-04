@@ -112,7 +112,6 @@ _Static_assert(sizeof(((struct ifreq *)0)->ifr_name) ==
 #endif
 
 __read_mostly epoch_t net_epoch_preempt;
-__read_mostly epoch_t net_epoch;
 #ifdef COMPAT_FREEBSD32
 #include <sys/mount.h>
 #include <compat/freebsd32/freebsd32.h>
@@ -702,7 +701,7 @@ if_free(struct ifnet *ifp)
 	IFNET_WUNLOCK();
 
 	if (refcount_release(&ifp->if_refcount))
-		epoch_call(net_epoch_preempt, &ifp->if_epoch_ctx, if_destroy);
+		NET_EPOCH_CALL(if_destroy, &ifp->if_epoch_ctx);
 	CURVNET_RESTORE();
 }
 
@@ -725,7 +724,7 @@ if_rele(struct ifnet *ifp)
 
 	if (!refcount_release(&ifp->if_refcount))
 		return;
-	epoch_call(net_epoch_preempt, &ifp->if_epoch_ctx, if_destroy);
+	NET_EPOCH_CALL(if_destroy, &ifp->if_epoch_ctx);
 }
 
 void
@@ -979,7 +978,6 @@ if_epochalloc(void *dummy __unused)
 {
 
 	net_epoch_preempt = epoch_alloc("Net preemptible", EPOCH_PREEMPT);
-	net_epoch = epoch_alloc("Net", 0);
 }
 SYSINIT(ifepochalloc, SI_SUB_EPOCH, SI_ORDER_ANY, if_epochalloc, NULL);
 
@@ -1895,7 +1893,7 @@ ifa_free(struct ifaddr *ifa)
 {
 
 	if (refcount_release(&ifa->ifa_refcnt))
-		epoch_call(net_epoch_preempt, &ifa->ifa_epoch_ctx, ifa_destroy);
+		NET_EPOCH_CALL(ifa_destroy, &ifa->ifa_epoch_ctx);
 }
 
 
@@ -1936,10 +1934,13 @@ ifa_maintain_loopback_route(int cmd, const char *otype, struct ifaddr *ifa,
 	if (rti_ifa != NULL)
 		ifa_free(rti_ifa);
 
-	if (error != 0 &&
-	    !(cmd == RTM_ADD && error == EEXIST) &&
-	    !(cmd == RTM_DELETE && error == ENOENT))
-		if_printf(ifp, "%s failed: %d\n", otype, error);
+	if (error == 0 ||
+	    (cmd == RTM_ADD && error == EEXIST) ||
+	    (cmd == RTM_DELETE && (error == ENOENT || error == ESRCH)))
+		return (error);
+
+	log(LOG_DEBUG, "%s: %s failed for interface %s: %u\n",
+		__func__, otype, if_name(ifp), error);
 
 	return (error);
 }
@@ -2033,7 +2034,7 @@ ifa_ifwithbroadaddr(const struct sockaddr *addr, int fibnum)
 	struct ifnet *ifp;
 	struct ifaddr *ifa;
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
 		if ((fibnum != RT_ALL_FIBS) && (ifp->if_fib != fibnum))
 			continue;
@@ -2063,7 +2064,7 @@ ifa_ifwithdstaddr(const struct sockaddr *addr, int fibnum)
 	struct ifnet *ifp;
 	struct ifaddr *ifa;
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	CK_STAILQ_FOREACH(ifp, &V_ifnet, if_link) {
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0)
 			continue;
@@ -2096,7 +2097,7 @@ ifa_ifwithnet(const struct sockaddr *addr, int ignore_ptp, int fibnum)
 	u_int af = addr->sa_family;
 	const char *addr_data = addr->sa_data, *cplim;
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	/*
 	 * AF_LINK addresses can be looked up directly by their index number,
 	 * so do that if we can.
@@ -2190,7 +2191,7 @@ ifaof_ifpforaddr(const struct sockaddr *addr, struct ifnet *ifp)
 	if (af >= AF_MAX)
 		return (NULL);
 
-	MPASS(in_epoch(net_epoch_preempt));
+	NET_EPOCH_ASSERT();
 	CK_STAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
 		if (ifa->ifa_addr->sa_family != af)
 			continue;
@@ -4014,7 +4015,7 @@ if_freemulti(struct ifmultiaddr *ifma)
 	KASSERT(ifma->ifma_refcount == 0, ("if_freemulti_epoch: refcount %d",
 	    ifma->ifma_refcount));
 
-	epoch_call(net_epoch_preempt, &ifma->ifma_epoch_ctx, if_destroymulti);
+	NET_EPOCH_CALL(if_destroymulti, &ifma->ifma_epoch_ctx);
 }
 
 

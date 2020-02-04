@@ -72,6 +72,13 @@ struct sigframe {
 	ucontext_t	sf_uc;	/* actual saved ucontext */
 };
 
+#ifdef COMPAT_FREEBSD64
+struct sigframe64 {
+	struct siginfo64 sf_si;	/* actual saved siginfo */
+	ucontext64_t	sf_uc;	/* actual saved ucontext */
+};
+#endif
+
 #endif /* !LOCORE */
 
 /* Definitions for syscalls */

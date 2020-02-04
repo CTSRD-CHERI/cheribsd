@@ -36,7 +36,6 @@
 
 #include <sys/types.h>
 
-#include <machine/cherireg.h>
 #include <machine/cpuregs.h>
 #include <machine/sysarch.h>
 

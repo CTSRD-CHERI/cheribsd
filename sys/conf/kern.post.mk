@@ -231,10 +231,9 @@ kernel-clean:
 # This is a hack.  BFD "optimizes" away dynamic mode if there are no
 # dynamic references.  We could probably do a '-Bforcedynamic' mode like
 # in the a.out ld.  For now, this works.
-HACK_EXTRA_FLAGS?= -shared
 hack.pico: Makefile
 	:> hack.c
-	${CC} ${CFLAGS:N-flto:N-fno-common} ${HACK_EXTRA_FLAGS} -nostdlib hack.c -o hack.pico
+	${CC} -shared ${CFLAGS} -nostdlib hack.c -o hack.pico
 	rm -f hack.c
 
 offset.inc: $S/kern/genoffset.sh genoffset.o
@@ -394,7 +393,8 @@ kernel-cleandepend: .PHONY
 	rm -f .depend .depend.* ${_ILINKS}
 
 kernel-tags:
-	@[ -f .depend ] || { echo "you must make depend first"; exit 1; }
+	@ls .depend.* > /dev/null 2>&1 || \
+	    { echo "you must make depend first"; exit 1; }
 	sh $S/conf/systags.sh
 
 kernel-install: .PHONY
